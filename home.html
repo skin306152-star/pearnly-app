@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11841111">
+<link rel="stylesheet" href="/static/home.css?v=11841112">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -4794,18 +4794,8 @@
                     </div>
                 </div>
 
-                <!-- 结果区(跑完显示) -->
-                <div class="vex-result" id="vex-result" style="display:none">
-                    <div class="vex-result-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M8 12l3 3 5-5"/>
-                        </svg>
-                    </div>
-                    <div class="vex-result-body">
-                        <div class="vex-result-title" data-i18n="vex-result-title">✓ 对账完成</div>
-                        <div class="vex-result-sub" id="vex-result-sub"></div>
-                    </div>
+                <!-- 下载行(对账完成后显示) -->
+                <div id="vex-dl-bar" style="display:none;margin-top:14px;justify-content:flex-end">
                     <a class="btn btn-primary" id="vex-download" href="#" download>
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M8 2v9M4 7l4 4 4-4M3 14h10"/>
@@ -6246,9 +6236,9 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11841111"></script>
+<script src="/static/home.js?v=11841112"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
-<script src="/static/version-banner.js?v=11841111" defer></script>
+<script src="/static/version-banner.js?v=11841112" defer></script>
 
 </body>
 </html>

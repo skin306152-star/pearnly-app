@@ -2005,8 +2005,6 @@ const I18N = {
         'vex-progress-running':    '对账中…',
         'vex-progress-sub':        '{a} 张发票 · {b} 份报告',
         'vex-progress-elapsed':    '对账中… {a} 张发票 · {b} 份报告 · {s} 秒',
-        'vex-result-title':        '✓ 对账完成',
-        'vex-result-sub':          '{a} 张 vs {r} 行 · 用时 {s} 秒',
         'vex-need-both':           '至少 1 张发票 + 1 份 VAT 报告',
         'vex-ready':               '已就绪 · {a} 张发票 · {b} 份报告',
         'vex-no-files':            '还没文件',
@@ -4317,8 +4315,6 @@ const I18N = {
         'vex-progress-running':    'Reconciling…',
         'vex-progress-sub':        '{a} invoices · {b} report(s)',
         'vex-progress-elapsed':    'Reconciling… {a} invoices · {b} report(s) · {s}s',
-        'vex-result-title':        '✓ Reconciliation Complete',
-        'vex-result-sub':          '{a} invoices vs {r} rows · {s}s',
         'vex-need-both':           'Need at least 1 invoice + 1 VAT report',
         'vex-ready':               'Ready · {a} invoices · {b} reports',
         'vex-no-files':            'No files yet',
@@ -6630,8 +6626,6 @@ const I18N = {
         'vex-progress-running':    'กำลังกระทบยอด…',
         'vex-progress-sub':        '{a} ใบกำกับ · {b} ไฟล์รายงาน',
         'vex-progress-elapsed':    'กระทบยอด… {a} ใบ · {b} ไฟล์รายงาน · {s} วิ',
-        'vex-result-title':        '✓ กระทบยอดเสร็จสิ้น',
-        'vex-result-sub':          '{a} ใบ vs {r} แถว · {s} วินาที',
         'vex-need-both':           'ต้องมีอย่างน้อย 1 ใบกำกับ + 1 รายงาน',
         'vex-ready':               'พร้อม · ใบกำกับ {a} · รายงาน {b}',
         'vex-no-files':            'ยังไม่มีไฟล์',
@@ -8936,8 +8930,6 @@ const I18N = {
         'vex-progress-running':    '照合中…',
         'vex-progress-sub':        '請求書 {a} · レポート {b} 件',
         'vex-progress-elapsed':    '照合中… 請求書 {a} · レポート {b} 件 · {s} 秒',
-        'vex-result-title':        '✓ 照合完了',
-        'vex-result-sub':          '請求書 {a} vs {r} 行 · {s} 秒',
         'vex-need-both':           '請求書 1 件 + VAT レポート 1 件以上必要',
         'vex-ready':               '準備完了 · 請求書 {a} · レポート {b}',
         'vex-no-files':            'まだファイルなし',
@@ -29884,7 +29876,9 @@ window.addEventListener('DOMContentLoaded', () => {
         _running = true;
         $('vex-build').disabled = true;
         $('vex-progress').style.display = 'flex';
-        $('vex-result').style.display   = 'none';
+        var _dlBarHide = document.getElementById('vex-dl-bar');
+        if (_dlBarHide) _dlBarHide.style.display = 'none';
+        ['vex-summary-collapse','vex-detail-collapse'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
         const startAt = Date.now();
         $('vex-progress-title').textContent = t('vex-progress-running') || 'AI 抽取中';
         $('vex-progress-sub').textContent =
@@ -29939,12 +29933,9 @@ window.addEventListener('DOMContentLoaded', () => {
             } catch (e) {}
 
             $('vex-progress').style.display = 'none';
-            $('vex-result').style.display = 'flex';
-            const _sEl = $('vex-result-sub');
-            const _p = { a: ok, r: rows, s: (ms / 1000).toFixed(1) };
-            _sEl._lastParams = _p;
-            _sEl.textContent = (t('vex-result-sub') || '{a} vs {r} rows · {s}s')
-                .replace('{a}', _p.a).replace('{r}', _p.r).replace('{s}', _p.s);
+            var _dlBar = document.getElementById('vex-dl-bar');
+            if (_dlBar) _dlBar.style.display = 'flex';
+            if (window._onVexResultShown) window._onVexResultShown();
 
             if (fail > 0) {
                 showToast((t('vex-toast-some-fail') || '有 {n} 张发票 OCR 失败').replace('{n}', fail), 'warn');
@@ -29970,7 +29961,8 @@ window.addEventListener('DOMContentLoaded', () => {
     function _reset() {
         _invoiceFiles = [];
         _reportFiles = [];
-        $('vex-result').style.display = 'none';
+        var _dlBar = document.getElementById('vex-dl-bar');
+        if (_dlBar) _dlBar.style.display = 'none';
         _renderFiles();
     }
 
@@ -30018,13 +30010,6 @@ window.addEventListener('DOMContentLoaded', () => {
             if (v) el.textContent = v;
         });
         _renderFiles();
-        // 切语言时重渲已展示的结果文字
-        const sub = document.getElementById('vex-result-sub');
-        if (sub && sub._lastParams) {
-            const p = sub._lastParams;
-            sub.textContent = (t('vex-result-sub') || '{a} vs {r} rows · {s}s')
-                .replace('{a}', p.a).replace('{r}', p.r).replace('{s}', p.s);
-        }
         // 切语言时重渲任务列表 tbody(状态/客户列用 t() 渲染需刷新)
         _loadVexTaskList();
     }
@@ -31379,22 +31364,13 @@ window.addEventListener('DOMContentLoaded', () => {
         _fillVexSummary();
         _fillVexDetail();
     }
-    // 监听 vex-result 显示状态 · 一旦显示 → 把折叠区也露出来
-    function _watchVexResult() {
-        var r = document.getElementById('vex-result');
-        if (!r) return;
-        var mo = new MutationObserver(function () {
-            if (r.style.display && r.style.display !== 'none') _onVexResultShown();
-        });
-        mo.observe(r, { attributes: true, attributeFilter: ['style'] });
-    }
 
-    window._fillVexSummary = _fillVexSummary;
-    window._fillVexDetail  = _fillVexDetail;
+    window._fillVexSummary    = _fillVexSummary;
+    window._fillVexDetail     = _fillVexDetail;
+    window._onVexResultShown  = _onVexResultShown;
 
     document.addEventListener('DOMContentLoaded', function () {
         _initGlvTogglePreview();
-        _watchVexResult();
     });
     // 二次重试 · 防止 DOM 还没加载
     setTimeout(_initGlvTogglePreview, 1500);

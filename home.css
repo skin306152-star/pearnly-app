@@ -14532,16 +14532,6 @@ body.settings-modal-open { overflow: hidden; }
 .vex-progress-title { font-size: 14px; font-weight: 600; color: #111827; }
 .vex-progress-sub   { font-size: 12px; color: #6B7280; margin-top: 4px; }
 
-.vex-result {
-    margin-top: 16px; padding: 18px 20px;
-    background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 12px;
-    display: flex; align-items: center; gap: 14px;
-}
-.vex-result-icon { width: 28px; height: 28px; color: #15803D; flex-shrink: 0; }
-.vex-result-icon svg { width: 28px; height: 28px; }
-.vex-result-body { flex: 1; }
-.vex-result-title { font-size: 14px; font-weight: 600; color: #064E3B; }
-.vex-result-sub   { font-size: 12px; color: #047857; margin-top: 4px; }
 
 /* ─ 手机端降级(铁律 · @media max-width:800px) ─ */
 @media (max-width: 800px) {
@@ -14559,8 +14549,7 @@ body.settings-modal-open { overflow: hidden; }
     .vex-files-row { grid-template-columns: 1fr; }
     .vex-action-bar { flex-wrap: wrap; gap: 10px; }
     .vex-action-info { flex: 1 1 100%; order: -1; text-align: center; }
-    .vex-result { flex-wrap: wrap; }
-    .vex-result-body { flex: 1 1 100%; }
+
 }
 
 /* ── v118.32.4.10.7 · VEX KPI 3 卡统一视觉 ── */

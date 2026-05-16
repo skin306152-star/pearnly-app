@@ -14452,7 +14452,7 @@ body.settings-modal-open { overflow: hidden; }
 }
 .vex-action-info { flex: 1; font-size: 12.5px; }
 .vex-action-info.muted { color: #9CA3AF; }
-.vex-action-info.ok    { color: #15803D; }
+.vex-action-info.ok    { color: var(--success, #16a34a); }
 
 /* v4.10.11 · 查看清单切换按钮 */
 .vex-toggle-preview-btn {
@@ -14465,8 +14465,8 @@ body.settings-modal-open { overflow: hidden; }
 
 /* v4.10.11 · 上传清单预览面板 */
 .vex-preview-panel {
-    border: 0.5px solid #E5E7EB; border-radius: 12px;
-    background: #FFFFFF; padding: 14px 18px; margin-top: 8px;
+    border: 1px solid var(--line, #e8e8e3); border-radius: 12px;
+    background: var(--bg, #f4f4f0); padding: 14px 18px; margin-top: 8px;
 }
 /* v118.32.5.5.24 · 列宽 1:1 + gap 60px · 跟上传区 .vex-drops (1fr 60px 1fr) 视觉对齐 */
 .vex-pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
@@ -14479,23 +14479,23 @@ body.settings-modal-open { overflow: hidden; }
 .vex-pp-search-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .vex-pp-search {
     flex: 1; height: 30px; font-size: 12px; padding: 0 10px;
-    border: 0.5px solid #E5E7EB; border-radius: 6px;
-    outline: none; color: #111827; background: #fff;
+    border: 0.5px solid var(--line, #e8e8e3); border-radius: 6px;
+    outline: none; color: #111827; background: var(--card, #fff);
 }
 .vex-pp-search:focus { border-color: #111111; }
 .vex-pp-clear-btn {
     height: 30px; padding: 0 10px; font-size: 12px;
-    background: transparent; border: 0.5px solid #E5E7EB;
+    background: transparent; border: 0.5px solid var(--line, #e8e8e3);
     border-radius: 6px; color: #6B7280; cursor: pointer; flex-shrink: 0;
 }
 .vex-pp-clear-btn:hover { color: #DC2626; border-color: #FCA5A5; }
 .vex-pp-file-list {
-    border: 0.5px solid #E5E7EB; border-radius: 8px;
-    max-height: 220px; overflow-y: auto;
+    border: 0.5px solid var(--line, #e8e8e3); border-radius: 8px;
+    max-height: 220px; overflow-y: auto; background: var(--card, #fff);
 }
 .vex-pp-file-row {
     display: flex; align-items: center;
-    padding: 8px 12px; border-bottom: 0.5px solid #E5E7EB; font-size: 12px;
+    padding: 8px 12px; border-bottom: 0.5px solid var(--line, #e8e8e3); font-size: 12px;
 }
 .vex-pp-file-row:last-child { border-bottom: 0; }
 .vex-pp-fi-icon { flex-shrink: 0; margin-right: 8px; display: block; }
@@ -14516,7 +14516,7 @@ body.settings-modal-open { overflow: hidden; }
 .vex-pp-fi-del:hover { color: #DC2626; }
 .vex-pp-pagination { text-align: center; padding: 6px 8px; font-size: 11px; color: #9CA3AF; }
 .vex-pp-guide {
-    margin-top: 14px; padding: 10px 12px; background: #DBEAFE;
+    margin-top: 14px; padding: 10px 12px; background: var(--line-soft, #f0f0eb);
     border-radius: 8px; display: flex; align-items: center;
     gap: 8px; font-size: 12px; color: #111111;
 }

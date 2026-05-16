@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11841112">
+<link rel="stylesheet" href="/static/home.css?v=11841113">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -5085,8 +5085,23 @@
 
             <!-- 结果区(默认隐藏) -->
             <div id="glv-result" style="display:none;">
+                <!-- 对账汇总 · 可折叠分区（默认收起） -->
+                <div class="glv-section" id="glv-section-summary" data-collapsed="true">
+                    <div class="glv-section-head" data-toggle="glv-section-summary" tabindex="0" role="button">
+                        <svg class="glv-section-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="5 7 8 10 11 7"/>
+                        </svg>
+                        <span class="glv-section-title" data-i18n="glv-summary-title">对账汇总</span>
+                    </div>
+                    <div class="glv-section-body">
+                        <table class="glv-summary-table" id="glv-summary-table">
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- 差异明细 · 可折叠分区（默认收起） -->
-                <div class="glv-section" id="glv-section-detail" data-collapsed="true">
+                <div class="glv-section" id="glv-section-detail" data-collapsed="true" style="margin-top:14px;">
                     <div class="glv-section-head" data-toggle="glv-section-detail" tabindex="0" role="button">
                         <svg class="glv-section-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="5 7 8 10 11 7"/>
@@ -5118,21 +5133,6 @@
                                 <tbody id="glv-tbody"></tbody>
                             </table>
                         </div>
-                    </div>
-                </div>
-
-                <!-- 对账汇总 · 可折叠分区（默认收起） -->
-                <div class="glv-section" id="glv-section-summary" data-collapsed="true" style="margin-top:14px;">
-                    <div class="glv-section-head" data-toggle="glv-section-summary" tabindex="0" role="button">
-                        <svg class="glv-section-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="5 7 8 10 11 7"/>
-                        </svg>
-                        <span class="glv-section-title" data-i18n="glv-summary-title">对账汇总</span>
-                    </div>
-                    <div class="glv-section-body">
-                        <table class="glv-summary-table" id="glv-summary-table">
-                            <tbody></tbody>
-                        </table>
                     </div>
                 </div>
             </div><!-- /glv-result -->
@@ -6236,9 +6236,9 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11841112"></script>
+<script src="/static/home.js?v=11841113"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
-<script src="/static/version-banner.js?v=11841112" defer></script>
+<script src="/static/version-banner.js?v=11841113" defer></script>
 
 </body>
 </html>

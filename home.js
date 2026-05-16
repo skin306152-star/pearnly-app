@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // v118.28.1.0 · 测试中心 · 全局错误拦截器(必须最早执行 · 才能拦到所有错误)
 // ============================================================
 (function () {
@@ -178,6 +178,31 @@ const I18N = {
         'btn-logout': '退出',
         // v118.27.3 · 左下角用户菜单 + 帮助反馈
         'user-menu-settings': '系统设置', 'user-menu-help': '帮助反馈', 'user-menu-logout': '退出登录',
+        // NAV-IA Phase 1 · 顶栏三件套(2026-05-15)
+        'avatar-menu-settings': '设置',
+        'avatar-menu-team': '团队成员',
+        'avatar-menu-billing': '订阅 & 套餐',
+        'avatar-menu-shortcuts': '键盘快捷键',
+        'avatar-menu-admin': '管理员后台',
+        'avatar-menu-test': '测试中心',
+        'avatar-menu-help': '帮助 & 反馈',
+        'avatar-menu-logout': '退出登录',
+        'avatar-menu-badge-admin': '超管',
+        // v118.44.0 NAV-IA Phase 8 · admin layout 独立 SPA
+        'adm-banner-msg': 'Pearnly 平台后台 · 仅超管可见 · 与日常用户视图隔离',
+        'adm-banner-title': '平台超管',
+        'adm-sidebar-section': '超管功能',
+        'adm-sidebar-cost': '成本追踪',
+        'adm-sidebar-users': '用户管理',
+        'adm-back-to-home': '返回普通视图',
+        'topbar-search-ph': '搜索发票 · 客户 · 跳转...',
+        'cmdk-input-ph': '跳转到页面 / 搜索发票号 / 客户名...',
+        'cmdk-section-jump': '跳转',
+        'cmdk-section-actions': '操作',
+        'cmdk-empty': '没找到匹配项',
+        'cmdk-foot-move': '移动',
+        'cmdk-foot-select': '选择',
+        'cmdk-foot-close': '关闭',
         'help-modal-title': '帮助反馈', 'help-modal-tip': '遇到问题或有产品建议?通过以下方式联系我们 · 通常 24 小时内回复',
         'contact-email-label': '邮箱', 'contact-phone-label': '电话', 'contact-line-label': 'LINE 客服',
         // v118.27.4 · 设置页 4 大类标题
@@ -220,9 +245,54 @@ const I18N = {
         'ob-fb-saved-local': '资料已暂存 · 上传时遇到问题',
         'nav-group-main': '主要',
         'nav-group-tools': '工具',
-        'nav-dashboard': '仪表盘',
-        'nav-ocr': '上传识别',
-        'nav-history': '单据记录',
+        'nav-dashboard': '首页',
+        'dash-title': '首页',
+        'dash-sub': '今日工作概况',
+        'dash-kpi-month-invoices': '本月发票',
+        'dash-kpi-month-invoices-sub': '张已识别',
+        'dash-kpi-pending': '待处理',
+        'dash-kpi-pending-sub': '条待审核',
+        'dash-kpi-exceptions': '异常',
+        'dash-kpi-exceptions-sub': '需立即处理',
+        'dash-kpi-plan': '配额',
+        'dash-kpi-plan-sub': '本月用量',
+        'dash-quick-title': '快速操作',
+        'dash-quick-sub': '3 步进入主流程',
+        'dash-quick-upload': '上传发票',
+        'dash-quick-clients': '查看客户',
+        'dash-quick-reconcile': '开始对账',
+        'dash-quick-exceptions': '处理异常',
+        'dash-recent-title': '最近动态',
+        'dash-recent-sub': '最近 5 条识别',
+        'dash-recent-empty': '还没有识别记录 · 去上传第一张吧',
+        'glv-preview-title': '查看清单',
+        'recon-preview-empty-vat': '尚未选择 VAT 报告',
+        'recon-preview-empty-gl': '尚未选择 GL 文件',
+        'vex-summary-title': '对账汇总',
+        'vex-detail-title': '差异明细',
+        'vex-sum-total': '总笔数',
+        'vex-sum-matched': '完全一致',
+        'vex-sum-diff': '数据差异',
+        'vex-sum-incomplete': 'OCR 漏识别',
+        'vex-sum-cash': '散客无发票',
+        'vex-detail-empty': '本次对账未发现差异',
+        'vex-detail-h-inv': '发票号',
+        'vex-detail-h-field': '差异字段',
+        'vex-detail-h-rep': '报告侧',
+        'vex-detail-h-inv-side': '发票侧',
+        'vex-detail-h-kind': '类型',
+        'recon-batch-selected': '已选 0 条',
+        'recon-batch-selected-n': '已选 {n} 条',
+        'recon-batch-clear': '取消选中',
+        'recon-batch-delete': '批量删除',
+        'recon-batch-delete-title': '批量删除',
+        'recon-batch-delete-confirm': '确定删除选中的 {n} 条对账任务?此操作不可恢复',
+        'recon-batch-delete-ok': '已删除 {n} 条',
+        'recon-batch-delete-fail': '批量删除失败 · 请重试',
+        'nav-group-sales': '销项管理',
+        'nav-group-expense': '进项管理',
+        'nav-ocr': '上传发票',
+        'nav-history': '发票记录',
         'ocr-title': '上传识别',
         'ocr-sub': '把票据一拍 · 数据自动进 Excel 和 ERP',
         'nav-automation': '自动化',
@@ -319,8 +389,8 @@ const I18N = {
         'cost-today': '今日花费',
         'cost-month': '本月花费',
         'cost-total': '累计花费',
-        'cost-engines': '引擎占比(本月)',
-        'cost-engines-sub': '主备引擎使用情况',
+        'cost-engines': '引擎明细(本月)',
+        'cost-engines-sub': '花费 · 次数 · 平均/次',
         'cost-trend-title': '最近 30 天趋势',
         'cost-refresh': '刷新',
         'cost-export': '导出 CSV',
@@ -368,6 +438,10 @@ const I18N = {
         'billing-msg-saved': '✅ 余额已更新 · 校准系数已重算',
         'billing-msg-fail': '保存失败',
         'billing-msg-balance-required': '请输入真实余额',
+        'adm-billing-calib-label': '校准系数(选填)',
+        'adm-billing-calib-ph': '留空 = 自动计算',
+        'adm-billing-calib-hint': '0.5 ~ 2.0 · 留空推荐',
+        'adm-billing-calib-invalid': '校准系数须在 0.5 ~ 2.0 之间',
         'cost-never-used': '从未',
         // v22 · admin
         // v22 · 管理后台
@@ -533,6 +607,7 @@ const I18N = {
         'history-source-email': '邮件抓取',
         'history-source-folder': '文件夹监听',
         'history-source-api': 'API 推送',
+        'history-smart-assigned': '智能归属',
         'history-empty-title': '还没有记录',
         'history-empty-desc': '识别的发票会自动出现在这里',
         'history-pager': '显示 {from}–{to} / 共 {total} 条',
@@ -861,7 +936,6 @@ const I18N = {
         'ep-adapter': '适配器类型',
         'ep-adapter-webhook': '自定义 Webhook',
         'ep-adapter-webhook-desc': 'HTTP POST 到任意 URL · 最通用',
-        'ep-adapter-mrerp-desc': '一键对接你的 Mr.ERP · 零配置',
         'ep-adapter-flow-desc': '泰国本地会计 SaaS',
         'tag-soon': '即将上线',
         'ep-name': '端点名称',
@@ -907,6 +981,10 @@ const I18N = {
         'erp-push-ok': '已推送到 {name}',
         'erp-push-fail': '推送失败:{err}',
         'erp-push-no-endpoint': '请先在「自动化」里配置 ERP 端点',
+        'log-push-rows': '成功推入 {n} 行明细',
+        'erp-pushed-badge': '已推送',
+        'erp-push-again-confirm': '该发票已成功推送到 ERP，确认再次推送？重复推送可能导致账目重复。',
+        'erp-push-again-ok': '确认再推',
         'rd-btn-verify': '校验',
         'rd-btn-sync': '同步',
         'rd-verifying': '校验中...',
@@ -1033,6 +1111,7 @@ const I18N = {
         'file-list-collapse': '收起',
         'alert-session': '会话已过期,请重新登录',
         'alert-password-changed-relogin': '密码已变更 · 请重新登录',
+        'alert-session-revoked': '您的账号已在其他设备登录 · 当前设备已下线',
         'admin-banner-msg': '超管视图 · 你正在以 Pearnly 平台管理员身份操作 · 所有动作都会留下审计日志',
         'toast-export-success': '✓ Excel 导出成功',
         'toast-export-error': '导出失败',
@@ -1189,9 +1268,6 @@ const I18N = {
         'field-sep': '分隔符',
         'log-detail-summary-ok': '推送成功',
         'log-detail-summary-fail': '推送失败',
-        'log-detail-mrerp-debug-tip': '推送失败 · 下载这次生成的 xlsx 给 Korn 看 · 让他在 mrerp4sme 后台手动上传定位字段错',
-        'log-detail-mrerp-hint-title': 'MR.ERP 服务端的提示(关键诊断证据 · 直接告诉我们字段错在哪)',
-        'log-detail-mrerp-debug-download': '下载这次的 xlsx',
         'log-detail-to-ep': '已发送到',
         'log-detail-request-human': '发给 ERP 的数据',
         'log-detail-response-human': 'ERP 返回的结果',
@@ -1722,10 +1798,33 @@ const I18N = {
         'nav-group-data': '数据处理',
         'nav-group-automation': '自动化管道',
         'nav-group-system': '系统设置',
-        'nav-exceptions': '异常栏',
+        'nav-exceptions': '异常',
         'nav-clients': '客户',
         'nav-vouchers': '凭证中心',
         'nav-receivables': '应收追踪',
+        // v118.33.3 NAV-IA Phase 3
+        'sidebar-cta-upload': '上传发票',
+        'nav-integrations': '集成',
+        'integrations-title': '集成',
+        'integrations-sub': 'Google · LINE · 邮箱 · ERP · 文件夹 · 云盘 等第三方授权 · 让 Pearnly 自动同步数据',
+        // v118.33.7 NAV-IA Phase 7
+        'integrations-section-google': 'GOOGLE 服务',
+        'integrations-section-channels': '收票渠道',
+        'integrations-section-erp': 'ERP 系统',
+        'integrations-google-info': '授权一次 Google 账号 · Drive 和 Sheets 均可使用 · 无需重复授权',
+        'int-name-drive': 'Google Drive',
+        'int-name-sheets': 'Google Sheets',
+        'int-name-gmail': 'Gmail 抓取',
+        'int-name-line': 'LINE Bot',
+        'int-name-folder': '文件夹监听',
+        'int-name-erp': 'ERP 对接',
+        'int-desc-drive': '发票/PV 审核后自动存入 Drive · 按客户和月份归档',
+        'int-desc-sheets': '识别结果实时同步到 Sheets · 老板/会计师在线查看',
+        'int-desc-gmail': '客户发来邮件附件自动抓 · 不用手动转发',
+        'int-desc-line': '外勤拍照发 LINE · 自动入账 · 单聊群聊都支持',
+        'int-desc-folder': '指定本地/共享文件夹 · 扔进去就自动识别',
+        'int-desc-erp': 'Xero · MR.ERP · Webhook 等 · 识别完自动推到 ERP',
+        'btn-configure': '配置',
         // v109.4 · 销售发票模块(v110.1)
         'nav-sales-invoices': '销售发票',
         'cs-sales-invoices-title': '销售发票',
@@ -1740,6 +1839,10 @@ const I18N = {
         'reconcile-sub': '银行流水自动 vs 系统发票匹配 · 月底关账从 3 小时压到 30 分钟',
         'reconcile-center-title': '对账中心',
         'reconcile-center-sub':   '选择对账类型',
+        'rc-page-title': '对账中心',
+        'rc-page-sub':   '核对账目 · 找出差异 · 关账更快',
+        'rc-bank-sub':   '银行流水自动 vs 系统发票匹配 · 月底关账从 3 小时压到 30 分钟',
+        'bank-empty-hint': '还没有对账记录 · 上传一份对账单开始',
         'reconcile-pending': '待对账',
         'reconcile-matched': '已完成',
         'reconcile-unmatched': '未匹配',
@@ -1805,7 +1908,41 @@ const I18N = {
         'reconcile-dev-seed-fail': '生成测试数据失败',
         // v118.32.0 · 销项税对账 · 屏 A
         'recon-tab-bank':     '银行对账',
-        'recon-tab-sale-vat': '销项税对账',
+        // v118.32.5 · 标签按 Thai 客户要求重命名 + 同步其它语言
+        'recon-tab-sale-vat': '销项税报告核查',
+        'recon-tab-gl-vat':   '收入对账',
+        'glv-sub':            '总账（GL）vs 销项税报告 · 上传两份文件一键比对',
+        'glv-up-vat-title':   '① 销项税报告',
+        'glv-up-vat-sub':     '支持 Excel / PDF / 图片',
+        'glv-up-gl-title':    '② 总账 GL',
+        'glv-up-gl-sub':      '支持 Excel / PDF',
+        'glv-acct-prefix':    '收入科目前缀',
+        'glv-btn-run':        '开始对账',
+        'glv-btn-export':     '导出 Excel',
+        'glv-kpi-matched':    '完全匹配',
+        'glv-kpi-diff':       '有差异',
+        'glv-kpi-unmatched':  'GL 未找到',
+        'glv-detail-title':   '差异明细',
+        'glv-summary-title':  '对账汇总',
+        'glv-h-doc':          '单据号',
+        'glv-h-date':         '日期',
+        'glv-h-customer':     '客户',
+        'glv-h-vat':          'VAT 金额',
+        'glv-h-gl':           'GL 金额',
+        'glv-h-diff':         '差异',
+        'glv-h-acct':         '收入科目',
+        'glv-running':        '对账中…',
+        'glv-hint-need-both': '请上传两份文件',
+        'glv-history-title':  '近期对账',
+        'glv-history-refresh':'刷新',
+        'glv-history-empty':  '暂无对账记录',
+        'glv-hist-time':      '时间',
+        'glv-hist-files':     '文件',
+        'glv-hist-rows':      '行数 (VAT/GL)',
+        'glv-hist-matched':   '匹配',
+        'glv-hist-diff':      '差异',
+        'glv-hist-missing':   '缺失',
+        'glv-hist-actions':   '操作',
         'sv-title':           '销项税对账',
         'sv-sub':             '发票 vs VAT 报告逐行核对 · 只看差异行 · 月底关账从 4 小时压到 30 分钟',
         'sv-sub-merged':      '上传发票和 VAT 报告 · 自动核对',
@@ -1825,10 +1962,33 @@ const I18N = {
         'vex-col-elapsed':     '用时',
         'vex-col-actions':     '操作',
         'vex-detail-soon':     '任务详情即将上线',
+        'vex-recent-show-limited':  '显示最近 5 条 · 共 {n} 条',
+        'vex-recent-show-all':      '查看全部 {n} 条',
+        'vex-recent-collapse':      '收起',
+        'vex-toggle-preview-open':  '查看清单',
+        'vex-toggle-preview-close': '收起清单',
+        'vex-preview-invoice':      '销售发票',
+        'vex-preview-report':       'VAT 报告',
+        'vex-preview-search':       '搜索文件名...',
+        'vex-preview-clear-all':    '全清',
+        'vex-preview-count':        '显示前 {n} / 共 {m}',
+        'vex-preview-guide-search': '文件多(800+ 张)时用搜索框过滤 · 滚动到底自动加载',
+        'vex-task-delete-confirm-title': '删除对账任务?',
+        'vex-task-delete-confirm-body':  '同时清掉对应的发票识别缓存 · 不可恢复',
+        'vex-task-delete-ok':   '已删除',
+        'vex-task-delete-fail': '删除失败',
+        'vex-clear-old-btn':     '清 7 天前任务',
+        'vex-clear-old-confirm': '确定清除 7 天前的对账任务?此操作不可撤销',
+        'vex-clear-old-success': '已清除 {n} 条任务',
+        'vex-main-action-tag':  '主操作',
         'vex-status-pending':  '待处理',
         'vex-status-running':  '处理中',
         'vex-status-done':     '已完成',
         'vex-status-failed':   '失败',
+        'vex-toast-expired':   '数据已过期 · 请重新对账',
+        'vex-toast-dl-fail':   '下载失败 · 请重试',
+        'vex-client-all':      '全部客户',
+        'vex-new-recon-title': '新建对账',
         // v118.32.4.9.5 · Excel 公式对账内测
         'vex-mode-standard':       '标准对账',
         'vex-mode-excel':          'Excel 公式对账',
@@ -1843,8 +2003,8 @@ const I18N = {
         'vex-btn-build':           '开始对账',
         'vex-btn-download':        '↓ 下载对账表',
         'vex-progress-running':    '对账中…',
-        'vex-progress-sub':        '{a} 张发票 vs {b} 行报告',
-        'vex-progress-elapsed':    '对账中… {a} 张发票 vs {b} 行报告 · {s} 秒',
+        'vex-progress-sub':        '{a} 张发票 · {b} 份报告',
+        'vex-progress-elapsed':    '对账中… {a} 张发票 · {b} 份报告 · {s} 秒',
         'vex-result-title':        '✓ 对账完成',
         'vex-result-sub':          '{a} 张 vs {r} 行 · 用时 {s} 秒',
         'vex-need-both':           '至少 1 张发票 + 1 份 VAT 报告',
@@ -2188,22 +2348,6 @@ const I18N = {
         'confirm-default-title': '请确认',
         'confirm-ok': '确定',
         'confirm-cancel': '取消',
-        // v118.27.1 · MR.ERP 适配器
-        'mrerp-btn': '下载 MR.ERP .xlsx',
-        'mrerp-btn-tip': '生成符合 MR.ERP 格式的 Excel · 在 MR.ERP 网站手动导入',
-        'mrerp-btn-disabled-no-map': '先去「自动化 → ERP 对接 → 字段映射」配 MR.ERP 客户编号',
-        'mrerp-btn-disabled-exc': '先解决异常栏的红色字段',
-        'mrerp-toast-ok': '已生成 .xlsx · 请在 MR.ERP 手动导入',
-        'mrerp-toast-fail': '生成失败:{err}',
-        'mrerp-err-no_client_mapping': '该客户还没配 MR.ERP 编号',
-        'mrerp-err-no_invoice_no': '发票号缺失',
-        'mrerp-err-no_invoice_date': '发票日期缺失',
-        'mrerp-err-no_total_amount': '金额缺失或为 0',
-        'mrerp-err-no_customer_mapping': '该客户在 MR.ERP 的编号未配置',
-        'mrerp-err-exception_unresolved': '异常未放行',
-        'mrerp-err-sheet_kind_stub_wait_material': '该单据类型样本未到 · 暂未开放',
-        'mrerp-err-module_missing': '后端模块缺失',
-        'mrerp-err-history_not_found': '记录不存在',
         // v118.27.5 · 抽屉统一推送按钮
         'unified-push-to': '推送到 {name}',
         'unified-push-tip': '推到默认连接器(单击)· 点 ▼ 选其他',
@@ -2216,7 +2360,6 @@ const I18N = {
         'unified-push-disabled-exc': '先解决异常栏的红色字段',
         'unified-push-ok': '已推送到 {name}',
         'unified-push-fail': '{name} 推送失败:{err}',
-        'unified-push-mrerp-ok': '已生成 .xlsx · 请在 MR.ERP 手动导入',
         'unified-push-go-config': '去配置',
         // v118.27.4 · Xero 适配器
         'xero-card-title': 'Xero',
@@ -2250,50 +2393,6 @@ const I18N = {
         'xero-err-module_missing': '后端模块缺失',
         'xero-toast-redirected-ok': 'Xero 已连接 · 共 {n} 个 organisation',
         'xero-toast-redirected-err': 'Xero 连接失败 · 请重试',
-        'mrerp-btn-disabled-no-map': '先去「自动化 → ERP 对接 → 字段映射」配 MR.ERP 客户编号',
-        'mrerp-btn-disabled-exc': '先解决异常栏的红色字段',
-        'mrerp-toast-ok': '已生成 .xlsx · 请在 MR.ERP 手动导入',
-        'mrerp-toast-fail': '生成失败:{err}',
-        'mrerp-err-no_client_mapping': '该客户还没配 MR.ERP 编号',
-        'mrerp-err-no_invoice_no': '发票号缺失',
-        'mrerp-err-no_invoice_date': '发票日期缺失',
-        'mrerp-err-no_total_amount': '金额缺失或为 0',
-        'mrerp-err-no_customer_mapping': '该客户在 MR.ERP 的编号未配置',
-        'mrerp-err-exception_unresolved': '异常未放行',
-        'mrerp-err-sheet_kind_stub_wait_material': '该单据类型样本未到 · 暂未开放',
-        'mrerp-err-module_missing': '后端模块缺失',
-        'mrerp-err-history_not_found': '记录不存在',
-        // v27.8.1.0 · MR.ERP 后端模拟登录直推
-        'mrerp-direct-card-not-connected': '未连接 MR.ERP',
-        'mrerp-direct-card-connected': '已连接 MR.ERP',
-        'mrerp-direct-connect-btn': '添加凭据',
-        'mrerp-direct-modify-btn': '修改',
-        'mrerp-direct-remove-btn': '移除',
-        'mrerp-direct-remove-confirm': '移除后该 tenant 的 MR.ERP 直推会停 · 也支持手动 .xlsx 导入 · 确定?',
-        'mrerp-direct-meta-company': '公司:',
-        'mrerp-direct-meta-comid': '账套:',
-        'mrerp-direct-meta-last-test': '最近测试:',
-        'mrerp-direct-test-pass': '✓ 通过',
-        'mrerp-direct-test-fail': '✗ 失败',
-        'mrerp-direct-test-never': '从未测过',
-        'mrerp-direct-test-korn-btn': 'Korn 真样本测试',
-        'mrerp-direct-test-korn-tip': '用 Korn 给的真实 SC xlsx 直接走 mrerp_pusher 推一次 · 诊断是 HTTP 流程 bug 还是 xlsx 内容差异 · 不真写库',
-        'mrerp-direct-test-korn-title': 'Korn 真样本对照测试',
-        'mrerp-direct-test-korn-running': '推送中(只到预览 · 不真写库)...',
-        'mrerp-direct-test-korn-stages': '走过的阶段',
-        'mrerp-direct-test-korn-preview-rows': '预览行数',
-        'mrerp-direct-test-korn-error': '错误',
-        'mrerp-direct-test-korn-raw-html': '展开 MR.ERP 返回的原始 HTML',
-        'mrerp-direct-test-korn-close': '关闭',
-        'log-detail-mrerp-debug-fail': '下载失败:{err}',
-        // v27.8.1.3 · 自动推 toggle(三类连接器共用 i18n key)
-        'erp-auto-push-label': '识别完自动推送',
-        'erp-auto-push-on-tip': '已开 · 文件夹 / 邮件 / LINE 上传 · OCR 完成自动推到此 ERP',
-        'erp-auto-push-off-tip': '关 · 需要手动点推送',
-        'erp-auto-push-toggling': '切换中...',
-        'erp-auto-push-toggle-fail': '切换失败:{err}',
-        'erp-auto-push-toggled-on': '已开启自动推送',
-        'erp-auto-push-toggled-off': '已关闭自动推送',
         // v118.27.8.1.15 · 大批量上传 (>100 张) 进度 + 关页警告 + 一次性提示
         'big-batch-progress-init':    '准备开始批量识别...',
         'big-batch-progress-running': '正在识别 {done} / {total} · 剩余约 {min} 分钟 · 可切去做别的',
@@ -2302,146 +2401,29 @@ const I18N = {
         'big-batch-first-tip':        '本次要识别 {n} 张 · 预计 {min} 分钟 · 后台会一直跑 · 完成自动保存到「单据记录」',
         // v118.27.8.1.15 · ERP 新用户引导(首次进 ERP 对接页 + 没有任何 endpoint 时弹一次)
         'erp-onboard-title':          '让 ERP 推送变成 0 操作',
-        'erp-onboard-body':           '识别完票据后 · Pearnly 可以自动推到 MR.ERP / Xero / 自定 Webhook · 你不用点任何按钮。新建 ERP 连接时默认会开启「自动推送」· 随时可以关。',
+        'erp-onboard-body':           '识别完票据后 · Pearnly 可以自动推到 ERP / Xero / Webhook · 你不用点任何按钮。新建 ERP 连接时默认会开启「自动推送」· 随时可以关。',
         'erp-onboard-ok':             '好 · 我去新建 ERP 连接',
         'erp-onboard-later':          '稍后再说',
-        // v118.27.8.1.16 · 完美匹配零点击 + 中分快速确认 toast
-        'mrerp-auto-matched-toast':   '已自动匹配到「{name}」· 推送 MR.ERP 中...',
-        'mrerp-quick-confirm-text':   '已自动归属到「{name}」',
-        'mrerp-quick-confirm-ok':     '没问题',
-        'mrerp-quick-confirm-change': '改一下',
-        'mrerp-recommend-badge':      '推荐',
-        'mrerp-maybe-badge':          '可能',
-
-        // v118.27.8.1.17 · 商品 picker mini modal · OCR detail 行映射
-        'mrerp-prod-prep-done-toast':   '商品映射全部已配 · 推送中...',
-        'mrerp-prod-pick-not-ready':    '商品选择器未就绪 · 请刷新页面重试',
-        'mrerp-prod-flow-cancelled':    '商品映射已取消 · 推送未发出',
-        'mrerp-prod-auto-matched-toast':'已自动匹配「{ocr}」到「{name}」',
-        'mrerp-pick-prod-title':        '配 MR.ERP 商品码',
-        'mrerp-pick-prod-progress':     '第 {i} / {n} 个待配',
-        'mrerp-pick-prod-ocrlabel':     'OCR 抽到:',
-        'mrerp-pick-prod-search-ph':    '输入商品码 / 名称搜索...',
-        'mrerp-pick-prod-loading':      '加载商品主表中...',
-        'mrerp-pick-prod-empty':        '无匹配商品',
-        'mrerp-pick-prod-empty-all':    'MR.ERP 没商品数据 · 请先在 MR.ERP 添加 · 或下方手动输入编号',
-        'mrerp-pick-prod-fetch-fail':   '拉取失败:{err}',
-        'mrerp-pick-prod-manual-summary':'列表里没有想要的?手动输入编号',
-        'mrerp-pick-prod-manual-ph':    '例:P00123',
-        'mrerp-pick-prod-manual-use':   '用此编号',
-        'mrerp-pick-prod-manual-empty': '请输入编号',
-        'mrerp-pick-prod-selected-label':'已选:',
-        'mrerp-pick-prod-skip':         '跳过此商品(用占位码)',
-        'mrerp-pick-prod-cancel':       '取消整个推送',
-        'mrerp-pick-prod-save':         '保存并继续',
-        'mrerp-pick-prod-save-ok':      '商品映射已保存',
-        'mrerp-pick-prod-save-fail':    '保存映射失败 · 请重试',
         'erp-add-webhook-card': '+ 添加 Webhook',
         'erp-add-webhook-card-tip': '推到任意 URL · 例:钉钉 / 飞书 / 自建 ERP',
         'erp-webhook-card-name': 'Webhook',
-        'mrerp-cred-modal-add': '添加 MR.ERP 凭据',
-        'mrerp-cred-modal-edit': '修改 MR.ERP 凭据',
-        'mrerp-cred-fallback-hint': '不想存密码?也可以下载 .xlsx 自己导入(在 OCR 历史抽屉的推送下拉里选「下载 MR.ERP .xlsx」)',
-        'mrerp-cred-field-username': 'MR.ERP 用户名 *',
-        'mrerp-cred-field-username-ph': '例:test01',
-        'mrerp-cred-field-password': 'MR.ERP 密码 *',
-        'mrerp-cred-field-password-ph': '不会明文存 · 加密保存',
-        'mrerp-cred-field-comidyear': '公司年度',
-        'mrerp-cred-field-seldb': '数据库编号',
-        'mrerp-cred-field-company': '公司名称',
-        'mrerp-cred-field-company-ph': '例:ABC 公司 2024 年度',
-        'mrerp-cred-field-company-tag': '仅显示用',
-        'mrerp-cred-section-login': '登录信息',
-        'mrerp-cred-advanced-summary': '高级设置',
-        'mrerp-cred-advanced-tag': '— 自动选不到账套时才用',
-        'mrerp-cred-advanced-hint-text': '优先用上方「选择账套」自动获取 · 这两栏仅在 MR.ERP 服务器抓不到账套列表时手填',
-        'mrerp-cred-dbselect-section': '选择账套',
-        'mrerp-cred-dbselect-ok': '✓ 已找到 {n} 个账套 · 请选择要连接的数据库',
-        'mrerp-cred-dbselect-ok-single': '✓ 已自动选 {name}',
-        'mrerp-cred-dbselect-empty': '未抓到账套 · 请展开下方「高级设置」手填公司年度 / 数据库编号',
-        'mrerp-cred-dbselect-fail': '抓账套列表失败:{err} · 可展开「高级设置」手填',
-        'mrerp-cred-dbselect-required': '请选择 1 个账套(或在高级设置手填)',
-        'mrerp-cred-dbselect-auto-tag': '已自动选',
-        'erp-map-howto-mrerp-title': '怎么找 MR.ERP 客户编号?',
-        'erp-map-howto-mrerp-body': '登录 MR.ERP → 左侧菜单「主数据」→「客户管理」→ 列表里每行前缀 4 位数字就是客户编号(例:0006)',
         'erp-map-show-advanced': '显示高级映射',
         'erp-map-hide-advanced': '折叠高级映射',
-        'erp-map-dev-fetch-selectdb': '抓 MR.ERP 账套页(13b 调试)',
-        'erp-map-dev-fetch-selectdb-running': '抓取中...',
-        'erp-map-dev-fetch-selectdb-ok': '✓ 已下载 · 把 json 文件发给 Claude',
-        'erp-map-dev-fetch-selectdb-fail': '抓取失败:{err}',
-        'erp-map-dev-fetch-page': '抓 MR.ERP 任意页(14a 调试)',
-        'erp-map-dev-fetch-page-input-ph': '空 = 抓主菜单 · 或粘路径如 /imparse/formupload.php?idmenu=...',
-        'erp-map-dev-fetch-page-running': '抓取中...',
-        'erp-map-dev-fetch-page-ok': '✓ 已下载 · 把 json 文件发给 Claude',
-        'erp-map-dev-fetch-page-fail': '抓取失败:{err}',
-        'erp-map-dev-fetch-customers': '抓 MR.ERP 客户列表(14b 调试)',
-        'erp-map-dev-fetch-customers-running': '抓取中(翻页 · 可能要几秒)...',
-        'erp-map-dev-fetch-customers-ok': '✓ 已下载 · 共 {n} 页 · 把 json 文件发给 Claude',
-        'erp-map-dev-fetch-customers-fail': '抓取失败:{err}',
-        // v27.8.1.14b · OCR 抽屉推送失败时 · 内联选 MR.ERP 编号
-        'mrerp-pick-cus-title': '配 MR.ERP 编号',
-        'mrerp-pick-cus-for-client': '为 Pearnly 客户',
-        'mrerp-pick-cus-for-client-tail': '选 MR.ERP 里对应的编号 · 选完自动重推',
-        'mrerp-pick-cus-search-ph': '输入编号 / 名称搜索...',
-        'mrerp-pick-cus-refresh': '刷新',
-        'mrerp-pick-cus-manual-summary': '列表里没有想要的?手动输入编号',
-        'mrerp-pick-cus-manual-ph': '例:0006',
-        'mrerp-pick-cus-manual-use': '用此编号',
-        'mrerp-pick-cus-selected-label': '已选:',
-        'mrerp-pick-cus-cancel': '取消',
-        'mrerp-pick-cus-save': '保存并推送',
-        'mrerp-pick-cus-loading': '加载客户列表中...',
-        'mrerp-pick-cus-empty': '无匹配客户',
-        'mrerp-pick-cus-empty-all': 'MR.ERP 没有客户数据 · 请在 MR.ERP 先添加客户 · 或在下方手动输入编号',
-        'mrerp-pick-cus-fetch-fail': '拉取失败:{err}',
-        'mrerp-pick-cus-save-fail': '保存映射失败:{err}',
-        'mrerp-pick-cus-save-ok': '已配 MR.ERP 编号 · 正在推送...',
-        'mrerp-pick-cus-manual-empty': '请输入编号',
-        'mrerp-pick-cus-no-client': '该发票还没归属 Pearnly 客户 · 先在右上角选客户 · 再上传',
         // v27.8.1.14b.2
         'results-saved-banner': '识别结果会自动保存到「单据记录」 · 关掉本页也不会丢',
         'history-filter-banner-prefix': '当前只看客户:',
         'history-filter-banner-clear': '显示所有客户的记录',
         'history-filter-banner-count': '({n} 条)',
-        'mrerp-pick-cus-buyer-label': '发票买方:',
-        'mrerp-cred-btn-test': '测试连接',
-        'mrerp-cred-btn-cancel': '取消',
-        'mrerp-cred-btn-save': '保存',
-        'mrerp-cred-btn-saving': '保存中...',
-        'mrerp-cred-btn-testing': '测试中...',
-        'mrerp-cred-test-ok': '✓ 凭据正确 · 可以保存',
-        'mrerp-cred-test-fail': '✗ 测试失败:{err}',
-        'mrerp-cred-save-ok': 'MR.ERP 已连接 · OCR 历史抽屉里可以「直推 MR.ERP」了',
-        'mrerp-cred-save-fail': '保存失败:{err}',
-        'mrerp-cred-remove-ok': 'MR.ERP 凭据已移除',
-        'mrerp-cred-remove-fail': '移除失败:{err}',
-        'mrerp-cred-empty-required': '用户名和密码必填',
-        'mrerp-cred-not-owner': '只有老板能配 ERP 凭据',
-        'mrerp-direct-push-tag': '直推',
-        'mrerp-direct-push-pushing': '正在推送 MR.ERP...',
-        'mrerp-direct-push-ok': '✓ 已推入 MR.ERP · 共 {n} 行',
-        'mrerp-direct-push-fail': '推送失败:{err}',
-        'mrerp-direct-err-auth_failed': 'MR.ERP 登录失败 · 凭据可能改了 · 重新填一次',
-        'mrerp-direct-err-no_credentials': '还没配 MR.ERP 凭据',
-        'mrerp-direct-err-no_client_mapping': '该客户还没配 MR.ERP 编号',
-        'mrerp-direct-err-credentials_corrupted': '凭据已损坏 · 请重新填',
-        'mrerp-direct-err-exception_unresolved': '先解决异常栏的红色字段',
-        'mrerp-direct-err-history_not_found': '记录不存在',
-        'mrerp-direct-err-no_tenant': '账号未关联租户',
-        'mrerp-direct-err-owner_only': '只有老板能配 ERP 凭据',
-        'mrerp-direct-err-module_missing': '后端模块缺失',
-        'mrerp-direct-err-pusher_module_missing': 'MR.ERP 推送引擎未部署',
-        'mrerp-direct-err-generate_failed': '生成 xlsx 失败',
-        'mrerp-direct-err-validation': 'MR.ERP 业务校验失败:{err}',
-        'mrerp-direct-err-network': 'MR.ERP 服务器无响应:{err}',
-        'mrerp-direct-err-module_unsupported': '该单据类型 MR.ERP 推送暂未支持',
-        'mrerp-direct-err-unknown': '未知错误:{err}',
         'erp-map-title': 'ERP 字段映射',
         'erp-map-sub': '把 Pearnly 的客户 / 科目 / 税码 翻译成你 ERP 系统的代码 · 后续推送 ERP 时会自动用这里的映射',
         'erp-map-subtab-clients': '客户映射',
         'erp-map-subtab-accounts': '科目映射',
         'erp-map-subtab-taxes': '税码映射',
+        'erp-map-subtab-products': '商品映射',
+        'erp-map-empty-products': '暂无商品映射',
+        'erp-map-empty-products-sub': '推送商品到 ERP 时系统会自动建立映射，可在此查看和删除',
+        'erp-map-col-item-name': 'OCR 商品名',
+        'erp-map-col-erp-product-code': 'ERP 商品码',
         'erp-map-add-row': '+ 新增映射',
         'erp-map-save': '保存',
         'erp-map-delete': '删除',
@@ -2493,11 +2475,6 @@ const I18N = {
         'erp-map-tax-wht_3': '代扣 3%',
         'erp-map-tax-wht_5': '代扣 5%',
         'erp-map-tax-non_vat': '非 VAT(不在系统内)',
-        'erp-map-dev-seed': '插测试映射',
-        'erp-map-dev-clear': '清测试数据',
-        'erp-map-dev-seed-ok': '已插入测试映射',
-        'erp-map-dev-cleared': '已清掉 {n} 条测试映射',
-        'erp-map-dev-fail': '操作失败',
     },
     en: {
         'lang-name': 'English',
@@ -2534,6 +2511,31 @@ const I18N = {
         'btn-logout': 'Log out',
         // v118.27.3
         'user-menu-settings': 'Settings', 'user-menu-help': 'Help & Feedback', 'user-menu-logout': 'Sign out',
+        // NAV-IA Phase 1 · 顶栏三件套(2026-05-15)
+        'avatar-menu-settings': 'Settings',
+        'avatar-menu-team': 'Team Members',
+        'avatar-menu-billing': 'Billing & Plan',
+        'avatar-menu-shortcuts': 'Keyboard Shortcuts',
+        'avatar-menu-admin': 'Admin Console',
+        'avatar-menu-test': 'Test Center',
+        'avatar-menu-help': 'Help & Feedback',
+        'avatar-menu-logout': 'Sign out',
+        'avatar-menu-badge-admin': 'Super',
+        // v118.44.0 NAV-IA Phase 8 · admin layout
+        'adm-banner-msg': 'Pearnly Platform Console · Super Admin only · Isolated from user view',
+        'adm-banner-title': 'Platform Admin',
+        'adm-sidebar-section': 'Admin Functions',
+        'adm-sidebar-cost': 'Cost Tracking',
+        'adm-sidebar-users': 'User Management',
+        'adm-back-to-home': 'Back to user view',
+        'topbar-search-ph': 'Search invoices · clients · jump...',
+        'cmdk-input-ph': 'Jump to page / Search invoice / client...',
+        'cmdk-section-jump': 'Jump to',
+        'cmdk-section-actions': 'Actions',
+        'cmdk-empty': 'No matches',
+        'cmdk-foot-move': 'Move',
+        'cmdk-foot-select': 'Select',
+        'cmdk-foot-close': 'Close',
         'help-modal-title': 'Help & Feedback', 'help-modal-tip': 'Hit an issue or have a suggestion? Reach us below — usually replied within 24 hours.',
         'contact-email-label': 'Email', 'contact-phone-label': 'Phone', 'contact-line-label': 'LINE',
         // v118.27.4
@@ -2576,9 +2578,54 @@ const I18N = {
         'ob-fb-saved-local': 'Saved locally · upload had issues',
         'nav-group-main': 'Main',
         'nav-group-tools': 'Tools',
-        'nav-dashboard': 'Dashboard',
-        'nav-ocr': 'Upload & OCR',
-        'nav-history': 'Documents',
+        'nav-dashboard': 'Home',
+        'dash-title': 'Home',
+        'dash-sub': "Today's overview",
+        'dash-kpi-month-invoices': 'Invoices this month',
+        'dash-kpi-month-invoices-sub': 'recognized',
+        'dash-kpi-pending': 'Pending',
+        'dash-kpi-pending-sub': 'awaiting review',
+        'dash-kpi-exceptions': 'Exceptions',
+        'dash-kpi-exceptions-sub': 'urgent',
+        'dash-kpi-plan': 'Quota',
+        'dash-kpi-plan-sub': 'used this month',
+        'dash-quick-title': 'Quick actions',
+        'dash-quick-sub': '3-step shortcut to main flow',
+        'dash-quick-upload': 'Upload invoice',
+        'dash-quick-clients': 'View clients',
+        'dash-quick-reconcile': 'Start reconcile',
+        'dash-quick-exceptions': 'Handle exceptions',
+        'dash-recent-title': 'Recent activity',
+        'dash-recent-sub': 'Last 5 recognitions',
+        'dash-recent-empty': 'No records yet · upload your first invoice',
+        'glv-preview-title': 'View list',
+        'recon-preview-empty-vat': 'No VAT report selected yet',
+        'recon-preview-empty-gl': 'No GL file selected yet',
+        'vex-summary-title': 'Reconciliation summary',
+        'vex-detail-title': 'Differences',
+        'vex-sum-total': 'Total',
+        'vex-sum-matched': 'Fully matched',
+        'vex-sum-diff': 'Data differs',
+        'vex-sum-incomplete': 'Incomplete recognition',
+        'vex-sum-cash': 'Cash customer (no invoice)',
+        'vex-detail-empty': 'No differences found in this run',
+        'vex-detail-h-inv': 'Invoice no',
+        'vex-detail-h-field': 'Field',
+        'vex-detail-h-rep': 'Report side',
+        'vex-detail-h-inv-side': 'Invoice side',
+        'vex-detail-h-kind': 'Type',
+        'recon-batch-selected': '0 selected',
+        'recon-batch-selected-n': '{n} selected',
+        'recon-batch-clear': 'Clear',
+        'recon-batch-delete': 'Delete selected',
+        'recon-batch-delete-title': 'Batch delete',
+        'recon-batch-delete-confirm': 'Delete {n} reconciliation tasks? This cannot be undone.',
+        'recon-batch-delete-ok': 'Deleted {n}',
+        'recon-batch-delete-fail': 'Batch delete failed · please retry',
+        'nav-group-sales': 'Sales',
+        'nav-group-expense': 'Expenses',
+        'nav-ocr': 'Upload Invoice',
+        'nav-history': 'Invoice Records',
         'ocr-title': 'Upload & OCR',
         'ocr-sub': 'Snap receipts · data flows to Excel & ERP automatically',
         'nav-automation': 'Automation',
@@ -2884,6 +2931,7 @@ const I18N = {
         'history-source-email': 'Email',
         'history-source-folder': 'Folder',
         'history-source-api': 'API',
+        'history-smart-assigned': 'Auto-assigned',
         'history-empty-title': 'No records yet',
         'history-empty-desc': 'Recognized invoices will appear here',
         'history-pager': '{from}–{to} of {total}',
@@ -3210,7 +3258,6 @@ const I18N = {
         'ep-adapter': 'Adapter',
         'ep-adapter-webhook': 'Custom Webhook',
         'ep-adapter-webhook-desc': 'HTTP POST to any URL · most universal',
-        'ep-adapter-mrerp-desc': 'One-click connect to your Mr.ERP · zero config',
         'ep-adapter-flow-desc': 'Thailand local accounting SaaS',
         'tag-soon': 'Coming soon',
         'ep-name': 'Endpoint name',
@@ -3255,6 +3302,10 @@ const I18N = {
         'erp-push-ok': 'Pushed to {name}',
         'erp-push-fail': 'Push failed: {err}',
         'erp-push-no-endpoint': 'Please configure an ERP endpoint in Automation first',
+        'log-push-rows': 'Successfully imported {n} rows',
+        'erp-pushed-badge': 'Pushed',
+        'erp-push-again-confirm': 'This invoice has already been pushed to ERP. Push again? Duplicates may occur.',
+        'erp-push-again-ok': 'Push again',
         'rd-btn-verify': 'Verify',
         'rd-btn-sync': 'Sync',
         'rd-verifying': 'Verifying...',
@@ -3381,6 +3432,7 @@ const I18N = {
         'file-list-collapse': 'Collapse',
         'alert-session': 'Session expired',
         'alert-password-changed-relogin': 'Password changed · Please sign in again',
+        'alert-session-revoked': 'Your account signed in on another device · This device has been logged out',
         'admin-banner-msg': 'Admin View · You are operating as a Pearnly platform administrator · All actions are audited',
         'toast-export-success': '✓ Excel exported',
         'toast-export-error': 'Export failed',
@@ -3537,9 +3589,6 @@ const I18N = {
         'field-sep': 'Separator',
         'log-detail-summary-ok': 'Push succeeded',
         'log-detail-summary-fail': 'Push failed',
-        'log-detail-mrerp-debug-tip': 'Push failed - download the xlsx Pearnly generated and send to Korn for manual upload in mrerp4sme to identify field issues',
-        'log-detail-mrerp-hint-title': 'MR.ERP server hints (key diagnostic - shows what field is wrong)',
-        'log-detail-mrerp-debug-download': 'Download this xlsx',
         'log-detail-to-ep': 'Sent to',
         'log-detail-request-human': 'Data sent to ERP',
         'log-detail-response-human': 'Response from ERP',
@@ -4074,6 +4123,29 @@ const I18N = {
         'nav-clients': 'Clients',
         'nav-vouchers': 'Vouchers',
         'nav-receivables': 'Receivables',
+        // v118.33.3 NAV-IA Phase 3
+        'sidebar-cta-upload': 'Upload Invoice',
+        'nav-integrations': 'Integrations',
+        'integrations-title': 'Integrations',
+        'integrations-sub': 'Google, LINE, Email, ERP, Folder, Cloud — third-party authorizations that let Pearnly sync data automatically',
+        // v118.33.7 NAV-IA Phase 7
+        'integrations-section-google': 'GOOGLE SERVICES',
+        'integrations-section-channels': 'Invoice Channels',
+        'integrations-section-erp': 'ERP Systems',
+        'integrations-google-info': 'Authorize Google once — both Drive and Sheets work without re-authorization',
+        'int-name-drive': 'Google Drive',
+        'int-name-sheets': 'Google Sheets',
+        'int-name-gmail': 'Gmail Ingest',
+        'int-name-line': 'LINE Bot',
+        'int-name-folder': 'Folder Watch',
+        'int-name-erp': 'ERP Push',
+        'int-desc-drive': 'Auto-archive invoices/PVs to Drive after review · organized by client and month',
+        'int-desc-sheets': 'Real-time sync of OCR results to Sheets · for owner and accountant to review online',
+        'int-desc-gmail': 'Auto-fetch attachments from customer emails · no manual forwarding needed',
+        'int-desc-line': 'Field staff snap a photo via LINE · auto-booked · supports private chat and groups',
+        'int-desc-folder': 'Specify a local/shared folder · drop files in to auto-recognize',
+        'int-desc-erp': 'Xero · MR.ERP · Webhook · auto-push after OCR completes',
+        'btn-configure': 'Configure',
         // v109.4 · sales invoice module (v110.1)
         'nav-sales-invoices': 'Sales Invoices',
         'cs-sales-invoices-title': 'Sales Invoices',
@@ -4088,6 +4160,10 @@ const I18N = {
         'reconcile-sub': 'Bank statement vs system invoice auto-matching · cut month-end close from 3 hours to 30 minutes',
         'reconcile-center-title': 'Reconciliation',
         'reconcile-center-sub':   'Select reconciliation type',
+        'rc-page-title': 'Reconciliation',
+        'rc-page-sub':   'Match accounts · find gaps · close books faster',
+        'rc-bank-sub':   'Auto-match bank transactions vs invoices · cut month-end close from 3 hrs to 30 min',
+        'bank-empty-hint': 'No reconciliation records yet · Upload a statement to start',
         'reconcile-pending': 'To Reconcile',
         'reconcile-matched': 'Done',
         'reconcile-unmatched': 'Unmatched',
@@ -4144,7 +4220,40 @@ const I18N = {
         'recon-reason-ai-cannot-classify':'Cannot recognize · please pick type manually',
         // ==== v118.32.x · VAT Reconciliation (Screen A + B + C) ====
         'recon-tab-bank':     'Bank Recon',
-        'recon-tab-sale-vat': 'Output VAT Recon',
+        'recon-tab-sale-vat': 'VAT Report Audit',
+        'recon-tab-gl-vat':   'Revenue Reconciliation',
+        'glv-sub':            'General Ledger vs Sales VAT Report · Upload two files to reconcile',
+        'glv-up-vat-title':   '① Sales VAT Report',
+        'glv-up-vat-sub':     'Supports Excel / PDF / image',
+        'glv-up-gl-title':    '② General Ledger',
+        'glv-up-gl-sub':      'Supports Excel / PDF',
+        'glv-acct-prefix':    'Revenue acct prefix',
+        'glv-btn-run':        'Run Reconciliation',
+        'glv-btn-export':     'Export Excel',
+        'glv-kpi-matched':    'Matched',
+        'glv-kpi-diff':       'Diff',
+        'glv-kpi-unmatched':  'GL Missing',
+        'glv-detail-title':   'Difference Detail',
+        'glv-summary-title':  'Reconciliation Summary',
+        'glv-h-doc':          'Document No.',
+        'glv-h-date':         'Date',
+        'glv-h-customer':     'Customer',
+        'glv-h-vat':          'VAT Amount',
+        'glv-h-gl':           'GL Amount',
+        'glv-h-diff':         'Diff',
+        'glv-h-acct':         'Revenue Acct',
+        'glv-running':        'Reconciling…',
+        'glv-hint-need-both': 'Please upload both files',
+        'glv-history-title':  'Recent Reconciliations',
+        'glv-history-refresh':'Refresh',
+        'glv-history-empty':  'No reconciliation history yet',
+        'glv-hist-time':      'Time',
+        'glv-hist-files':     'Files',
+        'glv-hist-rows':      'Rows (VAT/GL)',
+        'glv-hist-matched':   'Matched',
+        'glv-hist-diff':      'Diff',
+        'glv-hist-missing':   'Missing',
+        'glv-hist-actions':   'Actions',
         'recon-tab-batch':    'Batch Recognition',
         // Screen A
         'sv-title':           'Output VAT Reconciliation',
@@ -4166,10 +4275,33 @@ const I18N = {
         'vex-col-elapsed':     'Time',
         'vex-col-actions':     'Actions',
         'vex-detail-soon':     'Task detail coming soon',
+        'vex-recent-show-limited':  'Showing recent 5 of {n}',
+        'vex-recent-show-all':      'Show all {n}',
+        'vex-recent-collapse':      'Collapse',
+        'vex-toggle-preview-open':  'View files',
+        'vex-toggle-preview-close': 'Hide files',
+        'vex-preview-invoice':      'Sales invoices',
+        'vex-preview-report':       'VAT report',
+        'vex-preview-search':       'Search filename...',
+        'vex-preview-clear-all':    'Clear all',
+        'vex-preview-count':        'Showing {n} / {m}',
+        'vex-preview-guide-search': 'Use search to filter when many files · scroll for more',
+        'vex-task-delete-confirm-title': 'Delete reconciliation task?',
+        'vex-task-delete-confirm-body':  'This also clears the OCR cache · cannot be undone',
+        'vex-task-delete-ok':   'Deleted',
+        'vex-task-delete-fail': 'Delete failed',
+        'vex-clear-old-btn':     'Clear older than 7 days',
+        'vex-clear-old-confirm': 'Clear tasks older than 7 days? Cannot be undone',
+        'vex-clear-old-success': 'Cleared {n} tasks',
+        'vex-main-action-tag':  'Primary',
         'vex-status-pending':  'Pending',
         'vex-status-running':  'Running',
         'vex-status-done':     'Done',
         'vex-status-failed':   'Failed',
+        'vex-toast-expired':   'Data expired · please re-run reconciliation',
+        'vex-toast-dl-fail':   'Download failed · please retry',
+        'vex-client-all':      'All Clients',
+        'vex-new-recon-title': 'New Reconciliation',
         'vex-mode-standard':       'Standard',
         'vex-mode-excel':          'Excel formula',
         'vex-mode-hint':           '🧪 Experimental · please share feedback',
@@ -4183,8 +4315,8 @@ const I18N = {
         'vex-btn-build':           'Start Reconciliation',
         'vex-btn-download':        '↓ Download reconciliation',
         'vex-progress-running':    'Reconciling…',
-        'vex-progress-sub':        '{a} invoices vs {b} report rows',
-        'vex-progress-elapsed':    'Reconciling… {a} invoices vs {b} rows · {s}s',
+        'vex-progress-sub':        '{a} invoices · {b} report(s)',
+        'vex-progress-elapsed':    'Reconciling… {a} invoices · {b} report(s) · {s}s',
         'vex-result-title':        '✓ Reconciliation Complete',
         'vex-result-sub':          '{a} invoices vs {r} rows · {s}s',
         'vex-need-both':           'Need at least 1 invoice + 1 VAT report',
@@ -4528,53 +4660,6 @@ const I18N = {
         'confirm-default-title': 'Please confirm',
         'confirm-ok': 'OK',
         'confirm-cancel': 'Cancel',
-        // v118.27.1 · MR.ERP adapter
-        'mrerp-btn': 'Download MR.ERP .xlsx',
-        'mrerp-btn-tip': 'Generate an Excel file in MR.ERP format · then upload it on the MR.ERP website',
-        'mrerp-btn-disabled-no-map': 'Configure MR.ERP customer code first under Automation → ERP → Field mapping',
-        'mrerp-btn-disabled-exc': 'Resolve the red exception fields first',
-        'mrerp-toast-ok': 'XLSX generated · upload it on the MR.ERP website',
-        'mrerp-toast-fail': 'Failed: {err}',
-        'mrerp-err-no_client_mapping': 'This client has no MR.ERP code configured',
-        'mrerp-err-no_invoice_no': 'Invoice number missing',
-        'mrerp-err-no_invoice_date': 'Invoice date missing',
-        'mrerp-err-no_total_amount': 'Total amount missing or zero',
-        'mrerp-err-no_customer_mapping': 'No MR.ERP code configured for this client',
-        'mrerp-err-exception_unresolved': 'Unresolved exception',
-        'mrerp-err-sheet_kind_stub_wait_material': 'Document type sample not yet received · not open',
-        'mrerp-err-module_missing': 'Backend module missing',
-        'mrerp-err-history_not_found': 'Record not found',
-        // v27.8.1.0 · MR.ERP backend simulated login direct push
-        'mrerp-direct-card-not-connected': 'MR.ERP not connected',
-        'mrerp-direct-card-connected': 'MR.ERP connected',
-        'mrerp-direct-connect-btn': 'Add credentials',
-        'mrerp-direct-modify-btn': 'Edit',
-        'mrerp-direct-remove-btn': 'Remove',
-        'mrerp-direct-remove-confirm': 'After removal, MR.ERP direct push for this tenant will stop. Manual .xlsx import remains available. Continue?',
-        'mrerp-direct-meta-company': 'Company:',
-        'mrerp-direct-meta-comid': 'Account set:',
-        'mrerp-direct-meta-last-test': 'Last test:',
-        'mrerp-direct-test-pass': '✓ Passed',
-        'mrerp-direct-test-fail': '✗ Failed',
-        'mrerp-direct-test-never': 'Never tested',
-        'mrerp-direct-test-korn-btn': "Korn's real sample test",
-        'mrerp-direct-test-korn-tip': "Push Korn's real SC xlsx through mrerp_pusher (preview only, no DB write) - diagnose if it's HTTP flow or xlsx content issue",
-        'mrerp-direct-test-korn-title': "Korn's real sample diagnostic",
-        'mrerp-direct-test-korn-running': 'Pushing (preview only, no real write)...',
-        'mrerp-direct-test-korn-stages': 'Stages passed',
-        'mrerp-direct-test-korn-preview-rows': 'Preview rows',
-        'mrerp-direct-test-korn-error': 'Error',
-        'mrerp-direct-test-korn-raw-html': 'Expand MR.ERP raw HTML',
-        'mrerp-direct-test-korn-close': 'Close',
-        'log-detail-mrerp-debug-fail': 'Download failed: {err}',
-        // v27.8.1.3 · auto-push toggle
-        'erp-auto-push-label': 'Auto-push after OCR',
-        'erp-auto-push-on-tip': 'On · OCR finishes (folder / email / LINE) → auto-pushed to this ERP',
-        'erp-auto-push-off-tip': 'Off · push manually',
-        'erp-auto-push-toggling': 'Switching...',
-        'erp-auto-push-toggle-fail': 'Toggle failed: {err}',
-        'erp-auto-push-toggled-on': 'Auto-push enabled',
-        'erp-auto-push-toggled-off': 'Auto-push disabled',
         // v118.27.8.1.15 · big batch upload (>100) progress + unload guard + first-time tip
         'big-batch-progress-init':    'Starting batch OCR...',
         'big-batch-progress-running': 'Processing {done} / {total} · about {min} min left · feel free to switch tabs',
@@ -4583,139 +4668,18 @@ const I18N = {
         'big-batch-first-tip':        'You\'re processing {n} files · ~{min} min · runs in the background · auto-saved to Invoice Records when done',
         // v118.27.8.1.15 · ERP onboarding (first ERP visit + no endpoints yet)
         'erp-onboard-title':          'Make ERP push a 0-click flow',
-        'erp-onboard-body':           'After OCR, Pearnly can auto-push to MR.ERP / Xero / your webhook — no button needed. New ERP connections enable auto-push by default; you can turn it off any time.',
+        'erp-onboard-body':           'After OCR, Pearnly can auto-push to ERP / Xero / your webhook — no button needed. New ERP connections enable auto-push by default; you can turn it off any time.',
         'erp-onboard-ok':             'OK, let me add an ERP',
         'erp-onboard-later':          'Later',
-        // v118.27.8.1.16 · perfect-match zero-click + mid-score quick confirm toast
-        'mrerp-auto-matched-toast':   'Auto-matched to "{name}" · pushing to MR.ERP...',
-        'mrerp-quick-confirm-text':   'Auto-assigned to "{name}"',
-        'mrerp-quick-confirm-ok':     'Looks good',
-        'mrerp-quick-confirm-change': 'Change',
-        'mrerp-recommend-badge':      'Recommended',
-        'mrerp-maybe-badge':          'Maybe',
-
-        // v118.27.8.1.17 · product picker mini modal · OCR detail row mapping
-        'mrerp-prod-prep-done-toast':   'All product mappings configured · pushing...',
-        'mrerp-prod-pick-not-ready':    'Product picker not ready · please refresh',
-        'mrerp-prod-flow-cancelled':    'Product mapping cancelled · push aborted',
-        'mrerp-prod-auto-matched-toast':'Auto-matched "{ocr}" → {name}',
-        'mrerp-pick-prod-title':        'Pick MR.ERP product code',
-        'mrerp-pick-prod-progress':     'Step {i} / {n}',
-        'mrerp-pick-prod-ocrlabel':     'OCR item:',
-        'mrerp-pick-prod-search-ph':    'Search by code / name...',
-        'mrerp-pick-prod-loading':      'Loading product master...',
-        'mrerp-pick-prod-empty':        'No match',
-        'mrerp-pick-prod-empty-all':    'MR.ERP has no products · add them in MR.ERP first · or enter code manually below',
-        'mrerp-pick-prod-fetch-fail':   'Fetch failed: {err}',
-        'mrerp-pick-prod-manual-summary':"Can't find it? Enter code manually",
-        'mrerp-pick-prod-manual-ph':    'e.g. P00123',
-        'mrerp-pick-prod-manual-use':   'Use this code',
-        'mrerp-pick-prod-manual-empty': 'Enter a code',
-        'mrerp-pick-prod-selected-label':'Selected:',
-        'mrerp-pick-prod-skip':         'Skip this item (use placeholder)',
-        'mrerp-pick-prod-cancel':       'Cancel entire push',
-        'mrerp-pick-prod-save':         'Save & continue',
-        'mrerp-pick-prod-save-ok':      'Product mapping saved',
-        'mrerp-pick-prod-save-fail':    'Save failed · please retry',
         'erp-add-webhook-card': '+ Add Webhook',
         'erp-add-webhook-card-tip': 'POST to any URL · e.g. Slack / Zapier / custom ERP',
         'erp-webhook-card-name': 'Webhook',
-        'mrerp-cred-modal-add': 'Add MR.ERP credentials',
-        'mrerp-cred-modal-edit': 'Edit MR.ERP credentials',
-        'mrerp-cred-fallback-hint': "Don't want to save password? You can also download .xlsx and import it manually (OCR history drawer → push dropdown → \"Download MR.ERP .xlsx\").",
-        'mrerp-cred-field-username': 'MR.ERP Username *',
-        'mrerp-cred-field-username-ph': 'e.g. test01',
-        'mrerp-cred-field-password': 'MR.ERP Password *',
-        'mrerp-cred-field-password-ph': 'Stored encrypted, never in plain text',
-        'mrerp-cred-field-comidyear': 'Company year',
-        'mrerp-cred-field-seldb': 'Database number',
-        'mrerp-cred-field-company': 'Company name',
-        'mrerp-cred-field-company-ph': 'e.g. ABC Co., Ltd. 2024',
-        'mrerp-cred-field-company-tag': 'display only',
-        'mrerp-cred-section-login': 'Login info',
-        'mrerp-cred-advanced-summary': 'Advanced',
-        'mrerp-cred-advanced-tag': '— Only if auto-detect fails',
-        'mrerp-cred-advanced-hint-text': 'Prefer "Select database" above (auto). Fill these two only when MR.ERP server returns no database list.',
-        'mrerp-cred-dbselect-section': 'Select database',
-        'mrerp-cred-dbselect-ok': '✓ Found {n} databases · please pick one',
-        'mrerp-cred-dbselect-ok-single': '✓ Auto-selected {name}',
-        'mrerp-cred-dbselect-empty': 'No databases returned · expand "Advanced" below and fill manually',
-        'mrerp-cred-dbselect-fail': 'Fetch databases failed: {err} · you can fill manually under "Advanced"',
-        'mrerp-cred-dbselect-required': 'Pick a database (or fill manually under Advanced)',
-        'mrerp-cred-dbselect-auto-tag': 'auto-selected',
-        'erp-map-howto-mrerp-title': 'How to find your MR.ERP customer code?',
-        'erp-map-howto-mrerp-body': 'Log in to MR.ERP → left menu "Master data" → "Customer management" → the 4-digit prefix on each row is the customer code (e.g. 0006).',
         'erp-map-show-advanced': 'Show advanced mappings',
         'erp-map-hide-advanced': 'Hide advanced mappings',
-        'erp-map-dev-fetch-selectdb': 'Fetch MR.ERP selectdb page (13b debug)',
-        'erp-map-dev-fetch-selectdb-running': 'Fetching...',
-        'erp-map-dev-fetch-selectdb-ok': '✓ Downloaded · send the json file to Claude',
-        'erp-map-dev-fetch-selectdb-fail': 'Fetch failed: {err}',
-        'erp-map-dev-fetch-page': 'Fetch MR.ERP any page (14a debug)',
-        'erp-map-dev-fetch-page-input-ph': 'Empty = main menu · or paste path like /imparse/formupload.php?idmenu=...',
-        'erp-map-dev-fetch-page-running': 'Fetching...',
-        'erp-map-dev-fetch-page-ok': '✓ Downloaded · send the json file to Claude',
-        'erp-map-dev-fetch-page-fail': 'Fetch failed: {err}',
-        'erp-map-dev-fetch-customers': 'Fetch MR.ERP customer list (14b debug)',
-        'erp-map-dev-fetch-customers-running': 'Fetching (paginating, may take a few seconds)...',
-        'erp-map-dev-fetch-customers-ok': '✓ Downloaded · {n} pages · send the json file to Claude',
-        'erp-map-dev-fetch-customers-fail': 'Fetch failed: {err}',
-        'mrerp-pick-cus-title': 'Set MR.ERP code',
-        'mrerp-pick-cus-for-client': 'For Pearnly client',
-        'mrerp-pick-cus-for-client-tail': 'pick the matching MR.ERP code · will auto-retry push after save',
-        'mrerp-pick-cus-search-ph': 'Search by code or name...',
-        'mrerp-pick-cus-refresh': 'Refresh',
-        'mrerp-pick-cus-manual-summary': "Not in the list? Enter code manually",
-        'mrerp-pick-cus-manual-ph': 'e.g. 0006',
-        'mrerp-pick-cus-manual-use': 'Use this code',
-        'mrerp-pick-cus-selected-label': 'Selected:',
-        'mrerp-pick-cus-cancel': 'Cancel',
-        'mrerp-pick-cus-save': 'Save & push',
-        'mrerp-pick-cus-loading': 'Loading customer list...',
-        'mrerp-pick-cus-empty': 'No matching customer',
-        'mrerp-pick-cus-empty-all': 'No customers in MR.ERP · add customers in MR.ERP first or enter a code manually below',
-        'mrerp-pick-cus-fetch-fail': 'Fetch failed: {err}',
-        'mrerp-pick-cus-save-fail': 'Save mapping failed: {err}',
-        'mrerp-pick-cus-save-ok': 'MR.ERP code saved · pushing...',
-        'mrerp-pick-cus-manual-empty': 'Enter a code',
-        'mrerp-pick-cus-no-client': "This invoice isn't assigned to a Pearnly client yet · pick a client at top-right and re-upload",
-        'results-saved-banner': "Recognized invoices are auto-saved to ‘Document records’ · safe to leave this page",
+        'results-saved-banner': "Recognized invoices are auto-saved to 'Document records' · safe to leave this page",
         'history-filter-banner-prefix': 'Only showing client:',
         'history-filter-banner-clear': 'Show records for all clients',
         'history-filter-banner-count': '({n} record(s))',
-        'mrerp-pick-cus-buyer-label': 'Invoice buyer:',
-        'mrerp-cred-btn-test': 'Test connection',
-        'mrerp-cred-btn-cancel': 'Cancel',
-        'mrerp-cred-btn-save': 'Save',
-        'mrerp-cred-btn-saving': 'Saving...',
-        'mrerp-cred-btn-testing': 'Testing...',
-        'mrerp-cred-test-ok': '✓ Credentials valid · ready to save',
-        'mrerp-cred-test-fail': '✗ Test failed: {err}',
-        'mrerp-cred-save-ok': 'MR.ERP connected · "Push to MR.ERP" now available in OCR history drawer',
-        'mrerp-cred-save-fail': 'Save failed: {err}',
-        'mrerp-cred-remove-ok': 'MR.ERP credentials removed',
-        'mrerp-cred-remove-fail': 'Remove failed: {err}',
-        'mrerp-cred-empty-required': 'Username and password are required',
-        'mrerp-cred-not-owner': 'Only owner can configure ERP credentials',
-        'mrerp-direct-push-tag': 'Direct',
-        'mrerp-direct-push-pushing': 'Pushing to MR.ERP...',
-        'mrerp-direct-push-ok': '✓ Pushed to MR.ERP · {n} rows',
-        'mrerp-direct-push-fail': 'Push failed: {err}',
-        'mrerp-direct-err-auth_failed': 'MR.ERP login failed · credentials may have changed · please re-enter',
-        'mrerp-direct-err-no_credentials': 'MR.ERP credentials not configured',
-        'mrerp-direct-err-no_client_mapping': 'Client has no MR.ERP code mapping',
-        'mrerp-direct-err-credentials_corrupted': 'Credentials corrupted · please re-enter',
-        'mrerp-direct-err-exception_unresolved': 'Resolve red exception fields first',
-        'mrerp-direct-err-history_not_found': 'Record not found',
-        'mrerp-direct-err-no_tenant': 'Account not linked to tenant',
-        'mrerp-direct-err-owner_only': 'Only owner can configure ERP credentials',
-        'mrerp-direct-err-module_missing': 'Backend module missing',
-        'mrerp-direct-err-pusher_module_missing': 'MR.ERP push engine not deployed',
-        'mrerp-direct-err-generate_failed': 'XLSX generation failed',
-        'mrerp-direct-err-validation': 'MR.ERP rejected: {err}',
-        'mrerp-direct-err-network': 'MR.ERP server unreachable: {err}',
-        'mrerp-direct-err-module_unsupported': 'Document type not supported for MR.ERP push yet',
-        'mrerp-direct-err-unknown': 'Unknown error: {err}',
         // v118.27.5 · unified push button (drawer)
         'unified-push-to': 'Push to {name}',
         'unified-push-tip': 'Click to push to default · ▼ for other connectors',
@@ -4728,7 +4692,6 @@ const I18N = {
         'unified-push-disabled-exc': 'Resolve the red exception fields first',
         'unified-push-ok': 'Pushed to {name}',
         'unified-push-fail': '{name} push failed: {err}',
-        'unified-push-mrerp-ok': '.xlsx generated · upload it in MR.ERP',
         'unified-push-go-config': 'Set up',
         // v118.27.4 · Xero adapter
         'xero-card-title': 'Xero',
@@ -4767,6 +4730,11 @@ const I18N = {
         'erp-map-subtab-clients': 'Client mapping',
         'erp-map-subtab-accounts': 'Account mapping',
         'erp-map-subtab-taxes': 'Tax-code mapping',
+        'erp-map-subtab-products': 'Product mapping',
+        'erp-map-empty-products': 'No product mappings yet',
+        'erp-map-empty-products-sub': 'Mappings are created automatically when you push products to ERP',
+        'erp-map-col-item-name': 'OCR item name',
+        'erp-map-col-erp-product-code': 'ERP product code',
         'erp-map-add-row': '+ Add mapping',
         'erp-map-save': 'Save',
         'erp-map-delete': 'Delete',
@@ -4818,11 +4786,6 @@ const I18N = {
         'erp-map-tax-wht_3': 'WHT 3%',
         'erp-map-tax-wht_5': 'WHT 5%',
         'erp-map-tax-non_vat': 'Non-VAT (out of system)',
-        'erp-map-dev-seed': 'Insert test mappings',
-        'erp-map-dev-clear': 'Clear test data',
-        'erp-map-dev-seed-ok': 'Test mappings inserted',
-        'erp-map-dev-cleared': 'Cleared {n} test mapping(s)',
-        'erp-map-dev-fail': 'Operation failed',
     },
     th: {
         'lang-name': 'ไทย',
@@ -4859,6 +4822,31 @@ const I18N = {
         'btn-logout': 'ออก',
         // v118.27.3
         'user-menu-settings': 'การตั้งค่า', 'user-menu-help': 'ช่วยเหลือ', 'user-menu-logout': 'ออกจากระบบ',
+        // NAV-IA Phase 1 · 顶栏三件套(2026-05-15)
+        'avatar-menu-settings': 'การตั้งค่า',
+        'avatar-menu-team': 'สมาชิกทีม',
+        'avatar-menu-billing': 'สมัครสมาชิก & แพ็คเกจ',
+        'avatar-menu-shortcuts': 'คีย์ลัด',
+        'avatar-menu-admin': 'คอนโซลผู้ดูแล',
+        'avatar-menu-test': 'ศูนย์ทดสอบ',
+        'avatar-menu-help': 'ช่วยเหลือและข้อเสนอแนะ',
+        'avatar-menu-logout': 'ออกจากระบบ',
+        'avatar-menu-badge-admin': 'ผู้ดูแล',
+        // v118.44.0 NAV-IA Phase 8 · admin layout
+        'adm-banner-msg': 'หลังบ้าน Pearnly · เฉพาะผู้ดูแลแพลตฟอร์มเท่านั้น · แยกจากผู้ใช้ทั่วไป',
+        'adm-banner-title': 'ผู้ดูแลแพลตฟอร์ม',
+        'adm-sidebar-section': 'ฟังก์ชันผู้ดูแล',
+        'adm-sidebar-cost': 'ติดตามต้นทุน',
+        'adm-sidebar-users': 'จัดการผู้ใช้',
+        'adm-back-to-home': 'กลับสู่มุมมองปกติ',
+        'topbar-search-ph': 'ค้นหาใบเสร็จ · ลูกค้า · ไปยัง...',
+        'cmdk-input-ph': 'ไปยังหน้า / ค้นหาใบเสร็จ / ลูกค้า...',
+        'cmdk-section-jump': 'ไปยัง',
+        'cmdk-section-actions': 'การกระทำ',
+        'cmdk-empty': 'ไม่พบรายการ',
+        'cmdk-foot-move': 'เลื่อน',
+        'cmdk-foot-select': 'เลือก',
+        'cmdk-foot-close': 'ปิด',
         'help-modal-title': 'ช่วยเหลือและข้อเสนอแนะ', 'help-modal-tip': 'พบปัญหาหรือมีข้อเสนอ? ติดต่อเราได้ตามช่องทางด้านล่าง · ตอบกลับภายใน 24 ชม.',
         'contact-email-label': 'อีเมล', 'contact-phone-label': 'โทร', 'contact-line-label': 'LINE',
         // v118.27.4
@@ -4901,9 +4889,54 @@ const I18N = {
         'ob-fb-saved-local': 'บันทึกในเครื่องแล้ว · มีปัญหาในการอัปโหลด',
         'nav-group-main': 'หลัก',
         'nav-group-tools': 'เครื่องมือ',
-        'nav-dashboard': 'แดชบอร์ด',
-        'nav-ocr': 'อัปโหลดและอ่าน',
-        'nav-history': 'บันทึกเอกสาร',
+        'nav-dashboard': 'หน้าหลัก',
+        'dash-title': 'หน้าหลัก',
+        'dash-sub': 'ภาพรวมงานวันนี้',
+        'dash-kpi-month-invoices': 'ใบกำกับเดือนนี้',
+        'dash-kpi-month-invoices-sub': 'รายการที่รู้จำแล้ว',
+        'dash-kpi-pending': 'รอดำเนินการ',
+        'dash-kpi-pending-sub': 'รายการรอตรวจสอบ',
+        'dash-kpi-exceptions': 'ผิดปกติ',
+        'dash-kpi-exceptions-sub': 'ต้องจัดการด่วน',
+        'dash-kpi-plan': 'โควต้า',
+        'dash-kpi-plan-sub': 'ใช้ไปเดือนนี้',
+        'dash-quick-title': 'การกระทำด่วน',
+        'dash-quick-sub': 'ทางลัด 3 ขั้นตอน',
+        'dash-quick-upload': 'อัปโหลดใบกำกับ',
+        'dash-quick-clients': 'ดูลูกค้า',
+        'dash-quick-reconcile': 'เริ่มกระทบยอด',
+        'dash-quick-exceptions': 'จัดการรายการผิดปกติ',
+        'dash-recent-title': 'ความเคลื่อนไหวล่าสุด',
+        'dash-recent-sub': '5 รายการล่าสุด',
+        'dash-recent-empty': 'ยังไม่มีรายการ · เริ่มอัปโหลดใบแรกเลย',
+        'glv-preview-title': 'ดูรายการไฟล์',
+        'recon-preview-empty-vat': 'ยังไม่ได้เลือกรายงาน VAT',
+        'recon-preview-empty-gl': 'ยังไม่ได้เลือกไฟล์ GL',
+        'vex-summary-title': 'สรุปการกระทบยอด',
+        'vex-detail-title': 'รายละเอียดส่วนต่าง',
+        'vex-sum-total': 'รวมทั้งหมด',
+        'vex-sum-matched': 'ตรงกันสมบูรณ์',
+        'vex-sum-diff': 'ข้อมูลต่างกัน',
+        'vex-sum-incomplete': 'OCR อ่านไม่ครบ',
+        'vex-sum-cash': 'ลูกค้าเงินสด (ไม่มีใบกำกับ)',
+        'vex-detail-empty': 'การกระทบยอดครั้งนี้ไม่พบส่วนต่าง',
+        'vex-detail-h-inv': 'เลขใบกำกับ',
+        'vex-detail-h-field': 'ฟิลด์',
+        'vex-detail-h-rep': 'ฝั่งรายงาน',
+        'vex-detail-h-inv-side': 'ฝั่งใบกำกับ',
+        'vex-detail-h-kind': 'ประเภท',
+        'recon-batch-selected': 'เลือก 0 รายการ',
+        'recon-batch-selected-n': 'เลือก {n} รายการ',
+        'recon-batch-clear': 'ยกเลิกเลือก',
+        'recon-batch-delete': 'ลบที่เลือก',
+        'recon-batch-delete-title': 'ลบหลายรายการ',
+        'recon-batch-delete-confirm': 'ลบงานกระทบยอด {n} รายการ? การกระทำนี้ย้อนกลับไม่ได้',
+        'recon-batch-delete-ok': 'ลบแล้ว {n} รายการ',
+        'recon-batch-delete-fail': 'ลบไม่สำเร็จ · กรุณาลองใหม่',
+        'nav-group-sales': 'ฝั่งขาย',
+        'nav-group-expense': 'ฝั่งซื้อ',
+        'nav-ocr': 'อัปโหลดใบกำกับ',
+        'nav-history': 'บันทึกใบกำกับ',
         'ocr-title': 'อัปโหลดและอ่าน',
         'ocr-sub': 'ถ่ายรูปใบเสร็จ · ข้อมูลไหลเข้า Excel และ ERP อัตโนมัติ',
         'nav-automation': 'ระบบอัตโนมัติ',
@@ -5000,8 +5033,8 @@ const I18N = {
         'cost-today': 'วันนี้',
         'cost-month': 'เดือนนี้',
         'cost-total': 'ยอดรวม',
-        'cost-engines': 'การใช้เอนจิน (เดือนนี้)',
-        'cost-engines-sub': 'หลัก vs สำรอง',
+        'cost-engines': 'รายละเอียดเอนจิน (เดือนนี้)',
+        'cost-engines-sub': 'ค่าใช้จ่าย · จำนวน · เฉลี่ย/ครั้ง',
         'cost-trend-title': 'แนวโน้ม 30 วันล่าสุด',
         'cost-refresh': 'รีเฟรช',
         'cost-export': 'ส่งออก CSV',
@@ -5049,6 +5082,10 @@ const I18N = {
         'billing-msg-saved': '✅ อัปเดตแล้ว · คำนวณค่าปรับเทียบใหม่',
         'billing-msg-fail': 'บันทึกไม่สำเร็จ',
         'billing-msg-balance-required': 'ต้องระบุยอด',
+        'adm-billing-calib-label': 'ตัวคูณปรับ (ไม่บังคับ)',
+        'adm-billing-calib-ph': 'เว้นว่าง = คำนวณอัตโนมัติ',
+        'adm-billing-calib-hint': '0.5 ~ 2.0 · เว้นว่างแนะนำ',
+        'adm-billing-calib-invalid': 'ตัวคูณปรับต้องอยู่ระหว่าง 0.5 ~ 2.0',
         'cost-never-used': 'ไม่เคย',
         // v22 · admin
         'badge-soon': 'เร็วๆ นี้',
@@ -5209,6 +5246,7 @@ const I18N = {
         'history-source-email': 'อีเมล',
         'history-source-folder': 'โฟลเดอร์',
         'history-source-api': 'API',
+        'history-smart-assigned': 'กำหนดอัตโนมัติ',
         'history-empty-title': 'ยังไม่มีรายการ',
         'history-empty-desc': 'ใบกำกับที่อ่านแล้วจะแสดงที่นี่',
         'history-pager': '{from}–{to} จาก {total}',
@@ -5534,7 +5572,6 @@ const I18N = {
         'ep-adapter': 'ประเภท Adapter',
         'ep-adapter-webhook': 'Webhook แบบกำหนดเอง',
         'ep-adapter-webhook-desc': 'HTTP POST ไปที่ URL อะไรก็ได้ · ใช้ทั่วไป',
-        'ep-adapter-mrerp-desc': 'เชื่อม Mr.ERP ในคลิกเดียว · ไม่ต้องตั้งค่า',
         'ep-adapter-flow-desc': 'SaaS บัญชีท้องถิ่นของไทย',
         'tag-soon': 'เร็ว ๆ นี้',
         'ep-name': 'ชื่อ Endpoint',
@@ -5579,6 +5616,10 @@ const I18N = {
         'erp-push-ok': 'ส่งเข้า {name} เรียบร้อย',
         'erp-push-fail': 'ส่งล้มเหลว: {err}',
         'erp-push-no-endpoint': 'กรุณาตั้งค่า ERP endpoint ในหน้า Automation ก่อน',
+        'log-push-rows': 'นำเข้าสำเร็จ {n} แถว',
+        'erp-pushed-badge': 'ส่งแล้ว',
+        'erp-push-again-confirm': 'ใบแจ้งหนี้นี้ถูกส่งไปยัง ERP แล้ว ต้องการส่งอีกครั้งหรือไม่? อาจเกิดรายการซ้ำได้',
+        'erp-push-again-ok': 'ส่งอีกครั้ง',
         'rd-btn-verify': 'ตรวจสอบ',
         'rd-btn-sync': 'ดึงข้อมูล',
         'rd-verifying': 'กำลังตรวจสอบ...',
@@ -5705,6 +5746,7 @@ const I18N = {
         'file-list-collapse': 'ย่อ',
         'alert-session': 'เซสชันหมดอายุ',
         'alert-password-changed-relogin': 'เปลี่ยนรหัสผ่านแล้ว · กรุณาเข้าสู่ระบบใหม่',
+        'alert-session-revoked': 'บัญชีของคุณเข้าใช้งานจากเครื่องอื่น · เครื่องนี้ถูกออกจากระบบแล้ว',
         'admin-banner-msg': 'มุมมองผู้ดูแลระบบ · คุณกำลังใช้งานในฐานะผู้ดูแลแพลตฟอร์ม Pearnly · ทุกการดำเนินการจะถูกบันทึกตรวจสอบ',
         'toast-export-success': '✓ ส่งออก Excel สำเร็จ',
         'toast-export-error': 'ส่งออกล้มเหลว',
@@ -5861,9 +5903,6 @@ const I18N = {
         'field-sep': 'ตัวคั่น',
         'log-detail-summary-ok': 'ส่งสำเร็จ',
         'log-detail-summary-fail': 'ส่งไม่สำเร็จ',
-        'log-detail-mrerp-debug-tip': 'ส่งล้มเหลว · ดาวน์โหลด xlsx ที่ Pearnly สร้าง · ส่งให้ Korn อัปโหลดด้วยมือใน mrerp4sme เพื่อตรวจสอบฟิลด์',
-        'log-detail-mrerp-hint-title': 'คำใบ้จาก MR.ERP server (ดูได้เลยว่าฟิลด์ไหนผิด)',
-        'log-detail-mrerp-debug-download': 'ดาวน์โหลด xlsx นี้',
         'log-detail-to-ep': 'ส่งไปยัง',
         'log-detail-request-human': 'ข้อมูลที่ส่งไปยัง ERP',
         'log-detail-response-human': 'การตอบกลับจาก ERP',
@@ -6394,10 +6433,33 @@ const I18N = {
         'nav-group-data': 'จัดการข้อมูล',
         'nav-group-automation': 'ระบบอัตโนมัติ',
         'nav-group-system': 'ระบบ',
-        'nav-exceptions': 'รายการข้อยกเว้น',
+        'nav-exceptions': 'ข้อยกเว้น',
         'nav-clients': 'ลูกค้า',
         'nav-vouchers': 'ใบสำคัญ',
         'nav-receivables': 'ลูกหนี้',
+        // v118.33.3 NAV-IA Phase 3
+        'sidebar-cta-upload': 'อัปโหลดใบกำกับ',
+        'nav-integrations': 'การเชื่อมต่อ',
+        'integrations-title': 'การเชื่อมต่อ',
+        'integrations-sub': 'การเชื่อมต่อบุคคลที่สาม Google · LINE · อีเมล · ERP · โฟลเดอร์ · คลาวด์ ให้ Pearnly ซิงค์ข้อมูลอัตโนมัติ',
+        // v118.33.7 NAV-IA Phase 7
+        'integrations-section-google': 'บริการ GOOGLE',
+        'integrations-section-channels': 'ช่องทางรับใบกำกับ',
+        'integrations-section-erp': 'ระบบ ERP',
+        'integrations-google-info': 'อนุญาตบัญชี Google ครั้งเดียว · ใช้ได้ทั้ง Drive และ Sheets · ไม่ต้องอนุญาตซ้ำ',
+        'int-name-drive': 'Google Drive',
+        'int-name-sheets': 'Google Sheets',
+        'int-name-gmail': 'Gmail Ingest',
+        'int-name-line': 'LINE Bot',
+        'int-name-folder': 'ดูโฟลเดอร์',
+        'int-name-erp': 'เชื่อมต่อ ERP',
+        'int-desc-drive': 'จัดเก็บใบกำกับ/PV ที่ตรวจแล้วเข้า Drive อัตโนมัติ · แยกตามลูกค้าและเดือน',
+        'int-desc-sheets': 'ผลการอ่านซิงค์เข้า Sheets แบบเรียลไทม์ · เจ้าของ/ผู้สอบบัญชีเข้าดูออนไลน์ได้',
+        'int-desc-gmail': 'ดึงไฟล์แนบจากอีเมลลูกค้าอัตโนมัติ · ไม่ต้องส่งต่อเอง',
+        'int-desc-line': 'พนักงานถ่ายรูปส่ง LINE · ลงบัญชีอัตโนมัติ · รองรับทั้งแชตเดี่ยวและกลุ่ม',
+        'int-desc-folder': 'ระบุโฟลเดอร์ในเครื่อง/แชร์ · วางไฟล์ลงไปก็อ่านอัตโนมัติ',
+        'int-desc-erp': 'Xero · MR.ERP · Webhook · ส่งเข้า ERP อัตโนมัติหลังอ่านเสร็จ',
+        'btn-configure': 'ตั้งค่า',
         // v109.4 · ใบกำกับขาย (v110.1)
         'nav-sales-invoices': 'ใบกำกับขาย',
         'cs-sales-invoices-title': 'ใบกำกับขาย',
@@ -6406,12 +6468,16 @@ const I18N = {
         'cs-sales-invoices-f2': 'สร้าง PDF ใบกำกับภาษี / ใบเสร็จ ตามมาตรฐาน · ส่งอีเมล / LINE ให้ลูกค้าคลิกเดียว',
         'cs-sales-invoices-f3': 'VAT ขายรวมเข้า ภ.พ.30 อัตโนมัติ · เลิกพิมพ์เปรียบเทียบซื้อ-ขายด้วยมือ',
         'cs-sales-invoices-eta': 'เร็วๆ นี้ในเวอร์ชัน v110.1',
-        'nav-reconcile': 'กระทบยอด',
+        'nav-reconcile': 'ศูนย์กระทบยอด',
         // v118.26.0 · ศูนย์กระทบยอด เมนูหลัก
         'reconcile-title': 'กระทบยอดธนาคาร',
         'reconcile-sub': 'จับคู่รายการธนาคารกับใบกำกับภาษีอัตโนมัติ · ลดเวลาปิดเดือนจาก 3 ชม. เหลือ 30 นาที',
         'reconcile-center-title': 'ศูนย์กระทบยอด',
         'reconcile-center-sub':   'เลือกประเภทการกระทบยอด',
+        'rc-page-title': 'การกระทบยอด',
+        'rc-page-sub':   'กระทบยอดบัญชี · ค้นหาความต่าง · ปิดงบเร็วขึ้น',
+        'rc-bank-sub':   'จับคู่ธุรกรรมธนาคารกับใบกำกับภาษีอัตโนมัติ · ลดเวลาปิดงบจาก 3 ชม เหลือ 30 นาที',
+        'bank-empty-hint': 'ยังไม่มีบันทึกการกระทบยอด · อัปโหลดใบแจ้งยอดเพื่อเริ่ม',
         'reconcile-pending': 'รอกระทบยอด',
         'reconcile-matched': 'เสร็จแล้ว',
         'reconcile-unmatched': 'ไม่พบคู่',
@@ -6468,7 +6534,40 @@ const I18N = {
         'recon-reason-ai-cannot-classify':'ไม่สามารถระบุไฟล์นี้ได้ · กรุณาเลือกประเภทเอง',
         // ==== v118.32.x · กระทบยอด VAT (หน้า A + B + C) ====
         'recon-tab-bank':     'กระทบยอดธนาคาร',
-        'recon-tab-sale-vat': 'กระทบยอดภาษีขาย',
+        'recon-tab-sale-vat': 'ตรวจสอบรายงานภาษีขาย',
+        'recon-tab-gl-vat':   'กระทบรายได้',
+        'glv-sub':            'บัญชีแยกประเภท (GL) vs รายงานภาษีขาย · อัปโหลดสองไฟล์เพื่อกระทบยอด',
+        'glv-up-vat-title':   '① รายงานภาษีขาย',
+        'glv-up-vat-sub':     'รองรับ Excel / PDF / รูปภาพ',
+        'glv-up-gl-title':    '② บัญชีแยกประเภท GL',
+        'glv-up-gl-sub':      'รายงานสมุดบัญชีแยกประเภท · Excel / PDF',
+        'glv-acct-prefix':    'รหัสนำหน้าบัญชีรายได้',
+        'glv-btn-run':        'เริ่มกระทบยอด',
+        'glv-btn-export':     'ส่งออก Excel',
+        'glv-kpi-matched':    'จับคู่สมบูรณ์',
+        'glv-kpi-diff':       'มีผลต่าง',
+        'glv-kpi-unmatched':  'ไม่พบใน GL',
+        'glv-detail-title':   'รายละเอียดผลต่าง',
+        'glv-summary-title':  'สรุปการกระทบยอด',
+        'glv-h-doc':          'เลขที่เอกสาร',
+        'glv-h-date':         'วันที่',
+        'glv-h-customer':     'ชื่อลูกค้า',
+        'glv-h-vat':          'ยอดตามรายงาน VAT',
+        'glv-h-gl':           'ยอดตาม GL',
+        'glv-h-diff':         'ผลต่าง',
+        'glv-h-acct':         'รหัสบัญชีรายได้',
+        'glv-running':        'กำลังกระทบยอด…',
+        'glv-hint-need-both': 'กรุณาอัปโหลดทั้งสองไฟล์',
+        'glv-history-title':  'การกระทบยอดล่าสุด',
+        'glv-history-refresh':'รีเฟรช',
+        'glv-history-empty':  'ยังไม่มีประวัติการกระทบยอด',
+        'glv-hist-time':      'เวลา',
+        'glv-hist-files':     'ไฟล์',
+        'glv-hist-rows':      'จำนวนแถว (VAT/GL)',
+        'glv-hist-matched':   'จับคู่',
+        'glv-hist-diff':      'ผลต่าง',
+        'glv-hist-missing':   'ไม่พบ',
+        'glv-hist-actions':   'การจัดการ',
         'recon-tab-batch':    'กระทบยอดแบบกลุ่ม',
         'sv-title':           'กระทบยอดภาษีขาย',
         'sv-sub':             'เปรียบเทียบใบกำกับ vs รายงานทีละแถว · ดูเฉพาะที่ต่าง',
@@ -6489,10 +6588,33 @@ const I18N = {
         'vex-col-elapsed':     'เวลา',
         'vex-col-actions':     'การดำเนินการ',
         'vex-detail-soon':     'รายละเอียดงานเร็วๆ นี้',
+        'vex-recent-show-limited':  'แสดง 5 รายการล่าสุด จาก {n}',
+        'vex-recent-show-all':      'ดูทั้งหมด {n} รายการ',
+        'vex-recent-collapse':      'ย่อ',
+        'vex-toggle-preview-open':  'ดูรายการ',
+        'vex-toggle-preview-close': 'ซ่อนรายการ',
+        'vex-preview-invoice':      'ใบกำกับขาย',
+        'vex-preview-report':       'รายงาน VAT',
+        'vex-preview-search':       'ค้นชื่อไฟล์...',
+        'vex-preview-clear-all':    'ล้างทั้งหมด',
+        'vex-preview-count':        'แสดง {n} / {m}',
+        'vex-preview-guide-search': 'ใช้ค้นหากรองเมื่อไฟล์เยอะ · เลื่อนลงเพื่อโหลดเพิ่ม',
+        'vex-task-delete-confirm-title': 'ลบงานกระทบยอด?',
+        'vex-task-delete-confirm-body':  'ลบแคชการอ่านใบกำกับด้วย · ไม่สามารถกู้คืน',
+        'vex-task-delete-ok':   'ลบแล้ว',
+        'vex-task-delete-fail': 'ลบไม่สำเร็จ',
+        'vex-clear-old-btn':     'ลบงานเก่ากว่า 7 วัน',
+        'vex-clear-old-confirm': 'ลบงานกระทบยอดเก่ากว่า 7 วัน? ไม่สามารถย้อนกลับ',
+        'vex-clear-old-success': 'ลบ {n} รายการแล้ว',
+        'vex-main-action-tag':  'งานหลัก',
         'vex-status-pending':  'รอดำเนินการ',
         'vex-status-running':  'กำลังดำเนินการ',
         'vex-status-done':     'เสร็จแล้ว',
         'vex-status-failed':   'ล้มเหลว',
+        'vex-toast-expired':   'ข้อมูลหมดอายุ · กรุณากระทบยอดใหม่',
+        'vex-toast-dl-fail':   'ดาวน์โหลดล้มเหลว · โปรดลองอีกครั้ง',
+        'vex-client-all':      'ทุกลูกค้า',
+        'vex-new-recon-title': 'สร้างการกระทบยอดใหม่',
         'vex-mode-standard':       'มาตรฐาน',
         'vex-mode-excel':          'Excel สูตร',
         'vex-mode-hint':           '🧪 รุ่นทดลอง · กรุณาแจ้งฟีดแบ็ก',
@@ -6506,8 +6628,8 @@ const I18N = {
         'vex-btn-build':           'เริ่มกระทบยอด',
         'vex-btn-download':        '↓ ดาวน์โหลดตารางกระทบยอด',
         'vex-progress-running':    'กำลังกระทบยอด…',
-        'vex-progress-sub':        '{a} ใบกำกับ vs {b} แถวรายงาน',
-        'vex-progress-elapsed':    'กระทบยอด… {a} ใบ vs {b} แถว · {s} วินาที',
+        'vex-progress-sub':        '{a} ใบกำกับ · {b} ไฟล์รายงาน',
+        'vex-progress-elapsed':    'กระทบยอด… {a} ใบ · {b} ไฟล์รายงาน · {s} วิ',
         'vex-result-title':        '✓ กระทบยอดเสร็จสิ้น',
         'vex-result-sub':          '{a} ใบ vs {r} แถว · {s} วินาที',
         'vex-need-both':           'ต้องมีอย่างน้อย 1 ใบกำกับ + 1 รายงาน',
@@ -6849,53 +6971,6 @@ const I18N = {
         'confirm-default-title': 'ยืนยัน',
         'confirm-ok': 'ตกลง',
         'confirm-cancel': 'ยกเลิก',
-        // v118.27.1 · MR.ERP อะแดปเตอร์
-        'mrerp-btn': 'ดาวน์โหลด MR.ERP .xlsx',
-        'mrerp-btn-tip': 'สร้างไฟล์ Excel ตามรูปแบบ MR.ERP · แล้วอัปโหลดบนเว็บ MR.ERP',
-        'mrerp-btn-disabled-no-map': 'ตั้งรหัสลูกค้า MR.ERP ก่อนที่ ระบบอัตโนมัติ → ERP → แมปฟิลด์',
-        'mrerp-btn-disabled-exc': 'แก้ไขฟิลด์สีแดงในศูนย์ผิดปกติก่อน',
-        'mrerp-toast-ok': 'สร้าง .xlsx แล้ว · อัปโหลดบนเว็บ MR.ERP',
-        'mrerp-toast-fail': 'ล้มเหลว: {err}',
-        'mrerp-err-no_client_mapping': 'ลูกค้ารายนี้ยังไม่ได้ตั้งรหัส MR.ERP',
-        'mrerp-err-no_invoice_no': 'เลขใบกำกับว่าง',
-        'mrerp-err-no_invoice_date': 'วันที่ใบกำกับว่าง',
-        'mrerp-err-no_total_amount': 'ยอดรวมว่างหรือเป็น 0',
-        'mrerp-err-no_customer_mapping': 'ลูกค้ารายนี้ยังไม่ได้ตั้งรหัส MR.ERP',
-        'mrerp-err-exception_unresolved': 'ยังไม่ผ่านการตรวจ',
-        'mrerp-err-sheet_kind_stub_wait_material': 'ประเภทเอกสารนี้ยังไม่ได้รับตัวอย่าง',
-        'mrerp-err-module_missing': 'โมดูลแบ็กเอนด์หาย',
-        'mrerp-err-history_not_found': 'ไม่พบรายการ',
-        // v27.8.1.0 · MR.ERP ส่งตรงผ่านการล็อกอินจำลอง
-        'mrerp-direct-card-not-connected': 'ยังไม่ได้เชื่อม MR.ERP',
-        'mrerp-direct-card-connected': 'เชื่อม MR.ERP แล้ว',
-        'mrerp-direct-connect-btn': 'เพิ่มข้อมูลรับรอง',
-        'mrerp-direct-modify-btn': 'แก้ไข',
-        'mrerp-direct-remove-btn': 'ลบ',
-        'mrerp-direct-remove-confirm': 'หลังลบแล้ว การส่งตรง MR.ERP ของ tenant นี้จะหยุด · ยังนำเข้า .xlsx ด้วยตนเองได้ · ดำเนินการต่อ?',
-        'mrerp-direct-meta-company': 'บริษัท:',
-        'mrerp-direct-meta-comid': 'ชุดบัญชี:',
-        'mrerp-direct-meta-last-test': 'ทดสอบล่าสุด:',
-        'mrerp-direct-test-pass': '✓ ผ่าน',
-        'mrerp-direct-test-fail': '✗ ล้มเหลว',
-        'mrerp-direct-test-never': 'ยังไม่เคยทดสอบ',
-        'mrerp-direct-test-korn-btn': 'ทดสอบด้วยตัวอย่างของ Korn',
-        'mrerp-direct-test-korn-tip': 'ส่งไฟล์ SC ตัวอย่างจริงของ Korn ผ่าน mrerp_pusher (พรีวิวเท่านั้น ไม่เขียน DB) เพื่อวินิจฉัยว่าเป็นปัญหา HTTP flow หรือ xlsx content',
-        'mrerp-direct-test-korn-title': 'ทดสอบด้วยตัวอย่างจริงของ Korn',
-        'mrerp-direct-test-korn-running': 'กำลังส่ง (พรีวิวเท่านั้น ไม่เขียน DB)...',
-        'mrerp-direct-test-korn-stages': 'ขั้นตอนที่ผ่าน',
-        'mrerp-direct-test-korn-preview-rows': 'จำนวนแถวพรีวิว',
-        'mrerp-direct-test-korn-error': 'ข้อผิดพลาด',
-        'mrerp-direct-test-korn-raw-html': 'ดู HTML ดิบจาก MR.ERP',
-        'mrerp-direct-test-korn-close': 'ปิด',
-        'log-detail-mrerp-debug-fail': 'ดาวน์โหลดล้มเหลว: {err}',
-        // v27.8.1.3 · auto-push toggle
-        'erp-auto-push-label': 'ส่งอัตโนมัติหลัง OCR',
-        'erp-auto-push-on-tip': 'เปิด · เมื่ออัปโหลดผ่าน โฟลเดอร์ / อีเมล / LINE → ส่งเข้า ERP นี้อัตโนมัติ',
-        'erp-auto-push-off-tip': 'ปิด · ต้องกดส่งเอง',
-        'erp-auto-push-toggling': 'กำลังสลับ...',
-        'erp-auto-push-toggle-fail': 'สลับล้มเหลว: {err}',
-        'erp-auto-push-toggled-on': 'เปิดส่งอัตโนมัติแล้ว',
-        'erp-auto-push-toggled-off': 'ปิดส่งอัตโนมัติแล้ว',
         // v118.27.8.1.15 · อัปโหลดแบทช์ใหญ่ (>100 ใบ) progress + เตือนปิดหน้า + tip ครั้งแรก
         'big-batch-progress-init':    'กำลังเริ่มอ่านแบทช์...',
         'big-batch-progress-running': 'อ่านแล้ว {done} / {total} · เหลือประมาณ {min} นาที · ไปทำอย่างอื่นได้',
@@ -6904,139 +6979,18 @@ const I18N = {
         'big-batch-first-tip':        'รอบนี้จะอ่าน {n} ใบ · ใช้เวลาประมาณ {min} นาที · ทำงานเบื้องหลังต่อได้ · เสร็จแล้วจะเซฟเข้า「บันทึกบิล」อัตโนมัติ',
         // v118.27.8.1.15 · ERP onboarding ผู้ใช้ใหม่ (เข้าหน้า ERP ครั้งแรก + ยังไม่มี endpoint)
         'erp-onboard-title':          'ทำให้การส่งเข้า ERP เป็น 0 คลิก',
-        'erp-onboard-body':           'หลังอ่านบิลเสร็จ Pearnly ส่งเข้า MR.ERP / Xero / Webhook ของคุณอัตโนมัติได้ · ไม่ต้องกดอะไร เชื่อมต่อ ERP ใหม่จะเปิด「ส่งอัตโนมัติ」ให้เลย · ปิดเองได้ตลอด',
+        'erp-onboard-body':           'หลังอ่านบิลเสร็จ Pearnly ส่งเข้า ERP / Xero / Webhook ของคุณอัตโนมัติได้ · ไม่ต้องกดอะไร เชื่อมต่อ ERP ใหม่จะเปิด「ส่งอัตโนมัติ」ให้เลย · ปิดเองได้ตลอด',
         'erp-onboard-ok':             'ตกลง · ไปสร้าง ERP เลย',
         'erp-onboard-later':          'เอาไว้ก่อน',
-        // v118.27.8.1.16 · จับคู่ตรงเป๊ะ 0 คลิก + คะแนนกลาง quick-confirm toast
-        'mrerp-auto-matched-toast':   'จับคู่อัตโนมัติเป็น「{name}」· กำลังส่งเข้า MR.ERP...',
-        'mrerp-quick-confirm-text':   'กำหนดให้「{name}」แล้ว',
-        'mrerp-quick-confirm-ok':     'ใช่เลย',
-        'mrerp-quick-confirm-change': 'เปลี่ยน',
-        'mrerp-recommend-badge':      'แนะนำ',
-        'mrerp-maybe-badge':          'น่าจะใช่',
-
-        // v118.27.8.1.17 · product picker mini modal · OCR detail row mapping
-        'mrerp-prod-prep-done-toast':   'แมปสินค้าครบหมดแล้ว · กำลังส่ง...',
-        'mrerp-prod-pick-not-ready':    'ตัวเลือกสินค้ายังไม่พร้อม · กรุณารีเฟรชหน้า',
-        'mrerp-prod-flow-cancelled':    'ยกเลิกการแมปสินค้า · ไม่ได้ส่ง',
-        'mrerp-prod-auto-matched-toast':'จับคู่อัตโนมัติ「{ocr}」→「{name}」',
-        'mrerp-pick-prod-title':        'เลือกรหัสสินค้า MR.ERP',
-        'mrerp-pick-prod-progress':     'ขั้นตอน {i} / {n}',
-        'mrerp-pick-prod-ocrlabel':     'OCR ดึงมา:',
-        'mrerp-pick-prod-search-ph':    'ค้นหาด้วยรหัส / ชื่อ...',
-        'mrerp-pick-prod-loading':      'กำลังโหลดรายการสินค้า...',
-        'mrerp-pick-prod-empty':        'ไม่พบสินค้าที่ตรงกัน',
-        'mrerp-pick-prod-empty-all':    'MR.ERP ยังไม่มีข้อมูลสินค้า · เพิ่มที่ MR.ERP ก่อน · หรือพิมพ์รหัสด้วยมือด้านล่าง',
-        'mrerp-pick-prod-fetch-fail':   'ดึงข้อมูลล้มเหลว: {err}',
-        'mrerp-pick-prod-manual-summary':'หาไม่เจอ? พิมพ์รหัสด้วยมือ',
-        'mrerp-pick-prod-manual-ph':    'เช่น P00123',
-        'mrerp-pick-prod-manual-use':   'ใช้รหัสนี้',
-        'mrerp-pick-prod-manual-empty': 'กรุณากรอกรหัส',
-        'mrerp-pick-prod-selected-label':'เลือกแล้ว:',
-        'mrerp-pick-prod-skip':         'ข้ามสินค้านี้ (ใช้รหัสตัวแทน)',
-        'mrerp-pick-prod-cancel':       'ยกเลิกการส่งทั้งหมด',
-        'mrerp-pick-prod-save':         'บันทึก · ทำต่อ',
-        'mrerp-pick-prod-save-ok':      'บันทึกการแมปแล้ว',
-        'mrerp-pick-prod-save-fail':    'บันทึกล้มเหลว · ลองอีกครั้ง',
         'erp-add-webhook-card': '+ เพิ่ม Webhook',
         'erp-add-webhook-card-tip': 'POST ไปยัง URL ใดก็ได้ · เช่น LINE / Slack / ERP ที่สร้างเอง',
         'erp-webhook-card-name': 'Webhook',
-        'mrerp-cred-modal-add': 'เพิ่มข้อมูลรับรอง MR.ERP',
-        'mrerp-cred-modal-edit': 'แก้ไขข้อมูลรับรอง MR.ERP',
-        'mrerp-cred-fallback-hint': 'ไม่อยากเก็บรหัสผ่าน? ดาวน์โหลด .xlsx นำเข้าด้วยตนเองได้ (ลิ้นชักประวัติ OCR → เมนูส่ง → "ดาวน์โหลด MR.ERP .xlsx")',
-        'mrerp-cred-field-username': 'ชื่อผู้ใช้ MR.ERP *',
-        'mrerp-cred-field-username-ph': 'เช่น test01',
-        'mrerp-cred-field-password': 'รหัสผ่าน MR.ERP *',
-        'mrerp-cred-field-password-ph': 'เก็บแบบเข้ารหัส · ไม่เก็บข้อความธรรมดา',
-        'mrerp-cred-field-comidyear': 'ปีบริษัท',
-        'mrerp-cred-field-seldb': 'หมายเลขฐานข้อมูล',
-        'mrerp-cred-field-company': 'ชื่อบริษัท',
-        'mrerp-cred-field-company-ph': 'เช่น ABC Co., Ltd. 2024',
-        'mrerp-cred-field-company-tag': 'เพื่อแสดงเท่านั้น',
-        'mrerp-cred-section-login': 'ข้อมูลเข้าระบบ',
-        'mrerp-cred-advanced-summary': 'การตั้งค่าขั้นสูง',
-        'mrerp-cred-advanced-tag': '— เฉพาะเมื่อระบบหารายการอัตโนมัติไม่ได้',
-        'mrerp-cred-advanced-hint-text': 'ใช้「เลือกบัญชี」ด้านบนก่อน · ช่องนี้สำหรับกรณีที่ MR.ERP ไม่ส่งรายการบัญชีกลับมา',
-        'mrerp-cred-dbselect-section': 'เลือกบัญชีฐานข้อมูล',
-        'mrerp-cred-dbselect-ok': '✓ พบ {n} บัญชี · เลือก 1 รายการ',
-        'mrerp-cred-dbselect-ok-single': '✓ เลือก {name} ให้อัตโนมัติแล้ว',
-        'mrerp-cred-dbselect-empty': 'ไม่พบบัญชี · กางส่วน「ขั้นสูง」กรอกเองด้านล่าง',
-        'mrerp-cred-dbselect-fail': 'ดึงรายการบัญชีไม่สำเร็จ: {err} · กรอกเองในส่วน「ขั้นสูง」ได้',
-        'mrerp-cred-dbselect-required': 'กรุณาเลือกบัญชี 1 รายการ (หรือกรอกในส่วนขั้นสูง)',
-        'mrerp-cred-dbselect-auto-tag': 'เลือกอัตโนมัติ',
-        'erp-map-howto-mrerp-title': 'หารหัสลูกค้าของ MR.ERP ที่ไหน?',
-        'erp-map-howto-mrerp-body': 'เข้า MR.ERP → เมนูซ้าย「ข้อมูลหลัก」→「จัดการลูกค้า」→ ตัวเลข 4 หลักหน้าแต่ละแถวคือรหัสลูกค้า (เช่น 0006)',
         'erp-map-show-advanced': 'แสดงการแมปขั้นสูง',
         'erp-map-hide-advanced': 'ซ่อนการแมปขั้นสูง',
-        'erp-map-dev-fetch-selectdb': 'ดึงหน้า selectdb ของ MR.ERP (debug 13b)',
-        'erp-map-dev-fetch-selectdb-running': 'กำลังดึง...',
-        'erp-map-dev-fetch-selectdb-ok': '✓ ดาวน์โหลดแล้ว · ส่งไฟล์ json ให้ Claude',
-        'erp-map-dev-fetch-selectdb-fail': 'ดึงไม่สำเร็จ: {err}',
-        'erp-map-dev-fetch-page': 'ดึงหน้าใดก็ได้ของ MR.ERP (debug 14a)',
-        'erp-map-dev-fetch-page-input-ph': 'ว่าง = ดึงเมนูหลัก · หรือวางพาธ /imparse/formupload.php?idmenu=...',
-        'erp-map-dev-fetch-page-running': 'กำลังดึง...',
-        'erp-map-dev-fetch-page-ok': '✓ ดาวน์โหลดแล้ว · ส่งไฟล์ json ให้ Claude',
-        'erp-map-dev-fetch-page-fail': 'ดึงไม่สำเร็จ: {err}',
-        'erp-map-dev-fetch-customers': 'ดึงรายชื่อลูกค้า MR.ERP (debug 14b)',
-        'erp-map-dev-fetch-customers-running': 'กำลังดึง (แบ่งหน้า · ใช้เวลาสักครู่)...',
-        'erp-map-dev-fetch-customers-ok': '✓ ดาวน์โหลดแล้ว · รวม {n} หน้า · ส่งไฟล์ json ให้ Claude',
-        'erp-map-dev-fetch-customers-fail': 'ดึงไม่สำเร็จ: {err}',
-        'mrerp-pick-cus-title': 'ตั้งรหัส MR.ERP',
-        'mrerp-pick-cus-for-client': 'สำหรับลูกค้า Pearnly',
-        'mrerp-pick-cus-for-client-tail': 'เลือกรหัสที่ตรงใน MR.ERP · บันทึกแล้วระบบจะส่งซ้ำให้อัตโนมัติ',
-        'mrerp-pick-cus-search-ph': 'พิมพ์รหัส / ชื่อ เพื่อค้นหา...',
-        'mrerp-pick-cus-refresh': 'รีเฟรช',
-        'mrerp-pick-cus-manual-summary': 'ไม่มีในรายการ? กรอกรหัสเอง',
-        'mrerp-pick-cus-manual-ph': 'เช่น 0006',
-        'mrerp-pick-cus-manual-use': 'ใช้รหัสนี้',
-        'mrerp-pick-cus-selected-label': 'เลือก:',
-        'mrerp-pick-cus-cancel': 'ยกเลิก',
-        'mrerp-pick-cus-save': 'บันทึก & ส่ง',
-        'mrerp-pick-cus-loading': 'กำลังโหลดรายชื่อลูกค้า...',
-        'mrerp-pick-cus-empty': 'ไม่พบลูกค้าที่ตรงกัน',
-        'mrerp-pick-cus-empty-all': 'ไม่มีลูกค้าใน MR.ERP · กรุณาเพิ่มลูกค้าใน MR.ERP ก่อน หรือกรอกรหัสด้วยตนเองด้านล่าง',
-        'mrerp-pick-cus-fetch-fail': 'ดึงไม่สำเร็จ: {err}',
-        'mrerp-pick-cus-save-fail': 'บันทึกล้มเหลว: {err}',
-        'mrerp-pick-cus-save-ok': 'บันทึกรหัส MR.ERP แล้ว · กำลังส่ง...',
-        'mrerp-pick-cus-manual-empty': 'กรอกรหัส',
-        'mrerp-pick-cus-no-client': 'ใบแจ้งหนี้นี้ยังไม่ผูกกับลูกค้า Pearnly · เลือกลูกค้าที่มุมขวาบนแล้วอัปโหลดใหม่',
         'results-saved-banner': 'ผลการอ่านจะถูกบันทึกที่「บันทึกเอกสาร」อัตโนมัติ · ปิดหน้านี้ก็ไม่หาย',
         'history-filter-banner-prefix': 'แสดงเฉพาะลูกค้า:',
         'history-filter-banner-clear': 'แสดงทุกลูกค้า',
         'history-filter-banner-count': '({n} รายการ)',
-        'mrerp-pick-cus-buyer-label': 'ผู้ซื้อในใบ:',
-        'mrerp-cred-btn-test': 'ทดสอบการเชื่อมต่อ',
-        'mrerp-cred-btn-cancel': 'ยกเลิก',
-        'mrerp-cred-btn-save': 'บันทึก',
-        'mrerp-cred-btn-saving': 'กำลังบันทึก...',
-        'mrerp-cred-btn-testing': 'กำลังทดสอบ...',
-        'mrerp-cred-test-ok': '✓ ข้อมูลรับรองถูกต้อง · พร้อมบันทึก',
-        'mrerp-cred-test-fail': '✗ ทดสอบล้มเหลว: {err}',
-        'mrerp-cred-save-ok': 'เชื่อม MR.ERP แล้ว · ใช้ "ส่งเข้า MR.ERP" ในลิ้นชักประวัติ OCR ได้',
-        'mrerp-cred-save-fail': 'บันทึกล้มเหลว: {err}',
-        'mrerp-cred-remove-ok': 'ลบข้อมูลรับรอง MR.ERP แล้ว',
-        'mrerp-cred-remove-fail': 'ลบล้มเหลว: {err}',
-        'mrerp-cred-empty-required': 'ต้องกรอกชื่อผู้ใช้และรหัสผ่าน',
-        'mrerp-cred-not-owner': 'เฉพาะเจ้าของเท่านั้นที่ตั้งค่าข้อมูลรับรอง ERP ได้',
-        'mrerp-direct-push-tag': 'ส่งตรง',
-        'mrerp-direct-push-pushing': 'กำลังส่งเข้า MR.ERP...',
-        'mrerp-direct-push-ok': '✓ ส่งเข้า MR.ERP แล้ว · {n} แถว',
-        'mrerp-direct-push-fail': 'ส่งล้มเหลว: {err}',
-        'mrerp-direct-err-auth_failed': 'ล็อกอิน MR.ERP ล้มเหลว · ข้อมูลรับรองอาจเปลี่ยน · กรุณากรอกใหม่',
-        'mrerp-direct-err-no_credentials': 'ยังไม่ได้ตั้งค่าข้อมูลรับรอง MR.ERP',
-        'mrerp-direct-err-no_client_mapping': 'ลูกค้านี้ยังไม่มีรหัส MR.ERP',
-        'mrerp-direct-err-credentials_corrupted': 'ข้อมูลรับรองเสียหาย · กรุณากรอกใหม่',
-        'mrerp-direct-err-exception_unresolved': 'แก้ไขฟิลด์สีแดงในศูนย์ผิดปกติก่อน',
-        'mrerp-direct-err-history_not_found': 'ไม่พบรายการ',
-        'mrerp-direct-err-no_tenant': 'บัญชียังไม่ได้ผูกกับ tenant',
-        'mrerp-direct-err-owner_only': 'เฉพาะเจ้าของเท่านั้นที่ตั้งค่าข้อมูลรับรอง ERP ได้',
-        'mrerp-direct-err-module_missing': 'โมดูลฝั่งเซิร์ฟเวอร์หาย',
-        'mrerp-direct-err-pusher_module_missing': 'เอ็นจิ้นการส่ง MR.ERP ยังไม่ได้ติดตั้ง',
-        'mrerp-direct-err-generate_failed': 'สร้าง xlsx ล้มเหลว',
-        'mrerp-direct-err-validation': 'MR.ERP ปฏิเสธ: {err}',
-        'mrerp-direct-err-network': 'MR.ERP ไม่ตอบสนอง: {err}',
-        'mrerp-direct-err-module_unsupported': 'ประเภทเอกสารยังไม่รองรับการส่ง MR.ERP',
-        'mrerp-direct-err-unknown': 'ข้อผิดพลาดไม่ทราบสาเหตุ: {err}',
         // v118.27.5 · ปุ่มส่งรวม (drawer)
         'unified-push-to': 'ส่งเข้า {name}',
         'unified-push-tip': 'คลิกเพื่อส่งไปยังตัวเริ่มต้น · ▼ เลือกตัวอื่น',
@@ -7049,7 +7003,6 @@ const I18N = {
         'unified-push-disabled-exc': 'แก้ไขฟิลด์สีแดงในศูนย์ผิดปกติก่อน',
         'unified-push-ok': 'ส่งเข้า {name} แล้ว',
         'unified-push-fail': '{name} ส่งไม่สำเร็จ: {err}',
-        'unified-push-mrerp-ok': 'สร้าง .xlsx แล้ว · อัปโหลดบนเว็บ MR.ERP',
         'unified-push-go-config': 'ไปตั้งค่า',
         // v118.27.4 · Xero อะแดปเตอร์
         'xero-card-title': 'Xero',
@@ -7088,6 +7041,11 @@ const I18N = {
         'erp-map-subtab-clients': 'แมปลูกค้า',
         'erp-map-subtab-accounts': 'แมปบัญชี',
         'erp-map-subtab-taxes': 'แมปรหัสภาษี',
+        'erp-map-subtab-products': 'แมปสินค้า',
+        'erp-map-empty-products': 'ยังไม่มีการแมปสินค้า',
+        'erp-map-empty-products-sub': 'การแมปจะสร้างอัตโนมัติเมื่อส่งสินค้าไป ERP',
+        'erp-map-col-item-name': 'ชื่อสินค้า (OCR)',
+        'erp-map-col-erp-product-code': 'รหัสสินค้า ERP',
         'erp-map-add-row': '+ เพิ่มแมป',
         'erp-map-save': 'บันทึก',
         'erp-map-delete': 'ลบ',
@@ -7139,11 +7097,6 @@ const I18N = {
         'erp-map-tax-wht_3': 'หัก ณ ที่จ่าย 3%',
         'erp-map-tax-wht_5': 'หัก ณ ที่จ่าย 5%',
         'erp-map-tax-non_vat': 'นอกระบบ',
-        'erp-map-dev-seed': 'ใส่ข้อมูลทดสอบ',
-        'erp-map-dev-clear': 'ล้างข้อมูลทดสอบ',
-        'erp-map-dev-seed-ok': 'ใส่ข้อมูลทดสอบเรียบร้อย',
-        'erp-map-dev-cleared': 'ล้าง {n} รายการทดสอบ',
-        'erp-map-dev-fail': 'ทำรายการไม่สำเร็จ',
     },
     ja: {
         'lang-name': '日本語',
@@ -7180,6 +7133,31 @@ const I18N = {
         'btn-logout': 'ログアウト',
         // v118.27.3
         'user-menu-settings': '設定', 'user-menu-help': 'ヘルプ・フィードバック', 'user-menu-logout': 'ログアウト',
+        // NAV-IA Phase 1 · 顶栏三件套(2026-05-15)
+        'avatar-menu-settings': '設定',
+        'avatar-menu-team': 'チームメンバー',
+        'avatar-menu-billing': 'サブスクリプション・プラン',
+        'avatar-menu-shortcuts': 'キーボードショートカット',
+        'avatar-menu-admin': '管理者コンソール',
+        'avatar-menu-test': 'テストセンター',
+        'avatar-menu-help': 'ヘルプ・フィードバック',
+        'avatar-menu-logout': 'ログアウト',
+        'avatar-menu-badge-admin': '管理者',
+        // v118.44.0 NAV-IA Phase 8 · admin layout
+        'adm-banner-msg': 'Pearnly プラットフォーム管理 · スーパー管理者のみ · 通常ユーザービューと分離',
+        'adm-banner-title': 'プラットフォーム管理',
+        'adm-sidebar-section': '管理機能',
+        'adm-sidebar-cost': 'コスト追跡',
+        'adm-sidebar-users': 'ユーザー管理',
+        'adm-back-to-home': 'ユーザービューへ戻る',
+        'topbar-search-ph': '請求書・顧客・移動を検索...',
+        'cmdk-input-ph': 'ページ移動 / 請求書・顧客検索...',
+        'cmdk-section-jump': '移動',
+        'cmdk-section-actions': 'アクション',
+        'cmdk-empty': '該当なし',
+        'cmdk-foot-move': '移動',
+        'cmdk-foot-select': '選択',
+        'cmdk-foot-close': '閉じる',
         'help-modal-title': 'ヘルプ・フィードバック', 'help-modal-tip': '問題やご提案がありましたら、下記からご連絡ください · 24 時間以内に返信します',
         'contact-email-label': 'メール', 'contact-phone-label': '電話', 'contact-line-label': 'LINE',
         // v118.27.4
@@ -7222,9 +7200,54 @@ const I18N = {
         'ob-fb-saved-local': 'ローカルに保存しました · アップロードに問題があります',
         'nav-group-main': 'メイン',
         'nav-group-tools': 'ツール',
-        'nav-dashboard': 'ダッシュボード',
-        'nav-ocr': 'アップロード & OCR',
-        'nav-history': '伝票記録',
+        'nav-dashboard': 'ホーム',
+        'dash-title': 'ホーム',
+        'dash-sub': '今日の作業概要',
+        'dash-kpi-month-invoices': '今月の請求書',
+        'dash-kpi-month-invoices-sub': '件認識済み',
+        'dash-kpi-pending': '保留中',
+        'dash-kpi-pending-sub': '件レビュー待ち',
+        'dash-kpi-exceptions': '異常',
+        'dash-kpi-exceptions-sub': '至急対応が必要',
+        'dash-kpi-plan': 'クォータ',
+        'dash-kpi-plan-sub': '今月使用済み',
+        'dash-quick-title': 'クイック操作',
+        'dash-quick-sub': '3 ステップで主要画面へ',
+        'dash-quick-upload': '請求書をアップロード',
+        'dash-quick-clients': '顧客を見る',
+        'dash-quick-reconcile': '照合を開始',
+        'dash-quick-exceptions': '異常を処理',
+        'dash-recent-title': '最近の動き',
+        'dash-recent-sub': '直近 5 件の認識',
+        'dash-recent-empty': '記録なし · 最初の請求書をアップロードしましょう',
+        'glv-preview-title': 'リスト確認',
+        'recon-preview-empty-vat': 'VAT レポート未選択',
+        'recon-preview-empty-gl': 'GL ファイル未選択',
+        'vex-summary-title': '照合サマリー',
+        'vex-detail-title': '差異詳細',
+        'vex-sum-total': '合計',
+        'vex-sum-matched': '完全一致',
+        'vex-sum-diff': 'データ差異',
+        'vex-sum-incomplete': 'OCR 未認識',
+        'vex-sum-cash': '現金客 (請求書なし)',
+        'vex-detail-empty': '今回の照合で差異なし',
+        'vex-detail-h-inv': '請求書番号',
+        'vex-detail-h-field': 'フィールド',
+        'vex-detail-h-rep': 'レポート側',
+        'vex-detail-h-inv-side': '請求書側',
+        'vex-detail-h-kind': '種別',
+        'recon-batch-selected': '0 件選択',
+        'recon-batch-selected-n': '{n} 件選択',
+        'recon-batch-clear': '選択解除',
+        'recon-batch-delete': '一括削除',
+        'recon-batch-delete-title': '一括削除',
+        'recon-batch-delete-confirm': '選択した {n} 件の照合タスクを削除しますか?この操作は取り消せません',
+        'recon-batch-delete-ok': '{n} 件削除しました',
+        'recon-batch-delete-fail': '一括削除に失敗 · 再試行してください',
+        'nav-group-sales': '売上管理',
+        'nav-group-expense': '経費管理',
+        'nav-ocr': '請求書アップロード',
+        'nav-history': '請求書記録',
         'ocr-title': 'アップロード & OCR',
         'ocr-sub': '撮影するだけ · データは Excel と ERP へ自動連携',
         'nav-automation': '自動化',
@@ -7529,6 +7552,7 @@ const I18N = {
         'history-source-email': 'メール',
         'history-source-folder': 'フォルダ',
         'history-source-api': 'API',
+        'history-smart-assigned': '自動帰属',
         'history-empty-title': 'まだ記録がありません',
         'history-empty-desc': '認識した請求書はここに表示されます',
         'history-pager': '{from}–{to} / {total}',
@@ -7854,7 +7878,6 @@ const I18N = {
         'ep-adapter': 'アダプター',
         'ep-adapter-webhook': 'カスタム Webhook',
         'ep-adapter-webhook-desc': '任意の URL に HTTP POST · 最も汎用',
-        'ep-adapter-mrerp-desc': 'Mr.ERP にワンクリック連携',
         'ep-adapter-flow-desc': 'タイ国内会計 SaaS',
         'tag-soon': '近日',
         'ep-name': 'エンドポイント名',
@@ -7899,6 +7922,10 @@ const I18N = {
         'erp-push-ok': '{name} に送信しました',
         'erp-push-fail': '送信失敗:{err}',
         'erp-push-no-endpoint': '先に自動化タブで ERP エンドポイントを設定してください',
+        'log-push-rows': '{n} 行のインポートに成功しました',
+        'erp-pushed-badge': '送信済み',
+        'erp-push-again-confirm': 'この請求書はすでに ERP に送信済みです。再度送信しますか？重複が発生する可能性があります。',
+        'erp-push-again-ok': '再送信',
         'rd-btn-verify': '確認',
         'rd-btn-sync': '同期',
         'rd-verifying': '確認中...',
@@ -8025,6 +8052,7 @@ const I18N = {
         'file-list-collapse': '折りたたむ',
         'alert-session': 'セッション切れ',
         'alert-password-changed-relogin': 'パスワード変更済み · 再ログインしてください',
+        'alert-session-revoked': '他のデバイスでサインインされました · このデバイスはログアウトされました',
         'admin-banner-msg': '管理者ビュー · Pearnly プラットフォーム管理者として操作中 · すべての操作は監査ログに記録されます',
         'toast-export-success': '✓ Excel 出力完了',
         'toast-export-error': '出力失敗',
@@ -8181,9 +8209,6 @@ const I18N = {
         'field-sep': '区切り',
         'log-detail-summary-ok': '送信成功',
         'log-detail-summary-fail': '送信失敗',
-        'log-detail-mrerp-debug-tip': '送信失敗 · この xlsx をダウンロードして Korn に送り、mrerp4sme で手動アップロードしてフィールドの問題を特定',
-        'log-detail-mrerp-hint-title': 'MR.ERP サーバーのヒント(どのフィールドが間違っているか直接表示)',
-        'log-detail-mrerp-debug-download': 'この xlsx をダウンロード',
         'log-detail-to-ep': '送信先',
         'log-detail-request-human': 'ERP へ送信したデータ',
         'log-detail-response-human': 'ERP からの応答',
@@ -8718,6 +8743,29 @@ const I18N = {
         'nav-clients': 'クライアント',
         'nav-vouchers': '伝票センター',
         'nav-receivables': '売掛追跡',
+        // v118.33.3 NAV-IA Phase 3
+        'sidebar-cta-upload': '請求書アップロード',
+        'nav-integrations': '連携',
+        'integrations-title': '連携',
+        'integrations-sub': 'Google · LINE · メール · ERP · フォルダ · クラウド 等の連携 · Pearnly が自動でデータ同期',
+        // v118.33.7 NAV-IA Phase 7
+        'integrations-section-google': 'GOOGLE サービス',
+        'integrations-section-channels': '受信チャネル',
+        'integrations-section-erp': 'ERP システム',
+        'integrations-google-info': 'Google を一度認証すれば Drive と Sheets 両方使えます · 再認証不要',
+        'int-name-drive': 'Google Drive',
+        'int-name-sheets': 'Google Sheets',
+        'int-name-gmail': 'Gmail 取込',
+        'int-name-line': 'LINE Bot',
+        'int-name-folder': 'フォルダ監視',
+        'int-name-erp': 'ERP 連携',
+        'int-desc-drive': '請求書/PV 承認後 Drive に自動保存 · 顧客と月別に整理',
+        'int-desc-sheets': 'OCR 結果を Sheets にリアルタイム同期 · 経営者/会計士がオンライン確認',
+        'int-desc-gmail': '顧客メールの添付を自動取得 · 手動転送不要',
+        'int-desc-line': '外勤が LINE で撮影送信 · 自動仕訳 · 個別チャット&グループ対応',
+        'int-desc-folder': 'ローカル/共有フォルダを指定 · 入れるだけで自動認識',
+        'int-desc-erp': 'Xero · MR.ERP · Webhook など · OCR 完了後 ERP に自動送信',
+        'btn-configure': '設定',
         // v109.4 · 売上請求書モジュール (v110.1)
         'nav-sales-invoices': '売上請求書',
         'cs-sales-invoices-title': '売上請求書',
@@ -8732,6 +8780,10 @@ const I18N = {
         'reconcile-sub': '銀行明細と請求書を自動マッチング · 月末締めを 3 時間から 30 分に短縮',
         'reconcile-center-title': '照合センター',
         'reconcile-center-sub':   '照合タイプを選択',
+        'rc-page-title': '対照センター',
+        'rc-page-sub':   '帳簿照合 · 差異発見 · 月次決算を加速',
+        'rc-bank-sub':   '銀行明細と請求書を自動マッチング · 月末締めを3時間から30分に短縮',
+        'bank-empty-hint': '対照記録がまだありません · 明細をアップロードして開始',
         'reconcile-pending': '未照合',
         'reconcile-matched': '完了',
         'reconcile-unmatched': '不一致',
@@ -8788,7 +8840,40 @@ const I18N = {
         'recon-reason-ai-cannot-classify':'種別判定不可 · 手動で選択',
         // ==== v118.32.x · 売上税照合 (画面A + B + C) ====
         'recon-tab-bank':     '銀行照合',
-        'recon-tab-sale-vat': '売上税照合',
+        'recon-tab-sale-vat': '売上税報告チェック',
+        'recon-tab-gl-vat':   '売上照合',
+        'glv-sub':            '総勘定元帳（GL）vs 売上税報告 · 2ファイルをアップロードして照合',
+        'glv-up-vat-title':   '① 売上税報告',
+        'glv-up-vat-sub':     'Excel / PDF / 画像 対応',
+        'glv-up-gl-title':    '② 総勘定元帳 GL',
+        'glv-up-gl-sub':      'Excel / PDF 対応',
+        'glv-acct-prefix':    '収益科目接頭辞',
+        'glv-btn-run':        '照合開始',
+        'glv-btn-export':     'Excelエクスポート',
+        'glv-kpi-matched':    '完全一致',
+        'glv-kpi-diff':       '差異あり',
+        'glv-kpi-unmatched':  'GL未発見',
+        'glv-detail-title':   '差異明細',
+        'glv-summary-title':  '照合まとめ',
+        'glv-h-doc':          '伝票番号',
+        'glv-h-date':         '日付',
+        'glv-h-customer':     '顧客名',
+        'glv-h-vat':          'VAT報告金額',
+        'glv-h-gl':           'GL金額',
+        'glv-h-diff':         '差異',
+        'glv-h-acct':         '収益科目',
+        'glv-running':        '照合中…',
+        'glv-hint-need-both': '両方のファイルをアップロードしてください',
+        'glv-history-title':  '最近の照合',
+        'glv-history-refresh':'更新',
+        'glv-history-empty':  '照合履歴なし',
+        'glv-hist-time':      '時刻',
+        'glv-hist-files':     'ファイル',
+        'glv-hist-rows':      '行数 (VAT/GL)',
+        'glv-hist-matched':   '一致',
+        'glv-hist-diff':      '差異',
+        'glv-hist-missing':   '不一致',
+        'glv-hist-actions':   '操作',
         'recon-tab-batch':    '一括認識',
         'sv-title':           '売上税照合',
         'sv-sub':             '請求書 vs VATレポート行単位照合 · 差異のみ確認',
@@ -8809,10 +8894,33 @@ const I18N = {
         'vex-col-elapsed':     '処理時間',
         'vex-col-actions':     '操作',
         'vex-detail-soon':     'タスク詳細は近日公開',
+        'vex-recent-show-limited':  '直近 5 件を表示 · 全 {n} 件',
+        'vex-recent-show-all':      '全 {n} 件を表示',
+        'vex-recent-collapse':      '折りたたむ',
+        'vex-toggle-preview-open':  'リスト表示',
+        'vex-toggle-preview-close': 'リスト非表示',
+        'vex-preview-invoice':      '売上請求書',
+        'vex-preview-report':       'VAT レポート',
+        'vex-preview-search':       'ファイル名検索...',
+        'vex-preview-clear-all':    '全クリア',
+        'vex-preview-count':        '{n} 件表示 / 全 {m} 件',
+        'vex-preview-guide-search': 'ファイルが多い時は検索を使用 · スクロールで追加読み込み',
+        'vex-task-delete-confirm-title': '対照タスクを削除?',
+        'vex-task-delete-confirm-body':  '関連 OCR キャッシュも削除 · 復元不可',
+        'vex-task-delete-ok':   '削除完了',
+        'vex-task-delete-fail': '削除失敗',
+        'vex-clear-old-btn':     '7 日前のタスクをクリア',
+        'vex-clear-old-confirm': '7 日以上前のタスクをクリア?元に戻せません',
+        'vex-clear-old-success': '{n} 件をクリアしました',
+        'vex-main-action-tag':  'メインアクション',
         'vex-status-pending':  '待機中',
         'vex-status-running':  '処理中',
         'vex-status-done':     '完了',
         'vex-status-failed':   '失敗',
+        'vex-toast-expired':   'データ期限切れ · 再度照合してください',
+        'vex-toast-dl-fail':   'ダウンロードに失敗しました · もう一度お試しください',
+        'vex-client-all':      '全顧客',
+        'vex-new-recon-title': '新規照合',
         'vex-mode-standard':       '標準',
         'vex-mode-excel':          'Excel 数式',
         'vex-mode-hint':           '🧪 実験中 · フィードバックお願いします',
@@ -8826,8 +8934,8 @@ const I18N = {
         'vex-btn-build':           '照合開始',
         'vex-btn-download':        '↓ 照合表をダウンロード',
         'vex-progress-running':    '照合中…',
-        'vex-progress-sub':        '請求書 {a} vs レポート {b} 行',
-        'vex-progress-elapsed':    '照合中… 請求書 {a} vs {b} 行 · {s} 秒',
+        'vex-progress-sub':        '請求書 {a} · レポート {b} 件',
+        'vex-progress-elapsed':    '照合中… 請求書 {a} · レポート {b} 件 · {s} 秒',
         'vex-result-title':        '✓ 照合完了',
         'vex-result-sub':          '請求書 {a} vs {r} 行 · {s} 秒',
         'vex-need-both':           '請求書 1 件 + VAT レポート 1 件以上必要',
@@ -9169,53 +9277,6 @@ const I18N = {
         'confirm-default-title': 'ご確認ください',
         'confirm-ok': 'OK',
         'confirm-cancel': 'キャンセル',
-        // v118.27.1 · MR.ERP アダプター
-        'mrerp-btn': 'MR.ERP .xlsx をダウンロード',
-        'mrerp-btn-tip': 'MR.ERP 形式の Excel を生成 · MR.ERP サイトで手動アップロード',
-        'mrerp-btn-disabled-no-map': '先に「自動化 → ERP 連携 → フィールドマッピング」で MR.ERP 取引先コードを設定',
-        'mrerp-btn-disabled-exc': '赤い例外フィールドを先に解決してください',
-        'mrerp-toast-ok': 'XLSX 生成完了 · MR.ERP サイトでアップロードしてください',
-        'mrerp-toast-fail': '失敗: {err}',
-        'mrerp-err-no_client_mapping': 'この取引先の MR.ERP コードが未設定',
-        'mrerp-err-no_invoice_no': '請求書番号が空',
-        'mrerp-err-no_invoice_date': '請求書日付が空',
-        'mrerp-err-no_total_amount': '合計金額が空または 0',
-        'mrerp-err-no_customer_mapping': 'この取引先の MR.ERP コードが未設定',
-        'mrerp-err-exception_unresolved': '例外が未解決',
-        'mrerp-err-sheet_kind_stub_wait_material': 'この帳票タイプのサンプル待ち · 非公開',
-        'mrerp-err-module_missing': 'バックエンドモジュール欠如',
-        'mrerp-err-history_not_found': 'レコードが見つかりません',
-        // v27.8.1.0 · MR.ERP バックエンド模擬ログイン直接プッシュ
-        'mrerp-direct-card-not-connected': 'MR.ERP 未接続',
-        'mrerp-direct-card-connected': 'MR.ERP 接続済み',
-        'mrerp-direct-connect-btn': '認証情報を追加',
-        'mrerp-direct-modify-btn': '変更',
-        'mrerp-direct-remove-btn': '削除',
-        'mrerp-direct-remove-confirm': '削除すると · この tenant の MR.ERP 直接プッシュは停止します · .xlsx 手動インポートは引き続き利用可能 · 続行?',
-        'mrerp-direct-meta-company': '会社:',
-        'mrerp-direct-meta-comid': '帳簿セット:',
-        'mrerp-direct-meta-last-test': '最終テスト:',
-        'mrerp-direct-test-pass': '✓ 合格',
-        'mrerp-direct-test-fail': '✗ 失敗',
-        'mrerp-direct-test-never': '未テスト',
-        'mrerp-direct-test-korn-btn': 'Korn 実サンプルテスト',
-        'mrerp-direct-test-korn-tip': "Korn の実 SC xlsx を mrerp_pusher で直接プッシュ(プレビューのみ・DB書き込みなし)・HTTP フローか xlsx 内容かの診断",
-        'mrerp-direct-test-korn-title': 'Korn 実サンプル診断',
-        'mrerp-direct-test-korn-running': '送信中(プレビューのみ・DB書き込みなし)...',
-        'mrerp-direct-test-korn-stages': '通過ステージ',
-        'mrerp-direct-test-korn-preview-rows': 'プレビュー行数',
-        'mrerp-direct-test-korn-error': 'エラー',
-        'mrerp-direct-test-korn-raw-html': 'MR.ERP の生 HTML を展開',
-        'mrerp-direct-test-korn-close': '閉じる',
-        'log-detail-mrerp-debug-fail': 'ダウンロード失敗: {err}',
-        // v27.8.1.3 · auto-push toggle
-        'erp-auto-push-label': 'OCR 完了後 自動プッシュ',
-        'erp-auto-push-on-tip': 'オン · フォルダ / メール / LINE 経由でアップ → 自動でこの ERP に送信',
-        'erp-auto-push-off-tip': 'オフ · 手動プッシュが必要',
-        'erp-auto-push-toggling': '切替中...',
-        'erp-auto-push-toggle-fail': '切替失敗: {err}',
-        'erp-auto-push-toggled-on': '自動プッシュをオンにしました',
-        'erp-auto-push-toggled-off': '自動プッシュをオフにしました',
         // v118.27.8.1.15 · 大量アップロード (>100 枚) progress + 離脱警告 + 初回ティップ
         'big-batch-progress-init':    'バッチ認識を準備中...',
         'big-batch-progress-running': '認識中 {done} / {total} · 残り約 {min} 分 · 他の作業をどうぞ',
@@ -9224,139 +9285,18 @@ const I18N = {
         'big-batch-first-tip':        '今回は {n} 枚を認識 · 約 {min} 分 · バックグラウンドで継続 · 完了後「請求書記録」に自動保存',
         // v118.27.8.1.15 · ERP オンボーディング(初めて ERP ページに入る + endpoint がまだない時)
         'erp-onboard-title':          'ERP プッシュを 0 クリックに',
-        'erp-onboard-body':           'OCR 完了後 · Pearnly は MR.ERP / Xero / 自前 Webhook に自動でプッシュできます。ボタンを押す必要なし。新しい ERP 接続では「自動プッシュ」がデフォルトでオン · いつでもオフにできます。',
+        'erp-onboard-body':           'OCR 完了後 · Pearnly は ERP / Xero / Webhook に自動でプッシュできます。ボタンを押す必要なし。新しい ERP 接続では「自動プッシュ」がデフォルトでオン · いつでもオフにできます。',
         'erp-onboard-ok':             'OK · ERP を追加します',
         'erp-onboard-later':          '後で',
-        // v118.27.8.1.16 · 完全一致 0 クリック + 中スコア quick-confirm toast
-        'mrerp-auto-matched-toast':   '「{name}」に自動マッチ · MR.ERP にプッシュ中...',
-        'mrerp-quick-confirm-text':   '「{name}」に自動割り当てしました',
-        'mrerp-quick-confirm-ok':     'OK',
-        'mrerp-quick-confirm-change': '変更',
-        'mrerp-recommend-badge':      'おすすめ',
-        'mrerp-maybe-badge':          'もしかして',
-
-        // v118.27.8.1.17 · 商品 picker mini modal · OCR detail row mapping
-        'mrerp-prod-prep-done-toast':   '商品マッピングがすべて完了 · プッシュ中...',
-        'mrerp-prod-pick-not-ready':    '商品ピッカー未準備 · ページを再読み込みしてください',
-        'mrerp-prod-flow-cancelled':    '商品マッピングをキャンセル · プッシュは中止',
-        'mrerp-prod-auto-matched-toast':'「{ocr}」を「{name}」に自動マッチ',
-        'mrerp-pick-prod-title':        'MR.ERP 商品コードを選択',
-        'mrerp-pick-prod-progress':     'ステップ {i} / {n}',
-        'mrerp-pick-prod-ocrlabel':     'OCR 抽出:',
-        'mrerp-pick-prod-search-ph':    'コード / 名前で検索...',
-        'mrerp-pick-prod-loading':      '商品マスタを読み込み中...',
-        'mrerp-pick-prod-empty':        '一致する商品なし',
-        'mrerp-pick-prod-empty-all':    'MR.ERP に商品データがありません · MR.ERP で追加してください · または下に手動でコード入力',
-        'mrerp-pick-prod-fetch-fail':   '取得失敗: {err}',
-        'mrerp-pick-prod-manual-summary':'見つからない?手動でコード入力',
-        'mrerp-pick-prod-manual-ph':    '例: P00123',
-        'mrerp-pick-prod-manual-use':   'このコードを使う',
-        'mrerp-pick-prod-manual-empty': 'コードを入力してください',
-        'mrerp-pick-prod-selected-label':'選択:',
-        'mrerp-pick-prod-skip':         'この商品をスキップ(プレースホルダ使用)',
-        'mrerp-pick-prod-cancel':       'プッシュ全体をキャンセル',
-        'mrerp-pick-prod-save':         '保存して続行',
-        'mrerp-pick-prod-save-ok':      '商品マッピング保存済み',
-        'mrerp-pick-prod-save-fail':    '保存失敗 · 再試行してください',
         'erp-add-webhook-card': '+ Webhook 追加',
         'erp-add-webhook-card-tip': '任意の URL に POST · 例:Slack / Zapier / 自作 ERP',
         'erp-webhook-card-name': 'Webhook',
-        'mrerp-cred-modal-add': 'MR.ERP 認証情報を追加',
-        'mrerp-cred-modal-edit': 'MR.ERP 認証情報を編集',
-        'mrerp-cred-fallback-hint': 'パスワードを保存したくない? .xlsx をダウンロードして手動でインポートも可能(OCR 履歴ドロワー → プッシュドロップダウン → 「MR.ERP .xlsx をダウンロード」)',
-        'mrerp-cred-field-username': 'MR.ERP ユーザー名 *',
-        'mrerp-cred-field-username-ph': '例:test01',
-        'mrerp-cred-field-password': 'MR.ERP パスワード *',
-        'mrerp-cred-field-password-ph': '暗号化保存 · 平文では保存しない',
-        'mrerp-cred-field-comidyear': '会社年度',
-        'mrerp-cred-field-seldb': 'データベース番号',
-        'mrerp-cred-field-company': '会社名',
-        'mrerp-cred-field-company-ph': '例:ABC 株式会社 2024 年度',
-        'mrerp-cred-field-company-tag': '表示用のみ',
-        'mrerp-cred-section-login': 'ログイン情報',
-        'mrerp-cred-advanced-summary': '詳細設定',
-        'mrerp-cred-advanced-tag': '— 自動取得できない時のみ',
-        'mrerp-cred-advanced-hint-text': '上の「データベース選択」を優先 · MR.ERP からリストが取れない場合のみ手入力',
-        'mrerp-cred-dbselect-section': 'データベース選択',
-        'mrerp-cred-dbselect-ok': '✓ {n} 個のデータベースを取得 · 1 つ選択してください',
-        'mrerp-cred-dbselect-ok-single': '✓ {name} を自動選択',
-        'mrerp-cred-dbselect-empty': 'データベース取得失敗 · 下の「詳細設定」で手入力',
-        'mrerp-cred-dbselect-fail': 'データベース取得失敗: {err} · 「詳細設定」で手入力可能',
-        'mrerp-cred-dbselect-required': 'データベースを 1 つ選択(または詳細設定で手入力)',
-        'mrerp-cred-dbselect-auto-tag': '自動選択',
-        'erp-map-howto-mrerp-title': 'MR.ERP の取引先コードの探し方',
-        'erp-map-howto-mrerp-body': 'MR.ERP にログイン → 左メニュー「マスタデータ」→「取引先管理」→ 各行の先頭 4 桁の数字が取引先コード(例:0006)',
         'erp-map-show-advanced': '詳細マッピングを表示',
         'erp-map-hide-advanced': '詳細マッピングを折りたたむ',
-        'erp-map-dev-fetch-selectdb': 'MR.ERP selectdb ページ取得(13b デバッグ)',
-        'erp-map-dev-fetch-selectdb-running': '取得中...',
-        'erp-map-dev-fetch-selectdb-ok': '✓ ダウンロード完了 · json ファイルを Claude に送ってください',
-        'erp-map-dev-fetch-selectdb-fail': '取得失敗: {err}',
-        'erp-map-dev-fetch-page': 'MR.ERP 任意ページ取得(14a デバッグ)',
-        'erp-map-dev-fetch-page-input-ph': '空 = メインメニュー · またはパス /imparse/formupload.php?idmenu=... を貼付',
-        'erp-map-dev-fetch-page-running': '取得中...',
-        'erp-map-dev-fetch-page-ok': '✓ ダウンロード完了 · json ファイルを Claude に送ってください',
-        'erp-map-dev-fetch-page-fail': '取得失敗: {err}',
-        'erp-map-dev-fetch-customers': 'MR.ERP 取引先リスト取得(14b デバッグ)',
-        'erp-map-dev-fetch-customers-running': '取得中(ページング · 数秒かかる場合あり)...',
-        'erp-map-dev-fetch-customers-ok': '✓ ダウンロード完了 · {n} ページ · json を Claude に送ってください',
-        'erp-map-dev-fetch-customers-fail': '取得失敗: {err}',
-        'mrerp-pick-cus-title': 'MR.ERP コード設定',
-        'mrerp-pick-cus-for-client': 'Pearnly 顧客',
-        'mrerp-pick-cus-for-client-tail': 'MR.ERP の対応コードを選択 · 保存後に自動再送信されます',
-        'mrerp-pick-cus-search-ph': 'コード/名前で検索...',
-        'mrerp-pick-cus-refresh': '更新',
-        'mrerp-pick-cus-manual-summary': 'リストにない? コードを手入力',
-        'mrerp-pick-cus-manual-ph': '例: 0006',
-        'mrerp-pick-cus-manual-use': 'このコードを使用',
-        'mrerp-pick-cus-selected-label': '選択:',
-        'mrerp-pick-cus-cancel': 'キャンセル',
-        'mrerp-pick-cus-save': '保存して送信',
-        'mrerp-pick-cus-loading': '顧客リスト読込中...',
-        'mrerp-pick-cus-empty': '一致する顧客なし',
-        'mrerp-pick-cus-empty-all': 'MR.ERP に顧客データなし · MR.ERP で顧客を追加するか、下記で手動入力',
-        'mrerp-pick-cus-fetch-fail': '取得失敗: {err}',
-        'mrerp-pick-cus-save-fail': 'マッピング保存失敗: {err}',
-        'mrerp-pick-cus-save-ok': 'MR.ERP コード保存済 · 送信中...',
-        'mrerp-pick-cus-manual-empty': 'コードを入力',
-        'mrerp-pick-cus-no-client': 'この請求書は Pearnly 顧客に紐付いていません · 右上で顧客を選択して再アップロード',
         'results-saved-banner': '読取結果は「書類記録」に自動保存 · このページを閉じても消えません',
         'history-filter-banner-prefix': '表示中の顧客のみ:',
         'history-filter-banner-clear': '全顧客の記録を表示',
         'history-filter-banner-count': '({n} 件)',
-        'mrerp-pick-cus-buyer-label': '請求書の購入者:',
-        'mrerp-cred-btn-test': '接続テスト',
-        'mrerp-cred-btn-cancel': 'キャンセル',
-        'mrerp-cred-btn-save': '保存',
-        'mrerp-cred-btn-saving': '保存中...',
-        'mrerp-cred-btn-testing': 'テスト中...',
-        'mrerp-cred-test-ok': '✓ 認証情報有効 · 保存可能',
-        'mrerp-cred-test-fail': '✗ テスト失敗: {err}',
-        'mrerp-cred-save-ok': 'MR.ERP 接続済み · OCR 履歴ドロワーで「MR.ERP に直接プッシュ」が利用可能',
-        'mrerp-cred-save-fail': '保存失敗: {err}',
-        'mrerp-cred-remove-ok': 'MR.ERP 認証情報を削除しました',
-        'mrerp-cred-remove-fail': '削除失敗: {err}',
-        'mrerp-cred-empty-required': 'ユーザー名とパスワードは必須',
-        'mrerp-cred-not-owner': 'オーナーのみ ERP 認証情報を設定可能',
-        'mrerp-direct-push-tag': '直接',
-        'mrerp-direct-push-pushing': 'MR.ERP にプッシュ中...',
-        'mrerp-direct-push-ok': '✓ MR.ERP にプッシュ完了 · {n} 行',
-        'mrerp-direct-push-fail': 'プッシュ失敗: {err}',
-        'mrerp-direct-err-auth_failed': 'MR.ERP ログイン失敗 · 認証情報が変更された可能性 · 再入力してください',
-        'mrerp-direct-err-no_credentials': 'MR.ERP 認証情報未設定',
-        'mrerp-direct-err-no_client_mapping': 'このクライアントに MR.ERP コードがマッピングされていません',
-        'mrerp-direct-err-credentials_corrupted': '認証情報破損 · 再入力してください',
-        'mrerp-direct-err-exception_unresolved': '赤い例外フィールドを先に解決してください',
-        'mrerp-direct-err-history_not_found': 'レコードが見つかりません',
-        'mrerp-direct-err-no_tenant': 'アカウントが tenant に紐付いていません',
-        'mrerp-direct-err-owner_only': 'オーナーのみ ERP 認証情報を設定可能',
-        'mrerp-direct-err-module_missing': 'バックエンドモジュール欠落',
-        'mrerp-direct-err-pusher_module_missing': 'MR.ERP プッシュエンジン未デプロイ',
-        'mrerp-direct-err-generate_failed': 'xlsx 生成失敗',
-        'mrerp-direct-err-validation': 'MR.ERP 拒否: {err}',
-        'mrerp-direct-err-network': 'MR.ERP サーバー応答なし: {err}',
-        'mrerp-direct-err-module_unsupported': 'この文書タイプは MR.ERP プッシュ未対応',
-        'mrerp-direct-err-unknown': '不明なエラー: {err}',
         // v118.27.5 · ドロワー統合送信ボタン
         'unified-push-to': '{name} へプッシュ',
         'unified-push-tip': 'クリックでデフォルトに送信 · ▼ で他を選択',
@@ -9369,7 +9309,6 @@ const I18N = {
         'unified-push-disabled-exc': '赤い例外フィールドを先に解決してください',
         'unified-push-ok': '{name} に送信完了',
         'unified-push-fail': '{name} 送信失敗: {err}',
-        'unified-push-mrerp-ok': '.xlsx 生成完了 · MR.ERP で手動アップロード',
         'unified-push-go-config': '設定へ',
         // v118.27.4 · Xero アダプター
         'xero-card-title': 'Xero',
@@ -9408,6 +9347,11 @@ const I18N = {
         'erp-map-subtab-clients': '取引先マッピング',
         'erp-map-subtab-accounts': '勘定科目マッピング',
         'erp-map-subtab-taxes': '税コードマッピング',
+        'erp-map-subtab-products': '商品マッピング',
+        'erp-map-empty-products': '商品マッピングがありません',
+        'erp-map-empty-products-sub': 'ERP に商品をプッシュすると自動でマッピングが作成されます',
+        'erp-map-col-item-name': 'OCR 商品名',
+        'erp-map-col-erp-product-code': 'ERP 商品コード',
         'erp-map-add-row': '+ マッピングを追加',
         'erp-map-save': '保存',
         'erp-map-delete': '削除',
@@ -9459,11 +9403,6 @@ const I18N = {
         'erp-map-tax-wht_3': '源泉 3%',
         'erp-map-tax-wht_5': '源泉 5%',
         'erp-map-tax-non_vat': 'システム外',
-        'erp-map-dev-seed': 'テストデータを挿入',
-        'erp-map-dev-clear': 'テストデータを削除',
-        'erp-map-dev-seed-ok': 'テストマッピングを挿入しました',
-        'erp-map-dev-cleared': '{n} 件のテストマッピングを削除',
-        'erp-map-dev-fail': '操作に失敗しました',
     },
 };
 // ============================================================
@@ -9520,6 +9459,7 @@ let _sortKey = null;
 let _sortDir = 'asc';
 let _searchKeyword = '';
 let _drawerIdx = -1;
+let _drawerAlreadyPushed = false;
 let _engineCheckTimer = null;
 
 // ============================================================
@@ -9617,6 +9557,7 @@ function svgIcon(name, size) {
         api: '<path d="M3 6.5a4.5 4.5 0 0 1 9 0v11a4.5 4.5 0 0 1-9 0Z"/><path d="M12 17.5a4.5 4.5 0 0 0 9 0v-11a4.5 4.5 0 0 0-9 0Z"/>',
         copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
         minus: '<line x1="5" y1="12" x2="19" y2="12"/>',
+        sparkle: '<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>',
     };
     const inner = paths[name] || '';
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; flex-shrink: 0;">${inner}</svg>`;
@@ -9716,7 +9657,9 @@ async function apiGet(url) {
         if (isAuthFail) {
             console.warn('[auth-fail-redirect]', url, resp.status, detail);  // 诊断 · 用户截屏给我看
             localStorage.removeItem('mrpilot_token');
-            const _msgKey = (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin' : 'alert-session';
+            const _msgKey = (code === 'auth.session_revoked') ? 'alert-session-revoked'
+                          : (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin'
+                          : 'alert-session';
             showToast(t(_msgKey), 'error');
             setTimeout(() => { window.location.href = '/'; }, 1500);
             return null;
@@ -9745,7 +9688,9 @@ async function apiPost(url, data) {
         if (isAuthFail) {
             console.warn('[auth-fail-redirect]', url, resp.status, detail);
             localStorage.removeItem('mrpilot_token');
-            const _msgKey = (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin' : 'alert-session';
+            const _msgKey = (code === 'auth.session_revoked') ? 'alert-session-revoked'
+                          : (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin'
+                          : 'alert-session';
             showToast(t(_msgKey), 'error');
             setTimeout(() => { window.location.href = '/'; }, 1500);
             return null;
@@ -9775,7 +9720,9 @@ async function apiPut(url, data) {
             if (isAuthFail) {
                 console.warn('[auth-fail-redirect]', url, resp.status, detail);
                 localStorage.removeItem('mrpilot_token');
-                const _msgKey = (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin' : 'alert-session';
+                const _msgKey = (code === 'auth.session_revoked') ? 'alert-session-revoked'
+                          : (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin'
+                          : 'alert-session';
                 showToast(t(_msgKey), 'error');
                 setTimeout(() => { window.location.href = '/'; }, 1500);
                 return { ok: false };
@@ -10021,6 +9968,8 @@ setupDropdown('lang-dropdown', (item) => applyLang(item.dataset.lang));
     sel.value = _curLang;
 })();
 
+// v118.33.2 NAV-IA Phase 2 · adm-lang-bar IIFE 已删 · admin/超管走「设置 → 通用设置」或 Cmd+K 切 4 语
+
 // ============================================================
 // 侧栏 + 路由
 // ============================================================
@@ -10047,7 +9996,7 @@ document.getElementById('sidebar-overlay')?.addEventListener('click', () => {
     document.body.classList.remove('sidebar-open');
 });
 
-const VALID_ROUTES = ['ocr', 'dashboard', 'history', 'automation', 'integration', 'templates', 'api-keys', 'settings', 'admin-cost', 'admin-users', 'exceptions', 'clients', 'vouchers', 'sales-invoices', 'receivables', 'reconcile', 'cloud', 'test-center'];
+const VALID_ROUTES = ['ocr', 'dashboard', 'history', 'automation', 'integration', 'integrations', 'templates', 'api-keys', 'settings', 'admin-cost', 'admin-users', 'exceptions', 'clients', 'vouchers', 'sales-invoices', 'receivables', 'reconcile', 'cloud', 'test-center'];
 
 function routeTo(route) {
     // v109.4 · 老 admin 路由迁移到 admin-users(数据更全 · 字段对齐多租户)
@@ -10061,6 +10010,10 @@ function routeTo(route) {
 
     if (!VALID_ROUTES.includes(route)) route = 'ocr';
     currentRoute = route;
+    // v118.33.5 NAV-IA Phase 5 · 进子项路由 · 自动展开所在折叠组(销项/进项)
+    if (typeof window.expandNavGroupForRoute === 'function') {
+        window.expandNavGroupForRoute(route);
+    }
     // 切页
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const pageId = 'page-' + route;
@@ -10090,6 +10043,8 @@ function routeTo(route) {
     if (route === 'reconcile' && typeof window.loadReconcilePage === 'function') window.loadReconcilePage();
     // v118.28.1.0 · 测试中心
     if (route === 'test-center' && typeof window.loadTestCenterPage === 'function') window.loadTestCenterPage();
+    // v118.32.5.5.16 · 首页 dashboard
+    if (route === 'dashboard' && typeof window.loadDashboard === 'function') window.loadDashboard();
 }
 
 window.addEventListener('hashchange', () => {
@@ -10108,119 +10063,114 @@ document.querySelectorAll('.nav-item').forEach(item => {
     });
 });
 
-// ============================================================
-// 登出
-// ============================================================
-// v118.27.3 · 左下角用户菜单 · 替代原顶栏 btn-logout
-function _initSidebarUserMenu() {
-    'use strict';
-    const trigger = document.getElementById('sidebar-user-trigger');
-    const wrap = document.getElementById('sidebar-user');
-    const popup = document.getElementById('sidebar-user-popup');
-    if (!trigger || !wrap || !popup) {
-        console.warn('[v118.27.3] sidebar-user 元素未找到', { trigger: !!trigger, wrap: !!wrap, popup: !!popup });
-        return;
-    }
+// v118.33.7.3 · sidebar-cta-upload 已删 · 对齐 prototype_final(prototype sidebar 无 CTA)
 
-    function openMenu() {
-        popup.style.display = 'block';
-        wrap.classList.add('open');
-        trigger.setAttribute('aria-expanded', 'true');
-    }
-    function closeMenu() {
-        popup.style.display = 'none';
-        wrap.classList.remove('open');
-        trigger.setAttribute('aria-expanded', 'false');
-    }
-    trigger.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (popup.style.display === 'block') {
-            closeMenu();
-        } else {
-            openMenu();
+// v118.33.7.8 · 修 X 关闭 BUG · Phase 2 删 sidebar-user 时把 help-modal close 逻辑误删 · 这里独立绑回
+(function () {
+    function _bindHelpModal() {
+        const helpModal = document.getElementById('help-modal');
+        const helpClose = document.getElementById('help-modal-close');
+        if (!helpModal) return;
+        if (helpClose && !helpClose.dataset.bound) {
+            helpClose.addEventListener('click', function () {
+                helpModal.style.display = 'none';
+            });
+            helpClose.dataset.bound = '1';
         }
-    });
-    document.addEventListener('click', function(e) {
-        if (popup.style.display === 'block' && !wrap.contains(e.target)) {
-            closeMenu();
+        if (!helpModal.dataset.maskBound) {
+            helpModal.addEventListener('click', function (e) {
+                if (e.target === helpModal) helpModal.style.display = 'none';
+            });
+            helpModal.dataset.maskBound = '1';
         }
-    });
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeMenu();
-    });
-
-    // 系统设置 → 跳设置页(直接调路由 · 不依赖已删除的 sidebar nav-item)
-    const btnSettings = document.getElementById('user-menu-settings');
-    if (btnSettings) {
-        btnSettings.addEventListener('click', function() {
-            closeMenu();
-            // v118.32.3 · 改 modal 弹窗(替代路由切页)
-            if (typeof openSettingsModal === 'function') openSettingsModal();
-            else if (typeof routeTo === 'function') routeTo('settings');
-        });
+        // ESC 关闭
+        if (!window._helpModalEscBound) {
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && helpModal.style.display === 'flex') {
+                    helpModal.style.display = 'none';
+                }
+            });
+            window._helpModalEscBound = true;
+        }
     }
-
-    // 帮助反馈 → 弹 modal
-    const btnHelp = document.getElementById('user-menu-help');
-    const helpModal = document.getElementById('help-modal');
-    const helpClose = document.getElementById('help-modal-close');
-    if (btnHelp && helpModal) {
-        btnHelp.addEventListener('click', function() {
-            closeMenu();
-            helpModal.style.display = 'flex';
-        });
-    }
-    if (helpClose && helpModal) {
-        helpClose.addEventListener('click', function() {
-            helpModal.style.display = 'none';
-        });
-        helpModal.addEventListener('click', function(e) {
-            if (e.target === helpModal) helpModal.style.display = 'none';
-        });
-    }
-
-    // 退出登录
-    const btnLogout = document.getElementById('user-menu-logout');
-    if (btnLogout) {
-        btnLogout.addEventListener('click', function() {
-            try { localStorage.removeItem('mrpilot_token'); } catch(e) {}
-            try { localStorage.removeItem('mrpilot_user'); } catch(e) {}
-            window.location.href = '/';
-        });
-    }
-}
-
-// DOMContentLoaded 防 home.js 在某些边缘场景下提前跑(其实 home.js 在 </body> 前 · 但保险加一层)
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _initSidebarUserMenu);
-} else {
-    _initSidebarUserMenu();
-}
-
-// v118.27.3 · 渲染左下角用户头像 + 名 + 邮箱
-// v118.27.6 · 优先用 Google avatar_url · 失败 onerror 回退首字母
-function renderSidebarUser(u) {
-    if (!u) return;
-    const avatar = document.getElementById('sidebar-user-avatar');
-    const nameEl = document.getElementById('sidebar-user-name');
-    const emailEl = document.getElementById('sidebar-user-email');
-    if (!avatar || !nameEl || !emailEl) return;
-    const email = (u.username || '').trim();
-    const namePart = email.split('@')[0] || email || '—';
-    const letter = (email.charAt(0) || '?').toUpperCase();
-    const av = (u.avatar_url || '').trim();
-    if (av) {
-        // 转义双引号防 XSS · onerror 回退首字母
-        const safeUrl = av.replace(/"/g, '&quot;');
-        avatar.innerHTML = '<img src="' + safeUrl + '" alt="' + letter + '" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\'' + letter.replace(/'/g, "\\'") + '\'">';
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _bindHelpModal);
     } else {
-        avatar.textContent = letter;
+        _bindHelpModal();
     }
-    nameEl.textContent = namePart;
-    emailEl.textContent = email || '—';
-    avatar.setAttribute('title', email);
-}
+})();
+
+// v118.33.7 NAV-IA Phase 7 · 集成页「配置」按钮 → 跳自动化页(实际连接逻辑暂保留自动化页)
+(function () {
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.int-btn-configure');
+        if (!btn) return;
+        const route = btn.dataset.route || 'automation';
+        if (typeof routeTo === 'function') routeTo(route);
+    });
+})();
+
+// v118.33.5 NAV-IA Phase 5 · sidebar 可折叠业务流分组(销项▼/进项▼ · LS 持久化)
+(function () {
+    const NAV_COLLAPSE_KEY = 'mrpilot_nav_collapsed';
+    // 路由→组 映射:点哪个子项 · 哪个组自动展开
+    const ROUTE_GROUP_MAP = {
+        'ocr': 'sales', 'history': 'sales', 'reconcile': 'sales',
+        'sales-invoices': 'sales', 'receivables': 'sales',
+        'vouchers': 'expense'
+    };
+    function _getState() {
+        try {
+            const raw = localStorage.getItem(NAV_COLLAPSE_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) { return {}; }
+    }
+    function _setState(state) {
+        try { localStorage.setItem(NAV_COLLAPSE_KEY, JSON.stringify(state)); } catch (e) {}
+    }
+    function _applyState() {
+        const state = _getState();
+        document.querySelectorAll('.nav-collapsible').forEach(function (group) {
+            const key = group.dataset.collapsible;
+            if (state[key]) group.classList.add('collapsed');
+            else group.classList.remove('collapsed');
+        });
+    }
+    function _toggle(key) {
+        const state = _getState();
+        state[key] = !state[key];
+        _setState(state);
+        _applyState();
+    }
+    // 默认:首次访问 · 销项展开(日常)· 进项折叠(Phase 6 才填全)
+    (function _ensureDefault() {
+        const state = _getState();
+        let changed = false;
+        if (state.sales === undefined) { state.sales = false; changed = true; }
+        if (state.expense === undefined) { state.expense = true; changed = true; }
+        if (changed) _setState(state);
+    })();
+    _applyState();
+    // 绑定 toggle 按钮
+    document.querySelectorAll('.nav-group-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            _toggle(btn.dataset.toggleGroup);
+        });
+    });
+    // 暴露给 routeTo:进某个子项路由时自动展开所在组
+    window.expandNavGroupForRoute = function (route) {
+        const group = ROUTE_GROUP_MAP[route];
+        if (!group) return;
+        const state = _getState();
+        if (state[group]) {
+            state[group] = false;
+            _setState(state);
+            _applyState();
+        }
+    };
+})();
+
+// v118.33.2 NAV-IA Phase 2 · _initSidebarUserMenu / renderSidebarUser 已删 · 替代品在右上角头像菜单(avatar-popup · Phase 1 上线)· 设置 / 帮助 / 退出全部从那里走
 
 // ============================================================
 // 用户信息 + 配额 + 联系方式
@@ -10238,20 +10188,37 @@ async function loadAll() {
         _userInfo = u;
 
         // ============================================================
+        // v118.44.0 · NAV-IA Phase 8 · admin layout 独立 SPA 早退分支
+        // 当 admin.html 加载时设置 PEARNLY_ADMIN_LAYOUT=true · 此处填充全局态后立即 return
+        // 不调任何 home 渲染函数 · 所有 UI 由 admin.js 接管
+        // ============================================================
+        if (window.PEARNLY_ADMIN_LAYOUT) {
+            _quota = q;
+            _contact = c;
+            if (p) window._planState = p;
+            window.PEARNLY_ADMIN_MODE = true;
+            // 暴露 _userInfo 给 admin.js / 业务模块用
+            try { window._userInfoForAdmin = u; } catch (_) {}
+            return;
+        }
+
+        // ============================================================
         // v118.28.2 · 超管 /admin URL 独立(对齐 Stripe / Xero / QuickBooks)
         // 规则:
         //   - 普通用户 → 只能进 /home · 偷偷输 /admin 自动弹回
         //   - 超管 → 永远只看 /admin · 误进 /home 自动跳走
+        // v118.44.0 · _isAdminPath 加 startsWith('/admin/')· 新 /admin/cost · /admin/users 也算 admin path
         // ============================================================
         try {
-            const _isAdminPath = location.pathname === '/admin';
+            const _isAdminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
             const _isSuper = !!u.is_super_admin;
             if (_isAdminPath && !_isSuper) {
                 window.location.replace('/home');
                 return;
             }
             if (!_isAdminPath && _isSuper) {
-                window.location.replace('/admin');
+                // v118.44.0 · 超管默认跳新 admin layout(独立 SPA)· 不再跳 /admin(老 home.html 兜底)
+                window.location.replace('/admin/cost');
                 return;
             }
             window.PEARNLY_ADMIN_MODE = _isAdminPath;
@@ -10271,7 +10238,7 @@ async function loadAll() {
         _quota = q;
         _contact = c;
         if (p) window._planState = p;
-        try { renderSidebarUser(u); } catch(e) { console.error('sidebar user render', e); }
+        // v118.33.2 NAV-IA Phase 2 · renderSidebarUser 已删 · 头像菜单 renderAvatarMenu 接管(下面 Phase 1 块)
         // v0.15 · 顶部套餐下拉已删 · 不再设置 plan-current-label
         // v118.8 · 顶栏归属感 · 显示用户公司名(归属感 · 不再是 Pearnly 大字)
         renderBrandWorkspace();
@@ -10279,6 +10246,11 @@ async function loadAll() {
         renderQuotaBanner();   // v102 · 配额低/耗尽顶部预警
         renderTrialBanner();   // v118.8 · 试用临近到期横幅
         applySidebarVisibility();
+        // NAV-IA Phase 1 · 头像菜单角色显隐 + 渲染(顶栏三件套)
+        try {
+            if (typeof applyRoleVisibility === 'function') applyRoleVisibility();
+            if (typeof renderAvatarMenu === 'function') renderAvatarMenu(u);
+        } catch (e) { console.error('[nav-ia phase1] render avatar menu', e); }
         updateUploadHint();
         updateStartButton();
         // v118.11 · 员工首次登录强制改密(优先于 onboarding)
@@ -11196,14 +11168,7 @@ function applySidebarVisibility() {
     const adminDropdown = document.getElementById('admin-dropdown');
     if (adminDropdown) adminDropdown.style.display = isSuperAdmin(u) ? '' : 'none';
 
-    // v106 · 成本追踪 / 用户管理菜单:仅超管可见
-    document.querySelectorAll('.nav-admin-only').forEach(item => {
-        item.style.display = isSuperAdmin(u) ? '' : 'none';
-    });
-    // v118.27.4.2 · 整组 nav-group-admin-only 跟着同步显隐(防普通用户看到空标题)
-    document.querySelectorAll('.nav-group-admin-only').forEach(group => {
-        group.style.display = isSuperAdmin(u) ? '' : 'none';
-    });
+    // v118.33.2 NAV-IA Phase 2 · sidebar 底部「成本追踪 / 用户管理 / 测试 / adm-lang-bar」整体已删 · 显隐逻辑搬到头像菜单 applyRoleVisibility · 这里只剩顶栏超管下拉
 
     // ============================================================
     // v118.12 · 设置页 6 个 tab 显隐(原子函数驱动)
@@ -11949,6 +11914,8 @@ let _fileListExpanded = false;
 
 function renderFileList() {
     const list = document.getElementById('file-list');
+    // v118.44.0.2 · admin layout 没有 #file-list DOM · 加防御避免 applyLang 抛错 / lang-switching class 残留
+    if (!list) return;
     if (_selectedFiles.length === 0) {
         list.classList.remove('has-files');
         list.innerHTML = '';
@@ -11963,7 +11930,7 @@ function renderFileList() {
 
     let progressText = `<span class="count">${escapeHtml(t('file-list-total', { n: total }))}</span>`;
     const parts = [];
-    if (processing) parts.push(`<span style="color: var(--accent, #2563eb);">${processing} ${escapeHtml(t('status-processing'))}</span>`);
+    if (processing) parts.push(`<span style="color: var(--accent, #111111);">${processing} ${escapeHtml(t('status-processing'))}</span>`);
     if (success)    parts.push(`<span style="color: var(--success, #059669);">${success} ${escapeHtml(t('status-success'))}</span>`);
     if (error)      parts.push(`<span style="color: var(--danger, #dc2626);">${error} ${escapeHtml(t('status-error'))}</span>`);
     if (parts.length) progressText += ' · ' + parts.join(' · ');
@@ -12588,11 +12555,6 @@ function renderResults() {
         <div class="rh-stat">
             <span class="rh-stat-value">${successCount}</span>
             <span class="rh-stat-label">${t('stats-invoices')}</span>
-        </div>
-        <div class="rh-stat rh-stat-quality">
-            <span class="rh-stat-dot"></span>
-            <span class="rh-stat-value">${successRate}%</span>
-            <span class="rh-stat-label">${t('stats-success-rate')}</span>
         </div>
         <div class="rh-stat">
             <span class="rh-stat-label">${t('stats-total')}</span>
@@ -13930,21 +13892,22 @@ function hideAlerts() {
         document.getElementById('alert-' + t).classList.remove('show');
     });
 }
-function showToast(msg, type) {
-    const el = document.getElementById('toast');
-    el.className = 'toast show ' + (type || '');
-    el.textContent = msg;
-    setTimeout(() => el.classList.remove('show'), 2500);
-}
+// [TECH_DEBT §2 P0] 2026-05-15 · 删除 showToast 重复定义(line 13461 旧版)
+//   旧版签名 (msg, type) 被 line 14894 新版 (msg, kind, duration) 完全覆盖
+//   276 处调用点全部兼容新版(已用脚本核 type 参数:'' / error / info / success 全在新版 kind 白名单)
 
 // ============================================================
 // 启动
 // ============================================================
-applyLang(currentLang);
+// v118.44.0.5 · 顶层调用包 try-catch · 防 admin layout 下 applyLang/routeTo 抛错让后续 IIFE 不被注册
+//   (现象:home.js L13585 applyLang null.classList → JS 引擎停止解析后续顶层语句 → admin-cost IIFE 不跑 → window.loadAdminCostPage 不存在)
+try { applyLang(currentLang); } catch (e) { console.warn('[boot] applyLang failed', e); }
 
 // hash 路由初始化
-const initialRoute = (location.hash || '#/ocr').replace(/^#\//, '');
-routeTo(VALID_ROUTES.includes(initialRoute) ? initialRoute : 'ocr');
+try {
+    const initialRoute = (location.hash || '#/ocr').replace(/^#\//, '');
+    routeTo(VALID_ROUTES.includes(initialRoute) ? initialRoute : 'ocr');
+} catch (e) { console.warn('[boot] routeTo failed', e); }
 
 // v83 · 修复刷新 admin 页卡「加载中」:IIFE 里的 loadAdminUsersPage 赋值晚于此处启动
 // v109.4 · 老 admin 已删 · 改成 admin-users
@@ -14195,6 +14158,10 @@ function renderHistoryList() {
                 ? `<span class="history-badge edited">${escapeHtml(t('history-edited', { n: r.edit_count || 1 }))}</span>`
                 : '';
 
+            const smartBadge = r.smart_assigned_flag
+                ? `<span class="history-badge smart-assigned" title="${escapeHtml(t('history-smart-assigned'))}">${svgIcon('sparkle', 11)}</span>`
+                : '';
+
             const confClass = r.confidence === 'high' ? 'high' : (r.confidence === 'medium' ? 'mid' : 'low');
             const confLabel = r.confidence === 'high' ? t('conf-high') : (r.confidence === 'medium' ? t('conf-medium') : t('conf-low'));
             const confBadge = `<span class="history-badge conf-${confClass}">${escapeHtml(confLabel)}</span>`;
@@ -14217,7 +14184,7 @@ function renderHistoryList() {
                     </div>
                     <div class="history-cell-date">${dateStr}</div>
                     <div class="history-cell-file">
-                        <div class="history-cell-filename">${mainName} ${categoryBadge} ${multiBadge} ${sourceBadge}</div>
+                        <div class="history-cell-filename">${mainName} ${categoryBadge} ${multiBadge} ${sourceBadge} ${smartBadge}</div>
                         <div class="history-cell-subtitle">${subtitle}</div>
                     </div>
                     <div class="history-cell-amount">${amount}</div>
@@ -14285,6 +14252,9 @@ async function openHistoryDrawer(historyId) {
         if (typeof window.bindDrawerClient === 'function') {
             window.bindDrawerClient(detail.id, detail.client_id || null);
         }
+
+        // P0-2: 异步检查是否已推送过(不阻塞抽屉渲染)
+        _checkDrawerPushStatus(detail.id);
     } catch (e) {
         console.error('open history detail failed', e);
     }
@@ -14317,6 +14287,10 @@ function injectHistorySaveButton() {
             </svg>
             <span>${escapeHtml(t('btn-push-erp'))}</span>
         </button>
+        <span id="drawer-erp-pushed-badge" style="display:none;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#059669;background:#D1FAE5;padding:3px 8px;border-radius:20px;white-space:nowrap;">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;flex-shrink:0;"><path d="M2 6l3 3 5-5"/></svg>
+            ${escapeHtml(t('erp-pushed-badge'))}
+        </span>
         <div style="flex:1"></div>
         <button class="btn btn-primary" id="btn-save-history">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l3 3 7-7"/></svg>
@@ -14328,38 +14302,11 @@ function injectHistorySaveButton() {
     document.getElementById('btn-push-erp').addEventListener('click', pushHistoryToErp);
 }
 
-async function pushHistoryToErp() {
-    const r = _results[_drawerIdx];
-    if (!r || !r._historyId) return;
-    const btn = document.getElementById('btn-push-erp');
-    if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+// P0-2: 检查该发票是否已成功推送过 ERP
+async function _checkDrawerPushStatus(historyId) { /* stub */ }
 
-    try {
-        const resp = await fetch('/api/erp/push', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ history_id: r._historyId }),
-        });
-        const data = await resp.json();
-        if (!resp.ok) {
-            const code = (data && data.detail) ? data.detail : 'err.unknown';
-            if (code === 'erp.no_default_endpoint') {
-                showToast(t('erp-push-no-endpoint'), 'warn');
-            } else {
-                showToast(t('erp-push-fail', { err: code }), 'fail');
-            }
-            return;
-        }
-        if (data.ok) {
-            showToast(t('erp-push-ok', { name: data.endpoint_name || '' }));
-        } else {
-            showToast(t('erp-push-fail', { err: data.error_msg || 'unknown' }), 'fail');
-        }
-    } catch (e) {
-        showToast(t('erp-push-fail', { err: e.message }), 'fail');
-    } finally {
-        if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
-    }
+async function pushHistoryToErp() {
+    showToast(t('erp-push-coming-soon') || 'ERP 推送即将开放，敬请期待', 'info');
 }
 
 async function saveHistoryEdits() {
@@ -14914,46 +14861,6 @@ async function showLogDetail(logId) {
             modal.remove();
             return;
         }
-        // v27.8.1.6 · 「下载这次的 xlsx」按钮 · fetch + blob 带 Bearer token
-        const dlBtn = e.target.closest('[data-debug-xlsx-id]');
-        if (dlBtn) {
-            e.preventDefault();
-            const dlId = dlBtn.getAttribute('data-debug-xlsx-id');
-            const inv = (dlBtn.getAttribute('data-debug-xlsx-inv') || 'unknown')
-                            .replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 40);
-            const tk = localStorage.getItem('mrpilot_token');
-            dlBtn.disabled = true;
-            const oldText = dlBtn.textContent;
-            dlBtn.textContent = '...';
-            try {
-                const r = await fetch(`/api/erp/logs/${encodeURIComponent(dlId)}/debug-xlsx`, {
-                    headers: { 'Authorization': 'Bearer ' + tk },
-                });
-                if (!r.ok) {
-                    let detail = '';
-                    try { detail = (await r.json()).detail || ''; } catch (_) {}
-                    throw new Error('HTTP ' + r.status + (detail ? ' · ' + detail : ''));
-                }
-                const blob = await r.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `pearnly_debug_${inv}_${dlId.slice(0,8)}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 1500);
-            } catch (err) {
-                if (typeof showToast === 'function') {
-                    showToast((t('log-detail-mrerp-debug-fail') || 'Download failed: {err}').replace('{err}', err.message || 'network'), 'error');
-                } else {
-                    alert('Download failed: ' + (err.message || 'network'));
-                }
-            } finally {
-                dlBtn.disabled = false;
-                dlBtn.textContent = oldText;
-            }
-        }
     });
 
     try {
@@ -14976,6 +14883,15 @@ async function showLogDetail(logId) {
         const respBody = log.response_body || '(empty)';
 
         const isOk = log.status === 'success';
+        // P2-10: 成功推送时友好显示行数
+        let respDisplay = (typeof respBody === 'string') ? respBody : JSON.stringify(respBody, null, 2);
+        if (isOk) {
+            try {
+                const rj = (typeof log.response_body === 'string') ? JSON.parse(log.response_body) : (log.response_body || {});
+                const rows = rj.row_count || (Array.isArray(rj.imported_rows) ? rj.imported_rows.length : 0);
+                if (rows > 0) respDisplay = t('log-push-rows').replace('{n}', String(rows));
+            } catch (e) { /* 保留原始 */ }
+        }
         const summaryText = isOk ? t('log-detail-summary-ok') : t('log-detail-summary-fail');
         const summaryIcon = isOk ? '✓' : '✗';
 
@@ -14986,51 +14902,6 @@ async function showLogDetail(logId) {
                 <pre>${escapeHtml(humanizeError(log.error_msg))}</pre>
             </div>
         ` : '';
-
-        // v27.8.1.5 · MR.ERP 自动推失败 · 显示「下载这次的 xlsx」按钮(给 Korn 排查)
-        // v27.8.1.6 · 加 MR.ERP 抢救式错误提示(从 raw HTML 抓的关键词)
-        let mrerpDebugBox = '';
-        let mrerpHintsBox = '';
-        try {
-            const rb = (typeof log.request_body === 'string')
-                ? JSON.parse(log.request_body) : (log.request_body || {});
-            const isMrerpFail = !isOk && rb && (
-                rb.adapter === 'mrerp_auto' || rb.adapter === 'mrerp_direct'
-            );
-            if (isMrerpFail) {
-                // 1. MR.ERP 抢救式提示(从 raw HTML 抓的红色文字 / 关键词)
-                const hints = Array.isArray(rb._mrerp_hints) ? rb._mrerp_hints : [];
-                if (hints.length > 0) {
-                    mrerpHintsBox = `
-                        <div class="log-detail-section" style="background:#FEE2E2;padding:10px 12px;border-radius:8px;margin-top:8px;border-left:3px solid #DC2626;">
-                            <div style="font-size:12px;color:#7F1D1D;font-weight:600;margin-bottom:6px;">
-                                🔥 ${escapeHtml(t('log-detail-mrerp-hint-title'))}
-                            </div>
-                            <ul style="margin:0;padding-left:18px;font-size:13px;color:#7F1D1D;">
-                                ${hints.map(h => `<li>${escapeHtml(String(h))}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                // 2. xlsx 下载按钮
-                if (rb._debug_xlsx_b64) {
-                    mrerpDebugBox = `
-                        <div class="log-detail-section" style="background:#FEF3C7;padding:10px 12px;border-radius:8px;margin-top:8px;">
-                            <div style="font-size:12px;color:#78350F;margin-bottom:6px;">
-                                ${escapeHtml(t('log-detail-mrerp-debug-tip'))}
-                            </div>
-                            <button type="button"
-                                class="btn btn-primary btn-tiny"
-                                data-debug-xlsx-id="${escapeHtml(log.id)}"
-                                data-debug-xlsx-inv="${escapeHtml(log.invoice_no || 'unknown')}"
-                                style="display:inline-flex;align-items:center;gap:6px;">
-                                📥 ${escapeHtml(t('log-detail-mrerp-debug-download'))}
-                            </button>
-                        </div>
-                    `;
-                }
-            }
-        } catch (e) { /* 忽略 · 没就没 */ }
 
         modal.querySelector('.log-detail-box').innerHTML = `
             <div class="log-detail-head">
@@ -15062,8 +14933,6 @@ async function showLogDetail(logId) {
             </div>
 
             ${errBox}
-            ${mrerpHintsBox}
-            ${mrerpDebugBox}
 
             <details class="log-detail-collapsible">
                 <summary>${escapeHtml(t('log-detail-toggle'))}</summary>
@@ -15073,7 +14942,7 @@ async function showLogDetail(logId) {
                 </div>
                 <div class="log-detail-section">
                     <div class="log-detail-label">${escapeHtml(t('log-detail-response-human'))}</div>
-                    <pre>${escapeHtml(respBody)}</pre>
+                    <pre>${escapeHtml(respDisplay)}</pre>
                 </div>
             </details>
         `;
@@ -15607,9 +15476,9 @@ async function deleteEndpoint(endpointId) {
             return;
         }
 
-        // v0.10 · 自动化子菜单切换
+        // v0.10 · 自动化子菜单切换(guard: 只处理有 data-auto-tab 的按钮，防止对账中心等共用 .auto-nav-item 类名的按钮触发 switchAutomationTab(undefined))
         const autoNav = e.target.closest('.auto-nav-item');
-        if (autoNav) {
+        if (autoNav && autoNav.dataset.autoTab) {
             switchAutomationTab(autoNav.dataset.autoTab);
             return;
         }
@@ -17957,7 +17826,7 @@ async function deleteEndpoint(endpointId) {
         if (cid != null) {
             const c = (window._clientsCache || []).find(x => Number(x.id) === Number(cid));
             badge.classList.remove('is-empty');
-            if (dot)  dot.style.background = (c && c.color) || '#3B82F6';
+            if (dot)  dot.style.background = (c && c.color) || '#111111';
             if (name) name.textContent = (c && (c.short_name || c.name)) || ('#' + cid);
         } else {
             badge.classList.add('is-empty');
@@ -18015,7 +17884,7 @@ async function deleteEndpoint(endpointId) {
             const sel = (Number(c.id) === Number(_pickerSelected)) ? ' is-selected' : '';
             rows.push(
                 '<div class="bank-client-picker-row' + sel + '" data-cid="' + esc(c.id) + '">'
-                + '<span class="bank-cp-dot" style="background:' + esc(c.color || '#3B82F6') + '"></span>'
+                + '<span class="bank-cp-dot" style="background:' + esc(c.color || '#111111') + '"></span>'
                 + '<span>' + esc(c.short_name || c.name || '#' + c.id) + '</span>'
                 + '</div>'
             );
@@ -18684,6 +18553,36 @@ async function deleteEndpoint(endpointId) {
         if (!thb || thb === 0) return '<span class="cost-money cost-money-zero">฿ 0</span>';
         return `<span class="cost-money">฿ ${fmt(thb, 4)}</span>`;
     }
+
+    let _lastEngines = [];
+
+    function _renderEngines(engines) {
+        const engEl = document.getElementById('kpi-engines');
+        if (!engEl) return;
+        if (!engines || !engines.length) {
+            engEl.innerHTML = '<span style="font-size:13px; color:#9ca3af;">' + t('cost-no-engines') + '</span>';
+            return;
+        }
+        const _engNames = {
+            'gemini':       t('adm-engine-ocr'),
+            'google_vision':t('adm-engine-ocr-backup'),
+            'text_path':    t('adm-engine-epdf'),
+            'gemini-vex':   t('adm-engine-vex'),
+        };
+        const sorted = [...engines].sort(function(a, b) { return (b.cost_thb || 0) - (a.cost_thb || 0); });
+        engEl.innerHTML = sorted.map(function(e) {
+            const name = _engNames[e.engine] || e.engine;
+            const cost = e.cost_thb || 0;
+            const cnt  = e.count || 0;
+            const avg  = cnt ? cost / cnt : 0;
+            return '<div class="engine-row">'
+                + '<span class="engine-name">' + name + '</span>'
+                + '<span class="engine-stats">'
+                + '<span class="engine-cost">฿' + fmt(cost, 4) + '</span>'
+                + '<span class="engine-cnt">' + cnt + ' · avg ฿' + fmt(avg, 4) + '</span>'
+                + '</span></div>';
+        }).join('');
+    }
     function fmtTime(iso) {
         if (!iso) return t('cost-never-used');
         const d = new Date(iso);
@@ -18691,7 +18590,7 @@ async function deleteEndpoint(endpointId) {
         const diffMs = now - d;
         const diffMin = Math.floor(diffMs / 60000);
         if (diffMin < 1) return 'just now';
-        if (diffMin < 60) return diffMin + 'm ago';
+        if (diffMin < 60) return diffMin + 'min ago';
         const diffH = Math.floor(diffMin / 60);
         if (diffH < 24) return diffH + 'h ago';
         const diffD = Math.floor(diffH / 24);
@@ -18726,19 +18625,9 @@ async function deleteEndpoint(endpointId) {
             document.getElementById('kpi-total-sub').textContent =
                 (data.total.invoices || 0) + ' ' + t('cost-invoices-suffix') + ' · ' +
                 (data.total.pages || 0) + ' ' + t('cost-pages-suffix');
-            // 引擎占比
-            const engEl = document.getElementById('kpi-engines');
-            if (!data.engines || !data.engines.length) {
-                engEl.innerHTML = `<span style="font-size:13px; color:#9ca3af;">${t('cost-no-engines')}</span>`;
-            } else {
-                const totalCnt = data.engines.reduce((s, e) => s + (e.count || 0), 0);
-                const sorted = [...data.engines].sort((a, b) => b.count - a.count);
-                engEl.innerHTML = sorted.map(e => {
-                    const pct = totalCnt ? Math.round(e.count * 100 / totalCnt) : 0;
-                    const name = e.engine === 'gemini' ? 'Gemini' : e.engine === 'google_vision' ? 'Vision' : e.engine;
-                    return `<div class="engine-row"><span class="engine-name">${name}</span><span class="engine-pct">${pct}%</span></div>`;
-                }).join('');
-            }
+            // 引擎明细 · 缓存供切语言时重渲
+            _lastEngines = data.engines || [];
+            _renderEngines(_lastEngines);
         } catch (e) {
             console.error('cost overview fail', e);
             showToast(t('cost-load-fail'), 'fail');
@@ -18863,6 +18752,13 @@ async function deleteEndpoint(endpointId) {
         loadByUser();
         loadTrend();
     };
+
+    // 切语言时重渲引擎明细(无需重新 fetch)
+    if (typeof window.subscribeI18n === 'function') {
+        window.subscribeI18n('admin-cost-engines', function () {
+            _renderEngines(_lastEngines);
+        });
+    }
 
     // 绑定按钮
     document.addEventListener('DOMContentLoaded', () => {
@@ -18990,7 +18886,7 @@ async function deleteEndpoint(endpointId) {
         document.getElementById('client-input-email').value = (client && client.contact_email) || '';
         document.getElementById('client-input-notes').value = (client && client.notes) || '';
         // 颜色
-        const targetColor = (client && client.color) || '#3b82f6';
+        const targetColor = (client && client.color) || '#111111';
         document.querySelectorAll('#client-color-picker .color-swatch').forEach(s => {
             s.classList.toggle('active', s.dataset.color === targetColor);
         });
@@ -19005,7 +18901,7 @@ async function deleteEndpoint(endpointId) {
     }
     function getActiveColor() {
         const sel = document.querySelector('#client-color-picker .color-swatch.active');
-        return sel ? sel.dataset.color : '#3b82f6';
+        return sel ? sel.dataset.color : '#111111';
     }
 
     async function saveClient() {
@@ -19140,6 +19036,9 @@ async function deleteEndpoint(endpointId) {
                     body: JSON.stringify({ client_id: newCid }),
                 });
                 showToast(t('client-msg-updated'), 'success');
+                // P0-1: 保存后立即更新快照, 无需关闭抽屉即可推送
+                const snap = _results[_drawerIdx];
+                if (snap) snap.client_id = newCid;
                 await loadClientsCache();   // 刷新统计
             } catch (e) {
                 console.error(e);
@@ -19369,13 +19268,15 @@ async function deleteEndpoint(endpointId) {
     function openBillingModal() {
         document.getElementById('billing-input-balance').value = '';
         document.getElementById('billing-input-notes').value = '';
+        const ci = document.getElementById('billing-input-calib');
+        if (ci) ci.value = '';
         document.getElementById('billing-modal-mask').style.display = 'flex';
         setTimeout(() => document.getElementById('billing-input-balance').focus(), 50);
     }
     function closeBillingModal() {
         document.getElementById('billing-modal-mask').style.display = 'none';
     }
-    
+
     async function saveBilling() {
         const balance = parseFloat(document.getElementById('billing-input-balance').value);
         if (isNaN(balance) || balance < 0) {
@@ -19383,11 +19284,21 @@ async function deleteEndpoint(endpointId) {
             return;
         }
         const notes = document.getElementById('billing-input-notes').value.trim();
+        const calibInput = document.getElementById('billing-input-calib');
+        const calibRaw = calibInput ? calibInput.value.trim() : '';
+        let calibFactor = null;
+        if (calibRaw !== '') {
+            calibFactor = parseFloat(calibRaw);
+            if (isNaN(calibFactor) || calibFactor < 0.5 || calibFactor > 2.0) {
+                showToast(t('adm-billing-calib-invalid'), 'fail');
+                return;
+            }
+        }
         try {
             const r = await fetch('/api/admin/billing/balance', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authH() },
-                body: JSON.stringify({ real_balance_thb: balance, notes: notes || null }),
+                body: JSON.stringify({ real_balance_thb: balance, notes: notes || null, ...(calibFactor !== null ? { calibration_factor: calibFactor } : {}) }),
             });
             if (!r.ok) {
                 const err = await r.json().catch(() => ({}));
@@ -19550,7 +19461,7 @@ async function deleteEndpoint(endpointId) {
                 { code: 'print',     name: t('tpl-print'),     desc: t('tpl-print-desc'),     recommended: false },
             ];
         }
-        // v118.27.6 · 砍 ERP 录入格式(被 MR.ERP / Xero 适配器取代 · 向后兼容老服务器仍返回 erp)
+        // v118.27.6 · 砍 ERP 录入格式(被 ERP 适配器取代 · 向后兼容老服务器仍返回 erp)
         result = result.filter(tpl => tpl.code !== 'erp');
         // v118.27.7 · sales_detail_th 在「单据记录批量」入口也支持(走 /api/ocr/export-by-history-ids)
         // 客户卡片导出暂不支持 · 只在 history-batch 模式加
@@ -20878,35 +20789,53 @@ async function deleteEndpoint(endpointId) {
         risk: null,
     };
 
-    async function loadAdminUsersPage() {
+    function loadAdminUsersPage() {
         const tok = localStorage.getItem('mrpilot_token');
         if (!tok) return;
-        try {
-            // 1. 漏斗
-            const funnelR = await fetch('/api/admin/users/funnel', { headers: { 'Authorization': 'Bearer ' + tok } });
-            if (funnelR.status === 403) return; // 不是 admin
-            const funnel = await funnelR.json();
-            _admPageState.funnel = funnel;
-            renderAdmKpi(funnel);
-            renderAdmExpiring(funnel.trial_expiring_soon || []);
+        const _h = { headers: { 'Authorization': 'Bearer ' + tok } };
+        const _errHtml = (id) => `<div class="adm-empty" style="color:#ef4444">
+            加载失败 · <a href="#" style="color:#ef4444;text-decoration:underline" onclick="loadAdminUsersPage();return false">重试</a>
+        </div>`;
 
-            // 2. 待审核付款
-            const payR = await fetch('/api/admin/payments/pending', { headers: { 'Authorization': 'Bearer ' + tok } });
-            const pay = await payR.json();
-            _admPageState.pay = pay;
-            renderAdmPending(pay.payments || []);
+        // v4.10.16 · 4 路同时发出 · 各自独立渲染 · 互不阻塞(原串行 ~8s → 并行 ~2-3s)
+        const funnelP = fetch('/api/admin/users/funnel', _h);
+        const payP    = fetch('/api/admin/payments/pending', _h);
+        const usersP  = fetch('/api/admin/users?plan=all&search=&limit=100', _h);
+        const riskP   = fetch('/api/admin/risk/suspicious', _h);
 
-            // 3. 用户列表(默认全部)
-            await loadAdmUserList();
+        funnelP
+            .then(async r => { if (r.status === 403) return null; return r.json(); })
+            .then(d => {
+                if (!d) return;
+                _admPageState.funnel = d;
+                renderAdmKpi(d);
+                renderAdmExpiring(d.trial_expiring_soon || []);
+            })
+            .catch(() => {
+                const w = document.getElementById('adm-kpi-grid');
+                if (w) w.innerHTML = _errHtml();
+            });
 
-            // 4. 风控
-            const rR = await fetch('/api/admin/risk/suspicious', { headers: { 'Authorization': 'Bearer ' + tok } });
-            const risk = await rR.json();
-            _admPageState.risk = risk;
-            renderAdmRisk(risk);
-        } catch (e) {
-            console.error('loadAdminUsersPage', e);
-        }
+        payP.then(r => r.json())
+            .then(d => { _admPageState.pay = d; renderAdmPending(d.payments || []); })
+            .catch(() => {
+                const w = document.getElementById('adm-pending-list');
+                if (w) w.innerHTML = _errHtml();
+            });
+
+        usersP.then(r => r.json())
+            .then(d => { _admPageState.users = d.users || []; renderAdmUserList(d.users || []); })
+            .catch(() => {
+                const w = document.getElementById('adm-users-table');
+                if (w) w.innerHTML = _errHtml();
+            });
+
+        riskP.then(r => r.json())
+            .then(d => { _admPageState.risk = d; renderAdmRisk(d); })
+            .catch(() => {
+                const w = document.getElementById('adm-risk-content');
+                if (w) w.innerHTML = _errHtml();
+            });
     }
 
     // v118.3 · 立即用缓存数据 + 当前 i18n 重渲整页(切语言用 · 不等 fetch · 视觉零延迟)
@@ -20930,9 +20859,9 @@ async function deleteEndpoint(endpointId) {
         if (!wrap) return;
         const bp = f.by_plan || {};
         const cards = [
-            { lbl: tt('adm-kpi-today'), val: f.new_today || 0, color: '#1e3a8a' },
-            { lbl: tt('adm-kpi-week'), val: f.new_week || 0, color: '#2563eb' },
-            { lbl: tt('adm-kpi-month'), val: f.new_month || 0, color: '#3b82f6' },
+            { lbl: tt('adm-kpi-today'), val: f.new_today || 0, color: '#111111' },
+            { lbl: tt('adm-kpi-week'), val: f.new_week || 0, color: '#111111' },
+            { lbl: tt('adm-kpi-month'), val: f.new_month || 0, color: '#111111' },
             { lbl: tt('plan-trial'), val: bp.trial || 0, color: '#f59e0b' },
             { lbl: tt('plan-free'), val: bp.free || 0, color: '#64748b' },
             { lbl: tt('plan-pro'), val: bp.pro || 0, color: '#10b981' },
@@ -21277,7 +21206,7 @@ async function deleteEndpoint(endpointId) {
                 </div>
                 <div class="cpw-forgot-body">
                     <p class="cpw-forgot-tip" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">${esc(tt('adm-cd-warn'))}</p>
-                    <div style="background:#f8fafc;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:13px;">
+                    <div style="background:#f4f4f0;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:13px;">
                         <div style="font-weight:600;margin-bottom:8px;color:#0f172a;">${esc(t_owner.username || t_owner.email || username)}</div>
                         <div style="color:#64748b;margin-bottom:10px;">${esc(t_tenant.name || '—')}${t_tenant.tenant_type ? ' · ' + esc(t_tenant.tenant_type) : ''}</div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;color:#475569;">
@@ -21960,6 +21889,10 @@ async function deleteEndpoint(endpointId) {
         'adm-risk-ocr-24h': '张 / 24h',
         'common-close': '关闭',
         'adm-risk-clean': '✓ 当前无异常',
+        'adm-engine-ocr': '单据识别',
+        'adm-engine-ocr-backup': '单据识别(备用)',
+        'adm-engine-epdf': '电子PDF',
+        'adm-engine-vex': '销项税对账',
     });
     Object.assign(I18N.en, {
         'nav-admin-users': 'Users',
@@ -22264,6 +22197,10 @@ async function deleteEndpoint(endpointId) {
         'adm-risk-ocr-24h': 'OCR / 24 ชม.',
         'common-close': 'ปิด',
         'adm-risk-clean': '✓ ไม่มีความผิดปกติ',
+        'adm-engine-ocr': 'OCR หลัก',
+        'adm-engine-ocr-backup': 'OCR สำรอง',
+        'adm-engine-epdf': 'PDF อิเล็กทรอนิกส์',
+        'adm-engine-vex': 'กระทบยอดภาษีขาย',
     });
     Object.assign(I18N.ja, {
         'nav-admin-users': 'ユーザー管理',
@@ -25787,12 +25724,8 @@ try { window.I18N = I18N; } catch(e) {}
     }
 
     // ---------- 显隐控制 ----------
-    function _applyVisibility() {
-        const grp = document.getElementById('nav-group-test');
-        if (!grp) return;
-        grp.style.display = _isAllowed() ? '' : 'none';
-        _renderNavBadge();
-    }
+    // v118.33.2 NAV-IA Phase 2 · sidebar 测试组 nav-group-test 已删(入口走头像菜单)· 此函数保留外壳兼容外部调用 · 内部空跑
+    function _applyVisibility() { /* no-op · sidebar 测试组 DOM 已删 */ }
     window._tcApplyVisibility = _applyVisibility;
 
     // 监听用户登录信息就绪(_userInfo 在 fetchUserInfo 之后才有 · 用 setInterval 轻量轮询)
@@ -25853,7 +25786,7 @@ try { window.I18N = I18N; } catch(e) {}
                 <p id="line-email-sub-p" style="font-size:14px;color:#64748b;line-height:1.55;margin:0 0 18px;"></p>
                 <input id="line-email-input" type="email" autocomplete="email" style="width:100%;padding:12px 14px;border:1px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;font-family:inherit;" />
                 <div id="line-email-err" style="color:#dc2626;font-size:13px;margin-top:8px;min-height:18px;"></div>
-                <button id="line-email-submit-btn" type="button" style="width:100%;margin-top:14px;padding:13px 16px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;"></button>
+                <button id="line-email-submit-btn" type="button" style="width:100%;margin-top:14px;padding:13px 16px;background:#111111;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;"></button>
             </div>
         `;
         document.body.appendChild(el);
@@ -26369,9 +26302,8 @@ window.pearnlyConfirm = function (message, title) {
 (function () {
     'use strict';
 
-    const ERP_OPTIONS = ['mrerp', 'flowaccount', 'peak', 'xero', 'quickbooks', 'express'];
+    const ERP_OPTIONS = ['flowaccount', 'peak', 'xero', 'quickbooks', 'express'];
     const ERP_LABELS = {
-        mrerp:       'MR.ERP',
         flowaccount: 'FlowAccount',
         peak:        'PEAK',
         xero:        'Xero',
@@ -26393,12 +26325,12 @@ window.pearnlyConfirm = function (message, title) {
     const TEST_USER_ID = '468b50c1-5593-4fd6-990d-515ce8085563'; // skin
 
     let _state = {
-        sub: 'clients',          // clients / accounts / taxes
-        loaded: { clients: false, accounts: false, taxes: false },
-        items: { clients: [], accounts: [], taxes: [] },
+        sub: 'clients',          // clients / accounts / taxes / products
+        loaded: { clients: false, accounts: false, taxes: false, products: false },
+        items: { clients: [], accounts: [], taxes: [], products: [] },
         clientList: [],          // 客户下拉数据 · 一次拿
         clientLoaded: false,
-        addingNew: { clients: false, accounts: false, taxes: false },
+        addingNew: { clients: false, accounts: false, taxes: false, products: false },
         bound: false,
     };
 
@@ -26470,7 +26402,7 @@ window.pearnlyConfirm = function (message, title) {
                 _esc(t('erp-map-readonly-tip')) + '</div>';
         }
         html += '<div class="erp-map-toolbar">';
-        if (!readonly) {
+        if (!readonly && _state.sub !== 'products') {
             html += '<button class="btn btn-primary" type="button" id="erp-map-add-btn" data-i18n="erp-map-add-row">' +
                 _esc(t('erp-map-add-row')) + '</button>';
         }
@@ -26530,6 +26462,15 @@ window.pearnlyConfirm = function (message, title) {
                 '<div>' + _esc(t('erp-map-col-erp')) + '</div>' +
                 '<div>' + _esc(t('erp-map-col-category')) + '</div>' +
                 '<div>' + _esc(t('erp-map-col-erp-code')) + '</div>' +
+                '<div>' + _esc(t('erp-map-col-erp-name')) + '</div>' +
+                '<div>' + _esc(t('erp-map-col-notes')) + '</div>' +
+                '<div>' + _esc(t('erp-map-col-actions')) + '</div>' +
+            '</div>';
+        }
+        if (sub === 'products') {
+            return '<div class="erp-map-row erp-map-head row-products">' +
+                '<div>' + _esc(t('erp-map-col-item-name')) + '</div>' +
+                '<div>' + _esc(t('erp-map-col-erp-product-code')) + '</div>' +
                 '<div>' + _esc(t('erp-map-col-erp-name')) + '</div>' +
                 '<div>' + _esc(t('erp-map-col-notes')) + '</div>' +
                 '<div>' + _esc(t('erp-map-col-actions')) + '</div>' +
@@ -26646,6 +26587,15 @@ window.pearnlyConfirm = function (message, title) {
                 '<div>' + delBtn + '</div>' +
             '</div>';
         }
+        if (sub === 'products') {
+            return '<div class="erp-map-row row-products">' +
+                '<div data-label="' + _esc(t('erp-map-col-item-name')) + '" class="erp-map-cell-name">' + _esc(it.item_name || '') + '</div>' +
+                '<div data-label="' + _esc(t('erp-map-col-erp-product-code')) + '" class="erp-map-code">' + _esc(it.erp_code || '') + '</div>' +
+                '<div data-label="' + _esc(t('erp-map-col-erp-name')) + '">' + _esc(it.erp_name || '') + '</div>' +
+                '<div data-label="' + _esc(t('erp-map-col-notes')) + '">' + _esc(it.notes || '') + '</div>' +
+                '<div>' + delBtn + '</div>' +
+            '</div>';
+        }
         // taxes
         const taxLabel = t('erp-map-tax-' + (it.pearnly_tax_kind || '')) || it.pearnly_tax_kind;
         return '<div class="erp-map-row row-taxes">' +
@@ -26721,40 +26671,6 @@ window.pearnlyConfirm = function (message, title) {
         }
     }
 
-    async function _devSeed() {
-        const tk = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch('/api/erp/mappings/_dev/seed', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + tk },
-            });
-            if (!r.ok) throw new Error('http_' + r.status);
-            // 全部 sub 重拉
-            await Promise.all(['clients', 'accounts', 'taxes'].map(function (s) { return _fetchSub(s, true); }));
-            _renderTable();
-            _toast(t('erp-map-dev-seed-ok'), 'success');
-        } catch (e) {
-            _toast(t('erp-map-dev-fail'), 'error');
-        }
-    }
-
-    async function _devClear() {
-        const tk = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch('/api/erp/mappings/_dev/clear', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + tk },
-            });
-            if (!r.ok) throw new Error('http_' + r.status);
-            const data = await r.json();
-            await Promise.all(['clients', 'accounts', 'taxes'].map(function (s) { return _fetchSub(s, true); }));
-            _renderTable();
-            const msg = (t('erp-map-dev-cleared') || 'Cleared {n}').replace('{n}', String(data.deleted || 0));
-            _toast(msg, 'success');
-        } catch (e) {
-            _toast(t('erp-map-dev-fail'), 'error');
-        }
-    }
 
     // ─── 进入 tab + 切 sub-tab ─────────────────────
     async function _enterTab() {
@@ -26768,7 +26684,7 @@ window.pearnlyConfirm = function (message, title) {
         _state.sub = sub;
         _state.addingNew[sub] = false;
         // 切 sub 时清旧 sub 的 add 状态
-        ['clients', 'accounts', 'taxes'].forEach(function (s) {
+        ['clients', 'accounts', 'taxes', 'products'].forEach(function (s) {
             if (s !== sub) _state.addingNew[s] = false;
         });
         // 更新 sub-tab 高亮
@@ -26831,11 +26747,6 @@ window.pearnlyConfirm = function (message, title) {
                 _delete(delBtn.dataset.erpDel);
                 return;
             }
-            // skin 测试按钮
-            const seedBtn = ev.target.closest('#erp-map-dev-seed-btn');
-            if (seedBtn) { ev.preventDefault(); _devSeed(); return; }
-            const clearBtn = ev.target.closest('#erp-map-dev-clear-btn');
-            if (clearBtn) { ev.preventDefault(); _devClear(); return; }
         });
     }
 
@@ -26860,218 +26771,11 @@ window.pearnlyConfirm = function (message, title) {
     }
 })();
 
-// ============================================================
-// v118.27.1 · MR.ERP 适配器 · 历史抽屉「下载 MR.ERP .xlsx」按钮
-// 触发:历史抽屉打开 + injectHistorySaveButton 跑完后注入 mrerp 按钮
-// 状态:轮询 /api/erp/mrerp/status · disabled 条件:
-//   - 没配 mrerp 客户映射 → 提示去字段映射页
-//   - 当前 history 异常未放行 → 提示先解决异常
-// ============================================================
-(function () {
-    'use strict';
-
-    let _statusCache = null;     // {has_mapping, sheet_kinds_ready, sheet_kinds_stub}
-    let _statusLoaded = false;
-    let _bound = false;
-
-    async function _loadStatus(force) {
-        if (_statusLoaded && !force) return _statusCache;
-        const tk = localStorage.getItem('mrpilot_token');
-        if (!tk) return null;
-        try {
-            const r = await fetch('/api/erp/mrerp/status', {
-                headers: { 'Authorization': 'Bearer ' + tk },
-            });
-            if (!r.ok) throw new Error('http_' + r.status);
-            _statusCache = await r.json();
-            _statusLoaded = true;
-        } catch (e) {
-            _statusCache = { has_mapping: false, sheet_kinds_ready: [], sheet_kinds_stub: [] };
-            _statusLoaded = false;
-        }
-        return _statusCache;
-    }
-
-    function _esc(s) {
-        return (typeof escapeHtml === 'function')
-            ? escapeHtml(s == null ? '' : String(s))
-            : String(s == null ? '' : s);
-    }
-    function _toast(msg, kind) {
-        try { if (typeof showToast === 'function') showToast(msg, kind || 'info'); } catch (e) {}
-    }
-
-    function _isHistoryExceptional(historyObj) {
-        if (!historyObj) return false;
-        const st = String(historyObj.status || '').toLowerCase();
-        return st === 'exception' || st === 'exception_pending' || st === 'rejected';
-    }
-
-    function _getCurrentHistory() {
-        // 复用页面的 _results / _drawerIdx 全局
-        try {
-            const r = (typeof _results !== 'undefined' ? _results : [])[(typeof _drawerIdx !== 'undefined' ? _drawerIdx : -1)];
-            return r || null;
-        } catch (e) { return null; }
-    }
-
-    async function _inject() {
-        const saveBar = document.getElementById('drawer-history-save');
-        if (!saveBar) return;
-        if (saveBar.querySelector('#btn-mrerp-download')) return;  // 已注入
-        // v118.27.5 · 统一推送按钮存在时 · 老 mrerp 按钮不再注入(被统一按钮覆盖)
-        if (saveBar.querySelector('#pn-push-wrap')) return;
-
-        const status = await _loadStatus(false);
-        // v118.27.5.2 · race fix · await 期间统一按钮可能已被注入 · 重新 check
-        if (saveBar.querySelector('#pn-push-wrap')) return;
-        if (saveBar.querySelector('#btn-mrerp-download')) return;
-        const hasMap = !!(status && status.has_mapping);
-        const r = _getCurrentHistory();
-        const hid = r && (r._historyId || r.history_id);
-        if (!hid) return;
-        const isExc = _isHistoryExceptional(r);
-
-        let disabled = false;
-        let titleKey = 'mrerp-btn-tip';
-        if (!hasMap)      { disabled = true; titleKey = 'mrerp-btn-disabled-no-map'; }
-        else if (isExc)   { disabled = true; titleKey = 'mrerp-btn-disabled-exc'; }
-
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.id = 'btn-mrerp-download';
-        btn.className = 'btn btn-ghost' + (disabled ? ' disabled' : '');
-        btn.disabled = disabled;
-        btn.title = t(titleKey) || '';
-        btn.innerHTML =
-            '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-            '<rect x="3" y="3" width="10" height="10" rx="1.5"/><path d="M6 7h4M6 9h4M6 11h2"/><path d="M11 13l2 2 3-3"/></svg>' +
-            '<span>' + _esc(t('mrerp-btn')) + '</span>';
-        btn.addEventListener('click', _download);
-
-        // 插到现有「推 ERP」按钮右边
-        const pushErpBtn = document.getElementById('btn-push-erp');
-        if (pushErpBtn && pushErpBtn.parentNode) {
-            pushErpBtn.parentNode.insertBefore(btn, pushErpBtn.nextSibling);
-        } else {
-            saveBar.insertBefore(btn, saveBar.firstChild);
-        }
-    }
-
-    async function _download() {
-        const r = _getCurrentHistory();
-        const hid = r && (r._historyId || r.history_id);
-        if (!hid) return;
-        const btn = document.getElementById('btn-mrerp-download');
-        if (btn) { btn.disabled = true; btn.classList.add('loading'); }
-        const tk = localStorage.getItem('mrpilot_token');
-        try {
-            const resp = await fetch('/api/erp/mrerp/generate/' + encodeURIComponent(hid) + '?kind=sales_credit', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + tk },
-            });
-            if (!resp.ok) {
-                let detail = 'unknown';
-                try {
-                    const j = await resp.json();
-                    detail = j.detail || 'unknown';
-                } catch (e) {}
-                // 错误码 → 友好提示(物料 4 未到时 fallback 显示原码)
-                const errKey = String(detail).replace(/^mrerp\./, '').toLowerCase();
-                const friendly = t('mrerp-err-' + errKey);
-                const showText = (friendly && friendly !== 'mrerp-err-' + errKey)
-                    ? friendly
-                    : detail;
-                _toast(t('mrerp-toast-fail').replace('{err}', showText), 'error');
-                return;
-            }
-            const blob = await resp.blob();
-            const cd = resp.headers.get('Content-Disposition') || '';
-            let filename = 'Pearnly_MRERP.xlsx';
-            const m = cd.match(/filename="?([^";]+)"?/);
-            if (m) filename = m[1];
-            const a = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(function () {
-                URL.revokeObjectURL(url);
-                a.remove();
-            }, 100);
-            _toast(t('mrerp-toast-ok'), 'success');
-        } catch (e) {
-            _toast(t('mrerp-toast-fail').replace('{err}', e.message || 'network'), 'error');
-        } finally {
-            if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
-        }
-    }
-
-    // 监听历史抽屉打开后再注入
-    function _bind() {
-        if (_bound) return;
-        _bound = true;
-        // 现有 injectHistorySaveButton 在历史抽屉打开后跑 · 我们在它跑完后跟着注入
-        // 用 MutationObserver 监听 #drawer-body 的子节点变化
-        const drawerBody = function () { return document.getElementById('drawer-body'); };
-        try {
-            const observer = new MutationObserver(function () {
-                if (document.getElementById('drawer-history-save') &&
-                    !document.getElementById('btn-mrerp-download')) {
-                    _inject();
-                }
-            });
-            const target = drawerBody();
-            if (target) {
-                observer.observe(target, { childList: true, subtree: true });
-            } else {
-                // drawer-body 还没建 · 监听 body
-                const bodyObserver = new MutationObserver(function () {
-                    const b = drawerBody();
-                    if (b) {
-                        observer.observe(b, { childList: true, subtree: true });
-                        bodyObserver.disconnect();
-                    }
-                });
-                bodyObserver.observe(document.body, { childList: true, subtree: true });
-            }
-        } catch (e) {}
-
-        // 字段映射改了 → 失效 status 缓存(切到 mappings 子 tab 后离开重拉)
-        document.addEventListener('click', function (ev) {
-            if (ev.target.closest('.erp-subtab[data-erp-subtab="mappings"]')) {
-                _statusLoaded = false;
-            }
-        });
-    }
-
-    function _rerenderAll() {
-        // 切语言时 · 如果按钮已经注入 · 更新文字 + tooltip
-        const btn = document.getElementById('btn-mrerp-download');
-        if (!btn) return;
-        const span = btn.querySelector('span');
-        if (span) span.textContent = t('mrerp-btn');
-        // 重新决定 disabled tooltip
-        const r = _getCurrentHistory();
-        const hasMap = !!(_statusCache && _statusCache.has_mapping);
-        const isExc = _isHistoryExceptional(r);
-        let titleKey = 'mrerp-btn-tip';
-        if (!hasMap)    titleKey = 'mrerp-btn-disabled-no-map';
-        else if (isExc) titleKey = 'mrerp-btn-disabled-exc';
-        btn.title = t(titleKey) || '';
-    }
-
-    _bind();
-    if (typeof window.subscribeI18n === 'function') {
-        window.subscribeI18n('mrerp-download-btn', _rerenderAll);
-    }
-})();
 
 // ============================================================
 // v118.27.4 · Xero 连接卡片 + 推按钮注入
 // 渲染:自动化 → ERP 对接 → 连接 & 推送日志 sub-tab 顶部 #erp-connect-cards
-// 推按钮:历史抽屉 saveBar 内 · 跟 MR.ERP 按钮并排
+// 推按钮:历史抽屉 saveBar 内 · 跟 ERP 按钮并排
 // ============================================================
 (function () {
     'use strict';
@@ -27138,7 +26842,6 @@ window.pearnlyConfirm = function (message, title) {
 
         if (!s) {
             html += '</div></div>';
-            // v27.8.1.0 · upsert 模式 · 只替换自己的卡 · 不动 mrerp 卡
             const old = host.querySelector('.erp-connect-xero');
             if (old) {
                 old.outerHTML = html;
@@ -27207,7 +26910,6 @@ window.pearnlyConfirm = function (message, title) {
         }
         html += '</div></div>'; // /body /card
 
-        // v27.8.1.0 · upsert 模式 · 替换自己的卡 · 不影响 mrerp 卡
         const old = host.querySelector('.erp-connect-xero');
         if (old) {
             old.outerHTML = html;
@@ -27343,16 +27045,11 @@ window.pearnlyConfirm = function (message, title) {
             '<span style="margin-left:4px;">' + _esc(t('xero-push-btn')) + '</span>';
         btn.addEventListener('click', _onPush);
 
-        const mrerpBtn = document.getElementById('btn-mrerp-download');
-        if (mrerpBtn && mrerpBtn.parentNode) {
-            mrerpBtn.parentNode.insertBefore(btn, mrerpBtn.nextSibling);
+        const pushErpBtn = document.getElementById('btn-push-erp');
+        if (pushErpBtn && pushErpBtn.parentNode) {
+            pushErpBtn.parentNode.insertBefore(btn, pushErpBtn.nextSibling);
         } else {
-            const pushErpBtn = document.getElementById('btn-push-erp');
-            if (pushErpBtn && pushErpBtn.parentNode) {
-                pushErpBtn.parentNode.insertBefore(btn, pushErpBtn.nextSibling);
-            } else {
-                saveBar.insertBefore(btn, saveBar.firstChild);
-            }
+            saveBar.insertBefore(btn, saveBar.firstChild);
         }
     }
 
@@ -27498,782 +27195,6 @@ window.pearnlyConfirm = function (message, title) {
 })();
 
 
-// ============================================================
-// v27.8.1.0 · MR.ERP 后端模拟登录直推 IIFE
-//   - 渲染:自动化 → ERP 对接 → 连接 & 推送日志 sub-tab 顶部
-//     #erp-connect-cards · 跟 Xero 卡片并排
-//   - 凭据 modal:#mrerp-cred-modal-mask
-//   - 老板可写 / 员工只读
-//   - subscribeI18n 注册 · 切语言重渲(铁律 14)
-// ============================================================
-(function() {
-    'use strict';
-
-    let _status = null;
-    let _statusLoaded = false;
-    let _bound = false;
-    // v27.8.1.13b · 测试连接后用户选中的账套 {comidyear, seldb, label, comfullname} | null
-    let _selectedDb = null;
-
-    function _esc(s) {
-        return (typeof escapeHtml === 'function')
-            ? escapeHtml(s == null ? '' : String(s))
-            : String(s == null ? '' : s);
-    }
-    function _toast(msg, kind) {
-        try { if (typeof showToast === 'function') showToast(msg, kind || 'info'); } catch (e) {}
-    }
-    function _isOwner() {
-        const u = (typeof _userInfo !== 'undefined' ? _userInfo : null);
-        return !!(u && (u.role === 'owner' || u.is_super_admin));
-    }
-    function _fmtTime(iso) {
-        if (!iso) return '';
-        try {
-            const d = new Date(iso);
-            const pad = n => n < 10 ? '0' + n : '' + n;
-            return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
-                + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-        } catch (e) { return iso; }
-    }
-
-    // ─── 拉状态 ───────────────────────────────────────
-    async function _loadStatus(force) {
-        if (_statusLoaded && !force) return _status;
-        const tk = localStorage.getItem('mrpilot_token');
-        if (!tk) { _status = { connected: false }; return _status; }
-        try {
-            const r = await fetch('/api/erp/mrerp/credentials/status', {
-                headers: { 'Authorization': 'Bearer ' + tk },
-            });
-            if (!r.ok) throw new Error('http_' + r.status);
-            _status = await r.json();
-            _statusLoaded = true;
-        } catch (e) {
-            _status = { connected: false };
-        }
-        return _status;
-    }
-
-    // ─── 卡片渲染 ─────────────────────────────────────
-    function _renderCard() {
-        const host = document.getElementById('erp-connect-cards');
-        if (!host) return;
-        const s = _status || { connected: false };
-
-        let html = '<div class="erp-connect-card erp-connect-mrerp-direct">';
-        html += '<div class="erp-cc-head">';
-        html += '<div class="erp-cc-title">MR.ERP</div>';
-        if (s.connected) {
-            html += '<span class="erp-cc-badge green">' + _esc(t('mrerp-direct-card-connected')) + '</span>';
-        } else {
-            html += '<span class="erp-cc-badge gray">' + _esc(t('mrerp-direct-card-not-connected')) + '</span>';
-        }
-        html += '</div>'; // /head
-
-        html += '<div class="erp-cc-body">';
-        if (s.connected) {
-            // meta · 公司 / 账套 / 最近测试
-            html += '<div class="erp-cc-mrerp-meta">';
-            if (s.company_label) {
-                html += '<div class="erp-cc-mrerp-meta-row">'
-                    + '<span class="erp-cc-mrerp-meta-label">' + _esc(t('mrerp-direct-meta-company')) + '</span>'
-                    + '<span class="erp-cc-mrerp-meta-value">' + _esc(s.company_label) + '</span>'
-                    + '</div>';
-            }
-            html += '<div class="erp-cc-mrerp-meta-row">'
-                + '<span class="erp-cc-mrerp-meta-label">' + _esc(t('mrerp-direct-meta-comid')) + '</span>'
-                + '<span class="erp-cc-mrerp-meta-value">comidyear=' + _esc(s.comidyear) + ' / seldb=' + _esc(s.seldb) + '</span>'
-                + '</div>';
-            // 最近测试
-            let testStr;
-            if (s.last_test_at == null) {
-                testStr = '<span class="erp-cc-mrerp-meta-value">' + _esc(t('mrerp-direct-test-never')) + '</span>';
-            } else if (s.last_test_ok) {
-                testStr = '<span class="erp-cc-mrerp-test-pass">' + _esc(t('mrerp-direct-test-pass')) + '</span>'
-                    + ' <span class="erp-cc-mrerp-meta-value">' + _esc(_fmtTime(s.last_test_at)) + '</span>';
-            } else {
-                testStr = '<span class="erp-cc-mrerp-test-fail">' + _esc(t('mrerp-direct-test-fail')) + '</span>'
-                    + ' <span class="erp-cc-mrerp-meta-value">' + _esc(_fmtTime(s.last_test_at)) + '</span>';
-            }
-            html += '<div class="erp-cc-mrerp-meta-row">'
-                + '<span class="erp-cc-mrerp-meta-label">' + _esc(t('mrerp-direct-meta-last-test')) + '</span>'
-                + testStr
-                + '</div>';
-            html += '</div>'; // /meta
-
-            // v27.8.1.3 · 自动推送 toggle(老板可切 · 员工只读)
-            const ap = !!s.auto_push;
-            const apTip = ap ? t('erp-auto-push-on-tip') : t('erp-auto-push-off-tip');
-            html += '<div class="erp-cc-auto-push" title="' + _esc(apTip) + '">'
-                + '<label class="erp-cc-toggle' + (_isOwner() ? '' : ' is-readonly') + '">'
-                + '<input type="checkbox" id="mrerp-auto-push-toggle"' + (ap ? ' checked' : '') + (_isOwner() ? '' : ' disabled') + '>'
-                + '<span class="erp-cc-toggle-slider"></span>'
-                + '<span class="erp-cc-toggle-label">' + _esc(t('erp-auto-push-label')) + '</span>'
-                + '</label></div>';
-
-            if (_isOwner()) {
-                html += '<div class="erp-cc-actions">';
-                html += '<button class="btn btn-ghost btn-tiny" type="button" id="btn-mrerp-cred-edit">'
-                    + _esc(t('mrerp-direct-modify-btn')) + '</button>';
-                html += '<button class="btn btn-ghost btn-tiny" type="button" id="btn-mrerp-cred-remove">'
-                    + _esc(t('mrerp-direct-remove-btn')) + '</button>';
-                html += '<button class="btn btn-ghost btn-tiny" type="button" id="btn-mrerp-test-korn-sample" '
-                    + 'title="' + _esc(t('mrerp-direct-test-korn-tip')) + '" '
-                    + 'style="margin-left:auto;color:#7C2D12;border-color:#FED7AA;background:#FFEDD5;">'
-                    + '🧪 ' + _esc(t('mrerp-direct-test-korn-btn')) + '</button>';
-                html += '<button class="btn btn-ghost btn-tiny" type="button" id="btn-mrerp-diagnose-self" '
-                    + 'title="对比 Pearnly 生成的 xlsx vs Korn 真样本字节级差异" '
-                    + 'style="color:#1E3A8A;border-color:#BFDBFE;background:#DBEAFE;">'
-                    + '🔬 自诊断对比</button>';
-                html += '</div>';
-            }
-        } else {
-            // 未连接
-            if (_isOwner()) {
-                html += '<button class="btn btn-primary" type="button" id="btn-mrerp-cred-add">'
-                    + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg>'
-                    + '<span style="margin-left:6px;">' + _esc(t('mrerp-direct-connect-btn')) + '</span>'
-                    + '</button>';
-            } else {
-                html += '<div class="erp-cc-empty">' + _esc(t('mrerp-direct-card-not-connected')) + '</div>';
-            }
-        }
-        html += '</div></div>'; // /body /card
-
-        // upsert · 替换自己的卡 · 跟 Xero 共存
-        const old = host.querySelector('.erp-connect-mrerp-direct');
-        if (old) {
-            old.outerHTML = html;
-        } else {
-            host.insertAdjacentHTML('beforeend', html);
-        }
-    }
-
-    // ─── modal 控制 ────────────────────────────────────
-    function _openModal(prefill) {
-        const mask = document.getElementById('mrerp-cred-modal-mask');
-        if (!mask) return;
-        // 标题 · 添加 vs 修改
-        const title = document.getElementById('mrerp-cred-modal-title');
-        if (title) {
-            title.textContent = prefill
-                ? t('mrerp-cred-modal-edit')
-                : t('mrerp-cred-modal-add');
-        }
-        // 字段填充(修改时只填非密码字段 · 密码每次必须重输 · 安全考虑)
-        document.getElementById('mrerp-cred-input-username').value =
-            (prefill && prefill.username) || '';
-        document.getElementById('mrerp-cred-input-password').value = '';
-        document.getElementById('mrerp-cred-input-comidyear').value =
-            (prefill && prefill.comidyear) || 6;
-        document.getElementById('mrerp-cred-input-seldb').value =
-            (prefill && prefill.seldb) || 1;
-        document.getElementById('mrerp-cred-input-company').value =
-            (prefill && prefill.company_label) || '';
-        // v27.8.1.13b · 重置账套选择区
-        const dbsel = document.getElementById('mrerp-cred-dbselect');
-        const dbsellist = document.getElementById('mrerp-cred-dbselect-list');
-        if (dbsel) dbsel.style.display = 'none';
-        if (dbsellist) dbsellist.innerHTML = '';
-        _selectedDb = null;
-        // 清测试结果
-        const tr = document.getElementById('mrerp-cred-test-result');
-        if (tr) { tr.style.display = 'none'; tr.className = 'mrerp-cred-test-result'; tr.innerHTML = ''; }
-        mask.style.display = 'flex';
-    }
-
-    function _closeModal() {
-        const mask = document.getElementById('mrerp-cred-modal-mask');
-        if (mask) mask.style.display = 'none';
-    }
-
-    function _readModalForm() {
-        // v27.8.1.13b · comidyear/seldb 优先取用户选中的账套 · 否则取高级设置 input
-        let comidyear, seldb;
-        if (_selectedDb && _selectedDb.comidyear != null) {
-            comidyear = parseInt(_selectedDb.comidyear, 10) || 6;
-            seldb = parseInt(_selectedDb.seldb, 10) || 1;
-        } else {
-            comidyear = parseInt(document.getElementById('mrerp-cred-input-comidyear').value || '6', 10) || 6;
-            seldb = parseInt(document.getElementById('mrerp-cred-input-seldb').value || '1', 10) || 1;
-        }
-        return {
-            username: (document.getElementById('mrerp-cred-input-username').value || '').trim(),
-            password: (document.getElementById('mrerp-cred-input-password').value || ''),
-            comidyear: comidyear,
-            seldb: seldb,
-            company_label: (document.getElementById('mrerp-cred-input-company').value || '').trim() || null,
-        };
-    }
-
-    function _showInlineResult(ok, msg) {
-        const tr = document.getElementById('mrerp-cred-test-result');
-        if (!tr) return;
-        tr.className = 'mrerp-cred-test-result ' + (ok ? 'ok' : 'err');
-        tr.innerHTML = _esc(msg);
-        tr.style.display = 'block';
-    }
-
-    function _parseMrerpDetail(detail) {
-        // detail 格式:mrerp.<code> 或 mrerp.<code>:<原始消息>
-        let code = String(detail || 'unknown').replace(/^mrerp\./, '').toLowerCase();
-        let rawMsg = '';
-        const colonIdx = code.indexOf(':');
-        if (colonIdx >= 0) {
-            rawMsg = code.substring(colonIdx + 1);
-            code = code.substring(0, colonIdx);
-        }
-        const tr = t('mrerp-direct-err-' + code);
-        if (tr && tr !== 'mrerp-direct-err-' + code) {
-            return tr.replace('{err}', rawMsg || code);
-        }
-        return rawMsg || code;
-    }
-
-    // v27.8.1.13b · 渲染账套选择区(测试连接后) ─────────
-    function _renderDbSelect(companies) {
-        const wrap = document.getElementById('mrerp-cred-dbselect');
-        const list = document.getElementById('mrerp-cred-dbselect-list');
-        if (!wrap || !list) return;
-        _selectedDb = null;
-        // 数据库总数
-        let totalDbs = 0;
-        (companies || []).forEach(function (c) {
-            totalDbs += (c.databases || []).length;
-        });
-
-        if (!totalDbs) {
-            // 空 · 提示用户走高级设置
-            list.innerHTML = '<div class="mrerp-cred-dbselect-empty">'
-                + _esc(t('mrerp-cred-dbselect-empty')) + '</div>';
-            wrap.style.display = 'block';
-            return;
-        }
-
-        // 自动选 · 仅当 1 家 1 数据库时
-        const isSingle = (companies.length === 1 && (companies[0].databases || []).length === 1);
-        let html = '';
-        companies.forEach(function (c, ci) {
-            html += '<div class="mrerp-cred-dbselect-company">';
-            if (c.comname) {
-                html += '<div class="mrerp-cred-dbselect-comname">' + _esc(c.comname) + '</div>';
-            }
-            if (c.comfullname) {
-                html += '<div class="mrerp-cred-dbselect-comfullname">' + _esc(c.comfullname) + '</div>';
-            }
-            html += '<div class="mrerp-cred-dbselect-dbs">';
-            (c.databases || []).forEach(function (db, di) {
-                const isAuto = isSingle;
-                const checked = isSingle ? ' checked' : '';
-                const cls = 'mrerp-cred-dbselect-db' + (isSingle ? ' is-auto is-checked' : '');
-                html += '<label class="' + cls + '">'
-                    + '<input type="radio" name="mrerp-cred-db" value="' + ci + '_' + di + '"'
-                    + ' data-comidyear="' + _esc(db.comidyear) + '"'
-                    + ' data-seldb="' + _esc(db.seldb) + '"'
-                    + ' data-label="' + _esc(db.label) + '"'
-                    + ' data-comfullname="' + _esc(c.comfullname || '') + '"'
-                    + checked + '>'
-                    + '<span>' + _esc(db.label) + '</span>'
-                    + (isAuto ? ' <span class="mrerp-cred-label-tag">— ' + _esc(t('mrerp-cred-dbselect-auto-tag')) + '</span>' : '')
-                    + '</label>';
-            });
-            html += '</div>'; // /dbs
-            html += '</div>'; // /company
-        });
-        list.innerHTML = html;
-        wrap.style.display = 'block';
-
-        // 单 · 自动选 + 自动填公司名称(若用户没填)
-        if (isSingle) {
-            const c0 = companies[0];
-            const d0 = c0.databases[0];
-            _selectedDb = {
-                comidyear: d0.comidyear,
-                seldb: d0.seldb,
-                label: d0.label,
-                comfullname: c0.comfullname || '',
-            };
-            const cinput = document.getElementById('mrerp-cred-input-company');
-            if (cinput && !cinput.value.trim() && c0.comfullname) {
-                cinput.value = c0.comfullname + (d0.label ? (' / ' + d0.label) : '');
-            }
-        }
-    }
-
-    // 绑 dbselect radio 切换(只绑一次)
-    let _dbselectClickBound = false;
-    function _bindDbselectClick() {
-        if (_dbselectClickBound) return;
-        _dbselectClickBound = true;
-        document.addEventListener('change', function (ev) {
-            const rd = ev.target.closest('input[name="mrerp-cred-db"]');
-            if (!rd) return;
-            // 视觉:更新 is-checked class
-            document.querySelectorAll('.mrerp-cred-dbselect-db').forEach(function (lb) {
-                lb.classList.remove('is-checked');
-            });
-            const lb = rd.closest('.mrerp-cred-dbselect-db');
-            if (lb) lb.classList.add('is-checked');
-            _selectedDb = {
-                comidyear: parseInt(rd.dataset.comidyear, 10) || 6,
-                seldb: parseInt(rd.dataset.seldb, 10) || 1,
-                label: rd.dataset.label || '',
-                comfullname: rd.dataset.comfullname || '',
-            };
-            // 用户没填公司名时 · 自动填(已填的不覆盖)
-            const cinput = document.getElementById('mrerp-cred-input-company');
-            if (cinput && !cinput.value.trim() && _selectedDb.comfullname) {
-                cinput.value = _selectedDb.comfullname + (_selectedDb.label ? (' / ' + _selectedDb.label) : '');
-            }
-        });
-    }
-
-    // ─── modal 内「测试连接」 ─ v27.8.1.13b 改调 list-databases ─
-    async function _onTest() {
-        const form = _readModalForm();
-        if (!form.username || !form.password) {
-            _showInlineResult(false, t('mrerp-cred-empty-required'));
-            return;
-        }
-        const btn = document.getElementById('mrerp-cred-modal-test');
-        if (btn) { btn.disabled = true; btn.textContent = t('mrerp-cred-btn-testing'); }
-        _bindDbselectClick();
-        try {
-            const tk = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mrerp/list-databases', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tk,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    username: form.username,
-                    password: form.password,
-                }),
-            });
-            if (r.ok) {
-                const data = await r.json().catch(function () { return {}; });
-                const companies = data.companies || [];
-                let totalDbs = 0;
-                companies.forEach(function (c) { totalDbs += (c.databases || []).length; });
-                _renderDbSelect(companies);
-                if (totalDbs === 0) {
-                    _showInlineResult(false, t('mrerp-cred-dbselect-empty'));
-                } else if (totalDbs === 1) {
-                    const c0 = companies[0];
-                    const name = (c0.databases[0].label || '') + (c0.comfullname ? (' (' + c0.comfullname + ')') : '');
-                    _showInlineResult(true, t('mrerp-cred-dbselect-ok-single').replace('{name}', name));
-                } else {
-                    _showInlineResult(true, t('mrerp-cred-dbselect-ok').replace('{n}', String(totalDbs)));
-                }
-            } else {
-                let detail = 'unknown';
-                try { detail = (await r.json()).detail || 'unknown'; } catch (e) {}
-                const friendly = _parseMrerpDetail(detail);
-                _showInlineResult(false,
-                    t('mrerp-cred-dbselect-fail').replace('{err}', friendly));
-            }
-        } catch (e) {
-            _showInlineResult(false,
-                t('mrerp-cred-dbselect-fail').replace('{err}', e.message || 'network'));
-        } finally {
-            if (btn) { btn.disabled = false; btn.textContent = t('mrerp-cred-btn-test'); }
-        }
-    }
-
-    // ─── modal 内「保存」 ───────────────────────────────
-    async function _onSave() {
-        const form = _readModalForm();
-        if (!form.username || !form.password) {
-            _showInlineResult(false, t('mrerp-cred-empty-required'));
-            return;
-        }
-        // v27.8.1.13b · 校验:dbselect 显示且未选 → 拒绝(防误保存)
-        const dbsel = document.getElementById('mrerp-cred-dbselect');
-        if (dbsel && dbsel.style.display !== 'none') {
-            const radios = dbsel.querySelectorAll('input[name="mrerp-cred-db"]');
-            const checked = dbsel.querySelector('input[name="mrerp-cred-db"]:checked');
-            if (radios.length > 0 && !checked) {
-                _showInlineResult(false, t('mrerp-cred-dbselect-required'));
-                return;
-            }
-        }
-        const btn = document.getElementById('mrerp-cred-modal-save');
-        if (btn) { btn.disabled = true; btn.textContent = t('mrerp-cred-btn-saving'); }
-        try {
-            const tk = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mrerp/credentials', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tk,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(form),
-            });
-            if (r.ok) {
-                _toast(t('mrerp-cred-save-ok'), 'success');
-                _closeModal();
-                // 刷新卡片
-                _statusLoaded = false;
-                await _loadStatus(true);
-                _renderCard();
-                // /api/me 也需要刷新(has_mrerp_credentials 字段)· 让其他 IIFE 拿到新值
-                try {
-                    if (typeof window.refreshUserInfo === 'function') {
-                        window.refreshUserInfo();
-                    } else if (typeof refreshUserInfo === 'function') {
-                        refreshUserInfo();
-                    }
-                } catch (e) {}
-            } else {
-                let detail = 'unknown';
-                try { detail = (await r.json()).detail || 'unknown'; } catch (e) {}
-                const friendly = _parseMrerpDetail(detail);
-                _showInlineResult(false,
-                    t('mrerp-cred-save-fail').replace('{err}', friendly));
-            }
-        } catch (e) {
-            _showInlineResult(false,
-                t('mrerp-cred-save-fail').replace('{err}', e.message || 'network'));
-        } finally {
-            if (btn) { btn.disabled = false; btn.textContent = t('mrerp-cred-btn-save'); }
-        }
-    }
-
-    // ─── 移除凭据 ───────────────────────────────────────
-    async function _onRemove() {
-        let ok = false;
-        try {
-            ok = await window.pearnlyConfirm(t('mrerp-direct-remove-confirm'));
-        } catch (e) { ok = window.confirm(t('mrerp-direct-remove-confirm')); }
-        if (!ok) return;
-        try {
-            const tk = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mrerp/credentials', {
-                method: 'DELETE',
-                headers: { 'Authorization': 'Bearer ' + tk },
-            });
-            if (!r.ok) {
-                let detail = 'unknown';
-                try { detail = (await r.json()).detail || 'unknown'; } catch (e) {}
-                _toast(t('mrerp-cred-remove-fail').replace('{err}',
-                    _parseMrerpDetail(detail)), 'error');
-                return;
-            }
-            _toast(t('mrerp-cred-remove-ok'), 'success');
-            _statusLoaded = false;
-            await _loadStatus(true);
-            _renderCard();
-        } catch (e) {
-            _toast(t('mrerp-cred-remove-fail').replace('{err}',
-                e.message || 'network'), 'error');
-        }
-    }
-
-    // ─── 进 sub-tab 时拉数据 + 渲卡 ────────────────────
-    async function _onEnterConnectSubtab() {
-        await _loadStatus(true);
-        _renderCard();
-    }
-
-    // v27.8.1.8 · Korn 真样本对照测试 · 诊断 mrerp_pusher 流程是否本身有问题
-    async function _onTestKornSample() {
-        const tk = localStorage.getItem('mrpilot_token');
-        // 简易 progress modal
-        const mask = document.createElement('div');
-        mask.className = 'mrerp-cred-modal-mask';
-        mask.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;';
-        mask.innerHTML = `
-            <div style="background:white;border-radius:12px;padding:24px;max-width:560px;width:92vw;max-height:84vh;overflow-y:auto;">
-                <h3 style="margin:0 0 12px 0;font-size:16px;">🧪 ${_esc(t('mrerp-direct-test-korn-title'))}</h3>
-                <div id="korn-test-body" style="font-size:13px;line-height:1.6;color:#374151;">
-                    <div style="text-align:center;padding:20px;">${_esc(t('mrerp-direct-test-korn-running'))}</div>
-                </div>
-                <div style="text-align:right;margin-top:16px;">
-                    <button class="btn btn-ghost btn-tiny" id="korn-test-close" type="button">${_esc(t('mrerp-direct-test-korn-close'))}</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(mask);
-        const body = mask.querySelector('#korn-test-body');
-        mask.querySelector('#korn-test-close').onclick = () => mask.remove();
-        mask.onclick = (e) => { if (e.target === mask) mask.remove(); };
-
-        try {
-            const r = await fetch('/api/erp/mrerp/test-push-korn-sample', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + tk, 'Content-Type': 'application/json' },
-                body: JSON.stringify({}),
-            });
-            const data = await r.json();
-            const ok = data.success === true;
-            const verdict = data.verdict || '';
-            const stages = (data.stages || []).join(' → ');
-            const hints = (data.mrerp_hints || []).map(h => '<li>' + _esc(String(h)) + '</li>').join('');
-            const rawHtml = data.raw_html_preview ? data.raw_html_preview.slice(0, 2000) : '';
-
-            body.innerHTML = `
-                <div style="padding:10px 12px;border-radius:8px;background:${ok?'#D1FAE5':'#FEE2E2'};color:${ok?'#065F46':'#7F1D1D'};font-weight:600;margin-bottom:12px;">
-                    ${ok?'✅':'❌'} ${_esc(verdict)}
-                </div>
-                <div style="margin-bottom:8px;color:#6B7280;font-size:12px;">
-                    sample_size = ${data.sample_size || '-'} bytes ·
-                    elapsed = ${data.elapsed_ms || '-'}ms
-                </div>
-                <div style="margin-bottom:8px;"><b>${_esc(t('mrerp-direct-test-korn-stages'))}</b>:<br>${_esc(stages || '-')}</div>
-                ${ok ? `
-                    <div style="margin-bottom:8px;"><b>${_esc(t('mrerp-direct-test-korn-preview-rows'))}</b>: ${data.preview_rows}</div>
-                ` : `
-                    <div style="margin-bottom:8px;"><b>${_esc(t('mrerp-direct-test-korn-error'))}</b>:<br>
-                        <code style="background:#F3F4F6;padding:6px;display:block;border-radius:6px;word-break:break-all;font-size:11px;">${_esc(data.error || '-')}</code>
-                    </div>
-                    ${hints ? `<div style="margin-bottom:8px;"><b>MR.ERP hints:</b><ul style="margin:4px 0;padding-left:20px;">${hints}</ul></div>` : ''}
-                    ${rawHtml ? `<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:12px;color:#6B7280;">${_esc(t('mrerp-direct-test-korn-raw-html'))}</summary>
-                        <pre style="background:#F9FAFB;padding:8px;border-radius:6px;font-size:10px;overflow-x:auto;max-height:240px;white-space:pre-wrap;word-break:break-all;">${_esc(rawHtml)}</pre>
-                    </details>` : ''}
-                `}
-            `;
-        } catch (e) {
-            body.innerHTML = `<div style="color:#DC2626;padding:12px;">❌ Network: ${_esc(e.message || 'unknown')}</div>`;
-        }
-    }
-
-    // v27.8.1.10 · 自诊断对比 · 服务器端字节级 diff Pearnly vs Korn
-    async function _onDiagnoseSelf() {
-        const tk = localStorage.getItem('mrpilot_token');
-        const mask = document.createElement('div');
-        mask.className = 'mrerp-cred-modal-mask';
-        mask.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;';
-        mask.innerHTML = `
-            <div style="background:white;border-radius:12px;padding:24px;max-width:720px;width:94vw;max-height:90vh;overflow-y:auto;">
-                <h3 style="margin:0 0 12px 0;font-size:16px;">🔬 字节级对比:Pearnly 生成 vs Korn 真样本</h3>
-                <div id="diag-self-body" style="font-size:13px;line-height:1.6;color:#374151;">
-                    <div style="text-align:center;padding:20px;">分析中...</div>
-                </div>
-                <div style="text-align:right;margin-top:16px;">
-                    <button class="btn btn-ghost btn-tiny" id="diag-self-close" type="button">关闭</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(mask);
-        const body = mask.querySelector('#diag-self-body');
-        mask.querySelector('#diag-self-close').onclick = () => mask.remove();
-        mask.onclick = (e) => { if (e.target === mask) mask.remove(); };
-
-        try {
-            const r = await fetch('/api/erp/mrerp/diagnose-self', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + tk, 'Content-Type': 'application/json' },
-                body: '{}',
-            });
-            if (!r.ok) {
-                throw new Error('HTTP ' + r.status);
-            }
-            const d = await r.json();
-            const ours = d.ours || {};
-            const korn = d.korn || {};
-            const diffs = d.diffs || [];
-
-            const triggerB64Download = (b64, fname) => {
-                const bin = atob(b64);
-                const bytes = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-                const blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = fname;
-                document.body.appendChild(a); a.click(); a.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 1500);
-            };
-
-            const sheetTbl = (s, label) => {
-                if (!s || s.error) return `<div style="color:#DC2626;">${label}: ${_esc(s && s.error || 'unavailable')}</div>`;
-                let html = `<div style="margin-bottom:6px;"><b>${label}</b>: ${s.size_bytes} bytes · sharedStrings=${s.has_sharedStrings ? '✓' : '❌'}</div>`;
-                html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:10px;"><thead><tr style="background:#F3F4F6;"><th style="padding:4px;text-align:left;">Sheet</th><th style="padding:4px;">dim</th><th style="padding:4px;">cell types</th><th style="padding:4px;">rows</th></tr></thead><tbody>';
-                for (const sn of ['sheet1', 'sheet2', 'sheet3']) {
-                    const ss = (s.sheets || {})[sn];
-                    if (!ss) continue;
-                    html += `<tr><td style="padding:4px;border-top:1px solid #E5E7EB;">${sn}</td><td style="padding:4px;border-top:1px solid #E5E7EB;">${_esc(ss.dimension)}</td><td style="padding:4px;border-top:1px solid #E5E7EB;font-family:monospace;">${_esc(JSON.stringify(ss.cell_t_types))}</td><td style="padding:4px;border-top:1px solid #E5E7EB;">${(ss.rows||[]).join(',')}</td></tr>`;
-                }
-                html += '</tbody></table>';
-                return html;
-            };
-
-            const diffsHtml = diffs.length > 0
-                ? `<div style="background:#FEE2E2;padding:10px;border-radius:8px;margin-bottom:12px;border-left:3px solid #DC2626;"><b style="color:#7F1D1D;">🔥 字节级差异 (${diffs.length}):</b><ul style="margin:6px 0 0 18px;padding:0;font-size:12px;color:#7F1D1D;">${diffs.map(d => `<li>${_esc(d)}</li>`).join('')}</ul></div>`
-                : `<div style="background:#D1FAE5;padding:10px;border-radius:8px;margin-bottom:12px;color:#065F46;"><b>✅ 字节结构完全一致</b> · 失败应该有更深原因</div>`;
-
-            body.innerHTML = `
-                ${diffsHtml}
-                ${sheetTbl(ours, 'Pearnly 生成')}
-                ${sheetTbl(korn, 'Korn 真样本')}
-                <details style="margin-top:8px;"><summary style="cursor:pointer;color:#6B7280;font-size:12px;">展开 sharedStrings 内容预览</summary>
-                    <div style="margin-top:6px;"><b>Pearnly:</b><pre style="background:#F9FAFB;padding:6px;border-radius:4px;font-size:10px;max-height:160px;overflow:auto;">${_esc((ours.sharedStrings_preview||'(无)'))}</pre></div>
-                    <div><b>Korn:</b><pre style="background:#F9FAFB;padding:6px;border-radius:4px;font-size:10px;max-height:160px;overflow:auto;">${_esc((korn.sharedStrings_preview||'(无)'))}</pre></div>
-                </details>
-                <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-                    <button type="button" class="btn btn-primary btn-tiny" id="diag-dl-ours">📥 下载 Pearnly 生成的 xlsx</button>
-                    <button type="button" class="btn btn-ghost btn-tiny" id="diag-dl-korn">📥 下载 Korn 真样本</button>
-                </div>
-            `;
-            mask.querySelector('#diag-dl-ours').onclick = () => triggerB64Download(d.ours_xlsx_b64, 'pearnly_ours.xlsx');
-            mask.querySelector('#diag-dl-korn').onclick = () => triggerB64Download(d.korn_xlsx_b64, 'korn_real.xlsx');
-        } catch (e) {
-            body.innerHTML = `<div style="color:#DC2626;padding:12px;">❌ ${_esc(e.message || 'network error')}</div>`;
-        }
-    }
-
-    // ─── 绑定 ───────────────────────────────────────────
-    function _bind() {
-        if (_bound) return;
-        _bound = true;
-
-        document.addEventListener('click', function(ev) {
-            // 进 ERP 对接 · connect sub-tab
-            if (ev.target.closest('.erp-subtab[data-erp-subtab="connect"]')) {
-                setTimeout(_onEnterConnectSubtab, 60);
-                return;
-            }
-            if (ev.target.closest('.auto-nav-item[data-auto-tab="erp"]')) {
-                setTimeout(_onEnterConnectSubtab, 100);
-                return;
-            }
-            // 卡片按钮
-            if (ev.target.closest('#btn-mrerp-cred-add')) {
-                ev.preventDefault();
-                _openModal(null);
-                return;
-            }
-            if (ev.target.closest('#btn-mrerp-cred-edit')) {
-                ev.preventDefault();
-                _openModal(_status || {});
-                return;
-            }
-            if (ev.target.closest('#btn-mrerp-cred-remove')) {
-                ev.preventDefault();
-                _onRemove();
-                return;
-            }
-            // v27.8.1.8 · Korn 真样本对照测试(诊断神器)
-            if (ev.target.closest('#btn-mrerp-test-korn-sample')) {
-                ev.preventDefault();
-                _onTestKornSample();
-                return;
-            }
-            // v27.8.1.10 · 自诊断字节级对比
-            if (ev.target.closest('#btn-mrerp-diagnose-self')) {
-                ev.preventDefault();
-                _onDiagnoseSelf();
-                return;
-            }
-            // modal 按钮
-            if (ev.target.closest('#mrerp-cred-modal-close')
-                || ev.target.closest('#mrerp-cred-modal-cancel')) {
-                ev.preventDefault();
-                _closeModal();
-                return;
-            }
-            if (ev.target.closest('#mrerp-cred-modal-test')) {
-                ev.preventDefault();
-                _onTest();
-                return;
-            }
-            if (ev.target.closest('#mrerp-cred-modal-save')) {
-                ev.preventDefault();
-                _onSave();
-                return;
-            }
-            // 点 mask 关闭
-            const mask = document.getElementById('mrerp-cred-modal-mask');
-            if (mask && ev.target === mask) {
-                _closeModal();
-                return;
-            }
-        });
-
-        // v27.8.1.3 · auto-push toggle change
-        document.addEventListener('change', function(ev) {
-            if (ev.target && ev.target.id === 'mrerp-auto-push-toggle') {
-                _onToggleAutoPush(ev.target.checked, ev.target);
-            }
-        });
-    }
-
-    // v27.8.1.3 · 切自动推送开关
-    async function _onToggleAutoPush(on, checkboxEl) {
-        const tk = localStorage.getItem('mrpilot_token');
-        if (checkboxEl) checkboxEl.disabled = true;
-        try {
-            const r = await fetch('/api/erp/mrerp/auto-push', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tk,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ on: !!on }),
-            });
-            if (!r.ok) {
-                let detail = 'unknown';
-                try { detail = (await r.json()).detail || 'unknown'; } catch (e) {}
-                throw new Error(_parseMrerpDetail(detail));
-            }
-            _toast(on ? t('erp-auto-push-toggled-on') : t('erp-auto-push-toggled-off'), 'success');
-            _statusLoaded = false;
-            await _loadStatus(true);
-            _renderCard();
-        } catch (e) {
-            if (checkboxEl) checkboxEl.checked = !on;
-            _toast(t('erp-auto-push-toggle-fail').replace('{err}', e.message || 'network'), 'error');
-        } finally {
-            if (checkboxEl) checkboxEl.disabled = false;
-        }
-    }
-
-    function _rerenderAll() {
-        if (_status) _renderCard();
-        // modal 已开时切语言 · 刷新标题/按钮 label
-        const mask = document.getElementById('mrerp-cred-modal-mask');
-        if (mask && mask.style.display === 'flex') {
-            const title = document.getElementById('mrerp-cred-modal-title');
-            // 简单兜底:重新读 status 决定是 add 还是 edit
-            const isEdit = !!(_status && _status.connected);
-            if (title) {
-                title.textContent = isEdit
-                    ? t('mrerp-cred-modal-edit')
-                    : t('mrerp-cred-modal-add');
-            }
-            // 按钮 label
-            const btnTest = document.getElementById('mrerp-cred-modal-test');
-            const btnSave = document.getElementById('mrerp-cred-modal-save');
-            const btnCancel = document.getElementById('mrerp-cred-modal-cancel');
-            if (btnTest && !btnTest.disabled) btnTest.textContent = t('mrerp-cred-btn-test');
-            if (btnSave && !btnSave.disabled) btnSave.textContent = t('mrerp-cred-btn-save');
-            if (btnCancel) btnCancel.textContent = t('mrerp-cred-btn-cancel');
-        }
-    }
-
-    _bind();
-    if (typeof window.subscribeI18n === 'function') {
-        window.subscribeI18n('mrerp-credentials', _rerenderAll);
-    }
-    // v27.8.1.2 · 同 Xero IIFE · 等 _userInfo 就绪再渲(老板按钮立即出)
-    async function _waitForUserInfo(maxMs) {
-        const start = Date.now();
-        while (Date.now() - start < (maxMs || 5000)) {
-            if (typeof _userInfo !== 'undefined' && _userInfo && _userInfo.id) return _userInfo;
-            await new Promise(r => setTimeout(r, 80));
-        }
-        return null;
-    }
-    async function _autoBootstrap() {
-        await _waitForUserInfo(5000);
-        const a = document.querySelector('.auto-nav-item.active[data-auto-tab="erp"]');
-        const c = document.querySelector('.erp-subtab.active[data-erp-subtab="connect"]');
-        if (a && c) await _onEnterConnectSubtab();
-    }
-    setTimeout(_autoBootstrap, 250);
-})();
 (function() {
     'use strict';
 
@@ -28288,6 +27209,28 @@ window.pearnlyConfirm = function (message, title) {
     }
     function _toast(msg, kind) {
         try { if (typeof showToast === 'function') showToast(msg, kind || 'info'); } catch (e) {}
+    }
+    // P1-7: toast + 可点击链接(showToast 不支持 HTML，用 DOM 手建)
+    function _toastWithLink(msg, href, linkText) {
+        try {
+            let wrap = document.getElementById('mp-toast-wrap');
+            if (!wrap) { wrap = document.createElement('div'); wrap.id = 'mp-toast-wrap'; document.body.appendChild(wrap); }
+            const toast = document.createElement('div');
+            toast.className = 'mp-toast success';
+            const svg = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l3 3 7-7"/></svg>';
+            const span = document.createElement('span');
+            span.textContent = msg + ' ';
+            const a = document.createElement('a');
+            a.href = href; a.target = '_blank'; a.rel = 'noopener';
+            a.textContent = linkText;
+            a.style.cssText = 'color:inherit;text-decoration:underline;font-weight:600;';
+            span.appendChild(a);
+            toast.innerHTML = svg;
+            toast.appendChild(span);
+            wrap.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => { try { toast.remove(); } catch(e2) {} }, 300); }, 6000);
+        } catch (e) {}
     }
 
     async function _loadConnectors(force) {
@@ -28349,9 +27292,6 @@ window.pearnlyConfirm = function (message, title) {
         if (tp === 'xero') {
             return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M5.5 8l2 2 3-3.5"/></svg>';
         }
-        if (tp === 'mrerp') {
-            return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="10" height="10" rx="1.5"/><path d="M6 7h4M6 9h4M6 11h2"/></svg>';
-        }
         if (tp === 'webhook') {
             return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="11.5" r="1.8"/><circle cx="11" cy="4.5" r="1.8"/><path d="M6.4 10l3.2-4M5 9.6V5.5a3 3 0 016 0"/></svg>';
         }
@@ -28359,81 +27299,8 @@ window.pearnlyConfirm = function (message, title) {
         return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h9M8 5l3 3-3 3"/><rect x="11" y="3" width="3" height="10" rx="1"/></svg>';
     }
 
-    // v27.8.1.17 · MR.ERP 推送前预检 detail 行商品映射
-    //   1. 从 current history 抽 item_name 数组
-    //   2. POST /api/erp/mrerp/products/check
-    //   3. 若有 unmapped · 弹 product mini modal 逐个解决 · 全完后回调重推
-    //   返回 true = 可以推 · false = 拦截
-    async function _checkProductsBeforePush(connector, historyId) {
-        try {
-            const h = _getCurrentHistory();
-            const merged = h && h.merged_fields;
-            const items = (merged && Array.isArray(merged.items)) ? merged.items : [];
-            const seen = new Set();
-            const names = [];
-            for (const it of items) {
-                const nm = String((it && it.name) || '').trim();
-                if (nm && !seen.has(nm)) { seen.add(nm); names.push(nm); }
-            }
-            if (!names.length) return true;
-            const tk = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mrerp/products/check', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tk,
-                    'Content-Type':  'application/json',
-                },
-                body: JSON.stringify({ items: names }),
-            });
-            if (!r.ok) return true;
-            const data = await r.json().catch(function () { return {}; });
-            const unmapped = (data && data.unmapped) || [];
-            if (!unmapped.length) return true;
-            _runProductMappingFlow(connector, historyId, unmapped);
-            return false;
-        } catch (e) {
-            return true;
-        }
-    }
-
-    function _runProductMappingFlow(connector, historyId, unmapped) {
-        let idx = 0;
-        function _next() {
-            if (idx >= unmapped.length) {
-                if (typeof showToast === 'function') {
-                    showToast(t('mrerp-prod-prep-done-toast'), 'success', 2500);
-                }
-                setTimeout(function () { _pushOne(connector, historyId); }, 250);
-                return;
-            }
-            const itemName = unmapped[idx++];
-            if (typeof window.openMrerpPickProduct !== 'function') {
-                _toast(t('mrerp-prod-pick-not-ready'), 'error');
-                return;
-            }
-            window.openMrerpPickProduct({
-                itemName: itemName,
-                indexHint: idx,
-                totalHint: unmapped.length,
-                onSelected: function () { _next(); },
-                onSkip:     function () { _next(); },
-                onCancel:   function () {
-                    if (typeof showToast === 'function') {
-                        showToast(t('mrerp-prod-flow-cancelled'), 'warn', 3000);
-                    }
-                },
-            });
-        }
-        _next();
-    }
-
     async function _pushOne(connector, historyId) {
         if (!connector || !historyId) return false;
-        // v27.8.1.17 · 推 MR.ERP 前预检 detail 行商品映射 · 拦到 unmapped 就弹 product mini modal 逐个解决
-        if (connector.type === 'mrerp' || connector.type === 'mrerp_direct') {
-            const okPre = await _checkProductsBeforePush(connector, historyId);
-            if (!okPre) return false;  // 预检拦截 · modal 回调里会重推
-        }
         const btn = document.getElementById('btn-push-default');
         if (btn) { btn.disabled = true; btn.classList.add('loading'); }
         const tk = localStorage.getItem('mrpilot_token');
@@ -28441,11 +27308,6 @@ window.pearnlyConfirm = function (message, title) {
             let url, opts = { method: 'POST', headers: { 'Authorization': 'Bearer ' + tk } };
             if (connector.type === 'xero') {
                 url = '/api/erp/xero/push/' + encodeURIComponent(historyId);
-            } else if (connector.type === 'mrerp') {
-                url = '/api/erp/mrerp/generate/' + encodeURIComponent(historyId) + '?kind=sales_credit';
-            } else if (connector.type === 'mrerp_direct') {
-                // v27.8.1.0 · MR.ERP 后端模拟登录直推
-                url = '/api/erp/mrerp/push/' + encodeURIComponent(historyId);
             } else {
                 // webhook / flowaccount / 其他 · 走老 /api/erp/push 接口
                 url = '/api/erp/push';
@@ -28457,33 +27319,6 @@ window.pearnlyConfirm = function (message, title) {
             }
             const resp = await fetch(url, opts);
 
-            // MR.ERP 是文件下载 · 单独处理
-            if (connector.type === 'mrerp' && resp.ok) {
-                const blob = await resp.blob();
-                const cd = resp.headers.get('Content-Disposition') || '';
-                let filename = 'Pearnly_MRERP.xlsx';
-                const m = cd.match(/filename="?([^";]+)"?/);
-                if (m) filename = m[1];
-                const u = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = u; a.download = filename;
-                document.body.appendChild(a); a.click(); a.remove();
-                setTimeout(() => window.URL.revokeObjectURL(u), 1000);
-                _toast(t('unified-push-mrerp-ok'), 'success');
-                return true;
-            }
-
-            // v27.8.1.0 · MR.ERP 直推(成功 = JSON · 含 row_count)
-            if (connector.type === 'mrerp_direct' && resp.ok) {
-                let rowCount = 1;
-                try {
-                    const j = await resp.json();
-                    rowCount = j.row_count || (j.imported_rows || []).length || 1;
-                } catch (e) {}
-                _toast(t('mrerp-direct-push-ok').replace('{n}', String(rowCount)), 'success');
-                return true;
-            }
-
             if (!resp.ok) {
                 let detail = 'unknown';
                 try {
@@ -28491,58 +27326,8 @@ window.pearnlyConfirm = function (message, title) {
                     detail = j.detail;
                     if (typeof detail === 'object') detail = detail.code || JSON.stringify(detail);
                 } catch (e) {}
-                // 错误码 friendly 化(走 mrerp- / xero- 各自的 i18n key)
                 let friendly = String(detail || 'unknown');
-                if (connector.type === 'mrerp') {
-                    const k = friendly.replace(/^mrerp\./, '').toLowerCase();
-                    const tr = t('mrerp-err-' + k);
-                    if (tr && tr !== 'mrerp-err-' + k) friendly = tr;
-                } else if (connector.type === 'mrerp_direct') {
-                    // v27.8.1.0 · detail 格式:mrerp.<code> 或 mrerp.<code>:<原始消息>
-                    let code = friendly.replace(/^mrerp\./, '').toLowerCase();
-                    let rawMsg = '';
-                    const colonIdx = code.indexOf(':');
-                    if (colonIdx >= 0) {
-                        rawMsg = code.substring(colonIdx + 1);
-                        code = code.substring(0, colonIdx);
-                    }
-                    // v27.8.1.14b · no_client_mapping 拦截 · 弹 mini modal 内联引导(不 toast)
-                    // v27.8.1.14b.1 · 兼容多种码:no_client_mapping / no_customer_mapping / err_* 前缀
-                    const codeNorm = code.replace(/^err_/, '');
-                    const isClientMapMissing = (codeNorm === 'no_client_mapping' || codeNorm === 'no_customer_mapping');
-                    if (isClientMapMissing && typeof window.openMrerpPickCustomer === 'function') {
-                        const h = (typeof _getCurrentHistory === 'function') ? _getCurrentHistory() : null;
-                        const cid = h && h.client_id;
-                        const cname = h && (h.client_name || h.client_display_name || '');
-                        const buyerName = h && (h.buyer_name || h.seller_name || ''); // v27.8.1.14b.2
-                        if (cid) {
-                            // 已归属客户 · 走 mini modal · 选完自动重推
-                            try {
-                                window.openMrerpPickCustomer({
-                                    historyId: historyId,
-                                    clientId: cid,
-                                    clientName: cname || '',
-                                    buyerName: buyerName || '',
-                                    onSelected: function () {
-                                        // 用户保存映射后 · 自动重推一次
-                                        setTimeout(function () { _pushOne(connector, historyId); }, 200);
-                                    },
-                                });
-                                return false;
-                            } catch (e) {}
-                        } else {
-                            // 没归属客户 · 提示用户右上角选客户后重传(13a 已修上传自动归属)
-                            _toast(t('mrerp-pick-cus-no-client'), 'error');
-                            return false;
-                        }
-                    }
-                    const tr = t('mrerp-direct-err-' + code);
-                    if (tr && tr !== 'mrerp-direct-err-' + code) {
-                        friendly = tr.replace('{err}', rawMsg || code);
-                    } else {
-                        friendly = rawMsg || code || friendly;
-                    }
-                } else if (connector.type === 'xero') {
+                if (connector.type === 'xero') {
                     const k = friendly.replace(/^xero\./, '').toLowerCase();
                     const tr = t('xero-' + k);
                     if (tr && tr !== 'xero-' + k) friendly = tr;
@@ -28660,7 +27445,7 @@ window.pearnlyConfirm = function (message, title) {
         saveBar.insertBefore(wrap, saveBar.firstChild);
 
         // 1. hide 老 3 按钮(向后兼容 · DOM 留着)· querySelectorAll 防 race 残留多个同 ID
-        ['btn-push-erp', 'btn-mrerp-download', 'btn-xero-push'].forEach(id => {
+        ['btn-push-erp', 'btn-xero-push'].forEach(id => {
             saveBar.querySelectorAll('#' + id).forEach(old => {
                 old.style.display = 'none';
             });
@@ -28740,7 +27525,7 @@ window.pearnlyConfirm = function (message, title) {
         if (!saveBar) return;
         if (!saveBar.querySelector('#pn-push-wrap')) return;
         // 1. hide 所有旧按钮(querySelectorAll · race 导致 DOM 出现多个相同 ID 时全部 hide)
-        ['btn-push-erp', 'btn-mrerp-download', 'btn-xero-push'].forEach(id => {
+        ['btn-push-erp', 'btn-xero-push'].forEach(id => {
             saveBar.querySelectorAll('#' + id).forEach(old => {
                 if (old.style.display !== 'none') {
                     old.style.display = 'none';
@@ -28797,113 +27582,10 @@ window.pearnlyConfirm = function (message, title) {
 
 
 // ============================================================
-// v118.27.5.4 · 新版本检测横幅 · SaaS 标准做法
-// 部署完后 · 前端定时轮询 /api/version · 跟当前页面 v= 不一致就弹横幅
-// 用户点「刷新更新」 → 强制 cache-bust reload(查询参数 _=ts · 防 home.html 缓存)
-// 用户点「×」 → 这次 session 不再弹(下次开 tab 又会弹)
+// v118.32.5.5.24 · 屎山清理:删除 v118.27.5.4 老版本检测横幅(pn-version-banner)
+// 已被 static/version-banner.js 替代(顶部弹窗 · 4 语 release_notes)
+// 整段移除 · IIFE / DOM / 配套 CSS / 行为全删
 // ============================================================
-(function() {
-    'use strict';
-
-    let _clientVersion = null;
-    let _bannerShown = false;
-
-    function _esc(s) {
-        return (typeof escapeHtml === 'function') ? escapeHtml(s == null ? '' : String(s)) : String(s == null ? '' : s);
-    }
-
-    function _getClientVersion() {
-        if (_clientVersion) return _clientVersion;
-        try {
-            const scripts = document.querySelectorAll('script[src*="home.js"]');
-            for (const s of scripts) {
-                const m = (s.src || '').match(/home\.js\?v=(\d+)/);
-                if (m) { _clientVersion = m[1]; return m[1]; }
-            }
-        } catch (e) {}
-        return null;
-    }
-
-    async function _checkVersion() {
-        if (_bannerShown) return;
-        if (sessionStorage.getItem('pn_version_dismissed') === '1') return;
-        try {
-            const r = await fetch('/api/version', {
-                cache: 'no-store',
-                headers: { 'Pragma': 'no-cache' },
-            });
-            if (!r.ok) return;
-            const j = await r.json();
-            const serverVer = String((j && j.version) || '');
-            const clientVer = _getClientVersion();
-            if (!serverVer || !clientVer) return;
-            if (serverVer === '0' || clientVer === '0') return;
-            if (serverVer !== clientVer) {
-                _showBanner();
-            }
-        } catch (e) {
-            // 静默失败 · 不打扰用户
-        }
-    }
-
-    function _showBanner() {
-        if (_bannerShown) return;
-        if (document.getElementById('pn-version-banner')) { _bannerShown = true; return; }
-        _bannerShown = true;
-        const b = document.createElement('div');
-        b.id = 'pn-version-banner';
-        b.className = 'pn-version-banner';
-        b.innerHTML = ''
-            + '<span class="pn-vb-icon">'
-            +   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'
-            +     '<path d="M14 2v4h-4M2 14v-4h4"/>'
-            +     '<path d="M5.5 5A5 5 0 0113.5 7.5M2.5 8.5a5 5 0 008 3"/>'
-            +   '</svg>'
-            + '</span>'
-            + '<span class="pn-vb-msg">' + _esc(t('version-new-msg')) + '</span>'
-            + '<button type="button" class="pn-vb-btn" id="pn-vb-reload">' + _esc(t('version-reload')) + '</button>'
-            + '<button type="button" class="pn-vb-close" id="pn-vb-close" aria-label="' + _esc(t('version-dismiss')) + '">'
-            +   '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg>'
-            + '</button>';
-        document.body.appendChild(b);
-        document.getElementById('pn-vb-reload').addEventListener('click', () => {
-            // 强制 cache-bust reload · 给 URL 加 _=timestamp 让浏览器无法用缓存 · 必拿新 home.html
-            try {
-                const u = new URL(window.location.href);
-                u.searchParams.set('_v', String(Date.now()));
-                window.location.replace(u.toString());
-            } catch (e) {
-                window.location.reload();
-            }
-        });
-        document.getElementById('pn-vb-close').addEventListener('click', () => {
-            const el = document.getElementById('pn-version-banner');
-            if (el) el.remove();
-            _bannerShown = false;
-            try { sessionStorage.setItem('pn_version_dismissed', '1'); } catch (e) {}
-        });
-    }
-
-    function _rerenderBannerOnLangChange() {
-        const el = document.getElementById('pn-version-banner');
-        if (!el) return;
-        const msg = el.querySelector('.pn-vb-msg');
-        const reload = el.querySelector('#pn-vb-reload');
-        const close = el.querySelector('#pn-vb-close');
-        if (msg) msg.textContent = t('version-new-msg');
-        if (reload) reload.textContent = t('version-reload');
-        if (close) close.setAttribute('aria-label', t('version-dismiss'));
-    }
-
-    // 启动 30 秒后第一次 check(给页面加载留时间)· 之后每 5 分钟 check 一次
-    setTimeout(_checkVersion, 30 * 1000);
-    setInterval(_checkVersion, 5 * 60 * 1000);
-
-    // 切语言时刷新横幅文案(已显示的横幅 · 切语言后跟着变)
-    if (typeof window.subscribeI18n === 'function') {
-        window.subscribeI18n('version-banner', _rerenderBannerOnLangChange);
-    }
-})();
 
 // ============================================================
 // v27.8.1.13a · 字段映射 · 显示/折叠高级 sub-tab toggle + 凭据 modal 调试入口
@@ -28945,153 +27627,6 @@ window.pearnlyConfirm = function (message, title) {
         }
     });
 
-    // v27.8.1.13a · 抓 MR.ERP 账套页 · skin 白名单可见
-    // 把 raw HTML 下载成 json 文件 · Zihao 发给 Claude · 13b 用真实结构加解析
-    document.addEventListener('click', async function (ev) {
-        const btn = ev.target.closest('#erp-map-dev-fetch-selectdb-btn');
-        if (!btn) return;
-        ev.preventDefault();
-        if (btn.disabled) return;
-        const orig = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = (typeof t === 'function' && t('erp-map-dev-fetch-selectdb-running')) || 'Fetching...';
-        try {
-            const tok = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mrerp/debug-selectdb', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tok,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({}),
-            });
-            const data = await r.json().catch(function () { return {}; });
-            if (!r.ok) {
-                const errMsg = (data && data.detail) ? String(data.detail) : ('http_' + r.status);
-                const tpl = (typeof t === 'function') ? t('erp-map-dev-fetch-selectdb-fail') : 'Fetch failed: {err}';
-                if (typeof showToast === 'function') showToast(tpl.replace('{err}', errMsg), 'error');
-                else alert(tpl.replace('{err}', errMsg));
-                return;
-            }
-            // 下载 json 文件
-            const fname = 'mrerp_selectdb_' + Date.now() + '.json';
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const u = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = u; a.download = fname;
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(function () { URL.revokeObjectURL(u); }, 1000);
-            const okMsg = (typeof t === 'function' && t('erp-map-dev-fetch-selectdb-ok')) || '✓ Downloaded';
-            if (typeof showToast === 'function') showToast(okMsg, 'success');
-        } catch (e) {
-            const tpl = (typeof t === 'function') ? t('erp-map-dev-fetch-selectdb-fail') : 'Fetch failed: {err}';
-            if (typeof showToast === 'function') showToast(tpl.replace('{err}', e.message || 'unknown'), 'error');
-            else alert(tpl.replace('{err}', e.message || 'unknown'));
-        } finally {
-            btn.disabled = false;
-            btn.textContent = orig;
-        }
-    });
-
-    // v27.8.1.14a · 抓 MR.ERP 任意页(可选 path) · skin 白名单
-    // path 空 → 抓主菜单 mainmenu.php · path 给了 → 抓那个相对路径
-    // 用于:看客户主数据页结构 / 看其他模块结构 · 给 14b/未来 反向工程用
-    document.addEventListener('click', async function (ev) {
-        const btn = ev.target.closest('#erp-map-dev-fetch-page-btn');
-        if (!btn) return;
-        ev.preventDefault();
-        if (btn.disabled) return;
-        const input = document.getElementById('erp-map-dev-fetch-page-input');
-        const path = (input && input.value || '').trim();
-        const orig = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = (typeof t === 'function' && t('erp-map-dev-fetch-page-running')) || 'Fetching...';
-        try {
-            const tok = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mrerp/debug-fetch-page', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tok,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ path: path || null }),
-            });
-            const data = await r.json().catch(function () { return {}; });
-            if (!r.ok) {
-                const errMsg = (data && data.detail) ? String(data.detail) : ('http_' + r.status);
-                const tpl = (typeof t === 'function') ? t('erp-map-dev-fetch-page-fail') : 'Fetch failed: {err}';
-                if (typeof showToast === 'function') showToast(tpl.replace('{err}', errMsg), 'error');
-                else alert(tpl.replace('{err}', errMsg));
-                return;
-            }
-            // 下载 · 文件名带路径信息(取 path 末段)
-            const tag = (path || 'mainmenu').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 40) || 'page';
-            const fname = 'mrerp_page_' + tag + '_' + Date.now() + '.json';
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const u = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = u; a.download = fname;
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(function () { URL.revokeObjectURL(u); }, 1000);
-            const okMsg = (typeof t === 'function' && t('erp-map-dev-fetch-page-ok')) || '✓ Downloaded';
-            if (typeof showToast === 'function') showToast(okMsg, 'success');
-        } catch (e) {
-            const tpl = (typeof t === 'function') ? t('erp-map-dev-fetch-page-fail') : 'Fetch failed: {err}';
-            if (typeof showToast === 'function') showToast(tpl.replace('{err}', e.message || 'unknown'), 'error');
-            else alert(tpl.replace('{err}', e.message || 'unknown'));
-        } finally {
-            btn.disabled = false;
-            btn.textContent = orig;
-        }
-    });
-
-    // v27.8.1.14a.1 · 抓 MR.ERP 客户列表数据 · POST + 翻页拼接 · skin 白名单
-    document.addEventListener('click', async function (ev) {
-        const btn = ev.target.closest('#erp-map-dev-fetch-customers-btn');
-        if (!btn) return;
-        ev.preventDefault();
-        if (btn.disabled) return;
-        const orig = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = (typeof t === 'function' && t('erp-map-dev-fetch-customers-running')) || 'Fetching...';
-        try {
-            const tok = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mrerp/debug-fetch-customers', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tok,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({}),
-            });
-            const data = await r.json().catch(function () { return {}; });
-            if (!r.ok) {
-                const errMsg = (data && data.detail) ? String(data.detail) : ('http_' + r.status);
-                const tpl = (typeof t === 'function') ? t('erp-map-dev-fetch-customers-fail') : 'Fetch failed: {err}';
-                if (typeof showToast === 'function') showToast(tpl.replace('{err}', errMsg), 'error');
-                else alert(tpl.replace('{err}', errMsg));
-                return;
-            }
-            const fname = 'mrerp_customers_' + Date.now() + '.json';
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const u = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = u; a.download = fname;
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(function () { URL.revokeObjectURL(u); }, 1000);
-            const okMsg = ((typeof t === 'function' && t('erp-map-dev-fetch-customers-ok')) || '✓ Downloaded · {n} pages')
-                .replace('{n}', String(data.total_pages_fetched || 0));
-            if (typeof showToast === 'function') showToast(okMsg, 'success');
-        } catch (e) {
-            const tpl = (typeof t === 'function') ? t('erp-map-dev-fetch-customers-fail') : 'Fetch failed: {err}';
-            if (typeof showToast === 'function') showToast(tpl.replace('{err}', e.message || 'unknown'), 'error');
-            else alert(tpl.replace('{err}', e.message || 'unknown'));
-        } finally {
-            btn.disabled = false;
-            btn.textContent = orig;
-        }
-    });
-
     function _rerenderAll() {
         _setToggleLabel();
     }
@@ -29101,484 +27636,6 @@ window.pearnlyConfirm = function (message, title) {
     }
 })();
 
-// ============================================================
-// v27.8.1.14b · MR.ERP 选客户编号 mini modal · 内联引导
-// 入口:window.openMrerpPickCustomer({historyId, clientId, clientName, onSelected})
-// 用于:OCR 抽屉点 MR.ERP 推送失败 · 错误码 no_client_mapping 时拦截弹此 modal
-// 用户操作:从 MR.ERP 客户列表选(或手动输入)→ 保存映射 → 自动重推
-// ============================================================
-(function () {
-    'use strict';
-
-    let _bound = false;
-    let _state = {
-        historyId: null,
-        clientId: null,
-        clientName: '',
-        onSelected: null,
-        customers: [],       // 拉到的 MR.ERP 客户列表
-        cachedAt: 0,
-        filtered: [],        // 当前搜索过滤后的
-        selectedCode: '',
-        selectedName: '',
-        loading: false,
-    };
-
-    function _t(key, fallback) {
-        if (typeof t === 'function') {
-            const v = t(key);
-            if (v && v !== key) return v;
-        }
-        return fallback || key;
-    }
-    function _esc(s) {
-        return (typeof escapeHtml === 'function')
-            ? escapeHtml(s == null ? '' : String(s))
-            : String(s == null ? '' : s);
-    }
-    function _toast(msg, kind) {
-        try { if (typeof showToast === 'function') showToast(msg, kind || 'info'); } catch (e) {}
-    }
-
-    function _open(opts) {
-        _state.historyId = opts && opts.historyId;
-        _state.clientId = opts && opts.clientId;
-        _state.clientName = (opts && opts.clientName) || '—';
-        _state.buyerName = (opts && opts.buyerName) || '';   // v27.8.1.14b.2
-        _state.onSelected = (opts && opts.onSelected) || null;
-        _state.customers = [];
-        _state.filtered = [];
-        _state.selectedCode = '';
-        _state.selectedName = '';
-        _state.loading = false;
-
-        const mask = document.getElementById('mrerp-pick-cus-mask');
-        if (!mask) return;
-        // 客户名
-        const nm = document.getElementById('mrerp-pick-cus-client-name');
-        if (nm) nm.textContent = _state.clientName || '—';
-        // v27.8.1.14b.2 · OCR 买方名(有才显示)
-        const buyerWrap = document.getElementById('mrerp-pick-cus-buyer');
-        const buyerNameEl = document.getElementById('mrerp-pick-cus-buyer-name');
-        if (buyerWrap && buyerNameEl) {
-            if (_state.buyerName && String(_state.buyerName).trim()) {
-                buyerNameEl.textContent = String(_state.buyerName).trim();
-                buyerWrap.style.display = 'flex';
-            } else {
-                buyerWrap.style.display = 'none';
-            }
-        }
-        // 重置搜索 + 手动输入
-        const si = document.getElementById('mrerp-pick-cus-search-input');
-        if (si) si.value = '';
-        const mi = document.getElementById('mrerp-pick-cus-manual-input');
-        if (mi) mi.value = '';
-        const md = document.querySelector('.mrerp-pick-cus-manual');
-        if (md) md.open = false;
-        // 重置已选 + 保存按钮
-        _updateSelectedUI();
-        _updateSaveBtn();
-        mask.style.display = 'flex';
-        _bindOnce();
-        _fetchAndRender(false);
-    }
-
-    function _close() {
-        const mask = document.getElementById('mrerp-pick-cus-mask');
-        if (mask) mask.style.display = 'none';
-    }
-
-    async function _fetchAndRender(forceRefresh) {
-        const list = document.getElementById('mrerp-pick-cus-list');
-        if (!list) return;
-        _state.loading = true;
-        list.innerHTML = '<div class="mrerp-pick-cus-loading">'
-            + _esc(_t('mrerp-pick-cus-loading', 'Loading...')) + '</div>';
-        const refreshBtn = document.getElementById('mrerp-pick-cus-refresh-btn');
-        if (refreshBtn) refreshBtn.classList.add('loading');
-        try {
-            const tk = localStorage.getItem('mrpilot_token');
-            // v27.8.1.16 · 把 buyer_name 传给服务端 · 服务端跑模糊匹配 + 排序 + auto_select
-            const params = [];
-            if (forceRefresh) params.push('force_refresh=1');
-            if (_state.buyerName && String(_state.buyerName).trim()) {
-                params.push('buyer_name=' + encodeURIComponent(String(_state.buyerName).trim()));
-            }
-            const url = '/api/erp/mrerp/customers' + (params.length ? ('?' + params.join('&')) : '');
-            const r = await fetch(url, {
-                method: 'GET',
-                headers: { 'Authorization': 'Bearer ' + tk },
-            });
-            if (!r.ok) {
-                let detail = 'unknown';
-                try { detail = (await r.json()).detail || 'unknown'; } catch (e) {}
-                const friendly = String(detail).replace(/^mrerp\./, '');
-                list.innerHTML = '<div class="mrerp-pick-cus-empty">'
-                    + _esc(_t('mrerp-pick-cus-fetch-fail', 'Fetch failed: {err}').replace('{err}', friendly))
-                    + '</div>';
-                return;
-            }
-            const data = await r.json().catch(function () { return {}; });
-            _state.customers = data.customers || [];
-            _state.cachedAt = data.cached_at || 0;
-            _state.autoSelectCode = data.auto_select_code || null;
-            _state.autoSelectName = data.auto_select_name || '';
-            _state.autoSelectScore = data.auto_select_score || 0;
-
-            // v27.8.1.16 · 完美匹配场景 · 零点击短路
-            //   - auto_select_code 存在 → 跳过 modal · 后台保存映射 + 调 onSelected + 不打扰 toast
-            //   - 中分(top 1 score 0.7-0.97)→ 弹右下角 undo toast(3 秒默认确认)· 不弹完整 modal
-            if (_state.autoSelectCode) {
-                _autoApplyPerfect();
-                return;
-            }
-            const topScore = (_state.customers[0] && _state.customers[0].score) || 0;
-            if (topScore >= 0.7 && topScore < 0.97) {
-                _quickConfirmMidScore();
-                return;
-            }
-            // 低分 / 无 buyer / 无客户 · 走现状 modal
-            _renderList();
-        } catch (e) {
-            list.innerHTML = '<div class="mrerp-pick-cus-empty">'
-                + _esc(_t('mrerp-pick-cus-fetch-fail', 'Fetch failed: {err}').replace('{err}', e.message || 'network'))
-                + '</div>';
-        } finally {
-            _state.loading = false;
-            if (refreshBtn) refreshBtn.classList.remove('loading');
-        }
-    }
-
-    // v27.8.1.16 · 完美匹配(score>=0.97 且唯一)· 后台跑 + 不打扰
-    async function _autoApplyPerfect() {
-        // 立刻关 modal · 用户不该感知它打开过
-        _close();
-        const code = _state.autoSelectCode;
-        const name = _state.autoSelectName || '';
-        if (!code || !_state.clientId) return;
-        const ok = await _saveMappingSilent(code, name);
-        if (ok) {
-            if (typeof showToast === 'function') {
-                showToast(
-                    _t('mrerp-auto-matched-toast', 'Auto-matched to {name} · pushing to MR.ERP...')
-                        .replace('{name}', name || code),
-                    'success', 3500
-                );
-            }
-            if (typeof _state.onSelected === 'function') {
-                try { _state.onSelected(); } catch (e) {}
-            }
-        } else {
-            // 保存失败 · 退回 modal · 让用户手动选
-            _reopenModal();
-        }
-    }
-
-    // v27.8.1.16 · 中分(0.7-0.97)· 弹右下角 undo toast · 3 秒默认确认 · [改一下] 撤销
-    function _quickConfirmMidScore() {
-        const top = _state.customers[0] || {};
-        const name = top.name || '';
-        const code = top.code || '';
-        if (!code) {
-            _renderList();
-            return;
-        }
-        // 关 modal · 不让 modal 阻挡视线
-        _close();
-        _showUndoToast({
-            text: _t('mrerp-quick-confirm-text', 'Auto-assigned to {name}').replace('{name}', name || code),
-            okLabel: _t('mrerp-quick-confirm-ok', 'OK'),
-            changeLabel: _t('mrerp-quick-confirm-change', 'Change'),
-            countdownMs: 3000,
-            onConfirm: async function () {
-                const saved = await _saveMappingSilent(code, name);
-                if (saved) {
-                    if (typeof showToast === 'function') {
-                        showToast(
-                            _t('mrerp-auto-matched-toast', 'Auto-matched to {name} · pushing to MR.ERP...')
-                                .replace('{name}', name || code),
-                            'success', 3000
-                        );
-                    }
-                    if (typeof _state.onSelected === 'function') {
-                        try { _state.onSelected(); } catch (e) {}
-                    }
-                } else {
-                    _reopenModal();
-                }
-            },
-            onChange: function () {
-                _reopenModal();
-            },
-        });
-    }
-
-    function _reopenModal() {
-        const mask = document.getElementById('mrerp-pick-cus-mask');
-        if (mask) mask.style.display = 'flex';
-        // 不重新拉 · 直接渲染已有 _state.customers(已按 score 降序)
-        _renderList();
-    }
-
-    // 静默保存映射 · 不弹 modal 内部错误 toast · 返回 ok bool
-    async function _saveMappingSilent(code, name) {
-        try {
-            const tk = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mappings/clients', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tk,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    client_id: _state.clientId,
-                    erp_type: 'mrerp',
-                    erp_code: String(code || ''),
-                    notes: name ? ('auto-matched v16: ' + name) : 'auto-matched v16',
-                }),
-            });
-            return r.ok;
-        } catch (e) { return false; }
-    }
-
-    // v27.8.1.16 · 右下角 undo toast · 3 秒倒计时 · [改一下] 撤销
-    function _showUndoToast(opts) {
-        const existing = document.getElementById('mrerp-undo-toast');
-        if (existing) existing.remove();
-        const toast = document.createElement('div');
-        toast.id = 'mrerp-undo-toast';
-        toast.className = 'mrerp-undo-toast';
-        toast.innerHTML =
-            '<div class="mut-row">' +
-                '<svg class="mut-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                    '<path d="M3 8l3 3 7-7"/>' +
-                '</svg>' +
-                '<span class="mut-text">' + _esc(opts.text) + '</span>' +
-            '</div>' +
-            '<div class="mut-actions">' +
-                '<div class="mut-progress"><div class="mut-progress-fill"></div></div>' +
-                '<button type="button" class="mut-btn mut-btn-change" id="mrerp-undo-change">' + _esc(opts.changeLabel) + '</button>' +
-                '<button type="button" class="mut-btn mut-btn-ok" id="mrerp-undo-ok">' + _esc(opts.okLabel) + '</button>' +
-            '</div>';
-        document.body.appendChild(toast);
-        requestAnimationFrame(function () { toast.classList.add('show'); });
-
-        let done = false;
-        function _finish(cb) {
-            if (done) return;
-            done = true;
-            toast.classList.remove('show');
-            setTimeout(function () { toast.remove(); }, 220);
-            try { if (cb) cb(); } catch (e) {}
-        }
-
-        // 倒计时进度条
-        const fill = toast.querySelector('.mut-progress-fill');
-        const dur = Math.max(800, opts.countdownMs || 3000);
-        if (fill) {
-            fill.style.transition = 'width ' + dur + 'ms linear';
-            requestAnimationFrame(function () { fill.style.width = '0%'; });
-        }
-        const timerId = setTimeout(function () {
-            _finish(opts.onConfirm);
-        }, dur);
-
-        // [改一下] 点击 · 撤销 + 跳 modal
-        const changeBtn = toast.querySelector('#mrerp-undo-change');
-        if (changeBtn) changeBtn.addEventListener('click', function () {
-            clearTimeout(timerId);
-            _finish(opts.onChange);
-        });
-        // [✓] 点击 · 立刻确认 · 不等倒计时
-        const okBtn = toast.querySelector('#mrerp-undo-ok');
-        if (okBtn) okBtn.addEventListener('click', function () {
-            clearTimeout(timerId);
-            _finish(opts.onConfirm);
-        });
-    }
-
-
-    function _renderList() {
-        const list = document.getElementById('mrerp-pick-cus-list');
-        if (!list) return;
-        const search = (document.getElementById('mrerp-pick-cus-search-input') || {}).value || '';
-        const q = search.trim().toLowerCase();
-        let arr = _state.customers || [];
-        if (q) {
-            arr = arr.filter(function (c) {
-                return (String(c.code || '').toLowerCase().indexOf(q) >= 0)
-                    || (String(c.name || '').toLowerCase().indexOf(q) >= 0);
-            });
-        }
-        _state.filtered = arr;
-        if (!arr.length) {
-            if (!_state.customers.length) {
-                list.innerHTML = '<div class="mrerp-pick-cus-empty">'
-                    + _esc(_t('mrerp-pick-cus-empty-all', 'No customers')) + '</div>';
-            } else {
-                list.innerHTML = '<div class="mrerp-pick-cus-empty">'
-                    + _esc(_t('mrerp-pick-cus-empty', 'No match')) + '</div>';
-            }
-            return;
-        }
-        let html = '';
-        arr.forEach(function (c) {
-            const isActive = (_state.selectedCode && c.code === _state.selectedCode);
-            const cls = 'mrerp-pick-cus-row' + (isActive ? ' is-active' : '');
-            html += '<div class="' + cls + '" data-code="' + _esc(c.code) + '" data-name="' + _esc(c.name || '') + '">';
-            html += '<span class="mrerp-pick-cus-row-code">' + _esc(c.code) + '</span>';
-            html += '<span class="mrerp-pick-cus-row-name">' + _esc(c.name || '') + '</span>';
-            // v27.8.1.16 · score badge(推荐 / 可能) · 排在 type/status 徽章前
-            const sc = Number(c.score || 0);
-            if (sc >= 0.7) {
-                html += '<span class="mrerp-pick-cus-row-match match-recommend">'
-                    + _esc(_t('mrerp-recommend-badge', 'Recommended'))
-                    + '</span>';
-            } else if (sc >= 0.45) {
-                html += '<span class="mrerp-pick-cus-row-match match-maybe">'
-                    + _esc(_t('mrerp-maybe-badge', 'Maybe'))
-                    + '</span>';
-            }
-            // v27.8.1.14c · type(客户类型 · 来自 armas 第 2 列)优先于 status 显示
-            // type 不为空就显示 type · 否则显示 status · 都没就不显示
-            const badge = (c.type && String(c.type).trim()) ? c.type
-                : (c.status ? c.status : '');
-            if (badge) {
-                html += '<span class="mrerp-pick-cus-row-status">' + _esc(badge) + '</span>';
-            }
-            html += '</div>';
-        });
-        list.innerHTML = html;
-    }
-
-    function _selectCustomer(code, name) {
-        _state.selectedCode = String(code || '');
-        _state.selectedName = String(name || '');
-        _renderList();
-        _updateSelectedUI();
-        _updateSaveBtn();
-    }
-
-    function _updateSelectedUI() {
-        const sel = document.getElementById('mrerp-pick-cus-selected');
-        const cd = document.getElementById('mrerp-pick-cus-selected-code');
-        const nm = document.getElementById('mrerp-pick-cus-selected-name');
-        if (!sel) return;
-        if (_state.selectedCode) {
-            sel.style.display = 'flex';
-            if (cd) cd.textContent = _state.selectedCode;
-            if (nm) nm.textContent = _state.selectedName || '';
-        } else {
-            sel.style.display = 'none';
-        }
-    }
-
-    function _updateSaveBtn() {
-        const btn = document.getElementById('mrerp-pick-cus-save');
-        if (!btn) return;
-        btn.disabled = !_state.selectedCode;
-    }
-
-    async function _onSave() {
-        if (!_state.selectedCode || !_state.clientId) return;
-        const btn = document.getElementById('mrerp-pick-cus-save');
-        if (btn) btn.disabled = true;
-        try {
-            const tk = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mappings/clients', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tk,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    client_id: _state.clientId,
-                    erp_type: 'mrerp',
-                    erp_code: _state.selectedCode,
-                    notes: _state.selectedName ? ('auto via OCR drawer: ' + _state.selectedName) : '',
-                }),
-            });
-            if (!r.ok) {
-                let detail = 'unknown';
-                try { detail = (await r.json()).detail || 'unknown'; } catch (e) {}
-                _toast(_t('mrerp-pick-cus-save-fail', 'Save failed: {err}').replace('{err}', detail), 'error');
-                if (btn) btn.disabled = false;
-                return;
-            }
-            _toast(_t('mrerp-pick-cus-save-ok', 'Saved · pushing...'), 'success');
-            _close();
-            // 触发回调(由调用方负责重推)
-            if (typeof _state.onSelected === 'function') {
-                try { _state.onSelected(); } catch (e) {}
-            }
-        } catch (e) {
-            _toast(_t('mrerp-pick-cus-save-fail', 'Save failed: {err}').replace('{err}', e.message || 'network'), 'error');
-            if (btn) btn.disabled = false;
-        }
-    }
-
-    function _bindOnce() {
-        if (_bound) return;
-        _bound = true;
-        // 关闭
-        document.addEventListener('click', function (ev) {
-            if (ev.target.closest('#mrerp-pick-cus-close') ||
-                ev.target.closest('#mrerp-pick-cus-cancel')) {
-                _close();
-            }
-        });
-        // mask 点击关
-        const mask = document.getElementById('mrerp-pick-cus-mask');
-        if (mask) {
-            mask.addEventListener('click', function (ev) {
-                if (ev.target === mask) _close();
-            });
-        }
-        // 搜索 input · 本地过滤
-        document.addEventListener('input', function (ev) {
-            if (ev.target.id === 'mrerp-pick-cus-search-input') {
-                _renderList();
-            }
-        });
-        // 列表行 click
-        document.addEventListener('click', function (ev) {
-            const row = ev.target.closest('#mrerp-pick-cus-list .mrerp-pick-cus-row');
-            if (!row) return;
-            _selectCustomer(row.dataset.code, row.dataset.name);
-        });
-        // 手动输入用此编号
-        document.addEventListener('click', function (ev) {
-            if (!ev.target.closest('#mrerp-pick-cus-manual-use-btn')) return;
-            const inp = document.getElementById('mrerp-pick-cus-manual-input');
-            const v = (inp && inp.value || '').trim();
-            if (!v) {
-                _toast(_t('mrerp-pick-cus-manual-empty', 'Enter a code'), 'error');
-                return;
-            }
-            _selectCustomer(v, '');
-        });
-        // 刷新
-        document.addEventListener('click', function (ev) {
-            if (!ev.target.closest('#mrerp-pick-cus-refresh-btn')) return;
-            _fetchAndRender(true);
-        });
-        // 保存并推送
-        document.addEventListener('click', function (ev) {
-            if (!ev.target.closest('#mrerp-pick-cus-save')) return;
-            _onSave();
-        });
-        // i18n 切语言:重渲列表(状态徽章 / 空提示等)
-        if (typeof window.subscribeI18n === 'function') {
-            window.subscribeI18n('mrerp-pick-cus-title', function () {
-                const mask = document.getElementById('mrerp-pick-cus-mask');
-                if (mask && mask.style.display !== 'none') _renderList();
-            });
-        }
-    }
-
-    // 暴露入口
-    window.openMrerpPickCustomer = _open;
-})();
 
 // ============================================================
 // v27.8.1.14b.3 · 删 14b.2 加的 banner / 历史页死下拉
@@ -29840,436 +27897,6 @@ window.pearnlyConfirm = function (message, title) {
     });
 })();
 
-// ============================================================
-// v27.8.1.17 · MR.ERP 商品映射 mini modal
-// 入口:window.openMrerpPickProduct({itemName, indexHint, totalHint, onSelected, onSkip, onCancel})
-// 用于:推送 MR.ERP 前预检 detail 行商品 · unmapped item 一个一个用此 modal 解决
-// 数据源:GET /api/erp/mrerp/products?item_name=X · 跟客户 mini modal 同样的 ranked + auto_select
-// 保存:POST /api/erp/mappings/products · 写 erp_product_mappings 表 · 下次推送同样商品名自动用
-// ============================================================
-(function () {
-    'use strict';
-
-    let _bound = false;
-    let _state = {
-        itemName: '',
-        indexHint: 0,
-        totalHint: 0,
-        onSelected: null,
-        onSkip: null,
-        onCancel: null,
-        products: [],
-        filtered: [],
-        selectedCode: '',
-        selectedName: '',
-        loading: false,
-        autoApplied: false,
-    };
-
-    function _t(key, fallback) {
-        if (typeof t === 'function') {
-            const v = t(key);
-            if (v && v !== key) return v;
-        }
-        return fallback || key;
-    }
-    function _esc(s) {
-        return (typeof escapeHtml === 'function')
-            ? escapeHtml(s == null ? '' : String(s))
-            : String(s == null ? '' : s);
-    }
-    function _toast(msg, kind) {
-        try { if (typeof showToast === 'function') showToast(msg, kind || 'info'); } catch (e) {}
-    }
-
-    function _ensureDom() {
-        if (document.getElementById('mrerp-pick-prod-mask')) return;
-        const mask = document.createElement('div');
-        mask.id = 'mrerp-pick-prod-mask';
-        mask.className = 'mrerp-pick-prod-mask';
-        mask.style.display = 'none';
-        mask.innerHTML =
-            '<div class="mrerp-pick-prod-modal" role="dialog" aria-modal="true">' +
-                '<div class="mrerp-pick-prod-head">' +
-                    '<div class="mrerp-pick-prod-title" id="mrerp-pick-prod-title"></div>' +
-                    '<button type="button" class="mrerp-pick-prod-close" id="mrerp-pick-prod-close" aria-label="close">' +
-                        '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>' +
-                    '</button>' +
-                '</div>' +
-                '<div class="mrerp-pick-prod-progress" id="mrerp-pick-prod-progress"></div>' +
-                '<div class="mrerp-pick-prod-ocrname">' +
-                    '<span class="mrerp-pick-prod-ocrlabel" id="mrerp-pick-prod-ocrlabel"></span>' +
-                    '<span class="mrerp-pick-prod-ocrval" id="mrerp-pick-prod-ocrval"></span>' +
-                '</div>' +
-                '<div class="mrerp-pick-prod-search-row">' +
-                    '<input type="text" id="mrerp-pick-prod-search-input" class="mrerp-pick-prod-search-input"/>' +
-                    '<button type="button" class="mrerp-pick-prod-refresh-btn" id="mrerp-pick-prod-refresh-btn" aria-label="refresh">' +
-                        '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-                            '<path d="M2 8a6 6 0 1 1 1.7 4.2"/><path d="M2 12.5V9h3.5"/>' +
-                        '</svg>' +
-                    '</button>' +
-                '</div>' +
-                '<div class="mrerp-pick-prod-list" id="mrerp-pick-prod-list"></div>' +
-                '<details class="mrerp-pick-prod-manual">' +
-                    '<summary id="mrerp-pick-prod-manual-summary"></summary>' +
-                    '<div class="mrerp-pick-prod-manual-row">' +
-                        '<input type="text" id="mrerp-pick-prod-manual-input" class="mrerp-pick-prod-manual-input"/>' +
-                        '<button type="button" class="btn btn-secondary btn-small" id="mrerp-pick-prod-manual-use-btn"></button>' +
-                    '</div>' +
-                '</details>' +
-                '<div class="mrerp-pick-prod-selected" id="mrerp-pick-prod-selected" style="display:none;">' +
-                    '<span class="mrerp-pick-prod-selected-label" id="mrerp-pick-prod-selected-label"></span>' +
-                    '<span class="mrerp-pick-prod-selected-code" id="mrerp-pick-prod-selected-code"></span>' +
-                    '<span class="mrerp-pick-prod-selected-name" id="mrerp-pick-prod-selected-name"></span>' +
-                '</div>' +
-                '<div class="mrerp-pick-prod-btns">' +
-                    '<button type="button" class="btn btn-ghost btn-small" id="mrerp-pick-prod-skip"></button>' +
-                    '<div class="mrerp-pick-prod-btns-right">' +
-                        '<button type="button" class="btn btn-secondary" id="mrerp-pick-prod-cancel"></button>' +
-                        '<button type="button" class="btn btn-primary" id="mrerp-pick-prod-save" disabled></button>' +
-                    '</div>' +
-                '</div>' +
-            '</div>';
-        document.body.appendChild(mask);
-    }
-
-    function _renderText() {
-        const ttlEl    = document.getElementById('mrerp-pick-prod-title');
-        const progEl   = document.getElementById('mrerp-pick-prod-progress');
-        const ocrL     = document.getElementById('mrerp-pick-prod-ocrlabel');
-        const ocrV     = document.getElementById('mrerp-pick-prod-ocrval');
-        const sInp     = document.getElementById('mrerp-pick-prod-search-input');
-        const manSum   = document.getElementById('mrerp-pick-prod-manual-summary');
-        const manInp   = document.getElementById('mrerp-pick-prod-manual-input');
-        const manBtn   = document.getElementById('mrerp-pick-prod-manual-use-btn');
-        const selLbl   = document.getElementById('mrerp-pick-prod-selected-label');
-        const skipBtn  = document.getElementById('mrerp-pick-prod-skip');
-        const cancelBtn= document.getElementById('mrerp-pick-prod-cancel');
-        const saveBtn  = document.getElementById('mrerp-pick-prod-save');
-        if (ttlEl)    ttlEl.textContent    = _t('mrerp-pick-prod-title', 'Pick MR.ERP product code');
-        if (ocrL)     ocrL.textContent     = _t('mrerp-pick-prod-ocrlabel', 'OCR item:');
-        if (sInp)     sInp.placeholder     = _t('mrerp-pick-prod-search-ph', 'Search by code / name...');
-        if (manSum)   manSum.textContent   = _t('mrerp-pick-prod-manual-summary', "Can't find it? Enter code manually");
-        if (manInp)   manInp.placeholder   = _t('mrerp-pick-prod-manual-ph', 'e.g. P00123');
-        if (manBtn)   manBtn.textContent   = _t('mrerp-pick-prod-manual-use', 'Use this code');
-        if (selLbl)   selLbl.textContent   = _t('mrerp-pick-prod-selected-label', 'Selected:');
-        if (skipBtn)  skipBtn.textContent  = _t('mrerp-pick-prod-skip', 'Skip this item (use placeholder)');
-        if (cancelBtn)cancelBtn.textContent= _t('mrerp-pick-prod-cancel', 'Cancel');
-        if (saveBtn)  saveBtn.textContent  = _t('mrerp-pick-prod-save', 'Save & next');
-        // progress
-        if (progEl && _state.totalHint > 0) {
-            progEl.textContent = _t('mrerp-pick-prod-progress', 'Step {i}/{n}')
-                .replace('{i}', String(_state.indexHint))
-                .replace('{n}', String(_state.totalHint));
-        } else if (progEl) {
-            progEl.textContent = '';
-        }
-        if (ocrV) ocrV.textContent = _state.itemName || '';
-    }
-
-    function _open(opts) {
-        _ensureDom();
-        _state.itemName  = (opts && opts.itemName) || '';
-        _state.indexHint = (opts && opts.indexHint) || 0;
-        _state.totalHint = (opts && opts.totalHint) || 0;
-        _state.onSelected = (opts && opts.onSelected) || null;
-        _state.onSkip     = (opts && opts.onSkip)     || null;
-        _state.onCancel   = (opts && opts.onCancel)   || null;
-        _state.products = [];
-        _state.filtered = [];
-        _state.selectedCode = '';
-        _state.selectedName = '';
-        _state.loading = false;
-        _state.autoApplied = false;
-        _renderText();
-        // 重置搜索 + 手动 + 已选
-        const si = document.getElementById('mrerp-pick-prod-search-input');
-        if (si) si.value = '';
-        const mi = document.getElementById('mrerp-pick-prod-manual-input');
-        if (mi) mi.value = '';
-        const md = document.querySelector('#mrerp-pick-prod-mask .mrerp-pick-prod-manual');
-        if (md) md.open = false;
-        _updateSelectedUI();
-        _updateSaveBtn();
-        const mask = document.getElementById('mrerp-pick-prod-mask');
-        if (mask) mask.style.display = 'flex';
-        _bindOnce();
-        _fetchAndRender(false);
-    }
-
-    function _close() {
-        const mask = document.getElementById('mrerp-pick-prod-mask');
-        if (mask) mask.style.display = 'none';
-    }
-
-    async function _fetchAndRender(forceRefresh) {
-        const list = document.getElementById('mrerp-pick-prod-list');
-        if (!list) return;
-        _state.loading = true;
-        list.innerHTML = '<div class="mrerp-pick-prod-loading">'
-            + _esc(_t('mrerp-pick-prod-loading', 'Loading...')) + '</div>';
-        const refreshBtn = document.getElementById('mrerp-pick-prod-refresh-btn');
-        if (refreshBtn) refreshBtn.classList.add('loading');
-        try {
-            const tk = localStorage.getItem('mrpilot_token');
-            const params = [];
-            if (forceRefresh) params.push('force_refresh=1');
-            if (_state.itemName && String(_state.itemName).trim()) {
-                params.push('item_name=' + encodeURIComponent(String(_state.itemName).trim()));
-            }
-            const url = '/api/erp/mrerp/products' + (params.length ? ('?' + params.join('&')) : '');
-            const r = await fetch(url, {
-                method: 'GET',
-                headers: { 'Authorization': 'Bearer ' + tk },
-            });
-            if (!r.ok) {
-                let detail = 'unknown';
-                try { detail = (await r.json()).detail || 'unknown'; } catch (e) {}
-                const friendly = String(detail).replace(/^mrerp\./, '');
-                list.innerHTML = '<div class="mrerp-pick-prod-empty">'
-                    + _esc(_t('mrerp-pick-prod-fetch-fail', 'Fetch failed: {err}').replace('{err}', friendly))
-                    + '</div>';
-                return;
-            }
-            const data = await r.json().catch(function () { return {}; });
-            _state.products = data.products || [];
-            const autoCode = data.auto_select_code || null;
-            const autoName = data.auto_select_name || '';
-            // 完美匹配零点击 · 跟 v16 客户 modal 同思路
-            if (autoCode && !_state.autoApplied) {
-                _state.autoApplied = true;
-                _close();
-                const ok = await _saveMappingSilent(autoCode, autoName);
-                if (ok) {
-                    if (typeof showToast === 'function') {
-                        showToast(
-                            _t('mrerp-prod-auto-matched-toast', 'Auto-matched "{ocr}" → {name}')
-                                .replace('{ocr}', _state.itemName)
-                                .replace('{name}', autoName || autoCode),
-                            'success', 2800
-                        );
-                    }
-                    if (typeof _state.onSelected === 'function') {
-                        try { _state.onSelected(); } catch (e) {}
-                    }
-                    return;
-                } else {
-                    // 保存失败 · 重开 modal 让用户手动
-                    const mask = document.getElementById('mrerp-pick-prod-mask');
-                    if (mask) mask.style.display = 'flex';
-                    _state.autoApplied = false;
-                }
-            }
-            _renderList();
-        } catch (e) {
-            list.innerHTML = '<div class="mrerp-pick-prod-empty">'
-                + _esc(_t('mrerp-pick-prod-fetch-fail', 'Fetch failed: {err}').replace('{err}', e.message || 'network'))
-                + '</div>';
-        } finally {
-            _state.loading = false;
-            if (refreshBtn) refreshBtn.classList.remove('loading');
-        }
-    }
-
-    function _renderList() {
-        const list = document.getElementById('mrerp-pick-prod-list');
-        if (!list) return;
-        const search = (document.getElementById('mrerp-pick-prod-search-input') || {}).value || '';
-        const q = search.trim().toLowerCase();
-        let arr = _state.products || [];
-        if (q) {
-            arr = arr.filter(function (c) {
-                return (String(c.code || '').toLowerCase().indexOf(q) >= 0)
-                    || (String(c.name || '').toLowerCase().indexOf(q) >= 0);
-            });
-        }
-        _state.filtered = arr;
-        if (!arr.length) {
-            if (!_state.products.length) {
-                list.innerHTML = '<div class="mrerp-pick-prod-empty">'
-                    + _esc(_t('mrerp-pick-prod-empty-all', 'No products in MR.ERP master · enter code manually below'))
-                    + '</div>';
-            } else {
-                list.innerHTML = '<div class="mrerp-pick-prod-empty">'
-                    + _esc(_t('mrerp-pick-prod-empty', 'No match')) + '</div>';
-            }
-            return;
-        }
-        let html = '';
-        arr.forEach(function (c) {
-            const isActive = (_state.selectedCode && c.code === _state.selectedCode);
-            const cls = 'mrerp-pick-prod-row' + (isActive ? ' is-active' : '');
-            html += '<div class="' + cls + '" data-code="' + _esc(c.code) + '" data-name="' + _esc(c.name || '') + '">';
-            html += '<span class="mrerp-pick-prod-row-code">' + _esc(c.code) + '</span>';
-            html += '<span class="mrerp-pick-prod-row-name">' + _esc(c.name || '') + '</span>';
-            const sc = Number(c.score || 0);
-            if (sc >= 0.7) {
-                html += '<span class="mrerp-pick-prod-row-match match-recommend">'
-                    + _esc(_t('mrerp-recommend-badge', 'Recommended')) + '</span>';
-            } else if (sc >= 0.45) {
-                html += '<span class="mrerp-pick-prod-row-match match-maybe">'
-                    + _esc(_t('mrerp-maybe-badge', 'Maybe')) + '</span>';
-            }
-            if (c.type && String(c.type).trim()) {
-                html += '<span class="mrerp-pick-prod-row-status">' + _esc(c.type) + '</span>';
-            }
-            html += '</div>';
-        });
-        list.innerHTML = html;
-    }
-
-    function _selectProduct(code, name) {
-        _state.selectedCode = String(code || '');
-        _state.selectedName = String(name || '');
-        _renderList();
-        _updateSelectedUI();
-        _updateSaveBtn();
-    }
-
-    function _updateSelectedUI() {
-        const sel = document.getElementById('mrerp-pick-prod-selected');
-        const cd = document.getElementById('mrerp-pick-prod-selected-code');
-        const nm = document.getElementById('mrerp-pick-prod-selected-name');
-        if (!sel) return;
-        if (_state.selectedCode) {
-            sel.style.display = 'flex';
-            if (cd) cd.textContent = _state.selectedCode;
-            if (nm) nm.textContent = _state.selectedName || '';
-        } else {
-            sel.style.display = 'none';
-        }
-    }
-
-    function _updateSaveBtn() {
-        const btn = document.getElementById('mrerp-pick-prod-save');
-        if (!btn) return;
-        btn.disabled = !_state.selectedCode;
-    }
-
-    async function _saveMappingSilent(code, name) {
-        try {
-            const tk = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/erp/mappings/products', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + tk,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    erp_type:  'mrerp',
-                    item_name: _state.itemName,
-                    erp_code:  String(code || ''),
-                    erp_name:  name || '',
-                    notes:     'mini modal v17',
-                }),
-            });
-            return r.ok;
-        } catch (e) { return false; }
-    }
-
-    async function _onSave() {
-        if (!_state.selectedCode || !_state.itemName) return;
-        const btn = document.getElementById('mrerp-pick-prod-save');
-        if (btn) btn.disabled = true;
-        const ok = await _saveMappingSilent(_state.selectedCode, _state.selectedName);
-        if (!ok) {
-            _toast(_t('mrerp-pick-prod-save-fail', 'Save failed · please retry'), 'error');
-            if (btn) btn.disabled = false;
-            return;
-        }
-        _toast(_t('mrerp-pick-prod-save-ok', 'Mapping saved'), 'success');
-        _close();
-        if (typeof _state.onSelected === 'function') {
-            try { _state.onSelected(); } catch (e) {}
-        }
-    }
-
-    function _onSkip() {
-        _close();
-        if (typeof _state.onSkip === 'function') {
-            try { _state.onSkip(); } catch (e) {}
-        }
-    }
-
-    function _onCancel() {
-        _close();
-        if (typeof _state.onCancel === 'function') {
-            try { _state.onCancel(); } catch (e) {}
-        }
-    }
-
-    function _bindOnce() {
-        if (_bound) return;
-        _bound = true;
-        // 关闭(X / 取消 / 背景点击)
-        document.addEventListener('click', function (ev) {
-            if (ev.target.closest('#mrerp-pick-prod-close')) {
-                _onCancel();
-                return;
-            }
-            if (ev.target.closest('#mrerp-pick-prod-cancel')) {
-                _onCancel();
-                return;
-            }
-            const mask = document.getElementById('mrerp-pick-prod-mask');
-            if (mask && ev.target === mask) {
-                _onCancel();
-                return;
-            }
-            // 跳过
-            if (ev.target.closest('#mrerp-pick-prod-skip')) {
-                _onSkip();
-                return;
-            }
-            // 搜索 input
-            // 列表 row 点击
-            const row = ev.target.closest('#mrerp-pick-prod-list .mrerp-pick-prod-row');
-            if (row) {
-                _selectProduct(row.dataset.code, row.dataset.name);
-                return;
-            }
-            // 手动用此编号
-            if (ev.target.closest('#mrerp-pick-prod-manual-use-btn')) {
-                const inp = document.getElementById('mrerp-pick-prod-manual-input');
-                const v = (inp && inp.value || '').trim();
-                if (!v) {
-                    _toast(_t('mrerp-pick-prod-manual-empty', 'Enter a code'), 'error');
-                    return;
-                }
-                _selectProduct(v, '');
-                return;
-            }
-            // 刷新
-            if (ev.target.closest('#mrerp-pick-prod-refresh-btn')) {
-                _fetchAndRender(true);
-                return;
-            }
-            // 保存
-            if (ev.target.closest('#mrerp-pick-prod-save')) {
-                _onSave();
-                return;
-            }
-        });
-        // 搜索 input 本地过滤
-        document.addEventListener('input', function (ev) {
-            if (ev.target.id === 'mrerp-pick-prod-search-input') {
-                _renderList();
-            }
-        });
-        // i18n 切语言 · 重渲文字 + 列表
-        if (typeof window.subscribeI18n === 'function') {
-            window.subscribeI18n('mrerp-pick-prod-title', function () {
-                const mask = document.getElementById('mrerp-pick-prod-mask');
-                if (mask && mask.style.display !== 'none') {
-                    _renderText();
-                    _renderList();
-                }
-            });
-        }
-    }
-
-    window.openMrerpPickProduct = _open;
-})();
 
 /* ============================================================
  * v118.32.0 · 销项税对账模块 · 屏 A
@@ -30288,18 +27915,8 @@ window.pearnlyConfirm = function (message, title) {
 
     // ── 子 tab 切换 ───────────────────────────────────────
     function _setMainHeader(pane) {
-        const titleEl = document.getElementById('recon-main-title');
-        const subEl   = document.getElementById('recon-main-sub');
-        if (!titleEl || !subEl) return;
-        const keyMap = {
-            'bank':     ['reconcile-title',       'reconcile-sub'],
-            'sale-vat': ['sv-title',              'sv-sub-merged'],
-        };
-        const keys = keyMap[pane] || ['reconcile-center-title', 'reconcile-center-sub'];
-        titleEl.textContent = t(keys[0]) || titleEl.textContent;
-        subEl.textContent   = t(keys[1]) || subEl.textContent;
-        titleEl.setAttribute('data-i18n', keys[0]);
-        subEl.setAttribute('data-i18n', keys[1]);
+        // v4.10.4 · L2 pane 已各自有标题 · L1 永远保持 rc-page-title/rc-page-sub · 不随 tab 变
+        return;
     }
 
     function _initSubTabs() {
@@ -30309,10 +27926,15 @@ window.pearnlyConfirm = function (message, title) {
                 tabs.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 const pane = btn.dataset.reconTab;
-                document.getElementById('recon-pane-bank').style.display     = (pane === 'bank')     ? '' : 'none';
-                document.getElementById('recon-pane-sale-vat').style.display = (pane === 'sale-vat') ? '' : 'none';
+                const paneBank   = document.getElementById('recon-pane-bank');
+                const paneSv     = document.getElementById('recon-pane-sale-vat');
+                const paneGlVat  = document.getElementById('recon-pane-gl-vat');
+                if (paneBank)  paneBank.style.display  = (pane === 'bank')     ? '' : 'none';
+                if (paneSv)    paneSv.style.display    = (pane === 'sale-vat') ? '' : 'none';
+                if (paneGlVat) paneGlVat.style.display = (pane === 'gl-vat')   ? '' : 'none';
                 _setMainHeader(pane);
                 if (pane === 'sale-vat') _loadTasks();
+                if (pane === 'gl-vat' && window.GlVatRecon) window.GlVatRecon.ensureInit();
             });
         });
         const activeTab = document.querySelector('[data-recon-tab].active');
@@ -30500,7 +28122,7 @@ window.addEventListener('DOMContentLoaded', () => {
         wrap.style.display  = '';
         empty.style.display = 'none';
         list.innerHTML = _tasks.map(task => {
-            const color   = task.client_color || '#3b82f6';
+            const color   = task.client_color || '#111111';
             const initial = (task.client_name || '?')[0].toUpperCase();
             const period  = `${task.period_year}/${String(task.period_month).padStart(2,'0')}`;
             const badge   = _taskBadge(task.status);
@@ -30598,7 +28220,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!sel) return;
         sel.innerHTML = `<option value="" data-i18n="sv-select-client-ph">${t('sv-select-client-ph')}</option>` +
             _clients.map(c =>
-                `<option value="${c.id}" data-color="${_esc(c.color||'#3b82f6')}" data-taxid="${_esc(c.tax_id||'')}">${_esc(c.name)}</option>`
+                `<option value="${c.id}" data-color="${_esc(c.color||'#111111')}" data-taxid="${_esc(c.tax_id||'')}">${_esc(c.name)}</option>`
             ).join('');
     }
 
@@ -30609,7 +28231,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const opt = sel.options[sel.selectedIndex];
         const preview = $('sv-client-preview');
         if (!opt || !opt.value) { preview.style.display = 'none'; return; }
-        $('sv-client-avatar').style.background = opt.dataset.color || '#3b82f6';
+        $('sv-client-avatar').style.background = opt.dataset.color || '#111111';
         $('sv-client-avatar').textContent = opt.text[0].toUpperCase();
         $('sv-client-name').textContent   = opt.text;
         $('sv-client-taxid').textContent  = opt.dataset.taxid || '';
@@ -31005,7 +28627,7 @@ window.addEventListener('DOMContentLoaded', () => {
     function _renderHeader() {
         const t_ = _currentResult.task || {};
         const c  = _currentResult.client || {};
-        const color = c.color || '#3b82f6';
+        const color = c.color || '#111111';
         const initial = (c.name || '?')[0].toUpperCase();
         $('sv-result-avatar').style.background = color;
         $('sv-result-avatar').textContent = initial;
@@ -31547,7 +29169,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const conf = g.min_conf || 0;
         const confCls = conf >= 0.85 ? 'high' : (conf >= 0.6 ? 'mid' : 'low');
         return `<div class="bv-group-card ${g.new_client ? 'new-client' : ''}">
-            <div class="bv-group-avatar" style="background:#3b82f6">${_esc(initial)}</div>
+            <div class="bv-group-avatar" style="background:#111111">${_esc(initial)}</div>
             <div class="bv-group-info">
                 <div class="bv-group-client">
                     ${_esc(g.client_name)}
@@ -31852,6 +29474,10 @@ window.addEventListener('DOMContentLoaded', () => {
     let _invoiceFiles = [];
     let _reportFiles  = [];
     let _running = false;
+    let _vexAllRows   = [];
+    let _vexExpanded  = false;
+    let _previewLimitInv = 50, _previewLimitRep = 50;
+    let _previewSearchInv = '',  _previewSearchRep = '';
 
     // ── KPI 刷新 ──
     async function _loadVexKpi() {
@@ -31882,50 +29508,150 @@ window.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
     }
 
+    const VEX_LIMIT = 5;
+
     function _renderVexTaskList(rows, total) {
-        const tbody = document.getElementById('vex-task-tbody');
+        _vexAllRows  = rows;
+        _vexExpanded = false;
+        const tbody  = document.getElementById('vex-task-tbody');
+        const meta   = document.getElementById('vex-task-meta');
+        const toggle = document.getElementById('vex-task-toggle');
         if (!tbody) return;
         if (!rows.length) {
             tbody.innerHTML = '<tr><td colspan="9" class="vex-task-empty">' + (t('sv-empty-title') || '还没有对账任务') + '</td></tr>';
+            if (meta)   meta.style.display   = 'none';
+            if (toggle) toggle.style.display = 'none';
             return;
         }
+        const showExtra = rows.length > VEX_LIMIT;
+        if (meta) {
+            meta.style.display = showExtra ? '' : 'none';
+            if (showExtra) meta.textContent = (t('vex-recent-show-limited') || '显示最近 5 条 · 共 {n} 条').replace('{n}', rows.length);
+        }
+        if (toggle) toggle.style.display = showExtra ? '' : 'none';
+        _doRenderVexRows(rows.slice(0, VEX_LIMIT));
+        _updateVexToggleBtn();
+    }
+
+    function _doRenderVexRows(rows) {
+        const tbody = document.getElementById('vex-task-tbody');
+        if (!tbody) return;
         const statusLabel = {
-            'pending':  t('vex-status-pending')  || '待处理',
-            'running':  t('vex-status-running')  || '处理中',
-            'completed':t('vex-status-done')     || '已完成',
-            'failed':   t('vex-status-failed')   || '失败',
+            'pending': t('vex-status-pending') || '待处理',
+            'running': t('vex-status-running') || '处理中',
+            'done':    t('vex-status-done')    || '已完成',
+            'failed':  t('vex-status-failed')  || '失败',
         };
-        const statusClass = { 'pending':'badge-gray', 'running':'badge-blue', 'completed':'badge-green', 'failed':'badge-red' };
+        const statusClass = { 'pending':'badge-gray', 'running':'badge-blue', 'done':'badge-green', 'failed':'badge-red' };
+        const dlSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>`;
+        const delSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h10M6 4V3h4v1M5 4v8a1 1 0 001 1h4a1 1 0 001-1V4"/></svg>`;
         tbody.innerHTML = rows.map(row => {
-            const dt = row.created_at ? new Date(row.created_at).toLocaleDateString() : '—';
+            const dt = row.created_at ? new Date(row.created_at).toLocaleString([], { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
             const period = row.period || '—';
-            const kpiStr = row.matched_count != null
-                ? row.matched_count + ' ✓ · ' + row.mismatched_count + ' ⚠'
-                : '—';
-            const diff = row.mismatch_amount != null ? '฿ ' + Number(row.mismatch_amount).toLocaleString() : '—';
+            const kpiStr = row.matched_count != null ? row.matched_count + ' ✓ · ' + row.mismatched_count + ' ⚠' : '—';
+            const diff   = row.mismatch_amount != null ? '฿ ' + Number(row.mismatch_amount).toLocaleString() : '—';
             const elapsed = row.elapsed_seconds != null ? row.elapsed_seconds.toFixed(1) + ' s' : '—';
             const st = row.status || 'pending';
-            const stLabel = statusLabel[st] || st;
-            const stCls = statusClass[st] || 'badge-gray';
+            const clientDisplay = (row.client_name && row.client_name !== 'client')
+                ? row.client_name : (t('vex-client-all') || '全部客户');
             return `<tr class="vex-task-row" data-task-id="${_esc(row.id)}" style="cursor:pointer">
                 <td>${dt}</td>
-                <td>${_esc(row.client_name || '—')}</td>
+                <td>${_esc(clientDisplay)}</td>
                 <td>${_esc(period)}</td>
                 <td>${(row.invoice_count || 0) + ' / ' + (row.report_count || 0)}</td>
                 <td>${kpiStr}</td>
                 <td>${diff}</td>
-                <td><span class="badge ${stCls}">${stLabel}</span></td>
+                <td><span class="badge ${statusClass[st] || 'badge-gray'}">${statusLabel[st] || st}</span></td>
                 <td>${elapsed}</td>
-                <td><a class="vex-task-dl" href="/api/vat_excel/tasks/${_esc(row.id)}/download" download title="下载">↓</a></td>
+                <td><div class="vex-task-actions">
+                    <button class="vex-task-dl-btn" data-task-id="${_esc(row.id)}" title="${t('vex-col-actions')||'下载'}">${dlSvg}</button>
+                    <button class="vex-task-del-btn" data-task-id="${_esc(row.id)}" title="${t('vex-task-delete-confirm-title')||'删除'}">${delSvg}</button>
+                </div></td>
             </tr>`;
         }).join('');
-        // 点行 toast
-        tbody.querySelectorAll('.vex-task-row').forEach(tr => {
-            tr.addEventListener('click', e => {
-                if (e.target.closest('.vex-task-dl')) return;
-                showToast(t('vex-detail-soon') || '任务详情即将上线', 'info');
+        // 下载按钮
+        tbody.querySelectorAll('.vex-task-dl-btn').forEach(btn => {
+            btn.addEventListener('click', async e => {
+                e.stopPropagation();
+                const taskId = btn.dataset.taskId;
+                try {
+                    const resp = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(taskId) + '/download', { credentials: 'include', headers: _authHeader() });
+                    if (resp.status === 410) { showToast(t('vex-toast-expired') || '数据已过期 · 请重新对账', 'warn'); return; }
+                    if (!resp.ok) { showToast(t('vex-toast-dl-fail') || '下载失败 · 请重试', 'error'); return; }
+                    const blob = await resp.blob();
+                    const cd = resp.headers.get('Content-Disposition') || '';
+                    const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+                    const filename = m ? decodeURIComponent(m[1]) : ('vat_recon_' + taskId + '.xlsx');
+                    const url = URL.createObjectURL(blob);
+                    const tmpA = document.createElement('a');
+                    tmpA.href = url; tmpA.download = filename; tmpA.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                } catch (_) { showToast(t('vex-toast-dl-fail') || '下载失败 · 请重试', 'error'); }
             });
         });
+        // 删除按钮
+        tbody.querySelectorAll('.vex-task-del-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                _confirmDeleteVatTask(btn.dataset.taskId);
+            });
+        });
+    }
+
+    function _updateVexToggleBtn() {
+        const toggle = document.getElementById('vex-task-toggle');
+        if (!toggle) return;
+        const upSvg   = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10l-4-4-4 4"/></svg>`;
+        const downSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>`;
+        if (_vexExpanded) {
+            toggle.innerHTML = upSvg + (t('vex-recent-collapse') || '收起');
+        } else {
+            const lbl = (t('vex-recent-show-all') || '查看全部 {n} 条').replace('{n}', _vexAllRows.length);
+            toggle.innerHTML = downSvg + lbl;
+        }
+    }
+
+    function _toggleVexTaskList() {
+        _vexExpanded = !_vexExpanded;
+        _doRenderVexRows(_vexExpanded ? _vexAllRows : _vexAllRows.slice(0, VEX_LIMIT));
+        _updateVexToggleBtn();
+    }
+
+    async function _confirmDeleteVatTask(taskId) {
+        const title = t('vex-task-delete-confirm-title') || '删除对账任务?';
+        const body  = t('vex-task-delete-confirm-body')  || '同时清掉对应的发票识别缓存 · 不可恢复';
+        const ok = await showConfirm(body, { title, danger: true, okText: t('vex-task-delete-confirm-title') || '确认删除' });
+        if (!ok) return;
+        try {
+            const resp = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(taskId), {
+                method: 'DELETE', credentials: 'include', headers: _authHeader()
+            });
+            if (!resp.ok) throw new Error(resp.status);
+            showToast(t('vex-task-delete-ok') || '已删除', 'success');
+            _loadVexTaskList();
+            _loadVexKpi();
+        } catch (_) {
+            showToast(t('vex-task-delete-fail') || '删除失败', 'error');
+        }
+    }
+
+    async function _clearOldTasks() {
+        const msg = t('vex-clear-old-confirm') || '确定清除 7 天前的对账任务?此操作不可撤销';
+        const ok = await showConfirm(msg, { danger: true });
+        if (!ok) return;
+        try {
+            const resp = await fetch('/api/vat_excel/tasks/clear_old?days=7', {
+                method: 'DELETE', credentials: 'include', headers: _authHeader()
+            });
+            if (!resp.ok) throw new Error(resp.status);
+            const data = await resp.json();
+            const n = data.deleted || 0;
+            showToast((t('vex-clear-old-success') || '已清除 {n} 条任务').replace('{n}', n), 'success');
+            _loadVexTaskList();
+            _loadVexKpi();
+        } catch (_) {
+            showToast(t('vex-task-delete-fail') || '操作失败', 'error');
+        }
     }
 
     // ── 文件入队(去重 + 上限) ──
@@ -31975,8 +29701,9 @@ window.addEventListener('DOMContentLoaded', () => {
     function _renderFiles() {
         const il = $('vex-list-invoice');
         const rl = $('vex-list-report');
-        $('vex-count-invoice').textContent = _invoiceFiles.length;
-        $('vex-count-report').textContent  = _reportFiles.length;
+        const _cntInv = $('vex-count-invoice'), _cntRep = $('vex-count-report');
+        if (_cntInv) _cntInv.textContent = _invoiceFiles.length;
+        if (_cntRep) _cntRep.textContent = _reportFiles.length;
 
         const _row = (f, idx, kind) => `<div class="vex-fi">
             <svg class="vex-fi-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h6l4 4v8a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v4h4"/></svg>
@@ -32011,6 +29738,113 @@ window.addEventListener('DOMContentLoaded', () => {
                 info.className = 'vex-action-info ok';
             }
         }
+        _renderPreviewPanel();
+    }
+
+    // ── 预览面板 ──
+    const _ppInvIcon = `<svg class="vex-pp-fi-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
+    const _ppRepIcon = `<svg class="vex-pp-fi-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`;
+    const _ppDelIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+
+    function _renderPreviewPanel() {
+        const panel = $('vex-preview-panel');
+        if (!panel || panel.style.display === 'none') return;
+        _renderPreviewColFull('inv');
+        _renderPreviewColFull('rep');
+        const guide = $('vex-pp-guide');
+        if (guide) guide.style.display = _invoiceFiles.length > 100 ? 'flex' : 'none';
+    }
+
+    function _renderPreviewColFull(kind) {
+        const colEl = $(kind === 'inv' ? 'vex-pp-invoice-col' : 'vex-pp-report-col');
+        if (!colEl) return;
+        const files     = kind === 'inv' ? _invoiceFiles : _reportFiles;
+        const searchVal = kind === 'inv' ? _previewSearchInv : _previewSearchRep;
+        const title     = t(kind === 'inv' ? 'vex-preview-invoice' : 'vex-preview-report') || (kind === 'inv' ? '销售发票' : 'VAT 报告');
+        const ph        = _esc(t('vex-preview-search') || '搜索文件名...');
+        const clearLbl  = _esc(t('vex-preview-clear-all') || '全清');
+
+        colEl.innerHTML = `
+            <div class="vex-pp-col-title">
+                <span class="vex-pp-col-name">${_esc(title)} <span class="vex-pp-col-count">${files.length}</span></span>
+            </div>
+            <div class="vex-pp-search-row">
+                <input class="vex-pp-search" id="vex-pp-search-${kind}" type="text"
+                       placeholder="${ph}" value="${_esc(searchVal)}" autocomplete="off">
+                <button class="vex-pp-clear-btn" id="vex-pp-clearall-${kind}" type="button">${clearLbl}</button>
+            </div>
+            <div class="vex-pp-file-list" id="vex-pp-${kind}-list"></div>
+            <div class="vex-pp-pagination" id="vex-pp-${kind}-pg"></div>`;
+
+        const si = $('vex-pp-search-' + kind);
+        if (si) si.addEventListener('input', e => {
+            if (kind === 'inv') { _previewSearchInv = e.target.value; _previewLimitInv = 50; }
+            else                { _previewSearchRep = e.target.value; _previewLimitRep = 50; }
+            _renderFileListOnly(kind);
+        });
+
+        const ca = $('vex-pp-clearall-' + kind);
+        if (ca) ca.addEventListener('click', () => {
+            if (kind === 'inv') { _invoiceFiles = []; _previewSearchInv = ''; _previewLimitInv = 50; }
+            else                { _reportFiles  = []; _previewSearchRep = ''; _previewLimitRep = 50; }
+            _renderFiles();
+        });
+
+        _renderFileListOnly(kind);
+    }
+
+    function _renderFileListOnly(kind) {
+        const listEl = $('vex-pp-' + kind + '-list');
+        const pgEl   = $('vex-pp-' + kind + '-pg');
+        if (!listEl) return;
+        const files     = kind === 'inv' ? _invoiceFiles : _reportFiles;
+        const searchVal = kind === 'inv' ? _previewSearchInv : _previewSearchRep;
+        const limit     = kind === 'inv' ? _previewLimitInv  : _previewLimitRep;
+        const icon      = kind === 'inv' ? _ppInvIcon : _ppRepIcon;
+
+        const indexed  = files.map((f, i) => ({ f, i }));
+        const filtered = searchVal
+            ? indexed.filter(({ f }) => f.name.toLowerCase().includes(searchVal.toLowerCase()))
+            : indexed;
+        const shown = filtered.slice(0, limit);
+
+        listEl.innerHTML = shown.map(({ f, i }) => `
+            <div class="vex-pp-file-row">
+                ${icon}
+                <span class="vex-pp-fi-name" title="${_esc(f.name)}">${_esc(f.name)}</span>
+                <span class="vex-pp-fi-size">${_fmtSize(f.size)}</span>
+                <button class="vex-pp-fi-del" type="button" data-kind="${kind}" data-ridx="${i}" aria-label="remove">${_ppDelIcon}</button>
+            </div>`).join('') + `<div id="vex-pp-sentinel-${kind}" style="height:1px;flex-shrink:0"></div>`;
+
+        listEl.querySelectorAll('.vex-pp-fi-del').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.ridx, 10);
+                if (btn.dataset.kind === 'inv') _removeInvoice(idx);
+                else                           _removeReport(idx);
+            });
+        });
+
+        if (pgEl) {
+            const tpl = t('vex-preview-count') || '显示前 {n} / 共 {m}';
+            pgEl.textContent = tpl.replace('{n}', shown.length).replace('{m}', filtered.length);
+        }
+        _bindPreviewObserver(kind, filtered.length);
+    }
+
+    function _bindPreviewObserver(kind, totalFiltered) {
+        const limit    = kind === 'inv' ? _previewLimitInv : _previewLimitRep;
+        if (limit >= totalFiltered) return;
+        const sentinel = $('vex-pp-sentinel-' + kind);
+        const listEl   = $('vex-pp-' + kind + '-list');
+        if (!sentinel || !listEl) return;
+        const obs = new IntersectionObserver(entries => {
+            if (!entries[0].isIntersecting) return;
+            obs.disconnect();
+            if (kind === 'inv') _previewLimitInv += 50;
+            else                _previewLimitRep  += 50;
+            _renderFileListOnly(kind);
+        }, { root: listEl, threshold: 0.8 });
+        obs.observe(sentinel);
     }
 
     // ── 拖拽事件 ──
@@ -32081,10 +29915,11 @@ window.addEventListener('DOMContentLoaded', () => {
                 try { const j = await res.json(); msg = j.detail || msg; } catch(e) {}
                 throw new Error(msg);
             }
-            const ok   = parseInt(res.headers.get('X-Vex-Invoices-Ok')    || '0', 10);
-            const fail = parseInt(res.headers.get('X-Vex-Invoices-Fail') || '0', 10);
-            const rows = parseInt(res.headers.get('X-Vex-Report-Rows')   || '0', 10);
-            const ms   = parseInt(res.headers.get('X-Vex-Elapsed-Ms')    || '0', 10);
+            const ok     = parseInt(res.headers.get('X-Vex-Invoices-Ok')    || '0', 10);
+            const fail   = parseInt(res.headers.get('X-Vex-Invoices-Fail') || '0', 10);
+            const rows   = parseInt(res.headers.get('X-Vex-Report-Rows')   || '0', 10);
+            const ms     = parseInt(res.headers.get('X-Vex-Elapsed-Ms')    || '0', 10);
+            const taskId = res.headers.get('X-Vex-Task-Id') || '';
             const cd = res.headers.get('Content-Disposition') || '';
             const m  = cd.match(/filename="([^"]+)"/);
             const fname = (m && m[1]) || ('vat_recon_' + Date.now() + '.xlsx');
@@ -32119,6 +29954,8 @@ window.addEventListener('DOMContentLoaded', () => {
             // 刷新 KPI 卡 + 任务列表
             _loadVexKpi();
             setTimeout(_loadVexTaskList, 800);
+            // 填预览面板
+            if (taskId) _fetchAndFillVexPreview(taskId, fail);
         } catch (e) {
             clearInterval(_tick);
             $('vex-progress').style.display = 'none';
@@ -32137,6 +29974,42 @@ window.addEventListener('DOMContentLoaded', () => {
         _renderFiles();
     }
 
+    function _fmtAmt(v) {
+        if (v == null) return '—';
+        var n = parseFloat(v);
+        return isNaN(n) ? '—' : n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function _fetchAndFillVexPreview(taskId, failCount) {
+        try {
+            var r = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(taskId), { headers: _authHeader() });
+            if (!r.ok) throw new Error(r.status);
+            var data = await r.json();
+            var raw = data.raw_data_json;
+            if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch(e) { raw = {}; } }
+            raw = raw || {};
+            var backendRows = raw.rows || [];
+            var diffRows = [];
+            backendRows.forEach(function(row) {
+                if (row.kind === 'invoice_orphan') {
+                    diffRows.push({ invoice_no: row.invoice_no || '', field: '仅发票有', report_value: '—', invoice_value: _fmtAmt(row.amount_inv), kind: row.kind });
+                } else if (row.kind === 'report_orphan') {
+                    diffRows.push({ invoice_no: row.invoice_no || '', field: '仅报告有', report_value: _fmtAmt(row.amount_rep), invoice_value: '—', kind: row.kind });
+                } else if (row.dims && Object.keys(row.dims).length > 0) {
+                    Object.keys(row.dims).forEach(function(dim) {
+                        var val = String(row.dims[dim] || '');
+                        var parts = val.split(' ≠ ');
+                        diffRows.push({ invoice_no: row.invoice_no || '', field: dim, report_value: parts[0] || val, invoice_value: parts.length > 1 ? parts[1] : '—', kind: 'diff' });
+                    });
+                }
+            });
+            var cashCount = backendRows.filter(function(row) { return row.kind === 'matched_cash'; }).length;
+            window._vexLastTask = { total: raw.n_total || 0, matched: raw.n_ok || 0, diff: raw.n_diff || 0, incomplete: failCount || 0, cash: cashCount, diff_rows: diffRows, task_id: taskId };
+            if (window._fillVexSummary) window._fillVexSummary();
+            if (window._fillVexDetail)  window._fillVexDetail();
+        } catch(e) {}
+    }
+
     // ── i18n rerender ──
     function _rerenderAll() {
         const pane = document.getElementById('vex-pane');
@@ -32152,6 +30025,8 @@ window.addEventListener('DOMContentLoaded', () => {
             sub.textContent = (t('vex-result-sub') || '{a} vs {r} rows · {s}s')
                 .replace('{a}', p.a).replace('{r}', p.r).replace('{s}', p.s);
         }
+        // 切语言时重渲任务列表 tbody(状态/客户列用 t() 渲染需刷新)
+        _loadVexTaskList();
     }
 
     // ── init ──
@@ -32168,6 +30043,22 @@ window.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-recon-tab="sale-vat"]').forEach(btn => {
             btn.addEventListener('click', () => { _loadVexKpi(); _loadVexTaskList(); });
         });
+        const toggleBtn = document.getElementById('vex-task-toggle');
+        if (toggleBtn) toggleBtn.addEventListener('click', _toggleVexTaskList);
+        const clearOldBtn = document.getElementById('vex-clear-old-btn');
+        if (clearOldBtn) clearOldBtn.addEventListener('click', _clearOldTasks);
+        const previewToggleBtn = document.getElementById('vex-toggle-preview');
+        if (previewToggleBtn) previewToggleBtn.addEventListener('click', () => {
+            const panel = $('vex-preview-panel');
+            const label = $('vex-toggle-preview-label');
+            const isOpen = panel && panel.style.display !== 'none';
+            if (panel) panel.style.display = isOpen ? 'none' : '';
+            if (previewToggleBtn) previewToggleBtn.classList.toggle('open', !isOpen);
+            if (label) label.textContent = isOpen
+                ? (t('vex-toggle-preview-open')  || '查看清单')
+                : (t('vex-toggle-preview-close') || '收起清单');
+            if (!isOpen) _renderPreviewPanel();
+        });
         _renderFiles();
         _loadVexKpi();
     }
@@ -32177,10 +30068,1633 @@ window.addEventListener('DOMContentLoaded', () => {
     } else {
         _init();
     }
+
+
     if (typeof window.subscribeI18n === 'function') {
         window.subscribeI18n('vex-excel', _rerenderAll);
+        window.subscribeI18n('vex-preview-panel', _renderPreviewPanel);
     }
 })();
 
 
+// =================================================================
+// NAV-IA Phase 1 · 顶栏三件套(2026-05-15 拍板)
+// - 头像下拉菜单(右上角 · 替代旧 sidebar-user 入口)
+// - 顶栏搜索框(点击 / ⌘K 弹命令面板)
+// - Cmd+K 命令面板(13 跳转 + 4 切语言)
+// 视觉基准:pearnly_nav_prototype_final.html
+// 命名空间:avatar-menu-* (v118.33.2 Phase 2 已清掉旧 sidebar-user-popup)
+// =================================================================
+(function () {
+    'use strict';
 
+    // ---- 测试白名单判定(复刻 test-center _isAllowed 同款 3 条件) ----
+    function _isInTestWhitelist(u) {
+        try {
+            if (location.search.indexOf('test_center=1') >= 0) return true;
+            if (localStorage.getItem('pearnly_test_mode') === '1') return true;
+            if (u && u.id && String(u.id) === '468b50c1-5593-4fd6-990d-515ce8085563') return true;
+        } catch (_) {}
+        return false;
+    }
+
+    // ---- 角色显隐(暴露到 window · loadAll 在 9734 行会调) ----
+    window.applyRoleVisibility = function applyRoleVisibility() {
+        var u = window._userInfo;
+        if (!u) return;
+        var canTeam = (typeof canManageTeam === 'function') ? canManageTeam(u) : !!(u.role === 'owner' || u.is_super_admin);
+        var hideMoney = (typeof shouldHideMoney === 'function') ? shouldHideMoney(u) : (u.role === 'member' && !u.is_super_admin);
+        var isSuper = (typeof isSuperAdmin === 'function') ? isSuperAdmin(u) : !!u.is_super_admin;
+        var isTest = _isInTestWhitelist(u);
+
+        document.querySelectorAll('[data-show-if-team]').forEach(function (el) {
+            el.style.display = canTeam ? '' : 'none';
+        });
+        document.querySelectorAll('[data-show-if-money]').forEach(function (el) {
+            el.style.display = hideMoney ? 'none' : '';
+        });
+        document.querySelectorAll('[data-show-if-admin]').forEach(function (el) {
+            el.style.display = isSuper ? '' : 'none';
+        });
+        document.querySelectorAll('[data-show-if-test]').forEach(function (el) {
+            el.style.display = isTest ? '' : 'none';
+        });
+        var anySpecial = isSuper || isTest;
+        document.querySelectorAll('[data-show-if-special]').forEach(function (el) {
+            el.style.display = anySpecial ? '' : 'none';
+        });
+    };
+
+    // ---- 渲染头像 + 名字 + 邮箱(复用 renderSidebarUser 同款 letter/avatar_url 逻辑) ----
+    window.renderAvatarMenu = function renderAvatarMenu(u) {
+        if (!u) return;
+        var btn = document.getElementById('avatar-btn');
+        var nameEl = document.getElementById('avatar-popup-name');
+        var emailEl = document.getElementById('avatar-popup-email');
+        if (!btn || !nameEl || !emailEl) return;
+        var email = (u.username || '').trim();
+        var namePart = email.split('@')[0] || email || '—';
+        var letter = (email.charAt(0) || '?').toUpperCase();
+        var av = (u.avatar_url || '').trim();
+        if (av) {
+            var safeUrl = av.replace(/"/g, '&quot;');
+            var safeLetter = letter.replace(/'/g, "\\'");
+            btn.innerHTML = '<img src="' + safeUrl + '" alt="' + letter + '" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\'' + safeLetter + '\'">';
+        } else {
+            btn.textContent = letter;
+        }
+        nameEl.textContent = namePart;
+        emailEl.textContent = email || '—';
+        btn.setAttribute('title', email || '');
+    };
+
+    // ---- 头像 popup 交互 ----
+    function _initAvatarMenu() {
+        var wrap = document.getElementById('avatar-wrap');
+        var btn = document.getElementById('avatar-btn');
+        var popup = document.getElementById('avatar-popup');
+        if (!wrap || !btn || !popup) return;
+
+        function closePopup() {
+            popup.classList.remove('show');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+        function openPopup() {
+            popup.classList.add('show');
+            btn.setAttribute('aria-expanded', 'true');
+        }
+
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (popup.classList.contains('show')) closePopup();
+            else openPopup();
+        });
+
+        // 外部点击关闭(仅当 popup 开着 + 点击点不在 wrap 内)
+        document.addEventListener('click', function (e) {
+            if (popup.classList.contains('show') && !wrap.contains(e.target)) {
+                closePopup();
+            }
+        });
+
+        // 9 项 data-action 事件委托
+        popup.addEventListener('click', function (e) {
+            var item = e.target.closest('.avatar-popup-item');
+            if (!item) return;
+            var action = item.dataset.action;
+            closePopup();
+
+            switch (action) {
+                case 'settings':
+                    if (typeof openSettingsModal === 'function') openSettingsModal();
+                    else if (typeof routeTo === 'function') routeTo('settings');
+                    break;
+                case 'team':
+                    if (typeof openSettingsModal === 'function') openSettingsModal();
+                    else if (typeof routeTo === 'function') routeTo('settings');
+                    setTimeout(function () {
+                        if (typeof switchSettingsTab === 'function') switchSettingsTab('team');
+                    }, 50);
+                    break;
+                case 'billing':
+                    if (typeof openSettingsModal === 'function') openSettingsModal();
+                    else if (typeof routeTo === 'function') routeTo('settings');
+                    setTimeout(function () {
+                        if (typeof switchSettingsTab === 'function') switchSettingsTab('plan');
+                    }, 50);
+                    break;
+                case 'shortcuts':
+                    if (typeof showToast === 'function') {
+                        var msg = (typeof t === 'function') ? t('feature-coming-soon') : '即将上线';
+                        showToast(msg || '即将上线', 'info');
+                    }
+                    break;
+                case 'admin':
+                    // v118.44.0 NAV-IA Phase 8 · 跳新 admin SPA(独立 layout)· 不再走老 /admin = home.html
+                    window.location.href = '/admin/cost';
+                    break;
+                case 'test-center':
+                    if (typeof routeTo === 'function') routeTo('test-center');
+                    break;
+                case 'help':
+                    var helpModal = document.getElementById('help-modal');
+                    if (helpModal) helpModal.style.display = 'flex';
+                    break;
+                case 'logout':
+                    try { localStorage.removeItem('mrpilot_token'); } catch (_) {}
+                    try { localStorage.removeItem('mrpilot_user'); } catch (_) {}
+                    window.location.href = '/';
+                    break;
+            }
+        });
+
+        // 暴露给 cmdk 用
+        window._closeAvatarPopup = closePopup;
+    }
+
+    // ---- Cmd+K 命令面板 ----
+    function _cmdkVisibleItems() {
+        return [].slice.call(document.querySelectorAll('.cmdk-item'))
+            .filter(function (el) { return el.style.display !== 'none'; });
+    }
+    function _cmdkSetFocus(idx) {
+        var items = _cmdkVisibleItems();
+        items.forEach(function (i) { i.classList.remove('focus'); });
+        if (items[idx]) {
+            items[idx].classList.add('focus');
+            items[idx].scrollIntoView({ block: 'nearest' });
+        }
+    }
+    function _cmdkMoveFocus(delta) {
+        var items = _cmdkVisibleItems();
+        if (!items.length) return;
+        var cur = items.findIndex(function (i) { return i.classList.contains('focus'); });
+        if (cur < 0) cur = 0;
+        var next = (cur + delta + items.length) % items.length;
+        _cmdkSetFocus(next);
+    }
+    function _cmdkFilter(q) {
+        q = (q || '').toLowerCase().trim();
+        var visibleCount = 0;
+        var u = window._userInfo;
+        var isSuper = (typeof isSuperAdmin === 'function') ? isSuperAdmin(u) : !!(u && u.is_super_admin);
+        var isTest = _isInTestWhitelist(u);
+
+        document.querySelectorAll('.cmdk-item').forEach(function (item) {
+            // 权限项硬过滤(不显在 cmdk 里 · 不参与计数)
+            if (item.dataset.showIfAdmin === '1' && !isSuper) { item.style.display = 'none'; return; }
+            if (item.dataset.showIfTest === '1' && !isTest) { item.style.display = 'none'; return; }
+
+            var text = (item.dataset.cmdkText || item.textContent || '').toLowerCase();
+            var show = !q || text.indexOf(q) >= 0;
+            item.style.display = show ? '' : 'none';
+            item.classList.remove('focus');
+            if (show) visibleCount++;
+        });
+
+        // section 标题:该区无可见项时隐
+        document.querySelectorAll('[data-cmdk-section]').forEach(function (s) {
+            var n = s.nextElementSibling, any = false;
+            while (n && !n.hasAttribute('data-cmdk-section')) {
+                if (n.classList && n.classList.contains('cmdk-item') && n.style.display !== 'none') { any = true; break; }
+                n = n.nextElementSibling;
+            }
+            s.style.display = any ? '' : 'none';
+        });
+
+        var empty = document.getElementById('cmdk-empty');
+        if (empty) empty.style.display = visibleCount === 0 ? 'flex' : 'none';
+        _cmdkSetFocus(0);
+    }
+
+    window.openCmdk = function openCmdk() {
+        var mask = document.getElementById('cmdk-mask');
+        if (!mask) return;
+        // 关掉头像 popup(避免叠加)
+        if (typeof window._closeAvatarPopup === 'function') window._closeAvatarPopup();
+        mask.classList.add('show');
+        // 重新跑显隐(账号切换后保持正确)
+        if (typeof window.applyRoleVisibility === 'function') window.applyRoleVisibility();
+        setTimeout(function () {
+            var input = document.getElementById('cmdk-input');
+            if (!input) return;
+            input.value = '';
+            _cmdkFilter('');
+            input.focus();
+            _cmdkSetFocus(0);
+        }, 50);
+    };
+    window.closeCmdk = function closeCmdk() {
+        var mask = document.getElementById('cmdk-mask');
+        if (mask) mask.classList.remove('show');
+    };
+
+    function _cmdkActivate(item) {
+        if (!item) return;
+        // 「即将」项:不执行 · toast 提示
+        if (item.classList.contains('cmdk-item-locked')) {
+            if (typeof showToast === 'function') {
+                var msg = (typeof t === 'function') ? t('feature-coming-soon') : '即将上线';
+                showToast(msg || '即将上线', 'info');
+            }
+            return;
+        }
+        var route = item.dataset.cmdkRoute;
+        var action = item.dataset.cmdkAction;
+        window.closeCmdk();
+
+        if (route) {
+            if (typeof routeTo === 'function') routeTo(route);
+            return;
+        }
+        if (action) {
+            if (action === 'open-admin') { window.location.href = '/admin/cost'; return; }  // v118.44.0 · NAV-IA Phase 8 · 新 admin SPA
+            if (action.indexOf('lang-') === 0) {
+                var lang = action.slice(5);
+                if (typeof applyLang === 'function') applyLang(lang);
+            }
+        }
+    }
+
+    function _initCmdk() {
+        var mask = document.getElementById('cmdk-mask');
+        var input = document.getElementById('cmdk-input');
+        var body = document.getElementById('cmdk-body');
+        if (!mask || !input || !body) return;
+
+        // 点 mask 自身关闭(不冒泡到内部)
+        mask.addEventListener('click', function (e) {
+            if (e.target === mask) window.closeCmdk();
+        });
+        var escBtn = document.getElementById('cmdk-esc-btn');
+        if (escBtn) escBtn.addEventListener('click', function () { window.closeCmdk(); });
+
+        // 输入过滤
+        input.addEventListener('input', function (e) { _cmdkFilter(e.target.value); });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowDown') { e.preventDefault(); _cmdkMoveFocus(1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); _cmdkMoveFocus(-1); }
+            else if (e.key === 'Enter') {
+                e.preventDefault();
+                _cmdkActivate(mask.querySelector('.cmdk-item.focus'));
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                window.closeCmdk();
+            }
+        });
+
+        // 列表点击委托
+        body.addEventListener('click', function (e) {
+            var item = e.target.closest('.cmdk-item');
+            if (item) _cmdkActivate(item);
+        });
+        // 鼠标 hover 切焦点
+        body.addEventListener('mousemove', function (e) {
+            var item = e.target.closest('.cmdk-item');
+            if (!item || item.style.display === 'none' || item.classList.contains('cmdk-item-locked')) return;
+            _cmdkVisibleItems().forEach(function (i) { i.classList.remove('focus'); });
+            item.classList.add('focus');
+        });
+
+        // 顶栏搜索框点击 + 键盘可达
+        var tbs = document.getElementById('topbar-search');
+        if (tbs) {
+            tbs.addEventListener('click', function () { window.openCmdk(); });
+            tbs.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.openCmdk(); }
+            });
+        }
+    }
+
+    // ---- 全局快捷键:⌘K / Ctrl+K 打开 · ESC 关 cmdk → 关 avatar-popup ----
+    document.addEventListener('keydown', function (e) {
+        // ⌘K / Ctrl+K
+        if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+            e.preventDefault();
+            window.openCmdk();
+            return;
+        }
+        // ESC 链:cmdk → avatar-popup(只关一层)
+        if (e.key === 'Escape') {
+            var mask = document.getElementById('cmdk-mask');
+            if (mask && mask.classList.contains('show')) {
+                // input 内的 ESC 已由 _initCmdk 处理 · 这里兜底
+                window.closeCmdk();
+                return;
+            }
+            var popup = document.getElementById('avatar-popup');
+            if (popup && popup.classList.contains('show') && typeof window._closeAvatarPopup === 'function') {
+                window._closeAvatarPopup();
+            }
+        }
+    });
+
+    // ---- OS 探测 · 给顶栏搜索框 kbd 标签切显示 ----
+    try {
+        var ua = (navigator.userAgent || '').toLowerCase();
+        var isMac = ua.indexOf('mac') >= 0 || ua.indexOf('iphone') >= 0 || ua.indexOf('ipad') >= 0;
+        if (!isMac) document.body.classList.add('is-windows');
+    } catch (_) {}
+
+    // ---- 初始化 ----
+    function _init() {
+        _initAvatarMenu();
+        _initCmdk();
+        // i18n 切换时:刷一次显隐(隐藏项重新计算 · 不动文本)
+        if (typeof window.subscribeI18n === 'function') {
+            window.subscribeI18n('nav-ia-phase1-role', function () {
+                try { if (typeof window.applyRoleVisibility === 'function') window.applyRoleVisibility(); } catch (_) {}
+            });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _init);
+    } else {
+        _init();
+    }
+})();
+
+
+/* ════════════════════════════════════════════════════════════════════
+ * v118.32.5 · GL vs 销项税报表 对账模块
+ * ════════════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+
+    const $ = (id) => document.getElementById(id);
+    const _token = () => localStorage.getItem('mrpilot_token') || '';
+    // v118.32.5.1 · 优先读 window.currentLang（实时切换不依赖 localStorage 刷新）
+    const _lang  = () => {
+        if (typeof window.currentLang === 'string' && window.currentLang) return window.currentLang;
+        return localStorage.getItem('mrpilot_lang') || 'th';
+    };
+    const _authH = () => ({ 'Authorization': 'Bearer ' + _token() });
+
+    const STATE = {
+        inited: false,
+        glFile: null,
+        vatFile: null,
+        running: false,
+        currentTaskId: null,
+        lastDetail: [],
+        lastSummary: null,
+    };
+
+    // ── 多语言文本（与后端 _I18N 字典同源） ──────────────────────────
+    const I18N = {
+        th: {
+            not_found:        'ไม่พบข้อมูล',
+            running:          'กำลังประมวลผล...',
+            error:            'เกิดข้อผิดพลาด',
+            need_files:       'กรุณาเลือกไฟล์ทั้งสอง',
+            done:             'เสร็จสิ้น',
+            hint_need_both:   'กรุณาอัปโหลดทั้งสองไฟล์',
+            hint_need_one_more:'อัปโหลดอีก 1 ไฟล์',
+            hint_ready:       'พร้อมแล้ว · กดเริ่มกระทบยอด',
+            hist_load:        'โหลด',
+            hist_export:      'ส่งออก',
+            hist_delete:      'ลบ',
+            confirm_delete:   'ยืนยันการลบงานนี้?',
+            s_gl_total:       'ยอดรวมตามบัญชีแยกประเภท',
+            s_minus_gl_cr:    'หัก : รายการเครดิตที่ไม่มีในรายงานภาษีขาย',
+            s_plus_gl_dr:     'บวก : รายการเดบิตที่ไม่มีในรายงานภาษีขาย',
+            s_plus_vat_p:     'บวก : รายการยอดขายที่ไม่มีในบัญชีแยกประเภท',
+            s_minus_vat_n:    'หัก : รายการลดหนี้ที่ไม่มีในบัญชีแยกประเภท',
+            s_vat_total:      'ยอดรวมตามรายงานภาษีขาย',
+        },
+        zh: {
+            not_found:        '未找到数据',
+            running:          '正在对账中...',
+            error:            '出错了',
+            need_files:       '请先选择两个文件',
+            done:             '完成',
+            hint_need_both:   '请上传两份文件',
+            hint_need_one_more:'还需上传 1 份文件',
+            hint_ready:       '已就绪 · 点击开始对账',
+            hist_load:        '加载',
+            hist_export:      '导出',
+            hist_delete:      '删除',
+            confirm_delete:   '确认删除此任务？',
+            s_gl_total:       '总账金额合计',
+            s_minus_gl_cr:    '减：销项税报告不存在的贷方记录',
+            s_plus_gl_dr:     '加：销项税报告不存在的借方记录',
+            s_plus_vat_p:     '加：总账不存在的销售记录',
+            s_minus_vat_n:    '减：总账不存在的红字发票记录',
+            s_vat_total:      '销项税报告金额合计',
+        },
+        en: {
+            not_found:        'Not found',
+            running:          'Reconciling...',
+            error:            'Error',
+            need_files:       'Please select both files',
+            done:             'Done',
+            hint_need_both:   'Please upload both files',
+            hint_need_one_more:'1 more file required',
+            hint_ready:       'Ready · click Run to start',
+            hist_load:        'Load',
+            hist_export:      'Export',
+            hist_delete:      'Delete',
+            confirm_delete:   'Delete this task?',
+            s_gl_total:       'Total per General Ledger',
+            s_minus_gl_cr:    'Less: GL credits not in VAT Report',
+            s_plus_gl_dr:     'Add: GL debits not in VAT Report',
+            s_plus_vat_p:     'Add: Sales in VAT Report not in GL',
+            s_minus_vat_n:    'Less: Credit notes in VAT Report not in GL',
+            s_vat_total:      'Total per VAT Sales Report',
+        },
+        ja: {
+            not_found:        'データなし',
+            running:          '照合中...',
+            error:            'エラー',
+            need_files:       '両方のファイルを選択してください',
+            done:             '完了',
+            hint_need_both:   '両方のファイルをアップロードしてください',
+            hint_need_one_more:'あと 1 ファイル必要',
+            hint_ready:       '準備完了 · 「開始」をクリック',
+            hist_load:        '読込',
+            hist_export:      '出力',
+            hist_delete:      '削除',
+            confirm_delete:   'このタスクを削除しますか?',
+            s_gl_total:       '総勘定元帳合計',
+            s_minus_gl_cr:    '減：VAT報告にないGL貸方記録',
+            s_plus_gl_dr:     '加：VAT報告にないGL借方記録',
+            s_plus_vat_p:     '加：GLにない売上記録',
+            s_minus_vat_n:    '減：GLにない赤伝記録',
+            s_vat_total:      'VAT売上報告合計',
+        },
+    };
+    const _t = (key) => (I18N[_lang()] || I18N.th)[key] || key;
+
+    const _fmt = (n) => {
+        if (n === null || n === undefined || isNaN(n)) return '';
+        return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    // ── 文件选择 + 拖拽 ─────────────────────────────────────────────
+    function _bindUpload(cardId, inputId, nameId, target) {
+        const card  = $(cardId);
+        const input = $(inputId);
+        const name  = $(nameId);
+        if (!card || !input || !name) return;
+
+        const setFile = (f) => {
+            if (!f) return;
+            STATE[target] = f;
+            name.textContent = f.name + '  (' + Math.round(f.size / 1024) + ' KB)';
+            _updateRunButton();
+            _updateStatus();
+        };
+
+        card.addEventListener('click', () => input.click());
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+        });
+        input.addEventListener('change', () => setFile(input.files && input.files[0]));
+
+        // 拖拽
+        card.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            card.classList.add('drag-over');
+        });
+        card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+        card.addEventListener('drop', (e) => {
+            e.preventDefault();
+            card.classList.remove('drag-over');
+            const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            setFile(f);
+        });
+    }
+
+    function _updateRunButton() {
+        const btn = $('btn-glv-run');
+        if (!btn) return;
+        btn.disabled = !(STATE.glFile && STATE.vatFile) || STATE.running;
+    }
+
+    function _updateStatus() {
+        const status = $('glv-status');
+        if (!status) return;
+        if (STATE.running) return;  // 跑中不覆盖
+        if (!STATE.vatFile && !STATE.glFile) {
+            status.className = 'vex-action-info muted';
+            status.innerHTML = '<span>' + _t('hint_need_both') + '</span>';
+        } else if (STATE.vatFile && STATE.glFile) {
+            status.className = 'vex-action-info ok';
+            status.innerHTML = '<span>' + _t('hint_ready') + '</span>';
+        } else {
+            status.className = 'vex-action-info muted';
+            status.innerHTML = '<span>' + _t('hint_need_one_more') + '</span>';
+        }
+    }
+
+    // v118.32.5.5.25 · 删单文件(X 按钮 / 全清按钮)· 真清 STATE + UI + 刷 panel
+    function _removeFile(kind) {
+        if (kind === 'vat') {
+            STATE.vatFile = null;
+            const vi = $('glv-vat-input'); if (vi) vi.value = '';
+            const vn = $('glv-vat-name');  if (vn) vn.textContent = '';
+        } else if (kind === 'gl') {
+            STATE.glFile = null;
+            const gi = $('glv-gl-input'); if (gi) gi.value = '';
+            const gn = $('glv-gl-name');  if (gn) gn.textContent = '';
+        }
+        _updateRunButton();
+        _updateStatus();
+        // 刷 panel(如果展开)
+        if (window._reconCollapse && window._reconCollapse.renderGlvPreview) {
+            window._reconCollapse.renderGlvPreview();
+        }
+    }
+    window._glvRemoveFile = _removeFile;
+
+    function _reset() {
+        STATE.glFile = null;
+        STATE.vatFile = null;
+        STATE.currentTaskId = null;
+        STATE.lastDetail = [];
+        STATE.lastSummary = null;
+        const vi = $('glv-vat-input'); if (vi) vi.value = '';
+        const gi = $('glv-gl-input');  if (gi) gi.value = '';
+        const vn = $('glv-vat-name');  if (vn) vn.textContent = '';
+        const gn = $('glv-gl-name');   if (gn) gn.textContent = '';
+        const rs = $('glv-result');    if (rs) rs.style.display = 'none';
+        const kpi = $('glv-kpi-strip');if (kpi) kpi.style.display = 'none';
+        _updateRunButton();
+        _updateStatus();
+        // v5.5.25 · 清 panel 内容 + 清搜索框 state
+        if (window._glvClearPreviewSearch) window._glvClearPreviewSearch();
+        if (window._reconCollapse && window._reconCollapse.renderGlvPreview) {
+            window._reconCollapse.renderGlvPreview();
+        }
+    }
+
+    // ── 渲染 ────────────────────────────────────────────────────────
+    function _renderTable(detail) {
+        const tbody = $('glv-tbody');
+        if (!tbody) return;
+        _setDetailCount(detail.length);
+        tbody.innerHTML = '';
+        const nf = _t('not_found');
+        const frag = document.createDocumentFragment();
+
+        detail.forEach((r) => {
+            const tr = document.createElement('tr');
+
+            const td = (txt, cls) => {
+                const c = document.createElement('td');
+                if (cls) c.className = cls;
+                c.textContent = txt;
+                return c;
+            };
+
+            const noGl = (r.gl_amount === null || r.gl_amount === undefined);
+            const diff = r.diff;
+            let diffCls = 'glv-num';
+            let glCls   = 'glv-num';
+            if (noGl) { glCls += ' glv-cell-missing'; diffCls += ' glv-cell-missing'; }
+            else if (Math.abs(diff || 0) < 0.005) diffCls += ' glv-cell-ok';
+            else diffCls += ' glv-cell-diff';
+
+            tr.appendChild(td(r.doc_no || '',           'glv-doc'));
+            tr.appendChild(td(r.date || '',             ''));
+            tr.appendChild(td(r.customer_name || '',    ''));
+            tr.appendChild(td(_fmt(r.vat_amount),       'glv-num'));
+            tr.appendChild(td(noGl ? nf : _fmt(r.gl_amount), glCls));
+            tr.appendChild(td(noGl ? nf : _fmt(r.diff),      diffCls));
+            tr.appendChild(td(r.account_codes || '',    'glv-doc'));
+            frag.appendChild(tr);
+        });
+        tbody.appendChild(frag);
+    }
+
+    function _renderSummary(summary) {
+        const tbody = $('glv-summary-table') && $('glv-summary-table').querySelector('tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        const rows = [
+            [_t('s_gl_total'),    summary.gl_total,                true],
+            [_t('s_minus_gl_cr'), -(summary.gl_only_credit || 0),  false],
+            [_t('s_plus_gl_dr'),  summary.gl_only_debit  || 0,     false],
+            [_t('s_plus_vat_p'),  summary.vat_only_positive || 0,  false],
+            [_t('s_minus_vat_n'), summary.vat_only_negative || 0,  false],
+            [_t('s_vat_total'),   summary.vat_total,               true],
+        ];
+        rows.forEach(([label, amount, emph]) => {
+            const tr = document.createElement('tr');
+            if (emph) tr.className = 'glv-summary-total';
+            const td1 = document.createElement('td');
+            const td2 = document.createElement('td');
+            td1.textContent = label;
+            td2.textContent = _fmt(amount);
+            tr.appendChild(td1); tr.appendChild(td2);
+            tbody.appendChild(tr);
+        });
+    }
+
+    function _renderKpi(stats) {
+        if ($('glv-kpi-matched'))   $('glv-kpi-matched').textContent   = (stats && stats.matched   != null) ? stats.matched   : '—';
+        if ($('glv-kpi-diff'))      $('glv-kpi-diff').textContent      = (stats && stats.diff      != null) ? stats.diff      : '—';
+        if ($('glv-kpi-unmatched')) $('glv-kpi-unmatched').textContent = (stats && stats.unmatched != null) ? stats.unmatched : '—';
+    }
+
+    // ── 历史任务列表 ─────────────────────────────────────────────────
+    function _fmtTime(s) {
+        if (!s) return '';
+        try {
+            const d = new Date(s);
+            if (isNaN(d.getTime())) return s;
+            const pad = (n) => String(n).padStart(2, '0');
+            return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+                   ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+        } catch (_) { return s; }
+    }
+
+    async function _loadHistory() {
+        const tableEl  = $('glv-history-table');
+        const emptyEl  = $('glv-history-empty');
+        const tbody    = $('glv-history-tbody');
+        if (!tbody) return;
+        try {
+            const res = await fetch('/api/recon/gl-vat/tasks', { headers: _authH() });
+            const data = await res.json();
+            const tasks = (data && data.tasks) || [];
+            tbody.innerHTML = '';
+            if (!tasks.length) {
+                if (tableEl) tableEl.style.display = 'none';
+                if (emptyEl) emptyEl.style.display = '';
+                return;
+            }
+            if (tableEl) tableEl.style.display = '';
+            if (emptyEl) emptyEl.style.display = 'none';
+
+            tasks.forEach((t) => {
+                const tr = document.createElement('tr');
+                tr.dataset.taskId = t.id; // v118.32.5.5.20 · 批量删多选用
+                const cellTime = document.createElement('td');
+                cellTime.textContent = _fmtTime(t.created_at);
+                const cellFiles = document.createElement('td');
+                cellFiles.className = 'glv-history-file';
+                cellFiles.title = (t.vat_filename || '') + ' + ' + (t.gl_filename || '');
+                cellFiles.textContent = (t.vat_filename || '?') + ' + ' + (t.gl_filename || '?');
+                const cellRows = document.createElement('td');
+                cellRows.className = 'glv-num';
+                cellRows.textContent = (t.vat_row_count || 0) + ' / ' + (t.gl_row_count || 0);
+                const cellMatched = document.createElement('td');
+                cellMatched.className = 'glv-num';
+                cellMatched.textContent = t.matched_count || 0;
+                const cellDiff = document.createElement('td');
+                cellDiff.className = 'glv-num';
+                cellDiff.textContent = t.diff_count || 0;
+                const cellMiss = document.createElement('td');
+                cellMiss.className = 'glv-num';
+                cellMiss.textContent = t.unmatched_count || 0;
+                const cellAct = document.createElement('td');
+                cellAct.className = 'glv-history-actions';
+                // 三个图标按钮（hover 显示 tooltip · 同销项税对账风格）
+                const mkBtn = (svg, title, cls, onClick) => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    if (cls) b.className = cls;
+                    b.title = title;
+                    b.setAttribute('aria-label', title);
+                    b.innerHTML = svg;
+                    b.onclick = onClick;
+                    return b;
+                };
+                const SVG_LOAD = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8z"/><polyline points="6 8 8 10 10 8"/><line x1="8" y1="4" x2="8" y2="10"/></svg>';
+                const SVG_DL   = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>';
+                const SVG_DEL  = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 4 13 4"/><path d="M6 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4"/><path d="M5 4l1 9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-9"/></svg>';
+                cellAct.appendChild(mkBtn(SVG_LOAD, _t('hist_load'),   '',         () => _loadTask(t.id)));
+                cellAct.appendChild(mkBtn(SVG_DL,   _t('hist_export'), '',         () => _exportTask(t.id)));
+                cellAct.appendChild(mkBtn(SVG_DEL,  _t('hist_delete'), 'glv-del',  () => _deleteTask(t.id)));
+                [cellTime, cellFiles, cellRows, cellMatched, cellDiff, cellMiss, cellAct].forEach(c => tr.appendChild(c));
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error('[gl-vat] history load failed:', e);
+        }
+    }
+
+    async function _loadTask(taskId) {
+        try {
+            const res = await fetch('/api/recon/gl-vat/' + taskId, { headers: _authH() });
+            const data = await res.json();
+            if (!data || !data.ok) throw new Error('load_failed');
+            STATE.currentTaskId = taskId;
+            STATE.lastDetail    = data.detail || [];
+            STATE.lastSummary   = data.summary || {};
+            _renderKpi(data.stats || {});
+            _renderTable(STATE.lastDetail);
+            _renderSummary(STATE.lastSummary);
+            const rs = $('glv-result'); if (rs) rs.style.display = '';
+            window.scrollTo({ top: rs ? rs.offsetTop - 80 : 0, behavior: 'smooth' });
+        } catch (e) {
+            console.error('[gl-vat] load task failed:', e);
+            alert(_t('error') + ': ' + (e.message || e));
+        }
+    }
+
+    async function _exportTask(taskId) {
+        try {
+            const url = '/api/recon/gl-vat/' + taskId + '/export?lang=' + encodeURIComponent(_lang());
+            const res = await fetch(url, { headers: _authH() });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'GL_VAT_recon_' + taskId + '.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
+        } catch (e) {
+            console.error('[gl-vat] exportTask failed:', e);
+            if (typeof showToast === 'function') showToast(_t('error') + ': ' + (e.message || e), 'error');
+        }
+    }
+
+    async function _deleteTask(taskId) {
+        // v118.32.5.4 · 用产品自带 showConfirm 替换原生 confirm()
+        let ok;
+        if (typeof window.showConfirm === 'function') {
+            ok = await window.showConfirm(_t('confirm_delete'), { danger: true });
+        } else {
+            ok = confirm(_t('confirm_delete'));  // 兜底
+        }
+        if (!ok) return;
+        try {
+            const res = await fetch('/api/recon/gl-vat/' + taskId, { method: 'DELETE', headers: _authH() });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            _loadHistory();
+        } catch (e) {
+            console.error('[gl-vat] delete failed:', e);
+            if (typeof showToast === 'function') showToast(_t('error') + ': ' + (e.message || e), 'error');
+        }
+    }
+
+    // ── 跑对账 ──────────────────────────────────────────────────────
+    async function _run() {
+        if (!STATE.glFile || !STATE.vatFile) {
+            if (typeof showToast === 'function') showToast(_t('need_files'), 'warn');
+            return;
+        }
+        STATE.running = true;
+        _updateRunButton();
+        const status   = $('glv-status');
+        const progress = $('glv-progress');
+        const progressSub = $('glv-progress-sub');
+        if (status) {
+            status.className = 'vex-action-info';
+            status.style.color = '#5a9fd4';
+            status.innerHTML = '<span>' + _t('running') + '</span>';
+        }
+        if (progress) progress.style.display = '';
+        if (progressSub) progressSub.textContent =
+            (STATE.vatFile.name || 'VAT') + ' + ' + (STATE.glFile.name || 'GL');
+
+        const fd = new FormData();
+        fd.append('vat_file', STATE.vatFile);
+        fd.append('gl_file',  STATE.glFile);
+        const prefix = ($('glv-prefix') && $('glv-prefix').value || '4').trim() || '4';
+        fd.append('revenue_prefix', prefix);
+        fd.append('lang', _lang());  // v118.32.5 · 后端按 lang 返回错误消息
+
+        try {
+            const res = await fetch('/api/recon/gl-vat/run', {
+                method: 'POST',
+                headers: _authH(),
+                body: fd,
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error((data && data.detail) || (data && data.error) || ('HTTP ' + res.status));
+            }
+            STATE.currentTaskId = data.task_id;
+            STATE.lastDetail    = data.detail || [];
+            STATE.lastSummary   = data.summary || {};
+            _renderKpi(data.stats || {});
+            _renderTable(STATE.lastDetail);
+            _renderSummary(STATE.lastSummary);
+            const rs = $('glv-result');
+            if (rs) rs.style.display = '';
+            if (status) {
+                status.className = 'vex-action-info ok';
+                status.innerHTML = '<span>' + _t('done') + ' · GL ' + (data.gl_row_count || 0) +
+                                   ' · VAT ' + (data.vat_row_count || 0) + '</span>';
+            }
+        } catch (e) {
+            console.error('[gl-vat] run failed:', e);
+            if (status) {
+                status.className = 'vex-action-info';
+                status.style.color = '#ef4444';
+                status.innerHTML = '<span>' + _t('error') + ': ' + (e.message || e) + '</span>';
+            }
+        } finally {
+            STATE.running = false;
+            if (progress) progress.style.display = 'none';
+            _updateRunButton();
+        }
+    }
+
+    // ── 导出 Excel ──────────────────────────────────────────────────
+    async function _export() {
+        if (!STATE.currentTaskId) return;
+        try {
+            const url = '/api/recon/gl-vat/' + STATE.currentTaskId + '/export?lang=' + encodeURIComponent(_lang());
+            const res = await fetch(url, { headers: _authH() });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'GL_VAT_recon_' + STATE.currentTaskId + '.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
+        } catch (e) {
+            console.error('[gl-vat] export failed:', e);
+            if (typeof showToast === 'function') showToast(_t('error') + ': ' + (e.message || e), 'error');
+        }
+    }
+
+    // ── 语言切换时重渲（不依赖离开/返回 tab） ───────────────────────
+    function _onLangChange() {
+        // 1. 状态条
+        if (!STATE.running) _updateStatus();
+        // 2. 历史表（按钮 title / 空状态文案都靠 _t() 动态生成）
+        _loadHistory();
+        // 3. 当前明细表（表头由 data-i18n 处理，但单元格里 "未找到" 等动态文案要重渲）
+        if (STATE.lastDetail && STATE.lastDetail.length) {
+            _renderTable(STATE.lastDetail);
+        }
+        if (STATE.lastSummary) {
+            _renderSummary(STATE.lastSummary);
+        }
+    }
+
+    // ── 可折叠分区 ────────────────────────────────────────────────
+    function _bindSectionToggle() {
+        document.querySelectorAll('.glv-section-head[data-toggle]').forEach((head) => {
+            const targetId = head.getAttribute('data-toggle');
+            const target = document.getElementById(targetId);
+            if (!target) return;
+            const toggle = (e) => {
+                // 不要让头部里的按钮（导出）触发折叠
+                if (e.target && (e.target.closest('button') !== null) &&
+                    !e.target.classList.contains('glv-section-head')) {
+                    return;
+                }
+                const collapsed = target.getAttribute('data-collapsed') === 'true';
+                target.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
+            };
+            head.addEventListener('click', toggle);
+            head.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e); }
+            });
+        });
+    }
+
+    function _setDetailCount(n) {
+        const el = $('glv-detail-count');
+        if (el) el.textContent = (n != null) ? String(n) : '';
+    }
+
+    // ── 初始化（首次进入 tab 时调用） ────────────────────────────────
+    function ensureInit() {
+        if (STATE.inited) {
+            _loadHistory();  // 二次进入也刷新历史
+            return;
+        }
+        STATE.inited = true;
+        _bindUpload('glv-drop-gl',  'glv-gl-input',  'glv-gl-name',  'glFile');
+        _bindUpload('glv-drop-vat', 'glv-vat-input', 'glv-vat-name', 'vatFile');
+        const btnRun   = $('btn-glv-run');   if (btnRun)   btnRun.addEventListener('click', _run);
+        const btnExp   = $('btn-glv-export');if (btnExp)   btnExp.addEventListener('click', _export);
+        const btnReset = $('btn-glv-reset'); if (btnReset) btnReset.addEventListener('click', _reset);
+        const btnHRef  = $('btn-glv-history-refresh');
+        if (btnHRef) btnHRef.addEventListener('click', _loadHistory);
+        _bindSectionToggle();
+        _renderKpi(null);   // 初始 KPI 显示 '—'
+        _updateStatus();
+        _loadHistory();
+        // v118.32.5.1 · 订阅 i18n 切换总线 · 切语言实时刷新动态文案
+        if (typeof window.subscribeI18n === 'function') {
+            window.subscribeI18n('gl-vat-recon', _onLangChange);
+        }
+    }
+
+    window.GlVatRecon = { ensureInit };
+})();
+
+
+// ============================================================
+// v118.32.5.5.13 · Session 心跳 · 实时踢被挤掉的设备
+// 15 秒 ping + 切回 tab 立即 check · 利用现有 apiGet 401 处理
+// ============================================================
+(function () {
+    'use strict';
+    let _hbTimer = null;
+    let _hbRunning = false;
+    async function _sessionCheck() {
+        if (_hbRunning) return;
+        const tk = localStorage.getItem('mrpilot_token');
+        if (!tk) return;
+        _hbRunning = true;
+        try {
+            const r = await fetch('/api/me/plan', {
+                headers: { 'Authorization': 'Bearer ' + tk },
+                cache: 'no-store',
+            });
+            if (r.status === 401) {
+                const body = await r.json().catch(() => ({}));
+                const detail = body && body.detail;
+                let code = '';
+                if (typeof detail === 'string') code = detail;
+                else if (detail && typeof detail === 'object') code = detail.code || '';
+                console.warn('[heartbeat] session revoked', code);
+                localStorage.removeItem('mrpilot_token');
+                if (_hbTimer) { clearInterval(_hbTimer); _hbTimer = null; }
+                const _msgKey = (code === 'auth.session_revoked') ? 'alert-session-revoked'
+                              : (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin'
+                              : 'alert-session';
+                try {
+                    if (typeof showToast === 'function' && typeof t === 'function') {
+                        showToast(t(_msgKey), 'error');
+                    } else {
+                        alert('Your session has been revoked');
+                    }
+                } catch (_) {}
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+            }
+        } catch (e) {
+            // 网络错忽略 · 下个 tick 再试
+        } finally {
+            _hbRunning = false;
+        }
+    }
+    function _startHeartbeat() {
+        if (_hbTimer) clearInterval(_hbTimer);
+        _hbTimer = setInterval(_sessionCheck, 15000);  // 15 秒
+    }
+    // 启动
+    if (localStorage.getItem('mrpilot_token')) {
+        _startHeartbeat();
+    }
+    // 切回 tab 立即 check(关键 · 用户离开后回来第 1 秒就被踢)
+    window.addEventListener('focus', _sessionCheck);
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) _sessionCheck();
+    });
+    // 暴露调试
+    window._sessionCheck = _sessionCheck;
+})();
+
+// ============================================================
+// v118.32.5.5.16 · 首页 dashboard 加载逻辑
+// 路由进 #/dashboard 时调 · 不动后端 · 复用 /api/me/plan + /api/ocr/history
+// ============================================================
+(function _dashIIFE() {
+    'use strict';
+    function _t(k, fb) {
+        try { return (typeof window.t === 'function') ? window.t(k) : fb; }
+        catch (_) { return fb; }
+    }
+    function _fmtNum(n) {
+        if (n == null || isNaN(n)) return '—';
+        try { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); } catch(_) { return String(n); }
+    }
+    function _ago(iso) {
+        if (!iso) return '';
+        try {
+            const t = new Date(iso).getTime();
+            if (!t) return '';
+            const s = Math.floor((Date.now() - t) / 1000);
+            if (s < 60) return _t('time-just-now', '刚刚');
+            if (s < 3600) return Math.floor(s/60) + (_t('time-min-ago-suffix', ' 分钟前'));
+            if (s < 86400) return Math.floor(s/3600) + (_t('time-hour-ago-suffix', ' 小时前'));
+            return Math.floor(s/86400) + (_t('time-day-ago-suffix', ' 天前'));
+        } catch (_) { return ''; }
+    }
+    async function loadDashboard() {
+        const elInv = document.getElementById('dash-kpi-invoices');
+        const elPend = document.getElementById('dash-kpi-pending');
+        const elExc = document.getElementById('dash-kpi-exceptions');
+        const elPlan = document.getElementById('dash-kpi-plan');
+        const elPlanSub = document.getElementById('dash-kpi-plan-sub');
+        const elList = document.getElementById('dash-recent-list');
+        const elExcBadge = document.getElementById('dash-quick-exc-badge');
+        // 1. 拿 plan + 最近识别(并行 · 已有 endpoint · 不动后端)
+        try {
+            const [plan, recent] = await Promise.all([
+                fetch('/api/me/plan', { headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') } }).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch('/api/ocr/history?limit=5', { headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') } }).then(r => r.ok ? r.json() : null).catch(() => null),
+            ]);
+            // 本月发票 = 最近识别历史里本月份的
+            let mInv = 0, pending = 0, excCount = 0;
+            const rows = (recent && (recent.items || recent.history || recent)) || [];
+            const list = Array.isArray(rows) ? rows : [];
+            const now = new Date();
+            list.forEach(r => {
+                const dt = r.created_at || r.upload_time || r.date;
+                if (dt) {
+                    try {
+                        const d = new Date(dt);
+                        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) mInv++;
+                    } catch(_) {}
+                }
+                if (r.status === 'pending' || r.status === 'reviewing') pending++;
+                if (r.has_exception || r.is_exception || r.status === 'error') excCount++;
+            });
+            if (elInv) elInv.textContent = _fmtNum(mInv || (list.length || 0));
+            if (elPend) elPend.textContent = _fmtNum(pending);
+            if (elExc) elExc.textContent = _fmtNum(excCount);
+            if (elExcBadge) {
+                if (excCount > 0) { elExcBadge.style.display = ''; elExcBadge.textContent = excCount; }
+                else { elExcBadge.style.display = 'none'; }
+            }
+            // 配额显示
+            if (elPlan && plan) {
+                const used = plan.month_used || plan.used || 0;
+                const quota = plan.month_quota || plan.monthly_quota || plan.quota || 0;
+                elPlan.textContent = _fmtNum(used);
+                if (elPlanSub) {
+                    elPlanSub.textContent = (quota ? (used + ' / ' + _fmtNum(quota)) : _t('dash-kpi-plan-sub', '本月用量'));
+                }
+            }
+            // 最近 5 条
+            if (elList) {
+                if (list.length === 0) {
+                    elList.innerHTML = '<div class="dash-recent-empty">' + _t('dash-recent-empty', '还没有识别记录 · 去上传第一张吧') + '</div>';
+                } else {
+                    const html = list.slice(0, 5).map(r => {
+                        const key = (r.invoice_no || r.filename || r.id || '').toString();
+                        const mid = (r.supplier_name || r.buyer_name || r.client_name || r.notes || '').toString();
+                        const t = _ago(r.created_at || r.upload_time || r.date);
+                        const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+                        return '<div class="dash-recent-row"><span class="dash-recent-key" title="' + esc(key) + '">' + esc(key) + '</span><span class="dash-recent-mid" title="' + esc(mid) + '">' + esc(mid) + '</span><span class="dash-recent-time">' + esc(t) + '</span></div>';
+                    }).join('');
+                    elList.innerHTML = html;
+                }
+            }
+        } catch (e) {
+            // 失败静默 · 显示 — · 不打扰用户
+            if (elList) elList.innerHTML = '<div class="dash-recent-empty">' + _t('dash-recent-empty', '还没有识别记录 · 去上传第一张吧') + '</div>';
+        }
+    }
+    window.loadDashboard = loadDashboard;
+    // 启动时若 hash 落在 #/dashboard,也跑一次(loadAll 后)
+    document.addEventListener('DOMContentLoaded', function () {
+        if ((location.hash || '').replace(/^#\//, '') === 'dashboard') {
+            setTimeout(loadDashboard, 500);
+        }
+    });
+    // 4 语切换重渲染(refresh tooltip + empty state 文案)
+    if (typeof window.subscribeI18n === 'function') {
+        window.subscribeI18n('dashboard', function () {
+            if ((location.hash || '').replace(/^#\//, '') === 'dashboard') loadDashboard();
+        });
+    }
+})();
+
+// ============================================================
+// v118.32.5.5.19 · 销售税核查 vs 收入对账 对称化 折叠组件
+// 监听 .recon-collapse-head 点击 → toggle data-collapsed
+// 收入对账"查看清单" · 销售税核查"对账汇总 + 差异明细"
+// 数据来源:已有的前端 state(glv 上传 file / vex 跑完 result)· 不动后端
+// ============================================================
+(function _reconCollapseIIFE() {
+    'use strict';
+    function _esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+        });
+    }
+    function _fmtSize(b) {
+        if (!b || isNaN(b)) return '';
+        var n = Number(b);
+        if (n < 1024) return n + ' B';
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+        return (n / 1024 / 1024).toFixed(1) + ' MB';
+    }
+    // 全局事件代理 · 点击 .recon-collapse-head 切换(销售税核查 vex-summary/vex-detail 用)
+    document.addEventListener('click', function (e) {
+        var head = e.target.closest && e.target.closest('.recon-collapse-head');
+        if (!head) return;
+        var box = head.closest('.recon-collapse');
+        if (!box) return;
+        var nowCollapsed = box.getAttribute('data-collapsed') === 'true';
+        box.setAttribute('data-collapsed', nowCollapsed ? 'false' : 'true');
+        if (nowCollapsed) {
+            if (box.id === 'vex-summary-collapse') _fillVexSummary();
+            if (box.id === 'vex-detail-collapse') _fillVexDetail();
+        }
+    });
+    // 键盘 Enter / Space
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        var head = e.target.closest && e.target.closest('.recon-collapse-head');
+        if (!head) return;
+        e.preventDefault();
+        head.click();
+    });
+
+    // v118.32.5.5.25 · 收入对账"查看清单" 1:1 复刻销售税核查 vex-preview-panel
+    // 含:列标题 + count / 搜索框 + 全清按钮 / 文件 row + X 按钮 / 分页"显示前 N / 共 N"
+    // 数据源:STATE.vatFile / STATE.glFile(跨 IIFE 通过 input.files 读)
+    // X 按钮 / 全清:调 window._glvRemoveFile(kind) · 真清 STATE + UI + 刷 panel
+    var _glvSearch = { vat: '', gl: '' };
+    // 暴露给 _reset 调清搜索 state
+    window._glvClearPreviewSearch = function () { _glvSearch.vat = ''; _glvSearch.gl = ''; };
+
+    var _glvFileIco = '<svg class="vex-pp-fi-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+    var _glvDelIco = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+    function _renderGlvPreviewPanel() {
+        _renderGlvColumn('vat');
+        _renderGlvColumn('gl');
+    }
+
+    function _renderGlvColumn(kind) {
+        var colEl = document.getElementById(kind === 'vat' ? 'glv-pp-vat-col' : 'glv-pp-gl-col');
+        if (!colEl) return;
+        var inp = document.getElementById(kind === 'vat' ? 'glv-vat-input' : 'glv-gl-input');
+        var file = inp && inp.files && inp.files[0];
+        var titleKey = kind === 'vat' ? 'glv-up-vat-title' : 'glv-up-gl-title';
+        var titleFb = kind === 'vat' ? '① 销项税报告' : '② 总账 GL';
+        var title = (window.t && window.t(titleKey)) || titleFb;
+        var ph = _esc((window.t && window.t('vex-preview-search')) || '搜索文件名...');
+        var clearLbl = _esc((window.t && window.t('vex-preview-clear-all')) || '全清');
+        var searchVal = _glvSearch[kind] || '';
+        var totalCount = file ? 1 : 0;
+
+        colEl.innerHTML =
+            '<div class="vex-pp-col-title">' +
+                '<span class="vex-pp-col-name">' + _esc(title) + ' <span class="vex-pp-col-count">' + totalCount + '</span></span>' +
+            '</div>' +
+            '<div class="vex-pp-search-row">' +
+                '<input class="vex-pp-search" id="glv-pp-search-' + kind + '" type="text" placeholder="' + ph + '" value="' + _esc(searchVal) + '" autocomplete="off">' +
+                '<button class="vex-pp-clear-btn" id="glv-pp-clearall-' + kind + '" type="button">' + clearLbl + '</button>' +
+            '</div>' +
+            '<div class="vex-pp-file-list" id="glv-pp-' + kind + '-list"></div>' +
+            '<div class="vex-pp-pagination" id="glv-pp-' + kind + '-pg"></div>';
+
+        // 搜索 input 联动
+        var si = document.getElementById('glv-pp-search-' + kind);
+        if (si) si.addEventListener('input', function (e) {
+            _glvSearch[kind] = e.target.value;
+            _renderGlvFileListOnly(kind);
+        });
+        // 全清按钮
+        var ca = document.getElementById('glv-pp-clearall-' + kind);
+        if (ca) ca.addEventListener('click', function () {
+            if (window._glvRemoveFile) window._glvRemoveFile(kind);
+        });
+
+        _renderGlvFileListOnly(kind);
+    }
+
+    function _renderGlvFileListOnly(kind) {
+        var listEl = document.getElementById('glv-pp-' + kind + '-list');
+        var pgEl = document.getElementById('glv-pp-' + kind + '-pg');
+        if (!listEl) return;
+        var inp = document.getElementById(kind === 'vat' ? 'glv-vat-input' : 'glv-gl-input');
+        var file = inp && inp.files && inp.files[0];
+        var searchVal = (_glvSearch[kind] || '').toLowerCase();
+        var files = file ? [file] : [];
+        var filtered = searchVal
+            ? files.filter(function (f) { return f.name.toLowerCase().indexOf(searchVal) >= 0; })
+            : files;
+
+        listEl.innerHTML = filtered.map(function (f) {
+            return '<div class="vex-pp-file-row">' +
+                _glvFileIco +
+                '<span class="vex-pp-fi-name" title="' + _esc(f.name) + '">' + _esc(f.name) + '</span>' +
+                '<span class="vex-pp-fi-size">' + _fmtSize(f.size) + '</span>' +
+                '<button class="vex-pp-fi-del" type="button" data-kind="' + kind + '" aria-label="remove">' + _glvDelIco + '</button>' +
+            '</div>';
+        }).join('');
+
+        // X 删除按钮
+        listEl.querySelectorAll('.vex-pp-fi-del').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var k = btn.dataset.kind;
+                if (window._glvRemoveFile) window._glvRemoveFile(k);
+            });
+        });
+
+        // 分页提示
+        if (pgEl) {
+            var tpl = (window.t && window.t('vex-preview-count')) || '显示前 {n} / 共 {m}';
+            pgEl.textContent = tpl.replace('{n}', filtered.length).replace('{m}', filtered.length);
+        }
+    }
+
+    // 销售税核查"对账汇总"填数据 · 从最新 vex-task 行拿
+    function _fillVexSummary() {
+        var setVal = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = (v == null ? '—' : String(v)); };
+        var last = window._vexLastTask || {};
+        setVal('vex-sum-total', last.total);
+        setVal('vex-sum-matched', last.matched);
+        setVal('vex-sum-diff', last.diff);
+        setVal('vex-sum-incomplete', last.incomplete);
+        setVal('vex-sum-cash', last.cash);
+        var subEl = document.getElementById('vex-summary-sub');
+        if (subEl && last.task_id) subEl.textContent = '#' + last.task_id;
+    }
+
+    // 销售税核查"差异明细"填数据 · 从最新任务的 diff_rows 拿
+    function _fillVexDetail() {
+        var rows = (window._vexLastTask && window._vexLastTask.diff_rows) || [];
+        var tb = document.getElementById('vex-detail-tbody');
+        var tbl = document.getElementById('vex-detail-table');
+        var emp = document.getElementById('vex-detail-empty');
+        if (!tb || !tbl || !emp) return;
+        if (rows.length === 0) { tbl.style.display = 'none'; emp.style.display = ''; return; }
+        emp.style.display = 'none'; tbl.style.display = '';
+        var html = rows.map(function (r) {
+            return '<tr>' +
+                '<td class="recon-detail-cell-mono">' + _esc(r.invoice_no || '') + '</td>' +
+                '<td>' + _esc(r.field || '') + '</td>' +
+                '<td>' + _esc(r.report_value || '') + '</td>' +
+                '<td>' + _esc(r.invoice_value || '') + '</td>' +
+                '<td>' + _esc(r.kind || '') + '</td>' +
+                '</tr>';
+        }).join('');
+        tb.innerHTML = html;
+        var subEl = document.getElementById('vex-detail-sub');
+        if (subEl) subEl.textContent = String(rows.length);
+    }
+
+    // v5.5.23 · 收入对账 toggle 按钮 + 文件变化监听 · 复刻销售税核查
+    function _initGlvTogglePreview() {
+        var btn = document.getElementById('glv-toggle-preview');
+        if (btn && !btn._reconBound) {
+            btn._reconBound = true;
+            btn.addEventListener('click', function () {
+                var panel = document.getElementById('glv-preview-panel');
+                var label = document.getElementById('glv-toggle-preview-label');
+                var isOpen = panel && panel.style.display !== 'none';
+                if (panel) panel.style.display = isOpen ? 'none' : '';
+                btn.classList.toggle('open', !isOpen);
+                if (label) label.textContent = isOpen
+                    ? ((window.t && window.t('vex-toggle-preview-open')) || '查看清单')
+                    : ((window.t && window.t('vex-toggle-preview-close')) || '收起清单');
+                if (!isOpen) _renderGlvPreviewPanel();
+            });
+        }
+        // 文件变化时 · 若 panel 已展开则实时刷新
+        ['glv-vat-input', 'glv-gl-input'].forEach(function (id) {
+            var inp = document.getElementById(id);
+            if (!inp || inp._reconWatched) return;
+            inp._reconWatched = true;
+            inp.addEventListener('change', function () {
+                var panel = document.getElementById('glv-preview-panel');
+                if (panel && panel.style.display !== 'none') _renderGlvPreviewPanel();
+            });
+        });
+    }
+    function _onVexResultShown() {
+        var box1 = document.getElementById('vex-summary-collapse');
+        var box2 = document.getElementById('vex-detail-collapse');
+        if (box1) box1.style.display = '';
+        if (box2) box2.style.display = '';
+        _fillVexSummary();
+        _fillVexDetail();
+    }
+    // 监听 vex-result 显示状态 · 一旦显示 → 把折叠区也露出来
+    function _watchVexResult() {
+        var r = document.getElementById('vex-result');
+        if (!r) return;
+        var mo = new MutationObserver(function () {
+            if (r.style.display && r.style.display !== 'none') _onVexResultShown();
+        });
+        mo.observe(r, { attributes: true, attributeFilter: ['style'] });
+    }
+
+    window._fillVexSummary = _fillVexSummary;
+    window._fillVexDetail  = _fillVexDetail;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        _initGlvTogglePreview();
+        _watchVexResult();
+    });
+    // 二次重试 · 防止 DOM 还没加载
+    setTimeout(_initGlvTogglePreview, 1500);
+
+    // 切语言重渲染当前打开的内容
+    if (typeof window.subscribeI18n === 'function') {
+        window.subscribeI18n('recon-collapse', function () {
+            var panel = document.getElementById('glv-preview-panel');
+            if (panel && panel.style.display !== 'none') _renderGlvPreviewPanel();
+            // toggle 按钮 label 跟随展开状态
+            var label = document.getElementById('glv-toggle-preview-label');
+            var btn = document.getElementById('glv-toggle-preview');
+            if (label && btn) {
+                label.textContent = btn.classList.contains('open')
+                    ? ((window.t && window.t('vex-toggle-preview-close')) || '收起清单')
+                    : ((window.t && window.t('vex-toggle-preview-open')) || '查看清单');
+            }
+        });
+    }
+    // 调试暴露
+    window._reconCollapse = { renderGlvPreview: _renderGlvPreviewPanel, fillVexSummary: _fillVexSummary, fillVexDetail: _fillVexDetail };
+})();
+
+// ============================================================
+// v118.32.5.5.22 · Gmail 风格 thead 就地切换 · 对账历史多选 + 批量删
+// 默认 thead: 列标签 + master checkbox(最左)
+// 选中 ≥1 → thead 整行替换为操作栏("已选 N 条 · 批量删除")· 同行高 · 不在表外
+// 选中 0 → 还原默认 thead
+// 销售税核查 (vex-task-table) + 收入对账 (glv-history-table) 共用同一套
+// ============================================================
+(function _reconBatchDeleteIIFE() {
+    'use strict';
+    function _t(k, fb) { try { return (window.t && window.t(k)) || fb; } catch (_) { return fb; } }
+    function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+    function _authH() {
+        var t = ''; try { t = localStorage.getItem('mrpilot_token') || ''; } catch (_) {}
+        return t ? { 'Authorization': 'Bearer ' + t } : {};
+    }
+
+    var SELECTORS = [
+        { tbody: 'vex-task-tbody', api: '/api/recon/tasks/batch_delete', reload: function () { try { window.loadRecentTasks && window.loadRecentTasks(); } catch (_) {} }, kind: 'vex' },
+        { tbody: 'glv-history-tbody', api: '/api/recon/gl-vat/tasks/batch_delete', reload: function () { try { var btn = document.getElementById('btn-glv-history-refresh'); if (btn) btn.click(); } catch (_) {} }, kind: 'glv' }
+    ];
+
+    function _injectStyle() {
+        if (document.getElementById('recon-batch-style')) return;
+        var s = document.createElement('style');
+        s.id = 'recon-batch-style';
+        s.textContent =
+            // checkbox 列(thead + tbody 共用)
+            '.recon-sel-cell{width:36px;text-align:center;padding-left:10px!important;padding-right:6px!important}' +
+            '.recon-sel-cb,.recon-master-cb{cursor:pointer;width:14px;height:14px;accent-color:#111;margin:0;vertical-align:middle}' +
+            // 时间列防压缩
+            'th.recon-time-col,td.recon-time-col{white-space:nowrap}' +
+            // Gmail thead 切换:default vs batch 互斥显示
+            'tr.recon-thead-batch{display:none}' +
+            'thead.recon-batch-mode tr.recon-thead-default{display:none}' +
+            'thead.recon-batch-mode tr.recon-thead-batch{display:table-row}' +
+            // batch 行视觉(浅暖灰底 · 同行高 · 内嵌按钮)
+            'tr.recon-thead-batch th{background:#fafaf8;border-bottom:1px solid #e8e8e3;padding:8px 12px}' +
+            'tr.recon-thead-batch .recon-batch-inline{display:flex;align-items:center;gap:10px;font-size:12px;color:#111;font-weight:normal}' +
+            'tr.recon-thead-batch .recon-batch-count-inline{font-weight:600;color:#111;margin-right:4px}' +
+            'tr.recon-thead-batch .recon-batch-del-inline{background:#dc2626;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px}' +
+            'tr.recon-thead-batch .recon-batch-del-inline:hover{background:#b91c1c}' +
+            'tr.recon-thead-batch .recon-batch-clear-inline{background:transparent;border:none;color:#555;cursor:pointer;font-size:12px;font-family:inherit;text-decoration:underline;padding:4px 2px}' +
+            'tr.recon-thead-batch .recon-batch-clear-inline:hover{color:#111}' +
+            // 隐藏老 banner(v5.5.20 残留 · 不再渲染但兼容老 DOM)
+            '.recon-batch-bar{display:none!important}';
+        document.head.appendChild(s);
+    }
+
+    function _getRowTaskId(tr) {
+        if (!tr) return '';
+        if (tr.dataset && tr.dataset.taskId) return tr.dataset.taskId;
+        // vex-task 行另一个属性名
+        if (tr.dataset && tr.dataset.taskid) return tr.dataset.taskid;
+        return '';
+    }
+
+    // 给 thead 默认 tr 加 master checkbox 列 + 给"时间"列加 .recon-time-col(防压缩)
+    function _injectThead(cfg) {
+        var tbodyEl = document.getElementById(cfg.tbody);
+        if (!tbodyEl) return null;
+        var table = tbodyEl.closest('table');
+        if (!table) return null;
+        var thead = table.querySelector('thead');
+        if (!thead) return null;
+        if (thead._reconReady) return thead;
+        var defaultTr = thead.querySelector('tr');
+        if (!defaultTr) return null;
+        defaultTr.classList.add('recon-thead-default');
+        // master checkbox <th> 在最左
+        if (!defaultTr.querySelector('.recon-master-cb')) {
+            var th = document.createElement('th');
+            th.className = 'recon-sel-cell';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'recon-master-cb';
+            cb.setAttribute('aria-label', 'select all');
+            cb.addEventListener('change', function () { _onMasterChange(cfg, cb.checked); });
+            th.appendChild(cb);
+            defaultTr.insertBefore(th, defaultTr.firstElementChild);
+        }
+        // "时间"列加 nowrap class(第 2 列 · 紧接 master checkbox)
+        var timeTh = defaultTr.children[1];
+        if (timeTh && !timeTh.classList.contains('recon-time-col')) timeTh.classList.add('recon-time-col');
+        // batch tr(同 thead 内 · 默认 CSS 隐藏 · 切换时显示)
+        var colsTotal = defaultTr.children.length; // 含 master 后总列数
+        var batchTr = document.createElement('tr');
+        batchTr.className = 'recon-thead-batch';
+        var batchSelTh = document.createElement('th');
+        batchSelTh.className = 'recon-sel-cell';
+        // batch 行也放一个 master checkbox(联动)
+        var bcb = document.createElement('input');
+        bcb.type = 'checkbox';
+        bcb.className = 'recon-master-cb';
+        bcb.checked = true;
+        bcb.setAttribute('aria-label', 'select all');
+        bcb.addEventListener('change', function () { _onMasterChange(cfg, bcb.checked); });
+        batchSelTh.appendChild(bcb);
+        var actTh = document.createElement('th');
+        actTh.setAttribute('colspan', String(colsTotal - 1));
+        actTh.innerHTML =
+            '<div class="recon-batch-inline">' +
+                '<span class="recon-batch-count-inline" data-recon-count></span>' +
+                '<button type="button" class="recon-batch-del-inline" data-recon-del>' +
+                    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 4 13 4"/><path d="M6 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4"/><path d="M5 4l1 9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-9"/></svg>' +
+                    '<span data-recon-del-label></span>' +
+                '</button>' +
+                '<button type="button" class="recon-batch-clear-inline" data-recon-clear></button>' +
+            '</div>';
+        batchTr.appendChild(batchSelTh);
+        batchTr.appendChild(actTh);
+        thead.appendChild(batchTr);
+        actTh.querySelector('[data-recon-del]').addEventListener('click', function () { _doBatchDelete(cfg); });
+        actTh.querySelector('[data-recon-clear]').addEventListener('click', function () { _clearSelection(cfg); });
+        thead._reconReady = true;
+        _refreshTheadLang(cfg);
+        return thead;
+    }
+
+    // 给 tbody 每行加 row checkbox(最左)+ 给"时间"列(第 2 列)加 nowrap class
+    function _injectTbodyCheckboxes(cfg) {
+        var tbodyEl = document.getElementById(cfg.tbody);
+        if (!tbodyEl) return;
+        var rows = tbodyEl.querySelectorAll('tr');
+        rows.forEach(function (tr) {
+            var taskId = _getRowTaskId(tr);
+            if (!taskId) return; // empty-state row
+            // 已注入过 checkbox
+            if (tr.querySelector('.recon-sel-cb')) return;
+            var firstTd = tr.querySelector('td');
+            if (!firstTd) return;
+            var td = document.createElement('td');
+            td.className = 'recon-sel-cell';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'recon-sel-cb';
+            cb.dataset.taskId = taskId;
+            cb.dataset.kind = cfg.kind;
+            cb.addEventListener('click', function (e) { e.stopPropagation(); });
+            cb.addEventListener('change', function () { _refreshAfterChange(cfg); });
+            td.appendChild(cb);
+            tr.insertBefore(td, firstTd);
+            // "时间"列 nowrap
+            var timeTd = tr.children[1];
+            if (timeTd && !timeTd.classList.contains('recon-time-col')) timeTd.classList.add('recon-time-col');
+        });
+        _refreshAfterChange(cfg);
+    }
+
+    function _getCheckboxes(cfg) {
+        var tbodyEl = document.getElementById(cfg.tbody);
+        if (!tbodyEl) return [];
+        return Array.prototype.slice.call(tbodyEl.querySelectorAll('.recon-sel-cb'));
+    }
+
+    function _getSelectedIds(cfg) {
+        return _getCheckboxes(cfg).filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.dataset.taskId; });
+    }
+
+    function _onMasterChange(cfg, checked) {
+        _getCheckboxes(cfg).forEach(function (cb) { cb.checked = !!checked; });
+        _refreshAfterChange(cfg);
+    }
+
+    function _refreshAfterChange(cfg) {
+        var ids = _getSelectedIds(cfg);
+        var all = _getCheckboxes(cfg);
+        var tbodyEl = document.getElementById(cfg.tbody);
+        if (!tbodyEl) return;
+        var table = tbodyEl.closest('table');
+        var thead = table && table.querySelector('thead');
+        if (!thead) return;
+        if (ids.length > 0) {
+            thead.classList.add('recon-batch-mode');
+        } else {
+            thead.classList.remove('recon-batch-mode');
+        }
+        // 同步 master checkbox 状态(全选 / 部分 / 未选)
+        thead.querySelectorAll('.recon-master-cb').forEach(function (mcb) {
+            if (all.length === 0) { mcb.checked = false; mcb.indeterminate = false; return; }
+            if (ids.length === all.length) { mcb.checked = true; mcb.indeterminate = false; }
+            else if (ids.length === 0) { mcb.checked = false; mcb.indeterminate = false; }
+            else { mcb.checked = false; mcb.indeterminate = true; }
+        });
+        // 更新计数文案
+        var cntEl = thead.querySelector('[data-recon-count]');
+        if (cntEl) cntEl.textContent = _t('recon-batch-selected-n', '已选 {n} 条').replace('{n}', ids.length);
+    }
+
+    function _refreshTheadLang(cfg) {
+        var tbodyEl = document.getElementById(cfg.tbody);
+        if (!tbodyEl) return;
+        var table = tbodyEl.closest('table');
+        var thead = table && table.querySelector('thead');
+        if (!thead) return;
+        var delLbl = thead.querySelector('[data-recon-del-label]');
+        var clearBtn = thead.querySelector('[data-recon-clear]');
+        if (delLbl) delLbl.textContent = _t('recon-batch-delete', '批量删除');
+        if (clearBtn) clearBtn.textContent = _t('recon-batch-clear', '取消');
+        _refreshAfterChange(cfg);
+    }
+
+    function _clearSelection(cfg) {
+        _getCheckboxes(cfg).forEach(function (cb) { cb.checked = false; });
+        _refreshAfterChange(cfg);
+    }
+
+    async function _doBatchDelete(cfg) {
+        var ids = _getSelectedIds(cfg);
+        if (!ids.length) return;
+        var msg = _t('recon-batch-delete-confirm', '确定删除选中的 {n} 条对账任务?此操作不可恢复').replace('{n}', ids.length);
+        var ok = false;
+        try {
+            if (typeof window.pearnlyConfirm === 'function') {
+                ok = await window.pearnlyConfirm(msg, _t('recon-batch-delete-title', '批量删除'));
+            } else {
+                ok = window.confirm(msg);
+            }
+        } catch (_) { ok = false; }
+        if (!ok) return;
+        try {
+            var headers = Object.assign({ 'Content-Type': 'application/json' }, _authH());
+            var payloadIds = cfg.kind === 'glv' ? ids.map(function (v) { return parseInt(v, 10); }) : ids;
+            var resp = await fetch(cfg.api, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({ ids: payloadIds })
+            });
+            if (!resp.ok) {
+                if (typeof window.showToast === 'function') window.showToast(_t('recon-batch-delete-fail', '批量删除失败'), 'error');
+                return;
+            }
+            var data = await resp.json();
+            var del = (data && (data.deleted != null ? data.deleted : data.count)) || ids.length;
+            if (typeof window.showToast === 'function') window.showToast(_t('recon-batch-delete-ok', '已删除 {n} 条').replace('{n}', del), 'success');
+            cfg.reload();
+        } catch (e) {
+            if (typeof window.showToast === 'function') window.showToast(_t('recon-batch-delete-fail', '批量删除失败'), 'error');
+        }
+    }
+
+    function _setupOne(cfg) {
+        _injectThead(cfg);
+        _injectTbodyCheckboxes(cfg);
+        var tbodyEl = document.getElementById(cfg.tbody);
+        if (!tbodyEl || tbodyEl._reconBatchWatched) return;
+        tbodyEl._reconBatchWatched = true;
+        var mo = new MutationObserver(function () { _injectTbodyCheckboxes(cfg); });
+        mo.observe(tbodyEl, { childList: true, subtree: false });
+    }
+
+    function _setupAll() {
+        _injectStyle();
+        SELECTORS.forEach(_setupOne);
+        // 清掉 v5.5.20 残留的独立 banner(如果之前部署过)
+        document.querySelectorAll('.recon-batch-bar').forEach(function (el) { try { el.remove(); } catch (_) {} });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _setupAll);
+    } else {
+        _setupAll();
+    }
+    setTimeout(_setupAll, 1500);
+    setTimeout(_setupAll, 4000);
+
+    // ESC 清选
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        SELECTORS.forEach(function (cfg) {
+            if (_getSelectedIds(cfg).length > 0) _clearSelection(cfg);
+        });
+    });
+
+    // 4 语切换 → 刷新 thead 文案
+    if (typeof window.subscribeI18n === 'function') {
+        window.subscribeI18n('recon-batch-thead', function () {
+            SELECTORS.forEach(_refreshTheadLang);
+        });
+    }
+})();

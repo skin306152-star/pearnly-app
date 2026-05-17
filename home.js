@@ -1934,6 +1934,10 @@ const I18N = {
         'brv2-gl-credit-only':'GL贷方仅有(+)',
         'brv2-stmt-wd-only':  '账单提款仅有(−)',
         'brv2-stmt-dep-only': '账单存款仅有(+)',
+        'brv2-gl-debit-only-short':  'GL 借方仅有',
+        'brv2-gl-credit-only-short': 'GL 贷方仅有',
+        'brv2-stmt-wd-only-short':   '账单提款仅有',
+        'brv2-stmt-dep-only-short':  '账单存款仅有',
         'brv2-calc-close':    '计算期末余额',
         'brv2-stmt-close':    '账单期末余额',
         'brv2-diff-label':    '差异(应为0)',
@@ -4297,6 +4301,10 @@ const I18N = {
         'brv2-gl-credit-only':'GL Credit Only (+)',
         'brv2-stmt-wd-only':  'Stmt Withdrawal Only (−)',
         'brv2-stmt-dep-only': 'Stmt Deposit Only (+)',
+        'brv2-gl-debit-only-short':  'GL Debit Only',
+        'brv2-gl-credit-only-short': 'GL Credit Only',
+        'brv2-stmt-wd-only-short':   'Stmt WD Only',
+        'brv2-stmt-dep-only-short':  'Stmt Dep Only',
         'brv2-calc-close':    'Calculated Closing',
         'brv2-stmt-close':    'Statement Closing Balance',
         'brv2-diff-label':    'Difference (should be 0)',
@@ -6662,6 +6670,10 @@ const I18N = {
         'brv2-gl-credit-only':'GL เครดิตเท่านั้น (+)',
         'brv2-stmt-wd-only':  'บัญชีถอนเท่านั้น (−)',
         'brv2-stmt-dep-only': 'บัญชีฝากเท่านั้น (+)',
+        'brv2-gl-debit-only-short':  'GL เดบิตเท่านั้น',
+        'brv2-gl-credit-only-short': 'GL เครดิตเท่านั้น',
+        'brv2-stmt-wd-only-short':   'บัญชีถอนเท่านั้น',
+        'brv2-stmt-dep-only-short':  'บัญชีฝากเท่านั้น',
         'brv2-calc-close':    'ยอดปิดคำนวณ',
         'brv2-stmt-close':    'ยอดปิดบัญชีธนาคาร',
         'brv2-diff-label':    'ผลต่าง (ควรเป็น 0)',
@@ -9019,6 +9031,10 @@ const I18N = {
         'brv2-gl-credit-only':'GLのみ貸方(+)',
         'brv2-stmt-wd-only':  '明細のみ出金(−)',
         'brv2-stmt-dep-only': '明細のみ入金(+)',
+        'brv2-gl-debit-only-short':  'GLのみ借方',
+        'brv2-gl-credit-only-short': 'GLのみ貸方',
+        'brv2-stmt-wd-only-short':   '明細のみ出金',
+        'brv2-stmt-dep-only-short':  '明細のみ入金',
         'brv2-calc-close':    '計算期末残高',
         'brv2-stmt-close':    '明細期末残高',
         'brv2-diff-label':    '差異(0が理想)',
@@ -19105,14 +19121,12 @@ async function deleteEndpoint(endpointId) {
         setFrm('brf-stmt-close',    summary.stmt_closing           || 0);
         if ($('brf-diff')) {
             $('brf-diff').textContent = fmtNum(fdiff);
-            $('brf-diff').style.color = diffOk ? '#059669' : '#dc2626';
         }
 
-        // 差额行颜色
-        const diffRow = document.querySelector('.brv2-formula-diff-row');
-        if (diffRow) {
-            diffRow.classList.remove('ok', 'has-diff');
-            diffRow.classList.add(diffOk ? 'ok' : 'has-diff');
+        // 差额卡片颜色 (v118.33.12.0 · 横向公式卡片)
+        const diffCell = $('brv2-fcell-diff');
+        if (diffCell) {
+            diffCell.classList.toggle('brv2-fcell-diff-ok', diffOk);
         }
 
         // 导出按钮事件

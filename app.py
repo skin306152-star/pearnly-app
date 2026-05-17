@@ -202,25 +202,89 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动 bank_recon_v2 建表失败: {e}")
 
-    # v118.33.6 · 更新 git-deploy.sh · 确保包含所有 Python 源文件(幂等)
+    # v118.33.7 · 写入健壮版 git-deploy.sh（带回滚 + 健康检查 + 日志）
     try:
         import os as _os
         _deploy_sh = "/opt/mrpilot/git-deploy.sh"
-        if _os.path.exists(_deploy_sh):
-            _new_content = """#!/bin/bash
-# v118.33.6 · auto-updated by app.py startup to include all .py files
-set -e
-cd /opt/mrpilot
-git fetch pearnly master 2>&1
-# checkout all tracked files (includes any new .py modules added to repo)
-git checkout FETCH_HEAD -- . 2>/dev/null || git checkout FETCH_HEAD -- home.html home.js home.css app.py auth.py recon_routes.py db.py bank_recon_v2.py gl_vat_reconciler.py 2>/dev/null || true
-cp -f home.html home.js home.css static/ 2>/dev/null || true
-systemctl restart mrpilot
+        _new_content = r"""#!/bin/bash
+# ============================================================
+# git-deploy.sh  v118.33.7
+# 由 app.py 启动时自动写入 · 请勿手动修改（重启会覆盖）
+# 流程：fetch → checkout all → cp static → restart → health check
+# 失败时回滚到上一个 commit
+# ============================================================
+LOG=/var/log/mrpilot-deploy.log
+REPO=/opt/mrpilot
+REMOTE=pearnly
+BRANCH=master
+HEALTH_URL=http://localhost:8000/api/health
+MAX_WAIT=30   # 等待服务启动的最大秒数
+
+echo "======================================" >> "$LOG"
+echo "$(date '+%Y-%m-%d %H:%M:%S') git-deploy start" >> "$LOG"
+
+cd "$REPO" || { echo "cd failed" >> "$LOG"; exit 1; }
+
+# 1. 备份当前 HEAD
+PREV_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "")
+echo "prev HEAD: $PREV_HEAD" >> "$LOG"
+
+# 2. Fetch
+if ! git fetch "$REMOTE" "$BRANCH" >> "$LOG" 2>&1; then
+    echo "git fetch FAILED" >> "$LOG"
+    exit 1
+fi
+
+NEW_HEAD=$(git rev-parse FETCH_HEAD 2>/dev/null || echo "")
+echo "new HEAD:  $NEW_HEAD" >> "$LOG"
+
+if [ "$PREV_HEAD" = "$NEW_HEAD" ]; then
+    echo "already up to date — skipping restart" >> "$LOG"
+    exit 0
+fi
+
+# 3. Checkout all tracked files（包括新增的 .py 文件）
+if ! git checkout FETCH_HEAD -- . >> "$LOG" 2>&1; then
+    echo "git checkout failed — abort" >> "$LOG"
+    exit 1
+fi
+
+# 4. 复制静态资源
+mkdir -p static
+cp -f home.html home.js home.css static/ 2>> "$LOG" || true
+
+# 5. 重启服务
+echo "restarting mrpilot..." >> "$LOG"
+systemctl restart mrpilot >> "$LOG" 2>&1
+
+# 6. 健康检查（等服务起来）
+echo "waiting for health check..." >> "$LOG"
+for i in $(seq 1 $MAX_WAIT); do
+    sleep 1
+    HTTP=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" 2>/dev/null || echo "000")
+    if [ "$HTTP" = "200" ]; then
+        echo "health check OK after ${i}s (new HEAD: $NEW_HEAD)" >> "$LOG"
+        exit 0
+    fi
+done
+
+# 7. 服务未恢复 → 回滚
+echo "health check FAILED after ${MAX_WAIT}s — rolling back to $PREV_HEAD" >> "$LOG"
+if [ -n "$PREV_HEAD" ]; then
+    git checkout "$PREV_HEAD" -- . >> "$LOG" 2>&1
+    cp -f home.html home.js home.css static/ 2>> "$LOG" || true
+    systemctl restart mrpilot >> "$LOG" 2>&1
+    echo "rollback done — waiting for service..." >> "$LOG"
+    sleep 5
+    HTTP2=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" 2>/dev/null || echo "000")
+    echo "post-rollback health: $HTTP2" >> "$LOG"
+fi
+exit 1
 """
-            with open(_deploy_sh, 'w') as _f:
-                _f.write(_new_content)
-            _os.chmod(_deploy_sh, 0o755)
-            logger.info("[v118.33.6] git-deploy.sh updated to include all Python files")
+        with open(_deploy_sh, 'w') as _f:
+            _f.write(_new_content)
+        _os.chmod(_deploy_sh, 0o755)
+        logger.info("[v118.33.7] git-deploy.sh updated (with rollback + health check)")
     except Exception as e:
         logger.warning(f"git-deploy.sh update failed: {e}")
 
@@ -4323,26 +4387,69 @@ async def get_frontend_version():
 # 无需 SSH · 彻底绕开 fail2ban 问题
 @app.post("/internal/deploy")
 async def github_deploy_webhook(request: Request):
-    import hmac, hashlib, subprocess, os as _os
+    """
+    GitHub Webhook → 触发 git-deploy.sh
+    关键修复：先发响应，再用 detached subprocess 执行部署脚本。
+    这样 systemctl restart 不会在发送响应前就把自己杀掉。
+    """
+    import hmac as _hmac, hashlib as _hashlib, subprocess as _subprocess, os as _os
+    body = await request.body()
     secret = _os.environ.get("GITHUB_WEBHOOK_SECRET", "")
     if secret:
         sig = request.headers.get("X-Hub-Signature-256", "")
-        body = await request.body()
-        expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(sig, expected):
+        expected = "sha256=" + _hmac.new(secret.encode(), body, _hashlib.sha256).hexdigest()
+        if not _hmac.compare_digest(sig, expected):
+            logger.warning("[git-deploy] HMAC mismatch — ignored")
             raise HTTPException(status_code=403, detail="Invalid webhook signature")
-    else:
-        await request.body()  # drain body
+
+    logger.info("[git-deploy] webhook received · launching detached deploy in 3 s")
+
+    # ── 关键：用 start_new_session=True 开新会话 ──────────────────────
+    # 父进程（mrpilot）被 systemctl restart 杀掉后，子进程仍然存活，
+    # 能完成 git pull + cp + systemctl restart 整个流程。
+    _subprocess.Popen(
+        ["bash", "-c", "sleep 3 && bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1"],
+        close_fds=True,
+        start_new_session=True,   # 脱离父进程组，父死子不死
+    )
+    return {"ok": True, "status": "deploy scheduled in 3 s"}
+
+
+@app.get("/internal/deploy/manual")
+async def manual_deploy_trigger(token: str = ""):
+    """
+    备用手动部署触发器（webhook 失败时使用）。
+    访问：https://pearnly.com/internal/deploy/manual?token=<GITHUB_WEBHOOK_SECRET>
+    无需 SSH，浏览器直接触发。
+    """
+    import subprocess as _subprocess, os as _os
+    secret = _os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+    if not secret or token != secret:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    logger.info("[git-deploy] manual trigger")
+    _subprocess.Popen(
+        ["bash", "-c", "sleep 1 && bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1"],
+        close_fds=True,
+        start_new_session=True,
+    )
+    return {"ok": True, "status": "manual deploy scheduled", "log": "/var/log/mrpilot-deploy.log"}
+
+
+@app.get("/internal/deploy/log")
+async def deploy_log(token: str = "", lines: int = 50):
+    """查看最近部署日志。"""
+    import subprocess as _subprocess, os as _os
+    secret = _os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+    if not secret or token != secret:
+        raise HTTPException(status_code=403, detail="Invalid token")
     try:
-        result = subprocess.run(
-            ["bash", "/opt/mrpilot/git-deploy.sh"],
-            capture_output=True, text=True, timeout=120
+        result = _subprocess.run(
+            ["tail", f"-{lines}", "/var/log/mrpilot-deploy.log"],
+            capture_output=True, text=True, timeout=5
         )
-        logger.info(f"[git-deploy] rc={result.returncode} {result.stdout[:200]}")
-        return {"ok": True, "rc": result.returncode, "out": result.stdout[:500]}
+        return {"ok": True, "log": result.stdout}
     except Exception as e:
-        logger.error(f"[git-deploy] error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"ok": False, "error": str(e)}
 
 
 @app.get("/reset", response_class=HTMLResponse)

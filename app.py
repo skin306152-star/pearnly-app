@@ -252,7 +252,7 @@ fi
 
 # 4. 复制静态资源
 mkdir -p static
-cp -f home.html home.js home.css static/ 2>> "$LOG" || true
+cp -f home.html home.js home.css login.html static/ 2>> "$LOG" || true
 
 # 5. 重启服务
 echo "restarting mrpilot..." >> "$LOG"
@@ -273,7 +273,7 @@ done
 echo "health check FAILED after ${MAX_WAIT}s — rolling back to $PREV_HEAD" >> "$LOG"
 if [ -n "$PREV_HEAD" ]; then
     git reset --hard "$PREV_HEAD" >> "$LOG" 2>&1
-    cp -f home.html home.js home.css static/ 2>> "$LOG" || true
+    cp -f home.html home.js home.css login.html static/ 2>> "$LOG" || true
     systemctl restart mrpilot >> "$LOG" 2>&1
     echo "rollback done — waiting for service..." >> "$LOG"
     sleep 5

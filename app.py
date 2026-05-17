@@ -4374,7 +4374,7 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.33.10.0 更新:\n• 修复诊断表"esc is not defined"JS错误\n• 修复泰式千位分隔符（115.586.50 正确解析为 115,586.50）\n• 修复 GL 列头"เดบิท"未识别导致对账方向错误\n• 修复 GL 文本解析：自动从科目标题行提取期初余额\n• 修复 GL 文本解析：正确跳过"รวม"合计行、D/C 状态标记\n• 新增银行账单文本行解析器：KBank 无表格行式 PDF 现可正常读取",
+            "zh": "v118.33.10.0 更新:\n• 修复诊断表 esc is not defined JS错误\n• 修复泰式千位分隔符（115.586.50 正确解析为 115,586.50）\n• 修复 GL 列头 เดบิท 未识别导致对账方向错误\n• 修复 GL 文本解析：自动从科目标题行提取期初余额\n• 修复 GL 文本解析：正确跳过 รวม 合计行、D/C 状态标记\n• 新增银行账单文本行解析器：KBank 无表格行式 PDF 现可正常读取",
             "en": "v118.33.10.0 updates:\n• Fix 'esc is not defined' JS error in parse-diagnostics table\n• Fix Thai dot-thousands parsing (115.586.50 → 115,586.50)\n• Fix GL debit header detection (เดบิท with ท was missing)\n• Fix GL text parser: extract opening balance from account header line\n• Fix GL text parser: skip รวม total rows; handle D/C status tokens\n• Add bank statement text-line parser: KBank line-based PDFs now parse",
             "th": "v118.33.10.0 อัปเดต:\n• แก้ JS error 'esc is not defined' ในตารางวินิจฉัย\n• แก้การอ่านตัวเลขจุดพัน (115.586.50 → 115,586.50)\n• แก้การตรวจจับหัวคอลัมน์เดบิท (ท หายไป)\n• แก้ GL text parser: อ่านยอดยกมาจากบรรทัดหัวบัญชี\n• แก้ GL text parser: ข้ามบรรทัดรวม/หมายเหตุ และ D/C status\n• เพิ่ม bank statement text parser: KBank แบบไม่มีตารางอ่านได้แล้ว",
             "ja": "v118.33.10.0 更新:\n• 診断テーブルの'esc is not defined'JSエラー修正\n• タイ式桁区切りドット解析修正（115.586.50→115,586.50）\n• GL借方ヘッダー検出修正（เดบิทのท文字が欠落）\n• GLテキストパーサー：科目ヘッダー行から期首残高を取得\n• GLテキストパーサー：รวม合計行・D/Cステータストークンのスキップ修正\n• 銀行明細テキスト行パーサー追加：KBank非テーブルPDF対応"

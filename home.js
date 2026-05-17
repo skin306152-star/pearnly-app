@@ -14275,6 +14275,10 @@ setTimeout(() => {
     if (currentRoute === 'admin-users' && typeof window.loadAdminUsersPage === 'function') {
         window.loadAdminUsersPage();
     }
+    // v118.33.10.1 · reconcile 页初始 hash 时 loadReconcilePage 还未注册 · 补一次调用
+    if (currentRoute === 'reconcile' && typeof window.loadReconcilePage === 'function') {
+        window.loadReconcilePage();
+    }
 }, 0);
 
 loadAll();

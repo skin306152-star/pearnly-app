@@ -18884,11 +18884,13 @@ async function deleteEndpoint(endpointId) {
             const data = await res.json();
 
             if (!res.ok) {
+                // Real HTTP errors (401, 500, etc.) — no usable data
                 showError(data.detail || data.error || 'Error ' + res.status);
+                showProgress(false);
                 return;
             }
 
-            // 多 GL 账户时显示科目选择
+            // data.ok may be false (parse failure) but we still have parse_info to show
             if ((data.gl_accounts || []).length > 1) {
                 populateAcctSelect(data.gl_accounts);
             }
@@ -18896,7 +18898,6 @@ async function deleteEndpoint(endpointId) {
             _currentTask   = data;
             _allRows       = data.detail || [];
             _currentFilter = 'all';
-            // 重置 filter tab 到 "all"
             document.querySelectorAll('.brv2-filter-btn').forEach(b =>
                 b.classList.toggle('active', b.dataset.filter === 'all')
             );
@@ -18926,14 +18927,86 @@ async function deleteEndpoint(endpointId) {
         const dc = $('brv2-detail-collapse');
         const eb = $('brv2-export-btn');
         const nb = $('brv2-new-btn');
+        const pi = $('brv2-parse-info-wrap');
         if (sc) sc.style.display = show ? '' : 'none';
         if (dc) dc.style.display = show ? '' : 'none';
         if (eb) eb.style.display = show ? '' : 'none';
         if (nb) nb.style.display = show ? '' : 'none';
+        if (!show && pi) pi.style.display = 'none';
+    }
+
+    // ── 文件解析诊断表 ────────────────────────────────────────────────
+    function renderParseInfo(data) {
+        const wrap = $('brv2-parse-info-wrap');
+        const body = $('brv2-parse-info-body');
+        if (!wrap || !body) return;
+        const pi = data.parse_info;
+        if (!pi) { wrap.style.display = 'none'; return; }
+
+        const lang = window._currentLang || 'zh';
+        const L = {
+            title:  {zh:'文件解析状态', th:'สถานะการอ่านไฟล์', en:'File Parse Status', ja:'ファイル解析状態'},
+            type:   {zh:'类型', th:'ประเภท', en:'Type', ja:'種別'},
+            file:   {zh:'文件名', th:'ชื่อไฟล์', en:'File', ja:'ファイル'},
+            rows:   {zh:'解析行数', th:'แถวที่พบ', en:'Rows Found', ja:'解析行数'},
+            bank:   {zh:'银行/科目', th:'ธนาคาร/บัญชี', en:'Bank/Account', ja:'銀行/科目'},
+            status: {zh:'状态', th:'สถานะ', en:'Status', ja:'状態'},
+            stmt:   {zh:'账单', th:'บัญชีธนาคาร', en:'Stmt', ja:'明細'},
+            gl:     {zh:'总账GL', th:'GL', en:'GL', ja:'GL'},
+            ok:     {zh:'✓ 成功', th:'✓ สำเร็จ', en:'✓ OK', ja:'✓ 成功'},
+            warn:   {zh:'⚠ 0行', th:'⚠ 0 แถว', en:'⚠ 0 rows', ja:'⚠ 0行'},
+            fail:   {zh:'✗ 失败', th:'✗ ล้มเหลว', en:'✗ Failed', ja:'✗ 失敗'},
+        };
+        const t = k => (L[k] || {})[lang] || (L[k] || {}).zh || k;
+
+        const rows = [
+            ...(pi.stmt_files || []).map(f => ({...f, _type:'stmt', _extra: f.bank_code||''})),
+            ...(pi.gl_files   || []).map(f => ({...f, _type:'gl',   _extra: (f.accounts||[]).join(', ')})),
+        ];
+
+        const statusCell = row => {
+            if (!row.ok && row.error)
+                return `<span style="color:#dc2626">${t('fail')} — ${esc(String(row.error).slice(0,60))}</span>`;
+            if (!row.rows)
+                return `<span style="color:#d97706">${t('warn')}</span>`;
+            return `<span style="color:#059669">${t('ok')} (${row.rows})</span>`;
+        };
+
+        body.innerHTML = `
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--ink-2)">${t('title')}</div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px">
+                <thead>
+                    <tr style="background:#f3f4f6;font-weight:600">
+                        <th style="padding:6px 8px;text-align:left;border:1px solid #e5e7eb;white-space:nowrap">${t('type')}</th>
+                        <th style="padding:6px 8px;text-align:left;border:1px solid #e5e7eb">${t('file')}</th>
+                        <th style="padding:6px 8px;text-align:center;border:1px solid #e5e7eb;white-space:nowrap">${t('rows')}</th>
+                        <th style="padding:6px 8px;text-align:left;border:1px solid #e5e7eb;white-space:nowrap">${t('bank')}</th>
+                        <th style="padding:6px 8px;text-align:left;border:1px solid #e5e7eb;white-space:nowrap">${t('status')}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(row => `<tr>
+                        <td style="padding:5px 8px;border:1px solid #e5e7eb;white-space:nowrap">${row._type==='stmt'?t('stmt'):t('gl')}</td>
+                        <td style="padding:5px 8px;border:1px solid #e5e7eb;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc2(row.file||'')}">${esc(row.file||'')}</td>
+                        <td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center">${row.rows||0}</td>
+                        <td style="padding:5px 8px;border:1px solid #e5e7eb;color:var(--ink-2)">${esc(row._extra||'')}</td>
+                        <td style="padding:5px 8px;border:1px solid #e5e7eb">${statusCell(row)}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>`;
+        wrap.style.display = '';
     }
 
     // ── Render results ────────────────────────────────────────────────
     function renderResults(data) {
+        // Always render parse diagnostics (shown on both success and failure)
+        renderParseInfo(data);
+
+        // If parse failed, show error toast but still display the diagnostics panel
+        if (!data.ok && data.error) {
+            if (window.showToast) window.showToast(data.error, 'error');
+        }
+
         const stats   = data.stats   || {};
         const summary = data.summary || {};
 

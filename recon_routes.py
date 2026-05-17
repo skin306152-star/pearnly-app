@@ -1217,23 +1217,66 @@ async def bank_v2_run(
     stmt_results = await asyncio.gather(*[_parse_stmt(b, fn) for b, fn in stmt_data])
     gl_results = await asyncio.gather(*[_parse_gl(b, fn) for b, fn in gl_data])
 
-    # Check for parse errors
-    stmt_errors = [r.get("error", "parse error") for r in stmt_results if not r.get("ok")]
-    if stmt_errors:
-        raise HTTPException(422, _brv2_err("stmt_parse_fail", lang, e="; ".join(stmt_errors[:2])))
+    # Build per-file parse diagnostics (always included in every response)
+    parse_info = {
+        "stmt_files": [
+            {"file": fn, "rows": len(r.get("rows") or []),
+             "ok": r.get("ok", False), "error": r.get("error"),
+             "bank_code": r.get("bank_code", "")}
+            for r, (_, fn) in zip(stmt_results, stmt_data)
+        ],
+        "gl_files": [
+            {"file": fn, "rows": len(r.get("rows") or []),
+             "ok": r.get("ok", False), "error": r.get("error"),
+             "accounts": r.get("accounts", [])}
+            for r, (_, fn) in zip(gl_results, gl_data)
+        ],
+    }
 
-    gl_errors = [r.get("error", "parse error") for r in gl_results if not r.get("ok")]
-    if gl_errors:
-        raise HTTPException(422, _brv2_err("gl_parse_fail", lang, e="; ".join(gl_errors[:2])))
+    stmt_file_names = "; ".join(fn for _, fn in stmt_data)
+    gl_file_names   = "; ".join(fn for _, fn in gl_data)
+
+    def _save_failed_task(bc="", stmt_rc=0, gl_rc=0):
+        try:
+            return db.create_bank_recon_v2_task(
+                user_id=str(user["id"]), tenant_id=user.get("tenant_id"),
+                bank_code=bc, gl_account=gl_account,
+                stmt_files=stmt_file_names, gl_files=gl_file_names,
+                stmt_row_count=stmt_rc, gl_row_count=gl_rc,
+                matched_count=0, unmatched_gl=0, unmatched_stmt=0,
+                stmt_opening=0, stmt_closing=0, gl_opening=0, gl_closing=0,
+                formula_diff=0, detail_json=[], summary_json={},
+            )
+        except Exception:
+            return None
+
+    # Hard parse errors (file couldn't be read at all) → save diagnostic task, return 200 ok:false
+    stmt_errors = [r.get("error") for r in stmt_results if not r.get("ok")]
+    gl_errors   = [r.get("error") for r in gl_results if not r.get("ok")]
+    if stmt_errors or gl_errors:
+        err_key = "stmt_parse_fail" if stmt_errors else "gl_parse_fail"
+        err_msg = _brv2_err(err_key, lang,
+                            e="; ".join(filter(None, (stmt_errors + gl_errors)[:2])))
+        failed_id = _save_failed_task()
+        return {"ok": False, "error": err_msg, "task_id": failed_id,
+                "parse_info": parse_info, "stats": {}, "detail": [], "summary": {},
+                "gl_accounts": []}
 
     # 3. Merge multi-file data
     stmt_rows, stmt_opening, stmt_closing, bank_code = merge_statements(list(stmt_results))
     gl_rows, gl_accounts, gl_opening, gl_closing = merge_gl_files(list(gl_results), gl_account)
 
-    if not stmt_rows:
-        raise HTTPException(422, _brv2_err("stmt_no_rows", lang))
-    if not gl_rows:
-        raise HTTPException(422, _brv2_err("gl_no_rows", lang))
+    # No rows found → save diagnostic task, return 200 ok:false (not 422)
+    if not stmt_rows or not gl_rows:
+        err_key = "stmt_no_rows" if not stmt_rows else "gl_no_rows"
+        err_msg = _brv2_err(err_key, lang)
+        failed_id = _save_failed_task(
+            bc=bank_code,
+            stmt_rc=len(stmt_rows), gl_rc=len(gl_rows),
+        )
+        return {"ok": False, "error": err_msg, "task_id": failed_id,
+                "parse_info": parse_info, "stats": {}, "detail": [], "summary": {},
+                "gl_accounts": list(gl_accounts)}
 
     # 4. Reconcile
     recon_rows, summary = bank_reconcile(
@@ -1248,9 +1291,6 @@ async def bank_v2_run(
     summary_j = bank_summary_to_json(summary)
 
     # 6. Persist
-    stmt_file_names = "; ".join(fn for _, fn in stmt_data)
-    gl_file_names   = "; ".join(fn for _, fn in gl_data)
-
     unmatched_gl   = summary.gl_debit_only_count + summary.gl_credit_only_count
     unmatched_stmt = summary.stmt_withdrawal_only_count + summary.stmt_deposit_only_count
 
@@ -1282,6 +1322,7 @@ async def bank_v2_run(
         "gl_accounts": gl_accounts,
         "stmt_row_count": len(stmt_rows),
         "gl_row_count": len(gl_rows),
+        "parse_info": parse_info,
         "stats": {
             "matched": summary.matched_count,
             "gl_debit_only": summary.gl_debit_only_count,
@@ -1376,7 +1417,21 @@ async def bank_v2_export(task_id: int, request: Request, lang: str = "th"):
     recon_rows = rows_from_json(detail_raw)
     summary = bank_summary_from_json(summary_raw)
 
-    excel_bytes = export_bank_recon_excel(recon_rows, summary, lang=lang)
+    # Reconstruct parse_info from task fields for export diagnostics sheet
+    task_parse_info = {
+        "stmt_files": [
+            {"file": f.strip(), "rows": task.get("stmt_row_count", 0), "ok": True,
+             "bank_code": task.get("bank_code", "")}
+            for f in (task.get("stmt_files") or "").split(";") if f.strip()
+        ],
+        "gl_files": [
+            {"file": f.strip(), "rows": task.get("gl_row_count", 0), "ok": True,
+             "accounts": [task.get("gl_account") or ""]}
+            for f in (task.get("gl_files") or "").split(";") if f.strip()
+        ],
+    }
+    excel_bytes = export_bank_recon_excel(recon_rows, summary, lang=lang,
+                                          task_info=task, parse_info=task_parse_info)
 
     bank_code = task.get("bank_code") or "bank"
     ascii_name = f"BankRecon_v2_{task_id}_{bank_code.upper()}.xlsx"

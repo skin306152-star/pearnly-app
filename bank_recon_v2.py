@@ -1416,6 +1416,19 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     "st_gl_credit_only": {"th": "GL เครดิตเท่านั้น", "en": "GL Credit Only", "zh": "GL仅贷方", "ja": "GLのみ貸方"},
     "st_stmt_wd_only": {"th": "บัญชีถอนเท่านั้น", "en": "Stmt Withdrawal Only", "zh": "账单仅提款", "ja": "明細のみ出金"},
     "st_stmt_dep_only": {"th": "บัญชีฝากเท่านั้น", "en": "Stmt Deposit Only", "zh": "账单仅存款", "ja": "明細のみ入金"},
+    # File-info diagnostics sheet
+    "sh_fileinfo":      {"th": "ข้อมูลไฟล์", "en": "File Info", "zh": "文件信息", "ja": "ファイル情報"},
+    "fi_type":          {"th": "ประเภท", "en": "Type", "zh": "类型", "ja": "種別"},
+    "fi_file":          {"th": "ชื่อไฟล์", "en": "File", "zh": "文件名", "ja": "ファイル"},
+    "fi_rows":          {"th": "แถวที่พบ", "en": "Rows Found", "zh": "解析行数", "ja": "解析行数"},
+    "fi_bank_acct":     {"th": "ธนาคาร/บัญชี", "en": "Bank/Account", "zh": "银行/科目", "ja": "銀行/科目"},
+    "fi_status":        {"th": "สถานะ", "en": "Status", "zh": "状态", "ja": "状態"},
+    "fi_error":         {"th": "ข้อผิดพลาด", "en": "Error", "zh": "错误", "ja": "エラー"},
+    "fi_stmt_type":     {"th": "บัญชีธนาคาร", "en": "Bank Stmt", "zh": "银行账单", "ja": "銀行明細"},
+    "fi_gl_type":       {"th": "GL", "en": "GL", "zh": "总账(GL)", "ja": "GL"},
+    "fi_ok":            {"th": "✓ สำเร็จ", "en": "✓ OK", "zh": "✓ 成功", "ja": "✓ 成功"},
+    "fi_warn":          {"th": "⚠ 0 แถว", "en": "⚠ 0 rows", "zh": "⚠ 0行", "ja": "⚠ 0行"},
+    "fi_fail":          {"th": "✗ ล้มเหลว", "en": "✗ Failed", "zh": "✗ 失败", "ja": "✗ 失敗"},
 }
 
 
@@ -1450,8 +1463,9 @@ def export_bank_recon_excel(
     summary: BankReconSummary,
     lang: str = "th",
     task_info: Optional[Dict[str, Any]] = None,
+    parse_info: Optional[Dict[str, Any]] = None,
 ) -> bytes:
-    """Generate 4-sheet Excel report with i18n headers."""
+    """Generate Excel report with File Info + 4 data sheets, all headers i18n."""
     try:
         import openpyxl
         from openpyxl.styles import (
@@ -1512,10 +1526,91 @@ def export_bank_recon_excel(
         return d.strftime("%d/%m/%Y")
 
     # ══════════════════════════════════════════════════════════════════
+    # SHEET 0: File Info (parse diagnostics — always first sheet)
+    # ══════════════════════════════════════════════════════════════════
+    ws0 = wb.active
+    ws0.title = _t("sh_fileinfo", lang)
+    ws0.sheet_view.showGridLines = False
+    ws0.column_dimensions["A"].width = 14
+    ws0.column_dimensions["B"].width = 36
+    ws0.column_dimensions["C"].width = 12
+    ws0.column_dimensions["D"].width = 20
+    ws0.column_dimensions["E"].width = 14
+    ws0.column_dimensions["F"].width = 40
+
+    # Title row
+    ws0.merge_cells("A1:F1")
+    t0 = ws0["A1"]
+    t0.value = _t("sh_fileinfo", lang)
+    t0.font = Font(bold=True, color="FFFFFF", size=12)
+    t0.fill = PatternFill("solid", fgColor=COLOR_HEADER)
+    t0.alignment = Alignment(horizontal="center", vertical="center")
+    ws0.row_dimensions[1].height = 26
+
+    # Column headers
+    hdrs0 = [_t(k, lang) for k in ("fi_type", "fi_file", "fi_rows", "fi_bank_acct", "fi_status", "fi_error")]
+    for ci, h in enumerate(hdrs0, 1):
+        _hdr_style(ws0, 2, ci, h, color=COLOR_SUBHEAD)
+
+    # Build rows from parse_info (or reconstruct from task_info)
+    fi_rows: List[tuple] = []
+    if parse_info:
+        for f in (parse_info.get("stmt_files") or []):
+            status = _t("fi_ok", lang) if (f.get("ok") and f.get("rows", 0) > 0) \
+                else (_t("fi_warn", lang) if (f.get("ok") and f.get("rows", 0) == 0) \
+                else _t("fi_fail", lang))
+            fi_rows.append((_t("fi_stmt_type", lang), f.get("file",""),
+                            f.get("rows", 0), f.get("bank_code",""), status, f.get("error","") or ""))
+        for f in (parse_info.get("gl_files") or []):
+            status = _t("fi_ok", lang) if (f.get("ok") and f.get("rows", 0) > 0) \
+                else (_t("fi_warn", lang) if (f.get("ok") and f.get("rows", 0) == 0) \
+                else _t("fi_fail", lang))
+            accts = ", ".join(f.get("accounts") or [])
+            fi_rows.append((_t("fi_gl_type", lang), f.get("file",""),
+                            f.get("rows", 0), accts, status, f.get("error","") or ""))
+    elif task_info:
+        for fname in (task_info.get("stmt_files") or "").split(";"):
+            fname = fname.strip()
+            if not fname:
+                continue
+            rc = task_info.get("stmt_row_count", 0)
+            status = _t("fi_ok", lang) if rc > 0 else _t("fi_warn", lang)
+            fi_rows.append((_t("fi_stmt_type", lang), fname, rc,
+                            task_info.get("bank_code",""), status, ""))
+        for fname in (task_info.get("gl_files") or "").split(";"):
+            fname = fname.strip()
+            if not fname:
+                continue
+            rc = task_info.get("gl_row_count", 0)
+            status = _t("fi_ok", lang) if rc > 0 else _t("fi_warn", lang)
+            fi_rows.append((_t("fi_gl_type", lang), fname, rc,
+                            task_info.get("gl_account",""), status, ""))
+
+    STATUS_COLORS = {
+        _t("fi_ok", lang):   "D8F3DC",
+        _t("fi_warn", lang): "FFF3CD",
+        _t("fi_fail", lang): "FFDAD6",
+    }
+    for ri, row_data in enumerate(fi_rows, 3):
+        status_val = row_data[4]
+        fill_color = STATUS_COLORS.get(status_val, None)
+        for ci, val in enumerate(row_data, 1):
+            cell = ws0.cell(row=ri, column=ci, value=val)
+            cell.font = Font(size=9)
+            cell.alignment = Alignment(vertical="center",
+                                       horizontal="right" if ci == 3 else "left")
+            if fill_color:
+                cell.fill = PatternFill("solid", fgColor=fill_color)
+        ws0.row_dimensions[ri].height = 18
+
+    if fi_rows:
+        _border_range(ws0, 2, 2 + len(fi_rows), 1, 6)
+    ws0.freeze_panes = "A3"
+
+    # ══════════════════════════════════════════════════════════════════
     # SHEET 1: Summary
     # ══════════════════════════════════════════════════════════════════
-    ws1 = wb.active
-    ws1.title = _t("sh_summary", lang)
+    ws1 = wb.create_sheet(_t("sh_summary", lang))
     ws1.sheet_view.showGridLines = False
     ws1.column_dimensions["A"].width = 42
     ws1.column_dimensions["B"].width = 16
@@ -1525,8 +1620,8 @@ def export_bank_recon_excel(
     # Title
     ws1.merge_cells("A1:C1")
     title_cell = ws1["A1"]
-    title_cell.value = f"Bank Reconciliation · {summary.bank_code.upper()}" if lang == "en" else \
-                       f"สอบทาน GL กับบัญชีธนาคาร · {summary.bank_code.upper()}"
+    _RECON_TITLE = {"en": "Bank Reconciliation", "zh": "银行对账", "th": "สอบทาน GL กับบัญชีธนาคาร", "ja": "銀行照合"}
+    title_cell.value = f"{_RECON_TITLE.get(lang, 'Bank Reconciliation')} · {summary.bank_code.upper()}"
     title_cell.font = Font(bold=True, size=13, color="FFFFFF")
     title_cell.fill = PatternFill("solid", fgColor=COLOR_HEADER)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")

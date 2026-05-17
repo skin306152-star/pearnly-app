@@ -1890,6 +1890,22 @@
     .brv2-fcell-val { font-size: 12px; }
 }
 
+/* v118.33.13.0 · 银行对账 · OCR 准确性警告标识 */
+.brv2-ocr-warn {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 12px;
+    cursor: help;
+    line-height: 1;
+    vertical-align: middle;
+}
+.brv2-ocr-warn-bal { color: #dc2626; font-weight: 700; }
+.brv2-ocr-warn-conf { color: #ea580c; font-weight: 700; }
+tr.brv2-row-warn      td { background: #fef2f2 !important; }
+tr.brv2-row-warn-soft td { background: #fff7ed !important; }
+tr.brv2-row-warn:hover td,
+tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
+
 /* v118.33.11.0 · 历史记录分页器 */
 .hist-pager { display: flex; align-items: center; gap: 8px; padding: 8px 14px 10px; justify-content: flex-end; }
 .hist-pager-btn { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px 11px; cursor: pointer; font-size: 13px; color: #374151; font-family: inherit; line-height: 1.5; }
@@ -6428,7 +6444,7 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11833120"></script>
+<script src="/static/home.js?v=11833130"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 

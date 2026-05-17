@@ -70,6 +70,9 @@ class StatementRow:
     balance: float
     source_file: str = ""
     row_hash: str = ""       # for deduplication
+    # v118.33.13.0 · accuracy verification fields
+    confidence: str = "high"          # 'high'|'medium'|'low' (set by OCR engine)
+    balance_ok: Optional[bool] = None # True/False (arithmetic verified)/None (cannot verify)
 
     def __post_init__(self):
         if not self.row_hash:
@@ -115,6 +118,9 @@ class BankReconRow:
     date_diff_days: Optional[int] = None
     source_stmt_file: str = ""
     source_gl_file: str = ""
+    # v118.33.13.0 · OCR accuracy verification (from StatementRow)
+    stmt_confidence: str = "high"        # 'high'|'medium'|'low'
+    stmt_balance_ok: Optional[bool] = None  # True/False/None
 
 
 @dataclass
@@ -848,6 +854,18 @@ def parse_bank_statement_pdf(
     for r in rows:
         r.source_file = filename
 
+    # v118.33.13.0 · row-by-row balance arithmetic verification
+    # For each row: prev_balance + deposit - withdrawal should equal current balance.
+    # If it doesn't, set balance_ok=False so the UI can flag for human review.
+    _verify_row_balances(rows, opening)
+    balance_warn_count = sum(1 for r in rows if r.balance_ok is False)
+    low_conf_count = sum(1 for r in rows if r.confidence == "low")
+    if balance_warn_count or low_conf_count:
+        logger.info(
+            f"[stmt_parse][{filename}] verification: "
+            f"balance_warn={balance_warn_count} low_conf={low_conf_count} total={len(rows)}"
+        )
+
     if not rows:
         hint = " (PDF has no extractable text)" if not all_text.strip() else ""
         return {"ok": False, "error": f"No statement rows found in PDF{hint}",
@@ -860,7 +878,31 @@ def parse_bank_statement_pdf(
         "closing": closing,
         "bank_code": bank_code,
         "row_count": len(rows),
+        "balance_warn_count": balance_warn_count,
+        "low_conf_count": low_conf_count,
     }
+
+
+def _verify_row_balances(rows: List[StatementRow], opening: float) -> None:
+    """Walk rows in order; for each row check whether
+        prev_balance + deposit - withdrawal == row.balance (within AMOUNT_TOL).
+    Sets row.balance_ok = True / False / None (None when cannot verify).
+    Operates in-place. Tolerance accommodates rounding (0.05)."""
+    if not rows:
+        return
+    prev = opening
+    for r in rows:
+        # Cannot verify if amounts or balance are zero/missing
+        if r.balance is None:
+            r.balance_ok = None
+            continue
+        expected = round(prev + (r.deposit or 0) - (r.withdrawal or 0), 2)
+        diff = abs(expected - r.balance)
+        # Tolerance: 0.05 absolute OR 0.5% of amount (whichever is bigger, capped at 1.0)
+        amt = max(abs(r.deposit or 0), abs(r.withdrawal or 0))
+        tol = min(max(AMOUNT_TOL, amt * 0.005), 1.0)
+        r.balance_ok = diff <= tol
+        prev = r.balance
 
 
 def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> Dict[str, Any]:
@@ -876,16 +918,37 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         b64 = base64.b64encode(file_bytes).decode()
+        # v118.33.13.0 · strict accounting-grade prompt — no guessing, no hallucination
         prompt = (
-            "This is a bank statement PDF. Extract ALL transaction rows as JSON.\n"
-            "Return a JSON object with keys:\n"
-            '  "bank_code": string (kbank/bbl/kkp/ktb/scb/generic),\n'
-            '  "opening_balance": number,\n'
-            '  "closing_balance": number,\n'
-            '  "rows": array of {date: "YYYY-MM-DD", description: string, '
-            'withdrawal: number, deposit: number, balance: number}\n'
-            "withdrawal and deposit are always positive numbers.\n"
-            "Return ONLY valid JSON, no markdown."
+            "You are extracting bank statement data from a scanned PDF for FINANCIAL "
+            "RECONCILIATION. Wrong digits cause hours of debugging — accuracy beats "
+            "completeness.\n"
+            "\n"
+            "CRITICAL ACCURACY RULES:\n"
+            "1. NEVER guess or fill in unclear digits. If a number is blurry, partially "
+            "obscured, ambiguous, or you cannot read it with FULL confidence, return null "
+            "for that field and mark confidence='low'.\n"
+            "2. NEVER infer values from context — do NOT 'fix' balance math by adjusting "
+            "amounts. Extract exactly what is printed, even if the math looks wrong.\n"
+            "3. NEVER add rows that aren't clearly visible. If you're unsure whether a row "
+            "exists at all, skip it.\n"
+            "4. Thai number formats: '115.586,50' and '115,586.50' both mean 115586.50. "
+            "'115.586.50' (dot thousands separator) also means 115586.50.\n"
+            "5. withdrawal and deposit are MUTUALLY EXCLUSIVE — one is the amount, the "
+            "other must be 0.\n"
+            "\n"
+            "Return JSON only (no markdown fences) with this exact schema:\n"
+            "{\n"
+            '  "bank_code": "kbank"|"bbl"|"kkp"|"ktb"|"scb"|"generic",\n'
+            '  "opening_balance": number|null,\n'
+            '  "closing_balance": number|null,\n'
+            '  "rows": [{"date":"YYYY-MM-DD"|null, "description":"text exactly as printed",'
+            '"withdrawal":number|null, "deposit":number|null, "balance":number|null,'
+            '"confidence":"high"|"medium"|"low"}]\n'
+            "}\n"
+            "Mark confidence='low' if ANY field in the row required interpretation of "
+            "unclear characters. Mark confidence='medium' if mostly clear but you had "
+            "minor doubts. Mark 'high' only when every digit is unambiguous."
         )
         resp = model.generate_content([
             {"mime_type": "application/pdf", "data": b64},
@@ -902,12 +965,25 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
             d = _parse_date(str(r.get("date", "")))
             if d is None:
                 continue
+            # v118.33.13.0 · preserve null vs 0 distinction for confidence flagging
+            wd_raw = r.get("withdrawal")
+            dep_raw = r.get("deposit")
+            bal_raw = r.get("balance")
+            conf = (r.get("confidence") or "high").lower()
+            if conf not in ("high", "medium", "low"):
+                conf = "high"
+            # If OCR returned null for an amount field, that's a low-confidence signal
+            if wd_raw is None and dep_raw is None:
+                conf = "low"
+            if bal_raw is None:
+                conf = "low"
             rows.append(StatementRow(
                 date=d,
                 description=str(r.get("description", "")),
-                withdrawal=float(r.get("withdrawal", 0) or 0),
-                deposit=float(r.get("deposit", 0) or 0),
-                balance=float(r.get("balance", 0) or 0),
+                withdrawal=float(wd_raw or 0),
+                deposit=float(dep_raw or 0),
+                balance=float(bal_raw or 0),
+                confidence=conf,
             ))
 
         return {
@@ -1591,6 +1667,7 @@ def reconcile(
                 match_status="matched", match_layer=1,
                 stmt_date=sr.date, stmt_desc=sr.description,
                 stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
+                stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
                 gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
                 gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
                 date_diff_days=0,
@@ -1611,6 +1688,7 @@ def reconcile(
                 match_status="matched", match_layer=2,
                 stmt_date=sr.date, stmt_desc=sr.description,
                 stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
+                stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
                 gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
                 gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
                 date_diff_days=dd,
@@ -1631,6 +1709,7 @@ def reconcile(
                 match_status="matched", match_layer=3,
                 stmt_date=sr.date, stmt_desc=sr.description,
                 stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
+                stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
                 gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
                 gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
                 date_diff_days=dd,
@@ -1646,6 +1725,7 @@ def reconcile(
             match_status=status, match_layer=None,
             stmt_date=sr.date, stmt_desc=sr.description,
             stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
+            stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
             source_stmt_file=sr.source_file,
         ))
 
@@ -1788,6 +1868,30 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     "fi_ok":            {"th": "✓ สำเร็จ", "en": "✓ OK", "zh": "✓ 成功", "ja": "✓ 成功"},
     "fi_warn":          {"th": "⚠ 0 แถว", "en": "⚠ 0 rows", "zh": "⚠ 0行", "ja": "⚠ 0行"},
     "fi_fail":          {"th": "✗ ล้มเหลว", "en": "✗ Failed", "zh": "✗ 失败", "ja": "✗ 失敗"},
+    # v118.33.13.0 · OCR verification labels
+    "lbl_ocr_check":    {"th": "ตรวจสอบความถูกต้องของ OCR", "en": "OCR Accuracy Check",
+                         "zh": "OCR 准确性核查", "ja": "OCR精度チェック"},
+    "lbl_ocr_bal_warn": {"th": "ยอดคงเหลือไม่ตรง (ต้องตรวจ)", "en": "Balance mismatch (review)",
+                         "zh": "余额验证未通过", "ja": "残高検証エラー"},
+    "lbl_ocr_lowconf":  {"th": "ความมั่นใจต่ำ (เลือนราง)", "en": "Low confidence (blurry)",
+                         "zh": "低置信度（模糊）", "ja": "信頼度低（不鮮明）"},
+    "col_confidence":   {"th": "ความมั่นใจ", "en": "Confidence", "zh": "置信度", "ja": "信頼度"},
+    "col_balance_ok":   {"th": "ตรวจยอด", "en": "Balance Chk", "zh": "余额校验", "ja": "残高検証"},
+    # Statement detail sheet
+    "sh_stmt_detail":   {"th": "รายละเอียดบัญชี", "en": "Statement Detail",
+                         "zh": "银行账单明细", "ja": "明細"},
+    "sh_gl_detail":     {"th": "รายละเอียด GL", "en": "GL Detail",
+                         "zh": "GL 明细", "ja": "GL明細"},
+    "sh_usage":         {"th": "วิธีใช้งาน", "en": "How to Use",
+                         "zh": "使用说明", "ja": "使い方"},
+    "col_source_file":  {"th": "ไฟล์ต้นทาง", "en": "Source File",
+                         "zh": "原文件", "ja": "ファイル"},
+    "conf_high":        {"th": "✓ สูง", "en": "✓ high", "zh": "✓ 高", "ja": "✓ 高"},
+    "conf_medium":      {"th": "△ กลาง", "en": "△ medium", "zh": "△ 中", "ja": "△ 中"},
+    "conf_low":         {"th": "◌ ต่ำ", "en": "◌ low", "zh": "◌ 低", "ja": "◌ 低"},
+    "bal_ok":           {"th": "✓ ผ่าน", "en": "✓ pass", "zh": "✓ 通过", "ja": "✓ 合格"},
+    "bal_warn":         {"th": "⚠ ตรวจ", "en": "⚠ review", "zh": "⚠ 核对", "ja": "⚠ 要確認"},
+    "bal_na":           {"th": "—", "en": "—", "zh": "—", "ja": "—"},
 }
 
 
@@ -1967,104 +2071,179 @@ def export_bank_recon_excel(
     ws0.freeze_panes = "A3"
 
     # ══════════════════════════════════════════════════════════════════
-    # SHEET 1: Summary
+    # SHEET 1: Summary  (v118.33.13.0 · horizontal card layout)
     # ══════════════════════════════════════════════════════════════════
     ws1 = wb.create_sheet(_t("sh_summary", lang))
     ws1.sheet_view.showGridLines = False
-    ws1.column_dimensions["A"].width = 42
-    ws1.column_dimensions["B"].width = 16
-    ws1.column_dimensions["C"].width = 14
-    ws1.row_dimensions[1].height = 28
+    # 9 columns wide so the formula row fits without horizontal scroll
+    SUMM_COLS = 9
+    for ci in range(1, SUMM_COLS + 1):
+        ws1.column_dimensions[get_column_letter(ci)].width = 18
+    ws1.row_dimensions[1].height = 30
+
+    def _card(ws, row, col, label, value, *, value_fmt="#,##0.00",
+              card_fill="FFFFFF", value_fill=None, label_color="555555",
+              value_color="111111", bold_value=False):
+        """Draw a 2-row card: label on top (row), value below (row+1)."""
+        lc = ws.cell(row=row, column=col, value=label)
+        lc.font = Font(size=9, color=label_color, bold=False)
+        lc.fill = PatternFill("solid", fgColor=card_fill)
+        lc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        vc = ws.cell(row=row + 1, column=col, value=value)
+        vc.font = Font(size=11, bold=bold_value, color=value_color)
+        vc.alignment = Alignment(horizontal="right", vertical="center")
+        if isinstance(value, (int, float)):
+            vc.number_format = value_fmt
+        if value_fill:
+            vc.fill = PatternFill("solid", fgColor=value_fill)
+        return lc, vc
+
+    def _operator(ws, row, col, sym):
+        """Place a math operator symbol spanning the 2 card rows."""
+        ws.merge_cells(start_row=row, start_column=col, end_row=row + 1, end_column=col)
+        c = ws.cell(row=row, column=col, value=sym)
+        c.font = Font(size=14, bold=True, color="6B7280")
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        ws.column_dimensions[get_column_letter(col)].width = 4
 
     # Title
-    ws1.merge_cells("A1:C1")
-    title_cell = ws1["A1"]
+    ws1.merge_cells(start_row=1, start_column=1, end_row=1, end_column=SUMM_COLS)
+    title_cell = ws1.cell(row=1, column=1)
     _RECON_TITLE = {"en": "Bank Reconciliation", "zh": "银行对账", "th": "สอบทาน GL กับบัญชีธนาคาร", "ja": "銀行照合"}
     title_cell.value = f"{_RECON_TITLE.get(lang, 'Bank Reconciliation')} · {summary.bank_code.upper()}"
     title_cell.font = Font(bold=True, size=13, color="FFFFFF")
     title_cell.fill = PatternFill("solid", fgColor=COLOR_HEADER)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
+    # Info bar (bank + acct)
     r = 2
-    # Info rows
-    info_rows = [
-        (_t("lbl_bank", lang), summary.bank_code.upper()),
-        (_t("lbl_gl_acct", lang), summary.gl_account_code or "—"),
+    ws1.cell(row=r, column=1, value=_t("lbl_bank", lang)).font = Font(bold=True, size=10)
+    ws1.cell(row=r, column=2, value=summary.bank_code.upper()).font = Font(size=10)
+    ws1.cell(row=r, column=4, value=_t("lbl_gl_acct", lang)).font = Font(bold=True, size=10)
+    ws1.cell(row=r, column=5, value=summary.gl_account_code or "—").font = Font(size=10)
+    r += 2
+
+    # ── Section: Balance Statistics (5 horizontal cards) ──
+    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=SUMM_COLS)
+    _hdr_style(ws1, r, 1, _t("lbl_stats", lang), color=COLOR_SUBHEAD, size=10)
+    r += 1
+    # Skip one column on each side to center the 5 cards
+    stats_cards = [
+        (_t("lbl_stmt_open", lang),  summary.stmt_opening),
+        (_t("lbl_stmt_close", lang), summary.stmt_closing),
+        (_t("lbl_gl_open", lang),    summary.gl_opening),
+        (_t("lbl_gl_close", lang),   summary.gl_closing),
+        (_t("lbl_open_diff", lang),  summary.opening_diff),
     ]
-    for label, value in info_rows:
-        _label_style(ws1, r, 1, label, bold=True)
-        ws1.cell(r, 2, value).alignment = Alignment(vertical="center")
-        r += 1
+    for i, (lbl, val) in enumerate(stats_cards):
+        _card(ws1, r, i * 2 + 1, lbl, val,
+              card_fill="F3F4F6", bold_value=True)
+        # leave column i*2+2 blank for spacing
+    ws1.row_dimensions[r].height = 32
+    ws1.row_dimensions[r + 1].height = 22
+    r += 3
 
-    r += 1
-    # Balance table header
-    ws1.merge_cells(f"A{r}:C{r}")
-    _hdr_style(ws1, r, 1, _t("lbl_stats", lang), color=COLOR_SUBHEAD, size=9)
-    r += 1
-
-    balance_data = [
-        (_t("lbl_stmt_open", lang),   summary.stmt_opening),
-        (_t("lbl_stmt_close", lang),  summary.stmt_closing),
-        (_t("lbl_gl_open", lang),     summary.gl_opening),
-        (_t("lbl_gl_close", lang),    summary.gl_closing),
-        (_t("lbl_open_diff", lang),   summary.opening_diff),
-    ]
-    for label, val in balance_data:
-        _label_style(ws1, r, 1, label)
-        _num_style(ws1, r, 2, val)
-        r += 1
-
-    r += 1
-    # Reconciliation formula table
-    ws1.merge_cells(f"A{r}:C{r}")
-    _hdr_style(ws1, r, 1, _t("lbl_formula_title", lang), color=COLOR_SUBHEAD, size=9)
+    # ── Section: Reconciliation Formula ──
+    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=SUMM_COLS)
+    _hdr_style(ws1, r, 1, _t("lbl_formula_title", lang), color=COLOR_SUBHEAD, size=10)
     r += 1
 
-    formula_rows = [
-        (_t("lbl_gl_close", lang),      summary.gl_closing,              ""),
-        (_t("lbl_open_diff", lang),      summary.opening_diff,            "+/−"),
-        (_t("lbl_gl_debit_only", lang),  -summary.gl_debit_only_amount,   "−"),
+    # Row r/r+1: 6 input cards with operators between
+    # Layout: [card][+][card][-][card][+][card][-][card][+][card]
+    # Columns:  1   2   3    4   5   6   7    8   9 (need 11 cols, but we only have 9)
+    # Use compact layout: [card1][op][card2][op][card3]  then wrap to next row
+    # Actually let's do 6 cards × 3 cells (card spans 1 col, op spans 1 col)
+    # 6 cards + 5 ops = 11 cols. Widen SUMM_COLS? Yes — bump to 11.
+    formula_inputs = [
+        (_t("lbl_gl_close", lang),       summary.gl_closing,              ""),
+        (_t("lbl_open_diff", lang),      summary.opening_diff,            "+"),
+        (_t("lbl_gl_debit_only", lang), -summary.gl_debit_only_amount,   "−"),
         (_t("lbl_gl_credit_only", lang), summary.gl_credit_only_amount,   "+"),
-        (_t("lbl_stmt_wd_only", lang),   -summary.stmt_withdrawal_only_amount, "−"),
+        (_t("lbl_stmt_wd_only", lang),  -summary.stmt_withdrawal_only_amount, "−"),
         (_t("lbl_stmt_dep_only", lang),  summary.stmt_deposit_only_amount, "+"),
-        (_t("lbl_formula_calc", lang),   summary.formula_stmt_closing,    "="),
-        (_t("lbl_stmt_close", lang),     summary.stmt_closing,            ""),
-        (_t("lbl_formula_diff", lang),   summary.formula_diff,            ""),
     ]
-    for label, val, sign in formula_rows:
-        _label_style(ws1, r, 1, label)
-        ws1.cell(r, 3, sign).alignment = Alignment(horizontal="center")
-        fill = None
-        if label == _t("lbl_formula_diff", lang):
-            fill = COLOR_OK if abs(summary.formula_diff) < 0.05 else COLOR_DIFF
-        _num_style(ws1, r, 2, val, fill_color=fill)
-        r += 1
+    col = 1
+    for i, (lbl, val, op) in enumerate(formula_inputs):
+        if op:
+            _operator(ws1, r, col, op)
+            col += 1
+        _card(ws1, r, col, lbl, val, card_fill="F3F4F6")
+        col += 1
+    ws1.row_dimensions[r].height = 32
+    ws1.row_dimensions[r + 1].height = 22
+    r += 3
 
-    r += 1
-    # Count summary
-    ws1.merge_cells(f"A{r}:C{r}")
-    _hdr_style(ws1, r, 1, _t("lbl_count", lang), color=COLOR_SUBHEAD, size=9)
-    r += 1
+    # Calc-close vs Stmt-close → Diff (3 result cards in a row)
+    _operator(ws1, r, 1, "=")
+    _card(ws1, r, 2, _t("lbl_formula_calc", lang), summary.formula_stmt_closing,
+          card_fill="DBEAFE", bold_value=True)
+    _operator(ws1, r, 3, "vs")
+    _card(ws1, r, 4, _t("lbl_stmt_close", lang), summary.stmt_closing,
+          card_fill="F3F4F6", bold_value=True)
+    _operator(ws1, r, 5, "→")
+    diff_ok = abs(summary.formula_diff) < 0.05
+    _card(ws1, r, 6, _t("lbl_formula_diff", lang), summary.formula_diff,
+          card_fill=(COLOR_OK if diff_ok else COLOR_DIFF),
+          value_fill=(COLOR_OK if diff_ok else COLOR_DIFF),
+          value_color=("059669" if diff_ok else "DC2626"),
+          bold_value=True)
+    ws1.row_dimensions[r].height = 32
+    ws1.row_dimensions[r + 1].height = 22
+    r += 3
 
-    _hdr_style(ws1, r, 1, _t("col_status", lang), color="555555", size=9)
-    _hdr_style(ws1, r, 2, _t("lbl_count", lang), color="555555", size=9)
-    _hdr_style(ws1, r, 3, _t("lbl_amount", lang), color="555555", size=9)
+    # ── Section: Count summary (5 horizontal triplet cards) ──
+    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=SUMM_COLS)
+    _hdr_style(ws1, r, 1, _t("lbl_count", lang), color=COLOR_SUBHEAD, size=10)
     r += 1
-
     count_data = [
-        (_t("lbl_matched", lang), summary.matched_count, summary.stmt_total_deposit + summary.stmt_total_withdrawal - summary.stmt_deposit_only_amount - summary.stmt_withdrawal_only_amount),
-        (_t("lbl_gl_debit_only", lang), summary.gl_debit_only_count, summary.gl_debit_only_amount),
-        (_t("lbl_gl_credit_only", lang), summary.gl_credit_only_count, summary.gl_credit_only_amount),
-        (_t("lbl_stmt_wd_only", lang), summary.stmt_withdrawal_only_count, summary.stmt_withdrawal_only_amount),
-        (_t("lbl_stmt_dep_only", lang), summary.stmt_deposit_only_count, summary.stmt_deposit_only_amount),
+        (_t("lbl_matched", lang),         summary.matched_count,
+         summary.stmt_total_deposit + summary.stmt_total_withdrawal
+             - summary.stmt_deposit_only_amount - summary.stmt_withdrawal_only_amount),
+        (_t("lbl_gl_debit_only", lang),   summary.gl_debit_only_count,   summary.gl_debit_only_amount),
+        (_t("lbl_gl_credit_only", lang),  summary.gl_credit_only_count,  summary.gl_credit_only_amount),
+        (_t("lbl_stmt_wd_only", lang),    summary.stmt_withdrawal_only_count, summary.stmt_withdrawal_only_amount),
+        (_t("lbl_stmt_dep_only", lang),   summary.stmt_deposit_only_count,    summary.stmt_deposit_only_amount),
     ]
-    for label, cnt, amt in count_data:
-        _label_style(ws1, r, 1, label)
-        ws1.cell(r, 2, cnt).alignment = Alignment(horizontal="center")
-        _num_style(ws1, r, 3, amt)
-        r += 1
+    # 5 cards, each 1 col wide, but we want 3 rows per card (label/count/amount).
+    # Use simpler 2-row card with combined "cnt | amount" sub-label.
+    for i, (lbl, cnt, amt) in enumerate(count_data):
+        col = i * 2 + 1
+        # Label row
+        lc = ws1.cell(row=r, column=col, value=lbl)
+        lc.font = Font(size=9, color="555555")
+        lc.fill = PatternFill("solid", fgColor="F3F4F6")
+        lc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        # Count row
+        cc = ws1.cell(row=r + 1, column=col, value=cnt)
+        cc.font = Font(size=11, bold=True)
+        cc.alignment = Alignment(horizontal="center", vertical="center")
+        # Amount row
+        ac = ws1.cell(row=r + 2, column=col, value=amt)
+        ac.font = Font(size=10, color="6B7280")
+        ac.number_format = "#,##0.00"
+        ac.alignment = Alignment(horizontal="right", vertical="center")
+    ws1.row_dimensions[r].height = 32
+    ws1.row_dimensions[r + 1].height = 20
+    ws1.row_dimensions[r + 2].height = 20
+    r += 3
 
-    _border_range(ws1, 1, r - 1, 1, 3)
+    # v118.33.13.0 · OCR verification stats card (only if there are warnings to show)
+    warn_balance = sum(1 for rr in recon_rows if rr.stmt_balance_ok is False)
+    warn_lowconf = sum(1 for rr in recon_rows if rr.stmt_confidence == "low")
+    if warn_balance or warn_lowconf:
+        r += 1
+        ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=SUMM_COLS)
+        _hdr_style(ws1, r, 1, _t("lbl_ocr_check", lang), color=COLOR_SUBHEAD, size=10)
+        r += 1
+        _card(ws1, r, 1, _t("lbl_ocr_bal_warn", lang), warn_balance,
+              value_fmt="0", card_fill="FEE2E2", bold_value=True,
+              value_color="DC2626")
+        _card(ws1, r, 3, _t("lbl_ocr_lowconf", lang), warn_lowconf,
+              value_fmt="0", card_fill="FFEDD5", bold_value=True,
+              value_color="EA580C")
+        ws1.row_dimensions[r].height = 32
+        ws1.row_dimensions[r + 1].height = 22
+        r += 2
 
     # ══════════════════════════════════════════════════════════════════
     # SHEET 2: Matched Rows
@@ -2208,6 +2387,215 @@ def export_bank_recon_excel(
 
     _border_range(ws4, 1, max(1, len(stmt_only_rows) + 1), 1, len(st_cols))
 
+    # ══════════════════════════════════════════════════════════════════
+    # SHEET 5: Statement Detail (all parsed statement rows + OCR check)
+    # v118.33.13.0
+    # ══════════════════════════════════════════════════════════════════
+    ws5 = wb.create_sheet(_t("sh_stmt_detail", lang))
+    ws5.sheet_view.showGridLines = False
+
+    sd_cols = [
+        (_t("col_date", lang), 12),
+        (_t("col_desc", lang), 38),
+        (_t("col_withdrawal", lang), 14),
+        (_t("col_deposit", lang), 14),
+        (_t("col_balance", lang), 14),
+        (_t("col_confidence", lang), 12),
+        (_t("col_balance_ok", lang), 12),
+        (_t("col_source_file", lang), 22),
+    ]
+    for ci, (hdr, width) in enumerate(sd_cols, 1):
+        _hdr_style(ws5, 1, ci, hdr)
+        ws5.column_dimensions[get_column_letter(ci)].width = width
+
+    CONF_LBL = {
+        "high":   _t("conf_high", lang),
+        "medium": _t("conf_medium", lang),
+        "low":    _t("conf_low", lang),
+    }
+    CONF_FILL = {"high": "D8F3DC", "medium": "FFF3CD", "low": "FFDAD6"}
+
+    # Source: stmt-side rows (all of them — matched + stmt-only)
+    stmt_side_rows = [r for r in recon_rows if r.stmt_date is not None or r.stmt_balance != 0
+                      or r.stmt_withdrawal != 0 or r.stmt_deposit != 0]
+    # Sort by stmt_date
+    stmt_side_rows.sort(key=lambda x: (x.stmt_date or date.min, x.stmt_desc))
+
+    for ri, row in enumerate(stmt_side_rows, 2):
+        conf = (row.stmt_confidence or "high").lower()
+        if row.stmt_balance_ok is True:
+            bal_str = _t("bal_ok", lang); bal_fill = "D8F3DC"
+        elif row.stmt_balance_ok is False:
+            bal_str = _t("bal_warn", lang); bal_fill = "FFDAD6"
+        else:
+            bal_str = _t("bal_na", lang); bal_fill = None
+        vals = [
+            _fmt_date(row.stmt_date),
+            row.stmt_desc,
+            row.stmt_withdrawal or "",
+            row.stmt_deposit or "",
+            row.stmt_balance or "",
+            CONF_LBL.get(conf, conf),
+            bal_str,
+            row.source_stmt_file,
+        ]
+        for ci, val in enumerate(vals, 1):
+            cell = ws5.cell(ri, ci, val)
+            cell.font = Font(size=9)
+            if isinstance(val, float) and val:
+                cell.number_format = "#,##0.00"
+                cell.alignment = Alignment(horizontal="right")
+            # Highlight confidence/balance columns
+            if ci == 6:
+                cell.fill = PatternFill("solid", fgColor=CONF_FILL.get(conf, "FFFFFF"))
+                cell.alignment = Alignment(horizontal="center")
+            if ci == 7 and bal_fill:
+                cell.fill = PatternFill("solid", fgColor=bal_fill)
+                cell.alignment = Alignment(horizontal="center")
+        # Tint the whole row red if balance check failed
+        if row.stmt_balance_ok is False:
+            for ci in range(1, len(vals) + 1):
+                if ws5.cell(ri, ci).fill.fgColor.rgb in (None, "00000000", "FFFFFFFF"):
+                    ws5.cell(ri, ci).fill = PatternFill("solid", fgColor="FEF2F2")
+
+    _border_range(ws5, 1, max(1, len(stmt_side_rows) + 1), 1, len(sd_cols))
+    ws5.freeze_panes = "A2"
+
+    # ══════════════════════════════════════════════════════════════════
+    # SHEET 6: Usage Instructions (4-language)  v118.33.13.0
+    # ══════════════════════════════════════════════════════════════════
+    ws6 = wb.create_sheet(_t("sh_usage", lang))
+    ws6.sheet_view.showGridLines = False
+    ws6.column_dimensions["A"].width = 110
+    ws6.row_dimensions[1].height = 30
+
+    _USAGE_BLOCKS = {
+        "zh": [
+            ("银行对账表 · 使用说明", True),
+            ("", False),
+            ("Sheet 结构:", True),
+            ("• 「文件信息」  本次对账的源文件、解析行数、银行/科目识别结果", False),
+            ("• 「汇总」      期初/期末余额、对账公式、计数统计、OCR 准确性核查", False),
+            ("• 「已匹配」    L1 精确日期+金额 / L2 ±3 天 / L3 仅金额匹配的明细", False),
+            ("• 「GL未匹配」   只在 GL 中存在的记录", False),
+            ("• 「账单未匹配」 只在银行账单中存在的记录", False),
+            ("• 「银行账单明细」 OCR 提取的全部账单行 + 置信度 + 余额校验状态", False),
+            ("• 「使用说明」  本表", False),
+            ("", False),
+            ("OCR 准确性图例 (v118.33.13.0):", True),
+            ("• 置信度 ✓高: 数字清晰无歧义可直接信任", False),
+            ("• 置信度 △中: 多数清晰但有少量疑点", False),
+            ("• 置信度 ◌低: 数字模糊或难以辨认，请核对原 PDF", False),
+            ("• 余额校验 ✓通过: 上一行余额 ± 金额 == 本行余额 (容差 0.05)", False),
+            ("• 余额校验 ⚠核对: 不平衡 — 多半是 OCR 看错某个数字，请核对原 PDF", False),
+            ("• 余额校验 —    : 无法校验 (首行或缺失余额)", False),
+            ("", False),
+            ("对账公式:", True),
+            ("  GL期末 + 期初差异 − GL仅借方 + GL仅贷方 − 账单仅提款 + 账单仅存款 = 计算期末", False),
+            ("  计算期末 应等于 账单期末; 差异 = 计算期末 − 账单期末 (应为 0)", False),
+            ("", False),
+            ("重要提示: 扫描件 PDF 走 Gemini Vision OCR · 不可避免存在识别风险 · 凡是看到 ⚠ 或 ◌ 的行必须人工核对原 PDF 后才能采信。"
+             "Pearnly 永远不会自行填充模糊的数字 — 看不清就标红，决不替你猜。", False),
+        ],
+        "en": [
+            ("Bank Reconciliation · How to Use", True),
+            ("", False),
+            ("Sheet structure:", True),
+            ("• 'File Info'         Source files, rows parsed, bank/account detected", False),
+            ("• 'Summary'           Opening/closing balances, reconciliation formula, counts, OCR accuracy check", False),
+            ("• 'Matched'           L1 exact date+amount / L2 ±3-day / L3 amount-only matches", False),
+            ("• 'Unmatched GL'      Records that exist only in GL", False),
+            ("• 'Unmatched Stmt'    Records that exist only in the bank statement", False),
+            ("• 'Statement Detail'  All OCR-extracted statement rows + confidence + balance check", False),
+            ("• 'How to Use'        This sheet", False),
+            ("", False),
+            ("OCR Accuracy legend (v118.33.13.0):", True),
+            ("• Confidence ✓high: every digit is clear, can be trusted", False),
+            ("• Confidence △medium: mostly clear with minor doubts", False),
+            ("• Confidence ◌low: digit was blurry or hard to read — verify against the original PDF", False),
+            ("• Balance check ✓pass: prev_balance ± amount == this row balance (tolerance 0.05)", False),
+            ("• Balance check ⚠review: not balanced — likely a misread digit. Verify against the original PDF", False),
+            ("• Balance check —      : cannot verify (first row or missing balance)", False),
+            ("", False),
+            ("Reconciliation formula:", True),
+            ("  GL_close + Open_diff − GL_debit_only + GL_credit_only − Stmt_WD_only + Stmt_Dep_only = Calc_close", False),
+            ("  Calc_close should equal Stmt_close; Diff = Calc_close − Stmt_close (should be 0)", False),
+            ("", False),
+            ("IMPORTANT: Scanned PDFs go through Gemini Vision OCR. There is always residual OCR risk. "
+             "Any row marked ⚠ or ◌ MUST be cross-checked against the original PDF before trusting it. "
+             "Pearnly will NEVER auto-fill an unclear digit — if we can't read it, we flag it; we don't guess for you.", False),
+        ],
+        "th": [
+            ("รายงานการสอบทาน GL กับบัญชีธนาคาร · วิธีใช้งาน", True),
+            ("", False),
+            ("โครงสร้าง Sheet:", True),
+            ("• 'ข้อมูลไฟล์'         ไฟล์ต้นทาง จำนวนแถวที่อ่านได้ และธนาคาร/บัญชีที่ตรวจพบ", False),
+            ("• 'สรุป'              ยอดเปิด/ปิด สูตรการสอบทาน จำนวน และผลตรวจสอบ OCR", False),
+            ("• 'จับคู่แล้ว'         จับคู่ L1 ตรงทั้งวันที่และยอด / L2 ±3 วัน / L3 เฉพาะยอด", False),
+            ("• 'GL ไม่ตรง'          รายการที่มีใน GL เท่านั้น", False),
+            ("• 'บัญชีไม่ตรง'        รายการที่มีในบัญชีธนาคารเท่านั้น", False),
+            ("• 'รายละเอียดบัญชี'    รายการบัญชีที่ OCR อ่านได้ทั้งหมด + ระดับความมั่นใจ + ผลตรวจยอด", False),
+            ("• 'วิธีใช้งาน'         ชีตนี้", False),
+            ("", False),
+            ("คำอธิบายสัญลักษณ์ OCR (v118.33.13.0):", True),
+            ("• ความมั่นใจ ✓สูง: ตัวเลขชัดเจน ไว้ใจได้", False),
+            ("• ความมั่นใจ △กลาง: ส่วนใหญ่ชัด แต่มีจุดน่าสงสัยเล็กน้อย", False),
+            ("• ความมั่นใจ ◌ต่ำ: ตัวเลขเบลอหรืออ่านยาก — โปรดตรวจ PDF ต้นฉบับ", False),
+            ("• ตรวจยอด ✓ผ่าน: ยอดก่อน ± จำนวน == ยอดบรรทัดนี้ (ค่าเผื่อ 0.05)", False),
+            ("• ตรวจยอด ⚠ตรวจ: ไม่ตรง — น่าจะ OCR อ่านผิด โปรดตรวจ PDF ต้นฉบับ", False),
+            ("• ตรวจยอด —    : ตรวจไม่ได้ (บรรทัดแรกหรือไม่มียอด)", False),
+            ("", False),
+            ("สูตรการสอบทาน:", True),
+            ("  ปิด GL + ผลต่างยอดเปิด − GL เดบิตเท่านั้น + GL เครดิตเท่านั้น − บัญชีถอนเท่านั้น + บัญชีฝากเท่านั้น = ปิดคำนวณ", False),
+            ("  ปิดคำนวณ ควรเท่ากับ ปิดบัญชี; ผลต่าง = ปิดคำนวณ − ปิดบัญชี (ควรเป็น 0)", False),
+            ("", False),
+            ("สำคัญ: PDF ที่สแกนผ่าน Gemini Vision OCR ย่อมมีความเสี่ยงในการอ่านผิดเสมอ "
+             "แถวที่ติด ⚠ หรือ ◌ ต้องตรวจสอบกับ PDF ต้นฉบับก่อนเชื่อถือทุกครั้ง "
+             "Pearnly จะไม่เติมตัวเลขที่ไม่ชัดเจนเอง — ถ้าอ่านไม่ออก เราติดสัญลักษณ์ ไม่เดาแทนคุณ", False),
+        ],
+        "ja": [
+            ("銀行照合レポート · 使い方", True),
+            ("", False),
+            ("シート構成:", True),
+            ("• 「ファイル情報」     ソースファイル、解析行数、検出された銀行/科目", False),
+            ("• 「サマリー」         期首/期末残高、照合公式、件数、OCR精度チェック", False),
+            ("• 「一致」            L1 日付+金額完全一致 / L2 ±3日 / L3 金額のみ一致", False),
+            ("• 「GL不一致」        GLにのみ存在するレコード", False),
+            ("• 「明細不一致」      銀行明細にのみ存在するレコード", False),
+            ("• 「明細」            OCR抽出した全明細行 + 信頼度 + 残高検証結果", False),
+            ("• 「使い方」          このシート", False),
+            ("", False),
+            ("OCR精度凡例 (v118.33.13.0):", True),
+            ("• 信頼度 ✓高: 数字明瞭、信頼可能", False),
+            ("• 信頼度 △中: 概ね明瞭だが軽微な疑問あり", False),
+            ("• 信頼度 ◌低: 数字がぼやけている — 元のPDFを照合してください", False),
+            ("• 残高検証 ✓合格: 前残高 ± 金額 == この行残高 (誤差 0.05)", False),
+            ("• 残高検証 ⚠要確認: 不一致 — OCR誤読の可能性。元のPDFを照合してください", False),
+            ("• 残高検証 —      : 検証不可 (初行または残高欠落)", False),
+            ("", False),
+            ("照合公式:", True),
+            ("  GL期末 + 期首差 − GLのみ借方 + GLのみ貸方 − 明細のみ出金 + 明細のみ入金 = 計算期末", False),
+            ("  計算期末 は 明細期末 と等しいはず; 差異 = 計算期末 − 明細期末 (0 が理想)", False),
+            ("", False),
+            ("重要: スキャンPDFはGemini Vision OCRを使用 · OCR誤読リスクは常に存在します "
+             "⚠ または ◌ が付いた行は必ず元のPDFと照合してから利用してください "
+             "Pearnly は不明瞭な数字を自動で埋めません — 読めないものはマークし、推測しません", False),
+        ],
+    }
+    usage = _USAGE_BLOCKS.get(lang, _USAGE_BLOCKS["en"])
+    for i, (text, bold) in enumerate(usage, 1):
+        cell = ws6.cell(row=i, column=1, value=text)
+        if i == 1:
+            cell.font = Font(bold=True, size=14, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor=COLOR_HEADER)
+            cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
+        else:
+            cell.font = Font(bold=bold, size=10)
+            cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            if bold and text:
+                cell.fill = PatternFill("solid", fgColor="E5E7EB")
+        ws6.row_dimensions[i].height = 30 if i == 1 else (22 if bold else 18)
+
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
@@ -2249,6 +2637,9 @@ def rows_to_json(rows: List[BankReconRow]) -> List[Dict[str, Any]]:
             "date_diff_days": r.date_diff_days,
             "source_stmt_file": r.source_stmt_file,
             "source_gl_file": r.source_gl_file,
+            # v118.33.13.0 · OCR accuracy verification
+            "stmt_confidence": r.stmt_confidence,
+            "stmt_balance_ok": r.stmt_balance_ok,
         })
     return result
 
@@ -2273,6 +2664,8 @@ def rows_from_json(data: List[Dict[str, Any]]) -> List[BankReconRow]:
             date_diff_days=d.get("date_diff_days"),
             source_stmt_file=d.get("source_stmt_file", ""),
             source_gl_file=d.get("source_gl_file", ""),
+            stmt_confidence=d.get("stmt_confidence", "high"),
+            stmt_balance_ok=d.get("stmt_balance_ok"),
         ))
     return rows
 

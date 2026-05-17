@@ -19160,6 +19160,16 @@ async function deleteEndpoint(endpointId) {
             return;
         }
 
+        const _lang2 = window._currentLang || 'zh';
+        const T_OCR_WARN_BAL = { zh: 'OCR 余额验证未通过 · 上一行余额 ± 金额 ≠ 本行余额，请核对原 PDF',
+                                 th: 'การตรวจสอบยอดคงเหลือไม่ผ่าน · ยอดก่อนหน้า ± จำนวน ≠ ยอดบรรทัดนี้ โปรดตรวจสอบ PDF ต้นฉบับ',
+                                 en: 'Balance check FAILED · prev_balance ± amount ≠ this row balance — verify against the original PDF',
+                                 ja: '残高検証エラー · 前残高 ± 金額 ≠ この行残高 — 元のPDFと照合してください' }[_lang2];
+        const T_OCR_LOW_CONF = { zh: 'OCR 低置信度 · 数字模糊或难以辨认，请核对原 PDF',
+                                 th: 'OCR ความมั่นใจต่ำ · ตัวเลขเบลอหรืออ่านยาก โปรดตรวจสอบ PDF ต้นฉบับ',
+                                 en: 'OCR low confidence · digit was blurry or hard to read — verify against the original PDF',
+                                 ja: 'OCR信頼度低 · 数字がぼやけている — 元のPDFと照合してください' }[_lang2];
+
         tbody.innerHTML = rows.map(r => {
             const st = r.match_status;
             const layer = r.match_layer;
@@ -19175,12 +19185,23 @@ async function deleteEndpoint(endpointId) {
                 badge = '<span class="brv2-status-badge brv2-badge-gl-only">GL</span>';
             } else {
                 rowClass = 'stmt-only';
-                const stmtLbl = { zh: '账单', th: 'บัญชี', en: 'Stmt', ja: '明細' }[window._currentLang || 'zh'] || '账单';
+                const stmtLbl = { zh: '账单', th: 'บัญชี', en: 'Stmt', ja: '明細' }[_lang2] || '账单';
                 badge = `<span class="brv2-status-badge brv2-badge-stmt-only">${stmtLbl}</span>`;
             }
 
-            return `<tr class="${rowClass}">
-              <td>${badge}</td>
+            // v118.33.13.0 · OCR accuracy warning icons (balance check, confidence)
+            let warnIcons = '';
+            if (r.stmt_balance_ok === false) {
+                warnIcons += `<span class="brv2-ocr-warn brv2-ocr-warn-bal" title="${esc2(T_OCR_WARN_BAL)}">⚠</span>`;
+                rowClass += ' brv2-row-warn';
+            }
+            if (r.stmt_confidence === 'low') {
+                warnIcons += `<span class="brv2-ocr-warn brv2-ocr-warn-conf" title="${esc2(T_OCR_LOW_CONF)}">◌</span>`;
+                if (!rowClass.includes('brv2-row-warn')) rowClass += ' brv2-row-warn-soft';
+            }
+
+            return `<tr class="${rowClass.trim()}">
+              <td>${badge}${warnIcons}</td>
               <td>${esc2(fmtDate(r.stmt_date))}</td>
               <td title="${esc2(r.stmt_desc)}" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc2(r.stmt_desc)}</td>
               <td class="num">${r.stmt_withdrawal ? fmtNum(r.stmt_withdrawal) : ''}</td>

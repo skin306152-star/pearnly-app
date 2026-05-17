@@ -4378,10 +4378,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.33.11.0 更新:\n• 对账历史记录新增多选批量删除（含银行对账）\n• 三个对账模块历史记录改为每页 10 条分页显示\n• 上传提示文案统一为【请上传(1)+(2)】格式\n• 修复银行账单 PDF 解析：公司名/支票号中的数字不再干扰金额识别",
-            "en": "v118.33.11.0 updates:\n• History tables now support multi-select batch delete (all 3 modules incl. Bank Recon)\n• History paginated at 10 rows per page\n• Upload hints unified to '① file + ② file' format\n• Fix bank statement PDF parsing: numbers in descriptions no longer corrupt amounts",
-            "th": "v118.33.11.0 อัปเดต:\n• ประวัติงานรองรับเลือกหลายรายการเพื่อลบพร้อมกัน (ทุกโมดูลรวม Bank Recon)\n• แสดงประวัติ 10 รายการต่อหน้าพร้อมปุ่มเปลี่ยนหน้า\n• ข้อความอัปโหลดปรับเป็นรูปแบบ '① ไฟล์ + ② ไฟล์'\n• แก้การอ่าน PDF Statement: ตัวเลขในชื่อบริษัท/เลขเช็คไม่รบกวนการอ่านยอดเงินแล้ว",
-            "ja": "v118.33.11.0 更新:\n• 履歴テーブルで複数選択一括削除に対応（銀行照合含む全3モジュール）\n• 履歴を1ページ10件のページネーション表示に変更\n• アップロードヒントを「①ファイル＋②ファイル」形式に統一\n• 銀行明細PDF解析修正：説明文中の数字が金額認識を妨げなくなりました"
+            "zh": "v118.33.13.0 更新:\n• 银行对账 · 扫描件 OCR 严防幻觉：Gemini prompt 改严，看不清的数字一律返回 null，决不替你猜\n• 新增逐行余额校验：上一行余额 ± 金额 ≠ 本行余额时，明细表自动 ⚠ 标红，提醒人工核对原 PDF\n• Excel 导出汇总区改为横向卡片布局，不再需要缩放\n• Excel 新增「银行账单明细」sheet：含 OCR 置信度 + 余额校验状态\n• Excel 新增「使用说明」sheet（4 语）：图例 / 公式 / 重要提示",
+            "en": "v118.33.13.0 updates:\n• Bank Recon · scanned-PDF OCR hardened: stricter Gemini prompt — unclear digits return null, we never guess\n• Row-by-row balance verification: rows where prev_balance ± amount ≠ this balance are flagged ⚠ red for manual review against the original PDF\n• Excel export Summary redesigned as horizontal cards — no more zooming out\n• New 'Statement Detail' sheet in Excel: includes OCR confidence + balance check column\n• New 'How to Use' sheet (4 languages): legend / formula / important notes",
+            "th": "v118.33.13.0 อัปเดต:\n• สอบทานธนาคาร · OCR ของ PDF สแกนเข้มงวดขึ้น: prompt ของ Gemini ห้ามเดา ตัวเลขที่ไม่ชัดส่งคืน null\n• ตรวจสอบยอดคงเหลือทีละแถว: ถ้ายอดก่อนหน้า ± จำนวน ≠ ยอดบรรทัดนี้ จะติด ⚠ แดง ให้ตรวจ PDF ต้นฉบับ\n• ออกแบบส่วนสรุปใน Excel ใหม่ให้เป็นการ์ดแนวนอน ไม่ต้องย่อหน้าจอ\n• เพิ่ม Sheet 'รายละเอียดบัญชี' ใน Excel พร้อมระดับความมั่นใจ + ผลตรวจยอด\n• เพิ่ม Sheet 'วิธีใช้งาน' (4 ภาษา): สัญลักษณ์ / สูตร / ข้อควรระวัง",
+            "ja": "v118.33.13.0 更新:\n• 銀行照合 · スキャンPDFのOCR厳格化: Geminiプロンプトを強化、不明瞭な数字はnull返却、推測しません\n• 行ごとの残高検証: 前残高 ± 金額 ≠ この行残高 の場合 ⚠ で赤くマーク、元PDFと照合してください\n• Excel出力のサマリーを横並びカード形式に再設計、縮小不要に\n• Excelに「明細」シート追加: OCR信頼度 + 残高検証列を含む\n• 「使い方」シート(4言語)を追加: 凡例 / 公式 / 重要事項"
         }
     }
 

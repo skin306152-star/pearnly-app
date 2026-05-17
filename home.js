@@ -1910,6 +1910,49 @@ const I18N = {
         'reconcile-dev-seed-fail': '生成测试数据失败',
         // v118.32.0 · 销项税对账 · 屏 A
         'recon-tab-bank':     '银行对账',
+        // v118.33.6 · Bank Recon v2 keys (zh)
+        'brv2-stmt-title':    '银行账单',
+        'brv2-stmt-hint':     'PDF · KBank · BBL · KKP · KTB · 支持多文件',
+        'brv2-gl-title':      '总账 (GL)',
+        'brv2-gl-hint':       'Excel (.xlsx) 或 PDF · 支持多文件',
+        'brv2-choose-files':  '选择文件',
+        'brv2-acct-label':    'GL 科目',
+        'brv2-acct-all':      '全部',
+        'brv2-acct-hint':     '选择银行账户科目',
+        'brv2-run-btn':       '开始对账',
+        'brv2-processing':    '处理中…',
+        'brv2-stat-matched':  '已匹配',
+        'brv2-stat-gl-only':  'GL仅有',
+        'brv2-stat-stmt-only':'账单仅有',
+        'brv2-stat-diff':     '差异',
+        'brv2-formula-title': '对账公式',
+        'brv2-gl-close':      'GL期末余额',
+        'brv2-open-diff':     '期初差异',
+        'brv2-gl-debit-only': 'GL借方仅有(−)',
+        'brv2-gl-credit-only':'GL贷方仅有(+)',
+        'brv2-stmt-wd-only':  '账单提款仅有(−)',
+        'brv2-stmt-dep-only': '账单存款仅有(+)',
+        'brv2-calc-close':    '计算期末余额',
+        'brv2-stmt-close':    '账单期末余额',
+        'brv2-diff-label':    '差异(应为0)',
+        'brv2-filter-all':    '全部',
+        'brv2-filter-matched':'已匹配',
+        'brv2-filter-gl-only':'GL仅有',
+        'brv2-filter-stmt-only':'账单仅有',
+        'brv2-export-excel':  '导出Excel',
+        'brv2-new-btn':       '新建对账',
+        'brv2-th-status':     '状态',
+        'brv2-th-stmt-date':  '账单日期',
+        'brv2-th-stmt-desc':  '账单摘要',
+        'brv2-th-wd':         '提款',
+        'brv2-th-dep':        '存款',
+        'brv2-th-gl-date':    'GL日期',
+        'brv2-th-gl-doc':     'GL凭证号',
+        'brv2-th-gl-debit':   'GL借方',
+        'brv2-th-gl-credit':  'GL贷方',
+        'brv2-th-layer':      '匹配层',
+        'brv2-history-title': '最近对账',
+        'brv2-loading':       '加载中…',
         // v118.32.5 · 标签按 Thai 客户要求重命名 + 同步其它语言
         'recon-tab-sale-vat': '销项税报告核查',
         'recon-tab-gl-vat':   '收入对账',
@@ -4218,6 +4261,49 @@ const I18N = {
         'recon-reason-ai-cannot-classify':'Cannot recognize · please pick type manually',
         // ==== v118.32.x · VAT Reconciliation (Screen A + B + C) ====
         'recon-tab-bank':     'Bank Recon',
+        // v118.33.6 · Bank Recon v2 keys (en)
+        'brv2-stmt-title':    'Bank Statement',
+        'brv2-stmt-hint':     'PDF · KBank · BBL · KKP · KTB · Multiple files OK',
+        'brv2-gl-title':      'General Ledger (GL)',
+        'brv2-gl-hint':       'Excel (.xlsx) or PDF · Multiple files OK',
+        'brv2-choose-files':  'Choose Files',
+        'brv2-acct-label':    'GL Account',
+        'brv2-acct-all':      'All',
+        'brv2-acct-hint':     'Select bank account code',
+        'brv2-run-btn':       'Run Reconciliation',
+        'brv2-processing':    'Processing…',
+        'brv2-stat-matched':  'Matched',
+        'brv2-stat-gl-only':  'GL Only',
+        'brv2-stat-stmt-only':'Stmt Only',
+        'brv2-stat-diff':     'Difference',
+        'brv2-formula-title': 'Reconciliation Formula',
+        'brv2-gl-close':      'GL Closing Balance',
+        'brv2-open-diff':     'Opening Difference',
+        'brv2-gl-debit-only': 'GL Debit Only (−)',
+        'brv2-gl-credit-only':'GL Credit Only (+)',
+        'brv2-stmt-wd-only':  'Stmt Withdrawal Only (−)',
+        'brv2-stmt-dep-only': 'Stmt Deposit Only (+)',
+        'brv2-calc-close':    'Calculated Closing',
+        'brv2-stmt-close':    'Statement Closing Balance',
+        'brv2-diff-label':    'Difference (should be 0)',
+        'brv2-filter-all':    'All',
+        'brv2-filter-matched':'Matched',
+        'brv2-filter-gl-only':'GL Only',
+        'brv2-filter-stmt-only':'Stmt Only',
+        'brv2-export-excel':  'Export Excel',
+        'brv2-new-btn':       'New Recon',
+        'brv2-th-status':     'Status',
+        'brv2-th-stmt-date':  'Stmt Date',
+        'brv2-th-stmt-desc':  'Stmt Description',
+        'brv2-th-wd':         'Withdrawal',
+        'brv2-th-dep':        'Deposit',
+        'brv2-th-gl-date':    'GL Date',
+        'brv2-th-gl-doc':     'GL Doc No',
+        'brv2-th-gl-debit':   'GL Debit',
+        'brv2-th-gl-credit':  'GL Credit',
+        'brv2-th-layer':      'Layer',
+        'brv2-history-title': 'Recent Reconciliations',
+        'brv2-loading':       'Loading…',
         'recon-tab-sale-vat': 'VAT Report Audit',
         'recon-tab-gl-vat':   'Revenue Reconciliation',
         'glv-sub':            'General Ledger vs Sales VAT Report · Upload two files to reconcile',
@@ -6528,6 +6614,49 @@ const I18N = {
         'recon-reason-ai-cannot-classify':'ไม่สามารถระบุไฟล์นี้ได้ · กรุณาเลือกประเภทเอง',
         // ==== v118.32.x · กระทบยอด VAT (หน้า A + B + C) ====
         'recon-tab-bank':     'กระทบยอดธนาคาร',
+        // v118.33.6 · Bank Recon v2 keys (th)
+        'brv2-stmt-title':    'บัญชีธนาคาร',
+        'brv2-stmt-hint':     'PDF · KBank · BBL · KKP · KTB · หลายไฟล์ได้',
+        'brv2-gl-title':      'บัญชีแยกประเภท (GL)',
+        'brv2-gl-hint':       'Excel (.xlsx) หรือ PDF · หลายไฟล์ได้',
+        'brv2-choose-files':  'เลือกไฟล์',
+        'brv2-acct-label':    'รหัสบัญชี GL',
+        'brv2-acct-all':      'ทั้งหมด',
+        'brv2-acct-hint':     'เลือกบัญชีธนาคารที่ต้องการกระทบ',
+        'brv2-run-btn':       'เริ่มกระทบยอด',
+        'brv2-processing':    'กำลังประมวลผล…',
+        'brv2-stat-matched':  'จับคู่แล้ว',
+        'brv2-stat-gl-only':  'GL เท่านั้น',
+        'brv2-stat-stmt-only':'บัญชีเท่านั้น',
+        'brv2-stat-diff':     'ผลต่าง',
+        'brv2-formula-title': 'สูตรการสอบทาน',
+        'brv2-gl-close':      'ยอดปิด GL',
+        'brv2-open-diff':     'ผลต่างยอดเปิด',
+        'brv2-gl-debit-only': 'GL เดบิตเท่านั้น (−)',
+        'brv2-gl-credit-only':'GL เครดิตเท่านั้น (+)',
+        'brv2-stmt-wd-only':  'บัญชีถอนเท่านั้น (−)',
+        'brv2-stmt-dep-only': 'บัญชีฝากเท่านั้น (+)',
+        'brv2-calc-close':    'ยอดปิดคำนวณ',
+        'brv2-stmt-close':    'ยอดปิดบัญชีธนาคาร',
+        'brv2-diff-label':    'ผลต่าง (ควรเป็น 0)',
+        'brv2-filter-all':    'ทั้งหมด',
+        'brv2-filter-matched':'จับคู่แล้ว',
+        'brv2-filter-gl-only':'GL เท่านั้น',
+        'brv2-filter-stmt-only':'บัญชีเท่านั้น',
+        'brv2-export-excel':  'ส่งออก Excel',
+        'brv2-new-btn':       'สร้างใหม่',
+        'brv2-th-status':     'สถานะ',
+        'brv2-th-stmt-date':  'วันที่บัญชี',
+        'brv2-th-stmt-desc':  'รายการบัญชี',
+        'brv2-th-wd':         'ถอนเงิน',
+        'brv2-th-dep':        'ฝากเงิน',
+        'brv2-th-gl-date':    'วันที่ GL',
+        'brv2-th-gl-doc':     'เลขที่ GL',
+        'brv2-th-gl-debit':   'เดบิต GL',
+        'brv2-th-gl-credit':  'เครดิต GL',
+        'brv2-th-layer':      'ชั้น',
+        'brv2-history-title': 'ประวัติการกระทบยอด',
+        'brv2-loading':       'กำลังโหลด…',
         'recon-tab-sale-vat': 'ตรวจสอบรายงานภาษีขาย',
         'recon-tab-gl-vat':   'กระทบรายได้',
         'glv-sub':            'บัญชีแยกประเภท (GL) vs รายงานภาษีขาย · อัปโหลดสองไฟล์เพื่อกระทบยอด',
@@ -8830,6 +8959,49 @@ const I18N = {
         'recon-reason-ai-cannot-classify':'種別判定不可 · 手動で選択',
         // ==== v118.32.x · 売上税照合 (画面A + B + C) ====
         'recon-tab-bank':     '銀行照合',
+        // v118.33.6 · Bank Recon v2 keys (ja)
+        'brv2-stmt-title':    '銀行明細',
+        'brv2-stmt-hint':     'PDF · KBank · BBL · KKP · KTB · 複数ファイル可',
+        'brv2-gl-title':      '総勘定元帳 (GL)',
+        'brv2-gl-hint':       'Excel (.xlsx) または PDF · 複数ファイル可',
+        'brv2-choose-files':  'ファイル選択',
+        'brv2-acct-label':    'GL科目コード',
+        'brv2-acct-all':      'すべて',
+        'brv2-acct-hint':     '銀行口座科目を選択',
+        'brv2-run-btn':       '照合開始',
+        'brv2-processing':    '処理中…',
+        'brv2-stat-matched':  '一致',
+        'brv2-stat-gl-only':  'GLのみ',
+        'brv2-stat-stmt-only':'明細のみ',
+        'brv2-stat-diff':     '差異',
+        'brv2-formula-title': '照合公式',
+        'brv2-gl-close':      'GL期末残高',
+        'brv2-open-diff':     '期首差異',
+        'brv2-gl-debit-only': 'GLのみ借方(−)',
+        'brv2-gl-credit-only':'GLのみ貸方(+)',
+        'brv2-stmt-wd-only':  '明細のみ出金(−)',
+        'brv2-stmt-dep-only': '明細のみ入金(+)',
+        'brv2-calc-close':    '計算期末残高',
+        'brv2-stmt-close':    '明細期末残高',
+        'brv2-diff-label':    '差異(0が理想)',
+        'brv2-filter-all':    'すべて',
+        'brv2-filter-matched':'一致',
+        'brv2-filter-gl-only':'GLのみ',
+        'brv2-filter-stmt-only':'明細のみ',
+        'brv2-export-excel':  'Excel出力',
+        'brv2-new-btn':       '新規照合',
+        'brv2-th-status':     '状態',
+        'brv2-th-stmt-date':  '明細日付',
+        'brv2-th-stmt-desc':  '明細摘要',
+        'brv2-th-wd':         '出金',
+        'brv2-th-dep':        '入金',
+        'brv2-th-gl-date':    'GL日付',
+        'brv2-th-gl-doc':     'GL伝票番号',
+        'brv2-th-gl-debit':   'GL借方',
+        'brv2-th-gl-credit':  'GL貸方',
+        'brv2-th-layer':      '層',
+        'brv2-history-title': '照合履歴',
+        'brv2-loading':       '読み込み中…',
         'recon-tab-sale-vat': '売上税報告チェック',
         'recon-tab-gl-vat':   '売上照合',
         'glv-sub':            '総勘定元帳（GL）vs 売上税報告 · 2ファイルをアップロードして照合',
@@ -18407,6 +18579,429 @@ async function deleteEndpoint(endpointId) {
 })();
 
 /* ============================================================
+ * v118.33.6 · Bank Reconciliation v2 (Statement vs GL)
+ * Two upload zones · 3-layer matching · Excel export
+ * ============================================================ */
+(function () {
+    'use strict';
+
+    // ── State ─────────────────────────────────────────────────────────
+    let _stmtFiles   = [];   // File objects for bank statement
+    let _glFiles     = [];   // File objects for GL
+    let _currentTask = null; // Last run result {task_id, detail, summary, stats}
+    let _currentFilter = 'all';
+    let _allRows     = [];   // parsed detail rows (flat)
+
+    // ── DOM helpers ───────────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+    function fmtNum(v) {
+        if (v === null || v === undefined) return '—';
+        const n = Number(v);
+        if (isNaN(n)) return '—';
+        return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtDate(s) {
+        if (!s) return '—';
+        return String(s).slice(0, 10).split('-').reverse().join('/');
+    }
+    function esc2(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── File-chip rendering ───────────────────────────────────────────
+    function renderFileList(zone) {
+        const files  = zone === 'stmt' ? _stmtFiles : _glFiles;
+        const listEl = $(`brv2-${zone}-list`);
+        if (!listEl) return;
+        listEl.innerHTML = files.map((f, i) =>
+            `<div class="brv2-file-chip">
+              <svg viewBox="0 0 12 12" width="10" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="1" y="0.5" width="10" height="11" rx="1.5"/>
+              </svg>
+              <span>${esc2(f.name)}</span>
+              <button class="brv2-file-chip-remove" data-zone="${zone}" data-idx="${i}" title="ลบ">×</button>
+            </div>`
+        ).join('');
+        // remove listeners
+        listEl.querySelectorAll('.brv2-file-chip-remove').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.idx, 10);
+                if (btn.dataset.zone === 'stmt') _stmtFiles.splice(idx, 1);
+                else _glFiles.splice(idx, 1);
+                renderFileList(btn.dataset.zone);
+                updateRunBtn();
+            });
+        });
+    }
+
+    function updateRunBtn() {
+        const btn = $('brv2-run-btn');
+        if (btn) btn.disabled = (_stmtFiles.length === 0 || _glFiles.length === 0);
+    }
+
+    // ── Drag-and-drop ─────────────────────────────────────────────────
+    function setupDrop(zoneId, inputId, zone) {
+        const zoneEl = $(zoneId);
+        const inputEl = $(inputId);
+        if (!zoneEl || !inputEl) return;
+
+        zoneEl.addEventListener('dragover', e => { e.preventDefault(); zoneEl.classList.add('drag-over'); });
+        zoneEl.addEventListener('dragleave', () => zoneEl.classList.remove('drag-over'));
+        zoneEl.addEventListener('drop', e => {
+            e.preventDefault();
+            zoneEl.classList.remove('drag-over');
+            const dropped = Array.from(e.dataTransfer.files || []);
+            if (zone === 'stmt') _stmtFiles.push(...dropped);
+            else _glFiles.push(...dropped);
+            renderFileList(zone);
+            updateRunBtn();
+        });
+
+        const btn = $(`brv2-${zone}-btn`);
+        if (btn) btn.addEventListener('click', () => inputEl.click());
+
+        inputEl.addEventListener('change', () => {
+            const chosen = Array.from(inputEl.files || []);
+            if (zone === 'stmt') _stmtFiles.push(...chosen);
+            else _glFiles.push(...chosen);
+            inputEl.value = '';
+            renderFileList(zone);
+            updateRunBtn();
+        });
+    }
+
+    // ── Progress helpers ──────────────────────────────────────────────
+    function showProgress(show) {
+        const p = $('brv2-progress'), btn = $('brv2-run-btn'), err = $('brv2-error');
+        if (p)   p.style.display  = show ? '' : 'none';
+        if (btn) btn.disabled     = show;
+        if (err) err.style.display = 'none';
+    }
+    function showError(msg) {
+        const err = $('brv2-error');
+        if (err) { err.textContent = msg; err.style.display = ''; }
+        showProgress(false);
+        updateRunBtn();
+    }
+
+    // ── Run reconciliation ────────────────────────────────────────────
+    async function runRecon() {
+        if (_stmtFiles.length === 0 || _glFiles.length === 0) return;
+        const token = localStorage.getItem('auth_token') || '';
+        const lang  = (window._currentLang || 'th');
+        const acct  = ($('brv2-acct-select') || {}).value || '';
+
+        showProgress(true);
+        const results = $('brv2-results');
+        if (results) results.style.display = 'none';
+
+        try {
+            const fd = new FormData();
+            _stmtFiles.forEach(f => fd.append('stmt_files', f));
+            _glFiles.forEach(f => fd.append('gl_files', f));
+            fd.append('gl_account', acct);
+            fd.append('lang', lang);
+
+            const res = await fetch('/api/recon/bank-v2/run', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token },
+                body: fd,
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showError(data.detail || data.error || 'Error ' + res.status);
+                return;
+            }
+
+            // Handle multiple GL accounts
+            if ((data.gl_accounts || []).length > 1) {
+                populateAcctSelect(data.gl_accounts);
+            }
+
+            _currentTask = data;
+            _allRows = data.detail || [];
+            _currentFilter = 'all';
+
+            renderResults(data);
+            showProgress(false);
+            if (results) results.style.display = '';
+
+            // Refresh history
+            loadHistory();
+
+        } catch (e) {
+            showError(e.message || 'Network error');
+        }
+    }
+
+    function populateAcctSelect(accounts) {
+        const sel  = $('brv2-acct-select');
+        const row  = $('brv2-acct-row');
+        if (!sel || !row) return;
+        sel.innerHTML = `<option value="">ทั้งหมด / All</option>` +
+            accounts.map(a => `<option value="${esc2(a)}">${esc2(a)}</option>`).join('');
+        row.style.display = '';
+    }
+
+    // ── Render results ────────────────────────────────────────────────
+    function renderResults(data) {
+        const stats   = data.stats || {};
+        const summary = data.summary || {};
+
+        // Stats cards
+        const matched   = stats.matched || 0;
+        const glOnly    = (stats.gl_debit_only || 0) + (stats.gl_credit_only || 0);
+        const stmtOnly  = (stats.stmt_withdrawal_only || 0) + (stats.stmt_deposit_only || 0);
+        const fdiff     = Number(summary.formula_diff || 0);
+
+        if ($('brv2-stat-matched'))      $('brv2-stat-matched').textContent  = matched;
+        if ($('brv2-stat-gl-only'))      $('brv2-stat-gl-only').textContent  = glOnly;
+        if ($('brv2-stat-stmt-only'))    $('brv2-stat-stmt-only').textContent = stmtOnly;
+        if ($('brv2-stat-formula-diff')) $('brv2-stat-formula-diff').textContent = fmtNum(fdiff);
+
+        // Diff card color
+        const diffCard = $('brv2-card-diff');
+        if (diffCard) {
+            diffCard.classList.remove('has-diff', 'no-diff');
+            diffCard.classList.add(Math.abs(fdiff) < 0.05 ? 'no-diff' : 'has-diff');
+        }
+
+        // Formula box
+        function setFrm(id, val, neg) {
+            const el = $(id);
+            if (el) el.textContent = (neg && val > 0 ? '(' : '') + fmtNum(neg ? -val : val) + (neg && val > 0 ? ')' : '');
+        }
+        setFrm('brf-gl-close',     summary.gl_closing       || 0);
+        setFrm('brf-open-diff',    summary.opening_diff     || 0);
+        setFrm('brf-gl-debit-only',summary.gl_debit_only_amount || 0, true);
+        setFrm('brf-gl-credit-only',summary.gl_credit_only_amount || 0);
+        setFrm('brf-stmt-wd-only', summary.stmt_withdrawal_only_amount || 0, true);
+        setFrm('brf-stmt-dep-only',summary.stmt_deposit_only_amount || 0);
+        setFrm('brf-calc-close',   summary.formula_stmt_closing || 0);
+        setFrm('brf-stmt-close',   summary.stmt_closing     || 0);
+        if ($('brf-diff')) $('brf-diff').textContent = fmtNum(fdiff);
+
+        // Diff row color
+        const diffRow = document.querySelector('.brv2-formula-diff-row');
+        if (diffRow) {
+            diffRow.classList.remove('ok', 'has-diff');
+            diffRow.classList.add(Math.abs(fdiff) < 0.05 ? 'ok' : 'has-diff');
+        }
+
+        // Export button
+        const exportBtn = $('brv2-export-btn');
+        if (exportBtn) {
+            exportBtn.onclick = () => {
+                if (!_currentTask) return;
+                const l = window._currentLang || 'th';
+                window.open('/api/recon/bank-v2/' + _currentTask.task_id + '/export?lang=' + l, '_blank');
+            };
+        }
+
+        renderTable();
+    }
+
+    function renderTable() {
+        const tbody = $('brv2-tbody');
+        if (!tbody) return;
+
+        const rows = _allRows.filter(r => {
+            if (_currentFilter === 'all')     return true;
+            if (_currentFilter === 'matched') return r.match_status === 'matched';
+            if (_currentFilter === 'gl_only') return r.match_status.startsWith('gl_');
+            if (_currentFilter === 'stmt_only') return r.match_status.startsWith('stmt_');
+            return true;
+        });
+
+        if (rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--ink-3)">ไม่มีรายการ</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = rows.map(r => {
+            const st = r.match_status;
+            const layer = r.match_layer;
+
+            let rowClass = '';
+            let badge = '';
+            if (st === 'matched') {
+                if (layer === 1) { rowClass = 'matched';    badge = '<span class="brv2-status-badge brv2-badge-matched">L1 ✓</span>'; }
+                if (layer === 2) { rowClass = 'matched-l2'; badge = '<span class="brv2-status-badge brv2-badge-matched-l2">L2 ~</span>'; }
+                if (layer === 3) { rowClass = 'matched-l3'; badge = '<span class="brv2-status-badge brv2-badge-matched-l3">L3 ?</span>'; }
+            } else if (st === 'gl_debit_only' || st === 'gl_credit_only') {
+                rowClass = 'gl-only';
+                badge = '<span class="brv2-status-badge brv2-badge-gl-only">GL</span>';
+            } else {
+                rowClass = 'stmt-only';
+                badge = '<span class="brv2-status-badge brv2-badge-stmt-only">บัญชี</span>';
+            }
+
+            return `<tr class="${rowClass}">
+              <td>${badge}</td>
+              <td>${esc2(fmtDate(r.stmt_date))}</td>
+              <td title="${esc2(r.stmt_desc)}" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc2(r.stmt_desc)}</td>
+              <td class="num">${r.stmt_withdrawal ? fmtNum(r.stmt_withdrawal) : ''}</td>
+              <td class="num">${r.stmt_deposit    ? fmtNum(r.stmt_deposit)    : ''}</td>
+              <td>${esc2(fmtDate(r.gl_date))}</td>
+              <td title="${esc2(r.gl_doc_no)}" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc2(r.gl_doc_no)}</td>
+              <td class="num">${r.gl_debit  ? fmtNum(r.gl_debit)  : ''}</td>
+              <td class="num">${r.gl_credit ? fmtNum(r.gl_credit) : ''}</td>
+              <td>${layer ? 'L' + layer : '—'}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ── History ───────────────────────────────────────────────────────
+    async function loadHistory() {
+        const token = localStorage.getItem('auth_token') || '';
+        const listEl = $('brv2-history-list');
+        if (!listEl) return;
+        try {
+            const res  = await fetch('/api/recon/bank-v2/tasks', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const data = await res.json();
+            renderHistory(data.tasks || []);
+        } catch (e) {
+            if (listEl) listEl.innerHTML = '<div class="brv2-history-loading" style="color:#dc2626">โหลดประวัติไม่ได้</div>';
+        }
+    }
+
+    function renderHistory(tasks) {
+        const listEl = $('brv2-history-list');
+        if (!listEl) return;
+        if (!tasks.length) {
+            listEl.innerHTML = '<div class="brv2-history-loading">ยังไม่มีประวัติ</div>';
+            return;
+        }
+        const token = localStorage.getItem('auth_token') || '';
+        listEl.innerHTML = tasks.map(t => {
+            const bank   = (t.bank_code || 'bank').toUpperCase();
+            const diff   = Number(t.formula_diff || 0);
+            const diffOk = Math.abs(diff) < 0.05;
+            const diffCls = diffOk ? 'brv2-hist-diff-ok' : 'brv2-hist-diff-bad';
+            const diffTxt = diffOk ? '✓' : fmtNum(diff);
+            const stmtF  = (t.stmt_files || '').split(';')[0].trim().split('/').pop().split('\\').pop();
+            const glF    = (t.gl_files   || '').split(';')[0].trim().split('/').pop().split('\\').pop();
+            const dt     = t.created_at ? String(t.created_at).slice(0, 16).replace('T', ' ') : '';
+            return `<div class="brv2-hist-item" data-task-id="${t.id}">
+              <div class="brv2-hist-bank">${esc2(bank)}</div>
+              <div class="brv2-hist-info">
+                <div class="brv2-hist-files">${esc2(stmtF)} · ${esc2(glF)}</div>
+                <div class="brv2-hist-meta">${dt} · ✓${t.matched_count || 0} GL${(t.unmatched_gl||0)} บัญชี${(t.unmatched_stmt||0)}</div>
+              </div>
+              <div class="brv2-hist-stats"><span class="${diffCls}">${diffTxt}</span></div>
+              <button class="brv2-hist-del" data-task-id="${t.id}" title="ลบ">
+                <svg viewBox="0 0 14 14" width="12" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <path d="M2 4h10M5 4V2h4v2M6 7v4M8 7v4M3 4l1 8h6l1-8"/>
+                </svg>
+              </button>
+            </div>`;
+        }).join('');
+
+        // Bind history click
+        listEl.querySelectorAll('.brv2-hist-item').forEach(el => {
+            el.addEventListener('click', async (e) => {
+                if (e.target.closest('.brv2-hist-del')) return;
+                const tid = el.dataset.taskId;
+                await loadTask(tid, token);
+            });
+        });
+
+        // Bind delete
+        listEl.querySelectorAll('.brv2-hist-del').forEach(btn => {
+            btn.addEventListener('click', async e => {
+                e.stopPropagation();
+                const tid = btn.dataset.taskId;
+                if (!confirm('ลบรายการนี้?')) return;
+                await fetch('/api/recon/bank-v2/' + tid, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + token },
+                });
+                loadHistory();
+            });
+        });
+    }
+
+    async function loadTask(taskId, token) {
+        try {
+            const res  = await fetch('/api/recon/bank-v2/' + taskId, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const data = await res.json();
+            if (!data.ok) return;
+            _currentTask   = { task_id: data.task_id, ...data };
+            _allRows       = data.detail || [];
+            _currentFilter = 'all';
+            const results  = $('brv2-results');
+            if (results) results.style.display = '';
+            renderResults(_currentTask);
+        } catch (e) { /* silent */ }
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────
+    function init() {
+        setupDrop('brv2-stmt-zone', 'brv2-stmt-input', 'stmt');
+        setupDrop('brv2-gl-zone',   'brv2-gl-input',   'gl');
+
+        const runBtn = $('brv2-run-btn');
+        if (runBtn) runBtn.addEventListener('click', runRecon);
+
+        const newBtn = $('brv2-new-btn');
+        if (newBtn) newBtn.addEventListener('click', () => {
+            _currentTask   = null;
+            _allRows       = [];
+            _stmtFiles     = [];
+            _glFiles       = [];
+            renderFileList('stmt');
+            renderFileList('gl');
+            updateRunBtn();
+            const results = $('brv2-results');
+            if (results) results.style.display = 'none';
+        });
+
+        // Filter tabs
+        const filterTabs = $('brv2-filter-tabs');
+        if (filterTabs) {
+            filterTabs.addEventListener('click', e => {
+                const btn = e.target.closest('.brv2-filter-btn');
+                if (!btn) return;
+                _currentFilter = btn.dataset.filter;
+                filterTabs.querySelectorAll('.brv2-filter-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn)
+                );
+                renderTable();
+            });
+        }
+
+        loadHistory();
+        updateRunBtn();
+    }
+
+    // Expose load function for panel system
+    window._loadBankReconV2Panel = function(containerId) {
+        // Re-mount into given container if different (used by int-drawer)
+        const container = containerId ? document.getElementById(containerId) : null;
+        if (container && container.id !== 'recon-pane-bank') {
+            container.innerHTML = `<div style="padding:16px;font-size:13px;color:var(--ink-3)">
+                银行对账 v2 · 请前往对账中心使用</div>`;
+        }
+        init();
+    };
+
+    // Auto-init when pane becomes visible
+    document.addEventListener('DOMContentLoaded', () => {
+        // Init immediately if pane is active
+        if ($('brv2-run-btn')) init();
+    });
+
+    // Also init when reconcile page is navigated to
+    window._bankReconV2Init = init;
+
+})();
+
+/* ============================================================
  * v0.19 · T1 · LINE Bot 面板
  * ============================================================ */
 (function () {
@@ -24916,33 +25511,30 @@ try { window.I18N = I18N; } catch(e) {}
     }
 
     function _gotoBankSession(sessionId) {
-        // 打开集成抽屉加载银行对账面板 · 然后进入该会话详情
-        var title = (typeof t === 'function' ? t('auto-bank-title') : null) || '银行对账';
-        if (typeof window.openIntegrationDrawer === 'function') {
-            window.openIntegrationDrawer('bank', title);
-        }
-        if (sessionId) {
-            setTimeout(function() {
-                if (typeof window._openBankSession === 'function') {
-                    window._openBankSession(sessionId);
-                }
-            }, 400);
-        }
+        // v118.33.6 · redirect to reconcile center bank tab
+        if (typeof window.routeTo === 'function') window.routeTo('reconcile');
+        setTimeout(function() {
+            const bankTab = document.querySelector('[data-recon-tab="bank"]');
+            if (bankTab) bankTab.click();
+        }, 150);
     }
 
     function _renderError() {
-        _setNum('pending', 0, true);
-        _setNum('matched', 0, true);
-        _setNum('unmatched', 0, true);
-        _setLastActivityText('', false);
         _showError(true);
         _showEmpty(false);
     }
 
     function _gotoBankUpload() {
-        // 对账中心原地上传 · 直接触发文件选择器
-        var inp = document.getElementById('reconcile-bank-file-input');
-        if (inp) inp.click();
+        // v118.33.6 · go to reconcile center bank tab and trigger file pick
+        if (typeof window.routeTo === 'function') window.routeTo('reconcile');
+        setTimeout(function() {
+            const bankTab = document.querySelector('[data-recon-tab="bank"]');
+            if (bankTab) bankTab.click();
+            setTimeout(function() {
+                const stmtBtn = document.getElementById('brv2-stmt-btn');
+                if (stmtBtn) stmtBtn.click();
+            }, 300);
+        }, 150);
     }
 
     async function load() {
@@ -25085,7 +25677,12 @@ try { window.I18N = I18N; } catch(e) {}
     window.loadReconcilePage = async function() {
         _bindOnce();
         _maybeShowDevSeed();
-        await load();
+        // v118.33.6 · init bank recon v2 on reconcile page load
+        if (typeof window._bankReconV2Init === 'function') {
+            window._bankReconV2Init();
+        }
+        // Legacy stats load (harmless if DOM elements removed)
+        try { await load(); } catch(e) {}
     };
 
     // v118.26.1.2 · 对账中心首页注册 i18n 订阅总线
@@ -28125,6 +28722,10 @@ window.pearnlyConfirm = function (message, title) {
                 _setMainHeader(pane);
                 if (pane === 'sale-vat') _loadTasks();
                 if (pane === 'gl-vat' && window.GlVatRecon) window.GlVatRecon.ensureInit();
+                // v118.33.6 · Bank Recon v2 init on tab switch
+                if (pane === 'bank' && typeof window._bankReconV2Init === 'function') {
+                    window._bankReconV2Init();
+                }
             });
         });
         const activeTab = document.querySelector('[data-recon-tab].active');

@@ -196,6 +196,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动 vat_recon_tasks 建表失败: {e}")
 
+    # v118.33.6 · Bank Reconciliation v2 (Statement vs GL)
+    try:
+        db.ensure_bank_recon_v2_table()
+    except Exception as e:
+        logger.warning(f"启动 bank_recon_v2 建表失败: {e}")
+
     # v110.7 · 启动确保 users 表有欢迎向导用的 profile 字段(幂等 · 已有字段无影响)
     try:
         _ensure_user_profile_columns()

@@ -1113,3 +1113,296 @@ async def gl_vat_batch_delete(body: _GlBatchDeleteBody, request: Request):
         return {"deleted": 0}
     deleted = db.delete_gl_vat_tasks_batch(body.ids, str(user["id"]))
     return {"deleted": int(deleted)}
+
+
+# ════════════════════════════════════════════════════════════════════
+# v118.33.6 · Bank Statement vs GL Reconciliation v2
+# ════════════════════════════════════════════════════════════════════
+from bank_recon_v2 import (
+    parse_bank_statement_pdf, parse_gl as parse_gl_v2,
+    merge_statements, merge_gl_files,
+    reconcile as bank_reconcile,
+    export_bank_recon_excel,
+    rows_to_json, rows_from_json,
+    summary_to_json as bank_summary_to_json,
+    summary_from_json as bank_summary_from_json,
+)
+
+_BRV2_ERR = {
+    "auth_required": {"zh": "未登录", "en": "Not logged in", "th": "ยังไม่ได้เข้าสู่ระบบ", "ja": "未ログイン"},
+    "no_stmt_files":  {"zh": "请上传银行账单", "en": "Please upload bank statement files",
+                       "th": "กรุณาอัปโหลดไฟล์บัญชีธนาคาร", "ja": "銀行明細ファイルをアップロードしてください"},
+    "no_gl_files":    {"zh": "请上传GL文件", "en": "Please upload GL files",
+                       "th": "กรุณาอัปโหลดไฟล์ GL", "ja": "GLファイルをアップロードしてください"},
+    "stmt_parse_fail": {"zh": "账单解析失败: {e}", "en": "Statement parse failed: {e}",
+                        "th": "อ่านไฟล์บัญชีไม่สำเร็จ: {e}", "ja": "明細解析失敗: {e}"},
+    "gl_parse_fail":   {"zh": "GL解析失败: {e}", "en": "GL parse failed: {e}",
+                        "th": "อ่านไฟล์ GL ไม่สำเร็จ: {e}", "ja": "GL解析失敗: {e}"},
+    "stmt_no_rows":    {"zh": "账单中未找到交易记录", "en": "No transactions found in bank statement",
+                        "th": "ไม่พบรายการในบัญชีธนาคาร", "ja": "銀行明細に取引が見つかりません"},
+    "gl_no_rows":      {"zh": "GL中未找到记录", "en": "No rows found in GL",
+                        "th": "ไม่พบรายการใน GL", "ja": "GLにデータが見つかりません"},
+    "task_not_found":  {"zh": "任务不存在", "en": "Task not found",
+                        "th": "ไม่พบงาน", "ja": "タスクが見つかりません"},
+}
+
+
+def _brv2_err(key: str, lang: str = "th", **fmt) -> str:
+    lang = lang if lang in ("zh", "en", "th", "ja") else "th"
+    msg = (_BRV2_ERR.get(key) or {}).get(lang) or (_BRV2_ERR.get(key) or {}).get("en") or key
+    return msg.format(**fmt) if fmt else msg
+
+
+def _user_api_key(user: dict) -> str:
+    """Extract Gemini API key from user record."""
+    return (user.get("gemini_api_key") or user.get("api_key") or
+            os.environ.get("GEMINI_API_KEY", ""))
+
+
+@router.post("/bank-v2/run")
+async def bank_v2_run(
+    request: Request,
+    stmt_files: List[UploadFile] = File(...),
+    gl_files: List[UploadFile] = File(...),
+    gl_account: str = Form(""),
+    lang: str = Form("th"),
+):
+    """
+    Upload bank statement PDF(s) + GL file(s), run reconciliation.
+    Returns {ok, task_id, stats, detail, summary, gl_accounts}
+    """
+    import asyncio
+    lang = lang if lang in ("zh", "en", "th", "ja") else "th"
+    user = get_current_user_from_request(request)
+    if not user:
+        raise HTTPException(401, _brv2_err("auth_required", lang))
+
+    if not stmt_files:
+        raise HTTPException(422, _brv2_err("no_stmt_files", lang))
+    if not gl_files:
+        raise HTTPException(422, _brv2_err("no_gl_files", lang))
+
+    api_key = _user_api_key(user)
+    loop = asyncio.get_event_loop()
+
+    # 1. Read all uploaded files
+    stmt_data = []
+    for f in stmt_files:
+        content = await f.read()
+        stmt_data.append((content, f.filename or "statement.pdf"))
+
+    gl_data = []
+    for f in gl_files:
+        content = await f.read()
+        gl_data.append((content, f.filename or "gl.xlsx"))
+
+    # 2. Parse statement files (parallel)
+    async def _parse_stmt(b, fname):
+        return await loop.run_in_executor(
+            None, lambda: parse_bank_statement_pdf(b, fname, api_key)
+        )
+
+    async def _parse_gl(b, fname):
+        return await loop.run_in_executor(
+            None, lambda: parse_gl_v2(b, fname, gl_account, api_key)
+        )
+
+    stmt_results = await asyncio.gather(*[_parse_stmt(b, fn) for b, fn in stmt_data])
+    gl_results = await asyncio.gather(*[_parse_gl(b, fn) for b, fn in gl_data])
+
+    # Check for parse errors
+    stmt_errors = [r.get("error", "parse error") for r in stmt_results if not r.get("ok")]
+    if stmt_errors:
+        raise HTTPException(422, _brv2_err("stmt_parse_fail", lang, e="; ".join(stmt_errors[:2])))
+
+    gl_errors = [r.get("error", "parse error") for r in gl_results if not r.get("ok")]
+    if gl_errors:
+        raise HTTPException(422, _brv2_err("gl_parse_fail", lang, e="; ".join(gl_errors[:2])))
+
+    # 3. Merge multi-file data
+    stmt_rows, stmt_opening, stmt_closing, bank_code = merge_statements(list(stmt_results))
+    gl_rows, gl_accounts, gl_opening, gl_closing = merge_gl_files(list(gl_results), gl_account)
+
+    if not stmt_rows:
+        raise HTTPException(422, _brv2_err("stmt_no_rows", lang))
+    if not gl_rows:
+        raise HTTPException(422, _brv2_err("gl_no_rows", lang))
+
+    # 4. Reconcile
+    recon_rows, summary = bank_reconcile(
+        stmt_rows, gl_rows,
+        stmt_opening=stmt_opening, gl_opening=gl_opening,
+        stmt_closing=stmt_closing, gl_closing=gl_closing,
+        bank_code=bank_code, gl_account_code=gl_account,
+    )
+
+    # 5. Serialize
+    detail_j = rows_to_json(recon_rows)
+    summary_j = bank_summary_to_json(summary)
+
+    # 6. Persist
+    stmt_file_names = "; ".join(fn for _, fn in stmt_data)
+    gl_file_names   = "; ".join(fn for _, fn in gl_data)
+
+    unmatched_gl   = summary.gl_debit_only_count + summary.gl_credit_only_count
+    unmatched_stmt = summary.stmt_withdrawal_only_count + summary.stmt_deposit_only_count
+
+    task_id = db.create_bank_recon_v2_task(
+        user_id=str(user["id"]),
+        tenant_id=user.get("tenant_id"),
+        bank_code=bank_code,
+        gl_account=gl_account,
+        stmt_files=stmt_file_names,
+        gl_files=gl_file_names,
+        stmt_row_count=len(stmt_rows),
+        gl_row_count=len(gl_rows),
+        matched_count=summary.matched_count,
+        unmatched_gl=unmatched_gl,
+        unmatched_stmt=unmatched_stmt,
+        stmt_opening=stmt_opening,
+        stmt_closing=stmt_closing,
+        gl_opening=gl_opening,
+        gl_closing=gl_closing,
+        formula_diff=summary.formula_diff,
+        detail_json=detail_j,
+        summary_json=summary_j,
+    )
+
+    return {
+        "ok": True,
+        "task_id": task_id,
+        "bank_code": bank_code,
+        "gl_accounts": gl_accounts,
+        "stmt_row_count": len(stmt_rows),
+        "gl_row_count": len(gl_rows),
+        "stats": {
+            "matched": summary.matched_count,
+            "gl_debit_only": summary.gl_debit_only_count,
+            "gl_credit_only": summary.gl_credit_only_count,
+            "stmt_withdrawal_only": summary.stmt_withdrawal_only_count,
+            "stmt_deposit_only": summary.stmt_deposit_only_count,
+            "total": len(recon_rows),
+            "formula_diff": summary.formula_diff,
+        },
+        "detail": detail_j,
+        "summary": summary_j,
+    }
+
+
+@router.get("/bank-v2/tasks")
+async def bank_v2_list_tasks(request: Request):
+    user = get_current_user_from_request(request)
+    if not user:
+        raise HTTPException(401, "未登录")
+    tasks = db.list_bank_recon_v2_tasks(
+        user_id=str(user["id"]),
+        tenant_id=user.get("tenant_id"),
+        limit=50,
+    )
+    return {"ok": True, "tasks": tasks}
+
+
+@router.get("/bank-v2/{task_id}")
+async def bank_v2_get_task(task_id: int, request: Request):
+    user = get_current_user_from_request(request)
+    if not user:
+        raise HTTPException(401, "未登录")
+    task = db.get_bank_recon_v2_task(task_id)
+    if not task:
+        raise HTTPException(404, _brv2_err("task_not_found", "th"))
+    import json as _j
+
+    def _safe_json(v):
+        if isinstance(v, str):
+            try: return _j.loads(v)
+            except: return v
+        return v
+
+    return {
+        "ok": True,
+        "task_id": task["id"],
+        "bank_code": task.get("bank_code"),
+        "gl_account": task.get("gl_account"),
+        "stmt_files": task.get("stmt_files"),
+        "gl_files": task.get("gl_files"),
+        "stmt_row_count": task.get("stmt_row_count"),
+        "gl_row_count": task.get("gl_row_count"),
+        "stats": {
+            "matched": task.get("matched_count") or 0,
+            "unmatched_gl": task.get("unmatched_gl") or 0,
+            "unmatched_stmt": task.get("unmatched_stmt") or 0,
+        },
+        "stmt_opening": float(task.get("stmt_opening") or 0),
+        "stmt_closing": float(task.get("stmt_closing") or 0),
+        "gl_opening": float(task.get("gl_opening") or 0),
+        "gl_closing": float(task.get("gl_closing") or 0),
+        "formula_diff": float(task.get("formula_diff") or 0),
+        "detail": _safe_json(task.get("detail_json")),
+        "summary": _safe_json(task.get("summary_json")),
+        "created_at": str(task.get("created_at") or ""),
+    }
+
+
+@router.get("/bank-v2/{task_id}/export")
+async def bank_v2_export(task_id: int, request: Request, lang: str = "th"):
+    """Export reconciliation result as Excel."""
+    import json as _j, urllib.parse
+    user = get_current_user_from_request(request)
+    if not user:
+        raise HTTPException(401, "未登录")
+    if lang not in ("th", "zh", "en", "ja"):
+        lang = "th"
+
+    task = db.get_bank_recon_v2_task(task_id)
+    if not task:
+        raise HTTPException(404, "任务不存在")
+
+    def _sj(v):
+        if isinstance(v, str):
+            try: return _j.loads(v)
+            except: return []
+        return v or []
+
+    detail_raw = _sj(task.get("detail_json"))
+    summary_raw = _sj(task.get("summary_json")) if isinstance(_sj(task.get("summary_json")), dict) else {}
+
+    recon_rows = rows_from_json(detail_raw)
+    summary = bank_summary_from_json(summary_raw)
+
+    excel_bytes = export_bank_recon_excel(recon_rows, summary, lang=lang)
+
+    bank_code = task.get("bank_code") or "bank"
+    ascii_name = f"BankRecon_v2_{task_id}_{bank_code.upper()}.xlsx"
+    utf8_name = urllib.parse.quote(ascii_name)
+    return StreamingResponse(
+        io.BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition":
+                 f"attachment; filename={ascii_name}; filename*=UTF-8''{utf8_name}"},
+    )
+
+
+@router.delete("/bank-v2/{task_id}")
+async def bank_v2_delete(task_id: int, request: Request):
+    user = get_current_user_from_request(request)
+    if not user:
+        raise HTTPException(401, "未登录")
+    ok = db.delete_bank_recon_v2_task(task_id, str(user["id"]))
+    if not ok:
+        raise HTTPException(404, "任务不存在或无权删除")
+    return {"ok": True}
+
+
+class _BankV2BatchDeleteBody(BaseModel):
+    ids: List[int]
+
+
+@router.post("/bank-v2/tasks/batch_delete")
+async def bank_v2_batch_delete(body: _BankV2BatchDeleteBody, request: Request):
+    user = get_current_user_from_request(request)
+    if not user:
+        raise HTTPException(401, "未登录")
+    if not body.ids:
+        return {"deleted": 0}
+    deleted = db.delete_bank_recon_v2_tasks_batch(body.ids, str(user["id"]))
+    return {"deleted": int(deleted)}

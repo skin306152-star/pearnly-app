@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11841135">
+<link rel="stylesheet" href="/static/home.css?v=11841136">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -4483,116 +4483,176 @@
         <!-- ── 银行对账面板(原有内容) ── -->
         <div id="recon-pane-bank" class="recon-pane active">
 
-        <!-- 上传卡片 -->
-        <div class="rc-upload-card" id="bank-upload-card">
-            <div class="rc-upload-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
+        <!-- ── Bank Recon v2 Upload Section ── -->
+        <div class="brv2-upload-section" id="brv2-upload-section">
+
+          <!-- Row: two upload zones side by side -->
+          <div class="brv2-upload-row">
+
+            <!-- Zone A: Bank Statement -->
+            <div class="brv2-upload-zone" id="brv2-stmt-zone" data-zone="stmt">
+              <input type="file" id="brv2-stmt-input" accept="application/pdf,.pdf" multiple style="display:none">
+              <div class="brv2-zone-icon">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22">
+                  <rect x="3" y="2" width="14" height="16" rx="2"/>
+                  <path d="M6 7h8M6 10h8M6 13h5"/>
                 </svg>
+              </div>
+              <div class="brv2-zone-body">
+                <div class="brv2-zone-title" data-i18n="brv2-stmt-title">บัญชีธนาคาร</div>
+                <div class="brv2-zone-hint" data-i18n="brv2-stmt-hint">PDF · KBank · BBL · KKP · KTB · หลายไฟล์ได้</div>
+              </div>
+              <button class="brv2-zone-btn" id="brv2-stmt-btn" type="button" data-i18n="brv2-choose-files">เลือกไฟล์</button>
+              <div class="brv2-file-list" id="brv2-stmt-list"></div>
             </div>
-            <div class="rc-upload-card-body">
-                <div class="rc-upload-card-title" data-i18n="bank-upload-title">上传银行对账单</div>
-                <div class="rc-upload-card-sub" data-i18n="bank-upload-sub-batch">支持多选 · KBank · SCB · BBL · 其他银行也能解析大部分流水</div>
-            </div>
-            <button class="btn rc-upload-btn" id="btn-reconcile-upload-top" type="button">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M8 2v9M4 6l4-4 4 4"/>
-                    <path d="M3 14h10"/>
+
+            <!-- Zone B: GL -->
+            <div class="brv2-upload-zone" id="brv2-gl-zone" data-zone="gl">
+              <input type="file" id="brv2-gl-input" accept=".xlsx,.xls,.pdf,application/pdf" multiple style="display:none">
+              <div class="brv2-zone-icon brv2-zone-icon-gl">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22">
+                  <rect x="2" y="3" width="16" height="14" rx="1.5"/>
+                  <path d="M2 7h16"/>
+                  <path d="M7 7v10M12 7v10"/>
                 </svg>
-                <span data-i18n="bank-btn-upload-batch">选择 PDF(可多选)</span>
+              </div>
+              <div class="brv2-zone-body">
+                <div class="brv2-zone-title" data-i18n="brv2-gl-title">บัญชีแยกประเภท (GL)</div>
+                <div class="brv2-zone-hint" data-i18n="brv2-gl-hint">Excel (.xlsx) หรือ PDF · หลายไฟล์ได้</div>
+              </div>
+              <button class="brv2-zone-btn" id="brv2-gl-btn" type="button" data-i18n="brv2-choose-files">เลือกไฟล์</button>
+              <div class="brv2-file-list" id="brv2-gl-list"></div>
+            </div>
+
+          </div><!-- /brv2-upload-row -->
+
+          <!-- GL account selector (shown when multiple accounts found) -->
+          <div class="brv2-acct-row" id="brv2-acct-row" style="display:none">
+            <label class="brv2-acct-label" data-i18n="brv2-acct-label">รหัสบัญชี GL</label>
+            <select class="brv2-acct-select" id="brv2-acct-select">
+              <option value="" data-i18n="brv2-acct-all">ทั้งหมด</option>
+            </select>
+            <span class="brv2-acct-hint" data-i18n="brv2-acct-hint">เลือกบัญชีธนาคารที่ต้องการ</span>
+          </div>
+
+          <!-- Run button + progress -->
+          <div class="brv2-run-row">
+            <button class="btn brv2-run-btn" id="brv2-run-btn" type="button" disabled>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
+                <path d="M3 4l5 4-5 4V4z" fill="currentColor" stroke="none"/>
+                <path d="M11 4v8"/>
+              </svg>
+              <span data-i18n="brv2-run-btn">เริ่มสอบทาน</span>
             </button>
-            <!-- 测试按钮 · 默认隐藏 -->
-            <button class="btn btn-ghost btn-small" id="btn-reconcile-dev-seed" type="button" style="display:none" title="测试数据 · 插一份 mock 银行对账(仅 skin 测试账号可见)">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/>
-                    <path d="M5.5 8h5M8 5.5v5"/>
-                </svg>
-                <span data-i18n="reconcile-dev-seed">插测试流水</span>
+            <div class="brv2-progress" id="brv2-progress" style="display:none">
+              <div class="brv2-progress-bar"><div class="brv2-progress-fill" id="brv2-progress-fill"></div></div>
+              <span class="brv2-progress-label" id="brv2-progress-label" data-i18n="brv2-processing">กำลังประมวลผล…</span>
+            </div>
+            <div class="brv2-error" id="brv2-error" style="display:none"></div>
+          </div>
+
+        </div><!-- /brv2-upload-section -->
+
+        <!-- ── Results Section ── -->
+        <div class="brv2-results" id="brv2-results" style="display:none">
+
+          <!-- Summary cards -->
+          <div class="brv2-summary-cards" id="brv2-summary-cards">
+            <div class="brv2-card brv2-card-match">
+              <div class="brv2-card-num" id="brv2-stat-matched">0</div>
+              <div class="brv2-card-lbl" data-i18n="brv2-stat-matched">จับคู่แล้ว</div>
+            </div>
+            <div class="brv2-card brv2-card-gl">
+              <div class="brv2-card-num" id="brv2-stat-gl-only">0</div>
+              <div class="brv2-card-lbl" data-i18n="brv2-stat-gl-only">GL เท่านั้น</div>
+            </div>
+            <div class="brv2-card brv2-card-stmt">
+              <div class="brv2-card-num" id="brv2-stat-stmt-only">0</div>
+              <div class="brv2-card-lbl" data-i18n="brv2-stat-stmt-only">บัญชีเท่านั้น</div>
+            </div>
+            <div class="brv2-card brv2-card-diff" id="brv2-card-diff">
+              <div class="brv2-card-num" id="brv2-stat-formula-diff">0.00</div>
+              <div class="brv2-card-lbl" data-i18n="brv2-stat-diff">ผลต่าง</div>
+            </div>
+          </div>
+
+          <!-- Reconciliation formula mini-table -->
+          <div class="brv2-formula-box" id="brv2-formula-box">
+            <div class="brv2-formula-title" data-i18n="brv2-formula-title">สูตรสอบทาน</div>
+            <table class="brv2-formula-table" id="brv2-formula-table">
+              <tbody>
+                <tr><td data-i18n="brv2-gl-close">ยอดปิด GL</td><td class="brv2-num" id="brf-gl-close">—</td></tr>
+                <tr><td data-i18n="brv2-open-diff">ผลต่างยอดเปิด</td><td class="brv2-num" id="brf-open-diff">—</td></tr>
+                <tr><td data-i18n="brv2-gl-debit-only">GL เดบิตเท่านั้น (−)</td><td class="brv2-num" id="brf-gl-debit-only">—</td></tr>
+                <tr><td data-i18n="brv2-gl-credit-only">GL เครดิตเท่านั้น (+)</td><td class="brv2-num" id="brf-gl-credit-only">—</td></tr>
+                <tr><td data-i18n="brv2-stmt-wd-only">บัญชีถอนเท่านั้น (−)</td><td class="brv2-num" id="brf-stmt-wd-only">—</td></tr>
+                <tr><td data-i18n="brv2-stmt-dep-only">บัญชีฝากเท่านั้น (+)</td><td class="brv2-num" id="brf-stmt-dep-only">—</td></tr>
+                <tr class="brv2-formula-sep"><td data-i18n="brv2-calc-close">ยอดปิดคำนวณ</td><td class="brv2-num brv2-bold" id="brf-calc-close">—</td></tr>
+                <tr><td data-i18n="brv2-stmt-close">ยอดปิดบัญชีธนาคาร</td><td class="brv2-num" id="brf-stmt-close">—</td></tr>
+                <tr class="brv2-formula-diff-row"><td data-i18n="brv2-diff-label">ผลต่าง (ควรเป็น 0)</td><td class="brv2-num brv2-bold" id="brf-diff">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Action bar -->
+          <div class="brv2-action-bar">
+            <div class="brv2-filter-tabs" id="brv2-filter-tabs">
+              <button class="brv2-filter-btn active" data-filter="all" data-i18n="brv2-filter-all">ทั้งหมด</button>
+              <button class="brv2-filter-btn" data-filter="matched" data-i18n="brv2-filter-matched">จับคู่แล้ว</button>
+              <button class="brv2-filter-btn" data-filter="gl_only" data-i18n="brv2-filter-gl-only">GL เท่านั้น</button>
+              <button class="brv2-filter-btn" data-filter="stmt_only" data-i18n="brv2-filter-stmt-only">บัญชีเท่านั้น</button>
+            </div>
+            <button class="btn btn-ghost btn-small" id="brv2-export-btn" type="button">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" width="13" height="13">
+                <path d="M3 11v2h10v-2M8 2v8M5 7l3 4 3-4"/>
+              </svg>
+              <span data-i18n="brv2-export-excel">ส่งออก Excel</span>
             </button>
-        </div>
+            <button class="btn btn-ghost btn-small" id="brv2-new-btn" type="button">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" width="13" height="13">
+                <path d="M8 3v10M3 8h10"/>
+              </svg>
+              <span data-i18n="brv2-new-btn">สร้างใหม่</span>
+            </button>
+          </div>
 
-        <!-- 3 个统计卡:当月概览 -->
-        <div class="reconcile-stats-grid" id="reconcile-stats-grid">
-            <div class="reconcile-stat-card pending" data-stat="pending" id="reconcile-stat-pending">
-                <div class="reconcile-stat-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="9"/>
-                        <path d="M12 7v5l3 2"/>
-                    </svg>
-                </div>
-                <div class="reconcile-stat-body">
-                    <div class="reconcile-stat-num" data-num-target="pending">-</div>
-                    <div class="reconcile-stat-label" data-i18n="reconcile-pending">待对账</div>
-                </div>
-            </div>
-            <div class="reconcile-stat-card matched" data-stat="matched" id="reconcile-stat-matched">
-                <div class="reconcile-stat-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12l4 4 10-10"/>
-                    </svg>
-                </div>
-                <div class="reconcile-stat-body">
-                    <div class="reconcile-stat-num" data-num-target="matched">-</div>
-                    <div class="reconcile-stat-label" data-i18n="reconcile-matched">已完成</div>
-                </div>
-            </div>
-            <div class="reconcile-stat-card unmatched" data-stat="unmatched" id="reconcile-stat-unmatched">
-                <div class="reconcile-stat-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="9"/>
-                        <path d="M12 8v4M12 16h.01"/>
-                    </svg>
-                </div>
-                <div class="reconcile-stat-body">
-                    <div class="reconcile-stat-num" data-num-target="unmatched">-</div>
-                    <div class="reconcile-stat-label" data-i18n="reconcile-unmatched">未匹配</div>
-                </div>
-            </div>
-        </div>
+          <!-- Detail table -->
+          <div class="brv2-table-wrap">
+            <table class="brv2-table" id="brv2-detail-table">
+              <thead>
+                <tr>
+                  <th data-i18n="brv2-th-status">สถานะ</th>
+                  <th data-i18n="brv2-th-stmt-date">วันที่บัญชี</th>
+                  <th data-i18n="brv2-th-stmt-desc">รายการบัญชี</th>
+                  <th class="num" data-i18n="brv2-th-wd">ถอน</th>
+                  <th class="num" data-i18n="brv2-th-dep">ฝาก</th>
+                  <th data-i18n="brv2-th-gl-date">วันที่ GL</th>
+                  <th data-i18n="brv2-th-gl-doc">เลขที่ GL</th>
+                  <th class="num" data-i18n="brv2-th-gl-debit">เดบิต</th>
+                  <th class="num" data-i18n="brv2-th-gl-credit">เครดิต</th>
+                  <th data-i18n="brv2-th-layer">ชั้น</th>
+                </tr>
+              </thead>
+              <tbody id="brv2-tbody"></tbody>
+            </table>
+          </div>
 
-        <!-- 最近对账时间 / 加载错误提示 / 空态 -->
-        <div class="reconcile-meta-row" id="reconcile-meta-row">
-            <span class="reconcile-last-activity" id="reconcile-last-activity"></span>
-        </div>
+        </div><!-- /brv2-results -->
 
-        <div class="reconcile-error" id="reconcile-error" style="display:none;">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="8" cy="8" r="6.5"/>
-                <path d="M8 5v3M8 11h.01"/>
+        <!-- ── History Section ── -->
+        <div class="brv2-history" id="brv2-history">
+          <div class="brv2-history-head">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" width="14" height="14">
+              <circle cx="8" cy="8" r="6.5"/>
+              <path d="M8 4v4l2.5 2"/>
             </svg>
-            <span data-i18n="reconcile-stats-load-failed">加载概览失败 · 请检查网络</span>
-            <button class="btn btn-ghost btn-tiny" id="btn-reconcile-retry" type="button">
-                <span data-i18n="reconcile-stats-retry">重试</span>
-            </button>
+            <span data-i18n="brv2-history-title">ประวัติการสอบทาน</span>
+          </div>
+          <div class="brv2-history-list" id="brv2-history-list">
+            <div class="brv2-history-loading" data-i18n="brv2-loading">กำลังโหลด…</div>
+          </div>
         </div>
 
-        <div class="reconcile-empty" id="reconcile-empty" style="display:none;">
-            <div class="reconcile-empty-icon">
-                <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="10" y="14" width="44" height="36" rx="3"/>
-                    <line x1="10" y1="24" x2="54" y2="24"/>
-                    <line x1="18" y1="34" x2="34" y2="34"/>
-                    <line x1="18" y1="40" x2="28" y2="40"/>
-                    <circle cx="46" cy="40" r="6"/>
-                    <path d="M43 40l2 2 4-4"/>
-                </svg>
-            </div>
-            <div class="reconcile-empty-title" data-i18n="reconcile-empty-title">本月还没有对账会话</div>
-            <div class="reconcile-empty-hint" data-i18n="bank-empty-hint">还没有对账记录 · 上传一份对账单开始</div>
-        </div>
-
-        <!-- v118.26.1 · 最近对账会话列表(有数据时显示 · 替代空态) -->
-        <div class="reconcile-recent" id="reconcile-recent" style="display:none;">
-            <div class="reconcile-recent-head">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M2 4h12M2 8h12M2 12h8"/>
-                </svg>
-                <span data-i18n="reconcile-recent-title">最近对账</span>
-            </div>
-            <div class="reconcile-recent-list" id="reconcile-recent-list"></div>
-        </div>
         </div><!-- /recon-pane-bank -->
 
         <!-- ── 销项税对账面板(v118.32.0 · 屏 A) ── -->
@@ -6208,7 +6268,7 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11841135"></script>
+<script src="/static/home.js?v=11841136"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 

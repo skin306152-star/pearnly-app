@@ -1,31 +1,57 @@
 # 📋 BACKLOG · Pearnly 待办清单
 
-> **最近更新**:2026-05-17 · cache bust **v=11841136** · 银行对账 v2 全面重建(Statement vs GL · 3层匹配 · 4语言Excel导出) · 对账中心横向tab UI优化
-> **上次**:NAV-IA 重构 · 侧边栏分组 · 对账中心 tab 样式优化 · Git 自动部署流程建立
+> **最近更新**：2026-05-17 · cache bust **v=11841137** · 银行对账 v2 UI 对齐 vex-drop 视觉 + 双弹窗 bug 修复 + Git 部署可靠性全面加固
+> **上次**：银行对账 v2 后端 + 前端首次实现 · 对账中心横向 tab UI · Git 自动部署 webhook 建立
 
-## ✅ 已完成 · v118.33.6 · 银行对账 v2
+---
+
+## 🔴🔴 下窗口第一优先 · 银行对账 v2 · 部署测试未通过
+
+> **状态**：v11841137 已部署 · UI 视觉已重构对齐 vex-drop 风格 · **但测试未通过** · 具体问题由用户在下窗口反馈
+
+### 本窗口已完成（v11841137）
+- [x] UI 全面重构：使用 `vex-kpi-strip` / `vex-drops` / `vex-action-bar` / `recon-collapse` 与 GL-VAT、销项税对账完全一致的视觉结构
+- [x] 修复双弹窗 bug 根因：`init()` 加 `_initialized` 守卫，防止多次调用叠加 event listener
+- [x] 修复 `setupDrop`：整区点击触发文件对话框（去掉 zone 内部独立 button）
+- [x] 修复 `_gotoBankUpload`：去掉自动 click 按钮代码（进页面不再自动弹文件框）
+- [x] 过滤 tab 加 `stopPropagation` 防止触发折叠
+- [x] file chips 移到拖拽区外（`brv2-chips-row`），chip 上的 × 按钮加 `stopPropagation`
+- [x] Git 部署可靠性加固：
+  - `/internal/deploy` 改用 `Popen + start_new_session=True`（脱离父进程组，父死子不死）
+  - `git-deploy.sh v118.33.7`：fetch → checkout all → cp → restart → 健康检查 → 失败自动回滚
+  - 新增 `/internal/deploy/manual?token=` 备用手动触发接口
+  - 新增 `/internal/deploy/log?token=` 查看部署日志接口
+
+### ⚠️ 下窗口第一步：接收用户测试反馈并修复
+
+> 用户会在下窗口说明具体问题，先听完再动手
+
+**可能的问题方向（排查点）：**
+- 拖拽区点击后无反应 → `setupDrop` 内 `zoneEl.addEventListener('click', ...)` 是否绑上了
+- 文件选了但 Run 按钮没启用 → `updateRunBtn()` 是否被调
+- 提交后 API 返回错误 → 检查 `/api/recon/bank-v2/run` 端点和 `bank_recon_v2.py` 是否正常
+- 结果不显示 → `showResultSections(true)` + `renderResults()` 执行路径
+- i18n 文字没切换 → 检查 4 语字典中 `brv2-*` key 是否完整
+- 历史加载失败 → `/api/recon/bank-v2/tasks` 端点权限或 DB 问题
+
+---
+
+## ✅ 已完成 · v118.33.6 · 银行对账 v2 基础实现
 
 - [x] `bank_recon_v2.py` · 全新银行对账核心引擎
   - KBank / BBL / KKP / KTB / SCB / generic 自动识别 + 专属解析器
   - GL 支持 Excel (.xlsx/.xls) 和 PDF (pdfplumber → Gemini 兜底)
   - 3 层日期匹配：L1 精确日期 · L2 ±3天容差 · L3 仅金额
-  - 多文件合并 + 去重
-  - 多 GL 科目自动检测 · 用户下拉选择
+  - 多文件合并 + 去重 · 多 GL 科目自动检测
   - 对账公式验证：GL 期末 ± 调整项 = 账单期末
   - 4-sheet openpyxl Excel 导出 · 全 i18n (th/en/zh/ja) 表头
 - [x] API routes `/api/recon/bank-v2/*` · 落库 `bank_recon_v2_task` 表
 - [x] DB · `ensure_bank_recon_v2_table()` 幂等建表
-- [x] Frontend · 双上传区(账单 + GL) · 统计卡 · 对账公式框 · 可过滤明细表 · 历史记录
 - [x] i18n · 40+ 个 brv2- 前缀 key · zh/en/th/ja 全覆盖
-- [x] 旧 OCR 银行对账 UI 清除(DOM 瘦身)
-
-## 📌 待办
-
-
 
 ---
 
-## 🔴🔴 下窗口第一优先 · NAV-IA Phase 5 收尾 · 自动化并入集成
+## 🔴 下窗口第二优先 · NAV-IA Phase 5 收尾 · 自动化并入集成
 
 > **背景**:Phase 5(v118.33.5.0 · 2026-05-15)当时标为 ✅ 但漏了关键一步 — 「自动化」侧边栏入口没删 · 集成页的配置按钮还在跳自动化。本次完整收尾。
 > **拍板方案**:右侧抽屉(Drawer)模式 · 点集成页配置按钮 → 右侧滑入配置面板 · 不离开集成页

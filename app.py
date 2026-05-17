@@ -20,7 +20,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 import db  # v0.6.4 修复:新增 ERP 路由用到了 db.xxx 命名空间
-import line_client  # T1 · LINE Bot(v0.19.0)
+try:
+    import line_client  # T1 · LINE Bot(v0.19.0)
+except ImportError:
+    line_client = None  # line_client.py 不在 pearnly 仓库 · 文件需单独部署到服务器
 from db import (
     ensure_demo_account,
     find_user_by_username,

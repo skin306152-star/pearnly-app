@@ -1979,9 +1979,13 @@ def merge_gl_files(parsed_list: List[Dict[str, Any]],
 
     all_rows.sort(key=lambda r: (r.date or date.min, r.doc_no or ""))
 
+    # v118.33.13.5 · Cash-ledger formula (matches parse_gl_pdf v118.33.13.4):
+    # debit = cash IN (balance increase), credit = cash OUT (balance decrease)
+    # The OLD formula `opening + credit - debit` was the expense/revenue
+    # perspective and produced wrong closing balances for bank GLs.
     total_credit = sum(r.credit for r in all_rows)
     total_debit = sum(r.debit for r in all_rows)
-    closing = round(opening + total_credit - total_debit, 2)
+    closing = round(opening + total_debit - total_credit, 2)
 
     return all_rows, sorted(all_accounts), opening, closing
 

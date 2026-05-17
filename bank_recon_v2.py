@@ -1994,6 +1994,33 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     "bal_ok":           {"th": "✓ ผ่าน", "en": "✓ pass", "zh": "✓ 通过", "ja": "✓ 合格"},
     "bal_warn":         {"th": "⚠ ตรวจ", "en": "⚠ review", "zh": "⚠ 核对", "ja": "⚠ 要確認"},
     "bal_na":           {"th": "—", "en": "—", "zh": "—", "ja": "—"},
+    # v118.33.13.2 · Vertical itemized summary labels
+    "col_summary_item":   {"th": "รายการ", "en": "Item Description",
+                           "zh": "项目说明", "ja": "項目"},
+    "col_summary_amount": {"th": "จำนวนเงิน", "en": "Amount",
+                           "zh": "金额", "ja": "金額"},
+    "detail_no_items":    {"th": "ไม่มี", "en": "(none)",
+                           "zh": "无", "ja": "なし"},
+    "sec_open_diff_expand": {"th": "ผลต่างยอดเปิด (ยอดเปิดบัญชี − ยอดเปิด GL)",
+                             "en": "Opening Diff (Stmt Open − GL Open)",
+                             "zh": "期初差异（账单期初 − GL期初）",
+                             "ja": "期首差異（明細期首 − GL期首）"},
+    "sec_gl_debit_only_full":  {"th": "GL เดบิตเท่านั้น (ไม่มีในบัญชีธนาคาร)",
+                                "en": "GL Debit Only (not in Statement)",
+                                "zh": "GL 借方仅有（账单中不存在）",
+                                "ja": "GLのみ借方（明細に存在しない）"},
+    "sec_gl_credit_only_full": {"th": "GL เครดิตเท่านั้น (ไม่มีในบัญชีธนาคาร)",
+                                "en": "GL Credit Only (not in Statement)",
+                                "zh": "GL 贷方仅有（账单中不存在）",
+                                "ja": "GLのみ貸方（明細に存在しない）"},
+    "sec_stmt_wd_only_full":   {"th": "ถอนเงินในบัญชีเท่านั้น (ไม่มีใน GL)",
+                                "en": "Statement Withdrawal Only (not in GL)",
+                                "zh": "账单提款仅有（GL 中不存在）",
+                                "ja": "明細出金のみ（GLに存在しない）"},
+    "sec_stmt_dep_only_full":  {"th": "ฝากเงินในบัญชีเท่านั้น (ไม่มีใน GL)",
+                                "en": "Statement Deposit Only (not in GL)",
+                                "zh": "账单存款仅有（GL 中不存在）",
+                                "ja": "明細入金のみ（GLに存在しない）"},
 }
 
 
@@ -2173,179 +2200,200 @@ def export_bank_recon_excel(
     ws0.freeze_panes = "A3"
 
     # ══════════════════════════════════════════════════════════════════
-    # SHEET 1: Summary  (v118.33.13.1 · horizontal card layout, fixed col widths)
-    # Column allocation (UNIFIED across all rows — never override):
-    #   Card cols: 1, 3, 5, 7, 9, 11 → width 16 each
-    #   Op   cols: 2, 4, 6, 8, 10    → width 4 each
+    # SHEET 1: Summary  (v118.33.13.2 · vertical itemized layout)
+    # Style: 2-col (项目说明 | 金额), clear color tiers:
+    #   - Dark navy: title + main anchor rows (GL期末/账单期末)
+    #   - Light gray: section headers (减:/加:)
+    #   - White: detail rows (each unmatched item itemized)
+    #   - Blue: subtotal (计算期末余额)
+    #   - Red/green: final diff
+    # Inspired by the standard Thai/Chinese accounting reconciliation worksheet.
     # ══════════════════════════════════════════════════════════════════
     ws1 = wb.create_sheet(_t("sh_summary", lang))
     ws1.sheet_view.showGridLines = False
-    SUMM_COLS = 11
-    SUMM_CARD_W = 17
-    SUMM_OP_W = 4
-    for ci in range(1, SUMM_COLS + 1):
-        ws1.column_dimensions[get_column_letter(ci)].width = (
-            SUMM_CARD_W if ci % 2 == 1 else SUMM_OP_W
-        )
-    ws1.row_dimensions[1].height = 30
+    ws1.column_dimensions["A"].width = 78
+    ws1.column_dimensions["B"].width = 20
 
-    def _card(ws, row, col, label, value, *, value_fmt="#,##0.00",
-              card_fill="FFFFFF", value_fill=None, label_color="555555",
-              value_color="111111", bold_value=False):
-        """Draw a 2-row card: label on top (row), value below (row+1)."""
-        lc = ws.cell(row=row, column=col, value=label)
-        lc.font = Font(size=9, color=label_color, bold=False)
-        lc.fill = PatternFill("solid", fgColor=card_fill)
-        lc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        vc = ws.cell(row=row + 1, column=col, value=value)
-        vc.font = Font(size=11, bold=bold_value, color=value_color)
-        vc.alignment = Alignment(horizontal="right", vertical="center")
-        if isinstance(value, (int, float)):
-            vc.number_format = value_fmt
-        if value_fill:
-            vc.fill = PatternFill("solid", fgColor=value_fill)
-        return lc, vc
+    # Color palette
+    NAVY        = "1F2937"   # dark slate - main anchor rows
+    NAVY_LIGHT  = "374151"   # slightly lighter for sub-anchor
+    SECTION_BG  = "EEF2F6"   # very light blue-gray for section headers
+    DETAIL_BG   = "FFFFFF"
+    DETAIL_ALT  = "FAFBFC"
+    SUBTOTAL_BG = "DBEAFE"   # soft blue for calc-close subtotal
+    DIFF_OK_BG  = "D1FAE5"   # mint green for zero diff
+    DIFF_BAD_BG = "FEE2E2"   # soft red for non-zero diff
+    INFO_BG     = "F9FAFB"   # very subtle gray for bank/acct info
 
-    def _operator(ws, row, col, sym):
-        """Place math operator vertically merging the label row + value row.
-        (Does NOT change column widths — those are set once upfront.)"""
-        ws.merge_cells(start_row=row, start_column=col, end_row=row + 1, end_column=col)
-        c = ws.cell(row=row, column=col, value=sym)
-        c.font = Font(size=14, bold=True, color="6B7280")
+    NUM_FORMAT = '#,##0.00;[Red](#,##0.00)'
+
+    def _fmt_d(d):
+        if not d:
+            return ""
+        try:
+            return d.strftime("%d/%m/%Y")
+        except Exception:
+            return ""
+
+    def _title_row(row, text):
+        ws1.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+        c = ws1.cell(row, 1, text)
+        c.font = Font(bold=True, size=14, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor=NAVY)
         c.alignment = Alignment(horizontal="center", vertical="center")
+        ws1.row_dimensions[row].height = 32
 
-    # Title spans all 11 cols
-    ws1.merge_cells(start_row=1, start_column=1, end_row=1, end_column=SUMM_COLS)
-    title_cell = ws1.cell(row=1, column=1)
+    def _header_row(row, label_text, amount_text):
+        for col, txt in ((1, label_text), (2, amount_text)):
+            c = ws1.cell(row, col, txt)
+            c.font = Font(bold=True, size=11, color="FFFFFF")
+            c.fill = PatternFill("solid", fgColor=NAVY)
+            c.alignment = Alignment(horizontal="center", vertical="center")
+        ws1.row_dimensions[row].height = 26
+
+    def _anchor_row(row, label, value, *, bg=NAVY, fg="FFFFFF", size=12, bold=True):
+        a = ws1.cell(row, 1, label)
+        a.font = Font(bold=bold, size=size, color=fg)
+        a.fill = PatternFill("solid", fgColor=bg)
+        a.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        b = ws1.cell(row, 2, value)
+        b.font = Font(bold=bold, size=size, color=fg)
+        b.fill = PatternFill("solid", fgColor=bg)
+        b.alignment = Alignment(horizontal="right", vertical="center", indent=1)
+        b.number_format = NUM_FORMAT
+        ws1.row_dimensions[row].height = 24
+
+    def _section_row(row, label):
+        ws1.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+        c = ws1.cell(row, 1, label)
+        c.font = Font(bold=True, size=10, color="111827")
+        c.fill = PatternFill("solid", fgColor=SECTION_BG)
+        c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        ws1.row_dimensions[row].height = 22
+
+    def _detail_row(row, label, value, alt=False, italic=False, color="333333"):
+        bg = DETAIL_ALT if alt else DETAIL_BG
+        a = ws1.cell(row, 1, "  · " + (label if label else ""))
+        a.font = Font(size=9, color=color, italic=italic)
+        a.fill = PatternFill("solid", fgColor=bg)
+        a.alignment = Alignment(horizontal="left", vertical="center",
+                                indent=2, wrap_text=False)
+        b = ws1.cell(row, 2, value)
+        b.font = Font(size=10, color=color, italic=italic)
+        b.fill = PatternFill("solid", fgColor=bg)
+        b.alignment = Alignment(horizontal="right", vertical="center", indent=1)
+        if isinstance(value, (int, float)):
+            b.number_format = NUM_FORMAT
+        ws1.row_dimensions[row].height = 18
+
+    def _info_row(row, label, value):
+        a = ws1.cell(row, 1, label)
+        a.font = Font(size=10, color="6B7280")
+        a.fill = PatternFill("solid", fgColor=INFO_BG)
+        a.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        b = ws1.cell(row, 2, value)
+        b.font = Font(size=10, color="111827", bold=True)
+        b.fill = PatternFill("solid", fgColor=INFO_BG)
+        b.alignment = Alignment(horizontal="right", vertical="center", indent=1)
+        ws1.row_dimensions[row].height = 20
+
+    # ── 1. Title ──
     _RECON_TITLE = {"en": "Bank Reconciliation", "zh": "银行对账",
                     "th": "สอบทาน GL กับบัญชีธนาคาร", "ja": "銀行照合"}
-    title_cell.value = f"{_RECON_TITLE.get(lang, 'Bank Reconciliation')} · {summary.bank_code.upper()}"
-    title_cell.font = Font(bold=True, size=13, color="FFFFFF")
-    title_cell.fill = PatternFill("solid", fgColor=COLOR_HEADER)
-    title_cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    # Info bar (bank + acct) — span 2-col pairs
-    r = 2
-    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
-    ws1.cell(row=r, column=1, value=_t("lbl_bank", lang)).font = Font(bold=True, size=10)
-    ws1.cell(row=r, column=1).alignment = Alignment(horizontal="left", vertical="center")
-    ws1.merge_cells(start_row=r, start_column=3, end_row=r, end_column=4)
-    ws1.cell(row=r, column=3, value=summary.bank_code.upper()).font = Font(size=10)
-    ws1.merge_cells(start_row=r, start_column=5, end_row=r, end_column=6)
-    ws1.cell(row=r, column=5, value=_t("lbl_gl_acct", lang)).font = Font(bold=True, size=10)
-    ws1.merge_cells(start_row=r, start_column=7, end_row=r, end_column=8)
-    ws1.cell(row=r, column=7, value=summary.gl_account_code or "—").font = Font(size=10)
-    r += 2
-
-    # ── Section: Balance Statistics (5 horizontal cards at cols 1/3/5/7/9) ──
-    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=SUMM_COLS)
-    _hdr_style(ws1, r, 1, _t("lbl_stats", lang), color=COLOR_SUBHEAD, size=10)
-    r += 1
-    stats_cards = [
-        (_t("lbl_stmt_open", lang),  summary.stmt_opening),
-        (_t("lbl_stmt_close", lang), summary.stmt_closing),
-        (_t("lbl_gl_open", lang),    summary.gl_opening),
-        (_t("lbl_gl_close", lang),   summary.gl_closing),
-        (_t("lbl_open_diff", lang),  summary.opening_diff),
-    ]
-    for i, (lbl, val) in enumerate(stats_cards):
-        _card(ws1, r, i * 2 + 1, lbl, val, card_fill="F3F4F6", bold_value=True)
-    ws1.row_dimensions[r].height = 30
-    ws1.row_dimensions[r + 1].height = 24
-    r += 3
-
-    # ── Section: Reconciliation Formula ──
-    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=SUMM_COLS)
-    _hdr_style(ws1, r, 1, _t("lbl_formula_title", lang), color=COLOR_SUBHEAD, size=10)
+    r = 1
+    _title_row(r, f"{_RECON_TITLE.get(lang, 'Bank Reconciliation')} · {summary.bank_code.upper()}")
     r += 1
 
-    # 6 cards at cols 1/3/5/7/9/11; operators at 2/4/6/8/10
-    formula_inputs = [
-        (_t("lbl_gl_close", lang),       summary.gl_closing,              ""),
-        (_t("lbl_open_diff", lang),      summary.opening_diff,            "+"),
-        (_t("lbl_gl_debit_only", lang), -summary.gl_debit_only_amount,    "−"),
-        (_t("lbl_gl_credit_only", lang), summary.gl_credit_only_amount,   "+"),
-        (_t("lbl_stmt_wd_only", lang),  -summary.stmt_withdrawal_only_amount, "−"),
-        (_t("lbl_stmt_dep_only", lang),  summary.stmt_deposit_only_amount, "+"),
-    ]
-    col = 1
-    for i, (lbl, val, op) in enumerate(formula_inputs):
-        if op:
-            _operator(ws1, r, col, op)
-            col += 1
-        _card(ws1, r, col, lbl, val, card_fill="F3F4F6")
-        col += 1
-    ws1.row_dimensions[r].height = 30
-    ws1.row_dimensions[r + 1].height = 24
-    r += 3
+    # ── 2. Info: bank + GL account ──
+    _info_row(r, _t("lbl_bank", lang), summary.bank_code.upper())
+    r += 1
+    _info_row(r, _t("lbl_gl_acct", lang), summary.gl_account_code or "—")
+    r += 2  # blank-row spacer
 
-    # ── Result row: [=][Calc] [vs][Stmt] [→][Diff]
-    # Cards at cols 3/5/7 (16w); ops at 2/4/6 (4w); col 1 + 8-11 blank
-    _operator(ws1, r, 2, "=")
-    _card(ws1, r, 3, _t("lbl_formula_calc", lang), summary.formula_stmt_closing,
-          card_fill="DBEAFE", bold_value=True)
-    _operator(ws1, r, 4, "vs")
-    _card(ws1, r, 5, _t("lbl_stmt_close", lang), summary.stmt_closing,
-          card_fill="F3F4F6", bold_value=True)
-    _operator(ws1, r, 6, "→")
+    # ── 3. Column headers: 项目说明 | 金额 ──
+    _header_row(r, _t("col_summary_item", lang), _t("col_summary_amount", lang))
+    r += 1
+
+    # ── 4. Start anchor: GL 期末余额 ──
+    _anchor_row(r, _t("lbl_gl_close", lang), summary.gl_closing, bg=NAVY, size=12)
+    r += 1
+
+    # ── 5. + 期初差异 (signed) ──
+    sign_char = "+" if summary.opening_diff >= 0 else "−"
+    _section_row(r, f"{sign_char} {_t('sec_open_diff_expand', lang)}")
+    r += 1
+    open_diff_label = f"{summary.stmt_opening:,.2f} − {summary.gl_opening:,.2f}"
+    _detail_row(r, open_diff_label, summary.opening_diff)
+    r += 1
+
+    # ── 6. Itemized unmatched sections (4 categories) ──
+    def _add_itemized(sign_int, section_key, status_filter, get_fields):
+        """sign_int ∈ {-1, +1}.  get_fields(row) → (date_str, doc, desc, amt)."""
+        nonlocal r
+        ch = "+" if sign_int > 0 else "−"
+        rows_match = [rr for rr in recon_rows if rr.match_status == status_filter]
+        _section_row(r, f"{ch} {_t(section_key, lang)}")
+        r += 1
+        if not rows_match:
+            _detail_row(r, _t("detail_no_items", lang), 0.0, italic=True, color="9CA3AF")
+            r += 1
+            return
+        for i, rr in enumerate(rows_match):
+            date_str, doc, desc, amt = get_fields(rr)
+            parts = [p for p in (date_str, doc, desc) if p]
+            label = " · ".join(parts) if parts else ""
+            _detail_row(r, label, sign_int * (amt or 0), alt=(i % 2 == 1))
+            r += 1
+
+    def _gl_fields(rr):
+        amt = rr.gl_debit if rr.match_status == "gl_debit_only" else rr.gl_credit
+        return _fmt_d(rr.gl_date), rr.gl_doc_no or "", rr.gl_desc or "", amt
+
+    def _stmt_fields(rr):
+        amt = rr.stmt_withdrawal if rr.match_status == "stmt_withdrawal_only" else rr.stmt_deposit
+        return _fmt_d(rr.stmt_date), "", rr.stmt_desc or "", amt
+
+    _add_itemized(-1, "sec_gl_debit_only_full",  "gl_debit_only",  _gl_fields)
+    _add_itemized(+1, "sec_gl_credit_only_full", "gl_credit_only", _gl_fields)
+    _add_itemized(-1, "sec_stmt_wd_only_full",   "stmt_withdrawal_only", _stmt_fields)
+    _add_itemized(+1, "sec_stmt_dep_only_full",  "stmt_deposit_only",    _stmt_fields)
+
+    # ── 7. Subtotal: 计算期末余额 (light blue) ──
+    r += 1  # spacer
+    _anchor_row(r, _t("lbl_formula_calc", lang), summary.formula_stmt_closing,
+                bg=SUBTOTAL_BG, fg="1E3A8A", size=12)
+    r += 1
+
+    # ── 8. Target: 账单期末余额 (dark anchor, same style as GL_close) ──
+    _anchor_row(r, _t("lbl_stmt_close", lang), summary.stmt_closing, bg=NAVY, size=12)
+    r += 1
+
+    # ── 9. Final: 差异 (green if 0, red otherwise) ──
     diff_ok = abs(summary.formula_diff) < 0.05
-    _card(ws1, r, 7, _t("lbl_formula_diff", lang), summary.formula_diff,
-          card_fill=(COLOR_OK if diff_ok else COLOR_DIFF),
-          value_fill=(COLOR_OK if diff_ok else COLOR_DIFF),
-          value_color=("059669" if diff_ok else "DC2626"),
-          bold_value=True)
-    ws1.row_dimensions[r].height = 30
-    ws1.row_dimensions[r + 1].height = 24
-    r += 3
-
-    # ── Section: Count summary (5 cards at cols 1/3/5/7/9; 3-row each) ──
-    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=SUMM_COLS)
-    _hdr_style(ws1, r, 1, _t("lbl_count", lang), color=COLOR_SUBHEAD, size=10)
+    diff_bg = DIFF_OK_BG if diff_ok else DIFF_BAD_BG
+    diff_fg = "065F46" if diff_ok else "991B1B"
+    _anchor_row(r, _t("lbl_formula_diff", lang), summary.formula_diff,
+                bg=diff_bg, fg=diff_fg, size=13)
     r += 1
-    count_data = [
-        (_t("lbl_matched", lang),         summary.matched_count,
-         summary.stmt_total_deposit + summary.stmt_total_withdrawal
-             - summary.stmt_deposit_only_amount - summary.stmt_withdrawal_only_amount),
-        (_t("lbl_gl_debit_only", lang),   summary.gl_debit_only_count,   summary.gl_debit_only_amount),
-        (_t("lbl_gl_credit_only", lang),  summary.gl_credit_only_count,  summary.gl_credit_only_amount),
-        (_t("lbl_stmt_wd_only", lang),    summary.stmt_withdrawal_only_count, summary.stmt_withdrawal_only_amount),
-        (_t("lbl_stmt_dep_only", lang),   summary.stmt_deposit_only_count,    summary.stmt_deposit_only_amount),
-    ]
-    for i, (lbl, cnt, amt) in enumerate(count_data):
-        col = i * 2 + 1
-        lc = ws1.cell(row=r, column=col, value=lbl)
-        lc.font = Font(size=9, color="555555")
-        lc.fill = PatternFill("solid", fgColor="F3F4F6")
-        lc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        cc = ws1.cell(row=r + 1, column=col, value=cnt)
-        cc.font = Font(size=12, bold=True)
-        cc.alignment = Alignment(horizontal="center", vertical="center")
-        ac = ws1.cell(row=r + 2, column=col, value=amt)
-        ac.font = Font(size=10, color="6B7280")
-        ac.number_format = "#,##0.00"
-        ac.alignment = Alignment(horizontal="right", vertical="center")
-    ws1.row_dimensions[r].height = 30
-    ws1.row_dimensions[r + 1].height = 22
-    ws1.row_dimensions[r + 2].height = 22
-    r += 3
 
-    # v118.33.13.1 · OCR verification stats card (only when warnings exist)
+    # ── 10. OCR accuracy check (only if any warnings) ──
     warn_balance = sum(1 for rr in recon_rows if rr.stmt_balance_ok is False)
     warn_lowconf = sum(1 for rr in recon_rows if rr.stmt_confidence == "low")
     if warn_balance or warn_lowconf:
+        r += 1  # spacer
+        _section_row(r, _t("lbl_ocr_check", lang))
         r += 1
-        ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=SUMM_COLS)
-        _hdr_style(ws1, r, 1, _t("lbl_ocr_check", lang), color=COLOR_SUBHEAD, size=10)
-        r += 1
-        _card(ws1, r, 1, _t("lbl_ocr_bal_warn", lang), warn_balance,
-              value_fmt="0", card_fill="FEE2E2", bold_value=True,
-              value_color="DC2626")
-        _card(ws1, r, 3, _t("lbl_ocr_lowconf", lang), warn_lowconf,
-              value_fmt="0", card_fill="FFEDD5", bold_value=True,
-              value_color="EA580C")
-        ws1.row_dimensions[r].height = 30
-        ws1.row_dimensions[r + 1].height = 24
-        r += 2
+        if warn_balance:
+            _detail_row(r, _t("lbl_ocr_bal_warn", lang), warn_balance, color="DC2626")
+            r += 1
+        if warn_lowconf:
+            _detail_row(r, _t("lbl_ocr_lowconf", lang), warn_lowconf, color="EA580C", alt=True)
+            r += 1
+
+    # ── 11. Light border around the whole report ──
+    _border_range(ws1, 1, r - 1, 1, 2)
+    # Freeze header so it stays visible while scrolling
+    ws1.freeze_panes = "A6"
 
     # ══════════════════════════════════════════════════════════════════
     # SHEET 2: Matched Rows

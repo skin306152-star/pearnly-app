@@ -220,7 +220,7 @@ LOG=/var/log/mrpilot-deploy.log
 REPO=/opt/mrpilot
 REMOTE=pearnly
 BRANCH=master
-HEALTH_URL=http://localhost:8000/api/health
+HEALTH_URL=http://localhost:7860/api/health
 MAX_WAIT=30   # 等待服务启动的最大秒数
 
 echo "======================================" >> "$LOG"

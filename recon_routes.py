@@ -1118,15 +1118,20 @@ async def gl_vat_batch_delete(body: _GlBatchDeleteBody, request: Request):
 # ════════════════════════════════════════════════════════════════════
 # v118.33.6 · Bank Statement vs GL Reconciliation v2
 # ════════════════════════════════════════════════════════════════════
-from bank_recon_v2 import (
-    parse_bank_statement_pdf, parse_gl as parse_gl_v2,
-    merge_statements, merge_gl_files,
-    reconcile as bank_reconcile,
-    export_bank_recon_excel,
-    rows_to_json, rows_from_json,
-    summary_to_json as bank_summary_to_json,
-    summary_from_json as bank_summary_from_json,
-)
+try:
+    from bank_recon_v2 import (
+        parse_bank_statement_pdf, parse_gl as parse_gl_v2,
+        merge_statements, merge_gl_files,
+        reconcile as bank_reconcile,
+        export_bank_recon_excel,
+        rows_to_json, rows_from_json,
+        summary_to_json as bank_summary_to_json,
+        summary_from_json as bank_summary_from_json,
+    )
+    _BANK_V2_OK = True
+except ImportError as _brv2_import_err:
+    logger.warning(f"[bank-v2] bank_recon_v2 not available: {_brv2_import_err}")
+    _BANK_V2_OK = False
 
 _BRV2_ERR = {
     "auth_required": {"zh": "未登录", "en": "Not logged in", "th": "ยังไม่ได้เข้าสู่ระบบ", "ja": "未ログイン"},
@@ -1171,6 +1176,8 @@ async def bank_v2_run(
     Upload bank statement PDF(s) + GL file(s), run reconciliation.
     Returns {ok, task_id, stats, detail, summary, gl_accounts}
     """
+    if not _BANK_V2_OK:
+        raise HTTPException(503, "Bank Recon v2 module not available on this server")
     import asyncio
     lang = lang if lang in ("zh", "en", "th", "ja") else "th"
     user = get_current_user_from_request(request)

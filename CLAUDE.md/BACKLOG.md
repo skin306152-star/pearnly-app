@@ -1,7 +1,27 @@
 # 📋 BACKLOG · Pearnly 待办清单
 
-> **最近更新**:2026-05-17(凌晨) · cache bust **v=11841126** · session 踢人弹窗修复 + 心跳端点修复 + 大 PDF 504 修复 · **下窗口第一优先:NAV-IA Phase 5 收尾(自动化并入集成 + 银行对账归位)**
-> **上次**:session 踢人弹窗(v5.5.36) · 大 PDF timeout(v5.5.35) · Excel KPI 颜色填充(v5.5.33) · UI 精修(v5.5.30)
+> **最近更新**:2026-05-17 · cache bust **v=11841136** · 银行对账 v2 全面重建(Statement vs GL · 3层匹配 · 4语言Excel导出) · 对账中心横向tab UI优化
+> **上次**:NAV-IA 重构 · 侧边栏分组 · 对账中心 tab 样式优化 · Git 自动部署流程建立
+
+## ✅ 已完成 · v118.33.6 · 银行对账 v2
+
+- [x] `bank_recon_v2.py` · 全新银行对账核心引擎
+  - KBank / BBL / KKP / KTB / SCB / generic 自动识别 + 专属解析器
+  - GL 支持 Excel (.xlsx/.xls) 和 PDF (pdfplumber → Gemini 兜底)
+  - 3 层日期匹配：L1 精确日期 · L2 ±3天容差 · L3 仅金额
+  - 多文件合并 + 去重
+  - 多 GL 科目自动检测 · 用户下拉选择
+  - 对账公式验证：GL 期末 ± 调整项 = 账单期末
+  - 4-sheet openpyxl Excel 导出 · 全 i18n (th/en/zh/ja) 表头
+- [x] API routes `/api/recon/bank-v2/*` · 落库 `bank_recon_v2_task` 表
+- [x] DB · `ensure_bank_recon_v2_table()` 幂等建表
+- [x] Frontend · 双上传区(账单 + GL) · 统计卡 · 对账公式框 · 可过滤明细表 · 历史记录
+- [x] i18n · 40+ 个 brv2- 前缀 key · zh/en/th/ja 全覆盖
+- [x] 旧 OCR 银行对账 UI 清除(DOM 瘦身)
+
+## 📌 待办
+
+
 
 ---
 
@@ -1418,10 +1438,12 @@ function _openBankDrawer(sessionId) {
 - [x] GitHub Webhook 接口(`POST /internal/deploy`)写入 app.py
 - [x] 服务器 `/opt/mrpilot/git-deploy.sh` 部署脚本
 - [x] CLAUDE.md 部署铁律更新为 Git Push 流程
-- ⏳ 等 Zihao 提供 GitHub PAT → 完成首次 push + GitHub webhook 配置
-- 目的:代码自动备份 · fail2ban 问题永久消失 · 自动部署
+- [x] 首次 push 成功 · 38 个文件上传 GitHub
+- [x] GitHub Webhook 配置 `https://pearnly.com/internal/deploy`
+- [x] 端到端测试通过 · push → 自动部署 → 版本更新 · 全程零 SSH
+- 目的:代码自动备份 · fail2ban 问题永久消失 · 自动部署 ✅ 全部达成
 
-**Git 私库基础架构完成 · 等 PAT 即可全通**
+**Git 全自动部署已完全通 · fail2ban 问题永久解决**
 
 ---
 

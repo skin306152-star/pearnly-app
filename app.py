@@ -202,6 +202,28 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动 bank_recon_v2 建表失败: {e}")
 
+    # v118.33.6 · 更新 git-deploy.sh · 确保包含所有 Python 源文件(幂等)
+    try:
+        import os as _os
+        _deploy_sh = "/opt/mrpilot/git-deploy.sh"
+        if _os.path.exists(_deploy_sh):
+            _new_content = """#!/bin/bash
+# v118.33.6 · auto-updated by app.py startup to include all .py files
+set -e
+cd /opt/mrpilot
+git fetch pearnly master 2>&1
+# checkout all tracked files (includes any new .py modules added to repo)
+git checkout FETCH_HEAD -- . 2>/dev/null || git checkout FETCH_HEAD -- home.html home.js home.css app.py auth.py recon_routes.py db.py bank_recon_v2.py gl_vat_reconciler.py 2>/dev/null || true
+cp -f home.html home.js home.css static/ 2>/dev/null || true
+systemctl restart mrpilot
+"""
+            with open(_deploy_sh, 'w') as _f:
+                _f.write(_new_content)
+            _os.chmod(_deploy_sh, 0o755)
+            logger.info("[v118.33.6] git-deploy.sh updated to include all Python files")
+    except Exception as e:
+        logger.warning(f"git-deploy.sh update failed: {e}")
+
     # v110.7 · 启动确保 users 表有欢迎向导用的 profile 字段(幂等 · 已有字段无影响)
     try:
         _ensure_user_profile_columns()

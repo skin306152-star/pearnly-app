@@ -833,9 +833,12 @@ def parse_bank_statement_pdf(
         if len(text_rows) > len(rows):
             rows, opening, closing = text_rows, text_op, text_cl
 
-    # ── Step 5: Gemini fallback ──
+    # ── Step 5: Gemini fallback (OCR for scanned PDFs) ──
+    if len(rows) < MIN_PLUMBER_ROWS:
+        logger.info(f"[stmt_parse][{filename}] step5 gemini: api_key_present={bool(api_key)} text_chars={len(all_text)}")
     if len(rows) < MIN_PLUMBER_ROWS and api_key:
         gemini_result = _gemini_parse_statement(file_bytes, filename, api_key)
+        logger.info(f"[stmt_parse][{filename}] step5 gemini result: ok={gemini_result.get('ok')} rows={len(gemini_result.get('rows', []))}")
         if gemini_result.get("ok") and gemini_result.get("rows"):
             rows = gemini_result["rows"]
             opening = gemini_result.get("opening", opening)

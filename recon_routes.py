@@ -1189,7 +1189,13 @@ async def bank_v2_run(
     if not gl_files:
         raise HTTPException(422, _brv2_err("no_gl_files", lang))
 
-    api_key = _user_api_key(user)
+    # v118.33.12.1 · use _user_key (gemini_api_key OR custom_gemini_api_key)
+    # to match the rest of the system; fall back to env GEMINI_API_KEY.
+    import os as _os, logging as _lg
+    api_key = (_user_key(user) or _os.environ.get('GEMINI_API_KEY', '')).strip()
+    _lg.getLogger('recon').info(
+        f"[bank_v2_run] api_key_present={bool(api_key)} user_id={user.get('id')}"
+    )
     loop = asyncio.get_event_loop()
 
     # 1. Read all uploaded files

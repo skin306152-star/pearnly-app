@@ -9645,6 +9645,7 @@ window.subscribeI18n = function(name, fn) {
 // 状态
 // ============================================================
 let currentLang = localStorage.getItem('mrpilot_lang') || 'th';
+window._currentLang = currentLang;  // expose to IIFEs that can't access closure variable
 let currentRoute = 'ocr';
 let _userInfo = null;
 let _quota = null;
@@ -9990,6 +9991,7 @@ function applyLang(lang) {
     if (_langOverlay) _langOverlay.classList.add('show');
 
     currentLang = lang;
+    window._currentLang = lang;  // sync to global so all IIFEs read correct language
     localStorage.setItem('mrpilot_lang', lang);
     document.documentElement.lang = lang;
 
@@ -19333,6 +19335,15 @@ async function deleteEndpoint(endpointId) {
 
         loadHistory();
         updateRunBtn();
+
+        // Subscribe to global language changes so dynamic content re-renders
+        if (!Array.isArray(window.__i18nSubs)) window.__i18nSubs = [];
+        window.__i18nSubs = window.__i18nSubs.filter(s => s.name !== 'brv2');
+        window.__i18nSubs.push({ name: 'brv2', fn: function() {
+            updateRunBtn();
+            renderFileList('stmt');
+            renderFileList('gl');
+        }});
     }
 
     // Expose load function for panel system

@@ -208,10 +208,10 @@ async def lifespan(app: FastAPI):
         _deploy_sh = "/opt/mrpilot/git-deploy.sh"
         _new_content = r"""#!/bin/bash
 # ============================================================
-# git-deploy.sh  v118.33.7
+# git-deploy.sh  v118.33.10.1
 # 由 app.py 启动时自动写入 · 请勿手动修改（重启会覆盖）
-# 流程：fetch → checkout all → cp static → restart → health check
-# 失败时回滚到上一个 commit
+# 流程：fetch → reset hard → cp static → restart → health check
+# 失败时回滚到上一个 GitHub commit（不会回滚到本地旧 commit）
 # ============================================================
 LOG=/var/log/mrpilot-deploy.log
 REPO=/opt/mrpilot
@@ -225,9 +225,10 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') git-deploy start" >> "$LOG"
 
 cd "$REPO" || { echo "cd failed" >> "$LOG"; exit 1; }
 
-# 1. 备份当前 HEAD
-PREV_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "")
-echo "prev HEAD: $PREV_HEAD" >> "$LOG"
+# 1. 记录 GitHub 上一个已知的好版本作为回滚目标
+#    用远端追踪分支（不是本地 HEAD），避免回滚到比 GitHub 更老的本地 commit
+PREV_HEAD=$(git rev-parse "$REMOTE/$BRANCH" 2>/dev/null || echo "")
+echo "prev GitHub HEAD: $PREV_HEAD" >> "$LOG"
 
 # 2. Fetch
 if ! git fetch "$REMOTE" "$BRANCH" >> "$LOG" 2>&1; then
@@ -243,9 +244,9 @@ if [ "$PREV_HEAD" = "$NEW_HEAD" ]; then
     exit 0
 fi
 
-# 3. Checkout all tracked files（包括新增的 .py 文件）
-if ! git checkout FETCH_HEAD -- . >> "$LOG" 2>&1; then
-    echo "git checkout failed — abort" >> "$LOG"
+# 3. reset --hard 到最新 GitHub commit（同时移动本地 HEAD 指针）
+if ! git reset --hard FETCH_HEAD >> "$LOG" 2>&1; then
+    echo "git reset failed — abort" >> "$LOG"
     exit 1
 fi
 
@@ -268,10 +269,10 @@ for i in $(seq 1 $MAX_WAIT); do
     fi
 done
 
-# 7. 服务未恢复 → 回滚
+# 7. 服务未恢复 → 回滚到上一个 GitHub 版本（绝不回滚到 GitHub 之前的本地旧 commit）
 echo "health check FAILED after ${MAX_WAIT}s — rolling back to $PREV_HEAD" >> "$LOG"
 if [ -n "$PREV_HEAD" ]; then
-    git checkout "$PREV_HEAD" -- . >> "$LOG" 2>&1
+    git reset --hard "$PREV_HEAD" >> "$LOG" 2>&1
     cp -f home.html home.js home.css static/ 2>> "$LOG" || true
     systemctl restart mrpilot >> "$LOG" 2>&1
     echo "rollback done — waiting for service..." >> "$LOG"

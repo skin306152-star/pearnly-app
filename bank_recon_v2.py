@@ -192,7 +192,8 @@ def _parse_date(raw: str) -> Optional[date]:
                 if yr_raw >= 2500:
                     yr_raw -= 543
                 elif yr_raw < 100:
-                    yr_raw += 2000
+                    # Thai BE short year: 68 → BE 2568 → CE 2025
+                    yr_raw += 1957 if yr_raw >= 43 else 2000
                 try:
                     return date(yr_raw, month_num, day)
                 except ValueError:
@@ -213,7 +214,8 @@ def _parse_date(raw: str) -> Optional[date]:
                 if yr >= 2500:
                     yr -= 543
                 elif yr < 100:
-                    yr += 2000
+                    # Thai BE short year: 68 → BE 2568 → CE 2025
+                    yr += 1957 if yr >= 43 else 2000
             else:
                 return None
             return date(yr, mo, dy)
@@ -658,6 +660,7 @@ def parse_gl_excel(
     opening = 0.0
     closing = 0.0
     gl_opening_found = False
+    last_row_date = None  # carry-forward for blank date cells (Mr.erp style)
 
     for row in all_rows_raw[header_idx + 1:]:
         if not any(row):
@@ -679,8 +682,12 @@ def parse_gl_excel(
 
         # Extract fields
         d_str = row_list[col_map["date"]] if "date" in col_map and col_map["date"] < len(row_list) else ""
-        d = _parse_date(d_str)
-        if d is None:
+        d = _parse_date(d_str) if d_str else None
+        if d is not None:
+            last_row_date = d
+        elif last_row_date is not None:
+            d = last_row_date  # carry-forward blank date (Mr.erp prints date once per day)
+        else:
             continue
 
         doc_no = row_list[col_map["doc_no"]] if "doc_no" in col_map and col_map["doc_no"] < len(row_list) else ""
@@ -737,9 +744,17 @@ def parse_gl_pdf(
     try:
         pdf = pdfplumber.open(io.BytesIO(file_bytes))
         all_tables = []
+        page_texts = []
         for p in pdf.pages:
-            tbls = p.extract_tables() or []
-            all_tables.extend(tbls)
+            try:
+                tbls = p.extract_tables() or []
+                all_tables.extend(tbls)
+            except Exception:
+                pass  # skip bad page, try text fallback below
+            try:
+                page_texts.append(p.extract_text() or "")
+            except Exception:
+                page_texts.append("")
         pdf.close()
 
         rows = []
@@ -761,6 +776,7 @@ def parse_gl_pdf(
             if not col_map:
                 continue
 
+            last_tbl_date = None  # carry-forward within each table
             for row in table[header_idx + 1:]:
                 if not row:
                     continue
@@ -768,8 +784,12 @@ def parse_gl_pdf(
                 if _is_gl_skip_row(row_list):
                     continue
                 d_str = row_list[col_map["date"]] if "date" in col_map and col_map["date"] < len(row_list) else ""
-                d = _parse_date(d_str)
-                if d is None:
+                d = _parse_date(d_str) if d_str else None
+                if d is not None:
+                    last_tbl_date = d
+                elif last_tbl_date is not None:
+                    d = last_tbl_date
+                else:
                     continue
                 doc_no = row_list[col_map["doc_no"]] if "doc_no" in col_map and col_map["doc_no"] < len(row_list) else ""
                 desc = row_list[col_map["description"]] if "description" in col_map and col_map["description"] < len(row_list) else ""
@@ -790,6 +810,15 @@ def parse_gl_pdf(
                 rows.append(GlRow(date=d, doc_no=doc_no, account_code=acct,
                                   description=desc, debit=abs(debit), credit=abs(credit)))
 
+        # If table extraction yielded too few rows, try text-line parser
+        if len(rows) < MIN_PLUMBER_ROWS:
+            full_text = "\n".join(page_texts)
+            text_rows, text_accts, text_opening = _parse_gl_text_lines(full_text, account_code)
+            if len(text_rows) >= len(rows):
+                rows = text_rows
+                accounts_seen = set(text_accts)
+                opening = text_opening
+
         if len(rows) < MIN_PLUMBER_ROWS and api_key:
             return _gemini_parse_gl(file_bytes, filename, account_code, api_key)
 
@@ -806,6 +835,122 @@ def parse_gl_pdf(
     except Exception as e:
         logger.error(f"parse_gl_pdf [{filename}] failed: {e}", exc_info=True)
         return {"ok": False, "error": str(e), "rows": []}
+
+
+def _parse_gl_text_lines(
+    text: str, account_code: str = ""
+) -> Tuple[List[GlRow], List[str], float]:
+    """
+    Text-line fallback for Mr.erp Thai GL PDFs.
+    Format: วันที่  สมุด  ใบสำคัญ  คำอธิบาย  เดบิต  เครดิต  สถานะ  ยอดคงเหลือ
+    Date is printed once per day; subsequent same-day rows have blank date.
+    Returns (rows, account_list, opening_balance).
+    """
+    rows: List[GlRow] = []
+    accounts_seen: set = set()
+    opening = 0.0
+    last_date: Optional[date] = None
+
+    # Number pattern: Thai commas e.g. "1,234.56" or "1234.56"
+    _NUM_RE = re.compile(r"^[\d,]+\.\d+$")
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        # Skip header/report title lines
+        low = line.lower()
+        if any(kw in low for kw in ["รายงาน", "account", "page", "หน้า", "บัญชี:", "ชื่อ"]):
+            continue
+
+        # Opening balance line
+        if any(kw in line for kw in ["ยอดยกมา", "brought forward", "ยอดคงเหลือยกมา"]):
+            nums = re.findall(r"[\d,]+\.\d+", line)
+            if nums:
+                opening = _to_float(nums[-1])
+            continue
+
+        # Split on 2+ whitespace to get token columns
+        parts = re.split(r"\s{2,}", line)
+        if len(parts) < 3:
+            continue
+
+        # Try to identify date token (first or second part)
+        d = None
+        d_offset = 0
+        for offset in range(min(2, len(parts))):
+            d = _parse_date(parts[offset])
+            if d is not None:
+                d_offset = offset
+                last_date = d
+                break
+
+        if d is None:
+            if last_date is not None:
+                d = last_date
+                d_offset = -1  # no date token consumed
+            else:
+                continue
+
+        # After date token, remaining parts: doc_no, description, amounts...
+        rest = parts[d_offset + 1:] if d_offset >= 0 else parts
+        if len(rest) < 2:
+            continue
+
+        # Find numeric tokens (amounts) from the right
+        num_vals: List[float] = []
+        num_start = len(rest)
+        for i in range(len(rest) - 1, -1, -1):
+            tok = rest[i].replace(",", "")
+            if re.match(r"^\d+(\.\d+)?$", tok):
+                num_vals.insert(0, float(tok))
+                num_start = i
+            elif len(num_vals) > 0:
+                break
+
+        # Expect at least debit, credit (balance is optional)
+        if len(num_vals) < 1:
+            continue
+
+        # Layout: [...text parts...] [debit] [credit] [balance?] [status?]
+        # We take the last 2-3 numeric tokens as credit/debit/balance
+        debit = credit = 0.0
+        if len(num_vals) >= 2:
+            # Last two numerics before balance: debit and credit (one will be 0)
+            debit = num_vals[-3] if len(num_vals) >= 3 else 0.0
+            credit = num_vals[-2] if len(num_vals) >= 2 else 0.0
+            # If debit is 0 it means only credit filled; credit is the amount
+            # Determine by checking "D"/"C" status token if present
+            status_tok = rest[num_start - 1] if num_start > 0 else ""
+            if status_tok.upper() == "D":
+                debit = num_vals[0] if len(num_vals) == 1 else (num_vals[-3] or num_vals[-2])
+                credit = 0.0
+            elif status_tok.upper() == "C":
+                credit = num_vals[0] if len(num_vals) == 1 else (num_vals[-3] or num_vals[-2])
+                debit = 0.0
+        elif len(num_vals) == 1:
+            # Single amount — can't tell direction without status
+            continue
+
+        if debit == 0.0 and credit == 0.0:
+            continue
+
+        desc_parts = rest[:num_start]
+        doc_no = desc_parts[0] if desc_parts else ""
+        desc = " ".join(desc_parts[1:]) if len(desc_parts) > 1 else doc_no
+
+        acct = _extract_acct_code(doc_no) or _extract_acct_code(desc)
+        if account_code and acct and not acct.startswith(account_code):
+            continue
+
+        accounts_seen.add(acct or "?")
+        rows.append(GlRow(
+            date=d, doc_no=doc_no, account_code=acct,
+            description=desc, debit=abs(debit), credit=abs(credit),
+        ))
+
+    return rows, sorted(accounts_seen - {"?"}), opening
 
 
 def _gemini_parse_gl(file_bytes: bytes, filename: str,
@@ -1014,7 +1159,8 @@ def reconcile(
     def try_match_gl(stmt_row: StatementRow, layer: int) -> Optional[int]:
         """Find best GL match for a statement row. Returns GL index or None."""
         target_amount = stmt_row.withdrawal if stmt_row.withdrawal > 0 else stmt_row.deposit
-        direction = "D" if stmt_row.withdrawal > 0 else "C"
+        # Withdrawal from bank = company paid out = GL Credit; Deposit = GL Debit
+        direction = "C" if stmt_row.withdrawal > 0 else "D"
 
         best_idx = None
         best_day_diff = 999

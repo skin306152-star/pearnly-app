@@ -4374,10 +4374,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.33.8.0 更新:\n• 银行对账上传文件后新增「查看清单」按钮，展开预览面板与 GL-VAT 100% 一致\n• 对账完成后页面自动滚到结果区，错误时弹出提示\n• 最近对账记录改为表格格式并支持搜索，修复全部泰语乱码",
-            "en": "v118.33.8.0 updates:\n• Bank recon now has a 'View File List' toggle matching GL-VAT preview panel exactly\n• Page auto-scrolls to results after reconciliation; errors now show as toast\n• Recent history is now a searchable table; all Thai-language hard-codes fixed",
-            "th": "v118.33.8.0 อัปเดต:\n• การกระทบยอดธนาคาร: ปุ่ม 'ดูรายการไฟล์' ใหม่ · แผงแสดงไฟล์เหมือน GL-VAT 100%\n• หน้าเลื่อนไปที่ผลลัพธ์อัตโนมัติ · แสดงข้อผิดพลาดด้วย toast\n• ประวัติการกระทบยอดเป็นตาราง · ค้นหาได้ · แก้ข้อความภาษาไทยที่ฝังอยู่",
-            "ja": "v118.33.8.0 更新:\n• 銀行照合にファイルリスト確認パネルを追加（GL-VATと完全一致）\n• 照合完了後に結果へ自動スクロール、エラー時はトースト表示\n• 照合履歴をテーブル形式に変更・検索対応、タイ語ハードコードをすべて修正"
+            "zh": "v118.33.9.0 更新:\n• 修复泰语 GL PDF 解析失败（pdfplumber KeyError，已加文本行备用解析器）\n• 修复日期携带：Mr.erp GL 每日首行才印日期，续行留空现在自动继承\n• 修复泰历短年：68 年→公元 2025（原错判为 2068）\n• 修复对账方向：出款↔GL贷方、入款↔GL借方（原反向）\n• 修复语言默认：错误提示不再强制显示泰语\n• 修复 KPI 标签多语言不翻译问题",
+            "en": "v118.33.9.0 updates:\n• Fix Thai GL PDF parse failure (pdfplumber KeyError; added text-line fallback parser)\n• Fix date carry-forward: Mr.erp GL prints date once per day; blank rows now inherit\n• Fix Thai short Buddhist Era year: '68' → CE 2025 (was 2068)\n• Fix reconciliation direction: withdrawal↔GL Credit, deposit↔GL Debit (was reversed)\n• Fix language default: error toasts now respect UI language\n• Fix KPI label translations (i18n key mismatch)",
+            "th": "v118.33.9.0 อัปเดต:\n• แก้ GL PDF อ่านไม่ได้ (pdfplumber KeyError · เพิ่ม text parser สำรอง)\n• แก้วันที่ carry-forward: Mr.erp พิมพ์วันที่ครั้งเดียวต่อวัน บรรทัดถัดไปรับต่ออัตโนมัติ\n• แก้ปีพุทธศักราชย่อ: '68' → ค.ศ. 2025 (เดิมคำนวณเป็น 2068)\n• แก้ทิศทางจับคู่: ถอนเงิน↔GL เครดิต, ฝากเงิน↔GL เดบิต (เดิมสลับกัน)\n• แก้ภาษาเริ่มต้น: toast แสดงตามภาษา UI\n• แก้ป้ายกำกับ KPI ไม่แปลภาษา",
+            "ja": "v118.33.9.0 更新:\n• タイGL PDF解析失敗を修正（pdfplumber KeyError→テキスト行フォールバック追加）\n• 日付キャリーフォワード修正：Mr.erpは1日1回のみ日付印字、空白行が自動継承\n• 仏暦短縮年修正：'68'→西暦2025年（誤って2068年と判定していた）\n• 照合方向修正：出金↔GL貸方・入金↔GL借方（逆になっていた）\n• 言語デフォルト修正：エラーをUI言語で表示\n• KPIラベルの多言語翻訳キー不一致を修正"
         }
     }
 

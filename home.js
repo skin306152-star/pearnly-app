@@ -18863,7 +18863,7 @@ async function deleteEndpoint(endpointId) {
     async function runRecon() {
         if (_stmtFiles.length === 0 || _glFiles.length === 0) return;
         const token = localStorage.getItem('mrpilot_token') || '';
-        const lang  = (window._currentLang || 'th');
+        const lang  = (window._currentLang || 'zh');
         const acct  = ($('brv2-acct-select') || {}).value || '';
 
         showResultSections(false);
@@ -18994,7 +18994,7 @@ async function deleteEndpoint(endpointId) {
         if (exportBtn) {
             exportBtn.onclick = () => {
                 if (!_currentTask) return;
-                const l = window._currentLang || 'th';
+                const l = window._currentLang || 'zh';
                 window.open('/api/recon/bank-v2/' + _currentTask.task_id + '/export?lang=' + l, '_blank');
             };
         }
@@ -19148,7 +19148,7 @@ async function deleteEndpoint(endpointId) {
             const delConfirm = { zh: '删除这条记录?', th: 'ลบรายการนี้?', en: 'Delete this record?', ja: 'この記録を削除しますか?' }[lang] || '删除?';
             tdAct.appendChild(mkBtn(SVG_LOAD, '加载', '', () => loadTask(t.id, token)));
             tdAct.appendChild(mkBtn(SVG_DL,   '导出', '', () => {
-                const l = window._currentLang || 'th';
+                const l = window._currentLang || 'zh';
                 window.open('/api/recon/bank-v2/' + t.id + '/export?lang=' + l, '_blank');
             }));
             tdAct.appendChild(mkBtn(SVG_DEL,  '删除', 'glv-del', async () => {

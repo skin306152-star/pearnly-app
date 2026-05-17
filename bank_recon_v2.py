@@ -598,6 +598,171 @@ def _parse_stmt_text_lines(
     return rows, opening, closing
 
 
+
+def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, float]:
+    """
+    KBank PDF text extracted by pdfminer is COLUMN-STACKED: each field on its
+    own line. Pattern per transaction:
+        DATE          (DD-MM-YY)
+        TIME          (HH:MM)
+        DESCRIPTION   (รับโอนเงิน / โอนเงิน / ...)
+    Then a separate values block:
+        OPENING_BAL   (alone)
+        AMT1          (alone)
+        BAL1 channel  (number + text)
+        AMT2          (alone)
+        BAL2 channel
+        ...
+    We match transactions to (amt, bal) pairs by position.
+    """
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+
+    DATE_RE = re.compile(r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$')
+    TIME_RE = re.compile(r'^\d{1,2}:\d{2}$')
+
+    # Headers start at the FIRST date line in the document
+    hdr_start = 0
+    for i, line in enumerate(lines):
+        if DATE_RE.match(line):
+            hdr_start = i
+            break
+    # Values start AFTER the last column header "รายละเอียด" (so we skip the
+    # 3 summary numbers — closing balance, total withdrawal, total deposit)
+    val_start = hdr_start
+    for i, line in enumerate(lines):
+        if 'รายละเอียด' in line and i > 0:
+            val_start = i + 1
+            break
+
+    hdr_data = lines[hdr_start:]
+    val_data = lines[val_start:]
+    data = hdr_data  # used by header extraction below
+
+    def _is_num(s: str) -> bool:
+        s = s.replace(',', '').replace(' ', '').lstrip('-')
+        if not s:
+            return False
+        if s.count('.') > 1:
+            last = s.rfind('.')
+            s = s[:last].replace('.', '') + s[last:]
+        try:
+            float(s)
+            return True
+        except ValueError:
+            return False
+
+    # Phase 1: extract transaction headers (date, time, desc) in order
+    headers = []
+    i = 0
+    while i < len(data):
+        if DATE_RE.match(data[i]):
+            d_obj = _parse_date(data[i])
+            if d_obj is None:
+                i += 1
+                continue
+            time_str = ''
+            desc = ''
+            j = i + 1
+            if j < len(data) and TIME_RE.match(data[j]):
+                time_str = data[j]
+                j += 1
+            if j < len(data) and not DATE_RE.match(data[j]):
+                first_tok = data[j].split()[0] if data[j].split() else ''
+                if not _is_num(first_tok):
+                    desc = data[j]
+                    j += 1
+            headers.append({'date': d_obj, 'time': time_str, 'desc': desc})
+            i = j
+        else:
+            i += 1
+
+    if not headers:
+        return [], 0.0, 0.0
+
+    # Phase 2: extract value sequence (num-only vs num+text lines) from val_data
+    values = []
+    for line in val_data:
+        toks = line.split()
+        if not toks:
+            continue
+        v = _to_float(toks[0])
+        if v is None:
+            continue
+        if len(toks) == 1:
+            values.append(('num', v, ''))
+        else:
+            rest = ' '.join(toks[1:])
+            values.append(('bal', v, rest))
+
+    # Phase 3: pattern-match opening then alternating amt/bal
+    opening = 0.0
+    pairs = []
+    state = 'opening'
+    cur_amt = None
+    for kind, val, rest in values:
+        if state == 'opening':
+            if kind == 'num':
+                opening = val
+                state = 'amt'
+        elif state == 'amt':
+            if kind == 'num':
+                cur_amt = val
+                state = 'bal'
+        elif state == 'bal':
+            if kind == 'bal':
+                pairs.append((cur_amt, val, rest))
+                cur_amt = None
+                state = 'amt'
+            elif kind == 'num':
+                cur_amt = val
+
+    # Phase 4: drop first header if it's the opening (no time)
+    if headers and not headers[0]['time']:
+        headers = headers[1:]
+
+    # Phase 5: build StatementRows by zipping headers with pairs
+    rows: List[StatementRow] = []
+    prev_balance = opening
+    n = min(len(headers), len(pairs))
+    for k in range(n):
+        h = headers[k]
+        amt, bal, channel = pairs[k]
+        if amt is None or bal is None:
+            continue
+        diff = round(bal - prev_balance, 2)
+        wd = 0.0
+        dep = 0.0
+        if abs(diff - amt) <= AMOUNT_TOL:
+            dep = amt
+        elif abs(diff + amt) <= AMOUNT_TOL:
+            wd = amt
+        else:
+            text_blob = (h['desc'] + ' ' + channel).lower()
+            if ('รับโอน' in text_blob) or ('ฝาก' in text_blob and 'ฝากด้วยเช็ค' not in text_blob):
+                dep = amt
+            elif ('โอนเงิน' in text_blob) or ('ถอน' in text_blob) or ('จ่าย' in text_blob):
+                wd = amt
+            else:
+                if diff > 0:
+                    dep = amt
+                else:
+                    wd = amt
+        prev_balance = bal
+        full_desc = h['desc']
+        if channel:
+            full_desc = (full_desc + ' ' + channel).strip()
+        rows.append(StatementRow(
+            date=h['date'],
+            description=full_desc,
+            withdrawal=wd,
+            deposit=dep,
+            balance=bal,
+        ))
+
+    closing = rows[-1].balance if rows else 0.0
+    return rows, opening, closing
+
+
 def parse_bank_statement_pdf(
     file_bytes: bytes, filename: str, api_key: str = ""
 ) -> Dict[str, Any]:
@@ -609,6 +774,16 @@ def parse_bank_statement_pdf(
     page_texts = _pdf_extract_text_safe(file_bytes)
     all_text = "\n".join(page_texts)
     bank_code = _detect_bank(all_text) if all_text.strip() else "generic"
+    # DEBUG v118.33.11.1
+    logger.info(f"[stmt_parse][{filename}] pages={len(page_texts)} chars={len(all_text)} bank={bank_code}")
+    if all_text.strip(): logger.info(f"[stmt_parse][{filename}] first600: " + repr(all_text[:600]))
+    if all_text.strip():
+        try:
+            import os
+            os.makedirs('/tmp/stmt_debug', exist_ok=True)
+            with open(f'/tmp/stmt_debug/{filename}.txt', 'w') as _df:
+                _df.write(all_text)
+        except Exception: pass
 
     # ── Step 2: try pdfplumber table extraction ──
     all_tables: List = []
@@ -645,9 +820,16 @@ def parse_bank_statement_pdf(
             if len(rows2) > len(rows):
                 rows, opening, closing = rows2, op2, cl2
 
-    # ── Step 4: text-line fallback (handles line-based PDFs with no tables) ──
+    # ── Step 4a: KBank column-stacked text (pdfminer-extracted) ──
+    if len(rows) < MIN_PLUMBER_ROWS and all_text.strip() and bank_code == 'kbank':
+        col_rows, col_op, col_cl = _parse_kbank_text_columns(all_text)
+        logger.info(f"[stmt_parse][{filename}] step4a kbank-columns: rows={len(col_rows)}")
+        if len(col_rows) > len(rows):
+            rows, opening, closing = col_rows, col_op, col_cl
+    # ── Step 4b: generic text-line fallback ──
     if len(rows) < MIN_PLUMBER_ROWS and all_text.strip():
         text_rows, text_op, text_cl = _parse_stmt_text_lines(all_text, bank_code)
+        logger.info(f"[stmt_parse][{filename}] step4b text-line: tbl_rows={len(rows)} text_rows={len(text_rows)} bank={bank_code}")
         if len(text_rows) > len(rows):
             rows, opening, closing = text_rows, text_op, text_cl
 

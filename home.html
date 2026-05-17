@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11841136">
+<link rel="stylesheet" href="/static/home.css?v=11841137">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -4480,178 +4480,209 @@
         </div>
         <!-- pane 区(全宽) -->
 
-        <!-- ── 银行对账面板(原有内容) ── -->
+        <!-- ── 银行对账面板 v2（vex-drop 同款视觉） ── -->
         <div id="recon-pane-bank" class="recon-pane active">
 
-        <!-- ── Bank Recon v2 Upload Section ── -->
-        <div class="brv2-upload-section" id="brv2-upload-section">
-
-          <!-- Row: two upload zones side by side -->
-          <div class="brv2-upload-row">
-
-            <!-- Zone A: Bank Statement -->
-            <div class="brv2-upload-zone" id="brv2-stmt-zone" data-zone="stmt">
-              <input type="file" id="brv2-stmt-input" accept="application/pdf,.pdf" multiple style="display:none">
-              <div class="brv2-zone-icon">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22">
-                  <rect x="3" y="2" width="14" height="16" rx="2"/>
-                  <path d="M6 7h8M6 10h8M6 13h5"/>
-                </svg>
-              </div>
-              <div class="brv2-zone-body">
-                <div class="brv2-zone-title" data-i18n="brv2-stmt-title">บัญชีธนาคาร</div>
-                <div class="brv2-zone-hint" data-i18n="brv2-stmt-hint">PDF · KBank · BBL · KKP · KTB · หลายไฟล์ได้</div>
-              </div>
-              <button class="brv2-zone-btn" id="brv2-stmt-btn" type="button" data-i18n="brv2-choose-files">เลือกไฟล์</button>
-              <div class="brv2-file-list" id="brv2-stmt-list"></div>
+            <!-- KPI 4 卡 -->
+            <div class="vex-kpi-strip" id="brv2-kpi-strip">
+                <div class="vex-kpi-card">
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-ok">✓</div>
+                    <div>
+                        <div class="vex-kpi-val" id="brv2-kpi-matched">—</div>
+                        <div class="vex-kpi-lbl" data-i18n="brv2-kpi-matched">完全匹配</div>
+                    </div>
+                </div>
+                <div class="vex-kpi-card">
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-warn">GL</div>
+                    <div>
+                        <div class="vex-kpi-val" id="brv2-kpi-gl-only">—</div>
+                        <div class="vex-kpi-lbl" data-i18n="brv2-kpi-gl-only">GL 未对账</div>
+                    </div>
+                </div>
+                <div class="vex-kpi-card">
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-err">账</div>
+                    <div>
+                        <div class="vex-kpi-val" id="brv2-kpi-stmt-only">—</div>
+                        <div class="vex-kpi-lbl" data-i18n="brv2-kpi-stmt-only">账单未对账</div>
+                    </div>
+                </div>
+                <div class="vex-kpi-card">
+                    <div class="vex-kpi-icon-wrap" id="brv2-kpi-diff-icon" style="background:#f3f4f6;color:#6b7280">△</div>
+                    <div>
+                        <div class="vex-kpi-val" id="brv2-kpi-diff">—</div>
+                        <div class="vex-kpi-lbl" data-i18n="brv2-kpi-diff">差额</div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Zone B: GL -->
-            <div class="brv2-upload-zone" id="brv2-gl-zone" data-zone="gl">
-              <input type="file" id="brv2-gl-input" accept=".xlsx,.xls,.pdf,application/pdf" multiple style="display:none">
-              <div class="brv2-zone-icon brv2-zone-icon-gl">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22">
-                  <rect x="2" y="3" width="16" height="14" rx="1.5"/>
-                  <path d="M2 7h16"/>
-                  <path d="M7 7v10M12 7v10"/>
-                </svg>
-              </div>
-              <div class="brv2-zone-body">
-                <div class="brv2-zone-title" data-i18n="brv2-gl-title">บัญชีแยกประเภท (GL)</div>
-                <div class="brv2-zone-hint" data-i18n="brv2-gl-hint">Excel (.xlsx) หรือ PDF · หลายไฟล์ได้</div>
-              </div>
-              <button class="brv2-zone-btn" id="brv2-gl-btn" type="button" data-i18n="brv2-choose-files">เลือกไฟล์</button>
-              <div class="brv2-file-list" id="brv2-gl-list"></div>
+            <!-- 主操作区（沿用 vex-main-action 视觉） -->
+            <div class="vex-main-action">
+                <div class="vex-main-action-tag" data-i18n="vex-main-action-tag">主操作</div>
+
+                <!-- 左右双拖拽区 -->
+                <div class="vex-drops">
+                    <div class="vex-drop vex-drop-invoice" id="brv2-stmt-zone" role="button" tabindex="0">
+                        <div class="vex-drop-icon-wrap">
+                            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M8 4h12l6 6v16a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z"/>
+                                <path d="M20 4v6h6M10 14h12M10 20h8"/>
+                            </svg>
+                        </div>
+                        <div class="vex-drop-title" data-i18n="brv2-stmt-title">① 银行账单 PDF</div>
+                        <div class="vex-drop-sub" data-i18n="brv2-stmt-hint">KBank · BBL · KKP · KTB · 支持多文件</div>
+                        <div class="vex-drop-filename" id="brv2-stmt-name"></div>
+                        <input type="file" id="brv2-stmt-input" accept="application/pdf,.pdf" multiple style="display:none">
+                    </div>
+
+                    <div class="vex-drop-divider" aria-hidden="true"><span>+</span></div>
+
+                    <div class="vex-drop vex-drop-report" id="brv2-gl-zone" role="button" tabindex="0">
+                        <div class="vex-drop-icon-wrap">
+                            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="4" y="6" width="24" height="20" rx="2"/>
+                                <line x1="4" y1="13" x2="28" y2="13"/>
+                                <line x1="12" y1="6" x2="12" y2="26"/>
+                                <line x1="20" y1="6" x2="20" y2="26"/>
+                            </svg>
+                        </div>
+                        <div class="vex-drop-title" data-i18n="brv2-gl-title">② 总账 GL</div>
+                        <div class="vex-drop-sub" data-i18n="brv2-gl-hint">Excel (.xlsx) 或 PDF · 支持多文件</div>
+                        <div class="vex-drop-filename" id="brv2-gl-name"></div>
+                        <input type="file" id="brv2-gl-input" accept=".xlsx,.xls,.pdf,application/pdf" multiple style="display:none">
+                    </div>
+                </div>
+
+                <!-- 文件 chip 列表（拖拽区下方，可逐个删除） -->
+                <div class="brv2-chips-row" id="brv2-chips-row" style="display:none">
+                    <div class="brv2-chips-col">
+                        <div class="brv2-chips-lbl" data-i18n="brv2-stmt-title">银行账单</div>
+                        <div class="brv2-file-list" id="brv2-stmt-list"></div>
+                    </div>
+                    <div class="brv2-chips-col">
+                        <div class="brv2-chips-lbl" data-i18n="brv2-gl-title">总账 GL</div>
+                        <div class="brv2-file-list" id="brv2-gl-list"></div>
+                    </div>
+                </div>
+
+                <!-- 操作栏 -->
+                <div class="vex-action-bar">
+                    <button class="btn btn-ghost" id="brv2-reset-btn" type="button" data-i18n="vex-btn-reset">清空</button>
+                    <div class="vex-action-info muted" id="brv2-status">
+                        <span data-i18n="brv2-hint-need-both">请上传银行账单和 GL 文件</span>
+                    </div>
+                    <select class="brv2-acct-select" id="brv2-acct-select" style="display:none">
+                        <option value="" data-i18n="brv2-acct-all">全部账户</option>
+                    </select>
+                    <button class="btn btn-primary" id="brv2-run-btn" type="button" disabled>
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 8l4 4 6-8"/>
+                        </svg>
+                        <span data-i18n="brv2-run-btn">开始对账</span>
+                    </button>
+                </div>
+
+                <!-- 进度区 -->
+                <div class="vex-progress" id="brv2-progress" style="display:none">
+                    <div class="spinner"></div>
+                    <div>
+                        <div class="vex-progress-title" data-i18n="brv2-processing">对账中…</div>
+                        <div class="vex-progress-sub" id="brv2-progress-sub"></div>
+                    </div>
+                </div>
+
+                <!-- 错误提示 -->
+                <div class="brv2-error" id="brv2-error" style="display:none"></div>
+
+                <!-- 结果 · 对账公式折叠区 -->
+                <div class="recon-collapse" id="brv2-summary-collapse" data-collapsed="false" style="display:none;margin-top:14px">
+                    <div class="recon-collapse-head" data-toggle="brv2-summary-collapse" tabindex="0" role="button">
+                        <svg class="recon-collapse-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="5 7 8 10 11 7"/>
+                        </svg>
+                        <span class="recon-collapse-title" data-i18n="brv2-summary-title">对账公式</span>
+                        <span class="recon-collapse-sub" id="brv2-formula-sub"></span>
+                        <div class="glv-section-spacer"></div>
+                        <button class="btn btn-ghost btn-small" id="brv2-export-btn" type="button" style="display:none">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" width="13" height="13">
+                                <path d="M3 11v2h10v-2M8 2v8M5 7l3 4 3-4"/>
+                            </svg>
+                            <span data-i18n="brv2-export-excel">导出 Excel</span>
+                        </button>
+                        <button class="btn btn-ghost btn-small" id="brv2-new-btn" type="button" style="display:none">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" width="13" height="13">
+                                <path d="M8 3v10M3 8h10"/>
+                            </svg>
+                            <span data-i18n="brv2-new-btn">新建</span>
+                        </button>
+                    </div>
+                    <div class="recon-collapse-body">
+                        <table class="brv2-formula-table" id="brv2-formula-table">
+                            <tbody>
+                                <tr><td data-i18n="brv2-gl-close">GL 期末余额</td><td class="brv2-num" id="brf-gl-close">—</td></tr>
+                                <tr><td data-i18n="brv2-open-diff">期初差额</td><td class="brv2-num" id="brf-open-diff">—</td></tr>
+                                <tr><td data-i18n="brv2-gl-debit-only">GL 仅借方 (−)</td><td class="brv2-num" id="brf-gl-debit-only">—</td></tr>
+                                <tr><td data-i18n="brv2-gl-credit-only">GL 仅贷方 (+)</td><td class="brv2-num" id="brf-gl-credit-only">—</td></tr>
+                                <tr><td data-i18n="brv2-stmt-wd-only">账单仅提款 (−)</td><td class="brv2-num" id="brf-stmt-wd-only">—</td></tr>
+                                <tr><td data-i18n="brv2-stmt-dep-only">账单仅存款 (+)</td><td class="brv2-num" id="brf-stmt-dep-only">—</td></tr>
+                                <tr class="brv2-formula-sep"><td data-i18n="brv2-calc-close">计算期末</td><td class="brv2-num brv2-bold" id="brf-calc-close">—</td></tr>
+                                <tr><td data-i18n="brv2-stmt-close">账单期末</td><td class="brv2-num" id="brf-stmt-close">—</td></tr>
+                                <tr class="brv2-formula-diff-row"><td data-i18n="brv2-diff-label">差额 (应为 0)</td><td class="brv2-num brv2-bold" id="brf-diff">—</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 结果 · 明细折叠区 -->
+                <div class="recon-collapse" id="brv2-detail-collapse" data-collapsed="false" style="display:none;margin-top:10px">
+                    <div class="recon-collapse-head" data-toggle="brv2-detail-collapse" tabindex="0" role="button">
+                        <svg class="recon-collapse-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="5 7 8 10 11 7"/>
+                        </svg>
+                        <span class="recon-collapse-title" data-i18n="brv2-detail-title">明细</span>
+                        <span class="recon-collapse-sub" id="brv2-detail-sub"></span>
+                        <div class="glv-section-spacer"></div>
+                        <!-- 过滤 tabs（放在折叠头部右侧） -->
+                        <div class="brv2-filter-tabs" id="brv2-filter-tabs">
+                            <button class="brv2-filter-btn active" data-filter="all" data-i18n="brv2-filter-all">全部</button>
+                            <button class="brv2-filter-btn" data-filter="matched" data-i18n="brv2-filter-matched">已匹配</button>
+                            <button class="brv2-filter-btn" data-filter="gl_only" data-i18n="brv2-filter-gl-only">GL 未配</button>
+                            <button class="brv2-filter-btn" data-filter="stmt_only" data-i18n="brv2-filter-stmt-only">账单未配</button>
+                        </div>
+                    </div>
+                    <div class="recon-collapse-body">
+                        <div class="brv2-table-wrap">
+                            <table class="brv2-table" id="brv2-detail-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="brv2-th-status">状态</th>
+                                        <th data-i18n="brv2-th-stmt-date">账单日期</th>
+                                        <th data-i18n="brv2-th-stmt-desc">账单摘要</th>
+                                        <th class="num" data-i18n="brv2-th-wd">提款</th>
+                                        <th class="num" data-i18n="brv2-th-dep">存款</th>
+                                        <th data-i18n="brv2-th-gl-date">GL 日期</th>
+                                        <th data-i18n="brv2-th-gl-doc">GL 凭证</th>
+                                        <th class="num" data-i18n="brv2-th-gl-debit">借方</th>
+                                        <th class="num" data-i18n="brv2-th-gl-credit">贷方</th>
+                                        <th data-i18n="brv2-th-layer">层级</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="brv2-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /vex-main-action -->
+
+            <!-- 历史记录 -->
+            <div class="vex-task-section" id="brv2-history-section">
+                <div class="vex-task-header-wrap">
+                    <div class="vex-task-header" data-i18n="brv2-history-title">近期对账记录</div>
+                </div>
+                <div class="brv2-history-list" id="brv2-history-list">
+                    <div class="brv2-history-loading" data-i18n="brv2-loading">加载中…</div>
+                </div>
             </div>
-
-          </div><!-- /brv2-upload-row -->
-
-          <!-- GL account selector (shown when multiple accounts found) -->
-          <div class="brv2-acct-row" id="brv2-acct-row" style="display:none">
-            <label class="brv2-acct-label" data-i18n="brv2-acct-label">รหัสบัญชี GL</label>
-            <select class="brv2-acct-select" id="brv2-acct-select">
-              <option value="" data-i18n="brv2-acct-all">ทั้งหมด</option>
-            </select>
-            <span class="brv2-acct-hint" data-i18n="brv2-acct-hint">เลือกบัญชีธนาคารที่ต้องการ</span>
-          </div>
-
-          <!-- Run button + progress -->
-          <div class="brv2-run-row">
-            <button class="btn brv2-run-btn" id="brv2-run-btn" type="button" disabled>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
-                <path d="M3 4l5 4-5 4V4z" fill="currentColor" stroke="none"/>
-                <path d="M11 4v8"/>
-              </svg>
-              <span data-i18n="brv2-run-btn">เริ่มสอบทาน</span>
-            </button>
-            <div class="brv2-progress" id="brv2-progress" style="display:none">
-              <div class="brv2-progress-bar"><div class="brv2-progress-fill" id="brv2-progress-fill"></div></div>
-              <span class="brv2-progress-label" id="brv2-progress-label" data-i18n="brv2-processing">กำลังประมวลผล…</span>
-            </div>
-            <div class="brv2-error" id="brv2-error" style="display:none"></div>
-          </div>
-
-        </div><!-- /brv2-upload-section -->
-
-        <!-- ── Results Section ── -->
-        <div class="brv2-results" id="brv2-results" style="display:none">
-
-          <!-- Summary cards -->
-          <div class="brv2-summary-cards" id="brv2-summary-cards">
-            <div class="brv2-card brv2-card-match">
-              <div class="brv2-card-num" id="brv2-stat-matched">0</div>
-              <div class="brv2-card-lbl" data-i18n="brv2-stat-matched">จับคู่แล้ว</div>
-            </div>
-            <div class="brv2-card brv2-card-gl">
-              <div class="brv2-card-num" id="brv2-stat-gl-only">0</div>
-              <div class="brv2-card-lbl" data-i18n="brv2-stat-gl-only">GL เท่านั้น</div>
-            </div>
-            <div class="brv2-card brv2-card-stmt">
-              <div class="brv2-card-num" id="brv2-stat-stmt-only">0</div>
-              <div class="brv2-card-lbl" data-i18n="brv2-stat-stmt-only">บัญชีเท่านั้น</div>
-            </div>
-            <div class="brv2-card brv2-card-diff" id="brv2-card-diff">
-              <div class="brv2-card-num" id="brv2-stat-formula-diff">0.00</div>
-              <div class="brv2-card-lbl" data-i18n="brv2-stat-diff">ผลต่าง</div>
-            </div>
-          </div>
-
-          <!-- Reconciliation formula mini-table -->
-          <div class="brv2-formula-box" id="brv2-formula-box">
-            <div class="brv2-formula-title" data-i18n="brv2-formula-title">สูตรสอบทาน</div>
-            <table class="brv2-formula-table" id="brv2-formula-table">
-              <tbody>
-                <tr><td data-i18n="brv2-gl-close">ยอดปิด GL</td><td class="brv2-num" id="brf-gl-close">—</td></tr>
-                <tr><td data-i18n="brv2-open-diff">ผลต่างยอดเปิด</td><td class="brv2-num" id="brf-open-diff">—</td></tr>
-                <tr><td data-i18n="brv2-gl-debit-only">GL เดบิตเท่านั้น (−)</td><td class="brv2-num" id="brf-gl-debit-only">—</td></tr>
-                <tr><td data-i18n="brv2-gl-credit-only">GL เครดิตเท่านั้น (+)</td><td class="brv2-num" id="brf-gl-credit-only">—</td></tr>
-                <tr><td data-i18n="brv2-stmt-wd-only">บัญชีถอนเท่านั้น (−)</td><td class="brv2-num" id="brf-stmt-wd-only">—</td></tr>
-                <tr><td data-i18n="brv2-stmt-dep-only">บัญชีฝากเท่านั้น (+)</td><td class="brv2-num" id="brf-stmt-dep-only">—</td></tr>
-                <tr class="brv2-formula-sep"><td data-i18n="brv2-calc-close">ยอดปิดคำนวณ</td><td class="brv2-num brv2-bold" id="brf-calc-close">—</td></tr>
-                <tr><td data-i18n="brv2-stmt-close">ยอดปิดบัญชีธนาคาร</td><td class="brv2-num" id="brf-stmt-close">—</td></tr>
-                <tr class="brv2-formula-diff-row"><td data-i18n="brv2-diff-label">ผลต่าง (ควรเป็น 0)</td><td class="brv2-num brv2-bold" id="brf-diff">—</td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Action bar -->
-          <div class="brv2-action-bar">
-            <div class="brv2-filter-tabs" id="brv2-filter-tabs">
-              <button class="brv2-filter-btn active" data-filter="all" data-i18n="brv2-filter-all">ทั้งหมด</button>
-              <button class="brv2-filter-btn" data-filter="matched" data-i18n="brv2-filter-matched">จับคู่แล้ว</button>
-              <button class="brv2-filter-btn" data-filter="gl_only" data-i18n="brv2-filter-gl-only">GL เท่านั้น</button>
-              <button class="brv2-filter-btn" data-filter="stmt_only" data-i18n="brv2-filter-stmt-only">บัญชีเท่านั้น</button>
-            </div>
-            <button class="btn btn-ghost btn-small" id="brv2-export-btn" type="button">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" width="13" height="13">
-                <path d="M3 11v2h10v-2M8 2v8M5 7l3 4 3-4"/>
-              </svg>
-              <span data-i18n="brv2-export-excel">ส่งออก Excel</span>
-            </button>
-            <button class="btn btn-ghost btn-small" id="brv2-new-btn" type="button">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" width="13" height="13">
-                <path d="M8 3v10M3 8h10"/>
-              </svg>
-              <span data-i18n="brv2-new-btn">สร้างใหม่</span>
-            </button>
-          </div>
-
-          <!-- Detail table -->
-          <div class="brv2-table-wrap">
-            <table class="brv2-table" id="brv2-detail-table">
-              <thead>
-                <tr>
-                  <th data-i18n="brv2-th-status">สถานะ</th>
-                  <th data-i18n="brv2-th-stmt-date">วันที่บัญชี</th>
-                  <th data-i18n="brv2-th-stmt-desc">รายการบัญชี</th>
-                  <th class="num" data-i18n="brv2-th-wd">ถอน</th>
-                  <th class="num" data-i18n="brv2-th-dep">ฝาก</th>
-                  <th data-i18n="brv2-th-gl-date">วันที่ GL</th>
-                  <th data-i18n="brv2-th-gl-doc">เลขที่ GL</th>
-                  <th class="num" data-i18n="brv2-th-gl-debit">เดบิต</th>
-                  <th class="num" data-i18n="brv2-th-gl-credit">เครดิต</th>
-                  <th data-i18n="brv2-th-layer">ชั้น</th>
-                </tr>
-              </thead>
-              <tbody id="brv2-tbody"></tbody>
-            </table>
-          </div>
-
-        </div><!-- /brv2-results -->
-
-        <!-- ── History Section ── -->
-        <div class="brv2-history" id="brv2-history">
-          <div class="brv2-history-head">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" width="14" height="14">
-              <circle cx="8" cy="8" r="6.5"/>
-              <path d="M8 4v4l2.5 2"/>
-            </svg>
-            <span data-i18n="brv2-history-title">ประวัติการสอบทาน</span>
-          </div>
-          <div class="brv2-history-list" id="brv2-history-list">
-            <div class="brv2-history-loading" data-i18n="brv2-loading">กำลังโหลด…</div>
-          </div>
-        </div>
 
         </div><!-- /recon-pane-bank -->
 
@@ -6268,7 +6299,7 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11841136"></script>
+<script src="/static/home.js?v=11841137"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 

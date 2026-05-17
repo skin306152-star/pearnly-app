@@ -15790,3 +15790,33 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
   color: var(--ink-3); border-radius: 4px;
 }
 .brv2-hist-del:hover { color: #dc2626; background: #fef2f2; }
+
+/* ── Bank Recon v2 · chips row（文件列表区，位于 vex-drops 下方） ── */
+.brv2-chips-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 60px;
+  padding: 4px 0 2px;
+}
+@media (max-width: 700px) { .brv2-chips-row { grid-template-columns: 1fr; gap: 10px; } }
+.brv2-chips-col { display: flex; flex-direction: column; gap: 4px; }
+.brv2-chips-lbl {
+  font-size: 11px; font-weight: 600; color: var(--ink-3);
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px;
+}
+
+/* ── acct-select 在 vex-action-bar 内的尺寸 ── */
+.brv2-acct-select {
+  padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line);
+  font-size: 12px; background: #fff; color: var(--ink); min-width: 140px;
+}
+
+/* ── filter-tabs 在 recon-collapse-head 内（右侧对齐） ── */
+.recon-collapse-head .brv2-filter-tabs { margin-left: auto; }
+.recon-collapse-head .brv2-filter-btn {
+  padding: 3px 9px; font-size: 11px;
+}
+
+/* ── formula-table 在 recon-collapse-body 内去掉外边框 ── */
+#brv2-summary-collapse .brv2-formula-table { margin: 4px 0; }
+
+/* ── vex-kpi-strip 支持 4 卡（默认 flex 自动适配）── */
+#brv2-kpi-strip .vex-kpi-icon-wrap { font-size: 12px; font-weight: 700; }

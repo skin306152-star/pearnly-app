@@ -18586,6 +18586,7 @@ async function deleteEndpoint(endpointId) {
     'use strict';
 
     // ── State ─────────────────────────────────────────────────────────
+    let _initialized  = false; // guard: 防 init() 重复绑事件
     let _stmtFiles   = [];   // File objects for bank statement
     let _glFiles     = [];   // File objects for GL
     let _currentTask = null; // Last run result {task_id, detail, summary, stats}
@@ -18608,23 +18609,33 @@ async function deleteEndpoint(endpointId) {
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // ── File-chip rendering ───────────────────────────────────────────
+    // ── File rendering（vex-drop-filename + chip list） ──────────────
     function renderFileList(zone) {
         const files  = zone === 'stmt' ? _stmtFiles : _glFiles;
+        // 1. 更新拖拽区内摘要文字
+        const nameEl = $(`brv2-${zone}-name`);
+        if (nameEl) {
+            if (files.length === 0) {
+                nameEl.textContent = '';
+            } else {
+                const lang = window._currentLang || 'zh';
+                const labels = { zh: '个文件', th: ' ไฟล์', en: ' file(s)', ja: ' ファイル' };
+                nameEl.textContent = files.length + (labels[lang] || ' 个文件');
+            }
+        }
+        // 2. chip 列表（位于拖拽区下方）
         const listEl = $(`brv2-${zone}-list`);
         if (!listEl) return;
         listEl.innerHTML = files.map((f, i) =>
             `<div class="brv2-file-chip">
-              <svg viewBox="0 0 12 12" width="10" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="1" y="0.5" width="10" height="11" rx="1.5"/>
-              </svg>
+              <svg viewBox="0 0 12 12" width="10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="0.5" width="10" height="11" rx="1.5"/></svg>
               <span>${esc2(f.name)}</span>
-              <button class="brv2-file-chip-remove" data-zone="${zone}" data-idx="${i}" title="ลบ">×</button>
+              <button class="brv2-file-chip-remove" data-zone="${zone}" data-idx="${i}" title="删除">×</button>
             </div>`
         ).join('');
-        // remove listeners
         listEl.querySelectorAll('.brv2-file-chip-remove').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation(); // 防止冒泡到 zone → 不触发文件对话框
                 const idx = parseInt(btn.dataset.idx, 10);
                 if (btn.dataset.zone === 'stmt') _stmtFiles.splice(idx, 1);
                 else _glFiles.splice(idx, 1);
@@ -18632,18 +18643,48 @@ async function deleteEndpoint(endpointId) {
                 updateRunBtn();
             });
         });
+        // 3. 显示/隐藏 chips-row 容器
+        const chipsRow = $('brv2-chips-row');
+        if (chipsRow) {
+            chipsRow.style.display = (_stmtFiles.length + _glFiles.length > 0) ? '' : 'none';
+        }
     }
 
     function updateRunBtn() {
-        const btn = $('brv2-run-btn');
-        if (btn) btn.disabled = (_stmtFiles.length === 0 || _glFiles.length === 0);
+        const btn    = $('brv2-run-btn');
+        const status = $('brv2-status');
+        const hasStmt = _stmtFiles.length > 0;
+        const hasGl   = _glFiles.length > 0;
+        if (btn) btn.disabled = !(hasStmt && hasGl);
+        if (status) {
+            const lang = window._currentLang || 'zh';
+            if (!hasStmt && !hasGl) {
+                const m = { zh: '请上传银行账单和 GL 文件', th: 'กรุณาอัปโหลดบัญชีธนาคารและ GL', en: 'Upload bank statement and GL files', ja: '銀行明細と GL を両方アップロードしてください' };
+                status.textContent = m[lang] || m.zh;
+            } else if (!hasStmt) {
+                const m = { zh: '还缺银行账单 PDF', th: 'ยังขาดไฟล์บัญชีธนาคาร PDF', en: 'Missing bank statement PDF', ja: '銀行明細 PDF が未アップロード' };
+                status.textContent = m[lang] || m.zh;
+            } else if (!hasGl) {
+                const m = { zh: '还缺 GL 文件', th: 'ยังขาดไฟล์ GL', en: 'Missing GL file', ja: 'GL ファイルが未アップロード' };
+                status.textContent = m[lang] || m.zh;
+            } else {
+                const m = { zh: '两份文件已就绪', th: 'พร้อมสอบทาน', en: 'Ready to reconcile', ja: '照合を開始できます' };
+                status.textContent = m[lang] || m.zh;
+            }
+        }
     }
 
-    // ── Drag-and-drop ─────────────────────────────────────────────────
+    // ── Drag-and-drop（整区点击 · 无独立按钮） ────────────────────────
     function setupDrop(zoneId, inputId, zone) {
-        const zoneEl = $(zoneId);
+        const zoneEl  = $(zoneId);
         const inputEl = $(inputId);
         if (!zoneEl || !inputEl) return;
+
+        // 整区点击 → 弹文件对话框
+        zoneEl.addEventListener('click', () => inputEl.click());
+        zoneEl.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputEl.click(); }
+        });
 
         zoneEl.addEventListener('dragover', e => { e.preventDefault(); zoneEl.classList.add('drag-over'); });
         zoneEl.addEventListener('dragleave', () => zoneEl.classList.remove('drag-over'));
@@ -18656,9 +18697,6 @@ async function deleteEndpoint(endpointId) {
             renderFileList(zone);
             updateRunBtn();
         });
-
-        const btn = $(`brv2-${zone}-btn`);
-        if (btn) btn.addEventListener('click', () => inputEl.click());
 
         inputEl.addEventListener('change', () => {
             const chosen = Array.from(inputEl.files || []);
@@ -18691,9 +18729,8 @@ async function deleteEndpoint(endpointId) {
         const lang  = (window._currentLang || 'th');
         const acct  = ($('brv2-acct-select') || {}).value || '';
 
+        showResultSections(false);
         showProgress(true);
-        const results = $('brv2-results');
-        if (results) results.style.display = 'none';
 
         try {
             const fd = new FormData();
@@ -18714,20 +18751,21 @@ async function deleteEndpoint(endpointId) {
                 return;
             }
 
-            // Handle multiple GL accounts
+            // 多 GL 账户时显示科目选择
             if ((data.gl_accounts || []).length > 1) {
                 populateAcctSelect(data.gl_accounts);
             }
 
-            _currentTask = data;
-            _allRows = data.detail || [];
+            _currentTask   = data;
+            _allRows       = data.detail || [];
             _currentFilter = 'all';
+            // 重置 filter tab 到 "all"
+            document.querySelectorAll('.brv2-filter-btn').forEach(b =>
+                b.classList.toggle('active', b.dataset.filter === 'all')
+            );
 
-            renderResults(data);
             showProgress(false);
-            if (results) results.style.display = '';
-
-            // Refresh history
+            renderResults(data);
             loadHistory();
 
         } catch (e) {
@@ -18736,60 +18774,83 @@ async function deleteEndpoint(endpointId) {
     }
 
     function populateAcctSelect(accounts) {
-        const sel  = $('brv2-acct-select');
-        const row  = $('brv2-acct-row');
-        if (!sel || !row) return;
-        sel.innerHTML = `<option value="">ทั้งหมด / All</option>` +
+        const sel = $('brv2-acct-select');
+        if (!sel) return;
+        sel.innerHTML = `<option value="">全部账户 / All</option>` +
             accounts.map(a => `<option value="${esc2(a)}">${esc2(a)}</option>`).join('');
-        row.style.display = '';
+        sel.style.display = '';
+    }
+
+    // ── 显示/隐藏结果折叠区 ──────────────────────────────────────────
+    function showResultSections(show) {
+        const sc = $('brv2-summary-collapse');
+        const dc = $('brv2-detail-collapse');
+        const eb = $('brv2-export-btn');
+        const nb = $('brv2-new-btn');
+        if (sc) sc.style.display = show ? '' : 'none';
+        if (dc) dc.style.display = show ? '' : 'none';
+        if (eb) eb.style.display = show ? '' : 'none';
+        if (nb) nb.style.display = show ? '' : 'none';
     }
 
     // ── Render results ────────────────────────────────────────────────
     function renderResults(data) {
-        const stats   = data.stats || {};
+        const stats   = data.stats   || {};
         const summary = data.summary || {};
 
-        // Stats cards
-        const matched   = stats.matched || 0;
-        const glOnly    = (stats.gl_debit_only || 0) + (stats.gl_credit_only || 0);
-        const stmtOnly  = (stats.stmt_withdrawal_only || 0) + (stats.stmt_deposit_only || 0);
-        const fdiff     = Number(summary.formula_diff || 0);
+        const matched  = stats.matched || 0;
+        const glOnly   = (stats.gl_debit_only || 0) + (stats.gl_credit_only || 0);
+        const stmtOnly = (stats.stmt_withdrawal_only || 0) + (stats.stmt_deposit_only || 0);
+        const fdiff    = Number(summary.formula_diff || 0);
+        const diffOk   = Math.abs(fdiff) < 0.05;
 
-        if ($('brv2-stat-matched'))      $('brv2-stat-matched').textContent  = matched;
-        if ($('brv2-stat-gl-only'))      $('brv2-stat-gl-only').textContent  = glOnly;
-        if ($('brv2-stat-stmt-only'))    $('brv2-stat-stmt-only').textContent = stmtOnly;
-        if ($('brv2-stat-formula-diff')) $('brv2-stat-formula-diff').textContent = fmtNum(fdiff);
-
-        // Diff card color
-        const diffCard = $('brv2-card-diff');
-        if (diffCard) {
-            diffCard.classList.remove('has-diff', 'no-diff');
-            diffCard.classList.add(Math.abs(fdiff) < 0.05 ? 'no-diff' : 'has-diff');
+        // KPI strip
+        if ($('brv2-kpi-matched'))  $('brv2-kpi-matched').textContent  = matched;
+        if ($('brv2-kpi-gl-only'))  $('brv2-kpi-gl-only').textContent  = glOnly;
+        if ($('brv2-kpi-stmt-only'))$('brv2-kpi-stmt-only').textContent = stmtOnly;
+        if ($('brv2-kpi-diff'))     $('brv2-kpi-diff').textContent     = fmtNum(fdiff);
+        // 差额图标颜色
+        const diffIcon = $('brv2-kpi-diff-icon');
+        if (diffIcon) {
+            diffIcon.style.background = diffOk ? '#d1fae5' : '#fee2e2';
+            diffIcon.style.color      = diffOk ? '#065f46' : '#b91c1c';
         }
 
-        // Formula box
+        // Formula collapse 小标题
+        const formulaSub = $('brv2-formula-sub');
+        if (formulaSub) formulaSub.textContent = diffOk ? '✓ 平衡' : `差 ${fmtNum(fdiff)}`;
+
+        // Detail collapse 小标题
+        const detailSub = $('brv2-detail-sub');
+        if (detailSub) detailSub.textContent = `共 ${_allRows.length} 行`;
+
+        // 公式表
         function setFrm(id, val, neg) {
             const el = $(id);
-            if (el) el.textContent = (neg && val > 0 ? '(' : '') + fmtNum(neg ? -val : val) + (neg && val > 0 ? ')' : '');
+            if (!el) return;
+            el.textContent = (neg && val > 0 ? '(' : '') + fmtNum(neg ? -val : val) + (neg && val > 0 ? ')' : '');
         }
-        setFrm('brf-gl-close',     summary.gl_closing       || 0);
-        setFrm('brf-open-diff',    summary.opening_diff     || 0);
-        setFrm('brf-gl-debit-only',summary.gl_debit_only_amount || 0, true);
-        setFrm('brf-gl-credit-only',summary.gl_credit_only_amount || 0);
-        setFrm('brf-stmt-wd-only', summary.stmt_withdrawal_only_amount || 0, true);
-        setFrm('brf-stmt-dep-only',summary.stmt_deposit_only_amount || 0);
-        setFrm('brf-calc-close',   summary.formula_stmt_closing || 0);
-        setFrm('brf-stmt-close',   summary.stmt_closing     || 0);
-        if ($('brf-diff')) $('brf-diff').textContent = fmtNum(fdiff);
+        setFrm('brf-gl-close',      summary.gl_closing             || 0);
+        setFrm('brf-open-diff',     summary.opening_diff           || 0);
+        setFrm('brf-gl-debit-only', summary.gl_debit_only_amount   || 0, true);
+        setFrm('brf-gl-credit-only',summary.gl_credit_only_amount  || 0);
+        setFrm('brf-stmt-wd-only',  summary.stmt_withdrawal_only_amount || 0, true);
+        setFrm('brf-stmt-dep-only', summary.stmt_deposit_only_amount    || 0);
+        setFrm('brf-calc-close',    summary.formula_stmt_closing   || 0);
+        setFrm('brf-stmt-close',    summary.stmt_closing           || 0);
+        if ($('brf-diff')) {
+            $('brf-diff').textContent = fmtNum(fdiff);
+            $('brf-diff').style.color = diffOk ? '#059669' : '#dc2626';
+        }
 
-        // Diff row color
+        // 差额行颜色
         const diffRow = document.querySelector('.brv2-formula-diff-row');
         if (diffRow) {
             diffRow.classList.remove('ok', 'has-diff');
-            diffRow.classList.add(Math.abs(fdiff) < 0.05 ? 'ok' : 'has-diff');
+            diffRow.classList.add(diffOk ? 'ok' : 'has-diff');
         }
 
-        // Export button
+        // 导出按钮事件
         const exportBtn = $('brv2-export-btn');
         if (exportBtn) {
             exportBtn.onclick = () => {
@@ -18799,6 +18860,7 @@ async function deleteEndpoint(endpointId) {
             };
         }
 
+        showResultSections(true);
         renderTable();
     }
 
@@ -18934,20 +18996,46 @@ async function deleteEndpoint(endpointId) {
             _currentTask   = { task_id: data.task_id, ...data };
             _allRows       = data.detail || [];
             _currentFilter = 'all';
-            const results  = $('brv2-results');
-            if (results) results.style.display = '';
+            // 重置 filter tab 到 "all"
+            document.querySelectorAll('.brv2-filter-btn').forEach(b =>
+                b.classList.toggle('active', b.dataset.filter === 'all')
+            );
             renderResults(_currentTask);
         } catch (e) { /* silent */ }
     }
 
     // ── Init ──────────────────────────────────────────────────────────
     function init() {
+        if (_initialized) {
+            // 二次进入只刷历史
+            loadHistory();
+            return;
+        }
+        _initialized = true;
+
         setupDrop('brv2-stmt-zone', 'brv2-stmt-input', 'stmt');
         setupDrop('brv2-gl-zone',   'brv2-gl-input',   'gl');
 
         const runBtn = $('brv2-run-btn');
         if (runBtn) runBtn.addEventListener('click', runRecon);
 
+        // 清空按钮
+        const resetBtn = $('brv2-reset-btn');
+        if (resetBtn) resetBtn.addEventListener('click', () => {
+            _currentTask   = null;
+            _allRows       = [];
+            _stmtFiles     = [];
+            _glFiles       = [];
+            renderFileList('stmt');
+            renderFileList('gl');
+            updateRunBtn();
+            showResultSections(false);
+            // 重置 acct select
+            const sel = $('brv2-acct-select');
+            if (sel) sel.style.display = 'none';
+        });
+
+        // 新建按钮（在折叠头里）
         const newBtn = $('brv2-new-btn');
         if (newBtn) newBtn.addEventListener('click', () => {
             _currentTask   = null;
@@ -18957,14 +19045,14 @@ async function deleteEndpoint(endpointId) {
             renderFileList('stmt');
             renderFileList('gl');
             updateRunBtn();
-            const results = $('brv2-results');
-            if (results) results.style.display = 'none';
+            showResultSections(false);
         });
 
-        // Filter tabs
+        // 过滤 tab（事件冒泡拦截，不触发折叠）
         const filterTabs = $('brv2-filter-tabs');
         if (filterTabs) {
             filterTabs.addEventListener('click', e => {
+                e.stopPropagation(); // 防止触发 recon-collapse-head 折叠
                 const btn = e.target.closest('.brv2-filter-btn');
                 if (!btn) return;
                 _currentFilter = btn.dataset.filter;
@@ -25525,15 +25613,11 @@ try { window.I18N = I18N; } catch(e) {}
     }
 
     function _gotoBankUpload() {
-        // v118.33.6 · go to reconcile center bank tab and trigger file pick
+        // 导航到对账中心 → 银行对账 tab（不自动弹文件框，用户自己点区域）
         if (typeof window.routeTo === 'function') window.routeTo('reconcile');
         setTimeout(function() {
             const bankTab = document.querySelector('[data-recon-tab="bank"]');
             if (bankTab) bankTab.click();
-            setTimeout(function() {
-                const stmtBtn = document.getElementById('brv2-stmt-btn');
-                if (stmtBtn) stmtBtn.click();
-            }, 300);
         }, 150);
     }
 

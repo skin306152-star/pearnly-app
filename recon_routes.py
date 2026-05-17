@@ -1295,6 +1295,12 @@ async def bank_v2_run(
     # 5. Serialize
     detail_j = rows_to_json(recon_rows)
     summary_j = bank_summary_to_json(summary)
+    # v118.33.13.3 · embed real per-file parse_info into summary_json so the
+    # Excel "File Info" sheet shows accurate per-file rows/bank when exporting
+    # from history (previously it reconstructed bogus data using totals).
+    # summary_from_json filters out unknown keys, so this is non-invasive.
+    if isinstance(summary_j, dict):
+        summary_j["_parse_info"] = parse_info
 
     # 6. Persist
     unmatched_gl   = summary.gl_debit_only_count + summary.gl_credit_only_count
@@ -1423,19 +1429,25 @@ async def bank_v2_export(task_id: int, request: Request, lang: str = "th"):
     recon_rows = rows_from_json(detail_raw)
     summary = bank_summary_from_json(summary_raw)
 
-    # Reconstruct parse_info from task fields for export diagnostics sheet
-    task_parse_info = {
-        "stmt_files": [
-            {"file": f.strip(), "rows": task.get("stmt_row_count", 0), "ok": True,
-             "bank_code": task.get("bank_code", "")}
-            for f in (task.get("stmt_files") or "").split(";") if f.strip()
-        ],
-        "gl_files": [
-            {"file": f.strip(), "rows": task.get("gl_row_count", 0), "ok": True,
-             "accounts": [task.get("gl_account") or ""]}
-            for f in (task.get("gl_files") or "").split(";") if f.strip()
-        ],
-    }
+    # v118.33.13.3 · Use the real parse_info that was saved at run time if available,
+    # otherwise fall back to the old reconstruction (which is bogus — every file
+    # shows the TOTAL row count and the OVERALL bank_code).
+    saved_parse_info = summary_raw.get("_parse_info") if isinstance(summary_raw, dict) else None
+    if saved_parse_info and isinstance(saved_parse_info, dict):
+        task_parse_info = saved_parse_info
+    else:
+        task_parse_info = {
+            "stmt_files": [
+                {"file": f.strip(), "rows": task.get("stmt_row_count", 0), "ok": True,
+                 "bank_code": task.get("bank_code", "")}
+                for f in (task.get("stmt_files") or "").split(";") if f.strip()
+            ],
+            "gl_files": [
+                {"file": f.strip(), "rows": task.get("gl_row_count", 0), "ok": True,
+                 "accounts": [task.get("gl_account") or ""]}
+                for f in (task.get("gl_files") or "").split(";") if f.strip()
+            ],
+        }
     excel_bytes = export_bank_recon_excel(recon_rows, summary, lang=lang,
                                           task_info=task, parse_info=task_parse_info)
 

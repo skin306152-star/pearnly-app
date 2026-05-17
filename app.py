@@ -4378,10 +4378,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.33.13.2 更新:\n• Excel 汇总区彻底重设计：纵向 itemized 布局，参考销项税对账模板\n• 每条未匹配项展开为独立明细行（日期 · 凭证号 · 摘要 · 金额）\n• 颜色分层：深色 anchor 行 / 浅灰 section header / 白色 detail / 蓝色小计 / 红绿差异\n• 公式结构不变（GL期末 + 期初差 ± 4 类未匹配 = 计算期末 vs 账单期末）",
-            "en": "v118.33.13.2 updates:\n• Excel Summary fully redesigned: vertical itemized layout matching the VAT recon template\n• Every unmatched item expanded into its own detail row (date · doc# · description · amount)\n• Color tiers: dark anchors / light-gray section headers / white details / blue subtotal / red-green diff\n• Formula structure unchanged (GL_close + open_diff ± 4 unmatched cats = calc_close vs stmt_close)",
-            "th": "v118.33.13.2 อัปเดต:\n• ชีตสรุปใน Excel ออกแบบใหม่: เลย์เอาต์แนวตั้งแบบ itemized ตามเทมเพลตรายงานภาษีขาย\n• แต่ละรายการที่ไม่จับคู่จะแสดงเป็นแถวรายละเอียดแยก (วันที่ · เลขที่ · รายการ · จำนวนเงิน)\n• แบ่งสีตามลำดับชั้น: แถวหลักสีเข้ม / หัวข้อย่อยสีเทาอ่อน / รายละเอียดสีขาว / ยอดรวมย่อยสีน้ำเงิน / ผลต่างแดง-เขียว\n• โครงสร้างสูตรไม่เปลี่ยน (ปิด GL + ผลต่างเปิด ± 4 ประเภทที่ไม่จับคู่ = ปิดคำนวณ เทียบ ปิดบัญชี)",
-            "ja": "v118.33.13.2 更新:\n• Excelサマリーシートを全面再設計：VAT照合テンプレート準拠の縦型項目別レイアウト\n• 不一致項目を個別の明細行に展開（日付 · 伝票番号 · 摘要 · 金額）\n• 色分け: 主要行は濃色 / セクション見出しは薄灰 / 明細は白 / 小計は青 / 差異は赤緑\n• 公式構造は維持（GL期末 + 期首差 ± 4種類の不一致 = 計算期末 vs 明細期末）"
+            "zh": "v118.33.13.3 更新:\n• 修复 Excel「文件信息」sheet：之前从历史导出时，每个银行账单文件都显示同一个总行数+同一个银行 — 现在保存真实的每文件解析结果\n• 清理废弃的 i18n key（vex-recent-show-limited 等），无功能影响\n• 已知问题（下次再修）：GL 解析器对部分泰文 GL PDF 列识别有误（doc_no 字段被「日期+账类型」覆盖、真凭证号被挤到账户代码列），导致 0% 匹配率 — 需要重写 GL 列检测逻辑",
+            "en": "v118.33.13.3 updates:\n• Fix Excel 'File Info' sheet: when exporting from history, every statement file used to show the SAME total row count and the SAME bank — now we persist real per-file parse_info\n• Cleanup of dead i18n keys (vex-recent-show-limited etc.) - no functional impact\n• Known issue (next pass): GL parser mis-detects columns on some Thai GL PDFs (gl_doc_no captures 'date + journal type', real voucher# ends up in account_code) — causes 0% match rate. Needs GL column-detection rewrite.",
+            "th": "v118.33.13.3 อัปเดต:\n• แก้ชีต Excel 'ข้อมูลไฟล์': เดิมตอนส่งออกจากประวัติ ไฟล์รายการบัญชีทุกไฟล์จะแสดงจำนวนแถวรวม+ธนาคารเดียวกัน — ตอนนี้บันทึกผลการแยกวิเคราะห์ของแต่ละไฟล์จริง ๆ\n• ลบ i18n key ที่ไม่ใช้แล้ว — ไม่กระทบฟังก์ชัน\n• ปัญหาที่ทราบ (จะแก้รอบหน้า): การแยกคอลัมน์ GL PDF ของไทยบางรูปแบบยังคลาดเคลื่อน — ทำให้จับคู่ได้ 0%",
+            "ja": "v118.33.13.3 更新:\n• Excel「ファイル情報」シートを修正: 履歴から出力時、すべての明細ファイルが同じ合計行数と同じ銀行を表示していた — 現在は実際のファイル別解析結果を保存\n• 未使用のi18nキーを削除 — 機能への影響なし\n• 既知の問題(次回対応): 一部のタイ語GL PDFで列検出が誤り — 一致率0%の原因 — GL列検出ロジックの書き直しが必要"
         }
     }
 

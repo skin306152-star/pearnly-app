@@ -732,109 +732,138 @@ def parse_gl_excel(
     }
 
 
+def _pdf_extract_text_safe(file_bytes: bytes) -> List[str]:
+    """
+    Extract text from PDF without crashing on malformed metadata.
+    Tries pdfminer first (no KeyError('date') bug), then pdfplumber, then pypdf.
+    Returns list of page text strings.
+    """
+    # pdfminer is a dependency of pdfplumber and doesn't have the KeyError('date') bug
+    try:
+        from pdfminer.high_level import extract_text as _pm_extract
+        text = _pm_extract(io.BytesIO(file_bytes)) or ""
+        if text.strip():
+            return [text]
+    except Exception:
+        pass
+    # pypdf fallback
+    try:
+        import pypdf
+        reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+        return [pg.extract_text() or "" for pg in reader.pages]
+    except Exception:
+        pass
+    return []
+
+
 def parse_gl_pdf(
     file_bytes: bytes, filename: str, account_code: str = "", api_key: str = ""
 ) -> Dict[str, Any]:
-    """Parse GL from PDF using pdfplumber, Gemini fallback."""
+    """
+    Parse GL from PDF.
+    Strategy: (1) extract text safely via pdfminer/pypdf (immune to KeyError('date'))
+              (2) try pdfplumber table extraction (may crash on some PDFs — fully isolated)
+              (3) if tables give < MIN_PLUMBER_ROWS, try text-line parser on extracted text
+              (4) Gemini fallback if still < MIN_PLUMBER_ROWS and api_key provided
+    """
+    # ── Step 1: extract raw text independently (never crashes the whole function) ──
+    page_texts = _pdf_extract_text_safe(file_bytes)
+
+    # ── Step 2: try pdfplumber table extraction (fully isolated) ──
+    all_tables: List = []
     try:
         import pdfplumber
-    except ImportError:
-        return {"ok": False, "error": "pdfplumber not installed"}
-
-    try:
-        pdf = pdfplumber.open(io.BytesIO(file_bytes))
-        all_tables = []
-        page_texts = []
-        for p in pdf.pages:
-            try:
-                tbls = p.extract_tables() or []
-                all_tables.extend(tbls)
-            except Exception:
-                pass  # skip bad page, try text fallback below
-            try:
-                page_texts.append(p.extract_text() or "")
-            except Exception:
-                page_texts.append("")
-        pdf.close()
-
-        rows = []
-        accounts_seen = set()
-        opening = 0.0
-
-        for table in all_tables:
-            if not table or len(table) < 2:
-                continue
-            col_map: Dict[str, int] = {}
-            header_idx = 0
-            for i, row in enumerate(table[:5]):
-                cm = _map_gl_cols([str(c or "").strip() for c in row])
-                if len(cm) >= 2:
-                    col_map = cm
-                    header_idx = i
-                    break
-
-            if not col_map:
-                continue
-
-            last_tbl_date = None  # carry-forward within each table
-            for row in table[header_idx + 1:]:
-                if not row:
-                    continue
-                row_list = [str(c or "").strip() for c in row]
-                if _is_gl_skip_row(row_list):
-                    continue
-                d_str = row_list[col_map["date"]] if "date" in col_map and col_map["date"] < len(row_list) else ""
-                d = _parse_date(d_str) if d_str else None
-                if d is not None:
-                    last_tbl_date = d
-                elif last_tbl_date is not None:
-                    d = last_tbl_date
-                else:
-                    continue
-                doc_no = row_list[col_map["doc_no"]] if "doc_no" in col_map and col_map["doc_no"] < len(row_list) else ""
-                desc = row_list[col_map["description"]] if "description" in col_map and col_map["description"] < len(row_list) else ""
-                debit = _to_float(row_list[col_map["debit"]] if "debit" in col_map and col_map["debit"] < len(row_list) else 0)
-                credit = _to_float(row_list[col_map["credit"]] if "credit" in col_map and col_map["credit"] < len(row_list) else 0)
-                acct = ""
-                if "account" in col_map and col_map["account"] < len(row_list):
-                    acct = str(row_list[col_map["account"]]).strip()
-                if not acct:
-                    acct = _extract_acct_code(doc_no) or _extract_acct_code(desc)
-
-                if debit == 0.0 and credit == 0.0:
-                    continue
-                if account_code and acct and not acct.startswith(account_code):
-                    continue
-
-                accounts_seen.add(acct or "?")
-                rows.append(GlRow(date=d, doc_no=doc_no, account_code=acct,
-                                  description=desc, debit=abs(debit), credit=abs(credit)))
-
-        # If table extraction yielded too few rows, try text-line parser
-        if len(rows) < MIN_PLUMBER_ROWS:
-            full_text = "\n".join(page_texts)
-            text_rows, text_accts, text_opening = _parse_gl_text_lines(full_text, account_code)
-            if len(text_rows) >= len(rows):
-                rows = text_rows
-                accounts_seen = set(text_accts)
-                opening = text_opening
-
-        if len(rows) < MIN_PLUMBER_ROWS and api_key:
-            return _gemini_parse_gl(file_bytes, filename, account_code, api_key)
-
-        total_credit = sum(r.credit for r in rows)
-        total_debit = sum(r.debit for r in rows)
-        closing = round(opening + total_credit - total_debit, 2)
-
-        return {
-            "ok": True, "rows": rows,
-            "accounts": sorted(accounts_seen - {"?"}),
-            "opening": opening, "closing": closing, "row_count": len(rows),
-        }
-
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for p in pdf.pages:
+                try:
+                    tbls = p.extract_tables() or []
+                    all_tables.extend(tbls)
+                except Exception:
+                    pass
+                if not page_texts:
+                    try:
+                        page_texts.append(p.extract_text() or "")
+                    except Exception:
+                        pass
     except Exception as e:
-        logger.error(f"parse_gl_pdf [{filename}] failed: {e}", exc_info=True)
-        return {"ok": False, "error": str(e), "rows": []}
+        logger.warning(f"pdfplumber [{filename}] skipped: {e}")
+
+    # ── Step 3: parse table rows ──
+    rows: List[GlRow] = []
+    accounts_seen: set = set()
+    opening = 0.0
+
+    for table in all_tables:
+        if not table or len(table) < 2:
+            continue
+        col_map: Dict[str, int] = {}
+        header_idx = 0
+        for i, row in enumerate(table[:5]):
+            cm = _map_gl_cols([str(c or "").strip() for c in row])
+            if len(cm) >= 2:
+                col_map = cm
+                header_idx = i
+                break
+        if not col_map:
+            continue
+
+        last_tbl_date = None
+        for row in table[header_idx + 1:]:
+            if not row:
+                continue
+            row_list = [str(c or "").strip() for c in row]
+            if _is_gl_skip_row(row_list):
+                continue
+            d_str = row_list[col_map["date"]] if "date" in col_map and col_map["date"] < len(row_list) else ""
+            d = _parse_date(d_str) if d_str else None
+            if d is not None:
+                last_tbl_date = d
+            elif last_tbl_date is not None:
+                d = last_tbl_date
+            else:
+                continue
+            doc_no = row_list[col_map["doc_no"]] if "doc_no" in col_map and col_map["doc_no"] < len(row_list) else ""
+            desc = row_list[col_map["description"]] if "description" in col_map and col_map["description"] < len(row_list) else ""
+            debit = _to_float(row_list[col_map["debit"]] if "debit" in col_map and col_map["debit"] < len(row_list) else 0)
+            credit = _to_float(row_list[col_map["credit"]] if "credit" in col_map and col_map["credit"] < len(row_list) else 0)
+            acct = ""
+            if "account" in col_map and col_map["account"] < len(row_list):
+                acct = str(row_list[col_map["account"]]).strip()
+            if not acct:
+                acct = _extract_acct_code(doc_no) or _extract_acct_code(desc)
+            if debit == 0.0 and credit == 0.0:
+                continue
+            if account_code and acct and not acct.startswith(account_code):
+                continue
+            accounts_seen.add(acct or "?")
+            rows.append(GlRow(date=d, doc_no=doc_no, account_code=acct,
+                              description=desc, debit=abs(debit), credit=abs(credit)))
+
+    # ── Step 4: text-line fallback (Mr.erp Thai GL format) ──
+    if len(rows) < MIN_PLUMBER_ROWS and page_texts:
+        full_text = "\n".join(page_texts)
+        text_rows, text_accts, text_opening = _parse_gl_text_lines(full_text, account_code)
+        if len(text_rows) >= len(rows):
+            rows = text_rows
+            accounts_seen = set(text_accts)
+            opening = text_opening
+
+    # ── Step 5: Gemini fallback ──
+    if len(rows) < MIN_PLUMBER_ROWS and api_key:
+        return _gemini_parse_gl(file_bytes, filename, account_code, api_key)
+
+    if not rows:
+        hint = " (PDF has no extractable text)" if not any(t.strip() for t in page_texts) else ""
+        return {"ok": False, "error": f"No GL rows found in PDF{hint}", "rows": []}
+
+    total_credit = sum(r.credit for r in rows)
+    total_debit = sum(r.debit for r in rows)
+    closing = round(opening + total_credit - total_debit, 2)
+    return {
+        "ok": True, "rows": rows,
+        "accounts": sorted(accounts_seen - {"?"}),
+        "opening": opening, "closing": closing, "row_count": len(rows),
+    }
 
 
 def _parse_gl_text_lines(

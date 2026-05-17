@@ -1830,6 +1830,12 @@
     .adm-emp-row-head { display: none; }
     .adm-emp-cell-mute { font-size: 11.5px; }
 }
+/* v118.33.11.0 · 历史记录分页器 */
+.hist-pager { display: flex; align-items: center; gap: 8px; padding: 8px 14px 10px; justify-content: flex-end; }
+.hist-pager-btn { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px 11px; cursor: pointer; font-size: 13px; color: #374151; font-family: inherit; line-height: 1.5; }
+.hist-pager-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.hist-pager-btn:not(:disabled):hover { background: #f9fafb; border-color: #d1d5db; }
+.hist-pager-info { font-size: 12px; color: #6b7280; min-width: 72px; text-align: center; }
 </style>
 </head>
 <body>
@@ -4698,6 +4704,11 @@
                         </thead>
                         <tbody id="brv2-history-tbody"></tbody>
                     </table>
+                    <div class="hist-pager" id="brv2-history-pager" style="display:none">
+                        <button class="hist-pager-btn" id="brv2-history-prev" type="button" disabled>&#8592;</button>
+                        <span class="hist-pager-info" id="brv2-history-pager-info"></span>
+                        <button class="hist-pager-btn" id="brv2-history-next" type="button">&#8594;</button>
+                    </div>
                 </div>
             </div>
 
@@ -4869,7 +4880,6 @@
             <div class="vex-task-section" id="vex-task-section">
                 <div class="vex-task-header-wrap">
                     <div class="vex-task-header" data-i18n="sv-recent-tasks">近期对账任务</div>
-                    <span class="vex-task-meta" id="vex-task-meta" style="display:none"></span>
                     <input type="text" class="hist-search-input" id="vex-task-search" data-i18n-placeholder="hist-search-ph" placeholder="搜索..." autocomplete="off">
                 </div>
                 <div class="vex-task-table-wrap">
@@ -4889,8 +4899,12 @@
                         </thead>
                         <tbody id="vex-task-tbody"></tbody>
                     </table>
+                    <div class="hist-pager" id="vex-task-pager" style="display:none">
+                        <button class="hist-pager-btn" id="vex-task-prev" type="button" disabled>&#8592;</button>
+                        <span class="hist-pager-info" id="vex-task-pager-info"></span>
+                        <button class="hist-pager-btn" id="vex-task-next" type="button">&#8594;</button>
+                    </div>
                 </div>
-                <button class="vex-expand-btn" id="vex-task-toggle" style="display:none"></button>
             </div>
 
             <!-- ── 新建对账抽屉/模态(屏 A 核心) ── -->
@@ -5212,6 +5226,11 @@
                     </thead>
                     <tbody id="glv-history-tbody"></tbody>
                 </table>
+                <div class="hist-pager" id="glv-history-pager" style="display:none">
+                    <button class="hist-pager-btn" id="glv-history-prev" type="button" disabled>&#8592;</button>
+                    <span class="hist-pager-info" id="glv-history-pager-info"></span>
+                    <button class="hist-pager-btn" id="glv-history-next" type="button">&#8594;</button>
+                </div>
                 </div>
             </div>
 
@@ -6316,7 +6335,7 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11841702"></script>
+<script src="/static/home.js?v=11833110"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 

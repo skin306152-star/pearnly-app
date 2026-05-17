@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Mr.Pearnly · FastAPI 主入口 (v3.5)
 第 3.5 批:
@@ -4378,10 +4378,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.33.10.1 更新:\n• 修复对账中心首页刷新时显示旧占位符的问题\n• 首次进入 #/reconcile 现在可正确加载银行对账 v2 面板",
-            "en": "v118.33.10.1 updates:\n• Fix reconcile page showing old placeholder on hard refresh\n• Initial #/reconcile hash now correctly loads bank recon v2 panel",
-            "th": "v118.33.10.1 อัปเดต:\n• แก้หน้า reconcile แสดง placeholder เก่าตอน hard refresh\n• เปิด #/reconcile ครั้งแรกโหลดแผง bank recon v2 ได้ถูกต้อง",
-            "ja": "v118.33.10.1 更新:\n• reconcileページのハードリフレッシュ時に古いプレースホルダーが表示される問題を修正\n• 初回 #/reconcile アクセス時に銀行照合 v2 パネルを正しく読み込む"
+            "zh": "v118.33.11.0 更新:\n• 对账历史记录新增多选批量删除（含银行对账）\n• 三个对账模块历史记录改为每页 10 条分页显示\n• 上传提示文案统一为"请上传①…+②…"格式\n• 修复银行账单 PDF 解析：公司名/支票号中的数字不再干扰金额识别",
+            "en": "v118.33.11.0 updates:\n• History tables now support multi-select batch delete (all 3 modules incl. Bank Recon)\n• History paginated at 10 rows per page\n• Upload hints unified to '① file + ② file' format\n• Fix bank statement PDF parsing: numbers in descriptions no longer corrupt amounts",
+            "th": "v118.33.11.0 อัปเดต:\n• ประวัติงานรองรับเลือกหลายรายการเพื่อลบพร้อมกัน (ทุกโมดูลรวม Bank Recon)\n• แสดงประวัติ 10 รายการต่อหน้าพร้อมปุ่มเปลี่ยนหน้า\n• ข้อความอัปโหลดปรับเป็นรูปแบบ '① ไฟล์ + ② ไฟล์'\n• แก้การอ่าน PDF Statement: ตัวเลขในชื่อบริษัท/เลขเช็คไม่รบกวนการอ่านยอดเงินแล้ว",
+            "ja": "v118.33.11.0 更新:\n• 履歴テーブルで複数選択一括削除に対応（銀行照合含む全3モジュール）\n• 履歴を1ページ10件のページネーション表示に変更\n• アップロードヒントを「①ファイル＋②ファイル」形式に統一\n• 銀行明細PDF解析修正：説明文中の数字が金額認識を妨げなくなりました"
         }
     }
 

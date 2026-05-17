@@ -2058,7 +2058,7 @@ const I18N = {
         'vex-progress-running':    '对账中…',
         'vex-progress-sub':        '{a} 张发票 · {b} 份报告',
         'vex-progress-elapsed':    '对账中… {a} 张发票 · {b} 份报告 · {s} 秒',
-        'vex-need-both':           '至少 1 张发票 + 1 份 VAT 报告',
+        'vex-need-both':           '请上传① 销售发票 + ② VAT 报告',
         'vex-ready':               '已就绪 · {a} 张发票 · {b} 份报告',
         'vex-no-files':            '还没文件',
         'vex-toast-cap-inv':       '单次最多 1000 张发票 · 已截断',
@@ -4421,7 +4421,7 @@ const I18N = {
         'vex-progress-running':    'Reconciling…',
         'vex-progress-sub':        '{a} invoices · {b} report(s)',
         'vex-progress-elapsed':    'Reconciling… {a} invoices · {b} report(s) · {s}s',
-        'vex-need-both':           'Need at least 1 invoice + 1 VAT report',
+        'vex-need-both':           'Upload ① invoice(s) + ② VAT report',
         'vex-ready':               'Ready · {a} invoices · {b} reports',
         'vex-no-files':            'No files yet',
         'vex-toast-cap-inv':       'Max 1000 invoices per batch · truncated',
@@ -6785,7 +6785,7 @@ const I18N = {
         'vex-progress-running':    'กำลังกระทบยอด…',
         'vex-progress-sub':        '{a} ใบกำกับ · {b} ไฟล์รายงาน',
         'vex-progress-elapsed':    'กระทบยอด… {a} ใบ · {b} ไฟล์รายงาน · {s} วิ',
-        'vex-need-both':           'ต้องมีอย่างน้อย 1 ใบกำกับ + 1 รายงาน',
+        'vex-need-both':           'อัปโหลด ① ใบกำกับภาษี + ② รายงาน VAT',
         'vex-ready':               'พร้อม · ใบกำกับ {a} · รายงาน {b}',
         'vex-no-files':            'ยังไม่มีไฟล์',
         'vex-toast-cap-inv':       'สูงสุด 1000 ใบ · ตัดที่นี่',
@@ -9142,7 +9142,7 @@ const I18N = {
         'vex-progress-running':    '照合中…',
         'vex-progress-sub':        '請求書 {a} · レポート {b} 件',
         'vex-progress-elapsed':    '照合中… 請求書 {a} · レポート {b} 件 · {s} 秒',
-        'vex-need-both':           '請求書 1 件 + VAT レポート 1 件以上必要',
+        'vex-need-both':           '① 請求書 + ② VAT レポートをアップロード',
         'vex-ready':               '準備完了 · 請求書 {a} · レポート {b}',
         'vex-no-files':            'まだファイルなし',
         'vex-toast-cap-inv':       '1 回最大 1000 件 · 切り詰め',
@@ -19199,22 +19199,61 @@ async function deleteEndpoint(endpointId) {
         }
     }
 
+    const BRV2_PAGE_SIZE = 10;
+    let _brv2Page = 1;
+
+    function _brv2RenderPager() {
+        const pager = $('brv2-history-pager');
+        const info  = $('brv2-history-pager-info');
+        const prev  = $('brv2-history-prev');
+        const next  = $('brv2-history-next');
+        if (!pager) return;
+        if (_cachedHistoryTasks.length <= BRV2_PAGE_SIZE) { pager.style.display = 'none'; return; }
+        pager.style.display = '';
+        const totalPages = Math.ceil(_cachedHistoryTasks.length / BRV2_PAGE_SIZE);
+        if (info) info.textContent = _brv2Page + ' / ' + totalPages;
+        if (prev) prev.disabled = _brv2Page <= 1;
+        if (next) next.disabled = _brv2Page >= totalPages;
+    }
+
+    function _brv2InitPager() {
+        const prev = $('brv2-history-prev');
+        const next = $('brv2-history-next');
+        if (prev && !prev._brv2Bound) {
+            prev._brv2Bound = true;
+            prev.addEventListener('click', () => { if (_brv2Page > 1) { _brv2Page--; renderHistory(_cachedHistoryTasks); } });
+        }
+        if (next && !next._brv2Bound) {
+            next._brv2Bound = true;
+            next.addEventListener('click', () => {
+                const totalPages = Math.ceil(_cachedHistoryTasks.length / BRV2_PAGE_SIZE);
+                if (_brv2Page < totalPages) { _brv2Page++; renderHistory(_cachedHistoryTasks); }
+            });
+        }
+    }
+
     function renderHistory(tasks) {
-        _cachedHistoryTasks = tasks || [];
+        if (tasks !== undefined) { _cachedHistoryTasks = tasks || []; _brv2Page = 1; }
+        const all     = _cachedHistoryTasks;
         const emptyEl = $('brv2-history-empty');
         const wrap    = $('brv2-history-table-wrap');
         const tbody   = $('brv2-history-tbody');
         if (!tbody) return;
 
         const lang = window._currentLang || 'zh';
-        if (!tasks.length) {
+        if (!all.length) {
             const emptyTxt = { zh: '暂无对账记录', th: 'ยังไม่มีประวัติ', en: 'No records yet', ja: '記録なし' }[lang] || '暂无对账记录';
             if (emptyEl) { emptyEl.textContent = emptyTxt; emptyEl.style.display = ''; }
             if (wrap) wrap.style.display = 'none';
+            _brv2RenderPager();
             return;
         }
         if (emptyEl) emptyEl.style.display = 'none';
         if (wrap) wrap.style.display = '';
+        const totalPages = Math.ceil(all.length / BRV2_PAGE_SIZE);
+        if (_brv2Page > totalPages) _brv2Page = totalPages;
+        const start = (_brv2Page - 1) * BRV2_PAGE_SIZE;
+        const tasks_page = all.slice(start, start + BRV2_PAGE_SIZE);
 
         const token = localStorage.getItem('mrpilot_token') || '';
         const SVG_LOAD = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="8" cy="8" r="6"/><polyline points="6 8 8 10 10 8"/><line x1="8" y1="4" x2="8" y2="10"/></svg>';
@@ -19222,7 +19261,7 @@ async function deleteEndpoint(endpointId) {
         const SVG_DEL  = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 4 13 4"/><path d="M6 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4"/><path d="M5 4l1 9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-9"/></svg>';
 
         tbody.innerHTML = '';
-        tasks.forEach(t => {
+        tasks_page.forEach(t => {
             const diff   = Number(t.formula_diff || 0);
             const diffOk = Math.abs(diff) < 0.05;
             const stmtF  = (t.stmt_files || '').split(';').map(s => s.trim().split(/[/\\]/).pop()).filter(Boolean).join(', ');
@@ -19291,6 +19330,7 @@ async function deleteEndpoint(endpointId) {
             });
             tbody.appendChild(tr);
         });
+        _brv2RenderPager();
         _applyBrv2Search();
     }
 
@@ -19299,6 +19339,7 @@ async function deleteEndpoint(endpointId) {
         const tbody = $('brv2-history-tbody');
         if (!tbody) return;
         tbody.querySelectorAll('tr').forEach(tr => {
+            if (!tr.dataset.taskId) return;
             tr.style.display = (!q || tr.textContent.toLowerCase().includes(q)) ? '' : 'none';
         });
     }
@@ -19381,11 +19422,13 @@ async function deleteEndpoint(endpointId) {
         }
 
         _initBrv2TogglePreview();
+        _brv2InitPager();
         const hs = $('brv2-hist-search');
         if (hs) hs.addEventListener('input', _applyBrv2Search);
 
         loadHistory();
         updateRunBtn();
+        window._brv2LoadHistory = loadHistory;
 
         // Subscribe to global language changes so dynamic content re-renders
         if (!Array.isArray(window.__i18nSubs)) window.__i18nSubs = [];
@@ -19395,7 +19438,7 @@ async function deleteEndpoint(endpointId) {
             renderFileList('stmt');
             renderFileList('gl');
             if (_currentTask) renderResults(_currentTask);
-            renderHistory(_cachedHistoryTasks || []);
+            renderHistory();
         }});
     }
 
@@ -30708,45 +30751,57 @@ window.addEventListener('DOMContentLoaded', () => {
     // ── 任务列表加载 ──
     async function _loadVexTaskList() {
         try {
-            const r = await fetch('/api/vat_excel/tasks?page=1&page_size=20', { headers: _authHeader() });
+            const r = await fetch('/api/vat_excel/tasks?page=1&page_size=200', { headers: _authHeader() });
             if (!r.ok) return;
             const d = await r.json();
-            _renderVexTaskList(d.rows || [], d.total || 0);
+            _renderVexTaskList(d.rows || []);
         } catch (e) {}
     }
 
-    const VEX_LIMIT = 5;
+    const VEX_PAGE_SIZE = 10;
+    var _vexPage = 1;
 
     function _applyVexSearch() {
         var q = ((document.getElementById('vex-task-search') || {}).value || '').trim().toLowerCase();
+        _vexPage = 1;
+        _renderVexTaskList(_vexAllRows);
+        if (!q) return;
         var tbody = document.getElementById('vex-task-tbody');
         if (!tbody) return;
         tbody.querySelectorAll('tr').forEach(function (tr) {
-            tr.style.display = (!q || tr.textContent.toLowerCase().indexOf(q) >= 0) ? '' : 'none';
+            if (!tr.dataset.taskId) return;
+            tr.style.display = tr.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
         });
     }
 
-    function _renderVexTaskList(rows, total) {
-        _vexAllRows  = rows;
-        _vexExpanded = false;
-        const tbody  = document.getElementById('vex-task-tbody');
-        const meta   = document.getElementById('vex-task-meta');
-        const toggle = document.getElementById('vex-task-toggle');
+    function _renderVexTaskList(rows) {
+        _vexAllRows = rows || _vexAllRows;
+        const tbody = document.getElementById('vex-task-tbody');
         if (!tbody) return;
-        if (!rows.length) {
+        if (!_vexAllRows.length) {
             tbody.innerHTML = '<tr><td colspan="9" class="vex-task-empty">' + (t('sv-empty-title') || '还没有对账任务') + '</td></tr>';
-            if (meta)   meta.style.display   = 'none';
-            if (toggle) toggle.style.display = 'none';
+            _vexRenderPager(0);
             return;
         }
-        const showExtra = rows.length > VEX_LIMIT;
-        if (meta) {
-            meta.style.display = showExtra ? '' : 'none';
-            if (showExtra) meta.textContent = (t('vex-recent-show-limited') || '显示最近 5 条 · 共 {n} 条').replace('{n}', rows.length);
-        }
-        if (toggle) toggle.style.display = showExtra ? '' : 'none';
-        _doRenderVexRows(rows.slice(0, VEX_LIMIT));
-        _updateVexToggleBtn();
+        const totalPages = Math.ceil(_vexAllRows.length / VEX_PAGE_SIZE);
+        if (_vexPage > totalPages) _vexPage = totalPages;
+        const start = (_vexPage - 1) * VEX_PAGE_SIZE;
+        _doRenderVexRows(_vexAllRows.slice(start, start + VEX_PAGE_SIZE));
+        _vexRenderPager(_vexAllRows.length);
+    }
+
+    function _vexRenderPager(total) {
+        const pager = document.getElementById('vex-task-pager');
+        const info  = document.getElementById('vex-task-pager-info');
+        const prev  = document.getElementById('vex-task-prev');
+        const next  = document.getElementById('vex-task-next');
+        if (!pager) return;
+        if (total <= VEX_PAGE_SIZE) { pager.style.display = 'none'; return; }
+        pager.style.display = '';
+        const totalPages = Math.ceil(total / VEX_PAGE_SIZE);
+        if (info) info.textContent = _vexPage + ' / ' + totalPages;
+        if (prev) prev.disabled = _vexPage <= 1;
+        if (next) next.disabled = _vexPage >= totalPages;
     }
 
     function _doRenderVexRows(rows) {
@@ -30815,23 +30870,20 @@ window.addEventListener('DOMContentLoaded', () => {
         _applyVexSearch();
     }
 
-    function _updateVexToggleBtn() {
-        const toggle = document.getElementById('vex-task-toggle');
-        if (!toggle) return;
-        const upSvg   = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10l-4-4-4 4"/></svg>`;
-        const downSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>`;
-        if (_vexExpanded) {
-            toggle.innerHTML = upSvg + (t('vex-recent-collapse') || '收起');
-        } else {
-            const lbl = (t('vex-recent-show-all') || '查看全部 {n} 条').replace('{n}', _vexAllRows.length);
-            toggle.innerHTML = downSvg + lbl;
+    function _vexInitPager() {
+        var prev = document.getElementById('vex-task-prev');
+        var next = document.getElementById('vex-task-next');
+        if (prev && !prev._vexBound) {
+            prev._vexBound = true;
+            prev.addEventListener('click', function () { if (_vexPage > 1) { _vexPage--; _renderVexTaskList(); } });
         }
-    }
-
-    function _toggleVexTaskList() {
-        _vexExpanded = !_vexExpanded;
-        _doRenderVexRows(_vexExpanded ? _vexAllRows : _vexAllRows.slice(0, VEX_LIMIT));
-        _updateVexToggleBtn();
+        if (next && !next._vexBound) {
+            next._vexBound = true;
+            next.addEventListener('click', function () {
+                var totalPages = Math.ceil(_vexAllRows.length / VEX_PAGE_SIZE);
+                if (_vexPage < totalPages) { _vexPage++; _renderVexTaskList(); }
+            });
+        }
     }
 
     async function _confirmDeleteVatTask(taskId) {
@@ -31253,8 +31305,7 @@ window.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-recon-tab="sale-vat"]').forEach(btn => {
             btn.addEventListener('click', () => { _loadVexKpi(); _loadVexTaskList(); });
         });
-        const toggleBtn = document.getElementById('vex-task-toggle');
-        if (toggleBtn) toggleBtn.addEventListener('click', _toggleVexTaskList);
+        _vexInitPager();
         const vexSearchEl = document.getElementById('vex-task-search');
         if (vexSearchEl) vexSearchEl.addEventListener('input', _applyVexSearch);
         const previewToggleBtn = document.getElementById('vex-toggle-preview');
@@ -31678,7 +31729,7 @@ window.addEventListener('DOMContentLoaded', () => {
             error:            'เกิดข้อผิดพลาด',
             need_files:       'กรุณาเลือกไฟล์ทั้งสอง',
             done:             'เสร็จสิ้น',
-            hint_need_both:   'กรุณาอัปโหลดทั้งสองไฟล์',
+            hint_need_both:   'อัปโหลด ① รายงาน VAT + ② GL',
             hint_need_one_more:'อัปโหลดอีก 1 ไฟล์',
             hint_ready:       'พร้อมแล้ว · กดเริ่มกระทบยอด',
             hist_load:        'โหลด',
@@ -31698,7 +31749,7 @@ window.addEventListener('DOMContentLoaded', () => {
             error:            '出错了',
             need_files:       '请先选择两个文件',
             done:             '完成',
-            hint_need_both:   '请上传两份文件',
+            hint_need_both:   '请上传① 销项税报告 + ② 总账 GL',
             hint_need_one_more:'还需上传 1 份文件',
             hint_ready:       '已就绪 · 点击开始对账',
             hist_load:        '加载',
@@ -31718,7 +31769,7 @@ window.addEventListener('DOMContentLoaded', () => {
             error:            'Error',
             need_files:       'Please select both files',
             done:             'Done',
-            hint_need_both:   'Please upload both files',
+            hint_need_both:   'Upload ① VAT report + ② GL file',
             hint_need_one_more:'1 more file required',
             hint_ready:       'Ready · click Run to start',
             hist_load:        'Load',
@@ -31738,7 +31789,7 @@ window.addEventListener('DOMContentLoaded', () => {
             error:            'エラー',
             need_files:       '両方のファイルを選択してください',
             done:             '完了',
-            hint_need_both:   '両方のファイルをアップロードしてください',
+            hint_need_both:   '① VAT レポート + ② GL をアップロード',
             hint_need_one_more:'あと 1 ファイル必要',
             hint_ready:       '準備完了 · 「開始」をクリック',
             hist_load:        '読込',
@@ -31951,34 +32002,53 @@ window.addEventListener('DOMContentLoaded', () => {
         } catch (_) { return s; }
     }
 
+    const GLV_PAGE_SIZE = 10;
+    var _glvAllTasks = [];
+    var _glvPage = 1;
+
     function _applyGlvSearch() {
+        _glvPage = 1;
+        _renderGlvPage();
         var q = (($('glv-hist-search') || {}).value || '').trim().toLowerCase();
+        if (!q) return;
         var tbody = $('glv-history-tbody');
         if (!tbody) return;
         tbody.querySelectorAll('tr').forEach(function (tr) {
-            tr.style.display = (!q || tr.textContent.toLowerCase().indexOf(q) >= 0) ? '' : 'none';
+            if (!tr.dataset.taskId) return;
+            tr.style.display = tr.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
         });
     }
 
-    async function _loadHistory() {
-        const tableEl  = $('glv-history-table-wrap');
-        const emptyEl  = $('glv-history-empty');
-        const tbody    = $('glv-history-tbody');
+    function _renderGlvPage() {
+        const tableEl = $('glv-history-table-wrap');
+        const emptyEl = $('glv-history-empty');
+        const tbody   = $('glv-history-tbody');
+        const pager   = $('glv-history-pager');
+        const info    = $('glv-history-pager-info');
+        const prev    = $('glv-history-prev');
+        const next    = $('glv-history-next');
         if (!tbody) return;
-        try {
-            const res = await fetch('/api/recon/gl-vat/tasks', { headers: _authH() });
-            const data = await res.json();
-            const tasks = (data && data.tasks) || [];
-            tbody.innerHTML = '';
-            if (!tasks.length) {
-                if (tableEl) tableEl.style.display = 'none';
-                if (emptyEl) emptyEl.style.display = '';
-                return;
-            }
-            if (tableEl) tableEl.style.display = '';
-            if (emptyEl) emptyEl.style.display = 'none';
-
-            tasks.forEach((t) => {
+        tbody.innerHTML = '';
+        if (!_glvAllTasks.length) {
+            if (tableEl) tableEl.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = '';
+            if (pager) pager.style.display = 'none';
+            return;
+        }
+        if (tableEl) tableEl.style.display = '';
+        if (emptyEl) emptyEl.style.display = 'none';
+        const totalPages = Math.ceil(_glvAllTasks.length / GLV_PAGE_SIZE);
+        if (_glvPage > totalPages) _glvPage = totalPages;
+        const start = (_glvPage - 1) * GLV_PAGE_SIZE;
+        const pageTasks = _glvAllTasks.slice(start, start + GLV_PAGE_SIZE);
+        if (pager) {
+            pager.style.display = _glvAllTasks.length > GLV_PAGE_SIZE ? '' : 'none';
+            if (info) info.textContent = _glvPage + ' / ' + totalPages;
+            if (prev) prev.disabled = _glvPage <= 1;
+            if (next) next.disabled = _glvPage >= totalPages;
+        }
+        const tasks = pageTasks;
+        tasks.forEach((t) => {
                 const tr = document.createElement('tr');
                 tr.dataset.taskId = t.id; // v118.32.5.5.20 · 批量删多选用
                 const cellTime = document.createElement('td');
@@ -32020,8 +32090,33 @@ window.addEventListener('DOMContentLoaded', () => {
                 cellAct.appendChild(mkBtn(SVG_DEL,  _t('hist_delete'), 'glv-del',  () => _deleteTask(t.id)));
                 [cellTime, cellFiles, cellRows, cellMatched, cellDiff, cellMiss, cellAct].forEach(c => tr.appendChild(c));
                 tbody.appendChild(tr);
+        });
+    }
+
+    function _glvInitPager() {
+        var prev = $('glv-history-prev');
+        var next = $('glv-history-next');
+        if (prev && !prev._glvBound) {
+            prev._glvBound = true;
+            prev.addEventListener('click', function () { if (_glvPage > 1) { _glvPage--; _renderGlvPage(); } });
+        }
+        if (next && !next._glvBound) {
+            next._glvBound = true;
+            next.addEventListener('click', function () {
+                var totalPages = Math.ceil(_glvAllTasks.length / GLV_PAGE_SIZE);
+                if (_glvPage < totalPages) { _glvPage++; _renderGlvPage(); }
             });
-            _applyGlvSearch();
+        }
+    }
+
+    async function _loadHistory() {
+        try {
+            const res = await fetch('/api/recon/gl-vat/tasks', { headers: _authH() });
+            const data = await res.json();
+            _glvAllTasks = (data && data.tasks) || [];
+            _glvPage = 1;
+            _renderGlvPage();
+            _glvInitPager();
         } catch (e) {
             console.error('[gl-vat] history load failed:', e);
         }
@@ -32670,7 +32765,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     var SELECTORS = [
         { tbody: 'vex-task-tbody', api: '/api/recon/tasks/batch_delete', reload: function () { try { window.loadRecentTasks && window.loadRecentTasks(); } catch (_) {} }, kind: 'vex' },
-        { tbody: 'glv-history-tbody', api: '/api/recon/gl-vat/tasks/batch_delete', reload: function () { try { window._loadGlvHistory && window._loadGlvHistory(); } catch (_) {} }, kind: 'glv' }
+        { tbody: 'glv-history-tbody', api: '/api/recon/gl-vat/tasks/batch_delete', reload: function () { try { window._loadGlvHistory && window._loadGlvHistory(); } catch (_) {} }, kind: 'glv' },
+        { tbody: 'brv2-history-tbody', api: '/api/recon/bank-v2/tasks/batch_delete', reload: function () { try { window._brv2LoadHistory && window._brv2LoadHistory(); } catch (_) {} }, kind: 'brv2' }
     ];
 
     function _injectStyle() {

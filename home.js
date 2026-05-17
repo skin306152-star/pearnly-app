@@ -18862,7 +18862,7 @@ async function deleteEndpoint(endpointId) {
     // ── Run reconciliation ────────────────────────────────────────────
     async function runRecon() {
         if (_stmtFiles.length === 0 || _glFiles.length === 0) return;
-        const token = localStorage.getItem('auth_token') || '';
+        const token = localStorage.getItem('mrpilot_token') || '';
         const lang  = (window._currentLang || 'th');
         const acct  = ($('brv2-acct-select') || {}).value || '';
 
@@ -19057,7 +19057,7 @@ async function deleteEndpoint(endpointId) {
 
     // ── History ───────────────────────────────────────────────────────
     async function loadHistory() {
-        const token = localStorage.getItem('auth_token') || '';
+        const token = localStorage.getItem('mrpilot_token') || '';
         try {
             const res  = await fetch('/api/recon/bank-v2/tasks', {
                 headers: { 'Authorization': 'Bearer ' + token }
@@ -19090,7 +19090,7 @@ async function deleteEndpoint(endpointId) {
         if (emptyEl) emptyEl.style.display = 'none';
         if (wrap) wrap.style.display = '';
 
-        const token = localStorage.getItem('auth_token') || '';
+        const token = localStorage.getItem('mrpilot_token') || '';
         const SVG_LOAD = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="8" cy="8" r="6"/><polyline points="6 8 8 10 10 8"/><line x1="8" y1="4" x2="8" y2="10"/></svg>';
         const SVG_DL   = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>';
         const SVG_DEL  = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 4 13 4"/><path d="M6 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4"/><path d="M5 4l1 9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-9"/></svg>';

@@ -13097,29 +13097,45 @@ body.sidebar-collapsed .nav-collapsible.collapsed .nav-sub { max-height: 800px; 
  * v118.32.0 · 销项税对账 · 屏 A 专用样式
  * ============================================================ */
 
-/* === 对账中心 横向 tab 条 === */
+/* === 对账中心 横向 tab 条 (胶囊风格 · 层次清晰) === */
 .recon-tab-bar {
     display: flex;
-    gap: 0;
-    border-bottom: 1px solid var(--line);
+    gap: 3px;
+    padding: 4px;
+    background: #ebebе6;
+    background: var(--bg, #f0efe9);
+    border: 1px solid var(--line, #e4e4de);
+    border-radius: 10px;
     margin-bottom: 20px;
     overflow-x: auto;
+    width: fit-content;
+    max-width: 100%;
 }
 .recon-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     background: none;
     border: none;
-    border-bottom: 2px solid transparent;
-    padding: 10px 22px;
+    border-radius: 7px;
+    padding: 7px 16px;
     font-size: 13px;
     font-weight: 500;
-    color: var(--ink-3);
+    color: var(--ink-3, #999);
     cursor: pointer;
     white-space: nowrap;
-    margin-bottom: -1px;
-    transition: color .15s, border-color .15s;
+    transition: color .15s, background .15s, box-shadow .15s;
+    line-height: 1;
 }
-.recon-tab-btn:hover { color: var(--ink); }
-.recon-tab-btn.active { color: var(--ink); border-bottom-color: var(--accent, #4f46e5); }
+.recon-tab-btn svg { flex-shrink: 0; opacity: .7; transition: opacity .15s; }
+.recon-tab-btn:hover { color: var(--ink, #111); background: rgba(255,255,255,.6); }
+.recon-tab-btn:hover svg { opacity: 1; }
+.recon-tab-btn.active {
+    color: var(--ink, #111);
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06);
+}
+.recon-tab-btn.active svg { opacity: 1; }
 
 /* 子面板切换 */
 .recon-pane { display: block; }

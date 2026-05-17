@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11841134">
+<link rel="stylesheet" href="/static/home.css?v=11841135">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -4465,22 +4465,23 @@
 
         <!-- 顶部横向 tab 条 -->
         <div class="recon-tab-bar">
-            <button class="recon-tab-btn active" data-recon-tab="bank" data-i18n="recon-tab-bank">银行对账</button>
-            <button class="recon-tab-btn" data-recon-tab="sale-vat" data-i18n="recon-tab-sale-vat">销项税报告核查</button>
-            <button class="recon-tab-btn" data-recon-tab="gl-vat" data-i18n="recon-tab-gl-vat">GL对账</button>
+            <button class="recon-tab-btn active" data-recon-tab="bank" data-i18n="recon-tab-bank">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 6h12M3 6V4a5 5 0 0110 0v2M2 6v7a1 1 0 001 1h10a1 1 0 001-1V6"/><path d="M6 10h4"/></svg>
+                银行对账
+            </button>
+            <button class="recon-tab-btn" data-recon-tab="sale-vat" data-i18n="recon-tab-sale-vat">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 1.5H4a1 1 0 00-1 1v11a1 1 0 001 1h8a1 1 0 001-1V5.5L9 1.5z"/><path d="M9 1.5v4h4M5.5 9l1.5 1.5 3-3"/></svg>
+                销项税报告核查
+            </button>
+            <button class="recon-tab-btn" data-recon-tab="gl-vat" data-i18n="recon-tab-gl-vat">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="1.5" y="1.5" width="13" height="13" rx="1.5"/><path d="M1.5 5.5h13M1.5 9.5h13M5.5 5.5v9M10.5 5.5v9"/></svg>
+                收入对账
+            </button>
         </div>
         <!-- pane 区(全宽) -->
 
         <!-- ── 银行对账面板(原有内容) ── -->
         <div id="recon-pane-bank" class="recon-pane active">
-        <!-- v4.10.4 · L2 子模块标题区 -->
-        <div class="auto-panel-head">
-            <div>
-                <div class="auto-panel-title" data-i18n="recon-tab-bank">银行对账</div>
-                <div class="auto-panel-desc" data-i18n="rc-bank-sub">银行流水自动 vs 系统发票匹配 · 月底关账从 3 小时压到 30 分钟</div>
-            </div>
-        </div>
-        <div class="rc-panel-divider"></div>
 
         <!-- 上传卡片 -->
         <div class="rc-upload-card" id="bank-upload-card">
@@ -4597,14 +4598,6 @@
         <!-- ── 销项税对账面板(v118.32.0 · 屏 A) ── -->
         <div id="recon-pane-sale-vat" class="recon-pane" style="display:none">
 
-            <!-- v4.10.4 · L2 子模块标题区 -->
-            <div class="auto-panel-head">
-                <div>
-                    <div class="auto-panel-title" data-i18n="recon-tab-sale-vat">销项税对账</div>
-                    <div class="auto-panel-desc" data-i18n="sv-sub-merged">把客户给你的所有文件一次核对完</div>
-                </div>
-            </div>
-            <div class="rc-panel-divider"></div>
 
             <!-- v4.10.7 · KPI 3 卡统一视觉 -->
             <div class="vex-kpi-strip" id="vex-kpi-strip">
@@ -4926,14 +4919,6 @@
              ══════════════════════════════════════════════════════════════ -->
         <div id="recon-pane-gl-vat" class="recon-pane" style="display:none">
 
-            <!-- L2 子模块标题区 -->
-            <div class="auto-panel-head">
-                <div>
-                    <div class="auto-panel-title" data-i18n="recon-tab-gl-vat">收入对账</div>
-                    <div class="auto-panel-desc" data-i18n="glv-sub">总账（GL）vs 销项税报告 · 一键比对 + 差异定位</div>
-                </div>
-            </div>
-            <div class="rc-panel-divider"></div>
 
             <!-- KPI 3 卡（沿用 vex-kpi-strip 视觉 · 默认可见，跑完更新数字） -->
             <div class="vex-kpi-strip" id="glv-kpi-strip">
@@ -6223,7 +6208,7 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11841134"></script>
+<script src="/static/home.js?v=11841135"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 

@@ -1,6 +1,576 @@
 # 📋 BACKLOG · Pearnly 待办清单
 
-> **最近更新**:2026-05-12 PM(**P0-VAT v118.32.3.0 → v118.32.3.9 BCDEF 优化阶段** · 本窗口 10 个微版本累积 · ⚠️ 6 张卡 10 分钟未解决 · 详见 `HANDOVER_v118_32_3_9.md`)
+> **最近更新**:2026-05-17(凌晨) · cache bust **v=11841126** · session 踢人弹窗修复 + 心跳端点修复 + 大 PDF 504 修复 · **下窗口第一优先:NAV-IA Phase 5 收尾(自动化并入集成 + 银行对账归位)**
+> **上次**:session 踢人弹窗(v5.5.36) · 大 PDF timeout(v5.5.35) · Excel KPI 颜色填充(v5.5.33) · UI 精修(v5.5.30)
+
+---
+
+## 🔴🔴 下窗口第一优先 · NAV-IA Phase 5 收尾 · 自动化并入集成
+
+> **背景**:Phase 5(v118.33.5.0 · 2026-05-15)当时标为 ✅ 但漏了关键一步 — 「自动化」侧边栏入口没删 · 集成页的配置按钮还在跳自动化。本次完整收尾。
+> **拍板方案**:右侧抽屉(Drawer)模式 · 点集成页配置按钮 → 右侧滑入配置面板 · 不离开集成页
+> **银行对账**:自动化里的 bank tab 功能迁移到「对账中心」· 用抽屉承接 · 自动化不再有银行入口
+
+---
+
+### 📋 现状分析(已排查确认)
+
+**集成页现有卡片 vs 配置按钮去向:**
+
+| 卡片 | 配置按钮现在做什么 | 目标行为 |
+|------|-----------------|---------|
+| Google Drive | 已有内联展开(✅ 不用改) | 保持 |
+| Google Sheets | 已有内联展开(✅ 不用改) | 保持 |
+| Gmail 抓取 | `switchAutomationTab('email')` → 跳自动化 | 改为打开右侧抽屉 |
+| LINE Bot | `switchAutomationTab('linebot')` → 跳自动化 | 改为打开右侧抽屉 |
+| 文件夹监听 | `switchAutomationTab('folder')` → 跳自动化 | 改为打开右侧抽屉 |
+| ERP 对接 | `switchAutomationTab('erp')` → 跳自动化 | 改为打开右侧抽屉 |
+| **智能提醒** | **集成页缺失此卡片** | 新增卡片 + 抽屉 |
+
+**对账中心银行对账现状:**
+- 集成页**没有**银行对账卡片(正确 · 银行对账是核心业务不是集成)
+- 对账中心有「银行对账」区域 · 上传按钮 → `_gotoBankUpload()` → `routeTo('automation')` + `switchAutomationTab('bank')` → 跳走
+- 自动化 bank tab(L17253-18262)是真正的功能体(上传队列 + 会话详情 + 事务匹配)
+
+---
+
+### 🛠 执行步骤(顺序固定 · 可逐步验证)
+
+#### Step 1 · 集成页加通用右侧抽屉组件
+**文件**: `home.html` + `home.css` + `home.js`
+
+HTML 结构(加在 `</body>` 前):
+```html
+<div id="int-drawer-overlay" style="display:none;"></div>
+<div id="int-drawer" class="int-drawer">
+  <div class="int-drawer-header">
+    <button id="int-drawer-close">←</button>
+    <span id="int-drawer-title"></span>
+  </div>
+  <div id="int-drawer-body"></div>
+</div>
+```
+
+CSS(加到 home.css):
+```css
+.int-drawer {
+  position: fixed; top: 0; right: -480px; width: 480px; height: 100vh;
+  background: #fff; z-index: 10000; box-shadow: -4px 0 24px rgba(0,0,0,.12);
+  transition: right .25s ease; display: flex; flex-direction: column;
+}
+.int-drawer.open { right: 0; }
+#int-drawer-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.3); }
+#int-drawer-body { flex:1; overflow-y:auto; padding:20px; }
+@media(max-width:600px) { .int-drawer { width: 100vw; } }
+```
+
+JS 函数(加到 home.js · 集成模块 IIFE 内):
+```javascript
+function openIntegrationDrawer(tab, title) {
+    document.getElementById('int-drawer-title').textContent = title;
+    document.getElementById('int-drawer-body').innerHTML = '';
+    document.getElementById('int-drawer').classList.add('open');
+    document.getElementById('int-drawer-overlay').style.display = 'block';
+    // 复用现有 panel 加载函数
+    const loaders = {
+        linebot: window._loadLineBotPanel,
+        folder:  window._loadFolderWatcherPanel,
+        email:   window._loadEmailIngestPanel,
+        erp:     window._loadErpPanel,       // 见 Step 3 说明
+        alert:   window._loadNotificationsPanel,
+    };
+    if (loaders[tab]) loaders[tab]('int-drawer-body');
+}
+function closeIntegrationDrawer() {
+    document.getElementById('int-drawer').classList.remove('open');
+    document.getElementById('int-drawer-overlay').style.display = 'none';
+}
+document.getElementById('int-drawer-close').addEventListener('click', closeIntegrationDrawer);
+document.getElementById('int-drawer-overlay').addEventListener('click', closeIntegrationDrawer);
+```
+
+#### Step 2 · 集成页配置按钮改调 openIntegrationDrawer
+**找到集成页(#page-integrations 或 #page-integration)里各配置按钮的 click 处理:**
+
+```javascript
+// 改前:
+document.getElementById('btn-int-linebot-config').addEventListener('click', () => {
+    routeTo('automation'); setTimeout(() => switchAutomationTab('linebot'), 80);
+});
+
+// 改后:
+document.getElementById('btn-int-linebot-config').addEventListener('click', () => {
+    openIntegrationDrawer('linebot', t('int-name-line'));
+});
+```
+四个按钮(linebot / folder / email / erp)都要改。
+
+#### Step 3 · ERP 配置抽屉特殊处理
+自动化的 erp tab 调 `loadErpEndpoints()` + `loadErpLogs()` · 这两个函数可直接在抽屉 body 里调用:
+```javascript
+window._loadErpPanel = function(containerId) {
+    // 把原 #page-auto-erp 的 innerHTML 移到 container 里
+    // 或直接 clone 节点
+};
+```
+如果 erp tab 内容与集成页「ERP 对接」功能重叠太多 · 优先复用现有 ERP 对接卡片逻辑 · 不强制搬 tab。
+
+#### Step 4 · 集成页补「智能提醒」卡片
+在集成页(#page-integrations)「收票渠道」区块后面新增「自动化」区块:
+```html
+<div class="int-section-title">自动化 & 提醒</div>
+<div class="integration-row" id="int-row-alert">
+  <div class="int-icon">🔔</div>
+  <div>
+    <div class="int-name" data-i18n="auto-alert-title">智能提醒</div>
+    <div class="int-desc" data-i18n="auto-alert-desc">异常单/大额单第一时间推 LINE</div>
+  </div>
+  <button class="btn-int-config" id="btn-int-alert-config" data-i18n="int-btn-config">配置</button>
+</div>
+```
+点配置 → `openIntegrationDrawer('alert', t('auto-alert-title'))`
+
+**i18n 新增(4 语):** `auto-alert-desc` · `int-section-automation`
+
+#### Step 5 · 对账中心银行对账改用抽屉
+**文件**: `home.js`
+
+```javascript
+// 改前:
+function _gotoBankUpload() {
+    routeTo('automation');
+    setTimeout(() => switchAutomationTab('bank'), 80);
+}
+
+// 改后:
+function _gotoBankUpload() {
+    // 在对账中心内打开右侧抽屉 · 复用银行对账面板
+    _openBankDrawer(null);  // null = 新上传
+}
+
+function _openBankDrawer(sessionId) {
+    openIntegrationDrawer('bank', t('recon-bank-title'));
+    if (sessionId) {
+        // 加载特定会话
+        if (window._loadBankReconPanel) window._loadBankReconPanel('int-drawer-body', sessionId);
+    } else {
+        if (window._loadBankReconPanel) window._loadBankReconPanel('int-drawer-body', null);
+    }
+}
+```
+
+`_gotoBankSession(sessionId)` 同理改调 `_openBankDrawer(sessionId)`。
+
+**注**: `_loadBankReconPanel` 原来注入到 `#auto-bank` 容器 · 改成接受 containerId 参数即可复用。
+
+#### Step 6 · 删除自动化侧边栏入口
+**文件**: `home.js` + `home.html` + `home.css`
+
+清理清单:
+1. `VALID_ROUTES` 删 `'automation'`
+2. `routeTo('automation')` 所有调用点改向(bank 改 Step 5 · 其他查是否还有)
+3. `loadAutomationPage()` 函数 + `switchAutomationTab()` 整段可保留(因为 Step 1-5 的抽屉还在调 panel 函数)· 但可以加注释标记为 deprecated
+4. `home.html` 删 sidebar 里 `data-route="automation"` 的 nav-item
+5. `home.js` `applySidebarVisibility()` 删 automation 相关 group 显示逻辑
+6. i18n 4 语字典删 `nav-automation` / `nav-group-automation` 对应的 key(4 × 2 = 8 个地方)
+7. `home.css` 删 `.nav-group-automation` 样式(如有)
+8. `#page-automation` DOM 可暂时保留(防万一有遗漏引用)· 加 `display:none`
+
+#### Step 7 · 验证 + 部署
+验证清单:
+- [ ] 集成页 → LINE Bot「配置」→ 右侧抽屉滑入 LINE Bot 设置面板
+- [ ] 集成页 → 文件夹监听「配置」→ 抽屉
+- [ ] 集成页 → ERP 对接「配置」→ 抽屉
+- [ ] 集成页 → 智能提醒「配置」→ 抽屉
+- [ ] 对账中心 → 银行对账「上传」→ 抽屉(不跳走)
+- [ ] 对账中心 → 点历史会话 → 抽屉打开对应会话
+- [ ] 侧边栏:「自动化」入口消失
+- [ ] 侧边栏剩余:首页 / 销项管理▾ / 进项管理▾ / 客户 / 异常 / 集成(底部)
+- [ ] 手机端抽屉宽度 100vw
+
+**cache bust**: 11841126 → 11841127
+
+---
+
+## 🔴 下窗口第二优先 · Excel 差异明细 Sheet 表头美化
+
+**任务**: `gl_vat_reconciler.py` → `ws1`(差异明细 Sheet)表头样式升级
+
+**截图现状**:
+- Row 1 KPI label(总笔数/完全匹配/有差异/GL未找到/差异金额合计)：无填充 · 小字
+- Row 2 KPI value：有数值 · 红色边框框住
+- Row 4 主表头(状态/单据号/日期/客户名称...)：深蓝背景 + 白字 · 基础样式已有
+
+**设计目标**：对应颜色填充 · 字体加粗加大 · 整体漂亮专业
+
+**推荐方案**：
+- KPI label行(Row 1)：`#EFF6FF` 浅蓝底 · `#1D4ED8` 蓝色字 · 粗体 11px · 居中
+- KPI value行(Row 2)：白底 · 数值 14px 粗体 · 颜色按状态(完全匹配绿`#16A34A` · GL未找到橙`#D97706`)
+- 主表头行(Row 4)：保持/升级深蓝 · 字体 10→11px · 行高 22 · 白字加粗
+
+**文件**:`gl_vat_reconciler.py` 搜 `_write_ws1` 或 `ws1` Sheet 写入函数 · 加/改 PatternFill/Font 常量
+
+**验证**：pearnly.com → 收入对账 → 上传 `D:\Users\Skin\Desktop\新需求\` 两 PDF → 对账汇总头部"导出 Excel" → 看 差异明细 Sheet
+
+---
+
+## 🟡 下窗口第二优先 · 必须先验证(客户 Korn 要求)
+
+### Excel 对账汇总格式验证
+
+**客户要求(Korn 原话):**
+- `ตัวเลขแสดงถูกหมดแล้ว` ✅ 数字已全部正确
+- `ลบช่องสีเหลืองออกแค่นั้น ตัวเลขเยอะ สับสน` = **只需删掉黄色格子，数字太多太乱**
+
+**Korn 期望的 Excel 格式(ws2 / 对账汇总 Sheet):**
+```
+[深蓝]  ยอดรวมตามบัญชีแยกประเภท          | 4,548,637.56
+[粗体]  หัก: รายการเครดิตที่ไม่มีในรายงาน  |              ← B 列留空!
+[普通]      · IV6812003 · 06/12/68 ...    | (10,500.00)  ← 金额只在明细行
+[粗体]  บวก: รายการเดบิตที่ไม่มีในรายงาน   |              ← B 列留空!
+[普通]      · SR5904006 · 04/12/68 ...    | 1,000.00
+...
+[深蓝]  ยอดรวมตามรายงานภาษีขาย           | 4,610,085.22
+```
+
+**关键:**分区标题行(หัก/บวก 开头)B 列必须为空 · 金额仅在缩进明细行显示 · 无黄色
+
+**我们已做的修复(本窗口末尾 · 刚部署):**
+- `WHITE_FILL` 显式白色填充 → 消除黄色 ✅
+- `SECT_FONT` 粗体分区标题 ✅
+- `b_val = "" if not emphasize else amount` → B 列留空 ✅
+
+**⚠️ 下窗口第一步: 验证修复是否生效**
+1. 用 `D:\Users\Skin\Desktop\新需求\` 里的两个 PDF 重新跑对账
+2. 下载 Excel · 查 ws2(对账汇总)
+3. 分区标题行:粗体 + B 列空 + 无黄色 → **✅ 完成**
+4. 如仍有问题:在 `gl_vat_reconciler.py` 搜 `SECT_FONT` 和 `WHITE_FILL` 确认代码已部署
+
+---
+
+## ✅ 2026-05-16(深夜) 本窗口完成(v118.32.5.5.30 · UI 精修 · cache bust 11841123)
+
+- [x] GL 折叠头 + VAT 折叠头背景 → `#ffffff` 纯白 · hover → `#F9FAFB`
+- [x] 搜索框背景 → `#ffffff` 显式白色
+- [x] GL "导出 Excel" 按钮从差异明细头部移至**对账汇总头部**
+- [x] VAT 下载按钮从独立蓝色 bar 移至**对账汇总头部**(ghost 风 · 同款文案)
+- [x] VAT `recon-collapse-head` 全局 click 代理加 button/a 防误触判断
+- [x] 去除 `vex-dl-bar` DOM 元素(替换为注释)
+- [x] JS 3 处 `vex-dl-bar` 引用改为直接操作 `vex-download` 元素
+
+---
+
+## ✅ 2026-05-16(深深夜) 本窗口完成(接 v5.5.28 · 多项修复)
+
+### Bug 修复(P0 · Korn 对账数据错误)
+- [x] `vat_report_parser.py` · `_to_float()` 加括号负数解析 `(500.00)` → `-500.0`
+- [x] `gl_vat_reconciler.py` · `_DEBIT_LINE_KW` + `_is_debit_line()` · 退货关键词判 Debit
+
+### UI 修复
+- [x] GL `#1A3C5E` 深蓝 5 处全清除
+- [x] `glv-result` 移入 `vex-main-action` 白卡片内
+- [x] GL 对账跑完自动展开汇总/明细
+- [x] VAT 汇总行 UUID hash 删除
+- [x] 差异明细行数徽章 pill 样式
+- [x] 历史表下载按钮 tooltip "导出"
+- [x] GL 折叠头 hover 蓝色修正
+
+### CSS 层次修复(参考上传识别页)
+- [x] 主操作卡片 `#f4f4f0` → `#ffffff`(白)
+- [x] 上传格子 `#f4f4f0` → `#f8f8f6`(凹陷)
+- [x] KPI 卡片 `#F9FAFB` → `#ffffff`
+- [x] VAT/GL 历史区加白卡片样式
+
+### Excel 汇总格式(最后部署 · 待验证)
+- [x] `WHITE_FILL` 消除黄色
+- [x] `SECT_FONT` 分区标题粗体
+- [x] 分区标题 B 列留空(金额只在明细行)
+
+---
+
+## ✅ 2026-05-16(深夜) 本窗口完成(v118.32.5.5.26 → v118.32.5.5.28 · 3 个微版本)
+
+### VAT 预览面板数据接通 + UI 清理
+- [x] **v118.32.5.5.26** `_fetchAndFillVexPreview` 函数:对账后拉 `/api/vat_excel/tasks/{id}` JSON → 填充 vex-summary/detail-collapse 全量差异行(无截断 · 可滚动) + `app.py` 4 语 release_notes
+- [x] **v118.32.5.5.27** 砍掉"对账完成"绿色横幅(`vex-result` + `_watchVexResult` + i18n key + CSS) · 下载按钮移至极简 `vex-dl-bar`
+- [x] **v118.32.5.5.28** 蓝色 `#DBEAFE`→暖灰 · 预览面板边框统一 `var(--line)` · "完成"颜色→`var(--success)` · GL 汇总/明细顺序互换
+
+### 下窗口优先
+- [ ] 🟡 **GL 收入对账预览面板数据填充** — 骨架在 `glv-preview-panel` · 接 `/api/recon/gl-vat/tasks/{id}` JSON · 套路同 VAT v5.5.26
+
+---
+
+## ✅ 2026-05-16(晚) 本窗口完成(v118.32.5.5.16 → v118.32.5.5.25 · 10 个微版本)
+
+### NAV-IA 视觉 Gap + 首页内容
+- [x] **v118.32.5.5.16** 7 处硬编码蓝色全替换 + 首页 dashboard(4 KPI + 快速操作 + 最近动态)
+
+### 版本更新弹窗(新铁律 #6)
+- [x] **v118.32.5.5.17** `static/version-banner.js` 新文件 · 30s 轮询 · 顶部条 + modal + 4 语 + snooze
+- [x] `/api/version` 加 `release_notes` 4 语字段
+- [x] CLAUDE.md 铁律 #6:每次部署写 4 语 release_notes
+
+### 部署 graceful 三层
+- [x] **v118.32.5.5.18** systemd `TimeoutStopSec=35` + uvicorn `--timeout-graceful-shutdown 30` + `_recover_interrupted_tasks()` lifespan
+
+### 对账对称化 + 批量删
+- [x] **v118.32.5.5.19** 销项税核查加 summary/detail collapse · 收入对账加 glv-preview-panel 骨架
+- [x] **v118.32.5.5.20** GL VAT 批量删后端 API + 两个对账历史表前端多选 UI
+- [x] **v118.32.5.5.21** version-banner reload bug 修 + 文案 4 语标准化
+- [x] **v118.32.5.5.22** Gmail 风格 thead 批量模式 + 表头列宽错位修
+- [x] **v118.32.5.5.23** 收入对账清单面板改 vex-pp-grid 两栏
+- [x] **v118.32.5.5.24** 删老 pn-version-banner 屎山(116 行 JS + 86 行 CSS) + vex-pp-grid 宽度对齐
+- [x] **v118.32.5.5.25** `_renderGlvPreviewPanel` 1:1 复刻(搜索/清除/X 删/分页) + `_reset()` 同步刷新 + `_removeFile` 直写 STATE
+
+### 下窗口优先(已由 v5.5.26-28 解决)
+- [x] ~~🔴 **销项税核查预览数据填充**~~ — v5.5.26 已完成 · 全量差异行 · 5 KPI 卡
+
+---
+
+## ✅ 2026-05-16(中) 本窗口完成(17 个微版本)
+
+### Admin SPA 用户管理补全(NAV-IA Phase 8 收尾)
+- [x] **v118.44.1.0** 抽屉 7 section + 3 tab + 升级 modal · 移植自 home.js L20600-L22400
+- [x] **v118.44.1.1** 封停/解封/级联删除/风控完整版/批量封禁
+- [x] admin-i18n.js zh+th 49→130 key
+
+### GL/VAT 多 ERP 兼容
+- [x] **v118.32.5.5.0-5** GL 兼容 2/3 列 + 无日期延续行 + 余额变化判借贷 · 科目 4-7 位 · 切粘连 · ref_no 严格化
+- [x] **v118.32.5.5.8-9** BAKELAB pypdf 字符序乱 fallback · 销项税核查发票 text_path 快路径(24s→11s)
+- [x] **v118.32.5.5.11** Excel 汇总 Sheet 2 展开单据明细(Korn 反馈)
+
+### Session 1 账号 1 设备 + 反薅
+- [x] **v118.32.5.5.10/12/13** JWT jti + users.active_jti + ALTER commit=True + 15s 心跳 + focus 立即 check
+- [x] **v118.32.5.5.14** Trial 100/7d → 30/3d(Korn 🅱)
+- [x] **v118.32.5.5.15** 着陆页 4 真公司名换行业类目假名(4 语)
+
+### UI 系统化修
+- [x] **v118.32.5.5.2** 4 处 alert→showToast · filename 500 修(RFC 5987)
+- [x] **v118.32.5.5.6/7** z-index 批量修 13 处(modal/overlay 全升 10000)
+
+### 待用户测试确认
+- [ ] session 实时踢人(15s 内或 focus 立即)
+- [ ] admin SPA 抽屉 / 3 tab / 4 modal / 风控批量封禁
+- [ ] z-index 13 处批量修(除"添加员工"已确认)
+
+### 待 Korn 回复
+- [ ] 「5 人轮流用 1 账号」想堵法选 🅰/🅱/🅲/不堵
+- [ ] 多 ERP 真实样本(Express / Mr.ERP / FlowAccount)收集
+
+---
+
+## ✅ GL 对账主线(2026-05-15 晚 · 收官)
+
+> **PRD 文件**:`C:\Users\skin3\.claude\plans\10-vat-2-800-vat-declarative-cocoa.md`
+> **客户原始需求**:`D:\Users\Skin\Desktop\新需求\新需求.md`(Thai/中双语)
+
+| 项 | 工时 | 状态 |
+|---|---|---|
+| 核心引擎 + API + DB + 前端完整链路 | ~4 h | ✅ v118.32.5.0(v=11841086) |
+| Thai 客户重命名 + 4 语 i18n | ~0.5 h | ✅ v118.32.5.1(v=11841087) |
+| VAT PDF 文字行 regex 回退(无表格框线场景) | ~1 h | ✅ v118.32.5.2(v=11841089) |
+| UI 同 vex 系统对齐 + 历史表 + 折叠区 + showConfirm | ~1.5 h | ✅ v118.32.5.3(v=11841092) |
+| 销项税性能修(`fast_mode_invoice=True` 跳冗余 classify · 3min→40s) | ~0.5 h | ✅ v118.32.5.3(v=11841093) |
+| Excel 升级:5 KPI + 状态列 + 使用说明 Sheet(借鉴 vat_recon) | ~0.5 h | ✅ v118.32.5.4(v=11841094) |
+| 生产服 venv 装 pdfplumber 0.11.9 | ~5 min | ✅ |
+
+**总工时**:~8 小时 · 一窗口落地。
+
+**遗留小项**(下窗口可选):
+- 🟢 GL Excel 上传测真实样本(目前主要 PDF 测过)
+- 🟢 多 VAT 报告场景验证 `fast_mode_invoice` 副作用
+- 🟢 `scripts/check_i18n.py` lint(TECH_DEBT P0 #2)· 验证 `glv-*` 系列 key 4 语完整性
+- 🟡 GL-only 行也展示在明细(目前只在汇总)
+
+---
+
+## 🧭 NAV-IA 平行主线任务队列(2026-05-15 拍板 · P1 优先级)
+
+> **唯一 PRD**:`NAV_IA_PRD.md`
+> **基准实物**:`D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html`
+> **接力规则**:任何窗口可挑下一个 ⏸️ Phase 接干 · 不抢 P0-VAT 资源
+
+### Phase 0 · 文档体系建立 ✅(0.5 d · 2026-05-15)
+- ✅ 写 NAV_IA_PRD.md
+- ✅ CLAUDE.md 加「🧭 导航 IA 铁律」段
+- ✅ STATE_PEARNLY.md 加 NAV-IA 平行主线段
+- ✅ BACKLOG.md 加本队列(本节)
+- ✅ MODULE_ROADMAP.md 加 NAV-IA 横切模块
+- ✅ DESIGN_SYSTEM.md 加 §18 头像下拉菜单组件
+
+### Phase 1 · 顶栏三件套落地 ✅(实际 ~1 d · 2026-05-15 上线 v118.33.1.0)
+**影响文件**:`home.html`(+220 行) · `home.css`(+243 行) · `home.js`(+431 行)
+
+**A. 头像下拉菜单** ✅
+- [x] `home.html` topbar 加 `.avatar-wrap` + `.avatar-popup`(9 项 · 全内联 SVG · home.html 未引 Tabler)
+- [x] `home.css` 末尾追加 · 变量映射 prototype `--surface/--text/--border` → home.css `--card/--ink/--line`
+- [x] `home.js` 末尾新 IIFE 段 · `applyRoleVisibility` 复用 `isSuperAdmin / canManageTeam / shouldHideMoney` 原子函数 · `_isInTestWhitelist` 复刻 home.js:24821 3 条件(URL/localStorage/user_id 硬编码 · 因 `/api/me` 后端无 `is_test_whitelist` 字段)
+- [x] 9 个 i18n key 4 语全(写入顺序 th→en→zh→ja)
+- [x] loadAll hook 在 `applySidebarVisibility()` 后追加 `applyRoleVisibility() + renderAvatarMenu(u)`
+
+**B. 顶栏搜索框** ✅
+- [x] `home.html` 客户切换器左边插入 `.topbar-search`(灰底 + ⌘K kbd · OS 探测 `body.is-windows` 切 Ctrl K 显示)
+- [x] `home.css` 加样式 + 响应式(< 800px 缩图标 · **< 600px 完全隐藏**)
+- [x] 点击 / Enter / Space 触发 `window.openCmdk()`
+
+**C. Cmd+K 命令面板** ✅
+- [x] `home.html` toast 后插入 `.cmdk-mask + .cmdk`(13 跳转项 + 4 切语言 · 含「即将」灰显项 4 个)
+- [x] `home.css` 加 `.cmdk-*` 样式 · z-index 9100(避开现有 modal 0-9000)
+- [x] `home.js` IIFE 段:`openCmdk / closeCmdk / _cmdkFilter / _cmdkSetFocus / _cmdkMoveFocus / _cmdkActivate / _initCmdk` · 全局 `⌘K | Ctrl+K` + ESC 双关链(cmdk → avatar-popup)
+- [x] 8 个 i18n key 4 语全
+- [x] cmdk locked 项(dashboard/vouchers/receivables/automation)点击 toast 「即将上线」
+
+**D. 顺带做的 P0 屎山修复**(TECH_DEBT §2)✅
+- [x] 删 `showToast` 重复定义旧版(home.js:13461)· 276 调用点全兼容新版(line 14894)
+- [x] 写 TECH_DEBT.md(屎山治理路线图 + 已修清单 + 新代码标准 + §4.5 部署铁律的"系统层例外")
+- [x] CLAUDE.md 加「🧹 屎山治理铁律」段(在 §4 语并重之后)
+
+**E. 收尾** ✅
+- [x] cache bust 11841061 → 11841062(home.html 中 home.css?v= + home.js?v= 两处 · /api/version 自动 grep 不用改 app.py)
+- [x] 部署 v118.33.1.0(scp + ssh deploy.sh · PowerShell 工具 · 复刻 settings.local.json line 44 同款格式)
+- [x] 验证 https://pearnly.com/api/version → `{"version":"11841062"}` ✓
+- [x] 本地 tar.gz 自动删
+
+**验收**(skin 账号已给短版必测清单 · 5 项 · 每项 ≤30 秒)
+
+### Phase 2 · sidebar 重复入口清扫 ✅ 完成(实际 ~0.5 d · 2026-05-15 上线 v118.33.2.0)
+**影响文件**:`home.html`(-83 行) + `home.css`(-165 行 adm-lang-bar + sidebar-user 系列) + `home.js`(-150 行 _initSidebarUserMenu + renderSidebarUser + adm-lang-bar IIFE + applySidebarRoleVisibility admin 显隐)
+
+**实施**:
+- [x] home.html · 删 Line 2152-2234 整段(管理员组 / 测试组 / adm-lang-bar / sidebar-user 4 块)· 一行注释占位
+- [x] home.js · 删 adm-lang-bar IIFE(原 9528-9547)
+- [x] home.js · 删 `_initSidebarUserMenu()` + `renderSidebarUser()` + DOMContentLoaded hook 整段(原 9636-9748 共 113 行)
+- [x] home.js · 清 loadAll 里的 `renderSidebarUser(u)` 调用
+- [x] home.js · 删 `applySidebarRoleVisibility` 的 `.nav-admin-only` / `.nav-group-admin-only` / `adm-lang-bar` 显隐逻辑(原 10729-10739)
+- [x] home.js · 测试中心 `_applyVisibility` 改 no-op 外壳(保留 `window._tcApplyVisibility` 兼容外部调用 · nav-group-test DOM 已删)
+- [x] home.js · 更新 2 处 Phase 1 残留过期注释("不删旧 sidebar-user-popup" / "不动 sidebar-user-popup 的 ESC")
+- [x] home.css · 删 `.adm-lang-bar` + `.adm-lang-pill` 系列(原 5359-5385)
+- [x] home.css · 删 `.sidebar-user` + 所有子样式(原 9411-9547 共 137 行 · 保留 `.sidebar { display:flex; flex-direction:column; }`)
+- [x] cache bust 11841062 → 11841063
+- [x] 部署 v118.33.2.0(scp + ssh deploy.sh · /api/version 返 11841063 · systemctl active)
+- [x] 本地 tar.gz 自动删
+
+**保留项**(预期内):
+- admin-mode 视图代码(home.js 10672-10681)· Earn 走 `?admin=1` 老逻辑仍需 · Phase 8 独立 admin layout 后再清
+- i18n 字典里 `nav-group-test` / `nav-group-admin` / `nav-admin-cost` / `nav-admin-users` 等 key 保留(老顺序不动 · 不破坏字典)
+
+### Phase 3 · sidebar 集成一级入口 ✅ 完成(2026-05-15 · v118.33.3.0 上线 · CTA 在 v118.33.7.3 撤掉)
+**实际改动**:
+- [x] sidebar 底部加「集成」一级入口 · `data-route="integrations"` · 跳 `page-integrations` 空壳
+- [x] 路由表 + i18n × 17 个 key(4 语 全)
+- [x] ~~sidebar 顶部蓝色 CTA「上传发票」~~ — Phase 3 加了 · 但 prototype 没这个 · v118.33.7.3 撤(铁律:prototype > PRD 冲突时听 prototype)
+
+### Phase 4 · "即将" badge 大清扫 ✅ 完成(2026-05-15 · v118.33.4.0 上线)
+**改动**:
+- [x] sidebar 5 个 nav-item 上的 `<span class="nav-badge soon">即将</span>` 全删(仪表盘 / 凭证中心 / 销售发票 / 应收追踪 / 云盘同步)
+- [x] 5 个 page 本身保留 coming-soon 空壳 · 点击仍能进
+
+### Phase 5 · sidebar 业务流分组 ✅ 完成(2026-05-15 · v118.33.5.0 上线)
+**改动**:
+- [x] sidebar 旧 3 组(核心/数据/自动化) → 新结构:首页 / 销项管理▾ / 进项管理▾ / 客户 / 异常 / 自动化(暂留 · Phase 7 没整合) / 底部集成
+- [x] 销项管理▾ 5 子项(上传发票 / 发票记录 / VAT 对账 / 销售发票 / 应收追踪)· 进项管理▾ 1 子项(凭证中心 · Phase 6 才补全)
+- [x] 折叠组 IIFE(toggle + LS 持久化 + 路由跟随)· 默认销项展开 / 进项折叠
+- [x] 改 i18n:`nav-dashboard` 仪表盘 → 首页 / 新增 `nav-group-sales` 销项管理 + `nav-group-expense` 进项管理 / 后续把 `nav-ocr` `nav-history` `nav-reconcile` `nav-exceptions` 4 个 key 改为 prototype 命名(上传发票 / 发票记录 / VAT 对账 / 异常)· 4 语全
+- [x] 加 nav-divider 分隔线(客户/异常前)· 对齐 prototype
+- [x] 删 cloud 入口(prototype 没 · page-cloud 保留)
+
+### Phase 6 · 进项管理完整模块 🚫 永久跳出 NAV-IA(本质是独立 3 周大模块 · 等 Zihao 拍板独立开)
+
+> ⚠️ **本任务卡由 `MODULE_EXPENSE_PRD_v2.md` 全权负责** · 详见 `pearnly_project/CLAUDE.md/MODULE_EXPENSE_PRD_v2.md`
+> 命名:**凭证中心** · 路由 `/expense` · 对标 Paypers 一比一复制 + 全面超越
+
+**影响**:对应 MODULE_ROADMAP 第 6 模块「凭证中心」从 0% → 80%+
+
+**3 子版本拆分**(详见 v2 PRD):
+
+**v118.40 MVP**(8-10 d · 「能用」· Paypers 对齐)
+- [ ] 费用分类逻辑(15 类标准 · AI 自动 + 可手改)· 1.5 d
+- [ ] PV 生成(标准泰国模板 · 三签名栏)· 2 d
+- [ ] **代收据生成 ใบแทนใบเสร็จ**(合规格式)· 1 d
+- [ ] 月度支出仪表盘(总额/分类饼图/月对比)· 2 d
+- [ ] 多客户费用视图(按客户筛 + 按月筛)· 1 d
+- [ ] Google Drive 归档(按客户/月分文件夹)· 2 d
+- [ ] 4 语 i18n 全覆盖 · 0.5 d
+
+**v118.41 提升**(5-7 d · 「好用」· 建立差异化)
+- [ ] Google Sheets 实时同步 · 2 d
+- [ ] Shopee/Lazada/转账单 OCR 支持 · 1.5 d
+- [ ] ERP 直推(复用现有 webhook)· 1 d
+- [ ] 批量 PV 生成(一次审核多张)· 1 d
+- [ ] 操作审计日志 · 0.5 d
+
+**v118.42 专业**(3-5 d · 「超越」· 事务所规模化)
+- [ ] 月底批量报告(一键导出当月全部凭证包)· 1.5 d
+- [ ] 费用预算管理(设上限 + 超额提醒)· 2 d
+- [ ] 费用审批流(员工 → 会计 → 批准)· 2 d
+
+**数据模型**(详见 v2 PRD):
+- [ ] 新建表 `expense_records`(费用记录)
+- [ ] 新建表 `payment_vouchers`(付款凭证)
+
+**触发**:Phase 1-5 全部完成 + P0-VAT 主线收尾 + Zihao 拍板「开干 v118.40 MVP」
+
+### Phase 7 · 集成模块独立化 ✅ 完成(2026-05-15 · v118.33.7.0 上线)
+**目标**:settings 内「集成与连接」整段拆出来 · 升为 sidebar 一级独立页 `page-integrations`
+**影响文件**:`home.html` + `home.css` + `home.js`
+**实施**:
+- [ ] 新建独立 `page-integrations`(从 settings.集成与连接 整段搬出 · 含 Google 服务 / 收票渠道 / ERP 三区)
+- [ ] 6 通道统一 `.integration-row` 卡片化:Drive(已连接)/ Sheets(一键开启)/ Gmail / LINE Bot / 文件夹 / ERP 对接
+- [ ] settings 删「集成与连接」tab + 默认 tab 改为「账户信息」
+- [ ] `home.js`:路由表加 `integrations` + `showSettingsTab` 函数删 `integrations` 引用
+- [ ] 4 语 i18n × 7 个新 key(详见 NAV_IA_PRD §5.3)
+- [ ] Google 一次授权双服务铁律(Drive + Sheets 共享 OAuth · 蓝色信息条强调)
+- [ ] 部署 v118.44.1
+
+### 视觉皮肤对齐(插队任务 · 11 轮迭代 · 2026-05-15 · v118.33.7.1 → v118.33.7.11)✅ 完成
+- 整产品配色一刀切对齐 prototype:深蓝主色 → 纯黑 / 浅蓝 active 底 → 暖灰 / 亮蓝强调 → 黑 / 所有页头图标方块改暖灰底 + 灰图标 + 淡边
+- token 改:`--brand: #1a365d → #111111` / `--brand-hover: #2a4e7c → #333333` / `--accent: #4299e1 → #111111` / `--accent-soft: #ebf4ff → #f4f4f0`
+- 硬编码批量替换 50+ 处:`#EFF6FF` / `#F0F9FF` / `#E0F2FE` / `#BFDBFE` / `#E6F1FB` / `#F0F7FF` / `#185FA5` / `#0C447C` / `#85B7EB` 等浅蓝调一律 → `#f4f4f0` 暖灰 / 暖灰边
+- 蓝字硬编码 `#1d4ed8` / `#2563eb` / `#1e3a8a` / `#1e40af` / `#3B82F6` 全部 → `#111111`
+- `.btn-primary` 主按钮 深蓝 → 纯黑
+- `.page-head-icon` + `.page-head-clean .page-head-icon` 浅蓝渐变 → 暖灰单色 + 淡边(Phase 7.7 改了但被覆盖 · Phase 7.11 修对覆盖 BUG)
+- `.drop-zone` 对齐 prototype:浅暖灰底 + 灰虚线 → hover 黑虚线(不变背景)· 图标灰色 hover 变黑
+- `.nav-item.active` 浅蓝底蓝字 + 左竖条 → **纯黑底白字** + 去左竖条
+- `.topbar-left` 加 border-right 跟 sidebar 顶部「焊接」(prototype 视觉)
+- 顶栏高度 56 → 48 · body 字号 14 → 13 · nav-sub-item 缩进 14 → 38(对齐 prototype)
+- sidebar 改名:仪表盘 → 首页 / 上传识别 → 上传发票 / 单据记录 → 发票记录 / 对账中心 → VAT 对账 / 异常栏 → 异常(4 语全改)
+- 加 nav-divider(客户/异常前)
+- BUG 修:
+  - X 关闭按钮失效(Phase 2 删 sidebar-user 时把 help-modal close 逻辑误删)— 重新独立绑定 + ESC + 点遮罩关闭
+  - sidebar 收起态 nav-sub-item active 黑方块(padding-left 38px 把图标推出容器)— 收起态加 `padding-left: 10px !important`
+  - `.page-head-clean .page-head-icon` 覆盖问题(优先级更高 · 我之前改了基类没改这个 · Phase 7.11 修对)
+
+**保留的浅蓝(prototype 也这样)**:`#DBEAFE` / `#dbeafe` info 提示底 — 作 alert / info banner 用
+
+### Phase 8 · Admin Layout 独立 ✅ 完成(2026-05-15 · v118.44.0 → v118.44.0.7 共 8 个微版本)
+**Earn 铁律**(2026-05-15 拍板):**不工作 · 只管账户 + 看成本** · sub-nav 仅 2 项 · 砍其他
+**新文件**:`static/admin/admin.html` + `admin.css` + `admin.js` + `admin-i18n.js`(完全独立 SPA · 不引 home.js)
+**实施**:
+- [x] login.html 前端分流:Earn(`is_super_admin=true`)登录后前端跳 `/admin/cost`(后端零改动)
+- [x] admin layout sub-nav 只 2 项:成本追踪(`/admin/cost`)+ 用户管理(`/admin/users`)
+- [x] 头像菜单「管理员后台」(仅 super admin 可见)→ 跳 `/admin/cost`(home.js L29911 + L30029)
+- [x] 顶部 admin banner(黑底渐变 + 橙色腰线 · prototype Earn 视角对齐)
+- [x] 沿用 prototype_final CSS token · admin.css 复用 home.css token + 加专属变体
+- [x] 部署 v118.44.0(首部署)
+- [x] hotfix v118.44.0.1 · 老 `/admin` 路由 301 重定向到 `/admin/cost`(解决浏览器 cache 老 home.js 跳老路径)
+- [x] hotfix v118.44.0.2 · 修文字隐形(home.js applyLang 抛错残留 `.lang-switching` class)+ admin.js 持续轮询业务函数
+- [x] hotfix v118.44.0.3 · login.html 超管直跳 /admin/cost 跳过 /home 中转 · `/` `/login` 加 no-cache · 卡顿 3s → 1s
+- [x] hotfix v118.44.0.4 · 删除「返回普通视图」按钮(死循环) + 修语言下拉关闭(用 contains 判定)
+- [x] hotfix v118.44.0.5 · home.js L13585 顶层 try-catch + admin.js 自己 fetch admin 业务 API(独立)
+- [x] hotfix v118.44.0.6 · 诊断面板改累积日志
+- [x] hotfix v118.44.0.7 · **彻底独立** · admin.html 拔掉 home.js + 新建 admin-i18n.js(zh+th 49 key)+ 修 Google 余额 endpoint(`/api/admin/billing/balance`)+ 加 5 个按钮 listener + 删诊断 chip
+
+**已砍**:平台概览 / 操作日志 / API 健康度(Earn 不需要 · 2026-05-15 拍板)
+
+**cache bust**:`11841078` → `11841085`(本 Phase 累计升 7 次)
+
+**i18n 新增**:`adm-banner-msg/title` `adm-sidebar-section/cost/users` `adm-back-to-home`(zh+th+en+ja 各 6 key)+ admin-i18n.js 内嵌 49 个 admin 视图 key(zh + th)
+
+**承接关系**:NAV-IA 主线 8 Phase 全部完成 · 接下来等 Zihao 拍板独立开 Phase 6(进项管理 v118.40 · 3 周大模块)或回 P0-VAT 收尾
+
+---
+
+## 🆕 优先级状态(2026-05-12 重排)
 > **核心约束**:对齐 Xero / QuickBooks / Stripe / Notion 三层原则 L1/L2/L3
 > **战略铁律**(2026-05-09 拍板):自动化 ERP 适配器主线升 P0 · 所有窗口必须以 ERP 工作优先 · 其他全部排后
 > **战略升级**(2026-05-12 拍板):P0-VAT 销项税对账(月度刚需 · 14-18 d)插队为最高优先级 · P0-A MR.ERP 剩余 5 版暂停 · P0-VAT 全部完成后接力
@@ -841,14 +1411,17 @@
 
 ## 🟢 P0 公测启动并行(0.5 天)
 
-### A.1 Git 远程私库 push(0.5 天)· **公测前必做**
-- [ ] 在 GitHub / Gitea 创建私有 repo
-- [ ] 把 /opt/mrpilot 推上去 + 设 `.gitignore`(.env / *.tar.gz / pdfs / __pycache__)
-- [ ] 本地 `D:\Users\Skin\Desktop` 同步一份 git clone
-- [ ] 写 `deploy.sh` 备份触发 git push
-- 目的:防 D 盘故障 / 服务器爆 · 代码可恢复
+### A.1 Git 远程私库 push ✅ 完成(2026-05-17)
+- [x] 在 GitHub 创建私有 repo → `github.com/skin306152-star/pearnly-app`
+- [x] `.gitignore` 配置完成(`.env` / `*.tar.gz` / `__pycache__` / `uploads/` 等)
+- [x] 服务器 deploy key 配置(`/root/.ssh/github_pearnly`)
+- [x] GitHub Webhook 接口(`POST /internal/deploy`)写入 app.py
+- [x] 服务器 `/opt/mrpilot/git-deploy.sh` 部署脚本
+- [x] CLAUDE.md 部署铁律更新为 Git Push 流程
+- ⏳ 等 Zihao 提供 GitHub PAT → 完成首次 push + GitHub webhook 配置
+- 目的:代码自动备份 · fail2ban 问题永久消失 · 自动部署
 
-**做完 Git 私库即可启动公测** · ERP 适配器(v118.27.x)并行 · 不堵公测。
+**Git 私库基础架构完成 · 等 PAT 即可全通**
 
 ---
 

@@ -593,6 +593,7 @@ const I18N = {
         'history-section-title': '发票记录',
         'history-section-sub': '点击行查看详情 · 可编辑字段',
         'history-search-placeholder': '搜索文件名 / 发票号 / 供应商...',
+        'hist-search-ph': '搜索...',
         'history-range-7': '最近 7 天',
         'history-range-30': '最近 30 天',
         'history-range-90': '最近 90 天',
@@ -1811,6 +1812,7 @@ const I18N = {
         'integrations-section-google': 'GOOGLE 服务',
         'integrations-section-channels': '收票渠道',
         'integrations-section-erp': 'ERP 系统',
+        'int-section-automation': '通知提醒',
         'integrations-google-info': '授权一次 Google 账号 · Drive 和 Sheets 均可使用 · 无需重复授权',
         'int-name-drive': 'Google Drive',
         'int-name-sheets': 'Google Sheets',
@@ -1933,8 +1935,7 @@ const I18N = {
         'glv-h-acct':         '收入科目',
         'glv-running':        '对账中…',
         'glv-hint-need-both': '请上传两份文件',
-        'glv-history-title':  '近期对账',
-        'glv-history-refresh':'刷新',
+        'glv-history-title':  '近期对账任务',
         'glv-history-empty':  '暂无对账记录',
         'glv-hist-time':      '时间',
         'glv-hist-files':     '文件',
@@ -1977,9 +1978,6 @@ const I18N = {
         'vex-task-delete-confirm-body':  '同时清掉对应的发票识别缓存 · 不可恢复',
         'vex-task-delete-ok':   '已删除',
         'vex-task-delete-fail': '删除失败',
-        'vex-clear-old-btn':     '清 7 天前任务',
-        'vex-clear-old-confirm': '确定清除 7 天前的对账任务?此操作不可撤销',
-        'vex-clear-old-success': '已清除 {n} 条任务',
         'vex-main-action-tag':  '主操作',
         'vex-status-pending':  '待处理',
         'vex-status-running':  '处理中',
@@ -2915,6 +2913,7 @@ const I18N = {
         'history-section-title': 'Invoice Records',
         'history-section-sub': 'Click a row to view or edit fields',
         'history-search-placeholder': 'Search filename / invoice no / supplier...',
+        'hist-search-ph': 'Search...',
         'history-range-7': 'Last 7 days',
         'history-range-30': 'Last 30 days',
         'history-range-90': 'Last 90 days',
@@ -4130,6 +4129,7 @@ const I18N = {
         'integrations-section-google': 'GOOGLE SERVICES',
         'integrations-section-channels': 'Invoice Channels',
         'integrations-section-erp': 'ERP Systems',
+        'int-section-automation': 'Notification Alerts',
         'integrations-google-info': 'Authorize Google once — both Drive and Sheets work without re-authorization',
         'int-name-drive': 'Google Drive',
         'int-name-sheets': 'Google Sheets',
@@ -4242,8 +4242,7 @@ const I18N = {
         'glv-h-acct':         'Revenue Acct',
         'glv-running':        'Reconciling…',
         'glv-hint-need-both': 'Please upload both files',
-        'glv-history-title':  'Recent Reconciliations',
-        'glv-history-refresh':'Refresh',
+        'glv-history-title':  'Recent Reconciliation Tasks',
         'glv-history-empty':  'No reconciliation history yet',
         'glv-hist-time':      'Time',
         'glv-hist-files':     'Files',
@@ -4288,9 +4287,6 @@ const I18N = {
         'vex-task-delete-confirm-body':  'This also clears the OCR cache · cannot be undone',
         'vex-task-delete-ok':   'Deleted',
         'vex-task-delete-fail': 'Delete failed',
-        'vex-clear-old-btn':     'Clear older than 7 days',
-        'vex-clear-old-confirm': 'Clear tasks older than 7 days? Cannot be undone',
-        'vex-clear-old-success': 'Cleared {n} tasks',
         'vex-main-action-tag':  'Primary',
         'vex-status-pending':  'Pending',
         'vex-status-running':  'Running',
@@ -5228,6 +5224,7 @@ const I18N = {
         'history-section-title': 'บันทึกใบกำกับภาษี',
         'history-section-sub': 'คลิกเพื่อดูหรือแก้ไขข้อมูล',
         'history-search-placeholder': 'ค้นหาชื่อไฟล์ / เลขใบกำกับ / ผู้ขาย...',
+        'hist-search-ph': 'ค้นหา...',
         'history-range-7': '7 วันล่าสุด',
         'history-range-30': '30 วันล่าสุด',
         'history-range-90': '90 วันล่าสุด',
@@ -6442,6 +6439,7 @@ const I18N = {
         'integrations-section-google': 'บริการ GOOGLE',
         'integrations-section-channels': 'ช่องทางรับใบกำกับ',
         'integrations-section-erp': 'ระบบ ERP',
+        'int-section-automation': 'การแจ้งเตือน',
         'integrations-google-info': 'อนุญาตบัญชี Google ครั้งเดียว · ใช้ได้ทั้ง Drive และ Sheets · ไม่ต้องอนุญาตซ้ำ',
         'int-name-drive': 'Google Drive',
         'int-name-sheets': 'Google Sheets',
@@ -6554,8 +6552,7 @@ const I18N = {
         'glv-h-acct':         'รหัสบัญชีรายได้',
         'glv-running':        'กำลังกระทบยอด…',
         'glv-hint-need-both': 'กรุณาอัปโหลดทั้งสองไฟล์',
-        'glv-history-title':  'การกระทบยอดล่าสุด',
-        'glv-history-refresh':'รีเฟรช',
+        'glv-history-title':  'งานกระทบยอดล่าสุด',
         'glv-history-empty':  'ยังไม่มีประวัติการกระทบยอด',
         'glv-hist-time':      'เวลา',
         'glv-hist-files':     'ไฟล์',
@@ -6599,9 +6596,6 @@ const I18N = {
         'vex-task-delete-confirm-body':  'ลบแคชการอ่านใบกำกับด้วย · ไม่สามารถกู้คืน',
         'vex-task-delete-ok':   'ลบแล้ว',
         'vex-task-delete-fail': 'ลบไม่สำเร็จ',
-        'vex-clear-old-btn':     'ลบงานเก่ากว่า 7 วัน',
-        'vex-clear-old-confirm': 'ลบงานกระทบยอดเก่ากว่า 7 วัน? ไม่สามารถย้อนกลับ',
-        'vex-clear-old-success': 'ลบ {n} รายการแล้ว',
         'vex-main-action-tag':  'งานหลัก',
         'vex-status-pending':  'รอดำเนินการ',
         'vex-status-running':  'กำลังดำเนินการ',
@@ -7532,6 +7526,7 @@ const I18N = {
         'history-section-title': '請求書記録',
         'history-section-sub': 'クリックして表示または編集',
         'history-search-placeholder': 'ファイル名 / 請求書番号 / 取引先で検索...',
+        'hist-search-ph': '検索...',
         'history-range-7': '直近 7 日',
         'history-range-30': '直近 30 日',
         'history-range-90': '直近 90 日',
@@ -8746,6 +8741,7 @@ const I18N = {
         'integrations-section-google': 'GOOGLE サービス',
         'integrations-section-channels': '受信チャネル',
         'integrations-section-erp': 'ERP システム',
+        'int-section-automation': '通知アラート',
         'integrations-google-info': 'Google を一度認証すれば Drive と Sheets 両方使えます · 再認証不要',
         'int-name-drive': 'Google Drive',
         'int-name-sheets': 'Google Sheets',
@@ -8858,8 +8854,7 @@ const I18N = {
         'glv-h-acct':         '収益科目',
         'glv-running':        '照合中…',
         'glv-hint-need-both': '両方のファイルをアップロードしてください',
-        'glv-history-title':  '最近の照合',
-        'glv-history-refresh':'更新',
+        'glv-history-title':  '最近の照合タスク',
         'glv-history-empty':  '照合履歴なし',
         'glv-hist-time':      '時刻',
         'glv-hist-files':     'ファイル',
@@ -8903,9 +8898,6 @@ const I18N = {
         'vex-task-delete-confirm-body':  '関連 OCR キャッシュも削除 · 復元不可',
         'vex-task-delete-ok':   '削除完了',
         'vex-task-delete-fail': '削除失敗',
-        'vex-clear-old-btn':     '7 日前のタスクをクリア',
-        'vex-clear-old-confirm': '7 日以上前のタスクをクリア?元に戻せません',
-        'vex-clear-old-success': '{n} 件をクリアしました',
         'vex-main-action-tag':  'メインアクション',
         'vex-status-pending':  '待機中',
         'vex-status-running':  '処理中',
@@ -9632,6 +9624,45 @@ function showConfirm(msg, opts) {
 }
 
 // ============================================================
+// Session 被踢弹窗 (v118.32.5.5.34 · 替换原 toast+redirect)
+// ============================================================
+function _showSessionRevokedModal() {
+    if (document.getElementById('pn-session-revoked-modal')) return;
+    var l = (typeof currentLang === 'string' && currentLang)
+            || localStorage.getItem('mrpilot_lang') || 'th';
+    var titles = {
+        zh: '账号已在其他设备登录',
+        en: 'Signed in on another device',
+        th: 'บัญชีถูกเข้าใช้งานจากอุปกรณ์อื่น',
+        ja: '他のデバイスでサインインされました'
+    };
+    var bodies = {
+        zh: '你的账号刚刚在另一台设备上登录\n当前设备已自动退出，请重新登录继续使用。',
+        en: 'Your account was just signed in on another device.\nThis device has been logged out automatically.',
+        th: 'บัญชีของคุณเพิ่งเข้าสู่ระบบจากอุปกรณ์อื่น\nระบบออกจากอุปกรณ์นี้โดยอัตโนมัติแล้ว กรุณาเข้าสู่ระบบใหม่',
+        ja: 'お使いのアカウントが別のデバイスでサインインされました。\nこのデバイスは自動的にログアウトされました。'
+    };
+    var okLabels = { zh: '确定，去登录', en: 'OK, Sign in', th: 'ตกลง เข้าสู่ระบบ', ja: 'OK、ログイン' };
+    var lang = titles[l] ? l : 'th';
+    var overlay = document.createElement('div');
+    overlay.id = 'pn-session-revoked-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML =
+        '<div style="background:#fff;border-radius:14px;padding:32px 24px 24px;max-width:360px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.2);text-align:center;">' +
+            '<div style="width:52px;height:52px;border-radius:50%;background:#FEF2F2;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;flex-shrink:0;">' +
+                '<svg width="26" height="26" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="#DC2626"/></svg>' +
+            '</div>' +
+            '<div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:10px;line-height:1.4;">' + titles[lang] + '</div>' +
+            '<div style="font-size:13px;color:#6B7280;line-height:1.7;margin-bottom:24px;white-space:pre-line;">' + bodies[lang] + '</div>' +
+            '<button id="pn-srm-ok" style="width:100%;padding:11px 0;background:#111111;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">' + okLabels[lang] + '</button>' +
+        '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById('pn-srm-ok').addEventListener('click', function () {
+        window.location.href = '/';
+    });
+}
+
+// ============================================================
 // API
 // ============================================================
 async function apiGet(url) {
@@ -9649,11 +9680,13 @@ async function apiGet(url) {
         if (isAuthFail) {
             console.warn('[auth-fail-redirect]', url, resp.status, detail);  // 诊断 · 用户截屏给我看
             localStorage.removeItem('mrpilot_token');
-            const _msgKey = (code === 'auth.session_revoked') ? 'alert-session-revoked'
-                          : (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin'
-                          : 'alert-session';
-            showToast(t(_msgKey), 'error');
-            setTimeout(() => { window.location.href = '/'; }, 1500);
+            if (code === 'auth.session_revoked') {
+                _showSessionRevokedModal();
+            } else {
+                const _msgKey = (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin' : 'alert-session';
+                showToast(t(_msgKey), 'error');
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+            }
             return null;
         }
         // 业务类 403(如 quota.need_api_key)交由调用方处理
@@ -9680,11 +9713,13 @@ async function apiPost(url, data) {
         if (isAuthFail) {
             console.warn('[auth-fail-redirect]', url, resp.status, detail);
             localStorage.removeItem('mrpilot_token');
-            const _msgKey = (code === 'auth.session_revoked') ? 'alert-session-revoked'
-                          : (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin'
-                          : 'alert-session';
-            showToast(t(_msgKey), 'error');
-            setTimeout(() => { window.location.href = '/'; }, 1500);
+            if (code === 'auth.session_revoked') {
+                _showSessionRevokedModal();
+            } else {
+                const _msgKey = (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin' : 'alert-session';
+                showToast(t(_msgKey), 'error');
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+            }
             return null;
         }
         // 业务类 403 · 返回原 resp 让调用方处理
@@ -9712,11 +9747,13 @@ async function apiPut(url, data) {
             if (isAuthFail) {
                 console.warn('[auth-fail-redirect]', url, resp.status, detail);
                 localStorage.removeItem('mrpilot_token');
-                const _msgKey = (code === 'auth.session_revoked') ? 'alert-session-revoked'
-                          : (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin'
-                          : 'alert-session';
-                showToast(t(_msgKey), 'error');
-                setTimeout(() => { window.location.href = '/'; }, 1500);
+                if (code === 'auth.session_revoked') {
+                    _showSessionRevokedModal();
+                } else {
+                    const _msgKey = (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin' : 'alert-session';
+                    showToast(t(_msgKey), 'error');
+                    setTimeout(() => { window.location.href = '/'; }, 1500);
+                }
                 return { ok: false };
             }
             return { ok: false, status: resp.status, detail };
@@ -9988,7 +10025,8 @@ document.getElementById('sidebar-overlay')?.addEventListener('click', () => {
     document.body.classList.remove('sidebar-open');
 });
 
-const VALID_ROUTES = ['ocr', 'dashboard', 'history', 'automation', 'integration', 'integrations', 'templates', 'api-keys', 'settings', 'admin-cost', 'admin-users', 'exceptions', 'clients', 'vouchers', 'sales-invoices', 'receivables', 'reconcile', 'cloud', 'test-center'];
+// v118.32.5.5.37 NAV-IA Phase 5: automation 页面无侧边栏入口且不可路由 · 银行上传改为对账中心原地上传
+const VALID_ROUTES = ['ocr', 'dashboard', 'history', 'integration', 'integrations', 'templates', 'api-keys', 'settings', 'admin-cost', 'admin-users', 'exceptions', 'clients', 'vouchers', 'sales-invoices', 'receivables', 'reconcile', 'cloud', 'test-center'];
 
 function routeTo(route) {
     // v109.4 · 老 admin 路由迁移到 admin-users(数据更全 · 字段对齐多租户)
@@ -10025,7 +10063,7 @@ function routeTo(route) {
     // 特殊页面加载
     if (route === 'settings') renderSettings();
     if (route === 'history') loadHistoryPage();
-    if (route === 'automation') loadAutomationPage();
+    // automation 路由已移除 · 银行上传改为对账中心原地弹文件选择器
     if (route === 'admin-cost' && typeof window.loadAdminCostPage === 'function') window.loadAdminCostPage();
     if (route === 'admin-users' && typeof window.loadAdminUsersPage === 'function') window.loadAdminUsersPage();
     if (route === 'clients' && typeof window.loadClientsPage === 'function') window.loadClientsPage();
@@ -10092,14 +10130,120 @@ document.querySelectorAll('.nav-item').forEach(item => {
     }
 })();
 
-// v118.33.7 NAV-IA Phase 7 · 集成页「配置」按钮 → 跳自动化页(实际连接逻辑暂保留自动化页)
+// v118.32.5.5.37 NAV-IA Phase 5 收尾 · 集成页「配置」按钮 → 右侧抽屉(不再跳 automation 路由)
+// anchor→drawer tab 映射(google-drive/sheets 走原 inline 展开 · 不拦截)
 (function () {
+    const _anchorMap = { line: 'line', folder: 'folder', gmail: 'email', erp: 'erp', alert: 'alert' };
     document.addEventListener('click', function (e) {
         const btn = e.target.closest('.int-btn-configure');
         if (!btn) return;
-        const route = btn.dataset.route || 'automation';
-        if (typeof routeTo === 'function') routeTo(route);
+        const row = btn.closest('.integration-row');
+        const anchor = row ? row.dataset.intAnchor : null;
+        if (anchor && _anchorMap[anchor]) {
+            const nameEl = row.querySelector('.int-name');
+            const title = nameEl ? (nameEl.textContent || nameEl.innerText || '').trim() : '配置';
+            if (typeof window.openIntegrationDrawer === 'function') {
+                window.openIntegrationDrawer(_anchorMap[anchor], title);
+            }
+        }
+        // google-drive / google-sheets 走原有 inline 展开逻辑 · 不拦截
     });
+})();
+
+// v118.32.5.5.37 · 集成配置抽屉核心函数
+(function () {
+    'use strict';
+
+    // 把 .auto-panel 从 drawer body 归还到 .auto-content
+    function _returnPanel() {
+        const body = document.getElementById('int-drawer-body');
+        if (!body) return;
+        const autoContent = document.querySelector('.auto-content');
+        if (!autoContent) return;
+        Array.from(body.querySelectorAll('.auto-panel')).forEach(function (el) {
+            el.style.display = '';
+            autoContent.appendChild(el);
+        });
+    }
+
+    window.openIntegrationDrawer = function (tab, title) {
+        const drawer = document.getElementById('int-drawer');
+        const overlay = document.getElementById('int-drawer-overlay');
+        const titleEl = document.getElementById('int-drawer-title');
+        const body = document.getElementById('int-drawer-body');
+        if (!drawer || !body) return;
+
+        // 先归还上一个 panel
+        _returnPanel();
+
+        drawer.dataset.currentTab = tab || '';
+        if (titleEl) titleEl.textContent = title || '';
+        body.innerHTML = '';
+
+        // anchor → data-auto-panel ID 映射(自动化页面里的 panel 名)
+        var _panelIds = { line: 'linebot', folder: 'folder', email: 'email', alert: 'alert', erp: 'erp', bank: 'bank' };
+        var panelId = _panelIds[tab] || tab;
+
+        // 把对应的 auto-panel 移入抽屉(DOM move · 保留事件监听)
+        const panel = document.querySelector('.auto-panel[data-auto-panel="' + panelId + '"]');
+        if (panel) {
+            panel.style.display = 'block';
+            body.appendChild(panel);
+        } else {
+            body.innerHTML = '<div style="padding:20px;color:var(--ink-3);font-size:13px;">面板未找到</div>';
+        }
+
+        // 打开动画
+        drawer.classList.add('open');
+        if (overlay) overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+
+        // 触发数据加载(panel 已在 DOM 里 · loader 按固定 ID 渲染)
+        var loaders = {
+            line:   window._loadLineBotPanel,
+            folder: window._loadFolderWatcherPanel,
+            email:  window._loadEmailIngestPanel,
+            alert:  window._loadNotificationsPanel,
+            bank:   window._loadBankReconPanel,
+        };
+        if (loaders[tab]) {
+            try { loaders[tab](); } catch (e) { console.warn('[int-drawer] loader error', e); }
+        } else if (tab === 'erp') {
+            try {
+                if (typeof loadErpEndpoints === 'function') loadErpEndpoints();
+                if (typeof loadErpLogs === 'function') loadErpLogs();
+            } catch (e) { console.warn('[int-drawer] ERP load error', e); }
+        }
+    };
+
+    window.closeIntegrationDrawer = function () {
+        _returnPanel();
+        var drawer = document.getElementById('int-drawer');
+        var overlay = document.getElementById('int-drawer-overlay');
+        if (drawer) {
+            drawer.classList.remove('open');
+            drawer.dataset.currentTab = '';
+        }
+        if (overlay) overlay.style.display = 'none';
+        document.body.style.overflow = '';
+    };
+
+    // 绑定关闭事件
+    function _initDrawerEvents() {
+        var closeBtn = document.getElementById('int-drawer-close');
+        var overlay = document.getElementById('int-drawer-overlay');
+        if (closeBtn) closeBtn.addEventListener('click', window.closeIntegrationDrawer);
+        if (overlay) overlay.addEventListener('click', window.closeIntegrationDrawer);
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') window.closeIntegrationDrawer();
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _initDrawerEvents);
+    } else {
+        _initDrawerEvents();
+    }
 })();
 
 // v118.33.5 NAV-IA Phase 5 · sidebar 可折叠业务流分组(销项▼/进项▼ · LS 持久化)
@@ -10109,7 +10253,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
     const ROUTE_GROUP_MAP = {
         'ocr': 'sales', 'history': 'sales', 'reconcile': 'sales',
         'sales-invoices': 'sales', 'receivables': 'sales',
-        'vouchers': 'expense'
+        'vouchers': 'expense',
     };
     function _getState() {
         try {
@@ -12074,11 +12218,17 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                 // v0.15.6 · 只有真正 auth 失败才跳登录 · 其他 403(如 need_api_key)走业务错误展示
                 const cloned = resp.clone();
                 const body = await cloned.json().catch(() => ({}));
-                const code = (body && body.detail && body.detail.code) || '';
+                const _det = body && body.detail;
+                const code = (typeof _det === 'string') ? _det : ((_det && _det.code) || '');
                 if (!code || code.startsWith('auth.')) {
                     localStorage.removeItem('mrpilot_token');
-                    showToast(t('alert-session'), 'error');
-                    setTimeout(() => { window.location.href = '/'; }, 1200);
+                    if (code === 'auth.session_revoked') {
+                        _showSessionRevokedModal();
+                    } else {
+                        const _mk = (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin' : 'alert-session';
+                        showToast(t(_mk), 'error');
+                        setTimeout(() => { window.location.href = '/'; }, 1200);
+                    }
                     return { abort: true };
                 }
                 if (code === 'quota.need_api_key') {
@@ -12931,6 +13081,9 @@ async function rdFetch(url, payload) {
         });
         if (resp.status === 401) {
             localStorage.removeItem('mrpilot_token');
+            const _bd = await resp.json().catch(() => ({}));
+            const _dc = typeof _bd.detail === 'string' ? _bd.detail : ((_bd.detail && _bd.detail.code) || '');
+            if (_dc === 'auth.session_revoked') { _showSessionRevokedModal(); return null; }
             window.location.href = '/';
             return null;
         }
@@ -14044,6 +14197,9 @@ async function loadHistoryPage() {
         });
         if (resp.status === 401) {
             localStorage.removeItem('mrpilot_token');
+            const _bd = await resp.json().catch(() => ({}));
+            const _dc = typeof _bd.detail === 'string' ? _bd.detail : ((_bd.detail && _bd.detail.code) || '');
+            if (_dc === 'auth.session_revoked') { _showSessionRevokedModal(); return; }
             window.location.href = '/';
             return;
         }
@@ -14984,6 +15140,9 @@ async function loadErpEndpoints() {
         });
         if (resp.status === 401) {
             localStorage.removeItem('mrpilot_token');
+            const _bd = await resp.json().catch(() => ({}));
+            const _dc = typeof _bd.detail === 'string' ? _bd.detail : ((_bd.detail && _bd.detail.code) || '');
+            if (_dc === 'auth.session_revoked') { _showSessionRevokedModal(); return; }
             window.location.href = '/';
             return;
         }
@@ -15498,6 +15657,9 @@ async function deleteEndpoint(endpointId) {
             });
             if (resp.status === 401) {
                 localStorage.removeItem('mrpilot_token');
+                const _bd = await resp.json().catch(() => ({}));
+                const _dc = typeof _bd.detail === 'string' ? _bd.detail : ((_bd.detail && _bd.detail.code) || '');
+                if (_dc === 'auth.session_revoked') { _showSessionRevokedModal(); return; }
                 window.location.href = '/';
                 return;
             }
@@ -24754,19 +24916,17 @@ try { window.I18N = I18N; } catch(e) {}
     }
 
     function _gotoBankSession(sessionId) {
-        try {
-            if (typeof routeTo === 'function') routeTo('automation');
-            setTimeout(() => {
-                if (typeof switchAutomationTab === 'function') switchAutomationTab('bank');
-                // 二次延迟 · 让 _loadBankReconPanel 拉完 sessions 后打开会话
-                setTimeout(() => {
-                    if (sessionId && typeof window._openBankSession === 'function') {
-                        window._openBankSession(sessionId);
-                    }
-                }, 200);
-            }, 80);
-        } catch (e) {
-            console.warn('[reconcile] goto bank session failed', e);
+        // 打开集成抽屉加载银行对账面板 · 然后进入该会话详情
+        var title = (typeof t === 'function' ? t('auto-bank-title') : null) || '银行对账';
+        if (typeof window.openIntegrationDrawer === 'function') {
+            window.openIntegrationDrawer('bank', title);
+        }
+        if (sessionId) {
+            setTimeout(function() {
+                if (typeof window._openBankSession === 'function') {
+                    window._openBankSession(sessionId);
+                }
+            }, 400);
         }
     }
 
@@ -24779,17 +24939,10 @@ try { window.I18N = I18N; } catch(e) {}
         _showEmpty(false);
     }
 
-    // 上传按钮 → 跳到自动化 → 银行对账 tab(v118.26.4 简化时再改弹层)
     function _gotoBankUpload() {
-        try {
-            if (typeof routeTo === 'function') routeTo('automation');
-            // 路由切完后再切 tab(给 loadAutomationPage 一帧时间)
-            setTimeout(() => {
-                if (typeof switchAutomationTab === 'function') switchAutomationTab('bank');
-            }, 80);
-        } catch (e) {
-            console.warn('[reconcile] goto bank upload failed', e);
-        }
+        // 对账中心原地上传 · 直接触发文件选择器
+        var inp = document.getElementById('reconcile-bank-file-input');
+        if (inp) inp.click();
     }
 
     async function load() {
@@ -24822,10 +24975,55 @@ try { window.I18N = I18N; } catch(e) {}
         }
     }
 
+    // 对账中心原地上传：选文件 → POST /api/bank-recon/upload → 刷新对账中心
+    function _handleBankFileSelect(files) {
+        if (!files || !files.length) return;
+        const auth = 'Bearer ' + (localStorage.getItem('mrpilot_token') || '');
+        let done = 0;
+        const total = files.length;
+        Array.from(files).forEach(function(file) {
+            const fd = new FormData();
+            fd.append('file', file, file.name);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/bank-recon/upload');
+            xhr.setRequestHeader('Authorization', auth);
+            xhr.onload = function() {
+                done++;
+                try {
+                    const body = JSON.parse(xhr.responseText);
+                    if (xhr.status === 200 && body.tx_count !== undefined) {
+                        showToast((t('bank-upload-ok') || '解析成功 · 共 {n} 条流水').replace('{n}', body.tx_count), 'success');
+                    } else {
+                        showToast(file.name + ' ' + (t('upload-failed') || '上传失败'), 'error');
+                    }
+                } catch(e) {
+                    showToast(file.name + ' ' + (t('upload-failed') || '上传失败'), 'error');
+                }
+                if (done === total) setTimeout(load, 600);
+            };
+            xhr.onerror = function() {
+                done++;
+                showToast(file.name + ' ' + (t('upload-failed') || '上传失败'), 'error');
+                if (done === total) setTimeout(load, 600);
+            };
+            xhr.send(fd);
+        });
+        // toast 提示上传中
+        showToast((t('bank-queue-status-uploading') || '上传中') + '…', 'info');
+    }
+
     // 一次性绑定按钮(用事件委托 · 避免重复绑)
     function _bindOnce() {
         if (window.__reconcileBound) return;
         window.__reconcileBound = true;
+        // 银行对账单文件选择器
+        const bankFileInput = document.getElementById('reconcile-bank-file-input');
+        if (bankFileInput) {
+            bankFileInput.addEventListener('change', function() {
+                _handleBankFileSelect(this.files);
+                this.value = ''; // 重置 · 允许重复选同一文件
+            });
+        }
         document.addEventListener('click', (e) => {
             if (e.target.closest('#btn-reconcile-upload-top') ||
                 e.target.closest('#btn-reconcile-upload-empty')) {
@@ -29502,6 +29700,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const VEX_LIMIT = 5;
 
+    function _applyVexSearch() {
+        var q = ((document.getElementById('vex-task-search') || {}).value || '').trim().toLowerCase();
+        var tbody = document.getElementById('vex-task-tbody');
+        if (!tbody) return;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            tr.style.display = (!q || tr.textContent.toLowerCase().indexOf(q) >= 0) ? '' : 'none';
+        });
+    }
+
     function _renderVexTaskList(rows, total) {
         _vexAllRows  = rows;
         _vexExpanded = false;
@@ -29556,7 +29763,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 <td><span class="badge ${statusClass[st] || 'badge-gray'}">${statusLabel[st] || st}</span></td>
                 <td>${elapsed}</td>
                 <td><div class="vex-task-actions">
-                    <button class="vex-task-dl-btn" data-task-id="${_esc(row.id)}" title="${t('vex-col-actions')||'下载'}">${dlSvg}</button>
+                    <button class="vex-task-dl-btn" data-task-id="${_esc(row.id)}" title="${t('hist_export')||'导出'}">${dlSvg}</button>
                     <button class="vex-task-del-btn" data-task-id="${_esc(row.id)}" title="${t('vex-task-delete-confirm-title')||'删除'}">${delSvg}</button>
                 </div></td>
             </tr>`;
@@ -29588,6 +29795,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 _confirmDeleteVatTask(btn.dataset.taskId);
             });
         });
+        _applyVexSearch();
     }
 
     function _updateVexToggleBtn() {
@@ -29876,8 +30084,8 @@ window.addEventListener('DOMContentLoaded', () => {
         _running = true;
         $('vex-build').disabled = true;
         $('vex-progress').style.display = 'flex';
-        var _dlBarHide = document.getElementById('vex-dl-bar');
-        if (_dlBarHide) _dlBarHide.style.display = 'none';
+        var _dlBtnHide = document.getElementById('vex-download');
+        if (_dlBtnHide) _dlBtnHide.style.display = 'none';
         ['vex-summary-collapse','vex-detail-collapse'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
         const startAt = Date.now();
         $('vex-progress-title').textContent = t('vex-progress-running') || 'AI 抽取中';
@@ -29933,8 +30141,8 @@ window.addEventListener('DOMContentLoaded', () => {
             } catch (e) {}
 
             $('vex-progress').style.display = 'none';
-            var _dlBar = document.getElementById('vex-dl-bar');
-            if (_dlBar) _dlBar.style.display = 'flex';
+            var _dlBtn = document.getElementById('vex-download');
+            if (_dlBtn) _dlBtn.style.display = '';
             if (window._onVexResultShown) window._onVexResultShown();
 
             if (fail > 0) {
@@ -29961,8 +30169,8 @@ window.addEventListener('DOMContentLoaded', () => {
     function _reset() {
         _invoiceFiles = [];
         _reportFiles = [];
-        var _dlBar = document.getElementById('vex-dl-bar');
-        if (_dlBar) _dlBar.style.display = 'none';
+        var _dlBtn2 = document.getElementById('vex-download');
+        if (_dlBtn2) _dlBtn2.style.display = 'none';
         _renderFiles();
     }
 
@@ -30030,8 +30238,8 @@ window.addEventListener('DOMContentLoaded', () => {
         });
         const toggleBtn = document.getElementById('vex-task-toggle');
         if (toggleBtn) toggleBtn.addEventListener('click', _toggleVexTaskList);
-        const clearOldBtn = document.getElementById('vex-clear-old-btn');
-        if (clearOldBtn) clearOldBtn.addEventListener('click', _clearOldTasks);
+        const vexSearchEl = document.getElementById('vex-task-search');
+        if (vexSearchEl) vexSearchEl.addEventListener('input', _applyVexSearch);
         const previewToggleBtn = document.getElementById('vex-toggle-preview');
         if (previewToggleBtn) previewToggleBtn.addEventListener('click', () => {
             const panel = $('vex-preview-panel');
@@ -30677,22 +30885,34 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!tbody) return;
         tbody.innerHTML = '';
         const rows = [
-            [_t('s_gl_total'),    summary.gl_total,                true],
-            [_t('s_minus_gl_cr'), -(summary.gl_only_credit || 0),  false],
-            [_t('s_plus_gl_dr'),  summary.gl_only_debit  || 0,     false],
-            [_t('s_plus_vat_p'),  summary.vat_only_positive || 0,  false],
-            [_t('s_minus_vat_n'), summary.vat_only_negative || 0,  false],
-            [_t('s_vat_total'),   summary.vat_total,               true],
+            {label: _t('s_gl_total'),    amount: summary.gl_total,               emph: true,  items: [],                                    negate: false},
+            {label: _t('s_minus_gl_cr'), amount: -(summary.gl_only_credit || 0), emph: false, items: summary.gl_only_credit_items   || [],   negate: true},
+            {label: _t('s_plus_gl_dr'),  amount: summary.gl_only_debit  || 0,    emph: false, items: summary.gl_only_debit_items    || [],   negate: false},
+            {label: _t('s_plus_vat_p'),  amount: summary.vat_only_positive || 0, emph: false, items: summary.vat_only_positive_items || [],  negate: false},
+            {label: _t('s_minus_vat_n'), amount: summary.vat_only_negative || 0, emph: false, items: summary.vat_only_negative_items || [],  negate: false},
+            {label: _t('s_vat_total'),   amount: summary.vat_total,              emph: true,  items: [],                                    negate: false},
         ];
-        rows.forEach(([label, amount, emph]) => {
+        rows.forEach(({label, amount, emph, items, negate}) => {
             const tr = document.createElement('tr');
-            if (emph) tr.className = 'glv-summary-total';
+            tr.className = emph ? 'glv-summary-total' : 'glv-summary-sect';
             const td1 = document.createElement('td');
             const td2 = document.createElement('td');
             td1.textContent = label;
-            td2.textContent = _fmt(amount);
+            td2.textContent = emph ? _fmt(amount) : '';
             tr.appendChild(td1); tr.appendChild(td2);
             tbody.appendChild(tr);
+            (items || []).forEach(it => {
+                const itr = document.createElement('tr');
+                itr.className = 'glv-summary-item';
+                const itd1 = document.createElement('td');
+                const itd2 = document.createElement('td');
+                const parts = [it.doc_no, it.date, it.name].filter(Boolean);
+                itd1.textContent = '· ' + parts.join('  ·  ');
+                const dispAmt = negate ? -(it.amount || 0) : (it.amount || 0);
+                itd2.textContent = _fmt(dispAmt);
+                itr.appendChild(itd1); itr.appendChild(itd2);
+                tbody.appendChild(itr);
+            });
         });
     }
 
@@ -30714,8 +30934,17 @@ window.addEventListener('DOMContentLoaded', () => {
         } catch (_) { return s; }
     }
 
+    function _applyGlvSearch() {
+        var q = (($('glv-hist-search') || {}).value || '').trim().toLowerCase();
+        var tbody = $('glv-history-tbody');
+        if (!tbody) return;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            tr.style.display = (!q || tr.textContent.toLowerCase().indexOf(q) >= 0) ? '' : 'none';
+        });
+    }
+
     async function _loadHistory() {
-        const tableEl  = $('glv-history-table');
+        const tableEl  = $('glv-history-table-wrap');
         const emptyEl  = $('glv-history-empty');
         const tbody    = $('glv-history-tbody');
         if (!tbody) return;
@@ -30775,6 +31004,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 [cellTime, cellFiles, cellRows, cellMatched, cellDiff, cellMiss, cellAct].forEach(c => tr.appendChild(c));
                 tbody.appendChild(tr);
             });
+            _applyGlvSearch();
         } catch (e) {
             console.error('[gl-vat] history load failed:', e);
         }
@@ -30792,6 +31022,7 @@ window.addEventListener('DOMContentLoaded', () => {
             _renderTable(STATE.lastDetail);
             _renderSummary(STATE.lastSummary);
             const rs = $('glv-result'); if (rs) rs.style.display = '';
+            _expandResults();
             window.scrollTo({ top: rs ? rs.offsetTop - 80 : 0, behavior: 'smooth' });
         } catch (e) {
             console.error('[gl-vat] load task failed:', e);
@@ -30848,8 +31079,8 @@ window.addEventListener('DOMContentLoaded', () => {
         const progress = $('glv-progress');
         const progressSub = $('glv-progress-sub');
         if (status) {
-            status.className = 'vex-action-info';
-            status.style.color = '#5a9fd4';
+            status.className = 'vex-action-info muted';
+            status.style.color = '';
             status.innerHTML = '<span>' + _t('running') + '</span>';
         }
         if (progress) progress.style.display = '';
@@ -30881,8 +31112,10 @@ window.addEventListener('DOMContentLoaded', () => {
             _renderSummary(STATE.lastSummary);
             const rs = $('glv-result');
             if (rs) rs.style.display = '';
+            _expandResults();
             if (status) {
                 status.className = 'vex-action-info ok';
+                status.style.color = '';
                 status.innerHTML = '<span>' + _t('done') + ' · GL ' + (data.gl_row_count || 0) +
                                    ' · VAT ' + (data.vat_row_count || 0) + '</span>';
             }
@@ -30936,6 +31169,12 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── 可折叠分区 ────────────────────────────────────────────────
+    function _expandResults() {
+        var kpi = $('glv-kpi-strip');       if (kpi) kpi.style.display = '';
+        var ss  = $('glv-section-summary'); if (ss)  ss.setAttribute('data-collapsed', 'false');
+        var sd  = $('glv-section-detail');  if (sd)  sd.setAttribute('data-collapsed', 'false');
+    }
+
     function _bindSectionToggle() {
         document.querySelectorAll('.glv-section-head[data-toggle]').forEach((head) => {
             const targetId = head.getAttribute('data-toggle');
@@ -30974,11 +31213,12 @@ window.addEventListener('DOMContentLoaded', () => {
         const btnRun   = $('btn-glv-run');   if (btnRun)   btnRun.addEventListener('click', _run);
         const btnExp   = $('btn-glv-export');if (btnExp)   btnExp.addEventListener('click', _export);
         const btnReset = $('btn-glv-reset'); if (btnReset) btnReset.addEventListener('click', _reset);
-        const btnHRef  = $('btn-glv-history-refresh');
-        if (btnHRef) btnHRef.addEventListener('click', _loadHistory);
+        const glvSearchEl = $('glv-hist-search');
+        if (glvSearchEl) glvSearchEl.addEventListener('input', _applyGlvSearch);
         _bindSectionToggle();
         _renderKpi(null);   // 初始 KPI 显示 '—'
         _updateStatus();
+        window._loadGlvHistory = _loadHistory;
         _loadHistory();
         // v118.32.5.1 · 订阅 i18n 切换总线 · 切语言实时刷新动态文案
         if (typeof window.subscribeI18n === 'function') {
@@ -31004,7 +31244,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!tk) return;
         _hbRunning = true;
         try {
-            const r = await fetch('/api/me/plan', {
+            const r = await fetch('/api/me', {
                 headers: { 'Authorization': 'Bearer ' + tk },
                 cache: 'no-store',
             });
@@ -31017,17 +31257,19 @@ window.addEventListener('DOMContentLoaded', () => {
                 console.warn('[heartbeat] session revoked', code);
                 localStorage.removeItem('mrpilot_token');
                 if (_hbTimer) { clearInterval(_hbTimer); _hbTimer = null; }
-                const _msgKey = (code === 'auth.session_revoked') ? 'alert-session-revoked'
-                              : (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin'
-                              : 'alert-session';
-                try {
-                    if (typeof showToast === 'function' && typeof t === 'function') {
-                        showToast(t(_msgKey), 'error');
-                    } else {
-                        alert('Your session has been revoked');
-                    }
-                } catch (_) {}
-                setTimeout(() => { window.location.href = '/'; }, 1500);
+                if (code === 'auth.session_revoked') {
+                    try { _showSessionRevokedModal(); } catch (_) { window.location.href = '/'; }
+                } else {
+                    const _msgKey = (code === 'auth.password_changed_relogin') ? 'alert-password-changed-relogin' : 'alert-session';
+                    try {
+                        if (typeof showToast === 'function' && typeof t === 'function') {
+                            showToast(t(_msgKey), 'error');
+                        } else {
+                            alert('Session expired');
+                        }
+                    } catch (_) {}
+                    setTimeout(() => { window.location.href = '/'; }, 1500);
+                }
             }
         } catch (e) {
             // 网络错忽略 · 下个 tick 再试
@@ -31088,40 +31330,38 @@ window.addEventListener('DOMContentLoaded', () => {
         const elExcBadge = document.getElementById('dash-quick-exc-badge');
         // 1. 拿 plan + 最近识别(并行 · 已有 endpoint · 不动后端)
         try {
-            const [plan, recent] = await Promise.all([
-                fetch('/api/me/plan', { headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') } }).then(r => r.ok ? r.json() : null).catch(() => null),
-                fetch('/api/ocr/history?limit=5', { headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') } }).then(r => r.ok ? r.json() : null).catch(() => null),
+            const auth = { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
+            // 修正: /api/me/plan 不存在 → 用 /api/me/tenant-usage + /api/history
+            const [usage, recent, excStats] = await Promise.all([
+                fetch('/api/me/tenant-usage', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch('/api/history?limit=20', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch('/api/exceptions/stats?status=pending', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
             ]);
-            // 本月发票 = 最近识别历史里本月份的
-            let mInv = 0, pending = 0, excCount = 0;
+            // 本月发票 = tenant-usage 里的 ocr_this_month
+            const mInv = (usage && usage.ocr_this_month) || 0;
+            // 待处理 = 最近历史里 pending/reviewing 状态
+            let pending = 0;
             const rows = (recent && (recent.items || recent.history || recent)) || [];
             const list = Array.isArray(rows) ? rows : [];
-            const now = new Date();
             list.forEach(r => {
-                const dt = r.created_at || r.upload_time || r.date;
-                if (dt) {
-                    try {
-                        const d = new Date(dt);
-                        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) mInv++;
-                    } catch(_) {}
-                }
                 if (r.status === 'pending' || r.status === 'reviewing') pending++;
-                if (r.has_exception || r.is_exception || r.status === 'error') excCount++;
             });
-            if (elInv) elInv.textContent = _fmtNum(mInv || (list.length || 0));
+            // 异常 = exceptions/stats
+            const excCount = (excStats && (excStats.total || excStats.count || excStats.pending || 0)) || 0;
+            if (elInv) elInv.textContent = _fmtNum(mInv);
             if (elPend) elPend.textContent = _fmtNum(pending);
             if (elExc) elExc.textContent = _fmtNum(excCount);
             if (elExcBadge) {
                 if (excCount > 0) { elExcBadge.style.display = ''; elExcBadge.textContent = excCount; }
                 else { elExcBadge.style.display = 'none'; }
             }
-            // 配额显示
-            if (elPlan && plan) {
-                const used = plan.month_used || plan.used || 0;
-                const quota = plan.month_quota || plan.monthly_quota || plan.quota || 0;
+            // 配额显示 · 来自 tenant-usage
+            if (elPlan && usage) {
+                const used = usage.ocr_this_month || 0;
+                const quota = usage.quota || 0;
                 elPlan.textContent = _fmtNum(used);
                 if (elPlanSub) {
-                    elPlanSub.textContent = (quota ? (used + ' / ' + _fmtNum(quota)) : _t('dash-kpi-plan-sub', '本月用量'));
+                    elPlanSub.textContent = quota ? (used + ' / ' + _fmtNum(quota) + ' 张') : _t('dash-kpi-plan-sub', '本月用量');
                 }
             }
             // 最近 5 条
@@ -31183,6 +31423,8 @@ window.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', function (e) {
         var head = e.target.closest && e.target.closest('.recon-collapse-head');
         if (!head) return;
+        // 头部内的按钮/链接(如导出)不触发折叠
+        if (e.target.closest('button') || e.target.closest('a')) return;
         var box = head.closest('.recon-collapse');
         if (!box) return;
         var nowCollapsed = box.getAttribute('data-collapsed') === 'true';
@@ -31302,7 +31544,6 @@ window.addEventListener('DOMContentLoaded', () => {
         setVal('vex-sum-incomplete', last.incomplete);
         setVal('vex-sum-cash', last.cash);
         var subEl = document.getElementById('vex-summary-sub');
-        if (subEl && last.task_id) subEl.textContent = '#' + last.task_id;
     }
 
     // 销售税核查"差异明细"填数据 · 从最新任务的 diff_rows 拿
@@ -31412,7 +31653,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     var SELECTORS = [
         { tbody: 'vex-task-tbody', api: '/api/recon/tasks/batch_delete', reload: function () { try { window.loadRecentTasks && window.loadRecentTasks(); } catch (_) {} }, kind: 'vex' },
-        { tbody: 'glv-history-tbody', api: '/api/recon/gl-vat/tasks/batch_delete', reload: function () { try { var btn = document.getElementById('btn-glv-history-refresh'); if (btn) btn.click(); } catch (_) {} }, kind: 'glv' }
+        { tbody: 'glv-history-tbody', api: '/api/recon/gl-vat/tasks/batch_delete', reload: function () { try { window._loadGlvHistory && window._loadGlvHistory(); } catch (_) {} }, kind: 'glv' }
     ];
 
     function _injectStyle() {

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11841113">
+<link rel="stylesheet" href="/static/home.css?v=11841133">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -2147,13 +2147,7 @@
         <span class="nav-badge danger" id="nav-exc-badge" style="display:none;">0</span>
     </div>
 
-    <div class="nav-item" data-route="automation">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M11 2L4 11h5l-1 7 7-9h-5z"/>
-        </svg>
-        <span class="nav-label" data-i18n="nav-automation">自动化</span>
-    </div>
-
+    <!-- v118.32.5.5.37 NAV-IA Phase 5 收尾 · 自动化入口已移至集成页右侧抽屉 -->
     <!-- v118.33.3 NAV-IA Phase 3 · sidebar 底部「集成」一级入口 · 空壳路由 · Phase 7 才填内容(Google/LINE/Gmail/文件夹/ERP 第三方授权聚合) -->
     <div class="sidebar-bottom">
         <div class="nav-item" data-route="integrations" id="nav-integrations">
@@ -2499,8 +2493,8 @@
         </div>
     </section>
 
-    <!-- ============ 页面: 自动化 ============ -->
-    <section class="page" id="page-automation">
+    <!-- ============ 页面: 自动化 · Phase 5 收尾: 永久隐藏 · 无侧边栏入口 · 无路由 ============ -->
+    <section class="page" id="page-automation" style="display:none!important">
         <div class="page-head-clean">
             <div class="page-head-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -4452,6 +4446,8 @@
     </section>
 
     <!-- ============ 页面: 对账中心(v105 上线 · v118.32.4.9.2 改左右分栏)============ -->
+    <!-- 银行对账单上传 · 隐藏 input · JS 直接触发 -->
+    <input type="file" id="reconcile-bank-file-input" multiple accept=".pdf" style="display:none">
     <section class="page" id="page-reconcile">
         <!-- 顶部 page head -->
         <div class="page-head-clean">
@@ -4467,50 +4463,13 @@
             </div>
         </div>
 
-        <!-- v118.32.4.9.2 · 左右分栏(仿自动化页面 · 复用 .auto-layout CSS) -->
-        <div class="auto-layout">
-            <!-- 左侧子菜单 -->
-            <aside class="auto-sidebar">
-                <div class="auto-sidebar-inner">
-                    <button class="auto-nav-item active" data-recon-tab="bank">
-                        <span class="auto-nav-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M3 10l9-6 9 6"/>
-                                <path d="M5 10v9M12 10v9M19 10v9"/>
-                                <path d="M3 20h18"/>
-                            </svg>
-                        </span>
-                        <span class="auto-nav-label" data-i18n="recon-tab-bank">银行对账</span>
-                    </button>
-                    <button class="auto-nav-item" data-recon-tab="sale-vat">
-                        <span class="auto-nav-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="4" width="18" height="16" rx="2"/>
-                                <line x1="3" y1="9" x2="21" y2="9"/>
-                                <line x1="8" y1="4" x2="8" y2="9"/>
-                                <line x1="16" y1="4" x2="16" y2="9"/>
-                                <line x1="7" y1="14" x2="13" y2="14"/>
-                            </svg>
-                        </span>
-                        <span class="auto-nav-label" data-i18n="recon-tab-sale-vat">销项税对账</span>
-                    </button>
-                    <!-- v118.32.5 · GL vs 销项税报表 对账（新功能） -->
-                    <button class="auto-nav-item" data-recon-tab="gl-vat">
-                        <span class="auto-nav-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M4 4h16v4H4z"/>
-                                <path d="M4 10h7v10H4z"/>
-                                <path d="M13 10h7v4h-7z"/>
-                                <path d="M13 16h7v4h-7z"/>
-                            </svg>
-                        </span>
-                        <span class="auto-nav-label" data-i18n="recon-tab-gl-vat">GL对账</span>
-                    </button>
-                </div>
-            </aside>
-
-            <!-- 右侧 pane 区 -->
-            <div class="auto-pane-wrap">
+        <!-- 顶部横向 tab 条 -->
+        <div class="recon-tab-bar">
+            <button class="recon-tab-btn active" data-recon-tab="bank" data-i18n="recon-tab-bank">银行对账</button>
+            <button class="recon-tab-btn" data-recon-tab="sale-vat" data-i18n="recon-tab-sale-vat">销项税报告核查</button>
+            <button class="recon-tab-btn" data-recon-tab="gl-vat" data-i18n="recon-tab-gl-vat">GL对账</button>
+        </div>
+        <!-- pane 区(全宽) -->
 
         <!-- ── 银行对账面板(原有内容) ── -->
         <div id="recon-pane-bank" class="recon-pane active">
@@ -4756,6 +4715,13 @@
                         </svg>
                         <span class="recon-collapse-title" data-i18n="vex-summary-title">对账汇总</span>
                         <span class="recon-collapse-sub" id="vex-summary-sub"></span>
+                        <div class="glv-section-spacer"></div>
+                        <a class="btn btn-ghost btn-small glv-section-action" id="vex-download" href="#" download style="display:none">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M8 2v9M4 7l4 4 4-4M3 14h10"/>
+                            </svg>
+                            <span data-i18n="glv-btn-export">导出 Excel</span>
+                        </a>
                     </div>
                     <div class="recon-collapse-body">
                         <div class="recon-summary-grid" id="vex-summary-grid">
@@ -4794,15 +4760,7 @@
                     </div>
                 </div>
 
-                <!-- 下载行(对账完成后显示) -->
-                <div id="vex-dl-bar" style="display:none;margin-top:14px;justify-content:flex-end">
-                    <a class="btn btn-primary" id="vex-download" href="#" download>
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M8 2v9M4 7l4 4 4-4M3 14h10"/>
-                        </svg>
-                        <span data-i18n="vex-btn-download">↓ 下载对账表</span>
-                    </a>
-                </div>
+                <!-- vex-download 已移至 vex-summary-collapse 头部 -->
             </div><!-- /vex-pane -->
             </div><!-- /vex-main-action -->
 
@@ -4811,7 +4769,7 @@
                 <div class="vex-task-header-wrap">
                     <div class="vex-task-header" data-i18n="sv-recent-tasks">近期对账任务</div>
                     <span class="vex-task-meta" id="vex-task-meta" style="display:none"></span>
-                    <button class="vex-clear-old-btn" id="vex-clear-old-btn" type="button" data-i18n="vex-clear-old-btn">清 7 天前任务</button>
+                    <input type="text" class="hist-search-input" id="vex-task-search" data-i18n-placeholder="hist-search-ph" placeholder="搜索..." autocomplete="off">
                 </div>
                 <div class="vex-task-table-wrap">
                     <table class="vex-task-table">
@@ -5081,78 +5039,73 @@
                         <div class="vex-progress-sub" id="glv-progress-sub"></div>
                     </div>
                 </div>
-            </div><!-- /vex-main-action -->
 
-            <!-- 结果区(默认隐藏) -->
-            <div id="glv-result" style="display:none;">
-                <!-- 对账汇总 · 可折叠分区（默认收起） -->
-                <div class="glv-section" id="glv-section-summary" data-collapsed="true">
-                    <div class="glv-section-head" data-toggle="glv-section-summary" tabindex="0" role="button">
-                        <svg class="glv-section-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="5 7 8 10 11 7"/>
-                        </svg>
-                        <span class="glv-section-title" data-i18n="glv-summary-title">对账汇总</span>
-                    </div>
-                    <div class="glv-section-body">
-                        <table class="glv-summary-table" id="glv-summary-table">
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- 差异明细 · 可折叠分区（默认收起） -->
-                <div class="glv-section" id="glv-section-detail" data-collapsed="true" style="margin-top:14px;">
-                    <div class="glv-section-head" data-toggle="glv-section-detail" tabindex="0" role="button">
-                        <svg class="glv-section-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="5 7 8 10 11 7"/>
-                        </svg>
-                        <span class="glv-section-title" data-i18n="glv-detail-title">差异明细</span>
-                        <span class="glv-section-count" id="glv-detail-count"></span>
-                        <div class="glv-section-spacer"></div>
-                        <button class="btn btn-ghost btn-small glv-section-action" id="btn-glv-export" type="button">
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M8 2v9M4 7l4 4 4-4M3 14h10"/>
+                <!-- 结果区(默认隐藏) -->
+                <div id="glv-result" style="display:none;margin-top:14px;">
+                    <!-- 对账汇总 · 可折叠分区（默认收起） -->
+                    <div class="glv-section" id="glv-section-summary" data-collapsed="true">
+                        <div class="glv-section-head" data-toggle="glv-section-summary" tabindex="0" role="button">
+                            <svg class="glv-section-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="5 7 8 10 11 7"/>
                             </svg>
-                            <span data-i18n="glv-btn-export">导出 Excel</span>
-                        </button>
-                    </div>
-                    <div class="glv-section-body">
-                        <div class="glv-table-wrap">
-                            <table class="glv-table" id="glv-table">
-                                <thead>
-                                    <tr>
-                                        <th data-i18n="glv-h-doc">单据号</th>
-                                        <th data-i18n="glv-h-date">日期</th>
-                                        <th data-i18n="glv-h-customer">客户</th>
-                                        <th class="glv-num" data-i18n="glv-h-vat">VAT 金额</th>
-                                        <th class="glv-num" data-i18n="glv-h-gl">GL 金额</th>
-                                        <th class="glv-num" data-i18n="glv-h-diff">差异</th>
-                                        <th data-i18n="glv-h-acct">收入科目</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="glv-tbody"></tbody>
+                            <span class="glv-section-title" data-i18n="glv-summary-title">对账汇总</span>
+                            <div class="glv-section-spacer"></div>
+                            <button class="btn btn-ghost btn-small glv-section-action" id="btn-glv-export" type="button">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M8 2v9M4 7l4 4 4-4M3 14h10"/>
+                                </svg>
+                                <span data-i18n="glv-btn-export">导出 Excel</span>
+                            </button>
+                        </div>
+                        <div class="glv-section-body">
+                            <table class="glv-summary-table" id="glv-summary-table">
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
-                </div>
-            </div><!-- /glv-result -->
+
+                    <!-- 差异明细 · 可折叠分区（默认收起） -->
+                    <div class="glv-section" id="glv-section-detail" data-collapsed="true" style="margin-top:10px;">
+                        <div class="glv-section-head" data-toggle="glv-section-detail" tabindex="0" role="button">
+                            <svg class="glv-section-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="5 7 8 10 11 7"/>
+                            </svg>
+                            <span class="glv-section-title" data-i18n="glv-detail-title">差异明细</span>
+                            <span class="glv-section-count" id="glv-detail-count"></span>
+                        </div>
+                        <div class="glv-section-body">
+                            <div class="glv-table-wrap">
+                                <table class="glv-table" id="glv-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="glv-h-doc">单据号</th>
+                                            <th data-i18n="glv-h-date">日期</th>
+                                            <th data-i18n="glv-h-customer">客户</th>
+                                            <th class="glv-num" data-i18n="glv-h-vat">VAT 金额</th>
+                                            <th class="glv-num" data-i18n="glv-h-gl">GL 金额</th>
+                                            <th class="glv-num" data-i18n="glv-h-diff">差异</th>
+                                            <th data-i18n="glv-h-acct">收入科目</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="glv-tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div><!-- /glv-result -->
+            </div><!-- /vex-main-action -->
 
             <!-- 近期对账任务（沿用销项税对账的视觉） -->
-            <div class="glv-history" id="glv-history" style="margin-top:24px;">
+            <div class="glv-history" id="glv-history">
                 <div class="glv-result-head">
-                    <div class="glv-result-title" data-i18n="glv-history-title">近期对账</div>
-                    <button class="btn btn-ghost btn-small" id="btn-glv-history-refresh" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="14 2 14 6 10 6"/>
-                            <path d="M2 12a6 6 0 0 0 10.5 3.5L14 14"/>
-                        </svg>
-                        <span data-i18n="glv-history-refresh">刷新</span>
-                    </button>
+                    <div class="glv-result-title" data-i18n="glv-history-title">近期对账任务</div>
+                    <input type="text" class="hist-search-input" id="glv-hist-search" data-i18n-placeholder="hist-search-ph" placeholder="搜索..." autocomplete="off">
                 </div>
                 <div class="glv-history-empty" id="glv-history-empty" data-i18n="glv-history-empty">
                     暂无对账记录
                 </div>
-                <table class="glv-history-table" id="glv-history-table" style="display:none;">
+                <div class="glv-history-table-wrap" id="glv-history-table-wrap" style="display:none;">
+                <table class="glv-history-table" id="glv-history-table">
                     <thead>
                         <tr>
                             <th data-i18n="glv-hist-time">时间</th>
@@ -5166,12 +5119,10 @@
                     </thead>
                     <tbody id="glv-history-tbody"></tbody>
                 </table>
+                </div>
             </div>
 
         </div><!-- /recon-pane-gl-vat -->
-
-            </div><!-- /auto-pane-wrap -->
-        </div><!-- /auto-layout -->
 
 
     </section>
@@ -5679,6 +5630,12 @@
                 </div>
             </div>
 
+            <div class="sec-divider"></div>
+
+            <!-- 第 2 组 · 收票渠道(含 Gmail · v118.32.5.5.37 调整) -->
+            <div class="integrations-section-title" data-i18n="integrations-section-channels">收票渠道</div>
+
+            <!-- Gmail 抓取移至收票渠道(邮件是收票渠道 · 非 Google 产品功能) -->
             <div class="integration-row" data-int-target="automation" data-int-anchor="gmail">
                 <div class="int-icon ic-gm">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -5694,11 +5651,6 @@
                     <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
                 </div>
             </div>
-
-            <div class="sec-divider"></div>
-
-            <!-- 第 2 组 · 收票渠道 -->
-            <div class="integrations-section-title" data-i18n="integrations-section-channels">收票渠道</div>
 
             <div class="integration-row" data-int-target="automation" data-int-anchor="line">
                 <div class="int-icon ic-line">
@@ -5751,6 +5703,27 @@
                     <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
                 </div>
             </div>
+
+            <div class="sec-divider"></div>
+
+            <!-- v118.32.5.5.37 NAV-IA Phase 5 收尾 · 自动化 & 提醒 区块 -->
+            <div class="integrations-section-title" data-i18n="int-section-automation">通知提醒</div>
+
+            <div class="integration-row" data-int-target="drawer" data-int-anchor="alert">
+                <div class="int-icon ic-alert">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                        <path d="M10 21a2 2 0 0 0 4 0"/>
+                    </svg>
+                </div>
+                <div class="int-info">
+                    <div class="int-name"><span data-i18n="auto-alert-title">智能提醒</span></div>
+                    <div class="int-desc" data-i18n="auto-alert-desc">异常 high 或大额发票发生时 · 自动推送到老板/会计的 LINE</div>
+                </div>
+                <div class="int-actions">
+                    <button class="int-btn-configure" data-i18n="btn-configure">配置</button>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -5769,6 +5742,20 @@
         </button>
     </div>
     <div class="drawer-body" id="drawer-body"></div>
+</aside>
+
+<!-- ================= v118.32.5.5.37 · 集成配置抽屉(从集成页各配置按钮触发) ================= -->
+<div id="int-drawer-overlay" style="display:none;"></div>
+<aside id="int-drawer" class="int-drawer" role="dialog">
+    <div class="int-drawer-header">
+        <button id="int-drawer-close" class="int-drawer-back" aria-label="关闭">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                <path d="M12 5l-7 5 7 5"/>
+            </svg>
+        </button>
+        <span id="int-drawer-title" class="int-drawer-title"></span>
+    </div>
+    <div id="int-drawer-body" class="int-drawer-body"></div>
 </aside>
 
 <!-- ================= v118.20.3 · 异常栏专用抽屉 ================= -->
@@ -6236,7 +6223,7 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11841113"></script>
+<script src="/static/home.js?v=11841133"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 

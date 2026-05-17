@@ -12,6 +12,7 @@ v118.32.4.10.1 · Pearnly · Excel 公式对账模块(全网开放)
 """
 import io
 import os
+import re
 import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
@@ -24,7 +25,7 @@ from field_comparator import (
 )
 
 logger = logging.getLogger(__name__)
-MODULE_VERSION = "1.4.0"  # v118.32.4.10.0 · Excel 全 4 语化(文件名/Sheet 名/说明)
+MODULE_VERSION = "1.5.0"  # v4.10.23 · Sheet3 KPI 区升级为 Korn 模板格式(EFF6FF 行 · 标签+彩色大值)
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -63,6 +64,49 @@ def extract_invoice_fields(file_bytes: bytes, filename: str,
            invoice_date, period, amount_pre_vat, vat_amount, total_amount, error}
     """
     ext = (filename or "").lower().rsplit(".", 1)[-1]
+
+    # v118.32.5.5.9 · text_path 快路径(电子 PDF · 跳 Gemini · 5-10x 提速)
+    # BAKELAB / 多数泰国电子发票文字层完整 · 不需要 Gemini
+    if ext == "pdf":
+        try:
+            from pdf_text_extractor import try_text_extraction
+            tp = try_text_extraction(file_bytes, strict=False)
+            if tp:
+                fld: Dict[str, Any] = {}
+                for p in (tp.get("pages") or []):
+                    for k, v in (p.get("fields") or {}).items():
+                        if k not in fld and v:
+                            fld[k] = v
+                date_str = str(fld.get("date") or "").strip()
+                # 从 date 推 period MM/YYYY(兼容佛历)
+                period = ""
+                if date_str:
+                    m = re.match(r'(\d{1,2})[\-/.](\d{1,2})[\-/.](\d{2,4})', date_str)
+                    if m:
+                        y = int(m.group(3))
+                        if y < 100: y += 2000
+                        if y > 2400: y -= 543
+                        period = f"{int(m.group(2)):02d}/{y}"
+                logger.info(f"[vex.text_path] {filename} · 跳 Gemini · 0 cost")
+                return {
+                    "ok":              True,
+                    "filename":        filename,
+                    "buyer_tax_id":    str(fld.get("buyer_tax") or "").strip(),
+                    "buyer_name":      str(fld.get("buyer_name") or "").strip(),
+                    "buyer_branch":    "",
+                    "invoice_no":      str(fld.get("invoice_number") or "").strip(),
+                    "invoice_date":    date_str,
+                    "period":          period,
+                    "amount_pre_vat":  _to_float(fld.get("subtotal")),
+                    "vat_amount":      _to_float(fld.get("vat")),
+                    "total_amount":    _to_float(fld.get("total_amount")),
+                    "_input_tokens":   0,
+                    "_output_tokens":  0,
+                    "_engine":         "text_path",
+                }
+        except Exception as _tpe:
+            logger.info(f"[vex.text_path] {filename} 异常 fallback Gemini · {type(_tpe).__name__}: {_tpe}")
+
     mime = {"pdf": "application/pdf", "jpg": "image/jpeg", "jpeg": "image/jpeg",
             "png": "image/png", "webp": "image/webp"}.get(ext)
     if not mime:
@@ -94,18 +138,23 @@ def extract_invoice_fields(file_bytes: bytes, filename: str,
         )
         text = (response.text or "").strip()
         data = json.loads(text)
+        _usage = getattr(response, "usage_metadata", None)
+        _in_tok  = int(getattr(_usage, "prompt_token_count",     0) or 0)
+        _out_tok = int(getattr(_usage, "candidates_token_count", 0) or 0)
         return {
-            "ok":             True,
-            "filename":       filename,
-            "buyer_tax_id":   str(data.get("buyer_tax_id") or "").strip(),
-            "buyer_name":     str(data.get("buyer_name") or "").strip(),
-            "buyer_branch":   str(data.get("buyer_branch") or "").strip(),
-            "invoice_no":     str(data.get("invoice_no") or "").strip(),
-            "invoice_date":   str(data.get("invoice_date") or "").strip(),
-            "period":         str(data.get("period") or "").strip(),
-            "amount_pre_vat": _to_float(data.get("amount_pre_vat")),
-            "vat_amount":     _to_float(data.get("vat_amount")),
-            "total_amount":   _to_float(data.get("total_amount")),
+            "ok":              True,
+            "filename":        filename,
+            "buyer_tax_id":    str(data.get("buyer_tax_id") or "").strip(),
+            "buyer_name":      str(data.get("buyer_name") or "").strip(),
+            "buyer_branch":    str(data.get("buyer_branch") or "").strip(),
+            "invoice_no":      str(data.get("invoice_no") or "").strip(),
+            "invoice_date":    str(data.get("invoice_date") or "").strip(),
+            "period":          str(data.get("period") or "").strip(),
+            "amount_pre_vat":  _to_float(data.get("amount_pre_vat")),
+            "vat_amount":      _to_float(data.get("vat_amount")),
+            "total_amount":    _to_float(data.get("total_amount")),
+            "_input_tokens":   _in_tok,
+            "_output_tokens":  _out_tok,
         }
     except json.JSONDecodeError as e:
         logger.warning(f"[vex.extract] {filename} JSON 解析失败: {e} · raw={text[:200]}")
@@ -123,6 +172,49 @@ def _to_float(v) -> Optional[float]:
         return round(float(str(v).replace(",", "")), 2)
     except Exception:
         return None
+
+
+# ════════════════════════════════════════════════════════════════════════
+# v4.10.22 · OCR 准确率底线 · 7 项硬校验
+# ════════════════════════════════════════════════════════════════════════
+
+def _ocr_validate_invoice(inv: Dict) -> List[str]:
+    """7 项 OCR 准确率底线校验 · 返回问题 key 列表(空=全通过)
+    校验规则:发票号空 / 客户名空 / 税号非13位 / 日期格式异常 /
+             含税金额为0 / VAT≠7% / 净额+VAT≠总额"""
+    warns: List[str] = []
+    # 1. 发票号空
+    if not (inv.get("invoice_no") or "").strip():
+        warns.append("w_invoice_no_empty")
+    # 2. 客户名空
+    if not (inv.get("buyer_name") or "").strip():
+        warns.append("w_buyer_name_empty")
+    # 3. 税号非 13 位(仅当非空时校验 · 只数数字位数)
+    tax_digits = "".join(c for c in (inv.get("buyer_tax_id") or "") if c.isdigit())
+    if tax_digits and len(tax_digits) != 13:
+        warns.append("w_tax_id_bad_length")
+    # 4. 日期格式异常(仅当非空时校验)
+    date_str = (inv.get("invoice_date") or "").strip()
+    if date_str and parse_date(date_str) is None:
+        warns.append("w_date_parse_fail")
+    # 5. 含税金额为 0 或缺失
+    total = _to_float(inv.get("total_amount"))
+    if total is None or total == 0.0:
+        warns.append("w_total_zero")
+    # 6. VAT ≠ 7%(净额 > 10 THB 才检查 · 容差 max(1 THB, 5%))
+    pre = _to_float(inv.get("amount_pre_vat"))
+    vat = _to_float(inv.get("vat_amount"))
+    if pre is not None and vat is not None and pre > 10.0:
+        expected_vat = round(pre * 0.07, 2)
+        tol = max(1.0, expected_vat * 0.05)
+        if abs(vat - expected_vat) > tol:
+            warns.append("w_vat_rate_mismatch")
+    # 7. 净额 + VAT ≠ 总额(三值都有 · 容差 0.02 THB)
+    if pre is not None and vat is not None and total is not None and total > 0:
+        computed = round(pre + vat, 2)
+        if abs(computed - total) > 0.02:
+            warns.append("w_amount_sum_mismatch")
+    return warns
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -401,6 +493,210 @@ def extract_invoices_parallel(invoice_files: List[Dict[str, Any]],
 
 
 # ════════════════════════════════════════════════════════════════════════
+# v118.32.5 · 性能优化 B · 多发票批量 OCR（800+ 张场景，减少 5x API 调用）
+# ════════════════════════════════════════════════════════════════════════
+_INVOICE_BATCH_PROMPT = """You are reading {n} Thai tax invoices (ใบกำกับภาษี) attached in order: invoice_1, invoice_2, ..., invoice_{n}.
+
+For EACH invoice, extract the SAME 8 fields. Do NOT interpret · do NOT match · do NOT clean.
+
+Output JSON ONLY in this exact shape:
+{{
+  "invoices": [
+    {{
+      "index": 1,
+      "buyer_tax_id": "...",
+      "buyer_name":   "...",
+      "buyer_branch": "...",
+      "invoice_no":   "...",
+      "invoice_date": "...",
+      "period":       "...",
+      "amount_pre_vat": 0.00,
+      "vat_amount":     0.00,
+      "total_amount":   0.00
+    }},
+    ... (one object per attached invoice, in same order)
+  ]
+}}
+
+Field rules (identical to single-invoice mode):
+- buyer_tax_id: 13-digit Thai tax ID of the BUYER · digits only · "" if missing
+- buyer_name:   Buyer name EXACTLY as printed (keep prefixes like บริษัท ... จำกัด)
+- buyer_branch: "สำนักงานใหญ่" or 5-digit code · "" if cash customer
+- invoice_no:   Invoice number EXACTLY as printed · keep prefixes (INV/IV/TAX) · do NOT strip leading zeros
+- invoice_date: Date EXACTLY as printed · format DD/MM/YYYY · keep BE year as printed
+- period:       MM/YYYY (Gregorian only · BE-543 if Buddhist Era)
+- amount_pre_vat / vat_amount / total_amount: number · 2 decimals · no commas
+
+STRICT RULES:
+1. Output exactly {n} objects in the same order as the attached files
+2. If a field is partially visible or unreadable · output "" · do NOT guess
+3. Cash customer → buyer_tax_id="" buyer_branch=""
+4. Numbers: digits and dot only · no commas · no currency
+"""
+
+
+def _is_image_ext(filename: str) -> bool:
+    ext = (filename or "").lower().rsplit(".", 1)[-1]
+    return ext in {"jpg", "jpeg", "png", "webp"}
+
+
+def _mime_for(filename: str) -> Optional[str]:
+    ext = (filename or "").lower().rsplit(".", 1)[-1]
+    return {"pdf": "application/pdf", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+            "png": "image/png", "webp": "image/webp"}.get(ext)
+
+
+def extract_invoice_fields_batch(
+    invoice_files: List[Dict[str, Any]],
+    api_key: Optional[str] = None,
+    timeout: int = 90,
+) -> List[Dict[str, Any]]:
+    """一次 Gemini 调用抽取多张发票字段
+    invoice_files: [{filename, bytes}]，建议 ≤ 5 张/批
+    返回顺序与输入一致；任何一张失败/缺失 → 该 index 标记 ok=False
+    """
+    n = len(invoice_files)
+    if n == 0:
+        return []
+    if n == 1:
+        # 单张直接走原 single 流程，少一层包装
+        f = invoice_files[0]
+        return [extract_invoice_fields(f["bytes"], f["filename"], api_key=api_key)]
+
+    # 校验 mime
+    parts: List[Any] = [_INVOICE_BATCH_PROMPT.format(n=n)]
+    for f in invoice_files:
+        mime = _mime_for(f.get("filename") or "")
+        if not mime:
+            return [{"ok": False, "filename": x.get("filename"),
+                     "error": "batch contains unsupported format"} for x in invoice_files]
+        parts.append({"mime_type": mime, "data": f["bytes"]})
+
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        return [{"ok": False, "filename": f.get("filename"),
+                 "error": "google-generativeai 未安装"} for f in invoice_files]
+
+    key = (api_key or os.environ.get("GEMINI_API_KEY")
+           or os.environ.get("GOOGLE_API_KEY"))
+    if not key:
+        return [{"ok": False, "filename": f.get("filename"),
+                 "error": "Gemini key 未配置"} for f in invoice_files]
+
+    text = ""
+    try:
+        genai.configure(api_key=key)
+        model = genai.GenerativeModel(
+            "gemini-2.5-flash",
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0.0,
+            },
+        )
+        response = model.generate_content(
+            parts,
+            request_options={"timeout": timeout},
+        )
+        text = (response.text or "").strip()
+        data = json.loads(text)
+        items = data.get("invoices") or []
+        _usage = getattr(response, "usage_metadata", None)
+        _in_tok  = int(getattr(_usage, "prompt_token_count",     0) or 0)
+        _out_tok = int(getattr(_usage, "candidates_token_count", 0) or 0)
+        # token 均摊到每张
+        _in_per  = _in_tok  // max(n, 1)
+        _out_per = _out_tok // max(n, 1)
+
+        out: List[Dict[str, Any]] = [None] * n  # type: ignore
+        for r in items:
+            try:
+                idx = int(r.get("index", 0)) - 1
+            except Exception:
+                continue
+            if not (0 <= idx < n):
+                continue
+            out[idx] = {
+                "ok":              True,
+                "filename":        invoice_files[idx].get("filename"),
+                "buyer_tax_id":    str(r.get("buyer_tax_id") or "").strip(),
+                "buyer_name":      str(r.get("buyer_name") or "").strip(),
+                "buyer_branch":    str(r.get("buyer_branch") or "").strip(),
+                "invoice_no":      str(r.get("invoice_no") or "").strip(),
+                "invoice_date":    str(r.get("invoice_date") or "").strip(),
+                "period":          str(r.get("period") or "").strip(),
+                "amount_pre_vat":  _to_float(r.get("amount_pre_vat")),
+                "vat_amount":      _to_float(r.get("vat_amount")),
+                "total_amount":    _to_float(r.get("total_amount")),
+                "_input_tokens":   _in_per,
+                "_output_tokens":  _out_per,
+                "_batch_size":     n,
+            }
+        # 漏掉的 index → 标 fail，调用方会 fallback 单张
+        for i in range(n):
+            if out[i] is None:
+                out[i] = {"ok": False,
+                          "filename": invoice_files[i].get("filename"),
+                          "error": "batch_missing_index"}
+        return out  # type: ignore
+    except json.JSONDecodeError as e:
+        logger.warning(f"[vex.batch] JSON 解析失败 n={n}: {e} · raw={text[:200]}")
+        return [{"ok": False, "filename": f.get("filename"),
+                 "error": f"AI 返回格式异常: {str(e)[:60]}"} for f in invoice_files]
+    except Exception as e:
+        logger.error(f"[vex.batch] n={n} 失败: {type(e).__name__}: {e}")
+        return [{"ok": False, "filename": f.get("filename"),
+                 "error": str(e)[:120]} for f in invoice_files]
+
+
+def extract_invoices_batched_parallel(
+    invoice_files: List[Dict[str, Any]],
+    api_key: Optional[str] = None,
+    batch_size: int = 5,
+    max_workers: int = 4,
+    auto_fallback_single: bool = True,
+) -> List[Dict[str, Any]]:
+    """v118.32.5 · 批量 + 并行：
+       - 每批 batch_size 张走一次 Gemini
+       - 多批并行 max_workers 路
+       - 批失败时 auto_fallback_single 自动回退单张重试（保证不丢数据）
+    """
+    n = len(invoice_files)
+    if n == 0:
+        return []
+    results: List[Optional[Dict]] = [None] * n
+    batches: List[Tuple[int, List[Dict[str, Any]]]] = []
+    for start in range(0, n, batch_size):
+        chunk = invoice_files[start:start + batch_size]
+        batches.append((start, chunk))
+
+    def _run_batch(start: int, chunk: List[Dict[str, Any]]):
+        out = extract_invoice_fields_batch(chunk, api_key=api_key)
+        # fallback：批失败 / 批内部分失败 → 单张重试
+        if auto_fallback_single:
+            for j, r in enumerate(out):
+                if not (r and r.get("ok")):
+                    try:
+                        f = chunk[j]
+                        out[j] = extract_invoice_fields(
+                            f["bytes"], f["filename"], api_key=api_key
+                        )
+                    except Exception as e:
+                        logger.error(f"[vex.batch] fallback 单张失败 {chunk[j].get('filename')}: {e}")
+        for j, r in enumerate(out):
+            results[start + j] = r
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [pool.submit(_run_batch, s, c) for (s, c) in batches]
+        for fut in as_completed(futures):
+            try: fut.result()
+            except Exception as e:
+                logger.error(f"[vex.batch.parallel] 批失败: {e}")
+
+    return [r or {"ok": False, "error": "worker_returned_none"} for r in results]
+
+
+# ════════════════════════════════════════════════════════════════════════
 # VAT 报告多份拼接 · 校验同卖方同期间
 # ════════════════════════════════════════════════════════════════════════
 def merge_vat_reports(report_files: List[Dict[str, Any]],
@@ -415,12 +711,16 @@ def merge_vat_reports(report_files: List[Dict[str, Any]],
 
     parsed_list: List[Dict] = []
     sources: List[Dict] = []
+    _rep_in_tok  = 0
+    _rep_out_tok = 0
     for f in report_files:
         r = parse_vat_report(f["bytes"], f["filename"], api_key=api_key)
         if not r.get("ok"):
             return {"ok": False, "rows": [],
                     "error": f"「{f['filename']}」解析失败: {r.get('error', '未知')}"}
         parsed_list.append(r)
+        _rep_in_tok  += int(r.get("_input_tokens")  or 0)
+        _rep_out_tok += int(r.get("_output_tokens") or 0)
         sources.append({
             "filename": f["filename"],
             "row_count": r.get("row_count", len(r.get("rows", []))),
@@ -467,12 +767,14 @@ def merge_vat_reports(report_files: List[Dict[str, Any]],
     return {
         "ok": True,
         "rows": all_rows,
-        "seller_tax_id": seller_tax_id,
-        "seller_name":   seller_name,
-        "period_year":   period_year,
-        "period_month":  period_month,
-        "sources":       sources,
-        "row_count":     len(all_rows),
+        "seller_tax_id":   seller_tax_id,
+        "seller_name":     seller_name,
+        "period_year":     period_year,
+        "period_month":    period_month,
+        "sources":         sources,
+        "row_count":       len(all_rows),
+        "_input_tokens":   _rep_in_tok,
+        "_output_tokens":  _rep_out_tok,
     }
 
 
@@ -491,7 +793,7 @@ _I18N = {
         "sh3": "กระทบยอด",
         "sh4": "วิธีใช้งาน",
         "h_inv":     ["#", "เลขผู้เสียภาษี", "ชื่อลูกค้า", "เลขที่ใบกำกับ", "วันที่",
-                      "งวด", "ก่อนภาษี", "ภาษีมูลค่าเพิ่ม", "รวมทั้งสิ้น", "ไฟล์ต้นฉบับ"],
+                      "งวด", "ก่อนภาษี", "ภาษีมูลค่าเพิ่ม", "รวมทั้งสิ้น", "ไฟล์ต้นฉบับ", "ตรวจสอบ OCR"],
         "h_rep":     ["#", "เลขผู้เสียภาษี", "ชื่อลูกค้า", "วันที่", "งวด",
                       "ก่อนภาษี", "ภาษีมูลค่าเพิ่ม", "รวมทั้งสิ้น"],
         "h_recon":   ["#", "สถานะ", "ชื่อลูกค้า", "เลขใบกำกับ", "งวด",
@@ -524,12 +826,21 @@ _I18N = {
             "4. สถานะ: ✓ กระทบยอดได้ · ❗ ขาดด้านใดด้านหนึ่ง · ⚠ ยอดเงินต่างกัน · 🔍 เลขประจำตัวผู้เสียภาษีคล้ายกัน · 🟡 OCR อ่านเลขภาษีไม่ได้",
             "5. หากต้องการกระทบยอดใหม่ → แก้ไข Sheet 1 หรือ 2 แล้วสร้างไฟล์ Excel ใหม่",
         ],
+        "ocr_col": "ตรวจสอบ OCR",
+        "ocr_ok":  "✓ ผ่าน",
+        "w_invoice_no_empty":  "ไม่มีเลขใบกำกับ",
+        "w_buyer_name_empty":  "ไม่มีชื่อผู้ซื้อ",
+        "w_tax_id_bad_length": "เลขภาษีไม่ใช่ 13 หลัก",
+        "w_date_parse_fail":   "รูปแบบวันที่ผิดพลาด",
+        "w_total_zero":        "ยอดรวมเป็น 0",
+        "w_vat_rate_mismatch": "VAT ≠ 7%",
+        "w_amount_sum_mismatch": "ก่อนVAT+VAT≠รวม",
     },
     "en": {
         "fname_prefix": "Sales_VAT_Reconciliation",
         "sh1": "Invoices", "sh2": "VAT_Report", "sh3": "Reconciliation", "sh4": "How_to_Use",
         "h_inv":   ["#", "Buyer Tax ID", "Buyer Name", "Invoice No", "Date", "Period",
-                    "Pre-VAT", "VAT", "Total", "Source file"],
+                    "Pre-VAT", "VAT", "Total", "Source file", "OCR Check"],
         "h_rep":   ["#", "Buyer Tax ID", "Buyer Name", "Date", "Period",
                     "Pre-VAT", "VAT", "Total"],
         "h_recon": ["#", "Status", "Customer", "Invoice No", "Period",
@@ -561,11 +872,20 @@ _I18N = {
             "4. Status: ✓ Matched · ❗ One side only · ⚠ Amount mismatch · 🔍 Tax ID fuzzy · 🟡 OCR missed tax ID",
             "5. To re-reconcile → edit Sheet 1 or 2, then regenerate the Excel file",
         ],
+        "ocr_col": "OCR Check",
+        "ocr_ok":  "✓ OK",
+        "w_invoice_no_empty":  "Invoice no. missing",
+        "w_buyer_name_empty":  "Buyer name missing",
+        "w_tax_id_bad_length": "Tax ID ≠ 13 digits",
+        "w_date_parse_fail":   "Date format error",
+        "w_total_zero":        "Total = 0",
+        "w_vat_rate_mismatch": "VAT ≠ 7%",
+        "w_amount_sum_mismatch": "Pre-VAT + VAT ≠ Total",
     },
     "zh": {
         "fname_prefix": "销项税对账表",
         "sh1": "发票明细", "sh2": "VAT 报告明细", "sh3": "对账结果", "sh4": "使用说明",
-        "h_inv":   ["#", "买方税号", "客户名", "发票号", "日期", "期间", "不含税", "VAT", "含税", "原文件"],
+        "h_inv":   ["#", "买方税号", "客户名", "发票号", "日期", "期间", "不含税", "VAT", "含税", "原文件", "OCR 校验"],
         "h_rep":   ["#", "买方税号", "客户名", "日期", "期间", "不含税", "VAT", "含税"],
         "h_recon": ["#", "状态", "客户名", "发票号", "期间",
                     "金额(发)", "金额(报)", "差异金额",
@@ -595,12 +915,21 @@ _I18N = {
             "4. 状态: ✓ 匹配 · ❗ 只一边有 · ⚠ 金额不一致 · 🔍 税号疑似 · 🟡 OCR 漏抽税号",
             "5. 想重新对账 → 改 Sheet 1 或 2 后重新生成 Excel",
         ],
+        "ocr_col": "OCR 校验",
+        "ocr_ok":  "✓ 通过",
+        "w_invoice_no_empty":  "发票号空",
+        "w_buyer_name_empty":  "客户名空",
+        "w_tax_id_bad_length": "税号非13位",
+        "w_date_parse_fail":   "日期格式异常",
+        "w_total_zero":        "含税金额为0",
+        "w_vat_rate_mismatch": "VAT≠7%",
+        "w_amount_sum_mismatch": "净额+VAT≠总额",
     },
     "ja": {
         "fname_prefix": "売上VAT照合表",
         "sh1": "請求書明細", "sh2": "VAT報告明細", "sh3": "照合結果", "sh4": "使い方",
         "h_inv":   ["#", "買方税番号", "取引先名", "請求書番号", "日付", "期間",
-                    "税抜", "VAT", "合計", "元ファイル"],
+                    "税抜", "VAT", "合計", "元ファイル", "OCR 確認"],
         "h_rep":   ["#", "買方税番号", "取引先名", "日付", "期間",
                     "税抜", "VAT", "合計"],
         "h_recon": ["#", "ステータス", "取引先名", "請求書番号", "期間",
@@ -631,6 +960,15 @@ _I18N = {
             "4. ステータス: ✓ 一致 · ❗ 片方のみ · ⚠ 金額不一致 · 🔍 納税者番号が類似 · 🟡 OCR で番号未取得",
             "5. 再照合する場合 → シート 1 または 2 を修正後、Excel ファイルを再生成してください",
         ],
+        "ocr_col": "OCR 確認",
+        "ocr_ok":  "✓ 正常",
+        "w_invoice_no_empty":  "番号なし",
+        "w_buyer_name_empty":  "取引先名なし",
+        "w_tax_id_bad_length": "税番号13桁でない",
+        "w_date_parse_fail":   "日付フォーマット異常",
+        "w_total_zero":        "合計が0",
+        "w_vat_rate_mismatch": "VAT≠7%",
+        "w_amount_sum_mismatch": "税抜+VAT≠合計",
     },
 }
 
@@ -658,9 +996,8 @@ def build_excel(invoices: List[Dict[str, Any]],
     F_HEAD  = Font(name=FONT_NAME, size=11, bold=True, color="FFFFFF")
     F_NORM  = Font(name=FONT_NAME, size=10)
     F_BOLD  = Font(name=FONT_NAME, size=10, bold=True)
-    F_TITLE = Font(name=FONT_NAME, size=16, bold=True, color="111827")
-    F_KPI_LBL = Font(name=FONT_NAME, size=10, bold=True, color="FFFFFF")
-    F_KPI_VAL = Font(name=FONT_NAME, size=22, bold=True, color="FFFFFF")
+    F_TITLE = Font(name=FONT_NAME, size=18, bold=True, color="111827")
+    # F_KPI_LBL / F_KPI_VAL removed in v4.10.23 (replaced by Korn-style inline KPI)
     F_DIFF_RED = Font(name=FONT_NAME, size=10, color="DC2626")
 
     FILL_HEAD   = PatternFill("solid", fgColor="2563EB")  # 蓝表头
@@ -671,10 +1008,7 @@ def build_excel(invoices: List[Dict[str, Any]],
     FILL_MISS   = PatternFill("solid", fgColor="FEE2E2")  # 红底缺一边
     FILL_FUZZY  = PatternFill("solid", fgColor="DBEAFE")  # 蓝底疑似
     FILL_OCRMSG = PatternFill("solid", fgColor="FED7AA")  # 橙底 OCR 漏抽
-    FILL_KPI_B  = PatternFill("solid", fgColor="2563EB")
-    FILL_KPI_G  = PatternFill("solid", fgColor="16A34A")
-    FILL_KPI_R  = PatternFill("solid", fgColor="DC2626")
-    FILL_KPI_O  = PatternFill("solid", fgColor="D97706")
+    # FILL_KPI_B/G/R/O removed in v4.10.23 (KPI row now uses EFF6FF bg + colored text)
 
     BORDER_TH = Border(left=Side(style="thin", color="E5E7EB"),
                        right=Side(style="thin", color="E5E7EB"),
@@ -711,9 +1045,31 @@ def build_excel(invoices: List[Dict[str, Any]],
     ws1.append(headers1)
     _style_header(ws1, 1, len(headers1))
 
+    # v4.10.22 · OCR 校验色
+    FILL_OCR_WARN = FILL_MISS   # 有问题 → 红底(复用)
+    FILL_OCR_OK   = FILL_OK     # 全通过 → 绿底(复用)
+    F_OCR_WARN = Font(name=FONT_NAME, size=10, color="DC2626")
+    F_OCR_OK   = Font(name=FONT_NAME, size=10, color="16A34A", bold=True)
+
+    # 校验问题 key → 发票明细列号对应关系
+    _WARN_COL = {
+        "w_invoice_no_empty":  4,
+        "w_buyer_name_empty":  3,
+        "w_tax_id_bad_length": 2,
+        "w_date_parse_fail":   5,
+        "w_total_zero":        9,
+        "w_vat_rate_mismatch": 8,
+        "w_amount_sum_mismatch": 9,
+    }
+
+    # v4.10.22 · 先收集每行 OCR 校验结果(稍后在样式循环后应用)
+    _inv_ocr_warns: List[List[str]] = []
     for i, inv in enumerate(invoices, 1):
         # Bug 1 · 期间降级
         period_val = _derive_period(inv.get("invoice_date") or "", inv.get("period") or "")
+        warn_keys = _ocr_validate_invoice(inv)
+        _inv_ocr_warns.append(warn_keys)
+        warn_text = " · ".join(L.get(k, k) for k in warn_keys)
         ws1.append([
             i,
             inv.get("buyer_tax_id") or "",
@@ -725,6 +1081,7 @@ def build_excel(invoices: List[Dict[str, Any]],
             inv.get("vat_amount")     or 0,
             inv.get("total_amount")   or 0,
             inv.get("filename")     or "",
+            warn_text if warn_text else L.get("ocr_ok", "✓ OK"),
         ])
 
     # 合计行
@@ -741,8 +1098,8 @@ def build_excel(invoices: List[Dict[str, Any]],
             ws1.cell(row=sum_row, column=c).border = BORDER_TH
             ws1.cell(row=sum_row, column=c).font = F_BOLD
 
-    # 列宽 + 数字格式 + 斑马 + 行高
-    widths1 = [5, 18, 28, 18, 13, 10, 14, 14, 14, 28]
+    # 列宽 + 数字格式 + 斑马 + 行高(先统一设 F_NORM · 后面 OCR pass 再覆盖)
+    widths1 = [5, 18, 28, 18, 13, 10, 14, 14, 14, 28, 30]
     for i, w in enumerate(widths1, 1):
         ws1.column_dimensions[get_column_letter(i)].width = w
     for r in range(2, len(invoices) + 2):
@@ -754,7 +1111,24 @@ def build_excel(invoices: List[Dict[str, Any]],
         for col in (7, 8, 9):
             ws1.cell(row=r, column=col).alignment = AL_R
             ws1.cell(row=r, column=col).number_format = "#,##0.00"
+        ws1.cell(row=r, column=11).alignment = AL_L
     _zebra(ws1, 2, len(invoices) + 1, len(headers1))
+
+    # v4.10.22 · OCR 高亮 pass(在通用样式之后应用 · 确保覆盖 F_NORM)
+    for i, warn_keys in enumerate(_inv_ocr_warns, 1):
+        data_row = i + 1
+        ocr_cell = ws1.cell(row=data_row, column=11)
+        if warn_keys:
+            ocr_cell.fill = FILL_OCR_WARN
+            ocr_cell.font = F_OCR_WARN
+            for wk in warn_keys:
+                col = _WARN_COL.get(wk)
+                if col:
+                    ws1.cell(row=data_row, column=col).fill = FILL_OCR_WARN
+        else:
+            ocr_cell.fill = FILL_OCR_OK
+            ocr_cell.font = F_OCR_OK
+
     ws1.freeze_panes = "A2"
 
     # ════════════ Sheet 2 · VAT 报告明细 ════════════
@@ -817,16 +1191,6 @@ def build_excel(invoices: List[Dict[str, Any]],
     ws3 = wb.create_sheet(L["sh3"])
     ws3.sheet_properties.tabColor = "D97706"  # Tab 橙
 
-    # 顶部标题
-    ws3.cell(row=1, column=1, value=L["title"]).font = F_TITLE
-    ws3.row_dimensions[1].height = 28
-    meta_parts = []
-    if client_name: meta_parts.append(f"{L['client']}: {client_name}")
-    if period_year and period_month:
-        meta_parts.append(f"{L['period']}: {period_month:02d}/{period_year}")
-    if meta_parts:
-        ws3.cell(row=2, column=1, value=" · ".join(meta_parts)).font = F_NORM
-
     # 跑配对(Bug 2/3/4/5 全在这里)
     match_result = _build_recon_pairs(invoices, report_rows)
     pairs = match_result["pairs"]
@@ -840,7 +1204,7 @@ def build_excel(invoices: List[Dict[str, Any]],
         _inv = invoices[_p["inv_idx"]]; _rep = report_rows[_p["rep_idx"]]
         if not _eq_amount(_get_inv_total(_inv), _get_rep_total(_rep)): continue
         if _p["kind"] == "matched_cash":
-            n_ok += 1  # 散客金额ok即合格
+            n_ok += 1
         elif _p["kind"] == "matched":
             _d = _diff_dims(_inv, _rep)
             if not any(_d.values()):
@@ -853,38 +1217,58 @@ def build_excel(invoices: List[Dict[str, Any]],
             b = _get_rep_total(report_rows[p["rep_idx"]])
             if not _eq_amount(a, b):
                 diff_amount_total += abs(a - b)
-    # 孤儿单边金额也算异常
     for ii in unmatched_inv:
         diff_amount_total += _get_inv_total(invoices[ii])
     for ri in unmatched_rep:
         diff_amount_total += _get_rep_total(report_rows[ri])
 
-    # KPI 4 大卡(行 4-5 · 每卡 2 列宽 · 共 8 列)
+    # R1 · 标题行(Korn 样式 · 合并全行 · sz=18 · 高 36)
+    _n_cols3 = len(L["h_recon"])
+    ws3.merge_cells(f'A1:{get_column_letter(_n_cols3)}1')
+    _c_title = ws3.cell(row=1, column=1, value=L["title"])
+    _c_title.font = F_TITLE; _c_title.alignment = AL_C
+    ws3.row_dimensions[1].height = 36
+
+    # R2 · 客户+期间 meta
+    meta_parts = []
+    if client_name: meta_parts.append(f"{L['client']}: {client_name}")
+    if period_year and period_month:
+        meta_parts.append(f"{L['period']}: {period_month:02d}/{period_year}")
+    if meta_parts:
+        ws3.cell(row=2, column=1, value=" · ".join(meta_parts)).font = F_NORM
+
+    # R3 · 空行
+
+    # R4-R5 · KPI 4 大卡(每卡 4 列宽 · 共 16 列 · 彩色底色)
+    F_KPI_LBL2  = Font(name=FONT_NAME, size=10, bold=True, color="FFFFFF")
+    F_KPI_VAL2  = Font(name=FONT_NAME, size=22, bold=True, color="FFFFFF")
+    FILL_KPI_B  = PatternFill("solid", fgColor="2563EB")
+    FILL_KPI_G  = PatternFill("solid", fgColor="16A34A")
+    FILL_KPI_R  = PatternFill("solid", fgColor="DC2626")
+    FILL_KPI_O  = PatternFill("solid", fgColor="D97706")
     KPI_ROW_LBL = 4
     KPI_ROW_VAL = 5
     ws3.row_dimensions[KPI_ROW_LBL].height = 22
     ws3.row_dimensions[KPI_ROW_VAL].height = 44
 
     def _kpi(col_start, label, value, fill):
-        # label 行
         ws3.merge_cells(start_row=KPI_ROW_LBL, start_column=col_start,
-                        end_row=KPI_ROW_LBL,   end_column=col_start + 1)
+                        end_row=KPI_ROW_LBL,   end_column=col_start + 3)
         c1 = ws3.cell(row=KPI_ROW_LBL, column=col_start, value=label)
-        c1.font = F_KPI_LBL; c1.fill = fill; c1.alignment = AL_C
-        # value 行
+        c1.font = F_KPI_LBL2; c1.fill = fill; c1.alignment = AL_C
         ws3.merge_cells(start_row=KPI_ROW_VAL, start_column=col_start,
-                        end_row=KPI_ROW_VAL,   end_column=col_start + 1)
+                        end_row=KPI_ROW_VAL,   end_column=col_start + 3)
         c2 = ws3.cell(row=KPI_ROW_VAL, column=col_start, value=value)
-        c2.font = F_KPI_VAL; c2.fill = fill; c2.alignment = AL_C
+        c2.font = F_KPI_VAL2; c2.fill = fill; c2.alignment = AL_C
 
     _kpi(1, L["kpi_total"], n_total, FILL_KPI_B)
-    _kpi(3, L["kpi_ok"],    n_ok,    FILL_KPI_G)
-    _kpi(5, L["kpi_diff"],  n_diff,  FILL_KPI_R)
-    _kpi(7, L["kpi_amt"],   f"฿ {diff_amount_total:,.2f}", FILL_KPI_O)
+    _kpi(5, L["kpi_ok"],    n_ok,    FILL_KPI_G)
+    _kpi(9, L["kpi_diff"],  n_diff,  FILL_KPI_R)
+    _kpi(13, L["kpi_amt"],  f"฿ {diff_amount_total:,.2f}", FILL_KPI_O)
 
-    # 表头(14 列 · 行 7)
-    HEADER_ROW = 7
-    DATA_START = 8
+    # R6 · 表头(15 列)
+    HEADER_ROW = 6
+    DATA_START = 7
     headers3 = L["h_recon"]
     for c, h in enumerate(headers3, 1):
         cell = ws3.cell(row=HEADER_ROW, column=c, value=h)
@@ -946,6 +1330,29 @@ def build_excel(invoices: List[Dict[str, Any]],
         amt_diff = round(amt_inv - amt_rep, 2)
         period_inv = _derive_period(inv.get("invoice_date") or "", inv.get("period") or "")
 
+        # v4.10.13 · 净额/VAT 分字段差异备注
+        amt_pre_inv = float(inv.get("amount_pre_vat") or 0)
+        amt_vat_inv = float(inv.get("vat_amount") or 0)
+        amt_pre_rep = float((rep.get("report_amount_pre_vat") or rep.get("report_amount")) or 0)
+        amt_vat_rep = float(rep.get("report_vat_amount") or 0)
+        pre_diff  = round(amt_pre_inv - amt_pre_rep, 2)
+        vat_diff_ = round(amt_vat_inv - amt_vat_rep, 2)
+        if not _eq_amount(amt_inv, amt_rep):
+            if not _eq_amount(pre_diff, 0) and not _eq_amount(vat_diff_, 0):
+                _amt_note = f"净额差 {pre_diff:+,.2f} · VAT 差 {vat_diff_:+,.2f}"
+            elif not _eq_amount(pre_diff, 0):
+                _amt_note = f"净额差 {pre_diff:+,.2f} · VAT 一致"
+            else:
+                _amt_note = f"VAT 差 {vat_diff_:+,.2f} · 净额一致"
+        else:
+            _amt_note = ""
+
+        # v4.10.13 · ocr_missing · 备注追加提醒(dims 原样保留)
+        _base_note = pair.get("note") or ""
+        if pair["kind"] == "ocr_missing":
+            _base_note = (_base_note + " · OCR 抽取可能不完整 · 请核对原 PDF").lstrip(" · ")
+        _note_val = " · ".join(filter(None, [_base_note, _amt_note]))
+
         values = [
             seq_no,                                  # 1 #
             status_text,                              # 2 status
@@ -961,7 +1368,7 @@ def build_excel(invoices: List[Dict[str, Any]],
             tax_id_display,                           # 12 税号差(新)
             dims["branch"],                           # 13 分公司差
             dims["name"],                             # 14 客户名差
-            pair.get("note") or "",                   # 15 备注
+            _note_val,                                # 15 备注
         ]
         for c, v in enumerate(values, 1):
             cell = ws3.cell(row=row_cursor, column=c, value=v)

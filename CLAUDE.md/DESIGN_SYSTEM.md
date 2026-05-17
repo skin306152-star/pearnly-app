@@ -849,3 +849,290 @@ if (ok) doDelete();
 |----|------|------|----------|
 | 12 | **原生 `confirm()` 用法** · 与 4 语 i18n 不兼容 / 视觉与品牌脱节 | v118.27.0.1 已发现 1 处 · 已修 | 全部用 `pearnlyConfirm()` · 检查命令:`grep -rn "confirm(" static/home.js` |
 | 13 | ERP 卡片视觉重复定义 | 后续 FlowAccount / PEAK 适配器若复制 .erp-connect-card 样式重写 | 必须复用 `.erp-connect-card` 基类 + 加 `.erp-connect-<name>` 变体类 |
+
+---
+
+## 18. v118.43.x 新组件 · 头像下拉菜单(2026-05-15 · NAV-IA Phase 1)
+
+> **来源**:NAV-IA Phase 1 实施时引入 · 替代当前 sidebar 底部的散落入口(设置/管理员组/测试组/user-row)
+> **基准实物**:`D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html`(切视角看效果)
+> **PRD**:`NAV_IA_PRD.md`(唯一权威 · 含 4 类账号权限矩阵)
+
+### 18.1 用途
+顶栏右上角点头像 → 弹出 popup 菜单 · 收纳所有「账户 / 设置 / 团队 / 套餐 / 帮助 / 退出」相关入口 · 按 `tenant_role` + `is_test_whitelist` + `is_super_admin` 3 个 flag 显隐。
+
+### 18.2 容器结构
+
+```html
+<div class="avatar-wrap">
+  <div class="avatar" id="avatar-btn" title="账户菜单">Z</div>
+  <div class="avatar-popup" id="avatar-popup" role="menu">
+    <div class="avatar-popup-head">
+      <div class="avatar-popup-name" id="avatar-name">老板 · 老王</div>
+      <div class="avatar-popup-email" id="avatar-email">wang@事务所.com · 所长</div>
+    </div>
+    <div class="avatar-popup-item" data-i18n="avatar-menu-settings">
+      <i class="ti ti-settings"></i><span>设置</span>
+    </div>
+    <div class="avatar-popup-item" data-i18n="avatar-menu-team">
+      <i class="ti ti-users"></i><span>团队成员</span><span class="pill">3 人</span>
+    </div>
+    <!-- 付费 = 老板专属 -->
+    <div class="avatar-popup-item" data-show-if-role="owner" data-i18n="avatar-menu-billing">
+      <i class="ti ti-credit-card"></i><span>订阅 &amp; 套餐</span>
+    </div>
+    <div class="avatar-popup-item" data-i18n="avatar-menu-shortcuts">
+      <i class="ti ti-keyboard"></i><span>键盘快捷键</span>
+    </div>
+    <!-- 特殊权限项分隔 -->
+    <div class="avatar-popup-sep" data-show-if="any-special"></div>
+    <div class="avatar-popup-item" data-show-if="is_super_admin" data-i18n="avatar-menu-admin">
+      <i class="ti ti-shield-check"></i><span>管理员后台</span><span class="pill admin">超管</span>
+    </div>
+    <div class="avatar-popup-item" data-show-if="is_test_whitelist" data-i18n="avatar-menu-test">
+      <i class="ti ti-flask"></i><span>测试中心</span>
+    </div>
+    <div class="avatar-popup-sep"></div>
+    <div class="avatar-popup-item" data-i18n="avatar-menu-help">
+      <i class="ti ti-help-circle"></i><span>帮助 &amp; 反馈</span>
+    </div>
+    <div class="avatar-popup-item danger" data-i18n="avatar-menu-logout">
+      <i class="ti ti-logout"></i><span>退出登录</span>
+    </div>
+  </div>
+</div>
+```
+
+### 18.3 视觉规范(token 严格走 §1-7)
+
+| 属性 | 值 |
+|---|---|
+| popup 宽度 | 260px |
+| popup 圆角 | `--radius`(10px) |
+| popup 阴影 | `0 10px 30px rgba(0,0,0,0.08)`(§7.2 推荐 `--shadow-hover` 升 token) |
+| popup 边框 | `1px solid var(--line)`(App 主题)/`var(--border)`(Marketing) |
+| 头部 padding | `12px 10px 10px` · 底部 `1px solid var(--line-soft)` 分隔 |
+| 头部姓名字号 | 13px / 600 weight / `--ink` |
+| 头部邮箱字号 | 11px / 400 weight / `--ink-3` |
+| item 高度 | 自适应 · padding `8px 10px` · 圆角 `--radius-sm`(6px) |
+| item 字号 | 13px / `--ink-2` |
+| item icon 尺寸 | 15px / `--ink-3` / Tabler line 风格 |
+| item hover 底 | `var(--bg)` · text → `--ink` |
+| item.danger 文/icon | `var(--danger)` |
+| pill 角标 | 字号 10px / padding `1px 7px` / 圆角 4px / `--accent-soft` 底 + `--brand` 文 |
+| pill.admin 角标 | `#fef3c7` 底 + `#92400e` 文(金管理员色) |
+| 分隔条 | 1px / `var(--line-soft)` / margin `4px 0` |
+| 入场动画 | 无(立即显隐 · 不模仿 modal 200ms 缩放)|
+| popup 距头像 | `top: calc(100% + 8px)` |
+
+### 18.4 行为规范
+
+| 触发 | 行为 |
+|---|---|
+| 点头像 | toggle popup `.show` |
+| 点 popup 外任意处 | 关闭 |
+| ESC | 关闭 |
+| 点 popup 内 item | 执行 item 路由 + 关闭 |
+| 点 popup 内 sep 或 head | 不关闭 |
+| `/api/auth/me` 返回 | `applyRoleVisibility(me)` 显隐 4 类项 |
+
+### 18.5 权限矩阵(详见 NAV_IA_PRD §2.2)
+
+| 项 | 员工 | 老板 | skin | Earn |
+|---|---|---|---|---|
+| 设置 / 团队 / 快捷键 / 帮助 / 退出 | ✓ | ✓ | ✓ | ✓ |
+| 订阅 & 套餐 | ✗ | ✓ | ✓ | — |
+| 测试中心 | ✗ | ✗ | ✓ | ✗ |
+| 管理员后台 | ✗ | ✗ | ✗ | ✓ |
+
+> ⚠️ Earn 实际**不进 home.html** · 走独立 `/admin layout` · 此菜单仅作 prototype 演示对照
+
+### 18.6 i18n key(详见 NAV_IA_PRD §5.1)
+
+固化 9 个 key · zh/en/th/ja 4 语必全:
+- `avatar-menu-settings` `avatar-menu-team` `avatar-menu-billing` `avatar-menu-shortcuts`
+- `avatar-menu-admin` `avatar-menu-test`
+- `avatar-menu-help` `avatar-menu-logout`
+- `avatar-menu-badge-admin`
+
+新增同类菜单项遵循 `avatar-menu-<action>` 命名。
+
+### 18.7 反模式
+
+| # | 问题 | 修复 |
+|---|---|---|
+| A | 把管理员/测试入口直接挂 sidebar | 必须收进头像菜单 · 按 flag 显隐 |
+| B | 用 `display: none` 隐藏付费按钮(给员工看见但灰) | 必须用 `data-show-if-role="owner"` 完全隐藏 · 员工不知道有这功能 |
+| C | popup 用 modal 入场动画 | 头像菜单 = 即时显隐 · 不模仿 modal `scale 0.96 → 1` |
+| D | item 字号写 12px 或 14px | 必走梯度 = 13px |
+| E | 复用 `confirm()` 做退出确认 | 走 `pearnlyConfirm()`(铁律 47) |
+
+---
+
+## 19. v118.43.x 新组件 · 顶栏搜索 + Cmd+K 命令面板(2026-05-15 · NAV-IA Phase 1)
+
+> **基准实物**:`D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html`(点搜索框 / 按 ⌘K 试)
+> **PRD**:`NAV_IA_PRD.md §3.1 + §5.2`
+
+### 19.1 顶栏搜索框 `.topbar-search`
+
+**位置**:topbar 右侧 · 客户切换器**左边**
+
+**视觉**:
+```css
+.topbar-search {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);  /* 6px */
+  font-size: 12px;
+  color: var(--text-3);
+  min-width: 240px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.topbar-search:hover { border-color: var(--text-3); background: #fff; }
+.topbar-search .kbd {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 1px 5px; border-radius: 3px;
+  font-size: 10px; font-family: monospace;
+  color: var(--text-3);
+}
+```
+
+**行为**:
+- 点击 → `openCmdk()`
+- 移动端 < 800px:收缩为图标(`.topbar-search-text` + `.kbd` `display: none`)
+
+### 19.2 Cmd+K 命令面板 `.cmdk`
+
+**容器**:
+- mask:`position: fixed inset:0` · `rgba(0,0,0,0.4) + backdrop-filter: blur(3px)` · `z-index: 1000`
+- 面板:580px 宽 / max-width 92vw / 圆角 12px / `box-shadow: 0 20px 60px rgba(0,0,0,0.25)`
+- 入场动画:`180ms ease` opacity + translateY(-10 → 0)
+
+**3 段结构**:
+```html
+<div class="cmdk">
+  <div class="cmdk-input-wrap">         <!-- 顶 input -->
+    <i class="ti ti-search"></i>
+    <input class="cmdk-input" placeholder="跳转到... ">
+    <span class="cmdk-esc">ESC</span>
+  </div>
+  <div class="cmdk-body">                <!-- 中部列表 -->
+    <div class="cmdk-section">跳转</div>
+    <div class="cmdk-item" data-cmdk-text="..."> ... </div>
+    <div class="cmdk-section">操作</div>
+    <div class="cmdk-item"> ... </div>
+    <div class="cmdk-empty" style="display:none">没找到匹配项</div>
+  </div>
+  <div class="cmdk-foot">                <!-- 底部快捷键提示 -->
+    <span><kbd>↑</kbd><kbd>↓</kbd> 移动</span>
+    <span><kbd>Enter</kbd> 选择</span>
+    <span><kbd>ESC</kbd> 关闭</span>
+  </div>
+</div>
+```
+
+**视觉**:
+| 元素 | 规范 |
+|---|---|
+| input 区 padding | `14px 18px` · 底部 `1px solid var(--border)` |
+| input 字号 | 15px |
+| section 标签 | 10px / 700 weight / uppercase / 0.6px letter-spacing / 颜色 `--text-3` |
+| item padding | `8px 10px` · 圆角 6px |
+| item 字号 | 13px |
+| item icon | 16px / `--text-3` |
+| item hover/focus | 底 `var(--bg)` |
+| meta 标签(快捷键提示) | 字号 10px / `monospace` / `--bg` 底 / 圆角 3px |
+| body max-height | 56vh / `overflow-y: auto` |
+| foot padding | `8px 14px` · 字号 10px / `--text-3` |
+
+**行为**:
+- ⌘K(Mac)/Ctrl+K(Win)= 打开
+- `oninput` 实时过滤(基于 `data-cmdk-text` · 包含搜索 string 的项保留)
+- section 标签:若该区无可见 item → 自动隐藏
+- ↑↓ 键:`moveFocus(±1)` · 焦点项加 `.focus` class · `scrollIntoView({block:'nearest'})`
+- Enter:模拟点击当前 `.focus` item
+- ESC:关闭
+- 点 mask 外区域:关闭(`if(event.target===this) closeCmdk()`)
+
+**数据属性**:
+- `data-cmdk-text="<关键词集合>"`:用于过滤(可含中英拼音 alias · 如 `"VAT 对账 销项 vat"`)
+- `data-cmdk-section`:标记 section 标签(用于"无可见项时隐藏标签"逻辑)
+
+### 19.3 反模式
+
+| # | 问题 | 修复 |
+|---|---|---|
+| A | 搜索框点开是个空 modal · 没默认列表 | 必须开盖即显示所有跳转/操作 · 输入才过滤 |
+| B | 输入无匹配时无反馈 | 必须显示 `.cmdk-empty` 空状态(图标 + "没找到匹配项") |
+| C | 用全局快捷键不区分 input 内 ESC | input 内 ESC 关闭面板 · 不能与表单 ESC 冲突 |
+| D | 跳转项的 `data-cmdk-text` 只写中文 | 必须 中文 + 英文 + 拼音 alias(便于英语/泰语用户搜) |
+| E | 输入 ↑↓ 滚动屏幕而不是切焦点 | 必须 `e.preventDefault()` 后再 `moveFocus()` |
+
+---
+
+## 20. v118.43.x 新组件 · 集成卡片 `.integration-row`(2026-05-15 · NAV-IA Phase 7)
+
+> **基准实物**:`pearnly_nav_prototype_final.html` 的「集成」页(sidebar 底部入口)
+> **复用**:已在原 prototype 中存在 · 此处升 token 化 + 锁定为标准组件
+
+### 20.1 行结构
+
+```html
+<div class="integration-row connected">  <!-- 已连接加 .connected -->
+  <div class="int-icon ic-g"><i class="ti ti-brand-google-drive"></i></div>
+  <div class="int-info">
+    <div class="int-name">Google Drive <span class="connected-badge">已连接</span></div>
+    <div class="int-desc">发票/PV 审核后自动存入 Drive...</div>
+    <div class="int-status s-ok"><i class="ti ti-check"></i>skin306152@gmail.com</div>
+  </div>
+  <div class="int-actions"><button>配置</button><button>断开</button></div>
+</div>
+```
+
+### 20.2 视觉
+
+| 元素 | 规范 |
+|---|---|
+| 行容器 padding | `13px` · margin-bottom 8px · 边框 `1px solid var(--border)` · 圆角 6px |
+| `.connected` 状态 | 边框 `#86efac`(浅绿)· 底 `#f0fdf4`(浅绿)|
+| `.int-icon` | 36×36 · 圆角 6px · 字号 18px |
+| icon 变体类 | `.ic-g`(Google 蓝)/ `.ic-gs`(Sheets 绿)/ `.ic-gm`(Gmail 红)/ `.ic-line`(LINE 绿)/ `.ic-folder`(琥珀)/ `.ic-erp`(灰)|
+| `.int-name` 字号 | 13px / 500 weight |
+| `.int-desc` 字号 | 11px / `--text-3` |
+| `.int-status.s-ok` | 字号 11px / 颜色 `--green` |
+| `.int-status.s-no` | 字号 11px / 颜色 `--text-3` |
+| `.connected-badge` | `--green-bg` 底 / `--green` 文 / 字号 10px / 圆角 20px / padding `1px 7px` |
+
+### 20.3 分组段(必加)
+
+集成页内必须分 3 段:
+1. **Google 服务**(`section-title` uppercase · 字号 10px / 700)
+2. **收票渠道**
+3. **ERP 系统**
+
+每段之间用 `.sec-divider`(1px / `--border-light` / margin `16px 0`)隔开。
+
+### 20.4 信息条(Google 一次授权)
+
+页面顶部必须有蓝色信息条强调 Google 一次授权双服务:
+```html
+<div style="background: var(--blue-bg); color: var(--blue);
+            padding: 9px 12px; border-radius: 6px;
+            display: flex; gap: 6px; margin-bottom: 14px;">
+  <i class="ti ti-info-circle"></i>
+  授权一次 Google 账号 · Drive 和 Sheets 均可使用 · 无需重复授权
+</div>
+```
+
+### 20.5 反模式
+
+| # | 问题 | 修复 |
+|---|---|---|
+| A | 集成页放进 settings 内部 tab | 必须独立 sidebar 一级页(2026-05-15 拍板) |
+| B | Google 服务分散在多个分组 | 必须聚拢成「Google 服务」一段 · 顶部加授权信息条 |
+| C | 集成行无连接状态视觉 | `.connected` class 必须改边框 + 底色 |
+| D | 行内 actions 一堆按钮 | 最多 2 个(配置 + 断开)· 主操作放右侧 · 视觉对齐 |

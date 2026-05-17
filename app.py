@@ -4282,12 +4282,39 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "本次更新:\n• 销售税对账跑完后 · 摘要区自动显示匹配数、差异数、金额等关键指标\n• 差异明细全量展示 · 月底上百张发票也能全部看到 · 可上下滚动\n• 不用下载 Excel 就能一眼判断结果对不对",
-            "en": "What's new:\n• After VAT reconciliation runs, the summary panel now shows matched count, differences and amounts automatically\n• Difference details show all rows — no more 30-row cut-off, scroll to see everything\n• No need to download Excel to know if the result is correct",
-            "th": "อัปเดตในเวอร์ชันนี้:\n• หลังกระทบยอดภาษีขายเสร็จ · สรุปจะแสดงจำนวนที่ตรงและไม่ตรงอัตโนมัติ\n• รายการที่ไม่ตรงแสดงครบทุกแถว · เลื่อนดูได้ไม่จำกัด\n• ไม่ต้องดาวน์โหลด Excel ก็รู้ผลทันที",
-            "ja": "今回の更新:\n• VAT 照合が終わると · 一致件数・差異件数・金額が自動で表示されます\n• 差異明細は全件表示 · 件数が多くてもスクロールで全部確認できます\n• Excel をダウンロードしなくても結果をすぐ確認できます"
+            "zh": "本次更新:\n• 对账中心页面改版 · 左侧子菜单换成顶部横向 tab 条 · 内容区全宽显示\n• 首页数据卡片已接入真实数据 · 本月发票/待处理/配额实时显示",
+            "en": "What's new:\n• Reconciliation center redesigned · top horizontal tabs replace left sidebar · full-width content area\n• Dashboard KPI cards now show live data · invoices, pending items, quota in real time",
+            "th": "อัปเดตในเวอร์ชันนี้:\n• ศูนย์กระทบยอดออกแบบใหม่ · แท็บแนวนอนด้านบนแทนเมนูด้านซ้าย · พื้นที่เนื้อหาเต็มความกว้าง\n• การ์ด KPI หน้าแรกแสดงข้อมูลจริงแล้ว",
+            "ja": "今回の更新:\n• 照合センターをリデザイン · 左サイドバーを上部の横型タブに変更 · コンテンツ全幅表示\n• ダッシュボードKPIカードがリアルデータを表示するように"
         }
     }
+
+
+# ── GitHub Webhook 自动部署 (v118.41.133 · 2026-05-17) ──────────────────────
+# Claude 每次 git push → GitHub → 触发这个接口 → 服务器自动 pull + restart
+# 无需 SSH · 彻底绕开 fail2ban 问题
+@app.post("/internal/deploy")
+async def github_deploy_webhook(request: Request):
+    import hmac, hashlib, subprocess, os as _os
+    secret = _os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+    if secret:
+        sig = request.headers.get("X-Hub-Signature-256", "")
+        body = await request.body()
+        expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            raise HTTPException(status_code=403, detail="Invalid webhook signature")
+    else:
+        await request.body()  # drain body
+    try:
+        result = subprocess.run(
+            ["bash", "/opt/mrpilot/git-deploy.sh"],
+            capture_output=True, text=True, timeout=120
+        )
+        logger.info(f"[git-deploy] rc={result.returncode} {result.stdout[:200]}")
+        return {"ok": True, "rc": result.returncode, "out": result.stdout[:500]}
+    except Exception as e:
+        logger.error(f"[git-deploy] error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/reset", response_class=HTMLResponse)

@@ -1,7 +1,115 @@
 # CLAUDE.md · Pearnly 项目大脑
 > 每次启动 Claude Code 必须完整读完本文件再开始任何任务
 > 本文件 = 项目宪法 · 优先级高于一切临时指令
-> 最后更新：2026-05-13
+> 最后更新：2026-05-16
+
+---
+
+## 🔥 2026-05-16 新铁律(高优先级)
+
+### 1. 修一类不修一处(v118.32.5.5.7 拍板)
+修 bug 前 **grep 同类 pattern** · 一次性把全项目同类问题全修。**禁止**「用户报一处修一处 · 留尾巴」。
+- 例:z-index 修 1 处 · 实际 13 处都有 → 一次批量改
+- 例:alert 改 toast 修 1 处 · 全项目搜出来一起改
+
+### 2. ALTER TABLE 必须 `commit=True`(v118.32.5.5.12 踩坑)
+`db.get_cursor()` 默认不 commit · DDL(ALTER / CREATE)在 with 块退出时回滚。
+- ✅ 正确：`with db.get_cursor(commit=True) as cur:`
+- ❌ 错误：`with db.get_cursor() as cur:` 然后 ALTER TABLE
+- 现象：日志显示「字段就绪」· 但数据库里列没建上
+
+### 3. Session 1 账号 1 设备(v118.32.5.5.10)
+- JWT payload 加 `jti` uuid4 · `users.active_jti` 字段记录最新
+- 校验：`token.jti != user.active_jti` → 401 `auth.session_revoked`
+- 前端心跳 15s + window.focus / visibilitychange 立即 check
+- 老 token(无 jti)或老用户(无 active_jti)= 兼容放行 · 下次登录自动迁移
+
+### 4. PLG 反薅闸 5 道(Korn 拍板 🅱)
+1. Trial 30 张 / 3 天(短)
+2. 1 账号 1 设备(session 控制)
+3. 24h 同 IP 限 3 邮箱(auth_signup 已有)
+4. 24h 同 /24 子网限 10 邮箱(auth_signup 已有)
+5. 员工共享老板额度(seats 不增配额)
+
+> ⚠️ **不做「admin 审批制」**:฿299/月 价位审批制成本不可行 · 走 PLG 自助制 + 技术反薅是 SaaS 行业标准(Slack / Notion / Stripe / Figma)
+
+### 5. 着陆页禁止真公司名(v118.32.5.5.15)
+login.html 着陆页动画客户卡必须用**行业类目假名**(咖啡店/面包房/IT 公司/餐厅)· **禁止**用真实公司名避免商号冒用法律风险。
+
+### 6. 每次部署写 4 语 release_notes(v118.32.5.5.17 拍板)
+每次部署前 Claude **必须**在 `app.py` `/api/version` 返回的 `release_notes` 字段写 1-3 句 **4 语**更新说明:
+- 用户语言:zh / th / en / ja 全 · 缺一不部署
+- 大白话 · 让会计师看懂"我能用上啥"
+- **禁止**出现 OCR / API / Gemini / batch / SDK / endpoint / lifecycle 等技术词
+- 前端 `version-banner.js` 30 秒轮询 `/api/version` · 检测到版本变化 → 顶部弹窗 [查看更新内容] [现在刷新更新] [稍后更新]
+- 用户点"稍后"= 30 分钟同版本不再弹
+- 实现位置:`static/version-banner.js`(独立 IIFE · 不引 home.js)
+- 文案示例(v5.5.16+v5.5.17 合并):
+  - zh: "全产品视觉做了大清扫 · 删掉所有残留的浅蓝色 · 改成暖灰干净风 · 首页新增 4 个数据卡片让你一眼看清今日工作"
+  - 不许写:"清扫了 home.css 22 处 #f8fafc 硬编码改成 #f4f4f0"(技术细节 · 用户看不懂)
+
+---
+
+## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)
+
+**Pearnly 全局导航 = 跟着 `D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html` 走**
+
+**唯一基准文件**:`pearnly_nav_prototype_final.html`(Zihao 提供 + 头像菜单升级版)
+**核心 PRD 文件**:
+- `CLAUDE.md/NAV_IA_PRD.md`(导航 IA 主 PRD · 8 Phase 路线)
+- `CLAUDE.md/MODULE_EXPENSE_PRD_v2.md`(Phase 6 进项管理模块 · 对标 Paypers 一比一+超越 · 3 周)
+**优先级**:P1 平行主线 · 不抢 P0-VAT 资源 · 嵌入 P0-VAT 间隙跑
+
+**4 类账号 + 看到啥**(详见 NAV_IA_PRD §2.2):
+
+| 角色 | 看付费按钮 | 看测试中心 | 看管理员后台 | 进哪个 layout |
+|---|---|---|---|---|
+| 员工(tenant_role=employee) | ✗ | ✗ | ✗ | home.html |
+| 老板(tenant_role=owner) | ✓ | ✗ | ✗ | home.html |
+| skin(老板 + 测试白名单) | ✓ | ✓ | ✗ | home.html |
+| Earn(超管) | — | — | ✓ | **/admin layout 独立** |
+
+> ⚠️ **Earn 铁律不变**:永远只看 /admin · 不进 home.html UI
+
+**8 Phase 切片**(详见 NAV_IA_PRD §4)· **2026-05-15 全部完成**:
+- Phase 0 · 文档体系建立 ✅
+- Phase 1 · 顶栏三件套(头像菜单 + 搜索框 + Cmd+K) ✅ v118.33.1.0
+- Phase 2 · sidebar 重复入口清扫 ✅ v118.33.2.0
+- Phase 3 · sidebar 集成一级入口 ✅ v118.33.3.0
+- Phase 4 · "即将" badge 大清扫 ✅ v118.33.4.0
+- Phase 5 · sidebar 业务流分组(销项▾/进项▾)✅ v118.33.5.0
+- Phase 6 · 进项管理完整模块 🚫 永久跳过(等独立开 v118.40 · 子 PRD `MODULE_EXPENSE_PRD_v2.md`)
+- Phase 7 · 集成模块独立化 ✅ v118.33.7.0
+- 视觉皮肤对齐 11 轮 ✅ v118.33.7.1 → v7.11
+- Phase 8 · **Admin Layout 独立**(admin SPA 完全独立 · 不引 home.js)✅ v118.44.0 → v118.44.0.7
+
+**NAV-IA 主线已收官** · 接下来等 Zihao 拍板:回 P0-VAT 收尾 / 开 Phase 6 进项管理 v118.40 / 其他
+
+**Earn 铁律精确化**(2026-05-15 拍板):**不工作 · 只管账户 + 看成本** · Admin layout sub-nav 砍剩 2 项(成本追踪 + 用户管理)· 原 PRD 的"平台概览/操作日志/API 健康度"全删
+
+**铁律不变项**:
+- ❌ 不改后端 API(`/api/auth/me` 已返 3 个 flag · 不动)
+- ❌ 不动 P0-VAT 主线代码
+- ❌ 不破坏现有功能(只重排入口)
+- ❌ 不动 i18n 字典 zh→en→th→ja 顺序(新 key 按 th→en→zh→ja 加)
+
+**冲突优先级铁律(2026-05-15 v118.33.7.3 拍板)**:
+- 🥇 **prototype_final.html 实物视觉** > 📄 PRD 文字描述
+- PRD §3.2 写"加 CTA 上传发票" · 但 prototype 没这按钮 → 按 prototype · 不加(我 Phase 3 加了又在 v7.3 撤掉)
+- 视觉/交互冲突时 · 一律以 prototype 为最终基准 · PRD 写错的地方就是 PRD 错 · 不是 prototype 错
+- 不需要问 Zihao "PRD 跟 prototype 哪个对" · 默认 prototype 对
+
+**视觉对齐铁律(2026-05-15 v118.33.7.x 累积)**:
+- 主色:纯黑 `#111111`(不用深蓝)· active / 主按钮 / focus 都黑
+- 背景:暖灰 `#f4f4f0`(应用主背景)
+- 卡片:白 `#fff` + 淡边框 `#e8e8e3`(浮在暖灰背景)
+- 浅蓝 info 提示色保留 `#DBEAFE` + `#1E40AF`(prototype 也这样)· 其他蓝色一律去
+- drop 区:浅暖灰底 + 灰虚线 → hover 黑虚线(不变背景)
+- 字号:body 13px(不用 14px)· nav-item 13px · 顶栏 48px(不用 56px)
+
+**接力 sequence**:任何窗口开"继续"→ 读本段 + STATE_PEARNLY.md NAV-IA 当前 Phase → 读 NAV_IA_PRD §4 Phase X → 干 → 自动推到 Phase X+1
+
+---
 
 ---
 
@@ -39,6 +147,29 @@
 > ❌ 禁止：任何功能"先做一语 · 其他语言留空" = bug
 > ❌ 禁止：默认语言写死 `zh`（除非是中文专属功能）
 > ✅ 每个功能必须 4 语完整 · 缺一个 = 立刻修
+
+---
+
+## 🧹 屎山治理铁律(2026-05-15 启动 · 渐进翻新)
+
+**Pearnly 当前现状 · 大白话**:home.js 1.3 MB / 3 万行 · 一个函数 12,694 行 · `showToast` 同名定义两次(真 bug)· 106 处错误吞咽 · 0 测试 · 是个"盖到 30 层的违章楼"
+
+**不推倒重来**(里面住着 mrerp / BAKELAB / TIPCO 等真实付费客户)· **改用渐进翻新**:
+- 每个接力窗口在干主任务前 · **挑 1 件 P0 或 P1 债务修了**(0.5-2 小时)
+- **新功能不再往 home.js / home.css / home.html 里塞** · 全部独立文件
+- 老代码不动 · 等某模块完全被新版替代后再删
+
+**完整路线图 + 待修清单 + 新代码标准**:见 `CLAUDE.md/TECH_DEBT.md`
+
+**接力 agent 必读 TECH_DEBT.md 的 3 段**:
+- §2 待修清单(挑 1 件做)
+- §3 新代码标准(写新代码必须遵守)
+- §5 已修清单(修完后打勾 + 写日期 + 写窗口名)
+
+**测试机制**(skin 账号是测试账号 · 改了 UI 必给清单):
+- 接力窗口完成时 · 如果改了 UI 或加了新功能 → **给一份 skin 账号专属测试清单**(用户手动跑)
+- 有 Playwright 自动测试覆盖的项 · 跳过手动清单(自动跑就行)
+- 目前 Playwright 0 项 · 全部靠手动 → P0 第一件就是补 Playwright 烟测
 
 ---
 
@@ -193,16 +324,7 @@ D:\Users\Skin\Desktop\pearnly_project\
 
 4. 需要更新的：直接改 · 给 diff · 默认通过 · 自动保存
 
-5. **同步 _sync 文件夹（自动 · 给 Zihao 拖进 Claude Project Files）：**
-   - 路径：`D:\Users\Skin\Desktop\pearnly_project\_sync\`
-   - 存在就先清空 · 不存在就先创建
-   - 拷进去：
-     · 6 个核心 .md（CLAUDE.md · STATE_PEARNLY.md · BACKLOG.md · MODULE_ROADMAP.md · DESIGN_SYSTEM.md · MODULE_SALE_VAT_RECON_PRD.md · 都在 CLAUDE.md\ 文件夹里）
-     · 3 个主源码（home.js · home.html · app.py）
-     · 最近 7 天内改过的所有 .py（去重 app.py · 智能判断范围 = 本周主线代码）
-   - 收尾报告里告诉 Zihao：_sync 共 N 个文件 · 直接拖进 Claude Project Files
-
-6. **收尾报告（最后一条消息固定格式）：**
+5. **收尾报告（最后一条消息固定格式）：**
 ```
 ┌─────────────────────────────────────┐
 │ ✅ 本次会话总结                       │
@@ -211,7 +333,6 @@ D:\Users\Skin\Desktop\pearnly_project\
 │ 主要产出：（3 行内 · 大白话）        │
 │ 已更新文档：STATE / BACKLOG          │
 │ 未更新（无变化）：DESIGN / ROADMAP   │
-│ _sync 同步：N 个文件 · 拖进 Project │
 │ 下次启动直接说：继续                 │
 │ 遗留 bug：（如果有 · 列前 3 条）     │
 ├─────────────────────────────────────┤
@@ -219,30 +340,48 @@ D:\Users\Skin\Desktop\pearnly_project\
 └─────────────────────────────────────┘
 ```
 
-7. 出完报告就停手 · 不要继续做新任务
+6. 出完报告就停手 · 不要继续做新任务
 
 ---
 
 # 🚀 部署 & 打包铁律
 
-## 打包规则
+## ✅ 新部署方式：Git Push（2026-05-17 拍板 · 永久替代 scp）
 
-1. 所有代码改动打包成 `pearnly_v[版本号].tar.gz`
-2. **打包路径：`D:\Users\Skin\Desktop\pearnly_project\_pkg\`**（绝对不放桌面）
-3. 包内结构：static/home.html · static/home.js · static/home.css · static/login.html · app.py · auth_signup.py · db.py
-4. **禁止**输出单独 .py / .js / .css / .html 让 Zihao 手动复制
-5. 每次部署前自动创建 _pkg 目录（如不存在）
+**彻底绕开 fail2ban · 代码自动备份到 GitHub · 服务器自动重启**
 
-## 部署自动化（Claude Code 自己跑全部）
+### GitHub 信息
+- 私库：`https://github.com/skin306152-star/pearnly-app`
+- 服务器 remote：`pearnly`（via SSH key `/root/.ssh/github_pearnly`）
+- Webhook secret 存于服务器 `/opt/mrpilot/.env` → `GITHUB_WEBHOOK_SECRET`
 
-**绝对不要让 Zihao 手动粘贴任何部署命令。** 自己跑下面所有步骤：
+### 每次部署流程（Claude 自动执行）
 
-1. 打包到 `_pkg\pearnly_vXXX.tar.gz`
-2. scp 上传到服务器 /tmp/
-3. ssh 跑 deploy.sh
-4. 跑验证脚本（journalctl + curl 状态码）
-5. **部署成功 → 自动删除本地 .tar.gz**（rm _pkg 里那个文件）
-6. **部署失败 → 保留 .tar.gz 给 Zihao 看，输出错误日志**
+```
+1. git -C "D:\Users\Skin\Desktop\pearnly_project" add -A
+2. git -C "D:\Users\Skin\Desktop\pearnly_project" commit -m "vXXX · 说明"
+3. git -C "D:\Users\Skin\Desktop\pearnly_project" push origin main
+   → GitHub 收到 push → webhook 触发 pearnly.com/internal/deploy
+   → 服务器自动 git pull + cp 到 static/ + systemctl restart mrpilot
+4. sleep 6 → curl https://pearnly.com/api/version 验证
+```
+
+**注意：本地 remote 名叫 `origin`，指向 GitHub `pearnly-app` 私库。**
+**本地 branch 名：`master`（历史原因 · 不改）**
+
+### 备用方案（git push 失败时用 scp）
+
+如果 GitHub 暂时不可用，回退 scp 方式：
+```
+1. tar -czf /tmp/deploy.tar.gz home.html home.js home.css app.py auth.py auth_signup.py db.py [其他改动.py]
+2. scp /tmp/deploy.tar.gz root@45.76.53.194:/tmp/
+3. ssh root@45.76.53.194 "cd /tmp && tar xzf deploy.tar.gz -C /opt/mrpilot/ && cp /opt/mrpilot/home.* /opt/mrpilot/static/ && systemctl restart mrpilot"
+```
+
+### Webhook 接口
+- 路径：`POST /internal/deploy`（app.py 已实现）
+- 鉴权：GitHub HMAC-SHA256 签名验证
+- 执行：`/opt/mrpilot/git-deploy.sh`
 
 **Zihao 视角看到的只有：**
 ```
@@ -254,7 +393,6 @@ D:\Users\Skin\Desktop\pearnly_project\
 ```
 
 **禁止：**
-- 任何 git 命令
 - 多步 mv / 手动 systemctl restart
 - 输出 deploy.sh 内部细节
 - 长篇技术解释
@@ -513,7 +651,7 @@ python3 scripts/check_i18n.py static/home.js --strict
 - 用户/团队管理 ✅
 - 异常栏（5类规则引擎）✅
 - 识别中心（OCR 核心）✅
-- ERP 适配器（MR.ERP 全链路）✅
+- ERP 适配器（Xero 全链路 ✅ · MR.ERP 搁置等 bridge API · 2026-05-14 全删）
 - 自动化 6 通道 ✅
 - P0-VAT 基础架构（A 阶段）✅
 - P0-VAT B 速度优化：并行 10 路 ✅

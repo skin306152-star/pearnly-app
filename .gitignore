@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+*.egg-info/
+
+# 部署包（临时文件）
+_pkg/
+*.tar.gz
+deploy_v*.tar.gz
+
+# 截图 / 测试数据（不上传 GitHub）
+yichang/
+异常/
+uploads/
+
+# 数据库 / 密钥（绝对不上传）
+*.db
+*.sqlite
+*.pem
+*.key
+secrets.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 备份文件
+*.bak*
+*.bak_*

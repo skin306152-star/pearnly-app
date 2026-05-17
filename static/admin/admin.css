@@ -1,0 +1,346 @@
+/* ============================================================
+ * Pearnly · admin.css · v118.44.0 NAV-IA Phase 8
+ * Earn 超管 admin layout 独立样式 · 与 home.css 解耦
+ * 复用 home.css token(--bg / --card / --line / --ink / --brand 等)
+ * 视觉基准:pearnly_nav_prototype_final.html 右下角切 Earn 视角
+ * ============================================================ */
+
+/* 全屏布局 · 三层:banner(36) + topbar(48) + shell(剩余) */
+.admin-layout-body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* ============ 顶部 admin banner(36px · 黑底渐变 + 橙色底边)============ */
+.admin-layout-banner {
+    height: 36px;
+    background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+    color: #fff;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    font-size: 12px;
+    font-weight: 500;
+    border-bottom: 2px solid #f59e0b;
+    box-sizing: border-box;
+}
+.admin-layout-banner-left {
+    display: flex; align-items: center; gap: 8px;
+}
+.admin-layout-banner-left svg { color: #f59e0b; flex-shrink: 0; }
+.admin-layout-banner-right {
+    font-size: 11px;
+    color: rgba(255,255,255,0.65);
+}
+
+/* ============ 顶栏(48px)============ */
+.admin-layout-topbar {
+    height: 48px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    box-sizing: border-box;
+    position: relative;
+}
+.admin-layout-topbar-left .admin-layout-logo {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 14px;
+}
+.admin-layout-logo svg { color: var(--ink); flex-shrink: 0; }
+.admin-layout-logo strong { font-weight: 700; }
+.admin-layout-logo-tag {
+    font-size: 10px;
+    background: var(--ink);
+    color: #fff;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+}
+.admin-layout-topbar-right {
+    display: flex; align-items: center; gap: 8px;
+    position: relative;
+}
+
+/* 语言切换 */
+.admin-layout-langs {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+    color: var(--ink-2);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s;
+}
+.admin-layout-langs:hover {
+    background: var(--bg);
+    border-color: var(--ink-3);
+}
+.admin-layout-langs-popup {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 50px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    padding: 5px;
+    z-index: 100;
+    min-width: 140px;
+    display: none;
+}
+.admin-layout-langs-popup.show { display: block; }
+.admin-layout-langs-popup button {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: 0;
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--ink-2);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.admin-layout-langs-popup button:hover {
+    background: var(--bg);
+    color: var(--ink);
+}
+.admin-layout-langs-popup button.active {
+    background: var(--ink);
+    color: #fff;
+}
+
+/* 头像 + popup */
+.admin-layout-avatar-wrap { position: relative; }
+.admin-layout-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: #fff;
+    border: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+}
+.admin-layout-avatar-popup {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    padding: 6px;
+    z-index: 100;
+    min-width: 240px;
+    display: none;
+}
+.admin-layout-avatar-popup.show { display: block; }
+.admin-layout-avatar-head {
+    padding: 10px 10px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    margin-bottom: 4px;
+}
+.admin-layout-avatar-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 2px;
+}
+.admin-layout-avatar-email {
+    font-size: 11px;
+    color: var(--ink-3);
+    word-break: break-all;
+}
+.admin-layout-avatar-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 10px;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--danger);
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+}
+.admin-layout-avatar-item svg { color: var(--danger); flex-shrink: 0; }
+.admin-layout-avatar-item:hover {
+    background: var(--danger-bg);
+}
+
+/* ============ 主区:sidebar + main ============ */
+.admin-layout-shell {
+    display: flex;
+    height: calc(100vh - 36px - 48px); /* 减 banner + topbar 高 */
+    overflow: hidden;
+}
+
+/* ============ Sidebar(220px)============ */
+.admin-layout-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--card);
+    border-right: 1px solid var(--line);
+    padding: 10px 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+.admin-layout-sidebar-section {
+    font-size: 10px;
+    color: var(--ink-3);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 8px 18px 6px;
+}
+.admin-layout-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    margin: 1px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--ink-2);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.admin-layout-nav-item svg { color: var(--ink-3); flex-shrink: 0; transition: color 0.15s; }
+.admin-layout-nav-item:hover {
+    background: var(--bg);
+    color: var(--ink);
+}
+.admin-layout-nav-item:hover svg { color: var(--ink); }
+.admin-layout-nav-item.active {
+    background: var(--ink);
+    color: #fff;
+}
+.admin-layout-nav-item.active svg { color: #fff; }
+
+.admin-layout-sidebar-spacer { flex: 1; min-height: 16px; }
+.admin-layout-nav-item-back {
+    border-top: 1px solid var(--line-soft);
+    border-radius: 0;
+    margin: 4px 0 0;
+    padding: 12px 22px;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+.admin-layout-nav-item-back:hover {
+    background: var(--bg);
+    color: var(--ink-2);
+    border-radius: 0;
+}
+.admin-layout-nav-item-back.active {
+    background: transparent;
+    color: var(--ink-3);
+}
+
+/* ============ Main 区 ============ */
+.admin-layout-main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 28px;
+    background: var(--bg);
+    box-sizing: border-box;
+}
+
+/* page 切换:默认隐藏 · active 显示 */
+.admin-layout-main .page { display: none; }
+.admin-layout-main .page.active { display: block; }
+
+/* ============ toast 容器(home.js 用)============ */
+#toast-container.toast-container {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+#toast-container.toast-container .toast {
+    pointer-events: auto;
+}
+
+/* ============ 手机端适配 ============ */
+@media (max-width: 800px) {
+    .admin-layout-shell {
+        flex-direction: column;
+        height: auto;
+        overflow: visible;
+    }
+    .admin-layout-sidebar {
+        width: 100%;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 6px 8px;
+        gap: 6px;
+    }
+    .admin-layout-sidebar-section { display: none; }
+    .admin-layout-nav-item {
+        flex-shrink: 0;
+        margin: 0;
+        white-space: nowrap;
+    }
+    .admin-layout-sidebar-spacer { display: none; }
+    .admin-layout-nav-item-back {
+        border-top: 0;
+        padding: 8px 14px;
+    }
+    .admin-layout-main {
+        padding: 16px;
+        overflow-y: visible;
+    }
+    .admin-layout-banner {
+        font-size: 11px;
+        padding: 0 12px;
+    }
+    .admin-layout-banner-right { display: none; }
+    .admin-layout-logo-tag { display: none; }
+}
+
+/* ============ 防御:home.js 启动时可能查找的 admin-mode-banner 老 DOM · 在 admin layout 内置不渲染 ============ */
+body.admin-layout-body .admin-mode-banner { display: none !important; }
+
+/* ============ v118.44.0.2 · 防御:home.js applyLang 加 lang-switching class 后 · 若中途抛错残留 · 让 admin layout 文字永不隐形 ============ */
+body.admin-layout-body.lang-switching [data-i18n] {
+    opacity: 1 !important;
+}
+body.admin-layout-body .lang-switching-overlay {
+    display: none !important;
+}
+
+/* ============ page-head-icon 复用(home.css 已定义 · 此处只是确保不被覆盖)============ */
+.admin-layout-main .page-head-icon {
+    /* 沿用 home.css 11 轮视觉对齐的暖灰背景 · 不重复定义 */
+}

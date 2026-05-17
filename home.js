@@ -18639,6 +18639,7 @@ async function deleteEndpoint(endpointId) {
     let _currentFilter = 'all';
     let _allRows     = [];   // parsed detail rows (flat)
     let _brv2Search  = { stmt: '', gl: '' };
+    let _cachedHistoryTasks = [];
 
     // ── DOM helpers ───────────────────────────────────────────────────
     const $ = id => document.getElementById(id);
@@ -18922,7 +18923,9 @@ async function deleteEndpoint(endpointId) {
     function populateAcctSelect(accounts) {
         const sel = $('brv2-acct-select');
         if (!sel) return;
-        sel.innerHTML = `<option value="">全部账户 / All</option>` +
+        const _al = window._currentLang || 'zh';
+        const _allAcctLbl = { zh: '全部账户', th: 'ทุกบัญชี', en: 'All Accounts', ja: 'すべての口座' }[_al] || '全部账户';
+        sel.innerHTML = `<option value="">${_allAcctLbl}</option>` +
             accounts.map(a => `<option value="${esc2(a)}">${esc2(a)}</option>`).join('');
         sel.style.display = '';
     }
@@ -19003,6 +19006,34 @@ async function deleteEndpoint(endpointId) {
         wrap.style.display = '';
     }
 
+    // ── Export helper (fetch+blob so Auth header is sent) ─────────────
+    async function _brv2Export(taskId) {
+        const token = localStorage.getItem('mrpilot_token') || '';
+        const l = window._currentLang || 'zh';
+        try {
+            const resp = await fetch('/api/recon/bank-v2/' + taskId + '/export?lang=' + l, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                if (window.showToast) window.showToast(err.detail || 'Export failed', 'error');
+                return;
+            }
+            const blob = await resp.blob();
+            const cd = resp.headers.get('content-disposition') || '';
+            const m  = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            const filename = m ? m[1].replace(/['"]/g, '') : 'reconciliation.xlsx';
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            if (window.showToast) window.showToast('Export error: ' + e.message, 'error');
+        }
+    }
+
     // ── Render results ────────────────────────────────────────────────
     function renderResults(data) {
         // Always render parse diagnostics (shown on both success and failure)
@@ -19036,11 +19067,20 @@ async function deleteEndpoint(endpointId) {
 
         // Formula collapse 小标题
         const formulaSub = $('brv2-formula-sub');
-        if (formulaSub) formulaSub.textContent = diffOk ? '✓ 平衡' : `差 ${fmtNum(fdiff)}`;
+        if (formulaSub) {
+            const _fl = window._currentLang || 'zh';
+            formulaSub.textContent = diffOk
+                ? { zh: '✓ 平衡', th: '✓ สมดุล', en: '✓ Balanced', ja: '✓ 一致' }[_fl] || '✓ 平衡'
+                : ({ zh: '差 ', th: 'ต่าง ', en: 'Diff ', ja: '差 ' }[_fl] || '差 ') + fmtNum(fdiff);
+        }
 
         // Detail collapse 小标题
         const detailSub = $('brv2-detail-sub');
-        if (detailSub) detailSub.textContent = `共 ${_allRows.length} 行`;
+        if (detailSub) {
+            const _dl = window._currentLang || 'zh';
+            const _rowLbl = { zh: '共 {n} 行', th: 'ทั้งหมด {n} แถว', en: '{n} rows', ja: '計 {n} 行' }[_dl] || '共 {n} 行';
+            detailSub.textContent = _rowLbl.replace('{n}', _allRows.length);
+        }
 
         // 公式表
         function setFrm(id, val, neg) {
@@ -19073,8 +19113,7 @@ async function deleteEndpoint(endpointId) {
         if (exportBtn) {
             exportBtn.onclick = () => {
                 if (!_currentTask) return;
-                const l = window._currentLang || 'zh';
-                window.open('/api/recon/bank-v2/' + _currentTask.task_id + '/export?lang=' + l, '_blank');
+                _brv2Export(_currentTask.task_id);
             };
         }
 
@@ -19154,6 +19193,7 @@ async function deleteEndpoint(endpointId) {
     }
 
     function renderHistory(tasks) {
+        _cachedHistoryTasks = tasks || [];
         const emptyEl = $('brv2-history-empty');
         const wrap    = $('brv2-history-table-wrap');
         const tbody   = $('brv2-history-tbody');
@@ -19225,13 +19265,13 @@ async function deleteEndpoint(endpointId) {
                 return b;
             };
             const delConfirm = { zh: '删除这条记录?', th: 'ลบรายการนี้?', en: 'Delete this record?', ja: 'この記録を削除しますか?' }[lang] || '删除?';
-            tdAct.appendChild(mkBtn(SVG_LOAD, '加载', '', () => loadTask(t.id, token)));
-            tdAct.appendChild(mkBtn(SVG_DL,   '导出', '', () => {
-                const l = window._currentLang || 'zh';
-                window.open('/api/recon/bank-v2/' + t.id + '/export?lang=' + l, '_blank');
-            }));
-            tdAct.appendChild(mkBtn(SVG_DEL,  '删除', 'glv-del', async () => {
-                if (!confirm(delConfirm)) return;
+            const lblLoad = { zh: '加载', th: 'โหลด', en: 'Load', ja: '読込' }[lang] || '加载';
+            const lblExp  = { zh: '导出', th: 'ส่งออก', en: 'Export', ja: 'エクスポート' }[lang] || '导出';
+            const lblDel  = { zh: '删除', th: 'ลบ', en: 'Delete', ja: '削除' }[lang] || '删除';
+            tdAct.appendChild(mkBtn(SVG_LOAD, lblLoad, '', () => loadTask(t.id, token)));
+            tdAct.appendChild(mkBtn(SVG_DL,   lblExp,  '', () => _brv2Export(t.id)));
+            tdAct.appendChild(mkBtn(SVG_DEL,  lblDel,  'glv-del', async () => {
+                if (!(await showConfirm(delConfirm, { danger: true }))) return;
                 await fetch('/api/recon/bank-v2/' + t.id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
                 loadHistory();
             }));
@@ -19347,6 +19387,8 @@ async function deleteEndpoint(endpointId) {
             updateRunBtn();
             renderFileList('stmt');
             renderFileList('gl');
+            if (_currentTask) renderResults(_currentTask);
+            renderHistory(_cachedHistoryTasks || []);
         }});
     }
 

@@ -2516,7 +2516,7 @@ def export_bank_recon_excel(
     ws1 = wb.create_sheet(_t("sh_summary", lang))
     ws1.sheet_view.showGridLines = False
     ws1.column_dimensions["A"].width = 78
-    ws1.column_dimensions["B"].width = 20
+    ws1.column_dimensions["B"].width = 22  # v118.33.13.6 · fit (7-digit) amounts with parens
 
     # Color palette
     NAVY        = "1F2937"   # dark slate - main anchor rows

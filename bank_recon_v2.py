@@ -525,13 +525,25 @@ def _parse_stmt_text_lines(
         if d is None:
             continue
 
-        # Find numeric tokens from the right end
-        num_vals: List[Tuple[int, float]] = []
-        for i in range(len(toks) - 1, 0, -1):
+        # Group consecutive numeric tokens; pick rightmost group with >=2 members.
+        # This prevents numbers embedded in descriptions (company names, cheque IDs)
+        # from masking the actual amount+balance pair which always appear consecutively.
+        _groups: List[List[Tuple[int, float]]] = []
+        _cur: List[Tuple[int, float]] = []
+        for i in range(1, len(toks)):
             v = _tok_to_float(toks[i])
             if v is not None:
-                num_vals.insert(0, (i, v))
-            elif num_vals:
+                _cur.append((i, v))
+            else:
+                if _cur:
+                    _groups.append(_cur)
+                    _cur = []
+        if _cur:
+            _groups.append(_cur)
+        num_vals: List[Tuple[int, float]] = []
+        for _grp in reversed(_groups):
+            if len(_grp) >= 2:
+                num_vals = _grp
                 break
 
         if len(num_vals) < 2:

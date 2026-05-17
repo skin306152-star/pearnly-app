@@ -4374,10 +4374,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.33.9.0 更新:\n• 修复泰语 GL PDF 解析失败（pdfplumber KeyError，已加文本行备用解析器）\n• 修复日期携带：Mr.erp GL 每日首行才印日期，续行留空现在自动继承\n• 修复泰历短年：68 年→公元 2025（原错判为 2068）\n• 修复对账方向：出款↔GL贷方、入款↔GL借方（原反向）\n• 修复语言默认：错误提示不再强制显示泰语\n• 修复 KPI 标签多语言不翻译问题",
-            "en": "v118.33.9.0 updates:\n• Fix Thai GL PDF parse failure (pdfplumber KeyError; added text-line fallback parser)\n• Fix date carry-forward: Mr.erp GL prints date once per day; blank rows now inherit\n• Fix Thai short Buddhist Era year: '68' → CE 2025 (was 2068)\n• Fix reconciliation direction: withdrawal↔GL Credit, deposit↔GL Debit (was reversed)\n• Fix language default: error toasts now respect UI language\n• Fix KPI label translations (i18n key mismatch)",
-            "th": "v118.33.9.0 อัปเดต:\n• แก้ GL PDF อ่านไม่ได้ (pdfplumber KeyError · เพิ่ม text parser สำรอง)\n• แก้วันที่ carry-forward: Mr.erp พิมพ์วันที่ครั้งเดียวต่อวัน บรรทัดถัดไปรับต่ออัตโนมัติ\n• แก้ปีพุทธศักราชย่อ: '68' → ค.ศ. 2025 (เดิมคำนวณเป็น 2068)\n• แก้ทิศทางจับคู่: ถอนเงิน↔GL เครดิต, ฝากเงิน↔GL เดบิต (เดิมสลับกัน)\n• แก้ภาษาเริ่มต้น: toast แสดงตามภาษา UI\n• แก้ป้ายกำกับ KPI ไม่แปลภาษา",
-            "ja": "v118.33.9.0 更新:\n• タイGL PDF解析失敗を修正（pdfplumber KeyError→テキスト行フォールバック追加）\n• 日付キャリーフォワード修正：Mr.erpは1日1回のみ日付印字、空白行が自動継承\n• 仏暦短縮年修正：'68'→西暦2025年（誤って2068年と判定していた）\n• 照合方向修正：出金↔GL貸方・入金↔GL借方（逆になっていた）\n• 言語デフォルト修正：エラーをUI言語で表示\n• KPIラベルの多言語翻訳キー不一致を修正"
+            "zh": "v118.33.10.0 更新:\n• 修复诊断表"esc is not defined"JS错误\n• 修复泰式千位分隔符（115.586.50 正确解析为 115,586.50）\n• 修复 GL 列头"เดบิท"未识别导致对账方向错误\n• 修复 GL 文本解析：自动从科目标题行提取期初余额\n• 修复 GL 文本解析：正确跳过"รวม"合计行、D/C 状态标记\n• 新增银行账单文本行解析器：KBank 无表格行式 PDF 现可正常读取",
+            "en": "v118.33.10.0 updates:\n• Fix 'esc is not defined' JS error in parse-diagnostics table\n• Fix Thai dot-thousands parsing (115.586.50 → 115,586.50)\n• Fix GL debit header detection (เดบิท with ท was missing)\n• Fix GL text parser: extract opening balance from account header line\n• Fix GL text parser: skip รวม total rows; handle D/C status tokens\n• Add bank statement text-line parser: KBank line-based PDFs now parse",
+            "th": "v118.33.10.0 อัปเดต:\n• แก้ JS error 'esc is not defined' ในตารางวินิจฉัย\n• แก้การอ่านตัวเลขจุดพัน (115.586.50 → 115,586.50)\n• แก้การตรวจจับหัวคอลัมน์เดบิท (ท หายไป)\n• แก้ GL text parser: อ่านยอดยกมาจากบรรทัดหัวบัญชี\n• แก้ GL text parser: ข้ามบรรทัดรวม/หมายเหตุ และ D/C status\n• เพิ่ม bank statement text parser: KBank แบบไม่มีตารางอ่านได้แล้ว",
+            "ja": "v118.33.10.0 更新:\n• 診断テーブルの'esc is not defined'JSエラー修正\n• タイ式桁区切りドット解析修正（115.586.50→115,586.50）\n• GL借方ヘッダー検出修正（เดบิทのท文字が欠落）\n• GLテキストパーサー：科目ヘッダー行から期首残高を取得\n• GLテキストパーサー：รวม合計行・D/Cステータストークンのスキップ修正\n• 銀行明細テキスト行パーサー追加：KBank非テーブルPDF対応"
         }
     }
 

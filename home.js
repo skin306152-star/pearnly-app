@@ -18966,7 +18966,7 @@ async function deleteEndpoint(endpointId) {
 
         const statusCell = row => {
             if (!row.ok && row.error)
-                return `<span style="color:#dc2626">${t('fail')} — ${esc(String(row.error).slice(0,60))}</span>`;
+                return `<span style="color:#dc2626">${t('fail')} — ${esc2(String(row.error).slice(0,60))}</span>`;
             if (!row.rows)
                 return `<span style="color:#d97706">${t('warn')}</span>`;
             return `<span style="color:#059669">${t('ok')} (${row.rows})</span>`;
@@ -18987,9 +18987,9 @@ async function deleteEndpoint(endpointId) {
                 <tbody>
                     ${rows.map(row => `<tr>
                         <td style="padding:5px 8px;border:1px solid #e5e7eb;white-space:nowrap">${row._type==='stmt'?t('stmt'):t('gl')}</td>
-                        <td style="padding:5px 8px;border:1px solid #e5e7eb;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc2(row.file||'')}">${esc(row.file||'')}</td>
+                        <td style="padding:5px 8px;border:1px solid #e5e7eb;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc2(row.file||'')}">${esc2(row.file||'')}</td>
                         <td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center">${row.rows||0}</td>
-                        <td style="padding:5px 8px;border:1px solid #e5e7eb;color:var(--ink-2)">${esc(row._extra||'')}</td>
+                        <td style="padding:5px 8px;border:1px solid #e5e7eb;color:var(--ink-2)">${esc2(row._extra||'')}</td>
                         <td style="padding:5px 8px;border:1px solid #e5e7eb">${statusCell(row)}</td>
                     </tr>`).join('')}
                 </tbody>

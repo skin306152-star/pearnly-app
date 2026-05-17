@@ -164,6 +164,11 @@ def _to_float(val) -> float:
     if s.startswith("-"):
         neg = True
         s = s[1:]
+    # Handle Thai dot-as-thousands-separator: "115.586.50" → "115586.50"
+    dot_count = s.count('.')
+    if dot_count > 1:
+        last_dot = s.rfind('.')
+        s = s[:last_dot].replace('.', '') + s[last_dot:]
     try:
         v = round(float(s), 2)
         return -v if neg else v
@@ -451,30 +456,171 @@ def _parse_generic_pages(tables: List) -> Tuple[List[StatementRow], float, float
     return rows, opening, closing
 
 
+def _parse_stmt_text_lines(
+    text: str, bank_code: str = "generic"
+) -> Tuple[List[StatementRow], float, float]:
+    """
+    Text-line parser for Thai bank statements with no table structure (e.g. KBank CA).
+    Handles combined deposit/withdrawal column by comparing with running balance.
+    Handles Thai dot-as-thousands-separator (115.586.50 → 115586.50).
+    """
+    rows: List[StatementRow] = []
+    opening = 0.0
+    closing = 0.0
+    prev_balance: Optional[float] = None
+
+    def _tok_to_float(tok: str) -> Optional[float]:
+        s = tok.replace(',', '').replace(' ', '')
+        if not s:
+            return None
+        neg = s.startswith('-')
+        if neg:
+            s = s[1:]
+        dot_count = s.count('.')
+        if dot_count > 1:
+            last_dot = s.rfind('.')
+            s = s[:last_dot].replace('.', '') + s[last_dot:]
+        try:
+            v = float(s)
+            return -v if neg else v
+        except ValueError:
+            return None
+
+    _DATE_PREFIX = re.compile(r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$')
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        # Opening balance marker
+        if any(kw in line for kw in ["ยอดยกมา", "brought forward", "ยอดคงเหลือยกมา"]):
+            toks = line.split()
+            for tok in reversed(toks):
+                v = _tok_to_float(tok)
+                if v is not None and v > 0:
+                    opening = v
+                    prev_balance = opening
+                    break
+            continue
+
+        # Closing balance marker
+        if any(kw in line for kw in ["ยอดยกไป", "closing balance"]):
+            toks = line.split()
+            for tok in reversed(toks):
+                v = _tok_to_float(tok)
+                if v is not None and v > 0:
+                    closing = v
+                    break
+            continue
+
+        toks = line.split()
+        if len(toks) < 3:
+            continue
+
+        # First token must be a date (dd-mm-yy or dd/mm/yy)
+        if not _DATE_PREFIX.match(toks[0]):
+            continue
+        d = _parse_date(toks[0])
+        if d is None:
+            continue
+
+        # Find numeric tokens from the right end
+        num_vals: List[Tuple[int, float]] = []
+        for i in range(len(toks) - 1, 0, -1):
+            v = _tok_to_float(toks[i])
+            if v is not None:
+                num_vals.insert(0, (i, v))
+            elif num_vals:
+                break
+
+        if len(num_vals) < 2:
+            continue
+
+        balance = num_vals[-1][1]
+        amount = abs(num_vals[-2][1])
+        if amount == 0.0:
+            continue
+
+        desc_end_idx = num_vals[-2][0]
+        desc = " ".join(toks[1:desc_end_idx]).strip()
+
+        # Determine direction by comparing balance with previous balance
+        withdrawal = 0.0
+        deposit = 0.0
+        if prev_balance is not None:
+            diff = round(balance - prev_balance, 2)
+            if abs(diff - amount) <= AMOUNT_TOL:
+                deposit = amount
+            elif abs(diff + amount) <= AMOUNT_TOL:
+                withdrawal = amount
+            else:
+                # Balance delta doesn't match amount exactly — use description hints
+                desc_low = desc.lower()
+                if any(kw in desc_low for kw in ["จ่าย", "ถอน", "debit", "withdraw", "โอนออก", "ชำระ"]):
+                    withdrawal = amount
+                else:
+                    deposit = amount
+        else:
+            # No prev_balance yet — guess deposit
+            deposit = amount
+
+        prev_balance = balance
+        closing = balance
+
+        rows.append(StatementRow(
+            date=d, description=desc,
+            withdrawal=withdrawal, deposit=deposit, balance=balance,
+        ))
+
+    if not opening and rows:
+        first = rows[0]
+        if first.deposit > 0:
+            opening = round(first.balance - first.deposit, 2)
+        elif first.withdrawal > 0:
+            opening = round(first.balance + first.withdrawal, 2)
+
+    if not closing and rows:
+        closing = rows[-1].balance
+
+    return rows, opening, closing
+
+
 def parse_bank_statement_pdf(
     file_bytes: bytes, filename: str, api_key: str = ""
 ) -> Dict[str, Any]:
     """
     Parse a bank statement PDF.
-    Returns {ok, rows, opening, closing, bank_code, row_count, error}
+    Strategy: (1) safe text extraction (2) pdfplumber tables (3) text-line fallback (4) Gemini
     """
+    # ── Step 1: extract text safely (immune to pdfplumber KeyError crash) ──
+    page_texts = _pdf_extract_text_safe(file_bytes)
+    all_text = "\n".join(page_texts)
+    bank_code = _detect_bank(all_text) if all_text.strip() else "generic"
+
+    # ── Step 2: try pdfplumber table extraction ──
+    all_tables: List = []
     try:
         import pdfplumber
-    except ImportError:
-        return {"ok": False, "error": "pdfplumber not installed"}
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            if not all_text.strip():
+                all_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
+                bank_code = _detect_bank(all_text)
+            for p in pdf.pages:
+                try:
+                    tbls = p.extract_tables() or []
+                    all_tables.extend(tbls)
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning(f"pdfplumber stmt [{filename}] skipped: {e}")
 
-    try:
-        pdf = pdfplumber.open(io.BytesIO(file_bytes))
-        all_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
-        bank_code = _detect_bank(all_text)
+    # ── Step 3: table-based parsing ──
+    rows: List[StatementRow] = []
+    opening = 0.0
+    closing = 0.0
 
-        all_tables = []
-        for p in pdf.pages:
-            tbls = p.extract_tables() or []
-            all_tables.extend(tbls)
-        pdf.close()
-
-        # Choose parser based on bank
+    if all_tables:
         if bank_code == "kbank":
             rows, opening, closing = _parse_kbank_pages(all_tables)
         elif bank_code == "bbl":
@@ -482,38 +628,42 @@ def parse_bank_statement_pdf(
         else:
             rows, opening, closing = _parse_generic_pages(all_tables)
 
-        # Fallback: try other parsers if generic returned nothing
         if len(rows) < MIN_PLUMBER_ROWS and bank_code == "generic":
             rows2, op2, cl2 = _parse_kbank_pages(all_tables)
             if len(rows2) > len(rows):
                 rows, opening, closing = rows2, op2, cl2
 
-        # Gemini fallback for scanned PDFs
-        if len(rows) < MIN_PLUMBER_ROWS and api_key:
-            gemini_result = _gemini_parse_statement(file_bytes, filename, api_key)
-            if gemini_result.get("ok") and gemini_result.get("rows"):
-                rows = gemini_result["rows"]
-                opening = gemini_result.get("opening", opening)
-                closing = gemini_result.get("closing", closing)
-                bank_code = gemini_result.get("bank_code", bank_code)
+    # ── Step 4: text-line fallback (handles line-based PDFs with no tables) ──
+    if len(rows) < MIN_PLUMBER_ROWS and all_text.strip():
+        text_rows, text_op, text_cl = _parse_stmt_text_lines(all_text, bank_code)
+        if len(text_rows) > len(rows):
+            rows, opening, closing = text_rows, text_op, text_cl
 
-        # Set source file
-        for r in rows:
-            r.source_file = filename
+    # ── Step 5: Gemini fallback ──
+    if len(rows) < MIN_PLUMBER_ROWS and api_key:
+        gemini_result = _gemini_parse_statement(file_bytes, filename, api_key)
+        if gemini_result.get("ok") and gemini_result.get("rows"):
+            rows = gemini_result["rows"]
+            opening = gemini_result.get("opening", opening)
+            closing = gemini_result.get("closing", closing)
+            bank_code = gemini_result.get("bank_code", bank_code)
 
-        return {
-            "ok": True,
-            "rows": rows,
-            "opening": opening,
-            "closing": closing,
-            "bank_code": bank_code,
-            "row_count": len(rows),
-        }
+    for r in rows:
+        r.source_file = filename
 
-    except Exception as e:
-        logger.error(f"parse_bank_statement_pdf [{filename}] failed: {type(e).__name__}: {e}",
-                     exc_info=True)
-        return {"ok": False, "error": str(e), "rows": [], "opening": 0.0, "closing": 0.0}
+    if not rows:
+        hint = " (PDF has no extractable text)" if not all_text.strip() else ""
+        return {"ok": False, "error": f"No statement rows found in PDF{hint}",
+                "rows": [], "opening": 0.0, "closing": 0.0}
+
+    return {
+        "ok": True,
+        "rows": rows,
+        "opening": opening,
+        "closing": closing,
+        "bank_code": bank_code,
+        "row_count": len(rows),
+    }
 
 
 def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> Dict[str, Any]:
@@ -582,7 +732,7 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
 _GL_DATE_H  = {"วันที่", "date", "วัน", "日期"}
 _GL_DOC_H   = {"ใบสำคัญ", "เลขที่เอกสาร", "doc", "voucher", "reference", "เอกสาร", "凭证", "ref"}
 _GL_DESC_H  = {"คำอธิบาย", "รายการ", "description", "detail", "รายละเอียด", "摘要"}
-_GL_DEBIT_H = {"เดบิต", "debit", "dr", "借方", "ถอน", "จ่าย"}
+_GL_DEBIT_H = {"เดบิต", "เดบิท", "debit", "dr", "借方", "ถอน", "จ่าย"}
 _GL_CRED_H  = {"เครดิต", "credit", "cr", "贷方", "ฝาก", "รับ"}
 _GL_ACCT_H  = {"รหัสบัญชี", "account", "gl account", "เลขที่บัญชี", "รหัส", "账号", "科目"}
 
@@ -880,17 +1030,23 @@ def _parse_gl_text_lines(
     opening = 0.0
     last_date: Optional[date] = None
 
-    # Number pattern: Thai commas e.g. "1,234.56" or "1234.56"
-    _NUM_RE = re.compile(r"^[\d,]+\.\d+$")
-
     for line in text.splitlines():
         line = line.strip()
         if not line:
             continue
 
-        # Skip header/report title lines
+        # Skip header/report title/total lines
         low = line.lower()
-        if any(kw in low for kw in ["รายงาน", "account", "page", "หน้า", "บัญชี:", "ชื่อ"]):
+        if any(kw in low for kw in ["รายงาน", "account", "page", "หน้า", "บัญชี:", "ชื่อ",
+                                     "รวม", "total", "สรุป", "หมายเหตุ", "note"]):
+            continue
+
+        # Account code header: "1112-01 CA K-BANK006-8-83962-9 215,228.06"
+        # Starts with 3-6 digits then dash (NOT a date like "02/06/68")
+        if re.match(r'^\d{3,6}-\d', line):
+            nums = re.findall(r'[\d,]+\.\d+', line)
+            if nums and not opening:
+                opening = _to_float(nums[-1])
             continue
 
         # Opening balance line
@@ -922,45 +1078,51 @@ def _parse_gl_text_lines(
             else:
                 continue
 
-        # After date token, remaining parts: doc_no, description, amounts...
+        # After date token, remaining parts: book, doc_no, description, amounts...
         rest = parts[d_offset + 1:] if d_offset >= 0 else parts
         if len(rest) < 2:
             continue
 
-        # Find numeric tokens (amounts) from the right
+        # Find numeric tokens from the right, skipping D/C/DR/CR status tokens
         num_vals: List[float] = []
         num_start = len(rest)
+        status_tok = ""
         for i in range(len(rest) - 1, -1, -1):
-            tok = rest[i].replace(",", "")
-            if re.match(r"^\d+(\.\d+)?$", tok):
-                num_vals.insert(0, float(tok))
+            tok = rest[i].strip()
+            tok_up = tok.upper()
+            # Capture status token (D/C/DR/CR) but don't break
+            if tok_up in ("D", "C", "DR", "CR") and not status_tok:
+                status_tok = tok_up
+                continue
+            tok_clean = tok.replace(",", "")
+            if re.match(r"^\d+(\.\d+)?$", tok_clean):
+                num_vals.insert(0, float(tok_clean))
                 num_start = i
             elif len(num_vals) > 0:
                 break
 
-        # Expect at least debit, credit (balance is optional)
-        if len(num_vals) < 1:
+        # Need at least 2 numerics (amount + balance, or debit + credit + balance)
+        if len(num_vals) < 2:
             continue
 
-        # Layout: [...text parts...] [debit] [credit] [balance?] [status?]
-        # We take the last 2-3 numeric tokens as credit/debit/balance
+        # Determine debit/credit using status token or positional heuristic
         debit = credit = 0.0
-        if len(num_vals) >= 2:
-            # Last two numerics before balance: debit and credit (one will be 0)
-            debit = num_vals[-3] if len(num_vals) >= 3 else 0.0
-            credit = num_vals[-2] if len(num_vals) >= 2 else 0.0
-            # If debit is 0 it means only credit filled; credit is the amount
-            # Determine by checking "D"/"C" status token if present
-            status_tok = rest[num_start - 1] if num_start > 0 else ""
-            if status_tok.upper() == "D":
-                debit = num_vals[0] if len(num_vals) == 1 else (num_vals[-3] or num_vals[-2])
+        if status_tok in ("D", "DR"):
+            # Amount is debit; last numeric is balance, second-to-last is amount
+            debit = num_vals[-2]
+            credit = 0.0
+        elif status_tok in ("C", "CR"):
+            credit = num_vals[-2]
+            debit = 0.0
+        else:
+            # No explicit status: 3 numerics → [debit, credit, balance]; 2 → [amount, balance]
+            if len(num_vals) >= 3:
+                debit = num_vals[-3]
+                credit = num_vals[-2]
+            else:
+                # 2 numerics, no status — use first as debit (common for debit-only GL lines)
+                debit = num_vals[-2]
                 credit = 0.0
-            elif status_tok.upper() == "C":
-                credit = num_vals[0] if len(num_vals) == 1 else (num_vals[-3] or num_vals[-2])
-                debit = 0.0
-        elif len(num_vals) == 1:
-            # Single amount — can't tell direction without status
-            continue
 
         if debit == 0.0 and credit == 0.0:
             continue

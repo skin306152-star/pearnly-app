@@ -873,7 +873,7 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
         import base64
 
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
         b64 = base64.b64encode(file_bytes).decode()
         prompt = (
@@ -1349,7 +1349,7 @@ def _gemini_parse_gl(file_bytes: bytes, filename: str,
         import base64
 
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
         b64 = base64.b64encode(file_bytes).decode()
         acct_hint = f" Filter to account code starting with '{account_code}'." if account_code else ""

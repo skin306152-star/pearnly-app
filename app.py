@@ -4374,10 +4374,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "本次更新:\n• 对账中心页面改版 · 左侧子菜单换成顶部横向 tab 条 · 内容区全宽显示\n• 首页数据卡片已接入真实数据 · 本月发票/待处理/配额实时显示",
-            "en": "What's new:\n• Reconciliation center redesigned · top horizontal tabs replace left sidebar · full-width content area\n• Dashboard KPI cards now show live data · invoices, pending items, quota in real time",
-            "th": "อัปเดตในเวอร์ชันนี้:\n• ศูนย์กระทบยอดออกแบบใหม่ · แท็บแนวนอนด้านบนแทนเมนูด้านซ้าย · พื้นที่เนื้อหาเต็มความกว้าง\n• การ์ด KPI หน้าแรกแสดงข้อมูลจริงแล้ว",
-            "ja": "今回の更新:\n• 照合センターをリデザイン · 左サイドバーを上部の横型タブに変更 · コンテンツ全幅表示\n• ダッシュボードKPIカードがリアルデータを表示するように"
+            "zh": "v118.33.8.0 更新:\n• 银行对账上传文件后新增「查看清单」按钮，展开预览面板与 GL-VAT 100% 一致\n• 对账完成后页面自动滚到结果区，错误时弹出提示\n• 最近对账记录改为表格格式并支持搜索，修复全部泰语乱码",
+            "en": "v118.33.8.0 updates:\n• Bank recon now has a 'View File List' toggle matching GL-VAT preview panel exactly\n• Page auto-scrolls to results after reconciliation; errors now show as toast\n• Recent history is now a searchable table; all Thai-language hard-codes fixed",
+            "th": "v118.33.8.0 อัปเดต:\n• การกระทบยอดธนาคาร: ปุ่ม 'ดูรายการไฟล์' ใหม่ · แผงแสดงไฟล์เหมือน GL-VAT 100%\n• หน้าเลื่อนไปที่ผลลัพธ์อัตโนมัติ · แสดงข้อผิดพลาดด้วย toast\n• ประวัติการกระทบยอดเป็นตาราง · ค้นหาได้ · แก้ข้อความภาษาไทยที่ฝังอยู่",
+            "ja": "v118.33.8.0 更新:\n• 銀行照合にファイルリスト確認パネルを追加（GL-VATと完全一致）\n• 照合完了後に結果へ自動スクロール、エラー時はトースト表示\n• 照合履歴をテーブル形式に変更・検索対応、タイ語ハードコードをすべて修正"
         }
     }
 

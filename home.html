@@ -4480,7 +4480,7 @@
         </div>
         <!-- pane 区(全宽) -->
 
-        <!-- ── 银行对账面板 v2（vex-drop 同款视觉） ── -->
+        <!-- ── 银行对账面板 v2（vex-drop 同款视觉 · v118.33.6.1 UI 重构对齐 GL-VAT） ── -->
         <div id="recon-pane-bank" class="recon-pane active">
 
             <!-- KPI 4 卡 -->
@@ -4552,24 +4552,16 @@
                     </div>
                 </div>
 
-                <!-- 文件 chip 列表（拖拽区下方，可逐个删除） -->
-                <div class="brv2-chips-row" id="brv2-chips-row" style="display:none">
-                    <div class="brv2-chips-col">
-                        <div class="brv2-chips-lbl" data-i18n="brv2-stmt-title">银行账单</div>
-                        <div class="brv2-file-list" id="brv2-stmt-list"></div>
-                    </div>
-                    <div class="brv2-chips-col">
-                        <div class="brv2-chips-lbl" data-i18n="brv2-gl-title">总账 GL</div>
-                        <div class="brv2-file-list" id="brv2-gl-list"></div>
-                    </div>
-                </div>
-
                 <!-- 操作栏 -->
                 <div class="vex-action-bar">
                     <button class="btn btn-ghost" id="brv2-reset-btn" type="button" data-i18n="vex-btn-reset">清空</button>
                     <div class="vex-action-info muted" id="brv2-status">
                         <span data-i18n="brv2-hint-need-both">请上传银行账单和 GL 文件</span>
                     </div>
+                    <button class="vex-toggle-preview-btn" id="brv2-toggle-preview" type="button" style="display:none">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        <span id="brv2-toggle-preview-label" data-i18n="vex-toggle-preview-open">查看清单</span>
+                    </button>
                     <select class="brv2-acct-select" id="brv2-acct-select" style="display:none">
                         <option value="" data-i18n="brv2-acct-all">全部账户</option>
                     </select>
@@ -4579,6 +4571,14 @@
                         </svg>
                         <span data-i18n="brv2-run-btn">开始对账</span>
                     </button>
+                </div>
+
+                <!-- 查看清单面板（同款 vex-preview-panel 视觉） -->
+                <div class="vex-preview-panel" id="brv2-preview-panel" style="display:none">
+                    <div class="vex-pp-grid">
+                        <div id="brv2-pp-stmt-col"></div>
+                        <div id="brv2-pp-gl-col"></div>
+                    </div>
                 </div>
 
                 <!-- 进度区 -->
@@ -4674,13 +4674,32 @@
 
             </div><!-- /vex-main-action -->
 
-            <!-- 历史记录 -->
-            <div class="vex-task-section" id="brv2-history-section">
-                <div class="vex-task-header-wrap">
-                    <div class="vex-task-header" data-i18n="brv2-history-title">近期对账记录</div>
+            <!-- 历史记录（同款 glv-history 视觉） -->
+            <div class="glv-history" id="brv2-history">
+                <div class="glv-result-head">
+                    <div class="glv-result-title" data-i18n="brv2-history-title">近期对账记录</div>
+                    <input type="text" class="hist-search-input" id="brv2-hist-search"
+                           data-i18n-placeholder="brv2-hist-search-ph" placeholder="搜索..." autocomplete="off">
                 </div>
-                <div class="brv2-history-list" id="brv2-history-list">
-                    <div class="brv2-history-loading" data-i18n="brv2-loading">加载中…</div>
+                <div class="glv-history-empty" id="brv2-history-empty" data-i18n="brv2-history-empty">
+                    暂无对账记录
+                </div>
+                <div class="glv-history-table-wrap" id="brv2-history-table-wrap" style="display:none">
+                    <table class="glv-history-table" id="brv2-history-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="brv2-hist-time">时间</th>
+                                <th data-i18n="brv2-hist-files">文件</th>
+                                <th class="glv-num" data-i18n="brv2-hist-rows">账单/GL行数</th>
+                                <th class="glv-num" data-i18n="brv2-hist-matched">已匹配</th>
+                                <th class="glv-num" data-i18n="brv2-hist-gl-only">GL仅有</th>
+                                <th class="glv-num" data-i18n="brv2-hist-stmt-only">账单仅有</th>
+                                <th class="glv-num" data-i18n="brv2-hist-diff">差额</th>
+                                <th data-i18n="brv2-hist-actions">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="brv2-history-tbody"></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -6299,7 +6318,7 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11841137"></script>
+<script src="/static/home.js?v=11841380"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 

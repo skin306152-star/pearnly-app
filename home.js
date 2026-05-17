@@ -1951,8 +1951,18 @@ const I18N = {
         'brv2-th-gl-debit':   'GL借方',
         'brv2-th-gl-credit':  'GL贷方',
         'brv2-th-layer':      '匹配层',
-        'brv2-history-title': '最近对账',
-        'brv2-loading':       '加载中…',
+        'brv2-history-title':  '近期对账记录',
+        'brv2-loading':        '加载中…',
+        'brv2-history-empty':  '暂无对账记录',
+        'brv2-hist-search-ph': '搜索...',
+        'brv2-hist-time':      '时间',
+        'brv2-hist-files':     '文件',
+        'brv2-hist-rows':      '账单/GL行数',
+        'brv2-hist-matched':   '已匹配',
+        'brv2-hist-gl-only':   'GL仅有',
+        'brv2-hist-stmt-only': '账单仅有',
+        'brv2-hist-diff':      '差额',
+        'brv2-hist-actions':   '操作',
         // v118.32.5 · 标签按 Thai 客户要求重命名 + 同步其它语言
         'recon-tab-sale-vat': '销项税报告核查',
         'recon-tab-gl-vat':   '收入对账',
@@ -4302,8 +4312,18 @@ const I18N = {
         'brv2-th-gl-debit':   'GL Debit',
         'brv2-th-gl-credit':  'GL Credit',
         'brv2-th-layer':      'Layer',
-        'brv2-history-title': 'Recent Reconciliations',
-        'brv2-loading':       'Loading…',
+        'brv2-history-title':  'Recent Reconciliations',
+        'brv2-loading':        'Loading…',
+        'brv2-history-empty':  'No records yet',
+        'brv2-hist-search-ph': 'Search...',
+        'brv2-hist-time':      'Time',
+        'brv2-hist-files':     'Files',
+        'brv2-hist-rows':      'Rows (Stmt/GL)',
+        'brv2-hist-matched':   'Matched',
+        'brv2-hist-gl-only':   'GL Only',
+        'brv2-hist-stmt-only': 'Stmt Only',
+        'brv2-hist-diff':      'Difference',
+        'brv2-hist-actions':   'Actions',
         'recon-tab-sale-vat': 'VAT Report Audit',
         'recon-tab-gl-vat':   'Revenue Reconciliation',
         'glv-sub':            'General Ledger vs Sales VAT Report · Upload two files to reconcile',
@@ -6655,8 +6675,18 @@ const I18N = {
         'brv2-th-gl-debit':   'เดบิต GL',
         'brv2-th-gl-credit':  'เครดิต GL',
         'brv2-th-layer':      'ชั้น',
-        'brv2-history-title': 'ประวัติการกระทบยอด',
-        'brv2-loading':       'กำลังโหลด…',
+        'brv2-history-title':  'ประวัติการกระทบยอด',
+        'brv2-loading':        'กำลังโหลด…',
+        'brv2-history-empty':  'ยังไม่มีประวัติ',
+        'brv2-hist-search-ph': 'ค้นหา...',
+        'brv2-hist-time':      'เวลา',
+        'brv2-hist-files':     'ไฟล์',
+        'brv2-hist-rows':      'แถว (ธนาคาร/GL)',
+        'brv2-hist-matched':   'จับคู่แล้ว',
+        'brv2-hist-gl-only':   'GL เท่านั้น',
+        'brv2-hist-stmt-only': 'บัญชีธนาคารเท่านั้น',
+        'brv2-hist-diff':      'ผลต่าง',
+        'brv2-hist-actions':   'การดำเนินการ',
         'recon-tab-sale-vat': 'ตรวจสอบรายงานภาษีขาย',
         'recon-tab-gl-vat':   'กระทบรายได้',
         'glv-sub':            'บัญชีแยกประเภท (GL) vs รายงานภาษีขาย · อัปโหลดสองไฟล์เพื่อกระทบยอด',
@@ -9000,8 +9030,18 @@ const I18N = {
         'brv2-th-gl-debit':   'GL借方',
         'brv2-th-gl-credit':  'GL貸方',
         'brv2-th-layer':      '層',
-        'brv2-history-title': '照合履歴',
-        'brv2-loading':       '読み込み中…',
+        'brv2-history-title':  '照合履歴',
+        'brv2-loading':        '読み込み中…',
+        'brv2-history-empty':  '記録なし',
+        'brv2-hist-search-ph': '検索...',
+        'brv2-hist-time':      '時間',
+        'brv2-hist-files':     'ファイル',
+        'brv2-hist-rows':      '行数(明細/GL)',
+        'brv2-hist-matched':   '照合済',
+        'brv2-hist-gl-only':   'GLのみ',
+        'brv2-hist-stmt-only': '明細のみ',
+        'brv2-hist-diff':      '差額',
+        'brv2-hist-actions':   '操作',
         'recon-tab-sale-vat': '売上税報告チェック',
         'recon-tab-gl-vat':   '売上照合',
         'glv-sub':            '総勘定元帳（GL）vs 売上税報告 · 2ファイルをアップロードして照合',
@@ -18592,6 +18632,7 @@ async function deleteEndpoint(endpointId) {
     let _currentTask = null; // Last run result {task_id, detail, summary, stats}
     let _currentFilter = 'all';
     let _allRows     = [];   // parsed detail rows (flat)
+    let _brv2Search  = { stmt: '', gl: '' };
 
     // ── DOM helpers ───────────────────────────────────────────────────
     const $ = id => document.getElementById(id);
@@ -18609,10 +18650,10 @@ async function deleteEndpoint(endpointId) {
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // ── File rendering（vex-drop-filename + chip list） ──────────────
+    // ── File rendering（vex-drop-filename + preview panel） ──────────
     function renderFileList(zone) {
-        const files  = zone === 'stmt' ? _stmtFiles : _glFiles;
-        // 1. 更新拖拽区内摘要文字
+        const files = zone === 'stmt' ? _stmtFiles : _glFiles;
+        // 更新拖拽区内摘要文字
         const nameEl = $(`brv2-${zone}-name`);
         if (nameEl) {
             if (files.length === 0) {
@@ -18623,19 +18664,90 @@ async function deleteEndpoint(endpointId) {
                 nameEl.textContent = files.length + (labels[lang] || ' 个文件');
             }
         }
-        // 2. chip 列表（位于拖拽区下方）
-        const listEl = $(`brv2-${zone}-list`);
+        // 若 preview panel 已展开则刷新对应列
+        const panel = $('brv2-preview-panel');
+        if (panel && panel.style.display !== 'none') {
+            _renderBrv2Column(zone);
+        }
+        _updateTogglePreviewBtn();
+    }
+
+    function _updateTogglePreviewBtn() {
+        const btn   = $('brv2-toggle-preview');
+        const panel = $('brv2-preview-panel');
+        const hasFiles = (_stmtFiles.length + _glFiles.length) > 0;
+        if (btn) btn.style.display = hasFiles ? '' : 'none';
+        if (!hasFiles && panel) {
+            panel.style.display = 'none';
+            if (btn) btn.classList.remove('open');
+        }
+    }
+
+    function _renderBrv2PreviewPanel() {
+        _renderBrv2Column('stmt');
+        _renderBrv2Column('gl');
+    }
+
+    function _renderBrv2Column(zone) {
+        const colEl = $(zone === 'stmt' ? 'brv2-pp-stmt-col' : 'brv2-pp-gl-col');
+        if (!colEl) return;
+        const files = zone === 'stmt' ? _stmtFiles : _glFiles;
+        const lang = window._currentLang || 'zh';
+        const titleMap = {
+            stmt: { zh: '① 银行账单', th: '① บัญชีธนาคาร', en: '① Bank Stmt', ja: '① 銀行明細' },
+            gl:   { zh: '② 总账 GL',  th: '② GL รายงาน',  en: '② GL Report', ja: '② GL帳簿' },
+        };
+        const title     = (titleMap[zone] || {})[lang] || titleMap[zone].zh;
+        const ph        = esc2((window.t && window.t('vex-preview-search')) || '搜索文件名...');
+        const clearLbl  = esc2((window.t && window.t('vex-preview-clear-all')) || '全清');
+        const searchVal = _brv2Search[zone] || '';
+
+        colEl.innerHTML =
+            '<div class="vex-pp-col-title">' +
+                '<span class="vex-pp-col-name">' + esc2(title) +
+                ' <span class="vex-pp-col-count">' + files.length + '</span></span>' +
+            '</div>' +
+            '<div class="vex-pp-search-row">' +
+                '<input class="vex-pp-search" id="brv2-pp-search-' + zone + '" type="text" placeholder="' + ph + '" value="' + esc2(searchVal) + '" autocomplete="off">' +
+                '<button class="vex-pp-clear-btn" id="brv2-pp-clearall-' + zone + '" type="button">' + clearLbl + '</button>' +
+            '</div>' +
+            '<div class="vex-pp-file-list" id="brv2-pp-' + zone + '-list"></div>' +
+            '<div class="vex-pp-pagination" id="brv2-pp-' + zone + '-pg"></div>';
+
+        const si = $('brv2-pp-search-' + zone);
+        if (si) si.addEventListener('input', function (e) {
+            _brv2Search[zone] = e.target.value;
+            _renderBrv2FileList(zone);
+        });
+        const ca = $('brv2-pp-clearall-' + zone);
+        if (ca) ca.addEventListener('click', function () {
+            if (zone === 'stmt') _stmtFiles.length = 0;
+            else _glFiles.length = 0;
+            renderFileList(zone);
+            updateRunBtn();
+        });
+        _renderBrv2FileList(zone);
+    }
+
+    function _renderBrv2FileList(zone) {
+        const listEl = $('brv2-pp-' + zone + '-list');
+        const pgEl   = $('brv2-pp-' + zone + '-pg');
         if (!listEl) return;
-        listEl.innerHTML = files.map((f, i) =>
-            `<div class="brv2-file-chip">
-              <svg viewBox="0 0 12 12" width="10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="0.5" width="10" height="11" rx="1.5"/></svg>
-              <span>${esc2(f.name)}</span>
-              <button class="brv2-file-chip-remove" data-zone="${zone}" data-idx="${i}" title="删除">×</button>
-            </div>`
+        const files   = zone === 'stmt' ? _stmtFiles : _glFiles;
+        const q       = (_brv2Search[zone] || '').toLowerCase();
+        const filtered = q ? files.filter(f => f.name.toLowerCase().includes(q)) : files.slice();
+        const fileIco = '<svg class="vex-pp-fi-ico" viewBox="0 0 14 16" fill="none" stroke="currentColor" stroke-width="1.4" width="12" height="14"><path d="M3 1h6l3 3v11H3V1z"/><path d="M9 1v3h3"/></svg>';
+        const delIco  = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" width="11" height="11"><path d="M2 4h10M5 4V2h4v2M5.5 7v4M8.5 7v4M3 4l1 8h6l1-8"/></svg>';
+        listEl.innerHTML = filtered.map((f, i) =>
+            '<div class="vex-pp-file-row">' +
+            fileIco +
+            '<span class="vex-pp-fi-name" title="' + esc2(f.name) + '">' + esc2(f.name) + '</span>' +
+            '<span class="vex-pp-fi-size">' + _brv2FmtSize(f.size) + '</span>' +
+            '<button class="vex-pp-fi-del" type="button" data-zone="' + zone + '" data-idx="' + files.indexOf(f) + '" aria-label="remove">' + delIco + '</button>' +
+            '</div>'
         ).join('');
-        listEl.querySelectorAll('.brv2-file-chip-remove').forEach(btn => {
-            btn.addEventListener('click', e => {
-                e.stopPropagation(); // 防止冒泡到 zone → 不触发文件对话框
+        listEl.querySelectorAll('.vex-pp-fi-del').forEach(function (btn) {
+            btn.addEventListener('click', function () {
                 const idx = parseInt(btn.dataset.idx, 10);
                 if (btn.dataset.zone === 'stmt') _stmtFiles.splice(idx, 1);
                 else _glFiles.splice(idx, 1);
@@ -18643,10 +18755,34 @@ async function deleteEndpoint(endpointId) {
                 updateRunBtn();
             });
         });
-        // 3. 显示/隐藏 chips-row 容器
-        const chipsRow = $('brv2-chips-row');
-        if (chipsRow) {
-            chipsRow.style.display = (_stmtFiles.length + _glFiles.length > 0) ? '' : 'none';
+        if (pgEl) {
+            const tpl = (window.t && window.t('vex-preview-count')) || '显示 {n} / 共 {m}';
+            pgEl.textContent = tpl.replace('{n}', filtered.length).replace('{m}', files.length);
+        }
+    }
+
+    function _brv2FmtSize(bytes) {
+        if (!bytes) return '';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function _initBrv2TogglePreview() {
+        const btn = $('brv2-toggle-preview');
+        if (btn && !btn._reconBound) {
+            btn._reconBound = true;
+            btn.addEventListener('click', function () {
+                const panel = $('brv2-preview-panel');
+                const label = $('brv2-toggle-preview-label');
+                const isOpen = panel && panel.style.display !== 'none';
+                if (panel) panel.style.display = isOpen ? 'none' : '';
+                btn.classList.toggle('open', !isOpen);
+                if (label) label.textContent = isOpen
+                    ? ((window.t && window.t('vex-toggle-preview-open')) || '查看清单')
+                    : ((window.t && window.t('vex-toggle-preview-close')) || '收起清单');
+                if (!isOpen) _renderBrv2PreviewPanel();
+            });
         }
     }
 
@@ -18717,9 +18853,10 @@ async function deleteEndpoint(endpointId) {
     }
     function showError(msg) {
         const err = $('brv2-error');
-        if (err) { err.textContent = msg; err.style.display = ''; }
+        if (err) { err.textContent = msg; err.style.display = ''; err.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
         showProgress(false);
         updateRunBtn();
+        if (window.showToast) window.showToast(msg, 'error');
     }
 
     // ── Run reconciliation ────────────────────────────────────────────
@@ -18767,6 +18904,8 @@ async function deleteEndpoint(endpointId) {
             showProgress(false);
             renderResults(data);
             loadHistory();
+            const sc = $('brv2-summary-collapse');
+            if (sc) sc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
         } catch (e) {
             showError(e.message || 'Network error');
@@ -18877,7 +19016,8 @@ async function deleteEndpoint(endpointId) {
         });
 
         if (rows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--ink-3)">ไม่มีรายการ</td></tr>`;
+            const noRows = { zh: '无记录', th: 'ไม่มีรายการ', en: 'No rows', ja: '行なし' }[window._currentLang || 'zh'] || '无记录';
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--ink-3)">${noRows}</td></tr>`;
             return;
         }
 
@@ -18896,7 +19036,8 @@ async function deleteEndpoint(endpointId) {
                 badge = '<span class="brv2-status-badge brv2-badge-gl-only">GL</span>';
             } else {
                 rowClass = 'stmt-only';
-                badge = '<span class="brv2-status-badge brv2-badge-stmt-only">บัญชี</span>';
+                const stmtLbl = { zh: '账单', th: 'บัญชี', en: 'Stmt', ja: '明細' }[window._currentLang || 'zh'] || '账单';
+                badge = `<span class="brv2-status-badge brv2-badge-stmt-only">${stmtLbl}</span>`;
             }
 
             return `<tr class="${rowClass}">
@@ -18917,8 +19058,6 @@ async function deleteEndpoint(endpointId) {
     // ── History ───────────────────────────────────────────────────────
     async function loadHistory() {
         const token = localStorage.getItem('auth_token') || '';
-        const listEl = $('brv2-history-list');
-        if (!listEl) return;
         try {
             const res  = await fetch('/api/recon/bank-v2/tasks', {
                 headers: { 'Authorization': 'Bearer ' + token }
@@ -18926,63 +19065,115 @@ async function deleteEndpoint(endpointId) {
             const data = await res.json();
             renderHistory(data.tasks || []);
         } catch (e) {
-            if (listEl) listEl.innerHTML = '<div class="brv2-history-loading" style="color:#dc2626">โหลดประวัติไม่ได้</div>';
+            const emptyEl = $('brv2-history-empty');
+            const lang = window._currentLang || 'zh';
+            const errMsg = { zh: '加载失败', th: 'โหลดประวัติไม่ได้', en: 'Load failed', ja: '読み込み失敗' }[lang] || '加载失败';
+            if (emptyEl) { emptyEl.textContent = errMsg; emptyEl.style.display = ''; }
+            const wrap = $('brv2-history-table-wrap');
+            if (wrap) wrap.style.display = 'none';
         }
     }
 
     function renderHistory(tasks) {
-        const listEl = $('brv2-history-list');
-        if (!listEl) return;
+        const emptyEl = $('brv2-history-empty');
+        const wrap    = $('brv2-history-table-wrap');
+        const tbody   = $('brv2-history-tbody');
+        if (!tbody) return;
+
+        const lang = window._currentLang || 'zh';
         if (!tasks.length) {
-            listEl.innerHTML = '<div class="brv2-history-loading">ยังไม่มีประวัติ</div>';
+            const emptyTxt = { zh: '暂无对账记录', th: 'ยังไม่มีประวัติ', en: 'No records yet', ja: '記録なし' }[lang] || '暂无对账记录';
+            if (emptyEl) { emptyEl.textContent = emptyTxt; emptyEl.style.display = ''; }
+            if (wrap) wrap.style.display = 'none';
             return;
         }
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (wrap) wrap.style.display = '';
+
         const token = localStorage.getItem('auth_token') || '';
-        listEl.innerHTML = tasks.map(t => {
-            const bank   = (t.bank_code || 'bank').toUpperCase();
+        const SVG_LOAD = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="8" cy="8" r="6"/><polyline points="6 8 8 10 10 8"/><line x1="8" y1="4" x2="8" y2="10"/></svg>';
+        const SVG_DL   = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>';
+        const SVG_DEL  = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 4 13 4"/><path d="M6 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4"/><path d="M5 4l1 9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-9"/></svg>';
+
+        tbody.innerHTML = '';
+        tasks.forEach(t => {
             const diff   = Number(t.formula_diff || 0);
             const diffOk = Math.abs(diff) < 0.05;
-            const diffCls = diffOk ? 'brv2-hist-diff-ok' : 'brv2-hist-diff-bad';
-            const diffTxt = diffOk ? '✓' : fmtNum(diff);
-            const stmtF  = (t.stmt_files || '').split(';')[0].trim().split('/').pop().split('\\').pop();
-            const glF    = (t.gl_files   || '').split(';')[0].trim().split('/').pop().split('\\').pop();
+            const stmtF  = (t.stmt_files || '').split(';').map(s => s.trim().split(/[/\\]/).pop()).filter(Boolean).join(', ');
+            const glF    = (t.gl_files   || '').split(';').map(s => s.trim().split(/[/\\]/).pop()).filter(Boolean).join(', ');
             const dt     = t.created_at ? String(t.created_at).slice(0, 16).replace('T', ' ') : '';
-            return `<div class="brv2-hist-item" data-task-id="${t.id}">
-              <div class="brv2-hist-bank">${esc2(bank)}</div>
-              <div class="brv2-hist-info">
-                <div class="brv2-hist-files">${esc2(stmtF)} · ${esc2(glF)}</div>
-                <div class="brv2-hist-meta">${dt} · ✓${t.matched_count || 0} GL${(t.unmatched_gl||0)} บัญชี${(t.unmatched_stmt||0)}</div>
-              </div>
-              <div class="brv2-hist-stats"><span class="${diffCls}">${diffTxt}</span></div>
-              <button class="brv2-hist-del" data-task-id="${t.id}" title="ลบ">
-                <svg viewBox="0 0 14 14" width="12" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <path d="M2 4h10M5 4V2h4v2M6 7v4M8 7v4M3 4l1 8h6l1-8"/>
-                </svg>
-              </button>
-            </div>`;
-        }).join('');
 
-        // Bind history click
-        listEl.querySelectorAll('.brv2-hist-item').forEach(el => {
-            el.addEventListener('click', async (e) => {
-                if (e.target.closest('.brv2-hist-del')) return;
-                const tid = el.dataset.taskId;
-                await loadTask(tid, token);
-            });
-        });
+            const tr = document.createElement('tr');
+            tr.dataset.taskId = t.id;
 
-        // Bind delete
-        listEl.querySelectorAll('.brv2-hist-del').forEach(btn => {
-            btn.addEventListener('click', async e => {
-                e.stopPropagation();
-                const tid = btn.dataset.taskId;
-                if (!confirm('ลบรายการนี้?')) return;
-                await fetch('/api/recon/bank-v2/' + tid, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + token },
-                });
+            const tdTime = document.createElement('td');
+            tdTime.textContent = dt;
+
+            const tdFiles = document.createElement('td');
+            tdFiles.className = 'glv-history-file';
+            tdFiles.title = stmtF + ' + ' + glF;
+            tdFiles.textContent = stmtF + ' + ' + glF;
+
+            const tdRows = document.createElement('td');
+            tdRows.className = 'glv-num';
+            tdRows.textContent = (t.stmt_row_count || 0) + ' / ' + (t.gl_row_count || 0);
+
+            const tdMatched = document.createElement('td');
+            tdMatched.className = 'glv-num';
+            tdMatched.textContent = t.matched_count || 0;
+
+            const tdGlOnly = document.createElement('td');
+            tdGlOnly.className = 'glv-num';
+            tdGlOnly.textContent = (t.unmatched_gl || 0);
+
+            const tdStmtOnly = document.createElement('td');
+            tdStmtOnly.className = 'glv-num';
+            tdStmtOnly.textContent = (t.unmatched_stmt || 0);
+
+            const tdDiff = document.createElement('td');
+            tdDiff.className = 'glv-num';
+            tdDiff.style.color = diffOk ? '#059669' : '#dc2626';
+            tdDiff.textContent = diffOk ? '✓' : fmtNum(diff);
+
+            const tdAct = document.createElement('td');
+            tdAct.className = 'glv-history-actions';
+            const mkBtn = (svg, title, cls, onClick) => {
+                const b = document.createElement('button');
+                b.type = 'button'; b.title = title; b.setAttribute('aria-label', title);
+                if (cls) b.className = cls;
+                b.innerHTML = svg;
+                b.onclick = e => { e.stopPropagation(); onClick(); };
+                return b;
+            };
+            const delConfirm = { zh: '删除这条记录?', th: 'ลบรายการนี้?', en: 'Delete this record?', ja: 'この記録を削除しますか?' }[lang] || '删除?';
+            tdAct.appendChild(mkBtn(SVG_LOAD, '加载', '', () => loadTask(t.id, token)));
+            tdAct.appendChild(mkBtn(SVG_DL,   '导出', '', () => {
+                const l = window._currentLang || 'th';
+                window.open('/api/recon/bank-v2/' + t.id + '/export?lang=' + l, '_blank');
+            }));
+            tdAct.appendChild(mkBtn(SVG_DEL,  '删除', 'glv-del', async () => {
+                if (!confirm(delConfirm)) return;
+                await fetch('/api/recon/bank-v2/' + t.id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
                 loadHistory();
+            }));
+
+            [tdTime, tdFiles, tdRows, tdMatched, tdGlOnly, tdStmtOnly, tdDiff, tdAct].forEach(c => tr.appendChild(c));
+            tr.style.cursor = 'pointer';
+            tr.addEventListener('click', async (e) => {
+                if (e.target.closest('.glv-del') || e.target.closest('button')) return;
+                await loadTask(t.id, token);
             });
+            tbody.appendChild(tr);
+        });
+        _applyBrv2Search();
+    }
+
+    function _applyBrv2Search() {
+        const q = (($('brv2-hist-search') || {}).value || '').trim().toLowerCase();
+        const tbody = $('brv2-history-tbody');
+        if (!tbody) return;
+        tbody.querySelectorAll('tr').forEach(tr => {
+            tr.style.display = (!q || tr.textContent.toLowerCase().includes(q)) ? '' : 'none';
         });
     }
 
@@ -19062,6 +19253,10 @@ async function deleteEndpoint(endpointId) {
                 renderTable();
             });
         }
+
+        _initBrv2TogglePreview();
+        const hs = $('brv2-hist-search');
+        if (hs) hs.addEventListener('input', _applyBrv2Search);
 
         loadHistory();
         updateRunBtn();

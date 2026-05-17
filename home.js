@@ -1924,8 +1924,10 @@ const I18N = {
         'brv2-stat-matched':  '已匹配',
         'brv2-stat-gl-only':  'GL仅有',
         'brv2-stat-stmt-only':'账单仅有',
-        'brv2-stat-diff':     '差异',
+        'brv2-stat-diff':     '差额',
+        'brv2-stat-unmatched':'未匹配',
         'brv2-formula-title': '对账公式',
+        'brv2-detail-title':  '明细',
         'brv2-gl-close':      'GL期末余额',
         'brv2-open-diff':     '期初差异',
         'brv2-gl-debit-only': 'GL借方仅有(−)',
@@ -4286,7 +4288,9 @@ const I18N = {
         'brv2-stat-gl-only':  'GL Only',
         'brv2-stat-stmt-only':'Stmt Only',
         'brv2-stat-diff':     'Difference',
+        'brv2-stat-unmatched':'Unmatched',
         'brv2-formula-title': 'Reconciliation Formula',
+        'brv2-detail-title':  'Details',
         'brv2-gl-close':      'GL Closing Balance',
         'brv2-open-diff':     'Opening Difference',
         'brv2-gl-debit-only': 'GL Debit Only (−)',
@@ -6649,7 +6653,9 @@ const I18N = {
         'brv2-stat-gl-only':  'GL เท่านั้น',
         'brv2-stat-stmt-only':'บัญชีเท่านั้น',
         'brv2-stat-diff':     'ผลต่าง',
+        'brv2-stat-unmatched':'ไม่จับคู่',
         'brv2-formula-title': 'สูตรการสอบทาน',
+        'brv2-detail-title':  'รายละเอียด',
         'brv2-gl-close':      'ยอดปิด GL',
         'brv2-open-diff':     'ผลต่างยอดเปิด',
         'brv2-gl-debit-only': 'GL เดบิตเท่านั้น (−)',
@@ -9004,7 +9010,9 @@ const I18N = {
         'brv2-stat-gl-only':  'GLのみ',
         'brv2-stat-stmt-only':'明細のみ',
         'brv2-stat-diff':     '差異',
+        'brv2-stat-unmatched':'不一致',
         'brv2-formula-title': '照合公式',
+        'brv2-detail-title':  '明細',
         'brv2-gl-close':      'GL期末残高',
         'brv2-open-diff':     '期首差異',
         'brv2-gl-debit-only': 'GLのみ借方(−)',
@@ -19053,11 +19061,10 @@ async function deleteEndpoint(endpointId) {
         const fdiff    = Number(summary.formula_diff || 0);
         const diffOk   = Math.abs(fdiff) < 0.05;
 
-        // KPI strip
-        if ($('brv2-kpi-matched'))  $('brv2-kpi-matched').textContent  = matched;
-        if ($('brv2-kpi-gl-only'))  $('brv2-kpi-gl-only').textContent  = glOnly;
-        if ($('brv2-kpi-stmt-only'))$('brv2-kpi-stmt-only').textContent = stmtOnly;
-        if ($('brv2-kpi-diff'))     $('brv2-kpi-diff').textContent     = fmtNum(fdiff);
+        // KPI strip (3 cards)
+        if ($('brv2-kpi-matched'))   $('brv2-kpi-matched').textContent   = matched;
+        if ($('brv2-kpi-diff'))      $('brv2-kpi-diff').textContent      = fmtNum(fdiff);
+        if ($('brv2-kpi-unmatched')) $('brv2-kpi-unmatched').textContent = glOnly + stmtOnly;
         // 差额图标颜色
         const diffIcon = $('brv2-kpi-diff-icon');
         if (diffIcon) {

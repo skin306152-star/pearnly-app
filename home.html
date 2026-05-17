@@ -4483,7 +4483,7 @@
         <!-- ── 银行对账面板 v2（vex-drop 同款视觉 · v118.33.6.1 UI 重构对齐 GL-VAT） ── -->
         <div id="recon-pane-bank" class="recon-pane active">
 
-            <!-- KPI 4 卡 -->
+            <!-- KPI 3 卡 -->
             <div class="vex-kpi-strip" id="brv2-kpi-strip">
                 <div class="vex-kpi-card">
                     <div class="vex-kpi-icon-wrap vex-kpi-icon-ok">✓</div>
@@ -4493,24 +4493,17 @@
                     </div>
                 </div>
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-warn">GL</div>
-                    <div>
-                        <div class="vex-kpi-val" id="brv2-kpi-gl-only">—</div>
-                        <div class="vex-kpi-lbl" data-i18n="brv2-stat-gl-only">GL 未对账</div>
-                    </div>
-                </div>
-                <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-err">账</div>
-                    <div>
-                        <div class="vex-kpi-val" id="brv2-kpi-stmt-only">—</div>
-                        <div class="vex-kpi-lbl" data-i18n="brv2-stat-stmt-only">账单未对账</div>
-                    </div>
-                </div>
-                <div class="vex-kpi-card">
                     <div class="vex-kpi-icon-wrap" id="brv2-kpi-diff-icon" style="background:#f3f4f6;color:#6b7280">△</div>
                     <div>
                         <div class="vex-kpi-val" id="brv2-kpi-diff">—</div>
                         <div class="vex-kpi-lbl" data-i18n="brv2-stat-diff">差额</div>
+                    </div>
+                </div>
+                <div class="vex-kpi-card">
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-err">!</div>
+                    <div>
+                        <div class="vex-kpi-val" id="brv2-kpi-unmatched">—</div>
+                        <div class="vex-kpi-lbl" data-i18n="brv2-stat-unmatched">未匹配</div>
                     </div>
                 </div>
             </div>
@@ -4604,7 +4597,7 @@
                         <svg class="recon-collapse-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="5 7 8 10 11 7"/>
                         </svg>
-                        <span class="recon-collapse-title" data-i18n="brv2-summary-title">对账公式</span>
+                        <span class="recon-collapse-title" data-i18n="brv2-formula-title">对账公式</span>
                         <span class="recon-collapse-sub" id="brv2-formula-sub"></span>
                         <div class="glv-section-spacer"></div>
                         <button class="btn btn-ghost btn-small" id="brv2-export-btn" type="button" style="display:none">
@@ -4643,7 +4636,7 @@
                         <svg class="recon-collapse-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="5 7 8 10 11 7"/>
                         </svg>
-                        <span class="recon-collapse-title" data-i18n="brv2-detail-title">明细</span>
+                        <span class="recon-collapse-title" data-i18n="brv2-detail-title">明細</span>
                         <span class="recon-collapse-sub" id="brv2-detail-sub"></span>
                         <div class="glv-section-spacer"></div>
                         <!-- 过滤 tabs（放在折叠头部右侧） -->
@@ -6323,7 +6316,7 @@
     </div>
 </div>
 
-<script src="/static/home.js?v=11841701"></script>
+<script src="/static/home.js?v=11841702"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 

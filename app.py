@@ -7017,19 +7017,6 @@ def _check_password_strength(password: str) -> Optional[str]:
     return None
 
 
-def _gen_temp_password(length: int = 12) -> str:
-    """生成强随机临时密码 · 字母+数字+少量符号 · 易读(不含 0/O/l/1)"""
-    import secrets
-    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
-    # 保证至少含 2 字母 + 2 数字
-    while True:
-        pw = ''.join(secrets.choice(alphabet) for _ in range(length))
-        if (sum(c.isalpha() for c in pw) >= 2
-            and sum(c.isdigit() for c in pw) >= 2
-            and pw.lower() not in _WEAK_PASSWORDS):
-            return pw
-
-
 def _require_owner_or_super(request: Request) -> Dict[str, Any]:
     """老板或超管
     v118.26.2.4 · BUG 4 修补:新注册老板 tenant_id=NULL · 加员工时被拒

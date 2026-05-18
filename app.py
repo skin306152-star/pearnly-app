@@ -1683,106 +1683,27 @@ async def ocr_recognize(
     own_key = (user.get("gemini_api_key") or user.get("custom_gemini_api_key") or "").strip()
     api_key = own_key or None
 
-    # v118.20.4 · PDF 文本预筛(电子发票快速通道)
-    # 命中:0.3s 一张 · 跳过 Gemini · 省时省 API 配额
-    # 不命中:静默 fallback · 走原 Gemini → Vision 链(零回退副作用)
-    result = None
-    chain_info = []
+    # OCR · 新 pipeline 唯一路径(text_path layer 0 + Vision + Flash-Lite + Flash · 100% 埋点)
+    chain_info = ["pipeline_v1"]
     fallback_used = False
-    # Round 2 · 新 pipeline 接入(feature-flag-gated)
-    # OCR_USE_NEW_PIPELINE=true → 走 services/ocr/pipeline · 完整 Vision+Flash-Lite+Flash 三层 + 100% 埋点
-    # OCR_USE_NEW_PIPELINE=false(默认)→ 走旧 text_path → gemini → vision_fallback 链(行为不变)
-    _pipeline_cost_thb = None
-    if os.environ.get("OCR_USE_NEW_PIPELINE", "false").strip().lower() == "true":
-        try:
-            from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
-            from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
-            _pipe_res = _pipeline_run(content, max_pages=max_pages, api_key=api_key)
-            result = pipeline_result_to_legacy_dict(_pipe_res)
-            chain_info = ["pipeline_v1"]
-            _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
-            logger.info(
-                f"🆕 pipeline_v1 · file={file.filename} · pages={_pipe_res.page_count} "
-                f"· cost=฿{_pipeline_cost_thb:.4f} · elapsed={_pipe_res.elapsed_ms}ms"
-            )
-        except Exception as _pipe_err:
-            logger.warning(
-                f"⚠️ pipeline_v1 失败 · fallback 旧 OCR · "
-                f"{type(_pipe_err).__name__}: {_pipe_err}"
-            )
-            result = None
-            _pipeline_cost_thb = None
-
-    if result is None:
-        try:
-            from pdf_text_extractor import try_text_extraction
-            _text_result = try_text_extraction(content)
-            if _text_result:
-                result = _text_result
-                chain_info = ["text_path"]
-                logger.info(
-                    f"🚀 [text_path] 跳过 Gemini · file={file.filename} · "
-                    f"pages={result.get('page_count')} · {result.get('elapsed_ms')} ms"
-                )
-        except Exception as _tpe:
-            logger.warning(f"[text_path] 异常 · fallback Gemini · {type(_tpe).__name__}: {_tpe}")
-
-    # 主引擎 · Gemini(若文本预筛未命中)
-    if result is None:
-        chain_info = ["gemini"]
-        try:
-            from gemini_engine import recognize_pdf
-            result = recognize_pdf(content, max_pages=max_pages, api_key=api_key)
-            # 判断是否需要 Vision 兜底:Gemini 没返回 pages 或 pages 全是空字段
-            pages = result.get("pages", []) if result else []
-            all_empty = pages and all(
-                not (p.get("fields") or {}).get("invoice_no")
-                and not (p.get("fields") or {}).get("total_amount")
-                and not (p.get("fields") or {}).get("seller_name")
-                for p in pages
-            )
-            if not pages or all_empty:
-                raise RuntimeError("gemini_returned_empty")
-            logger.info(f"✅ OCR 主引擎成功 · file={file.filename} · pages={len(pages)}")
-        except HTTPException:
-            raise
-        except ValueError as e:
-            raise HTTPException(400, detail=str(e))
-        except Exception as gemini_err:
-            # Gemini 失败 · 启动 Google Vision 备份
-            logger.warning(f"⚠️ Gemini 失败({type(gemini_err).__name__}: {gemini_err})· 启动 Vision 备份")
-            try:
-                import vision_engine
-                from gemini_engine import _pdf_to_pil_images, restructure_with_text_hint
-
-                vision_texts = vision_engine.extract_text_from_pdf_bytes(content, max_pages=max_pages)
-                if not vision_texts:
-                    raise RuntimeError("vision_extract_failed")
-
-                # Vision 提了文字 · 用 Gemini 抽字段(只抽字段 · 不再读图)
-                try:
-                    all_images = _pdf_to_pil_images(content, dpi=150)
-                except Exception:
-                    all_images = []
-
-                pages_out = []
-                for idx in sorted(vision_texts.keys()):
-                    text = vision_texts[idx]
-                    img = all_images[idx] if idx < len(all_images) else None
-                    fields = restructure_with_text_hint(img, text, {}, [], api_key=api_key) if img else {}
-                    pages_out.append({
-                        "page": idx + 1,
-                        "fields": fields or {},
-                        "raw_text": text,
-                        "fallback_engine": "google_vision",
-                    })
-                result = {"pages": pages_out}
-                fallback_used = True
-                chain_info = ["gemini_failed", "google_vision"]
-                logger.info(f"✅ Vision 备份成功 · file={file.filename} · pages={len(pages_out)}")
-            except Exception as vision_err:
-                logger.exception(f"❌ Gemini + Vision 双失败: {type(vision_err).__name__}: {vision_err}")
-                raise HTTPException(500, detail="ocr.engine_error")
+    try:
+        from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
+        from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+        _pipe_res = _pipeline_run(content, max_pages=max_pages, api_key=api_key)
+        result = pipeline_result_to_legacy_dict(_pipe_res)
+        _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
+        logger.info(
+            f"🆕 pipeline_v1 · file={file.filename} · pages={_pipe_res.page_count} "
+            f"· cost=฿{_pipeline_cost_thb:.4f} · elapsed={_pipe_res.elapsed_ms}ms"
+        )
+    except HTTPException:
+        raise
+    except Exception as _pipe_err:
+        err_name = type(_pipe_err).__name__
+        if err_name == "Layer1PDFError" or isinstance(_pipe_err, ValueError):
+            raise HTTPException(400, detail=f"ocr.invalid_pdf: {_pipe_err}")
+        logger.exception(f"❌ pipeline_v1 失败: {err_name}: {_pipe_err}")
+        raise HTTPException(500, detail="ocr.engine_error")
 
     # ============================================================
     # v93 · 场景 2 · 非发票检测(Gemini Prompt 里新增 is_not_invoice 字段)
@@ -2135,39 +2056,14 @@ async def ocr_recognize(
         except Exception as e:
             logger.warning(f"xero 自动推入队失败: {e}")
 
-    # v106 · 写入成本日志(每张发票 1 条)
+    # 写入成本日志 · pipeline-v1 自带完整成本(Vision per-page + Flash-Lite + Flash · 100% 埋点)
     try:
         # 汇总 token 用量
         total_input_tokens = sum(int(p.get("input_tokens") or 0) for p in result.get("pages", []))
         total_output_tokens = sum(int(p.get("output_tokens") or 0) for p in result.get("pages", []))
         total_pages = int(result.get("page_count") or len(result.get("pages", [])) or 0)
-        # Gemini 2.5 Flash 价格(2026-05 · Tier 1 标准价 · 含图像 token):
-        #   text input:  $0.30 / 1M tokens
-        #   image input: $0.30 / 1M tokens(每张图 ~258 tokens 起)
-        #   output:      $2.50 / 1M tokens
-        # 实际计费:input/output token 已含图像 · 直接套公式即可
-        # 汇率参考 · 1 USD ≈ 35 THB(2026-05)
-        # v108 · 用最新的真实余额校准系数(若没记录则默认 1.10)
-        try:
-            _balance = db.get_latest_balance()
-            calib = float(_balance.get("calibration_factor") or 1.10) if _balance else 1.10
-        except Exception:
-            calib = 1.10
-        if _pipeline_cost_thb is not None:
-            # Round 2 · 新 pipeline 已自带完整成本(含 Vision 每页 $0.00150)
-            # 直接使用 · 跳过老的 token-only 公式(老公式漏了 Vision 单页成本)
-            cost_thb = _pipeline_cost_thb
-            primary_engine = "pipeline_v1"
-        else:
-            cost_usd = (total_input_tokens * db.OCR_PRICING["input_per_m_usd"] + total_output_tokens * db.OCR_PRICING["output_per_m_usd"]) / 1_000_000
-            # v4.10.14 过渡 · calib 校准系数 v4.10.15 admin 改造时统一砍
-            cost_thb = cost_usd * db.OCR_PRICING["usd_thb"] * calib
-            if chain_info and chain_info[0] == "text_path":
-                primary_engine = "text_path"
-            elif fallback_used:
-                primary_engine = "google_vision"
-            else:
-                primary_engine = "gemini"
+        cost_thb = _pipeline_cost_thb
+        primary_engine = "pipeline_v1"
         # 写一条记录(以本次识别的主 history 为锚)
         db.log_ocr_cost(
             user_id=str(user["id"]),
@@ -5579,44 +5475,29 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
             line_client.push_text(line_user_id, reply_txt)
             return
 
-        # 4. OCR(用 Gemini · 复用网页同一套)
-        # Round 2 · 新 pipeline 接入(feature-flag-gated)
+        # 4. OCR · 新 pipeline 唯一路径
         own_key = (user_fresh.get("gemini_api_key")
                    or user_fresh.get("custom_gemini_api_key") or "").strip()
         api_key = own_key or None
+        # 检查 API key 可用性(用户自带或系统默认)
+        if not api_key and not os.environ.get("GEMINI_API_KEY", "").strip():
+            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
+            return
 
-        result = None
-        _pipeline_cost_thb = None
-        if os.environ.get("OCR_USE_NEW_PIPELINE", "false").strip().lower() == "true":
-            try:
-                from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
-                from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
-                _pipe_res = _pipeline_run(pdf_bytes, max_pages=1, api_key=api_key)
-                result = pipeline_result_to_legacy_dict(_pipe_res)
-                _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
-                logger.info(
-                    f"🆕 [line_ocr] pipeline_v1 · pages={_pipe_res.page_count} "
-                    f"· cost=฿{_pipeline_cost_thb:.4f}"
-                )
-            except Exception as _pipe_err:
-                logger.warning(
-                    f"[line_ocr] pipeline_v1 失败 · fallback Gemini · "
-                    f"{type(_pipe_err).__name__}: {_pipe_err}"
-                )
-                result = None
-                _pipeline_cost_thb = None
-
-        if result is None:
-            try:
-                from gemini_engine import recognize_pdf as gemini_recognize, is_gemini_available
-                if not api_key and not is_gemini_available():
-                    line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
-                    return
-                result = gemini_recognize(pdf_bytes, max_pages=1, api_key=api_key)
-            except Exception as e:
-                logger.error(f"[line_ocr] Gemini 识别失败: {e}")
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
-                return
+        try:
+            from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
+            from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+            _pipe_res = _pipeline_run(pdf_bytes, max_pages=1, api_key=api_key)
+            result = pipeline_result_to_legacy_dict(_pipe_res)
+            _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
+            logger.info(
+                f"🆕 [line_ocr] pipeline_v1 · pages={_pipe_res.page_count} "
+                f"· cost=฿{_pipeline_cost_thb:.4f}"
+            )
+        except Exception as _pipe_err:
+            logger.error(f"[line_ocr] pipeline 识别失败: {type(_pipe_err).__name__}: {_pipe_err}")
+            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
+            return
 
         pages = result.get("pages") or []
         if not pages:
@@ -5642,26 +5523,24 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
             logger.warning(f"[line_ocr] 写 history 失败(不影响回复): {e}")
             hid = None
 
-        # Round 2 · 新 pipeline 路径强制 cost 埋点(LINE 入口此前漏记)
-        # 只在 pipeline 路径下写 · 旧 Gemini 路径维持原样(等全切后另行处理)
-        if _pipeline_cost_thb is not None:
-            try:
-                _line_in = sum(int(p.get("input_tokens") or 0) for p in pages)
-                _line_out = sum(int(p.get("output_tokens") or 0) for p in pages)
-                db.log_ocr_cost(
-                    user_id=str(user_fresh["id"]),
-                    tenant_id=str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None,
-                    history_id=hid,
-                    engine="pipeline_v1",
-                    pages=len(pages),
-                    input_tokens=_line_in,
-                    output_tokens=_line_out,
-                    cost_thb=_pipeline_cost_thb,
-                    elapsed_ms=int(result.get("elapsed_ms") or 0),
-                )
-                logger.info(f"💰 [line_ocr] cost log · ฿{_pipeline_cost_thb:.4f}")
-            except Exception as _ce:
-                logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
+        # LINE 入口 cost 埋点(pipeline 唯一路径,100% 记录)
+        try:
+            _line_in = sum(int(p.get("input_tokens") or 0) for p in pages)
+            _line_out = sum(int(p.get("output_tokens") or 0) for p in pages)
+            db.log_ocr_cost(
+                user_id=str(user_fresh["id"]),
+                tenant_id=str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None,
+                history_id=hid,
+                engine="pipeline_v1",
+                pages=len(pages),
+                input_tokens=_line_in,
+                output_tokens=_line_out,
+                cost_thb=_pipeline_cost_thb,
+                elapsed_ms=int(result.get("elapsed_ms") or 0),
+            )
+            logger.info(f"💰 [line_ocr] cost log · ฿{_pipeline_cost_thb:.4f}")
+        except Exception as _ce:
+            logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
 
         # 5.5 · 异常栏 hook(v118.22.0.2 修复 · LINE 入口此前漏挂 · 致 LINE 票据从不进 5 类规则)
         # v118.22.0.3 · 增加 duplicate 预检 · 让 LINE 票据也享有「重复发票拦截」防护

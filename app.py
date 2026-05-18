@@ -3118,9 +3118,10 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
     """前端「测试连接」按钮 · 不写日志、不改任何状态
 
     v118.34.1 (Zihao 2026-05-19 拍板) · mrerp 必须直接走 MRERPAdapter.login
-    + select_company,不能掉进 ADAPTER_REGISTRY → push_mrerp stub。Stub
-    是 push_to_endpoint 边界占位,跟"测试连接"语义不一样;wizard 还没保存
-    endpoint 时只能走这条路由,所以必须在这里也做正确分发。"""
+    + select_company,不能掉进 ADAPTER_REGISTRY → push_mrerp stub。
+    v118.34.2 (2026-05-19) · 加路由级 try/except 兜底 + 接受 wizard 发的
+    plaintext `{username, password}`(以前只接受 `{username_enc,
+    password_enc}` 容易碰到的 ImportError 上浮成 500)。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
     if req.adapter not in _erp.ADAPTER_REGISTRY:
@@ -3129,9 +3130,28 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
     cfg.pop("_token_set", None)
 
     # mrerp: real login + company-picker scrape (rich shape with
-    # ok / companies / error_friendly). Wizard JS already understands this.
+    # ok / companies / error_friendly). Wizard JS already understands
+    # this shape. test_mrerp_endpoint is contracted to NEVER raise but
+    # the route still wraps the call so a bug in the helper can't
+    # surface as a 500 to the UI — we'd rather render a friendly bar.
     if req.adapter == "mrerp":
-        return _erp.test_mrerp_endpoint(cfg)
+        try:
+            return _erp.test_mrerp_endpoint(cfg)
+        except Exception as e:
+            logger.exception("erp_test_connection mrerp helper raised")
+            return {
+                "ok": False,
+                "elapsed_ms": 0,
+                "companies": [],
+                "error_code": "ERR_UNEXPECTED",
+                "error_friendly": {
+                    "zh": f"服务器内部错误:{type(e).__name__}",
+                    "en": f"Internal server error: {type(e).__name__}",
+                    "th": f"ข้อผิดพลาดของเซิร์ฟเวอร์: {type(e).__name__}",
+                    "zh_TW": f"伺服器內部錯誤:{type(e).__name__}",
+                },
+                "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
+            }
 
     # Other adapters: legacy ping. Keep the historical shape so
     # webhook / flowaccount UIs aren't broken.
@@ -3183,19 +3203,37 @@ async def erp_endpoint_test_connection(
 
     adapter = (ep.get("adapter") or "").strip().lower()
     config = ep.get("config") or {}
-    if adapter == "mrerp":
-        result = _erp.test_mrerp_endpoint(config)
-    else:
-        # webhook / flowaccount / etc — defer to the existing ping test.
-        legacy = _erp.test_endpoint_connection(adapter, config)
+    # v118.34.2 (2026-05-19) · try/except wrapper mirrors the legacy
+    # route so even a bug in test_mrerp_endpoint can't surface as a 500.
+    try:
+        if adapter == "mrerp":
+            result = _erp.test_mrerp_endpoint(config)
+        else:
+            # webhook / flowaccount / etc — defer to the existing ping test.
+            legacy = _erp.test_endpoint_connection(adapter, config)
+            result = {
+                "ok": bool(legacy.get("success")),
+                "elapsed_ms": legacy.get("elapsed_ms", 0),
+                "http_status": legacy.get("http_status"),
+                "raw_error": legacy.get("error_msg"),
+                "companies": [],
+                "error_code": None if legacy.get("success") else "ERR_TECHNICAL",
+                "error_friendly": None,
+            }
+    except Exception as e:
+        logger.exception("erp_endpoint_test_connection helper raised")
         result = {
-            "ok": bool(legacy.get("success")),
-            "elapsed_ms": legacy.get("elapsed_ms", 0),
-            "http_status": legacy.get("http_status"),
-            "raw_error": legacy.get("error_msg"),
+            "ok": False,
+            "elapsed_ms": 0,
             "companies": [],
-            "error_code": None if legacy.get("success") else "ERR_TECHNICAL",
-            "error_friendly": None,
+            "error_code": "ERR_UNEXPECTED",
+            "error_friendly": {
+                "zh": f"服务器内部错误:{type(e).__name__}",
+                "en": f"Internal server error: {type(e).__name__}",
+                "th": f"ข้อผิดพลาดของเซิร์ฟเวอร์: {type(e).__name__}",
+                "zh_TW": f"伺服器內部錯誤:{type(e).__name__}",
+            },
+            "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
         }
 
     from datetime import datetime as _dt
@@ -4489,10 +4527,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.34.1 · MR.ERP「测试连接」修复:\n• 修复:wizard 第 2 步「测试连接」按钮以前掉进 push_mrerp 占位返回,现在直接走 MRERPAdapter.login + select_company\n• 修复:连接失败时错误条会显示真实文字(以前空白)· 4 语友好消息 + 原始错误 fallback 链兜底\n• 加守门测试 test_erp_test_connection_route_dispatch · 防止以后再回退到占位\n\nv118.34.0 · MR.ERP 一键对接(开发预览):\n• 「自动化 → ERP 对接」多了 MR.ERP 卡片 · 跟 Xero 同位置\n• 点「连接」走 3 步配置(选客户 → 填账号密码 + 测试连接 → 选公司 + 推送模式)\n• 选个现有客户和商品作模板 · 以后新客户新商品自动按模板建好(销售员 / 账户码 / 单位都继承)\n• 错误提示全中英泰繁中显示 · 不再露 MR.ERP 原文\n• 这版是开发预览 · 内测中 · 体验还在打磨",
-            "en": "v118.34.1 · MR.ERP \"Test connection\" fix:\n• Fixed: the wizard Step-2 test button used to fall into the push_mrerp stub. It now drives the real MRERPAdapter.login + select_company flow.\n• Fixed: connection-failure error bar now always shows text (was blank). 4-lang friendly message + raw error fallback chain ensures something is always rendered.\n• Added guard test test_erp_test_connection_route_dispatch so this can't regress.\n\nv118.34.0 · MR.ERP one-click integration (dev preview):\n• New MR.ERP card under Automation → ERP integrations, sits next to Xero\n• Click \"Connect\" for the 3-step setup (pick clients → enter login + test connection → pick company + push mode)\n• Choose an existing customer and product as templates — new customers and products from invoices get auto-created using the templates (salesman / account code / unit all inherited)\n• Every error shown in 4 languages, no raw MR.ERP text leaking through\n• Dev-preview build · internal testing only · UX still being polished",
-            "th": "v118.34.1 · แก้ปุ่ม «ทดสอบเชื่อมต่อ» MR.ERP:\n• แก้: ปุ่มทดสอบในขั้นที่ 2 ของวิซาร์ดเคยตกลงไปที่ stub ของ push_mrerp ตอนนี้เรียก MRERPAdapter.login + select_company จริง\n• แก้: เมื่อเชื่อมต่อไม่สำเร็จ แถบข้อผิดพลาดจะมีข้อความเสมอ (เคยว่างเปล่า) ข้อความเป็นมิตร 4 ภาษา + fallback ของข้อความดิบ\n• เพิ่ม guard test test_erp_test_connection_route_dispatch กันถดถอย\n\nv118.34.0 · เชื่อม MR.ERP คลิกเดียว (พรีวิวระยะพัฒนา):\n• การ์ด MR.ERP ใหม่ใน «อัตโนมัติ → เชื่อม ERP» วางคู่กับ Xero\n• กด «เชื่อมต่อ» เพื่อทำการตั้งค่า 3 ขั้น (เลือกลูกค้า → กรอกบัญชี + ทดสอบเชื่อมต่อ → เลือกบริษัท + โหมดส่ง)\n• เลือกลูกค้าและสินค้าที่มีอยู่เป็นแม่แบบ — ลูกค้า/สินค้าใหม่จากใบกำกับจะสร้างอัตโนมัติตามแม่แบบ\n• ข้อความข้อผิดพลาดทุกตัวแสดงเป็น 4 ภาษา ไม่มีข้อความดิบของ MR.ERP\n• รุ่นพรีวิวระยะพัฒนา · เฉพาะทดสอบภายใน · UX ยังขัดเกลาอยู่",
-            "ja": "v118.34.1 · MR.ERP「接続テスト」修正:\n• 修正: ウィザード Step-2 のテストボタンが push_mrerp スタブに吸い込まれていた問題。本来の MRERPAdapter.login + select_company を呼ぶように修正\n• 修正: 接続失敗時のエラーバーが常に文字を表示（以前は空白）。4 言語の親切メッセージ + 生エラーのフォールバックチェーン\n• 退行防止テスト test_erp_test_connection_route_dispatch を追加\n\nv118.34.0 · MR.ERP ワンクリック連携（開発プレビュー）:\n• 「自動化 → ERP連携」に Xero と並ぶ MR.ERP カードを追加\n• 「接続」をクリックして 3 ステップ設定（取引先選択 → ログイン情報入力 + 接続テスト → 会社選択 + 送信モード）\n• 既存の取引先と商品をテンプレートとして選択 — 請求書から新規取引先/商品を自動作成\n• エラー表示は全 4 言語の親切なメッセージ\n• 開発プレビュー版 · 内部テストのみ · UX 改善中"
+            "zh": "v118.34.2 · MR.ERP「测试连接」二次加固:\n• 修复:test_mrerp_endpoint 顶部 import 之前裸跑 · Playwright/KMS 任何依赖缺失就 500 · 现在全包在 try/except · 永远返 200 + 友好错误条\n• 修复:wizard 现在直接发 plaintext {username, password} · 后端同时支持 plaintext 和 Fernet 密文两种凭据格式 · 不再用 _enc 字段塞明文这种坑\n• 加 4 个守门测试(共 9 个)· 包括 ImportError 模拟 · 8 种垃圾输入 · plaintext 路径回归\n• 加 ERR_PLAYWRIGHT_MISSING / ERR_KMS_MISSING 错误码 · 4 语友好消息全 fallback\n\nv118.34.0/1 · MR.ERP 一键对接(开发预览):\n• 「自动化 → ERP 对接」多了 MR.ERP 卡片 + 3 步 wizard\n• 错误提示全 4 语友好消息 · 不露 MR.ERP 原文\n• 内测预览 · 体验还在打磨",
+            "en": "v118.34.2 · MR.ERP \"Test connection\" hardening pass 2:\n• Fixed: test_mrerp_endpoint had a bare import at the top — any missing dep (Playwright, KMS key) would 500. Now wrapped in try/except — always returns 200 with a friendly error bar.\n• Fixed: wizard now sends plaintext {username, password} directly. Backend accepts both plaintext AND Fernet ciphertext, no more 'plaintext in _enc field' hack.\n• Added 4 hardening guard tests (9 total): ImportError simulation, 8 garbage inputs, plaintext-path regression.\n• New ERR_PLAYWRIGHT_MISSING / ERR_KMS_MISSING codes with 4-lang fallback catalog.\n\nv118.34.0/1 · MR.ERP one-click integration (dev preview):\n• New MR.ERP card + 3-step wizard\n• 4-lang friendly errors, no raw MR.ERP text leaking\n• Dev preview build · internal testing only",
+            "th": "v118.34.2 · เสริมความแข็งแกร่ง «ทดสอบเชื่อมต่อ» รอบ 2:\n• แก้: test_mrerp_endpoint เคย import ที่ด้านบนแบบไม่มี try/except ถ้าขาด Playwright หรือ KMS จะคืน 500 ตอนนี้ครอบ try/except ทั้งหมด คืน 200 พร้อมแถบข้อผิดพลาดที่อ่านง่ายเสมอ\n• แก้: วิซาร์ดส่ง plaintext {username, password} โดยตรง แบ็กเอ็นด์รับทั้ง plaintext และ Fernet ciphertext\n• เพิ่ม guard test 4 ตัว (รวม 9 ตัว): จำลอง ImportError, 8 อินพุตเสีย, รีเกรชชัน plaintext\n• เพิ่มรหัส ERR_PLAYWRIGHT_MISSING / ERR_KMS_MISSING พร้อมข้อความ 4 ภาษา\n\nv118.34.0/1 · เชื่อม MR.ERP คลิกเดียว (พรีวิวระยะพัฒนา):\n• การ์ด MR.ERP + วิซาร์ด 3 ขั้น\n• ข้อความข้อผิดพลาด 4 ภาษา\n• รุ่นพรีวิว · ทดสอบภายในเท่านั้น",
+            "ja": "v118.34.2 · MR.ERP「接続テスト」強化第 2 段階:\n• 修正: test_mrerp_endpoint の冒頭 import が裸で走っていた — Playwright や KMS が無いと 500 に。全体を try/except で包み、常に 200 + フレンドリーなエラーバー\n• 修正: ウィザードがプレーンテキストの {username, password} を直送、バックエンドは両形式を受理\n• 退行防止テスト 4 件追加（計 9 件）: ImportError シミュ、8 種類の不正入力、plaintext リグレッション\n• ERR_PLAYWRIGHT_MISSING / ERR_KMS_MISSING を 4 言語フォールバックで追加\n\nv118.34.0/1 · MR.ERP ワンクリック連携（開発プレビュー）:\n• MR.ERP カード + 3 ステップウィザード\n• 4 言語のエラーメッセージ\n• 開発プレビュー版 · 内部テストのみ"
         }
     }
 

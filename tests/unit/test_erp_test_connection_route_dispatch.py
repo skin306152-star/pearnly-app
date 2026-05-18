@@ -103,6 +103,108 @@ class TestMrerpEndpointDoesNotUseStubTests(unittest.TestCase):
                           f"missing rich-shape key {key!r}; result={result!r}")
 
 
+class HardeningContractTests(unittest.TestCase):
+    """v118.34.2 contract: test_mrerp_endpoint must NEVER raise, must
+    accept both {username, password} plaintext and {username_enc,
+    password_enc} ciphertext, and must surface a friendly error even
+    when its imports fail."""
+
+    def test_never_raises_on_garbage_input(self):
+        """Hammer it with malformed input — None, weird types, mixed
+        shapes — and verify it always returns a dict, never throws."""
+        cases = [
+            None,
+            {},
+            {"username": "u"},   # missing password
+            {"password": "p"},   # missing username
+            {"username": "", "password": ""},  # both empty strings
+            {"username": "u", "password": "p", "system_url": ""},  # empty url
+            {"username_enc": "garbage", "password_enc": "more-garbage"},
+            {"username_enc": "gAAAAA-but-truncated"},  # looks-fernet-but-broken
+        ]
+        for cfg in cases:
+            try:
+                result = _erp.test_mrerp_endpoint(cfg)
+            except Exception as e:
+                self.fail(
+                    f"test_mrerp_endpoint raised {type(e).__name__} on "
+                    f"input {cfg!r}: {e!s}"
+                )
+            self.assertIsInstance(result, dict, f"non-dict for {cfg!r}")
+            self.assertIn("ok", result)
+            self.assertFalse(
+                result["ok"],
+                f"unexpected ok=True for malformed input {cfg!r}",
+            )
+            # Friendly error is always populated when ok=False.
+            self.assertIsInstance(
+                result.get("error_friendly"), dict,
+                f"missing error_friendly for {cfg!r}: {result!r}",
+            )
+
+    def test_accepts_plaintext_credentials_shape(self):
+        """Wizard sends {username, password} (plain). Backend must not
+        complain about missing _enc fields — it should attempt
+        construction and fail downstream (auth/network), not ERR_NO_CREDS."""
+        result = _erp.test_mrerp_endpoint({
+            "system_url": "https://invalid.example.org",
+            "username": "user-xyz",
+            "password": "pass-xyz",
+            "comidyear": "6", "seldb": "1",
+        })
+        self.assertFalse(result["ok"])
+        # Either we got past creds and hit a network/auth/playwright
+        # error, OR Playwright is missing on this host. Both are fine —
+        # the important thing is we DIDN'T report ERR_NO_CREDS for a
+        # request that supplied creds in the plaintext shape.
+        self.assertNotEqual(
+            result["error_code"], "ERR_NO_CREDS",
+            f"plaintext shape rejected as missing creds: {result!r}",
+        )
+
+    def test_garbage_in_plaintext_field_routes_through_to_login(self):
+        """Garbage value typed into 'username' is NOT a decrypt issue;
+        it should reach the login attempt (and fail there)."""
+        result = _erp.test_mrerp_endpoint({
+            "system_url": "https://invalid.example.org",
+            "username": "definitely-not-a-real-account",
+            "password": "x",
+        })
+        self.assertFalse(result["ok"])
+        # Not a decrypt issue because we sent plain.
+        self.assertNotEqual(result["error_code"], "ERR_CRED_DECRYPT")
+
+    def test_import_failure_returns_friendly_not_500(self):
+        """If the heavy MR.ERP/Playwright import fails (simulated by
+        patching the lazy import inside the function), we MUST surface
+        an ERR_PLAYWRIGHT_MISSING / ERR_UNEXPECTED with a friendly
+        catalogue — NOT raise (which becomes a 500 to the UI)."""
+        import builtins
+        real_import = builtins.__import__
+
+        def boom(name, *a, **kw):
+            if "mrerp_adapter" in name:
+                raise ImportError("No module named 'playwright.sync_api'")
+            return real_import(name, *a, **kw)
+
+        with patch.object(builtins, "__import__", side_effect=boom):
+            result = _erp.test_mrerp_endpoint({
+                "username": "u", "password": "p",
+            })
+        self.assertIsInstance(result, dict)
+        self.assertFalse(result["ok"])
+        self.assertIn(result["error_code"],
+                      ("ERR_PLAYWRIGHT_MISSING", "ERR_UNEXPECTED"))
+        self.assertIsInstance(result["error_friendly"], dict)
+        # Friendly text must mention playwright OR mention server error.
+        any_lang_text = " ".join(result["error_friendly"].values()).lower()
+        self.assertTrue(
+            "playwright" in any_lang_text or "server" in any_lang_text
+            or "服务器" in any_lang_text or "伺服器" in any_lang_text,
+            f"friendly message uninformative: {result['error_friendly']!r}",
+        )
+
+
 @unittest.skipUnless(
     __import__("importlib").util.find_spec("fastapi") is not None,
     "fastapi not installed in this env — route-level dispatch test is "

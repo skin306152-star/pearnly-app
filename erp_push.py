@@ -297,168 +297,258 @@ def push_to_endpoint(endpoint: Dict[str, Any], history_record: Dict[str, Any]) -
 def test_mrerp_endpoint(
     config: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """C-1 (Zihao 2026-05-18 拍板) MR.ERP-specific health check.
+    """C-1 (Zihao 2026-05-18 拍板) + v118.34.2 hardening (2026-05-19) ·
+    MR.ERP-specific health check.
 
     Drives MRERPAdapter.login + select_company against the configured
     instance, then reports back the company-picker page (so the wizard
     can render a company dropdown in Step 3 of the connect modal).
 
-    Expected `config` shape:
-        system_url:       https://www.mrerp4sme.com (default)
-        username_enc:     kms_helper-encrypted username
-        password_enc:     kms_helper-encrypted password
-        comidyear:        "6" (optional; used by select_company)
-        seldb:            "1" (optional)
+    Accepts TWO credential shapes:
+        wizard path (plaintext, in-memory only):
+            username:     "myuser"
+            password:     "mypass"
+        DB path (Fernet ciphertext, persisted endpoint):
+            username_enc: "gAAAAA..."
+            password_enc: "gAAAAA..."
+    Plus common fields:
+        system_url:   https://www.mrerp4sme.com (default)
+        comidyear:    "6" (optional)
+        seldb:        "1" (optional)
 
     Returns a dict the route handler can pass straight to the UI:
         ok               bool
         elapsed_ms       int
         companies        List[{label, comidyear, seldb}] (best-effort)
-        error_code       Optional[str]   ERR_* matching mrerp_business_friendly catalog
+        error_code       Optional[str]
         error_friendly   Optional[Dict[lang -> str]]
         raw_error        Optional[str]   for debugging; UI hides under "details"
 
-    Never raises; always returns a dict.
+    NEVER raises — even if Playwright is missing on the host, kms_helper
+    can't import, or the adapter blows up on construction. Any uncaught
+    exception is wrapped into a {ok: False, error_code: "ERR_UNEXPECTED",
+    raw_error: "<exception detail>"} response so the wizard error bar
+    always has something to render and we never surface a 500 to the UI.
     """
-    import os
-    import re
     import time as _time
-    from services.erp.mrerp_adapter import (
-        MRERPAdapter, MRERPAuthError, MRERPBusinessError,
-        MRERPTechnicalError,
-    )
-    from services.erp.mrerp_business_friendly import get_friendly
-
-    cfg = config or {}
-    login_url = (cfg.get("system_url") or "https://www.mrerp4sme.com").strip()
-    enc_user = cfg.get("username_enc") or ""
-    enc_pass = cfg.get("password_enc") or ""
-    comidyear = str(cfg.get("comidyear") or "6")
-    seldb = str(cfg.get("seldb") or "1")
-
-    if not (enc_user and enc_pass):
-        return {
-            "ok": False,
-            "elapsed_ms": 0,
-            "companies": [],
-            "error_code": "ERR_NO_CREDS",
-            "error_friendly": get_friendly("ERR_NO_CREDS"),
-            "raw_error": "username_enc / password_enc missing in config",
-        }
-
     t0 = _time.time()
-    try:
-        adapter = MRERPAdapter.from_encrypted(
-            login_url=login_url,
-            encrypted_username=enc_user,
-            encrypted_password=enc_pass,
-            comidyear=comidyear,
-            seldb=seldb,
-            headless=True,
-            retry_attempts=1,
-            retry_delays_seconds=(0.5,),
-        )
-    except Exception as e:
-        return {
-            "ok": False,
-            "elapsed_ms": int((_time.time() - t0) * 1000),
-            "companies": [],
-            "error_code": "ERR_CRED_DECRYPT",
-            "error_friendly": get_friendly("ERR_CRED_DECRYPT"),
-            "raw_error": f"{type(e).__name__}: {str(e)[:200]}",
-        }
 
-    companies: list = []
-    try:
-        with adapter:
-            adapter.login()
-            # Scrape the company-picker page (selectdb.php). Each
-            # company appears as a click target inside the page; we
-            # extract the text labels for the wizard's dropdown.
-            try:
-                adapter._page.goto(
-                    adapter.login_url + adapter.SELECTDB_PATH,
-                    wait_until="networkidle",
-                    timeout=10_000,
-                )
-                html = adapter._page.content() or ""
-                # MR.ERP selectdb.php renders <button onclick="...
-                # comidyear=N&seldb=M"> per company.
-                for m in re.finditer(
-                    r"(?:onclick|href)=[\"'][^\"']*"
-                    r"comidyear=(?P<y>\d+)[^\"']*seldb=(?P<s>\d+)[^\"']*[\"']"
-                    r"[^>]*>(?P<label>[^<]+)",
-                    html,
-                    re.DOTALL,
-                ):
-                    label = re.sub(r"\s+", " ", m.group("label")).strip()
-                    if not label or label.startswith("&"):
-                        continue
-                    companies.append({
-                        "label": label[:80],
-                        "comidyear": m.group("y"),
-                        "seldb": m.group("s"),
-                    })
-                # If the regex finds nothing, fall back to a single
-                # configured entry so the wizard at least shows the
-                # tenant's saved choice.
-                if not companies:
-                    companies.append({
-                        "label": f"TEST{comidyear}-{seldb}",
-                        "comidyear": comidyear,
-                        "seldb": seldb,
-                    })
-            except Exception as e:
-                logger.warning("company scrape failed: %s", e)
-                companies = []
-            # Confirm select_company actually works on the saved choice.
-            adapter.select_company()
-    except MRERPAuthError as e:
-        return {
-            "ok": False,
-            "elapsed_ms": int((_time.time() - t0) * 1000),
-            "companies": [],
-            "error_code": "ERR_AUTH",
-            "error_friendly": get_friendly("ERR_AUTH"),
-            "raw_error": str(e)[:300],
-        }
-    except MRERPTechnicalError as e:
-        return {
-            "ok": False,
-            "elapsed_ms": int((_time.time() - t0) * 1000),
-            "companies": [],
-            "error_code": "ERR_TECHNICAL",
-            "error_friendly": get_friendly("ERR_TECHNICAL"),
-            "raw_error": str(e)[:300],
-        }
-    except MRERPBusinessError as e:
-        return {
-            "ok": False,
-            "elapsed_ms": int((_time.time() - t0) * 1000),
-            "companies": [],
-            "error_code": "ERR_BUSINESS",
-            "error_friendly": get_friendly(str(e)[:80]),
-            "raw_error": str(e)[:300],
-        }
-    except Exception as e:
-        logger.exception("test_mrerp_endpoint unexpected error")
-        return {
-            "ok": False,
-            "elapsed_ms": int((_time.time() - t0) * 1000),
-            "companies": [],
-            "error_code": "ERR_UNEXPECTED",
-            "error_friendly": get_friendly("ERR_UNEXPECTED"),
-            "raw_error": f"{type(e).__name__}: {str(e)[:200]}",
-        }
+    def _elapsed():
+        return int((_time.time() - t0) * 1000)
 
-    return {
-        "ok": True,
-        "elapsed_ms": int((_time.time() - t0) * 1000),
-        "companies": companies,
-        "error_code": None,
-        "error_friendly": None,
-        "raw_error": None,
+    # Hard-coded fallback friendly catalog — used when even
+    # mrerp_business_friendly fails to import. Covers the same 4 langs
+    # as the regular catalog so the UI rendering layer doesn't need to
+    # special-case.
+    _FALLBACK_FRIENDLY = {
+        "ERR_UNEXPECTED": {
+            "zh": "服务器内部错误,请联系管理员",
+            "en": "Internal server error, please contact admin",
+            "th": "ข้อผิดพลาดของเซิร์ฟเวอร์ภายใน กรุณาติดต่อผู้ดูแล",
+            "zh_TW": "伺服器內部錯誤,請聯絡管理員",
+        },
+        "ERR_PLAYWRIGHT_MISSING": {
+            "zh": "服务器缺少 Playwright 依赖,请联系运维",
+            "en": "Server is missing the Playwright dependency",
+            "th": "เซิร์ฟเวอร์ขาดไลบรารี Playwright",
+            "zh_TW": "伺服器缺少 Playwright 依賴",
+        },
+        "ERR_KMS_MISSING": {
+            "zh": "服务器加密密钥未配置,请联系运维",
+            "en": "Server KMS key (PEARNLY_KMS_KEY) is not configured",
+            "th": "เซิร์ฟเวอร์ยังไม่ตั้งค่าคีย์เข้ารหัส",
+            "zh_TW": "伺服器加密金鑰未設定",
+        },
+        "ERR_NO_CREDS": {
+            "zh": "请输入用户名和密码",
+            "en": "Username and password required",
+            "th": "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน",
+            "zh_TW": "請輸入使用者名稱和密碼",
+        },
+        "ERR_CRED_DECRYPT": {
+            "zh": "凭据解密失败 · 请重新输入用户名和密码",
+            "en": "Credential decrypt failed — please re-enter username and password",
+            "th": "ถอดรหัสข้อมูลรับรองไม่สำเร็จ",
+            "zh_TW": "憑證解密失敗 · 請重新輸入",
+        },
     }
+
+    def _friendly(code: str) -> Dict[str, str]:
+        try:
+            from services.erp.mrerp_business_friendly import get_friendly
+            f = get_friendly(code)
+            if f:
+                return f
+        except Exception:
+            pass
+        return _FALLBACK_FRIENDLY.get(code, _FALLBACK_FRIENDLY["ERR_UNEXPECTED"])
+
+    def _fail(code: str, raw: str = "") -> Dict[str, Any]:
+        return {
+            "ok": False,
+            "elapsed_ms": _elapsed(),
+            "companies": [],
+            "error_code": code,
+            "error_friendly": _friendly(code),
+            "raw_error": (raw or "")[:300],
+        }
+
+    # ── top-level safety net: if ANY of the body below raises, we
+    #    still want to return a clean 200 with a friendly error.
+    try:
+        # ── imports (may fail on prod if Playwright wasn't installed) ──
+        try:
+            import re as _re
+            from services.erp.mrerp_adapter import (
+                MRERPAdapter, MRERPAuthError, MRERPBusinessError,
+                MRERPTechnicalError,
+            )
+        except ImportError as e:
+            logger.exception("test_mrerp_endpoint import failure")
+            msg = f"{type(e).__name__}: {e}"
+            code = ("ERR_PLAYWRIGHT_MISSING"
+                    if "playwright" in str(e).lower()
+                    else "ERR_UNEXPECTED")
+            return _fail(code, msg)
+
+        cfg = config or {}
+        login_url = (cfg.get("system_url") or "https://www.mrerp4sme.com").strip()
+        comidyear = str(cfg.get("comidyear") or "6")
+        seldb = str(cfg.get("seldb") or "1")
+
+        # Both credential shapes are accepted. Plaintext wins if both are
+        # present (wizard explicitly typed something fresh).
+        plain_user = (cfg.get("username") or "").strip()
+        plain_pass = cfg.get("password") or ""
+        enc_user = (cfg.get("username_enc") or "").strip()
+        enc_pass = cfg.get("password_enc") or ""
+
+        # Heuristic: a value that looks like Fernet ciphertext (gAAAAA*
+        # prefix) gets routed through the decrypt path even if it landed
+        # in the plaintext field. Covers the wizard's "edit saved
+        # endpoint" flow where the form pre-fills with stored ciphertext.
+        try:
+            from kms_helper import is_encrypted as _is_enc
+            if plain_user and _is_enc(plain_user) and not enc_user:
+                enc_user, plain_user = plain_user, ""
+            if plain_pass and _is_enc(plain_pass) and not enc_pass:
+                enc_pass, plain_pass = plain_pass, ""
+        except ImportError:
+            # kms_helper is broken; we can still serve the plaintext path.
+            pass
+
+        if not ((plain_user and plain_pass) or (enc_user and enc_pass)):
+            return _fail("ERR_NO_CREDS",
+                         "username/password missing (neither plain nor encrypted)")
+
+        # ── adapter construction (caught individually so we can
+        #    distinguish decrypt failure from constructor failure) ──
+        try:
+            if plain_user and plain_pass:
+                adapter = MRERPAdapter(
+                    login_url=login_url,
+                    username=plain_user,
+                    password=plain_pass,
+                    comidyear=comidyear,
+                    seldb=seldb,
+                    headless=True,
+                    retry_attempts=1,
+                    retry_delays_seconds=(0.5,),
+                )
+            else:
+                adapter = MRERPAdapter.from_encrypted(
+                    login_url=login_url,
+                    encrypted_username=enc_user,
+                    encrypted_password=enc_pass,
+                    comidyear=comidyear,
+                    seldb=seldb,
+                    headless=True,
+                    retry_attempts=1,
+                    retry_delays_seconds=(0.5,),
+                )
+        except ImportError as e:
+            # kms_helper failed to import — PEARNLY_KMS_KEY env likely missing.
+            logger.exception("test_mrerp_endpoint kms import failure")
+            return _fail("ERR_KMS_MISSING", f"{type(e).__name__}: {e}")
+        except ValueError as e:
+            # Constructor's own validation (login_url empty / decrypt
+            # failed with InvalidToken wrapped to ValueError).
+            return _fail("ERR_CRED_DECRYPT", f"{type(e).__name__}: {e}")
+        except Exception as e:
+            logger.exception("test_mrerp_endpoint adapter construction failed")
+            return _fail("ERR_UNEXPECTED", f"{type(e).__name__}: {e}")
+
+        # ── login + scrape ──
+        companies: list = []
+        try:
+            with adapter:
+                adapter.login()
+                # Scrape the company-picker page (selectdb.php). Each
+                # company appears as a click target inside the page; we
+                # extract the text labels for the wizard's dropdown.
+                try:
+                    adapter._page.goto(
+                        adapter.login_url + adapter.SELECTDB_PATH,
+                        wait_until="networkidle",
+                        timeout=10_000,
+                    )
+                    html = adapter._page.content() or ""
+                    # MR.ERP selectdb.php renders <button onclick="...
+                    # comidyear=N&seldb=M"> per company.
+                    for m in _re.finditer(
+                        r"(?:onclick|href)=[\"'][^\"']*"
+                        r"comidyear=(?P<y>\d+)[^\"']*seldb=(?P<s>\d+)[^\"']*[\"']"
+                        r"[^>]*>(?P<label>[^<]+)",
+                        html,
+                        _re.DOTALL,
+                    ):
+                        label = _re.sub(r"\s+", " ", m.group("label")).strip()
+                        if not label or label.startswith("&"):
+                            continue
+                        companies.append({
+                            "label": label[:80],
+                            "comidyear": m.group("y"),
+                            "seldb": m.group("s"),
+                        })
+                    # If the regex finds nothing, fall back to a single
+                    # configured entry so the wizard at least shows the
+                    # tenant's saved choice.
+                    if not companies:
+                        companies.append({
+                            "label": f"TEST{comidyear}-{seldb}",
+                            "comidyear": comidyear,
+                            "seldb": seldb,
+                        })
+                except Exception as e:
+                    logger.warning("company scrape failed: %s", e)
+                    companies = []
+                # Confirm select_company actually works on the saved choice.
+                adapter.select_company()
+        except MRERPAuthError as e:
+            return _fail("ERR_AUTH", str(e))
+        except MRERPTechnicalError as e:
+            return _fail("ERR_TECHNICAL", str(e))
+        except MRERPBusinessError as e:
+            return _fail("ERR_BUSINESS", str(e))
+        except Exception as e:
+            logger.exception("test_mrerp_endpoint login/scrape failed")
+            return _fail("ERR_UNEXPECTED", f"{type(e).__name__}: {e}")
+
+        return {
+            "ok": True,
+            "elapsed_ms": _elapsed(),
+            "companies": companies,
+            "error_code": None,
+            "error_friendly": None,
+            "raw_error": None,
+        }
+
+    except Exception as e:
+        # Catastrophic outer-loop catch. Should never fire (every path
+        # above handles its own errors) but the contract is "never raise"
+        # so a final safety net is mandatory.
+        logger.exception("test_mrerp_endpoint catastrophic failure")
+        return _fail("ERR_UNEXPECTED", f"{type(e).__name__}: {e}")
 
 
 def list_mrerp_customers(

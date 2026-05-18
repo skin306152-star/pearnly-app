@@ -1164,8 +1164,15 @@
                     adapter: 'mrerp',
                     config: {
                         system_url: 'https://www.mrerp4sme.com',
-                        username_enc: username,  // legacy route accepts plain
-                        password_enc: password,
+                        // v118.34.2 (Zihao 2026-05-19) · plaintext path.
+                        // Backend test_mrerp_endpoint accepts both
+                        // {username, password} (plain, this wizard call)
+                        // and {username_enc, password_enc} (Fernet,
+                        // saved endpoint reload). Sending plain avoids
+                        // a pointless server-side encrypt+decrypt
+                        // round-trip and shrinks the failure surface.
+                        username: username,
+                        password: password,
                         comidyear: '6', seldb: '1',
                     },
                 }),

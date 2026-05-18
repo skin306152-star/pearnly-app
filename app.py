@@ -3013,13 +3013,20 @@ class ErpTestConnectionRequest(BaseModel):
 
 
 def _strip_endpoint_for_response(ep: Dict[str, Any]) -> Dict[str, Any]:
-    """返回前端时,把 token 字段隐藏一半,避免泄漏"""
+    """返回前端时,把 token / 加密凭据 字段隐藏,避免泄漏"""
     out = dict(ep)
     cfg = dict(out.get("config") or {})
     if "token" in cfg and cfg["token"]:
         t = str(cfg["token"])
         cfg["token"] = (t[:4] + "***" + t[-4:]) if len(t) > 10 else "***"
         cfg["_token_set"] = True
+    # P1-B / C-1 · MR.ERP endpoints store Fernet-encrypted creds. The
+    # UI must never see them — replace with sentinel flags so the
+    # wizard knows credentials are present without exposing the values.
+    for sensitive in ("username_enc", "password_enc"):
+        if sensitive in cfg and cfg[sensitive]:
+            cfg[sensitive] = "***"
+            cfg[f"_{sensitive}_set"] = True
     out["config"] = cfg
     return out
 
@@ -3117,6 +3124,68 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
     cfg = dict(req.config or {})
     cfg.pop("_token_set", None)
     result = _erp.test_endpoint_connection(req.adapter, cfg)
+    return result
+
+
+# C-1 (Zihao 2026-05-18 拍板) · 60-second TTL cache for per-endpoint
+# health checks. Drives MRERPAdapter.login + select_company at most
+# once per 60s per (user_id, endpoint_id); the wizard / cards UI hits
+# this aggressively, so the cache keeps MR.ERP traffic sane.
+from services.erp._master_data_cache import TTLCache as _EndpointTestCache  # noqa: E402
+_endpoint_test_cache = _EndpointTestCache(max_size=512, ttl_seconds=60.0)
+
+
+@app.post("/api/erp/endpoints/{endpoint_id}/test-connection")
+async def erp_endpoint_test_connection(
+    endpoint_id: str,
+    request: Request,
+    refresh: bool = False,
+):
+    """Per-endpoint health check. Loads the stored endpoint (with its
+    Fernet-encrypted credentials), runs adapter-specific verification
+    (MR.ERP: login + select_company + scrape companies dropdown), and
+    returns a structured result the wizard / cards UI can render.
+
+    Caches by (user_id, endpoint_id) for 60s. Pass `?refresh=1` to
+    bypass the cache (used by the explicit "重新测试" button).
+
+    Returns 200 with `{ok: bool, ...}` either way — the UI uses `ok`
+    to decide the pill colour. Auth / not-found responses still HTTP
+    error normally so the UI can show a generic toast.
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    if not ep:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+
+    cache_key = (str(user["id"]), str(endpoint_id))
+    if not refresh:
+        cached = _endpoint_test_cache.get(cache_key)
+        if cached is not None:
+            return {**cached, "cached": True}
+
+    adapter = (ep.get("adapter") or "").strip().lower()
+    config = ep.get("config") or {}
+    if adapter == "mrerp":
+        result = _erp.test_mrerp_endpoint(config)
+    else:
+        # webhook / flowaccount / etc — defer to the existing ping test.
+        legacy = _erp.test_endpoint_connection(adapter, config)
+        result = {
+            "ok": bool(legacy.get("success")),
+            "elapsed_ms": legacy.get("elapsed_ms", 0),
+            "http_status": legacy.get("http_status"),
+            "raw_error": legacy.get("error_msg"),
+            "companies": [],
+            "error_code": None if legacy.get("success") else "ERR_TECHNICAL",
+            "error_friendly": None,
+        }
+
+    from datetime import datetime as _dt
+    result["last_tested_at"] = _dt.utcnow().isoformat() + "Z"
+    result["cached"] = False
+    _endpoint_test_cache.set(cache_key, result)
     return result
 
 

@@ -155,6 +155,43 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "MR.ERP 里没找到所选种子客户 · 请核对客户码并重新选择",
         "zh_TW": "MR.ERP 裡沒找到所選種子客戶 · 請核對客戶碼並重新選擇",
     },
+    # Connection-test buckets (C-1 wizard health-check path)
+    "ERR_NO_CREDS": {
+        "th": "ยังไม่ตั้งชื่อผู้ใช้ / รหัสผ่าน MR.ERP",
+        "en": "MR.ERP username / password not configured",
+        "zh": "尚未填 MR.ERP 用户名 / 密码",
+        "zh_TW": "尚未填 MR.ERP 使用者名稱 / 密碼",
+    },
+    "ERR_CRED_DECRYPT": {
+        "th": "ถอดรหัสรหัสผ่านที่บันทึกไว้ไม่ได้ — กรอกใหม่",
+        "en": "Stored credentials failed to decrypt — please re-enter them",
+        "zh": "保存的凭据无法解密 · 请重填一次",
+        "zh_TW": "儲存的憑證無法解密 · 請重填一次",
+    },
+    "ERR_AUTH": {
+        "th": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง — โปรดตรวจสอบ",
+        "en": "MR.ERP login bounced — verify the username and password",
+        "zh": "MR.ERP 登录被拒 · 用户名或密码错 · 请核对",
+        "zh_TW": "MR.ERP 登入被拒 · 使用者名稱或密碼錯 · 請核對",
+    },
+    "ERR_TECHNICAL": {
+        "th": "เครือข่ายหรือ MR.ERP ขัดข้องชั่วคราว — ลองอีกครั้ง",
+        "en": "Network or MR.ERP outage. Try again in a minute.",
+        "zh": "网络或 MR.ERP 暂时不可用 · 稍等再试",
+        "zh_TW": "網路或 MR.ERP 暫時不可用 · 稍等再試",
+    },
+    "ERR_BUSINESS": {
+        "th": "MR.ERP ตอบกลับด้วยข้อผิดพลาด — ดูรายละเอียดเพิ่มเติม",
+        "en": "MR.ERP returned a business error — check details below",
+        "zh": "MR.ERP 返业务错误 · 查看下方详情",
+        "zh_TW": "MR.ERP 返業務錯誤 · 查看下方詳情",
+    },
+    "ERR_UNEXPECTED": {
+        "th": "เกิดข้อผิดพลาดที่ไม่คาดคิด — แจ้งทีมงาน",
+        "en": "Unexpected error — please contact support",
+        "zh": "意外错误 · 请联系客服",
+        "zh_TW": "意外錯誤 · 請聯絡客服",
+    },
 }
 
 

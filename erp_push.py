@@ -204,10 +204,31 @@ def push_flowaccount(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -
 # 适配器分发器
 # ============================================================
 
+def push_mrerp(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tuple[bool, int, str]:
+    """MR.ERP push entry — currently a stub at the push_to_endpoint
+    boundary because MRERPAdapter operates on batches of histories
+    (`upload_invoice_batch(histories, mappings)`), not single payloads.
+    The wiring to feed single OCR rows through the batch adapter is
+    handled by a separate higher-level entry point (planned for the
+    push-pipeline rewrite); for now creating an "mrerp" endpoint is
+    allowed so the wizard / cards flow can exercise the test-connection
+    + config-storage path without enabling pushes."""
+    return False, 0, (
+        "mrerp push is not wired into push_to_endpoint yet; "
+        "use MRERPAdapter.upload_invoice_batch directly"
+    )
+
+
 ADAPTER_REGISTRY = {
     "webhook":     push_webhook,
     "flowaccount": push_flowaccount,
+    "mrerp":       push_mrerp,
 }
+
+# Adapters whose endpoint.config carries Fernet-encrypted credentials.
+# UI must never round-trip the raw values; the test-connection +
+# upload routes decrypt at the last moment.
+ENCRYPTED_CRED_ADAPTERS = {"mrerp"}
 
 
 def push_to_endpoint(endpoint: Dict[str, Any], history_record: Dict[str, Any]) -> Dict[str, Any]:
@@ -272,6 +293,173 @@ def push_to_endpoint(endpoint: Dict[str, Any], history_record: Dict[str, Any]) -
 # ============================================================
 # 测试连接(给前端「测试连接」按钮用)
 # ============================================================
+
+def test_mrerp_endpoint(
+    config: Dict[str, Any],
+) -> Dict[str, Any]:
+    """C-1 (Zihao 2026-05-18 拍板) MR.ERP-specific health check.
+
+    Drives MRERPAdapter.login + select_company against the configured
+    instance, then reports back the company-picker page (so the wizard
+    can render a company dropdown in Step 3 of the connect modal).
+
+    Expected `config` shape:
+        system_url:       https://www.mrerp4sme.com (default)
+        username_enc:     kms_helper-encrypted username
+        password_enc:     kms_helper-encrypted password
+        comidyear:        "6" (optional; used by select_company)
+        seldb:            "1" (optional)
+
+    Returns a dict the route handler can pass straight to the UI:
+        ok               bool
+        elapsed_ms       int
+        companies        List[{label, comidyear, seldb}] (best-effort)
+        error_code       Optional[str]   ERR_* matching mrerp_business_friendly catalog
+        error_friendly   Optional[Dict[lang -> str]]
+        raw_error        Optional[str]   for debugging; UI hides under "details"
+
+    Never raises; always returns a dict.
+    """
+    import os
+    import re
+    import time as _time
+    from services.erp.mrerp_adapter import (
+        MRERPAdapter, MRERPAuthError, MRERPBusinessError,
+        MRERPTechnicalError,
+    )
+    from services.erp.mrerp_business_friendly import get_friendly
+
+    cfg = config or {}
+    login_url = (cfg.get("system_url") or "https://www.mrerp4sme.com").strip()
+    enc_user = cfg.get("username_enc") or ""
+    enc_pass = cfg.get("password_enc") or ""
+    comidyear = str(cfg.get("comidyear") or "6")
+    seldb = str(cfg.get("seldb") or "1")
+
+    if not (enc_user and enc_pass):
+        return {
+            "ok": False,
+            "elapsed_ms": 0,
+            "companies": [],
+            "error_code": "ERR_NO_CREDS",
+            "error_friendly": get_friendly("ERR_NO_CREDS"),
+            "raw_error": "username_enc / password_enc missing in config",
+        }
+
+    t0 = _time.time()
+    try:
+        adapter = MRERPAdapter.from_encrypted(
+            login_url=login_url,
+            encrypted_username=enc_user,
+            encrypted_password=enc_pass,
+            comidyear=comidyear,
+            seldb=seldb,
+            headless=True,
+            retry_attempts=1,
+            retry_delays_seconds=(0.5,),
+        )
+    except Exception as e:
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "companies": [],
+            "error_code": "ERR_CRED_DECRYPT",
+            "error_friendly": get_friendly("ERR_CRED_DECRYPT"),
+            "raw_error": f"{type(e).__name__}: {str(e)[:200]}",
+        }
+
+    companies: list = []
+    try:
+        with adapter:
+            adapter.login()
+            # Scrape the company-picker page (selectdb.php). Each
+            # company appears as a click target inside the page; we
+            # extract the text labels for the wizard's dropdown.
+            try:
+                adapter._page.goto(
+                    adapter.login_url + adapter.SELECTDB_PATH,
+                    wait_until="networkidle",
+                    timeout=10_000,
+                )
+                html = adapter._page.content() or ""
+                # MR.ERP selectdb.php renders <button onclick="...
+                # comidyear=N&seldb=M"> per company.
+                for m in re.finditer(
+                    r"(?:onclick|href)=[\"'][^\"']*"
+                    r"comidyear=(?P<y>\d+)[^\"']*seldb=(?P<s>\d+)[^\"']*[\"']"
+                    r"[^>]*>(?P<label>[^<]+)",
+                    html,
+                    re.DOTALL,
+                ):
+                    label = re.sub(r"\s+", " ", m.group("label")).strip()
+                    if not label or label.startswith("&"):
+                        continue
+                    companies.append({
+                        "label": label[:80],
+                        "comidyear": m.group("y"),
+                        "seldb": m.group("s"),
+                    })
+                # If the regex finds nothing, fall back to a single
+                # configured entry so the wizard at least shows the
+                # tenant's saved choice.
+                if not companies:
+                    companies.append({
+                        "label": f"TEST{comidyear}-{seldb}",
+                        "comidyear": comidyear,
+                        "seldb": seldb,
+                    })
+            except Exception as e:
+                logger.warning("company scrape failed: %s", e)
+                companies = []
+            # Confirm select_company actually works on the saved choice.
+            adapter.select_company()
+    except MRERPAuthError as e:
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "companies": [],
+            "error_code": "ERR_AUTH",
+            "error_friendly": get_friendly("ERR_AUTH"),
+            "raw_error": str(e)[:300],
+        }
+    except MRERPTechnicalError as e:
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "companies": [],
+            "error_code": "ERR_TECHNICAL",
+            "error_friendly": get_friendly("ERR_TECHNICAL"),
+            "raw_error": str(e)[:300],
+        }
+    except MRERPBusinessError as e:
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "companies": [],
+            "error_code": "ERR_BUSINESS",
+            "error_friendly": get_friendly(str(e)[:80]),
+            "raw_error": str(e)[:300],
+        }
+    except Exception as e:
+        logger.exception("test_mrerp_endpoint unexpected error")
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "companies": [],
+            "error_code": "ERR_UNEXPECTED",
+            "error_friendly": get_friendly("ERR_UNEXPECTED"),
+            "raw_error": f"{type(e).__name__}: {str(e)[:200]}",
+        }
+
+    return {
+        "ok": True,
+        "elapsed_ms": int((_time.time() - t0) * 1000),
+        "companies": companies,
+        "error_code": None,
+        "error_friendly": None,
+        "raw_error": None,
+    }
+
 
 def test_endpoint_connection(adapter: str, config: Dict[str, Any]) -> Dict[str, Any]:
     """

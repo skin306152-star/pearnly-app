@@ -1158,12 +1158,6 @@ def _brv2_err(key: str, lang: str = "th", **fmt) -> str:
     return msg.format(**fmt) if fmt else msg
 
 
-def _user_api_key(user: dict) -> str:
-    """Extract Gemini API key from user record."""
-    return (user.get("gemini_api_key") or user.get("api_key") or
-            os.environ.get("GEMINI_API_KEY", ""))
-
-
 @router.post("/bank-v2/run")
 async def bank_v2_run(
     request: Request,

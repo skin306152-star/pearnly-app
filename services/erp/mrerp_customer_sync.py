@@ -659,10 +659,16 @@ class MRERPCustomerSyncService:
 
     def _copy_from_seed(self, page, seed_customer_code: str) -> None:
         """Drive the inpdupdata picker to clone `seed_customer_code`
-        into the current form. Raises if the seed isn't visible in the
-        picker (e.g. typo in config, seed deleted, tenant has > N
-        customers and picker paginates)."""
-        # Click "สำเนา" — readonly button with onclick=bshlistbox(this).
+        into the current form.
+
+        🛠 Patch 1 (Zihao 2026-05-18 拍板): the armas popup uses the
+        same virtual-scroll pattern as stkmas — at TEST2019 scale (2
+        customers) all rows are in the DOM, but on accounting-firm
+        tenants with 50+ customers only ~10 fit at a time. We now use
+        the popup's built-in `#bshlistboxinpsearch` input to filter
+        down to just the seed before clicking, mirroring the
+        `mrerp_product_sync._copy_from_seed` implementation.
+        """
         loc = page.locator('input#inpdupdata')
         if loc.count() == 0:
             raise MRERPTechnicalError(
@@ -671,12 +677,12 @@ class MRERPCustomerSyncService:
             )
         loc.first.click(timeout=5_000)
 
-        # AJAX fetch populates window.bshlistboxdata + renders
-        # #bshlistboxdetail. ~2-3s on a warm session, up to ~6s on a
-        # cold one.
+        # Wait for the popup search input (faster signal than
+        # detailshow's first <p>; the search input renders before AJAX
+        # populates the rows).
         try:
             page.wait_for_selector(
-                "#bshlistboxdetail #bshlistboxdetailshow p",
+                "#bshlistboxinpsearch",
                 state="visible",
                 timeout=10_000,
             )
@@ -685,18 +691,38 @@ class MRERPCustomerSyncService:
                 f"copy picker popup did not render: {e}") from e
         page.wait_for_timeout(500)
 
-        # Find the seed row inside the popup. Each row is
-        # <p onclick=bshlistboxdata2field(this)><span hidden>id</span>
-        #   <span>CODE</span><span>NAME</span></p>
-        # We match on the visible code text.
+        # Type the seed code into the popup's search input. The onkeyup
+        # handler `bshdatalistbox()` re-renders the visible rows in
+        # real time — only matching ones survive.
+        search = page.locator('input#bshlistboxinpsearch')
+        try:
+            search.fill(seed_customer_code)
+            # bshdatalistbox is wired to onkeyup — fire one to trigger
+            # the filter, then settle.
+            search.press("End")
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(
+                f"copy picker search input failed: {e}") from e
+        page.wait_for_timeout(800)
+
+        # Stricter selector first (exact text-is on the code span), then
+        # a fallback substring match in case the code contains
+        # characters that confuse text-is().
         row = page.locator(
-            f"#bshlistboxdetailshow p:has-text({seed_customer_code!r})"
+            "#bshlistboxdetailshow p"
+            f":has(span:text-is({seed_customer_code!r}))"
         ).first
+        if row.count() == 0:
+            row = page.locator(
+                "#bshlistboxdetailshow p"
+                f":has-text({seed_customer_code!r})"
+            ).first
         if row.count() == 0:
             raise MRERPBusinessError(
                 f"seed customer {seed_customer_code!r} not visible in "
                 f"the copy picker — confirm the code exists in this "
-                f"tenant's customer master",
+                f"tenant's customer master (searched via "
+                f"bshlistboxinpsearch)",
                 failed_rows=[{
                     "reason_code": "ERR_SEED_NOT_FOUND",
                     "seed_customer_code": seed_customer_code,
@@ -713,7 +739,6 @@ class MRERPCustomerSyncService:
         # form with the seed's full field set. ~1-2s.
         page.wait_for_timeout(2_500)
 
-        # Sanity check: the txtname field should now be the seed's name.
         try:
             populated_name = page.locator(
                 'input#txtname'

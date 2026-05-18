@@ -39,3 +39,6 @@ storage/
 
 tests/fixtures/
 tests/pipeline-results.json
+tests/pipeline-results-before-fix.json
+tests/pipeline-benchmark-*.json
+tests/compare-b1-b2-result.json

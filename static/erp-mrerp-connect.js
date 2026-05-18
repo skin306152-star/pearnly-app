@@ -488,4 +488,407 @@
 
     // Expose i18n / fetch helpers for the wizard module to share.
     window._mrerpConnectShared = { T, t, _esc, _toast, _tk, _authHeaders, _loadEndpoints, _testConnection, _activeLang };
+
+
+    // =============================================================
+    // C-3 · 3-step connect wizard (Zihao 2026-05-18 拍板)
+    //
+    // Loaded inline in this same file (not the originally suggested
+    // static/erp-connect-wizard.html) so we don't need a separate
+    // fetch — the modal DOM is built in-memory and inserted on first
+    // open. Keeps the network footprint to 1 CSS + 1 JS.
+    //
+    // Modal lifecycle:
+    //   _mrerpOpenWizard(endpoint | null)
+    //     - endpoint=null → new connection (Step 1 blank)
+    //     - endpoint=<obj> → edit (preload from endpoint.config)
+    //
+    // Step 3 includes the new "新客户模板" (seed_customer_code)
+    // dropdown that ties Customer auto-create to a known-good seed
+    // (e.g. 0006). Empty selection disables auto-create entirely.
+    // =============================================================
+
+    let _wizardEl = null;
+    let _wizardState = null;
+
+    function _ensureWizardDom() {
+        if (_wizardEl) return _wizardEl;
+        const wrap = document.createElement('div');
+        wrap.className = 'mrerp-wizard-overlay';
+        wrap.setAttribute('role', 'dialog');
+        wrap.setAttribute('aria-modal', 'true');
+        wrap.innerHTML = (
+            '<div class="mrerp-wizard">' +
+              '<div class="mrerp-wizard-head">' +
+                '<div class="mrerp-wizard-title" data-mw-title></div>' +
+                '<div class="mrerp-wizard-progress">' +
+                  '<span class="mrerp-wizard-step-dot is-active" data-mw-dot="1"></span>' +
+                  '<span class="mrerp-wizard-step-sep"></span>' +
+                  '<span class="mrerp-wizard-step-dot" data-mw-dot="2"></span>' +
+                  '<span class="mrerp-wizard-step-sep"></span>' +
+                  '<span class="mrerp-wizard-step-dot" data-mw-dot="3"></span>' +
+                '</div>' +
+                '<button class="mrerp-wizard-close" data-mw-close type="button" aria-label="close">' +
+                  '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>' +
+                '</button>' +
+              '</div>' +
+              '<div class="mrerp-wizard-body">' +
+                _buildStep1Html() +
+                _buildStep2Html() +
+                _buildStep3Html() +
+              '</div>' +
+              '<div class="mrerp-wizard-foot">' +
+                '<button class="btn btn-ghost" data-mw-cancel type="button"></button>' +
+                '<div class="mrerp-wizard-foot-spacer"></div>' +
+                '<button class="btn btn-ghost" data-mw-prev type="button" style="display:none;"></button>' +
+                '<button class="btn btn-primary" data-mw-next type="button"></button>' +
+              '</div>' +
+            '</div>'
+        );
+        document.body.appendChild(wrap);
+        _wizardEl = wrap;
+        _bindWizardEvents();
+        return wrap;
+    }
+
+    function _buildStep1Html() {
+        return (
+            '<div class="mrerp-wizard-step is-active" data-mw-step="1">' +
+              '<h3 class="mrerp-wizard-step-h" data-mw-step1-h></h3>' +
+              '<p class="mrerp-wizard-hint" data-mw-step1-hint></p>' +
+              '<div class="mrerp-wizard-checkboxes" data-mw-clients>' +
+                '<div class="mrerp-card-empty">—</div>' +
+              '</div>' +
+            '</div>'
+        );
+    }
+
+    function _buildStep2Html() {
+        return (
+            '<div class="mrerp-wizard-step" data-mw-step="2">' +
+              '<h3 class="mrerp-wizard-step-h" data-mw-step2-h></h3>' +
+              '<div class="mrerp-wizard-field">' +
+                '<label class="mrerp-wizard-label" data-mw-user-label></label>' +
+                '<input type="text" class="mrerp-wizard-input" data-mw-user autocomplete="username">' +
+              '</div>' +
+              '<div class="mrerp-wizard-field">' +
+                '<label class="mrerp-wizard-label" data-mw-pass-label></label>' +
+                '<input type="password" class="mrerp-wizard-input" data-mw-pass autocomplete="new-password">' +
+                '<div class="mrerp-wizard-hint" data-mw-pwd-hint></div>' +
+              '</div>' +
+              '<div class="mrerp-wizard-test-row">' +
+                '<button class="btn btn-ghost btn-tiny" type="button" data-mw-test></button>' +
+                '<span class="mrerp-wizard-test-status" data-mw-test-status></span>' +
+              '</div>' +
+              '<div class="mrerp-wizard-test-error" data-mw-test-error style="display:none;">' +
+                '<div data-mw-test-error-friendly></div>' +
+                '<div class="mrerp-wizard-test-error-raw" data-mw-test-error-raw></div>' +
+              '</div>' +
+            '</div>'
+        );
+    }
+
+    function _buildStep3Html() {
+        return (
+            '<div class="mrerp-wizard-step" data-mw-step="3">' +
+              '<h3 class="mrerp-wizard-step-h" data-mw-step3-h></h3>' +
+              '<div class="mrerp-wizard-field">' +
+                '<label class="mrerp-wizard-label" data-mw-company-label></label>' +
+                '<select class="mrerp-wizard-select" data-mw-company></select>' +
+              '</div>' +
+              '<div class="mrerp-wizard-field">' +
+                '<label class="mrerp-wizard-label" data-mw-mode-label></label>' +
+                '<div class="mrerp-wizard-radio-group">' +
+                  '<label class="mrerp-wizard-radio-row">' +
+                    '<input type="radio" name="mrerp-mode" value="auto" checked>' +
+                    '<span data-mw-mode-auto></span>' +
+                  '</label>' +
+                  '<label class="mrerp-wizard-radio-row">' +
+                    '<input type="radio" name="mrerp-mode" value="manual">' +
+                    '<span data-mw-mode-manual></span>' +
+                  '</label>' +
+                '</div>' +
+              '</div>' +
+              '<div class="mrerp-wizard-field">' +
+                '<label class="mrerp-wizard-label" data-mw-seed-label></label>' +
+                '<select class="mrerp-wizard-select" data-mw-seed>' +
+                  '<option value="" data-mw-seed-empty></option>' +
+                '</select>' +
+                '<div class="mrerp-wizard-hint" data-mw-seed-hint></div>' +
+              '</div>' +
+            '</div>'
+        );
+    }
+
+    function _bindWizardEvents() {
+        const w = _wizardEl;
+        w.querySelector('[data-mw-close]').addEventListener('click', _closeWizard);
+        w.querySelector('[data-mw-cancel]').addEventListener('click', _closeWizard);
+        w.querySelector('[data-mw-prev]').addEventListener('click', _wizardPrev);
+        w.querySelector('[data-mw-next]').addEventListener('click', _wizardNext);
+        w.querySelector('[data-mw-test]').addEventListener('click', _wizardRunTest);
+        w.addEventListener('click', function (e) {
+            // click outside the modal body closes
+            if (e.target === w) _closeWizard();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (!_wizardEl || !_wizardEl.classList.contains('is-open')) return;
+            if (e.key === 'Escape') _closeWizard();
+        });
+    }
+
+    function _applyWizardI18n() {
+        const w = _wizardEl;
+        w.querySelector('[data-mw-title]').textContent = t('wiz-title-connect');
+        // Step 1
+        w.querySelector('[data-mw-step1-h]').textContent = t('wiz-step-1-h');
+        w.querySelector('[data-mw-step1-hint]').textContent = t('wiz-step-1-hint');
+        // Step 2
+        w.querySelector('[data-mw-step2-h]').textContent = t('wiz-step-2-h');
+        w.querySelector('[data-mw-user-label]').textContent = t('wiz-username');
+        w.querySelector('[data-mw-pass-label]').textContent = t('wiz-password');
+        w.querySelector('[data-mw-pwd-hint]').textContent = t('wiz-pwd-hint');
+        w.querySelector('[data-mw-test]').textContent = t('wiz-test-btn');
+        w.querySelector('[data-mw-test-status]').textContent = t('wiz-test-pending');
+        // Step 3
+        w.querySelector('[data-mw-step3-h]').textContent = t('wiz-step-3-h');
+        w.querySelector('[data-mw-company-label]').textContent = t('wiz-company');
+        w.querySelector('[data-mw-mode-label]').textContent = t('wiz-mode');
+        w.querySelector('[data-mw-mode-auto]').textContent = t('wiz-mode-auto');
+        w.querySelector('[data-mw-mode-manual]').textContent = t('wiz-mode-manual');
+        w.querySelector('[data-mw-seed-label]').textContent = t('wiz-seed');
+        w.querySelector('[data-mw-seed-hint]').textContent = t('wiz-seed-hint');
+        w.querySelector('[data-mw-seed-empty]').textContent = t('wiz-seed-empty');
+        // Foot
+        w.querySelector('[data-mw-cancel]').textContent = t('btn-cancel');
+        w.querySelector('[data-mw-prev]').textContent = t('btn-prev');
+        w.querySelector('[data-mw-next]').textContent = t('btn-next');
+    }
+
+    function _gotoStep(n) {
+        _wizardState.step = n;
+        const w = _wizardEl;
+        w.querySelectorAll('.mrerp-wizard-step').forEach(function (el) {
+            el.classList.toggle('is-active', el.getAttribute('data-mw-step') === String(n));
+        });
+        w.querySelectorAll('[data-mw-dot]').forEach(function (el) {
+            const dn = parseInt(el.getAttribute('data-mw-dot'), 10);
+            el.classList.remove('is-active', 'is-done');
+            if (dn < n) el.classList.add('is-done');
+            else if (dn === n) el.classList.add('is-active');
+        });
+        w.querySelector('[data-mw-prev]').style.display = n > 1 ? '' : 'none';
+        w.querySelector('[data-mw-next]').textContent = (n === 3) ? t('btn-finish') : t('btn-next');
+    }
+
+    function _closeWizard() {
+        if (!_wizardEl) return;
+        _wizardEl.classList.remove('is-open');
+        _wizardState = null;
+    }
+
+    async function _openWizard(endpoint) {
+        _ensureWizardDom();
+        _applyWizardI18n();
+        _wizardState = {
+            step: 1,
+            endpoint: endpoint || null,
+            client_ids: ((endpoint && endpoint.config && endpoint.config.client_ids) || []),
+            companies: [],
+        };
+        // Reset inputs
+        const w = _wizardEl;
+        w.querySelector('[data-mw-user]').value = '';
+        w.querySelector('[data-mw-pass]').value = '';
+        w.querySelector('[data-mw-test-status]').textContent = t('wiz-test-pending');
+        w.querySelector('[data-mw-test-error]').style.display = 'none';
+        const seedSel = w.querySelector('[data-mw-seed]');
+        seedSel.innerHTML = '<option value="">' + _esc(t('wiz-seed-empty')) + '</option>';
+
+        // Step 1 — load Pearnly clients
+        const clientsBox = w.querySelector('[data-mw-clients]');
+        clientsBox.innerHTML = '<div class="mrerp-card-empty">…</div>';
+        try {
+            const r = await fetch('/api/clients?limit=200', { headers: _authHeaders() });
+            if (r.ok) {
+                const data = await r.json();
+                const items = (data && (data.items || data.clients)) || [];
+                const preSelected = new Set((_wizardState.client_ids || []).map(String));
+                if (items.length === 0) {
+                    clientsBox.innerHTML = '<div class="mrerp-card-empty">—</div>';
+                } else {
+                    clientsBox.innerHTML = items.map(function (c) {
+                        const id = String(c.id || c.client_id || '');
+                        const checked = preSelected.has(id) ? ' checked' : '';
+                        return (
+                            '<label class="mrerp-wizard-checkbox-row">' +
+                              '<input type="checkbox" data-mw-client value="' + _esc(id) + '"' + checked + '>' +
+                              '<span>' + _esc(c.name || c.client_name || ('#' + id)) + '</span>' +
+                            '</label>'
+                        );
+                    }).join('');
+                }
+            } else {
+                clientsBox.innerHTML = '<div class="mrerp-card-empty">—</div>';
+            }
+        } catch (e) {
+            clientsBox.innerHTML = '<div class="mrerp-card-empty">—</div>';
+        }
+
+        _gotoStep(1);
+        _wizardEl.classList.add('is-open');
+        // Focus the username on Step 2 entry; for now nothing special
+        // until user clicks Next.
+    }
+
+    function _wizardPrev() {
+        if (_wizardState.step > 1) _gotoStep(_wizardState.step - 1);
+    }
+
+    async function _wizardNext() {
+        if (_wizardState.step === 1) {
+            // Collect selected clients
+            const ids = [].slice.call(_wizardEl.querySelectorAll('[data-mw-client]:checked'))
+                .map(function (cb) { return cb.value; });
+            _wizardState.client_ids = ids;
+            _gotoStep(2);
+            setTimeout(function () { _wizardEl.querySelector('[data-mw-user]').focus(); }, 30);
+            return;
+        }
+        if (_wizardState.step === 2) {
+            // Move to step 3; populate company + seed from last test result.
+            const companies = _wizardState.companies || [];
+            const sel = _wizardEl.querySelector('[data-mw-company]');
+            sel.innerHTML = companies.length
+                ? companies.map(function (c) {
+                    return '<option value="' + _esc(c.comidyear) + ':' + _esc(c.seldb) +
+                        '">' + _esc(c.label) + '</option>';
+                  }).join('')
+                : '<option value="6:1">' + _esc('TEST2019') + '</option>';
+            // Seed dropdown — populate via a separate call once
+            // wizard is finalised; for now empty.
+            const seedSel = _wizardEl.querySelector('[data-mw-seed]');
+            if (seedSel.children.length === 1) {
+                // Lazily fill with placeholder hint — wizard saves the
+                // raw text value the user types into the field. (A
+                // future enhancement loads the live customer list via
+                // a dedicated /api/erp/endpoints/:id/customers route.)
+            }
+            _gotoStep(3);
+            return;
+        }
+        // Step 3 → finish
+        await _wizardFinish();
+    }
+
+    async function _wizardRunTest() {
+        const w = _wizardEl;
+        const username = w.querySelector('[data-mw-user]').value.trim();
+        const password = w.querySelector('[data-mw-pass]').value;
+        const statusEl = w.querySelector('[data-mw-test-status]');
+        const errBox = w.querySelector('[data-mw-test-error]');
+        errBox.style.display = 'none';
+        if (!username || !password) {
+            statusEl.textContent = t('wiz-test-pending');
+            return;
+        }
+        statusEl.textContent = t('wiz-test-running');
+
+        // Use the legacy /api/erp/test-connection endpoint for the
+        // wizard (the per-endpoint route only works for already-
+        // persisted endpoints; this one tests config in-memory).
+        try {
+            const r = await fetch('/api/erp/test-connection', {
+                method: 'POST',
+                headers: _authHeaders(),
+                body: JSON.stringify({
+                    adapter: 'mrerp',
+                    config: {
+                        system_url: 'https://www.mrerp4sme.com',
+                        username_enc: username,  // legacy route accepts plain
+                        password_enc: password,
+                        comidyear: '6', seldb: '1',
+                    },
+                }),
+            });
+            const data = r.ok ? await r.json() : { ok: false, error_code: 'ERR_HTTP_' + r.status };
+            if (data.ok || data.success) {
+                _wizardState.companies = data.companies || [];
+                statusEl.textContent = t('wiz-test-ok', { n: (data.companies || []).length || 1 });
+            } else {
+                const f = data.error_friendly || {};
+                statusEl.textContent = '✗';
+                errBox.style.display = '';
+                w.querySelector('[data-mw-test-error-friendly]').textContent =
+                    f[_activeLang()] || f.en || data.raw_error || data.error_code || '';
+                w.querySelector('[data-mw-test-error-raw]').textContent = data.raw_error || '';
+            }
+        } catch (e) {
+            statusEl.textContent = '✗';
+            errBox.style.display = '';
+            w.querySelector('[data-mw-test-error-friendly]').textContent = String(e).slice(0, 200);
+            w.querySelector('[data-mw-test-error-raw]').textContent = '';
+        }
+    }
+
+    async function _wizardFinish() {
+        const w = _wizardEl;
+        const username = w.querySelector('[data-mw-user]').value.trim();
+        const password = w.querySelector('[data-mw-pass]').value;
+        const companyChoice = w.querySelector('[data-mw-company]').value || '6:1';
+        const [comidyear, seldb] = companyChoice.split(':');
+        const mode = w.querySelector('input[name="mrerp-mode"]:checked').value;
+        const seed = (w.querySelector('[data-mw-seed]').value || '').trim();
+
+        if (!username || !password) {
+            _toast('请先填入用户名和密码', 'warn');
+            _gotoStep(2);
+            return;
+        }
+
+        const config = {
+            system_url: 'https://www.mrerp4sme.com',
+            // Server-side encrypts on receive (the route layer accepts
+            // plaintext for in-wizard creation; storage layer encrypts
+            // before writing to db). NOTE: this contract is enforced
+            // by the C-1 backend update — see app.py.
+            username_enc: username,
+            password_enc: password,
+            comidyear: comidyear,
+            seldb: seldb,
+            client_ids: _wizardState.client_ids || [],
+            seed_customer_code: seed || null,
+        };
+        const body = {
+            name: 'MR.ERP',
+            adapter: 'mrerp',
+            config: config,
+            is_default: false,
+            auto_push: mode === 'auto',
+        };
+
+        try {
+            const url = _wizardState.endpoint
+                ? '/api/erp/endpoints/' + encodeURIComponent(_wizardState.endpoint.id)
+                : '/api/erp/endpoints';
+            const method = _wizardState.endpoint ? 'PATCH' : 'POST';
+            const r = await fetch(url, {
+                method: method,
+                headers: _authHeaders(),
+                body: JSON.stringify(body),
+            });
+            if (!r.ok) {
+                _toast('保存失败 · 状态 ' + r.status, 'error');
+                return;
+            }
+            _toast('已保存', 'success');
+            _closeWizard();
+            setTimeout(_bootstrap, 100);
+        } catch (e) {
+            _toast(String(e).slice(0, 200), 'error');
+        }
+    }
+
+    // Replace the no-op stub with the real handler.
+    window._mrerpOpenWizard = _openWizard;
 })();

@@ -556,5 +556,96 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
                              f"push route did NOT offload: {r.text}")
 
 
+@unittest.skipUnless(
+    __import__("importlib").util.find_spec("playwright") is not None,
+    "playwright not installed in this env — chromium launch test only "
+    "runs where the package is present (skipped in clean dev boxes).",
+)
+class ChromiumActualLaunchTests(unittest.TestCase):
+    """v118.34.11 (Zihao 2026-05-19 拍板) · The named guard test the
+    user explicitly demanded after the TargetClosedError:
+
+        > test_chromium_can_actually_launch_in_production_env
+        > mock 不行 · 真起一个 browser 才算过
+
+    Forces a REAL chromium launch with the same server-side flags
+    production uses (--no-sandbox / --disable-dev-shm-usage / --disable-gpu).
+    If chromium can't actually launch in this environment, this test
+    fails with the exact same error text the wizard would surface to
+    the user. No mocks.
+
+    Why this matters: previously we shipped v118.34.9 with
+    `playwright_installed: true` and `chromium_installed: true` BOTH
+    showing green via /api/version, but production click still
+    crashed because system libs (libnss3, libgbm1, libcups2, ...)
+    weren't installed. The binary was on disk, the binary was just
+    unable to RUN. A boolean "is the file there" check is the
+    wrong assertion — the right one is "does it boot?".
+
+    Auto-skips when playwright pip package isn't installed. On
+    server-side / CI where playwright IS installed, this test must
+    pass; failure means the chromium environment is broken and
+    deploys should be paused until install-deps lands.
+    """
+
+    def test_chromium_can_actually_launch_in_production_env(self):
+        """Real launch, real version probe, real close. The test from
+        the user's spec, verbatim."""
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError as e:
+            self.skipTest(f"playwright import failed in this env: {e}")
+
+        pw = None
+        browser = None
+        try:
+            pw = sync_playwright().start()
+            browser = pw.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                ],
+            )
+            # Browser.version is a property in playwright-python sync
+            # API, not a method.
+            version = browser.version
+            # Sanity check the version string looks plausible.
+            self.assertRegex(
+                version, r"^\d+\.",
+                f"chromium reported odd version string: {version!r}",
+            )
+            # Open + close a page to exercise the full surface, not
+            # just the launch.
+            ctx = browser.new_context()
+            page = ctx.new_page()
+            page.goto("about:blank")
+            ctx.close()
+        except Exception as e:
+            # Bubble up the EXACT chromium error so the failure message
+            # tells operators what to install.
+            self.fail(
+                f"chromium failed to launch in this environment: "
+                f"{type(e).__name__}: {e}\n"
+                f"Hint: most commonly missing system libs. Try:\n"
+                f"    python -m playwright install-deps chromium\n"
+                f"On the prod box, the v118.34.11 deploy.sh handles "
+                f"this automatically; this test failing means the deploy "
+                f"step also failed."
+            )
+        finally:
+            try:
+                if browser is not None:
+                    browser.close()
+            except Exception:
+                pass
+            try:
+                if pw is not None:
+                    pw.stop()
+            except Exception:
+                pass
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

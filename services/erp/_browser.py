@@ -154,9 +154,29 @@ class BrowserSession:
     def __enter__(self) -> "BrowserSession":
         install_redact_filter(logger, self.redact_strings)
         self._pw = sync_playwright().start()
+        # v118.34.11 (Zihao 2026-05-19 拍板) · server-side launch flags:
+        #   --no-sandbox          required when chromium is started as
+        #                          root (which mrpilot is — see
+        #                          /root/.cache/ms-playwright path)
+        #   --disable-dev-shm-usage   /dev/shm is 64 MB by default on
+        #                              VPS-style hosts; chromium tries
+        #                              to put its IPC backing here and
+        #                              dies. This flag routes to /tmp
+        #                              instead.
+        #   --disable-gpu         server has no display; without this
+        #                          chromium prints a noisy warning and
+        #                          sometimes hangs waiting for the GPU
+        #                          process.
+        # Local dev (with a display) is unaffected — these are no-ops
+        # for headed launches on a desktop.
         self._browser = self._pw.chromium.launch(
             headless=self.headless,
             slow_mo=self.slow_mo_ms,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+            ],
         )
         self._ctx = self._browser.new_context(
             viewport={"width": self.viewport_width,

@@ -74,6 +74,57 @@ OCR_MAX_PAGES_PER_UPLOAD = int(os.environ.get("OCR_MAX_PAGES_PER_UPLOAD", "5"))
 OCR_MAX_FILE_SIZE_MB = int(os.environ.get("OCR_MAX_FILE_SIZE_MB", "20"))
 
 
+def _probe_chromium_launch():
+    """v118.34.11 (Zihao 2026-05-19 拍板) · Actually try to launch
+    chromium. Returns {"ok": bool, "error": str?}. The Playwright
+    sync_api → chromium.launch dance is what production wizard clicks
+    do; if libs are missing we want to surface the same TargetClosedError
+    HERE at startup, not on the first user click.
+
+    Cheap: launches headless with the same server-side args we use in
+    production (--no-sandbox / --disable-dev-shm-usage / --disable-gpu),
+    grabs Browser.version(), closes everything. Usually ~1-2 s.
+
+    Never raises. Any failure is captured into the returned dict so
+    the diagnostic can be served via /api/version without 500ing.
+    """
+    try:
+        from playwright.sync_api import sync_playwright as _sp
+    except ImportError as e:
+        return {"ok": False, "error": f"playwright import failed: {e}"}
+    pw = None
+    browser = None
+    try:
+        pw = _sp().start()
+        browser = pw.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+            ],
+        )
+        # Browser.version is a property in playwright-python sync API,
+        # not a method — calling it raises 'str object is not callable'.
+        version = browser.version
+        return {"ok": True, "version": version, "error": None}
+    except Exception as e:
+        msg = f"{type(e).__name__}: {str(e)[:300]}"
+        logger.warning("[playwright-bootstrap] chromium launch probe failed: %s", msg)
+        return {"ok": False, "error": msg}
+    finally:
+        try:
+            if browser is not None:
+                browser.close()
+        except Exception:
+            pass
+        try:
+            if pw is not None:
+                pw.stop()
+        except Exception:
+            pass
+
+
 def _ensure_playwright_installed():
     """v118.34.6 (Zihao 2026-05-19 拍板) · Playwright 装上的第四次尝试。
 
@@ -160,7 +211,34 @@ def _ensure_playwright_installed():
         logger.info(
             "[playwright-bootstrap] both pip package + chromium binary ready · skipping install"
         )
-        return
+        # v118.34.11 · even when both pieces look OK, actually try to
+        # launch chromium briefly. The v118.34.10 production failure
+        # was exactly this: pip + binary both present but the launch
+        # crashed because system libs (libnss3, libgbm1, etc) were
+        # missing. The real-launch probe writes the result into the
+        # status file so /api/version can surface it.
+        launch_result = _probe_chromium_launch()
+        _write_status(
+            playwright_installed=pip_importable,
+            chromium_installed=chromium_installed,
+            chromium_dir=chromium_dir,
+            chromium_can_launch=launch_result["ok"],
+            chromium_launch_error=launch_result.get("error"),
+            pip_version=pip_version,
+            python_bin=sys.executable,
+            effective_uid=_os.getuid() if hasattr(_os, "getuid") else None,
+            attempted_at_startup=True,
+        )
+        # If launch fails, fall through to spawn install-deps in
+        # background. install-deps is idempotent so it's safe to call
+        # even when nothing's missing — it'll just no-op the apt steps.
+        if not launch_result["ok"]:
+            logger.warning(
+                "[playwright-bootstrap] chromium launch FAILED at startup: %s · "
+                "spawning install-deps in background", launch_result.get("error"),
+            )
+        else:
+            return  # All three pieces verified · nothing to spawn.
 
     # ── Missing pieces · spawn detached install + restart ──
     # We DO NOT block lifespan here. git-deploy.sh's health-check
@@ -190,6 +268,10 @@ def _ensure_playwright_installed():
     # 是同一个解释器,site-packages 同一份。chromium 同理用
     # `{sys.executable} -m playwright`。
     py_bin = sys.executable or shutil.which("python3") or "python3"
+    # v118.34.11 · 三段式后台装:pip → chromium binary → chromium 系统依赖(apt)
+    # 第 3 步是 v118.34.10 漏掉的 · 没装 lib* 时 chromium.launch 立刻
+    # TargetClosedError(用户在生产看到的报错)。`playwright install-deps`
+    # 是 idempotent · 已装的 apt 包跳过 · 失败也不阻断 restart。
     cmd = (
         f"set -e; "
         f"touch {sentinel}; "
@@ -204,7 +286,11 @@ def _ensure_playwright_installed():
         f"  >> /var/log/mrpilot-deploy.log; "
         f"{py_bin} -m playwright install chromium "
         f"  >> /var/log/mrpilot-deploy.log 2>&1 || true; "
-        f"echo '[playwright-bootstrap] $(date) chromium done, restarting mrpilot...' "
+        f"echo '[playwright-bootstrap] $(date) chromium binary done, installing system deps...' "
+        f"  >> /var/log/mrpilot-deploy.log; "
+        f"{py_bin} -m playwright install-deps chromium "
+        f"  >> /var/log/mrpilot-deploy.log 2>&1 || true; "
+        f"echo '[playwright-bootstrap] $(date) system deps done, restarting mrpilot...' "
         f"  >> /var/log/mrpilot-deploy.log; "
         f"systemctl restart mrpilot >> /var/log/mrpilot-deploy.log 2>&1 || true; "
         f"rm -f {sentinel}"
@@ -290,6 +376,12 @@ def _read_playwright_status():
     return {
         "playwright_installed": bool(payload.get("playwright_installed")),
         "chromium_installed": bool(payload.get("chromium_installed")),
+        # v118.34.11 · most authoritative signal · true only if a real
+        # chromium.launch + version() round-trip succeeded at last
+        # startup. False here with True for the two above means system
+        # libs (libnss3, libgbm1, ...) are missing — see chromium_launch_error.
+        "chromium_can_launch": bool(payload.get("chromium_can_launch")),
+        "chromium_launch_error": payload.get("chromium_launch_error"),
         "playwright_version": payload.get("pip_version"),
         "pip_install_error": payload.get("pip_install_error"),
         "chromium_dir": payload.get("chromium_dir"),
@@ -521,6 +613,13 @@ timeout 60 "$PY" -m pip install playwright >> "$LOG" 2>&1 || \
 echo "playwright install chromium..." >> "$LOG"
 timeout 120 "$PY" -m playwright install chromium >> "$LOG" 2>&1 || \
     echo "playwright install chromium non-fatal failure" >> "$LOG"
+
+# 4.7. v118.34.11 · 装 chromium 运行时系统依赖 (apt install libnss3 libgbm1 ...)
+#     没这步 BrowserType.launch 立刻 TargetClosedError · 因为 chromium
+#     二进制 ≠ chromium 能跑 · 还需要十几个 .so · install-deps 用 apt 装齐
+echo "playwright install-deps chromium..." >> "$LOG"
+timeout 180 "$PY" -m playwright install-deps chromium >> "$LOG" 2>&1 || \
+    echo "playwright install-deps chromium non-fatal failure" >> "$LOG"
 
 # 5. 重启服务
 echo "restarting mrpilot..." >> "$LOG"
@@ -4859,8 +4958,8 @@ async def get_frontend_version():
         "ts": int(_t.time()),
         "playwright": _read_playwright_status(),
         "release_notes": {
-            "zh": "v118.34.10 · 修 sync Playwright in async loop · 加守门测试:\n• v118.34.9 装上 Playwright 后真域名点测试连接报「It looks like you are using Playwright Sync API inside the asyncio loop」\n• 根因:FastAPI 路由是 async event loop · MRERPAdapter 用 Playwright sync_api · 直调必炸\n• 修:所有 async 路由的 sync helper 调用都包 await asyncio.to_thread(...)\n  - /api/erp/test-connection · /api/erp/endpoints/:id/test-connection\n  - /api/erp/endpoints/:id/customers · /api/erp/endpoints/:id/products\n  - /api/erp/push · 重试单条 · 批量重推\n• 加守门测试 AsyncLoopOffloadTests (5 个) · 真 async client + 探针 helper · 跑 unittest.IsolatedAsyncioTestCase · 防 sync/async 冲突再回归\n\n刷浏览器(Ctrl+F5)再点测试连接 · 这次应该真返 companies 或 ERR_AUTH",
-            "en": "v118.34.10 · Fix sync Playwright in asyncio loop + add async guard tests:\n• v118.34.9 finally got Playwright installed on prod, but clicking 'Test connection' surfaced 'It looks like you are using Playwright Sync API inside the asyncio loop. Please use the Async API instead.'\n• Root cause: FastAPI routes are `async def` running in an asyncio event loop. MRERPAdapter uses Playwright's sync_api, which explicitly detects asyncio.get_running_loop() and refuses to start when one exists. Calling the sync helper directly inside an async route is therefore a hard fail.\n• Fix: every async route that delegates to a sync MRERPAdapter helper now wraps the call in `await asyncio.to_thread(...)`. The helper runs on a worker thread (no loop in scope), Playwright sync_api is happy.\n• Routes updated: /api/erp/test-connection (legacy + per-endpoint), /api/erp/endpoints/:id/customers, /api/erp/endpoints/:id/products, /api/erp/push (single + retry single + batch retry).\n• Added AsyncLoopOffloadTests (5 cases, unittest.IsolatedAsyncioTestCase + httpx.AsyncClient + ASGITransport) that plant a tripwire sync helper which raises if called within a running loop. Catches any future route that forgets to offload.\n\nHard-refresh (Ctrl+F5), click Test connection — should return companies or ERR_AUTH, not the asyncio error.",
+            "zh": "v118.34.11 · 修 chromium 缺系统依赖 + launch flags + 真起诊断:\n• v118.34.10 把 sync/async 修了 · 但点测试连接报 TargetClosedError\n• 根因:chromium 二进制装了 · 但缺 libnss3 / libgbm1 / libcups2 等系统 .so · launch 立刻挂\n• 修(三处):\n  - BrowserSession.launch 加 --no-sandbox --disable-dev-shm-usage --disable-gpu\n  - lifespan 后台 install 加第 3 步 playwright install-deps chromium (apt 装系统 lib)\n  - git-deploy.sh 也加 install-deps 步 · timeout 180s\n• /api/version 加 chromium_can_launch / chromium_launch_error 字段 · 启动时真起一个 browser 验证 · 不再凭 binary 在不在猜\n• 加守门测试 test_chromium_can_actually_launch_in_production_env · 真起 chromium · mock 不算\n\n刷浏览器(Ctrl+F5)点测试连接 · 应该真返 companies / ERR_AUTH",
+            "en": "v118.34.11 · Fix chromium-missing-system-libs + launch flags + real-launch diagnostic:\n• v118.34.10 fixed sync/async, but clicking 'Test connection' produced 'TargetClosedError: BrowserType.launch: Target page, context or browser has been closed'.\n• Root cause: chromium binary was on disk, but the .so deps it needs (libnss3, libgbm1, libcups2, libxkbcommon0, ...) weren't installed. The binary couldn't actually run.\n• Three-part fix:\n  - BrowserSession.launch now passes args=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] — server-side hygiene flags. --no-sandbox is mandatory when running as root (mrpilot does), --disable-dev-shm-usage avoids the 64 MB /dev/shm trap, --disable-gpu silences GPU init on headless servers.\n  - Lifespan + deploy.sh now also run `playwright install-deps chromium` which apt-installs the missing system libs.\n  - /api/version now returns chromium_can_launch + chromium_launch_error fields. Computed at startup by actually launching chromium briefly and reading Browser.version. The true authoritative signal — replaces the previous 'is the binary file on disk' check that wasn't catching this class of bug.\n• Added test_chromium_can_actually_launch_in_production_env — REAL launch, no mocks. Test fails with the operator-actionable hint 'try install-deps chromium' if launch breaks in CI/server.\n\nHard-refresh (Ctrl+F5), click Test connection.",
             "th": "v118.34.5 · Playwright ติดตั้งจริง + การ์ด Xero สอดคล้อง + today-stats ไม่หลุด:\n• /api/version เพิ่มฟิลด์ playwright.playwright_installed / chromium_installed — ดูสถานะติดตั้งในเบราว์เซอร์ได้ทันที ไม่ต้อง SSH\n• pip install playwright ตอนสตาร์ทเปลี่ยนเป็นแบบ synchronous (ไม่รวม chromium · ปกติ <15 วินาที) chromium ยังลงเบื้องหลังเหมือนเดิม\n• git-deploy.sh เพิ่มขั้นตอน pip install + playwright install chromium · MAX_WAIT ดันเป็น 90 วินาที\n• เขียนการ์ด Xero ใหม่ใช้ .integration-row เลย์เอาต์ — เหมือนการ์ด MR.ERP / FlowAccount ตรงกัน 1 ต่อ 1 เพิ่มสีไอคอน .ic-xero ฟ้าอ่อน\n• ข้อความ 'วันนี้ยังไม่มีการส่ง' ย้ายจากแท็บ Connect → แท็บ Push Logs\n\nหลัง deploy เข้า https://pearnly.com/api/version ดูฟิลด์ playwright.playwright_installed",
             "ja": "v118.34.5 · Playwright が実際にインストールされる + Xero カード整合 + today-stats のリーク修正:\n• /api/version に playwright.playwright_installed / chromium_installed フィールド追加 — ブラウザでインストール状態を確認可能、SSH 不要\n• 起動時の pip install playwright を **同期** 化（chromium は除く · 通常 <15 秒）。chromium は引き続きバックグラウンドで\n• git-deploy.sh に pip install -r requirements.txt + playwright install chromium 手順を追加 · MAX_WAIT を 90 秒に拡大\n• Xero カードを .integration-row レイアウトに書き直し — MR.ERP / FlowAccount カードと 1 対 1 で一致。.ic-xero 薄青アイコン追加\n• 「本日はまだ送信なし」を Connect タブから Push Logs タブに移動\n\nデプロイ後 https://pearnly.com/api/version で playwright.playwright_installed=true を確認"
         }

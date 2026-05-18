@@ -4274,7 +4274,6 @@ async def home():
 # v118.44.0.1 · NAV-IA Phase 8 hotfix · 老 /admin 永久重定向到 /admin/cost
 # 解决:老浏览器 cache 里的 home.js 仍跳 /admin · 导致 Earn 进入老 PEARNLY_ADMIN_MODE 视图(home.html 红 banner)
 # 修法:无论老新代码,/admin 都被 server 端 301 引导到 /admin/cost(新 admin SPA)
-# 老 PEARNLY_ADMIN_MODE 老逻辑(home.js L10879+)从此 dead code · v118.45 可清
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page():
     from fastapi.responses import RedirectResponse

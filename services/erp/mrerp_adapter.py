@@ -195,6 +195,8 @@ class MRERPAdapter:
         retry_attempts: int = 3,
         retry_delays_seconds: Tuple[float, ...] = (1.0, 5.0, 30.0),
         slow_mo_ms: int = 0,
+        enable_master_data_sync: bool = False,
+        master_data_auto_create: bool = False,
     ):
         if not login_url:
             raise ValueError("login_url required")
@@ -214,6 +216,18 @@ class MRERPAdapter:
         self.retry_attempts = max(1, int(retry_attempts))
         self.retry_delays = tuple(retry_delays_seconds)
         self.slow_mo_ms = max(0, int(slow_mo_ms))
+        # P1-B Phase 5: master-data sync wiring.
+        # `enable_master_data_sync=True` makes upload_invoice_batch enrich
+        # `mappings.clients` via MRERPCustomerSyncService.lookup BEFORE
+        # generating the xlsx, so an OCR buyer_name maps to an existing
+        # MR.ERP customer_code without the caller having to pre-stitch.
+        # `master_data_auto_create=True` extends the same preflight to
+        # call lookup_or_create — currently gated behind the known
+        # `armas/allsave.php` master-data-validation blocker (see
+        # mrerp_customer_sync._layer4_auto_create docstring).
+        self.enable_master_data_sync = bool(enable_master_data_sync)
+        self.master_data_auto_create = bool(master_data_auto_create)
+        self._customer_sync = None     # lazy-created on first use
 
         self._session: Optional[BrowserSession] = None
         self._logged_in = False
@@ -517,6 +531,16 @@ class MRERPAdapter:
 
         self.select_company()
         t0 = time.time()
+
+        # P1-B Phase 5 · master-data sync preflight.
+        # When enabled, runs BEFORE validate_history_for_sales_credit so
+        # the validator sees the enriched mappings and stops surfacing
+        # ERR_NO_CUSTOMER_MAPPING for buyers that already exist in MR.ERP
+        # (or that we just auto-created). Opt-in via constructor flag to
+        # avoid breaking callers that have already curated their own
+        # client→erp_code mappings.
+        if self.enable_master_data_sync:
+            self._sync_master_data(histories, mappings)
 
         # P1-A §3.1-§3.5 · client-side preflight before touching the
         # browser. Rejects field-length overflow, negative amount,
@@ -1257,6 +1281,100 @@ class MRERPAdapter:
             "ok" if not still_there else f"row {db_row_id} still listed",
         )
         return not still_there
+
+    # ----- master-data sync wiring (P1-B Phase 5) --------------------
+
+    def _sync_master_data(
+        self,
+        histories: List[Dict[str, Any]],
+        mappings: Dict[str, Any],
+    ) -> None:
+        """Best-effort enrichment of `mappings['clients']` from each
+        history's OCR buyer fields.
+
+        Each history can carry buyer info either at the top level
+        (`buyer_name`, `buyer_tax`, `buyer_addr`) or nested under
+        `history['fields']`. Anything we successfully resolve gets
+        upserted into `mappings['clients']` so the downstream
+        validate_history_for_sales_credit call no longer trips
+        ERR_NO_CUSTOMER_MAPPING.
+
+        Failures are SILENT here — the worst case is that validate
+        catches the missing mapping a few lines later and the row
+        becomes a FailedRow with `ERR_NO_CUSTOMER_MAPPING`. That's
+        cleaner than raising mid-batch and losing the other histories.
+
+        If `master_data_auto_create=True` is set, lookup_or_create runs
+        and may itself raise MRERPBusinessError (currently happens on
+        TEST2019 due to the master-data validation blocker — see
+        mrerp_customer_sync._layer4_auto_create docstring). We capture
+        the exception and continue; validate will then catch the row
+        as a missing mapping.
+        """
+        if not self.enable_master_data_sync:
+            return
+        if self._customer_sync is None:
+            from services.erp.mrerp_customer_sync import (
+                MRERPCustomerSyncService,
+            )
+            self._customer_sync = MRERPCustomerSyncService(self)
+        for h in histories:
+            buyer = self._extract_buyer(h)
+            if buyer is None:
+                continue
+            try:
+                if self.master_data_auto_create:
+                    result = self._customer_sync.lookup_or_create(
+                        buyer, mappings,
+                    )
+                else:
+                    result = self._customer_sync.lookup(buyer, mappings)
+                if result is None:
+                    continue
+                # Persist into mappings so validate_history finds it.
+                if buyer.client_id:
+                    self._customer_sync._upsert_mapping(
+                        mappings, buyer.client_id, result.customer_code,
+                    )
+            except MRERPBusinessError as e:
+                # Auto-create raised — let validate catch the missing
+                # mapping downstream so the FailedRow message names the
+                # specific invoice.
+                logger.info(
+                    "master-data sync skipped for buyer=%r: %s",
+                    buyer.name, e,
+                )
+
+    @staticmethod
+    def _extract_buyer(history: Dict[str, Any]):
+        """Pull buyer-side fields out of a flat OCR history dict.
+
+        Importing BuyerInfo lazily so the adapter stays usable without
+        the customer-sync service loaded (e.g. older callers).
+        """
+        from services.erp.mrerp_customer_sync import BuyerInfo
+        f = history.get("fields") if isinstance(history, dict) else {}
+        f = f if isinstance(f, dict) else {}
+        name = (
+            history.get("buyer_name") or f.get("buyer_name") or ""
+        )
+        name = str(name or "").strip()
+        if not name:
+            return None
+        tax_id = (
+            history.get("buyer_tax") or f.get("buyer_tax")
+            or history.get("buyer_tax_id") or f.get("buyer_tax_id") or ""
+        )
+        addr = (
+            history.get("buyer_addr") or f.get("buyer_addr") or ""
+        )
+        return BuyerInfo(
+            name=name,
+            client_id=int(history.get("client_id") or 0),
+            tenant_id=str(history.get("tenant_id") or ""),
+            tax_id=str(tax_id or "").strip() or None,
+            address=str(addr or "").strip() or None,
+        )
 
     # ----- diagnostics -----------------------------------------------
 

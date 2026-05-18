@@ -304,7 +304,7 @@ def _reply_messages(reply_token: str, messages: List[Dict[str, Any]]) -> bool:
         try:
             body = e.read().decode("utf-8", errors="replace")
         except Exception:
-            pass
+            pass  # body 读不到就保持空串,下行 logger.error 仍会记 HTTP code
         logger.error(f"LINE reply 失败 {e.code}: {body}")
         return False
     except Exception as e:

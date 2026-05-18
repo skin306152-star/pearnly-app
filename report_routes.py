@@ -262,8 +262,8 @@ def batch_export_history(req: HistoryBatchExportRequest, request: Request):
                     meta["client_name"] = c.get("name") or meta["client_name"]
                     meta["client_tax_id"] = c.get("tax_id") or ""
                     meta["client_branch"] = c.get("branch") or ""
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[report_routes] batch_export client lookup failed (client_id={req.client_id}): {e}")
 
         data = build_report(req.template, rows, meta, req.lang)
         fname = default_filename(req.template, meta.get("client_name", ""), "")

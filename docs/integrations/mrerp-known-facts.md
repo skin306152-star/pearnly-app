@@ -573,7 +573,23 @@ Korn 真样本:`690507-001`
 **校验顺序**(2026-05-18 集成测试发现):MR.ERP 服务端**先做长度校验** · 长度过 → 直接返长度错;长度过 → 才查主数据存在 → 返"找不到"
 → adapter MUST validate field lengths client-side before xlsx upload(否则 "ไม่พบ" 类错误被长度错误屏蔽 · 用户看不到根因)
 
-### 10.4 adapter 创建顺序(逻辑依赖)
+### 10.4 客户主数据 Copy-from-Seed 创建流(2026-05-18 实测)
+
+`armas/allform.php` 的 `inpdupdata`("สำเนา")按钮触发 `bshlistbox(this)` 弹出客户列表 · 点击行后 JS 函数 `bshlistboxafterselectdata` 通过 AJAX 把整个 seed 客户的所有字段(包括所有 master-data ref:salesman / sales area / shipping type / other branch / GL account code · 加上对应的 hidden val IDs)复制进当前表单。
+
+**调用方需覆盖的 4 个字段**:
+- `txtarcode`(新客户码)
+- `txtname`(新客户名)
+- `txttaxid`(新税号)
+- `txtaddr1..4`(若 OCR 抓到)
+
+**不要覆盖**:`txtrectype` / `txtacfile` / `txtemp` / `txtararea` / `txtardelivery` / `txtothcombrhcus` 全套 + 数字默认 (`txtdiscount=0.00` 等)+ `txtcountry=ประเทศไทย` + `selprefix=1`。
+
+完整字段映射:[docs/integrations/mrerp-customer-copy-flow.md](mrerp-customer-copy-flow.md)
+
+**已知限制**:`test01` 账号在 TEST2019 上 alldel.php 返"Delete Success"但客户不删 · 测试 orphan 累积。生产用 admin 账号不受影响。详见 copy-flow.md §8。
+
+### 10.5 adapter 创建顺序(逻辑依赖)
 
 1. 销售员 / 部门 / 工作号 / 分店(用户首次配置 · 1 次性)
 2. 商品(OCR 看到新商品名 → 抓 + 自动建 · 主流场景)

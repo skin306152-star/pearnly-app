@@ -343,10 +343,20 @@ class MRERPCustomerSyncService:
         self,
         buyer: BuyerInfo,
         mappings: Dict[str, Any],
+        *,
+        seed_customer_code: Optional[str] = None,
     ) -> CustomerSyncResult:
         """Run Layers 0-3 (via `lookup`) then fall through to Layer 4
-        auto-create when nothing matches. Returns a CustomerSyncResult
-        either way; only raises on technical failures.
+        copy-from-seed auto-create when nothing matches.
+
+        ``seed_customer_code`` (Zihao 2026-05-18 拍板 · copy path):
+            existing MR.ERP customer code (e.g. "0006") whose master-
+            data references (salesman / area / shipping / branch / GL
+            account codes) the new row should inherit. When omitted
+            and a lookup miss occurs, raises
+            ``MRERPBusinessError(ERR_NO_SEED_CUSTOMER)`` instead of
+            silently failing — auto-create REQUIRES a seed because the
+            "fill placeholders" path is rejected by the server.
 
         Side effects on auto-create:
           - inserts a new customer row in MR.ERP via armas/allform.php
@@ -354,17 +364,27 @@ class MRERPCustomerSyncService:
             push job hits Layer 1 on subsequent calls
 
         Raises:
-          - MRERPBusinessError when MR.ERP rejects the create (duplicate
-            code, missing required field, etc.) — caller surfaces this
-            as a FailedRow
+          - MRERPBusinessError when MR.ERP rejects the create (missing
+            seed, server validation, etc.) — caller surfaces this as
+            a FailedRow
           - MRERPTechnicalError on Playwright timeouts / lost selectors
         """
         existing = self.lookup(buyer, mappings)
         if existing is not None:
             return existing
 
-        # Layer 4: auto-create.
-        result = self._layer4_auto_create(buyer)
+        if not seed_customer_code:
+            raise MRERPBusinessError(
+                f"Auto-create needs a seed customer code "
+                f"(ERR_NO_SEED_CUSTOMER) — pick one in the ERP "
+                f"connection wizard or pass seed_customer_code "
+                f"explicitly. buyer={buyer.name!r}",
+                failed_rows=[{"buyer_name": buyer.name,
+                              "reason_code": "ERR_NO_SEED_CUSTOMER"}],
+            )
+
+        # Layer 4: copy-from-seed.
+        result = self._layer4_auto_create(buyer, seed_customer_code)
 
         # Persist into the mappings dict so downstream calls within the
         # same push job hit Layer 1.
@@ -391,21 +411,22 @@ class MRERPCustomerSyncService:
         to clean up auto-created rows.
 
         Returns True if the customer is gone from the listing afterwards.
-        The flow mirrors MRERPAdapter.delete_invoice:
-          1. nav allform.php?id=<code>&status=del (confirmation form)
-          2. click #btndel
-          3. global dialog handler accepts the 'ยืนยันการลบข้อมูล' confirm
-          4. verify listing no longer contains the code
 
-        Caller MUST be inside the adapter's `with` block (so the dialog
-        handler is wired).
+        Implementation per probe:
+            The btndel→confirmdel() JS is just
+                `location = "alldel.php?id=" + id`
+            so we GET that URL directly (still browser-driven; §7 compliant).
+            This avoids the Playwright "click that triggers an async
+            navigation" timing trap that the older btndel-click path
+            stumbled into.
+
+        Caller MUST be inside the adapter's `with` block.
         """
         if not customer_code:
             return False
         page = self.adapter._page
         del_url = (
-            f"{self.adapter.login_url}{self.FORM_PATH}"
-            f"?id={customer_code}&status=del"
+            f"{self.adapter.login_url}/armas/alldel.php?id={customer_code}"
         )
         try:
             page.goto(del_url, wait_until="networkidle",
@@ -414,19 +435,26 @@ class MRERPCustomerSyncService:
             logger.warning("delete_customer nav failed: %s", e)
             return False
 
-        btn = page.locator('button[id="btndel"]')
-        if btn.count() == 0:
-            logger.warning("delete_customer: no btndel for %s",
-                           customer_code)
-            return False
+        # alldel.php redirects to allview.php via JS after processing.
+        # Give the redirect + listing's showdata.php AJAX time to settle.
+        page.wait_for_timeout(2_500)
         try:
-            btn.first.click(timeout=5_000)
-            page.wait_for_timeout(2_000)
-        except (PWTimeout, PWError) as e:
-            logger.warning("delete_customer click failed: %s", e)
-            return False
+            page.wait_for_load_state("networkidle", timeout=10_000)
+        except PWTimeout:
+            pass
 
-        # Verify
+        # Force a fresh listing render: the cached listing in our local
+        # TTLCache + MR.ERP's own showdata.php sometimes lag the delete.
+        try:
+            page.goto(
+                self.adapter.login_url + self.LISTING_PATH,
+                wait_until="networkidle",
+                timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+            )
+            page.wait_for_timeout(1_500)
+        except (PWTimeout, PWError):
+            pass
+
         self.invalidate()
         listing = self._fetch_listing()
         gone = not any(r.code == customer_code for r in listing)
@@ -510,52 +538,38 @@ class MRERPCustomerSyncService:
 
     # ----- Layer 4 auto-create ---------------------------------
 
-    def _layer4_auto_create(self, buyer: BuyerInfo) -> CustomerSyncResult:
-        """Create a fresh customer row in MR.ERP via armas/allform.php.
+    def _layer4_auto_create(
+        self,
+        buyer: BuyerInfo,
+        seed_customer_code: str,
+    ) -> CustomerSyncResult:
+        """Create a new customer row by cloning a seed customer and
+        overriding the four fields that are unique to the new row.
 
-        🟠 KNOWN LIMITATION (2026-05-18 integration testing):
-            armas/allsave.php returns a server-side rejection
-            (`alert("Data is use in the system");`) when the saved
-            record references master-data codes (salesman /
-            sales-area / shipping-type / other-branch) that the
-            tenant's master DB doesn't recognise. Our placeholder
-            "0000" values fail; even "1111-01" (a real account code
-            from bshlistboxdata.php) only fixes txtacfile.
+        Flow (per [mrerp-customer-copy-flow.md](../../docs/integrations/mrerp-customer-copy-flow.md)):
+          1. nav armas/allform.php (blank form)
+          2. click #inpdupdata ("สำเนา") → opens bshlistbox popup
+          3. wait ~3s for AJAX-populated candidate list
+          4. click the seed row in #bshlistboxdetail
+          5. ~all 45 fields populate from the seed (incl. all hidden
+             master-data IDs and code/detail triplets)
+          6. override txtarcode (generated) + txtname (buyer.name)
+             + txttaxid (OCR or random) + txtaddr1..4 (OCR address)
+          7. click #btnsave → checknull() passes → allsave.php
+          8. verify by listing fetch
 
-            Production path forward (gated on Zihao's review):
-              EITHER  enumerate every tenant's valid codes via
-                      bshlistboxdata.php and store them in
-                      tenant_settings (P1-B extension)
-              OR      drive the "Copy from existing" picker
-                      (inpdupdata onclick=bshlistbox) so each new
-                      customer inherits master-data refs from a known-
-                      good template (e.g. 0006 in TEST2019)
-              OR      ask the operations team to seed sentinel
-                      master-data rows (code "0000" for each picker)
-
-            Phase 3 commits the scaffolding (readonly-bypass, full
-            checknull field coverage, code generation, post-save
-            verification, delete-customer cleanup) but the integration
-            test currently locks in the rejection behaviour. When the
-            chosen forward path lands, swap that test to assert
-            success.
-
-        Required fields per Zihao's manual creation of 0006:
-          - txtarcode  (customer code, generated)
-          - txtrectype (customer type, default 1-11 = ลูกหนี้การค้า)
-          - txtname    (customer name from OCR)
-          - txtacfile  (account code — needs valid tenant value)
-          - txtcountry (default ไทย)
-          - txttaxid   (13-digit random if OCR didn't provide)
-          - plus every other field checknull() consults (16 total)
-
-        Bypass strategy for code+detail dropdown pairs:
-          The form has 'code' visible inputs + 'val' hidden inputs +
-          'detail' label inputs (e.g. txtrectype / rectypeval /
-          txtrectypedetail). Visible 'code' inputs are readonly (the
-          real UX is a popup picker). We use JS to remove readonly +
-          set value on all three.
+        The earlier "fill placeholders" path is gone — it was rejected
+        by the server with `alert("Data is use in the system")` because
+        the placeholder codes weren't real master-data rows. The copy
+        flow inherits valid refs by construction.
         """
+        if not seed_customer_code:
+            raise MRERPBusinessError(
+                "ERR_NO_SEED_CUSTOMER — seed_customer_code is required",
+                failed_rows=[{"buyer_name": buyer.name,
+                              "reason_code": "ERR_NO_SEED_CUSTOMER"}],
+            )
+
         page = self.adapter._page
 
         # 1) Pick a unique customer code.
@@ -574,79 +588,23 @@ class MRERPCustomerSyncService:
             raise MRERPTechnicalError(
                 f"customer-create nav landed on {page.url}, not allform.php")
 
-        # 2) Fill every cell checknull() inspects. See alert text in
-        #    docs/integrations/mrerp-known-facts.md (auto-create flow).
+        # 2-5) Copy-from-seed.
         try:
-            self._fill_field(page, "txtarcode", customer_code)
-            self._fill_field(page, "txtname",
-                             (buyer.name or "")[:CUSTOMER_NAME_MAX])
-            # Code+detail pairs (popup-picker style, all readonly).
-            self._fill_code_detail_pair(
-                page, "txtrectype",
-                DEFAULT_CUSTOMER_TYPE_CODE,
-                fallback_detail=DEFAULT_CUSTOMER_TYPE_LABEL,
-            )
-            # txtacfile = "รหัสบัญชี" (account code). Picker validates
-            # against the tenant's chart-of-accounts; "0000" is rejected
-            # with "Data is use in the system". Use the first valid
-            # account code from bshlistboxdata.php — TEST2019 has
-            # "1111-01" / เงินสด.
-            self._fill_code_detail_pair(
-                page, "txtacfile",
-                TENANT_VALID_ACCOUNT_CODE,
-                fallback_detail=DEFAULT_BRANCH_LABEL,
-            )
-            self._fill_code_detail_pair(
-                page, "txtemp", DEFAULT_PLACEHOLDER,
-                fallback_detail=DEFAULT_PLACEHOLDER,
-            )
-            self._fill_code_detail_pair(
-                page, "txtararea", DEFAULT_PLACEHOLDER,
-                fallback_detail=DEFAULT_PLACEHOLDER,
-            )
-            self._fill_code_detail_pair(
-                page, "txtardelivery", DEFAULT_PLACEHOLDER,
-                fallback_detail=DEFAULT_PLACEHOLDER,
-            )
-            # checknull() also requires txtothcombrhcus (other branch
-            # cross-link), discovered when its source was dumped via
-            # page.evaluate(`checknull.toString()`).
-            self._fill_code_detail_pair(
-                page, "txtothcombrhcus", DEFAULT_PLACEHOLDER,
-                fallback_detail=DEFAULT_PLACEHOLDER,
-            )
-            # Plain text cells.
-            self._fill_field(page, "txtcountry", DEFAULT_COUNTRY)
-            self._fill_field(page, "txtcontact", DEFAULT_PLACEHOLDER)
-            self._fill_field(page, "txttopcode", DEFAULT_CREDIT_TERM)
-            self._fill_field(page, "txtdiscount", DEFAULT_NUMERIC_TEXT)
-            self._fill_field(page, "txtcreditamt", DEFAULT_NUMERIC_TEXT)
-            self._fill_field(page, "txtrankcode", DEFAULT_CUSTOMER_RANK)
-            self._fill_field(page, "txtcurrcode", DEFAULT_EXCHANGE_RATE)
-            # Tax ID — required by checknull even if empty; use OCR
-            # value or placeholder.
-            tax_id = (buyer.tax_id or "").strip()
-            if len(tax_id) == 13 and tax_id.isdigit():
-                self._fill_field(page, "txttaxid", tax_id)
-            else:
-                # Generate a random non-zero 13-digit string so the
-                # server doesn't reject duplicate "0000000000000" rows.
-                import secrets
-                rand_tin = str(
-                    secrets.randbelow(10 ** 12) + 10 ** 12
-                )[:13]
-                self._fill_field(page, "txttaxid", rand_tin)
-            # Address: at least addr1 is mandatory per the alert.
-            if buyer.address:
-                self._fill_addresses(page, buyer.address)
-            else:
-                self._fill_field(page, "txtaddr1", DEFAULT_PLACEHOLDER)
+            self._copy_from_seed(page, seed_customer_code)
+        except MRERPBusinessError:
+            raise
         except (PWTimeout, PWError) as e:
             raise MRERPTechnicalError(
-                f"customer-create fill timeout: {e}") from e
+                f"copy-from-seed flow timeout: {e}") from e
 
-        # 3) Click save. checknull() validates → form submit.
-        # Track dialog count so we know if any JS alert/confirm fired.
+        # 6) Override the fields that must be unique to the new row.
+        try:
+            self._override_after_copy(page, customer_code, buyer)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(
+                f"override-after-copy timeout: {e}") from e
+
+        # 7) Click save.
         dialogs_before = (
             len(self.adapter._session.dialogs)
             if self.adapter._session else 0
@@ -657,27 +615,25 @@ class MRERPCustomerSyncService:
             raise MRERPTechnicalError(
                 f"customer-create save click timeout: {e}") from e
 
-        # Wait for navigation OR an alert.
         try:
-            page.wait_for_load_state("networkidle", timeout=self.SAVE_TIMEOUT_MS)
+            page.wait_for_load_state("networkidle",
+                                      timeout=self.SAVE_TIMEOUT_MS)
         except PWTimeout:
             pass
-        page.wait_for_timeout(1_500)   # let JS settle
+        page.wait_for_timeout(1_500)
 
-        # 4) Check for validation alerts. If any fired AFTER the click,
-        # the create likely failed.
         if self.adapter._session:
             new_dialogs = self.adapter._session.dialogs[dialogs_before:]
         else:
             new_dialogs = []
 
-        # 5) Verify by listing fetch.
+        # 8) Verify by listing.
         self.invalidate()
         listing = self._fetch_listing()
         if any(r.code == customer_code for r in listing):
             logger.info(
-                "auto-created customer %s (%s)",
-                customer_code, buyer.name,
+                "auto-created customer %s (seed=%s, buyer=%s)",
+                customer_code, seed_customer_code, buyer.name,
             )
             return CustomerSyncResult(
                 customer_code=customer_code,
@@ -685,22 +641,122 @@ class MRERPCustomerSyncService:
                 confidence=1.0,
                 matched_name=buyer.name,
                 is_new=True,
-                erp_code_persisted=False,   # caller writes erp_client_mappings
+                erp_code_persisted=False,
             )
 
-        # Failed — surface dialog text in the error so the user can see
-        # which field MR.ERP rejected.
         dialog_text = " / ".join(d for d in new_dialogs)[:300]
         raise MRERPBusinessError(
             f"customer auto-create did not appear in listing "
-            f"(code={customer_code}, dialogs={dialog_text!r})",
+            f"(code={customer_code}, seed={seed_customer_code}, "
+            f"dialogs={dialog_text!r})",
             failed_rows=[{
-                "invoice_no": None,
                 "buyer_name": buyer.name,
                 "customer_code_attempted": customer_code,
+                "seed_customer_code": seed_customer_code,
                 "dialogs": new_dialogs,
             }],
         )
+
+    def _copy_from_seed(self, page, seed_customer_code: str) -> None:
+        """Drive the inpdupdata picker to clone `seed_customer_code`
+        into the current form. Raises if the seed isn't visible in the
+        picker (e.g. typo in config, seed deleted, tenant has > N
+        customers and picker paginates)."""
+        # Click "สำเนา" — readonly button with onclick=bshlistbox(this).
+        loc = page.locator('input#inpdupdata')
+        if loc.count() == 0:
+            raise MRERPTechnicalError(
+                "inpdupdata (copy) button missing — MR.ERP UI may have "
+                "changed"
+            )
+        loc.first.click(timeout=5_000)
+
+        # AJAX fetch populates window.bshlistboxdata + renders
+        # #bshlistboxdetail. ~2-3s on a warm session, up to ~6s on a
+        # cold one.
+        try:
+            page.wait_for_selector(
+                "#bshlistboxdetail #bshlistboxdetailshow p",
+                state="visible",
+                timeout=10_000,
+            )
+        except PWTimeout as e:
+            raise MRERPTechnicalError(
+                f"copy picker popup did not render: {e}") from e
+        page.wait_for_timeout(500)
+
+        # Find the seed row inside the popup. Each row is
+        # <p onclick=bshlistboxdata2field(this)><span hidden>id</span>
+        #   <span>CODE</span><span>NAME</span></p>
+        # We match on the visible code text.
+        row = page.locator(
+            f"#bshlistboxdetailshow p:has-text({seed_customer_code!r})"
+        ).first
+        if row.count() == 0:
+            raise MRERPBusinessError(
+                f"seed customer {seed_customer_code!r} not visible in "
+                f"the copy picker — confirm the code exists in this "
+                f"tenant's customer master",
+                failed_rows=[{
+                    "reason_code": "ERR_SEED_NOT_FOUND",
+                    "seed_customer_code": seed_customer_code,
+                }],
+            )
+
+        try:
+            row.click(timeout=3_000)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(
+                f"seed row click failed: {e}") from e
+
+        # bshlistboxafterselectdata fires an AJAX fetch to populate the
+        # form with the seed's full field set. ~1-2s.
+        page.wait_for_timeout(2_500)
+
+        # Sanity check: the txtname field should now be the seed's name.
+        try:
+            populated_name = page.locator(
+                'input#txtname'
+            ).first.input_value()
+        except Exception:
+            populated_name = ""
+        if not populated_name:
+            raise MRERPTechnicalError(
+                "copy picker click did not populate the form "
+                "(txtname still empty)"
+            )
+
+    def _override_after_copy(
+        self, page, customer_code: str, buyer: BuyerInfo,
+    ) -> None:
+        """Replace the seed's identity fields with the new customer's.
+
+        Per [mrerp-customer-copy-flow.md §5](../../docs/integrations/mrerp-customer-copy-flow.md):
+        leave master-data refs alone; override only the 4 unique fields.
+        """
+        # Customer code is editable text — direct fill is fine.
+        self._fill_field(page, "txtarcode", customer_code)
+        # Customer name — truncate to MR.ERP's ceiling.
+        self._fill_field(
+            page, "txtname",
+            (buyer.name or "")[:CUSTOMER_NAME_MAX],
+        )
+
+        # Tax ID — use OCR if available + 13 digits, else random.
+        tax_id = (buyer.tax_id or "").strip()
+        if len(tax_id) == 13 and tax_id.isdigit():
+            self._fill_field(page, "txttaxid", tax_id)
+        else:
+            import secrets
+            rand_tin = str(
+                secrets.randbelow(10 ** 12) + 10 ** 12
+            )[:13]
+            self._fill_field(page, "txttaxid", rand_tin)
+
+        # Address override — only when buyer has one (otherwise inherit
+        # seed's placeholder address; harmless).
+        if buyer.address:
+            self._fill_addresses(page, buyer.address)
 
     def _fill_field(self, page, field_id: str, value: str) -> None:
         loc = page.locator(f'input[id="{field_id}"]')

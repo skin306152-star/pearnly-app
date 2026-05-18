@@ -141,6 +141,20 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "发票日期超过 2 年 · 请确认",
         "zh_TW": "發票日期超過 2 年 · 請確認",
     },
+    "ERR_NO_SEED_CUSTOMER": {
+        "th": "ต้องเลือกลูกค้าต้นแบบในวิซาร์ดเชื่อม ERP ก่อนสร้างลูกค้าใหม่อัตโนมัติ",
+        "en": "Auto-create needs a seed customer. Pick one in the ERP "
+              "connection wizard.",
+        "zh": "自动建客户需先选模板 · 请到 ERP 连接向导挑一个种子客户",
+        "zh_TW": "自動建立客戶需先選範本 · 請到 ERP 連線精靈挑一個種子客戶",
+    },
+    "ERR_SEED_NOT_FOUND": {
+        "th": "ไม่พบลูกค้าต้นแบบในระบบ MR.ERP — ตรวจสอบรหัสและเลือกใหม่",
+        "en": "Seed customer not found in MR.ERP — verify the code and "
+              "reselect.",
+        "zh": "MR.ERP 里没找到所选种子客户 · 请核对客户码并重新选择",
+        "zh_TW": "MR.ERP 裡沒找到所選種子客戶 · 請核對客戶碼並重新選擇",
+    },
 }
 
 

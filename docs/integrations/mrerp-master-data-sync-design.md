@@ -183,18 +183,42 @@ erp_type='mrerp')`. The verify-against-listing step covers the case
 where MR.ERP user deleted the customer behind our back; we fall through
 to Layer 2 if the cached code no longer resolves.
 
-**Layer 2 — Tax-ID exact match**
+**Layer 2 — Exact normalized-name match**
 
-The buyer's Thai RD tax-ID is a 13-digit string. MR.ERP customers carry
-this in the "เลขประจำตัวผู้เสียภาษี" (TIN) field per
-[mrerp-customer-form-fields.md §2.4](mrerp-customer-form-fields.md). We
-scrape the listing HTML and pick the one row whose TIN cell exactly
-equals our normalized 13-digit string (strip dashes / spaces).
+(Updated 2026-05-18 after `armas/allview.php` probe.)
 
-Edge case: MR.ERP allows duplicate TINs (e.g. branch HQ + branch row,
-same TIN). Resolution: if multiple matches, prefer the one whose
-`branch_code` matches OCR `buyer.branch`; if still tied, prefer the
-"00000" (HQ) row; if still tied, escalate as "ambiguous" (see §3.5).
+The listing rows expose `code / type / prefix / name / URA` — but NOT
+the tax_id. Without re-fetching every candidate's detail page, an
+"exact TIN match" can't run from the listing alone. v1 of the service
+falls back to "exact normalized-name match":
+
+- Normalize buyer.name with `_matching.normalize_company_name` (strips
+  Thai/Eng/中文 legal suffixes, collapses punctuation, casefolds).
+- Scan the listing for a row whose `name_norm` equals the buyer's
+  normalized name.
+
+Edge case parked for v2: if/when MR.ERP exposes TIN in the listing
+(or we accept the per-row detail click cost), restore the original
+TIN-exact layer.
+
+**Layer 4 — Auto-create via Copy-from-Seed**(Zihao 2026-05-18 拍板)
+
+Earlier "fill placeholders" attempt was rejected by `armas/allsave.php`
+with `alert("Data is use in the system")` because the placeholder
+codes for salesman / sales-area / shipping-type / other-branch don't
+match the tenant's master DB.
+
+New approach: drive the native `inpdupdata` ("สำเนา" / Copy) UX in
+`armas/allform.php` to clone a **seed customer** (e.g. `0006`). Every
+master-data reference is inherited from the seed, so the new row's
+refs are valid by construction.
+
+Detail in [mrerp-customer-copy-flow.md](mrerp-customer-copy-flow.md).
+
+Caller must provide `seed_customer_code` (set per-endpoint in the
+wizard's Step 3 dropdown). Without it, the service raises
+`MRERPBusinessError(ERR_NO_SEED_CUSTOMER)` instead of silently
+attempting the broken placeholder path.
 
 **Layer 3 — Name fuzzy match**
 

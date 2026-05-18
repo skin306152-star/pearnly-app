@@ -59,3 +59,7 @@ scripts/probe/_debug/armas_listing_*.json
 scripts/probe/_debug/armas_create_*.html
 scripts/probe/_debug/armas_create_*.json
 scripts/probe/_debug/armas_delete_probe_*.json
+scripts/probe/_debug/armas_copy_*.json
+scripts/probe/_debug/armas_copy_v2_*.json
+scripts/probe/_debug/product_listing_*.html
+scripts/probe/_debug/product_form_*.json

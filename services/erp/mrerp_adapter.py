@@ -197,6 +197,7 @@ class MRERPAdapter:
         slow_mo_ms: int = 0,
         enable_master_data_sync: bool = False,
         master_data_auto_create: bool = False,
+        seed_customer_code: Optional[str] = None,
     ):
         if not login_url:
             raise ValueError("login_url required")
@@ -222,11 +223,20 @@ class MRERPAdapter:
         # generating the xlsx, so an OCR buyer_name maps to an existing
         # MR.ERP customer_code without the caller having to pre-stitch.
         # `master_data_auto_create=True` extends the same preflight to
-        # call lookup_or_create — currently gated behind the known
-        # `armas/allsave.php` master-data-validation blocker (see
-        # mrerp_customer_sync._layer4_auto_create docstring).
+        # call lookup_or_create (copy-from-seed; see
+        # mrerp_customer_sync._layer4_auto_create + the
+        # mrerp-customer-copy-flow.md doc). Requires
+        # `seed_customer_code` to be set or the call raises
+        # MRERPBusinessError(ERR_NO_SEED_CUSTOMER).
+        # `seed_customer_code` — existing MR.ERP customer code (e.g.
+        # "0006") whose master-data references the new auto-created
+        # rows inherit. Set this from `endpoint.config.seed_customer_code`
+        # on the persisted MR.ERP connection.
         self.enable_master_data_sync = bool(enable_master_data_sync)
         self.master_data_auto_create = bool(master_data_auto_create)
+        self.seed_customer_code = (
+            (seed_customer_code or "").strip() or None
+        )
         self._customer_sync = None     # lazy-created on first use
 
         self._session: Optional[BrowserSession] = None
@@ -1326,6 +1336,7 @@ class MRERPAdapter:
                 if self.master_data_auto_create:
                     result = self._customer_sync.lookup_or_create(
                         buyer, mappings,
+                        seed_customer_code=self.seed_customer_code,
                     )
                 else:
                     result = self._customer_sync.lookup(buyer, mappings)

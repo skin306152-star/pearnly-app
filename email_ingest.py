@@ -283,17 +283,42 @@ def _ingest_one_attachment(
             logger.warning(f"[email_ingest] 用户 {user_id} 额度不足 · 跳过 · used={used} quota={monthly_quota}")
             return None
 
-    # 调 Gemini
-    try:
-        import gemini_engine
-        api_key = user_key or os.environ.get("GEMINI_API_KEY", "")
-        if not api_key:
-            logger.error("[email_ingest] 没有可用的 Gemini API key")
-            return None
-        result = gemini_engine.recognize_pdf(content, api_key=api_key, max_pages=50)
-    except Exception as e:
-        logger.error(f"[email_ingest] Gemini 识别失败 · {filename}: {e}")
+    # 调 OCR
+    # Round 2 · 新 pipeline 接入(feature-flag-gated)
+    api_key = user_key or os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        logger.error("[email_ingest] 没有可用的 Gemini API key")
         return None
+
+    result = None
+    _pipeline_cost_thb = None
+
+    if os.environ.get("OCR_USE_NEW_PIPELINE", "false").strip().lower() == "true":
+        try:
+            from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
+            from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+            _pipe_res = _pipeline_run(content, max_pages=50, api_key=api_key)
+            result = pipeline_result_to_legacy_dict(_pipe_res)
+            _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
+            logger.info(
+                f"🆕 [email_ingest] pipeline_v1 · {filename} · pages={_pipe_res.page_count} "
+                f"· cost=฿{_pipeline_cost_thb:.4f}"
+            )
+        except Exception as _pipe_err:
+            logger.warning(
+                f"[email_ingest] pipeline_v1 失败 · fallback Gemini · {filename} · "
+                f"{type(_pipe_err).__name__}: {_pipe_err}"
+            )
+            result = None
+            _pipeline_cost_thb = None
+
+    if result is None:
+        try:
+            import gemini_engine
+            result = gemini_engine.recognize_pdf(content, api_key=api_key, max_pages=50)
+        except Exception as e:
+            logger.error(f"[email_ingest] Gemini 识别失败 · {filename}: {e}")
+            return None
 
     if not result or not result.get("pages"):
         logger.warning(f"[email_ingest] 识别结果为空 · {filename}")
@@ -347,6 +372,29 @@ def _ingest_one_attachment(
         source="email",
         source_ref=source_ref,
     )
+
+    # Round 2 · pipeline 路径强制 cost 埋点(email_ingest 此前完全漏记)
+    # 旧 Gemini 路径维持原样(等全切后另行处理)
+    if _pipeline_cost_thb is not None:
+        try:
+            _em_in = sum(int(p.get("input_tokens") or 0) for p in pages)
+            _em_out = sum(int(p.get("output_tokens") or 0) for p in pages)
+            _tenant_id = str(user.get("tenant_id")) if user.get("tenant_id") else None
+            db.log_ocr_cost(
+                user_id=user_id,
+                tenant_id=_tenant_id,
+                history_id=history_id,
+                engine="pipeline_v1",
+                pages=len(pages),
+                input_tokens=_em_in,
+                output_tokens=_em_out,
+                cost_thb=_pipeline_cost_thb,
+                elapsed_ms=int(result.get("elapsed_ms") or 0),
+            )
+            logger.info(f"💰 [email_ingest] cost log · {filename} · ฿{_pipeline_cost_thb:.4f}")
+        except Exception as _ce:
+            logger.warning(f"[email_ingest] cost log failed (non-blocking): {_ce}")
+
     return history_id
 
 

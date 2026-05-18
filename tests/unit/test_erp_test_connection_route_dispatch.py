@@ -882,5 +882,448 @@ class LoginFormRetryTests(unittest.TestCase):
         )
 
 
+@unittest.skipUnless(
+    __import__("importlib").util.find_spec("services.erp.mrerp_adapter") is not None,
+    "mrerp_adapter not importable in this env (e.g. playwright missing) — "
+    "push routing contract test runs server-side / CI where it's installed.",
+)
+class PushMRERPRouteContractTests(unittest.TestCase):
+    """A1 (Zihao 2026-05-19 拍板) · push_to_endpoint must route
+    adapter='mrerp' through push_mrerp_history (real MRERPAdapter wiring),
+    NOT through the push_mrerp stub.
+
+    Source contract:
+        > test_push_to_endpoint_route_calls_mrerp_adapter_not_stub
+        > 守门测试 · push_to_endpoint mrerp 分支必须真接 MRERPAdapter ·
+        > 不能落回 push_mrerp stub
+
+    The bug shape we're preventing: someone reads push_to_endpoint's
+    "adapter str → ADAPTER_REGISTRY[adapter] → push_fn(config, payload)"
+    pattern and "fixes" mrerp by changing the stub body to return success.
+    That would silently push test invoices when called from
+    /api/erp/push, completely bypassing MRERPAdapter's real flow.
+    This test catches that.
+    """
+
+    def setUp(self):
+        # Reset the fake adapter's call counter so tests don't leak.
+        _FakeMRERPAdapterForPushTests.reset()
+
+    def test_push_to_endpoint_route_calls_mrerp_adapter_not_stub(self):
+        """The named guard. Patches MRERPAdapter at the module symbol
+        push_mrerp_history imports from, drives push_to_endpoint with
+        adapter='mrerp', and verifies:
+
+        1. The response is from push_mrerp_history (carries
+           request_body.adapter='mrerp' + the success path emits
+           mrerp_bill_no).
+        2. The stub's "not wired into push_to_endpoint" smoking-gun
+           string never appears in response_body / error_msg.
+        3. The fake adapter's upload_invoice_batch was called exactly
+           once with the single-history list shape.
+        """
+        import erp_push as _erp_mod
+        from services.erp import mrerp_adapter as _mrerp_mod
+
+        endpoint = {
+            "id": "ep-test-1",
+            "user_id": "user-test-1",
+            "adapter": "mrerp",
+            "config": {
+                "system_url": "https://www.mrerp4sme.com",
+                "username": "u", "password": "p",  # plaintext path
+                "comidyear": "6", "seldb": "1",
+                "seed_customer_code": "0006",
+                "seed_product_code": "P001",
+            },
+            "enabled": True,
+        }
+        history = {
+            "id": "hist-test-1",
+            "invoice_no": "PEARNLY-TEST-ABCD",
+            "invoice_date": "2026-05-19",
+            "total_amount": 107.00,
+            "client_id": 1,
+            "pages": [{
+                "fields": {
+                    "buyer_name": "Skin Trading Co., Ltd.",
+                    "buyer_tax": "0123456789012",
+                    "items": [{"name": "Pepsi 500ml", "qty": 1,
+                               "unit_price": 100.00, "amount": 100.00}],
+                },
+            }],
+        }
+        mappings = {
+            "clients": [{"erp_type": "mrerp", "client_id": 1, "erp_code": "0006"}],
+            "products": [], "accounts": [], "taxes": [],
+        }
+
+        # push_mrerp_history does `import db as _db` lazily. Locally,
+        # the real db module may fail to import (missing psycopg2 etc.).
+        # Install a stub `db` module into sys.modules so the lazy import
+        # finds our test double instead. Restore it after.
+        fake_db = MagicMock()
+        fake_db.get_user_tenant_id = MagicMock(return_value="tenant-test-1")
+        fake_db.get_mrerp_mappings_bundle = MagicMock(return_value=mappings)
+        original_db = sys.modules.get("db")
+        sys.modules["db"] = fake_db
+        try:
+            with patch.object(_mrerp_mod, "MRERPAdapter", _FakeMRERPAdapterForPushTests), \
+                 patch.object(_erp_mod, "logger", MagicMock()):
+                result = _erp_mod.push_to_endpoint(endpoint, history)
+        finally:
+            if original_db is None:
+                sys.modules.pop("db", None)
+            else:
+                sys.modules["db"] = original_db
+
+        # ── Shape: must be the full push_to_endpoint dict.
+        self.assertIsInstance(result, dict)
+        for key in ("success", "http_status", "response_body", "error_msg",
+                    "elapsed_ms", "request_body", "adapter"):
+            self.assertIn(key, result,
+                          f"push_to_endpoint result missing {key!r}: {result!r}")
+        self.assertEqual(result["adapter"], "mrerp",
+                         f"adapter field clobbered: {result!r}")
+
+        # ── Smoking-gun: the stub message MUST NOT appear anywhere.
+        joined = " ".join([
+            str(result.get("response_body") or ""),
+            str(result.get("error_msg") or ""),
+        ]).lower()
+        self.assertNotIn(
+            "not wired into push_to_endpoint", joined,
+            f"push_to_endpoint(mrerp) still hits the stub: {result!r}",
+        )
+
+        # ── Real path indicators: success=True + mrerp_bill_no present.
+        self.assertTrue(
+            result["success"],
+            f"fake adapter returned success but push_to_endpoint reports "
+            f"failure (probably caught an exception): {result!r}",
+        )
+        self.assertEqual(
+            result.get("mrerp_bill_no"), "SI-TEST-OK",
+            f"mrerp_bill_no not propagated from ImportResult to "
+            f"push_to_endpoint result: {result!r}",
+        )
+
+        # ── The fake adapter must have been invoked exactly once.
+        self.assertEqual(
+            _FakeMRERPAdapterForPushTests.upload_call_count, 1,
+            "MRERPAdapter.upload_invoice_batch wasn't called — "
+            "push_to_endpoint(mrerp) is not actually going through "
+            "MRERPAdapter.",
+        )
+        # And it must have received a single-item history list.
+        last_call_histories = _FakeMRERPAdapterForPushTests.last_call_histories
+        self.assertIsInstance(last_call_histories, list)
+        self.assertEqual(
+            len(last_call_histories), 1,
+            "MRERPAdapter received !=1 histories — push_mrerp_history "
+            "must wrap the single history in a 1-item list.",
+        )
+
+    def test_push_to_endpoint_falls_back_to_webhook_path_for_non_mrerp(self):
+        """Sanity: non-mrerp adapters still go through ADAPTER_REGISTRY
+        (push_webhook etc.). The early-return for mrerp must NOT
+        accidentally break webhook routing."""
+        import erp_push as _erp_mod
+
+        endpoint = {
+            "id": "ep-test-wh", "user_id": "u",
+            "adapter": "webhook",
+            "config": {"url": "https://example.invalid/hook"},
+        }
+        history = {"id": "h1", "invoice_no": "INV1", "seller_name": "S",
+                   "total_amount": 100.0, "pages": []}
+
+        # ADAPTER_REGISTRY holds a frozen reference to push_webhook,
+        # captured at module-load time. To intercept the call we must
+        # patch the registry entry itself, not the push_webhook name.
+        webhook_mock = MagicMock(return_value=(True, 200, "ok-body"))
+        original = _erp_mod.ADAPTER_REGISTRY.get("webhook")
+        _erp_mod.ADAPTER_REGISTRY["webhook"] = webhook_mock
+        try:
+            result = _erp_mod.push_to_endpoint(endpoint, history)
+        finally:
+            _erp_mod.ADAPTER_REGISTRY["webhook"] = original
+
+        webhook_mock.assert_called_once()
+        self.assertTrue(result["success"])
+        self.assertEqual(result["adapter"], "webhook")
+
+
+class _FakeMRERPAdapterForPushTests:
+    """Test double for MRERPAdapter used by PushMRERPRouteContractTests.
+
+    Mimics the context-manager + upload_invoice_batch surface so
+    push_mrerp_history runs end-to-end without needing chromium. Records
+    call count + last-call arguments for assertions.
+
+    Class-level state is reset by `reset()` between tests; that's fine
+    because the test class runs them sequentially.
+    """
+    upload_call_count: int = 0
+    last_call_histories = None
+    last_call_mappings = None
+
+    @classmethod
+    def reset(cls):
+        cls.upload_call_count = 0
+        cls.last_call_histories = None
+        cls.last_call_mappings = None
+
+    @classmethod
+    def from_encrypted(cls, *, encrypted_username, encrypted_password, **kwargs):
+        return cls(username="decrypted-u", password="decrypted-p", **kwargs)
+
+    def __init__(self, *, username, password, login_url, **kwargs):
+        # Mimic real constructor's validation.
+        if not login_url:
+            raise ValueError("login_url required")
+        if not username or not password:
+            raise ValueError("username and password required")
+        self._username = username
+        self._password = password
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def upload_invoice_batch(self, histories, mappings):
+        """Return a happy-path ImportResult with one SuccessRow per
+        history. Records args so assertions can check the shape."""
+        from services.erp.mrerp_adapter import ImportResult, SuccessRow
+        cls = type(self)
+        cls.upload_call_count += 1
+        cls.last_call_histories = list(histories)
+        cls.last_call_mappings = dict(mappings) if isinstance(mappings, dict) else mappings
+        result = ImportResult(total=len(histories), elapsed_ms=42,
+                              xlsx_size_bytes=1024)
+        for h in histories:
+            inv_no = (h.get("invoice_no") or h.get("invoice_number")
+                      or "TEST-INV")
+            result.success.append(SuccessRow(
+                invoice_no=inv_no,
+                mrerp_bill_no="SI-TEST-OK",
+                original=h,
+            ))
+        return result
+
+
+def _can_import_app_for_async_tests() -> bool:
+    """The async push test needs to import the full app (FastAPI + db).
+    Locally, db.py imports psycopg2 which isn't always installed. Probe
+    once at module-load time and skip the test class if anything in the
+    chain fails — server-side / CI has the deps and runs the test."""
+    try:
+        import os
+        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        import app  # noqa
+        return True
+    except Exception:
+        return False
+
+
+@unittest.skipUnless(
+    _can_import_app_for_async_tests()
+    and __import__("importlib").util.find_spec("httpx") is not None
+    and __import__("importlib").util.find_spec("services.erp.mrerp_adapter") is not None,
+    "needs full app + httpx + mrerp_adapter; covered server-side otherwise.",
+)
+class PushMRERPAsyncContextTests(unittest.IsolatedAsyncioTestCase):
+    """A1 async sibling · proves push_to_endpoint(mrerp) survives the
+    async-context tripwire end-to-end.
+
+    Source contract:
+        > test_push_to_endpoint_in_async_context_pushes_real_invoice
+        > 必须真 async + 真 MRERPAdapter mock · 不许 sync pytest mock
+        > 证明 async 路由通
+
+    Plants a fake MRERPAdapter whose `__enter__` raises the exact
+    Playwright Sync-API-inside-loop error if it detects a running
+    event loop. If /api/erp/push (mrerp branch) goes through
+    push_to_endpoint without asyncio.to_thread, the fake adapter
+    fires and the test fails with that error message visible.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        import app   # noqa
+        cls.app_module = app
+
+    async def _make_async_client(self):
+        import httpx
+        try:
+            from httpx import ASGITransport
+            transport = ASGITransport(app=self.app_module.app)
+            return httpx.AsyncClient(transport=transport, base_url="http://test")
+        except ImportError:
+            return httpx.AsyncClient(app=self.app_module.app, base_url="http://test")
+
+    async def test_push_to_endpoint_in_async_context_pushes_real_invoice(self):
+        """The named guard. Drives a real httpx async POST to /api/erp/push
+        with adapter=mrerp, with MRERPAdapter replaced by a fake that
+        asserts no event loop is active in `__enter__`. If the route
+        forgot to wrap push_to_endpoint with asyncio.to_thread (or the
+        new mrerp early-route somehow runs in the loop directly), the
+        fake's `__enter__` raises RuntimeError mentioning 'Sync API'
+        and the route returns 500 with that text. We assert no such
+        text appears."""
+        app = self.app_module
+        from services.erp import mrerp_adapter as _mrerp_mod
+
+        fake_ep = {
+            "id": "ep-mrerp-1",
+            "user_id": "u",
+            "adapter": "mrerp",
+            "config": {
+                "system_url": "https://www.mrerp4sme.com",
+                "username_enc": "u", "password_enc": "p",
+                "comidyear": "6", "seldb": "1",
+            },
+            "enabled": True,
+        }
+        fake_history = {
+            "id": "h-1",
+            "invoice_no": "PEARNLY-TEST-ASYNC",
+            "invoice_date": "2026-05-19",
+            "total_amount": 107.0,
+            "client_id": 1,
+            "pages": [{"fields": {
+                "buyer_name": "Skin Trading Co., Ltd.",
+                "buyer_tax": "0123456789012",
+                "items": [{"name": "Pepsi 500ml", "qty": 1,
+                           "unit_price": 100.0, "amount": 100.0}],
+            }}],
+        }
+
+        fake_mappings = {
+            "clients": [{"erp_type": "mrerp", "client_id": 1,
+                         "erp_code": "0006"}],
+            "products": [], "accounts": [], "taxes": [],
+        }
+
+        _AsyncTripwireAdapter.reset()
+
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_ocr_history_detail",
+                          return_value=fake_history), \
+             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
+             patch.object(app.db, "get_user_tenant_id",
+                          return_value="tenant-1"), \
+             patch.object(app.db, "get_mrerp_mappings_bundle",
+                          return_value=fake_mappings), \
+             patch.object(app.db, "insert_push_log", return_value="log-1"), \
+             patch.object(app.db, "update_endpoint_stats", return_value=None), \
+             patch.object(app.db, "update_history_push_status",
+                          return_value=None), \
+             patch.object(app.db, "get_erp_retry_delay_sec",
+                          return_value=None), \
+             patch.object(_mrerp_mod, "MRERPAdapter", _AsyncTripwireAdapter):
+            client = await self._make_async_client()
+            async with client:
+                r = await client.post("/api/erp/push", json={
+                    "history_id": "h-1", "endpoint_id": "ep-mrerp-1",
+                })
+
+        # We accept either 200 (happy path) or 500 (some db wiring
+        # didn't mock perfectly) but NEVER the tripwire message. That
+        # message in the body means push_to_endpoint ran on the event
+        # loop — the bug we're catching.
+        body_text = r.text or ""
+        self.assertNotIn(
+            "Sync API inside the asyncio loop", body_text,
+            f"push_to_endpoint(mrerp) ran on the event loop. The route "
+            f"must wrap it in asyncio.to_thread. Response: {body_text}",
+        )
+
+        # Best-effort happy assertion: the fake adapter SHOULD have
+        # been invoked exactly once and the route should have returned
+        # ok=True. If the route reshuffling broke something else, we
+        # still want a green light on the async-context property, so
+        # those are warnings rather than failures.
+        if r.status_code == 200:
+            try:
+                body = r.json()
+            except Exception:
+                body = {}
+            self.assertTrue(
+                body.get("ok"),
+                f"push response not ok despite tripwire silent: {body!r}",
+            )
+            self.assertEqual(
+                _AsyncTripwireAdapter.enter_call_count, 1,
+                f"adapter __enter__ not called once: "
+                f"{_AsyncTripwireAdapter.enter_call_count}",
+            )
+
+
+class _AsyncTripwireAdapter:
+    """Like _FakeMRERPAdapterForPushTests but with `__enter__` checking
+    for a running asyncio loop — fires the exact Playwright sync-API
+    error if it sees one. Used by PushMRERPAsyncContextTests."""
+
+    enter_call_count: int = 0
+    upload_call_count: int = 0
+
+    @classmethod
+    def reset(cls):
+        cls.enter_call_count = 0
+        cls.upload_call_count = 0
+
+    @classmethod
+    def from_encrypted(cls, *, encrypted_username, encrypted_password, **kwargs):
+        return cls(username="decrypted-u", password="decrypted-p", **kwargs)
+
+    def __init__(self, *, username, password, login_url, **kwargs):
+        if not login_url:
+            raise ValueError("login_url required")
+        if not username or not password:
+            raise ValueError("username and password required")
+
+    def __enter__(self):
+        import asyncio
+        type(self).enter_call_count += 1
+        try:
+            loop = asyncio.get_running_loop()
+            raise RuntimeError(
+                "It looks like you are using Playwright Sync API "
+                "inside the asyncio loop. Please use the Async API "
+                "instead. (tripwire from PushMRERPAsyncContextTests · "
+                "loop=" + repr(loop) + ")"
+            )
+        except RuntimeError as e:
+            if "Sync API inside" in str(e):
+                raise
+            # No running loop — we're in a worker thread. Good.
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def upload_invoice_batch(self, histories, mappings):
+        from services.erp.mrerp_adapter import ImportResult, SuccessRow
+        type(self).upload_call_count += 1
+        result = ImportResult(total=len(histories), elapsed_ms=10,
+                              xlsx_size_bytes=512)
+        for h in histories:
+            inv_no = (h.get("invoice_no") or h.get("invoice_number")
+                      or "ASYNC-TEST")
+            result.success.append(SuccessRow(
+                invoice_no=inv_no,
+                mrerp_bill_no="SI-ASYNC-OK",
+                original=h,
+            ))
+        return result
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

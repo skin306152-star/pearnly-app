@@ -192,6 +192,42 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "意外错误 · 请联系客服",
         "zh_TW": "意外錯誤 · 請聯絡客服",
     },
+    # Product-sync buckets (Task 2 · Zihao 2026-05-18 拍板)
+    "ERR_NO_SEED_PRODUCT": {
+        "th": "ต้องเลือกสินค้าต้นแบบในวิซาร์ดเชื่อม ERP ก่อนสร้างสินค้าใหม่อัตโนมัติ",
+        "en": "Auto-create needs a seed product. Pick one in the ERP "
+              "connection wizard.",
+        "zh": "自动建商品需先选模板 · 请到 ERP 连接向导挑一个种子商品",
+        "zh_TW": "自動建立商品需先選範本 · 請到 ERP 連線精靈挑一個種子商品",
+    },
+    "ERR_SEED_PRODUCT_NOT_FOUND": {
+        "th": "ไม่พบสินค้าต้นแบบในระบบ MR.ERP — ตรวจสอบรหัสและเลือกใหม่",
+        "en": "Seed product not found in MR.ERP — verify the code and "
+              "reselect.",
+        "zh": "MR.ERP 里没找到所选种子商品 · 请核对商品码并重新选择",
+        "zh_TW": "MR.ERP 裡沒找到所選種子商品 · 請核對商品碼並重新選擇",
+    },
+    "ERR_PRODUCT_UNIT_NOT_FOUND": {
+        "th": "หน่วย OCR ไม่ตรงกับหน่วยของสินค้าต้นแบบ — เปลี่ยนต้นแบบ"
+              "หรือเอา hint หน่วยออก",
+        "en": "OCR unit does not match the seed product's unit — pick "
+              "a seed with the right unit or drop the OCR unit hint",
+        "zh": "OCR 单位与种子商品单位不符 · 换个种子或删去 OCR 单位提示",
+        "zh_TW": "OCR 單位與種子商品單位不符 · 換個種子或刪去 OCR 單位提示",
+    },
+    "WARN_PRODUCT_NAME_TRUNCATED": {
+        "th": "ชื่อสินค้ายาวเกิน 100 ตัวอักษร — ถูกตัดให้พอดี",
+        "en": "Product name exceeded 100 chars — truncated to fit",
+        "zh": "商品名超过 100 字符 · 已自动截断",
+        "zh_TW": "商品名超過 100 字元 · 已自動截斷",
+    },
+    "WARN_PRODUCT_PRICE_INHERITED_FROM_SEED": {
+        "th": "ราคาขายสืบทอดจากสินค้าต้นแบบ — โปรดตรวจสอบในระบบ MR.ERP",
+        "en": "Sales price inherited from the seed product — please "
+              "review in MR.ERP",
+        "zh": "销售价继承自种子商品 · 请到 MR.ERP 核对",
+        "zh_TW": "銷售價繼承自種子商品 · 請到 MR.ERP 核對",
+    },
 }
 
 

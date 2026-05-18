@@ -1320,10 +1320,18 @@ def get_default_erp_endpoint(user_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+# v118.34.13 · 暴露 create_erp_endpoint 失败时的具体 DB 错误。
+# 路由层在 new_id 为 None 时读这个 module global · 把错误一并写到
+# /api/version.last_500_traceback,避免用户看到一片空白。
+_last_create_endpoint_error: Optional[str] = None
+
+
 def create_erp_endpoint(user_id: str, name: str, adapter: str, config: Dict[str, Any],
                         is_default: bool = False, auto_push: bool = False) -> Optional[str]:
     """创建端点。如果 is_default=True,会自动取消其他端点的默认状态。返回新 id"""
     import json as _json
+    import traceback as _tb
+    global _last_create_endpoint_error
     try:
         with get_cursor(commit=True) as cur:
             if is_default:
@@ -1334,9 +1342,17 @@ def create_erp_endpoint(user_id: str, name: str, adapter: str, config: Dict[str,
                 RETURNING id
             """, (user_id, name, adapter, _json.dumps(config), is_default, auto_push))
             row = cur.fetchone()
+            _last_create_endpoint_error = None
             return str(row["id"]) if row else None
     except Exception as e:
-        logger.error(f"create_erp_endpoint failed: {e}")
+        _last_create_endpoint_error = (
+            f"{type(e).__name__}: {str(e)[:200]} | "
+            + _tb.format_exc()[-400:]
+        )
+        # logger.exception captures the full stack — visible in
+        # journalctl. The module global gives the route a short
+        # version to surface in the 500 response.
+        logger.exception("create_erp_endpoint failed")
         return None
 
 

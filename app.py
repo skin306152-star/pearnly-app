@@ -69,6 +69,50 @@ logging.basicConfig(
 )
 logger = logging.getLogger("mr-pilot")
 
+
+# v118.34.13 (Zihao 2026-05-19 拍板) · 最近 500 错误的现场摘要 ·
+# 通过 /api/version 直接读 · 用户不用 SSH 看 journalctl 也能拿到根因。
+# 内容控制在 1500 字符内,堆栈尾巴优先(异常点附近)。
+_last_500_event: Dict[str, Any] = {}
+
+
+def _record_500(*, path: str = "", method: str = "", detail: str = ""):
+    """Capture the current traceback (if any) + request context into the
+    module-level snapshot that /api/version surfaces. Safe to call from
+    anywhere — uses sys.exc_info() to grab the active traceback, falls
+    back to a synthetic message when no exception is in flight."""
+    import sys as _sys
+    import time as _t
+    import traceback as _tb
+    tb_str = ""
+    exc_type = ""
+    try:
+        et, ev, etb = _sys.exc_info()
+        if et is not None and ev is not None:
+            exc_type = et.__name__
+            tb_str = "".join(_tb.format_exception(et, ev, etb))
+    except Exception:
+        pass
+    if not tb_str and detail:
+        tb_str = f"(no traceback) {detail}"
+    # Trim to last 1500 chars — the tail is where the actual error is.
+    _last_500_event.clear()
+    _last_500_event.update({
+        "ts": int(_t.time()),
+        "path": str(path or "")[:200],
+        "method": str(method or "")[:10],
+        "detail": str(detail or "")[:200],
+        "exc_type": exc_type,
+        "traceback": (tb_str or "")[-1500:],
+    })
+
+
+def _read_last_500() -> Dict[str, Any]:
+    """Snapshot copy of the last captured 500 event."""
+    if not _last_500_event:
+        return {}
+    return dict(_last_500_event)
+
 DEMO_IP_DAILY_LIMIT = int(os.environ.get("DEMO_IP_DAILY_LIMIT", "20"))
 OCR_MAX_PAGES_PER_UPLOAD = int(os.environ.get("OCR_MAX_PAGES_PER_UPLOAD", "5"))
 OCR_MAX_FILE_SIZE_MB = int(os.environ.get("OCR_MAX_FILE_SIZE_MB", "20"))
@@ -901,6 +945,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# v118.34.13 (Zihao 2026-05-19 拍板) · catch-all exception handler so
+# any uncaught exception writes a traceback snapshot into _last_500_event
+# before propagating. HTTPException(500, ...) raised explicitly bypasses
+# this (FastAPI handles it before this hook fires), so routes that raise
+# 500 must also call _record_500 manually — see erp_endpoints_create.
+@app.exception_handler(Exception)
+async def _capture_unhandled_500(request: Request, exc: Exception):
+    from fastapi.responses import JSONResponse
+    try:
+        _record_500(
+            path=str(request.url.path),
+            method=request.method,
+            detail=f"unhandled {type(exc).__name__}: {str(exc)[:200]}",
+        )
+    except Exception:
+        pass
+    logger.exception(
+        "[capture-500] %s %s · %s",
+        request.method, request.url.path, type(exc).__name__,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": f"{type(exc).__name__}: {str(exc)[:200]}",
+            "diag_url": "/api/version (see playwright.last_500_traceback)",
+        },
+    )
 
 
 # ============================================================
@@ -3419,34 +3492,93 @@ async def erp_endpoints_list(request: Request):
 
 @app.post("/api/erp/endpoints")
 async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
+    """v118.34.13 (Zihao 2026-05-19 拍板) · 加 try/except + 500 现场记录 +
+    mrerp 凭据先 Fernet 加密再存盘。之前 wizard 把 plaintext 塞进
+    username_enc/password_enc 字段名(假签名)· DB 存的是明文 ·
+    回头 test-connection 解密就 InvalidToken。现在路由识别 mrerp ·
+    走 kms_helper.encrypt_str 转 ciphertext 再落地。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
     p = _plan_permissions(user.get("plan", "free"))
 
-    # v0.8 · 数量限制
-    ep_limit = p.get("endpoints_limit", 1)
-    if ep_limit != -1:
-        existing = db.list_erp_endpoints(user["id"])
-        if len(existing) >= ep_limit:
-            raise HTTPException(403, detail={
-                "code": "erp.endpoint_limit_reached",
-                "limit": ep_limit,
-            })
+    try:
+        # v0.8 · 数量限制
+        ep_limit = p.get("endpoints_limit", 1)
+        if ep_limit != -1:
+            existing = db.list_erp_endpoints(user["id"])
+            if len(existing) >= ep_limit:
+                raise HTTPException(403, detail={
+                    "code": "erp.endpoint_limit_reached",
+                    "limit": ep_limit,
+                })
 
-    # v0.8 · 自动推送权限
-    if req.auto_push and not p.get("can_auto_push_erp"):
-        raise HTTPException(403, detail="erp.auto_push_plus_required")
+        # v0.8 · 自动推送权限
+        if req.auto_push and not p.get("can_auto_push_erp"):
+            raise HTTPException(403, detail="erp.auto_push_plus_required")
 
-    if req.adapter not in _erp.ADAPTER_REGISTRY:
-        raise HTTPException(400, detail="erp.unknown_adapter")
-    new_id = db.create_erp_endpoint(
-        user["id"], req.name, req.adapter, req.config,
-        is_default=req.is_default, auto_push=req.auto_push,
-    )
-    if not new_id:
-        raise HTTPException(500, detail="erp.create_failed")
-    ep = db.get_erp_endpoint(user["id"], new_id)
-    return _strip_endpoint_for_response(ep) if ep else {"id": new_id}
+        if req.adapter not in _erp.ADAPTER_REGISTRY:
+            raise HTTPException(400, detail="erp.unknown_adapter")
+
+        # v118.34.13 · 加密 mrerp 凭据再落地 · wizard 发的是 plaintext。
+        # 即使字段名叫 _enc · 不加密就 None-op 解密会炸。
+        config = dict(req.config or {})
+        if req.adapter == "mrerp":
+            try:
+                from kms_helper import encrypt_str, is_encrypted
+                for fld in ("username_enc", "password_enc"):
+                    v = config.get(fld)
+                    if v and isinstance(v, str) and not is_encrypted(v):
+                        config[fld] = encrypt_str(v)
+            except ImportError as e:
+                # kms_helper 不可用(env 缺 KMS_KEY)· 记录并报清晰错误,
+                # 别让 500 给用户看一片空白。
+                _record_500(
+                    path="/api/erp/endpoints", method="POST",
+                    detail=f"kms_helper unavailable: {e}",
+                )
+                raise HTTPException(
+                    500,
+                    detail="erp.kms_key_missing · server KMS_KEY env not set",
+                )
+            except Exception as e:
+                _record_500(
+                    path="/api/erp/endpoints", method="POST",
+                    detail=f"encrypt failed: {type(e).__name__}: {e}",
+                )
+                raise HTTPException(
+                    500, detail=f"erp.encrypt_failed: {type(e).__name__}",
+                )
+
+        new_id = db.create_erp_endpoint(
+            user["id"], req.name, req.adapter, config,
+            is_default=req.is_default, auto_push=req.auto_push,
+        )
+        if not new_id:
+            # db.create_erp_endpoint swallowed the underlying DB error
+            # and returned None. Pull the last DB-side error out of the
+            # module global if available, otherwise mark as opaque.
+            last = getattr(db, "_last_create_endpoint_error", None) or "unknown"
+            _record_500(
+                path="/api/erp/endpoints", method="POST",
+                detail=f"db.create_erp_endpoint returned None · {last}",
+            )
+            raise HTTPException(
+                500,
+                detail=f"erp.create_failed · {str(last)[:200]}",
+            )
+        ep = db.get_erp_endpoint(user["id"], new_id)
+        return _strip_endpoint_for_response(ep) if ep else {"id": new_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Last-resort capture so /api/version's last_500_traceback
+        # shows the real stack instead of opaque "create_failed".
+        _record_500(
+            path="/api/erp/endpoints", method="POST",
+            detail=f"{type(e).__name__}: {str(e)[:200]}",
+        )
+        logger.exception("[erp_endpoints_create] unhandled error")
+        raise HTTPException(500, detail=f"erp.create_failed: {type(e).__name__}: {str(e)[:200]}")
 
 
 @app.patch("/api/erp/endpoints/{endpoint_id}")
@@ -4957,13 +5089,17 @@ async def get_frontend_version():
     # v118.34.5 · diagnostic state for the MR.ERP Playwright pipeline.
     # Lets the user verify in-browser whether the auto-installer landed
     # without needing SSH access. Cheap to compute (one stat() per call).
+    # v118.34.13 · also surfaces the last captured 500 traceback so the
+    # operator can read the actual stack from the browser instead of
+    # journalctl.
     return {
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "playwright": _read_playwright_status(),
+        "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.34.12 · 修 startup probe 自己掉进 sync-in-async 坑:\n• v118.34.11 加了 chromium 真起探测 · 但探测函数 _probe_chromium_launch 跑在 lifespan event loop 里 · Playwright sync_api 还是拒绝 · /api/version 假阴性显示 chromium_can_launch=false\n• 修:lifespan 用 await asyncio.to_thread(_ensure_playwright_installed) · 探测跑在 worker thread · 无 loop · sync_api 正常 start\n• 这是 v118.34.10 修路由时漏掉的 lifespan 自己也是 async\n\n刷浏览器(Ctrl+F5)看 /api/version 的 chromium_can_launch · 应该 true",
-            "en": "v118.34.12 · Fix startup probe self-tripping the sync-in-async guard:\n• v118.34.11 added a real chromium-launch probe at startup so we'd have an authoritative chromium_can_launch flag in /api/version. But the probe ran inside lifespan (which is `async def`), so Playwright's sync_api detected the running asyncio loop and refused to start — yielding a false-negative chromium_can_launch=false even though chromium itself was perfectly functional.\n• Fix: lifespan now calls `_ensure_playwright_installed` via `await asyncio.to_thread(...)`. The probe runs on a worker thread (no loop in scope), sync_api starts cleanly. Same pattern as the route fixes in v118.34.10 — lifespan was the one async path I forgot to wrap.\n\nHard-refresh (Ctrl+F5), check /api/version's playwright.chromium_can_launch — should be true.",
+            "zh": "v118.34.13 · 修 POST /api/erp/endpoints 500 + 加 last_500 诊断:\n• wizard 点完成报「保存失败 · 状态 500」\n• 根因 1:wizard 把 plaintext 凭据塞进 username_enc / password_enc 字段名 · 路由没加密就存 DB · 之后 test-connection 解密炸\n• 根因 2:db.create_erp_endpoint 吃 Exception 返 None · 路由翻译成 500 erp.create_failed · 用户看不到真实根因\n• 修:\n  - 路由识别 adapter=='mrerp' · 先 kms_helper.encrypt_str 再存\n  - 路由整体包 try/except · 异常都进 _record_500()\n  - db.create_erp_endpoint 失败把详细错误存 module global · 路由读出来塞进 500 detail\n  - 加 @app.exception_handler(Exception) 兜底未处理异常\n• /api/version 加 last_500 字段(path / method / exc_type / 最后 1500 字符 traceback)· 浏览器直接看根因\n\n刷浏览器 Ctrl+F5,重试保存 wizard · 若失败看 /api/version 的 last_500.traceback",
+            "en": "v118.34.13 · Fix POST /api/erp/endpoints 500 + expose last_500 traceback on /api/version:\n• Wizard 'Finish' button surfaced 500 'erp.create_failed' with no detail.\n• Root cause 1: wizard sends plaintext credentials in username_enc/password_enc fields (misleading names). The create route stored the plaintext as-is, so any later test-connection that tried to decrypt would fail with InvalidToken.\n• Root cause 2: db.create_erp_endpoint swallowed every exception and returned None. The route translated that to a generic 500 with no traceback visible to the operator. Real DB errors (schema drift, JSONB issues, unique conflicts) were invisible.\n• Fix:\n  - Route now encrypts mrerp credentials via kms_helper.encrypt_str before persisting (is_encrypted heuristic skips already-ciphered values).\n  - Entire route body wrapped in try/except. Any failure calls _record_500(...) before re-raising.\n  - db.create_erp_endpoint now uses logger.exception + writes the underlying error to a module global the route reads when surfacing the 500 detail.\n  - Added @app.exception_handler(Exception) to capture any other uncaught exception in any route.\n• /api/version now returns last_500 = {ts, path, method, exc_type, detail, traceback} (last 1500 chars of stack). Browser-readable, no SSH needed.\n\nHard-refresh (Ctrl+F5), retry the wizard. If it still fails, /api/version's last_500.traceback shows exactly where.",
             "th": "v118.34.5 · Playwright ติดตั้งจริง + การ์ด Xero สอดคล้อง + today-stats ไม่หลุด:\n• /api/version เพิ่มฟิลด์ playwright.playwright_installed / chromium_installed — ดูสถานะติดตั้งในเบราว์เซอร์ได้ทันที ไม่ต้อง SSH\n• pip install playwright ตอนสตาร์ทเปลี่ยนเป็นแบบ synchronous (ไม่รวม chromium · ปกติ <15 วินาที) chromium ยังลงเบื้องหลังเหมือนเดิม\n• git-deploy.sh เพิ่มขั้นตอน pip install + playwright install chromium · MAX_WAIT ดันเป็น 90 วินาที\n• เขียนการ์ด Xero ใหม่ใช้ .integration-row เลย์เอาต์ — เหมือนการ์ด MR.ERP / FlowAccount ตรงกัน 1 ต่อ 1 เพิ่มสีไอคอน .ic-xero ฟ้าอ่อน\n• ข้อความ 'วันนี้ยังไม่มีการส่ง' ย้ายจากแท็บ Connect → แท็บ Push Logs\n\nหลัง deploy เข้า https://pearnly.com/api/version ดูฟิลด์ playwright.playwright_installed",
             "ja": "v118.34.5 · Playwright が実際にインストールされる + Xero カード整合 + today-stats のリーク修正:\n• /api/version に playwright.playwright_installed / chromium_installed フィールド追加 — ブラウザでインストール状態を確認可能、SSH 不要\n• 起動時の pip install playwright を **同期** 化（chromium は除く · 通常 <15 秒）。chromium は引き続きバックグラウンドで\n• git-deploy.sh に pip install -r requirements.txt + playwright install chromium 手順を追加 · MAX_WAIT を 90 秒に拡大\n• Xero カードを .integration-row レイアウトに書き直し — MR.ERP / FlowAccount カードと 1 対 1 で一致。.ic-xero 薄青アイコン追加\n• 「本日はまだ送信なし」を Connect タブから Push Logs タブに移動\n\nデプロイ後 https://pearnly.com/api/version で playwright.playwright_installed=true を確認"
         }

@@ -5,7 +5,15 @@ __pycache__/
 *.pyd
 venv/
 .env
+.env.local
+.env.*.local
 *.egg-info/
+
+# Node (Playwright probe / future tooling)
+node_modules/
+playwright-report/
+test-results/
+.playwright/
 
 # 部署包（临时文件）
 _pkg/

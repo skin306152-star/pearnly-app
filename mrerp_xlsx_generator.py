@@ -660,8 +660,8 @@ def generate_xlsx(
     if schema.get('stub') and not schema.get('header_columns'):
         raise RuntimeError(f"sheet_kind={sheet_kind} 物料未到 · 字段未填")
 
-    # v27.8.1.12 · sales_credit 走 Korn 真样本克隆路径(100% PhpSpreadsheet 兼容)
-    # Korn 真样本已实测可被 mrerp_pusher 成功 import(v8 实验) · 用同模板必能成功
+    # sales_credit 走 Korn 真样本克隆路径(100% PhpSpreadsheet 兼容)
+    # 详见 docs/integrations/mrerp-known-facts.md §6 xlsx 字节级冷知识
     if sheet_kind == 'sales_credit':
         try:
             return _generate_xlsx_sales_credit_korn_clone(histories, mappings)

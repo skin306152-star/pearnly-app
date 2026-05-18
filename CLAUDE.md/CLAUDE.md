@@ -48,6 +48,27 @@ login.html 着陆页动画客户卡必须用**行业类目假名**(咖啡店/面
   - zh: "全产品视觉做了大清扫 · 删掉所有残留的浅蓝色 · 改成暖灰干净风 · 首页新增 4 个数据卡片让你一眼看清今日工作"
   - 不许写:"清扫了 home.css 22 处 #f8fafc 硬编码改成 #f4f4f0"(技术细节 · 用户看不懂)
 
+### 7. ERP 集成 · 无 API 必走 Playwright · 反向工程代码不留废件(2026-05-18 拍板 · 架构铁律)
+
+**无开放 API 的 ERP 一律走服务端 Playwright** · 不再做 HTTP 反向工程(老 PHP 系统 endpoint 抓包 + form 字段 + cookie session 重放)。
+
+历史教训:v27.8.0 MR.ERP 反向工程虽然实测通了 5 步 endpoint(`mrerp_pusher.py` 430 行)· 但:
+- 维护成本极高(MR.ERP 改一个 hidden field 就挂)
+- 字节级 xlsx 兼容(sharedStrings vs inlineStr / `<c t="n"/>` 删除属性等)调试 3 天
+- 错误信息只能 scrape HTML 关键词(`ไม่พบ` / `ผิดพลาด`)· 极脆
+- 站点反爬升级一次 = 全废
+
+Playwright 用浏览器引擎模拟用户 · cookie / JS / 跳转全自动 · 站点改 UI 也只是改 selector · 维护成本是反向工程的 1/10。
+
+**反向工程代码不留废件**:
+- ❌ **禁止**保留 `xxx.deprecated` / `xxx_legacy.py` / `xxx_old.py` 文件作"参考"
+- ❌ **禁止**在新代码注释里写"参考 xxx_legacy.py 的实现"
+- ✅ 抓包/反向工程产出的**先验信息**(URL / 表单字段名 / 数据格式 / 业务规则)全部转移到 `docs/integrations/<vendor>-known-facts.md`
+- ✅ 老代码直接 `git rm` · 历史在 git log 里 · 不需要文件层留遗体
+- ✅ 项目编年史(`CLAUDE.md/STATE_PEARNLY.md` · `BACKLOG.md` · `MODULE_ROADMAP.md`)可以留版本号记录"v27.8.0 做过反向工程"· 但**不留代码**
+
+适用范围:MR.ERP(无 API · ✅ 适用) · FlowAccount(有 API · 不适用) · Xero(有 API · 不适用)。新接 ERP 评估时优先看是否有 OpenAPI / OAuth · 没有就直接 Playwright。
+
 ---
 
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)

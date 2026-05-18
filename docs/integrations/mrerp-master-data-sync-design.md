@@ -331,7 +331,9 @@ the hash of the key. Cheap and proven (we use the pattern already in
 
 ## 4 · Product sync flow
 
-Largely parallel to §3, with these differences:
+Parallel to §3 Customer sync (now using Copy-from-Seed) with these
+differences. **Probe complete; implementation gated behind Zihao
+reviewing this section + the open questions below.**
 
 ### 4.1 Inputs
 
@@ -340,67 +342,90 @@ Largely parallel to §3, with these differences:
 class ItemInfo:
     name: str                # OCR item.name (Thai / Eng mixed)
     unit_code: Optional[str] # OCR units (ขวด / ชิ้น) — usually missing
-    tenant_id: str
+    tenant_id: str = ""
 ```
 
 No tax-ID equivalent. Name is the only signal. Heavier reliance on the
 fuzzy layer.
 
-### 4.2 Layer 1 — `erp_product_mappings` cache
+### 4.2 Probe-confirmed paths (2026-05-18)
 
-```python
-def normalize_item_name(s: str) -> str:
-    s = s.strip().casefold()
-    s = re.sub(r"\s+", " ", s)
-    return s
+| operation | URL | notes |
+|---|---|---|
+| Listing | `/stkmas/allview.php` | idmenu=24, "รหัสสินค้า" |
+| Form | `/stkmas/allform.php` | 75 inputs / 2 selects / inpdupdata available |
+| Save | `/stkmas/allsave.php` | mirrors armas |
+| Delete | `/stkmas/alldel.php?id=<code>` | (untested) |
+
+Full field map: [mrerp-product-form-fields.md](mrerp-product-form-fields.md).
+checknull() dumps 24+ required fields, including 9 GL-account-code
+references (`txtacfile_rev`/`_ret`/`_dis`/`_pur`/`_purret`/`_purdis`/
+`_inv`/`_cost`). **Every one is a popup-picker triplet** — same
+readonly pattern as armas.
+
+Conclusion: a "fill placeholders" path will fail with the same
+`alert("Data is use in the system")` rejection that Customer sync hit.
+**Copy-from-seed is the only realistic v1 path here too.**
+
+### 4.3 Layer cascade (mirror Customer)
+
+```
+L0  TTLCache by (tenant_id, normalize_item_name)
+L1  existing mappings['products'] row for (item_name_norm, erp_type='mrerp')
+L2  exact normalized-name match in stkmas/allview.php listing
+L3  Levenshtein fuzzy (threshold 0.90 — Zihao 2026-05-18 拍板,
+    tightened from 0.92 design recommendation)
+L4  Copy-from-seed auto-create (clone seed product, override
+    txtstkcode / txtstkname / txtstkapcode / txtstkapname /
+    txtstkarcode / txtstkarname)
 ```
 
-The existing `erp_product_mappings` table already stores `item_name_norm`
-([db.py §6120](../../db.py)). We reuse it.
+### 4.4 Caller override matrix (Phase 4 design)
 
-### 4.3 Layer 2 — MR.ERP listing (sales-side products)
+After clicking the seed product in the inpdupdata popup, override:
 
-URL: **TBD** — known-facts §10 marks the product master path as
-"待抓 · ระบบสินค้า(m3) 下". Adapter probe needs to be extended; this is
-prerequisite work before sync can ship. Tracked in the open-questions
-section of the adapter readme.
-
-Once probed, do the same exact-match-by-normalized-name as customer
-Layer 2.
-
-### 4.4 Layer 3 — fuzzy
-
-Same Levenshtein approach, but:
-- **recommended threshold**: `>= 0.92` (stricter than customer)
-  - **「待 Zihao 拍板」** product names are shorter on average; small
-    distances are higher proportion; tighter threshold reduces false
-    positives
-- normalization includes unit-aware tokenization (e.g. "Coca-Cola 330ml"
-  vs "Coca-Cola 500ml" should not match)
-
-### 4.5 Layer 4 — auto-create
-
-Field set TBD pending probe of `ระบบสินค้า` form. Minimum likely:
-
-| field | default | source |
+| field | new value | rationale |
 |---|---|---|
-| product code | generated — `P{YYMM}{SEQ4}` (same pattern as customer with own counter) | adapter |
-| product name | `item.name` truncated | OCR |
-| product category | constant **「待 Zihao 拍板」** — "0001 generic" placeholder OK? |
-| unit | `item.unit_code` or default "ชิ้น" | OCR / default |
-| selling price | 0 (we never know retail price from a purchase invoice) | constant |
+| `txtstkcode` | `P{YYMM}{SEQ4}` | unique stock code |
+| `txtstkname` | `item.name` (≤ 100 chars) | display |
+| `txtstkapcode` | same as txtstkcode | AP-side mirror |
+| `txtstkapname` | `item.name` | |
+| `txtstkarcode` | same as txtstkcode | AR-side mirror |
+| `txtstkarname` | `item.name` | |
 
-Edge case: MR.ERP may require a non-zero price. If so, set to 1 THB and
-flag in `erp_product_mappings.notes` for admin review.
+Inherit from seed (DO NOT override): `selstktype`, `selstkmet`, all 4
+unit triplets, all 9 account-code references, AP master ref, all
+numeric defaults, TRU + disable flags.
 
-### 4.6 Fallback when sync is impossible
+### 4.5 Open questions for Zihao (must answer before impl)
 
-Today the generator falls back to product_code `"123"`
-([mrerp-spec.md §4.2](mrerp-spec.md)). The new service should preserve
-this as a last-resort fallback: if `auto_create` itself fails (e.g.
-MR.ERP returns "duplicate name") AND no other layer matched, return
-`"123"` with `is_fallback=True` so the caller can decide whether to
-proceed or abort.
+1. **Sales price** — seed has a real price; copying it to a new product
+   is misleading. Override with `0`? With `1` (avoid MR.ERP "must be
+   > 0" check)? Or leave seed's value and flag for admin review?
+2. **Multiple seeds per tenant** — services / materials / stocked
+   goods often need different accounting. v1 accepts ONE seed per
+   endpoint; v2 may need name-pattern routing. Confirm v1 is enough.
+3. **Unit mismatch** — OCR may capture `unit_code="ขวด"` but the seed
+   uses `"ชิ้น"`. Override unit (and which of the 4 unit triplets)?
+   v1 recommendation: ignore OCR unit, inherit seed's.
+4. **`item.name` already 100+ chars** — truncate where? End is the
+   cleanest cut but loses descriptive suffix. Recommendation: end.
+5. **Cleanup permission** — same `alldel.php` issue as customers may
+   apply here. Tests will orphan products on TEST2019. Acceptable?
+
+### 4.6 NOT implementing this round
+
+Per Zihao 2026-05-18 directive: probe + design only. No
+`services/erp/mrerp_product_sync.py` file in this commit.
+
+When greenlit, implementation order mirrors Customer Phase 1+2+3+5:
+1. Add `normalize_item_name` callsite + `parse_stkmas_listing` parser
+   (~½ day · unit-testable).
+2. ProductSyncService Layers 0-3 (lookup-only · ~1 day · 1 integration
+   test).
+3. Layer 4 copy-from-seed (~1 day · 1 integration test with cleanup).
+4. Adapter wiring + propagate `seed_product_code` from endpoint
+   config (~½ day).
 
 ---
 

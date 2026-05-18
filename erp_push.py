@@ -10,7 +10,6 @@ Mr.Pilot · ERP 推送模块 (v0.6.0 · 支柱 3)
 
 支持的适配器:
 - webhook:通用 HTTP POST(MVP)
-- mr_erp:Mr.ERP 预置(以后做)
 - flowaccount:FlowAccount API(以后做)
 """
 
@@ -193,19 +192,6 @@ def _apply_field_map(payload: Dict[str, Any], field_map: Dict[str, str]) -> Dict
 
 
 # ============================================================
-# 适配器:Mr.ERP 预置(以后做,先占位)
-# ============================================================
-
-def push_mr_erp(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tuple[bool, int, str]:
-    """
-    Mr.ERP 一键启用预置适配器。
-    config 只需要 username + password,URL 是固定的。
-    具体接口定义等 Mr.ERP 那边的 PHP 接收脚本到位后实现。
-    """
-    return False, 0, "mr_erp adapter not implemented yet · 请先用 webhook 适配器"
-
-
-# ============================================================
 # 适配器:FlowAccount(以后做,先占位)
 # ============================================================
 
@@ -220,7 +206,6 @@ def push_flowaccount(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -
 
 ADAPTER_REGISTRY = {
     "webhook":     push_webhook,
-    "mr_erp":      push_mr_erp,
     "flowaccount": push_flowaccount,
 }
 

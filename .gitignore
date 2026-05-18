@@ -12,6 +12,7 @@ _pkg/
 _pkg_tmpstatic/
 *.tar.gz
 deploy_v*.tar.gz
+deploy_v*.zip
 
 # 截图 / 测试数据（不上传 GitHub）
 yichang/

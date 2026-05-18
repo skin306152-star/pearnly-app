@@ -229,7 +229,7 @@ def _parse_date(raw: str) -> Optional[date]:
                 try:
                     return date(yr_raw, month_num, day)
                 except ValueError:
-                    pass
+                    pass  # 该年月组合非合法日期 · 尝试下一规则
 
     # Numeric formats: dd-mm-yyyy, yyyy-mm-dd, dd/mm/yy
     parts = re.split(r"[-/\s]", clean)
@@ -252,7 +252,7 @@ def _parse_date(raw: str) -> Optional[date]:
                 return None
             return date(yr, mo, dy)
         except (ValueError, TypeError):
-            pass
+            pass  # 日期/月/年解析失败 · 返回 None
 
     return None
 
@@ -825,7 +825,7 @@ def parse_bank_statement_pdf(
                     tbls = p.extract_tables() or []
                     all_tables.extend(tbls)
                 except Exception:
-                    pass
+                    pass  # 该页 extract_tables 失败 · 跳过(每页容错)
     except Exception as e:
         logger.warning(f"pdfplumber stmt [{filename}] skipped: {e}")
 
@@ -1270,14 +1270,14 @@ def _pdf_extract_text_safe(file_bytes: bytes) -> List[str]:
         if text.strip():
             return [text]
     except Exception:
-        pass
+        pass  # pdfminer 失败 · 走 pypdf 兜底
     # pypdf fallback
     try:
         import pypdf
         reader = pypdf.PdfReader(io.BytesIO(file_bytes))
         return [pg.extract_text() or "" for pg in reader.pages]
     except Exception:
-        pass
+        pass  # pypdf 也失败 · 返回空列表 · 调用方走 Gemini 视觉兜底
     return []
 
 
@@ -1575,12 +1575,12 @@ def parse_gl_pdf(
                     tbls = p.extract_tables() or []
                     all_tables.extend(tbls)
                 except Exception:
-                    pass
+                    pass  # 该页 extract_tables 失败 · 跳过(每页容错)
                 if not page_texts:
                     try:
                         page_texts.append(p.extract_text() or "")
                     except Exception:
-                        pass
+                        pass  # 该页 extract_text 失败 · 跳过(每页容错)
     except Exception as e:
         logger.warning(f"pdfplumber [{filename}] skipped: {e}")
 

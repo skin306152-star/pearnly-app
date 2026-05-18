@@ -5580,19 +5580,43 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
             return
 
         # 4. OCR(用 Gemini · 复用网页同一套)
-        try:
-            from gemini_engine import recognize_pdf as gemini_recognize, is_gemini_available
-            own_key = (user_fresh.get("gemini_api_key")
-                       or user_fresh.get("custom_gemini_api_key") or "").strip()
-            api_key = own_key or None
-            if not api_key and not is_gemini_available():
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
+        # Round 2 · 新 pipeline 接入(feature-flag-gated)
+        own_key = (user_fresh.get("gemini_api_key")
+                   or user_fresh.get("custom_gemini_api_key") or "").strip()
+        api_key = own_key or None
+
+        result = None
+        _pipeline_cost_thb = None
+        if os.environ.get("OCR_USE_NEW_PIPELINE", "false").strip().lower() == "true":
+            try:
+                from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
+                from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+                _pipe_res = _pipeline_run(pdf_bytes, max_pages=1, api_key=api_key)
+                result = pipeline_result_to_legacy_dict(_pipe_res)
+                _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
+                logger.info(
+                    f"🆕 [line_ocr] pipeline_v1 · pages={_pipe_res.page_count} "
+                    f"· cost=฿{_pipeline_cost_thb:.4f}"
+                )
+            except Exception as _pipe_err:
+                logger.warning(
+                    f"[line_ocr] pipeline_v1 失败 · fallback Gemini · "
+                    f"{type(_pipe_err).__name__}: {_pipe_err}"
+                )
+                result = None
+                _pipeline_cost_thb = None
+
+        if result is None:
+            try:
+                from gemini_engine import recognize_pdf as gemini_recognize, is_gemini_available
+                if not api_key and not is_gemini_available():
+                    line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
+                    return
+                result = gemini_recognize(pdf_bytes, max_pages=1, api_key=api_key)
+            except Exception as e:
+                logger.error(f"[line_ocr] Gemini 识别失败: {e}")
+                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
                 return
-            result = gemini_recognize(pdf_bytes, max_pages=1, api_key=api_key)
-        except Exception as e:
-            logger.error(f"[line_ocr] Gemini 识别失败: {e}")
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
-            return
 
         pages = result.get("pages") or []
         if not pages:
@@ -5617,6 +5641,27 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
         except Exception as e:
             logger.warning(f"[line_ocr] 写 history 失败(不影响回复): {e}")
             hid = None
+
+        # Round 2 · 新 pipeline 路径强制 cost 埋点(LINE 入口此前漏记)
+        # 只在 pipeline 路径下写 · 旧 Gemini 路径维持原样(等全切后另行处理)
+        if _pipeline_cost_thb is not None:
+            try:
+                _line_in = sum(int(p.get("input_tokens") or 0) for p in pages)
+                _line_out = sum(int(p.get("output_tokens") or 0) for p in pages)
+                db.log_ocr_cost(
+                    user_id=str(user_fresh["id"]),
+                    tenant_id=str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None,
+                    history_id=hid,
+                    engine="pipeline_v1",
+                    pages=len(pages),
+                    input_tokens=_line_in,
+                    output_tokens=_line_out,
+                    cost_thb=_pipeline_cost_thb,
+                    elapsed_ms=int(result.get("elapsed_ms") or 0),
+                )
+                logger.info(f"💰 [line_ocr] cost log · ฿{_pipeline_cost_thb:.4f}")
+            except Exception as _ce:
+                logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
 
         # 5.5 · 异常栏 hook(v118.22.0.2 修复 · LINE 入口此前漏挂 · 致 LINE 票据从不进 5 类规则)
         # v118.22.0.3 · 增加 duplicate 预检 · 让 LINE 票据也享有「重复发票拦截」防护

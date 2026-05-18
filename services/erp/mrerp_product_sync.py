@@ -596,7 +596,13 @@ class MRERPProductSyncService:
 
     def _copy_from_seed(self, page, seed_product_code: str) -> None:
         """Drive the inpdupdata picker to clone `seed_product_code`.
-        Same flow as Customer Sync — see mrerp-customer-copy-flow.md."""
+
+        stkmas listings are larger than armas (TEST2019 has 73 products
+        vs 2 customers), so the popup virtualises rows — only ~10 are
+        in the DOM at a time. We use the popup's built-in
+        `#bshlistboxinpsearch` field to filter down to just the seed
+        before clicking, which works regardless of tenant size.
+        """
         loc = page.locator('input#inpdupdata')
         if loc.count() == 0:
             raise MRERPTechnicalError(
@@ -606,7 +612,7 @@ class MRERPProductSyncService:
         loc.first.click(timeout=5_000)
         try:
             page.wait_for_selector(
-                "#bshlistboxdetail #bshlistboxdetailshow p",
+                "#bshlistboxinpsearch",
                 state="visible",
                 timeout=10_000,
             )
@@ -615,13 +621,36 @@ class MRERPProductSyncService:
                 f"product copy picker popup did not render: {e}") from e
         page.wait_for_timeout(500)
 
+        # Type the seed code into the popup's search input. The onkeyup
+        # handler `bshdatalistbox()` re-filters the visible rows in
+        # real time.
+        search = page.locator('input#bshlistboxinpsearch')
+        try:
+            search.fill(seed_product_code)
+            # bshdatalistbox is wired to onkeyup — fire one to trigger
+            # the filter, then settle.
+            search.press("End")
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(
+                f"product copy picker search input failed: {e}") from e
+        page.wait_for_timeout(800)
+
         row = page.locator(
-            f"#bshlistboxdetailshow p:has-text({seed_product_code!r})"
+            "#bshlistboxdetailshow p"
+            f":has(span:text-is({seed_product_code!r}))"
         ).first
+        # Fallback selector: less strict (substring match) in case the
+        # code contains characters that confuse text-is().
+        if row.count() == 0:
+            row = page.locator(
+                "#bshlistboxdetailshow p"
+                f":has-text({seed_product_code!r})"
+            ).first
         if row.count() == 0:
             raise MRERPBusinessError(
                 f"ERR_SEED_PRODUCT_NOT_FOUND — seed product "
-                f"{seed_product_code!r} not visible in the copy picker",
+                f"{seed_product_code!r} not visible in the copy picker "
+                f"(searched via bshlistboxinpsearch)",
                 failed_rows=[{
                     "reason_code": "ERR_SEED_PRODUCT_NOT_FOUND",
                     "seed_product_code": seed_product_code,

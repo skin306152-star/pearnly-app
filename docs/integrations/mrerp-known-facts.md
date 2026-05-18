@@ -21,11 +21,16 @@
 
 ## 2. 登录流程
 
-### 2.1 预热(关键 · 不可省)
-PHP 老系统**必须先 GET 一次主页才会建 PHPSESSID session**。否则后续 POST 会被丢弃。
+### 2.1 站点结构 · 落地 ≠ 登录页(2026-05-18 Playwright 实测补充)
+- `https://www.mrerp4sme.com/` = **营销页**(无 form / 无 input)
+- 登录表单实际在 `https://www.mrerp4sme.com/login/login.php`
+- 营销页 → 登录页通过 `<a href="login/login.php">เข้าสู่ระบบ</a>` 跳转
+
+老 PHP 系统**必须先 GET 一次登录页才会建 PHPSESSID session**。否则后续 POST 会被丢弃。
 
 ```
-GET https://www.mrerp4sme.com/
+GET https://www.mrerp4sme.com/             ← 营销页 · 不建 session
+GET https://www.mrerp4sme.com/login/login.php  ← 真正建 session
 ```
 
 ### 2.2 提交登录表单

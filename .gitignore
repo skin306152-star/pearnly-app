@@ -9,11 +9,11 @@ venv/
 .env.*.local
 *.egg-info/
 
-# Node (Playwright probe / future tooling)
-node_modules/
+# Playwright(Python · 探测脚本副产物)
 playwright-report/
 test-results/
 .playwright/
+playwright_browsers/
 
 # 部署包（临时文件）
 _pkg/

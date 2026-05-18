@@ -1,0 +1,8 @@
+# Probe run 20260518-174717
+
+01-landing-marketing-page.png	GET / · URL=https://www.mrerp4sme.com/
+02-login-page.png	URL=https://www.mrerp4sme.com/login/login.php
+03-login-filled.png	登录表单已填(凭据已遮)
+04-post-login.png	提交后 · URL=https://www.mrerp4sme.com/index.php
+05-login-failed.png	被踢回 https://www.mrerp4sme.com/index.php
+06-ERR-fatal.png	❌ RuntimeError: login failed · 仍在公共区 · URL=https://www.mrerp4sme.com/index.php

@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "_comment": "Pearnly OCR pipeline 真实输出 · 抽自 tests/pipeline-results.json electronic[0]",
+    "_pipeline_version": "pipeline_v1 (services/ocr · L1 Vision + L2 Flash-Lite + L3 Flash visual)",
+    "_schema": "services/ocr/schemas.py ThaiInvoice + LineItem",
+    "_layer_chain": ["L1", "L2", "L3"],
+    "_layer1_avg_confidence": 0.9505,
+    "_layer3_trigger_reason": "total_amount='8516.13' not found in L1 OCR text (possibly hallucinated by layer 2)",
+    "_layer3_succeeded": true,
+    "_l2_tokens_in_out": [1826, 558],
+    "_l3_tokens_in_out": [2838, 557],
+    "_cost_thb": 0.145239,
+    "_elapsed_ms_total": 23736,
+    "_elapsed_ms_breakdown": { "L1": 988, "L2": 2068, "L3": 20223 },
+    "_needs_manual_review": false,
+    "_extracted_at": "2026-05-18",
+    "_source_pdf": "2aa032839fd34354a59eef054571b5af.pdf"
+  },
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV69/00271",
+  "date": "2026-03-31",
+  "date_raw": "31/3/2569",
+  "seller_name": "บริษัท ซินเซียร์ ไอซ์ จํากัด",
+  "seller_tax": "0105546015062",
+  "seller_addr": "",
+  "buyer_name": "บริษัท เมเจอร์ โบว์ล กรุ๊ป จำกัด (สาขา เอสพละนาด)",
+  "buyer_tax": "0105541034263",
+  "buyer_addr": "",
+  "subtotal": "7959.00",
+  "vat": "557.13",
+  "wht_rate": "",
+  "wht_amount": "",
+  "total_amount": "8516.13",
+  "items": [
+    {
+      "name": "น้ำแข็งยูนิต",
+      "qty": "126.00",
+      "price": "45.00",
+      "subtotal": "5670.00"
+    },
+    {
+      "name": "นํ้าแข็งหลอดเล็ก",
+      "qty": "45.00",
+      "price": "45.00",
+      "subtotal": "2025.00"
+    },
+    {
+      "name": "นํ้าแข็งกอน",
+      "qty": "24.00",
+      "price": "11.00",
+      "subtotal": "264.00"
+    }
+  ],
+  "notes": "",
+  "category": "น้ำแข็ง"
+}

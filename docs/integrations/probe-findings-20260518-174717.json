@@ -1,0 +1,38 @@
+{
+  "run_id": "20260518-174717",
+  "findings": {
+    "landing_url": "https://www.mrerp4sme.com/",
+    "login_nav_method": "click 'เข้าสู่ระบบ' link",
+    "login_page_url": "https://www.mrerp4sme.com/login/login.php",
+    "login_failed_url": "https://www.mrerp4sme.com/index.php"
+  },
+  "errors": [
+    "❌ RuntimeError: login failed · 仍在公共区 · URL=https://www.mrerp4sme.com/index.php"
+  ],
+  "shots": [
+    {
+      "file": "01-landing-marketing-page.png",
+      "scenario": "GET / · URL=https://www.mrerp4sme.com/"
+    },
+    {
+      "file": "02-login-page.png",
+      "scenario": "URL=https://www.mrerp4sme.com/login/login.php"
+    },
+    {
+      "file": "03-login-filled.png",
+      "scenario": "登录表单已填(凭据已遮)"
+    },
+    {
+      "file": "04-post-login.png",
+      "scenario": "提交后 · URL=https://www.mrerp4sme.com/index.php"
+    },
+    {
+      "file": "05-login-failed.png",
+      "scenario": "被踢回 https://www.mrerp4sme.com/index.php"
+    },
+    {
+      "file": "06-ERR-fatal.png",
+      "scenario": "❌ RuntimeError: login failed · 仍在公共区 · URL=https://www.mrerp4sme.com/index.php"
+    }
+  ]
+}

@@ -381,7 +381,7 @@ def merge_line_account_into_existing(temp_user_id: str, target_user_id: str, lin
             try:
                 cur.execute("DELETE FROM subscription_log WHERE user_id = %s", (temp_user_id,))
             except Exception:
-                pass
+                pass  # 表可能不存在 · 安全跳过
             # 5) 删临时账号
             cur.execute("DELETE FROM users WHERE id = %s", (temp_user_id,))
         logger.info(f"[v118.28.4.1] merged line_uid={line_uid} from temp={temp_user_id} → target={target_user_id}")
@@ -2434,7 +2434,7 @@ def _find_candidates_from_pages_jsonb(user_id: str, amount: float,
                         if abs((id_d - d).days) > date_tol_days:
                             continue
                     except ValueError:
-                        pass
+                        pass  # 日期格式异常 · 跳过日期过滤(保留候选)
                 out.append({
                     "id": row["id"],
                     "amount_total": amt_f,
@@ -3382,7 +3382,7 @@ def delete_owner_user_cascade(user_id: str) -> bool:
                     try:
                         cur.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
                     except Exception:
-                        pass
+                        pass  # savepoint 已不存在 · 忽略
                     logger.warning(f"[cascade-delete] {label} · 跳过(savepoint 已回滚): {str(e)[:200]}")
                     return False
 
@@ -3690,7 +3690,7 @@ def remove_employee(tenant_id: str, employee_user_id: str) -> bool:
                 try:
                     cur.execute(sql, (str(employee_user_id),))
                 except Exception:
-                    pass
+                    pass  # 表可能不存在 · 安全跳过
 
             cur.execute("DELETE FROM users WHERE id = %s", (str(employee_user_id),))
             return True
@@ -7336,7 +7336,7 @@ def get_recon_row(row_id: int) -> Optional[Dict[str, Any]]:
                     matching = next((x for x in rows if x.get("row_no") == r["report_row_no"]), {})
                     r.update({k: v for k, v in matching.items() if k.startswith("report_")})
             except Exception:
-                pass
+                pass  # report_rows JSON 解析 / 匹配失败 · 跳过该行 enrich
             return r
     except Exception as e:
         logger.error(f"get_recon_row failed: {e}")

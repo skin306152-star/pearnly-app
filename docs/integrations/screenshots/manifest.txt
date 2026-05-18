@@ -1,4 +1,4 @@
-# Probe run 20260518-175813
+# Probe run 20260518-183903
 
 01-landing-marketing-page.png	GET / · URL=https://www.mrerp4sme.com/
 02-login-page.png	URL=https://www.mrerp4sme.com/login/login.php
@@ -8,7 +8,10 @@
 06-company-clicked-TEST2019.png	点 TEST2019 · URL=https://www.mrerp4sme.com/login/mainmenu.php?comidyear=6&seldb=1
 07-sc-import-form.png	URL=https://www.mrerp4sme.com/impartran/formupload.php?idmenu=370
 08-form-inspected.png	idus=15 file_in=True
-09-file-chosen.png	已选 test-invoice-20260518-175813.xlsx
-10-after-upload.png	URL=https://www.mrerp4sme.com/impartran/formupload.php
-11-preview-page.png	URL=https://www.mrerp4sme.com/impartran/formupload.php
-12-preview-empty.png	0 行 · err=[]
+09-file-chosen.png	已选 test-invoice-20260518-183903.xlsx
+10-after-upload.png	URL=https://www.mrerp4sme.com/impartran/formrdpc.php
+11-preview-page.png	URL=https://www.mrerp4sme.com/impartran/formrdpc.php
+12-preview-checked.png	勾 1 行
+13-after-confirm.png	clicks=1 · URL=https://www.mrerp4sme.com/impartran/formrdpc.php · dialogs=['[confirm] ยืนยันการ "นำเข้าข้อมูลชุดที่ 1"']
+14-sc-listing-page.png	URL=https://www.mrerp4sme.com/artran/allview.php?idmenu=118
+15-search-result.png	inv=False cust=False search_used=True

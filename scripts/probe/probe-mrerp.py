@@ -546,100 +546,103 @@ def step_07_preview_confirm(page: Page):
             pass
     STATE.shot(page, "preview-checked", f"勾 {n} 行")
 
+    # 先勾全选(cballfrmimportN · 每个 form 一个)
+    for ball in page.locator('input[name^="cballfrmimport"]').all():
+        try:
+            if not ball.is_checked():
+                ball.check()
+        except Exception:
+            pass
+
+    # 实测(2026-05-18) · MR.ERP preview 页确认按钮 = btnuploadfrmN onclick=uploadfrm(N)
+    # text=นำเข้าข้อมูล(导入数据) · 一个 form 一个按钮(可能多 form)
     confirm_sels = [
-        'input[name="cballfrmimport1"]',  # 全选 checkbox
-        'input[type="submit"]',
-        'button[type="submit"]',
-        'button:has-text("Import")',
-        'button:has-text("ยืนยัน")',
-        'a:has-text("Confirm")',
-        'input[value*="Import" i]',
+        'button[id^="btnuploadfrm"]',
+        'button[onclick^="uploadfrm("]',
+        'input[name^="btnuploadfrm"]',
+        'button:has-text("นำเข้าข้อมูล")',
     ]
-    confirmed = False
+    confirmed_count = 0
     for sel in confirm_sels:
-        if sel == 'input[name="cballfrmimport1"]':
-            # 这是全选 box · 单独勾(可能要先勾再点提交)
-            box = page.locator(sel)
-            if box.count() > 0:
-                try:
-                    if not box.first.is_checked():
-                        box.first.check()
-                except Exception:
-                    pass
-            continue
-        btn = page.locator(sel)
-        if btn.count() > 0:
+        btns = page.locator(sel).all()
+        for btn in btns:
             try:
-                btn.first.click(timeout=5000)
-                confirmed = True
+                btn.click(timeout=5000)
+                confirmed_count += 1
                 log.info(f"  ✓ 点确认({sel})")
-                break
+                try:
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                except PWTimeout:
+                    pass
             except Exception as e:
                 log.warning(f"  confirm {sel} 失败: {e}")
+        if confirmed_count > 0:
+            break
 
-    try:
-        page.wait_for_load_state("networkidle", timeout=20000)
-    except PWTimeout:
-        pass
-    STATE.shot(page, "after-confirm", f"URL={page.url}")
-    return {"success": confirmed, "n_rows": n}
+    STATE.shot(page, "after-confirm", f"clicks={confirmed_count} · URL={page.url} · dialogs={STATE.dialogs[-2:] if STATE.dialogs else []}")
+    STATE.findings["confirm_clicked_count"] = confirmed_count
+    if STATE.dialogs:
+        STATE.findings["confirm_dialogs"] = list(STATE.dialogs[-5:])
+    return {"success": confirmed_count > 0, "n_rows": n,
+            "confirmed_count": confirmed_count}
 
 
 # ============================================================
 # Step 8 · 回主菜单 · 探索列表页 · 搜 PEARNLY-TEST
 # ============================================================
 def step_08_search_listing(page: Page):
-    log.info("→ STEP 08 · 探索列表页 + 搜 PEARNLY-TEST")
-    # 回主菜单
-    page.goto(f"{LOGIN_URL}/login/mainmenu.php?comidyear={COMIDYEAR}&seldb={SELDB}",
-              wait_until="networkidle", timeout=15000)
-    STATE.shot(page, "mainmenu-for-listing", f"URL={page.url}")
+    """实测(2026-05-18) · SC 列表页 = /artran/allview.php?idmenu=118
+    路径模式:`<module>/allview.php?idmenu=N` · 跟 impartran 批量导入不同"""
+    log.info("→ STEP 08 · 进 SC 列表页搜 PEARNLY-TEST")
+    list_url = f"{LOGIN_URL}/artran/allview.php?idmenu=118"
+    log.info(f"  nav: {list_url}")
+    page.goto(list_url, wait_until="networkidle", timeout=15000)
+    STATE.findings["list_url"] = page.url
+    STATE.shot(page, "sc-listing-page", f"URL={page.url}")
 
-    # dump mainmenu HTML 找列表入口
-    main_html = TEMPLATES_DIR / f"mainmenu-{TEST_RUN_ID}.html"
+    # 找搜索框 · MR.ERP 常见 pattern:txtsearch / txtquery / inputsearch
+    search_sels = [
+        'input[name*="search" i]',
+        'input[name*="query" i]',
+        'input[id*="search" i]',
+        'input[placeholder*="ค้นหา"]',
+        'input[type="text"]:not([readonly])',  # 兜底:任意可编辑文本框
+    ]
+    search_filled = False
+    for sel in search_sels:
+        loc = page.locator(sel)
+        if loc.count() > 0:
+            try:
+                first = loc.first
+                first.fill(TEST_INVOICE_NO)
+                first.press("Enter")
+                page.wait_for_load_state("networkidle", timeout=8000)
+                search_filled = True
+                log.info(f"  ✓ 搜索框({sel}) 填 PEARNLY-TEST-001")
+                STATE.findings["list_search_method"] = sel
+                break
+            except Exception as e:
+                log.debug(f"  search {sel}: {e}")
+
+    # dump 列表页 HTML(用于诊断/后续 selector 完善)
+    list_html = TEMPLATES_DIR / f"sc-listing-{TEST_RUN_ID}.html"
     try:
-        main_html.write_text(page.content(), encoding="utf-8")
+        list_html.write_text(page.content(), encoding="utf-8")
     except Exception:
         pass
 
-    # 找"销售/查看/查询/list/view"类菜单项
-    list_candidates = ["ขายเชื่อ", "รายการ", "บัญชี", "Sales", "List", "View", "查询",
-                       "ค้นหา", "Edit", "แก้ไข"]
-    clicked = False
-    for txt in list_candidates:
-        loc = page.get_by_text(txt, exact=False)
-        if loc.count() > 0:
-            try:
-                el = loc.first
-                # 排除点到导入入口
-                href = el.get_attribute("href") or ""
-                if "formupload" in href.lower():
-                    continue
-                el.click(timeout=3000)
-                page.wait_for_load_state("networkidle", timeout=8000)
-                if page.url != f"{LOGIN_URL}/login/mainmenu.php":
-                    clicked = True
-                    log.info(f"  ✓ 点 '{txt}' → URL={page.url}")
-                    STATE.findings["list_nav_method"] = f"click '{txt}'"
-                    break
-            except Exception as e:
-                log.debug(f"  click '{txt}': {e}")
-
-    if not clicked:
-        log.warning("  ⚠ 未找到列表/查询菜单 · 仅截 mainmenu")
-
-    STATE.shot(page, "listing-page-or-mainmenu", f"URL={page.url}")
-
-    # 在当前页找 PEARNLY-TEST
+    # 验证页面是否含 PEARNLY-TEST(列表 或 搜索结果)
     try:
         body = page.locator("body").inner_text(timeout=3000) or ""
     except Exception:
         body = ""
-    found_str = TEST_INVOICE_NO in body or TEST_CUSTOMER_CODE in body or "PEARNLYTEST" in body
-    log.info(f"  当前页含 PEARNLY-TEST? {found_str}")
-    STATE.findings["search_found_in_listing"] = found_str
-    STATE.shot(page, "search-result", f"contains PEARNLY-TEST? {found_str}")
-    return found_str
+    found_inv = TEST_INVOICE_NO in body
+    found_cust = TEST_CUSTOMER_CODE in body or "PEARNLYTEST" in body
+    log.info(f"  当前页 含 invoice? {found_inv} · 含 customer? {found_cust}")
+    STATE.findings["search_found_invoice"] = found_inv
+    STATE.findings["search_found_customer"] = found_cust
+    STATE.shot(page, "search-result", f"inv={found_inv} cust={found_cust} search_used={search_filled}")
+    return found_inv or found_cust
 
 
 # ============================================================

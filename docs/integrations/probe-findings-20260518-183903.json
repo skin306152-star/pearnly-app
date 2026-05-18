@@ -1,5 +1,5 @@
 {
-  "run_id": "20260518-175813",
+  "run_id": "20260518-183903",
   "findings": {
     "landing_url": "https://www.mrerp4sme.com/",
     "login_nav_method": "click 'เข้าสู่ระบบ' link",
@@ -11,15 +11,22 @@
     "idus": "15",
     "has_file_input": true,
     "template_link": "example.xlsx",
-    "form_html_dump": "D:\\Users\\Skin\\Desktop\\pearnly_project\\docs\\integrations\\templates\\upload-form-20260518-175813.html",
-    "post_upload_url": "https://www.mrerp4sme.com/impartran/formupload.php",
-    "preview_row_count": 0,
+    "form_html_dump": "D:\\Users\\Skin\\Desktop\\pearnly_project\\docs\\integrations\\templates\\upload-form-20260518-183903.html",
+    "post_upload_url": "https://www.mrerp4sme.com/impartran/formrdpc.php",
+    "preview_row_count": 1,
+    "confirm_clicked_count": 1,
+    "confirm_dialogs": [
+      "[confirm] ยืนยันการ \"นำเข้าข้อมูลชุดที่ 1\""
+    ],
     "confirm_result": {
-      "success": false,
-      "n_rows": 0,
-      "errors": [],
-      "red_text": []
-    }
+      "success": true,
+      "n_rows": 1,
+      "confirmed_count": 1
+    },
+    "list_url": "https://www.mrerp4sme.com/artran/allview.php?idmenu=118",
+    "list_search_method": "input[name*=\"search\" i]",
+    "search_found_invoice": false,
+    "search_found_customer": false
   },
   "errors": [],
   "shots": [
@@ -57,19 +64,31 @@
     },
     {
       "file": "09-file-chosen.png",
-      "scenario": "已选 test-invoice-20260518-175813.xlsx"
+      "scenario": "已选 test-invoice-20260518-183903.xlsx"
     },
     {
       "file": "10-after-upload.png",
-      "scenario": "URL=https://www.mrerp4sme.com/impartran/formupload.php"
+      "scenario": "URL=https://www.mrerp4sme.com/impartran/formrdpc.php"
     },
     {
       "file": "11-preview-page.png",
-      "scenario": "URL=https://www.mrerp4sme.com/impartran/formupload.php"
+      "scenario": "URL=https://www.mrerp4sme.com/impartran/formrdpc.php"
     },
     {
-      "file": "12-preview-empty.png",
-      "scenario": "0 行 · err=[]"
+      "file": "12-preview-checked.png",
+      "scenario": "勾 1 行"
+    },
+    {
+      "file": "13-after-confirm.png",
+      "scenario": "clicks=1 · URL=https://www.mrerp4sme.com/impartran/formrdpc.php · dialogs=['[confirm] ยืนยันการ \"นำเข้าข้อมูลชุดที่ 1\"']"
+    },
+    {
+      "file": "14-sc-listing-page.png",
+      "scenario": "URL=https://www.mrerp4sme.com/artran/allview.php?idmenu=118"
+    },
+    {
+      "file": "15-search-result.png",
+      "scenario": "inv=False cust=False search_used=True"
     }
   ]
 }

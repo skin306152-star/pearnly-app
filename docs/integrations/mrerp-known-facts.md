@@ -187,21 +187,88 @@ form 字段:
 - 同一 `<form id="frmimportN">` 内有表头 `<p>` + 数据 `<p>` · `<span>` 装值
 - 失败时**没有 cbimport · 但可能有错误 HTML**(红字 / `<font color=red>` / JS `alert()` / `ไม่พบ` / `ผิดพลาด` / `ซ้ำ` 等关键词)
 
-### Step 4 · 确认导入(真写库)
+### Step 4 · 确认导入(UI · 走 uploadfrm() AJAX)
+
+实测(2026-05-18) · preview 页确认按钮 UI:
+```html
+<button name="btnuploadfrm1" id="btnuploadfrm1" onclick="uploadfrm(1);">นำเข้าข้อมูล</button>
+```
+
+每个 `<form id="frmimportN">` 配套一个 `btnuploadfrmN` 按钮(N=1,2,...)。
+
+`uploadfrm(N)` JS 源码(2026-05-18 抓):
+```js
+function uploadfrm(form) {
+    // 必须有勾选 cbimport
+    if (querySelectorAll(`[id=frmimport${form}] [id^=cbimport]:checked`).length > 0) {
+        if (confirm(`ยืนยันการ "นำเข้าข้อมูลชุดที่ ${form}"`)) {     // ← JS confirm() · Playwright 必须挂 dialog handler
+            let formdata = new FormData(`#frmimport${form}`);
+            $.ajax({
+                type: "POST", url: "component/importpc.php", data: formdata,
+                success: function(result) {
+                    if (result == "1") {
+                        // "นำเข้าข้อมูลชุดที่ N เสร็จสมบูรณ์" (完成)
+                        disableform(form);
+                    }
+                    else if (result == "2") {
+                        // "จบกระบวนการ ระบบกำลังออกรายงาน" (处理结束·系统正在出报告)
+                        disableform(form);
+                        sdpt({numform:form, idus:$("#idus"+form).val()}, "component/report.php", "_blank");
+                    }
+                    // else (非 1 非 2): 未知 · 推测是错误描述 string
+                }
+            });
+        }
+    }
+}
+```
+
+**POST endpoint**:
 ```
 POST https://www.mrerp4sme.com/impartran/component/importpc.php
-Content-Type: multipart/form-data
+Content-Type: multipart/form-data (FormData(#frmimportN) · 含全 row hidden inputs)
 Referer: https://www.mrerp4sme.com/impartran/formrdpc.php
-X-Requested-With: XMLHttpRequest
 ```
 
-multipart 字段:
-- `idus` = ...
-- `selmenu` = `118`
-- `cballfrmimport1` = `on`(表示全选)
-- `cbimport[N]` = `N`(每个要导入的 row 一项 · 数组形式)
+**响应**:
+- `"1"` = 简单成功(直接完成)
+- `"2"` = 完成 + 通过 `sdpt()` 在 `_blank` 新窗口打开 `component/report.php` · 报告页 form-POST 加载
 
-**响应**:成功 = `200 + 短字符串`(实测 `"2"` · 推测是导入条数或最后 row_id)· 非纯数字 = 业务错误
+⚠️ **2026-05-18 实测重要发现** · `importpc="2"` **不等于** DB 实际写入:
+- 完整流程跑通(login → upload → preview 显示 1 行 → click `btnuploadfrm1` → JS confirm dialog accept → AJAX 返 `"2"`)
+- 但 `artran/allview.php?idmenu=118` 列表所有 mode(l/r/a)**都看不到新行**
+- 用 Korn 已知存在的 `customer_code=01-อนุรักษ์-001` + `invoice_no=690518-999`(YYMMDD-NNN 格式)重试 · 结果同
+- 推测 `report.php` 弹窗里有真正的错误/状态信息 · Playwright 抓 popup 时 URL 空 + sdpt 改 `_self` 也卡住 · **待 Zihao 决定排查方向**
+
+### Step 5 · 列表 / 查询 / 删除(2026-05-18 实测补)
+
+**列表 URL 模式**:`/<module>/allview.php?idmenu=<biz_id>[&mode=l|r|a]`
+- `<module>` = `artran`(AR Transaction · 销售类) / `imparse`(主数据类) / 其他
+- `<biz_id>` = 业务子类型 id(跟 `selmenu` 同号 · 见 §4)
+- `mode=l` = List All(全部)
+- `mode=r` = Reviewed(已审)
+- `mode=a` = Approved(已批)
+
+**已知销售类菜单 idmenu 表**(从 mainmenu HTML 抓 · 2026-05-18):
+| 业务 | 模块 | idmenu | 列表 URL |
+|---|---|---|---|
+| 报价 (ใบเสนอราคา) | arsq | 109 | `/arsq/allview.php?idmenu=109` |
+| 销售单 (ใบสั่งขาย) | arso | 112 | `/arso/allview.php?idmenu=112` |
+| 收预付 (รับเงินล่วงหน้า) | arad | 115 | `/arad/allview.php?idmenu=115` |
+| **销售-赊销** (ขายเชื่อ) | **artran** | **118** | `/artran/allview.php?idmenu=118` |
+| 增项票 (ใบเพิ่มหนี้) | arsd | 121 | `/arsd/allview.php?idmenu=121` |
+| 减项票 (ใบลดหนี้) | arsc | 123 | `/arsc/allview.php?idmenu=123` |
+
+**列表页元素**(2026-05-18 实测 artran/allview):
+- 搜索框:`<input name="txtsearch" placeholder="ค้นหาจาก เลขที่, วันที่, ชื่อ และ จำนวนเงิน" onkeyup="searchdata(1);">`(搜:编号/日期/名/金额)
+- 列表头:`เลขที่เอกสาร · วันที่เอกสาร · ชื่อลูกค้า · จำนวนเงิน · URA · View · Edit · Del`
+- 注意:**列表 `เลขที่เอกสาร` 列显示的是 `bill_no`(SI + invoice_no)·**不是** `invoice_no` 本身**
+- 删除入口:同 row 内 `<a href="allform.php?id=N&status=del"></a>`(N = MR.ERP 内部 row id · 不是 invoice_no)
+- 状态切换:`<button onclick="location='allview.php?mode=l';">` 等 3 个按钮
+
+**Mainmenu 结构**(必须先点 parent 才会出 child · `mmlv2()` JS 动态展开):
+- top-level: `<span onclick="mmlv2(this);" data-code="m5">ระบบขาย</span>`
+- 二级: 展开后才在 DOM 可见 · 三级链接才是 `<a href="../artran/allview.php?idmenu=118">`
 
 ---
 
@@ -265,20 +332,35 @@ sheet 数随模板动态 1-4 · 命名 **必须空格分隔**(不是 Sheet1/Shee
 Korn 真样本 sheet 3 **只有 header · 没 data row** → MR.ERP 服务端把这页当条件可选。
 
 ### 6.3 xlsx 字节级冷知识(PhpSpreadsheet 兼容性)
+
+✅ **2026-05-18 Playwright 实测 + Korn 真样本字节级对照(commit 待补)修正前述假设**:
+
+实测拿到 Korn 真样本(2026-05-10 服务器交付的 `test_data_mrerp_sample_SC.xlsx` · 10933B · 3 sheet)字节级解构对照后,真正的规则是:
+
+**通用规则**:
 - 字符串走 `sharedStrings.xml` · **不能用 inlineStr**(PhpSpreadsheet 不识别)
 - 数值 cell **不带 `t="n"` 属性**(Korn 真样本 default 是 numeric · 加 t 反而异常)
-- 每行加 `spans="1:N"` 属性
+- 每行 `<row>` 带 `spans="1:N"` + `ht="23.1"` + `customHeight="1"` + `x14ac:dyDescent="0.2"` 属性
+- worksheet 根标签必须含 `xmlns:x14ac="..."` + `mc:Ignorable="x14ac"`
+- 缺失 cell **可以**用完全空 `<c r="X#"/>`(Korn 真样本 P2/Q2/R2/S2 就是这种 · 之前 §6.3 旧假设 **没错** · 上轮 probe 失败是 style 索引问题不是空 cell 问题)
 - 日期单元格 number_format = `@`(强制文本)
 
-⚠️ **2026-05-18 Playwright 实测发现先验冲突**:
-- 历史反向工程说"缺失 cell 补**完全空 cell** `<c r="X#"/>`(让 row 显式声明每列存在)"
-- 但实际上传被拒 · MR.ERP 报错:`จำนวนคอลัมภ์ข้อมูลไม่ครบ 18 คอลัมภ์`(数据列数不到 18 列)
-- 字节级抽样显示我们 row 2 = 14 string cell + 1 数值 cell + **3 完全空 P/Q/R** + 1 spacer S = 19 cell · MR.ERP 视角"有效列" = 15 · 拒
-- **假设**:MR.ERP 数 `<v>` 子节点 cell 数 · 完全空 `<c/>` 不算
-- **下一步排查**(尚未确认):
-  - Korn 真样本 P/Q/R 是不是带空 `<v>`(`<c><v></v></c>` 或引用空 sharedString `<c t="s"><v>N</v></c>` N→"")
-  - 或者 schema note1/2/3 实际可以填占位字符(如空格 " ")让 generator 产生 string cell
-- **解决前禁止上传** · 不要硬猜规则改 generator(可能引入更深的字节差异)
+**Korn 真样本 styles.xml(cellXfs count=7 · 必须保留)**:
+| 索引 | numFmt | 用途 |
+|---|---|---|
+| s=0 | default | 不用 |
+| s=1 | 0 + valign=center | 不用 |
+| s=2 | **49 文本** + halign=center + valign=center | **表头**(header row 1) |
+| s=3 | 49 文本 + valign=center | **string 数据 cell**(data row · 非日期) |
+| s=4 | **187 yyyy-mm-dd** + valign=center | **日期 cell**(B2/H2/L2 = invoice_date/delivery_date/bill_date) |
+| s=5 | **4 数字 #,##0.00** + valign=center | **数值 cell**(O2 折扣 + sheet2 qty/price/amount) |
+| s=6 | 49 文本(无 alignment) | **spacer 占位**(sheet1 S2 末尾) |
+
+⚠️ **2026-05-18 实测 v1 失败的真因**:openpyxl fallback 路径生成的 styles.xml **自己的 s=1/2/3** 跟 Korn 的 s=2/3/4/5/6 含义完全不同 · MR.ERP 解析 cell 时按 style 索引检查"有效数据列",我们 s=2 引用了无效格式 → MR.ERP 数据列数判定失败 → alert `ไม่ครบ N คอลัมภ์`
+
+**正确做法**:用 `_generate_xlsx_sales_credit_korn_clone()` 路径 = 完全保留 Korn 模板的 styles.xml + workbook.xml + [Content_Types].xml + theme.xml · **仅**改写 `sheet1.xml`/`sheet2.xml`/`sheet3.xml` 的 `<sheetData>` 段 + `sharedStrings.xml` · 这样所有字节级规则全继承 Korn
+
+生产部署清单:`test_data_mrerp_sample_SC.xlsx` 必须存在于 `mrerp_xlsx_generator.py` 同目录 · 从服务器 `/opt/mrpilot/test_data_mrerp_sample_SC.xlsx` 取
 
 ---
 

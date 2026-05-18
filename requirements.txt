@@ -79,6 +79,16 @@ openai==2.32.0
 google-generativeai
 
 # ============================================================
+# === Browser automation (MR.ERP integration · v118.34.3) ===
+# ============================================================
+# CLAUDE.md §7 · 永远不直接 HTTP 调 mrerp4sme.com,所有交互走 Playwright。
+# 注意:pip install playwright 装的是 Python 库,chromium 浏览器二进制还要
+# 单独跑 `python -m playwright install chromium` 才会下载到磁盘。
+# /internal/install-playwright 管理员端点会一次性把两步都做完(给 prod
+# 部署用 · 不需要 SSH)。
+playwright
+
+# ============================================================
 # === 项目内部 "幽灵模块"(必须从服务器 /opt/mrpilot/ 取回到本地)===
 # ============================================================
 # 以下模块在本仓库 git 历史里从未存在过 · 不是 pip 包 · 但 app.py / db.py 等顶级 import 它们

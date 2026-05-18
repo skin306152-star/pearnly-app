@@ -4527,10 +4527,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.34.2 · MR.ERP「测试连接」二次加固:\n• 修复:test_mrerp_endpoint 顶部 import 之前裸跑 · Playwright/KMS 任何依赖缺失就 500 · 现在全包在 try/except · 永远返 200 + 友好错误条\n• 修复:wizard 现在直接发 plaintext {username, password} · 后端同时支持 plaintext 和 Fernet 密文两种凭据格式 · 不再用 _enc 字段塞明文这种坑\n• 加 4 个守门测试(共 9 个)· 包括 ImportError 模拟 · 8 种垃圾输入 · plaintext 路径回归\n• 加 ERR_PLAYWRIGHT_MISSING / ERR_KMS_MISSING 错误码 · 4 语友好消息全 fallback\n\nv118.34.0/1 · MR.ERP 一键对接(开发预览):\n• 「自动化 → ERP 对接」多了 MR.ERP 卡片 + 3 步 wizard\n• 错误提示全 4 语友好消息 · 不露 MR.ERP 原文\n• 内测预览 · 体验还在打磨",
-            "en": "v118.34.2 · MR.ERP \"Test connection\" hardening pass 2:\n• Fixed: test_mrerp_endpoint had a bare import at the top — any missing dep (Playwright, KMS key) would 500. Now wrapped in try/except — always returns 200 with a friendly error bar.\n• Fixed: wizard now sends plaintext {username, password} directly. Backend accepts both plaintext AND Fernet ciphertext, no more 'plaintext in _enc field' hack.\n• Added 4 hardening guard tests (9 total): ImportError simulation, 8 garbage inputs, plaintext-path regression.\n• New ERR_PLAYWRIGHT_MISSING / ERR_KMS_MISSING codes with 4-lang fallback catalog.\n\nv118.34.0/1 · MR.ERP one-click integration (dev preview):\n• New MR.ERP card + 3-step wizard\n• 4-lang friendly errors, no raw MR.ERP text leaking\n• Dev preview build · internal testing only",
-            "th": "v118.34.2 · เสริมความแข็งแกร่ง «ทดสอบเชื่อมต่อ» รอบ 2:\n• แก้: test_mrerp_endpoint เคย import ที่ด้านบนแบบไม่มี try/except ถ้าขาด Playwright หรือ KMS จะคืน 500 ตอนนี้ครอบ try/except ทั้งหมด คืน 200 พร้อมแถบข้อผิดพลาดที่อ่านง่ายเสมอ\n• แก้: วิซาร์ดส่ง plaintext {username, password} โดยตรง แบ็กเอ็นด์รับทั้ง plaintext และ Fernet ciphertext\n• เพิ่ม guard test 4 ตัว (รวม 9 ตัว): จำลอง ImportError, 8 อินพุตเสีย, รีเกรชชัน plaintext\n• เพิ่มรหัส ERR_PLAYWRIGHT_MISSING / ERR_KMS_MISSING พร้อมข้อความ 4 ภาษา\n\nv118.34.0/1 · เชื่อม MR.ERP คลิกเดียว (พรีวิวระยะพัฒนา):\n• การ์ด MR.ERP + วิซาร์ด 3 ขั้น\n• ข้อความข้อผิดพลาด 4 ภาษา\n• รุ่นพรีวิว · ทดสอบภายในเท่านั้น",
-            "ja": "v118.34.2 · MR.ERP「接続テスト」強化第 2 段階:\n• 修正: test_mrerp_endpoint の冒頭 import が裸で走っていた — Playwright や KMS が無いと 500 に。全体を try/except で包み、常に 200 + フレンドリーなエラーバー\n• 修正: ウィザードがプレーンテキストの {username, password} を直送、バックエンドは両形式を受理\n• 退行防止テスト 4 件追加（計 9 件）: ImportError シミュ、8 種類の不正入力、plaintext リグレッション\n• ERR_PLAYWRIGHT_MISSING / ERR_KMS_MISSING を 4 言語フォールバックで追加\n\nv118.34.0/1 · MR.ERP ワンクリック連携（開発プレビュー）:\n• MR.ERP カード + 3 ステップウィザード\n• 4 言語のエラーメッセージ\n• 開発プレビュー版 · 内部テストのみ"
+            "zh": "v118.34.3 · 加 Playwright 一键安装端点(给生产环境用):\n• 生产机缺 Playwright 库 + chromium 二进制 · 走 webhook 部署只 git pull + restart 不跑 pip install · 老坑\n• 加 /internal/install-playwright?token=<secret> 管理员端点 · 浏览器点一下就装好 + 自动 restart\n• requirements.txt 补 playwright · 以后干净环境部署能直接装上\n• v118.34.2 友好错误链在此次没改 · 错误条上看到 ERR_PLAYWRIGHT_MISSING 就用上面 URL 触发安装\n\nv118.34.0/1/2 · MR.ERP 一键对接(开发预览)· 已上线",
+            "en": "v118.34.3 · Playwright one-shot installer endpoint (prod ops):\n• Prod box was missing Playwright + chromium binary. The git-pull webhook only restarts mrpilot, never runs pip install — so new deps don't land automatically.\n• New /internal/install-playwright?token=<secret> admin endpoint installs both pip package + chromium binary, then schedules restart. One click in the browser.\n• requirements.txt now lists playwright so fresh clean-host deploys get it via pip install -r.\n• v118.34.2 friendly error chain unchanged — when you see ERR_PLAYWRIGHT_MISSING in the error bar, hit the URL above.\n\nv118.34.0/1/2 · MR.ERP one-click integration (dev preview) · live",
+            "th": "v118.34.3 · เอ็นด์พอยต์ติดตั้ง Playwright แบบคลิกเดียว (สำหรับโปรดักชัน):\n• เครื่องโปรดักชันยังไม่มี Playwright + chromium binary · webhook deploy แค่ git pull + restart ไม่ได้รัน pip install\n• เพิ่ม /internal/install-playwright?token=<secret> เอ็นด์พอยต์ผู้ดูแล · คลิกที่บราวเซอร์ก็ติดตั้ง + restart ให้\n• requirements.txt เพิ่ม playwright แล้ว · deploy ใหม่จะติดตั้งอัตโนมัติ\n• ห่วงโซ่ข้อความผิดพลาดมิตรของ v118.34.2 ไม่เปลี่ยน · ถ้าเห็น ERR_PLAYWRIGHT_MISSING คลิก URL ข้างต้น\n\nv118.34.0/1/2 · เชื่อม MR.ERP คลิกเดียว (พรีวิวระยะพัฒนา) · ใช้งานได้แล้ว",
+            "ja": "v118.34.3 · Playwright ワンクリックインストーラーエンドポイント（本番運用向け）:\n• 本番マシンに Playwright + chromium バイナリが無かった。webhook デプロイは git pull + restart だけで pip install を実行しない\n• 新規 /internal/install-playwright?token=<secret> 管理者エンドポイント — ブラウザで一度クリックすれば pip パッケージ + chromium 両方を入れ、自動 restart\n• requirements.txt に playwright を追加 — クリーンホストの新規デプロイで自動取得\n• v118.34.2 のフレンドリーエラーチェーンは変更なし — エラーバーに ERR_PLAYWRIGHT_MISSING が出たら上記 URL を叩く\n\nv118.34.0/1/2 · MR.ERP ワンクリック連携（開発プレビュー）· 稼働中"
         }
     }
 
@@ -4603,6 +4603,153 @@ async def deploy_log(token: str = "", lines: int = 50):
         return {"ok": True, "log": result.stdout}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+# ── Playwright admin installer (v118.34.3 · 2026-05-19) ─────────────────────
+# Background: git-deploy.sh on the server runs `git pull + systemctl restart`
+# but does NOT run `pip install -r requirements.txt`. The MR.ERP integration
+# needs Playwright + chromium binary; without them, /api/erp/test-connection
+# for mrerp returns ERR_PLAYWRIGHT_MISSING (the friendly fallback added in
+# v118.34.2).
+#
+# This endpoint installs both in one shot and schedules a restart so the
+# new module is picked up by the long-running uvicorn process. Auth uses
+# the same GITHUB_WEBHOOK_SECRET as the deploy webhook.
+#
+# Idempotent: pip skips already-installed packages, playwright skips
+# already-downloaded browsers. Safe to retry.
+@app.get("/internal/install-playwright")
+@app.post("/internal/install-playwright")
+async def install_playwright(token: str = "", with_deps: bool = False, restart: bool = True):
+    """One-shot installer for Playwright + chromium on the production host.
+
+    Query params:
+        token       Required. Same value as GITHUB_WEBHOOK_SECRET env.
+        with_deps   If true, runs `playwright install chromium --with-deps`
+                    (requires root + apt). Default false; usually not
+                    needed if the host already has libgbm/libnss/etc.
+        restart     If true (default), schedule mrpilot systemctl restart
+                    after install succeeds so uvicorn picks up the new
+                    module. The restart is detached/delayed 3 s, mirroring
+                    /internal/deploy so the response can land first.
+
+    Returns a JSON envelope with per-step stdout/stderr so the operator
+    can diff "what worked" vs "what failed" in the browser. NEVER raises
+    — failure modes are part of the response, not the HTTP status.
+    """
+    import subprocess as _subprocess
+    import os as _os
+    import shutil as _shutil
+    secret = _os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+    if not secret or token != secret:
+        raise HTTPException(status_code=403, detail="Invalid token")
+
+    log_lines = []
+
+    def _log(prefix, completed):
+        # CompletedProcess → string block we can render to the user.
+        log_lines.append(f"\n--- {prefix} (exit={completed.returncode}) ---")
+        if completed.stdout:
+            log_lines.append(completed.stdout.strip())
+        if completed.stderr:
+            log_lines.append("STDERR: " + completed.stderr.strip())
+
+    try:
+        # ── 1. pip install playwright ──
+        pip_bin = _shutil.which("pip3") or _shutil.which("pip") or "pip3"
+        # `--break-system-packages` mirrors deploy.sh's pattern; required on
+        # PEP-668 protected hosts (Ubuntu 23.04+ system Python).
+        pip_cmd = [pip_bin, "install", "playwright", "--break-system-packages"]
+        log_lines.append(f"$ {' '.join(pip_cmd)}")
+        r1 = _subprocess.run(pip_cmd, capture_output=True, text=True, timeout=300)
+        _log("pip install playwright", r1)
+        if r1.returncode != 0:
+            return {
+                "ok": False, "step": "pip_install",
+                "hint": "pip install failed — check stderr above. May need sudo or pip path fix.",
+                "log": "\n".join(log_lines),
+            }
+
+        # ── 2. download chromium ──
+        # We use `python3 -m playwright install` (vs `playwright` CLI) so we
+        # use the exact interpreter that mrpilot runs as, ensuring the
+        # browser ends up where Python will find it.
+        py_bin = _shutil.which("python3") or "python3"
+        browser_cmd = [py_bin, "-m", "playwright", "install", "chromium"]
+        if with_deps:
+            browser_cmd.append("--with-deps")
+        log_lines.append(f"\n$ {' '.join(browser_cmd)}")
+        # Browser download is ~140MB; allow up to 10 min on slow links.
+        r2 = _subprocess.run(browser_cmd, capture_output=True, text=True, timeout=600)
+        _log("playwright install chromium", r2)
+        if r2.returncode != 0:
+            return {
+                "ok": False, "step": "browser_install",
+                "hint": (
+                    "Browser download failed. If you see 'missing libgbm/libnss',"
+                    " re-run this URL with &with_deps=true to install system libs."
+                ),
+                "log": "\n".join(log_lines),
+            }
+
+        # ── 3. verify import works (in a clean subprocess) ──
+        verify_cmd = [
+            py_bin, "-c",
+            "from playwright.sync_api import sync_playwright; "
+            "print('IMPORT_OK · version', sync_playwright.__module__)"
+        ]
+        log_lines.append(f"\n$ {' '.join(verify_cmd)}")
+        r3 = _subprocess.run(verify_cmd, capture_output=True, text=True, timeout=15)
+        _log("verify import", r3)
+        import_ok = "IMPORT_OK" in (r3.stdout or "")
+
+        if not import_ok:
+            return {
+                "ok": False, "step": "verify",
+                "hint": "pip + browser installed but import still fails. Check that "
+                        "mrpilot's Python interpreter matches the one that ran pip.",
+                "log": "\n".join(log_lines),
+            }
+
+        # ── 4. schedule restart so the running uvicorn picks up the new module ──
+        next_step_url = None
+        if restart:
+            log_lines.append("\n--- scheduling mrpilot restart in 3 s ---")
+            _subprocess.Popen(
+                ["bash", "-c",
+                 "sleep 3 && systemctl restart mrpilot "
+                 ">> /var/log/mrpilot-deploy.log 2>&1"],
+                close_fds=True, start_new_session=True,
+            )
+        else:
+            next_step_url = (
+                "https://pearnly.com/internal/deploy/manual?token=<your-secret>"
+            )
+
+        return {
+            "ok": True, "step": "complete",
+            "restart_scheduled": bool(restart),
+            "next_step": (
+                "Wait ~10 s for the restart, then click 「测试连接」in the wizard. "
+                "If you still see ERR_PLAYWRIGHT_MISSING, retry with &with_deps=true."
+                if restart else f"Trigger restart manually: {next_step_url}"
+            ),
+            "log": "\n".join(log_lines),
+        }
+
+    except _subprocess.TimeoutExpired as e:
+        return {
+            "ok": False, "step": "timeout",
+            "hint": f"Step timed out after {e.timeout}s. Re-run; pip/playwright "
+                    f"resume partial downloads.",
+            "log": "\n".join(log_lines),
+        }
+    except Exception as e:
+        logger.exception("install_playwright endpoint failure")
+        return {
+            "ok": False, "step": "exception",
+            "log": "\n".join(log_lines) + f"\n\nEXCEPTION: {type(e).__name__}: {e}",
+        }
 
 
 @app.get("/reset", response_class=HTMLResponse)

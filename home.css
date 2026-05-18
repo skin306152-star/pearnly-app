@@ -11213,6 +11213,57 @@ body.sidebar-collapsed .nav-collapsible.collapsed .nav-sub { max-height: 800px; 
 /* ============================================================
  * v118.27.0.1 · ERP 对接二级 sub-tab(连接 & 字段映射)
  * ============================================================ */
+/* A4 (v118.34.19 · Zihao 2026-05-19 拍板) · 集成主页面顶部 tab 切换 */
+.int-top-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 0 0 16px;
+    border-bottom: 1px solid #e8e8e3;
+    background: #fff;
+    padding: 0 4px;
+    border-radius: 8px 8px 0 0;
+}
+.int-top-tab {
+    padding: 12px 22px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+}
+.int-top-tab:hover { color: #111; }
+.int-top-tab.active {
+    color: #111;
+    border-bottom-color: #111;
+}
+.int-top-panel { display: none; }
+.int-top-panel.active { display: block; }
+@media (max-width: 768px) {
+    .int-top-tab { padding: 10px 14px; font-size: 13px; flex: 1; text-align: center; }
+}
+
+/* 「看推送日志 →」 inline link button on ERP integration row */
+.int-btn-view-logs {
+    background: transparent;
+    border: 1px solid #e5e7eb;
+    color: #2563EB;
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 6px;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.int-btn-view-logs:hover {
+    background: #f0f7ff;
+    border-color: #93c5fd;
+}
+
 .erp-subtabs {
     display: flex;
     gap: 4px;

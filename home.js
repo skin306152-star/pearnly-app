@@ -1827,6 +1827,10 @@ const I18N = {
         'int-desc-folder': '指定本地/共享文件夹 · 扔进去就自动识别',
         'int-desc-erp': 'Xero · MR.ERP · Webhook 等 · 识别完自动推到 ERP',
         'btn-configure': '配置',
+        // A4 (v118.34.19) · 集成主页面顶部 tab 切换
+        'int-tab-cards': '集成卡片',
+        'int-tab-logs': '推送日志',
+        'int-btn-view-logs': '看推送日志 →',
         // v109.4 · 销售发票模块(v110.1)
         'nav-sales-invoices': '销售发票',
         'cs-sales-invoices-title': '销售发票',
@@ -4201,6 +4205,10 @@ const I18N = {
         'int-desc-folder': 'Specify a local/shared folder · drop files in to auto-recognize',
         'int-desc-erp': 'Xero · MR.ERP · Webhook · auto-push after OCR completes',
         'btn-configure': 'Configure',
+        // A4 (v118.34.19) · integration page top tabs
+        'int-tab-cards': 'Integrations',
+        'int-tab-logs': 'Push Log',
+        'int-btn-view-logs': 'View push log →',
         // v109.4 · sales invoice module (v110.1)
         'nav-sales-invoices': 'Sales Invoices',
         'cs-sales-invoices-title': 'Sales Invoices',
@@ -6568,6 +6576,10 @@ const I18N = {
         'int-desc-folder': 'ระบุโฟลเดอร์ในเครื่อง/แชร์ · วางไฟล์ลงไปก็อ่านอัตโนมัติ',
         'int-desc-erp': 'Xero · MR.ERP · Webhook · ส่งเข้า ERP อัตโนมัติหลังอ่านเสร็จ',
         'btn-configure': 'ตั้งค่า',
+        // A4 (v118.34.19) · แท็บหน้าการเชื่อมต่อ
+        'int-tab-cards': 'การ์ดเชื่อมต่อ',
+        'int-tab-logs': 'บันทึกการส่ง',
+        'int-btn-view-logs': 'ดูบันทึก →',
         // v109.4 · ใบกำกับขาย (v110.1)
         'nav-sales-invoices': 'ใบกำกับขาย',
         'cs-sales-invoices-title': 'ใบกำกับขาย',
@@ -8927,6 +8939,10 @@ const I18N = {
         'int-desc-folder': 'ローカル/共有フォルダを指定 · 入れるだけで自動認識',
         'int-desc-erp': 'Xero · MR.ERP · Webhook など · OCR 完了後 ERP に自動送信',
         'btn-configure': '設定',
+        // A4 (v118.34.19) · 連携ページ上部タブ
+        'int-tab-cards': '連携カード',
+        'int-tab-logs': '送信ログ',
+        'int-btn-view-logs': '送信ログを見る →',
         // v109.4 · 売上請求書モジュール (v110.1)
         'nav-sales-invoices': '売上請求書',
         'cs-sales-invoices-title': '売上請求書',
@@ -10082,7 +10098,9 @@ function applyLang(lang) {
         }
     } catch (e) {}
     try {
-        if (typeof loadErpLogs === 'function' && currentRoute === 'automation') {
+        // A4 (v118.34.19) · 集成主页面也展示推送日志 · 同样需要切语言刷新
+        if (typeof loadErpLogs === 'function'
+            && (currentRoute === 'automation' || currentRoute === 'integrations')) {
             loadErpLogs();
             if (typeof loadErpTodayStats === 'function') loadErpTodayStats();
         }
@@ -10305,6 +10323,16 @@ function routeTo(route) {
     if (route === 'test-center' && typeof window.loadTestCenterPage === 'function') window.loadTestCenterPage();
     // v118.32.5.5.16 · 首页 dashboard
     if (route === 'dashboard' && typeof window.loadDashboard === 'function') window.loadDashboard();
+    // A4 (v118.34.19) · 进集成页 · 默认 cards tab · 同时刷新 erp logs
+    // (logs tab 切过去时会再调一次 · 这里是首屏 / 切回时数据保鲜)
+    if (route === 'integrations') {
+        if (typeof loadErpLogs === 'function') {
+            try { loadErpLogs(); } catch (e) {}
+        }
+        if (typeof loadErpTodayStats === 'function') {
+            try { loadErpTodayStats(); } catch (e) {}
+        }
+    }
 }
 
 window.addEventListener('hashchange', () => {
@@ -10378,6 +10406,87 @@ document.querySelectorAll('.nav-item').forEach(item => {
         }
         // google-drive / google-sheets 走原有 inline 展开逻辑 · 不拦截
     });
+})();
+
+// A4 (v118.34.19 · Zihao 2026-05-19 拍板) · 集成主页面顶部 tab 切换
+// + "看推送日志 →" 链接(从 ERP 卡片 / 也可来自其他地方)
+(function () {
+    function _activateIntTopTab(targetKey) {
+        const tabs = document.querySelectorAll('#page-integrations .int-top-tab');
+        const panels = document.querySelectorAll('#page-integrations .int-top-panel');
+        tabs.forEach(t => {
+            const k = t.dataset.intTopTab;
+            t.classList.toggle('active', k === targetKey);
+        });
+        panels.forEach(p => {
+            const k = p.dataset.intTopPanel;
+            p.classList.toggle('active', k === targetKey);
+        });
+        // 切到 logs · 触发一次 fetch 让用户立刻看到数据
+        if (targetKey === 'logs' && typeof loadErpLogs === 'function') {
+            try { loadErpLogs(); } catch (e) {}
+            if (typeof loadErpTodayStats === 'function') {
+                try { loadErpTodayStats(); } catch (e) {}
+            }
+        }
+    }
+    // 暴露给 ERP 抽屉「看推送日志 →」按钮调用
+    window.activateIntegrationsLogsTab = function () {
+        // 如果集成抽屉打开了 · 关掉
+        try {
+            const drawer = document.getElementById('int-drawer');
+            const overlay = document.getElementById('int-drawer-overlay');
+            if (drawer) drawer.classList.remove('open');
+            if (overlay) overlay.classList.remove('open');
+            // 调用现有的关闭逻辑(若存在)清理 panel 归还
+            if (typeof window.closeIntegrationDrawer === 'function') {
+                window.closeIntegrationDrawer();
+            }
+        } catch (e) {}
+        // 切到集成页 + logs tab
+        if (typeof window.navigateTo === 'function') {
+            try { window.navigateTo('integrations'); } catch (e) {}
+        } else {
+            try { location.hash = '#/integrations'; } catch (e) {}
+        }
+        _activateIntTopTab('logs');
+        // 滚顶
+        try {
+            const page = document.getElementById('page-integrations');
+            if (page) page.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        } catch (e) {}
+    };
+
+    document.addEventListener('click', function (e) {
+        // tab 切换
+        const tab = e.target.closest('#page-integrations .int-top-tab');
+        if (tab) {
+            const k = tab.dataset.intTopTab;
+            if (k) _activateIntTopTab(k);
+            return;
+        }
+        // 「看推送日志 →」按钮(集成页 ERP 卡片 OR ERP 抽屉内 ERP 连接卡片)
+        const logsBtn = e.target.closest('[data-int-action="view-logs"], .int-btn-view-logs');
+        if (logsBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.activateIntegrationsLogsTab();
+        }
+    });
+
+    // 路由切到 #/integrations 时 · 如果 hash 带 ?tab=logs · 自动切 logs
+    function _onRouteToIntegrations() {
+        const h = (location.hash || '').toLowerCase();
+        if (h.includes('integrations') && h.includes('tab=logs')) {
+            setTimeout(() => _activateIntTopTab('logs'), 50);
+        }
+    }
+    window.addEventListener('hashchange', _onRouteToIntegrations);
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        _onRouteToIntegrations();
+    } else {
+        document.addEventListener('DOMContentLoaded', _onRouteToIntegrations);
+    }
 })();
 
 // v118.32.5.5.37 · 集成配置抽屉核心函数

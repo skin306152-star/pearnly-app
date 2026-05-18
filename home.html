@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11834918">
+<link rel="stylesheet" href="/static/home.css?v=11834919">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -2692,14 +2692,19 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                              "auto-erp-subtab-connect" data-i18n key 的归宿,旧
                              分类不动 · 仅拆出新的 "logs" tab。
                         -->
+                        <!-- v118.34.19 (A4) · 「推送日志」subtab 已移到集成主页面顶部 tab · 这里仅留 连接 / 字段映射 -->
                         <div class="erp-subtabs" role="tablist">
                             <button class="erp-subtab active" type="button" data-erp-subtab="connect" data-i18n="auto-erp-subtab-connect-only">连接</button>
-                            <button class="erp-subtab" type="button" data-erp-subtab="logs" data-i18n="erp-logs-title">推送日志</button>
                             <button class="erp-subtab" type="button" data-erp-subtab="mappings" data-i18n="auto-erp-subtab-mappings">字段映射</button>
                         </div>
 
                         <!-- 子面板 1:连接(纯卡片 · 不含日志、不含 today-stats · v118.34.5) -->
                         <div class="erp-subpanel active" data-erp-subpanel="connect">
+                            <!-- A4 (v118.34.19) · "看推送日志 →" 链接 ·
+                                 点了关抽屉 + 跳主页推送日志 tab(全宽视图) -->
+                            <div class="erp-connect-logs-link" style="text-align:right;margin:-4px 0 8px;">
+                                <button type="button" class="int-btn-view-logs" data-int-action="view-logs" data-i18n="int-btn-view-logs">看推送日志 →</button>
+                            </div>
                             <!-- v118.27.4 · ERP 系统连接卡片区(Xero · MR.ERP · FlowAccount) -->
                             <div class="erp-connect-cards" id="erp-connect-cards">
                                 <!-- IIFE 渲染 Xero 卡片 + 未来其他 ERP -->
@@ -2712,57 +2717,11 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                             </button>
                         </div>
 
-                        <!-- 子面板 1.5:推送日志(独立 subpanel · v118.34.4)
-                             #erp-logs-section 现在不在 connect subpanel 里了 ·
-                             home.js 的 #erp-logs-list 渲染逻辑不需要改 · 它本来
-                             就是按 id 抓 DOM 节点 · 父容器换位置无感。
-                             v118.34.5 · 把 #erp-today-stats ("今天还没推送"那行)
-                             也搬过来 · 这个属于日志统计 · 不该 leak 到"连接"tab。
-                        -->
-                        <div class="erp-subpanel" data-erp-subpanel="logs">
-                            <!-- v0.17 · M5 · 今日推送统计 (v118.34.5 从 connect 搬过来) -->
-                            <div id="erp-today-stats" class="erp-today-stats"></div>
-                            <!-- 之前是 <details> 折叠 · 独立 subpanel 后就是常驻展开 -->
-                            <section class="erp-logs-section" id="erp-logs-section">
-                                <div class="erp-logs-head">
-                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1"/>
-                                    </svg>
-                                    <span data-i18n="erp-logs-title">推送日志</span>
-                                    <span class="erp-logs-today-stats" id="erp-logs-today-stats"></span>
-                                </div>
-
-                                <div class="erp-logs-toolbar">
-                                    <div class="erp-logs-filters" id="erp-logs-filters">
-                                        <button class="chip-filter active" data-filter-key="all" data-filter-val=""><span data-i18n="erp-logs-filter-all">全部</span></button>
-                                        <button class="chip-filter" data-filter-key="status" data-filter-val="success">✓ <span data-i18n="erp-logs-filter-ok">成功</span></button>
-                                        <button class="chip-filter" data-filter-key="status" data-filter-val="retrying">↻ <span data-i18n="erp-logs-filter-retrying">重试中</span></button>
-                                        <button class="chip-filter" data-filter-key="status" data-filter-val="failed">✗ <span data-i18n="erp-logs-filter-fail">失败</span></button>
-                                        <button class="chip-filter" data-filter-key="trigger" data-filter-val="auto"><span data-i18n="erp-logs-filter-auto">自动</span></button>
-                                        <button class="chip-filter" data-filter-key="trigger" data-filter-val="manual"><span data-i18n="erp-logs-filter-manual">手动</span></button>
-                                    </div>
-                                    <button class="btn btn-ghost btn-tiny" id="btn-refresh-logs" title="刷新">
-                                        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 7a4.5 4.5 0 11-1.3-3.2M12 2v3h-3"/></svg>
-                                    </button>
-                                </div>
-
-                                <!-- v118.25.1 · 批量栏(选中 ≥1 时显示) -->
-                                <div id="erp-logs-batch-bar" class="erp-logs-batch-bar" style="display:none;">
-                                    <span class="erp-logs-batch-count" id="erp-logs-batch-count" data-i18n="erp-batch-selected" data-i18n-vars='{"n":0}'>已选 0 条</span>
-                                    <button class="btn btn-primary btn-tiny" id="btn-erp-batch-retry">
-                                        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 7a4.5 4.5 0 11-1.3-3.2M12 2v3h-3"/></svg>
-                                        <span data-i18n="erp-batch-retry-btn">批量重推</span>
-                                    </button>
-                                    <button class="btn btn-ghost btn-tiny" id="btn-erp-batch-clear">
-                                        <span data-i18n="erp-batch-clear">取消选择</span>
-                                    </button>
-                                </div>
-
-                                <div id="erp-logs-list" class="erp-logs-list">
-                                    <div class="erp-logs-empty" data-i18n="erp-logs-loading">加载中…</div>
-                                </div>
-                            </section>
-                        </div>
+                        <!-- v118.34.19 (A4) · subpanel="logs" 已删除 · 内容搬到
+                             集成主页面顶部 tab 2(全宽全屏)· erp-logs-section /
+                             erp-today-stats 等 DOM 节点搬过去后这里清空 ·
+                             home.js 的 loadErpLogs() 等通过 id 仍然找得到 ·
+                             不需要改. -->
 
                         <!-- 子面板 2:字段映射(老板可写 / 员工只读 · IIFE 渲染) -->
                         <div class="erp-subpanel" data-erp-subpanel="mappings">
@@ -5809,6 +5768,10 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </section>
 
     <!-- ============ 页面: 集成(NAV-IA Phase 7 · 视觉框架 · 6 张 integration-row 卡片 · 完整连接/断开逻辑暂走自动化页) ============ -->
+    <!-- v118.34.19 (Zihao 2026-05-19 拍板 · A4) · 顶部 2 tab 切换:
+         - tab1 集成卡片 (cards): 现有 integration-row 列表 · 不变
+         - tab2 推送日志 (logs): 从 auto-panel="erp" 抽屉里搬来 · 全宽全屏
+         自动化页 erp-subpanel="logs" 同步删除 · 避免双重 DOM. -->
     <section class="page" id="page-integrations">
         <div class="page-head-clean">
             <div class="page-head-icon">
@@ -5823,6 +5786,14 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             </div>
         </div>
 
+        <!-- A4 · 顶部 tab 切换 -->
+        <div class="int-top-tabs" role="tablist">
+            <button class="int-top-tab active" type="button" data-int-top-tab="cards" data-i18n="int-tab-cards">集成卡片</button>
+            <button class="int-top-tab" type="button" data-int-top-tab="logs" data-i18n="int-tab-logs">推送日志</button>
+        </div>
+
+        <!-- Tab 1: integration-row 卡片(现有内容不变) -->
+        <div class="int-top-panel active" data-int-top-panel="cards">
         <div class="card">
             <!-- Google 一次授权双服务 · 蓝色信息条 -->
             <div class="integrations-info-bar">
@@ -5938,6 +5909,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     <div class="int-desc" data-i18n="int-desc-erp">Xero · MR.ERP · Webhook 等 · 识别完自动推到 ERP</div>
                 </div>
                 <div class="int-actions">
+                    <button class="int-btn-view-logs" type="button" data-int-action="view-logs" data-i18n="int-btn-view-logs">看推送日志 →</button>
                     <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
                 </div>
             </div>
@@ -5963,6 +5935,55 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 </div>
             </div>
         </div>
+        </div>
+        <!-- /Tab 1 -->
+
+        <!-- Tab 2: 推送日志(从 auto-panel="erp" subpanel="logs" 搬过来 · A4 · v118.34.19) -->
+        <div class="int-top-panel" data-int-top-panel="logs">
+            <div class="card">
+                <!-- 今日推送统计 -->
+                <div id="erp-today-stats" class="erp-today-stats"></div>
+                <section class="erp-logs-section" id="erp-logs-section">
+                    <div class="erp-logs-head">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1"/>
+                        </svg>
+                        <span data-i18n="erp-logs-title">推送日志</span>
+                        <span class="erp-logs-today-stats" id="erp-logs-today-stats"></span>
+                    </div>
+
+                    <div class="erp-logs-toolbar">
+                        <div class="erp-logs-filters" id="erp-logs-filters">
+                            <button class="chip-filter active" data-filter-key="all" data-filter-val=""><span data-i18n="erp-logs-filter-all">全部</span></button>
+                            <button class="chip-filter" data-filter-key="status" data-filter-val="success">✓ <span data-i18n="erp-logs-filter-ok">成功</span></button>
+                            <button class="chip-filter" data-filter-key="status" data-filter-val="retrying">↻ <span data-i18n="erp-logs-filter-retrying">重试中</span></button>
+                            <button class="chip-filter" data-filter-key="status" data-filter-val="failed">✗ <span data-i18n="erp-logs-filter-fail">失败</span></button>
+                            <button class="chip-filter" data-filter-key="trigger" data-filter-val="auto"><span data-i18n="erp-logs-filter-auto">自动</span></button>
+                            <button class="chip-filter" data-filter-key="trigger" data-filter-val="manual"><span data-i18n="erp-logs-filter-manual">手动</span></button>
+                        </div>
+                        <button class="btn btn-ghost btn-tiny" id="btn-refresh-logs" title="刷新">
+                            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 7a4.5 4.5 0 11-1.3-3.2M12 2v3h-3"/></svg>
+                        </button>
+                    </div>
+
+                    <div id="erp-logs-batch-bar" class="erp-logs-batch-bar" style="display:none;">
+                        <span class="erp-logs-batch-count" id="erp-logs-batch-count" data-i18n="erp-batch-selected" data-i18n-vars='{"n":0}'>已选 0 条</span>
+                        <button class="btn btn-primary btn-tiny" id="btn-erp-batch-retry">
+                            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 7a4.5 4.5 0 11-1.3-3.2M12 2v3h-3"/></svg>
+                            <span data-i18n="erp-batch-retry-btn">批量重推</span>
+                        </button>
+                        <button class="btn btn-ghost btn-tiny" id="btn-erp-batch-clear">
+                            <span data-i18n="erp-batch-clear">取消选择</span>
+                        </button>
+                    </div>
+
+                    <div id="erp-logs-list" class="erp-logs-list">
+                        <div class="erp-logs-empty" data-i18n="erp-logs-loading">加载中…</div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <!-- /Tab 2 -->
     </section>
 
 </main>
@@ -6461,15 +6482,15 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11834918"></script>
+<script src="/static/home.js?v=11834919"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·
      独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834918">
-<script src="/static/erp-mrerp-connect.js?v=11834918" defer></script>
+<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834919">
+<script src="/static/erp-mrerp-connect.js?v=11834919" defer></script>
 <!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
-<script src="/static/erp-log-enhance.js?v=11834918" defer></script>
+<script src="/static/erp-log-enhance.js?v=11834919" defer></script>
 
 </body>
 </html>

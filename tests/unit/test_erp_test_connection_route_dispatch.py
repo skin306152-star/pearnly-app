@@ -647,5 +647,116 @@ class ChromiumActualLaunchTests(unittest.TestCase):
                 pass
 
 
+@unittest.skipUnless(
+    bool(__import__("os").environ.get("PEARNLY_DATABASE_URL")),
+    "PEARNLY_DATABASE_URL not set — real-DB constraint test only runs "
+    "where the DB is reachable (typically server-side / CI). Local dev "
+    "skips this; the server-side test catches the regression at deploy time.",
+)
+class MrerpAdapterConstraintTests(unittest.TestCase):
+    """v118.34.14 (Zihao 2026-05-19 拍板) · The named guard test the
+    user explicitly demanded after the CheckViolation surfaced from
+    /api/version's last_500 traceback:
+
+        > test_create_endpoint_with_adapter_mrerp_does_not_violate_constraint
+        > 在真测试 DB 里跑 · 不是 mock · 确保 schema 跟代码对得上
+
+    Inserts a real erp_endpoints row with adapter='mrerp' inside a
+    transaction, then ROLLS BACK so we don't pollute the database.
+    If the CHECK constraint hasn't been migrated to include 'mrerp',
+    the INSERT raises psycopg2.errors.CheckViolation — the exact bug
+    that 500'd /api/erp/endpoints in production.
+
+    Auto-skips locally where the DB isn't reachable. On server-side
+    CI this must pass; failure means the
+    ensure_erp_endpoints_adapter_constraint migration didn't run (or
+    ran but didn't include 'mrerp').
+    """
+
+    def setUp(self):
+        # Late import so the test file can still be collected on hosts
+        # without psycopg2 / postgres reachability.
+        try:
+            import db as _db
+            self._db = _db
+        except Exception as e:
+            self.skipTest(f"db module unavailable: {e}")
+        # Ensure the migration has run before we probe. Lifespan does
+        # this on prod, but in CI we may run tests without going through
+        # lifespan.
+        try:
+            self._db.ensure_erp_endpoints_adapter_constraint()
+        except Exception as e:
+            self.skipTest(f"could not run migration: {e}")
+
+    def test_create_endpoint_with_adapter_mrerp_does_not_violate_constraint(self):
+        """Insert an erp_endpoints row with adapter='mrerp'. If the
+        CHECK constraint still rejects 'mrerp', psycopg2 raises
+        CheckViolation. We wrap in a transaction and ROLLBACK so the
+        synthetic row never persists."""
+        import json as _json
+        import uuid
+
+        synthetic_user_id = "00000000-0000-0000-0000-000000fa11ed"
+        config = {
+            "system_url": "https://www.mrerp4sme.com",
+            "username_enc": "gAAAAA_dummy_ciphertext_for_test_only",
+            "password_enc": "gAAAAA_dummy_ciphertext_for_test_only",
+            "comidyear": "6", "seldb": "1",
+            "seed_customer_code": "0006",
+            "seed_product_code": "P001",
+        }
+        # Use a savepoint so we can roll back just this insert without
+        # disturbing any outer transaction.
+        try:
+            with self._db.get_cursor(commit=False) as cur:
+                cur.execute("SAVEPOINT mrerp_constraint_probe")
+                try:
+                    cur.execute(
+                        """
+                        INSERT INTO erp_endpoints
+                            (user_id, name, adapter, config, is_default, auto_push)
+                        VALUES (%s, %s, %s, %s::jsonb, %s, %s)
+                        RETURNING id
+                        """,
+                        (
+                            synthetic_user_id,
+                            "mrerp-constraint-test-" + uuid.uuid4().hex[:8],
+                            "mrerp",
+                            _json.dumps(config),
+                            False, False,
+                        ),
+                    )
+                    row = cur.fetchone()
+                    self.assertIsNotNone(
+                        row,
+                        "INSERT with adapter='mrerp' returned no row — "
+                        "the constraint may have silently rejected it.",
+                    )
+                    self.assertIn("id", row)
+                finally:
+                    # Always rollback to keep the test side-effect-free.
+                    cur.execute("ROLLBACK TO SAVEPOINT mrerp_constraint_probe")
+        except Exception as e:
+            # If it was a CheckViolation, surface the exact failure.
+            msg = str(e)
+            if "adapter" in msg.lower() and (
+                "violates check constraint" in msg.lower()
+                or "checkviolation" in type(e).__name__.lower()
+            ):
+                self.fail(
+                    f"erp_endpoints CHECK constraint still rejects "
+                    f"adapter='mrerp'. Run "
+                    f"ensure_erp_endpoints_adapter_constraint() in db.py. "
+                    f"Original error: {type(e).__name__}: {msg}"
+                )
+            # Foreign-key violation on synthetic_user_id is fine — it
+            # proves the CHECK passed before the FK check rejected.
+            if "foreign key" in msg.lower() or "user_id" in msg.lower():
+                return  # Acceptable — we got past the CHECK.
+            # Any other error — reraise so the test loudly fails.
+            raise
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

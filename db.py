@@ -1473,6 +1473,117 @@ def update_history_push_status(history_id: str, status: str):
 # ============================================================
 # v118.25 · ERP 推送失败自动重试(指数退避)
 # ============================================================
+def ensure_erp_endpoints_adapter_constraint():
+    """v118.34.14 (Zihao 2026-05-19 拍板) · erp_endpoints 的 adapter CHECK
+    constraint 之前只列 webhook / xero / flowaccount · MR.ERP 集成代码上线
+    时漏写 schema migration · 创建 endpoint 时 PostgreSQL 抛 CheckViolation
+    导致 POST /api/erp/endpoints 500("erp_endpoints_adapter_chk violated")。
+
+    这个函数:
+      1. 从 pg_catalog 查现存 CHECK 约束(若有)· 不靠固定名字
+      2. drop 旧约束 + 加新约束 · adapter 白名单加 'mrerp'
+      3. 幂等 — 已经包含 'mrerp' 时跳过
+
+    白名单跟 erp_push.py ADAPTER_REGISTRY 对齐 · 增 adapter 时这里和
+    那里一起改。
+    """
+    canonical = ("webhook", "xero", "flowaccount", "mrerp")
+    try:
+        with get_cursor(commit=True) as cur:
+            # 1. 找 adapter 上现存的 CHECK constraint(可能没有 · 也可能多个)
+            cur.execute("""
+                SELECT con.conname, pg_get_constraintdef(con.oid) AS def
+                FROM pg_constraint con
+                JOIN pg_class rel ON rel.oid = con.conrelid
+                WHERE rel.relname = 'erp_endpoints'
+                  AND con.contype = 'c'
+                  AND pg_get_constraintdef(con.oid) ILIKE '%adapter%'
+            """)
+            rows = cur.fetchall() or []
+            current_def = " ".join((r["def"] or "").lower() for r in rows)
+            # 2. 已经包含 'mrerp' 就不动 — 幂等
+            if "'mrerp'" in current_def:
+                logger.info(
+                    "✅ erp_endpoints adapter CHECK already includes mrerp (skip)"
+                )
+                return
+            # 3. drop 所有现存 adapter-related CHECK,然后建新的
+            for r in rows:
+                name = r["conname"]
+                cur.execute(
+                    f"ALTER TABLE erp_endpoints DROP CONSTRAINT IF EXISTS "
+                    f"{name}"
+                )
+                logger.info(
+                    "[migration] dropped old erp_endpoints CHECK: %s", name
+                )
+            # 4. 建新约束 · 名字回归 canonical
+            in_list = ", ".join(f"'{a}'" for a in canonical)
+            cur.execute(
+                f"ALTER TABLE erp_endpoints "
+                f"ADD CONSTRAINT erp_endpoints_adapter_chk "
+                f"CHECK (adapter IN ({in_list}))"
+            )
+            logger.info(
+                "✅ erp_endpoints adapter CHECK rewritten · whitelist=%s",
+                canonical,
+            )
+    except Exception as e:
+        logger.exception("ensure_erp_endpoints_adapter_constraint failed")
+        # 不抛 · 让启动继续 · 但下一次创建 mrerp endpoint 仍会 500 ·
+        # 现场会进 last_500 traceback · 操作者能拿到。
+
+
+def ensure_erp_push_logs_adapter_constraint():
+    """同 erp_endpoints 但针对 erp_push_logs · 若它也有 adapter CHECK
+    约束就同步加 mrerp。push log 表不一定带这个约束(取决于建表 DDL),
+    所以查 pg_catalog 找到了再 drop+rebuild,没找到就跳过。"""
+    canonical = ("webhook", "xero", "flowaccount", "mrerp")
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute("""
+                SELECT con.conname, pg_get_constraintdef(con.oid) AS def
+                FROM pg_constraint con
+                JOIN pg_class rel ON rel.oid = con.conrelid
+                WHERE rel.relname = 'erp_push_logs'
+                  AND con.contype = 'c'
+                  AND pg_get_constraintdef(con.oid) ILIKE '%adapter%'
+            """)
+            rows = cur.fetchall() or []
+            if not rows:
+                logger.info(
+                    "ℹ erp_push_logs has no adapter CHECK constraint (nothing to migrate)"
+                )
+                return
+            current_def = " ".join((r["def"] or "").lower() for r in rows)
+            if "'mrerp'" in current_def:
+                logger.info(
+                    "✅ erp_push_logs adapter CHECK already includes mrerp (skip)"
+                )
+                return
+            for r in rows:
+                name = r["conname"]
+                cur.execute(
+                    f"ALTER TABLE erp_push_logs DROP CONSTRAINT IF EXISTS "
+                    f"{name}"
+                )
+                logger.info(
+                    "[migration] dropped old erp_push_logs CHECK: %s", name
+                )
+            in_list = ", ".join(f"'{a}'" for a in canonical)
+            cur.execute(
+                f"ALTER TABLE erp_push_logs "
+                f"ADD CONSTRAINT erp_push_logs_adapter_chk "
+                f"CHECK (adapter IN ({in_list}))"
+            )
+            logger.info(
+                "✅ erp_push_logs adapter CHECK rewritten · whitelist=%s",
+                canonical,
+            )
+    except Exception as e:
+        logger.exception("ensure_erp_push_logs_adapter_constraint failed")
+
+
 def ensure_erp_retry_columns():
     """启动时给 erp_push_logs 表加 retry 相关列 · 幂等(列已存在则跳过)"""
     try:

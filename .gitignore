@@ -50,3 +50,7 @@ tests/pipeline-results.json
 tests/pipeline-results-before-fix.json
 tests/pipeline-benchmark-*.json
 tests/compare-b1-b2-result.json
+
+# MR.ERP adapter runtime artifacts (test-run screenshots, debug traces)
+docs/integrations/screenshots/_tests/
+scripts/probe/_debug/trace_*.json

@@ -236,9 +236,11 @@ Content-Type: multipart/form-data (FormData(#frmimportN) · 含全 row hidden in
 Referer: https://www.mrerp4sme.com/impartran/formrdpc.php
 ```
 
-**响应**:
-- `"1"` = 简单成功(直接完成)
-- `"2"` = 完成 + 通过 `sdpt()` 在 `_blank` 新窗口打开 `component/report.php` · 报告页 form-POST 加载
+**响应**(实测确认 2026-05-18 adapter happy + business error):
+- `"1"` = **全部 row 成功提交 · 不生成报告**(实测 happy path · 服务端 importpc.php 体只返 "1" · 不调 sdpt · 没有 report.php 请求)
+- `"2"` = **有 row 失败 · 生成报告**(实测 business error · importpc.php 体返 "2" · JS 调 sdpt → POST report.php · 服务端返 xlsx 附件)
+
+🔑 **adapter 关键**:不要永远等 report.php · "1" 时不会有 report · 必须先抓 importpc.php 响应体判分支
 
 ⚠️ **2026-05-18 实测重要发现** · `importpc="2"` **不等于** DB 实际写入:
 - 完整流程跑通(login → upload → preview 显示 1 行 → click `btnuploadfrm1` → JS confirm dialog accept → AJAX 返 `"2"`)
@@ -445,6 +447,18 @@ Korn 真样本:`690507-001`
 - `0507` = 月日
 - `-001` = 服务端再分配的序号
 
+### 字段长度上限(2026-05-18 集成测试发现)
+| 字段 | 上限 | 报错文案 |
+|---|---|---|
+| `invoice_no`(เลขที่)| **≤ 18 字符** | `เลขที่ต้องไม่เกิน 18 ตัวอักษร` |
+| `bill_no`(เลขที่บิล)| **≤ 20 字符** | `เลขที่บิลต้องไม่เกิน 20 ตัวอักษร` |
+| `customer_code`(รหัสลูกค้า)| **≤ 20 字符** | `รหัสลูกค้าต้องไม่เกิน 20 ตัวอักษร` |
+| `customer_bill`(รหัสลูกค้า (บิล))| **≤ 20 字符** | `รหัสลูกค้า (บิล) ต้องไม่เกิน 20 ตัวอักษร` |
+
+⚠️ 这几条限制是 **MR.ERP 服务端业务校验** · xlsx 模板 schema 字段标 `str(30)` / `str(50)` 但服务端实际更严
+→ adapter 输入侧需要预先截断 / 验证(2026-05-18 PT-XXXXXX 6-hex 后缀超 18 触发)
+→ 测试用 `PEARNLY-TEST-XXXX`(4-hex 后缀 = 17 字符)+ customer_code ≤ 20 字符安全
+
 ### 客户码 · 三段式 · 含泰文
 `01-อนุรักษ์-001`
 
@@ -547,10 +561,17 @@ Korn 真样本:`690507-001`
 - **真实结果在 report xlsx**:`Worksheet` sheet · 最后一列 `หมายเหตุ` · 每 row 一个错误描述(空 = 该 row OK)
 - 详见 §5 step 8
 
-**已知错误文案**(2026-05-18 实测样本 `samples/report_failure_customer_not_found.xlsx`):
+**已知错误文案**(2026-05-18 实测样本 `samples/report_failure_customer_not_found.xlsx` + adapter 集成测试):
 - `ไม่พบข้อมูลรหัสลูกค้า` = 找不到客户码(customer_code 列)
 - `ไม่พบข้อมูลรหัสลูกค้า (บิล)` = 找不到 customer_bill code
-- 同 row 多错误用 `\n` 分隔(`ไม่พบข้อมูลรหัสลูกค้า\nไม่พบข้อมูลรหัสลูกค้า (บิล)`)
+- `รหัสลูกค้าต้องไม่เกิน 20 ตัวอักษร` = customer_code 超 20 字符
+- `รหัสลูกค้า (บิล) ต้องไม่เกิน 20 ตัวอักษร` = customer_bill 超 20 字符
+- `เลขที่ต้องไม่เกิน 18 ตัวอักษร` = invoice_no 超 18 字符
+- `เลขที่บิลต้องไม่เกิน 20 ตัวอักษร` = bill_no 超 20 字符
+- 同 row 多错误用 `\n` 分隔(例:`ไม่พบข้อมูลรหัสลูกค้า\nไม่พบข้อมูลรหัสลูกค้า (บิล)`)
+
+**校验顺序**(2026-05-18 集成测试发现):MR.ERP 服务端**先做长度校验** · 长度过 → 直接返长度错;长度过 → 才查主数据存在 → 返"找不到"
+→ adapter MUST validate field lengths client-side before xlsx upload(否则 "ไม่พบ" 类错误被长度错误屏蔽 · 用户看不到根因)
 
 ### 10.4 adapter 创建顺序(逻辑依赖)
 

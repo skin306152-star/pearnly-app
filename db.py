@@ -6049,7 +6049,7 @@ def backfill_tenant_ids(dry_run: bool = True) -> Dict[str, Any]:
 #   - erp_code 用 VARCHAR 不用 INT(MR.ERP "7%" 字符串 / FlowAccount 数字 ID 都通吃)
 # ============================================================
 
-ERP_TYPES_VALID = {"flowaccount", "peak", "xero", "quickbooks", "express"}
+ERP_TYPES_VALID = {"flowaccount", "peak", "xero", "quickbooks", "express", "mrerp"}
 PEARNLY_TAX_KINDS_VALID = {
     "vat_7", "vat_0", "vat_exempt",
     "wht_1", "wht_3", "wht_5",

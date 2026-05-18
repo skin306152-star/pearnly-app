@@ -390,3 +390,91 @@ docs/integrations/screenshots/
 - ✅ 遇 xlsx 字节级拒 · 我**立刻停**了 · 没硬猜规则改 generator
 - ✅ 把先验冲突写回 known-facts.md §6.3 ⚠️
 - ✅ 报告 + 给 3 个修复路径让 Zihao 拍板
+
+---
+
+## 14. API 契约 · MRERPAdapter(2026-05-18 P0 落地)
+
+**位置**:[services/erp/](../../services/erp/)
+**Readme**:[mrerp-adapter-readme.md](mrerp-adapter-readme.md)(完整 API + 操作排错)
+**实现关键**:`importpc.php` 体 = `"1"` 全成功 / `"2"` 出 report → 已写入 known-facts §5 step 4
+
+### 14.1 入口
+
+```python
+from services.erp.mrerp_adapter import MRERPAdapter
+with MRERPAdapter.from_encrypted(login_url=..., encrypted_username=..., encrypted_password=...,
+                                  comidyear="6", seldb="1") as adapter:
+    result = adapter.upload_invoice_batch(histories, mappings)
+```
+
+构造也支持 `MRERPAdapter(..., username=..., password=...)` 接受明文(测试用 · 生产必须走 `from_encrypted` + `kms_helper`)。
+
+### 14.2 6 个核心方法
+
+| 方法 | 幂等 | 入口签名 | 重试 |
+|---|---|---|---|
+| `login()` | ✅ | `() -> None` | 3 次指数退避 |
+| `select_company()` | ✅ | `() -> None`(自动 login) | 3 次 |
+| `upload_invoice_batch(histories, mappings)` | ❌(MR.ERP invoice_no 唯一约束) | `(List, Dict) -> ImportResult` | **不重试** · 失败走 listing fallback |
+| `search_invoice(invoice_no)` | ✅ | `(str) -> Optional[InvoiceRecord]` | 3 次 |
+| `delete_invoice(db_row_id)` | ✅ | `(str) -> bool`(post-delete listing 校验) | 3 次 |
+| `dialog_log()` | ✅ | `() -> List[str]` | — |
+
+### 14.3 ImportResult / SuccessRow / FailedRow 字段
+
+```python
+@dataclass class ImportResult:
+    total: int                          # = len(input histories)
+    success: List[SuccessRow]
+    failed:  List[FailedRow]
+    elapsed_ms: int
+    xlsx_size_bytes: int
+    report_xlsx_path: Optional[str]     # 当 importpc=2 时归档
+    @property all_success: bool          # total>0 且 failed=[]
+
+@dataclass class SuccessRow:
+    invoice_no:     str                  # = derive_mrerp_invoice_no(history)
+    mrerp_bill_no:  str                  # = "SI" + invoice_no
+    original:       Dict                 # 原 history dict echo back
+
+@dataclass class FailedRow:
+    invoice_no:     str
+    reasons:        List[str]            # หมายเหตุ \n-split lines
+    original:       Dict
+    evidence_screenshot: Optional[str]   # 报告捕获时刻 PNG
+```
+
+### 14.4 异常分类
+
+```
+MRERPError                       (base · 上层 catch-all)
+├── MRERPAuthError               (登录被踢 / 主页被踢) → 不重试 · 通知用户
+├── MRERPTechnicalError          (timeout / DNS / 5xx / 选择器缺) → 内部 3 次指数退避
+└── MRERPBusinessError           (preview 0 行 / frmupload alert) → 不重试 · 返失败 row
+                                  ⚠️ 注:per-row 业务失败不抛此异常 · 而是放 ImportResult.failed
+                                  仅 xlsx 整体被拒(连 preview 都进不去)才抛
+```
+
+### 14.5 字段长度上限(adapter 调用方需自检)
+
+详见 [mrerp-known-facts.md](mrerp-known-facts.md) §7 完整表。摘要:
+
+| 字段 | 上限 | 超长后果 |
+|---|---|---|
+| `invoice_no` | 18 字符 | report.xlsx หมายเหตุ = `เลขที่ต้องไม่เกิน 18 ตัวอักษร` · row 失败 |
+| `bill_no` | 20 字符 | `เลขที่บิลต้องไม่เกิน 20 ตัวอักษร` |
+| `customer_code` | 20 字符 | `รหัสลูกค้าต้องไม่เกิน 20 ตัวอักษร` |
+| `customer_bill` | 20 字符 | `รหัสลูกค้า (บิล) ต้องไม่เกิน 20 ตัวอักษร` |
+
+⚠️ MR.ERP 校验顺序:**长度 > 主数据存在**(长度先错就遮盖"找不到"信息)· adapter 上游应做客户端长度校验,避免误诊。
+
+### 14.6 测试
+
+- `tests/unit/test_mrerp_report_parser.py`(6 tests · 离线)
+- `tests/integration/test_mrerp_adapter_technical.py`(1 test · 无网络 · TEST-NET-1 IP)
+- `tests/integration/test_mrerp_adapter_happy.py`(1 test · 需 .env.local · 用客户 `0006`)
+- `tests/integration/test_mrerp_adapter_business_error.py`(1 test · 需 .env.local · 用 `9999NONEXISTPNLY`)
+
+全套约 22s · 全过 = `ImportResult.all_success` 路径 + listing/delete 闭环已锁定。
+

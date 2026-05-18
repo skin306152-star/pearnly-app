@@ -441,6 +441,37 @@
 }
 
 /* ============================================================
+ * C-6 (Zihao 2026-05-18 拍板) · HARD-DEPRECATE the legacy webhook
+ * endpoint UX. Hides the visual surface; the underlying HTML/JS
+ * stays one more iteration so Zihao can verify the Xero flow
+ * doesn't depend on these selectors before they're physically
+ * removed. To re-enable for emergency rollback: comment this
+ * whole block out + re-deploy.
+ *
+ * Things hidden:
+ *   #btn-add-endpoint           "+ 新增端点" button
+ *   #erp-endpoints-list         legacy webhook endpoint cards
+ *   #endpoint-modal             the legacy create/edit modal itself
+ *   .erp-endpoint-card          per-endpoint webhook card class
+ *
+ * NOTE: any tenant whose only ERP config is a legacy webhook will
+ * lose visibility into it after this lands. Per Zihao Q1 拍板:
+ * HARD-DEPRECATE without an escape hatch; if a customer complains,
+ * restore via a per-tenant feature flag.
+ * ============================================================ */
+#btn-add-endpoint,
+#erp-endpoints-list,
+#endpoint-modal,
+.btn-add-endpoint,
+.erp-endpoint-card {
+    display: none !important;
+}
+
+/* The legacy modal's overlay continues to manage `display:none`
+   inline; the !important above wins over inline styles regardless
+   so the modal can never re-open accidentally. */
+
+/* ============================================================
  * Mobile (C-7) — cards stack, sidebar logs become full-width below
  * ============================================================ */
 

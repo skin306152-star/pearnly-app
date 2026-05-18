@@ -176,23 +176,28 @@ def _ensure_playwright_installed():
         )
         return
 
-    pip_bin = shutil.which("pip3") or shutil.which("pip") or "pip3"
+    # v118.34.7 (Zihao 2026-05-19 拍板) · 真正的根因找到了:
+    # /api/version 显示 chromium_installed=true 但 playwright_installed=false。
+    # 这意味着 `python3 -m playwright install chromium` 跑成功了
+    # (chromium 二进制在 /root/.cache/ms-playwright/chromium_headless_shell-*),
+    # 但 mrpilot 的 Python 进程 import playwright.sync_api 仍失败。
+    #
+    # 原因:之前的 install 命令用 `pip3` (system pip · /usr/bin/pip3)
+    # 装到 system site-packages,但 mrpilot 跑在 venv 里(或不同 Python
+    # 解释器),它的 import 路径看不到 system site-packages。
+    #
+    # 修法:全部命令用 `{sys.executable} -m pip` · 这样 pip 和 mrpilot
+    # 是同一个解释器,site-packages 同一份。chromium 同理用
+    # `{sys.executable} -m playwright`。
     py_bin = sys.executable or shutil.which("python3") or "python3"
-    # Build a robust install command:
-    #   1) Try pip install playwright (no flags), fall back to
-    #      --break-system-packages on PEP-668 hosts.
-    #   2) Run playwright install chromium (idempotent).
-    #   3) Update the status file as we go so /api/version can
-    #      reflect partial progress.
-    #   4) systemctl restart mrpilot so the new process picks up the
-    #      freshly-installed module.
-    #   5) Always rm the sentinel even on failure.
     cmd = (
         f"set -e; "
         f"touch {sentinel}; "
-        f"echo '[playwright-bootstrap] $(date) starting' >> /var/log/mrpilot-deploy.log; "
-        f"if ! {pip_bin} install playwright >> /var/log/mrpilot-deploy.log 2>&1; then "
-        f"  {pip_bin} install playwright --break-system-packages "
+        f"echo '[playwright-bootstrap] $(date) starting · py={py_bin}' "
+        f"  >> /var/log/mrpilot-deploy.log; "
+        # 用 mrpilot 自己的 python 跑 pip · 保证装到 mrpilot 的 site-packages
+        f"if ! {py_bin} -m pip install playwright >> /var/log/mrpilot-deploy.log 2>&1; then "
+        f"  {py_bin} -m pip install playwright --break-system-packages "
         f"    >> /var/log/mrpilot-deploy.log 2>&1 || true; "
         f"fi; "
         f"echo '[playwright-bootstrap] $(date) pip done, downloading chromium...' "
@@ -260,6 +265,12 @@ def _read_playwright_status():
         "playwright_version": payload.get("pip_version"),
         "pip_install_error": payload.get("pip_install_error"),
         "chromium_dir": payload.get("chromium_dir"),
+        # v118.34.7 · expose the python interpreter mrpilot is using.
+        # If this differs from the pip target, we know there's a
+        # site-packages mismatch causing the "chromium ok, pip not"
+        # paradox.
+        "python_bin": payload.get("python_bin"),
+        "effective_uid": payload.get("effective_uid"),
         "ts": payload.get("ts"),
     }
 
@@ -464,23 +475,37 @@ fi
 mkdir -p static
 cp -f home.html home.js home.css login.html static/ 2>> "$LOG" || true
 
-# 4.5. v118.34.5 · 装/升级 pip 依赖 (主要是为了 Playwright)
-#     不阻塞太久 · pip 已装的会快速 noop · 失败不阻断部署(健康检查
-#     仍按原逻辑判断 mrpilot 起没起来 · pip 失败时 lifespan 里的
-#     同步 install 会兜底再试)
-echo "pip install -r requirements.txt..." >> "$LOG"
-if [ -f requirements.txt ]; then
-    pip3 install -r requirements.txt --break-system-packages \
+# 4.5. v118.34.7 · 装/升级 pip 依赖 (主要是为了 Playwright)
+#     用 mrpilot 的 Python 自带 pip · 保证装到 mrpilot 实际用的 site-packages
+#     之前 v118.34.5 用 system pip3 装到 /usr/lib/python3/dist-packages,
+#     但 mrpilot 可能用 venv · import 看不到 · 才出现 chromium 装上但
+#     playwright 包仍 missing 的怪状态
+MRPILOT_PY=$(systemctl show -p ExecStart mrpilot 2>/dev/null | \
+    grep -oP 'argv\[\]=\K[^ ;]+' | head -1)
+if [ -z "$MRPILOT_PY" ] || [ ! -x "$MRPILOT_PY" ]; then
+    # 兜底:尝试常见路径
+    for cand in /opt/mrpilot/venv/bin/python /opt/mrpilot/venv/bin/python3 \
+                /usr/bin/python3; do
+        if [ -x "$cand" ]; then MRPILOT_PY="$cand"; break; fi
+    done
+fi
+echo "using python: $MRPILOT_PY" >> "$LOG"
+
+echo "pip install -r requirements.txt via mrpilot python..." >> "$LOG"
+if [ -f requirements.txt ] && [ -n "$MRPILOT_PY" ]; then
+    "$MRPILOT_PY" -m pip install -r requirements.txt --break-system-packages \
         >> "$LOG" 2>&1 || \
-        pip3 install -r requirements.txt >> "$LOG" 2>&1 || \
+        "$MRPILOT_PY" -m pip install -r requirements.txt >> "$LOG" 2>&1 || \
         echo "pip install non-fatal failure" >> "$LOG"
 fi
 
-# 4.6. v118.34.5 · 装/确认 chromium 浏览器(playwright 用 · 140 MB)
-#     idempotent · 已装会快速跳过 · 失败不阻断
-echo "playwright install chromium..." >> "$LOG"
-python3 -m playwright install chromium >> "$LOG" 2>&1 || \
-    echo "playwright install chromium non-fatal failure" >> "$LOG"
+# 4.6. v118.34.7 · 装/确认 chromium 浏览器(playwright 用 · 140 MB)
+#     idempotent · 已装会快速跳过 · 失败不阻断 · 用 mrpilot python
+echo "playwright install chromium via mrpilot python..." >> "$LOG"
+if [ -n "$MRPILOT_PY" ]; then
+    "$MRPILOT_PY" -m playwright install chromium >> "$LOG" 2>&1 || \
+        echo "playwright install chromium non-fatal failure" >> "$LOG"
+fi
 
 # 5. 重启服务
 echo "restarting mrpilot..." >> "$LOG"
@@ -4766,8 +4791,8 @@ async def get_frontend_version():
         "ts": int(_t.time()),
         "playwright": _read_playwright_status(),
         "release_notes": {
-            "zh": "v118.34.6 · v118.34.5 卡部署回滚 · 这版修了:\n• v118.34.5 sync pip install 卡 lifespan > 30 秒 · 旧 deploy.sh 健康检查超时回滚\n• v118.34.6 改回 detached 但加诊断写状态文件 · /api/version 暴露 playwright.playwright_installed\n• lifespan 顺序改了 · git-deploy.sh 先写盘再 ensure playwright · 下次部署自带 pip install + chromium\n• Xero 卡片 / today-stats 修复同 v118.34.5\n\n访问 https://pearnly.com/api/version 看 playwright.playwright_installed=true 没\n如果 false · 看 pip_install_error 字段有原因\n下次部署起 git-deploy.sh 自己装 (新版 heredoc 落盘了) · 不再依赖 lifespan",
-            "en": "v118.34.6 · v118.34.5 was rolled back · this fixes it:\n• v118.34.5's synchronous pip install blocked lifespan > 30 s; the legacy deploy.sh health-check timed out and rolled the deploy back to v118.34.4.\n• v118.34.6 reverts to detached background install + diagnostic status file. /api/version exposes playwright.playwright_installed / chromium_installed / pip_install_error.\n• Lifespan ordering: git-deploy.sh heredoc is now written BEFORE the playwright bootstrap step, so the new deploy.sh (which auto-installs deps) lands even if bootstrap fails.\n• Xero card + today-stats fixes carry over from v118.34.5.\n\nCheck https://pearnly.com/api/version for playwright.playwright_installed. If false, pip_install_error tells you why.\nNext deploy onwards, git-deploy.sh installs deps itself — no longer dependent on lifespan.",
+            "zh": "v118.34.7 · 找到根因了 · pip 装错 Python:\n• v118.34.6 部署后 /api/version 显示 chromium_installed=true 但 playwright_installed=false · 矛盾\n• 根因:之前用 system pip3(/usr/bin/pip3)装到 /usr/lib/python3/dist-packages · 但 mrpilot 跑在 venv · import 看不到\n• 改:全部命令用 sys.executable -m pip 和 -m playwright · 保证 pip / playwright / mrpilot 是同一个解释器\n• git-deploy.sh 也改 · 用 mrpilot 真实 Python 路径(从 systemctl show 拉,或常见 venv 路径兜底)\n• /api/version 加 python_bin / effective_uid 字段 · 验证用对了解释器\n\n访问 https://pearnly.com/api/version 看 playwright.playwright_installed 应该 true",
+            "en": "v118.34.7 · Root cause found — pip targeted the wrong Python:\n• After v118.34.6 deployed, /api/version showed chromium_installed=true but playwright_installed=false. Paradox.\n• Cause: previous installs used the system pip3 (/usr/bin/pip3) which writes to /usr/lib/python3/dist-packages, but mrpilot runs in a venv where that path isn't on sys.path. The chromium binary download succeeded (it goes to ~/.cache/ms-playwright, shared by all Python interpreters); the package import did not.\n• Fix: all install commands now use `sys.executable -m pip` and `sys.executable -m playwright`. This guarantees pip, playwright, and mrpilot all use the same interpreter and the same site-packages.\n• git-deploy.sh heredoc updated the same way — autodetects mrpilot's Python from `systemctl show -p ExecStart` with venv-path fallbacks.\n• /api/version exposes python_bin and effective_uid so the operator can verify the fix is targeting the right interpreter.\n\nCheck https://pearnly.com/api/version for playwright.playwright_installed=true",
             "th": "v118.34.5 · Playwright ติดตั้งจริง + การ์ด Xero สอดคล้อง + today-stats ไม่หลุด:\n• /api/version เพิ่มฟิลด์ playwright.playwright_installed / chromium_installed — ดูสถานะติดตั้งในเบราว์เซอร์ได้ทันที ไม่ต้อง SSH\n• pip install playwright ตอนสตาร์ทเปลี่ยนเป็นแบบ synchronous (ไม่รวม chromium · ปกติ <15 วินาที) chromium ยังลงเบื้องหลังเหมือนเดิม\n• git-deploy.sh เพิ่มขั้นตอน pip install + playwright install chromium · MAX_WAIT ดันเป็น 90 วินาที\n• เขียนการ์ด Xero ใหม่ใช้ .integration-row เลย์เอาต์ — เหมือนการ์ด MR.ERP / FlowAccount ตรงกัน 1 ต่อ 1 เพิ่มสีไอคอน .ic-xero ฟ้าอ่อน\n• ข้อความ 'วันนี้ยังไม่มีการส่ง' ย้ายจากแท็บ Connect → แท็บ Push Logs\n\nหลัง deploy เข้า https://pearnly.com/api/version ดูฟิลด์ playwright.playwright_installed",
             "ja": "v118.34.5 · Playwright が実際にインストールされる + Xero カード整合 + today-stats のリーク修正:\n• /api/version に playwright.playwright_installed / chromium_installed フィールド追加 — ブラウザでインストール状態を確認可能、SSH 不要\n• 起動時の pip install playwright を **同期** 化（chromium は除く · 通常 <15 秒）。chromium は引き続きバックグラウンドで\n• git-deploy.sh に pip install -r requirements.txt + playwright install chromium 手順を追加 · MAX_WAIT を 90 秒に拡大\n• Xero カードを .integration-row レイアウトに書き直し — MR.ERP / FlowAccount カードと 1 対 1 で一致。.ic-xero 薄青アイコン追加\n• 「本日はまだ送信なし」を Connect タブから Push Logs タブに移動\n\nデプロイ後 https://pearnly.com/api/version で playwright.playwright_installed=true を確認"
         }

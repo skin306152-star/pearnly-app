@@ -198,6 +198,7 @@ class MRERPAdapter:
         enable_master_data_sync: bool = False,
         master_data_auto_create: bool = False,
         seed_customer_code: Optional[str] = None,
+        seed_product_code: Optional[str] = None,
     ):
         if not login_url:
             raise ValueError("login_url required")
@@ -237,7 +238,11 @@ class MRERPAdapter:
         self.seed_customer_code = (
             (seed_customer_code or "").strip() or None
         )
+        self.seed_product_code = (
+            (seed_product_code or "").strip() or None
+        )
         self._customer_sync = None     # lazy-created on first use
+        self._product_sync = None      # lazy-created on first use
 
         self._session: Optional[BrowserSession] = None
         self._logged_in = False
@@ -1355,6 +1360,91 @@ class MRERPAdapter:
                     "master-data sync skipped for buyer=%r: %s",
                     buyer.name, e,
                 )
+
+        # Phase 5 extension: per-item product enrichment. Same
+        # opt-in / opt-out shape as the buyer branch above.
+        if self._product_sync is None:
+            from services.erp.mrerp_product_sync import (
+                MRERPProductSyncService,
+            )
+            self._product_sync = MRERPProductSyncService(self)
+        for h in histories:
+            items = self._extract_items(h)
+            for item in items:
+                try:
+                    if self.master_data_auto_create:
+                        result = self._product_sync.lookup_or_create(
+                            item, mappings,
+                            seed_product_code=self.seed_product_code,
+                        )
+                    else:
+                        result = self._product_sync.lookup(item, mappings)
+                    if result is None:
+                        continue
+                    self._product_sync._upsert_mapping(
+                        mappings, item, result.product_code,
+                    )
+                except MRERPBusinessError as e:
+                    logger.info(
+                        "product master-data sync skipped for item=%r: %s",
+                        item.name, e,
+                    )
+
+    @staticmethod
+    def _extract_items(history: Dict[str, Any]):
+        """Pull product line-items out of a flat OCR history dict.
+
+        OCR shape examples handled:
+          history['items']              flat list at top level
+          history['fields']['items']    nested under fields (common)
+          history['pages'][i]['fields']['items']    multi-page invoices
+
+        Returns a list of ItemInfo, deduped by normalized item_name.
+        """
+        from services.erp.mrerp_product_sync import ItemInfo
+        from services.erp._matching import normalize_item_name
+
+        f = history.get("fields") if isinstance(history, dict) else {}
+        f = f if isinstance(f, dict) else {}
+        candidates = []
+        for src in (
+            history.get("items"),
+            f.get("items"),
+        ):
+            if isinstance(src, list) and src:
+                candidates = src
+                break
+        if not candidates and isinstance(history.get("pages"), list):
+            for p in history["pages"]:
+                if not isinstance(p, dict):
+                    continue
+                pf = p.get("fields") or {}
+                if isinstance(pf, dict) and isinstance(pf.get("items"), list):
+                    candidates = pf["items"]
+                    break
+
+        seen_norm = set()
+        items = []
+        tenant_id = str(history.get("tenant_id") or "")
+        for it in candidates:
+            if not isinstance(it, dict):
+                continue
+            name = (it.get("name") or it.get("description")
+                    or it.get("item_name") or "")
+            name = str(name or "").strip()
+            if not name:
+                continue
+            norm = normalize_item_name(name)
+            if norm in seen_norm:
+                continue
+            seen_norm.add(norm)
+            items.append(ItemInfo(
+                name=name,
+                tenant_id=tenant_id,
+                unit_code=(it.get("unit") or it.get("unit_code") or None),
+                client_id=int(history.get("client_id") or 0),
+            ))
+        return items
 
     @staticmethod
     def _extract_buyer(history: Dict[str, Any]):

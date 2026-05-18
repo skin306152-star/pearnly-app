@@ -223,6 +223,49 @@
             zh_TW: '輸入客戶碼(如 0006)',
             ja: '顧客コード (例: 0006)',
         },
+        // Seed PRODUCT (Task 2 Phase 5)
+        'wiz-seedp': {
+            zh: '新商品模板(可选)',
+            en: 'New product template (optional)',
+            th: 'แม่แบบสินค้าใหม่ (ทางเลือก)',
+            zh_TW: '新商品範本(可選)',
+            ja: '新規商品テンプレート(任意)',
+        },
+        'wiz-seedp-hint': {
+            zh: '自动建新商品时拿这个作模板 · 单位/账户码/价格继承 · 不选 = 关闭自动建商品',
+            en: "When auto-creating a product, clone this row's unit/account/price refs. Leave blank to disable product auto-create.",
+            th: 'ใช้สินค้านี้เป็นแม่แบบตอนสร้างอัตโนมัติ · หน่วย/บัญชี/ราคา สืบทอด · เว้นว่าง = ปิด',
+            zh_TW: '自動建新商品時拿這個作範本 · 單位/帳戶碼/價格繼承 · 不選 = 關閉自動建商品',
+            ja: '自動作成時にこの行の単位/勘定/価格を継承 · 空欄 = 自動作成を無効化',
+        },
+        'wiz-seedp-empty': {
+            zh: '— 不自动建(默认) —',
+            en: '— do not auto-create (default) —',
+            th: '— ไม่สร้างอัตโนมัติ (ค่าเริ่มต้น) —',
+            zh_TW: '— 不自動建立(預設) —',
+            ja: '— 自動作成しない(デフォルト) —',
+        },
+        'wiz-seedp-loading': {
+            zh: '正在拉取商品列表…',
+            en: 'Loading product list…',
+            th: 'กำลังโหลดรายการสินค้า…',
+            zh_TW: '正在拉取商品列表…',
+            ja: '製品リストを読み込み中…',
+        },
+        'wiz-seedp-fallback': {
+            zh: '⚠ 无法拉取商品列表 · 请手动输入商品码',
+            en: '⚠ Could not fetch the product list — please type the code manually',
+            th: '⚠ ไม่สามารถดึงรายการสินค้าได้ — กรุณาพิมพ์รหัสด้วยตนเอง',
+            zh_TW: '⚠ 無法拉取商品列表 · 請手動輸入商品碼',
+            ja: '⚠ 製品リストを取得できません — コードを手動で入力してください',
+        },
+        'wiz-seedp-input-placeholder': {
+            zh: '输入商品码(如 P001)',
+            en: 'Product code (e.g. P001)',
+            th: 'รหัสสินค้า (เช่น P001)',
+            zh_TW: '輸入商品碼(如 P001)',
+            ja: '商品コード (例: P001)',
+        },
         'btn-cancel': {
             zh: '取消', en: 'Cancel', th: 'ยกเลิก', zh_TW: '取消', ja: 'キャンセル',
         },
@@ -721,6 +764,15 @@
                 '<div class="mrerp-wizard-hint" data-mw-seed-hint></div>' +
                 '<div class="mrerp-wizard-hint" data-mw-seed-fallback-hint style="display:none;color:#8a5a00;"></div>' +
               '</div>' +
+              '<div class="mrerp-wizard-field">' +
+                '<label class="mrerp-wizard-label" data-mw-seedp-label></label>' +
+                '<select class="mrerp-wizard-select" data-mw-seedp style="display:none;">' +
+                  '<option value="" data-mw-seedp-empty></option>' +
+                '</select>' +
+                '<input type="text" class="mrerp-wizard-input" data-mw-seedp-input style="display:none;" autocomplete="off">' +
+                '<div class="mrerp-wizard-hint" data-mw-seedp-hint></div>' +
+                '<div class="mrerp-wizard-hint" data-mw-seedp-fallback-hint style="display:none;color:#8a5a00;"></div>' +
+              '</div>' +
             '</div>'
         );
     }
@@ -778,6 +830,21 @@
         if (seedInput) seedInput.placeholder = t('wiz-seed-input-placeholder');
         const fbHint = w.querySelector('[data-mw-seed-fallback-hint]');
         if (fbHint) fbHint.textContent = t('wiz-seed-fallback');
+        // Seed product (Task 2 Phase 5)
+        const spLabel = w.querySelector('[data-mw-seedp-label]');
+        if (spLabel) spLabel.textContent = t('wiz-seedp');
+        const spHint = w.querySelector('[data-mw-seedp-hint]');
+        if (spHint) spHint.textContent = t('wiz-seedp-hint');
+        const spSelEl = w.querySelector('[data-mw-seedp]');
+        if (spSelEl) {
+            spSelEl.innerHTML =
+                '<option value="" data-mw-seedp-empty>' +
+                _esc(t('wiz-seedp-empty')) + '</option>';
+        }
+        const spInput = w.querySelector('[data-mw-seedp-input]');
+        if (spInput) spInput.placeholder = t('wiz-seedp-input-placeholder');
+        const spFbHint = w.querySelector('[data-mw-seedp-fallback-hint]');
+        if (spFbHint) spFbHint.textContent = t('wiz-seedp-fallback');
         // Foot
         w.querySelector('[data-mw-cancel]').textContent = t('btn-cancel');
         w.querySelector('[data-mw-prev]').textContent = t('btn-prev');
@@ -865,6 +932,84 @@
         const w = _wizardEl;
         const selectEl = w.querySelector('[data-mw-seed]');
         const inputEl = w.querySelector('[data-mw-seed-input]');
+        if (selectEl && selectEl.style.display !== 'none') {
+            return (selectEl.value || '').trim();
+        }
+        if (inputEl && inputEl.style.display !== 'none') {
+            return (inputEl.value || '').trim();
+        }
+        return '';
+    }
+
+    // Task 2 Phase 5 · seed PRODUCT helpers (parallel to seed customer).
+    async function _fetchSeedProducts(endpointId) {
+        if (!endpointId) return null;
+        try {
+            const r = await fetch(
+                '/api/erp/endpoints/' + encodeURIComponent(endpointId)
+                + '/products',
+                { headers: _authHeaders() },
+            );
+            if (!r.ok) return null;
+            const data = await r.json();
+            if (!data || !data.ok) return null;
+            return Array.isArray(data.products) ? data.products : [];
+        } catch (e) { return null; }
+    }
+
+    async function _populateSeedProductSelector(currentSeedCode) {
+        const w = _wizardEl;
+        const selectEl = w.querySelector('[data-mw-seedp]');
+        const inputEl = w.querySelector('[data-mw-seedp-input]');
+        const fbHintEl = w.querySelector('[data-mw-seedp-fallback-hint]');
+        if (!selectEl || !inputEl) return;
+
+        selectEl.style.display = 'none';
+        inputEl.style.display = 'none';
+        fbHintEl.style.display = 'none';
+
+        const endpointId = _wizardState && _wizardState.endpoint
+            ? _wizardState.endpoint.id : null;
+        if (endpointId) {
+            selectEl.innerHTML =
+                '<option value="">' + _esc(t('wiz-seedp-loading')) + '</option>';
+            selectEl.style.display = '';
+            selectEl.disabled = true;
+        } else {
+            inputEl.style.display = '';
+            inputEl.value = currentSeedCode || '';
+            return;
+        }
+
+        const products = await _fetchSeedProducts(endpointId);
+        selectEl.disabled = false;
+        if (products === null || products.length === 0) {
+            selectEl.style.display = 'none';
+            inputEl.style.display = '';
+            inputEl.value = currentSeedCode || '';
+            fbHintEl.style.display = '';
+            return;
+        }
+        const opts = ['<option value="">' + _esc(t('wiz-seedp-empty')) + '</option>'];
+        products.forEach(function (p) {
+            const label = (p.name || '') + ' (' + p.code + ')';
+            opts.push(
+                '<option value="' + _esc(p.code) + '">' +
+                _esc(label) + '</option>'
+            );
+        });
+        selectEl.innerHTML = opts.join('');
+        if (currentSeedCode && products.some(function (p) {
+            return p.code === currentSeedCode;
+        })) {
+            selectEl.value = currentSeedCode;
+        }
+    }
+
+    function _readSeedProductValue() {
+        const w = _wizardEl;
+        const selectEl = w.querySelector('[data-mw-seedp]');
+        const inputEl = w.querySelector('[data-mw-seedp-input]');
         if (selectEl && selectEl.style.display !== 'none') {
             return (selectEl.value || '').trim();
         }
@@ -984,6 +1129,11 @@
                 && _wizardState.endpoint.config
                 && _wizardState.endpoint.config.seed_customer_code) || '';
             _populateSeedSelector(currentSeed);
+            // Seed product dropdown (Task 2 Phase 5).
+            const currentSeedP = (_wizardState.endpoint
+                && _wizardState.endpoint.config
+                && _wizardState.endpoint.config.seed_product_code) || '';
+            _populateSeedProductSelector(currentSeedP);
             return;
         }
         // Step 3 → finish
@@ -1048,6 +1198,7 @@
         const [comidyear, seldb] = companyChoice.split(':');
         const mode = w.querySelector('input[name="mrerp-mode"]:checked').value;
         const seed = _readSeedValue();
+        const seedProduct = _readSeedProductValue();
 
         if (!username || !password) {
             _toast('请先填入用户名和密码', 'warn');
@@ -1067,6 +1218,7 @@
             seldb: seldb,
             client_ids: _wizardState.client_ids || [],
             seed_customer_code: seed || null,
+            seed_product_code: seedProduct || null,
         };
         const body = {
             name: 'MR.ERP',

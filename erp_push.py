@@ -582,6 +582,111 @@ def list_mrerp_customers(
     }
 
 
+def list_mrerp_products(
+    config: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Task 2 Phase 5 (Zihao 2026-05-18 拍板) · Pull the product listing
+    from stkmas/allview.php so the wizard's Step-3 seed-product
+    dropdown can show real options.
+
+    Returns the same shape as list_mrerp_customers but with a
+    `products` key:
+        {
+          "ok": bool, "elapsed_ms": int,
+          "products": [{code, name, category_code, category_name}],
+          "error_code", "error_friendly", "raw_error",
+        }
+    """
+    import time as _time
+    from services.erp.mrerp_adapter import (
+        MRERPAdapter, MRERPAuthError, MRERPBusinessError,
+        MRERPTechnicalError,
+    )
+    from services.erp.mrerp_product_sync import MRERPProductSyncService
+    from services.erp.mrerp_business_friendly import get_friendly
+
+    cfg = config or {}
+    login_url = (cfg.get("system_url") or "https://www.mrerp4sme.com").strip()
+    enc_user = cfg.get("username_enc") or ""
+    enc_pass = cfg.get("password_enc") or ""
+    comidyear = str(cfg.get("comidyear") or "6")
+    seldb = str(cfg.get("seldb") or "1")
+
+    if not (enc_user and enc_pass):
+        return {
+            "ok": False, "elapsed_ms": 0, "products": [],
+            "error_code": "ERR_NO_CREDS",
+            "error_friendly": get_friendly("ERR_NO_CREDS"),
+            "raw_error": "username_enc / password_enc missing in config",
+        }
+
+    t0 = _time.time()
+    try:
+        adapter = MRERPAdapter.from_encrypted(
+            login_url=login_url,
+            encrypted_username=enc_user,
+            encrypted_password=enc_pass,
+            comidyear=comidyear, seldb=seldb,
+            headless=True,
+            retry_attempts=1, retry_delays_seconds=(0.5,),
+        )
+    except Exception as e:
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "products": [],
+            "error_code": "ERR_CRED_DECRYPT",
+            "error_friendly": get_friendly("ERR_CRED_DECRYPT"),
+            "raw_error": f"{type(e).__name__}: {str(e)[:200]}",
+        }
+
+    try:
+        with adapter:
+            svc = MRERPProductSyncService(adapter)
+            rows = svc._fetch_listing()
+        products = [{
+            "code": r.code,
+            "name": r.name,
+            "category_code": r.category_code,
+            "category_name": r.category_name,
+        } for r in rows]
+    except MRERPAuthError as e:
+        return {
+            "ok": False, "elapsed_ms": int((_time.time() - t0) * 1000),
+            "products": [], "error_code": "ERR_AUTH",
+            "error_friendly": get_friendly("ERR_AUTH"),
+            "raw_error": str(e)[:300],
+        }
+    except MRERPTechnicalError as e:
+        return {
+            "ok": False, "elapsed_ms": int((_time.time() - t0) * 1000),
+            "products": [], "error_code": "ERR_TECHNICAL",
+            "error_friendly": get_friendly("ERR_TECHNICAL"),
+            "raw_error": str(e)[:300],
+        }
+    except MRERPBusinessError as e:
+        return {
+            "ok": False, "elapsed_ms": int((_time.time() - t0) * 1000),
+            "products": [], "error_code": "ERR_BUSINESS",
+            "error_friendly": get_friendly("ERR_BUSINESS"),
+            "raw_error": str(e)[:300],
+        }
+    except Exception as e:
+        logger.exception("list_mrerp_products unexpected error")
+        return {
+            "ok": False, "elapsed_ms": int((_time.time() - t0) * 1000),
+            "products": [], "error_code": "ERR_UNEXPECTED",
+            "error_friendly": get_friendly("ERR_UNEXPECTED"),
+            "raw_error": f"{type(e).__name__}: {str(e)[:200]}",
+        }
+
+    return {
+        "ok": True, "elapsed_ms": int((_time.time() - t0) * 1000),
+        "products": products, "error_code": None,
+        "error_friendly": None, "raw_error": None,
+    }
+
+
 def test_endpoint_connection(adapter: str, config: Dict[str, Any]) -> Dict[str, Any]:
     """
     用一个最小化测试 payload 调一次,验证配置是否正确。

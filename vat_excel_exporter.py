@@ -124,14 +124,6 @@ def _t(lang: str, key: str) -> str:
     return _LABELS.get(lang, _LABELS["th"]).get(key, _LABELS["th"].get(key, key))
 
 
-def _diff_field_match(diff_fields: Dict, field: str) -> bool:
-    """diff_fields 里某字段 matched=True 返回 True · 否则 False · key 缺失也算 True(没对比)"""
-    f = diff_fields.get(field) if isinstance(diff_fields, dict) else None
-    if not f or not isinstance(f, dict):
-        return True
-    return bool(f.get("matched", True))
-
-
 def _safe(v) -> str:
     return "" if v is None else str(v)
 

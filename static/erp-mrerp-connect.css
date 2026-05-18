@@ -1,0 +1,460 @@
+/* ============================================================
+ * static/erp-mrerp-connect.css
+ *
+ * C-2 ERP cards (MR.ERP / FlowAccount-soon) + C-3 wizard modal.
+ * Self-contained: never overrides the existing `.erp-connect-xero`
+ * IIFE's styles. New utility classes are namespaced `mrerp-*`.
+ *
+ * Reuses tokens from CLAUDE.md/DESIGN_SYSTEM.md:
+ *   #111111 primary text · #f4f4f0 background · #e8e8e3 borders
+ *   #DBEAFE / #1E40AF info pills (kept per visual rule)
+ * ============================================================ */
+
+/* New card row container — sits inside #erp-connect-cards alongside
+   the existing Xero card. The legacy Xero card stays untouched. */
+.mrerp-cards-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.mrerp-card {
+    flex: 1 1 240px;
+    min-width: 240px;
+    max-width: 320px;
+    background: #ffffff;
+    border: 1px solid #e8e8e3;
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.mrerp-card:hover:not(.is-coming-soon) {
+    border-color: #111111;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.mrerp-card.is-coming-soon {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.mrerp-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.mrerp-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111111;
+}
+
+.mrerp-card-pill {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.mrerp-pill-ok {
+    background: #d6f5e0;
+    color: #0a7a2c;
+}
+
+.mrerp-pill-warn {
+    background: #fdebcb;
+    color: #8a5a00;
+}
+
+.mrerp-pill-err {
+    background: #fbd6d6;
+    color: #921616;
+}
+
+.mrerp-pill-neutral {
+    background: #eaeae5;
+    color: #5d5d57;
+}
+
+.mrerp-pill-info {
+    background: #DBEAFE;
+    color: #1E40AF;
+}
+
+.mrerp-pill-testing {
+    background: #eef2ff;
+    color: #4338ca;
+}
+
+.mrerp-card-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    font-size: 12px;
+    color: #6B7280;
+    min-height: 36px;
+}
+
+.mrerp-card-stat-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mrerp-card-stat-label {
+    color: #9a9a93;
+    font-size: 11px;
+}
+
+.mrerp-card-stat-value {
+    color: #111111;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.mrerp-card-empty {
+    font-size: 12px;
+    color: #6B7280;
+    margin: 4px 0;
+    line-height: 1.5;
+}
+
+.mrerp-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.mrerp-card-actions .btn {
+    flex: 0 0 auto;
+}
+
+.mrerp-card-actions .btn-link {
+    background: transparent;
+    color: #6B7280;
+    padding: 6px 8px;
+    font-size: 12px;
+    border: 0;
+    cursor: pointer;
+}
+
+.mrerp-card-actions .btn-link:hover {
+    color: #111111;
+}
+
+/* ============================================================
+ * Empty-state banner — used when ZERO ERP endpoints configured.
+ * Renders ABOVE the cards row.
+ * ============================================================ */
+
+.mrerp-empty-banner {
+    background: #f4f4f0;
+    border: 1px dashed #d0d0c9;
+    border-radius: 8px;
+    padding: 18px;
+    margin: 12px 0;
+    text-align: center;
+    font-size: 13px;
+    color: #5d5d57;
+}
+
+.mrerp-empty-banner-hint {
+    font-size: 12px;
+    color: #9a9a93;
+    margin-top: 6px;
+}
+
+/* ============================================================
+ * Wizard modal (C-3)
+ * ============================================================ */
+
+.mrerp-wizard-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 17, 17, 0.4);
+    z-index: 4000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.mrerp-wizard-overlay.is-open {
+    display: flex;
+}
+
+.mrerp-wizard {
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 18px 40px rgba(17, 17, 17, 0.18);
+    width: min(820px, 100%);
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.mrerp-wizard-head {
+    padding: 18px 22px;
+    border-bottom: 1px solid #e8e8e3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.mrerp-wizard-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111111;
+}
+
+.mrerp-wizard-progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    margin-left: 18px;
+}
+
+.mrerp-wizard-step-dot {
+    width: 10px; height: 10px;
+    border-radius: 999px;
+    background: #e8e8e3;
+}
+
+.mrerp-wizard-step-dot.is-active {
+    background: #111111;
+}
+
+.mrerp-wizard-step-dot.is-done {
+    background: #16A34A;
+}
+
+.mrerp-wizard-step-sep {
+    flex: 0 0 28px;
+    height: 1px;
+    background: #e8e8e3;
+}
+
+.mrerp-wizard-close {
+    background: transparent;
+    border: 0;
+    padding: 4px;
+    cursor: pointer;
+    color: #6B7280;
+}
+
+.mrerp-wizard-close:hover { color: #111111; }
+
+.mrerp-wizard-body {
+    padding: 22px;
+    overflow: auto;
+    flex: 1;
+}
+
+.mrerp-wizard-step {
+    display: none;
+}
+
+.mrerp-wizard-step.is-active {
+    display: block;
+}
+
+.mrerp-wizard-step-h {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111111;
+    margin: 0 0 14px;
+}
+
+.mrerp-wizard-hint {
+    font-size: 12px;
+    color: #6B7280;
+    margin: 6px 0 14px;
+}
+
+.mrerp-wizard-field {
+    margin: 0 0 14px;
+}
+
+.mrerp-wizard-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #111111;
+    margin: 0 0 6px;
+}
+
+.mrerp-wizard-input,
+.mrerp-wizard-select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #e8e8e3;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #ffffff;
+    color: #111111;
+}
+
+.mrerp-wizard-input:focus,
+.mrerp-wizard-select:focus {
+    outline: none;
+    border-color: #111111;
+}
+
+.mrerp-wizard-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 260px;
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid #e8e8e3;
+    border-radius: 6px;
+}
+
+.mrerp-wizard-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.mrerp-wizard-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.mrerp-wizard-radio-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.mrerp-wizard-test-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.mrerp-wizard-test-status {
+    font-size: 12px;
+    color: #6B7280;
+}
+
+.mrerp-wizard-test-error {
+    margin-top: 6px;
+    padding: 10px 12px;
+    background: #fbd6d6;
+    border-left: 3px solid #921616;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #921616;
+}
+
+.mrerp-wizard-test-error-raw {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #6B7280;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.mrerp-wizard-foot {
+    padding: 16px 22px;
+    border-top: 1px solid #e8e8e3;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.mrerp-wizard-foot-spacer { flex: 1; }
+
+/* ============================================================
+ * Push-log sidebar tab (C-4)
+ * Sits next to the cards row; on desktop renders as a flex sibling,
+ * on mobile collapses below the cards (see C-7).
+ * ============================================================ */
+
+.mrerp-erp-layout {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.mrerp-erp-layout-cards {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.mrerp-erp-layout-logs {
+    flex: 0 0 320px;
+    background: #ffffff;
+    border: 1px solid #e8e8e3;
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.mrerp-logs-tab-head {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111111;
+    margin: 0 0 10px;
+}
+
+.mrerp-logs-row-friendly {
+    font-size: 12px;
+    color: #111111;
+    margin: 4px 0;
+}
+
+.mrerp-logs-row-raw-toggle {
+    font-size: 11px;
+    color: #6B7280;
+    cursor: pointer;
+    margin-top: 2px;
+}
+
+.mrerp-logs-row-raw {
+    margin-top: 4px;
+    padding: 8px;
+    background: #f4f4f0;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #5d5d57;
+    white-space: pre-wrap;
+}
+
+/* ============================================================
+ * Mobile (C-7) — cards stack, sidebar logs become full-width below
+ * ============================================================ */
+
+@media (max-width: 800px) {
+    .mrerp-cards-row { flex-direction: column; }
+    .mrerp-card { max-width: none; }
+    .mrerp-erp-layout { flex-direction: column; }
+    .mrerp-erp-layout-logs { flex: 1 1 100%; width: 100%; }
+    .mrerp-wizard {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+    .mrerp-wizard-overlay { padding: 0; }
+}

@@ -535,11 +535,6 @@ STRICT RULES:
 """
 
 
-def _is_image_ext(filename: str) -> bool:
-    ext = (filename or "").lower().rsplit(".", 1)[-1]
-    return ext in {"jpg", "jpeg", "png", "webp"}
-
-
 def _mime_for(filename: str) -> Optional[str]:
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     return {"pdf": "application/pdf", "jpg": "image/jpeg", "jpeg": "image/jpeg",

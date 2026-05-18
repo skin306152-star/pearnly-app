@@ -637,8 +637,7 @@ async def batch_process(request: Request,
         else:
             task_results.append(r)
 
-    # ── 阶段 2:OCR 全部发票(跨组并行 10 路 · 进度按文件粒度)
-    from gemini_engine import recognize_pdf
+    # ── 阶段 2:OCR 全部发票(新 pipeline 唯一路径,跨组并行 · 进度按文件粒度)
     import hashlib
     total_invoices = sum(len(g.get("invoice_filenames", []) or []) for (g, _tid, _cid) in built)
     _progress_update(progress_id, stage="ocr_invoices",
@@ -669,102 +668,51 @@ async def batch_process(request: Request,
             except Exception as e:
                 logger.warning(f"cache copy fail {fname}: {e}")
 
-        # Round 2 · 新 pipeline 接入(feature-flag-gated)
-        # OCR_USE_NEW_PIPELINE=true → 走 services/ocr/pipeline · 完整三层 + 100% 埋点
-        # 注:本阶段(a)pipeline 内部还没集成 layer 0 text_path,所以电子 PDF 也会过 Vision · 阶段(b)后会自动跳过
-        if os.environ.get("OCR_USE_NEW_PIPELINE", "false").strip().lower() == "true":
-            try:
-                from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
-                from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
-                _pipe_res = await asyncio.wait_for(
-                    loop.run_in_executor(
-                        None, lambda: _pipeline_run(content_b, max_pages=10, api_key=api_key)
-                    ),
-                    timeout=120.0,
-                )
-                _pipe_legacy = pipeline_result_to_legacy_dict(_pipe_res)
-                _pages = _pipe_legacy.get("pages") or []
-                _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
-                _hid = db.insert_ocr_history(
-                    user_id=str(user["id"]), filename=fname,
-                    page_count=_pipe_res.page_count or 1, pages=_pages,
-                    confidence="high",  # pipeline has L3 visual review built in for low-conf cases
-                    elapsed_ms=_pipe_res.elapsed_ms,
-                    file_size_kb=len(content_b)//1024, file_hash=file_hash,
-                    source="vat_recon_batch_pipeline_v1",
-                    source_ref=str(task_id), client_id=client_id)
-                # 强制 cost 埋点(recon batch 此前完全漏记 — 量最大的入口)
-                try:
-                    _r_in = sum(int(p.get("input_tokens") or 0) for p in _pages)
-                    _r_out = sum(int(p.get("output_tokens") or 0) for p in _pages)
-                    db.log_ocr_cost(
-                        user_id=str(user["id"]),
-                        tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
-                        history_id=_hid,
-                        engine="pipeline_v1",
-                        pages=_pipe_res.page_count or 1,
-                        input_tokens=_r_in,
-                        output_tokens=_r_out,
-                        cost_thb=_pipeline_cost_thb,
-                        elapsed_ms=_pipe_res.elapsed_ms,
-                    )
-                except Exception as _ce:
-                    logger.warning(f"[recon] cost log failed (non-blocking): {_ce}")
-                logger.info(
-                    f"🆕 [recon] pipeline_v1 · {fname} · pages={_pipe_res.page_count} "
-                    f"· cost=฿{_pipeline_cost_thb:.4f}"
-                )
-                return ("ok", fname, task_id)
-            except Exception as _pipe_err:
-                logger.warning(
-                    f"[recon] pipeline_v1 失败 · {fname} · fallback 旧 OCR · "
-                    f"{type(_pipe_err).__name__}: {_pipe_err}"
-                )
-
-        # v118.32.5 · 性能优化 A · 文字层快速通道
-        # 电子发票（带文字层 PDF）→ pdfplumber 直接抽，跳过 Gemini OCR
-        # 命中率高时（典型 50%-80%）整体 OCR 阶段提速 2-5x
+        # 新 pipeline 唯一路径(text_path layer 0 + Vision + Flash-Lite + Flash · 100% 埋点)
         try:
-            from pdf_text_extractor import try_text_extraction
-            _t0 = time.time()
-            text_result = await loop.run_in_executor(
-                None, lambda: try_text_extraction(content_b)
-            )
-            if text_result:
-                _pages = text_result.get("pages") or []
-                _elapsed = int((time.time() - _t0) * 1000)
-                db.insert_ocr_history(
-                    user_id=str(user["id"]), filename=fname,
-                    page_count=text_result.get("page_count") or len(_pages) or 1,
-                    pages=_pages,
-                    confidence=text_result.get("confidence") or "high",
-                    elapsed_ms=_elapsed,
-                    file_size_kb=len(content_b)//1024, file_hash=file_hash,
-                    source="vat_recon_batch_text",  # 区分 text_path vs Gemini OCR
-                    source_ref=str(task_id), client_id=client_id)
-                logger.info(f"🚀 [text_path] {fname} · pages={len(_pages)} · {_elapsed}ms")
-                return ("ok", fname, task_id)
-        except Exception as _tpe:
-            logger.warning(f"[text_path] {fname} 异常 fallback Gemini · {type(_tpe).__name__}: {_tpe}")
-
-        # 主引擎 · Gemini（文字层未命中）
-        try:
-            ocr_result = await asyncio.wait_for(
+            from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
+            from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+            _pipe_res = await asyncio.wait_for(
                 loop.run_in_executor(
-                    None, lambda: recognize_pdf(content_b, max_pages=10, api_key=api_key)),
-                timeout=60.0,
+                    None, lambda: _pipeline_run(content_b, max_pages=10, api_key=api_key)
+                ),
+                timeout=120.0,
             )
-            _pages = ocr_result.get("pages") or []
-            db.insert_ocr_history(
+            _pipe_legacy = pipeline_result_to_legacy_dict(_pipe_res)
+            _pages = _pipe_legacy.get("pages") or []
+            _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
+            _hid = db.insert_ocr_history(
                 user_id=str(user["id"]), filename=fname,
-                page_count=len(_pages) or 1, pages=_pages,
-                confidence=ocr_result.get("confidence") or "medium",
-                elapsed_ms=int(ocr_result.get("elapsed_ms") or 0),
+                page_count=_pipe_res.page_count or 1, pages=_pages,
+                confidence="high",  # pipeline 有 L3 视觉兜底
+                elapsed_ms=_pipe_res.elapsed_ms,
                 file_size_kb=len(content_b)//1024, file_hash=file_hash,
-                source="vat_recon_batch", source_ref=str(task_id), client_id=client_id)
+                source="vat_recon_batch_pipeline_v1",
+                source_ref=str(task_id), client_id=client_id)
+            # recon batch cost 埋点(量最大的入口 · 必须 100% 记录)
+            try:
+                _r_in = sum(int(p.get("input_tokens") or 0) for p in _pages)
+                _r_out = sum(int(p.get("output_tokens") or 0) for p in _pages)
+                db.log_ocr_cost(
+                    user_id=str(user["id"]),
+                    tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
+                    history_id=_hid,
+                    engine="pipeline_v1",
+                    pages=_pipe_res.page_count or 1,
+                    input_tokens=_r_in,
+                    output_tokens=_r_out,
+                    cost_thb=_pipeline_cost_thb,
+                    elapsed_ms=_pipe_res.elapsed_ms,
+                )
+            except Exception as _ce:
+                logger.warning(f"[recon] cost log failed (non-blocking): {_ce}")
+            logger.info(
+                f"🆕 [recon] pipeline_v1 · {fname} · pages={_pipe_res.page_count} "
+                f"· cost=฿{_pipeline_cost_thb:.4f}"
+            )
             return ("ok", fname, task_id)
         except Exception as e:
-            logger.error(f"OCR fail {fname}: {type(e).__name__}: {e}")
+            logger.error(f"[recon] OCR fail {fname}: {type(e).__name__}: {e}")
             return ("fail", fname, task_id)
 
     async def _ocr_with_sem(fname, task_id, client_id):

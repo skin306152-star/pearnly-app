@@ -127,3 +127,8 @@
 - 列表 URL:`armas/allview.php`
 - 测试样本:`0006` / Skin Trading Co., Ltd.(2026-05-18 Zihao 手动建)
 - 客户字段来源:Zihao 创建客户时的字段清单(本文档 §2)
+- **报错样本**(客户不存在时 report.php 返回):
+  - 文件:[docs/integrations/samples/report_failure_customer_not_found.xlsx](samples/report_failure_customer_not_found.xlsx)
+  - 触发:customer_code=`99-PEARNLYTEST-001`(不存在)上传
+  - 报错文案:`ไม่พบข้อมูลรหัสลูกค้า\nไม่พบข้อมูลรหัสลูกค้า (บิล)`
+  - adapter 解析方法:见 known-facts.md §5 Step 8 + §10.3

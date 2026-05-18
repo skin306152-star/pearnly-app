@@ -299,6 +299,50 @@ GET https://www.mrerp4sme.com/<module>/allform.php?id=<row_db_id>&status=del
 
 **销售员**:同上 · 主数据类别(可能在 ระบบข้อมูลกลาง m2 下)
 
+### Step 8 · 解析导入报告(report.php 下载的 xlsx)
+
+实测(2026-05-18 Zihao 手动 D1):`importpc.php` 返 `"2"` 后 · `sdpt()` 跳 `component/report.php` 在 _blank 新窗口 · 服务端**下载 xlsx 报告**(命名 `รายงานการนำเข้าข้อมูลชุดที่ N [DDMMYYYY_HHMMSS].xlsx`)
+
+**报告 xlsx 结构**(`docs/integrations/samples/report_failure_customer_not_found.xlsx`):
+- **跟 upload xlsx 同 3 sheet 同 sheet 名**(`Worksheet` / `Worksheet 1` / `Worksheet 2`)
+- **每 sheet 末尾 +1 列 `หมายเหตุ`**(对比上传时少这列):
+  - Sheet 1: 18 → **19 列**(末尾 หมายเหตุ)
+  - Sheet 2: 8 → **9 列**
+  - Sheet 3: 3 → **4 列**
+- Sheet 1 dim 扩到 26 列(末尾占位空 cell)· col 19 即 หมายเหตุ
+- **每 row 的 หมายเหตุ cell**:
+  - 空 = 该 row 写库成功
+  - 非空 = 错误描述(泰文 · 可多行 用 `\n` 分隔)
+
+**adapter 解析方法**(MVP 必含):
+```python
+from openpyxl import load_workbook
+wb = load_workbook(report_xlsx_bytes)
+ws = wb["Worksheet"]   # sheet 1 是单据头
+header_cells = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column+1)]
+note_col = header_cells.index("หมายเหตุ") + 1   # 最后一列(label)
+for r in range(2, ws.max_row + 1):
+    note = ws.cell(row=r, column=note_col).value
+    invoice_no = ws.cell(row=r, column=1).value   # เลขที่
+    if note:
+        # 该 row 写库失败 · note 是错误描述
+        error_msg = note.strip()
+    else:
+        # 成功
+        ...
+```
+
+**已知错误信息文案**(2026-05-18 实测):
+| 错误文案 | 触发条件 | 解决 |
+|---|---|---|
+| `ไม่พบข้อมูลรหัสลูกค้า` | customer_code 不在主数据 | 用 armas/allform.php 先建客户(见 §5 Step 7) |
+| `ไม่พบข้อมูลรหัสลูกค้า (บิล)` | customer_bill code 不在主数据 | 同上(通常 customer_bill = customer_code) |
+| (待抓)`ไม่พบข้อมูลรหัสสินค้า` | product_code 不在主数据 | 商品主数据创建 |
+| (待抓)`ไม่พบข้อมูลพนักงานขาย` | salesman 名不在主数据 | 销售员主数据创建 |
+| (待抓)`เลขที่เอกสารซ้ำ` | invoice_no 重复 | 改 invoice_no 或先删旧 |
+
+**重要**:`importpc.php` 返 `"2"` **不等于** 所有 row 都写库 · "2" 的语义是 "process completed + 出报告" · 真实结果**必须看 report xlsx 的 หมายเหตุ 列**。
+
 ---
 
 ## 6. xlsx 文件格式(sales_credit 模板)
@@ -462,30 +506,66 @@ Korn 真样本:`690507-001`
 
 ## 10. 主数据依赖矩阵(销项导入前必须存在)
 
-2026-05-18 实测确认 · sales_credit xlsx 导入要求以下主数据在 MR.ERP DB **已存在**(否则服务端 reject):
+2026-05-18 实测确认 · sales_credit xlsx 导入要求以下主数据在 MR.ERP DB **已存在**(否则 report 报错):
 
-| xlsx 字段 | 主数据类型 | 创建路径 | 风险等级 |
+| xlsx 字段 | 主数据类型 | 创建路径 | 风险 | 实测错误文案 |
+|---|---|---|---|---|
+| `customer_code` | 客户 | `armas/allform.php` · ✅ 实测 | 🔴 高 | `ไม่พบข้อมูลรหัสลูกค้า` |
+| `customer_bill` | 客户(bill) | 同上(通常 = customer_code) | 🔴 高 | `ไม่พบข้อมูลรหัสลูกค้า (บิล)` |
+| `product_code` | 商品 | 待抓 · ระบบสินค้า(m3) 下 | 🔴 高 | (待实测 · 推测 `ไม่พบข้อมูลรหัสสินค้า`) |
+| `salesman` | 销售员名 | 待抓 · 可能 ระบบข้อมูลกลาง(m2) | 🟡 中 | (待实测) |
+| `department`("BOI1") | 部门码 | 待抓 | 🟢 低 | (默认值通常 OK) |
+| `job`("00002") | 工作号 | 待抓 | 🟢 低 | 同上 |
+| `branch_code`("00000") | 分店码 | 内置 总部 | 🟢 低 | — |
+| `tax_rate_str`("7 (แยก)") | 税率枚举 | 系统预置 | 🟢 低 | — |
+| `sales_area` / `shipping_type` | 销售区/运输 | 客户主数据继承 | 🟢 低 | — |
+
+### 10.1 客户码格式 · 公司自定义(非通用三段式)
+
+2026-05-18 实测两个 DB 客户码格式完全不同:
+
+| DB | 公司 | 客户码格式 | 示例 |
 |---|---|---|---|
-| `customer_code` | 客户 | `armas/allform.php` · ✅ 已实测路径 | 🔴 高(每个新客户都要建) |
-| `product_code` | 商品 | `<module>/allform.php` · 待 Zihao 抓 module | 🔴 高(每个新商品都要建) |
-| `salesman` | 销售员名 | 待抓(可能在 ระบบข้อมูลกลาง m2)| 🟡 中(用户配置 1 次默认) |
-| `department`("BOI1") | 部门码 | 待抓 | 🟢 低(默认值即可) |
-| `job`("00002") | 工作号 | 待抓 | 🟢 低 |
-| `branch_code`("00000") | 分店码 | 待抓(可能内置)| 🟢 低 |
-| `tax_rate_str`("7 (แยก)") | 税率枚举 | 系统预置(不需新建)| 🟢 低 |
-| `sales_area` / `shipping_type` | 销售区/运输方式 | 客户主数据继承 | 🟢 低 |
+| Korn DB(seldb=?) | Korn Trading | **三段式 含泰文** | `01-อนุรักษ์-001` |
+| Skin DB(`comidyear=6` / `seldb=1` / TEST2019) | 测试公司 | **4 位数字** | `0006` |
 
-**adapter 创建顺序**(逻辑依赖):
+→ **客户码不是 ERP 强制格式** · 各租户自己规划编码方案。
+→ adapter 接入时:**先查 `armas/allview.php` 搜索 customer_code 是否冲突** · 然后才能新建。
+→ 旧 known-facts §7 写"必须三段式" = **误解** · 仅 Korn DB 用法。
+
+### 10.2 已知存在的测试客户码
+
+| DB | 客户码 | 客户名 | 用途 |
+|---|---|---|---|
+| Korn DB | `01-อนุรักษ์-001` | (未知 Thai name)| Korn 2026-05-10 reverse-engineering 实测样本 |
+| Skin DB(TEST2019) | `0006` | `Skin Trading Co., Ltd.` | **2026-05-18 Zihao 建** · probe end-to-end 用 |
+
+### 10.3 报错文案解析方法
+
+**永远从 `report.php` 下载的 xlsx 解析** · 不靠 importpc.php response code 判定:
+- `importpc.php` 返 `"2"` ≠ 写库成功 · 只是"流程结束 + 出报告"
+- **真实结果在 report xlsx**:`Worksheet` sheet · 最后一列 `หมายเหตุ` · 每 row 一个错误描述(空 = 该 row OK)
+- 详见 §5 step 8
+
+**已知错误文案**(2026-05-18 实测样本 `samples/report_failure_customer_not_found.xlsx`):
+- `ไม่พบข้อมูลรหัสลูกค้า` = 找不到客户码(customer_code 列)
+- `ไม่พบข้อมูลรหัสลูกค้า (บิล)` = 找不到 customer_bill code
+- 同 row 多错误用 `\n` 分隔(`ไม่พบข้อมูลรหัสลูกค้า\nไม่พบข้อมูลรหัสลูกค้า (บิล)`)
+
+### 10.4 adapter 创建顺序(逻辑依赖)
+
 1. 销售员 / 部门 / 工作号 / 分店(用户首次配置 · 1 次性)
 2. 商品(OCR 看到新商品名 → 抓 + 自动建 · 主流场景)
 3. 客户(OCR 看到新客户名/税号 → 抓 + 自动建)
-4. **然后**才能 sales_credit xlsx 上传
+4. **然后**才能 sales_credit xlsx 上传 + 下载 report + 解析 หมายเหตุ → 用户看
+5. 如有 row 失败:从报错文案推断缺啥主数据 → auto-create → retry
 
 ⚠️ **adapter 设计要点**:
-- 上传前先用 Playwright nav 各 `allview.php` 列表 · 搜 customer_code/product_code 是否存在
+- 上传前先用 Playwright nav 各 `allview.php` 列表 · 搜 customer/product/salesman 是否存在
 - 不存在 → 自动建(`allform.php` 填表 + 保存)
-- 否则导入会"`importpc.php` 返 2 + listing 没新行"(本轮实测 4 次失败的根因)
-- 这个 pre-check 是 **adapter MVP 必含功能** · 不能让用户先手工建主数据
+- 上传后 **永远下载 report.php xlsx 解析 หมายเหตุ** · 不靠 importpc response code
+- 失败 row 给用户清晰错误信息(基于 หมายเหตุ 文案 · 可 i18n 4 语)
+- 这是 **adapter MVP 必含功能**
 
 ---
 

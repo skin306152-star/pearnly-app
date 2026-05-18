@@ -1152,19 +1152,21 @@ def _check_user_quota(user: dict) -> tuple:
 # ============================================================
 @app.get("/api/health")
 async def health():
-    # v105 · 简化引擎架构 · 只检查 Gemini + Vision
-    try:
-        import vision_engine
-        vision_status = vision_engine.health_check()
-    except Exception as e:
-        vision_status = {"available": False, "error": str(e)}
+    # 新架构 · pipeline_v1 唯一路径 · 健康检查改为校验 GCP Service Account 就绪
+    _creds = (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or "").strip()
+    if _creds and os.path.isfile(_creds):
+        credentials_status = {"available": True, "path": _creds}
+    elif _creds:
+        credentials_status = {"available": False, "error": f"file not found: {_creds}"}
+    else:
+        credentials_status = {"available": False, "error": "GOOGLE_APPLICATION_CREDENTIALS env not set"}
     return {
         "status": "ok",
         "version": "0.18.5-v105",
         "engines": {
-            "primary": "gemini-2.5-flash",
-            "fallback": "google-vision-api",
-            "vision_status": vision_status,
+            "pipeline": "pipeline_v1",
+            "layers": ["text_path", "vision", "flash-lite", "flash"],
+            "credentials_status": credentials_status,
         },
     }
 

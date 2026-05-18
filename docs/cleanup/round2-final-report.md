@@ -76,16 +76,29 @@
 
 ---
 
-## 4. 需要你拍板的决策(短清单)
+## 4. 4 个决策项 · 用户回复(2026-05-18 收尾后追加)
 
-> 这些我做不了主,但建议尽快定:
-
-| # | 决策项 | 选项 | 我的倾向 |
+| # | 决策项 | 用户回复 | 备注 |
 |---|---|---|---|
-| 1 | 银行对账老模块还要不要砍? | A. 砍(需先重写前端 15 处接口调用)/ B. 留着(下个季度再说) | **B** · 这是活功能,不是死代码 |
-| 2 | IP 限流字段(`ip_used_today` 等)能不能让前端也不读了? | A. 让前端清掉那 4 处读取代码,然后服务端也删 / B. 保留(开发阶段无影响)| **B** · 反正服务端返回 null,前端有 null 兜底 |
-| 3 | 两个 VAT 导出策略(`vat_excel_export` vs `vat_excel_exporter`)留哪个? | A. 留公式对账版 / B. 留 Korn 模板版 / C. 两个都留 | 这是**业务决策**,我无判断依据 |
-| 4 | `_audit_pearnly_imports_check.py` 这个临时脚本还要不要保留在 `C:\Users\skin3\`? | A. 删(已迁到项目内)/ B. 留作快速备份 | **A** · 已永久化,临时文件保留意义不大 |
+| 1 | 银行对账老模块要砍吗? | **保留**,明天连同"GL 总账明细新 Sheet + Sheet 合并 7→4"一起迁移到 bank_recon_v2 | 待用户拍板细节后开始 |
+| 2 | IP 限流字段拉前端一起删? | **保留**(前端在用,B 选项) | 关闭 |
+| 3 | 两个 VAT 导出策略留哪个? | **两个都留**(都活着 · 不是重复 · 详见下文调研)| Round 1 audit 误判修正 |
+| 4 | `C:\Users\skin3\_audit_pearnly_imports*.py` 删不删? | 用户自己手动删 · 不在项目目录 | 关闭 |
+
+### 4.1 VAT 导出双轨调研(决策 3 详细结论)
+
+Round 1 audit 把 `vat_excel_export.py` 和 `vat_excel_exporter.py` 归为"功能重叠 / 重复代码候选" → **本会话调研后修正:不是重复,是两个不同产品**:
+
+| 模块 | 行数 | 路由族 | 前端调用 | 用途 |
+|---|---|---|---|---|
+| `vat_excel_export.py` | 1497 | `/api/vat_excel/*`(via `vat_excel_routes.py`)| 7+ 处 (`home.js` build/tasks/download/regenerate/clear_old)| 新版 A/B 测试:**AI 只抽 8 个字段 → Excel 公式自己核对**(Zihao 2026-05-13 拍板的实验)|
+| `vat_excel_exporter.py` | 391 | `/api/recon/*`(via `recon_routes.py:21`)| 10+ 处 (`home.js` bank-v2 export / 销项税对账导出)| 传统流程:**AI 全程对账完成后,把结果输出成 Korn 模板风格 Excel** |
+
+**关键差异**:
+- `vat_excel_export.py` 是**完整工作流**(input PDF → output Excel · AI 不判定 · 让 Excel 公式判定)
+- `vat_excel_exporter.py` 是**单一导出工具**(已有 task + rows + client + vat_report → 输出 Excel)
+
+**结论**:**都保留**。Round 1 把它俩并列写成"哪个是 strangler 目标"是审计偏差(被相似文件名误导)。本会话调研后此项**关闭**,不再视为待清理候选。
 
 ---
 

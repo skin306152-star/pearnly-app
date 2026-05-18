@@ -1993,19 +1993,6 @@ def merge_gl_files(parsed_list: List[Dict[str, Any]],
 # ─────────────────────────────────────────────────────────────────────────────
 # MATCHING ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
-def _build_index(gl_rows: List[GlRow]) -> Dict[str, List[int]]:
-    """Build amount→indices index for fast lookup."""
-    idx: Dict[str, List[int]] = {}
-    for i, r in enumerate(gl_rows):
-        if r.debit > 0:
-            key = f"D{r.debit:.2f}"
-            idx.setdefault(key, []).append(i)
-        if r.credit > 0:
-            key = f"C{r.credit:.2f}"
-            idx.setdefault(key, []).append(i)
-    return idx
-
-
 def reconcile(
     stmt_rows: List[StatementRow],
     gl_rows: List[GlRow],

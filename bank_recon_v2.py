@@ -2273,8 +2273,17 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     # Statement detail sheet
     "sh_stmt_detail":   {"th": "รายละเอียดบัญชี", "en": "Statement Detail",
                          "zh": "银行账单明细", "ja": "明細"},
-    "sh_gl_detail":     {"th": "รายละเอียด GL", "en": "GL Detail",
-                         "zh": "GL 明细", "ja": "GL明細"},
+    "sh_gl_detail":     {"th": "รายละเอียดบัญชีแยกประเภท", "en": "GL Detail",
+                         "zh": "总账明细", "ja": "元帳明細"},
+    # v118.34 · GL Detail Sheet column labels (no "GL" suffix · Sheet name already implies context)
+    "col_doc_no":       {"th": "เลขที่เอกสาร", "en": "Doc No",
+                         "zh": "凭证号", "ja": "伝票番号"},
+    "col_account_code": {"th": "รหัสบัญชี", "en": "Account Code",
+                         "zh": "科目代码", "ja": "科目コード"},
+    "col_debit":        {"th": "เดบิต", "en": "Debit",
+                         "zh": "借方", "ja": "借方"},
+    "col_credit":       {"th": "เครดิต", "en": "Credit",
+                         "zh": "贷方", "ja": "貸方"},
     "sh_usage":         {"th": "วิธีใช้งาน", "en": "How to Use",
                          "zh": "使用说明", "ja": "使い方"},
     "col_source_file":  {"th": "ไฟล์ต้นทาง", "en": "Source File",
@@ -2903,7 +2912,64 @@ def export_bank_recon_excel(
     ws5.freeze_panes = "A2"
 
     # ══════════════════════════════════════════════════════════════════
-    # SHEET 6: Usage Instructions (4-language)  v118.33.13.0
+    # SHEET 6: GL Detail (all GL rows reconstructed from recon_rows)
+    # v118.34 · Mirrors Sheet 5 (Statement Detail) — same visual idiom
+    # ══════════════════════════════════════════════════════════════════
+    ws_gl = wb.create_sheet(_t("sh_gl_detail", lang))
+    ws_gl.sheet_view.showGridLines = False
+
+    gld_cols = [
+        (_t("col_date", lang), 12),
+        (_t("col_doc_no", lang), 16),
+        (_t("col_account_code", lang), 14),
+        (_t("col_desc", lang), 38),
+        (_t("col_debit", lang), 14),
+        (_t("col_credit", lang), 14),
+        (_t("col_source_file", lang), 22),
+    ]
+    for ci, (hdr, width) in enumerate(gld_cols, 1):
+        _hdr_style(ws_gl, 1, ci, hdr)
+        ws_gl.column_dimensions[get_column_letter(ci)].width = width
+
+    # Source: every recon_row that carries GL data
+    # (matched rows + gl_debit_only + gl_credit_only).
+    # Stmt-only rows have no GL data → excluded.
+    gl_data_rows = [
+        r for r in recon_rows
+        if r.match_status == "matched"
+        or r.match_status in ("gl_debit_only", "gl_credit_only")
+    ]
+    gl_data_rows.sort(
+        key=lambda x: (x.gl_date or date.min, x.gl_doc_no or "", x.gl_account_code or "")
+    )
+
+    for ri, row in enumerate(gl_data_rows, 2):
+        alt_fill = "F8F9FA" if ri % 2 == 0 else None
+        vals = [
+            _fmt_date(row.gl_date),
+            row.gl_doc_no,
+            row.gl_account_code,
+            row.gl_desc,
+            row.gl_debit if row.gl_debit else "",
+            row.gl_credit if row.gl_credit else "",
+            row.source_gl_file,
+        ]
+        for ci, val in enumerate(vals, 1):
+            cell = ws_gl.cell(ri, ci, val)
+            cell.font = Font(size=9)
+            if isinstance(val, float) and val:
+                cell.number_format = "#,##0.00"
+                cell.alignment = Alignment(horizontal="right")
+            else:
+                cell.alignment = Alignment(vertical="center")
+            if alt_fill:
+                cell.fill = PatternFill("solid", fgColor=alt_fill)
+
+    _border_range(ws_gl, 1, max(1, len(gl_data_rows) + 1), 1, len(gld_cols))
+    ws_gl.freeze_panes = "A2"
+
+    # ══════════════════════════════════════════════════════════════════
+    # SHEET 7: Usage Instructions (4-language)  v118.33.13.0
     # ══════════════════════════════════════════════════════════════════
     ws6 = wb.create_sheet(_t("sh_usage", lang))
     ws6.sheet_view.showGridLines = False

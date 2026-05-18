@@ -283,35 +283,45 @@ OCR_FLASH_MODEL=gemini-2.5-flash             # 可覆盖
 
 ---
 
-## 四、上线策略(从 architecture.md §7.7 + 实战微调)
+## 四、切换策略(开发完直接全量,无灰度 / 无 Shadow)
 
-1. **Shadow 模式**(预计 1-2 周)
-   - feature flag 开关:`OCR_PIPELINE_ENABLED=true`,`OCR_PIPELINE_TRAFFIC_PCT=0`
-   - 旧 gemini_engine 仍然返回给用户
-   - 新 pipeline 并行跑一遍,结果**只写日志 / shadow 表**,不影响用户
-   - 对照指标:字段一致率 / Vision API 触发率 / Flash 兜底触发率 / 单页成本 / 单页延迟
-   - 双倍 API 消耗(注意试用额度,见疑问 H)
+> 用户当前**处于开发阶段,无真实用户**。原 architecture.md §7.7 的 5 步灰度方案不适用。
 
-2. **5% 灰度**(预计 3-5 天)
-   - `OCR_PIPELINE_TRAFFIC_PCT=5`
-   - 按用户 hash 选 5% 流量走新 pipeline,结果直接返回
-   - 监控失败率、客户反馈、低置信度队列长度
+### 切换流程(3 步)
 
-3. **逐档放量**:25% → 50% → 100%,每档至少 3 天
+**步骤 1 · 开发期**(`OCR_USE_NEW_PIPELINE=false`)
+- 旧 gemini_engine 继续生效,所有 OCR 入口走旧链路
+- 新 `services/ocr/` 代码独立开发,不接入业务流程
+- 开发到任何节点想实测新链路:把 env 切到 `true`,所有入口走 pipeline;有问题切回 `false`
+- 两套并存,**没有时间窗口约束**,开发到满意为止
 
-4. **100% 切换后**(用户决定 1):
-   - 等 1-2 周观察
-   - 删 engine_chain.py / typhoon_engine.py / nvidia_engine.py / ocr_engine.recognize_pdf(保留 count_pdf_pages)
-   - 删 app.py 旧路径分支
-   - 旧 gemini_engine.py / vision_engine.py 视情况:可能仍要保留(给 9+ 直调 genai 的模块当模板)或删
+**步骤 2 · 开发完成 + 测试通过**
+- 把 `OCR_USE_NEW_PIPELINE=true` 设为默认(本机 + 服务器都改)
+- 一次性切换所有 OCR 入口(主路由 / LINE / email / recon batch)到新 pipeline
+- **立刻删除旧 OCR 代码**(决策 1 + 5):
+  - app.py 内联兜底链(70 行 `text_path → gemini → vision_fallback`)
+  - app.py LINE / email / recon_routes 接入点的 else 旧分支
+  - 文件级删除:`engine_chain.py`、`typhoon_engine.py`、`nvidia_engine.py`、`ocr_engine.recognize_pdf`、`vision_engine.py`(REST 旧实现)
+  - `gemini_engine.py` 的 `recognize_pdf` 主入口 + `restructure_with_text_hint` 删除;Flash-Lite/Flash 基础设施部分**视 `services/ocr/llm_client.py` 设计决定**是否完全取代
+- feature flag `OCR_USE_NEW_PIPELINE` **保留作为开发自检**,但实际旧代码已删,切到 `false` 时报错或 NotImplementedError(可读性 > 静默失败)
 
-5. **紧急回滚**:`OCR_PIPELINE_ENABLED=false` 一行,所有入口立即切回旧 gemini_engine
+**步骤 3 · 回滚预案**
+- 开发期:切回 `OCR_USE_NEW_PIPELINE=false`,旧代码仍在,一行配置切回
+- 切完后(步骤 2 旧代码已删):feature flag 形同摆设,**真要回滚需 git revert + 重新部署**
+
+### 测试通过的标准(待用户定义,可阶段 3 后期讨论)
+
+建议但不强制:
+- `tests/fixtures/` 5-10 张脱敏样本 100% pass
+- `storage/pdfs/` 本地 50+ 张真实样本对比新旧两套结果,字段一致率 > 95%
+- 三层各自单测覆盖 + pipeline 整体 e2e 测试
+- `connectivity_check.py` 在本机 + 服务器都跑通(前置任务 0)
 
 ---
 
 ## 五、疑问跟踪
 
-### 阻塞问题(已确认,5/5)
+### 阻塞问题(已确认,4/4)
 
 | 编号 | 主题 | 状态 | 决策位置 |
 |---|---|---|---|
@@ -319,20 +329,22 @@ OCR_FLASH_MODEL=gemini-2.5-flash             # 可覆盖
 | B1 | 字段 schema 命名 | ✅ 已确认 | 见顶部「决策 2」 |
 | E1 | 测试样本 | ✅ 已确认 | 见顶部「决策 3」 |
 | G1 | 错误处理 | ✅ 已确认 | 见顶部「决策 4」 |
-| H1 | 灰度规则 | ✅ 已确认 | 见顶部「决策 5」 |
+| ~~H1~~ | ~~灰度规则~~ | ❌ 已废弃 | 决策 5 用单一 feature flag 替代灰度 |
 
-### 非阻塞问题(8 项,推迟到阶段 3 触及时再具体讨论)
+### 非阻塞问题(5 项,推迟到阶段 3 触及时再具体讨论)
 
 按用户指示,先不展开讨论,避免过度预设。**只列存档**:
 
 - **B2** · 内部 Decimal 对外序列化(字符串 vs number)
 - **C1** · 4 个入口(主路由 / LINE / email / recon batch)接入顺序
 - **C2** · recon_routes batch 并发 20 是否需降
-- **D1** · Shadow 期 API 额度翻倍是否扛得住 $300 / 91 天
-- **D2** · Shadow 结果落库方式(新表 / 日志 / 主表加列)
 - **F1** · cost log 粒度(每张 1 条 vs 每层 1 条)
-- **I1** · 死代码清理具体时机 — *决策 6 已部分明确(100% + 2 周观察后)*
 - **J1** · 下游消费者(invoice_grouper / archive / pdf_searchable / xero_pusher / mrerp_xlsx_generator)字段兼容性测试方式
+
+已废弃的非阻塞问题:
+- ~~**D1** · Shadow 期 API 额度翻倍~~ — 无 Shadow 期
+- ~~**D2** · Shadow 结果落库~~ — 无 Shadow 期
+- ~~**I1** · 死代码清理具体时机~~ — 决策 5 已完全明确(切完立刻删)
 
 阶段 3 实施到对应任务节点时,具体提出再讨论。
 
@@ -344,13 +356,12 @@ OCR_FLASH_MODEL=gemini-2.5-flash             # 可覆盖
 |---|---|---|
 | Vision API 网络连通性(中国大陆 / 部署机房) | **高** | **决策 1 已要求前置任务 0 在本机 + 服务器都跑通连通性测试**,详见 §七 |
 | 字段 schema 漂移影响下游(尤其 mrerp_xlsx_generator) | ~~中~~ → **低** | **决策 2 已选 `seller_tax`(完全兼容旧名)**,下游零改动 |
-| GCP 试用额度 $300 / 91 天耗尽 | **中** | Shadow 期 API 翻倍消耗,具体讨论推到 D1(非阻塞) |
+| GCP 试用额度 $300 / 91 天耗尽 | ~~中~~ → **低** | 无 Shadow 期(决策 1 简化),开发期 API 消耗仅来自手动测试,无双倍流量风险 |
 | Cloudflare proxy 与新 SDK 配置冲突 | **中** | Vision 走 Service Account 直连官方端点(决策 1);Flash-Lite/Flash 是否走 proxy 推到阶段 3 第 2 步触及时讨论 |
-| 三层全失败时用户感知异常 | **低** | **决策 4 分阶段策略**:Shadow 静默,灰度自动回退旧 gemini,100% 进低置信度队列 |
-| 灰度期同 tenant 不同 request 走不同链路导致对账混乱 | **低** | **决策 5 按 tenant_id hash + 白名单**,同 tenant 链路稳定 |
+| 三层全失败时用户感知异常 | **低** | **决策 4 两阶段策略**:开发期自动回退旧 gemini,切换后进低置信度队列 |
 | 真实样本进 git 泄露隐私 | **低** | **决策 3 明确 `storage/pdfs/` 不进 git**,正式 fixtures 脱敏后才用 |
 | 9+ 处直调 genai 的模块未来统一时阻力 | **低** | 本次不动,留接口预备;架构稳定后另立项 |
-| 死代码删除时机激进 | **低** | **决策 6**:100% 流量 + 2 周观察期 + 一行 feature flag 回滚 |
+| 死代码切完立刻删 → 回滚困难 | **低** | 测试通过才切;切前充分跑 `storage/pdfs/` 对照;真要回滚 `git revert` 重新部署 |
 | 老 ocr_history 数据兼容(没有 _confidence 子字典) | **低** | 新键可选,旧消费者不读则无影响 |
 
 ---
@@ -465,25 +476,14 @@ OCR_FLASH_MODEL=gemini-2.5-flash             # 可覆盖
 - ❌ `.secrets/` 未含 — **本次决策 1 选了项目外路径,不影响**;若未来要在项目内放敏感文件,用户自行添加
 - ⚠️ 软提示:`.gitignore` 第 27 行的 `secrets.json` 是具体文件名,**不会**覆盖 `pearnly-vision-key.json`。若误把 JSON key 拖进项目根目录有泄露风险,但本次路径在项目外,本次不受影响
 
-#### ☐ 6. tenant_id 格式核实(决策 5 的 ⚠️ 注意)
-
-白名单值:`skin306152@Gmail.com`
-
-需用户在阶段 3 接入 feature flag 代码前确认:**Pearnly 数据库 `users.tenant_id` 字段实际存储值是不是邮箱格式?**
-
-- 若是 → 白名单值正确,无需调整
-- 若是 UUID / 整数 → 用户给真实 tenant_id 值
-
-(此项非阻塞,可在阶段 3 第一次接入 feature flag 时再核实并补正)
-
 ---
 
 ### Checklist 状态
 
 完成 1 / 2 / 3 / 4 后告诉我"进阶段 3",我会从前置任务 0(`connectivity_check.py`)开始。
 - 5 已自动完成(读 .gitignore 报告)
-- 6 阶段 3 触及 feature flag 时再处理,不阻塞当前
+- ~~6 tenant_id 核实~~ — 已废弃(决策 5 用单一 feature flag 替代灰度,不再需要 tenant_id 白名单)
 
 ---
 
-*阶段 2 已完成 + 5 项阻塞决策已确认 + 6 项 checklist 已列。等用户完成 1-4 后说"进阶段 3"。*
+*阶段 2 已完成 + 5 项阻塞决策已确认(原 H1 灰度规则废弃) + 4 项 checklist 待用户操作。等用户完成 1-4 后说"进阶段 3"。*

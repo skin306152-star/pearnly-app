@@ -36,3 +36,6 @@ Thumbs.db
 
 payments/
 storage/
+
+tests/fixtures/
+tests/pipeline-results.json

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11834400">
+<link rel="stylesheet" href="/static/home.css?v=11834500">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -2698,15 +2698,12 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                             <button class="erp-subtab" type="button" data-erp-subtab="mappings" data-i18n="auto-erp-subtab-mappings">字段映射</button>
                         </div>
 
-                        <!-- 子面板 1:连接(不再含日志 · v118.34.4) -->
+                        <!-- 子面板 1:连接(纯卡片 · 不含日志、不含 today-stats · v118.34.5) -->
                         <div class="erp-subpanel active" data-erp-subpanel="connect">
                             <!-- v118.27.4 · ERP 系统连接卡片区(Xero · MR.ERP · FlowAccount) -->
                             <div class="erp-connect-cards" id="erp-connect-cards">
                                 <!-- IIFE 渲染 Xero 卡片 + 未来其他 ERP -->
                             </div>
-
-                            <!-- v0.17 · M5 · 今日推送统计 -->
-                            <div id="erp-today-stats" class="erp-today-stats"></div>
 
                             <div id="erp-endpoints-list"></div>
                             <button class="btn btn-primary btn-add-endpoint" id="btn-add-endpoint">
@@ -2719,8 +2716,12 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                              #erp-logs-section 现在不在 connect subpanel 里了 ·
                              home.js 的 #erp-logs-list 渲染逻辑不需要改 · 它本来
                              就是按 id 抓 DOM 节点 · 父容器换位置无感。
+                             v118.34.5 · 把 #erp-today-stats ("今天还没推送"那行)
+                             也搬过来 · 这个属于日志统计 · 不该 leak 到"连接"tab。
                         -->
                         <div class="erp-subpanel" data-erp-subpanel="logs">
+                            <!-- v0.17 · M5 · 今日推送统计 (v118.34.5 从 connect 搬过来) -->
+                            <div id="erp-today-stats" class="erp-today-stats"></div>
                             <!-- 之前是 <details> 折叠 · 独立 subpanel 后就是常驻展开 -->
                             <section class="erp-logs-section" id="erp-logs-section">
                                 <div class="erp-logs-head">
@@ -6460,15 +6461,15 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11834400"></script>
+<script src="/static/home.js?v=11834500"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·
      独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834400">
-<script src="/static/erp-mrerp-connect.js?v=11834400" defer></script>
+<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834500">
+<script src="/static/erp-mrerp-connect.js?v=11834500" defer></script>
 <!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
-<script src="/static/erp-log-enhance.js?v=11834400" defer></script>
+<script src="/static/erp-log-enhance.js?v=11834500" defer></script>
 
 </body>
 </html>

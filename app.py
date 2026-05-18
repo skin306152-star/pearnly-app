@@ -75,108 +75,218 @@ OCR_MAX_FILE_SIZE_MB = int(os.environ.get("OCR_MAX_FILE_SIZE_MB", "20"))
 
 
 def _ensure_playwright_installed():
-    """v118.34.4 (Zihao 2026-05-19 拍板) · MR.ERP 需要 Playwright + chromium
-    二进制。webhook 部署只 `git pull + systemctl restart`,从不跑 pip
-    install,所以新装服务器或加新依赖时 Playwright 不会自动到位 —
-    wizard 测试连接就返 ERR_PLAYWRIGHT_MISSING。
+    """v118.34.5 (Zihao 2026-05-19 拍板) · 第三次尝试解决 Playwright 装不上的问题。
 
-    设计要点:**绝不在启动主线程跑 pip install**。git-deploy.sh 等
-    health check 只给 30 秒,而 pip + chromium 下载可能要 1-2 分钟,
-    硬等会被回滚到上个版本。
+    历史教训:
+      • v118.34.3 加 admin URL → 要找密钥手动点 · 用户拒绝
+      • v118.34.4 lifespan 后台 spawn → 5+ 分钟仍没装上 · 无法自验
+        (推测:detached subprocess 被 systemd cgroup-kill 干掉,
+        或者 pip 权限/网络/PATH 问题没暴露)
 
-    所以这函数:
-      • 快速路径:能 `import playwright.sync_api` 就立刻返回(常态)
-      • 缺失路径:spawn 一个脱离 systemd 的后台进程做
-            pip install → playwright install chromium → systemctl
-            restart mrpilot
-        然后立刻返回,主 startup 继续 yield · uvicorn 正常上 HTTP。
-        ~60-120 秒后后台脚本跑完会自动 restart mrpilot,新进程的
-        lifespan 走快速路径,wizard 测试连接立刻可用。
+    v118.34.5 方案 (用户拍板 · 方案 A 同步装 + 暴露状态):
+      • 启动时 **同步** 跑 `pip install playwright`(无 chromium · 通常 5-15 s)
+      • 同时 git-deploy.sh heredoc 加 pip install 步 · 未来部署本身就装好
+      • chromium 仍后台装(140 MB · 没法塞进 30 s health-check)
+      • 全过程结果写到 /tmp/pearnly-playwright-status.json · /api/version
+        读这个文件返字段 playwright_installed / chromium_installed,
+        让用户浏览器直接验,不用 SSH
 
-      • sentinel 文件防止并发触发(同时收到 2 次 restart 信号时)。
-
-    全程 best-effort。任何失败只记 warning,启动绝不卡。
+    永远不抛错。任何失败只写状态文件 + log。
     """
     import importlib
+    import json
     import os as _os
+    import shutil
     import subprocess
+    import sys
+    import time as _t
 
-    # Fast path: already importable. (chromium binary check is delegated
-    # to a separate background spawn below — we only do "pip ok? → bail"
-    # here because the heavy work is checking the binary.)
+    status_path = "/tmp/pearnly-playwright-status.json"
+
+    def _write_status(**kwargs):
+        try:
+            payload = {"ts": int(_t.time()), **kwargs}
+            with open(status_path, "w") as f:
+                json.dump(payload, f)
+        except Exception:
+            pass
+
+    # ── Step 1: probe pip package ──
+    pip_importable = False
+    pip_version = None
     try:
-        importlib.import_module("playwright.sync_api")
-        logger.info("[playwright-bootstrap] pip package importable; skipping reinstall")
-        # Lazy chromium probe — try to spawn the browser in a child
-        # process with a 5 s budget. If it fails, schedule a background
-        # `playwright install chromium` (no restart needed since the
-        # pip package is already loaded).
-        _probe_and_repair_chromium()
-        return
+        m = importlib.import_module("playwright.sync_api")
+        pip_importable = True
+        try:
+            pip_version = getattr(
+                importlib.import_module("playwright"), "__version__", None
+            )
+        except Exception:
+            pip_version = None
     except ImportError:
+        pip_importable = False
+
+    if not pip_importable:
+        logger.warning("[playwright-bootstrap] pip package missing — installing synchronously")
+        pip_bin = shutil.which("pip3") or shutil.which("pip") or "pip3"
+        # First try without --break-system-packages (legacy hosts).
+        # If that fails, retry WITH it (PEP-668 hosts).
+        last_err = None
+        for variant in ([pip_bin, "install", "playwright"],
+                        [pip_bin, "install", "playwright", "--break-system-packages"]):
+            try:
+                r = subprocess.run(variant, capture_output=True, text=True, timeout=90)
+                if r.returncode == 0:
+                    last_err = None
+                    break
+                last_err = (
+                    f"variant={variant!r} exit={r.returncode} "
+                    f"stderr={(r.stderr or '')[-300:]!r}"
+                )
+            except subprocess.TimeoutExpired:
+                last_err = f"variant={variant!r} TIMEOUT 90s"
+            except Exception as e:
+                last_err = f"variant={variant!r} {type(e).__name__}: {e}"
+
+        if last_err is not None:
+            logger.warning("[playwright-bootstrap] pip install FAILED: %s", last_err)
+            _write_status(
+                playwright_installed=False,
+                chromium_installed=False,
+                pip_version=None,
+                pip_install_error=last_err,
+                pip_bin=pip_bin,
+                effective_uid=_os.getuid() if hasattr(_os, "getuid") else None,
+            )
+            # Don't spawn chromium — pip didn't work, no point.
+            return
+
+        # Re-import to pick up the freshly installed package.
+        try:
+            importlib.invalidate_caches()
+            importlib.import_module("playwright.sync_api")
+            pip_importable = True
+            try:
+                pip_version = getattr(
+                    importlib.import_module("playwright"), "__version__", None
+                )
+            except Exception:
+                pip_version = None
+            logger.info("[playwright-bootstrap] pip install ok (version=%s)", pip_version)
+        except ImportError as e:
+            logger.warning(
+                "[playwright-bootstrap] pip exit=0 but import still fails: %s "
+                "(likely python interpreter mismatch — pip3 != mrpilot's python)",
+                e,
+            )
+            _write_status(
+                playwright_installed=False,
+                chromium_installed=False,
+                pip_install_error=f"pip ok but post-import failed: {e}",
+                pip_bin=pip_bin,
+                python_bin=sys.executable,
+            )
+            return
+
+    # ── Step 2: chromium binary ──
+    # Heuristic: check $PLAYWRIGHT_BROWSERS_PATH or ~/.cache/ms-playwright.
+    # Looking for any dir matching chromium-* — if any exists, skip the
+    # background install. If none, kick it off detached (~140 MB · 1-2 min).
+    cache_root = (
+        _os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+        or _os.path.expanduser("~/.cache/ms-playwright")
+    )
+    chromium_installed = False
+    chromium_dir = None
+    try:
+        if _os.path.isdir(cache_root):
+            for name in _os.listdir(cache_root):
+                if name.startswith("chromium") and _os.path.isdir(_os.path.join(cache_root, name)):
+                    chromium_installed = True
+                    chromium_dir = _os.path.join(cache_root, name)
+                    break
+    except Exception:
         pass
 
-    # Slow path — schedule a detached background install + restart.
-    sentinel = "/tmp/pearnly-playwright-installing"
-    if _os.path.exists(sentinel):
-        logger.info("[playwright-bootstrap] sentinel exists — install already in progress, "
-                    "not spawning a second one")
-        return
+    if not chromium_installed:
+        sentinel = "/tmp/pearnly-playwright-chromium-installing"
+        if not _os.path.exists(sentinel):
+            py_bin = sys.executable or shutil.which("python3") or "python3"
+            cmd = (
+                f"touch {sentinel}; "
+                f"echo '[playwright-bootstrap] downloading chromium...' "
+                f">> /var/log/mrpilot-deploy.log; "
+                f"{py_bin} -m playwright install chromium "
+                f">> /var/log/mrpilot-deploy.log 2>&1; "
+                f"INSTALL_EXIT=$?; "
+                f"echo \"[playwright-bootstrap] chromium install exit=$INSTALL_EXIT\" "
+                f">> /var/log/mrpilot-deploy.log; "
+                f"rm -f {sentinel}"
+            )
+            try:
+                subprocess.Popen(
+                    ["bash", "-c", cmd], close_fds=True, start_new_session=True,
+                )
+                logger.warning(
+                    "[playwright-bootstrap] chromium NOT on disk — spawned detached "
+                    "download (~140 MB, 1-2 min). Watch /api/version for "
+                    "chromium_installed=true."
+                )
+            except Exception as e:
+                logger.warning("[playwright-bootstrap] chromium spawn failed: %s", e)
 
-    cmd = (
-        "touch {sentinel}; "
-        "{{ pip3 install playwright --break-system-packages "
-        "    >> /var/log/mrpilot-deploy.log 2>&1 "
-        "    && python3 -m playwright install chromium "
-        "        >> /var/log/mrpilot-deploy.log 2>&1 "
-        "    && echo \"[playwright-bootstrap] install ok, restarting mrpilot...\" "
-        "        >> /var/log/mrpilot-deploy.log "
-        "    && systemctl restart mrpilot "
-        "        >> /var/log/mrpilot-deploy.log 2>&1; "
-        "}}; "
-        "rm -f {sentinel}"
-    ).format(sentinel=sentinel)
-    try:
-        subprocess.Popen(
-            ["bash", "-c", cmd],
-            close_fds=True, start_new_session=True,
-        )
-        logger.warning(
-            "[playwright-bootstrap] Playwright NOT installed — spawned detached "
-            "install + auto-restart. Expect ~60-120 s of ERR_PLAYWRIGHT_MISSING "
-            "in the wizard, then automatic recovery. Tail "
-            "/var/log/mrpilot-deploy.log to watch progress."
-        )
-    except Exception as e:
-        logger.warning("[playwright-bootstrap] spawn failed: %s", e)
+    # Write final status snapshot so /api/version can report.
+    _write_status(
+        playwright_installed=pip_importable,
+        chromium_installed=chromium_installed,
+        chromium_dir=chromium_dir,
+        pip_version=pip_version,
+        python_bin=sys.executable,
+        effective_uid=_os.getuid() if hasattr(_os, "getuid") else None,
+    )
 
 
-def _probe_and_repair_chromium():
-    """Chromium probe — separate from pip probe because pip succeeds even
-    if the browser binary was deleted (e.g. someone wiped ~/.cache/
-    ms-playwright). We can't easily test the binary without launching it,
-    so we just kick off an idempotent `playwright install chromium` in
-    the background and let it no-op if the browser is already there.
-
-    NO restart this time — the running mrpilot can still serve general
-    requests; only the MR.ERP wizard fails until the browser arrives.
-    """
+def _read_playwright_status():
+    """Read the status snapshot written by _ensure_playwright_installed.
+    Returns a dict with at minimum playwright_installed / chromium_installed
+    (both falsy if file missing). Used by /api/version to surface state.
+    Also re-probes chromium on every call so the user can see install
+    progress in real time without waiting for the next restart."""
+    import json
     import os as _os
-    import subprocess
-    sentinel = "/tmp/pearnly-playwright-chromium-probe"
-    if _os.path.exists(sentinel):
-        return
+    status_path = "/tmp/pearnly-playwright-status.json"
+    payload = {}
     try:
-        subprocess.Popen(
-            ["bash", "-c",
-             f"touch {sentinel}; "
-             f"python3 -m playwright install chromium "
-             f">> /var/log/mrpilot-deploy.log 2>&1; "
-             f"rm -f {sentinel}"],
-            close_fds=True, start_new_session=True,
+        with open(status_path) as f:
+            payload = json.load(f) or {}
+    except Exception:
+        payload = {}
+
+    # Re-probe chromium live (cheap dir check); pip import status is
+    # what was true at startup and shouldn't change without a restart.
+    try:
+        cache_root = (
+            _os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+            or _os.path.expanduser("~/.cache/ms-playwright")
         )
-    except Exception as e:
-        logger.warning("[playwright-bootstrap] chromium probe spawn failed: %s", e)
+        live_chromium = False
+        if _os.path.isdir(cache_root):
+            for name in _os.listdir(cache_root):
+                if name.startswith("chromium") and _os.path.isdir(_os.path.join(cache_root, name)):
+                    live_chromium = True
+                    break
+        payload["chromium_installed"] = live_chromium
+    except Exception:
+        pass
+
+    return {
+        "playwright_installed": bool(payload.get("playwright_installed")),
+        "chromium_installed": bool(payload.get("chromium_installed")),
+        "playwright_version": payload.get("pip_version"),
+        "pip_install_error": payload.get("pip_install_error"),
+        "chromium_dir": payload.get("chromium_dir"),
+        "ts": payload.get("ts"),
+    }
 
 
 @asynccontextmanager
@@ -357,7 +467,7 @@ REPO=/opt/mrpilot
 REMOTE=pearnly
 BRANCH=master
 HEALTH_URL=http://localhost:7860/api/health
-MAX_WAIT=30   # 等待服务启动的最大秒数
+MAX_WAIT=90   # 等待服务启动的最大秒数 (v118.34.5 拉大 · 留时间给 pip + playwright install)
 
 echo "======================================" >> "$LOG"
 echo "$(date '+%Y-%m-%d %H:%M:%S') git-deploy start" >> "$LOG"
@@ -392,6 +502,24 @@ fi
 # 4. 复制静态资源
 mkdir -p static
 cp -f home.html home.js home.css login.html static/ 2>> "$LOG" || true
+
+# 4.5. v118.34.5 · 装/升级 pip 依赖 (主要是为了 Playwright)
+#     不阻塞太久 · pip 已装的会快速 noop · 失败不阻断部署(健康检查
+#     仍按原逻辑判断 mrpilot 起没起来 · pip 失败时 lifespan 里的
+#     同步 install 会兜底再试)
+echo "pip install -r requirements.txt..." >> "$LOG"
+if [ -f requirements.txt ]; then
+    pip3 install -r requirements.txt --break-system-packages \
+        >> "$LOG" 2>&1 || \
+        pip3 install -r requirements.txt >> "$LOG" 2>&1 || \
+        echo "pip install non-fatal failure" >> "$LOG"
+fi
+
+# 4.6. v118.34.5 · 装/确认 chromium 浏览器(playwright 用 · 140 MB)
+#     idempotent · 已装会快速跳过 · 失败不阻断
+echo "playwright install chromium..." >> "$LOG"
+python3 -m playwright install chromium >> "$LOG" 2>&1 || \
+    echo "playwright install chromium non-fatal failure" >> "$LOG"
 
 # 5. 重启服务
 echo "restarting mrpilot..." >> "$LOG"
@@ -4659,14 +4787,18 @@ async def admin_layout_page(rest: str):
 @app.get("/api/version")
 async def get_frontend_version():
     import time as _t
+    # v118.34.5 · diagnostic state for the MR.ERP Playwright pipeline.
+    # Lets the user verify in-browser whether the auto-installer landed
+    # without needing SSH access. Cheap to compute (one stat() per call).
     return {
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
+        "playwright": _read_playwright_status(),
         "release_notes": {
-            "zh": "v118.34.4 · MR.ERP UI 大改 + 6 个 bug 一波修:\n• 一比一复刻 Pearnly 集成卡片样式 · 横向 icon + 名字 + 描述 + 按钮 · 不再自创纵向卡片\n• ERP 抽屉拆 3 tab(连接 / 推送日志 / 字段映射)· 日志独占 subpanel · 全宽不被压缩\n• Wizard z-index 拉到 11000 · 不再被 sidebar 抽屉遮\n• 服务器启动自动后台装 Playwright + chromium · 不用再点任何 URL 找密钥\n• 启动清 ERP test-connection 缓存 · 避免老 stub-shape 响应残留\n• 4 语 i18n 全过 t() · 切语言时卡片自动重渲染 · 不再中泰文混杂\n• 加守门测试 test_test_connection_route_calls_mrerp_adapter_not_push_stub · 防 stub 回退\n\n后台部署完成 ~60-120 秒后 Playwright 装好会自动 restart · journalctl -u mrpilot 看进度",
-            "en": "v118.34.4 · MR.ERP UI overhaul + 6-bug batch:\n• 1-to-1 visual parity with Pearnly's existing integration cards — horizontal icon + name + description + button. No more invented vertical card style.\n• ERP drawer split into 3 sub-tabs (Connect / Push logs / Field mapping). Logs get their own full-width subpanel — no longer compressed alongside the cards.\n• Wizard z-index bumped to 11000, sits above sidebar drawers.\n• Server auto-installs Playwright + chromium in the background on startup — no admin URL to click, no secret to find.\n• ERP test-connection cache flushed on every restart so stale stub-shape entries don't haunt clients.\n• All visible text now routes through t() with 4-lang coverage. Cards auto-re-render on language switch — no more zh/th text mixing.\n• Added guard test test_test_connection_route_calls_mrerp_adapter_not_push_stub.\n\nAfter deploy, the Playwright auto-install runs ~60-120 s in the background and triggers another restart. Tail journalctl -u mrpilot to watch.",
-            "th": "v118.34.4 · ปรับ UI MR.ERP ใหญ่ + แก้ 6 บั๊กพร้อมกัน:\n• เลียนแบบการ์ดอินทิเกรชันของ Pearnly แบบ 1 ต่อ 1 — แนวนอน ไอคอน + ชื่อ + คำอธิบาย + ปุ่ม ไม่ประดิษฐ์การ์ดแนวตั้งเอง\n• แท็บ ERP แตกเป็น 3 (เชื่อมต่อ / บันทึกการส่ง / แมปฟิลด์) บันทึกมี subpanel เต็มความกว้าง ไม่ถูกบีบ\n• z-index ของวิซาร์ดดันขึ้น 11000 ไม่ถูก sidebar บัง\n• เซิร์ฟเวอร์ติดตั้ง Playwright + chromium อัตโนมัติเบื้องหลังตอนสตาร์ท ไม่ต้องคลิก URL หาคีย์ลับ\n• ล้างแคช test-connection ทุกครั้งที่รีสตาร์ท กันคำตอบเก่าค้าง\n• ข้อความทั้งหมดผ่าน t() ครอบคลุม 4 ภาษา การ์ดเรนเดอร์ใหม่อัตโนมัติเมื่อเปลี่ยนภาษา ไม่มีไทย/จีนปนกัน\n• เพิ่ม guard test test_test_connection_route_calls_mrerp_adapter_not_push_stub\n\nหลัง deploy การติดตั้ง Playwright อัตโนมัติจะรันราว 60-120 วินาทีและรีสตาร์ทอีกครั้ง ดูได้จาก journalctl -u mrpilot",
-            "ja": "v118.34.4 · MR.ERP UI 大改修 + 6 件のバグを一括修正:\n• Pearnly 既存の連携カードと 1 対 1 のビジュアル — 横並びアイコン + 名前 + 説明 + ボタン。独自の縦カードは廃止\n• ERP ドロワーを 3 サブタブに分割（接続 / 送信ログ / フィールドマッピング）。ログは独立 subpanel で全幅表示、もう圧縮されない\n• ウィザード z-index を 11000 に引き上げ、サイドバードロワーの上に表示\n• サーバー起動時に Playwright + chromium をバックグラウンドで自動インストール — URL をクリックしたり鍵を探したりする必要なし\n• リスタート時に ERP test-connection キャッシュをフラッシュし、古い stub-shape の応答を排除\n• 全テキストを t() 経由で 4 言語対応に。言語切替時にカードが自動再レンダ — zh/th の混在解消\n• ガードテスト test_test_connection_route_calls_mrerp_adapter_not_push_stub を追加\n\nデプロイ後、Playwright 自動インストールはバックグラウンドで 60-120 秒程度実行され、もう一度自動 restart します。journalctl -u mrpilot で進捗確認可能"
+            "zh": "v118.34.5 · Playwright 真装上 + Xero 卡片对齐 + today-stats 不再 leak:\n• /api/version 现在加 playwright.playwright_installed / chromium_installed · 浏览器直接看到状态 · 不用 SSH\n• 启动 pip install playwright 改成同步(非 chromium · 通常 <15 秒)· chromium 仍后台\n• git-deploy.sh 加 pip install -r requirements.txt + playwright install chromium 步骤 · MAX_WAIT 拉到 90 秒\n• Xero 卡片重写成 .integration-row 样式 · 跟 MR.ERP / FlowAccount 完全一致 · 加 .ic-xero 浅蓝图标色\n• 「今天还没推送」从「连接」tab 搬到「推送日志」tab · 不再 leak\n\n部署后访问 https://pearnly.com/api/version 看 playwright.playwright_installed 字段确认装上没",
+            "en": "v118.34.5 · Playwright actually lands + Xero card parity + today-stats no longer leaks:\n• /api/version now exposes playwright.playwright_installed / chromium_installed fields — verify install state in-browser without SSH.\n• Startup pip install playwright is now SYNCHRONOUS (no chromium · usually <15 s). Chromium still happens in the background.\n• git-deploy.sh adds pip install -r requirements.txt + playwright install chromium steps · MAX_WAIT bumped to 90 s.\n• Xero card rewritten to use .integration-row layout — 1:1 parity with MR.ERP / FlowAccount cards. Added .ic-xero light-blue icon tint.\n• 'No pushes today' message moved from Connect tab → Push Logs tab.\n\nAfter deploy, visit https://pearnly.com/api/version to verify playwright.playwright_installed=true",
+            "th": "v118.34.5 · Playwright ติดตั้งจริง + การ์ด Xero สอดคล้อง + today-stats ไม่หลุด:\n• /api/version เพิ่มฟิลด์ playwright.playwright_installed / chromium_installed — ดูสถานะติดตั้งในเบราว์เซอร์ได้ทันที ไม่ต้อง SSH\n• pip install playwright ตอนสตาร์ทเปลี่ยนเป็นแบบ synchronous (ไม่รวม chromium · ปกติ <15 วินาที) chromium ยังลงเบื้องหลังเหมือนเดิม\n• git-deploy.sh เพิ่มขั้นตอน pip install + playwright install chromium · MAX_WAIT ดันเป็น 90 วินาที\n• เขียนการ์ด Xero ใหม่ใช้ .integration-row เลย์เอาต์ — เหมือนการ์ด MR.ERP / FlowAccount ตรงกัน 1 ต่อ 1 เพิ่มสีไอคอน .ic-xero ฟ้าอ่อน\n• ข้อความ 'วันนี้ยังไม่มีการส่ง' ย้ายจากแท็บ Connect → แท็บ Push Logs\n\nหลัง deploy เข้า https://pearnly.com/api/version ดูฟิลด์ playwright.playwright_installed",
+            "ja": "v118.34.5 · Playwright が実際にインストールされる + Xero カード整合 + today-stats のリーク修正:\n• /api/version に playwright.playwright_installed / chromium_installed フィールド追加 — ブラウザでインストール状態を確認可能、SSH 不要\n• 起動時の pip install playwright を **同期** 化（chromium は除く · 通常 <15 秒）。chromium は引き続きバックグラウンドで\n• git-deploy.sh に pip install -r requirements.txt + playwright install chromium 手順を追加 · MAX_WAIT を 90 秒に拡大\n• Xero カードを .integration-row レイアウトに書き直し — MR.ERP / FlowAccount カードと 1 対 1 で一致。.ic-xero 薄青アイコン追加\n• 「本日はまだ送信なし」を Connect タブから Push Logs タブに移動\n\nデプロイ後 https://pearnly.com/api/version で playwright.playwright_installed=true を確認"
         }
     }
 

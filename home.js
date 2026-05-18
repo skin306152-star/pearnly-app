@@ -28103,91 +28103,155 @@ window.pearnlyConfirm = function (message, title) {
     }
 
     // ─── 连接卡片渲染 ──────────────────────────────────
+    // v118.34.5 (Zihao 2026-05-19 拍板) · 用户截图反馈 Xero 卡片跟
+    // MR.ERP / FlowAccount 风格不一致 · 一比一复刻 .integration-row 样式
+    // (跟 Google Drive / LINE Bot / Gmail 那种卡片完全一样的 class).
+    //
+    // 已连接状态下,组织列表 + auto-push toggle + 断开按钮 改成行内的
+    // 小卡片附属 region · 不再大块占用纵向空间。
     function _renderCard() {
         const host = document.getElementById('erp-connect-cards');
         if (!host) return;
         const s = _status;
 
-        // 卡片框架
-        let html = '<div class="erp-connect-card erp-connect-xero">';
-        html += '<div class="erp-cc-head">';
-        html += '<div class="erp-cc-title">' + _esc(t('xero-card-title')) + '</div>';
-
+        // Status pill — same class system as MR.ERP card.
+        let pill, configured = !!s, connected = false;
         if (!s) {
-            html += '</div></div>';
-            const old = host.querySelector('.erp-connect-xero');
-            if (old) {
-                old.outerHTML = html;
-            } else {
-                host.insertAdjacentHTML('beforeend', html);
-            }
-            return;
-        }
-
-        // 状态徽章
-        if (!s.configured) {
-            html += '<span class="erp-cc-badge gray">' + _esc(t('xero-card-not-configured')) + '</span>';
+            pill = '<span class="mrerp-card-pill mrerp-pill-neutral">' +
+                   _esc(t('xero-card-not-connected')) + '</span>';
+        } else if (!s.configured) {
+            pill = '<span class="mrerp-card-pill mrerp-pill-neutral">' +
+                   _esc(t('xero-card-not-configured')) + '</span>';
         } else if (s.connected) {
-            html += '<span class="erp-cc-badge green">' + _esc(t('xero-card-connected')) + '</span>';
+            connected = true;
+            pill = '<span class="mrerp-card-pill mrerp-pill-ok">' +
+                   _esc(t('xero-card-connected')) + '</span>';
         } else {
-            html += '<span class="erp-cc-badge gray">' + _esc(t('xero-card-not-connected')) + '</span>';
+            pill = '<span class="mrerp-card-pill mrerp-pill-neutral">' +
+                   _esc(t('xero-card-not-connected')) + '</span>';
         }
-        html += '</div>'; // /head
 
-        html += '<div class="erp-cc-body">';
-
-        if (!s.configured) {
-            html += '<div class="erp-cc-empty">' + _esc(t('xero-card-not-configured')) + '</div>';
+        // Action button (right side) — same .int-btn-configure class
+        // as the other integration cards. Click handler still wires to
+        // _onConnect / _onDisconnect via the existing button IDs.
+        let actionHtml = '';
+        if (!s || !s.configured) {
+            actionHtml = (
+                '<button type="button" class="int-btn-configure" id="btn-xero-connect">' +
+                  _esc(t('xero-connect-btn')) +
+                '</button>'
+            );
         } else if (!s.connected) {
-            // 未连接 · 显示「连接」按钮(老板)
             if (_isOwner()) {
-                html += '<button class="btn btn-primary" type="button" id="btn-xero-connect">' +
-                    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>' +
-                    '<span style="margin-left:6px;">' + _esc(t('xero-connect-btn')) + '</span></button>';
-            } else {
-                html += '<div class="erp-cc-empty">' + _esc(t('xero-card-not-connected')) + '</div>';
+                actionHtml = (
+                    '<button type="button" class="int-btn-configure" id="btn-xero-connect">' +
+                      _esc(t('xero-connect-btn')) +
+                    '</button>'
+                );
             }
         } else {
-            // 已连接 · 显示 organisation 列表 + 切默认 + 断开
+            // Connected · "Edit" opens the orgs/auto-push region in
+            // a small expandable area below the card. Plus a
+            // "Disconnect" link for owners.
+            actionHtml = (
+                '<button type="button" class="int-btn-configure" id="btn-xero-edit-toggle">' +
+                  _esc(t('card-btn-edit') || t('xero-disconnect-btn')) +
+                '</button>'
+            );
+        }
+
+        // Description text — keep it short, matching .int-desc pattern.
+        const descKey = (s && s.connected) ? 'xero-card-desc-connected'
+                       : 'xero-card-desc-default';
+        // Fall back to a sensible default if descKey isn't in the dict.
+        const descFallback = (s && s.connected)
+            ? (t('xero-card-connected') || 'Connected · default org will receive pushes')
+            : 'Cloud accounting · push invoices to your default Xero org';
+        const desc = (function () {
+            const v = t(descKey);
+            return (v === descKey ? descFallback : v);
+        })();
+
+        // Build the main row using Pearnly's existing class system.
+        let html = (
+            '<div class="integration-row erp-connect-xero' + (connected ? ' connected' : '') + '">' +
+              '<div class="int-icon ic-xero">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                  '<circle cx="12" cy="12" r="9"/>' +
+                  '<circle cx="9" cy="10" r="1.3" fill="currentColor"/>' +
+                  '<circle cx="15" cy="14" r="1.3" fill="currentColor"/>' +
+                  '<path d="M9 14l6-4"/>' +
+                '</svg>' +
+              '</div>' +
+              '<div class="int-info">' +
+                '<div class="int-name">' +
+                  '<span>' + _esc(t('xero-card-title') || 'Xero') + '</span>' +
+                  pill +
+                '</div>' +
+                '<div class="int-desc">' + _esc(desc) + '</div>' +
+              '</div>' +
+              '<div class="int-actions">' + actionHtml + '</div>' +
+            '</div>'
+        );
+
+        // Connected · attached "details" region below the row (orgs
+        // selector + auto-push toggle + disconnect). Renders only when
+        // _isOwner() AND we toggled it open via #btn-xero-edit-toggle.
+        if (s && s.configured && s.connected && _isOwner()) {
             const orgs = s.organisations || [];
-            if (orgs.length === 0) {
-                html += '<div class="erp-cc-empty">' + _esc(t('xero-card-not-connected')) + '</div>';
-            } else {
-                html += '<div class="erp-cc-meta">' + _esc((t('xero-org-count') || '').replace('{n}', String(orgs.length))) + '</div>';
-                html += '<div class="erp-cc-org-label">' + _esc(t('xero-default-org')) + ':</div>';
-                html += '<div class="erp-cc-orgs">';
+            let detailsBody = '';
+            if (orgs.length > 0) {
+                detailsBody += '<div class="erp-cc-meta">' +
+                    _esc((t('xero-org-count') || '').replace('{n}', String(orgs.length))) +
+                    '</div>';
+                detailsBody += '<div class="erp-cc-org-label">' +
+                    _esc(t('xero-default-org')) + ':</div>';
+                detailsBody += '<div class="erp-cc-orgs">';
                 orgs.forEach(function (o) {
-                    html += '<label class="erp-cc-org-row">' +
+                    detailsBody += '<label class="erp-cc-org-row">' +
                         '<input type="radio" name="xero-default-org" value="' + _esc(o.id) + '"' +
                         (o.is_default ? ' checked' : '') + '>' +
                         '<span class="erp-cc-org-name">' + _esc(o.organisation_name || o.organisation_id) + '</span>' +
                         '</label>';
                 });
-                html += '</div>';
-                // v27.8.1.3 · 自动推送 toggle(老板可切 · 员工只读)
+                detailsBody += '</div>';
                 const ap = !!s.auto_push;
                 const apTip = ap ? t('erp-auto-push-on-tip') : t('erp-auto-push-off-tip');
-                html += '<div class="erp-cc-auto-push" title="' + _esc(apTip) + '">'
-                    + '<label class="erp-cc-toggle' + (_isOwner() ? '' : ' is-readonly') + '">'
-                    + '<input type="checkbox" id="xero-auto-push-toggle"' + (ap ? ' checked' : '') + (_isOwner() ? '' : ' disabled') + '>'
+                detailsBody += '<div class="erp-cc-auto-push" title="' + _esc(apTip) + '">'
+                    + '<label class="erp-cc-toggle">'
+                    + '<input type="checkbox" id="xero-auto-push-toggle"' + (ap ? ' checked' : '') + '>'
                     + '<span class="erp-cc-toggle-slider"></span>'
                     + '<span class="erp-cc-toggle-label">' + _esc(t('erp-auto-push-label')) + '</span>'
                     + '</label></div>';
-                if (_isOwner()) {
-                    html += '<div class="erp-cc-actions">';
-                    html += '<button class="btn btn-ghost btn-tiny" type="button" id="btn-xero-disconnect">' +
-                        _esc(t('xero-disconnect-btn')) + '</button>';
-                    html += '</div>';
-                }
+                detailsBody += '<div class="erp-cc-actions">'
+                    + '<button class="btn btn-ghost btn-tiny" type="button" id="btn-xero-disconnect">'
+                    + _esc(t('xero-disconnect-btn')) + '</button>'
+                    + '</div>';
             }
+            // Hidden by default; #btn-xero-edit-toggle toggles its display.
+            html += '<div class="erp-xero-details" id="erp-xero-details" style="display:none; margin:8px 0 16px; padding:12px 14px; border:1px solid var(--line); border-radius:8px; background:var(--bg);">'
+                + detailsBody + '</div>';
         }
-        html += '</div></div>'; // /body /card
 
+        // Surgical replacement — find any prior Xero markup and swap.
         const old = host.querySelector('.erp-connect-xero');
+        const oldDetails = host.querySelector('#erp-xero-details');
+        if (oldDetails) oldDetails.remove();
         if (old) {
             old.outerHTML = html;
         } else {
-            host.insertAdjacentHTML('beforeend', html);
+            host.insertAdjacentHTML('afterbegin', html);
+        }
+
+        // Bind the new edit-toggle button.
+        const editBtn = document.getElementById('btn-xero-edit-toggle');
+        if (editBtn) {
+            editBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                const det = document.getElementById('erp-xero-details');
+                if (!det) return;
+                det.style.display = det.style.display === 'none' ? '' : 'none';
+            });
         }
     }
 

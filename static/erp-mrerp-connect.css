@@ -40,6 +40,12 @@
     color: #06834b;
 }
 
+.ic-xero {
+    /* Xero 品牌色 · 浅蓝 (跟官网视觉对齐) */
+    background: #e0f2fe;
+    color: #0284c7;
+}
+
 /* ============================================================
  * Status pill — 用在 .int-name 行的标题旁边
  * 配色跟 home.css 的 .auto-status-pill 同基调,不抢戏。

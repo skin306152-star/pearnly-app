@@ -1,0 +1,1010 @@
+<!DOCTYPE html><html><head>
+<meta charset="utf-8">
+<title>Mr.erp</title>
+<script type="text/javascript" src="../component/javascript/jquery.js"></script>
+<script type="text/javascript" src="../component/javascript/calcwindow.js"></script>
+<script type="text/javascript" src="../component/javascript/searchdata.js"></script>
+<script type="text/javascript" src="../component/javascript/resizeform.js"></script>
+<script type="text/javascript" src="../component/javascript/showdata.js"></script>		
+
+<link rel="stylesheet" type="text/css" href="../component/css/master-cen.css">
+<link rel="stylesheet" type="text/css" href="../component/css/header3span.css">
+<link rel="stylesheet" type="text/css" href="../component/css/verticalmiddle.css">
+<link rel="stylesheet" type="text/css" href="../component/css/showdata.css">
+
+<link rel="stylesheet" type="text/css" href="component/css/allview.css">
+<script type="text/javascript" src="component/javascript/allview.js"></script>
+
+</head>
+
+<body>
+	<div id="container">
+    
+		<div id="header">
+			<span>
+	            <button name="btnlistall" id="btnlistall" onclick="location='allview.php?mode=l';">List All</button>    
+<button name="btnreviewed" id="btnreviewed" onclick="location='allview.php?mode=r';">Reviewed</button>
+<button name="btnapproved" id="btnapproved" onclick="location='allview.php?mode=a';">Approved</button>  
+			</span>
+            <span>
+						
+	   	        <span id="labelsearch">ค้นหารายการ</span><input type="text" name="txtsearch" id="txtsearch" size="40" placeholder="ค้นหาจาก เลขที่, วันที่, ชื่อ และ จำนวนเงิน" onkeyup="searchdata(1);">
+        	    <button name="btnsearch" id="btnsearch" onclick="searchdata(2);">Search</button><input type="hidden" name="searchdataval" id="searchdataval" value="">
+								
+	            <button name="btnadd" id="btnadd" onclick="location='allform.php';">Add</button>    
+				<button name="btnlink" id="btnlink" onclick="location='selarmas.php';">ใบสั่งขาย</button>
+								
+			</span>
+            <span>
+			     <button name="btnmainmenu" id="btnmainmenu" onclick="location='../login/mainmenu.php?comidyear=6';">Mainmenu</button> 			</span>
+			<nav id="currposi">ขายเชื่อ-ในประเทศ &gt; List All</nav>
+    	</div>
+
+		<div id="body" style="height: 738px; width: 1440px;">
+            <div id="detail-box">
+							                
+				<!-- ======================================= -->     
+			
+        		<div id="showdata">                	
+                    <p>
+                    	<span>เลขที่เอกสาร</span>
+						<span>วันที่เอกสาร</span>
+                       	<span>ชื่อลูกค้า</span>
+						<span>จำนวนเงิน</span>	
+				    	<span>URA</span>
+						
+                        <span>View</span>
+												
+                        <span>Edit</span>
+												
+                        <span>Del</span>                                                
+												
+                	</p>                                                                                      
+                            	<p>
+                	<span>SIPEARNLY-TEST-001</span>
+					<span>18/05/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>107.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>18/05/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=58&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=58&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=58&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI690516-001</span>
+					<span>16/05/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>105.93</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>14/05/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=55&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=55&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=55&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI690515-001</span>
+					<span>15/05/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>15,700.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>14/05/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=54&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=54&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=54&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI690507-001</span>
+					<span>09/05/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>10,700.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>Patrakorn</span>
+									<span>09/05/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=50&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI690508-001</span>
+					<span>08/05/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>13,317.58</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>11/05/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=53&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=53&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=53&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI6904</span>
+					<span>30/04/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>950.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>24/04/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=48&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI690418-001</span>
+					<span>18/04/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>4,247.90</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>11/05/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=52&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=52&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=52&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI690415-001</span>
+					<span>15/04/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>4,635.24</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>11/05/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=51&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=51&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=51&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI6903</span>
+					<span>31/03/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>950.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>24/04/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=49&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SItest02</span>
+					<span>17/03/2569</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>950.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>17/03/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=47&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI690301-001</span>
+					<span>01/03/2569</span>
+					<span>ชื่อ test</span>        
+					<span>8,126.65</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>14/05/2569</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=56&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=56&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=56&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SItest22</span>
+					<span>06/07/2568</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>16.05</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>06/07/2568</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=46&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI671008-001</span>
+					<span>19/11/2567</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>16.05</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>18/11/2567</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=44&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI671102-001</span>
+					<span>29/02/2567</span>
+					<span>ชื่อ test</span>        
+					<span>107.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>11/02/2568</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=45&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=45&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=45&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SItest99</span>
+					<span>23/12/2566</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>42,000.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>Patrakorn</span>
+									<span>23/12/2566</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=43&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI123</span>
+					<span>09/12/2565</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>16.05</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>15/12/2566</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=39&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI0099</span>
+					<span>02/09/2565</span>
+					<span>ชื่อ test</span>        
+					<span>80.25</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>19/12/2566</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=41&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=41&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=41&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI0001</span>
+					<span>02/09/2565</span>
+					<span>ชื่อ test</span>        
+					<span>64.20</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>02/09/2565</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=38&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI1</span>
+					<span>29/07/2565</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>37.45</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>29/07/2565</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=37&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=37&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=37&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SItest08</span>
+					<span>01/04/2565</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>160.50</span>         					
+				    <span><a></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>Patrakorn</span>
+									<span>01/04/2565</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span>Patrakorn</span>
+									<span>19/07/2565</span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span>Patrakorn</span>
+									<span>19/07/2565</span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=36&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SItest5</span>
+					<span>01/03/2565</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>21.40</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>24/03/2565</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=35&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=35&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=35&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SItest</span>
+					<span>24/02/2565</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>110.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>Patrakorn</span>
+									<span>24/02/2565</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=34&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+            	<p>
+                	<span>SI650130-01</span>
+					<span>31/01/2565</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>214.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>30/01/2565</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=33&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=33&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=33&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SItest1</span>
+					<span>22/02/2564</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>1,798.67</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>Patrakorn</span>
+									<span>15/01/2565</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=32&amp;status=vie"></a></span>
+								
+                    <span><a href="allform.php?id=32&amp;status=edt"></a></span>
+								
+                    <span><a href="allform.php?id=32&amp;status=del"></a></span>                        
+							
+				</p>
+            	<p>
+                	<span>SITest01</span>
+					<span>18/09/2563</span>
+					<span>Skin Trading Co., Ltd.</span>        
+					<span>3,210.00</span>         					
+				    <span><a class="waitreview"></a>
+							<span class="showura">
+								<span>					
+									<span>รายการ</span>
+									<span>รหัส</span>
+									<span>วันที่</span>				
+								</span>
+								<span>					
+									<span>User</span>
+									<span>test01</span>
+									<span>21/09/2564</span>				
+								</span>
+								<span>					
+									<span>Reviewed</span>
+									<span></span>
+									<span></span>				
+								</span>
+								<span>					
+									<span>Approved</span>
+									<span></span>
+									<span></span>				
+								</span>
+							</span>
+						</span>
+							
+                    <span><a href="allform.php?id=31&amp;status=vie"></a></span>
+								
+                    <span></span>
+								
+                    <span></span>                        
+							
+				</p>
+</div>
+						
+    			<!-- ======================================= -->
+
+            </div>
+    	</div>
+
+		<div id="footer">
+    		<p>
+	<span>Username : </span>test01	<span>Status : </span>User	
+	<span>Company : </span>1010-01-000006 บริษัท ทดสอบการใช้ จำกัด	
+	<span>Database Name : </span>TEST2019</p>		
+	    </div>
+        
+	</div>
+
+	<script type="text/javascript">
+		showdata();
+	</script>	
+	
+
+
+</body></html>

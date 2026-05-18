@@ -17,6 +17,12 @@
 | 测试公司 | `test01` / `TEST2019` |
 | 测试公司参数 | `comidyear=6` · `seldb=1` |
 
+⚠️ **客户码格式 = 公司自定义**(2026-05-18 修订):
+- 旧 known-facts §7 写"三段式·含泰文(`01-อนุรักษ์-001`)" — 这只是 Korn DB 用法
+- Skin DB 测试客户用 4 位数字 `0006`
+- 实际是各租户自己规划编码方案 · ERP 不强制
+- adapter 在 armas/allform.php 创建前先查 armas/allview.php 看码是否冲突
+
 ---
 
 ## 2. 登录流程
@@ -270,6 +276,29 @@ Referer: https://www.mrerp4sme.com/impartran/formrdpc.php
 - top-level: `<span onclick="mmlv2(this);" data-code="m5">ระบบขาย</span>`
 - 二级: 展开后才在 DOM 可见 · 三级链接才是 `<a href="../artran/allview.php?idmenu=118">`
 
+### Step 6 · 删除单条记录(2026-05-18 实测 · 2 步)
+**Step 6a · 进删除前确认页**(GET · 不真删):
+```
+GET https://www.mrerp4sme.com/<module>/allform.php?id=<row_db_id>&status=del
+```
+- `<row_db_id>` 从 listing row 的 `<a href="allform.php?id=N&status=del">` 取
+- 页面渲染完整发票表单(只读)+ 末尾有 `<button id="btndel" onclick="confirmdel('N');">Delete</button>`
+
+**Step 6b · 点 btndel + dialog accept**:
+- click `btndel` → JS `confirmdel(N)` → 弹 `confirm("ยืนยันการลบข้อมูล")`
+- accept → POST 真删 → 跳 `allview.php`(回列表)
+- Playwright 必须挂全局 `page.on("dialog")` accept
+
+### Step 7 · 主数据创建(客户/商品/销售员)
+**客户(实测)**:
+- 创建 URL: `https://www.mrerp4sme.com/armas/allform.php`
+- 列表 URL: `https://www.mrerp4sme.com/armas/allview.php`
+- 完整字段表 → 见 [docs/integrations/mrerp-customer-form-fields.md](mrerp-customer-form-fields.md)
+
+**商品**:URL 路径未抓 · 主菜单 ระบบสินค้า(m3) 下 · 类似 `<module>/allform.php` 模式
+
+**销售员**:同上 · 主数据类别(可能在 ระบบข้อมูลกลาง m2 下)
+
 ---
 
 ## 6. xlsx 文件格式(sales_credit 模板)
@@ -428,6 +457,35 @@ Korn 真样本:`690507-001`
 - ❌ **绝对不**把它们提交进 git
 - ✅ 探测脚本走 `.env.local`(已在 `.gitignore`)
 - ✅ 未来生产存 DB 必须经 `kms_helper.encrypt_str` 加密(Fernet · key 在服务器 env)
+
+---
+
+## 10. 主数据依赖矩阵(销项导入前必须存在)
+
+2026-05-18 实测确认 · sales_credit xlsx 导入要求以下主数据在 MR.ERP DB **已存在**(否则服务端 reject):
+
+| xlsx 字段 | 主数据类型 | 创建路径 | 风险等级 |
+|---|---|---|---|
+| `customer_code` | 客户 | `armas/allform.php` · ✅ 已实测路径 | 🔴 高(每个新客户都要建) |
+| `product_code` | 商品 | `<module>/allform.php` · 待 Zihao 抓 module | 🔴 高(每个新商品都要建) |
+| `salesman` | 销售员名 | 待抓(可能在 ระบบข้อมูลกลาง m2)| 🟡 中(用户配置 1 次默认) |
+| `department`("BOI1") | 部门码 | 待抓 | 🟢 低(默认值即可) |
+| `job`("00002") | 工作号 | 待抓 | 🟢 低 |
+| `branch_code`("00000") | 分店码 | 待抓(可能内置)| 🟢 低 |
+| `tax_rate_str`("7 (แยก)") | 税率枚举 | 系统预置(不需新建)| 🟢 低 |
+| `sales_area` / `shipping_type` | 销售区/运输方式 | 客户主数据继承 | 🟢 低 |
+
+**adapter 创建顺序**(逻辑依赖):
+1. 销售员 / 部门 / 工作号 / 分店(用户首次配置 · 1 次性)
+2. 商品(OCR 看到新商品名 → 抓 + 自动建 · 主流场景)
+3. 客户(OCR 看到新客户名/税号 → 抓 + 自动建)
+4. **然后**才能 sales_credit xlsx 上传
+
+⚠️ **adapter 设计要点**:
+- 上传前先用 Playwright nav 各 `allview.php` 列表 · 搜 customer_code/product_code 是否存在
+- 不存在 → 自动建(`allform.php` 填表 + 保存)
+- 否则导入会"`importpc.php` 返 2 + listing 没新行"(本轮实测 4 次失败的根因)
+- 这个 pre-check 是 **adapter MVP 必含功能** · 不能让用户先手工建主数据
 
 ---
 

@@ -1,14 +1,16 @@
 # MR.ERP 销项发票批量导入 · 端到端探测报告
 
-> **🟡 9/10 跑通**(2026-05-18 路径 A 后):Korn 真样本 ssh 取回 · xlsx 字节级走 Korn-clone 路径 · 服务端 **AJAX 接收 + preview 显示 1 行 + confirm 调 importpc.php 返 `"2"`(JS 认为成功)** · 但 `artran/allview.php?idmenu=118` 列表所有 mode(l/r/a)**找不到新行**。
+> **🟢 10/10 全跑通**(2026-05-18 19:39):login → 选公司 → SC 导入 → upload → preview → confirm → DB write → listing 找到 row · db_id=58 → delete form → btndel + confirm dialog accept → 跳 allview.php → 验证 listing 不含 PEARNLY = ✅ 删除成功
 >
-> 🔴 **未解**:`importpc="2"` 但 DB 没新行 · `report.php` 在 `_blank` popup 加载 · Playwright 抓不到 · sdpt-monkey-patch 改 _self 也卡住。**按指令异常即停 · 等 Zihao 决定** 排查方向。
+> 🎯 **历史 4 次失败根因**:前 4 次 import 看起来 `importpc="2"` 但 listing 找不到 row · 实际是 **search filter 让 row 隐藏 + probe 的 found_inv 检测命中 `<input id="searchdataval" value="PEARNLY-TEST-001">` hidden field 是 false positive**。第 5 次跑(用 Zihao 建好的 customer `0006`)+ 跳过 search 直接看 listing top row · 确认 row 真在 DB。
 
-最后探测:2026-05-18 18:39 · run_id `20260518-183903`
+最后探测:2026-05-18 19:39:25 · run_id `20260518-193925`
 凭据:✅ `test01 / test01`
-Korn 模板:✅ `/opt/mrpilot/test_data_mrerp_sample_SC.xlsx` 已 scp 取回 · 项目根 + `docs/integrations/templates/korn_sample_SC.xlsx`
+Korn 模板:✅ `/opt/mrpilot/test_data_mrerp_sample_SC.xlsx` 已 scp 取回
+测试客户:✅ `0006` / Skin Trading Co., Ltd.(2026-05-18 Zihao 手动建)
 脚本:[scripts/probe/probe-mrerp.py](../../scripts/probe/probe-mrerp.py)
-先验:[docs/integrations/mrerp-known-facts.md](mrerp-known-facts.md)(本轮大幅扩充 §5/§6.3)
+先验:[docs/integrations/mrerp-known-facts.md](mrerp-known-facts.md)(本轮大幅扩充 §5/§6.3/§10)
+客户字段:[docs/integrations/mrerp-customer-form-fields.md](mrerp-customer-form-fields.md)
 样本:[docs/integrations/sample-ocr.json](sample-ocr.json)
 
 ---
@@ -18,40 +20,56 @@ Korn 模板:✅ `/opt/mrpilot/test_data_mrerp_sample_SC.xlsx` 已 scp 取回 · 
 | 阶段 | 状态 | 说明 |
 |---|---|---|
 | 站点结构 | ✅ | landing → /login/login.php → selectdb → mainmenu → impartran |
-| 登录 | ✅ | `test01/test01` · 一次通 |
+| 登录 | ✅ | `test01/test01` |
 | 选公司 TEST2019 | ✅ | comidyear=6 seldb=1 |
 | SC 批量导入入口 | ✅ | `impartran/formupload.php?idmenu=370` |
-| 上传表单 UI | ✅ | idus / selmenu / btnuploadfile / 模板锚点 example.xlsx 全抓到 |
-| **xlsx 字节级生成** | ✅ | **Korn-clone 路径** · 用 Korn 真样本 styles.xml/workbook.xml 不动 · 仅改写 sheetData + sharedStrings · 8586B(vs Korn 10933B · 差异是数据量少) |
-| **服务端 xlsx 接收** | ✅ | `frmupload()` AJAX POST `uploadexcel.php` 返空 body · `sdpt()` 跳 `formrdpc.php` preview |
-| **preview 解析** | ✅ | 服务端解析 xlsx 后 preview 显示 **1 可勾行**(cbimport[N] checkbox)· 字段全识别 |
-| **confirm 提交** | ✅ | 点 `btnuploadfrm1` → JS `confirm()` dialog accept → `uploadfrm(1)` POST `importpc.php` 返 `"2"` · JS 认为"完成+出报告" |
-| 报告 popup | 🔴 | `sdpt()` `_blank` 打开 `component/report.php` · Playwright 抓 popup URL 空 · monkey-patch 改 `_self` 也卡 click timeout |
-| **DB 写入** | 🔴 | `artran/allview.php?idmenu=118` 三种 mode(l/r/a)全部找不到 2026-05-18 行(即使用 Korn 已知 customer code `01-อนุรักษ์-001` + YYMMDD-NNN 格式 invoice_no 重试) |
-| 列表搜索 + 删除 | ⏸️ | 阻于"DB 未写入"未解 |
-| **测试数据污染** | 🟢 | 0 条新行进入 MR.ERP 列表 · 但是 `importpc="2"` 是否在某个隐藏 staging 表写入数据 · 暂不可知 · 等 Zihao 看 report 后决定是否清理 |
+| 上传表单 UI | ✅ | idus / selmenu / btnuploadfile / 模板锚点 example.xlsx |
+| xlsx 字节级生成 | ✅ | Korn-clone 路径 · 复用 Korn styles.xml · 8582B |
+| 服务端 xlsx 接收 | ✅ | `frmupload()` AJAX POST `uploadexcel.php` 返空 body |
+| preview 解析 | ✅ | 服务端解 xlsx 显示 1 可勾行 cbimport[N] |
+| confirm 提交 | ✅ | `uploadfrm(1)` JS · confirm dialog accept · `importpc.php` 返 `"2"` |
+| **DB 写入** | ✅ | `artran/allview.php?idmenu=118&mode=l` top row = `SIPEARNLY-TEST-001 / 18/05/2569 / Skin Trading Co., Ltd. / 107.00` · db_id=58 |
+| **delete form** | ✅ | nav `artran/allform.php?id=58&status=del` · 渲染只读发票表单 + btndel |
+| **删除 + 验证** | ✅ | 点 btndel → `confirmdel(58)` JS → confirm dialog "ยืนยันการลบข้อมูล" accept → POST + 跳 allview.php → **listing 不含 PEARNLY** |
+| **测试数据污染** | 🟢 | 0 条 · 删除已验证 |
 
 ---
 
-## 2. 端到端测试结果(本轮跑到 xlsx 被拒为止)
+## 2. 端到端测试结果(10/10 全跑通)
 
-### 2.1 截图全链路(12 张 · 覆盖 step 1-6 + 服务端拒收)
-| # | 文件 | 场景 | 信息 |
+### 2.1 截图全链路(18 张 · 覆盖 step 01-18 全流程)
+| # | 文件 | 场景 | 时间戳 |
 |---|---|---|---|
-| 01 | `screenshots/01-landing-marketing-page.png` | GET `/` 落地 | 营销 SPA · 5 个导航链接 · 无登录表单 |
-| 02 | `screenshots/02-login-page.png` | 点 `เข้าสู่ระบบ` 进 `/login/login.php` | 登录表单可见 · form action=`checklogin.php` |
-| 03 | `screenshots/03-login-filled.png` | 填 `txtusers` + `txtpasswords` | 凭据已遮挡(filter) |
-| 04 | `screenshots/04-post-login.png` | 提交后跳 `/login/selectdb.php` | ✅ 登录成功 · 公司选择页 |
-| 05 | `screenshots/05-post-login-verified.png` | 双重验证(GET selectdb 不被踢) | ✅ 已认证 |
-| 06 | `screenshots/06-company-clicked-TEST2019.png` | 点 TEST2019 公司 | 跳 mainmenu · `comidyear=6&seldb=1` 自动带上 |
-| 07 | `screenshots/07-sc-import-form.png` | 直达 `impartran/formupload.php?idmenu=370` | 销项赊销批量导入页 |
-| 08 | `screenshots/08-form-inspected.png` | 抓 form 结构 | **idus=15 抓到 ✓** · file input 存在 · selmenu default=118 |
-| 09 | `screenshots/09-file-chosen.png` | `set_input_files(test-invoice.xlsx)` | 文件名显示在 `inpuploadfile` |
-| 10 | `screenshots/10-after-upload.png` | 点 `btnuploadfile` → AJAX 触发 | 🔴 AJAX 返非空 → JS alert |
-| 11 | `screenshots/11-preview-page.png` | (没真到 preview · 仍在 formupload) | URL 没变(AJAX 被拒) |
-| 12 | `screenshots/12-preview-empty.png` | preview 0 行(因为没上传成功) | n_rows=0 |
+| 01 | `screenshots/01-landing-marketing-page.png` | GET `/` 落地 | 19:39:28 |
+| 02 | `screenshots/02-login-page.png` | 进 `/login/login.php` | 19:39:29 |
+| 03 | `screenshots/03-login-filled.png` | 填表单(凭据遮) | 19:39:29 |
+| 04 | `screenshots/04-post-login.png` | 提交 → `/login/selectdb.php` ✅ | 19:39:30 |
+| 05 | `screenshots/05-post-login-verified.png` | 双重验证 ✅ | 19:39:31 |
+| 06 | `screenshots/06-company-clicked-TEST2019.png` | 点 TEST2019 → mainmenu | 19:39:32 |
+| 07 | `screenshots/07-sc-import-form.png` | `impartran/formupload.php?idmenu=370` | 19:39:36 |
+| 08 | `screenshots/08-form-inspected.png` | idus=15 抓到 ✓ | 19:39:36 |
+| 09 | `screenshots/09-file-chosen.png` | set_input_files xlsx | 19:39:36 |
+| 10 | `screenshots/10-after-upload.png` | AJAX → 自动跳 formrdpc | 19:39:36 |
+| 11 | `screenshots/11-preview-page.png` | preview · 1 可勾行 | 19:39:36 |
+| 12 | `screenshots/12-preview-checked.png` | 勾 1 行 | 19:39:37 |
+| 13 | `screenshots/13-after-confirm.png` | uploadfrm(1) + confirm dialog accept · importpc=2 | 19:39:49 |
+| 14 | `screenshots/14-sc-listing-page.png` | `artran/allview.php?idmenu=118&mode=l` | 19:39:50 |
+| 15 | `screenshots/15-search-result.png` | **db_id=58 找到** | 19:39:50 |
+| 16 | `screenshots/16-delete-form-page.png` | `allform.php?id=58&status=del` | 19:39:50 |
+| 17 | `screenshots/17-after-delete.png` | btndel + confirm accept → allview.php | 19:39:54 |
+| 18 | `screenshots/18-verify-deletion.png` | **✅ 删除成功 · listing 不含 PEARNLY** | 19:39:54 |
 
-### 2.2 实测站点结构(已写回 known-facts §2.1/§5/§9)
+### 2.2 关键时间戳总结
+- 19:39:25 probe start
+- 19:39:36 xlsx upload → AJAX OK
+- 19:39:37 confirm dialog accept → import 触发
+- 19:39:49 importpc 返 "2"(完成 + 报告)
+- 19:39:50 listing 找到 db_id=58
+- 19:39:51 删除 confirm dialog accept
+- 19:39:54 删除验证 listing 不含 PEARNLY ✅
+- **总耗时:29 秒**(端到端全链路)
+
+### 2.3 实测站点结构(已写回 known-facts §2.1/§5/§9)
 | 验证项 | 与先验对比 | 结果 |
 |---|---|---|
 | 登录表单 4 input + 0 hidden + 0 CSRF | known-facts §2.2 一字不差 | ✅ 反向工程稳定 |
@@ -61,20 +79,15 @@ Korn 模板:✅ `/opt/mrpilot/test_data_mrerp_sample_SC.xlsx` 已 scp 取回 · 
 | `selmenu=118` 默认选中 ขายเชื่อ-รายได้ขายในประเทศ | known-facts §4 | ✅ 实测一致 |
 | 表单含模板下载锚点 `<a href="example.xlsx">` | known-facts 未提 | ✅ **新补** · 但未实际下载验证 |
 
-### 2.3 关键错误信息(MR.ERP 服务端原文)
-**Playwright dialog handler 抓到的 alert 内容**:
-```
-Sheet ที่ 1 ไม่พบข้อมูลในการอัพโหลด
-หรือข้อมูลในไฟล์ที่อัพโหลดมีจำนวนคอลัมภ์ข้อมูลไม่ครบ 18 คอลัมภ์
-Sheet ที่ 2 ไม่พบข้อมูลในการอัพโหลด
-หรือข้อมูลในไฟล์ที่อัพโหลดมีจำนวนคอลัมภ์ข้อมูลไม่ครบ 8 คอลัมภ์
-Sheet ที่ 3 ข้อมูลในไฟล์ที่อัพโหลดมีจำนวนคอลัมภ์ข้อมูลไม่ครบ 3 คอลัมภ์
-```
-
-直译:
-> Sheet 1: 找不到数据 或 上传文件中数据列数不到 18 列
-> Sheet 2: 同 8 列
-> Sheet 3: 同 3 列
+### 2.4 历史失败 → 修复路径(便于复盘)
+| 阶段 | 失败原因 | 修复 |
+|---|---|---|
+| 第 1 轮 v118.27.8 反向工程 | HTTP RE 维护成本高 | 删 `mrerp_pusher.py` · 转 Playwright(铁律 §7) |
+| 第 2 轮 Playwright v1 | xlsx fallback styles.xml 索引错位 → "ไม่ครบ 18 คอลัมภ์" | ssh 取 Korn 真样本 · 走 clone 路径(铁律 §8) |
+| 第 3-4 轮 confirm | 客户码 `99-PEARNLYTEST` 不在主数据 | Zihao 手动建客户 `0006` |
+| 第 5 轮 listing | `found_inv=True` false positive(searchdataval hidden field) | 不用 search · 直接 row HTML 匹配 SIPEARNLY + 抓 del id |
+| 第 5 轮 delete | tr-locator 不匹配(HTML 用 p+span) | 用 `<p>` 内嵌 SIPEARNLY · 抓 `allform.php?id=N&status=del` href |
+| 第 5 轮 delete confirm | `allform.php?status=del` 是确认页非删除 | 必须点 btndel · confirmdel(N) JS · confirm dialog accept |
 
 ### 2.4 字节级排查 v2(2026-05-18 Korn 真样本对照 · 推翻 v1 假设)
 
@@ -115,11 +128,11 @@ Korn 真样本 styles.xml(`cellXfs count="7"`):
 
 ---
 
-## 3. 根因 + 修复路径推荐(待 Zihao 拍板)
+## 3. (历史)根因排查 + 修复路径(本轮已完成 · 留作记录)
 
 ---
 
-### 3.0 路径 A 已执行(本轮)+ 仍未解的最后 10%
+### 3.0 路径 A 已执行(2026-05-18)
 
 ✅ **路径 A 完成**:
 - `scp root@45.76.53.194:/opt/mrpilot/test_data_mrerp_sample_SC.xlsx ./` · 取得 10933B Korn 真样本
@@ -320,41 +333,48 @@ python scripts/probe/probe-mrerp.py
 
 ---
 
-## 11. 截图清单(本轮 12 张)
+## 11. 截图清单(本轮 18 张 · 全 10 步)
 
 ```
 docs/integrations/screenshots/
 ├── 01-landing-marketing-page.png        GET / → 营销页
-├── 02-login-page.png                    /login/login.php · 4 input · 0 hidden ✅
-├── 03-login-filled.png                  表单已填(凭据已遮)
-├── 04-post-login.png                    302 → /login/selectdb.php ✅ 登录成功
-├── 05-post-login-verified.png           双重验证通过 ✅
-├── 06-company-clicked-TEST2019.png      点 TEST2019 → mainmenu ✅
-├── 07-sc-import-form.png                impartran/formupload.php?idmenu=370 ✅
-├── 08-form-inspected.png                idus=15 · file_in=True · selmenu=118 ✅
-├── 09-file-chosen.png                   set_input_files 完成
-├── 10-after-upload.png                  AJAX 触发(URL 不动 · 因被拒)
-├── 11-preview-page.png                  停在 formupload.php(没跳 formrdpc)
-├── 12-preview-empty.png                 n_rows=0 · 未到 preview
+├── 02-login-page.png                    /login/login.php
+├── 03-login-filled.png                  表单已填(凭据遮)
+├── 04-post-login.png                    → /login/selectdb.php ✅
+├── 05-post-login-verified.png           双重验证 ✅
+├── 06-company-clicked-TEST2019.png      mainmenu ✅
+├── 07-sc-import-form.png                impartran/formupload.php ✅
+├── 08-form-inspected.png                idus=15 + file_in
+├── 09-file-chosen.png                   xlsx 选好
+├── 10-after-upload.png                  AJAX → formrdpc ✅
+├── 11-preview-page.png                  preview 1 row
+├── 12-preview-checked.png               勾选
+├── 13-after-confirm.png                 confirm + importpc=2 ✅
+├── 14-sc-listing-page.png               artran/allview · top row 我们的
+├── 15-search-result.png                 db_id=58 找到 ✅
+├── 16-delete-form-page.png              allform.php?id=58&status=del
+├── 17-after-delete.png                  btndel + accept → allview ✅
+├── 18-verify-deletion.png               ✅ listing 不含 PEARNLY
 └── manifest.txt                         一键索引
 ```
 
-Korn 模板修复后预期 +5 张:`13-preview-checked` / `14-after-confirm` / `15-search-result` / `16-after-delete` / `17-verify-deletion`
-
 ---
 
-## 12. 已生产文件清单(本轮新加 + 沿用)
+## 12. 已生产文件清单
 
 | 路径 | 用途 | 状态 |
 |---|---|---|
-| `scripts/probe/probe-mrerp.py` | 端到端探测脚本 | 已更新 step 06 + dialog handler |
-| `docs/integrations/mrerp-known-facts.md` | 站点先验事实 | **本轮新增 §6.3 ⚠️** + §5 §9 实测扩充 |
-| `docs/integrations/mrerp-spec.md` | 本文档 | **本轮重写** |
-| `docs/integrations/sample-ocr.json` | OCR 真实输出 | 不变 |
-| `docs/integrations/screenshots/01-12.png` | 12 张截图 | **本轮覆盖**(更深远) |
-| `docs/integrations/templates/upload-form-*.html` | upload page HTML dump | ✅ 本轮抓到 |
-| `docs/integrations/templates/test-invoice-*.xlsx` | 测试 xlsx(6807B · 3 sheet) | ✅ 但被 MR.ERP 拒 |
-| `docs/integrations/probe-findings-*.json` | 探测过程结构化输出 | 含 alert 消息原文 |
+| `scripts/probe/probe-mrerp.py` | 端到端探测脚本 · 可重跑 | 10 step 全跑通 ✅ |
+| `test_data_mrerp_sample_SC.xlsx`(根)| Korn 真样本 · generator clone 路径触发 | 10933B(2026-05-10 Korn 交付)|
+| `docs/integrations/templates/korn_sample_SC.xlsx` | 同上 · docs 副本 | 同上 |
+| `docs/integrations/templates/test-invoice-*.xlsx` | 测试 xlsx | 8582B · 3 sheet · 服务端 ACCEPT |
+| `docs/integrations/templates/sc-listing-*.html` | listing HTML dump · 含 SIPEARNLY row | ✅ |
+| `docs/integrations/templates/upload-form-*.html` | upload form HTML dump | ✅ |
+| `docs/integrations/screenshots/01-18.png` | 18 张全步骤截图 | ✅ |
+| `docs/integrations/probe-findings-*.json` | 探测过程结构化输出 + db_id | ✅ |
+| `docs/integrations/mrerp-known-facts.md` | 站点先验 · 大幅扩充 §1 §5 §6.3 §9 §10 | ✅ |
+| `docs/integrations/mrerp-customer-form-fields.md` | 客户字段参考(adapter 接入用) | 🆕 |
+| `docs/integrations/mrerp-spec.md` | 本文档 | **🟢 全跑通** |
 
 ---
 

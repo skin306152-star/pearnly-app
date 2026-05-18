@@ -1,5 +1,5 @@
 {
-  "run_id": "20260518-183903",
+  "run_id": "20260518-193925",
   "findings": {
     "landing_url": "https://www.mrerp4sme.com/",
     "login_nav_method": "click 'เข้าสู่ระบบ' link",
@@ -11,22 +11,25 @@
     "idus": "15",
     "has_file_input": true,
     "template_link": "example.xlsx",
-    "form_html_dump": "D:\\Users\\Skin\\Desktop\\pearnly_project\\docs\\integrations\\templates\\upload-form-20260518-183903.html",
+    "form_html_dump": "D:\\Users\\Skin\\Desktop\\pearnly_project\\docs\\integrations\\templates\\upload-form-20260518-193925.html",
     "post_upload_url": "https://www.mrerp4sme.com/impartran/formrdpc.php",
     "preview_row_count": 1,
     "confirm_clicked_count": 1,
+    "report_captured": false,
     "confirm_dialogs": [
       "[confirm] ยืนยันการ \"นำเข้าข้อมูลชุดที่ 1\""
     ],
     "confirm_result": {
       "success": true,
       "n_rows": 1,
-      "confirmed_count": 1
+      "confirmed_count": 1,
+      "report_captured": false
     },
-    "list_url": "https://www.mrerp4sme.com/artran/allview.php?idmenu=118",
-    "list_search_method": "input[name*=\"search\" i]",
-    "search_found_invoice": false,
-    "search_found_customer": false
+    "list_url": "https://www.mrerp4sme.com/artran/allview.php?idmenu=118&mode=l",
+    "found_in_listing": true,
+    "test_db_id": "58",
+    "delete_clicked": true,
+    "deletion_verified": true
   },
   "errors": [],
   "shots": [
@@ -64,7 +67,7 @@
     },
     {
       "file": "09-file-chosen.png",
-      "scenario": "已选 test-invoice-20260518-183903.xlsx"
+      "scenario": "已选 test-invoice-20260518-193925.xlsx"
     },
     {
       "file": "10-after-upload.png",
@@ -84,11 +87,23 @@
     },
     {
       "file": "14-sc-listing-page.png",
-      "scenario": "URL=https://www.mrerp4sme.com/artran/allview.php?idmenu=118"
+      "scenario": "URL=https://www.mrerp4sme.com/artran/allview.php?idmenu=118&mode=l"
     },
     {
       "file": "15-search-result.png",
-      "scenario": "inv=False cust=False search_used=True"
+      "scenario": "row found · db_id=58"
+    },
+    {
+      "file": "16-delete-form-page.png",
+      "scenario": "URL=https://www.mrerp4sme.com/artran/allform.php?id=58&status=del"
+    },
+    {
+      "file": "17-after-delete.png",
+      "scenario": "URL=https://www.mrerp4sme.com/artran/allview.php"
+    },
+    {
+      "file": "18-verify-deletion.png",
+      "scenario": "✅ 删除成功 · listing 不含 PEARNLY"
     }
   ]
 }

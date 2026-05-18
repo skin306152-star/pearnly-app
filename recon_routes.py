@@ -669,6 +669,58 @@ async def batch_process(request: Request,
             except Exception as e:
                 logger.warning(f"cache copy fail {fname}: {e}")
 
+        # Round 2 · 新 pipeline 接入(feature-flag-gated)
+        # OCR_USE_NEW_PIPELINE=true → 走 services/ocr/pipeline · 完整三层 + 100% 埋点
+        # 注:本阶段(a)pipeline 内部还没集成 layer 0 text_path,所以电子 PDF 也会过 Vision · 阶段(b)后会自动跳过
+        if os.environ.get("OCR_USE_NEW_PIPELINE", "false").strip().lower() == "true":
+            try:
+                from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
+                from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+                _pipe_res = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None, lambda: _pipeline_run(content_b, max_pages=10, api_key=api_key)
+                    ),
+                    timeout=120.0,
+                )
+                _pipe_legacy = pipeline_result_to_legacy_dict(_pipe_res)
+                _pages = _pipe_legacy.get("pages") or []
+                _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
+                _hid = db.insert_ocr_history(
+                    user_id=str(user["id"]), filename=fname,
+                    page_count=_pipe_res.page_count or 1, pages=_pages,
+                    confidence="high",  # pipeline has L3 visual review built in for low-conf cases
+                    elapsed_ms=_pipe_res.elapsed_ms,
+                    file_size_kb=len(content_b)//1024, file_hash=file_hash,
+                    source="vat_recon_batch_pipeline_v1",
+                    source_ref=str(task_id), client_id=client_id)
+                # 强制 cost 埋点(recon batch 此前完全漏记 — 量最大的入口)
+                try:
+                    _r_in = sum(int(p.get("input_tokens") or 0) for p in _pages)
+                    _r_out = sum(int(p.get("output_tokens") or 0) for p in _pages)
+                    db.log_ocr_cost(
+                        user_id=str(user["id"]),
+                        tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
+                        history_id=_hid,
+                        engine="pipeline_v1",
+                        pages=_pipe_res.page_count or 1,
+                        input_tokens=_r_in,
+                        output_tokens=_r_out,
+                        cost_thb=_pipeline_cost_thb,
+                        elapsed_ms=_pipe_res.elapsed_ms,
+                    )
+                except Exception as _ce:
+                    logger.warning(f"[recon] cost log failed (non-blocking): {_ce}")
+                logger.info(
+                    f"🆕 [recon] pipeline_v1 · {fname} · pages={_pipe_res.page_count} "
+                    f"· cost=฿{_pipeline_cost_thb:.4f}"
+                )
+                return ("ok", fname, task_id)
+            except Exception as _pipe_err:
+                logger.warning(
+                    f"[recon] pipeline_v1 失败 · {fname} · fallback 旧 OCR · "
+                    f"{type(_pipe_err).__name__}: {_pipe_err}"
+                )
+
         # v118.32.5 · 性能优化 A · 文字层快速通道
         # 电子发票（带文字层 PDF）→ pdfplumber 直接抽，跳过 Gemini OCR
         # 命中率高时（典型 50%-80%）整体 OCR 阶段提速 2-5x

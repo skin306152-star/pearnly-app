@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11834300">
+<link rel="stylesheet" href="/static/home.css?v=11834400">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -2683,15 +2683,24 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                             <span id="erp-status-summary" class="auto-status-pill" data-i18n="auto-status-loading">加载中…</span>
                         </div>
 
-                        <!-- v118.27.0.1 · ERP 对接二级 tab(连接 + 推送日志 / 字段映射)· 老板可见映射子 tab · 员工自动隐藏 -->
+                        <!-- v118.34.4 (Zihao 2026-05-19 拍板) · ERP 三级 tab 拆分:
+                             连接 / 推送日志 / 字段映射。
+                             之前:连接 + 推送日志 挤在同一 subpanel · filter chips
+                             和日志 row 被压缩看不清。现在:推送日志独占 subpanel·
+                             全宽全屏 · 没有侧栏挤压。
+                             ⚠ data-erp-subpanel="connect" 的 panel 同时也是
+                             "auto-erp-subtab-connect" data-i18n key 的归宿,旧
+                             分类不动 · 仅拆出新的 "logs" tab。
+                        -->
                         <div class="erp-subtabs" role="tablist">
-                            <button class="erp-subtab active" type="button" data-erp-subtab="connect" data-i18n="auto-erp-subtab-connect">连接 & 推送日志</button>
+                            <button class="erp-subtab active" type="button" data-erp-subtab="connect" data-i18n="auto-erp-subtab-connect-only">连接</button>
+                            <button class="erp-subtab" type="button" data-erp-subtab="logs" data-i18n="erp-logs-title">推送日志</button>
                             <button class="erp-subtab" type="button" data-erp-subtab="mappings" data-i18n="auto-erp-subtab-mappings">字段映射</button>
                         </div>
 
-                        <!-- 子面板 1:连接 + 推送日志(原 ERP panel 内容) -->
+                        <!-- 子面板 1:连接(不再含日志 · v118.34.4) -->
                         <div class="erp-subpanel active" data-erp-subpanel="connect">
-                            <!-- v118.27.4 · ERP 系统连接卡片区(Xero · 后续家家加在这) -->
+                            <!-- v118.27.4 · ERP 系统连接卡片区(Xero · MR.ERP · FlowAccount) -->
                             <div class="erp-connect-cards" id="erp-connect-cards">
                                 <!-- IIFE 渲染 Xero 卡片 + 未来其他 ERP -->
                             </div>
@@ -2704,16 +2713,23 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
                                 <span data-i18n="auto-erp-add">新增端点</span>
                             </button>
+                        </div>
 
-                            <!-- 推送日志折叠区 -->
-                            <details class="erp-logs-section" id="erp-logs-section">
-                                <summary class="erp-logs-head">
+                        <!-- 子面板 1.5:推送日志(独立 subpanel · v118.34.4)
+                             #erp-logs-section 现在不在 connect subpanel 里了 ·
+                             home.js 的 #erp-logs-list 渲染逻辑不需要改 · 它本来
+                             就是按 id 抓 DOM 节点 · 父容器换位置无感。
+                        -->
+                        <div class="erp-subpanel" data-erp-subpanel="logs">
+                            <!-- 之前是 <details> 折叠 · 独立 subpanel 后就是常驻展开 -->
+                            <section class="erp-logs-section" id="erp-logs-section">
+                                <div class="erp-logs-head">
                                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                                         <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1"/>
                                     </svg>
                                     <span data-i18n="erp-logs-title">推送日志</span>
                                     <span class="erp-logs-today-stats" id="erp-logs-today-stats"></span>
-                                </summary>
+                                </div>
 
                                 <div class="erp-logs-toolbar">
                                     <div class="erp-logs-filters" id="erp-logs-filters">
@@ -2744,7 +2760,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                                 <div id="erp-logs-list" class="erp-logs-list">
                                     <div class="erp-logs-empty" data-i18n="erp-logs-loading">加载中…</div>
                                 </div>
-                            </details>
+                            </section>
                         </div>
 
                         <!-- 子面板 2:字段映射(老板可写 / 员工只读 · IIFE 渲染) -->
@@ -6444,15 +6460,15 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11834300"></script>
+<script src="/static/home.js?v=11834400"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·
      独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834300">
-<script src="/static/erp-mrerp-connect.js?v=11834300" defer></script>
+<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834400">
+<script src="/static/erp-mrerp-connect.js?v=11834400" defer></script>
 <!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
-<script src="/static/erp-log-enhance.js?v=11834300" defer></script>
+<script src="/static/erp-log-enhance.js?v=11834400" defer></script>
 
 </body>
 </html>

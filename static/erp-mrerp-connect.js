@@ -278,6 +278,56 @@
         'btn-finish': {
             zh: '完成 ✓', en: 'Finish ✓', th: 'เสร็จสิ้น ✓', zh_TW: '完成 ✓', ja: '完了 ✓',
         },
+        // v118.34.4 · new strings for the integration-row card style.
+        'mrerp-card-desc': {
+            zh: '把识别完的发票自动推到 MR.ERP · 客户/商品/销售员自动建',
+            en: 'Auto-push OCRed invoices to MR.ERP — customers / products / salesmen auto-created',
+            th: 'ส่งใบกำกับที่ OCR แล้วเข้า MR.ERP อัตโนมัติ — ลูกค้า / สินค้า / พนักงานขาย สร้างให้',
+            zh_TW: '把辨識完的發票自動推到 MR.ERP · 客戶/商品/銷售員自動建',
+            ja: 'OCR 済みの請求書を MR.ERP に自動送信 — 取引先/商品/営業担当を自動作成',
+        },
+        'flow-card-desc': {
+            zh: '泰国本地 SaaS 会计 · 即将上线',
+            en: 'Thai-local SaaS accounting · coming soon',
+            th: 'ระบบบัญชี SaaS ของไทย · เร็วๆ นี้',
+            zh_TW: '泰國本地 SaaS 會計 · 即將上線',
+            ja: 'タイのローカル SaaS 会計 · 近日公開',
+        },
+        'card-see-logs': {
+            zh: '看推送日志 →',
+            en: 'See push logs →',
+            th: 'ดูประวัติส่ง →',
+            zh_TW: '看推送記錄 →',
+            ja: '送信ログを見る →',
+        },
+        // Wizard finish toasts / validation messages — were hardcoded
+        // Chinese before v118.34.4.
+        'wiz-fill-creds': {
+            zh: '请先填入用户名和密码',
+            en: 'Please enter username and password first',
+            th: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่านก่อน',
+            zh_TW: '請先填入使用者名稱和密碼',
+            ja: 'ユーザー名とパスワードを入力してください',
+        },
+        'wiz-save-failed': {
+            zh: '保存失败 · 状态 {status}',
+            en: 'Save failed · status {status}',
+            th: 'บันทึกไม่สำเร็จ · สถานะ {status}',
+            zh_TW: '儲存失敗 · 狀態 {status}',
+            ja: '保存失敗 · ステータス {status}',
+        },
+        'wiz-saved': {
+            zh: '已保存', en: 'Saved', th: 'บันทึกแล้ว', zh_TW: '已儲存', ja: '保存しました',
+        },
+        // v118.34.4 · the new 3-way ERP subtab split (连接 / 推送日志 /
+        // 字段映射). "推送日志" reuses home.js's existing erp-logs-title
+        // key. "连接" needs its own translation since the original key
+        // (auto-erp-subtab-connect) meant "连接 & 推送日志" — which is
+        // now misleading. We don't touch home.js dict per Zihao's rule,
+        // so we localize this tab from our own IIFE in _localizeSubtabs().
+        'auto-erp-subtab-connect-only': {
+            zh: '连接', en: 'Connect', th: 'เชื่อมต่อ', zh_TW: '連接', ja: '接続',
+        },
     };
 
     function _activeLang() {
@@ -358,133 +408,167 @@
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Card rendering (C-2)
+    // Card rendering · v118.34.4 大改写
+    //
+    // 一比一复刻 Pearnly 既有 .integration-row 卡片样式
+    // (Google Drive / LINE Bot / Gmail 抓取 那种横向 icon + 名字 +
+    // 描述 + 按钮 的卡片)。
+    //
+    // 不再用 .mrerp-card 这种自创类 · CSS 完全 reuse home.css 的
+    // .integration-row + .int-icon + .int-info + .int-actions。
     // ─────────────────────────────────────────────────────────────
     function _renderCards(host, mrerpEp) {
-        // Cards row. Renders MR.ERP card + FlowAccount-soon card.
-        // (Xero card is rendered by the existing IIFE upstream of this
-        // host; we coexist with it.)
+        // host 是 #erp-connect-cards · 我们渲染 MR.ERP 卡片 +
+        // FlowAccount-soon 卡片。Xero 卡片由另一个 IIFE 在 host 内
+        // 单独 prepend · 我们不动它,只 append 自己的。
         const cardsHtml = [
             _renderMrerpCard(mrerpEp),
             _renderFlowAccountCard(),
         ].join('');
 
-        let row = host.querySelector('.mrerp-cards-row');
-        if (!row) {
-            row = document.createElement('div');
-            row.className = 'mrerp-cards-row';
-            host.appendChild(row);
+        // Find or create our own append zone (not interfering with
+        // anything Xero IIFE put in there).
+        let zone = host.querySelector('[data-mrerp-zone]');
+        if (!zone) {
+            zone = document.createElement('div');
+            zone.setAttribute('data-mrerp-zone', '1');
+            // Tiny top margin so we don't crowd whatever sits above
+            // (typically the Xero card or a section title).
+            zone.style.marginTop = '8px';
+            host.appendChild(zone);
         }
-        row.innerHTML = cardsHtml;
+        zone.innerHTML = cardsHtml;
 
-        _bindCardEvents(row, mrerpEp);
+        _bindCardEvents(zone, mrerpEp);
     }
+
+    // The MR.ERP icon — small grid glyph matching the Pearnly visual
+    // style (1.8px stroke, currentColor, viewBox 24).
+    const _MRERP_ICON_SVG = (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+          '<rect x="3" y="3" width="18" height="18" rx="3"/>' +
+          '<path d="M7 8h10M7 12h10M7 16h6"/>' +
+        '</svg>'
+    );
+
+    // FlowAccount icon — circular play-style glyph.
+    const _FLOW_ICON_SVG = (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+          '<circle cx="12" cy="12" r="9"/>' +
+          '<path d="M10 8l5 4-5 4z" fill="currentColor"/>' +
+        '</svg>'
+    );
 
     function _renderMrerpCard(ep) {
         const configured = !!ep;
-        let pill = '<span class="mrerp-card-pill mrerp-pill-neutral">' + _esc(t('card-not-configured')) + '</span>';
-        let pillTitle = '';
-        if (configured) {
-            pill = '<span class="mrerp-card-pill mrerp-pill-testing" data-mrerp-test-pill="' + _esc(ep.id) + '">' +
+
+        // Status pill — shown next to the card name (matches the
+        // pattern used by other Pearnly cards: name + small inline pill).
+        let pill;
+        if (!configured) {
+            pill = '<span class="mrerp-card-pill mrerp-pill-neutral">' +
+                _esc(t('card-not-configured')) + '</span>';
+        } else {
+            pill = '<span class="mrerp-card-pill mrerp-pill-testing" '
+                + 'data-mrerp-test-pill="' + _esc(ep.id) + '">' +
                 _esc(t('card-checking')) + '</span>';
-            pillTitle = t('card-btn-retest');
         }
 
-        // Stats from endpoint or defaults
-        const cfg = ep && ep.config ? ep.config : {};
-        const lastIso = ep && ep.last_push_at ? ep.last_push_at : null;
-        const monthPushed = (ep && typeof ep.month_pushed === 'number') ? ep.month_pushed : (ep ? '—' : '—');
-        const monthFailed = (ep && typeof ep.month_failed === 'number') ? ep.month_failed : (ep ? '—' : '—');
-        const mode = !ep ? t('card-stat-mode-none')
-                         : (ep.auto_push ? t('card-stat-mode-auto') : t('card-stat-mode-manual'));
-
-        const statsHtml = configured ? (
-            '<div class="mrerp-card-stats">' +
-              '<div class="mrerp-card-stat-row">' +
-                '<span class="mrerp-card-stat-label">' + _esc(t('card-stat-last-push')) + '</span>' +
-                '<span class="mrerp-card-stat-value">' + _esc(_fmtRelativeTime(lastIso)) + '</span>' +
-              '</div>' +
-              '<div class="mrerp-card-stat-row">' +
-                '<span class="mrerp-card-stat-label">' + _esc(t('card-stat-month-pushed')) + '</span>' +
-                '<span class="mrerp-card-stat-value">' + _esc(String(monthPushed)) + '</span>' +
-              '</div>' +
-              '<div class="mrerp-card-stat-row">' +
-                '<span class="mrerp-card-stat-label">' + _esc(t('card-stat-month-failed')) + '</span>' +
-                '<span class="mrerp-card-stat-value">' + _esc(String(monthFailed)) + '</span>' +
-              '</div>' +
-              '<div class="mrerp-card-stat-row">' +
-                '<span class="mrerp-card-stat-label">' + _esc(t('wiz-mode')) + '</span>' +
-                '<span class="mrerp-card-stat-value">' + _esc(mode) + '</span>' +
-              '</div>' +
-            '</div>'
-        ) : (
-            '<div class="mrerp-card-empty">' +
-                _esc(t('wiz-step-1-hint')) +
-            '</div>'
-        );
-
-        const actionsHtml = configured ? (
-            '<div class="mrerp-card-actions">' +
-              '<button class="btn btn-ghost btn-tiny" type="button" data-mrerp-card-action="edit">' +
-                _esc(t('card-btn-edit')) +
-              '</button>' +
-              '<button class="btn-link" type="button" data-mrerp-card-action="retest" title="' + _esc(pillTitle) + '">' +
-                _esc(t('card-btn-retest')) +
-              '</button>' +
-            '</div>'
-        ) : (
-            '<div class="mrerp-card-actions">' +
-              '<button class="btn btn-primary btn-tiny" type="button" data-mrerp-card-action="connect">' +
-                _esc(t('card-btn-connect')) +
-              '</button>' +
-            '</div>'
-        );
+        // Action buttons — right side. Use Pearnly's .int-btn-configure
+        // class (the same class the OUTER integration row buttons use)
+        // so visually we render identically.
+        let actionsHtml;
+        if (configured) {
+            actionsHtml = (
+                '<button type="button" class="int-btn-configure" data-mrerp-card-action="edit">' +
+                  _esc(t('card-btn-edit')) +
+                '</button>' +
+                '<button type="button" class="mrerp-card-see-logs" data-mrerp-card-action="see-logs" '
+                  + 'title="' + _esc(t('card-see-logs')) + '">' +
+                  _esc(t('card-see-logs')) +
+                '</button>'
+            );
+        } else {
+            actionsHtml = (
+                '<button type="button" class="int-btn-configure" data-mrerp-card-action="connect">' +
+                  _esc(t('card-btn-connect')) +
+                '</button>'
+            );
+        }
 
         return (
-            '<div class="mrerp-card mrerp-card-mrerp" data-mrerp-card="mrerp"' +
-                (ep ? ' data-mrerp-endpoint-id="' + _esc(ep.id) + '"' : '') + '>' +
-              '<div class="mrerp-card-head">' +
-                '<span class="mrerp-card-name">' + _esc(t('mrerp-card-name')) + '</span>' +
-                pill +
+            '<div class="integration-row' + (configured ? ' connected' : '') + '" '
+                + 'data-mrerp-card="mrerp"'
+                + (ep ? ' data-mrerp-endpoint-id="' + _esc(ep.id) + '"' : '') + '>' +
+              '<div class="int-icon ic-mrerp">' + _MRERP_ICON_SVG + '</div>' +
+              '<div class="int-info">' +
+                '<div class="int-name">' +
+                  '<span>' + _esc(t('mrerp-card-name')) + '</span>' +
+                  pill +
+                '</div>' +
+                '<div class="int-desc">' + _esc(t('mrerp-card-desc')) + '</div>' +
               '</div>' +
-              statsHtml +
-              actionsHtml +
+              '<div class="int-actions">' + actionsHtml + '</div>' +
             '</div>'
         );
     }
 
     function _renderFlowAccountCard() {
         return (
-            '<div class="mrerp-card is-coming-soon" data-mrerp-card="flowaccount">' +
-              '<div class="mrerp-card-head">' +
-                '<span class="mrerp-card-name">' + _esc(t('flow-card-name')) + '</span>' +
-                '<span class="mrerp-card-pill mrerp-pill-info">' + _esc(t('card-coming-soon')) + '</span>' +
+            '<div class="integration-row is-coming-soon" data-mrerp-card="flowaccount">' +
+              '<div class="int-icon ic-flowaccount">' + _FLOW_ICON_SVG + '</div>' +
+              '<div class="int-info">' +
+                '<div class="int-name">' +
+                  '<span>' + _esc(t('flow-card-name')) + '</span>' +
+                  '<span class="mrerp-card-pill mrerp-pill-info">' + _esc(t('card-coming-soon')) + '</span>' +
+                '</div>' +
+                '<div class="int-desc">' + _esc(t('flow-card-desc')) + '</div>' +
               '</div>' +
-              '<div class="mrerp-card-empty">' +
-                _esc('Thai-local SaaS · 即将上线') +
+              '<div class="int-actions">' +
+                '<button type="button" class="int-btn-configure" disabled>' +
+                  _esc(t('card-btn-connect')) +
+                '</button>' +
               '</div>' +
             '</div>'
         );
     }
 
-    function _bindCardEvents(row, mrerpEp) {
+    function _bindCardEvents(zone, mrerpEp) {
         // Card-level "Connect" / "Edit" → open wizard
-        row.querySelectorAll('[data-mrerp-card-action="connect"], [data-mrerp-card-action="edit"]').forEach(function (btn) {
+        zone.querySelectorAll('[data-mrerp-card-action="connect"], [data-mrerp-card-action="edit"]').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
                 window._mrerpOpenWizard(mrerpEp || null);
             });
         });
-        // Re-test
-        row.querySelectorAll('[data-mrerp-card-action="retest"]').forEach(function (btn) {
+        // "See push logs →" — switch ERP subtab to the new logs panel.
+        zone.querySelectorAll('[data-mrerp-card-action="see-logs"]').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
-                if (!mrerpEp) return;
-                _refreshCardHealth(mrerpEp.id, true);
+                _switchToLogsTab();
             });
         });
+    }
+
+    // v118.34.4 · jump to the "推送日志" subtab. We click the tab pill
+    // by selector so the existing tab switcher (whatever home.js wires
+    // up to .erp-subtab) handles the panel toggle for us — no fragile
+    // direct DOM manipulation.
+    function _switchToLogsTab() {
+        const tab = document.querySelector('.erp-subtabs [data-erp-subtab="logs"]');
+        if (tab && typeof tab.click === 'function') {
+            tab.click();
+            return;
+        }
+        // Fallback: home.js hasn't wired the new tab yet — just expand
+        // the legacy <details> log section.
+        const det = document.getElementById('erp-logs-section');
+        if (det) {
+            det.open = true;
+            det.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 
     async function _refreshCardHealth(endpointId, force) {
@@ -513,6 +597,8 @@
     async function _bootstrap() {
         const host = document.getElementById('erp-connect-cards');
         if (!host) return;
+        // v118.34.4 · localize the new "连接" tab (key not in home.js dict).
+        _localizeSubtabs();
         const endpoints = await _loadEndpoints();
         const mrerpEp = endpoints.find(function (e) {
             return (e.adapter || '').toLowerCase() === 'mrerp';
@@ -524,6 +610,17 @@
         }
         // C-5 · conditional hide of the 字段映射 sub-tab.
         _applyMappingsTabVisibility(endpoints);
+    }
+
+    // v118.34.4 · localize the new "连接" tab. The new "推送日志" tab
+    // uses data-i18n="erp-logs-title" which IS in home.js's dict, so
+    // home.js's applyLang() handles it automatically. "连接" uses a
+    // new key (auto-erp-subtab-connect-only) we own here.
+    function _localizeSubtabs() {
+        const connectTab = document.querySelector(
+            '.erp-subtab[data-erp-subtab="connect"]'
+        );
+        if (connectTab) connectTab.textContent = t('auto-erp-subtab-connect-only');
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -626,6 +723,49 @@
         if (!tabEl) return;
         setTimeout(_bootstrap, 80);
     }, true);
+
+    // ─────────────────────────────────────────────────────────────
+    // v118.34.4 · 跟随 Pearnly 语言切换重新渲染。
+    // 之前 bug:卡片用 _activeLang() 在 bootstrap 时计算文字,但用户
+    // 后续切语言时不会自动重渲染 · 导致截图里看到的「中泰文混杂」
+    // (drawer 标题已经切到泰文,但卡片 pill 还是中文)。
+    //
+    // 我们订阅三个信号 + 每 800ms 兜底轮询:
+    //   1. 监听 storage event(用户在另一个 tab 切语言会 fire)
+    //   2. 监听 'mrpilot:lang-changed' custom event(若 home.js 以
+    //      后愿意广播 · 我们提前接住)
+    //   3. 监听 .lang-switcher 点击(目前 home.js 切语言入口)
+    //   4. 轮询 _activeLang() 比较上次值 · 兜底捕获任何
+    //      window.currentLang 直接赋值的场景
+    // 任意触发就调一次 _bootstrap · 内部本来就只重画 DOM,无副作用。
+    // ─────────────────────────────────────────────────────────────
+    let _lastLang = _activeLang();
+    function _maybeRerenderForLang() {
+        const cur = _activeLang();
+        if (cur === _lastLang) return;
+        _lastLang = cur;
+        _bootstrap();
+    }
+    try {
+        window.addEventListener('storage', function (e) {
+            if (e && e.key === 'mrpilot_lang') _maybeRerenderForLang();
+        });
+        window.addEventListener('mrpilot:lang-changed', _maybeRerenderForLang);
+        document.addEventListener('click', function (e) {
+            // Any element whose data-lang attribute looks like a 2-letter
+            // code (e.g. zh/en/th/ja/zh_TW) is treated as a lang switch
+            // candidate. Cheap heuristic — false positives are harmless
+            // because _maybeRerenderForLang short-circuits when nothing
+            // actually changed.
+            const sw = e.target.closest && e.target.closest('[data-lang], .lang-switcher button, .lang-option');
+            if (!sw) return;
+            // Give home.js a tick to commit the change before we read.
+            setTimeout(_maybeRerenderForLang, 120);
+        }, true);
+        // Safety-net poll — 800 ms is invisible to humans, and the
+        // _bootstrap call only fires when the lang actually changed.
+        setInterval(_maybeRerenderForLang, 800);
+    } catch (_e) { /* environment without window/document — noop */ }
 
     // Expose i18n / fetch helpers for the wizard module to share.
     window._mrerpConnectShared = { T, t, _esc, _toast, _tk, _authHeaders, _loadEndpoints, _testConnection, _activeLang };
@@ -1228,17 +1368,18 @@
         const seedProduct = _readSeedProductValue();
 
         if (!username || !password) {
-            _toast('请先填入用户名和密码', 'warn');
+            _toast(t('wiz-fill-creds'), 'warn');
             _gotoStep(2);
             return;
         }
 
         const config = {
             system_url: 'https://www.mrerp4sme.com',
-            // Server-side encrypts on receive (the route layer accepts
-            // plaintext for in-wizard creation; storage layer encrypts
-            // before writing to db). NOTE: this contract is enforced
-            // by the C-1 backend update — see app.py.
+            // v118.34.4 · save endpoint also takes plaintext (server-
+            // side storage layer encrypts before writing to db). The
+            // _enc-suffixed names are kept for backward compat with the
+            // existing save route contract — content is plaintext here
+            // and the route encrypts on insert.
             username_enc: username,
             password_enc: password,
             comidyear: comidyear,
@@ -1266,10 +1407,10 @@
                 body: JSON.stringify(body),
             });
             if (!r.ok) {
-                _toast('保存失败 · 状态 ' + r.status, 'error');
+                _toast(t('wiz-save-failed', { status: r.status }), 'error');
                 return;
             }
-            _toast('已保存', 'success');
+            _toast(t('wiz-saved'), 'success');
             _closeWizard();
             setTimeout(_bootstrap, 100);
         } catch (e) {

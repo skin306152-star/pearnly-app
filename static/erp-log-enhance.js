@@ -30,6 +30,33 @@
 
     function _shared() { return window._mrerpConnectShared || null; }
 
+    // v118.34.4 · i18n for the strings this file owns. Reuses the
+    // shared t() helper from erp-mrerp-connect.js when available, but
+    // keeps its own local dict + fallback so this file works
+    // standalone even if loading order ever flips.
+    const _LOCAL_T = {
+        'log-view-raw': {
+            zh: '查看原文',
+            en: 'View raw',
+            th: 'ดูข้อความดิบ',
+            zh_TW: '查看原文',
+            ja: '原文を表示',
+        },
+        'log-hide-raw': {
+            zh: '隐藏原文',
+            en: 'Hide raw',
+            th: 'ซ่อนข้อความดิบ',
+            zh_TW: '隱藏原文',
+            ja: '原文を隠す',
+        },
+    };
+    function _t(key) {
+        const sh = _shared();
+        const lang = sh && typeof sh._activeLang === 'function' ? sh._activeLang() : 'zh';
+        const entry = _LOCAL_T[key] || {};
+        return entry[lang] || entry.en || entry.zh || key;
+    }
+
     function _matchRawError(rowEl) {
         // The existing renderer puts the raw response/error somewhere
         // inside the row. We grep visible text for known Thai keywords
@@ -96,14 +123,16 @@
         const toggle = document.createElement('a');
         toggle.className = 'mrerp-logs-row-raw-toggle';
         toggle.href = '#';
-        toggle.textContent = '查看原文';
+        toggle.textContent = _t('log-view-raw');
         const rawBox = document.createElement('div');
         rawBox.className = 'mrerp-logs-row-raw';
         rawBox.style.display = 'none';
         rawBox.textContent = raw;
         toggle.addEventListener('click', function (e) {
             e.preventDefault();
-            rawBox.style.display = rawBox.style.display === 'none' ? '' : 'none';
+            const hidden = rawBox.style.display === 'none';
+            rawBox.style.display = hidden ? '' : 'none';
+            toggle.textContent = hidden ? _t('log-hide-raw') : _t('log-view-raw');
         });
 
         // Append at the end of the row's clickable area; if the row

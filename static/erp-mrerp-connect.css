@@ -1,200 +1,100 @@
 /* ============================================================
  * static/erp-mrerp-connect.css
  *
- * C-2 ERP cards (MR.ERP / FlowAccount-soon) + C-3 wizard modal.
- * Self-contained: never overrides the existing `.erp-connect-xero`
- * IIFE's styles. New utility classes are namespaced `mrerp-*`.
+ * v118.34.4 (Zihao 2026-05-19 拍板) · 大改写
+ * 不再自己发明卡片样式 · 一比一复刻 Pearnly 现有 .integration-row
+ * (Google Drive / LINE Bot / Gmail 抓取 那种横向卡片)。
  *
- * Reuses tokens from CLAUDE.md/DESIGN_SYSTEM.md:
- *   #111111 primary text · #f4f4f0 background · #e8e8e3 borders
- *   #DBEAFE / #1E40AF info pills (kept per visual rule)
+ * 这个文件现在只剩下:
+ *   1. MR.ERP / FlowAccount 图标背景色 (.ic-mrerp / .ic-flowaccount)
+ *      —— 复用 home.css 的 .int-icon 尺寸/形状
+ *   2. 状态 pill (.mrerp-card-pill + 颜色变体) —— 跟 home.css 的
+ *      .auto-status-pill 配色保持一致
+ *   3. Wizard modal —— z-index 拉到 .int-drawer (10000) 之上
+ *   4. C-6 hard-deprecate legacy webhook UX
+ *
+ * 删掉的:
+ *   .mrerp-card / .mrerp-cards-row / .mrerp-card-head / .mrerp-card-stats /
+ *   .mrerp-card-empty / .mrerp-card-actions / .mrerp-empty-banner / 等
+ *   —— 全部由 .integration-row + .int-icon + .int-info + .int-actions 接管
+ *
+ * 触碰原则: home.css 的 .integration-row / .int-* 不许 override —— 我
+ * 们只加新东西,不改既有 Pearnly tokens。
  * ============================================================ */
 
-/* New card row container — sits inside #erp-connect-cards alongside
-   the existing Xero card. The legacy Xero card stays untouched. */
-.mrerp-cards-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 8px;
-}
+/* ============================================================
+ * MR.ERP / FlowAccount icon background colors
+ * 复刻 home.css 里 .ic-g / .ic-gm / .ic-line / .ic-folder 的 token 风格:
+ *   light tint background + brand color foreground
+ * ============================================================ */
 
-.mrerp-card {
-    flex: 1 1 240px;
-    min-width: 240px;
-    max-width: 320px;
-    background: #ffffff;
-    border: 1px solid #e8e8e3;
-    border-radius: 8px;
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-
-.mrerp-card:hover:not(.is-coming-soon) {
-    border-color: #111111;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.mrerp-card.is-coming-soon {
-    opacity: 0.65;
-    cursor: not-allowed;
-}
-
-.mrerp-card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.mrerp-card-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: #111111;
-}
-
-.mrerp-card-pill {
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 999px;
-    line-height: 1;
-    white-space: nowrap;
-}
-
-.mrerp-pill-ok {
-    background: #d6f5e0;
-    color: #0a7a2c;
-}
-
-.mrerp-pill-warn {
-    background: #fdebcb;
-    color: #8a5a00;
-}
-
-.mrerp-pill-err {
-    background: #fbd6d6;
-    color: #921616;
-}
-
-.mrerp-pill-neutral {
-    background: #eaeae5;
-    color: #5d5d57;
-}
-
-.mrerp-pill-info {
-    background: #DBEAFE;
-    color: #1E40AF;
-}
-
-.mrerp-pill-testing {
-    background: #eef2ff;
+.ic-mrerp {
+    /* MR.ERP 品牌色 · 深蓝偏紫 · 跟 Xero 的浅蓝拉开区分 */
+    background: #ebe9ff;
     color: #4338ca;
 }
 
-.mrerp-card-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 12px;
-    font-size: 12px;
-    color: #6B7280;
-    min-height: 36px;
-}
-
-.mrerp-card-stat-row {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.mrerp-card-stat-label {
-    color: #9a9a93;
-    font-size: 11px;
-}
-
-.mrerp-card-stat-value {
-    color: #111111;
-    font-size: 13px;
-    font-weight: 500;
-}
-
-.mrerp-card-empty {
-    font-size: 12px;
-    color: #6B7280;
-    margin: 4px 0;
-    line-height: 1.5;
-}
-
-.mrerp-card-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 4px;
-}
-
-.mrerp-card-actions .btn {
-    flex: 0 0 auto;
-}
-
-.mrerp-card-actions .btn-link {
-    background: transparent;
-    color: #6B7280;
-    padding: 6px 8px;
-    font-size: 12px;
-    border: 0;
-    cursor: pointer;
-}
-
-.mrerp-card-actions .btn-link:hover {
-    color: #111111;
+.ic-flowaccount {
+    /* FlowAccount 品牌色 · 橙绿混合 (用绿色调更接近他们 logo) */
+    background: #e6f5ea;
+    color: #06834b;
 }
 
 /* ============================================================
- * Empty-state banner — used when ZERO ERP endpoints configured.
- * Renders ABOVE the cards row.
+ * Status pill — 用在 .int-name 行的标题旁边
+ * 配色跟 home.css 的 .auto-status-pill 同基调,不抢戏。
  * ============================================================ */
 
-.mrerp-empty-banner {
-    background: #f4f4f0;
-    border: 1px dashed #d0d0c9;
-    border-radius: 8px;
-    padding: 18px;
-    margin: 12px 0;
-    text-align: center;
-    font-size: 13px;
-    color: #5d5d57;
+.mrerp-card-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    line-height: 1.4;
+    white-space: nowrap;
+    letter-spacing: 0.1px;
+    flex-shrink: 0;
 }
 
-.mrerp-empty-banner-hint {
-    font-size: 12px;
-    color: #9a9a93;
-    margin-top: 6px;
+.mrerp-pill-ok       { background: #d6f5e0; color: #0a7a2c; }
+.mrerp-pill-warn     { background: #fdebcb; color: #8a5a00; }
+.mrerp-pill-err      { background: #fbd6d6; color: #921616; }
+.mrerp-pill-neutral  { background: #eaeae5; color: #5d5d57; }
+.mrerp-pill-info     { background: #DBEAFE; color: #1E40AF; }
+.mrerp-pill-testing  { background: #eef2ff; color: #4338ca; }
+
+/* "即将上线" 用 info 色 + 半透明效果整行 */
+.integration-row.is-coming-soon { opacity: 0.65; cursor: not-allowed; }
+.integration-row.is-coming-soon .int-btn-configure {
+    pointer-events: none; opacity: 0.55;
 }
 
 /* ============================================================
- * Wizard modal (C-3)
+ * Wizard modal · z-index bumped above .int-drawer (10000) +
+ * .modal-overlay (10000). 11000 保证在所有 sidebar/drawer 之上,
+ * 但仍在浏览器原生 alert 之下。
  * ============================================================ */
 
 .mrerp-wizard-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(17, 17, 17, 0.4);
-    z-index: 4000;
+    background: rgba(17, 17, 17, 0.45);
+    z-index: 11000;            /* v118.34.4 · 之前是 4000,被抽屉(10000)遮 */
     display: none;
     align-items: center;
     justify-content: center;
     padding: 24px;
 }
 
-.mrerp-wizard-overlay.is-open {
-    display: flex;
-}
+.mrerp-wizard-overlay.is-open { display: flex; }
 
 .mrerp-wizard {
     background: #ffffff;
     border-radius: 10px;
-    box-shadow: 0 18px 40px rgba(17, 17, 17, 0.18);
+    box-shadow: 0 18px 40px rgba(17, 17, 17, 0.22);
     width: min(820px, 100%);
     max-height: 100%;
     display: flex;
@@ -204,7 +104,7 @@
 
 .mrerp-wizard-head {
     padding: 18px 22px;
-    border-bottom: 1px solid #e8e8e3;
+    border-bottom: 1px solid var(--line, #e8e8e3);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -214,7 +114,7 @@
 .mrerp-wizard-title {
     font-size: 16px;
     font-weight: 600;
-    color: #111111;
+    color: var(--ink, #111111);
 }
 
 .mrerp-wizard-progress {
@@ -228,21 +128,16 @@
 .mrerp-wizard-step-dot {
     width: 10px; height: 10px;
     border-radius: 999px;
-    background: #e8e8e3;
+    background: var(--line, #e8e8e3);
 }
 
-.mrerp-wizard-step-dot.is-active {
-    background: #111111;
-}
-
-.mrerp-wizard-step-dot.is-done {
-    background: #16A34A;
-}
+.mrerp-wizard-step-dot.is-active { background: var(--ink, #111111); }
+.mrerp-wizard-step-dot.is-done   { background: #16A34A; }
 
 .mrerp-wizard-step-sep {
     flex: 0 0 28px;
     height: 1px;
-    background: #e8e8e3;
+    background: var(--line, #e8e8e3);
 }
 
 .mrerp-wizard-close {
@@ -250,10 +145,10 @@
     border: 0;
     padding: 4px;
     cursor: pointer;
-    color: #6B7280;
+    color: var(--ink-3, #6B7280);
 }
 
-.mrerp-wizard-close:hover { color: #111111; }
+.mrerp-wizard-close:hover { color: var(--ink, #111111); }
 
 .mrerp-wizard-body {
     padding: 22px;
@@ -261,36 +156,29 @@
     flex: 1;
 }
 
-.mrerp-wizard-step {
-    display: none;
-}
-
-.mrerp-wizard-step.is-active {
-    display: block;
-}
+.mrerp-wizard-step       { display: none; }
+.mrerp-wizard-step.is-active { display: block; }
 
 .mrerp-wizard-step-h {
     font-size: 14px;
     font-weight: 600;
-    color: #111111;
+    color: var(--ink, #111111);
     margin: 0 0 14px;
 }
 
 .mrerp-wizard-hint {
     font-size: 12px;
-    color: #6B7280;
+    color: var(--ink-3, #6B7280);
     margin: 6px 0 14px;
 }
 
-.mrerp-wizard-field {
-    margin: 0 0 14px;
-}
+.mrerp-wizard-field { margin: 0 0 14px; }
 
 .mrerp-wizard-label {
     display: block;
     font-size: 12px;
     font-weight: 500;
-    color: #111111;
+    color: var(--ink, #111111);
     margin: 0 0 6px;
 }
 
@@ -298,17 +186,18 @@
 .mrerp-wizard-select {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line, #e8e8e3);
     border-radius: 6px;
     font-size: 13px;
     background: #ffffff;
-    color: #111111;
+    color: var(--ink, #111111);
+    font-family: inherit;
 }
 
 .mrerp-wizard-input:focus,
 .mrerp-wizard-select:focus {
     outline: none;
-    border-color: #111111;
+    border-color: var(--ink, #111111);
 }
 
 .mrerp-wizard-checkboxes {
@@ -318,11 +207,12 @@
     max-height: 260px;
     overflow: auto;
     padding: 10px;
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line, #e8e8e3);
     border-radius: 6px;
 }
 
-.mrerp-wizard-checkbox-row {
+.mrerp-wizard-checkbox-row,
+.mrerp-wizard-radio-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -335,13 +225,6 @@
     gap: 6px;
 }
 
-.mrerp-wizard-radio-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-}
-
 .mrerp-wizard-test-row {
     display: flex;
     align-items: center;
@@ -351,7 +234,7 @@
 
 .mrerp-wizard-test-status {
     font-size: 12px;
-    color: #6B7280;
+    color: var(--ink-3, #6B7280);
 }
 
 .mrerp-wizard-test-error {
@@ -367,7 +250,7 @@
 .mrerp-wizard-test-error-raw {
     margin-top: 6px;
     font-size: 11px;
-    color: #6B7280;
+    color: var(--ink-3, #6B7280);
     font-family: monospace;
     white-space: pre-wrap;
     word-break: break-all;
@@ -375,7 +258,7 @@
 
 .mrerp-wizard-foot {
     padding: 16px 22px;
-    border-top: 1px solid #e8e8e3;
+    border-top: 1px solid var(--line, #e8e8e3);
     display: flex;
     gap: 10px;
     justify-content: flex-end;
@@ -385,79 +268,62 @@
 .mrerp-wizard-foot-spacer { flex: 1; }
 
 /* ============================================================
- * Push-log sidebar tab (C-4)
- * Sits next to the cards row; on desktop renders as a flex sibling,
- * on mobile collapses below the cards (see C-7).
+ * Push log enhancements (C-4)
+ * 友好消息覆盖层 + 查看原文折叠。整个 #erp-logs-section 现在(v118.34.4
+ * 起)是独立 subpanel · 不再挤在卡片旁边 · 自然就有完整宽度。
  * ============================================================ */
-
-.mrerp-erp-layout {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-}
-
-.mrerp-erp-layout-cards {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.mrerp-erp-layout-logs {
-    flex: 0 0 320px;
-    background: #ffffff;
-    border: 1px solid #e8e8e3;
-    border-radius: 8px;
-    padding: 14px;
-}
-
-.mrerp-logs-tab-head {
-    font-size: 13px;
-    font-weight: 600;
-    color: #111111;
-    margin: 0 0 10px;
-}
 
 .mrerp-logs-row-friendly {
     font-size: 12px;
-    color: #111111;
+    color: var(--ink, #111111);
     margin: 4px 0;
 }
 
 .mrerp-logs-row-raw-toggle {
     font-size: 11px;
-    color: #6B7280;
+    color: var(--ink-3, #6B7280);
     cursor: pointer;
     margin-top: 2px;
+    text-decoration: underline dotted;
 }
 
 .mrerp-logs-row-raw {
     margin-top: 4px;
     padding: 8px;
-    background: #f4f4f0;
+    background: var(--bg, #f4f4f0);
     border-radius: 4px;
     font-family: monospace;
     font-size: 11px;
     color: #5d5d57;
     white-space: pre-wrap;
+    word-break: break-word;
 }
 
 /* ============================================================
- * C-6 (Zihao 2026-05-18 拍板) · HARD-DEPRECATE the legacy webhook
- * endpoint UX. Hides the visual surface; the underlying HTML/JS
- * stays one more iteration so Zihao can verify the Xero flow
- * doesn't depend on these selectors before they're physically
- * removed. To re-enable for emergency rollback: comment this
- * whole block out + re-deploy.
- *
- * Things hidden:
- *   #btn-add-endpoint           "+ 新增端点" button
- *   #erp-endpoints-list         legacy webhook endpoint cards
- *   #endpoint-modal             the legacy create/edit modal itself
- *   .erp-endpoint-card          per-endpoint webhook card class
- *
- * NOTE: any tenant whose only ERP config is a legacy webhook will
- * lose visibility into it after this lands. Per Zihao Q1 拍板:
- * HARD-DEPRECATE without an escape hatch; if a customer complains,
- * restore via a per-tenant feature flag.
+ * "看推送 →" 文字链 · 放在 .integration-row 的 .int-actions 里
+ * 让用户从 ERP 卡片一键跳到推送日志 subpanel。
+ * ============================================================ */
+
+.mrerp-card-see-logs {
+    background: transparent;
+    border: 0;
+    color: var(--ink-3, #6B7280);
+    font-size: 12px;
+    font-family: inherit;
+    padding: 6px 8px;
+    cursor: pointer;
+    text-decoration: underline dotted;
+}
+
+.mrerp-card-see-logs:hover {
+    color: var(--ink, #111111);
+    text-decoration: underline;
+}
+
+/* ============================================================
+ * C-6 (Zihao 2026-05-18 拍板) · HARD-DEPRECATE the legacy webhook UX.
+ * Hides the visual surface; underlying HTML stays one more iteration
+ * so the Xero flow doesn't get disturbed. Removal happens with C-6b.
  * ============================================================ */
 #btn-add-endpoint,
 #erp-endpoints-list,
@@ -467,31 +333,13 @@
     display: none !important;
 }
 
-/* The legacy modal's overlay continues to manage `display:none`
-   inline; the !important above wins over inline styles regardless
-   so the modal can never re-open accidentally. */
-
 /* ============================================================
- * Mobile (C-7 · Zihao 2026-05-18 拍板) — cards stack vertically,
- * wizard goes full-screen, sidebar logs collapse below cards.
- *
- * Verified in preview at 375x812 (iPhone 12) + 1280x720 (desktop):
- *   • .mrerp-cards-row → flex-direction: column on mobile
- *   • .mrerp-card → full-width (343px on 375px viewport)
- *   • .mrerp-wizard → fills 100% of viewport on mobile, becomes
- *     a centred 820px card on desktop
- *
- * Touch-target sizing: all action buttons ≥ 32px height already
- * inherited from .btn / .btn-tiny in home.css — no separate tweak
- * needed here (CLAUDE.md 手机端 §44×44 rule covered by existing
- * .btn class).
+ * Mobile (C-7) — wizard fills viewport on phones.
+ * Cards are already responsive via home.css's @media block on
+ * .integration-row (flex-direction: column at ≤600px).
  * ============================================================ */
 
 @media (max-width: 800px) {
-    .mrerp-cards-row { flex-direction: column; }
-    .mrerp-card { max-width: none; min-width: 0; }
-    .mrerp-erp-layout { flex-direction: column; }
-    .mrerp-erp-layout-logs { flex: 1 1 100%; width: 100%; }
     .mrerp-wizard {
         width: 100%;
         max-width: 100%;
@@ -500,37 +348,19 @@
         border-radius: 0;
     }
     .mrerp-wizard-overlay { padding: 0; }
-    .mrerp-wizard-body {
-        /* Compact spacing on small screens — keeps Step 1's checkbox
-           list scrollable within a single viewport. */
-        padding: 16px;
-    }
-    .mrerp-wizard-checkboxes {
-        max-height: 220px;  /* fits between header and footer @ 375x812 */
-    }
+    .mrerp-wizard-body { padding: 16px; }
+    .mrerp-wizard-checkboxes { max-height: 220px; }
     .mrerp-wizard-foot {
         padding: 12px 16px;
-        /* Stack the buttons on a really tight viewport so they don't
-           overflow the row. */
         flex-wrap: wrap;
     }
     .mrerp-wizard-progress {
         flex: 0 0 auto;
         margin-left: 0;
     }
-    /* Sidebar logs (when promoted via .mrerp-erp-layout in a future
-       C-4 follow-up) sits below cards on mobile, not next to. */
-    .mrerp-erp-layout-logs {
-        margin-top: 12px;
-    }
 }
 
-/* Even-smaller-phone (≤360px) — Pixel 5 portrait, older Android.
-   Drop the heading font a notch + tighten card padding so the
-   "未连接 / 已连接" pill never gets cut off. */
 @media (max-width: 360px) {
-    .mrerp-card { padding: 12px; }
-    .mrerp-card-name { font-size: 13px; }
     .mrerp-wizard-title { font-size: 15px; }
     .mrerp-wizard-step-h { font-size: 13px; }
 }

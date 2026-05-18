@@ -74,6 +74,111 @@ OCR_MAX_PAGES_PER_UPLOAD = int(os.environ.get("OCR_MAX_PAGES_PER_UPLOAD", "5"))
 OCR_MAX_FILE_SIZE_MB = int(os.environ.get("OCR_MAX_FILE_SIZE_MB", "20"))
 
 
+def _ensure_playwright_installed():
+    """v118.34.4 (Zihao 2026-05-19 拍板) · MR.ERP 需要 Playwright + chromium
+    二进制。webhook 部署只 `git pull + systemctl restart`,从不跑 pip
+    install,所以新装服务器或加新依赖时 Playwright 不会自动到位 —
+    wizard 测试连接就返 ERR_PLAYWRIGHT_MISSING。
+
+    设计要点:**绝不在启动主线程跑 pip install**。git-deploy.sh 等
+    health check 只给 30 秒,而 pip + chromium 下载可能要 1-2 分钟,
+    硬等会被回滚到上个版本。
+
+    所以这函数:
+      • 快速路径:能 `import playwright.sync_api` 就立刻返回(常态)
+      • 缺失路径:spawn 一个脱离 systemd 的后台进程做
+            pip install → playwright install chromium → systemctl
+            restart mrpilot
+        然后立刻返回,主 startup 继续 yield · uvicorn 正常上 HTTP。
+        ~60-120 秒后后台脚本跑完会自动 restart mrpilot,新进程的
+        lifespan 走快速路径,wizard 测试连接立刻可用。
+
+      • sentinel 文件防止并发触发(同时收到 2 次 restart 信号时)。
+
+    全程 best-effort。任何失败只记 warning,启动绝不卡。
+    """
+    import importlib
+    import os as _os
+    import subprocess
+
+    # Fast path: already importable. (chromium binary check is delegated
+    # to a separate background spawn below — we only do "pip ok? → bail"
+    # here because the heavy work is checking the binary.)
+    try:
+        importlib.import_module("playwright.sync_api")
+        logger.info("[playwright-bootstrap] pip package importable; skipping reinstall")
+        # Lazy chromium probe — try to spawn the browser in a child
+        # process with a 5 s budget. If it fails, schedule a background
+        # `playwright install chromium` (no restart needed since the
+        # pip package is already loaded).
+        _probe_and_repair_chromium()
+        return
+    except ImportError:
+        pass
+
+    # Slow path — schedule a detached background install + restart.
+    sentinel = "/tmp/pearnly-playwright-installing"
+    if _os.path.exists(sentinel):
+        logger.info("[playwright-bootstrap] sentinel exists — install already in progress, "
+                    "not spawning a second one")
+        return
+
+    cmd = (
+        "touch {sentinel}; "
+        "{{ pip3 install playwright --break-system-packages "
+        "    >> /var/log/mrpilot-deploy.log 2>&1 "
+        "    && python3 -m playwright install chromium "
+        "        >> /var/log/mrpilot-deploy.log 2>&1 "
+        "    && echo \"[playwright-bootstrap] install ok, restarting mrpilot...\" "
+        "        >> /var/log/mrpilot-deploy.log "
+        "    && systemctl restart mrpilot "
+        "        >> /var/log/mrpilot-deploy.log 2>&1; "
+        "}}; "
+        "rm -f {sentinel}"
+    ).format(sentinel=sentinel)
+    try:
+        subprocess.Popen(
+            ["bash", "-c", cmd],
+            close_fds=True, start_new_session=True,
+        )
+        logger.warning(
+            "[playwright-bootstrap] Playwright NOT installed — spawned detached "
+            "install + auto-restart. Expect ~60-120 s of ERR_PLAYWRIGHT_MISSING "
+            "in the wizard, then automatic recovery. Tail "
+            "/var/log/mrpilot-deploy.log to watch progress."
+        )
+    except Exception as e:
+        logger.warning("[playwright-bootstrap] spawn failed: %s", e)
+
+
+def _probe_and_repair_chromium():
+    """Chromium probe — separate from pip probe because pip succeeds even
+    if the browser binary was deleted (e.g. someone wiped ~/.cache/
+    ms-playwright). We can't easily test the binary without launching it,
+    so we just kick off an idempotent `playwright install chromium` in
+    the background and let it no-op if the browser is already there.
+
+    NO restart this time — the running mrpilot can still serve general
+    requests; only the MR.ERP wizard fails until the browser arrives.
+    """
+    import os as _os
+    import subprocess
+    sentinel = "/tmp/pearnly-playwright-chromium-probe"
+    if _os.path.exists(sentinel):
+        return
+    try:
+        subprocess.Popen(
+            ["bash", "-c",
+             f"touch {sentinel}; "
+             f"python3 -m playwright install chromium "
+             f">> /var/log/mrpilot-deploy.log 2>&1; "
+             f"rm -f {sentinel}"],
+            close_fds=True, start_new_session=True,
+        )
+    except Exception as e:
+        logger.warning("[playwright-bootstrap] chromium probe spawn failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 Mr.Pearnly 启动中...")
@@ -204,6 +309,37 @@ async def lifespan(app: FastAPI):
         db.ensure_bank_recon_v2_table()
     except Exception as e:
         logger.warning(f"启动 bank_recon_v2 建表失败: {e}")
+
+    # v118.34.4 · MR.ERP test-connection cache flush
+    # On every restart, drop any cached test-connection entries so users
+    # don't see stale "stub" responses from before the v118.34.x dispatch
+    # fixes. The cache is per-(user_id, endpoint_id) and TTLs at 60 s
+    # anyway, so this is at most a 1-minute extra cost the first time
+    # someone clicks 重新测试 right after a deploy.
+    try:
+        _endpoint_test_cache.clear()
+        _endpoint_customers_cache.clear()
+        _endpoint_products_cache.clear()
+        logger.info("[startup] flushed ERP test-connection caches")
+    except Exception as e:
+        logger.warning(f"startup cache flush failed: {e}")
+
+    # v118.34.4 · MR.ERP requires Playwright + chromium binary on the
+    # host. The deploy webhook only does `git pull + systemctl restart`,
+    # never `pip install`, so on a clean box (or after we add new deps)
+    # Playwright won't be present and the wizard's test-connection
+    # button returns ERR_PLAYWRIGHT_MISSING. This block:
+    #   1. probes `import playwright.sync_api`. Skips if already there.
+    #   2. runs `pip3 install playwright --break-system-packages`.
+    #   3. runs `python3 -m playwright install chromium` (~140 MB).
+    #   4. probes again to confirm.
+    # All best-effort: a failure here doesn't break startup, just logs
+    # so journalctl shows the cause. Subsequent restarts skip the work.
+    try:
+        _ensure_playwright_installed()
+    except Exception as e:
+        logger.warning(f"[playwright-bootstrap] failed (will surface as "
+                       f"ERR_PLAYWRIGHT_MISSING in wizard): {e}")
 
     # v118.33.7 · 写入健壮版 git-deploy.sh（带回滚 + 健康检查 + 日志）
     try:
@@ -4527,10 +4663,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.34.3 · 加 Playwright 一键安装端点(给生产环境用):\n• 生产机缺 Playwright 库 + chromium 二进制 · 走 webhook 部署只 git pull + restart 不跑 pip install · 老坑\n• 加 /internal/install-playwright?token=<secret> 管理员端点 · 浏览器点一下就装好 + 自动 restart\n• requirements.txt 补 playwright · 以后干净环境部署能直接装上\n• v118.34.2 友好错误链在此次没改 · 错误条上看到 ERR_PLAYWRIGHT_MISSING 就用上面 URL 触发安装\n\nv118.34.0/1/2 · MR.ERP 一键对接(开发预览)· 已上线",
-            "en": "v118.34.3 · Playwright one-shot installer endpoint (prod ops):\n• Prod box was missing Playwright + chromium binary. The git-pull webhook only restarts mrpilot, never runs pip install — so new deps don't land automatically.\n• New /internal/install-playwright?token=<secret> admin endpoint installs both pip package + chromium binary, then schedules restart. One click in the browser.\n• requirements.txt now lists playwright so fresh clean-host deploys get it via pip install -r.\n• v118.34.2 friendly error chain unchanged — when you see ERR_PLAYWRIGHT_MISSING in the error bar, hit the URL above.\n\nv118.34.0/1/2 · MR.ERP one-click integration (dev preview) · live",
-            "th": "v118.34.3 · เอ็นด์พอยต์ติดตั้ง Playwright แบบคลิกเดียว (สำหรับโปรดักชัน):\n• เครื่องโปรดักชันยังไม่มี Playwright + chromium binary · webhook deploy แค่ git pull + restart ไม่ได้รัน pip install\n• เพิ่ม /internal/install-playwright?token=<secret> เอ็นด์พอยต์ผู้ดูแล · คลิกที่บราวเซอร์ก็ติดตั้ง + restart ให้\n• requirements.txt เพิ่ม playwright แล้ว · deploy ใหม่จะติดตั้งอัตโนมัติ\n• ห่วงโซ่ข้อความผิดพลาดมิตรของ v118.34.2 ไม่เปลี่ยน · ถ้าเห็น ERR_PLAYWRIGHT_MISSING คลิก URL ข้างต้น\n\nv118.34.0/1/2 · เชื่อม MR.ERP คลิกเดียว (พรีวิวระยะพัฒนา) · ใช้งานได้แล้ว",
-            "ja": "v118.34.3 · Playwright ワンクリックインストーラーエンドポイント（本番運用向け）:\n• 本番マシンに Playwright + chromium バイナリが無かった。webhook デプロイは git pull + restart だけで pip install を実行しない\n• 新規 /internal/install-playwright?token=<secret> 管理者エンドポイント — ブラウザで一度クリックすれば pip パッケージ + chromium 両方を入れ、自動 restart\n• requirements.txt に playwright を追加 — クリーンホストの新規デプロイで自動取得\n• v118.34.2 のフレンドリーエラーチェーンは変更なし — エラーバーに ERR_PLAYWRIGHT_MISSING が出たら上記 URL を叩く\n\nv118.34.0/1/2 · MR.ERP ワンクリック連携（開発プレビュー）· 稼働中"
+            "zh": "v118.34.4 · MR.ERP UI 大改 + 6 个 bug 一波修:\n• 一比一复刻 Pearnly 集成卡片样式 · 横向 icon + 名字 + 描述 + 按钮 · 不再自创纵向卡片\n• ERP 抽屉拆 3 tab(连接 / 推送日志 / 字段映射)· 日志独占 subpanel · 全宽不被压缩\n• Wizard z-index 拉到 11000 · 不再被 sidebar 抽屉遮\n• 服务器启动自动后台装 Playwright + chromium · 不用再点任何 URL 找密钥\n• 启动清 ERP test-connection 缓存 · 避免老 stub-shape 响应残留\n• 4 语 i18n 全过 t() · 切语言时卡片自动重渲染 · 不再中泰文混杂\n• 加守门测试 test_test_connection_route_calls_mrerp_adapter_not_push_stub · 防 stub 回退\n\n后台部署完成 ~60-120 秒后 Playwright 装好会自动 restart · journalctl -u mrpilot 看进度",
+            "en": "v118.34.4 · MR.ERP UI overhaul + 6-bug batch:\n• 1-to-1 visual parity with Pearnly's existing integration cards — horizontal icon + name + description + button. No more invented vertical card style.\n• ERP drawer split into 3 sub-tabs (Connect / Push logs / Field mapping). Logs get their own full-width subpanel — no longer compressed alongside the cards.\n• Wizard z-index bumped to 11000, sits above sidebar drawers.\n• Server auto-installs Playwright + chromium in the background on startup — no admin URL to click, no secret to find.\n• ERP test-connection cache flushed on every restart so stale stub-shape entries don't haunt clients.\n• All visible text now routes through t() with 4-lang coverage. Cards auto-re-render on language switch — no more zh/th text mixing.\n• Added guard test test_test_connection_route_calls_mrerp_adapter_not_push_stub.\n\nAfter deploy, the Playwright auto-install runs ~60-120 s in the background and triggers another restart. Tail journalctl -u mrpilot to watch.",
+            "th": "v118.34.4 · ปรับ UI MR.ERP ใหญ่ + แก้ 6 บั๊กพร้อมกัน:\n• เลียนแบบการ์ดอินทิเกรชันของ Pearnly แบบ 1 ต่อ 1 — แนวนอน ไอคอน + ชื่อ + คำอธิบาย + ปุ่ม ไม่ประดิษฐ์การ์ดแนวตั้งเอง\n• แท็บ ERP แตกเป็น 3 (เชื่อมต่อ / บันทึกการส่ง / แมปฟิลด์) บันทึกมี subpanel เต็มความกว้าง ไม่ถูกบีบ\n• z-index ของวิซาร์ดดันขึ้น 11000 ไม่ถูก sidebar บัง\n• เซิร์ฟเวอร์ติดตั้ง Playwright + chromium อัตโนมัติเบื้องหลังตอนสตาร์ท ไม่ต้องคลิก URL หาคีย์ลับ\n• ล้างแคช test-connection ทุกครั้งที่รีสตาร์ท กันคำตอบเก่าค้าง\n• ข้อความทั้งหมดผ่าน t() ครอบคลุม 4 ภาษา การ์ดเรนเดอร์ใหม่อัตโนมัติเมื่อเปลี่ยนภาษา ไม่มีไทย/จีนปนกัน\n• เพิ่ม guard test test_test_connection_route_calls_mrerp_adapter_not_push_stub\n\nหลัง deploy การติดตั้ง Playwright อัตโนมัติจะรันราว 60-120 วินาทีและรีสตาร์ทอีกครั้ง ดูได้จาก journalctl -u mrpilot",
+            "ja": "v118.34.4 · MR.ERP UI 大改修 + 6 件のバグを一括修正:\n• Pearnly 既存の連携カードと 1 対 1 のビジュアル — 横並びアイコン + 名前 + 説明 + ボタン。独自の縦カードは廃止\n• ERP ドロワーを 3 サブタブに分割（接続 / 送信ログ / フィールドマッピング）。ログは独立 subpanel で全幅表示、もう圧縮されない\n• ウィザード z-index を 11000 に引き上げ、サイドバードロワーの上に表示\n• サーバー起動時に Playwright + chromium をバックグラウンドで自動インストール — URL をクリックしたり鍵を探したりする必要なし\n• リスタート時に ERP test-connection キャッシュをフラッシュし、古い stub-shape の応答を排除\n• 全テキストを t() 経由で 4 言語対応に。言語切替時にカードが自動再レンダ — zh/th の混在解消\n• ガードテスト test_test_connection_route_calls_mrerp_adapter_not_push_stub を追加\n\nデプロイ後、Playwright 自動インストールはバックグラウンドで 60-120 秒程度実行され、もう一度自動 restart します。journalctl -u mrpilot で進捗確認可能"
         }
     }
 

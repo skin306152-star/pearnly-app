@@ -58,6 +58,61 @@ class StubContractTests(unittest.TestCase):
         self.assertEqual(http_status, 0)
         self.assertIn("not wired", body.lower())
 
+    def test_test_connection_route_calls_mrerp_adapter_not_push_stub(self):
+        """v118.34.4 (Zihao 2026-05-19 拍板) · The named guard the user
+        explicitly demanded. Source of truth for the contract:
+
+            "test-connection 路由 mrerp 分支改成直接 instantiate
+             MRERPAdapter + 调 login + select_company · 不要走
+             push_to_endpoint stub"
+
+        We verify this by calling _erp.test_mrerp_endpoint (the function
+        the routes — both /api/erp/test-connection and
+        /api/erp/endpoints/:id/test-connection — delegate to for mrerp)
+        with empty config. The result MUST be the rich `test_mrerp_endpoint`
+        shape ({ok, companies, error_friendly, ...}), NOT the
+        push_mrerp stub shape ({success, response_body, error_msg}).
+
+        Critically, the raw_error/response_body MUST NOT carry the
+        stub's "not wired into push_to_endpoint yet" phrase — that's
+        the smoking-gun string that surfaced in the user's F12 trace.
+
+        If this test ever fails, either:
+          (a) someone rewired the route through ADAPTER_REGISTRY again
+              (the original C-1 trap), OR
+          (b) someone changed test_mrerp_endpoint's response shape and
+              broke the wizard's UI contract.
+        Either way: revert their commit, do not patch around it.
+        """
+        result = _erp.test_mrerp_endpoint({})
+        # ── Shape: rich, not stub ──
+        for required_key in ("ok", "companies", "error_code",
+                             "error_friendly", "raw_error", "elapsed_ms"):
+            self.assertIn(required_key, result,
+                          f"rich shape missing {required_key!r}; "
+                          f"someone may have routed mrerp through "
+                          f"push_to_endpoint again: {result!r}")
+        # The stub-shape keys must NOT leak through.
+        for stub_key in ("response_body", "http_status"):
+            self.assertNotIn(stub_key, result,
+                             f"stub-shape key {stub_key!r} leaked into "
+                             f"test_mrerp_endpoint result; mrerp branch "
+                             f"is delegating through push_mrerp again: "
+                             f"{result!r}")
+        # The smoking-gun substring from the user's F12 trace.
+        joined = " ".join([
+            str(result.get("raw_error") or ""),
+            str(result.get("error_code") or ""),
+            " ".join((result.get("error_friendly") or {}).values()),
+        ]).lower()
+        self.assertNotIn("not wired into push_to_endpoint", joined,
+                         f"stub message leaked into mrerp test-connection: "
+                         f"{result!r}")
+        # And empty-config short-circuit returns ERR_NO_CREDS, not
+        # ERR_PUSH_NOT_WIRED — proves we went through test_mrerp_endpoint
+        # not push_mrerp.
+        self.assertEqual(result.get("error_code"), "ERR_NO_CREDS")
+
     def test_adapter_registry_mrerp_points_at_stub(self):
         self.assertIs(_erp.ADAPTER_REGISTRY.get("mrerp"), _erp.push_mrerp)
 

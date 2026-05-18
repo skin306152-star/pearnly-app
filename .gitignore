@@ -9,6 +9,7 @@ venv/
 
 # 部署包（临时文件）
 _pkg/
+_pkg_tmpstatic/
 *.tar.gz
 deploy_v*.tar.gz
 

@@ -29,7 +29,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.ocr.pipeline import run_on_path  # noqa: E402
+from services.ocr.pipeline import (  # noqa: E402
+    InvoicePatternMemory,
+    run_on_path,
+)
 
 
 # ============================================================
@@ -117,15 +120,19 @@ def serialize_pipeline_result(pr_obj, path):
     }
 
 
-def run_batch(name, file_list):
-    """Run pipeline on every file in list, return list of dicts."""
+def run_batch(name, file_list, pattern_memory=None):
+    """Run pipeline on every file in list, return list of dicts.
+
+    pattern_memory: shared InvoicePatternMemory passed to every pipeline.run
+    so the template-familiarity check learns across files within the batch.
+    """
     results = []
     for i, fp in enumerate(file_list, 1):
         rel_name = Path(fp).name
         print(f"  [{i:2}/{len(file_list)}] {rel_name[:70]}", flush=True)
         t0 = time.time()
         try:
-            pr_obj = run_on_path(fp)
+            pr_obj = run_on_path(fp, pattern_memory=pattern_memory)
             r = serialize_pipeline_result(pr_obj, fp)
             r["status"] = "OK"
             # Compact echo
@@ -202,13 +209,18 @@ def summarize_batch(batch_name, results):
         for p in r.get("pages", []):
             chains[tuple(p["layer_chain"])] += 1
             for t in p["trigger_reasons"]:
-                if "confidence" in t.lower():
-                    trigger_buckets["low_confidence"] += 1
-                elif "missing" in t.lower():
+                tl = t.lower()
+                if "conf" in tl:
+                    trigger_buckets["word_low_confidence"] += 1
+                elif "not found in l1" in tl:
+                    trigger_buckets["l1_hallucination"] += 1
+                elif "pattern" in tl and "differs" in tl:
+                    trigger_buckets["pattern_anomaly"] += 1
+                elif "missing" in tl:
                     trigger_buckets["missing_field"] += 1
-                elif "math" in t.lower():
+                elif "math" in tl:
                     trigger_buckets["math_fail"] += 1
-                elif "tax" in t.lower():
+                elif "tax" in tl:
                     trigger_buckets["tax_format"] += 1
                 else:
                     trigger_buckets["other"] += 1
@@ -297,6 +309,11 @@ def main():
     for name, files in batches:
         print(f"  batch {name}: {len(files)} files")
 
+    # B1 fix: shared pattern memory across all batches, so template
+    # familiarity check accumulates knowledge of each seller_tax's
+    # invoice_number prefixes.
+    shared_pattern_memory = InvoicePatternMemory()
+
     all_results = {}
     summaries = []
     for name, files in batches:
@@ -315,7 +332,7 @@ def main():
             })
             continue
         print(f"\n=== batch '{name}' ({len(files)} files) ===", flush=True)
-        results = run_batch(name, files)
+        results = run_batch(name, files, pattern_memory=shared_pattern_memory)
         all_results[name] = results
         summaries.append(summarize_batch(name, results))
 

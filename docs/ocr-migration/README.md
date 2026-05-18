@@ -22,10 +22,12 @@
 - [x] **阶段 3 第 3 步**:`services/ocr/layer3_fallback.py`(Flash 视觉兜底)
 - [x] **(插入)调研**:测试数据多样性 → 产出 [test-data-analysis.md](./test-data-analysis.md)
 - [x] **阶段 3 第 4 步**:`services/ocr/pipeline.py` + 三批测试(49 文件 / 97 页 / 0 异常 / ฿0.072/页)→ 产出 [pipeline-test-results.md](./pipeline-test-results.md)
+- [x] **阶段 3 第 5 步**:**B1/B2 修复 + 性能压测 + 漏埋点排查**(IV69 准确率 57%→86%,L3 失败率 2%→1%,c=5 加速 4.2x,**揭示真账单 vs dashboard 7.4x 偏差是 P0 上线 blocker**)→ 产出 [performance-benchmark.md](./performance-benchmark.md) + [fast-path-design.md](./fast-path-design.md)(§六/§七 漏埋点 + 100% 埋点设计)
 
 下一步候选(由用户决策):
-- [ ] 修阶段 3 第 4 步发现的 B1 / B2(IV69 模板误读 / Flash JSON 失败)
+- [ ] **🔴 P0**:接入 app.py 时用 fast-path-design.md §七 的"强制埋点 checklist",确保新 pipeline 真账单 vs dashboard 偏差 < 10%
 - [ ] 接入 app.py(主路由 / LINE / email / recon batch 4 个入口)+ feature flag `OCR_USE_NEW_PIPELINE`
+- [ ] 集成 layer 0 text_path 快速通道(80% 电子 PDF 场景成本 -60%)
 - [ ] 严格人工 ground truth N=100+ 准确率 baseline 单独立项
 - [ ] 测试通过 + 全量切换 → 删旧代码(决策 5)
 
@@ -49,6 +51,8 @@
 | [migration-plan.md](./migration-plan.md) | 阶段 2 输出 | 文件/函数级迁移计划 + 6 项已确认决策 |
 | [test-data-analysis.md](./test-data-analysis.md) | 阶段 3 中段 | 测试数据多样性分析 + 12 张代表子集挑选 |
 | [pipeline-test-results.md](./pipeline-test-results.md) | 阶段 3 第 4 步输出 | 三批 49 文件 / 97 页 / 触发率 / 成本 / 准确率 / 上线建议 |
+| [fast-path-design.md](./fast-path-design.md) | 阶段 3 第 5 步输出 | 快速通道集成 + 监控埋点对齐 + 漏埋点排查(7.4x 偏差)+ 100% 埋点设计 |
+| [performance-benchmark.md](./performance-benchmark.md) | 阶段 3 第 5 步输出 | 并发 c=1/5/10 + 大文件压测 / SLA / 月底量级估算 / 上线建议 |
 
 ## 与屎山清理的协作
 

@@ -70,7 +70,11 @@ DEFAULT_MODEL = os.environ.get("OCR_FLASH_MODEL", "gemini-2.5-flash")
 DEFAULT_MAX_RETRIES = 1
 DEFAULT_TIMEOUT_SECONDS = 90  # longer than layer 2 — vision calls are slower
 DEFAULT_TEMPERATURE = 0.0
-DEFAULT_MAX_OUTPUT_TOKENS = 4096
+# B2 fix: bumped from 4096 to 8192. Real-world Thai invoices serialized
+# to JSON with all line items can exceed 4096 output tokens, leading to
+# truncated unterminated-string JSON errors. 8192 leaves headroom for
+# 50+ line items + long Thai company names + full address.
+DEFAULT_MAX_OUTPUT_TOKENS = 8192
 
 # Truncate layer 1 OCR text to avoid bloating the prompt on large pages.
 # Layer 3 has the IMAGE for ground truth; OCR text is just a hint.
@@ -364,16 +368,42 @@ def _call_gemini_with_retry(
             f"layer3: image_bytes not a valid image: {type(e).__name__}: {e}"
         ) from e
 
-    user_prompt = _build_user_prompt(layer1_text, layer2_invoice, trigger_reasons)
+    base_user_prompt = _build_user_prompt(layer1_text, layer2_invoice, trigger_reasons)
     model = _get_model(api_key=api_key, model_name=model_name)
 
     last_parse_error: Optional[str] = None
     last_raw_preview: str = ""
 
+    # B2 fix: retry prompt enhancement — on retry, append explicit JSON
+    # hygiene instructions to reduce chance of malformed JSON. Gemini Flash
+    # has been observed to emit unterminated strings mid-response,
+    # especially when serializing long Thai text. The retry hint tells the
+    # model what specifically went wrong.
+    _RETRY_HINT_BASE = (
+        "\n\nIMPORTANT — your previous response was invalid JSON. Common "
+        "failure modes:\n"
+        "  1. Unterminated string (missing closing double-quote)\n"
+        "  2. Unescaped newline inside a string value\n"
+        "  3. Missing comma between fields\n"
+        "  4. Trailing comma after last field\n"
+        "Output exactly ONE complete JSON object. Close every string with a "
+        "double-quote. Replace any literal newlines inside string values with "
+        "spaces. Do NOT use markdown code fences. Do NOT add commentary "
+        "before or after the JSON."
+    )
+
     for attempt in range(max_retries + 1):
+        # B2 fix: on retry, augment the user prompt with JSON hygiene rules
+        if attempt == 0:
+            current_user_prompt = base_user_prompt
+        else:
+            current_user_prompt = (
+                base_user_prompt + _RETRY_HINT_BASE
+                + f"\n\nPrevious parse error: {last_parse_error}"
+            )
         try:
             response = model.generate_content(
-                [_SYSTEM_PROMPT, pil_image, user_prompt],
+                [_SYSTEM_PROMPT, pil_image, current_user_prompt],
                 request_options={"timeout": timeout},
             )
         except Exception as e:

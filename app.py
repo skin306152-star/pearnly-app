@@ -3409,9 +3409,19 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
     # this shape. test_mrerp_endpoint is contracted to NEVER raise but
     # the route still wraps the call so a bug in the helper can't
     # surface as a 500 to the UI — we'd rather render a friendly bar.
+    #
+    # v118.34.10 (Zihao 2026-05-19 拍板) · MUST use asyncio.to_thread:
+    # MRERPAdapter uses Playwright's sync_api which explicitly refuses
+    # to start when there's a running asyncio loop. FastAPI handlers
+    # ARE the running loop, so a direct call raises
+    # "Playwright Sync API inside the asyncio loop". to_thread offloads
+    # to a worker thread (no running loop there), letting Playwright
+    # initialise cleanly. Same applies to every other route in this
+    # file that touches MRERPAdapter.
+    import asyncio as _asyncio
     if req.adapter == "mrerp":
         try:
-            return _erp.test_mrerp_endpoint(cfg)
+            return await _asyncio.to_thread(_erp.test_mrerp_endpoint, cfg)
         except Exception as e:
             logger.exception("erp_test_connection mrerp helper raised")
             return {
@@ -3429,8 +3439,9 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
             }
 
     # Other adapters: legacy ping. Keep the historical shape so
-    # webhook / flowaccount UIs aren't broken.
-    return _erp.test_endpoint_connection(req.adapter, cfg)
+    # webhook / flowaccount UIs aren't broken. push_webhook uses
+    # `requests.post` which is also sync I/O — to_thread either way.
+    return await _asyncio.to_thread(_erp.test_endpoint_connection, req.adapter, cfg)
 
 
 # C-1 (Zihao 2026-05-18 拍板) · 60-second TTL cache for per-endpoint
@@ -3480,12 +3491,15 @@ async def erp_endpoint_test_connection(
     config = ep.get("config") or {}
     # v118.34.2 (2026-05-19) · try/except wrapper mirrors the legacy
     # route so even a bug in test_mrerp_endpoint can't surface as a 500.
+    # v118.34.10 · asyncio.to_thread keeps Playwright's sync API off
+    # the FastAPI event loop (refuses to start otherwise).
+    import asyncio as _asyncio
     try:
         if adapter == "mrerp":
-            result = _erp.test_mrerp_endpoint(config)
+            result = await _asyncio.to_thread(_erp.test_mrerp_endpoint, config)
         else:
             # webhook / flowaccount / etc — defer to the existing ping test.
-            legacy = _erp.test_endpoint_connection(adapter, config)
+            legacy = await _asyncio.to_thread(_erp.test_endpoint_connection, adapter, config)
             result = {
                 "ok": bool(legacy.get("success")),
                 "elapsed_ms": legacy.get("elapsed_ms", 0),
@@ -3565,7 +3579,23 @@ async def erp_endpoint_customers(
         if cached is not None:
             return {**cached, "cached": True}
 
-    result = _erp.list_mrerp_customers(ep.get("config") or {})
+    # v118.34.10 · asyncio.to_thread — Playwright sync API in async loop trap.
+    import asyncio as _asyncio
+    try:
+        result = await _asyncio.to_thread(_erp.list_mrerp_customers, ep.get("config") or {})
+    except Exception as e:
+        logger.exception("list_mrerp_customers raised")
+        result = {
+            "ok": False, "customers": [],
+            "error_code": "ERR_UNEXPECTED",
+            "error_friendly": {
+                "zh": f"服务器内部错误:{type(e).__name__}",
+                "en": f"Internal server error: {type(e).__name__}",
+                "th": f"ข้อผิดพลาดของเซิร์ฟเวอร์: {type(e).__name__}",
+                "zh_TW": f"伺服器內部錯誤:{type(e).__name__}",
+            },
+            "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
+        }
     from datetime import datetime as _dt
     result["last_fetched_at"] = _dt.utcnow().isoformat() + "Z"
     result["cached"] = False
@@ -3608,7 +3638,23 @@ async def erp_endpoint_products(
         if cached is not None:
             return {**cached, "cached": True}
 
-    result = _erp.list_mrerp_products(ep.get("config") or {})
+    # v118.34.10 · asyncio.to_thread — Playwright sync API in async loop trap.
+    import asyncio as _asyncio
+    try:
+        result = await _asyncio.to_thread(_erp.list_mrerp_products, ep.get("config") or {})
+    except Exception as e:
+        logger.exception("list_mrerp_products raised")
+        result = {
+            "ok": False, "products": [],
+            "error_code": "ERR_UNEXPECTED",
+            "error_friendly": {
+                "zh": f"服务器内部错误:{type(e).__name__}",
+                "en": f"Internal server error: {type(e).__name__}",
+                "th": f"ข้อผิดพลาดของเซิร์ฟเวอร์: {type(e).__name__}",
+                "zh_TW": f"伺服器內部錯誤:{type(e).__name__}",
+            },
+            "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
+        }
     from datetime import datetime as _dt
     result["last_fetched_at"] = _dt.utcnow().isoformat() + "Z"
     result["cached"] = False
@@ -3645,8 +3691,11 @@ async def erp_push(req: ErpPushRequest, request: Request):
     if not endpoint.get("enabled", True):
         raise HTTPException(400, detail="erp.endpoint_disabled")
 
-    # 3) 推送
-    result = _erp.push_to_endpoint(endpoint, history)
+    # 3) 推送 · v118.34.10 · asyncio.to_thread keeps push_to_endpoint
+    # (which may call Playwright via push_mrerp once C-1 wires it,
+    # plus uses sync `requests` for webhook adapters) off the event loop.
+    import asyncio as _asyncio
+    result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
 
     # 4) 写日志
     log_id = db.insert_push_log(
@@ -4361,7 +4410,9 @@ async def erp_retry_push(log_id: str, request: Request):
     if not endpoint:
         raise HTTPException(404, detail="erp.endpoint_not_found")
 
-    result = _erp.push_to_endpoint(endpoint, history)
+    # v118.34.10 · asyncio.to_thread keeps push_to_endpoint off the loop.
+    import asyncio as _asyncio
+    result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
 
     # 写新一条日志(attempt 递增)
     new_log_id = db.insert_push_log(
@@ -4442,7 +4493,9 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
                 details.append({"log_id": log_id, "result": "skipped", "reason": "ref_deleted"})
                 continue
 
-            result = _erp.push_to_endpoint(endpoint, history)
+            # v118.34.10 · asyncio.to_thread keeps push_to_endpoint off the loop.
+            import asyncio as _asyncio
+            result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
             db.insert_push_log(
                 user_id=user["id"],
                 endpoint_id=endpoint["id"],
@@ -4806,8 +4859,8 @@ async def get_frontend_version():
         "ts": int(_t.time()),
         "playwright": _read_playwright_status(),
         "release_notes": {
-            "zh": "v118.34.9 · 极简化 · 加 deploy log 暴露 · 看到根因:\n• v118.34.7 / 8 连续两次都没落 · /api/version 的 ts 没变\n• 推测 v118.34.6 的 deploy.sh (没 timeout) 卡在 pip install -r requirements.txt 死循环 · webhook 后台进程没退出 · 健康检查超时回滚\n• v118.34.9:\n  - /api/version 加 deploy_log_tail (最后 40 行 mrpilot-deploy.log) 和 sentinels 字段 · 可以浏览器直接看到部署日志,定位根因\n  - 简化 deploy.sh:直接用 /opt/mrpilot/venv/bin/python(失败兜 /usr/bin/python3)· 不再 grep · 不再装全部 requirements\n  - 每步 timeout 60-120s · 卡死也不影响 deploy 完成\n  - lifespan 后台 spawn 撤回 systemd-run 复杂度 · 用普通 Popen\n\n部署完看 /api/version 的 deploy_log_tail 字段",
-            "en": "v118.34.9 · Maximum simplification + deploy log surfaced via /api/version:\n• v118.34.7 + v118.34.8 both silently rolled back. /api/version's `ts` field never advanced, meaning mrpilot v118.34.7/8 never restarted successfully.\n• Most likely cause: the v118.34.6 deploy.sh I wrote (still on disk, running every subsequent push) does `pip install -r requirements.txt` without a `timeout` wrapper. If that step hangs on network/dep resolution, the script never reaches `systemctl restart mrpilot` and the webhook subprocess stays parked indefinitely.\n• v118.34.9 changes:\n  - /api/version `playwright` now includes `deploy_log_tail` (last 40 lines of /var/log/mrpilot-deploy.log) and `sentinels` (any /tmp/pearnly-* markers). Browser-visible deploy diagnostics, no SSH.\n  - deploy.sh heredoc dropped the grep -oP autodetect — uses `/opt/mrpilot/venv/bin/python` with fallback to `/usr/bin/python3`. Just installs `playwright` (not -r requirements.txt). Each step wrapped in `timeout` (60 s pip, 120 s chromium).\n  - lifespan-spawned install reverted to simple `subprocess.Popen` (no systemd-run experiment).\n\nAfter deploy, the /api/version response will tell us exactly what the deploy.sh saw.",
+            "zh": "v118.34.10 · 修 sync Playwright in async loop · 加守门测试:\n• v118.34.9 装上 Playwright 后真域名点测试连接报「It looks like you are using Playwright Sync API inside the asyncio loop」\n• 根因:FastAPI 路由是 async event loop · MRERPAdapter 用 Playwright sync_api · 直调必炸\n• 修:所有 async 路由的 sync helper 调用都包 await asyncio.to_thread(...)\n  - /api/erp/test-connection · /api/erp/endpoints/:id/test-connection\n  - /api/erp/endpoints/:id/customers · /api/erp/endpoints/:id/products\n  - /api/erp/push · 重试单条 · 批量重推\n• 加守门测试 AsyncLoopOffloadTests (5 个) · 真 async client + 探针 helper · 跑 unittest.IsolatedAsyncioTestCase · 防 sync/async 冲突再回归\n\n刷浏览器(Ctrl+F5)再点测试连接 · 这次应该真返 companies 或 ERR_AUTH",
+            "en": "v118.34.10 · Fix sync Playwright in asyncio loop + add async guard tests:\n• v118.34.9 finally got Playwright installed on prod, but clicking 'Test connection' surfaced 'It looks like you are using Playwright Sync API inside the asyncio loop. Please use the Async API instead.'\n• Root cause: FastAPI routes are `async def` running in an asyncio event loop. MRERPAdapter uses Playwright's sync_api, which explicitly detects asyncio.get_running_loop() and refuses to start when one exists. Calling the sync helper directly inside an async route is therefore a hard fail.\n• Fix: every async route that delegates to a sync MRERPAdapter helper now wraps the call in `await asyncio.to_thread(...)`. The helper runs on a worker thread (no loop in scope), Playwright sync_api is happy.\n• Routes updated: /api/erp/test-connection (legacy + per-endpoint), /api/erp/endpoints/:id/customers, /api/erp/endpoints/:id/products, /api/erp/push (single + retry single + batch retry).\n• Added AsyncLoopOffloadTests (5 cases, unittest.IsolatedAsyncioTestCase + httpx.AsyncClient + ASGITransport) that plant a tripwire sync helper which raises if called within a running loop. Catches any future route that forgets to offload.\n\nHard-refresh (Ctrl+F5), click Test connection — should return companies or ERR_AUTH, not the asyncio error.",
             "th": "v118.34.5 · Playwright ติดตั้งจริง + การ์ด Xero สอดคล้อง + today-stats ไม่หลุด:\n• /api/version เพิ่มฟิลด์ playwright.playwright_installed / chromium_installed — ดูสถานะติดตั้งในเบราว์เซอร์ได้ทันที ไม่ต้อง SSH\n• pip install playwright ตอนสตาร์ทเปลี่ยนเป็นแบบ synchronous (ไม่รวม chromium · ปกติ <15 วินาที) chromium ยังลงเบื้องหลังเหมือนเดิม\n• git-deploy.sh เพิ่มขั้นตอน pip install + playwright install chromium · MAX_WAIT ดันเป็น 90 วินาที\n• เขียนการ์ด Xero ใหม่ใช้ .integration-row เลย์เอาต์ — เหมือนการ์ด MR.ERP / FlowAccount ตรงกัน 1 ต่อ 1 เพิ่มสีไอคอน .ic-xero ฟ้าอ่อน\n• ข้อความ 'วันนี้ยังไม่มีการส่ง' ย้ายจากแท็บ Connect → แท็บ Push Logs\n\nหลัง deploy เข้า https://pearnly.com/api/version ดูฟิลด์ playwright.playwright_installed",
             "ja": "v118.34.5 · Playwright が実際にインストールされる + Xero カード整合 + today-stats のリーク修正:\n• /api/version に playwright.playwright_installed / chromium_installed フィールド追加 — ブラウザでインストール状態を確認可能、SSH 不要\n• 起動時の pip install playwright を **同期** 化（chromium は除く · 通常 <15 秒）。chromium は引き続きバックグラウンドで\n• git-deploy.sh に pip install -r requirements.txt + playwright install chromium 手順を追加 · MAX_WAIT を 90 秒に拡大\n• Xero カードを .integration-row レイアウトに書き直し — MR.ERP / FlowAccount カードと 1 対 1 で一致。.ic-xero 薄青アイコン追加\n• 「本日はまだ送信なし」を Connect タブから Push Logs タブに移動\n\nデプロイ後 https://pearnly.com/api/version で playwright.playwright_installed=true を確認"
         }

@@ -342,5 +342,219 @@ class RouteDispatchTests(unittest.TestCase):
         mrerp_mock.assert_not_called()
 
 
+@unittest.skipUnless(
+    __import__("importlib").util.find_spec("fastapi") is not None
+    and __import__("importlib").util.find_spec("httpx") is not None,
+    "needs fastapi + httpx; the async route test is covered server-side.",
+)
+class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
+    """v118.34.10 (Zihao 2026-05-19 拍板) · The named guard the user
+    explicitly demanded after seeing the
+        'Playwright Sync API inside the asyncio loop'
+    error from a real production click.
+
+    Source contract:
+        > test_test_connection_route_in_async_context_does_not_block
+        > 在真 async 环境里调一次 · 确保不出 sync/async 冲突
+
+    The flaw the user caught: my existing unit tests run inside
+    pytest/unittest sync land, so they never exercised the route's
+    async-handler-to-sync-Playwright path. The bug only shows up when
+    the route's `await` chain reaches the Playwright sync_api with a
+    running asyncio loop in scope. Playwright explicitly detects
+    asyncio.get_running_loop() and refuses to start.
+
+    These tests plant a "tripwire" sync helper that does the same
+    detection. If the route calls the helper without offloading
+    (i.e. uses `_erp.test_mrerp_endpoint(cfg)` directly), the helper
+    runs inside the event loop, the tripwire fires, the test fails
+    with a clear message. If the route uses
+    `await asyncio.to_thread(_erp.test_mrerp_endpoint, cfg)`, the
+    helper runs in a worker thread (no loop), tripwire passes.
+
+    Covers ALL the production async routes that touch MRERPAdapter:
+      • /api/erp/test-connection
+      • /api/erp/endpoints/:id/test-connection
+      • /api/erp/endpoints/:id/customers
+      • /api/erp/endpoints/:id/products
+      • /api/erp/push
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        import app   # noqa
+        cls.app_module = app
+
+    @staticmethod
+    def _tripwire_sync_helper(*args, **kwargs):
+        """Pretends to be a sync helper. Records whether it was called
+        from within an asyncio loop (BAD) or from a worker thread (GOOD).
+
+        Returns the rich-shape success dict so the route's downstream
+        code is happy — we don't want to mask the bug behind a different
+        failure mode."""
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            # We're inside an event loop — route did NOT offload.
+            # Raise the exact Playwright error text so the failure
+            # mode matches what the user saw on production.
+            raise RuntimeError(
+                "It looks like you are using Playwright Sync API "
+                "inside the asyncio loop. Please use the Async API "
+                "instead. (tripwire from "
+                "AsyncLoopOffloadTests · loop=" + repr(loop) + ")"
+            )
+        except RuntimeError as e:
+            if "Sync API inside" in str(e):
+                raise
+            # No running loop — we're in a thread. Good.
+        return {
+            "ok": True, "elapsed_ms": 12, "companies": [],
+            "error_code": None, "error_friendly": None, "raw_error": None,
+            "customers": [], "products": [],
+            "success": True, "http_status": 200, "response_body": "ok",
+            "error_msg": None, "request_body": None, "adapter": "mrerp",
+        }
+
+    async def _make_async_client(self):
+        import httpx
+        try:
+            from httpx import ASGITransport
+            transport = ASGITransport(app=self.app_module.app)
+            return httpx.AsyncClient(transport=transport, base_url="http://test")
+        except ImportError:
+            # Older httpx without explicit ASGITransport
+            return httpx.AsyncClient(app=self.app_module.app, base_url="http://test")
+
+    async def test_test_connection_route_in_async_context_does_not_block(self):
+        """The named test from the user's spec. Hits the legacy
+        /api/erp/test-connection route with adapter=mrerp from a real
+        async client and asserts the route offloads to a thread."""
+        app = self.app_module
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app._erp, "test_mrerp_endpoint",
+                          side_effect=self._tripwire_sync_helper):
+            client = await self._make_async_client()
+            async with client:
+                r = await client.post("/api/erp/test-connection", json={
+                    "adapter": "mrerp",
+                    "config": {"username": "u", "password": "p"},
+                })
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(
+            body.get("ok"),
+            f"route response not ok (tripwire likely fired): {body!r}",
+        )
+
+    async def test_per_endpoint_test_connection_route_offloads(self):
+        """Same tripwire on the per-endpoint variant."""
+        app = self.app_module
+        fake_ep = {
+            "id": "ep-1", "adapter": "mrerp", "config": {"username": "u"},
+            "enabled": True,
+        }
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
+             patch.object(app._erp, "test_mrerp_endpoint",
+                          side_effect=self._tripwire_sync_helper):
+            client = await self._make_async_client()
+            async with client:
+                r = await client.post(
+                    "/api/erp/endpoints/ep-1/test-connection?refresh=1",
+                )
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(
+            body.get("ok"),
+            f"per-endpoint route tripwire fired: {body!r}",
+        )
+
+    async def test_customers_route_offloads(self):
+        app = self.app_module
+        fake_ep = {"id": "ep-1", "adapter": "mrerp", "config": {}, "enabled": True}
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
+             patch.object(app._erp, "list_mrerp_customers",
+                          side_effect=self._tripwire_sync_helper):
+            client = await self._make_async_client()
+            async with client:
+                r = await client.get(
+                    "/api/erp/endpoints/ep-1/customers?refresh=1",
+                )
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        # Tripwire dict carries ok=True. If route bypassed to_thread,
+        # the route would have hit RuntimeError and returned an
+        # error_code in the friendly catch block.
+        self.assertTrue(
+            body.get("ok"),
+            f"customers route tripwire fired: {body!r}",
+        )
+
+    async def test_products_route_offloads(self):
+        app = self.app_module
+        fake_ep = {"id": "ep-1", "adapter": "mrerp", "config": {}, "enabled": True}
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
+             patch.object(app._erp, "list_mrerp_products",
+                          side_effect=self._tripwire_sync_helper):
+            client = await self._make_async_client()
+            async with client:
+                r = await client.get(
+                    "/api/erp/endpoints/ep-1/products?refresh=1",
+                )
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(
+            body.get("ok"),
+            f"products route tripwire fired: {body!r}",
+        )
+
+    async def test_push_route_offloads(self):
+        """`push_to_endpoint` MUST also be offloaded because once the
+        mrerp branch lights up it will drive MRERPAdapter the same way."""
+        app = self.app_module
+        fake_ep = {"id": "ep-1", "adapter": "webhook",
+                   "config": {"url": "http://example/"}, "enabled": True}
+        fake_history = {
+            "id": "h-1", "invoice_no": "INV-1",
+            "seller_name": "S", "total_amount": "100",
+        }
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history), \
+             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
+             patch.object(app.db, "insert_push_log", return_value="log-1"), \
+             patch.object(app.db, "update_endpoint_stats", return_value=None), \
+             patch.object(app.db, "update_history_push_status", return_value=None), \
+             patch.object(app._erp, "push_to_endpoint",
+                          side_effect=self._tripwire_sync_helper):
+            client = await self._make_async_client()
+            async with client:
+                r = await client.post("/api/erp/push", json={
+                    "history_id": "h-1", "endpoint_id": "ep-1",
+                })
+        # Route returns ok status; key thing is the route DIDN'T hit
+        # the tripwire (which would've raised RuntimeError).
+        self.assertIn(r.status_code, (200, 500), r.text)
+        if r.status_code == 500:
+            # Inspect what raised; tripwire-fired indicates the bug.
+            self.assertNotIn("Playwright Sync API", r.text,
+                             f"push route did NOT offload: {r.text}")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

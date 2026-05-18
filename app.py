@@ -1603,7 +1603,7 @@ async def ocr_recognize(
                     logger.info(f"🚀 [Cache] 自动推送已入队 · history={cached['id']}")
             except Exception as e:
                 logger.warning(f"[Cache] 自动推送入队失败: {e}")
-            # v27.8.1.3 · 同时触发 Xero / MR.ERP 自动推(独立通道)
+            # v27.8.1.3 · 同时触发 Xero 自动推(独立通道)
             try:
                 _trigger_auto_push_all(str(user["id"]), _tid(user), cached["id"])
             except Exception as e:
@@ -2103,7 +2103,7 @@ async def ocr_recognize(
                 logger.info(f"🚀 自动推送已入队 · {len(history_ids)} 张发票 × {len(auto_eps)} 端点")
         except Exception as e:
             logger.warning(f"自动推送入队失败(不影响识别): {e}")
-        # v27.8.1.3 · 同时触发 Xero / MR.ERP 自动推(独立通道 · 跟 webhook 并存)
+        # v27.8.1.3 · 同时触发 Xero 自动推(独立通道 · 跟 webhook 并存)
         try:
             for hid in history_ids:
                 _trigger_auto_push_all(str(user["id"]), _tid(user), hid)
@@ -3325,7 +3325,7 @@ async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict
 
 
 # ============================================================
-# v27.8.1.3 · Xero / MR.ERP 后台自动推(OCR 完成 hook 调用)
+# v27.8.1.3 · Xero 后台自动推(OCR 完成 hook 调用)
 # ============================================================
 async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: str):
     """v27.8.1.3 · 自动推 Xero(后台 · 失败只写日志不抛)"""
@@ -7706,7 +7706,7 @@ async def delete_mapping_product(mapping_id: str, request: Request):
 async def erp_connectors_status(request: Request):
     """
     统一返回当前用户/租户所有「已配置的 ERP 连接器」 · 不管它走的是
-    OAuth API(Xero) / 一键导出(MR.ERP) / 老 webhook endpoints 表(自定义/flowaccount)
+    OAuth API(Xero) / 老 webhook endpoints 表(自定义/flowaccount)
     
     返回:
     {
@@ -7717,7 +7717,7 @@ async def erp_connectors_status(request: Request):
     
     method:
       - "api"      → 直接 fetch(后端推送 · 完成即结束)
-      - "download" → fetch + 浏览器下载 .xlsx(MR.ERP)
+      - "download" → fetch + 浏览器下载 .xlsx
       - "webhook"  → 走老 /api/erp/push 接口(endpoint_id 必填)
     """
     user = get_current_user_from_request(request)

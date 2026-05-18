@@ -758,5 +758,129 @@ class MrerpAdapterConstraintTests(unittest.TestCase):
             raise
 
 
+@unittest.skipUnless(
+    __import__("importlib").util.find_spec("playwright") is not None,
+    "playwright not installed in this env — login-form retry test only "
+    "runs where chromium can launch.",
+)
+class LoginFormRetryTests(unittest.TestCase):
+    """v118.34.15 (Zihao 2026-05-19 拍板) · the user's named guard test:
+
+        > mock 慢网络 (3s 延迟) · 验证 wait_for_selector 起作用
+
+    Spins a tiny local HTTP server that returns the MR.ERP login form
+    HTML AFTER a 3-second delay. MRERPAdapter must wait_for_selector
+    long enough to see the inputs appear instead of immediately
+    bailing with 'login form missing txtusers/txtpasswords inputs'.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import http.server
+        import socketserver
+        import threading
+        import time as _time
+
+        cls._delay_seconds = 3
+
+        class _SlowMrErpHandler(http.server.BaseHTTPRequestHandler):
+            # Class-shared state — these aren't methods on the handler
+            # itself; they're stamped during request dispatch.
+            def log_message(self, *_a, **_kw):  # quiet test logs
+                pass
+
+            def do_GET(self):
+                if self.path == "/" or self.path.startswith("/login"):
+                    # Stall to simulate slow network.
+                    _time.sleep(cls._delay_seconds)
+                    body = (
+                        b"<html><head><title>Mr.erp</title></head>"
+                        b"<body>"
+                        b"<form action='/login/checklogin.php' method='post'>"
+                        b"<input type='text' name='txtusers' id='txtusers'>"
+                        b"<input type='password' name='txtpasswords' id='txtpasswords'>"
+                        b"<input type='submit' name='btnsubmit' value='Login'>"
+                        b"</form>"
+                        b"</body></html>"
+                    )
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                self.send_response(404)
+                self.end_headers()
+
+        # Bind ephemeral port so parallel test runs don't collide.
+        cls._server = socketserver.TCPServer(("127.0.0.1", 0), _SlowMrErpHandler)
+        cls._port = cls._server.server_address[1]
+        cls._thread = threading.Thread(
+            target=cls._server.serve_forever, daemon=True,
+        )
+        cls._thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            cls._server.shutdown()
+            cls._server.server_close()
+        except Exception:
+            pass
+
+    def test_wait_for_selector_survives_3s_delay_before_form_renders(self):
+        """If MRERPAdapter's login lookup didn't wait, a 3-second-delayed
+        login page would fail with 'login form missing ...'. With the
+        v118.34.15 wait+reload, the lookup blocks up to 15 s per try
+        and finds the inputs once they arrive."""
+        try:
+            from services.erp.mrerp_adapter import MRERPAdapter
+            from services.erp.exceptions import (
+                MRERPAuthError, MRERPTechnicalError,
+            )
+        except ImportError as e:
+            self.skipTest(f"mrerp_adapter import unavailable: {e}")
+
+        url = f"http://127.0.0.1:{self._port}"
+        adapter = MRERPAdapter(
+            login_url=url,
+            username="probe",
+            password="probe",
+            comidyear="6", seldb="1",
+            headless=True,
+            retry_attempts=1,           # outer-layer retry off — we
+            retry_delays_seconds=(0,),  # only want to test the inner wait
+        )
+        # We expect EITHER a successful form fill (and then an auth
+        # error because our fake server doesn't actually authenticate),
+        # OR a clean MRERPAuthError. We MUST NOT see "login form
+        # missing txtusers/txtpasswords inputs" — that's the regression.
+        observed_msg = ""
+        try:
+            with adapter:
+                adapter.login()
+        except MRERPAuthError as e:
+            observed_msg = str(e)
+        except MRERPTechnicalError as e:
+            observed_msg = str(e)
+        except Exception as e:
+            observed_msg = f"{type(e).__name__}: {e}"
+
+        self.assertNotIn(
+            "login form missing", observed_msg.lower(),
+            f"wait_for_selector regression — the login probe gave up "
+            f"before the slow-server form rendered: {observed_msg!r}"
+        )
+        # Also: 'after reload' would mean we tried once, reloaded, and
+        # still didn't see it. With a 3s delay and 15s budget, this
+        # shouldn't happen.
+        self.assertNotIn(
+            "after reload", observed_msg.lower(),
+            f"wait_for_selector reload-retry regression — even the "
+            f"reload-and-retry path gave up on a 3s-delayed form: "
+            f"{observed_msg!r}"
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

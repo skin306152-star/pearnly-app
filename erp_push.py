@@ -444,6 +444,15 @@ def test_mrerp_endpoint(
         # ── adapter construction (caught individually so we can
         #    distinguish decrypt failure from constructor failure) ──
         try:
+            # v118.34.15 · retry_attempts=2 + 2s delay between · 配合
+            # 新加的 login form wait+reload 内层 retry · 两层组合给一次
+            # 测试连接最多:
+            #   外层 attempt 1:
+            #     login form wait 15s (try1) → reload+wait 15s (try2) → fail
+            #   sleep 2s
+            #   外层 attempt 2:
+            #     login form wait 15s (try1) → reload+wait 15s (try2) → fail
+            # 总预算 ~64s · 但绝大多数情况都在第一层就过了。
             if plain_user and plain_pass:
                 adapter = MRERPAdapter(
                     login_url=login_url,
@@ -452,8 +461,8 @@ def test_mrerp_endpoint(
                     comidyear=comidyear,
                     seldb=seldb,
                     headless=True,
-                    retry_attempts=1,
-                    retry_delays_seconds=(0.5,),
+                    retry_attempts=2,
+                    retry_delays_seconds=(2.0,),
                 )
             else:
                 adapter = MRERPAdapter.from_encrypted(
@@ -463,8 +472,8 @@ def test_mrerp_endpoint(
                     comidyear=comidyear,
                     seldb=seldb,
                     headless=True,
-                    retry_attempts=1,
-                    retry_delays_seconds=(0.5,),
+                    retry_attempts=2,
+                    retry_delays_seconds=(2.0,),
                 )
         except ImportError as e:
             # kms_helper failed to import — PEARNLY_KMS_KEY env likely missing.
@@ -527,6 +536,11 @@ def test_mrerp_endpoint(
         except MRERPAuthError as e:
             return _fail("ERR_AUTH", str(e))
         except MRERPTechnicalError as e:
+            # v118.34.15 · the new login form retry path puts the
+            # screenshot path inside the exception message after
+            # "screenshot=". Echo it into raw_error so the wizard's
+            # error bar carries actionable hint and /api/version's
+            # last_500 has a real path to /tmp/mrerp_login_fail_<ts>.png.
             return _fail("ERR_TECHNICAL", str(e))
         except MRERPBusinessError as e:
             return _fail("ERR_BUSINESS", str(e))

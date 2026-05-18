@@ -3133,6 +3133,9 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
 # this aggressively, so the cache keeps MR.ERP traffic sane.
 from services.erp._master_data_cache import TTLCache as _EndpointTestCache  # noqa: E402
 _endpoint_test_cache = _EndpointTestCache(max_size=512, ttl_seconds=60.0)
+# Task 1 (Zihao 2026-05-18 拍板) — separate cache for the customers /
+# products dropdown listings used by the wizard's Step 3.
+_endpoint_customers_cache = _EndpointTestCache(max_size=512, ttl_seconds=60.0)
 
 
 @app.post("/api/erp/endpoints/{endpoint_id}/test-connection")
@@ -3186,6 +3189,61 @@ async def erp_endpoint_test_connection(
     result["last_tested_at"] = _dt.utcnow().isoformat() + "Z"
     result["cached"] = False
     _endpoint_test_cache.set(cache_key, result)
+    return result
+
+
+@app.get("/api/erp/endpoints/{endpoint_id}/customers")
+async def erp_endpoint_customers(
+    endpoint_id: str,
+    request: Request,
+    refresh: bool = False,
+):
+    """Task 1 (Zihao 2026-05-18 拍板) · Fetch the MR.ERP customer
+    listing for an endpoint so the wizard's Step-3 seed dropdown can
+    show real options.
+
+    Returns 200 with `{ok, customers: [{code, name, type_name, prefix}]}`
+    or `{ok: false, error_code, error_friendly, raw_error}` on
+    auth/network failure so the UI can degrade gracefully (fall back
+    to a free-text input).
+
+    Cached 60s per (user_id, endpoint_id). Pass `?refresh=1` to force.
+    Only available for `adapter='mrerp'` endpoints.
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    if not ep:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+
+    adapter = (ep.get("adapter") or "").strip().lower()
+    if adapter != "mrerp":
+        # Other adapters don't have a sensible customer-listing
+        # equivalent; surface 200 with empty list so the wizard can
+        # render gracefully.
+        return {
+            "ok": False, "customers": [],
+            "error_code": "ERR_ADAPTER_NO_CUSTOMERS",
+            "error_friendly": {
+                "zh": "此适配器没有客户列表接口",
+                "en": "This adapter does not expose a customer listing",
+                "th": "อะแดปเตอร์นี้ไม่มี API รายชื่อลูกค้า",
+                "zh_TW": "此適配器沒有客戶列表介面",
+            },
+            "elapsed_ms": 0,
+        }
+
+    cache_key = (str(user["id"]), str(endpoint_id), "customers")
+    if not refresh:
+        cached = _endpoint_customers_cache.get(cache_key)
+        if cached is not None:
+            return {**cached, "cached": True}
+
+    result = _erp.list_mrerp_customers(ep.get("config") or {})
+    from datetime import datetime as _dt
+    result["last_fetched_at"] = _dt.utcnow().isoformat() + "Z"
+    result["cached"] = False
+    _endpoint_customers_cache.set(cache_key, result)
     return result
 
 

@@ -195,6 +195,34 @@
             zh_TW: '— 不自動建立(預設) —',
             ja: '— 自動作成しない(デフォルト) —',
         },
+        'wiz-seed-loading': {
+            zh: '正在拉取客户列表…',
+            en: 'Loading customer list…',
+            th: 'กำลังโหลดรายชื่อลูกค้า…',
+            zh_TW: '正在拉取客戶列表…',
+            ja: '顧客リストを読み込み中…',
+        },
+        'wiz-seed-fallback': {
+            zh: '⚠ 无法拉取客户列表 · 请手动输入客户码',
+            en: '⚠ Could not fetch the customer list — please type the code manually',
+            th: '⚠ ไม่สามารถดึงรายชื่อลูกค้าได้ — กรุณาพิมพ์รหัสด้วยตนเอง',
+            zh_TW: '⚠ 無法拉取客戶列表 · 請手動輸入客戶碼',
+            ja: '⚠ 顧客リストを取得できません — コードを手動で入力してください',
+        },
+        'wiz-seed-placeholder': {
+            zh: '请选择一个现有客户作模板',
+            en: 'Pick an existing customer as the template',
+            th: 'เลือกลูกค้าที่มีอยู่เพื่อใช้เป็นแม่แบบ',
+            zh_TW: '請選擇一個現有客戶作範本',
+            ja: '既存の顧客をテンプレートとして選択',
+        },
+        'wiz-seed-input-placeholder': {
+            zh: '输入客户码(如 0006)',
+            en: 'Customer code (e.g. 0006)',
+            th: 'รหัสลูกค้า (เช่น 0006)',
+            zh_TW: '輸入客戶碼(如 0006)',
+            ja: '顧客コード (例: 0006)',
+        },
         'btn-cancel': {
             zh: '取消', en: 'Cancel', th: 'ยกเลิก', zh_TW: '取消', ja: 'キャンセル',
         },
@@ -659,6 +687,11 @@
     }
 
     function _buildStep3Html() {
+        // The seed field is dual-rendered: a <select> filled from
+        // GET /api/erp/endpoints/:id/customers when editing an
+        // existing endpoint (so the user picks from the live list),
+        // OR a text input as fallback when creating a new endpoint
+        // (no id yet) or when the fetch fails.
         return (
             '<div class="mrerp-wizard-step" data-mw-step="3">' +
               '<h3 class="mrerp-wizard-step-h" data-mw-step3-h></h3>' +
@@ -681,10 +714,12 @@
               '</div>' +
               '<div class="mrerp-wizard-field">' +
                 '<label class="mrerp-wizard-label" data-mw-seed-label></label>' +
-                '<select class="mrerp-wizard-select" data-mw-seed>' +
+                '<select class="mrerp-wizard-select" data-mw-seed style="display:none;">' +
                   '<option value="" data-mw-seed-empty></option>' +
                 '</select>' +
+                '<input type="text" class="mrerp-wizard-input" data-mw-seed-input style="display:none;" autocomplete="off">' +
                 '<div class="mrerp-wizard-hint" data-mw-seed-hint></div>' +
+                '<div class="mrerp-wizard-hint" data-mw-seed-fallback-hint style="display:none;color:#8a5a00;"></div>' +
               '</div>' +
             '</div>'
         );
@@ -728,11 +763,115 @@
         w.querySelector('[data-mw-mode-manual]').textContent = t('wiz-mode-manual');
         w.querySelector('[data-mw-seed-label]').textContent = t('wiz-seed');
         w.querySelector('[data-mw-seed-hint]').textContent = t('wiz-seed-hint');
-        w.querySelector('[data-mw-seed-empty]').textContent = t('wiz-seed-empty');
+        // Reset the seed select to its initial single-option state so
+        // _populateSeedSelector has a consistent starting point. (On
+        // subsequent _openWizard calls, the previous run may have
+        // populated the select with N customer options + wiped the
+        // data-mw-seed-empty option.)
+        const seedSelEl = w.querySelector('[data-mw-seed]');
+        if (seedSelEl) {
+            seedSelEl.innerHTML =
+                '<option value="" data-mw-seed-empty>' +
+                _esc(t('wiz-seed-empty')) + '</option>';
+        }
+        const seedInput = w.querySelector('[data-mw-seed-input]');
+        if (seedInput) seedInput.placeholder = t('wiz-seed-input-placeholder');
+        const fbHint = w.querySelector('[data-mw-seed-fallback-hint]');
+        if (fbHint) fbHint.textContent = t('wiz-seed-fallback');
         // Foot
         w.querySelector('[data-mw-cancel]').textContent = t('btn-cancel');
         w.querySelector('[data-mw-prev]').textContent = t('btn-prev');
         w.querySelector('[data-mw-next]').textContent = t('btn-next');
+    }
+
+    // Fetch the seed-customer list for the wizard's Step-3 dropdown.
+    // Returns null when no endpoint id is available (new wizard) OR
+    // when the fetch errors — caller falls back to a text input.
+    async function _fetchSeedCustomers(endpointId) {
+        if (!endpointId) return null;
+        try {
+            const r = await fetch(
+                '/api/erp/endpoints/' + encodeURIComponent(endpointId)
+                + '/customers',
+                { headers: _authHeaders() },
+            );
+            if (!r.ok) return null;
+            const data = await r.json();
+            if (!data || !data.ok) return null;
+            return Array.isArray(data.customers) ? data.customers : [];
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function _populateSeedSelector(currentSeedCode) {
+        const w = _wizardEl;
+        const selectEl = w.querySelector('[data-mw-seed]');
+        const inputEl = w.querySelector('[data-mw-seed-input]');
+        const fbHintEl = w.querySelector('[data-mw-seed-fallback-hint]');
+
+        // Default both hidden until we know which one to show.
+        selectEl.style.display = 'none';
+        inputEl.style.display = 'none';
+        fbHintEl.style.display = 'none';
+
+        const endpointId = _wizardState && _wizardState.endpoint
+            ? _wizardState.endpoint.id : null;
+
+        // Stage 1: loading
+        if (endpointId) {
+            selectEl.innerHTML =
+                '<option value="">' + _esc(t('wiz-seed-loading')) + '</option>';
+            selectEl.style.display = '';
+            selectEl.disabled = true;
+        } else {
+            // No endpoint persisted yet — go straight to text fallback.
+            inputEl.style.display = '';
+            inputEl.value = currentSeedCode || '';
+            return;
+        }
+
+        const customers = await _fetchSeedCustomers(endpointId);
+        selectEl.disabled = false;
+
+        if (customers === null || customers.length === 0) {
+            // Fetch failed (or empty listing) → degrade to text input.
+            selectEl.style.display = 'none';
+            inputEl.style.display = '';
+            inputEl.value = currentSeedCode || '';
+            fbHintEl.style.display = '';
+            return;
+        }
+
+        // Populate the dropdown.
+        const opts = ['<option value="">' + _esc(t('wiz-seed-empty')) + '</option>'];
+        customers.forEach(function (c) {
+            const label = (c.prefix ? c.prefix + ' ' : '')
+                + (c.name || '') + ' (' + c.code + ')';
+            opts.push(
+                '<option value="' + _esc(c.code) + '">' +
+                _esc(label) + '</option>'
+            );
+        });
+        selectEl.innerHTML = opts.join('');
+        if (currentSeedCode && customers.some(function (c) {
+            return c.code === currentSeedCode;
+        })) {
+            selectEl.value = currentSeedCode;
+        }
+    }
+
+    function _readSeedValue() {
+        const w = _wizardEl;
+        const selectEl = w.querySelector('[data-mw-seed]');
+        const inputEl = w.querySelector('[data-mw-seed-input]');
+        if (selectEl && selectEl.style.display !== 'none') {
+            return (selectEl.value || '').trim();
+        }
+        if (inputEl && inputEl.style.display !== 'none') {
+            return (inputEl.value || '').trim();
+        }
+        return '';
     }
 
     function _gotoStep(n) {
@@ -826,7 +965,7 @@
             return;
         }
         if (_wizardState.step === 2) {
-            // Move to step 3; populate company + seed from last test result.
+            // Move to step 3; populate company + seed dropdown.
             const companies = _wizardState.companies || [];
             const sel = _wizardEl.querySelector('[data-mw-company]');
             sel.innerHTML = companies.length
@@ -835,16 +974,16 @@
                         '">' + _esc(c.label) + '</option>';
                   }).join('')
                 : '<option value="6:1">' + _esc('TEST2019') + '</option>';
-            // Seed dropdown — populate via a separate call once
-            // wizard is finalised; for now empty.
-            const seedSel = _wizardEl.querySelector('[data-mw-seed]');
-            if (seedSel.children.length === 1) {
-                // Lazily fill with placeholder hint — wizard saves the
-                // raw text value the user types into the field. (A
-                // future enhancement loads the live customer list via
-                // a dedicated /api/erp/endpoints/:id/customers route.)
-            }
+
             _gotoStep(3);
+            // Seed customer dropdown (Task 1) — async populate from
+            // /api/erp/endpoints/:id/customers when editing an
+            // existing endpoint. Falls back to text input on new
+            // wizard or fetch failure.
+            const currentSeed = (_wizardState.endpoint
+                && _wizardState.endpoint.config
+                && _wizardState.endpoint.config.seed_customer_code) || '';
+            _populateSeedSelector(currentSeed);
             return;
         }
         // Step 3 → finish
@@ -908,7 +1047,7 @@
         const companyChoice = w.querySelector('[data-mw-company]').value || '6:1';
         const [comidyear, seldb] = companyChoice.split(':');
         const mode = w.querySelector('input[name="mrerp-mode"]:checked').value;
-        const seed = (w.querySelector('[data-mw-seed]').value || '').trim();
+        const seed = _readSeedValue();
 
         if (!username || !password) {
             _toast('请先填入用户名和密码', 'warn');

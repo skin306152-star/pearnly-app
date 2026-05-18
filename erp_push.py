@@ -461,6 +461,127 @@ def test_mrerp_endpoint(
     }
 
 
+def list_mrerp_customers(
+    config: Dict[str, Any],
+) -> Dict[str, Any]:
+    """C-3 follow-up (Zihao 2026-05-18 拍板 Task 1): pull the customer
+    listing from armas/allview.php so the wizard's Step-3 seed dropdown
+    can show real options instead of asking the user to remember a code.
+
+    Returns:
+        {
+          "ok": bool,
+          "elapsed_ms": int,
+          "customers": [{code, name, type_name, prefix}],
+          "error_code": Optional[str],
+          "error_friendly": Optional[Dict[lang, str]],
+          "raw_error": Optional[str],
+        }
+
+    The route layer caches this for 60s per (user, endpoint) to keep
+    MR.ERP load sane.
+    """
+    import time as _time
+    from services.erp.mrerp_adapter import (
+        MRERPAdapter, MRERPAuthError, MRERPBusinessError,
+        MRERPTechnicalError,
+    )
+    from services.erp.mrerp_customer_sync import MRERPCustomerSyncService
+    from services.erp.mrerp_business_friendly import get_friendly
+
+    cfg = config or {}
+    login_url = (cfg.get("system_url") or "https://www.mrerp4sme.com").strip()
+    enc_user = cfg.get("username_enc") or ""
+    enc_pass = cfg.get("password_enc") or ""
+    comidyear = str(cfg.get("comidyear") or "6")
+    seldb = str(cfg.get("seldb") or "1")
+
+    if not (enc_user and enc_pass):
+        return {
+            "ok": False, "elapsed_ms": 0, "customers": [],
+            "error_code": "ERR_NO_CREDS",
+            "error_friendly": get_friendly("ERR_NO_CREDS"),
+            "raw_error": "username_enc / password_enc missing in config",
+        }
+
+    t0 = _time.time()
+    try:
+        adapter = MRERPAdapter.from_encrypted(
+            login_url=login_url,
+            encrypted_username=enc_user,
+            encrypted_password=enc_pass,
+            comidyear=comidyear, seldb=seldb,
+            headless=True,
+            retry_attempts=1, retry_delays_seconds=(0.5,),
+        )
+    except Exception as e:
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "customers": [],
+            "error_code": "ERR_CRED_DECRYPT",
+            "error_friendly": get_friendly("ERR_CRED_DECRYPT"),
+            "raw_error": f"{type(e).__name__}: {str(e)[:200]}",
+        }
+
+    try:
+        with adapter:
+            svc = MRERPCustomerSyncService(adapter)
+            rows = svc._fetch_listing()
+        customers = [{
+            "code": r.code,
+            "name": r.name,
+            "type_name": r.type_name,
+            "prefix": r.prefix,
+        } for r in rows]
+    except MRERPAuthError as e:
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "customers": [],
+            "error_code": "ERR_AUTH",
+            "error_friendly": get_friendly("ERR_AUTH"),
+            "raw_error": str(e)[:300],
+        }
+    except MRERPTechnicalError as e:
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "customers": [],
+            "error_code": "ERR_TECHNICAL",
+            "error_friendly": get_friendly("ERR_TECHNICAL"),
+            "raw_error": str(e)[:300],
+        }
+    except MRERPBusinessError as e:
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "customers": [],
+            "error_code": "ERR_BUSINESS",
+            "error_friendly": get_friendly("ERR_BUSINESS"),
+            "raw_error": str(e)[:300],
+        }
+    except Exception as e:
+        logger.exception("list_mrerp_customers unexpected error")
+        return {
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "customers": [],
+            "error_code": "ERR_UNEXPECTED",
+            "error_friendly": get_friendly("ERR_UNEXPECTED"),
+            "raw_error": f"{type(e).__name__}: {str(e)[:200]}",
+        }
+
+    return {
+        "ok": True,
+        "elapsed_ms": int((_time.time() - t0) * 1000),
+        "customers": customers,
+        "error_code": None,
+        "error_friendly": None,
+        "raw_error": None,
+    }
+
+
 def test_endpoint_connection(adapter: str, config: Dict[str, Any]) -> Dict[str, Any]:
     """
     用一个最小化测试 payload 调一次,验证配置是否正确。

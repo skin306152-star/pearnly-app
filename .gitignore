@@ -54,3 +54,5 @@ tests/compare-b1-b2-result.json
 # MR.ERP adapter runtime artifacts (test-run screenshots, debug traces)
 docs/integrations/screenshots/_tests/
 scripts/probe/_debug/trace_*.json
+scripts/probe/_debug/armas_listing_*.html
+scripts/probe/_debug/armas_listing_*.json

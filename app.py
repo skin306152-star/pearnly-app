@@ -3780,6 +3780,65 @@ async def erp_endpoint_test_connection(
     return result
 
 
+async def _fetch_listing_with_retry(
+    fetch_fn,
+    config: dict,
+    *,
+    listing_kind: str,
+    max_attempts: int = 2,
+    delay_seconds: float = 2.0,
+) -> dict:
+    """A3 (Zihao 2026-05-19 拍板) · transient-aware retry wrapper for
+    /endpoints/:id/customers and /endpoints/:id/products.
+
+    Retries up to `max_attempts` times with `delay_seconds` between
+    attempts when the underlying fetch reports a transient error
+    (ERR_TECHNICAL / ERR_UNEXPECTED / network exception from
+    asyncio.to_thread). Non-transient errors (ERR_AUTH /
+    ERR_CRED_DECRYPT / ERR_BUSINESS / ERR_NO_CREDS) break out of the
+    loop immediately — those don't get better by retrying.
+
+    Always returns a dict matching the underlying fetch's response
+    shape; never raises.
+    """
+    import asyncio as _asyncio
+    transient_codes = {"ERR_TECHNICAL", "ERR_UNEXPECTED", "ERR_NETWORK"}
+    result: dict = {}
+    for attempt in range(1, max_attempts + 1):
+        if attempt > 1:
+            await _asyncio.sleep(delay_seconds)
+            logger.info(
+                "[listing-retry] %s attempt %d/%d after %.1fs delay",
+                listing_kind, attempt, max_attempts, delay_seconds,
+            )
+        try:
+            result = await _asyncio.to_thread(fetch_fn, config)
+        except Exception as e:
+            logger.exception(
+                "[listing-retry] %s attempt %d raised", listing_kind, attempt,
+            )
+            result = {
+                "ok": False,
+                listing_kind: [],
+                "error_code": "ERR_UNEXPECTED",
+                "error_friendly": {
+                    "zh": f"服务器内部错误:{type(e).__name__}",
+                    "en": f"Internal server error: {type(e).__name__}",
+                    "th": f"ข้อผิดพลาดของเซิร์ฟเวอร์: {type(e).__name__}",
+                    "zh_TW": f"伺服器內部錯誤:{type(e).__name__}",
+                },
+                "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
+            }
+        if result.get("ok"):
+            return result
+        # Non-transient: bail out · the retry won't help.
+        if result.get("error_code") not in transient_codes:
+            return result
+        # Transient: loop will retry (unless we just exhausted attempts).
+    # All retries exhausted; surface the last result.
+    return result
+
+
 @app.get("/api/erp/endpoints/{endpoint_id}/customers")
 async def erp_endpoint_customers(
     endpoint_id: str,
@@ -3827,27 +3886,23 @@ async def erp_endpoint_customers(
         if cached is not None:
             return {**cached, "cached": True}
 
-    # v118.34.10 · asyncio.to_thread — Playwright sync API in async loop trap.
-    import asyncio as _asyncio
-    try:
-        result = await _asyncio.to_thread(_erp.list_mrerp_customers, ep.get("config") or {})
-    except Exception as e:
-        logger.exception("list_mrerp_customers raised")
-        result = {
-            "ok": False, "customers": [],
-            "error_code": "ERR_UNEXPECTED",
-            "error_friendly": {
-                "zh": f"服务器内部错误:{type(e).__name__}",
-                "en": f"Internal server error: {type(e).__name__}",
-                "th": f"ข้อผิดพลาดของเซิร์ฟเวอร์: {type(e).__name__}",
-                "zh_TW": f"伺服器內部錯誤:{type(e).__name__}",
-            },
-            "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
-        }
+    # A3 (Zihao 2026-05-19 拍板) · route-level retry + don't-cache-failures
+    # for transient listing flakes.
+    # Layered with the _fetch_listing's own wait_for_selector + reload
+    # (handles slow renders) and gives one full retry cycle if a whole
+    # nav round-trip times out (e.g. mid-deploy MR.ERP 5xx).
+    result = await _fetch_listing_with_retry(
+        _erp.list_mrerp_customers,
+        ep.get("config") or {},
+        listing_kind="customers",
+    )
     from datetime import datetime as _dt
     result["last_fetched_at"] = _dt.utcnow().isoformat() + "Z"
     result["cached"] = False
-    _endpoint_customers_cache.set(cache_key, result)
+    # Only cache success — sticky failure was the user-reported "first
+    # click works, second click says '无法拉取客户列表'" bug.
+    if result.get("ok"):
+        _endpoint_customers_cache.set(cache_key, result)
     return result
 
 
@@ -3886,27 +3941,18 @@ async def erp_endpoint_products(
         if cached is not None:
             return {**cached, "cached": True}
 
-    # v118.34.10 · asyncio.to_thread — Playwright sync API in async loop trap.
-    import asyncio as _asyncio
-    try:
-        result = await _asyncio.to_thread(_erp.list_mrerp_products, ep.get("config") or {})
-    except Exception as e:
-        logger.exception("list_mrerp_products raised")
-        result = {
-            "ok": False, "products": [],
-            "error_code": "ERR_UNEXPECTED",
-            "error_friendly": {
-                "zh": f"服务器内部错误:{type(e).__name__}",
-                "en": f"Internal server error: {type(e).__name__}",
-                "th": f"ข้อผิดพลาดของเซิร์ฟเวอร์: {type(e).__name__}",
-                "zh_TW": f"伺服器內部錯誤:{type(e).__name__}",
-            },
-            "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
-        }
+    # A3 (Zihao 2026-05-19 拍板) · route-level retry + don't-cache-failures
+    # · mirror of customer listing route.
+    result = await _fetch_listing_with_retry(
+        _erp.list_mrerp_products,
+        ep.get("config") or {},
+        listing_kind="products",
+    )
     from datetime import datetime as _dt
     result["last_fetched_at"] = _dt.utcnow().isoformat() + "Z"
     result["cached"] = False
-    _endpoint_products_cache.set(cache_key, result)
+    if result.get("ok"):
+        _endpoint_products_cache.set(cache_key, result)
     return result
 
 
@@ -5111,10 +5157,10 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.34.17 · 推送状态 3 处 UI 不一致修了:\n• 上窗口你看到的截图:同一张推送失败的发票 · 抽屉显示「已推送」绿色 · 通知显示「失败」红色 · 日志 tab 显示「失败」\n• 根因:前端 _pushOne 函数只看 HTTP 状态码 · 看到 200 就弹「已推送」绿 toast · 没看 body.ok\n• MR.ERP 业务失败时后端返 HTTP 200 + body.ok=false + error_msg(为了能写推送日志)· 老 JS 漏看 body.ok\n• 修:_pushOne 在 200 后还要看 body.ok · false 时弹红色失败 toast(带 error_msg)\n• 自动推送 toast 同步调正:文案从「已推送到 ERP」改成「已开始推送 · 结果看推送日志」· 颜色 success 改 info\n• 加守门测试 PushStatusSourceOfTruthTests:推送失败时验证后端 3 处写入(erp_push_logs.status / endpoint_stats / ocr_history.last_push_status)全是「failed」· 不能错位\n\n刷浏览器再推一次失败的发票 · 3 处状态应该都是失败",
-            "en": "v118.34.17 · Three-way push status mismatch fixed:\n• Last screenshot you sent: same failed push showed '已推送 (Pushed)' in green in the drawer, '推送失败 (Push failed)' in the notification, and 'Failed' in the log tab.\n• Root cause: frontend _pushOne function only checked HTTP status — saw 200 and showed green success toast without reading body.ok.\n• On MR.ERP business failures the backend returns HTTP 200 + body.ok=false + error_msg (so it can still write the failure to erp_push_logs). The old JS missed body.ok.\n• Fix: _pushOne now reads body.ok after the 200 check — false → red fail toast with the error_msg.\n• Auto-push toast also adjusted: text from 'Pushed to ERP' to 'ERP push started · check push log for result'; color from success(green) to info(blue) since it's just queued, not finished.\n• Added PushStatusSourceOfTruthTests guard: on a failed push, verifies all three backend writes (erp_push_logs.status / endpoint_stats / ocr_history.last_push_status) are 'failed' — they cannot diverge.\n\nRefresh and trigger a failing push again — all three status views should agree.",
-            "th": "v118.34.17 · แก้สถานะการส่งที่ไม่ตรงกัน 3 จุด UI:\n• สกรีนช็อตล่าสุดที่ส่งมา: ใบกำกับเดียวกันที่ส่งล้มเหลว · drawer ขึ้น '已推送 (ส่งแล้ว)' สีเขียว · notification ขึ้น 'ส่งล้มเหลว' สีแดง · log tab ขึ้น 'ล้มเหลว'\n• สาเหตุ: ฟังก์ชัน frontend _pushOne เช็คแค่ HTTP code — เห็น 200 ก็โชว์ toast เขียวสำเร็จ ไม่ได้อ่าน body.ok\n• เวลา MR.ERP ปฏิเสธ business backend จะคืน HTTP 200 + body.ok=false + error_msg (เพื่อให้บันทึก log การส่งได้) · JS เก่ามองข้าม body.ok\n• แก้: _pushOne อ่าน body.ok หลังเช็ค 200 · ถ้า false ขึ้น toast แดงพร้อม error_msg\n• ปรับ auto-push toast: ข้อความจาก 'ส่ง ERP แล้ว' เป็น 'เริ่มส่ง ERP · ดูบันทึกผล' · สี success → info เพราะแค่ queue ยังไม่เสร็จ\n• เพิ่มเทสต์เฝ้าระวัง PushStatusSourceOfTruthTests: ตอนส่งล้มเหลว ตรวจว่า backend เขียน 3 จุด (erp_push_logs.status / endpoint_stats / ocr_history.last_push_status) เป็น 'failed' หมด ไม่หลุด\n\nรีเฟรชแล้วทดลองส่งใบที่ล้มเหลวอีกครั้ง · สถานะทั้ง 3 จุดควรตรงกัน",
-            "ja": "v118.34.17 · プッシュ状態 3 箇所 UI 不一致を修正:\n• 前のスクショ: 同じ失敗したプッシュが drawer で「已推送 (送信済)」緑表示 / 通知が「送信失敗」赤 / log タブが「失敗」と表示\n• 原因: フロントエンド _pushOne 関数は HTTP ステータスのみ確認 — 200 を見ると body.ok を読まずに緑成功 toast を表示\n• MR.ERP のビジネス失敗時、バックエンドは HTTP 200 + body.ok=false + error_msg を返す (erp_push_logs に失敗を書き込むため)。古い JS は body.ok を見逃した\n• 修正: _pushOne は 200 後に body.ok を読む · false なら error_msg 付きで赤い失敗 toast\n• auto-push toast も調整: 「ERP へ送信済」→「ERP 送信開始 · 結果は送信ログを確認」/ 色 success → info (まだキューに入っただけで完了ではない)\n• PushStatusSourceOfTruthTests ガード追加: 失敗時、バックエンドの 3 箇所書き込み (erp_push_logs.status / endpoint_stats / ocr_history.last_push_status) が全て 'failed' であることを検証 · 整合性が崩れない\n\nブラウザを更新して失敗するプッシュを再実行 · 3 箇所の状態が一致するはず"
+            "zh": "v118.34.18 · 客户/商品下拉抖动修了:\n• 上窗口你看到的截图:wizard 第一次打开「修改」 seed 客户字段显示真下拉(含 0006)· 第二次打开变成「无法拉取客户列表 · 请手动输入」· 商品同样\n• 根因 2 层:\n  - 抓取层:_fetch_listing 用 networkidle 但表格 AJAX 偶尔慢一步 · count==0 就返\n  - 路由层:GET .../customers 失败立刻进 60s 缓存 · 下次点直接读缓存的失败 · 没 retry\n• 修(2 层):\n  - _fetch_listing 加 wait_for_selector('#showdata p', 10s) · 失败后 page.reload() 再 wait · 仍失败截图存 /tmp/mrerp_listing_fail_<kind>_<ts>.png\n  - 路由层加 _fetch_listing_with_retry 包装器:transient 错误(ERR_TECHNICAL/UNEXPECTED)retry 2 次 间隔 2s · 非 transient(ERR_AUTH/CRED_DECRYPT)直接 bail · 失败响应不缓存\n• 加 ListingRetryContractTests 3 个守门测试:transient 真 retry · auth 错不 retry · 失败不缓存\n\n刷浏览器开 wizard 修改 mrerp · 多开几次看 seed 下拉是不是稳定显示客户列表",
+            "en": "v118.34.18 · Customer/product dropdown flake fixed:\n• Symptom: opening the MR.ERP wizard's 'Edit' modal, the seed-customer field shows the real dropdown (with 0006) the first time but on the second open says '无法拉取客户列表 · please type a code manually'. Same for products.\n• Root cause has two layers:\n  - Fetch: _fetch_listing waits for networkidle but the listing AJAX sometimes lands a tick later; reading count==0 returned empty.\n  - Route: GET .../customers cached the failure for 60 s, so subsequent clicks served the cached failure without trying again.\n• Two-layer fix:\n  - _fetch_listing now adds wait_for_selector('#showdata p', 10s) after the goto; on timeout it page.reload() and waits again; if still nothing, screenshot to /tmp/mrerp_listing_fail_<kind>_<ts>.png and raise.\n  - Route adds _fetch_listing_with_retry wrapper: transient errors (ERR_TECHNICAL/UNEXPECTED) get 2 attempts with 2 s delay; non-transient (ERR_AUTH/CRED_DECRYPT) bail immediately to save MR.ERP login attempts; failed responses are NOT cached.\n• Added ListingRetryContractTests: 3 guards proving transient retries, auth bails fast, failures don't get cached.\n\nRefresh and open the MR.ERP wizard edit a few times — seed dropdowns should stay populated stably.",
+            "th": "v118.34.18 · แก้ปัญหา dropdown ลูกค้า/สินค้ากระตุก:\n• อาการ: เปิด wizard 'แก้ไข' MR.ERP ครั้งแรกฟิลด์ลูกค้าต้นแบบโชว์ dropdown จริง (มี 0006) · เปิดครั้งที่สองกลับขึ้น '无法拉取客户列表 · กรุณาพิมพ์รหัสเอง' · สินค้าก็เป็นแบบเดียวกัน\n• สาเหตุ 2 ชั้น:\n  - ชั้น fetch: _fetch_listing รอแค่ networkidle แต่ตาราง AJAX บางทีมาช้านิดเดียว · count==0 เลยคืนว่าง\n  - ชั้น route: GET .../customers ล้มเหลวแล้ว cache ค้าง 60 วินาที · คลิกครั้งถัดไปเสิร์ฟ failure จาก cache ไม่ลองใหม่ ไม่มี retry\n• แก้ 2 ชั้น:\n  - _fetch_listing เพิ่ม wait_for_selector('#showdata p', 10s) หลัง goto · timeout ก็ page.reload() แล้วรออีกครั้ง · ยังไม่ได้ก็ screenshot ไปที่ /tmp/mrerp_listing_fail_<kind>_<ts>.png\n  - Route ใส่ _fetch_listing_with_retry wrapper: error แบบ transient (ERR_TECHNICAL/UNEXPECTED) ลอง 2 ครั้ง ห่าง 2 วินาที · แบบไม่ transient (ERR_AUTH/CRED_DECRYPT) ออกทันที · response ที่ล้มเหลวไม่ cache\n• เพิ่ม ListingRetryContractTests 3 ตัว: transient retry จริง · auth ไม่ retry · failure ไม่ถูก cache\n\nรีเฟรชแล้วเปิด wizard แก้ไข mrerp ซ้ำหลายๆ ครั้ง · ดู seed dropdown ว่าโชว์รายชื่อสม่ำเสมอไหม",
+            "ja": "v118.34.18 · 顧客/商品ドロップダウンの揺らぎ修正:\n• 症状: MR.ERP ウィザード「編集」を開くと初回は seed 顧客フィールドに本物のドロップダウン(0006 含む)を表示 · 2 回目を開くと「顧客リストを取得できません · 手動入力してください」に変わる · 商品も同様\n• 原因 2 層:\n  - 取得層: _fetch_listing は networkidle 待ちだがリスト AJAX が1テンポ遅れるとcount==0 で空が返る\n  - ルート層: GET .../customers が失敗するとそれを 60 秒キャッシュ · 次クリックは取得失敗をキャッシュから返す · retry なし\n• 修正 2 層:\n  - _fetch_listing: goto 後に wait_for_selector('#showdata p', 10s) を追加 · タイムアウト時 page.reload() + 再度 wait · それでもダメなら /tmp/mrerp_listing_fail_<kind>_<ts>.png にスクリーンショット\n  - ルートに _fetch_listing_with_retry ラッパー: transient(ERR_TECHNICAL/UNEXPECTED)は 2 秒間隔で 2 回試行 · 非 transient(ERR_AUTH/CRED_DECRYPT)は即終了 · 失敗レスポンスはキャッシュしない\n• ListingRetryContractTests 3 つのガードテスト追加: transient は retry · auth は retry しない · 失敗はキャッシュされない\n\nブラウザ更新 → mrerp ウィザードを何度か編集で開く → seed ドロップダウンが安定して顧客リストを表示するはず"
         }
     }
 

@@ -911,7 +911,18 @@ class MRERPCustomerSyncService:
 
     def _fetch_listing(self) -> List[ListingCustomer]:
         """Returns the parsed customer listing, hitting the in-service
-        TTLCache to avoid refetching during a single push job."""
+        TTLCache to avoid refetching during a single push job.
+
+        A3 (Zihao 2026-05-19 拍板) · two-layer reliability:
+          1. wait_for_selector('#showdata p', 10s) after goto · catches
+             the slow-render race where networkidle finishes before the
+             AJAX listing rows attach to DOM.
+          2. On timeout: page.reload() + another 10 s budget.
+          3. Still nothing: save_listing_fail_screenshot() · path baked
+             into MRERPTechnicalError so /api/version's last_500 carries
+             it forward and the route layer's retry can decide whether
+             to re-try.
+        """
         cached = self.cache.get(self._listing_cache_key)
         if cached is not None:
             return cached
@@ -920,22 +931,54 @@ class MRERPCustomerSyncService:
         self.adapter.select_company()
         url = self.adapter.login_url + self.LISTING_PATH
         page = self.adapter._page
-        try:
-            page.goto(
-                url,
-                wait_until="networkidle",
-                timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
-            )
-            html = page.content() or ""
-        except PWTimeout as e:
-            raise MRERPTechnicalError(
-                f"customer listing fetch timeout: {e}") from e
-
-        rows = parse_armas_listing(html)
-        # Cache for the rest of the session.
-        self.cache.set(self._listing_cache_key, rows)
-        logger.info("fetched armas listing: %d rows", len(rows))
-        return rows
+        last_err: Optional[Exception] = None
+        for attempt in (1, 2):
+            try:
+                if attempt == 1:
+                    page.goto(
+                        url,
+                        wait_until="networkidle",
+                        timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+                    )
+                else:
+                    # Second attempt: full page reload to shake loose
+                    # any half-rendered state from the first GOTO.
+                    page.reload(
+                        wait_until="networkidle",
+                        timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+                    )
+                # Wait specifically for the listing rows to attach.
+                page.wait_for_selector(
+                    "#showdata p", state="attached", timeout=10_000,
+                )
+                html = page.content() or ""
+                rows = parse_armas_listing(html)
+                self.cache.set(self._listing_cache_key, rows)
+                logger.info(
+                    "fetched armas listing: %d rows (attempt %d)",
+                    len(rows), attempt,
+                )
+                return rows
+            except PWTimeout as e:
+                last_err = e
+                logger.warning(
+                    "customer listing fetch attempt %d timed out: %s",
+                    attempt, e,
+                )
+                continue
+            except Exception as e:
+                # Non-timeout: bubble up immediately so the route can
+                # report a precise error code instead of a generic retry
+                # cascade.
+                raise MRERPTechnicalError(
+                    f"customer listing fetch raised: {type(e).__name__}: {e}"
+                ) from e
+        # Both attempts timed out → screenshot + raise.
+        shot = self.adapter.save_listing_fail_screenshot("customers")
+        raise MRERPTechnicalError(
+            f"customer listing fetch failed after wait+reload retry; "
+            f"screenshot={shot}; last_error={last_err}"
+        )
 
 
 __all__ = [

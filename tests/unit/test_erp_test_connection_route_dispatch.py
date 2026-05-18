@@ -1517,5 +1517,155 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
         self.assertEqual(history_status_mock.call_args.args[1], "success")
 
 
+@unittest.skipUnless(
+    _can_import_app_for_async_tests()
+    and __import__("importlib").util.find_spec("fastapi") is not None,
+    "needs full app + fastapi; covered server-side otherwise.",
+)
+class ListingRetryContractTests(unittest.TestCase):
+    """A3 (Zihao 2026-05-19 拍板) · listing fetch flake-tolerance contract.
+
+    Source contract:
+        > "listing 抓取依赖 MR.ERP 网站 timing · 偶尔失败 ·
+        >  60s 缓存命中时返成功 · miss 时去拉若失败就 fallback to text input ·
+        >  没 retry · 用户体验抖动"
+        > "GET .../customers 和 .../products 路由加 retry (2 次 · 间隔 2s)"
+
+    What this test pins down:
+        - Transient failure (ERR_TECHNICAL) → route retries up to 2 times.
+        - Non-transient failure (ERR_AUTH) → route does NOT retry.
+        - Failed response is NOT cached — next click can retry fresh.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        import app
+        cls.app_module = app
+
+    def _make_client(self):
+        from fastapi.testclient import TestClient
+        return TestClient(self.app_module.app)
+
+    def _patch_common(self):
+        """Returns the patches that every test needs (auth + endpoint
+        lookup with adapter=mrerp). Cache the patches as a contextlib
+        ExitStack so each test can `with stack:` apply them all."""
+        app = self.app_module
+        fake_ep = {
+            "id": "ep-1", "user_id": "u",
+            "adapter": "mrerp", "config": {
+                "username_enc": "u", "password_enc": "p",
+            },
+            "name": "MR.ERP", "enabled": True,
+        }
+        import contextlib
+        stack = contextlib.ExitStack()
+        stack.enter_context(patch.object(app, "get_current_user_from_request",
+                                         return_value={"id": "u", "plan": "pro"}))
+        stack.enter_context(patch.object(app, "_check_push_access", return_value=None))
+        stack.enter_context(patch.object(app.db, "get_erp_endpoint", return_value=fake_ep))
+        return stack
+
+    def test_customers_route_retries_on_transient_failure(self):
+        app = self.app_module
+        # First call: ERR_TECHNICAL (transient). Second call: success.
+        results_to_return = iter([
+            {"ok": False, "customers": [], "error_code": "ERR_TECHNICAL",
+             "error_friendly": {"zh": "技术错误"}, "raw_error": "timeout",
+             "elapsed_ms": 100},
+            {"ok": True, "customers": [{"code": "0006", "name": "Skin"}],
+             "error_code": None, "error_friendly": None, "raw_error": None,
+             "elapsed_ms": 200},
+        ])
+        fetch_mock = MagicMock(side_effect=lambda cfg: next(results_to_return))
+
+        with self._patch_common(), \
+             patch.object(app._erp, "list_mrerp_customers", fetch_mock), \
+             patch("asyncio.sleep", side_effect=lambda s: None):
+            with self._make_client() as client:
+                r = client.get(
+                    "/api/erp/endpoints/ep-1/customers?refresh=1",
+                )
+
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(
+            body["ok"],
+            f"retry didn't recover on second attempt: {body!r}",
+        )
+        self.assertEqual(
+            fetch_mock.call_count, 2,
+            f"expected exactly 2 fetch calls (1 fail + 1 retry), "
+            f"got {fetch_mock.call_count}",
+        )
+        self.assertEqual(body["customers"][0]["code"], "0006")
+
+    def test_customers_route_does_not_retry_on_auth_failure(self):
+        """ERR_AUTH is non-transient · retry would just fail again ·
+        bail out after 1 attempt."""
+        app = self.app_module
+        fetch_mock = MagicMock(return_value={
+            "ok": False, "customers": [], "error_code": "ERR_AUTH",
+            "error_friendly": {"zh": "凭据错误"}, "raw_error": "401",
+            "elapsed_ms": 50,
+        })
+
+        with self._patch_common(), \
+             patch.object(app._erp, "list_mrerp_customers", fetch_mock), \
+             patch("asyncio.sleep", side_effect=lambda s: None):
+            with self._make_client() as client:
+                r = client.get(
+                    "/api/erp/endpoints/ep-1/customers?refresh=1",
+                )
+
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertFalse(body["ok"])
+        self.assertEqual(body["error_code"], "ERR_AUTH")
+        self.assertEqual(
+            fetch_mock.call_count, 1,
+            f"ERR_AUTH should NOT be retried — wasting MR.ERP login "
+            f"attempts is bad — got {fetch_mock.call_count} calls",
+        )
+
+    def test_failed_response_is_not_cached(self):
+        """Sticky-failure bug: if a transient flake gets cached for 60s,
+        the next click reads the cache and shows '无法拉取客户列表' even
+        though MR.ERP is fine. Asserts failure responses bypass the cache
+        so the next click retries fresh."""
+        app = self.app_module
+        fetch_mock = MagicMock(return_value={
+            "ok": False, "customers": [], "error_code": "ERR_TECHNICAL",
+            "error_friendly": {"zh": "技术错误"}, "raw_error": "timeout",
+            "elapsed_ms": 100,
+        })
+
+        # Clear any existing cache for this key.
+        try:
+            app._endpoint_customers_cache.clear()
+        except AttributeError:
+            pass
+
+        with self._patch_common(), \
+             patch.object(app._erp, "list_mrerp_customers", fetch_mock), \
+             patch("asyncio.sleep", side_effect=lambda s: None):
+            with self._make_client() as client:
+                r1 = client.get("/api/erp/endpoints/ep-1/customers")
+                r2 = client.get("/api/erp/endpoints/ep-1/customers")
+
+        self.assertFalse(r1.json()["ok"])
+        self.assertFalse(r2.json()["ok"])
+        # If failures were cached, fetch_mock would be called only twice
+        # (once for r1's two retry attempts; r2 would hit cache). We
+        # require it called 4 times (2 retries × 2 requests).
+        self.assertEqual(
+            fetch_mock.call_count, 4,
+            f"failure response was cached — second request didn't hit "
+            f"the backend ({fetch_mock.call_count} calls instead of 4)",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

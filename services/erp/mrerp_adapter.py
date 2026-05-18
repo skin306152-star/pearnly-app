@@ -560,6 +560,27 @@ class MRERPAdapter:
             logger.warning("save_login_fail_screenshot failed: %s", e)
             return None
 
+    def save_listing_fail_screenshot(self, kind: str = "listing") -> Optional[str]:
+        """A3 (Zihao 2026-05-19 拍板) · listing fetch failure screenshot.
+        Parallel to _save_login_fail_screenshot. Public method so the
+        customer/product sync services can call it through the adapter
+        reference they already hold (`self.adapter`).
+
+        `kind` typically 'customers' / 'products' — embedded in the
+        filename so support can grep the right file.
+        """
+        import time as _time
+        if self._page is None:
+            return None
+        try:
+            safe_kind = "".join(c for c in kind if c.isalnum() or c in "._-") or "listing"
+            path = f"/tmp/mrerp_listing_fail_{safe_kind}_{int(_time.time())}.png"
+            self._page.screenshot(path=path, full_page=True)
+            return path
+        except Exception as e:
+            logger.warning("save_listing_fail_screenshot failed: %s", e)
+            return None
+
     def _wait_for_login_inputs_with_retry(self):
         """Returns (user_locator, pass_locator) once both are visible.
         Strategy:

@@ -745,26 +745,55 @@ class MRERPProductSyncService:
     # ----- listing fetch ---------------------------------------
 
     def _fetch_listing(self) -> List[ListingProduct]:
+        """A3 (Zihao 2026-05-19 拍板) · mirror of customer listing
+        reliability layer: wait_for_selector + reload retry + screenshot."""
         cached = self.cache.get(self._listing_cache_key)
         if cached is not None:
             return cached
         self.adapter.select_company()
         url = self.adapter.login_url + self.LISTING_PATH
         page = self.adapter._page
-        try:
-            page.goto(
-                url,
-                wait_until="networkidle",
-                timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
-            )
-            html = page.content() or ""
-        except PWTimeout as e:
-            raise MRERPTechnicalError(
-                f"product listing fetch timeout: {e}") from e
-        rows = parse_stkmas_listing(html)
-        self.cache.set(self._listing_cache_key, rows)
-        logger.info("fetched stkmas listing: %d rows", len(rows))
-        return rows
+        last_err: Optional[Exception] = None
+        for attempt in (1, 2):
+            try:
+                if attempt == 1:
+                    page.goto(
+                        url,
+                        wait_until="networkidle",
+                        timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+                    )
+                else:
+                    page.reload(
+                        wait_until="networkidle",
+                        timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+                    )
+                page.wait_for_selector(
+                    "#showdata p", state="attached", timeout=10_000,
+                )
+                html = page.content() or ""
+                rows = parse_stkmas_listing(html)
+                self.cache.set(self._listing_cache_key, rows)
+                logger.info(
+                    "fetched stkmas listing: %d rows (attempt %d)",
+                    len(rows), attempt,
+                )
+                return rows
+            except PWTimeout as e:
+                last_err = e
+                logger.warning(
+                    "product listing fetch attempt %d timed out: %s",
+                    attempt, e,
+                )
+                continue
+            except Exception as e:
+                raise MRERPTechnicalError(
+                    f"product listing fetch raised: {type(e).__name__}: {e}"
+                ) from e
+        shot = self.adapter.save_listing_fail_screenshot("products")
+        raise MRERPTechnicalError(
+            f"product listing fetch failed after wait+reload retry; "
+            f"screenshot={shot}; last_error={last_err}"
+        )
 
 
 __all__ = [

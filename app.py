@@ -3115,16 +3115,27 @@ async def erp_endpoints_delete(endpoint_id: str, request: Request):
 
 @app.post("/api/erp/test-connection")
 async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
-    """前端「测试连接」按钮 · 不写日志、不改任何状态"""
+    """前端「测试连接」按钮 · 不写日志、不改任何状态
+
+    v118.34.1 (Zihao 2026-05-19 拍板) · mrerp 必须直接走 MRERPAdapter.login
+    + select_company,不能掉进 ADAPTER_REGISTRY → push_mrerp stub。Stub
+    是 push_to_endpoint 边界占位,跟"测试连接"语义不一样;wizard 还没保存
+    endpoint 时只能走这条路由,所以必须在这里也做正确分发。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
     if req.adapter not in _erp.ADAPTER_REGISTRY:
         raise HTTPException(400, detail="erp.unknown_adapter")
-    # 如果 config.token 是 "***" 占位,说明从已存在的端点编辑,要还原 token
     cfg = dict(req.config or {})
     cfg.pop("_token_set", None)
-    result = _erp.test_endpoint_connection(req.adapter, cfg)
-    return result
+
+    # mrerp: real login + company-picker scrape (rich shape with
+    # ok / companies / error_friendly). Wizard JS already understands this.
+    if req.adapter == "mrerp":
+        return _erp.test_mrerp_endpoint(cfg)
+
+    # Other adapters: legacy ping. Keep the historical shape so
+    # webhook / flowaccount UIs aren't broken.
+    return _erp.test_endpoint_connection(req.adapter, cfg)
 
 
 # C-1 (Zihao 2026-05-18 拍板) · 60-second TTL cache for per-endpoint
@@ -4478,10 +4489,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "v118.34.0 · MR.ERP 一键对接(开发预览):\n• 「自动化 → ERP 对接」多了 MR.ERP 卡片 · 跟 Xero 同位置\n• 点「连接」走 3 步配置(选客户 → 填账号密码 + 测试连接 → 选公司 + 推送模式)\n• 选个现有客户和商品作模板 · 以后新客户新商品自动按模板建好(销售员 / 账户码 / 单位都继承)\n• 错误提示全中英泰繁中显示 · 不再露 MR.ERP 原文\n• 这版是开发预览 · 内测中 · 体验还在打磨\n\nv118.33.13.5 更新:\n• 修复 merge_gl_files 仍用旧公式(期末 = 期初 + 贷方 − 借方,费用账视角)覆盖解析器返回的正确值。现在统一为现金账户公式:期末 = 期初 + 借方 − 贷方。GL 期末余额从错的 305,356.06 → 正确的 125,100.06",
-            "en": "v118.34.0 · MR.ERP one-click integration (dev preview):\n• New MR.ERP card under Automation → ERP integrations, sits next to Xero\n• Click \"Connect\" for the 3-step setup (pick clients → enter login + test connection → pick company + push mode)\n• Choose an existing customer and product as templates — new customers and products from invoices get auto-created using the templates (salesman / account code / unit all inherited)\n• Every error shown in 4 languages, no raw MR.ERP text leaking through\n• Dev-preview build · internal testing only · UX still being polished\n\nv118.33.13.5 updates:\n• Fixed merge_gl_files using the old expense-ledger formula. GL closing balance now correctly 125,100.06.",
-            "th": "v118.34.0 · เชื่อม MR.ERP คลิกเดียว (พรีวิวระยะพัฒนา):\n• การ์ด MR.ERP ใหม่ใน «อัตโนมัติ → เชื่อม ERP» วางคู่กับ Xero\n• กด «เชื่อมต่อ» เพื่อทำการตั้งค่า 3 ขั้น (เลือกลูกค้า → กรอกบัญชี + ทดสอบเชื่อมต่อ → เลือกบริษัท + โหมดส่ง)\n• เลือกลูกค้าและสินค้าที่มีอยู่เป็นแม่แบบ — ลูกค้า/สินค้าใหม่จากใบกำกับจะสร้างอัตโนมัติตามแม่แบบ (พนักงานขาย / รหัสบัญชี / หน่วย สืบทอดทั้งหมด)\n• ข้อความข้อผิดพลาดทุกตัวแสดงเป็น 4 ภาษา ไม่มีข้อความดิบของ MR.ERP\n• รุ่นพรีวิวระยะพัฒนา · เฉพาะทดสอบภายใน · UX ยังขัดเกลาอยู่\n\nv118.33.13.5 อัปเดต:\n• แก้สูตร merge_gl_files ที่ยังใช้สูตรเก่าของบัญชีค่าใช้จ่าย ยอดปิดบัญชี GL ถูกต้องเป็น 125,100.06",
-            "ja": "v118.34.0 · MR.ERP ワンクリック連携（開発プレビュー）:\n• 「自動化 → ERP連携」に Xero と並ぶ MR.ERP カードを追加\n• 「接続」をクリックして 3 ステップ設定（取引先選択 → ログイン情報入力 + 接続テスト → 会社選択 + 送信モード）\n• 既存の取引先と商品をテンプレートとして選択 — 請求書から新規取引先/商品を自動作成（営業担当 / 勘定コード / 単位を継承）\n• エラー表示は全 4 言語の親切なメッセージ、MR.ERP の生メッセージは漏れません\n• 開発プレビュー版 · 内部テストのみ · UX 改善中\n\nv118.33.13.5 更新:\n• merge_gl_files の古い経費元帳数式を修正。GL期末残高は正しく 125,100.06。"
+            "zh": "v118.34.1 · MR.ERP「测试连接」修复:\n• 修复:wizard 第 2 步「测试连接」按钮以前掉进 push_mrerp 占位返回,现在直接走 MRERPAdapter.login + select_company\n• 修复:连接失败时错误条会显示真实文字(以前空白)· 4 语友好消息 + 原始错误 fallback 链兜底\n• 加守门测试 test_erp_test_connection_route_dispatch · 防止以后再回退到占位\n\nv118.34.0 · MR.ERP 一键对接(开发预览):\n• 「自动化 → ERP 对接」多了 MR.ERP 卡片 · 跟 Xero 同位置\n• 点「连接」走 3 步配置(选客户 → 填账号密码 + 测试连接 → 选公司 + 推送模式)\n• 选个现有客户和商品作模板 · 以后新客户新商品自动按模板建好(销售员 / 账户码 / 单位都继承)\n• 错误提示全中英泰繁中显示 · 不再露 MR.ERP 原文\n• 这版是开发预览 · 内测中 · 体验还在打磨",
+            "en": "v118.34.1 · MR.ERP \"Test connection\" fix:\n• Fixed: the wizard Step-2 test button used to fall into the push_mrerp stub. It now drives the real MRERPAdapter.login + select_company flow.\n• Fixed: connection-failure error bar now always shows text (was blank). 4-lang friendly message + raw error fallback chain ensures something is always rendered.\n• Added guard test test_erp_test_connection_route_dispatch so this can't regress.\n\nv118.34.0 · MR.ERP one-click integration (dev preview):\n• New MR.ERP card under Automation → ERP integrations, sits next to Xero\n• Click \"Connect\" for the 3-step setup (pick clients → enter login + test connection → pick company + push mode)\n• Choose an existing customer and product as templates — new customers and products from invoices get auto-created using the templates (salesman / account code / unit all inherited)\n• Every error shown in 4 languages, no raw MR.ERP text leaking through\n• Dev-preview build · internal testing only · UX still being polished",
+            "th": "v118.34.1 · แก้ปุ่ม «ทดสอบเชื่อมต่อ» MR.ERP:\n• แก้: ปุ่มทดสอบในขั้นที่ 2 ของวิซาร์ดเคยตกลงไปที่ stub ของ push_mrerp ตอนนี้เรียก MRERPAdapter.login + select_company จริง\n• แก้: เมื่อเชื่อมต่อไม่สำเร็จ แถบข้อผิดพลาดจะมีข้อความเสมอ (เคยว่างเปล่า) ข้อความเป็นมิตร 4 ภาษา + fallback ของข้อความดิบ\n• เพิ่ม guard test test_erp_test_connection_route_dispatch กันถดถอย\n\nv118.34.0 · เชื่อม MR.ERP คลิกเดียว (พรีวิวระยะพัฒนา):\n• การ์ด MR.ERP ใหม่ใน «อัตโนมัติ → เชื่อม ERP» วางคู่กับ Xero\n• กด «เชื่อมต่อ» เพื่อทำการตั้งค่า 3 ขั้น (เลือกลูกค้า → กรอกบัญชี + ทดสอบเชื่อมต่อ → เลือกบริษัท + โหมดส่ง)\n• เลือกลูกค้าและสินค้าที่มีอยู่เป็นแม่แบบ — ลูกค้า/สินค้าใหม่จากใบกำกับจะสร้างอัตโนมัติตามแม่แบบ\n• ข้อความข้อผิดพลาดทุกตัวแสดงเป็น 4 ภาษา ไม่มีข้อความดิบของ MR.ERP\n• รุ่นพรีวิวระยะพัฒนา · เฉพาะทดสอบภายใน · UX ยังขัดเกลาอยู่",
+            "ja": "v118.34.1 · MR.ERP「接続テスト」修正:\n• 修正: ウィザード Step-2 のテストボタンが push_mrerp スタブに吸い込まれていた問題。本来の MRERPAdapter.login + select_company を呼ぶように修正\n• 修正: 接続失敗時のエラーバーが常に文字を表示（以前は空白）。4 言語の親切メッセージ + 生エラーのフォールバックチェーン\n• 退行防止テスト test_erp_test_connection_route_dispatch を追加\n\nv118.34.0 · MR.ERP ワンクリック連携（開発プレビュー）:\n• 「自動化 → ERP連携」に Xero と並ぶ MR.ERP カードを追加\n• 「接続」をクリックして 3 ステップ設定（取引先選択 → ログイン情報入力 + 接続テスト → 会社選択 + 送信モード）\n• 既存の取引先と商品をテンプレートとして選択 — 請求書から新規取引先/商品を自動作成\n• エラー表示は全 4 言語の親切なメッセージ\n• 開発プレビュー版 · 内部テストのみ · UX 改善中"
         }
     }
 

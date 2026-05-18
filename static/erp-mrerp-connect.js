@@ -1170,22 +1170,42 @@
                     },
                 }),
             });
-            const data = r.ok ? await r.json() : { ok: false, error_code: 'ERR_HTTP_' + r.status };
+            let data;
+            try {
+                data = await r.json();
+            } catch (_je) {
+                data = { ok: false, error_code: 'ERR_HTTP_' + r.status, raw_error: await r.text().catch(()=>'') };
+            }
+            if (!r.ok && !data) {
+                data = { ok: false, error_code: 'ERR_HTTP_' + r.status };
+            }
             if (data.ok || data.success) {
                 _wizardState.companies = data.companies || [];
                 statusEl.textContent = t('wiz-test-ok', { n: (data.companies || []).length || 1 });
             } else {
+                // v118.34.1 (Zihao 2026-05-19 拍板) · 错误条不能空白。
+                // 优先级:friendly[lang] > friendly.en > raw_error >
+                // error_msg (legacy shape) > response_body (legacy stub) >
+                // error_code > generic fallback。至少一条文字一定要落出。
                 const f = data.error_friendly || {};
+                const friendly = f[_activeLang()] || f.en
+                    || data.raw_error
+                    || data.error_msg
+                    || data.response_body
+                    || data.error_code
+                    || ('HTTP ' + (r.status || 0) + ' · connection failed');
                 statusEl.textContent = '✗';
                 errBox.style.display = '';
                 w.querySelector('[data-mw-test-error-friendly]').textContent =
-                    f[_activeLang()] || f.en || data.raw_error || data.error_code || '';
-                w.querySelector('[data-mw-test-error-raw]').textContent = data.raw_error || '';
+                    String(friendly).slice(0, 400);
+                w.querySelector('[data-mw-test-error-raw]').textContent =
+                    String(data.raw_error || data.response_body || '').slice(0, 400);
             }
         } catch (e) {
             statusEl.textContent = '✗';
             errBox.style.display = '';
-            w.querySelector('[data-mw-test-error-friendly]').textContent = String(e).slice(0, 200);
+            w.querySelector('[data-mw-test-error-friendly]').textContent =
+                String(e && e.message || e || 'connection failed').slice(0, 200);
             w.querySelector('[data-mw-test-error-raw]').textContent = '';
         }
     }

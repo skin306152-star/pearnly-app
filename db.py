@@ -6501,26 +6501,6 @@ def find_erp_product_mappings_batch(tenant_id, erp_type, item_names):
         return {}
 
 
-# ─── skin 白名单 · 演示数据(用 notes 'DEMO' 标记 · 一键清掉)─
-def clear_erp_test_mappings(tenant_id):
-    """清掉所有 notes='DEMO' 或 'DEMO ...' 开头的映射"""
-    if not tenant_id:
-        return 0
-    n = 0
-    try:
-        with get_cursor(commit=True) as cur:
-            for tbl in ("erp_client_mappings", "erp_account_mappings", "erp_tax_mappings"):
-                cur.execute(
-                    f"DELETE FROM {tbl} WHERE tenant_id = %s "
-                    f"AND (notes = 'DEMO' OR notes LIKE 'DEMO %%')",
-                    (str(tenant_id),)
-                )
-                n += cur.rowcount
-    except Exception as e:
-        logger.error(f"clear_erp_test_mappings failed: {e}")
-    return n
-
-
 def get_mrerp_mappings_bundle(tenant_id):
     """通用 ERP 映射束 · 一次拿 4 张映射表(clients / accounts / taxes / products)
     供推送引擎(Xero 等)使用

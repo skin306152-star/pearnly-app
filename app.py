@@ -209,45 +209,24 @@ def _ensure_playwright_installed():
         f"systemctl restart mrpilot >> /var/log/mrpilot-deploy.log 2>&1 || true; "
         f"rm -f {sentinel}"
     )
-    # v118.34.8 (Zihao 2026-05-19 拍板) · 用 systemd-run --scope 把
-    # install 进程放进自己的 transient scope · 不属于 mrpilot 的 cgroup ·
-    # 这样后续 systemctl restart mrpilot 不会把 install 子进程也杀掉。
-    # 没有 systemd-run 时回退到普通 Popen + start_new_session(同 v118.34.7)。
-    systemd_run = shutil.which("systemd-run")
-    spawn_args = None
+    # v118.34.9 · revert to simple Popen. systemd-run might block lifespan
+    # or fail if the unit can't be created in mrpilot's cgroup context.
+    # The simple detached Popen with start_new_session=True survives if
+    # the install completes before mrpilot's next restart (~10-60 s for
+    # pip alone since chromium is already on disk).
     try:
-        if systemd_run:
-            spawn_args = [
-                systemd_run, "--scope", "--collect",
-                "--unit=mrpilot-playwright-install",
-                "bash", "-c", cmd,
-            ]
-            subprocess.Popen(
-                spawn_args,
-                close_fds=True,
-                start_new_session=True,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            logger.warning(
-                "[playwright-bootstrap] spawned via systemd-run --scope · "
-                "scope=mrpilot-playwright-install · survives mrpilot restart. "
-                "Watch /api/version for playwright.playwright_installed=true."
-            )
-        else:
-            subprocess.Popen(
-                ["bash", "-c", cmd], close_fds=True, start_new_session=True,
-            )
-            logger.warning(
-                "[playwright-bootstrap] systemd-run unavailable — spawned plain "
-                "detached subprocess (may get cgroup-killed by restart). "
-                "Watch /api/version for playwright.playwright_installed=true."
-            )
-    except Exception as e:
-        logger.warning(
-            "[playwright-bootstrap] spawn failed (args=%r): %s", spawn_args, e
+        subprocess.Popen(
+            ["bash", "-c", cmd],
+            close_fds=True, start_new_session=True,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
+        logger.warning(
+            "[playwright-bootstrap] spawned plain detached install + restart. "
+            "Watch /api/version playwright.playwright_installed."
+        )
+    except Exception as e:
+        logger.warning("[playwright-bootstrap] spawn failed: %s", e)
         _write_status(
             playwright_installed=pip_importable,
             chromium_installed=chromium_installed,
@@ -288,6 +267,26 @@ def _read_playwright_status():
     except Exception:
         pass
 
+    # v118.34.9 · add deploy log tail so the user can see WHY repeated
+    # deploys roll back without SSH. Limited to last 40 lines and grep
+    # filtered to interesting markers to keep payload reasonable.
+    deploy_log_tail = ""
+    try:
+        with open("/var/log/mrpilot-deploy.log") as f:
+            lines = f.readlines()[-40:]
+            deploy_log_tail = "".join(lines)[-3000:]
+    except Exception as e:
+        deploy_log_tail = f"(log unreadable: {e})"
+
+    # Also expose any sentinels still on /tmp so we can spot stuck installs.
+    sentinels = []
+    try:
+        for name in _os.listdir("/tmp"):
+            if name.startswith("pearnly-"):
+                sentinels.append(name)
+    except Exception:
+        pass
+
     return {
         "playwright_installed": bool(payload.get("playwright_installed")),
         "chromium_installed": bool(payload.get("chromium_installed")),
@@ -301,6 +300,8 @@ def _read_playwright_status():
         "python_bin": payload.get("python_bin"),
         "effective_uid": payload.get("effective_uid"),
         "ts": payload.get("ts"),
+        "deploy_log_tail": deploy_log_tail,
+        "sentinels": sentinels,
     }
 
 
@@ -504,36 +505,22 @@ fi
 mkdir -p static
 cp -f home.html home.js home.css login.html static/ 2>> "$LOG" || true
 
-# 4.5. v118.34.8 · 极简化 · 用 systemctl show 找 mrpilot 用的 python ·
-#     失败兜底常见路径 · 用 timeout 30 防止单步卡死整个部署
-MRPILOT_PY=""
-EXEC=$(systemctl show -p ExecStart mrpilot 2>/dev/null | head -1)
-case "$EXEC" in
-    *"/opt/mrpilot/venv/bin/python"*) MRPILOT_PY="/opt/mrpilot/venv/bin/python" ;;
-    *"/usr/bin/python3"*) MRPILOT_PY="/usr/bin/python3" ;;
-esac
-if [ -z "$MRPILOT_PY" ] || [ ! -x "$MRPILOT_PY" ]; then
-    for cand in /opt/mrpilot/venv/bin/python /opt/mrpilot/venv/bin/python3 /usr/bin/python3; do
-        if [ -x "$cand" ]; then MRPILOT_PY="$cand"; break; fi
-    done
-fi
-echo "using python: $MRPILOT_PY" >> "$LOG"
+# 4.5. v118.34.9 · 极简版 · 只装 playwright(用 mrpilot 的 venv python
+#     如果存在,否则用 system python3)· 每步 timeout 防止卡死
+PY=/opt/mrpilot/venv/bin/python
+if [ ! -x "$PY" ]; then PY=/usr/bin/python3; fi
+echo "using python: $PY" >> "$LOG"
 
-# 只装 playwright (避免 -r requirements.txt 触发整个依赖树重装,可能极慢)
-echo "pip install playwright via $MRPILOT_PY..." >> "$LOG"
-if [ -n "$MRPILOT_PY" ] && [ -x "$MRPILOT_PY" ]; then
-    timeout 60 "$MRPILOT_PY" -m pip install playwright >> "$LOG" 2>&1 || \
-        timeout 60 "$MRPILOT_PY" -m pip install playwright --break-system-packages \
-            >> "$LOG" 2>&1 || \
-        echo "pip install playwright non-fatal failure" >> "$LOG"
-fi
+echo "pip install playwright..." >> "$LOG"
+timeout 60 "$PY" -m pip install playwright >> "$LOG" 2>&1 || \
+    timeout 60 "$PY" -m pip install playwright --break-system-packages \
+        >> "$LOG" 2>&1 || \
+    echo "pip install playwright non-fatal failure" >> "$LOG"
 
-# 4.6. v118.34.8 · 装/确认 chromium 浏览器(playwright 用 · idempotent)
+# 4.6. v118.34.9 · chromium 已装时跳过(idempotent)
 echo "playwright install chromium..." >> "$LOG"
-if [ -n "$MRPILOT_PY" ] && [ -x "$MRPILOT_PY" ]; then
-    timeout 120 "$MRPILOT_PY" -m playwright install chromium >> "$LOG" 2>&1 || \
-        echo "playwright install chromium non-fatal failure" >> "$LOG"
-fi
+timeout 120 "$PY" -m playwright install chromium >> "$LOG" 2>&1 || \
+    echo "playwright install chromium non-fatal failure" >> "$LOG"
 
 # 5. 重启服务
 echo "restarting mrpilot..." >> "$LOG"
@@ -4819,8 +4806,8 @@ async def get_frontend_version():
         "ts": int(_t.time()),
         "playwright": _read_playwright_status(),
         "release_notes": {
-            "zh": "v118.34.8 · 极简化 + systemd-run scope · 防 cgroup-kill:\n• v118.34.7 没落 · /api/version 的 ts 没变 · 推测 git-deploy.sh 的 grep -oP 在某些环境 bash 起来卡了 · 或 pip install -r requirements.txt 慢到健康检查超时回滚\n• v118.34.8 修:\n  - git-deploy.sh 用 case 解析(简单 grep 兼容性问题)· 只装 playwright 不装全部 requirements\n  - 每步加 timeout(pip 60s · chromium 120s)\n  - MAX_WAIT 拉到 180s\n  - 后台 install 进程用 systemd-run --scope 启 · 不在 mrpilot cgroup · 后续 restart 不会杀它\n\n访问 /api/version 看 playwright.playwright_installed",
-            "en": "v118.34.8 · Simplification + systemd-run scope to prevent cgroup-kill:\n• v118.34.7 didn't land — /api/version's ts never changed, suggesting either the grep -oP autodetect line in deploy.sh's heredoc had a bash issue, or pip install -r requirements.txt was too slow and the health check timed out → rollback to v118.34.6.\n• v118.34.8 fixes:\n  - deploy.sh autodetect uses `case` instead of grep -oP for portability; installs ONLY playwright (not -r requirements.txt) so it can't drag in slow deps; wraps each pip step in `timeout 60` and chromium in `timeout 120`.\n  - MAX_WAIT bumped to 180 s.\n  - Lifespan-spawned background install now launches under `systemd-run --scope --unit=mrpilot-playwright-install` when available, so it's in its own transient cgroup. mrpilot's restart no longer kills it mid-install.\n\nCheck /api/version's playwright.playwright_installed and ts (should advance on next restart).",
+            "zh": "v118.34.9 · 极简化 · 加 deploy log 暴露 · 看到根因:\n• v118.34.7 / 8 连续两次都没落 · /api/version 的 ts 没变\n• 推测 v118.34.6 的 deploy.sh (没 timeout) 卡在 pip install -r requirements.txt 死循环 · webhook 后台进程没退出 · 健康检查超时回滚\n• v118.34.9:\n  - /api/version 加 deploy_log_tail (最后 40 行 mrpilot-deploy.log) 和 sentinels 字段 · 可以浏览器直接看到部署日志,定位根因\n  - 简化 deploy.sh:直接用 /opt/mrpilot/venv/bin/python(失败兜 /usr/bin/python3)· 不再 grep · 不再装全部 requirements\n  - 每步 timeout 60-120s · 卡死也不影响 deploy 完成\n  - lifespan 后台 spawn 撤回 systemd-run 复杂度 · 用普通 Popen\n\n部署完看 /api/version 的 deploy_log_tail 字段",
+            "en": "v118.34.9 · Maximum simplification + deploy log surfaced via /api/version:\n• v118.34.7 + v118.34.8 both silently rolled back. /api/version's `ts` field never advanced, meaning mrpilot v118.34.7/8 never restarted successfully.\n• Most likely cause: the v118.34.6 deploy.sh I wrote (still on disk, running every subsequent push) does `pip install -r requirements.txt` without a `timeout` wrapper. If that step hangs on network/dep resolution, the script never reaches `systemctl restart mrpilot` and the webhook subprocess stays parked indefinitely.\n• v118.34.9 changes:\n  - /api/version `playwright` now includes `deploy_log_tail` (last 40 lines of /var/log/mrpilot-deploy.log) and `sentinels` (any /tmp/pearnly-* markers). Browser-visible deploy diagnostics, no SSH.\n  - deploy.sh heredoc dropped the grep -oP autodetect — uses `/opt/mrpilot/venv/bin/python` with fallback to `/usr/bin/python3`. Just installs `playwright` (not -r requirements.txt). Each step wrapped in `timeout` (60 s pip, 120 s chromium).\n  - lifespan-spawned install reverted to simple `subprocess.Popen` (no systemd-run experiment).\n\nAfter deploy, the /api/version response will tell us exactly what the deploy.sh saw.",
             "th": "v118.34.5 · Playwright ติดตั้งจริง + การ์ด Xero สอดคล้อง + today-stats ไม่หลุด:\n• /api/version เพิ่มฟิลด์ playwright.playwright_installed / chromium_installed — ดูสถานะติดตั้งในเบราว์เซอร์ได้ทันที ไม่ต้อง SSH\n• pip install playwright ตอนสตาร์ทเปลี่ยนเป็นแบบ synchronous (ไม่รวม chromium · ปกติ <15 วินาที) chromium ยังลงเบื้องหลังเหมือนเดิม\n• git-deploy.sh เพิ่มขั้นตอน pip install + playwright install chromium · MAX_WAIT ดันเป็น 90 วินาที\n• เขียนการ์ด Xero ใหม่ใช้ .integration-row เลย์เอาต์ — เหมือนการ์ด MR.ERP / FlowAccount ตรงกัน 1 ต่อ 1 เพิ่มสีไอคอน .ic-xero ฟ้าอ่อน\n• ข้อความ 'วันนี้ยังไม่มีการส่ง' ย้ายจากแท็บ Connect → แท็บ Push Logs\n\nหลัง deploy เข้า https://pearnly.com/api/version ดูฟิลด์ playwright.playwright_installed",
             "ja": "v118.34.5 · Playwright が実際にインストールされる + Xero カード整合 + today-stats のリーク修正:\n• /api/version に playwright.playwright_installed / chromium_installed フィールド追加 — ブラウザでインストール状態を確認可能、SSH 不要\n• 起動時の pip install playwright を **同期** 化（chromium は除く · 通常 <15 秒）。chromium は引き続きバックグラウンドで\n• git-deploy.sh に pip install -r requirements.txt + playwright install chromium 手順を追加 · MAX_WAIT を 90 秒に拡大\n• Xero カードを .integration-row レイアウトに書き直し — MR.ERP / FlowAccount カードと 1 対 1 で一致。.ic-xero 薄青アイコン追加\n• 「本日はまだ送信なし」を Connect タブから Push Logs タブに移動\n\nデプロイ後 https://pearnly.com/api/version で playwright.playwright_installed=true を確認"
         }

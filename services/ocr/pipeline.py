@@ -58,6 +58,7 @@ from .layer1_vision import (
     Layer1PDFError,
     extract_from_image_bytes as _l1_extract_image,
 )
+from .text_path import try_extract as _try_text_extract
 from .layer2_structure import (
     Layer2Error,
     extract_from_page as _l2_extract_page,
@@ -109,6 +110,14 @@ COST_FLASH_OUTPUT_PER_M_USD = 2.50
 
 DEFAULT_DPI = 200
 DEFAULT_MAX_PAGES = 50
+
+# Layer 0: pypdf text extraction fast path. When True and a PDF has an
+# embedded text layer (avg chars/page >= 200), pipeline skips Vision API
+# entirely — only Flash-Lite (+ optional Flash) runs. See text_path.py.
+# Default False; production toggles via env once verified on real traffic.
+DEFAULT_ENABLE_TEXT_PATH = os.environ.get(
+    "OCR_FAST_PATH_ENABLED", "false"
+).strip().lower() == "true"
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".tiff", ".tif", ".bmp", ".gif"}
 PDF_EXTENSIONS = {".pdf"}
@@ -211,6 +220,7 @@ def run_on_path(
     enable_layer3: bool = True,
     fallback_to_layer2_on_layer3_error: bool = True,
     pattern_memory: Optional[InvoicePatternMemory] = None,
+    enable_text_path: Optional[bool] = None,
 ) -> PipelineResult:
     """End-to-end pipeline on a file path (auto-detects PDF vs image).
 
@@ -251,8 +261,10 @@ def run_on_path(
             enable_layer3=enable_layer3,
             fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
             pattern_memory=pattern_memory,
+            enable_text_path=enable_text_path,
         )
     if ext in IMAGE_EXTENSIONS:
+        # Layer 0 text_path only applies to PDFs — images go straight to Vision
         return run_on_image_bytes(
             file_bytes,
             api_key=api_key,
@@ -274,14 +286,25 @@ def run_on_pdf_bytes(
     enable_layer3: bool = True,
     fallback_to_layer2_on_layer3_error: bool = True,
     pattern_memory: Optional[InvoicePatternMemory] = None,
+    enable_text_path: Optional[bool] = None,
 ) -> PipelineResult:
     """Run pipeline on PDF bytes.
 
     Pipeline owns the PDF -> image rendering (so the image bytes are
-    available for layer 3 without re-rendering).
+    available for layer 3 visual fallback regardless of layer 0 outcome).
+
+    When enable_text_path is True (or None and OCR_FAST_PATH_ENABLED env
+    is true), pipeline first tries pypdf text extraction (layer 0). On
+    hit, Vision API is skipped for all pages; text from pypdf feeds
+    directly into Layer 2. On miss (avg chars < threshold, or pypdf
+    error), falls back to the normal Vision -> Flash-Lite -> Flash chain.
     """
     if not pdf_bytes:
         raise Layer1PDFError("pipeline: empty PDF bytes")
+
+    # Resolve enable_text_path: explicit arg > env default
+    if enable_text_path is None:
+        enable_text_path = DEFAULT_ENABLE_TEXT_PATH
 
     try:
         import fitz  # PyMuPDF
@@ -291,6 +314,23 @@ def run_on_pdf_bytes(
         ) from e
 
     t0 = time.time()
+
+    # === Layer 0: try pypdf text extraction (cheap, free, electronic PDFs only) ===
+    # If hit, we'll use these Page objects as layer 1 result, skipping Vision.
+    # If miss, layer1_pages_override stays None and we run Vision normally.
+    layer1_pages_override: Optional[List[Page]] = None
+    if enable_text_path:
+        try:
+            text_l1 = _try_text_extract(pdf_bytes, max_pages=max_pages)
+            if text_l1 is not None:
+                layer1_pages_override = list(text_l1.pages)
+        except Exception as _tpe:  # pragma: no cover  (defensive)
+            logger.warning(
+                "pipeline: text_path exception (fallback to Vision): %s",
+                _tpe,
+            )
+
+    # === Render PDF pages (always, since layer 3 may need them even if text_path hit) ===
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     except Exception as e:
@@ -322,8 +362,28 @@ def run_on_pdf_bytes(
     finally:
         doc.close()
 
+    # Defensive: if text_path returned a different page count than render
+    # (rare — implies pypdf and fitz disagree about page count), drop the
+    # override and run full Vision to keep them consistent.
+    if (
+        layer1_pages_override is not None
+        and len(layer1_pages_override) != len(page_image_bytes_list)
+    ):
+        logger.warning(
+            "pipeline: text_path/render page count mismatch (%d vs %d) — "
+            "dropping text_path override",
+            len(layer1_pages_override),
+            len(page_image_bytes_list),
+        )
+        layer1_pages_override = None
+
     page_results: List[PipelinePageResult] = []
     for i, image_bytes in enumerate(page_image_bytes_list, start=1):
+        l1_override = (
+            layer1_pages_override[i - 1]
+            if layer1_pages_override is not None
+            else None
+        )
         pr = _process_one_page(
             image_bytes,
             page_number=i,
@@ -331,6 +391,7 @@ def run_on_pdf_bytes(
             enable_layer3=enable_layer3,
             fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
             pattern_memory=pattern_memory,
+            layer1_page_override=l1_override,
         )
         page_results.append(pr)
 
@@ -384,15 +445,27 @@ def _process_one_page(
     enable_layer3: bool,
     fallback_to_layer2_on_layer3_error: bool,
     pattern_memory: Optional[InvoicePatternMemory] = None,
+    layer1_page_override: Optional[Page] = None,
 ) -> PipelinePageResult:
-    """L1 -> L2 -> (maybe L3) for ONE page. Captures cost / latency / errors."""
+    """L1 -> L2 -> (maybe L3) for ONE page. Captures cost / latency / errors.
+
+    If layer1_page_override is given (typically from text_path layer 0),
+    Layer 1 Vision API is skipped — the supplied Page is used directly.
+    image_bytes is still kept for potential Layer 3 visual fallback.
+    """
     t_total = time.time()
 
-    # --- Layer 1 ---
-    t_l1 = time.time()
-    l1_result = _l1_extract_image(image_bytes, page_number=page_number)
-    l1_ms = int((time.time() - t_l1) * 1000)
-    l1_page = l1_result.pages[0]
+    # --- Layer 1 (skipped if layer1_page_override provided) ---
+    if layer1_page_override is None:
+        t_l1 = time.time()
+        l1_result = _l1_extract_image(image_bytes, page_number=page_number)
+        l1_ms = int((time.time() - t_l1) * 1000)
+        l1_page = l1_result.pages[0]
+        l1_layer_name = "L1"
+    else:
+        l1_ms = 0  # text_path is essentially free per-page after PDF-level extract
+        l1_page = layer1_page_override
+        l1_layer_name = "text"
 
     # --- Layer 2 ---
     t_l2 = time.time()
@@ -405,7 +478,7 @@ def _process_one_page(
 
     # --- Layer 3 (conditional) ---
     invoice = l2_invoice
-    layer_chain = ["L1", "L2"]
+    layer_chain = [l1_layer_name, "L2"]
     l3_in_tokens = 0
     l3_out_tokens = 0
     l3_ms = 0
@@ -422,7 +495,7 @@ def _process_one_page(
                 api_key=api_key,
             )
             invoice = l3_result.invoice
-            layer_chain = ["L1", "L2", "L3"]
+            layer_chain = [l1_layer_name, "L2", "L3"]
             l3_in_tokens = l3_result.input_tokens
             l3_out_tokens = l3_result.output_tokens
             l3_ms = l3_result.elapsed_ms
@@ -435,7 +508,7 @@ def _process_one_page(
                 "pipeline: L3 fallback error on page %d: %s", page_number, e
             )
             if fallback_to_layer2_on_layer3_error:
-                layer_chain = ["L1", "L2", "L3_failed"]
+                layer_chain = [l1_layer_name, "L2", "L3_failed"]
                 needs_manual_review = True
             else:
                 raise
@@ -443,7 +516,7 @@ def _process_one_page(
             error_msg = f"L3 quota: {e}"
             logger.warning("pipeline: L3 quota on page %d: %s", page_number, e)
             if fallback_to_layer2_on_layer3_error:
-                layer_chain = ["L1", "L2", "L3_quota"]
+                layer_chain = [l1_layer_name, "L2", "L3_quota"]
                 needs_manual_review = True
             else:
                 raise
@@ -453,7 +526,7 @@ def _process_one_page(
                 "pipeline: L3 transient on page %d: %s", page_number, e
             )
             if fallback_to_layer2_on_layer3_error:
-                layer_chain = ["L1", "L2", "L3_transient"]
+                layer_chain = [l1_layer_name, "L2", "L3_transient"]
                 needs_manual_review = True
             else:
                 raise
@@ -462,7 +535,7 @@ def _process_one_page(
             error_msg = f"L3 error: {e}"
             logger.warning("pipeline: L3 error on page %d: %s", page_number, e)
             if fallback_to_layer2_on_layer3_error:
-                layer_chain = ["L1", "L2", "L3_failed"]
+                layer_chain = [l1_layer_name, "L2", "L3_failed"]
                 needs_manual_review = True
             else:
                 raise
@@ -630,15 +703,19 @@ def _compute_total_cost(page_results: List[PipelinePageResult]) -> float:
     """Sum estimated cost across pages, return THB.
 
     Notes:
-        - Vision $0.00150/page applies even if a page is blank
+        - Vision $0.00150/page applies only when Layer 1 Vision actually
+          ran (layer_chain starts with "L1"). When text_path (Layer 0)
+          hit and Vision was skipped, layer_chain starts with "text" and
+          no Vision cost is added.
         - Flash-Lite cost = (input * 0.10 + output * 0.40) / 1M tokens, USD
         - Flash cost = (input * 0.30 + output * 2.50) / 1M tokens, USD
         - Then * THB_PER_USD (default 35)
     """
     total_usd = 0.0
     for pr in page_results:
-        # Vision per-page
-        total_usd += COST_VISION_PER_PAGE_USD
+        # Vision per-page — only when L1 actually ran (skipped for text_path)
+        if "L1" in pr.layer_chain:
+            total_usd += COST_VISION_PER_PAGE_USD
         # Flash-Lite (always runs)
         total_usd += (pr.layer2_input_tokens / 1_000_000.0) * COST_FLASHLITE_INPUT_PER_M_USD
         total_usd += (pr.layer2_output_tokens / 1_000_000.0) * COST_FLASHLITE_OUTPUT_PER_M_USD

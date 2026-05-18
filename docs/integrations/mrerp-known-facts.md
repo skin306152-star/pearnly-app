@@ -589,7 +589,35 @@ Korn 真样本:`690507-001`
 
 **已知限制**:`test01` 账号在 TEST2019 上 alldel.php 返"Delete Success"但客户不删 · 测试 orphan 累积。生产用 admin 账号不受影响。详见 copy-flow.md §8。
 
-### 10.5 adapter 创建顺序(逻辑依赖)
+### 10.6 商品主数据 Copy-from-Seed 创建流(2026-05-18 实测 · Task 2 Phase 3)
+
+`stkmas/allform.php` 也有 `inpdupdata`(สำเนา)按钮 + 同款 bshlistbox popup。
+
+**关键差异 vs 客户(armas)**:
+- 弹层**虚拟滚动**:73+ 商品的 TEST2019 popup 一次只 DOM-渲染 ~10 行;直接点击行选择只对前 N 个有效
+- 弹层有内置 search 输入 `#bshlistboxinpsearch`(onkeyup="bshdatalistbox()")· 输入种子码就过滤
+- adapter 实现:`MRERPProductSyncService._copy_from_seed` 先 `fill()` 搜索框再 `click()` 行
+
+**Override 字段(6 个 vs customer 的 4 个)**:
+- `txtstkcode`(商品码 · adapter 生成)
+- `txtstkname`(商品名 · OCR `items[].name`)
+- `txtstkapcode` / `txtstkapname`(AP 镜像)
+- `txtstkarcode` / `txtstkarname`(AR 镜像)
+
+**继承 seed**:`selstktype` / `selstkmet` / 4 个 unit triplet / 9 个 GL account triplet / AP master ref / 价格 / cost / TRU + disable flags。
+
+**ERR/WARN catalog**(Task 2 新加 · 4-lang):
+- `ERR_NO_SEED_PRODUCT` · 没配 seed 抛
+- `ERR_SEED_PRODUCT_NOT_FOUND` · seed 码不在 popup
+- `ERR_PRODUCT_UNIT_NOT_FOUND` · OCR `item.unit_code` 与 seed 的 `txtunit_usell` 不匹配
+- `WARN_PRODUCT_NAME_TRUNCATED` · 商品名超 100 字符自动截断
+- `WARN_PRODUCT_PRICE_INHERITED_FROM_SEED` · seed 销售价照搬给新商品 · 提醒用户事后改
+
+完整字段映射:[docs/integrations/mrerp-product-form-fields.md](mrerp-product-form-fields.md) · 实现:[services/erp/mrerp_product_sync.py](../../services/erp/mrerp_product_sync.py)
+
+**已知限制**:同 customer · `test01` alldel.php 返 "Delete Success" 但不真删 · 生产用 admin 不受影响。
+
+### 10.7 adapter 创建顺序(逻辑依赖)
 
 1. 销售员 / 部门 / 工作号 / 分店(用户首次配置 · 1 次性)
 2. 商品(OCR 看到新商品名 → 抓 + 自动建 · 主流场景)

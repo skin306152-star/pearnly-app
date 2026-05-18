@@ -413,19 +413,51 @@ numeric defaults, TRU + disable flags.
 5. **Cleanup permission** — same `alldel.php` issue as customers may
    apply here. Tests will orphan products on TEST2019. Acceptable?
 
-### 4.6 NOT implementing this round
+### 4.6 ✅ Implementation status (2026-05-18 · Task 2)
 
-Per Zihao 2026-05-18 directive: probe + design only. No
-`services/erp/mrerp_product_sync.py` file in this commit.
+Zihao 2026-05-18 拍板 answered all 5 §4.5 questions and unlocked
+implementation. All four phases shipped in 4 commits:
 
-When greenlit, implementation order mirrors Customer Phase 1+2+3+5:
-1. Add `normalize_item_name` callsite + `parse_stkmas_listing` parser
-   (~½ day · unit-testable).
-2. ProductSyncService Layers 0-3 (lookup-only · ~1 day · 1 integration
-   test).
-3. Layer 4 copy-from-seed (~1 day · 1 integration test with cleanup).
-4. Adapter wiring + propagate `seed_product_code` from endpoint
-   config (~½ day).
+| Phase | Commit | Status |
+|---|---|---|
+| 1+2 (parser + Layers 0-3 + 19 tests) | `2f633d1` | ✅ |
+| 3 (Layer 4 auto-create + 4 integration tests) | `bc9faea` | ✅ |
+| 5 (adapter wiring + GET /endpoints/:id/products + wizard) | `4696d74` | ✅ |
+| Customer dropdown realised (companion Task 1) | `4191f66` | ✅ |
+
+**Files in place**:
+- `services/erp/mrerp_product_sync.py` (580 lines · L0-L4 + delete)
+- `services/erp/mrerp_business_friendly.py` (+ 5 new ERR/WARN keys, 4-lang)
+- `tests/unit/test_mrerp_product_sync_unit.py` (15 cases)
+- `tests/integration/test_mrerp_product_sync.py` (4 lookup cases)
+- `tests/integration/test_mrerp_product_sync_create.py` (4 create cases)
+- Adapter constructor: new `seed_product_code` flag
+- `MRERPAdapter._sync_master_data` extended with item loop
+- `MRERPAdapter._extract_items` helper handles 3 OCR shapes
+- Route: `GET /api/erp/endpoints/:id/products` (60s TTL cache)
+- Wizard Step 3: seed-product dropdown / text-input fallback / warn
+
+**Zihao 拍板 answers baked in**:
+- Q1 Sales price → copy from seed (no override in `_override_after_copy`;
+  WARN_PRODUCT_PRICE_INHERITED_FROM_SEED appended to result.warnings)
+- Q2 Multi-seed → v1 single seed via endpoint.config.seed_product_code
+- Q3 Unit mismatch → ERR_PRODUCT_UNIT_NOT_FOUND raised before save
+  (verified by integration test_product_unit_not_found_raises_friendly_error)
+- Q4 Name ≥ 100 chars → truncated + WARN_PRODUCT_NAME_TRUNCATED
+  (verified by integration test_product_name_truncation_with_warn)
+- Q5 Cleanup permission → same alldel.php limitation as customers;
+  orphan products logged with "ORPHANED PRODUCT (please clean
+  manually)"; documented + accepted.
+
+**Net new tests this round**: 27 (Task 1: 4 + Task 2: 23).
+
+**One known follow-up** captured separately: stkmas listings on
+larger tenants paginate the bshlistbox popup. Product Sync's
+`_copy_from_seed` types the seed code into `#bshlistboxinpsearch`
+to filter before clicking. Customer Sync's flow doesn't yet — fine
+for TEST2019 (2 customers) but should adopt the same pattern when
+a tenant exceeds the popup's render window (~10 rows). Tracked in
+[mrerp-customer-copy-flow.md §9](mrerp-customer-copy-flow.md).
 
 ---
 

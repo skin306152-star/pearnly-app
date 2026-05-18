@@ -258,7 +258,7 @@ def _ingest_one_attachment(
 
     # 页数检查(复用 ocr_engine)
     try:
-        from ocr_engine import count_pdf_pages
+        from services.ocr.pdf_utils import count_pdf_pages
         page_count = count_pdf_pages(content)
         if page_count == 0:
             logger.warning(f"[email_ingest] 无法解析 PDF · {filename}")

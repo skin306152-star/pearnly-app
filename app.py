@@ -1521,7 +1521,7 @@ async def ocr_recognize(
         raise HTTPException(400, detail={"code": "ocr.file_too_large", "mb": max_mb})
 
     # 3. 页数校验(所有引擎都要检查)
-    from ocr_engine import count_pdf_pages
+    from services.ocr.pdf_utils import count_pdf_pages
     page_count = count_pdf_pages(content)
     if page_count == 0:
         raise HTTPException(400, detail="ocr.invalid_pdf")

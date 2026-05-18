@@ -1,0 +1,299 @@
+# -*- coding: utf-8 -*-
+"""
+services/erp/mrerp_business_friendly.py
+
+Friendly-message catalog for MR.ERP business failures.
+
+Mirrors the xero_pusher.XERO_ERROR_FRIENDLY shape but keyed on the patterns
+that show up in the report.php xlsx's `หมายเหตุ` column (or in our own
+ERR_* codes coming out of validate_history_for_sales_credit).
+
+The catalog has two layers:
+- ERR_* codes  : exact-string keys; cover everything our adapter can
+                 emit before reaching MR.ERP (length checks, missing
+                 customer mapping, etc.).
+- Thai reasons : substring-match keys (case-insensitive). Lets us catch
+                 the actual server-side rejections from MR.ERP even when
+                 the report wording drifts a bit between releases.
+
+P1-A §3.9 (Zihao 2026-05-18 拍板) — 4-language coverage:
+    th     Thai      (primary; matches MR.ERP UI language)
+    en     English   (international)
+    zh     Simplified Chinese (mainland)
+    zh_TW  Traditional Chinese (Taiwan/HK)
+
+Deviation note: CLAUDE.md's standard 4-lang set is `zh/en/th/ja`. Zihao
+explicitly substituted ja → zh_TW for this catalog because the failure-
+message UI surface lives close to MR.ERP-side accountants where Taiwan
+locale is more common than Japanese.
+
+Lookup contract (`get_friendly(reason, lang='zh')`):
+    - returns the lang string when found
+    - falls back to English, then to the input reason
+    - never returns None
+
+Use `translate_reasons(reasons, lang)` for the common case of a whole
+FailedRow.reasons list.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Dict, List, Optional
+
+
+SUPPORTED_LANGS = ("th", "en", "zh", "zh_TW")
+DEFAULT_LANG = "zh"
+
+
+# Adapter-side ERR codes — these never reach MR.ERP. Cover the validate
+# pre-flight + the technical errors that show up in FailedRow.reasons.
+_ERR_CATALOG: Dict[str, Dict[str, str]] = {
+    "ERR_NO_HISTORY": {
+        "th": "ไม่มีข้อมูลใบกำกับ",
+        "en": "Invoice payload is empty",
+        "zh": "发票数据为空",
+        "zh_TW": "發票資料為空",
+    },
+    "ERR_NO_CLIENT": {
+        "th": "ลูกค้าไม่ระบุ (Pearnly client_id ว่าง)",
+        "en": "Pearnly client_id is missing",
+        "zh": "未指定 Pearnly 客户(client_id 缺失)",
+        "zh_TW": "未指定 Pearnly 客戶(client_id 缺失)",
+    },
+    "ERR_NO_CUSTOMER_MAPPING": {
+        "th": "ยังไม่ตั้งรหัสลูกค้า MR.ERP สำหรับลูกค้านี้",
+        "en": "No MR.ERP customer mapping configured for this client",
+        "zh": "该客户未配置 MR.ERP 客户码映射",
+        "zh_TW": "該客戶未設定 MR.ERP 客戶碼對應",
+    },
+    "ERR_NO_INVOICE_NO": {
+        "th": "เลขที่ใบกำกับว่าง",
+        "en": "Invoice number is empty",
+        "zh": "发票号为空",
+        "zh_TW": "發票號為空",
+    },
+    "ERR_NO_INVOICE_DATE": {
+        "th": "วันที่ใบกำกับว่าง",
+        "en": "Invoice date is empty",
+        "zh": "发票日期为空",
+        "zh_TW": "發票日期為空",
+    },
+    "ERR_NO_TOTAL_AMOUNT": {
+        "th": "ยอดรวมว่างหรือเท่ากับ 0",
+        "en": "Total amount missing or zero",
+        "zh": "总金额为空或为 0",
+        "zh_TW": "總金額為空或為 0",
+    },
+    "ERR_NEGATIVE_AMOUNT": {
+        "th": "ยอดรวมติดลบ ห้ามใช้กับใบกำกับขาย",
+        "en": "Negative total amount — sales_credit upload requires "
+              "positive total (use a credit note workflow instead)",
+        "zh": "总金额为负 · 销项发票不允许(请走红字发票流程)",
+        "zh_TW": "總金額為負 · 銷項發票不允許(請走紅字發票流程)",
+    },
+    "ERR_INVOICE_NO_TOO_LONG": {
+        "th": "เลขที่ใบกำกับยาวเกิน 18 ตัวอักษร (ตัดอัตโนมัติแล้ว)",
+        "en": "Invoice number exceeds 18 chars (auto-rejected before upload)",
+        "zh": "发票号超过 18 字符 · 已在上传前自动拦截",
+        "zh_TW": "發票號超過 18 字元 · 已在上傳前自動攔截",
+    },
+    "ERR_BILL_NO_TOO_LONG": {
+        "th": "เลขที่บิล (SI + เลขที่) ยาวเกิน 20 ตัวอักษร",
+        "en": "Bill number (SI + invoice_no) exceeds 20 chars",
+        "zh": "账单号(SI + 发票号)超过 20 字符",
+        "zh_TW": "帳單號(SI + 發票號)超過 20 字元",
+    },
+    "ERR_CUSTOMER_CODE_TOO_LONG": {
+        "th": "รหัสลูกค้ายาวเกิน 20 ตัวอักษร",
+        "en": "Customer code exceeds 20 chars",
+        "zh": "客户码超过 20 字符",
+        "zh_TW": "客戶碼超過 20 字元",
+    },
+    "ERR_CUSTOMER_BILL_TOO_LONG": {
+        "th": "รหัสลูกค้า (บิล) ยาวเกิน 20 ตัวอักษร",
+        "en": "Customer billing code exceeds 20 chars",
+        "zh": "客户账单码超过 20 字符",
+        "zh_TW": "客戶帳單碼超過 20 字元",
+    },
+    "ERR_TAX_RATE_INVALID": {
+        "th": "อัตราภาษีไม่อยู่ในรายการที่อนุญาต",
+        "en": "Tax rate is not in the allowed set "
+              "{vat_7, vat_0, vat_exempt, non_vat}",
+        "zh": "税率不在允许枚举内(vat_7 / vat_0 / vat_exempt / non_vat)",
+        "zh_TW": "稅率不在允許列舉內(vat_7 / vat_0 / vat_exempt / non_vat)",
+    },
+    "ERR_DATE_FUTURE": {
+        "th": "วันที่ใบกำกับเลย 30 วันในอนาคต ห้ามอัปโหลด",
+        "en": "Invoice date is more than 30 days in the future — upload blocked",
+        "zh": "发票日期超过 30 天未来 · 拒绝上传",
+        "zh_TW": "發票日期超過 30 天未來 · 拒絕上傳",
+    },
+    "WARN_DATE_NEAR_FUTURE": {
+        "th": "วันที่ใบกำกับเกิน 7 วันในอนาคต — โปรดยืนยัน",
+        "en": "Invoice date is more than 7 days in the future — please confirm",
+        "zh": "发票日期超过 7 天未来 · 请确认",
+        "zh_TW": "發票日期超過 7 天未來 · 請確認",
+    },
+    "WARN_DATE_TOO_OLD": {
+        "th": "วันที่ใบกำกับเก่ากว่า 2 ปี — โปรดยืนยัน",
+        "en": "Invoice date is more than 2 years old — please confirm",
+        "zh": "发票日期超过 2 年 · 请确认",
+        "zh_TW": "發票日期超過 2 年 · 請確認",
+    },
+}
+
+
+# Substring patterns that show up verbatim in MR.ERP's report.php xlsx
+# หมายเหตุ column. Match is case-insensitive containment so we catch
+# minor wording drift between MR.ERP versions.
+_THAI_REASON_CATALOG: List[tuple] = [
+    (
+        "ไม่พบข้อมูลรหัสลูกค้า (บิล)",
+        {
+            "th": "ไม่พบรหัสลูกค้า (บิล) ในระบบ — สร้างลูกค้าก่อน",
+            "en": "Customer billing code not found in MR.ERP master data — "
+                  "create the customer first",
+            "zh": "MR.ERP 主数据找不到客户账单码 · 需先创建客户",
+            "zh_TW": "MR.ERP 主資料找不到客戶帳單碼 · 需先建立客戶",
+        },
+    ),
+    (
+        "ไม่พบข้อมูลรหัสลูกค้า",
+        {
+            "th": "ไม่พบรหัสลูกค้าในระบบ — สร้างลูกค้าก่อน",
+            "en": "Customer code not found in MR.ERP master data — "
+                  "create the customer first",
+            "zh": "MR.ERP 主数据找不到客户码 · 需先创建客户",
+            "zh_TW": "MR.ERP 主資料找不到客戶碼 · 需先建立客戶",
+        },
+    ),
+    (
+        "ไม่พบข้อมูลรหัสสินค้า",
+        {
+            "th": "ไม่พบรหัสสินค้าในระบบ — สร้างสินค้าก่อน",
+            "en": "Product code not found in MR.ERP master data — "
+                  "create the product first",
+            "zh": "MR.ERP 主数据找不到商品码 · 需先创建商品",
+            "zh_TW": "MR.ERP 主資料找不到商品碼 · 需先建立商品",
+        },
+    ),
+    (
+        "ไม่พบข้อมูลพนักงานขาย",
+        {
+            "th": "ไม่พบพนักงานขายในระบบ",
+            "en": "Salesman not found in MR.ERP master data",
+            "zh": "MR.ERP 主数据找不到销售员",
+            "zh_TW": "MR.ERP 主資料找不到業務員",
+        },
+    ),
+    (
+        "เลขที่เอกสารซ้ำ",
+        {
+            "th": "เลขที่ใบกำกับซ้ำกับที่มีอยู่แล้ว",
+            "en": "Invoice number duplicates an existing record in MR.ERP",
+            "zh": "发票号与 MR.ERP 已有记录重复",
+            "zh_TW": "發票號與 MR.ERP 已有紀錄重複",
+        },
+    ),
+    (
+        "เลขที่ดังกล่าวมีอยู่ในระบบแล้ว",
+        {
+            "th": "เลขที่ใบกำกับมีอยู่ในระบบแล้ว",
+            "en": "This invoice number already exists in MR.ERP",
+            "zh": "该发票号已存在于 MR.ERP",
+            "zh_TW": "該發票號已存在於 MR.ERP",
+        },
+    ),
+    (
+        "เลขที่ต้องไม่เกิน 18 ตัวอักษร",
+        {
+            "th": "เลขที่ใบกำกับยาวเกิน 18 ตัวอักษร",
+            "en": "Invoice number exceeds the 18-character limit",
+            "zh": "发票号超过 18 字符限制",
+            "zh_TW": "發票號超過 18 字元限制",
+        },
+    ),
+    (
+        "เลขที่บิลต้องไม่เกิน 20 ตัวอักษร",
+        {
+            "th": "เลขที่บิลยาวเกิน 20 ตัวอักษร",
+            "en": "Bill number exceeds the 20-character limit",
+            "zh": "账单号超过 20 字符限制",
+            "zh_TW": "帳單號超過 20 字元限制",
+        },
+    ),
+    (
+        "รหัสลูกค้า (บิล) ต้องไม่เกิน 20 ตัวอักษร",
+        {
+            "th": "รหัสลูกค้า (บิล) ยาวเกิน 20 ตัวอักษร",
+            "en": "Customer billing code exceeds the 20-character limit",
+            "zh": "客户账单码超过 20 字符限制",
+            "zh_TW": "客戶帳單碼超過 20 字元限制",
+        },
+    ),
+    (
+        "รหัสลูกค้าต้องไม่เกิน 20 ตัวอักษร",
+        {
+            "th": "รหัสลูกค้ายาวเกิน 20 ตัวอักษร",
+            "en": "Customer code exceeds the 20-character limit",
+            "zh": "客户码超过 20 字符限制",
+            "zh_TW": "客戶碼超過 20 字元限制",
+        },
+    ),
+]
+
+
+def get_friendly(
+    reason: Optional[str],
+    lang: str = DEFAULT_LANG,
+) -> Dict[str, str]:
+    """Translate one rejection reason into all 4 supported languages.
+
+    Returns a dict containing every supported language. If no catalog
+    entry matches, returns a dict where every language falls back to
+    the raw `reason` string (so callers always get a printable value).
+
+    `lang` selects which key is treated as primary (used by callers that
+    want a single-string fallback), but the full dict is returned either
+    way so the UI can offer "show original" toggles.
+    """
+    if not reason:
+        return {k: "" for k in SUPPORTED_LANGS}
+
+    # Exact match on ERR_* codes first (cheap, deterministic).
+    if reason in _ERR_CATALOG:
+        return dict(_ERR_CATALOG[reason])
+
+    # Substring match for Thai reasons coming from report.php.
+    low = reason.strip().lower()
+    for pattern, translations in _THAI_REASON_CATALOG:
+        if pattern.lower() in low:
+            return dict(translations)
+
+    # Unknown — echo the raw reason in every language. The UI can render
+    # it verbatim; the user at least sees something honest.
+    return {k: reason for k in SUPPORTED_LANGS}
+
+
+def translate_reasons(
+    reasons: List[str],
+    lang: str = DEFAULT_LANG,
+) -> List[Dict[str, str]]:
+    """Apply get_friendly to a whole list (typically FailedRow.reasons).
+
+    Returns a parallel list of {lang -> text} dicts.
+    """
+    return [get_friendly(r, lang=lang) for r in (reasons or [])]
+
+
+def primary_friendly(
+    reason: Optional[str],
+    lang: str = DEFAULT_LANG,
+) -> str:
+    """Convenience: one string in the caller's chosen language, falling
+    back gracefully to English then to the raw text."""
+    translations = get_friendly(reason, lang=lang)
+    if lang in translations and translations[lang]:
+        return translations[lang]
+    return translations.get("en") or (reason or "")

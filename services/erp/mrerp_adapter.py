@@ -75,6 +75,9 @@ from services.erp.exceptions import (                   # noqa: E402
     MRERPError,
     MRERPTechnicalError,
 )
+from services.erp.mrerp_business_friendly import (      # noqa: E402
+    translate_reasons,
+)
 from services.erp.mrerp_report_parser import (          # noqa: E402
     ImportReport,
     parse_import_report,
@@ -103,10 +106,17 @@ class InvoiceRecord:
 
 @dataclass
 class FailedRow:
-    """One invoice that failed business validation."""
+    """One invoice that failed business validation.
+
+    `reasons` holds the raw Thai/English text exactly as MR.ERP wrote it
+    in the report.xlsx (or our ERR_* code for preflight failures).
+    `reasons_friendly` is a parallel list of `{lang: translation}` dicts
+    sourced from `services.erp.mrerp_business_friendly`; the UI picks
+    whichever language matches the viewer."""
     invoice_no: str
     reasons: List[str]
     original: Dict[str, Any]
+    reasons_friendly: List[Dict[str, str]] = field(default_factory=list)
     evidence_screenshot: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -508,13 +518,55 @@ class MRERPAdapter:
         self.select_company()
         t0 = time.time()
 
+        # P1-A §3.1-§3.5 · client-side preflight before touching the
+        # browser. Rejects field-length overflow, negative amount,
+        # invalid tax kind, far-future dates etc. up front so we don't
+        # waste an upload round-trip (and so the user sees the real
+        # root cause instead of MR.ERP's "length too long" mask).
+        preflight_failed: List[FailedRow] = []
+        valid_histories: List[Dict[str, Any]] = []
+        for h in histories:
+            ok, err_code, warnings = (
+                mrerp_xlsx_generator.validate_history_for_sales_credit(
+                    h, mappings,
+                )
+            )
+            if warnings:
+                logger.info(
+                    "preflight warnings for %s: %s",
+                    h.get("invoice_number") or h.get("invoice_no") or "?",
+                    warnings,
+                )
+            if ok:
+                valid_histories.append(h)
+                continue
+            inv_no = (
+                mrerp_xlsx_generator.derive_mrerp_invoice_no(h)
+                if h.get("invoice_date") else
+                (h.get("invoice_number") or h.get("invoice_no") or "?")
+            )
+            reasons = [err_code or "ERR_UNKNOWN_PREFLIGHT"]
+            preflight_failed.append(FailedRow(
+                invoice_no=inv_no,
+                reasons=reasons,
+                reasons_friendly=translate_reasons(reasons),
+                original=h,
+            ))
+
+        if not valid_histories:
+            # Every history was rejected at preflight; nothing to upload.
+            result = ImportResult(total=len(histories))
+            result.failed = preflight_failed
+            result.elapsed_ms = int((time.time() - t0) * 1000)
+            return result
+
         xlsx_bytes = mrerp_xlsx_generator.generate_xlsx(
-            histories, mappings, sheet_kind="sales_credit"
+            valid_histories, mappings, sheet_kind="sales_credit"
         )
 
         expected_invoices = [
             mrerp_xlsx_generator.derive_mrerp_invoice_no(h)
-            for h in histories
+            for h in valid_histories
         ]
 
         # Upload runs UN-retried: MR.ERP enforces uniqueness on invoice_no,
@@ -532,7 +584,7 @@ class MRERPAdapter:
             )
             report = parse_import_report(payload)   # type: ignore[arg-type]
             result = self._classify_against_inputs(
-                histories, report, evidence_screenshot=evidence,
+                valid_histories, report, evidence_screenshot=evidence,
             )
             if self.screenshot_dir and payload:
                 report_save = (
@@ -548,8 +600,8 @@ class MRERPAdapter:
             evidence = self._shot(
                 "all-success", "importpc=1 (no report generated)"
             )
-            result = ImportResult(total=len(histories))
-            for h, inv in zip(histories, expected_invoices):
+            result = ImportResult(total=len(valid_histories))
+            for h, inv in zip(valid_histories, expected_invoices):
                 result.success.append(SuccessRow(
                     invoice_no=inv,
                     mrerp_bill_no=f"SI{inv}",
@@ -561,10 +613,14 @@ class MRERPAdapter:
                 "post-confirm timeout fallback to listing",
             )
             result = self._classify_via_listing(
-                histories, expected_invoices,
+                valid_histories, expected_invoices,
                 evidence_screenshot=evidence,
             )
 
+        # Merge preflight failures into the final result.
+        if preflight_failed:
+            result.failed.extend(preflight_failed)
+        result.total = len(histories)   # full input count, not just valid
         result.elapsed_ms = int((time.time() - t0) * 1000)
         result.xlsx_size_bytes = len(xlsx_bytes)
         return result
@@ -998,13 +1054,15 @@ class MRERPAdapter:
                     original=original,
                 ))
             else:
+                reasons = [
+                    "import status uncertain: report.php download "
+                    "did not arrive and listing does not contain "
+                    "this invoice",
+                ]
                 result.failed.append(FailedRow(
                     invoice_no=inv,
-                    reasons=[
-                        "import status uncertain: report.php download "
-                        "did not arrive and listing does not contain "
-                        "this invoice",
-                    ],
+                    reasons=reasons,
+                    reasons_friendly=translate_reasons(reasons),
                     original=original,
                     evidence_screenshot=evidence_screenshot,
                 ))
@@ -1038,9 +1096,11 @@ class MRERPAdapter:
             ))
         for row in report.failed:
             original = by_invoice.get(row.invoice_no, {})
+            reasons = list(row.reasons)
             result.failed.append(FailedRow(
                 invoice_no=row.invoice_no,
-                reasons=list(row.reasons),
+                reasons=reasons,
+                reasons_friendly=translate_reasons(reasons),
                 original=original,
                 evidence_screenshot=evidence_screenshot,
             ))
@@ -1051,9 +1111,11 @@ class MRERPAdapter:
                {f.invoice_no for f in result.failed}
         for inv, original in by_invoice.items():
             if inv not in seen:
+                reasons = ["report did not mention this invoice"]
                 result.failed.append(FailedRow(
                     invoice_no=inv,
-                    reasons=["report did not mention this invoice"],
+                    reasons=reasons,
+                    reasons_friendly=translate_reasons(reasons),
                     original=original,
                     evidence_screenshot=evidence_screenshot,
                 ))

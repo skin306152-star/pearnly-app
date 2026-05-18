@@ -39,7 +39,7 @@ schema sheet 列字段(按出现顺序映射 sheet):
 import io
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -104,6 +104,24 @@ def _resolve_product_code(item_name: Any, lookup: Dict[str, str]) -> Optional[st
 # ============================================================
 MAX_AMOUNT = Decimal("999999999.99")
 
+# 服务端业务校验上限(2026-05-18 集成测试发现 · 见 mrerp-known-facts.md §7)
+# xlsx schema 字段标 str(30) / str(50) 但 MR.ERP 服务端实际更严
+# 校验顺序:服务端先做长度校验 → 长度过 → 才查主数据存在
+# adapter 必须 client-side 拦截,避免 "ไม่พบ" 类错误被长度错遮盖
+MRERP_INVOICE_NO_MAX = 18
+MRERP_BILL_NO_MAX = 20
+MRERP_CUSTOMER_CODE_MAX = 20
+MRERP_CUSTOMER_BILL_MAX = 20
+
+# sales_credit 允许的 Pearnly tax_kind 枚举(derive_tax_kind 的返回值之一)
+# wht_* 是预扣税 · 销项发票不适用 · 仅 vat_* 或 non_vat 合法
+MRERP_VALID_TAX_KINDS_SC = ("vat_7", "vat_0", "vat_exempt", "non_vat")
+
+# 日期检查阈值(单位:天)
+MRERP_DATE_FUTURE_HARD_REJECT_DAYS = 30   # > today + 30d → ERR_DATE_FUTURE
+MRERP_DATE_FUTURE_WARN_DAYS = 7           # > today + 7d → 警告(不拒)
+MRERP_DATE_PAST_WARN_DAYS = 730           # < today - 730d → 警告(2 年前)
+
 
 def fmt_date(value: Any) -> str:
     """日期 → YYYY-MM-DD 字符串(cell 用 @ 文本格式)"""
@@ -138,7 +156,8 @@ def fmt_str(value: Any, max_len: int = 50) -> str:
 
 
 def fmt_number(value: Any) -> Optional[float]:
-    """金额 → float · 超上限或非法返回 None"""
+    """金额 → float · 超上限或非法返回 None · 负数静默 clamp 到 -MAX_AMOUNT
+    (保留原行为:用于摘要/展示场景 · 不抛错)"""
     if value is None or value == "":
         return None
     try:
@@ -149,6 +168,29 @@ def fmt_number(value: Any) -> Optional[float]:
         return float(MAX_AMOUNT)
     if n < -MAX_AMOUNT:
         return float(-MAX_AMOUNT)
+    return float(n)
+
+
+def fmt_number_strict(value: Any) -> float:
+    """金额严格模式 → float · 负数 / 超 MAX_AMOUNT / 非法都 raise ValueError
+    用于 sales_credit 上传前 preflight · 销项发票净额必须 > 0
+    (P1-A §3.3 · 2026-05-18)"""
+    if value is None or value == "":
+        raise ValueError("amount is missing")
+    try:
+        n = Decimal(str(value))
+    except Exception as e:
+        raise ValueError(f"amount not parseable: {value!r}") from e
+    if n < 0:
+        raise ValueError(
+            f"negative amount {n} not allowed for sales_credit upload "
+            "(use a credit-note flow instead)"
+        )
+    if n > MAX_AMOUNT:
+        raise ValueError(
+            f"amount {n} exceeds MR.ERP ceiling {MAX_AMOUNT}; "
+            "split the invoice or escalate"
+        )
     return float(n)
 
 
@@ -583,23 +625,98 @@ def build_sales_credit_tail_row(history: Dict[str, Any]) -> Dict[str, Any]:
 def validate_history_for_sales_credit(
     history: Dict[str, Any],
     mappings: Dict[str, Any],
-) -> Tuple[bool, Optional[str]]:
-    """返回 (ok, error_code) · error_code 走 get_error_friendly"""
+) -> Tuple[bool, Optional[str], List[str]]:
+    """Preflight check before sending a history through the MR.ERP sales_credit
+    upload. Returns (ok, error_code, warnings).
+
+    error_code (when ok=False) — one of:
+        ERR_NO_HISTORY            history dict empty
+        ERR_NO_CLIENT             client_id missing
+        ERR_NO_CUSTOMER_MAPPING   erp_client_mappings has no mrerp row
+        ERR_NO_INVOICE_NO         neither invoice_no nor invoice_number set
+        ERR_NO_INVOICE_DATE       invoice_date missing
+        ERR_NO_TOTAL_AMOUNT       total_amount missing or 0
+        ERR_NEGATIVE_AMOUNT       total_amount < 0  (P1-A §3.3)
+        ERR_INVOICE_NO_TOO_LONG   derived invoice_no > 18 chars  (P1-A §3.1)
+        ERR_BILL_NO_TOO_LONG      SI+invoice_no > 20 chars       (P1-A §3.1)
+        ERR_CUSTOMER_CODE_TOO_LONG       customer_code > 20 chars  (P1-A §3.1)
+        ERR_CUSTOMER_BILL_TOO_LONG       customer_bill > 20 chars  (P1-A §3.1)
+        ERR_TAX_RATE_INVALID      derive_tax_kind ∉ MRERP_VALID_TAX_KINDS_SC  (P1-A §3.2)
+        ERR_DATE_FUTURE           invoice_date > today + 30 days  (P1-A §3.5)
+
+    warnings (non-blocking; caller can push these into the exceptions table):
+        WARN_DATE_NEAR_FUTURE     invoice_date in (today + 7d, today + 30d]
+        WARN_DATE_TOO_OLD         invoice_date < today - 730 days
+
+    The check order intentionally matches MR.ERP's own server-side ordering
+    (length → existence → enum → date) so error messages line up.
+    """
     if not history:
-        return False, 'ERR_NO_HISTORY'
+        return False, 'ERR_NO_HISTORY', []
     cid = history.get('client_id') or 0
     if not cid:
-        return False, 'ERR_NO_CLIENT'
-    if not lookup_customer_code(cid, mappings):
-        return False, 'ERR_NO_CUSTOMER_MAPPING'
+        return False, 'ERR_NO_CLIENT', []
+    customer_code = lookup_customer_code(cid, mappings)
+    if not customer_code:
+        return False, 'ERR_NO_CUSTOMER_MAPPING', []
     if not (history.get('invoice_no') or history.get('invoice_number')):
-        return False, 'ERR_NO_INVOICE_NO'
+        return False, 'ERR_NO_INVOICE_NO', []
     if not history.get('invoice_date'):
-        return False, 'ERR_NO_INVOICE_DATE'
-    total = fmt_number(history.get('total_amount'))
-    if total is None or total <= 0:
-        return False, 'ERR_NO_TOTAL_AMOUNT'
-    return True, None
+        return False, 'ERR_NO_INVOICE_DATE', []
+
+    # Amount: strict mode rejects negative + overflow.
+    try:
+        total = fmt_number_strict(history.get('total_amount'))
+    except ValueError as e:
+        msg = str(e).lower()
+        if 'negative' in msg:
+            return False, 'ERR_NEGATIVE_AMOUNT', []
+        if 'exceeds' in msg or 'missing' in msg:
+            return False, 'ERR_NO_TOTAL_AMOUNT', []
+        return False, 'ERR_NO_TOTAL_AMOUNT', []
+    if total <= 0:
+        return False, 'ERR_NO_TOTAL_AMOUNT', []
+
+    # Length pre-flight (P1-A §3.1).
+    invoice_no = derive_mrerp_invoice_no(history)
+    if len(invoice_no) > MRERP_INVOICE_NO_MAX:
+        return False, 'ERR_INVOICE_NO_TOO_LONG', []
+    bill_no = 'SI' + invoice_no
+    if len(bill_no) > MRERP_BILL_NO_MAX:
+        return False, 'ERR_BILL_NO_TOO_LONG', []
+    if len(customer_code) > MRERP_CUSTOMER_CODE_MAX:
+        return False, 'ERR_CUSTOMER_CODE_TOO_LONG', []
+    # customer_bill defaults to customer_code; allow override via mapping
+    # if a future schema introduces it.
+    customer_bill = customer_code
+    if len(customer_bill) > MRERP_CUSTOMER_BILL_MAX:
+        return False, 'ERR_CUSTOMER_BILL_TOO_LONG', []
+
+    # Tax rate enum gate (P1-A §3.2).
+    tax_kind = derive_tax_kind(history)
+    if tax_kind not in MRERP_VALID_TAX_KINDS_SC:
+        return False, 'ERR_TAX_RATE_INVALID', []
+
+    # Date sanity (P1-A §3.5).
+    warnings: List[str] = []
+    inv_date_str = fmt_date(history.get('invoice_date'))
+    parsed_inv: Optional[date] = None
+    if inv_date_str and len(inv_date_str) >= 10:
+        try:
+            parsed_inv = datetime.strptime(inv_date_str[:10], "%Y-%m-%d").date()
+        except Exception:
+            parsed_inv = None
+    if parsed_inv is not None:
+        today = date.today()
+        delta = (parsed_inv - today).days
+        if delta > MRERP_DATE_FUTURE_HARD_REJECT_DAYS:
+            return False, 'ERR_DATE_FUTURE', []
+        if delta > MRERP_DATE_FUTURE_WARN_DAYS:
+            warnings.append('WARN_DATE_NEAR_FUTURE')
+        if delta < -MRERP_DATE_PAST_WARN_DAYS:
+            warnings.append('WARN_DATE_TOO_OLD')
+
+    return True, None, warnings
 
 
 # ============================================================

@@ -472,12 +472,24 @@
    so the modal can never re-open accidentally. */
 
 /* ============================================================
- * Mobile (C-7) — cards stack, sidebar logs become full-width below
+ * Mobile (C-7 · Zihao 2026-05-18 拍板) — cards stack vertically,
+ * wizard goes full-screen, sidebar logs collapse below cards.
+ *
+ * Verified in preview at 375x812 (iPhone 12) + 1280x720 (desktop):
+ *   • .mrerp-cards-row → flex-direction: column on mobile
+ *   • .mrerp-card → full-width (343px on 375px viewport)
+ *   • .mrerp-wizard → fills 100% of viewport on mobile, becomes
+ *     a centred 820px card on desktop
+ *
+ * Touch-target sizing: all action buttons ≥ 32px height already
+ * inherited from .btn / .btn-tiny in home.css — no separate tweak
+ * needed here (CLAUDE.md 手机端 §44×44 rule covered by existing
+ * .btn class).
  * ============================================================ */
 
 @media (max-width: 800px) {
     .mrerp-cards-row { flex-direction: column; }
-    .mrerp-card { max-width: none; }
+    .mrerp-card { max-width: none; min-width: 0; }
     .mrerp-erp-layout { flex-direction: column; }
     .mrerp-erp-layout-logs { flex: 1 1 100%; width: 100%; }
     .mrerp-wizard {
@@ -488,4 +500,37 @@
         border-radius: 0;
     }
     .mrerp-wizard-overlay { padding: 0; }
+    .mrerp-wizard-body {
+        /* Compact spacing on small screens — keeps Step 1's checkbox
+           list scrollable within a single viewport. */
+        padding: 16px;
+    }
+    .mrerp-wizard-checkboxes {
+        max-height: 220px;  /* fits between header and footer @ 375x812 */
+    }
+    .mrerp-wizard-foot {
+        padding: 12px 16px;
+        /* Stack the buttons on a really tight viewport so they don't
+           overflow the row. */
+        flex-wrap: wrap;
+    }
+    .mrerp-wizard-progress {
+        flex: 0 0 auto;
+        margin-left: 0;
+    }
+    /* Sidebar logs (when promoted via .mrerp-erp-layout in a future
+       C-4 follow-up) sits below cards on mobile, not next to. */
+    .mrerp-erp-layout-logs {
+        margin-top: 12px;
+    }
+}
+
+/* Even-smaller-phone (≤360px) — Pixel 5 portrait, older Android.
+   Drop the heading font a notch + tighten card padding so the
+   "未连接 / 已连接" pill never gets cut off. */
+@media (max-width: 360px) {
+    .mrerp-card { padding: 12px; }
+    .mrerp-card-name { font-size: 13px; }
+    .mrerp-wizard-title { font-size: 15px; }
+    .mrerp-wizard-step-h { font-size: 13px; }
 }

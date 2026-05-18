@@ -61,7 +61,7 @@ try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass
+    pass  # dotenv 可选 · 未装则用系统环境变量
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -340,13 +340,13 @@ exit 1
         try:
             await email_task
         except asyncio.CancelledError:
-            pass
+            pass  # 任务取消 · 正常退出
     if erp_retry_task is not None:
         erp_retry_task.cancel()
         try:
             await erp_retry_task
         except asyncio.CancelledError:
-            pass
+            pass  # 任务取消 · 正常退出
     logger.info("👋 Mr.Pearnly 关闭")
 
 
@@ -1021,8 +1021,8 @@ def _check_user_quota(user: dict) -> tuple:
                     _row = _cur.fetchone()
                     if _row:
                         _gk = (_row["gemini_api_key"] if isinstance(_row, dict) else _row[0])
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[user_info] 读取老板 gemini_api_key 失败: {e}")
         has_own_key = bool((_gk or "").strip())
         if has_own_key:
             return True, None, {
@@ -1342,8 +1342,8 @@ async def login(req: LoginRequest, request: Request):
                 raise HTTPException(403, detail="auth.account_expired")
         except HTTPException:
             raise
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[auth] 校验账户过期失败: {e}")
 
     # v118.11 · 员工首次登录(role=member && 还没 last_login_at)→ 返回 must_change_password 让前端弹强制改密 modal
     must_change_password = bool(
@@ -1372,8 +1372,8 @@ async def login(req: LoginRequest, request: Request):
                 "DELETE FROM login_failure_log WHERE email_or_username = %s",
                 (req.username.lower().strip(),),
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[login] 清理失败日志失败: {e}")
 
     # 返回 · 同时提供 token 和 access_token 两个键(向前兼容)
     user_info = {"id": str(user["id"]), "username": user["username"], "plan": user["plan"]}
@@ -1622,8 +1622,8 @@ async def ocr_recognize(
             if _raw_t_c:
                 try:
                     _exc_total_c = float(str(_raw_t_c).replace(",", "").strip())
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"[cache_hit] total_amount 解析失败: {e}")
             _asyncio_exc_c.create_task(_async_run_exception_checks(
                 history_id=str(cached["id"]),
                 user_id=str(user["id"]),
@@ -1903,8 +1903,8 @@ async def ocr_recognize(
     dup_check_on = True
     try:
         dup_check_on = db.get_user_dup_check_enabled(str(user["id"]))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[dup_check] 读取用户设置失败 · 用默认值: {e}")
 
     # v114 · PDF 留底 · 所有发票共享同一份原 PDF · 失败不阻塞主流程
     # v115 · 升级 · 先生成 searchable PDF(把 OCR 文字塞进不可见层)· 失败 fallback 原 PDF
@@ -1986,16 +1986,16 @@ async def ocr_recognize(
                         s = str(raw_date).replace("/", "-")[:10]
                         _dt.strptime(s, "%Y-%m-%d")
                         date_iso = s
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"[ocr_post] invoice_date 解析失败: {e}")
                 # 金额转 float
                 total_f = None
                 raw_amt = g_fields.get("total_amount")
                 if raw_amt:
                     try:
                         total_f = float(str(raw_amt).replace(",", "").strip())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"[ocr_post] total_amount 解析失败: {e}")
 
                 dup = db.check_duplicate_invoice(
                     user_id=str(user["id"]),
@@ -2074,8 +2074,8 @@ async def ocr_recognize(
                 if _raw_t:
                     try:
                         _exc_total = float(str(_raw_t).replace(",", "").strip())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"[exc_check] total_amount 解析失败: {e}")
                 _asyncio_exc.create_task(_async_run_exception_checks(
                     history_id=str(hid),
                     user_id=str(user["id"]),
@@ -3361,8 +3361,8 @@ async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: 
                     attempt=1, elapsed_ms=int((time.time() - t0) * 1000),
                     trigger="auto",
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[xero_auto] 写 push_log(no_mapping)失败: {e}")
             return
         # 拿 token + push
         try:
@@ -3406,8 +3406,8 @@ async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: 
                     attempt=1, elapsed_ms=int((time.time() - t0) * 1000),
                     trigger="auto",
                 )
-            except Exception:
-                pass
+            except Exception as _le:
+                logger.warning(f"[xero_auto] 写 push_log(exception)失败: {_le}")
     except Exception as e:
         logger.exception(f"[AutoPushXero] outer exception: {e}")
 
@@ -4597,8 +4597,8 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
     if picture:
         try:
             db.update_user_avatar(str(user["id"]), picture)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[google_oauth] 同步用户头像失败: {e}")
     _safe_plan = user.get("plan") or "free"
     token = create_access_token(
         user_id=str(user["id"]),
@@ -4742,8 +4742,8 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
     if line_picture:
         try:
             db.update_user_avatar(str(user["id"]), line_picture)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[line_login] 同步用户头像失败: {e}")
     _safe_plan = user.get("plan") or "free"
     token = create_access_token(
         user_id=str(user["id"]),
@@ -5046,8 +5046,8 @@ def send_email_code(req: SendEmailCodeRequest, request: Request):
         ip = ""
         try:
             ip = (request.client.host if request.client else "")[:64]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[email_code] 读取客户端 IP 失败: {e}")
         try:
             with db.get_cursor(commit=True) as cur:
                 cur.execute("""
@@ -5072,8 +5072,8 @@ def send_email_code(req: SendEmailCodeRequest, request: Request):
                         UPDATE email_codes SET used = TRUE, used_at = NOW()
                         WHERE email = %s AND code = %s AND purpose = %s
                     """, (email, code, req.purpose))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[email_code] 标记 code 已用失败: {e}")
             logger.error(f"send_email_code smtp failed for {email}: {err}")
             raise HTTPException(status_code=502, detail="email_delivery_failed")
 
@@ -5525,8 +5525,8 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
                 if _raw_t_c:
                     try:
                         _exc_total_c = float(str(_raw_t_c).replace(",", "").strip())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"[line_cache] total_amount 解析失败: {e}")
                 _asyncio_exc_lc.create_task(_async_run_exception_checks(
                     history_id=str(cached["id"]),
                     user_id=str(user_fresh["id"]),
@@ -5599,8 +5599,8 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
                 if _raw_t:
                     try:
                         _exc_total = float(str(_raw_t).replace(",", "").strip())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"[line_ocr_exc] total_amount 解析失败: {e}")
                 # duplicate 检测(同网页入口)
                 _dup = None
                 try:
@@ -5657,8 +5657,8 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
         logger.exception(f"[line_ocr] 未知异常: {e}")
         try:
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
-        except Exception:
-            pass
+        except Exception as _pe:
+            logger.warning(f"[line_ocr] err 通知 push_text 失败: {_pe}")
 
 
 # ============================================================
@@ -6103,8 +6103,8 @@ async def api_create_client(req: ClientCreateRequest, request: Request):
     # v118.28.1 · 创建者自动获得分配(让员工身份创建客户后能看到)
     try:
         db.auto_assign_client_to_creator(str(user["id"]), int(new_id))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[client_create] auto_assign 失败: {e}")
     client = db.get_client(str(user["id"]), new_id, tenant_id=_tid(user))
     return {"ok": True, "client": _serialize_client(client) if client else {"id": new_id}}
 
@@ -7135,8 +7135,8 @@ async def team_set_employee_assignments(employee_id: str,
             ip=get_client_ip(request),
             ua=request.headers.get("user-agent", ""),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[team_assign] 写操作日志失败: {e}")
     return {"ok": True, "assigned_count": len(req.client_ids or [])}
 
 
@@ -8022,8 +8022,8 @@ async def xero_push(history_id: str, request: Request):
                 attempt=1, elapsed_ms=int((time.time() - t0) * 1000),
                 trigger="manual",
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[xero_manual] 写 push_log(no_contact)失败: {e}")
         raise HTTPException(400, detail="xero.err_contact_not_found")
 
     # 拼 payload + 推
@@ -8036,8 +8036,8 @@ async def xero_push(history_id: str, request: Request):
             invs = body.get("Invoices") or []
             if invs:
                 invoice_id = invs[0].get("InvoiceID", "")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[xero_manual] 解析 InvoiceID 失败: {e}")
         try:
             db.insert_push_log(
                 user_id=str(user["id"]), endpoint_id=None, history_id=history_id,
@@ -8051,8 +8051,8 @@ async def xero_push(history_id: str, request: Request):
                 elapsed_ms=int((time.time() - t0) * 1000),
                 trigger="manual",
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[xero_manual] 写 push_log(ok)失败: {e}")
         return {"ok": True, "invoice_id": invoice_id, "organisation_id": xero_org_id}
 
     # 失败 · 解析错误码
@@ -8071,8 +8071,8 @@ async def xero_push(history_id: str, request: Request):
             elapsed_ms=int((time.time() - t0) * 1000),
             trigger="manual",
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[xero_manual] 写 push_log(fail)失败: {e}")
     raise HTTPException(http_st or 400, detail=f"xero.{err_code.lower()}")
 
 

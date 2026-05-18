@@ -1,11 +1,20 @@
 # Pearnly 屎山清理对话方案
 
-> **当前进度**:阶段 1.5++ — 已完成(2026-05-18)
-> - 阶段 1 审计:[`docs/code-cleanup-audit.md`](../code-cleanup-audit.md)(v1.2 · 8🟢 20🟡 3🔴 8⚪ · 🟡-15.5 已解决)
-> - 阶段 1.5 启动检查:[`docs/startup-check-report.md`](../startup-check-report.md)+ 新建 [`requirements.txt`](../../requirements.txt)
-> - 阶段 1.5+ 幽灵模块抢救:commit `90c1271` 4 个文件入 git,本机 import 全 OK
-> - 阶段 1.5++ 部署流程调研:[`docs/deploy-sync-analysis.md`](../deploy-sync-analysis.md)— 真相还原 + 3 风险 + P0/P1/P2 建议
-> - ⏳ 剩待用户做:服务器残留扫描(P0-1)+ pip install + 配 .env + 阶段 2 门禁
+> ## ✅ Round 1 完成(2026-05-18)
+>
+> **总体成果**:24 commits · 5 次 push · 代码净 -870 行死代码 · 7 个幽灵模块抢救入 git · 新建 8 份治理文档
+>
+> **收尾报告**:[`docs/cleanup/round1-final-report.md`](round1-final-report.md)
+>
+> **关键交付**:
+> - 阶段 1 审计:[`docs/code-cleanup-audit.md`](../code-cleanup-audit.md)(v1.2)
+> - 阶段 1.5 启动检查:[`docs/startup-check-report.md`](../startup-check-report.md)+ [`requirements.txt`](../../requirements.txt)
+> - 阶段 1.5++ 部署流程:[`docs/deploy-sync-analysis.md`](../deploy-sync-analysis.md)
+> - 重估表:[`docs/cleanup/audit-rerated.md`](audit-rerated.md)
+> - bank_reconcile 调研:[`docs/cleanup/bank-reconcile-migration.md`](bank-reconcile-migration.md)
+> - app.py 兼容注释扫描:[`docs/cleanup/app-py-legacy-comments-pure.md`](app-py-legacy-comments-pure.md)
+>
+> **Round 2 起点**:见 round1-final-report.md §5(剩余 🟡/🔴 清单)+ §6(下次会话建议)
 
 > 本文档由 Claude(Anthropic) 整理,用于指导 Claude Code 安全地清理 Pearnly 项目中积累的代码债务(屎山)。
 > 使用方式:**单独开一个 Claude Code 对话窗口** 专门跑清理这条线,和 OCR 迁移那条线隔离。

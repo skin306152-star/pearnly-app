@@ -1325,5 +1325,197 @@ class _AsyncTripwireAdapter:
         return result
 
 
+@unittest.skipUnless(
+    _can_import_app_for_async_tests()
+    and __import__("importlib").util.find_spec("fastapi") is not None,
+    "needs full app + fastapi; covered server-side otherwise.",
+)
+class PushStatusSourceOfTruthTests(unittest.TestCase):
+    """A2 (Zihao 2026-05-19 拍板) · single source-of-truth contract for
+    push status.
+
+    Source contract:
+        > "统一所有 UI 都从 erp_push_logs.success 取 · 单一 source of truth"
+        > "加守门测试: 推送失败时 invoice_records.status != 'pushed'"
+
+    What this test pins down:
+        - When push_to_endpoint returns `success=False`, the /api/erp/push
+          route MUST return HTTP 200 + body.ok=False (NOT 4xx — failure is
+          a business outcome the route still wants to log).
+        - The same boolean drives THREE writes:
+            erp_push_logs.status = 'failed'
+            erp_endpoints.success_count/failure_count (failure_count++)
+            ocr_history.last_push_status = 'failed'
+        - All three views (drawer badge / push-log tab / today-stats)
+          read from these tables → if all three are sourced from
+          result["success"], they cannot diverge.
+
+    The bug shape we're preventing: optimistic UI flag (e.g. `data.ok`
+    in the JS being set true for HTTP 200 even when body.ok=false), OR
+    backend writing 'success' to one table and 'failed' to another.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        import app
+        cls.app_module = app
+
+    def _make_client(self):
+        from fastapi.testclient import TestClient
+        return TestClient(self.app_module.app)
+
+    def test_push_failure_returns_200_with_body_ok_false(self):
+        """Business / auth / technical failure: route returns 200 +
+        body.ok=False so the JS can render a fail toast while the
+        backend logs a failed row."""
+        app = self.app_module
+
+        fake_ep = {
+            "id": "ep-1", "user_id": "u",
+            "adapter": "mrerp", "config": {}, "name": "MR.ERP",
+            "enabled": True,
+        }
+        fake_history = {
+            "id": "h-1", "invoice_no": "INV-FAIL",
+            "seller_name": "Seller", "total_amount": 100.0,
+        }
+        # The actual smoking-gun: push_to_endpoint returns success=False
+        # with the realistic error_msg shape from a failed business
+        # validation.
+        failed_result = {
+            "success": False,
+            "http_status": 200,
+            "response_body": '{"ok": false, "reasons": ["ไม่พบข้อมูลรหัสลูกค้า"]}',
+            "error_msg": "ERR_BUSINESS: customer not found",
+            "elapsed_ms": 1234,
+            "request_body": {"history_id": "h-1"},
+            "adapter": "mrerp",
+        }
+
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_ocr_history_detail",
+                          return_value=fake_history), \
+             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
+             patch.object(app.db, "insert_push_log",
+                          return_value="log-1") as insert_log_mock, \
+             patch.object(app.db, "update_endpoint_stats",
+                          return_value=None) as stats_mock, \
+             patch.object(app.db, "update_history_push_status",
+                          return_value=None) as history_status_mock, \
+             patch.object(app.db, "get_erp_retry_delay_sec",
+                          return_value=60), \
+             patch.object(app.db, "schedule_log_retry", return_value=None), \
+             patch.object(app._erp, "push_to_endpoint",
+                          return_value=failed_result):
+            with self._make_client() as client:
+                r = client.post("/api/erp/push", json={
+                    "history_id": "h-1", "endpoint_id": "ep-1",
+                })
+
+        # ── Contract 1: HTTP 200 (not 4xx — business failure is logged)
+        self.assertEqual(
+            r.status_code, 200,
+            f"failed push returned non-200 — the JS can't distinguish "
+            f"business-failure (which should land in push log) from a "
+            f"true HTTP error: {r.status_code} {r.text}",
+        )
+
+        # ── Contract 2: body.ok=False (the SoT field the JS must read)
+        body = r.json()
+        self.assertEqual(
+            body["ok"], False,
+            f"push failed but body.ok != False — JS will show a green "
+            f"success toast on a failure: {body!r}",
+        )
+        self.assertIn("error_msg", body)
+
+        # ── Contract 3: all three write paths used the same boolean
+        insert_log_mock.assert_called_once()
+        log_kwargs = insert_log_mock.call_args.kwargs
+        self.assertEqual(
+            log_kwargs.get("status"), "failed",
+            f"erp_push_logs.status != 'failed' on failed push: "
+            f"{log_kwargs!r}",
+        )
+
+        stats_mock.assert_called_once()
+        # update_endpoint_stats is positional: (endpoint_id, success_bool)
+        stats_success_arg = stats_mock.call_args.args[1]
+        self.assertEqual(
+            stats_success_arg, False,
+            f"update_endpoint_stats success!=False on failed push: "
+            f"{stats_mock.call_args!r}",
+        )
+
+        history_status_mock.assert_called_once()
+        history_status_arg = history_status_mock.call_args.args[1]
+        self.assertEqual(
+            history_status_arg, "failed",
+            f"ocr_history.last_push_status != 'failed' on failed push "
+            f"(this is the field the drawer reads — if it says "
+            f"'success' the drawer renders the green '已推送' badge "
+            f"while the log tab shows '推送失败'): "
+            f"{history_status_mock.call_args!r}",
+        )
+
+    def test_push_success_returns_200_with_body_ok_true(self):
+        """Sanity: success path also returns 200 + body.ok=True and
+        writes 'success' to all three sites. Pinned to make sure the
+        failure-path fix doesn't accidentally invert success too."""
+        app = self.app_module
+
+        fake_ep = {
+            "id": "ep-1", "user_id": "u",
+            "adapter": "mrerp", "config": {}, "name": "MR.ERP",
+            "enabled": True,
+        }
+        fake_history = {
+            "id": "h-1", "invoice_no": "INV-OK",
+            "seller_name": "Seller", "total_amount": 107.0,
+        }
+        success_result = {
+            "success": True,
+            "http_status": 200,
+            "response_body": '{"ok": true, "mrerp_bill_no": "SI-OK"}',
+            "error_msg": None,
+            "elapsed_ms": 2500,
+            "request_body": {"history_id": "h-1"},
+            "adapter": "mrerp",
+            "mrerp_bill_no": "SI-OK",
+        }
+
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_ocr_history_detail",
+                          return_value=fake_history), \
+             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
+             patch.object(app.db, "insert_push_log",
+                          return_value="log-1") as insert_log_mock, \
+             patch.object(app.db, "update_endpoint_stats",
+                          return_value=None) as stats_mock, \
+             patch.object(app.db, "update_history_push_status",
+                          return_value=None) as history_status_mock, \
+             patch.object(app._erp, "push_to_endpoint",
+                          return_value=success_result):
+            with self._make_client() as client:
+                r = client.post("/api/erp/push", json={
+                    "history_id": "h-1", "endpoint_id": "ep-1",
+                })
+
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(body["ok"], f"success push body.ok != True: {body!r}")
+
+        self.assertEqual(
+            insert_log_mock.call_args.kwargs.get("status"), "success")
+        self.assertEqual(stats_mock.call_args.args[1], True)
+        self.assertEqual(history_status_mock.call_args.args[1], "success")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

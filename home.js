@@ -1171,7 +1171,7 @@ const I18N = {
         'ep-plus-limit-hint': '已用 {used}/{limit} 个端点',
         'upgrade-to-plus': '升级 Plus 解锁 3 个',
         'feature-coming-soon': '功能即将上线 · 敬请期待',
-        'auto-push-fired': '已自动推送到 ERP · {file}',
+        'auto-push-fired': '已开始推送到 ERP · {file} · 结果看推送日志',
         'erp-logs-title': '推送日志',
         'erp-logs-hint': '最近 20 条',
         'erp-logs-loading': '加载中…',
@@ -3545,7 +3545,7 @@ const I18N = {
         'ep-plus-limit-hint': 'Using {used}/{limit} endpoints',
         'upgrade-to-plus': 'Upgrade to Plus for 3',
         'feature-coming-soon': 'Coming soon · stay tuned',
-        'auto-push-fired': 'Auto-pushed to ERP · {file}',
+        'auto-push-fired': 'ERP push started · {file} · check push log for result',
         'erp-logs-title': 'Push logs',
         'erp-logs-hint': 'Last 20',
         'erp-logs-loading': 'Loading…',
@@ -5912,7 +5912,7 @@ const I18N = {
         'ep-plus-limit-hint': 'ใช้ {used}/{limit} Endpoints',
         'upgrade-to-plus': 'อัปเกรด Plus ได้ 3',
         'feature-coming-soon': 'ฟีเจอร์กำลังจะมา · โปรดรอ',
-        'auto-push-fired': 'ส่ง ERP อัตโนมัติแล้ว · {file}',
+        'auto-push-fired': 'เริ่มส่ง ERP · {file} · ดูบันทึกผล',
         'erp-logs-title': 'บันทึกการส่ง',
         'erp-logs-hint': '20 รายการล่าสุด',
         'erp-logs-loading': 'กำลังโหลด…',
@@ -8271,7 +8271,7 @@ const I18N = {
         'ep-plus-limit-hint': '{used}/{limit} エンドポイント使用中',
         'upgrade-to-plus': 'Plus で 3 個に',
         'feature-coming-soon': '近日公開予定',
-        'auto-push-fired': 'ERP へ自動送信済 · {file}',
+        'auto-push-fired': 'ERP 送信開始 · {file} · 結果は送信ログを確認',
         'erp-logs-title': '送信ログ',
         'erp-logs-hint': '直近 20 件',
         'erp-logs-loading': '読み込み中…',
@@ -12563,8 +12563,11 @@ document.getElementById('btn-start').addEventListener('click', async () => {
             }
 
             // v0.9 · 自动推送提示(右下 toast)
+            // A2 (Zihao 2026-05-19 拍板) · 改 info 颜色 + 文案明示"已开始 ·
+            // 结果看推送日志" · auto_pushed 只是"已入队 asyncio.create_task"
+            // 不是"已完成" · 显示 success 绿色会跟实际失败的推送日志矛盾.
             if (data.auto_pushed) {
-                showToast(t('auto-push-fired', { file: data.filename }), 'success');
+                showToast(t('auto-push-fired', { file: data.filename }), 'info');
             }
 
             if (data.quota && data.quota.used_this_month != null && _userInfo) {
@@ -28656,13 +28659,21 @@ window.pearnlyConfirm = function (message, title) {
             }
             const resp = await fetch(url, opts);
 
+            // A2 (Zihao 2026-05-19 拍板) · single source of truth: the
+            // server's body.ok flag (mirrors result["success"] from
+            // push_to_endpoint · same value the server writes to
+            // erp_push_logs.status and ocr_history.last_push_status).
+            // Reading only resp.ok lets the toast lie green when the
+            // route returns HTTP 200 + {ok:false} for legitimate
+            // business failures (e.g. MR.ERP report.php หมายเหตุ
+            // rejection · adapter rejected the row). Parse body
+            // upfront so both branches can see body.ok and body.error_msg.
+            let body = {};
+            try { body = await resp.json(); } catch (e) {}
+
             if (!resp.ok) {
-                let detail = 'unknown';
-                try {
-                    const j = await resp.json();
-                    detail = j.detail;
-                    if (typeof detail === 'object') detail = detail.code || JSON.stringify(detail);
-                } catch (e) {}
+                let detail = (body && body.detail) || 'unknown';
+                if (typeof detail === 'object') detail = detail.code || JSON.stringify(detail);
                 let friendly = String(detail || 'unknown');
                 if (connector.type === 'xero') {
                     const k = friendly.replace(/^xero\./, '').toLowerCase();
@@ -28670,6 +28681,14 @@ window.pearnlyConfirm = function (message, title) {
                     if (tr && tr !== 'xero-' + k) friendly = tr;
                 }
                 _toast(t('unified-push-fail').replace('{name}', connector.name).replace('{err}', friendly), 'error');
+                return false;
+            }
+            if (body && body.ok === false) {
+                // HTTP 200 + business failure · route surfaced ok=false
+                // and an error_msg. Show the failure toast, NOT success.
+                let err = body.error_msg || body.error_code || 'unknown';
+                err = String(err).slice(0, 200);
+                _toast(t('unified-push-fail').replace('{name}', connector.name).replace('{err}', err), 'error');
                 return false;
             }
             _toast(t('unified-push-ok').replace('{name}', connector.name), 'success');

@@ -3621,7 +3621,7 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
     if len(pdf_bytes) > 20 * 1024 * 1024:
         raise HTTPException(413, detail="bank_recon.file_too_large")
 
-    import bank_reconcile as br
+    import bank_recon_v2 as br
     import asyncio
 
     # 先建会话 · 再异步解析(但这里走同步等结果 · 简化前端)
@@ -3747,7 +3747,7 @@ async def bank_recon_run_match(session_id: str, request: Request):
     if session.get("parse_status") != "parsed":
         raise HTTPException(400, detail="bank_recon.not_parsed")
 
-    import bank_reconcile as br
+    import bank_recon_v2 as br
     import asyncio
     try:
         stats = await asyncio.wait_for(

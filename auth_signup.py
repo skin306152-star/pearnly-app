@@ -492,14 +492,14 @@ def _hash_password(password: str) -> str:
             if callable(fn):
                 return fn(password)
     except Exception:
-        pass
+        pass  # auth 模块无可用 hash 函数 · 走下一兜底
     # 第二选 · passlib bcrypt(项目大概率装了)
     try:
         from passlib.context import CryptContext
         ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
         return ctx.hash(password)
     except Exception:
-        pass
+        pass  # passlib 未装 · 走下一兜底
     # 终极 fallback(可能跟 verify_password 不兼容 · 看 log 警告)
     logger.warning("⚠ Using sha256 fallback for password hashing - verify_password may not match!")
     salt = secrets.token_hex(8)
@@ -1215,7 +1215,7 @@ def _log_risk(user_id, event_type, request, detail_dict=None):
                 # 从请求 body 取 fingerprint(可选)
                 pass
             except Exception:
-                pass
+                pass  # 占位 stub · fingerprint 提取未实现
         with _db.get_cursor(commit=True) as cur:
                 cur.execute("""
                     INSERT INTO risk_log(user_id, event_type, ip, fingerprint, detail)
@@ -1377,8 +1377,8 @@ def get_my_plan(request: Request):
                 try:
                     cur.execute("SELECT COUNT(*) FROM clients WHERE user_id=%s AND COALESCE(is_active,true)=true", (user_id,))
                     clients_count = _row_count(cur.fetchone(), 0)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"[admin_user_detail] clients 计数失败: {e}")
 
         # v111.1 · trial 7 天倒计时
         days_left = None
@@ -1902,7 +1902,7 @@ def admin_cleanup_demo(request: Request):
                     try:
                         cur.execute(f"DELETE FROM {tbl} WHERE user_id IN ({placeholders})", ids)
                     except Exception:
-                        pass
+                        pass  # 表可能不存在 · 安全跳过
                 # 最后删用户
                 cur.execute(f"DELETE FROM users WHERE id IN ({placeholders})", ids)
                 deleted["users"] = cur.rowcount
@@ -2482,8 +2482,8 @@ def forgot_password(req: ForgotPasswordRequest, request: Request):
                 n = row.get("n") if isinstance(row, dict) else (row[0] if row else 0)
                 if n and int(n) >= 3:
                     return {"ok": True}  # 不告诉对方限流
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[password_reset] 频次检查失败 · 放行: {e}")
 
         # 找用户
         user = None

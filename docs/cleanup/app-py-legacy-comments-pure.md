@@ -1,5 +1,8 @@
 # app.py 兼容/旧/废弃注释 · 纯墓碑扫描结果(任务 C 第 1 步)
 
+> ## 🚫 处理决策(2026-05-18 用户拍板)
+> **扫描完成,建议跳过,理由 ROI 过低**:全文 ~70+ 处 legacy 注释里真·纯墓碑只 1 处(app.py:4348),其余都是 code explainer / compat code 注释 / section header / false positive。1 行 ROI 不值得动手。本文档作为"已扫描已评估"的留底,**不进入清理执行**。
+
 > **生成日期**:2026-05-18
 > **方法**:`grep -nE "^\s*#.*(旧|老|废弃|已删|不用|deprecated|backup|legacy|兼容)" app.py`
 > **范围**:**只扫描分类,不动手**(任务 C 第 1 步)

@@ -268,6 +268,13 @@ OCR 模块正在另一个会话(`docs/ocr-migration/`)进行架构迁移(Vision 
 - **建议处理方式**:用户澄清"MR.ERP 全删"的精确含义后决定
 - **风险**:中(可能影响某些隐藏路径)
 
+#### ⚠ 已知误名(2026-05-18 阶段 3 任务 B-3 发现)
+**`db.get_mrerp_mappings_bundle`** 虽然名字带 `mrerp`,但**实际是给 Xero 集成用的通用 ERP 映射拼装函数**(app.py:3344 自动推 + 7988 手动推 都用它取 `erp_type == "xero"` 的 client mapping)。**绝对不能删**,删了 Xero 立即挂。
+
+**处理决策**(2026-05-18 用户拍板):**保留不动,跳过 rename**。理由:rename 涉及 app.py 多处调用,属"超出范围的改造",优先级低于其他清理。**以后做 schema 重构时统一处理**。
+
+---
+
 #### 🟡-10 `db.py` 中 MR.ERP 7 处(`get_mrerp_mappings_bundle` 等)
 - **位置**:`db.py:6049`(SQL 注释)、`db.py:6506, 6528, 6554, 6581`(mrerp 演示映射注入)、`db.py:6621-6635`(`get_mrerp_mappings_bundle` 函数定义)
 - **类型**:过时代码 + 死函数(待确认)

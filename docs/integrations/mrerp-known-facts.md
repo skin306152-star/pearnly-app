@@ -115,11 +115,42 @@ Referer: https://www.mrerp4sme.com/login/mainmenu.php
 ```
 
 页面含:
-- `<input type="file" name="uploadfile" accept="...spreadsheet...">`
-- `<input type="hidden" name="idus" value="...">`
-- `<select name="selmenu">`(业务子类型下拉)
+- `<input type="file" name="uploadfile" id="uploadfile" accept="...spreadsheet..." onchange="cufexcel();">`
+- `<input type="hidden" name="idus" id="idus" value="...">`
+- `<input type="text" name="inpuploadfile" readonly>` (文件名显示框)
+- `<input type="button" name="btnseluploadfile" value="เลือกไฟล์" onclick="seluploadfile();">` (选文件按钮)
+- `<input type="button" name="btnuploadfile" value="อัพโหลด" onclick="frmupload();">` ← **真正的上传按钮**
+- `<select name="selmenu">`(业务子类型下拉 · default `<option value="118">ขายเชื่อ-รายได้ขายในประเทศ</option>`)
+- 模板下载链接(2026-05-18 实测):页面下方 `<a href="example.xlsx">` 类似锚点
 
-### Step 2 · 上传 xlsx(存 server session · 不真写库)
+🔴 **铁律**:`btnuploadfile` 是 `type="button"`(不是 `type="submit"`) · Playwright selector 必须用 `input[name="btnuploadfile"]` · 不能靠通用 submit selector
+
+### Step 2 · 上传 xlsx(走 AJAX · 不是整页跳转)
+
+`frmupload()` JS 实测(2026-05-18 抓的源码):
+```js
+function frmupload() {
+    if (#uploadfile.value == "") alert("กรุณาเลือกไฟล์...");
+    else if (#selmenu.value == "") alert("กรุณาเลือกเมนู...");
+    else if (selmenu.option:checked.data-chklac == "2") alert("กรุณากำหนดการเชื่อมโยง...");
+    else {
+        var formdata = new FormData(#frm);
+        $.ajax({
+            type: "POST", url: "component/uploadexcel.php", data: formdata,
+            success: function(result) {
+                if (result == "")           // ← 空 = 成功
+                    sdpt({idus, selmenu}, "formrdpc.php", "_self");   // 用 sdpt() 跳预览
+                else {                       // ← 非空 = 错误信息
+                    $("#frm")[0].reset();
+                    alert(result);
+                }
+            }
+        });
+    }
+}
+```
+
+POST 实际请求:
 ```
 POST https://www.mrerp4sme.com/impartran/component/uploadexcel.php
 Content-Type: multipart/form-data
@@ -133,7 +164,12 @@ multipart 字段:
 - `idus` = 上一步 scrape 的值
 - `selmenu` = `118`(sales_credit)
 
-**响应**:成功 = `200 + Content-Length: 0`(0 字节 · 不是 JSON)
+**响应**:
+- 成功 = `200 + 空 body` → JS 用 `sdpt()` 跳 `formrdpc.php`(client-side form post)
+- 失败 = `200 + 错误描述 string` → JS `alert(string)` + form reset
+  - 实测错误格式(2026-05-18):`Sheet ที่ N ไม่พบข้อมูลในการอัพโหลด หรือข้อมูลในไฟล์ที่อัพโหลดมีจำนวนคอลัมภ์ข้อมูลไม่ครบ M คอลัมภ์`
+
+🔴 **关键**:Playwright 必须**全局挂 `page.on("dialog", ...)`** 才能抓到失败原因 · 否则 alert 被 Playwright 默认 auto-dismiss · 信息全丢
 
 ### Step 3 · 拿预览页(解析可勾选行)
 ```
@@ -232,8 +268,17 @@ Korn 真样本 sheet 3 **只有 header · 没 data row** → MR.ERP 服务端把
 - 字符串走 `sharedStrings.xml` · **不能用 inlineStr**(PhpSpreadsheet 不识别)
 - 数值 cell **不带 `t="n"` 属性**(Korn 真样本 default 是 numeric · 加 t 反而异常)
 - 每行加 `spans="1:N"` 属性
-- 缺失 cell 补**完全空 cell** `<c r="X#"/>`(让 row 显式声明每列存在)
 - 日期单元格 number_format = `@`(强制文本)
+
+⚠️ **2026-05-18 Playwright 实测发现先验冲突**:
+- 历史反向工程说"缺失 cell 补**完全空 cell** `<c r="X#"/>`(让 row 显式声明每列存在)"
+- 但实际上传被拒 · MR.ERP 报错:`จำนวนคอลัมภ์ข้อมูลไม่ครบ 18 คอลัมภ์`(数据列数不到 18 列)
+- 字节级抽样显示我们 row 2 = 14 string cell + 1 数值 cell + **3 完全空 P/Q/R** + 1 spacer S = 19 cell · MR.ERP 视角"有效列" = 15 · 拒
+- **假设**:MR.ERP 数 `<v>` 子节点 cell 数 · 完全空 `<c/>` 不算
+- **下一步排查**(尚未确认):
+  - Korn 真样本 P/Q/R 是不是带空 `<v>`(`<c><v></v></c>` 或引用空 sharedString `<c t="s"><v>N</v></c>` N→"")
+  - 或者 schema note1/2/3 实际可以填占位字符(如空格 " ")让 generator 产生 string cell
+- **解决前禁止上传** · 不要硬猜规则改 generator(可能引入更深的字节差异)
 
 ---
 
@@ -284,9 +329,12 @@ Korn 真样本:`690507-001`
 
 | 现象 | 可能原因 | 排查 |
 |---|---|---|
-| 上传 200 但预览页 0 行 | xlsx 数据被服务端拒 | scrape HTML 找 `<font color=red>` / `alert()` / `ไม่พบ` / `ผิดพลาด` / `ซ้ำ` 等 |
+| 上传按钮点击后页面没跳 | `frmupload()` AJAX 上传失败 · 服务端返非空 string · JS `alert(result)` 弹窗 | **必须挂 Playwright `page.on("dialog", ...)`** 捕获 alert 内容(2026-05-18 实测发现) |
+| alert `Sheet N ไม่พบข้อมูล / ไม่ครบ N คอลัมภ์` | xlsx 字节级与 MR.ERP 期望不符 · 数据列数不足 | 见 §6.3 ⚠️ · 排查 row 2 实际"有 `<v>` 数据列"数量 |
+| 上传 200 但预览页 0 行 | xlsx 数据被服务端拒(走到 preview 但无 cbimport) | scrape HTML 找 `<font color=red>` / `ไม่พบ` / `ผิดพลาด` / `ซ้ำ` 等 |
 | 上传 401/403 | session 过期 | 重新登录 |
 | 选公司被踢回 login | 密码错 / session 没建 | 检查是否漏 §2.1 预热 GET |
+| 提交后 URL 是 `/index.php` | 登录失败(静默 302 回营销首页) | 用"body 含 `ออกจากระบบ` OR URL 含 selectdb/mainmenu"做正向判定 |
 | confirm 返非数字 | 业务校验失败 | response body 通常带泰文错误描述 |
 | scrape idus 失败 | 服务端返了登录页 | dump body 前 1500 字符诊断 |
 

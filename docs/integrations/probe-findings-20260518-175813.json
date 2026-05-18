@@ -1,0 +1,75 @@
+{
+  "run_id": "20260518-175813",
+  "findings": {
+    "landing_url": "https://www.mrerp4sme.com/",
+    "login_nav_method": "click 'เข้าสู่ระบบ' link",
+    "login_page_url": "https://www.mrerp4sme.com/login/login.php",
+    "post_login_url": "https://www.mrerp4sme.com/login/selectdb.php",
+    "company_select_method": "click TEST2019 button",
+    "sc_nav_method": "direct nav (formupload.php?idmenu=370)",
+    "sc_import_url": "https://www.mrerp4sme.com/impartran/formupload.php?idmenu=370",
+    "idus": "15",
+    "has_file_input": true,
+    "template_link": "example.xlsx",
+    "form_html_dump": "D:\\Users\\Skin\\Desktop\\pearnly_project\\docs\\integrations\\templates\\upload-form-20260518-175813.html",
+    "post_upload_url": "https://www.mrerp4sme.com/impartran/formupload.php",
+    "preview_row_count": 0,
+    "confirm_result": {
+      "success": false,
+      "n_rows": 0,
+      "errors": [],
+      "red_text": []
+    }
+  },
+  "errors": [],
+  "shots": [
+    {
+      "file": "01-landing-marketing-page.png",
+      "scenario": "GET / · URL=https://www.mrerp4sme.com/"
+    },
+    {
+      "file": "02-login-page.png",
+      "scenario": "URL=https://www.mrerp4sme.com/login/login.php"
+    },
+    {
+      "file": "03-login-filled.png",
+      "scenario": "登录表单已填(凭据已遮)"
+    },
+    {
+      "file": "04-post-login.png",
+      "scenario": "提交后 · URL=https://www.mrerp4sme.com/login/selectdb.php"
+    },
+    {
+      "file": "05-post-login-verified.png",
+      "scenario": "已认证 · URL=https://www.mrerp4sme.com/login/selectdb.php"
+    },
+    {
+      "file": "06-company-clicked-TEST2019.png",
+      "scenario": "点 TEST2019 · URL=https://www.mrerp4sme.com/login/mainmenu.php?comidyear=6&seldb=1"
+    },
+    {
+      "file": "07-sc-import-form.png",
+      "scenario": "URL=https://www.mrerp4sme.com/impartran/formupload.php?idmenu=370"
+    },
+    {
+      "file": "08-form-inspected.png",
+      "scenario": "idus=15 file_in=True"
+    },
+    {
+      "file": "09-file-chosen.png",
+      "scenario": "已选 test-invoice-20260518-175813.xlsx"
+    },
+    {
+      "file": "10-after-upload.png",
+      "scenario": "URL=https://www.mrerp4sme.com/impartran/formupload.php"
+    },
+    {
+      "file": "11-preview-page.png",
+      "scenario": "URL=https://www.mrerp4sme.com/impartran/formupload.php"
+    },
+    {
+      "file": "12-preview-empty.png",
+      "scenario": "0 行 · err=[]"
+    }
+  ]
+}

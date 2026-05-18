@@ -1,8 +1,14 @@
-# Probe run 20260518-174717
+# Probe run 20260518-175813
 
 01-landing-marketing-page.png	GET / · URL=https://www.mrerp4sme.com/
 02-login-page.png	URL=https://www.mrerp4sme.com/login/login.php
 03-login-filled.png	登录表单已填(凭据已遮)
-04-post-login.png	提交后 · URL=https://www.mrerp4sme.com/index.php
-05-login-failed.png	被踢回 https://www.mrerp4sme.com/index.php
-06-ERR-fatal.png	❌ RuntimeError: login failed · 仍在公共区 · URL=https://www.mrerp4sme.com/index.php
+04-post-login.png	提交后 · URL=https://www.mrerp4sme.com/login/selectdb.php
+05-post-login-verified.png	已认证 · URL=https://www.mrerp4sme.com/login/selectdb.php
+06-company-clicked-TEST2019.png	点 TEST2019 · URL=https://www.mrerp4sme.com/login/mainmenu.php?comidyear=6&seldb=1
+07-sc-import-form.png	URL=https://www.mrerp4sme.com/impartran/formupload.php?idmenu=370
+08-form-inspected.png	idus=15 file_in=True
+09-file-chosen.png	已选 test-invoice-20260518-175813.xlsx
+10-after-upload.png	URL=https://www.mrerp4sme.com/impartran/formupload.php
+11-preview-page.png	URL=https://www.mrerp4sme.com/impartran/formupload.php
+12-preview-empty.png	0 行 · err=[]

@@ -94,6 +94,7 @@ class ProbeState:
         self.shots: List[Tuple[str, str]] = []   # [(filename, scenario)]
         self.findings: Dict[str, Any] = {}
         self.errors: List[str] = []
+        self.dialogs: List[str] = []   # JS alert/confirm 消息(实测发现 frmupload 用 alert 报错)
 
     def shot(self, page: Page, name: str, scenario: str = ""):
         self.step += 1
@@ -417,13 +418,19 @@ def step_06_upload(page: Page, xlsx_path: str):
     file_in.first.set_input_files(xlsx_path)
     STATE.shot(page, "file-chosen", f"已选 {Path(xlsx_path).name}")
 
+    # 实测(2026-05-18) · MR.ERP 上传按钮是 type=button + onclick=frmupload()
+    # 不是标准 type=submit · 必须明确 selector
     submit_sels = [
+        'input[name="btnuploadfile"]',
+        'input[id="btnuploadfile"]',
+        'input[onclick*="frmupload"]',
+        'input[value*="อัพโหลด"]',         # 注意:อัพโหลด(MR.ERP 拼写)≠ อัปโหลด(标准)
+        'input[value*="อัปโหลด"]',
         'input[type="submit"]',
         'button[type="submit"]',
         'button:has-text("Upload")',
-        'button:has-text("อัปโหลด")',
+        'button:has-text("อัพโหลด")',
         'input[value*="Upload" i]',
-        'input[value*="อัปโหลด"]',
     ]
     submitted = False
     for sel in submit_sels:
@@ -437,18 +444,30 @@ def step_06_upload(page: Page, xlsx_path: str):
             except Exception as e:
                 log.warning(f"  submit {sel} 失败: {e}")
     if not submitted:
-        # 表单 Enter 兜底
+        # 兜底:直接调 JS frmupload()(脚本里仍走浏览器 · 不是 HTTP RE)
         try:
-            file_in.first.press("Enter")
-            log.info("  Enter 兜底提交")
+            page.evaluate("typeof frmupload === 'function' && frmupload()")
+            log.info("  ✓ JS frmupload() 兜底")
             submitted = True
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning(f"  JS frmupload 失败: {e}")
 
     try:
         page.wait_for_load_state("networkidle", timeout=20000)
     except PWTimeout:
         log.warning("  upload networkidle 超时")
+
+    # 实测(2026-05-18)·frmupload() 走 AJAX · 上传成功后调 sdpt() 跳 formrdpc.php
+    # 等待 URL 变化(成功)或检测 alert(失败 · 已挂全局 dialog handler)
+    try:
+        page.wait_for_url("**/formrdpc.php**", timeout=10000)
+        log.info(f"  ✓ AJAX 成功 · 自动跳 formrdpc")
+    except PWTimeout:
+        log.warning(f"  ⚠ AJAX 没跳 formrdpc · 当前 URL={page.url}")
+        if STATE.dialogs:
+            log.warning(f"  alert 消息: {STATE.dialogs[-3:]}")
+            STATE.findings["upload_alert_messages"] = list(STATE.dialogs)
+
     STATE.shot(page, "after-upload", f"URL={page.url}")
     STATE.findings["post_upload_url"] = page.url
 
@@ -705,6 +724,18 @@ def main() -> int:
                                     slow_mo=150 if HEADED else 0)
         ctx = browser.new_context(viewport=VIEWPORT, locale="th-TH")
         page = ctx.new_page()
+
+        # 全局 dialog handler · 抓所有 JS alert/confirm
+        # 实测发现:frmupload() 失败时用 alert(error_msg) 报错 · 不挂会丢信息
+        def _on_dialog(d):
+            msg = (d.message or "")[:500]
+            log.info(f"  💬 dialog ({d.type}): {msg}")
+            STATE.dialogs.append(f"[{d.type}] {msg}")
+            try:
+                d.accept()
+            except Exception:
+                pass
+        page.on("dialog", _on_dialog)
 
         fatal: Optional[BaseException] = None
         try:

@@ -1689,18 +1689,43 @@ async def ocr_recognize(
     result = None
     chain_info = []
     fallback_used = False
-    try:
-        from pdf_text_extractor import try_text_extraction
-        _text_result = try_text_extraction(content)
-        if _text_result:
-            result = _text_result
-            chain_info = ["text_path"]
+    # Round 2 · 新 pipeline 接入(feature-flag-gated)
+    # OCR_USE_NEW_PIPELINE=true → 走 services/ocr/pipeline · 完整 Vision+Flash-Lite+Flash 三层 + 100% 埋点
+    # OCR_USE_NEW_PIPELINE=false(默认)→ 走旧 text_path → gemini → vision_fallback 链(行为不变)
+    _pipeline_cost_thb = None
+    if os.environ.get("OCR_USE_NEW_PIPELINE", "false").strip().lower() == "true":
+        try:
+            from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
+            from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+            _pipe_res = _pipeline_run(content, max_pages=max_pages, api_key=api_key)
+            result = pipeline_result_to_legacy_dict(_pipe_res)
+            chain_info = ["pipeline_v1"]
+            _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
             logger.info(
-                f"🚀 [text_path] 跳过 Gemini · file={file.filename} · "
-                f"pages={result.get('page_count')} · {result.get('elapsed_ms')} ms"
+                f"🆕 pipeline_v1 · file={file.filename} · pages={_pipe_res.page_count} "
+                f"· cost=฿{_pipeline_cost_thb:.4f} · elapsed={_pipe_res.elapsed_ms}ms"
             )
-    except Exception as _tpe:
-        logger.warning(f"[text_path] 异常 · fallback Gemini · {type(_tpe).__name__}: {_tpe}")
+        except Exception as _pipe_err:
+            logger.warning(
+                f"⚠️ pipeline_v1 失败 · fallback 旧 OCR · "
+                f"{type(_pipe_err).__name__}: {_pipe_err}"
+            )
+            result = None
+            _pipeline_cost_thb = None
+
+    if result is None:
+        try:
+            from pdf_text_extractor import try_text_extraction
+            _text_result = try_text_extraction(content)
+            if _text_result:
+                result = _text_result
+                chain_info = ["text_path"]
+                logger.info(
+                    f"🚀 [text_path] 跳过 Gemini · file={file.filename} · "
+                    f"pages={result.get('page_count')} · {result.get('elapsed_ms')} ms"
+                )
+        except Exception as _tpe:
+            logger.warning(f"[text_path] 异常 · fallback Gemini · {type(_tpe).__name__}: {_tpe}")
 
     # 主引擎 · Gemini(若文本预筛未命中)
     if result is None:
@@ -2128,15 +2153,21 @@ async def ocr_recognize(
             calib = float(_balance.get("calibration_factor") or 1.10) if _balance else 1.10
         except Exception:
             calib = 1.10
-        cost_usd = (total_input_tokens * db.OCR_PRICING["input_per_m_usd"] + total_output_tokens * db.OCR_PRICING["output_per_m_usd"]) / 1_000_000
-        # v4.10.14 过渡 · calib 校准系数 v4.10.15 admin 改造时统一砍
-        cost_thb = cost_usd * db.OCR_PRICING["usd_thb"] * calib
-        if chain_info and chain_info[0] == "text_path":
-            primary_engine = "text_path"
-        elif fallback_used:
-            primary_engine = "google_vision"
+        if _pipeline_cost_thb is not None:
+            # Round 2 · 新 pipeline 已自带完整成本(含 Vision 每页 $0.00150)
+            # 直接使用 · 跳过老的 token-only 公式(老公式漏了 Vision 单页成本)
+            cost_thb = _pipeline_cost_thb
+            primary_engine = "pipeline_v1"
         else:
-            primary_engine = "gemini"
+            cost_usd = (total_input_tokens * db.OCR_PRICING["input_per_m_usd"] + total_output_tokens * db.OCR_PRICING["output_per_m_usd"]) / 1_000_000
+            # v4.10.14 过渡 · calib 校准系数 v4.10.15 admin 改造时统一砍
+            cost_thb = cost_usd * db.OCR_PRICING["usd_thb"] * calib
+            if chain_info and chain_info[0] == "text_path":
+                primary_engine = "text_path"
+            elif fallback_used:
+                primary_engine = "google_vision"
+            else:
+                primary_engine = "gemini"
         # 写一条记录(以本次识别的主 history 为锚)
         db.log_ocr_cost(
             user_id=str(user["id"]),

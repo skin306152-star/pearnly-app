@@ -2274,7 +2274,7 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     "col_confidence":   {"th": "ความมั่นใจ", "en": "Confidence", "zh": "置信度", "ja": "信頼度"},
     "col_balance_ok":   {"th": "ตรวจยอด", "en": "Balance Check", "zh": "余额校验", "ja": "残高検証"},
     # Statement detail sheet
-    "sh_stmt_detail":   {"th": "รายละเอียดบัญชี", "en": "Statement Detail",
+    "sh_stmt_detail":   {"th": "รายละเอียดSTATEMENT", "en": "Statement Detail",
                          "zh": "银行对账单明细", "ja": "明細"},
     "sh_gl_detail":     {"th": "รายละเอียดบัญชีแยกประเภท", "en": "GL Detail",
                          "zh": "总账明细", "ja": "元帳明細"},
@@ -2390,7 +2390,7 @@ _USAGE_BLOCKS: Dict[str, List[Tuple[str, bool]]] = {
         ("โครงสร้าง Sheet (รวม 4 แผ่น):", True),
         ("• 'สรุป'                          แผ่นนี้ · ข้อมูลไฟล์ สูตรกระทบยอด สถิติ และคำแนะนำการใช้งาน", False),
         ("• 'ผลการจับคู่'                   รายการจับคู่ + GL ที่จับคู่ไม่ได้ + Statement ที่จับคู่ไม่ได้ พร้อมคอลัมน์สถานะ", False),
-        ("• 'รายละเอียดบัญชี'               รายการบัญชีที่ OCR อ่านได้ทั้งหมด + ความมั่นใจ + ผลตรวจยอด", False),
+        ("• 'รายละเอียดSTATEMENT'           รายการบัญชีที่ OCR อ่านได้ทั้งหมด + ความมั่นใจ + ผลตรวจยอด", False),
         ("• 'รายละเอียดบัญชีแยกประเภท'      รายการบัญชีแยกประเภท (GL) ที่ OCR อ่านได้ทั้งหมด", False),
         ("", False),
         ("คำอธิบายสัญลักษณ์ OCR:", True),

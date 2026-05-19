@@ -8702,3 +8702,196 @@ def ensure_credits_tables():
         logger.error(f"ensure_credits_tables failed: {e}")
         raise
 
+
+# ============================================================
+# Credits billing — check & deduct
+# ============================================================
+
+_CREDITS_TIER1_PRICE = 1.5    # ฿/page, first 200 pages/month per tenant
+_CREDITS_TIER2_PRICE = 0.75   # ฿/page, beyond 200 pages/month
+_CREDITS_TIER1_LIMIT = 200
+
+
+def _calc_pages_cost(pages_used_before: int, new_pages: int) -> float:
+    """Tier-split cost calculation. Example: used=190, new=10 → 10×1.5=15฿."""
+    cost = 0.0
+    remaining = new_pages
+    used = pages_used_before
+
+    if used < _CREDITS_TIER1_LIMIT:
+        tier1_avail = _CREDITS_TIER1_LIMIT - used
+        tier1_pages = min(remaining, tier1_avail)
+        cost += tier1_pages * _CREDITS_TIER1_PRICE
+        remaining -= tier1_pages
+
+    if remaining > 0:
+        cost += remaining * _CREDITS_TIER2_PRICE
+
+    return round(cost, 4)
+
+
+def check_company_credits(
+    tenant_id: str,
+    estimated_pages: int = 1,
+    user_id: str = None,
+) -> dict:
+    """Check whether tenant has enough credits for estimated_pages.
+
+    Returns dict:
+      ok: bool
+      balance_thb: float | None
+      pages_this_month: int
+      estimated_cost: float
+      reason: str  (only when ok=False)
+    """
+    try:
+        # Billing-exempt users always pass
+        if user_id:
+            with get_cursor() as cur:
+                cur.execute(
+                    "SELECT is_billing_exempt FROM users WHERE id = %s::uuid",
+                    (str(user_id),)
+                )
+                row = cur.fetchone()
+                if row and row.get("is_billing_exempt"):
+                    return {
+                        "ok": True, "balance_thb": None,
+                        "pages_this_month": 0, "estimated_cost": 0.0,
+                    }
+
+        year_month = _datetime.now().strftime("%Y-%m")
+
+        with get_cursor() as cur:
+            cur.execute(
+                "SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s::uuid",
+                (str(tenant_id),)
+            )
+            bal_row = cur.fetchone()
+            balance = float(bal_row["balance_thb"]) if bal_row else 0.0
+
+            cur.execute("""
+                SELECT pages_used FROM monthly_page_usage
+                WHERE tenant_id = %s::uuid AND year_month = %s
+            """, (str(tenant_id), year_month))
+            usage_row = cur.fetchone()
+            pages_used = int(usage_row["pages_used"]) if usage_row else 0
+
+        cost = _calc_pages_cost(pages_used, estimated_pages)
+
+        if balance < cost:
+            return {
+                "ok": False,
+                "balance_thb": balance,
+                "pages_this_month": pages_used,
+                "estimated_cost": cost,
+                "reason": "insufficient_credits",
+            }
+
+        return {
+            "ok": True,
+            "balance_thb": balance,
+            "pages_this_month": pages_used,
+            "estimated_cost": cost,
+        }
+
+    except Exception as e:
+        logger.error(f"check_company_credits failed: {e}")
+        # Fail open — never block OCR due to billing system error
+        return {"ok": True, "balance_thb": None, "pages_this_month": 0, "estimated_cost": 0.0}
+
+
+def deduct_company_credits(
+    tenant_id: str,
+    user_id: str,
+    pages: int,
+    history_id: str = None,
+) -> dict:
+    """Atomically deduct credits after successful OCR.
+
+    1. Lock tenant_credits row (serialises concurrent requests for same tenant)
+    2. Calculate authoritative cost with current month usage
+    3. UPDATE balance, INSERT ledger entry, UPDATE monthly counter
+    Returns dict: cost_thb, balance_after, pages_used_this_month
+    """
+    try:
+        # Billing-exempt users — log ฿0, no deduction
+        if user_id:
+            with get_cursor() as cur:
+                cur.execute(
+                    "SELECT is_billing_exempt FROM users WHERE id = %s::uuid",
+                    (str(user_id),)
+                )
+                row = cur.fetchone()
+                if row and row.get("is_billing_exempt"):
+                    return {"cost_thb": 0.0, "balance_after": None, "pages_used_this_month": 0}
+
+        year_month = _datetime.now().strftime("%Y-%m")
+
+        with get_cursor(commit=True) as cur:
+            # --- 1. Lock balance row ---
+            cur.execute("""
+                SELECT balance_thb FROM tenant_credits
+                WHERE tenant_id = %s::uuid
+                FOR UPDATE
+            """, (str(tenant_id),))
+            bal_row = cur.fetchone()
+            balance = float(bal_row["balance_thb"]) if bal_row else 0.0
+
+            # --- 2. Ensure monthly row exists, then read ---
+            cur.execute("""
+                INSERT INTO monthly_page_usage (tenant_id, year_month, pages_used)
+                VALUES (%s::uuid, %s, 0)
+                ON CONFLICT (tenant_id, year_month) DO NOTHING
+            """, (str(tenant_id), year_month))
+            cur.execute("""
+                SELECT pages_used FROM monthly_page_usage
+                WHERE tenant_id = %s::uuid AND year_month = %s
+            """, (str(tenant_id), year_month))
+            usage_row = cur.fetchone()
+            pages_before = int(usage_row["pages_used"]) if usage_row else 0
+
+            # --- 3. Authoritative cost (with row lock held) ---
+            cost = _calc_pages_cost(pages_before, pages)
+
+            # --- 4. Deduct balance ---
+            cur.execute("""
+                UPDATE tenant_credits
+                SET balance_thb = balance_thb - %s, updated_at = NOW()
+                WHERE tenant_id = %s::uuid
+                RETURNING balance_thb
+            """, (cost, str(tenant_id)))
+            upd = cur.fetchone()
+            balance_after = float(upd["balance_thb"]) if upd else (balance - cost)
+
+            # --- 5. Ledger entry (negative amount = deduction) ---
+            desc = f"OCR {pages}p"
+            if history_id:
+                desc += f" · {str(history_id)[:8]}"
+            cur.execute("""
+                INSERT INTO credit_transactions
+                    (tenant_id, user_id, type, amount_thb, pages, balance_after, description)
+                VALUES (%s::uuid, %s::uuid, 'usage', %s, %s, %s, %s)
+            """, (str(tenant_id), str(user_id), -cost, pages, balance_after, desc))
+
+            # --- 6. Update monthly page counter ---
+            new_total = pages_before + pages
+            cur.execute("""
+                UPDATE monthly_page_usage
+                SET pages_used = %s, updated_at = NOW()
+                WHERE tenant_id = %s::uuid AND year_month = %s
+            """, (new_total, str(tenant_id), year_month))
+
+        logger.info(
+            f"[credits] deduct tenant={str(tenant_id)[:8]} pages={pages} "
+            f"cost=฿{cost:.2f} balance_after=฿{balance_after:.2f}"
+        )
+        return {
+            "cost_thb": cost,
+            "balance_after": balance_after,
+            "pages_used_this_month": new_total,
+        }
+
+    except Exception as e:
+        logger.error(f"deduct_company_credits failed: {e}")
+        return {"cost_thb": 0.0, "balance_after": 0.0, "pages_used_this_month": 0}
+

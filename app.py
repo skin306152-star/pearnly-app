@@ -2020,6 +2020,32 @@ async def ocr_recognize(
             "max": max_pages, "actual": page_count,
         })
 
+    # credits · 按量付费余额检查（与旧配额门并行运行，测试通过后替换）
+    _credits_tid = _tid(user)
+    if _credits_tid:
+        _cr = db.check_company_credits(
+            tenant_id=_credits_tid,
+            estimated_pages=page_count,
+            user_id=str(user.get("id")),
+        )
+        if not _cr.get("ok"):
+            _cr_lang = (
+                (user.get("lang") or "")
+                or (request.headers.get("Accept-Language") or "")[:2]
+            ).lower()[:2]
+            _CR_MSG = {
+                "th": "เครดิตไม่เพียงพอ กรุณาเติมเงิน",
+                "zh": "余额不足，请充值",
+                "en": "Insufficient credits, please top up",
+                "ja": "残高不足です。チャージしてください",
+            }
+            raise HTTPException(status_code=403, detail={
+                "code": "credits.insufficient",
+                "message": _CR_MSG.get(_cr_lang, _CR_MSG["en"]),
+                "balance_thb": _cr.get("balance_thb"),
+                "estimated_cost": _cr.get("estimated_cost"),
+            })
+
     # 4. 配额检查 · v0.15 · 新双轨:自带 key → 不限 · 否则扣 user.monthly_quota
     # === v109.3 · 新套餐配额检查(防薅 + 真实计量) ===
     try:
@@ -2668,6 +2694,18 @@ async def ocr_recognize(
         logger.info(f"💰 成本记录 · {total_pages} 页 · in={total_input_tokens} out={total_output_tokens} · ≈THB {cost_thb:.4f}")
     except Exception as _cost_err:
         logger.warning(f"成本记录写入失败(不影响识别): {_cost_err}")
+
+    # credits · 按量扣费（豁免用户自动跳过，失败不影响识别返回）
+    try:
+        if _credits_tid:
+            db.deduct_company_credits(
+                tenant_id=_credits_tid,
+                user_id=str(user["id"]),
+                pages=page_count,       # page_count is always in scope
+                history_id=primary_history_id,
+            )
+    except Exception as _deduct_err:
+        logger.warning(f"credits deduct failed (非阻断): {_deduct_err}")
 
     return {
         "filename": file.filename,

@@ -181,7 +181,6 @@ const I18N = {
         // NAV-IA Phase 1 · 顶栏三件套(2026-05-15)
         'avatar-menu-settings': '设置',
         'avatar-menu-team': '团队成员',
-        'avatar-menu-billing': '订阅 & 套餐',
         'avatar-menu-shortcuts': '键盘快捷键',
         'avatar-menu-admin': '管理员后台',
         'avatar-menu-test': '测试中心',
@@ -254,8 +253,32 @@ const I18N = {
         'dash-kpi-pending-sub': '条待审核',
         'dash-kpi-exceptions': '异常',
         'dash-kpi-exceptions-sub': '需立即处理',
-        'dash-kpi-plan': '配额',
-        'dash-kpi-plan-sub': '本月用量',
+        'dash-kpi-credits': '账户余额',
+        'dash-kpi-credits-sub': '账户余额',
+        'dash-kpi-credits-exempt': '豁免账号',
+        'dash-kpi-usage': '本月用量',
+        'dash-kpi-usage-sub': '张/200张',
+        'dash-topup': '充值',
+        'topup-modal-title': '充值到账户',
+        'topup-amount-label': '充值金额 (฿)',
+        'topup-payer-label': '付款人姓名',
+        'topup-note-label': '备注',
+        'topup-qr-label': '扫码付款 (PromptPay)',
+        'topup-qr-unavailable': '付款码图片未配置',
+        'topup-submit-btn': '提交充值申请',
+        'topup-step2-title': '申请已提交',
+        'topup-step2-sub': '请上传付款截图，加速审核',
+        'topup-slip-label': '上传付款截图',
+        'topup-upload-btn': '上传截图',
+        'topup-close-btn': '稍后上传，关闭',
+        'topup-uploading': '上传中…',
+        'topup-upload-ok': '截图已上传',
+        'topup-upload-fail': '上传失败',
+        'topup-submitting': '提交中…',
+        'topup-submit-fail': '提交失败',
+        'topup-amount-err': '请输入有效金额',
+        'topup-auto-approved': '充值成功，余额已更新',
+        'topup-pending-review': '截图已收到，等待审核',
         'dash-quick-title': '快速操作',
         'dash-quick-sub': '3 步进入主流程',
         'dash-quick-upload': '上传发票',
@@ -537,7 +560,6 @@ const I18N = {
         'err.server': '服务器错误 · 稍后重试',
         'btn-custom-tpl': '自定义模板',
         'btn-close': '关闭',
-        'btn-upgrade': '升级查看',
         'results-title': '识别结果',
         'results-sub': '点击行查看详情 · 点击列名排序',
         'search-placeholder': '搜索发票号或文件名...',
@@ -799,15 +821,6 @@ const I18N = {
         'field-seller-name': '卖方',
         // v118.8 · 顶栏归属感 + 试用临近到期横幅
         'brand-workspace-fallback': '我的工作台',
-        'trial-banner-info': '7 天试用还剩 <strong>{n} 天</strong> · 试用结束前升级保留所有数据',
-        'trial-banner-soon': '试用即将到期 · 仅剩 <strong>{n} 天</strong> · 现在升级享月付 ฿299',
-        'trial-banner-1day': '试用<strong>明天到期</strong> · 不升级将无法继续使用 · 立即升级',
-        'trial-banner-expired': '试用已到期 · 升级后所有数据立即恢复',
-        'trial-banner-cta': '立即升级',
-        'quota-banner-low': '今日识别配额还剩 {n} 次 · 用完后将无法继续识别新发票',
-        'quota-banner-very-low': '今日识别配额仅剩 {n} 次 · 即将耗尽',
-        'quota-banner-exhausted': '今日识别配额已用尽 · 新发票识别会失败 · 请明天再试或升级套餐',
-        'quota-banner-dismiss': '今天不再提醒',
         // ============ v103 · OCR 引擎降级链提示 ============
         'fallback-typhoon-nvidia-toast': '主引擎暂时不可用 · {file} 已用备用引擎识别 · 建议复核字段',
         'fallback-easyocr-toast': '主引擎和备用引擎都不可用 · {file} 已用本地引擎识别 · 字段较粗 · 请人工复核',
@@ -1316,7 +1329,6 @@ const I18N = {
         'invoice-part-of': '{i}/{n} 张',
         'toast-invoices-split': '已识别 {n} 张发票 · 分别存档',
         'multi-invoice-toast': '{file} · 识别到 {n} 张发票,已分别存档',
-        'plan-free-name': '试用',
         'plan-monthly-name': '月付',
         'plan-lifetime-name': '买断',
         'plan-monthly-price': '฿299 / 月',
@@ -1418,6 +1430,23 @@ const I18N = {
         'set-notif-title': '通知偏好',
         'set-notif-sub': '控制智能提醒和检测的行为',
         'set-plan-title': '套餐 & 用量',
+        'usage-history-title': '使用明细',
+        'usage-history-loading': '加载中…',
+        'usage-history-empty': '暂无使用记录',
+        'usage-history-all-users': '全部成员',
+        'usage-history-col-date': '日期',
+        'usage-history-col-user': '用户',
+        'usage-history-col-file': '文件名',
+        'usage-history-col-pages': '张数',
+        'usage-history-col-cost': '费用',
+        'usage-history-prev': '‹ 上一页',
+        'usage-history-next': '下一页 ›',
+        'usage-export-btn': '导出报告',
+        'usage-export-pdf': '导出 PDF',
+        'usage-export-xlsx': '导出 Excel',
+        'usage-export-loading': '生成中…',
+        'usage-export-fail': '导出失败',
+        'usage-export-empty': '本期无数据可导出',
         'set-save': '保存修改',
         'msg-saving': '保存中...',
         'msg-saved': '已保存',
@@ -1447,6 +1476,9 @@ const I18N = {
         'info-unlimited-own-key': '自带 API · 不限用量',
         'info-need-api-key': '请在设置页填入您的识别服务密钥',
         'settings-sub-type': '订阅类型',
+        'set-plan-billing-title': '计费方式',
+        'set-plan-billing-mode': '按使用量计费',
+        'set-plan-billing-detail': '每月前 200 张 ฿1.50/张 · 超出后 ฿0.75/张 · 每月 1 日重置',
         'settings-role': '账号身份',
         'settings-role-super-admin': '超级管理员',
         'sub-type-monthly': '月度订阅',
@@ -1715,10 +1747,27 @@ const I18N = {
         'admin-confirm-suspend': '确认暂停用户「{name}」?他和他的员工将只能查看历史 · 无法识别新发票',
         'admin-confirm-resume': '确认启用用户「{name}」?',
         'admin-confirm-freeze': '确认冻结用户「{name}」?冻结后他和所有员工将完全无法登录',
-        'settings-team': '员工管理',
-        'team-title': '员工管理',
-        'team-sub': '管理你公司内的员工账号',
-        'team-add': '添加员工',
+        'settings-team': '团队成员',
+        'team-title': '团队成员',
+        'team-sub': '管理你公司内的员工账号 · 员工只能看到本公司数据',
+        'team-add': '+ 添加员工',
+        // v118.34 · 团队成员列表新字段
+        'team-joined-at': '加入',
+        'team-pages-this-month': '本月 {n} 张',
+        // v118.34 · 员工首次登录强制改密 modal
+        'force-pwd-title': '请先修改密码再使用',
+        'force-pwd-sub': '老板创建账号时给了一个临时密码 · 出于安全考虑请立即修改',
+        'force-pwd-old': '当前密码(老板给的)',
+        'force-pwd-new': '新密码',
+        'force-pwd-new-ph': '至少 8 位 · 字母 + 数字',
+        'force-pwd-confirm': '再次输入新密码',
+        'force-pwd-submit': '保存并继续',
+        'force-pwd-old-required': '请输入老板给的密码',
+        'force-pwd-mismatch': '两次输入不一致',
+        'force-pwd-wrong-old': '当前密码不对',
+        'force-pwd-fail': '修改失败',
+        'force-pwd-ok': '密码已修改',
+        'team-modal-email-hint2': '员工用此邮箱登录 · 全平台唯一',
         'team-never-login': '从未登录',
         'team-status-active': '正常',
         'team-status-disabled': '已禁用',
@@ -2598,7 +2647,6 @@ const I18N = {
         // NAV-IA Phase 1 · 顶栏三件套(2026-05-15)
         'avatar-menu-settings': 'Settings',
         'avatar-menu-team': 'Team Members',
-        'avatar-menu-billing': 'Billing & Plan',
         'avatar-menu-shortcuts': 'Keyboard Shortcuts',
         'avatar-menu-admin': 'Admin Console',
         'avatar-menu-test': 'Test Center',
@@ -2671,8 +2719,32 @@ const I18N = {
         'dash-kpi-pending-sub': 'awaiting review',
         'dash-kpi-exceptions': 'Exceptions',
         'dash-kpi-exceptions-sub': 'urgent',
-        'dash-kpi-plan': 'Quota',
-        'dash-kpi-plan-sub': 'used this month',
+        'dash-kpi-credits': 'Credits Balance',
+        'dash-kpi-credits-sub': 'current balance',
+        'dash-kpi-credits-exempt': 'Exempt account',
+        'dash-kpi-usage': 'This Month Usage',
+        'dash-kpi-usage-sub': 'pages/200',
+        'dash-topup': 'Top up',
+        'topup-modal-title': 'Top Up Account',
+        'topup-amount-label': 'Amount (฿)',
+        'topup-payer-label': 'Payer name',
+        'topup-note-label': 'Note',
+        'topup-qr-label': 'Scan to pay (PromptPay)',
+        'topup-qr-unavailable': 'QR code image not configured',
+        'topup-submit-btn': 'Submit Top-Up Request',
+        'topup-step2-title': 'Request Submitted',
+        'topup-step2-sub': 'Upload payment slip to speed up review',
+        'topup-slip-label': 'Upload payment slip',
+        'topup-upload-btn': 'Upload Slip',
+        'topup-close-btn': 'Upload later, Close',
+        'topup-uploading': 'Uploading…',
+        'topup-upload-ok': 'Slip uploaded',
+        'topup-upload-fail': 'Upload failed',
+        'topup-submitting': 'Submitting…',
+        'topup-submit-fail': 'Submission failed',
+        'topup-amount-err': 'Please enter a valid amount',
+        'topup-auto-approved': 'Top-up successful, credits added',
+        'topup-pending-review': 'Slip received, pending review',
         'dash-quick-title': 'Quick actions',
         'dash-quick-sub': '3-step shortcut to main flow',
         'dash-quick-upload': 'Upload invoice',
@@ -2949,7 +3021,6 @@ const I18N = {
         'err.server': 'Server error · retry later',
         'btn-custom-tpl': 'Custom Template',
         'btn-close': 'Close',
-        'btn-upgrade': 'Upgrade',
         'results-title': 'Results',
         'results-sub': 'Click row for details · Click header to sort',
         'search-placeholder': 'Search invoice # or filename...',
@@ -3210,15 +3281,6 @@ const I18N = {
         'field-seller-name': 'Seller',
         // v118.8 · 顶栏归属感 + 试用临近到期横幅
         'brand-workspace-fallback': 'My Workspace',
-        'trial-banner-info': '<strong>{n} days</strong> left in your 7-day trial · upgrade before it ends to keep all data',
-        'trial-banner-soon': 'Trial ending soon · only <strong>{n} days</strong> left · upgrade now from ฿299/mo',
-        'trial-banner-1day': 'Trial <strong>ends tomorrow</strong> · upgrade now to keep using',
-        'trial-banner-expired': 'Trial expired · upgrade now to restore all data',
-        'trial-banner-cta': 'Upgrade now',
-        'quota-banner-low': '{n} OCR runs left today · running out soon',
-        'quota-banner-very-low': 'Only {n} OCR runs left today · nearly exhausted',
-        'quota-banner-exhausted': 'Daily OCR quota exhausted · new invoices will fail · try tomorrow or upgrade plan',
-        'quota-banner-dismiss': 'Dismiss for today',
         // ============ v103 · OCR engine fallback chain ============
         'fallback-typhoon-nvidia-toast': 'Primary engine unavailable · {file} processed with backup engine · please review fields',
         'fallback-easyocr-toast': 'Primary and backup engines unavailable · {file} processed with local engine · fields are rough · manual review needed',
@@ -3722,7 +3784,6 @@ const I18N = {
         'invoice-part-of': '{i}/{n}',
         'toast-invoices-split': '{n} invoices detected · saved separately',
         'multi-invoice-toast': '{file} · {n} invoices detected, saved separately',
-        'plan-free-name': 'Trial',
         'plan-monthly-name': 'Monthly',
         'plan-lifetime-name': 'Lifetime',
         'plan-monthly-price': '฿299 / mo',
@@ -3824,6 +3885,23 @@ const I18N = {
         'set-notif-title': 'Notification Preferences',
         'set-notif-sub': 'Control smart alerts and detection behavior',
         'set-plan-title': 'Plan & Usage',
+        'usage-history-title': 'Usage History',
+        'usage-history-loading': 'Loading…',
+        'usage-history-empty': 'No usage records yet',
+        'usage-history-all-users': 'All members',
+        'usage-history-col-date': 'Date',
+        'usage-history-col-user': 'User',
+        'usage-history-col-file': 'Filename',
+        'usage-history-col-pages': 'Pages',
+        'usage-history-col-cost': 'Cost',
+        'usage-history-prev': '‹ Prev',
+        'usage-history-next': 'Next ›',
+        'usage-export-btn': 'Export Report',
+        'usage-export-pdf': 'Export PDF',
+        'usage-export-xlsx': 'Export Excel',
+        'usage-export-loading': 'Generating…',
+        'usage-export-fail': 'Export failed',
+        'usage-export-empty': 'No data to export for this period',
         'set-save': 'Save changes',
         'msg-saving': 'Saving...',
         'msg-saved': 'Saved',
@@ -3853,6 +3931,9 @@ const I18N = {
         'info-unlimited-own-key': 'Own API · Unlimited',
         'info-need-api-key': 'Please add your recognition key in Settings',
         'settings-sub-type': 'Subscription',
+        'set-plan-billing-title': 'Billing',
+        'set-plan-billing-mode': 'Pay as you go',
+        'set-plan-billing-detail': 'First 200 pages ฿1.50/page · Over 200 pages ฿0.75/page · Resets on the 1st',
         'settings-role': 'Account Role',
         'settings-role-super-admin': 'Super Admin',
         'sub-type-monthly': 'Monthly',
@@ -4122,9 +4203,26 @@ const I18N = {
         'admin-confirm-resume': 'Activate user "{name}"?',
         'admin-confirm-freeze': 'Freeze user "{name}"? They and all staff will be unable to login.',
         'settings-team': 'Team',
-        'team-title': 'Team Management',
-        'team-sub': 'Manage your employee accounts',
-        'team-add': 'Add Employee',
+        'team-title': 'Team',
+        'team-sub': 'Manage your employee accounts · employees only see this company’s data',
+        'team-add': '+ Add Member',
+        // v118.34 · team list new fields
+        'team-joined-at': 'Joined',
+        'team-pages-this-month': '{n} pages this month',
+        // v118.34 · force change password modal
+        'force-pwd-title': 'Please change your password to continue',
+        'force-pwd-sub': 'Your owner created this account with a temporary password. Please change it now for security.',
+        'force-pwd-old': 'Current password (from owner)',
+        'force-pwd-new': 'New password',
+        'force-pwd-new-ph': 'Min 8 chars · letters + digits',
+        'force-pwd-confirm': 'Confirm new password',
+        'force-pwd-submit': 'Save & continue',
+        'force-pwd-old-required': 'Please enter the password your owner gave you',
+        'force-pwd-mismatch': 'Passwords don’t match',
+        'force-pwd-wrong-old': 'Current password is incorrect',
+        'force-pwd-fail': 'Change failed',
+        'force-pwd-ok': 'Password changed',
+        'team-modal-email-hint2': 'Employee logs in with this email · unique across platform',
         'team-never-login': 'Never',
         'team-status-active': 'Active',
         'team-status-disabled': 'Disabled',
@@ -4994,7 +5092,6 @@ const I18N = {
         // NAV-IA Phase 1 · 顶栏三件套(2026-05-15)
         'avatar-menu-settings': 'การตั้งค่า',
         'avatar-menu-team': 'สมาชิกทีม',
-        'avatar-menu-billing': 'สมัครสมาชิก & แพ็คเกจ',
         'avatar-menu-shortcuts': 'คีย์ลัด',
         'avatar-menu-admin': 'คอนโซลผู้ดูแล',
         'avatar-menu-test': 'ศูนย์ทดสอบ',
@@ -5067,8 +5164,32 @@ const I18N = {
         'dash-kpi-pending-sub': 'รายการรอตรวจสอบ',
         'dash-kpi-exceptions': 'ผิดปกติ',
         'dash-kpi-exceptions-sub': 'ต้องจัดการด่วน',
-        'dash-kpi-plan': 'โควต้า',
-        'dash-kpi-plan-sub': 'ใช้ไปเดือนนี้',
+        'dash-kpi-credits': 'เครดิตคงเหลือ',
+        'dash-kpi-credits-sub': 'ยอดปัจจุบัน',
+        'dash-kpi-credits-exempt': 'บัญชียกเว้น',
+        'dash-kpi-usage': 'การใช้งานเดือนนี้',
+        'dash-kpi-usage-sub': 'หน้า/200',
+        'dash-topup': 'เติมเงิน',
+        'topup-modal-title': 'เติมเงินในบัญชี',
+        'topup-amount-label': 'จำนวนเงิน (฿)',
+        'topup-payer-label': 'ชื่อผู้โอน',
+        'topup-note-label': 'หมายเหตุ',
+        'topup-qr-label': 'สแกนจ่าย (PromptPay)',
+        'topup-qr-unavailable': 'ไม่พบรูป QR Code',
+        'topup-submit-btn': 'ส่งคำขอเติมเงิน',
+        'topup-step2-title': 'ส่งคำขอแล้ว',
+        'topup-step2-sub': 'อัปโหลดสลิปเพื่อเร่งการตรวจสอบ',
+        'topup-slip-label': 'อัปโหลดสลิป',
+        'topup-upload-btn': 'อัปโหลดสลิป',
+        'topup-close-btn': 'อัปโหลดทีหลัง, ปิด',
+        'topup-uploading': 'กำลังอัปโหลด…',
+        'topup-upload-ok': 'อัปโหลดสลิปแล้ว',
+        'topup-upload-fail': 'อัปโหลดล้มเหลว',
+        'topup-submitting': 'กำลังส่ง…',
+        'topup-submit-fail': 'ส่งล้มเหลว',
+        'topup-amount-err': 'กรุณาใส่จำนวนเงินที่ถูกต้อง',
+        'topup-auto-approved': 'เติมเงินสำเร็จ ยอดเครดิตได้รับการอัปเดตแล้ว',
+        'topup-pending-review': 'ได้รับสลิปแล้ว รอการตรวจสอบ',
         'dash-quick-title': 'การกระทำด่วน',
         'dash-quick-sub': 'ทางลัด 3 ขั้นตอน',
         'dash-quick-upload': 'อัปโหลดใบกำกับ',
@@ -5345,7 +5466,6 @@ const I18N = {
         'err.server': 'เซิร์ฟเวอร์ผิดพลาด · ลองใหม่ภายหลัง',
         'btn-custom-tpl': 'เทมเพลตเอง',
         'btn-close': 'ปิด',
-        'btn-upgrade': 'อัปเกรด',
         'results-title': 'ผลลัพธ์',
         'results-sub': 'คลิกแถวเพื่อดูรายละเอียด · คลิกหัวคอลัมน์เพื่อเรียง',
         'search-placeholder': 'ค้นหาเลขที่หรือชื่อไฟล์...',
@@ -5605,15 +5725,6 @@ const I18N = {
         'field-seller-name': 'ผู้ขาย',
         // v118.8 · 顶栏归属感 + 试用临近到期横幅
         'brand-workspace-fallback': 'พื้นที่ทำงานของฉัน',
-        'trial-banner-info': 'ทดลอง 7 วันเหลือ <strong>{n} วัน</strong> · อัพเกรดก่อนหมดเพื่อเก็บข้อมูลทั้งหมด',
-        'trial-banner-soon': 'ทดลองใกล้หมดอายุ · เหลือ <strong>{n} วัน</strong> · อัพเกรดทันที ฿299/เดือน',
-        'trial-banner-1day': 'ทดลอง<strong>หมดอายุพรุ่งนี้</strong> · ไม่อัพเกรดจะใช้งานต่อไม่ได้ · อัพเกรดเลย',
-        'trial-banner-expired': 'ทดลองหมดอายุแล้ว · อัพเกรดเพื่อกู้ข้อมูลทั้งหมด',
-        'trial-banner-cta': 'อัพเกรดเลย',
-        'quota-banner-low': 'เหลือโควตา OCR วันนี้ {n} ครั้ง · ใกล้หมดแล้ว',
-        'quota-banner-very-low': 'เหลือโควตา OCR วันนี้เพียง {n} ครั้ง · ใกล้หมด',
-        'quota-banner-exhausted': 'โควตา OCR วันนี้หมดแล้ว · ใบกำกับใหม่จะไม่ทำงาน · ลองพรุ่งนี้หรืออัพเกรดแพคเกจ',
-        'quota-banner-dismiss': 'ไม่แจ้งวันนี้',
         // ============ v103 · ระบบสำรอง OCR ============
         'fallback-typhoon-nvidia-toast': 'เครื่องหลักไม่พร้อม · {file} ใช้เครื่องสำรอง · กรุณาตรวจทาน',
         'fallback-easyocr-toast': 'เครื่องหลักและสำรองไม่พร้อม · {file} ใช้ระบบในเครื่อง · ฟิลด์อาจไม่สมบูรณ์ · ตรวจทานด้วยตนเอง',
@@ -6117,7 +6228,6 @@ const I18N = {
         'invoice-part-of': '{i}/{n}',
         'toast-invoices-split': 'พบ {n} ใบ · บันทึกแยก',
         'multi-invoice-toast': '{file} · พบ {n} ใบ บันทึกแยกแล้ว',
-        'plan-free-name': 'ทดลอง',
         'plan-monthly-name': 'รายเดือน',
         'plan-lifetime-name': 'ตลอดชีพ',
         'plan-monthly-price': '฿299 / เดือน',
@@ -6219,6 +6329,23 @@ const I18N = {
         'set-notif-title': 'การแจ้งเตือน',
         'set-notif-sub': 'ควบคุมการแจ้งและการตรวจสอบอัตโนมัติ',
         'set-plan-title': 'แพ็กเกจ & การใช้งาน',
+        'usage-history-title': 'ประวัติการใช้งาน',
+        'usage-history-loading': 'กำลังโหลด…',
+        'usage-history-empty': 'ยังไม่มีประวัติการใช้งาน',
+        'usage-history-all-users': 'สมาชิกทั้งหมด',
+        'usage-history-col-date': 'วันที่',
+        'usage-history-col-user': 'ผู้ใช้',
+        'usage-history-col-file': 'ชื่อไฟล์',
+        'usage-history-col-pages': 'หน้า',
+        'usage-history-col-cost': 'ค่าใช้จ่าย',
+        'usage-history-prev': '‹ ก่อนหน้า',
+        'usage-history-next': 'ถัดไป ›',
+        'usage-export-btn': 'ส่งออกรายงาน',
+        'usage-export-pdf': 'ส่งออก PDF',
+        'usage-export-xlsx': 'ส่งออก Excel',
+        'usage-export-loading': 'กำลังสร้าง…',
+        'usage-export-fail': 'ส่งออกล้มเหลว',
+        'usage-export-empty': 'ไม่มีข้อมูลในงวดนี้',
         'set-save': 'บันทึก',
         'msg-saving': 'กำลังบันทึก...',
         'msg-saved': 'บันทึกแล้ว',
@@ -6248,6 +6375,9 @@ const I18N = {
         'info-unlimited-own-key': 'API ของคุณ · ไม่จำกัด',
         'info-need-api-key': 'กรุณาใส่คีย์บริการ OCR ในหน้าตั้งค่า',
         'settings-sub-type': 'ประเภทการสมัคร',
+        'set-plan-billing-title': 'วิธีคิดค่าบริการ',
+        'set-plan-billing-mode': 'คิดตามการใช้งาน',
+        'set-plan-billing-detail': '200 แผ่นแรก ฿1.50/แผ่น · เกิน 200 แผ่น ฿0.75/แผ่น · รีเซ็ตทุกวันที่ 1',
         'settings-role': 'บทบาทบัญชี',
         'settings-role-super-admin': 'ผู้ดูแลระบบสูงสุด',
         'sub-type-monthly': 'รายเดือน',
@@ -6517,7 +6647,24 @@ const I18N = {
         'admin-confirm-resume': 'เปิด "{name}" ?',
         'admin-confirm-freeze': 'ยืนยันอายัดผู้ใช้ "{name}" ? หลังอายัดเขาและพนักงานทั้งหมดจะเข้าสู่ระบบไม่ได้',
         'settings-team': 'ทีมงาน',
-        'team-title': 'จัดการทีม',
+        'team-title': 'พนักงาน',
+        'team-add': '+ เพิ่มพนักงาน',
+        'team-joined-at': 'เข้าร่วม',
+        'team-pages-this-month': 'เดือนนี้ {n} แผ่น',
+        'force-pwd-title': 'กรุณาเปลี่ยนรหัสผ่านก่อนใช้งาน',
+        'force-pwd-sub': 'เจ้านายตั้งรหัสผ่านชั่วคราวให้ · กรุณาเปลี่ยนทันทีเพื่อความปลอดภัย',
+        'force-pwd-old': 'รหัสผ่านปัจจุบัน (เจ้านายให้)',
+        'force-pwd-new': 'รหัสผ่านใหม่',
+        'force-pwd-new-ph': 'อย่างน้อย 8 ตัว · ตัวอักษร + ตัวเลข',
+        'force-pwd-confirm': 'ยืนยันรหัสผ่านใหม่',
+        'force-pwd-submit': 'บันทึก & ดำเนินการต่อ',
+        'force-pwd-old-required': 'กรุณากรอกรหัสผ่านที่เจ้านายให้',
+        'force-pwd-mismatch': 'รหัสผ่านไม่ตรงกัน',
+        'force-pwd-wrong-old': 'รหัสผ่านปัจจุบันไม่ถูกต้อง',
+        'force-pwd-fail': 'เปลี่ยนล้มเหลว',
+        'force-pwd-ok': 'เปลี่ยนรหัสผ่านสำเร็จ',
+        'team-modal-email-hint2': 'พนักงานใช้อีเมลนี้ล็อกอิน · ไม่ซ้ำกันทั้งระบบ',
+        'team-title-old': 'จัดการทีม',
         'team-sub': 'จัดการบัญชีพนักงาน',
         'team-add': 'เพิ่มพนักงาน',
         'team-never-login': 'ไม่เคยเข้า',
@@ -7386,7 +7533,6 @@ const I18N = {
         // NAV-IA Phase 1 · 顶栏三件套(2026-05-15)
         'avatar-menu-settings': '設定',
         'avatar-menu-team': 'チームメンバー',
-        'avatar-menu-billing': 'サブスクリプション・プラン',
         'avatar-menu-shortcuts': 'キーボードショートカット',
         'avatar-menu-admin': '管理者コンソール',
         'avatar-menu-test': 'テストセンター',
@@ -7459,8 +7605,32 @@ const I18N = {
         'dash-kpi-pending-sub': '件レビュー待ち',
         'dash-kpi-exceptions': '異常',
         'dash-kpi-exceptions-sub': '至急対応が必要',
-        'dash-kpi-plan': 'クォータ',
-        'dash-kpi-plan-sub': '今月使用済み',
+        'dash-kpi-credits': '残高',
+        'dash-kpi-credits-sub': '現在の残高',
+        'dash-kpi-credits-exempt': '免除アカウント',
+        'dash-kpi-usage': '今月の使用量',
+        'dash-kpi-usage-sub': 'ページ/200',
+        'dash-topup': 'チャージ',
+        'topup-modal-title': 'アカウントへチャージ',
+        'topup-amount-label': 'チャージ金額 (฿)',
+        'topup-payer-label': '送金者名',
+        'topup-note-label': 'メモ',
+        'topup-qr-label': 'QRコードで支払い (PromptPay)',
+        'topup-qr-unavailable': 'QRコード画像が設定されていません',
+        'topup-submit-btn': 'チャージ申請を送信',
+        'topup-step2-title': '申請が送信されました',
+        'topup-step2-sub': 'スリップをアップロードして審査を早めてください',
+        'topup-slip-label': '支払いスリップをアップロード',
+        'topup-upload-btn': 'スリップをアップロード',
+        'topup-close-btn': '後でアップロード、閉じる',
+        'topup-uploading': 'アップロード中…',
+        'topup-upload-ok': 'スリップをアップロードしました',
+        'topup-upload-fail': 'アップロード失敗',
+        'topup-submitting': '送信中…',
+        'topup-submit-fail': '送信失敗',
+        'topup-amount-err': '有効な金額を入力してください',
+        'topup-auto-approved': 'チャージ完了、残高が更新されました',
+        'topup-pending-review': 'スリップを受信しました。審査中です',
         'dash-quick-title': 'クイック操作',
         'dash-quick-sub': '3 ステップで主要画面へ',
         'dash-quick-upload': '請求書をアップロード',
@@ -7736,7 +7906,6 @@ const I18N = {
         'err.server': 'サーバーエラー · 後で再試行',
         'btn-custom-tpl': 'カスタム',
         'btn-close': '閉じる',
-        'btn-upgrade': 'アップグレード',
         'results-title': '認識結果',
         'results-sub': '行クリックで詳細 · ヘッダで並び替え',
         'search-placeholder': '請求書番号やファイル名で検索...',
@@ -7996,15 +8165,6 @@ const I18N = {
         'field-seller-name': '売り手',
         // v118.8 · 顶栏归属感 + 试用临近到期横幅
         'brand-workspace-fallback': 'マイワークスペース',
-        'trial-banner-info': '7日間試用 残り <strong>{n}日</strong> · 期限切れ前にアップグレードでデータ保持',
-        'trial-banner-soon': '試用期間まもなく終了 · 残り <strong>{n}日</strong> · 月額฿299でアップグレード',
-        'trial-banner-1day': '試用 <strong>明日終了</strong> · アップグレードして継続利用',
-        'trial-banner-expired': '試用期間終了 · アップグレードでデータ復元',
-        'trial-banner-cta': 'アップグレード',
-        'quota-banner-low': '本日の OCR 残り {n} 回 · 間もなく上限',
-        'quota-banner-very-low': '本日の OCR 残り {n} 回のみ · ほぼ上限',
-        'quota-banner-exhausted': '本日の OCR 上限に達しました · 新規認識は失敗します · 明日再試行またはプランをアップグレード',
-        'quota-banner-dismiss': '本日は再表示しない',
         // ============ v103 · OCR フォールバック ============
         'fallback-typhoon-nvidia-toast': 'メインエンジン利用不可 · {file} はバックアップエンジンで処理 · フィールド確認推奨',
         'fallback-easyocr-toast': 'メインとバックアップ共に不可 · {file} はローカルエンジンで処理 · フィールドは粗いため手動確認必須',
@@ -8508,7 +8668,6 @@ const I18N = {
         'invoice-part-of': '{i}/{n}',
         'toast-invoices-split': '{n} 件検出 · 別々に保存',
         'multi-invoice-toast': '{file} · {n} 件検出、個別保存',
-        'plan-free-name': 'トライアル',
         'plan-monthly-name': '月額',
         'plan-lifetime-name': '買い切り',
         'plan-monthly-price': '฿299 / 月',
@@ -8610,6 +8769,23 @@ const I18N = {
         'set-notif-title': '通知設定',
         'set-notif-sub': 'アラートと検出の動作を制御',
         'set-plan-title': 'プラン & 使用量',
+        'usage-history-title': '利用履歴',
+        'usage-history-loading': '読み込み中…',
+        'usage-history-empty': '利用履歴がありません',
+        'usage-history-all-users': '全メンバー',
+        'usage-history-col-date': '日付',
+        'usage-history-col-user': 'ユーザー',
+        'usage-history-col-file': 'ファイル名',
+        'usage-history-col-pages': 'ページ数',
+        'usage-history-col-cost': '費用',
+        'usage-history-prev': '‹ 前へ',
+        'usage-history-next': '次へ ›',
+        'usage-export-btn': 'レポート出力',
+        'usage-export-pdf': 'PDF 出力',
+        'usage-export-xlsx': 'Excel 出力',
+        'usage-export-loading': '生成中…',
+        'usage-export-fail': '出力に失敗しました',
+        'usage-export-empty': 'この期間にデータがありません',
         'set-save': '保存',
         'msg-saving': '保存中...',
         'msg-saved': '保存しました',
@@ -8639,6 +8815,9 @@ const I18N = {
         'info-unlimited-own-key': '独自 API · 無制限',
         'info-need-api-key': '設定で認識サービスキーをご入力ください',
         'settings-sub-type': 'サブスクリプション',
+        'set-plan-billing-title': '料金プラン',
+        'set-plan-billing-mode': '使用量課金',
+        'set-plan-billing-detail': '最初の200枚 ฿1.50/枚 · 200枚超 ฿0.75/枚 · 毎月1日リセット',
         'settings-role': 'アカウント権限',
         'settings-role-super-admin': 'スーパー管理者',
         'sub-type-monthly': '月額',
@@ -8908,7 +9087,24 @@ const I18N = {
         'admin-confirm-resume': '「{name}」有効化?',
         'admin-confirm-freeze': 'ユーザー「{name}」を凍結しますか? 凍結後は本人と全社員がログイン不可',
         'settings-team': 'チーム',
-        'team-title': 'チーム管理',
+        'team-title': 'メンバー',
+        'team-add': '+ メンバー追加',
+        'team-joined-at': '参加日',
+        'team-pages-this-month': '今月 {n} 枚',
+        'force-pwd-title': 'パスワードを変更してから続行してください',
+        'force-pwd-sub': '管理者が仮パスワードで作成しました · セキュリティのため変更してください',
+        'force-pwd-old': '現在のパスワード(管理者から)',
+        'force-pwd-new': '新しいパスワード',
+        'force-pwd-new-ph': '8 文字以上 · 英字 + 数字',
+        'force-pwd-confirm': '新しいパスワード(確認)',
+        'force-pwd-submit': '保存して続行',
+        'force-pwd-old-required': '管理者から渡されたパスワードを入力',
+        'force-pwd-mismatch': 'パスワードが一致しません',
+        'force-pwd-wrong-old': '現在のパスワードが間違っています',
+        'force-pwd-fail': '変更失敗',
+        'force-pwd-ok': 'パスワードを変更しました',
+        'team-modal-email-hint2': '社員はこのメールでログインします · プラットフォーム全体で一意',
+        'team-title-old': 'チーム管理',
         'team-sub': '社員アカウント管理',
         'team-add': '社員追加',
         'team-never-login': '未ログイン',
@@ -9816,49 +10012,20 @@ function canManageApiKey(u)   { return isOwner(u) && isLifetime(u); }
 window.isMoneyHidden = shouldHideMoney;
 // ============================================================
 
-// 单次批量上限:v118.27.8.1.15 后 trial 30 / monthly 500 / yearly 800 / lifetime 1000
+// v118.34 · 旧 plan-based 上限映射已删除 · credits 系统下统一上限
 function getMaxFiles() {
-    // v111.2 · 优先用后端 /api/me/plan 返回的 limits.max_upload_files
-    try {
-        const ps = window._planState;
-        if (ps && ps.limits && ps.limits.max_upload_files) {
-            return ps.limits.max_upload_files;
-        }
-        // 后端 plan 字符串兜底(/api/me/plan 还没回 · 用 _userInfo.plan)
-        const plan = (_userInfo && _userInfo.plan) || 'trial';
-        // super_admin 直接放最高
-        if (_userInfo && _userInfo.is_super_admin) return 9999;
-        // v118.27.8.1.15 · 全档上调对齐后端 PLAN_CONFIG
-        const mapping = {
-            'admin': 9999, 'lifetime': 1000, 'yearly': 800, 'monthly': 500, 'trial': 30,
-            // 老 plan 名兼容(不会再用·但保险)
-            'enterprise': 1000, 'firm': 800, 'pro': 500, 'plus': 30, 'free': 30,
-        };
-        return mapping[plan] || 30;
-    } catch (_) {
-        return 30;
-    }
+    if (_userInfo && _userInfo.is_super_admin) return 9999;
+    return 500;
 }
 
 function getMaxPagesPerFile() {
-    try {
-        const ps = window._planState;
-        if (ps && ps.limits && ps.limits.max_pages_per_file) return ps.limits.max_pages_per_file;
-        if (_userInfo && _userInfo.is_super_admin) return 999;
-        const plan = (_userInfo && _userInfo.plan) || 'trial';
-        return (plan === 'lifetime' || plan === 'enterprise') ? 100 : 50;
-    } catch (_) { return 50; }
+    if (_userInfo && _userInfo.is_super_admin) return 999;
+    return 100;
 }
 
 function getMaxMbPerFile() {
-    try {
-        const ps = window._planState;
-        if (ps && ps.limits && ps.limits.max_mb_per_file) return ps.limits.max_mb_per_file;
-        if (_userInfo && _userInfo.is_super_admin) return 500;
-        const plan = (_userInfo && _userInfo.plan) || 'trial';
-        if (plan === 'lifetime' || plan === 'enterprise') return 200;
-        return 100;
-    } catch (_) { return 100; }
+    if (_userInfo && _userInfo.is_super_admin) return 500;
+    return 200;
 }
 
 const token = localStorage.getItem('mrpilot_token');
@@ -10190,7 +10357,7 @@ function applyLang(lang) {
     if (_userInfo) renderInfoBar();
     if (_quota) updateUploadHint();
     // v111.3 · 切语言时重渲染 trial banner(原 bug · 顶部黄条不刷新)
-    try { if (typeof renderTrialBanner === 'function') renderTrialBanner(); } catch(e){}
+    // v118.34 · trial-banner 已删除
     renderFileList();
     renderResults();
     if (currentRoute === 'settings') renderSettings();
@@ -10768,6 +10935,9 @@ async function loadAll() {
         ]);
         if (!u || !q) return;
         _userInfo = u;
+        window._userInfo = u;
+        // v118.34 · 员工首次登录(must_change_password=true)立即弹强制改密 modal
+        try { if (typeof window._maybeShowForcePwdModal === 'function') window._maybeShowForcePwdModal(); } catch (_) {}
 
         // ============================================================
         // v118.44.0 · NAV-IA Phase 8 · admin layout 独立 SPA 早退分支
@@ -10825,8 +10995,7 @@ async function loadAll() {
         // v118.8 · 顶栏归属感 · 显示用户公司名(归属感 · 不再是 Pearnly 大字)
         renderBrandWorkspace();
         renderInfoBar();
-        renderQuotaBanner();   // v102 · 配额低/耗尽顶部预警
-        renderTrialBanner();   // v118.8 · 试用临近到期横幅
+        // v118.34 · renderQuotaBanner / renderTrialBanner 已删除
         applySidebarVisibility();
         // NAV-IA Phase 1 · 头像菜单角色显隐 + 渲染(顶栏三件套)
         try {
@@ -10885,6 +11054,7 @@ function switchSettingsTab(tabName) {
         if (tabName === 'team') loadTeamList();
         // v118.21.2 · 切到 learned tab 时加载学习规则
         if (tabName === 'learned' && typeof window.loadLearnedRules === 'function') window.loadLearnedRules();
+        if (tabName === 'plan' && typeof window.loadUsageHistory === 'function') window.loadUsageHistory(1);
     } catch (e) { console.warn('settings tab side effect failed:', e); }
 }
 
@@ -10910,37 +11080,41 @@ async function loadTeamList() {
         listEl.style.display = '';
         listEl.innerHTML = employees.map(e => {
             const lastLogin = e.last_login_at ? new Date(e.last_login_at).toLocaleDateString() : (t('team-never-login') || '从未登录');
+            const joinedAt = e.created_at ? new Date(e.created_at).toLocaleDateString() : '';
             const statusCls = e.is_active === false ? 'team-status-off' : 'team-status-on';
             const statusText = e.is_active === false ? (t('team-status-disabled') || '已禁用') : (t('team-status-active') || '正常');
-            const emailLine = e.email ? `<span class="team-meta-sep">·</span><span>${escapeHtml(e.email)}</span>` : '';
+            const displayName = e.email || e.username || '';
+            const pages = Number(e.pages_this_month || 0);
+            // v118.34 · 显示 email / 加入时间 / 本月用量(per-user 来自 credit_transactions 拆分)
             return `
             <div class="team-card" data-employee-id="${escapeHtml(e.id)}">
                 <div class="team-card-main">
-                    <div class="team-avatar">${escapeHtml((e.username || '?')[0].toUpperCase())}</div>
+                    <div class="team-avatar">${escapeHtml((displayName || '?')[0].toUpperCase())}</div>
                     <div class="team-info">
-                        <div class="team-name">${escapeHtml(e.username || '')}</div>
+                        <div class="team-name">${escapeHtml(displayName)}</div>
                         <div class="team-meta">
                             <span class="team-status-dot ${statusCls}"></span>
                             <span>${escapeHtml(statusText)}</span>
                             <span class="team-meta-sep">·</span>
-                            <span>${escapeHtml(t('team-last-login') || '上次登录')}: ${escapeHtml(lastLogin)}</span>
-                            ${emailLine}
+                            <span>${escapeHtml(t('team-joined-at') || '加入')}: ${escapeHtml(joinedAt)}</span>
                             <span class="team-meta-sep">·</span>
-                            <span>${escapeHtml((t('team-assigned-clients') || '已分配 {n} 客户').replace('{n}', e.assigned_client_count || 0))}</span>
+                            <span>${escapeHtml((t('team-pages-this-month') || '本月 {n} 张').replace('{n}', pages))}</span>
+                            <span class="team-meta-sep">·</span>
+                            <span>${escapeHtml(t('team-last-login') || '上次登录')}: ${escapeHtml(lastLogin)}</span>
                         </div>
                     </div>
                 </div>
                 <div class="team-card-actions">
-                    <button class="btn btn-ghost btn-small" data-assign-clients="${escapeHtml(e.id)}" data-name="${escapeHtml(e.username || '')}">
+                    <button class="btn btn-ghost btn-small" data-assign-clients="${escapeHtml(e.id)}" data-name="${escapeHtml(displayName)}">
                         ${escapeHtml(t('team-assign-clients') || '分配客户')}
                     </button>
-                    <button class="btn btn-ghost btn-small" data-reset-pwd-employee="${escapeHtml(e.id)}" data-name="${escapeHtml(e.username || '')}" title="${escapeHtml(t('team-reset-pwd') || '重置密码')}">
+                    <button class="btn btn-ghost btn-small" data-reset-pwd-employee="${escapeHtml(e.id)}" data-name="${escapeHtml(displayName)}" title="${escapeHtml(t('team-reset-pwd') || '重置密码')}">
                         ${escapeHtml(t('team-reset-pwd') || '重置密码')}
                     </button>
                     <button class="btn btn-ghost btn-small" data-toggle-employee="${escapeHtml(e.id)}" data-active="${e.is_active === false ? 'false' : 'true'}">
                         ${escapeHtml(e.is_active === false ? (t('team-enable') || '启用') : (t('team-disable') || '禁用'))}
                     </button>
-                    <button class="btn btn-ghost btn-small btn-danger-text" data-remove-employee="${escapeHtml(e.id)}" data-name="${escapeHtml(e.username || '')}">
+                    <button class="btn btn-ghost btn-small btn-danger-text" data-remove-employee="${escapeHtml(e.id)}" data-name="${escapeHtml(displayName)}">
                         ${escapeHtml(t('team-remove') || '移除')}
                     </button>
                 </div>
@@ -10969,14 +11143,9 @@ async function showAddEmployeeModal() {
             </div>
             <div class="add-emp-body">
                 <div class="add-emp-field">
-                    <label>${escapeHtml(t('team-modal-username') || '员工用户名')}</label>
-                    <input type="text" class="add-emp-input" id="add-emp-username" placeholder="${escapeHtml(t('team-modal-username-ph') || 'employee01')}" autocomplete="off">
-                    <div class="add-emp-hint">${escapeHtml(t('team-modal-username-hint') || '3-50 位 · 字母 / 数字 / 下划线 / 点 / 横线 · 唯一')}</div>
-                </div>
-                <div class="add-emp-field">
-                    <label>${escapeHtml(t('team-modal-email') || '邮箱(选填)')}</label>
+                    <label>${escapeHtml(t('team-modal-email') || '邮箱')}</label>
                     <input type="email" class="add-emp-input" id="add-emp-email" placeholder="${escapeHtml(t('team-modal-email-ph') || 'employee@example.com')}" autocomplete="off">
-                    <div class="add-emp-hint">${escapeHtml(t('team-modal-email-hint') || '选填 · 用于忘记密码时邮件重置 · 留空则只能由老板重置')}</div>
+                    <div class="add-emp-hint">${escapeHtml(t('team-modal-email-hint2') || '员工用此邮箱登录 · 全平台唯一')}</div>
                 </div>
                 <div class="add-emp-field">
                     <label>${escapeHtml(t('team-modal-password') || '初始密码')}</label>
@@ -10993,7 +11162,7 @@ async function showAddEmployeeModal() {
     `;
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('show'));
-    setTimeout(() => { const inp = document.getElementById('add-emp-username'); if (inp) inp.focus(); }, 200);
+    setTimeout(() => { const inp = document.getElementById('add-emp-email'); if (inp) inp.focus(); }, 200);
 
     function close() {
         overlay.classList.remove('show');
@@ -11004,31 +11173,19 @@ async function showAddEmployeeModal() {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
     overlay.querySelector('#add-emp-submit').addEventListener('click', async () => {
-        const usernameEl = document.getElementById('add-emp-username');
         const emailEl = document.getElementById('add-emp-email');
         const passwordEl = document.getElementById('add-emp-password');
         const msgEl = document.getElementById('add-emp-msg');
         const submitBtn = document.getElementById('add-emp-submit');
-        const username = (usernameEl.value || '').trim();
-        const email = (emailEl.value || '').trim();
+        const email = (emailEl.value || '').trim().toLowerCase();
         const password = passwordEl.value || '';
         msgEl.textContent = '';
         msgEl.classList.remove('error');
 
-        if (!username || username.length < 3) {
-            msgEl.textContent = t('team-modal-err-username') || '用户名至少 3 位';
-            msgEl.classList.add('error'); return;
-        }
-        if (!/^[a-zA-Z0-9_.\-]+$/.test(username)) {
-            msgEl.textContent = t('team-modal-err-username-fmt') || '只能用字母 / 数字 / 下划线 / 点 / 横线';
-            msgEl.classList.add('error'); return;
-        }
-        // v118.11 · 邮箱选填 · 但填了就要格式正确
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             msgEl.textContent = t('msg-email-invalid') || '邮箱格式不对';
             msgEl.classList.add('error'); return;
         }
-        // v118.11 · 密码强度本地预检(后端再校验一次,这里给即时反馈)
         if (password.length < 8) {
             msgEl.textContent = t('pwd-too-short') || '密码至少 8 位';
             msgEl.classList.add('error'); return;
@@ -11045,9 +11202,8 @@ async function showAddEmployeeModal() {
         submitBtn.disabled = true;
         submitBtn.textContent = t('msg-saving') || '保存中...';
         try {
-            const payload = { username, password };
-            if (email) payload.email = email;
-            const resp = await apiPost('/api/team/employees', payload);
+            // v118.34 · 只发 { email, password } · 后端 username 自动取 email
+            const resp = await apiPost('/api/team/employees', { email, password });
             const body = resp ? await resp.json().catch(() => ({})) : {};
             if (resp && resp.ok && body && body.ok) {
                 showToast(t('team-added') || '员工已添加', 'success');
@@ -11057,8 +11213,9 @@ async function showAddEmployeeModal() {
             }
             const code = (body && body.detail) || 'unknown';
             const msgMap = {
-                'team.username_exists': t('team-username-exists') || '用户名已被占用',
+                'team.email_invalid': t('msg-email-invalid') || '邮箱格式不对',
                 'team.email_exists': t('team-email-exists') || '邮箱已被占用',
+                'team.username_exists': t('team-username-exists') || '用户名已被占用',
                 'team.create_failed':  t('team-create-failed') || '创建失败',
                 'team.only_owner_or_super': t('team-no-permission') || '无权限',
                 'team.no_tenant': t('team-no-tenant') || '请先升级账号',
@@ -11575,161 +11732,13 @@ function renderBrandWorkspace() {
 
 // v102 · 顶部配额预警 banner 渲染
 // v109.4 · 统一用 tenant_used/tenant_quota · 跟顶栏 chip / 设置页 / 用户管理表对齐
-function renderQuotaBanner() {
-    const el = document.getElementById('quota-banner');
-    if (!el) return;
-    if (!_userInfo) { el.style.display = 'none'; return; }
-
-    // 超管 / 自带 key 用户:不显示 banner
-    if (_userInfo.is_super_admin || _userInfo.tenant_type === 'admin' || _userInfo.tenant_type === 'byo_api') {
-        el.style.display = 'none';
-        return;
-    }
-
-    let used = 0, total = 0;
-    if (_userInfo.plan === 'free' && _quota && _quota.ip_daily_limit) {
-        used = _quota.ip_used_today || 0;
-        total = _quota.ip_daily_limit;
-    } else if (_userInfo.tenant_quota != null && _userInfo.tenant_quota > 0) {
-        // v109.4 · 优先 tenant 字段
-        used = _userInfo.tenant_used || 0;
-        total = _userInfo.tenant_quota;
-    } else if (_userInfo.monthly_quota && _userInfo.monthly_quota > 0) {
-        // v109.4 · 兜底用 user 表字段
-        used = _userInfo.used_this_month || 0;
-        total = _userInfo.monthly_quota;
-    } else {
-        // 没配额信息 · 不显示 banner
-        el.style.display = 'none';
-        return;
-    }
-
-    if (total <= 0) { el.style.display = 'none'; return; }
-
-    const remaining = Math.max(0, total - used);
-    const pct = (used / total) * 100;
-
-    // 用户主动关闭过当天的 banner · 不再弹(localStorage 当日 key)
-    const todayKey = 'quota_banner_dismiss_' + new Date().toISOString().slice(0, 10);
-    if (localStorage.getItem(todayKey)) { el.style.display = 'none'; return; }
-
-    let cls, msg;
-    if (remaining === 0) {
-        cls = 'danger';
-        msg = t('quota-banner-exhausted');
-    } else if (pct >= 90) {
-        cls = 'danger';
-        msg = t('quota-banner-very-low', { n: remaining });
-    } else if (pct >= 70) {
-        cls = 'warn';
-        msg = t('quota-banner-low', { n: remaining });
-    } else {
-        el.style.display = 'none';
-        return;
-    }
-
-    el.className = 'quota-banner ' + cls;
-    el.innerHTML = `
-        <span class="quota-banner-icon">${svgIcon('alert', 18)}</span>
-        <span class="quota-banner-msg">${escapeHtml(msg)}</span>
-        <button type="button" class="quota-banner-close" aria-label="dismiss" title="${escapeHtml(t('quota-banner-dismiss'))}">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>
-        </button>
-    `;
-    el.style.display = 'flex';
-    const closeBtn = el.querySelector('.quota-banner-close');
-    if (closeBtn) closeBtn.addEventListener('click', () => {
-        localStorage.setItem(todayKey, '1');
-        el.style.display = 'none';
-    });
-}
+// v118.34 · renderQuotaBanner 已删除
 
 // v118.8 · 试用临近到期横幅 · 7 天试用最后阶段提示用户升级
-function renderTrialBanner() {
-    const el = document.getElementById('trial-banner');
-    if (!el) return;
-    if (!_userInfo) { el.style.display = 'none'; return; }
-
-    // v118.12 · 员工 / 超管 / 已付费 / 自带 key:不显示
-    if (shouldHideMoney(_userInfo)) { el.style.display = 'none'; return; }
-    if (_userInfo.is_super_admin || _userInfo.tenant_type === 'admin' || _userInfo.tenant_type === 'byo_api') {
-        el.style.display = 'none';
-        return;
-    }
-    // 非试用用户:不显示(用 effective_plan 优先 · plan 兜底)
-    const plan = _userInfo.effective_plan || _userInfo.plan || '';
-    if (plan !== 'trial' && plan !== 'free') {
-        el.style.display = 'none';
-        return;
-    }
-
-    // 拿剩余天数 · 优先 _planState · 兜底 _userInfo
-    let days = null;
-    if (window._planState && (window._planState.trial_days_left !== null && window._planState.trial_days_left !== undefined)) {
-        days = Math.max(0, Math.floor(window._planState.trial_days_left));
-    } else if (_userInfo.trial_days_left !== null && _userInfo.trial_days_left !== undefined) {
-        days = Math.max(0, Math.floor(_userInfo.trial_days_left));
-    }
-    if (days === null) { el.style.display = 'none'; return; }
-
-    // 用户主动 dismiss 当天就不再显示(只对 info 级别生效 · 紧急的还是要显示)
-    const todayKey = 'trial_banner_dismissed_' + new Date().toDateString();
-    if (days >= 4 && localStorage.getItem(todayKey) === '1') {
-        el.style.display = 'none';
-        return;
-    }
-
-    // 决定级别
-    let cls, msg;
-    if (days <= 0) {
-        cls = 'danger';
-        msg = t('trial-banner-expired');
-    } else if (days === 1) {
-        cls = 'danger';
-        msg = t('trial-banner-1day');
-    } else if (days <= 3) {
-        cls = 'warn';
-        msg = t('trial-banner-soon', { n: days });
-    } else if (days <= 6) {
-        cls = 'info';
-        msg = t('trial-banner-info', { n: days });
-    } else {
-        // 7 天满 · 不显示横幅
-        el.style.display = 'none';
-        return;
-    }
-
-    const icon = cls === 'danger'
-        ? '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 2l8 16H2z"/><path d="M10 8v4M10 15h.01"/></svg>'
-        : (cls === 'warn'
-            ? '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 2"/></svg>'
-            : '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4M10 14h.01"/></svg>');
-
-    el.className = 'trial-banner ' + cls;
-    el.innerHTML = `
-        <span class="trial-banner-icon">${icon}</span>
-        <span class="trial-banner-msg">${msg}</span>
-        <button type="button" class="trial-banner-cta" id="trial-banner-upgrade">
-            ${escapeHtml(t('trial-banner-cta'))}
-        </button>
-    `;
-    el.style.display = 'flex';
-    const upgradeBtn = el.querySelector('#trial-banner-upgrade');
-    if (upgradeBtn) upgradeBtn.addEventListener('click', () => {
-        // 触发升级 modal(如果有)· 或滚到设置页套餐
-        if (typeof window.openUpgradeModal === 'function') {
-            window.openUpgradeModal();
-        } else {
-            location.hash = '#/settings';
-        }
-    });
-}
+// v118.34 · renderTrialBanner 已删除
 
 function applySidebarVisibility() {
-    // v118.8 · 试用临近到期横幅 · 7 天试用 · 剩 3 天提示 · 剩 1 天警示 · 过期红色
-    if (typeof window.renderTrialBanner !== 'function') {
-        window.renderTrialBanner = renderTrialBanner;
-    }
+    // v118.34 · renderTrialBanner 已删除
     // v0.15 · 扁平权限 · 所有用户看到相同的侧栏
     // v118.12 · 全部改用 6 原子函数(isSuperAdmin / isOwner / isEmployee / shouldHideMoney / canManageTeam / canManageApiKey)
     const u = _userInfo;
@@ -11780,21 +11789,7 @@ function applySidebarVisibility() {
     const infoBar = document.getElementById('info-bar');
     if (infoBar) infoBar.style.display = _hideMoney ? 'none' : '';
 
-    // trial-banner(7 天试用倒计时横幅)
-    const trialBanner = document.getElementById('trial-banner');
-    if (trialBanner && _hideMoney) trialBanner.style.display = 'none';
-
-    // plan-banner(v109.3 IIFE 那个 fixed 顶部横幅)
-    const planBanner = document.getElementById('plan-banner');
-    if (planBanner && _hideMoney) {
-        planBanner.style.display = 'none';
-        document.body.classList.remove('has-plan-banner');
-    }
-
-    // 升级按钮(顶栏 / 任何带 data-upgrade-cta 标记的元素)
-    document.querySelectorAll('[data-upgrade-cta], .btn-upgrade, .topbar-upgrade').forEach(el => {
-        el.style.display = _hideMoney ? 'none' : '';
-    });
+    // v118.34 · trial-banner / plan-banner / 升级按钮 已删除
 
     // body class · 让 CSS 可以基于角色做额外样式收尾(比如员工进设置默认 active 不在公司信息)
     document.body.classList.toggle('role-employee', isEmployee(u));
@@ -11903,28 +11898,9 @@ function renderInfoBar() {
             </div>
         `;
     } else {
-        // shared_api · 月付共用 key(默认分支 · trial 也走这条)
-        // v109.4 · 优先 tenant 字段 · 缺失回退 user 字段
-        const used = (user.tenant_used != null) ? user.tenant_used : (user.used_this_month || 0);
-        const total = (user.tenant_quota != null && user.tenant_quota > 0)
-            ? user.tenant_quota
-            : (user.monthly_quota || 0);
-        const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
-        let cls = '';
-        if (pct >= 95) cls = 'danger';
-        else if (pct >= 80) cls = 'warn';
-        if (total > 0) {
-            usageHtml = `
-                <div class="info-chip">
-                    <span class="chip-label">${escapeHtml(t('info-monthly'))}</span>
-                    <span class="chip-value">${used} / ${total}</span>
-                    <div class="mini-bar"><div class="mini-bar-fill ${cls}" style="width:${pct}%"></div></div>
-                </div>
-            `;
-        } else {
-            // 完全无配额信息 · 不显示 chip
-            usageHtml = '';
-        }
+        // v118.34 · shared_api 月付 · 旧 monthly_quota 已删除 · 顶栏不再显配额 chip
+        // 余额/用量改在「套餐 & 用量」tab 显示 · 通过 GET /api/me/credits 拿
+        usageHtml = '';
     }
 
     if (bar) bar.innerHTML = usageHtml;
@@ -11952,11 +11928,7 @@ function _planDisplayLabel(plan) {
     return plan.charAt(0).toUpperCase() + plan.slice(1);
 }
 
-function showUpgradeModal(targetPlan) {
-    // v0.15 · 升级窗已废弃 · 所有用户权限相同
-    // 保留函数签名仅为兼容旧 data-upgrade 引用
-    return;
-}
+// v118.34 · showUpgradeModal 已删除
 
 // 升级窗 DOM 相关事件 · 已废弃 · 防御性检查
 try {
@@ -12791,7 +12763,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                 _userInfo.used_this_month = data.quota.used_this_month;
                 _userInfo.tenant_used = data.quota.used_this_month;
                 renderInfoBar();
-                renderQuotaBanner();
+                // v118.34 · renderQuotaBanner 已删除
             }
 
             renderFileList();
@@ -14261,125 +14233,22 @@ function renderSettings() {
         return;
     }
 
-    // v87 · 用多租户正确字段 tenant_type 判断(之前用的 account_type 是老字段)
-    // v109.4 · 完整支持 trial / free / pro / firm / enterprise · 不再都走「月度订阅+无限」
+    // v118.35 · 按量付费改造后 · 删除订阅类型显示 · 渲染计费方式块
     const tt = u.tenant_type;
-    const userPlan = (u.plan || 'monthly').toLowerCase();
-    const isTrial = userPlan === 'trial';
-    const isFree = userPlan === 'free';
-    const lineVerified = !!(u.line_verified || u.line_user_id);
-
-    let subType, quotaText;
-    if (tt === 'byo_api') {
-        if (u.has_own_gemini_key) {
-            subType = t('sub-type-own-key');       // "自带密钥 · 不限"
-            quotaText = t('usage-unlimited');
-        } else {
-            subType = t('sub-type-need-setup');    // "买断版 · 待配置"
-            quotaText = t('sub-need-api-key');
-        }
-    } else if (isTrial) {
-        // 试用账号
-        subType = t('settings-sub-trial');
-        if (!lineVerified) {
-            // 未绑 LINE · 配额受限
-            quotaText = t('settings-quota-trial-no-line');
-        } else {
-            const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-            const total = (u.tenant_quota != null && u.tenant_quota > 0)
-                ? u.tenant_quota
-                : (u.monthly_quota || 50);
-            quotaText = `${used} / ${total}`;
-        }
-    } else if (isFree) {
-        // 免费版
-        subType = t('settings-sub-free');
-        if (!lineVerified) {
-            quotaText = t('settings-quota-free-no-line');
-        } else {
-            const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-            const total = (u.tenant_quota != null && u.tenant_quota > 0)
-                ? u.tenant_quota
-                : (u.monthly_quota || 10);
-            quotaText = `${used} / ${total}`;
-        }
-    } else if (userPlan === 'pro' || userPlan === 'solo') {
-        subType = t('settings-sub-solo');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'team') {
-        subType = t('settings-sub-team');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'firm') {
-        subType = t('settings-sub-firm');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'enterprise') {
-        subType = t('settings-sub-enterprise');
-        quotaText = t('usage-unlimited');
-    // v118.27.8.1.17 · 补 v111+ 新 plan 名分支(之前漏 · 升级后还显示「月度订阅」)
-    } else if (userPlan === 'monthly') {
-        subType = t('settings-sub-monthly');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'yearly') {
-        subType = t('settings-sub-yearly');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'lifetime') {
-        subType = t('settings-sub-lifetime');
-        quotaText = t('usage-unlimited');
-    } else {
-        // 兜底:月付共用 key(老数据)
-        subType = t('sub-type-monthly');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    }
-
-    // v109.4 · 有效期智能显示:trial 显示「7 天试用 · 还剩 X 天」/ 月付显示具体日期
-    // v118.27.8.1.17 · 改读 plan_expires_at(优先)· lifetime 显示「永久」· 有 plan_days_left 时优先展示「还剩 N 天」
-    let expires;
-    if (isTrial) {
-        const trialDays = u.trial_days_left;
-        if (trialDays !== null && trialDays !== undefined) {
-            const d = Math.max(0, Math.floor(trialDays));
-            expires = d > 0 ? t('settings-trial-days-left', { n: d }) : t('settings-trial-expired');
-        } else if (u.expires_at || u.trial_expires_at) {
-            expires = new Date(u.expires_at || u.trial_expires_at).toLocaleDateString();
-        } else {
-            expires = t('settings-trial-7days');
-        }
-    } else if (userPlan === 'lifetime' || u.plan_days_left === -1) {
-        expires = t('settings-lifetime-forever');
-    } else {
-        // 优先 plan_expires_at · 兼容老 expires_at · 都没就显示「—」
-        const expRaw = u.plan_expires_at || u.expires_at;
-        if (expRaw) {
-            const d = new Date(expRaw);
-            // 同时展示「还剩 N 天」更直观
-            if (typeof u.plan_days_left === 'number' && u.plan_days_left >= 0) {
-                expires = `${d.toLocaleDateString()} · ${t('settings-days-left', { n: u.plan_days_left })}`;
-            } else {
-                expires = d.toLocaleDateString();
-            }
-        } else {
-            expires = t('settings-never');
-        }
-    }
 
     el.innerHTML = `
         <table style="width:100%; font-size:13px; border-collapse: collapse;">
-            <tr><td style="color:#a0aec0; padding:8px 0; width:120px;">${t('settings-username')}</td><td style="padding:8px 0;">${escapeHtml(u.username)}</td></tr>
-            <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-sub-type')}</td><td style="padding:8px 0;"><strong>${escapeHtml(subType)}</strong></td></tr>
-            <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-quota')}</td><td style="padding:8px 0;">${escapeHtml(quotaText)}</td></tr>
-            <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-expires')}</td><td style="padding:8px 0;">${escapeHtml(expires)}</td></tr>
+            <tr>
+                <td style="color:#a0aec0; padding:8px 0; width:120px;">${t('settings-username')}</td>
+                <td style="padding:8px 0;">${escapeHtml(u.username)}</td>
+            </tr>
+            <tr>
+                <td style="color:#a0aec0; padding:8px 0; vertical-align: top;">${t('set-plan-billing-title')}</td>
+                <td style="padding:8px 0;">
+                    <div><strong>${t('set-plan-billing-mode')}</strong></div>
+                    <div style="color:#a0aec0; font-size:12px; margin-top:4px;">${t('set-plan-billing-detail')}</div>
+                </td>
+            </tr>
         </table>
     `;
 
@@ -21508,2949 +21377,7 @@ async function deleteEndpoint(endpointId) {
 // ============================================================
 // v109.3 · 商业模式 · 套餐 + 防薅 + 升级弹窗 + LINE 绑定
 // ============================================================
-(function() {
-    'use strict';
-
-    let _planState = null;
-
-    // ===== i18n 注入 =====
-    const V109_3_I18N = {
-        zh: {
-            'plan-trial': '试用', 'plan-free': '免费版', 'plan-pro': 'Pro', 'plan-firm': 'Firm', 'plan-enterprise': '企业版',
-            'banner-trial-left': '试用还剩 {n} 天 · {used}/{limit} 张',
-            'banner-trial-last': '试用今天到期 · 立即升级保留数据',
-            'banner-trial-expiring': '试用还剩 {n} 天 · 立即升级保留数据',
-            'banner-trial-needs-line': '试用 · 绑定 LINE 解锁完整 50 张',
-            'banner-free': '免费版 · 本月 {used}/{limit} 张',
-            'banner-free-needs-line': '免费版 · 绑定 LINE 解锁 10 张/月',
-            'banner-pro': 'Pro · 还剩 {n} 天 · {used}/{limit} 张',
-            'banner-firm': 'Firm · 还剩 {n} 天',
-            'banner-monthly': '月付 · 还剩 {n} 天 · {used}/{limit} 张',
-            'banner-yearly':  '年付 · 还剩 {n} 天 · {used}/{limit} 张',
-            'btn-renew': '续费',
-            'banner-locked': '账号已封停: {reason}',
-            'btn-upgrade': '升级',
-            'btn-link-line': '绑定 LINE',
-            // 升级弹窗
-            'upg-title': '升级套餐',
-            'upg-sub': '选择适合您的套餐 · 立即解锁全部功能',
-            'upg-pro-tagline': '个人会计 / 小事务所',
-            'upg-firm-tagline': '专业事务所 · 多用户协作',
-            'upg-recommended': '推荐',
-            'upg-monthly': '/月',
-            'upg-feat-ocr': 'OCR · {n} 张/月',
-            'upg-feat-ocr-unlim': 'OCR · 无限',
-            'upg-feat-clients': '客户 · {n} 个',
-            'upg-feat-clients-unlim': '客户 · 无限',
-            'upg-feat-seats': '用户席位 · {n}',
-            'upg-feat-automation': '自动化(邮件/文件夹/ERP)',
-            'upg-feat-templates': '高级模板(ภ.พ.30 等)',
-            'upg-feat-batch': '批量导出',
-            'upg-feat-line': 'LINE Bot 集成',
-            'upg-pick-pro': '选择 Pro',
-            'upg-pick-firm': '选择 Firm',
-            // 付款
-            'pay-title': '付款 · {plan}',
-            'pay-amount': '请转账 ฿{n}',
-            'pay-step1': '步骤 1 · 转账',
-            'pay-bank-row': 'Kasikorn Bank · 011-1-83212-9',
-            'pay-promptpay-row': 'PromptPay · +66 85-064-2609',
-            'pay-step2': '步骤 2 · 上传截图',
-            'pay-pick-file': '选择截图',
-            'pay-payer-name': '您的姓名(可选)',
-            'pay-payer-note': '备注(可选)',
-            'pay-submit': '提交审核',
-            'pay-submitting': '提交中...',
-            'pay-back': '返回',
-            'pay-line-contact': '或联系 LINE: @Pearnly',
-            'pay-success': '已提交 · 5-10 分钟内审核完毕 · 我们会通过 LINE 通知您',
-            'pay-fail': '提交失败',
-            'pay-need-screenshot': '请上传付款截图',
-            // v111.2 · 新 3 档套餐 + 终身 Gemini key
-            'upg-plan-trial':     '试用',
-            'upg-plan-trial-desc':    '100 张/月 · 7 天 · 3 客户 · ฿0',
-            'upg-plan-monthly-desc':  '500 张/月 · 30 天 · 10 客户 · ฿299',
-            'upg-plan-yearly-desc':   '1500 张/月 · 365 天 · 30 客户 · ฿2,990',
-            'upg-plan-lifetime-desc': '无限 · 永久 · 自带 Gemini Key · ฿9,900',
-            'upg-plan-monthly':   '月付',
-            'upg-plan-yearly':    '年付',
-            'upg-plan-lifetime':  '终身买断',
-            'upg-monthly-tag':    '入门 · 个人会计',
-            'upg-yearly-tag':     '省 {pct}% · 中小事务所',
-            'upg-lifetime-tag':   '一次买断 · 自带 Gemini Key · 无限',
-            'upg-lifetime-badge': '永久',
-            'upg-per-month':      '/月',
-            'upg-per-year':       '/年',
-            'upg-once':           '一次',
-            'upg-pick':           '选择',
-            'upg-feat-files':     '一次最多 {n} 文件',
-            'upg-feat-own-key':   '自带 Gemini API Key',
-            'pay-acct-no':        '账号',
-            'pay-copied':         '已复制',
-            'pay-step3-key':      '步骤 3 · 填写 Gemini API Key',
-            'pay-key-hint':       '终身用户需自带 Gemini Key · 在这里申请(免费):',
-            'pay-need-gemini-key': '请填写有效的 Gemini API Key(以 AIza 开头)',
-            'plan-changed-toast': '套餐已更新 · 配额已同步',
-            'adm-slip-not-found': '截图不存在或已被删除',
-            'adm-drawer-sec-actions': '快速操作',
-            'adm-drawer-btn-upgrade': '修改套餐',
-            'adm-drawer-btn-ban': '封禁账号',
-            'adm-drawer-btn-unban': '解除封禁',
-            'adm-confirm-ban': '确认封禁 {e}?该用户将无法登录',
-            'adm-banned': '已封禁',
-            'adm-unbanned': '已解封',
-            'scanner-editor-title':   '编辑',
-            'scanner-editor-confirm': '完成',
-            'scanner-filter-original':'原图',
-            'scanner-filter-enhance': '增强',
-            'scanner-filter-bw':      '黑白',
-            'scanner-filter-gray':    '灰度',
-            'scanner-brightness':     '亮度',
-            'scanner-contrast':       '对比',
-            'scanner-readjust':       '调整边框',
-            'scanner-quad-title':     '调整四角',
-            'scanner-quad-cancel':    '取消',
-            'scanner-quad-confirm':   '确定',
-            'scanner-quad-hint':      '拖动 4 个角点 · 框选纸张范围',
-            'scanner-filter-smart':   '智能高清',
-            'scanner-retake':         '重拍这张',
-            'scanner-rotate-left':    '左转',
-            'scanner-rotate-right':   '右转',
-            'scanner-crop':           '裁剪',
-            'scanner-flash':          '闪光灯',
-            'scanner-flash-unavailable':'此摄像头不支持闪光灯',
-            'scanner-album':          '从相册选',
-            // LINE 绑定
-            'line-modal-title': '绑定 LINE 解锁完整功能',
-            'line-modal-sub': '绑定后立即解锁:',
-            'line-benefit-1': '完整 50 张 OCR(试用)/ 10 张/月(免费版)',
-            'line-benefit-2': '3 个客户(试用)',
-            'line-benefit-3': '每周 LINE 接收使用周报',
-            'line-benefit-4': '到期前自动 LINE 提醒',
-            'line-link-btn': '点击绑定 LINE',
-            'line-link-success': '绑定成功 · 配额已解锁',
-            // v109.4 · LINE OAuth 即将上线
-            'line-coming-title': 'LINE 绑定功能即将上线',
-            'line-coming-desc': '我们正在接入 LINE 官方授权 · 不久即可一键安全绑定 · 急需开通可联系我们',
-            'line-coming-close': '我知道了',
-            'line-link-fail': '绑定失败 · 请重试',
-            'line-already-linked': '此 LINE 已绑定其他账号',
-            // toast
-            'toast-rate-limit': '操作过于频繁 · 请稍后再试',
-            'toast-quota-exceeded': '本期配额已用完',
-            'toast-needs-line': '请先绑定 LINE 解锁配额',
-            'modal-close': '关闭',
-        },
-        en: {
-            'plan-trial': 'Trial', 'plan-free': 'Free', 'plan-pro': 'Pro', 'plan-firm': 'Firm', 'plan-enterprise': 'Enterprise',
-            'banner-trial-left': '{n} days left · {used}/{limit} used',
-            'banner-trial-last': 'Trial expires today · upgrade to keep data',
-            'banner-trial-expiring': '{n} days left · upgrade to keep your data',
-            'banner-trial-needs-line': 'Trial · link LINE to unlock 50 OCRs',
-            'banner-free': 'Free · {used}/{limit} used this month',
-            'banner-free-needs-line': 'Free · link LINE to unlock 10 OCRs/month',
-            'banner-pro': 'Pro · {n} days left · {used}/{limit}',
-            'banner-firm': 'Firm · {n} days left',
-            'banner-monthly': 'Monthly · {n} days left · {used}/{limit}',
-            'banner-yearly':  'Yearly · {n} days left · {used}/{limit}',
-            'btn-renew': 'Renew',
-            'banner-locked': 'Account banned: {reason}',
-            'btn-upgrade': 'Upgrade', 'btn-link-line': 'Link LINE',
-            'upg-title': 'Upgrade Plan',
-            'upg-sub': 'Pick the right plan · unlock all features instantly',
-            'upg-pro-tagline': 'Solo accountants / small firms',
-            'upg-firm-tagline': 'Pro firms · multi-user',
-            'upg-recommended': 'Recommended',
-            'upg-monthly': '/mo',
-            'upg-feat-ocr': 'OCR · {n}/month',
-            'upg-feat-ocr-unlim': 'OCR · Unlimited',
-            'upg-feat-clients': '{n} clients',
-            'upg-feat-clients-unlim': 'Unlimited clients',
-            'upg-feat-seats': '{n} user seat(s)',
-            'upg-feat-automation': 'Automation (Email/Folder/ERP)',
-            'upg-feat-templates': 'Advanced templates (P.P.30 etc.)',
-            'upg-feat-batch': 'Batch export',
-            'upg-feat-line': 'LINE Bot integration',
-            'upg-pick-pro': 'Choose Pro',
-            'upg-pick-firm': 'Choose Firm',
-            'pay-title': 'Payment · {plan}',
-            'pay-amount': 'Transfer ฿{n}',
-            'pay-step1': 'Step 1 · Transfer',
-            'pay-bank-row': 'Kasikorn Bank · 011-1-83212-9',
-            'pay-promptpay-row': 'PromptPay · +66 85-064-2609',
-            'pay-step2': 'Step 2 · Upload screenshot',
-            'pay-pick-file': 'Pick file',
-            'pay-payer-name': 'Your name (optional)',
-            'pay-payer-note': 'Note (optional)',
-            'pay-submit': 'Submit for review',
-            'pay-submitting': 'Submitting...',
-            'pay-back': 'Back',
-            'pay-line-contact': 'Or contact LINE: @Pearnly',
-            'pay-success': 'Submitted · review in 5-10 min · we will notify via LINE',
-            'pay-fail': 'Submit failed',
-            'pay-need-screenshot': 'Please upload screenshot',
-            // v111.2 · new 3-tier
-            'upg-plan-trial':     'Trial',
-            'upg-plan-trial-desc':    '100/mo · 7 days · 3 clients · ฿0',
-            'upg-plan-monthly-desc':  '500/mo · 30 days · 10 clients · ฿299',
-            'upg-plan-yearly-desc':   '1500/mo · 365 days · 30 clients · ฿2,990',
-            'upg-plan-lifetime-desc': 'Unlimited · Forever · Own Gemini Key · ฿9,900',
-            'upg-plan-monthly':   'Monthly',
-            'upg-plan-yearly':    'Yearly',
-            'upg-plan-lifetime':  'Lifetime',
-            'upg-monthly-tag':    'Starter · Solo accountants',
-            'upg-yearly-tag':     'Save {pct}% · SME firms',
-            'upg-lifetime-tag':   'Pay once · Bring your own Gemini Key · Unlimited',
-            'upg-lifetime-badge': 'Forever',
-            'upg-per-month':      '/mo',
-            'upg-per-year':       '/yr',
-            'upg-once':           'one-time',
-            'upg-pick':           'Choose',
-            'upg-feat-files':     'Up to {n} files per upload',
-            'upg-feat-own-key':   'Bring your own Gemini API Key',
-            'pay-acct-no':        'Account #',
-            'pay-copied':         'Copied',
-            'pay-step3-key':      'Step 3 · Enter Gemini API Key',
-            'pay-key-hint':       'Lifetime users bring their own Gemini key · Get one free at:',
-            'pay-need-gemini-key': 'Please enter a valid Gemini API Key (starts with AIza)',
-            'plan-changed-toast': 'Plan updated · quota synced',
-            'adm-slip-not-found': 'Screenshot not found',
-            'adm-drawer-sec-actions': 'Quick Actions',
-            'adm-drawer-btn-upgrade': 'Change Plan',
-            'adm-drawer-btn-ban': 'Ban Account',
-            'adm-drawer-btn-unban': 'Unban',
-            'adm-confirm-ban': 'Ban {e}? This user can no longer log in.',
-            'adm-banned': 'Account banned',
-            'adm-unbanned': 'Account unbanned',
-            'scanner-editor-title':   'Edit',
-            'scanner-editor-confirm': 'Done',
-            'scanner-filter-original':'Original',
-            'scanner-filter-enhance': 'Enhance',
-            'scanner-filter-bw':      'B & W',
-            'scanner-filter-gray':    'Gray',
-            'scanner-brightness':     'Brightness',
-            'scanner-contrast':       'Contrast',
-            'scanner-readjust':       'Adjust corners',
-            'scanner-quad-title':     'Adjust 4 corners',
-            'scanner-quad-cancel':    'Cancel',
-            'scanner-quad-confirm':   'OK',
-            'scanner-quad-hint':      'Drag 4 corners · select paper area',
-            'scanner-filter-smart':   'Smart HD',
-            'scanner-retake':         'Retake',
-            'scanner-rotate-left':    'Rotate L',
-            'scanner-rotate-right':   'Rotate R',
-            'scanner-crop':           'Crop',
-            'scanner-flash':          'Flash',
-            'scanner-flash-unavailable':'Flash not supported on this camera',
-            'scanner-album':          'From album',
-            'line-modal-title': 'Link LINE to unlock full features',
-            'line-modal-sub': 'After linking you will get:',
-            'line-benefit-1': 'Full 50 OCRs (trial) / 10 OCRs/mo (free)',
-            'line-benefit-2': '3 clients (trial)',
-            'line-benefit-3': 'Weekly usage report via LINE',
-            'line-benefit-4': 'Auto reminder before plan expires',
-            'line-link-btn': 'Click to link LINE',
-            'line-link-success': 'Linked · quota unlocked',
-            // v109.4 · LINE OAuth coming soon
-            'line-coming-title': 'LINE Binding · Coming Soon',
-            'line-coming-desc': 'We\'re integrating LINE official login · secure one-tap binding will be available shortly · Contact us for early access',
-            'line-coming-close': 'Got it',
-            'line-link-fail': 'Link failed · please retry',
-            'line-already-linked': 'This LINE is linked to another account',
-            'toast-rate-limit': 'Too many requests · try later',
-            'toast-quota-exceeded': 'Quota exceeded',
-            'toast-needs-line': 'Please link LINE first',
-            'modal-close': 'Close',
-        },
-        th: {
-            'plan-trial': 'ทดลอง', 'plan-free': 'ฟรี', 'plan-pro': 'Pro', 'plan-firm': 'Firm', 'plan-enterprise': 'Enterprise',
-            'banner-trial-left': 'ทดลองเหลือ {n} วัน · ใช้ {used}/{limit}',
-            'banner-trial-last': 'ทดลองหมดวันนี้ · อัปเกรดเพื่อเก็บข้อมูล',
-            'banner-trial-expiring': 'เหลือ {n} วัน · อัปเกรดเพื่อเก็บข้อมูล',
-            'banner-trial-needs-line': 'ทดลอง · ผูก LINE เพื่อปลดล็อก 50 ใบ',
-            'banner-free': 'ฟรี · ใช้ {used}/{limit} เดือนนี้',
-            'banner-free-needs-line': 'ฟรี · ผูก LINE เพื่อปลดล็อก 10 ใบ/เดือน',
-            'banner-pro': 'Pro · เหลือ {n} วัน · {used}/{limit}',
-            'banner-firm': 'Firm · เหลือ {n} วัน',
-            'banner-monthly': 'รายเดือน · เหลือ {n} วัน · {used}/{limit}',
-            'banner-yearly':  'รายปี · เหลือ {n} วัน · {used}/{limit}',
-            'btn-renew': 'ต่ออายุ',
-            'banner-locked': 'บัญชีถูกระงับ: {reason}',
-            'btn-upgrade': 'อัปเกรด', 'btn-link-line': 'ผูก LINE',
-            'upg-title': 'อัปเกรดแพ็กเกจ',
-            'upg-sub': 'เลือกแพ็กเกจที่เหมาะ · ปลดล็อกฟีเจอร์ทันที',
-            'upg-pro-tagline': 'นักบัญชี / สำนักงานเล็ก',
-            'upg-firm-tagline': 'สำนักงานบัญชีมืออาชีพ',
-            'upg-recommended': 'แนะนำ',
-            'upg-monthly': '/เดือน',
-            'upg-feat-ocr': 'OCR · {n} ใบ/เดือน',
-            'upg-feat-ocr-unlim': 'OCR · ไม่จำกัด',
-            'upg-feat-clients': 'ลูกค้า · {n}',
-            'upg-feat-clients-unlim': 'ลูกค้า · ไม่จำกัด',
-            'upg-feat-seats': 'ผู้ใช้ · {n} คน',
-            'upg-feat-automation': 'อัตโนมัติ (อีเมล/โฟลเดอร์/ERP)',
-            'upg-feat-templates': 'แม่แบบขั้นสูง (ภ.พ.30 ฯลฯ)',
-            'upg-feat-batch': 'ส่งออกหลายรายการ',
-            'upg-feat-line': 'เชื่อมต่อ LINE Bot',
-            'upg-pick-pro': 'เลือก Pro',
-            'upg-pick-firm': 'เลือก Firm',
-            'pay-title': 'ชำระเงิน · {plan}',
-            'pay-amount': 'โอน ฿{n}',
-            'pay-step1': 'ขั้นที่ 1 · โอนเงิน',
-            'pay-bank-row': 'ธนาคารกสิกรไทย · 011-1-83212-9',
-            'pay-promptpay-row': 'PromptPay · +66 85-064-2609',
-            'pay-step2': 'ขั้นที่ 2 · อัปโหลดสลิป',
-            'pay-pick-file': 'เลือกไฟล์',
-            'pay-payer-name': 'ชื่อผู้โอน (ไม่บังคับ)',
-            'pay-payer-note': 'หมายเหตุ (ไม่บังคับ)',
-            'pay-submit': 'ส่งตรวจสอบ',
-            'pay-submitting': 'กำลังส่ง...',
-            'pay-back': 'ย้อนกลับ',
-            'pay-line-contact': 'หรือติดต่อ LINE: @Pearnly',
-            'pay-success': 'ส่งแล้ว · ตรวจสอบ 5-10 นาที · จะแจ้งทาง LINE',
-            'pay-fail': 'ส่งไม่สำเร็จ',
-            'pay-need-screenshot': 'กรุณาอัปโหลดสลิป',
-            // v111.2 · 3 แพ็คเกจ
-            'upg-plan-trial':     'ทดลอง',
-            'upg-plan-trial-desc':    '100/เดือน · 7 วัน · 3 ลูกค้า · ฿0',
-            'upg-plan-monthly-desc':  '500/เดือน · 30 วัน · 10 ลูกค้า · ฿299',
-            'upg-plan-yearly-desc':   '1500/เดือน · 365 วัน · 30 ลูกค้า · ฿2,990',
-            'upg-plan-lifetime-desc': 'ไม่จำกัด · ตลอดชีพ · Gemini Key ของตนเอง · ฿9,900',
-            'upg-plan-monthly':   'รายเดือน',
-            'upg-plan-yearly':    'รายปี',
-            'upg-plan-lifetime':  'ตลอดชีพ',
-            'upg-monthly-tag':    'เริ่มต้น · นักบัญชีอิสระ',
-            'upg-yearly-tag':     'ประหยัด {pct}% · สำนักงานบัญชีขนาดกลาง',
-            'upg-lifetime-tag':   'จ่ายครั้งเดียว · ใช้ Gemini Key ของคุณเอง · ไม่จำกัด',
-            'upg-lifetime-badge': 'ตลอดไป',
-            'upg-per-month':      '/เดือน',
-            'upg-per-year':       '/ปี',
-            'upg-once':           'จ่ายครั้งเดียว',
-            'upg-pick':           'เลือก',
-            'upg-feat-files':     'อัปโหลดสูงสุด {n} ไฟล์ต่อครั้ง',
-            'upg-feat-own-key':   'ใช้ Gemini API Key ของคุณเอง',
-            'pay-acct-no':        'เลขที่บัญชี',
-            'pay-copied':         'คัดลอกแล้ว',
-            'pay-step3-key':      'ขั้นที่ 3 · กรอก Gemini API Key',
-            'pay-key-hint':       'ผู้ใช้ตลอดชีพต้องใช้ Gemini Key ของตัวเอง · ขอฟรีได้ที่:',
-            'pay-need-gemini-key': 'กรุณากรอก Gemini API Key (ขึ้นต้นด้วย AIza)',
-            'plan-changed-toast': 'อัปเดตแพ็คเกจแล้ว · โควต้าซิงค์แล้ว',
-            'adm-slip-not-found': 'ไม่พบสลิป',
-            'adm-drawer-sec-actions': 'การดำเนินการด่วน',
-            'adm-drawer-btn-upgrade': 'เปลี่ยนแพ็คเกจ',
-            'adm-drawer-btn-ban': 'แบนบัญชี',
-            'adm-drawer-btn-unban': 'ปลดแบน',
-            'adm-confirm-ban': 'ยืนยันแบน {e}?',
-            'adm-banned': 'แบนแล้ว',
-            'adm-unbanned': 'ปลดแบนแล้ว',
-            'scanner-editor-title':   'แก้ไข',
-            'scanner-editor-confirm': 'เสร็จ',
-            'scanner-filter-original':'ต้นฉบับ',
-            'scanner-filter-enhance': 'ปรับแต่ง',
-            'scanner-filter-bw':      'ขาว-ดำ',
-            'scanner-filter-gray':    'เทา',
-            'scanner-brightness':     'ความสว่าง',
-            'scanner-contrast':       'ความคมชัด',
-            'scanner-readjust':       'ปรับขอบ',
-            'scanner-quad-title':     'ปรับ 4 มุม',
-            'scanner-quad-cancel':    'ยกเลิก',
-            'scanner-quad-confirm':   'ตกลง',
-            'scanner-quad-hint':      'ลาก 4 มุม · เลือกพื้นที่กระดาษ',
-            'scanner-filter-smart':   'HD อัจฉริยะ',
-            'scanner-retake':         'ถ่ายใหม่',
-            'scanner-rotate-left':    'หมุนซ้าย',
-            'scanner-rotate-right':   'หมุนขวา',
-            'scanner-crop':           'ตัด',
-            'scanner-flash':          'แฟลช',
-            'scanner-flash-unavailable':'กล้องนี้ไม่รองรับแฟลช',
-            'scanner-album':          'จากอัลบั้ม',
-            'line-modal-title': 'ผูก LINE เพื่อปลดล็อกฟีเจอร์เต็ม',
-            'line-modal-sub': 'หลังจากผูกคุณจะได้รับ:',
-            'line-benefit-1': 'OCR เต็ม 50 ใบ (ทดลอง) / 10 ใบ/เดือน (ฟรี)',
-            'line-benefit-2': 'ลูกค้า 3 ราย (ทดลอง)',
-            'line-benefit-3': 'รายงานสัปดาห์ทาง LINE',
-            'line-benefit-4': 'แจ้งเตือนก่อนหมดอายุ',
-            'line-link-btn': 'คลิกผูก LINE',
-            'line-link-success': 'ผูกสำเร็จ · ปลดล็อกแล้ว',
-            // v109.4 · LINE OAuth เร็วๆ นี้
-            'line-coming-title': 'การเชื่อม LINE · เร็วๆ นี้',
-            'line-coming-desc': 'เรากำลังเชื่อมต่อ LINE Official Login · จะสามารถผูกบัญชีได้อย่างปลอดภัยในไม่ช้า · ต้องการเปิดด่วนติดต่อเราได้',
-            'line-coming-close': 'เข้าใจแล้ว',
-            'line-link-fail': 'ผูกไม่สำเร็จ · ลองใหม่',
-            'line-already-linked': 'LINE นี้ถูกผูกกับบัญชีอื่นแล้ว',
-            'toast-rate-limit': 'คำขอบ่อยเกินไป · ลองใหม่ทีหลัง',
-            'toast-quota-exceeded': 'โควตาหมดแล้ว',
-            'toast-needs-line': 'กรุณาผูก LINE ก่อน',
-            'modal-close': 'ปิด',
-        },
-        ja: {
-            'plan-trial': '試用', 'plan-free': 'Free', 'plan-pro': 'Pro', 'plan-firm': 'Firm', 'plan-enterprise': 'Enterprise',
-            'banner-trial-left': '試用残り {n} 日 · {used}/{limit}',
-            'banner-trial-last': '本日試用終了 · データ保持のためアップグレード',
-            'banner-trial-expiring': '残り {n} 日 · データ保持のためアップグレード',
-            'banner-trial-needs-line': '試用 · LINE 連携で 50 枚解放',
-            'banner-free': 'Free · 今月 {used}/{limit}',
-            'banner-free-needs-line': 'Free · LINE 連携で 10 枚/月解放',
-            'banner-pro': 'Pro · 残り {n} 日 · {used}/{limit}',
-            'banner-firm': 'Firm · 残り {n} 日',
-            'banner-monthly': '月払い · あと {n} 日 · {used}/{limit}',
-            'banner-yearly':  '年払い · あと {n} 日 · {used}/{limit}',
-            'btn-renew': '更新',
-            'banner-locked': 'アカウント停止: {reason}',
-            'btn-upgrade': 'アップグレード', 'btn-link-line': 'LINE 連携',
-            'upg-title': 'プランアップグレード',
-            'upg-sub': '最適なプランを選択 · 全機能を即解放',
-            'upg-pro-tagline': '個人会計 / 小規模事務所',
-            'upg-firm-tagline': 'プロ事務所 · マルチユーザー',
-            'upg-recommended': '推奨',
-            'upg-monthly': '/月',
-            'upg-feat-ocr': 'OCR · {n} 枚/月',
-            'upg-feat-ocr-unlim': 'OCR · 無制限',
-            'upg-feat-clients': '顧客 · {n}',
-            'upg-feat-clients-unlim': '顧客 · 無制限',
-            'upg-feat-seats': 'ユーザー席 · {n}',
-            'upg-feat-automation': '自動化(メール/フォルダ/ERP)',
-            'upg-feat-templates': '高度テンプレート(ภ.พ.30 等)',
-            'upg-feat-batch': '一括エクスポート',
-            'upg-feat-line': 'LINE Bot 連携',
-            'upg-pick-pro': 'Pro を選択',
-            'upg-pick-firm': 'Firm を選択',
-            'pay-title': '支払い · {plan}',
-            'pay-amount': '฿{n} を振込',
-            'pay-step1': 'ステップ 1 · 振込',
-            'pay-bank-row': 'カシコン銀行 · 011-1-83212-9',
-            'pay-promptpay-row': 'PromptPay · +66 85-064-2609',
-            'pay-step2': 'ステップ 2 · スクショアップロード',
-            'pay-pick-file': 'ファイル選択',
-            'pay-payer-name': 'お名前(任意)',
-            'pay-payer-note': '備考(任意)',
-            'pay-submit': '審査依頼',
-            'pay-submitting': '送信中...',
-            'pay-back': '戻る',
-            'pay-line-contact': 'または LINE: @Pearnly',
-            'pay-success': '送信完了 · 5-10 分で審査 · LINE で通知',
-            'pay-fail': '送信失敗',
-            'pay-need-screenshot': 'スクショをアップロードしてください',
-            // v111.2 · 新 3 プラン
-            'upg-plan-trial':     '試用',
-            'upg-plan-trial-desc':    '100 枚/月 · 7 日 · 3 顧客 · ฿0',
-            'upg-plan-monthly-desc':  '500 枚/月 · 30 日 · 10 顧客 · ฿299',
-            'upg-plan-yearly-desc':   '1500 枚/月 · 365 日 · 30 顧客 · ฿2,990',
-            'upg-plan-lifetime-desc': '無制限 · 永久 · Gemini Key 持参 · ฿9,900',
-            'upg-plan-monthly':   '月払い',
-            'upg-plan-yearly':    '年払い',
-            'upg-plan-lifetime':  '買い切り',
-            'upg-monthly-tag':    'スターター · 個人会計士',
-            'upg-yearly-tag':     '{pct}% お得 · 中小事務所',
-            'upg-lifetime-tag':   '一度払い · 自分の Gemini Key 使用 · 無制限',
-            'upg-lifetime-badge': '永久',
-            'upg-per-month':      '/月',
-            'upg-per-year':       '/年',
-            'upg-once':           '一度',
-            'upg-pick':           '選択',
-            'upg-feat-files':     '一度に最大 {n} ファイル',
-            'upg-feat-own-key':   '自分の Gemini API Key を使用',
-            'pay-acct-no':        '口座番号',
-            'pay-copied':         'コピー完了',
-            'pay-step3-key':      'ステップ 3 · Gemini API Key を入力',
-            'pay-key-hint':       '買い切り利用者は自分の Gemini Key を使用 · 無料申請:',
-            'pay-need-gemini-key': '有効な Gemini API Key を入力してください(AIza で始まる)',
-            'plan-changed-toast': 'プランを更新しました · クォータ同期完了',
-            'adm-slip-not-found': 'スクショが見つかりません',
-            'adm-drawer-sec-actions': 'クイックアクション',
-            'adm-drawer-btn-upgrade': 'プラン変更',
-            'adm-drawer-btn-ban': 'アカウント停止',
-            'adm-drawer-btn-unban': '停止解除',
-            'adm-confirm-ban': '{e} を停止?',
-            'adm-banned': '停止しました',
-            'adm-unbanned': '解除しました',
-            'scanner-editor-title':   '編集',
-            'scanner-editor-confirm': '完了',
-            'scanner-filter-original':'オリジナル',
-            'scanner-filter-enhance': '強調',
-            'scanner-filter-bw':      '白黒',
-            'scanner-filter-gray':    'グレー',
-            'scanner-brightness':     '明るさ',
-            'scanner-contrast':       'コントラスト',
-            'scanner-readjust':       '枠調整',
-            'scanner-quad-title':     '4 角を調整',
-            'scanner-quad-cancel':    'キャンセル',
-            'scanner-quad-confirm':   'OK',
-            'scanner-quad-hint':      '4 角をドラッグ · 紙の範囲を選択',
-            'scanner-filter-smart':   'スマート HD',
-            'scanner-retake':         '撮り直す',
-            'scanner-rotate-left':    '左回転',
-            'scanner-rotate-right':   '右回転',
-            'scanner-crop':           'トリミング',
-            'scanner-flash':          'フラッシュ',
-            'scanner-flash-unavailable':'このカメラはフラッシュ非対応',
-            'scanner-album':          'アルバムから',
-            'line-modal-title': 'LINE 連携で全機能解放',
-            'line-modal-sub': '連携後すぐに:',
-            'line-benefit-1': 'OCR 完全 50 枚(試用)/ 10 枚/月(Free)',
-            'line-benefit-2': '顧客 3 件(試用)',
-            'line-benefit-3': '週次レポートを LINE で受信',
-            'line-benefit-4': '期限前に自動 LINE 通知',
-            'line-link-btn': 'クリックして LINE 連携',
-            'line-link-success': '連携成功 · クォータ解放',
-            // v109.4 · LINE OAuth 近日公開
-            'line-coming-title': 'LINE 連携機能 · 近日公開',
-            'line-coming-desc': 'LINE 公式ログインを統合中 · まもなく安全なワンタップ連携が利用可能 · 至急ご利用の場合はお問い合わせください',
-            'line-coming-close': '了解',
-            'line-link-fail': '連携失敗 · 再試行',
-            'line-already-linked': 'この LINE は他アカウントに連携済',
-            'toast-rate-limit': 'リクエスト過多 · しばらくしてから再試行',
-            'toast-quota-exceeded': 'クォータ超過',
-            'toast-needs-line': 'まず LINE を連携してください',
-            'modal-close': '閉じる',
-        },
-    };
-    Object.keys(V109_3_I18N).forEach(lang => {
-        if (!I18N[lang]) I18N[lang] = {};
-        Object.assign(I18N[lang], V109_3_I18N[lang]);
-    });
-
-    function tt(key, params) {
-        let s = (I18N[currentLang] && I18N[currentLang][key]) || key;
-        if (params) Object.keys(params).forEach(p => {
-            s = s.replace(new RegExp('\\{' + p + '\\}', 'g'), params[p]);
-        });
-        return s;
-    }
-    function esc(s) {
-        if (s === null || s === undefined) return '';
-        return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-    }
-
-    // ============================================================
-    // 拉当前套餐
-    // ============================================================
-    async function loadPlan() {
-        try {
-            const tok = localStorage.getItem('mrpilot_token');
-            if (!tok) return null;
-            const r = await fetch('/api/me/plan', { headers: { 'Authorization': 'Bearer ' + tok } });
-            if (!r.ok) return null;
-            const newState = await r.json();
-            // v111.3 · 如果 plan 档变了(管理员后台改套餐) · 全 UI 刷新
-            const oldPlan = _planState && _planState.plan;
-            const oldLimit = _planState && _planState.usage && _planState.usage.ocr_limit;
-            _planState = newState;
-            window._planState = _planState;
-            renderTrialBanner();
-            const newPlan = newState.plan;
-            const newLimit = newState.usage && newState.usage.ocr_limit;
-            if (oldPlan && (oldPlan !== newPlan || oldLimit !== newLimit)) {
-                console.log('[v111.3] plan changed:', oldPlan, '→', newPlan);
-                // 同步刷新顶部 / 上传提示 / 侧栏可见性
-                try {
-                    const u = await apiGet('/api/me');
-                    const q = await apiGet('/api/ocr/quota');
-                    if (u) _userInfo = u;
-                    if (q) _quota = q;
-                    renderInfoBar();
-                    renderQuotaBanner();
-                    applySidebarVisibility();
-                    updateUploadHint();
-                    updateStartButton();
-                    showToast(tt('plan-changed-toast'), 'info');
-                } catch (e) { console.error('plan sync refresh failed', e); }
-            }
-            return _planState;
-        } catch (e) { console.error('loadPlan', e); return null; }
-    }
-    window.reloadPlan = loadPlan;
-    // v111.3 · 让 setLang 能调到这个闭包内的函数
-    window.renderTrialBanner = function() { renderTrialBanner(); };
-
-    // ============================================================
-    // Trial Banner
-    // ============================================================
-    function ensureBanner() {
-        if (document.getElementById('plan-banner')) return;
-        const el = document.createElement('div');
-        el.id = 'plan-banner';
-        el.className = 'plan-banner';
-        el.style.display = 'none';
-        // v109.4 · 改成 appendChild · banner 是 fixed 不影响布局位置 · 但避免插入 body.firstChild 抢占 topbar
-        document.body.appendChild(el);
-    }
-
-    function renderTrialBanner() {
-        ensureBanner();
-        const banner = document.getElementById('plan-banner');
-        const hideBanner = () => {
-            banner.style.display = 'none';
-            document.body.classList.remove('has-plan-banner');
-        };
-        const showBanner = () => {
-            banner.style.display = '';
-            document.body.classList.add('has-plan-banner');
-        };
-        if (!_planState) { hideBanner(); return; }
-        // v111.3 · super_admin 不显示 banner
-        if (_userInfo && _userInfo.is_super_admin) { hideBanner(); return; }
-        // v118.12 · 员工不显示任何套餐 banner(钱相关)
-        if (typeof shouldHideMoney === 'function' && shouldHideMoney(_userInfo)) { hideBanner(); return; }
-
-        const { plan, usage, trial_days_left, plan_days_left } = _planState;
-        let html = '', level = 'info';
-
-        if (plan === 'admin') {
-            hideBanner(); return;
-        } else if (plan === 'trial') {
-            const days = (trial_days_left === null || trial_days_left === undefined) ? null : Math.max(0, Math.floor(trial_days_left));
-            if (days === null) {
-                hideBanner(); return;
-            } else if (days <= 0) {
-                html = `<span>${esc(tt('banner-trial-last'))}</span>`;
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-upgrade'))}</button>`;
-                level = 'danger';
-            } else if (days <= 2) {
-                html = `<span>${esc(tt('banner-trial-expiring', {n: days}))}</span>`;
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-upgrade'))}</button>`;
-                level = 'warn';
-            } else {
-                html = `<span>${esc(tt('banner-trial-left', {n: days, used: usage.ocr_used, limit: usage.ocr_limit}))}</span>`;
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-upgrade'))}</button>`;
-                level = 'info';
-            }
-        } else if (plan === 'monthly') {
-            const d = Math.max(0, plan_days_left || 0);
-            html = `<span>${esc(tt('banner-monthly', {n: d, used: usage.ocr_used, limit: usage.ocr_limit}))}</span>`;
-            // 7 天内到期 · 黄色提醒
-            if (d <= 7 && d > 0) {
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-renew'))}</button>`;
-                level = 'warn';
-            } else {
-                level = 'success';
-            }
-        } else if (plan === 'yearly') {
-            const d = Math.max(0, plan_days_left || 0);
-            html = `<span>${esc(tt('banner-yearly', {n: d, used: usage.ocr_used, limit: usage.ocr_limit}))}</span>`;
-            if (d <= 30 && d > 0) {
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-renew'))}</button>`;
-                level = 'warn';
-            } else {
-                level = 'success';
-            }
-        } else if (plan === 'lifetime') {
-            // 永久 · 不显示 banner
-            hideBanner(); return;
-        } else {
-            hideBanner(); return;
-        }
-        banner.className = 'plan-banner plan-banner-' + level;
-        banner.innerHTML = html;
-        showBanner();
-    }
-
-    // ============================================================
-    // 升级弹窗
-    // ============================================================
-    function ensureUpgradeModal() {
-        if (document.getElementById('upgrade-modal')) return;
-        const html = `
-        <div class="upg-overlay" id="upgrade-modal" style="display:none;">
-            <div class="upg-modal">
-                <div class="upg-head">
-                    <div>
-                        <div class="upg-title" id="upg-title">${esc(tt('upg-title'))}</div>
-                        <div class="upg-sub" id="upg-sub">${esc(tt('upg-sub'))}</div>
-                    </div>
-                    <button class="upg-close" id="upg-close-x"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l8 8M14 6l-8 8" stroke-linecap="round"/></svg></button>
-                </div>
-                <div class="upg-body" id="upg-body"></div>
-            </div>
-        </div>`;
-        const w = document.createElement('div'); w.innerHTML = html.trim();
-        document.body.appendChild(w.firstElementChild);
-        document.getElementById('upg-close-x').addEventListener('click', closeUpgradeModal);
-        document.getElementById('upgrade-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'upgrade-modal') closeUpgradeModal();
-        });
-    }
-    function closeUpgradeModal() {
-        const m = document.getElementById('upgrade-modal');
-        if (m) m.style.display = 'none';
-    }
-
-    function renderPlanCards() {
-        // v111.2 · 3 档:monthly / yearly / lifetime
-        const ps = window._planState;
-        const monthlyPrice = (ps && ps.pricing && ps.pricing.monthly_thb) || 299;
-        const yearlyPrice  = (ps && ps.pricing && ps.pricing.yearly_thb)  || 2990;
-        const lifetimePrice = (ps && ps.pricing && ps.pricing.lifetime_thb) || 9900;
-        const monthlyEquiv = Math.round(yearlyPrice / 12);
-        const savePct = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
-
-        return `
-        <div class="upg-cards upg-cards-3">
-            <!-- 月付 -->
-            <div class="upg-card" onclick="window.__upg_pick_plan('monthly')">
-                <div class="upg-card-name">${esc(tt('upg-plan-monthly'))}</div>
-                <div class="upg-card-tag">${esc(tt('upg-monthly-tag'))}</div>
-                <div class="upg-card-price">฿${monthlyPrice}<span class="upg-card-price-unit">${esc(tt('upg-per-month'))}</span></div>
-                <ul class="upg-card-feats">
-                    <li>${esc(tt('upg-feat-ocr', {n: 500}))}</li>
-                    <li>${esc(tt('upg-feat-files', {n: 30}))}</li>
-                    <li>${esc(tt('upg-feat-clients', {n: 10}))}</li>
-                    <li>${esc(tt('upg-feat-automation'))}</li>
-                    <li>${esc(tt('upg-feat-templates'))}</li>
-                    <li>${esc(tt('upg-feat-line'))}</li>
-                </ul>
-                <button class="btn btn-ghost upg-pick-btn">${esc(tt('upg-pick'))}</button>
-            </div>
-
-            <!-- 年付 (推荐) -->
-            <div class="upg-card is-recommended" onclick="window.__upg_pick_plan('yearly')">
-                <div class="upg-card-rec">${esc(tt('upg-recommended'))}</div>
-                <div class="upg-card-name">${esc(tt('upg-plan-yearly'))}</div>
-                <div class="upg-card-tag">${esc(tt('upg-yearly-tag', {pct: savePct}))}</div>
-                <div class="upg-card-price">฿${yearlyPrice}<span class="upg-card-price-unit">${esc(tt('upg-per-year'))}</span></div>
-                <div class="upg-card-equiv">≈ ฿${monthlyEquiv}/${esc(tt('upg-per-month').replace('/',''))}</div>
-                <ul class="upg-card-feats">
-                    <li>${esc(tt('upg-feat-ocr', {n: 1500}))}</li>
-                    <li>${esc(tt('upg-feat-files', {n: 50}))}</li>
-                    <li>${esc(tt('upg-feat-clients', {n: 30}))}</li>
-                    <li>${esc(tt('upg-feat-seats', {n: 3}))}</li>
-                    <li>${esc(tt('upg-feat-automation'))}</li>
-                    <li>${esc(tt('upg-feat-templates'))}</li>
-                    <li>${esc(tt('upg-feat-line'))}</li>
-                </ul>
-                <button class="btn btn-primary upg-pick-btn">${esc(tt('upg-pick'))}</button>
-            </div>
-
-            <!-- 终身 -->
-            <div class="upg-card upg-card-lifetime" onclick="window.__upg_pick_plan('lifetime')">
-                <div class="upg-card-rec upg-card-rec-life">${esc(tt('upg-lifetime-badge'))}</div>
-                <div class="upg-card-name">${esc(tt('upg-plan-lifetime'))}</div>
-                <div class="upg-card-tag">${esc(tt('upg-lifetime-tag'))}</div>
-                <div class="upg-card-price">฿${lifetimePrice}<span class="upg-card-price-unit">${esc(tt('upg-once'))}</span></div>
-                <ul class="upg-card-feats">
-                    <li>${esc(tt('upg-feat-ocr-unlim'))}</li>
-                    <li>${esc(tt('upg-feat-files', {n: 100}))}</li>
-                    <li>${esc(tt('upg-feat-clients-unlim'))}</li>
-                    <li>${esc(tt('upg-feat-seats', {n: 5}))}</li>
-                    <li>${esc(tt('upg-feat-own-key'))}</li>
-                    <li>${esc(tt('upg-feat-automation'))}</li>
-                    <li>${esc(tt('upg-feat-line'))}</li>
-                </ul>
-                <button class="btn btn-ghost upg-pick-btn">${esc(tt('upg-pick'))}</button>
-            </div>
-        </div>`;
-    }
-
-    function renderPaymentForm(plan) {
-        const ps = window._planState;
-        const priceMap = {
-            monthly:  (ps && ps.pricing && ps.pricing.monthly_thb) || 299,
-            yearly:   (ps && ps.pricing && ps.pricing.yearly_thb)  || 2990,
-            lifetime: (ps && ps.pricing && ps.pricing.lifetime_thb) || 9900,
-        };
-        const price = priceMap[plan] || 299;
-        const planLabel = {
-            monthly:  tt('upg-plan-monthly'),
-            yearly:   tt('upg-plan-yearly'),
-            lifetime: tt('upg-plan-lifetime'),
-        }[plan];
-        const isLifetime = (plan === 'lifetime');
-
-        // 收款信息 · 后端 /api/me/plan 的 payment_info
-        const pi = (ps && ps.payment_info) || {};
-
-        return `
-        <button class="upg-back-btn" onclick="window.__upg_back()">← ${esc(tt('pay-back'))}</button>
-
-        <div class="pay-plan-summary">
-            <div class="pay-plan-name">${esc(planLabel)}</div>
-            <div class="pay-amount-big">฿${price.toLocaleString()}</div>
-        </div>
-
-        <div class="pay-section">
-            <div class="pay-section-title">${esc(tt('pay-step1'))}</div>
-            <div class="pay-bank-card">
-                <div class="pay-bank-row pay-bank-name">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="6" width="16" height="11" rx="1"/><path d="M5 6V4h10v2"/></svg>
-                    ${esc(pi.bank_th || pi.bank || 'ธนาคารกสิกรไทย')}
-                </div>
-                <div class="pay-bank-row pay-bank-acct">
-                    <span class="pay-bank-label">${esc(tt('pay-acct-no'))}</span>
-                    <span class="pay-bank-value pay-copyable" onclick="navigator.clipboard.writeText('${esc((pi.account_no||'').replace(/-/g,''))}'); showToast('${esc(tt('pay-copied'))}','success')">${esc(pi.account_no || '011-1-83212-9')}</span>
-                </div>
-                <div class="pay-bank-row pay-bank-promptpay">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="2" width="10" height="16" rx="1.5"/><circle cx="10" cy="15" r="1" fill="currentColor"/></svg>
-                    <span class="pay-bank-label">PromptPay</span>
-                    <span class="pay-bank-value pay-copyable" onclick="navigator.clipboard.writeText('${esc((pi.promptpay||'').replace(/[^0-9+]/g,''))}'); showToast('${esc(tt('pay-copied'))}','success')">${esc(pi.promptpay || '+66 85-064-2609')}</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="pay-section">
-            <div class="pay-section-title">${esc(tt('pay-step2'))}</div>
-            <input type="file" id="pay-screenshot" accept="image/*" style="display:none">
-            <button class="btn btn-ghost pay-pick-btn" onclick="document.getElementById('pay-screenshot').click()">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="14" height="12" rx="1"/><circle cx="7" cy="9" r="1.5"/><path d="M3 14l4-4 3 3 3-2 4 4"/></svg>
-                <span id="pay-file-label">${esc(tt('pay-pick-file'))}</span>
-            </button>
-            <input type="text" id="pay-payer-name" class="pay-input" placeholder="${esc(tt('pay-payer-name'))}">
-            <input type="text" id="pay-payer-note" class="pay-input" placeholder="${esc(tt('pay-payer-note'))}">
-        </div>
-
-        ${isLifetime ? `
-        <div class="pay-section pay-lifetime-key">
-            <div class="pay-section-title">${esc(tt('pay-step3-key'))}</div>
-            <div class="pay-key-hint">${esc(tt('pay-key-hint'))} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">https://aistudio.google.com/apikey</a></div>
-            <input type="text" id="pay-gemini-key" class="pay-input" placeholder="AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX">
-        </div>` : ''}
-
-        <button class="btn btn-primary pay-submit-btn" id="pay-submit-btn">${esc(tt('pay-submit'))}</button>
-        <div class="pay-line-contact">
-            ${esc(tt('pay-line-contact'))}
-        </div>`;
-    }
-
-    let _currentUpgPlan = null;
-
-    window.openUpgradeModal = function(highlight) {
-        // v118.12 · 员工守卫:即使前端漏隐藏 · 入口也阻断 · 防止误触发
-        if (typeof shouldHideMoney === 'function' && shouldHideMoney(_userInfo)) {
-            console.warn('[v118.12] openUpgradeModal blocked for employee role');
-            return;
-        }
-        ensureUpgradeModal();
-        _currentUpgPlan = null;
-        document.getElementById('upg-title').textContent = tt('upg-title');
-        document.getElementById('upg-sub').textContent = tt('upg-sub');
-        document.getElementById('upg-body').innerHTML = renderPlanCards();
-        document.getElementById('upgrade-modal').style.display = '';
-    };
-
-    window.__upg_pick_plan = function(plan) {
-        _currentUpgPlan = plan;
-        document.getElementById('upg-title').textContent = tt('pay-title', {plan: plan.toUpperCase()});
-        document.getElementById('upg-sub').textContent = '';
-        document.getElementById('upg-body').innerHTML = renderPaymentForm(plan);
-
-        document.getElementById('pay-screenshot').addEventListener('change', (e) => {
-            const f = e.target.files[0];
-            if (f) document.getElementById('pay-file-label').textContent = f.name;
-        });
-        document.getElementById('pay-submit-btn').addEventListener('click', submitPayment);
-    };
-
-    window.__upg_back = function() {
-        document.getElementById('upg-title').textContent = tt('upg-title');
-        document.getElementById('upg-sub').textContent = tt('upg-sub');
-        document.getElementById('upg-body').innerHTML = renderPlanCards();
-    };
-
-    async function submitPayment() {
-        const fInput = document.getElementById('pay-screenshot');
-        const file = fInput.files && fInput.files[0];
-        if (!file) { showToast(tt('pay-need-screenshot'), 'error'); return; }
-
-        // v111.2 · lifetime 必须填 Gemini key
-        let geminiKey = '';
-        if (_currentUpgPlan === 'lifetime') {
-            const keyInput = document.getElementById('pay-gemini-key');
-            geminiKey = (keyInput && keyInput.value || '').trim();
-            if (!geminiKey || !geminiKey.startsWith('AIza') || geminiKey.length < 30) {
-                showToast(tt('pay-need-gemini-key'), 'error');
-                return;
-            }
-        }
-
-        const btn = document.getElementById('pay-submit-btn');
-        const orig = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = tt('pay-submitting');
-        try {
-            const fd = new FormData();
-            fd.append('target_plan', _currentUpgPlan);
-            fd.append('payer_name', document.getElementById('pay-payer-name').value || '');
-            fd.append('payer_note', document.getElementById('pay-payer-note').value || '');
-            fd.append('screenshot', file);
-            const tok = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/payment/submit', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + tok },
-                body: fd,
-            });
-            const data = await r.json().catch(() => ({}));
-            if (!r.ok) {
-                showToast(tt('pay-fail') + ' · ' + (data.detail || ''), 'error');
-                btn.disabled = false; btn.textContent = orig;
-                return;
-            }
-
-            // v111.2 · lifetime · 顺手把 Gemini key 存到 settings
-            if (geminiKey) {
-                try {
-                    await fetch('/api/settings/gemini-key', {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': 'Bearer ' + tok,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ api_key: geminiKey }),
-                    });
-                } catch (ke) {
-                    console.warn('save gemini key failed', ke);
-                }
-            }
-
-            closeUpgradeModal();
-            showToast(tt('pay-success'), 'success');
-        } catch (e) {
-            console.error(e);
-            showToast(tt('pay-fail'), 'error');
-            btn.disabled = false; btn.textContent = orig;
-        }
-    }
-
-    // ============================================================
-    // LINE 绑定弹窗(开发期 · 用 dev 端点 · 真 OAuth 后续接)
-    // ============================================================
-    function ensureLineModal() {
-        if (document.getElementById('line-modal')) return;
-        const html = `
-        <div class="upg-overlay" id="line-modal" style="display:none;">
-            <div class="upg-modal" style="max-width:440px">
-                <div class="upg-head">
-                    <div>
-                        <div class="upg-title">${esc(tt('line-modal-title'))}</div>
-                        <div class="upg-sub">${esc(tt('line-modal-sub'))}</div>
-                    </div>
-                    <button class="upg-close" id="line-close-x"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l8 8M14 6l-8 8" stroke-linecap="round"/></svg></button>
-                </div>
-                <div class="upg-body">
-                    <ul class="line-benefits">
-                        <li>${esc(tt('line-benefit-1'))}</li>
-                        <li>${esc(tt('line-benefit-2'))}</li>
-                        <li>${esc(tt('line-benefit-3'))}</li>
-                        <li>${esc(tt('line-benefit-4'))}</li>
-                    </ul>
-                    <button class="btn btn-line" id="line-link-btn">
-                        <svg viewBox="0 0 20 20" fill="currentColor" style="width:18px;height:18px"><circle cx="10" cy="10" r="9"/></svg>
-                        <span>${esc(tt('line-link-btn'))}</span>
-                    </button>
-                </div>
-            </div>
-        </div>`;
-        const w = document.createElement('div'); w.innerHTML = html.trim();
-        document.body.appendChild(w.firstElementChild);
-        document.getElementById('line-close-x').addEventListener('click', closeLineModal);
-        document.getElementById('line-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'line-modal') closeLineModal();
-        });
-        document.getElementById('line-link-btn').addEventListener('click', linkLineDev);
-    }
-    function closeLineModal() {
-        const m = document.getElementById('line-modal');
-        if (m) m.style.display = 'none';
-    }
-    window.openLineLinkModal = function() {
-        ensureLineModal();
-        document.getElementById('line-modal').style.display = '';
-    };
-
-    async function linkLineDev() {
-        // v109.4 · 关掉 dev 后门(任何人点击都能假绑定)
-        // 改成显示「即将上线」提示 · 真 LINE OAuth 接入后这个函数恢复正常调用 /api/me/link_line
-        const btn = document.getElementById('line-link-btn');
-        if (btn) btn.disabled = true;
-        // 显示提示卡片(替换 modal 内容)
-        const modal = document.getElementById('line-modal');
-        if (modal) {
-            const inner = modal.querySelector('.line-modal-inner') || modal.firstElementChild;
-            if (inner) {
-                inner.innerHTML = `
-                    <div class="line-coming-wrap">
-                        <div class="line-coming-icon">
-                            <svg viewBox="0 0 48 48" fill="none" stroke="#06C755" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="24" cy="24" r="20"/>
-                                <path d="M24 14v10l6 4"/>
-                            </svg>
-                        </div>
-                        <div class="line-coming-title">${esc(tt('line-coming-title'))}</div>
-                        <div class="line-coming-desc">${esc(tt('line-coming-desc'))}</div>
-                        <div class="line-coming-contact">
-                            <svg viewBox="0 0 24 24" fill="#06C755">
-                                <path d="M12 2C6.48 2 2 5.97 2 10.86c0 3.14 2.03 5.91 5.07 7.5l-.5 3.51c-.07.45.42.78.79.55l4.04-2.4c.2.02.4.03.6.03 5.52 0 10-3.97 10-8.86C22 5.97 17.52 2 12 2z"/>
-                            </svg>
-                            LINE: @Pearnly
-                        </div>
-                        <button class="btn btn-primary line-coming-close" id="line-coming-close">${esc(tt('line-coming-close'))}</button>
-                    </div>
-                `;
-                const closeBtn = inner.querySelector('#line-coming-close');
-                if (closeBtn) closeBtn.addEventListener('click', closeLineModal);
-            }
-        }
-    }
-
-    // ============================================================
-    // OCR 配额超额拦截(全局拦截 fetch · 看 v109. 开头的 detail)
-    // ============================================================
-    const _origFetch = window.fetch;
-    window.fetch = async function(input, init) {
-        const resp = await _origFetch.apply(this, arguments);
-        // 拦截配额错误 · 自动弹弹窗
-        if (resp.status === 429) {
-            try {
-                const cl = resp.clone();
-                const data = await cl.json();
-                const detail = data.detail;
-                if (typeof detail === 'object' && detail && typeof detail.code === 'string' && detail.code.startsWith('v109.')) {
-                    if (detail.needs_line_verify) {
-                        setTimeout(() => { showToast(tt('toast-needs-line'), 'info'); openLineLinkModal(); }, 100);
-                    } else {
-                        setTimeout(() => { showToast(tt('toast-quota-exceeded'), 'info'); openUpgradeModal('pro'); }, 100);
-                    }
-                }
-            } catch (_) {}
-        }
-        return resp;
-    };
-
-    // ============================================================
-    // 后台 · 用户管理页(仅 super_admin · 由路由切换触发渲染)
-    // ============================================================
-    // v118.3 · 全页数据缓存 · 切语言时立即重渲(不等 fetch)
-    const _admPageState = {
-        funnel: null,
-        pay: null,
-        users: [],
-        risk: null,
-    };
-
-    function loadAdminUsersPage() {
-        const tok = localStorage.getItem('mrpilot_token');
-        if (!tok) return;
-        const _h = { headers: { 'Authorization': 'Bearer ' + tok } };
-        const _errHtml = (id) => `<div class="adm-empty" style="color:#ef4444">
-            加载失败 · <a href="#" style="color:#ef4444;text-decoration:underline" onclick="loadAdminUsersPage();return false">重试</a>
-        </div>`;
-
-        // v4.10.16 · 4 路同时发出 · 各自独立渲染 · 互不阻塞(原串行 ~8s → 并行 ~2-3s)
-        const funnelP = fetch('/api/admin/users/funnel', _h);
-        const payP    = fetch('/api/admin/payments/pending', _h);
-        const usersP  = fetch('/api/admin/users?plan=all&search=&limit=100', _h);
-        const riskP   = fetch('/api/admin/risk/suspicious', _h);
-
-        funnelP
-            .then(async r => { if (r.status === 403) return null; return r.json(); })
-            .then(d => {
-                if (!d) return;
-                _admPageState.funnel = d;
-                renderAdmKpi(d);
-                renderAdmExpiring(d.trial_expiring_soon || []);
-            })
-            .catch(() => {
-                const w = document.getElementById('adm-kpi-grid');
-                if (w) w.innerHTML = _errHtml();
-            });
-
-        payP.then(r => r.json())
-            .then(d => { _admPageState.pay = d; renderAdmPending(d.payments || []); })
-            .catch(() => {
-                const w = document.getElementById('adm-pending-list');
-                if (w) w.innerHTML = _errHtml();
-            });
-
-        usersP.then(r => r.json())
-            .then(d => { _admPageState.users = d.users || []; renderAdmUserList(d.users || []); })
-            .catch(() => {
-                const w = document.getElementById('adm-users-table');
-                if (w) w.innerHTML = _errHtml();
-            });
-
-        riskP.then(r => r.json())
-            .then(d => { _admPageState.risk = d; renderAdmRisk(d); })
-            .catch(() => {
-                const w = document.getElementById('adm-risk-content');
-                if (w) w.innerHTML = _errHtml();
-            });
-    }
-
-    // v118.3 · 立即用缓存数据 + 当前 i18n 重渲整页(切语言用 · 不等 fetch · 视觉零延迟)
-    window.__rerenderAdmPage = function() {
-        if (_admPageState.funnel) {
-            renderAdmKpi(_admPageState.funnel);
-            renderAdmExpiring(_admPageState.funnel.trial_expiring_soon || []);
-        }
-        if (_admPageState.pay) renderAdmPending(_admPageState.pay.payments || []);
-        if (_admPageState.users && _admPageState.users.length) renderAdmUserList(_admPageState.users);
-        if (_admPageState.risk) renderAdmRisk(_admPageState.risk);
-        // v118.29.0 · 日志切语言重渲
-        if (_admLogsState && _admLogsState.rows && _admLogsState.rows.length) {
-            renderAdmLogs();
-            renderAdmLogsPager();
-        }
-    };
-
-    function renderAdmKpi(f) {
-        const wrap = document.getElementById('adm-kpi-grid');
-        if (!wrap) return;
-        const bp = f.by_plan || {};
-        const cards = [
-            { lbl: tt('adm-kpi-today'), val: f.new_today || 0, color: '#111111' },
-            { lbl: tt('adm-kpi-week'), val: f.new_week || 0, color: '#111111' },
-            { lbl: tt('adm-kpi-month'), val: f.new_month || 0, color: '#111111' },
-            { lbl: tt('plan-trial'), val: bp.trial || 0, color: '#f59e0b' },
-            { lbl: tt('plan-free'), val: bp.free || 0, color: '#64748b' },
-            { lbl: tt('plan-pro'), val: bp.pro || 0, color: '#10b981' },
-            { lbl: tt('plan-firm'), val: bp.firm || 0, color: '#8b5cf6' },
-            { lbl: tt('adm-kpi-conv'), val: (f.conversion_pct || 0) + '%', color: '#dc2626' },
-        ];
-        wrap.innerHTML = cards.map(c => `
-            <div class="adm-kpi-card" style="border-top: 3px solid ${c.color}">
-                <div class="adm-kpi-val" style="color: ${c.color}">${esc(c.val)}</div>
-                <div class="adm-kpi-lbl">${esc(c.lbl)}</div>
-            </div>
-        `).join('');
-    }
-
-    function renderAdmPending(rows) {
-        const wrap = document.getElementById('adm-pending-list');
-        if (!wrap) return;
-        if (!rows.length) {
-            wrap.innerHTML = `<div class="adm-empty">${esc(tt('adm-pending-empty'))}</div>`;
-            return;
-        }
-        wrap.innerHTML = rows.filter(r => r.status === 'pending').map(r => `
-            <div class="adm-pending-item">
-                <div class="adm-pending-info">
-                    <div class="adm-pending-line1">
-                        <strong>${esc(r.user_email || '?')}</strong> · ${esc(r.company_name || '')}
-                        <span class="adm-tag">${esc(r.target_plan.toUpperCase())}</span>
-                    </div>
-                    <div class="adm-pending-line2">฿${esc(r.amount_thb)} · ${esc(r.payer_name || '—')} · ${esc(r.payer_note || '')}</div>
-                    <div class="adm-pending-line3">${esc(new Date(r.created_at).toLocaleString())} · LINE: ${esc(r.line_id || '—')}</div>
-                </div>
-                <div class="adm-pending-actions">
-                    ${r.screenshot_path ? `<button class="btn btn-ghost btn-sm" onclick="window.__adm_view_slip(${r.id})">${esc(tt('adm-view-slip'))}</button>` : ''}
-                    <button class="btn btn-primary btn-sm" onclick="window.__adm_approve(${r.id})">${esc(tt('adm-approve'))}</button>
-                    <button class="btn btn-danger btn-sm" onclick="window.__adm_reject(${r.id})">${esc(tt('adm-reject'))}</button>
-                </div>
-            </div>
-        `).join('') || `<div class="adm-empty">${esc(tt('adm-pending-empty'))}</div>`;
-    }
-
-    // v111.3 · 看付款截图 · 带 token 鉴权 · 用 blob URL 打开
-    window.__adm_view_slip = async function(payment_id) {
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/payments/${payment_id}/screenshot`, {
-                headers: { 'Authorization': 'Bearer ' + tok },
-            });
-            if (!r.ok) { showToast(tt('adm-slip-not-found'), 'error'); return; }
-            const blob = await r.blob();
-            const url = URL.createObjectURL(blob);
-            // 弹个简单 lightbox
-            const overlay = document.createElement('div');
-            overlay.className = 'slip-overlay';
-            overlay.innerHTML = `
-                <div class="slip-modal">
-                    <button class="slip-close" aria-label="close">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>
-                    </button>
-                    <img src="${url}" alt="payment slip">
-                </div>`;
-            const close = () => { URL.revokeObjectURL(url); overlay.remove(); };
-            overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-            overlay.querySelector('.slip-close').addEventListener('click', close);
-            document.body.appendChild(overlay);
-        } catch (e) {
-            console.error(e);
-            showToast(tt('adm-slip-not-found'), 'error');
-        }
-    };
-
-    window.__adm_approve = async function(id) {
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/payments/${id}/review?action=approve`, {
-                method: 'POST', headers: { 'Authorization': 'Bearer ' + tok },
-            });
-            if (r.ok) { showToast(tt('adm-approved'), 'success'); loadAdminUsersPage(); }
-            else showToast(tt('adm-action-fail'), 'error');
-        } catch (e) { showToast(tt('adm-action-fail'), 'error'); }
-    };
-    window.__adm_reject = async function(id) {
-        const ok = await showConfirm(tt('adm-confirm-reject'), { danger: true });
-        if (!ok) return;
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/payments/${id}/review?action=reject`, {
-                method: 'POST', headers: { 'Authorization': 'Bearer ' + tok },
-            });
-            if (r.ok) { showToast(tt('adm-rejected'), 'success'); loadAdminUsersPage(); }
-            else showToast(tt('adm-action-fail'), 'error');
-        } catch (e) { showToast(tt('adm-action-fail'), 'error'); }
-    };
-
-    function renderAdmExpiring(rows) {
-        const wrap = document.getElementById('adm-expiring-list');
-        if (!wrap) return;
-        if (!rows.length) {
-            wrap.innerHTML = `<div class="adm-empty">${esc(tt('adm-expiring-empty'))}</div>`;
-            return;
-        }
-        wrap.innerHTML = rows.map(r => `
-            <div class="adm-expiring-item">
-                <div>
-                    <strong>${esc(r.email)}</strong> · ${esc(r.company_name || '')}
-                    <span class="adm-tag adm-tag-warn">${r.hours_left}h</span>
-                </div>
-                <div class="adm-expiring-actions">
-                    ${r.line_id ? `<span class="adm-line-id">LINE: ${esc(r.line_id)}</span>` : ''}
-                    <button class="btn btn-primary btn-sm" onclick="window.__adm_quick_upgrade('${esc(r.id)}', '${esc(r.email)}')">${esc(tt('adm-quick-upgrade'))}</button>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    window.__adm_quick_upgrade = async function(uid, email) {
-        // v109.4 · 用 modal 代替原生 prompt · 跟产品 UI 一致
-        // 套餐对齐新方案:trial/solo/team/firm/enterprise
-        let overlay = document.getElementById('adm-upgrade-overlay');
-        if (overlay) overlay.remove();
-        overlay = document.createElement('div');
-        overlay.className = 'cpw-forgot-overlay';
-        overlay.id = 'adm-upgrade-overlay';
-        const plans = [
-            { id: 'trial',    label: tt('upg-plan-trial'),    desc: tt('upg-plan-trial-desc') },
-            { id: 'monthly',  label: tt('upg-plan-monthly'),  desc: tt('upg-plan-monthly-desc') },
-            { id: 'yearly',   label: tt('upg-plan-yearly'),   desc: tt('upg-plan-yearly-desc') },
-            { id: 'lifetime', label: tt('upg-plan-lifetime'), desc: tt('upg-plan-lifetime-desc') },
-        ];
-        overlay.innerHTML = `
-            <div class="cpw-forgot-modal" style="max-width:480px;">
-                <div class="cpw-forgot-head">
-                    <div class="cpw-forgot-title">${esc(tt('adm-upgrade-title'))}</div>
-                    <button class="cpw-forgot-close" id="adm-upg-close">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>
-                    </button>
-                </div>
-                <div class="cpw-forgot-body">
-                    <p class="cpw-forgot-desc">${esc(email)}</p>
-                    <div class="adm-plan-options">
-                        ${plans.map(p => `
-                            <label class="adm-plan-option">
-                                <input type="radio" name="adm-target-plan" value="${p.id}">
-                                <div class="adm-plan-option-body">
-                                    <div class="adm-plan-option-label">${esc(p.label)}</div>
-                                    <div class="adm-plan-option-desc">${esc(p.desc)}</div>
-                                </div>
-                            </label>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="cpw-forgot-foot">
-                    <button class="btn btn-ghost" id="adm-upg-cancel">${esc(tt('cpw-forgot-cancel'))}</button>
-                    <button class="btn btn-primary" id="adm-upg-confirm">${esc(tt('adm-upg-confirm'))}</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(overlay);
-        const close = () => overlay.remove();
-        overlay.querySelector('#adm-upg-close').addEventListener('click', close);
-        overlay.querySelector('#adm-upg-cancel').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-        overlay.querySelector('#adm-upg-confirm').addEventListener('click', async () => {
-            const sel = overlay.querySelector('input[name="adm-target-plan"]:checked');
-            if (!sel) { showToast(tt('adm-pick-plan'), 'warn'); return; }
-            const targetPlan = sel.value;
-            const tok = localStorage.getItem('mrpilot_token');
-            try {
-                const r = await fetch('/api/admin/users/upgrade', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: uid, target_plan: targetPlan, note: 'manual_admin' }),
-                });
-                if (r.ok) { showToast(tt('adm-upgrade-ok'), 'success'); close(); loadAdminUsersPage(); }
-                else { const data = await r.json().catch(() => ({})); showToast(data.detail || tt('adm-upgrade-fail'), 'error'); }
-            } catch (e) { showToast(tt('adm-upgrade-fail'), 'error'); }
-        });
-    };
-
-    async function loadAdmUserList() {
-        const tok = localStorage.getItem('mrpilot_token');
-        const planF = document.getElementById('adm-plan-filter').value;
-        const search = document.getElementById('adm-user-search').value;
-        try {
-            const qs = `?plan=${encodeURIComponent(planF)}&search=${encodeURIComponent(search)}&limit=100`;
-            const r = await fetch('/api/admin/users' + qs, { headers: { 'Authorization': 'Bearer ' + tok } });
-            const data = await r.json();
-            _admPageState.users = data.users || [];  // v118.3 · 缓存
-            renderAdmUserList(data.users || []);
-        } catch (e) { console.error(e); }
-    }
-
-    function renderAdmUserList(users) {
-        const wrap = document.getElementById('adm-users-table');
-        if (!wrap) return;
-        if (!users.length) {
-            wrap.innerHTML = `<div class="adm-empty">${esc(tt('adm-users-empty'))}</div>`;
-            return;
-        }
-        // v109.4 · 当前登录的 super_admin 自己 · 不能对自己操作
-        const meId = (window._userInfo && window._userInfo.id) ? String(window._userInfo.id) : null;
-        const planLabelMap = {
-            'trial': 'Trial',
-            'free': 'Trial',
-            'solo': 'Pearnly Solo',
-            'team': 'Pearnly Team',
-            'firm': 'Pearnly Firm',
-            'enterprise': 'Enterprise',
-            'pro': 'Pearnly Solo',  // v109.4 · 老 pro 视为 solo · 兼容老数据
-            'plus': 'Pearnly Solo', // v109.4 · 老 plus 也视为 solo
-            'monthly': 'Monthly',
-            'lifetime': 'Lifetime',
-        };
-        wrap.innerHTML = `
-            <div class="adm-table-head">
-                <div>${esc(tt('adm-col-email'))}</div>
-                <div>${esc(tt('adm-col-company'))}</div>
-                <div>${esc(tt('adm-col-plan'))}</div>
-                <div>${esc(tt('adm-col-usage'))}</div>
-                <div>${esc(tt('adm-col-country'))}</div>
-                <div>${esc(tt('adm-col-actions'))}</div>
-            </div>
-            ${users.map(u => {
-                const isSelf = meId && String(u.id) === meId;
-                const isAdmin = u.is_super_admin || u.tenant_type === 'admin';
-                const planLabel = planLabelMap[u.plan] || (u.plan ? u.plan.charAt(0).toUpperCase() + u.plan.slice(1) : '—');
-                const adminBadge = isAdmin ? `<span class="adm-admin-tag">${esc(tt('admin-type-super'))}</span>` : '';
-                const lineBadge = u.line_id ? '· LINE' : '';
-                // 自己那行 / 其他超管 · 操作按钮 disabled + 加 tooltip
-                const actions = (isSelf || isAdmin)
-                    ? `<div class="adm-row-actions" title="${esc(tt('admin-self-disabled-tip'))}">
-                            <button class="btn btn-ghost btn-sm" disabled>${esc(tt('adm-upgrade'))}</button>
-                            <button class="btn btn-ghost btn-sm" disabled>${esc(tt('adm-ban'))}</button>
-                       </div>`
-                    : `<div class="adm-row-actions">
-                            <button class="btn btn-ghost btn-sm" onclick="window.__adm_quick_upgrade('${esc(u.id)}', '${esc(u.email)}')">${esc(tt('adm-upgrade'))}</button>
-                            <button class="btn btn-ghost btn-sm" onclick="window.__adm_ban_user('${esc(u.id)}', '${esc(u.email)}')">${esc(tt('adm-ban'))}</button>
-                            <button class="btn btn-ghost btn-sm adm-emp-btn-danger" onclick="window.__adm_cascade_delete('${esc(u.id)}', '${esc(u.username || u.email || '')}')" title="${esc(tt('adm-cascade-del-tip'))}">${esc(tt('adm-cascade-del'))}</button>
-                       </div>`;
-                return `
-                    <div class="adm-table-row${isSelf ? ' adm-self-row' : ''}">
-                        <div>
-                            <div class="adm-cell-strong adm-cell-clickable" onclick="window.__adm_open_user_drawer('${esc(u.id)}')">${esc(u.email || u.username)}</div>
-                            <div class="adm-cell-mute">${esc(new Date(u.created_at).toLocaleDateString())} ${adminBadge}</div>
-                        </div>
-                        <div>${esc(u.company_name || '—')}</div>
-                        <div>
-                            <span class="adm-plan-badge adm-plan-${esc(u.plan)}">${esc(planLabel)}</span>
-                            ${u.days_left !== null && u.days_left !== undefined ? `<div class="adm-cell-mute">${u.days_left}d</div>` : ''}
-                        </div>
-                        <div>${u.ocr_used_month || 0}</div>
-                        <div>${esc(u.country || '—')} ${lineBadge}</div>
-                        ${actions}
-                    </div>
-                `;
-            }).join('')}
-        `;
-    }
-
-    window.__adm_ban_user = async function(uid, email) {
-        // v109.4 · 用 modal 代替原生 prompt
-        let overlay = document.getElementById('adm-ban-overlay');
-        if (overlay) overlay.remove();
-        overlay = document.createElement('div');
-        overlay.className = 'cpw-forgot-overlay';
-        overlay.id = 'adm-ban-overlay';
-        overlay.innerHTML = `
-            <div class="cpw-forgot-modal" style="max-width:420px;">
-                <div class="cpw-forgot-head">
-                    <div class="cpw-forgot-title">${esc(tt('adm-ban-title'))}</div>
-                    <button class="cpw-forgot-close" id="adm-ban-close">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>
-                    </button>
-                </div>
-                <div class="cpw-forgot-body">
-                    <p class="cpw-forgot-desc">${esc(email)}</p>
-                    <p class="cpw-forgot-tip">${esc(tt('adm-ban-warn'))}</p>
-                    <div style="margin-top:12px;">
-                        <label style="display:block;font-size:13px;color:#475569;margin-bottom:6px;">${esc(tt('adm-ban-reason'))}</label>
-                        <input type="text" id="adm-ban-reason-input" class="cpw-input" autocomplete="off" placeholder="${esc(tt('adm-ban-reason-ph'))}" value="abuse">
-                    </div>
-                </div>
-                <div class="cpw-forgot-foot">
-                    <button class="btn btn-ghost" id="adm-ban-cancel">${esc(tt('cpw-forgot-cancel'))}</button>
-                    <button class="btn btn-danger" id="adm-ban-confirm">${esc(tt('adm-ban-confirm'))}</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(overlay);
-        const close = () => overlay.remove();
-        overlay.querySelector('#adm-ban-close').addEventListener('click', close);
-        overlay.querySelector('#adm-ban-cancel').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-        overlay.querySelector('#adm-ban-confirm').addEventListener('click', async () => {
-            const reason = (overlay.querySelector('#adm-ban-reason-input').value || '').trim() || 'abuse';
-            const tok = localStorage.getItem('mrpilot_token');
-            try {
-                const r = await fetch(`/api/admin/users/${uid}/ban?reason=${encodeURIComponent(reason)}`, {
-                    method: 'POST', headers: { 'Authorization': 'Bearer ' + tok },
-                });
-                if (r.ok) { showToast(tt('adm-ban-ok'), 'success'); close(); loadAdmUserList(); }
-                else { const data = await r.json().catch(() => ({})); showToast(data.detail || tt('adm-ban-fail'), 'error'); }
-            } catch (e) { showToast(tt('adm-ban-fail'), 'error'); }
-        });
-    };
-
-    // v118.16 · 级联删除老板账号(高风险 · 双重确认)
-    window.__adm_cascade_delete = async function(uid, username) {
-        const tok = localStorage.getItem('mrpilot_token');
-        // 1) 先取影响范围
-        let preview;
-        try {
-            const r = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/cascade-preview`, {
-                headers: { 'Authorization': 'Bearer ' + tok }
-            });
-            if (!r.ok) {
-                const data = await r.json().catch(() => ({}));
-                showToast(data.detail || tt('adm-cd-preview-fail'), 'error');
-                return;
-            }
-            preview = await r.json();
-        } catch (e) {
-            showToast(tt('adm-cd-preview-fail'), 'error');
-            return;
-        }
-
-        // 2) 渲染 modal
-        let overlay = document.getElementById('adm-cd-overlay');
-        if (overlay) overlay.remove();
-        overlay = document.createElement('div');
-        overlay.className = 'cpw-forgot-overlay';
-        overlay.id = 'adm-cd-overlay';
-        const c = preview.counts || {};
-        const t_owner = preview.owner || {};
-        const t_tenant = preview.tenant || {};
-        overlay.innerHTML = `
-            <div class="cpw-forgot-modal" style="max-width:520px;">
-                <div class="cpw-forgot-head">
-                    <div class="cpw-forgot-title" style="color:#dc2626;">⚠ ${esc(tt('adm-cd-title'))}</div>
-                    <button class="cpw-forgot-close" id="adm-cd-close">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>
-                    </button>
-                </div>
-                <div class="cpw-forgot-body">
-                    <p class="cpw-forgot-tip" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">${esc(tt('adm-cd-warn'))}</p>
-                    <div style="background:#f4f4f0;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:13px;">
-                        <div style="font-weight:600;margin-bottom:8px;color:#0f172a;">${esc(t_owner.username || t_owner.email || username)}</div>
-                        <div style="color:#64748b;margin-bottom:10px;">${esc(t_tenant.name || '—')}${t_tenant.tenant_type ? ' · ' + esc(t_tenant.tenant_type) : ''}</div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;color:#475569;">
-                            <div>${esc(tt('adm-cd-c-employees'))}: <b>${c.employees||0}</b></div>
-                            <div>${esc(tt('adm-cd-c-ocr'))}: <b>${c.ocr_records||0}</b></div>
-                            <div>${esc(tt('adm-cd-c-clients'))}: <b>${c.clients||0}</b></div>
-                            <div>${esc(tt('adm-cd-c-erp'))}: <b>${c.erp_endpoints||0}</b></div>
-                            <div>${esc(tt('adm-cd-c-pushlog'))}: <b>${c.erp_push_logs||0}</b></div>
-                            <div>${esc(tt('adm-cd-c-email'))}: <b>${c.email_accounts||0}</b></div>
-                            <div>${esc(tt('adm-cd-c-bank'))}: <b>${c.bank_recon_sessions||0}</b></div>
-                        </div>
-                    </div>
-                    <label style="display:block;margin:12px 0 4px;font-size:13px;color:#475569;">${esc(tt('adm-cd-type-username').replace('{n}', t_owner.username || username))}</label>
-                    <input type="text" id="adm-cd-username" autocomplete="off" placeholder="${esc(t_owner.username || username)}"
-                        style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;box-sizing:border-box;">
-                    <label style="display:block;margin:12px 0 4px;font-size:13px;color:#475569;">${esc(tt('adm-cd-type-password'))}</label>
-                    <input type="password" id="adm-cd-password" autocomplete="current-password"
-                        style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;box-sizing:border-box;">
-                </div>
-                <div class="cpw-forgot-footer">
-                    <button class="btn btn-ghost" id="adm-cd-cancel">${esc(tt('confirm-cancel') || '取消')}</button>
-                    <button class="btn btn-danger" id="adm-cd-submit">${esc(tt('adm-cd-submit'))}</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(overlay);
-        const close = () => overlay.remove();
-        document.getElementById('adm-cd-close').addEventListener('click', close);
-        document.getElementById('adm-cd-cancel').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-
-        document.getElementById('adm-cd-submit').addEventListener('click', async () => {
-            const u = (document.getElementById('adm-cd-username').value || '').trim();
-            const p = document.getElementById('adm-cd-password').value || '';
-            const expected = (t_owner.username || username || '').trim();
-            if (u !== expected) {
-                showToast(tt('adm-cd-username-mismatch'), 'error');
-                return;
-            }
-            if (!p) {
-                showToast(tt('adm-cd-password-required'), 'error');
-                return;
-            }
-            try {
-                const r = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/cascade-delete`, {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ confirm_username: u, confirm_password: p }),
-                });
-                const data = await r.json().catch(() => ({}));
-                if (r.ok) {
-                    showToast(tt('adm-cd-ok'), 'success');
-                    close();
-                    loadAdmUserList();
-                } else {
-                    // 把后端 detail 转成友好文案
-                    const code = data.detail;
-                    const map = {
-                        'admin.password_invalid': tt('adm-cd-password-invalid'),
-                        'admin.username_mismatch': tt('adm-cd-username-mismatch'),
-                        'admin.cannot_delete_self': tt('adm-cd-cannot-self'),
-                        'admin.not_an_owner': tt('adm-cd-not-owner'),
-                        'admin.cascade_delete_failed': tt('adm-cd-fail'),
-                    };
-                    showToast(map[code] || (typeof code === 'string' ? code : tt('adm-cd-fail')), 'error');
-                }
-            } catch (e) {
-                showToast(tt('adm-cd-fail'), 'error');
-            }
-        });
-    };
-
-    // v109.4 · 用户详情抽屉(右侧滑出)· 展示完整字段
-    window.__adm_open_user_drawer = async function(uid) {
-        const tok = localStorage.getItem('mrpilot_token');
-        let overlay = document.getElementById('adm-drawer-overlay');
-        if (overlay) overlay.remove();
-        overlay = document.createElement('div');
-        overlay.className = 'adm-drawer-overlay';
-        overlay.id = 'adm-drawer-overlay';
-        overlay.dataset.uid = uid;   // v111.3 · setLang 重渲用
-        overlay.innerHTML = `
-            <div class="adm-drawer">
-                <div class="adm-drawer-head">
-                    <div class="adm-drawer-title">${esc(tt('adm-drawer-title'))}</div>
-                    <button class="adm-drawer-close" id="adm-drawer-close" aria-label="close">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>
-                    </button>
-                </div>
-                <div class="adm-drawer-body" id="adm-drawer-body">
-                    <div class="adm-drawer-loading">${esc(tt('adm-drawer-loading'))}</div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(overlay);
-
-        // 等下一帧再加 .show class · 让 transition 生效
-        requestAnimationFrame(() => overlay.classList.add('show'));
-
-        const close = () => {
-            overlay.classList.remove('show');
-            setTimeout(() => overlay.remove(), 250);
-        };
-        overlay.querySelector('#adm-drawer-close').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-
-        // 拉详情
-        try {
-            const r = await fetch(`/api/admin/users/${uid}`, { headers: { 'Authorization': 'Bearer ' + tok } });
-            if (!r.ok) {
-                document.getElementById('adm-drawer-body').innerHTML =
-                    `<div class="adm-drawer-error">${esc(tt('adm-drawer-error'))}</div>`;
-                return;
-            }
-            const u = await r.json();
-            renderAdmUserDrawer(u);
-        } catch (e) {
-            document.getElementById('adm-drawer-body').innerHTML =
-                `<div class="adm-drawer-error">${esc(tt('adm-drawer-error'))}</div>`;
-        }
-    };
-
-    // 抽屉内部渲染
-    function renderAdmUserDrawer(u) {
-        const body = document.getElementById('adm-drawer-body');
-        if (!body) return;
-
-        const fmtTime = (s) => {
-            if (!s) return '—';
-            try {
-                const d = new Date(s);
-                const now = new Date();
-                const diff = Math.floor((now - d) / 1000);
-                let rel;
-                if (diff < 60) rel = tt('time-just-now');
-                else if (diff < 3600) rel = tt('time-mins-ago', { n: Math.floor(diff/60) });
-                else if (diff < 86400) rel = tt('time-hours-ago', { n: Math.floor(diff/3600) });
-                else if (diff < 86400 * 30) rel = tt('time-days-ago', { n: Math.floor(diff/86400) });
-                else rel = '';
-                return d.toLocaleString() + (rel ? ' · ' + rel : '');
-            } catch (e) { return s; }
-        };
-
-        const planLabelMap = {
-            'trial': 'Trial', 'free': 'Trial',
-            'solo': 'Pearnly Solo', 'pro': 'Pearnly Solo', 'plus': 'Pearnly Solo',
-            'team': 'Pearnly Team',
-            'firm': 'Pearnly Firm',
-            'enterprise': 'Enterprise',
-            'monthly': 'Monthly', 'lifetime': 'Lifetime',
-        };
-        const planLabel = planLabelMap[u.plan] || (u.plan || '—');
-
-        const lineStatus = u.line_user_id
-            ? `<span class="adm-drawer-pill adm-pill-success">✓ ${esc(tt('adm-drawer-line-linked'))}</span>`
-            : `<span class="adm-drawer-pill adm-pill-warn">○ ${esc(tt('adm-drawer-line-not-linked'))}</span>`;
-
-        const riskBadge = u.has_risk_signal
-            ? `<span class="adm-drawer-pill adm-pill-danger">⚠ ${esc(tt('adm-drawer-risky'))}</span>`
-            : '';
-
-        body.innerHTML = `
-            <div class="adm-drawer-header-row">
-                <div class="adm-drawer-avatar">${esc((u.email || u.username || '?').charAt(0).toUpperCase())}</div>
-                <div class="adm-drawer-header-text">
-                    <div class="adm-drawer-name">${esc(u.email || u.username || '')}</div>
-                    <div class="adm-drawer-sub">${esc(u.company_name || tt('adm-drawer-no-company'))}</div>
-                </div>
-            </div>
-
-            <div class="adm-drawer-section">
-                <div class="adm-drawer-section-title">${esc(tt('adm-drawer-sec-account'))}</div>
-                <div class="adm-drawer-grid">
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-plan'))}</div>
-                    <div class="adm-drawer-value">
-                        <span class="adm-plan-badge adm-plan-${esc(u.plan)}">${esc(planLabel)}</span>
-                        ${u.days_left != null ? ` · ${u.days_left}d` : ''}
-                    </div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-status'))}</div>
-                    <div class="adm-drawer-value">${u.is_active === false ? esc(tt('adm-drawer-banned')) : esc(tt('adm-drawer-active'))}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-line'))}</div>
-                    <div class="adm-drawer-value">${lineStatus}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-role'))}</div>
-                    <div class="adm-drawer-value">${u.is_super_admin ? '⭐ Super Admin' : esc(u.role || 'owner')}</div>
-                </div>
-            </div>
-
-            <div class="adm-drawer-section">
-                <div class="adm-drawer-section-title">${esc(tt('adm-drawer-sec-contact'))}</div>
-                <div class="adm-drawer-grid">
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-email'))}</div>
-                    <div class="adm-drawer-value">${esc(u.email || '—')}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-phone'))}</div>
-                    <div class="adm-drawer-value">${esc(u.phone || '—')}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-line-id'))}</div>
-                    <div class="adm-drawer-value">${esc(u.line_id || '—')}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-country'))}</div>
-                    <div class="adm-drawer-value">${esc(u.country || '—')}</div>
-                </div>
-            </div>
-
-            <div class="adm-drawer-section">
-                <div class="adm-drawer-section-title">${esc(tt('adm-drawer-sec-signup'))} ${riskBadge}</div>
-                <div class="adm-drawer-grid">
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-signed-up'))}</div>
-                    <div class="adm-drawer-value">${esc(fmtTime(u.created_at))}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-source'))}</div>
-                    <div class="adm-drawer-value">${esc(u.signup_source || tt('adm-drawer-source-direct'))}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-ip'))}</div>
-                    <div class="adm-drawer-value adm-drawer-mono">${esc(u.signup_ip || '—')}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-fingerprint'))}</div>
-                    <div class="adm-drawer-value adm-drawer-mono">${esc((u.signup_fingerprint || '—').slice(0, 16))}${u.signup_fingerprint ? '...' : ''}</div>
-                </div>
-            </div>
-
-            <div class="adm-drawer-section">
-                <div class="adm-drawer-section-title">${esc(tt('adm-drawer-sec-usage'))}</div>
-                <div class="adm-drawer-grid">
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-month-ocr'))}</div>
-                    <div class="adm-drawer-value">${u.ocr_used_month || 0} / ${u.ocr_quota || tt('adm-drawer-unlimited')}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-total-ocr'))}</div>
-                    <div class="adm-drawer-value">${u.ocr_total || 0}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-last-ocr'))}</div>
-                    <div class="adm-drawer-value">${esc(fmtTime(u.last_ocr_at))}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-last-login'))}</div>
-                    <div class="adm-drawer-value">${esc(fmtTime(u.last_login_at))}</div>
-                </div>
-            </div>
-
-            <div class="adm-drawer-section">
-                <div class="adm-drawer-section-title">${esc(tt('adm-drawer-sec-payment'))}</div>
-                <div class="adm-drawer-grid">
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-payments'))}</div>
-                    <div class="adm-drawer-value">${u.payment_count || 0}</div>
-                    <div class="adm-drawer-label">${esc(tt('adm-drawer-last-payment'))}</div>
-                    <div class="adm-drawer-value">${esc(fmtTime(u.last_payment_at))}</div>
-                </div>
-            </div>
-
-            ${!u.is_super_admin ? `
-            <div class="adm-drawer-section adm-drawer-actions-section">
-                <div class="adm-drawer-section-title">${esc(tt('adm-drawer-sec-actions'))}</div>
-                <div class="adm-drawer-actions-grid">
-                    <button class="btn btn-primary" onclick="window.__adm_upgrade_from_drawer('${esc(u.id)}', '${esc(u.email || '')}')">
-                        ${esc(tt('adm-drawer-btn-upgrade'))}
-                    </button>
-                    ${u.is_active === false ?
-                        `<button class="btn btn-ghost" onclick="window.__adm_unban_user('${esc(u.id)}')">${esc(tt('adm-drawer-btn-unban'))}</button>` :
-                        `<button class="btn btn-danger" onclick="window.__adm_ban_user('${esc(u.id)}', '${esc(u.email || '')}')">${esc(tt('adm-drawer-btn-ban'))}</button>`
-                    }
-                </div>
-            </div>
-            ` : ''}
-        `;
-    }
-
-    // v111.3 · 抽屉里点升级 → 复用现有快速升级对话框
-    window.__adm_upgrade_from_drawer = function(uid, email) {
-        if (typeof window.__adm_quick_upgrade === 'function') {
-            window.__adm_quick_upgrade(uid, email);
-        } else {
-            showToast('upgrade dialog not loaded', 'error');
-        }
-    };
-    // v111.3 · 封禁/解封用户(用现有 admin/users/ban API)
-    window.__adm_ban_user = async function(uid, email) {
-        const ok = await showConfirm(tt('adm-confirm-ban', { e: email }), { danger: true });
-        if (!ok) return;
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/users/${uid}/ban`, {
-                method: 'POST', headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason: 'admin_action' }),
-            });
-            if (r.ok) { showToast(tt('adm-banned'), 'success'); loadAdminUsersPage(); }
-            else showToast(tt('adm-action-fail'), 'error');
-        } catch (e) { showToast(tt('adm-action-fail'), 'error'); }
-    };
-    window.__adm_unban_user = async function(uid) {
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/users/${uid}/unban`, {
-                method: 'POST', headers: { 'Authorization': 'Bearer ' + tok },
-            });
-            if (r.ok) { showToast(tt('adm-unbanned'), 'success'); loadAdminUsersPage(); }
-            else showToast(tt('adm-action-fail'), 'error');
-        } catch (e) { showToast(tt('adm-action-fail'), 'error'); }
-    };
-
-    // v116 · 风控状态(模块内闭包)
-    const _admRiskState = {
-        collapsed: true,                    // 默认收起
-        page: { ip: 1, fp: 1, heavy: 1 },   // 各分类当前页
-        pageSize: 5,
-        data: null,                          // 缓存上一次接口数据
-    };
-
-    function renderAdmRisk(r) {
-        const wrap = document.getElementById('adm-risk-content');
-        if (!wrap) return;
-        if (r) _admRiskState.data = r;
-        const data = _admRiskState.data || {};
-        const sip = data.same_ip_signups || [];
-        const sfp = data.same_fingerprint_signups || [];
-        const heavy = data.heavy_ocr_users || [];
-        const ev = data.risk_events_24h || [];
-        const totalSignals = sip.length + sfp.length + heavy.length;
-        const totalEvents = ev.reduce((a, e) => a + (e.count || 0), 0);
-
-        // 全部干净:简单一行
-        if (!totalSignals && !totalEvents) {
-            wrap.innerHTML = `<div class="adm-empty">${esc(tt('adm-risk-clean'))}</div>`;
-            return;
-        }
-
-        // 顶部 summary + 展开/收起
-        const collapsed = _admRiskState.collapsed;
-        const summary = `
-            <div class="adm-risk-summary">
-                <div class="adm-risk-summary-stats">
-                    ${totalSignals > 0 ? `<span class="adm-risk-stat-pill warn">${totalSignals} ${esc(tt('adm-risk-stat-groups'))}</span>` : ''}
-                    ${totalEvents > 0 ? `<span class="adm-risk-stat-pill info">${totalEvents} ${esc(tt('adm-risk-stat-events'))}</span>` : ''}
-                </div>
-                <button class="adm-risk-toggle-btn" onclick="window.__adm_risk_toggle()">
-                    ${esc(collapsed ? tt('adm-risk-expand') : tt('adm-risk-collapse'))}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(${collapsed ? '0' : '180'}deg); transition: transform 0.2s">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </button>
-            </div>`;
-
-        if (collapsed) {
-            wrap.innerHTML = summary;
-            return;
-        }
-
-        // 展开 · 渲染 4 分组
-        const renderGroup = (title, items, kind, renderRow) => {
-            if (!items.length) return '';
-            const ps = _admRiskState.pageSize;
-            const cur = _admRiskState.page[kind] || 1;
-            const totalPages = Math.max(1, Math.ceil(items.length / ps));
-            const safeCur = Math.min(cur, totalPages);
-            const slice = items.slice((safeCur - 1) * ps, safeCur * ps);
-            const pager = totalPages > 1 ? `
-                <div class="adm-risk-pager">
-                    <button class="adm-risk-pager-btn" ${safeCur <= 1 ? 'disabled' : ''} onclick="window.__adm_risk_page('${kind}', ${safeCur - 1})">‹</button>
-                    <span class="adm-risk-pager-info">${safeCur} / ${totalPages}</span>
-                    <button class="adm-risk-pager-btn" ${safeCur >= totalPages ? 'disabled' : ''} onclick="window.__adm_risk_page('${kind}', ${safeCur + 1})">›</button>
-                </div>` : '';
-            return `
-                <div class="adm-risk-block">
-                    <div class="adm-risk-title">${esc(title)} <span class="adm-risk-count">(${items.length})</span></div>
-                    <div class="adm-risk-rows">${slice.map(renderRow).join('')}</div>
-                    ${pager}
-                </div>`;
-        };
-
-        const ipRows = renderGroup(tt('adm-risk-same-ip'), sip, 'ip', x => `
-            <div class="adm-risk-row">
-                <div class="adm-risk-row-main">
-                    <div><strong>IP</strong> <code>${esc(x.ip)}</code> · ${x.count} ${esc(tt('adm-risk-accounts'))}</div>
-                    <div class="adm-risk-row-sub">${(x.accounts || []).slice(0, 3).map(a => esc(a.email)).join(' · ')}${(x.accounts || []).length > 3 ? ` …` : ''}</div>
-                </div>
-                <button class="adm-risk-detail-btn" onclick='window.__adm_risk_detail("ip", ${JSON.stringify(JSON.stringify(x))})'>${esc(tt('adm-risk-view-detail'))}</button>
-            </div>`);
-
-        const fpRows = renderGroup(tt('adm-risk-same-fp'), sfp, 'fp', x => `
-            <div class="adm-risk-row">
-                <div class="adm-risk-row-main">
-                    <div><strong>FP</strong> <code>${esc(x.fingerprint_short || '')}</code> · ${x.count} ${esc(tt('adm-risk-accounts'))}</div>
-                    <div class="adm-risk-row-sub">${(x.accounts || []).slice(0, 3).map(a => esc(a.email)).join(' · ')}${(x.accounts || []).length > 3 ? ` …` : ''}</div>
-                </div>
-                <button class="adm-risk-detail-btn" onclick='window.__adm_risk_detail("fp", ${JSON.stringify(JSON.stringify(x))})'>${esc(tt('adm-risk-view-detail'))}</button>
-            </div>`);
-
-        const heavyRows = renderGroup(tt('adm-risk-heavy-ocr'), heavy, 'heavy', x => `
-            <div class="adm-risk-row">
-                <div class="adm-risk-row-main">
-                    <div><strong>${esc(x.email)}</strong> ${x.is_banned ? `<span class="adm-pill-banned">${esc(tt('adm-risk-banned-tag'))}</span>` : ''}</div>
-                    <div class="adm-risk-row-sub">${esc(x.plan || '')} · ${x.ocr_today} ${esc(tt('adm-risk-ocr-24h'))}</div>
-                </div>
-                ${x.is_banned
-                    ? `<button class="adm-risk-detail-btn" onclick="window.__adm_unban_user('${x.user_id}')">${esc(tt('adm-drawer-btn-unban'))}</button>`
-                    : `<button class="adm-risk-detail-btn danger" onclick="window.__adm_ban_user('${x.user_id}', '${esc(x.email)}')">${esc(tt('adm-drawer-btn-ban'))}</button>`}
-            </div>`);
-
-        const evBlock = ev.length ? `
-            <div class="adm-risk-block">
-                <div class="adm-risk-title">${esc(tt('adm-risk-events-24h'))}</div>
-                <div class="adm-risk-tags">
-                    ${ev.map(e => `<span class="adm-tag ${e.event === 'disposable_email' || e.event === 'rate_limited_try_later' ? 'adm-tag-warn' : ''}">${esc(e.event)}: ${e.count}</span>`).join('')}
-                </div>
-            </div>` : '';
-
-        wrap.innerHTML = summary + ipRows + fpRows + heavyRows + evBlock;
-    }
-
-    // v118 · export 给 applyLang · 切语言时立即用缓存数据重渲(不等 fetch)
-    window.__rerenderAdmRisk = function() { renderAdmRisk(); };
-
-    // v116 · 折叠/展开
-    window.__adm_risk_toggle = function() {
-        _admRiskState.collapsed = !_admRiskState.collapsed;
-        renderAdmRisk();
-    };
-    // v116 · 分页
-    window.__adm_risk_page = function(kind, page) {
-        _admRiskState.page[kind] = page;
-        renderAdmRisk();
-    };
-
-    // v116 · 查看详情 modal · 显示 group 内所有 accounts + 操作按钮
-    window.__adm_risk_detail = function(kind, groupJson) {
-        let group;
-        try { group = JSON.parse(groupJson); } catch(e) { return; }
-        const accounts = group.accounts || [];
-        const headerKey = kind === 'ip' ? `IP: ${group.ip}` : `Fingerprint: ${group.fingerprint_short || ''}`;
-
-        // 关掉旧的(如果有)
-        const old = document.getElementById('adm-risk-detail-modal');
-        if (old) old.remove();
-
-        const modal = document.createElement('div');
-        modal.id = 'adm-risk-detail-modal';
-        modal.className = 'modal-overlay';
-        modal.innerHTML = `
-            <div class="modal modal-md">
-                <div class="modal-head">
-                    <div class="modal-title">${esc(tt('adm-risk-detail-title'))}</div>
-                    <button class="modal-close" onclick="document.getElementById('adm-risk-detail-modal').remove()">×</button>
-                </div>
-                <div class="modal-body">
-                    <div class="adm-risk-detail-meta">${esc(headerKey)} · ${accounts.length} ${esc(tt('adm-risk-accounts'))}</div>
-                    <div class="adm-risk-detail-list" id="adm-risk-detail-list">
-                        ${accounts.map(a => `
-                            <div class="adm-risk-detail-row" data-uid="${esc(a.user_id)}">
-                                <div class="adm-risk-detail-main">
-                                    <div><strong>${esc(a.email)}</strong>
-                                        ${a.is_banned ? `<span class="adm-pill-banned">${esc(tt('adm-risk-banned-tag'))}</span>` : ''}
-                                    </div>
-                                    <div class="adm-risk-detail-sub">${esc(a.plan || '')} · ${esc((a.created_at || '').slice(0, 10))}</div>
-                                </div>
-                                <div class="adm-risk-detail-actions">
-                                    ${a.is_banned
-                                        ? `<button class="adm-risk-detail-btn" onclick="window.__adm_risk_modal_unban('${esc(a.user_id)}')">${esc(tt('adm-drawer-btn-unban'))}</button>`
-                                        : `<button class="adm-risk-detail-btn danger" onclick="window.__adm_risk_modal_ban('${esc(a.user_id)}', '${esc(a.email)}')">${esc(tt('adm-drawer-btn-ban'))}</button>`}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="modal-foot">
-                    <button class="btn-ghost" onclick="document.getElementById('adm-risk-detail-modal').remove()">${esc(tt('common-close'))}</button>
-                    <button class="btn-danger" onclick='window.__adm_risk_batch_ban(${JSON.stringify(JSON.stringify(accounts))})'>
-                        ${esc(tt('adm-risk-batch-ban'))} (${accounts.filter(a => !a.is_banned).length})
-                    </button>
-                </div>
-            </div>`;
-        document.body.appendChild(modal);
-    };
-
-    // v116 · modal 内单个 ban/unban(操作完后刷新整个风控)
-    window.__adm_risk_modal_ban = async function(uid, email) {
-        const ok = await showConfirm(tt('adm-confirm-ban', { e: email }), { danger: true });
-        if (!ok) return;
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/users/${uid}/ban`, {
-                method: 'POST', headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason: 'risk_review' }),
-            });
-            if (r.ok) {
-                showToast(tt('adm-banned'), 'success');
-                document.getElementById('adm-risk-detail-modal')?.remove();
-                loadAdminUsersPage();
-            } else showToast(tt('adm-action-fail'), 'error');
-        } catch (e) { showToast(tt('adm-action-fail'), 'error'); }
-    };
-    window.__adm_risk_modal_unban = async function(uid) {
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/users/${uid}/unban`, {
-                method: 'POST', headers: { 'Authorization': 'Bearer ' + tok },
-            });
-            if (r.ok) {
-                showToast(tt('adm-unbanned'), 'success');
-                document.getElementById('adm-risk-detail-modal')?.remove();
-                loadAdminUsersPage();
-            } else showToast(tt('adm-action-fail'), 'error');
-        } catch (e) { showToast(tt('adm-action-fail'), 'error'); }
-    };
-
-    // v116 · 批量封禁(modal 底部按钮)
-    window.__adm_risk_batch_ban = async function(accountsJson) {
-        let accounts;
-        try { accounts = JSON.parse(accountsJson); } catch(e) { return; }
-        const targets = accounts.filter(a => !a.is_banned).map(a => a.user_id);
-        if (!targets.length) { showToast(tt('adm-risk-no-targets'), 'info'); return; }
-        const ok = await showConfirm(tt('adm-risk-confirm-batch', { n: targets.length }), { danger: true });
-        if (!ok) return;
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch('/api/admin/risk/batch-ban', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_ids: targets, reason: 'risk_batch_ban' }),
-            });
-            const j = await r.json().catch(() => ({}));
-            if (r.ok && j.ok) {
-                showToast(tt('adm-risk-batch-done', { n: j.banned || 0 }), 'success');
-                document.getElementById('adm-risk-detail-modal')?.remove();
-                loadAdminUsersPage();
-            } else showToast(tt('adm-action-fail'), 'error');
-        } catch (e) { showToast(tt('adm-action-fail'), 'error'); }
-    };
-
-    // 路由切换触发(hash 变化时)
-    function bindAdminUsersRoute() {
-        const fire = () => {
-            if (location.hash === '#admin-users') {
-                loadAdminUsersPage();
-            }
-        };
-        window.addEventListener('hashchange', fire);
-        fire();
-    }
-
-    // 把额外 i18n 加进来
-    Object.assign(I18N.zh, {
-        'nav-admin-users': '用户管理',
-        'admin-users-title': '用户管理',
-        'admin-users-sub': '注册用户 · 套餐分布 · 待审核付款 · 风控',
-        'adm-kpi-today': '今日新增', 'adm-kpi-week': '本周新增', 'adm-kpi-month': '本月新增',
-        'adm-kpi-conv': '付费转化',
-        'adm-pending-title': '待审核付款',
-        'adm-pending-empty': '没有待审核的付款',
-        'adm-refresh': '刷新',
-        'adm-view-slip': '查看截图',
-        'adm-approve': '批准',
-        'adm-reject': '拒绝',
-        'adm-approved': '已批准 · 用户已升级',
-        'adm-rejected': '已拒绝',
-        'adm-confirm-reject': '确认拒绝此付款?',
-        'adm-action-fail': '操作失败',
-        'adm-expiring-title': 'Trial 即将到期(≤ 3 天)',
-        'adm-expiring-empty': '无',
-        'adm-quick-upgrade': '一键升级',
-        'adm-users-title': '所有用户',
-        'adm-users-empty': '没有用户',
-        // v118.12 · 客户/员工分 tab
-        'adm-tab-customers': '客户',
-        'adm-cascade-del': '删除账号',
-        'adm-cascade-del-tip': '永久删除该账号 + 整个事务所数据 · 不可恢复',
-        'adm-cd-title': '永久删除客户账号',
-        'adm-cd-warn': '此操作将永久删除该老板 + 旗下所有员工 + 全部识别记录 / 客户档案 / ERP 配置 / 邮箱配置 / 对账数据。删除后不可恢复 · 请确认无误。',
-        'adm-cd-c-employees': '员工',
-        'adm-cd-c-ocr': '发票识别',
-        'adm-cd-c-clients': '客户档案',
-        'adm-cd-c-erp': 'ERP 端点',
-        'adm-cd-c-pushlog': '推送日志',
-        'adm-cd-c-email': '邮箱配置',
-        'adm-cd-c-bank': '对账会话',
-        'adm-cd-type-username': '请输入要删除的账号「{n}」以确认:',
-        'adm-cd-type-password': '输入您(超管)自己的登录密码:',
-        'adm-cd-submit': '永久删除',
-        'adm-cd-username-mismatch': '账号名不匹配 · 已取消',
-        'adm-cd-password-required': '请输入您的密码',
-        'adm-cd-password-invalid': '密码错误',
-        'adm-cd-cannot-self': '不能删除自己',
-        'adm-cd-not-owner': '该用户不是老板账号',
-        'adm-cd-ok': '已永久删除',
-        'adm-cd-fail': '删除失败',
-        'adm-cd-preview-fail': '获取影响范围失败',
-
-        'adm-tab-employees': '员工',
-        'adm-employees-empty': '暂无员工',
-        'adm-employee-search-ph': '员工名 / 邮箱 / 老板 / 公司',
-        'adm-emp-col-name': '员工',
-        'adm-emp-col-owner': '所属老板',
-        'adm-emp-col-tenant': '事务所',
-        // v118.28.6 · 超管员工 tab 只读提示
-        'adm-emp-readonly-tip': '本视图为只读 · 员工管理(启用/禁用/重置密码/移除)由所属老板自行操作 · 如需协助请打开老板抽屉',
-            'adm-emp-col-actions': '操作',
-            'adm-emp-enable': '启用',
-            'adm-emp-disable': '禁用',
-            'adm-emp-reset-pw': '重置密码',
-            'adm-emp-remove': '移除',
-            'adm-emp-confirm-enable': '启用',
-            'adm-emp-confirm-disable': '禁用',
-            'adm-emp-confirm-reset-pw': '为 {n} 重置密码?',
-            'adm-emp-confirm-remove': '⚠ 永久移除员工 {n}?\n该员工的账号将被删除 · 此操作不可恢复。',
-            'adm-emp-confirm-type-name': '请输入员工名 "{n}" 以确认删除:',
-            'adm-emp-name-mismatch': '员工名不匹配 · 已取消',
-            'adm-emp-toggle-ok': '操作成功',
-            'adm-emp-toggle-fail': '操作失败',
-            'adm-emp-new-pw': '新临时密码(请复制并告诉员工):\n\n{n}\n\n下次登录会强制员工改密。',
-            'adm-emp-reset-fail': '重置失败',
-            'adm-emp-remove-ok': '已移除',
-            'adm-emp-copy-and-close': '我已复制',
-            'adm-emp-remove-fail': '移除失败',
-        'adm-emp-col-status': '状态',
-        'adm-emp-col-last-login': '最后登录',
-        'adm-emp-col-created': '创建时间',
-        'adm-plan-solo': 'Solo',
-        'adm-plan-team': 'Team',
-        'adm-filter-all': '全部套餐',
-        'adm-col-email': '邮箱', 'adm-col-company': '公司', 'adm-col-plan': '套餐', 'adm-search-ph': '邮箱 / 公司名',
-        'adm-col-usage': '本月用量', 'adm-col-country': '国家', 'adm-col-actions': '操作',
-        'adm-upgrade': '升级', 'adm-ban': '封停',
-        // v109.4 · admin modal
-        'adm-upgrade-title': '修改套餐',
-        'adm-upg-confirm': '确认升级',
-        'adm-pick-plan': '请选择套餐',
-        'adm-upgrade-ok': '套餐已修改',
-        'adm-upgrade-fail': '修改失败',
-        'adm-ban-title': '封停账号',
-        'adm-ban-warn': '⚠ 封停后该账号将无法登录 · 操作可撤销',
-        'adm-ban-reason': '原因',
-        'adm-ban-reason-ph': '如:abuse / 欠费 / 测试',
-        'adm-ban-confirm': '确认封停',
-        'adm-ban-ok': '已封停',
-        'adm-ban-fail': '操作失败',
-        // v109.4 · 用户详情抽屉
-        'adm-drawer-title': '用户详情',
-        'adm-drawer-loading': '加载中...',
-        'adm-drawer-error': '加载失败 · 请稍后重试',
-        'adm-drawer-no-company': '未填写公司',
-        'adm-drawer-sec-account': '账户',
-        'adm-drawer-sec-contact': '联系方式',
-        'adm-drawer-sec-signup': '注册信息',
-        'adm-drawer-sec-usage': '使用情况',
-        'adm-drawer-sec-payment': '付款记录',
-        'adm-drawer-plan': '套餐',
-        'adm-drawer-status': '状态',
-        'adm-drawer-line': 'LINE',
-        'adm-drawer-role': '角色',
-        'adm-drawer-email': '邮箱',
-        'adm-drawer-phone': '手机',
-        'adm-drawer-line-id': 'LINE ID',
-        'adm-drawer-country': '国家',
-        'adm-drawer-signed-up': '注册时间',
-        'adm-drawer-source': '注册来源',
-        'adm-drawer-source-direct': '直接访问',
-        'adm-drawer-ip': '注册 IP',
-        'adm-drawer-fingerprint': '设备指纹',
-        'adm-drawer-month-ocr': '本月用量',
-        'adm-drawer-total-ocr': '累计 OCR',
-        'adm-drawer-last-ocr': '最近识别',
-        'adm-drawer-last-login': '最后登录',
-        'adm-drawer-payments': '付款次数',
-        'adm-drawer-last-payment': '最近付款',
-        'adm-drawer-banned': '🚫 已封停',
-        'adm-drawer-active': '✓ 正常',
-        'adm-drawer-line-linked': '已绑定',
-        'adm-drawer-line-not-linked': '未绑定',
-        'adm-drawer-risky': '风险用户',
-        'adm-drawer-unlimited': '无限',
-        'time-just-now': '刚刚',
-        'time-mins-ago': '{n} 分钟前',
-        'time-hours-ago': '{n} 小时前',
-        'time-days-ago': '{n} 天前',
-        'adm-risk-title': '⚠ 风控 · 可疑活动',
-        'adm-risk-events-24h': '24h 风控事件',
-        'adm-risk-same-ip': '同 IP 注册多个账号',
-        'adm-risk-same-fp': '同设备指纹注册多个',
-        'adm-risk-heavy-ocr': 'OCR 异常用量(24h > 30 张)',
-        'adm-risk-stat-groups': '可疑分组',
-        'adm-risk-stat-events': '风控事件',
-        'adm-risk-expand': '展开查看',
-        'adm-risk-collapse': '收起',
-        'adm-risk-accounts': '个账号',
-        'adm-risk-view-detail': '查看详情',
-        'adm-risk-detail-title': '可疑分组详情',
-        'adm-risk-batch-ban': '批量封禁',
-        'adm-risk-confirm-batch': '确认封禁这 {n} 个账号?此操作可在用户管理中解除',
-        'adm-risk-batch-done': '已封禁 {n} 个账号',
-        'adm-risk-no-targets': '没有可封禁的账号(均已封禁或为超管)',
-        'adm-risk-banned-tag': '已封禁',
-        'adm-risk-ocr-24h': '张 / 24h',
-        'common-close': '关闭',
-        'adm-risk-clean': '✓ 当前无异常',
-        'adm-engine-ocr': '单据识别',
-        'adm-engine-ocr-backup': '单据识别(备用)',
-        'adm-engine-epdf': '电子PDF',
-        'adm-engine-vex': '销项税对账',
-    });
-    Object.assign(I18N.en, {
-        'nav-admin-users': 'Users',
-        'admin-users-title': 'User Management',
-        'admin-users-sub': 'Signups · plan distribution · pending payments · risk control',
-        'adm-kpi-today': 'Today', 'adm-kpi-week': 'Week', 'adm-kpi-month': 'Month',
-        'adm-kpi-conv': 'Conversion',
-        'adm-pending-title': 'Pending Payments',
-        'adm-pending-empty': 'No pending payments',
-        'adm-refresh': 'Refresh',
-        'adm-view-slip': 'View slip',
-        'adm-approve': 'Approve', 'adm-reject': 'Reject',
-        'adm-approved': 'Approved · user upgraded',
-        'adm-rejected': 'Rejected',
-        'adm-confirm-reject': 'Confirm reject?',
-        'adm-action-fail': 'Action failed',
-        'adm-expiring-title': 'Trial expiring soon (≤ 3 days)',
-        'adm-expiring-empty': 'None',
-        'adm-quick-upgrade': 'Quick upgrade',
-        'adm-users-title': 'All Users', 'adm-users-empty': 'No users',
-        // v118.12 · customers / employees tabs
-        'adm-tab-customers': 'Customers',
-        'adm-cascade-del': 'Delete account',
-        'adm-cascade-del-tip': 'Permanently delete this account + entire firm data · cannot undo',
-        'adm-cd-title': 'Permanently delete customer',
-        'adm-cd-warn': 'This will permanently delete the owner + all employees + all OCR records / clients / ERP configs / email configs / reconciliation data. Cannot be undone — please confirm.',
-        'adm-cd-c-employees': 'Employees',
-        'adm-cd-c-ocr': 'OCR records',
-        'adm-cd-c-clients': 'Clients',
-        'adm-cd-c-erp': 'ERP endpoints',
-        'adm-cd-c-pushlog': 'Push logs',
-        'adm-cd-c-email': 'Email accounts',
-        'adm-cd-c-bank': 'Bank recon',
-        'adm-cd-type-username': 'Type username "{n}" to confirm:',
-        'adm-cd-type-password': 'Enter YOUR (super-admin) login password:',
-        'adm-cd-submit': 'Permanently delete',
-        'adm-cd-username-mismatch': 'Username mismatch · cancelled',
-        'adm-cd-password-required': 'Enter your password',
-        'adm-cd-password-invalid': 'Wrong password',
-        'adm-cd-cannot-self': 'Cannot delete yourself',
-        'adm-cd-not-owner': 'Not an owner account',
-        'adm-cd-ok': 'Deleted',
-        'adm-cd-fail': 'Delete failed',
-        'adm-cd-preview-fail': 'Failed to fetch impact',
-
-        'adm-tab-employees': 'Employees',
-        'adm-employees-empty': 'No employees yet',
-        'adm-employee-search-ph': 'Username / email / owner / firm',
-        'adm-emp-col-name': 'Employee',
-        'adm-emp-col-owner': 'Owner',
-        'adm-emp-col-tenant': 'Firm',
-        // v118.28.6
-        'adm-emp-readonly-tip': 'Read-only view · Employee management (enable/disable/reset password/remove) is the firm owner\'s responsibility · Open the owner drawer if assistance is needed',
-            'adm-emp-col-actions': 'Actions',
-            'adm-emp-enable': 'Enable',
-            'adm-emp-disable': 'Disable',
-            'adm-emp-reset-pw': 'Reset password',
-            'adm-emp-remove': 'Remove',
-            'adm-emp-confirm-enable': 'Enable',
-            'adm-emp-confirm-disable': 'Disable',
-            'adm-emp-confirm-reset-pw': 'Reset password for {n}?',
-            'adm-emp-confirm-remove': '⚠ Permanently remove employee {n}?\nAccount will be deleted · this action cannot be undone.',
-            'adm-emp-confirm-type-name': 'Type employee name "{n}" to confirm:',
-            'adm-emp-name-mismatch': 'Name mismatch · cancelled',
-            'adm-emp-toggle-ok': 'OK',
-            'adm-emp-toggle-fail': 'Failed',
-            'adm-emp-new-pw': 'New temp password (copy and tell employee):\n\n{n}\n\nEmployee will be forced to change on next login.',
-            'adm-emp-reset-fail': 'Reset failed',
-            'adm-emp-remove-ok': 'Removed',
-            'adm-emp-copy-and-close': 'Copied',
-            'adm-emp-remove-fail': 'Remove failed',
-        'adm-emp-col-status': 'Status',
-        'adm-emp-col-last-login': 'Last login',
-        'adm-emp-col-created': 'Created',
-        'adm-plan-solo': 'Solo',
-        'adm-plan-team': 'Team',
-        'adm-filter-all': 'All plans',
-        'adm-col-email': 'Email', 'adm-col-company': 'Company', 'adm-col-plan': 'Plan', 'adm-search-ph': 'Email / Company',
-        'adm-col-usage': 'Usage', 'adm-col-country': 'Country', 'adm-col-actions': 'Actions',
-        'adm-upgrade': 'Upgrade', 'adm-ban': 'Ban',
-        // v109.4 · admin modal
-        'adm-upgrade-title': 'Change Plan',
-        'adm-upg-confirm': 'Confirm Upgrade',
-        'adm-pick-plan': 'Please select a plan',
-        'adm-upgrade-ok': 'Plan updated',
-        'adm-upgrade-fail': 'Update failed',
-        'adm-ban-title': 'Ban Account',
-        'adm-ban-warn': '⚠ Banned account cannot login · action is reversible',
-        'adm-ban-reason': 'Reason',
-        'adm-ban-reason-ph': 'e.g. abuse / unpaid / test',
-        'adm-ban-confirm': 'Confirm Ban',
-        'adm-ban-ok': 'Banned',
-        'adm-ban-fail': 'Failed',
-        // v109.4 · user detail drawer
-        'adm-drawer-title': 'User Details',
-        'adm-drawer-loading': 'Loading...',
-        'adm-drawer-error': 'Failed to load · please retry',
-        'adm-drawer-no-company': 'No company',
-        'adm-drawer-sec-account': 'Account',
-        'adm-drawer-sec-contact': 'Contact',
-        'adm-drawer-sec-signup': 'Sign-up Info',
-        'adm-drawer-sec-usage': 'Usage',
-        'adm-drawer-sec-payment': 'Payments',
-        'adm-drawer-plan': 'Plan',
-        'adm-drawer-status': 'Status',
-        'adm-drawer-line': 'LINE',
-        'adm-drawer-role': 'Role',
-        'adm-drawer-email': 'Email',
-        'adm-drawer-phone': 'Phone',
-        'adm-drawer-line-id': 'LINE ID',
-        'adm-drawer-country': 'Country',
-        'adm-drawer-signed-up': 'Signed up',
-        'adm-drawer-source': 'Source',
-        'adm-drawer-source-direct': 'Direct',
-        'adm-drawer-ip': 'Sign-up IP',
-        'adm-drawer-fingerprint': 'Device fingerprint',
-        'adm-drawer-month-ocr': 'OCR this month',
-        'adm-drawer-total-ocr': 'OCR total',
-        'adm-drawer-last-ocr': 'Last OCR',
-        'adm-drawer-last-login': 'Last login',
-        'adm-drawer-payments': 'Payment count',
-        'adm-drawer-last-payment': 'Last payment',
-        'adm-drawer-banned': '🚫 Banned',
-        'adm-drawer-active': '✓ Active',
-        'adm-drawer-line-linked': 'Linked',
-        'adm-drawer-line-not-linked': 'Not linked',
-        'adm-drawer-risky': 'Risk user',
-        'adm-drawer-unlimited': 'Unlimited',
-        'time-just-now': 'just now',
-        'time-mins-ago': '{n} min ago',
-        'time-hours-ago': '{n} hr ago',
-        'time-days-ago': '{n} days ago',
-        'adm-risk-title': '⚠ Risk · Suspicious Activity',
-        'adm-risk-events-24h': '24h risk events',
-        'adm-risk-same-ip': 'Same IP multi-signups',
-        'adm-risk-same-fp': 'Same fingerprint multi-signups',
-        'adm-risk-heavy-ocr': 'Heavy OCR (>30 in 24h)',
-        'adm-risk-stat-groups': 'suspicious groups',
-        'adm-risk-stat-events': 'risk events',
-        'adm-risk-expand': 'Expand',
-        'adm-risk-collapse': 'Collapse',
-        'adm-risk-accounts': 'accounts',
-        'adm-risk-view-detail': 'View detail',
-        'adm-risk-detail-title': 'Suspicious group detail',
-        'adm-risk-batch-ban': 'Batch ban',
-        'adm-risk-confirm-batch': 'Ban these {n} accounts? You can unban them later in user management.',
-        'adm-risk-batch-done': '{n} accounts banned',
-        'adm-risk-no-targets': 'No accounts to ban (all banned or super-admin)',
-        'adm-risk-banned-tag': 'Banned',
-        'adm-risk-ocr-24h': 'OCRs / 24h',
-        'common-close': 'Close',
-        'adm-risk-clean': '✓ All clear',
-    });
-    Object.assign(I18N.th, {
-        'nav-admin-users': 'จัดการผู้ใช้',
-        'admin-users-title': 'จัดการผู้ใช้',
-        'admin-users-sub': 'ผู้สมัคร · แพ็กเกจ · รอตรวจสอบ · ควบคุมความเสี่ยง',
-        'adm-kpi-today': 'วันนี้', 'adm-kpi-week': 'สัปดาห์นี้', 'adm-kpi-month': 'เดือนนี้',
-        'adm-kpi-conv': 'อัตราชำระ',
-        'adm-pending-title': 'รอตรวจสอบการชำระ',
-        'adm-pending-empty': 'ไม่มี',
-        'adm-refresh': 'รีเฟรช',
-        'adm-view-slip': 'ดูสลิป',
-        'adm-approve': 'อนุมัติ', 'adm-reject': 'ปฏิเสธ',
-        'adm-approved': 'อนุมัติแล้ว · ผู้ใช้ได้รับการอัปเกรด',
-        'adm-rejected': 'ปฏิเสธแล้ว',
-        'adm-confirm-reject': 'ยืนยันปฏิเสธ?',
-        'adm-action-fail': 'ไม่สำเร็จ',
-        'adm-expiring-title': 'ทดลองใกล้หมดอายุ (≤ 3 วัน)',
-        'adm-expiring-empty': 'ไม่มี',
-        'adm-quick-upgrade': 'อัปเกรดทันที',
-        'adm-users-title': 'ผู้ใช้ทั้งหมด', 'adm-users-empty': 'ไม่มี',
-        // v118.12 · ลูกค้า / พนักงาน
-        'adm-tab-customers': 'ลูกค้า',
-        'adm-cascade-del': 'ลบบัญชี',
-        'adm-cascade-del-tip': 'ลบบัญชีและข้อมูลสำนักงานทั้งหมดอย่างถาวร · ไม่สามารถกู้คืนได้',
-        'adm-cd-title': 'ลบลูกค้าอย่างถาวร',
-        'adm-cd-warn': 'การดำเนินการนี้จะลบเจ้าของ + พนักงานทั้งหมด + ประวัติ OCR / ลูกค้า / ERP / อีเมล / กระทบยอดทั้งหมดอย่างถาวร · ไม่สามารถกู้คืนได้',
-        'adm-cd-c-employees': 'พนักงาน',
-        'adm-cd-c-ocr': 'OCR',
-        'adm-cd-c-clients': 'ลูกค้า',
-        'adm-cd-c-erp': 'ERP',
-        'adm-cd-c-pushlog': 'Push logs',
-        'adm-cd-c-email': 'อีเมล',
-        'adm-cd-c-bank': 'กระทบยอด',
-        'adm-cd-type-username': 'พิมพ์ชื่อผู้ใช้ "{n}" เพื่อยืนยัน:',
-        'adm-cd-type-password': 'พิมพ์รหัสผ่าน(ผู้ดูแลระบบ)ของคุณ:',
-        'adm-cd-submit': 'ลบถาวร',
-        'adm-cd-username-mismatch': 'ชื่อไม่ตรงกัน · ยกเลิก',
-        'adm-cd-password-required': 'กรอกรหัสผ่าน',
-        'adm-cd-password-invalid': 'รหัสผ่านไม่ถูกต้อง',
-        'adm-cd-cannot-self': 'ลบตัวเองไม่ได้',
-        'adm-cd-not-owner': 'ไม่ใช่บัญชีเจ้าของ',
-        'adm-cd-ok': 'ลบแล้ว',
-        'adm-cd-fail': 'ลบล้มเหลว',
-        'adm-cd-preview-fail': 'ดึงข้อมูลผลกระทบล้มเหลว',
-
-        'adm-tab-employees': 'พนักงาน',
-        'adm-employees-empty': 'ยังไม่มีพนักงาน',
-        'adm-employee-search-ph': 'ชื่อผู้ใช้ / อีเมล / เจ้าของ / สำนักงาน',
-        'adm-emp-col-name': 'พนักงาน',
-        'adm-emp-col-owner': 'เจ้าของ',
-        'adm-emp-col-tenant': 'สำนักงาน',
-        // v118.28.6
-        'adm-emp-readonly-tip': 'มุมมองแบบอ่านอย่างเดียว · การจัดการพนักงาน (เปิด/ปิด/รีเซ็ตรหัสผ่าน/ลบ) เป็นหน้าที่ของเจ้าของสำนักงาน · เปิดลิ้นชักเจ้าของหากต้องการช่วยเหลือ',
-            'adm-emp-col-actions': 'การดำเนินการ',
-            'adm-emp-enable': 'เปิดใช้',
-            'adm-emp-disable': 'ปิดใช้',
-            'adm-emp-reset-pw': 'รีเซ็ตรหัสผ่าน',
-            'adm-emp-remove': 'ลบ',
-            'adm-emp-confirm-enable': 'เปิดใช้',
-            'adm-emp-confirm-disable': 'ปิดใช้',
-            'adm-emp-confirm-reset-pw': 'รีเซ็ตรหัสผ่านให้ {n}?',
-            'adm-emp-confirm-remove': '⚠ ลบพนักงาน {n} อย่างถาวร?\nบัญชีจะถูกลบ · ไม่สามารถกู้คืนได้',
-            'adm-emp-confirm-type-name': 'พิมพ์ชื่อพนักงาน "{n}" เพื่อยืนยัน:',
-            'adm-emp-name-mismatch': 'ชื่อไม่ตรงกัน · ยกเลิก',
-            'adm-emp-toggle-ok': 'สำเร็จ',
-            'adm-emp-toggle-fail': 'ล้มเหลว',
-            'adm-emp-new-pw': 'รหัสผ่านชั่วคราวใหม่(คัดลอกและบอกพนักงาน):\n\n{n}\n\nพนักงานจะถูกบังคับให้เปลี่ยนรหัสในการเข้าสู่ระบบครั้งถัดไป',
-            'adm-emp-reset-fail': 'รีเซ็ตล้มเหลว',
-            'adm-emp-remove-ok': 'ลบแล้ว',
-            'adm-emp-copy-and-close': 'คัดลอกแล้ว',
-            'adm-emp-remove-fail': 'ลบล้มเหลว',
-        'adm-emp-col-status': 'สถานะ',
-        'adm-emp-col-last-login': 'เข้าใช้ล่าสุด',
-        'adm-emp-col-created': 'สร้างเมื่อ',
-        'adm-plan-solo': 'Solo',
-        'adm-plan-team': 'Team',
-        'adm-filter-all': 'แพ็กเกจทั้งหมด',
-        'adm-col-email': 'อีเมล', 'adm-col-company': 'บริษัท', 'adm-col-plan': 'แพ็กเกจ', 'adm-search-ph': 'อีเมล / บริษัท',
-        'adm-col-usage': 'ใช้แล้ว', 'adm-col-country': 'ประเทศ', 'adm-col-actions': 'จัดการ',
-        'adm-upgrade': 'อัปเกรด', 'adm-ban': 'ระงับ',
-        // v109.4 · admin modal
-        'adm-upgrade-title': 'เปลี่ยนแพ็กเกจ',
-        'adm-upg-confirm': 'ยืนยันอัปเกรด',
-        'adm-pick-plan': 'กรุณาเลือกแพ็กเกจ',
-        'adm-upgrade-ok': 'อัปเดตแพ็กเกจแล้ว',
-        'adm-upgrade-fail': 'อัปเดตไม่สำเร็จ',
-        'adm-ban-title': 'ระงับบัญชี',
-        'adm-ban-warn': '⚠ บัญชีที่ถูกระงับจะเข้าสู่ระบบไม่ได้ · สามารถยกเลิกได้',
-        'adm-ban-reason': 'เหตุผล',
-        'adm-ban-reason-ph': 'เช่น abuse / ค้างชำระ / ทดสอบ',
-        'adm-ban-confirm': 'ยืนยันระงับ',
-        'adm-ban-ok': 'ระงับแล้ว',
-        'adm-ban-fail': 'ล้มเหลว',
-        // v109.4 · ลิ้นชักรายละเอียดผู้ใช้
-        'adm-drawer-title': 'รายละเอียดผู้ใช้',
-        'adm-drawer-loading': 'กำลังโหลด...',
-        'adm-drawer-error': 'โหลดไม่สำเร็จ · ลองใหม่',
-        'adm-drawer-no-company': 'ไม่ได้กรอกบริษัท',
-        'adm-drawer-sec-account': 'บัญชี',
-        'adm-drawer-sec-contact': 'การติดต่อ',
-        'adm-drawer-sec-signup': 'ข้อมูลสมัคร',
-        'adm-drawer-sec-usage': 'การใช้งาน',
-        'adm-drawer-sec-payment': 'การชำระ',
-        'adm-drawer-plan': 'แพ็กเกจ',
-        'adm-drawer-status': 'สถานะ',
-        'adm-drawer-line': 'LINE',
-        'adm-drawer-role': 'บทบาท',
-        'adm-drawer-email': 'อีเมล',
-        'adm-drawer-phone': 'โทรศัพท์',
-        'adm-drawer-line-id': 'LINE ID',
-        'adm-drawer-country': 'ประเทศ',
-        'adm-drawer-signed-up': 'สมัครเมื่อ',
-        'adm-drawer-source': 'ช่องทาง',
-        'adm-drawer-source-direct': 'เข้าตรง',
-        'adm-drawer-ip': 'IP ที่สมัคร',
-        'adm-drawer-fingerprint': 'ลายนิ้วมืออุปกรณ์',
-        'adm-drawer-month-ocr': 'OCR เดือนนี้',
-        'adm-drawer-total-ocr': 'OCR รวม',
-        'adm-drawer-last-ocr': 'OCR ล่าสุด',
-        'adm-drawer-last-login': 'เข้าสู่ระบบล่าสุด',
-        'adm-drawer-payments': 'จำนวนชำระ',
-        'adm-drawer-last-payment': 'ชำระล่าสุด',
-        'adm-drawer-banned': '🚫 ระงับแล้ว',
-        'adm-drawer-active': '✓ ปกติ',
-        'adm-drawer-line-linked': 'เชื่อมแล้ว',
-        'adm-drawer-line-not-linked': 'ยังไม่เชื่อม',
-        'adm-drawer-risky': 'ผู้ใช้เสี่ยง',
-        'adm-drawer-unlimited': 'ไม่จำกัด',
-        'time-just-now': 'เพิ่งจะ',
-        'time-mins-ago': '{n} นาทีที่แล้ว',
-        'time-hours-ago': '{n} ชั่วโมงที่แล้ว',
-        'time-days-ago': '{n} วันที่แล้ว',
-        'adm-risk-title': '⚠ ควบคุมความเสี่ยง',
-        'adm-risk-events-24h': 'เหตุการณ์ 24h',
-        'adm-risk-same-ip': 'IP เดียวกันสมัครหลายบัญชี',
-        'adm-risk-same-fp': 'อุปกรณ์เดียวกันสมัครหลายบัญชี',
-        'adm-risk-heavy-ocr': 'OCR ผิดปกติ (>30 ใน 24h)',
-        'adm-risk-stat-groups': 'กลุ่มน่าสงสัย',
-        'adm-risk-stat-events': 'เหตุการณ์ความเสี่ยง',
-        'adm-risk-expand': 'ขยาย',
-        'adm-risk-collapse': 'ย่อ',
-        'adm-risk-accounts': 'บัญชี',
-        'adm-risk-view-detail': 'ดูรายละเอียด',
-        'adm-risk-detail-title': 'รายละเอียดกลุ่มน่าสงสัย',
-        'adm-risk-batch-ban': 'แบนหลายบัญชี',
-        'adm-risk-confirm-batch': 'แบน {n} บัญชีนี้? สามารถปลดแบนภายหลังได้',
-        'adm-risk-batch-done': 'แบน {n} บัญชีเรียบร้อย',
-        'adm-risk-no-targets': 'ไม่มีบัญชีให้แบน (แบนหมดแล้วหรือเป็นแอดมิน)',
-        'adm-risk-banned-tag': 'ถูกแบน',
-        'adm-risk-ocr-24h': 'OCR / 24 ชม.',
-        'common-close': 'ปิด',
-        'adm-risk-clean': '✓ ไม่มีความผิดปกติ',
-        'adm-engine-ocr': 'OCR หลัก',
-        'adm-engine-ocr-backup': 'OCR สำรอง',
-        'adm-engine-epdf': 'PDF อิเล็กทรอนิกส์',
-        'adm-engine-vex': 'กระทบยอดภาษีขาย',
-    });
-    Object.assign(I18N.ja, {
-        'nav-admin-users': 'ユーザー管理',
-        'admin-users-title': 'ユーザー管理',
-        'admin-users-sub': '登録 · プラン分布 · 審査待ち · リスク管理',
-        'adm-kpi-today': '今日', 'adm-kpi-week': '今週', 'adm-kpi-month': '今月',
-        'adm-kpi-conv': '有料転換',
-        'adm-pending-title': '審査待ちの支払',
-        'adm-pending-empty': 'なし',
-        'adm-refresh': '更新',
-        'adm-view-slip': 'スリップ',
-        'adm-approve': '承認', 'adm-reject': '拒否',
-        'adm-approved': '承認 · ユーザー昇格',
-        'adm-rejected': '拒否済',
-        'adm-confirm-reject': '拒否しますか?',
-        'adm-action-fail': '失敗',
-        'adm-expiring-title': '試用期限間近(≤ 3 日)',
-        'adm-expiring-empty': 'なし',
-        'adm-quick-upgrade': '即昇格',
-        'adm-users-title': '全ユーザー', 'adm-users-empty': 'なし',
-        // v118.12 · 顧客 / 社員
-        'adm-tab-customers': '顧客',
-        'adm-cascade-del': 'アカウント削除',
-        'adm-cascade-del-tip': 'アカウントと事務所データを完全削除 · 復元不可',
-        'adm-cd-title': '顧客を完全削除',
-        'adm-cd-warn': 'オーナー + 全社員 + OCR履歴 / 顧客 / ERP / メール / 銀行照合データを完全削除します · 復元不可 · 確認してください',
-        'adm-cd-c-employees': '社員',
-        'adm-cd-c-ocr': 'OCR',
-        'adm-cd-c-clients': '顧客',
-        'adm-cd-c-erp': 'ERP',
-        'adm-cd-c-pushlog': 'プッシュログ',
-        'adm-cd-c-email': 'メール',
-        'adm-cd-c-bank': '銀行照合',
-        'adm-cd-type-username': 'ユーザー名 "{n}" を入力して確認:',
-        'adm-cd-type-password': 'あなた(管理者)のログインパスワードを入力:',
-        'adm-cd-submit': '完全削除',
-        'adm-cd-username-mismatch': '名前が一致しません · キャンセル',
-        'adm-cd-password-required': 'パスワードを入力',
-        'adm-cd-password-invalid': 'パスワード違い',
-        'adm-cd-cannot-self': '自分を削除できません',
-        'adm-cd-not-owner': 'オーナーアカウントではない',
-        'adm-cd-ok': '削除済み',
-        'adm-cd-fail': '削除失敗',
-        'adm-cd-preview-fail': '影響範囲取得失敗',
-
-        'adm-tab-employees': '社員',
-        'adm-employees-empty': '社員なし',
-        'adm-employee-search-ph': 'ユーザー名 / メール / オーナー / 事務所',
-        'adm-emp-col-name': '社員',
-        'adm-emp-col-owner': 'オーナー',
-        'adm-emp-col-tenant': '事務所',
-        // v118.28.6
-        'adm-emp-readonly-tip': '読み取り専用ビュー · 社員管理(有効化/無効化/パスワードリセット/削除)は事務所オーナーの担当 · サポートが必要な場合はオーナードロワーを開いてください',
-            'adm-emp-col-actions': '操作',
-            'adm-emp-enable': '有効化',
-            'adm-emp-disable': '無効化',
-            'adm-emp-reset-pw': 'パスワードリセット',
-            'adm-emp-remove': '削除',
-            'adm-emp-confirm-enable': '有効化',
-            'adm-emp-confirm-disable': '無効化',
-            'adm-emp-confirm-reset-pw': '{n} のパスワードをリセットしますか?',
-            'adm-emp-confirm-remove': '⚠ 社員 {n} を完全に削除しますか?\nアカウントは削除されます · この操作は元に戻せません',
-            'adm-emp-confirm-type-name': '社員名 "{n}" を入力して確認:',
-            'adm-emp-name-mismatch': '名前が一致しません · キャンセル',
-            'adm-emp-toggle-ok': '成功',
-            'adm-emp-toggle-fail': '失敗',
-            'adm-emp-new-pw': '新しい一時パスワード(コピーして社員に伝える):\n\n{n}\n\n次回ログイン時に強制的にパスワード変更されます',
-            'adm-emp-reset-fail': 'リセット失敗',
-            'adm-emp-remove-ok': '削除済み',
-            'adm-emp-copy-and-close': 'コピー済み',
-            'adm-emp-remove-fail': '削除失敗',
-        'adm-emp-col-status': '状態',
-        'adm-emp-col-last-login': '最終ログイン',
-        'adm-emp-col-created': '作成日',
-        'adm-plan-solo': 'Solo',
-        'adm-plan-team': 'Team',
-        'adm-filter-all': '全プラン',
-        'adm-col-email': 'メール', 'adm-col-company': '会社', 'adm-col-plan': 'プラン', 'adm-search-ph': 'メール / 会社',
-        'adm-col-usage': '使用量', 'adm-col-country': '国', 'adm-col-actions': '操作',
-        'adm-upgrade': '昇格', 'adm-ban': '停止',
-        // v109.4 · admin modal
-        'adm-upgrade-title': 'プラン変更',
-        'adm-upg-confirm': 'アップグレード確認',
-        'adm-pick-plan': 'プランを選択してください',
-        'adm-upgrade-ok': 'プランを変更しました',
-        'adm-upgrade-fail': '変更に失敗しました',
-        'adm-ban-title': 'アカウント停止',
-        'adm-ban-warn': '⚠ 停止されたアカウントはログインできません · 操作は取り消し可能',
-        'adm-ban-reason': '理由',
-        'adm-ban-reason-ph': '例:abuse / 未払い / テスト',
-        'adm-ban-confirm': '停止確認',
-        'adm-ban-ok': '停止しました',
-        'adm-ban-fail': '失敗',
-        // v109.4 · ユーザー詳細ドロワー
-        'adm-drawer-title': 'ユーザー詳細',
-        'adm-drawer-loading': '読み込み中...',
-        'adm-drawer-error': '読み込み失敗 · 再試行してください',
-        'adm-drawer-no-company': '会社未入力',
-        'adm-drawer-sec-account': 'アカウント',
-        'adm-drawer-sec-contact': '連絡先',
-        'adm-drawer-sec-signup': '登録情報',
-        'adm-drawer-sec-usage': '利用状況',
-        'adm-drawer-sec-payment': '支払い',
-        'adm-drawer-plan': 'プラン',
-        'adm-drawer-status': '状態',
-        'adm-drawer-line': 'LINE',
-        'adm-drawer-role': '役割',
-        'adm-drawer-email': 'メール',
-        'adm-drawer-phone': '電話',
-        'adm-drawer-line-id': 'LINE ID',
-        'adm-drawer-country': '国',
-        'adm-drawer-signed-up': '登録日時',
-        'adm-drawer-source': '登録元',
-        'adm-drawer-source-direct': '直接アクセス',
-        'adm-drawer-ip': '登録 IP',
-        'adm-drawer-fingerprint': 'デバイス指紋',
-        'adm-drawer-month-ocr': '今月の OCR',
-        'adm-drawer-total-ocr': '累計 OCR',
-        'adm-drawer-last-ocr': '最終 OCR',
-        'adm-drawer-last-login': '最終ログイン',
-        'adm-drawer-payments': '支払い回数',
-        'adm-drawer-last-payment': '最終支払い',
-        'adm-drawer-banned': '🚫 停止中',
-        'adm-drawer-active': '✓ 正常',
-        'adm-drawer-line-linked': '連携済',
-        'adm-drawer-line-not-linked': '未連携',
-        'adm-drawer-risky': 'リスクユーザー',
-        'adm-drawer-unlimited': '無制限',
-        'time-just-now': 'たった今',
-        'time-mins-ago': '{n} 分前',
-        'time-hours-ago': '{n} 時間前',
-        'time-days-ago': '{n} 日前',
-        'adm-risk-title': '⚠ リスク · 不審な活動',
-        'adm-risk-events-24h': '24h リスクイベント',
-        'adm-risk-same-ip': '同 IP 複数登録',
-        'adm-risk-same-fp': '同指紋複数登録',
-        'adm-risk-heavy-ocr': '異常 OCR(24h で 30 超)',
-        'adm-risk-stat-groups': '不審グループ',
-        'adm-risk-stat-events': 'リスクイベント',
-        'adm-risk-expand': '展開',
-        'adm-risk-collapse': '折りたたむ',
-        'adm-risk-accounts': 'アカウント',
-        'adm-risk-view-detail': '詳細を見る',
-        'adm-risk-detail-title': '不審グループ詳細',
-        'adm-risk-batch-ban': '一括停止',
-        'adm-risk-confirm-batch': '{n} アカウントを停止しますか?後で解除可能。',
-        'adm-risk-batch-done': '{n} アカウント停止完了',
-        'adm-risk-no-targets': '停止できるアカウントがありません',
-        'adm-risk-banned-tag': '停止中',
-        'adm-risk-ocr-24h': 'OCR / 24h',
-        'common-close': '閉じる',
-        'adm-risk-clean': '✓ 異常なし',
-    });
-
-    document.addEventListener('DOMContentLoaded', () => {
-        // 显示 admin 侧栏项(super_admin 才能看见)· 复用现有 nav-admin-only 类
-        // home.js 里已经有逻辑根据 user.is_super_admin 显示这些
-        loadPlan();
-        bindAdminUsersRoute();
-        // 绑定后台筛选事件
-        const planFilter = document.getElementById('adm-plan-filter');
-        if (planFilter) planFilter.addEventListener('change', loadAdmUserList);
-        const search = document.getElementById('adm-user-search');
-        if (search) {
-            let timer;
-            search.addEventListener('input', () => {
-                clearTimeout(timer);
-                timer = setTimeout(loadAdmUserList, 300);
-            });
-        }
-        const refr = document.getElementById('adm-refresh-pending');
-        if (refr) refr.addEventListener('click', loadAdminUsersPage);
-
-        setInterval(loadPlan, 60000); // 1 分钟
-    });
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        loadPlan();
-        bindAdminUsersRoute();
-        setInterval(loadPlan, 60000);
-    }
-
-    // v109.4 · 暴露给 routeTo 调用 · 让侧栏点击能直接触发表格加载
-    window.loadAdminUsersPage = loadAdminUsersPage;
-
-    // ============================================================
-    // v118.12 · 员工 tab(新)· 仅超管查看 · 显示所有 role=member 用户
-    // ============================================================
-    let _admEmployeesCache = [];
-
-    async function loadAdmEmployees() {
-        const tok = localStorage.getItem('mrpilot_token');
-        if (!tok) return;
-        try {
-            const r = await fetch('/api/admin/employees', { headers: { 'Authorization': 'Bearer ' + tok } });
-            if (r.status === 403) return;
-            const data = await r.json();
-            _admEmployeesCache = data.employees || [];
-            renderAdmEmployees(_admEmployeesCache);
-        } catch (e) {
-            console.error('loadAdmEmployees', e);
-        }
-    }
-
-    function renderAdmEmployees(employees) {
-        const wrap = document.getElementById('adm-employees-table');
-        if (!wrap) return;
-        // 应用搜索过滤
-        const q = (document.getElementById('adm-employee-search')?.value || '').toLowerCase().trim();
-        const filtered = q
-            ? employees.filter(e =>
-                (e.username || '').toLowerCase().includes(q) ||
-                (e.email || '').toLowerCase().includes(q) ||
-                (e.tenant_name || '').toLowerCase().includes(q) ||
-                (e.owner_username || '').toLowerCase().includes(q))
-            : employees;
-        if (!filtered.length) {
-            wrap.innerHTML = `<div class="adm-empty">${esc(tt('adm-employees-empty'))}</div>`;
-            return;
-        }
-        // v118.28.6 · 只读化 · 砍「禁用/启用 / 重置密码 / 移除」3 个写按钮
-        // 行业惯例:Xero/QuickBooks/Stripe 超管对客户内部员工 = 只读 + 跳老板抽屉
-        wrap.innerHTML = `
-            <div class="adm-emp-readonly-tip">${esc(tt('adm-emp-readonly-tip'))}</div>
-            <div class="adm-emp-row adm-emp-row-head">
-                <div>${esc(tt('adm-emp-col-name'))}</div>
-                <div>${esc(tt('adm-emp-col-owner'))}</div>
-                <div>${esc(tt('adm-emp-col-tenant'))}</div>
-                <div>${esc(tt('adm-emp-col-status'))}</div>
-                <div>${esc(tt('adm-emp-col-last-login'))}</div>
-            </div>
-            ${filtered.map(e => {
-                const statusCls = (e.is_active === false) ? 'adm-emp-status-disabled' : 'adm-emp-status-active';
-                const statusTxt = (e.is_active === false) ? tt('team-status-disabled') : tt('team-status-active');
-                const lastLogin = e.last_login_at
-                    ? new Date(e.last_login_at).toLocaleDateString()
-                    : tt('team-never-login');
-                return `
-                    <div class="adm-emp-row">
-                        <div>
-                            <div class="adm-emp-cell-strong">${esc(e.username || '?')}</div>
-                            <div class="adm-emp-cell-mute">${esc(e.email || '—')}</div>
-                        </div>
-                        <div>
-                            ${e.owner_id ? `<a class="adm-emp-owner-link" onclick="window.__adm_open_user_drawer('${esc(e.owner_id)}')">${esc(e.owner_username || e.owner_email || '—')}</a>` : '—'}
-                        </div>
-                        <div class="adm-emp-cell-mute">${esc(e.tenant_name || '—')}</div>
-                        <div class="${statusCls}">${esc(statusTxt)}</div>
-                        <div class="adm-emp-cell-mute">${esc(lastLogin)}</div>
-                    </div>
-                `;
-            }).join('')}
-        `;
-    }
-
-    // v118.13 · 员工 tab 操作处理 · v118.14 改用统一 modal
-    window.__adm_emp_toggle = async function(employeeId, username, makeActive) {
-        if (!employeeId) return;
-        const verb = makeActive ? (tt('adm-emp-confirm-enable') || '启用') : (tt('adm-emp-confirm-disable') || '禁用');
-        const ok = await showConfirm(`${verb} ${username}?`, {
-            title: tt('adm-emp-col-actions') || '操作',
-            danger: !makeActive,
-        });
-        if (!ok) return;
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/employees/${encodeURIComponent(employeeId)}/active`, {
-                method: 'PATCH',
-                headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_active: !!makeActive }),
-            });
-            if (r.ok) {
-                showToast(tt('adm-emp-toggle-ok') || '操作成功', 'success');
-                loadAdmEmployees();
-            } else {
-                showToast(tt('adm-emp-toggle-fail') || '操作失败', 'error');
-            }
-        } catch (e) { showToast(tt('adm-emp-toggle-fail') || '操作失败', 'error'); }
-    };
-
-    window.__adm_emp_reset_pw = async function(employeeId, username) {
-        if (!employeeId) return;
-        const ok = await showConfirm(
-            (tt('adm-emp-confirm-reset-pw') || '为 {n} 重置密码?').replace('{n}', username),
-            { title: tt('adm-emp-reset-pw') || '重置密码' }
-        );
-        if (!ok) return;
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/employees/${encodeURIComponent(employeeId)}/reset-password`, {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
-            });
-            const data = await r.json();
-            if (r.ok && data.new_password) {
-                // 用统一 modal · 单按钮信息提示(替代 alert)
-                await showConfirm(
-                    (tt('adm-emp-new-pw') || '新临时密码(请复制并告诉员工):\n\n{n}\n\n下次登录会强制员工改密。').replace('{n}', data.new_password),
-                    {
-                        title: tt('adm-emp-reset-pw') || '重置密码',
-                        okText: tt('adm-emp-copy-and-close') || '我已复制',
-                        hideCancel: true,
-                    }
-                );
-            } else {
-                showToast(tt('adm-emp-reset-fail') || '重置失败', 'error');
-            }
-        } catch (e) { showToast(tt('adm-emp-reset-fail') || '重置失败', 'error'); }
-    };
-
-    window.__adm_emp_remove = async function(employeeId, username) {
-        if (!employeeId) return;
-        // 第 1 步:danger confirm
-        const ok1 = await showConfirm(
-            (tt('adm-emp-confirm-remove') || '⚠ 永久移除员工 {n}?\n该员工的账号将被删除 · 此操作不可恢复。').replace('{n}', username),
-            { title: tt('adm-emp-remove') || '移除', danger: true }
-        );
-        if (!ok1) return;
-        // 第 2 步:输入员工名再次确认 · 用 promptInput 模式
-        const typed = await showConfirm(
-            (tt('adm-emp-confirm-type-name') || '请输入员工名 "{n}" 以确认删除:').replace('{n}', username),
-            {
-                title: tt('adm-emp-remove') || '移除',
-                danger: true,
-                promptInput: true,
-                placeholder: username,
-                okText: tt('adm-emp-remove') || '移除',
-            }
-        );
-        if (typed === null) return; // 取消
-        if (typed !== username) {
-            showToast(tt('adm-emp-name-mismatch') || '员工名不匹配 · 已取消', 'info');
-            return;
-        }
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch(`/api/admin/employees/${encodeURIComponent(employeeId)}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': 'Bearer ' + tok },
-            });
-            if (r.ok) {
-                showToast(tt('adm-emp-remove-ok') || '已移除', 'success');
-                loadAdmEmployees();
-            } else {
-                showToast(tt('adm-emp-remove-fail') || '移除失败', 'error');
-            }
-        } catch (e) { showToast(tt('adm-emp-remove-fail') || '移除失败', 'error'); }
-    };
-
-    // tab 切换
-    document.addEventListener('click', (ev) => {
-        const tabBtn = ev.target.closest('.adm-tab[data-adm-tab]');
-        if (!tabBtn) return;
-        const targetTab = tabBtn.dataset.admTab;
-        document.querySelectorAll('.adm-tab[data-adm-tab]').forEach(b =>
-            b.classList.toggle('active', b.dataset.admTab === targetTab));
-        document.querySelectorAll('[data-adm-tab-pane]').forEach(p => {
-            p.style.display = (p.dataset.admTabPane === targetTab) ? '' : 'none';
-        });
-        document.querySelectorAll('[data-adm-tab-filter]').forEach(f => {
-            f.style.display = (f.dataset.admTabFilter === targetTab) ? '' : 'none';
-        });
-        if (targetTab === 'employees') loadAdmEmployees();
-        if (targetTab === 'logs') loadAdmLogs(1);
-    });
-
-    // 员工搜索 · 实时过滤
-    document.addEventListener('input', (ev) => {
-        if (ev.target && ev.target.id === 'adm-employee-search') {
-            renderAdmEmployees(_admEmployeesCache);
-        }
-        if (ev.target && ev.target.id === 'adm-logs-search') {
-            clearTimeout(window.__admLogsSearchTimer);
-            window.__admLogsSearchTimer = setTimeout(function() {
-                _admLogsState.q = (ev.target.value || '').trim();
-                loadAdmLogs(1);
-            }, 350);
-        }
-    });
-
-    // v118.29.0 · CSV 导出 · 用 fetch 拿 token + blob 下载(避免 GET URL 暴露 token)
-    async function _csvDownload(url, filename) {
-        const tok = localStorage.getItem('mrpilot_token');
-        if (!tok) return;
-        try {
-            const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + tok } });
-            if (!resp.ok) {
-                showToast(tt('adm-csv-failed') || 'Export failed', 'error');
-                return;
-            }
-            const blob = await resp.blob();
-            const a = document.createElement('a');
-            const objUrl = URL.createObjectURL(blob);
-            a.href = objUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(function() {
-                URL.revokeObjectURL(objUrl);
-                a.remove();
-            }, 100);
-            showToast(tt('adm-csv-ok') || 'Exported', 'success');
-        } catch (e) {
-            showToast(tt('adm-csv-failed') || 'Export failed', 'error');
-        }
-    }
-
-    document.addEventListener('click', function(ev) {
-        const btnUsers = ev.target.closest('#adm-users-csv-btn');
-        if (btnUsers) {
-            ev.preventDefault();
-            _csvDownload('/api/admin/users.csv', 'pearnly_users.csv');
-            return;
-        }
-        const btnLogs = ev.target.closest('#adm-logs-csv-btn');
-        if (btnLogs) {
-            ev.preventDefault();
-            const q = encodeURIComponent(_admLogsState.q || '');
-            _csvDownload('/api/admin/logs.csv?q=' + q, 'pearnly_logs.csv');
-            return;
-        }
-        // 分页器按钮
-        const pgBtn = ev.target.closest('.adm-pager-btn[data-adm-page]');
-        if (pgBtn && !pgBtn.disabled) {
-            const targetPage = parseInt(pgBtn.dataset.admPage, 10);
-            const scope = pgBtn.dataset.admPagerScope;
-            if (scope === 'logs') loadAdmLogs(targetPage);
-        }
-    });
-
-    // ============================================================
-    // v118.29.0 · 操作日志加载 + 渲染 + 分页
-    // ============================================================
-    const _admLogsState = { page: 1, per_page: 50, q: '', total: 0, rows: [] };
-
-    async function loadAdmLogs(page) {
-        const tok = localStorage.getItem('mrpilot_token');
-        if (!tok) return;
-        const tbl = document.getElementById('adm-logs-table');
-        if (tbl) tbl.innerHTML = '<div class="adm-log-empty">' + esc(tt('adm-logs-loading') || 'Loading...') + '</div>';
-        _admLogsState.page = page || 1;
-        try {
-            const url = '/api/admin/logs?page=' + _admLogsState.page +
-                '&per_page=' + _admLogsState.per_page +
-                '&q=' + encodeURIComponent(_admLogsState.q || '');
-            const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + tok } });
-            if (!r.ok) throw new Error('http_' + r.status);
-            const data = await r.json();
-            _admLogsState.rows = data.logs || [];
-            _admLogsState.total = data.total || 0;
-            renderAdmLogs();
-            renderAdmLogsPager();
-        } catch (e) {
-            if (tbl) tbl.innerHTML = '<div class="adm-log-empty">' + esc(tt('adm-logs-fail') || 'Failed to load') + '</div>';
-        }
-    }
-
-    function renderAdmLogs() {
-        const tbl = document.getElementById('adm-logs-table');
-        if (!tbl) return;
-        const rows = _admLogsState.rows || [];
-        if (!rows.length) {
-            tbl.innerHTML = '<div class="adm-log-empty">' + esc(tt('adm-logs-empty') || 'No logs') + '</div>';
-            return;
-        }
-        const head = `
-            <div class="adm-log-row adm-log-head">
-                <div>${esc(tt('adm-log-time') || 'Time')}</div>
-                <div>${esc(tt('adm-log-actor') || 'Actor')}</div>
-                <div>${esc(tt('adm-log-action') || 'Action')}</div>
-                <div>${esc(tt('adm-log-target') || 'Target')}</div>
-                <div>${esc(tt('adm-log-ip') || 'IP')}</div>
-            </div>`;
-        const body = rows.map(function(l) {
-            let timeStr = '';
-            if (l.created_at) {
-                try {
-                    const d = new Date(l.created_at);
-                    timeStr = d.toLocaleString();
-                } catch (e) { timeStr = l.created_at; }
-            }
-            const actor = (l.actor_username || '-') + (l.actor_is_super ? ' ⭐' : '');
-            return `
-                <div class="adm-log-row">
-                    <div class="adm-log-time" data-label="${esc(tt('adm-log-time') || 'Time')}">${esc(timeStr)}</div>
-                    <div class="adm-log-actor" data-label="${esc(tt('adm-log-actor') || 'Actor')}">${esc(actor)}</div>
-                    <div data-label="${esc(tt('adm-log-action') || 'Action')}"><span class="adm-log-action">${esc(l.action || '-')}</span></div>
-                    <div class="adm-log-target" data-label="${esc(tt('adm-log-target') || 'Target')}">${esc(l.target_name || l.target_type || '-')}</div>
-                    <div class="adm-log-ip" data-label="${esc(tt('adm-log-ip') || 'IP')}">${esc(l.ip || '-')}</div>
-                </div>`;
-        }).join('');
-        tbl.innerHTML = head + body;
-    }
-
-    function renderAdmLogsPager() {
-        const wrap = document.getElementById('adm-pager-logs');
-        if (!wrap) return;
-        const total = _admLogsState.total || 0;
-        const page = _admLogsState.page || 1;
-        const per = _admLogsState.per_page || 50;
-        const totalPages = Math.max(1, Math.ceil(total / per));
-        const info = (tt('adm-pager-total') || 'Total {n}').replace('{n}', total);
-        const pageStr = (tt('adm-pager-page') || 'Page {p} / {t}').replace('{p}', page).replace('{t}', totalPages);
-        wrap.style.display = '';
-        wrap.innerHTML = `
-            <div class="adm-pager-info">${esc(info)}</div>
-            <div class="adm-pager-ctrl">
-                <button class="adm-pager-btn" type="button" data-adm-page="${page - 1}" data-adm-pager-scope="logs" ${page <= 1 ? 'disabled' : ''}>← ${esc(tt('adm-pager-prev') || 'Prev')}</button>
-                <span class="adm-pager-page">${esc(pageStr)}</span>
-                <button class="adm-pager-btn" type="button" data-adm-page="${page + 1}" data-adm-pager-scope="logs" ${page >= totalPages ? 'disabled' : ''}>${esc(tt('adm-pager-next') || 'Next')} →</button>
-            </div>`;
-    }
-
-    window.loadAdmEmployees = loadAdmEmployees;
-})();
+// v118.34 · 旧 upgrade-modal IIFE 已删除 (2943 行) · credits 系统替代
 // ============================================================
 // v109.3 END
 // ============================================================
@@ -31953,12 +28880,10 @@ window.addEventListener('DOMContentLoaded', () => {
 (function () {
     'use strict';
 
-    // ---- 测试白名单判定(复刻 test-center _isAllowed 同款 3 条件) ----
+    // ---- 测试白名单判定 · v118.35 严格按 email 匹配,移除 URL/localStorage/UUID 旁路 ----
     function _isInTestWhitelist(u) {
         try {
-            if (location.search.indexOf('test_center=1') >= 0) return true;
-            if (localStorage.getItem('pearnly_test_mode') === '1') return true;
-            if (u && u.id && String(u.id) === '468b50c1-5593-4fd6-990d-515ce8085563') return true;
+            if (u && u.email && String(u.email).toLowerCase() === 'skin306152@gmail.com') return true;
         } catch (_) {}
         return false;
     }
@@ -33040,18 +29965,23 @@ window.addEventListener('DOMContentLoaded', () => {
         const elInv = document.getElementById('dash-kpi-invoices');
         const elPend = document.getElementById('dash-kpi-pending');
         const elExc = document.getElementById('dash-kpi-exceptions');
-        const elPlan = document.getElementById('dash-kpi-plan');
-        const elPlanSub = document.getElementById('dash-kpi-plan-sub');
+        // v118.34 · dash-kpi-plan 已删除
+        const elCredits = document.getElementById('dash-kpi-credits');
+        const elCreditsSub = document.getElementById('dash-kpi-credits-sub');
+        const elCreditsCard = document.getElementById('dash-kpi-credits-card');
+        const elUsage = document.getElementById('dash-kpi-usage');
+        const elUsageSub = document.getElementById('dash-kpi-usage-sub');
         const elList = document.getElementById('dash-recent-list');
         const elExcBadge = document.getElementById('dash-quick-exc-badge');
         // 1. 拿 plan + 最近识别(并行 · 已有 endpoint · 不动后端)
         try {
             const auth = { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
             // 修正: /api/me/plan 不存在 → 用 /api/me/tenant-usage + /api/history
-            const [usage, recent, excStats] = await Promise.all([
+            const [usage, recent, excStats, credits] = await Promise.all([
                 fetch('/api/me/tenant-usage', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
                 fetch('/api/history?limit=20', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
                 fetch('/api/exceptions/stats?status=pending', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch('/api/me/credits', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
             ]);
             // 本月发票 = tenant-usage 里的 ocr_this_month
             const mInv = (usage && usage.ocr_this_month) || 0;
@@ -33071,13 +30001,66 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (excCount > 0) { elExcBadge.style.display = ''; elExcBadge.textContent = excCount; }
                 else { elExcBadge.style.display = 'none'; }
             }
-            // 配额显示 · 来自 tenant-usage
-            if (elPlan && usage) {
-                const used = usage.ocr_this_month || 0;
-                const quota = usage.quota || 0;
-                elPlan.textContent = _fmtNum(used);
-                if (elPlanSub) {
-                    elPlanSub.textContent = quota ? (used + ' / ' + _fmtNum(quota) + ' 张') : _t('dash-kpi-plan-sub', '本月用量');
+            // v118.34 · 旧「配额」KPI 卡已删除 · 由「账户余额」+「本月用量」替代
+            // 余额 + 用量卡片（区分老板/员工视角）
+            if (credits) {
+                const _esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+                if (credits.is_owner) {
+                    // ── 老板视角 ──────────────────────────────
+                    if (elCreditsCard) elCreditsCard.style.display = '';
+                    const exempt = credits.is_billing_exempt;
+                    const bal = credits.balance_thb != null ? Number(credits.balance_thb) : 0;
+                    const pages = credits.pages_this_month || 0;
+                    // 余额
+                    if (elCredits) {
+                        if (exempt) {
+                            elCredits.textContent = '∞';
+                            elCredits.classList.remove('dash-red');
+                        } else {
+                            elCredits.textContent = '฿' + bal.toFixed(2);
+                            if (bal < 50) elCredits.classList.add('dash-red');
+                            else elCredits.classList.remove('dash-red');
+                        }
+                    }
+                    if (elCreditsSub) {
+                        elCreditsSub.textContent = exempt
+                            ? _t('dash-kpi-credits-exempt', '豁免账号')
+                            : _t('dash-kpi-credits-sub', '账户余额');
+                    }
+                    // 充值入口
+                    const topupEl = document.getElementById('dash-kpi-topup-link');
+                    if (topupEl && !exempt) {
+                        topupEl.style.display = '';
+                        topupEl.innerHTML = '<a href="#" style="color:#E26E4B;font-size:11px;text-decoration:none" onclick="event.preventDefault();window._openTopupModal&&window._openTopupModal()">' + _t('dash-topup', '充值') + ' →</a>';
+                    }
+                    // 总用量
+                    if (elUsage) elUsage.textContent = _fmtNum(pages);
+                    if (elUsageSub) {
+                        elUsageSub.textContent = pages > 200
+                            ? pages + ' 张 @0.75฿'
+                            : pages + '/200 张';
+                    }
+                    // 按用户拆分列表
+                    const bdEl = document.getElementById('dash-kpi-usage-breakdown');
+                    if (bdEl) {
+                        const breakdown = credits.user_breakdown || [];
+                        if (breakdown.length > 0) {
+                            const rows = breakdown.map(r =>
+                                '<div style="display:flex;justify-content:space-between;font-size:11px;color:#999;padding:1px 0"><span>' + _esc(r.name) + '</span><span>' + _esc(r.count) + ' 张</span></div>'
+                            ).join('');
+                            bdEl.innerHTML = '<div style="margin-top:6px;border-top:1px solid #eee;padding-top:4px">' + rows + '</div>';
+                        } else {
+                            bdEl.innerHTML = '';
+                        }
+                    }
+                } else {
+                    // ── 员工视角：完全隐藏余额卡，只显示自己用量 ──
+                    if (elCreditsCard) elCreditsCard.style.display = 'none';
+                    const myCount = credits.my_invoice_count || 0;
+                    if (elUsage) elUsage.textContent = _fmtNum(myCount);
+                    if (elUsageSub) elUsageSub.textContent = myCount + ' 张';
+                    const bdEl = document.getElementById('dash-kpi-usage-breakdown');
+                    if (bdEl) bdEl.innerHTML = '';
                 }
             }
             // 最近 5 条
@@ -33631,4 +30614,403 @@ window.addEventListener('DOMContentLoaded', () => {
             SELECTORS.forEach(_refreshTheadLang);
         });
     }
+})();
+
+// ── 充值申请弹窗 IIFE ──────────────────────────────────────────────────────────
+(function () {
+    'use strict';
+
+    let _currentRequestId = null;
+
+    function _t(k, fb) {
+        return (window._i18nGet && window._i18nGet(k)) || fb || k;
+    }
+
+    window._openTopupModal = function () {
+        const overlay = document.getElementById('topup-modal-overlay');
+        if (!overlay) return;
+        _currentRequestId = null;
+        const s1 = document.getElementById('topup-step-1');
+        const s2 = document.getElementById('topup-step-2');
+        if (s1) s1.style.display = '';
+        if (s2) s2.style.display = 'none';
+        ['topup-amount-input', 'topup-payer-input', 'topup-note-input', 'topup-slip-input'].forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        const errEl = document.getElementById('topup-amount-error');
+        if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+        overlay.style.display = 'flex';
+    };
+
+    window._closeTopupModal = function () {
+        const overlay = document.getElementById('topup-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+        if (typeof window.loadDashboard === 'function') window.loadDashboard();
+    };
+
+    window._topupSubmitRequest = async function () {
+        const amtEl = document.getElementById('topup-amount-input');
+        const payerEl = document.getElementById('topup-payer-input');
+        const noteEl = document.getElementById('topup-note-input');
+        const submitBtn = document.getElementById('topup-submit-btn');
+        const amt = parseFloat(amtEl ? amtEl.value : '');
+        const errEl = document.getElementById('topup-amount-error');
+        if (!amt || amt <= 0) {
+            if (errEl) { errEl.textContent = _t('topup-amount-err', '请输入有效金额'); errEl.style.display = ''; }
+            return;
+        }
+        if (errEl) errEl.style.display = 'none';
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = _t('topup-submitting', '提交中…'); }
+        try {
+            const token = localStorage.getItem('mrpilot_token') || '';
+            const res = await fetch('/api/credits/topup/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({
+                    amount_thb: amt,
+                    payer_name: payerEl ? payerEl.value.trim() : '',
+                    note: noteEl ? noteEl.value.trim() : '',
+                })
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+            _currentRequestId = data.request_id;
+            const s1 = document.getElementById('topup-step-1');
+            const s2 = document.getElementById('topup-step-2');
+            if (s1) s1.style.display = 'none';
+            if (s2) s2.style.display = '';
+        } catch (e) {
+            if (errEl) { errEl.textContent = _t('topup-submit-fail', '提交失败') + ': ' + e.message; errEl.style.display = ''; }
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = _t('topup-submit-btn', '提交充值申请'); }
+        }
+    };
+
+    window._topupUploadSlip = async function () {
+        if (!_currentRequestId) return;
+        const fileEl = document.getElementById('topup-slip-input');
+        const upErrEl = document.getElementById('topup-upload-error');
+        if (!fileEl || !fileEl.files || !fileEl.files[0]) {
+            window._closeTopupModal();
+            return;
+        }
+        const uploadBtn = document.getElementById('topup-upload-btn');
+        if (upErrEl) upErrEl.style.display = 'none';
+        if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = _t('topup-uploading', '上传中…'); }
+        try {
+            const token = localStorage.getItem('mrpilot_token') || '';
+            const fd = new FormData();
+            fd.append('file', fileEl.files[0]);
+            const res = await fetch('/api/credits/topup/upload-slip/' + _currentRequestId, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token },
+                body: fd
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+            if (data.auto_approved) {
+                if (window.showToast) window.showToast(_t('topup-auto-approved', '充值成功，余额已更新'), 'success');
+            } else {
+                if (window.showToast) window.showToast(_t('topup-pending-review', '截图已收到，等待审核'), 'info');
+            }
+            window._closeTopupModal();
+        } catch (e) {
+            if (upErrEl) { upErrEl.textContent = _t('topup-upload-fail', '上传失败') + ': ' + e.message; upErrEl.style.display = ''; }
+            if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = _t('topup-upload-btn', '上传截图'); }
+        }
+    };
+
+    document.addEventListener('click', function (ev) {
+        const overlay = document.getElementById('topup-modal-overlay');
+        if (overlay && ev.target === overlay) window._closeTopupModal();
+    });
+
+    document.addEventListener('input', function (ev) {
+        if (ev.target && ev.target.id === 'topup-amount-input') {
+            const errEl = document.getElementById('topup-amount-error');
+            if (errEl) errEl.style.display = 'none';
+        }
+    });
+})();
+
+// ── 使用明细 · loadUsageHistory ───────────────────────────────────────────────
+async function loadUsageHistory(page) {
+    page = page || 1;
+    const wrap = document.getElementById('usage-history-table');
+    const pagerEl = document.getElementById('usage-history-pager');
+    const filterEl = document.getElementById('usage-history-filter');
+    const userFilterEl = document.getElementById('usage-history-user-filter');
+    if (!wrap) return;
+
+    const _t = function(k, fb) { return (window._i18nGet && window._i18nGet(k)) || fb || k; };
+    const token = localStorage.getItem('mrpilot_token') || '';
+    const perPage = 20;
+
+    wrap.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-size:13px">' + _t('usage-history-loading', '加载中…') + '</div>';
+    if (pagerEl) pagerEl.innerHTML = '';
+
+    const userId = userFilterEl ? userFilterEl.value : '';
+    let url = '/api/credits/usage-history?page=' + page + '&per_page=' + perPage;
+    if (userId) url += '&user_id=' + encodeURIComponent(userId);
+
+    try {
+        const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const isOwner = data.is_owner;
+
+        // Owner: show user filter dropdown, populate members on first load
+        if (isOwner && filterEl) {
+            filterEl.style.display = '';
+            if (userFilterEl && data.members && data.members.length && userFilterEl.options.length <= 1) {
+                data.members.forEach(function(m) {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.email || m.username || m.id;
+                    userFilterEl.appendChild(opt);
+                });
+            }
+        }
+
+        if (!data.rows || !data.rows.length) {
+            wrap.innerHTML = '<div style="padding:24px;text-align:center;color:#aaa;font-size:13px">' + _t('usage-history-empty', '暂无使用记录') + '</div>';
+            return;
+        }
+
+        const fmtDate = function(s) { return s ? s.replace('T', ' ').slice(0, 16) : '—'; };
+        const cols = isOwner
+            ? ['usage-history-col-date','usage-history-col-user','usage-history-col-file','usage-history-col-pages','usage-history-col-cost']
+            : ['usage-history-col-date','usage-history-col-file','usage-history-col-pages','usage-history-col-cost'];
+
+        let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+        html += '<thead><tr style="background:#f8fafc;border-bottom:1px solid #e5e7eb">';
+        cols.forEach(function(k) {
+            html += '<th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;white-space:nowrap">' + _t(k, k) + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+
+        data.rows.forEach(function(r) {
+            const fname = r.filename ? r.filename.split('/').pop().split('\\').pop() : '—';
+            html += '<tr style="border-bottom:1px solid #f1f5f9">';
+            html += '<td style="padding:8px 12px;color:#64748b;white-space:nowrap;font-size:12px">' + fmtDate(r.date) + '</td>';
+            if (isOwner) {
+                html += '<td style="padding:8px 12px;color:#374151;font-size:12px">' + (r.user_email || '—') + '</td>';
+            }
+            html += '<td style="padding:8px 12px;color:#374151;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + fname + '">' + fname + '</td>';
+            html += '<td style="padding:8px 12px;color:#374151;text-align:right">' + (r.pages || 0) + '</td>';
+            html += '<td style="padding:8px 12px;color:#374151;text-align:right;white-space:nowrap">฿' + Math.abs(r.cost_thb).toFixed(2) + '</td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        wrap.innerHTML = html;
+
+        // Pager
+        if (pagerEl && data.total > perPage) {
+            const totalPages = Math.ceil(data.total / perPage);
+            let pHtml = '<span style="color:#94a3b8;font-size:12px">' + page + ' / ' + totalPages + '</span>';
+            if (page > 1) {
+                pHtml += ' <button onclick="loadUsageHistory(' + (page - 1) + ')" style="padding:4px 10px;border:1px solid #e5e7eb;border-radius:5px;background:#fff;cursor:pointer;font-size:12px">' + _t('usage-history-prev', '‹ 上一页') + '</button>';
+            }
+            if (page < totalPages) {
+                pHtml += ' <button onclick="loadUsageHistory(' + (page + 1) + ')" style="padding:4px 10px;border:1px solid #e5e7eb;border-radius:5px;background:#fff;cursor:pointer;font-size:12px">' + _t('usage-history-next', '下一页 ›') + '</button>';
+            }
+            pagerEl.innerHTML = pHtml;
+        }
+    } catch (e) {
+        wrap.innerHTML = '<div style="padding:20px;color:#dc2626;font-size:13px">加载失败: ' + e.message + '</div>';
+    }
+}
+
+window.loadUsageHistory = loadUsageHistory;
+
+document.addEventListener('change', function(ev) {
+    if (ev.target && ev.target.id === 'usage-history-user-filter') {
+        loadUsageHistory(1);
+    }
+});
+
+// ===== 导出报告 =====
+(function() {
+    function _toggleMenu() {
+        var menu = document.getElementById('usage-export-menu');
+        if (!menu) return;
+        menu.style.display = (menu.style.display === 'none' || !menu.style.display) ? 'block' : 'none';
+    }
+    function _closeMenu() {
+        var menu = document.getElementById('usage-export-menu');
+        if (menu) menu.style.display = 'none';
+    }
+    document.addEventListener('click', function(ev) {
+        var btn = document.getElementById('usage-export-btn');
+        var menu = document.getElementById('usage-export-menu');
+        if (!menu || menu.style.display === 'none') return;
+        if (btn && (btn === ev.target || btn.contains(ev.target))) return;
+        if (menu === ev.target || menu.contains(ev.target)) return;
+        _closeMenu();
+    });
+
+    async function _exportUsageReport(fmt) {
+        _closeMenu();
+        var btn = document.getElementById('usage-export-btn');
+        var originalText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = (window._t ? window._t('usage-export-loading', '生成中…') : '生成中…');
+        }
+        try {
+            var token = localStorage.getItem('mrpilot_token');
+            var lang = (typeof currentLang === 'string' ? currentLang : (localStorage.getItem('mrpilot_lang') || 'zh'));
+            if (['zh', 'en', 'th', 'ja'].indexOf(lang) < 0) lang = 'zh';
+            var uidSel = document.getElementById('usage-history-user-filter');
+            var uid = (uidSel && uidSel.value) ? uidSel.value : '';
+            var now = new Date();
+            var y = now.getFullYear();
+            var m = String(now.getMonth() + 1).padStart(2, '0');
+            var firstDay = y + '-' + m + '-01';
+            var today = y + '-' + m + '-' + String(now.getDate()).padStart(2, '0');
+            var qs = 'start_date=' + firstDay + '&end_date=' + today + '&format=' + fmt + '&lang=' + lang;
+            if (uid) qs += '&user_id=' + encodeURIComponent(uid);
+
+            var resp = await fetch('/api/credits/usage-report?' + qs, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            if (!resp.ok) {
+                var msg = (window._t ? window._t('usage-export-fail', '导出失败') : '导出失败');
+                try {
+                    var err = await resp.json();
+                    if (err && err.detail) msg += ': ' + err.detail;
+                } catch (e) {}
+                if (window.showToast) window.showToast(msg, 'error');
+                else alert(msg);
+                return;
+            }
+            var blob = await resp.blob();
+            var cd = resp.headers.get('Content-Disposition') || '';
+            var fname = 'pearnly_usage_' + y + m + '.' + fmt;
+            var match = cd.match(/filename="?([^";]+)"?/i);
+            if (match) fname = match[1];
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = fname;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+        } catch (e) {
+            var msg = (window._t ? window._t('usage-export-fail', '导出失败') : '导出失败') + ': ' + (e && e.message || e);
+            if (window.showToast) window.showToast(msg, 'error');
+            else alert(msg);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+    }
+    window._toggleUsageExportMenu = _toggleMenu;
+    window._exportUsageReport = _exportUsageReport;
+})();
+
+// ============================================================
+// v118.34 · 员工首次登录强制改密 modal
+// 触发:_userInfo.must_change_password === true(后端 /api/me 返回)
+// 锁定:overlay 无关闭按钮、不能 ESC、不能点外部关闭 · 必须改完才放行
+// ============================================================
+(function() {
+    function _t(key, fallback) { return (window.t ? window.t(key, fallback) : (fallback || key)); }
+    function _esc(s) {
+        if (s === null || s === undefined) return '';
+        return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    let _shown = false;
+
+    function open() {
+        if (_shown) return;
+        if (document.getElementById('force-pwd-overlay')) return;
+        _shown = true;
+        const overlay = document.createElement('div');
+        overlay.id = 'force-pwd-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.65);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px);';
+        overlay.innerHTML = `
+            <div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:24px;box-shadow:0 14px 50px rgba(0,0,0,.22);font-family:inherit">
+                <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:6px">${_esc(_t('force-pwd-title', '请先修改密码'))}</div>
+                <div style="font-size:13px;color:#475569;line-height:1.55;margin-bottom:14px">${_esc(_t('force-pwd-sub', '老板创建账号时给了一个临时密码 · 出于安全考虑请立即修改'))}</div>
+                <div style="margin-bottom:10px">
+                    <label style="display:block;font-size:12px;color:#475569;margin-bottom:4px">${_esc(_t('force-pwd-old', '当前密码(老板给的)'))}</label>
+                    <input id="force-pwd-old" type="password" autocomplete="current-password" style="width:100%;padding:9px 11px;border:1px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit;box-sizing:border-box">
+                </div>
+                <div style="margin-bottom:10px">
+                    <label style="display:block;font-size:12px;color:#475569;margin-bottom:4px">${_esc(_t('force-pwd-new', '新密码'))}</label>
+                    <input id="force-pwd-new" type="password" autocomplete="new-password" placeholder="${_esc(_t('force-pwd-new-ph', '至少 8 位 · 字母 + 数字'))}" style="width:100%;padding:9px 11px;border:1px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit;box-sizing:border-box">
+                </div>
+                <div style="margin-bottom:6px">
+                    <label style="display:block;font-size:12px;color:#475569;margin-bottom:4px">${_esc(_t('force-pwd-confirm', '再次输入'))}</label>
+                    <input id="force-pwd-confirm" type="password" autocomplete="new-password" style="width:100%;padding:9px 11px;border:1px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit;box-sizing:border-box">
+                </div>
+                <div id="force-pwd-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;font-size:12px;padding:8px 10px;border-radius:6px;margin:8px 0"></div>
+                <button id="force-pwd-submit" type="button" style="margin-top:10px;width:100%;padding:10px;background:#E26E4B;border:none;color:#fff;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">${_esc(_t('force-pwd-submit', '保存并继续'))}</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        setTimeout(() => { const el = document.getElementById('force-pwd-old'); if (el) el.focus(); }, 80);
+
+        function showErr(msg) {
+            const el = document.getElementById('force-pwd-error');
+            if (!el) return;
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+        document.getElementById('force-pwd-submit').addEventListener('click', async () => {
+            const oldPwd = document.getElementById('force-pwd-old').value || '';
+            const newPwd = document.getElementById('force-pwd-new').value || '';
+            const confirmPwd = document.getElementById('force-pwd-confirm').value || '';
+            if (!oldPwd) { showErr(_t('force-pwd-old-required', '请输入老板给的密码')); return; }
+            if (newPwd.length < 8) { showErr(_t('pwd-too-short', '密码至少 8 位')); return; }
+            if (!(/[a-zA-Z]/.test(newPwd) && /\d/.test(newPwd))) { showErr(_t('pwd-too-weak', '密码至少 8 位 · 字母 + 数字')); return; }
+            if (newPwd !== confirmPwd) { showErr(_t('force-pwd-mismatch', '两次输入不一致')); return; }
+            const btn = document.getElementById('force-pwd-submit');
+            btn.disabled = true;
+            btn.textContent = _t('msg-saving', '保存中...');
+            try {
+                const token = localStorage.getItem('mrpilot_token');
+                const resp = await fetch('/api/me/change_password', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ old_password: oldPwd, new_password: newPwd }),
+                });
+                if (!resp.ok) {
+                    const j = await resp.json().catch(() => ({}));
+                    const code = j.detail || '';
+                    const map = {
+                        'wrong_old_password': _t('force-pwd-wrong-old', '当前密码不对'),
+                        'password_too_short': _t('pwd-too-short', '密码至少 8 位'),
+                        'password_too_weak': _t('pwd-too-weak', '密码至少 8 位 · 字母 + 数字'),
+                    };
+                    showErr(map[code] || _t('force-pwd-fail', '修改失败') + ' (' + code + ')');
+                    btn.disabled = false;
+                    btn.textContent = _t('force-pwd-submit', '保存并继续');
+                    return;
+                }
+                if (window._userInfo) window._userInfo.must_change_password = false;
+                overlay.remove();
+                _shown = false;
+                if (window.showToast) window.showToast(_t('force-pwd-ok', '密码已修改'), 'success');
+            } catch (e) {
+                showErr(_t('force-pwd-fail', '修改失败') + ': ' + (e && e.message || e));
+                btn.disabled = false;
+                btn.textContent = _t('force-pwd-submit', '保存并继续');
+            }
+        });
+    }
+
+    // 暴露给主流程调用 · _userInfo 加载完后判断 must_change_password 就开
+    window._maybeShowForcePwdModal = function() {
+        try {
+            const u = window._userInfo || {};
+            if (u.must_change_password === true) open();
+        } catch (e) { /* swallow */ }
+    };
 })();

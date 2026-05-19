@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11834937">
+<link rel="stylesheet" href="/static/home.css?v=11834938">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -26,8 +26,23 @@
     position: static !important;
     top: auto !important;
     min-height: 0 !important;
-    overflow-y: auto !important;
+    overflow-y: scroll !important;  /* v118.34.38 · 永远显示滚动条 · 不用 auto · 用户得能"看到"可以滚 */
     flex-shrink: 0 !important;
+    scrollbar-width: thin !important;
+    scrollbar-gutter: stable !important;
+}
+.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar {
+    width: 8px !important;
+}
+.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18) !important;
+    border-radius: 4px;
+}
+.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.32) !important;
 }
 .settings-modal-overlay #page-settings #settings-content,
 .settings-modal-overlay #page-settings .settings-content,
@@ -6535,15 +6550,15 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11834937"></script>
+<script src="/static/home.js?v=11834938"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·
      独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834937">
-<script src="/static/erp-mrerp-connect.js?v=11834937" defer></script>
+<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834938">
+<script src="/static/erp-mrerp-connect.js?v=11834938" defer></script>
 <!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
-<script src="/static/erp-log-enhance.js?v=11834937" defer></script>
+<script src="/static/erp-log-enhance.js?v=11834938" defer></script>
 
 </body>
 </html>

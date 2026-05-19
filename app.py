@@ -591,6 +591,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动 bank_recon_v2 建表失败: {e}")
 
+    # credits · 按量付费系统表结构初始化
+    try:
+        db.ensure_credits_tables()
+    except Exception as e:
+        logger.warning(f"启动 credits 建表失败: {e}")
+
     # v118.34.4 · MR.ERP test-connection cache flush
     # On every restart, drop any cached test-connection entries so users
     # don't see stale "stub" responses from before the v118.34.x dispatch
@@ -4194,6 +4200,46 @@ async def erp_push(req: ErpPushRequest, request: Request):
     if not endpoint.get("enabled", True):
         raise HTTPException(400, detail="erp.endpoint_disabled")
 
+    # 批 2 改动 2 (Zihao 2026-05-19 拍板 · v118.34.34) · 推送去重 check.
+    # 同 history × endpoint 已经 success 过 → 写 skipped_dup log + 静默
+    # 返回原成功的 bill_no. 防同张发票被自动 + 手动 + 重试反复推到 MR.ERP.
+    existing = db.has_recent_successful_push(
+        req.history_id, endpoint["id"], user["id"],
+    )
+    if existing:
+        log_id = db.insert_push_log(
+            user_id=user["id"],
+            endpoint_id=endpoint["id"],
+            history_id=req.history_id,
+            invoice_no=history.get("invoice_no"),
+            seller_name=history.get("seller_name"),
+            total_amount=history.get("total_amount"),
+            status="skipped_dup",
+            http_status=200,
+            request_body={"adapter": endpoint.get("adapter"),
+                          "skipped_reason": "already_success",
+                          "prior_log_id": str(existing.get("id"))},
+            response_body=existing.get("response_body"),
+            error_msg=None,
+            attempt=1,
+            elapsed_ms=0,
+            trigger="manual",
+        )
+        logger.info(
+            "[push-dedup] skipped manual push · history=%s endpoint=%s "
+            "(prior log=%s)",
+            req.history_id[:8], endpoint["id"][:8],
+            str(existing.get("id"))[:8],
+        )
+        return {
+            "ok": True,
+            "log_id": log_id,
+            "http_status": 200,
+            "skipped_dup": True,
+            "prior_log_id": str(existing.get("id")),
+            "endpoint_name": endpoint.get("name"),
+        }
+
     # 3) 推送 · v118.34.10 · asyncio.to_thread keeps push_to_endpoint
     # (which may call Playwright via push_mrerp once C-1 wires it,
     # plus uses sync `requests` for webhook adapters) off the event loop.
@@ -4266,6 +4312,38 @@ async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict
     # 2) 循环推每个端点 · 用线程池避免阻塞事件循环(requests 是同步库)
     for ep in endpoints:
         try:
+            # 批 2 改动 2 (v118.34.34) · 推送去重 · 同 history × endpoint
+            # 已 success 过 → 静默跳过 + 写 skipped_dup log.
+            existing = db.has_recent_successful_push(
+                history_id, ep["id"], user_id,
+            )
+            if existing:
+                db.insert_push_log(
+                    user_id=user_id,
+                    endpoint_id=ep["id"],
+                    history_id=history_id,
+                    invoice_no=history.get("invoice_no"),
+                    seller_name=history.get("seller_name"),
+                    total_amount=history.get("total_amount"),
+                    status="skipped_dup",
+                    http_status=200,
+                    request_body={"adapter": ep.get("adapter"),
+                                  "skipped_reason": "already_success",
+                                  "prior_log_id": str(existing.get("id"))},
+                    response_body=existing.get("response_body"),
+                    error_msg=None,
+                    attempt=1,
+                    elapsed_ms=0,
+                    trigger="auto",
+                )
+                logger.info(
+                    "[AutoPush-dedup] skipped · history=%s endpoint=%s "
+                    "(prior=%s)",
+                    history_id[:8], ep["id"][:8],
+                    str(existing.get("id"))[:8],
+                )
+                continue
+
             # push_to_endpoint 是同步调用(requests) · 用 run_in_executor 挪到线程
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(None, _erp.push_to_endpoint, ep, history)
@@ -4486,12 +4564,15 @@ async def erp_logs(request: Request,
                    endpoint_id: Optional[str] = None,
                    status: Optional[str] = None,
                    trigger: Optional[str] = None,
+                   adapter: Optional[str] = None,
                    limit: int = 50, offset: int = 0):
+    """批 3 改动 6 (v118.34.34) · 新增 adapter 参数 · 让前端按 ERP 类型筛日志."""
     user = get_current_user_from_request(request)
     _check_push_access(user)
     return db.list_push_logs(
         user["id"], history_id=history_id, endpoint_id=endpoint_id,
         status_filter=status, trigger_filter=trigger,
+        adapter_filter=adapter,
         limit=min(limit, 200), offset=max(0, offset),
     )
 
@@ -5408,7 +5489,8 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.34.33 · 批 1 · OCR 自动归属客户 + 不 retry 用户数据错 + 日志加客户/ERP 列:\n• 改动 1 OCR 完自动 resolve client_id:按 buyer_name + buyer_tax 匹配 Pearnly 客户表(税号 0.98 / 完全名 0.95 / substring 0.80-0.90 / 学习记忆 1.0)· ≥0.95 自动绑 + 学习下次 · 0.80-0.95 标 suggested_client_id · <0.80 不绑 · 没归属的发票直接不入 auto-push 队列(不再炸 ERR_NO_CLIENT)\n• 改动 3 retry 区分用户数据错:USER_DATA_ERROR_CODES (NO_CLIENT/NO_CUSTOMER_MAPPING/NO_INVOICE_NO/DATE_FUTURE/DUPLICATE_INVOICE 等) + 泰文 raw 模式 · 这类错不进重试队列 · retry worker 命中也立刻摘队列\n• 改动 5 日志列表加 Pearnly 客户列:LEFT JOIN clients · UI 显示 client_name · 未归属灰色「未归属」+ tip\n• 改动 8 顺便做 ERP 列:LEFT JOIN erp_endpoints · 显示 endpoint.name(用户起的)\n• 新 db 表 buyer_to_client_memory · 用户在抽屉 assign 时学习 buyer→client · 下次 OCR 自动归属\n\n上传一张 buyer 跟已有客户名相似的发票 · 应该自动归属 + auto-push 成功",
+            "zh": "v118.34.34 · 批 2+3 · 推送去重 + ERP 启停 toggle + 推送按钮动态 + 日志 ERP filter chip:\n• 改动 2 推送去重:db.has_recent_successful_push 检查同 history × 同 endpoint 5 分钟内有 success log · 命中直接写 status=skipped_dup 日志 + 不再推 MR.ERP · 防同一发票多个 trigger (auto + 手动 / 多个 endpoint default) 撞 ERR_DUPLICATE_INVOICE\n• 改动 7 ERP 卡片启用/停用 toggle:MR.ERP 卡片右侧加「停用/启用」按钮 · 停用要二次确认 · 停用后卡片整行灰化 + pill 改「已停用」+ skip health check · 自动推送 worker 已 enabled 检查(老逻辑)· 现 UI 让用户能切. 4 语 friendly tip + toast.\n• 改动 4 推送按钮动态:OCR 抽屉「推送到 ERP」按钮按 _erpEndpoints.filter(enabled).length 渲染:0 → 不渲染 · 1 → label = 推送到 {name} 单击直推 · ≥2 → label = 推送到 ERP ▾ + 单击展开 endpoint 选择 popover. 选 disabled endpoint 后返 friendly toast + 刷新 cache.\n• 改动 6 日志加 ERP filter chip:推送日志页 toolbar chip 行加分隔线 + MR.ERP / Xero / FlowAccount-soon 三个 chip · /api/erp/logs?adapter=mrerp 后端 JOIN e.adapter 过滤 · NULL-safe 滤掉孤儿 log.\n\n端到端:1) 配 2 个 enabled endpoint · 推一张发票看 popover 出现 2) 停用 MR.ERP · 看卡片灰化 + 推送 button 自动改 3) 日志页点 MR.ERP chip · 看只剩 MR.ERP 的 log",
+            "release_notes_archived_v34_33": "v118.34.33 · 批 1 · OCR 自动归属客户 + 不 retry 用户数据错 + 日志加客户/ERP 列:\n• 改动 1 OCR 完自动 resolve client_id:按 buyer_name + buyer_tax 匹配 Pearnly 客户表(税号 0.98 / 完全名 0.95 / substring 0.80-0.90 / 学习记忆 1.0)· ≥0.95 自动绑 + 学习下次 · 0.80-0.95 标 suggested_client_id · <0.80 不绑 · 没归属的发票直接不入 auto-push 队列(不再炸 ERR_NO_CLIENT)\n• 改动 3 retry 区分用户数据错:USER_DATA_ERROR_CODES (NO_CLIENT/NO_CUSTOMER_MAPPING/NO_INVOICE_NO/DATE_FUTURE/DUPLICATE_INVOICE 等) + 泰文 raw 模式 · 这类错不进重试队列 · retry worker 命中也立刻摘队列\n• 改动 5 日志列表加 Pearnly 客户列:LEFT JOIN clients · UI 显示 client_name · 未归属灰色「未归属」+ tip\n• 改动 8 顺便做 ERP 列:LEFT JOIN erp_endpoints · 显示 endpoint.name(用户起的)\n• 新 db 表 buyer_to_client_memory · 用户在抽屉 assign 时学习 buyer→client · 下次 OCR 自动归属",
             "release_notes_archived_v34_28": "v118.34.28 · 死链修:derive_mrerp_invoice_no seq 不再写死 001:\n• 根因:第一笔 push 成功 → bill_no SI690519-001 · 第二笔 push (同一天) MR.ERP 报「เลขที่ดังกล่าวมีอยู่ในระบบแล้ว(已存在)」· 因为 derive_mrerp_invoice_no seq 写死 \"001\" · 同一天所有 push 都 derive YYMMDD-001 撞\n• 之前的 docstring 写「序号取 history.id 末 3 位 hex 转 dec mod 1000」但代码写错成 hardcode \"001\" · 注释和实现不一致\n• 修:按 docstring 真实现 · 用 history.id 末 6 位 hex 转 dec mod 999 + 1 (避开 000)· 同一 history 重传幂等 · 不同 history 序号不同\n• 测试: 5 个 uuid → 5 个不同 seq (460/272/732/705/078) · 同 uuid 两次 → 同 seq (441/441) · 幂等保证\n\n现在可以并发推多笔 · 不会撞 invoice_no",
             "release_notes_archived_v34_27": "v118.34.27 · listing 拉不到不再阻断 push · fail-soft 走 auto-create:\n• 根因:TEST2019 stkmas listing 在 30s × 3 retries 都拉不出来(MR.ERP 服务端慢或 #showdata p selector 不命中)· 之前 listing fetch 在 lookup() 里 raise · 整个 push fail\n• 修:mrerp_customer_sync.lookup + mrerp_product_sync.lookup 把 _fetch_listing() try/catch MRERPTechnicalError · 失败时 log warning + return None · 让 lookup_or_create 走 L4 auto-create (创建路径 stkmas/allform.php 不依赖 allview.php listing)\n• 效果:listing 拉不到 → L1 DB mapping 没命中 → L2/L3 listing 路径 fail-soft return None → L4 自动建用 seed 模板 · push 继续\n• 跟之前 v34.26 sync 吞 MRERPTechnicalError 是互补:v34.26 在 sync 顶层吞 · v34.27 在 lookup 里 fail-soft 让 lookup_or_create 能继续走 L4\n\n这是 stkmas listing 慢的兜底方案 · 自动建客户/商品全链路通",
             "release_notes_archived_v34_26": "v118.34.26 · 修 3 个生产卡点 (a/b/c):\n• 问题 a sync listing timeout 让整批 push 炸:adapter._sync_master_data 现在也 catch MRERPTechnicalError(之前只 catch MRERPBusinessError)· listing fetch 超时不再炸整批 · 让 validate_history_for_sales_credit 后面 ERR_NO_CUSTOMER_MAPPING preflight 早返友好错给用户。customer + product 两侧同步\n• 问题 b ERR_NO_CUSTOMER_MAPPING friendly 改 action-oriented:旧「该客户未配置 MR.ERP 客户码映射」→ 新「这个客户在 MR.ERP 里还没对应客户码 · 请打开 MR.ERP 连接向导选「种子客户」(开自动建) · 或去 ERP 设置手动加映射」4 语都改\n• 问题 c wizard 客户列表一直 loading:_fetchSeedCustomers + _fetchSeedProducts 加 AbortController 60s client-side timeout · 后端 worst case 90s 会卡 wizard · 客户端 60s 兜底超时 → fail-over 显示 input + 「⚠ 无法拉取」hint。\n\n刷浏览器:wizard 编辑 mrerp 看客户列表 60s 内会回(成功或失败)· 不再无限 loading",

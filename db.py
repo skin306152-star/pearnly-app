@@ -1433,6 +1433,36 @@ def insert_push_log(user_id: str, endpoint_id: Optional[str], history_id: Option
         return None
 
 
+def has_recent_successful_push(
+    history_id: str, endpoint_id: str, user_id: str,
+) -> Optional[Dict[str, Any]]:
+    """批 2 改动 2 (Zihao 2026-05-19 拍板 · v118.34.34) · 推送去重 check.
+    返回最近一次 success log (含 mrerp_bill_no 等)· 没有返 None.
+
+    用于 push_to_endpoint 之前 check:同 history × endpoint 之前已经
+    success 过 · 别再推一次 · 写一条 skipped_dup log 静默跳过.
+
+    严格 user_id scope · 防跨账号 false positive.
+    """
+    if not history_id or not endpoint_id:
+        return None
+    try:
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT id, response_body, created_at, invoice_no
+                FROM erp_push_logs
+                WHERE history_id = %s AND endpoint_id = %s
+                  AND user_id = %s AND status = 'success'
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (history_id, endpoint_id, str(user_id)))
+            r = cur.fetchone()
+            return dict(r) if r else None
+    except Exception as e:
+        logger.error(f"has_recent_successful_push failed: {e}")
+        return None
+
+
 def update_endpoint_stats(endpoint_id: str, success: bool):
     """推送完成后更新端点的成功/失败计数 + last_used_at + last_status"""
     try:
@@ -1780,8 +1810,15 @@ def list_push_logs(user_id: str, history_id: Optional[str] = None,
                    endpoint_id: Optional[str] = None,
                    status_filter: Optional[str] = None,
                    trigger_filter: Optional[str] = None,
+                   adapter_filter: Optional[str] = None,
                    limit: int = 50, offset: int = 0) -> Dict[str, Any]:
-    """查询推送日志,支持按 history/endpoint/status/trigger 过滤"""
+    """查询推送日志,支持按 history/endpoint/status/trigger/adapter 过滤
+
+    批 3 改动 6 (Zihao 2026-05-19 拍板 · v118.34.34) · 新增 adapter_filter.
+    按 erp_endpoints.adapter (mrerp/xero/webhook 等) 过滤. 已删除的 endpoint
+    join 不到 row (endpoint_adapter is NULL),自动不命中任何 adapter filter,
+    符合预期 (用户筛 "MR.ERP" 不会带出已删 endpoint 的孤儿 log).
+    """
     try:
         with get_cursor() as cur:
             where = ["user_id = %s"]
@@ -1817,9 +1854,19 @@ def list_push_logs(user_id: str, history_id: Optional[str] = None,
                 .replace("status = 'failed' AND next_retry_at IS NULL",
                          "l.status = 'failed' AND l.next_retry_at IS NULL")
                 .replace("trigger = %s", "l.trigger = %s"))
+            # 批 3 改动 6 · adapter filter · 走 JOIN 后的 e.adapter (e 是 endpoint).
+            # NULL-safe: LOWER(e.adapter) = LOWER(%s) 自动滤掉孤儿 log.
+            if adapter_filter:
+                joined_where += " AND LOWER(e.adapter) = LOWER(%s)"
+                params.append(adapter_filter)
 
+            # COUNT 必须跟主查询走相同 JOIN · 因为 joined_where 可能引用 e.adapter.
             cur.execute(
-                f"SELECT COUNT(*) AS n FROM erp_push_logs l WHERE {joined_where}",
+                f"""SELECT COUNT(*) AS n FROM erp_push_logs l
+                    LEFT JOIN ocr_history h ON h.id = l.history_id
+                    LEFT JOIN clients c ON c.id = h.client_id
+                    LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
+                    WHERE {joined_where}""",
                 tuple(params),
             )
             total = cur.fetchone()["n"]
@@ -8541,4 +8588,117 @@ def delete_bank_recon_v2_tasks_batch(ids: list, user_id: str) -> int:
     except Exception as e:
         logger.error(f"delete_bank_recon_v2_tasks_batch failed: {e}")
         return 0
+
+
+def ensure_credits_tables():
+    """按量付费系统 - 新增表结构，不影响任何现有逻辑"""
+    try:
+        with get_cursor(commit=True) as cur:
+
+            # 1. 用户-公司多对多关系表
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_company_roles (
+                    id SERIAL PRIMARY KEY,
+                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    role TEXT NOT NULL CHECK (role IN ('admin','member')),
+                    is_active BOOLEAN DEFAULT TRUE,
+                    joined_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(user_id, tenant_id)
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_ucr_user ON user_company_roles(user_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_ucr_tenant ON user_company_roles(tenant_id)")
+
+            # 2. 公司钱包余额
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS tenant_credits (
+                    tenant_id UUID PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+                    balance_thb NUMERIC(12,2) NOT NULL DEFAULT 0,
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+
+            # 3. 充值/扣费流水
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS credit_transactions (
+                    id SERIAL PRIMARY KEY,
+                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                    type TEXT NOT NULL CHECK (type IN ('topup','usage','adjustment')),
+                    amount_thb NUMERIC(12,2) NOT NULL,
+                    pages INT DEFAULT 0,
+                    balance_after NUMERIC(12,2) NOT NULL,
+                    description TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_ctx_tenant ON credit_transactions(tenant_id, created_at DESC)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_ctx_user ON credit_transactions(user_id, created_at DESC)")
+
+            # 4. 月用量统计（月初重置）
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS monthly_page_usage (
+                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    year_month TEXT NOT NULL,
+                    pages_used INT NOT NULL DEFAULT 0,
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (tenant_id, year_month)
+                )
+            """)
+
+            # 5. 充值申请表（用户上传转账截图）
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS topup_requests (
+                    id SERIAL PRIMARY KEY,
+                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    requested_by UUID NOT NULL REFERENCES users(id),
+                    amount_thb NUMERIC(12,2) NOT NULL,
+                    slip_path TEXT,
+                    payer_name TEXT,
+                    note TEXT,
+                    status TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending','approved','rejected')),
+                    reviewed_by UUID REFERENCES users(id),
+                    reviewed_at TIMESTAMPTZ,
+                    review_note TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+
+            # 6. users 表新增豁免字段
+            cur.execute("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS is_billing_exempt BOOLEAN NOT NULL DEFAULT FALSE
+            """)
+
+            # 7. 迁移现有用户归属到 user_company_roles
+            cur.execute("""
+                INSERT INTO user_company_roles (user_id, tenant_id, role)
+                SELECT
+                    id,
+                    tenant_id,
+                    CASE WHEN role = 'owner' THEN 'admin' ELSE 'member' END
+                FROM users
+                WHERE tenant_id IS NOT NULL AND is_active = TRUE
+                ON CONFLICT (user_id, tenant_id) DO NOTHING
+            """)
+
+            # 8. 为每个现有公司建初始钱包（余额0）
+            cur.execute("""
+                INSERT INTO tenant_credits (tenant_id)
+                SELECT id FROM tenants
+                ON CONFLICT (tenant_id) DO NOTHING
+            """)
+
+            # 9. 设置豁免账号
+            cur.execute("""
+                UPDATE users SET is_billing_exempt = TRUE
+                WHERE email IN ('skin306152@gmail.com','mrerp@outlook.co.th')
+            """)
+
+        logger.info("[credits] 新表结构初始化完成")
+    except Exception as e:
+        logger.error(f"ensure_credits_tables failed: {e}")
+        raise
 

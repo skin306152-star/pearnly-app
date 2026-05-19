@@ -2632,6 +2632,33 @@ body.sidebar-collapsed .nav-lock-icon {
     color: white;
     border-color: var(--brand);
 }
+/* 批 3 改动 6 (v118.34.34) · ERP adapter chip 视觉区分 ·
+   分隔线 + 灰色 disabled 即将上线状态 */
+.erp-logs-filter-sep {
+    color: var(--line, #e8e8e3);
+    align-self: center;
+    margin: 0 2px;
+    user-select: none;
+    font-size: 12px;
+}
+.chip-filter.chip-filter-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: var(--bg, #f4f4f0);
+}
+.chip-filter.chip-filter-disabled:hover {
+    background: var(--bg, #f4f4f0);
+    color: var(--ink-3, #6B7280);
+}
+.chip-filter .chip-soon {
+    margin-left: 4px;
+    font-size: 9px;
+    padding: 1px 4px;
+    background: #fdebcb;
+    color: #8a5a00;
+    border-radius: 999px;
+    letter-spacing: 0.2px;
+}
 .btn-tiny {
     padding: 4px 8px;
     font-size: 11px;

@@ -78,6 +78,57 @@
     pointer-events: none; opacity: 0.55;
 }
 
+/* v118.34.34 (Zihao 2026-05-19 拍板 · 批 2 改动 7) · 已停用卡片 ·
+   整行灰化 · 但「启用」按钮要保持可点 · 不然没法重新启用. */
+.integration-row.is-disabled {
+    opacity: 0.55;
+    background: var(--bg, #f4f4f0);
+}
+.integration-row.is-disabled .int-icon {
+    filter: grayscale(0.7);
+}
+/* "启用" 按钮一定要点得到 · 跳出灰化叠加 · 用 brand 色突出 */
+.integration-row.is-disabled .mrerp-card-toggle-enable {
+    opacity: 1;
+    background: var(--ink, #111111);
+    color: #ffffff;
+    border-color: var(--ink, #111111);
+}
+
+/* 启用/停用 toggle button · 复用 int-btn-configure 的 ghost 风格但更紧凑 */
+.mrerp-card-toggle {
+    background: transparent;
+    border: 1px solid var(--line, #e8e8e3);
+    color: var(--ink, #111111);
+    font-size: 12px;
+    font-family: inherit;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.mrerp-card-toggle:hover:not(:disabled) {
+    background: var(--ink, #111111);
+    color: #ffffff;
+    border-color: var(--ink, #111111);
+}
+.mrerp-card-toggle:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+/* 停用动作 = 红/橙警示色,提醒用户这是会让自动推送停的操作 */
+.mrerp-card-toggle-disable:hover:not(:disabled) {
+    background: #b45309;
+    color: #ffffff;
+    border-color: #b45309;
+}
+/* 启用动作 = 绿色 ok 色,正向反馈 */
+.mrerp-card-toggle-enable:hover:not(:disabled) {
+    background: #0a7a2c;
+    color: #ffffff;
+    border-color: #0a7a2c;
+}
+
 /* ============================================================
  * Wizard modal · z-index bumped above .int-drawer (10000) +
  * .modal-overlay (10000). 11000 保证在所有 sidebar/drawer 之上,

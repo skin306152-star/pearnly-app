@@ -342,6 +342,63 @@
             zh_TW: '看推送記錄 →',
             ja: '送信ログを見る →',
         },
+        // v118.34.34 (Zihao 2026-05-19 拍板 · 批 2 改动 7) · 启用/停用 toggle
+        'card-btn-disable': {
+            zh: '停用',
+            en: 'Disable',
+            th: 'ปิดใช้งาน',
+            zh_TW: '停用',
+            ja: '無効化',
+        },
+        'card-btn-enable': {
+            zh: '启用',
+            en: 'Enable',
+            th: 'เปิดใช้งาน',
+            zh_TW: '啟用',
+            ja: '有効化',
+        },
+        'card-disabled-pill': {
+            zh: '已停用',
+            en: 'Disabled',
+            th: 'ปิดใช้งานแล้ว',
+            zh_TW: '已停用',
+            ja: '無効',
+        },
+        'card-disabled-tip': {
+            zh: '已停用 · 自动推送跳过 · 手动推送不可选 · 重新点「启用」才会推送',
+            en: 'Disabled · auto-push skipped · cannot be selected for manual push · click "Enable" to resume',
+            th: 'ปิดใช้งาน · ส่งอัตโนมัติถูกข้าม · เลือกส่งด้วยตนเองไม่ได้ · กด "เปิดใช้งาน" เพื่อใช้ต่อ',
+            zh_TW: '已停用 · 自動推送跳過 · 手動推送不可選 · 重新點「啟用」才會推送',
+            ja: '無効化済み · 自動送信はスキップ · 手動送信で選択不可 · 「有効化」をクリックで再開',
+        },
+        'card-toggle-disable-confirm': {
+            zh: '停用 MR.ERP 后,新发票不会再推送(已成功的不动)· 继续?',
+            en: 'Disabling MR.ERP stops new pushes (existing successful pushes are kept). Continue?',
+            th: 'ปิดใช้งาน MR.ERP จะหยุดส่งใบกำกับใหม่ (รายการที่สำเร็จแล้วยังคงอยู่) · ดำเนินการต่อ?',
+            zh_TW: '停用 MR.ERP 後,新發票不會再推送(已成功的不動)· 繼續?',
+            ja: 'MR.ERP を無効化すると新しい送信は停止します (既存の成功は保持) · 続行しますか?',
+        },
+        'card-toggle-disable-success': {
+            zh: '已停用 MR.ERP',
+            en: 'MR.ERP disabled',
+            th: 'ปิดใช้งาน MR.ERP แล้ว',
+            zh_TW: '已停用 MR.ERP',
+            ja: 'MR.ERP を無効化しました',
+        },
+        'card-toggle-enable-success': {
+            zh: '已启用 MR.ERP',
+            en: 'MR.ERP enabled',
+            th: 'เปิดใช้งาน MR.ERP แล้ว',
+            zh_TW: '已啟用 MR.ERP',
+            ja: 'MR.ERP を有効化しました',
+        },
+        'card-toggle-failed': {
+            zh: '切换失败 · 稍后再试',
+            en: 'Toggle failed · please retry',
+            th: 'สลับสถานะไม่สำเร็จ · ลองอีกครั้ง',
+            zh_TW: '切換失敗 · 稍後再試',
+            ja: '切り替えに失敗しました · 再試行してください',
+        },
         // Wizard finish toasts / validation messages — were hardcoded
         // Chinese before v118.34.4.
         'wiz-fill-creds': {
@@ -503,6 +560,9 @@
 
     function _renderMrerpCard(ep) {
         const configured = !!ep;
+        // v118.34.34 (Zihao 2026-05-19 拍板) · 启用/停用 toggle 状态.
+        // ep.enabled 默认 true · 老数据无此字段也按 true 处理.
+        const enabled = configured ? (ep.enabled !== false) : true;
 
         // Status pill — shown next to the card name (matches the
         // pattern used by other Pearnly cards: name + small inline pill).
@@ -510,6 +570,12 @@
         if (!configured) {
             pill = '<span class="mrerp-card-pill mrerp-pill-neutral">' +
                 _esc(t('card-not-configured')) + '</span>';
+        } else if (!enabled) {
+            // v118.34.34 · 已停用 · 用 neutral 灰 pill · 不显示 checking 状态
+            // (停用时不该跑 health check)· title 让 hover 看到原因.
+            pill = '<span class="mrerp-card-pill mrerp-pill-neutral" '
+                + 'title="' + _esc(t('card-disabled-tip')) + '">' +
+                _esc(t('card-disabled-pill')) + '</span>';
         } else {
             pill = '<span class="mrerp-card-pill mrerp-pill-testing" '
                 + 'data-mrerp-test-pill="' + _esc(ep.id) + '">' +
@@ -519,9 +585,20 @@
         // Action buttons — right side. Use Pearnly's .int-btn-configure
         // class (the same class the OUTER integration row buttons use)
         // so visually we render identically.
+        // v118.34.34 · configured 卡片现在额外有「停用/启用」按钮.
         let actionsHtml;
         if (configured) {
+            const toggleLabel = enabled ? t('card-btn-disable') : t('card-btn-enable');
+            const toggleClass = enabled
+                ? 'mrerp-card-toggle mrerp-card-toggle-disable'
+                : 'mrerp-card-toggle mrerp-card-toggle-enable';
             actionsHtml = (
+                '<button type="button" class="' + toggleClass + '" '
+                  + 'data-mrerp-card-action="toggle-enabled" '
+                  + 'data-mrerp-enabled="' + (enabled ? '1' : '0') + '" '
+                  + 'title="' + _esc(t('card-disabled-tip')) + '">' +
+                  _esc(toggleLabel) +
+                '</button>' +
                 '<button type="button" class="int-btn-configure" data-mrerp-card-action="edit">' +
                   _esc(t('card-btn-edit')) +
                 '</button>' +
@@ -538,8 +615,13 @@
             );
         }
 
+        // v118.34.34 · 停用时整行加 is-disabled class 让 CSS 灰掉.
+        const rowCls = 'integration-row'
+            + (configured ? ' connected' : '')
+            + ((configured && !enabled) ? ' is-disabled' : '');
+
         return (
-            '<div class="integration-row' + (configured ? ' connected' : '') + '" '
+            '<div class="' + rowCls + '" '
                 + 'data-mrerp-card="mrerp"'
                 + (ep ? ' data-mrerp-endpoint-id="' + _esc(ep.id) + '"' : '') + '>' +
               '<div class="int-icon ic-mrerp">' + _MRERP_ICON_SVG + '</div>' +
@@ -590,6 +672,65 @@
                 e.preventDefault();
                 e.stopPropagation();
                 _switchToLogsTab();
+            });
+        });
+        // v118.34.34 (批 2 改动 7) · 停用/启用 toggle ·
+        // 停用要二次确认 · 启用直接切. 切完重 bootstrap 整张卡片以
+        // 同步状态(pill/灰化/按钮文字 全部要变).
+        zone.querySelectorAll('[data-mrerp-card-action="toggle-enabled"]').forEach(function (btn) {
+            btn.addEventListener('click', async function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!mrerpEp) return;
+                const currentlyEnabled = btn.getAttribute('data-mrerp-enabled') === '1';
+                const newEnabled = !currentlyEnabled;
+                if (!newEnabled) {
+                    // 停用要二次确认.
+                    let confirmed = false;
+                    try {
+                        if (typeof window.pearnlyConfirm === 'function') {
+                            confirmed = await window.pearnlyConfirm(t('card-toggle-disable-confirm'));
+                        } else {
+                            confirmed = window.confirm(t('card-toggle-disable-confirm'));
+                        }
+                    } catch (e2) {
+                        confirmed = window.confirm(t('card-toggle-disable-confirm'));
+                    }
+                    if (!confirmed) return;
+                }
+                // Optimistic UI lock — disable the button while patching.
+                btn.disabled = true;
+                try {
+                    const r = await fetch(
+                        '/api/erp/endpoints/' + encodeURIComponent(mrerpEp.id),
+                        {
+                            method: 'PATCH',
+                            headers: _authHeaders(),
+                            body: JSON.stringify({ enabled: newEnabled }),
+                        }
+                    );
+                    if (!r.ok) {
+                        _toast(t('card-toggle-failed'), 'error');
+                        btn.disabled = false;
+                        return;
+                    }
+                    _toast(
+                        newEnabled ? t('card-toggle-enable-success') : t('card-toggle-disable-success'),
+                        'success'
+                    );
+                    // Reload endpoints & re-render the whole card area so
+                    // pill / row class / toggle button label all flip together.
+                    await _bootstrap();
+                    // v118.34.34 · 通知 home.js · 让推送按钮也更新可选 ERP 数.
+                    try {
+                        if (typeof window._refreshErpEndpointsCache === 'function') {
+                            window._refreshErpEndpointsCache();
+                        }
+                    } catch (e2) {}
+                } catch (err) {
+                    _toast(t('card-toggle-failed'), 'error');
+                    btn.disabled = false;
+                }
             });
         });
     }
@@ -646,8 +787,9 @@
             return (e.adapter || '').toLowerCase() === 'mrerp';
         }) || null;
         _renderCards(host, mrerpEp);
-        if (mrerpEp) {
-            // Fire-and-forget initial health check.
+        if (mrerpEp && mrerpEp.enabled !== false) {
+            // v118.34.34 · 停用的 endpoint 不跑 health check ·
+            // pill 已固定显示「已停用」· 跑 check 反而会把它覆盖成 testing.
             _refreshCardHealth(mrerpEp.id, false);
         }
         // C-5 · conditional hide of the 字段映射 sub-tab.

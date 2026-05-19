@@ -946,7 +946,7 @@ _I18N = {
         "st_inv_no_diff":   "⚠ 番号差",
         "st_tax_id_diff":   "⚠ 税番号差",
         "st_multi_diff":    "⚠ 複数不一致",
-        "title": "売上 VAT 照合表", "client": "取引先", "period": "期間",
+        "title": "売上VAT照合表", "client": "取引先", "period": "期間",
         "help_lines": [
             "使い方:",
             "1. 「請求書明細」シート = AI が読み取った適格請求書の明細 · 照合前に金額等を修正できます",

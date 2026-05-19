@@ -1021,13 +1021,18 @@
     // Fetch the seed-customer list for the wizard's Step-3 dropdown.
     // Returns null when no endpoint id is available (new wizard) OR
     // when the fetch errors — caller falls back to a text input.
+    // 问题 c (Zihao 2026-05-19 拍板 · v118.34.26) · 加 60s client-side
+    // timeout (AbortController) · 后端 listing fetch 30s × 3 = 90s worst case
+    // · 客户端 60s 兜底超时 · 防 wizard UI 一直 "正在拉取客户列表..."
     async function _fetchSeedCustomers(endpointId) {
         if (!endpointId) return null;
+        const ctrl = new AbortController();
+        const tid = setTimeout(function () { ctrl.abort(); }, 60_000);
         try {
             const r = await fetch(
                 '/api/erp/endpoints/' + encodeURIComponent(endpointId)
                 + '/customers',
-                { headers: _authHeaders() },
+                { headers: _authHeaders(), signal: ctrl.signal },
             );
             if (!r.ok) return null;
             const data = await r.json();
@@ -1035,6 +1040,8 @@
             return Array.isArray(data.customers) ? data.customers : [];
         } catch (e) {
             return null;
+        } finally {
+            clearTimeout(tid);
         }
     }
 
@@ -1127,19 +1134,23 @@
     }
 
     // Task 2 Phase 5 · seed PRODUCT helpers (parallel to seed customer).
+    // 问题 c (v118.34.26) · 加 60s client-side timeout 同 customer side.
     async function _fetchSeedProducts(endpointId) {
         if (!endpointId) return null;
+        const ctrl = new AbortController();
+        const tid = setTimeout(function () { ctrl.abort(); }, 60_000);
         try {
             const r = await fetch(
                 '/api/erp/endpoints/' + encodeURIComponent(endpointId)
                 + '/products',
-                { headers: _authHeaders() },
+                { headers: _authHeaders(), signal: ctrl.signal },
             );
             if (!r.ok) return null;
             const data = await r.json();
             if (!data || !data.ok) return null;
             return Array.isArray(data.products) ? data.products : [];
         } catch (e) { return null; }
+        finally { clearTimeout(tid); }
     }
 
     async function _populateSeedProductSelector(currentSeedCode) {

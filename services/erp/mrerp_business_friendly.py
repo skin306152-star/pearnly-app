@@ -71,10 +71,12 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh_TW": "這個 ERP 連線還沒綁任何 Pearnly 客戶 · 請在精靈第 1 步至少選 1 個客戶",
     },
     "ERR_NO_CUSTOMER_MAPPING": {
-        "th": "ยังไม่ตั้งรหัสลูกค้า MR.ERP สำหรับลูกค้านี้",
-        "en": "No MR.ERP customer mapping configured for this client",
-        "zh": "该客户未配置 MR.ERP 客户码映射",
-        "zh_TW": "該客戶未設定 MR.ERP 客戶碼對應",
+        # 问题 b (Zihao 2026-05-19 拍板 · v118.34.26) · action-oriented:
+        # 告诉用户去哪里配 mapping · 或者开 wizard 种子客户开自动建.
+        "th": "ลูกค้านี้ยังไม่มีรหัสลูกค้า MR.ERP ที่ตรงกัน · กรุณาเปิดวิซาร์ดเชื่อม MR.ERP เลือก ลูกค้าต้นแบบ (เปิดสร้างอัตโนมัติ) · หรือไปที่ การตั้งค่า ERP เพื่อเพิ่มการแมปด้วยตนเอง",
+        "en": "This client has no matching MR.ERP customer code · open the MR.ERP wizard and pick a seed customer (enables auto-create), or go to ERP settings to add the mapping manually",
+        "zh": "这个客户在 MR.ERP 里还没对应客户码 · 请打开 MR.ERP 连接向导选「种子客户」(开自动建) · 或去 ERP 设置手动加映射",
+        "zh_TW": "這個客戶在 MR.ERP 裡還沒對應客戶碼 · 請打開 MR.ERP 連線精靈選「種子客戶」(開自動建立) · 或去 ERP 設定手動加對應",
     },
     "ERR_NO_INVOICE_NO": {
         "th": "เลขที่ใบกำกับว่าง",

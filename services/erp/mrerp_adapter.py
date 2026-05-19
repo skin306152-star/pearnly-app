@@ -1562,6 +1562,15 @@ class MRERPAdapter:
                     "master-data sync skipped for buyer=%r: %s",
                     buyer.name, e,
                 )
+            except MRERPTechnicalError as e:
+                # 问题 a (Zihao 2026-05-19 拍板 · v118.34.26) · listing fetch
+                # timeout 等 technical · 不让 sync 把整批 push 炸掉. swallow +
+                # log warning · 让 validate_history_for_sales_credit 后面
+                # ERR_NO_CUSTOMER_MAPPING preflight 早返友好错给用户.
+                logger.warning(
+                    "master-data sync technical fail (continuing) for buyer=%r: %s",
+                    buyer.name, e,
+                )
 
         # Phase 5 extension: per-item product enrichment. Same
         # opt-in / opt-out shape as the buyer branch above.
@@ -1593,6 +1602,13 @@ class MRERPAdapter:
                 except MRERPBusinessError as e:
                     logger.info(
                         "product master-data sync skipped for item=%r: %s",
+                        item.name, e,
+                    )
+                except MRERPTechnicalError as e:
+                    # 问题 a 镜像 (v118.34.26) · listing fetch timeout 不炸整批 ·
+                    # validate 接下来 ERR_NO_CUSTOMER_MAPPING 早返友好错.
+                    logger.warning(
+                        "product master-data sync technical fail (continuing) for item=%r: %s",
                         item.name, e,
                     )
 

@@ -242,6 +242,22 @@
             zh_TW: '(已儲存 · 當前列表暫未顯示)',
             ja: '(保存済み · 現在のリストには表示されていません)',
         },
+        // v118.34.32 (Zihao 2026-05-19 拍板) · fail-over 状态的 dynamic 文案 ·
+        // 让用户一眼看出当前显示的是"上次保存的值" + "可以手动改" · 不是状态冲突.
+        'wiz-seed-fallback-saved': {
+            zh: '⚠ 无法拉取最新客户列表 · 当前显示上次保存的「{code}」· 你可以手动改成别的',
+            en: '⚠ Could not fetch the latest customer list · showing the previously saved value "{code}" · you can type a different one',
+            th: '⚠ ไม่สามารถดึงรายชื่อลูกค้าล่าสุดได้ · กำลังแสดงค่าที่บันทึกไว้ "{code}" · คุณสามารถพิมพ์ค่าอื่นได้',
+            zh_TW: '⚠ 無法拉取最新客戶列表 · 當前顯示上次儲存的「{code}」· 你可以手動改成別的',
+            ja: '⚠ 最新の顧客リストを取得できません · 前回保存した「{code}」を表示中 · 別の値を入力できます',
+        },
+        'wiz-seedp-fallback-saved': {
+            zh: '⚠ 无法拉取最新商品列表 · 当前显示上次保存的「{code}」· 你可以手动改成别的',
+            en: '⚠ Could not fetch the latest product list · showing the previously saved value "{code}" · you can type a different one',
+            th: '⚠ ไม่สามารถดึงรายการสินค้าล่าสุดได้ · กำลังแสดงค่าที่บันทึกไว้ "{code}" · คุณสามารถพิมพ์ค่าอื่นได้',
+            zh_TW: '⚠ 無法拉取最新商品列表 · 當前顯示上次儲存的「{code}」· 你可以手動改成別的',
+            ja: '⚠ 最新の商品リストを取得できません · 前回保存した「{code}」を表示中 · 別の値を入力できます',
+        },
         'wiz-seed-input-placeholder': {
             zh: '输入客户码(如 0006)',
             en: 'Customer code (e.g. 0006)',
@@ -1080,9 +1096,16 @@
             selectEl.style.display = 'none';
             inputEl.style.display = '';
             inputEl.value = currentSeedCode || '';
+            inputEl.classList.add('mrerp-seed-input-saved');
+            if (currentSeedCode) {
+                fbHintEl.textContent = t('wiz-seed-fallback-saved', { code: currentSeedCode });
+            } else {
+                fbHintEl.textContent = t('wiz-seed-fallback');
+            }
             fbHintEl.style.display = '';
             return;
         }
+        inputEl.classList.remove('mrerp-seed-input-saved');
 
         // Populate the dropdown.
         const opts = ['<option value="">' + _esc(t('wiz-seed-empty')) + '</option>'];
@@ -1183,9 +1206,19 @@
             selectEl.style.display = 'none';
             inputEl.style.display = '';
             inputEl.value = currentSeedCode || '';
+            inputEl.classList.add('mrerp-seed-input-saved');   // 橙色边框 · 提示用户这是 fallback
+            // v118.34.32 (Zihao 2026-05-19 拍板) · fb hint 文案 dynamic ·
+            // 把 currentSeedCode 嵌入 · 让用户看出来是 "上次保存的值 · 可改"
+            if (currentSeedCode) {
+                fbHintEl.textContent = t('wiz-seedp-fallback-saved', { code: currentSeedCode });
+            } else {
+                fbHintEl.textContent = t('wiz-seedp-fallback');
+            }
             fbHintEl.style.display = '';
             return;
         }
+        // success path · clean input visual state
+        inputEl.classList.remove('mrerp-seed-input-saved');
         const opts = ['<option value="">' + _esc(t('wiz-seedp-empty')) + '</option>'];
         const inList = !!(currentSeedCode && products.some(function (p) {
             return p.code === currentSeedCode;

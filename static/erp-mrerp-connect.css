@@ -262,6 +262,20 @@
     word-break: break-all;
 }
 
+/* v118.34.32 (Zihao 2026-05-19 拍板) · seed input fail-over 视觉强化 ·
+   橙色边框 + 浅黄背景 · 让用户一眼看出这是"上次保存的值需要确认/手动改"
+   · 不是普通输入框 · 配合 fb hint dynamic 文案. */
+.mrerp-seed-input-saved {
+    border: 2px solid #F59E0B !important;
+    background: #FFFBEB !important;
+    font-weight: 500;
+}
+.mrerp-seed-input-saved:focus {
+    border-color: #D97706 !important;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
 /* P-4 (v118.34.21) · 失败截图路径单独高亮 · 让用户能 scp 给客服 */
 .mrerp-wizard-test-error-screenshot {
     margin-top: 6px;

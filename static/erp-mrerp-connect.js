@@ -1106,6 +1106,11 @@
         } else {
             selectEl.value = '';   // 没设 · 留 placeholder 选中
         }
+        // 问题 B (Zihao 2026-05-19 拍板 · v118.34.25) · success path 显式 hide
+        // input + fallback hint · 防 race / 上次 fallback 状态残留 → 下拉跟 hint
+        // 同时显示的矛盾态.
+        inputEl.style.display = 'none';
+        fbHintEl.style.display = 'none';
     }
 
     function _readSeedValue() {
@@ -1194,6 +1199,9 @@
         } else {
             selectEl.value = '';
         }
+        // 问题 B (v118.34.25) · 镜像 customer side · 显式 hide input + hint
+        inputEl.style.display = 'none';
+        fbHintEl.style.display = 'none';
     }
 
     function _readSeedProductValue() {

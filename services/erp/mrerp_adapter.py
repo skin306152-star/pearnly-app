@@ -1529,6 +1529,16 @@ class MRERPAdapter:
             buyer = self._extract_buyer(h)
             if buyer is None:
                 continue
+            # 问题 A (Zihao 2026-05-19 拍板 · v118.34.25) · history.client_id
+            # 是 0/null 时跳过 customer sync. 没 client_id 走到 L2 listing
+            # 抓取浪费 90s+(30s × 3 retries) · 而且 preflight 接着会 ERR_NO_CLIENT
+            # · 早返让用户看到清晰的错而不是 "listing fetch failed".
+            if not (buyer.client_id and buyer.client_id > 0):
+                logger.info(
+                    "master-data sync skipped (no client_id assigned) for buyer=%r",
+                    buyer.name,
+                )
+                continue
             try:
                 if self.master_data_auto_create:
                     result = self._customer_sync.lookup_or_create(
@@ -1561,6 +1571,10 @@ class MRERPAdapter:
             )
             self._product_sync = MRERPProductSyncService(self)
         for h in histories:
+            # 问题 A 镜像 (v118.34.25) · 没 client_id 也跳过 product sync ·
+            # 没归属到客户的发票 · 推都推不出去 · 没必要预先拉 stkmas listing.
+            if not (h.get('client_id') and int(h.get('client_id') or 0) > 0):
+                continue
             items = self._extract_items(h)
             for item in items:
                 try:

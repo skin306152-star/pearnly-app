@@ -15234,13 +15234,14 @@ async function loadErpLogs() {
             return;
         }
         // 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 表头行 + 全选 checkbox.
-        // 全选只勾「可选行」(failed 终态 · 非 retrying · 非 success). 半选状态
-        // indeterminate · 跟现有 _erpSelected set 联动 · _refreshErpBatchBar 同步.
+        // 问题 D (v118.34.25) · 改成: 全选含 success log (批量删除清历史) ·
+        // 仅 retrying 中的行不可选(防跟 worker 撞). 批量重试 server-side
+        // 自动 skip success · 不会重复推.
         const selectableIds = items
             .filter(function (l) {
                 var isR = l.status === 'failed' && l.next_retry_at
                     && (new Date(l.next_retry_at).getTime() > Date.now() - 60000);
-                return l.status === 'failed' && !isR;
+                return !isR;
             })
             .map(function (l) { return l.id; });
         const headerRow = '<div class="erp-log-row erp-log-row-header" data-log-header>'
@@ -15300,8 +15301,11 @@ async function loadErpLogs() {
             const retryBtn = (log.status === 'failed' && !isRetrying)
                 ? `<button class="log-retry-btn" data-log-retry="${escapeHtml(log.id)}" title="${escapeHtml(t('log-retry-title'))}">↻</button>`
                 : '';
-            // v118.25.1 · 失败终态才能勾选(重试中正在自动跑 · 不让用户抢)· 成功的勾了也没用
-            const canSelect = (log.status === 'failed' && !isRetrying);
+            // 问题 D (Zihao 2026-05-19 拍板 · v118.34.25) · 全选要含 success.
+            // 原:只 failed 终态可选(重试中防抢 · success 没意义)
+            // 改:重试中仍不可选(防跟 worker 撞)· success 可选(批量删除清历史用)·
+            //     批量重试 server-side 跳过 success (skipped++) · 已实现.
+            const canSelect = !isRetrying;
             const checked = _erpSelected.has(log.id) ? 'checked' : '';
             const cb = canSelect
                 ? `<input type="checkbox" class="erp-log-cb" data-log-cb="${escapeHtml(log.id)}" ${checked}>`
@@ -15454,6 +15458,17 @@ async function _runErpBatchDelete() {
             return;
         }
         const r = await resp.json();
+        // 问题 C (Zihao 2026-05-19 拍板 · v118.34.25) · 立即从 DOM 移除被删 row ·
+        // 不等 reload · 用户视觉立刻反馈"消失了". 然后再 reload 拉新数据填充
+        // (DB 还有别的 log · 自动接着显示 · 不是"日志又弹出来"的 bug · 是正常分页).
+        ids.forEach(function (id) {
+            var row = document.querySelector('[data-log-detail="' + id + '"]');
+            if (row) row.remove();
+        });
+        // 立即 hide batch bar(_erpSelected.clear 后 _refreshErpBatchBar 也会做 ·
+        // 但提前 hide 防止短暂残留视觉).
+        var bar = document.getElementById('erp-logs-batch-bar');
+        if (bar) bar.style.display = 'none';
         showToast(
             t('erp-batch-delete-result', {
                 n: r.deleted || 0, skip: r.skipped || 0,
@@ -15461,7 +15476,8 @@ async function _runErpBatchDelete() {
             (r.deleted > 0) ? 'success' : 'warn',
         );
         _erpSelected.clear();
-        loadErpLogs();
+        // 延迟 500ms reload · 让用户先看到 "消失了" 效果 + toast · 再拉新数据
+        setTimeout(loadErpLogs, 500);
     } catch (e) {
         console.error('batch delete failed', e);
         showToast(t('erp-logs-error'), 'error');
@@ -15621,7 +15637,10 @@ function humanizeError(raw) {
     if (!raw) return '';
     const r = String(raw);
     if (/ECONNREFUSED|Connection refused/i.test(r)) return '连接被拒绝 · ERP 地址可能错了,或服务没启动';
-    if (/ETIMEDOUT|timeout/i.test(r))                return '连接超时 · ERP 响应太慢(>10s)';
+    // 问题 A (Zihao 2026-05-19 拍板 · v118.34.25) · 去掉 ">10s" 过时数字
+    // (实际 wait_for_selector 30s · retry 3 次 · 累计 ~90s)
+    if (/listing fetch failed|wait_for_selector/i.test(r)) return '拉取 MR.ERP 客户/商品列表超时 · 已重试 3 次仍不通 · 可能 MR.ERP 响应慢 · 稍后再试';
+    if (/ETIMEDOUT|timeout/i.test(r))                return '连接超时 · MR.ERP 响应慢 · 稍后再试';
     if (/ENOTFOUND|getaddrinfo/i.test(r))            return '域名解析失败 · ERP 地址拼错了';
     if (/certificate|SSL/i.test(r))                  return 'SSL 证书问题 · ERP 站点证书异常';
     if (/401|Unauthorized/i.test(r))                 return 'HTTP 401 · 认证失败,检查 Token 是否正确';

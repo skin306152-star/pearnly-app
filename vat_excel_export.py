@@ -832,7 +832,7 @@ _I18N = {
         "w_amount_sum_mismatch": "ก่อนVAT+VAT≠รวม",
     },
     "en": {
-        "fname_prefix": "Sales_VAT_Reconciliation",
+        "fname_prefix": "Output_VAT_Reconciliation",
         "sh1": "Invoices", "sh2": "VAT_Report", "sh3": "Reconciliation", "sh4": "How_to_Use",
         "h_inv":   ["#", "Buyer Tax ID", "Buyer Name", "Invoice No", "Date", "Period",
                     "Pre-VAT", "VAT", "Total", "Source file", "OCR Check"],
@@ -858,7 +858,7 @@ _I18N = {
         "st_inv_no_diff":   "⚠ Invoice no diff",
         "st_tax_id_diff":   "⚠ Tax ID diff",
         "st_multi_diff":    "⚠ Multiple diffs",
-        "title": "Sales VAT Reconciliation", "client": "Client", "period": "Period",
+        "title": "Output VAT Reconciliation", "client": "Client", "period": "Period",
         "help_lines": [
             "How to use:",
             "1. 'Invoices' sheet = AI-extracted tax invoice data · edit values before reconciliation if needed",

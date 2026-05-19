@@ -80,7 +80,7 @@ _LABELS = {
     "en": {
         "biz_name":"Business Name", "biz_address":"Business Address",
         "tax_id":"Tax ID", "branch":"Branch",
-        "period":"Tax Period", "report_title":"Sales VAT Report",
+        "period":"Tax Period", "report_title":"Output VAT Report",
         "main_office":"Head Office",
         "invoice_side":"Invoice Side",
         "check_marks":"✓ Check Marks",

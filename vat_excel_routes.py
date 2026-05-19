@@ -36,7 +36,7 @@ EXCEL_STORE_DIR = "/opt/mrpilot/uploads/vat_recon"
 # 4 语文件名前缀（th→en→zh→ja · GTM 优先级顺序）
 _FNAME_PREFIX = {
     "th": "รายงานกระทบยอดภาษีขาย",
-    "en": "Sales_VAT_Reconciliation",
+    "en": "Output_VAT_Reconciliation",
     "zh": "销项税对账表",
     "ja": "売上VAT照合表",
 }

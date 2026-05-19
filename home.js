@@ -1907,7 +1907,7 @@ const I18N = {
         'bv-fail-timeout':       'AI 识别超时 · 文件太复杂或服务器繁忙 · 请重试或换更小的 PDF',
         'bv-fail-parse':         '销项税报告 AI 识别失败',
         'bv-fail-no-report':     '缺少销项税报告 (PDF/图片)',
-        'bv-fail-task-exists':   '该客户本月已有对账任务 · 请到「销项税对账」tab 删除旧任务后重试',
+        'bv-fail-task-exists':   '该客户本月已有对账任务 · 请到「销项税报告核查」tab 删除旧任务后重试',
         'bv-fail-no-client':     '客户信息缺失',
         'bv-fail-report-missing':'销项税报告文件读取失败',
         'bv-fail-unknown':       '处理失败',
@@ -23781,6 +23781,10 @@ async function deleteEndpoint(endpointId) {
         'adm-risk-ocr-24h': 'OCRs / 24h',
         'common-close': 'Close',
         'adm-risk-clean': '✓ All clear',
+        'adm-engine-ocr': 'Invoice OCR',
+        'adm-engine-ocr-backup': 'Invoice OCR (backup)',
+        'adm-engine-epdf': 'Electronic PDF',
+        'adm-engine-vex': 'Output VAT Reconciliation',
     });
     Object.assign(I18N.th, {
         'nav-admin-users': 'จัดการผู้ใช้',
@@ -24089,6 +24093,10 @@ async function deleteEndpoint(endpointId) {
         'adm-risk-ocr-24h': 'OCR / 24h',
         'common-close': '閉じる',
         'adm-risk-clean': '✓ 異常なし',
+        'adm-engine-ocr': '請求書認識',
+        'adm-engine-ocr-backup': '請求書認識（予備）',
+        'adm-engine-epdf': '電子PDF',
+        'adm-engine-vex': '売上税報告チェック',
     });
 
     document.addEventListener('DOMContentLoaded', () => {

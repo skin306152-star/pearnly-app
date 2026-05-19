@@ -218,19 +218,19 @@ def derive_mrerp_invoice_no(history: Dict[str, Any]) -> str:
         d = _dt.utcnow()
         date_part = f"{(d.year + 543) % 100:02d}{d.month:02d}{d.day:02d}"
 
-    # 取 history.id 末 6 位 hex 转 dec mod 99999 + 1 (1-99999 · 5 位 seq) ·
-    # MR.ERP test 数据库 cumulative · 3 位 seq (1-999) 跟历史 push 撞率太高 ·
-    # 5 位 seq 几乎不撞. 同 history 仍幂等. invoice_no 总长 6+1+5 = 12 char ·
-    # 远小于 18 char 上限.
+    # v118.34.31 (Zihao 2026-05-19 拍板) · seq 升级到 history.id 末 8 位 hex
+    # mod 999999 + 1 (1-999999 · 6 位 seq) · MR.ERP test 数据库累计 push 多 ·
+    # 5 位也撞 · 6 位几乎不撞 (撞率 ~ 1/百万). 同 history 仍幂等 (确定算法).
+    # invoice_no 总长 6+1+6 = 13 char · 还在 18 字符上限内.
     hist_id = str(history.get('id') or '').replace('-', '')
     if hist_id:
         try:
-            seq_int = int(hist_id[-6:], 16) % 99999 + 1   # 1-99999
-            seq = f"{seq_int:05d}"
+            seq_int = int(hist_id[-8:], 16) % 999999 + 1   # 1-999999
+            seq = f"{seq_int:06d}"
         except ValueError:
-            seq = "00001"
+            seq = "000001"
     else:
-        seq = "00001"
+        seq = "000001"
     return f"{date_part}-{seq}"
 
 

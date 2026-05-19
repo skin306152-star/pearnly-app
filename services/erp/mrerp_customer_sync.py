@@ -955,7 +955,10 @@ class MRERPCustomerSyncService:
         url = self.adapter.login_url + self.LISTING_PATH
         page = self.adapter._page
         last_err: Optional[Exception] = None
-        for attempt in (1, 2):
+        # 问题 2 加固 (Zihao 2026-05-19 拍板 · v118.34.24):
+        # attempts 2 → 3 · wait_for_selector 10s → 30s · 间隔 5s 退让 server.
+        import time as _time
+        for attempt in (1, 2, 3):
             try:
                 if attempt == 1:
                     page.goto(
@@ -964,15 +967,16 @@ class MRERPCustomerSyncService:
                         timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
                     )
                 else:
-                    # Second attempt: full page reload to shake loose
-                    # any half-rendered state from the first GOTO.
+                    # Retry: 5s 退让 + page.reload() · 给 server 时间稳定 +
+                    # 抖落 half-rendered state.
+                    _time.sleep(5)
                     page.reload(
                         wait_until="networkidle",
                         timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
                     )
-                # Wait specifically for the listing rows to attach.
+                # Wait specifically for the listing rows to attach (30s).
                 page.wait_for_selector(
-                    "#showdata p", state="attached", timeout=10_000,
+                    "#showdata p", state="attached", timeout=30_000,
                 )
                 html = page.content() or ""
                 rows = parse_armas_listing(html)
@@ -985,7 +989,7 @@ class MRERPCustomerSyncService:
             except PWTimeout as e:
                 last_err = e
                 logger.warning(
-                    "customer listing fetch attempt %d timed out: %s",
+                    "customer listing fetch attempt %d/3 timed out: %s",
                     attempt, e,
                 )
                 continue
@@ -996,10 +1000,10 @@ class MRERPCustomerSyncService:
                 raise MRERPTechnicalError(
                     f"customer listing fetch raised: {type(e).__name__}: {e}"
                 ) from e
-        # Both attempts timed out → screenshot + raise.
+        # All 3 attempts timed out → screenshot + raise.
         shot = self.adapter.save_listing_fail_screenshot("customers")
         raise MRERPTechnicalError(
-            f"customer listing fetch failed after wait+reload retry; "
+            f"customer listing fetch failed after 3 wait+reload attempts; "
             f"screenshot={shot}; last_error={last_err}"
         )
 

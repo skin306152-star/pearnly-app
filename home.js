@@ -1193,6 +1193,15 @@ const I18N = {
         'erp-batch-delete-btn': '批量删除',
         'erp-batch-delete-confirm': '确定删除所选 {n} 条推送日志吗?这个操作不可撤销',
         'erp-batch-delete-result': '已删除 {n} 条 · 跳过 {skip} 条',
+        // 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 表头全选 + 列标签
+        'erp-log-select-all-tip': '全选 / 取消全选 (仅失败终态行)',
+        'erp-log-col-time': '时间',
+        'erp-log-col-status': '状态',
+        'erp-log-col-trigger': '触发',
+        'erp-log-col-invoice': '发票号',
+        'erp-log-col-seller': '卖家',
+        'erp-log-col-http': 'HTTP',
+        'erp-log-col-elapsed': '耗时',
         'erp-batch-confirm': '确认对所选 {n} 条记录批量重推?',
         'erp-batch-result': '批量完成 · 成功 {ok} 条 · 失败 {fail} 条 · 跳过 {skip} 条',
         'erp-batch-empty-warn': '请先勾选至少一条失败记录',
@@ -3574,6 +3583,14 @@ const I18N = {
         'erp-batch-delete-btn': 'Delete selected',
         'erp-batch-delete-confirm': 'Delete the {n} selected push log(s)? This cannot be undone',
         'erp-batch-delete-result': 'Deleted {n} · skipped {skip}',
+        'erp-log-select-all-tip': 'Select / deselect all (failed rows only)',
+        'erp-log-col-time': 'Time',
+        'erp-log-col-status': 'Status',
+        'erp-log-col-trigger': 'Trigger',
+        'erp-log-col-invoice': 'Invoice',
+        'erp-log-col-seller': 'Seller',
+        'erp-log-col-http': 'HTTP',
+        'erp-log-col-elapsed': 'Elapsed',
         'erp-batch-confirm': 'Re-push the {n} selected records?',
         'erp-batch-result': 'Done · {ok} succeeded · {fail} failed · {skip} skipped',
         'erp-batch-empty-warn': 'Please select at least one failed record',
@@ -5948,6 +5965,14 @@ const I18N = {
         'erp-batch-delete-btn': 'ลบที่เลือก',
         'erp-batch-delete-confirm': 'ลบบันทึก {n} รายการที่เลือก? · การกระทำนี้ไม่สามารถยกเลิกได้',
         'erp-batch-delete-result': 'ลบไปแล้ว {n} รายการ · ข้าม {skip}',
+        'erp-log-select-all-tip': 'เลือก/ยกเลิกทั้งหมด (เฉพาะรายการที่ล้มเหลว)',
+        'erp-log-col-time': 'เวลา',
+        'erp-log-col-status': 'สถานะ',
+        'erp-log-col-trigger': 'ทริกเกอร์',
+        'erp-log-col-invoice': 'เลขที่ใบกำกับ',
+        'erp-log-col-seller': 'ผู้ขาย',
+        'erp-log-col-http': 'HTTP',
+        'erp-log-col-elapsed': 'ใช้เวลา',
         'erp-batch-confirm': 'ส่งซ้ำ {n} รายการที่เลือก?',
         'erp-batch-result': 'เสร็จสิ้น · สำเร็จ {ok} · ล้มเหลว {fail} · ข้าม {skip}',
         'erp-batch-empty-warn': 'กรุณาเลือกอย่างน้อย 1 รายการที่ล้มเหลว',
@@ -8314,6 +8339,14 @@ const I18N = {
         'erp-batch-delete-btn': '一括削除',
         'erp-batch-delete-confirm': '選択した {n} 件のプッシュログを削除しますか? · この操作は取り消せません',
         'erp-batch-delete-result': '{n} 件削除 · {skip} 件スキップ',
+        'erp-log-select-all-tip': '全選択 / 全解除 (失敗行のみ)',
+        'erp-log-col-time': '時刻',
+        'erp-log-col-status': '状態',
+        'erp-log-col-trigger': 'トリガー',
+        'erp-log-col-invoice': '請求書番号',
+        'erp-log-col-seller': '販売者',
+        'erp-log-col-http': 'HTTP',
+        'erp-log-col-elapsed': '経過',
         'erp-batch-confirm': '選択した {n} 件を一括再送しますか?',
         'erp-batch-result': '完了 · 成功 {ok} · 失敗 {fail} · スキップ {skip}',
         'erp-batch-empty-warn': '失敗した記録を最低 1 件選択してください',
@@ -15200,7 +15233,29 @@ async function loadErpLogs() {
             listEl.innerHTML = `<div class="erp-logs-empty">${escapeHtml(t('erp-logs-empty'))}</div>`;
             return;
         }
-        listEl.innerHTML = items.map(log => {
+        // 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 表头行 + 全选 checkbox.
+        // 全选只勾「可选行」(failed 终态 · 非 retrying · 非 success). 半选状态
+        // indeterminate · 跟现有 _erpSelected set 联动 · _refreshErpBatchBar 同步.
+        const selectableIds = items
+            .filter(function (l) {
+                var isR = l.status === 'failed' && l.next_retry_at
+                    && (new Date(l.next_retry_at).getTime() > Date.now() - 60000);
+                return l.status === 'failed' && !isR;
+            })
+            .map(function (l) { return l.id; });
+        const headerRow = '<div class="erp-log-row erp-log-row-header" data-log-header>'
+            + (selectableIds.length > 0
+                ? `<input type="checkbox" class="erp-log-cb erp-log-cb-all" data-log-select-all title="${escapeHtml(t('erp-log-select-all-tip'))}">`
+                : `<span class="erp-log-cb-spacer"></span>`)
+            + `<span class="log-time">${escapeHtml(t('erp-log-col-time'))}</span>`
+            + `<span class="log-status">${escapeHtml(t('erp-log-col-status'))}</span>`
+            + `<span class="log-tag-header">${escapeHtml(t('erp-log-col-trigger'))}</span>`
+            + `<span class="log-invoice">${escapeHtml(t('erp-log-col-invoice'))}</span>`
+            + `<span class="log-seller">${escapeHtml(t('erp-log-col-seller'))}</span>`
+            + `<span class="log-http">${escapeHtml(t('erp-log-col-http'))}</span>`
+            + `<span class="log-elapsed">${escapeHtml(t('erp-log-col-elapsed'))}</span>`
+            + '</div>';
+        listEl.innerHTML = headerRow + items.map(log => {
             const time = new Date(log.created_at);
             const timeStr = `${String(time.getMonth()+1).padStart(2,'0')}-${String(time.getDate()).padStart(2,'0')} ${String(time.getHours()).padStart(2,'0')}:${String(time.getMinutes()).padStart(2,'0')}`;
             // v118.25 · 三态:success / retrying(failed + 有 next_retry_at)/ failed(终态)
@@ -15305,6 +15360,24 @@ async function loadErpTodayStats() {
 function _refreshErpBatchBar() {
     const bar = document.getElementById('erp-logs-batch-bar');
     const countEl = document.getElementById('erp-logs-batch-count');
+    // 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 同步表头全选 checkbox 状态.
+    // none → unchecked · all → checked · partial → indeterminate.
+    const headerCb = document.querySelector('[data-log-select-all]');
+    if (headerCb) {
+        const visibleCbs = document.querySelectorAll('[data-log-cb]');
+        const total = visibleCbs.length;
+        const sel = _erpSelected.size;
+        if (sel === 0) {
+            headerCb.checked = false;
+            headerCb.indeterminate = false;
+        } else if (sel >= total) {
+            headerCb.checked = true;
+            headerCb.indeterminate = false;
+        } else {
+            headerCb.checked = false;
+            headerCb.indeterminate = true;
+        }
+    }
     if (!bar || !countEl) return;
     const n = _erpSelected.size;
     if (n === 0) {
@@ -16031,6 +16104,21 @@ async function deleteEndpoint(endpointId) {
             const id = cb.dataset.logCb;
             if (cb.checked) _erpSelected.add(id);
             else _erpSelected.delete(id);
+            _refreshErpBatchBar();
+            return;
+        }
+        // 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 表头全选 checkbox
+        const selectAllCb = e.target.closest('[data-log-select-all]');
+        if (selectAllCb) {
+            e.stopPropagation();
+            const checkAll = selectAllCb.checked;
+            const allCbs = document.querySelectorAll('[data-log-cb]');
+            allCbs.forEach(function (rowCb) {
+                rowCb.checked = checkAll;
+                const id = rowCb.dataset.logCb;
+                if (checkAll) _erpSelected.add(id);
+                else _erpSelected.delete(id);
+            });
             _refreshErpBatchBar();
             return;
         }

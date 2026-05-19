@@ -8656,6 +8656,26 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
     border: 1px solid #e8e8e3;
     border-radius: 6px;
 }
+/* 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 推送日志表头行
+   · 全选 checkbox + 列标签 · 区分于数据 row */
+.erp-log-row-header {
+    background: #f9fafb;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 500;
+    border-bottom: 1px solid #e5e7eb;
+    cursor: default !important;
+}
+.erp-log-row-header:hover {
+    background: #f9fafb !important;
+}
+.erp-log-cb-all {
+    cursor: pointer;
+}
+/* indeterminate 状态视觉 · 浏览器原生支持 input.indeterminate 但要确保 visible */
+.erp-log-cb-all:indeterminate {
+    opacity: 1;
+}
 /* Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除按钮 · 危险色 ghost */
 .btn-danger-ghost {
     color: #dc2626;

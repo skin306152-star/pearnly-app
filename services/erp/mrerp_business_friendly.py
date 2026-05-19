@@ -286,19 +286,23 @@ _THAI_REASON_CATALOG: List[tuple] = [
     (
         "เลขที่เอกสารซ้ำ",
         {
-            "th": "เลขที่ใบกำกับซ้ำกับที่มีอยู่แล้ว",
-            "en": "Invoice number duplicates an existing record in MR.ERP",
-            "zh": "发票号与 MR.ERP 已有记录重复",
-            "zh_TW": "發票號與 MR.ERP 已有紀錄重複",
+            # 问题 1 (Zihao 2026-05-19 拍板 · v118.34.24) · 文案改人话 + 行动指引.
+            # 旧文案: "发票号与 MR.ERP 已有记录重复" — 干 · 不知道下一步.
+            # 新文案: 解释 + 告诉用户去 MR.ERP 后台编辑.
+            "th": "ใบกำกับนี้เคยส่งเข้า MR.ERP แล้ว · ส่งซ้ำไม่ได้ · หากต้องการแก้ไข กรุณาเปิด MR.ERP แล้วแก้รายการนี้โดยตรง",
+            "en": "This invoice was already pushed to MR.ERP previously · duplicates aren't allowed · to update, open MR.ERP and edit the bill directly",
+            "zh": "这张发票之前已经推送过 MR.ERP 了 · 不能重复推 · 如需更新请去 MR.ERP 后台直接编辑这张单据",
+            "zh_TW": "這張發票之前已經推送過 MR.ERP 了 · 不能重複推 · 如需更新請去 MR.ERP 後台直接編輯這張單據",
         },
     ),
     (
         "เลขที่ดังกล่าวมีอยู่ในระบบแล้ว",
         {
-            "th": "เลขที่ใบกำกับมีอยู่ในระบบแล้ว",
-            "en": "This invoice number already exists in MR.ERP",
-            "zh": "该发票号已存在于 MR.ERP",
-            "zh_TW": "該發票號已存在於 MR.ERP",
+            # 同 "เลขที่เอกสารซ้ำ" 处理 · MR.ERP 两种文案 · 用户面行动指引一致.
+            "th": "ใบกำกับนี้เคยส่งเข้า MR.ERP แล้ว · ส่งซ้ำไม่ได้ · หากต้องการแก้ไข กรุณาเปิด MR.ERP แล้วแก้รายการนี้โดยตรง",
+            "en": "This invoice was already pushed to MR.ERP previously · duplicates aren't allowed · to update, open MR.ERP and edit the bill directly",
+            "zh": "这张发票之前已经推送过 MR.ERP 了 · 不能重复推 · 如需更新请去 MR.ERP 后台直接编辑这张单据",
+            "zh_TW": "這張發票之前已經推送過 MR.ERP 了 · 不能重複推 · 如需更新請去 MR.ERP 後台直接編輯這張單據",
         },
     ),
     (

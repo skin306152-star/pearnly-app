@@ -774,7 +774,15 @@ class MRERPProductSyncService:
 
     def _fetch_listing(self) -> List[ListingProduct]:
         """A3 (Zihao 2026-05-19 拍板) · mirror of customer listing
-        reliability layer: wait_for_selector + reload retry + screenshot."""
+        reliability layer: wait_for_selector + reload retry + screenshot.
+
+        问题 2 加固 (Zihao 2026-05-19 拍板 · v118.34.24):
+          - attempts 2 → 3
+          - wait_for_selector 10s → 30s (大 tenant listing 慢)
+          - 间隔 0 → 5s (退让 server 压力)
+          - cache TTL 由 caller 控制(app.py 改 600s)
+        """
+        import time as _time
         cached = self.cache.get(self._listing_cache_key)
         if cached is not None:
             return cached
@@ -782,7 +790,7 @@ class MRERPProductSyncService:
         url = self.adapter.login_url + self.LISTING_PATH
         page = self.adapter._page
         last_err: Optional[Exception] = None
-        for attempt in (1, 2):
+        for attempt in (1, 2, 3):
             try:
                 if attempt == 1:
                     page.goto(
@@ -791,12 +799,14 @@ class MRERPProductSyncService:
                         timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
                     )
                 else:
+                    # 退让 server 压力 + 给 PHP session 时间稳定.
+                    _time.sleep(5)
                     page.reload(
                         wait_until="networkidle",
                         timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
                     )
                 page.wait_for_selector(
-                    "#showdata p", state="attached", timeout=10_000,
+                    "#showdata p", state="attached", timeout=30_000,
                 )
                 html = page.content() or ""
                 rows = parse_stkmas_listing(html)
@@ -809,7 +819,7 @@ class MRERPProductSyncService:
             except PWTimeout as e:
                 last_err = e
                 logger.warning(
-                    "product listing fetch attempt %d timed out: %s",
+                    "product listing fetch attempt %d/3 timed out: %s",
                     attempt, e,
                 )
                 continue
@@ -819,7 +829,7 @@ class MRERPProductSyncService:
                 ) from e
         shot = self.adapter.save_listing_fail_screenshot("products")
         raise MRERPTechnicalError(
-            f"product listing fetch failed after wait+reload retry; "
+            f"product listing fetch failed after 3 wait+reload attempts; "
             f"screenshot={shot}; last_error={last_err}"
         )
 

@@ -13911,12 +13911,17 @@ body.settings-modal-open { overflow: hidden; }
     overflow-y: auto;
     flex-shrink: 0;
     background: #fafaf8;
+    position: static;
+    max-height: 100%;
+    min-height: 0;
 }
 .settings-modal-overlay #page-settings #settings-content,
-.settings-modal-overlay #page-settings .settings-content-wrap {
+.settings-modal-overlay #page-settings .settings-content-wrap,
+.settings-modal-overlay #page-settings .settings-content {
     flex: 1;
     overflow-y: auto;
     padding: 24px 28px;
+    min-height: 0;
 }
 
 /* ✕ 关闭按钮(右上角) */
@@ -15637,3 +15642,111 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
 
 /* ── vex-kpi-strip 支持 4 卡（默认 flex 自动适配）── */
 #brv2-kpi-strip .vex-kpi-icon-wrap { font-size: 12px; font-weight: 700; }
+
+/* ── topup v2 modal ─────────────────────────────────────────── v118.35 */
+.topup-v2-box {
+    background: #fff;
+    border-radius: 16px;
+    width: min(480px, 94vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    display: flex;
+    flex-direction: column;
+}
+.topup-v2-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 22px 0; flex-shrink: 0;
+}
+.topup-v2-title { font-size: 17px; font-weight: 600; color: var(--ink, #111827); }
+.topup-v2-close {
+    border: none; background: none; cursor: pointer; padding: 6px;
+    color: var(--ink-3, #9ca3af); border-radius: 6px; line-height: 0;
+    transition: background .15s;
+}
+.topup-v2-close:hover { background: #f3f4f6; }
+.topup-v2-steps {
+    display: flex; align-items: center; padding: 16px 22px 0; flex-shrink: 0;
+}
+.topup-v2-step {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 auto;
+}
+.topup-v2-dot {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--line, #e5e7eb); color: #9ca3af;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; transition: all .2s;
+}
+.topup-v2-step.active .topup-v2-dot { background: var(--brand, #111); color: #fff; }
+.topup-v2-slabel { font-size: 11px; color: #9ca3af; white-space: nowrap; }
+.topup-v2-step.active .topup-v2-slabel { color: var(--brand, #111); }
+.topup-v2-line { flex: 1; height: 1px; background: var(--line, #e5e7eb); margin: 0 6px 18px; }
+.topup-v2-body { padding: 16px 22px; flex: 1; overflow-y: auto; }
+.topup-v2-label {
+    display: block; font-size: 12px; color: var(--ink-3, #6b7280);
+    margin: 12px 0 6px;
+}
+.topup-v2-label:first-child { margin-top: 0; }
+.topup-v2-input {
+    width: 100%; box-sizing: border-box;
+    padding: 9px 11px; border: 1px solid var(--line, #e5e7eb);
+    border-radius: 8px; font-size: 14px; font-family: inherit;
+    background: #fff; color: var(--ink, #111827); transition: border-color .15s;
+}
+.topup-v2-input:focus { outline: none; border-color: var(--brand, #111); }
+.topup-v2-qamts {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px;
+}
+.topup-v2-qamt {
+    padding: 8px 4px; border: 1px solid var(--line, #e5e7eb);
+    border-radius: 8px; background: #fff; cursor: pointer;
+    font-size: 13px; font-weight: 500; color: var(--ink, #111827);
+    transition: all .15s;
+}
+.topup-v2-qamt:hover { border-color: var(--brand, #111); }
+.topup-v2-qamt.active {
+    border-color: var(--brand, #111);
+    background: var(--accent-soft, #f5f5f4);
+    color: var(--brand, #111); font-weight: 600;
+}
+.topup-v2-err {
+    margin-top: 6px; padding: 7px 10px; font-size: 12px;
+    color: #7f1d1d; background: #fef2f2;
+    border: 1px solid #fecaca; border-radius: 6px;
+}
+.topup-v2-bank-label { font-size: 12px; color: var(--ink-3, #6b7280); margin: 0 0 10px; }
+.topup-v2-bank-card {
+    background: #f8fafc; border: 1px solid var(--line, #e5e7eb);
+    border-radius: 12px; padding: 16px; margin-bottom: 12px;
+}
+.topup-v2-bank-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.topup-v2-bank-branch { font-size: 12px; color: var(--ink-3, #6b7280); margin-bottom: 10px; }
+.topup-v2-bank-acct { font-size: 22px; font-weight: 700; letter-spacing: .05em; margin-bottom: 2px; }
+.topup-v2-bank-holder { font-size: 12px; color: var(--ink-3, #6b7280); margin-bottom: 12px; }
+.topup-v2-copy {
+    border: 1px solid var(--line, #e5e7eb); background: #fff;
+    border-radius: 7px; padding: 6px 14px; font-size: 12px;
+    cursor: pointer; transition: all .15s; color: var(--ink, #111827);
+}
+.topup-v2-copy:hover { background: #f3f4f6; }
+.topup-v2-warn {
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+    padding: 10px 13px; font-size: 12px; color: #92400e; line-height: 1.5;
+}
+.topup-v2-drop {
+    border: 2px dashed var(--line, #e5e7eb); border-radius: 10px;
+    padding: 28px 16px; text-align: center; cursor: pointer;
+    transition: all .15s; color: var(--ink-3, #9ca3af);
+    margin-bottom: 6px; display: flex; flex-direction: column;
+    align-items: center; gap: 8px;
+}
+.topup-v2-drop:hover, .topup-v2-drop.drag-over {
+    border-color: var(--brand, #111); background: #f9fafb;
+}
+.topup-v2-drop.has-file { border-color: #10b981; background: #f0fdf4; color: #065f46; }
+.topup-v2-drop-text { font-size: 13px; }
+.topup-v2-foot {
+    display: flex; gap: 8px; justify-content: flex-end;
+    padding: 14px 22px 20px;
+    border-top: 1px solid var(--line, #e5e7eb); flex-shrink: 0;
+}

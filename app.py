@@ -1060,12 +1060,13 @@ class LoginResponse(BaseModel):
 class UserInfo(BaseModel):
     id: str
     username: str
-    plan: str
-    # v0.15.5 · 明确账号类型(monthly / lifetime / lifetime_pending)· 前端显隐判断用
+    email: Optional[str] = None
+    # v118.34 · plan/monthly_quota/expires_at 已从响应删除 · credits 系统接管
     account_type: str = "monthly"
-    # 基础配额
-    monthly_quota: int
     used_this_month: int
+    # v118.34 · 员工首次登录强制改密 · 前端读这个判断弹强制修改密码 modal
+    must_change_password: bool = False
+    is_billing_exempt: bool = False
     # IP 限流(v0.8 废弃,仅兼容旧前端)
     ip_used_today: Optional[int] = None
     ip_daily_limit: Optional[int] = None
@@ -1098,8 +1099,6 @@ class UserInfo(BaseModel):
     typhoon_used_this_month: int
     history_retention_days: int
     custom_template_limit: int
-    # 其他
-    expires_at: Optional[str] = None
     # v22 · 多租户
     tenant_id: Optional[str] = None
     tenant_name: Optional[str] = None
@@ -1117,10 +1116,9 @@ class UserInfo(BaseModel):
 
 
 class QuotaResponse(BaseModel):
-    plan: str
+    # v118.34 · plan/monthly_quota 字段已删除 · credits 系统接管 · 保留 endpoint 兼容老 client
     ip_used_today: Optional[int] = None
     ip_daily_limit: Optional[int] = None
-    monthly_quota: Optional[int] = None
     used_this_month: Optional[int] = None
     max_pages_per_upload: int
     max_file_size_mb: int
@@ -1143,28 +1141,6 @@ class ExportByHistoryIdsRequest(BaseModel):
 # ============================================================
 # 辅助:把 DB user 转成 UserInfo
 # ============================================================
-def _calc_trial_days_left(user) -> Optional[float]:
-    """v109.4 · 计算试用剩余天数(浮点 · 让前端做 ceil)"""
-    if (user.get("plan") or "").lower() != "trial":
-        return None
-    exp = user.get("trial_expires_at") or user.get("expires_at")
-    if not exp:
-        return None
-    try:
-        from datetime import datetime, timezone
-        if isinstance(exp, str):
-            # 处理可能的字符串格式
-            exp = datetime.fromisoformat(exp.replace("Z", "+00:00"))
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
-        delta = (exp - now).total_seconds() / 86400.0
-        return max(0.0, delta)
-    except Exception:
-        return None
-
-
-# v110.7 · 启动时确保 users 表有欢迎向导所需的 profile 字段(幂等)
 def _ensure_user_profile_columns():
     """
     确保 users 表有 5 个 profile 字段 · 用于欢迎向导和资料完善。
@@ -1177,6 +1153,7 @@ def _ensure_user_profile_columns():
         ("line_id", "VARCHAR(64)"),
         ("phone", "VARCHAR(32)"),
         ("active_jti", "TEXT"),  # v118.32.5.5.10 · 1 账号 1 设备 session 控制
+        ("must_change_password", "BOOLEAN NOT NULL DEFAULT FALSE"),  # v118.34 · 员工首次登录强制改密
     ]
     # v118.32.5.5.11 · 必须 commit=True · 否则 DDL 在 with 退出时回滚 · 列不会持久化
     with db.get_cursor(commit=True) as cur:
@@ -1188,17 +1165,46 @@ def _ensure_user_profile_columns():
     logger.info("✅ v110.7 users profile 字段就绪")
 
 
+_OPEN_PERMS = {
+    # v118.34 · _plan_permissions 旧函数已删除 · 历史回退 · 所有用户全开
+    # 配额改由 credits 系统(/api/me/credits + /api/credits/usage-report)管控
+    "monthly_quota": None,
+    "max_pages_per_upload": 50,
+    "max_file_size_mb": 100,
+    "can_edit_fields": True,
+    "can_verify_tax": True,
+    "rd_daily_limit": None,
+    "can_extract_items": True,
+    "can_view_history": True,
+    "history_retention_days": 365,
+    "can_push_erp": True,
+    "can_auto_push_erp": True,
+    "endpoints_limit": -1,
+    "can_archive": True,
+    "can_customize_archive": True,
+    "zip_batch_limit": -1,
+    "can_use_email_ingest": True,
+    "can_use_folder_watch": True,
+    "can_use_smart_alert": True,
+    "can_use_custom_template": True,
+    "custom_template_limit": -1,
+    "typhoon_quota_monthly": 500,
+    "can_manage_api_keys": True,
+    "can_auto_classify": True,
+    "can_duplicate_detect": True,
+    "can_ai_query": True,
+    "can_voucher_draft": True,
+}
+
+
 def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
-    # v0.15 · 所有用户功能相同 · 配额由 user.monthly_quota 字段决定
-    # v118.11 · 防御性兜底:某些员工账号 DB 中 plan 字段为 NULL · 导致 Pydantic UserInfo.plan: str 校验失败抛 500
-    # v118.12 · 套餐归 tenant 不归 user · 员工自动继承老板的 plan/quota
-    # v118.12.1 · 修正:tenants 表实际没有 plan 字段 · plan 仍存在 user 表
-    #   - 员工(role=member):取同 tenant 的 owner.plan 作为 effective_plan(继承老板)
-    #   - 老板(role=owner):用自己的 user.plan
+    # v118.34 · 旧订阅系统已下线 · plan/effective_plan/plan_expires_at/trial_expires_at/monthly_quota 字段全部移除
+    # · 配额由 credits 系统(tenant_credits + credit_transactions)接管
+    # · 功能权限改为全开 · _OPEN_PERMS 提供兼容字段
     role = user.get("role") or "owner"
     is_super = bool(user.get("is_super_admin"))
 
-    # v22 · 多租户:查用户所属租户(配额/技术维度从这里来)
+    # v22 · 多租户:查用户所属租户(显示用)
     tenant_info = None
     if user.get("tenant_id"):
         try:
@@ -1207,100 +1213,21 @@ def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
             logger.warning(f"_build_user_info: get_tenant failed: {_te}")
             tenant_info = None
 
-    # v118.12.1 · effective_plan 取值优先级:
-    #   员工 → 同 tenant 的 owner 的 plan(动态查 · 防员工 plan 不同步)
-    #   老板 → 自己的 user.plan
-    #   都缺 → "free" 兜底
-    # v118.27.8.1.17 · 员工继承老板时不只继承 plan · 同时继承 plan_expires_at / trial_expires_at / monthly_quota
-    #                  否则员工设置页 / 顶栏跟老板对不齐(Bug 修)
-    effective_plan = user.get("plan") or "free"
-    inherited_plan_exp = None
-    inherited_trial_exp = None
-    inherited_quota = None
-    if role == "member" and user.get("tenant_id"):
-        try:
-            import db as _db
-            with _db.get_cursor() as cur:
-                cur.execute(
-                    "SELECT plan, plan_expires_at, trial_expires_at, monthly_quota "
-                    "FROM users WHERE tenant_id = %s AND role = 'owner' LIMIT 1",
-                    (str(user["tenant_id"]),),
-                )
-                _row = cur.fetchone()
-                if _row:
-                    _row_dict = _row if isinstance(_row, dict) else {
-                        "plan": _row[0], "plan_expires_at": _row[1],
-                        "trial_expires_at": _row[2], "monthly_quota": _row[3],
-                    }
-                    _owner_plan = _row_dict.get("plan")
-                    if _owner_plan:
-                        effective_plan = _owner_plan
-                        inherited_plan_exp = _row_dict.get("plan_expires_at")
-                        inherited_trial_exp = _row_dict.get("trial_expires_at")
-                        inherited_quota = _row_dict.get("monthly_quota")
-        except Exception as _ee:
-            logger.warning(f"_build_user_info: lookup owner plan failed: {_ee}")
+    p_perms = _OPEN_PERMS
 
-    plan = effective_plan
-    p_perms = _plan_permissions(effective_plan)
-
-    # 真实配额(不看 plan)
-    # None/0/负 且有 gemini_api_key = 买断 · 显示无限(0 视为不限)
-    # None/0/负 且无 key = 买断待配置 (UI 显示"请先填密钥")
-    # >0 = 月付 · 显示配额
+    # 自带 key 标识(仍用于设置页 API Key 输入框显隐)
     has_own_key = bool((user.get("gemini_api_key") or "").strip())
-    raw_quota = user.get("monthly_quota")
-    if has_own_key:
-        real_quota = 0            # 前端协议:0 表示"自带 key · 不限"
-        account_type = "lifetime"  # 买断 · 已填 key
-    elif raw_quota and int(raw_quota) > 0:
-        real_quota = int(raw_quota)
-        account_type = "monthly"   # 月付
-    else:
-        real_quota = 0
-        account_type = "lifetime_pending"  # 买断 · 待填 key
-
-    # v118.27.8.1.17 · 计算 plan_expires_at(员工继承优先 · 老板用自己的) + plan_days_left
-    # 之前只读 user.expires_at 老字段 · 升级套餐后该列没维护 · 设置页一直显「—」
-    _plan_exp_val = inherited_plan_exp if inherited_plan_exp else user.get("plan_expires_at")
-    _trial_exp_val = inherited_trial_exp if inherited_trial_exp else user.get("trial_expires_at")
-    if isinstance(_plan_exp_val, str):
-        _plan_exp_str = _plan_exp_val
-    elif _plan_exp_val:
-        _plan_exp_str = _plan_exp_val.isoformat() if hasattr(_plan_exp_val, "isoformat") else str(_plan_exp_val)
-    else:
-        _plan_exp_str = None
-    if isinstance(_trial_exp_val, str):
-        _trial_exp_str = _trial_exp_val
-    elif _trial_exp_val:
-        _trial_exp_str = _trial_exp_val.isoformat() if hasattr(_trial_exp_val, "isoformat") else str(_trial_exp_val)
-    else:
-        _trial_exp_str = None
-    # plan_days_left:lifetime → -1(永久)· 其他算实际天数
-    _plan_days_left = None
-    if effective_plan == "lifetime":
-        _plan_days_left = -1
-    elif _plan_exp_val:
-        try:
-            from datetime import datetime, timezone
-            _exp_dt = _plan_exp_val
-            if isinstance(_exp_dt, str):
-                _exp_dt = datetime.fromisoformat(_exp_dt.replace("Z", "+00:00"))
-            if _exp_dt.tzinfo is None:
-                _exp_dt = _exp_dt.replace(tzinfo=timezone.utc)
-            _delta = _exp_dt - datetime.now(timezone.utc)
-            _plan_days_left = max(0, int(_delta.total_seconds() // 86400))
-        except Exception:
-            _plan_days_left = None
+    account_type = "lifetime" if has_own_key else "monthly"
 
     return {
         "id": str(user["id"]),
         "username": user["username"],
-        "plan": plan,
-        "effective_plan": effective_plan,  # v118.12 · 员工继承自 tenant 的真实套餐 · 前端应该用这个
-        "account_type": account_type,     # v0.15.5 · 明确的账号类型 · 供前端显示判断
-        "monthly_quota": real_quota,
+        "email": user.get("email") or None,
+        "account_type": account_type,
         "used_this_month": int(user.get("used_this_month", 0) or 0),
+        # v118.34 · 员工首次登录强制改密 + 计费豁免标识
+        "must_change_password": bool(user.get("must_change_password")),
+        "is_billing_exempt": bool(user.get("is_billing_exempt")),
         "ip_used_today": ip_used,
         "ip_daily_limit": ip_limit,
         # 基础能力
@@ -1332,19 +1259,8 @@ def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
         "typhoon_quota_monthly": p_perms.get("typhoon_quota_monthly", 0) or 0,
         "typhoon_used_this_month": user.get("typhoon_used_this_month", 0) or 0,
         "can_manage_api_keys": p_perms.get("can_manage_api_keys", False),
-        # v118.27.8.1.17 · expires_at 优先 plan_expires_at · 兼容老 user.expires_at 字段
-        "expires_at": _plan_exp_str or (str(user["expires_at"]) if user.get("expires_at") else None),
-        # v118.27.8.1.17 · 明确字段 · 跟 /api/me/plan 对齐 SSoT
-        "plan_expires_at": _plan_exp_str,
-        "plan_days_left":  _plan_days_left,
-        # v109.4 · 暴露试用 + LINE 状态给前端 · settings 页面区分 trial/月付/绑/未绑
-        # v118.12 · 员工不应该有自己的 trial · 试用是 tenant 级 · 这里改从 tenant 取
-        # v118.27.8.1.17 · 修幽灵字段:tenants 表没 trial_expires_at 列 · 直接用上面算好的 _trial_exp_str
-        #                  (员工继承老板 trial · 老板用自己的)
-        "trial_expires_at": _trial_exp_str,
-        "trial_days_left": _calc_trial_days_left(user) if effective_plan == "trial" else None,
         "line_verified": bool(user.get("line_user_id") or user.get("line_verified_at")),
-        # v0.15 · 新增:买断标识(前端根据此决定显示 API Key 输入框)
+        # v0.15 · 自带 key 标识(设置页判断 API Key 输入框显隐)
         "has_own_gemini_key": has_own_key,
         # v22 · 多租户:供前端显示租户信息 + 判断超管
         "tenant_id": str(user["tenant_id"]) if user.get("tenant_id") else None,
@@ -1376,261 +1292,6 @@ def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
         # v118.12.5 · onboarding wizard 暂时下架(没真实现个性化推荐 · 弹了也是噪音)
         # 永远返回 true · 前端 wizard 不弹 · 后续要恢复直接改回判断逻辑
         "profile_filled": True,
-    }
-
-
-def _plan_permissions(plan: str = None) -> dict:
-    """
-    v0.15 · 彻底扁平化 · 不再有套餐概念
-    所有用户功能完全一样 · 配额由 user.monthly_quota 单独控制
-    plan 参数保留仅为兼容 · 忽略其值 · 永远返回全开权限
-    """
-    return {
-        # 这里的 monthly_quota 是 "权限层默认值" · 实际配额以 user.monthly_quota 为准
-        # 下游代码应读 user.monthly_quota · 而不是 perms["monthly_quota"]
-        "monthly_quota": None,                # 权限层不限 · 实际配额看 user
-        "max_pages_per_upload": 50,
-        "max_file_size_mb": 100,
-        "can_edit_fields": True,
-        "can_verify_tax": True,
-        "rd_daily_limit": None,
-        "can_extract_items": True,
-        "can_view_history": True,
-        "history_retention_days": 365,
-        "can_push_erp": True,
-        "can_auto_push_erp": True,
-        "endpoints_limit": -1,
-        "can_archive": True,
-        "can_customize_archive": True,
-        "zip_batch_limit": -1,
-        "can_use_email_ingest": True,
-        "can_use_folder_watch": True,
-        "can_use_smart_alert": True,
-        "can_use_custom_template": True,
-        "custom_template_limit": -1,
-        "typhoon_quota_monthly": 500,
-        "can_manage_api_keys": True,
-        "can_auto_classify": True,
-        "can_duplicate_detect": True,
-        "can_ai_query": True,
-        "can_voucher_draft": True,
-    }
-
-
-def _check_user_quota(user: dict) -> tuple:
-    """
-    v0.15 · 检查用户本月配额
-    v87 · 多租户支持 · 优先按 tenant_type 判断配额来源
-    返回 (ok: bool, error_msg: Optional[str], quota_info: dict)
-
-    多租户规则(v87):
-    - tenant_type=admin → 超管无限
-    - tenant_type=byo_api → 买断自带 key · 看 user.gemini_api_key 是否填
-    - tenant_type=shared_api → 月付共用系统 key · 配额用 tenant.monthly_quota
-    老规则(兜底 · 无 tenant_id 的用户):
-    - 用户填了 gemini_api_key → 买断 · 不限
-    - monthly_quota <= 0 → 需提示填 key
-    - monthly_quota > 0 · used < quota → 可识别
-    - monthly_quota > 0 · used >= quota → 本月配额用完
-
-    v118.26.2.2 紧急修补 · 2026-05-09 · OCR P0 BUG
-    BUG 真凶:v27.7 fix_orphan 给所有孤立用户建了 tenant_type='shared_api'
-    但 monthly_quota=0(继承 user.monthly_quota 的 NULL/0)· 进入 tenant 分支后
-    被 if t_quota <= 0 拦成 quota.need_api_key · 导致所有 trial/free/pro 用户
-    OCR 全部失败。修补:有效 plan 用户已被前置 _v109_quota 检查过(ocr_recognize 入口)·
-    这里直接放行 · 不再走 tenant 配额拦截。lifetime 用户保留自带 key 检查。
-
-    v118.26.2.4 加强 · 2026-05-09 · 安全 + 员工继承
-    - BUG 6 · 顶部加 banned / is_active=False 拦截 · 防被禁用账号绕过 OCR
-    - BUG 7 · role=member 员工 · 用同 tenant 的 owner 的 plan 判断(跟 _build_user_info 一致)
-
-    v118.27.5.2 紧急修补:SKIN 测试号双闸全放行
-    BUG:v118.27.5 只在 auth_signup.check_ocr_quota 加白名单 · 但本函数(_check_user_quota)
-    是第 2 道闸 · SKIN 的 tenant_type 仍走 byo_api 分支被 quota.need_api_key 拦
-    修:本函数顶部也加 SKIN 白名单 · 跟 auth_signup 保持一致
-    """
-    # v118.27.5.2 · SKIN 测试号双闸白名单(跟 auth_signup.check_ocr_quota 一致)
-    if str(user.get("id") or "") == "468b50c1-5593-4fd6-990d-515ce8085563":
-        return True, None, {
-            "mode": "skin_test_whitelist",
-            "monthly_quota": None,
-            "used_this_month": 0,
-        }
-
-    # v118.26.2.4 · 安全闸 · 被禁用 / 封禁账号绝对不能 OCR
-    if user.get("is_banned"):
-        return False, "account.banned", {
-            "mode": "banned",
-            "monthly_quota": 0,
-            "used_this_month": 0,
-        }
-    if user.get("is_active") is False:
-        return False, "account.inactive", {
-            "mode": "inactive",
-            "monthly_quota": 0,
-            "used_this_month": 0,
-        }
-
-    # v118.26.2.2 紧急放行 · 有效 plan 用户(_v109_quota 已查过试用期/月配额)
-    # v118.26.2.4 · 员工 role=member 时 · 取老板 plan(继承 · 跟 _build_user_info 同步)
-    user_plan = user.get("plan")
-    if user.get("role") == "member" and user.get("tenant_id"):
-        try:
-            with db.get_cursor() as _cur:
-                _cur.execute(
-                    "SELECT plan FROM users WHERE tenant_id = %s AND role = 'owner' LIMIT 1",
-                    (str(user["tenant_id"]),),
-                )
-                _row = _cur.fetchone()
-                if _row:
-                    _owner_plan = (_row["plan"] if isinstance(_row, dict) else _row[0])
-                    if _owner_plan:
-                        user_plan = _owner_plan
-        except Exception as _e:
-            logger.warning(f"_check_user_quota: lookup owner plan failed: {_e}")
-
-    if user.get("is_super_admin") or user_plan == "admin":
-        return True, None, {
-            "mode": "admin",
-            "monthly_quota": None,
-            "used_this_month": 0,
-        }
-    if user_plan == "lifetime":
-        # lifetime 必须自带 Gemini key(员工继承时 · 看老板 key)
-        _gk = user.get("gemini_api_key")
-        if not _gk and user.get("role") == "member" and user.get("tenant_id"):
-            try:
-                with db.get_cursor() as _cur:
-                    _cur.execute(
-                        "SELECT gemini_api_key FROM users WHERE tenant_id = %s AND role = 'owner' LIMIT 1",
-                        (str(user["tenant_id"]),),
-                    )
-                    _row = _cur.fetchone()
-                    if _row:
-                        _gk = (_row["gemini_api_key"] if isinstance(_row, dict) else _row[0])
-            except Exception as e:
-                logger.warning(f"[user_info] 读取老板 gemini_api_key 失败: {e}")
-        has_own_key = bool((_gk or "").strip())
-        if has_own_key:
-            return True, None, {
-                "mode": "lifetime",
-                "monthly_quota": None,
-                "used_this_month": int(user.get("used_this_month") or 0),
-            }
-        return False, "quota.need_api_key", {
-            "mode": "need_setup",
-            "monthly_quota": 0,
-            "used_this_month": 0,
-        }
-    if user_plan in ("trial", "free", "pro", "firm", "enterprise",
-                     "monthly", "yearly"):
-        return True, None, {
-            "mode": "v109_plan",
-            "monthly_quota": None,
-            "used_this_month": int(user.get("used_this_month") or 0),
-        }
-
-    # === 以下为老多租户兜底(plan 字段为 NULL 或非标值的极旧用户)===
-    # v87 · 多租户优先分支
-    tenant_id = user.get("tenant_id")
-    if tenant_id:
-        try:
-            tenant = db.get_tenant(str(tenant_id))
-        except Exception as e:
-            logger.warning(f"_check_user_quota get_tenant failed: {e}")
-            tenant = None
-        if tenant:
-            tt = tenant.get("tenant_type")
-            # 超管 · 无限
-            if tt == "admin" or user.get("is_super_admin"):
-                return True, None, {
-                    "mode": "admin",
-                    "monthly_quota": None,
-                    "used_this_month": 0,
-                }
-            # 买断自带 key
-            if tt == "byo_api":
-                has_own_key = bool((user.get("gemini_api_key") or "").strip())
-                if has_own_key:
-                    return True, None, {
-                        "mode": "lifetime",
-                        "monthly_quota": None,
-                        "used_this_month": int(user.get("used_this_month") or 0),
-                    }
-                return False, "quota.need_api_key", {
-                    "mode": "need_setup",
-                    "monthly_quota": 0,
-                    "used_this_month": 0,
-                }
-            # 月付共用系统 key(shared_api)· 配额在 tenant 层
-            if tt == "shared_api":
-                t_quota = int(tenant.get("monthly_quota") or 0)
-                t_used = int(tenant.get("used_this_month") or 0)
-                if t_quota <= 0:
-                    # 月付但管理员没配额度 · 联系管理员
-                    return False, "quota.need_api_key", {
-                        "mode": "need_setup",
-                        "monthly_quota": 0,
-                        "used_this_month": 0,
-                    }
-                if t_used >= t_quota:
-                    return False, "quota.exhausted", {
-                        "mode": "shared",
-                        "monthly_quota": t_quota,
-                        "used_this_month": t_used,
-                    }
-                return True, None, {
-                    "mode": "shared",
-                    "monthly_quota": t_quota,
-                    "used_this_month": t_used,
-                }
-
-    # 老规则(兜底)· 保持向后兼容
-    # === v109.3 · 新 plan 系统的用户(trial/free/pro/firm/enterprise)走新逻辑 ===
-    # === v111.1 · 加 monthly/yearly/lifetime/admin 新档名 ===
-    # 这些用户已经在前面被 v109.3 quota check 检查过 · 这里直接放行
-    user_plan = user.get("plan")
-    if user_plan in ("trial", "free", "pro", "firm", "enterprise",
-                     "monthly", "yearly", "lifetime", "admin"):
-        return True, None, {
-            "mode": "v109_plan",
-            "monthly_quota": None,
-            "used_this_month": int(user.get("used_this_month") or 0),
-        }
-
-    has_own_key = bool((user.get("gemini_api_key") or "").strip())
-    quota = user.get("monthly_quota")
-    used = int(user.get("used_this_month") or 0)
-
-    # 情况 1 · 自带 key(买断)· 无限制
-    if has_own_key:
-        return True, None, {
-            "mode": "lifetime",
-            "monthly_quota": None,
-            "used_this_month": used,
-        }
-
-    # 情况 2 · 无 key · 无配额(或配额 <= 0)· 需要填 API Key
-    if not quota or quota <= 0:
-        return False, "quota.need_api_key", {
-            "mode": "need_setup",
-            "monthly_quota": 0,
-            "used_this_month": used,
-        }
-
-    # 情况 3 · 月付 · 超额
-    if used >= quota:
-        return False, "quota.exhausted", {
-            "mode": "monthly",
-            "monthly_quota": int(quota),
-            "used_this_month": used,
-        }
-
-    # 情况 4 · 月付 · 正常
-    return True, None, {
-        "mode": "monthly",
-        "monthly_quota": int(quota),
-        "used_this_month": used,
     }
 
 
@@ -1672,118 +1333,6 @@ async def contact():
 # ============================================================
 # 套餐元数据(前端生成对比表)
 # ============================================================
-@app.get("/api/plans")
-async def plans_metadata():
-    """v0.8 · 新分档:Free 能体验完整工作流,Plus/Pro 拉开量与自动化差距"""
-    return {
-        "plans": [
-            {
-                "id": "free",
-                # 引擎:Free 用普通引擎(EasyOCR)· 保留精准升级提示
-                "engine": "EasyOCR",
-                "engine_label_key": "plan-engine-standard",
-                "engine_secondary": None,
-                # 识别额度
-                "monthly_quota": 50,               # v0.8 改:月 50 张(原来是按 IP 20/日)
-                "daily_quota_per_ip": None,        # 不再用 IP 日限
-                "max_pages_per_upload": 10,
-                "max_file_size_mb": 30,
-                # 基础功能 · Free 开放
-                "can_edit_fields": True,           # v0.8 改:开放字段编辑
-                "can_verify_tax": True,            # v0.8 改:开放 RD 校验(有次数限制)
-                "rd_daily_limit": 5,               # v0.8 新:Free 每天 5 次 RD 校验
-                "can_extract_items": True,
-                # 历史记录
-                "can_view_history": True,          # v0.8 改:开放
-                "history_retention_days": 7,      # v0.8 新:Free 只留 7 天
-                # ERP 推送
-                "can_push_erp": True,              # v0.8 改:允许配置 + 手动推
-                "can_auto_push_erp": False,        # v0.8 新:但不能自动推
-                "endpoints_limit": 1,              # v0.8 新:Free 限 1 个端点
-                # 智能归档
-                "can_archive": True,               # v0.8 新:默认模板可用
-                "can_customize_archive": False,    # v0.8 新:不能改模板
-                "zip_batch_limit": 10,             # v0.8 新:一次最多 10 张 ZIP
-                # 其他自动化(Plus 独有)
-                "can_use_email_ingest": False,
-                "can_use_folder_watch": False,
-                "can_use_smart_alert": False,
-                # 模板/API Key/次级能力
-                "can_use_custom_template": False,
-                "custom_template_limit": 0,
-                "can_manage_api_keys": False,
-                "support_level": "community",
-            },
-            {
-                "id": "plus",
-                "engine": "Gemini Flash",
-                "engine_label_key": "plan-engine-precise",
-                "engine_secondary": "Typhoon OCR",
-                "monthly_quota": 500,
-                "daily_quota_per_ip": None,
-                "max_pages_per_upload": 20,
-                "max_file_size_mb": 50,
-                "can_edit_fields": True,
-                "can_verify_tax": True,
-                "rd_daily_limit": None,            # 无限
-                "can_extract_items": True,
-                "can_view_history": True,
-                "history_retention_days": 90,
-                "can_push_erp": True,
-                "can_auto_push_erp": True,         # 开放自动推
-                "endpoints_limit": 3,
-                "can_archive": True,
-                "can_customize_archive": True,     # 可自定义模板
-                "zip_batch_limit": 100,
-                "can_use_email_ingest": True,
-                "email_ingest_limit": 1,
-                "can_use_folder_watch": True,
-                "folder_watch_limit": 1,
-                "can_use_smart_alert": True,
-                "smart_alert_level": "basic",
-                "can_use_custom_template": True,
-                "custom_template_limit": 3,
-                "typhoon_quota_monthly": 100,
-                "can_manage_api_keys": False,
-                "support_level": "line_email",
-            },
-            {
-                "id": "pro",
-                "engine": "Gemini (Your Key)",
-                "engine_label_key": "plan-engine-precise",
-                "engine_secondary": "Typhoon OCR",
-                "monthly_quota": None,             # 无限
-                "daily_quota_per_ip": None,
-                "max_pages_per_upload": 50,
-                "max_file_size_mb": 100,
-                "can_edit_fields": True,
-                "can_verify_tax": True,
-                "rd_daily_limit": None,
-                "can_extract_items": True,
-                "can_view_history": True,
-                "history_retention_days": 365,
-                "can_push_erp": True,
-                "can_auto_push_erp": True,
-                "endpoints_limit": -1,             # -1 = 无限
-                "can_archive": True,
-                "can_customize_archive": True,
-                "zip_batch_limit": -1,
-                "can_use_email_ingest": True,
-                "email_ingest_limit": 5,
-                "can_use_folder_watch": True,
-                "folder_watch_limit": -1,
-                "can_use_smart_alert": True,
-                "smart_alert_level": "advanced",
-                "can_use_custom_template": True,
-                "custom_template_limit": -1,
-                "typhoon_quota_monthly": 500,
-                "can_manage_api_keys": True,
-                "support_level": "dedicated",
-            },
-        ],
-    }
-
-
 # ============================================================
 # 登录
 # ============================================================
@@ -1966,18 +1515,12 @@ async def update_me_profile(payload: ProfileUpdate, request: Request):
 @app.get("/api/ocr/quota", response_model=QuotaResponse)
 async def get_quota(request: Request):
     user = get_current_user_from_request(request)
-    # v118.11 · plan=NULL 防御兜底 · 同 _build_user_info
-    plan = user.get("plan") or "free"
-    p_perms = _plan_permissions(plan)
-    monthly_quota = p_perms.get("monthly_quota")
-    used_this_month = int(user.get("used_this_month") or 0) if monthly_quota is not None else None
-
+    # v118.34 · 旧 plan/monthly_quota 已下线 · 返回静态上限(credits 系统在 /api/me/credits)
+    p_perms = _OPEN_PERMS
     return QuotaResponse(
-        plan=plan,
         ip_used_today=None,
         ip_daily_limit=None,
-        monthly_quota=monthly_quota,
-        used_this_month=used_this_month,
+        used_this_month=int(user.get("used_this_month") or 0),
         max_pages_per_upload=p_perms["max_pages_per_upload"],
         max_file_size_mb=p_perms["max_file_size_mb"],
     )
@@ -2002,7 +1545,7 @@ async def ocr_recognize(
         raise HTTPException(400, detail="ocr.empty_pdf")
 
     # 2. 按套餐决定页数/大小上限 · v0.8 单一数据源
-    p_perms = _plan_permissions(plan)
+    p_perms = _OPEN_PERMS
     max_pages = p_perms["max_pages_per_upload"]
     max_mb = p_perms["max_file_size_mb"]
 
@@ -2046,57 +1589,9 @@ async def ocr_recognize(
                 "estimated_cost": _cr.get("estimated_cost"),
             })
 
-    # 4. 配额检查 · v0.15 · 新双轨:自带 key → 不限 · 否则扣 user.monthly_quota
-    # === v109.3 · 新套餐配额检查(防薅 + 真实计量) ===
-    try:
-        from auth_signup import check_ocr_quota as _v109_quota
-        _q = _v109_quota(str(user.get("id")))
-        if not _q.get("allowed"):
-            reason = _q.get("reason", "quota_exceeded")
-            raise HTTPException(status_code=429, detail={
-                "code": f"v109.{reason}",
-                "used": _q.get("used"), "limit": _q.get("limit"), "plan": _q.get("plan"),
-                "needs_line_verify": reason == "needs_line_verify",
-            })
-    except HTTPException:
-        raise
-    except Exception as _v109e:
-        logger.warning(f"v109 quota check skip: {_v109e}")
-
-    ok, err_code, quota_info = _check_user_quota(user)
-    if not ok:
-        if err_code == "quota.need_api_key":
-            # 买断账号未填 key
-            raise HTTPException(403, detail={
-                "code": "quota.need_api_key",
-            })
-        elif err_code == "quota.exhausted":
-            raise HTTPException(429, detail={
-                "code": "ocr.monthly_limit_exceeded",
-                "limit": quota_info["monthly_quota"],
-                "used": quota_info["used_this_month"],
-                "remaining": 0,
-                "requested": page_count,
-            })
-        else:
-            raise HTTPException(429, detail={"code": err_code or "quota.unknown"})
-
-    # 如果是月付用户 · 并且本次识别会超额 · 也要拒绝
-    if quota_info["mode"] == "monthly":
-        mq = quota_info["monthly_quota"]
-        um = quota_info["used_this_month"]
-        if um + page_count > mq:
-            raise HTTPException(429, detail={
-                "code": "ocr.monthly_limit_exceeded",
-                "limit": mq,
-                "used": um,
-                "remaining": max(0, mq - um),
-                "requested": page_count,
-            })
-
-    monthly_quota = quota_info.get("monthly_quota")  # 兼容下游(None=不限)
+    # v118.34 · 旧配额闸(check_ocr_quota / _check_user_quota)已删除 · credits 系统管控
     used_today = None
-    used_month = quota_info.get("used_this_month")
+    used_month = None
 
     # 4.5. 文件指纹缓存 · v0.8 改:所有 plan 都启用(按 user_id 隔离,不跨用户)
     # v92 · 缓存窗口从 24h 扩到 30 天(默认) · 月末复核上月票也能命中 · 省 Gemini 配额
@@ -2108,7 +1603,7 @@ async def ocr_recognize(
 
         # v0.9 · 缓存命中也触发自动推送(用户的期待是"每次上传就推送")
         cache_auto_pushed = False
-        if _plan_permissions(plan).get("can_auto_push_erp"):
+        if True:  # v118.34 · 旧 plan 闸已拆 · 永远允许 auto-push
             try:
                 auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
                 if auto_eps:
@@ -2187,7 +1682,6 @@ async def ocr_recognize(
                 "ip_used_today": None,
                 "ip_daily_limit": None,
                 "used_this_month": int(user.get("used_this_month") or 0),
-                "monthly_quota": monthly_quota,
             },
         }
 
@@ -2245,18 +1739,15 @@ async def ocr_recognize(
     typhoon_enhanced = False
     typhoon_pages_enhanced = []
 
-    # 6. 更新配额 · v87 多租户支持:shared=扣租户 · monthly=扣用户(老) · admin/lifetime 不扣
+    # 6. v118.34 · 旧配额闸(quota_info / shared / monthly)已删除 · 改用 credits 系统
     new_month_used = None
-    qm = quota_info.get("mode")
-    if qm == "shared" and user.get("tenant_id"):
+    if user.get("tenant_id"):
         try:
             tu = db.increment_tenant_monthly_usage(str(user["tenant_id"]), page_count)
             if tu >= 0:
                 new_month_used = tu
         except Exception as e:
             logger.warning(f"increment_tenant_monthly_usage failed: {e}")
-    elif qm == "monthly" and monthly_quota is not None:
-        new_month_used = increment_user_monthly_usage(str(user["id"]), page_count)
 
     # 7. 智能置信度
     #    策略:不再跨页"合并取第一个非空值",避免一页成功一页失败被误判为高
@@ -2630,7 +2121,7 @@ async def ocr_recognize(
     # auto-push 必炸 ERR_NO_CLIENT 浪费 retry 队列(对应 Zihao 截图里
     # 一直 retry 的混乱).
     auto_pushed = False
-    if history_ids and _plan_permissions(plan).get("can_auto_push_erp"):
+    if history_ids:  # v118.34 · 旧 plan 闸已拆
         try:
             auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
             if auto_eps:
@@ -2698,12 +2189,19 @@ async def ocr_recognize(
     # credits · 按量扣费（豁免用户自动跳过，失败不影响识别返回）
     try:
         if _credits_tid:
-            db.deduct_company_credits(
+            _ded_result = db.deduct_company_credits(
                 tenant_id=_credits_tid,
                 user_id=str(user["id"]),
                 pages=page_count,       # page_count is always in scope
                 history_id=primary_history_id,
             )
+            # Task 5 · 余额 < 50 触发低余额邮件(防骚扰已在邮件函数内处理)
+            try:
+                bal_after = _ded_result.get("balance_after") if isinstance(_ded_result, dict) else None
+                if bal_after is not None and bal_after < 50 and not user.get("is_billing_exempt"):
+                    send_low_balance_email(_credits_tid, float(bal_after))
+            except Exception as _email_err:
+                logger.warning(f"[email] low_balance trigger skipped: {_email_err}")
     except Exception as _deduct_err:
         logger.warning(f"credits deduct failed (非阻断): {_deduct_err}")
 
@@ -2745,7 +2243,6 @@ async def ocr_recognize(
             "ip_used_today": None,
             "ip_daily_limit": None,
             "used_this_month": new_month_used if new_month_used is not None else int(user.get("used_this_month") or 0),
-            "monthly_quota": monthly_quota,
         },
     }
 
@@ -2913,11 +2410,6 @@ async def v1_recognize(
 @app.post("/api/v1/ocr/export")
 async def v1_export(req: ExportRequest, request: Request):
     return await ocr_export(req, request)
-
-
-@app.get("/api/v1/plans")
-async def v1_plans():
-    return await plans_metadata()
 
 
 @app.get("/api/v1/health")
@@ -3399,12 +2891,8 @@ def _tid(user: dict) -> Optional[str]:
 
 
 def _check_history_access(user: dict):
-    """v0.8 · 所有 plan 都能看历史,保留天数不同"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_view_history"):
-        raise HTTPException(403, detail="history.upgrade_required")
-    return int(p.get("history_retention_days", 7))
+    """v118.34 · 所有用户均可看历史 · 旧 plan 闸已拆"""
+    return 365
 
 
 @app.get("/api/history")
@@ -3609,11 +3097,8 @@ import erp_push as _erp
 
 
 def _check_push_access(user: dict):
-    """所有 plan 都可用 ERP 推送(v0.8)· Free 有数量限制,无自动推"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_push_erp"):
-        raise HTTPException(403, detail="erp.upgrade_required")
+    """v118.34 · 所有用户均可推 ERP · 旧 plan 闸已拆"""
+    return
 
 
 class ErpEndpointCreate(BaseModel):
@@ -3673,7 +3158,7 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
     走 kms_helper.encrypt_str 转 ciphertext 再落地。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
-    p = _plan_permissions(user.get("plan", "free"))
+    p = _OPEN_PERMS
 
     try:
         # v0.8 · 数量限制
@@ -3847,7 +3332,7 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
 
     # v0.8 · auto_push 权限
     if fields.get("auto_push"):
-        p = _plan_permissions(user.get("plan", "free"))
+        p = _OPEN_PERMS
         if not p.get("can_auto_push_erp"):
             raise HTTPException(403, detail="erp.auto_push_plus_required")
 
@@ -5213,17 +4698,12 @@ class RdQueryRequest(BaseModel):
 
 
 def _check_rd_access(user: dict):
-    """v0.8 · 所有 plan 可用 · Free 有日限"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_verify_tax"):
-        raise HTTPException(403, detail="rd.upgrade_required")
-
-    daily_limit = p.get("rd_daily_limit")
+    """v118.34 · 所有用户均可调 RD API · 旧 plan 闸已拆"""
+    return
+    # 以下为旧日限逻辑(已死代码 · daily_limit 永远为 None)
+    daily_limit = None
     if daily_limit is None:
         return  # 无限
-
-    # 当日用量(从 Redis/内存都没有,直接查 DB 简表)
     used = db.get_rd_daily_usage(str(user["id"]))
     if used >= daily_limit:
         raise HTTPException(429, detail={
@@ -5284,19 +4764,13 @@ class ArchivePreviewRequest(BaseModel):
 
 
 def _check_archive_access(user: dict):
-    """所有 plan 都能读归档设置 · 用默认模板"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_archive"):
-        raise HTTPException(403, detail="archive.upgrade_required")
+    """v118.34 · 所有用户均可读归档 · 旧 plan 闸已拆"""
+    return
 
 
 def _check_archive_customize(user: dict):
-    """只有 Plus/Pro 能改归档模板"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_customize_archive"):
-        raise HTTPException(403, detail="archive.customize_plus_required")
+    """v118.34 · 所有用户均可定制归档模板 · 旧 plan 闸已拆"""
+    return
 
 
 @app.get("/api/archive/settings")
@@ -6168,6 +5642,180 @@ from email.utils import formataddr as _formataddr
 import traceback as _tb_v276
 
 
+# ============================================================
+# 业务邮件 · 仅泰语(Task 5)
+#   全部 try/except 包裹 · 失败仅记日志 · 不影响主流程
+# ============================================================
+
+_PEARNLY_BASE_URL = os.environ.get("PEARNLY_BASE_URL", "https://pearnly.com").rstrip("/")
+
+
+def _wrap_thai_email(title_th: str, body_html: str, cta_text: str = "", cta_url: str = "") -> str:
+    """统一泰语邮件模板 · brand banner + body + 可选 CTA + footer"""
+    cta_block = ""
+    if cta_text and cta_url:
+        cta_block = (
+            f'<div style="margin:24px 0 8px"><a href="{cta_url}" '
+            'style="display:inline-block;background:#0f172a;color:#fff;'
+            'padding:12px 26px;border-radius:8px;font-size:14px;'
+            'text-decoration:none;font-weight:500">'
+            f'{cta_text}</a></div>'
+        )
+    return (
+        '<!doctype html><html><body style="margin:0;padding:0;'
+        'background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'
+        '\'Segoe UI\',\'Helvetica Neue\',sans-serif;color:#0f172a">'
+        '<div style="max-width:560px;margin:32px auto;background:#fff;'
+        'border-radius:16px;overflow:hidden;'
+        'box-shadow:0 4px 24px rgba(0,0,0,.06)">'
+        '<div style="background:linear-gradient(135deg,#0f172a,#1e293b);'
+        'padding:28px;color:#fff">'
+        '<div style="font-size:20px;font-weight:700;letter-spacing:.5px">'
+        'Pearnly</div>'
+        '<div style="font-size:12px;opacity:.7;margin-top:2px">'
+        'ระบบอัตโนมัติบัญชีไทย</div>'
+        '</div>'
+        '<div style="padding:28px">'
+        f'<div style="font-size:18px;font-weight:600;margin-bottom:14px">{title_th}</div>'
+        f'<div style="font-size:14px;line-height:1.7;color:#475569">{body_html}</div>'
+        f'{cta_block}'
+        '</div>'
+        '<div style="padding:16px 28px;background:#f8fafc;'
+        'font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0">'
+        'Pearnly · สงวนลิขสิทธิ์ © 2026'
+        '</div></div></body></html>'
+    )
+
+
+def send_topup_approved_email(tenant_id: str, amount: float, new_balance: float) -> bool:
+    """充值审核通过 · 通知 tenant owner(仅泰语)
+    失败不抛异常 · 仅日志 · 任何环节出错都返回 False
+    """
+    try:
+        owner_email = db.get_tenant_owner_email(str(tenant_id))
+        if not owner_email:
+            logger.info(f"[email] topup_approved skip · no owner for tenant={tenant_id}")
+            return False
+        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+        bkk = _tz(_td(hours=7))
+        ts = _dt.now(bkk).strftime("%Y-%m-%d %H:%M")
+        body = (
+            f'<p>การเติมเครดิตของคุณได้รับการอนุมัติเรียบร้อยแล้ว</p>'
+            f'<table style="width:100%;border-collapse:collapse;margin:16px 0">'
+            f'<tr><td style="padding:8px 0;color:#64748b;width:140px">จำนวนที่เติม</td>'
+            f'<td style="padding:8px 0;font-weight:600">฿{float(amount):,.2f}</td></tr>'
+            f'<tr><td style="padding:8px 0;color:#64748b">ยอดคงเหลือ</td>'
+            f'<td style="padding:8px 0;font-weight:600">฿{float(new_balance):,.2f}</td></tr>'
+            f'<tr><td style="padding:8px 0;color:#64748b">เวลา</td>'
+            f'<td style="padding:8px 0">{ts} (เวลาไทย)</td></tr>'
+            f'</table>'
+            f'<p style="color:#64748b;font-size:13px">คุณสามารถเริ่มสแกนใบกำกับได้แล้ว</p>'
+        )
+        html = _wrap_thai_email(
+            "เติมเครดิตสำเร็จ",
+            body,
+            cta_text="เข้าใช้งาน",
+            cta_url=f"{_PEARNLY_BASE_URL}/home",
+        )
+        ok, err = _smtp_send_email(owner_email, "เติมเครดิตสำเร็จ - Pearnly", html)
+        if not ok:
+            logger.warning(f"[email] topup_approved send failed · err={err}")
+        return bool(ok)
+    except Exception as e:
+        logger.error(f"[email] send_topup_approved_email exception: {e}")
+        return False
+
+
+def send_low_balance_email(tenant_id: str, balance: float) -> bool:
+    """低余额提醒 · 24h 内不重复发送
+    1. 读 tenant_credits.low_balance_notified_at
+    2. 若 NOW() - notified_at <= 24h 则跳过
+    3. 否则发邮件 · 成功后 UPDATE notified_at = NOW()
+    任何环节失败都返回 False · 不抛异常
+    """
+    try:
+        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+        state = db.get_tenant_credits_state(str(tenant_id))
+        notified_at = state.get("low_balance_notified_at")
+        if notified_at is not None:
+            now = _dt.now(_tz.utc)
+            # notified_at 是 TIMESTAMPTZ · psycopg 返回 aware datetime
+            try:
+                if hasattr(notified_at, "tzinfo") and notified_at.tzinfo is None:
+                    notified_at = notified_at.replace(tzinfo=_tz.utc)
+                if (now - notified_at) < _td(hours=24):
+                    return False  # 24h 内已通知过
+            except Exception as _e:
+                logger.warning(f"[email] low_balance time-diff skip: {_e}")
+        owner_email = db.get_tenant_owner_email(str(tenant_id))
+        if not owner_email:
+            return False
+        body = (
+            f'<p>เครดิตของคุณเหลือน้อย</p>'
+            f'<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;'
+            f'padding:12px 16px;margin:16px 0;color:#92400e">'
+            f'ยอดคงเหลือปัจจุบัน: <strong>฿{float(balance):,.2f}</strong>'
+            f'</div>'
+            f'<p style="color:#64748b;font-size:13px">'
+            f'เพื่อไม่ให้การสแกนใบกำกับสะดุด กรุณาเติมเครดิตล่วงหน้า'
+            f'</p>'
+        )
+        html = _wrap_thai_email(
+            "แจ้งเตือนเครดิตเหลือน้อย",
+            body,
+            cta_text="เติมเครดิต",
+            cta_url=f"{_PEARNLY_BASE_URL}/home",
+        )
+        ok, err = _smtp_send_email(owner_email, "แจ้งเตือนเครดิตเหลือน้อย - Pearnly", html)
+        if not ok:
+            logger.warning(f"[email] low_balance send failed · err={err}")
+            return False
+        # 标记已通知
+        try:
+            db.mark_low_balance_notified(str(tenant_id))
+        except Exception as _e:
+            logger.warning(f"[email] mark_low_balance_notified failed: {_e}")
+        return True
+    except Exception as e:
+        logger.error(f"[email] send_low_balance_email exception: {e}")
+        return False
+
+
+def send_employee_invitation_email(email: str, password: str) -> bool:
+    """员工邀请邮件 · 包含初始密码 + 首次登录改密提醒(仅泰语)"""
+    try:
+        if not email or "@" not in str(email):
+            return False
+        body = (
+            f'<p>คุณได้รับเชิญให้เข้าใช้งานระบบ Pearnly ในฐานะพนักงาน</p>'
+            f'<table style="width:100%;border-collapse:collapse;margin:16px 0">'
+            f'<tr><td style="padding:8px 0;color:#64748b;width:140px">อีเมลเข้าใช้งาน</td>'
+            f'<td style="padding:8px 0;font-weight:600">{email}</td></tr>'
+            f'<tr><td style="padding:8px 0;color:#64748b">รหัสผ่านเริ่มต้น</td>'
+            f'<td style="padding:8px 0;font-weight:600;font-family:monospace;'
+            f'background:#f1f5f9;padding:6px 10px;border-radius:4px;display:inline-block">'
+            f'{password}</td></tr>'
+            f'</table>'
+            f'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;'
+            f'padding:12px 16px;margin:16px 0;color:#991b1b;font-size:13px">'
+            f'<strong>สำคัญ:</strong> โปรดเปลี่ยนรหัสผ่านทันทีหลังเข้าใช้งานครั้งแรก'
+            f'</div>'
+        )
+        html = _wrap_thai_email(
+            "คุณได้รับเชิญเข้าใช้ Pearnly",
+            body,
+            cta_text="เข้าสู่ระบบ",
+            cta_url=f"{_PEARNLY_BASE_URL}/",
+        )
+        ok, err = _smtp_send_email(str(email), "คุณได้รับเชิญเข้าใช้ Pearnly", html)
+        if not ok:
+            logger.warning(f"[email] employee_invitation send failed · err={err}")
+        return bool(ok)
+    except Exception as e:
+        logger.error(f"[email] send_employee_invitation_email exception: {e}")
+        return False
+
+
 def _smtp_send_email(to_email: str, subject: str, html_body: str) -> tuple:
     """SMTP 发邮件 · 返回 (success: bool, error: str)"""
     host = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
@@ -6788,25 +6436,8 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
             return
 
-        # 所有账号都走 Gemini · 区别只在 key 归属(月付共用 / 买断自带)和配额
-        ok, err_code, quota_info = _check_user_quota(user_fresh)
-        if not ok:
-            if err_code in ("quota.exhausted", "ocr.monthly_limit_exceeded"):
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_quota"))
-            elif err_code == "quota.need_api_key":
-                # 买断账号没填 key
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_need_key"))
-            else:
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_quota"))
-            return
-
-        # 月付用户:本次 1 页 · 预先检查是否超额
-        if quota_info.get("mode") == "monthly":
-            mq = quota_info.get("monthly_quota") or 0
-            um = quota_info.get("used_this_month") or 0
-            if um + 1 > mq:
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_quota"))
-                return
+        # v118.34 · _check_user_quota 已删除 · LINE 入口的配额闸由 credits 系统统一处理
+        # (credits 不足时 ocr_recognize 会抛 403 · LINE 侧暂不预检 · 错误经主链路处理)
 
         # 3. 图片 → PDF
         pdf_bytes = line_client.image_to_pdf_bytes(img_bytes)
@@ -6975,14 +6606,13 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
             except Exception as _e:
                 logger.warning(f"[line_ocr] 异常检测入队失败(不影响推送): {_e}")
 
-        # 6. 扣配额(月付)· v87 多租户支持
-        qm = quota_info.get("mode")
-        if qm == "shared" and user_fresh.get("tenant_id"):
+        # 6. v118.34 · 旧配额闸已删除 · 改记录 tenant 月度用量(给后台 funnel 统计用)
+        if user_fresh.get("tenant_id"):
             try:
                 db.increment_tenant_monthly_usage(str(user_fresh["tenant_id"]), n=1)
             except Exception as e:
                 logger.warning(f"[line_ocr] 扣租户配额失败: {e}")
-        elif qm == "monthly":
+        if False:
             try:
                 increment_user_monthly_usage(str(user_fresh["id"]), n=1)
             except Exception as e:
@@ -7727,6 +7357,608 @@ async def get_my_tenant_usage(request: Request):
     }
 
 
+@app.get("/api/me/credits")
+async def get_my_credits(request: Request):
+    """查询账户余额和用量（区分老板/员工视角）"""
+    import datetime as _dt
+    user = get_current_user_from_request(request)
+    user_id = str(user.get("id", ""))
+    tenant_id = user.get("tenant_id")
+    is_exempt = bool(user.get("is_billing_exempt", False))
+    # 老板 = 自己注册（invited_by IS NULL）；员工 = 被老板邀请创建
+    is_owner = user.get("invited_by") is None
+
+    if not tenant_id:
+        return {"has_tenant": False, "is_owner": is_owner}
+
+    tid = str(tenant_id)
+    # Task 6A · Asia/Bangkok 时区(UTC+7)· 与 deduct_company_credits 锚点一致
+    _bkk = _dt.timezone(_dt.timedelta(hours=7))
+    year_month = _dt.datetime.now(_bkk).strftime("%Y-%m")
+
+    if is_owner:
+        balance_thb = 0.0
+        pages_this_month = 0
+        try:
+            with db.get_cursor() as cur:
+                cur.execute("SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s", (tid,))
+                row = cur.fetchone()
+                if row:
+                    balance_thb = float(row[0])
+                cur.execute(
+                    "SELECT pages_used FROM monthly_page_usage WHERE tenant_id = %s AND year_month = %s",
+                    (tid, year_month),
+                )
+                row = cur.fetchone()
+                if row:
+                    pages_this_month = int(row[0])
+        except Exception as e:
+            logger.warning(f"get_my_credits owner DB: {e}")
+
+        # 按用户拆分本月识别量（从 ocr_history 统计）
+        user_breakdown = []
+        try:
+            with db.get_cursor() as cur:
+                cur.execute("""
+                    SELECT h.user_id::text,
+                           COALESCE(u.username, split_part(u.email, '@', 1)) AS name,
+                           COUNT(*) AS invoice_count
+                    FROM ocr_history h
+                    LEFT JOIN users u ON u.id::text = h.user_id::text
+                    WHERE h.user_id::text IN (
+                        SELECT id::text FROM users WHERE tenant_id = %s
+                    )
+                      AND DATE_TRUNC('month', h.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                    GROUP BY h.user_id, u.username, u.email
+                    ORDER BY invoice_count DESC
+                    LIMIT 10
+                """, (tid,))
+                rows = cur.fetchall()
+                user_breakdown = [
+                    {"name": r["name"], "count": int(r["invoice_count"])}
+                    for r in rows
+                ]
+        except Exception as e:
+            logger.warning(f"get_my_credits breakdown: {e}")
+
+        return {
+            "has_tenant": True,
+            "is_owner": True,
+            "is_billing_exempt": is_exempt,
+            "balance_thb": balance_thb,
+            "pages_this_month": pages_this_month,
+            "tier_threshold": 200,
+            "current_rate": 0.75 if pages_this_month >= 200 else 1.5,
+            "user_breakdown": user_breakdown,
+        }
+    else:
+        # 员工：只返回自己本月发票数，不暴露任何余额/金额信息
+        my_count = 0
+        try:
+            with db.get_cursor() as cur:
+                cur.execute("""
+                    SELECT COUNT(*) AS cnt
+                    FROM ocr_history
+                    WHERE user_id::text = %s
+                      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                """, (user_id,))
+                row = cur.fetchone()
+                if row:
+                    my_count = int(row[0])
+        except Exception as e:
+            logger.warning(f"get_my_credits employee count: {e}")
+
+        return {
+            "has_tenant": True,
+            "is_owner": False,
+            "my_invoice_count": my_count,
+        }
+
+
+# ============================================================
+# 充值申请 · 用户端 + 管理端
+# ============================================================
+
+async def _verify_slip_with_slipok(slip_abs_path: str, expected_amount_thb: float) -> dict:
+    """验证泰国转账截图. ok=None → 未配置key, 走人工审核; ok=False → 验证未通过; ok=True → 自动approve."""
+    import httpx as _httpx
+    api_key = os.environ.get("SLIPOK_API_KEY", "")
+    branch_id = os.environ.get("SLIPOK_BRANCH_ID", "")
+    if not api_key or not branch_id:
+        return {"ok": None, "error": "SLIPOK_API_KEY/SLIPOK_BRANCH_ID not configured"}
+    try:
+        fname = os.path.basename(slip_abs_path)
+        mime = "image/png" if fname.endswith(".png") else "application/pdf" if fname.endswith(".pdf") else "image/jpeg"
+        with open(slip_abs_path, "rb") as f:
+            file_data = f.read()
+        async with _httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"https://api.slipok.com/api/line/apikey/{branch_id}",
+                headers={"x-authorization": api_key},
+                files={"files": (fname, file_data, mime)},
+                data={"log": "true"},
+            )
+        if resp.status_code != 200:
+            logger.warning(f"SlipOK HTTP {resp.status_code}: {resp.text[:300]}")
+            return {"ok": None, "error": f"SlipOK HTTP {resp.status_code}"}
+        body = resp.json()
+        if not body.get("success"):
+            logger.warning(f"SlipOK !success: {body}")
+            return {"ok": False, "error": str(body.get("message", "verification failed"))}
+        d = body.get("data", {})
+        verified_amount = float(d.get("amount", 0))
+        sender = (d.get("sender") or {}).get("displayName", "")
+        receiver = (d.get("receiver") or {}).get("displayName", "")
+        transaction_id = d.get("transRef", "")
+        amount_ok = abs(verified_amount - expected_amount_thb) <= 1.0
+        logger.info(f"SlipOK result: verified={verified_amount} expected={expected_amount_thb} ok={amount_ok} ref={transaction_id}")
+        return {
+            "ok": amount_ok,
+            "verified_amount": verified_amount,
+            "sender": sender,
+            "receiver": receiver,
+            "transaction_id": transaction_id,
+            "error": "" if amount_ok else f"amount {verified_amount} ≠ expected {expected_amount_thb}",
+        }
+    except Exception as e:
+        logger.warning(f"_verify_slip_with_slipok exception: {e}")
+        return {"ok": None, "error": str(e)}
+
+
+class _TopupRequestBody(BaseModel):
+    amount_thb: float = Field(..., gt=0, le=500000)
+    payer_name: str = Field("", max_length=200)
+    note: str = Field("", max_length=500)
+
+class _AdminTopupApproveBody(BaseModel):
+    actual_amount_thb: float = Field(..., gt=0)
+    note: str = Field("", max_length=500)
+
+class _AdminTopupRejectBody(BaseModel):
+    note: str = Field("", max_length=500)
+
+
+# ============================================================
+# Multi-company (Task 3 · 不动 JWT · 用 users.active_tenant_id)
+# ============================================================
+
+class _SwitchCompanyBody(BaseModel):
+    tenant_id: str = Field(..., min_length=8)
+
+
+@app.get("/api/my-companies")
+async def my_companies(request: Request):
+    """返回当前用户隶属的所有公司列表 · 含 balance(仅 admin 角色可见) + 月用量"""
+    user = get_current_user_from_request(request)
+    user_id = str(user.get("id", ""))
+    if not user_id:
+        raise HTTPException(401, detail="auth.required")
+
+    items = db.list_user_companies(user_id)
+
+    # 取 active_tenant_id(若未设置则降级到 tenant_id)
+    active_tid = None
+    try:
+        with db.get_cursor() as cur:
+            cur.execute(
+                "SELECT active_tenant_id, tenant_id FROM users WHERE id = %s::uuid",
+                (user_id,)
+            )
+            row = cur.fetchone()
+            if row:
+                active_tid = str(row.get("active_tenant_id") or row.get("tenant_id") or "")
+    except Exception as _e:
+        logger.warning(f"my_companies active_tid lookup failed: {_e}")
+
+    # admin 才看 balance · member 屏蔽 balance 字段(置 None)
+    out = []
+    for it in items:
+        is_admin = (it.get("role") == "admin")
+        out.append({
+            "tenant_id": it["tenant_id"],
+            "name": it["name"],
+            "role": it["role"],
+            "balance_thb": (it["balance_thb"] if is_admin else None),
+            "pages_this_month": it["pages_this_month"],
+            "is_active_tenant": (it["tenant_id"] == active_tid),
+        })
+    return {"companies": out, "active_tenant_id": active_tid}
+
+
+@app.post("/api/switch-company")
+async def switch_company(body: _SwitchCompanyBody, request: Request):
+    """切换当前活动公司 · 校验归属后更新 users.active_tenant_id"""
+    user = get_current_user_from_request(request)
+    user_id = str(user.get("id", ""))
+    if not user_id:
+        raise HTTPException(401, detail="auth.required")
+    ok = db.set_user_active_tenant(user_id, body.tenant_id)
+    if not ok:
+        raise HTTPException(403, detail="company.not_member")
+    return {"ok": True, "active_tenant_id": body.tenant_id}
+
+
+@app.post("/api/credits/topup/request")
+async def credits_topup_request(req: _TopupRequestBody, request: Request):
+    user = get_current_user_from_request(request)
+    if user.get("invited_by") is not None:
+        raise HTTPException(403, detail="credits.owner_only")
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(400, detail="credits.no_tenant")
+    with db.get_cursor(commit=True) as cur:
+        cur.execute("""
+            INSERT INTO topup_requests (tenant_id, requested_by, amount_thb, payer_name, note)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
+        """, (str(tenant_id), str(user["id"]), req.amount_thb,
+              req.payer_name.strip(), req.note.strip()))
+        request_id = cur.fetchone()["id"]
+    return {"request_id": request_id, "status": "pending"}
+
+
+@app.post("/api/credits/topup/upload-slip/{request_id}")
+async def credits_topup_upload_slip(request_id: int, request: Request, file: UploadFile = File(...)):
+    user = get_current_user_from_request(request)
+    uid = str(user.get("id", ""))
+    tid = str(user.get("tenant_id") or "")
+    with db.get_cursor() as cur:
+        cur.execute("SELECT tenant_id, status, amount_thb FROM topup_requests WHERE id = %s", (request_id,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, detail="topup.not_found")
+    if str(row["tenant_id"]) != tid:
+        raise HTTPException(403, detail="topup.forbidden")
+    if row["status"] != "pending":
+        raise HTTPException(400, detail="topup.already_reviewed")
+    expected_amount = float(row["amount_thb"])
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(413, detail="topup.file_too_large")
+    slips_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "slips")
+    os.makedirs(slips_dir, exist_ok=True)
+    fname = (file.filename or "slip.jpg").lower()
+    ext = ".png" if fname.endswith(".png") else ".pdf" if fname.endswith(".pdf") else ".jpg"
+    slip_filename = f"{request_id}{ext}"
+    slip_abs = os.path.join(slips_dir, slip_filename)
+    with open(slip_abs, "wb") as fp:
+        fp.write(content)
+    with db.get_cursor(commit=True) as cur:
+        cur.execute("UPDATE topup_requests SET slip_path = %s WHERE id = %s",
+                    (f"slips/{slip_filename}", request_id))
+    # ── SlipOK 自动验证 ──────────────────────────────────────────
+    slipok = await _verify_slip_with_slipok(slip_abs, expected_amount)
+    if slipok.get("ok") is True:
+        verified_amount = slipok["verified_amount"]
+        ref = slipok.get("transaction_id", "")
+        try:
+            with db.get_cursor(commit=True) as cur:
+                cur.execute("""UPDATE topup_requests SET status='approved', reviewed_at=NOW(),
+                    review_note=%s, amount_thb=%s WHERE id=%s""",
+                    (f"SlipOK auto-approved · ref={ref}", verified_amount, request_id))
+                cur.execute("""INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
+                    ON CONFLICT (tenant_id) DO UPDATE
+                    SET balance_thb = tenant_credits.balance_thb + %s, updated_at = NOW()
+                    RETURNING balance_thb""", (tid, verified_amount, verified_amount))
+                new_balance = float(cur.fetchone()["balance_thb"])
+                cur.execute("""INSERT INTO credit_transactions
+                    (tenant_id, user_id, type, amount_thb, balance_after, description)
+                    VALUES (%s::uuid, %s::uuid, 'topup', %s, %s, %s)""",
+                    (tid, uid, verified_amount, new_balance,
+                     f"SlipOK自动充值 · #{request_id} · ref={ref}"))
+            logger.info(f"[topup] SlipOK auto-approved #{request_id} ฿{verified_amount} tenant={tid[:8]}")
+            return {"ok": True, "auto_approved": True, "balance_thb": new_balance,
+                    "slip_path": f"slips/{slip_filename}"}
+        except Exception as e:
+            logger.error(f"SlipOK auto-approve DB error: {e}")
+            # Fall through to manual review
+    # ── 人工审核 (no key, ok=False, or auto-approve DB error) ────
+    return {"ok": True, "auto_approved": False, "slip_path": f"slips/{slip_filename}"}
+
+
+@app.get("/api/credits/topup/history")
+async def credits_topup_history(request: Request):
+    user = get_current_user_from_request(request)
+    tid = str(user.get("tenant_id") or "")
+    if not tid:
+        return []
+    with db.get_cursor() as cur:
+        cur.execute("""
+            SELECT id, amount_thb, payer_name, note, status, slip_path,
+                   review_note, created_at, reviewed_at
+            FROM topup_requests WHERE tenant_id = %s
+            ORDER BY created_at DESC LIMIT 20
+        """, (tid,))
+        rows = cur.fetchall()
+    return [
+        {"id": r["id"], "amount_thb": float(r["amount_thb"]),
+         "payer_name": r["payer_name"] or "", "note": r["note"] or "",
+         "status": r["status"], "slip_path": r["slip_path"],
+         "review_note": r["review_note"] or "",
+         "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+         "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None}
+        for r in rows
+    ]
+
+
+@app.get("/api/credits/usage-history")
+async def credits_usage_history(request: Request, page: int = 1, per_page: int = 20, user_id: str = None):
+    user = get_current_user_from_request(request)
+    tid = str(user.get("tenant_id") or "")
+    if not tid:
+        return {"rows": [], "total": 0, "page": page, "per_page": per_page, "is_owner": False, "members": []}
+    is_owner = user.get("invited_by") is None
+    if not is_owner:
+        user_id = str(user["id"])
+    per_page = min(50, max(1, per_page))
+    offset = (max(1, page) - 1) * per_page
+    uid_sql = "AND ct.user_id = %s::uuid" if user_id else ""
+    uid_params = [user_id] if user_id else []
+    try:
+        with db.get_cursor() as cur:
+            cur.execute(f"""
+                SELECT COUNT(*) AS n FROM credit_transactions ct
+                WHERE ct.tenant_id = %s::uuid AND ct.type = 'usage' {uid_sql}
+            """, [tid] + uid_params)
+            total = int(cur.fetchone()["n"])
+            cur.execute(f"""
+                SELECT
+                    ct.created_at, ct.pages, ct.amount_thb AS cost_thb, ct.balance_after,
+                    u.email AS user_email, u.username AS user_name,
+                    oh.filename
+                FROM credit_transactions ct
+                LEFT JOIN users u ON u.id = ct.user_id::uuid
+                LEFT JOIN ocr_history oh
+                    ON oh.user_id = ct.user_id::uuid
+                    AND oh.tenant_id = ct.tenant_id::uuid
+                    AND ct.description LIKE '%% · ' || LEFT(oh.id::text, 8)
+                WHERE ct.tenant_id = %s::uuid AND ct.type = 'usage' {uid_sql}
+                ORDER BY ct.created_at DESC
+                LIMIT %s OFFSET %s
+            """, [tid] + uid_params + [per_page, offset])
+            rows = cur.fetchall()
+    except Exception as e:
+        logger.warning(f"credits_usage_history: {e}")
+        return {"rows": [], "total": 0, "page": page, "per_page": per_page, "is_owner": is_owner, "members": []}
+    members = []
+    if is_owner:
+        try:
+            with db.get_cursor() as cur:
+                cur.execute("""
+                    SELECT id, email, username FROM users
+                    WHERE tenant_id = %s::uuid AND is_active = TRUE ORDER BY email
+                """, (tid,))
+                members = [{"id": str(r["id"]), "email": r["email"] or "", "username": r["username"] or ""} for r in cur.fetchall()]
+        except Exception:
+            pass
+    return {
+        "is_owner": is_owner,
+        "rows": [{
+            "date": r["created_at"].isoformat() if r["created_at"] else None,
+            "user_email": r["user_email"] or "",
+            "user_name": r["user_name"] or "",
+            "filename": r["filename"] or "",
+            "pages": int(r["pages"] or 0),
+            "cost_thb": float(r["cost_thb"] or 0),
+            "balance_after": float(r["balance_after"]) if r["balance_after"] is not None else None,
+        } for r in rows],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "members": members,
+    }
+
+
+@app.get("/api/credits/usage-report")
+async def credits_usage_report(
+    request: Request,
+    start_date: str = None,
+    end_date: str = None,
+    format: str = "pdf",
+    user_id: str = None,
+    lang: str = "zh",
+):
+    """导出使用明细报告 · PDF/XLSX · 按用户分组."""
+    import datetime as _dt
+    import usage_report as _ur
+
+    user = get_current_user_from_request(request)
+    tid = str(user.get("tenant_id") or "")
+    if not tid:
+        raise HTTPException(status_code=400, detail="no_tenant")
+
+    is_owner = user.get("invited_by") is None
+    if not is_owner:
+        user_id = str(user["id"])  # 员工只能导出自己
+
+    today = _dt.date.today()
+    try:
+        if start_date:
+            sd = _dt.date.fromisoformat(start_date)
+        else:
+            sd = today.replace(day=1)
+        if end_date:
+            ed = _dt.date.fromisoformat(end_date)
+        else:
+            ed = today
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid_date")
+
+    if ed < sd:
+        raise HTTPException(status_code=400, detail="end_before_start")
+
+    fmt = (format or "pdf").lower()
+    if fmt not in ("pdf", "xlsx"):
+        raise HTTPException(status_code=400, detail="invalid_format")
+    if lang not in ("zh", "en", "th", "ja"):
+        lang = "zh"
+
+    ed_exclusive = ed + _dt.timedelta(days=1)
+
+    uid_sql = ""
+    uid_params: list = []
+    if user_id:
+        uid_sql = "AND ct.user_id = %s::uuid"
+        uid_params = [user_id]
+
+    rows: list = []
+    company = ""
+    try:
+        with db.get_cursor() as cur:
+            cur.execute("SELECT name FROM tenants WHERE id = %s::uuid", (tid,))
+            trow = cur.fetchone()
+            if trow:
+                company = trow.get("name") or ""
+            cur.execute(f"""
+                SELECT
+                    ct.user_id::text AS user_id,
+                    ct.created_at,
+                    ct.pages,
+                    ct.amount_thb AS cost_thb,
+                    u.email AS user_email,
+                    u.username AS user_name,
+                    oh.filename
+                FROM credit_transactions ct
+                LEFT JOIN users u ON u.id = ct.user_id::uuid
+                LEFT JOIN ocr_history oh
+                    ON oh.user_id = ct.user_id::uuid
+                    AND oh.tenant_id = ct.tenant_id::uuid
+                    AND ct.description LIKE '%% · ' || LEFT(oh.id::text, 8)
+                WHERE ct.tenant_id = %s::uuid
+                  AND ct.type = 'usage'
+                  AND ct.created_at >= %s
+                  AND ct.created_at < %s
+                  {uid_sql}
+                ORDER BY u.email NULLS LAST, ct.created_at ASC
+            """, [tid, sd, ed_exclusive] + uid_params)
+            for r in cur.fetchall():
+                rows.append({
+                    "user_id": r["user_id"],
+                    "date": r["created_at"].isoformat() if r["created_at"] else None,
+                    "pages": int(r["pages"] or 0),
+                    "cost_thb": float(r["cost_thb"] or 0),
+                    "user_email": r["user_email"] or "",
+                    "user_name": r["user_name"] or "",
+                    "filename": r["filename"] or "",
+                })
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"credits_usage_report query: {e}")
+        raise HTTPException(status_code=500, detail="query_failed")
+
+    safe_tenant = "".join(ch for ch in (company or "tenant") if ch.isalnum() or ch in "-_")[:24] or "tenant"
+    fname_stem = f"pearnly_usage_{safe_tenant}_{sd.strftime('%Y%m%d')}_{ed.strftime('%Y%m%d')}"
+
+    try:
+        if fmt == "pdf":
+            data = _ur.build_pdf(
+                lang=lang, company=company or "—",
+                start_date=sd.isoformat(), end_date=ed.isoformat(), rows=rows,
+            )
+            return Response(
+                content=data, media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{fname_stem}.pdf"'},
+            )
+        else:
+            data = _ur.build_xlsx(
+                lang=lang, company=company or "—",
+                start_date=sd.isoformat(), end_date=ed.isoformat(), rows=rows,
+            )
+            return Response(
+                content=data,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f'attachment; filename="{fname_stem}.xlsx"'},
+            )
+    except Exception as e:
+        logger.error(f"credits_usage_report build {fmt}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"build_failed: {e}")
+
+
+@app.get("/api/admin/credits/topup/requests")
+async def admin_topup_list(request: Request, status: str = "pending"):
+    _require_super_admin(request)
+    where = "" if status == "all" else "WHERE tr.status = %s"
+    params = () if status == "all" else (status,)
+    with db.get_cursor() as cur:
+        cur.execute(f"""
+            SELECT tr.id, tr.amount_thb, tr.payer_name, tr.note,
+                   tr.status, tr.slip_path, tr.review_note,
+                   tr.created_at, tr.reviewed_at,
+                   u.username, u.email, t.name AS tenant_name
+            FROM topup_requests tr
+            LEFT JOIN users u ON u.id = tr.requested_by
+            LEFT JOIN tenants t ON t.id = tr.tenant_id
+            {where}
+            ORDER BY tr.created_at DESC LIMIT 100
+        """, params)
+        rows = cur.fetchall()
+    return [
+        {"id": r["id"], "amount_thb": float(r["amount_thb"]),
+         "payer_name": r["payer_name"] or "", "note": r["note"] or "",
+         "status": r["status"], "slip_path": r["slip_path"] or "",
+         "review_note": r["review_note"] or "",
+         "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+         "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None,
+         "username": r["username"] or "", "email": r["email"] or "",
+         "tenant_name": r["tenant_name"] or ""}
+        for r in rows
+    ]
+
+
+@app.post("/api/admin/credits/topup/approve/{request_id}")
+async def admin_topup_approve(request_id: int, body: _AdminTopupApproveBody, request: Request):
+    _require_super_admin(request)
+    admin_user = get_current_user_from_request(request)
+    admin_id = str(admin_user["id"])
+    with db.get_cursor(commit=True) as cur:
+        cur.execute(
+            "SELECT tenant_id, status FROM topup_requests WHERE id = %s FOR UPDATE",
+            (request_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, detail="topup.not_found")
+        if row["status"] != "pending":
+            raise HTTPException(400, detail="topup.already_reviewed")
+        tid = str(row["tenant_id"])
+        amt = body.actual_amount_thb
+        cur.execute("""UPDATE topup_requests SET status='approved', reviewed_by=%s,
+            reviewed_at=NOW(), review_note=%s, amount_thb=%s WHERE id=%s""",
+            (admin_id, body.note, amt, request_id))
+        cur.execute("""INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
+            ON CONFLICT (tenant_id) DO UPDATE
+            SET balance_thb = tenant_credits.balance_thb + %s, updated_at = NOW()
+            RETURNING balance_thb""", (tid, amt, amt))
+        new_balance = float(cur.fetchone()["balance_thb"])
+        cur.execute("""INSERT INTO credit_transactions
+            (tenant_id, user_id, type, amount_thb, balance_after, description)
+            VALUES (%s, %s, 'topup', %s, %s, %s)""",
+            (tid, admin_id, amt, new_balance, f"充值审核通过 · 申请#{request_id}"))
+    # Task 5 · 通知 tenant owner(失败不影响主流程)
+    try:
+        send_topup_approved_email(tid, amt, new_balance)
+    except Exception as _e:
+        logger.warning(f"[email] topup_approved trigger skipped: {_e}")
+    return {"ok": True, "new_balance": new_balance}
+
+
+@app.post("/api/admin/credits/topup/reject/{request_id}")
+async def admin_topup_reject(request_id: int, body: _AdminTopupRejectBody, request: Request):
+    _require_super_admin(request)
+    admin_user = get_current_user_from_request(request)
+    admin_id = str(admin_user["id"])
+    with db.get_cursor(commit=True) as cur:
+        cur.execute("SELECT status FROM topup_requests WHERE id = %s", (request_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, detail="topup.not_found")
+        if row["status"] != "pending":
+            raise HTTPException(400, detail="topup.already_reviewed")
+        cur.execute("""UPDATE topup_requests SET status='rejected', reviewed_by=%s,
+            reviewed_at=NOW(), review_note=%s WHERE id=%s""",
+            (admin_id, body.note, request_id))
+    return {"ok": True}
+
+
 # ============================================================
 # v23 · 用户管理(超管)· 员工管理(老板)· 操作日志
 # ============================================================
@@ -7754,10 +7986,10 @@ class AdminResetPasswordRequest(BaseModel):
 
 
 class EmployeeAddRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50, pattern="^[a-zA-Z0-9_.-]+$")
+    # v118.34 · email 主标识 · username 可选(留空自动取 email)
+    email: str = Field(..., min_length=5, max_length=200)
     password: str = Field(..., min_length=6, max_length=100)
-    # v118.11 · 邮箱选填 · 用于员工自助忘记密码
-    email: Optional[str] = Field(None, max_length=200)
+    username: Optional[str] = Field(None, min_length=3, max_length=50, pattern="^[a-zA-Z0-9_.-]+$")
 
 
 class EmployeeToggleRequest(BaseModel):
@@ -7827,24 +8059,20 @@ async def admin_list_users(request: Request):
             """)
             db_rows = cur.fetchall()
         for r in db_rows:
-            tenant_plan = r.get("plan") or "free"
+            # v118.34 · plan/monthly_quota/trial_expires_at 字段已从响应删除 · credits 系统替代
             rows.append({
                 "user_id": str(r["user_id"]),
-                "id": str(r["user_id"]),                      # v118.12.1 · 兼容前端 u.id 字段
+                "id": str(r["user_id"]),
                 "username": r.get("username"),
                 "email": r.get("email"),
                 "company_name": r.get("company_name"),
                 "tenant_id": str(r["tenant_id"]) if r.get("tenant_id") else None,
                 "tenant_type": r.get("tenant_type"),
                 "tenant_status": r.get("tenant_status"),
-                "plan": tenant_plan,                          # v118.12 · 客户列表用 user.plan(实际套餐字段)
                 "is_active": r.get("is_active"),
                 "country": r.get("country"),
-                "monthly_quota": int(r.get("tenant_quota") or 0),
                 "used_this_month": int(r.get("tenant_used") or 0),
                 "employees_count": int(r.get("employees_count") or 0),
-                "trial_expires_at": r["subscription_expires_at"].isoformat() if r.get("subscription_expires_at") else None,
-                "subscription_expires_at": r["subscription_expires_at"].isoformat() if r.get("subscription_expires_at") else None,
                 "last_login_at": r["last_login_at"].isoformat() if r.get("last_login_at") else None,
                 "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
             })
@@ -7980,16 +8208,13 @@ async def admin_user_detail(user_id: str, request: Request):
         "role": user.get("role"),
         "is_active": user.get("is_active"),
         "is_super_admin": bool(user.get("is_super_admin")),
-        "plan": user.get("plan") or "free",
+        # v118.34 · plan/monthly_quota/trial_expires_at/expires_at 已从响应删除
         "monthly_volume": user.get("monthly_volume"),
-        "monthly_quota": int(user.get("monthly_quota") or 0),
         "used_this_month": int(user.get("used_this_month") or 0),
         "cumulative_ocr": cumulative_ocr,
         "last_ocr_at": last_ocr_at,
         "payment_count": payment_count,
         "last_payment_at": last_payment_at,
-        "trial_expires_at": str(user["trial_expires_at"]) if user.get("trial_expires_at") else None,
-        "expires_at": str(user["expires_at"]) if user.get("expires_at") else None,
         "last_login_at": user["last_login_at"].isoformat() if user.get("last_login_at") else None,
         "created_at": user["created_at"].isoformat() if user.get("created_at") else None,
         "signup_ip": user.get("signup_ip") or user.get("registration_ip"),
@@ -8002,7 +8227,7 @@ async def admin_user_detail(user_id: str, request: Request):
             "name": tenant.get("name") if tenant else None,
             "tenant_type": tenant.get("tenant_type") if tenant else None,
             "status": tenant.get("status") if tenant else None,
-            "monthly_quota": int(tenant.get("monthly_quota") or 0) if tenant else 0,
+            # v118.34 · monthly_quota 已删除 · credits 系统接管
             "used_this_month": int(tenant.get("used_this_month") or 0) if tenant else 0,
             "notes": tenant.get("notes") if tenant else None,
         } if tenant else None,
@@ -8442,8 +8667,12 @@ async def team_list_employees(request: Request):
             {
                 "id": str(e["id"]),
                 "username": e.get("username"),
+                "email": e.get("email") or "",
                 "role": e.get("role"),
                 "is_active": e.get("is_active"),
+                "is_billing_exempt": bool(e.get("is_billing_exempt")),
+                "must_change_password": bool(e.get("must_change_password")),
+                "pages_this_month": int(e.get("pages_this_month") or 0),
                 "last_login_at": e["last_login_at"].isoformat() if e.get("last_login_at") else None,
                 "created_at": e["created_at"].isoformat() if e.get("created_at") else None,
                 "assigned_client_count": len(assignments.get(str(e["id"]), [])),
@@ -8513,49 +8742,54 @@ async def team_set_employee_assignments(employee_id: str,
     return {"ok": True, "assigned_count": len(req.client_ids or [])}
 
 
-# 加员工
+# 加员工 v118.34 · email 主标识 · 继承 is_billing_exempt · must_change_password=TRUE
 @app.post("/api/team/employees")
 async def team_add_employee(req: EmployeeAddRequest, request: Request):
     owner = _require_owner_or_super(request)
+    email_norm = (req.email or "").strip().lower()
+    if "@" not in email_norm or "." not in email_norm.split("@", 1)[1]:
+        raise HTTPException(400, detail="team.email_invalid")
     # v118.11 · 密码强度校验
     pw_err = _check_password_strength(req.password)
     if pw_err:
         raise HTTPException(400, detail=pw_err)
-    # 提前查是否已存在
-    existing = db.find_user_by_username(req.username)
-    if existing:
-        raise HTTPException(409, detail="team.username_exists")
-    # v118.11 · 邮箱也要查重(如果填了)
-    if req.email:
-        try:
-            import db as _db
-            with _db.get_cursor() as cur:
-                cur.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s) LIMIT 1", (req.email,))
-                if cur.fetchone():
-                    raise HTTPException(409, detail="team.email_exists")
-        except HTTPException:
-            raise
-        except Exception as _ex:
-            logger.warning(f"email check skip: {_ex}")
+    # 查重(email + username)
+    try:
+        import db as _db
+        with _db.get_cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE LOWER(email) = %s LIMIT 1", (email_norm,))
+            if cur.fetchone():
+                raise HTTPException(409, detail="team.email_exists")
+            cur.execute("SELECT id FROM users WHERE username = %s LIMIT 1",
+                        (req.username or email_norm,))
+            if cur.fetchone():
+                raise HTTPException(409, detail="team.username_exists")
+    except HTTPException:
+        raise
+    except Exception as _ex:
+        logger.warning(f"team add dup check skip: {_ex}")
     new_id = db.add_employee(
         tenant_id=str(owner["tenant_id"]),
-        username=req.username,
+        email=email_norm,
         password=req.password,
         invited_by=str(owner["id"]),
+        is_billing_exempt=bool(owner.get("is_billing_exempt")),
+        username=req.username,
     )
     if not new_id:
         raise HTTPException(400, detail="team.create_failed")
-    # v118.11 · 员工创建后写入 email(如果提供)
-    if req.email:
-        try:
-            import db as _db
-            with _db.get_cursor(commit=True) as cur:
-                cur.execute("UPDATE users SET email = %s WHERE id = %s",
-                            (req.email.strip().lower(), new_id))
-        except Exception as _ex:
-            logger.warning(f"set employee email failed: {_ex}")
-    _log_op(request, owner, "employee.add", "employee", new_id, req.username, {})
-    return {"ok": True, "id": new_id}
+    _log_op(request, owner, "employee.add", "employee", new_id, email_norm, {"email": email_norm})
+    # Task 5 · 发送邀请邮件(失败不影响主流程)
+    try:
+        send_employee_invitation_email(email_norm, req.password)
+    except Exception as _e:
+        logger.warning(f"[email] employee_invitation trigger skipped: {_e}")
+    return {
+        "ok": True,
+        "id": new_id,
+        "email": email_norm,
+        "must_change_password": True,
+    }
 
 
 # v118.11 · 重置员工密码 · 系统生成强随机临时密码 · 一次性返回给老板

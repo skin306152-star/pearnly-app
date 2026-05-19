@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11834934">
+<link rel="stylesheet" href="/static/home.css?v=11835200">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
@@ -58,102 +58,7 @@
     gap: 8px;
 }
 
-/* v102 · 顶部配额预警 banner */
-.quota-banner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 0 0 16px;
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    line-height: 1.5;
-}
-.quota-banner.warn {
-    background: #fef3c7;
-    color: #92400e;
-    border-left: 3px solid #f59e0b;
-}
-.quota-banner.danger {
-    background: #fee2e2;
-    color: #991b1b;
-    border-left: 3px solid #dc2626;
-}
-.quota-banner-icon {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-}
-.quota-banner-icon svg {
-    width: 18px;
-    height: 18px;
-}
-.quota-banner-msg {
-    flex: 1;
-    word-break: break-word;
-}
-.quota-banner-close {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: inherit;
-    opacity: 0.6;
-    padding: 4px 6px;
-    border-radius: 4px;
-    line-height: 0;
-}
-.quota-banner-close:hover { opacity: 1; background: rgba(0,0,0,0.06); }
-
-/* v118.8 · 试用临近到期横幅(剩 3/1 天颜色递进) */
-.trial-banner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 0 0 12px;
-    padding: 12px 16px;
-    border-radius: 10px;
-    font-size: 13px;
-    line-height: 1.5;
-}
-.trial-banner.info {
-    background: #DBEAFE;
-    color: #111111;
-    border-left: 3px solid #111111;
-}
-.trial-banner.warn {
-    background: linear-gradient(90deg, #fefce8 0%, #fef3c7 100%);
-    color: #92400e;
-    border-left: 3px solid #f59e0b;
-}
-.trial-banner.danger {
-    background: linear-gradient(90deg, #fef2f2 0%, #fee2e2 100%);
-    color: #991b1b;
-    border-left: 3px solid #dc2626;
-}
-.trial-banner-icon { flex-shrink: 0; }
-.trial-banner-icon svg { width: 18px; height: 18px; }
-.trial-banner-msg { flex: 1; }
-.trial-banner-msg strong { font-weight: 700; }
-.trial-banner-cta {
-    padding: 6px 14px;
-    background: rgba(255,255,255,0.7);
-    border: 1px solid currentColor;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: inherit;
-    cursor: pointer;
-    flex-shrink: 0;
-    text-decoration: none;
-    transition: all 0.15s;
-}
-.trial-banner-cta:hover { background: currentColor; color: #fff; }
-.trial-banner-cta:hover * { color: #fff; }
-.trial-banner.danger .trial-banner-cta {
-    background: #dc2626; color: #fff; border-color: #dc2626;
-}
-.trial-banner.danger .trial-banner-cta:hover { background: #b91c1c; }
-.quota-banner-close svg { width: 14px; height: 14px; }
+/* v118.34 · 旧 quota-banner / trial-banner 样式已删除 · credits 系统替代 */
 
 /* 状态徽章 · 不可点 · 避免误以为能交互 */
 .history-badge {
@@ -2043,14 +1948,6 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     </svg>
                     <span data-i18n="avatar-menu-team">团队成员</span>
                 </button>
-                <button type="button" class="avatar-popup-item" data-action="billing" data-show-if-money="1" id="avatar-menu-billing" role="menuitem">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <rect x="2.5" y="5" width="15" height="11" rx="1.5"/>
-                        <line x1="2.5" y1="9" x2="17.5" y2="9"/>
-                        <line x1="5.5" y1="13" x2="8" y2="13"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-billing">订阅 &amp; 套餐</span>
-                </button>
                 <button type="button" class="avatar-popup-item" data-action="shortcuts" id="avatar-menu-shortcuts" role="menuitem">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <rect x="2" y="5.5" width="16" height="10" rx="1.5"/>
@@ -2249,8 +2146,8 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 <main class="main">
 
     <!-- v102 · 顶部配额预警 banner · 由 JS 渲染填充 -->
-    <div id="trial-banner" class="trial-banner" style="display:none;"></div>
-    <div id="quota-banner" class="quota-banner" style="display:none;"></div>
+    <!-- v118.34 · trial-banner / quota-banner 已删除 · credits 系统接管 -->
+
 
     <!-- ============ 页面: 识别中心 (默认) ============ -->
     <section class="page active" id="page-ocr">
@@ -2433,10 +2330,18 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 <div class="dash-kpi-val dash-red" id="dash-kpi-exceptions">—</div>
                 <div class="dash-kpi-sub" data-i18n="dash-kpi-exceptions-sub">需立即处理</div>
             </div>
-            <div class="dash-kpi">
-                <div class="dash-kpi-label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 7h12"/></svg><span data-i18n="dash-kpi-plan">配额</span></div>
-                <div class="dash-kpi-val" id="dash-kpi-plan">—</div>
-                <div class="dash-kpi-sub" id="dash-kpi-plan-sub" data-i18n="dash-kpi-plan-sub">本月用量</div>
+            <!-- v118.34 · 旧「配额」KPI 卡已删除 · 由「账户余额」+「本月用量」替代 -->
+            <div class="dash-kpi" id="dash-kpi-credits-card">
+                <div class="dash-kpi-label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M6.5 6h2a1.5 1.5 0 0 1 0 3h-2v-3zm0 3v2"/></svg><span data-i18n="dash-kpi-credits">账户余额</span></div>
+                <div class="dash-kpi-val" id="dash-kpi-credits">—</div>
+                <div class="dash-kpi-sub" id="dash-kpi-credits-sub" data-i18n="dash-kpi-credits-sub">账户余额</div>
+                <div id="dash-kpi-topup-link" style="display:none;margin-top:6px"></div>
+            </div>
+            <div class="dash-kpi" id="dash-kpi-usage-card">
+                <div class="dash-kpi-label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="9" width="3" height="4" rx="0.5"/><rect x="6.5" y="6" width="3" height="7" rx="0.5"/><rect x="11" y="3" width="3" height="10" rx="0.5"/></svg><span data-i18n="dash-kpi-usage">本月用量</span></div>
+                <div class="dash-kpi-val" id="dash-kpi-usage">—</div>
+                <div class="dash-kpi-sub" id="dash-kpi-usage-sub" data-i18n="dash-kpi-usage-sub">张/200张</div>
+                <div id="dash-kpi-usage-breakdown"></div>
             </div>
         </div>
         <div class="dash-grid2">
@@ -3946,6 +3851,32 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                         <div class="section-title" data-i18n="set-plan-title">套餐 & 用量</div>
                     </div>
                     <div id="settings-info"></div>
+                </div>
+                <!-- 使用明细 card -->
+                <div class="card" style="margin-top:16px">
+                    <div class="section-head" style="flex-wrap:wrap;gap:8px">
+                        <div class="section-title" data-i18n="usage-history-title">使用明细</div>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                            <div id="usage-history-filter" style="display:none">
+                                <select id="usage-history-user-filter" style="padding:5px 9px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;color:#374151">
+                                    <option value="" data-i18n="usage-history-all-users">全部成员</option>
+                                </select>
+                            </div>
+                            <div style="position:relative;display:inline-block">
+                                <button id="usage-export-btn" type="button" style="padding:5px 11px;border:1px solid #e26e4b;background:#fff;color:#e26e4b;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;font-weight:500" onclick="window._toggleUsageExportMenu&&window._toggleUsageExportMenu()">
+                                    <span data-i18n="usage-export-btn">导出报告</span> ▾
+                                </button>
+                                <div id="usage-export-menu" style="display:none;position:absolute;right:0;top:30px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.08);z-index:100;min-width:130px;overflow:hidden">
+                                    <a href="#" data-i18n="usage-export-pdf" onclick="event.preventDefault();window._exportUsageReport&&window._exportUsageReport('pdf')" style="display:block;padding:8px 14px;color:#374151;text-decoration:none;font-size:12px;border-bottom:1px solid #f1f5f9">导出 PDF</a>
+                                    <a href="#" data-i18n="usage-export-xlsx" onclick="event.preventDefault();window._exportUsageReport&&window._exportUsageReport('xlsx')" style="display:block;padding:8px 14px;color:#374151;text-decoration:none;font-size:12px">导出 Excel</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="usage-history-table">
+                        <div style="padding:20px;text-align:center;color:#aaa;font-size:13px" data-i18n="usage-history-loading">加载中…</div>
+                    </div>
+                    <div id="usage-history-pager" style="display:flex;gap:8px;padding:10px 0 0;align-items:center;justify-content:flex-end;font-size:13px"></div>
                 </div>
             </div>
 
@@ -6495,15 +6426,16 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11834934"></script>
+
+<script src="/static/home.js?v=11835200"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·
      独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834934">
-<script src="/static/erp-mrerp-connect.js?v=11834934" defer></script>
+<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11835200">
+<script src="/static/erp-mrerp-connect.js?v=11835200" defer></script>
 <!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
-<script src="/static/erp-log-enhance.js?v=11834934" defer></script>
+<script src="/static/erp-log-enhance.js?v=11835200" defer></script>
 
 </body>
 </html>

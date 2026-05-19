@@ -44,6 +44,68 @@
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
     }
+    function _adminDialog(opts) {
+        var ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:#fff;border-radius:12px;padding:24px;width:420px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.2)';
+        function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+        var html = '<div style="font-size:16px;font-weight:600;margin-bottom:16px">' + _esc(opts.title) + '</div>';
+        opts.fields.forEach(function(f) {
+            html += '<div style="margin-bottom:12px">';
+            html += '<label style="display:block;font-size:13px;color:#6b7280;margin-bottom:6px">' + _esc(f.label) + '</label>';
+            if (f.type === 'textarea') {
+                html += '<textarea id="adm-dlg-' + f.id + '"'
+                      + ' placeholder="' + _esc(f.placeholder || '') + '"'
+                      + (f.required ? ' required' : '')
+                      + ' rows="' + (f.rows || 3) + '"'
+                      + ' style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;outline:none;resize:vertical;font-family:inherit"></textarea>';
+            } else {
+                html += '<input id="adm-dlg-' + f.id + '" type="' + (f.type || 'text') + '"'
+                      + ' placeholder="' + _esc(f.placeholder || '') + '"'
+                      + (f.required ? ' required' : '')
+                      + ' style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;outline:none">';
+            }
+            html += '</div>';
+        });
+        html += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">';
+        html += '<button id="adm-dlg-cancel" style="padding:8px 16px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;cursor:pointer;font-size:14px">' + _esc(opts.cancelText || _t('adm-cancel')) + '</button>';
+        var okStyle = opts.danger
+            ? 'padding:8px 16px;border-radius:8px;border:none;background:#dc2626;color:#fff;cursor:pointer;font-size:14px'
+            : 'padding:8px 16px;border-radius:8px;border:none;background:#111;color:#fff;cursor:pointer;font-size:14px';
+        html += '<button id="adm-dlg-ok" style="' + okStyle + '">' + _esc(opts.okText || _t('adm-confirm')) + '</button>';
+        html += '</div>';
+        box.innerHTML = html;
+        ov.appendChild(box);
+        document.body.appendChild(ov);
+        var first = box.querySelector('input, textarea');
+        if (first) setTimeout(function() { first.focus(); }, 50);
+        function close() { ov.remove(); }
+        box.querySelector('#adm-dlg-cancel').addEventListener('click', function() { close(); if (opts.onCancel) opts.onCancel(); });
+        ov.addEventListener('click', function(e) { if (e.target === ov) { close(); if (opts.onCancel) opts.onCancel(); } });
+        box.querySelector('#adm-dlg-ok').addEventListener('click', function() {
+            var values = {}, valid = true;
+            opts.fields.forEach(function(f) {
+                var el = box.querySelector('#adm-dlg-' + f.id);
+                values[f.id] = el ? el.value.trim() : '';
+                if (f.required && !values[f.id]) { if (el) { el.style.borderColor = '#ef4444'; el.focus(); } valid = false; }
+            });
+            if (!valid) return;
+            close();
+            opts.onConfirm(values);
+        });
+        box.addEventListener('keydown', function(e) {
+            // Enter 提交(textarea 内 Ctrl+Enter 才提交)
+            if (e.key === 'Enter') {
+                var t = e.target;
+                if (t && t.tagName === 'TEXTAREA' && !e.ctrlKey && !e.metaKey) return;
+                e.preventDefault();
+                box.querySelector('#adm-dlg-ok').click();
+            }
+            if (e.key === 'Escape') { close(); if (opts.onCancel) opts.onCancel(); }
+        });
+    }
+
     function _toast(msg, kind) {
         let host = document.getElementById('admin-toast-host');
         if (!host) {
@@ -154,22 +216,22 @@
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape') popup.classList.remove('show'); });
     }
 
-    // ============ 语言切换 ============
+    // ============ 语言切换(admin 仅支持 zh/th)============
     function _bindLang() {
         const btn = document.getElementById('admin-lang-btn');
         const popup = document.getElementById('admin-lang-popup');
         const label = document.getElementById('admin-lang-label');
         if (!btn || !popup) return;
-        const labelMap = { zh: '中', en: 'EN', th: 'ไทย', ja: '日' };
+        const labelMap = { zh: '中', th: 'ไทย' };
         function _setLabel(lang) {
             popup.querySelectorAll('button[data-admin-lang]').forEach(function (b) {
                 b.classList.toggle('active', b.dataset.adminLang === lang);
             });
-            if (label) label.textContent = labelMap[lang] || '中';
+            if (label) label.textContent = labelMap[lang] || 'ไทย';
         }
-        let cur = 'zh';
-        try { cur = localStorage.getItem('mrpilot_lang') || 'zh'; } catch (_) {}
-        if (!['zh', 'th'].includes(cur)) cur = 'zh'; // en/ja 暂未翻译 · 回落 zh
+        let cur = 'th';
+        try { cur = localStorage.getItem('mrpilot_lang') || 'th'; } catch (_) {}
+        if (!['zh', 'th'].includes(cur)) cur = 'th'; // en/ja → th(admin 仅双语)
         _curLang = cur;
         _setLabel(cur);
 
@@ -181,14 +243,13 @@
             b.addEventListener('click', function () {
                 const lang = b.dataset.adminLang;
                 if (!['zh', 'th'].includes(lang)) {
-                    _toast(_t('adm-soon') + ' · en/ja');
                     popup.classList.remove('show');
                     return;
                 }
                 _applyI18n(lang);
                 _setLabel(lang);
                 popup.classList.remove('show');
-                // 重新渲染当前页(刷新数据内的文案)
+                // 重新渲染当前页(刷新动态内容文案)
                 if (location.pathname === '/admin/users') _renderUsersPage();
                 else _renderCostPage();
             });
@@ -304,12 +365,8 @@
         fetch('/api/admin/users/funnel', _hd).then(r => r.json()).then(d => {
             _admPageState.funnel = d;
             _renderAdmKpi(d);
-            _renderAdmExpiring(d.trial_expiring_soon || []);
         }).catch(_ => {});
-        fetch('/api/admin/payments/pending', _hd).then(r => r.json()).then(d => {
-            _admPageState.pay = d;
-            _renderAdmPending((d && d.payments) || []);
-        }).catch(_ => {});
+        // v118.34 · payments/pending fetch 已删除 (4 行)
         fetch('/api/admin/users?plan=all&search=&limit=100', _hd).then(r => r.json()).then(d => {
             _admPageState.users = (d && d.users) || [];
             _renderAdmUserList(_admPageState.users);
@@ -326,18 +383,13 @@
     function _renderAdmKpi(f) {
         const wrap = document.getElementById('adm-kpi-grid');
         if (!wrap) return;
-        const bp = (f && f.by_plan) || {};
+        // v118.34 · 旧 plan 分布卡 + 转化率已删除
         const cards = [
             { lbl: _t('adm-kpi-today'), val: (f && f.new_today) || 0, color: '#111111' },
             { lbl: _t('adm-kpi-week'), val: (f && f.new_week) || 0, color: '#111111' },
             { lbl: _t('adm-kpi-month'), val: (f && f.new_month) || 0, color: '#111111' },
-            { lbl: _t('plan-trial'), val: bp.trial || 0, color: '#f59e0b' },
-            { lbl: _t('plan-free'), val: bp.free || 0, color: '#64748b' },
-            { lbl: _t('plan-pro'), val: bp.pro || 0, color: '#10b981' },
-            { lbl: _t('plan-firm'), val: bp.firm || 0, color: '#8b5cf6' },
-            { lbl: _t('adm-kpi-conv'), val: ((f && f.conversion_pct) || 0) + '%', color: '#dc2626' },
         ];
-        wrap.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0';
+        wrap.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0';
         wrap.innerHTML = cards.map(c =>
             '<div style="background:#fff;border:1px solid #e8e8e3;border-top:3px solid ' + c.color + ';border-radius:10px;padding:14px 16px">' +
                 '<div style="font-size:22px;font-weight:700;color:' + c.color + '">' + _esc(c.val) + '</div>' +
@@ -346,61 +398,17 @@
         ).join('');
     }
 
-    function _renderAdmPending(rows) {
-        const wrap = document.getElementById('adm-pending-list');
-        if (!wrap) return;
-        const pending = rows.filter(r => r.status === 'pending');
-        if (!pending.length) {
-            wrap.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-pending-empty')) + '</div>';
-            return;
-        }
-        wrap.innerHTML = pending.map(r =>
-            '<div style="background:#fff;border:1px solid #e8e8e3;border-radius:6px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:12px">' +
-                '<div style="flex:1;min-width:0"><strong>' + _esc(r.user_email || '?') + '</strong> · ' + _esc(r.company_name || '') +
-                ' <span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:4px;font-size:11px;margin-left:4px">' + _esc((r.target_plan || '').toUpperCase()) + '</span>' +
-                '<div style="color:#6b7280;font-size:12px;margin-top:3px">฿' + _esc(r.amount_thb) + ' · ' + _esc(r.payer_name || '—') + ' · ' + _esc(r.payer_note || '') + '</div></div>' +
-                '<div style="display:flex;gap:6px;flex-shrink:0">' +
-                    (r.screenshot_path ? '<button class="btn btn-ghost btn-sm" onclick="window.__admViewSlip(' + r.id + ')">' + _esc(_t('adm-view-slip')) + '</button>' : '') +
-                    '<button class="btn btn-primary btn-sm" onclick="window.__admApprovePay(' + r.id + ')">' + _esc(_t('adm-approve')) + '</button>' +
-                    '<button class="btn btn-danger btn-sm" onclick="window.__admRejectPay(' + r.id + ')">' + _esc(_t('adm-reject')) + '</button>' +
-                '</div>' +
-            '</div>'
-        ).join('');
-    }
+    // v118.34 · _renderAdmPending 已删除 (21 行) · 旧 payments/pending 端点已下线
 
-    function _renderAdmExpiring(rows) {
-        const wrap = document.getElementById('adm-expiring-list');
-        if (!wrap) return;
-        if (!rows.length) {
-            wrap.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-expiring-empty')) + '</div>';
-            return;
-        }
-        wrap.innerHTML = rows.map(r =>
-            '<div style="background:#fff;border:1px solid #e8e8e3;border-radius:6px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">' +
-                '<div><strong>' + _esc(r.email) + '</strong> · ' + _esc(r.company_name || '') +
-                ' <span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:4px;font-size:11px;margin-left:4px">' + r.hours_left + 'h</span></div>' +
-                '<button class="btn btn-primary btn-sm" onclick="window.__admQuickUpgrade(\'' + _esc(r.id) + '\',\'' + _esc(r.email) + '\')">' + _esc(_t('adm-quick-upgrade')) + '</button>' +
-            '</div>'
-        ).join('');
-    }
+    // v118.34 · _renderAdmExpiring 已删除 (15 行) · trial 系统已下线
 
-    function _planLabel(plan) {
-        const map = {
-            'trial': 'Trial', 'free': 'Trial',
-            'solo': 'Pearnly Solo', 'pro': 'Pearnly Solo', 'plus': 'Pearnly Solo',
-            'team': 'Pearnly Team', 'firm': 'Pearnly Firm', 'enterprise': 'Enterprise',
-            'monthly': 'Monthly', 'yearly': 'Yearly', 'lifetime': 'Lifetime',
-        };
-        return map[plan] || (plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : '—');
-    }
+    // v118.34 · _planLabel 已删除
 
     function _renderAdmUserList(users) {
         const wrap = document.getElementById('adm-users-table');
         if (!wrap) return;
         const sq = (document.getElementById('adm-user-search')?.value || '').toLowerCase().trim();
-        const pf = document.getElementById('adm-plan-filter')?.value || 'all';
         let filtered = users || [];
-        if (pf !== 'all') filtered = filtered.filter(u => u.plan === pf);
         if (sq) filtered = filtered.filter(u =>
             (u.email || '').toLowerCase().includes(sq) ||
             (u.username || '').toLowerCase().includes(sq) ||
@@ -414,7 +422,6 @@
             '<div class="adm-table-head">' +
                 '<div>' + _esc(_t('adm-col-email')) + '</div>' +
                 '<div>' + _esc(_t('adm-col-company')) + '</div>' +
-                '<div>' + _esc(_t('adm-col-plan')) + '</div>' +
                 '<div>' + _esc(_t('adm-col-usage')) + '</div>' +
                 '<div>' + _esc(_t('adm-col-country')) + '</div>' +
                 '<div>' + _esc(_t('adm-col-actions')) + '</div>' +
@@ -425,11 +432,9 @@
                 const lineBadge = u.line_id ? ' · LINE' : '';
                 const actions = isAdmin
                     ? '<div class="adm-row-actions" title="' + _esc(_t('admin-self-disabled-tip')) + '">' +
-                        '<button class="btn btn-ghost btn-sm" disabled>' + _esc(_t('adm-upgrade')) + '</button>' +
                         '<button class="btn btn-ghost btn-sm" disabled>' + _esc(_t('adm-ban')) + '</button>' +
                     '</div>'
                     : '<div class="adm-row-actions">' +
-                        '<button class="btn btn-ghost btn-sm" onclick="window.__admQuickUpgrade(\'' + _esc(u.id) + '\',\'' + _esc(u.email || '') + '\')">' + _esc(_t('adm-upgrade')) + '</button>' +
                         (u.is_active === false
                             ? '<button class="btn btn-ghost btn-sm" onclick="window.__admUnbanUser(\'' + _esc(u.id) + '\')">' + _esc(_t('adm-drawer-btn-unban')) + '</button>'
                             : '<button class="btn btn-ghost btn-sm" onclick="window.__admBanUser(\'' + _esc(u.id) + '\',\'' + _esc(u.email || '') + '\')">' + _esc(_t('adm-ban')) + '</button>'
@@ -442,10 +447,6 @@
                         '<div class="adm-cell-mute">' + (u.created_at ? new Date(u.created_at).toLocaleDateString() : '—') + adminBadge + '</div>' +
                     '</div>' +
                     '<div>' + _esc(u.company_name || '—') + '</div>' +
-                    '<div>' +
-                        '<span class="adm-plan-badge adm-plan-' + _esc(u.plan || 'trial') + '">' + _esc(_planLabel(u.plan)) + '</span>' +
-                        (u.days_left != null ? '<div class="adm-cell-mute">' + u.days_left + 'd</div>' : '') +
-                    '</div>' +
                     '<div>' + (u.ocr_used_month || 0) + '</div>' +
                     '<div>' + _esc(u.country || '—') + lineBadge + '</div>' +
                     actions +
@@ -748,7 +749,6 @@
                 '</div>' +
             '</div>' +
             sec(_t('adm-drawer-sec-account'),
-                row(_t('adm-drawer-plan'), '<span class="adm-plan-badge adm-plan-' + _esc(u.plan || 'trial') + '">' + _esc(_planLabel(u.plan)) + '</span>' + (u.days_left != null ? ' · ' + u.days_left + 'd' : '')) +
                 row(_t('adm-drawer-status'), u.is_active === false ? _esc(_t('adm-drawer-banned')) : _esc(_t('adm-drawer-active'))) +
                 row(_t('adm-drawer-line'), lineStatus) +
                 row(_t('adm-drawer-role'), u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner'))
@@ -780,7 +780,6 @@
                 '<div class="adm-drawer-section adm-drawer-actions-section">' +
                     '<div class="adm-drawer-section-title">' + _esc(_t('adm-drawer-sec-actions')) + '</div>' +
                     '<div class="adm-drawer-actions-grid">' +
-                        '<button class="btn btn-primary" onclick="window.__admQuickUpgrade(\'' + _esc(u.id) + '\',\'' + _esc(u.email || '') + '\')">' + _esc(_t('adm-drawer-btn-upgrade')) + '</button>' +
                         (u.is_active === false
                             ? '<button class="btn btn-ghost" onclick="window.__admUnbanUser(\'' + _esc(u.id) + '\')">' + _esc(_t('adm-drawer-btn-unban')) + '</button>'
                             : '<button class="btn btn-danger" onclick="window.__admBanUser(\'' + _esc(u.id) + '\',\'' + _esc(u.email || '') + '\')">' + _esc(_t('adm-drawer-btn-ban')) + '</button>'
@@ -793,62 +792,7 @@
     }
 
     // ============ v118.44.1 升级 modal ============
-    window.__admQuickUpgrade = function(uid, email) {
-        const old = document.getElementById('adm-upgrade-overlay');
-        if (old) old.remove();
-        const plans = [
-            { id: 'trial', label: _t('upg-plan-trial'), desc: _t('upg-plan-trial-desc') },
-            { id: 'monthly', label: _t('upg-plan-monthly'), desc: _t('upg-plan-monthly-desc') },
-            { id: 'yearly', label: _t('upg-plan-yearly'), desc: _t('upg-plan-yearly-desc') },
-            { id: 'lifetime', label: _t('upg-plan-lifetime'), desc: _t('upg-plan-lifetime-desc') },
-        ];
-        const ov = document.createElement('div');
-        ov.id = 'adm-upgrade-overlay';
-        ov.className = 'cpw-forgot-overlay';
-        ov.innerHTML =
-            '<div class="cpw-forgot-modal" style="max-width:480px">' +
-                '<div class="cpw-forgot-head"><div class="cpw-forgot-title">' + _esc(_t('adm-upgrade-title')) + '</div>' +
-                    '<button class="cpw-forgot-close" id="adm-upg-close"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg></button>' +
-                '</div>' +
-                '<div class="cpw-forgot-body">' +
-                    '<p class="cpw-forgot-desc">' + _esc(email) + '</p>' +
-                    '<div class="adm-plan-options">' +
-                        plans.map(p =>
-                            '<label class="adm-plan-option">' +
-                                '<input type="radio" name="adm-target-plan" value="' + p.id + '">' +
-                                '<div class="adm-plan-option-body">' +
-                                    '<div class="adm-plan-option-label">' + _esc(p.label) + '</div>' +
-                                    '<div class="adm-plan-option-desc">' + _esc(p.desc) + '</div>' +
-                                '</div>' +
-                            '</label>'
-                        ).join('') +
-                    '</div>' +
-                '</div>' +
-                '<div class="cpw-forgot-foot">' +
-                    '<button class="btn btn-ghost" id="adm-upg-cancel">' + _esc(_t('cpw-forgot-cancel')) + '</button>' +
-                    '<button class="btn btn-primary" id="adm-upg-confirm">' + _esc(_t('adm-upg-confirm')) + '</button>' +
-                '</div>' +
-            '</div>';
-        document.body.appendChild(ov);
-        const close = () => ov.remove();
-        ov.querySelector('#adm-upg-close').addEventListener('click', close);
-        ov.querySelector('#adm-upg-cancel').addEventListener('click', close);
-        ov.addEventListener('click', e => { if (e.target === ov) close(); });
-        ov.querySelector('#adm-upg-confirm').addEventListener('click', async () => {
-            const sel = ov.querySelector('input[name="adm-target-plan"]:checked');
-            if (!sel) { _toast(_t('adm-pick-plan'), 'error'); return; }
-            const tok = localStorage.getItem('mrpilot_token');
-            try {
-                const r = await fetch('/api/admin/users/upgrade', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: uid, target_plan: sel.value, note: 'manual_admin' }),
-                });
-                if (r.ok) { _toast(_t('adm-upgrade-ok'), 'success'); close(); _renderUsersPage(); }
-                else { const d = await r.json().catch(() => ({})); _toast(d.detail || _t('adm-upgrade-fail'), 'error'); }
-            } catch (e) { _toast(_t('adm-upgrade-fail'), 'error'); }
-        });
-    };
+    window.__admQuickUpgrade = function() {};  // v118.34 · 旧 upgrade modal 已删除 (56 行)
 
     // ============ v118.44.1 封停 modal ============
     window.__admBanUser = function(uid, email) {
@@ -1165,6 +1109,7 @@
                 });
                 if (target === 'employees' && !_admEmployeesCache.rows.length) _loadAdmEmployees();
                 if (target === 'logs' && !_admLogsState.rows.length) _loadAdmLogs(1);
+                if (target === 'topup') _loadAdmTopup();
                 return;
             }
             const pgBtn = ev.target.closest('.adm-pager-btn[data-adm-page]');
@@ -1192,8 +1137,11 @@
             }
         });
         document.addEventListener('change', function(ev) {
-            if (ev.target && ev.target.id === 'adm-plan-filter') {
+            if (false && ev.target && ev.target.id === 'adm-plan-filter') {
                 _renderAdmUserList(_admPageState.users || []);
+            }
+            if (ev.target && ev.target.id === 'adm-topup-status-filter') {
+                _loadAdmTopup();
             }
         });
     }
@@ -1229,19 +1177,20 @@
             gbtn.setAttribute('rel', 'noopener');
         }
         // 更新余额
-        _on('btn-billing-update', 'click', async function () {
-            const input = prompt(_curLang === 'th' ? 'ยอดคงเหลือ Google จริง (THB):' : 'Google 实际余额(THB):');
-            if (!input) return;
-            const bal = parseFloat(input);
-            if (isNaN(bal) || bal < 0) { _toast(_curLang === 'th' ? 'ตัวเลขไม่ถูกต้อง' : '数字格式错误', 'error'); return; }
-            try {
-                await _adminFetch('/api/admin/billing/balance', {
-                    method: 'POST',
-                    body: { real_balance_thb: bal },
-                });
-                _toast(_curLang === 'th' ? 'บันทึกแล้ว' : '已保存', 'success');
-                _renderCostPage();
-            } catch (e) { _toast(_t('adm-load-fail') + ' · ' + e.message, 'error'); }
+        _on('btn-billing-update', 'click', function () {
+            _adminDialog({
+                title: _t('adm-billing-balance-title'),
+                fields: [{ id: 'bal', label: _t('adm-billing-balance-title'), type: 'number', placeholder: '0.00', required: true }],
+                onConfirm: async function(vals) {
+                    const bal = parseFloat(vals.bal);
+                    if (isNaN(bal) || bal < 0) { _toast(_curLang === 'th' ? 'ตัวเลขไม่ถูกต้อง' : '数字格式错误', 'error'); return; }
+                    try {
+                        await _adminFetch('/api/admin/billing/balance', { method: 'POST', body: { real_balance_thb: bal } });
+                        _toast(_curLang === 'th' ? 'บันทึกแล้ว' : '已保存', 'success');
+                        _renderCostPage();
+                    } catch (e) { _toast(_t('adm-load-fail') + ' · ' + e.message, 'error'); }
+                }
+            });
         });
         // 导出 CSV(成本)
         _on('btn-cost-export', 'click', async function () {
@@ -1266,14 +1215,123 @@
         });
     }
 
+    // ============ 充值审核 tab ============
+    async function _loadAdmTopup() {
+        const wrap = document.getElementById('adm-topup-table');
+        if (!wrap) return;
+        wrap.innerHTML = '<div style="padding:20px;color:#aaa">' + _t('adm-topup-loading', '加载中…') + '</div>';
+        const statusEl = document.getElementById('adm-topup-status-filter');
+        const status = statusEl ? statusEl.value : 'pending';
+        try {
+            const rows = await _adminFetch('/api/admin/credits/topup/requests?status=' + encodeURIComponent(status));
+            _renderAdmTopup(rows || []);
+        } catch (e) {
+            wrap.innerHTML = '<div style="padding:20px;color:#e55">' + _t('adm-load-fail', '加载失败') + ' · ' + e.message + '</div>';
+        }
+    }
+
+    function _renderAdmTopup(rows) {
+        const wrap = document.getElementById('adm-topup-table');
+        if (!wrap) return;
+        if (!rows.length) {
+            wrap.innerHTML = '<div style="padding:20px;color:#aaa">' + _t('adm-topup-empty', '暂无充值申请') + '</div>';
+            return;
+        }
+        const statusLabel = function (s) {
+            if (s === 'approved') return '<span style="color:#4CAF50">' + _t('adm-topup-approved', '已通过') + '</span>';
+            if (s === 'rejected') return '<span style="color:#e55">' + _t('adm-topup-rejected', '已驳回') + '</span>';
+            return '<span style="color:#E26E4B">' + _t('adm-topup-pending', '待审核') + '</span>';
+        };
+        const fmtDate = function (s) { return s ? s.replace('T', ' ').slice(0, 16) : '—'; };
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+        html += '<thead><tr style="background:#f5f5f5">';
+        ['adm-topup-col-user','adm-topup-col-amount','adm-topup-col-payer','adm-topup-col-note',
+         'adm-topup-col-time','adm-topup-col-slip','adm-topup-col-actions'].forEach(function (k) {
+            html += '<th style="padding:8px 10px;text-align:left;font-weight:600;white-space:nowrap">' + _t(k, k) + '</th>';
+        });
+        html += '<th style="padding:8px 10px;text-align:left;font-weight:600">状态</th>';
+        html += '</tr></thead><tbody>';
+        rows.forEach(function (r) {
+            const slipCell = r.slip_path
+                ? '<a href="/static/' + r.slip_path + '" target="_blank" style="color:#E26E4B">' + _t('adm-topup-view-slip', '查看') + '</a>'
+                : '—';
+            const actionCell = r.status === 'pending'
+                ? '<button onclick="window._admTopupApprove(' + r.id + ')" style="margin-right:6px;padding:3px 10px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">' + _t('adm-topup-approve', '通过') + '</button>'
+                  + '<button onclick="window._admTopupReject(' + r.id + ')" style="padding:3px 10px;background:#e55;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">' + _t('adm-topup-reject', '驳回') + '</button>'
+                : r.review_note ? ('<span style="font-size:11px;color:#888">' + r.review_note + '</span>') : '—';
+            html += '<tr style="border-bottom:1px solid #f0f0f0">'
+                + '<td style="padding:8px 10px">' + (r.tenant_name || r.email || r.username || '—') + '<br><span style="font-size:11px;color:#aaa">' + (r.email || '') + '</span></td>'
+                + '<td style="padding:8px 10px;white-space:nowrap">฿' + Number(r.amount_thb).toFixed(2) + '</td>'
+                + '<td style="padding:8px 10px">' + (r.payer_name || '—') + '</td>'
+                + '<td style="padding:8px 10px;max-width:160px;word-break:break-word">' + (r.note || '—') + '</td>'
+                + '<td style="padding:8px 10px;white-space:nowrap">' + fmtDate(r.created_at) + '</td>'
+                + '<td style="padding:8px 10px">' + slipCell + '</td>'
+                + '<td style="padding:8px 10px">' + actionCell + '</td>'
+                + '<td style="padding:8px 10px">' + statusLabel(r.status) + '</td>'
+                + '</tr>';
+        });
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+    }
+
+    async function _admTopupApprove(id) {
+        _adminDialog({
+            title: _t('adm-topup-approve'),
+            fields: [
+                { id: 'amt', label: _t('adm-topup-actual-amount'), type: 'number', placeholder: '0.00', required: true },
+                { id: 'note', label: _t('adm-review-note'), type: 'text', placeholder: '' }
+            ],
+            onConfirm: async function(vals) {
+                const amt = parseFloat(vals.amt);
+                if (!amt || amt <= 0) { _toast(_t('adm-topup-fail') + ': invalid amount', 'error'); return; }
+                try {
+                    await _adminFetch('/api/admin/credits/topup/approve/' + id, {
+                        method: 'POST',
+                        body: { actual_amount_thb: amt, note: vals.note }
+                    });
+                    _toast(_t('adm-topup-approve-ok'), 'success');
+                    _loadAdmTopup();
+                } catch (e) { _toast(_t('adm-topup-fail') + ': ' + e.message, 'error'); }
+            }
+        });
+    }
+
+    async function _admTopupReject(id) {
+        _adminDialog({
+            title: _t('adm-reject-reason'),
+            danger: true,
+            fields: [{
+                id: 'note',
+                label: _t('adm-reject-reason'),
+                type: 'textarea',
+                rows: 4,
+                required: true,
+                placeholder: _t('adm-reject-reason-ph')
+            }],
+            onConfirm: async function(vals) {
+                try {
+                    await _adminFetch('/api/admin/credits/topup/reject/' + id, {
+                        method: 'POST',
+                        body: { note: vals.note }
+                    });
+                    _toast(_t('adm-topup-reject-ok'), 'success');
+                    _loadAdmTopup();
+                } catch (e) { _toast(_t('adm-topup-fail') + ': ' + e.message, 'error'); }
+            }
+        });
+    }
+
+    window._admTopupApprove = _admTopupApprove;
+    window._admTopupReject = _admTopupReject;
+
     // ============ 主启动流程 ============
     async function _boot() {
         const user = await _verifySuperAdmin();
         if (!user) return;
-        // 初始 lang
+        // 初始 lang(en/ja → th 降级)
         try {
-            let cur = localStorage.getItem('mrpilot_lang') || 'zh';
-            if (!['zh', 'th'].includes(cur)) cur = 'zh';
+            let cur = localStorage.getItem('mrpilot_lang') || 'th';
+            if (!['zh', 'th'].includes(cur)) cur = 'th';
             _curLang = cur;
         } catch (_) {}
         _applyI18n(_curLang);

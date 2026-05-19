@@ -259,26 +259,50 @@ const I18N = {
         'dash-kpi-usage': '本月用量',
         'dash-kpi-usage-sub': '张/200张',
         'dash-topup': '充值',
-        'topup-modal-title': '充值到账户',
-        'topup-amount-label': '充值金额 (฿)',
-        'topup-payer-label': '付款人姓名',
-        'topup-note-label': '备注',
-        'topup-qr-label': '扫码付款 (PromptPay)',
-        'topup-qr-unavailable': '付款码图片未配置',
-        'topup-submit-btn': '提交充值申请',
-        'topup-step2-title': '申请已提交',
-        'topup-step2-sub': '请上传付款截图，加速审核',
-        'topup-slip-label': '上传付款截图',
-        'topup-upload-btn': '上传截图',
-        'topup-close-btn': '稍后上传，关闭',
-        'topup-uploading': '上传中…',
-        'topup-upload-ok': '截图已上传',
-        'topup-upload-fail': '上传失败',
-        'topup-submitting': '提交中…',
-        'topup-submit-fail': '提交失败',
-        'topup-amount-err': '请输入有效金额',
+        'topup-title': '充值到账户',
+        'topup-step1': '填金额',
+        'topup-step2': '转账',
+        'topup-step3': '上传截图',
+        'topup-amount-label': '充值金额',
+        'topup-amount-invalid': '请输入有效金额（最低 ฿10）',
+        'topup-bank-label': '转账到以下账户',
+        'topup-bank-note': '请转账恰好 ฿{amount}，截图后再关闭银行App',
+        'topup-copy-account': '复制账号',
+        'topup-copied': '已复制',
+        'topup-slip-drop': '点击或拖拽截图',
+        'topup-slip-required': '请上传转账截图',
+        'topup-payer-label': '付款人姓名（选填）',
+        'topup-note-label': '备注（选填）',
+        'topup-submit-fail': '提交失败，请重试',
+        'topup-upload-fail': '上传失败，请重试',
         'topup-auto-approved': '充值成功，余额已更新',
-        'topup-pending-review': '截图已收到，等待审核',
+        'topup-pending': '申请已提交，等待审核',
+        'topup-btn-next': '下一步',
+        'topup-btn-back': '上一步',
+        'topup-btn-submit': '提交申请',
+        'topup-btn-cancel': '取消',
+        'credits-updated': '充值成功，余额已更新，可以开始使用',
+        'time-just-now': '刚刚',
+        'time-min-ago-suffix': ' 分钟前',
+        'time-hour-ago-suffix': ' 小时前',
+        'time-day-ago-suffix': ' 天前',
+        'select-company': '选择工作公司',
+        'select-company-sub': '您隶属于多家公司，请选择一家进入',
+        'switch-company': '切换',
+        'switch-company-title': '切换公司',
+        'switch-company-fail': '切换失败',
+        'company-role-admin': '管理员',
+        'company-role-member': '员工',
+        'company-pages-month': '本月用量',
+        'company-balance': '余额',
+        'low-balance-title': '余额不足',
+        'low-balance-msg': '余额不足，请及时充值',
+        'zero-balance-msg': '余额已用完，请充值后继续使用',
+        'near-tier-msg': '本月已用 {n} 张，超出 200 张后单价 ฿0.75',
+        'topup-cta': '立即充值',
+        'welcome-title': '欢迎使用 Pearnly',
+        'welcome-msg': '账户已就绪。先充值后即可开始扫描发票。',
+        'welcome-skip': '稍后再说',
         'dash-quick-title': '快速操作',
         'dash-quick-sub': '3 步进入主流程',
         'dash-quick-upload': '上传发票',
@@ -1784,7 +1808,8 @@ const I18N = {
         'team-modal-err-username': '用户名至少 3 位',
         'team-modal-err-username-fmt': '只能用字母 / 数字 / 下划线 / 点 / 横线',
         // v118.11 · 员工账号体系 · 邮箱/重置密码/弱密码黑名单
-        'team-modal-email': '邮箱(选填)',
+        'team-modal-email': '邮箱',
+        'team-modal-email-required': '请输入邮箱',
         'team-modal-email-ph': 'employee@example.com',
         'team-modal-email-hint': '选填 · 用于忘记密码时邮件重置 · 留空则只能由老板重置',
         'team-email-exists': '邮箱已被占用',
@@ -2725,26 +2750,50 @@ const I18N = {
         'dash-kpi-usage': 'This Month Usage',
         'dash-kpi-usage-sub': 'pages/200',
         'dash-topup': 'Top up',
-        'topup-modal-title': 'Top Up Account',
-        'topup-amount-label': 'Amount (฿)',
-        'topup-payer-label': 'Payer name',
-        'topup-note-label': 'Note',
-        'topup-qr-label': 'Scan to pay (PromptPay)',
-        'topup-qr-unavailable': 'QR code image not configured',
-        'topup-submit-btn': 'Submit Top-Up Request',
-        'topup-step2-title': 'Request Submitted',
-        'topup-step2-sub': 'Upload payment slip to speed up review',
-        'topup-slip-label': 'Upload payment slip',
-        'topup-upload-btn': 'Upload Slip',
-        'topup-close-btn': 'Upload later, Close',
-        'topup-uploading': 'Uploading…',
-        'topup-upload-ok': 'Slip uploaded',
+        'topup-title': 'Add Credits',
+        'topup-step1': 'Amount',
+        'topup-step2': 'Transfer',
+        'topup-step3': 'Upload Slip',
+        'topup-amount-label': 'Amount',
+        'topup-amount-invalid': 'Please enter a valid amount (min ฿10)',
+        'topup-bank-label': 'Transfer to',
+        'topup-bank-note': 'Transfer exactly ฿{amount}, screenshot before closing bank app',
+        'topup-copy-account': 'Copy account',
+        'topup-copied': 'Copied',
+        'topup-slip-drop': 'Click or drag slip',
+        'topup-slip-required': 'Slip required',
+        'topup-payer-label': 'Payer name (optional)',
+        'topup-note-label': 'Note (optional)',
+        'topup-submit-fail': 'Submit failed',
         'topup-upload-fail': 'Upload failed',
-        'topup-submitting': 'Submitting…',
-        'topup-submit-fail': 'Submission failed',
-        'topup-amount-err': 'Please enter a valid amount',
-        'topup-auto-approved': 'Top-up successful, credits added',
-        'topup-pending-review': 'Slip received, pending review',
+        'topup-auto-approved': 'Credits added',
+        'topup-pending': 'Pending review',
+        'topup-btn-next': 'Next',
+        'topup-btn-back': 'Back',
+        'topup-btn-submit': 'Submit',
+        'topup-btn-cancel': 'Cancel',
+        'credits-updated': 'Credits added, you can start scanning now',
+        'time-just-now': 'just now',
+        'time-min-ago-suffix': ' min ago',
+        'time-hour-ago-suffix': ' hr ago',
+        'time-day-ago-suffix': ' d ago',
+        'select-company': 'Select Company',
+        'select-company-sub': 'You belong to multiple companies. Choose one to enter.',
+        'switch-company': 'Switch',
+        'switch-company-title': 'Switch company',
+        'switch-company-fail': 'Switch failed',
+        'company-role-admin': 'Admin',
+        'company-role-member': 'Member',
+        'company-pages-month': 'Pages this month',
+        'company-balance': 'Balance',
+        'low-balance-title': 'Low balance',
+        'low-balance-msg': 'Balance is low, please top up soon',
+        'zero-balance-msg': 'Balance depleted, top up to continue',
+        'near-tier-msg': 'Used {n} this month — over 200: ฿0.75/page',
+        'topup-cta': 'Top up now',
+        'welcome-title': 'Welcome to Pearnly',
+        'welcome-msg': 'Your account is ready. Top up first to start scanning invoices.',
+        'welcome-skip': 'Later',
         'dash-quick-title': 'Quick actions',
         'dash-quick-sub': '3-step shortcut to main flow',
         'dash-quick-upload': 'Upload invoice',
@@ -4239,7 +4288,8 @@ const I18N = {
         'team-modal-err-username': 'Username must be at least 3 chars',
         'team-modal-err-username-fmt': 'Only letters / digits / _ / . / - allowed',
         // v118.11 · employee account system · email / reset / weak-password blacklist
-        'team-modal-email': 'Email (optional)',
+        'team-modal-email': 'Email',
+        'team-modal-email-required': 'Email is required',
         'team-modal-email-ph': 'employee@example.com',
         'team-modal-email-hint': 'Optional · for self-service password reset · leave blank if owner-managed',
         'team-email-exists': 'Email already in use',
@@ -5169,27 +5219,51 @@ const I18N = {
         'dash-kpi-credits-exempt': 'บัญชียกเว้น',
         'dash-kpi-usage': 'การใช้งานเดือนนี้',
         'dash-kpi-usage-sub': 'หน้า/200',
-        'dash-topup': 'เติมเงิน',
-        'topup-modal-title': 'เติมเงินในบัญชี',
-        'topup-amount-label': 'จำนวนเงิน (฿)',
-        'topup-payer-label': 'ชื่อผู้โอน',
-        'topup-note-label': 'หมายเหตุ',
-        'topup-qr-label': 'สแกนจ่าย (PromptPay)',
-        'topup-qr-unavailable': 'ไม่พบรูป QR Code',
-        'topup-submit-btn': 'ส่งคำขอเติมเงิน',
-        'topup-step2-title': 'ส่งคำขอแล้ว',
-        'topup-step2-sub': 'อัปโหลดสลิปเพื่อเร่งการตรวจสอบ',
-        'topup-slip-label': 'อัปโหลดสลิป',
-        'topup-upload-btn': 'อัปโหลดสลิป',
-        'topup-close-btn': 'อัปโหลดทีหลัง, ปิด',
-        'topup-uploading': 'กำลังอัปโหลด…',
-        'topup-upload-ok': 'อัปโหลดสลิปแล้ว',
-        'topup-upload-fail': 'อัปโหลดล้มเหลว',
-        'topup-submitting': 'กำลังส่ง…',
-        'topup-submit-fail': 'ส่งล้มเหลว',
-        'topup-amount-err': 'กรุณาใส่จำนวนเงินที่ถูกต้อง',
-        'topup-auto-approved': 'เติมเงินสำเร็จ ยอดเครดิตได้รับการอัปเดตแล้ว',
-        'topup-pending-review': 'ได้รับสลิปแล้ว รอการตรวจสอบ',
+        'dash-topup': 'เติมเครดิต',
+        'topup-title': 'เติมเครดิต',
+        'topup-step1': 'ระบุจำนวน',
+        'topup-step2': 'โอนเงิน',
+        'topup-step3': 'อัปโหลดสลิป',
+        'topup-amount-label': 'จำนวนเงิน',
+        'topup-amount-invalid': 'กรุณาระบุจำนวนเงินที่ถูกต้อง (ขั้นต่ำ ฿10)',
+        'topup-bank-label': 'โอนเงินไปที่บัญชีนี้',
+        'topup-bank-note': 'โอนพอดี ฿{amount} และถ่ายสลิปก่อนปิดแอปธนาคาร',
+        'topup-copy-account': 'คัดลอกเลขบัญชี',
+        'topup-copied': 'คัดลอกแล้ว',
+        'topup-slip-drop': 'คลิกหรือลากไฟล์',
+        'topup-slip-required': 'กรุณาอัปโหลดสลิป',
+        'topup-payer-label': 'ชื่อผู้โอน (ไม่บังคับ)',
+        'topup-note-label': 'หมายเหตุ (ไม่บังคับ)',
+        'topup-submit-fail': 'ส่งคำขอไม่สำเร็จ',
+        'topup-upload-fail': 'อัปโหลดไม่สำเร็จ',
+        'topup-auto-approved': 'เติมเครดิตสำเร็จ',
+        'topup-pending': 'ส่งคำขอแล้ว รอตรวจสอบ',
+        'topup-btn-next': 'ถัดไป',
+        'topup-btn-back': 'ย้อนกลับ',
+        'topup-btn-submit': 'ส่งคำขอ',
+        'topup-btn-cancel': 'ยกเลิก',
+        'credits-updated': 'เติมเครดิตสำเร็จ เริ่มใช้งานได้เลย',
+        'time-just-now': 'เมื่อกี้',
+        'time-min-ago-suffix': ' นาทีที่แล้ว',
+        'time-hour-ago-suffix': ' ชม.ที่แล้ว',
+        'time-day-ago-suffix': ' วันที่แล้ว',
+        'select-company': 'เลือกบริษัท',
+        'select-company-sub': 'คุณอยู่หลายบริษัท กรุณาเลือกหนึ่งบริษัทเพื่อเข้าใช้',
+        'switch-company': 'เปลี่ยน',
+        'switch-company-title': 'เปลี่ยนบริษัท',
+        'switch-company-fail': 'เปลี่ยนล้มเหลว',
+        'company-role-admin': 'ผู้ดูแล',
+        'company-role-member': 'พนักงาน',
+        'company-pages-month': 'การใช้งานเดือนนี้',
+        'company-balance': 'ยอดคงเหลือ',
+        'low-balance-title': 'เครดิตเหลือน้อย',
+        'low-balance-msg': 'เครดิตเหลือน้อย กรุณาเติมเงิน',
+        'zero-balance-msg': 'เครดิตหมดแล้ว กรุณาเติมเพื่อใช้งานต่อ',
+        'near-tier-msg': 'ใช้ไปแล้ว {n} แผ่นเดือนนี้ เกิน 200 แผ่น ฿0.75/แผ่น',
+        'topup-cta': 'เติมเครดิต',
+        'welcome-title': 'ยินดีต้อนรับสู่ Pearnly',
+        'welcome-msg': 'บัญชีพร้อมใช้งาน เติมเครดิตก่อนเพื่อเริ่มสแกนใบกำกับ',
+        'welcome-skip': 'ภายหลัง',
         'dash-quick-title': 'การกระทำด่วน',
         'dash-quick-sub': 'ทางลัด 3 ขั้นตอน',
         'dash-quick-upload': 'อัปโหลดใบกำกับ',
@@ -6683,7 +6757,8 @@ const I18N = {
         'team-modal-err-username': 'ชื่อผู้ใช้อย่างน้อย 3 ตัว',
         'team-modal-err-username-fmt': 'ใช้ได้เฉพาะอักษร / ตัวเลข / _ / . / -',
         // v118.11 · ระบบบัญชีพนักงาน · อีเมล / รีเซ็ต / รหัสผ่านอ่อน
-        'team-modal-email': 'อีเมล (ไม่บังคับ)',
+        'team-modal-email': 'อีเมล',
+        'team-modal-email-required': 'กรุณากรอกอีเมล',
         'team-modal-email-ph': 'employee@example.com',
         'team-modal-email-hint': 'ไม่บังคับ · ใช้รีเซ็ตรหัสผ่านด้วยตัวเอง · เว้นว่างได้หากให้เจ้าของจัดการ',
         'team-email-exists': 'อีเมลนี้ถูกใช้แล้ว',
@@ -7611,26 +7686,50 @@ const I18N = {
         'dash-kpi-usage': '今月の使用量',
         'dash-kpi-usage-sub': 'ページ/200',
         'dash-topup': 'チャージ',
-        'topup-modal-title': 'アカウントへチャージ',
-        'topup-amount-label': 'チャージ金額 (฿)',
-        'topup-payer-label': '送金者名',
-        'topup-note-label': 'メモ',
-        'topup-qr-label': 'QRコードで支払い (PromptPay)',
-        'topup-qr-unavailable': 'QRコード画像が設定されていません',
-        'topup-submit-btn': 'チャージ申請を送信',
-        'topup-step2-title': '申請が送信されました',
-        'topup-step2-sub': 'スリップをアップロードして審査を早めてください',
-        'topup-slip-label': '支払いスリップをアップロード',
-        'topup-upload-btn': 'スリップをアップロード',
-        'topup-close-btn': '後でアップロード、閉じる',
-        'topup-uploading': 'アップロード中…',
-        'topup-upload-ok': 'スリップをアップロードしました',
-        'topup-upload-fail': 'アップロード失敗',
-        'topup-submitting': '送信中…',
+        'topup-title': 'クレジットを追加',
+        'topup-step1': '金額入力',
+        'topup-step2': '振込',
+        'topup-step3': 'スリップ送信',
+        'topup-amount-label': '金額',
+        'topup-amount-invalid': '有効な金額を入力（最低฿10）',
+        'topup-bank-label': '振込先',
+        'topup-bank-note': 'ちょうど฿{amount}を振込み、銀行アプリを閉じる前にスクショ',
+        'topup-copy-account': '口座番号をコピー',
+        'topup-copied': 'コピー完了',
+        'topup-slip-drop': 'クリックまたはドラッグ',
+        'topup-slip-required': 'スリップが必要',
+        'topup-payer-label': '振込人名（任意）',
+        'topup-note-label': 'メモ（任意）',
         'topup-submit-fail': '送信失敗',
-        'topup-amount-err': '有効な金額を入力してください',
-        'topup-auto-approved': 'チャージ完了、残高が更新されました',
-        'topup-pending-review': 'スリップを受信しました。審査中です',
+        'topup-upload-fail': 'アップロード失敗',
+        'topup-auto-approved': 'チャージ完了',
+        'topup-pending': '申請送信、審査中',
+        'topup-btn-next': '次へ',
+        'topup-btn-back': '戻る',
+        'topup-btn-submit': '送信',
+        'topup-btn-cancel': 'キャンセル',
+        'credits-updated': 'チャージ完了、スキャンを開始できます',
+        'time-just-now': 'たった今',
+        'time-min-ago-suffix': ' 分前',
+        'time-hour-ago-suffix': ' 時間前',
+        'time-day-ago-suffix': ' 日前',
+        'select-company': '会社を選択',
+        'select-company-sub': '複数の会社に所属しています。1社を選んで入ってください',
+        'switch-company': '切替',
+        'switch-company-title': '会社を切り替え',
+        'switch-company-fail': '切替失敗',
+        'company-role-admin': '管理者',
+        'company-role-member': 'メンバー',
+        'company-pages-month': '今月の利用',
+        'company-balance': '残高',
+        'low-balance-title': '残高不足',
+        'low-balance-msg': '残高不足です、早めにチャージしてください',
+        'zero-balance-msg': '残高がなくなりました。チャージ後にご利用ください',
+        'near-tier-msg': '今月 {n} 枚使用 · 200 枚超で ฿0.75/枚',
+        'topup-cta': 'チャージ',
+        'welcome-title': 'Pearnly へようこそ',
+        'welcome-msg': 'アカウント準備完了。チャージしてからスキャンを開始してください',
+        'welcome-skip': '後で',
         'dash-quick-title': 'クイック操作',
         'dash-quick-sub': '3 ステップで主要画面へ',
         'dash-quick-upload': '請求書をアップロード',
@@ -9123,7 +9222,8 @@ const I18N = {
         'team-modal-err-username': 'ユーザー名は 3 文字以上',
         'team-modal-err-username-fmt': '英数 / _ / . / - のみ',
         // v118.11 · 社員アカウント体系 · メール / リセット / 弱パスワードブラックリスト
-        'team-modal-email': 'メール (任意)',
+        'team-modal-email': 'メール',
+        'team-modal-email-required': 'メールを入力してください',
         'team-modal-email-ph': 'employee@example.com',
         'team-modal-email-hint': '任意 · パスワードを忘れた場合のリセットに使用 · 未入力の場合はオーナーが管理',
         'team-email-exists': 'このメールは既に使用されています',
@@ -11023,6 +11123,10 @@ async function loadAll() {
         try { maybeShowOnboarding(u); } catch(e) { console.error('onboarding init', e); }
         // v118.10 · 设置页表单数据预填充
         try { fillSettingsForms(u); } catch(e) { console.error('settings forms init', e); }
+        // Task 3 · 多公司选择器:若用户属多家公司且未选 active → 弹选择
+        try { if (typeof window._initCompanySwitcher === 'function') window._initCompanySwitcher(); } catch(e) { console.error('company switcher init', e); }
+        // Task 4 · 余额预警 + 新用户引导
+        try { if (typeof window._initBalanceAlerts === 'function') window._initBalanceAlerts(u); } catch(e) { console.error('balance alerts init', e); }
     } catch (e) { console.error(e); }
 }
 
@@ -11144,7 +11248,7 @@ async function showAddEmployeeModal() {
             <div class="add-emp-body">
                 <div class="add-emp-field">
                     <label>${escapeHtml(t('team-modal-email') || '邮箱')}</label>
-                    <input type="email" class="add-emp-input" id="add-emp-email" placeholder="${escapeHtml(t('team-modal-email-ph') || 'employee@example.com')}" autocomplete="off">
+                    <input type="email" class="add-emp-input" id="add-emp-email" placeholder="${escapeHtml(t('team-modal-email-ph') || 'employee@example.com')}" autocomplete="off" required>
                     <div class="add-emp-hint">${escapeHtml(t('team-modal-email-hint2') || '员工用此邮箱登录 · 全平台唯一')}</div>
                 </div>
                 <div class="add-emp-field">
@@ -11182,7 +11286,11 @@ async function showAddEmployeeModal() {
         msgEl.textContent = '';
         msgEl.classList.remove('error');
 
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        if (!email) {
+            msgEl.textContent = t('team-modal-email-required') || '请输入邮箱';
+            msgEl.classList.add('error'); return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             msgEl.textContent = t('msg-email-invalid') || '邮箱格式不对';
             msgEl.classList.add('error'); return;
         }
@@ -30616,121 +30724,671 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 })();
 
-// ── 充值申请弹窗 IIFE ──────────────────────────────────────────────────────────
+// ── 充值弹窗 v2 · 3-step flow + 余额实时轮询 ──────────────────────────────────
 (function () {
     'use strict';
 
-    let _currentRequestId = null;
+    function _t(k) { return (typeof window.t === 'function' ? window.t(k) : null) || k; }
+    function _tok() { return localStorage.getItem('mrpilot_token') || ''; }
+    function _g(id) { return document.getElementById(id); }
 
-    function _t(k, fb) {
-        return (window._i18nGet && window._i18nGet(k)) || fb || k;
+    // ── 余额实时轮询 ──
+    var _lastBal = null;
+    var _pollTimer = null;
+
+    function _startPoll() {
+        if (_pollTimer) return;
+        _pollTimer = setInterval(function () {
+            if (document.hidden) return;
+            var tok = _tok();
+            if (!tok) return;
+            if (window._userInfo && window._userInfo.is_billing_exempt) return;
+            fetch('/api/me/credits', { headers: { 'Authorization': 'Bearer ' + tok } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d) return;
+                    var bal = d.balance_thb != null ? Number(d.balance_thb) : 0;
+                    if (_lastBal !== null && bal > _lastBal) {
+                        if (window.showToast) window.showToast(_t('credits-updated'), 'success');
+                        if (typeof window.loadDashboard === 'function') window.loadDashboard();
+                        if (typeof window._refreshBalanceAlerts === 'function') window._refreshBalanceAlerts();
+                    }
+                    _lastBal = bal;
+                })
+                .catch(function () {});
+        }, 30000);
+    }
+
+    function _stopPoll() {
+        if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+        _lastBal = null;
+    }
+
+    window._startCreditsPoll = _startPoll;
+    window._stopCreditsPoll = _stopPoll;
+    _startPoll(); // 登录后页面已有 token，直接启动
+
+    // ── modal state ──
+    var _reqId = null;
+    var _amount = 0;
+
+    // ── 构建 DOM（懒创建，只建一次）──
+    function _render() {
+        if (_g('topup-v2-ov')) return;
+        var ov = document.createElement('div');
+        ov.id = 'topup-v2-ov';
+        ov.className = 'topup-v2-ov';
+        ov.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9500;align-items:center;justify-content:center;padding:16px';
+        ov.innerHTML = [
+            '<div class="topup-v2-box">',
+            '  <div class="topup-v2-head">',
+            '    <div class="topup-v2-title" id="tv2-title"></div>',
+            '    <button class="topup-v2-close" id="tv2-close" aria-label="close">',
+            '      <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="16" y2="16"/><line x1="16" y1="4" x2="4" y2="16"/></svg>',
+            '    </button>',
+            '  </div>',
+            '  <div class="topup-v2-steps">',
+            '    <div class="topup-v2-step" id="tv2-d1"><span class="topup-v2-dot">1</span><span class="topup-v2-slabel" id="tv2-sl1"></span></div>',
+            '    <div class="topup-v2-line"></div>',
+            '    <div class="topup-v2-step" id="tv2-d2"><span class="topup-v2-dot">2</span><span class="topup-v2-slabel" id="tv2-sl2"></span></div>',
+            '    <div class="topup-v2-line"></div>',
+            '    <div class="topup-v2-step" id="tv2-d3"><span class="topup-v2-dot">3</span><span class="topup-v2-slabel" id="tv2-sl3"></span></div>',
+            '  </div>',
+            '  <div class="topup-v2-body">',
+            // Step 1
+            '    <div id="tv2-s1">',
+            '      <label class="topup-v2-label" id="tv2-al"></label>',
+            '      <div class="topup-v2-qamts">',
+            '        <button class="topup-v2-qamt" data-val="100">฿100</button>',
+            '        <button class="topup-v2-qamt" data-val="500">฿500</button>',
+            '        <button class="topup-v2-qamt" data-val="1000">฿1,000</button>',
+            '        <button class="topup-v2-qamt" data-val="2000">฿2,000</button>',
+            '      </div>',
+            '      <input id="tv2-amt" type="number" min="10" step="1" class="topup-v2-input" placeholder="฿ ...">',
+            '      <div id="tv2-ae" class="topup-v2-err" style="display:none"></div>',
+            '    </div>',
+            // Step 2
+            '    <div id="tv2-s2" style="display:none">',
+            '      <p class="topup-v2-bank-label" id="tv2-bl"></p>',
+            '      <div class="topup-v2-bank-card">',
+            '        <div class="topup-v2-bank-name">ธนาคาร กรุงเทพ</div>',
+            '        <div class="topup-v2-bank-branch">สาขาโชคชัย 4 ลาดพร้าว</div>',
+            '        <div class="topup-v2-bank-acct">230-0-91368-4</div>',
+            '        <div class="topup-v2-bank-holder">บจ. มิสเตอร์ อี อาร์ พี</div>',
+            '        <button class="topup-v2-copy" id="tv2-copy"></button>',
+            '      </div>',
+            '      <div class="topup-v2-warn" id="tv2-bn"></div>',
+            '    </div>',
+            // Step 3
+            '    <div id="tv2-s3" style="display:none">',
+            '      <div class="topup-v2-drop" id="tv2-drop">',
+            '        <input type="file" id="tv2-file" accept="image/*,.pdf" style="display:none">',
+            '        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+            '        <span class="topup-v2-drop-text" id="tv2-dt"></span>',
+            '      </div>',
+            '      <div id="tv2-se" class="topup-v2-err" style="display:none"></div>',
+            '      <label class="topup-v2-label" id="tv2-pl"></label>',
+            '      <input id="tv2-payer" type="text" maxlength="200" class="topup-v2-input">',
+            '      <label class="topup-v2-label" id="tv2-nl"></label>',
+            '      <input id="tv2-note" type="text" maxlength="500" class="topup-v2-input">',
+            '      <div id="tv2-ue" class="topup-v2-err" style="display:none"></div>',
+            '    </div>',
+            '  </div>',
+            '  <div class="topup-v2-foot">',
+            '    <button class="btn btn-ghost" id="tv2-back" style="display:none"></button>',
+            '    <button class="btn btn-primary" id="tv2-next"></button>',
+            '  </div>',
+            '</div>'
+        ].join('');
+        document.body.appendChild(ov);
+        _bindEvents();
+    }
+
+    function _applyText() {
+        var setText = function(id, v) { var e = _g(id); if (e) e.textContent = v; };
+        setText('tv2-title', _t('topup-title'));
+        setText('tv2-sl1', _t('topup-step1'));
+        setText('tv2-sl2', _t('topup-step2'));
+        setText('tv2-sl3', _t('topup-step3'));
+        setText('tv2-al', _t('topup-amount-label'));
+        setText('tv2-bl', _t('topup-bank-label'));
+        setText('tv2-copy', _t('topup-copy-account'));
+        setText('tv2-dt', _t('topup-slip-drop'));
+        setText('tv2-pl', _t('topup-payer-label'));
+        setText('tv2-nl', _t('topup-note-label'));
+    }
+
+    function _setStep(n) {
+        [1,2,3].forEach(function(i) {
+            var s = _g('tv2-s' + i); if (s) s.style.display = i === n ? '' : 'none';
+            var d = _g('tv2-d' + i); if (d) d.classList.toggle('active', i <= n);
+        });
+        var back = _g('tv2-back'), next = _g('tv2-next');
+        if (n === 1) {
+            if (back) { back.style.display = ''; back.textContent = _t('topup-btn-cancel'); }
+        } else {
+            if (back) { back.style.display = ''; back.textContent = _t('topup-btn-back'); }
+        }
+        if (next) next.textContent = n === 3 ? _t('topup-btn-submit') : _t('topup-btn-next');
+        if (n === 2) {
+            var bn = _g('tv2-bn');
+            if (bn) bn.innerHTML = _t('topup-bank-note').replace('{amount}', '<strong>฿' + Number(_amount).toLocaleString() + '</strong>');
+        }
+    }
+
+    function _curStep() {
+        for (var i = 1; i <= 3; i++) { var e = _g('tv2-s' + i); if (e && e.style.display !== 'none') return i; }
+        return 1;
+    }
+
+    function _clrErr(id) { var e = _g(id); if (e) { e.textContent = ''; e.style.display = 'none'; } }
+    function _showErr(id, msg) { var e = _g(id); if (e) { e.textContent = msg; e.style.display = ''; } }
+
+    function _setFile(f) {
+        var dt = _g('tv2-dt'); if (dt) dt.textContent = f.name;
+        var drop = _g('tv2-drop'); if (drop) drop.classList.add('has-file');
+        _clrErr('tv2-se');
+    }
+
+    function _bindEvents() {
+        var ov = _g('topup-v2-ov');
+        _g('tv2-close').addEventListener('click', _close);
+        ov.addEventListener('click', function(e) { if (e.target === ov) _close(); });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && ov && ov.style.display !== 'none') _close();
+        });
+        // quick amount buttons
+        ov.addEventListener('click', function(e) {
+            var btn = e.target.closest('.topup-v2-qamt');
+            if (!btn) return;
+            ov.querySelectorAll('.topup-v2-qamt').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var inp = _g('tv2-amt'); if (inp) { inp.value = btn.dataset.val; _clrErr('tv2-ae'); }
+        });
+        var amtInp = _g('tv2-amt');
+        if (amtInp) amtInp.addEventListener('input', function() {
+            ov.querySelectorAll('.topup-v2-qamt').forEach(function(b) { b.classList.remove('active'); });
+            _clrErr('tv2-ae');
+        });
+        // copy
+        var copyBtn = _g('tv2-copy');
+        if (copyBtn) copyBtn.addEventListener('click', function() {
+            if (!navigator.clipboard) return;
+            navigator.clipboard.writeText('2300913684').then(function() {
+                var orig = copyBtn.textContent;
+                copyBtn.textContent = _t('topup-copied');
+                setTimeout(function() { copyBtn.textContent = orig; }, 1500);
+            });
+        });
+        // drop zone
+        var drop = _g('tv2-drop'), fi = _g('tv2-file');
+        if (drop) {
+            drop.addEventListener('click', function() { if (fi) fi.click(); });
+            drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('drag-over'); });
+            drop.addEventListener('dragleave', function() { drop.classList.remove('drag-over'); });
+            drop.addEventListener('drop', function(e) {
+                e.preventDefault(); drop.classList.remove('drag-over');
+                var f = e.dataTransfer && e.dataTransfer.files[0]; if (f) _setFile(f);
+            });
+        }
+        if (fi) fi.addEventListener('change', function() { if (fi.files[0]) _setFile(fi.files[0]); });
+        // back / next
+        _g('tv2-back').addEventListener('click', function() {
+            var n = _curStep(); if (n <= 1) { _close(); return; } _setStep(n - 1);
+        });
+        _g('tv2-next').addEventListener('click', function() {
+            var n = _curStep();
+            if (n === 1) _step1Next();
+            else if (n === 2) _setStep(3);
+            else _step3Submit();
+        });
+    }
+
+    async function _step1Next() {
+        var inp = _g('tv2-amt'), amt = inp ? parseFloat(inp.value) : 0;
+        if (!amt || amt < 10) { _showErr('tv2-ae', _t('topup-amount-invalid')); return; }
+        _amount = amt;
+        var next = _g('tv2-next'); if (next) { next.disabled = true; next.textContent = '…'; }
+        try {
+            var res = await fetch('/api/credits/topup/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _tok() },
+                body: JSON.stringify({ amount_thb: amt })
+            });
+            if (!res.ok) throw new Error(await res.text());
+            var data = await res.json();
+            _reqId = data.request_id;
+            _setStep(2);
+        } catch(e) {
+            _showErr('tv2-ae', _t('topup-submit-fail') + ' · ' + e.message);
+        } finally {
+            if (next) { next.disabled = false; next.textContent = _t('topup-btn-next'); }
+        }
+    }
+
+    async function _step3Submit() {
+        var fi = _g('tv2-file');
+        if (!fi || !fi.files || !fi.files[0]) { _showErr('tv2-se', _t('topup-slip-required')); return; }
+        var btn = _g('tv2-next'); if (btn) { btn.disabled = true; btn.textContent = '…'; }
+        try {
+            var fd = new FormData();
+            fd.append('file', fi.files[0]);
+            var payer = _g('tv2-payer'), note = _g('tv2-note');
+            if (payer && payer.value.trim()) fd.append('payer_name', payer.value.trim());
+            if (note && note.value.trim()) fd.append('note', note.value.trim());
+            var res = await fetch('/api/credits/topup/upload-slip/' + _reqId, {
+                method: 'POST', headers: { 'Authorization': 'Bearer ' + _tok() }, body: fd
+            });
+            if (!res.ok) throw new Error(await res.text());
+            var data = await res.json();
+            if (data.auto_approved) {
+                if (window.showToast) window.showToast(_t('topup-auto-approved'), 'success');
+                if (typeof window.loadDashboard === 'function') window.loadDashboard();
+            } else {
+                if (window.showToast) window.showToast(_t('topup-pending'), 'info');
+            }
+            _close();
+        } catch(e) {
+            _showErr('tv2-ue', _t('topup-upload-fail') + ' · ' + e.message);
+            if (btn) { btn.disabled = false; btn.textContent = _t('topup-btn-submit'); }
+        }
+    }
+
+    function _close() {
+        var ov = _g('topup-v2-ov'); if (ov) ov.style.display = 'none';
+        if (typeof window.loadDashboard === 'function') window.loadDashboard();
     }
 
     window._openTopupModal = function () {
-        const overlay = document.getElementById('topup-modal-overlay');
-        if (!overlay) return;
-        _currentRequestId = null;
-        const s1 = document.getElementById('topup-step-1');
-        const s2 = document.getElementById('topup-step-2');
-        if (s1) s1.style.display = '';
-        if (s2) s2.style.display = 'none';
-        ['topup-amount-input', 'topup-payer-input', 'topup-note-input', 'topup-slip-input'].forEach(function (id) {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-        const errEl = document.getElementById('topup-amount-error');
-        if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
-        overlay.style.display = 'flex';
+        _render();
+        _reqId = null; _amount = 0;
+        ['tv2-amt','tv2-payer','tv2-note'].forEach(function(id) { var e=_g(id); if(e) e.value=''; });
+        var fi = _g('tv2-file'); if (fi) fi.value = '';
+        var drop = _g('tv2-drop'); if (drop) drop.classList.remove('has-file','drag-over');
+        _g('topup-v2-ov').querySelectorAll('.topup-v2-qamt').forEach(function(b) { b.classList.remove('active'); });
+        ['tv2-ae','tv2-se','tv2-ue'].forEach(function(id) { _clrErr(id); });
+        _applyText();
+        _setStep(1);
+        _g('topup-v2-ov').style.display = 'flex';
     };
 
-    window._closeTopupModal = function () {
-        const overlay = document.getElementById('topup-modal-overlay');
-        if (overlay) overlay.style.display = 'none';
-        if (typeof window.loadDashboard === 'function') window.loadDashboard();
-    };
-
-    window._topupSubmitRequest = async function () {
-        const amtEl = document.getElementById('topup-amount-input');
-        const payerEl = document.getElementById('topup-payer-input');
-        const noteEl = document.getElementById('topup-note-input');
-        const submitBtn = document.getElementById('topup-submit-btn');
-        const amt = parseFloat(amtEl ? amtEl.value : '');
-        const errEl = document.getElementById('topup-amount-error');
-        if (!amt || amt <= 0) {
-            if (errEl) { errEl.textContent = _t('topup-amount-err', '请输入有效金额'); errEl.style.display = ''; }
-            return;
-        }
-        if (errEl) errEl.style.display = 'none';
-        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = _t('topup-submitting', '提交中…'); }
-        try {
-            const token = localStorage.getItem('mrpilot_token') || '';
-            const res = await fetch('/api/credits/topup/request', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-                body: JSON.stringify({
-                    amount_thb: amt,
-                    payer_name: payerEl ? payerEl.value.trim() : '',
-                    note: noteEl ? noteEl.value.trim() : '',
-                })
-            });
-            if (!res.ok) throw new Error(await res.text());
-            const data = await res.json();
-            _currentRequestId = data.request_id;
-            const s1 = document.getElementById('topup-step-1');
-            const s2 = document.getElementById('topup-step-2');
-            if (s1) s1.style.display = 'none';
-            if (s2) s2.style.display = '';
-        } catch (e) {
-            if (errEl) { errEl.textContent = _t('topup-submit-fail', '提交失败') + ': ' + e.message; errEl.style.display = ''; }
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = _t('topup-submit-btn', '提交充值申请'); }
-        }
-    };
-
-    window._topupUploadSlip = async function () {
-        if (!_currentRequestId) return;
-        const fileEl = document.getElementById('topup-slip-input');
-        const upErrEl = document.getElementById('topup-upload-error');
-        if (!fileEl || !fileEl.files || !fileEl.files[0]) {
-            window._closeTopupModal();
-            return;
-        }
-        const uploadBtn = document.getElementById('topup-upload-btn');
-        if (upErrEl) upErrEl.style.display = 'none';
-        if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = _t('topup-uploading', '上传中…'); }
-        try {
-            const token = localStorage.getItem('mrpilot_token') || '';
-            const fd = new FormData();
-            fd.append('file', fileEl.files[0]);
-            const res = await fetch('/api/credits/topup/upload-slip/' + _currentRequestId, {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + token },
-                body: fd
-            });
-            if (!res.ok) throw new Error(await res.text());
-            const data = await res.json();
-            if (data.auto_approved) {
-                if (window.showToast) window.showToast(_t('topup-auto-approved', '充值成功，余额已更新'), 'success');
-            } else {
-                if (window.showToast) window.showToast(_t('topup-pending-review', '截图已收到，等待审核'), 'info');
+    // 切语言时若 modal 开着，重新应用文字
+    if (typeof window.subscribeI18n === 'function') {
+        window.subscribeI18n('topup-v2', function () {
+            var ov = _g('topup-v2-ov');
+            if (ov && ov.style.display !== 'none' && ov.style.display !== '') {
+                _applyText();
+                _setStep(_curStep());
             }
-            window._closeTopupModal();
-        } catch (e) {
-            if (upErrEl) { upErrEl.textContent = _t('topup-upload-fail', '上传失败') + ': ' + e.message; upErrEl.style.display = ''; }
-            if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = _t('topup-upload-btn', '上传截图'); }
+        });
+    }
+})();
+
+// ── 多公司选择器 + 顶栏切换 (Task 3) ─────────────────────────────────────────
+(function () {
+    'use strict';
+    function _t(k, params) {
+        try {
+            var s = (typeof window.t === 'function') ? window.t(k, params) : k;
+            return s;
+        } catch (_) { return k; }
+    }
+    function _tok() { return localStorage.getItem('mrpilot_token') || ''; }
+    function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+
+    var _companies = [];
+    var _activeTid = null;
+
+    function _fetchCompanies() {
+        return fetch('/api/my-companies', { headers: { 'Authorization': 'Bearer ' + _tok() } })
+            .then(function (r) { return r.ok ? r.json() : { companies: [], active_tenant_id: null }; })
+            .catch(function () { return { companies: [], active_tenant_id: null }; });
+    }
+
+    function _switchTo(tid) {
+        return fetch('/api/switch-company', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + _tok(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenant_id: tid }),
+        }).then(function (r) {
+            if (!r.ok) throw new Error('switch failed');
+            return r.json();
+        });
+    }
+
+    function _renderSelector() {
+        var ov = document.getElementById('company-selector-ov');
+        if (!ov) {
+            ov = document.createElement('div');
+            ov.id = 'company-selector-ov';
+            ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:9800;display:flex;align-items:center;justify-content:center;padding:16px';
+            document.body.appendChild(ov);
         }
+        var cards = _companies.map(function (c) {
+            var roleLabel = c.role === 'admin' ? _t('company-role-admin') : _t('company-role-member');
+            var balanceLine = (c.balance_thb != null)
+                ? '<div style="color:#64748b;font-size:13px;margin-top:8px">' + _esc(_t('company-balance')) + ': <strong style="color:#0f172a">฿' + Number(c.balance_thb).toLocaleString() + '</strong></div>'
+                : '';
+            var pagesLine = '<div style="color:#94a3b8;font-size:12px;margin-top:4px">' + _esc(_t('company-pages-month')) + ': ' + (c.pages_this_month || 0) + '</div>';
+            return ''
+                + '<div class="company-card" data-tid="' + _esc(c.tenant_id) + '"'
+                + '     style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column">'
+                + '  <div style="display:flex;align-items:center;justify-content:space-between">'
+                + '    <div style="font-size:16px;font-weight:600;color:#0f172a">' + _esc(c.name || '—') + '</div>'
+                + '    <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + (c.role === 'admin' ? '#fef3c7' : '#dbeafe') + ';color:' + (c.role === 'admin' ? '#92400e' : '#1e40af') + '">' + _esc(roleLabel) + '</span>'
+                + '  </div>'
+                + balanceLine + pagesLine
+                + '</div>';
+        }).join('');
+        ov.innerHTML = ''
+            + '<div style="background:#f8fafc;border-radius:16px;padding:28px 28px 24px;max-width:560px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
+            + '  <div style="font-size:20px;font-weight:700;color:#0f172a;margin-bottom:6px">' + _esc(_t('select-company')) + '</div>'
+            + '  <div style="color:#64748b;font-size:13px;margin-bottom:20px">' + _esc(_t('select-company-sub')) + '</div>'
+            + '  <div style="display:flex;flex-direction:column;gap:10px">' + cards + '</div>'
+            + '</div>';
+        ov.querySelectorAll('.company-card').forEach(function (el) {
+            el.addEventListener('mouseenter', function () { el.style.borderColor = '#0f172a'; el.style.transform = 'translateY(-1px)'; el.style.boxShadow = '0 6px 16px rgba(0,0,0,.08)'; });
+            el.addEventListener('mouseleave', function () { el.style.borderColor = '#e5e7eb'; el.style.transform = 'translateY(0)'; el.style.boxShadow = 'none'; });
+            el.addEventListener('click', function () {
+                var tid = el.dataset.tid;
+                _switchTo(tid).then(function () {
+                    ov.remove();
+                    location.reload();
+                }).catch(function () {
+                    if (window.showToast) window.showToast(_t('switch-company-fail'), 'error');
+                });
+            });
+        });
+    }
+
+    function _bindBrandSwitch() {
+        var el = document.getElementById('brand-workspace');
+        if (!el || _companies.length <= 1) return;
+        el.style.cursor = 'pointer';
+        el.title = _t('switch-company-title');
+        if (el.dataset.cswBound === '1') return;
+        el.dataset.cswBound = '1';
+        // 添加下拉箭头(若没有)
+        if (!el.querySelector('.csw-arrow')) {
+            var arrow = document.createElement('span');
+            arrow.className = 'csw-arrow';
+            arrow.style.cssText = 'display:inline-block;margin-left:4px;font-size:10px;color:#64748b;vertical-align:middle';
+            arrow.textContent = '▾';
+            el.appendChild(arrow);
+        }
+        el.addEventListener('click', function (e) {
+            e.stopPropagation();
+            _toggleSwitcher(el);
+        });
+    }
+
+    function _toggleSwitcher(anchor) {
+        var existing = document.getElementById('company-switcher-pop');
+        if (existing) { existing.remove(); return; }
+        var pop = document.createElement('div');
+        pop.id = 'company-switcher-pop';
+        var rect = anchor.getBoundingClientRect();
+        pop.style.cssText = 'position:fixed;top:' + (rect.bottom + 6) + 'px;left:' + rect.left + 'px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.12);min-width:240px;z-index:9700;padding:6px';
+        var items = _companies.map(function (c) {
+            var active = (c.tenant_id === _activeTid);
+            var roleLabel = c.role === 'admin' ? _t('company-role-admin') : _t('company-role-member');
+            return ''
+                + '<div class="csw-item" data-tid="' + _esc(c.tenant_id) + '"'
+                + '     style="padding:9px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;' + (active ? 'background:#f1f5f9' : '') + '">'
+                + '  <div>'
+                + '    <div style="font-size:13px;color:#0f172a;font-weight:' + (active ? '600' : '500') + '">' + _esc(c.name || '—') + '</div>'
+                + '    <div style="font-size:11px;color:#94a3b8;margin-top:2px">' + _esc(roleLabel) + '</div>'
+                + '  </div>'
+                + (active ? '<span style="color:#16a34a;font-size:14px">✓</span>' : '')
+                + '</div>';
+        }).join('');
+        pop.innerHTML = items;
+        document.body.appendChild(pop);
+        pop.querySelectorAll('.csw-item').forEach(function (el) {
+            el.addEventListener('mouseenter', function () { if (el.dataset.tid !== _activeTid) el.style.background = '#f8fafc'; });
+            el.addEventListener('mouseleave', function () { if (el.dataset.tid !== _activeTid) el.style.background = ''; });
+            el.addEventListener('click', function () {
+                var tid = el.dataset.tid;
+                if (tid === _activeTid) { pop.remove(); return; }
+                _switchTo(tid).then(function () {
+                    pop.remove();
+                    location.reload();
+                }).catch(function () {
+                    if (window.showToast) window.showToast(_t('switch-company-fail'), 'error');
+                });
+            });
+        });
+        // 点击外部关闭
+        setTimeout(function () {
+            var close = function (e) {
+                if (!pop.contains(e.target)) {
+                    pop.remove();
+                    document.removeEventListener('click', close);
+                }
+            };
+            document.addEventListener('click', close);
+        }, 0);
+    }
+
+    window._initCompanySwitcher = function () {
+        // admin 模式不走多公司(超管账号有自己的视图)
+        if (window.PEARNLY_ADMIN_LAYOUT || window.PEARNLY_ADMIN_MODE) return;
+        if (!_tok()) return;
+        _fetchCompanies().then(function (data) {
+            _companies = (data && data.companies) || [];
+            _activeTid = (data && data.active_tenant_id) || null;
+            if (_companies.length === 0) return;
+            // 单公司:静默确保 active 已设置
+            if (_companies.length === 1) {
+                var only = _companies[0];
+                if (!_activeTid || _activeTid !== only.tenant_id) {
+                    _switchTo(only.tenant_id).catch(function () {});
+                }
+                return;
+            }
+            // 多公司:若未设 active 或 active 不在列表中 → 弹选择器
+            var validActive = _activeTid && _companies.some(function (c) { return c.tenant_id === _activeTid; });
+            if (!validActive) {
+                _renderSelector();
+            } else {
+                _bindBrandSwitch();
+            }
+        });
     };
 
-    document.addEventListener('click', function (ev) {
-        const overlay = document.getElementById('topup-modal-overlay');
-        if (overlay && ev.target === overlay) window._closeTopupModal();
-    });
+    // 暴露给手动调用(切换后刷新数据)
+    window._reopenCompanySelector = function () {
+        _fetchCompanies().then(function (data) {
+            _companies = (data && data.companies) || [];
+            _activeTid = (data && data.active_tenant_id) || null;
+            if (_companies.length > 1) _renderSelector();
+        });
+    };
 
-    document.addEventListener('input', function (ev) {
-        if (ev.target && ev.target.id === 'topup-amount-input') {
-            const errEl = document.getElementById('topup-amount-error');
-            if (errEl) errEl.style.display = 'none';
+    // 切语言时若选择器开着,重渲染
+    if (typeof window.subscribeI18n === 'function') {
+        window.subscribeI18n('company-selector', function () {
+            if (document.getElementById('company-selector-ov')) _renderSelector();
+            // brand title 也跟着更新
+            var el = document.getElementById('brand-workspace');
+            if (el && _companies.length > 1) el.title = _t('switch-company-title');
+        });
+    }
+})();
+
+// ── 余额预警条 + 新用户引导 (Task 4) ─────────────────────────────────────────
+(function () {
+    'use strict';
+    function _t(k, params) {
+        try { return (typeof window.t === 'function') ? window.t(k, params) : k; }
+        catch (_) { return k; }
+    }
+    function _tok() { return localStorage.getItem('mrpilot_token') || ''; }
+    function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+
+    var _state = { balance: null, pages: 0, hasHistory: false, lastUserId: null };
+
+    function _isOwner(u) { return !!(u && (u.invited_by == null) && u.role !== 'member'); }
+    function _shouldGate(u) {
+        if (!u) return false;
+        if (u.is_billing_exempt) return false;       // 豁免账号不预警
+        if (!_isOwner(u)) return false;              // 员工不预警
+        return true;
+    }
+
+    function _removeBar() {
+        var b = document.getElementById('balance-alert-bar');
+        if (b) b.remove();
+    }
+
+    function _renderBar(kind, msg, ctaText) {
+        _removeBar();
+        var palette = {
+            red:   { bg: '#fef2f2', border: '#fecaca', text: '#991b1b', btn: '#dc2626' },
+            yellow:{ bg: '#fffbeb', border: '#fde68a', text: '#92400e', btn: '#d97706' },
+            blue:  { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af', btn: '#2563eb' },
+        };
+        var c = palette[kind] || palette.yellow;
+        var bar = document.createElement('div');
+        bar.id = 'balance-alert-bar';
+        bar.style.cssText = 'background:' + c.bg + ';border-bottom:1px solid ' + c.border + ';color:' + c.text + ';padding:10px 18px;display:flex;align-items:center;justify-content:space-between;font-size:13px;gap:12px;flex-wrap:wrap';
+        var btnHtml = ctaText
+            ? '<button id="balance-alert-cta" style="background:' + c.btn + ';color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:500">' + _esc(ctaText) + '</button>'
+            : '';
+        bar.innerHTML = ''
+            + '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">'
+            + '  <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">'
+            + '    <path d="m10 1.8 8.5 14.7H1.5z"/><path d="M10 8v3.5"/><circle cx="10" cy="14.5" r=".5" fill="currentColor"/>'
+            + '  </svg>'
+            + '  <span>' + _esc(msg) + '</span>'
+            + '</div>'
+            + btnHtml;
+        // 插入到 topbar 之后(顶栏正下方)
+        var topbar = document.querySelector('.topbar');
+        if (topbar && topbar.parentNode) {
+            topbar.parentNode.insertBefore(bar, topbar.nextSibling);
+        } else {
+            document.body.insertBefore(bar, document.body.firstChild);
         }
-    });
+        var cta = document.getElementById('balance-alert-cta');
+        if (cta) {
+            cta.addEventListener('click', function () {
+                if (typeof window._openTopupModal === 'function') window._openTopupModal();
+            });
+        }
+    }
+
+    function _evaluate() {
+        var u = window._userInfo;
+        if (!_shouldGate(u)) { _removeBar(); return; }
+        var bal = _state.balance;
+        var pgs = _state.pages;
+        if (bal == null) return;
+        if (bal <= 0.001) {
+            _renderBar('red', _t('zero-balance-msg'), _t('topup-cta'));
+        } else if (bal < 50) {
+            _renderBar('yellow', _t('low-balance-msg'), _t('topup-cta'));
+        } else if (pgs >= 190 && pgs < 200) {
+            _renderBar('blue', _t('near-tier-msg', { n: pgs }), _t('topup-cta'));
+        } else {
+            _removeBar();
+        }
+    }
+
+    function _refresh() {
+        var u = window._userInfo;
+        if (!_shouldGate(u)) { _removeBar(); return; }
+        fetch('/api/me/credits', { headers: { 'Authorization': 'Bearer ' + _tok() } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+                if (!d) return;
+                _state.balance = d.balance_thb != null ? Number(d.balance_thb) : null;
+                _state.pages = d.pages_this_month != null ? Number(d.pages_this_month) : 0;
+                _evaluate();
+            }).catch(function () {});
+    }
+
+    function _onboardingKey(userId) { return 'pearnly_onboarding_seen_' + (userId || 'anon'); }
+
+    function _maybeShowOnboarding(u) {
+        if (!_shouldGate(u)) return;
+        // 仅 0 余额时引导
+        if (_state.balance == null || _state.balance > 0.001) return;
+        var key = _onboardingKey(u.id);
+        try { if (localStorage.getItem(key) === '1') return; } catch (_) { return; }
+        // 已有 OCR 历史则跳过
+        fetch('/api/history?page=1&per_page=1', { headers: { 'Authorization': 'Bearer ' + _tok() } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+                var hasHist = !!(d && d.items && d.items.length > 0);
+                if (hasHist) {
+                    try { localStorage.setItem(key, '1'); } catch (_) {}
+                    return;
+                }
+                _showOnboarding(key);
+            }).catch(function () {});
+    }
+
+    function _showOnboarding(key) {
+        if (document.getElementById('pearnly-onboard-ov')) return;
+        var ov = document.createElement('div');
+        ov.id = 'pearnly-onboard-ov';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9600;display:flex;align-items:center;justify-content:center;padding:16px';
+        ov.innerHTML = ''
+            + '<div style="background:#fff;border-radius:16px;padding:32px 32px 24px;max-width:460px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
+            + '  <div style="width:56px;height:56px;border-radius:14px;background:#fef3c7;display:flex;align-items:center;justify-content:center;margin-bottom:16px">'
+            + '    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6Z"/><path d="m9 12 2 2 4-4"/></svg>'
+            + '  </div>'
+            + '  <div style="font-size:20px;font-weight:700;color:#0f172a;margin-bottom:8px">' + _esc(_t('welcome-title')) + '</div>'
+            + '  <div style="color:#475569;font-size:14px;line-height:1.6;margin-bottom:24px">' + _esc(_t('welcome-msg')) + '</div>'
+            + '  <div style="display:flex;gap:8px;justify-content:flex-end">'
+            + '    <button id="onboard-skip" style="padding:9px 18px;border:1px solid #e5e7eb;background:#fff;border-radius:8px;font-size:13px;cursor:pointer;color:#64748b">' + _esc(_t('welcome-skip')) + '</button>'
+            + '    <button id="onboard-go" style="padding:9px 18px;border:none;background:#0f172a;color:#fff;border-radius:8px;font-size:13px;cursor:pointer;font-weight:500">' + _esc(_t('topup-cta')) + '</button>'
+            + '  </div>'
+            + '</div>';
+        document.body.appendChild(ov);
+        function close() {
+            try { localStorage.setItem(key, '1'); } catch (_) {}
+            ov.remove();
+        }
+        document.getElementById('onboard-skip').addEventListener('click', close);
+        document.getElementById('onboard-go').addEventListener('click', function () {
+            close();
+            if (typeof window._openTopupModal === 'function') window._openTopupModal();
+        });
+        ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    }
+
+    window._initBalanceAlerts = function (u) {
+        if (!u) return;
+        if (window.PEARNLY_ADMIN_LAYOUT || window.PEARNLY_ADMIN_MODE) return;
+        _state.lastUserId = u.id || null;
+        if (!_shouldGate(u)) { _removeBar(); return; }
+        // 首次拉余额 → 评估 → 决定是否弹引导
+        fetch('/api/me/credits', { headers: { 'Authorization': 'Bearer ' + _tok() } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+                if (!d) return;
+                _state.balance = d.balance_thb != null ? Number(d.balance_thb) : null;
+                _state.pages = d.pages_this_month != null ? Number(d.pages_this_month) : 0;
+                _evaluate();
+                _maybeShowOnboarding(u);
+            }).catch(function () {});
+    };
+
+    // 充值轮询 hook · 余额变化后刷新预警
+    window._refreshBalanceAlerts = _refresh;
+
+    // 切语言重渲提示条
+    if (typeof window.subscribeI18n === 'function') {
+        window.subscribeI18n('balance-alerts', function () {
+            if (document.getElementById('balance-alert-bar')) _evaluate();
+            if (document.getElementById('pearnly-onboard-ov')) {
+                document.getElementById('pearnly-onboard-ov').remove();
+                if (_state.lastUserId) _showOnboarding(_onboardingKey(_state.lastUserId));
+            }
+        });
+    }
 })();
 
 // ── 使用明细 · loadUsageHistory ───────────────────────────────────────────────
@@ -30742,7 +31400,7 @@ async function loadUsageHistory(page) {
     const userFilterEl = document.getElementById('usage-history-user-filter');
     if (!wrap) return;
 
-    const _t = function(k, fb) { return (window._i18nGet && window._i18nGet(k)) || fb || k; };
+    const _t = function(k, fb) { var r = typeof window.t === 'function' ? window.t(k) : null; return (r && r !== k ? r : null) || fb || k; };
     const token = localStorage.getItem('mrpilot_token') || '';
     const perPage = 20;
 
@@ -30822,6 +31480,16 @@ async function loadUsageHistory(page) {
 }
 
 window.loadUsageHistory = loadUsageHistory;
+
+// 切语言重渲使用明细表格(若正在显示)
+if (typeof window.subscribeI18n === 'function') {
+    window.subscribeI18n('usage-history', function () {
+        var wrap = document.getElementById('usage-history-table');
+        if (wrap && wrap.children.length > 0) {
+            try { loadUsageHistory(1); } catch (e) {}
+        }
+    });
+}
 
 document.addEventListener('change', function(ev) {
     if (ev.target && ev.target.id === 'usage-history-user-filter') {

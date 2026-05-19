@@ -535,7 +535,14 @@ def get_user_monthly_usage(user_id: str) -> int:
 # ============================================================
 
 import json as _json
-from datetime import datetime as _datetime, timedelta as _timedelta
+from datetime import datetime as _datetime, timedelta as _timedelta, timezone as _tzinfo
+
+# Task 6A · Asia/Bangkok 时区 · 月度计费 / 重置统一锚点(UTC+7)
+_BKK_TZ = _tzinfo(_timedelta(hours=7))
+
+def _bkk_year_month() -> str:
+    """Return current YYYY-MM in Asia/Bangkok timezone."""
+    return _datetime.now(_BKK_TZ).strftime("%Y-%m")
 
 
 def _extract_summary_fields(pages: list) -> dict:
@@ -3875,15 +3882,30 @@ def list_operation_logs_paged(
 # 员工管理(老板自助)
 # ============================================================
 def list_employees(tenant_id: str) -> List[Dict[str, Any]]:
-    """列某 tenant 下的员工(role=member)"""
+    """列某 tenant 下的员工(role=member)
+    v118.34 · 增加 email / is_billing_exempt / must_change_password / pages_this_month
+    """
+    import datetime as _dt
+    ym = _dt.date.today().strftime("%Y-%m")
     try:
         with get_cursor() as cur:
             cur.execute("""
-                SELECT id, username, role, is_active, last_login_at, created_at, invited_by
-                FROM users
-                WHERE tenant_id = %s AND role = 'member'
-                ORDER BY created_at ASC
-            """, (str(tenant_id),))
+                SELECT u.id, u.username, u.email, u.role,
+                       u.is_active, u.last_login_at, u.created_at,
+                       u.invited_by, u.is_billing_exempt,
+                       COALESCE(u.must_change_password, FALSE) AS must_change_password,
+                       COALESCE((
+                           SELECT SUM(ct.pages)::int
+                           FROM credit_transactions ct
+                           WHERE ct.user_id = u.id
+                             AND ct.type = 'usage'
+                             AND to_char(ct.created_at, 'YYYY-MM') = %s
+                       ), 0) AS pages_this_month
+                FROM users u
+                WHERE u.tenant_id = %s
+                  AND u.role = 'member'
+                ORDER BY u.created_at ASC
+            """, (ym, str(tenant_id)))
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_employees failed: {e}")
@@ -3892,19 +3914,27 @@ def list_employees(tenant_id: str) -> List[Dict[str, Any]]:
 
 def add_employee(
     tenant_id: str,
-    username: str,
+    email: str,
     password: str,
     invited_by: Optional[str] = None,
+    is_billing_exempt: bool = False,
+    username: Optional[str] = None,
 ) -> Optional[str]:
     """
-    老板给自家公司加员工
-    - 用户名全局唯一
+    v118.34 · 老板加员工 · email 主标识 · 继承 is_billing_exempt · 必改密码
+    - email 必填(也作 username)
     - tenant_id 必填
     - role 固定 = 'member'
+    - must_change_password = TRUE(员工首次登录强制改密)
     返回新员工 user_id · 失败返回 None
     """
     try:
-        existing = find_user_by_username(username)
+        email_norm = (email or "").strip().lower()
+        if not email_norm or "@" not in email_norm:
+            return None
+        uname = (username or "").strip() or email_norm
+        # 唯一性(以 username 列)
+        existing = find_user_by_username(uname)
         if existing:
             return None
 
@@ -3918,13 +3948,41 @@ def add_employee(
 
             cur.execute("""
                 INSERT INTO users (
-                    username, password_hash, plan, is_active, is_super_admin,
-                    tenant_id, role, invited_by, company_name
-                ) VALUES (%s, %s, 'plus', TRUE, FALSE, %s, 'member', %s, %s)
+                    username, email, email_normalized, password_hash,
+                    plan, is_active, is_super_admin,
+                    tenant_id, role, invited_by, company_name,
+                    is_billing_exempt, must_change_password
+                ) VALUES (%s, %s, %s, %s, 'free', TRUE, FALSE,
+                          %s, 'member', %s, %s, %s, TRUE)
                 RETURNING id
-            """, (username, pw_hash, str(tenant_id),
-                  str(invited_by) if invited_by else None, company_name))
-            return str(cur.fetchone()["id"])
+            """, (uname, email_norm, email_norm, pw_hash,
+                  str(tenant_id),
+                  str(invited_by) if invited_by else None, company_name,
+                  bool(is_billing_exempt)))
+            new_id = str(cur.fetchone()["id"])
+
+            # v118.34 · 同事务写 user_company_roles + memberships(双轨兼容)
+            try:
+                cur.execute("""
+                    INSERT INTO user_company_roles (user_id, tenant_id, role, is_active, joined_at)
+                    VALUES (%s::uuid, %s::uuid, 'member', TRUE, NOW())
+                    ON CONFLICT DO NOTHING
+                """, (new_id, str(tenant_id)))
+            except Exception as e:
+                logger.warning(f"add_employee · user_company_roles skip: {e}")
+            try:
+                cur.execute("SELECT id FROM roles WHERE name = 'staff' AND is_system = TRUE LIMIT 1")
+                staff = cur.fetchone()
+                if staff:
+                    cur.execute("""
+                        INSERT INTO memberships (user_id, tenant_id, role_id, status, joined_at)
+                        VALUES (%s::uuid, %s::uuid, %s::uuid, 'active', NOW())
+                        ON CONFLICT (user_id) DO NOTHING
+                    """, (new_id, str(tenant_id), str(staff["id"])))
+            except Exception as e:
+                logger.warning(f"add_employee · memberships skip: {e}")
+
+            return new_id
     except Exception as e:
         logger.error(f"add_employee failed: {e}")
         return None
@@ -3932,8 +3990,8 @@ def add_employee(
 
 def remove_employee(tenant_id: str, employee_user_id: str) -> bool:
     """
-    老板删员工
-    安全校验:只删 tenant_id 匹配 + role=member 的 user
+    v118.34 · 老板删员工 · 改为软删除(is_active=FALSE) + 吊销 session
+    安全校验:tenant_id 匹配 + role=member
     """
     try:
         with get_cursor(commit=True) as cur:
@@ -3946,20 +4004,26 @@ def remove_employee(tenant_id: str, employee_user_id: str) -> bool:
             if not cur.fetchone():
                 return False
 
-            # 级联删员工相关数据
-            for sql in [
-                "DELETE FROM ocr_history WHERE user_id = %s",
-                "DELETE FROM erp_push_logs WHERE user_id = %s",
-                "DELETE FROM line_bindings WHERE user_id = %s",
-                "DELETE FROM line_binding_codes WHERE user_id = %s",
-                "DELETE FROM user_settings WHERE user_id = %s",
-            ]:
-                try:
-                    cur.execute(sql, (str(employee_user_id),))
-                except Exception:
-                    pass  # 表可能不存在 · 安全跳过
+            # v118.34 软删除:停用 + 吊销 active_jti(强制下线)
+            cur.execute("""
+                UPDATE users
+                SET is_active = FALSE,
+                    active_jti = NULL
+                WHERE id = %s
+            """, (str(employee_user_id),))
 
-            cur.execute("DELETE FROM users WHERE id = %s", (str(employee_user_id),))
+            # 同步 memberships / user_company_roles status(若存在)
+            try:
+                cur.execute("UPDATE memberships SET status='inactive' WHERE user_id = %s::uuid",
+                            (str(employee_user_id),))
+            except Exception:
+                pass
+            try:
+                cur.execute("UPDATE user_company_roles SET is_active=FALSE WHERE user_id = %s::uuid",
+                            (str(employee_user_id),))
+            except Exception:
+                pass
+
             return True
     except Exception as e:
         logger.error(f"remove_employee failed: {e}")
@@ -6084,22 +6148,23 @@ def migrate_to_membership_model(dry_run: bool = True) -> Dict[str, Any]:
 
 # ============================================================
 # v118.27.7.1 · 孤立用户(tenant_id IS NULL)盘点 + 修复
+# v118.34 · 简化:不再继承 user.plan / monthly_quota / trial_expires_at /
+#          plan_expires_at 到新 tenant · credits 系统按 tenant_id 共享 ·
+#          新 tenant 直接默认值即可
 #   - 给每个孤立用户建一个独立 tenant + 写 membership
-#   - 完整继承 user.plan / monthly_quota / expires(防付费用户掉级)
 #   - 单用户独立事务 · 一个失败不影响其他
 # ============================================================
 
 def list_orphan_users() -> List[Dict[str, Any]]:
     """列出所有 tenant_id IS NULL 的用户(过滤超管)+ 每个用户的数据量统计
     给超管看清楚哪些用户需要补建 tenant
+    v118.34 · 不再读旧 plan/quota/trial_expires_at/plan_expires_at 字段
     """
     try:
         with get_cursor() as cur:
             cur.execute("""
                 SELECT
                     u.id, u.username, u.email, u.full_name, u.company_name,
-                    u.plan, u.monthly_quota, u.used_this_month,
-                    u.trial_expires_at, u.plan_expires_at,
                     u.role, u.signup_country, u.last_login_at, u.created_at,
                     (SELECT COUNT(*) FROM ocr_history WHERE user_id = u.id) AS ocr_count,
                     (SELECT COUNT(*) FROM clients WHERE user_id = u.id) AS client_count,
@@ -6118,13 +6183,8 @@ def list_orphan_users() -> List[Dict[str, Any]]:
                     "email": r.get("email"),
                     "full_name": r.get("full_name"),
                     "company_name": r.get("company_name"),
-                    "plan": r.get("plan") or "free",
-                    "monthly_quota": int(r.get("monthly_quota") or 0),
-                    "used_this_month": int(r.get("used_this_month") or 0),
                     "role": r.get("role"),
                     "country": r.get("signup_country"),
-                    "trial_expires_at": r["trial_expires_at"].isoformat() if r.get("trial_expires_at") else None,
-                    "plan_expires_at": r["plan_expires_at"].isoformat() if r.get("plan_expires_at") else None,
                     "last_login_at": r["last_login_at"].isoformat() if r.get("last_login_at") else None,
                     "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
                     "ocr_count": int(r.get("ocr_count") or 0),
@@ -6139,7 +6199,7 @@ def list_orphan_users() -> List[Dict[str, Any]]:
 
 def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
     """给孤立用户每人建独立 tenant + 同步写 memberships
-    继承 user.plan / monthly_quota / trial_expires_at / plan_expires_at 到新 tenant
+    v118.34 · 不再继承 plan/quota/expires_at · 新 tenant 默认 100 张配额(只是兼容字段 · credits 接管)
     单个用户独立事务 · 失败不影响其他
 
     返回:
@@ -6187,10 +6247,6 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
                 "username": u.get("username"),
                 "email": u.get("email"),
                 "tenant_name_to_create": tenant_name,
-                "plan_inherit": u.get("plan") or "free",
-                "quota_inherit": int(u.get("monthly_quota") or 0),
-                "trial_expires_at": u.get("trial_expires_at"),
-                "plan_expires_at": u.get("plan_expires_at"),
                 "ocr_records": u.get("ocr_count"),
                 "client_records": u.get("client_count"),
                 "erp_endpoints": u.get("erp_count"),
@@ -6206,22 +6262,17 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
         for p in out["plan"]:
             try:
                 with get_cursor(commit=True) as cur:
-                    # 1. 建 tenant · v27.7.2 修:tenants 表只有 subscription_expires_at · 没有 trial_expires_at
-                    # 用户的 trial / plan 到期都收敛到 tenant.subscription_expires_at(优先 plan_expires_at)
+                    # v118.34 · 不再写 subscription_expires_at(旧订阅字段)· monthly_quota=100 兼容
                     cur.execute("""
                         INSERT INTO tenants (
                             name, owner_user_id, tenant_type, monthly_quota,
-                            used_this_month, status, member_count,
-                            tenant_type_v2, subscription_expires_at
+                            used_this_month, status, member_count, tenant_type_v2
                         )
-                        VALUES (%s, %s, 'shared_api', %s, 0, 'active', 1,
-                                'firm', %s)
+                        VALUES (%s, %s, 'shared_api', 100, 0, 'active', 1, 'firm')
                         RETURNING id
                     """, (
                         p["tenant_name_to_create"],
                         p["user_id"],
-                        p["quota_inherit"],
-                        p.get("plan_expires_at") or p.get("trial_expires_at"),
                     ))
                     new_tenant_id = str(cur.fetchone()["id"])
 
@@ -8672,6 +8723,18 @@ def ensure_credits_tables():
                 ADD COLUMN IF NOT EXISTS is_billing_exempt BOOLEAN NOT NULL DEFAULT FALSE
             """)
 
+            # 6a. users 表新增 active_tenant_id(多公司切换 · 不动 JWT)
+            cur.execute("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS active_tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL
+            """)
+
+            # 6b. tenant_credits 表新增 low_balance_notified_at(邮件防骚扰)
+            cur.execute("""
+                ALTER TABLE tenant_credits
+                ADD COLUMN IF NOT EXISTS low_balance_notified_at TIMESTAMPTZ
+            """)
+
             # 7. 迁移现有用户归属到 user_company_roles
             cur.execute("""
                 INSERT INTO user_company_roles (user_id, tenant_id, role)
@@ -8759,7 +8822,8 @@ def check_company_credits(
                         "pages_this_month": 0, "estimated_cost": 0.0,
                     }
 
-        year_month = _datetime.now().strftime("%Y-%m")
+        # Task 6A · 月度统计锚定 Asia/Bangkok 时区(UTC+7)
+        year_month = _bkk_year_month()
 
         with get_cursor() as cur:
             cur.execute(
@@ -8825,7 +8889,8 @@ def deduct_company_credits(
                 if row and row.get("is_billing_exempt"):
                     return {"cost_thb": 0.0, "balance_after": None, "pages_used_this_month": 0}
 
-        year_month = _datetime.now().strftime("%Y-%m")
+        # Task 6A · 月度统计锚定 Asia/Bangkok 时区(UTC+7)
+        year_month = _bkk_year_month()
 
         with get_cursor(commit=True) as cur:
             # --- 1. Lock balance row ---
@@ -8895,3 +8960,128 @@ def deduct_company_credits(
         logger.error(f"deduct_company_credits failed: {e}")
         return {"cost_thb": 0.0, "balance_after": 0.0, "pages_used_this_month": 0}
 
+
+# ============================================================
+# Multi-company helpers (Task 3)
+# ============================================================
+
+def list_user_companies(user_id: str) -> list:
+    """Return all companies a user belongs to.
+
+    Each item: {tenant_id, name, role, balance_thb, pages_this_month, is_active}
+    Uses Asia/Bangkok timezone for year_month.
+    """
+    try:
+        year_month = _bkk_year_month()
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT
+                    ucr.tenant_id::text AS tenant_id,
+                    t.name AS name,
+                    ucr.role AS role,
+                    ucr.is_active AS is_active,
+                    COALESCE(tc.balance_thb, 0) AS balance_thb,
+                    COALESCE(mpu.pages_used, 0) AS pages_this_month
+                FROM user_company_roles ucr
+                JOIN tenants t ON t.id = ucr.tenant_id
+                LEFT JOIN tenant_credits tc ON tc.tenant_id = ucr.tenant_id
+                LEFT JOIN monthly_page_usage mpu
+                       ON mpu.tenant_id = ucr.tenant_id AND mpu.year_month = %s
+                WHERE ucr.user_id = %s::uuid AND ucr.is_active = TRUE
+                ORDER BY t.name
+            """, (year_month, str(user_id)))
+            rows = cur.fetchall() or []
+        out = []
+        for r in rows:
+            out.append({
+                "tenant_id": r["tenant_id"],
+                "name": r["name"] or "",
+                "role": r["role"] or "member",
+                "balance_thb": float(r["balance_thb"] or 0),
+                "pages_this_month": int(r["pages_this_month"] or 0),
+                "is_active": bool(r["is_active"]),
+            })
+        return out
+    except Exception as e:
+        logger.error(f"list_user_companies failed: {e}")
+        return []
+
+
+def set_user_active_tenant(user_id: str, tenant_id: str) -> bool:
+    """Validate user belongs to tenant; if yes set active_tenant_id."""
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute("""
+                SELECT 1 FROM user_company_roles
+                WHERE user_id = %s::uuid AND tenant_id = %s::uuid AND is_active = TRUE
+                LIMIT 1
+            """, (str(user_id), str(tenant_id)))
+            if not cur.fetchone():
+                return False
+            cur.execute("""
+                UPDATE users SET active_tenant_id = %s::uuid
+                WHERE id = %s::uuid
+            """, (str(tenant_id), str(user_id)))
+        return True
+    except Exception as e:
+        logger.error(f"set_user_active_tenant failed: {e}")
+        return False
+
+
+def get_effective_tenant_id(user_row: dict) -> str:
+    """Prefer active_tenant_id, fall back to tenant_id."""
+    if not user_row:
+        return None
+    return user_row.get("active_tenant_id") or user_row.get("tenant_id")
+
+
+def get_tenant_owner_email(tenant_id: str) -> str:
+    """Return owner email (invited_by IS NULL) for a tenant. None on failure."""
+    try:
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT email FROM users
+                WHERE tenant_id = %s::uuid AND invited_by IS NULL
+                  AND is_active = TRUE
+                ORDER BY created_at ASC
+                LIMIT 1
+            """, (str(tenant_id),))
+            row = cur.fetchone()
+            return (row["email"] if row else None)
+    except Exception as e:
+        logger.error(f"get_tenant_owner_email failed: {e}")
+        return None
+
+
+def get_tenant_credits_state(tenant_id: str) -> dict:
+    """Return {balance_thb, low_balance_notified_at} for a tenant."""
+    try:
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT balance_thb, low_balance_notified_at
+                FROM tenant_credits WHERE tenant_id = %s::uuid
+            """, (str(tenant_id),))
+            row = cur.fetchone()
+            if not row:
+                return {"balance_thb": 0.0, "low_balance_notified_at": None}
+            return {
+                "balance_thb": float(row["balance_thb"] or 0),
+                "low_balance_notified_at": row["low_balance_notified_at"],
+            }
+    except Exception as e:
+        logger.error(f"get_tenant_credits_state failed: {e}")
+        return {"balance_thb": 0.0, "low_balance_notified_at": None}
+
+
+def mark_low_balance_notified(tenant_id: str) -> bool:
+    """Update tenant_credits.low_balance_notified_at = NOW()."""
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute("""
+                UPDATE tenant_credits SET low_balance_notified_at = NOW()
+                WHERE tenant_id = %s::uuid
+            """, (str(tenant_id),))
+        return True
+    except Exception as e:
+        logger.error(f"mark_low_balance_notified failed: {e}")
+        return False

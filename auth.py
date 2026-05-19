@@ -188,6 +188,19 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
     except Exception as _e:
         logger.warning(f"[session] jti 比对异常 · 放行: {_e}")
 
+    # ============================================================
+    # Task 3 · active_tenant_id 优先于 JWT.tenant_id
+    #   多公司用户切换公司时只更新 users.active_tenant_id
+    #   不动 JWT · 业务逻辑统一从 user["tenant_id"] 读
+    # ============================================================
+    try:
+        active_tid = user.get("active_tenant_id")
+        if active_tid:
+            user["_jwt_tenant_id"] = user.get("tenant_id")
+            user["tenant_id"] = active_tid
+    except Exception as _e:
+        logger.warning(f"[active_tenant] override skip: {_e}")
+
     return user
 
 

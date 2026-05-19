@@ -1,12 +1,114 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-16(深夜) · **v118.32.5.5.30** 在线 ✅ · cache bust **v=11841123** · 折叠头白色 + 导出按钮移位 + Excel差异明细表头美化(下窗口)
+> **最近更新**:2026-05-19 · **按量付费系统全面落地** · cache bust **v=11835200** · 任务 1-6 完成
+
+---
+
+## 🚀 按量付费系统(铁律 · 任何窗口先读)
+
+> 旧订阅系统(trial/monthly/yearly/lifetime)已下线,系统改为按量付费。
+> 任何接力窗口必须遵守以下约定,不得擅自改回旧模型。
+
+### 计费模型
+
+| 项 | 规则 |
+|---|---|
+| 单位 | 按 OCR 页数(`pages`)计费 |
+| 第一档 | 前 200 张/月 → **฿1.50/张** |
+| 第二档 | 超过 200 张 → **฿0.75/张** |
+| 重置 | **Asia/Bangkok**(UTC+7)每月 1 日 00:00 自动重置(年月由 `_bkk_year_month()` 锚定) |
+| 存储 | 钱包余额 = `tenant_credits.balance_thb`(NUMERIC(12,2)) |
+| 月用量 | `monthly_page_usage(tenant_id, year_month)`(YYYY-MM, Asia/Bangkok) |
+| 流水 | `credit_transactions`(type ∈ topup/usage/adjustment) |
+
+### 角色判定
+
+- `users.invited_by IS NULL` → **owner**(可见余额 / 充值入口 / 报表导出 / 余额预警)
+- `users.invited_by IS NOT NULL` → **employee**(屏蔽以上,只能扫单)
+- `users.is_billing_exempt = TRUE` → **豁免账号**(不扣费 · 不预警 · 不入流水)
+  - 内部白名单:`skin306152@gmail.com`、`mrerp@outlook.co.th`
+
+### 并发与一致性
+
+- `deduct_company_credits` **必须** `SELECT ... FOR UPDATE` 锁 `tenant_credits` 行(已实现)
+- 在事务内完成:① 锁行 ② 读 monthly_usage ③ 计算分档 ④ 扣款 ⑤ 写流水 ⑥ 更新月用量
+- 一律走 Asia/Bangkok 时区算月度,不要用 `_datetime.now()` 裸取(会被服务器 TZ 漂移)
+
+### 多公司(Task 3)
+
+- `users.active_tenant_id`(可空 UUID · `ON DELETE SET NULL`)优先于 `users.tenant_id`
+- `auth.get_current_user_from_request` 已自动覆盖 `user["tenant_id"]`(若 active 存在)
+- JWT **不**变(`tenant_id` 字段保留,但运行时被 active 覆盖)
+- API:`GET /api/my-companies` / `POST /api/switch-company`
+
+### 邮件通知(Task 5 · 仅泰语 · 必须 try/except)
+
+| 函数 | 触发点 | 防骚扰 |
+|---|---|---|
+| `send_topup_approved_email` | `/api/admin/credits/topup/approve` 成功后 | 无 |
+| `send_low_balance_email` | `deduct_company_credits` 后 balance<50 | `tenant_credits.low_balance_notified_at` · 24h 去重 |
+| `send_employee_invitation_email` | `/api/team/employees` 成功后 | 无 |
+
+任何邮件发送 **必须** 包裹 try/except,失败仅记 warning,不阻塞主流程。
+
+### admin 后台
+
+- 仅 zh / th 双语(en/ja 用户登录自动降级 th)
+- 原生 alert/confirm/prompt 全部替换为 `_adminDialog` + `_toast`(textarea 支持驳回原因)
+
+### 前端铁律(切语言)
+
+- 任何用 `t()` 动态生成 innerHTML 的 IIFE 必须 `subscribeI18n('模块名', _rerenderAll)`
+- 已注册模块:topup-v2、usage-history、company-selector、balance-alerts、dashboard 等
+
+---
+
+## ✅ 2026-05-19 完成清单(Task 1-6 · 按量付费系统加固)
+
+> **接力规则**:本段为最新窗口产出,旧段保留作历史
+
+### Task 1 · 语言切换(home.js + admin.js)
+- topup IIFE 接入 `subscribeI18n`(切语言 · modal 开着时同步重渲文字)
+- usage-history 接入 `subscribeI18n`
+- admin `labelMap` 移除 en/ja 项 · 默认与回落统一 `th`
+
+### Task 2 · admin 弹窗(static/admin/admin.js)
+- `_adminDialog` 支持 `type:'textarea'`(rows / Ctrl+Enter 提交)+ `danger` 红色按钮
+- 驳回充值改用 textarea + 必填 + 红色按钮 + 详尽 placeholder
+- 验证:`alert/confirm/prompt` 调用数 = 0
+
+### Task 3 · 多公司(db.py + app.py + auth.py + home.js)
+- DB:`users.active_tenant_id UUID`(ON DELETE SET NULL)
+- API:`GET /api/my-companies` · `POST /api/switch-company`
+- auth.py:`get_current_user_from_request` 内自动用 active 覆盖 tenant_id
+- 前端:`_initCompanySwitcher` IIFE · 单公司静默 · 多公司全屏卡片选择 · 顶栏 brand 下拉切换
+
+### Task 4 · 余额预警(home.js)
+- `_initBalanceAlerts` IIFE · 顶栏正下方插预警条:
+  - 余额=0 → 红色 · `zero-balance-msg`
+  - 余额<50 → 黄色 · `low-balance-msg`
+  - 本月 ≥190 张 → 蓝色 · `near-tier-msg` 带页数
+- 新用户引导:owner + 余额=0 + 无历史 + 首次登录 → 卡片 · `localStorage.pearnly_onboarding_seen_<uid>`
+- 豁免账号 / 员工 / 已有历史 → 跳过
+
+### Task 5 · 邮件(app.py)
+- `send_topup_approved_email(tenant_id, amount, new_balance)` → owner
+- `send_low_balance_email(tenant_id, balance)` → 24h 防骚扰
+- `send_employee_invitation_email(email, password)` → 新员工
+- `tenant_credits.low_balance_notified_at TIMESTAMPTZ`(已 ADD COLUMN IF NOT EXISTS)
+- 全部 try/except 包裹 · 失败仅日志 · 主流程不阻塞
+
+### Task 6 · 加固
+- **时区**:`_bkk_year_month()` 助手 + `_BKK_TZ` 全局,替换两处 `_datetime.now().strftime("%Y-%m")` + app.py `/api/me/credits` 的 `_dt.date.today()`
+- **并发**:`deduct_company_credits` 第 8900 行 `SELECT … FOR UPDATE` 验证存在
+- **移动端**:`<meta viewport>` 已在 home.html L5;`home.css` 内 `@media` 数 = 84 处
+- **STATE_PEARNLY.md** 本段更新(下面老段保留)
 
 ---
 
 ## 🆕 2026-05-16(深夜) 本窗口完成清单(v118.32.5.5.30 · UI精修)
 
-> **接力规则**:换窗口先看本段
+> 历史段 · 保留作 changelog
 
 ### 对账 UI 视觉精修(home.html / home.css / home.js · cache bust 11841123)
 

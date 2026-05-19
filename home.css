@@ -8656,6 +8656,16 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
     border: 1px solid #e8e8e3;
     border-radius: 6px;
 }
+/* Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除按钮 · 危险色 ghost */
+.btn-danger-ghost {
+    color: #dc2626;
+    background: transparent;
+    border: 1px solid #fecaca;
+}
+.btn-danger-ghost:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+}
 .erp-logs-batch-count {
     flex: 1;
     font-size: 13px;

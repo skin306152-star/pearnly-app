@@ -1708,6 +1708,23 @@ def update_log_status_after_retry(log_id: str, success: bool,
         logger.error(f"update_log_status_after_retry failed: {e}")
 
 
+def delete_push_logs(user_id: str, log_ids: List[str]) -> int:
+    """Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除推送日志.
+    严格 user_id scope · 不许跨账号删除 · 返回真删除的行数."""
+    if not log_ids:
+        return 0
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute(
+                "DELETE FROM erp_push_logs WHERE user_id = %s AND id = ANY(%s::uuid[])",
+                (user_id, list(log_ids)),
+            )
+            return cur.rowcount or 0
+    except Exception as e:
+        logger.error(f"delete_push_logs failed: {e}")
+        return 0
+
+
 def list_push_logs(user_id: str, history_id: Optional[str] = None,
                    endpoint_id: Optional[str] = None,
                    status_filter: Optional[str] = None,

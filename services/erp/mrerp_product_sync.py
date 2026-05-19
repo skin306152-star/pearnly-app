@@ -492,9 +492,37 @@ class MRERPProductSyncService:
             raise MRERPTechnicalError(
                 f"product-create form nav timeout: {e}") from e
 
-        if "allform.php" not in (page.url or ""):
+        # Bug 8 fix (Zihao 2026-05-19 拍板 · v118.34.23) · MR.ERP PHP session
+        # 偶尔在 customer-sync 跑完后 · 进到 stkmas 模块时被服务端无声 invalidate.
+        # 表现: page.url 落在 /login/login.php · 不是 /stkmas/allform.php.
+        # 修: detect 这种 bounce · 尝试 re-login + select_company + 再 goto 一次.
+        # 仍失败才抛 ERR_TECHNICAL · 给用户清晰路径(刷新重试 / 等几分钟).
+        landed_url = page.url or ""
+        if "/login/login.php" in landed_url:
+            logger.warning(
+                "[product-create] nav bounced to login.php · attempt re-login + retry"
+            )
+            warnings.append("WARN_SESSION_REFRESHED")
+            try:
+                # Force re-login by toggling _logged_in flag · adapter.login()
+                # is idempotent · _company_selected also clears.
+                self.adapter._logged_in = False
+                self.adapter._company_selected = False
+                self.adapter.login()
+                self.adapter.select_company()
+                page.goto(target, wait_until="networkidle",
+                          timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            except Exception as e:
+                raise MRERPTechnicalError(
+                    f"product-create session re-login failed: {type(e).__name__}: {e}"
+                ) from e
+            landed_url = page.url or ""
+
+        if "allform.php" not in landed_url:
             raise MRERPTechnicalError(
-                f"product-create nav landed on {page.url}, not allform.php")
+                f"product-create nav landed on {landed_url}, not allform.php "
+                f"(session refresh did not recover)"
+            )
 
         try:
             self._copy_from_seed(page, seed_product_code)

@@ -1189,6 +1189,10 @@ const I18N = {
         'erp-batch-selected': '已选 {n} 条',
         'erp-batch-retry-btn': '批量重推',
         'erp-batch-clear': '取消选择',
+        // Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除
+        'erp-batch-delete-btn': '批量删除',
+        'erp-batch-delete-confirm': '确定删除所选 {n} 条推送日志吗?这个操作不可撤销',
+        'erp-batch-delete-result': '已删除 {n} 条 · 跳过 {skip} 条',
         'erp-batch-confirm': '确认对所选 {n} 条记录批量重推?',
         'erp-batch-result': '批量完成 · 成功 {ok} 条 · 失败 {fail} 条 · 跳过 {skip} 条',
         'erp-batch-empty-warn': '请先勾选至少一条失败记录',
@@ -3567,6 +3571,9 @@ const I18N = {
         'erp-batch-selected': '{n} selected',
         'erp-batch-retry-btn': 'Retry selected',
         'erp-batch-clear': 'Clear selection',
+        'erp-batch-delete-btn': 'Delete selected',
+        'erp-batch-delete-confirm': 'Delete the {n} selected push log(s)? This cannot be undone',
+        'erp-batch-delete-result': 'Deleted {n} · skipped {skip}',
         'erp-batch-confirm': 'Re-push the {n} selected records?',
         'erp-batch-result': 'Done · {ok} succeeded · {fail} failed · {skip} skipped',
         'erp-batch-empty-warn': 'Please select at least one failed record',
@@ -5938,6 +5945,9 @@ const I18N = {
         'erp-batch-selected': 'เลือกแล้ว {n} รายการ',
         'erp-batch-retry-btn': 'ส่งซ้ำที่เลือก',
         'erp-batch-clear': 'ยกเลิกการเลือก',
+        'erp-batch-delete-btn': 'ลบที่เลือก',
+        'erp-batch-delete-confirm': 'ลบบันทึก {n} รายการที่เลือก? · การกระทำนี้ไม่สามารถยกเลิกได้',
+        'erp-batch-delete-result': 'ลบไปแล้ว {n} รายการ · ข้าม {skip}',
         'erp-batch-confirm': 'ส่งซ้ำ {n} รายการที่เลือก?',
         'erp-batch-result': 'เสร็จสิ้น · สำเร็จ {ok} · ล้มเหลว {fail} · ข้าม {skip}',
         'erp-batch-empty-warn': 'กรุณาเลือกอย่างน้อย 1 รายการที่ล้มเหลว',
@@ -8301,6 +8311,9 @@ const I18N = {
         'erp-batch-selected': '{n} 件選択中',
         'erp-batch-retry-btn': '一括再送',
         'erp-batch-clear': '選択解除',
+        'erp-batch-delete-btn': '一括削除',
+        'erp-batch-delete-confirm': '選択した {n} 件のプッシュログを削除しますか? · この操作は取り消せません',
+        'erp-batch-delete-result': '{n} 件削除 · {skip} 件スキップ',
         'erp-batch-confirm': '選択した {n} 件を一括再送しますか?',
         'erp-batch-result': '完了 · 成功 {ok} · 失敗 {fail} · スキップ {skip}',
         'erp-batch-empty-warn': '失敗した記録を最低 1 件選択してください',
@@ -15304,6 +15317,7 @@ function _refreshErpBatchBar() {
 
 // v118.25.1 · 批量重推执行 · 调 /api/erp/logs/batch-retry · 提示成功/失败/跳过计数
 async function _runErpBatchRetry() {
+    console.info('[ErpBatch] retry triggered · selected=', _erpSelected.size);
     const ids = Array.from(_erpSelected);
     if (ids.length === 0) {
         showToast(t('erp-batch-empty-warn'), 'warn');
@@ -15339,6 +15353,90 @@ async function _runErpBatchRetry() {
         showToast(t('erp-logs-error'), 'error');
     }
 }
+
+// Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除执行
+async function _runErpBatchDelete() {
+    console.info('[ErpBatch] delete triggered · selected=', _erpSelected.size);
+    const ids = Array.from(_erpSelected);
+    if (ids.length === 0) {
+        showToast(t('erp-batch-empty-warn'), 'warn');
+        return;
+    }
+    const ok = await showConfirm(
+        t('erp-batch-delete-confirm', { n: ids.length }),
+        { danger: true },
+    );
+    if (!ok) return;
+    try {
+        const resp = await fetch('/api/erp/logs/batch-delete', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ log_ids: ids }),
+        });
+        if (!resp.ok) {
+            showToast(t('erp-logs-error'), 'error');
+            return;
+        }
+        const r = await resp.json();
+        showToast(
+            t('erp-batch-delete-result', {
+                n: r.deleted || 0, skip: r.skipped || 0,
+            }),
+            (r.deleted > 0) ? 'success' : 'warn',
+        );
+        _erpSelected.clear();
+        loadErpLogs();
+    } catch (e) {
+        console.error('batch delete failed', e);
+        showToast(t('erp-logs-error'), 'error');
+    }
+}
+
+// Bug 5 fix (v118.34.23) · defensive: 直接绑定到按钮 + 也保留事件委托
+// 防 IIFE document-level handler 某些情况下没接管. 用 capture phase 保证 fire.
+(function _bindErpBatchButtonsDirect() {
+    function _bind() {
+        var btnRetry = document.getElementById('btn-erp-batch-retry');
+        var btnDelete = document.getElementById('btn-erp-batch-delete');
+        var btnClear = document.getElementById('btn-erp-batch-clear');
+        if (btnRetry && !btnRetry.dataset.boundDirect) {
+            btnRetry.addEventListener('click', function (e) {
+                e.preventDefault(); e.stopPropagation();
+                _runErpBatchRetry();
+            });
+            btnRetry.dataset.boundDirect = '1';
+        }
+        if (btnDelete && !btnDelete.dataset.boundDirect) {
+            btnDelete.addEventListener('click', function (e) {
+                e.preventDefault(); e.stopPropagation();
+                _runErpBatchDelete();
+            });
+            btnDelete.dataset.boundDirect = '1';
+        }
+        if (btnClear && !btnClear.dataset.boundDirect) {
+            btnClear.addEventListener('click', function (e) {
+                e.preventDefault(); e.stopPropagation();
+                _erpSelected.clear();
+                document.querySelectorAll('.erp-log-cb').forEach(function (x) { x.checked = false; });
+                _refreshErpBatchBar();
+            });
+            btnClear.dataset.boundDirect = '1';
+        }
+    }
+    // Bind at DOM ready + also on every tab switch / log load via mutation observer.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _bind);
+    } else {
+        _bind();
+    }
+    // 兜底: 隔 2s 重试 binding(防早期 DOM 还没渲染)
+    setTimeout(_bind, 2000);
+    setTimeout(_bind, 5000);
+    window._bindErpBatchButtons = _bind;
+})();
 
 async function showLogDetail(logId) {
     // v0.10 · 立即弹窗显示 loading · 再请求

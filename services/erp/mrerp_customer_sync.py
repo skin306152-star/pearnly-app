@@ -583,10 +583,33 @@ class MRERPCustomerSyncService:
             raise MRERPTechnicalError(
                 f"customer-create form nav timeout: {e}") from e
 
+        # Bug 8 fix (Zihao 2026-05-19 拍板 · v118.34.23) · session bounce 检测 ·
+        # 跟 mrerp_product_sync 镜像 · armas/allform.php 也可能在长 batch 后被
+        # MR.ERP 服务端无声 invalidate session.
+        landed_url = page.url or ""
+        if "/login/login.php" in landed_url:
+            logger.warning(
+                "[customer-create] nav bounced to login.php · re-login + retry"
+            )
+            try:
+                self.adapter._logged_in = False
+                self.adapter._company_selected = False
+                self.adapter.login()
+                self.adapter.select_company()
+                page.goto(target, wait_until="networkidle",
+                          timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            except Exception as e:
+                raise MRERPTechnicalError(
+                    f"customer-create session re-login failed: {type(e).__name__}: {e}"
+                ) from e
+            landed_url = page.url or ""
+
         # Sanity: confirm we're on the create form.
-        if "allform.php" not in (page.url or ""):
+        if "allform.php" not in landed_url:
             raise MRERPTechnicalError(
-                f"customer-create nav landed on {page.url}, not allform.php")
+                f"customer-create nav landed on {landed_url}, not allform.php "
+                f"(session refresh did not recover)"
+            )
 
         # 2-5) Copy-from-seed.
         try:

@@ -1036,6 +1036,34 @@ logger.info(f"📌 前端版本 PEARNLY_FRONTEND_VERSION = {PEARNLY_FRONTEND_VER
 
 
 # ============================================================
+# v118.34.37 · 启动时清掉 static/**/*.gz 强制 nginx 动态 gzip
+# ============================================================
+# 根因(2026-05-20 调试发现): nginx gzip_static on 服务 pre-gzipped .gz
+# 文件 · 但 deploy.sh 只 cp 源 .css/.js 不更新 .gz · 导致:
+#   - curl 不带 Accept-Encoding: gzip → 拿到新源文件
+#   - 浏览器带 Accept-Encoding: gzip → 拿到陈旧 .gz (mtime 跟最近源文件相差几小时)
+#   - 即使 URL 加 ?v=NNN cache-bust 也没用 · nginx 静态文件忽略 query string
+# 修: 每次 app 启动时删掉 static 下所有 .gz · 让 nginx 退回到 gzip on the fly
+# 性能影响: 微小 (CSS/JS 文件本来就有 nginx 自身的 in-memory cache)
+def _purge_stale_static_gz():
+    import os as _os, glob as _glob
+    try:
+        deleted = 0
+        for fp in _glob.glob("static/**/*.gz", recursive=True):
+            try:
+                _os.remove(fp)
+                deleted += 1
+            except Exception:
+                pass
+        if deleted:
+            logger.info(f"🧹 启动清除 static/**/*.gz · 删了 {deleted} 个陈旧预压缩文件 · nginx 将动态 gzip 当前源文件")
+    except Exception as _e:
+        logger.warning(f"_purge_stale_static_gz 失败: {_e}")
+
+_purge_stale_static_gz()
+
+
+# ============================================================
 # Models
 # ============================================================
 class LoginRequest(BaseModel):
@@ -5489,7 +5517,7 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.34.36 · 真正修好设置弹窗响应式 bug + 缓存强刷:\n• 根因:基础规则 .settings-side-nav (home.css:9758) 含 max-height:calc(100vh - topbar - 32px) + position:sticky · 这俩在 modal 内不该应用 · 让 side-nav 高度永远大于 modal 实际可用空间 · 内容被父 overflow:hidden 切掉 · 自身 overflow-y:auto 永远不触发. 上一版 v34.35 改了 align-items 但漏了这条 max-height 覆盖.\n• 修:.settings-modal-overlay #page-settings .settings-side-nav 加 max-height:none + position:static + top:auto 三条 !important 覆盖基础规则.\n• 全部静态资源 v=11834935 → 11834936 强制浏览器清缓存(immutable + max-age=2592000 让上一版改动可能没被加载)\n• 此次部署也包含 v34.35 完整改动:对账中心 78 条 4 语术语统一 · Excel sheet 名 รายละเอียดบัญชี → รายละเอียดSTATEMENT · adm-engine-vex 4 语补全 · ERP 集成页布局调整(看推送日志移底/Xero 真 toggle/MR.ERP 删冗余日志按钮/FlowAccount 空卡片删除)",
+            "zh": "v118.34.37 · 真正的真正修好 · nginx pre-gzipped 陈旧 .gz 文件根因找到 + 修复:\n• 用 Playwright + CDP 抓出根因:nginx gzip_static on 服务 prod 上 pre-gzipped .gz 文件 · 但 deploy.sh 只 cp 源 .css/.js 不更新 .gz · 导致浏览器拿到的 .gz 永远是 May 19 14:22 的旧版(78KB compressed vs 440KB 新源)· 即使 URL ?v=NNNN cache-bust 也没用 · nginx 静态文件忽略 query string · 这就是 v34.35/v34.36 推上去用户看不到任何变化的真正原因.\n• 修 1: app.py 启动时 _purge_stale_static_gz() 删 static/**/*.gz · 让 nginx 退回动态 gzip 当前文件 · 一次 deploy 就生效不用 SSH\n• 修 2: home.html 加内联防御性 CSS 覆盖 · 即使 home.css.gz 暂时未清也保证设置弹窗能滚\n• 修 3: Xero/MR.ERP 卡片视觉大小统一 .erp-connect-cards .integration-row { min-height:72px } · 用户拍板\n• 全部静态资源 v=11834936 → 11834937 + 删 .gz 双保险\n\n这次部署包含历次累积:对账中心 78 条 4 语术语统一 + Excel sheet 名 รายละเอียดบัญชี → รายละเอียดSTATEMENT + ERP 集成页布局调整 + 设置弹窗响应式修复",
             "release_notes_archived_v34_33": "v118.34.33 · 批 1 · OCR 自动归属客户 + 不 retry 用户数据错 + 日志加客户/ERP 列:\n• 改动 1 OCR 完自动 resolve client_id:按 buyer_name + buyer_tax 匹配 Pearnly 客户表(税号 0.98 / 完全名 0.95 / substring 0.80-0.90 / 学习记忆 1.0)· ≥0.95 自动绑 + 学习下次 · 0.80-0.95 标 suggested_client_id · <0.80 不绑 · 没归属的发票直接不入 auto-push 队列(不再炸 ERR_NO_CLIENT)\n• 改动 3 retry 区分用户数据错:USER_DATA_ERROR_CODES (NO_CLIENT/NO_CUSTOMER_MAPPING/NO_INVOICE_NO/DATE_FUTURE/DUPLICATE_INVOICE 等) + 泰文 raw 模式 · 这类错不进重试队列 · retry worker 命中也立刻摘队列\n• 改动 5 日志列表加 Pearnly 客户列:LEFT JOIN clients · UI 显示 client_name · 未归属灰色「未归属」+ tip\n• 改动 8 顺便做 ERP 列:LEFT JOIN erp_endpoints · 显示 endpoint.name(用户起的)\n• 新 db 表 buyer_to_client_memory · 用户在抽屉 assign 时学习 buyer→client · 下次 OCR 自动归属",
             "release_notes_archived_v34_28": "v118.34.28 · 死链修:derive_mrerp_invoice_no seq 不再写死 001:\n• 根因:第一笔 push 成功 → bill_no SI690519-001 · 第二笔 push (同一天) MR.ERP 报「เลขที่ดังกล่าวมีอยู่ในระบบแล้ว(已存在)」· 因为 derive_mrerp_invoice_no seq 写死 \"001\" · 同一天所有 push 都 derive YYMMDD-001 撞\n• 之前的 docstring 写「序号取 history.id 末 3 位 hex 转 dec mod 1000」但代码写错成 hardcode \"001\" · 注释和实现不一致\n• 修:按 docstring 真实现 · 用 history.id 末 6 位 hex 转 dec mod 999 + 1 (避开 000)· 同一 history 重传幂等 · 不同 history 序号不同\n• 测试: 5 个 uuid → 5 个不同 seq (460/272/732/705/078) · 同 uuid 两次 → 同 seq (441/441) · 幂等保证\n\n现在可以并发推多笔 · 不会撞 invoice_no",
             "release_notes_archived_v34_27": "v118.34.27 · listing 拉不到不再阻断 push · fail-soft 走 auto-create:\n• 根因:TEST2019 stkmas listing 在 30s × 3 retries 都拉不出来(MR.ERP 服务端慢或 #showdata p selector 不命中)· 之前 listing fetch 在 lookup() 里 raise · 整个 push fail\n• 修:mrerp_customer_sync.lookup + mrerp_product_sync.lookup 把 _fetch_listing() try/catch MRERPTechnicalError · 失败时 log warning + return None · 让 lookup_or_create 走 L4 auto-create (创建路径 stkmas/allform.php 不依赖 allview.php listing)\n• 效果:listing 拉不到 → L1 DB mapping 没命中 → L2/L3 listing 路径 fail-soft return None → L4 自动建用 seed 模板 · push 继续\n• 跟之前 v34.26 sync 吞 MRERPTechnicalError 是互补:v34.26 在 sync 顶层吞 · v34.27 在 lookup 里 fail-soft 让 lookup_or_create 能继续走 L4\n\n这是 stkmas listing 慢的兜底方案 · 自动建客户/商品全链路通",

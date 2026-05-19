@@ -110,8 +110,13 @@ class ThaiSubstringLookupTests(unittest.TestCase):
 
     def test_duplicate_invoice_number(self):
         out = get_friendly("เลขที่ดังกล่าวมีอยู่ในระบบแล้ว")
-        self.assertIn("already exists", out["en"])
-        self.assertIn("已存在", out["zh"])
+        # v118.34.24 (Zihao 2026-05-19 拍板 · 问题 1) · friendly 文案
+        # 从干巴巴 "already exists" 改成行动指引 ·
+        # 新文案: "already pushed ... duplicates aren't allowed ... edit the bill"
+        self.assertIn("already pushed", out["en"])
+        self.assertIn("MR.ERP", out["en"])
+        self.assertIn("推送过", out["zh"])
+        self.assertIn("不能重复推", out["zh"])
 
 
 class UnknownReasonTests(unittest.TestCase):

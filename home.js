@@ -2452,6 +2452,13 @@ const I18N = {
         'xero-card-connected': '已连接 Xero',
         'xero-connect-btn': '连接 Xero',
         'xero-disconnect-btn': '断开连接',
+        // v118.34.35 · Xero 卡片对齐 MR.ERP toggle 模式 · 补 i18n key
+        'card-btn-enable':  '启用',
+        'card-btn-disable': '停用',
+        'card-btn-edit':    '修改',
+        'card-toggle-disable-confirm': '停用后,新发票不会再自动推送(已成功的不动)· 继续?',
+        'erp-auto-push-on-tip':  '自动推送已开启 · 识别完发票会自动推到 ERP',
+        'erp-auto-push-off-tip': '自动推送已关闭 · 需手动点「推到 ERP」按钮',
         'xero-disconnect-confirm': '断开后该 tenant 的 Xero token 全部删除 · 推送会停 · 确定?',
         'xero-default-org': '默认 organisation',
         'xero-pick-org': '选择默认 organisation',
@@ -4867,6 +4874,13 @@ const I18N = {
         'xero-card-not-configured': 'Xero is not configured. Contact the Pearnly team.',
         'xero-card-not-connected': 'Not connected to Xero',
         'xero-card-connected': 'Connected to Xero',
+        // v118.34.35 · Xero 卡片 toggle i18n keys
+        'card-btn-enable':  'Enable',
+        'card-btn-disable': 'Disable',
+        'card-btn-edit':    'Edit',
+        'card-toggle-disable-confirm': 'Disable auto-push? New invoices will no longer be pushed automatically (existing pushes unchanged) · Continue?',
+        'erp-auto-push-on-tip':  'Auto-push is ON · OCRed invoices will be pushed to ERP automatically',
+        'erp-auto-push-off-tip': 'Auto-push is OFF · Click "Push to ERP" to push manually',
         'xero-connect-btn': 'Connect Xero',
         'xero-disconnect-btn': 'Disconnect',
         'xero-disconnect-confirm': 'All Xero tokens for this tenant will be deleted. Pushes will stop. Continue?',
@@ -7259,6 +7273,13 @@ const I18N = {
         'xero-card-not-configured': 'Xero ยังไม่ได้ตั้งค่า · ติดต่อทีม Pearnly',
         'xero-card-not-connected': 'ยังไม่ได้เชื่อม Xero',
         'xero-card-connected': 'เชื่อม Xero แล้ว',
+        // v118.34.35 · Xero 卡 toggle i18n keys
+        'card-btn-enable':  'เปิดใช้',
+        'card-btn-disable': 'ปิดใช้',
+        'card-btn-edit':    'แก้ไข',
+        'card-toggle-disable-confirm': 'ปิดใช้แล้ว ใบกำกับใหม่จะไม่ถูกส่งอัตโนมัติ (รายการที่ส่งสำเร็จแล้วจะไม่ถูกแตะต้อง) · ดำเนินการต่อ?',
+        'erp-auto-push-on-tip':  'ส่งอัตโนมัติเปิดอยู่ · ใบกำกับที่ OCR เสร็จจะถูกส่งเข้า ERP อัตโนมัติ',
+        'erp-auto-push-off-tip': 'ส่งอัตโนมัติปิดอยู่ · ต้องกด "ส่งเข้า ERP" ด้วยตนเอง',
         'xero-connect-btn': 'เชื่อม Xero',
         'xero-disconnect-btn': 'ตัดการเชื่อม',
         'xero-disconnect-confirm': 'การเชื่อม Xero ทั้งหมดของ tenant นี้จะถูกลบ · การส่งจะหยุด · ดำเนินการต่อ?',
@@ -9651,6 +9672,13 @@ const I18N = {
         'xero-card-not-configured': 'Xero 未設定 · Pearnly チームへ連絡',
         'xero-card-not-connected': 'Xero 未接続',
         'xero-card-connected': 'Xero 接続済み',
+        // v118.34.35 · Xero 卡 toggle i18n keys
+        'card-btn-enable':  '有効化',
+        'card-btn-disable': '無効化',
+        'card-btn-edit':    '編集',
+        'card-toggle-disable-confirm': '無効化すると · 新規請求書は自動送信されなくなります (成功した送信はそのまま) · 続行しますか?',
+        'erp-auto-push-on-tip':  '自動送信 ON · OCR 完了した請求書が自動で ERP へ送信されます',
+        'erp-auto-push-off-tip': '自動送信 OFF · 「ERP へ送信」ボタンで手動送信',
         'xero-connect-btn': 'Xero に接続',
         'xero-disconnect-btn': '切断',
         'xero-disconnect-confirm': 'この tenant の Xero トークンを全て削除します · 送信が停止 · 続行?',
@@ -28637,9 +28665,9 @@ window.pearnlyConfirm = function (message, title) {
                    _esc(t('xero-card-not-connected')) + '</span>';
         }
 
-        // Action button (right side) — same .int-btn-configure class
-        // as the other integration cards. Click handler still wires to
-        // _onConnect / _onDisconnect via the existing button IDs.
+        // v118.34.35 · Xero 卡片对齐 MR.ERP 模式 · 真启用/停用 toggle
+        // 未配置 / 未连接 OAuth → 连接 Xero 按钮 (启动 OAuth flow)
+        // 已连接 → 启用/停用 toggle (= auto_push) + 修改 按钮 (展开 details)
         let actionHtml = '';
         if (!s || !s.configured) {
             actionHtml = (
@@ -28656,12 +28684,20 @@ window.pearnlyConfirm = function (message, title) {
                 );
             }
         } else {
-            // Connected · "Edit" opens the orgs/auto-push region in
-            // a small expandable area below the card. Plus a
-            // "Disconnect" link for owners.
+            // 已连接 · "启用/停用" toggle 控制 auto_push · "修改" 展开 details 面板
+            const ap = !!s.auto_push;
+            const toggleLabel = ap ? t('card-btn-disable') : t('card-btn-enable');
+            const toggleClass = ap
+                ? 'mrerp-card-toggle mrerp-card-toggle-disable'
+                : 'mrerp-card-toggle mrerp-card-toggle-enable';
             actionHtml = (
+                '<button type="button" class="' + toggleClass + '" id="btn-xero-toggle-enabled" '
+                  + 'data-xero-enabled="' + (ap ? '1' : '0') + '" '
+                  + 'title="' + _esc(ap ? t('erp-auto-push-on-tip') : t('erp-auto-push-off-tip')) + '">' +
+                  _esc(toggleLabel) +
+                '</button>' +
                 '<button type="button" class="int-btn-configure" id="btn-xero-edit-toggle">' +
-                  _esc(t('card-btn-edit') || t('xero-disconnect-btn')) +
+                  _esc(t('card-btn-edit')) +
                 '</button>'
             );
         }
@@ -28757,6 +28793,26 @@ window.pearnlyConfirm = function (message, title) {
                 const det = document.getElementById('erp-xero-details');
                 if (!det) return;
                 det.style.display = det.style.display === 'none' ? '' : 'none';
+            });
+        }
+
+        // v118.34.35 · 启用/停用 toggle (= auto_push) · 对齐 MR.ERP 模式
+        const toggleBtn = document.getElementById('btn-xero-toggle-enabled');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', async function (e) {
+                e.preventDefault();
+                if (toggleBtn.disabled) return;
+                const currentlyEnabled = toggleBtn.getAttribute('data-xero-enabled') === '1';
+                const next = !currentlyEnabled;
+                // 停用要二次确认 (新发票将不再推送)
+                if (!next) {
+                    try {
+                        const ok = await window.pearnlyConfirm(t('card-toggle-disable-confirm'));
+                        if (!ok) return;
+                    } catch (e2) { /* fallback: 无 confirm 直接继续 */ }
+                }
+                toggleBtn.disabled = true;
+                await _onToggleAutoPush(next, null);
             });
         }
     }

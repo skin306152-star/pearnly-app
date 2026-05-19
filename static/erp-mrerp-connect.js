@@ -517,12 +517,11 @@
     // .integration-row + .int-icon + .int-info + .int-actions。
     // ─────────────────────────────────────────────────────────────
     function _renderCards(host, mrerpEp) {
-        // host 是 #erp-connect-cards · 我们渲染 MR.ERP 卡片 +
-        // FlowAccount-soon 卡片。Xero 卡片由另一个 IIFE 在 host 内
-        // 单独 prepend · 我们不动它,只 append 自己的。
+        // host 是 #erp-connect-cards · 我们渲染 MR.ERP 卡片。
+        // Xero 卡片由另一个 IIFE 在 host 内单独 prepend · 我们不动它,只 append 自己的。
+        // v118.34.35 · FlowAccount "即将上线" 空卡片移除
         const cardsHtml = [
             _renderMrerpCard(mrerpEp),
-            _renderFlowAccountCard(),
         ].join('');
 
         // Find or create our own append zone (not interfering with
@@ -588,6 +587,7 @@
         // v118.34.34 · configured 卡片现在额外有「停用/启用」按钮.
         let actionsHtml;
         if (configured) {
+            // v118.34.35 · 删 "看推送日志" 按钮 · 统一放在面板底部
             const toggleLabel = enabled ? t('card-btn-disable') : t('card-btn-enable');
             const toggleClass = enabled
                 ? 'mrerp-card-toggle mrerp-card-toggle-disable'
@@ -601,10 +601,6 @@
                 '</button>' +
                 '<button type="button" class="int-btn-configure" data-mrerp-card-action="edit">' +
                   _esc(t('card-btn-edit')) +
-                '</button>' +
-                '<button type="button" class="mrerp-card-see-logs" data-mrerp-card-action="see-logs" '
-                  + 'title="' + _esc(t('card-see-logs')) + '">' +
-                  _esc(t('card-see-logs')) +
                 '</button>'
             );
         } else {
@@ -637,25 +633,7 @@
         );
     }
 
-    function _renderFlowAccountCard() {
-        return (
-            '<div class="integration-row is-coming-soon" data-mrerp-card="flowaccount">' +
-              '<div class="int-icon ic-flowaccount">' + _FLOW_ICON_SVG + '</div>' +
-              '<div class="int-info">' +
-                '<div class="int-name">' +
-                  '<span>' + _esc(t('flow-card-name')) + '</span>' +
-                  '<span class="mrerp-card-pill mrerp-pill-info">' + _esc(t('card-coming-soon')) + '</span>' +
-                '</div>' +
-                '<div class="int-desc">' + _esc(t('flow-card-desc')) + '</div>' +
-              '</div>' +
-              '<div class="int-actions">' +
-                '<button type="button" class="int-btn-configure" disabled>' +
-                  _esc(t('card-btn-connect')) +
-                '</button>' +
-              '</div>' +
-            '</div>'
-        );
-    }
+    // v118.34.35 · _renderFlowAccountCard 已删除 (空卡片占位 · 上线时再加回)
 
     function _bindCardEvents(zone, mrerpEp) {
         // Card-level "Connect" / "Edit" → open wizard

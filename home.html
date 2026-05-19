@@ -2700,14 +2700,9 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 
                         <!-- 子面板 1:连接(纯卡片 · 不含日志、不含 today-stats · v118.34.5) -->
                         <div class="erp-subpanel active" data-erp-subpanel="connect">
-                            <!-- A4 (v118.34.19) · "看推送日志 →" 链接 ·
-                                 点了关抽屉 + 跳主页推送日志 tab(全宽视图) -->
-                            <div class="erp-connect-logs-link" style="text-align:right;margin:-4px 0 8px;">
-                                <button type="button" class="int-btn-view-logs" data-int-action="view-logs" data-i18n="int-btn-view-logs">看推送日志 →</button>
-                            </div>
-                            <!-- v118.27.4 · ERP 系统连接卡片区(Xero · MR.ERP · FlowAccount) -->
+                            <!-- v118.27.4 · ERP 系统连接卡片区(Xero · MR.ERP) -->
                             <div class="erp-connect-cards" id="erp-connect-cards">
-                                <!-- IIFE 渲染 Xero 卡片 + 未来其他 ERP -->
+                                <!-- IIFE 渲染 Xero 卡片 + MR.ERP 卡片 -->
                             </div>
 
                             <div id="erp-endpoints-list"></div>
@@ -2715,6 +2710,11 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
                                 <span data-i18n="auto-erp-add">新增端点</span>
                             </button>
+
+                            <!-- v118.34.35 · 看推送日志按钮放到底部 · 将来加新 ERP 卡片时按钮自然在最下 -->
+                            <div class="erp-connect-logs-link" style="text-align:left;margin:16px 0 0;">
+                                <button type="button" class="int-btn-view-logs" data-int-action="view-logs" data-i18n="int-btn-view-logs">看推送日志 →</button>
+                            </div>
                         </div>
 
                         <!-- v118.34.19 (A4) · subpanel="logs" 已删除 · 内容搬到
@@ -6500,8 +6500,8 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·
      独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834934">
-<script src="/static/erp-mrerp-connect.js?v=11834934" defer></script>
+<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834935">
+<script src="/static/erp-mrerp-connect.js?v=11834935" defer></script>
 <!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
 <script src="/static/erp-log-enhance.js?v=11834934" defer></script>
 

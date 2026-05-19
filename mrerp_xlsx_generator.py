@@ -197,7 +197,12 @@ def fmt_number_strict(value: Any) -> float:
 def derive_mrerp_invoice_no(history: Dict[str, Any]) -> str:
     """v27.8.1.5 · 根据 OCR invoice_date 生成 MR.ERP 期望格式 YYMMDD-NNN
     Korn 真样本:'690507-001' = BE 年(西历+543 末 2 位)+ 月 + 日 + 序号
-    序号取 history.id 末 3 位 hex 转 dec mod 1000(同一发票总是同序号 · 重传幂等)"""
+
+    v118.34.28 (Zihao 2026-05-19 拍板) · 修死链:之前 seq 写死 "001" ·
+    所有 push 都 derive 出 YYMMDD-001 · MR.ERP 服务端不会自动 increment ·
+    第一笔成功后第二笔重复就 "เลขที่ดังกล่าวมีอยู่ในระบบแล้ว".
+    序号现在按 docstring 设计取 history.id 末 3 位 hex 转 dec mod 1000 ·
+    同一 history 重传幂等 · 不同 history 序号不同."""
     inv_date_str = fmt_date(history.get('invoice_date'))
     if inv_date_str and len(inv_date_str) >= 10:
         try:
@@ -213,7 +218,16 @@ def derive_mrerp_invoice_no(history: Dict[str, Any]) -> str:
         d = _dt.utcnow()
         date_part = f"{(d.year + 543) % 100:02d}{d.month:02d}{d.day:02d}"
 
-    seq = "001"  # v27.8.1.6 · 跟 Korn 真样本一致 · MR.ERP 服务端自己会再分配
+    # 取 history.id 末 3 位 hex 转 dec mod 1000 · 0 → 001 (避开)
+    hist_id = str(history.get('id') or '').replace('-', '')
+    if hist_id:
+        try:
+            seq_int = int(hist_id[-6:], 16) % 999 + 1   # 1-999
+            seq = f"{seq_int:03d}"
+        except ValueError:
+            seq = "001"
+    else:
+        seq = "001"
     return f"{date_part}-{seq}"
 
 

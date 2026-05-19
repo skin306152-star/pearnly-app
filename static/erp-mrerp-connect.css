@@ -262,6 +262,18 @@
     word-break: break-all;
 }
 
+/* P-4 (v118.34.21) · 失败截图路径单独高亮 · 让用户能 scp 给客服 */
+.mrerp-wizard-test-error-screenshot {
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: rgba(146, 22, 22, 0.08);
+    border-left: 2px solid #D97706;
+    font-size: 11px;
+    color: #921616;
+    font-family: monospace;
+    word-break: break-all;
+}
+
 .mrerp-wizard-foot {
     padding: 16px 22px;
     border-top: 1px solid var(--line, #e8e8e3);

@@ -1667,5 +1667,135 @@ class ListingRetryContractTests(unittest.TestCase):
         )
 
 
+@unittest.skipUnless(
+    _can_import_app_for_async_tests()
+    and __import__("importlib").util.find_spec("fastapi") is not None,
+    "needs full app + fastapi; covered server-side otherwise.",
+)
+class PatchEndpointEncryptionContractTests(unittest.TestCase):
+    """P-3 (Zihao 2026-05-19 拍板) · PATCH /api/erp/endpoints/:id MUST
+    mirror POST's Fernet encryption logic for mrerp adapters. Otherwise
+    the wizard's 'edit saved endpoint' flow stores plaintext under
+    `username_enc` / `password_enc` field names — next test-connection
+    decrypt → InvalidToken → ERR_CRED_DECRYPT.
+
+    Bug shape we're catching: PATCH receiving plaintext doesn't run it
+    through `kms_helper.encrypt_str` before calling `db.update_erp_endpoint`,
+    so the DB stores plaintext while later code paths expect ciphertext.
+
+    Sibling spec: v118.34.13 (already covered in POST) ·
+    test_create_endpoint_with_adapter_mrerp_does_not_violate_constraint
+    proves CHECK; this test proves encryption mirror.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        import app
+        cls.app_module = app
+
+    def _make_client(self):
+        from fastapi.testclient import TestClient
+        return TestClient(self.app_module.app)
+
+    def test_patch_mrerp_endpoint_encrypts_plaintext_credentials(self):
+        """Send plaintext via PATCH; verify db.update_erp_endpoint
+        receives ciphertext in username_enc/password_enc."""
+        app = self.app_module
+        existing_ep = {
+            "id": "ep-1", "user_id": "u",
+            "adapter": "mrerp",
+            "config": {
+                "system_url": "https://www.mrerp4sme.com",
+                "username_enc": "gAAAAA_old_user_ciphertext",
+                "password_enc": "gAAAAA_old_pass_ciphertext",
+                "comidyear": "6", "seldb": "1",
+            },
+            "enabled": True, "name": "MR.ERP",
+        }
+
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep), \
+             patch.object(app.db, "update_erp_endpoint",
+                          return_value=True) as update_mock:
+            with self._make_client() as client:
+                r = client.patch("/api/erp/endpoints/ep-1", json={
+                    "config": {
+                        "system_url": "https://www.mrerp4sme.com",
+                        # Plaintext freshly typed by user via wizard re-edit
+                        "username_enc": "test01",
+                        "password_enc": "newpassword01",
+                        "comidyear": "6", "seldb": "1",
+                    },
+                })
+
+        self.assertEqual(r.status_code, 200, r.text)
+        update_mock.assert_called_once()
+        # The 'config' kwarg passed to update_erp_endpoint should have
+        # ciphertext, NOT plaintext.
+        sent_config = update_mock.call_args.kwargs.get("config", {})
+        self.assertIn("username_enc", sent_config)
+        self.assertIn("password_enc", sent_config)
+        # Fernet ciphertext starts with "gAAAAA"
+        self.assertTrue(
+            sent_config["username_enc"].startswith("gAAAAA"),
+            f"PATCH stored plaintext username — encryption regression: "
+            f"{sent_config['username_enc']!r}",
+        )
+        self.assertTrue(
+            sent_config["password_enc"].startswith("gAAAAA"),
+            f"PATCH stored plaintext password — encryption regression: "
+            f"{sent_config['password_enc']!r}",
+        )
+
+    def test_patch_mrerp_endpoint_does_not_double_encrypt(self):
+        """If the config carries already-encrypted ciphertext (gAAAAA*),
+        PATCH must NOT re-encrypt it. Otherwise re-saving an existing
+        endpoint produces ciphertext-of-ciphertext that fails to decrypt."""
+        app = self.app_module
+        existing_ep = {
+            "id": "ep-1", "user_id": "u",
+            "adapter": "mrerp",
+            "config": {"system_url": "https://www.mrerp4sme.com"},
+            "enabled": True, "name": "MR.ERP",
+        }
+        # Generate a real-looking Fernet ciphertext for the test (using
+        # the same kms_helper the route uses).
+        try:
+            from kms_helper import encrypt_str
+            already_ct_user = encrypt_str("test01")
+            already_ct_pass = encrypt_str("test01pass")
+        except Exception as e:
+            self.skipTest(f"kms_helper unavailable: {e}")
+
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "pro"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep), \
+             patch.object(app.db, "update_erp_endpoint",
+                          return_value=True) as update_mock:
+            with self._make_client() as client:
+                r = client.patch("/api/erp/endpoints/ep-1", json={
+                    "config": {
+                        "username_enc": already_ct_user,
+                        "password_enc": already_ct_pass,
+                    },
+                })
+
+        self.assertEqual(r.status_code, 200, r.text)
+        sent_config = update_mock.call_args.kwargs.get("config", {})
+        self.assertEqual(
+            sent_config["username_enc"], already_ct_user,
+            "PATCH double-encrypted already-encrypted username",
+        )
+        self.assertEqual(
+            sent_config["password_enc"], already_ct_pass,
+            "PATCH double-encrypted already-encrypted password",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

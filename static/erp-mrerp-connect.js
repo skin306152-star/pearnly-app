@@ -147,6 +147,14 @@
             zh_TW: '✓ 已連接 · 看到 {n} 個公司',
             ja: '✓ 接続済み — {n} 社が見つかりました',
         },
+        // P-4 (Zihao 2026-05-19 拍板 · v118.34.21) · 失败时把截图路径单独显示
+        'wiz-screenshot-saved': {
+            zh: '失败截图存到了:{path} · 发给客服可以加快排查',
+            en: 'Failure screenshot saved at: {path} · send this to support to speed up triage',
+            th: 'บันทึกภาพข้อผิดพลาดที่: {path} · ส่งให้ทีมซัพพอร์ตเพื่อช่วยตรวจสอบ',
+            zh_TW: '失敗截圖存到了:{path} · 發給客服可加快排查',
+            ja: 'エラースクショ保存先: {path} · サポートに送ると調査が早まります',
+        },
         'wiz-step-3-h': {
             zh: '选公司 + 推送模式',
             en: 'Pick the company and push mode',
@@ -863,6 +871,7 @@
               '</div>' +
               '<div class="mrerp-wizard-test-error" data-mw-test-error style="display:none;">' +
                 '<div data-mw-test-error-friendly></div>' +
+                '<div class="mrerp-wizard-test-error-screenshot" data-mw-test-error-screenshot style="display:none;"></div>' +
                 '<div class="mrerp-wizard-test-error-raw" data-mw-test-error-raw></div>' +
               '</div>' +
             '</div>'
@@ -1329,6 +1338,9 @@
             if (data.ok || data.success) {
                 _wizardState.companies = data.companies || [];
                 statusEl.textContent = t('wiz-test-ok', { n: (data.companies || []).length || 1 });
+                // 成功时清掉旧截图提示
+                const shotEl = w.querySelector('[data-mw-test-error-screenshot]');
+                if (shotEl) { shotEl.textContent = ''; shotEl.style.display = 'none'; }
             } else {
                 // v118.34.1 (Zihao 2026-05-19 拍板) · 错误条不能空白。
                 // 优先级:friendly[lang] > friendly.en > raw_error >
@@ -1345,8 +1357,24 @@
                 errBox.style.display = '';
                 w.querySelector('[data-mw-test-error-friendly]').textContent =
                     String(friendly).slice(0, 400);
+                // P-4 (Zihao 2026-05-19 拍板 · v118.34.21) · login-form 失败后端把
+                // 截图路径塞进 raw_error 字串("...screenshot=/tmp/mrerp_login_fail_<ts>.png")
+                // 在 dense raw_error block 里被 hidden。这里把它正则抽出来 ·
+                // 单独显示在 friendly + raw 之间 · 用户一眼看到能 scp 给客服。
+                const shotEl = w.querySelector('[data-mw-test-error-screenshot]');
+                const rawText = String(data.raw_error || data.response_body || '');
+                const shotMatch = rawText.match(/screenshot=(\S+\.png)/i);
+                if (shotEl) {
+                    if (shotMatch) {
+                        shotEl.textContent = t('wiz-screenshot-saved', { path: shotMatch[1] });
+                        shotEl.style.display = '';
+                    } else {
+                        shotEl.textContent = '';
+                        shotEl.style.display = 'none';
+                    }
+                }
                 w.querySelector('[data-mw-test-error-raw]').textContent =
-                    String(data.raw_error || data.response_body || '').slice(0, 400);
+                    rawText.slice(0, 400);
             }
         } catch (e) {
             statusEl.textContent = '✗';
@@ -1354,6 +1382,8 @@
             w.querySelector('[data-mw-test-error-friendly]').textContent =
                 String(e && e.message || e || 'connection failed').slice(0, 200);
             w.querySelector('[data-mw-test-error-raw]').textContent = '';
+            const shotEl = w.querySelector('[data-mw-test-error-screenshot]');
+            if (shotEl) { shotEl.textContent = ''; shotEl.style.display = 'none'; }
         }
     }
 

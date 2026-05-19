@@ -3596,21 +3596,61 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
 
 @app.patch("/api/erp/endpoints/{endpoint_id}")
 async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request: Request):
+    """P-3 (Zihao 2026-05-19 拍板 · v118.34.21) · PATCH 路由现在镜像 POST
+    路由的 Fernet 加密逻辑:wizard 编辑已有 endpoint 重新输入密码时,JS 把
+    新密码塞进 username_enc/password_enc 字段名(假签名)· 这条路径之前不
+    走加密 → DB 落明文 → test-connection 解密 InvalidToken → ERR_CRED_DECRYPT.
+
+    现在:如果目标 endpoint adapter=='mrerp' 且 PATCH config 携带
+    username_enc/password_enc · 用 kms_helper.is_encrypted 判断是不是真
+    ciphertext;明文就 encrypt_str 转一次再 update。已是 ciphertext
+    (gAAAAA*)的不动 · 防止 double-encrypt。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
     # 如果 config 里 token 是 "***" 占位符,说明用户没改 token,要保留旧值
     fields = {k: v for k, v in req.dict(exclude_unset=True).items() if v is not None}
+
+    # 先查目标 endpoint 的 adapter · PATCH 不带 adapter · 必须从已有数据看
+    existing_ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    target_adapter = (existing_ep.get("adapter") or "").strip().lower() if existing_ep else ""
+
     if "config" in fields:
         new_cfg = dict(fields["config"] or {})
         token = str(new_cfg.get("token", ""))
         if token and ("***" in token or token == ""):
-            old_ep = db.get_erp_endpoint(user["id"], endpoint_id)
-            if old_ep:
-                old_token = (old_ep.get("config") or {}).get("token", "")
+            if existing_ep:
+                old_token = (existing_ep.get("config") or {}).get("token", "")
                 if old_token:
                     new_cfg["token"] = old_token
         # 清掉前端塞的标记字段
         new_cfg.pop("_token_set", None)
+
+        # P-3 · MR.ERP 加密镜像 POST 路由 (v118.34.13 一致)
+        if target_adapter == "mrerp":
+            try:
+                from kms_helper import encrypt_str, is_encrypted
+                for fld in ("username_enc", "password_enc"):
+                    v = new_cfg.get(fld)
+                    if v and isinstance(v, str) and not is_encrypted(v):
+                        new_cfg[fld] = encrypt_str(v)
+            except ImportError as e:
+                _record_500(
+                    path=f"/api/erp/endpoints/{endpoint_id}", method="PATCH",
+                    detail=f"kms_helper unavailable: {e}",
+                )
+                raise HTTPException(
+                    500,
+                    detail="erp.kms_key_missing · server KMS_KEY env not set",
+                )
+            except Exception as e:
+                _record_500(
+                    path=f"/api/erp/endpoints/{endpoint_id}", method="PATCH",
+                    detail=f"encrypt failed: {type(e).__name__}: {e}",
+                )
+                raise HTTPException(
+                    500, detail=f"erp.encrypt_failed: {type(e).__name__}",
+                )
+
         fields["config"] = new_cfg
 
     # v0.8 · auto_push 权限
@@ -5157,10 +5197,10 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.34.20 · 写入 5 条新铁律 + 更新 STATE 文档:\n• CLAUDE.md/CLAUDE.md 新加 §9-§13(本窗口 A1-A4 沉淀的架构经验):\n  - §9 老 PHP 响应码 ≠ 业务成功(MR.ERP importpc '2' / alldel '成功')\n  - §10 所有 async 路由分支必须有「async context not stub」守门测试 · sync mock 不算\n  - §11 任何外部 listing 拉取必须 retry ≥1 次 + 失败截图 · 路由层 transient retry · 失败不缓存\n  - §12 状态字段单一 source of truth · 多处 UI 同步取 · 不许多字段并存\n  - §13 不许在 sync pytest mock 里证明 async 路由通 · 必须真 async + tripwire\n• docs/STATE_2026_05_19.md 追加本窗口收尾段 · 4 个 commit hash + 守门测试列表 + 未完成事项(B1-B8 真生产 E2E 因 token 缺失暂搁)\n\n没用户面变化 · 内部代码文档更新",
-            "en": "v118.34.20 · 5 new iron rules + STATE doc update:\n• CLAUDE.md/CLAUDE.md added §9-§13 (architectural lessons from this window's A1-A4):\n  - §9 Old PHP success codes ≠ business success (MR.ERP importpc '2' / alldel 'success')\n  - §10 Every async route branch must have an 'async context not stub' guard test · sync mock doesn't count\n  - §11 External listing fetches must retry ≥1 with failure screenshot · route-level transient retry · failures NOT cached\n  - §12 Status fields must be single source of truth · multi-place UI must read the same backend field · don't keep duplicate fields\n  - §13 Don't use sync pytest mocks to prove async routes work · must use real async + tripwire\n• docs/STATE_2026_05_19.md addendum · 4 commit hashes + guard test inventory + unfinished item (B1-B8 production E2E blocked on missing token)\n\nNo user-facing changes · internal code+doc update.",
-            "th": "v118.34.20 · เพิ่มกฎเหล็ก 5 ข้อ + อัปเดต STATE doc:\n• CLAUDE.md/CLAUDE.md เพิ่ม §9-§13 (สรุปประสบการณ์จาก A1-A4 ของ window นี้):\n  - §9 รหัสตอบกลับของระบบ PHP เก่า ≠ สำเร็จจริง (MR.ERP importpc '2' / alldel 'success')\n  - §10 ทุก async route ต้องมี guard test 'async context not stub' · sync mock ไม่นับ\n  - §11 การดึง listing ภายนอกต้อง retry ≥1 ครั้ง + screenshot ตอนล้มเหลว · route ระดับ transient retry · failure ไม่เก็บ cache\n  - §12 status field ต้องมี source of truth เดียว · UI ทุกที่ต้องอ่าน field เดียวกัน · ห้ามมี field ซ้ำ\n  - §13 ห้ามใช้ sync pytest mock พิสูจน์ว่า async route ใช้ได้ · ต้องเป็น real async + tripwire\n• docs/STATE_2026_05_19.md เพิ่มท้ายเรื่อง · commit hash 4 อัน + รายการ guard tests + งานค้าง (B1-B8 production E2E ติดเพราะไม่มี token)\n\nไม่มีการเปลี่ยนหน้าผู้ใช้ · เป็นการอัปเดตโค้ดและเอกสารภายใน",
-            "ja": "v118.34.20 · 鉄則 5 件追加 + STATE ドキュメント更新:\n• CLAUDE.md/CLAUDE.md に §9-§13 を追加(本ウィンドウ A1-A4 で得た知見):\n  - §9 古い PHP 成功コード ≠ ビジネス成功(MR.ERP importpc '2' / alldel '成功')\n  - §10 全ての async ルート分岐に「async context not stub」ガードテスト必須 · sync mock は不可\n  - §11 外部 listing 取得は retry ≥1 + 失敗時スクショ必須 · ルート層 transient retry · 失敗はキャッシュしない\n  - §12 ステータスフィールドは単一 source of truth · 多箇所 UI は同じバックエンドフィールドを読む · 複数フィールド禁止\n  - §13 sync pytest mock で async ルートの正常動作を証明禁止 · real async + tripwire 必須\n• docs/STATE_2026_05_19.md に本ウィンドウ追記 · 4 commit hash + ガードテスト一覧 + 未完成項目(B1-B8 本番 E2E は token 不足で保留)\n\nユーザー面変更なし · 内部コード+ドキュメント更新"
+            "zh": "v118.34.21 · 收尾 2 个老 bug (P-3 + P-4):\n• P-3:PATCH /api/erp/endpoints/:id 之前不加密 mrerp 凭据 · wizard 编辑老 endpoint 重新输密码 → 落库明文 → 下次 test-connection InvalidToken → ERR_CRED_DECRYPT. 现在 PATCH 也走 kms_helper.encrypt_str · 跟 POST 路由对齐 · 已加密的 ciphertext 不 double-encrypt.\n• P-4:wizard 测试连接失败后端把截图路径塞在 raw_error 一坨密集文本里用户看不见. 现在 JS 正则抽 screenshot=(\\S+\\.png) · 单独显示成「失败截图存到了:{path} · 发给客服可以加快排查」橙色高亮条 · 4 语都补.\n• 加守门测试 PatchEndpointEncryptionContractTests 2 条:plaintext 触发加密 · 已加密的不 double-encrypt.\n\n配过 mrerp 的话 · 试一次「编辑」改密码 · 改完应该还能正常测试连接.",
+            "en": "v118.34.21 · Closing out P-3 + P-4 from STATE.md:\n• P-3: PATCH /api/erp/endpoints/:id previously skipped mrerp credential encryption · wizard editing an existing endpoint with a fresh password would store plaintext under username_enc/password_enc · next test-connection's decrypt threw InvalidToken → ERR_CRED_DECRYPT. PATCH now mirrors POST's kms_helper.encrypt_str logic; already-encrypted ciphertext is NOT double-encrypted.\n• P-4: wizard test-connection failures left the screenshot path buried inside a dense raw_error blob. The JS now regex-extracts `screenshot=(\\S+\\.png)` and surfaces it on its own orange-bordered line: 'Failure screenshot saved at: {path} · send this to support'. 4-lang complete.\n• Added PatchEndpointEncryptionContractTests with 2 guards: plaintext triggers encryption · already-encrypted ciphertext is preserved.\n\nIf you have an MR.ERP endpoint, try editing it and changing the password — test-connection should keep working afterward.",
+            "th": "v118.34.21 · ปิดงาน 2 บัก P-3 + P-4:\n• P-3: PATCH /api/erp/endpoints/:id เดิมไม่เข้ารหัสข้อมูลรับรอง mrerp · เมื่อแก้ไข endpoint แล้วใส่รหัสผ่านใหม่ → เก็บ plaintext ใน DB → ครั้งถัดไป test-connection ถอดรหัสไม่ผ่าน → ERR_CRED_DECRYPT. ตอนนี้ PATCH ก็ใช้ kms_helper.encrypt_str เหมือน POST · ciphertext ที่เข้ารหัสแล้วไม่ encrypt ซ้ำ.\n• P-4: ตอนทดสอบเชื่อมต่อล้มเหลว backend แอบใส่ path สกรีนช็อตอยู่ใน raw_error ก้อนใหญ่ ผู้ใช้มองไม่เห็น · ตอนนี้ JS regex ดึง screenshot=(\\S+\\.png) ออกมาโชว์เป็นแถบสีส้ม 'บันทึกภาพข้อผิดพลาดที่: {path} · ส่งให้ทีมซัพพอร์ตเพื่อช่วยตรวจสอบ' · 4 ภาษาครบ.\n• เพิ่ม PatchEndpointEncryptionContractTests 2 ตัว: plaintext กระตุ้นการเข้ารหัส · ที่เข้ารหัสแล้วไม่ double-encrypt.\n\nถ้ามี endpoint mrerp อยู่แล้ว ลองคลิก 'แก้ไข' เปลี่ยนรหัสผ่าน · หลังบันทึก test-connection ควรใช้ได้ปกติ",
+            "ja": "v118.34.21 · STATE.md の P-3 + P-4 を回収:\n• P-3: PATCH /api/erp/endpoints/:id は mrerp 認証情報の暗号化をスキップしていた · ウィザードで既存 endpoint のパスワードを再入力すると平文が DB に保存 → 次回 test-connection 復号で InvalidToken → ERR_CRED_DECRYPT. PATCH も kms_helper.encrypt_str を通すように修正 · POST と一致 · 既に暗号化された ciphertext は再暗号化しない.\n• P-4: ウィザードの接続テスト失敗時、screenshot パスが raw_error の塊に埋もれてユーザーが見えなかった · JS で正規表現 `screenshot=(\\S+\\.png)` を抽出し、別行の橙色強調枠で「エラースクショ保存先: {path} · サポートに送ると調査が早まります」と表示 · 4 言語対応.\n• PatchEndpointEncryptionContractTests を 2 件追加: plaintext が暗号化される · 暗号化済みは double-encrypt しない.\n\nMR.ERP endpoint があれば「編集」でパスワード変更 → test-connection が継続して動くはず."
         }
     }
 

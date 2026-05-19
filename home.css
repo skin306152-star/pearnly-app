@@ -14252,8 +14252,18 @@ body.settings-modal-open { overflow: hidden; }
 }
 .settings-modal-overlay #page-settings .settings-side-nav {
     width: 220px;
-    min-height: 0;  /* v118.34.35 · 防 flex 子元素自然高度撑爆父容器 */
+    min-height: 0;
+    /* v118.34.36 · 真正修复响应式 bug · 根因: 基础规则 .settings-side-nav (home.css:9758)
+       含 max-height: calc(100vh - var(--topbar-h) - 32px) + position: sticky,
+       这两条在 modal 内不该应用 · modal 内 side-nav 应该让 flex 容器决定高度 · 不该
+       自己设 max-height (会比 modal 可用高度大很多 · 超出部分被父 overflow:hidden clip 掉 ·
+       自身 overflow-y:auto 永远不触发) */
+    max-height: none !important;
+    position: static !important;
+    top: auto !important;
+    border: none;
     border-right: 1px solid var(--line, #e5e7eb);
+    border-radius: 0;
     padding: 16px 8px;
     overflow-y: auto;
     overscroll-behavior: contain;

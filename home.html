@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11834938">
+<link rel="stylesheet" href="/static/home.css?v=11834939">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -22,11 +22,16 @@
     overflow: hidden !important;
 }
 .settings-modal-overlay #page-settings .settings-side-nav {
-    max-height: none !important;
+    /* v118.34.39 · 直接用 calc 卡死 max-height · 不再依赖 flex chain (align-items: stretch + min-height: 0)
+       根因 (2026-05-20 用户 DevTools 诊断抓出): 用户 viewport 659px / zoom 142% 时,
+       modal max-height 正确卡到 560px · 但 layout (flex:1) + side-nav 被 align-items:stretch 撑到
+       内容高度 611px · 超出 modal 90px · 被 modal overflow:hidden 切掉 · 永远看不到底部 '联系我们'.
+       现在直接给 side-nav 自己设 max-height: modal高度 - title bar (~80px) · bypass flex quirks. */
+    max-height: calc(min(85vh, 100vh - 64px) - 80px) !important;
     position: static !important;
     top: auto !important;
     min-height: 0 !important;
-    overflow-y: scroll !important;  /* v118.34.38 · 永远显示滚动条 · 不用 auto · 用户得能"看到"可以滚 */
+    overflow-y: scroll !important;
     flex-shrink: 0 !important;
     scrollbar-width: thin !important;
     scrollbar-gutter: stable !important;
@@ -6550,15 +6555,15 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11834938"></script>
+<script src="/static/home.js?v=11834939"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·
      独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834938">
-<script src="/static/erp-mrerp-connect.js?v=11834938" defer></script>
+<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834939">
+<script src="/static/erp-mrerp-connect.js?v=11834939" defer></script>
 <!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
-<script src="/static/erp-log-enhance.js?v=11834938" defer></script>
+<script src="/static/erp-log-enhance.js?v=11834939" defer></script>
 
 </body>
 </html>

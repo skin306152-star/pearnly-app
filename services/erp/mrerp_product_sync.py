@@ -268,7 +268,17 @@ class MRERPProductSyncService:
             self.cache.set(cache_key, l1.product_code)
             return l1
 
-        listing = self._fetch_listing()
+        # 最终冲刺 (Zihao 2026-05-19 拍板 · v118.34.27) · listing fetch 在 TEST2019
+        # 30s × 3 还炸 · 不让它阻断 lookup. fail-soft: 拿不到 listing 就当成 L2/L3
+        # 无 match · 让 lookup_or_create 走 L4 auto-create (创建不依赖 listing).
+        try:
+            listing = self._fetch_listing()
+        except MRERPTechnicalError as e:
+            logger.warning(
+                "product _fetch_listing failed in lookup · skipping L2/L3 · "
+                "fall through to None (caller will go L4 auto-create): %s", e,
+            )
+            return None
 
         l2 = self._layer2_exact_name(name_norm, listing)
         if l2 is not None:

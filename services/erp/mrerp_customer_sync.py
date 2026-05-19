@@ -325,7 +325,17 @@ class MRERPCustomerSyncService:
             return l1
 
         # L2/L3 · scan the live listing.
-        listing = self._fetch_listing()
+        # 最终冲刺 (Zihao 2026-05-19 拍板 · v118.34.27) · fail-soft listing fetch ·
+        # 镜像 product side · listing 拉不到不阻断 lookup · 让 lookup_or_create
+        # 走 L4 auto-create (创建路径不依赖 listing).
+        try:
+            listing = self._fetch_listing()
+        except MRERPTechnicalError as e:
+            logger.warning(
+                "customer _fetch_listing failed in lookup · skipping L2/L3 · "
+                "fall through to None (caller goes L4 auto-create): %s", e,
+            )
+            return None
 
         l2 = self._layer2_exact_name(name_norm, listing)
         if l2 is not None:

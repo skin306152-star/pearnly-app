@@ -2003,7 +2003,7 @@ const I18N = {
         // v118.32.5 · 标签按 Thai 客户要求重命名 + 同步其它语言
         'recon-tab-sale-vat': '销项税报告核查',
         'recon-tab-gl-vat':   '收入对账',
-        'glv-sub':            '总账（GL）vs 销项税报告 · 上传两份文件一键比对',
+        'glv-sub':            '总账（GL）vs 销项税报告 · 上传两份文件一键对账',
         'glv-up-vat-title':   '① 销项税报告',
         'glv-up-vat-sub':     '支持 Excel / PDF / 图片',
         'glv-up-gl-title':    '② 总账 GL',
@@ -32310,7 +32310,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
 /* ════════════════════════════════════════════════════════════════════
- * v118.32.5 · GL vs 销项税报表 对账模块
+ * v118.32.5 · GL vs 销项税报告 对账模块
  * ════════════════════════════════════════════════════════════════════ */
 (function () {
     'use strict';
@@ -32370,10 +32370,10 @@ window.addEventListener('DOMContentLoaded', () => {
             hist_delete:      '删除',
             confirm_delete:   '确认删除此任务？',
             s_gl_total:       '总账金额合计',
-            s_minus_gl_cr:    '减：销项税报告不存在的贷方记录',
-            s_plus_gl_dr:     '加：销项税报告不存在的借方记录',
-            s_plus_vat_p:     '加：总账不存在的销售记录',
-            s_minus_vat_n:    '减：总账不存在的红字发票记录',
+            s_minus_gl_cr:    '减：销项税报告中未列的贷方记录',
+            s_plus_gl_dr:     '加：销项税报告中未列的借方记录',
+            s_plus_vat_p:     '加：总账中未列的销售记录',
+            s_minus_vat_n:    '减：总账中未列的贷项凭单(credit note)记录',
             s_vat_total:      '销项税报告金额合计',
         },
         en: {

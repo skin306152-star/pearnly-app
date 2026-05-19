@@ -506,7 +506,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动 email_codes 建表失败: {e}")
 
-    # v118.32.5 · gl_vat_task 表(GL vs 销项税报表 对账)
+    # v118.32.5 · gl_vat_task 表(GL vs 销项税报告 对账)
     try:
         db.ensure_gl_vat_task_table()
     except Exception as e:

@@ -20,7 +20,7 @@ from field_comparator import compare_all_fields
 from vat_file_classifier import classify_file
 from vat_excel_exporter import export_recon_task
 from vat_ai_analyzer import analyze_diff
-# v118.32.5 · GL vs 销项税报表 对账
+# v118.32.5 · GL vs 销项税报告 对账
 from gl_vat_reconciler import (
     parse_gl, reconcile_gl_vat, export_gl_vat_excel,
     detail_to_json, summary_to_json,
@@ -923,7 +923,7 @@ async def export_excel(task_id: int, request: Request, lang: str = "th"):
 
 
 # ════════════════════════════════════════════════════════════════════
-# v118.32.5 · GL vs 销项税报表 对账（新功能）
+# v118.32.5 · GL vs 销项税报告 对账（新功能）
 # ════════════════════════════════════════════════════════════════════
 
 @router.post("/gl-vat/run")

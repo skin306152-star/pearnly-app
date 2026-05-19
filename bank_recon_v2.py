@@ -2201,8 +2201,8 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     # Sheet names
     "sh_summary":      {"th": "สรุป", "en": "Summary", "zh": "汇总", "ja": "サマリー"},
     "sh_matched":      {"th": "จับคู่แล้ว", "en": "Matched", "zh": "已匹配", "ja": "一致"},
-    "sh_unmatched_gl": {"th": "GL ไม่ตรง", "en": "Unmatched GL", "zh": "GL未匹配", "ja": "GL不一致"},
-    "sh_unmatched_st": {"th": "บัญชีไม่ตรง", "en": "Unmatched Stmt", "zh": "账单未匹配", "ja": "明細不一致"},
+    "sh_unmatched_gl": {"th": "GL ที่จับคู่ไม่ได้", "en": "Unmatched GL", "zh": "GL未匹配", "ja": "GL不一致"},
+    "sh_unmatched_st": {"th": "Statement ที่จับคู่ไม่ได้", "en": "Unmatched Stmt", "zh": "账单未匹配", "ja": "明細不一致"},
     # v118.34 · Consolidated Match Results sheet (matched + gl-only + stmt-only with Status col)
     "sh_match_results": {"th": "ผลการจับคู่", "en": "Match Results", "zh": "对账结果", "ja": "照合結果"},
     "status_matched":   {"th": "✓ จับคู่แล้ว", "en": "✓ Matched", "zh": "✓ 已匹配", "ja": "✓ 一致"},
@@ -2226,21 +2226,21 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     # Summary labels
     "lbl_bank":        {"th": "ธนาคาร", "en": "Bank", "zh": "银行", "ja": "銀行"},
     "lbl_gl_acct":     {"th": "รหัสบัญชี GL", "en": "GL Account", "zh": "GL科目", "ja": "GL科目"},
-    "lbl_stmt_open":   {"th": "ยอดเปิดต้นงวด (บัญชีธนาคาร)", "en": "Stmt Opening Balance", "zh": "账单期初余额", "ja": "明細期首残高"},
-    "lbl_stmt_close":  {"th": "ยอดปิดปลายงวด (บัญชีธนาคาร)", "en": "Stmt Closing Balance", "zh": "账单期末余额", "ja": "明細期末残高"},
-    "lbl_gl_open":     {"th": "ยอดเปิดต้นงวด (GL)", "en": "GL Opening Balance", "zh": "GL期初余额", "ja": "GL期首残高"},
-    "lbl_gl_close":    {"th": "ยอดปิดปลายงวด (GL)", "en": "GL Closing Balance", "zh": "GL期末余额", "ja": "GL期末残高"},
-    "lbl_open_diff":   {"th": "ผลต่างยอดเปิด", "en": "Opening Diff", "zh": "期初差异", "ja": "期首差異"},
+    "lbl_stmt_open":   {"th": "ยอดยกมา (Statement)", "en": "Stmt Opening Balance", "zh": "账单期初余额", "ja": "明細期首残高"},
+    "lbl_stmt_close":  {"th": "ยอดยกไป (Statement)", "en": "Stmt Closing Balance", "zh": "账单期末余额", "ja": "明細期末残高"},
+    "lbl_gl_open":     {"th": "ยอดยกมา (GL)", "en": "GL Opening Balance", "zh": "GL期初余额", "ja": "GL期首残高"},
+    "lbl_gl_close":    {"th": "ยอดยกไป (GL)", "en": "GL Closing Balance", "zh": "GL期末余额", "ja": "GL期末残高"},
+    "lbl_open_diff":   {"th": "ผลต่างยอดยกมา", "en": "Opening Diff", "zh": "期初差异", "ja": "期首差異"},
     "lbl_matched":     {"th": "รายการที่จับคู่ได้", "en": "Matched Items", "zh": "已匹配项目", "ja": "一致項目"},
     "lbl_gl_debit_only": {"th": "GL เดบิตเท่านั้น (ไม่มีในบัญชีธนาคาร)", "en": "GL Debit Only (not in stmt)", "zh": "GL仅借方（账单无）", "ja": "GLのみ借方"},
     "lbl_gl_credit_only": {"th": "GL เครดิตเท่านั้น (ไม่มีในบัญชีธนาคาร)", "en": "GL Credit Only (not in stmt)", "zh": "GL仅贷方（账单无）", "ja": "GLのみ貸方"},
-    "lbl_stmt_wd_only": {"th": "บัญชีถอนเท่านั้น (ไม่มีใน GL)", "en": "Stmt Withdrawal Only (not in GL)", "zh": "账单仅提款（GL无）", "ja": "明細のみ出金"},
-    "lbl_stmt_dep_only": {"th": "บัญชีฝากเท่านั้น (ไม่มีใน GL)", "en": "Stmt Deposit Only (not in GL)", "zh": "账单仅存款（GL无）", "ja": "明細のみ入金"},
+    "lbl_stmt_wd_only": {"th": "รายการถอนใน Statement เท่านั้น (ไม่มีใน GL)", "en": "Stmt Withdrawal Only (not in GL)", "zh": "账单仅提款（GL无）", "ja": "明細のみ出金"},
+    "lbl_stmt_dep_only": {"th": "รายการฝากใน Statement เท่านั้น (ไม่มีใน GL)", "en": "Stmt Deposit Only (not in GL)", "zh": "账单仅存款（GL无）", "ja": "明細のみ入金"},
     "lbl_formula_calc": {"th": "ยอดปิดคำนวณ (สูตร)", "en": "Calculated Closing (formula)", "zh": "公式计算期末余额", "ja": "計算期末残高（公式）"},
     "lbl_formula_diff": {"th": "ผลต่าง (ควรเป็น 0)", "en": "Difference (should be 0)", "zh": "差异（应为0）", "ja": "差異（0が理想）"},
     "lbl_count":        {"th": "จำนวน", "en": "Count", "zh": "数量", "ja": "件数"},
     "lbl_amount":       {"th": "จำนวนเงิน", "en": "Amount", "zh": "金额", "ja": "金額"},
-    "lbl_formula_title": {"th": "สูตรการสอบทาน", "en": "Reconciliation Formula", "zh": "对账公式", "ja": "照合公式"},
+    "lbl_formula_title": {"th": "สูตรการกระทบยอด", "en": "Reconciliation Formula", "zh": "对账公式", "ja": "照合公式"},
     "lbl_stats":        {"th": "สถิติ", "en": "Statistics", "zh": "统计", "ja": "統計"},
     # Match layer labels
     "layer_1":  {"th": "L1-ตรงวันที่", "en": "L1-ExactDate", "zh": "L1-精确日期", "ja": "L1-日付一致"},
@@ -2249,8 +2249,8 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     # Status labels
     "st_gl_debit_only": {"th": "GL เดบิตเท่านั้น", "en": "GL Debit Only", "zh": "GL仅借方", "ja": "GLのみ借方"},
     "st_gl_credit_only": {"th": "GL เครดิตเท่านั้น", "en": "GL Credit Only", "zh": "GL仅贷方", "ja": "GLのみ貸方"},
-    "st_stmt_wd_only": {"th": "บัญชีถอนเท่านั้น", "en": "Stmt Withdrawal Only", "zh": "账单仅提款", "ja": "明細のみ出金"},
-    "st_stmt_dep_only": {"th": "บัญชีฝากเท่านั้น", "en": "Stmt Deposit Only", "zh": "账单仅存款", "ja": "明細のみ入金"},
+    "st_stmt_wd_only": {"th": "รายการถอนเท่านั้น", "en": "Stmt Withdrawal Only", "zh": "账单仅提款", "ja": "明細のみ出金"},
+    "st_stmt_dep_only": {"th": "รายการฝากเท่านั้น", "en": "Stmt Deposit Only", "zh": "账单仅存款", "ja": "明細のみ入金"},
     # File-info diagnostics sheet
     "sh_fileinfo":      {"th": "ข้อมูลไฟล์", "en": "File Info", "zh": "文件信息", "ja": "ファイル情報"},
     "fi_type":          {"th": "ประเภท", "en": "Type", "zh": "类型", "ja": "種別"},
@@ -2259,7 +2259,7 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     "fi_bank_acct":     {"th": "ธนาคาร/บัญชี", "en": "Bank/Account", "zh": "银行/科目", "ja": "銀行/科目"},
     "fi_status":        {"th": "สถานะ", "en": "Status", "zh": "状态", "ja": "状態"},
     "fi_error":         {"th": "ข้อผิดพลาด", "en": "Error", "zh": "错误", "ja": "エラー"},
-    "fi_stmt_type":     {"th": "บัญชีธนาคาร", "en": "Bank Stmt", "zh": "银行账单", "ja": "銀行明細"},
+    "fi_stmt_type":     {"th": "Statement ธนาคาร", "en": "Bank Stmt", "zh": "银行账单", "ja": "銀行明細"},
     "fi_gl_type":       {"th": "GL", "en": "GL", "zh": "总账(GL)", "ja": "GL"},
     "fi_ok":            {"th": "✓ สำเร็จ", "en": "✓ OK", "zh": "✓ 成功", "ja": "✓ 成功"},
     "fi_warn":          {"th": "⚠ 0 แถว", "en": "⚠ 0 rows", "zh": "⚠ 0行", "ja": "⚠ 0行"},
@@ -2267,7 +2267,7 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     # v118.33.13.0 · OCR verification labels
     "lbl_ocr_check":    {"th": "ตรวจสอบความถูกต้องของ OCR", "en": "OCR Accuracy Check",
                          "zh": "OCR 准确性核查", "ja": "OCR精度チェック"},
-    "lbl_ocr_bal_warn": {"th": "ยอดคงเหลือไม่ตรง (ต้องตรวจ)", "en": "Balance mismatch (review)",
+    "lbl_ocr_bal_warn": {"th": "ยอดคงเหลือไม่ตรง (โปรดตรวจสอบ)", "en": "Balance mismatch (review)",
                          "zh": "余额验证未通过", "ja": "残高検証エラー"},
     "lbl_ocr_lowconf":  {"th": "ความมั่นใจต่ำ (เลือนราง)", "en": "Low confidence (blurry)",
                          "zh": "低置信度（模糊）", "ja": "信頼度低（不鮮明）"},
@@ -2304,7 +2304,7 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
                            "zh": "金额", "ja": "金額"},
     "detail_no_items":    {"th": "ไม่มี", "en": "(none)",
                            "zh": "无", "ja": "なし"},
-    "sec_open_diff_expand": {"th": "ผลต่างยอดเปิด (ยอดเปิดบัญชี − ยอดเปิด GL)",
+    "sec_open_diff_expand": {"th": "ผลต่างยอดยกมา (ยอดยกมา Statement − ยอดยกมา GL)",
                              "en": "Opening Diff (Stmt Open − GL Open)",
                              "zh": "期初差异（账单期初 − GL期初）",
                              "ja": "期首差異（明細期首 − GL期首）"},
@@ -2385,11 +2385,11 @@ _USAGE_BLOCKS: Dict[str, List[Tuple[str, bool]]] = {
          "Pearnly will NEVER auto-fill an unclear digit — if we can't read it, we flag it; we don't guess for you.", False),
     ],
     "th": [
-        ("รายงานการสอบทาน GL กับบัญชีธนาคาร · วิธีใช้งาน", True),
+        ("รายงานการกระทบยอด GL กับบัญชีธนาคาร · วิธีใช้งาน", True),
         ("", False),
         ("โครงสร้าง Sheet (รวม 4 แผ่น):", True),
-        ("• 'สรุป'                          แผ่นนี้ · ข้อมูลไฟล์ สูตรสอบทาน สถิติ และคำแนะนำการใช้งาน", False),
-        ("• 'ผลการจับคู่'                   รายการจับคู่ + GL ไม่ตรง + บัญชีไม่ตรง พร้อมคอลัมน์สถานะ", False),
+        ("• 'สรุป'                          แผ่นนี้ · ข้อมูลไฟล์ สูตรกระทบยอด สถิติ และคำแนะนำการใช้งาน", False),
+        ("• 'ผลการจับคู่'                   รายการจับคู่ + GL ที่จับคู่ไม่ได้ + Statement ที่จับคู่ไม่ได้ พร้อมคอลัมน์สถานะ", False),
         ("• 'รายละเอียดบัญชี'               รายการบัญชีที่ OCR อ่านได้ทั้งหมด + ความมั่นใจ + ผลตรวจยอด", False),
         ("• 'รายละเอียดบัญชีแยกประเภท'      รายการบัญชีแยกประเภท (GL) ที่ OCR อ่านได้ทั้งหมด", False),
         ("", False),
@@ -2401,9 +2401,9 @@ _USAGE_BLOCKS: Dict[str, List[Tuple[str, bool]]] = {
         ("• ตรวจยอด ⚠ตรวจ: ไม่ตรง — น่าจะ OCR อ่านผิด โปรดตรวจ PDF ต้นฉบับ", False),
         ("• ตรวจยอด —    : ตรวจไม่ได้ (บรรทัดแรกหรือไม่มียอด)", False),
         ("", False),
-        ("สูตรการสอบทาน:", True),
-        ("  ปิด GL + ผลต่างยอดเปิด − GL เดบิตเท่านั้น + GL เครดิตเท่านั้น − บัญชีถอนเท่านั้น + บัญชีฝากเท่านั้น = ปิดคำนวณ", False),
-        ("  ปิดคำนวณ ควรเท่ากับ ปิดบัญชี; ผลต่าง = ปิดคำนวณ − ปิดบัญชี (ควรเป็น 0)", False),
+        ("สูตรการกระทบยอด:", True),
+        ("  ปิด GL + ผลต่างยอดยกมา − GL เดบิตเท่านั้น + GL เครดิตเท่านั้น − รายการถอนเท่านั้น + รายการฝากเท่านั้น = ปิดคำนวณ", False),
+        ("  ปิดคำนวณ ควรเท่ากับ ยอดยกไป Statement; ผลต่าง = ปิดคำนวณ − ยอดยกไป Statement (ควรเป็น 0)", False),
         ("", False),
         ("สำคัญ: PDF ที่สแกนผ่าน AI OCR ย่อมมีความเสี่ยงในการอ่านผิดเสมอ "
          "แถวที่ติด ⚠ หรือ ◌ ต้องตรวจสอบกับ PDF ต้นฉบับก่อนเชื่อถือทุกครั้ง "
@@ -2629,7 +2629,7 @@ def export_bank_recon_excel(
 
     # ── 1. Title ──
     _RECON_TITLE = {"en": "Bank Reconciliation", "zh": "银行对账",
-                    "th": "สอบทาน GL กับบัญชีธนาคาร", "ja": "銀行照合"}
+                    "th": "กระทบยอด GL กับบัญชีธนาคาร", "ja": "銀行照合"}
     r = 1
     _title_row(r, f"{_RECON_TITLE.get(lang, 'Bank Reconciliation')} · {summary.bank_code.upper()}")
     r += 1

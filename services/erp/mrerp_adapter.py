@@ -903,9 +903,32 @@ class MRERPAdapter:
         except (PWTimeout, PWError) as e:
             raise MRERPTechnicalError(f"formupload nav timeout: {e}") from e
 
+        # 最终冲刺 v118.34.30 (Zihao 2026-05-19 拍板) · 镜像 Bug 8 修法到
+        # upload nav. 长 sync (listing fetch retry × 3 = 90s) 后 · MR.ERP
+        # session 可能已过期 · upload nav 被 bounce 回 login.php · 抛
+        # MRERPAuthError. 改:detect bounce + auto re-login + retry once ·
+        # 让 push 跨过 session 真过期场景 · 不报 ERR_AUTH 给用户.
         if self._is_login_bounced():
-            self._logged_in = self._company_selected = False
-            raise MRERPAuthError("session expired before upload")
+            logger.warning(
+                "[upload] nav bounced to login · attempting re-login + retry"
+            )
+            self._logged_in = False
+            self._company_selected = False
+            try:
+                self.login()
+                self.select_company()
+                page.goto(upload_url,
+                          wait_until="networkidle",
+                          timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            except Exception as e:
+                raise MRERPAuthError(
+                    f"upload nav session re-login failed: {type(e).__name__}: {e}"
+                ) from e
+            if self._is_login_bounced():
+                self._logged_in = self._company_selected = False
+                raise MRERPAuthError(
+                    "session expired before upload (re-login did not recover)"
+                )
 
         # Step B: write xlsx bytes to a temp file (set_input_files requires
         # a path) and feed it to the file input.

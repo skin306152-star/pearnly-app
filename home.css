@@ -2559,6 +2559,33 @@ body.sidebar-collapsed .nav-lock-icon {
 .log-tag.manual { background: #F3F4F6; color: #6B7280; }
 .log-invoice { min-width: 100px; color: var(--ink); }
 .log-seller { flex: 1; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 批 1 改动 5 + 改动 8 (v118.34.33) · Pearnly 客户列 + ERP 列 */
+.log-client {
+    min-width: 110px;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+.log-client-empty {
+    color: #9ca3af;
+    font-style: italic;
+    font-weight: normal;
+    cursor: help;
+}
+.log-erp {
+    min-width: 90px;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+.log-erp-deleted {
+    color: #9ca3af;
+    font-style: italic;
+}
 .log-http { color: var(--ink-3); }
 .log-elapsed { color: var(--ink-3); min-width: 60px; text-align: right; }
 

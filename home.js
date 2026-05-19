@@ -1202,6 +1202,12 @@ const I18N = {
         'erp-log-col-seller': '卖家',
         'erp-log-col-http': 'HTTP',
         'erp-log-col-elapsed': '耗时',
+        // 批 1 改动 5 + 改动 8 (v118.34.33) · 加 Pearnly 客户 + ERP 列
+        'erp-log-col-client': 'Pearnly 客户',
+        'erp-log-col-erp': 'ERP',
+        'erp-log-client-unassigned': '未归属',
+        'erp-log-client-unassigned-tip': '这张发票没分配 Pearnly 客户 · 在发票详情里指定',
+        'erp-log-endpoint-deleted': '已删除',
         'erp-batch-confirm': '确认对所选 {n} 条记录批量重推?',
         'erp-batch-result': '批量完成 · 成功 {ok} 条 · 失败 {fail} 条 · 跳过 {skip} 条',
         'erp-batch-empty-warn': '请先勾选至少一条失败记录',
@@ -3591,6 +3597,11 @@ const I18N = {
         'erp-log-col-seller': 'Seller',
         'erp-log-col-http': 'HTTP',
         'erp-log-col-elapsed': 'Elapsed',
+        'erp-log-col-client': 'Pearnly Client',
+        'erp-log-col-erp': 'ERP',
+        'erp-log-client-unassigned': 'Unassigned',
+        'erp-log-client-unassigned-tip': 'No Pearnly client assigned · open the invoice details to set one',
+        'erp-log-endpoint-deleted': 'Deleted',
         'erp-batch-confirm': 'Re-push the {n} selected records?',
         'erp-batch-result': 'Done · {ok} succeeded · {fail} failed · {skip} skipped',
         'erp-batch-empty-warn': 'Please select at least one failed record',
@@ -5973,6 +5984,11 @@ const I18N = {
         'erp-log-col-seller': 'ผู้ขาย',
         'erp-log-col-http': 'HTTP',
         'erp-log-col-elapsed': 'ใช้เวลา',
+        'erp-log-col-client': 'ลูกค้า Pearnly',
+        'erp-log-col-erp': 'ERP',
+        'erp-log-client-unassigned': 'ยังไม่ได้กำหนด',
+        'erp-log-client-unassigned-tip': 'ใบกำกับนี้ยังไม่ได้กำหนดลูกค้า Pearnly · เปิดรายละเอียดใบกำกับเพื่อเลือก',
+        'erp-log-endpoint-deleted': 'ถูกลบ',
         'erp-batch-confirm': 'ส่งซ้ำ {n} รายการที่เลือก?',
         'erp-batch-result': 'เสร็จสิ้น · สำเร็จ {ok} · ล้มเหลว {fail} · ข้าม {skip}',
         'erp-batch-empty-warn': 'กรุณาเลือกอย่างน้อย 1 รายการที่ล้มเหลว',
@@ -8347,6 +8363,11 @@ const I18N = {
         'erp-log-col-seller': '販売者',
         'erp-log-col-http': 'HTTP',
         'erp-log-col-elapsed': '経過',
+        'erp-log-col-client': 'Pearnly 取引先',
+        'erp-log-col-erp': 'ERP',
+        'erp-log-client-unassigned': '未割当',
+        'erp-log-client-unassigned-tip': 'この請求書には Pearnly 取引先が未割当 · 請求書詳細を開いて指定してください',
+        'erp-log-endpoint-deleted': '削除済み',
         'erp-batch-confirm': '選択した {n} 件を一括再送しますか?',
         'erp-batch-result': '完了 · 成功 {ok} · 失敗 {fail} · スキップ {skip}',
         'erp-batch-empty-warn': '失敗した記録を最低 1 件選択してください',
@@ -15252,7 +15273,11 @@ async function loadErpLogs() {
             + `<span class="log-status">${escapeHtml(t('erp-log-col-status'))}</span>`
             + `<span class="log-tag-header">${escapeHtml(t('erp-log-col-trigger'))}</span>`
             + `<span class="log-invoice">${escapeHtml(t('erp-log-col-invoice'))}</span>`
+            // 批 1 改动 5 (v118.34.33) · 新增 "Pearnly 客户" 列 · 跟 "卖家" 分开
+            + `<span class="log-client">${escapeHtml(t('erp-log-col-client'))}</span>`
             + `<span class="log-seller">${escapeHtml(t('erp-log-col-seller'))}</span>`
+            // 改动 8 · "ERP" 列(走哪个 endpoint)
+            + `<span class="log-erp">${escapeHtml(t('erp-log-col-erp'))}</span>`
             + `<span class="log-http">${escapeHtml(t('erp-log-col-http'))}</span>`
             + `<span class="log-elapsed">${escapeHtml(t('erp-log-col-elapsed'))}</span>`
             + '</div>';
@@ -15310,6 +15335,14 @@ async function loadErpLogs() {
             const cb = canSelect
                 ? `<input type="checkbox" class="erp-log-cb" data-log-cb="${escapeHtml(log.id)}" ${checked}>`
                 : `<span class="erp-log-cb-spacer"></span>`;
+            // 批 1 改动 5 (v118.34.33) · Pearnly 客户列 · 未归属灰色提示用户补
+            const clientCell = log.client_name
+                ? `<span class="log-client">${escapeHtml((log.client_name || '').substring(0, 18))}</span>`
+                : `<span class="log-client log-client-empty" title="${escapeHtml(t('erp-log-client-unassigned-tip'))}">${escapeHtml(t('erp-log-client-unassigned'))}</span>`;
+            // 改动 8 (v118.34.33) · ERP 列 · endpoint 名(用户起的)
+            const erpCell = log.endpoint_name
+                ? `<span class="log-erp">${escapeHtml((log.endpoint_name || '').substring(0, 14))}</span>`
+                : `<span class="log-erp log-erp-deleted">${escapeHtml(t('erp-log-endpoint-deleted'))}</span>`;
             return `
                 <div class="erp-log-row ${statusClass}" data-log-detail="${escapeHtml(log.id)}">
                     ${cb}
@@ -15317,7 +15350,9 @@ async function loadErpLogs() {
                     <span class="log-status" title="${escapeHtml(statusLabel)}">${statusIcon}</span>
                     ${triggerTag}
                     <span class="log-invoice">${escapeHtml(log.invoice_no || '-')}</span>
+                    ${clientCell}
                     <span class="log-seller">${escapeHtml((log.seller_name || '').substring(0, 20))}</span>
+                    ${erpCell}
                     <span class="log-http">HTTP ${log.http_status || '-'}</span>
                     <span class="log-elapsed">${log.elapsed_ms}ms</span>
                     ${retryChip}

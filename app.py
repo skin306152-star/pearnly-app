@@ -476,6 +476,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动 supplier_categories 建表失败: {e}")
 
+    # 批 1 改动 1 (Zihao 2026-05-19 拍板 · v118.34.33) · buyer→client 学习表
+    try:
+        db.ensure_buyer_to_client_table()
+    except Exception as e:
+        logger.warning(f"启动 buyer_to_client_memory 建表失败: {e}")
+
     # v118.27.5 · users.google_sub 列(Google OAuth 关联)
     try:
         db.ensure_google_sub_column()
@@ -859,15 +865,26 @@ async def _run_erp_retry_tick():
                     db.clear_retry_schedule(str(log["id"]))
                     logger.info(f"[erp_retry] log {log['id']} 重试 #{new_count} 成功")
                 else:
-                    # 仍失败 · 看还有没有下一次
-                    next_delay = db.get_erp_retry_delay_sec(new_count)
-                    if next_delay is None:
-                        # 用完 3 次 · 不再调度 · 等用户手动
+                    # 批 1 改动 3 (v118.34.33) · 用户数据错 retry 阶段也要识别 ·
+                    # 一旦从技术错变成用户数据错(或本来就是)· 立刻摘队列.
+                    if db.is_user_data_error(result.get("error_msg")):
                         db.clear_retry_schedule(str(log["id"]))
-                        logger.warning(f"[erp_retry] log {log['id']} 重试 {new_count} 次仍失败 · 停止")
+                        logger.info(
+                            "[erp_retry] log %s 重试 #%d 命中 user-data 错 · "
+                            "停止队列 (err=%r)",
+                            log["id"], new_count,
+                            (result.get("error_msg") or "")[:80],
+                        )
                     else:
-                        db.schedule_log_retry(str(log["id"]), next_delay)
-                        logger.info(f"[erp_retry] log {log['id']} 重试 #{new_count} 失败 · {next_delay}s 后再试")
+                        # 仍失败 · 看还有没有下一次
+                        next_delay = db.get_erp_retry_delay_sec(new_count)
+                        if next_delay is None:
+                            # 用完 3 次 · 不再调度 · 等用户手动
+                            db.clear_retry_schedule(str(log["id"]))
+                            logger.warning(f"[erp_retry] log {log['id']} 重试 {new_count} 次仍失败 · 停止")
+                        else:
+                            db.schedule_log_retry(str(log["id"]), next_delay)
+                            logger.info(f"[erp_retry] log {log['id']} 重试 #{new_count} 失败 · {next_delay}s 后再试")
             except Exception as e_inner:
                 logger.warning(f"[erp_retry] 单条处理失败 log_id={log.get('id')}: {e_inner}")
                 # 单条失败不影响其它
@@ -2477,6 +2494,79 @@ async def ocr_recognize(
                 primary_archive_name = g_archive_name
                 primary_category_tag = g_category_tag
 
+            # 批 1 改动 1 (Zihao 2026-05-19 拍板 · v118.34.33) · auto-resolve
+            # client_id. 如果右上角客户切换器没选 client_id (常态) · 按
+            # buyer_name + buyer_tax 匹配 Pearnly 客户:
+            #   ≥0.95 → 自动 assign + 学习 · 让 auto-push 继续
+            #   0.80-0.95 → 不 assign · 写 suggested_client_id 到 history.pages
+            #               + 不 trigger auto-push (等用户确认)
+            #   <0.80 → 不 assign · 不 trigger auto-push
+            _auto_resolved_client = False
+            try:
+                history_existing_client = (
+                    int(client_id) if (client_id and str(client_id).strip().isdigit())
+                    else None
+                )
+                if not history_existing_client:
+                    _buyer_name = (g_fields or {}).get("buyer_name")
+                    _buyer_tax = (g_fields or {}).get("buyer_tax")
+                    resolved = db.try_resolve_buyer_to_client(
+                        buyer_name=_buyer_name,
+                        buyer_tax=_buyer_tax,
+                        user_id=str(user["id"]),
+                        tenant_id=_tid(user),
+                    )
+                    if resolved:
+                        conf = resolved.get("confidence", 0.0)
+                        rcid = resolved.get("client_id")
+                        if conf >= 0.95 and rcid:
+                            # 自动绑 + 学习
+                            db.update_history_client_id(
+                                hid, rcid, str(user["id"]),
+                                tenant_id=_tid(user),
+                            )
+                            db.learn_buyer_to_client(
+                                _buyer_name, _buyer_tax, rcid,
+                                str(user["id"]), tenant_id=_tid(user),
+                            )
+                            _auto_resolved_client = True
+                            logger.info(
+                                "[auto-resolve] history=%s client_id=%s "
+                                "name=%r conf=%.2f source=%s",
+                                hid[:8], rcid, resolved.get("client_name"),
+                                conf, resolved.get("match_source"),
+                            )
+                        elif conf >= 0.80 and rcid:
+                            # 建议归属 · 不 auto-assign · 标 suggestion
+                            # 抽屉 UI 显示 "建议归属 X · 点确认"
+                            logger.info(
+                                "[auto-resolve] SUGGEST history=%s client_id=%s "
+                                "name=%r conf=%.2f",
+                                hid[:8], rcid, resolved.get("client_name"), conf,
+                            )
+                            # 把 suggestion stash 到 history.pages[0].fields 让前端读
+                            try:
+                                _new_pages = [dict(p) for p in (g_pages_for_save or [])]
+                                if _new_pages:
+                                    _f = dict(_new_pages[0].get("fields") or {})
+                                    _f["_suggested_client_id"] = rcid
+                                    _f["_suggested_client_name"] = resolved.get("client_name")
+                                    _f["_suggested_client_confidence"] = conf
+                                    _new_pages[0] = {**_new_pages[0], "fields": _f}
+                                    db.update_ocr_history_pages(
+                                        str(user["id"]), hid, _new_pages,
+                                        tenant_id=_tid(user),
+                                    )
+                            except Exception as _se:
+                                logger.warning(f"stash suggestion failed: {_se}")
+                    else:
+                        logger.info(
+                            "[auto-resolve] no match history=%s buyer=%r",
+                            hid[:8], (_buyer_name or "")[:40],
+                        )
+            except Exception as _are:
+                logger.warning(f"auto-resolve client_id failed (history={hid[:8]}): {_are}")
+
             # v118.20.1 · 异常栏 · 异步跑零成本规则(不阻塞 OCR 主流程)
             try:
                 import asyncio as _asyncio_exc
@@ -2503,16 +2593,43 @@ async def ocr_recognize(
                 logger.warning(f"异常检测入队失败(不影响识别): {_exc_e}")
 
     # v0.9 · 自动推送 ERP(异步 · 不阻塞返回)· 每张发票都推
+    # 批 1 改动 1 (v118.34.33) · 只对有 client_id 的 history 触发 auto-push.
+    # 没 client_id 的就交给「待归属」/「建议归属」UI 让用户确认 · 防止
+    # auto-push 必炸 ERR_NO_CLIENT 浪费 retry 队列(对应 Zihao 截图里
+    # 一直 retry 的混乱).
     auto_pushed = False
     if history_ids and _plan_permissions(plan).get("can_auto_push_erp"):
         try:
             auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
             if auto_eps:
-                import asyncio
+                # 重新查 history 拿真实 client_id (auto-resolve 已经 update 过)
+                pushable_ids = []
                 for hid in history_ids:
-                    asyncio.create_task(_auto_push_history(str(user["id"]), hid, auto_eps, tenant_id=_tid(user)))
-                auto_pushed = True
-                logger.info(f"🚀 自动推送已入队 · {len(history_ids)} 张发票 × {len(auto_eps)} 端点")
+                    h = db.get_ocr_history_detail(
+                        str(user["id"]), hid, tenant_id=_tid(user),
+                    )
+                    if h and h.get("client_id"):
+                        pushable_ids.append(hid)
+                    else:
+                        logger.info(
+                            "[auto-push] skip history=%s · no client_id assigned",
+                            hid[:8],
+                        )
+                if pushable_ids:
+                    import asyncio
+                    for hid in pushable_ids:
+                        asyncio.create_task(
+                            _auto_push_history(
+                                str(user["id"]), hid, auto_eps,
+                                tenant_id=_tid(user),
+                            ),
+                        )
+                    auto_pushed = True
+                    logger.info(
+                        "🚀 自动推送已入队 · %d/%d 张发票 × %d 端点 "
+                        "(没归属的发票跳过)",
+                        len(pushable_ids), len(history_ids), len(auto_eps),
+                    )
         except Exception as e:
             logger.warning(f"自动推送入队失败(不影响识别): {e}")
         # v27.8.1.3 · 同时触发 Xero 自动推(独立通道 · 跟 webhook 并存)
@@ -4106,10 +4223,18 @@ async def erp_push(req: ErpPushRequest, request: Request):
                                   "success" if result["success"] else "failed")
 
     # v118.25 · 手动推送失败 · 也进重试队列(给用户"扔出去就不管"的体验)
+    # 批 1 改动 3 (v118.34.33) · 用户数据错(ERR_NO_CLIENT 等)不入重试 ·
+    # retry 没意义 + 污染队列.
     if not result["success"] and log_id:
-        first_delay = db.get_erp_retry_delay_sec(0)
-        if first_delay is not None:
-            db.schedule_log_retry(str(log_id), first_delay)
+        if db.is_user_data_error(result.get("error_msg")):
+            logger.info(
+                "[push] user-data error · NOT scheduling retry · log=%s err=%r",
+                str(log_id)[:8], (result.get("error_msg") or "")[:80],
+            )
+        else:
+            first_delay = db.get_erp_retry_delay_sec(0)
+            if first_delay is not None:
+                db.schedule_log_retry(str(log_id), first_delay)
 
     return {
         "ok": result["success"],
@@ -4170,11 +4295,19 @@ async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict
             )
 
             # v118.25 · 自动推送失败 · 进入重试队列(60s 后第一次重试)
+            # 批 1 改动 3 (v118.34.33) · 用户数据错跳过重试队列.
             if not result["success"] and new_log_id:
-                first_delay = db.get_erp_retry_delay_sec(0)
-                if first_delay is not None:
-                    db.schedule_log_retry(str(new_log_id), first_delay)
-                    logger.info(f"[AutoPush] 失败入重试队列 · log={new_log_id} · {first_delay}s 后第 1 次重试")
+                if db.is_user_data_error(result.get("error_msg")):
+                    logger.info(
+                        "[AutoPush] user-data error · NOT scheduling retry · "
+                        "log=%s err=%r", str(new_log_id)[:8],
+                        (result.get("error_msg") or "")[:80],
+                    )
+                else:
+                    first_delay = db.get_erp_retry_delay_sec(0)
+                    if first_delay is not None:
+                        db.schedule_log_retry(str(new_log_id), first_delay)
+                        logger.info(f"[AutoPush] 失败入重试队列 · log={new_log_id} · {first_delay}s 后第 1 次重试")
 
             logger.info(
                 f"[AutoPush] user={user_id[:8]}.. history={history_id[:8]}.. "
@@ -5275,7 +5408,8 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.34.28 · 死链修:derive_mrerp_invoice_no seq 不再写死 001:\n• 根因:第一笔 push 成功 → bill_no SI690519-001 · 第二笔 push (同一天) MR.ERP 报「เลขที่ดังกล่าวมีอยู่ในระบบแล้ว(已存在)」· 因为 derive_mrerp_invoice_no seq 写死 \"001\" · 同一天所有 push 都 derive YYMMDD-001 撞\n• 之前的 docstring 写「序号取 history.id 末 3 位 hex 转 dec mod 1000」但代码写错成 hardcode \"001\" · 注释和实现不一致\n• 修:按 docstring 真实现 · 用 history.id 末 6 位 hex 转 dec mod 999 + 1 (避开 000)· 同一 history 重传幂等 · 不同 history 序号不同\n• 测试: 5 个 uuid → 5 个不同 seq (460/272/732/705/078) · 同 uuid 两次 → 同 seq (441/441) · 幂等保证\n\n现在可以并发推多笔 · 不会撞 invoice_no",
+            "zh": "v118.34.33 · 批 1 · OCR 自动归属客户 + 不 retry 用户数据错 + 日志加客户/ERP 列:\n• 改动 1 OCR 完自动 resolve client_id:按 buyer_name + buyer_tax 匹配 Pearnly 客户表(税号 0.98 / 完全名 0.95 / substring 0.80-0.90 / 学习记忆 1.0)· ≥0.95 自动绑 + 学习下次 · 0.80-0.95 标 suggested_client_id · <0.80 不绑 · 没归属的发票直接不入 auto-push 队列(不再炸 ERR_NO_CLIENT)\n• 改动 3 retry 区分用户数据错:USER_DATA_ERROR_CODES (NO_CLIENT/NO_CUSTOMER_MAPPING/NO_INVOICE_NO/DATE_FUTURE/DUPLICATE_INVOICE 等) + 泰文 raw 模式 · 这类错不进重试队列 · retry worker 命中也立刻摘队列\n• 改动 5 日志列表加 Pearnly 客户列:LEFT JOIN clients · UI 显示 client_name · 未归属灰色「未归属」+ tip\n• 改动 8 顺便做 ERP 列:LEFT JOIN erp_endpoints · 显示 endpoint.name(用户起的)\n• 新 db 表 buyer_to_client_memory · 用户在抽屉 assign 时学习 buyer→client · 下次 OCR 自动归属\n\n上传一张 buyer 跟已有客户名相似的发票 · 应该自动归属 + auto-push 成功",
+            "release_notes_archived_v34_28": "v118.34.28 · 死链修:derive_mrerp_invoice_no seq 不再写死 001:\n• 根因:第一笔 push 成功 → bill_no SI690519-001 · 第二笔 push (同一天) MR.ERP 报「เลขที่ดังกล่าวมีอยู่ในระบบแล้ว(已存在)」· 因为 derive_mrerp_invoice_no seq 写死 \"001\" · 同一天所有 push 都 derive YYMMDD-001 撞\n• 之前的 docstring 写「序号取 history.id 末 3 位 hex 转 dec mod 1000」但代码写错成 hardcode \"001\" · 注释和实现不一致\n• 修:按 docstring 真实现 · 用 history.id 末 6 位 hex 转 dec mod 999 + 1 (避开 000)· 同一 history 重传幂等 · 不同 history 序号不同\n• 测试: 5 个 uuid → 5 个不同 seq (460/272/732/705/078) · 同 uuid 两次 → 同 seq (441/441) · 幂等保证\n\n现在可以并发推多笔 · 不会撞 invoice_no",
             "release_notes_archived_v34_27": "v118.34.27 · listing 拉不到不再阻断 push · fail-soft 走 auto-create:\n• 根因:TEST2019 stkmas listing 在 30s × 3 retries 都拉不出来(MR.ERP 服务端慢或 #showdata p selector 不命中)· 之前 listing fetch 在 lookup() 里 raise · 整个 push fail\n• 修:mrerp_customer_sync.lookup + mrerp_product_sync.lookup 把 _fetch_listing() try/catch MRERPTechnicalError · 失败时 log warning + return None · 让 lookup_or_create 走 L4 auto-create (创建路径 stkmas/allform.php 不依赖 allview.php listing)\n• 效果:listing 拉不到 → L1 DB mapping 没命中 → L2/L3 listing 路径 fail-soft return None → L4 自动建用 seed 模板 · push 继续\n• 跟之前 v34.26 sync 吞 MRERPTechnicalError 是互补:v34.26 在 sync 顶层吞 · v34.27 在 lookup 里 fail-soft 让 lookup_or_create 能继续走 L4\n\n这是 stkmas listing 慢的兜底方案 · 自动建客户/商品全链路通",
             "release_notes_archived_v34_26": "v118.34.26 · 修 3 个生产卡点 (a/b/c):\n• 问题 a sync listing timeout 让整批 push 炸:adapter._sync_master_data 现在也 catch MRERPTechnicalError(之前只 catch MRERPBusinessError)· listing fetch 超时不再炸整批 · 让 validate_history_for_sales_credit 后面 ERR_NO_CUSTOMER_MAPPING preflight 早返友好错给用户。customer + product 两侧同步\n• 问题 b ERR_NO_CUSTOMER_MAPPING friendly 改 action-oriented:旧「该客户未配置 MR.ERP 客户码映射」→ 新「这个客户在 MR.ERP 里还没对应客户码 · 请打开 MR.ERP 连接向导选「种子客户」(开自动建) · 或去 ERP 设置手动加映射」4 语都改\n• 问题 c wizard 客户列表一直 loading:_fetchSeedCustomers + _fetchSeedProducts 加 AbortController 60s client-side timeout · 后端 worst case 90s 会卡 wizard · 客户端 60s 兜底超时 → fail-over 显示 input + 「⚠ 无法拉取」hint。\n\n刷浏览器:wizard 编辑 mrerp 看客户列表 60s 内会回(成功或失败)· 不再无限 loading",
             "release_notes_archived_v34_25": "v118.34.25 · 修 4 个生产体验问题 (A/B/C/D):\n• 问题 A 推送 listing 超时 + 文案改:1) home.js humanizeError 去掉 大于 10s 老数字 · 加 listing fetch 专门翻译「拉取 MR.ERP 客户/商品列表超时 · 已重试 3 次仍不通」2) adapter._sync_master_data 加 guard:history.client_id 是 0/null 时 · 跳过 customer + product sync(让 preflight ERR_NO_CLIENT 早返 · 不浪费 90s+ listing 拉取)\n• 问题 B wizard 商品下拉 + 警告并存:success path 显式 hide inputEl + fbHintEl · customer + product 镜像 · 防 race / 上次 fallback 残留\n• 问题 C 批量删除视觉反馈:删除后立即从 DOM 移除被删 row + 立即 hide batch bar · 500ms 后再 reload 拉新数据(用户先看到「消失了」再自动接显示剩余 log)\n• 问题 D 全选含 success:canSelect 从「仅 failed 终态」改成「非 retrying-in-progress」· success log 也能选(批量删除清历史)· 批量重试 server 已 skip success 不会重复推 · selectableIds 同步\n\n试一下:1) wizard 编辑 mrerp 看商品下拉 (P26050011 应该正确选中 + 没警告) 2) 推送日志全选应该包括成功的 row 3) 删除完应该看到 row 立即消失",
@@ -7233,6 +7367,39 @@ async def api_assign_client(history_id: str, req: AssignClientRequest, request: 
     ok = db.assign_invoice_to_client(str(user["id"]), history_id, req.client_id, tenant_id=_tid(user))
     if not ok:
         raise HTTPException(400, detail="client.assign_failed")
+
+    # 批 1 改动 1 (Zihao 2026-05-19 拍板 · v118.34.33) · 用户手动 assign 时 ·
+    # 把 buyer_name + buyer_tax → client_id 的关系学进 buyer_to_client_memory ·
+    # 下次 OCR 出同 buyer 就 auto-resolve · 不用每次手动选.
+    if req.client_id is not None:
+        try:
+            h = db.get_ocr_history_detail(
+                str(user["id"]), history_id, tenant_id=_tid(user),
+            )
+            if h:
+                _pages = h.get("pages") or []
+                _primary = next(
+                    (p for p in _pages
+                     if isinstance(p, dict)
+                     and not p.get("is_duplicate")
+                     and not p.get("is_copy")),
+                    _pages[0] if _pages else {},
+                )
+                _f = (_primary or {}).get("fields") or {}
+                _buyer_name = _f.get("buyer_name") or ""
+                _buyer_tax = _f.get("buyer_tax") or ""
+                if _buyer_name:
+                    db.learn_buyer_to_client(
+                        _buyer_name, _buyer_tax, int(req.client_id),
+                        str(user["id"]), tenant_id=_tid(user),
+                    )
+                    logger.info(
+                        "[assign_client] learned buyer→client: %r → %s",
+                        _buyer_name[:40], req.client_id,
+                    )
+        except Exception as e:
+            logger.warning(f"learn buyer→client failed (history={history_id[:8]}): {e}")
+
     return {"ok": True}
 
 

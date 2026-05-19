@@ -1608,6 +1608,57 @@ def ensure_erp_retry_columns():
 _ERP_RETRY_DELAYS_SEC = [60, 300, 1800]
 ERP_MAX_RETRIES = 3
 
+# 批 1 改动 3 (Zihao 2026-05-19 拍板 · v118.34.33) · 用户数据错不 retry.
+# 这些错 retry 没意义 · 用户数据没改之前再推还是失败 · 污染重试队列 +
+# 用户看到一堆 "已重试 1/3 · 2 分钟后再试" 噪音.
+# 区分:
+#   - 用户数据错 → 不入 retry · status 留 'failed' · 用户看到时主动处理
+#   - 技术错 (网络/timeout/session) → retry 3 次 (60s/5min/30min)
+USER_DATA_ERROR_CODES = {
+    "ERR_NO_CLIENT",
+    "ERR_NO_CUSTOMER_MAPPING",
+    "ERR_NO_INVOICE_NO",
+    "ERR_NO_INVOICE_DATE",
+    "ERR_NO_TOTAL_AMOUNT",
+    "ERR_NEGATIVE_AMOUNT",
+    "ERR_TAX_ID_INVALID",
+    "ERR_DATE_FUTURE",
+    "ERR_INVOICE_NO_TOO_LONG",
+    "ERR_BILL_NO_TOO_LONG",
+    "ERR_CUSTOMER_CODE_TOO_LONG",
+    "ERR_NO_SEED_CUSTOMER",
+    "ERR_NO_SEED_PRODUCT",
+    # MR.ERP duplicate · 重推还是同一个 bill_no · 没意义
+    "ERR_DUPLICATE_INVOICE",
+}
+
+# Thai raw error patterns that map to user-data errors (报错可能直接是 raw 泰文)
+USER_DATA_ERROR_THAI_PATTERNS = (
+    "เลขที่ดังกล่าวมีอยู่ในระบบแล้ว",   # duplicate
+    "เลขที่เอกสารซ้ำ",                # duplicate
+    "ไม่พบข้อมูลรหัสลูกค้า",          # customer mapping missing
+    "ลูกค้าไม่ระบุ",                   # client missing
+    "เลขที่ต้องไม่เกิน",               # length limit
+)
+
+
+def is_user_data_error(error_msg: Optional[str]) -> bool:
+    """判断这条错误是不是"用户数据错"(不应该 retry).
+    匹配 ERR_* code 前缀 OR 已知泰文 raw 模式.
+    """
+    if not error_msg:
+        return False
+    s = str(error_msg)
+    # 任一 ERR_* code 命中
+    for code in USER_DATA_ERROR_CODES:
+        if code in s:
+            return True
+    # 任一已知泰文模式命中
+    for pat in USER_DATA_ERROR_THAI_PATTERNS:
+        if pat in s:
+            return True
+    return False
+
 
 def get_erp_retry_delay_sec(retry_count: int) -> Optional[int]:
     """根据已重试次数返回下次重试延迟(秒)· 超过最大次数返回 None"""
@@ -1753,16 +1804,41 @@ def list_push_logs(user_id: str, history_id: Optional[str] = None,
                 where.append("trigger = %s")
                 params.append(trigger_filter)
             where_sql = " AND ".join(where)
-            cur.execute(f"SELECT COUNT(*) AS n FROM erp_push_logs WHERE {where_sql}", tuple(params))
+            # 批 1 改动 5/8 (Zihao 2026-05-19 拍板 · v118.34.33) · JOIN clients
+            # 拿 Pearnly 客户名 (改动 5) + JOIN erp_endpoints 拿 endpoint
+            # name (改动 8). where_sql 字段全部 prefix 成 l.* 防 join 后 ambig.
+            joined_where = (where_sql
+                .replace("user_id = %s", "l.user_id = %s")
+                .replace("history_id = %s", "l.history_id = %s")
+                .replace("endpoint_id = %s", "l.endpoint_id = %s")
+                .replace("status = 'success'", "l.status = 'success'")
+                .replace("status = 'failed' AND next_retry_at IS NOT NULL",
+                         "l.status = 'failed' AND l.next_retry_at IS NOT NULL")
+                .replace("status = 'failed' AND next_retry_at IS NULL",
+                         "l.status = 'failed' AND l.next_retry_at IS NULL")
+                .replace("trigger = %s", "l.trigger = %s"))
+
+            cur.execute(
+                f"SELECT COUNT(*) AS n FROM erp_push_logs l WHERE {joined_where}",
+                tuple(params),
+            )
             total = cur.fetchone()["n"]
             cur.execute(f"""
-                SELECT id, endpoint_id, history_id, invoice_no, seller_name,
-                       total_amount, status, http_status, error_msg, attempt,
-                       elapsed_ms, trigger, created_at,
-                       retry_count, max_retries, next_retry_at
-                FROM erp_push_logs
-                WHERE {where_sql}
-                ORDER BY created_at DESC
+                SELECT l.id, l.endpoint_id, l.history_id, l.invoice_no,
+                       l.seller_name, l.total_amount, l.status, l.http_status,
+                       l.error_msg, l.attempt, l.elapsed_ms, l.trigger,
+                       l.created_at, l.retry_count, l.max_retries,
+                       l.next_retry_at,
+                       h.client_id AS history_client_id,
+                       c.name AS client_name,
+                       e.name AS endpoint_name,
+                       e.adapter AS endpoint_adapter
+                FROM erp_push_logs l
+                LEFT JOIN ocr_history h ON h.id = l.history_id
+                LEFT JOIN clients c ON c.id = h.client_id
+                LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
+                WHERE {joined_where}
+                ORDER BY l.created_at DESC
                 LIMIT %s OFFSET %s
             """, tuple(params) + (limit, offset))
             items = [dict(r) for r in cur.fetchall()]
@@ -4148,6 +4224,276 @@ def get_category_for_seller(seller_name: Optional[str], user_id: str, tenant_id:
     except Exception as e:
         logger.warning(f"get_category_for_seller failed: {e}")
         return None
+
+
+def ensure_buyer_to_client_table():
+    """改动 1 (Zihao 2026-05-19 拍板 · v118.34.33) · OCR 完成时按 buyer_name +
+    buyer_tax 学习买家 → Pearnly 客户的映射 · 下次 OCR 出同 buyer 自动归属.
+
+    幂等:lifespan 启动调一次. 跟 supplier_categories 同 pattern.
+    """
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS buyer_to_client_memory (
+                    id           BIGSERIAL PRIMARY KEY,
+                    tenant_id    UUID,
+                    user_id      UUID NOT NULL,
+                    buyer_name   TEXT NOT NULL,
+                    buyer_tax    TEXT,
+                    client_id    INTEGER NOT NULL,
+                    use_count    INTEGER NOT NULL DEFAULT 1,
+                    last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                -- tenant-or-user-scoped uniqueness on buyer_name+tax pair
+                CREATE UNIQUE INDEX IF NOT EXISTS buyer_to_client_unique_scope
+                    ON buyer_to_client_memory
+                    (COALESCE(tenant_id::text, user_id::text),
+                     LOWER(buyer_name),
+                     COALESCE(buyer_tax, ''));
+                CREATE INDEX IF NOT EXISTS buyer_to_client_tax_idx
+                    ON buyer_to_client_memory (buyer_tax)
+                    WHERE buyer_tax IS NOT NULL AND length(buyer_tax) >= 10;
+            """)
+        logger.info("✅ buyer_to_client_memory table ensured")
+    except Exception as e:
+        logger.warning(f"ensure_buyer_to_client_table failed: {e}")
+
+
+def learn_buyer_to_client(
+    buyer_name: Optional[str],
+    buyer_tax: Optional[str],
+    client_id: int,
+    user_id: str,
+    tenant_id: Optional[str] = None,
+) -> bool:
+    """改动 1 · 用户在抽屉里 assign client_id 时调 · 学习买家 → 客户 映射.
+    下次 OCR 出同 buyer 自动归属(改动 1 的 resolve 路径).
+
+    幂等:如果同 (scope, buyer_name, buyer_tax) 已存在 · 更新 client_id
+    + use_count++ + last_used_at.
+    """
+    if not buyer_name or not buyer_name.strip():
+        return False
+    if not client_id:
+        return False
+    name = buyer_name.strip()[:200]
+    tax = (buyer_tax or "").strip()[:30] or None
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute("""
+                INSERT INTO buyer_to_client_memory
+                    (tenant_id, user_id, buyer_name, buyer_tax, client_id)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (COALESCE(tenant_id::text, user_id::text),
+                             LOWER(buyer_name), COALESCE(buyer_tax, ''))
+                DO UPDATE SET client_id = EXCLUDED.client_id,
+                              use_count = buyer_to_client_memory.use_count + 1,
+                              last_used_at = NOW()
+            """, (tenant_id, str(user_id), name, tax, int(client_id)))
+        return True
+    except Exception as e:
+        logger.warning(f"learn_buyer_to_client failed: {e}")
+        return False
+
+
+def try_resolve_buyer_to_client(
+    buyer_name: Optional[str],
+    buyer_tax: Optional[str],
+    user_id: str,
+    tenant_id: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """改动 1 (Zihao 2026-05-19 拍板) · 按 buyer_name + buyer_tax 查找 Pearnly
+    客户 · 返 {client_id, client_name, confidence}.
+
+    阈值 (Zihao 拍板):
+      ≥0.95 → 自动绑 + 学习
+      0.80-0.95 → 抽屉标"建议归属" (caller 决定)
+      <0.80 → 标"待归属" (caller 决定)
+
+    匹配优先级:
+      1. buyer_to_client_memory 学习记忆(完全匹配 buyer_name + 同 tax)
+         → confidence 1.0
+      2. clients.tax_id 完全匹配(13 位 tax_id 唯一)
+         → confidence 0.98
+      3. clients.name 完全匹配(case-insensitive)
+         → confidence 0.95
+      4. clients.name 包含 buyer_name (substring 双向)
+         → confidence 0.85
+      5. clients.short_name 完全/部分匹配
+         → confidence 0.80
+      没匹配返 None.
+
+    Tenant-scoped lookup · 跟 list_clients 一致.
+    """
+    if not buyer_name or not buyer_name.strip():
+        return None
+    name = buyer_name.strip()
+    tax = (buyer_tax or "").strip() or None
+
+    try:
+        with get_cursor() as cur:
+            # Layer 1: 学习记忆完全匹配
+            if tenant_id:
+                cur.execute("""
+                    SELECT m.client_id, c.name AS client_name
+                    FROM buyer_to_client_memory m
+                    JOIN clients c ON c.id = m.client_id
+                    WHERE COALESCE(m.tenant_id::text, m.user_id::text) =
+                          COALESCE(%s::text, %s::text)
+                      AND LOWER(m.buyer_name) = LOWER(%s)
+                      AND COALESCE(m.buyer_tax, '') = COALESCE(%s, '')
+                      AND c.is_active = TRUE
+                    LIMIT 1
+                """, (tenant_id, str(user_id), name, tax))
+            else:
+                cur.execute("""
+                    SELECT m.client_id, c.name AS client_name
+                    FROM buyer_to_client_memory m
+                    JOIN clients c ON c.id = m.client_id
+                    WHERE m.user_id = %s AND m.tenant_id IS NULL
+                      AND LOWER(m.buyer_name) = LOWER(%s)
+                      AND COALESCE(m.buyer_tax, '') = COALESCE(%s, '')
+                      AND c.is_active = TRUE
+                    LIMIT 1
+                """, (str(user_id), name, tax))
+            r = cur.fetchone()
+            if r:
+                return {
+                    "client_id": int(r["client_id"]),
+                    "client_name": r["client_name"],
+                    "confidence": 1.0,
+                    "match_source": "memory",
+                }
+
+            # Layer 2: tax_id 完全匹配(13 位 unique)
+            if tax and len(tax.replace("-", "").replace(" ", "")) >= 10:
+                tax_clean = tax.replace("-", "").replace(" ", "")
+                if tenant_id:
+                    cur.execute("""
+                        SELECT id, name FROM clients
+                        WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)
+                          AND REPLACE(REPLACE(COALESCE(tax_id, ''), '-', ''), ' ', '') = %s
+                          AND is_active = TRUE
+                        LIMIT 1
+                    """, (tenant_id, tax_clean))
+                else:
+                    cur.execute("""
+                        SELECT id, name FROM clients
+                        WHERE user_id = %s
+                          AND REPLACE(REPLACE(COALESCE(tax_id, ''), '-', ''), ' ', '') = %s
+                          AND is_active = TRUE
+                        LIMIT 1
+                    """, (str(user_id), tax_clean))
+                r = cur.fetchone()
+                if r:
+                    return {
+                        "client_id": int(r["id"]),
+                        "client_name": r["name"],
+                        "confidence": 0.98,
+                        "match_source": "tax_id_exact",
+                    }
+
+            # Layer 3-5: 名字匹配
+            if tenant_id:
+                cur.execute("""
+                    SELECT id, name, short_name FROM clients
+                    WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)
+                      AND is_active = TRUE
+                """, (tenant_id,))
+            else:
+                cur.execute("""
+                    SELECT id, name, short_name FROM clients
+                    WHERE user_id = %s AND is_active = TRUE
+                """, (str(user_id),))
+            rows = cur.fetchall()
+            if not rows:
+                return None
+
+            name_lower = name.lower()
+            best = None  # (confidence, client_id, client_name, source)
+            for r in rows:
+                cname = (r["name"] or "").strip()
+                sname = (r["short_name"] or "").strip()
+                if not cname:
+                    continue
+                cname_lower = cname.lower()
+                sname_lower = sname.lower() if sname else ""
+
+                # Layer 3: name 完全匹配 (case-insensitive)
+                if cname_lower == name_lower:
+                    return {
+                        "client_id": int(r["id"]),
+                        "client_name": cname,
+                        "confidence": 0.95,
+                        "match_source": "name_exact",
+                    }
+                # Layer 3.5: short_name 完全匹配
+                if sname_lower and sname_lower == name_lower:
+                    return {
+                        "client_id": int(r["id"]),
+                        "client_name": cname,
+                        "confidence": 0.90,
+                        "match_source": "short_name_exact",
+                    }
+                # Layer 4: substring 双向 (一个含另一个)
+                if (cname_lower in name_lower or name_lower in cname_lower):
+                    # 取较短的占较长的比例当 confidence (越接近 1 越像)
+                    ratio = min(len(cname_lower), len(name_lower)) / \
+                            max(len(cname_lower), len(name_lower))
+                    conf = 0.80 + (ratio * 0.10)   # 0.80-0.90
+                    if best is None or conf > best[0]:
+                        best = (conf, int(r["id"]), cname, "name_substring")
+                # Layer 5: short_name substring
+                if sname_lower and (sname_lower in name_lower or name_lower in sname_lower):
+                    ratio = min(len(sname_lower), len(name_lower)) / \
+                            max(len(sname_lower), len(name_lower))
+                    conf = 0.78 + (ratio * 0.08)
+                    if best is None or conf > best[0]:
+                        best = (conf, int(r["id"]), cname, "short_substring")
+
+            if best:
+                return {
+                    "client_id": best[1],
+                    "client_name": best[2],
+                    "confidence": round(best[0], 3),
+                    "match_source": best[3],
+                }
+            return None
+    except Exception as e:
+        logger.warning(f"try_resolve_buyer_to_client failed: {e}")
+        return None
+
+
+def update_history_client_id(
+    history_id: str,
+    client_id: Optional[int],
+    user_id: str,
+    tenant_id: Optional[str] = None,
+) -> bool:
+    """改动 1 · auto-resolve 时 update history.client_id. Mirror of
+    assign_invoice_to_client but skips visible_ids permission check
+    (called from server-side auto-resolve hook · not from user click)."""
+    try:
+        with get_cursor(commit=True) as cur:
+            if tenant_id:
+                cur.execute("""
+                    UPDATE ocr_history
+                    SET client_id = %s, updated_at = NOW()
+                    WHERE id = %s
+                      AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
+                """, (client_id, history_id, tenant_id))
+            else:
+                cur.execute("""
+                    UPDATE ocr_history
+                    SET client_id = %s, updated_at = NOW()
+                    WHERE id = %s AND user_id = %s
+                """, (client_id, history_id, str(user_id)))
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.warning(f"update_history_client_id failed: {e}")
+        return False
 
 
 def upsert_supplier_category(seller_name: Optional[str], category: Optional[str],

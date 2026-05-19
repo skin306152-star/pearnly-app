@@ -11264,6 +11264,30 @@ body.sidebar-collapsed .nav-collapsible.collapsed .nav-sub { max-height: 800px; 
     border-color: #93c5fd;
 }
 
+/* Bug 3 fix (Zihao 2026-05-19 拍板 · v118.34.22) · 抽屉里的「看推送日志」
+   原来 text-align:right + 480px drawer 偶尔被内容把容器撑过 viewport
+   → 按钮跑出视窗 → 用户感知"点不到"。改:left-align + flex 自然布局 +
+   背景色 + 圆角小卡片 · 一眼能看见 · 不依赖 right-edge 浮动. */
+.int-drawer-body .erp-connect-logs-link {
+    display: flex !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    margin: 8px 0 12px !important;
+}
+.int-drawer-body .erp-connect-logs-link .int-btn-view-logs {
+    background: #f0f7ff;
+    border: 1px solid #93c5fd;
+    color: #1d4ed8;
+    font-weight: 500;
+    padding: 8px 14px;
+    font-size: 13px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.int-drawer-body .erp-connect-logs-link .int-btn-view-logs:hover {
+    background: #dbeafe;
+    border-color: #60a5fa;
+}
+
 .erp-subtabs {
     display: flex;
     gap: 4px;

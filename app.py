@@ -3532,9 +3532,24 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
         if req.adapter not in _erp.ADAPTER_REGISTRY:
             raise HTTPException(400, detail="erp.unknown_adapter")
 
+        # Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · 拒绝没绑客户的 mrerp endpoint
+        # 落库 · 否则推送时 ERR_NO_CLIENT 一连串失败. 前端 wizard Step 1 也加了
+        # 一道闸 · 这里是双保险(API 直接打过来 / 老 wizard 残留状态).
+        config = dict(req.config or {})
+        if req.adapter == "mrerp":
+            client_ids = config.get("client_ids") or []
+            if not isinstance(client_ids, list) or not client_ids:
+                raise HTTPException(
+                    400,
+                    detail={
+                        "code": "erp.endpoint_no_clients",
+                        "message_zh": "这个 ERP 连接还没绑任何 Pearnly 客户 · 请在向导第 1 步至少选 1 个客户",
+                        "message_en": "No Pearnly clients linked to this ERP connection · pick at least one in wizard Step 1",
+                    },
+                )
+
         # v118.34.13 · 加密 mrerp 凭据再落地 · wizard 发的是 plaintext。
         # 即使字段名叫 _enc · 不加密就 None-op 解密会炸。
-        config = dict(req.config or {})
         if req.adapter == "mrerp":
             try:
                 from kms_helper import encrypt_str, is_encrypted
@@ -3624,6 +3639,22 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
                     new_cfg["token"] = old_token
         # 清掉前端塞的标记字段
         new_cfg.pop("_token_set", None)
+        new_cfg.pop("_username_enc_set", None)
+        new_cfg.pop("_password_enc_set", None)
+
+        # Bug 1 (v118.34.22) · 镜像 POST 的 client_ids 验证 · PATCH 改 client_ids
+        # 为空也得拦下 · 否则用户误删可能 silent regression 全推送失败.
+        if target_adapter == "mrerp" and "client_ids" in new_cfg:
+            cids = new_cfg.get("client_ids") or []
+            if not isinstance(cids, list) or not cids:
+                raise HTTPException(
+                    400,
+                    detail={
+                        "code": "erp.endpoint_no_clients",
+                        "message_zh": "这个 ERP 连接不能没有 Pearnly 客户 · 至少留 1 个",
+                        "message_en": "ERP connection must have at least one Pearnly client",
+                    },
+                )
 
         # P-3 · MR.ERP 加密镜像 POST 路由 (v118.34.13 一致)
         if target_adapter == "mrerp":
@@ -3869,10 +3900,27 @@ async def _fetch_listing_with_retry(
                 },
                 "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
             }
-        if result.get("ok"):
+        # Bug 2 (Zihao 2026-05-19 拍板 · v118.34.22) · 每次结果都打可观察 log ·
+        # 包含失败截图路径(如果有). 让 journalctl/api/version 一眼看到 retry
+        # 链路: 第几次 / 是否成功 / 截图 / 错误码.
+        ok_flag = result.get("ok")
+        code = result.get("error_code")
+        raw = str(result.get("raw_error") or "")
+        import re as _re
+        shot_match = _re.search(r"screenshot=(\S+\.png)", raw, _re.IGNORECASE)
+        shot_path = shot_match.group(1) if shot_match else None
+        logger.info(
+            "[listing-retry] %s attempt %d → ok=%s code=%s screenshot=%s",
+            listing_kind, attempt, ok_flag, code, shot_path or "-",
+        )
+        if ok_flag:
             return result
         # Non-transient: bail out · the retry won't help.
-        if result.get("error_code") not in transient_codes:
+        if code not in transient_codes:
+            logger.info(
+                "[listing-retry] %s attempt %d code=%s non-transient · bail out",
+                listing_kind, attempt, code,
+            )
             return result
         # Transient: loop will retry (unless we just exhausted attempts).
     # All retries exhausted; surface the last result.
@@ -5197,8 +5245,10 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.34.21 · 收尾 2 个老 bug (P-3 + P-4):\n• P-3:PATCH /api/erp/endpoints/:id 之前不加密 mrerp 凭据 · wizard 编辑老 endpoint 重新输密码 → 落库明文 → 下次 test-connection InvalidToken → ERR_CRED_DECRYPT. 现在 PATCH 也走 kms_helper.encrypt_str · 跟 POST 路由对齐 · 已加密的 ciphertext 不 double-encrypt.\n• P-4:wizard 测试连接失败后端把截图路径塞在 raw_error 一坨密集文本里用户看不见. 现在 JS 正则抽 screenshot=(\\S+\\.png) · 单独显示成「失败截图存到了:{path} · 发给客服可以加快排查」橙色高亮条 · 4 语都补.\n• 加守门测试 PatchEndpointEncryptionContractTests 2 条:plaintext 触发加密 · 已加密的不 double-encrypt.\n\n配过 mrerp 的话 · 试一次「编辑」改密码 · 改完应该还能正常测试连接.",
-            "en": "v118.34.21 · Closing out P-3 + P-4 from STATE.md:\n• P-3: PATCH /api/erp/endpoints/:id previously skipped mrerp credential encryption · wizard editing an existing endpoint with a fresh password would store plaintext under username_enc/password_enc · next test-connection's decrypt threw InvalidToken → ERR_CRED_DECRYPT. PATCH now mirrors POST's kms_helper.encrypt_str logic; already-encrypted ciphertext is NOT double-encrypted.\n• P-4: wizard test-connection failures left the screenshot path buried inside a dense raw_error blob. The JS now regex-extracts `screenshot=(\\S+\\.png)` and surfaces it on its own orange-bordered line: 'Failure screenshot saved at: {path} · send this to support'. 4-lang complete.\n• Added PatchEndpointEncryptionContractTests with 2 guards: plaintext triggers encryption · already-encrypted ciphertext is preserved.\n\nIf you have an MR.ERP endpoint, try editing it and changing the password — test-connection should keep working afterward.",
+            "zh": "v118.34.22 · 修 4 个生产 UI bug (Bug 1-4):\n• Bug 1 ERR_NO_CLIENT 全栈防护:wizard Step 1 至少选 1 客户才能 Next(前端 toast 警告)· POST/PATCH endpoint 后端校验 client_ids 空 → 400 friendly · ERR_NO_CLIENT 友好文案从「未指定 Pearnly 客户(client_id 缺失)」改成「这张发票还没分配 Pearnly 客户 · 请先在发票详情里指定客户」4 语都改\n• Bug 2 seed 下拉默认值 + listing retry log:wizard 渲染下拉时 selectedValue=endpoint.config.seed_xxx · 不在 listing 时合成 option 标「(已保存 · 当前列表暂未显示)」· 不 fallback 到 listing[0]。app.py _fetch_listing_with_retry 每次结果都打 log 包含 ok/code/screenshot 路径\n• Bug 3 抽屉「看推送日志」link CSS 修:原来 text-align:right 偶尔被内容撑过 viewport → 按钮跑出。改 flex left-align + 蓝色高亮卡片 · 不依赖 right-edge 浮动\n• Bug 4 删集成卡片右下「看推送日志」link:入口收敛 · 用户点「配置」进 ERP 抽屉 → 抽屉里点「看推送日志 →」· 或直接点集成主页顶部「推送日志」tab\n\nBug 5-8 (批量重试/批量删除/推送下拉/product-create session) 下个版本继续",
+            "release_notes_archived_v34_21": "v118.34.21 · 收尾 2 个老 bug (P-3 + P-4):\n• P-3:PATCH /api/erp/endpoints/:id 之前不加密 mrerp 凭据 · wizard 编辑老 endpoint 重新输密码 → 落库明文 → 下次 test-connection InvalidToken → ERR_CRED_DECRYPT. 现在 PATCH 也走 kms_helper.encrypt_str · 跟 POST 路由对齐 · 已加密的 ciphertext 不 double-encrypt.\n• P-4:wizard 测试连接失败后端把截图路径塞在 raw_error 一坨密集文本里用户看不见. 现在 JS 正则抽 screenshot=(\\S+\\.png) · 单独显示成「失败截图存到了:{path} · 发给客服可以加快排查」橙色高亮条 · 4 语都补.\n• 加守门测试 PatchEndpointEncryptionContractTests 2 条:plaintext 触发加密 · 已加密的不 double-encrypt.\n\n配过 mrerp 的话 · 试一次「编辑」改密码 · 改完应该还能正常测试连接.",
+            "en": "v118.34.22 · 4 production UI bugs fixed (Bug 1-4):\n• Bug 1 ERR_NO_CLIENT full-stack guard: wizard Step 1 now requires ≥1 client before Next (frontend toast warn). POST/PATCH endpoint backend validator rejects empty client_ids → 400 friendly. ERR_NO_CLIENT friendly message rewritten from technical 'client_id missing' to action-oriented 'this invoice has no Pearnly client assigned · open the invoice details and pick a client first' in 4 langs.\n• Bug 2 seed dropdown default + listing retry log: wizard renders dropdown with selectedValue=endpoint.config.seed_xxx; if the saved code isn't in the current listing page, synthesize an option labelled 'saved · not on current listing page' rather than fallback-selecting listing[0]. app.py _fetch_listing_with_retry now logs ok/code/screenshot path on every attempt.\n• Bug 3 drawer 'View push log' link CSS fix: original text-align:right occasionally let the button overflow the 480px drawer width → user couldn't see it. Switched to flex left-align with a blue-highlighted card; no longer depends on right-edge flow.\n• Bug 4 removed the right-side 'View push log' link from the integrations card. Entry path collapsed: click '配置' → ERP drawer → click 'View push log →' inside the drawer · or click the integrations page top tab 'Push Log' directly.\n\nBug 5-8 (batch retry / batch delete / push button dropdown / product-create session) to follow in the next version.",
+            "en_archived_v34_21": "v118.34.21 · Closing out P-3 + P-4 from STATE.md:\n• P-3: PATCH /api/erp/endpoints/:id previously skipped mrerp credential encryption · wizard editing an existing endpoint with a fresh password would store plaintext under username_enc/password_enc · next test-connection's decrypt threw InvalidToken → ERR_CRED_DECRYPT. PATCH now mirrors POST's kms_helper.encrypt_str logic; already-encrypted ciphertext is NOT double-encrypted.\n• P-4: wizard test-connection failures left the screenshot path buried inside a dense raw_error blob. The JS now regex-extracts `screenshot=(\\S+\\.png)` and surfaces it on its own orange-bordered line: 'Failure screenshot saved at: {path} · send this to support'. 4-lang complete.\n• Added PatchEndpointEncryptionContractTests with 2 guards: plaintext triggers encryption · already-encrypted ciphertext is preserved.\n\nIf you have an MR.ERP endpoint, try editing it and changing the password — test-connection should keep working afterward.",
             "th": "v118.34.21 · ปิดงาน 2 บัก P-3 + P-4:\n• P-3: PATCH /api/erp/endpoints/:id เดิมไม่เข้ารหัสข้อมูลรับรอง mrerp · เมื่อแก้ไข endpoint แล้วใส่รหัสผ่านใหม่ → เก็บ plaintext ใน DB → ครั้งถัดไป test-connection ถอดรหัสไม่ผ่าน → ERR_CRED_DECRYPT. ตอนนี้ PATCH ก็ใช้ kms_helper.encrypt_str เหมือน POST · ciphertext ที่เข้ารหัสแล้วไม่ encrypt ซ้ำ.\n• P-4: ตอนทดสอบเชื่อมต่อล้มเหลว backend แอบใส่ path สกรีนช็อตอยู่ใน raw_error ก้อนใหญ่ ผู้ใช้มองไม่เห็น · ตอนนี้ JS regex ดึง screenshot=(\\S+\\.png) ออกมาโชว์เป็นแถบสีส้ม 'บันทึกภาพข้อผิดพลาดที่: {path} · ส่งให้ทีมซัพพอร์ตเพื่อช่วยตรวจสอบ' · 4 ภาษาครบ.\n• เพิ่ม PatchEndpointEncryptionContractTests 2 ตัว: plaintext กระตุ้นการเข้ารหัส · ที่เข้ารหัสแล้วไม่ double-encrypt.\n\nถ้ามี endpoint mrerp อยู่แล้ว ลองคลิก 'แก้ไข' เปลี่ยนรหัสผ่าน · หลังบันทึก test-connection ควรใช้ได้ปกติ",
             "ja": "v118.34.21 · STATE.md の P-3 + P-4 を回収:\n• P-3: PATCH /api/erp/endpoints/:id は mrerp 認証情報の暗号化をスキップしていた · ウィザードで既存 endpoint のパスワードを再入力すると平文が DB に保存 → 次回 test-connection 復号で InvalidToken → ERR_CRED_DECRYPT. PATCH も kms_helper.encrypt_str を通すように修正 · POST と一致 · 既に暗号化された ciphertext は再暗号化しない.\n• P-4: ウィザードの接続テスト失敗時、screenshot パスが raw_error の塊に埋もれてユーザーが見えなかった · JS で正規表現 `screenshot=(\\S+\\.png)` を抽出し、別行の橙色強調枠で「エラースクショ保存先: {path} · サポートに送ると調査が早まります」と表示 · 4 言語対応.\n• PatchEndpointEncryptionContractTests を 2 件追加: plaintext が暗号化される · 暗号化済みは double-encrypt しない.\n\nMR.ERP endpoint があれば「編集」でパスワード変更 → test-connection が継続して動くはず."
         }

@@ -34,6 +34,7 @@ test-connection bug — yank their commit.
 
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -1795,6 +1796,126 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
             sent_config["password_enc"], already_ct_pass,
             "PATCH double-encrypted already-encrypted password",
         )
+
+
+@unittest.skipUnless(
+    _can_import_app_for_async_tests()
+    and __import__("importlib").util.find_spec("fastapi") is not None,
+    "needs full app + fastapi; covered server-side otherwise.",
+)
+class EndpointClientIdsRequiredTests(unittest.TestCase):
+    """Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · mrerp endpoint must be
+    bound to at least one Pearnly client. Otherwise every push lands
+    ERR_NO_CLIENT (because the history's client_id won't be resolvable
+    against the endpoint's client list).
+
+    Two layers:
+        1. wizard Step 1 enforces ≥ 1 client client-side (toast warn)
+        2. POST/PATCH /api/erp/endpoints validates server-side · 400
+
+    This test pins layer 2 — wizard-bypass attempts (curl / API direct)
+    still get blocked.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        import app
+        cls.app_module = app
+
+    def _make_client(self):
+        from fastapi.testclient import TestClient
+        return TestClient(self.app_module.app)
+
+    def test_post_mrerp_with_empty_client_ids_is_rejected(self):
+        app = self.app_module
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "lifetime"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "list_erp_endpoints", return_value=[]):
+            with self._make_client() as client:
+                r = client.post("/api/erp/endpoints", json={
+                    "name": "MR.ERP No-Client",
+                    "adapter": "mrerp",
+                    "config": {
+                        "system_url": "https://www.mrerp4sme.com",
+                        "username_enc": "u", "password_enc": "p",
+                        "client_ids": [],
+                    },
+                })
+        self.assertEqual(r.status_code, 400, r.text)
+        body = r.json()
+        # Detail can be a string or dict — accept both shapes as long as
+        # it carries the no_clients code.
+        detail = body.get("detail")
+        flat = str(detail) if isinstance(detail, (str, int)) else json.dumps(detail) if isinstance(detail, dict) else ""
+        self.assertIn(
+            "endpoint_no_clients", flat,
+            f"expected endpoint_no_clients in detail, got {detail!r}",
+        )
+
+    def test_post_mrerp_with_missing_client_ids_is_rejected(self):
+        app = self.app_module
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "lifetime"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "list_erp_endpoints", return_value=[]):
+            with self._make_client() as client:
+                r = client.post("/api/erp/endpoints", json={
+                    "name": "MR.ERP No-Client-Key",
+                    "adapter": "mrerp",
+                    "config": {
+                        "system_url": "https://www.mrerp4sme.com",
+                        "username_enc": "u", "password_enc": "p",
+                        # no client_ids key at all
+                    },
+                })
+        self.assertEqual(r.status_code, 400, r.text)
+
+    def test_patch_mrerp_clearing_client_ids_is_rejected(self):
+        """User mistakenly trying to remove all clients via PATCH gets
+        blocked too — the regression vector is sneakier than POST
+        because the wizard might Re-render an empty checkbox state."""
+        app = self.app_module
+        existing_ep = {
+            "id": "ep-1", "user_id": "u",
+            "adapter": "mrerp",
+            "config": {"client_ids": ["49"]},
+            "enabled": True, "name": "MR.ERP",
+        }
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "lifetime"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep), \
+             patch.object(app.db, "update_erp_endpoint", return_value=True):
+            with self._make_client() as client:
+                r = client.patch("/api/erp/endpoints/ep-1", json={
+                    "config": {"client_ids": []},
+                })
+        self.assertEqual(r.status_code, 400, r.text)
+
+    def test_post_non_mrerp_adapter_allows_empty_client_ids(self):
+        """Webhook etc. don't need client_ids · the restriction is
+        mrerp-specific (because mrerp push needs to resolve client_id
+        to a customer code mapping)."""
+        app = self.app_module
+        with patch.object(app, "get_current_user_from_request",
+                          return_value={"id": "u", "plan": "lifetime"}), \
+             patch.object(app, "_check_push_access", return_value=None), \
+             patch.object(app.db, "list_erp_endpoints", return_value=[]), \
+             patch.object(app.db, "create_erp_endpoint", return_value="new-ep-id"), \
+             patch.object(app.db, "get_erp_endpoint",
+                          return_value={"id": "new-ep-id", "adapter": "webhook",
+                                        "config": {"url": "https://example/"}}):
+            with self._make_client() as client:
+                r = client.post("/api/erp/endpoints", json={
+                    "name": "Generic webhook",
+                    "adapter": "webhook",
+                    "config": {"url": "https://example.invalid/hook"},
+                })
+        # Webhook with no client_ids should pass — restriction is mrerp-only.
+        self.assertEqual(r.status_code, 200, r.text)
 
 
 if __name__ == "__main__":

@@ -56,10 +56,19 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh_TW": "發票資料為空",
     },
     "ERR_NO_CLIENT": {
-        "th": "ลูกค้าไม่ระบุ (Pearnly client_id ว่าง)",
-        "en": "Pearnly client_id is missing",
-        "zh": "未指定 Pearnly 客户(client_id 缺失)",
-        "zh_TW": "未指定 Pearnly 客戶(client_id 缺失)",
+        # Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · 把 "client_id 缺失" 这种技术词
+        # 翻译成会计师能看懂的「请先在发票详情指定客户」· 同时告诉用户去哪 / 怎么修.
+        "th": "ใบกำกับนี้ยังไม่ได้กำหนดลูกค้า Pearnly · กรุณาเปิดรายละเอียดใบกำกับและเลือกลูกค้าก่อน",
+        "en": "This invoice has no Pearnly client assigned · open the invoice details and pick a client first",
+        "zh": "这张发票还没分配 Pearnly 客户 · 请先在发票详情里指定客户",
+        "zh_TW": "這張發票還沒分配 Pearnly 客戶 · 請先在發票詳情指定客戶",
+    },
+    "ERR_ENDPOINT_NO_CLIENTS": {
+        # Bug 1 (v118.34.22) · POST/PATCH endpoint 时 client_ids 空数组的友好错.
+        "th": "ยังไม่ได้เลือกลูกค้า Pearnly สำหรับการเชื่อม ERP · กรุณาเลือกลูกค้าอย่างน้อย 1 รายการในขั้นตอน 1 ของวิซาร์ด",
+        "en": "No Pearnly clients are linked to this ERP connection · pick at least one client in wizard Step 1",
+        "zh": "这个 ERP 连接还没绑任何 Pearnly 客户 · 请在向导第 1 步至少选 1 个客户",
+        "zh_TW": "這個 ERP 連線還沒綁任何 Pearnly 客戶 · 請在精靈第 1 步至少選 1 個客戶",
     },
     "ERR_NO_CUSTOMER_MAPPING": {
         "th": "ยังไม่ตั้งรหัสลูกค้า MR.ERP สำหรับลูกค้านี้",

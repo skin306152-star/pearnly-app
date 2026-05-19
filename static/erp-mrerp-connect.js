@@ -111,6 +111,14 @@
         'wiz-step-1-select-all': {
             zh: '全选', en: 'Select all', th: 'เลือกทั้งหมด', zh_TW: '全選', ja: 'すべて選択',
         },
+        // Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · Step 1 必选 ≥1 客户
+        'wiz-step-1-need-client': {
+            zh: '请至少选 1 个 Pearnly 客户 · 这个 ERP 连接才知道把谁的发票推过去',
+            en: 'Pick at least one Pearnly client · the ERP connection needs to know whose invoices to push',
+            th: 'เลือกลูกค้า Pearnly อย่างน้อย 1 รายการ · ERP จะได้รู้ว่าจะส่งใบกำกับของใคร',
+            zh_TW: '請至少選 1 個 Pearnly 客戶 · 這個 ERP 連線才知道把誰的發票推過去',
+            ja: '少なくとも 1 件の Pearnly 取引先を選択してください · ERP 連携が誰の請求書を送るか判断するために必要です',
+        },
         'wiz-step-2-h': {
             zh: '填入 MR.ERP 登录信息',
             en: 'Enter your MR.ERP login',
@@ -223,6 +231,16 @@
             th: 'เลือกลูกค้าที่มีอยู่เพื่อใช้เป็นแม่แบบ',
             zh_TW: '請選擇一個現有客戶作範本',
             ja: '既存の顧客をテンプレートとして選択',
+        },
+        // Bug 2 (Zihao 2026-05-19 拍板 · v118.34.22) · 已保存 seed code 不在 listing
+        // 当前页时 · 用这个 label 标记 · 让用户知道 endpoint 配置就是这个值 ·
+        // 不会被误以为是 listing[0] fallback 默认.
+        'wiz-seed-saved-not-in-list': {
+            zh: '(已保存 · 当前列表暂未显示)',
+            en: '(saved · not on current listing page)',
+            th: '(บันทึกไว้ · ไม่ปรากฏในหน้าปัจจุบัน)',
+            zh_TW: '(已儲存 · 當前列表暫未顯示)',
+            ja: '(保存済み · 現在のリストには表示されていません)',
         },
         'wiz-seed-input-placeholder': {
             zh: '输入客户码(如 0006)',
@@ -1061,6 +1079,19 @@
 
         // Populate the dropdown.
         const opts = ['<option value="">' + _esc(t('wiz-seed-empty')) + '</option>'];
+        const inList = !!(currentSeedCode && customers.some(function (c) {
+            return c.code === currentSeedCode;
+        }));
+        // Bug 2 (Zihao 2026-05-19 拍板 · v118.34.22) · 已保存的 seed_customer_code
+        // 不在当前 listing 时(可能在分页 page 2+)· 插一个合成 option 在顶部
+        // 标记 "(已保存 · 未在当前列表)"· 用户能看出来 endpoint 配置里就是这个 ·
+        // 不会被 fallback 到 listing[0] 误以为换了.
+        if (currentSeedCode && !inList) {
+            opts.push(
+                '<option value="' + _esc(currentSeedCode) + '">' +
+                _esc(currentSeedCode + ' · ' + t('wiz-seed-saved-not-in-list')) + '</option>'
+            );
+        }
         customers.forEach(function (c) {
             const label = (c.prefix ? c.prefix + ' ' : '')
                 + (c.name || '') + ' (' + c.code + ')';
@@ -1070,10 +1101,10 @@
             );
         });
         selectEl.innerHTML = opts.join('');
-        if (currentSeedCode && customers.some(function (c) {
-            return c.code === currentSeedCode;
-        })) {
-            selectEl.value = currentSeedCode;
+        if (currentSeedCode) {
+            selectEl.value = currentSeedCode;   // 总是显式 select 已保存的
+        } else {
+            selectEl.value = '';   // 没设 · 留 placeholder 选中
         }
     }
 
@@ -1140,6 +1171,16 @@
             return;
         }
         const opts = ['<option value="">' + _esc(t('wiz-seedp-empty')) + '</option>'];
+        const inList = !!(currentSeedCode && products.some(function (p) {
+            return p.code === currentSeedCode;
+        }));
+        // Bug 2 (v118.34.22) · 已保存 seed_product_code 不在 listing 时合成 option
+        if (currentSeedCode && !inList) {
+            opts.push(
+                '<option value="' + _esc(currentSeedCode) + '">' +
+                _esc(currentSeedCode + ' · ' + t('wiz-seed-saved-not-in-list')) + '</option>'
+            );
+        }
         products.forEach(function (p) {
             const label = (p.name || '') + ' (' + p.code + ')';
             opts.push(
@@ -1148,10 +1189,10 @@
             );
         });
         selectEl.innerHTML = opts.join('');
-        if (currentSeedCode && products.some(function (p) {
-            return p.code === currentSeedCode;
-        })) {
+        if (currentSeedCode) {
             selectEl.value = currentSeedCode;
+        } else {
+            selectEl.value = '';
         }
     }
 
@@ -1253,6 +1294,13 @@
             // Collect selected clients
             const ids = [].slice.call(_wizardEl.querySelectorAll('[data-mw-client]:checked'))
                 .map(function (cb) { return cb.value; });
+            // Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · 至少选 1 客户才能 Next ·
+            // 否则保存的 endpoint 没绑任何客户 · 推送时 history.client_id 找不到
+            // 关联 → ERR_NO_CLIENT 一连串失败。前端先拦住 · 配合后端 validator 双保险.
+            if (!ids.length) {
+                _toast(t('wiz-step-1-need-client'), 'warn');
+                return;
+            }
             _wizardState.client_ids = ids;
             _gotoStep(2);
             setTimeout(function () { _wizardEl.querySelector('[data-mw-user]').focus(); }, 30);

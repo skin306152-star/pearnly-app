@@ -313,7 +313,7 @@ def _reply_messages(reply_token: str, messages: List[Dict[str, Any]]) -> bool:
 
 
 # ============================================================
-# 推送消息(push · 要收费 · 免费套餐每月 500 条)
+# 推送消息(push · LINE 官方计费限制按账号配置)
 # ============================================================
 
 def push_text(to_line_user_id: str, text: str) -> bool:
@@ -445,9 +445,9 @@ OCR_RESULT_I18N = {
         "multi_invoices": "📦 识别出 {n} 张发票(仅显示第 1 张 · 完整结果请查网页历史)",
         "err_download": "❌ 图片下载失败 · 请重发",
         "err_ocr": "❌ 识别失败 · 请换张清晰点的照片再试",
-        "err_quota": "⚠️ 本月识别额度已用完 · 请等下月重置或联系管理员",
-        "err_need_key": "⚠️ 请先到网站「设置 → API Key」填入您的 Gemini API Key",
-        "err_plan": "⚠️ 账号暂不可用 · 请联系管理员",
+        "err_quota": "⚠️ 余额不足或额度暂不可用 · 请充值或联系管理员",
+        "err_service": "⚠️ 识别服务暂不可用 · 请联系管理员",
+        "err_account": "⚠️ 账号暂不可用 · 请联系管理员",
         "view_on_web": "网页历史记录查看详情 👉 https://mr-cloud-mr-cloud.hf.space",
     },
     "en": {
@@ -461,9 +461,9 @@ OCR_RESULT_I18N = {
         "multi_invoices": "📦 {n} invoices detected (showing #1 only · see web history for all)",
         "err_download": "❌ Image download failed · please resend",
         "err_ocr": "❌ Recognition failed · try a clearer photo",
-        "err_quota": "⚠️ Monthly quota exhausted · please wait for reset or contact admin",
-        "err_need_key": "⚠️ Please set your Gemini API Key at 'Settings → API Key' on the website",
-        "err_plan": "⚠️ Account unavailable · please contact admin",
+        "err_quota": "⚠️ Balance is insufficient or usage is unavailable · please top up or contact admin",
+        "err_service": "⚠️ Recognition service is unavailable · please contact admin",
+        "err_account": "⚠️ Account unavailable · please contact admin",
         "view_on_web": "View details in web history 👉 https://mr-cloud-mr-cloud.hf.space",
     },
     "th": {
@@ -477,9 +477,9 @@ OCR_RESULT_I18N = {
         "multi_invoices": "📦 พบ {n} ใบ (แสดงเฉพาะใบแรก · ดูทั้งหมดในเว็บ)",
         "err_download": "❌ ดาวน์โหลดรูปไม่สำเร็จ · กรุณาส่งใหม่",
         "err_ocr": "❌ อ่านไม่สำเร็จ · ลองถ่ายให้ชัดขึ้น",
-        "err_quota": "⚠️ โควต้าเดือนนี้หมดแล้ว · กรุณารอเดือนหน้าหรือติดต่อผู้ดูแล",
-        "err_need_key": "⚠️ กรุณาตั้งค่า Gemini API Key ที่ 'การตั้งค่า → API Key' บนเว็บก่อน",
-        "err_plan": "⚠️ บัญชีไม่พร้อมใช้งาน · กรุณาติดต่อผู้ดูแล",
+        "err_quota": "⚠️ ยอดไม่พอหรือการใช้งานยังไม่พร้อม · กรุณาเติมเงินหรือติดต่อผู้ดูแล",
+        "err_service": "⚠️ บริการอ่านเอกสารยังไม่พร้อม · กรุณาติดต่อผู้ดูแล",
+        "err_account": "⚠️ บัญชีไม่พร้อมใช้งาน · กรุณาติดต่อผู้ดูแล",
         "view_on_web": "ดูรายละเอียดบนเว็บ 👉 https://mr-cloud-mr-cloud.hf.space",
     },
     "ja": {
@@ -493,9 +493,9 @@ OCR_RESULT_I18N = {
         "multi_invoices": "📦 {n} 枚検出(1 枚目のみ表示 · 全件は Web で確認)",
         "err_download": "❌ 画像ダウンロード失敗 · 再送信してください",
         "err_ocr": "❌ 認識失敗 · より鮮明な写真でお試しください",
-        "err_quota": "⚠️ 月間枠を使い切りました · リセットまたは管理者にお問い合わせください",
-        "err_need_key": "⚠️ Web の「設定 → API Key」で Gemini API Key を設定してください",
-        "err_plan": "⚠️ アカウント利用不可 · 管理者にお問い合わせください",
+        "err_quota": "⚠️ 残高不足、または利用できません · チャージまたは管理者にお問い合わせください",
+        "err_service": "⚠️ 認識サービスは現在利用できません · 管理者にお問い合わせください",
+        "err_account": "⚠️ アカウント利用不可 · 管理者にお問い合わせください",
         "view_on_web": "Web で履歴を確認 👉 https://mr-cloud-mr-cloud.hf.space",
     },
 }

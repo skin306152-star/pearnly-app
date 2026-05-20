@@ -44,7 +44,7 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
 def create_access_token(
     user_id: str,
     username: str,
-    plan: str,
+    billing_mode: str = "credits",
     tenant_id: Optional[str] = None,
     role: str = "owner",
     is_super_admin: bool = False,
@@ -66,7 +66,7 @@ def create_access_token(
         "sub": user_id,
         "jti": jti,
         "username": username,
-        "plan": plan,
+        "billing_mode": billing_mode or "credits",
         "tenant_id": tenant_id,
         "role": role,
         "is_super_admin": is_super_admin,

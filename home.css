@@ -1,6 +1,6 @@
 ﻿/* ============================================================
    Pilot · Home CSS (v0.3.5)
-   侧栏布局 + 套餐对比弹窗 + 各页面占位
+   侧栏布局 + 计费页面 + 各页面占位
    ----
    v118.33.7.1 NAV-IA 视觉皮肤对齐 prototype_final · 暖灰调 + 边框替代阴影
    v118.33.6 · Bank Reconciliation v2 CSS (Statement vs GL)
@@ -480,7 +480,7 @@ body.sidebar-collapsed .nav-item:hover .nav-label::before {
 }
 body.sidebar-collapsed .main { margin-left: var(--sidebar-w-collapsed); }
 /* v109.4 · banner 显示时主内容自动下移 36px · 不被遮挡 */
-/* v118.34 · has-plan-banner 规则已删除 */
+/* v118.34 · 旧计费横幅规则已删除 */
 
 .page { display: none; animation: pageIn 200ms ease; }
 .page.active { display: block; }
@@ -498,9 +498,6 @@ body.sidebar-collapsed .main { margin-left: var(--sidebar-w-collapsed); }
 }
 .info-chip .chip-label { color: var(--ink-3); }
 .info-chip .chip-value { font-weight: 600; color: var(--ink); }
-.info-chip .chip-value.plan-free { color: var(--ink-2); }
-.info-chip .chip-value.plan-plus { color: var(--brand); }
-.info-chip .chip-value.plan-pro { color: var(--warn); }
 .info-chip .mini-bar {
     width: 50px; height: 4px; background: var(--line);
     border-radius: 2px; overflow: hidden; margin-left: 2px;
@@ -994,64 +991,6 @@ details.raw-text pre {
     display: flex; justify-content: flex-end;
 }
 
-/* ============ 套餐对比表 ============ */
-.plan-current-banner {
-    background: var(--accent-soft); padding: 10px 14px;
-    border-radius: 6px; font-size: 13px; color: var(--brand);
-    margin-bottom: 16px;
-}
-.plan-current-banner strong { font-weight: 700; }
-
-.plan-table-wrap { margin-bottom: 18px; }
-.plan-table-label {
-    font-size: 12px; color: var(--ink-3); margin-bottom: 8px;
-    text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
-}
-.plan-table {
-    border: 1px solid var(--line); border-radius: 8px;
-    overflow: hidden;
-}
-.plan-row {
-    display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr;
-    font-size: 12.5px;
-    border-top: 1px solid var(--line-soft);
-}
-.plan-row:first-child { border-top: none; }
-.plan-row.head {
-    background: var(--bg);
-    font-weight: 600;
-}
-.plan-row > div {
-    padding: 10px 10px;
-    display: flex; flex-direction: column; justify-content: center;
-}
-.plan-row .label-col { color: var(--ink-3); }
-.plan-row .plan-col {
-    text-align: center; align-items: center;
-}
-.plan-row .plan-col.free { color: var(--ink-2); }
-.plan-row .plan-col.plus {
-    background: var(--accent-soft);
-    color: var(--brand); font-weight: 500;
-    border-left: 1px solid var(--accent);
-    border-right: 1px solid var(--accent);
-}
-.plan-row .plan-col.pro { color: var(--ink); }
-.plan-row.head .plan-col.plus {
-    background: var(--brand);
-    color: #fff;
-    border-left: 1px solid var(--brand);
-    border-right: 1px solid var(--brand);
-}
-.plan-row.head .plan-col.plus .plan-name { color: #fff; }
-.plan-row.head .plan-col.plus .plan-tag { color: #fff; opacity: 0.9; }
-.plan-row.head .plan-col.free .plan-tag { color: var(--brand); font-weight: 600; }
-.plan-row.head .plan-col.pro .plan-tag { color: var(--ink-3); }
-.plan-name { font-size: 14px; font-weight: 700; letter-spacing: -0.3px; }
-.plan-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
-.plan-check { color: var(--success); font-weight: 700; }
-.plan-dash { color: var(--ink-4); }
-
 .contact-title {
     font-size: 12px; color: var(--ink-3);
     text-transform: uppercase; letter-spacing: 0.05em;
@@ -1115,8 +1054,6 @@ a.contact-item:hover { background: var(--bg-hover, #eef2f7); }
     letter-spacing: 0.05em; text-transform: uppercase;
     margin-bottom: 14px;
 }
-.coming-soon .cs-tag.plus { background: var(--accent-soft); color: var(--brand); }
-.coming-soon .cs-tag.pro { background: #fef5e7; color: var(--warn); }
 
 /* ============ Toast ============ */
 .toast {
@@ -1143,9 +1080,6 @@ a.contact-item:hover { background: var(--bg-hover, #eef2f7); }
     .main { margin-left: 0 !important; padding: 14px; }
     .brand-divider, .brand-sub { display: none; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .plan-row { grid-template-columns: 1fr; }
-    .plan-row > div { border-top: 1px solid var(--line-soft); }
-    .plan-row > div:first-child { border-top: none; }
     /* v86 · 手机端:topbar-left 不再占 sidebar 宽度 · 汉堡按钮显示 */
     .topbar { padding: 0 14px; }
     .topbar-left { width: auto; padding-left: 0; gap: 8px; }
@@ -1216,7 +1150,7 @@ a.contact-item:hover { background: var(--bg-hover, #eef2f7); }
     border-color: #e8e8e3;
 }
 
-/* Free 用户看到的锁按钮 */
+/* 受限状态按钮 */
 .rd-btn-locked {
     display: inline-flex;
     align-items: center;
@@ -2356,32 +2290,21 @@ a.contact-item:hover { background: var(--bg-hover, #eef2f7); }
 }
 
 /* ============================================================
-   v0.8 · Plus 角标 + 禁用开关样式
+   v0.8 · 状态角标 + 禁用开关样式
    ============================================================ */
-.form-switch-row.disabled-plus {
+.form-switch-row.disabled-limit {
     opacity: 0.6;
     cursor: not-allowed;
     position: relative;
 }
-.form-switch-row.disabled-plus input[type="checkbox"] {
+.form-switch-row.disabled-limit input[type="checkbox"] {
     cursor: not-allowed;
 }
-.plus-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    margin-left: 8px;
-    font-size: 10px;
-    font-weight: 600;
-    background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);
-    color: white;
-    border-radius: 4px;
-    letter-spacing: 0.05em;
-}
-.btn-disabled-plus {
+.btn-disabled-limit {
     opacity: 0.5 !important;
     cursor: not-allowed !important;
 }
-.btn-disabled-plus:hover {
+.btn-disabled-limit:hover {
     background: inherit !important;
 }
 
@@ -2450,53 +2373,6 @@ a.contact-item:hover { background: var(--bg-hover, #eef2f7); }
     display: flex;
     align-items: center;
     gap: 6px;
-}
-
-/* ============================================================
-   v0.8.2 · 锁样式(Free 下受限功能显示但变灰 + 锁图标)
-   ============================================================ */
-.nav-item.locked-for-plan {
-    opacity: 0.55;
-    cursor: pointer;
-}
-.nav-item.locked-for-plan:hover {
-    opacity: 0.75;
-    background: var(--bg-hover, #f3f4f6);
-}
-.nav-item.locked-for-plan .nav-label {
-    color: var(--ink-3, #6b7280);
-}
-
-.nav-lock-icon {
-    width: 12px;
-    height: 12px;
-    margin-left: auto;
-    opacity: 0;
-    color: var(--ink-3, #9ca3af);
-    flex-shrink: 0;
-    transition: opacity 0.15s;
-}
-.nav-item.locked-for-plan .nav-lock-icon {
-    opacity: 0.75;
-}
-.nav-item.locked-for-plan:hover .nav-lock-icon {
-    opacity: 1;
-}
-
-/* 识别页「自定义模板」按钮 · Free 锁样式 */
-.btn.locked-for-plan {
-    opacity: 0.55;
-    position: relative;
-}
-.btn.locked-for-plan::after {
-    content: "🔒";
-    margin-left: 6px;
-    font-size: 11px;
-}
-
-/* 侧栏收起时锁图标藏起(只留灰色状态) */
-body.sidebar-collapsed .nav-lock-icon {
-    display: none;
 }
 
 /* ============================================================
@@ -3661,27 +3537,6 @@ button.history-missing-amount-btn {
 .archive-palette-btn.buyer:hover   { background: #EDE9FE; border-color: #DDD6FE; }
 .archive-palette-btn.sep:hover     { background: #F3F4F6; }
 
-/* 升级窗卖点 banner */
-.plan-selling-point {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    background: #DBEAFE;
-    border: 1px solid #e8e8e3;
-    border-radius: 10px;
-    margin: 14px 0;
-    font-size: 13px;
-    font-weight: 500;
-    color: #4338CA;
-}
-.plan-selling-point svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-    color: #6366F1;
-}
-
 /* ============================================================
    v0.10.1 · 抽屉诊断按钮 + 诊断对话框
    ============================================================ */
@@ -3801,56 +3656,6 @@ button.history-missing-amount-btn {
 .history-badge.multi::before {
     content: "📑";
     display: none;  /* emoji 不显示,保持纯文字风格 */
-}
-
-/* ============================================================
-   v0.12 · 升级窗 2 列版(月付 vs 买断)
-   ============================================================ */
-.plan-table-2col .plan-row {
-    display: grid !important;
-    grid-template-columns: 1.3fr 1fr 1fr !important;
-}
-.plan-table-2col .plan-col.monthly,
-.plan-table-2col .plan-col.lifetime {
-    padding: 14px 16px;
-    text-align: center;
-}
-.plan-table-2col .plan-row.head .plan-col {
-    padding: 18px 12px;
-    border-bottom: 2px solid var(--line);
-}
-.plan-table-2col .plan-col.monthly {
-    background: linear-gradient(135deg, #f4f4f0 0%, #f4f4f0 100%);
-}
-.plan-table-2col .plan-col.lifetime {
-    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
-}
-.plan-table-2col .plan-row.head .plan-col .plan-name {
-    font-size: 17px;
-    font-weight: 700;
-    margin-bottom: 4px;
-}
-.plan-table-2col .plan-row.head .plan-col .plan-price {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--ink);
-    margin-bottom: 6px;
-}
-.plan-table-2col .plan-row.head .plan-col.monthly .plan-price { color: #0369A1; }
-.plan-table-2col .plan-row.head .plan-col.lifetime .plan-price { color: #B45309; }
-.plan-table-2col .plan-row.head .plan-col .plan-tag {
-    font-size: 11px;
-    padding: 3px 10px;
-    border-radius: 10px;
-    display: inline-block;
-}
-.plan-table-2col .plan-row.head .plan-col.monthly .plan-tag {
-    background: #0369A1;
-    color: white;
-}
-.plan-table-2col .plan-row.head .plan-col.lifetime .plan-tag {
-    background: #B45309;
-    color: white;
 }
 
 /* ============================================================
@@ -4065,96 +3870,11 @@ button.history-missing-amount-btn {
 }
 
 /* ============================================================
-   v0.15 · 设置页 · Gemini API Key 区域
+   v118.36 · BILLING-01 · 外部密钥 UI 样式已下线
    ============================================================ */
-.api-key-desc {
-    font-size: 12px;
-    color: var(--ink-3);
-    line-height: 1.6;
-    margin: 0 0 14px;
-}
-.api-key-current {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: #ECFDF5;
-    border: 1px solid #A7F3D0;
-    border-radius: 6px;
-    font-size: 12px;
-    color: #065F46;
-    margin-bottom: 12px;
-}
-.api-key-current svg {
-    width: 14px;
-    height: 14px;
-    color: #10B981;
-    flex-shrink: 0;
-}
-.api-key-current code {
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-    font-size: 11px;
-    background: rgba(0,0,0,0.06);
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-.api-key-form {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-.api-key-input {
-    flex: 1;
-    min-width: 220px;
-    padding: 8px 12px;
-    font-size: 13px;
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    outline: none;
-    background: #fff;
-    color: var(--ink);
-}
-.api-key-input:focus {
-    border-color: #6366F1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-.api-key-msg {
-    font-size: 12px;
-    min-height: 18px;
-    margin-bottom: 6px;
-}
-.api-key-msg.success { color: #059669; }
-.api-key-msg.error   { color: #DC2626; }
-.api-key-msg.info    { color: #4B5563; }
-.api-key-help {
-    font-size: 12px;
-}
-.api-key-help a {
-    color: #4F46E5;
-    text-decoration: none;
-}
-.api-key-help a:hover {
-    text-decoration: underline;
-}
-
-/* 顶部信息条 · 自带 key 标识 */
-.info-chip .chip-value-lifetime {
-    background: linear-gradient(135deg, #FDE68A, #F59E0B);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    font-weight: 700;
-}
-.info-chip.chip-warn {
-    background: #FEF3C7;
-    color: #92400E;
-    border-color: #FCD34D;
-}
 
 /* ============================================================
-   v0.15 · 占位页 · 即将上线徽章(替代原来 Plus/Pro tag)
+   v0.15 · 占位页 · 即将上线徽章(替代原来 legacy tag)
    ============================================================ */
 .coming-soon .cs-coming {
     display: inline-block;
@@ -4168,29 +3888,6 @@ button.history-missing-amount-btn {
     font-weight: 600;
 }
 
-/* v0.15 · 覆盖:旧 Plus/Pro tag 相关(如果还在用) · 统一为中性灰 */
-.cs-tag.plus, .cs-tag.pro, .cs-tag.free {
-    background: #F3F4F6 !important;
-    color: #6B7280 !important;
-}
-.plus-badge, .pro-badge {
-    display: none !important;   /* 彻底隐藏旧 Plus/Pro 徽章 */
-}
-/* v0.15 · 侧栏 locked-for-plan 样式失效 · 所有侧栏项正常展示 */
-.nav-item.locked-for-plan {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-}
-.nav-item.locked-for-plan .nav-lock-icon {
-    display: none !important;
-}
-.btn.locked-for-plan {
-    opacity: 1 !important;
-}
-.btn.locked-for-plan::after {
-    display: none !important;  /* 移除 🔒 符号 */
-}
-/* 顶部已删除 plan-dropdown · 其 CSS 不再影响 */
 
 /* ============================================================
    v22 · 管理后台(超管专属)
@@ -5585,16 +5282,6 @@ button.history-missing-amount-btn {
 .cost-table .cost-money-zero {
     color: var(--ink-3, #9ca3af);
 }
-.cost-table .cost-plan-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    background: #f4f4f0;
-    color: #111111;
-}
-
 @media (max-width: 768px) {
     .cost-kpi-value { font-size: 22px; }
     .cost-section { padding: 16px; }
@@ -6308,7 +5995,7 @@ button.history-missing-amount-btn {
     .report-period-item { font-size: 12px; padding: 6px 12px; }
 }
 
-/* v118.34 · 旧 v109.3 Trial Banner + 升级弹窗 + LINE CSS 已删除 (380 行) */
+/* v118.34 · 旧 v109.3 旧提示横幅 + 旧弹窗 + LINE CSS 已删除 (380 行) */
 /* ============================================================
    v109.3 · 后台用户管理页
    ============================================================ */
@@ -6447,19 +6134,6 @@ button.history-missing-amount-btn {
 .adm-cell-strong { font-weight: 600; color: #0f172a; }
 .adm-cell-mute { font-size: 11px; color: #94a3b8; margin-top: 2px; }
 .adm-row-actions { display: flex; gap: 4px; flex-wrap: wrap; }
-.adm-plan-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 10px; font-weight: 700;
-    letter-spacing: .3px;
-}
-.adm-plan-trial { background: #fef3c7; color: #92400e; }
-.adm-plan-free { background: #f1f5f9; color: #475569; }
-.adm-plan-pro { background: #d1fae5; color: #065f46; }
-.adm-plan-firm { background: #ede9fe; color: #5b21b6; }
-.adm-plan-enterprise { background: #fce7f3; color: #9d174d; }
-
 /* v117 · 切语言时让所有 i18n 文字统一淡入 · 掩盖分帧重绘的先后顺序 */
 body.lang-switching [data-i18n] {
     opacity: 0;
@@ -6727,7 +6401,7 @@ body [data-i18n] {
 }
 
 /* 忘记密码 modal · v118.32.5.5.6 · z-index 提到 10000 · 高于 settings-modal-overlay(9998)
-   · 同时作为 admin 升级/封停/级联删除/付款审核等多个子级 modal 的样式基类 · 共享 z-index */
+   · 同时作为 admin 封停/级联删除/付款审核等多个子级 modal 的样式基类 · 共享 z-index */
 .cpw-forgot-overlay {
     position: fixed; inset: 0;
     background: rgba(15, 23, 42, 0.5);
@@ -6803,38 +6477,6 @@ body [data-i18n] {
     justify-content: flex-end;
 }
 .cpw-forgot-foot .btn { min-width: 90px; }
-
-/* ============================================================ */
-/* v109.4 · admin 升级/封停 modal · 套餐选项                     */
-/* ============================================================ */
-.adm-plan-options {
-    display: flex; flex-direction: column; gap: 8px;
-    margin-top: 8px;
-}
-.adm-plan-option {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 9px;
-    cursor: pointer;
-    transition: border-color .15s, background .15s;
-}
-.adm-plan-option:hover { border-color: #94a3b8; background: #f4f4f0; }
-.adm-plan-option input[type="radio"] {
-    width: 16px; height: 16px;
-    accent-color: #0a2540;
-    flex-shrink: 0;
-}
-.adm-plan-option input[type="radio"]:checked + .adm-plan-option-body .adm-plan-option-label {
-    color: #0a2540;
-}
-.adm-plan-option:has(input:checked) {
-    border-color: #0a2540;
-    background: #f0f6fc;
-}
-.adm-plan-option-body { flex: 1; }
-.adm-plan-option-label { font-size: 14px; font-weight: 600; color: #1e293b; }
-.adm-plan-option-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
 
 /* 自己那行高亮 */
 .adm-self-row {
@@ -11931,7 +11573,7 @@ body.sidebar-collapsed .nav-collapsible.collapsed .nav-sub { max-height: 800px; 
 }
 
 /* ============================================================
- * v27.8.1.14a · dev-bar 抓任意 MR.ERP 页面输入组(skin 调试用)
+ * v27.8.1.14a · dev-bar 抓任意 MR.ERP 页面输入组(skin 排查用)
  * ============================================================ */
 .erp-map-dev-fetch-page-group {
     display: inline-flex;

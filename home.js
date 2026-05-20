@@ -148,7 +148,7 @@ const I18N = {
         'brand-sub': '票据识别助手',
         // v118.28.4.1 · LINE 用户补邮箱 modal
         'line-email-title': '请补充邮箱地址',
-        'line-email-sub': '为了向您发送月度报表、试用到期提醒和团队协作邀请 · 请填写常用邮箱',
+        'line-email-sub': '为了向您发送月度报表和团队协作邀请 · 请填写常用邮箱',
         'line-email-placeholder': '您的邮箱地址',
         'line-email-submit': '保存并继续',
         'line-email-err-invalid': '邮箱格式不正确',
@@ -222,7 +222,7 @@ const I18N = {
         'ob-role-cfo': 'CFO / 财务经理',
         'ob-role-business': '企业主',
         'ob-s2-title': '每月大约处理多少张单据?',
-        'ob-s2-sub': '我们会推荐合适的方案 · 不会自动扣费',
+        'ob-s2-sub': '我们会估算使用量 · 不会自动扣费',
         'ob-vol-1-tip': '小型业务',
         'ob-vol-2-tip': '中型事务所',
         'ob-vol-3-tip': '大型事务所',
@@ -237,7 +237,7 @@ const I18N = {
         'ob-s4-sub': '填了之后我们会通过 LINE 给您发送使用周报、配额提醒和重要更新',
         'ob-final-tip': '填完所有信息 · Pearnly 将根据您的角色和规模推荐最合适的工作流',
         'ob-fb-role': '✓ 已根据您的角色推荐合适模板',
-        'ob-fb-volume': '✓ 已根据规模匹配方案建议',
+        'ob-fb-volume': '✓ 已根据规模估算使用量',
         'ob-fb-country': '✓ 已切换到当地税号验证规则',
         'ob-fb-line': '✓ 已开启 LINE 通知',
         'ob-fb-done': '资料已保存 · 欢迎使用 Pearnly!',
@@ -444,7 +444,6 @@ const I18N = {
         'cost-by-user-title': '按用户分组',
         'cost-by-user-hint': '按本月花费排序 · 找烧钱多的用户',
         'cost-th-user': '用户',
-        'cost-th-plan': '套餐',
         'cost-th-today': '今日',
         'cost-th-month': '本月',
         'cost-th-total': '累计',
@@ -494,8 +493,6 @@ const I18N = {
         // v22 · 管理后台
         // v22 · 员工管理
         'badge-soon': '即将',
-        'badge-plus': 'Plus',
-        'badge-pro': 'Pro',
         'page-ocr-title': '上传识别',
         'page-ocr-desc': '上传泰文/英文 PDF 发票,自动识别并导出',
         'page-dashboard-title': '仪表盘',
@@ -512,7 +509,6 @@ const I18N = {
         'page-api-desc': '用于 UiPath 或其他自动化工具调用',
         'page-settings-title': '设置',
         'page-settings-desc': '账号 · 通知 · 关于',
-        'info-plan': '套餐',
         'info-engine': '模式',
         'info-usage': '今日用量',
         'info-monthly': '本月用量',
@@ -629,9 +625,9 @@ const I18N = {
         'drawer-items-empty': '未识别到商品明细',
         'drawer-edit-count': '· 已编辑 {n} 个字段',
         'raw-text': '查看完整识别文本',
-        'readonly-banner': '字段编辑仅 Plus 以上可用 · <a data-upgrade="plus">升级查看</a>',
+        'readonly-banner': '此账号暂无字段编辑权限',
         'tax-unverified': '未验证',
-        'tax-tip-unverified': '税号验证仅 Plus 以上可用',
+        'tax-tip-unverified': '税号验证暂未启用',
         'badge-cached': '已复用',
         'badge-cached-hint': '秒返回 · 未扣额度',
         'history-title': '发票记录',
@@ -843,7 +839,7 @@ const I18N = {
         'field-invoice-no': '发票号',
         'field-invoice-date': '日期',
         'field-seller-name': '卖方',
-        // v118.8 · 顶栏归属感 + 试用临近到期横幅
+        // v118.8 · 顶栏归属感 + 账户状态横幅
         'brand-workspace-fallback': '我的工作台',
         // ============ v103 · OCR 引擎降级链提示 ============
         'fallback-typhoon-nvidia-toast': '主引擎暂时不可用 · {file} 已用备用引擎识别 · 建议复核字段',
@@ -1032,7 +1028,7 @@ const I18N = {
         'rd-syncing': '查询中...',
         'rd-status-valid': '已注册',
         'rd-status-invalid': '未找到',
-        'rd-tip-upgrade': 'RD 校验仅 Plus 以上可用',
+        'rd-tip-upgrade': 'RD 校验暂未启用',
         'rd-modal-title': '从泰国税务局同步',
         'rd-modal-current': '当前值',
         'rd-modal-official': '官方数据',
@@ -1048,39 +1044,13 @@ const I18N = {
         'rd-field-address': '地址',
         'rd-field-postcode': '邮编',
         'pages-unit': '页',
-        'upgrade-current': '当前套餐: <strong>{current}</strong>',
-        'upgrade-feature-label': '功能对比',
-        'upgrade-contact-label': '详情请咨询我们',
-        'upgrade-plan-tag-free': '当前',
-        'upgrade-plan-tag-plus': '推荐',
-        'upgrade-plan-tag-pro': '团队',
         'feat-engine': '识别引擎',
-        'feat-monthly': '每月识别',
         'feat-per-upload': '单次上传页数',
         'feat-filesize': '单文件大小',
         'feat-edit': '字段编辑',
         'feat-tax': '泰国税号校验',
         'feat-history': '历史保留',
-        'feat-api-key': '自定义 API Key',
         'feat-support': '客户支持',
-        'val-free-engine': '标准',
-        'val-plus-engine': '精准',
-        'val-pro-engine': '精准 · 自带 Key',
-        'val-free-monthly': '50 张 / 月',
-        'val-plus-monthly': '500 张 / 月',
-        'val-pro-monthly': '无限',
-        'val-free-upload': '10 页',
-        'val-plus-upload': '20 页',
-        'val-pro-upload': '50 页',
-        'val-free-filesize': '30 MB',
-        'val-plus-filesize': '50 MB',
-        'val-pro-filesize': '100 MB',
-        'val-free-history': '7 天',
-        'val-plus-history': '90 天',
-        'val-pro-history': '365 天',
-        'val-free-support': '社区',
-        'val-plus-support': 'LINE / 邮件',
-        'val-pro-support': '专属客服',
         'contact-phone': '电话',
         'contact-line': 'LINE',
         'contact-email': '邮箱',
@@ -1091,8 +1061,6 @@ const I18N = {
         'status-error': '失败',
         'status-cancelled': '已取消',
         'cs-tag-soon': '即将开放',
-        'cs-tag-plus': 'Plus 专享',
-        'cs-tag-pro': 'Pro 专享',
         'cs-dashboard-title': '智能仪表盘',
         'cs-dashboard-desc': '可视化月度数据 / 高置信比例 / 识别量趋势图',
         'cs-history-title': '识别历史管理',
@@ -1132,9 +1100,7 @@ const I18N = {
         'cpw-forgot-fail': '发送失败 · 请稍后重试',
         'cpw-forgot-close-btn': '关闭',
         // v109.4 · 用户管理类型徽章
-        'admin-type-monthly': '月付',
-        'admin-type-byo-key': '买断',
-        'admin-type-trial': '试用',
+        'admin-type-credits': '按量计费',
         'admin-type-super': '超管',
         'admin-self-disabled-tip': '不能对自己的账号执行此操作',
         'badge-coming': '即将',
@@ -1163,10 +1129,8 @@ const I18N = {
         'err.ocr.engine_error': 'OCR 引擎错误',
         'err.ocr.engine_busy': '系统繁忙,请稍后再试',
         'err.ocr.engine_not_configured': '识别服务暂不可用',
-        'err.ocr.plan_not_supported': '当前套餐不支持',
         'err.ocr.not_invoice': '这不像发票 · 请重选文件',
         'err.export.empty_records': '没有可导出的记录',
-        'err.export.template_locked': '此模板需 Plus 套餐',
         'err.export.build_failed': 'Excel 生成失败',
         'err.network': '请检查网络连接后重试',
         'err.timeout': '处理超时 · 网络慢或服务器繁忙',
@@ -1185,29 +1149,11 @@ const I18N = {
         'feat-email': '邮箱抓取',
         'feat-folder': '文件夹监听',
         'feat-alert': '智能提醒',
-        'val-free-tax': '5 次 / 天',
-        'val-free-ep': '1 个端点',
-        'val-free-archive': '默认模板',
-        'val-free-zip': '10 张 / 次',
-        'val-plus-ep': '3 个端点',
-        'val-plus-zip': '100 张 / 次',
-        'val-plus-email': '1 个邮箱',
-        'val-plus-folder': '1 个文件夹',
-        'val-pro-ep': '无限端点',
-        'val-pro-zip': '无限',
-        'val-pro-email': '5 个邮箱',
-        'val-pro-folder': '无限',
         'ep-limit-reached': '端点数量已达上限({limit})',
-        'ep-auto-push-plus': '自动推送是 Plus 专享 · 点击升级',
-        'free-monthly-exceeded': '本月免费额度已用完 · 升级 Plus 解锁 500 张/月',
         'copy': '复制',
         'copied': '已复制',
         'copy-failed': '复制失败',
-        'plan-downgrade-hint': '降级请联系客服',
-        'free-quota-upgrade': '升级解锁 500/月',
-        'ep-free-limit-hint': 'Free 已用 {used}/{limit} 个端点 ·',
-        'ep-plus-limit-hint': '已用 {used}/{limit} 个端点',
-        'upgrade-to-plus': '升级 Plus 解锁 3 个',
+        'ep-limit-hint': '已用 {used}/{limit} 个端点',
         'feature-coming-soon': '功能即将上线 · 敬请期待',
         'auto-push-fired': '已开始推送到 ERP · {file} · 结果看推送日志',
         'erp-logs-title': '推送日志',
@@ -1268,7 +1214,7 @@ const I18N = {
         'erp-retry-next-min': '约 {n} 分钟后再试',
         'erp-retry-next-soon': '即将自动重试',
         'erp-retry-exhausted': '已自动重试 {n} 次仍失败 · 请检查后手动重推',
-        // v118.25.0.1 · 修推送日志详情弹窗的 label 错位 bug(原本错复用「当前套餐」)
+        // v118.25.0.1 · 修推送日志详情弹窗的 label 错位 bug(原本错复用「当前计费」)
         'log-detail-invoice-no': '发票号',
         'log-detail-request': '请求内容',
         'log-detail-response': '响应内容',
@@ -1292,7 +1238,6 @@ const I18N = {
         'archive-rule-btn': '归档规则',
         'archive-rule-tip': '自定义识别后的文件命名规则',
         'archive-editor-desc': '自定义识别后文件的命名规则和归档文件夹结构',
-        'archive-upgrade-hint': '自定义归档规则为 Plus 专属功能',
         'archive-current-rule': '当前规则(点字段编辑 · 拖拽排序)',
         'archive-add-field': '添加字段(点击加入规则)',
         'archive-preview': '实时预览',
@@ -1341,7 +1286,7 @@ const I18N = {
         'history-missing-amount-action': '补金额',
         'drawer-diagnose-tip': '查看原始识别数据',
         'diagnose-title': '原始识别数据',
-        'diagnose-hint': '调试用 · 可定位「是识别没出来」还是「字段映射错了」',
+        'diagnose-hint': '排查用 · 可定位「是识别没出来」还是「字段映射错了」',
         'diagnose-copy': '复制 JSON',
         'diagnose-copied': '已复制',
         'diagnose-copy-fail': '复制失败',
@@ -1377,13 +1322,12 @@ const I18N = {
         'set-tab-company': '公司信息',
         'set-tab-security': '账户安全',
         'set-tab-notifications': '通知偏好',
-        'set-tab-plan': '套餐 & 用量',
+        'set-tab-billing': '计费 & 用量',
         'set-tab-team': '团队管理',
         'set-tab-archive': '归档规则',
         'set-archive-title': '归档规则',
         'set-archive-sub': '设置批量下载 ZIP 时的文件命名模板 · 例如 日期_供应商_金额.pdf',
         'set-archive-open-btn': '打开命名规则编辑器',
-        'set-tab-api': 'API & 密钥',
         'set-tab-learned': '学习规则',
         'set-tab-general': '通用设置',
         'set-general-title': '通用设置',
@@ -1426,7 +1370,7 @@ const I18N = {
         'set-security-sub': '建议每 90 天更换一次密码',
         'set-notif-title': '通知偏好',
         'set-notif-sub': '控制智能提醒和检测的行为',
-        'set-plan-title': '套餐 & 用量',
+        'set-billing-title': '计费 & 用量',
         'usage-history-title': '使用明细',
         'usage-history-loading': '加载中…',
         'usage-history-empty': '暂无使用记录',
@@ -1469,35 +1413,14 @@ const I18N = {
         'pref-dup-check-off-toast': '已关闭重复检测',
         'pref-save-failed': '设置保存失败',
         'settings-about': '联系我们',
-        'about-desc': '需要帮助、升级账号或反馈问题 · 欢迎联系我们',
-        'info-unlimited-own-key': '自带 API · 不限用量',
-        'info-need-api-key': '请在设置页填入您的识别服务密钥',
-        'set-plan-billing-title': '计费方式',
-        'set-plan-billing-mode': '按使用量计费',
-        'set-plan-billing-detail': '每月前 200 张 ฿1.50/张 · 超出后 ฿0.75/张 · 每月 1 日重置',
+        'about-desc': '需要帮助或反馈问题 · 欢迎联系我们',
+        'set-billing-method-title': '计费方式',
+        'set-billing-method-mode': '按使用量计费',
+        'set-billing-method-detail': '每月前 200 张 ฿1.50/张 · 超出后 ฿0.75/张 · 每月 1 日重置',
         'settings-role': '账号身份',
         'settings-role-super-admin': '超级管理员',
-        'settings-api-key': '识别服务密钥',
-        'settings-api-key-desc': '填入您自己的识别服务密钥后可无限次使用 · 不计入系统计费',
-        'api-key-current-label': '当前已保存:',
-        'btn-api-key-test': '测试',
-        'btn-api-key-save': '保存',
-        'btn-api-key-clear': '清除',
-        'api-key-how-to-get': '如何获取密钥?',
-        'api-key-saved': '✓ API Key 已保存',
-        'api-key-cleared': '✓ 已清除 · 将使用系统额度',
-        'api-key-clear-confirm': '清除后将切换回使用系统额度 · 确定吗?',
-        'gemini.testing': '正在测试…',
-        'gemini.key_valid': '✓ Key 有效 · 可以保存',
-        'gemini.key_invalid': '✗ Key 无效 · 请检查',
-        'gemini.key_empty': '请先输入 Key',
-        'gemini.invalid_key_format': '格式不对 · Gemini Key 以 AIza 开头',
-        'gemini.key_quota_exceeded': 'Key 配额已用尽',
-        'gemini.test_error': '测试失败 · 请稍后再试',
-        'gemini.test_empty': '响应为空 · Key 可能有问题',
         'settings.save_failed': '保存失败',
         'err.ocr.monthly_limit_exceeded': '本月额度已用完({used}/{limit}) · 请联系客服续费',
-        'err.quota.need_api_key': '此账号需自备识别服务密钥 · 请先在设置页填入',
         'err.account.banned': '此账号已被禁用 · 请联系管理员',
         'err.account.inactive': '此账号未激活 · 请联系管理员',
         'feature-contact-us': '该功能暂未开放 · 如有需要请联系我们',
@@ -1609,8 +1532,7 @@ const I18N = {
         'admin-col-active': '状态',
         'admin-col-last-login': '最后登录',
         'admin-type-admin': '超管',
-        'admin-type-shared': '月付',
-        'admin-type-byo': '买断',
+        'admin-type-shared': '按量计费',
         'admin-quota-unlimited': '不限',
         'admin-status-active': '正常',
         'admin-status-warning': '欠费提醒',
@@ -1669,11 +1591,9 @@ const I18N = {
         'admin-field-verify-password': '你的超管密码',
         'admin-field-confirm-name': '输入账号确认',
         'admin-field-current-quota': '当前配额',
-        'admin-opt-shared': '月付(共用系统 key)',
-        'admin-opt-byo': '买断(自带 Gemini key)',
-        'admin-hint-quota': '月付推荐 100-500 · 买断设 0(不限)',
+        'admin-opt-shared': '按量计费(共用系统 key)',
+        'admin-hint-quota': '按量计费 · 推荐 100-500',
         'admin-hint-quota-default': '默认 500 次/月 · 可修改',
-        'admin-hint-quota-zero': '设 0 = 不限(买断)',
         'admin-hint-username': '英文 · 用户用这个登录',
         'admin-hint-password': '至少 8 位 · 建议告知用户首次登录后修改',
         'admin-placeholder-username': '如:abc_boss',
@@ -1807,7 +1727,7 @@ const I18N = {
         'team-username-exists': '用户名已被占用',
         'team-create-failed': '创建失败',
         'team-no-permission': '无权限',
-        'team-no-tenant': '请先升级账号',
+        'team-no-tenant': '请先选择或创建公司',
         'team-toggle-failed': '操作失败',
         'team-remove-failed': '移除失败',
         'team-confirm-remove': '确定移除员工 {n}?',
@@ -2588,7 +2508,7 @@ const I18N = {
         'brand-sub': 'Invoice Recognition',
         // v118.28.4.1 · LINE user email completion modal
         'line-email-title': 'Please add your email',
-        'line-email-sub': 'We need your email to send monthly reports, trial expiration reminders, and team collaboration invites.',
+        'line-email-sub': 'We need your email for monthly reports and team collaboration invites.',
         'line-email-placeholder': 'Your email address',
         'line-email-submit': 'Save and continue',
         'line-email-err-invalid': 'Invalid email format',
@@ -2648,7 +2568,7 @@ const I18N = {
         'set-group-account': 'Account', 'set-group-company': 'Company', 'set-group-workflow': 'Workflow', 'set-group-system': 'System', 'set-group-about': 'About',
         'nav-group-admin': 'Admin',
         'set-page-title': 'Settings', 'set-page-sub': 'Manage your account, company and workflow',
-        // v110.7 · Onboarding wizard (B plan)
+        // v110.7 · Onboarding wizard
         'ob-eyebrow': 'Complete profile · unlock personalization',
         'ob-skip': 'Skip this step',
         'ob-next': 'Next →',
@@ -2662,7 +2582,7 @@ const I18N = {
         'ob-role-cfo': 'CFO / finance manager',
         'ob-role-business': 'Business owner',
         'ob-s2-title': 'About how many invoices per month?',
-        'ob-s2-sub': 'We will recommend the right plan · no auto-billing',
+        'ob-s2-sub': 'We will estimate usage · no auto-billing',
         'ob-vol-1-tip': 'Small business',
         'ob-vol-2-tip': 'Mid-size firm',
         'ob-vol-3-tip': 'Large firm',
@@ -2677,7 +2597,7 @@ const I18N = {
         'ob-s4-sub': 'We will send weekly usage reports, quota alerts, and important updates via LINE',
         'ob-final-tip': 'Fill in all the info — Pearnly will tailor the best workflow based on your role and scale',
         'ob-fb-role': '✓ Templates recommended based on your role',
-        'ob-fb-volume': '✓ Plan suggestions matched to your scale',
+        'ob-fb-volume': '✓ Usage estimate matched to your scale',
         'ob-fb-country': '✓ Switched to local tax ID validation rules',
         'ob-fb-line': '✓ LINE notifications enabled',
         'ob-fb-done': 'Profile saved · welcome to Pearnly!',
@@ -2884,7 +2804,6 @@ const I18N = {
         'cost-by-user-title': 'By User',
         'cost-by-user-hint': 'Sorted by month spend · find heavy users',
         'cost-th-user': 'User',
-        'cost-th-plan': 'Plan',
         'cost-th-today': 'Today',
         'cost-th-month': 'Month',
         'cost-th-total': 'Total',
@@ -2932,8 +2851,6 @@ const I18N = {
         'cost-never-used': 'Never',
         // v22 · admin
         'badge-soon': 'Soon',
-        'badge-plus': 'Plus',
-        'badge-pro': 'Pro',
         'page-ocr-title': 'Upload & OCR',
         'page-ocr-desc': 'Upload Thai/English PDF invoices for auto recognition',
         'page-dashboard-title': 'Dashboard',
@@ -2950,7 +2867,6 @@ const I18N = {
         'page-api-desc': 'For UiPath or other automation tools',
         'page-settings-title': 'Settings',
         'page-settings-desc': 'Account · notifications · about',
-        'info-plan': 'Plan',
         'info-engine': 'Mode',
         'info-usage': 'Today',
         'info-monthly': 'Monthly',
@@ -3064,9 +2980,9 @@ const I18N = {
         'drawer-items-empty': 'No line items detected',
         'drawer-edit-count': '· {n} field(s) edited',
         'raw-text': 'View full text',
-        'readonly-banner': 'Field editing requires Plus · <a data-upgrade="plus">Upgrade</a>',
+        'readonly-banner': 'Field editing is not enabled for this account',
         'tax-unverified': 'Unverified',
-        'tax-tip-unverified': 'Tax verification requires Plus',
+        'tax-tip-unverified': 'Tax verification is not enabled',
         'badge-cached': 'Cached',
         'badge-cached-hint': 'Instant · no quota used',
         'history-title': 'Invoice Records',
@@ -3277,7 +3193,7 @@ const I18N = {
         'field-invoice-no': 'Invoice no.',
         'field-invoice-date': 'Date',
         'field-seller-name': 'Seller',
-        // v118.8 · 顶栏归属感 + 试用临近到期横幅
+        // v118.8 · 顶栏归属感 + 账户状态横幅
         'brand-workspace-fallback': 'My Workspace',
         // ============ v103 · OCR engine fallback chain ============
         'fallback-typhoon-nvidia-toast': 'Primary engine unavailable · {file} processed with backup engine · please review fields',
@@ -3464,7 +3380,7 @@ const I18N = {
         'rd-syncing': 'Looking up...',
         'rd-status-valid': 'Registered',
         'rd-status-invalid': 'Not found',
-        'rd-tip-upgrade': 'RD verification requires Plus',
+        'rd-tip-upgrade': 'RD verification is not enabled',
         'rd-modal-title': 'Sync from Revenue Department',
         'rd-modal-current': 'Current',
         'rd-modal-official': 'Official',
@@ -3480,39 +3396,13 @@ const I18N = {
         'rd-field-address': 'Address',
         'rd-field-postcode': 'Postcode',
         'pages-unit': 'pages',
-        'upgrade-current': 'Current plan: <strong>{current}</strong>',
-        'upgrade-feature-label': 'Feature Comparison',
-        'upgrade-contact-label': 'Contact us for details',
-        'upgrade-plan-tag-free': 'Current',
-        'upgrade-plan-tag-plus': 'Recommended',
-        'upgrade-plan-tag-pro': 'Team',
         'feat-engine': 'Engine',
-        'feat-monthly': 'Monthly quota',
         'feat-per-upload': 'Pages per upload',
         'feat-filesize': 'Max file size',
         'feat-edit': 'Edit fields',
         'feat-tax': 'Thai tax verify',
         'feat-history': 'History retention',
-        'feat-api-key': 'Custom API Key',
         'feat-support': 'Support',
-        'val-free-engine': 'Standard',
-        'val-plus-engine': 'Precise',
-        'val-pro-engine': 'Precise · Your Key',
-        'val-free-monthly': '50 / month',
-        'val-plus-monthly': '500 / month',
-        'val-pro-monthly': 'Unlimited',
-        'val-free-upload': '10 pages',
-        'val-plus-upload': '20 pages',
-        'val-pro-upload': '50 pages',
-        'val-free-filesize': '30 MB',
-        'val-plus-filesize': '50 MB',
-        'val-pro-filesize': '100 MB',
-        'val-free-history': '7 days',
-        'val-plus-history': '90 days',
-        'val-pro-history': '365 days',
-        'val-free-support': 'Community',
-        'val-plus-support': 'LINE / Email',
-        'val-pro-support': 'Dedicated',
         'contact-phone': 'Phone',
         'contact-line': 'LINE',
         'contact-email': 'Email',
@@ -3523,8 +3413,6 @@ const I18N = {
         'status-error': 'Failed',
         'status-cancelled': 'Cancelled',
         'cs-tag-soon': 'Coming Soon',
-        'cs-tag-plus': 'Plus Only',
-        'cs-tag-pro': 'Pro Only',
         'cs-dashboard-title': 'Smart Dashboard',
         'cs-dashboard-desc': 'Visualize monthly data / quality ratio / trends',
         'cs-history-title': 'Recognition History',
@@ -3564,9 +3452,7 @@ const I18N = {
         'cpw-forgot-fail': 'Failed to send · please try again',
         'cpw-forgot-close-btn': 'Close',
         // v109.4 · user management type badges
-        'admin-type-monthly': 'Monthly',
-        'admin-type-byo-key': 'Lifetime',
-        'admin-type-trial': 'Trial',
+        'admin-type-credits': 'Pay as you go',
         'admin-type-super': 'Admin',
         'admin-self-disabled-tip': 'Cannot perform this action on your own account',
         'badge-coming': 'Soon',
@@ -3595,10 +3481,8 @@ const I18N = {
         'err.ocr.engine_error': 'Engine error',
         'err.ocr.engine_busy': 'System busy, please retry later',
         'err.ocr.engine_not_configured': 'Service temporarily unavailable',
-        'err.ocr.plan_not_supported': 'Not supported on your plan',
         'err.ocr.not_invoice': 'This doesn\'t look like an invoice · please re-select',
         'err.export.empty_records': 'No records',
-        'err.export.template_locked': 'Requires Plus',
         'err.export.build_failed': 'Build failed',
         'err.network': 'Check your connection and retry',
         'err.timeout': 'Timed out · slow network or busy server',
@@ -3617,29 +3501,11 @@ const I18N = {
         'feat-email': 'Email ingest',
         'feat-folder': 'Folder watch',
         'feat-alert': 'Smart alerts',
-        'val-free-tax': '5 / day',
-        'val-free-ep': '1 endpoint',
-        'val-free-archive': 'Default template',
-        'val-free-zip': '10 / batch',
-        'val-plus-ep': '3 endpoints',
-        'val-plus-zip': '100 / batch',
-        'val-plus-email': '1 mailbox',
-        'val-plus-folder': '1 folder',
-        'val-pro-ep': 'Unlimited',
-        'val-pro-zip': 'Unlimited',
-        'val-pro-email': '5 mailboxes',
-        'val-pro-folder': 'Unlimited',
         'ep-limit-reached': 'Endpoint limit reached ({limit})',
-        'ep-auto-push-plus': 'Auto-push is Plus only · Click to upgrade',
-        'free-monthly-exceeded': 'Monthly free quota exceeded · Upgrade to Plus for 500/month',
         'copy': 'Copy',
         'copied': 'Copied',
         'copy-failed': 'Copy failed',
-        'plan-downgrade-hint': 'Contact support to downgrade',
-        'free-quota-upgrade': 'Upgrade for 500/mo',
-        'ep-free-limit-hint': 'Free uses {used}/{limit} endpoints ·',
-        'ep-plus-limit-hint': 'Using {used}/{limit} endpoints',
-        'upgrade-to-plus': 'Upgrade to Plus for 3',
+        'ep-limit-hint': 'Using {used}/{limit} endpoints',
         'feature-coming-soon': 'Coming soon · stay tuned',
         'auto-push-fired': 'ERP push started · {file} · check push log for result',
         'erp-logs-title': 'Push logs',
@@ -3721,7 +3587,6 @@ const I18N = {
         'archive-rule-btn': 'Archive rule',
         'archive-rule-tip': 'Customize file naming after recognition',
         'archive-editor-desc': 'Customize file naming and folder structure',
-        'archive-upgrade-hint': 'Custom archive rules are a Plus feature',
         'archive-current-rule': 'Current rule (click to edit · drag to reorder)',
         'archive-add-field': 'Add field (click to append)',
         'archive-preview': 'Live preview',
@@ -3806,13 +3671,12 @@ const I18N = {
         'set-tab-company': 'Company',
         'set-tab-security': 'Security',
         'set-tab-notifications': 'Notifications',
-        'set-tab-plan': 'Plan & Usage',
+        'set-tab-billing': 'Billing & Usage',
         'set-tab-team': 'Team',
         'set-tab-archive': 'Archive Rule',
         'set-archive-title': 'Archive Rule',
         'set-archive-sub': 'Naming template applied when batch-downloading as ZIP · e.g. date_supplier_amount.pdf',
         'set-archive-open-btn': 'Open template editor',
-        'set-tab-api': 'API & Keys',
         'set-tab-learned': 'Learned Rules',
         'set-tab-general': 'General',
         'set-general-title': 'General Settings',
@@ -3855,7 +3719,7 @@ const I18N = {
         'set-security-sub': 'We recommend changing password every 90 days',
         'set-notif-title': 'Notification Preferences',
         'set-notif-sub': 'Control smart alerts and detection behavior',
-        'set-plan-title': 'Plan & Usage',
+        'set-billing-title': 'Billing & Usage',
         'usage-history-title': 'Usage History',
         'usage-history-loading': 'Loading…',
         'usage-history-empty': 'No usage records yet',
@@ -3898,35 +3762,14 @@ const I18N = {
         'pref-dup-check-off-toast': 'Duplicate check disabled',
         'pref-save-failed': 'Failed to save setting',
         'settings-about': 'Contact us',
-        'about-desc': 'Need help, upgrades, or feedback? Reach out to us',
-        'info-unlimited-own-key': 'Own API · Unlimited',
-        'info-need-api-key': 'Please add your recognition key in Settings',
-        'set-plan-billing-title': 'Billing',
-        'set-plan-billing-mode': 'Pay as you go',
-        'set-plan-billing-detail': 'First 200 pages ฿1.50/page · Over 200 pages ฿0.75/page · Resets on the 1st',
+        'about-desc': 'Need help or feedback? Reach out to us',
+        'set-billing-method-title': 'Billing',
+        'set-billing-method-mode': 'Pay as you go',
+        'set-billing-method-detail': 'First 200 pages ฿1.50/page · Over 200 pages ฿0.75/page · Resets on the 1st',
         'settings-role': 'Account Role',
         'settings-role-super-admin': 'Super Admin',
-        'settings-api-key': 'Recognition Service Key',
-        'settings-api-key-desc': 'Enter your own recognition service key for unlimited use · Does not count against system billing',
-        'api-key-current-label': 'Current saved:',
-        'btn-api-key-test': 'Test',
-        'btn-api-key-save': 'Save',
-        'btn-api-key-clear': 'Clear',
-        'api-key-how-to-get': 'How to get a key?',
-        'api-key-saved': '✓ API Key saved',
-        'api-key-cleared': '✓ Cleared · will use system quota',
-        'api-key-clear-confirm': 'Clearing will switch back to system quota. Continue?',
-        'gemini.testing': 'Testing...',
-        'gemini.key_valid': '✓ Key valid · OK to save',
-        'gemini.key_invalid': '✗ Invalid key',
-        'gemini.key_empty': 'Enter a key first',
-        'gemini.invalid_key_format': 'Invalid format · Gemini keys start with AIza',
-        'gemini.key_quota_exceeded': 'Key quota exceeded',
-        'gemini.test_error': 'Test failed · try again',
-        'gemini.test_empty': 'Empty response · key may be wrong',
         'settings.save_failed': 'Save failed',
         'err.ocr.monthly_limit_exceeded': 'Monthly quota exceeded ({used}/{limit}) · please contact support',
-        'err.quota.need_api_key': 'This account requires your own recognition service key · add it in Settings',
         'err.account.banned': 'This account has been suspended · please contact admin',
         'err.account.inactive': 'This account is inactive · please contact admin',
         'feature-contact-us': 'Feature not open yet · contact us if needed',
@@ -4038,8 +3881,7 @@ const I18N = {
         'admin-col-active': 'Active',
         'admin-col-last-login': 'Last Login',
         'admin-type-admin': 'Super',
-        'admin-type-shared': 'Monthly',
-        'admin-type-byo': 'Lifetime',
+        'admin-type-shared': 'Pay as you go',
         'admin-quota-unlimited': 'Unlimited',
         'admin-status-active': 'Active',
         'admin-status-warning': 'Overdue',
@@ -4098,11 +3940,9 @@ const I18N = {
         'admin-field-verify-password': 'Your admin password',
         'admin-field-confirm-name': 'Type username to confirm',
         'admin-field-current-quota': 'Current Quota',
-        'admin-opt-shared': 'Monthly (shared API)',
-        'admin-opt-byo': 'Lifetime (BYO API key)',
-        'admin-hint-quota': 'Monthly: 100-500 · Lifetime: 0 (unlimited)',
+        'admin-opt-shared': 'Pay as you go (shared API)',
+        'admin-hint-quota': 'Pay as you go · 100-500 recommended',
         'admin-hint-quota-default': 'Default 500/month · editable',
-        'admin-hint-quota-zero': '0 = Unlimited (lifetime)',
         'admin-hint-username': 'English · user logs in with this',
         'admin-hint-password': 'Min 8 chars · share with user',
         'admin-placeholder-username': 'e.g. abc_boss',
@@ -4236,7 +4076,7 @@ const I18N = {
         'team-username-exists': 'Username already taken',
         'team-create-failed': 'Create failed',
         'team-no-permission': 'No permission',
-        'team-no-tenant': 'Please upgrade first',
+        'team-no-tenant': 'Select or create a company first',
         'team-toggle-failed': 'Operation failed',
         'team-remove-failed': 'Remove failed',
         'team-confirm-remove': 'Remove employee {n}?',
@@ -5007,7 +4847,7 @@ const I18N = {
         'brand-sub': 'ผู้ช่วยอ่านใบแจ้งหนี้',
         // v118.28.4.1 · LINE user email completion modal
         'line-email-title': 'กรุณากรอกอีเมลของคุณ',
-        'line-email-sub': 'เราใช้อีเมลเพื่อส่งรายงานประจำเดือน · แจ้งเตือนทดลองใช้หมดอายุ · และคำเชิญทีม',
+        'line-email-sub': 'เราใช้อีเมลเพื่อส่งรายงานประจำเดือนและคำเชิญทีม',
         'line-email-placeholder': 'ที่อยู่อีเมลของคุณ',
         'line-email-submit': 'บันทึกและดำเนินการต่อ',
         'line-email-err-invalid': 'รูปแบบอีเมลไม่ถูกต้อง',
@@ -5081,7 +4921,7 @@ const I18N = {
         'ob-role-cfo': 'CFO / ผู้จัดการการเงิน',
         'ob-role-business': 'เจ้าของธุรกิจ',
         'ob-s2-title': 'ใบกำกับประมาณเดือนละกี่ใบ?',
-        'ob-s2-sub': 'เราจะแนะนำแพ็คเกจที่เหมาะ · ไม่มีการเรียกเก็บอัตโนมัติ',
+        'ob-s2-sub': 'เราจะประเมินการใช้งานที่เหมาะสม · ไม่มีการเรียกเก็บอัตโนมัติ',
         'ob-vol-1-tip': 'ธุรกิจขนาดเล็ก',
         'ob-vol-2-tip': 'สำนักงานขนาดกลาง',
         'ob-vol-3-tip': 'สำนักงานขนาดใหญ่',
@@ -5096,7 +4936,7 @@ const I18N = {
         'ob-s4-sub': 'หลังจากกรอกแล้ว เราจะส่งรายงานประจำสัปดาห์ การเตือนโควต้า และการอัปเดตสำคัญผ่าน LINE',
         'ob-final-tip': 'กรอกครบทุกข้อ · Pearnly จะแนะนำเวิร์กโฟลว์ที่เหมาะกับบทบาทและขนาดของคุณ',
         'ob-fb-role': '✓ แนะนำเทมเพลตตามบทบาทของคุณแล้ว',
-        'ob-fb-volume': '✓ จับคู่แพ็คเกจกับขนาดของคุณแล้ว',
+        'ob-fb-volume': '✓ ประเมินการใช้งานตามขนาดของคุณแล้ว',
         'ob-fb-country': '✓ เปลี่ยนเป็นกฎตรวจสอบเลขผู้เสียภาษีท้องถิ่นแล้ว',
         'ob-fb-line': '✓ เปิดการแจ้งเตือน LINE แล้ว',
         'ob-fb-done': 'บันทึกข้อมูลแล้ว · ยินดีต้อนรับสู่ Pearnly!',
@@ -5303,7 +5143,6 @@ const I18N = {
         'cost-by-user-title': 'แยกตามผู้ใช้',
         'cost-by-user-hint': 'เรียงตามยอดเดือนนี้ · หาคนที่ใช้เยอะ',
         'cost-th-user': 'ผู้ใช้',
-        'cost-th-plan': 'แพ็กเกจ',
         'cost-th-today': 'วันนี้',
         'cost-th-month': 'เดือน',
         'cost-th-total': 'รวม',
@@ -5351,8 +5190,6 @@ const I18N = {
         'cost-never-used': 'ไม่เคย',
         // v22 · admin
         'badge-soon': 'เร็วๆ นี้',
-        'badge-plus': 'Plus',
-        'badge-pro': 'Pro',
         'page-ocr-title': 'อัปโหลดและอ่าน',
         'page-ocr-desc': 'อัปโหลด PDF ภาษาไทย/อังกฤษ อ่านข้อมูลอัตโนมัติ',
         'page-dashboard-title': 'แดชบอร์ด',
@@ -5369,7 +5206,6 @@ const I18N = {
         'page-api-desc': 'สำหรับ UiPath หรือเครื่องมืออัตโนมัติอื่น',
         'page-settings-title': 'ตั้งค่า',
         'page-settings-desc': 'บัญชี · แจ้งเตือน · เกี่ยวกับ',
-        'info-plan': 'แพ็กเกจ',
         'info-engine': 'โหมด',
         'info-usage': 'วันนี้',
         'info-monthly': 'เดือนนี้',
@@ -5483,9 +5319,9 @@ const I18N = {
         'drawer-items-empty': 'ไม่พบรายการสินค้า',
         'drawer-edit-count': '· แก้ไข {n} ช่อง',
         'raw-text': 'ดูข้อความทั้งหมด',
-        'readonly-banner': 'แก้ไขข้อมูลต้องใช้ Plus · <a data-upgrade="plus">อัปเกรด</a>',
+        'readonly-banner': 'บัญชีนี้ยังไม่ได้เปิดสิทธิ์แก้ไขฟิลด์',
         'tax-unverified': 'ยังไม่ตรวจ',
-        'tax-tip-unverified': 'การตรวจภาษีต้องใช้ Plus',
+        'tax-tip-unverified': 'ยังไม่ได้เปิดใช้งานการตรวจสอบเลขภาษี',
         'badge-cached': 'ใช้ซ้ำ',
         'badge-cached-hint': 'ทันที · ไม่หักโควต้า',
         'history-title': 'บันทึกใบกำกับภาษี',
@@ -5695,7 +5531,7 @@ const I18N = {
         'field-invoice-no': 'เลขที่ใบกำกับ',
         'field-invoice-date': 'วันที่',
         'field-seller-name': 'ผู้ขาย',
-        // v118.8 · 顶栏归属感 + 试用临近到期横幅
+        // v118.8 · 顶栏归属感 + 账户状态横幅
         'brand-workspace-fallback': 'พื้นที่ทำงานของฉัน',
         // ============ v103 · ระบบสำรอง OCR ============
         'fallback-typhoon-nvidia-toast': 'เครื่องหลักไม่พร้อม · {file} ใช้เครื่องสำรอง · กรุณาตรวจทาน',
@@ -5882,7 +5718,7 @@ const I18N = {
         'rd-syncing': 'กำลังค้นหา...',
         'rd-status-valid': 'ลงทะเบียนแล้ว',
         'rd-status-invalid': 'ไม่พบ',
-        'rd-tip-upgrade': 'ตรวจสอบกรมสรรพากรต้องใช้ Plus',
+        'rd-tip-upgrade': 'ยังไม่ได้เปิดใช้งานการตรวจสอบ RD',
         'rd-modal-title': 'ดึงข้อมูลจากกรมสรรพากร',
         'rd-modal-current': 'ค่าปัจจุบัน',
         'rd-modal-official': 'ข้อมูลทางการ',
@@ -5898,39 +5734,13 @@ const I18N = {
         'rd-field-address': 'ที่อยู่',
         'rd-field-postcode': 'รหัสไปรษณีย์',
         'pages-unit': 'หน้า',
-        'upgrade-current': 'แพ็กเกจปัจจุบัน: <strong>{current}</strong>',
-        'upgrade-feature-label': 'เปรียบเทียบฟีเจอร์',
-        'upgrade-contact-label': 'ติดต่อเราสำหรับรายละเอียด',
-        'upgrade-plan-tag-free': 'ปัจจุบัน',
-        'upgrade-plan-tag-plus': 'แนะนำ',
-        'upgrade-plan-tag-pro': 'ทีม',
         'feat-engine': 'เครื่องมืออ่าน',
-        'feat-monthly': 'โควต้าต่อเดือน',
         'feat-per-upload': 'หน้าต่อครั้ง',
         'feat-filesize': 'ขนาดไฟล์สูงสุด',
         'feat-edit': 'แก้ไขข้อมูล',
         'feat-tax': 'ตรวจเลขภาษี',
         'feat-history': 'เก็บประวัติ',
-        'feat-api-key': 'API Key ของตัวเอง',
         'feat-support': 'บริการลูกค้า',
-        'val-free-engine': 'มาตรฐาน',
-        'val-plus-engine': 'แม่นยำ',
-        'val-pro-engine': 'แม่นยำ · Key ของคุณ',
-        'val-free-monthly': '50 ใบ / เดือน',
-        'val-plus-monthly': '500 ใบ / เดือน',
-        'val-pro-monthly': 'ไม่จำกัด',
-        'val-free-upload': '10 หน้า',
-        'val-plus-upload': '20 หน้า',
-        'val-pro-upload': '50 หน้า',
-        'val-free-filesize': '30 MB',
-        'val-plus-filesize': '50 MB',
-        'val-pro-filesize': '100 MB',
-        'val-free-history': '7 วัน',
-        'val-plus-history': '90 วัน',
-        'val-pro-history': '365 วัน',
-        'val-free-support': 'ชุมชน',
-        'val-plus-support': 'LINE / อีเมล',
-        'val-pro-support': 'ทีมโดยเฉพาะ',
         'contact-phone': 'โทร',
         'contact-line': 'LINE',
         'contact-email': 'อีเมล',
@@ -5941,8 +5751,6 @@ const I18N = {
         'status-error': 'ล้มเหลว',
         'status-cancelled': 'ยกเลิก',
         'cs-tag-soon': 'เร็วๆ นี้',
-        'cs-tag-plus': 'Plus เท่านั้น',
-        'cs-tag-pro': 'Pro เท่านั้น',
         'cs-dashboard-title': 'แดชบอร์ดอัจฉริยะ',
         'cs-dashboard-desc': 'กราฟข้อมูลรายเดือน / คุณภาพ / แนวโน้ม',
         'cs-history-title': 'ประวัติการอ่าน',
@@ -5982,9 +5790,7 @@ const I18N = {
         'cpw-forgot-fail': 'ส่งไม่สำเร็จ · กรุณาลองอีกครั้ง',
         'cpw-forgot-close-btn': 'ปิด',
         // v109.4 · ป้ายประเภทผู้ใช้
-        'admin-type-monthly': 'รายเดือน',
-        'admin-type-byo-key': 'ซื้อขาด',
-        'admin-type-trial': 'ทดลอง',
+        'admin-type-credits': 'คิดตามการใช้งาน',
         'admin-type-super': 'ผู้ดูแล',
         'admin-self-disabled-tip': 'ไม่สามารถดำเนินการกับบัญชีของตนเองได้',
         'badge-coming': 'เร็วๆ นี้',
@@ -6013,10 +5819,8 @@ const I18N = {
         'err.ocr.engine_error': 'เครื่องยนต์ขัดข้อง',
         'err.ocr.engine_busy': 'ระบบไม่ว่าง กรุณาลองใหม่',
         'err.ocr.engine_not_configured': 'บริการไม่พร้อมใช้งาน',
-        'err.ocr.plan_not_supported': 'แพ็กเกจไม่รองรับ',
         'err.ocr.not_invoice': 'ไฟล์นี้ไม่ใช่ใบกำกับภาษี · กรุณาเลือกใหม่',
         'err.export.empty_records': 'ไม่มีข้อมูล',
-        'err.export.template_locked': 'ต้อง Plus',
         'err.export.build_failed': 'สร้างไม่สำเร็จ',
         'err.network': 'กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่',
         'err.timeout': 'หมดเวลา · เครือข่ายช้าหรือเซิร์ฟเวอร์ไม่ว่าง',
@@ -6035,29 +5839,11 @@ const I18N = {
         'feat-email': 'ดึงจากอีเมล',
         'feat-folder': 'เฝ้าโฟลเดอร์',
         'feat-alert': 'แจ้งเตือนอัจฉริยะ',
-        'val-free-tax': '5 ครั้ง / วัน',
-        'val-free-ep': '1 Endpoint',
-        'val-free-archive': 'เทมเพลตมาตรฐาน',
-        'val-free-zip': '10 ใบ / ครั้ง',
-        'val-plus-ep': '3 Endpoints',
-        'val-plus-zip': '100 ใบ / ครั้ง',
-        'val-plus-email': '1 อีเมล',
-        'val-plus-folder': '1 โฟลเดอร์',
-        'val-pro-ep': 'ไม่จำกัด',
-        'val-pro-zip': 'ไม่จำกัด',
-        'val-pro-email': '5 อีเมล',
-        'val-pro-folder': 'ไม่จำกัด',
         'ep-limit-reached': 'จำนวน Endpoint ถึงขีดจำกัดแล้ว ({limit})',
-        'ep-auto-push-plus': 'ส่งอัตโนมัติเฉพาะ Plus · คลิกเพื่ออัปเกรด',
-        'free-monthly-exceeded': 'โควต้าฟรีเดือนนี้หมดแล้ว · อัพเกรด Plus เพื่อ 500/เดือน',
         'copy': 'คัดลอก',
         'copied': 'คัดลอกแล้ว',
         'copy-failed': 'คัดลอกไม่สำเร็จ',
-        'plan-downgrade-hint': 'ลดแพ็กเกจติดต่อทีมงาน',
-        'free-quota-upgrade': 'อัปเกรด 500/เดือน',
-        'ep-free-limit-hint': 'Free ใช้ {used}/{limit} Endpoints ·',
-        'ep-plus-limit-hint': 'ใช้ {used}/{limit} Endpoints',
-        'upgrade-to-plus': 'อัปเกรด Plus ได้ 3',
+        'ep-limit-hint': 'ใช้ {used}/{limit} Endpoints',
         'feature-coming-soon': 'ฟีเจอร์กำลังจะมา · โปรดรอ',
         'auto-push-fired': 'เริ่มส่ง ERP · {file} · ดูบันทึกผล',
         'erp-logs-title': 'บันทึกการส่ง',
@@ -6139,7 +5925,6 @@ const I18N = {
         'archive-rule-btn': 'กฎจัดเก็บ',
         'archive-rule-tip': 'กำหนดรูปแบบการตั้งชื่อไฟล์',
         'archive-editor-desc': 'กำหนดรูปแบบชื่อไฟล์และโครงสร้างโฟลเดอร์',
-        'archive-upgrade-hint': 'การกำหนดกฎไฟล์เป็นฟีเจอร์ของ Plus',
         'archive-current-rule': 'กฎปัจจุบัน (คลิกแก้ · ลากเรียง)',
         'archive-add-field': 'เพิ่มฟิลด์ (คลิกเพื่อเพิ่ม)',
         'archive-preview': 'ตัวอย่าง',
@@ -6224,13 +6009,12 @@ const I18N = {
         'set-tab-company': 'ข้อมูลบริษัท',
         'set-tab-security': 'ความปลอดภัย',
         'set-tab-notifications': 'การแจ้งเตือน',
-        'set-tab-plan': 'แพ็กเกจ & การใช้งาน',
+        'set-tab-billing': 'การคิดเงิน & การใช้งาน',
         'set-tab-team': 'จัดการทีม',
         'set-tab-archive': 'กฎจัดเก็บ',
         'set-archive-title': 'กฎจัดเก็บ',
         'set-archive-sub': 'รูปแบบชื่อไฟล์ตอนดาวน์โหลด ZIP รายชุด · เช่น วันที่_ผู้ขาย_จำนวน.pdf',
         'set-archive-open-btn': 'เปิดตัวแก้ไขรูปแบบ',
-        'set-tab-api': 'API & คีย์',
         'set-tab-learned': 'กฎที่เรียนรู้',
         'set-tab-general': 'ตั้งค่าทั่วไป',
         'set-general-title': 'ตั้งค่าทั่วไป',
@@ -6273,7 +6057,7 @@ const I18N = {
         'set-security-sub': 'แนะนำเปลี่ยนรหัสทุก 90 วัน',
         'set-notif-title': 'การแจ้งเตือน',
         'set-notif-sub': 'ควบคุมการแจ้งและการตรวจสอบอัตโนมัติ',
-        'set-plan-title': 'แพ็กเกจ & การใช้งาน',
+        'set-billing-title': 'การคิดเงิน & การใช้งาน',
         'usage-history-title': 'ประวัติการใช้งาน',
         'usage-history-loading': 'กำลังโหลด…',
         'usage-history-empty': 'ยังไม่มีประวัติการใช้งาน',
@@ -6316,35 +6100,14 @@ const I18N = {
         'pref-dup-check-off-toast': 'ปิดการตรวจซ้ำแล้ว',
         'pref-save-failed': 'บันทึกไม่สำเร็จ',
         'settings-about': 'ติดต่อเรา',
-        'about-desc': 'ต้องการความช่วยเหลือหรืออัปเกรด · ติดต่อเรา',
-        'info-unlimited-own-key': 'API ของคุณ · ไม่จำกัด',
-        'info-need-api-key': 'กรุณาใส่คีย์บริการ OCR ในหน้าตั้งค่า',
-        'set-plan-billing-title': 'วิธีคิดค่าบริการ',
-        'set-plan-billing-mode': 'คิดตามการใช้งาน',
-        'set-plan-billing-detail': '200 แผ่นแรก ฿1.50/แผ่น · เกิน 200 แผ่น ฿0.75/แผ่น · รีเซ็ตทุกวันที่ 1',
+        'about-desc': 'ต้องการความช่วยเหลือหรือส่ง feedback · ติดต่อเรา',
+        'set-billing-method-title': 'วิธีคิดค่าบริการ',
+        'set-billing-method-mode': 'คิดตามการใช้งาน',
+        'set-billing-method-detail': '200 แผ่นแรก ฿1.50/แผ่น · เกิน 200 แผ่น ฿0.75/แผ่น · รีเซ็ตทุกวันที่ 1',
         'settings-role': 'บทบาทบัญชี',
         'settings-role-super-admin': 'ผู้ดูแลระบบสูงสุด',
-        'settings-api-key': 'คีย์บริการ OCR',
-        'settings-api-key-desc': 'ใส่คีย์บริการ OCR ของคุณเองเพื่อใช้ได้ไม่จำกัด · ไม่นับรวมการคิดเงินของระบบ',
-        'api-key-current-label': 'บันทึกไว้ปัจจุบัน:',
-        'btn-api-key-test': 'ทดสอบ',
-        'btn-api-key-save': 'บันทึก',
-        'btn-api-key-clear': 'ลบ',
-        'api-key-how-to-get': 'รับคีย์อย่างไร?',
-        'api-key-saved': '✓ บันทึกแล้ว',
-        'api-key-cleared': '✓ ล้างแล้ว · ใช้โควตาระบบ',
-        'api-key-clear-confirm': 'ล้างแล้วจะใช้โควตาระบบ · แน่ใจ?',
-        'gemini.testing': 'กำลังทดสอบ...',
-        'gemini.key_valid': '✓ ใช้ได้',
-        'gemini.key_invalid': '✗ คีย์ไม่ถูกต้อง',
-        'gemini.key_empty': 'กรุณาใส่คีย์',
-        'gemini.invalid_key_format': 'รูปแบบผิด · ขึ้นต้นด้วย AIza',
-        'gemini.key_quota_exceeded': 'โควตาคีย์หมด',
-        'gemini.test_error': 'ทดสอบล้มเหลว',
-        'gemini.test_empty': 'ไม่มีคำตอบ · คีย์อาจผิด',
         'settings.save_failed': 'บันทึกล้มเหลว',
         'err.ocr.monthly_limit_exceeded': 'โควตาหมด ({used}/{limit}) · ติดต่อฝ่ายสนับสนุน',
-        'err.quota.need_api_key': 'บัญชีนี้ต้องใช้คีย์บริการรู้จำของคุณเอง · กรุณาเพิ่มในหน้าตั้งค่า',
         'err.account.banned': 'บัญชีนี้ถูกระงับการใช้งาน · กรุณาติดต่อผู้ดูแลระบบ',
         'err.account.inactive': 'บัญชีนี้ยังไม่เปิดใช้งาน · กรุณาติดต่อผู้ดูแลระบบ',
         'feature-contact-us': 'ฟีเจอร์นี้ยังไม่เปิด · ติดต่อเราหากต้องการ',
@@ -6456,8 +6219,7 @@ const I18N = {
         'admin-col-active': 'ใช้งาน',
         'admin-col-last-login': 'เข้าล่าสุด',
         'admin-type-admin': 'ผู้ดูแล',
-        'admin-type-shared': 'รายเดือน',
-        'admin-type-byo': 'ซื้อขาด',
+        'admin-type-shared': 'คิดตามการใช้งาน',
         'admin-quota-unlimited': 'ไม่จำกัด',
         'admin-status-active': 'ปกติ',
         'admin-status-warning': 'ค้างชำระ',
@@ -6516,11 +6278,9 @@ const I18N = {
         'admin-field-verify-password': 'รหัสผู้ดูแล',
         'admin-field-confirm-name': 'พิมพ์ชื่อเพื่อยืนยัน',
         'admin-field-current-quota': 'โควตาปัจจุบัน',
-        'admin-opt-shared': 'รายเดือน (ใช้ key ร่วม)',
-        'admin-opt-byo': 'ซื้อขาด (Gemini key เอง)',
-        'admin-hint-quota': 'รายเดือน 100-500 / ซื้อขาด 0',
+        'admin-opt-shared': 'คิดตามการใช้งาน (ใช้ key ร่วม)',
+        'admin-hint-quota': 'คิดตามการใช้งาน · แนะนำ 100-500',
         'admin-hint-quota-default': 'ค่าเริ่มต้น 500 ครั้ง/เดือน · แก้ไขได้',
-        'admin-hint-quota-zero': '0 = ไม่จำกัด',
         'admin-hint-username': 'ภาษาอังกฤษ',
         'admin-hint-password': 'อย่างน้อย 8 ตัว',
         'admin-placeholder-username': 'เช่น abc_boss',
@@ -6585,7 +6345,6 @@ const I18N = {
         'force-pwd-fail': 'เปลี่ยนล้มเหลว',
         'force-pwd-ok': 'เปลี่ยนรหัสผ่านสำเร็จ',
         'team-modal-email-hint2': 'พนักงานใช้อีเมลนี้ล็อกอิน · ไม่ซ้ำกันทั้งระบบ',
-        'team-title-old': 'จัดการทีม',
         'team-sub': 'จัดการบัญชีพนักงาน',
         'team-add': 'เพิ่มพนักงาน',
         'team-never-login': 'ไม่เคยเข้า',
@@ -6654,7 +6413,7 @@ const I18N = {
         'team-username-exists': 'ชื่อผู้ใช้นี้ถูกใช้แล้ว',
         'team-create-failed': 'สร้างล้มเหลว',
         'team-no-permission': 'ไม่มีสิทธิ์',
-        'team-no-tenant': 'โปรดอัปเกรดก่อน',
+        'team-no-tenant': 'กรุณาเลือกหรือสร้างบริษัทก่อน',
         'team-toggle-failed': 'ดำเนินการล้มเหลว',
         'team-remove-failed': 'ลบล้มเหลว',
         'team-confirm-remove': 'ลบพนักงาน {n}?',
@@ -7422,7 +7181,7 @@ const I18N = {
         'brand-sub': '請求書認識',
         // v118.28.4.1 · LINE ユーザー メール補完 modal
         'line-email-title': 'メールアドレスを登録してください',
-        'line-email-sub': '月次レポート・トライアル期限通知・チーム招待をお送りするため、メールアドレスをご登録ください',
+        'line-email-sub': '月次レポートとチーム招待のため、メールアドレスをご登録ください',
         'line-email-placeholder': 'メールアドレス',
         'line-email-submit': '保存して続行',
         'line-email-err-invalid': 'メール形式が正しくありません',
@@ -7482,7 +7241,7 @@ const I18N = {
         'set-group-account': 'アカウント', 'set-group-company': '会社', 'set-group-workflow': 'ワークフロー', 'set-group-system': 'システム', 'set-group-about': '概要',
         'nav-group-admin': '管理者',
         'set-page-title': '設定', 'set-page-sub': 'アカウント · 会社 · ワークフローを管理',
-        // v110.7 · ログイン後ウェルカムウィザード(プラン B)
+        // v110.7 · ログイン後ウェルカムウィザード
         'ob-eyebrow': 'プロフィール完成 · パーソナライズ体験',
         'ob-skip': 'このステップをスキップ',
         'ob-next': '次へ →',
@@ -7496,7 +7255,7 @@ const I18N = {
         'ob-role-cfo': 'CFO / 経理マネージャー',
         'ob-role-business': '経営者',
         'ob-s2-title': '月間請求書はおおよそ何枚?',
-        'ob-s2-sub': '最適なプランを提案します · 自動課金はありません',
+        'ob-s2-sub': '使用量の目安を提案します · 自動課金はありません',
         'ob-vol-1-tip': '小規模',
         'ob-vol-2-tip': '中規模事務所',
         'ob-vol-3-tip': '大規模事務所',
@@ -7511,7 +7270,7 @@ const I18N = {
         'ob-s4-sub': '入力後、週次利用レポート、クォータ通知、重要なお知らせを LINE で送信します',
         'ob-final-tip': 'すべて入力すると、お役職と規模に合わせた最適なワークフローを Pearnly が提案します',
         'ob-fb-role': '✓ お役職に基づいてテンプレートを推奨しました',
-        'ob-fb-volume': '✓ 規模に合うプラン提案を準備しました',
+        'ob-fb-volume': '✓ 規模に合う使用量目安を準備しました',
         'ob-fb-country': '✓ ローカル税番号検証ルールに切替えました',
         'ob-fb-line': '✓ LINE 通知を有効にしました',
         'ob-fb-done': 'プロフィール保存完了 · Pearnly へようこそ!',
@@ -7718,7 +7477,6 @@ const I18N = {
         'cost-by-user-title': 'ユーザー別',
         'cost-by-user-hint': '今月の使用額順 · 多用ユーザーを見つける',
         'cost-th-user': 'ユーザー',
-        'cost-th-plan': 'プラン',
         'cost-th-today': '今日',
         'cost-th-month': '今月',
         'cost-th-total': '累計',
@@ -7765,8 +7523,6 @@ const I18N = {
         'adm-billing-calib-invalid': '校正係数は 0.5 ~ 2.0 の範囲で',
         'cost-never-used': '未使用',
         'badge-soon': '近日',
-        'badge-plus': 'Plus',
-        'badge-pro': 'Pro',
         'page-ocr-title': 'アップロード & OCR',
         'page-ocr-desc': 'タイ語/英語 PDF をアップロードして自動認識',
         'page-dashboard-title': 'ダッシュボード',
@@ -7783,7 +7539,6 @@ const I18N = {
         'page-api-desc': 'UiPath など自動化ツール向け',
         'page-settings-title': '設定',
         'page-settings-desc': 'アカウント · 通知 · について',
-        'info-plan': 'プラン',
         'info-engine': 'モード',
         'info-usage': '本日',
         'info-monthly': '今月',
@@ -7897,9 +7652,9 @@ const I18N = {
         'drawer-items-empty': '明細なし',
         'drawer-edit-count': '· {n} 項目編集',
         'raw-text': '全文を表示',
-        'readonly-banner': '編集には Plus が必要 · <a data-upgrade="plus">アップグレード</a>',
+        'readonly-banner': 'このアカウントでは項目編集が有効ではありません',
         'tax-unverified': '未検証',
-        'tax-tip-unverified': '税番号検証には Plus が必要',
+        'tax-tip-unverified': '税番号検証は有効ではありません',
         'badge-cached': 'キャッシュ',
         'badge-cached-hint': '即時 · クォータ消費なし',
         'history-title': '請求書記録',
@@ -8109,7 +7864,7 @@ const I18N = {
         'field-invoice-no': '請求番号',
         'field-invoice-date': '日付',
         'field-seller-name': '売り手',
-        // v118.8 · 顶栏归属感 + 试用临近到期横幅
+        // v118.8 · 顶栏归属感 + 账户状态横幅
         'brand-workspace-fallback': 'マイワークスペース',
         // ============ v103 · OCR フォールバック ============
         'fallback-typhoon-nvidia-toast': 'メインエンジン利用不可 · {file} はバックアップエンジンで処理 · フィールド確認推奨',
@@ -8296,7 +8051,7 @@ const I18N = {
         'rd-syncing': '照会中...',
         'rd-status-valid': '登録済み',
         'rd-status-invalid': '見つかりません',
-        'rd-tip-upgrade': 'RD 確認には Plus が必要',
+        'rd-tip-upgrade': 'RD 確認は有効ではありません',
         'rd-modal-title': 'タイ歳入局から同期',
         'rd-modal-current': '現在',
         'rd-modal-official': '公式データ',
@@ -8312,39 +8067,13 @@ const I18N = {
         'rd-field-address': '住所',
         'rd-field-postcode': '郵便番号',
         'pages-unit': '枚',
-        'upgrade-current': '現在のプラン: <strong>{current}</strong>',
-        'upgrade-feature-label': '機能比較',
-        'upgrade-contact-label': '詳細はお問い合わせください',
-        'upgrade-plan-tag-free': '現在',
-        'upgrade-plan-tag-plus': 'おすすめ',
-        'upgrade-plan-tag-pro': 'チーム',
         'feat-engine': 'エンジン',
-        'feat-monthly': '月間枚数',
         'feat-per-upload': '1 回アップロード',
         'feat-filesize': '最大ファイル',
         'feat-edit': '項目編集',
         'feat-tax': 'タイ税番号検証',
         'feat-history': '履歴保存',
-        'feat-api-key': 'カスタム API Key',
         'feat-support': 'サポート',
-        'val-free-engine': '標準',
-        'val-plus-engine': '高精度',
-        'val-pro-engine': '高精度 · 自前 Key',
-        'val-free-monthly': '50 件 / 月',
-        'val-plus-monthly': '500 件 / 月',
-        'val-pro-monthly': '無制限',
-        'val-free-upload': '10 ページ',
-        'val-plus-upload': '20 ページ',
-        'val-pro-upload': '50 ページ',
-        'val-free-filesize': '30 MB',
-        'val-plus-filesize': '50 MB',
-        'val-pro-filesize': '100 MB',
-        'val-free-history': '7 日',
-        'val-plus-history': '90 日',
-        'val-pro-history': '365 日',
-        'val-free-support': 'コミュニティ',
-        'val-plus-support': 'LINE / メール',
-        'val-pro-support': '専任サポート',
         'contact-phone': '電話',
         'contact-line': 'LINE',
         'contact-email': 'メール',
@@ -8355,8 +8084,6 @@ const I18N = {
         'status-error': '失敗',
         'status-cancelled': 'キャンセル',
         'cs-tag-soon': '近日公開',
-        'cs-tag-plus': 'Plus 限定',
-        'cs-tag-pro': 'Pro 限定',
         'cs-dashboard-title': 'スマートダッシュボード',
         'cs-dashboard-desc': '月次データ / 品質率 / トレンドの可視化',
         'cs-history-title': '認識履歴',
@@ -8396,9 +8123,7 @@ const I18N = {
         'cpw-forgot-fail': '送信に失敗しました · 再度お試しください',
         'cpw-forgot-close-btn': '閉じる',
         // v109.4 · ユーザー管理タイプバッジ
-        'admin-type-monthly': '月額',
-        'admin-type-byo-key': '買い切り',
-        'admin-type-trial': 'トライアル',
+        'admin-type-credits': '使用量課金',
         'admin-type-super': '管理者',
         'admin-self-disabled-tip': '自分のアカウントには実行できません',
         'badge-coming': '近日',
@@ -8427,10 +8152,8 @@ const I18N = {
         'err.ocr.engine_error': 'エンジンエラー',
         'err.ocr.engine_busy': 'システム混雑中、後ほどお試しください',
         'err.ocr.engine_not_configured': 'サービス一時利用不可',
-        'err.ocr.plan_not_supported': 'プラン非対応',
         'err.ocr.not_invoice': 'これは請求書ではないようです · 再選択してください',
         'err.export.empty_records': 'データなし',
-        'err.export.template_locked': 'Plus 必要',
         'err.export.build_failed': '生成失敗',
         'err.network': 'ネットワーク接続を確認してください',
         'err.timeout': 'タイムアウト · 通信が遅いかサーバー混雑',
@@ -8449,29 +8172,11 @@ const I18N = {
         'feat-email': 'メール取込',
         'feat-folder': 'フォルダ監視',
         'feat-alert': 'スマート通知',
-        'val-free-tax': '5 回 / 日',
-        'val-free-ep': '1 エンドポイント',
-        'val-free-archive': '既定テンプレート',
-        'val-free-zip': '10 件 / 回',
-        'val-plus-ep': '3 エンドポイント',
-        'val-plus-zip': '100 件 / 回',
-        'val-plus-email': '1 メール',
-        'val-plus-folder': '1 フォルダ',
-        'val-pro-ep': '無制限',
-        'val-pro-zip': '無制限',
-        'val-pro-email': '5 メール',
-        'val-pro-folder': '無制限',
         'ep-limit-reached': 'エンドポイント上限({limit})',
-        'ep-auto-push-plus': '自動送信は Plus 限定 · クリックでアップグレード',
-        'free-monthly-exceeded': '今月の無料枠を超過 · Plus にアップで 500/月',
         'copy': 'コピー',
         'copied': 'コピーしました',
         'copy-failed': 'コピー失敗',
-        'plan-downgrade-hint': 'ダウングレードはサポートへ',
-        'free-quota-upgrade': 'Plus で 500/月',
-        'ep-free-limit-hint': 'Free は {used}/{limit} エンドポイント使用 ·',
-        'ep-plus-limit-hint': '{used}/{limit} エンドポイント使用中',
-        'upgrade-to-plus': 'Plus で 3 個に',
+        'ep-limit-hint': '{used}/{limit} エンドポイント使用中',
         'feature-coming-soon': '近日公開予定',
         'auto-push-fired': 'ERP 送信開始 · {file} · 結果は送信ログを確認',
         'erp-logs-title': '送信ログ',
@@ -8553,7 +8258,6 @@ const I18N = {
         'archive-rule-btn': 'アーカイブ規則',
         'archive-rule-tip': '認識後のファイル命名をカスタマイズ',
         'archive-editor-desc': 'ファイル名とフォルダ構造をカスタマイズ',
-        'archive-upgrade-hint': 'カスタム命名は Plus 限定',
         'archive-current-rule': '現在のルール(クリックで編集 · ドラッグで並替)',
         'archive-add-field': 'フィールド追加(クリックで追加)',
         'archive-preview': 'プレビュー',
@@ -8638,13 +8342,12 @@ const I18N = {
         'set-tab-company': '会社情報',
         'set-tab-security': 'アカウント保護',
         'set-tab-notifications': '通知設定',
-        'set-tab-plan': 'プラン & 使用量',
+        'set-tab-billing': '請求 & 使用量',
         'set-tab-team': 'チーム管理',
         'set-tab-archive': 'アーカイブ規則',
         'set-archive-title': 'アーカイブ規則',
         'set-archive-sub': 'ZIP 一括ダウンロード時のファイル名テンプレート · 例:日付_仕入先_金額.pdf',
         'set-archive-open-btn': 'テンプレートエディタを開く',
-        'set-tab-api': 'API & キー',
         'set-tab-learned': '学習ルール',
         'set-tab-general': '一般設定',
         'set-general-title': '一般設定',
@@ -8687,7 +8390,7 @@ const I18N = {
         'set-security-sub': '90 日ごとのパスワード変更を推奨',
         'set-notif-title': '通知設定',
         'set-notif-sub': 'アラートと検出の動作を制御',
-        'set-plan-title': 'プラン & 使用量',
+        'set-billing-title': '請求 & 使用量',
         'usage-history-title': '利用履歴',
         'usage-history-loading': '読み込み中…',
         'usage-history-empty': '利用履歴がありません',
@@ -8730,35 +8433,14 @@ const I18N = {
         'pref-dup-check-off-toast': '重複検出を無効化',
         'pref-save-failed': '保存に失敗',
         'settings-about': 'お問い合わせ',
-        'about-desc': 'お問い合わせやアップグレードはお気軽に',
-        'info-unlimited-own-key': '独自 API · 無制限',
-        'info-need-api-key': '設定で認識サービスキーをご入力ください',
-        'set-plan-billing-title': '料金プラン',
-        'set-plan-billing-mode': '使用量課金',
-        'set-plan-billing-detail': '最初の200枚 ฿1.50/枚 · 200枚超 ฿0.75/枚 · 毎月1日リセット',
+        'about-desc': 'お問い合わせやフィードバックはお気軽に',
+        'set-billing-method-title': '請求方式',
+        'set-billing-method-mode': '使用量課金',
+        'set-billing-method-detail': '最初の200枚 ฿1.50/枚 · 200枚超 ฿0.75/枚 · 毎月1日リセット',
         'settings-role': 'アカウント権限',
         'settings-role-super-admin': 'スーパー管理者',
-        'settings-api-key': '認識サービスキー',
-        'settings-api-key-desc': 'ご自身の認識サービスキーを入力すると無制限で利用可能 · システム課金には計上されません',
-        'api-key-current-label': '保存済み:',
-        'btn-api-key-test': 'テスト',
-        'btn-api-key-save': '保存',
-        'btn-api-key-clear': 'クリア',
-        'api-key-how-to-get': 'キーの取得方法',
-        'api-key-saved': '✓ 保存しました',
-        'api-key-cleared': '✓ クリア · システムクォータ使用',
-        'api-key-clear-confirm': 'クリアするとシステムクォータに戻ります。続行?',
-        'gemini.testing': 'テスト中...',
-        'gemini.key_valid': '✓ 有効',
-        'gemini.key_invalid': '✗ 無効なキー',
-        'gemini.key_empty': 'キーを入力してください',
-        'gemini.invalid_key_format': '形式が不正 · AIza で始まる',
-        'gemini.key_quota_exceeded': 'キーのクォータ超過',
-        'gemini.test_error': 'テスト失敗',
-        'gemini.test_empty': '応答なし',
         'settings.save_failed': '保存失敗',
         'err.ocr.monthly_limit_exceeded': '月のクォータ超過 ({used}/{limit}) · サポートへ',
-        'err.quota.need_api_key': 'このアカウントは認識サービスキーが必要 · 設定画面で入力してください',
         'err.account.banned': 'このアカウントは停止されています · 管理者にお問い合わせください',
         'err.account.inactive': 'このアカウントは未有効化です · 管理者にお問い合わせください',
         'feature-contact-us': 'この機能はまだ未開放 · 必要な場合はお問い合わせください',
@@ -8870,8 +8552,7 @@ const I18N = {
         'admin-col-active': '有効',
         'admin-col-last-login': '最終ログイン',
         'admin-type-admin': '管理',
-        'admin-type-shared': '月額',
-        'admin-type-byo': '買切',
+        'admin-type-shared': '使用量課金',
         'admin-quota-unlimited': '無制限',
         'admin-status-active': '正常',
         'admin-status-warning': '未払',
@@ -8930,11 +8611,9 @@ const I18N = {
         'admin-field-verify-password': '管理者パスワード',
         'admin-field-confirm-name': 'アカウント名を入力',
         'admin-field-current-quota': '現在のクォータ',
-        'admin-opt-shared': '月額',
-        'admin-opt-byo': '買切',
-        'admin-hint-quota': '月額 100-500',
+        'admin-opt-shared': '使用量課金',
+        'admin-hint-quota': '使用量課金 · 100-500 推奨',
         'admin-hint-quota-default': 'デフォルト 500回/月 · 変更可',
-        'admin-hint-quota-zero': '0 = 無制限',
         'admin-hint-username': '英字',
         'admin-hint-password': '8 文字以上',
         'admin-placeholder-username': '例 abc_boss',
@@ -8999,7 +8678,6 @@ const I18N = {
         'force-pwd-fail': '変更失敗',
         'force-pwd-ok': 'パスワードを変更しました',
         'team-modal-email-hint2': '社員はこのメールでログインします · プラットフォーム全体で一意',
-        'team-title-old': 'チーム管理',
         'team-sub': '社員アカウント管理',
         'team-add': '社員追加',
         'team-never-login': '未ログイン',
@@ -9068,7 +8746,7 @@ const I18N = {
         'team-username-exists': 'ユーザー名は使用中',
         'team-create-failed': '作成失敗',
         'team-no-permission': '権限なし',
-        'team-no-tenant': 'まずアップグレードを',
+        'team-no-tenant': '先に会社を選択または作成してください',
         'team-toggle-failed': '操作失敗',
         'team-remove-failed': '削除失敗',
         'team-confirm-remove': '社員 {n} を削除?',
@@ -9834,12 +9512,12 @@ const I18N = {
 };
 // ============================================================
 // Pearnly · Home JS (v0.3.5)
-// 侧栏 + Hash 路由 + 套餐对比弹窗 + 权限控制
+// 侧栏 + Hash 路由 + 权限控制
 // ============================================================
 
 // I18N 字典会被另外 concat 进来
 // ============================================================
-// v118.26.1.2 · i18n 订阅总线(根治"切语言不刷新"反复出现的 bug)
+// v118.26.1.2 · i18n 监听总线(根治"切语言不刷新"反复出现的 bug)
 // ============================================================
 //
 // 背景:Pearnly 的 i18n 是"声明式 + 命令式"两套机制:
@@ -9850,9 +9528,9 @@ const I18N = {
 // 痛点:写新模块时 ① 暴露 _rerender ② 在 applyLang 加 try 钩子 ③ 钩子内调全部
 //       3 步任意 1 步漏 = 切语言新 bug(已经发生 ≥ 5 次)
 //
-// 新方案(订阅总线):
+// 新方案(监听总线):
 //   模块加载时调 subscribeI18n('模块名', _rerenderAll)
-//   切语言时 applyLang 末尾统一遍历 __i18nSubs · 自动通知所有订阅者
+//   切语言时 applyLang 末尾统一遍历 __i18nSubs · 自动通知所有监听者
 //
 // 铁律(写进 DESIGN_SYSTEM.md):
 //   任何用 t() 函数动态生成 innerHTML 的 IIFE 模块 · 必须在加载时调用
@@ -9898,17 +9576,15 @@ let _engineCheckTimer = null;
 function isSuperAdmin(u) { u = u || _userInfo; return !!(u && u.is_super_admin); }
 function isOwner(u)      { u = u || _userInfo; return !!u && (u.role === 'owner' || isSuperAdmin(u)); }
 function isEmployee(u)   { u = u || _userInfo; return !!u && u.role === 'member' && !isSuperAdmin(u); }
-function isTrial(u)      { u = u || _userInfo; return !!u && (u.effective_plan === 'trial' || u.plan === 'trial') && !isSuperAdmin(u); }
-function isLifetime(u)   { u = u || _userInfo; return !!u && u.tenant_type === 'byo_api'; }
+// v118.36 · BILLING-01 · legacy access helpers 已删除 · 外部密钥路径下线
 // 钱相关 UI 是否应该隐藏(员工就该看不到)· 这是核心铁律 · v118.12 主菜
 function shouldHideMoney(u)   { return isEmployee(u); }
 function canManageTeam(u)     { return isOwner(u); }
-function canManageApiKey(u)   { return isOwner(u) && isLifetime(u); }
 // 兼容旧代码 · 老的 isMoneyHidden 别处可能用 · 保留别名
 window.isMoneyHidden = shouldHideMoney;
 // ============================================================
 
-// v118.34 · 旧 plan-based 上限映射已删除 · credits 系统下统一上限
+// v118.34 · 旧分档上限映射已删除 · credits 系统下统一上限
 function getMaxFiles() {
     if (_userInfo && _userInfo.is_super_admin) return 9999;
     return 500;
@@ -10104,7 +9780,7 @@ async function apiGet(url) {
             }
             return null;
         }
-        // 业务类 403(如 quota.need_api_key)交由调用方处理
+        // 业务类 403 交由调用方处理
         const err = new Error('biz_403'); err.detail = detail; throw err;
     }
     if (!resp.ok) throw new Error('fetch failed');
@@ -10188,7 +9864,7 @@ function applyLang(lang) {
     // 加 class → 同步替换 DOM → 双 rAF 后移除 class · 让所有 i18n 文字一起淡入
     document.body.classList.add('lang-switching');
 
-    // v118.2 · 全局 overlay · 覆盖动态 render 滞后(admin 表格 / 套餐 modal 等)
+    // v118.2 · 全局 overlay · 覆盖动态 render 滞后(admin 表格 / 计费 modal 等)
     const _langOverlay = document.getElementById('lang-switching-overlay');
     if (_langOverlay) _langOverlay.classList.add('show');
 
@@ -10252,8 +9928,8 @@ function applyLang(lang) {
 
     if (_userInfo) renderInfoBar();
     if (_quota) updateUploadHint();
-    // v111.3 · 切语言时重渲染 trial banner(原 bug · 顶部黄条不刷新)
-    // v118.34 · trial-banner 已删除
+    // v111.3 · 切语言时重渲染账户状态横幅
+    // v118.34 · 账户状态横幅由 credits 接管
     renderFileList();
     renderResults();
     if (currentRoute === 'settings') renderSettings();
@@ -10367,7 +10043,7 @@ function applyLang(lang) {
         });
     });
 
-    // v118.2 · 等 400ms 后隐藏 overlay · 给异步 fetch (admin 表格 / 套餐 modal) 一点时间完成
+    // v118.2 · 等 400ms 后隐藏 overlay · 给异步 fetch (admin 表格 / 计费 modal) 一点时间完成
     // 比看到 5 秒撕裂体验好很多
     setTimeout(() => {
         const ov = document.getElementById('lang-switching-overlay');
@@ -10401,7 +10077,7 @@ document.addEventListener('click', () => {
     document.querySelectorAll('.dropdown.open').forEach(el => el.classList.remove('open'));
 });
 setupDropdown('lang-dropdown', (item) => applyLang(item.dataset.lang));
-// v0.15 · 删除顶部套餐下拉 · 所有用户权限一致
+// v0.15 · 删除顶部计费下拉 · 所有用户权限一致
 
 // v118.28.5.1 · 设置 → 系统 → 通用设置 · 语言 select 切换(替代旧 set-lang-row 4 按钮卡)
 (function () {
@@ -10822,13 +10498,12 @@ document.querySelectorAll('.nav-item').forEach(item => {
 // ============================================================
 async function loadAll() {
     try {
-        // v118.35 · CLEANUP-01 · 旧 /api/me/plan 已下线 · getMaxFiles 改静态上限
+        // v118.35 · CLEANUP-01 · 旧计费状态端点已下线 · getMaxFiles 改静态上限
         const [u, q, c] = await Promise.all([
             apiGet('/api/me'),
             apiGet('/api/ocr/quota'),
             fetch('/api/contact').then(r => r.json()).catch(() => null),
         ]);
-        const p = null;
         if (!u || !q) return;
         _userInfo = u;
         window._userInfo = u;
@@ -10843,7 +10518,6 @@ async function loadAll() {
         if (window.PEARNLY_ADMIN_LAYOUT) {
             _quota = q;
             _contact = c;
-            if (p) window._planState = p;
             window.PEARNLY_ADMIN_MODE = true;
             // 暴露 _userInfo 给 admin.js / 业务模块用
             try { window._userInfoForAdmin = u; } catch (_) {}
@@ -10885,13 +10559,11 @@ async function loadAll() {
 
         _quota = q;
         _contact = c;
-        if (p) window._planState = p;
         // v118.33.2 NAV-IA Phase 2 · renderSidebarUser 已删 · 头像菜单 renderAvatarMenu 接管(下面 Phase 1 块)
-        // v0.15 · 顶部套餐下拉已删 · 不再设置 plan-current-label
+        // v0.15 · 顶部旧计费下拉已删
         // v118.8 · 顶栏归属感 · 显示用户公司名(归属感 · 不再是 Pearnly 大字)
         renderBrandWorkspace();
         renderInfoBar();
-        // v118.34 · renderQuotaBanner / renderTrialBanner 已删除
         applySidebarVisibility();
         // NAV-IA Phase 1 · 头像菜单角色显隐 + 渲染(顶栏三件套)
         try {
@@ -10929,11 +10601,11 @@ async function loadAll() {
 // v118.10 · 设置页 · 二级 tab 切换
 function switchSettingsTab(tabName) {
     if (!tabName) return;
-    // v118.12.3 · 员工守卫:阻止切到隐藏的 tab(team/api/plan/company)
+    // v118.12.3 · 员工守卫:阻止切到隐藏的 tab(team/api/billing/company)
     // 防止 localStorage 恢复 + 老板用过 team 后员工登录被带到 team panel
     try {
         if (typeof shouldHideMoney === 'function' && shouldHideMoney(_userInfo)) {
-            if (['team', 'api', 'plan', 'company'].indexOf(tabName) >= 0) {
+            if (['team', 'api', 'billing', 'company'].indexOf(tabName) >= 0) {
                 tabName = 'profile';
                 try { localStorage.setItem('mrpilot_settings_tab', 'profile'); } catch(e){}
             }
@@ -10954,7 +10626,7 @@ function switchSettingsTab(tabName) {
         if (tabName === 'team') loadTeamList();
         // v118.21.2 · 切到 learned tab 时加载学习规则
         if (tabName === 'learned' && typeof window.loadLearnedRules === 'function') window.loadLearnedRules();
-        if (tabName === 'plan' && typeof window.loadUsageHistory === 'function') window.loadUsageHistory(1);
+        if (tabName === 'billing' && typeof window.loadUsageHistory === 'function') window.loadUsageHistory(1);
     } catch (e) { console.warn('settings tab side effect failed:', e); }
 }
 
@@ -11122,7 +10794,7 @@ async function showAddEmployeeModal() {
                 'team.username_exists': t('team-username-exists') || '用户名已被占用',
                 'team.create_failed':  t('team-create-failed') || '创建失败',
                 'team.only_owner_or_super': t('team-no-permission') || '无权限',
-                'team.no_tenant': t('team-no-tenant') || '请先升级账号',
+                'team.no_tenant': t('team-no-tenant') || '请先选择或创建公司',
                 'pwd.too_short': t('pwd-too-short') || '密码至少 8 位',
                 'pwd.too_weak_numeric': t('pwd-too-weak-numeric') || '不能是纯数字',
                 'pwd.too_weak_common': t('pwd-too-weak-common') || '这个密码太常见 · 请换一个',
@@ -11628,7 +11300,7 @@ function renderBrandWorkspace() {
     el.textContent = name;
     el.title = name;
     el.removeAttribute('data-i18n');
-    // v118.8.1 · 调试用 · 出问题时在 console 看 _userInfo 实际字段
+    // v118.8.1 · 排查用 · 出问题时在 console 看 _userInfo 实际字段
     if (!u.company_name && !u.company) {
         console.debug('[Pearnly] brand-workspace fallback to:', name, '· _userInfo fields:', Object.keys(u));
     }
@@ -11638,26 +11310,14 @@ function renderBrandWorkspace() {
 // v109.4 · 统一用 tenant_used/tenant_quota · 跟顶栏 chip / 设置页 / 用户管理表对齐
 // v118.34 · renderQuotaBanner 已删除
 
-// v118.8 · 试用临近到期横幅 · 7 天试用最后阶段提示用户升级
-// v118.34 · renderTrialBanner 已删除
-
 function applySidebarVisibility() {
-    // v118.34 · renderTrialBanner 已删除
     // v0.15 · 扁平权限 · 所有用户看到相同的侧栏
-    // v118.12 · 全部改用 6 原子函数(isSuperAdmin / isOwner / isEmployee / shouldHideMoney / canManageTeam / canManageApiKey)
+    // v118.36 · BILLING-01 · canManageApiKey 已删除 · API key 设置 tab 下线
     const u = _userInfo;
     if (!u) return;
     const _hideMoney = shouldHideMoney(u);
     const _canTeam = canManageTeam(u);
-    const _canApiKey = canManageApiKey(u);
 
-    // 模板 / API Key 主导航 · 目前还没实现 · 保持"即将上线"样式
-    const tplNav = document.querySelector('.nav-item[data-route="templates"]');
-    if (tplNav) { tplNav.classList.remove('locked-for-plan'); tplNav.removeAttribute('data-locked-target'); }
-    const apiNav = document.querySelector('.nav-item[data-route="api-keys"]');
-    if (apiNav) { apiNav.classList.remove('locked-for-plan'); apiNav.removeAttribute('data-locked-target'); }
-    const tplBtn = document.getElementById('btn-custom-template');
-    if (tplBtn) { tplBtn.style.display = ''; tplBtn.classList.remove('locked-for-plan'); }
 
     // v22 · 超管下拉(顶栏):仅超管可见
     const adminDropdown = document.getElementById('admin-dropdown');
@@ -11674,12 +11334,10 @@ function applySidebarVisibility() {
     const teamPanel = document.querySelector('.settings-panel[data-settings-panel="team"]');
     if (teamPanel) teamPanel.dataset.permHidden = _canTeam ? '0' : '1';
 
-    // API & 密钥:仅买断 owner / 超管
-    const apiTab = document.querySelector('.settings-tab[data-tab="api"]');
-    if (apiTab) apiTab.style.display = (_canApiKey || isSuperAdmin(u)) ? '' : 'none';
+    // v118.36 · BILLING-01 · API & 密钥 tab 整体删除 · DOM 也已删
 
-    // 套餐 & 用量:员工隐藏
-    const planTab = document.querySelector('.settings-tab[data-tab="plan"]');
+    // 计费 & 用量:员工隐藏
+    const planTab = document.querySelector('.settings-tab[data-tab="billing"]');
     if (planTab) planTab.style.display = _hideMoney ? 'none' : '';
 
     // v118.12 · 公司信息 tab:员工隐藏(公司是事务所属性 · 跟员工无关)
@@ -11693,7 +11351,7 @@ function applySidebarVisibility() {
     const infoBar = document.getElementById('info-bar');
     if (infoBar) infoBar.style.display = _hideMoney ? 'none' : '';
 
-    // v118.34 · trial-banner / plan-banner / 升级按钮 已删除
+    // v118.34 · 旧计费提示横幅和入口全部下线
 
     // body class · 让 CSS 可以基于角色做额外样式收尾(比如员工进设置默认 active 不在公司信息)
     document.body.classList.toggle('role-employee', isEmployee(u));
@@ -11738,7 +11396,7 @@ function applySidebarVisibility() {
         document.body.classList.add('admin-mode');
 
         // v118.28.2.1 · 设置页里只保留超管自己用得上的 tab
-        // 砍掉:公司信息 / 团队管理 / 套餐 / 归档规则 / 学习规则 / API 密钥 / 通用设置 / 访问日志
+        // 砍掉:公司信息 / 团队管理 / 计费用量 / 归档规则 / 学习规则 / API 密钥 / 通用设置 / 访问日志
         // 保留:个人资料 / 账户安全 / 通知偏好 / 联系我们
         const _adminSettingsAllowed = ['profile', 'security', 'notifications', 'about'];
         document.querySelectorAll('.settings-tab').forEach(tab => {
@@ -11762,8 +11420,6 @@ function applySidebarVisibility() {
     }
 }
 
-// v0.15 · renderPlanDropdown 已废弃 · 顶部套餐下拉删除
-
 function renderInfoBar() {
     const user = _userInfo;
     const bar = document.getElementById('info-bar');
@@ -11773,54 +11429,22 @@ function renderInfoBar() {
         return;
     }
 
-    // v87 · 用多租户正确字段 tenant_type 判断(之前用的 account_type 是老字段 · 建号时可能错)
-    // shared_api = 月付共用 key · byo_api = 买断自带 key · admin = 超管
-    let usageHtml = '';
-    const tt = user.tenant_type;
-    if (tt === 'byo_api') {
-        // 买断自带 key
-        if (user.has_own_gemini_key) {
-            // 已填 key · 不限
-            usageHtml = `
-                <div class="info-chip">
-                    <span class="chip-value chip-value-lifetime">${escapeHtml(t('info-unlimited-own-key'))}</span>
-                </div>
-            `;
-        } else {
-            // 未填 key · 提示
-            usageHtml = `
-                <div class="info-chip chip-warn">
-                    <span class="chip-value">${escapeHtml(t('info-need-api-key'))}</span>
-                </div>
-            `;
-        }
-    } else if (tt === 'admin' || user.is_super_admin) {
-        // 超管 · 无配额概念
-        usageHtml = `
-            <div class="info-chip">
-                <span class="chip-value chip-value-lifetime">${escapeHtml(t('info-unlimited-own-key'))}</span>
-            </div>
-        `;
-    } else {
-        // v118.34 · shared_api 月付 · 旧 monthly_quota 已删除 · 顶栏不再显配额 chip
-        // 余额/用量改在「套餐 & 用量」tab 显示 · 通过 GET /api/me/credits 拿
-        usageHtml = '';
-    }
-
-    if (bar) bar.innerHTML = usageHtml;
+    // v118.36 · BILLING-01 · 租户类型 / 外部密钥分支全删 · 顶栏 chip 一律走 credits
+    // 余额/用量改在「计费 & 用量」tab 显示 · 通过 GET /api/me/credits 拿
+    if (bar) bar.innerHTML = '';
 }
 
 function updateUploadHint() {
     if (!_quota) return;
     document.getElementById('upload-hint').textContent = t('upload-hint', {
-        pages: getMaxPagesPerFile(),   // v111.2 · 用 plan limits
-        mb:    getMaxMbPerFile(),       // v111.2 · 用 plan limits
+        pages: getMaxPagesPerFile(),
+        mb:    getMaxMbPerFile(),
         files: getMaxFiles(),
     });
 }
 
-// v118.35 · CLEANUP-01 · 旧 _planDisplayLabel / upgrade-modal 防御性句柄 / data-upgrade 点击 IIFE 全删除
-// credits 系统接管 · 旧订阅永不出现
+// v118.35 · CLEANUP-01 · 旧计费弹窗兼容句柄已删除
+// credits 系统接管
 
 // ============================================================
 // 侧栏锁定项点击
@@ -12189,7 +11813,7 @@ function renderCameraBufferBar() {
     }
 }
 
-// v118.27.8.1.14e · 注册 i18n 订阅 · 切语言时浮条立刻重渲
+// v118.27.8.1.14e · 注册 i18n 监听 · 切语言时浮条立刻重渲
 if (typeof window.subscribeI18n === 'function') {
     window.subscribeI18n('camera-buffer-bar', () => {
         if (_cameraBuffer.length > 0) renderCameraBufferBar();
@@ -12449,15 +12073,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
     hideAlerts();
     document.getElementById('btn-start').disabled = true;
 
-    // 只有 Free 用户需要检查 EasyOCR 引擎是否就绪(Plus/Pro 走 Gemini 秒响应)
-    if (_userInfo && _userInfo.plan === 'free') {
-        const health = await fetch('/api/health').then(r => r.json()).catch(() => null);
-        if (health && !health.ocr_ready) {
-            showAlert('info', t('alert-loading-engine'));
-            startEnginePolling();
-        }
-    }
-
+    // OCR 引擎可用性检查
     // v118.20.1.6 · 并行处理多 PDF · 提到 6 路(后端单 PDF 内已 3 并发 · 总并发 ≤ Gemini 60 RPM · Tier 2 安全)
     const pendingFiles = _selectedFiles.filter(f => f.status === 'waiting');
     const PARALLEL_LIMIT = 6;
@@ -12501,7 +12117,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
             window._ocrCtrls.delete(ctrl);
 
             if (resp.status === 401 || resp.status === 403) {
-                // v0.15.6 · 只有真正 auth 失败才跳登录 · 其他 403(如 need_api_key)走业务错误展示
+                // v0.15.6 · 只有真正 auth 失败才跳登录 · 其他 403 走业务错误展示
                 const cloned = resp.clone();
                 const body = await cloned.json().catch(() => ({}));
                 const _det = body && body.detail;
@@ -12516,9 +12132,6 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                         setTimeout(() => { window.location.href = '/'; }, 1200);
                     }
                     return { abort: true };
-                }
-                if (code === 'quota.need_api_key') {
-                    showToast(t('err.quota.need_api_key'), 'error');
                 }
                 // 让下方 !resp.ok 分支接手,展示在文件卡片上
             }
@@ -12542,7 +12155,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                 }
                 f.status = 'error';
                 // v92 · Bug 7 · 服务端错误可以重试(除了格式/大小等用户侧问题)
-                f.canRetry = !/not_pdf|invalid_pdf|file_too_large|too_many_pages|monthly_limit_exceeded|ip_limit_exceeded|plan_not_supported|need_api_key|not_invoice/.test(f.errorKey || '');
+                f.canRetry = !/not_pdf|invalid_pdf|file_too_large|too_many_pages|monthly_limit_exceeded|ip_limit_exceeded|not_invoice/.test(f.errorKey || '');
                 renderFileList();
                 return {};
             }
@@ -13319,8 +12932,8 @@ function renderRdActions(side) {
     // side: 'seller' 或 'buyer'
     const canVerify = _userInfo && _userInfo.can_verify_tax;
     if (!canVerify) {
-        // Free 用户:显示锁标(点击触发升级弹窗)
-        return `<button class="rd-btn-locked" data-upgrade="plus" type="button" title="${escapeHtml(t('rd-tip-upgrade'))}">
+        // 只读状态:显示锁标
+        return `<button class="rd-btn-locked" type="button" title="${escapeHtml(t('rd-tip-upgrade'))}">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 016 0v2"/></svg>
         </button>`;
     }
@@ -14084,7 +13697,7 @@ function renderSettings() {
     if (!el) return;
     const u = _userInfo;
 
-    // v85 · 超管不显示订阅/配额/有效期 · 只显示身份标识
+    // v85 · 超管不显示用量卡 · 只显示身份标识
     if (u.is_super_admin) {
         el.innerHTML = `
             <table style="width:100%; font-size:13px; border-collapse: collapse;">
@@ -14092,15 +13705,12 @@ function renderSettings() {
                 <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-role')}</td><td style="padding:8px 0;"><strong style="color:#d97706;">🛡️ ${escapeHtml(t('settings-role-super-admin'))}</strong></td></tr>
             </table>
         `;
-        // v118.10.3 · 超管也显示 API Key 卡片(测试 + 管理需要 · 即使本身不走 Gemini)
-        const apiKeyCard = document.getElementById('api-key-card');
-        if (apiKeyCard) apiKeyCard.style.display = '';
+        // v118.36 · BILLING-01 · API Key 卡片 DOM 已删
         return;
     }
 
-    // v118.35 · 按量付费改造后 · 删除订阅类型显示 · 渲染计费方式块
-    const tt = u.tenant_type;
-
+    // v118.35 · 按量付费改造后 · 渲染计费方式块
+    // v118.36 · BILLING-01 · 租户类型和外部密钥输入框全部下线
     el.innerHTML = `
         <table style="width:100%; font-size:13px; border-collapse: collapse;">
             <tr>
@@ -14108,141 +13718,21 @@ function renderSettings() {
                 <td style="padding:8px 0;">${escapeHtml(u.username)}</td>
             </tr>
             <tr>
-                <td style="color:#a0aec0; padding:8px 0; vertical-align: top;">${t('set-plan-billing-title')}</td>
+                <td style="color:#a0aec0; padding:8px 0; vertical-align: top;">${t('set-billing-method-title')}</td>
                 <td style="padding:8px 0;">
-                    <div><strong>${t('set-plan-billing-mode')}</strong></div>
-                    <div style="color:#a0aec0; font-size:12px; margin-top:4px;">${t('set-plan-billing-detail')}</div>
+                    <div><strong>${t('set-billing-method-mode')}</strong></div>
+                    <div style="color:#a0aec0; font-size:12px; margin-top:4px;">${t('set-billing-method-detail')}</div>
                 </td>
             </tr>
         </table>
     `;
-
-    // v0.15 · 加载 Gemini Key 当前状态
-    loadGeminiKeyInfo();
-
-    // v87 · API Key 卡片只对买断账号(tenant_type=byo_api)显示
-    // 月付(shared_api)共用系统 key · 不能也不需要填
-    // v118.10.2 · 超管(Earn)也能看(测试 + 管理需要)
-    const apiKeyCard = document.getElementById('api-key-card');
-    if (apiKeyCard) {
-        const showCard = (tt === 'byo_api') || (_userInfo && _userInfo.is_super_admin);
-        apiKeyCard.style.display = showCard ? '' : 'none';
-    }
 }
 
 // ============================================================
-// v0.15 · Gemini API Key 管理
+// v118.36 · BILLING-01 · 外部密钥管理全部删除
+// loadGeminiKeyInfo / setApiKeyMsg / saveGeminiKey / testGeminiKey / clearGeminiKey 全部下线
+// refreshUserInfo 仍保留(其他模块可能调) · _userInfo 不再含外部密钥标识
 // ============================================================
-async function loadGeminiKeyInfo() {
-    const currentEl = document.getElementById('settings-api-key-current');
-    const clearBtn = document.getElementById('btn-api-key-clear');
-    if (!currentEl) return;
-    try {
-        const resp = await fetch('/api/settings/gemini-key', {
-            headers: { 'Authorization': 'Bearer ' + token },
-        });
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (data.has_key) {
-            currentEl.style.display = '';
-            currentEl.innerHTML = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7l3 3 6-6"/></svg> ${escapeHtml(t('api-key-current-label'))} <code>${escapeHtml(data.preview)}</code>`;
-            if (clearBtn) clearBtn.style.display = '';
-        } else {
-            currentEl.style.display = 'none';
-            if (clearBtn) clearBtn.style.display = 'none';
-        }
-    } catch (e) {
-        console.warn('loadGeminiKeyInfo failed', e);
-    }
-}
-
-function setApiKeyMsg(text, kind) {
-    const el = document.getElementById('api-key-msg');
-    if (!el) return;
-    el.textContent = text || '';
-    el.className = 'api-key-msg' + (kind ? ' ' + kind : '');
-}
-
-async function saveGeminiKey() {
-    const input = document.getElementById('api-key-input');
-    const raw = (input?.value || '').trim();
-    setApiKeyMsg('', '');
-
-    try {
-        const resp = await fetch('/api/settings/gemini-key', {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ api_key: raw || null }),
-        });
-        const data = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-            const code = (data.detail || '').toString();
-            const msgKey = code.includes('invalid_key_format') ? 'gemini.invalid_key_format' : 'settings.save_failed';
-            setApiKeyMsg(t(msgKey), 'error');
-            return;
-        }
-        setApiKeyMsg(t(raw ? 'api-key-saved' : 'api-key-cleared'), 'success');
-        input.value = '';
-        // 刷新 _userInfo 的 has_own_gemini_key
-        await refreshUserInfo();
-        renderSettings();
-    } catch (e) {
-        setApiKeyMsg(t('settings.save_failed'), 'error');
-    }
-}
-
-async function testGeminiKey() {
-    const input = document.getElementById('api-key-input');
-    const raw = (input?.value || '').trim();
-    if (!raw) {
-        setApiKeyMsg(t('gemini.key_empty'), 'error');
-        return;
-    }
-    setApiKeyMsg(t('gemini.testing'), 'info');
-    try {
-        const resp = await fetch('/api/settings/gemini-key/test', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ api_key: raw }),
-        });
-        const data = await resp.json().catch(() => ({}));
-        const msgKey = data.msg || (data.ok ? 'gemini.key_valid' : 'gemini.test_error');
-        setApiKeyMsg(t(msgKey), data.ok ? 'success' : 'error');
-    } catch (e) {
-        setApiKeyMsg(t('gemini.test_error'), 'error');
-    }
-}
-
-async function clearGeminiKey() {
-    const ok = await showConfirm(t('api-key-clear-confirm'), { danger: true });
-    if (!ok) return;
-    try {
-        const resp = await fetch('/api/settings/gemini-key', {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ api_key: null }),
-        });
-        if (resp.ok) {
-            setApiKeyMsg(t('api-key-cleared'), 'success');
-            await refreshUserInfo();
-            renderSettings();
-        } else {
-            setApiKeyMsg(t('settings.save_failed'), 'error');
-        }
-    } catch (e) {
-        setApiKeyMsg(t('settings.save_failed'), 'error');
-    }
-}
-
 async function refreshUserInfo() {
     try {
         const resp = await fetch('/api/me', {
@@ -14254,13 +13744,6 @@ async function refreshUserInfo() {
 
 // 事件绑定(页面加载时只绑一次)
 document.addEventListener('DOMContentLoaded', () => {
-    const saveBtn = document.getElementById('btn-api-key-save');
-    const testBtn = document.getElementById('btn-api-key-test');
-    const clearBtn = document.getElementById('btn-api-key-clear');
-    if (saveBtn) saveBtn.addEventListener('click', saveGeminiKey);
-    if (testBtn) testBtn.addEventListener('click', testGeminiKey);
-    if (clearBtn) clearBtn.addEventListener('click', clearGeminiKey);
-
     // v92 · Bug 7 · 断网横幅
     installNetworkBanner();
 });
@@ -14362,28 +13845,13 @@ const _historyState = {
     loading: false,
 };
 
-// 通用:渲染页头右侧的信息条(Plan 徽章 + 月用量进度)· 参考识别页风格
+// 通用:渲染页头右侧的信息条
 function renderPageHeadInfo(containerId) {
     const el = document.getElementById(containerId);
     if (!el || !_userInfo) return;
 
-    const plan = _userInfo.plan || 'free';
-    const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
-
     let usageHtml = '';
-    if (plan === 'free' && _quota && _quota.ip_daily_limit) {
-        const used = _quota.ip_used_today || 0;
-        const total = _quota.ip_daily_limit;
-        const pct = Math.min(100, (used / total) * 100);
-        const cls = pct >= 90 ? 'danger' : (pct >= 70 ? 'warn' : '');
-        usageHtml = `
-            <div class="info-chip">
-                <span class="chip-label">${t('info-daily')}</span>
-                <span class="chip-value">${used} / ${total}</span>
-                <div class="mini-bar"><div class="mini-bar-fill ${cls}" style="width:${pct}%"></div></div>
-            </div>
-        `;
-    } else if (_userInfo.tenant_quota) {
+    if (_userInfo.tenant_quota) {
         // v109.4 · 改用 tenant_used/tenant_quota · 跟其他组件对齐
         const used = _userInfo.tenant_used || 0;
         const total = _userInfo.tenant_quota;
@@ -14398,12 +13866,7 @@ function renderPageHeadInfo(containerId) {
         `;
     }
 
-    el.innerHTML = `
-        <div class="info-chip">
-            <span class="chip-value plan-${plan}">${planLabel}</span>
-        </div>
-        ${usageHtml}
-    `;
+    el.innerHTML = usageHtml;
 }
 
 // v0.16 · 历史记录多选删除状态(页面级 · 切页/搜索/刷新都会清空)
@@ -14447,7 +13910,7 @@ async function loadHistoryPage() {
         setTimeout(() => loadHistoryPage(), 300);
         return;
     }
-    const freeBlock = document.getElementById('history-free-block');
+    const freeBlock = document.getElementById('history-locked-block');
     const main = document.getElementById('history-main');
     const empty = document.getElementById('history-empty');
     if (!freeBlock || !main || !empty) {
@@ -15034,7 +14497,7 @@ async function loadAutomationPage() {
         setTimeout(() => loadAutomationPage(), 300);
         return;
     }
-    const freeBlock = document.getElementById('automation-free-block');
+    const freeBlock = document.getElementById('automation-locked-block');
     const main = document.getElementById('automation-main');
     if (!freeBlock || !main) {
         console.warn('[Automation] container missing');
@@ -15651,11 +15114,11 @@ function renderErpEndpointsList() {
         if (limit !== -1 && _erpEndpoints.length >= limit) {
             addBtn.disabled = true;
             addBtn.title = t('ep-limit-reached', { limit });
-            addBtn.classList.add('btn-disabled-plus');
+            addBtn.classList.add('btn-disabled-limit');
         } else {
             addBtn.disabled = false;
             addBtn.title = '';
-            addBtn.classList.remove('btn-disabled-plus');
+            addBtn.classList.remove('btn-disabled-limit');
         }
     }
 
@@ -15716,18 +15179,13 @@ function renderErpEndpointsList() {
         `;
     }).join('');
 
-    // v0.8.1 · 列表下方显示上限提示(根据 plan)
+    // v0.8.1 · 列表下方显示上限提示
     if (_userInfo && _userInfo.endpoints_limit !== -1) {
         const usedN = _erpEndpoints.length;
         const limit = _userInfo.endpoints_limit;
-        const plan = _userInfo.plan;
         const hint = document.createElement('div');
         hint.className = 'erp-limit-hint';
-        if (plan === 'free') {
-            hint.innerHTML = `${escapeHtml(t('ep-free-limit-hint', { used: usedN, limit }))} <a data-upgrade="plus">${escapeHtml(t('upgrade-to-plus'))}</a>`;
-        } else {
-            hint.textContent = t('ep-plus-limit-hint', { used: usedN, limit });
-        }
+        hint.textContent = t('ep-limit-hint', { used: usedN, limit });
         list.appendChild(hint);
     }
 }
@@ -15776,12 +15234,10 @@ function openEndpointModal(editingId) {
     const autoPushRow = autoPushEl.closest('.form-switch-row');
     autoPushEl.disabled = false;
     if (autoPushRow) {
-        autoPushRow.classList.remove('disabled-plus');
+        autoPushRow.classList.remove('disabled-limit');
         autoPushRow.title = '';
         autoPushRow.style.cursor = '';
         autoPushRow.onclick = null;
-        const b = autoPushRow.querySelector('.plus-badge');
-        if (b) b.remove();
     }
 
     modal.style.display = '';
@@ -17466,12 +16922,6 @@ async function deleteEndpoint(endpointId) {
         const canEdit = !!(_userInfo && _userInfo.can_customize_archive);
         _archiveReadOnly = !canEdit;
 
-        // v0.15 · 元素已从 HTML 删除 · 兼容性兜底
-        const upgradeBanner = document.getElementById('archive-upgrade-banner');
-        if (upgradeBanner) upgradeBanner.style.display = canEdit ? 'none' : '';
-        const plusBadge = document.getElementById('archive-plus-badge');
-        if (plusBadge) plusBadge.style.display = canEdit ? 'none' : '';
-
         try {
             const resp = await fetch('/api/archive/settings', {
                 headers: { 'Authorization': 'Bearer ' + token },
@@ -18855,7 +18305,7 @@ async function deleteEndpoint(endpointId) {
         }
         renderQueue();
     };
-    // v118.26.1.2 · 注册到 i18n 订阅总线 · 切语言自动重渲(不再依赖 applyLang 散调用)
+    // v118.26.1.2 · 注册到 i18n 监听总线 · 切语言自动重渲(不再依赖 applyLang 散调用)
     if (typeof window.subscribeI18n === 'function') {
         window.subscribeI18n('bank-recon', window._rerenderBankRecon);
     }
@@ -20106,19 +19556,18 @@ async function deleteEndpoint(endpointId) {
 
     async function loadByUser() {
         const tbody = document.getElementById('cost-by-user-tbody');
-        tbody.innerHTML = `<tr><td colspan="9" class="cost-table-empty">${t('cost-loading')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="cost-table-empty">${t('cost-loading')}</td></tr>`;
         try {
             const data = await fetchJson('/api/admin/cost/by_user');
             const users = data.users || [];
             if (!users.length) {
-                tbody.innerHTML = `<tr><td colspan="9" class="cost-table-empty">${t('cost-empty')}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="cost-table-empty">${t('cost-empty')}</td></tr>`;
                 return;
             }
             tbody.innerHTML = users.map(u => {
                 const avg = u.total_invoices ? (u.total_cost_thb / u.total_invoices) : 0;
                 return `<tr>
                     <td><strong>${escapeHtml(u.username || '—')}</strong></td>
-                    <td>${u.plan ? `<span class="cost-plan-badge">${escapeHtml(u.plan)}</span>` : '—'}</td>
                     <td>${fmtCost(u.today_cost_thb)}</td>
                     <td>${fmtCost(u.month_cost_thb)}</td>
                     <td>${fmtCost(u.total_cost_thb)}</td>
@@ -20130,7 +19579,7 @@ async function deleteEndpoint(endpointId) {
             }).join('');
         } catch (e) {
             console.error('cost by_user fail', e);
-            tbody.innerHTML = `<tr><td colspan="9" class="cost-table-empty">${t('cost-load-fail')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="cost-table-empty">${t('cost-load-fail')}</td></tr>`;
         }
     }
 
@@ -20171,7 +19620,7 @@ async function deleteEndpoint(endpointId) {
                 const x = PAD + (innerW / filled.length) * i + gap / 2;
                 const h = (d.cost_thb / maxCost) * innerH;
                 const y = H - h - PAD / 2;
-                return `<rect class="trend-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" 
+                return `<rect class="trend-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}"
                               width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2">
                     <title>${d.day}: ฿${d.cost_thb.toFixed(4)} · ${d.invoices} ${t('cost-invoices-suffix')}</title>
                 </rect>`;
@@ -20666,7 +20115,7 @@ async function deleteEndpoint(endpointId) {
             return d.toISOString().slice(0, 10);
         } catch (e) { return iso.slice(0, 16); }
     }
-    
+
     async function loadBilling() {
         const body = document.getElementById('billing-card-body');
         if (!body) return null;
@@ -20689,7 +20138,7 @@ async function deleteEndpoint(endpointId) {
             return null;
         }
     }
-    
+
     function renderBilling(d) {
         const body = document.getElementById('billing-card-body');
         if (!body) return;
@@ -20705,7 +20154,7 @@ async function deleteEndpoint(endpointId) {
         let accBadge = '';
         if (d.accuracy_pct !== null && d.accuracy_pct !== undefined) {
             const cls = d.accuracy_pct >= 95 ? 'good' : d.accuracy_pct >= 80 ? 'fair' : 'poor';
-            const label = d.accuracy_pct >= 95 ? t('billing-accuracy-good') : 
+            const label = d.accuracy_pct >= 95 ? t('billing-accuracy-good') :
                           d.accuracy_pct >= 80 ? t('billing-accuracy-fair') : t('billing-accuracy-poor');
             accBadge = `<span class="billing-accuracy-badge ${cls}">${escapeHtml(label)} ${d.accuracy_pct}%</span>`;
         }
@@ -20733,7 +20182,7 @@ async function deleteEndpoint(endpointId) {
             </div>
         `;
     }
-    
+
     // 弹窗
     function openBillingModal() {
         document.getElementById('billing-input-balance').value = '';
@@ -20782,7 +20231,7 @@ async function deleteEndpoint(endpointId) {
             showToast(t('billing-msg-fail') + ' · ' + (e.message || ''), 'fail');
         }
     }
-    
+
     // 钩子:成本面板加载时也加载余额
     if (typeof window.loadAdminCostPage === 'function') {
         const _orig = window.loadAdminCostPage;
@@ -20802,11 +20251,11 @@ async function deleteEndpoint(endpointId) {
             }
         }, 200);
     }
-    
+
     document.addEventListener('DOMContentLoaded', () => {
         const updBtn = document.getElementById('btn-billing-update');
         if (updBtn) updBtn.addEventListener('click', openBillingModal);
-        
+
         const closeBtn = document.getElementById('billing-modal-close');
         if (closeBtn) closeBtn.addEventListener('click', closeBillingModal);
         const cancelBtn = document.getElementById('billing-modal-cancel');
@@ -20815,7 +20264,7 @@ async function deleteEndpoint(endpointId) {
         if (saveBtn) saveBtn.addEventListener('click', saveBilling);
         const mask = document.getElementById('billing-modal-mask');
         if (mask) mask.addEventListener('click', (e) => { if (e.target === mask) closeBillingModal(); });
-        
+
         // 初始 google 链接
         const linkBtn = document.getElementById('btn-billing-google');
         if (linkBtn && !linkBtn.href) linkBtn.href = 'https://aistudio.google.com/app/billing';
@@ -21240,7 +20689,7 @@ async function deleteEndpoint(endpointId) {
 // ============================================================
 
 // ============================================================
-// v109.3 · 商业模式 · 套餐 + 防薅 + 升级弹窗 + LINE 绑定
+// v109.3 · LINE 绑定与安全防护
 // ============================================================
 // v118.34 · 旧 upgrade-modal IIFE 已删除 (2943 行) · credits 系统替代
 // ============================================================
@@ -23460,7 +22909,7 @@ try { window.I18N = I18N; } catch(e) {}
         try { await load(); } catch(e) {}
     };
 
-    // v118.26.1.2 · 对账中心首页注册 i18n 订阅总线
+    // v118.26.1.2 · 对账中心首页注册 i18n 监听总线
     //   切语言时刷新「最近对账时间」「最近对账列表」文案
     window._rerenderReconcile = function() {
         if (typeof currentRoute === 'string' && currentRoute === 'reconcile') {
@@ -23477,7 +22926,7 @@ try { window.I18N = I18N; } catch(e) {}
 // v118.28.0 · 顶栏客户切换器(ClientSwitcher)
 //   - localStorage 持久化 currentClientId
 //   - 选中后派发 'pearnly:client-changed' CustomEvent
-//   - history / exceptions / bank list / dashboard 各模块订阅事件 reload
+//   - history / exceptions / bank list / dashboard 各模块监听事件 reload
 //   - 客户列表来自 window._clientsCache(已存在的全局缓存)
 //   - 删除当前选中客户后自动回退「全部客户」
 //   - subscribeI18n 注册 · 切语言不残留
@@ -23802,7 +23251,7 @@ try { window.I18N = I18N; } catch(e) {}
         // 4) 仪表盘:进页时再 fetch · 这里不动
     });
 
-    // ---------- i18n 订阅 ----------
+    // ---------- i18n 监听 ----------
     if (typeof window.subscribeI18n === 'function') {
         window.subscribeI18n('client-switcher', _rerenderAll);
     }
@@ -24308,7 +23757,7 @@ try { window.I18N = I18N; } catch(e) {}
         _rerenderAll();
     };
 
-    // i18n 订阅 · 切语言重渲(若当前在测试中心页)
+    // i18n 监听 · 切语言重渲(若当前在测试中心页)
     if (typeof window.subscribeI18n === 'function') {
         window.subscribeI18n('test-center', function () {
             _renderNavBadge();
@@ -24443,7 +23892,7 @@ try { window.I18N = I18N; } catch(e) {}
         _init();
     }
 
-    // i18n 订阅 · 切语言时重渲 modal 文案(若正在显示)
+    // i18n 监听 · 切语言时重渲 modal 文案(若正在显示)
     if (typeof window.subscribeI18n === 'function') {
         window.subscribeI18n('line-email-modal', function() {
             if (_shown) _renderTexts();
@@ -24631,7 +24080,7 @@ try { window.I18N = I18N; } catch(e) {}
         if (_checkN > 60) clearInterval(_vTimer);
     }, 500);
 
-    // i18n 订阅 · 切语言重渲(若已加载)
+    // i18n 监听 · 切语言重渲(若已加载)
     if (typeof window.subscribeI18n === 'function') {
         window.subscribeI18n('me-access-log', function() {
             _applyVisibility();
@@ -26600,7 +26049,7 @@ window.pearnlyConfirm = function (message, title) {
         }
     }
 
-    
+
 // v118.32.3 · 系统设置改为 modal 弹窗(参考 DeepSeek/ChatGPT/Linear)
 function _wrapSettingsAsModal() {
     const page = document.getElementById('page-settings');
@@ -27186,7 +26635,7 @@ window.addEventListener('DOMContentLoaded', () => {
         setTimeout(_rerenderAll, 100); // 初始化后立即对齐当前语言
     }
 
-    // ✅ 注册 i18n 订阅(铁律 13)
+    // ✅ 注册 i18n 监听(铁律 13)
     if (typeof window.subscribeI18n === 'function') {
         window.subscribeI18n('sale-vat-recon', _rerenderAll);
     }
@@ -28855,7 +28304,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     if (typeof openSettingsModal === 'function') openSettingsModal();
                     else if (typeof routeTo === 'function') routeTo('settings');
                     setTimeout(function () {
-                        if (typeof switchSettingsTab === 'function') switchSettingsTab('plan');
+                        if (typeof switchSettingsTab === 'function') switchSettingsTab('billing');
                     }, 50);
                     break;
                 case 'shortcuts':
@@ -29726,7 +29175,7 @@ window.addEventListener('DOMContentLoaded', () => {
         _updateStatus();
         window._loadGlvHistory = _loadHistory;
         _loadHistory();
-        // v118.32.5.1 · 订阅 i18n 切换总线 · 切语言实时刷新动态文案
+        // v118.32.5.1 · 监听 i18n 切换总线 · 切语言实时刷新动态文案
         if (typeof window.subscribeI18n === 'function') {
             window.subscribeI18n('gl-vat-recon', _onLangChange);
         }
@@ -29802,7 +29251,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ============================================================
 // v118.32.5.5.16 · 首页 dashboard 加载逻辑
-// 路由进 #/dashboard 时调 · 不动后端 · 复用 /api/me/plan + /api/ocr/history
+// 路由进 #/dashboard 时调 · 复用用量与历史接口
 // ============================================================
 (function _dashIIFE() {
     'use strict';
@@ -29830,7 +29279,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const elInv = document.getElementById('dash-kpi-invoices');
         const elPend = document.getElementById('dash-kpi-pending');
         const elExc = document.getElementById('dash-kpi-exceptions');
-        // v118.34 · dash-kpi-plan 已删除
+        // v118.34 · 旧计费 KPI 已删除
         const elCredits = document.getElementById('dash-kpi-credits');
         const elCreditsSub = document.getElementById('dash-kpi-credits-sub');
         const elCreditsCard = document.getElementById('dash-kpi-credits-card');
@@ -29838,10 +29287,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const elUsageSub = document.getElementById('dash-kpi-usage-sub');
         const elList = document.getElementById('dash-recent-list');
         const elExcBadge = document.getElementById('dash-quick-exc-badge');
-        // 1. 拿 plan + 最近识别(并行 · 已有 endpoint · 不动后端)
+        // 1. 拿用量 + 最近识别(并行)
         try {
             const auth = { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
-            // 修正: /api/me/plan 不存在 → 用 /api/me/tenant-usage + /api/history
+            // 用 /api/me/tenant-usage + /api/history
             const [usage, recent, excStats, credits] = await Promise.all([
                 fetch('/api/me/tenant-usage', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
                 fetch('/api/history?limit=20', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),

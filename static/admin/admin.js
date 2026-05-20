@@ -317,13 +317,12 @@
             const tbody = document.getElementById('cost-by-user-tbody');
             if (!tbody) return;
             if (!users.length) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#a0aec0">' + _t('adm-empty') + '</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#a0aec0">' + _t('adm-empty') + '</td></tr>';
             } else {
                 tbody.innerHTML = users.map(u => {
                     const avg = u.total_invoices ? (u.total_cost_thb / u.total_invoices) : 0;
                     return '<tr>' +
                         '<td><strong>' + _esc(u.username || '—') + '</strong></td>' +
-                        '<td>' + _esc(u.plan || '—') + '</td>' +
                         '<td>' + _fmtBaht(u.today_cost_thb) + '</td>' +
                         '<td>' + _fmtBaht(u.month_cost_thb) + '</td>' +
                         '<td>' + _fmtBaht(u.total_cost_thb) + '</td>' +
@@ -336,7 +335,7 @@
             }
         } catch (e) {
             const tbody = document.getElementById('cost-by-user-tbody');
-            if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#dc2626">' + _t('adm-load-fail') + '</td></tr>';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#dc2626">' + _t('adm-load-fail') + '</td></tr>';
         }
         // trend
         try {
@@ -367,7 +366,7 @@
             _renderAdmKpi(d);
         }).catch(_ => {});
         // v118.34 · payments/pending fetch 已删除 (4 行)
-        fetch('/api/admin/users?plan=all&search=&limit=100', _hd).then(r => r.json()).then(d => {
+        fetch('/api/admin/users?search=&limit=100', _hd).then(r => r.json()).then(d => {
             _admPageState.users = (d && d.users) || [];
             _renderAdmUserList(_admPageState.users);
         }).catch(_ => {
@@ -383,7 +382,7 @@
     function _renderAdmKpi(f) {
         const wrap = document.getElementById('adm-kpi-grid');
         if (!wrap) return;
-        // v118.34 · 旧 plan 分布卡 + 转化率已删除
+        // v118.34 · 旧分档分布卡 + 转化率已删除
         const cards = [
             { lbl: _t('adm-kpi-today'), val: (f && f.new_today) || 0, color: '#111111' },
             { lbl: _t('adm-kpi-week'), val: (f && f.new_week) || 0, color: '#111111' },
@@ -400,9 +399,9 @@
 
     // v118.34 · _renderAdmPending 已删除 (21 行) · 旧 payments/pending 端点已下线
 
-    // v118.34 · _renderAdmExpiring 已删除 (15 行) · trial 系统已下线
+    // v118.34 · _renderAdmExpiring 已删除
 
-    // v118.34 · _planLabel 已删除
+    // v118.34 · 旧分档 label 已删除
 
     function _renderAdmUserList(users) {
         const wrap = document.getElementById('adm-users-table');
@@ -427,7 +426,7 @@
                 '<div>' + _esc(_t('adm-col-actions')) + '</div>' +
             '</div>' +
             filtered.map(u => {
-                const isAdmin = u.is_super_admin || u.tenant_type === 'admin';
+                const isAdmin = !!u.is_super_admin;
                 const adminBadge = isAdmin ? ' <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-size:10px">' + _esc(_t('admin-type-super')) + '</span>' : '';
                 const lineBadge = u.line_id ? ' · LINE' : '';
                 const actions = isAdmin
@@ -523,7 +522,7 @@
             '<div class="adm-risk-row">' +
                 '<div class="adm-risk-row-main">' +
                     '<div><strong>' + _esc(x.email) + '</strong> ' + (x.is_banned ? '<span class="adm-pill-banned">' + _esc(_t('adm-risk-banned-tag')) + '</span>' : '') + '</div>' +
-                    '<div class="adm-risk-row-sub">' + _esc(x.plan || '') + ' · ' + x.ocr_today + ' ' + _esc(_t('adm-risk-ocr-24h')) + '</div>' +
+                    '<div class="adm-risk-row-sub">' + x.ocr_today + ' ' + _esc(_t('adm-risk-ocr-24h')) + '</div>' +
                 '</div>' +
                 (x.is_banned
                     ? '<button class="adm-risk-detail-btn" onclick="window.__admUnbanUser(\'' + _esc(x.user_id) + '\')">' + _esc(_t('adm-drawer-btn-unban')) + '</button>'
@@ -573,7 +572,7 @@
                                     '<div><strong>' + _esc(a.email) + '</strong>' +
                                         (a.is_banned ? ' <span class="adm-pill-banned">' + _esc(_t('adm-risk-banned-tag')) + '</span>' : '') +
                                     '</div>' +
-                                    '<div class="adm-risk-detail-sub">' + _esc(a.plan || '') + ' · ' + _esc((a.created_at || '').slice(0, 10)) + '</div>' +
+                                    '<div class="adm-risk-detail-sub">' + _esc((a.created_at || '').slice(0, 10)) + '</div>' +
                                 '</div>' +
                                 '<div class="adm-risk-detail-actions">' +
                                     (a.is_banned
@@ -886,7 +885,7 @@
                     '<p class="cpw-forgot-tip" style="background:#fef2f2;border-color:#fecaca;color:#991b1b">' + _esc(_t('adm-cd-warn')) + '</p>' +
                     '<div style="background:#f4f4f0;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:13px">' +
                         '<div style="font-weight:600;margin-bottom:8px;color:#0f172a">' + _esc(t_owner.username || t_owner.email || username) + '</div>' +
-                        '<div style="color:#64748b;margin-bottom:10px">' + _esc(t_tenant.name || '—') + (t_tenant.tenant_type ? ' · ' + _esc(t_tenant.tenant_type) : '') + '</div>' +
+                        '<div style="color:#64748b;margin-bottom:10px">' + _esc(t_tenant.name || '—') + '</div>' +
                         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;color:#475569">' +
                             '<div>' + _esc(_t('adm-cd-c-employees')) + ': <b>' + (c.employees || 0) + '</b></div>' +
                             '<div>' + _esc(_t('adm-cd-c-ocr')) + ': <b>' + (c.ocr_records || 0) + '</b></div>' +
@@ -1137,9 +1136,6 @@
             }
         });
         document.addEventListener('change', function(ev) {
-            if (false && ev.target && ev.target.id === 'adm-plan-filter') {
-                _renderAdmUserList(_admPageState.users || []);
-            }
             if (ev.target && ev.target.id === 'adm-topup-status-filter') {
                 _loadAdmTopup();
             }

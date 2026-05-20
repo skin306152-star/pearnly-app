@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pearnly · v109.3 商业模式核心
-==============================
-- 自由注册(7 天 trial · 50 张 / 3 客户)
-- 套餐拦截(trial / free / pro / firm)
-- 付费提交(KBank / PromptPay)+ 后台审核
-- 后台用户管理 + 漏斗 + 待审核付款
+Pearnly · signup / account lifecycle
+====================================
+- 邮箱验证码注册
+- Google / LINE OAuth 注册
+- 防滥用风控
+- 新账号统一接入 credits 按量计费
 """
 
 import os
@@ -27,156 +27,12 @@ logger = logging.getLogger("mrpilot.signup")
 router = APIRouter(tags=["signup-v109.3"])
 
 
-# ============================================================
-# 套餐定义(单一权威源)
-# ============================================================
-# ============================================================
-# v111.1 · 套餐定义重整(2026-05-04)
-#
-# 新模型 5 档:
-#   trial    - 7 天试用 · 100 张/月 · 一次 15 文件
-#   monthly  - ฿299/月 · 500 张/月 · 一次 30 文件
-#   yearly   - ฿2,990/年 · 1500 张/月 · 一次 50 文件
-#   lifetime - ฿9,900 一次买断 · 无限 · 自带 Gemini key · 一次 100 文件
-#   admin    - super admin · 无限 · 一次 999 文件
-#
-# 老 plan 通过 LEGACY_PLAN_MAP 自动映射(_get_plan 出口处):
-#   free, plus → trial · pro → monthly · firm → yearly · enterprise → lifetime
-#
-# 数据库 plan 字段不强制迁移 · 上层一律看 mapped_plan
-# ============================================================
-
-PLAN_CONFIG = {
-    # === 新 5 档 ===
-    "trial": {
-        "ocr_per_period":     30,   # v118.32.5.5.14 · Korn 反薅闸 · 100→30 张/月
-        "max_upload_files":   30,
-        "max_pages_per_file": 50,
-        "max_mb_per_file":    100,
-        "clients_max":        3,
-        "seats_max":          1,
-        "automation":         False,
-        "advanced_templates": False,
-        "batch_export":       True,
-        "line_bot":           False,
-        "duration_days":      3,   # v118.32.5.5.14 · Korn 反薅闸 · 7→3 天
-        "needs_own_key":      False,
-        "price_thb":          0,
-        "billing":            "trial",
-        # 兼容老字段(/api/me/plan 用)· 不再依赖 LINE 双轨制
-        "ocr_with_line":          30,  # v118.32.5.5.14 · 同步缩
-        "clients_max_with_line":  3,
-    },
-    "monthly": {
-        "ocr_per_period":     500,
-        "max_upload_files":   500,  # v118.27.8.1.15 · 30→500 · 月付 500 张 · Korn 反馈月底 300-700 张要一次跑完
-        "max_pages_per_file": 50,
-        "max_mb_per_file":    100,
-        "clients_max":        10,
-        "seats_max":          1,
-        "automation":         True,
-        "advanced_templates": True,
-        "batch_export":       True,
-        "line_bot":           True,
-        "duration_days":      30,
-        "needs_own_key":      False,
-        "price_thb":          299,
-        "billing":            "monthly",
-    },
-    "yearly": {
-        "ocr_per_period":     1500,
-        "max_upload_files":   800,  # v118.27.8.1.15 · 50→800 · 年付高峰月 800 张一锅端
-        "max_pages_per_file": 50,
-        "max_mb_per_file":    100,
-        "clients_max":        30,
-        "seats_max":          3,
-        "automation":         True,
-        "advanced_templates": True,
-        "batch_export":       True,
-        "line_bot":           True,
-        "duration_days":      365,
-        "needs_own_key":      False,
-        "price_thb":          2990,
-        "billing":            "yearly",
-    },
-    "lifetime": {
-        "ocr_per_period":     999999,
-        "max_upload_files":   1000, # v118.27.8.1.15 · 100→1000 · 买断不限月 · 单次也开大
-        "max_pages_per_file": 100,
-        "max_mb_per_file":    200,
-        "clients_max":        999999,
-        "seats_max":          5,
-        "automation":         True,
-        "advanced_templates": True,
-        "batch_export":       True,
-        "line_bot":           True,
-        "duration_days":      None,           # 永久
-        "needs_own_key":      True,           # 必须自己填 Gemini key
-        "price_thb":          9900,
-        "billing":            "lifetime",
-    },
-    "admin": {
-        "ocr_per_period":     999999,
-        "max_upload_files":   9999, # v118.27.8.1.15 · 999→9999 · admin 必须 >= lifetime(1000)· 内部不变式
-        "max_pages_per_file": 999,
-        "max_mb_per_file":    500,
-        "clients_max":        999999,
-        "seats_max":          999999,
-        "automation":         True,
-        "advanced_templates": True,
-        "batch_export":       True,
-        "line_bot":           True,
-        "duration_days":      None,
-        "needs_own_key":      False,
-        "price_thb":          0,
-        "billing":            "admin",
-    },
-    # === 老 plan 别名(数据库还有这些值 · 兼容直接读)===
-    # 实际不会被 _get_plan 返回(已通过 LEGACY_PLAN_MAP 映射)· 仅为保险
-    "free": {
-        # v118.32.5.5.14 · 跟 trial 同步缩(防有老用户卡在 free 别名)
-        "ocr_per_period": 30, "max_upload_files": 30, "max_pages_per_file": 50,
-        "max_mb_per_file": 100, "clients_max": 3, "seats_max": 1,
-        "automation": False, "advanced_templates": False, "batch_export": True,
-        "line_bot": False, "duration_days": 3, "needs_own_key": False,
-        "price_thb": 0, "billing": "trial",
-        "ocr_with_line": 30, "clients_max_with_line": 3,
-        "_legacy_alias": "trial",
-    },
-    "pro": {
-        "ocr_per_period": 500, "max_upload_files": 500, "max_pages_per_file": 50,
-        "max_mb_per_file": 100, "clients_max": 10, "seats_max": 1,
-        "automation": True, "advanced_templates": True, "batch_export": True,
-        "line_bot": True, "duration_days": 30, "needs_own_key": False,
-        "price_thb": 299, "billing": "monthly",
-        "_legacy_alias": "monthly",
-    },
-    "firm": {
-        "ocr_per_period": 1500, "max_upload_files": 800, "max_pages_per_file": 50,
-        "max_mb_per_file": 100, "clients_max": 30, "seats_max": 3,
-        "automation": True, "advanced_templates": True, "batch_export": True,
-        "line_bot": True, "duration_days": 365, "needs_own_key": False,
-        "price_thb": 2990, "billing": "yearly",
-        "_legacy_alias": "yearly",
-    },
-    "enterprise": {
-        "ocr_per_period": 999999, "max_upload_files": 1000, "max_pages_per_file": 100,
-        "max_mb_per_file": 200, "clients_max": 999999, "seats_max": 5,
-        "automation": True, "advanced_templates": True, "batch_export": True,
-        "line_bot": True, "duration_days": None, "needs_own_key": True,
-        "price_thb": 9900, "billing": "lifetime",
-        "_legacy_alias": "lifetime",
-    },
-}
-
-# 老 plan → 新 plan 字符串映射(_get_plan 出口处用)
-LEGACY_PLAN_MAP = {
-    "free":       "trial",
-    "plus":       "trial",
-    "pro":        "monthly",
-    "firm":       "yearly",
-    "enterprise": "lifetime",
-}
+# Credits 系统唯一计费模型。
+# 这些值只用于注册时写兼容字段；真实余额/扣费由 tenant_credits
+# / credit_transactions / monthly_page_usage 管。
+CREDITS_BILLING_MODE = "credits"
+CREDITS_COMPAT_PLAN_VALUE = "credits"
+CREDITS_COMPAT_MONTHLY_QUOTA = 100
 
 
 # ============================================================
@@ -273,7 +129,7 @@ def get_ip_subnet24(ip: str) -> str:
 def check_signup_abuse(email_norm: str, ip: str, fingerprint: str = None) -> Optional[str]:
     """
     防薅检查 · 返回错误代码或 None(通过)
-    
+
     检查项:
     1. 同 IP 24 小时 ≥ 3 个账号 → 拒绝
     2. 同 /24 网段 24 小时 ≥ 10 个 → 拒绝
@@ -352,15 +208,12 @@ def _ensure_schema():
         import db as _db
         sqls = [
             # users 表新增字段(原有)
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'free'",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_expires_at TIMESTAMPTZ",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMPTZ",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'credits'",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_country TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS line_id TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS line_user_id TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS line_verified_at TIMESTAMPTZ",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS parent_user_id UUID",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS upgraded_at TIMESTAMPTZ",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT",
@@ -391,35 +244,6 @@ def _ensure_schema():
             # 影响:role='user' 的孤儿用户在 admin「客户」列表/雇员校验/cascade 删除等查询里被漏掉
             # 幂等:跑多少次都安全
             "UPDATE users SET role='owner' WHERE role='user'",
-            # 订阅日志
-            """CREATE TABLE IF NOT EXISTS subscription_log (
-                id BIGSERIAL PRIMARY KEY,
-                user_id UUID NOT NULL,
-                from_plan TEXT,
-                to_plan TEXT NOT NULL,
-                changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                changed_by UUID,
-                reason TEXT,
-                amount_thb NUMERIC(10,2),
-                note TEXT
-            )""",
-            "CREATE INDEX IF NOT EXISTS idx_sub_log_user ON subscription_log(user_id, changed_at DESC)",
-            # 待审核付款
-            """CREATE TABLE IF NOT EXISTS payment_pending (
-                id BIGSERIAL PRIMARY KEY,
-                user_id UUID NOT NULL,
-                target_plan TEXT NOT NULL,
-                amount_thb NUMERIC(10,2) NOT NULL,
-                screenshot_path TEXT,
-                payer_name TEXT,
-                payer_note TEXT,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                reviewed_at TIMESTAMPTZ,
-                reviewed_by UUID,
-                review_note TEXT
-            )""",
-            "CREATE INDEX IF NOT EXISTS idx_pay_pending_status ON payment_pending(status, created_at DESC)",
             # 风控日志
             """CREATE TABLE IF NOT EXISTS risk_log (
                 id BIGSERIAL PRIMARY KEY,
@@ -555,62 +379,9 @@ def _require_super_admin(request: Request):
     return u
 
 
-def _get_plan(user_id: str) -> str:
-    """v111.1 · 取用户当前套餐(自动 map 老 plan + 处理过期)
-    返回值始终是新模型 plan 字符串(trial/monthly/yearly/lifetime/admin)
-    v111.2 · super_admin 直接返 admin · 不走 plan 字段
-    """
-    try:
-        import db as _db
-        with _db.get_cursor(commit=True) as cur:
-                # v111.2 · super_admin 第一关 · 一律 admin plan
-                cur.execute("""
-                    SELECT COALESCE(is_super_admin, false) AS sa,
-                           plan, trial_expires_at, plan_expires_at
-                    FROM users WHERE id=%s
-                """, (user_id,))
-                row = cur.fetchone()
-                if not row:
-                    return "trial"
-                if isinstance(row, dict):
-                    sa = row.get("sa")
-                    raw_plan = row.get("plan")
-                    trial_exp = row.get("trial_expires_at")
-                    plan_exp = row.get("plan_expires_at")
-                else:
-                    sa, raw_plan, trial_exp, plan_exp = row
-
-                # v111.2 · super_admin 一律 admin · 享受 999 限制
-                if sa:
-                    return "admin"
-
-                # v111.1 · 老 plan 自动 map 到新 plan
-                mapped_plan = LEGACY_PLAN_MAP.get(raw_plan or "trial", raw_plan or "trial")
-
-                now = _now()
-
-                # trial 到期 → 保持 trial · 让 check_ocr_quota 拒绝
-                # (用户还能看历史 · 引导付款)
-                if mapped_plan == "trial" and trial_exp and trial_exp < now:
-                    # 不改库 · 仅返回 trial(quota 检查会拒绝)
-                    return "trial"
-
-                # monthly/yearly 到期 → 转回 trial · 让用户重新付款
-                if mapped_plan in ("monthly", "yearly") and plan_exp and plan_exp < now:
-                    cur.execute("UPDATE users SET plan='trial', plan_expires_at=NULL WHERE id=%s", (user_id,))
-                    cur.execute("""
-                        INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
-                        VALUES (%s, %s, 'trial', 'plan_expired')
-                    """, (user_id, mapped_plan))
-                    logger.info(f"[v111.1] User {str(user_id)[:8]} {mapped_plan} 过期 · 自动转 trial")
-                    return "trial"
-
-                # lifetime 永不过期(plan_expires_at 应为 NULL)
-                # admin 永不过期
-                return mapped_plan if mapped_plan in PLAN_CONFIG else "trial"
-    except Exception as e:
-        logger.error(f"_get_plan failed: {e}")
-        return "trial"
+def _get_billing_mode(user_id: str) -> str:
+    """Return the active billing mode for new code paths."""
+    return CREDITS_BILLING_MODE
 
 
 # ============================================================
@@ -619,7 +390,7 @@ def _get_plan(user_id: str) -> str:
 # 用户加员工/查 tenant 数据时被 _require_owner_or_super 拦或懒建。
 # 3 个注册路径(email signup / Google OAuth / LINE OAuth)统一调此函数。
 # ============================================================
-def _ensure_tenant_for_new_user(cur, user_id, plan: str,
+def _ensure_tenant_for_new_user(cur, user_id, billing_mode: str = CREDITS_BILLING_MODE,
                                   company_name: str = None,
                                   full_name: str = None,
                                   username: str = None) -> Optional[str]:
@@ -638,9 +409,7 @@ def _ensure_tenant_for_new_user(cur, user_id, plan: str,
             tenant_name = f"user_{str(user_id)[:8]}"
         tenant_name = tenant_name[:100]
 
-        # PLAN_CONFIG 拿真实配额(防 fix_orphan 那种 monthly_quota=0 复发)
-        features = PLAN_CONFIG.get(plan) or PLAN_CONFIG.get("trial") or {}
-        monthly_quota = int(features.get("ocr_per_period") or 100)
+        monthly_quota = CREDITS_COMPAT_MONTHLY_QUOTA
 
         # 建 tenant(同事务)
         cur.execute("""
@@ -663,19 +432,19 @@ def _ensure_tenant_for_new_user(cur, user_id, plan: str,
             "UPDATE users SET tenant_id = %s WHERE id = %s AND tenant_id IS NULL",
             (str(new_tenant_id), str(user_id))
         )
-        logger.info(f"[v118.26.2.5 ensure-tenant] +tenant {str(new_tenant_id)[:8]}.. user={str(user_id)[:8]}.. plan={plan} quota={monthly_quota}")
+        logger.info(f"[ensure-tenant] +tenant {str(new_tenant_id)[:8]}.. user={str(user_id)[:8]}.. billing={billing_mode}")
         return str(new_tenant_id)
     except Exception as e:
-        logger.warning(f"[v118.26.2.5 ensure-tenant] fail user={user_id} plan={plan}: {e}")
+        logger.warning(f"[ensure-tenant] fail user={user_id} billing={billing_mode}: {e}")
         return None
 
 
-
-
-def get_plan_features(plan: str) -> Dict[str, Any]:
-    """v111.1 · 取套餐配置 · 自动 map 老 plan · fallback trial"""
-    mapped = LEGACY_PLAN_MAP.get(plan, plan)
-    return PLAN_CONFIG.get(mapped, PLAN_CONFIG["trial"]).copy()
+def get_billing_features() -> Dict[str, Any]:
+    """Compatibility helper for callers that need current billing metadata."""
+    return {
+        "billing_mode": CREDITS_BILLING_MODE,
+        "monthly_quota": CREDITS_COMPAT_MONTHLY_QUOTA,
+    }
 
 
 # ============================================================
@@ -727,7 +496,7 @@ class LoginRequest(BaseModel):
 # ============================================================
 @router.post("/api/auth/signup")
 def signup(req: SignupRequest, request: Request):
-    """新用户注册 · 自动 trial 7 天 · 自动登录 · 5 层防薅"""
+    """新用户注册 · 自动登录 · credits 按量计费 · 5 层防薅"""
     try:
         # 紧急止血:全局禁用注册
         if is_signup_globally_disabled():
@@ -816,21 +585,6 @@ def signup(req: SignupRequest, request: Request):
                 username = email_raw
                 password_hash = _hash_password(req.password)
 
-                # 邀请码处理
-                invite_plan = "trial"
-                if req.invite_code:
-                    code = req.invite_code.strip().upper()
-                    if code in ("PARTNER2026", "VIP2026"):
-                        invite_plan = "pro"
-                    elif code in ("FIRM2026",):
-                        invite_plan = "firm"
-
-                trial_exp = _now() + timedelta(days=PLAN_CONFIG["trial"]["duration_days"])
-                plan_exp = None
-                if invite_plan in ("pro", "firm"):
-                    plan_exp = _now() + timedelta(days=30)
-                    trial_exp = None
-
                 # 取 users 表实际有的列(避免插入不存在的字段触发 transaction abort)
                 cur.execute("""
                     SELECT column_name FROM information_schema.columns
@@ -857,9 +611,7 @@ def signup(req: SignupRequest, request: Request):
                     "phone": (req.phone or "").strip() or None,
                     "signup_source": (req.signup_source or "").strip() or None,
                     "newsletter_opt_in": bool(req.newsletter_opt_in),
-                    "plan": invite_plan,
-                    "trial_expires_at": trial_exp,
-                    "plan_expires_at": plan_exp,
+                    "plan": CREDITS_COMPAT_PLAN_VALUE,
                     "signup_country": country,
                     "line_id": (req.line_id or "").strip() or None,
                     "signup_ip": ip,
@@ -901,17 +653,11 @@ def signup(req: SignupRequest, request: Request):
 
                 # v118.26.2.5 · 同事务建 tenant + 回填 tenant_id(失败不阻塞)
                 _new_tid = _ensure_tenant_for_new_user(
-                    cur, str(user_id), invite_plan,
+                    cur, str(user_id), CREDITS_BILLING_MODE,
                     company_name=company,
                     full_name=full_name_safe,
                     username=username,
                 )
-
-                # 订阅日志(同一事务 · 不能 try/except)
-                cur.execute("""
-                    INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
-                    VALUES (%s, NULL, %s, %s)
-                """, (user_id, invite_plan, "signup" if invite_plan == "trial" else "invite_code"))
 
         # 自动创建 1 个示例客户(独立事务 · 失败不影响主注册)
         try:
@@ -927,7 +673,7 @@ def signup(req: SignupRequest, request: Request):
         token = create_access_token(
             user_id=str(user_id),
             username=username,
-            plan=invite_plan,
+            billing_mode=CREDITS_BILLING_MODE,
             tenant_id=_new_tid,
             role="owner",
             is_super_admin=False,
@@ -937,10 +683,7 @@ def signup(req: SignupRequest, request: Request):
             "ok": True,
             "user_id": str(user_id),
             "token": token,
-            "plan": invite_plan,
-            "needs_line_verify": invite_plan == "trial",  # 提示前端展示绑定 LINE
-            "trial_expires_at": trial_exp.isoformat() if trial_exp else None,
-            "plan_expires_at": plan_exp.isoformat() if plan_exp else None,
+            "billing_mode": CREDITS_BILLING_MODE,
         }
 
     except HTTPException:
@@ -952,7 +695,7 @@ def signup(req: SignupRequest, request: Request):
 
 # ============================================================
 # v118.27.5.1 · Google OAuth 一键建账号
-# 跳过密码 / 跳过 5 层防薅(Google 邮箱已验证) · 默认 trial 7 天
+# 跳过密码 / 跳过 5 层防薅(Google 邮箱已验证) · 统一 credits 按量计费
 # 仅供 app.py 的 /api/auth/google/callback 在用户首次用 Google 登录且未注册时调用
 # ============================================================
 def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
@@ -974,8 +717,6 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
         company = email_prefix or "User"
         full_name_safe = (full_name or "").strip() or None
 
-        invite_plan = "trial"
-        trial_exp = _now() + timedelta(days=PLAN_CONFIG["trial"]["duration_days"])
         ua_safe = (ua or "")[:512]
 
         with _db.get_cursor(commit=True) as cur:
@@ -1000,8 +741,7 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
                 "email_normalized": email_norm,
                 "company_name": company,
                 "full_name": full_name_safe,
-                "plan": invite_plan,
-                "trial_expires_at": trial_exp,
+                "plan": CREDITS_COMPAT_PLAN_VALUE,
                 "signup_country": "TH",
                 "signup_ip": ip,
                 "signup_user_agent": ua_safe,
@@ -1036,20 +776,11 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
 
             # v118.26.2.5 · 同事务建 tenant
             _ensure_tenant_for_new_user(
-                cur, str(user_id), invite_plan,
+                cur, str(user_id), CREDITS_BILLING_MODE,
                 company_name=company,
                 full_name=full_name_safe,
                 username=email_raw,
             )
-
-            # 订阅日志
-            try:
-                cur.execute("""
-                    INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
-                    VALUES (%s, NULL, %s, 'google_oauth_signup')
-                """, (user_id, invite_plan))
-            except Exception as ce:
-                logger.warning(f"[google_oauth_signup] subscription_log skip: {ce}")
 
         # 自动建 1 个示例客户(独立事务 · 失败不影响主注册)
         try:
@@ -1102,8 +833,6 @@ def create_user_via_line_oauth(line_uid: str, display_name: str = None,
         full_name_safe = (display_name or "").strip() or None
         company = full_name_safe or "LINE User"
 
-        invite_plan = "trial"
-        trial_exp = _now() + timedelta(days=PLAN_CONFIG["trial"]["duration_days"])
         ua_safe = (ua or "")[:512]
 
         with _db.get_cursor(commit=True) as cur:
@@ -1126,8 +855,7 @@ def create_user_via_line_oauth(line_uid: str, display_name: str = None,
                 "email_normalized": email_norm,
                 "company_name": company,
                 "full_name": full_name_safe,
-                "plan": invite_plan,
-                "trial_expires_at": trial_exp,
+                "plan": CREDITS_COMPAT_PLAN_VALUE,
                 "signup_country": "TH",
                 "signup_ip": ip,
                 "signup_user_agent": ua_safe,
@@ -1162,19 +890,11 @@ def create_user_via_line_oauth(line_uid: str, display_name: str = None,
 
             # v118.26.2.5 · 同事务建 tenant
             _ensure_tenant_for_new_user(
-                cur, str(user_id), invite_plan,
+                cur, str(user_id), CREDITS_BILLING_MODE,
                 company_name=company,
                 full_name=full_name_safe,
                 username=username_use,
             )
-
-            try:
-                cur.execute("""
-                    INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
-                    VALUES (%s, NULL, %s, 'line_oauth_signup')
-                """, (user_id, invite_plan))
-            except Exception as ce:
-                logger.warning(f"[line_oauth_signup] subscription_log skip: {ce}")
 
         try:
             with _db.get_cursor(commit=True) as cur2:
@@ -1215,13 +935,13 @@ def _log_risk(user_id, event_type, request, detail_dict=None):
 
 
 # ============================================================
-# LINE 绑定(防薅核心 · 解锁完整 trial 配额)
+# LINE 绑定
 # ============================================================
 @router.post("/api/me/link_line")
 def link_line(req: LineLinkRequest, request: Request):
     """
-    用户绑定 LINE userId · 解锁完整配额
-    
+    用户绑定 LINE userId。
+
     流程:
     1. 前端通过 LINE OAuth 拿到 userId(由 LINE Login API 返回)
     2. 调本接口 · 把 userId 跟当前用户绑定
@@ -1267,7 +987,7 @@ def link_line(req: LineLinkRequest, request: Request):
 # ============================================================
 @router.post("/api/me/link_line_dev")
 def link_line_dev(request: Request):
-    """开发期间用 · 模拟绑定一个随机 LINE userId · 让 trial 配额解锁"""
+    """开发期间用 · 模拟绑定一个随机 LINE userId"""
     try:
         u = _get_user_safe(request)
         if not u:
@@ -1302,22 +1022,11 @@ def link_line_dev(request: Request):
 # ============================================================
 @router.get("/api/admin/users/funnel")
 def admin_user_funnel(request: Request):
-    """注册漏斗 + 套餐分布"""
+    """注册漏斗 + 风控概览"""
     try:
         _require_super_admin(request)
         import db as _db
         with _db.get_cursor(commit=True) as cur:
-                # 套餐分布
-                cur.execute("""
-                    SELECT COALESCE(plan,'free') AS p, COUNT(*) AS n FROM users GROUP BY p
-                """)
-                by_plan = {}
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        by_plan[r.get("p") or "free"] = r.get("n", 0)
-                    else:
-                        by_plan[r[0]] = r[1]
-
                 # 今日/本周/本月新增
                 cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE")
                 today = _row_count(cur.fetchone())
@@ -1338,46 +1047,12 @@ def admin_user_funnel(request: Request):
                     else:
                         by_country.append({"country": r[0], "count": r[1]})
 
-                # Trial 即将到期(剩余 ≤ 3 天)
-                cur.execute("""
-                    SELECT id, COALESCE(email, username) AS email, company_name, line_id, trial_expires_at
-                    FROM users
-                    WHERE plan='trial' AND trial_expires_at IS NOT NULL
-                      AND trial_expires_at > NOW()
-                      AND trial_expires_at < NOW() + INTERVAL '3 days'
-                    ORDER BY trial_expires_at ASC
-                    LIMIT 50
-                """)
-                expiring = []
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        rid = r.get("id"); rem = r.get("email"); rcomp = r.get("company_name")
-                        rline = r.get("line_id"); rte = r.get("trial_expires_at")
-                    else:
-                        rid, rem, rcomp, rline, rte = r[0], r[1], r[2], r[3], r[4]
-                    expiring.append({
-                        "id": str(rid),
-                        "email": rem,
-                        "company_name": rcomp,
-                        "line_id": rline,
-                        "trial_expires_at": rte.isoformat() if rte else None,
-                        "hours_left": int((rte - _now()).total_seconds() // 3600) if rte else None,
-                    })
-
-                # 转化率
-                total_users = sum(by_plan.values()) or 1
-                paid = by_plan.get("pro", 0) + by_plan.get("firm", 0) + by_plan.get("enterprise", 0)
-                conversion = round(paid / total_users * 100, 1)
-
         return {
             "ok": True,
-            "by_plan": by_plan,
             "new_today": today,
             "new_week": week,
             "new_month": month,
             "by_country": by_country,
-            "trial_expiring_soon": expiring,
-            "conversion_pct": conversion,
         }
     except HTTPException:
         raise
@@ -1391,13 +1066,13 @@ def admin_user_funnel(request: Request):
 # ============================================================
 @router.post("/api/admin/cleanup_demo")
 def admin_cleanup_demo(request: Request):
-    """删除 demo / demo_plus 等测试账号 + 数据 · 保留 earn / super_admin"""
+    """删除 demo 测试账号 + 数据 · 保留 earn / super_admin"""
     try:
         admin = _require_super_admin(request)
         import db as _db
         deleted = {"users": 0, "ocr_history": 0, "clients": 0}
         with _db.get_cursor(commit=True) as cur:
-                # 找出要删的用户(demo / demo_plus / 任何 username 以 demo_ 开头)
+                # 找出要删的用户(demo / 任何 username 以 demo_ 开头)
                 cur.execute("""
                     SELECT id, username FROM users
                     WHERE (username='demo' OR username LIKE 'demo_%')
@@ -1425,7 +1100,7 @@ def admin_cleanup_demo(request: Request):
                 except Exception as e:
                     logger.warning(f"cleanup clients skip: {e}")
                 # 其他可能的关联表(安全 try)
-                for tbl in ["ocr_cost_log", "subscription_log", "payment_pending", "push_log", "billing_balance_log"]:
+                for tbl in ["ocr_cost_log", "push_log", "billing_balance_log"]:
                     try:
                         cur.execute(f"DELETE FROM {tbl} WHERE user_id IN ({placeholders})", ids)
                     except Exception:
@@ -1464,7 +1139,6 @@ def admin_suspicious_users(request: Request):
                            jsonb_agg(jsonb_build_object(
                                'user_id', id::text,
                                'email', COALESCE(email, username),
-                               'plan', plan,
                                'is_banned', is_banned,
                                'created_at', created_at::text
                            ) ORDER BY created_at DESC) AS accounts,
@@ -1498,7 +1172,6 @@ def admin_suspicious_users(request: Request):
                            jsonb_agg(jsonb_build_object(
                                'user_id', id::text,
                                'email', COALESCE(email, username),
-                               'plan', plan,
                                'is_banned', is_banned,
                                'created_at', created_at::text
                            ) ORDER BY created_at DESC) AS accounts
@@ -1531,13 +1204,13 @@ def admin_suspicious_users(request: Request):
 
                 # 3. OCR 用量异常(单日 > 30 张)
                 cur.execute("""
-                    SELECT u.id, COALESCE(u.email, u.username) AS user_email, u.plan,
+                    SELECT u.id, COALESCE(u.email, u.username) AS user_email,
                            u.is_banned,
                            COUNT(o.id) AS today_count
                     FROM users u
                     JOIN ocr_history o ON o.user_id = u.id
                     WHERE o.created_at > NOW() - INTERVAL '24 hours'
-                    GROUP BY u.id, u.email, u.username, u.plan, u.is_banned
+                    GROUP BY u.id, u.email, u.username, u.is_banned
                     HAVING COUNT(o.id) > 30
                     ORDER BY today_count DESC
                     LIMIT 30
@@ -1547,14 +1220,13 @@ def admin_suspicious_users(request: Request):
                     if isinstance(r, dict):
                         heavy.append({
                             "user_id": str(r.get("id")), "email": r.get("user_email"),
-                            "plan": r.get("plan"),
                             "is_banned": r.get("is_banned", False),
                             "ocr_today": r.get("today_count"),
                         })
                     else:
                         heavy.append({
-                            "user_id": str(r[0]), "email": r[1], "plan": r[2],
-                            "is_banned": r[3], "ocr_today": r[4],
+                            "user_id": str(r[0]), "email": r[1],
+                            "is_banned": r[2], "ocr_today": r[3],
                         })
 
                 # 4. 风控事件最近 24h
@@ -2093,7 +1765,6 @@ def admin_signup_sources(request: Request):
                 SELECT
                     COALESCE(signup_source, 'unknown') AS source,
                     COUNT(*) AS user_count,
-                    COUNT(*) FILTER (WHERE plan IN ('plus', 'pro', 'lifetime')) AS paid_count,
                     COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') AS week_count
                 FROM users
                 WHERE signup_source IS NOT NULL OR created_at > NOW() - INTERVAL '90 days'
@@ -2104,7 +1775,7 @@ def admin_signup_sources(request: Request):
         out = []
         for r in rows:
             d = dict(r) if hasattr(r, 'keys') else {}
-            for k in ("user_count", "paid_count", "week_count"):
+            for k in ("user_count", "week_count"):
                 if k in d:
                     d[k] = int(d[k] or 0)
             out.append(d)

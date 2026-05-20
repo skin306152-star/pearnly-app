@@ -200,7 +200,6 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                         <thead>
                             <tr>
                                 <th data-i18n="cost-th-user">用户</th>
-                                <th data-i18n="cost-th-plan">套餐</th>
                                 <th data-i18n="cost-th-today">今日</th>
                                 <th data-i18n="cost-th-month">本月</th>
                                 <th data-i18n="cost-th-total">累计</th>
@@ -211,7 +210,7 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                             </tr>
                         </thead>
                         <tbody id="cost-by-user-tbody">
-                            <tr><td colspan="9" class="cost-table-empty" data-i18n="cost-loading">加载中…</td></tr>
+                            <tr><td colspan="8" class="cost-table-empty" data-i18n="cost-loading">加载中…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -231,26 +230,11 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                 </div>
                 <div class="page-head-text">
                     <h1 class="page-title" data-i18n="admin-users-title">用户管理</h1>
-                    <div class="page-subtitle" data-i18n="admin-users-sub">注册用户 · 套餐分布 · 待审核付款 · 风控</div>
+                    <div class="page-subtitle" data-i18n="admin-users-sub">注册用户 · 充值审核 · 风控</div>
                 </div>
             </div>
 
             <div class="adm-kpi-grid" id="adm-kpi-grid"></div>
-
-            <div class="adm-section">
-                <div class="adm-section-head">
-                    <div class="adm-section-title" data-i18n="adm-pending-title">待审核付款</div>
-                    <button class="btn btn-ghost btn-sm" id="adm-refresh-pending"><span data-i18n="adm-refresh">刷新</span></button>
-                </div>
-                <div class="adm-pending-list" id="adm-pending-list"></div>
-            </div>
-
-            <div class="adm-section">
-                <div class="adm-section-head">
-                    <div class="adm-section-title" data-i18n="adm-expiring-title">Trial 即将到期(≤ 3 天)</div>
-                </div>
-                <div class="adm-expiring-list" id="adm-expiring-list"></div>
-            </div>
 
             <div class="adm-section">
                 <div class="adm-section-head">
@@ -260,13 +244,6 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                         <button class="adm-tab" data-adm-tab="logs" data-i18n="adm-tab-logs">操作日志</button>
                     </div>
                     <div class="adm-filters" data-adm-tab-filter="customers">
-                        <select class="adm-filter" id="adm-plan-filter">
-                            <option value="all" data-i18n="adm-filter-all">全部</option>
-                            <option value="trial" data-i18n="plan-trial">Trial</option>
-                            <option value="solo" data-i18n="adm-plan-solo">Solo</option>
-                            <option value="team" data-i18n="adm-plan-team">Team</option>
-                            <option value="firm" data-i18n="plan-firm">Firm</option>
-                        </select>
                         <input type="text" class="adm-search" id="adm-user-search" data-i18n-placeholder="adm-search-ph">
                         <button class="btn btn-ghost btn-sm" id="adm-users-csv-btn" type="button">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;">

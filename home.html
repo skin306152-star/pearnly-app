@@ -58,7 +58,7 @@
     gap: 8px;
 }
 
-/* v118.34 · 旧 quota-banner / trial-banner 样式已删除 · credits 系统替代 */
+/* v118.34 · 旧提示横幅样式已删除 · credits 系统替代 */
 
 /* 状态徽章 · 不可点 · 避免误以为能交互 */
 .history-badge {
@@ -2146,7 +2146,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 <main class="main">
 
     <!-- v102 · 顶部配额预警 banner · 由 JS 渲染填充 -->
-    <!-- v118.34 · trial-banner / quota-banner 已删除 · credits 系统接管 -->
+    <!-- v118.34 · 旧提示横幅已删除 · credits 系统接管 -->
 
 
     <!-- ============ 页面: 识别中心 (默认) ============ -->
@@ -2396,7 +2396,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             </div>
         </div>
 
-        <div class="card" id="history-free-block" style="display:none;">
+        <div class="card" id="history-locked-block" style="display:none;">
             <div class="coming-soon">
                 <svg class="cs-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="24" cy="24" r="18"/><path d="M24 14v10l7 5"/>
@@ -2494,8 +2494,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             </div>
         </div>
 
-        <!-- Free 用户占位 -->
-        <div class="card" id="automation-free-block" style="display:none;">
+        <div class="card" id="automation-locked-block" style="display:none;">
             <div class="coming-soon">
                 <svg class="cs-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M26 4L10 26h12l-2 18 16-22H24z"/>
@@ -2505,7 +2504,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             </div>
         </div>
 
-        <!-- Plus/Pro 用户主界面 · 左侧子菜单 + 右侧内容区(v0.10) -->
+        <!-- 自动化主界面 · 左侧子菜单 + 右侧内容区(v0.10) -->
         <div id="automation-main" style="display:none;">
             <div class="auto-layout">
                 <!-- 左侧子菜单 -->
@@ -3610,9 +3609,9 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="6.5" r="3"/><circle cx="6" cy="6.5" r="3"/><path d="M2 17v-1.5a3 3 0 013-3h2a3 3 0 013 3V17M11 13a3 3 0 013-3h2a3 3 0 013 3v4"/></svg>
                     <span>团队管理</span>
                 </button>
-                <button class="settings-tab settings-nav-item" data-tab="plan" data-i18n="set-tab-plan">
+                <button class="settings-tab settings-nav-item" data-tab="billing" data-i18n="set-tab-billing">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="10" rx="1.5"/><path d="M3 9h14M7 13h2"/></svg>
-                    <span>套餐 & 用量</span>
+                    <span>计费 & 用量</span>
                 </button>
             </div>
             <div class="settings-nav-group">
@@ -3625,10 +3624,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="6.5"/><path d="M7 10l2 2 4-4"/></svg>
                     <span>学习规则</span>
                 </button>
-                <button class="settings-tab settings-nav-item" data-tab="api" data-i18n="set-tab-api">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3l-2 4h3l-2 4 6-6h-3l2-2zM9 17l-3-3 3-3"/></svg>
-                    <span>API & 密钥</span>
-                </button>
+                <!-- v118.36 · BILLING-01 · API 密钥 tab 已删除 · 外部密钥路径下线 -->
             </div>
             <div class="settings-nav-group">
                 <div class="settings-nav-group-title" data-i18n="set-group-system">系统</div>
@@ -3844,11 +3840,11 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 </div>
             </div>
 
-            <!-- Tab 5 · 套餐 & 用量 -->
-            <div class="settings-pane" data-pane="plan">
+            <!-- Tab 5 · 计费 & 用量 -->
+            <div class="settings-pane" data-pane="billing">
                 <div class="card">
                     <div class="section-head">
-                        <div class="section-title" data-i18n="set-plan-title">套餐 & 用量</div>
+                        <div class="section-title" data-i18n="set-billing-title">计费 & 用量</div>
                     </div>
                     <div id="settings-info"></div>
                 </div>
@@ -3923,30 +3919,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 </div>
             </div>
 
-            <!-- Tab 7 · API & 密钥(买断用户专属 · 由 JS 控制 tab 显隐) -->
-            <div class="settings-pane" data-pane="api">
-                <!-- v0.15 · 识别服务密钥(仅买断用户显示) -->
-                <div class="card" id="api-key-card">
-                    <div class="section-head">
-                        <div class="section-title" data-i18n="settings-api-key">识别服务密钥</div>
-                    </div>
-                    <div class="api-key-desc" data-i18n="settings-api-key-desc">
-                        买断版专属 · 填入您自己的识别服务密钥后可无限次使用 · 不占用系统月度额度
-                    </div>
-                    <div id="settings-api-key-current" class="api-key-current" style="display:none;"></div>
-                    <div class="api-key-form">
-                        <input type="password" id="api-key-input" class="api-key-input"
-                               placeholder="AIza..." autocomplete="off" spellcheck="false">
-                        <button type="button" class="btn btn-ghost btn-small" id="btn-api-key-test" data-i18n="btn-api-key-test">测试</button>
-                        <button type="button" class="btn btn-primary btn-small" id="btn-api-key-save" data-i18n="btn-api-key-save">保存</button>
-                        <button type="button" class="btn btn-ghost btn-small" id="btn-api-key-clear" data-i18n="btn-api-key-clear" style="display:none;">清除</button>
-                    </div>
-                    <div id="api-key-msg" class="api-key-msg"></div>
-                    <div class="api-key-help">
-                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" data-i18n="api-key-how-to-get">如何获取密钥?</a>
-                    </div>
-                </div>
-            </div>
+            <!-- v118.36 · BILLING-01 · API 密钥 settings pane 已删除 · 外部密钥路径下线 -->
 
             <!-- v118.21.2 · 学习规则(撤销「忽略此类」白名单) -->
             <div class="settings-pane" data-pane="learned">
@@ -4054,7 +4027,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     <div class="section-head">
                         <div class="section-title" data-i18n="settings-about">联系我们</div>
                     </div>
-                    <div class="about-desc" data-i18n="about-desc">需要帮助、升级账号或反馈问题 · 欢迎联系我们</div>
+                    <div class="about-desc" data-i18n="about-desc">需要帮助或反馈问题 · 欢迎联系我们</div>
                     <div class="contact-grid" id="settings-contact-grid"></div>
                 </div>
             </div>
@@ -4339,7 +4312,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 </div>
                 <div class="form-row">
                     <label data-i18n="billing-field-balance">当前余额(THB)*</label>
-                    <input type="number" id="billing-input-balance" step="0.01" min="0" 
+                    <input type="number" id="billing-input-balance" step="0.01" min="0"
                            data-i18n-placeholder="billing-field-balance-ph" />
                 </div>
                 <div class="form-row">
@@ -5358,34 +5331,13 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             </div>
             <div class="page-head-text">
                 <h1 class="page-title" data-i18n="admin-users-title">用户管理</h1>
-                <div class="page-subtitle" data-i18n="admin-users-sub">注册用户 · 套餐分布 · 待审核付款 · 风控</div>
+                <div class="page-subtitle" data-i18n="admin-users-sub">注册用户 · 充值审核 · 风控</div>
             </div>
         </div>
 
         <!-- 漏斗概览 -->
         <div class="adm-kpi-grid" id="adm-kpi-grid">
             <!-- 动态填充 -->
-        </div>
-
-        <!-- 待审核付款 -->
-        <div class="adm-section">
-            <div class="adm-section-head">
-                <div class="adm-section-title" data-i18n="adm-pending-title">待审核付款</div>
-                <button class="btn btn-ghost btn-sm" id="adm-refresh-pending"><span data-i18n="adm-refresh">刷新</span></button>
-            </div>
-            <div class="adm-pending-list" id="adm-pending-list">
-                <!-- 动态填充 -->
-            </div>
-        </div>
-
-        <!-- Trial 即将到期 -->
-        <div class="adm-section">
-            <div class="adm-section-head">
-                <div class="adm-section-title" data-i18n="adm-expiring-title">Trial 即将到期(≤ 3 天)</div>
-            </div>
-            <div class="adm-expiring-list" id="adm-expiring-list">
-                <!-- 动态填充 -->
-            </div>
         </div>
 
         <!-- 用户管理 · v118.12 分两 tab:客户 / 员工 · v118.29.0 加日志 tab + 分页 + CSV -->
@@ -5397,13 +5349,6 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     <button class="adm-tab" data-adm-tab="logs" data-i18n="adm-tab-logs">操作日志</button>
                 </div>
                 <div class="adm-filters" data-adm-tab-filter="customers">
-                    <select class="adm-filter" id="adm-plan-filter">
-                        <option value="all" data-i18n="adm-filter-all">全部</option>
-                        <option value="trial" data-i18n="plan-trial">Trial</option>
-                        <option value="solo" data-i18n="adm-plan-solo">Solo</option>
-                        <option value="team" data-i18n="adm-plan-team">Team</option>
-                        <option value="firm" data-i18n="plan-firm">Firm</option>
-                    </select>
                     <input type="text" class="adm-search" id="adm-user-search" data-i18n-placeholder="adm-search-ph">
                     <button class="btn btn-ghost btn-sm" id="adm-users-csv-btn" type="button">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;">
@@ -5557,7 +5502,6 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     <thead>
                         <tr>
                             <th data-i18n="cost-th-user">用户</th>
-                            <th data-i18n="cost-th-plan">套餐</th>
                             <th data-i18n="cost-th-today">今日</th>
                             <th data-i18n="cost-th-month">本月</th>
                             <th data-i18n="cost-th-total">累计</th>
@@ -5568,7 +5512,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                         </tr>
                     </thead>
                     <tbody id="cost-by-user-tbody">
-                        <tr><td colspan="9" class="cost-table-empty" data-i18n="cost-loading">加载中…</td></tr>
+                        <tr><td colspan="8" class="cost-table-empty" data-i18n="cost-loading">加载中…</td></tr>
                     </tbody>
                 </table>
             </div>

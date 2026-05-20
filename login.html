@@ -128,7 +128,7 @@ body {
     .lang-btn-dd { padding: 6px 8px; }
 }
 @media (max-width: 380px) {
-    /* 极窄屏·进一步压缩,确保 [语言][登录][立即试用] 三者能同屏 */
+    /* 极窄屏·进一步压缩,确保 [语言][登录][立即注册] 三者能同屏 */
     .topbar-btn-ghost { padding: 6px 8px; font-size: 11px; }
     .topbar-btn-primary { padding: 6px 9px; font-size: 11px; }
     .topbar-right { gap: 4px; }
@@ -1357,17 +1357,6 @@ body {
 }
 .auth-form { display: none; }
 .auth-form.active { display: block; }
-.trial-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 4px 10px;
-    background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
-    color: #92400e;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    margin-bottom: 14px;
-}
-.trial-badge svg { width: 12px; height: 12px; }
 .form-h2 {
     font-size: 22px;
     font-weight: 700;
@@ -2616,7 +2605,7 @@ body {
         <div class="topbar-cta">
             <button class="topbar-btn topbar-btn-ghost" data-open-auth="login" data-i18n="topbar-login">登录</button>
             <!-- v118.9 · 滚动 30%+ 后才淡入 · 智能转化 -->
-            <button class="topbar-btn topbar-btn-primary topbar-btn-sticky" id="topbar-sticky-cta" data-open-auth="signup" data-i18n="topbar-signup">立即试用</button>
+            <button class="topbar-btn topbar-btn-primary topbar-btn-sticky" id="topbar-sticky-cta" data-open-auth="signup" data-i18n="topbar-signup">立即注册</button>
         </div>
     </div>
 </nav>

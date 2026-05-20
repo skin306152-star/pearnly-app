@@ -67,17 +67,17 @@ def get_cursor(commit: bool = False):
 
 
 def ensure_demo_account():
-    """启动时确保 demo (Free) 和 demo_plus (Plus 200) 账号存在 · 幂等"""
+    """启动时确保 credits demo 账号存在 · 幂等"""
     _ensure_one_account(
         username=os.environ.get("DEMO_USERNAME", "demo"),
         password=os.environ.get("DEMO_PASSWORD", "demo2026"),
-        plan="free",
-        monthly_quota=0,
-        can_use_gemini=False,
-        can_edit_fields=False,
-        can_verify_tax=False,
-        can_use_custom_template=False,
-        can_view_history=False,
+        billing_mode="credits",
+        monthly_quota=100,
+        can_use_gemini=True,
+        can_edit_fields=True,
+        can_verify_tax=True,
+        can_use_custom_template=True,
+        can_view_history=True,
         can_use_typhoon=False,
         can_push_erp=False,
         can_use_automation=False,
@@ -85,13 +85,13 @@ def ensure_demo_account():
         typhoon_quota_monthly=0,
         history_retention_days=0,
         custom_template_limit=0,
-        notes='公共测试账号 · Free · 按 IP 每天限流',
+        notes='公共测试账号 · credits 按量计费',
     )
     _ensure_one_account(
-        username=os.environ.get("DEMO_PLUS_USERNAME", "demo_plus"),
-        password=os.environ.get("DEMO_PLUS_PASSWORD", "demoplus2026"),
-        plan="plus",
-        monthly_quota=200,  # 最低档 Plus 200
+        username=os.environ.get("DEMO_CREDITS_USERNAME", "demo_credits"),
+        password=os.environ.get("DEMO_CREDITS_PASSWORD", "democredits2026"),
+        billing_mode="credits",
+        monthly_quota=100,
         can_use_gemini=True,
         can_edit_fields=True,
         can_verify_tax=True,
@@ -104,12 +104,12 @@ def ensure_demo_account():
         typhoon_quota_monthly=0,
         history_retention_days=90,
         custom_template_limit=3,
-        notes='Plus 测试账号 · 200 张/月 · Gemini Flash',
+        notes='credits 测试账号 · 按量计费 · Gemini Flash',
     )
 
 
 def _ensure_one_account(
-    username, password, plan, monthly_quota,
+    username, password, billing_mode, monthly_quota,
     can_use_gemini, can_edit_fields, can_verify_tax,
     can_use_custom_template, can_view_history, can_use_typhoon,
     can_push_erp, can_use_automation, can_manage_api_keys,
@@ -147,14 +147,14 @@ def _ensure_one_account(
                         is_active = TRUE
                     WHERE id = %s
                 """, (
-                    correct_hash, plan, monthly_quota,
+                    correct_hash, billing_mode, monthly_quota,
                     can_use_gemini, can_edit_fields, can_verify_tax,
                     can_use_custom_template, can_view_history, can_use_typhoon,
                     can_push_erp, can_use_automation, can_manage_api_keys,
                     typhoon_quota_monthly, history_retention_days, custom_template_limit,
                     row["id"],
                 ))
-                logger.info(f"✅ {username} 账号已同步({plan} 权限)")
+                logger.info(f"✅ {username} 账号已同步({billing_mode} 权限)")
             else:
                 cur.execute("""
                     INSERT INTO users (
@@ -173,14 +173,14 @@ def _ensure_one_account(
                         %s, TRUE
                     )
                 """, (
-                    username, correct_hash, plan, monthly_quota,
+                    username, correct_hash, billing_mode, monthly_quota,
                     can_use_gemini, can_edit_fields, can_verify_tax,
                     can_use_custom_template, can_view_history, can_use_typhoon,
                     can_push_erp, can_use_automation, can_manage_api_keys,
                     typhoon_quota_monthly, history_retention_days, custom_template_limit,
                     notes,
                 ))
-                logger.info(f"✅ {username} 账号已创建({plan})")
+                logger.info(f"✅ {username} 账号已创建({billing_mode})")
     except Exception as e:
         logger.error(f"❌ 初始化账号失败 ({username}): {e}")
         raise
@@ -377,7 +377,7 @@ def merge_line_account_into_existing(temp_user_id: str, target_user_id: str, lin
             cur.execute("UPDATE users SET line_uid = %s WHERE id = %s", (line_uid, target_user_id))
             # 3) 删临时账号的示例 client(create_user_via_line_oauth 建的 1 个)
             cur.execute("DELETE FROM clients WHERE user_id = %s", (temp_user_id,))
-            # 4) 删订阅日志
+            # 4) 删旧计费日志
             try:
                 cur.execute("DELETE FROM subscription_log WHERE user_id = %s", (temp_user_id,))
             except Exception:
@@ -458,7 +458,7 @@ def increment_ip_usage(ip: str, n: int = 1) -> int:
 
 def increment_user_monthly_usage(user_id: str, n: int = 1) -> int:
     """
-    Plus 用户识别后累加本月用量。
+    识别后累加本月用量。
     如果已经跨月(last_usage_month != 本月),会重置为 n 而不是累加。
     返回最新的 used_this_month 值。
     """
@@ -547,12 +547,12 @@ def _bkk_year_month() -> str:
 
 def _extract_summary_fields(pages: list) -> dict:
     """从 pages 抽出列表展示用的核心字段
-    v106.2 修复:多联发票(底单/发票/收据 3 页) Gemini 可能把所有页都标 is_copy=true · 
+    v106.2 修复:多联发票(底单/发票/收据 3 页) Gemini 可能把所有页都标 is_copy=true ·
     导致摘要字段全 None · 列表显示「未识别到 · 金额 · 发票号 · 日期 · 卖方」误报
     改进:先找非副本主页 · 找不到再用 is_duplicate=False 的页 · 最后兜底用第 1 页
     """
     pages = pages or []
-    
+
     def _build_from_page(p):
         f = (p.get("fields") or {})
         raw_date = f.get("date")
@@ -577,14 +577,14 @@ def _extract_summary_fields(pages: list) -> dict:
             "seller_name": (f.get("seller_name") or "")[:200] or None,
             "total_amount": total,
         }
-    
+
     # 1. 优先 · 非副本主页(是非 is_copy 也非 is_duplicate)
     for p in pages:
         if not p.get("is_copy") and not p.get("is_duplicate"):
             f = p.get("fields") or {}
             if f.get("invoice_number") or f.get("total_amount") or f.get("seller_name"):
                 return _build_from_page(p)
-    
+
     # 2. 兜底 · 全部 is_copy/is_duplicate 时 · 选有最多关键字段的那页
     def _score(p):
         f = p.get("fields") or {}
@@ -594,12 +594,12 @@ def _extract_summary_fields(pages: list) -> dict:
         if f.get("seller_name"): s += 1
         if f.get("date"): s += 1
         return s
-    
+
     if pages:
         best = max(pages, key=_score)
         if _score(best) > 0:
             return _build_from_page(best)
-    
+
     return {"invoice_no": None, "invoice_date": None, "seller_name": None, "total_amount": None}
 
 
@@ -916,51 +916,10 @@ def set_user_dup_check_enabled(user_id: str, enabled: bool) -> bool:
 
 
 # ============================================================
-# v0.15 · 用户自带 Gemini API Key(买断用户)
+# v118.36 · BILLING-01 · 外部密钥路径已下线
+# set_user_gemini_key / get_user_gemini_key / get_user_gemini_key_masked
+# 函数全部删除 · users.gemini_api_key 字段冻结 · 新代码不读不写
 # ============================================================
-def set_user_gemini_key(user_id: str, api_key: Optional[str]) -> bool:
-    """
-    保存用户自带的 Gemini API Key
-    api_key 为空串 / None 时 → 清空(切回系统 key)
-    """
-    val = (api_key or "").strip() or None
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute("UPDATE users SET gemini_api_key = %s WHERE id = %s",
-                        (val, user_id))
-        return True
-    except Exception as e:
-        logger.error(f"保存 Gemini key 失败: {e}")
-        return False
-
-
-def get_user_gemini_key(user_id: str) -> Optional[str]:
-    """读取明文(后端内部用 · 不返回给前端)"""
-    try:
-        with get_cursor() as cur:
-            cur.execute("SELECT gemini_api_key FROM users WHERE id = %s", (user_id,))
-            r = cur.fetchone()
-            if r and r.get("gemini_api_key"):
-                return r["gemini_api_key"]
-    except Exception as e:
-        logger.warning(f"读 Gemini key 失败: {e}")
-    return None
-
-
-def get_user_gemini_key_masked(user_id: str) -> dict:
-    """
-    给前端用 · 只返回遮罩信息
-    {has_key: bool, preview: str}  preview 例:'AIza***...x9Y2'
-    """
-    k = get_user_gemini_key(user_id)
-    if not k:
-        return {"has_key": False, "preview": ""}
-    # 只显示前 4 + 后 4
-    if len(k) <= 8:
-        preview = "*" * len(k)
-    else:
-        preview = f"{k[:4]}...{k[-4:]}"
-    return {"has_key": True, "preview": preview}
 
 
 def list_ocr_history(
@@ -976,7 +935,7 @@ def list_ocr_history(
     """
     分页列表查询。
     retention_days: None=自动从 user 表拉(向后兼容老调用方漏传)
-                    0=不可查 / 90=Plus 90 天 / -1=Pro 永久
+                    0=不可查 / 正数=保留天数 / -1=长期保留
     keyword: 在 filename / invoice_no / seller_name 里模糊匹配
     v118.14 · tenant_id 给了 → 多租户共享:看同 tenant 所有用户的发票(老板看员工的)
               没给 → 老逻辑:只看自己的(向前兼容)
@@ -1993,7 +1952,7 @@ def upsert_archive_settings(user_id: str,
 
 
 # ============================================================
-# v0.8 · RD 校验日限(Free 5/天)
+# v0.8 · RD 校验日限
 # ============================================================
 def get_rd_daily_usage(user_id: str) -> int:
     """返回今天用户已调 RD 的次数"""
@@ -2031,31 +1990,15 @@ def increment_rd_daily_usage(user_id: str, n: int = 1) -> int:
 # ============================================================
 # v0.8.1 · 过期历史清理
 # ============================================================
-def cleanup_expired_history(free_days: int = 7, plus_days: int = 90, pro_days: int = 365) -> int:
-    """按 plan 删除过期历史 · 返回删除条数"""
+def cleanup_expired_history(retention_days: int = 365) -> int:
+    """按统一保留期删除过期历史 · 返回删除条数"""
     total = 0
     try:
         with get_cursor(commit=True) as cur:
-            # Free
             cur.execute("""
                 DELETE FROM ocr_history
-                WHERE user_id IN (SELECT id FROM users WHERE plan = 'free')
-                  AND created_at < NOW() - (%s || ' days')::interval
-            """, (str(free_days),))
-            total += cur.rowcount
-            # Plus
-            cur.execute("""
-                DELETE FROM ocr_history
-                WHERE user_id IN (SELECT id FROM users WHERE plan = 'plus')
-                  AND created_at < NOW() - (%s || ' days')::interval
-            """, (str(plus_days),))
-            total += cur.rowcount
-            # Pro
-            cur.execute("""
-                DELETE FROM ocr_history
-                WHERE user_id IN (SELECT id FROM users WHERE plan = 'pro')
-                  AND created_at < NOW() - (%s || ' days')::interval
-            """, (str(pro_days),))
+                WHERE created_at < NOW() - (%s || ' days')::interval
+            """, (str(retention_days),))
             total += cur.rowcount
         return total
     except Exception as e:
@@ -3242,8 +3185,7 @@ def create_tenant(
     """
     超级管理员用 · 创建一个新租户
     tenant_type:
-        'shared_api' = 月付 · 共用系统 Gemini key
-        'byo_api'    = 买断 · 用户自带 Gemini key
+        'shared_api' = credits 系统兼容值
         'admin'      = 超级管理员租户
     返回新建 tenant 的 id · 失败返回 None
     """
@@ -3272,23 +3214,6 @@ def create_tenant(
     except Exception as e:
         logger.error(f"create_tenant failed (name={name}): {e}")
         return None
-
-
-def update_tenant_quota(tenant_id: str, monthly_quota: int) -> bool:
-    """
-    超级管理员用 · 改租户月度限额
-    传 0 = 不限额(买断类 tenant 用)
-    """
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                "UPDATE tenants SET monthly_quota = %s, updated_at = NOW() WHERE id = %s",
-                (int(monthly_quota), str(tenant_id)),
-            )
-            return cur.rowcount > 0
-    except Exception as e:
-        logger.error(f"update_tenant_quota failed: {e}")
-        return False
 
 
 def update_tenant_status(tenant_id: str, status: str) -> bool:
@@ -3442,43 +3367,6 @@ def get_tenant_usage_summary(tenant_id: str) -> Dict[str, Any]:
 # v23 · 用户(老板)管理 + 员工 + 操作日志
 # ============================================================
 import bcrypt as _bcrypt
-
-
-def list_all_owner_users(limit: int = 200) -> List[Dict[str, Any]]:
-    """
-    超管用 · 列所有 owner 用户(每个对应一家公司)
-    返回含:用户名 / 公司名称 / 类型 / 配额 / 用量 / 员工数 / 状态
-    """
-    try:
-        with get_cursor() as cur:
-            cur.execute("""
-                SELECT
-                    u.id AS user_id,
-                    u.username,
-                    u.company_name,
-                    u.is_active,
-                    u.is_super_admin,
-                    u.last_login_at,
-                    u.created_at,
-                    t.id AS tenant_id,
-                    t.name AS tenant_name,
-                    t.tenant_type,
-                    t.status AS tenant_status,
-                    t.monthly_quota,
-                    t.used_this_month,
-                    (SELECT COUNT(*) FROM users u2 WHERE u2.tenant_id = t.id AND u2.role = 'member') AS employees_count
-                FROM users u
-                JOIN tenants t ON t.id = u.tenant_id
-                WHERE u.role = 'owner'
-                ORDER BY u.created_at DESC
-                LIMIT %s
-            """, (int(limit),))
-            return [dict(r) for r in cur.fetchall()]
-    except Exception as e:
-        logger.error(f"list_all_owner_users failed: {e}")
-        return []
-
-
 def create_owner_user(
     username: str,
     password: str,
@@ -3519,7 +3407,7 @@ def create_owner_user(
                 INSERT INTO users (
                     username, password_hash, plan, is_active, is_super_admin,
                     tenant_id, role, company_name
-                ) VALUES (%s, %s, 'plus', TRUE, FALSE, %s, 'owner', %s)
+                ) VALUES (%s, %s, 'credits', TRUE, FALSE, %s, 'owner', %s)
                 RETURNING id
             """, (username, pw_hash, tenant_id, company_name))
             user_id = str(cur.fetchone()["id"])
@@ -3553,7 +3441,7 @@ def preview_owner_cascade(user_id: str) -> Optional[Dict[str, Any]]:
             # tenant 名(如果有)
             tenant = {}
             if tenant_id:
-                cur.execute("SELECT name, tenant_type FROM tenants WHERE id = %s", (tenant_id,))
+                cur.execute("SELECT name FROM tenants WHERE id = %s", (tenant_id,))
                 tenant = cur.fetchone() or {}
 
             counts = {}
@@ -3603,7 +3491,6 @@ def preview_owner_cascade(user_id: str) -> Optional[Dict[str, Any]]:
                 "tenant": {
                     "id": tenant_id,
                     "name": tenant.get("name") if tenant_id else None,
-                    "tenant_type": tenant.get("tenant_type") if tenant_id else None,
                     "is_orphan": not tenant_id,  # v118.16.2 · 标记孤立用户(前端可显示)
                 },
                 "counts": counts,
@@ -4192,7 +4079,6 @@ def get_cost_by_user(limit: int = 50) -> List[Dict[str, Any]]:
                 SELECT
                     c.user_id,
                     u.username,
-                    u.plan,
                     COALESCE(SUM(CASE WHEN c.created_at::date = CURRENT_DATE THEN c.cost_thb END), 0) AS today_cost,
                     COALESCE(SUM(CASE WHEN date_trunc('month', c.created_at) = date_trunc('month', NOW()) THEN c.cost_thb END), 0) AS month_cost,
                     COALESCE(SUM(c.cost_thb), 0) AS total_cost,
@@ -4201,7 +4087,7 @@ def get_cost_by_user(limit: int = 50) -> List[Dict[str, Any]]:
                     MAX(c.created_at) AS last_used_at
                 FROM ocr_cost_log c
                 LEFT JOIN users u ON u.id = c.user_id
-                GROUP BY c.user_id, u.username, u.plan
+                GROUP BY c.user_id, u.username
                 ORDER BY month_cost DESC, total_cost DESC
                 LIMIT %s
             """, (limit,))
@@ -4696,7 +4582,7 @@ def list_clients(user_id: str, include_inactive: bool = False, tenant_id: Option
             cur.execute(f"""
                 SELECT c.*,
                     (SELECT COUNT(*) FROM ocr_history WHERE client_id = c.id) AS invoice_count,
-                    (SELECT COALESCE(SUM(total_amount), 0) FROM ocr_history 
+                    (SELECT COALESCE(SUM(total_amount), 0) FROM ocr_history
                      WHERE client_id = c.id AND total_amount IS NOT NULL) AS total_amount,
                     (SELECT MAX(created_at) FROM ocr_history WHERE client_id = c.id) AS last_invoice_at
                 FROM clients c
@@ -4737,7 +4623,7 @@ def create_client(user_id: str, tenant_id: Optional[str], name: str, **kwargs) -
     try:
         with get_cursor(commit=True) as cur:
             cur.execute("""
-                INSERT INTO clients (user_id, tenant_id, name, short_name, tax_id, 
+                INSERT INTO clients (user_id, tenant_id, name, short_name, tax_id,
                     address, contact_person, contact_phone, contact_email, notes, color)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
@@ -4954,7 +4840,7 @@ def add_balance_log(real_balance: float, user_id: str, notes: Optional[str] = No
                     calibration = round(real_used / estimated_used, 4)
                     # 限制范围 · 避免异常数据(如手抖输错)
                     calibration = max(0.5, min(calibration, 2.0))
-            
+
             # 2. 写新记录
             cur.execute("""
                 INSERT INTO billing_balance_log
@@ -4991,9 +4877,9 @@ def get_balance_summary() -> Dict[str, Any]:
                 "real_since_last": 0,
                 "accuracy_pct": None,
             }
-            
-            
-            
+
+
+
         # 算自上次更新以来 · 我们当前估算了多少
         with get_cursor() as cur:
             cur.execute("""
@@ -5001,10 +4887,10 @@ def get_balance_summary() -> Dict[str, Any]:
                 WHERE created_at > %s
             """, (latest["created_at"],))
             est_since = float(cur.fetchone()["estimated_since"] or 0)
-        
+
         # 当前预估实际余额
         current_estimated_balance = float(latest["real_balance_thb"]) - est_since
-        
+
         # 准确度(上次)
         accuracy = None
         if latest.get("estimated_used_since_last") and float(latest["estimated_used_since_last"]) > 0.001:
@@ -5012,7 +4898,7 @@ def get_balance_summary() -> Dict[str, Any]:
             est = float(latest["estimated_used_since_last"])
             if real > 0:
                 accuracy = round(min(est, real) / max(est, real) * 100, 1)
-        
+
         return {
             "has_balance": True,
             "real_balance_thb": float(latest["real_balance_thb"]),
@@ -5871,7 +5757,7 @@ def ensure_membership_tables():
             cur.execute("""
                 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tenant_type_v2 TEXT DEFAULT 'firm';
             """)
-            # 注意:tenants 表已经有老的 tenant_type(shared_api/byo_api/admin · 计费类型)
+            # 注意:tenants 表已有 legacy tenant_type 字段(shared_api/admin · 兼容值)
             # 不能覆盖 · 用新列 tenant_type_v2 区分(firm/sme/freelancer · 业务类型)
 
             # ── 5. clients 表 · tenant_id 列已存在(v107 ensure_clients_table 已建)· 不重复 ALTER
@@ -6148,8 +6034,7 @@ def migrate_to_membership_model(dry_run: bool = True) -> Dict[str, Any]:
 
 # ============================================================
 # v118.27.7.1 · 孤立用户(tenant_id IS NULL)盘点 + 修复
-# v118.34 · 简化:不再继承 user.plan / monthly_quota / trial_expires_at /
-#          plan_expires_at 到新 tenant · credits 系统按 tenant_id 共享 ·
+# v118.34 · 简化:不再继承旧分档字段到新 tenant · credits 系统按 tenant_id 共享 ·
 #          新 tenant 直接默认值即可
 #   - 给每个孤立用户建一个独立 tenant + 写 membership
 #   - 单用户独立事务 · 一个失败不影响其他
@@ -6158,7 +6043,7 @@ def migrate_to_membership_model(dry_run: bool = True) -> Dict[str, Any]:
 def list_orphan_users() -> List[Dict[str, Any]]:
     """列出所有 tenant_id IS NULL 的用户(过滤超管)+ 每个用户的数据量统计
     给超管看清楚哪些用户需要补建 tenant
-    v118.34 · 不再读旧 plan/quota/trial_expires_at/plan_expires_at 字段
+    v118.34 · 不再读旧分档/配额/有效期字段
     """
     try:
         with get_cursor() as cur:
@@ -6199,17 +6084,17 @@ def list_orphan_users() -> List[Dict[str, Any]]:
 
 def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
     """给孤立用户每人建独立 tenant + 同步写 memberships
-    v118.34 · 不再继承 plan/quota/expires_at · 新 tenant 默认 100 张配额(只是兼容字段 · credits 接管)
+    v118.34 · 不再继承旧分档字段 · 新 tenant 使用兼容默认值 · credits 接管
     单个用户独立事务 · 失败不影响其他
 
     返回:
-      ok / dry_run / scanned / plan(每个会建的 tenant 详情)/ executed / errors
+      ok / dry_run / scanned / previews(每个会建的 tenant 详情)/ executed / errors
     """
     out: Dict[str, Any] = {
         "ok": False,
         "dry_run": bool(dry_run),
         "scanned": 0,
-        "plan": [],
+        "previews": [],
         "executed": 0,
         "errors": [],
     }
@@ -6229,7 +6114,7 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
                 return out
             owner_role_id = str(r["id"])
 
-        # 给每个孤立用户做 plan
+        # 给每个孤立用户生成预览
         for u in orphans:
             user_id = u["user_id"]
             # tenant.name 优先级:company_name > full_name > username > email_prefix
@@ -6251,18 +6136,18 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
                 "client_records": u.get("client_count"),
                 "erp_endpoints": u.get("erp_count"),
             }
-            out["plan"].append(preview)
+            out["previews"].append(preview)
 
         if dry_run:
             out["ok"] = True
-            logger.info(f"[v27.7.1 fix_orphan] DRY-RUN · scanned={out['scanned']} plans={len(out['plan'])}")
+            logger.info(f"[v27.7.1 fix_orphan] DRY-RUN · scanned={out['scanned']} previews={len(out['previews'])}")
             return out
 
         # 真执行 · 每个用户独立事务
-        for p in out["plan"]:
+        for p in out["previews"]:
             try:
                 with get_cursor(commit=True) as cur:
-                    # v118.34 · 不再写 subscription_expires_at(旧订阅字段)· monthly_quota=100 兼容
+                    # v118.34 · 使用兼容默认值创建 tenant
                     cur.execute("""
                         INSERT INTO tenants (
                             name, owner_user_id, tenant_type, monthly_quota,
@@ -6302,7 +6187,7 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
                 out["errors"].append({"user_id": p["user_id"], "msg": str(e_one)[:200]})
 
         out["ok"] = True
-        logger.info(f"[v27.7.1 fix_orphan] EXECUTED · executed={out['executed']}/{len(out['plan'])} errors={len(out['errors'])}")
+        logger.info(f"[v27.7.1 fix_orphan] EXECUTED · executed={out['executed']}/{len(out['previews'])} errors={len(out['errors'])}")
         return out
     except Exception as e:
         import traceback

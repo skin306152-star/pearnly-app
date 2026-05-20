@@ -632,8 +632,8 @@ tr:hover td { background: #fafaf8; }
         </div>
         <div class="avatar-popup-item" onclick="goto('settings')"><i class="ti ti-settings"></i>设置</div>
         <div class="avatar-popup-item"><i class="ti ti-users"></i>团队成员<span class="pill">3 人</span></div>
-        <!-- 付费/订阅 = 老板专属(员工不可见) -->
-        <div class="avatar-popup-item" data-show-if-role="owner" onclick="goto('billing')"><i class="ti ti-credit-card"></i>订阅 &amp; 套餐</div>
+        <!-- 付费/计费 = 老板专属(员工不可见) -->
+        <div class="avatar-popup-item" data-show-if-role="owner" onclick="goto('billing')"><i class="ti ti-credit-card"></i>充值与用量</div>
         <div class="avatar-popup-item"><i class="ti ti-keyboard"></i>键盘快捷键</div>
         <!-- 特殊权限项(skin 测试白名单 / Earn 超管)有任一才显示分隔 -->
         <div class="avatar-popup-sep" data-show-if="any-special"></div>
@@ -876,7 +876,7 @@ tr:hover td { background: #fafaf8; }
             <thead><tr><th style="width:28px"><input type="checkbox"></th><th>供应商</th><th>费用类别</th><th>日期</th><th>金额</th><th>VAT</th><th>状态</th><th></th></tr></thead>
             <tbody>
               <tr><td><input type="checkbox"></td><td><div style="font-weight:500">Office Mate Thailand</div><div style="font-size:11px;color:var(--text-3)"><i class="ti ti-id-badge" style="font-size:10px"></i> 0105555012345 ✓</div></td><td><span style="font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:3px"><i class="ti ti-briefcase" style="font-size:12px"></i>办公用品</span></td><td style="color:var(--text-3)">05/12</td><td style="font-weight:600">฿3,850</td><td style="color:var(--text-3)">฿269</td><td><span class="badge b-ok"><i class="ti ti-check"></i>已审核</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td></tr>
-              <tr><td><input type="checkbox"></td><td><div style="font-weight:500">Anthropic (Claude)</div><div style="font-size:11px;color:var(--text-3)"><i class="ti ti-world" style="font-size:10px"></i> 境外 <span style="background:var(--blue-bg);color:var(--blue);padding:1px 5px;border-radius:4px;font-size:10px">USD</span></div></td><td><span style="font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:3px"><i class="ti ti-device-laptop" style="font-size:12px"></i>软件/订阅</span></td><td style="color:var(--text-3)">05/11</td><td style="font-weight:600">$190</td><td style="color:var(--text-3)">—</td><td><span class="badge b-warn"><i class="ti ti-clock"></i>待审核</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td></tr>
+              <tr><td><input type="checkbox"></td><td><div style="font-weight:500">Anthropic (Claude)</div><div style="font-size:11px;color:var(--text-3)"><i class="ti ti-world" style="font-size:10px"></i> 境外 <span style="background:var(--blue-bg);color:var(--blue);padding:1px 5px;border-radius:4px;font-size:10px">USD</span></div></td><td><span style="font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:3px"><i class="ti ti-device-laptop" style="font-size:12px"></i>软件服务</span></td><td style="color:var(--text-3)">05/11</td><td style="font-weight:600">$190</td><td style="color:var(--text-3)">—</td><td><span class="badge b-warn"><i class="ti ti-clock"></i>待审核</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td></tr>
               <tr><td><input type="checkbox"></td><td><div style="font-weight:500">Big C 超市（拆分）</div><div style="font-size:11px;color:var(--text-3)"><i class="ti ti-arrows-split" style="font-size:10px"></i> 1张票→2类别</div></td><td><span style="font-size:11px;color:var(--text-2)"><i class="ti ti-tag" style="font-size:11px"></i> 办公+餐饮</span></td><td style="color:var(--text-3)">05/10</td><td style="font-weight:600">฿2,450</td><td style="color:var(--text-3)">฿171</td><td><span class="badge b-ok"><i class="ti ti-check"></i>已审核</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td></tr>
               <tr><td><input type="checkbox"></td><td><div style="font-weight:500">PTT 加油站</div><div style="font-size:11px;color:var(--text-3)">0105536012344</div></td><td><span style="font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:3px"><i class="ti ti-car" style="font-size:12px"></i>交通费</span></td><td style="color:var(--text-3)">05/10</td><td style="font-weight:600">฿1,400</td><td style="color:var(--text-3)">฿98</td><td><span class="badge b-err"><i class="ti ti-alert-circle"></i>有异常</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td></tr>
               <tr><td><input type="checkbox"></td><td><div style="font-weight:500">工作午餐（手动）</div><div style="font-size:11px;color:var(--text-3)"><i class="ti ti-pencil" style="font-size:10px"></i> 无票据·手动记录</div></td><td><span style="font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:3px"><i class="ti ti-soup" style="font-size:12px"></i>餐饮费</span></td><td style="color:var(--text-3)">05/09</td><td style="font-weight:600">฿320</td><td style="color:var(--text-3)">—</td><td><span class="badge" style="background:#ede9fe;color:#7c3aed"><i class="ti ti-certificate"></i>代收据</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td></tr>
@@ -894,7 +894,7 @@ tr:hover td { background: #fafaf8; }
         <div style="display:flex;flex-direction:column;gap:10px">
           <div class="card">
             <div class="card-title"><i class="ti ti-chart-bar"></i>费用分类</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span style="font-size:11px;color:var(--text-2);min-width:72px">软件/订阅</span><div style="flex:1;height:6px;background:var(--border-light);border-radius:3px;overflow:hidden"><div style="width:72%;height:100%;background:var(--blue);border-radius:3px"></div></div><span style="font-size:11px;font-weight:500;min-width:58px;text-align:right">฿82,400</span></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span style="font-size:11px;color:var(--text-2);min-width:72px">软件服务</span><div style="flex:1;height:6px;background:var(--border-light);border-radius:3px;overflow:hidden"><div style="width:72%;height:100%;background:var(--blue);border-radius:3px"></div></div><span style="font-size:11px;font-weight:500;min-width:58px;text-align:right">฿82,400</span></div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span style="font-size:11px;color:var(--text-2);min-width:72px">餐饮费</span><div style="flex:1;height:6px;background:var(--border-light);border-radius:3px;overflow:hidden"><div style="width:45%;height:100%;background:var(--green);border-radius:3px"></div></div><span style="font-size:11px;font-weight:500;min-width:58px;text-align:right">฿51,200</span></div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span style="font-size:11px;color:var(--text-2);min-width:72px">交通费</span><div style="flex:1;height:6px;background:var(--border-light);border-radius:3px;overflow:hidden"><div style="width:30%;height:100%;background:var(--amber);border-radius:3px"></div></div><span style="font-size:11px;font-weight:500;min-width:58px;text-align:right">฿34,100</span></div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span style="font-size:11px;color:var(--text-2);min-width:72px">租金</span><div style="flex:1;height:6px;background:var(--border-light);border-radius:3px;overflow:hidden"><div style="width:55%;height:100%;background:#7c3aed;border-radius:3px"></div></div><span style="font-size:11px;font-weight:500;min-width:58px;text-align:right">฿62,800</span></div>
@@ -973,7 +973,7 @@ tr:hover td { background: #fafaf8; }
             <div style="display:flex;gap:6px"><input type="text" value="零食/饮料" style="flex:1;padding:4px 7px;border-radius:5px;border:1px solid #fde68a;font-size:11px"><input type="number" value="2000" style="flex:1;padding:4px 7px;border-radius:5px;border:1px solid #fde68a;font-size:11px"><select style="flex:1;padding:4px 7px;border-radius:5px;border:1px solid #fde68a;font-size:11px"><option>餐饮费</option><option>办公用品</option></select></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:3px;font-weight:500"><i class="ti ti-tag" style="font-size:12px"></i> 费用类别</label><select style="width:100%;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:12px"><option>办公用品</option><option>软件/订阅</option><option>餐饮费</option><option>交通费</option></select></div>
+            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:3px;font-weight:500"><i class="ti ti-tag" style="font-size:12px"></i> 费用类别</label><select style="width:100%;padding:6px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:12px"><option>办公用品</option><option>软件服务</option><option>餐饮费</option><option>交通费</option></select></div>
             <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:3px;font-weight:500"><i class="ti ti-paperclip" style="font-size:12px"></i> 附加证据</label><button class="btn" style="width:100%;font-size:11px;justify-content:center"><i class="ti ti-file-plus"></i>附加文件</button></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
@@ -1012,7 +1012,7 @@ tr:hover td { background: #fafaf8; }
             <thead><tr><th style="background:var(--accent);color:#fff;width:24px">#</th><th style="background:var(--accent);color:#fff">รายการ / 费用说明</th><th style="background:var(--accent);color:#fff">เลขที่เอกสาร</th><th style="background:var(--accent);color:#fff;text-align:right">ราคาก่อน VAT</th><th style="background:var(--accent);color:#fff;text-align:right">VAT 7%</th><th style="background:var(--accent);color:#fff;text-align:right">รวม</th></tr></thead>
             <tbody>
               <tr><td>1</td><td><div>ค่าเครื่องใช้สำนักงาน</div><div style="font-size:10px;color:var(--text-3)">办公用品 · 08/05/69</div></td><td style="font-family:monospace;font-size:11px">IV-2025-00481</td><td style="text-align:right">฿3,598</td><td style="text-align:right">฿252</td><td style="text-align:right;font-weight:600">฿3,850</td></tr>
-              <tr><td>2</td><td><div>ค่าซอฟต์แวร์ Adobe</div><div style="font-size:10px;color:var(--text-3)">软件订阅 · 01/05/69</div></td><td style="font-family:monospace;font-size:11px">INV-ADO-5523</td><td style="text-align:right">฿5,794</td><td style="text-align:right">฿406</td><td style="text-align:right;font-weight:600">฿6,200</td></tr>
+              <tr><td>2</td><td><div>ค่าซอฟต์แวร์ Adobe</div><div style="font-size:10px;color:var(--text-3)">软件服务 · 01/05/69</div></td><td style="font-family:monospace;font-size:11px">INV-ADO-5523</td><td style="text-align:right">฿5,794</td><td style="text-align:right">฿406</td><td style="text-align:right;font-weight:600">฿6,200</td></tr>
               <tr><td>3</td><td><div>ค่าโฆษณา Facebook</div><div style="font-size:10px;color:var(--text-3)">广告费 · 05/05/69</div></td><td style="font-family:monospace;font-size:11px">META-INV-2025</td><td style="text-align:right">฿4,206</td><td style="text-align:right">฿294</td><td style="text-align:right;font-weight:600">฿4,500</td></tr>
             </tbody>
             <tfoot><tr><td colspan="3" style="text-align:right;background:var(--bg);font-weight:600">รวมทั้งหมด / 合计</td><td style="text-align:right;background:var(--bg);font-weight:600">฿13,598</td><td style="text-align:right;background:var(--bg);font-weight:600">฿952</td><td style="text-align:right;background:var(--bg);font-weight:600">฿14,550</td></tr></tfoot>
@@ -1030,7 +1030,7 @@ tr:hover td { background: #fafaf8; }
             <span class="badge b-warn" style="margin-bottom:10px"><i class="ti ti-clock"></i>待审核</span>
             <div style="font-size:11px;color:var(--text-2);margin-bottom:8px">包含 3 张票据 · 共 ฿14,550</div>
             <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:12px"><span>Office Mate 办公用品</span><span style="font-weight:500">฿3,850</span></div>
-            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:12px"><span>Adobe 软件订阅</span><span style="font-weight:500">฿6,200</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:12px"><span>Adobe 软件服务</span><span style="font-weight:500">฿6,200</span></div>
             <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px"><span>Facebook 广告费</span><span style="font-weight:500">฿4,500</span></div>
             <div style="display:flex;flex-direction:column;gap:5px;margin-top:12px">
               <button class="btn btn-primary" style="justify-content:center;background:var(--green);border-color:var(--green)"><i class="ti ti-check"></i>审核通过</button>
@@ -1211,7 +1211,7 @@ tr:hover td { background: #fafaf8; }
           <table>
             <thead><tr><th>分类名称</th><th style="text-align:right">本月金额</th><th>笔数</th><th>占比</th><th>预算</th><th>状态</th><th>操作</th></tr></thead>
             <tbody>
-              <tr><td><div style="font-weight:500;display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:var(--blue);display:inline-block"></span><i class="ti ti-device-laptop" style="font-size:13px;color:var(--text-3)"></i>软件/订阅</div><div style="font-size:10px;color:var(--text-3)">ค่าซอฟต์แวร์</div></td><td style="text-align:right;font-weight:600">฿82,400</td><td style="color:var(--text-3)">34张</td><td style="font-size:11px">29% <div style="width:50px;height:4px;background:var(--border-light);border-radius:2px;display:inline-block;vertical-align:middle;margin-left:4px;overflow:hidden"><div style="width:72%;height:100%;background:var(--blue)"></div></div></td><td><span style="font-size:11px;color:var(--red)">฿80,000 超฿2,400</span></td><td><span class="badge b-err"><i class="ti ti-alert-triangle"></i>超预算</span></td><td><div style="display:flex;gap:4px"><button class="btn" style="font-size:11px;padding:3px 7px">预算</button><button class="btn" style="font-size:11px;padding:3px 7px">编辑</button></div></td></tr>
+              <tr><td><div style="font-weight:500;display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:var(--blue);display:inline-block"></span><i class="ti ti-device-laptop" style="font-size:13px;color:var(--text-3)"></i>软件服务</div><div style="font-size:10px;color:var(--text-3)">ค่าซอฟต์แวร์</div></td><td style="text-align:right;font-weight:600">฿82,400</td><td style="color:var(--text-3)">34张</td><td style="font-size:11px">29% <div style="width:50px;height:4px;background:var(--border-light);border-radius:2px;display:inline-block;vertical-align:middle;margin-left:4px;overflow:hidden"><div style="width:72%;height:100%;background:var(--blue)"></div></div></td><td><span style="font-size:11px;color:var(--red)">฿80,000 超฿2,400</span></td><td><span class="badge b-err"><i class="ti ti-alert-triangle"></i>超预算</span></td><td><div style="display:flex;gap:4px"><button class="btn" style="font-size:11px;padding:3px 7px">预算</button><button class="btn" style="font-size:11px;padding:3px 7px">编辑</button></div></td></tr>
               <tr><td><div style="font-weight:500;display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:#7c3aed;display:inline-block"></span><i class="ti ti-home" style="font-size:13px;color:var(--text-3)"></i>租金</div><div style="font-size:10px;color:var(--text-3)">ค่าเช่า</div></td><td style="text-align:right;font-weight:600">฿62,800</td><td style="color:var(--text-3)">1张</td><td style="font-size:11px">22%</td><td><span style="font-size:11px;color:var(--green)">฿65,000 余฿2,200</span></td><td><span class="badge b-ok"><i class="ti ti-check"></i>正常</span></td><td><div style="display:flex;gap:4px"><button class="btn" style="font-size:11px;padding:3px 7px">预算</button><button class="btn" style="font-size:11px;padding:3px 7px">编辑</button></div></td></tr>
               <tr><td><div style="font-weight:500;display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:var(--green);display:inline-block"></span><i class="ti ti-tools-kitchen-2" style="font-size:13px;color:var(--text-3)"></i>餐饮费</div><div style="font-size:10px;color:var(--text-3)">ค่าอาหาร</div></td><td style="text-align:right;font-weight:600">฿51,200</td><td style="color:var(--text-3)">68张</td><td style="font-size:11px">18%</td><td><span style="font-size:11px;color:var(--amber)">฿55,000 余฿3,800</span></td><td><span class="badge b-warn"><i class="ti ti-alert-circle"></i>接近上限</span></td><td><div style="display:flex;gap:4px"><button class="btn" style="font-size:11px;padding:3px 7px">预算</button><button class="btn" style="font-size:11px;padding:3px 7px">编辑</button></div></td></tr>
               <tr><td><div style="font-weight:500;display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:var(--amber);display:inline-block"></span><i class="ti ti-car" style="font-size:13px;color:var(--text-3)"></i>交通费</div><div style="font-size:10px;color:var(--text-3)">ค่าเดินทาง</div></td><td style="text-align:right;font-weight:600">฿34,100</td><td style="color:var(--text-3)">22张</td><td style="font-size:11px">12%</td><td><span style="font-size:11px;color:var(--green)">฿40,000 余฿5,900</span></td><td><span class="badge b-ok"><i class="ti ti-check"></i>正常</span></td><td><div style="display:flex;gap:4px"><button class="btn" style="font-size:11px;padding:3px 7px">预算</button><button class="btn" style="font-size:11px;padding:3px 7px">编辑</button></div></td></tr>
@@ -1229,7 +1229,7 @@ tr:hover td { background: #fafaf8; }
           </div>
           <div class="card">
             <div class="card-title"><i class="ti ti-bell"></i>超预算提醒</div>
-            <div style="background:var(--red-bg);border-radius:6px;padding:9px 11px;font-size:12px;color:var(--red);margin-bottom:7px;display:flex;gap:6px"><i class="ti ti-alert-triangle" style="font-size:14px;flex-shrink:0"></i><div><strong>软件/订阅</strong> 超出预算 ฿2,400<br><span style="font-size:11px">建议检查是否有重复订阅</span></div></div>
+            <div style="background:var(--red-bg);border-radius:6px;padding:9px 11px;font-size:12px;color:var(--red);margin-bottom:7px;display:flex;gap:6px"><i class="ti ti-alert-triangle" style="font-size:14px;flex-shrink:0"></i><div><strong>软件服务</strong> 超出预算 ฿2,400<br><span style="font-size:11px">建议检查是否有重复扣费</span></div></div>
             <div style="background:var(--amber-bg);border-radius:6px;padding:9px 11px;font-size:12px;color:var(--amber);display:flex;gap:6px"><i class="ti ti-alert-circle" style="font-size:14px;flex-shrink:0"></i><div><strong>餐饮费</strong> 距上限仅余 ฿3,800<br><span style="font-size:11px">本月还有 13 天</span></div></div>
           </div>
         </div>
@@ -1480,12 +1480,12 @@ tr:hover td { background: #fafaf8; }
       </div>
     </div>
 
-    <!-- v3 新页面:订阅 & 套餐 + Credit 加量包(对标 Paypers · 跨月不清零超越 · 2026-05-15) -->
+    <!-- v3 新页面:充值与用量 + Credit 加量包(对标 Paypers · 跨月不清零超越 · 2026-05-15) -->
     <div class="page" id="page-billing">
       <div class="page-header">
         <div class="page-title-group">
           <div class="page-icon"><i class="ti ti-credit-card"></i></div>
-          <div><div class="page-title">订阅 &amp; 套餐</div><div class="page-sub">月度订阅 + Credit 加量包 · 1 credit = 1 张自动识别 · 跨月不清零</div></div>
+          <div><div class="page-title">充值与用量</div><div class="page-sub">按量计费 + Credit 加量包 · 1 credit = 1 张自动识别 · 跨月不清零</div></div>
         </div>
         <div class="page-actions">
           <button class="btn"><i class="ti ti-receipt"></i>账单历史</button>
@@ -1495,15 +1495,15 @@ tr:hover td { background: #fafaf8; }
 
       <!-- 当前用量看板 -->
       <div class="kpi-grid">
-        <div class="kpi"><div class="kpi-label"><i class="ti ti-crown"></i>当前套餐</div><div class="kpi-val blue">Pro</div><div class="kpi-sub">฿599/月 · 5/15 续费</div></div>
-        <div class="kpi"><div class="kpi-label"><i class="ti ti-files"></i>本月已用</div><div class="kpi-val">412 / 1000</div><div class="kpi-sub">订阅额度 · 还剩 588</div></div>
+        <div class="kpi"><div class="kpi-label"><i class="ti ti-crown"></i>计费模式</div><div class="kpi-val blue">按量</div><div class="kpi-sub">Credit 余额实时扣减</div></div>
+        <div class="kpi"><div class="kpi-label"><i class="ti ti-files"></i>本月已用</div><div class="kpi-val">412 / 1000</div><div class="kpi-sub">本月用量 · 余额充足</div></div>
         <div class="kpi"><div class="kpi-label"><i class="ti ti-coin"></i>Credit 余额</div><div class="kpi-val amber">237</div><div class="kpi-sub">永久有效 · 不过期</div></div>
         <div class="kpi"><div class="kpi-label"><i class="ti ti-trending-up"></i>累计已识别</div><div class="kpi-val green">12,847</div><div class="kpi-sub">从 2025/11 起</div></div>
       </div>
 
-      <!-- 月度套餐对比 -->
+      <!-- Credit 充值包 -->
       <div class="card" style="margin-bottom:14px">
-        <div class="card-title"><i class="ti ti-package"></i>月度订阅套餐</div>
+        <div class="card-title"><i class="ti ti-package"></i>Credit 充值包</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
           <div style="border:1px solid var(--border);border-radius:8px;padding:14px">
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">Free</div>
@@ -1528,7 +1528,7 @@ tr:hover td { background: #fafaf8; }
               <li><i class="ti ti-check" style="color:var(--green);font-size:11px"></i> ERP 推送</li>
               <li><i class="ti ti-check" style="color:var(--green);font-size:11px"></i> VAT 对账</li>
             </ul>
-            <button class="btn btn-primary" style="width:100%;margin-top:10px;font-size:11px;justify-content:center" disabled>当前套餐</button>
+            <button class="btn btn-primary" style="width:100%;margin-top:10px;font-size:11px;justify-content:center" disabled>当前方案</button>
           </div>
           <div style="border:1px solid var(--border);border-radius:8px;padding:14px">
             <div style="font-size:11px;color:#7c3aed;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Business</div>
@@ -1561,7 +1561,7 @@ tr:hover td { background: #fafaf8; }
       <div class="card">
         <div class="card-title"><i class="ti ti-coin" style="color:var(--amber)"></i>Credit 加量包
           <span style="margin-left:8px;font-size:10px;background:var(--green-bg);color:var(--green);padding:2px 7px;border-radius:4px;font-weight:600">超 Paypers</span>
-          <span style="margin-left:auto;font-size:11px;color:var(--text-3)">订阅额度用完 · 加量更划算 · <strong style="color:var(--green)">永久不过期</strong></span>
+          <span style="margin-left:auto;font-size:11px;color:var(--text-3)">余额不足 · 加量更划算 · <strong style="color:var(--green)">永久不过期</strong></span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
           <div style="border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform=''">
@@ -1619,7 +1619,7 @@ tr:hover td { background: #fafaf8; }
           <div class="settings-nav-item" onclick="showSettingsTab('notifications')" id="stab-notifications"><i class="ti ti-bell"></i>通知设置</div>
           <div class="settings-nav-item" onclick="showSettingsTab('language')" id="stab-language"><i class="ti ti-language"></i>界面与语言</div>
           <div class="settings-nav-section">系统</div>
-          <div class="settings-nav-item" onclick="showSettingsTab('billing')" id="stab-billing"><i class="ti ti-credit-card"></i>订阅与计费</div>
+          <div class="settings-nav-item" onclick="showSettingsTab('billing')" id="stab-billing"><i class="ti ti-credit-card"></i>充值与计费</div>
         </div>
         <div class="settings-content">
           <!-- v3 拍板:「集成与连接」整段已搬到 page-integrations 独立页 -->
@@ -1654,8 +1654,8 @@ tr:hover td { background: #fafaf8; }
           </div>
           <!-- 计费 -->
           <div id="stab-content-billing" style="display:none">
-            <div class="settings-title">订阅与计费</div>
-            <div class="settings-sub">管理您的订阅计划和账单信息</div>
+            <div class="settings-title">充值与计费</div>
+            <div class="settings-sub">管理余额、充值记录和账单信息</div>
             <div style="color:var(--text-3);font-size:12px;text-align:center;padding:40px">计费页面</div>
           </div>
         </div>
@@ -1687,7 +1687,7 @@ tr:hover td { background: #fafaf8; }
       <div class="cmdk-item" data-cmdk-text="代收据 ใบแทนใบเสร็จ 进项 receipt substitute" onclick="cmdkJump('expense-substitute')"><i class="ti ti-certificate"></i>进项 · 代收据 ใบแทนใบเสร็จ</div>
       <div class="cmdk-item" data-cmdk-text="费用分类 进项 expense-cat" onclick="cmdkJump('expense-cat')"><i class="ti ti-tags"></i>进项 · 费用分类</div>
       <div class="cmdk-item" data-cmdk-text="集成 Google Drive Sheets LINE Gmail ERP integrations" onclick="cmdkJump('integrations')"><i class="ti ti-plug-connected"></i>集成 · 第三方授权</div>
-      <div class="cmdk-item" data-cmdk-text="订阅 套餐 Credit 加量包 billing pricing 付费" onclick="cmdkJump('billing')"><i class="ti ti-credit-card"></i>订阅 &amp; 套餐 · Credit 加量包</div>
+      <div class="cmdk-item" data-cmdk-text="充值 用量 Credit 加量包 billing pricing 付费" onclick="cmdkJump('billing')"><i class="ti ti-credit-card"></i>充值与用量 · Credit 加量包</div>
       <div class="cmdk-item" data-cmdk-text="客户 clients" onclick="cmdkJump('clients')"><i class="ti ti-building"></i>客户<span class="cmdk-meta">G C</span></div>
       <div class="cmdk-item" data-cmdk-text="异常 anomalies 6 条" onclick="cmdkJump('anomalies')"><i class="ti ti-alert-triangle"></i>异常 (6 条)<span class="cmdk-meta">G A</span></div>
       <div class="cmdk-item" data-cmdk-text="设置 集成 settings" onclick="cmdkJump('settings')"><i class="ti ti-settings"></i>设置</div>
@@ -1768,12 +1768,12 @@ tr:hover td { background: #fafaf8; }
       <div class="card">
         <div class="card-title"><i class="ti ti-list"></i>本月 tenant API 调用 Top 5</div>
         <table>
-          <thead><tr><th>Tenant</th><th>OCR 张数</th><th>Token 用量</th><th style="text-align:right">本月成本</th><th>套餐</th></tr></thead>
+          <thead><tr><th>Tenant</th><th>OCR 张数</th><th>Token 用量</th><th style="text-align:right">本月成本</th><th>计费</th></tr></thead>
           <tbody>
             <tr><td><div style="font-weight:500">mrerp@outlook.co.th</div><div style="font-size:11px;color:var(--text-3)">真实付费 · 不许碰</div></td><td>847</td><td>4.2M</td><td style="text-align:right;font-weight:600">$412</td><td><span class="badge b-ok">Yearly</span></td></tr>
             <tr><td><div style="font-weight:500">BAKELAB</div><div style="font-size:11px;color:var(--text-3)">Zihao 测试</div></td><td>412</td><td>2.1M</td><td style="text-align:right;font-weight:600">$198</td><td><span class="badge b-blue">Pro</span></td></tr>
             <tr><td><div style="font-weight:500">TIPCO Foods</div><div style="font-size:11px;color:var(--text-3)">新客户</div></td><td>312</td><td>1.6M</td><td style="text-align:right;font-weight:600">$152</td><td><span class="badge b-blue">Pro</span></td></tr>
-            <tr><td><div style="font-weight:500">TEST_中国贸易</div><div style="font-size:11px;color:var(--text-3)">试用</div></td><td>89</td><td>0.4M</td><td style="text-align:right;font-weight:600">$42</td><td><span class="badge b-gray">Free</span></td></tr>
+            <tr><td><div style="font-weight:500">TEST_中国贸易</div><div style="font-size:11px;color:var(--text-3)">测试</div></td><td>89</td><td>0.4M</td><td style="text-align:right;font-weight:600">$42</td><td><span class="badge b-gray">Credits</span></td></tr>
             <tr><td><div style="font-weight:500">skin306152</div><div style="font-size:11px;color:var(--text-3)">测试白名单</div></td><td>2,847</td><td>14.2M</td><td style="text-align:right;font-weight:600;color:var(--amber)">$1,068</td><td><span class="badge b-warn">Max</span></td></tr>
           </tbody>
         </table>
@@ -1905,7 +1905,7 @@ function setRole(role) {
   document.querySelector('.avatar-popup-email').textContent = r.email;
   document.querySelector('.avatar').textContent = r.name.charAt(0).toUpperCase() === 'S' ? 'S' : (r.name.match(/[一-龥]/) ? r.name.match(/[一-龥]/)[0] : r.name.charAt(0).toUpperCase());
   document.querySelectorAll('.role-sim button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
-  // 按 tenant_role 显隐:老板专属项(付费/订阅相关)
+  // 按 tenant_role 显隐:老板专属项(付费/计费相关)
   document.querySelectorAll('[data-show-if-role="owner"]').forEach(el => el.style.display = (r.tenant_role === 'owner') ? '' : 'none');
   // 测试白名单
   document.querySelectorAll('[data-show-if="is_test_whitelist"]').forEach(el => el.style.display = r.is_test_whitelist ? '' : 'none');

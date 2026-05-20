@@ -59,6 +59,10 @@ from .layer1_vision import (
     extract_from_image_bytes as _l1_extract_image,
 )
 from .text_path import try_extract as _try_text_extract
+from .table_path import (
+    SUPPORTED_TABLE_EXTENSIONS,
+    extract_from_table_file as _table_extract,
+)
 from .layer2_structure import (
     Layer2Error,
     extract_from_page as _l2_extract_page,
@@ -72,10 +76,16 @@ from .layer3_fallback import (
     refine_page as _l3_refine_page,
 )
 from .schemas import (
+    BusinessDocumentType,
     Page,
     PipelinePageResult,
     PipelineResult,
     ThaiInvoice,
+)
+from .validators import (
+    validate_bank_document,
+    validate_gl_document,
+    validate_invoice,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,6 +131,14 @@ DEFAULT_ENABLE_TEXT_PATH = os.environ.get(
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".tiff", ".tif", ".bmp", ".gif"}
 PDF_EXTENSIONS = {".pdf"}
+# 2026-05-21 multi-format refactor: Excel/CSV/Word bypass OCR entirely
+# (table_path direct read). Final set comes from table_path.SUPPORTED_TABLE_EXTENSIONS.
+TABLE_EXTENSIONS = SUPPORTED_TABLE_EXTENSIONS
+
+# 2026-05-21 confidence routing buckets (per request "confidence routing /
+# review queue"). Auto-flow threshold matches financial-grade SaaS norms.
+CONFIDENCE_AUTO_THRESHOLD = float(os.environ.get("OCR_CONF_AUTO", "0.98"))
+CONFIDENCE_REVIEW_THRESHOLD = float(os.environ.get("OCR_CONF_REVIEW", "0.90"))
 
 
 # ============================================================
@@ -221,6 +239,7 @@ def run_on_path(
     fallback_to_layer2_on_layer3_error: bool = True,
     pattern_memory: Optional[InvoicePatternMemory] = None,
     enable_text_path: Optional[bool] = None,
+    document_type: BusinessDocumentType = "auto",
 ) -> PipelineResult:
     """End-to-end pipeline on a file path (auto-detects PDF vs image).
 
@@ -262,6 +281,7 @@ def run_on_path(
             fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
             pattern_memory=pattern_memory,
             enable_text_path=enable_text_path,
+            document_type=document_type,
         )
     if ext in IMAGE_EXTENSIONS:
         # Layer 0 text_path only applies to PDFs — images go straight to Vision
@@ -271,10 +291,22 @@ def run_on_path(
             enable_layer3=enable_layer3,
             fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
             pattern_memory=pattern_memory,
+            document_type=document_type,
+        )
+    if ext in TABLE_EXTENSIONS:
+        # 2026-05-21 multi-format refactor: Excel/CSV/Word bypass OCR
+        # entirely. table_path reads the file structurally and produces
+        # Layer1Result-shaped pages with table_rows / table_headers set.
+        return run_on_table_bytes(
+            file_bytes,
+            filename=p.name,
+            api_key=api_key,
+            pattern_memory=pattern_memory,
+            document_type=document_type,
         )
     raise ValueError(
         f"pipeline: unsupported extension {ext!r}; "
-        f"supported: {sorted(PDF_EXTENSIONS | IMAGE_EXTENSIONS)}"
+        f"supported: {sorted(PDF_EXTENSIONS | IMAGE_EXTENSIONS | TABLE_EXTENSIONS)}"
     )
 
 
@@ -287,6 +319,7 @@ def run_on_pdf_bytes(
     fallback_to_layer2_on_layer3_error: bool = True,
     pattern_memory: Optional[InvoicePatternMemory] = None,
     enable_text_path: Optional[bool] = None,
+    document_type: BusinessDocumentType = "auto",
 ) -> PipelineResult:
     """Run pipeline on PDF bytes.
 
@@ -392,6 +425,7 @@ def run_on_pdf_bytes(
             fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
             pattern_memory=pattern_memory,
             layer1_page_override=l1_override,
+            document_type=document_type,
         )
         page_results.append(pr)
 
@@ -411,6 +445,7 @@ def run_on_image_bytes(
     enable_layer3: bool = True,
     fallback_to_layer2_on_layer3_error: bool = True,
     pattern_memory: Optional[InvoicePatternMemory] = None,
+    document_type: BusinessDocumentType = "auto",
 ) -> PipelineResult:
     """Run pipeline on a single image's bytes (PNG / JPG / WEBP / etc.)."""
     if not image_bytes:
@@ -424,6 +459,7 @@ def run_on_image_bytes(
         enable_layer3=enable_layer3,
         fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
         pattern_memory=pattern_memory,
+        document_type=document_type,
     )
     elapsed_ms = int((time.time() - t0) * 1000)
     cost_thb = _compute_total_cost([pr])
@@ -431,6 +467,57 @@ def run_on_image_bytes(
         pages=[pr],
         page_count=1,
         elapsed_ms=elapsed_ms,
+        estimated_cost_thb=cost_thb,
+    )
+
+
+def run_on_table_bytes(
+    file_bytes: bytes,
+    filename: str,
+    api_key: Optional[str] = None,
+    pattern_memory: Optional[InvoicePatternMemory] = None,
+    document_type: BusinessDocumentType = "auto",
+) -> PipelineResult:
+    """Run pipeline on a table-shaped file (Excel/CSV/Word). NO OCR.
+
+    2026-05-21 multi-format refactor: per request "Excel/CSV/Word 不要走
+    OCR, 直接读取". table_path reads the file structurally and returns
+    Layer1Result-shaped pages where Page.table_rows + Page.table_headers
+    carry the grid. Layer 2 then serializes (header|cell|cell...) into text
+    for the LLM so it can still pick out columns by name.
+
+    Layer 1 Vision and Layer 3 visual fallback are BOTH skipped — there's
+    no image to look at. If Layer 2 confidence is low, the result is
+    marked needs_review rather than escalated.
+    """
+    if not file_bytes:
+        raise ValueError("pipeline: empty table file bytes")
+
+    t0 = time.time()
+    layer1_result = _table_extract(file_bytes, filename=filename)
+
+    page_results: List[PipelinePageResult] = []
+    for l1_page in layer1_result.pages:
+        # No image — pass image_bytes=b"" and skip layer 3 entirely
+        pr = _process_one_page(
+            image_bytes=b"",
+            page_number=l1_page.page_number,
+            api_key=api_key,
+            enable_layer3=False,  # no image, no visual fallback
+            fallback_to_layer2_on_layer3_error=True,
+            pattern_memory=pattern_memory,
+            layer1_page_override=l1_page,
+            document_type=document_type,
+        )
+        page_results.append(pr)
+
+    elapsed_ms = int((time.time() - t0) * 1000)
+    cost_thb = _compute_total_cost(page_results)
+    return PipelineResult(
+        pages=page_results,
+        page_count=len(page_results),
+        elapsed_ms=elapsed_ms,
+        engine="pipeline_v1_table",
         estimated_cost_thb=cost_thb,
     )
 
@@ -446,6 +533,7 @@ def _process_one_page(
     fallback_to_layer2_on_layer3_error: bool,
     pattern_memory: Optional[InvoicePatternMemory] = None,
     layer1_page_override: Optional[Page] = None,
+    document_type: BusinessDocumentType = "auto",
 ) -> PipelinePageResult:
     """L1 -> L2 -> (maybe L3) for ONE page. Captures cost / latency / errors.
 
@@ -469,15 +557,34 @@ def _process_one_page(
 
     # --- Layer 2 ---
     t_l2 = time.time()
-    l2_result = _l2_extract_page(l1_page, api_key=api_key)
+    l2_result = _l2_extract_page(l1_page, api_key=api_key, document_type=document_type)
     l2_ms = int((time.time() - t_l2) * 1000)
     l2_invoice = l2_result.invoice
+    l2_document = l2_result.document
 
-    # --- Trigger evaluation ---
-    triggers = _evaluate_triggers(l1_page, l2_invoice, pattern_memory)
+    # --- Validators (2026-05-21 multi-schema refactor) ---
+    # Run doc-type-specific validation: GL must not parse description numbers
+    # as amounts, bank statement must source amounts from deposit/withdrawal,
+    # invoice fields must come from total/subtotal/vat columns.
+    validation_warnings: List[str] = list(l2_result.validation_warnings)
+    if document_type == "general_ledger" and l2_document is not None:
+        validation_warnings.extend(validate_gl_document(l2_document, l1_page))
+    elif document_type == "bank_statement" and l2_document is not None:
+        validation_warnings.extend(validate_bank_document(l2_document, l1_page))
+    elif document_type in ("auto", "invoice"):
+        validation_warnings.extend(validate_invoice(l2_invoice, l1_page))
+
+    # --- Trigger evaluation (invoice path only — non-invoice docs use validators) ---
+    if document_type in ("auto", "invoice"):
+        triggers = _evaluate_triggers(l1_page, l2_invoice, pattern_memory)
+    else:
+        # For non-invoice doc types, Layer 3 visual fallback is not yet
+        # implemented. Triggers come from validators only.
+        triggers = list(validation_warnings)
 
     # --- Layer 3 (conditional) ---
     invoice = l2_invoice
+    document = l2_document
     layer_chain = [l1_layer_name, "L2"]
     l3_in_tokens = 0
     l3_out_tokens = 0
@@ -485,7 +592,19 @@ def _process_one_page(
     needs_manual_review = False
     error_msg: Optional[str] = None
 
-    if triggers and enable_layer3:
+    # 2026-05-21 multi-schema refactor: L3 visual fallback only for invoice/auto.
+    # Non-invoice docs route to needs_review when validators flag issues.
+    l3_eligible = (
+        triggers
+        and enable_layer3
+        and document_type in ("auto", "invoice")
+        and image_bytes  # no image (table_path) → no visual fallback
+    )
+
+    if validation_warnings and document_type not in ("auto", "invoice"):
+        needs_manual_review = True
+
+    if l3_eligible:
         try:
             l3_result = _l3_refine_page(
                 image_bytes=image_bytes,
@@ -493,6 +612,7 @@ def _process_one_page(
                 layer2_invoice=l2_invoice,
                 trigger_reasons=triggers,
                 api_key=api_key,
+                document_type=document_type,
             )
             invoice = l3_result.invoice
             layer_chain = [l1_layer_name, "L2", "L3"]
@@ -544,12 +664,32 @@ def _process_one_page(
 
     # Record final invoice pattern in pattern memory (after possible L3
     # correction). Subsequent pages benefit from this learned baseline.
-    if pattern_memory is not None and not invoice.is_not_invoice:
+    if (
+        pattern_memory is not None
+        and document_type in ("auto", "invoice")
+        and not invoice.is_not_invoice
+    ):
         pattern_memory.record(invoice.seller_tax, invoice.invoice_number)
+
+    # 2026-05-21 confidence routing — derive a single page confidence and
+    # route into one of three buckets per the spec.
+    final_confidence = _aggregate_page_confidence(
+        l1_page=l1_page,
+        invoice=invoice,
+        document=document,
+        triggers=triggers,
+        needs_manual_review=needs_manual_review,
+        document_type=document_type,
+    )
+    confidence_band = _bucket_confidence(final_confidence, needs_manual_review)
+    if confidence_band == "needs_review":
+        needs_manual_review = True
 
     return PipelinePageResult(
         page_number=page_number,
         invoice=invoice,
+        document_type=document_type,
+        document=document,
         layer_chain=layer_chain,
         trigger_reasons=triggers,
         layer1_avg_confidence=l1_page.avg_confidence,
@@ -562,8 +702,48 @@ def _process_one_page(
         layer3_ms=l3_ms,
         total_ms=total_ms,
         needs_manual_review=needs_manual_review,
+        confidence_band=confidence_band,
+        final_confidence=final_confidence,
+        validation_warnings=validation_warnings,
         error=error_msg,
     )
+
+
+# ============================================================
+# Confidence aggregation + routing (2026-05-21 refactor)
+# ============================================================
+def _aggregate_page_confidence(
+    l1_page: Page,
+    invoice: ThaiInvoice,
+    document,
+    triggers: List[str],
+    needs_manual_review: bool,
+    document_type: BusinessDocumentType,
+) -> float:
+    """Return a single 0..1 confidence for the page.
+
+    - Start at L1 avg_confidence (1.0 for text/table paths).
+    - Subtract penalty per trigger/validation warning.
+    - Floor at 0.0, cap at 1.0.
+    """
+    base = float(l1_page.avg_confidence or 0.0)
+    if base <= 0.0:
+        base = 0.85  # neutral starting point when L1 doesn't provide one
+    penalty = 0.05 * len(triggers)
+    if needs_manual_review:
+        penalty += 0.10
+    final = max(0.0, min(1.0, base - penalty))
+    return final
+
+
+def _bucket_confidence(conf: float, needs_review: bool) -> str:
+    if needs_review:
+        return "needs_review"
+    if conf >= CONFIDENCE_AUTO_THRESHOLD:
+        return "auto"
+    if conf >= CONFIDENCE_REVIEW_THRESHOLD:
+        return "yellow_confirm"
+    return "needs_review"
 
 
 # ============================================================

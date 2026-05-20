@@ -794,9 +794,35 @@ def parse_bank_statement_pdf(
     file_bytes: bytes, filename: str, api_key: str = ""
 ) -> Dict[str, Any]:
     """
-    Parse a bank statement PDF.
-    Strategy: (1) safe text extraction (2) pdfplumber tables (3) text-line fallback (4) Gemini
+    Parse a bank statement.
+
+    2026-05-21 multi-format refactor: name kept for back-compat but now
+    accepts ANY format. .pdf goes through the existing pdfplumber + Gemini
+    pipeline. Other formats (Excel / CSV / Word / image / TXT) go through
+    services/ocr/pipeline with document_type='bank_statement' so the
+    bank-statement prompt + validators block description-column digits
+    from being assigned to deposit / withdrawal / balance.
+
+    Strategy for PDF: (1) safe text extraction (2) pdfplumber tables (3) text-line fallback (4) Gemini
     """
+    import os as _os
+    ext = (filename or "").lower().rsplit(".", 1)[-1]
+    if ext != "pdf":
+        return _parse_bank_stmt_via_pipeline(file_bytes, filename)
+
+    # 2026-05-21: PDF bank statement defaults to new pipeline (document_type
+    # =bank_statement + validators). Set OCR_PDF_STMT_LEGACY=true to opt back
+    # into the existing pdfplumber+Gemini path.
+    if _os.environ.get("OCR_PDF_STMT_LEGACY", "").strip().lower() != "true":
+        pipeline_result = _parse_bank_stmt_via_pipeline(file_bytes, filename)
+        if pipeline_result.get("ok") and pipeline_result.get("rows"):
+            return pipeline_result
+        logger.warning(
+            f"[parse_bank_statement] pipeline yielded "
+            f"{pipeline_result.get('row_count')} rows / "
+            f"err={pipeline_result.get('error')!r} · falling back to legacy"
+        )
+
     # ── Step 1: extract text safely (immune to pdfplumber KeyError crash) ──
     page_texts = _pdf_extract_text_safe(file_bytes)
     all_text = "\n".join(page_texts)
@@ -1883,18 +1909,163 @@ def _gemini_parse_gl(file_bytes: bytes, filename: str,
 
 def parse_gl(file_bytes: bytes, filename: str,
              account_code: str = "", api_key: str = "") -> Dict[str, Any]:
-    """Route to Excel or PDF GL parser based on file extension."""
+    """Route to Excel / PDF / pipeline GL parser based on file extension.
+
+    2026-05-21 multi-format refactor:
+    - .xlsx / .xls / .xlsm → parse_gl_excel (structural)
+    - .pdf                 → parse_gl_pdf   (existing Gemini path)
+    - .csv / .tsv / .docx / .doc / .txt / images → unified services/ocr/pipeline
+      with document_type='general_ledger' so prompt + validators block
+      description-column numbers (e.g. 6091) from being parsed as amounts.
+    """
+    import os as _os
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     if ext in ("xlsx", "xls", "xlsm"):
         result = parse_gl_excel(file_bytes, filename, account_code)
+    elif ext == "pdf":
+        # 2026-05-21: PDF GL defaults to new pipeline (document_type=
+        # general_ledger + validators). OCR_PDF_GL_LEGACY=true rolls back
+        # to the previous Gemini Vision parse_gl_pdf path.
+        if _os.environ.get("OCR_PDF_GL_LEGACY", "").strip().lower() == "true":
+            result = parse_gl_pdf(file_bytes, filename, account_code, api_key)
+        else:
+            result = _parse_gl_via_pipeline(file_bytes, filename, account_code)
+            if not (result.get("ok") and result.get("rows")):
+                logger.warning(
+                    f"[parse_gl] pipeline yielded {result.get('row_count')} rows / "
+                    f"err={result.get('error')!r} · falling back to parse_gl_pdf"
+                )
+                result = parse_gl_pdf(file_bytes, filename, account_code, api_key)
     else:
-        result = parse_gl_pdf(file_bytes, filename, account_code, api_key)
+        result = _parse_gl_via_pipeline(file_bytes, filename, account_code)
 
     if result.get("ok"):
         for r in result.get("rows", []):
             r.source_file = filename
 
     return result
+
+
+def _parse_bank_stmt_via_pipeline(file_bytes: bytes, filename: str) -> Dict[str, Any]:
+    """Bank-recon-v2 adapter: route non-PDF bank statements through the
+    unified pipeline with document_type='bank_statement', then convert to
+    List[StatementRow] so the rest of bank-v2/run consumes it unchanged.
+
+    Validators guarantee deposit/withdrawal/balance came from their
+    respective columns — description / reference / account-number digits
+    are rejected and cleared before this adapter runs.
+    """
+    try:
+        from services.ocr.pipeline import (
+            run_on_image_bytes as _run_image,
+            run_on_table_bytes as _run_table,
+            IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+        )
+        from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+    except ImportError as e:
+        return {"ok": False, "rows": [], "row_count": 0, "bank_code": "generic",
+                "error": f"pipeline import failed: {e}"}
+
+    ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
+    try:
+        if ext_dot in IMAGE_EXTENSIONS:
+            pr = _run_image(file_bytes, document_type="bank_statement")
+        elif ext_dot in TABLE_EXTENSIONS:
+            pr = _run_table(file_bytes, filename=filename or "stmt",
+                            document_type="bank_statement")
+        else:
+            return {"ok": False, "rows": [], "row_count": 0, "bank_code": "generic",
+                    "error": f"unsupported format {ext_dot}"}
+    except Exception as e:
+        return {"ok": False, "rows": [], "row_count": 0, "bank_code": "generic",
+                "error": f"pipeline parse failed: {type(e).__name__}: {e}"}
+
+    legacy = pipeline_result_to_legacy_dict(pr)
+    pages = legacy.get("pages") or []
+    if not pages:
+        return {"ok": False, "rows": [], "row_count": 0, "bank_code": "generic",
+                "error": "no pages parsed"}
+    doc = (pages[0] or {}).get("document") or {}
+    bank_name_l = (doc.get("bank_name") or "").lower()
+    bank_code = "generic"
+    for code, sigs in _BANK_SIGNATURES.items():
+        if any(s in bank_name_l or s in (doc.get("bank_name") or "") for s in sigs):
+            bank_code = code
+            break
+
+    rows: List[StatementRow] = []
+    for e in (doc.get("entries") or []):
+        deposit = _to_float(e.get("deposit"))
+        withdrawal = _to_float(e.get("withdrawal"))
+        balance = _to_float(e.get("balance"))
+        if deposit == 0.0 and withdrawal == 0.0:
+            continue
+        tx_date = None
+        if e.get("transaction_date"):
+            try:
+                yy, mm, dd = e["transaction_date"].split("-")
+                tx_date = date(int(yy), int(mm), int(dd))
+            except (ValueError, AttributeError):
+                tx_date = _parse_date(e.get("transaction_date_raw") or "")
+        rows.append(StatementRow(
+            date=tx_date,
+            description=e.get("description") or "",
+            withdrawal=withdrawal,
+            deposit=deposit,
+            balance=balance,
+            source_file=filename,
+        ))
+    return {
+        "ok": True,
+        "rows": rows,
+        "row_count": len(rows),
+        "bank_code": bank_code,
+        "parser_version": "bank_recon_v2+pipeline_v1",
+        "needs_review": legacy.get("_needs_review", False),
+    }
+
+
+def _parse_gl_via_pipeline(file_bytes: bytes, filename: str,
+                            account_code: str = "") -> Dict[str, Any]:
+    """Bank-recon-v2 adapter: route GL through services/ocr/pipeline with
+    document_type='general_ledger', then convert to List[GlRow]."""
+    try:
+        from services.ocr.pipeline import (
+            run_on_image_bytes as _run_image,
+            run_on_table_bytes as _run_table,
+            IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+        )
+        from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+    except ImportError as e:
+        return {"ok": False, "rows": [], "row_count": 0, "accounts": [],
+                "error": f"pipeline import failed: {e}"}
+    ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
+    try:
+        if ext_dot in IMAGE_EXTENSIONS:
+            pr = _run_image(file_bytes, document_type="general_ledger")
+        elif ext_dot in TABLE_EXTENSIONS:
+            pr = _run_table(file_bytes, filename=filename or "gl",
+                            document_type="general_ledger")
+        else:
+            return {"ok": False, "rows": [], "row_count": 0, "accounts": [],
+                    "error": f"unsupported format {ext_dot}"}
+    except Exception as e:
+        return {"ok": False, "rows": [], "row_count": 0, "accounts": [],
+                "error": f"pipeline parse failed: {type(e).__name__}: {e}"}
+
+    legacy = pipeline_result_to_legacy_dict(pr)
+    rows = gl_rows_from_pipeline_legacy(legacy)
+    if account_code:
+        rows = [r for r in rows if r.account_code == account_code]
+    accounts = sorted({r.account_code for r in rows if r.account_code})
+    return {
+        "ok": True,
+        "rows": rows,
+        "row_count": len(rows),
+        "accounts": accounts,
+        "parser_version": "bank_recon_v2+pipeline_v1",
+        "needs_review": legacy.get("_needs_review", False),
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -3224,6 +3395,137 @@ class ParsedStatement:
         d = asdict(self)
         d["transactions"] = [asdict(t) for t in self.transactions]
         return d
+
+
+# ============================================================
+# 2026-05-21 multi-format refactor · adapter for the unified pipeline
+# ============================================================
+def parsed_from_pipeline_legacy(legacy_dict: Dict[str, Any],
+                                 filename: str) -> ParsedStatement:
+    """Build a ParsedStatement from services/ocr/pipeline legacy dict output.
+
+    The unified pipeline returns one normalized JSON per uploaded file with
+    `document` populated when document_type=bank_statement. We pluck the
+    BankStatementDocument off the first page and convert each
+    BankStatementEntry into a BankTransaction so the rest of the bank
+    reconciliation flow consumes it unchanged.
+
+    All amounts are guaranteed to come from deposit/withdrawal/balance
+    columns thanks to validators.validate_bank_document — description-
+    column digits will NOT leak in here.
+    """
+    pages = legacy_dict.get("pages") or []
+    if not pages:
+        return ParsedStatement(
+            bank_code="OTHER", account_last4=None, statement_month=None,
+            period_start=None, period_end=None,
+            opening_balance=None, closing_balance=None,
+            total_inflow=0.0, total_outflow=0.0,
+            transactions=[], pages=0, parse_method="pipeline_v1_empty",
+        )
+
+    # The unified pipeline preserves the source ParsedStatement-shaped doc
+    # in pages[0].document for bank_statement uploads.
+    first_doc = (pages[0] or {}).get("document") or {}
+    entries = first_doc.get("entries") or []
+
+    bank_name = (first_doc.get("bank_name") or "").lower()
+    bank_code = "OTHER"
+    if "kasikorn" in bank_name or "kbank" in bank_name or "กสิกร" in (first_doc.get("bank_name") or ""):
+        bank_code = "KBANK"
+    elif "siam commercial" in bank_name or "scb" in bank_name:
+        bank_code = "SCB"
+    elif "bangkok bank" in bank_name or "bbl" in bank_name:
+        bank_code = "BBL"
+    elif "krungthai" in bank_name or "ktb" in bank_name:
+        bank_code = "KTB"
+    elif "krungsri" in bank_name or "ayudhya" in bank_name:
+        bank_code = "BAY"
+    elif "ttb" in bank_name or "tmb" in bank_name:
+        bank_code = "TTB"
+
+    transactions: List[BankTransaction] = []
+    total_in = 0.0
+    total_out = 0.0
+    for idx, e in enumerate(entries, start=1):
+        deposit = _to_float(e.get("deposit"))
+        withdrawal = _to_float(e.get("withdrawal"))
+        balance = _to_float(e.get("balance")) if e.get("balance") else None
+        direction = "IN" if deposit > 0 else ("OUT" if withdrawal > 0 else "")
+        if direction == "":
+            continue  # skip header / summary rows that survived the LLM
+        amount = deposit if direction == "IN" else withdrawal
+        if direction == "IN":
+            total_in += amount
+        else:
+            total_out += amount
+        transactions.append(BankTransaction(
+            row_no=idx,
+            tx_date=e.get("transaction_date") or None,
+            value_date=None,
+            direction=direction,
+            amount=amount,
+            balance_after=balance,
+            description=e.get("description") or "",
+            counterparty=None,
+            ref_no=e.get("reference") or None,
+            channel=None,
+        ))
+
+    return ParsedStatement(
+        bank_code=bank_code,
+        account_last4=first_doc.get("account_last4") or None,
+        statement_month=(first_doc.get("period_start") or "")[:7] + "-01"
+            if first_doc.get("period_start") else None,
+        period_start=first_doc.get("period_start") or None,
+        period_end=first_doc.get("period_end") or None,
+        opening_balance=_to_float(first_doc.get("opening_balance"))
+            if first_doc.get("opening_balance") else None,
+        closing_balance=_to_float(first_doc.get("closing_balance"))
+            if first_doc.get("closing_balance") else None,
+        total_inflow=total_in,
+        total_outflow=total_out,
+        transactions=transactions,
+        pages=int(legacy_dict.get("page_count") or 1),
+        parse_method="pipeline_v1_table",
+    )
+
+
+def gl_rows_from_pipeline_legacy(legacy_dict: Dict[str, Any]) -> List[GlRow]:
+    """Adapter: services/ocr/pipeline GL output → List[GlRow] for matching.
+
+    Use this in `/api/recon/bank-v2/run` when the uploaded GL file is
+    Excel/CSV/Word so it bypasses Gemini Vision. document_type=general_ledger
+    in the pipeline call guarantees:
+        - amount comes from Debit/Credit columns only
+        - description-column digits (e.g. '6091') are NOT parsed as amount
+    """
+    out: List[GlRow] = []
+    for page in (legacy_dict.get("pages") or []):
+        doc = (page or {}).get("document") or {}
+        for e in (doc.get("entries") or []):
+            debit = _to_float(e.get("debit"))
+            credit = _to_float(e.get("credit"))
+            if debit == 0.0 and credit == 0.0:
+                continue
+            tx_date_str = e.get("transaction_date") or ""
+            tx_date = None
+            if tx_date_str:
+                try:
+                    yy, mm, dd = tx_date_str.split("-")
+                    tx_date = date(int(yy), int(mm), int(dd))
+                except (ValueError, AttributeError):
+                    tx_date = _parse_date(e.get("transaction_date_raw") or tx_date_str)
+            out.append(GlRow(
+                date=tx_date,
+                doc_no=e.get("voucher_no") or "",
+                account_code=e.get("account_code") or "",
+                description=e.get("description") or "",
+                debit=debit,
+                credit=credit,
+                source_file="",
+            ))
+    return out
 
 
 # ============================================================

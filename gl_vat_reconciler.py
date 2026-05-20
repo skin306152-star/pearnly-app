@@ -580,14 +580,131 @@ def parse_gl_excel(file_bytes: bytes, revenue_prefix: str = "4") -> Dict[str, An
 # 统一入口
 # ─────────────────────────────────────────────────────────────────────
 def parse_gl(file_bytes: bytes, filename: str, revenue_prefix: str = "4") -> Dict[str, Any]:
-    """按后缀分发到 parse_gl_excel / parse_gl_pdf"""
+    """按后缀分发解析 GL 文件。
+
+    2026-05-21 multi-format refactor:
+    - .xlsx / .xls      → parse_gl_excel (structural, reliable)
+    - .pdf              → parse_gl_pdf   (existing Gemini Vision path)
+    - .csv / .tsv / .docx / .doc / .txt / 图片 → 新统一 pipeline,
+      显式 document_type='general_ledger' 让 prompt + validators 防止
+      description 列的数字(例如 6091)被识别成 debit/credit/amount。
+    """
+    import os as _os
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     if ext in ("xlsx", "xls"):
         return parse_gl_excel(file_bytes, revenue_prefix)
     if ext == "pdf":
+        # 2026-05-21: PDF GL defaults to the new pipeline so description-column
+        # numbers (e.g. 6091) can't leak into debit/credit. Set
+        # OCR_PDF_GL_LEGACY=true to opt back into the older Gemini-Vision
+        # parse_gl_pdf path (kept for emergency rollback).
+        if _os.environ.get("OCR_PDF_GL_LEGACY", "").strip().lower() == "true":
+            return parse_gl_pdf(file_bytes, revenue_prefix)
+        result = _parse_gl_via_pipeline(file_bytes, filename, revenue_prefix)
+        if result.get("ok") and result.get("rows"):
+            return result
+        # Pipeline returned 0 rows or errored — fall back to legacy so we
+        # don't worsen the worst case (legacy at least extracted SOMETHING
+        # for the production customers we already serve).
+        logger.warning(
+            f"[parse_gl] pipeline yielded {result.get('row_count')} rows / "
+            f"err={result.get('error')!r} · falling back to parse_gl_pdf"
+        )
         return parse_gl_pdf(file_bytes, revenue_prefix)
-    return {"ok": False, "rows": [], "row_count": 0,
-            "error": f"暂不支持 .{ext} · 请上传 Excel 或 PDF"}
+    return _parse_gl_via_pipeline(file_bytes, filename, revenue_prefix)
+
+
+def _parse_gl_via_pipeline(file_bytes: bytes, filename: str,
+                            revenue_prefix: str) -> Dict[str, Any]:
+    """Route non-PDF/non-Excel GL files through services/ocr/pipeline with
+    document_type=general_ledger, then convert the normalized JSON into the
+    List[GlRow] shape gl_vat_reconciler.reconcile_gl_vat expects.
+
+    Supported here: CSV / TSV / Word / image / TXT.
+    Excludes Excel and PDF on purpose — those paths already work well and
+    have been tested with real customer data; not worth the regression risk
+    in this refactor.
+    """
+    try:
+        from services.ocr.pipeline import (
+            run_on_image_bytes as _run_image,
+            run_on_table_bytes as _run_table,
+            IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+        )
+        from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+    except ImportError as e:
+        return {"ok": False, "rows": [], "row_count": 0,
+                "error": f"pipeline import failed: {e}"}
+
+    ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
+    try:
+        if ext_dot in IMAGE_EXTENSIONS:
+            pr = _run_image(file_bytes, document_type="general_ledger")
+        elif ext_dot in TABLE_EXTENSIONS:
+            pr = _run_table(file_bytes, filename=filename or "gl",
+                            document_type="general_ledger")
+        else:
+            return {"ok": False, "rows": [], "row_count": 0,
+                    "error": f"暂不支持 {ext_dot} · 请上传 Excel / PDF / CSV / Word / 图片"}
+    except Exception as e:
+        return {"ok": False, "rows": [], "row_count": 0,
+                "error": f"pipeline parse failed: {type(e).__name__}: {e}"}
+
+    legacy = pipeline_result_to_legacy_dict(pr)
+    rows = _gl_rows_from_pipeline_legacy(legacy, revenue_prefix)
+    warnings = []
+    for p in (legacy.get("pages") or []):
+        warnings.extend(p.get("_validation_warnings") or [])
+    return {
+        "ok": True,
+        "rows": rows,
+        "row_count": len(rows),
+        "parser_version": f"{PARSER_VERSION}+pipeline_v1",
+        "needs_review": legacy.get("_needs_review", False),
+        "validation_warnings": warnings,
+    }
+
+
+def _gl_rows_from_pipeline_legacy(legacy_dict: Dict[str, Any],
+                                   revenue_prefix: str) -> List[GlRow]:
+    """Convert pipeline normalized JSON (general_ledger) → List[GlRow] for
+    reconcile_gl_vat. Filters to revenue rows (account_code starts with
+    revenue_prefix, e.g. "4") and ensures amounts came from Debit/Credit
+    (not from description) — validators already cleared mis-sourced fields,
+    so any debit/credit value left here is provenance-clean.
+    """
+    out: List[GlRow] = []
+    for page in (legacy_dict.get("pages") or []):
+        doc = (page or {}).get("document") or {}
+        for e in (doc.get("entries") or []):
+            account_code = (e.get("account_code") or "").strip()
+            if revenue_prefix and not account_code.startswith(revenue_prefix):
+                continue
+            try:
+                debit = float(e.get("debit") or 0)
+            except (ValueError, TypeError):
+                debit = 0.0
+            try:
+                credit = float(e.get("credit") or 0)
+            except (ValueError, TypeError):
+                credit = 0.0
+            if debit == 0.0 and credit == 0.0:
+                continue
+            doc_no_raw = (e.get("voucher_no") or "").strip()
+            try:
+                norm = normalize_invoice_no(doc_no_raw) if doc_no_raw else ""
+            except Exception:
+                norm = doc_no_raw
+            out.append(GlRow(
+                doc_no=doc_no_raw,
+                norm_doc_no=norm,
+                date=e.get("transaction_date") or "",
+                account_code=account_code,
+                description=e.get("description") or "",
+                debit=debit,
+                credit=credit,
+            ))
+    return out
 
 
 # ─────────────────────────────────────────────────────────────────────

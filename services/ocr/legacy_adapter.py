@@ -63,7 +63,7 @@ def _invoice_to_legacy_fields(inv: ThaiInvoice) -> Dict[str, Any]:
 
 
 def _page_to_legacy(p: PipelinePageResult) -> Dict[str, Any]:
-    return {
+    out: Dict[str, Any] = {
         "page_number": p.page_number,
         "page": p.page_number,  # alternate key used by some downstream consumers
         "text": "",  # not surfaced by pipeline; downstream rarely uses raw text
@@ -80,7 +80,17 @@ def _page_to_legacy(p: PipelinePageResult) -> Dict[str, Any]:
         "_trigger_reasons": list(p.trigger_reasons),
         "_needs_manual_review": bool(p.needs_manual_review),
         "_layer1_avg_confidence": float(p.layer1_avg_confidence),
+        # 2026-05-21 multi-schema refactor
+        "_document_type": str(p.document_type),
+        "_confidence_band": str(p.confidence_band),
+        "_final_confidence": float(p.final_confidence),
+        "_validation_warnings": list(p.validation_warnings),
     }
+    # When a non-invoice document is present (GL / Bank / VAT / Table), expose
+    # its normalized JSON so bank reconciliation can consume it directly.
+    if p.document is not None:
+        out["document"] = p.document.model_dump(mode="json")
+    return out
 
 
 def pipeline_result_to_legacy_dict(pr: PipelineResult) -> Dict[str, Any]:
@@ -93,6 +103,14 @@ def pipeline_result_to_legacy_dict(pr: PipelineResult) -> Dict[str, Any]:
         legacy-shaped dict — drop-in for old `gemini_engine.recognize_pdf`
         callers + their downstream code (no changes needed)
     """
+    # 2026-05-21 aggregate routing: worst-case bucket across all pages.
+    # Order: needs_review > yellow_confirm > auto
+    band_priority = {"needs_review": 2, "yellow_confirm": 1, "auto": 0}
+    worst_band = "auto"
+    for p in pr.pages:
+        if band_priority.get(p.confidence_band, 0) > band_priority[worst_band]:
+            worst_band = p.confidence_band
+
     return {
         "pages": [_page_to_legacy(p) for p in pr.pages],
         "page_count": int(pr.page_count),
@@ -101,4 +119,8 @@ def pipeline_result_to_legacy_dict(pr: PipelineResult) -> Dict[str, Any]:
         # Pass-through aggregate cost so callers can prefer this over their
         # own token-based formula (which misses Vision per-page cost).
         "_pipeline_cost_thb": float(pr.estimated_cost_thb),
+        # 2026-05-21 multi-schema refactor: top-level routing signal
+        "_document_type": str(pr.pages[0].document_type) if pr.pages else "auto",
+        "_confidence_band": worst_band,
+        "_needs_review": worst_band == "needs_review",
     }

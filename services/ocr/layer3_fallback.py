@@ -55,9 +55,14 @@ from typing import List, Optional, Tuple
 from pydantic import ValidationError
 
 from .schemas import (
+    BankStatementDocument,
+    BusinessDocumentType,
+    GeneralLedgerDocument,
+    GenericTableDocument,
     Layer3PageResult,
     Page,
     ThaiInvoice,
+    VatReportDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,8 +149,21 @@ Output ONE JSON object matching this schema (no markdown, no explanation, just J
   "total_amount": "number-as-string or null",
   "items": [{"name": "...", "qty": "...", "price": "...", "subtotal": "..."}],
   "notes": "remark text",
-  "category": "3-5 char summary in items' language"
+  "category": "3-5 char summary in items' language",
+  "source_refs": {
+    "invoice_number": {"value": "...", "source_text": "as printed", "source_column": "Invoice No."} or omit,
+    "total_amount":   {"value": "...", "source_text": "as printed", "source_column": "Total"     } or omit,
+    "subtotal":       {"value": "...", "source_text": "as printed", "source_column": "Subtotal"  } or omit,
+    "vat":            {"value": "...", "source_text": "as printed", "source_column": "VAT"       } or omit,
+    "seller_tax":     {"value": "...", "source_text": "as printed", "source_column": "Tax ID"    } or omit,
+    "buyer_tax":      {"value": "...", "source_text": "as printed", "source_column": "Tax ID"    } or omit,
+    "date":           {"value": "...", "source_text": "as printed", "source_column": "Date"      } or omit
+  }
 }
+
+PROVENANCE — fill source_refs for amount + tax-id + date fields with the
+exact printed column label of the cell the value came from. Validators
+reject amounts sourced from Description / Remark / Address columns.
 
 CRITICAL RULES (same as previous extraction; pay attention):
 1. DATE: Buddhist year (>= 2400) MUST be converted to Gregorian by subtracting 543. e.g. 2569 -> 2026. ALWAYS fill date_raw with the original text.
@@ -197,6 +215,7 @@ def refine_with_image(
     model_name: str = DEFAULT_MODEL,
     max_retries: int = DEFAULT_MAX_RETRIES,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    document_type: BusinessDocumentType = "auto",
 ) -> Tuple[ThaiInvoice, dict]:
     """Refine a (suspect) ThaiInvoice using visual review of the source image.
 
@@ -243,6 +262,21 @@ def refine_with_image(
             f"{type(layer2_invoice).__name__}"
         )
 
+    # 2026-05-21 multi-schema refactor: Layer 3 visual fallback currently
+    # supports ONLY invoice/auto. Non-invoice doc types (GL/Bank/VAT) go
+    # through Layer 2 with their dedicated prompts; if their confidence is
+    # low, pipeline.py routes them to needs_review queue rather than firing
+    # the invoice-shaped Layer 3. We accept document_type for forward
+    # compat — when it's a non-invoice type, log + still do invoice refine
+    # (the caller in pipeline.py should not have called us here).
+    if document_type not in ("auto", "invoice"):
+        logger.warning(
+            "layer3: called with document_type=%s — invoice prompt will be used "
+            "(non-invoice visual fallback not implemented; pipeline should "
+            "route these to needs_review instead)",
+            document_type,
+        )
+
     key = (
         api_key
         or os.environ.get("GOOGLE_API_KEY")
@@ -283,6 +317,7 @@ def refine_page(
     model_name: str = DEFAULT_MODEL,
     max_retries: int = DEFAULT_MAX_RETRIES,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    document_type: BusinessDocumentType = "auto",
 ) -> Layer3PageResult:
     """Refine layer 2's invoice for one Page using visual fallback.
 
@@ -315,6 +350,7 @@ def refine_page(
             model_name=model_name,
             max_retries=max_retries,
             timeout=timeout,
+            document_type=document_type,
         )
     except (Layer3Error, TypeError) as e:
         # Preserve exception type for caller dispatch; add page context

@@ -1139,9 +1139,7 @@ const I18N = {
         'admin-self-disabled-tip': '不能对自己的账号执行此操作',
         'badge-coming': '即将',
         'settings-username': '用户名',
-        'settings-plan': '当前套餐',
         'settings-quota': '配额',
-        'settings-expires': '有效期',
         'settings-never': '—',
         'alert-loading-engine': '服务正在启动,请稍候片刻...',
         'alert-engine-ready': '✓ 服务就绪',
@@ -1341,7 +1339,6 @@ const I18N = {
         'history-amount-missing': '缺金额',
         'history-amount-missing-tip': 'OCR 未识别到金额 · 打开详情可手工补填',
         'history-missing-amount-action': '补金额',
-        'upgrade-selling-point': 'Plus 用户平均每月省下 38 小时手工录入时间',
         'drawer-diagnose-tip': '查看原始识别数据',
         'diagnose-title': '原始识别数据',
         'diagnose-hint': '调试用 · 可定位「是识别没出来」还是「字段映射错了」',
@@ -1353,30 +1350,6 @@ const I18N = {
         'invoice-part-of': '{i}/{n} 张',
         'toast-invoices-split': '已识别 {n} 张发票 · 分别存档',
         'multi-invoice-toast': '{file} · 识别到 {n} 张发票,已分别存档',
-        'plan-monthly-name': '月付',
-        'plan-lifetime-name': '买断',
-        'plan-monthly-price': '฿299 / 月',
-        'plan-lifetime-price': '฿4,990 一次',
-        'plan-monthly-tag': '最灵活',
-        'plan-lifetime-tag': '最划算',
-        'plan-point-gemini': 'AI 引擎',
-        'plan-point-quota': '月识别额度',
-        'plan-point-rate': '速率限制',
-        'plan-point-history': '历史保留',
-        'plan-point-features': '全部功能解锁',
-        'plan-point-ai-assist': 'AI 智能辅助',
-        'plan-point-suitable': '适合人群',
-        'val-monthly-gemini': '系统共用',
-        'val-monthly-quota': '500 张 / 月',
-        'val-monthly-rate': '5 张/分钟',
-        'val-monthly-history': '1 年',
-        'val-monthly-suitable': '中小企业 · 稳定用量',
-        'val-lifetime-gemini': '用户自带',
-        'val-lifetime-quota': '不限',
-        'val-lifetime-rate': '不限',
-        'val-lifetime-history': '永久',
-        'val-lifetime-suitable': '高频用户 · 长期使用',
-        'upgrade-title-paid': '升级 Pearnly',
         'typhoon-enhanced-toast': '{file} · 已用泰文增强 {n} 页',
         'typhoon-badge': '泰文增强',
         'typhoon-badge-tip': '该发票部分字段缺失 · 已自动启用泰文增强',
@@ -1499,35 +1472,11 @@ const I18N = {
         'about-desc': '需要帮助、升级账号或反馈问题 · 欢迎联系我们',
         'info-unlimited-own-key': '自带 API · 不限用量',
         'info-need-api-key': '请在设置页填入您的识别服务密钥',
-        'settings-sub-type': '订阅类型',
         'set-plan-billing-title': '计费方式',
         'set-plan-billing-mode': '按使用量计费',
         'set-plan-billing-detail': '每月前 200 张 ฿1.50/张 · 超出后 ฿0.75/张 · 每月 1 日重置',
         'settings-role': '账号身份',
         'settings-role-super-admin': '超级管理员',
-        'sub-type-monthly': '月度订阅',
-        // v109.4 · 套餐显示
-        'settings-sub-trial': '试用',
-        'settings-sub-free': '免费版',
-        'settings-sub-solo': 'Pearnly Solo',
-        'settings-sub-team': 'Pearnly Team',
-        'settings-sub-firm': 'Pearnly Firm',
-        'settings-sub-enterprise': 'Enterprise',
-
-        // v118.27.8.1.17 · 套餐&用量页 v111+ 新 plan 名分支(monthly / yearly / lifetime)+ 有效期天数
-        'settings-sub-monthly':       '月度订阅',
-        'settings-sub-yearly':        '年度订阅',
-        'settings-sub-lifetime':      '终身买断',
-        'settings-days-left':         '还剩 {n} 天',
-        'settings-lifetime-forever':  '永久',
-        'settings-quota-trial-no-line': '20 张 · 绑定 LINE 解锁完整 50 张',
-        'settings-quota-free-no-line': '0 张 · 绑定 LINE 解锁 10 张/月',
-        'settings-trial-days-left': '7 天试用 · 还剩 {n} 天',
-        'settings-trial-expired': '试用已到期 · 立即升级',
-        'settings-trial-7days': '7 天试用',
-        'sub-type-own-key': '自带 API Key · 无限制',
-        'sub-type-need-setup': '待配置',
-        'sub-need-api-key': '请在下方填入识别服务密钥',
         'settings-api-key': '识别服务密钥',
         'settings-api-key-desc': '买断版专属 · 填入您自己的识别服务密钥后可无限次使用 · 不占用系统月度额度',
         'api-key-current-label': '当前已保存:',
@@ -3622,9 +3571,7 @@ const I18N = {
         'admin-self-disabled-tip': 'Cannot perform this action on your own account',
         'badge-coming': 'Soon',
         'settings-username': 'Username',
-        'settings-plan': 'Plan',
         'settings-quota': 'Quota',
-        'settings-expires': 'Expires',
         'settings-never': '—',
         'alert-loading-engine': 'Service starting up, please wait a moment...',
         'alert-engine-ready': '✓ Ready',
@@ -3821,7 +3768,6 @@ const I18N = {
         'history-amount-missing': 'No amount',
         'history-amount-missing-tip': 'OCR missed the amount · open details to fill it in',
         'history-missing-amount-action': 'Fill amount',
-        'upgrade-selling-point': 'Plus users save an average of 38 hours of data entry per month',
         'drawer-diagnose-tip': 'View raw recognition data',
         'diagnose-title': 'Raw recognition data',
         'diagnose-hint': 'For debugging · tells apart OCR miss vs field-mapping error',
@@ -3833,30 +3779,6 @@ const I18N = {
         'invoice-part-of': '{i}/{n}',
         'toast-invoices-split': '{n} invoices detected · saved separately',
         'multi-invoice-toast': '{file} · {n} invoices detected, saved separately',
-        'plan-monthly-name': 'Monthly',
-        'plan-lifetime-name': 'Lifetime',
-        'plan-monthly-price': '฿299 / mo',
-        'plan-lifetime-price': '฿4,990 once',
-        'plan-monthly-tag': 'Most flexible',
-        'plan-lifetime-tag': 'Best value',
-        'plan-point-gemini': 'AI Engine',
-        'plan-point-quota': 'Monthly quota',
-        'plan-point-rate': 'Rate limit',
-        'plan-point-history': 'History retention',
-        'plan-point-features': 'All features unlocked',
-        'plan-point-ai-assist': 'AI assistance',
-        'plan-point-suitable': 'Suitable for',
-        'val-monthly-gemini': 'Shared (ours)',
-        'val-monthly-quota': '500 / month',
-        'val-monthly-rate': '5 / min',
-        'val-monthly-history': '1 year',
-        'val-monthly-suitable': 'SMEs · steady use',
-        'val-lifetime-gemini': 'Your own key',
-        'val-lifetime-quota': 'Unlimited',
-        'val-lifetime-rate': 'Unlimited',
-        'val-lifetime-history': 'Forever',
-        'val-lifetime-suitable': 'Heavy users',
-        'upgrade-title-paid': 'Upgrade Pearnly',
         'typhoon-enhanced-toast': '{file} · {n} page(s) enhanced with Thai OCR',
         'typhoon-badge': 'Thai-enhanced',
         'typhoon-badge-tip': 'Some fields were missing · Thai-enhanced mode applied automatically',
@@ -3979,35 +3901,11 @@ const I18N = {
         'about-desc': 'Need help, upgrades, or feedback? Reach out to us',
         'info-unlimited-own-key': 'Own API · Unlimited',
         'info-need-api-key': 'Please add your recognition key in Settings',
-        'settings-sub-type': 'Subscription',
         'set-plan-billing-title': 'Billing',
         'set-plan-billing-mode': 'Pay as you go',
         'set-plan-billing-detail': 'First 200 pages ฿1.50/page · Over 200 pages ฿0.75/page · Resets on the 1st',
         'settings-role': 'Account Role',
         'settings-role-super-admin': 'Super Admin',
-        'sub-type-monthly': 'Monthly',
-        // v109.4 · plan display
-        'settings-sub-trial': 'Trial',
-        'settings-sub-free': 'Free',
-        'settings-sub-solo': 'Pearnly Solo',
-        'settings-sub-team': 'Pearnly Team',
-        'settings-sub-firm': 'Pearnly Firm',
-        'settings-sub-enterprise': 'Enterprise',
-
-        // v118.27.8.1.17 · settings page · v111+ plan names + days remaining
-        'settings-sub-monthly':       'Monthly',
-        'settings-sub-yearly':        'Yearly',
-        'settings-sub-lifetime':      'Lifetime',
-        'settings-days-left':         '{n} days left',
-        'settings-lifetime-forever':  'Forever',
-        'settings-quota-trial-no-line': '20 pages · link LINE to unlock full 50',
-        'settings-quota-free-no-line': '0 pages · link LINE to unlock 10/month',
-        'settings-trial-days-left': '7-day trial · {n} days left',
-        'settings-trial-expired': 'Trial expired · upgrade now',
-        'settings-trial-7days': '7-day trial',
-        'sub-type-own-key': 'Own API Key · Unlimited',
-        'sub-type-need-setup': 'Setup required',
-        'sub-need-api-key': 'Please add your recognition key below',
         'settings-api-key': 'Recognition Service Key',
         'settings-api-key-desc': 'Lifetime plan only · Enter your own recognition service key for unlimited use · Does not count against system monthly quota',
         'api-key-current-label': 'Current saved:',
@@ -6091,9 +5989,7 @@ const I18N = {
         'admin-self-disabled-tip': 'ไม่สามารถดำเนินการกับบัญชีของตนเองได้',
         'badge-coming': 'เร็วๆ นี้',
         'settings-username': 'ชื่อผู้ใช้',
-        'settings-plan': 'แพ็กเกจ',
         'settings-quota': 'โควตา',
-        'settings-expires': 'หมดอายุ',
         'settings-never': '—',
         'alert-loading-engine': 'ระบบกำลังเริ่มต้น กรุณารอสักครู่...',
         'alert-engine-ready': '✓ พร้อมใช้งาน',
@@ -6290,7 +6186,6 @@ const I18N = {
         'history-amount-missing': 'ไม่มียอดเงิน',
         'history-amount-missing-tip': 'OCR ไม่ได้อ่านยอดเงิน · เปิดรายละเอียดเพื่อกรอก',
         'history-missing-amount-action': 'กรอกยอดเงิน',
-        'upgrade-selling-point': 'ผู้ใช้ Plus ประหยัดเวลาป้อนข้อมูลเฉลี่ยเดือนละ 38 ชั่วโมง',
         'drawer-diagnose-tip': 'ดูข้อมูล OCR ดิบ',
         'diagnose-title': 'ข้อมูล OCR ดิบ',
         'diagnose-hint': 'สำหรับดีบัก · แยกระหว่าง OCR ไม่ได้ vs ฟิลด์จับคู่ผิด',
@@ -6302,30 +6197,6 @@ const I18N = {
         'invoice-part-of': '{i}/{n}',
         'toast-invoices-split': 'พบ {n} ใบ · บันทึกแยก',
         'multi-invoice-toast': '{file} · พบ {n} ใบ บันทึกแยกแล้ว',
-        'plan-monthly-name': 'รายเดือน',
-        'plan-lifetime-name': 'ตลอดชีพ',
-        'plan-monthly-price': '฿299 / เดือน',
-        'plan-lifetime-price': '฿4,990 ครั้งเดียว',
-        'plan-monthly-tag': 'ยืดหยุ่นที่สุด',
-        'plan-lifetime-tag': 'คุ้มค่าที่สุด',
-        'plan-point-gemini': 'AI Engine',
-        'plan-point-quota': 'โควตารายเดือน',
-        'plan-point-rate': 'ขีดจำกัดความเร็ว',
-        'plan-point-history': 'เก็บประวัติ',
-        'plan-point-features': 'ปลดล็อกทุกฟีเจอร์',
-        'plan-point-ai-assist': 'AI ช่วยเหลือ',
-        'plan-point-suitable': 'เหมาะสำหรับ',
-        'val-monthly-gemini': 'ใช้ร่วมกัน',
-        'val-monthly-quota': '500 / เดือน',
-        'val-monthly-rate': '5 / นาที',
-        'val-monthly-history': '1 ปี',
-        'val-monthly-suitable': 'SME · ใช้คงที่',
-        'val-lifetime-gemini': 'คีย์ของคุณเอง',
-        'val-lifetime-quota': 'ไม่จำกัด',
-        'val-lifetime-rate': 'ไม่จำกัด',
-        'val-lifetime-history': 'ถาวร',
-        'val-lifetime-suitable': 'ผู้ใช้หนัก',
-        'upgrade-title-paid': 'อัปเกรด Pearnly',
         'typhoon-enhanced-toast': '{file} · เสริมการอ่านภาษาไทย {n} หน้า',
         'typhoon-badge': 'เสริมไทย',
         'typhoon-badge-tip': 'บางฟิลด์ขาด · เปิดโหมดเสริมภาษาไทยอัตโนมัติ',
@@ -6448,35 +6319,11 @@ const I18N = {
         'about-desc': 'ต้องการความช่วยเหลือหรืออัปเกรด · ติดต่อเรา',
         'info-unlimited-own-key': 'API ของคุณ · ไม่จำกัด',
         'info-need-api-key': 'กรุณาใส่คีย์บริการ OCR ในหน้าตั้งค่า',
-        'settings-sub-type': 'ประเภทการสมัคร',
         'set-plan-billing-title': 'วิธีคิดค่าบริการ',
         'set-plan-billing-mode': 'คิดตามการใช้งาน',
         'set-plan-billing-detail': '200 แผ่นแรก ฿1.50/แผ่น · เกิน 200 แผ่น ฿0.75/แผ่น · รีเซ็ตทุกวันที่ 1',
         'settings-role': 'บทบาทบัญชี',
         'settings-role-super-admin': 'ผู้ดูแลระบบสูงสุด',
-        'sub-type-monthly': 'รายเดือน',
-        // v109.4 · plan display
-        'settings-sub-trial': 'ทดลอง',
-        'settings-sub-free': 'ฟรี',
-        'settings-sub-solo': 'Pearnly Solo',
-        'settings-sub-team': 'Pearnly Team',
-        'settings-sub-firm': 'Pearnly Firm',
-        'settings-sub-enterprise': 'Enterprise',
-
-        // v118.27.8.1.17 · settings page · v111+ plan names + days remaining
-        'settings-sub-monthly':       'รายเดือน',
-        'settings-sub-yearly':        'รายปี',
-        'settings-sub-lifetime':      'ตลอดชีพ',
-        'settings-days-left':         'เหลือ {n} วัน',
-        'settings-lifetime-forever':  'ตลอดไป',
-        'settings-quota-trial-no-line': '20 หน้า · เชื่อม LINE ปลดล็อก 50 หน้า',
-        'settings-quota-free-no-line': '0 หน้า · เชื่อม LINE ปลดล็อก 10/เดือน',
-        'settings-trial-days-left': 'ทดลอง 7 วัน · เหลือ {n} วัน',
-        'settings-trial-expired': 'หมดอายุทดลอง · อัปเกรดเลย',
-        'settings-trial-7days': 'ทดลอง 7 วัน',
-        'sub-type-own-key': 'API ของตัวเอง · ไม่จำกัด',
-        'sub-type-need-setup': 'ต้องตั้งค่า',
-        'sub-need-api-key': 'กรุณาใส่คีย์บริการ OCR ด้านล่าง',
         'settings-api-key': 'คีย์บริการ OCR',
         'settings-api-key-desc': 'เฉพาะแบบซื้อขาด · ใส่คีย์บริการ OCR ของคุณเองเพื่อใช้ได้ไม่จำกัด · ไม่นับรวมโควตารายเดือนระบบ',
         'api-key-current-label': 'บันทึกไว้ปัจจุบัน:',
@@ -8556,9 +8403,7 @@ const I18N = {
         'admin-self-disabled-tip': '自分のアカウントには実行できません',
         'badge-coming': '近日',
         'settings-username': 'ユーザー名',
-        'settings-plan': 'プラン',
         'settings-quota': 'クォータ',
-        'settings-expires': '有効期限',
         'settings-never': '—',
         'alert-loading-engine': 'サービス起動中、少々お待ちください...',
         'alert-engine-ready': '✓ 準備完了',
@@ -8755,7 +8600,6 @@ const I18N = {
         'history-amount-missing': '金額なし',
         'history-amount-missing-tip': 'OCR で金額未取得 · 詳細を開いて入力',
         'history-missing-amount-action': '金額入力',
-        'upgrade-selling-point': 'Plus ユーザーは月平均 38 時間の入力作業を削減',
         'drawer-diagnose-tip': 'OCR 原データを表示',
         'diagnose-title': 'OCR 原データ',
         'diagnose-hint': 'デバッグ用 · OCR 未取得とフィールド誤マッピングを区別',
@@ -8767,30 +8611,6 @@ const I18N = {
         'invoice-part-of': '{i}/{n}',
         'toast-invoices-split': '{n} 件検出 · 別々に保存',
         'multi-invoice-toast': '{file} · {n} 件検出、個別保存',
-        'plan-monthly-name': '月額',
-        'plan-lifetime-name': '買い切り',
-        'plan-monthly-price': '฿299 / 月',
-        'plan-lifetime-price': '฿4,990 一括',
-        'plan-monthly-tag': '最も柔軟',
-        'plan-lifetime-tag': '最もお得',
-        'plan-point-gemini': 'AI Engine',
-        'plan-point-quota': '月次クォータ',
-        'plan-point-rate': 'レート制限',
-        'plan-point-history': '履歴保持',
-        'plan-point-features': '全機能解放',
-        'plan-point-ai-assist': 'AI アシスト',
-        'plan-point-suitable': '向いている方',
-        'val-monthly-gemini': '共有',
-        'val-monthly-quota': '500 件/月',
-        'val-monthly-rate': '5 件/分',
-        'val-monthly-history': '1 年',
-        'val-monthly-suitable': '中小企業',
-        'val-lifetime-gemini': '自前のキー',
-        'val-lifetime-quota': '無制限',
-        'val-lifetime-rate': '無制限',
-        'val-lifetime-history': '永久',
-        'val-lifetime-suitable': 'ヘビーユーザー',
-        'upgrade-title-paid': 'Pearnly をアップグレード',
         'typhoon-enhanced-toast': '{file} · タイ語強化 {n} ページ',
         'typhoon-badge': 'タイ語強化',
         'typhoon-badge-tip': '一部フィールド欠落 · タイ語強化モードで自動補完',
@@ -8913,35 +8733,11 @@ const I18N = {
         'about-desc': 'お問い合わせやアップグレードはお気軽に',
         'info-unlimited-own-key': '独自 API · 無制限',
         'info-need-api-key': '設定で認識サービスキーをご入力ください',
-        'settings-sub-type': 'サブスクリプション',
         'set-plan-billing-title': '料金プラン',
         'set-plan-billing-mode': '使用量課金',
         'set-plan-billing-detail': '最初の200枚 ฿1.50/枚 · 200枚超 ฿0.75/枚 · 毎月1日リセット',
         'settings-role': 'アカウント権限',
         'settings-role-super-admin': 'スーパー管理者',
-        'sub-type-monthly': '月額',
-        // v109.4 · プラン表示
-        'settings-sub-trial': 'トライアル',
-        'settings-sub-free': '無料版',
-        'settings-sub-solo': 'Pearnly Solo',
-        'settings-sub-team': 'Pearnly Team',
-        'settings-sub-firm': 'Pearnly Firm',
-        'settings-sub-enterprise': 'Enterprise',
-
-        // v118.27.8.1.17 · settings page · v111+ plan names + days remaining
-        'settings-sub-monthly':       '月額',
-        'settings-sub-yearly':        '年額',
-        'settings-sub-lifetime':      '買い切り',
-        'settings-days-left':         '残り {n} 日',
-        'settings-lifetime-forever':  '永久',
-        'settings-quota-trial-no-line': '20 枚 · LINE 連携で 50 枚解放',
-        'settings-quota-free-no-line': '0 枚 · LINE 連携で 10 枚/月解放',
-        'settings-trial-days-left': '7 日間トライアル · 残り {n} 日',
-        'settings-trial-expired': 'トライアル終了 · 今すぐアップグレード',
-        'settings-trial-7days': '7 日間トライアル',
-        'sub-type-own-key': '独自 API Key · 無制限',
-        'sub-type-need-setup': '設定が必要',
-        'sub-need-api-key': '下で認識サービスキーを入力',
         'settings-api-key': '認識サービスキー',
         'settings-api-key-desc': '買い切り版専用 · ご自身の認識サービスキーを入力すると無制限で利用可能 · システム月間クォータを消費しません',
         'api-key-current-label': '保存済み:',
@@ -11026,13 +10822,13 @@ document.querySelectorAll('.nav-item').forEach(item => {
 // ============================================================
 async function loadAll() {
     try {
-        const [u, q, c, p] = await Promise.all([
+        // v118.35 · CLEANUP-01 · 旧 /api/me/plan 已下线 · getMaxFiles 改静态上限
+        const [u, q, c] = await Promise.all([
             apiGet('/api/me'),
             apiGet('/api/ocr/quota'),
             fetch('/api/contact').then(r => r.json()).catch(() => null),
-            // v111.2 · 启动时拉 plan limits · 让 getMaxFiles 立即可用
-            apiGet('/api/me/plan').catch(() => null),
         ]);
+        const p = null;
         if (!u || !q) return;
         _userInfo = u;
         window._userInfo = u;
@@ -12023,44 +11819,8 @@ function updateUploadHint() {
     });
 }
 
-// ============================================================
-// 升级弹窗(对比表)
-// ============================================================
-function _planDisplayLabel(plan) {
-    // v0.12 · plan 的显示名(不直接用 plan.toUpperCase)
-    if (plan === 'monthly')  return t('plan-monthly-name') || 'Monthly';
-    if (plan === 'lifetime') return t('plan-lifetime-name') || 'Lifetime';
-    if (plan === 'free')     return t('plan-free-name') || 'Free';
-    if (plan === 'plus')     return 'Plus';
-    if (plan === 'pro')      return 'Pro';
-    return plan.charAt(0).toUpperCase() + plan.slice(1);
-}
-
-// v118.34 · showUpgradeModal 已删除
-
-// 升级窗 DOM 相关事件 · 已废弃 · 防御性检查
-try {
-    const closeBtn = document.getElementById('upgrade-close');
-    if (closeBtn) closeBtn.addEventListener('click', () => {
-        const m = document.getElementById('upgrade-modal');
-        if (m) m.classList.remove('show');
-    });
-    const closeBtn2 = document.getElementById('upgrade-close-btn');
-    if (closeBtn2) closeBtn2.addEventListener('click', () => {
-        const m = document.getElementById('upgrade-modal');
-        if (m) m.classList.remove('show');
-    });
-} catch (e) {}
-
-// 全局 data-upgrade 按钮 · v0.15 不再触发升级窗 · 静默忽略
-document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-upgrade]');
-    if (el) {
-        e.preventDefault();
-        // no-op · 以前会弹升级窗
-    }
-});
-
+// v118.35 · CLEANUP-01 · 旧 _planDisplayLabel / upgrade-modal 防御性句柄 / data-upgrade 点击 IIFE 全删除
+// credits 系统接管 · 旧订阅永不出现
 
 // ============================================================
 // 侧栏锁定项点击
@@ -14082,9 +13842,6 @@ function openDiagnoseDialog() {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (document.getElementById('drawer').classList.contains('show')) closeDrawer();
-        else if (document.getElementById('upgrade-modal').classList.contains('show')) {
-            document.getElementById('upgrade-modal').classList.remove('show');
-        }
     }
 });
 

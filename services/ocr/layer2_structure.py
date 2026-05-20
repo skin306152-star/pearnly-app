@@ -50,11 +50,16 @@ from typing import Optional, Tuple
 from pydantic import ValidationError
 
 from .schemas import (
+    BankStatementDocument,
+    BusinessDocumentType,
+    GeneralLedgerDocument,
+    GenericTableDocument,
     Layer1Result,
     Layer2PageResult,
     Layer2Result,
     Page,
     ThaiInvoice,
+    VatReportDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,7 +102,213 @@ class Layer2TransientError(Layer2Error):
 
 
 # ============================================================
-# Prompt
+# Per-document-type prompts (2026-05-21 multi-schema refactor)
+# ============================================================
+# Each business document type gets its own prompt + output schema. The
+# CRITICAL design rule: GL files MUST only treat Debit/Credit column values
+# as amounts. Description-column numbers (e.g. '6091', 'JV681130.1',
+# '1112-07', 'QP10280137') MUST NOT be parsed as amount/debit/credit.
+# Same principle for Bank Statements: only deposit/withdrawal/balance.
+
+_GL_SYSTEM_PROMPT = """You are an accountant reading a General Ledger (GL) report. The input is plain text extracted from a GL print-out or spreadsheet. Your job: parse each transaction row into a strict JSON schema.
+
+Output ONE JSON object (no markdown fences, no prose, just JSON):
+
+{
+  "document_type": "general_ledger",
+  "period_start": "YYYY-MM-DD or empty string",
+  "period_end": "YYYY-MM-DD or empty string",
+  "account_name": "bank/GL account name or empty",
+  "account_number": "account number or empty",
+  "opening_balance": "number-as-string, no commas, or empty",
+  "closing_balance": "number-as-string, no commas, or empty",
+  "entries": [
+    {
+      "transaction_date": "YYYY-MM-DD or empty",
+      "transaction_date_raw": "date text as printed",
+      "voucher_no": "voucher / journal / document number (e.g. JV681130.1, QP10280137) or empty",
+      "account_code": "account code (e.g. 1112-07) or empty",
+      "description": "row description text (Thai or English) — may contain digits like '6091' which are NOT amounts",
+      "debit": "number-as-string from the Debit / เดบิต column, no commas, empty if no debit",
+      "credit": "number-as-string from the Credit / เครดิต column, no commas, empty if no credit",
+      "amount": "debit if debit>0 else credit (derived number-as-string)",
+      "direction": "deposit | withdrawal | empty",
+      "balance": "running balance from the Balance / ยอดคงเหลือ column, or empty",
+      "debit_ref":   {"value": "number", "source_text": "as printed", "source_column": "Debit"   } or null,
+      "credit_ref":  {"value": "number", "source_text": "as printed", "source_column": "Credit"  } or null,
+      "balance_ref": {"value": "number", "source_text": "as printed", "source_column": "Balance" } or null,
+      "raw_row_data": {"column header": "cell text"}
+    }
+  ]
+}
+
+PROVENANCE — MANDATORY:
+For every non-empty debit / credit / balance you fill, ALSO fill the matching
+*_ref object with `source_column` set to the EXACT column-header text where
+you read that number from (e.g. "Debit", "เดบิต", "Credit", "เครดิต",
+"Balance", "ยอดคงเหลือ"). If you read the number from a Description /
+Voucher No. / Account Code column, FILL source_column with that header
+EXACTLY — downstream validators will then reject and clear the field. Do NOT
+guess or omit source_column when the value is non-empty.
+
+CRITICAL RULES — VIOLATIONS ARE BUGS:
+
+1. AMOUNT SOURCING (most important):
+   - debit / credit / balance / amount fields MAY ONLY contain values from the
+     Debit / Credit / Balance columns of the GL.
+   - The following columns are NEVER amounts: Description / รายการ / คำอธิบาย,
+     Account Code / รหัสบัญชี, Voucher No. / เลขที่เอกสาร, Journal No., Reference.
+   - Example: if you see "6091" in the Description column, '6091' goes in
+     `description`. It MUST NOT appear in `debit`, `credit`, `amount`, or `balance`.
+   - Example: 'JV681130.1' is a voucher_no, never an amount.
+   - Example: '1112-07' is an account_code, never an amount.
+
+2. DIRECTION DERIVATION:
+   - debit > 0  →  direction = "deposit"     (bank account goes UP / เงินฝาก)
+   - credit > 0 →  direction = "withdrawal"  (bank account goes DOWN / ถอนเงิน)
+   - both 0 / both blank → direction = "" (skip — likely a header or summary row)
+
+3. AMOUNT DERIVATION:
+   - amount = debit if debit > 0 else credit
+   - Never sum debit + credit into amount. They are mutually exclusive in a row.
+
+4. DATES: convert Buddhist year (>=2400) to Gregorian by subtracting 543.
+   ALWAYS preserve original text in transaction_date_raw.
+
+5. NUMBERS: no commas, no currency symbols, no parentheses. "12,450.00" → "12450.00".
+   Negative numbers stay negative ("-500.00").
+
+6. SKIP rows that are pure subtotals / openings / closings / page headers
+   (e.g. "ยอดยกมา", "ยอดยกไป", "Balance forward", "Subtotal"). They go into
+   opening_balance / closing_balance, NOT entries.
+
+7. raw_row_data is for audit: dump the original column→cell mapping as you
+   read it. If you cannot identify columns, leave it as an empty object {}.
+
+If the text is clearly NOT a General Ledger (e.g. a tax invoice was uploaded
+into the GL slot by mistake), return:
+  {"document_type": "general_ledger", "entries": [], "account_name": "(not a GL)"}
+"""
+
+_BANK_STATEMENT_SYSTEM_PROMPT = """You are an accountant reading a Bank Statement. The input is plain text extracted from a bank PDF. Your job: parse each transaction row into a strict JSON schema.
+
+Output ONE JSON object (no markdown fences, no prose, just JSON):
+
+{
+  "document_type": "bank_statement",
+  "bank_name": "full bank name or empty",
+  "bank_code": "kbank / bbl / scb / ktb / kkp / bay / ttb / empty",
+  "account_name": "account holder name or empty",
+  "account_number": "full account number or empty",
+  "account_last4": "last 4 digits of account or empty",
+  "period_start": "YYYY-MM-DD or empty",
+  "period_end": "YYYY-MM-DD or empty",
+  "opening_balance": "number-as-string or empty",
+  "closing_balance": "number-as-string or empty",
+  "entries": [
+    {
+      "transaction_date": "YYYY-MM-DD or empty",
+      "transaction_date_raw": "as printed",
+      "description": "transaction description / remark",
+      "reference": "reference code / transaction code or empty",
+      "deposit": "number-as-string from Deposit / Credit / เงินเข้า / ฝาก column, or empty",
+      "withdrawal": "number-as-string from Withdrawal / Debit / เงินออก / ถอน column, or empty",
+      "amount": "deposit if deposit>0 else withdrawal (derived)",
+      "direction": "deposit | withdrawal | empty",
+      "balance": "running balance from Balance / ยอดคงเหลือ column, or empty",
+      "deposit_ref":    {"value": "number", "source_text": "as printed", "source_column": "Deposit"    } or null,
+      "withdrawal_ref": {"value": "number", "source_text": "as printed", "source_column": "Withdrawal" } or null,
+      "balance_ref":    {"value": "number", "source_text": "as printed", "source_column": "Balance"    } or null,
+      "raw_row_data": {"column header": "cell text"}
+    }
+  ]
+}
+
+PROVENANCE — MANDATORY:
+For every non-empty deposit / withdrawal / balance, ALSO fill the matching
+*_ref object with `source_column` set to the EXACT column-header text the
+number came from. Allowed columns: "Deposit" / "เงินเข้า" / "ฝาก" (deposit),
+"Withdrawal" / "เงินออก" / "ถอน" (withdrawal), "Balance" / "ยอดคงเหลือ".
+If the source was actually a Description / Reference / Account-No column,
+fill source_column with that header verbatim — validators reject these.
+
+CRITICAL RULES — VIOLATIONS ARE BUGS:
+
+1. AMOUNT SOURCING:
+   - deposit / withdrawal / balance / amount fields MAY ONLY contain values from
+     the Deposit / Withdrawal / Balance columns.
+   - Reference codes, transaction codes, account-number digits, remark text
+     digits MUST NEVER be parsed into amount fields.
+
+2. DIRECTION:
+   - deposit > 0    → direction = "deposit"
+   - withdrawal > 0 → direction = "withdrawal"
+
+3. AMOUNT DERIVATION: amount = deposit if deposit > 0 else withdrawal.
+
+4. DATES: convert Buddhist (>=2400) by -543. Preserve raw text.
+
+5. NUMBERS: no commas, no THB / ฿. Negative numbers stay negative.
+
+If the text is clearly NOT a bank statement, return:
+  {"document_type": "bank_statement", "entries": [], "bank_name": "(not a bank statement)"}
+"""
+
+_VAT_REPORT_SYSTEM_PROMPT = """You are an accountant reading a Thai VAT report (รายงานภาษีขาย / รายงานภาษีซื้อ). Each row is one invoice. Your job: parse rows into strict JSON.
+
+Output ONE JSON object (no markdown, no prose, just JSON):
+
+{
+  "document_type": "vat_report",
+  "seller_name": "the report-filing company name or empty",
+  "seller_tax": "13-digit Thai tax ID of the filing company or empty",
+  "period_year": "Gregorian 4-digit year, e.g. '2026'",
+  "period_month": "'01'..'12'",
+  "total_subtotal": "report total net amount or empty",
+  "total_vat": "report total VAT amount or empty",
+  "total_total": "report grand total or empty",
+  "entries": [
+    {
+      "seq_no": "row sequence number or empty",
+      "transaction_date": "YYYY-MM-DD or empty",
+      "transaction_date_raw": "as printed",
+      "invoice_no": "invoice number",
+      "customer_name": "buyer name",
+      "customer_tax": "13-digit Thai tax ID or empty",
+      "customer_branch": "branch / สำนักงานใหญ่ or empty",
+      "subtotal": "net amount (number-as-string)",
+      "vat": "VAT amount (number-as-string)",
+      "total": "total amount (number-as-string)",
+      "raw_row_data": {"column header": "cell text"}
+    }
+  ]
+}
+
+CRITICAL RULES:
+1. Buddhist year (>=2400) converted to Gregorian by -543. period_year is Gregorian.
+2. Numbers: no commas, no currency.
+3. Tax IDs: exactly 13 digits, no dashes/spaces. Empty if not found.
+4. Skip total/subtotal/page-footer rows — those go into the document-level
+   total_subtotal / total_vat / total_total fields.
+"""
+
+_GENERIC_TABLE_SYSTEM_PROMPT = """You are reading a tabular document of unknown business type. Extract the table grid into a strict JSON object:
+
+{
+  "document_type": "generic_table",
+  "headers": ["col1", "col2", ...],
+  "rows": [
+    {"col1": "value", "col2": "value", ...}
+  ]
+}
+
+Output ONLY the JSON. Preserve cell text exactly as printed. Do NOT interpret
+numbers as amounts or dates — keep them as strings. Skip blank rows.
+"""
+
+
+# ============================================================
+# Original invoice prompt (unchanged behavior path)
 # ============================================================
 _SYSTEM_PROMPT = """You are an accountant extracting structured data from Thai tax invoice text. The text has already been OCR'd by another engine; your job is purely to interpret and map it to JSON. Do NOT correct typos or "improve" company names.
 
@@ -123,8 +334,25 @@ Output ONE JSON object matching this schema (no markdown fences, no explanation,
   "total_amount": "number-as-string or null",
   "items": [{"name": "...", "qty": "...", "price": "...", "subtotal": "..."}],
   "notes": "remark text",
-  "category": "3-5 char summary in items' language (e.g. 餐饮, ค่าขนส่ง)"
+  "category": "3-5 char summary in items' language (e.g. 餐饮, ค่าขนส่ง)",
+  "source_refs": {
+    "invoice_number": {"value": "...", "source_text": "as printed", "source_column": "Invoice No."} or omit,
+    "total_amount":   {"value": "...", "source_text": "as printed", "source_column": "Total"     } or omit,
+    "subtotal":       {"value": "...", "source_text": "as printed", "source_column": "Subtotal"  } or omit,
+    "vat":            {"value": "...", "source_text": "as printed", "source_column": "VAT"       } or omit,
+    "seller_tax":     {"value": "...", "source_text": "as printed", "source_column": "Tax ID"    } or omit,
+    "buyer_tax":      {"value": "...", "source_text": "as printed", "source_column": "Tax ID"    } or omit,
+    "date":           {"value": "...", "source_text": "as printed", "source_column": "Date"      } or omit
+  }
 }
+
+PROVENANCE — fill source_refs for amount + tax-id + date fields:
+For each non-empty amount field (total_amount / subtotal / vat / wht_amount),
+fill source_refs[<field>].source_column with the printed label of the cell
+the number came from (e.g. "Total" / "ยอดรวม" / "จำนวนเงิน" / "Subtotal" /
+"VAT" / "ภาษีมูลค่าเพิ่ม"). If the number came from a Description / Remark /
+Address / Tax-ID-column-by-accident, fill that label EXACTLY — downstream
+validators will reject and force needs_review. Do NOT invent column names.
 
 CRITICAL RULES:
 1. DATE: Buddhist year (>= 2400) MUST be converted to Gregorian by subtracting 543. e.g. 2569 -> 2026. ALWAYS fill date_raw with the original text.
@@ -190,53 +418,106 @@ def extract_from_page(
     model_name: str = DEFAULT_MODEL,
     max_retries: int = DEFAULT_MAX_RETRIES,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    document_type: BusinessDocumentType = "auto",
 ) -> Layer2PageResult:
-    """Extract ThaiInvoice from a single layer-1 Page, with per-call metadata.
+    """Extract structured data from a single layer-1 Page.
+
+    Routes by document_type (2026-05-21 multi-schema refactor):
+        - "auto" / "invoice"        → invoice prompt → ThaiInvoice
+        - "bank_statement"          → bank prompt → BankStatementDocument
+        - "general_ledger"          → GL prompt → GeneralLedgerDocument
+        - "vat_report"              → VAT prompt → VatReportDocument
+        - "generic_table"           → generic table prompt → GenericTableDocument
+
+    Non-invoice docs return Layer2PageResult with `document` populated and
+    `invoice` left at is_not_invoice=True for backwards compat.
 
     Empty pages (no text after strip) are skipped — no API call is made.
-    The returned Layer2PageResult has `skipped=True` and an empty ThaiInvoice
-    with `is_not_invoice=True`.
-
-    Args:
-        page: a Page from Layer1Result.pages
-        api_key, model_name, max_retries, timeout: see extract_from_text
-
-    Returns:
-        Layer2PageResult: invoice + page_number + tokens + retries + elapsed
 
     Raises:
         Same as extract_from_text. The page_number is included in error msg.
     """
     t0 = time.time()
 
-    if not page.full_text or not page.full_text.strip():
+    # Build text from Page — prefer structured table_rows when available
+    # (Excel/CSV/Word direct-read path), else use full_text.
+    text_input = _page_to_text(page)
+
+    if not text_input or not text_input.strip():
         return Layer2PageResult(
             page_number=page.page_number,
             invoice=ThaiInvoice(is_not_invoice=True),
+            document_type=document_type,
             elapsed_ms=int((time.time() - t0) * 1000),
             skipped=True,
         )
 
+    # Invoice / auto path → existing behavior, returns ThaiInvoice
+    if document_type in ("auto", "invoice"):
+        try:
+            invoice, meta = _extract_internal(
+                text_input,
+                api_key=api_key,
+                model_name=model_name,
+                max_retries=max_retries,
+                timeout=timeout,
+            )
+        except (ValueError, Layer2Error) as e:
+            raise type(e)(f"layer2: page {page.page_number}: {e}") from e
+
+        return Layer2PageResult(
+            page_number=page.page_number,
+            invoice=invoice,
+            document_type=document_type,
+            document=None,
+            elapsed_ms=int((time.time() - t0) * 1000),
+            input_tokens=meta["input_tokens"],
+            output_tokens=meta["output_tokens"],
+            retries=meta["retries"],
+        )
+
+    # Non-invoice doc types — route to the per-type prompt+schema
     try:
-        invoice, meta = _extract_internal(
-            page.full_text,
+        document, meta = _extract_doc_internal(
+            text_input,
+            document_type=document_type,
             api_key=api_key,
             model_name=model_name,
             max_retries=max_retries,
             timeout=timeout,
+            page_number=page.page_number,
         )
     except (ValueError, Layer2Error) as e:
-        # Re-raise with page context; preserve original type for caller dispatch
         raise type(e)(f"layer2: page {page.page_number}: {e}") from e
 
     return Layer2PageResult(
         page_number=page.page_number,
-        invoice=invoice,
+        invoice=ThaiInvoice(is_not_invoice=True),
+        document_type=document_type,
+        document=document,
         elapsed_ms=int((time.time() - t0) * 1000),
         input_tokens=meta["input_tokens"],
         output_tokens=meta["output_tokens"],
         retries=meta["retries"],
     )
+
+
+def _page_to_text(page: Page) -> str:
+    """Convert a Page to plain text for Layer 2 input.
+
+    When page has structured table_rows (table_path / Excel/CSV/Word),
+    serialize them with headers preserved so Layer 2 can identify columns.
+    Else use Page.full_text as-is.
+    """
+    if page.table_rows is not None and page.table_headers is not None:
+        # Pipe-delimited grid keeps column structure obvious to the LLM
+        header_line = " | ".join(page.table_headers)
+        body_lines = []
+        for row in page.table_rows:
+            cells = [str(row.get(h, "")) for h in page.table_headers]
+            body_lines.append(" | ".join(cells))
+        return header_line + "\n" + "\n".join(body_lines)
+    return page.full_text
 
 
 def extract_from_layer1(
@@ -245,6 +526,7 @@ def extract_from_layer1(
     model_name: str = DEFAULT_MODEL,
     max_retries: int = DEFAULT_MAX_RETRIES,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    document_type: BusinessDocumentType = "auto",
 ) -> Layer2Result:
     """Process every Page in a Layer1Result, returning a Layer2Result.
 
@@ -275,6 +557,7 @@ def extract_from_layer1(
                 model_name=model_name,
                 max_retries=max_retries,
                 timeout=timeout,
+                document_type=document_type,
             )
         )
 
@@ -283,6 +566,90 @@ def extract_from_layer1(
         elapsed_ms=int((time.time() - t0) * 1000),
         model=model_name,
     )
+
+
+# ============================================================
+# Internal: per-document-type extraction (2026-05-21 refactor)
+# ============================================================
+_DOC_PROMPTS: dict = {
+    "general_ledger": _GL_SYSTEM_PROMPT,
+    "bank_statement": _BANK_STATEMENT_SYSTEM_PROMPT,
+    "vat_report": _VAT_REPORT_SYSTEM_PROMPT,
+    "generic_table": _GENERIC_TABLE_SYSTEM_PROMPT,
+}
+
+_DOC_SCHEMAS: dict = {
+    "general_ledger": GeneralLedgerDocument,
+    "bank_statement": BankStatementDocument,
+    "vat_report": VatReportDocument,
+    "generic_table": GenericTableDocument,
+}
+
+
+def _extract_doc_internal(
+    text: str,
+    document_type: BusinessDocumentType,
+    api_key: Optional[str],
+    model_name: str,
+    max_retries: int,
+    timeout: int,
+    page_number: int,
+):
+    """Extract per-document-type schema (GL / Bank / VAT / Table).
+
+    Picks the matching prompt + Pydantic schema by document_type, calls
+    Gemini with the same retry logic as invoice extraction, validates the
+    result against the schema, returns (document, metadata).
+    """
+    if not isinstance(text, str):
+        raise TypeError(f"layer2: text must be str, got {type(text).__name__}")
+
+    cleaned = text.strip()
+    if len(cleaned) < MIN_TEXT_LENGTH:
+        # Too short — return empty document of the right type
+        schema_cls = _DOC_SCHEMAS[document_type]
+        return (
+            schema_cls(),
+            {"input_tokens": 0, "output_tokens": 0, "retries": 0},
+        )
+
+    if len(cleaned) > MAX_TEXT_LENGTH:
+        logger.warning(
+            "layer2: input text %d chars truncated to %d (doc_type=%s)",
+            len(cleaned), MAX_TEXT_LENGTH, document_type,
+        )
+        cleaned = cleaned[:MAX_TEXT_LENGTH]
+
+    key = (
+        api_key
+        or os.environ.get("GOOGLE_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
+    )
+    if not key:
+        raise Layer2AuthError(
+            "layer2: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set"
+        )
+
+    prompt_prefix = _DOC_PROMPTS[document_type]
+    schema_cls = _DOC_SCHEMAS[document_type]
+
+    data, meta = _call_gemini_with_retry(
+        cleaned,
+        api_key=key.strip(),
+        model_name=model_name,
+        max_retries=max_retries,
+        timeout=timeout,
+        system_prompt_override=prompt_prefix,
+    )
+
+    try:
+        document = schema_cls(**data)
+    except ValidationError as e:
+        raise ValueError(
+            f"layer2: Gemini JSON parsed but failed {schema_cls.__name__} schema: {e}"
+        ) from e
+
+    return document, meta
 
 
 # ============================================================
@@ -354,6 +721,7 @@ def _call_gemini_with_retry(
     model_name: str,
     max_retries: int,
     timeout: int,
+    system_prompt_override: Optional[str] = None,
 ) -> Tuple[dict, dict]:
     """Make Gemini API call with JSON-parse retry budget.
 
@@ -361,11 +729,15 @@ def _call_gemini_with_retry(
     quota errors propagate immediately (no point retrying them at this layer
     — pipeline.py decides whether to retry transient errors).
 
+    When system_prompt_override is provided, that prompt is used instead of
+    the default invoice prompt (multi-schema refactor).
+
     Returns (data: dict, metadata: dict)
     metadata keys: input_tokens, output_tokens, retries
     """
     model = _get_model(api_key=api_key, model_name=model_name)
-    prompt = _SYSTEM_PROMPT + "\n\n" + _USER_PROMPT_PREFIX + text
+    sys_prompt = system_prompt_override if system_prompt_override else _SYSTEM_PROMPT
+    prompt = sys_prompt + "\n\n" + _USER_PROMPT_PREFIX + text
 
     last_parse_error: Optional[str] = None
     last_raw_preview: str = ""

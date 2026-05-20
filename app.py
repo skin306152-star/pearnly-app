@@ -2021,13 +2021,19 @@ async def ocr_recognize(
     client_ip = get_client_ip(request)
     plan = user.get("plan", "free")
 
-    # 1. 基本校验
-    if not (file.filename and file.filename.lower().endswith(".pdf")):
-        raise HTTPException(400, detail="ocr.not_pdf")
+    # 1. 基本校验 (2026-05-21 multi-format refactor: PDF + image + Excel + CSV + Word)
+    from services.ocr.pipeline import (
+        PDF_EXTENSIONS, IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+    )
+    _all_exts = PDF_EXTENSIONS | IMAGE_EXTENSIONS | TABLE_EXTENSIONS
+    _fname = (file.filename or "").lower()
+    _ext = "." + _fname.rsplit(".", 1)[-1] if "." in _fname else ""
+    if not _fname or _ext not in _all_exts:
+        raise HTTPException(400, detail="ocr.unsupported_format")
 
     content = await file.read()
     if len(content) == 0:
-        raise HTTPException(400, detail="ocr.empty_pdf")
+        raise HTTPException(400, detail="ocr.empty_file")
 
     # 2. 按套餐决定页数/大小上限 · v0.8 单一数据源
     p_perms = _plan_permissions(plan)
@@ -2037,16 +2043,19 @@ async def ocr_recognize(
     if len(content) > max_mb * 1024 * 1024:
         raise HTTPException(400, detail={"code": "ocr.file_too_large", "mb": max_mb})
 
-    # 3. 页数校验(所有引擎都要检查)
-    from services.ocr.pdf_utils import count_pdf_pages
-    page_count = count_pdf_pages(content)
-    if page_count == 0:
-        raise HTTPException(400, detail="ocr.invalid_pdf")
-    if page_count > max_pages:
-        raise HTTPException(400, detail={
-            "code": "ocr.too_many_pages",
-            "max": max_pages, "actual": page_count,
-        })
+    # 3. 页数校验 — only meaningful for PDFs. Excel/CSV/Word/image skip this.
+    if _ext in PDF_EXTENSIONS:
+        from services.ocr.pdf_utils import count_pdf_pages
+        page_count = count_pdf_pages(content)
+        if page_count == 0:
+            raise HTTPException(400, detail="ocr.invalid_pdf")
+        if page_count > max_pages:
+            raise HTTPException(400, detail={
+                "code": "ocr.too_many_pages",
+                "max": max_pages, "actual": page_count,
+            })
+    else:
+        page_count = 1  # images / single-CSV / single-DOCX count as 1 page
 
     # 4. 配额检查 · v0.15 · 新双轨:自带 key → 不限 · 否则扣 user.monthly_quota
     # === v109.3 · 新套餐配额检查(防薅 + 真实计量) ===
@@ -2201,16 +2210,29 @@ async def ocr_recognize(
     api_key = own_key or None
 
     # OCR · 新 pipeline 唯一路径(text_path layer 0 + Vision + Flash-Lite + Flash · 100% 埋点)
+    # 2026-05-21 multi-format refactor: dispatch by extension to PDF /
+    # image / table reader. PDF and image go through OCR; Excel/CSV/Word
+    # bypass OCR via table_path.
     chain_info = ["pipeline_v1"]
     fallback_used = False
     try:
-        from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
+        from services.ocr.pipeline import (
+            run_on_pdf_bytes as _pipeline_run_pdf,
+            run_on_image_bytes as _pipeline_run_image,
+            run_on_table_bytes as _pipeline_run_table,
+        )
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
-        _pipe_res = _pipeline_run(content, max_pages=max_pages, api_key=api_key)
+        if _ext in PDF_EXTENSIONS:
+            _pipe_res = _pipeline_run_pdf(content, max_pages=max_pages, api_key=api_key)
+        elif _ext in IMAGE_EXTENSIONS:
+            _pipe_res = _pipeline_run_image(content, api_key=api_key)
+        else:  # TABLE_EXTENSIONS — Excel / CSV / Word / TXT
+            _pipe_res = _pipeline_run_table(content, filename=file.filename or "upload", api_key=api_key)
+            chain_info = ["pipeline_v1_table"]
         result = pipeline_result_to_legacy_dict(_pipe_res)
         _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
         logger.info(
-            f"🆕 pipeline_v1 · file={file.filename} · pages={_pipe_res.page_count} "
+            f"🆕 pipeline_v1 · file={file.filename} · ext={_ext} · pages={_pipe_res.page_count} "
             f"· cost=฿{_pipeline_cost_thb:.4f} · elapsed={_pipe_res.elapsed_ms}ms"
         )
     except HTTPException:
@@ -2218,7 +2240,7 @@ async def ocr_recognize(
     except Exception as _pipe_err:
         err_name = type(_pipe_err).__name__
         if err_name == "Layer1PDFError" or isinstance(_pipe_err, ValueError):
-            raise HTTPException(400, detail=f"ocr.invalid_pdf: {_pipe_err}")
+            raise HTTPException(400, detail=f"ocr.invalid_file: {_pipe_err}")
         logger.exception(f"❌ pipeline_v1 失败: {err_name}: {_pipe_err}")
         raise HTTPException(500, detail="ocr.engine_error")
 
@@ -4785,11 +4807,21 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
     """
     user = get_current_user_from_request(request)
     filename = file.filename or "statement.pdf"
-    if not filename.lower().endswith(".pdf"):
-        raise HTTPException(400, detail="bank_recon.only_pdf")
+    # 2026-05-21 multi-format refactor: bank statement upload supports
+    # PDF / image / Excel / CSV / Word. PDF goes through bank_recon_v2's
+    # existing parser; tabular formats go through the unified pipeline
+    # with document_type=bank_statement.
+    from services.ocr.pipeline import (
+        PDF_EXTENSIONS, IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+    )
+    _bank_all_exts = PDF_EXTENSIONS | IMAGE_EXTENSIONS | TABLE_EXTENSIONS
+    _bank_fname_l = filename.lower()
+    _bank_ext = "." + _bank_fname_l.rsplit(".", 1)[-1] if "." in _bank_fname_l else ""
+    if _bank_ext not in _bank_all_exts:
+        raise HTTPException(400, detail="bank_recon.unsupported_format")
 
     pdf_bytes = await file.read()
-    if not pdf_bytes or len(pdf_bytes) < 200:
+    if not pdf_bytes or len(pdf_bytes) < 50:
         raise HTTPException(400, detail="bank_recon.empty_file")
     if len(pdf_bytes) > 20 * 1024 * 1024:
         raise HTTPException(413, detail="bank_recon.file_too_large")
@@ -4797,9 +4829,29 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
     import bank_recon_v2 as br
     import asyncio
 
-    # 先建会话 · 再异步解析(但这里走同步等结果 · 简化前端)
     try:
-        parsed = await asyncio.to_thread(br.parse_statement_pdf, pdf_bytes, filename)
+        if _bank_ext in PDF_EXTENSIONS:
+            # Existing flow: pdfplumber → Gemini fallback (handles scan + text PDFs)
+            parsed = await asyncio.to_thread(br.parse_statement_pdf, pdf_bytes, filename)
+        else:
+            # New flow: route through unified pipeline with explicit document_type
+            # so Excel/CSV/Word bank statements bypass OCR and the GL/Bank
+            # validators reject mis-sourced amounts (e.g. 6091).
+            from services.ocr.pipeline import (
+                run_on_image_bytes as _bank_run_image,
+                run_on_table_bytes as _bank_run_table,
+            )
+            from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+            if _bank_ext in IMAGE_EXTENSIONS:
+                _pipe_res = await asyncio.to_thread(
+                    _bank_run_image, pdf_bytes, document_type="bank_statement"
+                )
+            else:  # TABLE_EXTENSIONS
+                _pipe_res = await asyncio.to_thread(
+                    _bank_run_table, pdf_bytes, filename, None, None, "bank_statement"
+                )
+            _legacy = pipeline_result_to_legacy_dict(_pipe_res)
+            parsed = br.parsed_from_pipeline_legacy(_legacy, filename)
     except Exception as e:
         logger.exception("[bank_recon] 解析异常")
         raise HTTPException(500, detail=f"bank_recon.parse_exception:{str(e)[:100]}")
@@ -5517,7 +5569,11 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.34.39 · 设置弹窗滚动彻底修好 · 用户 DevTools 诊断抓出真正 bug:\n• 用户在 zoom 142% / viewport 659px 时测出: modal max-height 是 560px (正确) 但 layout + side-nav 被 align-items:stretch + flex:1 撑成 611px (内容高度) · 超出 modal 90px · 被 modal overflow:hidden 切掉 · '联系我们' 永远看不到\n• 根因: 之前靠 min-height:0 + flex shrink chain 让 flex item 缩到父容器 · 实际 flex 默认 min-height:auto 导致 item 至少跟内容一样高 · 我的 min-height:0 没起到预期作用\n• 修: 放弃 flex stretch 推力 · 直接给 side-nav 设 max-height: calc(min(85vh, 100vh - 64px) - 80px) · 用 calc 卡死最大高 · 不再依赖 flex chain · 现在 overflow-y:scroll 必然触发\n• cache-bust v=11834938 → 11834939\n\n累积 fix 包含: 对账中心 78 条 4 语术语统一 · Excel sheet 名 รายละเอียดบัญชี → รายละเอียดSTATEMENT · ERP 集成页布局 · 设置弹窗响应式 + 滚动条 · Xero/MR.ERP 卡同高 · nginx pre-gzipped 陈旧 .gz 自动清除",
+            "zh": "v118.35.0.0 · 文件上传更聪明 · 银行/总账识别更准:\n• Excel、CSV、Word 现在可以直接上传 · 不用再先转 PDF · 系统会自动判断文件类型选最合适的读法\n• 银行对账单和总账识别全面加固 · 摘要列的数字(比如客户编号、凭证号)再也不会被误读成金额\n• 识别结果按准确度自动分流 · 高准确度直接进对账 · 不太确定的会标黄让你确认 · 真的看不清的直接进人工复核 · 不会瞎填一个错的塞给你",
+            "th": "v118.35.0.0 · อัปโหลดไฟล์ฉลาดขึ้น · กระทบยอดธนาคาร / บัญชีแยกประเภทแม่นยำขึ้น:\n• Excel, CSV, Word อัปโหลดได้โดยตรงแล้ว · ไม่ต้องแปลงเป็น PDF ก่อน · ระบบเลือกวิธีอ่านที่เหมาะกับไฟล์โดยอัตโนมัติ\n• Bank Statement และ General Ledger อ่านแม่นยำขึ้นมาก · ตัวเลขในคอลัมน์รายการ (เช่น รหัสลูกค้า, เลขที่เอกสาร) จะไม่ถูกเข้าใจผิดว่าเป็นจำนวนเงินอีกต่อไป\n• ผลลัพธ์แบ่งตามความมั่นใจอัตโนมัติ · มั่นใจสูงเข้ากระทบยอดทันที · ไม่แน่ใจขึ้นสีเหลืองให้ยืนยัน · อ่านไม่ออกเข้าคิวตรวจสอบ · ไม่เดามั่ว",
+            "en": "v118.35.0.0 · Smarter file upload · Bank statement & GL reading is more accurate:\n• Excel, CSV, and Word files can now be uploaded directly · no need to convert to PDF first · the system picks the best reading method based on the file type\n• Bank statement and general ledger reading is hardened · numbers in the description column (customer codes, voucher numbers, etc.) will no longer be misread as amounts\n• Results are auto-routed by confidence · high-confidence flows straight into reconciliation · uncertain ones get a yellow tag for you to confirm · unreadable ones go to manual review · we never fill in a wrong guess",
+            "ja": "v118.35.0.0 · ファイルアップロードがより賢く · 銀行明細・総勘定元帳の読み取りがより正確に:\n• Excel・CSV・Word ファイルを直接アップロード可能に · PDF への変換は不要 · ファイル形式に応じて最適な読み取り方法を自動選択\n• 銀行明細と総勘定元帳の読み取りを強化 · 摘要欄の数字(顧客コード・伝票番号など)が金額として誤認されることはなくなりました\n• 結果は信頼度に応じて自動振り分け · 高信頼度はそのまま照合へ · 不確実なものは黄色タグで確認待ち · 読み取り不能なものは人手チェックへ · 推測で誤った値を入れることはありません",
+            "release_notes_archived_v34_39": "v118.34.39 · 设置弹窗滚动彻底修好 · 用户 DevTools 诊断抓出真正 bug:\n• 用户在 zoom 142% / viewport 659px 时测出: modal max-height 是 560px (正确) 但 layout + side-nav 被 align-items:stretch + flex:1 撑成 611px (内容高度) · 超出 modal 90px · 被 modal overflow:hidden 切掉 · '联系我们' 永远看不到\n• 根因: 之前靠 min-height:0 + flex shrink chain 让 flex item 缩到父容器 · 实际 flex 默认 min-height:auto 导致 item 至少跟内容一样高 · 我的 min-height:0 没起到预期作用\n• 修: 放弃 flex stretch 推力 · 直接给 side-nav 设 max-height: calc(min(85vh, 100vh - 64px) - 80px) · 用 calc 卡死最大高 · 不再依赖 flex chain · 现在 overflow-y:scroll 必然触发\n• cache-bust v=11834938 → 11834939\n\n累积 fix 包含: 对账中心 78 条 4 语术语统一 · Excel sheet 名 รายละเอียดบัญชี → รายละเอียดSTATEMENT · ERP 集成页布局 · 设置弹窗响应式 + 滚动条 · Xero/MR.ERP 卡同高 · nginx pre-gzipped 陈旧 .gz 自动清除",
             "release_notes_archived_v34_33": "v118.34.33 · 批 1 · OCR 自动归属客户 + 不 retry 用户数据错 + 日志加客户/ERP 列:\n• 改动 1 OCR 完自动 resolve client_id:按 buyer_name + buyer_tax 匹配 Pearnly 客户表(税号 0.98 / 完全名 0.95 / substring 0.80-0.90 / 学习记忆 1.0)· ≥0.95 自动绑 + 学习下次 · 0.80-0.95 标 suggested_client_id · <0.80 不绑 · 没归属的发票直接不入 auto-push 队列(不再炸 ERR_NO_CLIENT)\n• 改动 3 retry 区分用户数据错:USER_DATA_ERROR_CODES (NO_CLIENT/NO_CUSTOMER_MAPPING/NO_INVOICE_NO/DATE_FUTURE/DUPLICATE_INVOICE 等) + 泰文 raw 模式 · 这类错不进重试队列 · retry worker 命中也立刻摘队列\n• 改动 5 日志列表加 Pearnly 客户列:LEFT JOIN clients · UI 显示 client_name · 未归属灰色「未归属」+ tip\n• 改动 8 顺便做 ERP 列:LEFT JOIN erp_endpoints · 显示 endpoint.name(用户起的)\n• 新 db 表 buyer_to_client_memory · 用户在抽屉 assign 时学习 buyer→client · 下次 OCR 自动归属",
             "release_notes_archived_v34_28": "v118.34.28 · 死链修:derive_mrerp_invoice_no seq 不再写死 001:\n• 根因:第一笔 push 成功 → bill_no SI690519-001 · 第二笔 push (同一天) MR.ERP 报「เลขที่ดังกล่าวมีอยู่ในระบบแล้ว(已存在)」· 因为 derive_mrerp_invoice_no seq 写死 \"001\" · 同一天所有 push 都 derive YYMMDD-001 撞\n• 之前的 docstring 写「序号取 history.id 末 3 位 hex 转 dec mod 1000」但代码写错成 hardcode \"001\" · 注释和实现不一致\n• 修:按 docstring 真实现 · 用 history.id 末 6 位 hex 转 dec mod 999 + 1 (避开 000)· 同一 history 重传幂等 · 不同 history 序号不同\n• 测试: 5 个 uuid → 5 个不同 seq (460/272/732/705/078) · 同 uuid 两次 → 同 seq (441/441) · 幂等保证\n\n现在可以并发推多笔 · 不会撞 invoice_no",
             "release_notes_archived_v34_27": "v118.34.27 · listing 拉不到不再阻断 push · fail-soft 走 auto-create:\n• 根因:TEST2019 stkmas listing 在 30s × 3 retries 都拉不出来(MR.ERP 服务端慢或 #showdata p selector 不命中)· 之前 listing fetch 在 lookup() 里 raise · 整个 push fail\n• 修:mrerp_customer_sync.lookup + mrerp_product_sync.lookup 把 _fetch_listing() try/catch MRERPTechnicalError · 失败时 log warning + return None · 让 lookup_or_create 走 L4 auto-create (创建路径 stkmas/allform.php 不依赖 allview.php listing)\n• 效果:listing 拉不到 → L1 DB mapping 没命中 → L2/L3 listing 路径 fail-soft return None → L4 自动建用 seed 模板 · push 继续\n• 跟之前 v34.26 sync 吞 MRERPTechnicalError 是互补:v34.26 在 sync 顶层吞 · v34.27 在 lookup 里 fail-soft 让 lookup_or_create 能继续走 L4\n\n这是 stkmas listing 慢的兜底方案 · 自动建客户/商品全链路通",

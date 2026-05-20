@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11834939">
+<link rel="stylesheet" href="/static/home.css?v=11835000">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -2343,10 +2343,10 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     <path d="M14 32V16a2 2 0 012-2h12l8 8v10a2 2 0 01-2 2H16a2 2 0 01-2-2z"/>
                     <path d="M28 14v8h8M24 28v-6M20 24l4-4 4 4"/>
                 </svg>
-                <div class="text" data-i18n="drop-text">点击或拖拽 PDF 文件到此处</div>
-                <div class="hint" data-i18n="drop-hint">支持泰文 / 英文 · 数据不存服务器</div>
+                <div class="text" data-i18n="drop-text">点击或拖拽文件到此处</div>
+                <div class="hint" data-i18n="drop-hint">支持 PDF / 图片 / Excel / CSV / Word · 系统自动选择 OCR 或直接解析 · 数据不存服务器</div>
             </div>
-            <input type="file" id="file-input" accept="application/pdf" multiple>
+            <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.bmp,.gif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc,.txt" multiple>
 
             <!-- v113 · 移动端拍照入口 + 上传图片入口 · 桌面端也展示"上传图片" -->
             <div class="upload-alt-row" id="upload-alt-row" style="display:none;">
@@ -2369,7 +2369,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             <!-- v113 · 拍照 input(每点一次拍 1 张 · 触发原生相机)-->
             <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;">
             <!-- v113 · 选图 input(多选 · 支持图片和 PDF 混选)-->
-            <input type="file" id="gallery-input" accept="image/*,application/pdf" multiple style="display:none;">
+            <input type="file" id="gallery-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.bmp,.gif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc,.txt" multiple style="display:none;">
 
             <ul class="file-list" id="file-list"></ul>
 
@@ -2828,9 +2828,9 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                                 </div>
                                 <label for="bank-file-input" class="btn btn-primary bank-upload-btn">
                                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
-                                    <span data-i18n="bank-btn-upload-batch">选择 PDF(可多选)</span>
+                                    <span data-i18n="bank-btn-upload-batch">选择文件(可多选)</span>
                                 </label>
-                                <input type="file" id="bank-file-input" accept="application/pdf,.pdf" multiple style="display:none">
+                                <input type="file" id="bank-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" multiple style="display:none">
                             </div>
                             <!-- 单文件遗留 progress / error · 仅在仅传 1 张时降级显示 · 多文件走下方队列 -->
                             <div id="bank-upload-progress" class="bank-upload-progress" style="display:none">
@@ -4565,7 +4565,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 
     <!-- ============ 页面: 对账中心(v105 上线 · v118.32.4.9.2 改左右分栏)============ -->
     <!-- 银行对账单上传 · 隐藏 input · JS 直接触发 -->
-    <input type="file" id="reconcile-bank-file-input" multiple accept=".pdf" style="display:none">
+    <input type="file" id="reconcile-bank-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" style="display:none">
     <section class="page" id="page-reconcile">
         <!-- 顶部 page head -->
         <div class="page-head-clean">
@@ -4642,7 +4642,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                         <div class="vex-drop-title" data-i18n="brv2-stmt-title">① 银行账单 PDF</div>
                         <div class="vex-drop-sub" data-i18n="brv2-stmt-hint">KBank · BBL · KKP · KTB · 支持多文件</div>
                         <div class="vex-drop-filename" id="brv2-stmt-name"></div>
-                        <input type="file" id="brv2-stmt-input" accept="application/pdf,.pdf" multiple style="display:none">
+                        <input type="file" id="brv2-stmt-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" multiple style="display:none">
                     </div>
 
                     <div class="vex-drop-divider" aria-hidden="true"><span>+</span></div>
@@ -4659,7 +4659,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                         <div class="vex-drop-title" data-i18n="brv2-gl-title">② 总账 GL</div>
                         <div class="vex-drop-sub" data-i18n="brv2-gl-hint">Excel (.xlsx) 或 PDF · 支持多文件</div>
                         <div class="vex-drop-filename" id="brv2-gl-name"></div>
-                        <input type="file" id="brv2-gl-input" accept=".xlsx,.xls,.pdf,application/pdf" multiple style="display:none">
+                        <input type="file" id="brv2-gl-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" multiple style="display:none">
                     </div>
                 </div>
 
@@ -4905,7 +4905,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                         </div>
                         <div class="vex-drop-title" data-i18n="vex-drop-invoice-title">销售发票</div>
                         <div class="vex-drop-sub" data-i18n="vex-drop-invoice-sub">多张拖入 · 单次最多 1000 张</div>
-                        <input type="file" id="vex-input-invoice" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
+                        <input type="file" id="vex-input-invoice" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" style="display:none">
                     </div>
                     <div class="vex-drop-divider" aria-hidden="true">
                         <span>+</span>
@@ -4923,7 +4923,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                         </div>
                         <div class="vex-drop-title" data-i18n="vex-drop-report-title">VAT 报告</div>
                         <div class="vex-drop-sub" data-i18n="vex-drop-report-sub">1 份或多份 PDF · 按顺序拼接</div>
-                        <input type="file" id="vex-input-report" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
+                        <input type="file" id="vex-input-report" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" style="display:none">
                     </div>
                 </div>
 
@@ -5140,7 +5140,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                                 <span data-i18n="sv-drop-hint">拖拽或点击上传 VAT 报告</span>
                                 <span class="sv-dropzone-ext">.xlsx / .xls / .pdf / .jpg / .png</span>
                             </div>
-                            <input type="file" id="sv-file-input" accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp" multiple style="display:none">
+                            <input type="file" id="sv-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" multiple style="display:none">
                         </div>
 
                         <!-- 上传成功预览 -->
@@ -5232,7 +5232,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                         <div class="vex-drop-title" data-i18n="glv-up-vat-title">① 销项税报告</div>
                         <div class="vex-drop-sub"   data-i18n="glv-up-vat-sub">支持 Excel / PDF / 图片</div>
                         <div class="vex-drop-filename" id="glv-vat-name"></div>
-                        <input type="file" id="glv-vat-input" accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp" style="display:none">
+                        <input type="file" id="glv-vat-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" style="display:none">
                     </div>
 
                     <div class="vex-drop-divider" aria-hidden="true"><span>+</span></div>
@@ -5249,7 +5249,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                         <div class="vex-drop-title" data-i18n="glv-up-gl-title">② 总账 GL</div>
                         <div class="vex-drop-sub"   data-i18n="glv-up-gl-sub">支持 Excel / PDF</div>
                         <div class="vex-drop-filename" id="glv-gl-name"></div>
-                        <input type="file" id="glv-gl-input" accept=".xlsx,.xls,.pdf" style="display:none">
+                        <input type="file" id="glv-gl-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" style="display:none">
                     </div>
                 </div>
 
@@ -6555,15 +6555,15 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11834939"></script>
+<script src="/static/home.js?v=11835000"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·
      独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11834939">
-<script src="/static/erp-mrerp-connect.js?v=11834939" defer></script>
+<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11835000">
+<script src="/static/erp-mrerp-connect.js?v=11835000" defer></script>
 <!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
-<script src="/static/erp-log-enhance.js?v=11834939" defer></script>
+<script src="/static/erp-log-enhance.js?v=11835000" defer></script>
 
 </body>
 </html>

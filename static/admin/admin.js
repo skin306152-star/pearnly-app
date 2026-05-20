@@ -665,7 +665,7 @@
                     '<div class="cpw-forgot-body"><div style="white-space:pre-line">' + _esc(message) + '</div></div>' +
                     '<div class="cpw-forgot-foot">' +
                         (opts.hideCancel ? '' : '<button class="btn btn-ghost" id="adm-cf-cancel">' + _esc(_t('confirm-cancel')) + '</button>') +
-                        '<button class="btn ' + (opts.danger ? 'btn-danger' : 'btn-primary') + '" id="adm-cf-ok">' + _esc(opts.okText || _t('adm-upg-confirm')) + '</button>' +
+                        '<button class="btn ' + (opts.danger ? 'btn-danger' : 'btn-primary') + '" id="adm-cf-ok">' + _esc(opts.okText || _t('confirm-ok') || 'OK') + '</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(ov);

@@ -1,6 +1,34 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-19 · **按量付费系统全面落地** · cache bust **v=11835200** · 任务 1-6 完成
+> **最近更新**:2026-05-20 · **CLEANUP-01 旧订阅永久禁用** · 按量付费系统全面落地 · cache bust **v=11835200** · 任务 1-6 完成
+
+---
+
+## 🔒 铁律-CLEANUP-01:旧订阅永久禁用(任何窗口先读)
+
+> 旧订阅 UI(月付/年付/终身买断 + KBank 011-1-83212-9 + +66 85-064-2609)
+> 已于 v118.35 / 2026-05-20 全部下线。任何后续窗口必须遵守:
+
+- **禁止新增**:`monthly` / `yearly` / `lifetime` 套餐相关 UI / 路由 / i18n key
+- **禁止新增**:`plan-card` / `upgrade-modal` / `trial-banner` / `quota-banner` 等订阅 DOM
+- **禁止新增**:`upg-*` / `plan-card-*` / `val-monthly-*` / `val-lifetime-*` 命名 i18n key
+- **禁止引用**:KBank `011-1-83212-9` / promptpay `+66 85-064-2609`(已从所有代码/占位符清除)
+- **冻结 DB 字段**(物理保留 · 逻辑停写):`users.plan` / `trial_expires_at` /
+  `plan_expires_at` / `monthly_quota` · 新代码一律不写 · 前端不读
+- **唯一收款账户**:Standard Chartered Bank `230-0-91368-4` · มิสเตอร์ อี อาร์ พี
+- **唯一计费模型**:前 200 张 ฿1.50/张 · 超出 ฿0.75/张 · Asia/Bangkok 每月 1 日重置
+- **唯一充值入口**:3 步充值弹窗 `_openTopupModal`(POST /api/credits/topup/request → SlipOK)
+
+### CLEANUP-01 已下线的接口(404)
+- `GET  /api/me/plan`
+- `POST /api/payment/submit`
+- `GET  /api/admin/payments/pending`
+- `POST /api/admin/users/upgrade`
+- `GET  /api/admin/payments/{id}/screenshot`
+- `POST /api/admin/payments/{id}/review`
+
+### 保留的接口(admin 只读冻结字段)
+- `GET /api/admin/users/funnel`(只读 users.plan 做注册漏斗统计 · 不写)
 
 ---
 

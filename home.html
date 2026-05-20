@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835000">
+<link rel="stylesheet" href="/static/home.css?v=11835001">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -4640,7 +4640,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                             </svg>
                         </div>
                         <div class="vex-drop-title" data-i18n="brv2-stmt-title">① 银行账单 PDF</div>
-                        <div class="vex-drop-sub" data-i18n="brv2-stmt-hint">KBank · BBL · KKP · KTB · 支持多文件</div>
+                        <div class="vex-drop-sub" data-i18n="brv2-stmt-hint">PDF / 图片 / Excel / CSV / Word · 多文件 · 自动识别</div>
                         <div class="vex-drop-filename" id="brv2-stmt-name"></div>
                         <input type="file" id="brv2-stmt-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" multiple style="display:none">
                     </div>
@@ -4657,7 +4657,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                             </svg>
                         </div>
                         <div class="vex-drop-title" data-i18n="brv2-gl-title">② 总账 GL</div>
-                        <div class="vex-drop-sub" data-i18n="brv2-gl-hint">Excel (.xlsx) 或 PDF · 支持多文件</div>
+                        <div class="vex-drop-sub" data-i18n="brv2-gl-hint">PDF / 图片 / Excel / CSV / Word · 多文件 · 自动识别</div>
                         <div class="vex-drop-filename" id="brv2-gl-name"></div>
                         <input type="file" id="brv2-gl-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" multiple style="display:none">
                     </div>
@@ -4922,7 +4922,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                             </svg>
                         </div>
                         <div class="vex-drop-title" data-i18n="vex-drop-report-title">VAT 报告</div>
-                        <div class="vex-drop-sub" data-i18n="vex-drop-report-sub">1 份或多份 PDF · 按顺序拼接</div>
+                        <div class="vex-drop-sub" data-i18n="vex-drop-report-sub">PDF / 图片 / Excel / CSV / Word · 自动识别</div>
                         <input type="file" id="vex-input-report" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" style="display:none">
                     </div>
                 </div>
@@ -5230,7 +5230,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                             </svg>
                         </div>
                         <div class="vex-drop-title" data-i18n="glv-up-vat-title">① 销项税报告</div>
-                        <div class="vex-drop-sub"   data-i18n="glv-up-vat-sub">支持 Excel / PDF / 图片</div>
+                        <div class="vex-drop-sub"   data-i18n="glv-up-vat-sub">PDF / 图片 / Excel / CSV / Word · 自动识别</div>
                         <div class="vex-drop-filename" id="glv-vat-name"></div>
                         <input type="file" id="glv-vat-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" style="display:none">
                     </div>
@@ -5247,7 +5247,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                             </svg>
                         </div>
                         <div class="vex-drop-title" data-i18n="glv-up-gl-title">② 总账 GL</div>
-                        <div class="vex-drop-sub"   data-i18n="glv-up-gl-sub">支持 Excel / PDF</div>
+                        <div class="vex-drop-sub"   data-i18n="glv-up-gl-sub">PDF / 图片 / Excel / CSV / Word · 自动识别</div>
                         <div class="vex-drop-filename" id="glv-gl-name"></div>
                         <input type="file" id="glv-gl-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" style="display:none">
                     </div>
@@ -6555,15 +6555,15 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11835000"></script>
+<script src="/static/home.js?v=11835001"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·
      独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11835000">
-<script src="/static/erp-mrerp-connect.js?v=11835000" defer></script>
+<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11835001">
+<script src="/static/erp-mrerp-connect.js?v=11835001" defer></script>
 <!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
-<script src="/static/erp-log-enhance.js?v=11835000" defer></script>
+<script src="/static/erp-log-enhance.js?v=11835001" defer></script>
 
 </body>
 </html>

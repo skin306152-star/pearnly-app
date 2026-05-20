@@ -2401,19 +2401,7 @@ a.contact-item:hover { background: var(--bg-hover, #eef2f7); }
     font-weight: 500;
 }
 
-/* 配额条升级链 */
-.chip-upgrade-hint {
-    display: inline-block;
-    margin-left: 8px;
-    font-size: 11px;
-    color: #7C3AED;
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: none;
-}
-.chip-upgrade-hint:hover {
-    text-decoration: underline;
-}
+/* v118.35 · CLEANUP-01 · .chip-upgrade-hint 已删除 · credits 系统接管 */
 
 /* ERP 端点列表 · 数量上限提示 */
 .erp-limit-hint {
@@ -3334,20 +3322,7 @@ button.btn-primary.btn-tiny:hover {
     font-size: 13px;
     margin-bottom: 20px;
 }
-.archive-upgrade-banner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
-    border: 1px solid #FCD34D;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    font-size: 13px;
-    color: #92400E;
-}
-.archive-upgrade-banner svg { width: 18px; height: 18px; color: #D97706; flex-shrink: 0; }
-.archive-upgrade-banner span { flex: 1; }
+/* v118.35 · CLEANUP-01 · .archive-upgrade-banner 已删除 · DOM 元素早已移除 */
 
 .archive-section { margin-bottom: 24px; }
 .archive-section-label {

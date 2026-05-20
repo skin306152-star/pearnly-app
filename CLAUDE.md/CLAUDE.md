@@ -221,6 +221,27 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 
 **历史教训**:v118.34.10 之前 138 个单元测试全过 · 但生产里 5 个 async 路由全报 "Playwright Sync API inside the asyncio loop" · sync mock 蒙人。
 
+### 14. 每个窗口启动必须先 check 在 master · 不在就切回去(2026-05-21 拍板 · 最高优先级 · 防"部署撞墙"重复发生)
+
+**症状**:连续几个窗口都遇到同一个 bug — 干完活想部署时撞到 `cleanup-01-v2` 分支挂在 master 前面 5 个 commit · webhook 在 master · push cleanup-01-v2 不触发部署 · cherry-pick 到 master 又撞 4 文件冲突 · 用户每次都崩溃。
+
+**根因**:本地 `git checkout cleanup-01-v2` 留在那里没切回去 · 新窗口启动时 `gitStatus` 显示当前在 cleanup-01-v2 · AI 默认在这分支上干活 · 等部署才发现 push 错地方。
+
+**铁律**:
+1. **每个窗口开工前必须跑** `git branch --show-current` · 不是 `master` 就立刻 `git checkout master`(`gitStatus` 里 "Current branch" 写啥就读啥 · 不在 master 就警告 Zihao 然后切)
+2. 部署前 push 也必须 `git push origin master`(不是当前 branch · 是显式写 master)
+3. 长期保留的 feature branch 必须有明确生命周期 · 不要让一个 4 天前的"待 review" 分支变僵尸 · 要么 PR 合并 · 要么删
+
+**当前僵尸分支**(2026-05-21 起,留在 remote 等 Zihao 决定):
+- `cleanup-01-v2` · GPT 写的"旧订阅/BYO API Key 永久下线" v2 · 16 文件 -5684/+210 · 含 login "立即试用→立即注册"重命名 + 8 处 BYO key 代码删除等 · 4 天没 ship
+- `feature/credits-system` · 同样 CLEANUP-01 第一版 · 更早的清理工作
+
+**这两条分支处理方案**(等 Zihao 拍板,默认保留):
+- A: 想 ship 就在 GitHub 上开 PR `cleanup-01-v2 → master`
+- B: 不想 ship 就 `git push origin --delete cleanup-01-v2 feature/credits-system` 永久删除
+
+**不要做的**:不要在 feature 分支上叠新工作(像 v118.35.0.0 OCR 我犯的错)· 永远从 master 开新分支或直接在 master 干。
+
 ---
 
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)

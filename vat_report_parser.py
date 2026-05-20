@@ -718,6 +718,79 @@ def parse_with_gemini(file_bytes: bytes, mime_type: str,
 # 统一入口 · 按后缀分发 + 自动 fallback
 # ======================================================================
 
+def _parse_vat_via_pipeline(file_bytes: bytes, filename: str,
+                             api_key: Optional[str] = None) -> Dict[str, Any]:
+    """v118.35.0.2 · Route VAT report through services/ocr/pipeline with
+    document_type='vat_report'. Used for non-PDF/non-Excel/non-image formats
+    (CSV / TSV / DOCX / DOC / TXT / TIFF / BMP / GIF / XLSM).
+
+    Converts pipeline normalized JSON (VatReportDocument) → row dict format
+    that downstream reconciliation code expects (report_date / report_invoice_no
+    / report_buyer_name / report_buyer_tax_id / report_amount_pre_vat /
+    report_vat_amount / report_amount / etc).
+    """
+    try:
+        from services.ocr.pipeline import (
+            run_on_image_bytes as _run_image,
+            run_on_table_bytes as _run_table,
+            IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+        )
+        from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+    except ImportError as e:
+        return {"ok": False, "rows": [], "row_count": 0,
+                "error": f"pipeline import failed: {e}"}
+
+    ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
+    try:
+        if ext_dot in IMAGE_EXTENSIONS:
+            pr = _run_image(file_bytes, api_key=api_key, document_type="vat_report")
+        elif ext_dot in TABLE_EXTENSIONS:
+            pr = _run_table(file_bytes, filename=filename or "vat",
+                            api_key=api_key, document_type="vat_report")
+        else:
+            return {"ok": False, "rows": [], "row_count": 0,
+                    "error": f"pipeline 不支持 {ext_dot}"}
+    except Exception as e:
+        return {"ok": False, "rows": [], "row_count": 0,
+                "error": f"pipeline parse failed: {type(e).__name__}: {e}"}
+
+    legacy = pipeline_result_to_legacy_dict(pr)
+    rows: List[Dict] = []
+    row_no = 0
+    for page in (legacy.get("pages") or []):
+        doc = (page or {}).get("document") or {}
+        for e in (doc.get("entries") or []):
+            row_no += 1
+            invoice_no = str(e.get("invoice_no") or "").strip()
+            if not re.search(r"[A-Za-z0-9]{2,}", invoice_no):
+                continue  # skip rows without a real invoice number
+            parsed = {
+                "row_no":                int(e.get("seq_no") or row_no) if str(e.get("seq_no") or "").isdigit() else row_no,
+                "report_date":           e.get("transaction_date") or "",
+                "report_invoice_no":     invoice_no,
+                "report_ref_no":         invoice_no,
+                "report_buyer_name":     str(e.get("customer_name") or "").strip(),
+                "report_buyer_tax_id":   normalize_tax_id(e.get("customer_tax") or ""),
+                "report_buyer_branch":   normalize_branch(e.get("customer_branch") or ""),
+                "report_amount_pre_vat": _to_float(e.get("subtotal")),
+                "report_vat_amount":     _to_float(e.get("vat")),
+                "report_amount":         _to_float(e.get("total")),
+            }
+            parsed["is_individual"] = not bool(parsed["report_buyer_tax_id"])
+            rows.append(parsed)
+
+    return {
+        "ok": True,
+        "rows": rows,
+        "row_count": len(rows),
+        "meta": {},
+        "warnings": [],
+        "parser_version": PARSER_VERSION,
+        "method": "pipeline_v1",
+        "needs_review": legacy.get("_needs_review", False),
+    }
+
+
 def parse_vat_report(file_bytes: bytes, filename: str,
                      api_key: Optional[str] = None) -> Dict[str, Any]:
     ext = (filename or "").lower().rsplit(".", 1)[-1]
@@ -756,9 +829,12 @@ def parse_vat_report(file_bytes: bytes, filename: str,
         if result is None:
             mime = "image/jpeg" if ext == "jpg" else f"image/{ext}"
             result = parse_with_gemini(file_bytes, mime, api_key=api_key)
+    elif ext in ("csv", "tsv", "docx", "doc", "txt", "tiff", "tif", "bmp", "gif", "xlsm"):
+        # 2026-05-21 v118.35.0.2 · 新增格式走统一 pipeline · document_type=vat_report
+        result = _parse_vat_via_pipeline(file_bytes, filename, api_key=api_key)
     else:
         return {"ok": False,
-                "error": f"暂不支持 .{ext} · 请用 Excel / PDF / 图片格式",
+                "error": f"暂不支持 .{ext} · 请用 Excel / PDF / 图片 / CSV / Word 等格式",
                 "rows": []}
 
     # v118.32.5.5.3 · 所有路径出口统一过滤一次(Gemini 路径双保险)

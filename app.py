@@ -751,7 +751,7 @@ exit 1
     try:
         with db.get_cursor(commit=True) as cur:
             recovered = 0
-            for tbl in ['ocr_history', 'reconciliation_task', 'gl_vat_task']:
+            for tbl in ['reconciliation_task', 'gl_vat_task']:
                 try:
                     cur.execute(
                         f"UPDATE {tbl} SET status='interrupted' "

@@ -9,24 +9,30 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + **阶段 2 Task 2.1 ✅** ➡️ **下一步阶段 3 Task 3.1（本机 import）**
+**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + **阶段 3 Task 3.1 ✅ + Task 3.2 🟡 进行中** ➡️ **接力点：修 CI unit tests 红**
 
-**用户说"继续"时直接做的事**（阶段 3 Task 3.1）：
-1. `pip install passlib psycopg2-binary xlrd`
-2. 跑 `python scripts/check_imports.py --quiet` 必须退出 0
-3. 检查 requirements.txt 版本是否锁定（若缺则补 pip freeze）
-4. 没改业务代码 · 仅装包 · commit `chore(deps): 装齐本机 dev 依赖` 即可（无需 push 也行 · pip 是本机配置）
+**当前 CI 状态**（GitHub Actions · 最新 run #3 · commit `24e2a90`）：
+- ✅ Step "check_imports" → 绿（本地 + CI 都过）
+- ✅ Step "check_i18n --strict" → 绿（**Task 4.1 随 3.2 一并完成**）
+- ❌ Step "unit tests" → 红 · 真 FAIL 还没定位（前 60 行多是 SKIP · 后 67 行被截 · 没抓到）
 
-**预计工时**：30 分钟（装包 + 验证）
+**用户说"继续"时直接做的事**：
+1. 查最新 CI run 的 unit tests 完整输出（避免再 push 浪费）：
+   - PowerShell + `gh` 或调 `GET /repos/skin306152-star/pearnly-app/actions/runs/<id>/logs` API
+   - 上次会话已抓到 step 头部 · 但 raw log 中 FAIL 部分被 60 行 head 截掉 · 要扩量到 `-Tail 200` 或全文
+2. 定位失败测试 · 分两路：
+   - **真 bug**（生产代码在 Linux 不兼容 / Windows-only 行为）→ 修
+   - **本机 dev only 测试**（需要真 fastapi / playwright / 完整 app 启动）→ 标 `@unittest.skipIf` 或移到 `tests/integration/`
+3. push commit 让 CI 转绿 · 阶段 3 + 阶段 4 Task 4.1 一并 ✅
 
-**然后 Task 3.2**：GitHub Actions CI（1h）· 新建 `.github/workflows/ci.yml`
+**预计剩余工时**：1-2 小时（看 fail 数量）
 
-**注意事项**：
-- 本机缺 `passlib` / `psycopg2` / `xlrd` · 但这次**用 mock 不连 DB** · 不受影响
-- import 真的不行的话 · 测试文件只 import 被测函数（`from db import list_ocr_history` 而不是 `import db`），避开依赖加载
-- 测试发现的真 bug **立即修**（参考今天发现 P0 越权读的处理方式）
+**⚠️ 本机环境风险（必读 · 详见文末 F-02/F-03）**：
+- 用户机器 8GB RAM 偏小 · 长会话 + 1M context + 并行工具 → Bun OOM 实测 7-8 次 crash
+- **开窗口前先重启 Windows + 关浏览器** · 每 30-45 分钟用 `/clear` 释放上下文
+- Bash 调 git 可能踩 Cygwin fork bomb · `git push` 改用 PowerShell 直调 git.exe
 
-**禁区**：
+**禁区**（不变）：
 - ❌ 不要重构 `app.py` / `db.py` / `home.js` · 阶段 5-7 才动
 - ❌ 不要盲信体检报告新指控 · 误报率 75% · 必须 grep + read 核实
 - ❌ 不要碰 `home.js` 加新功能 · 新功能必须独立 .js（铁律待加）
@@ -121,24 +127,33 @@
 - **验证**：装包后再跑 97 个 contract test 全过（确认 stub 仍兼容真 psycopg2）
 - **未做也不该做**：pin 上述 3 个版本到 requirements.txt（prod 上跑的版本可能不同 · pin 反而风险）
 
-### Task 3.2 · GitHub Actions 最小 CI（P1-02）
-- **状态**：blocked by 3.1
+### Task 3.2 · GitHub Actions 最小 CI（P1-02）🟡 进行中
+- **状态**：workflow 已建 + 已推 · 3 个 step 中 **2/3 绿** · 卡在 unit tests
 - **类型**：新建 workflow
-- **产出**：`.github/workflows/ci.yml`
-- **CI 步骤**：checkout → setup-python → pip install → check_imports → tests/unit/* （跳过需要外部服务的 integration tests）
-- **完成判定**：workflow 在 GitHub PR 上能跑 · 不需要生产 secret · 不联网调外部业务
-- **工作量**：1 小时
+- **产出**：`.github/workflows/ci.yml`（含 check_imports + check_i18n + unit tests · **Task 4.1 一并完成**）
+- **commits**（按时间倒序）：
+  - `24e2a90` `fix(ci): 加 reportlab 到 requirements (usage_report.py 用于生成使用明细 PDF)`
+  - `be0474c` `fix(ci): 补 2 个真依赖让 CI import-check 通过`（git 加 usage_report.py + requirements 加 python-docx）
+  - `e01129c` `ci(github-actions): 最小 CI 接入 import + i18n + unit tests`
+- **CI 实测演进**：
+  - Run #1（`e01129c`）→ 红 · `app.py` 引用了未入 git 的 `usage_report.py` + `db.py` 引用了未声明的 `docx`
+  - Run #2（`be0474c`）→ 红 · 新入 git 的 `usage_report.py` 自己 import `reportlab`（洋葱效应：补一个冒一个）
+  - Run #3（`24e2a90`）→ import-check ✅ + i18n ✅ + **unit tests ❌**（未深查 · 接力点）
+- **真实工作量**：已花 ≈3h（含 3 次 CI 来回 + 修依赖洋葱）· 剩余 1-2h
+- **完成判定**：3 个 step 都绿 · PR 上能跑
+- **剩余工作**：见上方"下次窗口入口"接力点
+- **附带 follow-ups**：服务器要同步 `pip install python-docx reportlab`（见 F-01）
 
 ---
 
 ## 🟡 阶段 4 · i18n + E2E 保险（P1-03 / P1-04）
 
-### Task 4.1 · i18n 检查脚本（P1-03）
-- **状态**：pending
-- **类型**：新建 script + 接入 CI
-- **产出**：`scripts/check_i18n.py` · `--strict` 失败时退出非 0
-- **完成判定**：检查 `home.js` 4 语 key 集合一致 + 不重排 I18N 字典
-- **工作量**：1 小时
+### Task 4.1 · i18n 检查脚本（P1-03）✅ 2026-05-22 完成（随 Task 3.2 一并）
+- **状态**：✅ completed · CI run #3 step `check_i18n --strict` 绿
+- **类型**：脚本之前就存在 · 本次接入 CI · 不重做
+- **产出**：`scripts/check_i18n.py`（早期已有）· `.github/workflows/ci.yml` 接入为独立 step
+- **完成判定**：CI 上 `--strict` 模式跑过 · 退出 0
+- **关联 commit**：`e01129c`（CI workflow 创建时一并接入）
 
 ### Task 4.2 · 第一个 Playwright smoke（P1-04）
 - **状态**：pending
@@ -260,8 +275,8 @@
 | 0 · 安全基线 | ✅ 完成 | 5+1/5 | 2026-05-21 一天闭环 · 含 1 个意外发现的真 P0 |
 | **1 · 多租户保险** | ✅ 完成 | **2/2** | Task 1.1 ✅ + Task 1.2 ✅ · 54 个 contract test 守门 |
 | 2 · 计费保险 | ✅ 完成 | 1/1 | 43 个 billing contract test 守门 · 价格规则锁定 |
-| 3 · CI 保险 | ⚪ 待启动 | 0/2 | |
-| 4 · i18n + E2E | ⚪ 待启动 | 0/2 | |
+| **3 · CI 保险** | 🟡 进行中 | **1.7/2** | Task 3.1 ✅ + Task 3.2 🟡（CI 已建 · import + i18n 绿 · unit tests 红待修）|
+| **4 · i18n + E2E** | 🟡 部分完成 | **1/2** | Task 4.1 ✅（随 3.2 接入 CI）+ 4.2 Playwright 仍 pending |
 | 5 · 后端路由拆 | ⚪ 待启动 | 0/3 | |
 | 6 · DB 迁移规范 | ⚪ 待启动 | 0/2 | |
 | 7 · 前端拆分 | ⚪ 待启动 | 0/3 | |
@@ -270,7 +285,11 @@
 **预计总工时**：35-50 小时（按每天 2-3 小时投入 · 约 3-4 周完成阶段 1-6 · 7-8 长期持续）
 
 **完成的 commits**（按时间倒序）：
-- _待填_ · 阶段 2 Task 2.1 Credits 计费 contract tests (43 测试 · 价格 + 扣费 + 并发)
+- `24e2a90` · 阶段 3 Task 3.2 修 CI 依赖：加 reportlab（usage_report.py 用于生成使用明细 PDF）
+- `be0474c` · 阶段 3 Task 3.2 修 CI 依赖：commit usage_report.py 进 git + 加 python-docx 到 requirements
+- `e01129c` · 阶段 3 Task 3.2 + 阶段 4 Task 4.1 ci.yml 最小 CI 接入 import + i18n + unit tests
+- `9a84128` · 阶段 3 Task 3.1 完成入档
+- `0164601` · 阶段 2 Task 2.1 Credits 计费 contract tests (43 测试 · 价格 + 扣费 + 并发)
 - `fd499aa` · 阶段 1 Task 1.2 多租户隔离 contract tests (54 测试 · 13 表 · 25 函数)
 - `c65eed1` · 收工入档 + EXECUTION_PLAN 进度更新
 - `8dd2c9c` · 阶段 1 Task 1.1 + 意外 P0 越权读修复 + 矩阵文档
@@ -288,6 +307,43 @@
 - **单次会话目标**：完成一个 Task（不要超过 2 个 · 避免上下文爆炸）
 - **完成一个 Task 后**：更新本文档进度看板 · commit `docs(plan): mark Task X.Y completed`
 - **每完成一个阶段**：在 `STATE_PEARNLY.md` 写一段总结 · 在本文档对应阶段加 ✅
+
+---
+
+## 🔔 已知 follow-ups · 下次窗口必读
+
+> 这些都不阻塞主线 · 但要在脑子里挂着 · 触发条件来了再做
+
+### F-01 · 服务器装包同步（2026-05-22 起）
+**触发场景**：用户传 `.docx` 文件做 OCR · 或导出"使用明细" PDF/XLSX
+**问题**：阶段 3 Task 3.2 给 `requirements.txt` 加了 `python-docx` + `reportlab` · CI 装包 OK · 但生产服务器（45.76.53.194）push 后只 pull 代码 · **不会自动 pip install**
+**实际影响**：
+- `python-docx`：99% 用户传 PDF/图片/Excel · `.docx` 路径极少触发 → 不紧急
+- `reportlab`：生产应该已装（usage_report 系列功能历史跑过）· 稳起见 ssh 跑一次确认
+**修法**：下次 ssh 服务器时跑一句
+```
+ssh root@45.76.53.194 "cd /opt/mrpilot && source venv/bin/activate && pip install python-docx reportlab && systemctl restart mrpilot"
+```
+**优先级**：P2 · 30 秒能做完
+
+### F-02 · 本机 Bun OOM crash 频发（2026-05-22 实测 7-8 次）
+**症状**：长会话（1h+）+ Claude Code 1M 上下文模式 + 并行工具调用 → Bun runtime OOM → 整个 Claude Code 进程崩
+**crash 时数据**：RSS 仅 0.4-0.7 GB · 但页缺 91 万次 = 系统内存碎片化 · Windows 给不出连续块
+**根因**：用户机器 **8 GB RAM 偏小**（2026 主流 16 GB）+ 后台进程（浏览器 / 微信 / Defender）挤占
+**应对（不改代码 · 改用法）**：
+1. 每次开 Claude Code 前**重启 Windows** + **关浏览器/微信**
+2. 长会话每 30-45 分钟用 `/clear` 释放上下文（牺牲短期记忆换稳定）
+3. 非必要时**避免并行 spawn 多个工具**（每个调用都吃内存）
+4. 触发 OOM → 直接重启电脑 · 别试图救活
+**根本解决（可选）**：用户加内存到 16 GB（笔记本拆后盖装内存条 · 约 200-400 元 · 性价比最高）
+**优先级**：P2 · 不阻塞工程 · 影响用户体验
+
+### F-03 · git-credential-manager OOM（2026-05-22 偶发）
+**症状**：`git push` 时报 `cannot spawn git-credential-manager: Function not implemented` + `Out of memory tried to allocate 5 wchar_t's`
+**关键**：**push 本身成功了**（GitHub 收到代码）· 只是凭据缓存写失败
+**根因**：跟 F-02 同源 · Cygwin fork bomb 在低内存时触发
+**绕过**：用 PowerShell 调 git（不走 Cygwin）：`PowerShell git push origin master`
+**优先级**：P3 · 不阻塞 · 只是体验差
 
 ---
 

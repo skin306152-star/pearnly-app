@@ -444,6 +444,17 @@ def _read_playwright_status():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 Mr.Pearnly 启动中...")
+
+    # v118.35.0.28 P0 安全 self-check (体检 2026-05-21)
+    # /internal/deploy 现在 fail-closed · secret 缺失会拒服务 ·
+    # 启动时早期告警 · 不要等到 GitHub webhook 来才发现没配。
+    import os as _os
+    if not _os.environ.get("GITHUB_WEBHOOK_SECRET"):
+        logger.critical(
+            "⚠️ GITHUB_WEBHOOK_SECRET missing — /internal/deploy will return 503 · "
+            "auto-deploy via GitHub webhook is DISABLED until env var is set"
+        )
+
     # v0.15.1 · 不再自动创建 demo 账号 · 账号由 Supabase 管理
     # 如需恢复自动创建 · 取消下方注释:
     # try:
@@ -5416,16 +5427,22 @@ async def github_deploy_webhook(request: Request):
     GitHub Webhook → 触发 git-deploy.sh
     关键修复：先发响应，再用 detached subprocess 执行部署脚本。
     这样 systemctl restart 不会在发送响应前就把自己杀掉。
+
+    v118.35.0.28 安全修(P0 体检 2026-05-21) · fail-closed:
+    GITHUB_WEBHOOK_SECRET 缺失时直接 503 拒服务 · 不再降级成无鉴权 ·
+    避免运维忘记配 secret 时被任意人触发 git pull + restart。
     """
     import hmac as _hmac, hashlib as _hashlib, subprocess as _subprocess, os as _os
     body = await request.body()
     secret = _os.environ.get("GITHUB_WEBHOOK_SECRET", "")
-    if secret:
-        sig = request.headers.get("X-Hub-Signature-256", "")
-        expected = "sha256=" + _hmac.new(secret.encode(), body, _hashlib.sha256).hexdigest()
-        if not _hmac.compare_digest(sig, expected):
-            logger.warning("[git-deploy] HMAC mismatch — ignored")
-            raise HTTPException(status_code=403, detail="Invalid webhook signature")
+    if not secret:
+        logger.error("[git-deploy] GITHUB_WEBHOOK_SECRET not configured · refusing webhook")
+        raise HTTPException(status_code=503, detail="webhook secret not configured")
+    sig = request.headers.get("X-Hub-Signature-256", "")
+    expected = "sha256=" + _hmac.new(secret.encode(), body, _hashlib.sha256).hexdigest()
+    if not _hmac.compare_digest(sig, expected):
+        logger.warning("[git-deploy] HMAC mismatch — ignored")
+        raise HTTPException(status_code=403, detail="Invalid webhook signature")
 
     logger.info("[git-deploy] webhook received · launching detached deploy in 3 s")
 

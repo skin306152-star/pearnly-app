@@ -1173,3 +1173,103 @@ expartran/  = 交易类导出(idmenu=404 商品销售导出)
 - home.js 死代码 · 0.2 天 · P3
 - 老的 `HANDOVER_v118_27_8_1_14e.md` 已过期 · 由 Zihao 删除(铁律 13)
 - 新的 `HANDOVER_v118_27_8_1_17_1.md` 给下个窗口接 v18 用 · 必读
+---
+
+# 🎯 2026-05-21 会话 · v118.35.0.17 → v118.35.0.27（11 个版本 + 1 事故回滚）
+
+**当前线上版本**: v118.35.0.27 · cache-bust 11835027 · Tag `v1.1.0-credits-stable` → HEAD
+
+## 重大事件
+
+### 1) v118.35.0.20 部署后全站超时事故（14 分钟内自愈）
+
+- **触发**: v0.20 在每个 OCR 请求加 3 次 DB 查询（`is_user_billing_exempt` + `balance` + `pages_used`）
+- **根因**: `db.SimpleConnectionPool(maxconn=5)` 太小 · 并发 OCR 把池打满 · 后续请求阻塞累积 → 全站 30+ 秒超时
+- **回滚**: 14 分钟内 `git revert` + push · webhook 自动部署回 v0.19
+- **修正**: v0.21
+  - `maxconn` 5 → 30
+  - 3 次独立 SELECT → 1 次 LEFT JOIN（`get_billing_status_combined`）
+  - 扣费改 `asyncio.create_task + to_thread` fire-and-forget · 不阻塞 OCR 关键路径
+  - `is_billing_exempt` 加 5 分钟进程内 LRU cache
+- **铁律 15** 已在 v0.17 入 CLAUDE.md（删后端字段必须同步删 Pydantic response_model）
+
+### 2) P0 商业漏洞修复 · Credits 计费业务闭环
+
+- **漏洞**: 新注册账户余额 0 仍可无限免费用 OCR · 因为 cherry-pick v36 时只搭了基础设施 · 业务层（check/deduct/owner/state）注释里写"下版本拉"被遗忘
+- **修复**: v0.21 完整接入 3 个 OCR 入口扣费 + 前置检查
+  - `/api/ocr/recognize` · `/api/vat_excel/build` · `/api/recon/bank-v2/run`
+  - 余额不足返 HTTP 402 + 友好 4 语提示
+  - 删除硬编码 `SKIN_TEST_USER_ID` · 改 `users.is_billing_exempt` 单一数据源
+- **价格规则**（Korn 拍板）:
+  - PDF 前 200 张 ฿1.50/张 · 第 201 张起 ฿0.75/张 · 跨界自动拆段
+  - Excel/CSV/Word 不走 OCR · 按字符 50 字符 = 1 satang（฿0.01）· 向上取整
+- **白名单**: `users.is_billing_exempt = TRUE` · 数据库已标 `skin306152@gmail.com` + `mrerp@outlook.co.th`
+
+### 3) Korn 用户银行流水 OCR 失败修复（v0.19）
+
+- **触发**: `STATEMENT EXCEL.xlsx`（泰文 5 列 47 行）报 "Gemini returned invalid JSON after 2" + "BankStatementDocument schema 8 validation errors"
+- **根因**: `bank_recon_v2._parse_bank_stmt_via_pipeline` 没有 xlsx 直读 fallback · 强制走 Gemini · 长泰文撞 token 限制
+- **修复**: 加 `parse_bank_stmt_xlsx_direct`
+  - 多语表头识别（zh/th/en/vi · 5 列 日期/描述/取款/存款/余额）
+  - 期初余额识别（空日期+空金额 / "ยอดยกมา/brought forward/opening/期初" 关键词）
+  - 日期 carry-forward（同日多笔的空日期行）
+  - xlsx 优先直读 · 失败再降级到 Gemini
+- **验证**: 4 场景全过（Korn xlsx / 中文表头 / 英文表头+期初 / 无表头 fallback / 表头不全 fallback）
+
+## 基础设施变更
+
+| 维度 | 改前 | 改后 |
+|---|---|---|
+| DB `maxconn` | 5 | **30** |
+| uvicorn workers | 1 | **2**（failover）|
+| `timeout-keep-alive` | 30s（默认） | **10s** |
+| OCR 关键路径 DB 调用 | v0.20 加到 4 次 | **1 次**（合并查询） |
+| 白名单 LRU cache | 无 | **5 分钟** |
+
+## 新 DB 表 / 字段（v0.21 cherry-pick 落地）
+
+- `tenant_credits` · 公司钱包余额
+- `credit_transactions` · 充扣流水（type: topup/usage/adjustment）
+- `monthly_page_usage` · 月用量统计（用于 PDF 分级）
+- `topup_requests` · 充值申请（含 SlipOK 自动验证 + admin 手动审批）
+- `users.is_billing_exempt` · 豁免标记
+- `users.active_tenant_id` · 多公司切换
+
+## 新文件
+
+- `services/monitoring.py` · Gemini 调用统计 + DB 池 + OS 指标 ring buffer
+- `services/task_queue.py` · 任务队列基础设施（内存版 · 接口契约 · 不接 OCR）
+- `services/ocr/error_format.py` · OCR 错误翻译层（v0.19 加）
+
+## Earn 后台监控扩展（v0.22 + v0.25 + v0.26 + v0.27）
+
+成本追踪页底部新增 3 个 section + 12 个 KPI 卡 + CSV 导出:
+1. 用户扣费 KPI（今日扣费 / 本月扣费 / 余额池总和 / 透支公司数）
+2. 公司余额清单表（透支飘红 · 余额低橙色）
+3. 系统监控 3 行 12 卡（Gemini RPM / 撞限流 / DB 池 / 内存 / CPU / 核数 / Worker / 队列 4 项）
+4. Credits 扣费明细 CSV（UTF-8 BOM · Excel 直开）
+
+## 重要决策
+
+1. **新注册不给试用额度** · 必须充值才能用 · 白名单 2 邮箱豁免
+2. **LINE 告警砍掉** · `@059oupmg` 已用于用户交互 · 不混用作运维告警 · 改 Earn 后台监控看
+3. **Gemini 多 key 轮询取消** · Tier 1 单 key 1000 RPM 已足够 · 等真撞限流再升 Tier 2
+4. **Redis 任务队列最小版** · 写接口契约 + Earn 监控展示 · 不接 OCR 核心 · 等真需要时再装 redis-server
+5. **收入对账完整度复盘** · 实际 93/100（之前误判 0/100）· 5 endpoint + 完整 UI + 4 语 i18n + 3-sheet Excel 全在 · 真缺的只有 P0 金额容差（已修 ±฿0.01）
+
+## 文档 · Tag
+
+- **铁律 15** 已入 `CLAUDE.md/CLAUDE.md:245-265`（删后端字段必须同步删 Pydantic response_model）
+- **Tag `v1.1.0-credits-stable`** → HEAD `5eb4bb4`（含今日所有改进的稳定版）
+- 旧 tag `v1.0.0-credits-release` 保留 → `b742e14`（指 5 月初空架子版 · 历史快照）
+
+## 遗留（明天 / 下次 / 看用户量）
+
+| 优先级 | 任务 | 备注 |
+|---|---|---|
+| 🟡 P1 | Redis 真上线 · 装 redis-server · 接 OCR 入队 · 独立 consumer worker · systemd 加 unit | 单独部署窗口 · 风险高 · 用户量 ≥ 100+ 家时启动 |
+| 🟢 P2 | 收入对账日期容差 + 客户名模糊匹配 | 业务体验改进 |
+| 🟢 P2 | admin 后台 LINE 告警 · 用现有 `line_client.push_text` · 不混 `@059oupmg` | 等 Earn 决定要不要专门建告警 Bot |
+| 🟢 P3 | 4 语切换全站巡检 · Playwright 自动跑一圈 | 工作量大 · 留独立窗口 |
+| 🟢 P3 | 银行对账 CSV/DOCX 前端 placeholder 文案完善 | 后端已支持 · 缺前端文案 |
+

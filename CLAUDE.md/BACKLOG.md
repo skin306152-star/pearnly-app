@@ -1856,3 +1856,82 @@ function _openBankDrawer(sessionId) {
 - [ ] **v118.30.4** 扩展安装引导 + 兼容性检测(Chrome / Edge / Brave) · 1.5 天
 - [ ] **v118.30.5** Chrome Web Store 提交 + 审核响应 · 2-3 天
 - [ ] **v118.30.6** 错误处理 + 重试 + 推送日志 · 1.5 天
+
+---
+
+# 📅 2026-05-21 完成项
+
+11 个版本上线（v118.35.0.17 → v118.35.0.27 · v0.20 回滚）· Tag `v1.1.0-credits-stable` 已打。
+
+## ✅ 业务功能
+
+- [x] **v0.17** admin 语言菜单简化为 zh/th（删 EN/JP 空壳） · `_admPrompt` 卡片输入框替代原生 prompt · CLAUDE.md 加铁律 15
+- [x] **v0.18** 注册失败返友好 4 语提示（取代裸 Python 异常 stack）
+- [x] **v0.19** 银行流水 xlsx 直读 fallback · 对账中心错误词 4 语翻译 · `_humanizeReconError`
+- [x] **v0.21** Credits 计费业务闭环（修 v0.20 事故）· `maxconn` 30 · 合并查询 · 异步扣费 · 删硬编码白名单
+- [x] **v0.22** Earn 后台 Credits 数据互通（4 个 admin endpoint + KPI + 公司清单 + CSV 导出）
+- [x] **v0.23** 修 `[object Object]` toast · 简化余额提示文案
+- [x] **v0.24** GL 友好提示 · 首页充值入口永远可见 · 「系统繁忙」去 OCR 技术词
+- [x] **v0.25** Earn 后台系统监控（Gemini RPM / 撞限流 / DB 池）· LINE 告警砍掉
+- [x] **v0.26** 收入对账金额 ±฿0.01 容差 · Earn 监控 OS 指标（内存 / CPU / 核数 / Worker）
+- [x] **v0.27** 销项税多页 PDF `source_filename + source_page` 溯源 · 任务队列基础设施（最小版）
+
+## ✅ 基础设施变更
+
+- [x] DB `SimpleConnectionPool(minconn=2, maxconn=30)`（原 1/5）
+- [x] uvicorn `--workers 2 --timeout-keep-alive 10`（原 1 worker · default keepalive）
+- [x] systemd unit 备份保留 `mrpilot.service.bak-1779363143`
+
+## ✅ Bug 修复（13 个）
+
+- [x] 注册失败露 Python 异常 stack
+- [x] admin EN/JP 空壳菜单
+- [x] admin "更新余额" 原生 prompt
+- [x] Korn 银行流水 xlsx 报 Gemini schema 错误
+- [x] 对账中心状态表露 raw 技术词
+- [x] **0 余额能无限免费用 OCR（P0 商业漏洞）**
+- [x] 充值 >฿500,000 露 raw pydantic ValidationError JSON
+- [x] 销项税对账失败 toast `[object Object]`
+- [x] 银行对账失败 toast `[object Object]`
+- [x] "OCR 服务繁忙" 露 OCR 技术词
+- [x] 收入对账金额差 ฿0.01 误标"有差异"
+- [x] 销项税多页 PDF 合并后丢失页码
+- [x] `release_notes` 字典 dup-key（zh 是 v0.17 / 其他还是 v34.21）
+
+## ✅ 文档
+
+- [x] CLAUDE.md 加铁律 15（删后端字段必须同步删 Pydantic response_model）
+- [x] Tag `v1.1.0-credits-stable` → HEAD `5eb4bb4`
+
+---
+
+# 📥 2026-05-21 新增遗留（明天 / 下次）
+
+## 🟡 P1（用户量 ≥ 30+ 家事务所前应做）
+
+- [ ] **Redis 任务队列真上线**
+  - 装 `redis-server`（apt · 服务器 SSH）
+  - 装 Python `redis` 包（pip + requirements.txt）
+  - swap `services/task_queue.py` 内存实现 → Redis lpush/brpop
+  - OCR 入口改"入队 + 返 task_id"
+  - 前端轮询 `/api/ocr/status/{task_id}` 改异步模式
+  - 独立 consumer worker 进程（systemd 加 unit）
+  - 风险:高 · 单独部署窗口 · 预计半天
+
+- [ ] **admin LINE 告警**（撤销过 · 留代码框架）
+  - 决定专门建告警 LINE Bot 还是用现有 `@059oupmg`
+  - 复活 `services/alerts.py`（git history 可找）
+  - DB 表 `monitoring_alerts_config` 已撤 · 重新加
+
+## 🟢 P2
+
+- [ ] 收入对账日期容差（±N 天）· 客户名 Levenshtein 模糊匹配
+- [ ] 收入对账多文件聚合细测（代码已 `asyncio.gather` 并行 · 但未跑过端到端）
+- [ ] 监控面板 30 天 Gemini 调用趋势曲线（已有 `/api/admin/cost/daily_trend` endpoint · 复用现有图表）
+
+## 🟢 P3
+
+- [ ] 4 语切换全站巡检 · Playwright 自动跑一圈所有页面
+- [ ] 银行对账 CSV/DOCX 前端 placeholder 文案完善（后端已支持）
+- [ ] `_test_reports/` `probes/` `usage_report.py` `recon-i18n-fixes-2026-05-19.md` 这些未跟踪文件清理或 .gitignore
+

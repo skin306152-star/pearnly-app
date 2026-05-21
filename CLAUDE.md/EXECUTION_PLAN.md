@@ -9,16 +9,14 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0 ✅ + 意外修 P0 ✅ + 阶段 1 Task 1.1 ✅ ➡️ **下一步 Task 1.2**
+**当前位置**：阶段 0 ✅ + 意外修 P0 ✅ + 阶段 1 Task 1.1 ✅ + **Task 1.2 ✅** ➡️ **下一步阶段 2 Task 2.1（计费保险）**
 
-**用户说"继续"时直接做的事**：
-1. 读 `docs/architecture/tenant-access-matrix.md`（已落档的蓝图）
-2. 新建 `tests/unit/test_tenant_isolation_contract.py`
-3. 用 `unittest.mock.MagicMock` 模拟 cursor · 不连真实 DB
-4. 覆盖矩阵 §2 的 13 张表函数（list / get / delete）
-5. 验证点 3 条：tenant 模式 SQL 必含 tenant 限制 · user-only 不扩大 · 删除必带 scope
-6. 跑 `python -m unittest tests.unit.test_tenant_isolation_contract -v` 验证全通过
-7. commit + push（属于"加测试"非"改代码" · 不触发铁律 16 红线 · 可直接 push）
+**用户说"继续"时直接做的事**（阶段 2 Task 2.1）：
+1. 读 `db.py` charge_ocr / get_tenant_balance / get_billing_status_combined
+2. 新建 `tests/unit/test_billing_contract.py`
+3. mock cursor 验证 5 类场景：余额不足 402 / 白名单跳过 / 扣费必写流水 / PDF 200/201 页边界 / Excel 50/51 字符边界
+4. 跑 `python -m unittest tests.unit.test_billing_contract -v`
+5. commit + push（同 1.2 · 加测试 · 不触发铁律 16 红线）
 
 **预计工时**：2-3 小时（纯测试代码 · 不动业务）
 
@@ -63,10 +61,16 @@
 - **风险 TOP 10** 见矩阵 §4
 - **未验证 10 项** 见矩阵 §5 · 留给 Task 1.2 自动化测试覆盖部分 + 未来 integration test 覆盖剩余
 
-### Task 1.2 · 多租户隔离 contract tests 第一批（P1-06）➡️ **下一步**
-- **状态**：🟡 ready · 蓝图已就绪
+### Task 1.2 · 多租户隔离 contract tests 第一批（P1-06）✅ 2026-05-21 完成
+- **状态**：✅ completed · 54 个测试全过
 - **类型**：unit tests · 用 mock cursor 捕获 SQL · 不连真实 DB
-- **产出**：`tests/unit/test_tenant_isolation_contract.py`
+- **产出**：`tests/unit/test_tenant_isolation_contract.py`（650 行 · 8 个测试类）
+- **覆盖统计**：13 张表 · 25 个函数（list/get/delete + 批量） · 含 P0 防回归 2 条 + 跨租户负向 8 条
+- **验证通过**：
+  - SQL shape 锁定（tenant_id / user_id / tenant_id IS NULL 三模式）
+  - `get_gl_vat_task(123)` 和 `get_bank_recon_v2_task(123)` 单参数调用 → TypeError ✅
+  - tenant B 喂 tenant A 的 id · cursor 返 None → 函数返 None（fail-safe）
+  - 所有 delete 函数 SQL 必含 user_id/tenant_id/endpoint_id 之一（防裸 WHERE id）
 - **覆盖函数清单**（按矩阵 §2 严格对应）：
   - `list_ocr_history` `get_ocr_history_detail` `delete_ocr_history` `delete_ocr_history_with_pdf_paths`
   - `list_clients` `get_client` `delete_client`
@@ -254,7 +258,7 @@
 | 阶段 | 状态 | 完成 / 总数 | 备注 |
 |---|---|---|---|
 | 0 · 安全基线 | ✅ 完成 | 5+1/5 | 2026-05-21 一天闭环 · 含 1 个意外发现的真 P0 |
-| **1 · 多租户保险** | 🟡 进行中 | **1/2** | Task 1.1 ✅ · **Task 1.2 ➡️ 下一步** |
+| **1 · 多租户保险** | ✅ 完成 | **2/2** | Task 1.1 ✅ + Task 1.2 ✅ · 54 个 contract test 守门 |
 | 2 · 计费保险 | ⚪ 待启动 | 0/1 | |
 | 3 · CI 保险 | ⚪ 待启动 | 0/2 | |
 | 4 · i18n + E2E | ⚪ 待启动 | 0/2 | |
@@ -266,6 +270,8 @@
 **预计总工时**：35-50 小时（按每天 2-3 小时投入 · 约 3-4 周完成阶段 1-6 · 7-8 长期持续）
 
 **完成的 commits**（按时间倒序）：
+- _待填_ · 阶段 1 Task 1.2 多租户隔离 contract tests (54 测试 · 13 表 · 25 函数)
+- `c65eed1` · 收工入档 + EXECUTION_PLAN 进度更新
 - `8dd2c9c` · 阶段 1 Task 1.1 + 意外 P0 越权读修复 + 矩阵文档
 - `bdef105` · EXECUTION_PLAN 8 阶段路线创建
 - `b5063d5` · P0-04 CORS 收紧

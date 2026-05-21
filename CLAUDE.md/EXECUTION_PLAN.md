@@ -9,16 +9,17 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0 ✅ + 意外修 P0 ✅ + 阶段 1 Task 1.1 ✅ + **Task 1.2 ✅** ➡️ **下一步阶段 2 Task 2.1（计费保险）**
+**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + **阶段 2 Task 2.1 ✅** ➡️ **下一步阶段 3 Task 3.1（本机 import）**
 
-**用户说"继续"时直接做的事**（阶段 2 Task 2.1）：
-1. 读 `db.py` charge_ocr / get_tenant_balance / get_billing_status_combined
-2. 新建 `tests/unit/test_billing_contract.py`
-3. mock cursor 验证 5 类场景：余额不足 402 / 白名单跳过 / 扣费必写流水 / PDF 200/201 页边界 / Excel 50/51 字符边界
-4. 跑 `python -m unittest tests.unit.test_billing_contract -v`
-5. commit + push（同 1.2 · 加测试 · 不触发铁律 16 红线）
+**用户说"继续"时直接做的事**（阶段 3 Task 3.1）：
+1. `pip install passlib psycopg2-binary xlrd`
+2. 跑 `python scripts/check_imports.py --quiet` 必须退出 0
+3. 检查 requirements.txt 版本是否锁定（若缺则补 pip freeze）
+4. 没改业务代码 · 仅装包 · commit `chore(deps): 装齐本机 dev 依赖` 即可（无需 push 也行 · pip 是本机配置）
 
-**预计工时**：2-3 小时（纯测试代码 · 不动业务）
+**预计工时**：30 分钟（装包 + 验证）
+
+**然后 Task 3.2**：GitHub Actions CI（1h）· 新建 `.github/workflows/ci.yml`
 
 **注意事项**：
 - 本机缺 `passlib` / `psycopg2` / `xlrd` · 但这次**用 mock 不连 DB** · 不受影响
@@ -94,18 +95,18 @@
 
 > **为什么紧跟阶段 1**：今天刚修过 P0 商业漏洞（0 余额能用 OCR）· 但没测试守门 = 下次发布可能复发。Credits 是直接收入 · 任何 bug 都直接亏钱。
 
-### Task 2.1 · Credits 计费关键路径测试（P1-07）
-- **状态**：pending
+### Task 2.1 · Credits 计费关键路径测试（P1-07）✅ 2026-05-21 完成
+- **状态**：✅ completed · 43 个测试全过
 - **类型**：unit tests · mock cursor
-- **产出**：`tests/unit/test_billing_contract.py`
-- **覆盖场景**：
-  - 新用户 `is_billing_exempt=False` · OCR/VAT/recon 余额不足返回 402
-  - 白名单用户 `is_billing_exempt=True` · 余额 0 仍可用
-  - `charge_ocr` 扣余额必须写 `credit_transactions`
-  - PDF 分级定价边界：200 / 201 页
-  - Excel 字符计费边界：50 / 51 字符
-- **完成判定**：单测不依赖真实 DB · 当前价格规则被锁住
-- **工作量**：2-3 小时
+- **产出**：`tests/unit/test_billing_contract.py`（650+ 行 · 9 个测试类）
+- **覆盖统计**：6 个核心函数 · 5 大类场景 · 43 个测试
+  - **A 价格规则**：PDF tier1/tier2 + 边界 199/200/201/250 used · Excel 49/50/51 chars · 价格常量 lock
+  - **B 余额检查**：exempt 跳 DB · no_tenant · insufficient_balance · v0.21 单 SELECT 性能合约
+  - **C 失败不扣**：no_tenant / unknown kind / exempt / cost=0 都不写 DB
+  - **D 成功必写**：PDF 3 表 (credits + transactions + monthly_usage) · Excel 2 表 · 流水 amount 必负
+  - **E 重复请求**：当前契约 charge_ocr 非幂等 · 去重靠 file_hash · 锁定 + 文档化
+  - **F 并发安全**：SELECT FOR UPDATE 必存在 · monthly_page_usage 必 ON CONFLICT UPSERT
+  - **G 跨租户**：所有写入 params 必含调用方 tenant_id
 
 ---
 
@@ -259,7 +260,7 @@
 |---|---|---|---|
 | 0 · 安全基线 | ✅ 完成 | 5+1/5 | 2026-05-21 一天闭环 · 含 1 个意外发现的真 P0 |
 | **1 · 多租户保险** | ✅ 完成 | **2/2** | Task 1.1 ✅ + Task 1.2 ✅ · 54 个 contract test 守门 |
-| 2 · 计费保险 | ⚪ 待启动 | 0/1 | |
+| 2 · 计费保险 | ✅ 完成 | 1/1 | 43 个 billing contract test 守门 · 价格规则锁定 |
 | 3 · CI 保险 | ⚪ 待启动 | 0/2 | |
 | 4 · i18n + E2E | ⚪ 待启动 | 0/2 | |
 | 5 · 后端路由拆 | ⚪ 待启动 | 0/3 | |
@@ -270,7 +271,8 @@
 **预计总工时**：35-50 小时（按每天 2-3 小时投入 · 约 3-4 周完成阶段 1-6 · 7-8 长期持续）
 
 **完成的 commits**（按时间倒序）：
-- _待填_ · 阶段 1 Task 1.2 多租户隔离 contract tests (54 测试 · 13 表 · 25 函数)
+- _待填_ · 阶段 2 Task 2.1 Credits 计费 contract tests (43 测试 · 价格 + 扣费 + 并发)
+- `fd499aa` · 阶段 1 Task 1.2 多租户隔离 contract tests (54 测试 · 13 表 · 25 函数)
 - `c65eed1` · 收工入档 + EXECUTION_PLAN 进度更新
 - `8dd2c9c` · 阶段 1 Task 1.1 + 意外 P0 越权读修复 + 矩阵文档
 - `bdef105` · EXECUTION_PLAN 8 阶段路线创建

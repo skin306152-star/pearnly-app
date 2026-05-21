@@ -1219,6 +1219,28 @@ async def bank_v2_run(
     if not gl_files:
         raise HTTPException(422, _brv2_err("no_gl_files", lang))
 
+    # v118.35.0.21 · Credits 前置检查(1 次 SELECT · 异步扣费)
+    _billing_bv2 = {"is_exempt": True, "pages_used_this_month": 0}
+    try:
+        import db as _db_credit
+        _tid_bv2 = user.get("tenant_id")
+        _billing_bv2 = _db_credit.get_billing_status_combined(str(user.get("id")), _tid_bv2)
+        if not _billing_bv2.get("allowed") and not _billing_bv2.get("is_exempt"):
+            _est_cost = float(_db_credit.estimate_pdf_cost_thb(
+                _billing_bv2.get("pages_used_this_month", 0),
+                len(stmt_files) + len(gl_files)))
+            raise HTTPException(402, detail={
+                "code": "insufficient_balance",
+                "balance": _billing_bv2.get("balance_thb", 0.0),
+                "estimated_cost": _est_cost,
+                "pages_used_this_month": _billing_bv2.get("pages_used_this_month", 0),
+            })
+    except HTTPException:
+        raise
+    except Exception as _be:
+        import logging as _lg_pre
+        _lg_pre.getLogger('recon').warning(f"[bank_v2.credits] pre-check skip: {_be}")
+
     # v118.33.12.1 · use _user_key (gemini_api_key OR custom_gemini_api_key)
     # to match the rest of the system; fall back to env GEMINI_API_KEY.
     import os as _os, logging as _lg
@@ -1252,6 +1274,39 @@ async def bank_v2_run(
 
     stmt_results = await asyncio.gather(*[_parse_stmt(b, fn) for b, fn in stmt_data])
     gl_results = await asyncio.gather(*[_parse_gl(b, fn) for b, fn in gl_data])
+
+    # v118.35.0.21 · 异步扣费 · 按文件扩展名分 pdf/excel 两种 kind
+    if not _billing_bv2.get("is_exempt"):
+        try:
+            import db as _db_chg
+            _tid_chg = user.get("tenant_id")
+            _excel_exts = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv", ".txt", ".docx", ".doc"}
+            _pdf_units = 0
+            _excel_units = 0
+            for r, (b, fn) in list(zip(stmt_results, stmt_data)) + list(zip(gl_results, gl_data)):
+                if not r.get("ok"):
+                    continue
+                row_count = len(r.get("rows") or [])
+                if row_count == 0:
+                    continue
+                ext = "." + (fn or "").lower().rsplit(".", 1)[-1] if "." in (fn or "") else ""
+                if ext in _excel_exts:
+                    _excel_units += _db_chg._excel_char_count_estimate(b, fn)
+                else:
+                    _pdf_units += row_count
+            if _pdf_units > 0:
+                asyncio.create_task(asyncio.to_thread(
+                    _db_chg.charge_ocr_async,
+                    str(user.get("id")), _tid_chg, "pdf", _pdf_units,
+                    None, f"银行对账 PDF · {_pdf_units} 行"))
+            if _excel_units > 0:
+                asyncio.create_task(asyncio.to_thread(
+                    _db_chg.charge_ocr_async,
+                    str(user.get("id")), _tid_chg, "excel", _excel_units,
+                    None, f"银行对账 Excel · {_excel_units} 字符"))
+        except Exception as _ce:
+            import logging as _lg_ce
+            _lg_ce.getLogger('recon').warning(f"💳 bank_v2 async charge skip: {_ce}")
 
     # v118.35.0.19 · per-file parse diagnostics 带 error_code 字段 · 前端用它做 i18n 翻译
     parse_info = {

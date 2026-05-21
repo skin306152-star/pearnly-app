@@ -103,6 +103,25 @@ async def build_excel_endpoint(
     if lang not in ("th", "zh", "en", "ja"):
         lang = "th"
 
+    # v118.35.0.21 · Credits 前置检查(1 次 SELECT · 异步扣费)
+    _billing_vex = {"is_exempt": True, "pages_used_this_month": 0}
+    try:
+        _billing_vex = db.get_billing_status_combined(str(user_id), tenant_id)
+        if not _billing_vex.get("allowed") and not _billing_vex.get("is_exempt"):
+            _est_pages = len(invoices) + len(reports)
+            _est_cost = float(db.estimate_pdf_cost_thb(
+                _billing_vex.get("pages_used_this_month", 0), _est_pages))
+            raise HTTPException(402, detail={
+                "code": "insufficient_balance",
+                "balance": _billing_vex.get("balance_thb", 0.0),
+                "estimated_cost": _est_cost,
+                "pages_used_this_month": _billing_vex.get("pages_used_this_month", 0),
+            })
+    except HTTPException:
+        raise
+    except Exception as _be:
+        logger.warning(f"[vex.credits] pre-check skip: {_be}")
+
     api_key = _user_key(user)
     t0 = time.time()
 
@@ -145,6 +164,19 @@ async def build_excel_endpoint(
     fail_invoices = [r for r in parsed_invoices if not r.get("ok")]
     logger.info(f"[vex.build] 发票 OCR · ok={len(ok_invoices)} fail={len(fail_invoices)} "
                 f"· 总耗时 {time.time()-t0:.1f}s")
+
+    # v118.35.0.21 · 异步扣费 · 失败发票不扣 · 豁免账号自动跳过
+    if not _billing_vex.get("is_exempt"):
+        try:
+            _billed_pages = len(ok_invoices) + len(reports)
+            if _billed_pages > 0:
+                asyncio.create_task(asyncio.to_thread(
+                    db.charge_ocr_async,
+                    str(user_id), tenant_id, "pdf", _billed_pages,
+                    None, f"VAT 对账 · {len(ok_invoices)} 张发票 + {len(reports)} 份报告"
+                ))
+        except Exception as _ce:
+            logger.warning(f"💳 vex.build async charge skip: {_ce}")
 
     # 生成 Excel (返回 tuple)
     xlsx_bytes, task_summary = await loop.run_in_executor(

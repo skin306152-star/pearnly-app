@@ -40,11 +40,15 @@ def get_pool() -> SimpleConnectionPool:
     global _pool
     if _pool is None:
         url = _get_database_url()
+        # v118.35.0.21 · maxconn 5 → 30 · 修 v0.20 部署后全站超时的真因
+        # 老 maxconn=5 在 v0.20 加 credits 检查后(每个 OCR 多 3 次 DB 查询)
+        # 5 个并发 OCR 就把连接池打满 · 后续请求阻塞 → 累积 → 全站超时
+        # Supabase 默认允许 ~60 个连接 · 30 安全有冗余
         _pool = SimpleConnectionPool(
-            minconn=1, maxconn=5, dsn=url,
+            minconn=2, maxconn=30, dsn=url,
             connect_timeout=10, sslmode="require",
         )
-        logger.info("✅ PostgreSQL 连接池已建立")
+        logger.info("✅ PostgreSQL 连接池已建立(minconn=2 maxconn=30)")
     return _pool
 
 
@@ -8802,4 +8806,270 @@ def set_user_active_tenant(user_id: str, tenant_id: str) -> bool:
     except Exception as e:
         logger.error(f"set_user_active_tenant failed: {e}")
         return False
+
+
+# ============================================================================
+# v118.35.0.21 · Credits 计费业务层(v0.21 修正版 · 修 v0.20 部署后超时)
+#
+# v0.20 教训:
+#   - 每个 OCR 加 3 次独立 DB 查询(is_exempt + balance + pages_used)
+#   - maxconn=5 连接池被并发 OCR 撑爆 → 全站超时 → 回滚
+#
+# v0.21 修正:
+#   1. maxconn 5→30(见上面 get_pool · 真凶)
+#   2. get_billing_status_combined: 一次 SELECT 拿 3 个字段(取代 v0.20 三次查询)
+#   3. is_user_billing_exempt: 加 5 分钟 LRU cache(白名单极少变)
+#   4. charge_ocr: 由调用端 asyncio.create_task 异步触发(不阻塞 OCR 返回)
+#
+# 价格规则(Korn 拍板 2026-05-21):
+#   PDF: 当月 ≤ 200 张 → ฿1.50/张 · > 200 张 → ฿0.75/张(跨界自动拆段)
+#   Excel/Word/CSV: 50 字符 = 1 satang(฿0.01)· 向上取整
+# 白名单: users.is_billing_exempt = TRUE 自动跳过
+# ============================================================================
+from decimal import Decimal as _DecV21, ROUND_HALF_UP as _RH_V21
+import math as _math_v21
+import time as _time_v21
+
+PDF_TIER1_LIMIT_V21 = 200
+PDF_TIER1_PRICE_V21 = _DecV21("1.50")
+PDF_TIER2_PRICE_V21 = _DecV21("0.75")
+EXCEL_CHARS_PER_SATANG_V21 = 50
+EXCEL_SATANG_PRICE_V21 = _DecV21("0.01")
+
+# 白名单 LRU cache(进程内 · 5 分钟 TTL · 减少 DB 压力)
+_EXEMPT_CACHE_V21: dict = {}
+_EXEMPT_CACHE_TTL_V21 = 300
+
+
+def is_user_billing_exempt(user_id) -> bool:
+    """v0.21 · 5 分钟 cache · 白名单极少变 · 减少 DB roundtrip"""
+    if not user_id:
+        return False
+    key = str(user_id)
+    now = _time_v21.time()
+    hit = _EXEMPT_CACHE_V21.get(key)
+    if hit and hit[1] > now:
+        return hit[0]
+    try:
+        with get_cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(is_billing_exempt, FALSE) AS x "
+                "FROM users WHERE id = %s::uuid LIMIT 1",
+                (str(user_id),)
+            )
+            row = cur.fetchone()
+            result = bool(row["x"]) if row else False
+            _EXEMPT_CACHE_V21[key] = (result, now + _EXEMPT_CACHE_TTL_V21)
+            if len(_EXEMPT_CACHE_V21) > 5000:
+                # 限制 cache 体积 · 简单清理
+                _EXEMPT_CACHE_V21.clear()
+            return result
+    except Exception as e:
+        logger.warning(f"is_user_billing_exempt error user={user_id}: {e}")
+        return False
+
+
+def get_billing_status_combined(user_id, tenant_id) -> dict:
+    """v0.21 · 一次 SELECT 拿 is_exempt + balance + pages_used_this_month
+    取代 v0.20 的 3 次独立查询 · DB roundtrip 从 3 → 1。
+    返: {allowed, is_exempt, balance_thb, pages_used_this_month, error_code}
+    """
+    # 白名单走 cache(不查 DB · 0 RTT)
+    if is_user_billing_exempt(user_id):
+        return {"allowed": True, "is_exempt": True, "balance_thb": 0.0,
+                "pages_used_this_month": 0, "error_code": None}
+    if not tenant_id:
+        return {"allowed": False, "is_exempt": False, "balance_thb": 0.0,
+                "pages_used_this_month": 0, "error_code": "no_tenant"}
+    try:
+        ym = _bkk_year_month()
+        with get_cursor() as cur:
+            # 一次 SELECT 合并两个 LEFT JOIN · 一次 DB roundtrip
+            cur.execute("""
+                SELECT
+                    COALESCE(tc.balance_thb, 0) AS balance_thb,
+                    COALESCE(mpu.pages_used, 0) AS pages_used
+                FROM (SELECT 1) AS dummy
+                LEFT JOIN tenant_credits tc ON tc.tenant_id = %s::uuid
+                LEFT JOIN monthly_page_usage mpu
+                       ON mpu.tenant_id = %s::uuid AND mpu.year_month = %s
+                LIMIT 1
+            """, (str(tenant_id), str(tenant_id), ym))
+            row = cur.fetchone()
+            bal = float(row["balance_thb"] if row else 0)
+            used = int(row["pages_used"] if row else 0)
+        if bal <= 0:
+            return {"allowed": False, "is_exempt": False, "balance_thb": bal,
+                    "pages_used_this_month": used, "error_code": "insufficient_balance"}
+        return {"allowed": True, "is_exempt": False, "balance_thb": bal,
+                "pages_used_this_month": used, "error_code": None}
+    except Exception as e:
+        logger.warning(f"get_billing_status_combined error tenant={tenant_id}: {e}")
+        # 失败时不阻塞 OCR(降级到允许 · 但 log 警报)
+        return {"allowed": True, "is_exempt": False, "balance_thb": 0.0,
+                "pages_used_this_month": 0, "error_code": "lookup_error"}
+
+
+def estimate_pdf_cost_thb(pages_used_this_month: int, page_count: int) -> _DecV21:
+    """估算 PDF N 页的总成本 · 跨界自动拆段
+    v0.21 改: 调用端传 pages_used_this_month · 不再查 DB · 与前置 combined 查询复用
+    """
+    n = max(0, int(page_count or 0))
+    if n == 0:
+        return _DecV21("0.00")
+    used = max(0, int(pages_used_this_month or 0))
+    tier1_remaining = max(0, PDF_TIER1_LIMIT_V21 - used)
+    tier1_pages = min(n, tier1_remaining)
+    tier2_pages = n - tier1_pages
+    cost = (PDF_TIER1_PRICE_V21 * tier1_pages) + (PDF_TIER2_PRICE_V21 * tier2_pages)
+    return cost.quantize(_DecV21("0.01"), rounding=_RH_V21)
+
+
+def estimate_excel_cost_thb(char_count: int) -> _DecV21:
+    """Excel/Word/CSV 按字符计费 · 50 字符 = 1 satang · 向上取整"""
+    n = max(0, int(char_count or 0))
+    if n == 0:
+        return _DecV21("0.00")
+    satang = _math_v21.ceil(n / EXCEL_CHARS_PER_SATANG_V21)
+    return (EXCEL_SATANG_PRICE_V21 * satang).quantize(_DecV21("0.01"), rounding=_RH_V21)
+
+
+def charge_ocr(user_id, tenant_id, kind: str, units: int,
+               history_id: str = None, description: str = "") -> dict:
+    """OCR 完成后扣费 · v0.21 由调用端用 asyncio.create_task 异步触发
+    单原子事务(SELECT FOR UPDATE 防并发)· 内部仍持有连接 · 但已脱离 OCR 关键路径
+    kind: 'pdf' (units=page_count) | 'excel' (units=char_count)
+    豁免账号自动跳过返 ok=True charged=0
+    """
+    if not tenant_id:
+        return {"ok": False, "error": "no_tenant"}
+    if is_user_billing_exempt(user_id):
+        return {"ok": True, "charged_thb": 0.0, "balance_after": None,
+                "kind": kind, "units": units, "transaction_id": None, "exempt": True}
+
+    if kind == "pdf":
+        used = 0
+        try:
+            with get_cursor() as _c:
+                _c.execute(
+                    "SELECT COALESCE(pages_used, 0) AS u FROM monthly_page_usage "
+                    "WHERE tenant_id = %s::uuid AND year_month = %s",
+                    (str(tenant_id), _bkk_year_month())
+                )
+                _r = _c.fetchone()
+                used = int(_r["u"]) if _r else 0
+        except Exception:
+            used = 0
+        cost = estimate_pdf_cost_thb(used, units)
+        pages_inc = int(units)
+    elif kind == "excel":
+        cost = estimate_excel_cost_thb(units)
+        pages_inc = 0
+    else:
+        return {"ok": False, "error": f"unknown_kind:{kind}"}
+
+    if cost <= _DecV21("0"):
+        return {"ok": True, "charged_thb": 0.0, "balance_after": None,
+                "kind": kind, "units": units, "transaction_id": None}
+
+    ym = _bkk_year_month()
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute(
+                "SELECT balance_thb FROM tenant_credits "
+                "WHERE tenant_id = %s::uuid FOR UPDATE",
+                (str(tenant_id),)
+            )
+            row = cur.fetchone()
+            if not row:
+                cur.execute(
+                    "INSERT INTO tenant_credits (tenant_id, balance_thb) "
+                    "VALUES (%s::uuid, 0) RETURNING balance_thb",
+                    (str(tenant_id),)
+                )
+                row = cur.fetchone()
+            current_bal = _DecV21(str(row["balance_thb"]))
+            new_bal = current_bal - cost  # 可扣到负数(OCR 已完成 · 后续充值补)
+
+            cur.execute(
+                "UPDATE tenant_credits SET balance_thb = %s, updated_at = NOW() "
+                "WHERE tenant_id = %s::uuid",
+                (str(new_bal), str(tenant_id))
+            )
+            cur.execute(
+                "INSERT INTO credit_transactions "
+                "(tenant_id, user_id, type, amount_thb, pages, balance_after, description) "
+                "VALUES (%s::uuid, %s::uuid, 'usage', %s, %s, %s, %s) RETURNING id",
+                (str(tenant_id), str(user_id) if user_id else None,
+                 str(-cost), pages_inc, str(new_bal),
+                 description or f"OCR {kind} units={units} hid={history_id or ''}")
+            )
+            tx_id = cur.fetchone()["id"]
+
+            if kind == "pdf" and pages_inc > 0:
+                cur.execute(
+                    "INSERT INTO monthly_page_usage (tenant_id, year_month, pages_used, updated_at) "
+                    "VALUES (%s::uuid, %s, %s, NOW()) "
+                    "ON CONFLICT (tenant_id, year_month) DO UPDATE "
+                    "SET pages_used = monthly_page_usage.pages_used + EXCLUDED.pages_used, "
+                    "    updated_at = NOW()",
+                    (str(tenant_id), ym, pages_inc)
+                )
+        logger.info(f"[charge_ocr] OK tenant={str(tenant_id)[:8]} kind={kind} "
+                    f"units={units} cost=฿{cost} bal_after=฿{new_bal}")
+        return {"ok": True, "charged_thb": float(cost), "balance_after": float(new_bal),
+                "kind": kind, "units": units, "transaction_id": tx_id}
+    except Exception as e:
+        logger.error(f"[charge_ocr] FAIL tenant={tenant_id} kind={kind} units={units}: {e}")
+        return {"ok": False, "error": str(e)[:200]}
+
+
+def _excel_char_count_estimate(file_bytes: bytes, filename: str) -> int:
+    """估算 Excel/CSV/Word 文件的总字符数 · 用于扣费"""
+    if not file_bytes:
+        return 0
+    fn = (filename or "").lower()
+    try:
+        if fn.endswith(".xlsx") or fn.endswith(".xlsm") or fn.endswith(".xls"):
+            try:
+                import openpyxl, io
+                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+                total = 0
+                for ws in wb.worksheets:
+                    for row in ws.iter_rows(values_only=True):
+                        for c in row:
+                            if c is not None:
+                                total += len(str(c))
+                return total
+            except Exception:
+                return max(0, len(file_bytes) // 4)  # 粗估降级
+        elif fn.endswith(".csv") or fn.endswith(".tsv") or fn.endswith(".txt"):
+            try:
+                return len(file_bytes.decode("utf-8", errors="ignore"))
+            except Exception:
+                return 0
+        elif fn.endswith(".docx") or fn.endswith(".doc"):
+            try:
+                import docx, io
+                doc = docx.Document(io.BytesIO(file_bytes))
+                return sum(len(p.text) for p in doc.paragraphs)
+            except Exception:
+                return max(0, len(file_bytes) // 2)
+    except Exception as e:
+        logger.warning(f"_excel_char_count_estimate error fn={fn}: {e}")
+    return 0
+
+
+def charge_ocr_async(user_id, tenant_id, kind: str, units: int,
+                     history_id: str = None, description: str = "") -> None:
+    """v0.21 · 异步扣费包装 · 调用方:
+       asyncio.create_task(asyncio.to_thread(db.charge_ocr_async, ...))
+       fire-and-forget · 不阻塞 OCR 关键路径 · 失败仅 log 不影响用户
+    """
+    try:
+        result = charge_ocr(user_id, tenant_id, kind, units, history_id, description)
+        if not result.get("ok"):
+            logger.warning(f"[charge_ocr_async] failed silently: {result.get('error')}")
+    except Exception as e:
+        logger.error(f"[charge_ocr_async] exception(swallowed): {e}")
 

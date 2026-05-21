@@ -39,10 +39,10 @@ _GLV_ERR = {
         "th": "อ่านไฟล์ GL ไม่สำเร็จ: {e}", "ja": "GL 解析失敗: {e}",
     },
     "gl_no_revenue_rows": {
-        "zh": "GL 文件中未找到任何收入类科目数据 · 请检查文件或科目前缀",
-        "en": "No revenue account rows found in GL · check file or account prefix",
-        "th": "ไม่พบรายการบัญชีรายได้ใน GL · ตรวจสอบไฟล์หรือรหัสนำหน้าบัญชี",
-        "ja": "GL に収益科目データが見つかりません · ファイルまたは科目接頭辞を確認",
+        "zh": "在文件里没找到收入科目数据。请确认右侧上传的是『总账 GL』(Excel/CSV · 至少含日期/科目/借方/贷方列)· 如果你的收入科目不是 4 开头,请调右侧『收入科目前缀』",
+        "en": "No revenue account rows found. Please upload a General Ledger file (Excel/CSV with Date/Account/Debit/Credit columns) · If your revenue accounts don't start with '4', adjust the 'Revenue Account Prefix' on the right",
+        "th": "ไม่พบรายการบัญชีรายได้ในไฟล์ · กรุณาอัปโหลดบัญชีแยกประเภท GL (Excel/CSV ที่มีคอลัมน์ วันที่/รหัสบัญชี/เดบิต/เครดิต) · หากบัญชีรายได้ไม่ขึ้นต้นด้วย 4 ให้ปรับ 'รหัสนำหน้าบัญชีรายได้' ด้านขวา",
+        "ja": "ファイルに収益科目データが見つかりません · 右側に『総勘定元帳 GL』(日付/科目/借方/貸方列のある Excel/CSV) をアップロードしてください · 収益科目が 4 以外で始まる場合は右側の『収益科目接頭辞』を変更してください",
     },
     "vat_parse_failed": {
         "zh": "销项税报告解析失败：{e}", "en": "Failed to parse VAT report: {e}",

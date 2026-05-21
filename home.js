@@ -532,7 +532,7 @@ const I18N = {
         'ocr-summary-rate': '⚠ {n} 张被限流',
         'ocr-summary-other': '⚠ {n} 张其他错误',
         'err.cancelled': '已取消',
-        'err.gemini_overloaded': 'OCR 服务繁忙 · 稍后重试',
+        'err.gemini_overloaded': '识别服务暂时拥堵 · 30 秒后请重试 · 不会扣费',
         'err.rate_limit': '触发限流 · 稍后重试',
         'err.server': '服务器错误 · 稍后重试',
         'btn-custom-tpl': '自定义模板',
@@ -2964,7 +2964,7 @@ const I18N = {
         'ocr-summary-rate': '⚠ {n} rate limited',
         'ocr-summary-other': '⚠ {n} other errors',
         'err.cancelled': 'Cancelled',
-        'err.gemini_overloaded': 'OCR service busy · retry later',
+        'err.gemini_overloaded': 'Recognition service busy · please retry in 30 s · no charge',
         'err.rate_limit': 'Rate limited · retry later',
         'err.server': 'Server error · retry later',
         'btn-custom-tpl': 'Custom Template',
@@ -5379,7 +5379,7 @@ const I18N = {
         'ocr-summary-rate': '⚠ ถูกจำกัดอัตรา {n}',
         'ocr-summary-other': '⚠ ข้อผิดพลาดอื่น {n}',
         'err.cancelled': 'ยกเลิกแล้ว',
-        'err.gemini_overloaded': 'บริการ OCR งานล้น · ลองใหม่ภายหลัง',
+        'err.gemini_overloaded': 'ระบบรู้จำกำลังคับคั่ง · ลองใหม่ภายใน 30 วินาที · ไม่เก็บเงิน',
         'err.rate_limit': 'ถูกจำกัดอัตรา · ลองใหม่ภายหลัง',
         'err.server': 'เซิร์ฟเวอร์ผิดพลาด · ลองใหม่ภายหลัง',
         'btn-custom-tpl': 'เทมเพลตเอง',
@@ -7789,7 +7789,7 @@ const I18N = {
         'ocr-summary-rate': '⚠ レート制限 {n}',
         'ocr-summary-other': '⚠ その他のエラー {n}',
         'err.cancelled': 'キャンセル済み',
-        'err.gemini_overloaded': 'OCR サービス過負荷 · 後で再試行',
+        'err.gemini_overloaded': '認識サービスが混雑しています · 30 秒後に再試行 · 課金されません',
         'err.rate_limit': 'レート制限 · 後で再試行',
         'err.server': 'サーバーエラー · 後で再試行',
         'btn-custom-tpl': 'カスタム',
@@ -32864,13 +32864,11 @@ window.addEventListener('DOMContentLoaded', () => {
                         balVal.className = (bal < 50) ? 'dash-kpi-val dash-red' : 'dash-kpi-val';
                     }
                     if (balSub) {
-                        if (bal < 50) {
-                            // v118.35.0.11 · 跟 legacy 一样:onclick 直接调 window._openTopupModal
-                            const linkTxt = (typeof t === 'function') ? t('dash-kpi-balance-topup') : 'Top up →';
-                            balSub.innerHTML = '<a href="#" id="kpi-balance-topup-link" style="color:#dc2626;text-decoration:underline;cursor:pointer;" onclick="event.preventDefault();window._openTopupModal&&window._openTopupModal();return false;">' + escapeHtml(linkTxt) + '</a>';
-                        } else {
-                            balSub.innerHTML = '&nbsp;';
-                        }
+                        // v118.35.0.24 · 充值入口永远显示(老逻辑只在 <50 时显示 · 转化率低)
+                        // 低余额红色高亮 · 正常余额灰色低调
+                        const linkTxt = (typeof t === 'function') ? t('dash-kpi-balance-topup') : 'Top up →';
+                        const linkColor = (bal < 50) ? '#dc2626' : '#6b7280';
+                        balSub.innerHTML = '<a href="#" id="kpi-balance-topup-link" style="color:' + linkColor + ';text-decoration:underline;cursor:pointer;" onclick="event.preventDefault();window._openTopupModal&&window._openTopupModal();return false;">' + escapeHtml(linkTxt) + '</a>';
                     }
                 }
             }

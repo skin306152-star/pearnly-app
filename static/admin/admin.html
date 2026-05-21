@@ -214,6 +214,69 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                     </table>
                 </div>
             </div>
+
+            <!-- v118.35.0.22 · Credits 收入端 KPI(用户扣费 · 跟成本互补) -->
+            <div class="cost-section" style="margin-top:24px">
+                <div class="cost-section-head">
+                    <h3 data-i18n="rev-kpi-title">用户扣费 KPI</h3>
+                    <div class="cost-actions">
+                        <button class="btn btn-primary" id="btn-credits-export">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M8 2v8M5 7l3 3 3-3M3 13h10"/>
+                            </svg>
+                            <span data-i18n="rev-export">导出扣费明细</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="cost-kpi-grid">
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="rev-today">今日扣费</div>
+                        <div class="cost-kpi-value" id="kpi-rev-today">—</div>
+                        <div class="cost-kpi-sub" id="kpi-rev-today-sub">—</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="rev-month">本月扣费</div>
+                        <div class="cost-kpi-value" id="kpi-rev-month">—</div>
+                        <div class="cost-kpi-sub" id="kpi-rev-month-sub">—</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="rev-pool">余额池总和</div>
+                        <div class="cost-kpi-value" id="kpi-rev-pool">—</div>
+                        <div class="cost-kpi-sub" data-i18n="rev-pool-sub">所有公司余额合计</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="rev-overdraft">透支公司</div>
+                        <div class="cost-kpi-value" id="kpi-rev-overdraft">—</div>
+                        <div class="cost-kpi-sub" data-i18n="rev-overdraft-sub">余额 ≤ 0 的公司</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v118.35.0.22 · 全公司余额清单 -->
+            <div class="cost-section">
+                <div class="cost-section-head">
+                    <h3 data-i18n="tn-list-title">公司余额清单</h3>
+                    <span class="cost-section-hint" data-i18n="tn-list-hint">按余额降序 · 透支飘红</span>
+                </div>
+                <div class="cost-table-wrap">
+                    <table class="cost-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="tn-th-name">公司</th>
+                                <th data-i18n="tn-th-balance">当前余额</th>
+                                <th data-i18n="tn-th-month-usage">本月扣费</th>
+                                <th data-i18n="tn-th-pages">本月页数</th>
+                                <th data-i18n="tn-th-topup">累计充值</th>
+                                <th data-i18n="tn-th-last">最后使用</th>
+                                <th data-i18n="tn-th-status">状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="credits-tenants-tbody">
+                            <tr><td colspan="7" class="cost-table-empty" data-i18n="cost-loading">加载中…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </section>
 
         <!-- ============ v118.44.0 NAV-IA Phase 8 · 嵌入 page-admin-users(原 home.html L4960-5068 · 业务逻辑由 home.js loadAdminUsersPage 接管)============ -->

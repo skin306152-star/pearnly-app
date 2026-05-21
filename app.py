@@ -5378,7 +5378,7 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.35.0.21 · 计费系统真正打通(v0.20 部署超时事故修正版):\n• v0.20 大事故复盘:加了余额检查/扣费后服务全挂 → 真因是数据库连接池只有 5 个 · 撑爆了 · 已扩到 30 个 + 加 5 分钟缓存白名单 + 扣费改异步(不阻塞识别)\n• 计费规则按你定的:PDF 前 200 张 ฿1.50/张 · 第 201 张起 ฿0.75/张 · Excel/Word/CSV 不走 AI 直接按字符 · 50 字符 = 1 satang(฿0.01)\n• 零余额上传时弹『余额不足 · 当前 ฿0 · 本次约需 ฿X · 点击充值』· 4 语\n• 充值超过 ฿500,000 上限不再露 pydantic 报错 · 改友好提示 · 4 语\n• 白名单两个邮箱(skin306152 + mrerp)通过 users.is_billing_exempt 字段管理 · 删硬编码 user_id",
+            "zh": "v118.35.0.22 · Earn 超管面板 · Credits 数据互通:\n• Earn 后台『成本追踪』页底下新增『用户扣费 KPI』卡片(今日扣费 / 本月扣费 / 余额池总和 / 透支公司数)\n• 加『公司余额清单』表格:每家公司当前余额 / 本月扣费 / 累计充值 / 状态(正常/低/⚠透支)· 透支飘红一眼看到\n• 加『导出扣费明细』按钮 → 输出 CSV(带 BOM 给 Excel 用 · 30 天每条扣费/充值/退款明细 · 供会计对账)\n• 4 个新超管 API: /api/admin/credits/{overview,tenants,daily_trend,export}\n• zh + th 两语都加好(Earn 后台只支持中泰)\n\n旧记录 v118.35.0.21 · 计费系统真正打通(v0.20 部署超时事故修正版):\n• v0.20 大事故复盘:加了余额检查/扣费后服务全挂 → 真因是数据库连接池只有 5 个 · 撑爆了 · 已扩到 30 个 + 加 5 分钟缓存白名单 + 扣费改异步(不阻塞识别)\n• 计费规则按你定的:PDF 前 200 张 ฿1.50/张 · 第 201 张起 ฿0.75/张 · Excel/Word/CSV 不走 AI 直接按字符 · 50 字符 = 1 satang(฿0.01)\n• 零余额上传时弹『余额不足 · 当前 ฿0 · 本次约需 ฿X · 点击充值』· 4 语\n• 充值超过 ฿500,000 上限不再露 pydantic 报错 · 改友好提示 · 4 语\n• 白名单两个邮箱(skin306152 + mrerp)通过 users.is_billing_exempt 字段管理 · 删硬编码 user_id",
             "th": "v118.35.0.21 · ระบบคิดเงินเชื่อมเสร็จสมบูรณ์ (แก้ v0.20 บั๊กเซิร์ฟล่ม):\n• v0.20 ล่ม: connection pool 5 ไม่พอ → ขยายเป็น 30 + cache whitelist 5 นาที + ตัดเงินเป็น async\n• ราคา: PDF 200 แผ่นแรก ฿1.50/แผ่น · 201+ ฿0.75/แผ่น · Excel/Word/CSV 50 ตัวอักษร = 1 สตางค์\n• ยอด 0 อัปโหลด → 'ยอดเงินไม่พอ · ปัจจุบัน ฿0 · ต้องการ ~฿X · แตะเพื่อเติมเงิน'\n• เติมเงินเกิน ฿500,000 → ข้อความเป็นมิตร · 4 ภาษา\n• Whitelist 2 อีเมล (skin306152 + mrerp) ผ่าน users.is_billing_exempt",
             "en": "v118.35.0.21 · Credits billing fully wired (v0.20 outage post-mortem):\n• v0.20 outage root cause: DB connection pool was only 5 · OCR with 3 added DB queries saturated it · expanded to 30 + 5min whitelist cache + async deduction (off OCR critical path)\n• Pricing: PDF first 200 pages ฿1.50/page · 201+ at ฿0.75/page · Excel/Word/CSV by char · 50 chars = 1 satang (฿0.01)\n• Upload at ฿0 → 'Insufficient balance · current ฿0 · need ~฿X · tap to top up'\n• Topup over ฿500,000 → friendly message · 4 langs\n• 2 whitelist emails (skin306152 + mrerp) via users.is_billing_exempt field",
             "ja": "v118.35.0.21 · クレジット課金システム完全接続 (v0.20 障害修正版):\n• v0.20 障害: DB 接続プール 5 が枯渇 → 30 に拡張 + ホワイトリスト 5 分キャッシュ + 課金を非同期化\n• 価格: PDF 最初 200 枚 ฿1.50/枚 · 201 枚以降 ฿0.75/枚 · Excel/Word/CSV 文字数課金 · 50 文字 = 1 サタン\n• 残高 0 アップロード → 『残高不足 · 現在 ฿0 · 今回必要 ~฿X · タップでチャージ』\n• チャージ ฿500,000 超過 → 親切メッセージ · 4 言語\n• ホワイトリスト 2 アドレス (skin306152 + mrerp) は users.is_billing_exempt 経由",
@@ -7088,6 +7088,76 @@ async def admin_cost_daily_trend(request: Request, days: int = 30):
     _require_super_admin(request)
     days = max(1, min(int(days), 365))
     return {"days": db.get_cost_daily_trend(days=days)}
+
+
+# ============================================================
+# v118.35.0.22 · Earn 超管 · Credits 数据互通(收入端 · 跟 cost 互补)
+# ============================================================
+@app.get("/api/admin/credits/overview")
+async def admin_credits_overview(request: Request):
+    """收入端 KPI · 今日/本月扣费 + 充值 + 余额池总和 + 透支公司数"""
+    _require_super_admin(request)
+    return db.get_credits_revenue_overview()
+
+
+@app.get("/api/admin/credits/tenants")
+async def admin_credits_tenants(request: Request, limit: int = 100):
+    """全公司余额清单 + 当月用量 + 透支警报"""
+    _require_super_admin(request)
+    limit = max(1, min(int(limit), 500))
+    return {"tenants": db.get_tenants_credits_summary(limit=limit)}
+
+
+@app.get("/api/admin/credits/daily_trend")
+async def admin_credits_daily_trend(request: Request, days: int = 30):
+    """每天收支趋势 · 从 credit_transactions 拉(替代 ocr_cost_log)"""
+    _require_super_admin(request)
+    days = max(1, min(int(days), 365))
+    return {"days": db.get_credits_daily_trend(days=days)}
+
+
+@app.get("/api/admin/credits/export")
+async def admin_credits_export(request: Request, days: int = 30):
+    """导出 CSV · 最近 N 天每条 credit_transactions 记录(供会计对账)"""
+    _require_super_admin(request)
+    days = max(1, min(int(days), 365))
+    try:
+        with db.get_cursor() as cur:
+            cur.execute("""
+                SELECT
+                    ct.id, ct.tenant_id::text, t.name AS tenant_name,
+                    ct.user_id::text, u.username,
+                    ct.type, ct.amount_thb, ct.pages, ct.balance_after,
+                    ct.description, ct.created_at
+                FROM credit_transactions ct
+                LEFT JOIN tenants t ON t.id = ct.tenant_id
+                LEFT JOIN users u ON u.id = ct.user_id
+                WHERE ct.created_at >= NOW() - INTERVAL %s
+                ORDER BY ct.created_at DESC
+            """, (f"{days} days",))
+            rows = cur.fetchall() or []
+    except Exception as e:
+        raise HTTPException(500, detail=f"export_failed: {e}")
+
+    import io, csv
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["id", "tenant_id", "tenant_name", "user_id", "username",
+                "type", "amount_thb", "pages", "balance_after", "description", "created_at"])
+    for r in rows:
+        w.writerow([
+            r["id"], r["tenant_id"] or "", r["tenant_name"] or "",
+            r["user_id"] or "", r["username"] or "",
+            r["type"], float(r["amount_thb"] or 0), int(r["pages"] or 0),
+            float(r["balance_after"] or 0), r["description"] or "",
+            r["created_at"].isoformat() if r["created_at"] else "",
+        ])
+    from fastapi.responses import Response
+    return Response(
+        content="﻿" + buf.getvalue(),  # BOM 让 Excel 识别 UTF-8
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename=credits_{days}days.csv"},
+    )
 
 
 @app.get("/api/admin/cost/export")

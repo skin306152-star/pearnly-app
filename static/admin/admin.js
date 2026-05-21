@@ -288,6 +288,66 @@
                     }).join('') + '</div>';
             }
         } catch (e) { /* trend 失败不致命 */ }
+
+        // v118.35.0.22 · Credits 收入 KPI + 公司清单(并行拉)
+        _renderCreditsRevenue();
+        _renderCreditsTenants();
+    }
+
+    // v118.35.0.22 · Credits 收入端 KPI 渲染(从 credit_transactions 拉真实扣费)
+    async function _renderCreditsRevenue() {
+        try {
+            const d = await _adminFetch('/api/admin/credits/overview');
+            const today = d.today || {}, month = d.month || {};
+            const pageSuffix = _curLang === 'th' ? ' หน้า' : ' 页';
+            const ocrSuffix  = _curLang === 'th' ? ' ครั้ง' : ' 次';
+            _setText('kpi-rev-today', '฿ ' + _fmt(today.usage_thb || 0, 2));
+            _setText('kpi-rev-today-sub', (today.ocr_count || 0) + ocrSuffix + ' · ' + (today.pages || 0) + pageSuffix);
+            _setText('kpi-rev-month', '฿ ' + _fmt(month.usage_thb || 0, 2));
+            _setText('kpi-rev-month-sub', (month.ocr_count || 0) + ocrSuffix + ' · ' + (month.pages || 0) + pageSuffix);
+            _setText('kpi-rev-pool', '฿ ' + _fmt(d.pool_balance_thb || 0, 2));
+            const overdraft = d.overdraft_tenants || 0;
+            const odEl = document.getElementById('kpi-rev-overdraft');
+            if (odEl) {
+                odEl.textContent = String(overdraft);
+                odEl.style.color = overdraft > 0 ? '#dc2626' : '';
+            }
+        } catch (e) {
+            console.error('credits revenue', e);
+        }
+    }
+
+    // v118.35.0.22 · 全公司余额清单渲染
+    async function _renderCreditsTenants() {
+        const tbody = document.getElementById('credits-tenants-tbody');
+        if (!tbody) return;
+        try {
+            const d = await _adminFetch('/api/admin/credits/tenants?limit=200');
+            const tenants = (d && d.tenants) || [];
+            if (!tenants.length) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#a0aec0">' + _t('adm-empty') + '</td></tr>';
+                return;
+            }
+            tbody.innerHTML = tenants.map(t => {
+                const balColor = t.is_overdraft ? '#dc2626' : (t.is_low_balance ? '#d97706' : '#059669');
+                const statusLabel = t.is_overdraft
+                    ? '<span style="color:#dc2626;font-weight:600">' + _t('tn-status-overdraft') + '</span>'
+                    : (t.is_low_balance
+                        ? '<span style="color:#d97706">' + _t('tn-status-low') + '</span>'
+                        : '<span style="color:#059669">' + _t('tn-status-ok') + '</span>');
+                return '<tr>' +
+                    '<td><strong>' + _esc(t.tenant_name || '—') + '</strong></td>' +
+                    '<td style="color:' + balColor + ';font-weight:600">฿ ' + _fmt(t.balance_thb || 0, 2) + '</td>' +
+                    '<td>฿ ' + _fmt(t.month_usage_thb || 0, 2) + '</td>' +
+                    '<td>' + (t.pages_this_month || 0) + '</td>' +
+                    '<td>฿ ' + _fmt(t.lifetime_topup_thb || 0, 2) + '</td>' +
+                    '<td>' + (t.last_usage_at ? String(t.last_usage_at).slice(0, 16).replace('T', ' ') : '—') + '</td>' +
+                    '<td>' + statusLabel + '</td>' +
+                '</tr>';
+            }).join('');
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#dc2626">' + _t('adm-load-fail') + '</td></tr>';
+        }
     }
 
     // ============ 用户管理页业务(v118.44.1 完整版)============
@@ -1294,6 +1354,19 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url; a.download = 'pearnly_cost_' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+                URL.revokeObjectURL(url);
+            } catch (e) { _toast(_t('adm-load-fail') + ' · ' + e.message, 'error'); }
+        });
+        // v118.35.0.22 · 导出 Credits 扣费明细
+        _on('btn-credits-export', 'click', async function () {
+            try {
+                const tok = localStorage.getItem('mrpilot_token');
+                const r = await fetch('/api/admin/credits/export?days=30', { headers: { 'Authorization': 'Bearer ' + tok } });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const blob = await r.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'pearnly_credits_' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
                 URL.revokeObjectURL(url);
             } catch (e) { _toast(_t('adm-load-fail') + ' · ' + e.message, 'error'); }
         });

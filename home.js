@@ -1471,7 +1471,7 @@ const I18N = {
         'topup-amount-label':    '充值金额',
         'topup-amount-invalid':  '请输入有效金额(最低 ฿10)',
         'topup-amount-too-large':'充值金额超过单次上限 ฿500,000 · 请减小金额',
-        'err.insufficient_balance': '余额不足 · 当前 ฿{balance} · 本次约需 ฿{estimated_cost} · 点击充值',
+        'err.insufficient_balance': '余额不足 · 当前 ฿{balance} · 点击充值',
         'topup-bank-label':      '转账到以下账户',
         'topup-bank-note':       '请转账恰好 ฿{amount} · 截图后再关闭银行 App',
         'topup-copy-account':    '复制账号',
@@ -3896,7 +3896,7 @@ const I18N = {
         'topup-amount-label':    'Amount',
         'topup-amount-invalid':  'Please enter a valid amount (min ฿10)',
         'topup-amount-too-large':'Amount exceeds single-topup cap ฿500,000 · please reduce',
-        'err.insufficient_balance': 'Insufficient balance · current ฿{balance} · need ~฿{estimated_cost} · tap to top up',
+        'err.insufficient_balance': 'Insufficient balance · current ฿{balance} · tap to top up',
         'topup-bank-label':      'Transfer to',
         'topup-bank-note':       'Transfer exactly ฿{amount} · screenshot before closing bank app',
         'topup-copy-account':    'Copy account',
@@ -6310,7 +6310,7 @@ const I18N = {
         'topup-amount-label':    'จำนวนเงิน',
         'topup-amount-invalid':  'กรุณาระบุจำนวนเงินที่ถูกต้อง (ขั้นต่ำ ฿10)',
         'topup-amount-too-large':'จำนวนเงินเกินวงเงินสูงสุดต่อครั้ง ฿500,000 · กรุณาลดจำนวน',
-        'err.insufficient_balance': 'ยอดเงินไม่พอ · ปัจจุบัน ฿{balance} · ต้องการ ~฿{estimated_cost} · แตะเพื่อเติมเงิน',
+        'err.insufficient_balance': 'ยอดเงินไม่พอ · ปัจจุบัน ฿{balance} · แตะเพื่อเติมเงิน',
         'topup-bank-label':      'โอนเงินไปที่บัญชีนี้',
         'topup-bank-note':       'โอนพอดี ฿{amount} และถ่ายสลิปก่อนปิดแอปธนาคาร',
         'topup-copy-account':    'คัดลอกเลขบัญชี',
@@ -8720,7 +8720,7 @@ const I18N = {
         'topup-amount-label':    '金額',
         'topup-amount-invalid':  '有効な金額を入力(最低 ฿10)',
         'topup-amount-too-large':'1 回の上限 ฿500,000 を超えています · 金額を減らしてください',
-        'err.insufficient_balance': '残高不足 · 現在 ฿{balance} · 今回必要 ~฿{estimated_cost} · タップでチャージ',
+        'err.insufficient_balance': '残高不足 · 現在 ฿{balance} · タップでチャージ',
         'topup-bank-label':      '振込先',
         'topup-bank-note':       'ちょうど ฿{amount} を振込み · 銀行アプリを閉じる前にスクショ',
         'topup-copy-account':    '口座番号をコピー',
@@ -15611,6 +15611,35 @@ async function showLogDetail(logId) {
     }
 }
 
+// v118.35.0.23 · 把后端 HTTPException detail 转成人话(防 [object Object])
+// detail 可能是: string / {code, ...其它字段} / pydantic errors[] / 其它对象
+function _humanizeBackendError(detail, fallback) {
+    if (detail == null) return fallback || '操作失败';
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+        // pydantic ValidationError
+        const first = detail[0] || {};
+        if (first.msg) return first.msg;
+        return fallback || '请求格式错误';
+    }
+    if (typeof detail === 'object') {
+        // 优先按 code 走 i18n: 'err.<code>'
+        if (detail.code) {
+            const k = 'err.' + detail.code;
+            try {
+                const tr = t(k, detail);
+                if (tr && tr !== k) return tr;
+            } catch (_) {}
+            return detail.code;
+        }
+        if (detail.message) return detail.message;
+        if (detail.error)   return detail.error;
+        if (detail.detail && typeof detail.detail === 'string') return detail.detail;
+        try { return JSON.stringify(detail).slice(0, 160); } catch (_) {}
+    }
+    return fallback || String(detail);
+}
+
 function humanizeError(raw) {
     if (!raw) return '';
     const r = String(raw);
@@ -19210,8 +19239,8 @@ async function deleteEndpoint(endpointId) {
             const data = await res.json();
 
             if (!res.ok) {
-                // Real HTTP errors (401, 500, etc.) — no usable data
-                showError(data.detail || data.error || 'Error ' + res.status);
+                // v118.35.0.23 · detail 可能是 {code,balance,...} 对象 · 用 _humanizeBackendError 防 [object Object]
+                showError(_humanizeBackendError(data.detail || data.error, 'Error ' + res.status));
                 showProgress(false);
                 return;
             }
@@ -29884,7 +29913,7 @@ window.addEventListener('DOMContentLoaded', () => {
                                        period_month: month, vat_report_id: _reportId }),
             });
             const taskData = await taskRes.json();
-            if (!taskRes.ok) { showToast(taskData.detail || '建任务失败', 'error'); return; }
+            if (!taskRes.ok) { showToast(_humanizeBackendError(taskData.detail, '建任务失败'), 'error'); return; }
             const taskId = taskData.task_id;
 
             showToast(t('sv-toast-started'), 'info');
@@ -29892,7 +29921,7 @@ window.addEventListener('DOMContentLoaded', () => {
             // 2. 触发对账
             const runRes  = await fetch(`/api/recon/run/${taskId}`, { method: 'POST', headers: _authHeader() });
             const runData = await runRes.json();
-            if (!runRes.ok) { showToast(runData.detail || '对账失败', 'error'); return; }
+            if (!runRes.ok) { showToast(_humanizeBackendError(runData.detail, '对账失败'), 'error'); return; }
 
             const stats = runData.stats || {};
             showToast(t('sv-toast-done')

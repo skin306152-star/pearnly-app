@@ -47,6 +47,26 @@ router = APIRouter(tags=["signup-v109.3"])
 # ============================================================
 
 PLAN_CONFIG = {
+    # === v118.35.0.4 新注册默认 · pay-as-you-go credits ===
+    # 月配额不卡(走 tenant_credits.balance_thb 真扣费) · 但保留 features 让
+    # 现有 quota/features 链路不空 · features.ocr_per_period=999999 避免
+    # check_ocr_quota 误判超额 · 真实计量由 credits 系统在 OCR 端点扣
+    "credits": {
+        "ocr_per_period":     999999,
+        "max_upload_files":   500,
+        "max_pages_per_file": 50,
+        "max_mb_per_file":    100,
+        "clients_max":        999,
+        "seats_max":          5,
+        "automation":         True,
+        "advanced_templates": True,
+        "batch_export":       True,
+        "line_bot":           True,
+        "duration_days":      None,
+        "needs_own_key":      False,
+        "price_thb":          0,
+        "billing":            "credits",
+    },
     # === 新 5 档 ===
     "trial": {
         "ocr_per_period":     30,   # v118.32.5.5.14 · Korn 反薅闸 · 100→30 张/月
@@ -827,8 +847,8 @@ def signup(req: SignupRequest, request: Request):
                 username = email_raw
                 password_hash = _hash_password(req.password)
 
-                # 邀请码处理
-                invite_plan = "trial"
+                # 邀请码处理 · v118.35.0.4 默认 credits(pay-as-you-go)· 不再 trial
+                invite_plan = "credits"
                 if req.invite_code:
                     code = req.invite_code.strip().upper()
                     if code in ("PARTNER2026", "VIP2026"):
@@ -836,11 +856,11 @@ def signup(req: SignupRequest, request: Request):
                     elif code in ("FIRM2026",):
                         invite_plan = "firm"
 
-                trial_exp = _now() + timedelta(days=PLAN_CONFIG["trial"]["duration_days"])
+                # v118.35.0.4 · credits 不设 trial 到期 · 走充值余额
+                trial_exp = None
                 plan_exp = None
                 if invite_plan in ("pro", "firm"):
                     plan_exp = _now() + timedelta(days=30)
-                    trial_exp = None
 
                 # 取 users 表实际有的列(避免插入不存在的字段触发 transaction abort)
                 cur.execute("""
@@ -919,10 +939,19 @@ def signup(req: SignupRequest, request: Request):
                 )
 
                 # 订阅日志(同一事务 · 不能 try/except)
+                # v118.35.0.4 · credits + trial 都算自然注册 · 邀请码升级才算 invite_code
                 cur.execute("""
                     INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
                     VALUES (%s, NULL, %s, %s)
-                """, (user_id, invite_plan, "signup" if invite_plan == "trial" else "invite_code"))
+                """, (user_id, invite_plan,
+                       "signup" if invite_plan in ("credits", "trial") else "invite_code"))
+
+                # v118.35.0.4 · credits 新公司初始化 0 余额 · pay-as-you-go 待充值
+                if invite_plan == "credits" and _new_tid:
+                    try:
+                        _db.ensure_tenant_credits(_new_tid)
+                    except Exception as ce:
+                        logger.warning(f"[signup] ensure_tenant_credits skip: {ce}")
 
         # 自动创建 1 个示例客户(独立事务 · 失败不影响主注册)
         try:
@@ -949,7 +978,8 @@ def signup(req: SignupRequest, request: Request):
             "user_id": str(user_id),
             "token": token,
             "plan": invite_plan,
-            "needs_line_verify": invite_plan == "trial",  # 提示前端展示绑定 LINE
+            # v118.35.0.4 · credits 用户不走 LINE 防薅闸 · 直接 pay-as-you-go
+            "needs_line_verify": invite_plan == "trial",
             "trial_expires_at": trial_exp.isoformat() if trial_exp else None,
             "plan_expires_at": plan_exp.isoformat() if plan_exp else None,
         }
@@ -985,8 +1015,9 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
         company = email_prefix or "User"
         full_name_safe = (full_name or "").strip() or None
 
-        invite_plan = "trial"
-        trial_exp = _now() + timedelta(days=PLAN_CONFIG["trial"]["duration_days"])
+        # v118.35.0.4 · 默认 credits(pay-as-you-go)· 不再 trial 7 天到期
+        invite_plan = "credits"
+        trial_exp = None
         ua_safe = (ua or "")[:512]
 
         with _db.get_cursor(commit=True) as cur:
@@ -1045,8 +1076,8 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
             row = cur.fetchone()
             user_id = _row_count(row) if not isinstance(row, dict) else row.get("id")
 
-            # v118.26.2.5 · 同事务建 tenant
-            _ensure_tenant_for_new_user(
+            # v118.26.2.5 · 同事务建 tenant · v118.35.0.4 拿返回 tenant_id 给 credits 初始化用
+            _new_tid_g = _ensure_tenant_for_new_user(
                 cur, str(user_id), invite_plan,
                 company_name=company,
                 full_name=full_name_safe,
@@ -1061,6 +1092,13 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
                 """, (user_id, invite_plan))
             except Exception as ce:
                 logger.warning(f"[google_oauth_signup] subscription_log skip: {ce}")
+
+            # v118.35.0.4 · credits 新公司初始化 0 余额
+            if invite_plan == "credits" and _new_tid_g:
+                try:
+                    _db.ensure_tenant_credits(_new_tid_g)
+                except Exception as ce:
+                    logger.warning(f"[google_oauth_signup] ensure_tenant_credits skip: {ce}")
 
         # 自动建 1 个示例客户(独立事务 · 失败不影响主注册)
         try:
@@ -1113,8 +1151,9 @@ def create_user_via_line_oauth(line_uid: str, display_name: str = None,
         full_name_safe = (display_name or "").strip() or None
         company = full_name_safe or "LINE User"
 
-        invite_plan = "trial"
-        trial_exp = _now() + timedelta(days=PLAN_CONFIG["trial"]["duration_days"])
+        # v118.35.0.4 · 默认 credits(pay-as-you-go)· 不再 trial 7 天到期
+        invite_plan = "credits"
+        trial_exp = None
         ua_safe = (ua or "")[:512]
 
         with _db.get_cursor(commit=True) as cur:
@@ -1171,8 +1210,8 @@ def create_user_via_line_oauth(line_uid: str, display_name: str = None,
             row = cur.fetchone()
             user_id = _row_count(row) if not isinstance(row, dict) else row.get("id")
 
-            # v118.26.2.5 · 同事务建 tenant
-            _ensure_tenant_for_new_user(
+            # v118.26.2.5 · 同事务建 tenant · v118.35.0.4 拿返回 tenant_id
+            _new_tid_l = _ensure_tenant_for_new_user(
                 cur, str(user_id), invite_plan,
                 company_name=company,
                 full_name=full_name_safe,
@@ -1186,6 +1225,13 @@ def create_user_via_line_oauth(line_uid: str, display_name: str = None,
                 """, (user_id, invite_plan))
             except Exception as ce:
                 logger.warning(f"[line_oauth_signup] subscription_log skip: {ce}")
+
+            # v118.35.0.4 · credits 新公司初始化 0 余额
+            if invite_plan == "credits" and _new_tid_l:
+                try:
+                    _db.ensure_tenant_credits(_new_tid_l)
+                except Exception as ce:
+                    logger.warning(f"[line_oauth_signup] ensure_tenant_credits skip: {ce}")
 
         try:
             with _db.get_cursor(commit=True) as cur2:
@@ -1980,9 +2026,11 @@ def check_ocr_quota(user_id: str) -> Dict[str, Any]:
                 return {"allowed": False, "reason": "banned", "ban_reason": ban_reason, "plan": "banned"}
 
             # ---- map 到新 plan ----
+            # v118.35.0.4 · 未知 plan / 误植 admin 兜底改成 credits(新注册默认)
+            # 老 trial 用户保留(raw_plan='trial' 走原路径 → plan='trial')
             plan = LEGACY_PLAN_MAP.get(raw_plan, raw_plan)
             if plan not in PLAN_CONFIG or plan == "admin":
-                plan = "trial"
+                plan = "credits"
             features = PLAN_CONFIG[plan]
 
             # ---- lifetime · 必须自带 Gemini key ----

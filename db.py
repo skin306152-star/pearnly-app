@@ -8702,3 +8702,21 @@ def ensure_credits_tables():
         logger.error(f"ensure_credits_tables failed: {e}")
         raise
 
+
+# v118.35.0.4 · 给新建公司初始化 0 余额的 tenant_credits 行
+# 调用点: auth_signup 的 3 个注册路径(email / google / line)
+# 幂等 · 已存在不覆盖 · 失败 log warning 不抛 · 让注册主流程不受影响
+def ensure_tenant_credits(tenant_id) -> None:
+    if not tenant_id:
+        return
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute(
+                "INSERT INTO tenant_credits (tenant_id, balance_thb) "
+                "VALUES (%s, 0) ON CONFLICT (tenant_id) DO NOTHING",
+                (str(tenant_id),)
+            )
+        logger.info(f"[credits] ensure_tenant_credits tenant={str(tenant_id)[:8]}.. balance=0")
+    except Exception as e:
+        logger.warning(f"ensure_tenant_credits skip tenant={tenant_id}: {e}")
+

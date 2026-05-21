@@ -1465,6 +1465,24 @@ const I18N = {
         'settings-sub-lifetime':      '终身买断',
         'settings-days-left':         '还剩 {n} 天',
         'settings-lifetime-forever':  '永久',
+        // v118.35.0.7 · credits 钱包计费 · 4 语
+        'settings-sub-credits':       '按量充值',
+        'credits-balance':            '钱包余额',
+        'credits-this-month':         '本月已识别',
+        'credits-pages-unit':         '张',
+        'credits-topup-btn':          '充值',
+        'credits-topup-title':        '提交充值申请',
+        'credits-topup-amount':       '充值金额(THB)',
+        'credits-topup-payer':        '汇款人姓名(可选)',
+        'credits-topup-note':         '备注(可选)',
+        'credits-topup-submit':       '提交申请',
+        'credits-topup-cancel':       '取消',
+        'credits-topup-submitted':    '✓ 申请已提交 · 等管理员审核',
+        'credits-topup-failed':       '提交失败 · 请稍后重试',
+        'credits-topup-hint':         '提交后 · 等待管理员审核到账 · 通常 1 个工作日内',
+        'credits-no-tenant':          '尚未配置公司 · 联系管理员',
+        'credits-employee-view':      '员工视角 · 不显示余额',
+        'credits-my-count':           '我本月识别',
         'settings-quota-trial-no-line': '20 张 · 绑定 LINE 解锁完整 50 张',
         'settings-quota-free-no-line': '0 张 · 绑定 LINE 解锁 10 张/月',
         'settings-trial-days-left': '7 天试用 · 还剩 {n} 天',
@@ -3880,6 +3898,24 @@ const I18N = {
         'settings-sub-lifetime':      'Lifetime',
         'settings-days-left':         '{n} days left',
         'settings-lifetime-forever':  'Forever',
+        // v118.35.0.7 · credits wallet billing
+        'settings-sub-credits':       'Pay-as-you-go',
+        'credits-balance':            'Wallet balance',
+        'credits-this-month':         'Pages this month',
+        'credits-pages-unit':         'pages',
+        'credits-topup-btn':          'Top up',
+        'credits-topup-title':        'Submit top-up request',
+        'credits-topup-amount':       'Amount (THB)',
+        'credits-topup-payer':        'Payer name (optional)',
+        'credits-topup-note':         'Note (optional)',
+        'credits-topup-submit':       'Submit',
+        'credits-topup-cancel':       'Cancel',
+        'credits-topup-submitted':    '✓ Request submitted · awaiting admin review',
+        'credits-topup-failed':       'Submit failed · please retry',
+        'credits-topup-hint':         'Admin will review · usually within 1 business day',
+        'credits-no-tenant':          'Workspace not configured · contact admin',
+        'credits-employee-view':      'Employee view · balance hidden',
+        'credits-my-count':           'My pages this month',
         'settings-quota-trial-no-line': '20 pages · link LINE to unlock full 50',
         'settings-quota-free-no-line': '0 pages · link LINE to unlock 10/month',
         'settings-trial-days-left': '7-day trial · {n} days left',
@@ -6284,6 +6320,24 @@ const I18N = {
         'settings-sub-lifetime':      'ตลอดชีพ',
         'settings-days-left':         'เหลือ {n} วัน',
         'settings-lifetime-forever':  'ตลอดไป',
+        // v118.35.0.7 · credits wallet 4 ภาษา
+        'settings-sub-credits':       'จ่ายตามการใช้',
+        'credits-balance':            'ยอดในกระเป๋า',
+        'credits-this-month':         'หน้าที่อ่านเดือนนี้',
+        'credits-pages-unit':         'หน้า',
+        'credits-topup-btn':          'เติมเงิน',
+        'credits-topup-title':        'ส่งคำขอเติมเงิน',
+        'credits-topup-amount':       'จำนวนเงิน (THB)',
+        'credits-topup-payer':        'ชื่อผู้โอน (ไม่บังคับ)',
+        'credits-topup-note':         'หมายเหตุ (ไม่บังคับ)',
+        'credits-topup-submit':       'ส่งคำขอ',
+        'credits-topup-cancel':       'ยกเลิก',
+        'credits-topup-submitted':    '✓ ส่งคำขอแล้ว · รอแอดมินอนุมัติ',
+        'credits-topup-failed':       'ส่งไม่สำเร็จ · กรุณาลองใหม่',
+        'credits-topup-hint':         'แอดมินจะตรวจสอบ · ปกติภายใน 1 วันทำการ',
+        'credits-no-tenant':          'ยังไม่ได้ตั้งค่าบริษัท · ติดต่อแอดมิน',
+        'credits-employee-view':      'มุมมองพนักงาน · ไม่แสดงยอดเงิน',
+        'credits-my-count':           'หน้าที่ฉันอ่านเดือนนี้',
         'settings-quota-trial-no-line': '20 หน้า · เชื่อม LINE ปลดล็อก 50 หน้า',
         'settings-quota-free-no-line': '0 หน้า · เชื่อม LINE ปลดล็อก 10/เดือน',
         'settings-trial-days-left': 'ทดลอง 7 วัน · เหลือ {n} วัน',
@@ -8684,6 +8738,24 @@ const I18N = {
         'settings-sub-lifetime':      '買い切り',
         'settings-days-left':         '残り {n} 日',
         'settings-lifetime-forever':  '永久',
+        // v118.35.0.7 · credits ウォレット 4 言語
+        'settings-sub-credits':       '従量課金',
+        'credits-balance':            'ウォレット残高',
+        'credits-this-month':         '今月の認識ページ',
+        'credits-pages-unit':         'ページ',
+        'credits-topup-btn':          'チャージ',
+        'credits-topup-title':        'チャージ申請を送信',
+        'credits-topup-amount':       '金額 (THB)',
+        'credits-topup-payer':        '送金者名 (任意)',
+        'credits-topup-note':         'メモ (任意)',
+        'credits-topup-submit':       '送信',
+        'credits-topup-cancel':       'キャンセル',
+        'credits-topup-submitted':    '✓ 申請を送信しました · 管理者の承認待ち',
+        'credits-topup-failed':       '送信失敗 · 再試行してください',
+        'credits-topup-hint':         '管理者が確認します · 通常 1 営業日以内',
+        'credits-no-tenant':          'ワークスペース未設定 · 管理者にお問い合わせください',
+        'credits-employee-view':      '従業員ビュー · 残高は非表示',
+        'credits-my-count':           '今月の自分の認識ページ',
         'settings-quota-trial-no-line': '20 枚 · LINE 連携で 50 枚解放',
         'settings-quota-free-no-line': '0 枚 · LINE 連携で 10 枚/月解放',
         'settings-trial-days-left': '7 日間トライアル · 残り {n} 日',
@@ -14333,7 +14405,17 @@ function renderSettings() {
     const userPlan = (u.plan || 'monthly').toLowerCase();
     const isTrial = userPlan === 'trial';
     const isFree = userPlan === 'free';
+    const isCredits = userPlan === 'credits';
     const lineVerified = !!(u.line_verified || u.line_user_id);
+
+    // v118.35.0.7 · credits 钱包计费(新注册默认 · 不走 trial / monthly)
+    // 走单独渲染分支 · 不参与下面 trial/free/pro/... 的 quota 计算
+    if (isCredits) {
+        _renderCreditsSettings(u, el);
+        const apiKeyCard = document.getElementById('api-key-card');
+        if (apiKeyCard) apiKeyCard.style.display = u.is_super_admin ? '' : 'none';
+        return;
+    }
 
     let subType, quotaText;
     if (tt === 'byo_api') {
@@ -14461,6 +14543,138 @@ function renderSettings() {
         apiKeyCard.style.display = showCard ? '' : 'none';
     }
 }
+
+// ============================================================
+// v118.35.0.7 · credits 钱包计费 · 设置页渲染 + 充值申请
+// 拉 /api/me/credits · 老板看余额 + 本月用量 + 充值按钮
+// 员工只看自己本月识别页数
+// 充值按钮弹原生 prompt 输金额 → POST /api/credits/topup/request
+// ============================================================
+function _renderCreditsSettings(u, el) {
+    const username = escapeHtml(u.username || '');
+    // 占位渲染(立即显示 · 不等异步)
+    el.innerHTML = `
+        <table style="width:100%; font-size:13px; border-collapse: collapse;">
+            <tr>
+                <td style="color:#a0aec0; padding:8px 0; width:140px;">${t('settings-username')}</td>
+                <td style="padding:8px 0;">${username}</td>
+            </tr>
+            <tr>
+                <td style="color:#a0aec0; padding:8px 0;">${t('settings-sub-type')}</td>
+                <td style="padding:8px 0;"><strong>${escapeHtml(t('settings-sub-credits'))}</strong></td>
+            </tr>
+            <tr id="credits-balance-row" style="display:none;">
+                <td style="color:#a0aec0; padding:8px 0;">${t('credits-balance')}</td>
+                <td style="padding:8px 0;"><strong id="credits-balance-val">—</strong>
+                    <button type="button" id="btn-credits-topup" class="btn btn-primary"
+                        style="margin-left:12px; padding:4px 12px; font-size:12px;">
+                        ${escapeHtml(t('credits-topup-btn'))}
+                    </button>
+                </td>
+            </tr>
+            <tr id="credits-pages-row" style="display:none;">
+                <td style="color:#a0aec0; padding:8px 0;">
+                    <span id="credits-pages-label">${t('credits-this-month')}</span>
+                </td>
+                <td style="padding:8px 0;"><strong id="credits-pages-val">—</strong> ${escapeHtml(t('credits-pages-unit'))}</td>
+            </tr>
+            <tr id="credits-info-row">
+                <td colspan="2" style="color:#a0aec0; padding:8px 0; font-size:12px;" id="credits-info-msg">…</td>
+            </tr>
+        </table>
+    `;
+    // 异步拉真实数据
+    _loadCreditsData();
+}
+
+async function _loadCreditsData() {
+    try {
+        const resp = await fetch('/api/me/credits', {
+            headers: { 'Authorization': 'Bearer ' + token },
+        });
+        if (!resp.ok) {
+            const msg = document.getElementById('credits-info-msg');
+            if (msg) msg.textContent = 'HTTP ' + resp.status;
+            return;
+        }
+        const data = await resp.json();
+        const infoEl = document.getElementById('credits-info-msg');
+        if (!data.has_tenant) {
+            if (infoEl) infoEl.textContent = t('credits-no-tenant');
+            return;
+        }
+        const balRow = document.getElementById('credits-balance-row');
+        const pagesRow = document.getElementById('credits-pages-row');
+        const pagesLabel = document.getElementById('credits-pages-label');
+        if (data.is_owner) {
+            const bal = (typeof data.balance_thb === 'number') ? data.balance_thb : 0;
+            const pages = (typeof data.pages_this_month === 'number') ? data.pages_this_month : 0;
+            if (balRow) balRow.style.display = '';
+            if (pagesRow) pagesRow.style.display = '';
+            const balEl = document.getElementById('credits-balance-val');
+            const pagesEl = document.getElementById('credits-pages-val');
+            if (balEl) balEl.textContent = '฿' + bal.toFixed(2);
+            if (pagesEl) pagesEl.textContent = String(pages);
+            if (pagesLabel) pagesLabel.textContent = t('credits-this-month');
+            if (infoEl) infoEl.textContent = t('credits-topup-hint');
+            const btn = document.getElementById('btn-credits-topup');
+            if (btn && !btn._bound) {
+                btn._bound = true;
+                btn.addEventListener('click', _openTopupModal);
+            }
+        } else {
+            // 员工视图
+            const myCount = (typeof data.my_invoice_count === 'number') ? data.my_invoice_count : 0;
+            if (pagesRow) pagesRow.style.display = '';
+            if (pagesLabel) pagesLabel.textContent = t('credits-my-count');
+            const pagesEl = document.getElementById('credits-pages-val');
+            if (pagesEl) pagesEl.textContent = String(myCount);
+            if (infoEl) infoEl.textContent = t('credits-employee-view');
+        }
+    } catch (e) {
+        console.error('[credits] load failed:', e);
+        const msg = document.getElementById('credits-info-msg');
+        if (msg) msg.textContent = (e && e.message) || 'error';
+    }
+}
+
+async function _openTopupModal() {
+    // 简化版:用原生 prompt 输金额 · 后续 v36 改正经 modal
+    const amountStr = prompt(t('credits-topup-amount'), '500');
+    if (!amountStr) return;
+    const amount = parseFloat(amountStr);
+    if (!isFinite(amount) || amount <= 0) {
+        showToast(t('credits-topup-failed'), 'error');
+        return;
+    }
+    const payer = prompt(t('credits-topup-payer'), '') || '';
+    const note = prompt(t('credits-topup-note'), '') || '';
+    try {
+        const resp = await fetch('/api/credits/topup/request', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                amount_thb: amount,
+                payer_name: payer,
+                note: note,
+            }),
+        });
+        if (!resp.ok) {
+            const data = await resp.json().catch(() => ({}));
+            showToast(t('credits-topup-failed') + (data.detail ? ' · ' + data.detail : ''), 'error');
+            return;
+        }
+        showToast(t('credits-topup-submitted'), 'success');
+        _loadCreditsData();  // 刷新一下显示
+    } catch (e) {
+        console.error('[credits] topup failed:', e);
+        showToast(t('credits-topup-failed'), 'error');
+    }
+}
+
 
 // ============================================================
 // v0.15 · Gemini API Key 管理
@@ -32066,13 +32280,18 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---- 角色显隐(暴露到 window · loadAll 在 9734 行会调) ----
+    // v118.35.0.7 · 没 user info 时强制隐藏 admin/test/special · 不再 early-return
+    // 让特权入口"默认看不见"(home.html 4 处也已 style=display:none 兜底)
+    // 防止普通账号刚登录的窗口期看到"管理员后台"按钮
     window.applyRoleVisibility = function applyRoleVisibility() {
         var u = window._userInfo;
-        if (!u) return;
-        var canTeam = (typeof canManageTeam === 'function') ? canManageTeam(u) : !!(u.role === 'owner' || u.is_super_admin);
-        var hideMoney = (typeof shouldHideMoney === 'function') ? shouldHideMoney(u) : (u.role === 'member' && !u.is_super_admin);
-        var isSuper = (typeof isSuperAdmin === 'function') ? isSuperAdmin(u) : !!u.is_super_admin;
-        var isTest = _isInTestWhitelist(u);
+        var canTeam = false, hideMoney = true, isSuper = false, isTest = false;
+        if (u) {
+            canTeam = (typeof canManageTeam === 'function') ? canManageTeam(u) : !!(u.role === 'owner' || u.is_super_admin);
+            hideMoney = (typeof shouldHideMoney === 'function') ? shouldHideMoney(u) : (u.role === 'member' && !u.is_super_admin);
+            isSuper = (typeof isSuperAdmin === 'function') ? isSuperAdmin(u) : !!u.is_super_admin;
+            isTest = _isInTestWhitelist(u);
+        }
 
         document.querySelectorAll('[data-show-if-team]').forEach(function (el) {
             el.style.display = canTeam ? '' : 'none';

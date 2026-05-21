@@ -264,6 +264,43 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 
 ---
 
+### 16. 全档位 push 授权 · Claude 写完直接部署(2026-05-21 拍板 · C 档位 · Zihao 信任前提)
+
+**背景**:之前每次 `git push origin master` 都要 Zihao 单独说"授权 push"· 因为 webhook 自动部署 = push 即上线。Zihao 在 2026-05-21 选择 C 档位(全部授权)· 取消每次询问。
+
+**铁律**:
+1. **Claude 写完代码 + 自测后 · 可以直接 `git commit` + `git push origin master`** · 不再每次问"授权 push"
+2. **仍保留的红线**(必须问):
+   - `git push --force` / `--force-with-lease` 到 master(可能擦掉 Zihao 在本地的未推 commit)
+   - `git reset --hard` / `git revert` / 删除 tag / 删除 branch(任何破坏 git 历史的操作)
+   - `git push --no-verify` 或绕过 pre-commit hook
+   - 大于 30 个文件改动的"重构级" commit(让 Zihao 先 review)
+   - 涉及 `db.py` schema migration · 删表 / 删字段 / `DROP` 任何东西
+   - 部署后立刻能影响**所有用户**的破坏性改动(关键路径如登录 / 注册 / OCR / 计费的大改)· 改前先口头汇报方案
+3. **Claude 主动做的事**:
+   - 每次 push 后 · 在回复里**告知用户 commit hash + 改了什么 + 部署 ETA**(约 15s 后用户能访问到新版本)
+   - 失败的 webhook / 部署 · 主动检查 `/api/version` 看 cache_bust 是否更新 · 没更新就报警
+   - 重大改动 push 前 · 主动跑本地测试(`pytest` / `curl` / `playwright`)· 测过再 push
+4. **Zihao 的撤回权**:任何时候可以说"切回 A / B 档"· Claude 立即恢复每次询问机制
+
+**适用反例**(以下场景仍要问):
+- Zihao 明确说"先别 push" / "等我看看"
+- Claude 自己**不确定**改动是否正确(预感有 bug)
+- 改动会**影响生产数据**(charge / refund / 删用户数据 / migration)
+
+**触发位置自检**(每次 push 前内心 checklist):
+- [ ] 改动是否触发上面"红线"任意一条 → 是 → 停下问 Zihao
+- [ ] 本地是否在 master 分支(铁律 14)
+- [ ] 改动是否经过自测(至少 grep / curl / 编译过)
+- [ ] commit message 是否说清楚 why(不是 what)
+- 全过 → 直接 `git commit` + `git push origin master` + 汇报 hash
+
+**已落实**:
+- 2026-05-21 拍板 C 档位 · 取消每次"授权 push"询问
+- 红线 6 条仍保留 · Claude 触发任意一条必须停下问
+
+---
+
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)
 
 **Pearnly 全局导航 = 跟着 `D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html` 走**

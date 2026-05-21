@@ -726,10 +726,12 @@ def _vat_doc_no(vat_row: Dict[str, Any]) -> str:
 def reconcile_gl_vat(
     gl_rows: List[GlRow],
     vat_rows: List[Dict[str, Any]],
+    amount_tolerance: float = 0.01,
 ) -> Tuple[List[ReconRow], GlVatSummary]:
     """
     对账主流程
     返回（明细列表，汇总）
+    v118.35.0.26 · 金额容差(默认 ฿0.01)· |diff| <= tolerance 算匹配
     """
     # GL 索引: norm_doc_no -> [GlRow]
     gl_idx: Dict[str, List[GlRow]] = defaultdict(list)
@@ -772,6 +774,9 @@ def reconcile_gl_vat(
                 gl_amt = round(-sum(r.debit for r in gl_matches), 2)
             else:
                 gl_amt = round(sum(r.credit for r in gl_matches), 2)
+            raw_diff = round(vat_amt - gl_amt, 2)
+            # v118.35.0.26 · |diff| <= tolerance 视为匹配 · diff 显式 0
+            effective_diff = 0.0 if abs(raw_diff) <= amount_tolerance else raw_diff
             accts = ",".join(sorted({r.account_code for r in gl_matches if r.account_code}))
             detail.append(ReconRow(
                 doc_no=raw_no,
@@ -779,7 +784,7 @@ def reconcile_gl_vat(
                 customer_name=str(vat.get("report_buyer_name") or ""),
                 vat_amount=round(vat_amt, 2),
                 gl_amount=gl_amt,
-                diff=round(vat_amt - gl_amt, 2),
+                diff=effective_diff,
                 account_codes=accts,
             ))
 

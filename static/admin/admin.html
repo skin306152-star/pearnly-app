@@ -280,6 +280,29 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                         <div class="cost-kpi-sub" data-i18n="mon-db-sub">高于 25/30 触发告警</div>
                     </div>
                 </div>
+                <!-- v118.35.0.26 · OS 指标(CPU/内存/进程) -->
+                <div class="cost-kpi-grid" style="margin-top:12px">
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-mem">内存使用</div>
+                        <div class="cost-kpi-value" id="mon-mem">—</div>
+                        <div class="cost-kpi-sub" id="mon-mem-sub">—</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-load">CPU 负载</div>
+                        <div class="cost-kpi-value" id="mon-load">—</div>
+                        <div class="cost-kpi-sub" id="mon-load-sub" data-i18n="mon-load-sub">1分钟 / 5分钟 / 15分钟</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-cores">CPU 核数</div>
+                        <div class="cost-kpi-value" id="mon-cores">—</div>
+                        <div class="cost-kpi-sub" data-i18n="mon-cores-sub">服务器配置</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-procs">Worker 进程</div>
+                        <div class="cost-kpi-value" id="mon-procs">—</div>
+                        <div class="cost-kpi-sub" data-i18n="mon-procs-sub">uvicorn master + worker</div>
+                    </div>
+                </div>
             </div>
 
             <!-- v118.35.0.22 · 全公司余额清单 -->

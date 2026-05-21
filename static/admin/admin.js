@@ -324,6 +324,33 @@
                     elDb.textContent = '—';
                 }
             }
+            // v118.35.0.26 · OS 指标
+            const os_ = d.os || {};
+            if (os_.available) {
+                const memPct = os_.mem_pct || 0;
+                const elMem = document.getElementById('mon-mem');
+                if (elMem) {
+                    elMem.textContent = memPct + '%';
+                    elMem.style.color = memPct >= 85 ? '#dc2626' : (memPct >= 70 ? '#d97706' : '');
+                }
+                _setText('mon-mem-sub', (os_.mem_used_mb || 0) + ' / ' + (os_.mem_total_mb || 0) + ' MB');
+                const la1 = os_.loadavg_1min || 0;
+                const cores = os_.cpu_cores || 1;
+                const elLoad = document.getElementById('mon-load');
+                if (elLoad) {
+                    elLoad.textContent = la1.toFixed(2);
+                    elLoad.style.color = la1 >= cores ? '#dc2626' : (la1 >= cores * 0.7 ? '#d97706' : '');
+                }
+                _setText('mon-load-sub',
+                    (os_.loadavg_1min || 0).toFixed(2) + ' / '
+                    + (os_.loadavg_5min || 0).toFixed(2) + ' / '
+                    + (os_.loadavg_15min || 0).toFixed(2));
+                _setText('mon-cores', String(cores));
+                _setText('mon-procs', String(os_.uvicorn_procs || 0));
+            } else {
+                _setText('mon-mem', '—'); _setText('mon-load', '—');
+                _setText('mon-cores', '—'); _setText('mon-procs', '—');
+            }
         } catch (e) {
             console.warn('monitoring overview', e);
         }

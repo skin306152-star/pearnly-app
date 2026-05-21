@@ -126,10 +126,59 @@ def record_gemini_call(success: bool, http_status: int = 200, latency_ms: int = 
         pass  # 监控失败不影响业务
 
 
+def get_os_stats() -> Dict[str, Any]:
+    """v0.26 · 服务器 OS 指标(尽可能不引新依赖)"""
+    out = {"available": False}
+    try:
+        import os
+        # Linux /proc 读法 · 0 额外依赖
+        # 内存
+        with open("/proc/meminfo") as f:
+            mi = f.read()
+        mem = {}
+        for line in mi.splitlines():
+            k, _, v = line.partition(":")
+            v = v.strip().split()[0]
+            try:
+                mem[k.strip()] = int(v) * 1024  # KB → bytes
+            except Exception:
+                pass
+        mem_total = mem.get("MemTotal", 0)
+        mem_avail = mem.get("MemAvailable", 0)
+        mem_used = mem_total - mem_avail
+        # CPU(瞬时采样不准 · 取 loadavg)
+        with open("/proc/loadavg") as f:
+            la = f.read().strip().split()
+        # 进程数
+        try:
+            import subprocess
+            uvc = int(subprocess.run(
+                ["pgrep", "-cf", "uvicorn app:app"],
+                capture_output=True, text=True, timeout=3
+            ).stdout.strip() or "0")
+        except Exception:
+            uvc = 0
+        out = {
+            "available": True,
+            "mem_total_mb": mem_total // (1024 * 1024),
+            "mem_used_mb": mem_used // (1024 * 1024),
+            "mem_pct": round(mem_used / mem_total * 100, 1) if mem_total else 0,
+            "loadavg_1min": float(la[0]) if len(la) > 0 else 0,
+            "loadavg_5min": float(la[1]) if len(la) > 1 else 0,
+            "loadavg_15min": float(la[2]) if len(la) > 2 else 0,
+            "cpu_cores": os.cpu_count() or 1,
+            "uvicorn_procs": uvc,
+        }
+    except Exception:
+        pass
+    return out
+
+
 def get_monitoring_overview() -> Dict[str, Any]:
     """admin 面板拉取入口"""
     return {
         "gemini": gemini_stats.get_stats(),
         "db_pool": DBPoolStats.get_stats(),
+        "os": get_os_stats(),
         "ts": int(time.time()),
     }

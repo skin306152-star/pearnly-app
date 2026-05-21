@@ -8332,10 +8332,23 @@ def create_gl_vat_task(
         return None
 
 
-def get_gl_vat_task(task_id: int) -> Optional[Dict[str, Any]]:
+def get_gl_vat_task(task_id: int, user_id: str, tenant_id=None) -> Optional[Dict[str, Any]]:
+    """v118.35.0.29 P0 安全 (体检 2026-05-21 风险 1):
+    旧签名 (task_id) 无任何权限校验 · 任何登录用户可读任意 tenant 的对账任务 ·
+    现强制 caller 传 user_id · 可选 tenant_id 走 Dual-Key 模式 ·
+    DB 层 fail-safe · caller 不传 scope 物理拿不到 row"""
     try:
         with get_cursor() as cur:
-            cur.execute("SELECT * FROM gl_vat_task WHERE id = %s", (task_id,))
+            if tenant_id:
+                cur.execute(
+                    "SELECT * FROM gl_vat_task WHERE id = %s AND tenant_id = %s::uuid",
+                    (task_id, tenant_id),
+                )
+            else:
+                cur.execute(
+                    "SELECT * FROM gl_vat_task WHERE id = %s AND user_id = %s::uuid",
+                    (task_id, user_id),
+                )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -8518,10 +8531,22 @@ def create_bank_recon_v2_task(
         return None
 
 
-def get_bank_recon_v2_task(task_id: int) -> Optional[Dict[str, Any]]:
+def get_bank_recon_v2_task(task_id: int, user_id: str, tenant_id=None) -> Optional[Dict[str, Any]]:
+    """v118.35.0.29 P0 安全 (体检 2026-05-21 风险 2):
+    镜像 get_gl_vat_task · 旧签名无权限校验 · 现强制 user_id + 可选 tenant_id ·
+    Dual-Key 模式 · DB 层 fail-safe"""
     try:
         with get_cursor() as cur:
-            cur.execute("SELECT * FROM bank_recon_v2_task WHERE id = %s", (task_id,))
+            if tenant_id:
+                cur.execute(
+                    "SELECT * FROM bank_recon_v2_task WHERE id = %s AND tenant_id = %s::uuid",
+                    (task_id, tenant_id),
+                )
+            else:
+                cur.execute(
+                    "SELECT * FROM bank_recon_v2_task WHERE id = %s AND user_id = %s::uuid",
+                    (task_id, user_id),
+                )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:

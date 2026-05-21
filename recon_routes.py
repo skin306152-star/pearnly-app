@@ -1068,11 +1068,16 @@ async def gl_vat_list_tasks(request: Request):
 
 @router.get("/gl-vat/{task_id}")
 async def gl_vat_get_task(task_id: int, request: Request):
-    """读取一份完整的 GL 对账结果（含明细 JSON）"""
+    """读取一份完整的 GL 对账结果（含明细 JSON）
+
+    v118.35.0.29 P0 隔离 (体检 2026-05-21 风险 1):
+    旧 db.get_gl_vat_task(task_id) 无任何权限校验 · 改成强制传 user_id + tenant_id ·
+    跨 tenant 用户拿不到 task · 自然 404 (跟 task 不存在一样的响应 · 防枚举侧信道)
+    """
     user = get_current_user_from_request(request)
     if not user:
         raise HTTPException(401, _glv_err("auth_required", "th"))
-    task = db.get_gl_vat_task(task_id)
+    task = db.get_gl_vat_task(task_id, str(user["id"]), user.get("tenant_id"))
     if not task:
         raise HTTPException(404, _glv_err("task_not_found", "th"))
     return {
@@ -1102,7 +1107,8 @@ async def gl_vat_export(task_id: int, request: Request, lang: str = "th"):
     if lang not in ("th", "zh", "en", "ja"):
         lang = "th"
 
-    task = db.get_gl_vat_task(task_id)
+    # v118.35.0.29 P0 隔离修复(体检风险 1) · 强制 user_id + tenant_id scope
+    task = db.get_gl_vat_task(task_id, str(user["id"]), user.get("tenant_id"))
     if not task:
         raise HTTPException(404, "任务不存在")
 
@@ -1451,10 +1457,11 @@ async def bank_v2_list_tasks(request: Request):
 
 @router.get("/bank-v2/{task_id}")
 async def bank_v2_get_task(task_id: int, request: Request):
+    """v118.35.0.29 P0 隔离 (体检 2026-05-21 风险 2) · 镜像 gl_vat 修复"""
     user = get_current_user_from_request(request)
     if not user:
         raise HTTPException(401, "未登录")
-    task = db.get_bank_recon_v2_task(task_id)
+    task = db.get_bank_recon_v2_task(task_id, str(user["id"]), user.get("tenant_id"))
     if not task:
         raise HTTPException(404, _brv2_err("task_not_found", "th"))
     import json as _j
@@ -1500,7 +1507,8 @@ async def bank_v2_export(task_id: int, request: Request, lang: str = "th"):
     if lang not in ("th", "zh", "en", "ja"):
         lang = "th"
 
-    task = db.get_bank_recon_v2_task(task_id)
+    # v118.35.0.29 P0 隔离修复(体检风险 2) · 强制 user_id + tenant_id scope
+    task = db.get_bank_recon_v2_task(task_id, str(user["id"]), user.get("tenant_id"))
     if not task:
         raise HTTPException(404, "任务不存在")
 

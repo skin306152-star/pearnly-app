@@ -1109,6 +1109,7 @@ const I18N = {
         'alert-loading-engine': '服务正在启动,请稍候片刻...',
         'alert-engine-ready': '✓ 服务就绪',
         'alert-only-pdf': '⚠ 只支持 PDF 文件',
+        'alert-unsupported-format': '⚠ 不支持的文件格式 · 已自动忽略不识别的文件',
         'alert-file-count': '⚠ 一次最多 {n} 个文件',
         'file-list-total': '共 {n} 个文件',
         'file-list-expand': '展开全部',
@@ -2006,6 +2007,7 @@ const I18N = {
         'glv-sub':            '总账（GL）vs 销项税报告 · 上传两份文件一键对账',
         'glv-up-vat-title':   '① 销项税报告',
         'glv-up-vat-sub':     'PDF / 图片 / Excel / CSV / Word · 多文件 · 自动识别',
+        'glv-files-count':    '{n} 个文件',
         'glv-up-gl-title':    '② 总账 GL',
         'glv-up-gl-sub':      'PDF / 图片 / Excel / CSV / Word · 多文件 · 自动识别',
         'glv-acct-prefix':    '收入科目前缀',
@@ -3525,6 +3527,7 @@ const I18N = {
         'alert-loading-engine': 'Service starting up, please wait a moment...',
         'alert-engine-ready': '✓ Ready',
         'alert-only-pdf': '⚠ PDF only',
+        'alert-unsupported-format': '⚠ Unsupported file format · unsupported files were ignored',
         'alert-file-count': '⚠ Max {n} files',
         'file-list-total': '{n} files',
         'file-list-expand': 'Expand all',
@@ -4409,6 +4412,7 @@ const I18N = {
         'glv-sub':            'General Ledger vs Output VAT Report · Upload two files to reconcile',
         'glv-up-vat-title':   '① Output VAT Report',
         'glv-up-vat-sub':     'PDF / images / Excel / CSV / Word · multi-file · auto-detected',
+        'glv-files-count':    '{n} files',
         'glv-up-gl-title':    '② General Ledger',
         'glv-up-gl-sub':      'PDF / images / Excel / CSV / Word · multi-file · auto-detected',
         'glv-acct-prefix':    'Revenue account prefix',
@@ -5927,6 +5931,7 @@ const I18N = {
         'alert-loading-engine': 'ระบบกำลังเริ่มต้น กรุณารอสักครู่...',
         'alert-engine-ready': '✓ พร้อมใช้งาน',
         'alert-only-pdf': '⚠ เฉพาะ PDF',
+        'alert-unsupported-format': '⚠ รูปแบบไฟล์ไม่รองรับ · ไฟล์ที่ไม่รองรับถูกข้าม',
         'alert-file-count': '⚠ สูงสุด {n} ไฟล์',
         'file-list-total': '{n} ไฟล์',
         'file-list-expand': 'ขยายทั้งหมด',
@@ -6811,6 +6816,7 @@ const I18N = {
         'glv-sub':            'บัญชีแยกประเภท (GL) vs รายงานภาษีขาย · อัปโหลดสองไฟล์เพื่อกระทบยอด',
         'glv-up-vat-title':   '① รายงานภาษีขาย',
         'glv-up-vat-sub':     'PDF / รูปภาพ / Excel / CSV / Word · หลายไฟล์ · ตรวจจับอัตโนมัติ',
+        'glv-files-count':    '{n} ไฟล์',
         'glv-up-gl-title':    '② บัญชีแยกประเภท GL',
         'glv-up-gl-sub':      'PDF / รูปภาพ / Excel / CSV / Word · หลายไฟล์ · ตรวจจับอัตโนมัติ',
         'glv-acct-prefix':    'รหัสนำหน้าบัญชีรายได้',
@@ -8325,6 +8331,7 @@ const I18N = {
         'alert-loading-engine': 'サービス起動中、少々お待ちください...',
         'alert-engine-ready': '✓ 準備完了',
         'alert-only-pdf': '⚠ PDF のみ',
+        'alert-unsupported-format': '⚠ サポート外のファイル形式 · 対象外ファイルはスキップされました',
         'alert-file-count': '⚠ 最大 {n} ファイル',
         'file-list-total': '{n} 個のファイル',
         'file-list-expand': 'すべて展開',
@@ -9209,6 +9216,7 @@ const I18N = {
         'glv-sub':            '総勘定元帳（GL）vs 売上税報告 · 2ファイルをアップロードして照合',
         'glv-up-vat-title':   '① 売上税報告',
         'glv-up-vat-sub':     'PDF / 画像 / Excel / CSV / Word · 複数 · 自動判別',
+        'glv-files-count':    '{n} 個のファイル',
         'glv-up-gl-title':    '② 総勘定元帳 GL',
         'glv-up-gl-sub':      'PDF / 画像 / Excel / CSV / Word · 複数 · 自動判別',
         'glv-acct-prefix':    '収益科目プレフィックス',
@@ -12490,15 +12498,35 @@ async function imageFileToPdf(imgFile) {
     return imagesToPdf([imgFile]);
 }
 
+// v118.35.0.3 · 主上传区接收 PDF / 图片 / Excel / CSV / Word — 跟 #file-input
+// accept 属性 + drop-hint 文案对齐 · 之前只接 PDF 是个老遗留过滤(底层 OCR
+// pipeline 已经多 schema 支持所有格式 / 后端 /api/ocr/recognize 也接全格式)
+const _SUPPORTED_UPLOAD_EXT = /\.(pdf|png|jpe?g|webp|tiff?|bmp|gif|xlsx?|xlsm|csv|tsv|docx?|txt)$/i;
+function _isImageFile(f) {
+    return (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|tiff?|bmp|gif)$/i.test(f.name);
+}
+function _isPdfFile(f) {
+    return f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+}
+function _isSupportedUpload(f) {
+    return _isPdfFile(f) || _isImageFile(f) || _SUPPORTED_UPLOAD_EXT.test(f.name);
+}
+
 function handleFiles(fileList) {
     hideAlerts();
-    const files = Array.from(fileList).filter(f =>
-        f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf'
-    );
-    if (files.length !== fileList.length) showAlert('warn', t('alert-only-pdf'));
+    const all = Array.from(fileList);
+    const supported = all.filter(_isSupportedUpload);
+    if (supported.length !== all.length) {
+        showAlert('warn', t('alert-unsupported-format'));
+    }
+
+    // 图片走 imagesToPdf 通道(保留拍照单张缓冲条 UX),其他(PDF / Excel / CSV /
+    // Word / TXT)直接入 _selectedFiles · 后端走 multi-format pipeline
+    const directFiles = supported.filter(f => !_isImageFile(f));
+    const imageFiles  = supported.filter(_isImageFile);
 
     const existing = new Set(_selectedFiles.map(f => f.name + '_' + f.size));
-    for (const f of files) {
+    for (const f of directFiles) {
         const key = f.name + '_' + f.size;
         if (!existing.has(key)) {
             _selectedFiles.push({
@@ -12506,6 +12534,15 @@ function handleFiles(fileList) {
                 status: 'waiting', errorKey: null, errorParams: null,
             });
             existing.add(key);
+        }
+    }
+
+    if (imageFiles.length > 0) {
+        // 复用相册多选路径 · 默认每张图独立成 1 个 PDF · 用户可在浮条里改"合并"
+        try {
+            handleCameraImages(imageFiles, 'gallery');
+        } catch (err) {
+            console.error('[upload] image route failed', err);
         }
     }
 
@@ -32382,8 +32419,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const STATE = {
         inited: false,
-        glFile: null,
-        vatFile: null,
+        // v118.35.0.3 · 多文件 · File[]
+        glFile: [],
+        vatFile: [],
         running: false,
         currentTaskId: null,
         lastDetail: [],
@@ -32481,25 +32519,41 @@ window.addEventListener('DOMContentLoaded', () => {
     };
 
     // ── 文件选择 + 拖拽 ─────────────────────────────────────────────
+    // v118.35.0.3 · 销项税报告核查改多文件 · STATE.vatFile / STATE.glFile 现在是 File[]
     function _bindUpload(cardId, inputId, nameId, target) {
         const card  = $(cardId);
         const input = $(inputId);
         const name  = $(nameId);
         if (!card || !input || !name) return;
 
-        const setFile = (f) => {
-            if (!f) return;
-            STATE[target] = f;
-            name.textContent = f.name + '  (' + Math.round(f.size / 1024) + ' KB)';
+        const addFiles = (files) => {
+            if (!files || !files.length) return;
+            const arr = Array.isArray(STATE[target]) ? STATE[target].slice() : [];
+            const seen = new Set(arr.map(f => f.name + '|' + f.size));
+            for (const f of files) {
+                if (!f) continue;
+                const k = f.name + '|' + f.size;
+                if (!seen.has(k)) { arr.push(f); seen.add(k); }
+            }
+            STATE[target] = arr;
+            _renderCardSummary(name, arr);
             _updateRunButton();
             _updateStatus();
+            // 同步 panel(若已展开)
+            if (window._reconCollapse && window._reconCollapse.renderGlvPreview) {
+                window._reconCollapse.renderGlvPreview();
+            }
         };
 
         card.addEventListener('click', () => input.click());
         card.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
         });
-        input.addEventListener('change', () => setFile(input.files && input.files[0]));
+        input.addEventListener('change', () => {
+            addFiles(Array.from(input.files || []));
+            // 清空原生 input,允许重复选同名文件 · 同时避免 panel 仍从 input.files 取
+            input.value = '';
+        });
 
         // 拖拽
         card.addEventListener('dragover', (e) => {
@@ -32510,25 +32564,45 @@ window.addEventListener('DOMContentLoaded', () => {
         card.addEventListener('drop', (e) => {
             e.preventDefault();
             card.classList.remove('drag-over');
-            const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-            setFile(f);
+            const files = (e.dataTransfer && e.dataTransfer.files) ? Array.from(e.dataTransfer.files) : [];
+            addFiles(files);
         });
+    }
+
+    function _renderCardSummary(nameEl, arr) {
+        if (!nameEl) return;
+        if (!arr || arr.length === 0) { nameEl.textContent = ''; return; }
+        const totalKB = arr.reduce((s, f) => s + Math.round(f.size / 1024), 0);
+        if (arr.length === 1) {
+            nameEl.textContent = arr[0].name + '  (' + totalKB + ' KB)';
+        } else {
+            const tpl = (window.t && window.t('glv-files-count')) || '{n} 个文件';
+            nameEl.textContent = tpl.replace('{n}', arr.length) + '  (' + totalKB + ' KB)';
+        }
+    }
+
+    function _glvFiles(target) {
+        const v = STATE[target];
+        return Array.isArray(v) ? v : (v ? [v] : []);
     }
 
     function _updateRunButton() {
         const btn = $('btn-glv-run');
         if (!btn) return;
-        btn.disabled = !(STATE.glFile && STATE.vatFile) || STATE.running;
+        const has = _glvFiles('glFile').length > 0 && _glvFiles('vatFile').length > 0;
+        btn.disabled = !has || STATE.running;
     }
 
     function _updateStatus() {
         const status = $('glv-status');
         if (!status) return;
         if (STATE.running) return;  // 跑中不覆盖
-        if (!STATE.vatFile && !STATE.glFile) {
+        const vN = _glvFiles('vatFile').length;
+        const gN = _glvFiles('glFile').length;
+        if (vN === 0 && gN === 0) {
             status.className = 'vex-action-info muted';
             status.innerHTML = '<span>' + _t('hint_need_both') + '</span>';
-        } else if (STATE.vatFile && STATE.glFile) {
+        } else if (vN > 0 && gN > 0) {
             status.className = 'vex-action-info ok';
             status.innerHTML = '<span>' + _t('hint_ready') + '</span>';
         } else {
@@ -32537,20 +32611,22 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // v118.32.5.5.25 · 删单文件(X 按钮 / 全清按钮)· 真清 STATE + UI + 刷 panel
-    function _removeFile(kind) {
-        if (kind === 'vat') {
-            STATE.vatFile = null;
-            const vi = $('glv-vat-input'); if (vi) vi.value = '';
-            const vn = $('glv-vat-name');  if (vn) vn.textContent = '';
-        } else if (kind === 'gl') {
-            STATE.glFile = null;
-            const gi = $('glv-gl-input'); if (gi) gi.value = '';
-            const gn = $('glv-gl-name');  if (gn) gn.textContent = '';
+    // v118.32.5.5.25 · 删文件(X 按钮 / 全清按钮)· 真清 STATE + UI + 刷 panel
+    // v118.35.0.3 · 支持多文件 · idx=null 时整列清空 · idx=N 时只删第 N 个
+    function _removeFile(kind, idx) {
+        const target = kind === 'vat' ? 'vatFile' : 'glFile';
+        const inputId = kind === 'vat' ? 'glv-vat-input' : 'glv-gl-input';
+        const nameId  = kind === 'vat' ? 'glv-vat-name'  : 'glv-gl-name';
+        const arr = _glvFiles(target);
+        if (idx == null) {
+            STATE[target] = [];
+        } else {
+            STATE[target] = arr.filter((_, i) => i !== idx);
         }
+        const inp = $(inputId); if (inp) inp.value = '';
+        _renderCardSummary($(nameId), _glvFiles(target));
         _updateRunButton();
         _updateStatus();
-        // 刷 panel(如果展开)
         if (window._reconCollapse && window._reconCollapse.renderGlvPreview) {
             window._reconCollapse.renderGlvPreview();
         }
@@ -32558,8 +32634,8 @@ window.addEventListener('DOMContentLoaded', () => {
     window._glvRemoveFile = _removeFile;
 
     function _reset() {
-        STATE.glFile = null;
-        STATE.vatFile = null;
+        STATE.glFile = [];
+        STATE.vatFile = [];
         STATE.currentTaskId = null;
         STATE.lastDetail = [];
         STATE.lastSummary = null;
@@ -32571,7 +32647,6 @@ window.addEventListener('DOMContentLoaded', () => {
         const kpi = $('glv-kpi-strip');if (kpi) kpi.style.display = 'none';
         _updateRunButton();
         _updateStatus();
-        // v5.5.25 · 清 panel 内容 + 清搜索框 state
         if (window._glvClearPreviewSearch) window._glvClearPreviewSearch();
         if (window._reconCollapse && window._reconCollapse.renderGlvPreview) {
             window._reconCollapse.renderGlvPreview();
@@ -32869,8 +32944,11 @@ window.addEventListener('DOMContentLoaded', () => {
             (STATE.vatFile.name || 'VAT') + ' + ' + (STATE.glFile.name || 'GL');
 
         const fd = new FormData();
-        fd.append('vat_file', STATE.vatFile);
-        fd.append('gl_file',  STATE.glFile);
+        // v118.35.0.3 · multi-file · 同 key 多次 append → 后端 List[UploadFile]
+        const _vats = _glvFiles('vatFile');
+        const _gls  = _glvFiles('glFile');
+        for (const f of _vats) fd.append('vat_files', f, f.name);
+        for (const f of _gls)  fd.append('gl_files',  f, f.name);
         const prefix = ($('glv-prefix') && $('glv-prefix').value || '4').trim() || '4';
         fd.append('revenue_prefix', prefix);
         fd.append('lang', _lang());  // v118.32.5 · 后端按 lang 返回错误消息
@@ -33008,6 +33086,10 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     window.GlVatRecon = { ensureInit };
+    // v118.35.0.3 · 让 preview panel(在另一个 IIFE)能拿到多文件 STATE
+    window._glvPreviewFiles = function (kind) {
+        return _glvFiles(kind === 'vat' ? 'vatFile' : 'glFile');
+    };
 })();
 
 
@@ -33240,18 +33322,30 @@ window.addEventListener('DOMContentLoaded', () => {
         _renderGlvColumn('gl');
     }
 
+    function _glvStateFiles(kind) {
+        // v118.35.0.3 · 多文件 · 直接从 GlVatRecon STATE 拿 · input.files 已被
+        // bindUpload 主动清空(允许重复选同名文件)· 所以以 STATE 为单一真相
+        try {
+            // 同 IIFE 内不可直接拿 STATE,这里通过 DOM/全局桥(_glvPreviewFiles)读
+            if (typeof window._glvPreviewFiles === 'function') {
+                return window._glvPreviewFiles(kind) || [];
+            }
+        } catch (_) {}
+        var inp = document.getElementById(kind === 'vat' ? 'glv-vat-input' : 'glv-gl-input');
+        return (inp && inp.files) ? Array.from(inp.files) : [];
+    }
+
     function _renderGlvColumn(kind) {
         var colEl = document.getElementById(kind === 'vat' ? 'glv-pp-vat-col' : 'glv-pp-gl-col');
         if (!colEl) return;
-        var inp = document.getElementById(kind === 'vat' ? 'glv-vat-input' : 'glv-gl-input');
-        var file = inp && inp.files && inp.files[0];
+        var files = _glvStateFiles(kind);
         var titleKey = kind === 'vat' ? 'glv-up-vat-title' : 'glv-up-gl-title';
         var titleFb = kind === 'vat' ? '① 销项税报告' : '② 总账 GL';
         var title = (window.t && window.t(titleKey)) || titleFb;
         var ph = _esc((window.t && window.t('vex-preview-search')) || '搜索文件名...');
         var clearLbl = _esc((window.t && window.t('vex-preview-clear-all')) || '全清');
         var searchVal = _glvSearch[kind] || '';
-        var totalCount = file ? 1 : 0;
+        var totalCount = files.length;
 
         colEl.innerHTML =
             '<div class="vex-pp-col-title">' +
@@ -33283,20 +33377,21 @@ window.addEventListener('DOMContentLoaded', () => {
         var listEl = document.getElementById('glv-pp-' + kind + '-list');
         var pgEl = document.getElementById('glv-pp-' + kind + '-pg');
         if (!listEl) return;
-        var inp = document.getElementById(kind === 'vat' ? 'glv-vat-input' : 'glv-gl-input');
-        var file = inp && inp.files && inp.files[0];
+        var files = _glvStateFiles(kind);
         var searchVal = (_glvSearch[kind] || '').toLowerCase();
-        var files = file ? [file] : [];
+        // 记下原始索引,供 X 按钮调 _glvRemoveFile(kind, idx) 删第 N 个
+        var indexed = files.map(function (f, i) { return { f: f, i: i }; });
         var filtered = searchVal
-            ? files.filter(function (f) { return f.name.toLowerCase().indexOf(searchVal) >= 0; })
-            : files;
+            ? indexed.filter(function (it) { return it.f.name.toLowerCase().indexOf(searchVal) >= 0; })
+            : indexed;
 
-        listEl.innerHTML = filtered.map(function (f) {
+        listEl.innerHTML = filtered.map(function (it) {
+            var f = it.f;
             return '<div class="vex-pp-file-row">' +
                 _glvFileIco +
                 '<span class="vex-pp-fi-name" title="' + _esc(f.name) + '">' + _esc(f.name) + '</span>' +
                 '<span class="vex-pp-fi-size">' + _fmtSize(f.size) + '</span>' +
-                '<button class="vex-pp-fi-del" type="button" data-kind="' + kind + '" aria-label="remove">' + _glvDelIco + '</button>' +
+                '<button class="vex-pp-fi-del" type="button" data-kind="' + kind + '" data-idx="' + it.i + '" aria-label="remove">' + _glvDelIco + '</button>' +
             '</div>';
         }).join('');
 
@@ -33304,7 +33399,8 @@ window.addEventListener('DOMContentLoaded', () => {
         listEl.querySelectorAll('.vex-pp-fi-del').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var k = btn.dataset.kind;
-                if (window._glvRemoveFile) window._glvRemoveFile(k);
+                var i = parseInt(btn.dataset.idx, 10);
+                if (window._glvRemoveFile) window._glvRemoveFile(k, isNaN(i) ? null : i);
             });
         });
 

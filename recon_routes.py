@@ -929,51 +929,87 @@ async def export_excel(task_id: int, request: Request, lang: str = "th"):
 @router.post("/gl-vat/run")
 async def gl_vat_run(
     request: Request,
-    gl_file: UploadFile = File(...),
-    vat_file: UploadFile = File(...),
+    # v118.35.0.3 · 多文件 · 旧的 gl_file/vat_file 单文件字段保留兼容(老前端
+    # 还在用 / 测试 fixture / 外部脚本)· 新前端发 gl_files/vat_files 列表
+    gl_file: Optional[UploadFile] = File(None),
+    vat_file: Optional[UploadFile] = File(None),
+    gl_files: Optional[List[UploadFile]] = File(None),
+    vat_files: Optional[List[UploadFile]] = File(None),
     revenue_prefix: str = Form("4"),
     lang: str = Form("th"),
 ):
     """
-    上传 GL 总账 + 销项税报告，立即跑对账，返回明细 + 汇总 + task_id
-    - gl_file:  Excel 或 PDF
-    - vat_file: Excel / PDF / 图片
-    - revenue_prefix: 收入科目代码前缀（默认 "4"）
-    - lang: 错误消息语言 zh/en/th/ja（默认 th）
+    上传 GL 总账 + 销项税报告(各支持多文件),立即跑对账。
+    - gl_files / vat_files: Excel / PDF / 图片 / CSV / Word / TXT · 多份
+    - 兼容旧调用方:gl_file + vat_file 单文件字段
+    - revenue_prefix: 收入科目代码前缀(默认 "4")
+    - lang: 错误消息语言 zh/en/th/ja
     """
     lang = lang if lang in ("zh", "en", "th", "ja") else "th"
     user = get_current_user_from_request(request)
     if not user:
         raise HTTPException(401, _glv_err("auth_required", lang))
 
-    gl_bytes  = await gl_file.read()
-    vat_bytes = await vat_file.read()
-    gl_name   = gl_file.filename or "gl.pdf"
-    vat_name  = vat_file.filename or "vat.pdf"
+    # 合并新旧字段 · 至少各 1 份
+    gl_list:  List[UploadFile] = list(gl_files or [])
+    vat_list: List[UploadFile] = list(vat_files or [])
+    if gl_file is not None:
+        gl_list.append(gl_file)
+    if vat_file is not None:
+        vat_list.append(vat_file)
+    if not gl_list or not vat_list:
+        raise HTTPException(422, _glv_err("gl_parse_failed", lang, e="missing files"))
 
-    # 1. 解析 GL
+    # 读所有字节
+    gl_data:  List[tuple] = []
+    vat_data: List[tuple] = []
+    for f in gl_list:
+        gl_data.append((await f.read(), f.filename or "gl.pdf"))
+    for f in vat_list:
+        vat_data.append((await f.read(), f.filename or "vat.pdf"))
+
+    gl_name  = "; ".join(fn for _, fn in gl_data)
+    vat_name = "; ".join(fn for _, fn in vat_data)
+    api_key = _user_key(user)
+
+    # 1. 并行解析所有 GL 文件 + 合并 rows
     import asyncio
     loop = asyncio.get_event_loop()
-    gl_result = await loop.run_in_executor(
-        None, lambda: parse_gl(gl_bytes, gl_name, revenue_prefix or "4")
-    )
-    if not gl_result.get("ok"):
+    gl_results = await asyncio.gather(*[
+        loop.run_in_executor(None, lambda b=b, n=n: parse_gl(b, n, revenue_prefix or "4"))
+        for b, n in gl_data
+    ])
+    gl_errors = [r.get("error") for r in gl_results if not r.get("ok") and r.get("error")]
+    if gl_errors and not any(r.get("rows") for r in gl_results):
+        # 所有 GL 都解析失败
         raise HTTPException(422, _glv_err("gl_parse_failed", lang,
-                                          e=gl_result.get("error", "unknown")))
-    if not gl_result.get("rows"):
-        logger.warning(f"[gl-vat] GL parsed but 0 revenue rows · file={gl_name} · "
-                       f"prefix={revenue_prefix} · diag={gl_result.get('diag')}")
+                                          e="; ".join(filter(None, gl_errors))[:200]))
+    merged_gl_rows = []
+    for r in gl_results:
+        merged_gl_rows.extend(r.get("rows") or [])
+    if not merged_gl_rows:
+        logger.warning(f"[gl-vat] GL parsed but 0 revenue rows · files={gl_name} · "
+                       f"prefix={revenue_prefix}")
         raise HTTPException(422, _glv_err("gl_no_revenue_rows", lang))
+    gl_result = {"ok": True, "rows": merged_gl_rows,
+                 "row_count": sum(r.get("row_count") or 0 for r in gl_results)}
 
-    # 2. 解析 VAT 报表
-    vat_result = await loop.run_in_executor(
-        None, lambda: parse_vat_report(vat_bytes, vat_name, api_key=_user_key(user))
-    )
-    if not vat_result.get("ok"):
+    # 2. 并行解析所有 VAT 报表 + 合并 rows
+    vat_results = await asyncio.gather(*[
+        loop.run_in_executor(None, lambda b=b, n=n: parse_vat_report(b, n, api_key=api_key))
+        for b, n in vat_data
+    ])
+    vat_errors = [r.get("error") for r in vat_results if not r.get("ok") and r.get("error")]
+    if vat_errors and not any(r.get("rows") for r in vat_results):
         raise HTTPException(422, _glv_err("vat_parse_failed", lang,
-                                          e=vat_result.get("error", "unknown")))
-    if not vat_result.get("rows"):
+                                          e="; ".join(filter(None, vat_errors))[:200]))
+    merged_vat_rows = []
+    for r in vat_results:
+        merged_vat_rows.extend(r.get("rows") or [])
+    if not merged_vat_rows:
         raise HTTPException(422, _glv_err("vat_no_rows", lang))
+    vat_result = {"ok": True, "rows": merged_vat_rows,
+                  "row_count": sum(r.get("row_count") or 0 for r in vat_results)}
 
     # 3. 对账
     detail, summary = reconcile_gl_vat(gl_result["rows"], vat_result["rows"])

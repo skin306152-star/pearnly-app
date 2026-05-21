@@ -15,6 +15,8 @@ from typing import List, Dict, Any, Optional
 from field_comparator import (
     normalize_tax_id, normalize_branch, parse_date,
 )
+# v118.35.0.3 · 包装 pydantic ValidationError 为单行用户友好提示
+from services.ocr.error_format import short_error as _short_err
 
 logger = logging.getLogger(__name__)
 PARSER_VERSION = "1.1.0"
@@ -752,7 +754,7 @@ def _parse_vat_via_pipeline(file_bytes: bytes, filename: str,
                     "error": f"pipeline 不支持 {ext_dot}"}
     except Exception as e:
         return {"ok": False, "rows": [], "row_count": 0,
-                "error": f"pipeline parse failed: {type(e).__name__}: {e}"}
+                "error": _short_err(e)}
 
     legacy = pipeline_result_to_legacy_dict(pr)
     rows: List[Dict] = []

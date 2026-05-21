@@ -19,6 +19,11 @@ from datetime import date, datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, asdict, field
 
+# v118.35.0.3 · 包装 pipeline 抛出的 pydantic ValidationError · 不再把
+# "Input should be a valid string ... https://errors.pydantic.dev/2.13/v/..."
+# 整串塞进对账中心红色 toast 给用户看
+from services.ocr.error_format import short_error as _short_err
+
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1978,7 +1983,7 @@ def _parse_bank_stmt_via_pipeline(file_bytes: bytes, filename: str) -> Dict[str,
                     "error": f"unsupported format {ext_dot}"}
     except Exception as e:
         return {"ok": False, "rows": [], "row_count": 0, "bank_code": "generic",
-                "error": f"pipeline parse failed: {type(e).__name__}: {e}"}
+                "error": _short_err(e)}
 
     legacy = pipeline_result_to_legacy_dict(pr)
     pages = legacy.get("pages") or []
@@ -2051,7 +2056,7 @@ def _parse_gl_via_pipeline(file_bytes: bytes, filename: str,
                     "error": f"unsupported format {ext_dot}"}
     except Exception as e:
         return {"ok": False, "rows": [], "row_count": 0, "accounts": [],
-                "error": f"pipeline parse failed: {type(e).__name__}: {e}"}
+                "error": _short_err(e)}
 
     legacy = pipeline_result_to_legacy_dict(pr)
     rows = gl_rows_from_pipeline_legacy(legacy)

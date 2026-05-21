@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835008">
+<link rel="stylesheet" href="/static/home.css?v=11835009">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -2497,6 +2497,19 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 <div class="dash-kpi-label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 7h12"/></svg><span data-i18n="dash-kpi-plan">配额</span></div>
                 <div class="dash-kpi-val" id="dash-kpi-plan">—</div>
                 <div class="dash-kpi-sub" id="dash-kpi-plan-sub" data-i18n="dash-kpi-plan-sub">本月用量</div>
+            </div>
+        </div>
+        <!-- v118.35.0.9 · credits 第二排 KPI · 账户余额 + 本月用量(分级显示) -->
+        <div class="dash-kpi-grid dash-kpi-grid-credits" id="dash-kpi-credits" style="grid-template-columns: repeat(2, 1fr);">
+            <div class="dash-kpi" id="dash-kpi-balance-card" style="display:none;">
+                <div class="dash-kpi-label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="12" height="9" rx="1.5"/><circle cx="11" cy="8.5" r="1.5"/></svg><span data-i18n="dash-kpi-balance">账户余额</span></div>
+                <div class="dash-kpi-val" id="dash-kpi-balance">—</div>
+                <div class="dash-kpi-sub" id="dash-kpi-balance-sub">&nbsp;</div>
+            </div>
+            <div class="dash-kpi" id="dash-kpi-usage-card">
+                <div class="dash-kpi-label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l4-5 3 3 5-7"/><circle cx="14" cy="4" r="1.2"/></svg><span data-i18n="dash-kpi-usage">本月用量</span></div>
+                <div class="dash-kpi-val" id="dash-kpi-usage">—</div>
+                <div class="dash-kpi-sub" id="dash-kpi-usage-sub">&nbsp;</div>
             </div>
         </div>
         <div class="dash-grid2">
@@ -6555,7 +6568,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11835008"></script>
+<script src="/static/home.js?v=11835009"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·

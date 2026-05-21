@@ -799,11 +799,6 @@ const I18N = {
         'field-seller-name': '卖方',
         // v118.8 · 顶栏归属感 + 试用临近到期横幅
         'brand-workspace-fallback': '我的工作台',
-        'trial-banner-info': '7 天试用还剩 <strong>{n} 天</strong> · 试用结束前升级保留所有数据',
-        'trial-banner-soon': '试用即将到期 · 仅剩 <strong>{n} 天</strong> · 现在升级享月付 ฿299',
-        'trial-banner-1day': '试用<strong>明天到期</strong> · 不升级将无法继续使用 · 立即升级',
-        'trial-banner-expired': '试用已到期 · 升级后所有数据立即恢复',
-        'trial-banner-cta': '立即升级',
         'quota-banner-low': '今日识别配额还剩 {n} 次 · 用完后将无法继续识别新发票',
         'quota-banner-very-low': '今日识别配额仅剩 {n} 次 · 即将耗尽',
         'quota-banner-exhausted': '今日识别配额已用尽 · 新发票识别会失败 · 请明天再试或升级套餐',
@@ -1452,7 +1447,6 @@ const I18N = {
         'settings-role-super-admin': '超级管理员',
         'sub-type-monthly': '月度订阅',
         // v109.4 · 套餐显示
-        'settings-sub-trial': '试用',
         'settings-sub-free': '免费版',
         'settings-sub-solo': 'Pearnly Solo',
         'settings-sub-team': 'Pearnly Team',
@@ -1465,29 +1459,22 @@ const I18N = {
         'settings-sub-lifetime':      '终身买断',
         'settings-days-left':         '还剩 {n} 天',
         'settings-lifetime-forever':  '永久',
-        // v118.35.0.7 · credits 钱包计费 · 4 语
-        'settings-sub-credits':       '按量充值',
-        'credits-balance':            '钱包余额',
-        'credits-this-month':         '本月已识别',
-        'credits-pages-unit':         '张',
-        'credits-topup-btn':          '充值',
-        'credits-topup-title':        '提交充值申请',
+        // v118.35.0.9 · credits 极简化 · 设置页 3 行 + 首页 KPI 余额/用量 2 卡
+        'settings-billing-mode':      '计费方式',
+        'settings-billing-credits':   '按使用量计费',
+        'settings-billing-pricing':   '前 200 张/月 · ฿1.50/张 · 超过部分 · ฿0.75/张',
+        'dash-kpi-balance':           '账户余额',
+        'dash-kpi-balance-empty':     '—',
+        'dash-kpi-balance-exempt':    '豁免账号',
+        'dash-kpi-balance-topup':     '充值 →',
+        'dash-kpi-usage':             '本月用量',
+        'dash-kpi-usage-sub-low':     '{used}/200 张 · ฿1.50/张',
+        'dash-kpi-usage-sub-high':    '{used} 张 · ฿0.75/张',
         'credits-topup-amount':       '充值金额(THB)',
         'credits-topup-payer':        '汇款人姓名(可选)',
         'credits-topup-note':         '备注(可选)',
-        'credits-topup-submit':       '提交申请',
-        'credits-topup-cancel':       '取消',
         'credits-topup-submitted':    '✓ 申请已提交 · 等管理员审核',
         'credits-topup-failed':       '提交失败 · 请稍后重试',
-        'credits-topup-hint':         '提交后 · 等待管理员审核到账 · 通常 1 个工作日内',
-        'credits-no-tenant':          '尚未配置公司 · 联系管理员',
-        'credits-employee-view':      '员工视角 · 不显示余额',
-        'credits-my-count':           '我本月识别',
-        'settings-quota-trial-no-line': '20 张 · 绑定 LINE 解锁完整 50 张',
-        'settings-quota-free-no-line': '0 张 · 绑定 LINE 解锁 10 张/月',
-        'settings-trial-days-left': '7 天试用 · 还剩 {n} 天',
-        'settings-trial-expired': '试用已到期 · 立即升级',
-        'settings-trial-7days': '7 天试用',
         'sub-type-own-key': '自带 API Key · 无限制',
         'sub-type-need-setup': '待配置',
         'sub-need-api-key': '请在下方填入识别服务密钥',
@@ -3237,11 +3224,6 @@ const I18N = {
         'field-seller-name': 'Seller',
         // v118.8 · 顶栏归属感 + 试用临近到期横幅
         'brand-workspace-fallback': 'My Workspace',
-        'trial-banner-info': '<strong>{n} days</strong> left in your 7-day trial · upgrade before it ends to keep all data',
-        'trial-banner-soon': 'Trial ending soon · only <strong>{n} days</strong> left · upgrade now from ฿299/mo',
-        'trial-banner-1day': 'Trial <strong>ends tomorrow</strong> · upgrade now to keep using',
-        'trial-banner-expired': 'Trial expired · upgrade now to restore all data',
-        'trial-banner-cta': 'Upgrade now',
         'quota-banner-low': '{n} OCR runs left today · running out soon',
         'quota-banner-very-low': 'Only {n} OCR runs left today · nearly exhausted',
         'quota-banner-exhausted': 'Daily OCR quota exhausted · new invoices will fail · try tomorrow or upgrade plan',
@@ -3885,7 +3867,6 @@ const I18N = {
         'settings-role-super-admin': 'Super Admin',
         'sub-type-monthly': 'Monthly',
         // v109.4 · plan display
-        'settings-sub-trial': 'Trial',
         'settings-sub-free': 'Free',
         'settings-sub-solo': 'Pearnly Solo',
         'settings-sub-team': 'Pearnly Team',
@@ -3898,29 +3879,22 @@ const I18N = {
         'settings-sub-lifetime':      'Lifetime',
         'settings-days-left':         '{n} days left',
         'settings-lifetime-forever':  'Forever',
-        // v118.35.0.7 · credits wallet billing
-        'settings-sub-credits':       'Pay-as-you-go',
-        'credits-balance':            'Wallet balance',
-        'credits-this-month':         'Pages this month',
-        'credits-pages-unit':         'pages',
-        'credits-topup-btn':          'Top up',
-        'credits-topup-title':        'Submit top-up request',
+        // v118.35.0.9 · credits minimal billing
+        'settings-billing-mode':      'Billing',
+        'settings-billing-credits':   'Pay-as-you-go',
+        'settings-billing-pricing':   'First 200 pages/mo · ฿1.50/page · beyond · ฿0.75/page',
+        'dash-kpi-balance':           'Account balance',
+        'dash-kpi-balance-empty':     '—',
+        'dash-kpi-balance-exempt':    'Billing exempt',
+        'dash-kpi-balance-topup':     'Top up →',
+        'dash-kpi-usage':             'Usage this month',
+        'dash-kpi-usage-sub-low':     '{used}/200 pages · ฿1.50/page',
+        'dash-kpi-usage-sub-high':    '{used} pages · ฿0.75/page',
         'credits-topup-amount':       'Amount (THB)',
         'credits-topup-payer':        'Payer name (optional)',
         'credits-topup-note':         'Note (optional)',
-        'credits-topup-submit':       'Submit',
-        'credits-topup-cancel':       'Cancel',
         'credits-topup-submitted':    '✓ Request submitted · awaiting admin review',
         'credits-topup-failed':       'Submit failed · please retry',
-        'credits-topup-hint':         'Admin will review · usually within 1 business day',
-        'credits-no-tenant':          'Workspace not configured · contact admin',
-        'credits-employee-view':      'Employee view · balance hidden',
-        'credits-my-count':           'My pages this month',
-        'settings-quota-trial-no-line': '20 pages · link LINE to unlock full 50',
-        'settings-quota-free-no-line': '0 pages · link LINE to unlock 10/month',
-        'settings-trial-days-left': '7-day trial · {n} days left',
-        'settings-trial-expired': 'Trial expired · upgrade now',
-        'settings-trial-7days': '7-day trial',
         'sub-type-own-key': 'Own API Key · Unlimited',
         'sub-type-need-setup': 'Setup required',
         'sub-need-api-key': 'Please add your recognition key below',
@@ -5659,11 +5633,6 @@ const I18N = {
         'field-seller-name': 'ผู้ขาย',
         // v118.8 · 顶栏归属感 + 试用临近到期横幅
         'brand-workspace-fallback': 'พื้นที่ทำงานของฉัน',
-        'trial-banner-info': 'ทดลอง 7 วันเหลือ <strong>{n} วัน</strong> · อัพเกรดก่อนหมดเพื่อเก็บข้อมูลทั้งหมด',
-        'trial-banner-soon': 'ทดลองใกล้หมดอายุ · เหลือ <strong>{n} วัน</strong> · อัพเกรดทันที ฿299/เดือน',
-        'trial-banner-1day': 'ทดลอง<strong>หมดอายุพรุ่งนี้</strong> · ไม่อัพเกรดจะใช้งานต่อไม่ได้ · อัพเกรดเลย',
-        'trial-banner-expired': 'ทดลองหมดอายุแล้ว · อัพเกรดเพื่อกู้ข้อมูลทั้งหมด',
-        'trial-banner-cta': 'อัพเกรดเลย',
         'quota-banner-low': 'เหลือโควตา OCR วันนี้ {n} ครั้ง · ใกล้หมดแล้ว',
         'quota-banner-very-low': 'เหลือโควตา OCR วันนี้เพียง {n} ครั้ง · ใกล้หมด',
         'quota-banner-exhausted': 'โควตา OCR วันนี้หมดแล้ว · ใบกำกับใหม่จะไม่ทำงาน · ลองพรุ่งนี้หรืออัพเกรดแพคเกจ',
@@ -6307,7 +6276,6 @@ const I18N = {
         'settings-role-super-admin': 'ผู้ดูแลระบบสูงสุด',
         'sub-type-monthly': 'รายเดือน',
         // v109.4 · plan display
-        'settings-sub-trial': 'ทดลอง',
         'settings-sub-free': 'ฟรี',
         'settings-sub-solo': 'Pearnly Solo',
         'settings-sub-team': 'Pearnly Team',
@@ -6320,29 +6288,22 @@ const I18N = {
         'settings-sub-lifetime':      'ตลอดชีพ',
         'settings-days-left':         'เหลือ {n} วัน',
         'settings-lifetime-forever':  'ตลอดไป',
-        // v118.35.0.7 · credits wallet 4 ภาษา
-        'settings-sub-credits':       'จ่ายตามการใช้',
-        'credits-balance':            'ยอดในกระเป๋า',
-        'credits-this-month':         'หน้าที่อ่านเดือนนี้',
-        'credits-pages-unit':         'หน้า',
-        'credits-topup-btn':          'เติมเงิน',
-        'credits-topup-title':        'ส่งคำขอเติมเงิน',
+        // v118.35.0.9 · credits ขั้นต่ำ
+        'settings-billing-mode':      'การคิดค่าใช้จ่าย',
+        'settings-billing-credits':   'จ่ายตามการใช้งาน',
+        'settings-billing-pricing':   '200 หน้าแรก/เดือน · ฿1.50/หน้า · ส่วนเกิน · ฿0.75/หน้า',
+        'dash-kpi-balance':           'ยอดเงินคงเหลือ',
+        'dash-kpi-balance-empty':     '—',
+        'dash-kpi-balance-exempt':    'ยกเว้นการเรียกเก็บเงิน',
+        'dash-kpi-balance-topup':     'เติมเงิน →',
+        'dash-kpi-usage':             'การใช้งานเดือนนี้',
+        'dash-kpi-usage-sub-low':     '{used}/200 หน้า · ฿1.50/หน้า',
+        'dash-kpi-usage-sub-high':    '{used} หน้า · ฿0.75/หน้า',
         'credits-topup-amount':       'จำนวนเงิน (THB)',
         'credits-topup-payer':        'ชื่อผู้โอน (ไม่บังคับ)',
         'credits-topup-note':         'หมายเหตุ (ไม่บังคับ)',
-        'credits-topup-submit':       'ส่งคำขอ',
-        'credits-topup-cancel':       'ยกเลิก',
         'credits-topup-submitted':    '✓ ส่งคำขอแล้ว · รอแอดมินอนุมัติ',
         'credits-topup-failed':       'ส่งไม่สำเร็จ · กรุณาลองใหม่',
-        'credits-topup-hint':         'แอดมินจะตรวจสอบ · ปกติภายใน 1 วันทำการ',
-        'credits-no-tenant':          'ยังไม่ได้ตั้งค่าบริษัท · ติดต่อแอดมิน',
-        'credits-employee-view':      'มุมมองพนักงาน · ไม่แสดงยอดเงิน',
-        'credits-my-count':           'หน้าที่ฉันอ่านเดือนนี้',
-        'settings-quota-trial-no-line': '20 หน้า · เชื่อม LINE ปลดล็อก 50 หน้า',
-        'settings-quota-free-no-line': '0 หน้า · เชื่อม LINE ปลดล็อก 10/เดือน',
-        'settings-trial-days-left': 'ทดลอง 7 วัน · เหลือ {n} วัน',
-        'settings-trial-expired': 'หมดอายุทดลอง · อัปเกรดเลย',
-        'settings-trial-7days': 'ทดลอง 7 วัน',
         'sub-type-own-key': 'API ของตัวเอง · ไม่จำกัด',
         'sub-type-need-setup': 'ต้องตั้งค่า',
         'sub-need-api-key': 'กรุณาใส่คีย์บริการ OCR ด้านล่าง',
@@ -8077,11 +8038,6 @@ const I18N = {
         'field-seller-name': '売り手',
         // v118.8 · 顶栏归属感 + 试用临近到期横幅
         'brand-workspace-fallback': 'マイワークスペース',
-        'trial-banner-info': '7日間試用 残り <strong>{n}日</strong> · 期限切れ前にアップグレードでデータ保持',
-        'trial-banner-soon': '試用期間まもなく終了 · 残り <strong>{n}日</strong> · 月額฿299でアップグレード',
-        'trial-banner-1day': '試用 <strong>明日終了</strong> · アップグレードして継続利用',
-        'trial-banner-expired': '試用期間終了 · アップグレードでデータ復元',
-        'trial-banner-cta': 'アップグレード',
         'quota-banner-low': '本日の OCR 残り {n} 回 · 間もなく上限',
         'quota-banner-very-low': '本日の OCR 残り {n} 回のみ · ほぼ上限',
         'quota-banner-exhausted': '本日の OCR 上限に達しました · 新規認識は失敗します · 明日再試行またはプランをアップグレード',
@@ -8725,7 +8681,6 @@ const I18N = {
         'settings-role-super-admin': 'スーパー管理者',
         'sub-type-monthly': '月額',
         // v109.4 · プラン表示
-        'settings-sub-trial': 'トライアル',
         'settings-sub-free': '無料版',
         'settings-sub-solo': 'Pearnly Solo',
         'settings-sub-team': 'Pearnly Team',
@@ -8738,29 +8693,22 @@ const I18N = {
         'settings-sub-lifetime':      '買い切り',
         'settings-days-left':         '残り {n} 日',
         'settings-lifetime-forever':  '永久',
-        // v118.35.0.7 · credits ウォレット 4 言語
-        'settings-sub-credits':       '従量課金',
-        'credits-balance':            'ウォレット残高',
-        'credits-this-month':         '今月の認識ページ',
-        'credits-pages-unit':         'ページ',
-        'credits-topup-btn':          'チャージ',
-        'credits-topup-title':        'チャージ申請を送信',
+        // v118.35.0.9 · credits 最小構成
+        'settings-billing-mode':      '料金体系',
+        'settings-billing-credits':   '従量課金',
+        'settings-billing-pricing':   '月 200 ページまで · ฿1.50/ページ · 超過分 · ฿0.75/ページ',
+        'dash-kpi-balance':           '残高',
+        'dash-kpi-balance-empty':     '—',
+        'dash-kpi-balance-exempt':    '請求免除',
+        'dash-kpi-balance-topup':     'チャージ →',
+        'dash-kpi-usage':             '今月の利用',
+        'dash-kpi-usage-sub-low':     '{used}/200 ページ · ฿1.50/ページ',
+        'dash-kpi-usage-sub-high':    '{used} ページ · ฿0.75/ページ',
         'credits-topup-amount':       '金額 (THB)',
         'credits-topup-payer':        '送金者名 (任意)',
         'credits-topup-note':         'メモ (任意)',
-        'credits-topup-submit':       '送信',
-        'credits-topup-cancel':       'キャンセル',
         'credits-topup-submitted':    '✓ 申請を送信しました · 管理者の承認待ち',
         'credits-topup-failed':       '送信失敗 · 再試行してください',
-        'credits-topup-hint':         '管理者が確認します · 通常 1 営業日以内',
-        'credits-no-tenant':          'ワークスペース未設定 · 管理者にお問い合わせください',
-        'credits-employee-view':      '従業員ビュー · 残高は非表示',
-        'credits-my-count':           '今月の自分の認識ページ',
-        'settings-quota-trial-no-line': '20 枚 · LINE 連携で 50 枚解放',
-        'settings-quota-free-no-line': '0 枚 · LINE 連携で 10 枚/月解放',
-        'settings-trial-days-left': '7 日間トライアル · 残り {n} 日',
-        'settings-trial-expired': 'トライアル終了 · 今すぐアップグレード',
-        'settings-trial-7days': '7 日間トライアル',
         'sub-type-own-key': '独自 API Key · 無制限',
         'sub-type-need-setup': '設定が必要',
         'sub-need-api-key': '下で認識サービスキーを入力',
@@ -11752,14 +11700,8 @@ function renderQuotaBanner() {
     });
 }
 
-// v118.35.0.8 · trial 横幅永久下线 · 老 trial 横幅彻底废除
-// 系统已从 trial / 月付套餐 切到 pay-as-you-go credits 钱包计费
-// 6 个老 trial 用户(2026-05-21 DB 迁移)已全部 plan='credits' + trial_expires_at=NULL
-// 此函数保留为 noop · 防有调用方 NullPointer · 但永不渲染
-function renderTrialBanner() {
-    const el = document.getElementById('trial-banner');
-    if (el) el.style.display = 'none';
-}
+// v118.35.0.9 · renderTrialBanner 函数从 home.js 完全删除(v0.8 noop · v0.9 物理移除)·
+// 没有调用站还在调它 · 函数不存在也不会报错 · trial-banner div 由 CSS 默认 display:none 兜底
 
 function applySidebarVisibility() {
     // v118.8 · 试用临近到期横幅 · 7 天试用 · 剩 3 天提示 · 剩 1 天警示 · 过期红色
@@ -11827,9 +11769,9 @@ function applySidebarVisibility() {
         document.body.classList.remove('has-plan-banner');
     }
 
-    // 升级按钮(顶栏 / 任何带 data-upgrade-cta 标记的元素)
+    // v118.35.0.9 · 升级按钮全局 click 绑定永久下线 · 直接隐藏所有 .btn-upgrade / .topbar-upgrade / [data-upgrade-cta]
     document.querySelectorAll('[data-upgrade-cta], .btn-upgrade, .topbar-upgrade').forEach(el => {
-        el.style.display = _hideMoney ? 'none' : '';
+        el.style.display = 'none';
     });
 
     // body class · 让 CSS 可以基于角色做额外样式收尾(比如员工进设置默认 active 不在公司信息)
@@ -11988,11 +11930,7 @@ function _planDisplayLabel(plan) {
     return plan.charAt(0).toUpperCase() + plan.slice(1);
 }
 
-function showUpgradeModal(targetPlan) {
-    // v0.15 · 升级窗已废弃 · 所有用户权限相同
-    // 保留函数签名仅为兼容旧 data-upgrade 引用
-    return;
-}
+// v118.35.0.9 · 升级 modal 已永久下线 · 函数从 home.js 物理移除
 
 // 升级窗 DOM 相关事件 · 已废弃 · 防御性检查
 try {
@@ -14326,139 +14264,10 @@ function renderSettings() {
         return;
     }
 
-    // v87 · 用多租户正确字段 tenant_type 判断(之前用的 account_type 是老字段)
-    // v109.4 · 完整支持 trial / free / pro / firm / enterprise · 不再都走「月度订阅+无限」
-    const tt = u.tenant_type;
-    const userPlan = (u.plan || 'monthly').toLowerCase();
-    const isTrial = userPlan === 'trial';
-    const isFree = userPlan === 'free';
-    const isCredits = userPlan === 'credits';
-    const lineVerified = !!(u.line_verified || u.line_user_id);
-
-    // v118.35.0.7 · credits 钱包计费(新注册默认)
-    // v118.35.0.8 · trial 也路由到 credits 渲染分支 · 6 个老 trial 已 DB 迁移到 credits ·
-    //               这里防御性兜底:任何残留 plan='trial' 也只看到"按使用量计费"卡 ·
-    //               不再显示「7 天试用 · 还剩 X 天」「立即升级」等老套餐文案
-    if (isCredits || isTrial) {
-        _renderCreditsSettings(u, el);
-        const apiKeyCard = document.getElementById('api-key-card');
-        if (apiKeyCard) apiKeyCard.style.display = u.is_super_admin ? '' : 'none';
-        return;
-    }
-
-    let subType, quotaText;
-    if (tt === 'byo_api') {
-        if (u.has_own_gemini_key) {
-            subType = t('sub-type-own-key');       // "自带密钥 · 不限"
-            quotaText = t('usage-unlimited');
-        } else {
-            subType = t('sub-type-need-setup');    // "买断版 · 待配置"
-            quotaText = t('sub-need-api-key');
-        }
-    } else if (isTrial) {
-        // 试用账号
-        subType = t('settings-sub-trial');
-        if (!lineVerified) {
-            // 未绑 LINE · 配额受限
-            quotaText = t('settings-quota-trial-no-line');
-        } else {
-            const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-            const total = (u.tenant_quota != null && u.tenant_quota > 0)
-                ? u.tenant_quota
-                : (u.monthly_quota || 50);
-            quotaText = `${used} / ${total}`;
-        }
-    } else if (isFree) {
-        // 免费版
-        subType = t('settings-sub-free');
-        if (!lineVerified) {
-            quotaText = t('settings-quota-free-no-line');
-        } else {
-            const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-            const total = (u.tenant_quota != null && u.tenant_quota > 0)
-                ? u.tenant_quota
-                : (u.monthly_quota || 10);
-            quotaText = `${used} / ${total}`;
-        }
-    } else if (userPlan === 'pro' || userPlan === 'solo') {
-        subType = t('settings-sub-solo');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'team') {
-        subType = t('settings-sub-team');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'firm') {
-        subType = t('settings-sub-firm');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'enterprise') {
-        subType = t('settings-sub-enterprise');
-        quotaText = t('usage-unlimited');
-    // v118.27.8.1.17 · 补 v111+ 新 plan 名分支(之前漏 · 升级后还显示「月度订阅」)
-    } else if (userPlan === 'monthly') {
-        subType = t('settings-sub-monthly');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'yearly') {
-        subType = t('settings-sub-yearly');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    } else if (userPlan === 'lifetime') {
-        subType = t('settings-sub-lifetime');
-        quotaText = t('usage-unlimited');
-    } else {
-        // 兜底:月付共用 key(老数据)
-        subType = t('sub-type-monthly');
-        const used = (u.tenant_used != null) ? u.tenant_used : (u.used_this_month || 0);
-        const total = (u.tenant_quota != null) ? u.tenant_quota : (u.monthly_quota || 0);
-        quotaText = total > 0 ? `${used} / ${total}` : t('usage-unlimited');
-    }
-
-    // v109.4 · 有效期智能显示:trial 显示「7 天试用 · 还剩 X 天」/ 月付显示具体日期
-    // v118.27.8.1.17 · 改读 plan_expires_at(优先)· lifetime 显示「永久」· 有 plan_days_left 时优先展示「还剩 N 天」
-    let expires;
-    if (isTrial) {
-        const trialDays = u.trial_days_left;
-        if (trialDays !== null && trialDays !== undefined) {
-            const d = Math.max(0, Math.floor(trialDays));
-            expires = d > 0 ? t('settings-trial-days-left', { n: d }) : t('settings-trial-expired');
-        } else if (u.expires_at || u.trial_expires_at) {
-            expires = new Date(u.expires_at || u.trial_expires_at).toLocaleDateString();
-        } else {
-            expires = t('settings-trial-7days');
-        }
-    } else if (userPlan === 'lifetime' || u.plan_days_left === -1) {
-        expires = t('settings-lifetime-forever');
-    } else {
-        // 优先 plan_expires_at · 兼容老 expires_at · 都没就显示「—」
-        const expRaw = u.plan_expires_at || u.expires_at;
-        if (expRaw) {
-            const d = new Date(expRaw);
-            // 同时展示「还剩 N 天」更直观
-            if (typeof u.plan_days_left === 'number' && u.plan_days_left >= 0) {
-                expires = `${d.toLocaleDateString()} · ${t('settings-days-left', { n: u.plan_days_left })}`;
-            } else {
-                expires = d.toLocaleDateString();
-            }
-        } else {
-            expires = t('settings-never');
-        }
-    }
-
-    el.innerHTML = `
-        <table style="width:100%; font-size:13px; border-collapse: collapse;">
-            <tr><td style="color:#a0aec0; padding:8px 0; width:120px;">${t('settings-username')}</td><td style="padding:8px 0;">${escapeHtml(u.username)}</td></tr>
-            <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-sub-type')}</td><td style="padding:8px 0;"><strong>${escapeHtml(subType)}</strong></td></tr>
-            <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-quota')}</td><td style="padding:8px 0;">${escapeHtml(quotaText)}</td></tr>
-            <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-expires')}</td><td style="padding:8px 0;">${escapeHtml(expires)}</td></tr>
-        </table>
-    `;
+    // v118.35.0.9 · 所有非超管用户(包括 byo_api · monthly · yearly · lifetime · free)
+    // 全部走 credits 计费方式渲染 · DB 已批量迁移到 plan='credits'(v0.9 R6) ·
+    // 设置页只显示:用户名 + 计费方式 + 价格说明 · 不再显示订阅类型/配额/有效期表格
+    _renderCreditsSettings(u, el);
 
     // v0.15 · 加载 Gemini Key 当前状态
     loadGeminiKeyInfo();
@@ -14474,134 +14283,29 @@ function renderSettings() {
 }
 
 // ============================================================
-// v118.35.0.7 · credits 钱包计费 · 设置页渲染 + 充值申请
-// 拉 /api/me/credits · 老板看余额 + 本月用量 + 充值按钮
-// 员工只看自己本月识别页数
-// 充值按钮弹原生 prompt 输金额 → POST /api/credits/topup/request
+// v118.35.0.9 · credits 计费 · 设置页极简渲染
+// 只显示:用户名 + 计费方式 + 价格说明小字
+// 余额卡 / 充值按钮搬到首页 KPI 卡 · 这里不再重复
 // ============================================================
 function _renderCreditsSettings(u, el) {
     const username = escapeHtml(u.username || '');
-    // 占位渲染(立即显示 · 不等异步)
     el.innerHTML = `
         <table style="width:100%; font-size:13px; border-collapse: collapse;">
             <tr>
-                <td style="color:#a0aec0; padding:8px 0; width:140px;">${t('settings-username')}</td>
+                <td style="color:#a0aec0; padding:8px 0; width:140px;">${escapeHtml(t('settings-username'))}</td>
                 <td style="padding:8px 0;">${username}</td>
             </tr>
             <tr>
-                <td style="color:#a0aec0; padding:8px 0;">${t('settings-sub-type')}</td>
-                <td style="padding:8px 0;"><strong>${escapeHtml(t('settings-sub-credits'))}</strong></td>
+                <td style="color:#a0aec0; padding:8px 0;">${escapeHtml(t('settings-billing-mode'))}</td>
+                <td style="padding:8px 0;"><strong>${escapeHtml(t('settings-billing-credits'))}</strong></td>
             </tr>
-            <tr id="credits-balance-row" style="display:none;">
-                <td style="color:#a0aec0; padding:8px 0;">${t('credits-balance')}</td>
-                <td style="padding:8px 0;"><strong id="credits-balance-val">—</strong>
-                    <button type="button" id="btn-credits-topup" class="btn btn-primary"
-                        style="margin-left:12px; padding:4px 12px; font-size:12px;">
-                        ${escapeHtml(t('credits-topup-btn'))}
-                    </button>
+            <tr>
+                <td colspan="2" style="color:#a0aec0; padding:8px 0; font-size:12px;">
+                    ${escapeHtml(t('settings-billing-pricing'))}
                 </td>
-            </tr>
-            <tr id="credits-pages-row" style="display:none;">
-                <td style="color:#a0aec0; padding:8px 0;">
-                    <span id="credits-pages-label">${t('credits-this-month')}</span>
-                </td>
-                <td style="padding:8px 0;"><strong id="credits-pages-val">—</strong> ${escapeHtml(t('credits-pages-unit'))}</td>
-            </tr>
-            <tr id="credits-info-row">
-                <td colspan="2" style="color:#a0aec0; padding:8px 0; font-size:12px;" id="credits-info-msg">…</td>
             </tr>
         </table>
     `;
-    // 异步拉真实数据
-    _loadCreditsData();
-}
-
-async function _loadCreditsData() {
-    try {
-        const resp = await fetch('/api/me/credits', {
-            headers: { 'Authorization': 'Bearer ' + token },
-        });
-        if (!resp.ok) {
-            const msg = document.getElementById('credits-info-msg');
-            if (msg) msg.textContent = 'HTTP ' + resp.status;
-            return;
-        }
-        const data = await resp.json();
-        const infoEl = document.getElementById('credits-info-msg');
-        if (!data.has_tenant) {
-            if (infoEl) infoEl.textContent = t('credits-no-tenant');
-            return;
-        }
-        const balRow = document.getElementById('credits-balance-row');
-        const pagesRow = document.getElementById('credits-pages-row');
-        const pagesLabel = document.getElementById('credits-pages-label');
-        if (data.is_owner) {
-            const bal = (typeof data.balance_thb === 'number') ? data.balance_thb : 0;
-            const pages = (typeof data.pages_this_month === 'number') ? data.pages_this_month : 0;
-            if (balRow) balRow.style.display = '';
-            if (pagesRow) pagesRow.style.display = '';
-            const balEl = document.getElementById('credits-balance-val');
-            const pagesEl = document.getElementById('credits-pages-val');
-            if (balEl) balEl.textContent = '฿' + bal.toFixed(2);
-            if (pagesEl) pagesEl.textContent = String(pages);
-            if (pagesLabel) pagesLabel.textContent = t('credits-this-month');
-            if (infoEl) infoEl.textContent = t('credits-topup-hint');
-            const btn = document.getElementById('btn-credits-topup');
-            if (btn && !btn._bound) {
-                btn._bound = true;
-                btn.addEventListener('click', _openTopupModal);
-            }
-        } else {
-            // 员工视图
-            const myCount = (typeof data.my_invoice_count === 'number') ? data.my_invoice_count : 0;
-            if (pagesRow) pagesRow.style.display = '';
-            if (pagesLabel) pagesLabel.textContent = t('credits-my-count');
-            const pagesEl = document.getElementById('credits-pages-val');
-            if (pagesEl) pagesEl.textContent = String(myCount);
-            if (infoEl) infoEl.textContent = t('credits-employee-view');
-        }
-    } catch (e) {
-        console.error('[credits] load failed:', e);
-        const msg = document.getElementById('credits-info-msg');
-        if (msg) msg.textContent = (e && e.message) || 'error';
-    }
-}
-
-async function _openTopupModal() {
-    // 简化版:用原生 prompt 输金额 · 后续 v36 改正经 modal
-    const amountStr = prompt(t('credits-topup-amount'), '500');
-    if (!amountStr) return;
-    const amount = parseFloat(amountStr);
-    if (!isFinite(amount) || amount <= 0) {
-        showToast(t('credits-topup-failed'), 'error');
-        return;
-    }
-    const payer = prompt(t('credits-topup-payer'), '') || '';
-    const note = prompt(t('credits-topup-note'), '') || '';
-    try {
-        const resp = await fetch('/api/credits/topup/request', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                amount_thb: amount,
-                payer_name: payer,
-                note: note,
-            }),
-        });
-        if (!resp.ok) {
-            const data = await resp.json().catch(() => ({}));
-            showToast(t('credits-topup-failed') + (data.detail ? ' · ' + data.detail : ''), 'error');
-            return;
-        }
-        showToast(t('credits-topup-submitted'), 'success');
-        _loadCreditsData();  // 刷新一下显示
-    } catch (e) {
-        console.error('[credits] topup failed:', e);
-        showToast(t('credits-topup-failed'), 'error');
-    }
 }
 
 
@@ -22313,15 +22017,15 @@ async function deleteEndpoint(endpointId) {
                 hideBanner(); return;
             } else if (days <= 0) {
                 html = `<span>${esc(tt('banner-trial-last'))}</span>`;
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-upgrade'))}</button>`;
+                html += '';  // v118.35.0.9 · upgrade button retired
                 level = 'danger';
             } else if (days <= 2) {
                 html = `<span>${esc(tt('banner-trial-expiring', {n: days}))}</span>`;
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-upgrade'))}</button>`;
+                html += '';  // v118.35.0.9 · upgrade button retired
                 level = 'warn';
             } else {
                 html = `<span>${esc(tt('banner-trial-left', {n: days, used: usage.ocr_used, limit: usage.ocr_limit}))}</span>`;
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-upgrade'))}</button>`;
+                html += '';  // v118.35.0.9 · upgrade button retired
                 level = 'info';
             }
         } else if (plan === 'monthly') {
@@ -22329,7 +22033,7 @@ async function deleteEndpoint(endpointId) {
             html = `<span>${esc(tt('banner-monthly', {n: d, used: usage.ocr_used, limit: usage.ocr_limit}))}</span>`;
             // 7 天内到期 · 黄色提醒
             if (d <= 7 && d > 0) {
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-renew'))}</button>`;
+                html += '';  // v118.35.0.9 · upgrade button retired
                 level = 'warn';
             } else {
                 level = 'success';
@@ -22338,7 +22042,7 @@ async function deleteEndpoint(endpointId) {
             const d = Math.max(0, plan_days_left || 0);
             html = `<span>${esc(tt('banner-yearly', {n: d, used: usage.ocr_used, limit: usage.ocr_limit}))}</span>`;
             if (d <= 30 && d > 0) {
-                html += ` <button class="plan-banner-btn" onclick="openUpgradeModal()">${esc(tt('btn-renew'))}</button>`;
+                html += '';  // v118.35.0.9 · upgrade button retired
                 level = 'warn';
             } else {
                 level = 'success';
@@ -22519,21 +22223,9 @@ async function deleteEndpoint(endpointId) {
         </div>`;
     }
 
+    // v118.35.0.9 · 升级 modal 整套永久下线 · 跟 plan='credits' pay-as-you-go 不兼容
+    // 入口 entry 函数物理移除 · 老调用站(已批量清理)调到也是 ReferenceError 不会真弹窗
     let _currentUpgPlan = null;
-
-    window.openUpgradeModal = function(highlight) {
-        // v118.12 · 员工守卫:即使前端漏隐藏 · 入口也阻断 · 防止误触发
-        if (typeof shouldHideMoney === 'function' && shouldHideMoney(_userInfo)) {
-            console.warn('[v118.12] openUpgradeModal blocked for employee role');
-            return;
-        }
-        ensureUpgradeModal();
-        _currentUpgPlan = null;
-        document.getElementById('upg-title').textContent = tt('upg-title');
-        document.getElementById('upg-sub').textContent = tt('upg-sub');
-        document.getElementById('upg-body').innerHTML = renderPlanCards();
-        document.getElementById('upgrade-modal').style.display = '';
-    };
 
     window.__upg_pick_plan = function(plan) {
         _currentUpgPlan = plan;
@@ -22715,7 +22407,7 @@ async function deleteEndpoint(endpointId) {
                     if (detail.needs_line_verify) {
                         setTimeout(() => { showToast(tt('toast-needs-line'), 'info'); openLineLinkModal(); }, 100);
                     } else {
-                        setTimeout(() => { showToast(tt('toast-quota-exceeded'), 'info'); openUpgradeModal('pro'); }, 100);
+                        setTimeout(() => { showToast(tt('toast-quota-exceeded'), 'info'); /* v118.35.0.9 · upgrade modal retired */ }, 100);
                     }
                 }
             } catch (_) {}
@@ -33332,6 +33024,8 @@ window.addEventListener('DOMContentLoaded', () => {
         } catch (_) { return ''; }
     }
     async function loadDashboard() {
+        // v118.35.0.9 · 第二排 credits KPI · 余额 + 用量
+        loadCreditsCard();
         const elInv = document.getElementById('dash-kpi-invoices');
         const elPend = document.getElementById('dash-kpi-pending');
         const elExc = document.getElementById('dash-kpi-exceptions');
@@ -33396,6 +33090,122 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
     window.loadDashboard = loadDashboard;
+
+    // v118.35.0.9 · credits 余额 + 用量 KPI 卡渲染
+    // 数据源: GET /api/me/credits
+    // 卡 1 余额:
+    //   - is_billing_exempt=true → "∞" + "豁免账号"
+    //   - is_owner=true · 非豁免 → "฿X.XX" · 余额 < 50 红字 + "充值 →" 链接
+    //   - is_owner=false (员工) → 整张卡 display:none
+    // 卡 2 用量:
+    //   - 所有人显示
+    //   - pages_this_month < 200 → "X" + "{used}/200 张 · ฿1.50/张"
+    //   - pages_this_month >= 200 → "X" + "{used} 张 · ฿0.75/张"
+    async function loadCreditsCard() {
+        const balCard = document.getElementById('dash-kpi-balance-card');
+        const usageCard = document.getElementById('dash-kpi-usage-card');
+        const balVal = document.getElementById('dash-kpi-balance');
+        const balSub = document.getElementById('dash-kpi-balance-sub');
+        const usageVal = document.getElementById('dash-kpi-usage');
+        const usageSub = document.getElementById('dash-kpi-usage-sub');
+        if (!balCard || !usageCard) return;
+        try {
+            const auth = { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
+            const resp = await fetch('/api/me/credits', { headers: auth });
+            if (!resp.ok) {
+                // 鉴权失败或服务异常 · 默认隐藏余额 · 用量显示 "—"
+                balCard.style.display = 'none';
+                if (usageVal) usageVal.textContent = '—';
+                if (usageSub) usageSub.textContent = '';
+                return;
+            }
+            const data = await resp.json();
+            const isOwner = !!data.is_owner;
+            const isExempt = !!data.is_billing_exempt;
+
+            // === 卡 1 · 账户余额 ===
+            if (!isOwner) {
+                balCard.style.display = 'none';
+            } else {
+                balCard.style.display = '';
+                if (isExempt) {
+                    if (balVal) {
+                        balVal.textContent = '∞';
+                        balVal.className = 'dash-kpi-val dash-green';
+                    }
+                    if (balSub) {
+                        balSub.textContent = (typeof t === 'function') ? t('dash-kpi-balance-exempt') : 'Billing exempt';
+                    }
+                } else {
+                    const bal = (typeof data.balance_thb === 'number') ? data.balance_thb : 0;
+                    if (balVal) {
+                        balVal.textContent = '฿' + bal.toFixed(2);
+                        balVal.className = (bal < 50) ? 'dash-kpi-val dash-red' : 'dash-kpi-val';
+                    }
+                    if (balSub) {
+                        if (bal < 50) {
+                            const linkTxt = (typeof t === 'function') ? t('dash-kpi-balance-topup') : 'Top up →';
+                            balSub.innerHTML = '<a href="#" id="kpi-balance-topup-link" style="color:#dc2626;text-decoration:underline;cursor:pointer;">' + escapeHtml(linkTxt) + '</a>';
+                            const lnk = document.getElementById('kpi-balance-topup-link');
+                            if (lnk) lnk.addEventListener('click', function (e) {
+                                e.preventDefault();
+                                _kpiPromptTopup();
+                            });
+                        } else {
+                            balSub.innerHTML = '&nbsp;';
+                        }
+                    }
+                }
+            }
+
+            // === 卡 2 · 本月用量(所有人显示) ===
+            const pages = (typeof data.pages_this_month === 'number') ? data.pages_this_month
+                        : (typeof data.my_invoice_count === 'number') ? data.my_invoice_count
+                        : 0;
+            usageCard.style.display = '';
+            if (usageVal) usageVal.textContent = String(pages);
+            if (usageSub) {
+                const key = (pages >= 200) ? 'dash-kpi-usage-sub-high' : 'dash-kpi-usage-sub-low';
+                const tpl = (typeof t === 'function') ? t(key, { used: pages }) : (pages + ' pages');
+                usageSub.textContent = tpl;
+            }
+        } catch (e) {
+            console.warn('[credits] loadCreditsCard failed:', e);
+            balCard.style.display = 'none';
+            if (usageVal) usageVal.textContent = '—';
+        }
+    }
+    window.loadCreditsCard = loadCreditsCard;
+
+    function _kpiPromptTopup() {
+        // 复用设置页同款 prompt 流程(简化版 · v36 改正经 modal)
+        const amountStr = prompt((typeof t === 'function') ? t('credits-topup-amount') : 'Amount (THB)', '500');
+        if (!amountStr) return;
+        const amount = parseFloat(amountStr);
+        if (!isFinite(amount) || amount <= 0) {
+            if (typeof showToast === 'function') showToast(t('credits-topup-failed'), 'error');
+            return;
+        }
+        const payer = prompt(t('credits-topup-payer'), '') || '';
+        const note = prompt(t('credits-topup-note'), '') || '';
+        fetch('/api/credits/topup/request', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ amount_thb: amount, payer_name: payer, note: note }),
+        }).then(function (r) {
+            if (r.ok) {
+                if (typeof showToast === 'function') showToast(t('credits-topup-submitted'), 'success');
+                loadCreditsCard();
+            } else {
+                if (typeof showToast === 'function') showToast(t('credits-topup-failed'), 'error');
+            }
+        }).catch(function () {
+            if (typeof showToast === 'function') showToast(t('credits-topup-failed'), 'error');
+        });
+    }
     // 启动时若 hash 落在 #/dashboard,也跑一次(loadAll 后)
     document.addEventListener('DOMContentLoaded', function () {
         if ((location.hash || '').replace(/^#\//, '') === 'dashboard') {

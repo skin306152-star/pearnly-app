@@ -1086,29 +1086,31 @@ class LoginResponse(BaseModel):
 
 
 class UserInfo(BaseModel):
+    # v118.35.0.15 · credits 全站统一后 · 所有老 plan/quota 字段改 Optional ·
+    # _build_user_info() 已不再返回 plan/monthly_quota/trial_expires_at/
+    # plan_expires_at/plan_days_left/tenant_quota/tenant_used 8 字段(v0.11) ·
+    # 这里也跟着改成 Optional · 避免 Pydantic ResponseValidationError 500 ·
+    # 配额改由 credits 系统(/api/me/credits)接管
     id: str
     username: str
-    plan: str
     # v0.15.5 · 明确账号类型(monthly / lifetime / lifetime_pending)· 前端显隐判断用
     account_type: str = "monthly"
-    # 基础配额
-    monthly_quota: int
-    used_this_month: int
+    used_this_month: int = 0
     # IP 限流(v0.8 废弃,仅兼容旧前端)
     ip_used_today: Optional[int] = None
     ip_daily_limit: Optional[int] = None
-    # 精细化权限
-    can_edit_fields: bool
-    can_verify_tax: bool
-    can_use_gemini: bool
-    can_use_typhoon: bool
-    can_use_custom_template: bool
-    can_view_history: bool
-    can_push_erp: bool
-    can_manage_api_keys: bool
+    # 精细化权限(全开 · credits 模型不再区分套餐)
+    can_edit_fields: bool = True
+    can_verify_tax: bool = True
+    can_use_gemini: bool = True
+    can_use_typhoon: bool = True
+    can_use_custom_template: bool = True
+    can_view_history: bool = True
+    can_push_erp: bool = True
+    can_manage_api_keys: bool = False
     # v0.15 · 买断标识
     has_own_gemini_key: bool = False
-    # v0.8 新增
+    # v0.8
     rd_daily_limit: Optional[int] = None
     can_extract_items: bool = True
     can_auto_push_erp: bool = False
@@ -1121,20 +1123,16 @@ class UserInfo(BaseModel):
     can_use_smart_alert: bool = False
     # 兼容旧字段(不再使用但前端可能仍引用)
     can_use_automation: bool = False
-    # 配额
-    typhoon_quota_monthly: int
-    typhoon_used_this_month: int
-    history_retention_days: int
-    custom_template_limit: int
-    # 其他
-    expires_at: Optional[str] = None
+    # 配额(全部默认 0)
+    typhoon_quota_monthly: int = 0
+    typhoon_used_this_month: int = 0
+    history_retention_days: int = 365
+    custom_template_limit: int = 0
     # v22 · 多租户
     tenant_id: Optional[str] = None
     tenant_name: Optional[str] = None
     tenant_type: Optional[str] = None          # shared_api / byo_api / admin
     tenant_status: Optional[str] = None        # active / warning / suspended / frozen
-    tenant_quota: Optional[int] = None         # 租户月度限额
-    tenant_used: Optional[int] = None          # 租户本月已用
     role: Optional[str] = None                 # owner / member
     is_super_admin: bool = False
     # v118.8.4 · 公司名 + 真实姓名(注册时填的) · 顶栏归属感用
@@ -1142,6 +1140,31 @@ class UserInfo(BaseModel):
     full_name: Optional[str] = None
     # v118.27.6 · Google 头像 URL(OAuth 注册同步)
     avatar_url: Optional[str] = None
+    # v110.7 · 欢迎向导 profile 字段
+    monthly_volume: Optional[str] = None
+    country: Optional[str] = None
+    line_id: Optional[str] = None
+    phone: Optional[str] = None
+    line_verified: bool = False
+    profile_filled: bool = True
+    # v118.11 · 员工首次登录强制改密
+    must_change_password: bool = False
+    # v118.35.0.11 · credits 新加 4 字段
+    email: Optional[str] = None
+    invited_by: Optional[str] = None
+    is_billing_exempt: bool = False
+    active_tenant_id: Optional[str] = None
+    # === 老字段全部 Optional · _build_user_info 已不返回 · credits 系统接管 ===
+    plan: Optional[str] = None                 # v0.11 删 · 仅保 Optional 兼容老前端
+    monthly_quota: Optional[int] = None        # v0.11 删
+    effective_plan: Optional[str] = None       # v0.11 删
+    plan_expires_at: Optional[str] = None      # v0.11 删
+    plan_days_left: Optional[int] = None       # v0.11 删
+    trial_expires_at: Optional[str] = None     # v0.11 删
+    trial_days_left: Optional[float] = None    # v0.11 删
+    tenant_quota: Optional[int] = None         # v0.11 删
+    tenant_used: Optional[int] = None          # v0.11 删
+    expires_at: Optional[str] = None           # v0.11 删
 
 
 class QuotaResponse(BaseModel):

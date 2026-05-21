@@ -8803,3 +8803,317 @@ def set_user_active_tenant(user_id: str, tenant_id: str) -> bool:
         logger.error(f"set_user_active_tenant failed: {e}")
         return False
 
+
+# ============================================================================
+# v118.35.0.20 · Credits 计费系统业务层(填上 cherry-pick v36 留的 TODO)
+# 价格规则(Korn 拍板 2026-05-21):
+#   PDF: 当月累计 ≤ 200 张  → ฿1.50 / 张
+#        当月累计 > 200 张  → ฿0.75 / 张
+#   Excel/Word/CSV: 不走 OCR · 按字符计费 · 50 字符 = 1 satang(฿0.01)
+# 白名单: users.is_billing_exempt = TRUE 跳过扣费(skin306152 + mrerp@outlook.co.th)
+# ============================================================================
+from decimal import Decimal as _DecV20, ROUND_HALF_UP as _RH_V20
+import math as _math_v20
+
+PDF_TIER1_LIMIT_V20 = 200            # 前 N 张按 tier1 价
+PDF_TIER1_PRICE_V20 = _DecV20("1.50")  # ฿/张
+PDF_TIER2_PRICE_V20 = _DecV20("0.75")  # ฿/张(超过 200)
+EXCEL_CHARS_PER_SATANG_V20 = 50      # 50 字符 = 1 satang
+EXCEL_SATANG_PRICE_V20 = _DecV20("0.01")  # ฿/satang
+
+
+def is_user_billing_exempt(user_id) -> bool:
+    """v118.35.0.20 · 白名单查询 · 单一数据源(users.is_billing_exempt)
+    取代 auth_signup.py 和 app.py 里的硬编码 SKIN_TEST_USER_ID。
+    """
+    if not user_id:
+        return False
+    try:
+        with get_cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(is_billing_exempt, FALSE) FROM users WHERE id = %s::uuid LIMIT 1",
+                (str(user_id),)
+            )
+            row = cur.fetchone()
+            if not row:
+                return False
+            v = row[0] if isinstance(row, (tuple, list)) else (
+                row.get("is_billing_exempt") if isinstance(row, dict) else
+                row[list(row.keys())[0]]
+            )
+            return bool(v)
+    except Exception as e:
+        logger.warning(f"is_user_billing_exempt error user={user_id}: {e}")
+        return False
+
+
+def _get_pages_used_this_month(tenant_id) -> int:
+    """当月已用 PDF 页数(按 Asia/Bangkok)· 找不到记录返 0"""
+    if not tenant_id:
+        return 0
+    try:
+        ym = _bkk_year_month()
+        with get_cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(pages_used, 0) FROM monthly_page_usage "
+                "WHERE tenant_id = %s::uuid AND year_month = %s",
+                (str(tenant_id), ym)
+            )
+            row = cur.fetchone()
+            if not row:
+                return 0
+            v = row[0] if isinstance(row, (tuple, list)) else (
+                row.get("pages_used") if isinstance(row, dict) else 0
+            )
+            return int(v or 0)
+    except Exception as e:
+        logger.warning(f"_get_pages_used_this_month error tenant={tenant_id}: {e}")
+        return 0
+
+
+def _get_balance_thb(tenant_id) -> _DecV20:
+    """当前公司钱包余额"""
+    if not tenant_id:
+        return _DecV20("0")
+    try:
+        with get_cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(balance_thb, 0) FROM tenant_credits "
+                "WHERE tenant_id = %s::uuid",
+                (str(tenant_id),)
+            )
+            row = cur.fetchone()
+            if not row:
+                return _DecV20("0")
+            v = row[0] if isinstance(row, (tuple, list)) else (
+                row.get("balance_thb") if isinstance(row, dict) else 0
+            )
+            return _DecV20(str(v or 0))
+    except Exception as e:
+        logger.warning(f"_get_balance_thb error tenant={tenant_id}: {e}")
+        return _DecV20("0")
+
+
+def estimate_pdf_cost_thb(tenant_id, page_count: int) -> _DecV20:
+    """估算 PDF N 页的总成本 · 跨界自动拆段(193→207 = 7 张 tier1 + 7 张 tier2)
+    返回 Decimal · 保留 2 位小数。
+    """
+    n = max(0, int(page_count or 0))
+    if n == 0:
+        return _DecV20("0.00")
+    used = _get_pages_used_this_month(tenant_id)
+    # 当月剩余 tier1 额度
+    tier1_remaining = max(0, PDF_TIER1_LIMIT_V20 - used)
+    tier1_pages = min(n, tier1_remaining)
+    tier2_pages = n - tier1_pages
+    cost = (PDF_TIER1_PRICE_V20 * tier1_pages) + (PDF_TIER2_PRICE_V20 * tier2_pages)
+    return cost.quantize(_DecV20("0.01"), rounding=_RH_V20)
+
+
+def estimate_excel_cost_thb(char_count: int) -> _DecV20:
+    """估算 Excel/Word/CSV 字符数对应的成本 · 50 字符 = 1 satang · 向上取整"""
+    n = max(0, int(char_count or 0))
+    if n == 0:
+        return _DecV20("0.00")
+    satang = _math_v20.ceil(n / EXCEL_CHARS_PER_SATANG_V20)
+    return (EXCEL_SATANG_PRICE_V20 * satang).quantize(_DecV20("0.01"), rounding=_RH_V20)
+
+
+def get_billing_status(user_id, tenant_id) -> dict:
+    """OCR 前置检查 · 返:
+       {allowed: bool, is_exempt: bool, balance_thb: float,
+        pages_used_this_month: int, error_code: str|None}
+    业务流程: 入口先调这个 · is_exempt=True 直接放行 · 否则看 balance > 0。
+    """
+    exempt = is_user_billing_exempt(user_id)
+    if exempt:
+        return {
+            "allowed": True, "is_exempt": True, "balance_thb": 0.0,
+            "pages_used_this_month": 0, "error_code": None,
+        }
+    bal = _get_balance_thb(tenant_id)
+    used = _get_pages_used_this_month(tenant_id)
+    if bal <= _DecV20("0"):
+        return {
+            "allowed": False, "is_exempt": False, "balance_thb": float(bal),
+            "pages_used_this_month": used, "error_code": "insufficient_balance",
+        }
+    return {
+        "allowed": True, "is_exempt": False, "balance_thb": float(bal),
+        "pages_used_this_month": used, "error_code": None,
+    }
+
+
+def charge_ocr(user_id, tenant_id, kind: str, units: int,
+               history_id: str = None, description: str = "") -> dict:
+    """OCR 完成后真扣费 · 原子事务(SELECT FOR UPDATE 防并发)
+       kind: 'pdf' (units = page_count) | 'excel' (units = char_count)
+       返: {ok, charged_thb, balance_after, kind, units, transaction_id, error}
+       豁免账号自动跳过 · 返 ok=True charged=0。
+    """
+    if not tenant_id:
+        return {"ok": False, "error": "no_tenant"}
+    if is_user_billing_exempt(user_id):
+        logger.info(f"[charge_ocr] EXEMPT user={str(user_id)[:8]} skip charge kind={kind} units={units}")
+        return {"ok": True, "charged_thb": 0.0, "balance_after": None,
+                "kind": kind, "units": units, "transaction_id": None, "exempt": True}
+
+    if kind == "pdf":
+        cost = estimate_pdf_cost_thb(tenant_id, units)
+        pages_inc = int(units)
+    elif kind == "excel":
+        cost = estimate_excel_cost_thb(units)
+        pages_inc = 0  # Excel 不计入 PDF 月度分级窗口
+    else:
+        return {"ok": False, "error": f"unknown_kind:{kind}"}
+
+    if cost <= _DecV20("0"):
+        return {"ok": True, "charged_thb": 0.0, "balance_after": None,
+                "kind": kind, "units": units, "transaction_id": None}
+
+    ym = _bkk_year_month()
+    try:
+        with get_cursor(commit=True) as cur:
+            # 锁住该公司钱包行 · 防并发
+            cur.execute(
+                "SELECT balance_thb FROM tenant_credits "
+                "WHERE tenant_id = %s::uuid FOR UPDATE",
+                (str(tenant_id),)
+            )
+            row = cur.fetchone()
+            if not row:
+                cur.execute(
+                    "INSERT INTO tenant_credits (tenant_id, balance_thb) "
+                    "VALUES (%s::uuid, 0) RETURNING balance_thb",
+                    (str(tenant_id),)
+                )
+                row = cur.fetchone()
+            current_bal = _DecV20(str(row[0] if isinstance(row, (tuple, list)) else row.get("balance_thb")))
+            new_bal = current_bal - cost  # 可扣到负数(OCR 已完成不能不扣 · 后续充值补)
+
+            cur.execute(
+                "UPDATE tenant_credits SET balance_thb = %s, updated_at = NOW() "
+                "WHERE tenant_id = %s::uuid",
+                (str(new_bal), str(tenant_id))
+            )
+
+            # 写入 credit_transactions(type=usage · amount 用负数表示扣费)
+            cur.execute(
+                "INSERT INTO credit_transactions "
+                "(tenant_id, user_id, type, amount_thb, pages, balance_after, description) "
+                "VALUES (%s::uuid, %s::uuid, 'usage', %s, %s, %s, %s) RETURNING id",
+                (str(tenant_id), str(user_id) if user_id else None,
+                 str(-cost), pages_inc, str(new_bal),
+                 description or f"OCR {kind} units={units} hid={history_id or ''}")
+            )
+            tx_row = cur.fetchone()
+            tx_id = tx_row[0] if isinstance(tx_row, (tuple, list)) else tx_row.get("id")
+
+            # PDF 累计页数(用于下次分级)· Excel 不计入
+            if kind == "pdf" and pages_inc > 0:
+                cur.execute(
+                    "INSERT INTO monthly_page_usage (tenant_id, year_month, pages_used, updated_at) "
+                    "VALUES (%s::uuid, %s, %s, NOW()) "
+                    "ON CONFLICT (tenant_id, year_month) DO UPDATE "
+                    "SET pages_used = monthly_page_usage.pages_used + EXCLUDED.pages_used, "
+                    "    updated_at = NOW()",
+                    (str(tenant_id), ym, pages_inc)
+                )
+        logger.info(f"[charge_ocr] OK tenant={str(tenant_id)[:8]} kind={kind} units={units} "
+                    f"cost=฿{cost} bal_after=฿{new_bal} tx={tx_id}")
+        return {"ok": True, "charged_thb": float(cost), "balance_after": float(new_bal),
+                "kind": kind, "units": units, "transaction_id": tx_id}
+    except Exception as e:
+        logger.error(f"[charge_ocr] FAIL tenant={tenant_id} kind={kind} units={units}: {e}")
+        return {"ok": False, "error": str(e)[:200]}
+
+
+def refund_ocr(user_id, tenant_id, amount_thb: float,
+               history_id: str = None, reason: str = "ocr_failed") -> dict:
+    """OCR 失败退款 · 写正向 transaction · 不影响 monthly_page_usage(页数已统计)
+    业务:如果扣费已成功但 OCR 整体失败 · 调这个把钱还回去。
+    """
+    if not tenant_id or not amount_thb or float(amount_thb) <= 0:
+        return {"ok": False, "error": "invalid_args"}
+    if is_user_billing_exempt(user_id):
+        return {"ok": True, "refunded_thb": 0.0, "exempt": True}
+
+    amt = _DecV20(str(amount_thb)).quantize(_DecV20("0.01"), rounding=_RH_V20)
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE tenant_credits SET balance_thb = balance_thb + %s, updated_at = NOW() "
+                "WHERE tenant_id = %s::uuid RETURNING balance_thb",
+                (str(amt), str(tenant_id))
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"ok": False, "error": "tenant_credits_not_found"}
+            new_bal = _DecV20(str(row[0] if isinstance(row, (tuple, list)) else row.get("balance_thb")))
+
+            cur.execute(
+                "INSERT INTO credit_transactions "
+                "(tenant_id, user_id, type, amount_thb, pages, balance_after, description) "
+                "VALUES (%s::uuid, %s::uuid, 'adjustment', %s, 0, %s, %s)",
+                (str(tenant_id), str(user_id) if user_id else None,
+                 str(amt), str(new_bal),
+                 f"refund:{reason} hid={history_id or ''}")
+            )
+        logger.info(f"[refund_ocr] OK tenant={str(tenant_id)[:8]} amt=฿{amt} reason={reason}")
+        return {"ok": True, "refunded_thb": float(amt), "balance_after": float(new_bal)}
+    except Exception as e:
+        logger.error(f"[refund_ocr] FAIL tenant={tenant_id} amt={amount_thb}: {e}")
+        return {"ok": False, "error": str(e)[:200]}
+
+
+def _excel_char_count_estimate(file_bytes: bytes, filename: str) -> int:
+    """v118.35.0.20 · 估算 Excel/CSV/Word 文件的总字符数(用于扣费)
+    简化方案:openpyxl 读所有 cell · 拼字符串 · 长度即字符数
+    失败时返 0(后续可降级到默认估值)。
+    """
+    if not file_bytes:
+        return 0
+    fn = (filename or "").lower()
+    try:
+        if fn.endswith(".xlsx") or fn.endswith(".xlsm") or fn.endswith(".xls"):
+            try:
+                import openpyxl, io
+                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+                total = 0
+                for ws in wb.worksheets:
+                    for row in ws.iter_rows(values_only=True):
+                        for c in row:
+                            if c is not None:
+                                total += len(str(c))
+                return total
+            except Exception:
+                try:
+                    import xlrd
+                    wb = xlrd.open_workbook(file_contents=file_bytes)
+                    total = 0
+                    for s in wb.sheets():
+                        for r in range(s.nrows):
+                            for c in s.row_values(r):
+                                if c is not None and c != "":
+                                    total += len(str(c))
+                    return total
+                except Exception:
+                    return 0
+        elif fn.endswith(".csv") or fn.endswith(".tsv") or fn.endswith(".txt"):
+            try:
+                # 去掉前后空白和分隔符 · 估算实际字符
+                return len(file_bytes.decode("utf-8", errors="ignore"))
+            except Exception:
+                return 0
+        elif fn.endswith(".docx") or fn.endswith(".doc"):
+            try:
+                import docx, io
+                doc = docx.Document(io.BytesIO(file_bytes))
+                return sum(len(p.text) for p in doc.paragraphs)
+            except Exception:
+                # 老 .doc 不支持 · 用字节数 / 2 粗估(unicode 2 字节/字符)
+                return max(0, len(file_bytes) // 2)
+    except Exception as e:
+        logger.warning(f"_excel_char_count_estimate error fn={fn}: {e}")
+    return 0
+

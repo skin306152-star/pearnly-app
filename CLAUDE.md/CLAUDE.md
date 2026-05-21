@@ -242,6 +242,26 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 
 **不要做的**:不要在 feature 分支上叠新工作(像 v118.35.0.0 OCR 我犯的错)· 永远从 master 开新分支或直接在 master 干。
 
+### 15. 删后端字段必须同步删 Pydantic response_model(2026-05-21 拍板 · v118.35.0.15 踩坑 · 高优先级)
+
+**症状**:v0.11 我从 `_build_user_info()` 删了 8 个老套餐字段(`plan` / `monthly_quota` / `trial_expires_at` 等)· 但**忘了同步改 Pydantic `UserInfo` model**(那些字段仍是 required)· 导致 `/api/me` 抛 `ResponseValidationError 500`(`type='missing', loc=('response', 'plan')`)· 前端 `_userInfo = null` → `renderSettings()` 早退 → "套餐&用量"面板空白。
+我连改 3 次 CSS/i18n/渲染逻辑都没修好 · 真根因是 API 500 · 不是前端。
+
+**铁律**:
+1. 改后端返回 dict 的字段(增/删/改名)· **必须 grep `class XxxInfo` / `response_model=XxxInfo`** · 同步更新 Pydantic schema
+2. 改 schema 时 · 兼容老调用者:**删字段先改 Optional + default None** · 一个迭代后再真删
+3. 改完**用 token 直接 curl `/api/<endpoint>` 看 HTTP 状态** · 不要只看前端 UI 截图 · 500 是 backend 在喊救命
+4. 前端报"渲染异常 / 数据空 / 早退"· 第一步:`curl -H "Authorization: Bearer $TOKEN" /api/<endpoint>` · 不是 grep CSS
+
+**触发位置自检**(改 _build_xxx / dict 返回时必读):
+- `class UserInfo(BaseModel)` · `class TenantInfo(BaseModel)` · 凡是 FastAPI 路由 `response_model=` 指向的 model
+- 删 dict 字段 → grep `loc=.*'<字段名>'` 看是否有测试 fixture · grep `XxxInfo` model 类
+- 改字段名 → 全局 grep 旧名(后端 + 前端)
+
+**已落实**:
+- v118.35.0.15 修了 UserInfo · 把 8 个老字段全改 Optional · 加了 4 个新 credits 字段
+- 后续删字段:不直删 · 先 Optional 一版 · 部署后下版再删 schema 字段
+
 ---
 
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)

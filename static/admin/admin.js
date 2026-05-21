@@ -160,7 +160,7 @@
         const popup = document.getElementById('admin-lang-popup');
         const label = document.getElementById('admin-lang-label');
         if (!btn || !popup) return;
-        const labelMap = { zh: '中', en: 'EN', th: 'ไทย', ja: '日' };
+        const labelMap = { zh: '中', th: 'ไทย' };
         function _setLabel(lang) {
             popup.querySelectorAll('button[data-admin-lang]').forEach(function (b) {
                 b.classList.toggle('active', b.dataset.adminLang === lang);
@@ -180,15 +180,9 @@
         popup.querySelectorAll('button[data-admin-lang]').forEach(function (b) {
             b.addEventListener('click', function () {
                 const lang = b.dataset.adminLang;
-                if (!['zh', 'th'].includes(lang)) {
-                    _toast(_t('adm-soon') + ' · en/ja');
-                    popup.classList.remove('show');
-                    return;
-                }
                 _applyI18n(lang);
                 _setLabel(lang);
                 popup.classList.remove('show');
-                // 重新渲染当前页(刷新数据内的文案)
                 if (location.pathname === '/admin/users') _renderUsersPage();
                 else _renderCostPage();
             });
@@ -648,6 +642,46 @@
             } else _toast(_t('adm-action-fail'), 'error');
         } catch (e) { _toast(_t('adm-action-fail'), 'error'); }
     };
+
+    // ============ v118.35.0.17 通用输入 modal · 替代 window.prompt ============
+    function _admPrompt(message, opts) {
+        opts = opts || {};
+        return new Promise(resolve => {
+            const old = document.getElementById('adm-prompt-modal');
+            if (old) old.remove();
+            const ov = document.createElement('div');
+            ov.id = 'adm-prompt-modal';
+            ov.className = 'cpw-forgot-overlay';
+            ov.innerHTML =
+                '<div class="cpw-forgot-modal" style="max-width:420px">' +
+                    '<div class="cpw-forgot-head"><div class="cpw-forgot-title">' + _esc(opts.title || message) + '</div></div>' +
+                    '<div class="cpw-forgot-body">' +
+                        '<input type="' + (opts.type || 'text') + '" id="adm-pr-input" ' +
+                            'placeholder="' + _esc(opts.placeholder || '') + '" ' +
+                            'value="' + _esc(opts.defaultValue || '') + '" ' +
+                            'style="width:100%;padding:8px;border-radius:4px;border:1px solid #ddd;box-sizing:border-box">' +
+                    '</div>' +
+                    '<div class="cpw-forgot-foot">' +
+                        '<button class="btn btn-ghost" id="adm-pr-cancel">' + _esc(_t('confirm-cancel')) + '</button>' +
+                        '<button class="btn btn-primary" id="adm-pr-ok">' + _esc(opts.okText || _t('adm-upg-confirm')) + '</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(ov);
+            const inp = ov.querySelector('#adm-pr-input');
+            setTimeout(() => { if (inp) inp.focus(); }, 50);
+            const cleanup = () => ov.remove();
+            const finish = (val) => { cleanup(); resolve(val); };
+            ov.querySelector('#adm-pr-ok').addEventListener('click', () => finish(inp ? inp.value : null));
+            ov.querySelector('#adm-pr-cancel').addEventListener('click', () => finish(null));
+            ov.addEventListener('click', e => { if (e.target === ov) finish(null); });
+            if (inp) {
+                inp.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') { e.preventDefault(); finish(inp.value); }
+                    else if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+                });
+            }
+        });
+    }
 
     // ============ v118.44.1 通用确认 modal ============
     function _admConfirm(message, opts) {
@@ -1230,7 +1264,14 @@
         }
         // 更新余额
         _on('btn-billing-update', 'click', async function () {
-            const input = prompt(_curLang === 'th' ? 'ยอดคงเหลือ Google จริง (THB):' : 'Google 实际余额(THB):');
+            const input = await _admPrompt(
+                _curLang === 'th' ? 'ยอดคงเหลือ Google จริง (THB):' : 'Google 实际余额(THB):',
+                {
+                    title: _curLang === 'th' ? 'อัปเดตยอดคงเหลือ Google' : '更新 Google 余额',
+                    type: 'number',
+                    placeholder: '0.00',
+                }
+            );
             if (!input) return;
             const bal = parseFloat(input);
             if (isNaN(bal) || bal < 0) { _toast(_curLang === 'th' ? 'ตัวเลขไม่ถูกต้อง' : '数字格式错误', 'error'); return; }

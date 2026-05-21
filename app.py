@@ -5378,7 +5378,7 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.35.0.24 · 按用量付费正式启用\n• 计费方式:发票识别按张计费,前 200 张每张 ฿1.50,第 201 张起每张 ฿0.75;Excel / CSV / Word 文件按字符计费,每 50 字符 ฿0.01\n• 余额查看:首页『账户余额』卡片可随时查看当前余额与本月用量\n• 余额不足时上传会清晰提示当前余额,可直接进入充值\n• 单次充值最低 ฿10、上限 ฿500,000\n• 银行流水 Excel 上传支持自动直读,识别更快更稳\n• 系统性能与稳定性持续优化",
+            "zh": "v118.35.0.25 · 按用量付费 + Earn 后台监控\n• 内部:Earn 后台『成本追踪』页底部增加『系统监控』卡片 · 实时显示识别请求数 / 撞限流次数 / 数据库连接占用 · 30 秒自动刷新\n\n— 以下是面向用户的部分(不变) — \n\nv118.35.0.24 · 按用量付费正式启用\n• 计费方式:发票识别按张计费,前 200 张每张 ฿1.50,第 201 张起每张 ฿0.75;Excel / CSV / Word 文件按字符计费,每 50 字符 ฿0.01\n• 余额查看:首页『账户余额』卡片可随时查看当前余额与本月用量\n• 余额不足时上传会清晰提示当前余额,可直接进入充值\n• 单次充值最低 ฿10、上限 ฿500,000\n• 银行流水 Excel 上传支持自动直读,识别更快更稳\n• 系统性能与稳定性持续优化",
             "th": "v118.35.0.22 · ระบบคิดเงินตามการใช้งานเปิดให้บริการแล้ว\n• อัตราค่าบริการ:ใบกำกับภาษี PDF 200 ใบแรก ฿1.50/ใบ · ใบที่ 201 ขึ้นไป ฿0.75/ใบ;ไฟล์ Excel / CSV / Word คิดตามตัวอักษร 50 ตัวอักษร = ฿0.01\n• ตรวจสอบยอด:การ์ด『ยอดคงเหลือ』บนหน้าแรก แสดงยอดและการใช้งานของเดือนนี้\n• เมื่อยอดเงินไม่พอ ระบบจะแสดงยอดปัจจุบันและค่าบริการที่ต้องชำระ พร้อมเข้าหน้าเติมเงินทันที\n• เติมเงินขั้นต่ำ ฿10 · สูงสุดต่อครั้ง ฿500,000\n• อัปโหลดไฟล์ Statement Excel รองรับการอ่านอัตโนมัติ · เร็วและเสถียรขึ้น\n• ปรับปรุงประสิทธิภาพและเสถียรภาพของระบบอย่างต่อเนื่อง",
             "en": "v118.35.0.22 · Pay-as-you-go billing now live\n• Pricing: PDF invoice recognition at ฿1.50 per page for the first 200 pages, ฿0.75 per page from page 201; Excel / CSV / Word imports at ฿0.01 per 50 characters\n• Balance at a glance: the homepage 'Account Balance' card shows your current balance and this month's usage\n• When balance is low, upload prompts clearly show your current balance and the estimated cost, with one-tap access to top up\n• Top-up minimum ฿10, single-transaction cap ฿500,000\n• Bank-statement Excel uploads are now read directly for faster, more reliable results\n• Ongoing performance and stability improvements",
             "ja": "v118.35.0.22 · 従量課金プランの提供を開始\n• 料金体系:PDF 請求書の認識は最初の 200 枚まで 1 枚 ฿1.50、201 枚目から 1 枚 ฿0.75;Excel / CSV / Word の取り込みは 50 文字あたり ฿0.01\n• 残高表示:ホーム画面の『アカウント残高』カードで現在の残高と当月利用量を常時確認可能\n• 残高不足時にはアップロード画面で現在の残高と概算金額を提示し、そのままチャージ画面へ遷移可能\n• チャージは最低 ฿10、1 回あたりの上限 ฿500,000\n• 銀行明細 Excel のアップロードを自動直接読取に対応・より高速で安定\n• システムのパフォーマンスと安定性を継続的に改善",
@@ -7112,6 +7112,17 @@ async def admin_credits_daily_trend(request: Request, days: int = 30):
     _require_super_admin(request)
     days = max(1, min(int(days), 365))
     return {"days": db.get_credits_daily_trend(days=days)}
+
+
+# ============================================================
+# v118.35.0.25 · Earn 监控面板 · Gemini 限流统计 + DB 连接池(只看数据 · 无 LINE 告警)
+# ============================================================
+@app.get("/api/admin/monitoring/overview")
+async def admin_monitoring_overview(request: Request):
+    """监控数据 · Gemini 调用统计 + DB 连接池(超管登录后看)"""
+    _require_super_admin(request)
+    from services.monitoring import get_monitoring_overview
+    return get_monitoring_overview()
 
 
 @app.get("/api/admin/credits/export")

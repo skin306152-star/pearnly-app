@@ -292,7 +292,43 @@
         // v118.35.0.22 · Credits 收入 KPI + 公司清单(并行拉)
         _renderCreditsRevenue();
         _renderCreditsTenants();
+        // v118.35.0.25 · 系统监控(只看 · 不接 LINE)
+        _renderMonitoring();
     }
+
+    // v118.35.0.25 · 系统监控渲染(每 30 秒自动刷新)
+    async function _renderMonitoring() {
+        try {
+            const d = await _adminFetch('/api/admin/monitoring/overview');
+            const g = d.gemini || {};
+            const db_ = d.db_pool || {};
+            _setText('mon-rpm', String(g.rpm_now || 0));
+            const v429 = g.recent_5min_429 || 0;
+            const el429 = document.getElementById('mon-429');
+            if (el429) {
+                el429.textContent = String(v429);
+                el429.style.color = v429 >= 10 ? '#dc2626' : (v429 > 0 ? '#d97706' : '');
+            }
+            _setText('mon-today', String(g.today_total || 0));
+            const lng = _curLang === 'th' ? 'ครั้ง' : '次';
+            _setText('mon-today-sub',
+                (g.today_429 || 0) + ' ' + (_curLang === 'th' ? 'จำกัด' : '限流') + ' · '
+                + (g.today_errors || 0) + ' ' + (_curLang === 'th' ? 'ข้อผิดพลาด' : '失败'));
+            const elDb = document.getElementById('mon-db');
+            if (elDb) {
+                if (db_.available) {
+                    elDb.textContent = db_.used + ' / ' + db_.max;
+                    const ratio = db_.used / db_.max;
+                    elDb.style.color = ratio >= 0.83 ? '#dc2626' : (ratio >= 0.5 ? '#d97706' : '');
+                } else {
+                    elDb.textContent = '—';
+                }
+            }
+        } catch (e) {
+            console.warn('monitoring overview', e);
+        }
+    }
+
 
     // v118.35.0.22 · Credits 收入端 KPI 渲染(从 credit_transactions 拉真实扣费)
     async function _renderCreditsRevenue() {

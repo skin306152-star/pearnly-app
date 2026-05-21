@@ -252,6 +252,36 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                 </div>
             </div>
 
+            <!-- v118.35.0.25 · 系统监控 + LINE 告警 -->
+            <div class="cost-section" style="margin-top:24px">
+                <div class="cost-section-head">
+                    <h3 data-i18n="mon-title">系统监控</h3>
+                    <span class="cost-section-hint" data-i18n="mon-hint">实时数据 · 30 秒刷新</span>
+                </div>
+                <div class="cost-kpi-grid">
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-rpm">当前 RPM</div>
+                        <div class="cost-kpi-value" id="mon-rpm">—</div>
+                        <div class="cost-kpi-sub" data-i18n="mon-rpm-sub">最近 60 秒识别请求数</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-429">5 分钟撞限流</div>
+                        <div class="cost-kpi-value" id="mon-429">—</div>
+                        <div class="cost-kpi-sub" data-i18n="mon-429-sub">≥10 触发 LINE 告警</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-today">今日识别总数</div>
+                        <div class="cost-kpi-value" id="mon-today">—</div>
+                        <div class="cost-kpi-sub" id="mon-today-sub">—</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-db">数据库连接占用</div>
+                        <div class="cost-kpi-value" id="mon-db">—</div>
+                        <div class="cost-kpi-sub" data-i18n="mon-db-sub">高于 25/30 触发告警</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- v118.35.0.22 · 全公司余额清单 -->
             <div class="cost-section">
                 <div class="cost-section-head">

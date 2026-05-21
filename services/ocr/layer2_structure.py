@@ -756,12 +756,28 @@ def _call_gemini_with_retry(
     for attempt in range(max_retries + 1):
         # v118.35.0.5 · 重试时追加"精简输出"指令 · 救 token 上限截断场景
         prompt = base_prompt + (_RETRY_TRIM_HINT if attempt > 0 else "")
+        # v118.35.0.25 · 埋点 · 记 Gemini 调用统计(给 Earn 监控面板 + LINE 告警用)
+        import time as _t_v25
+        _t_start = _t_v25.time()
         try:
             response = model.generate_content(
                 prompt,
                 request_options={"timeout": timeout},
             )
+            try:
+                from services.monitoring import record_gemini_call as _rec
+                _rec(success=True, http_status=200,
+                     latency_ms=int((_t_v25.time() - _t_start) * 1000))
+            except Exception:
+                pass
         except Exception as e:
+            try:
+                from services.monitoring import record_gemini_call as _rec
+                _http = 429 if ("ResourceExhausted" in type(e).__name__ or "429" in str(e)) else 500
+                _rec(success=False, http_status=_http,
+                     latency_ms=int((_t_v25.time() - _t_start) * 1000))
+            except Exception:
+                pass
             # Network / auth / quota / unknown — classify and propagate
             raise _classify_gemini_exception(e) from e
 

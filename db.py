@@ -8676,6 +8676,7 @@ def ensure_credits_tables():
                 ADD COLUMN IF NOT EXISTS is_billing_exempt BOOLEAN NOT NULL DEFAULT FALSE
             """)
 
+
             # 6a. v118.35.0.6 · users 表新增 active_tenant_id(multi-company 切换 ·
             #     auth.py 在 JWT.tenant_id 上 overlay 这个字段 · 不动 token)
             cur.execute("""

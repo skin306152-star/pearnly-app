@@ -1697,119 +1697,7 @@ async def contact():
     }
 
 
-# ============================================================
-# 套餐元数据(前端生成对比表)
-# ============================================================
-@app.get("/api/plans")
-async def plans_metadata():
-    """v0.8 · 新分档:Free 能体验完整工作流,Plus/Pro 拉开量与自动化差距"""
-    return {
-        "plans": [
-            {
-                "id": "free",
-                # 引擎:Free 用普通引擎(EasyOCR)· 保留精准升级提示
-                "engine": "EasyOCR",
-                "engine_label_key": "plan-engine-standard",
-                "engine_secondary": None,
-                # 识别额度
-                "monthly_quota": 50,               # v0.8 改:月 50 张(原来是按 IP 20/日)
-                "daily_quota_per_ip": None,        # 不再用 IP 日限
-                "max_pages_per_upload": 10,
-                "max_file_size_mb": 30,
-                # 基础功能 · Free 开放
-                "can_edit_fields": True,           # v0.8 改:开放字段编辑
-                "can_verify_tax": True,            # v0.8 改:开放 RD 校验(有次数限制)
-                "rd_daily_limit": 5,               # v0.8 新:Free 每天 5 次 RD 校验
-                "can_extract_items": True,
-                # 历史记录
-                "can_view_history": True,          # v0.8 改:开放
-                "history_retention_days": 7,      # v0.8 新:Free 只留 7 天
-                # ERP 推送
-                "can_push_erp": True,              # v0.8 改:允许配置 + 手动推
-                "can_auto_push_erp": False,        # v0.8 新:但不能自动推
-                "endpoints_limit": 1,              # v0.8 新:Free 限 1 个端点
-                # 智能归档
-                "can_archive": True,               # v0.8 新:默认模板可用
-                "can_customize_archive": False,    # v0.8 新:不能改模板
-                "zip_batch_limit": 10,             # v0.8 新:一次最多 10 张 ZIP
-                # 其他自动化(Plus 独有)
-                "can_use_email_ingest": False,
-                "can_use_folder_watch": False,
-                "can_use_smart_alert": False,
-                # 模板/API Key/次级能力
-                "can_use_custom_template": False,
-                "custom_template_limit": 0,
-                "can_manage_api_keys": False,
-                "support_level": "community",
-            },
-            {
-                "id": "plus",
-                "engine": "Gemini Flash",
-                "engine_label_key": "plan-engine-precise",
-                "engine_secondary": "Typhoon OCR",
-                "monthly_quota": 500,
-                "daily_quota_per_ip": None,
-                "max_pages_per_upload": 20,
-                "max_file_size_mb": 50,
-                "can_edit_fields": True,
-                "can_verify_tax": True,
-                "rd_daily_limit": None,            # 无限
-                "can_extract_items": True,
-                "can_view_history": True,
-                "history_retention_days": 90,
-                "can_push_erp": True,
-                "can_auto_push_erp": True,         # 开放自动推
-                "endpoints_limit": 3,
-                "can_archive": True,
-                "can_customize_archive": True,     # 可自定义模板
-                "zip_batch_limit": 100,
-                "can_use_email_ingest": True,
-                "email_ingest_limit": 1,
-                "can_use_folder_watch": True,
-                "folder_watch_limit": 1,
-                "can_use_smart_alert": True,
-                "smart_alert_level": "basic",
-                "can_use_custom_template": True,
-                "custom_template_limit": 3,
-                "typhoon_quota_monthly": 100,
-                "can_manage_api_keys": False,
-                "support_level": "line_email",
-            },
-            {
-                "id": "pro",
-                "engine": "Gemini (Your Key)",
-                "engine_label_key": "plan-engine-precise",
-                "engine_secondary": "Typhoon OCR",
-                "monthly_quota": None,             # 无限
-                "daily_quota_per_ip": None,
-                "max_pages_per_upload": 50,
-                "max_file_size_mb": 100,
-                "can_edit_fields": True,
-                "can_verify_tax": True,
-                "rd_daily_limit": None,
-                "can_extract_items": True,
-                "can_view_history": True,
-                "history_retention_days": 365,
-                "can_push_erp": True,
-                "can_auto_push_erp": True,
-                "endpoints_limit": -1,             # -1 = 无限
-                "can_archive": True,
-                "can_customize_archive": True,
-                "zip_batch_limit": -1,
-                "can_use_email_ingest": True,
-                "email_ingest_limit": 5,
-                "can_use_folder_watch": True,
-                "folder_watch_limit": -1,
-                "can_use_smart_alert": True,
-                "smart_alert_level": "advanced",
-                "can_use_custom_template": True,
-                "custom_template_limit": -1,
-                "typhoon_quota_monthly": 500,
-                "can_manage_api_keys": True,
-                "support_level": "dedicated",
-            },
-        ],
-    }
+# v118.35.0.6 · /api/plans + /api/v1/plans 已下线 · credits 系统接管(legacy/credits-system-5de6cc5 tag)
 
 
 # ============================================================
@@ -2927,9 +2815,7 @@ async def v1_export(req: ExportRequest, request: Request):
     return await ocr_export(req, request)
 
 
-@app.get("/api/v1/plans")
-async def v1_plans():
-    return await plans_metadata()
+# v118.35.0.6 · /api/v1/plans 已下线 · 配套 /api/plans · credits 系统接管
 
 
 @app.get("/api/v1/health")
@@ -5569,10 +5455,10 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.35.0.4 · 新注册改成按量充值(pay-as-you-go)· 不再 3 天 trial:\n• 新注册账号默认 plan=credits · 公司钱包 0 余额 · 充多少用多少 · 不会突然到期被锁\n• 老 trial 账号不动 · 升级路径不变",
-            "th": "v118.35.0.4 · ลงทะเบียนใหม่เปลี่ยนเป็นจ่ายตามการใช้งาน(pay-as-you-go)· ไม่ใช่ทดลอง 3 วัน:\n• บัญชีลงทะเบียนใหม่ใช้ plan=credits · กระเป๋าเงินบริษัทเริ่มที่ 0 · เติมเท่าไรใช้ได้เท่านั้น · ไม่มีหมดอายุกะทันหัน\n• บัญชี trial เดิมไม่กระทบ",
-            "en": "v118.35.0.4 · New signups now pay-as-you-go credits · no more 3-day trial:\n• New accounts default to plan=credits · workspace wallet starts at 0 · top up to use · no surprise expiry\n• Existing trial accounts unaffected",
-            "ja": "v118.35.0.4 · 新規登録を従量課金(クレジット)に変更 · 3 日トライアル廃止:\n• 新規アカウントは plan=credits がデフォルト · ワークスペースの残高は 0 から · チャージした分だけ利用可能 · 突然の期限切れなし\n• 既存のトライアルアカウントには影響なし",
+            "zh": "v118.35.0.6 · credits 后端接通 + 老套餐接口下线:\n• 钱包余额、充值申请、用量明细等 11 个后端接口已接通(后台审批 + 多公司切换都通)\n• 老的 /api/plans 套餐元数据接口已正式下线 · 配额改由按量计费的钱包余额接管\n• 前端充值 UI 下个版本补 · 现在可以走管理后台手工充值",
+            "th": "v118.35.0.6 · เชื่อม credits backend + ปิด API ของแพ็กเกจเก่า:\n• เชื่อมต่อ 11 endpoints หลังบ้านสำหรับ ดูยอด / ขอเติม / ดูการใช้งาน (รวมการอนุมัติของแอดมิน + สลับบริษัท)\n• /api/plans เก่าถูกปิดถาวร · โควตาเปลี่ยนเป็นยอดเงินในกระเป๋าจ่ายตามการใช้งาน\n• UI เติมเงินจะมาในเวอร์ชันถัดไป · ตอนนี้เติมผ่านแอดมินก่อน",
+            "en": "v118.35.0.6 · credits backend wired up · legacy plans API retired:\n• 11 backend endpoints live for balance / topup / usage history (admin approval + multi-company switch all wired)\n• Legacy /api/plans is retired · quota now driven by pay-as-you-go wallet balance\n• Top-up UI ships next version · for now top-ups go through admin manual approval",
+            "ja": "v118.35.0.6 · credits バックエンド接続 · 旧プラン API 廃止:\n• 残高 / チャージ / 利用履歴の 11 個のエンドポイントを接続(管理者承認 + マルチ会社切り替え含む)\n• 旧 /api/plans は廃止 · 配額は従量課金ウォレット残高に変更\n• チャージ UI は次バージョンで実装 · 当面は管理者手動承認で対応",
             "release_notes_archived_v34_39": "v118.34.39 · 设置弹窗滚动彻底修好 · 用户 DevTools 诊断抓出真正 bug:\n• 用户在 zoom 142% / viewport 659px 时测出: modal max-height 是 560px (正确) 但 layout + side-nav 被 align-items:stretch + flex:1 撑成 611px (内容高度) · 超出 modal 90px · 被 modal overflow:hidden 切掉 · '联系我们' 永远看不到\n• 根因: 之前靠 min-height:0 + flex shrink chain 让 flex item 缩到父容器 · 实际 flex 默认 min-height:auto 导致 item 至少跟内容一样高 · 我的 min-height:0 没起到预期作用\n• 修: 放弃 flex stretch 推力 · 直接给 side-nav 设 max-height: calc(min(85vh, 100vh - 64px) - 80px) · 用 calc 卡死最大高 · 不再依赖 flex chain · 现在 overflow-y:scroll 必然触发\n• cache-bust v=11834938 → 11834939\n\n累积 fix 包含: 对账中心 78 条 4 语术语统一 · Excel sheet 名 รายละเอียดบัญชี → รายละเอียดSTATEMENT · ERP 集成页布局 · 设置弹窗响应式 + 滚动条 · Xero/MR.ERP 卡同高 · nginx pre-gzipped 陈旧 .gz 自动清除",
             "release_notes_archived_v34_33": "v118.34.33 · 批 1 · OCR 自动归属客户 + 不 retry 用户数据错 + 日志加客户/ERP 列:\n• 改动 1 OCR 完自动 resolve client_id:按 buyer_name + buyer_tax 匹配 Pearnly 客户表(税号 0.98 / 完全名 0.95 / substring 0.80-0.90 / 学习记忆 1.0)· ≥0.95 自动绑 + 学习下次 · 0.80-0.95 标 suggested_client_id · <0.80 不绑 · 没归属的发票直接不入 auto-push 队列(不再炸 ERR_NO_CLIENT)\n• 改动 3 retry 区分用户数据错:USER_DATA_ERROR_CODES (NO_CLIENT/NO_CUSTOMER_MAPPING/NO_INVOICE_NO/DATE_FUTURE/DUPLICATE_INVOICE 等) + 泰文 raw 模式 · 这类错不进重试队列 · retry worker 命中也立刻摘队列\n• 改动 5 日志列表加 Pearnly 客户列:LEFT JOIN clients · UI 显示 client_name · 未归属灰色「未归属」+ tip\n• 改动 8 顺便做 ERP 列:LEFT JOIN erp_endpoints · 显示 endpoint.name(用户起的)\n• 新 db 表 buyer_to_client_memory · 用户在抽屉 assign 时学习 buyer→client · 下次 OCR 自动归属",
             "release_notes_archived_v34_28": "v118.34.28 · 死链修:derive_mrerp_invoice_no seq 不再写死 001:\n• 根因:第一笔 push 成功 → bill_no SI690519-001 · 第二笔 push (同一天) MR.ERP 报「เลขที่ดังกล่าวมีอยู่ในระบบแล้ว(已存在)」· 因为 derive_mrerp_invoice_no seq 写死 \"001\" · 同一天所有 push 都 derive YYMMDD-001 撞\n• 之前的 docstring 写「序号取 history.id 末 3 位 hex 转 dec mod 1000」但代码写错成 hardcode \"001\" · 注释和实现不一致\n• 修:按 docstring 真实现 · 用 history.id 末 6 位 hex 转 dec mod 999 + 1 (避开 000)· 同一 history 重传幂等 · 不同 history 序号不同\n• 测试: 5 个 uuid → 5 个不同 seq (460/272/732/705/078) · 同 uuid 两次 → 同 seq (441/441) · 幂等保证\n\n现在可以并发推多笔 · 不会撞 invoice_no",
@@ -9493,6 +9379,623 @@ async def xero_push(history_id: str, request: Request):
     except Exception as e:
         logger.warning(f"[xero_manual] 写 push_log(fail)失败: {e}")
     raise HTTPException(http_st or 400, detail=f"xero.{err_code.lower()}")
+
+
+
+
+# ============================================================
+# v118.35.0.6 · credits 后端 11 接口 + multi-company 切换 + topup 审核
+# 从 legacy/credits-system-5de6cc5 cherry-pick surgery (D1 方案 · 只接
+# 后端 · 前端 home.js/home.html/home.css 不动 · 充值 UI 暂缺 v36 补)
+# ============================================================
+
+def send_topup_approved_email(tenant_id, amount_thb, new_balance):
+    """v118.35.0.6 · 占位 noop · v36 真接邮件再实现."""
+    logger.info(f"[email-stub] topup_approved tenant={str(tenant_id)[:8]} amt={amount_thb} bal={new_balance}")
+
+
+@app.get("/api/me/credits")
+async def get_my_credits(request: Request):
+    """查询账户余额和用量（区分老板/员工视角）"""
+    import datetime as _dt
+    user = get_current_user_from_request(request)
+    user_id = str(user.get("id", ""))
+    tenant_id = user.get("tenant_id")
+    is_exempt = bool(user.get("is_billing_exempt", False))
+    # 老板 = 自己注册（invited_by IS NULL）；员工 = 被老板邀请创建
+    is_owner = user.get("invited_by") is None
+
+    if not tenant_id:
+        return {"has_tenant": False, "is_owner": is_owner}
+
+    tid = str(tenant_id)
+    # Task 6A · Asia/Bangkok 时区(UTC+7)· 与 deduct_company_credits 锚点一致
+    _bkk = _dt.timezone(_dt.timedelta(hours=7))
+    year_month = _dt.datetime.now(_bkk).strftime("%Y-%m")
+
+    if is_owner:
+        balance_thb = 0.0
+        pages_this_month = 0
+        try:
+            with db.get_cursor() as cur:
+                cur.execute("SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s", (tid,))
+                row = cur.fetchone()
+                if row:
+                    balance_thb = float(row[0])
+                cur.execute(
+                    "SELECT pages_used FROM monthly_page_usage WHERE tenant_id = %s AND year_month = %s",
+                    (tid, year_month),
+                )
+                row = cur.fetchone()
+                if row:
+                    pages_this_month = int(row[0])
+        except Exception as e:
+            logger.warning(f"get_my_credits owner DB: {e}")
+
+        # 按用户拆分本月识别量（从 ocr_history 统计）
+        user_breakdown = []
+        try:
+            with db.get_cursor() as cur:
+                cur.execute("""
+                    SELECT h.user_id::text,
+                           COALESCE(u.username, split_part(u.email, '@', 1)) AS name,
+                           COUNT(*) AS invoice_count
+                    FROM ocr_history h
+                    LEFT JOIN users u ON u.id::text = h.user_id::text
+                    WHERE h.user_id::text IN (
+                        SELECT id::text FROM users WHERE tenant_id = %s
+                    )
+                      AND DATE_TRUNC('month', h.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                    GROUP BY h.user_id, u.username, u.email
+                    ORDER BY invoice_count DESC
+                    LIMIT 10
+                """, (tid,))
+                rows = cur.fetchall()
+                user_breakdown = [
+                    {"name": r["name"], "count": int(r["invoice_count"])}
+                    for r in rows
+                ]
+        except Exception as e:
+            logger.warning(f"get_my_credits breakdown: {e}")
+
+        return {
+            "has_tenant": True,
+            "is_owner": True,
+            "is_billing_exempt": is_exempt,
+            "balance_thb": balance_thb,
+            "pages_this_month": pages_this_month,
+            "tier_threshold": 200,
+            "current_rate": 0.75 if pages_this_month >= 200 else 1.5,
+            "user_breakdown": user_breakdown,
+        }
+    else:
+        # 员工：只返回自己本月发票数，不暴露任何余额/金额信息
+        my_count = 0
+        try:
+            with db.get_cursor() as cur:
+                cur.execute("""
+                    SELECT COUNT(*) AS cnt
+                    FROM ocr_history
+                    WHERE user_id::text = %s
+                      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                """, (user_id,))
+                row = cur.fetchone()
+                if row:
+                    my_count = int(row[0])
+        except Exception as e:
+            logger.warning(f"get_my_credits employee count: {e}")
+
+        return {
+            "has_tenant": True,
+            "is_owner": False,
+            "my_invoice_count": my_count,
+        }
+
+
+# ============================================================
+# 充值申请 · 用户端 + 管理端
+# ============================================================
+
+async def _verify_slip_with_slipok(slip_abs_path: str, expected_amount_thb: float) -> dict:
+    """验证泰国转账截图. ok=None → 未配置key, 走人工审核; ok=False → 验证未通过; ok=True → 自动approve."""
+    import httpx as _httpx
+    api_key = os.environ.get("SLIPOK_API_KEY", "")
+    branch_id = os.environ.get("SLIPOK_BRANCH_ID", "")
+    if not api_key or not branch_id:
+        return {"ok": None, "error": "SLIPOK_API_KEY/SLIPOK_BRANCH_ID not configured"}
+    try:
+        fname = os.path.basename(slip_abs_path)
+        mime = "image/png" if fname.endswith(".png") else "application/pdf" if fname.endswith(".pdf") else "image/jpeg"
+        with open(slip_abs_path, "rb") as f:
+            file_data = f.read()
+        async with _httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"https://api.slipok.com/api/line/apikey/{branch_id}",
+                headers={"x-authorization": api_key},
+                files={"files": (fname, file_data, mime)},
+                data={"log": "true"},
+            )
+        if resp.status_code != 200:
+            logger.warning(f"SlipOK HTTP {resp.status_code}: {resp.text[:300]}")
+            return {"ok": None, "error": f"SlipOK HTTP {resp.status_code}"}
+        body = resp.json()
+        if not body.get("success"):
+            logger.warning(f"SlipOK !success: {body}")
+            return {"ok": False, "error": str(body.get("message", "verification failed"))}
+        d = body.get("data", {})
+        verified_amount = float(d.get("amount", 0))
+        sender = (d.get("sender") or {}).get("displayName", "")
+        receiver = (d.get("receiver") or {}).get("displayName", "")
+        transaction_id = d.get("transRef", "")
+        amount_ok = abs(verified_amount - expected_amount_thb) <= 1.0
+        logger.info(f"SlipOK result: verified={verified_amount} expected={expected_amount_thb} ok={amount_ok} ref={transaction_id}")
+        return {
+            "ok": amount_ok,
+            "verified_amount": verified_amount,
+            "sender": sender,
+            "receiver": receiver,
+            "transaction_id": transaction_id,
+            "error": "" if amount_ok else f"amount {verified_amount} ≠ expected {expected_amount_thb}",
+        }
+    except Exception as e:
+        logger.warning(f"_verify_slip_with_slipok exception: {e}")
+        return {"ok": None, "error": str(e)}
+
+
+class _TopupRequestBody(BaseModel):
+    amount_thb: float = Field(..., gt=0, le=500000)
+    payer_name: str = Field("", max_length=200)
+    note: str = Field("", max_length=500)
+
+class _AdminTopupApproveBody(BaseModel):
+    actual_amount_thb: float = Field(..., gt=0)
+    note: str = Field("", max_length=500)
+
+class _AdminTopupRejectBody(BaseModel):
+    note: str = Field("", max_length=500)
+
+
+# ============================================================
+# Multi-company (Task 3 · 不动 JWT · 用 users.active_tenant_id)
+# ============================================================
+
+class _SwitchCompanyBody(BaseModel):
+    tenant_id: str = Field(..., min_length=8)
+
+
+@app.get("/api/my-companies")
+async def my_companies(request: Request):
+    """返回当前用户隶属的所有公司列表 · 含 balance(仅 admin 角色可见) + 月用量"""
+    user = get_current_user_from_request(request)
+    user_id = str(user.get("id", ""))
+    if not user_id:
+        raise HTTPException(401, detail="auth.required")
+
+    items = db.list_user_companies(user_id)
+
+    # 取 active_tenant_id(若未设置则降级到 tenant_id)
+    active_tid = None
+    try:
+        with db.get_cursor() as cur:
+            cur.execute(
+                "SELECT active_tenant_id, tenant_id FROM users WHERE id = %s::uuid",
+                (user_id,)
+            )
+            row = cur.fetchone()
+            if row:
+                active_tid = str(row.get("active_tenant_id") or row.get("tenant_id") or "")
+    except Exception as _e:
+        logger.warning(f"my_companies active_tid lookup failed: {_e}")
+
+    # admin 才看 balance · member 屏蔽 balance 字段(置 None)
+    out = []
+    for it in items:
+        is_admin = (it.get("role") == "admin")
+        out.append({
+            "tenant_id": it["tenant_id"],
+            "name": it["name"],
+            "role": it["role"],
+            "balance_thb": (it["balance_thb"] if is_admin else None),
+            "pages_this_month": it["pages_this_month"],
+            "is_active_tenant": (it["tenant_id"] == active_tid),
+        })
+    return {"companies": out, "active_tenant_id": active_tid}
+
+
+@app.post("/api/switch-company")
+async def switch_company(body: _SwitchCompanyBody, request: Request):
+    """切换当前活动公司 · 校验归属后更新 users.active_tenant_id"""
+    user = get_current_user_from_request(request)
+    user_id = str(user.get("id", ""))
+    if not user_id:
+        raise HTTPException(401, detail="auth.required")
+    ok = db.set_user_active_tenant(user_id, body.tenant_id)
+    if not ok:
+        raise HTTPException(403, detail="company.not_member")
+    return {"ok": True, "active_tenant_id": body.tenant_id}
+
+
+@app.post("/api/credits/topup/request")
+async def credits_topup_request(req: _TopupRequestBody, request: Request):
+    user = get_current_user_from_request(request)
+    if user.get("invited_by") is not None:
+        raise HTTPException(403, detail="credits.owner_only")
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(400, detail="credits.no_tenant")
+    with db.get_cursor(commit=True) as cur:
+        cur.execute("""
+            INSERT INTO topup_requests (tenant_id, requested_by, amount_thb, payer_name, note)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
+        """, (str(tenant_id), str(user["id"]), req.amount_thb,
+              req.payer_name.strip(), req.note.strip()))
+        request_id = cur.fetchone()["id"]
+    return {"request_id": request_id, "status": "pending"}
+
+
+@app.post("/api/credits/topup/upload-slip/{request_id}")
+async def credits_topup_upload_slip(request_id: int, request: Request, file: UploadFile = File(...)):
+    user = get_current_user_from_request(request)
+    uid = str(user.get("id", ""))
+    tid = str(user.get("tenant_id") or "")
+    with db.get_cursor() as cur:
+        cur.execute("SELECT tenant_id, status, amount_thb FROM topup_requests WHERE id = %s", (request_id,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, detail="topup.not_found")
+    if str(row["tenant_id"]) != tid:
+        raise HTTPException(403, detail="topup.forbidden")
+    if row["status"] != "pending":
+        raise HTTPException(400, detail="topup.already_reviewed")
+    expected_amount = float(row["amount_thb"])
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(413, detail="topup.file_too_large")
+    slips_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "slips")
+    os.makedirs(slips_dir, exist_ok=True)
+    fname = (file.filename or "slip.jpg").lower()
+    ext = ".png" if fname.endswith(".png") else ".pdf" if fname.endswith(".pdf") else ".jpg"
+    slip_filename = f"{request_id}{ext}"
+    slip_abs = os.path.join(slips_dir, slip_filename)
+    with open(slip_abs, "wb") as fp:
+        fp.write(content)
+    with db.get_cursor(commit=True) as cur:
+        cur.execute("UPDATE topup_requests SET slip_path = %s WHERE id = %s",
+                    (f"slips/{slip_filename}", request_id))
+    # ── SlipOK 自动验证 ──────────────────────────────────────────
+    slipok = await _verify_slip_with_slipok(slip_abs, expected_amount)
+    if slipok.get("ok") is True:
+        verified_amount = slipok["verified_amount"]
+        ref = slipok.get("transaction_id", "")
+        try:
+            with db.get_cursor(commit=True) as cur:
+                cur.execute("""UPDATE topup_requests SET status='approved', reviewed_at=NOW(),
+                    review_note=%s, amount_thb=%s WHERE id=%s""",
+                    (f"SlipOK auto-approved · ref={ref}", verified_amount, request_id))
+                cur.execute("""INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
+                    ON CONFLICT (tenant_id) DO UPDATE
+                    SET balance_thb = tenant_credits.balance_thb + %s, updated_at = NOW()
+                    RETURNING balance_thb""", (tid, verified_amount, verified_amount))
+                new_balance = float(cur.fetchone()["balance_thb"])
+                cur.execute("""INSERT INTO credit_transactions
+                    (tenant_id, user_id, type, amount_thb, balance_after, description)
+                    VALUES (%s::uuid, %s::uuid, 'topup', %s, %s, %s)""",
+                    (tid, uid, verified_amount, new_balance,
+                     f"SlipOK自动充值 · #{request_id} · ref={ref}"))
+            logger.info(f"[topup] SlipOK auto-approved #{request_id} ฿{verified_amount} tenant={tid[:8]}")
+            return {"ok": True, "auto_approved": True, "balance_thb": new_balance,
+                    "slip_path": f"slips/{slip_filename}"}
+        except Exception as e:
+            logger.error(f"SlipOK auto-approve DB error: {e}")
+            # Fall through to manual review
+    # ── 人工审核 (no key, ok=False, or auto-approve DB error) ────
+    return {"ok": True, "auto_approved": False, "slip_path": f"slips/{slip_filename}"}
+
+
+@app.get("/api/credits/topup/history")
+async def credits_topup_history(request: Request):
+    user = get_current_user_from_request(request)
+    tid = str(user.get("tenant_id") or "")
+    if not tid:
+        return []
+    with db.get_cursor() as cur:
+        cur.execute("""
+            SELECT id, amount_thb, payer_name, note, status, slip_path,
+                   review_note, created_at, reviewed_at
+            FROM topup_requests WHERE tenant_id = %s
+            ORDER BY created_at DESC LIMIT 20
+        """, (tid,))
+        rows = cur.fetchall()
+    return [
+        {"id": r["id"], "amount_thb": float(r["amount_thb"]),
+         "payer_name": r["payer_name"] or "", "note": r["note"] or "",
+         "status": r["status"], "slip_path": r["slip_path"],
+         "review_note": r["review_note"] or "",
+         "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+         "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None}
+        for r in rows
+    ]
+
+
+@app.get("/api/credits/usage-history")
+async def credits_usage_history(request: Request, page: int = 1, per_page: int = 20, user_id: str = None):
+    user = get_current_user_from_request(request)
+    tid = str(user.get("tenant_id") or "")
+    if not tid:
+        return {"rows": [], "total": 0, "page": page, "per_page": per_page, "is_owner": False, "members": []}
+    is_owner = user.get("invited_by") is None
+    if not is_owner:
+        user_id = str(user["id"])
+    per_page = min(50, max(1, per_page))
+    offset = (max(1, page) - 1) * per_page
+    uid_sql = "AND ct.user_id = %s::uuid" if user_id else ""
+    uid_params = [user_id] if user_id else []
+    try:
+        with db.get_cursor() as cur:
+            cur.execute(f"""
+                SELECT COUNT(*) AS n FROM credit_transactions ct
+                WHERE ct.tenant_id = %s::uuid AND ct.type = 'usage' {uid_sql}
+            """, [tid] + uid_params)
+            total = int(cur.fetchone()["n"])
+            cur.execute(f"""
+                SELECT
+                    ct.created_at, ct.pages, ct.amount_thb AS cost_thb, ct.balance_after,
+                    u.email AS user_email, u.username AS user_name,
+                    oh.filename
+                FROM credit_transactions ct
+                LEFT JOIN users u ON u.id = ct.user_id::uuid
+                LEFT JOIN ocr_history oh
+                    ON oh.user_id = ct.user_id::uuid
+                    AND oh.tenant_id = ct.tenant_id::uuid
+                    AND ct.description LIKE '%% · ' || LEFT(oh.id::text, 8)
+                WHERE ct.tenant_id = %s::uuid AND ct.type = 'usage' {uid_sql}
+                ORDER BY ct.created_at DESC
+                LIMIT %s OFFSET %s
+            """, [tid] + uid_params + [per_page, offset])
+            rows = cur.fetchall()
+    except Exception as e:
+        logger.warning(f"credits_usage_history: {e}")
+        return {"rows": [], "total": 0, "page": page, "per_page": per_page, "is_owner": is_owner, "members": []}
+    members = []
+    if is_owner:
+        try:
+            with db.get_cursor() as cur:
+                cur.execute("""
+                    SELECT id, email, username FROM users
+                    WHERE tenant_id = %s::uuid AND is_active = TRUE ORDER BY email
+                """, (tid,))
+                members = [{"id": str(r["id"]), "email": r["email"] or "", "username": r["username"] or ""} for r in cur.fetchall()]
+        except Exception:
+            pass
+    return {
+        "is_owner": is_owner,
+        "rows": [{
+            "date": r["created_at"].isoformat() if r["created_at"] else None,
+            "user_email": r["user_email"] or "",
+            "user_name": r["user_name"] or "",
+            "filename": r["filename"] or "",
+            "pages": int(r["pages"] or 0),
+            "cost_thb": float(r["cost_thb"] or 0),
+            "balance_after": float(r["balance_after"]) if r["balance_after"] is not None else None,
+        } for r in rows],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "members": members,
+    }
+
+
+@app.get("/api/credits/usage-report")
+async def credits_usage_report(
+    request: Request,
+    start_date: str = None,
+    end_date: str = None,
+    format: str = "pdf",
+    user_id: str = None,
+    lang: str = "zh",
+):
+    """导出使用明细报告 · PDF/XLSX · 按用户分组."""
+    import datetime as _dt
+    import usage_report as _ur
+
+    user = get_current_user_from_request(request)
+    tid = str(user.get("tenant_id") or "")
+    if not tid:
+        raise HTTPException(status_code=400, detail="no_tenant")
+
+    is_owner = user.get("invited_by") is None
+    if not is_owner:
+        user_id = str(user["id"])  # 员工只能导出自己
+
+    today = _dt.date.today()
+    try:
+        if start_date:
+            sd = _dt.date.fromisoformat(start_date)
+        else:
+            sd = today.replace(day=1)
+        if end_date:
+            ed = _dt.date.fromisoformat(end_date)
+        else:
+            ed = today
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid_date")
+
+    if ed < sd:
+        raise HTTPException(status_code=400, detail="end_before_start")
+
+    fmt = (format or "pdf").lower()
+    if fmt not in ("pdf", "xlsx"):
+        raise HTTPException(status_code=400, detail="invalid_format")
+    if lang not in ("zh", "en", "th", "ja"):
+        lang = "zh"
+
+    ed_exclusive = ed + _dt.timedelta(days=1)
+
+    uid_sql = ""
+    uid_params: list = []
+    if user_id:
+        uid_sql = "AND ct.user_id = %s::uuid"
+        uid_params = [user_id]
+
+    rows: list = []
+    company = ""
+    try:
+        with db.get_cursor() as cur:
+            cur.execute("SELECT name FROM tenants WHERE id = %s::uuid", (tid,))
+            trow = cur.fetchone()
+            if trow:
+                company = trow.get("name") or ""
+            cur.execute(f"""
+                SELECT
+                    ct.user_id::text AS user_id,
+                    ct.created_at,
+                    ct.pages,
+                    ct.amount_thb AS cost_thb,
+                    u.email AS user_email,
+                    u.username AS user_name,
+                    oh.filename
+                FROM credit_transactions ct
+                LEFT JOIN users u ON u.id = ct.user_id::uuid
+                LEFT JOIN ocr_history oh
+                    ON oh.user_id = ct.user_id::uuid
+                    AND oh.tenant_id = ct.tenant_id::uuid
+                    AND ct.description LIKE '%% · ' || LEFT(oh.id::text, 8)
+                WHERE ct.tenant_id = %s::uuid
+                  AND ct.type = 'usage'
+                  AND ct.created_at >= %s
+                  AND ct.created_at < %s
+                  {uid_sql}
+                ORDER BY u.email NULLS LAST, ct.created_at ASC
+            """, [tid, sd, ed_exclusive] + uid_params)
+            for r in cur.fetchall():
+                rows.append({
+                    "user_id": r["user_id"],
+                    "date": r["created_at"].isoformat() if r["created_at"] else None,
+                    "pages": int(r["pages"] or 0),
+                    "cost_thb": float(r["cost_thb"] or 0),
+                    "user_email": r["user_email"] or "",
+                    "user_name": r["user_name"] or "",
+                    "filename": r["filename"] or "",
+                })
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"credits_usage_report query: {e}")
+        raise HTTPException(status_code=500, detail="query_failed")
+
+    safe_tenant = "".join(ch for ch in (company or "tenant") if ch.isalnum() or ch in "-_")[:24] or "tenant"
+    fname_stem = f"pearnly_usage_{safe_tenant}_{sd.strftime('%Y%m%d')}_{ed.strftime('%Y%m%d')}"
+
+    try:
+        if fmt == "pdf":
+            data = _ur.build_pdf(
+                lang=lang, company=company or "—",
+                start_date=sd.isoformat(), end_date=ed.isoformat(), rows=rows,
+            )
+            return Response(
+                content=data, media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{fname_stem}.pdf"'},
+            )
+        else:
+            data = _ur.build_xlsx(
+                lang=lang, company=company or "—",
+                start_date=sd.isoformat(), end_date=ed.isoformat(), rows=rows,
+            )
+            return Response(
+                content=data,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f'attachment; filename="{fname_stem}.xlsx"'},
+            )
+    except Exception as e:
+        logger.error(f"credits_usage_report build {fmt}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"build_failed: {e}")
+
+
+@app.get("/api/admin/credits/topup/requests")
+async def admin_topup_list(request: Request, status: str = "pending"):
+    _require_super_admin(request)
+    where = "" if status == "all" else "WHERE tr.status = %s"
+    params = () if status == "all" else (status,)
+    with db.get_cursor() as cur:
+        cur.execute(f"""
+            SELECT tr.id, tr.amount_thb, tr.payer_name, tr.note,
+                   tr.status, tr.slip_path, tr.review_note,
+                   tr.created_at, tr.reviewed_at,
+                   u.username, u.email, t.name AS tenant_name
+            FROM topup_requests tr
+            LEFT JOIN users u ON u.id = tr.requested_by
+            LEFT JOIN tenants t ON t.id = tr.tenant_id
+            {where}
+            ORDER BY tr.created_at DESC LIMIT 100
+        """, params)
+        rows = cur.fetchall()
+    return [
+        {"id": r["id"], "amount_thb": float(r["amount_thb"]),
+         "payer_name": r["payer_name"] or "", "note": r["note"] or "",
+         "status": r["status"], "slip_path": r["slip_path"] or "",
+         "review_note": r["review_note"] or "",
+         "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+         "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None,
+         "username": r["username"] or "", "email": r["email"] or "",
+         "tenant_name": r["tenant_name"] or ""}
+        for r in rows
+    ]
+
+
+@app.post("/api/admin/credits/topup/approve/{request_id}")
+async def admin_topup_approve(request_id: int, body: _AdminTopupApproveBody, request: Request):
+    _require_super_admin(request)
+    admin_user = get_current_user_from_request(request)
+    admin_id = str(admin_user["id"])
+    with db.get_cursor(commit=True) as cur:
+        cur.execute(
+            "SELECT tenant_id, status FROM topup_requests WHERE id = %s FOR UPDATE",
+            (request_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, detail="topup.not_found")
+        if row["status"] != "pending":
+            raise HTTPException(400, detail="topup.already_reviewed")
+        tid = str(row["tenant_id"])
+        amt = body.actual_amount_thb
+        cur.execute("""UPDATE topup_requests SET status='approved', reviewed_by=%s,
+            reviewed_at=NOW(), review_note=%s, amount_thb=%s WHERE id=%s""",
+            (admin_id, body.note, amt, request_id))
+        cur.execute("""INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
+            ON CONFLICT (tenant_id) DO UPDATE
+            SET balance_thb = tenant_credits.balance_thb + %s, updated_at = NOW()
+            RETURNING balance_thb""", (tid, amt, amt))
+        new_balance = float(cur.fetchone()["balance_thb"])
+        cur.execute("""INSERT INTO credit_transactions
+            (tenant_id, user_id, type, amount_thb, balance_after, description)
+            VALUES (%s, %s, 'topup', %s, %s, %s)""",
+            (tid, admin_id, amt, new_balance, f"充值审核通过 · 申请#{request_id}"))
+    # Task 5 · 通知 tenant owner(失败不影响主流程)
+    try:
+        send_topup_approved_email(tid, amt, new_balance)
+    except Exception as _e:
+        logger.warning(f"[email] topup_approved trigger skipped: {_e}")
+    return {"ok": True, "new_balance": new_balance}
+
+
+@app.post("/api/admin/credits/topup/reject/{request_id}")
+async def admin_topup_reject(request_id: int, body: _AdminTopupRejectBody, request: Request):
+    _require_super_admin(request)
+    admin_user = get_current_user_from_request(request)
+    admin_id = str(admin_user["id"])
+    with db.get_cursor(commit=True) as cur:
+        cur.execute("SELECT status FROM topup_requests WHERE id = %s", (request_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, detail="topup.not_found")
+        if row["status"] != "pending":
+            raise HTTPException(400, detail="topup.already_reviewed")
+        cur.execute("""UPDATE topup_requests SET status='rejected', reviewed_by=%s,
+            reviewed_at=NOW(), review_note=%s WHERE id=%s""",
+            (admin_id, body.note, request_id))
+    return {"ok": True}
+
+
 
 
 if __name__ == "__main__":

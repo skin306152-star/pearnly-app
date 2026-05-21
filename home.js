@@ -19284,9 +19284,57 @@ async function deleteEndpoint(endpointId) {
             ...(pi.gl_files   || []).map(f => ({...f, _type:'gl',   _extra: (f.accounts||[]).join(', ')})),
         ];
 
+        // v118.35.0.19 · 错误提示词翻译层:把后端 raw 技术错误翻译成用户能懂的话(4 语)
+        const _ERR_MAP = {
+            stmt_headers_not_found: {zh:'认不出表头列 · 请确认文件含日期/金额/余额列',
+                                     th:'หาคอลัมน์หัวตารางไม่เจอ · ตรวจสอบไฟล์มีวันที่/จำนวนเงิน/ยอดคงเหลือ',
+                                     en:'Cannot detect column headers · ensure file has date/amount/balance columns',
+                                     ja:'列ヘッダーが認識できません · 日付/金額/残高列を確認してください'},
+            stmt_no_rows: {zh:'文件里没有交易数据 · 请确认上传了正确的银行流水',
+                           th:'ไม่พบรายการธุรกรรมในไฟล์ · ตรวจสอบว่าอัปโหลด statement ที่ถูกต้อง',
+                           en:'No transaction rows found · please check the file',
+                           ja:'取引データが見つかりません · ファイルを確認してください'},
+            file_not_supported: {zh:'不支持此文件类型 · 请上传 PDF / 图片 / Excel / CSV',
+                                 th:'ไม่รองรับไฟล์ประเภทนี้ · กรุณาอัปโหลด PDF / รูปภาพ / Excel / CSV',
+                                 en:'File type not supported · please upload PDF / image / Excel / CSV',
+                                 ja:'このファイル形式は非対応 · PDF / 画像 / Excel / CSV をアップロード'},
+            file_unreadable: {zh:'文件无法读取 · 可能已损坏或被加密',
+                              th:'อ่านไฟล์ไม่ได้ · อาจเสียหายหรือถูกเข้ารหัส',
+                              en:'File cannot be read · may be corrupted or encrypted',
+                              ja:'ファイルを読み取れません · 破損または暗号化の可能性'},
+            ocr_failed: {zh:'文件识别失败 · 请尝试更清晰的版本或换 PDF 格式重传',
+                         th:'อ่านไฟล์ไม่ออก · ลองเวอร์ชันที่ชัดเจนกว่าหรือเปลี่ยนเป็น PDF',
+                         en:'Could not read file · try a clearer version or upload as PDF',
+                         ja:'読み取り失敗 · より鮮明なファイルまたは PDF 形式で再試行'},
+            gl_headers_not_found: {zh:'认不出总账表头 · 请确认文件含科目/借方/贷方列',
+                                   th:'หาหัวคอลัมน์ GL ไม่เจอ · ตรวจสอบมีคอลัมน์บัญชี/เดบิต/เครดิต',
+                                   en:'Cannot detect GL column headers · ensure account/debit/credit columns exist',
+                                   ja:'GL 列ヘッダー認識不可 · 科目/借方/貸方列を確認してください'},
+        };
+        // raw error → error_code 正则映射(后端老路径未带 code 时兜底)
+        const _rawToCode = raw => {
+            const r = String(raw || '');
+            if (/Cannot detect bank statement column headers/i.test(r)) return 'stmt_headers_not_found';
+            if (/Cannot detect GL column headers/i.test(r)) return 'gl_headers_not_found';
+            if (/No transaction rows found|no pages parsed/i.test(r)) return 'stmt_no_rows';
+            if (/unsupported format/i.test(r)) return 'file_not_supported';
+            if (/Cannot read Excel|file_unreadable/i.test(r)) return 'file_unreadable';
+            if (/Gemini.*invalid JSON|Gemini.*parsed but failed|validation errors|BankStatementDocument schema|layer2:|layer1:/i.test(r)) return 'ocr_failed';
+            return null;
+        };
+        const _humanizeReconError = (row) => {
+            const code = row.error_code || _rawToCode(row.error);
+            if (code && _ERR_MAP[code]) {
+                const lng = window._currentLang || 'zh';
+                return _ERR_MAP[code][lng] || _ERR_MAP[code].zh;
+            }
+            // 无法翻译 → 用通用 + 截断 raw(供技术支持参考)
+            return String(row.error || '').slice(0, 80);
+        };
+
         const statusCell = row => {
             if (!row.ok && row.error)
-                return `<span style="color:#dc2626">${t('fail')} — ${esc2(String(row.error).slice(0,60))}</span>`;
+                return `<span style="color:#dc2626">${t('fail')} — ${esc2(_humanizeReconError(row))}</span>`;
             if (!row.rows)
                 return `<span style="color:#d97706">${t('warn')}</span>`;
             return `<span style="color:#059669">${t('ok')} (${row.rows})</span>`;

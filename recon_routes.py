@@ -1253,17 +1253,19 @@ async def bank_v2_run(
     stmt_results = await asyncio.gather(*[_parse_stmt(b, fn) for b, fn in stmt_data])
     gl_results = await asyncio.gather(*[_parse_gl(b, fn) for b, fn in gl_data])
 
-    # Build per-file parse diagnostics (always included in every response)
+    # v118.35.0.19 · per-file parse diagnostics 带 error_code 字段 · 前端用它做 i18n 翻译
     parse_info = {
         "stmt_files": [
             {"file": fn, "rows": len(r.get("rows") or []),
              "ok": r.get("ok", False), "error": r.get("error"),
+             "error_code": r.get("error_code"),
              "bank_code": r.get("bank_code", "")}
             for r, (_, fn) in zip(stmt_results, stmt_data)
         ],
         "gl_files": [
             {"file": fn, "rows": len(r.get("rows") or []),
              "ok": r.get("ok", False), "error": r.get("error"),
+             "error_code": r.get("error_code"),
              "accounts": r.get("accounts", [])}
             for r, (_, fn) in zip(gl_results, gl_data)
         ],

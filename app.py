@@ -1001,6 +1001,10 @@ app.add_middleware(
 # 500 must also call _record_500 manually — see erp_endpoints_create.
 @app.exception_handler(Exception)
 async def _capture_unhandled_500(request: Request, exc: Exception):
+    """v118.35.0.28 安全脱敏 (P0-03 体检 2026-05-21)
+    服务端仍记录完整 traceback (_record_500 + logger.exception) ·
+    但客户端只收到稳定错误码 · 不再回传异常类型/text/diag_url ·
+    内部诊断由超管接口 /api/admin/diagnostics/runtime 提供"""
     from fastapi.responses import JSONResponse
     try:
         _record_500(
@@ -1016,10 +1020,7 @@ async def _capture_unhandled_500(request: Request, exc: Exception):
     )
     return JSONResponse(
         status_code=500,
-        content={
-            "detail": f"{type(exc).__name__}: {str(exc)[:200]}",
-            "diag_url": "/api/version (see playwright.last_500_traceback)",
-        },
+        content={"detail": "server.internal_error"},
     )
 
 
@@ -5374,20 +5375,15 @@ async def admin_layout_page(rest: str):
 # v118.27.5.4 · 前端版本检测接口 · 前端定时轮询 · 不一致弹横幅
 # v118.32.5.5.17 · 加 release_notes 4 语字段 · version-banner.js 拿来显示更新内容
 # 铁律(v5.5.17 拍板):每次部署写 1-3 句 4 语更新说明 · 大白话 · 不出现 OCR/API/Gemini 技术词
+# v118.35.0.28 安全脱敏 (P0-02 体检 2026-05-21):
+#   公开接口只返回 version/ts/release_notes 三个公开字段
+#   内部诊断 (playwright / last_500 / traceback) 挪到 /api/admin/diagnostics/runtime
 @app.get("/api/version")
 async def get_frontend_version():
     import time as _t
-    # v118.34.5 · diagnostic state for the MR.ERP Playwright pipeline.
-    # Lets the user verify in-browser whether the auto-installer landed
-    # without needing SSH access. Cheap to compute (one stat() per call).
-    # v118.34.13 · also surfaces the last captured 500 traceback so the
-    # operator can read the actual stack from the browser instead of
-    # journalctl.
     return {
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
-        "playwright": _read_playwright_status(),
-        "last_500": _read_last_500(),
         "release_notes": {
             "zh": "v118.35.0.27 · 多页报告溯源 + 任务队列基础设施\n• 销项税对账多份 PDF 合并后 · 每行附带『来源文件 + 页码』· 对账有差异时能定位原 PDF 第几页(以前只能凭记忆翻找)\n• 内部:Earn 后台系统监控增加 4 张任务队列卡片(待处理 / 处理中 / 最近成功 / 最近失败)· 为日后高并发铺路\n\n— 以下面向用户(不变) —\n\nv118.35.0.26 · 收入对账容差优化 + 系统监控扩展\n• 收入对账金额对比加入 ฿0.01 容差:小到分位的浮点差异不再误标『有差异』· 真差异仍清晰显示\n• 内部:Earn 后台『系统监控』新增内存使用 / CPU 负载 / 核数 / Worker 进程 4 张卡 · 全面运维视图\n\n— 以下面向用户(不变) — \n\nv118.35.0.24 · 按用量付费正式启用\n• 计费方式:发票识别按张计费,前 200 张每张 ฿1.50,第 201 张起每张 ฿0.75;Excel / CSV / Word 文件按字符计费,每 50 字符 ฿0.01\n• 余额查看:首页『账户余额』卡片可随时查看当前余额与本月用量\n• 余额不足时上传会清晰提示当前余额,可直接进入充值\n• 单次充值最低 ฿10、上限 ฿500,000\n• 银行流水 Excel 上传支持自动直读,识别更快更稳\n• 系统性能与稳定性持续优化",
             "th": "v118.35.0.27 · ตรวจสอบที่มาของรายงานหลายหน้า + โครงสร้างคิวงาน\n• การกระทบยอดภาษีขายเมื่อรวมหลายไฟล์ PDF · แต่ละรายการแนบ『ชื่อไฟล์ต้นทาง + เลขหน้า』· เมื่อพบความแตกต่างสามารถระบุได้ทันทีว่ามาจากไฟล์ใด หน้าใด (เดิมต้องเปิดทีละไฟล์ค้นเอง)\n• ภายใน:หน้าจอ Earn เพิ่ม 4 การ์ดติดตามคิวงาน (รอดำเนินการ / กำลังทำ / สำเร็จล่าสุด / ล้มเหลวล่าสุด)· เตรียมพร้อมสำหรับปริมาณงานสูง\n\n— ด้านล่างคือฟีเจอร์สำหรับผู้ใช้ (ไม่เปลี่ยนแปลง) —\n\nv118.35.0.26 · ปรับค่าเผื่อการกระทบยอดรายได้ + ขยายการติดตามระบบ\n• การเปรียบเทียบยอดเพิ่มค่าเผื่อ ฿0.01:ส่วนต่างเล็กระดับสตางค์จะไม่ถูกเตือนว่า『ไม่ตรง』อีก · ส่วนต่างจริงยังคงแสดงชัดเจน\n• ภายใน:Earn『การติดตามระบบ』เพิ่มการ์ดหน่วยความจำ / โหลด CPU / จำนวนคอร์ / โปรเซส Worker · ภาพรวมการทำงานครบถ้วน\n\n— ด้านล่างคือฟีเจอร์สำหรับผู้ใช้ (ไม่เปลี่ยนแปลง) —\n\nv118.35.0.24 · ระบบคิดเงินตามการใช้งานเปิดให้บริการแล้ว\n• อัตราค่าบริการ:ใบกำกับภาษี PDF 200 ใบแรก ฿1.50/ใบ · ใบที่ 201 ขึ้นไป ฿0.75/ใบ;ไฟล์ Excel / CSV / Word คิดตามตัวอักษร 50 ตัวอักษร = ฿0.01\n• ตรวจสอบยอด:การ์ด『ยอดคงเหลือ』บนหน้าแรก แสดงยอดและการใช้งานของเดือนนี้\n• เมื่อยอดเงินไม่พอ ระบบจะแสดงยอดปัจจุบันและค่าบริการที่ต้องชำระ พร้อมเข้าหน้าเติมเงินทันที\n• เติมเงินขั้นต่ำ ฿10 · สูงสุดต่อครั้ง ฿500,000\n• อัปโหลดไฟล์ Statement Excel รองรับการอ่านอัตโนมัติ · เร็วและเสถียรขึ้น\n• ปรับปรุงประสิทธิภาพและเสถียรภาพของระบบอย่างต่อเนื่อง",
@@ -5415,6 +5411,26 @@ async def get_frontend_version():
             "th_archived_v34_21": "v118.34.21 · ปิดงาน 2 บัก P-3 + P-4:\n• P-3: PATCH /api/erp/endpoints/:id เดิมไม่เข้ารหัสข้อมูลรับรอง mrerp · เมื่อแก้ไข endpoint แล้วใส่รหัสผ่านใหม่ → เก็บ plaintext ใน DB → ครั้งถัดไป test-connection ถอดรหัสไม่ผ่าน → ERR_CRED_DECRYPT. ตอนนี้ PATCH ก็ใช้ kms_helper.encrypt_str เหมือน POST · ciphertext ที่เข้ารหัสแล้วไม่ encrypt ซ้ำ.\n• P-4: ตอนทดสอบเชื่อมต่อล้มเหลว backend แอบใส่ path สกรีนช็อตอยู่ใน raw_error ก้อนใหญ่ ผู้ใช้มองไม่เห็น · ตอนนี้ JS regex ดึง screenshot=(\\S+\\.png) ออกมาโชว์เป็นแถบสีส้ม 'บันทึกภาพข้อผิดพลาดที่: {path} · ส่งให้ทีมซัพพอร์ตเพื่อช่วยตรวจสอบ' · 4 ภาษาครบ.\n• เพิ่ม PatchEndpointEncryptionContractTests 2 ตัว: plaintext กระตุ้นการเข้ารหัส · ที่เข้ารหัสแล้วไม่ double-encrypt.\n\nถ้ามี endpoint mrerp อยู่แล้ว ลองคลิก 'แก้ไข' เปลี่ยนรหัสผ่าน · หลังบันทึก test-connection ควรใช้ได้ปกติ",
             "ja_archived_v34_21": "v118.34.21 · STATE.md の P-3 + P-4 を回収:\n• P-3: PATCH /api/erp/endpoints/:id は mrerp 認証情報の暗号化をスキップしていた · ウィザードで既存 endpoint のパスワードを再入力すると平文が DB に保存 → 次回 test-connection 復号で InvalidToken → ERR_CRED_DECRYPT. PATCH も kms_helper.encrypt_str を通すように修正 · POST と一致 · 既に暗号化された ciphertext は再暗号化しない.\n• P-4: ウィザードの接続テスト失敗時、screenshot パスが raw_error の塊に埋もれてユーザーが見えなかった · JS で正規表現 `screenshot=(\\S+\\.png)` を抽出し、別行の橙色強調枠で「エラースクショ保存先: {path} · サポートに送ると調査が早まります」と表示 · 4 言語対応.\n• PatchEndpointEncryptionContractTests を 2 件追加: plaintext が暗号化される · 暗号化済みは double-encrypt しない.\n\nMR.ERP endpoint があれば「編集」でパスワード変更 → test-connection が継続して動くはず."
         }
+    }
+
+
+# ── 超管诊断接口 (v118.35.0.28 · 体检 P0-02 2026-05-21) ───────────────────
+# 这里收纳所有原先暴露在 /api/version 的内部诊断字段:
+#   · playwright 状态 (安装情况 / 浏览器路径 / chromium probe)
+#   · last_500 (最近一次未捕获 500 的 path/method/exc_type/traceback)
+#   · 前端 cache_bust 等运行时状态
+# 仅超管能访问 · 普通用户 403 · 未登录 401
+# 体检 P0-03 让全局异常 handler 不再返回 traceback · 运维要看根因走这里
+@app.get("/api/admin/diagnostics/runtime")
+async def admin_diagnostics_runtime(request: Request):
+    _require_super_admin(request)
+    import time as _t
+    return {
+        "ok": True,
+        "ts": int(_t.time()),
+        "version": PEARNLY_FRONTEND_VERSION,
+        "playwright": _read_playwright_status(),
+        "last_500": _read_last_500(),
     }
 
 

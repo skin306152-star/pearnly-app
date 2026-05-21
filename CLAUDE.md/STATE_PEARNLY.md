@@ -1273,3 +1273,104 @@ expartran/  = 交易类导出(idmenu=404 商品销售导出)
 | 🟢 P3 | 4 语切换全站巡检 · Playwright 自动跑一圈 | 工作量大 · 留独立窗口 |
 | 🟢 P3 | 银行对账 CSV/DOCX 前端 placeholder 文案完善 | 后端已支持 · 缺前端文案 |
 
+---
+
+# 🆕 2026-05-21 第二会话总结（接得上下一窗口）
+
+## 来源
+用户委托另一个 AI 做只读体检 · 产出 2 份桌面文档:
+- `D:\Users\Skin\Desktop\Pearnly_只读项目体检报告_2026-05-21.md`
+- `D:\Users\Skin\Desktop\Pearnly_按优先级可执行任务清单_2026-05-21.md`
+
+体检评分: 产品 8/10 · **工程结构 4/10** · 安全 5/10 · 测试 5/10 · 可维护性 4/10
+
+## 本窗口做的 6 件事
+
+### 1. 核实体检报告每条指控（先验证再修）
+P0-01 指控 4 个端点 fail-open · 实测**只 1 个真有漏洞**（误报率 75%）。这是一个核实方法论 · 不要盲信体检结论 · 一定要 grep + read 验证。
+
+### 2. 修完所有体检 P0（5 个 commit · 5 项全闭）
+| ID | Commit | 内容 |
+|---|---|---|
+| P0-01 | `6226f10` | `/internal/deploy` fail-closed when GITHUB_WEBHOOK_SECRET 缺失 → 503 |
+| P0-02 | `1972abb` | `/api/version` 公开诊断脱敏 → 拆出 `/api/admin/diagnostics/runtime` |
+| P0-03 | `1972abb` | 全局异常 handler 客户端只返回 `{"detail":"server.internal_error"}` |
+| P0-04 | `b5063d5` | CORS `["*"]` → `[pearnly.com, www.pearnly.com]` + env 覆盖 + dev 放 localhost |
+| P0-05 | `1972abb` | `.env.example` 5 个变量 → 60+ 变量 12 分区 |
+
+### 3. 加铁律 16（全档位 push 授权 C 档）
+位置: `CLAUDE.md/CLAUDE.md:268-308`
+内容: Claude 写完代码可直接 push · **保留 6 条红线必须问**（force-push / reset-hard / 30+ 文件 / db schema migration / 关键路径破坏 / no-verify）。Zihao 在 2026-05-21 选 C 档位。
+
+### 4. 写最优执行清单（8 阶段路线）
+位置: `CLAUDE.md/EXECUTION_PLAN.md`（新文件 · 243 行）· commit `bdef105`
+
+**核心原则**: 永远先写测试守门 → 再拆代码 · 拆代码本身需要测试当安全网。
+
+| 阶段 | 状态 | 内容 |
+|---|---|---|
+| 0 安全基线 | ✅ 完成 | P0-01~05 + 铁律 16 |
+| **1 多租户保险** | 🟡 进行中（1/2）| Task 1.1 ✅ · Task 1.2 待启动 |
+| 2 计费保险 | ⚪ | Credits contract tests |
+| 3 CI 保险 | ⚪ | GitHub Actions + check_imports |
+| 4 i18n + E2E | ⚪ | check_i18n + 第一个 Playwright smoke |
+| 5 后端路由拆 | ⚪ | 抽 billing_router + admin_diagnostics_router |
+| 6 DB 迁移规范 | ⚪ | ensure_* 盘点 + Alembic 设计 |
+| 7 前端绞杀拆 | ⚪ | dashboard.js + billing.js |
+| 8 治理收尾 | ⚪ | 文档导航 + 锁版本 + 静默吞错清理 |
+
+### 5. 阶段 1 Task 1.1 完成: 多租户隔离矩阵
+位置: `docs/architecture/tenant-access-matrix.md`（新文件 · 349 行）· commit `8dd2c9c`
+
+13 张表完整的读/写/删隔离矩阵 + 风险 TOP 10 + 未验证 10 项。
+
+### 6. **意外发现并修复 1 个 P0 真漏洞**（商业终结级）
+`db.get_gl_vat_task(task_id)` 和 `db.get_bank_recon_v2_task(task_id)` 无任何权限校验 · `recon_routes.py` 4 个路由直接裸调返回 · 任何登录用户可枚举 `task_id` 拖走平台所有事务所的对账详情。
+
+修复方案: DB 层 fail-safe（不在路由层补丁）
+- 函数签名加 `user_id` 必传 + `tenant_id` 可选
+- Dual-Key SQL: `WHERE id=%s AND (tenant_id=%s::uuid OR user_id=%s::uuid)`
+- caller 不传 scope **物理拿不到 row**
+- 跨 tenant 用户 → 404（与"任务不存在"同响应 · 防枚举侧信道）
+
+涉及 6 处修改（commit `8dd2c9c`）:
+- `db.py:8335` get_gl_vat_task
+- `db.py:8534` get_bank_recon_v2_task
+- `recon_routes.py:1080` GET /gl-vat/{id}
+- `recon_routes.py:1111` GET /gl-vat/{id}/export
+- `recon_routes.py:1464` GET /bank-v2/{id}
+- `recon_routes.py:1511` GET /bank-v2/{id}/export
+
+## 当前生产版本
+- 前端 cache_bust: `11835027`（未变 · 今天没动 home.js）
+- 最新 commit: `8dd2c9c`
+- 部署状态: ✅ 全部已上线 + 验证过 401/404 行为
+
+## 累积 commits（按时间）
+- `08409c1` docs(release-notes + 铁律 16): 4 语对齐 + push 授权
+- `6226f10` P0-01 internal/deploy fail-closed
+- `1972abb` P0-02/03/05 version 脱敏 + 异常脱敏 + env 补全
+- `b5063d5` P0-04 CORS 收紧
+- `bdef105` docs(plan): EXECUTION_PLAN 8 阶段路线
+- `8dd2c9c` **P0 越权读修复** + 多租户矩阵文档
+
+---
+
+# 🚀 下次启动一句话（明天进窗口先看这条）
+
+> **状态**: 体检 P0 全闭 · 阶段 1 Task 1.1 已完成 · 下一步做 Task 1.2
+> **第一句话**: 直接说"继续" → 我会读 `CLAUDE.md/EXECUTION_PLAN.md` 阶段 1 看板 → 启动 Task 1.2（多租户隔离 contract tests · 2-3 小时 · 不动业务代码 · 只加 `tests/unit/test_tenant_isolation_contract.py`）
+> **蓝图已就绪**: `docs/architecture/tenant-access-matrix.md` 列了 13 张表的所有 list/get/delete 函数 · 直接用作测试清单
+> **环境前提**: Task 1.2 需要 `pytest` 或 `unittest` 跑 · 本机 `passlib`/`psycopg2`/`xlrd` 缺失但**这次测试用 mock cursor 不连真 DB** · 不影响本地跑
+
+## 下次窗口必读
+1. `CLAUDE.md/EXECUTION_PLAN.md` · 全文 · 看进度看板 + 阶段 1 Task 1.2 描述
+2. `docs/architecture/tenant-access-matrix.md` · §2 表级矩阵（13 张表函数清单）+ §4 风险 TOP 10
+3. `CLAUDE.md/CLAUDE.md:268-308` · 铁律 16（push 授权 + 红线 6 条）
+
+## 下次窗口禁止做
+- ❌ 推倒重构 / 一次性拆完 home.js / db.py
+- ❌ 在阶段 1+2 完成前碰目录拆分
+- ❌ 改 `app.py` / `db.py` / `home.js` 新增功能（建立硬规矩 · 新功能必须独立文件）
+- ❌ 不核实就修体检报告新指控（误报率 75% · 必须先 grep + read 验证）
+

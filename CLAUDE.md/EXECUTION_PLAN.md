@@ -7,6 +7,33 @@
 
 ---
 
+# 🚀 下次窗口入口（明天 Claude 进来先看这段）
+
+**当前位置**：阶段 0 ✅ + 意外修 P0 ✅ + 阶段 1 Task 1.1 ✅ ➡️ **下一步 Task 1.2**
+
+**用户说"继续"时直接做的事**：
+1. 读 `docs/architecture/tenant-access-matrix.md`（已落档的蓝图）
+2. 新建 `tests/unit/test_tenant_isolation_contract.py`
+3. 用 `unittest.mock.MagicMock` 模拟 cursor · 不连真实 DB
+4. 覆盖矩阵 §2 的 13 张表函数（list / get / delete）
+5. 验证点 3 条：tenant 模式 SQL 必含 tenant 限制 · user-only 不扩大 · 删除必带 scope
+6. 跑 `python -m unittest tests.unit.test_tenant_isolation_contract -v` 验证全通过
+7. commit + push（属于"加测试"非"改代码" · 不触发铁律 16 红线 · 可直接 push）
+
+**预计工时**：2-3 小时（纯测试代码 · 不动业务）
+
+**注意事项**：
+- 本机缺 `passlib` / `psycopg2` / `xlrd` · 但这次**用 mock 不连 DB** · 不受影响
+- import 真的不行的话 · 测试文件只 import 被测函数（`from db import list_ocr_history` 而不是 `import db`），避开依赖加载
+- 测试发现的真 bug **立即修**（参考今天发现 P0 越权读的处理方式）
+
+**禁区**：
+- ❌ 不要重构 `app.py` / `db.py` / `home.js` · 阶段 5-7 才动
+- ❌ 不要盲信体检报告新指控 · 误报率 75% · 必须 grep + read 核实
+- ❌ 不要碰 `home.js` 加新功能 · 新功能必须独立 .js（铁律待加）
+
+---
+
 ## 🟢 阶段 0 · 安全基线（2026-05-21 完成 ✅）
 
 | ID | 任务 | Commit | 验证 |
@@ -16,8 +43,11 @@
 | P0-03 | 全局异常 handler 客户端脱敏 → `{"detail":"server.internal_error"}` | `1972abb` | 代码层确认 ✅ |
 | P0-04 | CORS `["*"]` → `[pearnly.com, www.pearnly.com]` + env 覆盖 + dev 放 localhost | `b5063d5` | evil.com → ACAO 空 ✅ |
 | P0-05 | `.env.example` 5 个变量 → 60+ 变量 12 分区 | `1972abb` | 文件已覆盖所有真实 env 引用 ✅ |
+| **P0-加** | **GL-VAT / Bank Recon task 越权读漏洞**（阶段 1 副产物 · 商业终结级） | `8dd2c9c` | 未登录 401 + DB 层 fail-safe ✅ |
 
-**说明**：体检报告 P0-04 严重度高估 · Bearer token 架构下宽 CORS 危险弱于 cookie 应用 · 但仍做了收紧（best practice）。
+**说明**：
+- 体检报告 P0-04 严重度高估 · Bearer token 架构下宽 CORS 危险弱于 cookie 应用 · 但仍做了收紧（best practice）
+- **P0-加** 不在体检报告里 · 是阶段 1 Task 1.1 多租户矩阵分析时**意外挖出的真漏洞**：任何登录用户可枚举 `task_id` 拖走所有事务所对账详情。已修复（DB 层强制 user_id/tenant_id scope · 不依赖路由层兜底）
 
 ---
 
@@ -25,23 +55,34 @@
 
 > **为什么先做这个**：商业 SaaS 最致命单点事故 = A 事务所看到 B 事务所数据。代码里有 `tenant_id` 但路径混杂（部分查询 `tenant_id` 直接过滤 · 部分通过 `user_id IN (SELECT id FROM users WHERE tenant_id=%s)` · 还有历史 fallback / lazy tenant / membership 模型）。**没有自动化测试守门 = 下次重构必然炸。**
 
-### Task 1.1 · 多租户隔离矩阵文档（P1-05）
-- **状态**：pending
-- **类型**：只读分析 · 不动代码 · 0 风险
-- **产出**：`docs/architecture/tenant-access-matrix.md`
-- **覆盖表**：`users` / `tenants` / `ocr_history` / `clients` / `erp_endpoints` / `erp_push_logs` / `tenant_credits` / `credit_transactions` / `topup_requests` / `vat_recon_tasks` / `gl_vat_task` / `bank_recon_v2_task` / `notification_rules`
-- **覆盖角色**：owner / member / super_admin / multi-company admin·member
-- **完成判定**：每张表写清读/写/删权限 + 标记对应函数/路由 + 标记未验证风险点
-- **工作量**：1-2 小时
-- **后续依赖**：Task 1.2
+### Task 1.1 · 多租户隔离矩阵文档（P1-05）✅ 2026-05-21 完成
+- **状态**：✅ completed · commit `8dd2c9c`
+- **产出**：`docs/architecture/tenant-access-matrix.md`（349 行）
+- **关键发现**：13 张表 9 张完整 · 2 张半完整（故意单 User）· **2 张有真漏洞**
+- **副产物 P0 修复**：`get_gl_vat_task` + `get_bank_recon_v2_task` 越权读 · 已在 commit `8dd2c9c` 一并修复
+- **风险 TOP 10** 见矩阵 §4
+- **未验证 10 项** 见矩阵 §5 · 留给 Task 1.2 自动化测试覆盖部分 + 未来 integration test 覆盖剩余
 
-### Task 1.2 · 多租户隔离 contract tests 第一批（P1-06）
-- **状态**：blocked by 1.1
+### Task 1.2 · 多租户隔离 contract tests 第一批（P1-06）➡️ **下一步**
+- **状态**：🟡 ready · 蓝图已就绪
 - **类型**：unit tests · 用 mock cursor 捕获 SQL · 不连真实 DB
 - **产出**：`tests/unit/test_tenant_isolation_contract.py`
-- **覆盖函数**：`get_ocr_history_detail` / `list_ocr_history` / `delete_ocr_history_with_pdf_paths` / `list_clients` / `list_erp_logs` / `list_vat_recon_tasks` / `list_bank_recon_v2_tasks`
-- **完成判定**：tenant 模式 SQL 必含 tenant 限制 · user-only 模式不能扩大到全局 · 删除必带 scope
+- **覆盖函数清单**（按矩阵 §2 严格对应）：
+  - `list_ocr_history` `get_ocr_history_detail` `delete_ocr_history` `delete_ocr_history_with_pdf_paths`
+  - `list_clients` `get_client` `delete_client`
+  - `list_vat_recon_tasks` `get_vat_recon_task` `delete_vat_recon_task`
+  - `list_gl_vat_tasks` **`get_gl_vat_task`**（防回归）`delete_gl_vat_task`
+  - `list_bank_recon_v2_tasks` **`get_bank_recon_v2_task`**（防回归）`delete_bank_recon_v2_task`
+  - `list_notification_rules` `get_notification_rule` `delete_notification_rule`
+  - `get_erp_endpoint` `list_erp_endpoints` `delete_erp_endpoint`（单 User 模式 · 验证不扩大）
+- **验证点**：
+  1. `tenant_id` 给了 → SQL 必含 `tenant_id = %s` 过滤
+  2. `tenant_id` 不给 → SQL 必含 `user_id = %s` 过滤 · 不能 fallback 到无 WHERE
+  3. delete 操作必须带 scope · 不能裸 `DELETE FROM xxx WHERE id = %s`
+  4. **新增防回归**：`get_gl_vat_task` / `get_bank_recon_v2_task` 必传 user_id · 不带 scope 调用要么 TypeError 要么返回 None
+- **完成判定**：`python -m unittest tests.unit.test_tenant_isolation_contract -v` 全过
 - **工作量**：2-3 小时
+- **commit message 模板**：`test(tenant): contract tests 覆盖 13 张表的隔离 (阶段 1 Task 1.2)`
 
 ---
 
@@ -212,8 +253,8 @@
 
 | 阶段 | 状态 | 完成 / 总数 | 备注 |
 |---|---|---|---|
-| 0 · 安全基线 | ✅ 完成 | 5/5 | 2026-05-21 一天闭环 |
-| 1 · 多租户保险 | 🟡 进行中 | 0/2 | **下一步从这里开始** |
+| 0 · 安全基线 | ✅ 完成 | 5+1/5 | 2026-05-21 一天闭环 · 含 1 个意外发现的真 P0 |
+| **1 · 多租户保险** | 🟡 进行中 | **1/2** | Task 1.1 ✅ · **Task 1.2 ➡️ 下一步** |
 | 2 · 计费保险 | ⚪ 待启动 | 0/1 | |
 | 3 · CI 保险 | ⚪ 待启动 | 0/2 | |
 | 4 · i18n + E2E | ⚪ 待启动 | 0/2 | |
@@ -223,6 +264,14 @@
 | 8 · 治理收尾 | ⚪ 待启动 | 0/2 | |
 
 **预计总工时**：35-50 小时（按每天 2-3 小时投入 · 约 3-4 周完成阶段 1-6 · 7-8 长期持续）
+
+**完成的 commits**（按时间倒序）：
+- `8dd2c9c` · 阶段 1 Task 1.1 + 意外 P0 越权读修复 + 矩阵文档
+- `bdef105` · EXECUTION_PLAN 8 阶段路线创建
+- `b5063d5` · P0-04 CORS 收紧
+- `1972abb` · P0-02/03/05 三合一
+- `6226f10` · P0-01 fail-closed
+- `08409c1` · 铁律 16 + release_notes 4 语对齐
 
 ---
 

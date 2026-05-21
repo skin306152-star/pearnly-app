@@ -985,13 +985,24 @@ app.include_router(reports_router)  # v109.0
 app.include_router(signup_router)  # v109.3
 app.include_router(recon_router)   # v118.32.0 · 销项税对账
 app.include_router(vat_excel_router)  # v118.32.4.9.5 · Excel 公式对账内测(skin306152 only)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# v118.35.0.28 P0-04 CORS 收紧 (体检 2026-05-21):
+# 旧 allow_origins=["*"] + allow_credentials=True 浏览器会自动拒绝凭据请求,
+# 但无凭据跨域 fetch 仍放行 · 收紧到生产白名单 + env 覆盖 + dev 自动放 localhost
+# 注: 用户从 pearnly.com 访问时 home.js 调 /api/* 是同源, 根本不触发 CORS;
+# 收紧只影响第三方域名想跨域调 API 的场景 · 无嵌入式合作伙伴情况下零风险
+_cors_default = "https://pearnly.com,https://www.pearnly.com"
+_cors_origins_str = (os.environ.get("CORS_ALLOW_ORIGINS") or _cors_default).strip()
+_cors_allow_origins = [o.strip() for o in _cors_origins_str.split(",") if o.strip()]
+_cors_kwargs = {
+    "allow_origins": _cors_allow_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+# PEARNLY_ENV=development 时额外放 localhost 任意端口 · 本地开发不会被 CORS 卡
+if (os.environ.get("PEARNLY_ENV") or "").strip().lower() == "development":
+    _cors_kwargs["allow_origin_regex"] = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 
 # v118.34.13 (Zihao 2026-05-19 拍板) · catch-all exception handler so

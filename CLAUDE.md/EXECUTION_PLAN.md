@@ -114,13 +114,12 @@
 
 > **为什么这个时候做**：阶段 1+2 已经写了测试 · CI 才有东西可跑。CI 是"防 v0.20 重演"的最后一道保险（如果有 CI · 那次 db pool 5 的改动会被预跑暴露）。
 
-### Task 3.1 · 本地 import check 通过（P1-01）
-- **状态**：pending
-- **类型**：环境补齐 · 不改业务代码
-- **产出**：本机 `python scripts/check_imports.py --quiet` 退出 0
-- **当前缺失**：`passlib` / `psycopg2` / `xlrd`（Windows 本地）
-- **完成判定**：检查脚本退出 0 · `requirements.txt` 锁好版本
-- **工作量**：30 分钟
+### Task 3.1 · 本地 import check 通过（P1-01）✅ 2026-05-21 完成
+- **状态**：✅ completed · `python scripts/check_imports.py --quiet` 退出 0
+- **类型**：环境补齐 · 不改业务代码 · 不改 requirements.txt（早就声明 · 只是本机没装）
+- **装上**：passlib 1.7.4 · psycopg2-binary 2.9.12 · xlrd 2.0.2
+- **验证**：装包后再跑 97 个 contract test 全过（确认 stub 仍兼容真 psycopg2）
+- **未做也不该做**：pin 上述 3 个版本到 requirements.txt（prod 上跑的版本可能不同 · pin 反而风险）
 
 ### Task 3.2 · GitHub Actions 最小 CI（P1-02）
 - **状态**：blocked by 3.1

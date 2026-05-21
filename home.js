@@ -1470,8 +1470,6 @@ const I18N = {
         'topup-step3':           '上传截图',
         'topup-amount-label':    '充值金额',
         'topup-amount-invalid':  '请输入有效金额(最低 ฿10)',
-        'topup-amount-too-large':'充值金额超过单次上限 ฿500,000 · 请减小金额',
-        'err.insufficient_balance': '余额不足 · 当前 ฿{balance} · 本次约需 ฿{estimated_cost} · 点击充值',
         'topup-bank-label':      '转账到以下账户',
         'topup-bank-note':       '请转账恰好 ฿{amount} · 截图后再关闭银行 App',
         'topup-copy-account':    '复制账号',
@@ -3895,8 +3893,6 @@ const I18N = {
         'topup-step3':           'Upload Slip',
         'topup-amount-label':    'Amount',
         'topup-amount-invalid':  'Please enter a valid amount (min ฿10)',
-        'topup-amount-too-large':'Amount exceeds single-topup cap ฿500,000 · please reduce',
-        'err.insufficient_balance': 'Insufficient balance · current ฿{balance} · need ~฿{estimated_cost} · tap to top up',
         'topup-bank-label':      'Transfer to',
         'topup-bank-note':       'Transfer exactly ฿{amount} · screenshot before closing bank app',
         'topup-copy-account':    'Copy account',
@@ -6309,8 +6305,6 @@ const I18N = {
         'topup-step3':           'อัปโหลดสลิป',
         'topup-amount-label':    'จำนวนเงิน',
         'topup-amount-invalid':  'กรุณาระบุจำนวนเงินที่ถูกต้อง (ขั้นต่ำ ฿10)',
-        'topup-amount-too-large':'จำนวนเงินเกินวงเงินสูงสุดต่อครั้ง ฿500,000 · กรุณาลดจำนวน',
-        'err.insufficient_balance': 'ยอดเงินไม่พอ · ปัจจุบัน ฿{balance} · ต้องการ ~฿{estimated_cost} · แตะเพื่อเติมเงิน',
         'topup-bank-label':      'โอนเงินไปที่บัญชีนี้',
         'topup-bank-note':       'โอนพอดี ฿{amount} และถ่ายสลิปก่อนปิดแอปธนาคาร',
         'topup-copy-account':    'คัดลอกเลขบัญชี',
@@ -8719,8 +8713,6 @@ const I18N = {
         'topup-step3':           'スリップ送信',
         'topup-amount-label':    '金額',
         'topup-amount-invalid':  '有効な金額を入力(最低 ฿10)',
-        'topup-amount-too-large':'1 回の上限 ฿500,000 を超えています · 金額を減らしてください',
-        'err.insufficient_balance': '残高不足 · 現在 ฿{balance} · 今回必要 ~฿{estimated_cost} · タップでチャージ',
         'topup-bank-label':      '振込先',
         'topup-bank-note':       'ちょうど ฿{amount} を振込み · 銀行アプリを閉じる前にスクショ',
         'topup-copy-account':    '口座番号をコピー',
@@ -33646,8 +33638,6 @@ window.addEventListener('DOMContentLoaded', () => {
     async function _step1Next() {
         var inp = _g('tv2-amt'), amt = inp ? parseFloat(inp.value) : 0;
         if (!amt || amt < 10) { _showErr('tv2-ae', _t('topup-amount-invalid')); return; }
-        // v118.35.0.20 · 前端兜底:超过单次上限 ฿500,000 立即提示(不走后端 422)
-        if (amt > 500000) { _showErr('tv2-ae', _t('topup-amount-too-large')); return; }
         _amount = amt;
         var next = _g('tv2-next'); if (next) { next.disabled = true; next.textContent = '…'; }
         try {
@@ -33656,31 +33646,12 @@ window.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _tok() },
                 body: JSON.stringify({ amount_thb: amt })
             });
-            if (!res.ok) {
-                // v118.35.0.20 · 422 raw pydantic ValidationError → 友好翻译
-                var raw = await res.text();
-                var msg = _t('topup-submit-fail');
-                try {
-                    var body = JSON.parse(raw);
-                    var d = body.detail;
-                    if (Array.isArray(d) && d.length) {
-                        var first = d[0] || {};
-                        var typ = first.type || '';
-                        if (typ.indexOf('less_than') >= 0) msg = _t('topup-amount-too-large');
-                        else if (typ.indexOf('greater_than') >= 0) msg = _t('topup-amount-invalid');
-                        else if (typ.indexOf('decimal_parsing') >= 0 || typ === 'float_parsing') msg = _t('topup-amount-invalid');
-                        else if (first.msg) msg = _t('topup-submit-fail');
-                    } else if (typeof d === 'string') {
-                        msg = d;
-                    }
-                } catch(_) { /* 非 JSON · 用默认 msg */ }
-                throw new Error(msg);
-            }
+            if (!res.ok) throw new Error(await res.text());
             var data = await res.json();
             _reqId = data.request_id;
             _setStep(2);
         } catch(e) {
-            _showErr('tv2-ae', e.message || _t('topup-submit-fail'));
+            _showErr('tv2-ae', _t('topup-submit-fail') + ' · ' + e.message);
         } finally {
             if (next) { next.disabled = false; next.textContent = _t('topup-btn-next'); }
         }

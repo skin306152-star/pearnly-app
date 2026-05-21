@@ -103,25 +103,6 @@ async def build_excel_endpoint(
     if lang not in ("th", "zh", "en", "ja"):
         lang = "th"
 
-    # v118.35.0.20 · Credits 前置检查 · 没钱直接拒绝(白名单 is_billing_exempt 跳过)
-    try:
-        import db as _db_credit
-        _billing = _db_credit.get_billing_status(str(user_id), tenant_id)
-        if not _billing.get("allowed") and not _billing.get("is_exempt"):
-            # 估算: 发票 N 张 + 报告若干页 · 都按 PDF tier 价
-            _est_pages = len(invoices) + len(reports)  # 报告先按 1 张算 · 实际可能多页 · 扣费时按实际
-            _est_cost = float(_db_credit.estimate_pdf_cost_thb(tenant_id, _est_pages))
-            raise HTTPException(402, detail={
-                "code": "insufficient_balance",
-                "balance": _billing.get("balance_thb", 0.0),
-                "estimated_cost": _est_cost,
-                "pages_used_this_month": _billing.get("pages_used_this_month", 0),
-            })
-    except HTTPException:
-        raise
-    except Exception as _be:
-        logger.warning(f"[vex.credits] pre-check skip(error tolerated): {_be}")
-
     api_key = _user_key(user)
     t0 = time.time()
 
@@ -164,23 +145,6 @@ async def build_excel_endpoint(
     fail_invoices = [r for r in parsed_invoices if not r.get("ok")]
     logger.info(f"[vex.build] 发票 OCR · ok={len(ok_invoices)} fail={len(fail_invoices)} "
                 f"· 总耗时 {time.time()-t0:.1f}s")
-
-    # v118.35.0.20 · Credits 真扣费 · 只扣成功的发票 · 报告按 1 份算 1 页(简化)
-    # 失败的发票不扣 · 用户重传不重复扣(发票内容已有缓存命中机制)
-    try:
-        import db as _db_chg
-        _billed_pages = len(ok_invoices) + len(reports)  # 成功发票 + 报告份数
-        if _billed_pages > 0:
-            _chg = _db_chg.charge_ocr(
-                user_id=str(user_id), tenant_id=tenant_id,
-                kind="pdf", units=_billed_pages,
-                description=f"VAT 对账 · {len(ok_invoices)} 张发票 + {len(reports)} 份报告",
-            )
-            if _chg.get("ok"):
-                logger.info(f"💳 vex.build charged ฿{_chg.get('charged_thb', 0):.2f} · "
-                            f"bal_after=฿{_chg.get('balance_after')}")
-    except Exception as _ce:
-        logger.warning(f"💳 vex.build charge_ocr exception(silent): {_ce}")
 
     # 生成 Excel (返回 tuple)
     xlsx_bytes, task_summary = await loop.run_in_executor(

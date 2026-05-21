@@ -1907,21 +1907,16 @@ def check_ocr_quota(user_id: str) -> Dict[str, Any]:
     v110.16 · super_admin 完全豁免(开发/运维账号无配额限制)
     v118.27.5 · skin306152 测试账号永久放行(避免 trial 7 天到期后被升级窗口骚扰 · 跟 ERP/银行对账 dev seed 白名单一致)
     """
-    # v118.35.0.20 · 白名单改查 users.is_billing_exempt 字段(取代硬编码)
-    # 数据库 SQL: UPDATE users SET is_billing_exempt=TRUE WHERE email IN
-    #   ('skin306152@gmail.com','mrerp@outlook.co.th') · 单一数据源
-    try:
-        import db as _db_wl
-        if _db_wl.is_user_billing_exempt(user_id):
-            return {
-                "allowed": True,
-                "plan": "exempt",
-                "reason": "billing_exempt",
-                "used": 0,
-                "limit": 999999,
-            }
-    except Exception as _wle:
-        logger.warning(f"check_ocr_quota whitelist lookup skip: {_wle}")
+    # v118.27.5 · skin 测试账号白名单
+    SKIN_TEST_USER_ID = "468b50c1-5593-4fd6-990d-515ce8085563"
+    if str(user_id or "") == SKIN_TEST_USER_ID:
+        return {
+            "allowed": True,
+            "plan": "trial",
+            "reason": "skin_test_whitelist",
+            "used": 0,
+            "limit": 999999,
+        }
 
     try:
         import db as _db

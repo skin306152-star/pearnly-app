@@ -1219,26 +1219,6 @@ async def bank_v2_run(
     if not gl_files:
         raise HTTPException(422, _brv2_err("no_gl_files", lang))
 
-    # v118.35.0.20 · Credits 前置检查 · 没钱直接拒绝(白名单 is_billing_exempt 跳过)
-    try:
-        import db as _db_credit
-        _tid_bv2 = user.get("tenant_id")
-        _billing = _db_credit.get_billing_status(str(user.get("id")), _tid_bv2)
-        if not _billing.get("allowed") and not _billing.get("is_exempt"):
-            # 粗估: 每份按 1 页 PDF · 实际扣费在 OCR 后按真实计
-            _est_cost = float(_db_credit.estimate_pdf_cost_thb(_tid_bv2, len(stmt_files) + len(gl_files)))
-            raise HTTPException(402, detail={
-                "code": "insufficient_balance",
-                "balance": _billing.get("balance_thb", 0.0),
-                "estimated_cost": _est_cost,
-                "pages_used_this_month": _billing.get("pages_used_this_month", 0),
-            })
-    except HTTPException:
-        raise
-    except Exception as _be:
-        import logging as _lg_pre
-        _lg_pre.getLogger('recon').warning(f"[bank_v2.credits] pre-check skip: {_be}")
-
     # v118.33.12.1 · use _user_key (gemini_api_key OR custom_gemini_api_key)
     # to match the rest of the system; fall back to env GEMINI_API_KEY.
     import os as _os, logging as _lg
@@ -1272,50 +1252,6 @@ async def bank_v2_run(
 
     stmt_results = await asyncio.gather(*[_parse_stmt(b, fn) for b, fn in stmt_data])
     gl_results = await asyncio.gather(*[_parse_gl(b, fn) for b, fn in gl_data])
-
-    # v118.35.0.20 · Credits 真扣费 · 按文件类型分别计费
-    # xlsx/csv/docx → kind=excel(按字符) · pdf/图片 → kind=pdf(按页)
-    # 失败的文件不扣 · OCR 失败的文件天然没成本
-    try:
-        import db as _db_chg
-        _tid_chg = user.get("tenant_id")
-        _excel_exts = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv", ".txt", ".docx", ".doc"}
-        _pdf_chars = 0  # 累计 PDF 页数
-        _excel_chars = 0  # 累计 Excel 字符数
-        for r, (b, fn) in list(zip(stmt_results, stmt_data)) + list(zip(gl_results, gl_data)):
-            if not r.get("ok"):
-                continue  # 失败不扣
-            row_count = len(r.get("rows") or [])
-            if row_count == 0:
-                continue
-            ext = "." + (fn or "").lower().rsplit(".", 1)[-1] if "." in (fn or "") else ""
-            if ext in _excel_exts:
-                _excel_chars += _db_chg._excel_char_count_estimate(b, fn)
-            else:
-                _pdf_chars += row_count  # PDF: 每行交易当 1 页
-        if _pdf_chars > 0:
-            _c1 = _db_chg.charge_ocr(
-                user_id=str(user.get("id")), tenant_id=_tid_chg,
-                kind="pdf", units=_pdf_chars,
-                description=f"银行对账 PDF · {_pdf_chars} 行",
-            )
-            if _c1.get("ok"):
-                import logging as _lg_chg
-                _lg_chg.getLogger('recon').info(
-                    f"💳 bank_v2 PDF charged ฿{_c1.get('charged_thb', 0):.2f}")
-        if _excel_chars > 0:
-            _c2 = _db_chg.charge_ocr(
-                user_id=str(user.get("id")), tenant_id=_tid_chg,
-                kind="excel", units=_excel_chars,
-                description=f"银行对账 Excel · {_excel_chars} 字符",
-            )
-            if _c2.get("ok"):
-                import logging as _lg_chg2
-                _lg_chg2.getLogger('recon').info(
-                    f"💳 bank_v2 Excel charged ฿{_c2.get('charged_thb', 0):.2f}")
-    except Exception as _ce:
-        import logging as _lg_ce
-        _lg_ce.getLogger('recon').warning(f"💳 bank_v2 charge exception(silent): {_ce}")
 
     # v118.35.0.19 · per-file parse diagnostics 带 error_code 字段 · 前端用它做 i18n 翻译
     parse_info = {

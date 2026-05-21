@@ -1405,19 +1405,7 @@ def _check_user_quota(user: dict) -> tuple:
     是第 2 道闸 · SKIN 的 tenant_type 仍走 byo_api 分支被 quota.need_api_key 拦
     修:本函数顶部也加 SKIN 白名单 · 跟 auth_signup 保持一致
     """
-    # v118.35.0.20 · 白名单改查 users.is_billing_exempt(取代硬编码 user_id)
-    # 跟 auth_signup.check_ocr_quota 一致 · 单一数据源
-    try:
-        if db.is_user_billing_exempt(user.get("id")):
-            return True, None, {
-                "mode": "billing_exempt",
-                "monthly_quota": None,
-                "used_this_month": 0,
-                "remaining": 999999,
-            }
-    except Exception as _wle:
-        logger.warning(f"_check_user_quota whitelist lookup skip: {_wle}")
-    # 老路径兼容(防 is_billing_exempt 字段读取异常时回退)
+    # v118.27.5.2 · SKIN 测试号双闸白名单(跟 auth_signup.check_ocr_quota 一致)
     if str(user.get("id") or "") == "468b50c1-5593-4fd6-990d-515ce8085563":
         return True, None, {
             "mode": "skin_test_whitelist",
@@ -1937,29 +1925,6 @@ async def ocr_recognize(
     used_today = None
     used_month = quota_info.get("used_this_month")
 
-    # v118.35.0.20 · Credits 余额前置检查(填上 cherry-pick v36 留的 TODO)
-    # 业务: 没钱就不让 OCR · 白名单 is_billing_exempt 自动跳过
-    # 估算成本仅供用户提示 · 不预扣 · 实际扣费在 OCR 完成后
-    try:
-        _billing = db.get_billing_status(str(user.get("id")), _tid(user))
-        if not _billing.get("allowed") and not _billing.get("is_exempt"):
-            # 估算本次成本(让用户知道需要充多少)
-            if _ext in PDF_EXTENSIONS:
-                _est_cost = float(db.estimate_pdf_cost_thb(_tid(user), page_count))
-            else:
-                _chars = db._excel_char_count_estimate(content, file.filename or "")
-                _est_cost = float(db.estimate_excel_cost_thb(_chars))
-            raise HTTPException(402, detail={
-                "code": "insufficient_balance",
-                "balance": _billing.get("balance_thb", 0.0),
-                "estimated_cost": _est_cost,
-                "pages_used_this_month": _billing.get("pages_used_this_month", 0),
-            })
-    except HTTPException:
-        raise
-    except Exception as _be:
-        logger.warning(f"[credits] billing pre-check skip(error tolerated): {_be}")
-
     # 4.5. 文件指纹缓存 · v0.8 改:所有 plan 都启用(按 user_id 隔离,不跨用户)
     # v92 · 缓存窗口从 24h 扩到 30 天(默认) · 月末复核上月票也能命中 · 省 Gemini 配额
     import hashlib
@@ -2086,30 +2051,6 @@ async def ocr_recognize(
             f"🆕 pipeline_v1 · file={file.filename} · ext={_ext} · pages={_pipe_res.page_count} "
             f"· cost=฿{_pipeline_cost_thb:.4f} · elapsed={_pipe_res.elapsed_ms}ms"
         )
-
-        # v118.35.0.20 · Credits 真扣费 · OCR 成功才扣 · 豁免账号自动跳过
-        # PDF 按页扣 · Excel/Word/CSV 按字符扣
-        try:
-            if _ext in PDF_EXTENSIONS:
-                _charge = db.charge_ocr(
-                    user_id=str(user.get("id")), tenant_id=_tid(user),
-                    kind="pdf", units=int(_pipe_res.page_count or page_count),
-                    description=f"OCR PDF · {file.filename}",
-                )
-            else:
-                # Excel/CSV/Word · 按字符计费 · _excel_char_count_estimate 计字符数
-                _chars = db._excel_char_count_estimate(content, file.filename or "")
-                _charge = db.charge_ocr(
-                    user_id=str(user.get("id")), tenant_id=_tid(user),
-                    kind="excel", units=int(_chars),
-                    description=f"OCR Excel · {file.filename} · {_chars} chars",
-                )
-            if _charge.get("ok"):
-                logger.info(f"💳 charged ฿{_charge.get('charged_thb', 0):.2f} · bal_after=฿{_charge.get('balance_after')}")
-            else:
-                logger.warning(f"💳 charge_ocr FAIL: {_charge.get('error')}")
-        except Exception as _ce:
-            logger.warning(f"💳 charge_ocr exception(silent): {_ce}")
     except HTTPException:
         raise
     except Exception as _pipe_err:
@@ -5384,10 +5325,7 @@ async def get_frontend_version():
         "playwright": _read_playwright_status(),
         "last_500": _read_last_500(),
         "release_notes": {
-            "zh": "v118.35.0.20 · 计费系统真正打通 · 没钱不让识别:\n• 之前的大漏洞:新注册账户余额 0 也能无限识别 · 因为后台只有月页数检查 · 没接钱包余额检查 · 也没扣费代码 · 等于免费送 · 今天补齐\n• 价格规则按你定的:PDF 前 200 张 ฿1.50/张 · 第 201 张起 ฿0.75/张 · Excel/Word/CSV 不走 AI 直接按字符 · 50 字符 = 1 satang(฿0.01)\n• 余额 0 上传时弹『余额不足 · 当前 ฿0 · 本次约需 ฿X · 点击充值』· 不是干巴巴的英文报错 · 4 语都翻好\n• 充值输入超过 ฿500,000 上限时不再露 pydantic 报错 · 改成『充值金额超过单次上限』· 4 语\n• 白名单两个邮箱(skin306152 + mrerp)通过数据库 is_billing_exempt 字段管理 · 不再硬编码 user_id · 单一数据源\n• 3 个 OCR 入口全部接入:发票识别 / 销项税对账 / 银行对账",
-            "th": "v118.35.0.20 · ระบบคิดเงินเชื่อมเสร็จสมบูรณ์ · ไม่มีเงินใช้ OCR ไม่ได้:\n• บั๊กเก่า: ผู้ใช้ใหม่ยอด 0 บาทใช้ OCR ฟรีไม่จำกัด · เพราะตรวจสอบแค่โควต้ารายเดือน · ไม่ได้เชื่อมกระเป๋าเงินกับโค้ดหักเงิน · วันนี้แก้แล้ว\n• ราคาตามที่ตกลง: PDF 200 แผ่นแรก ฿1.50/แผ่น · แผ่นที่ 201 ขึ้นไป ฿0.75/แผ่น · Excel/Word/CSV ไม่ผ่าน AI คิดตามตัวอักษร · 50 ตัวอักษร = 1 สตางค์\n• อัปโหลดตอนยอด 0 จะแสดง 'ยอดเงินไม่พอ · ปัจจุบัน ฿0 · ต้องการ ~฿X · แตะเพื่อเติมเงิน' · 4 ภาษา\n• กรอกจำนวนเงินเติมเกิน ฿500,000 ไม่ขึ้นข้อความ pydantic แล้ว · เปลี่ยนเป็น 'จำนวนเงินเกินวงเงินสูงสุดต่อครั้ง' · 4 ภาษา\n• Whitelist 2 อีเมล (skin306152 + mrerp) ใช้ฟิลด์ is_billing_exempt ใน DB จัดการ · ไม่ฮาร์ดโค้ด user_id อีกต่อไป\n• เชื่อม 3 จุดอัปโหลดทั้งหมด: OCR ใบกำกับ / ศูนย์กระทบยอดภาษีขาย / ศูนย์กระทบยอดธนาคาร",
-            "en": "v118.35.0.20 · Credits billing fully wired · no balance = no OCR:\n• Critical bug fixed: new accounts at ฿0 could use OCR unlimited because only monthly page check existed · wallet check + deduction code were missing · effectively free · plugged today\n• Pricing per your spec: PDF first 200 pages ฿1.50/page · 201+ at ฿0.75/page · Excel/Word/CSV skip AI · charged by character · 50 chars = 1 satang (฿0.01)\n• Upload with ฿0 balance now shows 'Insufficient balance · current ฿0 · need ~฿X · tap to top up' · 4 langs\n• Topup over ฿500,000 cap no longer shows raw pydantic error · changed to 'Amount exceeds single-topup cap' · 4 langs\n• 2 whitelist emails (skin306152 + mrerp) now managed via users.is_billing_exempt DB field · no more hardcoded user_id · single source of truth\n• Wired all 3 OCR entry points: invoice OCR / VAT recon / bank recon",
-            "ja": "v118.35.0.20 · クレジット課金システム完全接続 · 残高なしで OCR 不可:\n• 致命バグ修正: 新規ユーザー残高 0 でも無制限 OCR · 月間ページチェックのみで残高チェック + 課金コードが未実装 · 実質無料 · 本日修正\n• 価格仕様: PDF 最初の 200 枚 ฿1.50/枚 · 201 枚以降 ฿0.75/枚 · Excel/Word/CSV は AI 不要 · 文字数課金 · 50 文字 = 1 サタン (฿0.01)\n• 残高 0 でアップロード時『残高不足 · 現在 ฿0 · 今回必要 ~฿X · タップでチャージ』表示 · 4 言語\n• チャージ ฿500,000 超過時 pydantic エラー非表示 · 『1 回の上限を超えています』に変更 · 4 言語\n• ホワイトリスト 2 アドレス (skin306152 + mrerp) は users.is_billing_exempt DB フィールドで管理 · user_id ハードコード廃止\n• 3 つの OCR エントリーポイント全接続: 請求書 OCR / VAT 対照 / 銀行対照",
+            "zh": "v118.35.0.19 · 银行流水 Excel 上传修复 + 对账失败提示词换人话:\n• 用户上传 Excel 银行流水时,系统现在会先尝试『直读』(零成本+瞬间完成),只有读不出表头才降级到 AI(原来强制走 AI 容易撞 token 限制崩掉)· 支持中/英/泰文表头自动识别\n• 对账中心『文件解析状态』表的红字错误从『layer2: Gemini returned invalid JSON』这种技术词换成『认不出表头列 · 请确认文件含日期/金额/余额列』这种人话 · 4 语全翻好",
             "th": "v118.35.0.19 · แก้บั๊กอัปโหลด Statement Excel + เปลี่ยนข้อความ error เป็นภาษาคน:\n• ตอนอัปโหลด Excel statement ระบบจะลอง 'อ่านตรง' ก่อน (ฟรี+ทันที) · อ่านหัวคอลัมน์ไม่ออกค่อย fallback ไป AI · รองรับหัวภาษาไทย/อังกฤษ/จีนอัตโนมัติ\n• ตารางสถานะการอ่านไฟล์ในศูนย์กระทบยอด · ข้อความ error แดงๆ เปลี่ยนจาก 'Gemini returned invalid JSON' เป็น 'หาคอลัมน์หัวตารางไม่เจอ · ตรวจสอบไฟล์มีวันที่/จำนวนเงิน/ยอดคงเหลือ' · ครบ 4 ภาษา",
             "en": "v118.35.0.19 · Bank statement Excel fix + plain-language reconciliation errors:\n• When users upload bank-statement Excel files, the system now tries direct-read first (free + instant), falling back to AI only when headers can't be detected (previously forced through AI and hit token limits) · Auto-detects Chinese/English/Thai headers\n• Reconciliation 'File Parse Status' table now shows plain-language errors like 'Cannot detect column headers · ensure date/amount/balance columns exist' instead of 'Gemini returned invalid JSON' (4 langs)",
             "ja": "v118.35.0.19 · 銀行明細 Excel 修正 + 対照失敗メッセージを平易な表現に:\n• ユーザーが銀行明細 Excel をアップロードする際、まず『直接読取』(無料+即時)を試行 · ヘッダー認識できない場合のみ AI にフォールバック(従来は強制 AI でトークン制限超過) · 中/英/タイ語ヘッダー自動認識\n• 対照センターの『ファイル解析状態』表のエラー表示を『Gemini returned invalid JSON』から『列ヘッダーが認識できません · 日付/金額/残高列を確認してください』へ · 4 言語対応",

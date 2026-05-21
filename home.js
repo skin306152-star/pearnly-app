@@ -10298,8 +10298,7 @@ function applyLang(lang) {
 
     if (_userInfo) renderInfoBar();
     if (_quota) updateUploadHint();
-    // v111.3 · 切语言时重渲染 trial banner(原 bug · 顶部黄条不刷新)
-    try { if (typeof renderTrialBanner === 'function') renderTrialBanner(); } catch(e){}
+    // v118.35.0.8 · renderTrialBanner 已废 · 不再调
     renderFileList();
     renderResults();
     if (currentRoute === 'settings') renderSettings();
@@ -10935,7 +10934,7 @@ async function loadAll() {
         renderBrandWorkspace();
         renderInfoBar();
         renderQuotaBanner();   // v102 · 配额低/耗尽顶部预警
-        renderTrialBanner();   // v118.8 · 试用临近到期横幅
+        // v118.35.0.8 · renderTrialBanner 已废 · credits 系统接管
         applySidebarVisibility();
         // NAV-IA Phase 1 · 头像菜单角色显隐 + 渲染(顶栏三件套)
         try {
@@ -11753,85 +11752,13 @@ function renderQuotaBanner() {
     });
 }
 
-// v118.8 · 试用临近到期横幅 · 7 天试用最后阶段提示用户升级
+// v118.35.0.8 · trial 横幅永久下线 · 老 trial 横幅彻底废除
+// 系统已从 trial / 月付套餐 切到 pay-as-you-go credits 钱包计费
+// 6 个老 trial 用户(2026-05-21 DB 迁移)已全部 plan='credits' + trial_expires_at=NULL
+// 此函数保留为 noop · 防有调用方 NullPointer · 但永不渲染
 function renderTrialBanner() {
     const el = document.getElementById('trial-banner');
-    if (!el) return;
-    if (!_userInfo) { el.style.display = 'none'; return; }
-
-    // v118.12 · 员工 / 超管 / 已付费 / 自带 key:不显示
-    if (shouldHideMoney(_userInfo)) { el.style.display = 'none'; return; }
-    if (_userInfo.is_super_admin || _userInfo.tenant_type === 'admin' || _userInfo.tenant_type === 'byo_api') {
-        el.style.display = 'none';
-        return;
-    }
-    // 非试用用户:不显示(用 effective_plan 优先 · plan 兜底)
-    const plan = _userInfo.effective_plan || _userInfo.plan || '';
-    if (plan !== 'trial' && plan !== 'free') {
-        el.style.display = 'none';
-        return;
-    }
-
-    // 拿剩余天数 · 优先 _planState · 兜底 _userInfo
-    let days = null;
-    if (window._planState && (window._planState.trial_days_left !== null && window._planState.trial_days_left !== undefined)) {
-        days = Math.max(0, Math.floor(window._planState.trial_days_left));
-    } else if (_userInfo.trial_days_left !== null && _userInfo.trial_days_left !== undefined) {
-        days = Math.max(0, Math.floor(_userInfo.trial_days_left));
-    }
-    if (days === null) { el.style.display = 'none'; return; }
-
-    // 用户主动 dismiss 当天就不再显示(只对 info 级别生效 · 紧急的还是要显示)
-    const todayKey = 'trial_banner_dismissed_' + new Date().toDateString();
-    if (days >= 4 && localStorage.getItem(todayKey) === '1') {
-        el.style.display = 'none';
-        return;
-    }
-
-    // 决定级别
-    let cls, msg;
-    if (days <= 0) {
-        cls = 'danger';
-        msg = t('trial-banner-expired');
-    } else if (days === 1) {
-        cls = 'danger';
-        msg = t('trial-banner-1day');
-    } else if (days <= 3) {
-        cls = 'warn';
-        msg = t('trial-banner-soon', { n: days });
-    } else if (days <= 6) {
-        cls = 'info';
-        msg = t('trial-banner-info', { n: days });
-    } else {
-        // 7 天满 · 不显示横幅
-        el.style.display = 'none';
-        return;
-    }
-
-    const icon = cls === 'danger'
-        ? '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 2l8 16H2z"/><path d="M10 8v4M10 15h.01"/></svg>'
-        : (cls === 'warn'
-            ? '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 2"/></svg>'
-            : '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4M10 14h.01"/></svg>');
-
-    el.className = 'trial-banner ' + cls;
-    el.innerHTML = `
-        <span class="trial-banner-icon">${icon}</span>
-        <span class="trial-banner-msg">${msg}</span>
-        <button type="button" class="trial-banner-cta" id="trial-banner-upgrade">
-            ${escapeHtml(t('trial-banner-cta'))}
-        </button>
-    `;
-    el.style.display = 'flex';
-    const upgradeBtn = el.querySelector('#trial-banner-upgrade');
-    if (upgradeBtn) upgradeBtn.addEventListener('click', () => {
-        // 触发升级 modal(如果有)· 或滚到设置页套餐
-        if (typeof window.openUpgradeModal === 'function') {
-            window.openUpgradeModal();
-        } else {
-            location.hash = '#/settings';
-        }
-    });
+    if (el) el.style.display = 'none';
 }
 
 function applySidebarVisibility() {
@@ -14408,9 +14335,11 @@ function renderSettings() {
     const isCredits = userPlan === 'credits';
     const lineVerified = !!(u.line_verified || u.line_user_id);
 
-    // v118.35.0.7 · credits 钱包计费(新注册默认 · 不走 trial / monthly)
-    // 走单独渲染分支 · 不参与下面 trial/free/pro/... 的 quota 计算
-    if (isCredits) {
+    // v118.35.0.7 · credits 钱包计费(新注册默认)
+    // v118.35.0.8 · trial 也路由到 credits 渲染分支 · 6 个老 trial 已 DB 迁移到 credits ·
+    //               这里防御性兜底:任何残留 plan='trial' 也只看到"按使用量计费"卡 ·
+    //               不再显示「7 天试用 · 还剩 X 天」「立即升级」等老套餐文案
+    if (isCredits || isTrial) {
         _renderCreditsSettings(u, el);
         const apiKeyCard = document.getElementById('api-key-card');
         if (apiKeyCard) apiKeyCard.style.display = u.is_super_admin ? '' : 'none';

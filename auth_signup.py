@@ -988,7 +988,8 @@ def signup(req: SignupRequest, request: Request):
         raise
     except Exception as e:
         logger.error(f"signup failed: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"signup_error: {e}")
+        # v118.35.0.18 · detail 改成固定 code · 走前端 i18n · 不再把 Python 异常对象拼给用户看
+        raise HTTPException(status_code=500, detail="signup_error")
 
 
 # ============================================================

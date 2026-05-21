@@ -3661,6 +3661,7 @@ const I18N = {
         'msg-disposable-email': '请使用真实邮箱注册 · 不支持临时邮箱',
         'msg-rate-limit': '操作过于频繁 · 请稍后再试',
         'msg-signup-disabled': '注册暂时关闭 · 请联系 hello@pearnly.com',
+        'msg-signup-failed': '注册失败 · 请稍后重试 · 如持续异常请联系 hello@pearnly.com',
         'msg-network': '网络错误 · 请重试',
         'msg-signup-success': '注册成功 · 正在跳转...',
         'msg-login-success': '登录成功',
@@ -3866,6 +3867,7 @@ const I18N = {
         'msg-disposable-email': 'กรุณาใช้อีเมลจริง',
         'msg-rate-limit': 'คำขอบ่อยเกินไป · ลองใหม่ภายหลัง',
         'msg-signup-disabled': 'การสมัครปิดชั่วคราว · ติดต่อ hello@pearnly.com',
+        'msg-signup-failed': 'สมัครไม่สำเร็จ · ลองอีกครั้งภายหลัง · หากยังไม่ได้ติดต่อ hello@pearnly.com',
         'msg-network': 'เกิดข้อผิดพลาด',
         'msg-signup-success': 'สมัครสำเร็จ · กำลังเข้าสู่ระบบ...',
         'msg-login-success': 'เข้าสู่ระบบสำเร็จ',
@@ -4070,6 +4072,7 @@ const I18N = {
         'msg-disposable-email': 'Please use a real email',
         'msg-rate-limit': 'Too many requests · try again later',
         'msg-signup-disabled': 'Signup paused · contact hello@pearnly.com',
+        'msg-signup-failed': 'Signup failed · please retry · if it persists contact hello@pearnly.com',
         'msg-network': 'Network error · please retry',
         'msg-signup-success': 'Account created · redirecting...',
         'msg-login-success': 'Signed in',
@@ -4275,6 +4278,7 @@ const I18N = {
         'msg-disposable-email': '実在のメールでご登録',
         'msg-rate-limit': 'リクエスト過多',
         'msg-signup-disabled': '登録一時停止 · hello@pearnly.com までご連絡ください',
+        'msg-signup-failed': '登録に失敗しました · 後ほど再試行してください · 続く場合は hello@pearnly.com までご連絡ください',
         'msg-network': 'ネットワークエラー',
         'msg-signup-success': '登録完了 · 移動中...',
         'msg-login-success': 'ログイン成功',
@@ -4762,8 +4766,10 @@ async function submitSignup(skipStep2) {
                 'verification_code_used': 'msg-code-invalid',
                 'verification_code_expired': 'msg-code-expired',
                 'verification_code_check_failed': 'msg-code-invalid',
+                // v118.35.0.18 · signup_error 真 bug 修复 · 不再把后端 Python 异常露给用户
+                'signup_error': 'msg-signup-failed',
             };
-            toast(map[code] ? t(map[code]) : (typeof data.detail === 'string' ? data.detail : t('msg-network')), 'error');
+            toast(map[code] ? t(map[code]) : t('msg-signup-failed'), 'error');
             btn.disabled = false; btn.innerHTML = orig;
             return;
         }

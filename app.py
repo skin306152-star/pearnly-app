@@ -1217,16 +1217,17 @@ def _ensure_user_profile_columns():
 
 
 def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
-    # v0.15 · 所有用户功能相同 · 配额由 user.monthly_quota 字段决定
-    # v118.11 · 防御性兜底:某些员工账号 DB 中 plan 字段为 NULL · 导致 Pydantic UserInfo.plan: str 校验失败抛 500
-    # v118.12 · 套餐归 tenant 不归 user · 员工自动继承老板的 plan/quota
-    # v118.12.1 · 修正:tenants 表实际没有 plan 字段 · plan 仍存在 user 表
-    #   - 员工(role=member):取同 tenant 的 owner.plan 作为 effective_plan(继承老板)
-    #   - 老板(role=owner):用自己的 user.plan
+    # v118.35.0.11 · credits 统一后 · 老 plan / effective_plan / monthly_quota /
+    # plan_expires_at / plan_days_left / trial_expires_at / tenant_quota /
+    # tenant_used 字段全部从返回值删除 · 不再做员工继承老板 plan 的 DB 查询 ·
+    # 不再算 plan_days_left / trial_days_left 这些套餐到期天数.
+    # 配额改由 credits 系统(tenant_credits.balance_thb + monthly_page_usage)
+    # 接管 · 前端读 /api/me/credits 拿余额和本月用量 · 设置页只显示用户名 +
+    # 计费方式(按使用量计费)+ 价格说明小字.
     role = user.get("role") or "owner"
     is_super = bool(user.get("is_super_admin"))
 
-    # v22 · 多租户:查用户所属租户(配额/技术维度从这里来)
+    # v22 · 多租户:查用户所属租户(显示 tenant_name + tenant_type 给顶栏用)
     tenant_info = None
     if user.get("tenant_id"):
         try:
@@ -1235,99 +1236,20 @@ def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
             logger.warning(f"_build_user_info: get_tenant failed: {_te}")
             tenant_info = None
 
-    # v118.12.1 · effective_plan 取值优先级:
-    #   员工 → 同 tenant 的 owner 的 plan(动态查 · 防员工 plan 不同步)
-    #   老板 → 自己的 user.plan
-    #   都缺 → "free" 兜底
-    # v118.27.8.1.17 · 员工继承老板时不只继承 plan · 同时继承 plan_expires_at / trial_expires_at / monthly_quota
-    #                  否则员工设置页 / 顶栏跟老板对不齐(Bug 修)
-    effective_plan = user.get("plan") or "free"
-    inherited_plan_exp = None
-    inherited_trial_exp = None
-    inherited_quota = None
-    if role == "member" and user.get("tenant_id"):
-        try:
-            import db as _db
-            with _db.get_cursor() as cur:
-                cur.execute(
-                    "SELECT plan, plan_expires_at, trial_expires_at, monthly_quota "
-                    "FROM users WHERE tenant_id = %s AND role = 'owner' LIMIT 1",
-                    (str(user["tenant_id"]),),
-                )
-                _row = cur.fetchone()
-                if _row:
-                    _row_dict = _row if isinstance(_row, dict) else {
-                        "plan": _row[0], "plan_expires_at": _row[1],
-                        "trial_expires_at": _row[2], "monthly_quota": _row[3],
-                    }
-                    _owner_plan = _row_dict.get("plan")
-                    if _owner_plan:
-                        effective_plan = _owner_plan
-                        inherited_plan_exp = _row_dict.get("plan_expires_at")
-                        inherited_trial_exp = _row_dict.get("trial_expires_at")
-                        inherited_quota = _row_dict.get("monthly_quota")
-        except Exception as _ee:
-            logger.warning(f"_build_user_info: lookup owner plan failed: {_ee}")
+    p_perms = _plan_permissions(None)
 
-    plan = effective_plan
-    p_perms = _plan_permissions(effective_plan)
-
-    # 真实配额(不看 plan)
-    # None/0/负 且有 gemini_api_key = 买断 · 显示无限(0 视为不限)
-    # None/0/负 且无 key = 买断待配置 (UI 显示"请先填密钥")
-    # >0 = 月付 · 显示配额
+    # 自带 key 标识(设置页 API Key 输入框显隐用 · 跟 plan 解耦)
     has_own_key = bool((user.get("gemini_api_key") or "").strip())
-    raw_quota = user.get("monthly_quota")
-    if has_own_key:
-        real_quota = 0            # 前端协议:0 表示"自带 key · 不限"
-        account_type = "lifetime"  # 买断 · 已填 key
-    elif raw_quota and int(raw_quota) > 0:
-        real_quota = int(raw_quota)
-        account_type = "monthly"   # 月付
-    else:
-        real_quota = 0
-        account_type = "lifetime_pending"  # 买断 · 待填 key
-
-    # v118.27.8.1.17 · 计算 plan_expires_at(员工继承优先 · 老板用自己的) + plan_days_left
-    # 之前只读 user.expires_at 老字段 · 升级套餐后该列没维护 · 设置页一直显「—」
-    _plan_exp_val = inherited_plan_exp if inherited_plan_exp else user.get("plan_expires_at")
-    _trial_exp_val = inherited_trial_exp if inherited_trial_exp else user.get("trial_expires_at")
-    if isinstance(_plan_exp_val, str):
-        _plan_exp_str = _plan_exp_val
-    elif _plan_exp_val:
-        _plan_exp_str = _plan_exp_val.isoformat() if hasattr(_plan_exp_val, "isoformat") else str(_plan_exp_val)
-    else:
-        _plan_exp_str = None
-    if isinstance(_trial_exp_val, str):
-        _trial_exp_str = _trial_exp_val
-    elif _trial_exp_val:
-        _trial_exp_str = _trial_exp_val.isoformat() if hasattr(_trial_exp_val, "isoformat") else str(_trial_exp_val)
-    else:
-        _trial_exp_str = None
-    # plan_days_left:lifetime → -1(永久)· 其他算实际天数
-    _plan_days_left = None
-    if effective_plan == "lifetime":
-        _plan_days_left = -1
-    elif _plan_exp_val:
-        try:
-            from datetime import datetime, timezone
-            _exp_dt = _plan_exp_val
-            if isinstance(_exp_dt, str):
-                _exp_dt = datetime.fromisoformat(_exp_dt.replace("Z", "+00:00"))
-            if _exp_dt.tzinfo is None:
-                _exp_dt = _exp_dt.replace(tzinfo=timezone.utc)
-            _delta = _exp_dt - datetime.now(timezone.utc)
-            _plan_days_left = max(0, int(_delta.total_seconds() // 86400))
-        except Exception:
-            _plan_days_left = None
+    account_type = "lifetime" if has_own_key else "monthly"
 
     return {
         "id": str(user["id"]),
         "username": user["username"],
-        "plan": plan,
-        "effective_plan": effective_plan,  # v118.12 · 员工继承自 tenant 的真实套餐 · 前端应该用这个
+        "email": user.get("email") or None,
+        "invited_by": user.get("invited_by"),
+        "is_billing_exempt": bool(user.get("is_billing_exempt", False)),
+        "active_tenant_id": str(user["active_tenant_id"]) if user.get("active_tenant_id") else None,
         "account_type": account_type,     # v0.15.5 · 明确的账号类型 · 供前端显示判断
-        "monthly_quota": real_quota,
         "used_this_month": int(user.get("used_this_month", 0) or 0),
         "ip_used_today": ip_used,
         "ip_daily_limit": ip_limit,
@@ -1360,17 +1282,9 @@ def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
         "typhoon_quota_monthly": p_perms.get("typhoon_quota_monthly", 0) or 0,
         "typhoon_used_this_month": user.get("typhoon_used_this_month", 0) or 0,
         "can_manage_api_keys": p_perms.get("can_manage_api_keys", False),
-        # v118.27.8.1.17 · expires_at 优先 plan_expires_at · 兼容老 user.expires_at 字段
-        "expires_at": _plan_exp_str or (str(user["expires_at"]) if user.get("expires_at") else None),
-        # v118.27.8.1.17 · 明确字段 · 跟 /api/me/plan 对齐 SSoT
-        "plan_expires_at": _plan_exp_str,
-        "plan_days_left":  _plan_days_left,
-        # v109.4 · 暴露试用 + LINE 状态给前端 · settings 页面区分 trial/月付/绑/未绑
-        # v118.12 · 员工不应该有自己的 trial · 试用是 tenant 级 · 这里改从 tenant 取
-        # v118.27.8.1.17 · 修幽灵字段:tenants 表没 trial_expires_at 列 · 直接用上面算好的 _trial_exp_str
-        #                  (员工继承老板 trial · 老板用自己的)
-        "trial_expires_at": _trial_exp_str,
-        "trial_days_left": _calc_trial_days_left(user) if effective_plan == "trial" else None,
+        # v118.35.0.11 · 删除 expires_at / plan_expires_at / plan_days_left /
+        #               trial_expires_at / trial_days_left / tenant_quota /
+        #               tenant_used · credits 系统接管 · 前端读 /api/me/credits
         "line_verified": bool(user.get("line_user_id") or user.get("line_verified_at")),
         # v0.15 · 新增:买断标识(前端根据此决定显示 API Key 输入框)
         "has_own_gemini_key": has_own_key,
@@ -1379,15 +1293,6 @@ def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
         "tenant_name": tenant_info.get("name") if tenant_info else None,
         "tenant_type": tenant_info.get("tenant_type") if tenant_info else None,
         "tenant_status": tenant_info.get("status") if tenant_info else None,
-        # v109.4 · tenant 表配额没同步时回退到 user 表 · 防止前端显示矛盾
-        "tenant_quota": (
-            int(tenant_info["monthly_quota"]) if tenant_info and tenant_info.get("monthly_quota") is not None
-            else (real_quota if real_quota and real_quota > 0 else None)
-        ),
-        "tenant_used": (
-            int(tenant_info["used_this_month"]) if tenant_info and tenant_info.get("used_this_month") is not None
-            else int(user.get("used_this_month", 0) or 0)
-        ),
         "role": role,
         "is_super_admin": is_super,
         # v118.8.4 · 公司名 + 真实姓名(注册时填的) · 顶栏归属感 + 设置页显示

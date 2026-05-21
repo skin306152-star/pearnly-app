@@ -312,7 +312,9 @@ class BankStatementEntry(BaseModel):
     withdrawal_ref: Optional[FieldRef] = Field(default=None)
     balance_ref: Optional[FieldRef] = Field(default=None)
 
-    raw_row_data: Dict[str, Any] = Field(default_factory=dict)
+    # v118.35.0.11 · raw_row_data 字段从 BankStatementEntry 删除 · 80+ 行流水 ×
+    # 每行 ~150 token raw_row_data dict = 输出超 8192 → JSON 截断 · 改后 token
+    # 预算砍掉一半 · 跟 max_output_tokens 16384 一起把截断率压到 0
 
     @field_validator(
         "transaction_date", "transaction_date_raw", "description",
@@ -337,11 +339,6 @@ class BankStatementEntry(BaseModel):
         if v in ("deposit", "withdrawal"):
             return v
         return ""
-
-    @field_validator("raw_row_data", mode="before")
-    @classmethod
-    def _coerce_raw_row(cls, v):
-        return {} if v is None else v
 
 
 class BankStatementDocument(BaseModel):

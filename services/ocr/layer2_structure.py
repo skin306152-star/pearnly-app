@@ -72,30 +72,18 @@ DEFAULT_MODEL = os.environ.get("OCR_FLASHLITE_MODEL", "gemini-2.5-flash-lite")
 DEFAULT_MAX_RETRIES = 1
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_TEMPERATURE = 0.0
-# v118.35.0.5 · 4096 → 8192 看齐 layer3 · 大流水 Excel(30+ 行 + 每行 *_ref 嵌套
-# 对象 + raw_row_data dict)序列化后 Gemini 输出超 4096 被截断 · 导致 JSON
-# Unterminated string → 解析两次都失败 → 用户看到"layer2: invalid JSON after 2".
-# 真实计量(prod log 2026-05-21 04:19:42): Unterminated at char 9520 = ~5k token
-# 输出尾部。
-DEFAULT_MAX_OUTPUT_TOKENS = 8192
+# v118.35.0.11 · 8192 → 16384 · raw_row_data 字段从 BankStatementEntry schema
+# 物理删除后 · 单 entry token 砍掉一半 · 但极大流水 Excel(80-100 行交易) +
+# 长描述字段 还是有可能撞 8192 · 16384 给足空间.
+DEFAULT_MAX_OUTPUT_TOKENS = 16384
 
-# v118.35.0.5 · 重试时追加"精简输出"指令 · 跟 layer3_fallback.py:413+ 的 B2 fix
-# 同思路 · 让 Gemini 在第二次尝试时主动丢掉 raw_row_data + *_ref 字段 · 节
-# 省一半 token · 真正能救回 JSON 截断的场景(同 prompt 同 temperature=0 重试
-# 等于复读机).
+# v118.35.0.11 · 重试 prompt 精简成最小必要字段 · 针对 bank_statement 截断场景
 _RETRY_TRIM_HINT = (
     "\n\nIMPORTANT — your previous response was truncated mid-string and "
-    "could not be parsed as JSON. To stay within the output budget on this "
-    "retry, OMIT the following optional fields entirely (the schema accepts "
-    "their absence): "
-    "(1) every `raw_row_data` object; "
-    "(2) every `*_ref` object — `debit_ref` / `credit_ref` / `balance_ref` "
-    "/ `deposit_ref` / `withdrawal_ref` / `amount_ref` / `vat_amount_ref` "
-    "/ `net_amount_ref` and any similar provenance objects. "
-    "Keep ONLY the core fields per entry: transaction_date, voucher_no, "
-    "account_code, description, debit, credit, amount, direction, balance, "
-    "deposit, withdrawal, invoice_no, customer_name, net_amount, vat_amount, "
-    "total_amount. Reply with a single valid JSON object, no fences."
+    "could not be parsed as JSON. On this retry, output ONLY the core "
+    "fields per entry: date, description, amount, balance. "
+    "OMIT all `raw_row_data` / `*_ref` / source provenance objects. "
+    "Reply with a single valid JSON object, no fences, no markdown."
 )
 
 # Skip Gemini call if text is shorter than this (likely garbage / blank page)
@@ -242,8 +230,7 @@ Output ONE JSON object (no markdown fences, no prose, just JSON):
       "balance": "running balance from Balance / ยอดคงเหลือ column, or empty",
       "deposit_ref":    {"value": "number", "source_text": "as printed", "source_column": "Deposit"    } or null,
       "withdrawal_ref": {"value": "number", "source_text": "as printed", "source_column": "Withdrawal" } or null,
-      "balance_ref":    {"value": "number", "source_text": "as printed", "source_column": "Balance"    } or null,
-      "raw_row_data": {"column header": "cell text"}
+      "balance_ref":    {"value": "number", "source_text": "as printed", "source_column": "Balance"    } or null
     }
   ]
 }

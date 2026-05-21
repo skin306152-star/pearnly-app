@@ -22042,232 +22042,8 @@ async function deleteEndpoint(endpointId) {
         showBanner();
     }
 
-    // ============================================================
-    // v118.35.0.9 · 升级 modal 整套永久下线 · 函数 + DOM + 监听器全删
-    // credits 系统不是"升级"模型 · 用户改成"充值"(首页 KPI 红字链接 → prompt)
-    // ============================================================
+    // v118.35.0.10 · 升级 modal 整套已永久下线 · 死代码 226 行物理删除
 
-    function renderPlanCards() {
-        // v111.2 · 3 档:monthly / yearly / lifetime
-        const ps = window._planState;
-        const monthlyPrice = (ps && ps.pricing && ps.pricing.monthly_thb) || 299;
-        const yearlyPrice  = (ps && ps.pricing && ps.pricing.yearly_thb)  || 2990;
-        const lifetimePrice = (ps && ps.pricing && ps.pricing.lifetime_thb) || 9900;
-        const monthlyEquiv = Math.round(yearlyPrice / 12);
-        const savePct = Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100);
-
-        return `
-        <div class="upg-cards upg-cards-3">
-            <!-- 月付 -->
-            <div class="upg-card" onclick="window.__upg_pick_plan('monthly')">
-                <div class="upg-card-name">${esc(tt('upg-plan-monthly'))}</div>
-                <div class="upg-card-tag">${esc(tt('upg-monthly-tag'))}</div>
-                <div class="upg-card-price">฿${monthlyPrice}<span class="upg-card-price-unit">${esc(tt('upg-per-month'))}</span></div>
-                <ul class="upg-card-feats">
-                    <li>${esc(tt('upg-feat-ocr', {n: 500}))}</li>
-                    <li>${esc(tt('upg-feat-files', {n: 30}))}</li>
-                    <li>${esc(tt('upg-feat-clients', {n: 10}))}</li>
-                    <li>${esc(tt('upg-feat-automation'))}</li>
-                    <li>${esc(tt('upg-feat-templates'))}</li>
-                    <li>${esc(tt('upg-feat-line'))}</li>
-                </ul>
-                <button class="btn btn-ghost upg-pick-btn">${esc(tt('upg-pick'))}</button>
-            </div>
-
-            <!-- 年付 (推荐) -->
-            <div class="upg-card is-recommended" onclick="window.__upg_pick_plan('yearly')">
-                <div class="upg-card-rec">${esc(tt('upg-recommended'))}</div>
-                <div class="upg-card-name">${esc(tt('upg-plan-yearly'))}</div>
-                <div class="upg-card-tag">${esc(tt('upg-yearly-tag', {pct: savePct}))}</div>
-                <div class="upg-card-price">฿${yearlyPrice}<span class="upg-card-price-unit">${esc(tt('upg-per-year'))}</span></div>
-                <div class="upg-card-equiv">≈ ฿${monthlyEquiv}/${esc(tt('upg-per-month').replace('/',''))}</div>
-                <ul class="upg-card-feats">
-                    <li>${esc(tt('upg-feat-ocr', {n: 1500}))}</li>
-                    <li>${esc(tt('upg-feat-files', {n: 50}))}</li>
-                    <li>${esc(tt('upg-feat-clients', {n: 30}))}</li>
-                    <li>${esc(tt('upg-feat-seats', {n: 3}))}</li>
-                    <li>${esc(tt('upg-feat-automation'))}</li>
-                    <li>${esc(tt('upg-feat-templates'))}</li>
-                    <li>${esc(tt('upg-feat-line'))}</li>
-                </ul>
-                <button class="btn btn-primary upg-pick-btn">${esc(tt('upg-pick'))}</button>
-            </div>
-
-            <!-- 终身 -->
-            <div class="upg-card upg-card-lifetime" onclick="window.__upg_pick_plan('lifetime')">
-                <div class="upg-card-rec upg-card-rec-life">${esc(tt('upg-lifetime-badge'))}</div>
-                <div class="upg-card-name">${esc(tt('upg-plan-lifetime'))}</div>
-                <div class="upg-card-tag">${esc(tt('upg-lifetime-tag'))}</div>
-                <div class="upg-card-price">฿${lifetimePrice}<span class="upg-card-price-unit">${esc(tt('upg-once'))}</span></div>
-                <ul class="upg-card-feats">
-                    <li>${esc(tt('upg-feat-ocr-unlim'))}</li>
-                    <li>${esc(tt('upg-feat-files', {n: 100}))}</li>
-                    <li>${esc(tt('upg-feat-clients-unlim'))}</li>
-                    <li>${esc(tt('upg-feat-seats', {n: 5}))}</li>
-                    <li>${esc(tt('upg-feat-own-key'))}</li>
-                    <li>${esc(tt('upg-feat-automation'))}</li>
-                    <li>${esc(tt('upg-feat-line'))}</li>
-                </ul>
-                <button class="btn btn-ghost upg-pick-btn">${esc(tt('upg-pick'))}</button>
-            </div>
-        </div>`;
-    }
-
-    function renderPaymentForm(plan) {
-        const ps = window._planState;
-        const priceMap = {
-            monthly:  (ps && ps.pricing && ps.pricing.monthly_thb) || 299,
-            yearly:   (ps && ps.pricing && ps.pricing.yearly_thb)  || 2990,
-            lifetime: (ps && ps.pricing && ps.pricing.lifetime_thb) || 9900,
-        };
-        const price = priceMap[plan] || 299;
-        const planLabel = {
-            monthly:  tt('upg-plan-monthly'),
-            yearly:   tt('upg-plan-yearly'),
-            lifetime: tt('upg-plan-lifetime'),
-        }[plan];
-        const isLifetime = (plan === 'lifetime');
-
-        // 收款信息 · 后端 /api/me/plan 的 payment_info
-        const pi = (ps && ps.payment_info) || {};
-
-        return `
-        <button class="upg-back-btn" onclick="window.__upg_back()">← ${esc(tt('pay-back'))}</button>
-
-        <div class="pay-plan-summary">
-            <div class="pay-plan-name">${esc(planLabel)}</div>
-            <div class="pay-amount-big">฿${price.toLocaleString()}</div>
-        </div>
-
-        <div class="pay-section">
-            <div class="pay-section-title">${esc(tt('pay-step1'))}</div>
-            <div class="pay-bank-card">
-                <div class="pay-bank-row pay-bank-name">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="6" width="16" height="11" rx="1"/><path d="M5 6V4h10v2"/></svg>
-                    ${esc(pi.bank_th || pi.bank || 'ธนาคารกสิกรไทย')}
-                </div>
-                <div class="pay-bank-row pay-bank-acct">
-                    <span class="pay-bank-label">${esc(tt('pay-acct-no'))}</span>
-                    <span class="pay-bank-value pay-copyable" onclick="navigator.clipboard.writeText('${esc((pi.account_no||'').replace(/-/g,''))}'); showToast('${esc(tt('pay-copied'))}','success')">${esc(pi.account_no || '011-1-83212-9')}</span>
-                </div>
-                <div class="pay-bank-row pay-bank-promptpay">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="2" width="10" height="16" rx="1.5"/><circle cx="10" cy="15" r="1" fill="currentColor"/></svg>
-                    <span class="pay-bank-label">PromptPay</span>
-                    <span class="pay-bank-value pay-copyable" onclick="navigator.clipboard.writeText('${esc((pi.promptpay||'').replace(/[^0-9+]/g,''))}'); showToast('${esc(tt('pay-copied'))}','success')">${esc(pi.promptpay || '+66 85-064-2609')}</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="pay-section">
-            <div class="pay-section-title">${esc(tt('pay-step2'))}</div>
-            <input type="file" id="pay-screenshot" accept="image/*" style="display:none">
-            <button class="btn btn-ghost pay-pick-btn" onclick="document.getElementById('pay-screenshot').click()">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="14" height="12" rx="1"/><circle cx="7" cy="9" r="1.5"/><path d="M3 14l4-4 3 3 3-2 4 4"/></svg>
-                <span id="pay-file-label">${esc(tt('pay-pick-file'))}</span>
-            </button>
-            <input type="text" id="pay-payer-name" class="pay-input" placeholder="${esc(tt('pay-payer-name'))}">
-            <input type="text" id="pay-payer-note" class="pay-input" placeholder="${esc(tt('pay-payer-note'))}">
-        </div>
-
-        ${isLifetime ? `
-        <div class="pay-section pay-lifetime-key">
-            <div class="pay-section-title">${esc(tt('pay-step3-key'))}</div>
-            <div class="pay-key-hint">${esc(tt('pay-key-hint'))} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">https://aistudio.google.com/apikey</a></div>
-            <input type="text" id="pay-gemini-key" class="pay-input" placeholder="AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX">
-        </div>` : ''}
-
-        <button class="btn btn-primary pay-submit-btn" id="pay-submit-btn">${esc(tt('pay-submit'))}</button>
-        <div class="pay-line-contact">
-            ${esc(tt('pay-line-contact'))}
-        </div>`;
-    }
-
-    // v118.35.0.9 · 升级 modal 整套永久下线 · 跟 plan='credits' pay-as-you-go 不兼容
-    // 入口 entry 函数物理移除 · 老调用站(已批量清理)调到也是 ReferenceError 不会真弹窗
-    let _currentUpgPlan = null;
-
-    window.__upg_pick_plan = function(plan) {
-        _currentUpgPlan = plan;
-        document.getElementById('upg-title').textContent = tt('pay-title', {plan: plan.toUpperCase()});
-        document.getElementById('upg-sub').textContent = '';
-        document.getElementById('upg-body').innerHTML = renderPaymentForm(plan);
-
-        document.getElementById('pay-screenshot').addEventListener('change', (e) => {
-            const f = e.target.files[0];
-            if (f) document.getElementById('pay-file-label').textContent = f.name;
-        });
-        document.getElementById('pay-submit-btn').addEventListener('click', submitPayment);
-    };
-
-    window.__upg_back = function() {
-        document.getElementById('upg-title').textContent = tt('upg-title');
-        document.getElementById('upg-sub').textContent = tt('upg-sub');
-        document.getElementById('upg-body').innerHTML = renderPlanCards();
-    };
-
-    async function submitPayment() {
-        const fInput = document.getElementById('pay-screenshot');
-        const file = fInput.files && fInput.files[0];
-        if (!file) { showToast(tt('pay-need-screenshot'), 'error'); return; }
-
-        // v111.2 · lifetime 必须填 Gemini key
-        let geminiKey = '';
-        if (_currentUpgPlan === 'lifetime') {
-            const keyInput = document.getElementById('pay-gemini-key');
-            geminiKey = (keyInput && keyInput.value || '').trim();
-            if (!geminiKey || !geminiKey.startsWith('AIza') || geminiKey.length < 30) {
-                showToast(tt('pay-need-gemini-key'), 'error');
-                return;
-            }
-        }
-
-        const btn = document.getElementById('pay-submit-btn');
-        const orig = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = tt('pay-submitting');
-        try {
-            const fd = new FormData();
-            fd.append('target_plan', _currentUpgPlan);
-            fd.append('payer_name', document.getElementById('pay-payer-name').value || '');
-            fd.append('payer_note', document.getElementById('pay-payer-note').value || '');
-            fd.append('screenshot', file);
-            const tok = localStorage.getItem('mrpilot_token');
-            const r = await fetch('/api/payment/submit', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + tok },
-                body: fd,
-            });
-            const data = await r.json().catch(() => ({}));
-            if (!r.ok) {
-                showToast(tt('pay-fail') + ' · ' + (data.detail || ''), 'error');
-                btn.disabled = false; btn.textContent = orig;
-                return;
-            }
-
-            // v111.2 · lifetime · 顺手把 Gemini key 存到 settings
-            if (geminiKey) {
-                try {
-                    await fetch('/api/settings/gemini-key', {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': 'Bearer ' + tok,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ api_key: geminiKey }),
-                    });
-                } catch (ke) {
-                    console.warn('save gemini key failed', ke);
-                }
-            }
-
-            closeUpgradeModal();
-            showToast(tt('pay-success'), 'success');
-        } catch (e) {
-            console.error(e);
-            showToast(tt('pay-fail'), 'error');
-            btn.disabled = false; btn.textContent = orig;
-        }
-    }
 
     // ============================================================
     // LINE 绑定弹窗(开发期 · 用 dev 端点 · 真 OAuth 后续接)
@@ -33103,13 +32879,9 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                     if (balSub) {
                         if (bal < 50) {
+                            // v118.35.0.11 · 跟 legacy 一样:onclick 直接调 window._openTopupModal
                             const linkTxt = (typeof t === 'function') ? t('dash-kpi-balance-topup') : 'Top up →';
-                            balSub.innerHTML = '<a href="#" id="kpi-balance-topup-link" style="color:#dc2626;text-decoration:underline;cursor:pointer;">' + escapeHtml(linkTxt) + '</a>';
-                            const lnk = document.getElementById('kpi-balance-topup-link');
-                            if (lnk) lnk.addEventListener('click', function (e) {
-                                e.preventDefault();
-                                _kpiPromptTopup();
-                            });
+                            balSub.innerHTML = '<a href="#" id="kpi-balance-topup-link" style="color:#dc2626;text-decoration:underline;cursor:pointer;" onclick="event.preventDefault();window._openTopupModal&&window._openTopupModal();return false;">' + escapeHtml(linkTxt) + '</a>';
                         } else {
                             balSub.innerHTML = '&nbsp;';
                         }
@@ -33136,35 +32908,15 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     window.loadCreditsCard = loadCreditsCard;
 
+    // v118.35.0.11 · 3 步充值 modal · 还原 legacy/credits-system-5de6cc5 同款体验
+    // Step 1: 金额 (快捷 ฿100/500/1000/2000 + 自定义) → POST /api/credits/topup/request 拿 request_id
+    // Step 2: 显示银行账号 (BBL ธนาคาร กรุงเทพ) + 复制按钮
+    // Step 3: 拖拽/选择转账截图 + 付款人姓名 + 备注 → POST /api/credits/topup/upload-slip/{id} → toast 成功
     function _kpiPromptTopup() {
-        // 复用设置页同款 prompt 流程(简化版 · v36 改正经 modal)
-        const amountStr = prompt((typeof t === 'function') ? t('credits-topup-amount') : 'Amount (THB)', '500');
-        if (!amountStr) return;
-        const amount = parseFloat(amountStr);
-        if (!isFinite(amount) || amount <= 0) {
-            if (typeof showToast === 'function') showToast(t('credits-topup-failed'), 'error');
-            return;
-        }
-        const payer = prompt(t('credits-topup-payer'), '') || '';
-        const note = prompt(t('credits-topup-note'), '') || '';
-        fetch('/api/credits/topup/request', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ amount_thb: amount, payer_name: payer, note: note }),
-        }).then(function (r) {
-            if (r.ok) {
-                if (typeof showToast === 'function') showToast(t('credits-topup-submitted'), 'success');
-                loadCreditsCard();
-            } else {
-                if (typeof showToast === 'function') showToast(t('credits-topup-failed'), 'error');
-            }
-        }).catch(function () {
-            if (typeof showToast === 'function') showToast(t('credits-topup-failed'), 'error');
-        });
+        if (typeof window._openTopupModal === 'function') window._openTopupModal();
     }
+
+
     // 启动时若 hash 落在 #/dashboard,也跑一次(loadAll 后)
     document.addEventListener('DOMContentLoaded', function () {
         if ((location.hash || '').replace(/^#\//, '') === 'dashboard') {
@@ -33707,6 +33459,309 @@ window.addEventListener('DOMContentLoaded', () => {
     if (typeof window.subscribeI18n === 'function') {
         window.subscribeI18n('recon-batch-thead', function () {
             SELECTORS.forEach(_refreshTheadLang);
+        });
+    }
+})();
+// ============================================================
+// v118.35.0.11 · 充值弹窗 · legacy/credits-system-5de6cc5:home.js
+// L30727-31025 IIFE 完整原样提取(299 行)· 不改字符
+// ============================================================
+// ── 充值弹窗 v2 · 3-step flow + 余额实时轮询 ──────────────────────────────────
+(function () {
+    'use strict';
+
+    function _t(k) { return (typeof window.t === 'function' ? window.t(k) : null) || k; }
+    function _tok() { return localStorage.getItem('mrpilot_token') || ''; }
+    function _g(id) { return document.getElementById(id); }
+
+    // ── 余额实时轮询 ──
+    var _lastBal = null;
+    var _pollTimer = null;
+
+    function _startPoll() {
+        if (_pollTimer) return;
+        _pollTimer = setInterval(function () {
+            if (document.hidden) return;
+            var tok = _tok();
+            if (!tok) return;
+            if (window._userInfo && window._userInfo.is_billing_exempt) return;
+            fetch('/api/me/credits', { headers: { 'Authorization': 'Bearer ' + tok } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d) return;
+                    var bal = d.balance_thb != null ? Number(d.balance_thb) : 0;
+                    if (_lastBal !== null && bal > _lastBal) {
+                        if (window.showToast) window.showToast(_t('credits-updated'), 'success');
+                        if (typeof window.loadDashboard === 'function') window.loadDashboard();
+                        if (typeof window._refreshBalanceAlerts === 'function') window._refreshBalanceAlerts();
+                    }
+                    _lastBal = bal;
+                })
+                .catch(function () {});
+        }, 30000);
+    }
+
+    function _stopPoll() {
+        if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+        _lastBal = null;
+    }
+
+    window._startCreditsPoll = _startPoll;
+    window._stopCreditsPoll = _stopPoll;
+    _startPoll(); // 登录后页面已有 token，直接启动
+
+    // ── modal state ──
+    var _reqId = null;
+    var _amount = 0;
+
+    // ── 构建 DOM（懒创建，只建一次）──
+    function _render() {
+        if (_g('topup-v2-ov')) return;
+        var ov = document.createElement('div');
+        ov.id = 'topup-v2-ov';
+        ov.className = 'topup-v2-ov';
+        ov.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9500;align-items:center;justify-content:center;padding:16px';
+        ov.innerHTML = [
+            '<div class="topup-v2-box">',
+            '  <div class="topup-v2-head">',
+            '    <div class="topup-v2-title" id="tv2-title"></div>',
+            '    <button class="topup-v2-close" id="tv2-close" aria-label="close">',
+            '      <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="16" y2="16"/><line x1="16" y1="4" x2="4" y2="16"/></svg>',
+            '    </button>',
+            '  </div>',
+            '  <div class="topup-v2-steps">',
+            '    <div class="topup-v2-step" id="tv2-d1"><span class="topup-v2-dot">1</span><span class="topup-v2-slabel" id="tv2-sl1"></span></div>',
+            '    <div class="topup-v2-line"></div>',
+            '    <div class="topup-v2-step" id="tv2-d2"><span class="topup-v2-dot">2</span><span class="topup-v2-slabel" id="tv2-sl2"></span></div>',
+            '    <div class="topup-v2-line"></div>',
+            '    <div class="topup-v2-step" id="tv2-d3"><span class="topup-v2-dot">3</span><span class="topup-v2-slabel" id="tv2-sl3"></span></div>',
+            '  </div>',
+            '  <div class="topup-v2-body">',
+            // Step 1
+            '    <div id="tv2-s1">',
+            '      <label class="topup-v2-label" id="tv2-al"></label>',
+            '      <div class="topup-v2-qamts">',
+            '        <button class="topup-v2-qamt" data-val="100">฿100</button>',
+            '        <button class="topup-v2-qamt" data-val="500">฿500</button>',
+            '        <button class="topup-v2-qamt" data-val="1000">฿1,000</button>',
+            '        <button class="topup-v2-qamt" data-val="2000">฿2,000</button>',
+            '      </div>',
+            '      <input id="tv2-amt" type="number" min="10" step="1" class="topup-v2-input" placeholder="฿ ...">',
+            '      <div id="tv2-ae" class="topup-v2-err" style="display:none"></div>',
+            '    </div>',
+            // Step 2
+            '    <div id="tv2-s2" style="display:none">',
+            '      <p class="topup-v2-bank-label" id="tv2-bl"></p>',
+            '      <div class="topup-v2-bank-card">',
+            '        <div class="topup-v2-bank-name">ธนาคาร กรุงเทพ</div>',
+            '        <div class="topup-v2-bank-branch">สาขาโชคชัย 4 ลาดพร้าว</div>',
+            '        <div class="topup-v2-bank-acct">230-0-91368-4</div>',
+            '        <div class="topup-v2-bank-holder">บจ. มิสเตอร์ อี อาร์ พี</div>',
+            '        <button class="topup-v2-copy" id="tv2-copy"></button>',
+            '      </div>',
+            '      <div class="topup-v2-warn" id="tv2-bn"></div>',
+            '    </div>',
+            // Step 3
+            '    <div id="tv2-s3" style="display:none">',
+            '      <div class="topup-v2-drop" id="tv2-drop">',
+            '        <input type="file" id="tv2-file" accept="image/*,.pdf" style="display:none">',
+            '        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+            '        <span class="topup-v2-drop-text" id="tv2-dt"></span>',
+            '      </div>',
+            '      <div id="tv2-se" class="topup-v2-err" style="display:none"></div>',
+            '      <label class="topup-v2-label" id="tv2-pl"></label>',
+            '      <input id="tv2-payer" type="text" maxlength="200" class="topup-v2-input">',
+            '      <label class="topup-v2-label" id="tv2-nl"></label>',
+            '      <input id="tv2-note" type="text" maxlength="500" class="topup-v2-input">',
+            '      <div id="tv2-ue" class="topup-v2-err" style="display:none"></div>',
+            '    </div>',
+            '  </div>',
+            '  <div class="topup-v2-foot">',
+            '    <button class="btn btn-ghost" id="tv2-back" style="display:none"></button>',
+            '    <button class="btn btn-primary" id="tv2-next"></button>',
+            '  </div>',
+            '</div>'
+        ].join('');
+        document.body.appendChild(ov);
+        _bindEvents();
+    }
+
+    function _applyText() {
+        var setText = function(id, v) { var e = _g(id); if (e) e.textContent = v; };
+        setText('tv2-title', _t('topup-title'));
+        setText('tv2-sl1', _t('topup-step1'));
+        setText('tv2-sl2', _t('topup-step2'));
+        setText('tv2-sl3', _t('topup-step3'));
+        setText('tv2-al', _t('topup-amount-label'));
+        setText('tv2-bl', _t('topup-bank-label'));
+        setText('tv2-copy', _t('topup-copy-account'));
+        setText('tv2-dt', _t('topup-slip-drop'));
+        setText('tv2-pl', _t('topup-payer-label'));
+        setText('tv2-nl', _t('topup-note-label'));
+    }
+
+    function _setStep(n) {
+        [1,2,3].forEach(function(i) {
+            var s = _g('tv2-s' + i); if (s) s.style.display = i === n ? '' : 'none';
+            var d = _g('tv2-d' + i); if (d) d.classList.toggle('active', i <= n);
+        });
+        var back = _g('tv2-back'), next = _g('tv2-next');
+        if (n === 1) {
+            if (back) { back.style.display = ''; back.textContent = _t('topup-btn-cancel'); }
+        } else {
+            if (back) { back.style.display = ''; back.textContent = _t('topup-btn-back'); }
+        }
+        if (next) next.textContent = n === 3 ? _t('topup-btn-submit') : _t('topup-btn-next');
+        if (n === 2) {
+            var bn = _g('tv2-bn');
+            if (bn) bn.innerHTML = _t('topup-bank-note').replace('{amount}', '<strong>฿' + Number(_amount).toLocaleString() + '</strong>');
+        }
+    }
+
+    function _curStep() {
+        for (var i = 1; i <= 3; i++) { var e = _g('tv2-s' + i); if (e && e.style.display !== 'none') return i; }
+        return 1;
+    }
+
+    function _clrErr(id) { var e = _g(id); if (e) { e.textContent = ''; e.style.display = 'none'; } }
+    function _showErr(id, msg) { var e = _g(id); if (e) { e.textContent = msg; e.style.display = ''; } }
+
+    function _setFile(f) {
+        var dt = _g('tv2-dt'); if (dt) dt.textContent = f.name;
+        var drop = _g('tv2-drop'); if (drop) drop.classList.add('has-file');
+        _clrErr('tv2-se');
+    }
+
+    function _bindEvents() {
+        var ov = _g('topup-v2-ov');
+        _g('tv2-close').addEventListener('click', _close);
+        ov.addEventListener('click', function(e) { if (e.target === ov) _close(); });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && ov && ov.style.display !== 'none') _close();
+        });
+        // quick amount buttons
+        ov.addEventListener('click', function(e) {
+            var btn = e.target.closest('.topup-v2-qamt');
+            if (!btn) return;
+            ov.querySelectorAll('.topup-v2-qamt').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var inp = _g('tv2-amt'); if (inp) { inp.value = btn.dataset.val; _clrErr('tv2-ae'); }
+        });
+        var amtInp = _g('tv2-amt');
+        if (amtInp) amtInp.addEventListener('input', function() {
+            ov.querySelectorAll('.topup-v2-qamt').forEach(function(b) { b.classList.remove('active'); });
+            _clrErr('tv2-ae');
+        });
+        // copy
+        var copyBtn = _g('tv2-copy');
+        if (copyBtn) copyBtn.addEventListener('click', function() {
+            if (!navigator.clipboard) return;
+            navigator.clipboard.writeText('2300913684').then(function() {
+                var orig = copyBtn.textContent;
+                copyBtn.textContent = _t('topup-copied');
+                setTimeout(function() { copyBtn.textContent = orig; }, 1500);
+            });
+        });
+        // drop zone
+        var drop = _g('tv2-drop'), fi = _g('tv2-file');
+        if (drop) {
+            drop.addEventListener('click', function() { if (fi) fi.click(); });
+            drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('drag-over'); });
+            drop.addEventListener('dragleave', function() { drop.classList.remove('drag-over'); });
+            drop.addEventListener('drop', function(e) {
+                e.preventDefault(); drop.classList.remove('drag-over');
+                var f = e.dataTransfer && e.dataTransfer.files[0]; if (f) _setFile(f);
+            });
+        }
+        if (fi) fi.addEventListener('change', function() { if (fi.files[0]) _setFile(fi.files[0]); });
+        // back / next
+        _g('tv2-back').addEventListener('click', function() {
+            var n = _curStep(); if (n <= 1) { _close(); return; } _setStep(n - 1);
+        });
+        _g('tv2-next').addEventListener('click', function() {
+            var n = _curStep();
+            if (n === 1) _step1Next();
+            else if (n === 2) _setStep(3);
+            else _step3Submit();
+        });
+    }
+
+    async function _step1Next() {
+        var inp = _g('tv2-amt'), amt = inp ? parseFloat(inp.value) : 0;
+        if (!amt || amt < 10) { _showErr('tv2-ae', _t('topup-amount-invalid')); return; }
+        _amount = amt;
+        var next = _g('tv2-next'); if (next) { next.disabled = true; next.textContent = '…'; }
+        try {
+            var res = await fetch('/api/credits/topup/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _tok() },
+                body: JSON.stringify({ amount_thb: amt })
+            });
+            if (!res.ok) throw new Error(await res.text());
+            var data = await res.json();
+            _reqId = data.request_id;
+            _setStep(2);
+        } catch(e) {
+            _showErr('tv2-ae', _t('topup-submit-fail') + ' · ' + e.message);
+        } finally {
+            if (next) { next.disabled = false; next.textContent = _t('topup-btn-next'); }
+        }
+    }
+
+    async function _step3Submit() {
+        var fi = _g('tv2-file');
+        if (!fi || !fi.files || !fi.files[0]) { _showErr('tv2-se', _t('topup-slip-required')); return; }
+        var btn = _g('tv2-next'); if (btn) { btn.disabled = true; btn.textContent = '…'; }
+        try {
+            var fd = new FormData();
+            fd.append('file', fi.files[0]);
+            var payer = _g('tv2-payer'), note = _g('tv2-note');
+            if (payer && payer.value.trim()) fd.append('payer_name', payer.value.trim());
+            if (note && note.value.trim()) fd.append('note', note.value.trim());
+            var res = await fetch('/api/credits/topup/upload-slip/' + _reqId, {
+                method: 'POST', headers: { 'Authorization': 'Bearer ' + _tok() }, body: fd
+            });
+            if (!res.ok) throw new Error(await res.text());
+            var data = await res.json();
+            if (data.auto_approved) {
+                if (window.showToast) window.showToast(_t('topup-auto-approved'), 'success');
+                if (typeof window.loadDashboard === 'function') window.loadDashboard();
+            } else {
+                if (window.showToast) window.showToast(_t('topup-pending'), 'info');
+            }
+            _close();
+        } catch(e) {
+            _showErr('tv2-ue', _t('topup-upload-fail') + ' · ' + e.message);
+            if (btn) { btn.disabled = false; btn.textContent = _t('topup-btn-submit'); }
+        }
+    }
+
+    function _close() {
+        var ov = _g('topup-v2-ov'); if (ov) ov.style.display = 'none';
+        if (typeof window.loadDashboard === 'function') window.loadDashboard();
+    }
+
+    window._openTopupModal = function () {
+        _render();
+        _reqId = null; _amount = 0;
+        ['tv2-amt','tv2-payer','tv2-note'].forEach(function(id) { var e=_g(id); if(e) e.value=''; });
+        var fi = _g('tv2-file'); if (fi) fi.value = '';
+        var drop = _g('tv2-drop'); if (drop) drop.classList.remove('has-file','drag-over');
+        _g('topup-v2-ov').querySelectorAll('.topup-v2-qamt').forEach(function(b) { b.classList.remove('active'); });
+        ['tv2-ae','tv2-se','tv2-ue'].forEach(function(id) { _clrErr(id); });
+        _applyText();
+        _setStep(1);
+        _g('topup-v2-ov').style.display = 'flex';
+    };
+
+    // 切语言时若 modal 开着，重新应用文字
+    if (typeof window.subscribeI18n === 'function') {
+        window.subscribeI18n('topup-v2', function () {
+            var ov = _g('topup-v2-ov');
+            if (ov && ov.style.display !== 'none' && ov.style.display !== '') {
+                _applyText();
+                _setStep(_curStep());
+            }
         });
     }
 })();

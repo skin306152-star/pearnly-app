@@ -1466,6 +1466,9 @@ const I18N = {
         'settings-billing-pricing':    '每月前 200 张 ฿1.50/张 · 超出 ฿0.75/张',
         // 充值 modal (V2 from legacy/credits-system-5de6cc5 · 21 keys × 4 lang)
         'topup-title':           '充值到账户',
+        'topup-step1':           '填金额',
+        'topup-step2':           '转账',
+        'topup-step3':           '上传截图',
         'topup-amount-label':    '充值金额',
         'topup-amount-invalid':  '请输入有效金额(最低 ฿10)',
         'topup-bank-label':      '转账到以下账户',
@@ -3908,6 +3911,9 @@ const I18N = {
         'settings-billing-pricing':    'First 200 pages/month ฿1.50/page · Above ฿0.75/page',
         // topup modal 21 keys
         'topup-title':           'Add Credits',
+        'topup-step1':           'Amount',
+        'topup-step2':           'Transfer',
+        'topup-step3':           'Upload Slip',
         'topup-amount-label':    'Amount',
         'topup-amount-invalid':  'Please enter a valid amount (min ฿10)',
         'topup-bank-label':      'Transfer to',
@@ -6339,6 +6345,9 @@ const I18N = {
         'settings-billing-pricing':    '200 หน้าแรก/เดือน ฿1.50/หน้า · เกินกว่านั้น ฿0.75/หน้า',
         // topup modal 21 keys
         'topup-title':           'เติมเครดิต',
+        'topup-step1':           'ระบุจำนวน',
+        'topup-step2':           'โอนเงิน',
+        'topup-step3':           'อัปโหลดสลิป',
         'topup-amount-label':    'จำนวนเงิน',
         'topup-amount-invalid':  'กรุณาระบุจำนวนเงินที่ถูกต้อง (ขั้นต่ำ ฿10)',
         'topup-bank-label':      'โอนเงินไปที่บัญชีนี้',
@@ -8766,6 +8775,9 @@ const I18N = {
         'settings-billing-pricing':    '月最初の 200 ページ ฿1.50/ページ · 超過分 ฿0.75/ページ',
         // topup modal 21 keys
         'topup-title':           'クレジットを追加',
+        'topup-step1':           '金額入力',
+        'topup-step2':           '振込',
+        'topup-step3':           'スリップ送信',
         'topup-amount-label':    '金額',
         'topup-amount-invalid':  '有効な金額を入力(最低 ฿10)',
         'topup-bank-label':      '振込先',
@@ -11030,6 +11042,9 @@ function switchSettingsTab(tabName) {
         if (tabName === 'team') loadTeamList();
         // v118.21.2 · 切到 learned tab 时加载学习规则
         if (tabName === 'learned' && typeof window.loadLearnedRules === 'function') window.loadLearnedRules();
+        // v118.35.0.14 · 切到 plan tab 时重渲 credits 计费卡 · 否则首次打开 modal
+        // 之后切 tab 来回 · #settings-info 内容会消失(原 bug: 套餐&用量 panel 空白)
+        if (tabName === 'plan' && typeof renderSettings === 'function') renderSettings();
     } catch (e) { console.warn('settings tab side effect failed:', e); }
 }
 

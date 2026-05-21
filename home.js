@@ -1370,7 +1370,6 @@ const I18N = {
         'set-archive-title': '归档规则',
         'set-archive-sub': '设置批量下载 ZIP 时的文件命名模板 · 例如 日期_供应商_金额.pdf',
         'set-archive-open-btn': '打开命名规则编辑器',
-        'set-tab-api': 'API & 密钥',
         'set-tab-learned': '学习规则',
         'set-tab-general': '通用设置',
         'set-general-title': '通用设置',
@@ -1501,27 +1500,6 @@ const I18N = {
         'credits-topup-note':         '备注(可选)',
         'credits-topup-submitted':    '✓ 申请已提交 · 等管理员审核',
         'credits-topup-failed':       '提交失败 · 请稍后重试',
-        'sub-type-own-key': '自带 API Key · 无限制',
-        'sub-type-need-setup': '待配置',
-        'sub-need-api-key': '请在下方填入识别服务密钥',
-        'settings-api-key': '识别服务密钥',
-        'settings-api-key-desc': '买断版专属 · 填入您自己的识别服务密钥后可无限次使用 · 不占用系统月度额度',
-        'api-key-current-label': '当前已保存:',
-        'btn-api-key-test': '测试',
-        'btn-api-key-save': '保存',
-        'btn-api-key-clear': '清除',
-        'api-key-how-to-get': '如何获取密钥?',
-        'api-key-saved': '✓ API Key 已保存',
-        'api-key-cleared': '✓ 已清除 · 将使用系统额度',
-        'api-key-clear-confirm': '清除后将切换回使用系统额度 · 确定吗?',
-        'gemini.testing': '正在测试…',
-        'gemini.key_valid': '✓ Key 有效 · 可以保存',
-        'gemini.key_invalid': '✗ Key 无效 · 请检查',
-        'gemini.key_empty': '请先输入 Key',
-        'gemini.invalid_key_format': '格式不对 · Gemini Key 以 AIza 开头',
-        'gemini.key_quota_exceeded': 'Key 配额已用尽',
-        'gemini.test_error': '测试失败 · 请稍后再试',
-        'gemini.test_empty': '响应为空 · Key 可能有问题',
         'settings.save_failed': '保存失败',
         'err.ocr.monthly_limit_exceeded': '本月额度已用完({used}/{limit}) · 请联系客服续费',
         'err.quota.need_api_key': '此账号需自备识别服务密钥 · 请先在设置页填入',
@@ -3816,7 +3794,6 @@ const I18N = {
         'set-archive-title': 'Archive Rule',
         'set-archive-sub': 'Naming template applied when batch-downloading as ZIP · e.g. date_supplier_amount.pdf',
         'set-archive-open-btn': 'Open template editor',
-        'set-tab-api': 'API & Keys',
         'set-tab-learned': 'Learned Rules',
         'set-tab-general': 'General',
         'set-general-title': 'General Settings',
@@ -3946,27 +3923,6 @@ const I18N = {
         'credits-topup-note':         'Note (optional)',
         'credits-topup-submitted':    '✓ Request submitted · awaiting admin review',
         'credits-topup-failed':       'Submit failed · please retry',
-        'sub-type-own-key': 'Own API Key · Unlimited',
-        'sub-type-need-setup': 'Setup required',
-        'sub-need-api-key': 'Please add your recognition key below',
-        'settings-api-key': 'Recognition Service Key',
-        'settings-api-key-desc': 'Lifetime plan only · Enter your own recognition service key for unlimited use · Does not count against system monthly quota',
-        'api-key-current-label': 'Current saved:',
-        'btn-api-key-test': 'Test',
-        'btn-api-key-save': 'Save',
-        'btn-api-key-clear': 'Clear',
-        'api-key-how-to-get': 'How to get a key?',
-        'api-key-saved': '✓ API Key saved',
-        'api-key-cleared': '✓ Cleared · will use system quota',
-        'api-key-clear-confirm': 'Clearing will switch back to system quota. Continue?',
-        'gemini.testing': 'Testing...',
-        'gemini.key_valid': '✓ Key valid · OK to save',
-        'gemini.key_invalid': '✗ Invalid key',
-        'gemini.key_empty': 'Enter a key first',
-        'gemini.invalid_key_format': 'Invalid format · Gemini keys start with AIza',
-        'gemini.key_quota_exceeded': 'Key quota exceeded',
-        'gemini.test_error': 'Test failed · try again',
-        'gemini.test_empty': 'Empty response · key may be wrong',
         'settings.save_failed': 'Save failed',
         'err.ocr.monthly_limit_exceeded': 'Monthly quota exceeded ({used}/{limit}) · please contact support',
         'err.quota.need_api_key': 'This account requires your own recognition service key · add it in Settings',
@@ -6250,7 +6206,6 @@ const I18N = {
         'set-archive-title': 'กฎจัดเก็บ',
         'set-archive-sub': 'รูปแบบชื่อไฟล์ตอนดาวน์โหลด ZIP รายชุด · เช่น วันที่_ผู้ขาย_จำนวน.pdf',
         'set-archive-open-btn': 'เปิดตัวแก้ไขรูปแบบ',
-        'set-tab-api': 'API & คีย์',
         'set-tab-learned': 'กฎที่เรียนรู้',
         'set-tab-general': 'ตั้งค่าทั่วไป',
         'set-general-title': 'ตั้งค่าทั่วไป',
@@ -6380,27 +6335,6 @@ const I18N = {
         'credits-topup-note':         'หมายเหตุ (ไม่บังคับ)',
         'credits-topup-submitted':    '✓ ส่งคำขอแล้ว · รอแอดมินอนุมัติ',
         'credits-topup-failed':       'ส่งไม่สำเร็จ · กรุณาลองใหม่',
-        'sub-type-own-key': 'API ของตัวเอง · ไม่จำกัด',
-        'sub-type-need-setup': 'ต้องตั้งค่า',
-        'sub-need-api-key': 'กรุณาใส่คีย์บริการ OCR ด้านล่าง',
-        'settings-api-key': 'คีย์บริการ OCR',
-        'settings-api-key-desc': 'เฉพาะแบบซื้อขาด · ใส่คีย์บริการ OCR ของคุณเองเพื่อใช้ได้ไม่จำกัด · ไม่นับรวมโควตารายเดือนระบบ',
-        'api-key-current-label': 'บันทึกไว้ปัจจุบัน:',
-        'btn-api-key-test': 'ทดสอบ',
-        'btn-api-key-save': 'บันทึก',
-        'btn-api-key-clear': 'ลบ',
-        'api-key-how-to-get': 'รับคีย์อย่างไร?',
-        'api-key-saved': '✓ บันทึกแล้ว',
-        'api-key-cleared': '✓ ล้างแล้ว · ใช้โควตาระบบ',
-        'api-key-clear-confirm': 'ล้างแล้วจะใช้โควตาระบบ · แน่ใจ?',
-        'gemini.testing': 'กำลังทดสอบ...',
-        'gemini.key_valid': '✓ ใช้ได้',
-        'gemini.key_invalid': '✗ คีย์ไม่ถูกต้อง',
-        'gemini.key_empty': 'กรุณาใส่คีย์',
-        'gemini.invalid_key_format': 'รูปแบบผิด · ขึ้นต้นด้วย AIza',
-        'gemini.key_quota_exceeded': 'โควตาคีย์หมด',
-        'gemini.test_error': 'ทดสอบล้มเหลว',
-        'gemini.test_empty': 'ไม่มีคำตอบ · คีย์อาจผิด',
         'settings.save_failed': 'บันทึกล้มเหลว',
         'err.ocr.monthly_limit_exceeded': 'โควตาหมด ({used}/{limit}) · ติดต่อฝ่ายสนับสนุน',
         'err.quota.need_api_key': 'บัญชีนี้ต้องใช้คีย์บริการรู้จำของคุณเอง · กรุณาเพิ่มในหน้าตั้งค่า',
@@ -8680,7 +8614,6 @@ const I18N = {
         'set-archive-title': 'アーカイブ規則',
         'set-archive-sub': 'ZIP 一括ダウンロード時のファイル名テンプレート · 例:日付_仕入先_金額.pdf',
         'set-archive-open-btn': 'テンプレートエディタを開く',
-        'set-tab-api': 'API & キー',
         'set-tab-learned': '学習ルール',
         'set-tab-general': '一般設定',
         'set-general-title': '一般設定',
@@ -8810,27 +8743,6 @@ const I18N = {
         'credits-topup-note':         'メモ (任意)',
         'credits-topup-submitted':    '✓ 申請を送信しました · 管理者の承認待ち',
         'credits-topup-failed':       '送信失敗 · 再試行してください',
-        'sub-type-own-key': '独自 API Key · 無制限',
-        'sub-type-need-setup': '設定が必要',
-        'sub-need-api-key': '下で認識サービスキーを入力',
-        'settings-api-key': '認識サービスキー',
-        'settings-api-key-desc': '買い切り版専用 · ご自身の認識サービスキーを入力すると無制限で利用可能 · システム月間クォータを消費しません',
-        'api-key-current-label': '保存済み:',
-        'btn-api-key-test': 'テスト',
-        'btn-api-key-save': '保存',
-        'btn-api-key-clear': 'クリア',
-        'api-key-how-to-get': 'キーの取得方法',
-        'api-key-saved': '✓ 保存しました',
-        'api-key-cleared': '✓ クリア · システムクォータ使用',
-        'api-key-clear-confirm': 'クリアするとシステムクォータに戻ります。続行?',
-        'gemini.testing': 'テスト中...',
-        'gemini.key_valid': '✓ 有効',
-        'gemini.key_invalid': '✗ 無効なキー',
-        'gemini.key_empty': 'キーを入力してください',
-        'gemini.invalid_key_format': '形式が不正 · AIza で始まる',
-        'gemini.key_quota_exceeded': 'キーのクォータ超過',
-        'gemini.test_error': 'テスト失敗',
-        'gemini.test_empty': '応答なし',
         'settings.save_failed': '保存失敗',
         'err.ocr.monthly_limit_exceeded': '月のクォータ超過 ({used}/{limit}) · サポートへ',
         'err.quota.need_api_key': 'このアカウントは認識サービスキーが必要 · 設定画面で入力してください',
@@ -14357,8 +14269,7 @@ function renderSettings() {
     // 设置页只显示:用户名 + 计费方式 + 价格说明 · 不再显示订阅类型/配额/有效期表格
     _renderCreditsSettings(u, el);
 
-    // v0.15 · 加载 Gemini Key 当前状态
-    loadGeminiKeyInfo();
+    // v118.35.0.16 · BYO Gemini Key 已永久下线 · credits 系统接管
 
     // v87 · API Key 卡片只对买断账号(tenant_type=byo_api)显示
     // 月付(shared_api)共用系统 key · 不能也不需要填
@@ -14398,118 +14309,8 @@ function _renderCreditsSettings(u, el) {
 }
 
 
-// ============================================================
-// v0.15 · Gemini API Key 管理
-// ============================================================
-async function loadGeminiKeyInfo() {
-    const currentEl = document.getElementById('settings-api-key-current');
-    const clearBtn = document.getElementById('btn-api-key-clear');
-    if (!currentEl) return;
-    try {
-        const resp = await fetch('/api/settings/gemini-key', {
-            headers: { 'Authorization': 'Bearer ' + token },
-        });
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (data.has_key) {
-            currentEl.style.display = '';
-            currentEl.innerHTML = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7l3 3 6-6"/></svg> ${escapeHtml(t('api-key-current-label'))} <code>${escapeHtml(data.preview)}</code>`;
-            if (clearBtn) clearBtn.style.display = '';
-        } else {
-            currentEl.style.display = 'none';
-            if (clearBtn) clearBtn.style.display = 'none';
-        }
-    } catch (e) {
-        console.warn('loadGeminiKeyInfo failed', e);
-    }
-}
+// v118.35.0.16 · BYO Gemini Key 全套(loadGeminiKeyInfo/saveGeminiKey/testGeminiKey/clearGeminiKey + setApiKeyMsg) 物理删除
 
-function setApiKeyMsg(text, kind) {
-    const el = document.getElementById('api-key-msg');
-    if (!el) return;
-    el.textContent = text || '';
-    el.className = 'api-key-msg' + (kind ? ' ' + kind : '');
-}
-
-async function saveGeminiKey() {
-    const input = document.getElementById('api-key-input');
-    const raw = (input?.value || '').trim();
-    setApiKeyMsg('', '');
-
-    try {
-        const resp = await fetch('/api/settings/gemini-key', {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ api_key: raw || null }),
-        });
-        const data = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-            const code = (data.detail || '').toString();
-            const msgKey = code.includes('invalid_key_format') ? 'gemini.invalid_key_format' : 'settings.save_failed';
-            setApiKeyMsg(t(msgKey), 'error');
-            return;
-        }
-        setApiKeyMsg(t(raw ? 'api-key-saved' : 'api-key-cleared'), 'success');
-        input.value = '';
-        // 刷新 _userInfo 的 has_own_gemini_key
-        await refreshUserInfo();
-        renderSettings();
-    } catch (e) {
-        setApiKeyMsg(t('settings.save_failed'), 'error');
-    }
-}
-
-async function testGeminiKey() {
-    const input = document.getElementById('api-key-input');
-    const raw = (input?.value || '').trim();
-    if (!raw) {
-        setApiKeyMsg(t('gemini.key_empty'), 'error');
-        return;
-    }
-    setApiKeyMsg(t('gemini.testing'), 'info');
-    try {
-        const resp = await fetch('/api/settings/gemini-key/test', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ api_key: raw }),
-        });
-        const data = await resp.json().catch(() => ({}));
-        const msgKey = data.msg || (data.ok ? 'gemini.key_valid' : 'gemini.test_error');
-        setApiKeyMsg(t(msgKey), data.ok ? 'success' : 'error');
-    } catch (e) {
-        setApiKeyMsg(t('gemini.test_error'), 'error');
-    }
-}
-
-async function clearGeminiKey() {
-    const ok = await showConfirm(t('api-key-clear-confirm'), { danger: true });
-    if (!ok) return;
-    try {
-        const resp = await fetch('/api/settings/gemini-key', {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ api_key: null }),
-        });
-        if (resp.ok) {
-            setApiKeyMsg(t('api-key-cleared'), 'success');
-            await refreshUserInfo();
-            renderSettings();
-        } else {
-            setApiKeyMsg(t('settings.save_failed'), 'error');
-        }
-    } catch (e) {
-        setApiKeyMsg(t('settings.save_failed'), 'error');
-    }
-}
 
 async function refreshUserInfo() {
     try {
@@ -14522,12 +14323,7 @@ async function refreshUserInfo() {
 
 // 事件绑定(页面加载时只绑一次)
 document.addEventListener('DOMContentLoaded', () => {
-    const saveBtn = document.getElementById('btn-api-key-save');
-    const testBtn = document.getElementById('btn-api-key-test');
-    const clearBtn = document.getElementById('btn-api-key-clear');
-    if (saveBtn) saveBtn.addEventListener('click', saveGeminiKey);
-    if (testBtn) testBtn.addEventListener('click', testGeminiKey);
-    if (clearBtn) clearBtn.addEventListener('click', clearGeminiKey);
+    // v118.35.0.16 · BYO Gemini Key 按钮事件绑定永久下线
 
     // v92 · Bug 7 · 断网横幅
     installNetworkBanner();

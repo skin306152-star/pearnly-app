@@ -5220,65 +5220,7 @@ async def dup_check_put(payload: DupCheckSettingPayload, request: Request):
 #   GET  · 读遮罩信息(安全)
 #   PUT  · 保存 key
 #   POST /test · 用 key 做一次最小调用验证有效
-# ============================================================
-class GeminiKeyPayload(BaseModel):
-    api_key: Optional[str] = None  # 空串 / null = 清空
-
-
-@app.get("/api/settings/gemini-key")
-async def gemini_key_get(request: Request):
-    user = get_current_user_from_request(request)
-    return db.get_user_gemini_key_masked(str(user["id"]))
-
-
-@app.put("/api/settings/gemini-key")
-async def gemini_key_put(payload: GeminiKeyPayload, request: Request):
-    user = get_current_user_from_request(request)
-    key = (payload.api_key or "").strip() or None
-    # 基础校验
-    if key and not key.startswith("AIza"):
-        raise HTTPException(400, detail="gemini.invalid_key_format")
-    if key and len(key) < 30:
-        raise HTTPException(400, detail="gemini.invalid_key_format")
-    ok = db.set_user_gemini_key(str(user["id"]), key)
-    if not ok:
-        raise HTTPException(500, detail="settings.save_failed")
-    return {"ok": True, "has_key": bool(key)}
-
-
-@app.post("/api/settings/gemini-key/test")
-async def gemini_key_test(payload: GeminiKeyPayload, request: Request):
-    """
-    用传入的 key 做最小调用验证 · 不保存
-    返回 { ok: bool, msg: str (i18n key 或错误详情) }
-    """
-    get_current_user_from_request(request)  # 要求登录
-    key = (payload.api_key or "").strip()
-    if not key:
-        return {"ok": False, "msg": "gemini.key_empty"}
-    if not key.startswith("AIza") or len(key) < 30:
-        return {"ok": False, "msg": "gemini.invalid_key_format"}
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        # 最小请求 · 输出应该是 "ok"(仅 1-2 token)
-        resp = model.generate_content("Reply with just: ok",
-                                      request_options={"timeout": 15})
-        txt = resp.text if hasattr(resp, "text") else ""
-        if txt:
-            return {"ok": True, "msg": "gemini.key_valid"}
-        return {"ok": False, "msg": "gemini.test_empty"}
-    except Exception as e:
-        err_name = type(e).__name__
-        err_msg = str(e)[:200]
-        logger.info(f"[gemini-key/test] 失败: {err_name}: {err_msg}")
-        # 常见错误归类
-        if "401" in err_msg or "API_KEY_INVALID" in err_msg or "invalid" in err_msg.lower():
-            return {"ok": False, "msg": "gemini.key_invalid"}
-        if "quota" in err_msg.lower() or "429" in err_msg:
-            return {"ok": False, "msg": "gemini.key_quota_exceeded"}
-        return {"ok": False, "msg": "gemini.test_error"}
+# v118.35.0.16 · /api/settings/gemini-key GET/PUT/POST routes 永久下线 · credits 系统不需要用户自带 key
 
 
 @app.post("/api/archive/rename-preview")

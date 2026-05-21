@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835014">
+<link rel="stylesheet" href="/static/home.css?v=11835016">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -3793,10 +3793,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="6.5"/><path d="M7 10l2 2 4-4"/></svg>
                     <span>学习规则</span>
                 </button>
-                <button class="settings-tab settings-nav-item" data-tab="api" data-i18n="set-tab-api">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3l-2 4h3l-2 4 6-6h-3l2-2zM9 17l-3-3 3-3"/></svg>
-                    <span>API & 密钥</span>
-                </button>
+                <!-- v118.35.0.16 · API & 密钥 tab 永久下线 · credits 系统接管 -->
             </div>
             <div class="settings-nav-group">
                 <div class="settings-nav-group-title" data-i18n="set-group-system">系统</div>
@@ -4065,30 +4062,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 </div>
             </div>
 
-            <!-- Tab 7 · API & 密钥(买断用户专属 · 由 JS 控制 tab 显隐) -->
-            <div class="settings-pane" data-pane="api">
-                <!-- v0.15 · 识别服务密钥(仅买断用户显示) -->
-                <div class="card" id="api-key-card">
-                    <div class="section-head">
-                        <div class="section-title" data-i18n="settings-api-key">识别服务密钥</div>
-                    </div>
-                    <div class="api-key-desc" data-i18n="settings-api-key-desc">
-                        买断版专属 · 填入您自己的识别服务密钥后可无限次使用 · 不占用系统月度额度
-                    </div>
-                    <div id="settings-api-key-current" class="api-key-current" style="display:none;"></div>
-                    <div class="api-key-form">
-                        <input type="password" id="api-key-input" class="api-key-input"
-                               placeholder="AIza..." autocomplete="off" spellcheck="false">
-                        <button type="button" class="btn btn-ghost btn-small" id="btn-api-key-test" data-i18n="btn-api-key-test">测试</button>
-                        <button type="button" class="btn btn-primary btn-small" id="btn-api-key-save" data-i18n="btn-api-key-save">保存</button>
-                        <button type="button" class="btn btn-ghost btn-small" id="btn-api-key-clear" data-i18n="btn-api-key-clear" style="display:none;">清除</button>
-                    </div>
-                    <div id="api-key-msg" class="api-key-msg"></div>
-                    <div class="api-key-help">
-                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" data-i18n="api-key-how-to-get">如何获取密钥?</a>
-                    </div>
-                </div>
-            </div>
+            <!-- v118.35.0.16 · Tab 7 API & 密钥(BYO Gemini Key)整段永久下线 · credits 系统不再需要用户自带 key -->
 
             <!-- v118.21.2 · 学习规则(撤销「忽略此类」白名单) -->
             <div class="settings-pane" data-pane="learned">
@@ -6568,7 +6542,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11835014"></script>
+<script src="/static/home.js?v=11835016"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·

@@ -1507,73 +1507,7 @@ def get_my_plan(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============================================================
-# 路由 · 升级套餐(用户提交付款截图)
-# ============================================================
-@router.post("/api/payment/submit")
-async def submit_payment(
-    request: Request,
-    target_plan: str = Form(...),
-    payer_name: str = Form(""),
-    payer_note: str = Form(""),
-    screenshot: Optional[UploadFile] = File(None),
-):
-    try:
-        u = _get_user_safe(request)
-        if not u:
-            raise HTTPException(status_code=401, detail="unauthorized")
-        if target_plan not in ("monthly", "yearly", "lifetime", "pro", "firm"):
-            raise HTTPException(status_code=400, detail="invalid_plan")
-        # v111.2 · 老 plan 名自动 map
-        target_plan = LEGACY_PLAN_MAP.get(target_plan, target_plan)
-        if target_plan not in ("monthly", "yearly", "lifetime"):
-            raise HTTPException(status_code=400, detail="invalid_plan")
-
-        amount = PLAN_CONFIG[target_plan].get("price_thb", 0)
-        screenshot_path = None
-
-        if screenshot:
-            # 保存到 /opt/mrpilot/payments/
-            os.makedirs("payments", exist_ok=True)
-            ext = ".jpg"
-            ct = screenshot.content_type or ""
-            if "png" in ct: ext = ".png"
-            elif "webp" in ct: ext = ".webp"
-            fname = f"payments/pay_{u.get('id')}_{int(_now().timestamp())}{ext}"
-            try:
-                content = await screenshot.read()
-                if len(content) > 5 * 1024 * 1024:
-                    raise HTTPException(status_code=400, detail="screenshot_too_large")
-                with open(fname, "wb") as f:
-                    f.write(content)
-                screenshot_path = fname
-            except Exception as fe:
-                logger.warning(f"screenshot save skip: {fe}")
-
-        import db as _db
-        with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
-                    INSERT INTO payment_pending(
-                        user_id, target_plan, amount_thb,
-                        screenshot_path, payer_name, payer_note,
-                        status
-                    ) VALUES (%s, %s, %s, %s, %s, %s, 'pending')
-                    RETURNING id
-                """, (u.get("id"), target_plan, amount, screenshot_path,
-                      payer_name or None, payer_note or None))
-                pid = _row_count(cur.fetchone())
-
-        return {"ok": True, "payment_id": pid, "status": "pending"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"submit_payment: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================================
-# 后台 · 漏斗 / 概览
-# ============================================================
+# v118.35.0.11 · /api/payment/submit 路由永久下线 · credits 系统不再走升级模式 · 用户冲入是 /api/credits/topup/request
 @router.get("/api/admin/users/funnel")
 def admin_user_funnel(request: Request):
     """注册漏斗 + 套餐分布"""

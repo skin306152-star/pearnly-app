@@ -303,6 +303,29 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                         <div class="cost-kpi-sub" data-i18n="mon-procs-sub">uvicorn master + worker</div>
                     </div>
                 </div>
+                <!-- v118.35.0.27 · 任务队列(最小版 · 接口契约 · 未接 OCR) -->
+                <div class="cost-kpi-grid" style="margin-top:12px">
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-q-pending">队列待处理</div>
+                        <div class="cost-kpi-value" id="mon-q-pending">—</div>
+                        <div class="cost-kpi-sub" id="mon-q-pending-sub" data-i18n="mon-q-sub-notconnected">待接入 · 当前 0</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-q-running">队列处理中</div>
+                        <div class="cost-kpi-value" id="mon-q-running">—</div>
+                        <div class="cost-kpi-sub" data-i18n="mon-q-sub-notconnected">待接入 · 当前 0</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-q-done">最近成功</div>
+                        <div class="cost-kpi-value" id="mon-q-done">—</div>
+                        <div class="cost-kpi-sub" data-i18n="mon-q-sub-recent">最近 200 条</div>
+                    </div>
+                    <div class="cost-kpi-card">
+                        <div class="cost-kpi-label" data-i18n="mon-q-failed">最近失败</div>
+                        <div class="cost-kpi-value" id="mon-q-failed">—</div>
+                        <div class="cost-kpi-sub" data-i18n="mon-q-sub-recent">最近 200 条</div>
+                    </div>
+                </div>
             </div>
 
             <!-- v118.35.0.22 · 全公司余额清单 -->

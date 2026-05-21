@@ -174,11 +174,21 @@ def get_os_stats() -> Dict[str, Any]:
     return out
 
 
+def get_queue_stats() -> Dict[str, Any]:
+    """v0.27 · 任务队列状态(最小版 · 接口契约稳定)"""
+    try:
+        from services.task_queue import get_queue_stats as _q
+        return _q()
+    except Exception:
+        return {"available": False}
+
+
 def get_monitoring_overview() -> Dict[str, Any]:
     """admin 面板拉取入口"""
     return {
         "gemini": gemini_stats.get_stats(),
         "db_pool": DBPoolStats.get_stats(),
         "os": get_os_stats(),
+        "queue": get_queue_stats(),
         "ts": int(time.time()),
     }

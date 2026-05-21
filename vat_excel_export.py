@@ -742,13 +742,19 @@ def merge_vat_reports(report_files: List[Dict[str, Any]],
                 "error": f"多份报告期间不一致 · 请检查"}
 
     # 合并 rows · 重排 row_no 连续递增
+    # v118.35.0.27 · 多页 PDF 溯源:每行加 source_filename + source_page
+    # 让对账差异行能定位回原 PDF 第几页
     all_rows: List[Dict] = []
     seq = 0
-    for p in parsed_list:
+    for p, src in zip(parsed_list, report_files):
+        src_filename = src.get("filename", "")
         for row in p.get("rows", []):
             seq += 1
             row = dict(row)
             row["row_no"] = seq
+            row["source_filename"] = src_filename
+            # 保留原 row 里的 page_no(如果 parse_vat_report 返回)· 否则空
+            row.setdefault("source_page", row.get("page_no") or row.get("page") or "")
             all_rows.append(row)
 
     seller_tax_id = (next(iter(sellers)) if sellers else "")

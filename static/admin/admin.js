@@ -351,6 +351,12 @@
                 _setText('mon-mem', '—'); _setText('mon-load', '—');
                 _setText('mon-cores', '—'); _setText('mon-procs', '—');
             }
+            // v118.35.0.27 · 任务队列
+            const q = d.queue || {};
+            _setText('mon-q-pending', String(q.pending || 0));
+            _setText('mon-q-running', String(q.running || 0));
+            _setText('mon-q-done', String(q.done_recent || 0));
+            _setText('mon-q-failed', String(q.failed_recent || 0));
         } catch (e) {
             console.warn('monitoring overview', e);
         }

@@ -82,6 +82,13 @@
             'mon-cores-sub': '服务器配置',
             'mon-procs': 'Worker 进程',
             'mon-procs-sub': 'uvicorn master + worker',
+            // v118.35.0.27 · 任务队列(最小版)
+            'mon-q-pending': '队列待处理',
+            'mon-q-running': '队列处理中',
+            'mon-q-done': '最近成功',
+            'mon-q-failed': '最近失败',
+            'mon-q-sub-notconnected': '待接入 · 当前 0',
+            'mon-q-sub-recent': '最近 200 条',
             // 用户管理页
             'admin-users-title': '用户管理',
             'admin-users-sub': '注册用户 · 套餐分布 · 待审核付款 · 风控',
@@ -254,6 +261,13 @@
             'mon-cores-sub': 'การตั้งค่าเซิร์ฟเวอร์',
             'mon-procs': 'กระบวนการ Worker',
             'mon-procs-sub': 'uvicorn master + worker',
+            // v118.35.0.27 · คิวงาน(เวอร์ชันเล็ก)
+            'mon-q-pending': 'คิวรอ',
+            'mon-q-running': 'คิวกำลังทำ',
+            'mon-q-done': 'สำเร็จล่าสุด',
+            'mon-q-failed': 'ล้มเหลวล่าสุด',
+            'mon-q-sub-notconnected': 'รอเชื่อมต่อ · ตอนนี้ 0',
+            'mon-q-sub-recent': '200 รายการล่าสุด',
             'admin-users-title': 'จัดการผู้ใช้',
             'admin-users-sub': 'ผู้สมัคร · แพ็กเกจ · รอตรวจสอบ · ควบคุมความเสี่ยง',
             'adm-pending-title': 'รอตรวจสอบการชำระ',

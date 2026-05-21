@@ -11930,21 +11930,7 @@ function _planDisplayLabel(plan) {
     return plan.charAt(0).toUpperCase() + plan.slice(1);
 }
 
-// v118.35.0.9 · 升级 modal 已永久下线 · 函数从 home.js 物理移除
-
-// 升级窗 DOM 相关事件 · 已废弃 · 防御性检查
-try {
-    const closeBtn = document.getElementById('upgrade-close');
-    if (closeBtn) closeBtn.addEventListener('click', () => {
-        const m = document.getElementById('upgrade-modal');
-        if (m) m.classList.remove('show');
-    });
-    const closeBtn2 = document.getElementById('upgrade-close-btn');
-    if (closeBtn2) closeBtn2.addEventListener('click', () => {
-        const m = document.getElementById('upgrade-modal');
-        if (m) m.classList.remove('show');
-    });
-} catch (e) {}
+// v118.35.0.9 · 升级 modal 已永久下线 · 函数从 home.js 物理移除 · 相关 DOM 监听器也删干净
 
 // 全局 data-upgrade 按钮 · v0.15 不再触发升级窗 · 静默忽略
 document.addEventListener('click', (e) => {
@@ -14004,10 +13990,8 @@ function openDiagnoseDialog() {
 
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+        // v118.35.0.9 · 升级 modal 已下线 · 只剩 drawer 处理
         if (document.getElementById('drawer').classList.contains('show')) closeDrawer();
-        else if (document.getElementById('upgrade-modal').classList.contains('show')) {
-            document.getElementById('upgrade-modal').classList.remove('show');
-        }
     }
 });
 
@@ -22059,34 +22043,9 @@ async function deleteEndpoint(endpointId) {
     }
 
     // ============================================================
-    // 升级弹窗
+    // v118.35.0.9 · 升级 modal 整套永久下线 · 函数 + DOM + 监听器全删
+    // credits 系统不是"升级"模型 · 用户改成"充值"(首页 KPI 红字链接 → prompt)
     // ============================================================
-    function ensureUpgradeModal() {
-        if (document.getElementById('upgrade-modal')) return;
-        const html = `
-        <div class="upg-overlay" id="upgrade-modal" style="display:none;">
-            <div class="upg-modal">
-                <div class="upg-head">
-                    <div>
-                        <div class="upg-title" id="upg-title">${esc(tt('upg-title'))}</div>
-                        <div class="upg-sub" id="upg-sub">${esc(tt('upg-sub'))}</div>
-                    </div>
-                    <button class="upg-close" id="upg-close-x"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l8 8M14 6l-8 8" stroke-linecap="round"/></svg></button>
-                </div>
-                <div class="upg-body" id="upg-body"></div>
-            </div>
-        </div>`;
-        const w = document.createElement('div'); w.innerHTML = html.trim();
-        document.body.appendChild(w.firstElementChild);
-        document.getElementById('upg-close-x').addEventListener('click', closeUpgradeModal);
-        document.getElementById('upgrade-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'upgrade-modal') closeUpgradeModal();
-        });
-    }
-    function closeUpgradeModal() {
-        const m = document.getElementById('upgrade-modal');
-        if (m) m.style.display = 'none';
-    }
 
     function renderPlanCards() {
         // v111.2 · 3 档:monthly / yearly / lifetime

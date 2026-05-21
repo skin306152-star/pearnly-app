@@ -16003,8 +16003,19 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
 /* ============================================================
    v118.35.0.11 · 充值弹窗 · legacy/credits-system-5de6cc5:home.css
    L15647-15755 完整原样提取(106 行)· 不改字符
-   注:legacy CSS 没有 .topup-v2-ov 叠加层规则 · 跟 legacy 完全一致
+   v118.35.0.13 · 补 .topup-v2-ov 叠加层 CSS · legacy 漏了这块 · 没它
+   弹窗会无暗背景 + 左上角不居中 · 这里 10 行新加(不动 legacy 那 106 行)
    ============================================================ */
+.topup-v2-ov {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    z-index: 9900;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 16px;
+    backdrop-filter: blur(2px);
+}
+.topup-v2-ov[style*="flex"] { display: flex; }
 .topup-v2-box {
     background: #fff;
     border-radius: 16px;

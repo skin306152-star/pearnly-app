@@ -1460,9 +1460,32 @@ const I18N = {
         'settings-days-left':         '还剩 {n} 天',
         'settings-lifetime-forever':  '永久',
         // v118.35.0.9 · credits 极简化 · 设置页 3 行 + 首页 KPI 余额/用量 2 卡
-        'settings-billing-mode':      '计费方式',
-        'settings-billing-credits':   '按使用量计费',
-        'settings-billing-pricing':   '前 200 张/月 · ฿1.50/张 · 超过部分 · ฿0.75/张',
+        // v118.35.0.13 · 按用户规范重命名 key + 完整 21 个 topup modal 文案
+        'settings-billing-mode-title': '计费方式',
+        'settings-billing-mode':       '按使用量计费',
+        'settings-billing-pricing':    '每月前 200 张 ฿1.50/张 · 超出 ฿0.75/张',
+        // 充值 modal (V2 from legacy/credits-system-5de6cc5 · 21 keys × 4 lang)
+        'topup-title':           '充值到账户',
+        'topup-amount-label':    '充值金额',
+        'topup-amount-invalid':  '请输入有效金额(最低 ฿10)',
+        'topup-bank-label':      '转账到以下账户',
+        'topup-bank-note':       '请转账恰好 ฿{amount} · 截图后再关闭银行 App',
+        'topup-copy-account':    '复制账号',
+        'topup-copied':          '已复制',
+        'topup-slip-drop':       '点击或拖拽截图',
+        'topup-slip-required':   '请上传转账截图',
+        'topup-payer-label':     '付款人姓名(选填)',
+        'topup-note-label':      '备注(选填)',
+        'topup-submit-fail':     '提交失败 · 请重试',
+        'topup-upload-fail':     '上传失败 · 请重试',
+        'topup-auto-approved':   '充值成功 · 余额已更新',
+        'topup-pending':         '申请已提交 · 等待审核',
+        'topup-btn-next':        '下一步',
+        'topup-btn-back':        '上一步',
+        'topup-btn-submit':      '提交申请',
+        'topup-btn-cancel':      '取消',
+        'topup-cta':             '立即充值',
+        'credits-updated':       '余额已更新',
         'dash-kpi-balance':           '账户余额',
         'dash-kpi-balance-empty':     '—',
         'dash-kpi-balance-exempt':    '豁免账号',
@@ -3879,10 +3902,32 @@ const I18N = {
         'settings-sub-lifetime':      'Lifetime',
         'settings-days-left':         '{n} days left',
         'settings-lifetime-forever':  'Forever',
-        // v118.35.0.9 · credits minimal billing
-        'settings-billing-mode':      'Billing',
-        'settings-billing-credits':   'Pay-as-you-go',
-        'settings-billing-pricing':   'First 200 pages/mo · ฿1.50/page · beyond · ฿0.75/page',
+        // v118.35.0.9 · credits minimal billing · v118.35.0.13 renamed keys + topup
+        'settings-billing-mode-title': 'Billing',
+        'settings-billing-mode':       'Pay as you go',
+        'settings-billing-pricing':    'First 200 pages/month ฿1.50/page · Above ฿0.75/page',
+        // topup modal 21 keys
+        'topup-title':           'Add Credits',
+        'topup-amount-label':    'Amount',
+        'topup-amount-invalid':  'Please enter a valid amount (min ฿10)',
+        'topup-bank-label':      'Transfer to',
+        'topup-bank-note':       'Transfer exactly ฿{amount} · screenshot before closing bank app',
+        'topup-copy-account':    'Copy account',
+        'topup-copied':          'Copied',
+        'topup-slip-drop':       'Click or drag slip',
+        'topup-slip-required':   'Slip required',
+        'topup-payer-label':     'Payer name (optional)',
+        'topup-note-label':      'Note (optional)',
+        'topup-submit-fail':     'Submit failed',
+        'topup-upload-fail':     'Upload failed',
+        'topup-auto-approved':   'Credits added',
+        'topup-pending':         'Pending review',
+        'topup-btn-next':        'Next',
+        'topup-btn-back':        'Back',
+        'topup-btn-submit':      'Submit',
+        'topup-btn-cancel':      'Cancel',
+        'topup-cta':             'Top up now',
+        'credits-updated':       'Balance updated',
         'dash-kpi-balance':           'Account balance',
         'dash-kpi-balance-empty':     '—',
         'dash-kpi-balance-exempt':    'Billing exempt',
@@ -6288,10 +6333,32 @@ const I18N = {
         'settings-sub-lifetime':      'ตลอดชีพ',
         'settings-days-left':         'เหลือ {n} วัน',
         'settings-lifetime-forever':  'ตลอดไป',
-        // v118.35.0.9 · credits ขั้นต่ำ
-        'settings-billing-mode':      'การคิดค่าใช้จ่าย',
-        'settings-billing-credits':   'จ่ายตามการใช้งาน',
-        'settings-billing-pricing':   '200 หน้าแรก/เดือน · ฿1.50/หน้า · ส่วนเกิน · ฿0.75/หน้า',
+        // v118.35.0.9 · credits ขั้นต่ำ · v118.35.0.13 renamed + topup
+        'settings-billing-mode-title': 'รูปแบบการคิดเงิน',
+        'settings-billing-mode':       'คิดตามการใช้งาน',
+        'settings-billing-pricing':    '200 หน้าแรก/เดือน ฿1.50/หน้า · เกินกว่านั้น ฿0.75/หน้า',
+        // topup modal 21 keys
+        'topup-title':           'เติมเครดิต',
+        'topup-amount-label':    'จำนวนเงิน',
+        'topup-amount-invalid':  'กรุณาระบุจำนวนเงินที่ถูกต้อง (ขั้นต่ำ ฿10)',
+        'topup-bank-label':      'โอนเงินไปที่บัญชีนี้',
+        'topup-bank-note':       'โอนพอดี ฿{amount} และถ่ายสลิปก่อนปิดแอปธนาคาร',
+        'topup-copy-account':    'คัดลอกเลขบัญชี',
+        'topup-copied':          'คัดลอกแล้ว',
+        'topup-slip-drop':       'คลิกหรือลากไฟล์',
+        'topup-slip-required':   'กรุณาอัปโหลดสลิป',
+        'topup-payer-label':     'ชื่อผู้โอน (ไม่บังคับ)',
+        'topup-note-label':      'หมายเหตุ (ไม่บังคับ)',
+        'topup-submit-fail':     'ส่งคำขอไม่สำเร็จ',
+        'topup-upload-fail':     'อัปโหลดไม่สำเร็จ',
+        'topup-auto-approved':   'เติมเครดิตสำเร็จ',
+        'topup-pending':         'ส่งคำขอแล้ว รอตรวจสอบ',
+        'topup-btn-next':        'ถัดไป',
+        'topup-btn-back':        'ย้อนกลับ',
+        'topup-btn-submit':      'ส่งคำขอ',
+        'topup-btn-cancel':      'ยกเลิก',
+        'topup-cta':             'เติมเครดิต',
+        'credits-updated':       'อัปเดตยอดแล้ว',
         'dash-kpi-balance':           'ยอดเงินคงเหลือ',
         'dash-kpi-balance-empty':     '—',
         'dash-kpi-balance-exempt':    'ยกเว้นการเรียกเก็บเงิน',
@@ -8693,10 +8760,32 @@ const I18N = {
         'settings-sub-lifetime':      '買い切り',
         'settings-days-left':         '残り {n} 日',
         'settings-lifetime-forever':  '永久',
-        // v118.35.0.9 · credits 最小構成
-        'settings-billing-mode':      '料金体系',
-        'settings-billing-credits':   '従量課金',
-        'settings-billing-pricing':   '月 200 ページまで · ฿1.50/ページ · 超過分 · ฿0.75/ページ',
+        // v118.35.0.9 · credits 最小構成 · v118.35.0.13 renamed + topup
+        'settings-billing-mode-title': '課金方式',
+        'settings-billing-mode':       '従量課金',
+        'settings-billing-pricing':    '月最初の 200 ページ ฿1.50/ページ · 超過分 ฿0.75/ページ',
+        // topup modal 21 keys
+        'topup-title':           'クレジットを追加',
+        'topup-amount-label':    '金額',
+        'topup-amount-invalid':  '有効な金額を入力(最低 ฿10)',
+        'topup-bank-label':      '振込先',
+        'topup-bank-note':       'ちょうど ฿{amount} を振込み · 銀行アプリを閉じる前にスクショ',
+        'topup-copy-account':    '口座番号をコピー',
+        'topup-copied':          'コピー完了',
+        'topup-slip-drop':       'クリックまたはドラッグ',
+        'topup-slip-required':   'スリップが必要',
+        'topup-payer-label':     '振込人名 (任意)',
+        'topup-note-label':      'メモ (任意)',
+        'topup-submit-fail':     '送信失敗',
+        'topup-upload-fail':     'アップロード失敗',
+        'topup-auto-approved':   'チャージ完了',
+        'topup-pending':         '申請送信 · 審査中',
+        'topup-btn-next':        '次へ',
+        'topup-btn-back':        '戻る',
+        'topup-btn-submit':      '送信',
+        'topup-btn-cancel':      'キャンセル',
+        'topup-cta':             'チャージ',
+        'credits-updated':       '残高更新',
         'dash-kpi-balance':           '残高',
         'dash-kpi-balance-empty':     '—',
         'dash-kpi-balance-exempt':    '請求免除',
@@ -14272,7 +14361,8 @@ function renderSettings() {
 // 余额卡 / 充值按钮搬到首页 KPI 卡 · 这里不再重复
 // ============================================================
 function _renderCreditsSettings(u, el) {
-    const username = escapeHtml(u.username || '');
+    // v118.35.0.13 · 3 行: 用户名 + 计费方式 + 价格说明 · keys 跟用户规范命名对齐
+    const username = escapeHtml(u.username || u.email || '');
     el.innerHTML = `
         <table style="width:100%; font-size:13px; border-collapse: collapse;">
             <tr>
@@ -14280,8 +14370,8 @@ function _renderCreditsSettings(u, el) {
                 <td style="padding:8px 0;">${username}</td>
             </tr>
             <tr>
-                <td style="color:#a0aec0; padding:8px 0;">${escapeHtml(t('settings-billing-mode'))}</td>
-                <td style="padding:8px 0;"><strong>${escapeHtml(t('settings-billing-credits'))}</strong></td>
+                <td style="color:#a0aec0; padding:8px 0;">${escapeHtml(t('settings-billing-mode-title'))}</td>
+                <td style="padding:8px 0;"><strong>${escapeHtml(t('settings-billing-mode'))}</strong></td>
             </tr>
             <tr>
                 <td colspan="2" style="color:#a0aec0; padding:8px 0; font-size:12px;">

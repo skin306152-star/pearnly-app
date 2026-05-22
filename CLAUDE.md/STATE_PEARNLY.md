@@ -1,6 +1,6 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-22(第四会话) · **整顿模式 ON** · REFACTOR-A1 Vite 落地全 4 子完成
+> **最近更新**:2026-05-22(第四会话) · **整顿模式 ON** · REFACTOR-A1 Vite + A2.1 Alembic + A9 Dependabot 三件基础设施落地
 
 ---
 
@@ -11,8 +11,8 @@
 **核心文档**:[`CLAUDE.md/REFACTOR_MASTER_PLAN.md`](REFACTOR_MASTER_PLAN.md)(整顿单一权威源 · 9 阶段 A-I · 60+ task)
 
 **当前状态**:
-- **阶段 A 工具链** 🟡 2/10(A0 ✅ + A1 ✅ 全 4 子)
-- **下一个 task**:**REFACTOR-A2 Alembic 落地**(2.5h · 装包 + env.py + 001 试点 + git-deploy.sh 钩子)
+- **阶段 A 工具链** 🟡 3.5/10(A0 ✅ + A1 ✅ + A2.1 ✅ + A9 ✅)· 阶段 A 已超 1/3
+- **下一个 task**:**REFACTOR-A7 依赖锁定**(1-2h · pip-tools 生成 requirements.lock.txt)· 或 A5 CI lint(半天)/ A3 环境分级(1-2 天)
 
 **封锁条款**(铁律 #18):
 - ❌ 0 新功能开发(P0-VAT v4.9.6 / Phase 6 进项管理 / MODULE_ROADMAP 全 hold)
@@ -46,32 +46,56 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 > **接力规则**:换窗口先看本段
 
-### 3 个 commit · push 后 prod 11835032 部署成功
+### 7 个 commit · prod 11835033 + Alembic + Dependabot 落地
 
 | Commit | Task | 内容 |
 |---|---|---|
 | `e11e81d` | REFACTOR-A1.1 | 装 Vite 6.4.2 + 配 esbuild · 本地 build · src/main.js 占位 · src/package.json 局部 ESM scope · vite.config.mjs · 不动 playwright |
 | `cfbb7d5` | REFACTOR-A1.2 | CI 加 vite build step(npm ci 后 / Playwright 前) · 守门从 4 关升到 5 关 · 防本地 build 漏跑 |
 | `1c4c3bd` | REFACTOR-A1.3 | dashboard.js / billing.js 从 static/home/ 搬到 src/home/ · 改 ES module(去 IIFE)· Vite bundle 到 static/dist/main.js 15.11kB(gzip 5.03kB · 减 37%)· home.html cache_bust 11835031→11835032 · script tag 改 type=module · release_notes v118.35.0.32 4 语 · A1.4 自动验证 prod 通 |
+| `086a981` | REFACTOR-A1.4 | A1 全 4 子完成入档 · 主计划 + STATE 更新 |
+| `5a74a25` | hotfix | home.js L29630 `_renderTaskList` 加 null guard · 修部署后 console TypeError · 跟 Vite 改动无关(home.js 老 bug)· 加载顺序变触发 · cache_bust 11835032→11835033 |
+| `4d5c8ba` | REFACTOR-A2.1 | 装 alembic 1.18 + SQLAlchemy 2 · alembic/env.py 从 env var 读 DATABASE_URL · 001_baseline 空迁移 · A2.2 git-deploy.sh 钩子并入 B3(真迁第一个 ensure_* 时再加) |
+| `e57993a` | REFACTOR-A9 | .github/dependabot.yml · pip + npm + github-actions 3 ecosystem · 周一 08:00 Asia/Bangkok 开 PR · patch/minor 分组 · security 始终单 PR |
 
 ### A1.4 prod 自动验证(本会话)
-- ✅ /api/version 返 version=11835032
-- ✅ /static/dist/main.js?v=11835032 fetch 200 · 15107 bytes
+- ✅ /api/version 返 version=11835033(含 hotfix)
+- ✅ /static/dist/main.js?v=11835033 fetch 200 · 15107 bytes
 - ✅ 旧路径 /static/home/{dashboard,billing}.js 404 · home.html 不再引用 · 无害
-- ⏳ 等 Zihao 人工测 dashboard + 充值 modal UI 跑通
+- ✅ Zihao Console 截图确认 vite bundle loaded + 报 _renderTaskList null bug · 已 hotfix 修
+
+### hotfix 经验记录(本会话)
+- A1.3 部署后 Zihao 截图发现 home.js L29630 `_renderTaskList` TypeError
+- 根因:_rerenderAll(i18n / module init)在用户不在 sv 销项税页时调它 · DOM 元素 null
+- 跟 Vite 无关(home.js 老 bug · _renderClientSelect L29732 已有同款 guard · _renderTaskList 漏)
+- A1.3 改了加载顺序(main.js type=module vs 老 2 条 defer 链)· 触发时机变 → 沉默的 bug 跳出来
+- 修:加 1 行 null guard · cache_bust 11835032→11835033 · release_notes 不动
+- 教训:home.js 33k 行还有很多类似 null check 漏点 · 阶段 C 拆 home.js 时一并扫
 
 ### 重大决策(本会话拍板)
 - **Vite build 方案 = 本地 build · 产物 static/dist/* 进 git · 服务器零改动**
 - **home.js 33k 行不进 Vite · 阶段 C 后再纳入**(铁律 #18 渐进翻新)
 - **顶层 package.json 不加 type:module · src/package.json 局部 ESM**(避免炸 playwright.config.js CJS)
 - **A1.3 改 script tag 顺序**:home.js 同步 → main.js type=module 自动 defer · 等价原 dashboard/billing defer
+- **A2.2 钩子并入 B3**(2026-05-22):A2.1 装好后 001 空迁移 · hook 是 no-op · 留到 B3 真要跑第一条迁移时再加 git-deploy.sh hook · 同步搞 `pip install -r requirements.txt` · 降低风险
+- **Dependabot 不上 Renovate**(2026-05-22):GitHub 内置免费 · 不引入第三方 · A 阶段够用
 
 ### 必测清单(Zihao 自测 · 每项 ≤30 秒)
-1. 浏览器打开 https://pearnly.com · 看头部"立即更新"横幅是否弹出
-2. 点更新 + 登录 · 首页 #/dashboard 路由 · 看 KPI 卡片有数据(本月发票 / 余额 / 用量)
+1. 浏览器打开 https://pearnly.com · 看头部"立即更新"横幅是否再弹(11835033)
+2. 点更新 + 登录 · 首页 #/dashboard · 看 KPI 卡片有数据 + **F12 Console 不再报 _renderTaskList TypeError**
 3. 点充值 · 看 3 步 modal 能开 · 输金额 + 看银行账号 + 关闭(不用真传)
-4. F12 DevTools Console · 应该看到 `[pearnly] vite bundle loaded · dashboard + billing` · 没 ERROR
-5. F12 Network · 应该看到 `/static/dist/main.js?v=11835032` 加载成功 200 · 旧 `/static/home/dashboard.js` 不再 fetch
+4. F12 Console · 应该看到 `[pearnly] vite bundle loaded · dashboard + billing` · 没 ERROR
+5. F12 Network · 看到 `/static/dist/main.js?v=11835033` 200 · 旧 `/static/home/dashboard.js` 不再 fetch
+
+### 下窗口接力(给下个 Claude 窗口看)
+- **当前 task**:REFACTOR-A7 依赖锁定(1-2h · pip-tools 生成 requirements.lock.txt + CI 改用 lock)
+- **备选**:A5 CI lint(半天 · 风险中 · 涉及自动 reformat 现有 .py)/ A3 环境分级(1-2 天 · 重)
+- **A2.2 git-deploy.sh 钩子注意事项**(等 B3 真要做时):
+  1. ssh 上服务器 cat /opt/mrpilot/git-deploy.sh 看现状(已知 L688 只 pip install playwright · 不重 pip install -r)
+  2. 加 `pip install -r requirements.txt` 在 git pull 后(让 alembic 进 prod venv)
+  3. 加 `alembic upgrade head` 在 systemctl restart 前
+  4. 加失败回滚(alembic downgrade -1)
+  5. test 在 staging 跑通后再上 prod
 
 ---
 

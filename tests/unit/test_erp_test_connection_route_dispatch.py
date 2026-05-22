@@ -1152,7 +1152,7 @@ def _can_import_app_for_async_tests() -> bool:
     and __import__("importlib").util.find_spec("services.erp.mrerp_adapter") is not None,
     "needs full app + httpx + mrerp_adapter; covered server-side otherwise.",
 )
-class PushMRERPAsyncContextTests(unittest.IsolatedAsyncioTestCase):
+class PushMRERPAsyncContextTests(unittest.TestCase):
     """A1 async sibling · proves push_to_endpoint(mrerp) survives the
     async-context tripwire end-to-end.
 
@@ -1166,6 +1166,16 @@ class PushMRERPAsyncContextTests(unittest.IsolatedAsyncioTestCase):
     event loop. If /api/erp/push (mrerp branch) goes through
     push_to_endpoint without asyncio.to_thread, the fake adapter
     fires and the test fails with that error message visible.
+
+    v118.35.0.30(2026-05-22 CI run #5 修复)· 本类原本继承
+    `unittest.IsolatedAsyncioTestCase`,但该 API 在 Python 3.10
+    (`_setupAsyncioLoop` hook)和 Python 3.11+(`asyncio.Runner`-based
+    `_setupAsyncioRunner` / `_tearDownAsyncioRunner` hooks)之间不一致,
+    且对前面 sync TestClient 残留的 `asyncio.events._running_loop` 标志
+    非常敏感(setUp 或 tearDown 任何一步撞 `_check_running` 就炸)。
+    改用普通 `TestCase` + 内部 `asyncio.run()` · async 验证目的不变
+    (test 内部协程视角 `get_running_loop()` 仍返非 None,tripwire 逻辑
+    保留),但彻底绕开 3.10/3.11 API 差异 + 跨 OS event-loop 残留污染。
     """
 
     @classmethod
@@ -1174,22 +1184,6 @@ class PushMRERPAsyncContextTests(unittest.IsolatedAsyncioTestCase):
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app   # noqa
         cls.app_module = app
-
-    def _setupAsyncioLoop(self):
-        # v118.35.0.29(2026-05-22 本机 OOM 链路尾巴)·Windows + Python 3.10 +
-        # starlette TestClient 用 `with TestClient(app) as c:` 跑 lifespan
-        # 后,asyncio.events._running_loop 没被清回 None,导致下一个
-        # IsolatedAsyncioTestCase.run_until_complete 撞 _check_running 报
-        # "Cannot run the event loop while another loop is running"·
-        # 本类按 alpha 顺序紧跟在多个 with-TestClient sync TestCase 后面,
-        # 是污染靶点。CI ubuntu-latest 不复现(用户图 run #3 三个 step
-        # 全绿)·这里只是补本机一致性。
-        import asyncio.events as _aevents
-        try:
-            _aevents._set_running_loop(None)
-        except Exception:
-            pass
-        super()._setupAsyncioLoop()
 
     async def _make_async_client(self):
         import httpx
@@ -1200,7 +1194,19 @@ class PushMRERPAsyncContextTests(unittest.IsolatedAsyncioTestCase):
         except ImportError:
             return httpx.AsyncClient(app=self.app_module.app, base_url="http://test")
 
-    async def test_push_to_endpoint_in_async_context_pushes_real_invoice(self):
+    def test_push_to_endpoint_in_async_context_pushes_real_invoice(self):
+        """Sync wrapper · asyncio.run() 跑真正的 async 验证体。"""
+        import asyncio
+        # 先清掉前面 sync TestClient 可能残留的 running_loop 标志,
+        # 否则 asyncio.run() 自己也会撞 _check_running。
+        import asyncio.events as _aevents
+        try:
+            _aevents._set_running_loop(None)
+        except Exception:
+            pass
+        asyncio.run(self._async_test_push_to_endpoint_in_async_context_pushes_real_invoice())
+
+    async def _async_test_push_to_endpoint_in_async_context_pushes_real_invoice(self):
         """The named guard. Drives a real httpx async POST to /api/erp/push
         with adapter=mrerp, with MRERPAdapter replaced by a fake that
         asserts no event loop is active in `__enter__`. If the route

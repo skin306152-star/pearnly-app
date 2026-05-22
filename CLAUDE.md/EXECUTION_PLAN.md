@@ -9,7 +9,7 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0-5 ✅ + **阶段 6 ✅ 全收官(Task 6.1 ✅ + 6.2 ✅)**(2026-05-22 本会话 10+ commit · 累积 app.py 减 850 行 + DB 迁移设计文档完整) ➡️ **下一接力点:阶段 7 Task 7.1 抽 home.js dashboard 模块(3-4h · 第一次拆前端)· 或 Task 6.3 实际落地 Alembic(2.5h · 本设计提出 · 未在原 EXECUTION_PLAN · 风险中)· 或回 P0-VAT v4.9.6 主线**
+**当前位置**：阶段 0-6 ✅ + **阶段 7 Task 7.1 ✅ 第一次拆前端落地**(2026-05-22 第三会话 · home.js 减 197 行 · `static/home/dashboard.js` 196 行独立模块) ➡️ **下一接力点:Task 7.2 抽 home.js billing/topup 模块(3-4h · 跟 5.1 抽 billing router 是镜像)· 或 Task 6.3 实际落地 Alembic(2.5h)· 或回 P0-VAT v4.9.6 主线**
 
 **当前 CI 状态**（GitHub Actions · commit `767ade9` · run #13 完整 4 step 全绿 161s）：
 - ✅ Step "Static import check" → 绿（修了 BOM 之后)
@@ -336,12 +336,39 @@
 
 > **目标**：让 `home.js` 33,768 行**不再增长** · 然后逐步变小。一次只拆一个模块 · 每个配 Playwright smoke。
 
-### Task 7.1 · 抽出 dashboard 模块（P2-06）
-- **状态**：blocked by 阶段 4（要有 Playwright 当网）
-- **产出**：`static/home/dashboard.js`
-- **范围**：只抽首页 dashboard · 不碰 OCR/对账/ERP/billing
-- **完成判定**：DOM id / API 调用 / i18n 不变 · home.js 行数减少
-- **工作量**：3-4 小时
+### Task 7.1 · 抽出 dashboard 模块（P2-06）✅ 2026-05-22 完成
+- **状态**：✅ completed · 阶段 7 开张第一炮 · 第一次拆前端
+- **类型**：纯搬家 · 0 业务逻辑改动 · IIFE 整片搬走
+- **产出**：新文件 `static/home/dashboard.js`(196 行 · 含 `_dashIIFE` + `loadDashboard` + `loadCreditsCard` + `_kpiPromptTopup` 4 函数 + DOMContentLoaded + subscribeI18n 注册)
+- **范围**：只抽首页 dashboard 加载逻辑(4 KPI 卡 + 快速操作 + 最近 5 条) · 不碰 OCR/对账/ERP/billing
+- **改动清单**:
+  - 新建 `static/home/dashboard.js`(独立 IIFE · 0 业务变化)
+  - `home.html` L6545 home.js 加 cache bust 11835027 → 11835028
+  - `home.html` L6546 新加 `<script src="/static/home/dashboard.js?v=11835028" defer>`(必在 home.js 之后)
+  - `home.html` L7 home.css 同步 cache bust(同上)
+  - `home.js` 删 L32720-32916(197 行 · 含前导空行 + 整个 dashboard IIFE)· 33768 → 33571 行(净减 197)
+  - `app.py` 4 语 release_notes 加 v118.35.0.28 entry(铁律 #6 强制)
+- **外部依赖(home.js 必须先加载)**:
+  - 全局函数 4:`window.t` `window.subscribeI18n` `window._openTopupModal` `escapeHtml`(L9953 顶级 fn 声明 · 浏览器自动挂 window)
+  - 后端 API 4:`/api/me/tenant-usage` `/api/history` `/api/exceptions/stats` `/api/me/credits`(不动后端)
+  - DOM id 10+:在 `home.html` L2468-2548(不动 HTML)
+  - i18n key 4 个 dash-* 在 home.js 翻译块(留 home.js · dashboard.js 通过 `t()` 取)
+- **completion gate(本机 4 道全绿)**:
+  - ✅ `python scripts/check_imports.py --quiet` → EXIT 0
+  - ✅ `python scripts/check_i18n.py --strict` → 4 lang 2324 keys 齐 · 0 missing 0 extra
+  - ✅ `python -m unittest discover -s tests/unit` → 293 tests · OK (skipped=2) · 2.0s
+  - ✅ `npx playwright test` → 1 passed (5.7s) · prod 着陆页 4 件事
+  - ✅ `node --check` → dashboard.js + home.js 语法都合法
+- **字节级删除防 BOM 重演**(吸取 Task 5.1+5.2 教训):用 Python 读 bytes → `split(b'\\r\\n')` → del 切片 → `join(b'\\r\\n')` → 写 bytes · 全程 CRLF 不变 · 无 BOM
+- **真实工作量**:≈75 分钟(原估 3-4h · 大幅好于预期 · 因为 dashboard 本来就是干净独立 IIFE · 已有 `window.loadDashboard` 桥 · 拆出来 0 改 callsites)
+- **关键决策**:
+  - 加载顺序:`dashboard.js?defer` 在 home.js 之后 · 保证 `escapeHtml` / `t` / `subscribeI18n` / `_openTopupModal` 全局已就绪
+  - 4 个 `window.loadDashboard()` callsites(home.js L10509 / L33282 / L33532 / L33545)0 改 · 全部通过全局桥不变
+  - `_kpiPromptTopup` 死代码照搬不删(纯搬家原则 · Task 5.1+5.2 教训)
+  - DOM id 10+ 全部留 `home.html` · dashboard.js 通过 `getElementById` 读 · 0 改 HTML 结构
+  - i18n 4 个 `dash-*` key 在 home.js 翻译块 · dashboard.js 通过 `t()` 取 · 0 改翻译字典(也就保证 4 语完整性 check 通过)
+- **CI 演进**:本次 push 等 commit 后 GitHub Actions run · 4 step 应全绿(import / i18n / unit / e2e)
+- **生产验证 TODO**(push 部署后做):curl `/api/version` 看 cache bust 已升到 11835028 · 浏览器登录 skin → `#/dashboard` 看 4 KPI 卡显示数字 · DevTools console 无 error · 切 4 语 dashboard 文案重渲染正常
 
 ### Task 7.2 · 抽出 billing/topup 前端模块（P2-07）
 - **状态**：blocked by 5.1 + 7.1
@@ -396,9 +423,9 @@
 | 2 · 计费保险 | ✅ 完成 | 1/1 | 43 个 billing contract test 守门 · 价格规则锁定 |
 | **3 · CI 保险** | ✅ 完成 | **2/2** | Task 3.1 ✅ + Task 3.2 ✅(commit `d1912aa` · 本机 unit tests 全绿 · CI run #4 等结果)|
 | **4 · i18n + E2E** | 🟡 部分完成 | **1/2** | Task 4.1 ✅（随 3.2 接入 CI）+ 4.2 Playwright 仍 pending |
-| 5 · 后端路由拆 | ⚪ 待启动 | 0/3 | |
-| 6 · DB 迁移规范 | ⚪ 待启动 | 0/2 | |
-| 7 · 前端拆分 | ⚪ 待启动 | 0/3 | |
+| 5 · 后端路由拆 | ✅ 完成 | **3/3** | 2026-05-22 第二会话(`fa5e0ea` `876649d` `8ca78f9`)· app.py 减 850 行 |
+| 6 · DB 迁移规范 | ✅ 完成 | **2/2** | 2026-05-22 第二会话(`3ab1684` `96c38c2`)· 25 个 ensure_* 全清单 + Alembic 设计 |
+| **7 · 前端拆分** | 🟡 部分完成 | **1/3** | Task 7.1 ✅(2026-05-22 第三会话)· dashboard 抽出 · home.js 减 197 行 |
 | 8 · 治理收尾 | ⚪ 待启动 | 0/2 | |
 
 **预计总工时**：35-50 小时（按每天 2-3 小时投入 · 约 3-4 周完成阶段 1-6 · 7-8 长期持续）

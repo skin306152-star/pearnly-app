@@ -124,7 +124,21 @@
       "Bash(PYTHONUTF8=1 python -c ' *)",
       "Bash(tar -czf /tmp/pearnly_v4.10.23.tar.gz app.py db.py auth_signup.py vat_excel_export.py vat_excel_routes.py vat_excel_exporter.py vat_report_parser.py vat_file_classifier.py vat_ai_analyzer.py reconciliation_matcher.py recon_routes.py field_comparator.py home.html home.js home.css)",
       "Bash(tar -czf /tmp/pearnly_v4.10.23b.tar.gz app.py db.py auth_signup.py vat_excel_export.py vat_excel_routes.py vat_excel_exporter.py vat_report_parser.py vat_file_classifier.py vat_ai_analyzer.py reconciliation_matcher.py recon_routes.py field_comparator.py home.html home.js home.css)",
-      "Bash(tar -czf /tmp/pearnly_v4.10.23c.tar.gz app.py db.py auth_signup.py vat_excel_export.py vat_excel_routes.py vat_excel_exporter.py vat_report_parser.py vat_file_classifier.py vat_ai_analyzer.py reconciliation_matcher.py recon_routes.py field_comparator.py home.html home.js home.css)"
+      "Bash(tar -czf /tmp/pearnly_v4.10.23c.tar.gz app.py db.py auth_signup.py vat_excel_export.py vat_excel_routes.py vat_excel_exporter.py vat_report_parser.py vat_file_classifier.py vat_ai_analyzer.py reconciliation_matcher.py recon_routes.py field_comparator.py home.html home.js home.css)",
+      "Bash(git push *)",
+      "Bash(grep -n \"me/credits\\\\|me\\\\\\\\\\\\\\\\/credits\\\\|/credits\\\\b\" app.py)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(git tag *)",
+      "Bash(git cherry-pick *)",
+      "Bash(awk '/^@app\\\\.|^def [a-zA-Z]|^class [a-zA-Z]/ {print NR+7943\": \"$0}')",
+      "Bash(git commit -m 'docs: 2026-05-21 会话总结 · v0.17 → v0.27 入档\\(STATE + BACKLOG\\) *)",
+      "PowerShell($r = Invoke-RestMethod https://pearnly.com/api/version; \"version: $\\($r.version\\)\"; \"cache_bust: $\\($r.cache_bust\\)\"; foreach\\($lang in 'zh','en','th','ja'\\){ $txt = $r.release_notes.$lang; \"$lang -> $\\($txt.Substring\\(0,[Math]::Min\\(80,$txt.Length\\)\\)\\)\" })",
+      "Bash(git commit *)",
+      "PowerShell($r = Invoke-RestMethod https://pearnly.com/api/version; \"version: $\\($r.version\\)\"; foreach\\($lang in 'zh','en','th','ja'\\){ $txt = $r.release_notes.$lang; $first = \\($txt -split \"`n\"\\)[0]; \"$lang -> $first\" })",
+      "Bash(grep -iE '\\\\.env$|\\\\.env\\\\.|secret|credential')",
+      "PowerShell($v = Invoke-RestMethod https://pearnly.com/api/version; \"==== /api/version 字段 ====\"; $v.PSObject.Properties | ForEach-Object { \"$\\($_.Name\\): $\\(if \\($_.Value -is [string] -or $_.Value -is [int]\\) { $_.Value } else { '\\(object\\)' }\\)\" } | Select-Object -First 10; \"`n==== /api/admin/diagnostics/runtime 未鉴权 ====\" ; try { Invoke-RestMethod https://pearnly.com/api/admin/diagnostics/runtime -ErrorAction Stop } catch { \"HTTP $\\($_.Exception.Response.StatusCode.value__\\) · body=$\\($_.ErrorDetails.Message\\)\" })",
+      "Bash(xargs grep -l \"CREATE TABLE.*users\\\\|CREATE TABLE.*tenants\\\\|erp_endpoints\\\\|erp_push_logs\")",
+      "Bash(bash /tmp/table_scan.sh)"
     ]
   }
 }

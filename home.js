@@ -29626,6 +29626,9 @@ window.addEventListener('DOMContentLoaded', () => {
         const wrap = $('sv-task-list-wrap');
         const empty = $('sv-empty');
         const list  = $('sv-task-list');
+        // hotfix 2026-05-22 · _rerenderAll(i18n 切换 / module init)可能在用户不在 sv 页时调
+        // DOM 没渲染 → 3 个 element 全 null · _renderClientSelect 已有同样 guard
+        if (!wrap || !empty || !list) return;
         if (!_tasks.length) {
             wrap.style.display  = 'none';
             empty.style.display = '';

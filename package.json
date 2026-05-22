@@ -1,0 +1,14 @@
+{
+  "name": "pearnly-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Pearnly E2E smoke tests (Playwright). Not a runtime package.",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
+  }
+}

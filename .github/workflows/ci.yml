@@ -1,11 +1,12 @@
 name: CI
 
-# 阶段 3 Task 3.2 + 阶段 4 Task 4.1 · 最小 CI 自动化保险(EXECUTION_PLAN P1-02 / P1-03)
-# 防"v0.20 db pool 5 重演" · 每次 push / PR 必须三关都过:
+# 阶段 3 Task 3.2 + 阶段 4 Task 4.1 + 阶段 4 Task 4.2 · 最小 CI 自动化保险
+# 防"v0.20 db pool 5 重演" · 每次 push / PR 必须四关都过:
 #   1) import 静态检查
 #   2) home.js i18n 4 语完整性(zh/en/th/ja key 集合一致)
 #   3) unit tests 全绿
-# 不依赖生产 secret / 不联网调外部业务(整 contract tests 全部 stub)
+#   4) Playwright E2E smoke(pearnly.com 着陆页 · 顶栏 + 4 语切换 + 无 console error)
+# 不依赖生产 secret · 不调后端业务(integ contract tests 全部 stub · e2e 只 GET 公开页)
 
 on:
   push:
@@ -52,3 +53,42 @@ jobs:
 
       - name: Run unit tests
         run: python -m unittest discover -s tests/unit -p "test_*.py" -v
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Node deps (npm ci · 严格按 lockfile)
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Install Chromium system deps
+        run: npx playwright install-deps chromium
+
+      - name: E2E smoke (Playwright · pearnly.com)
+        run: npx playwright test
+        env:
+          PEARNLY_E2E_BASE_URL: https://pearnly.com
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

@@ -1207,6 +1207,12 @@ async def bank_v2_run(
     gl_files: List[UploadFile] = File(...),
     gl_account: str = Form(""),
     lang: str = Form("th"),
+    # BUG-B v118.35.0.36 (2026-05-22) · OCR 抽 3 个 anchor 余额不准时 · 前端用户手动录入兜底
+    # 任意一个 override 非 None · 用 override 替换 OCR/parse 抽到的值传给 bank_reconcile
+    # 整顿期 (铁律 #18) Zihao 拍板破例做 · 业务等式锚点错位会让整张对账报告废 · 算紧急
+    stmt_opening_override: Optional[float] = Form(None),
+    gl_opening_override: Optional[float] = Form(None),
+    gl_closing_override: Optional[float] = Form(None),
 ):
     """
     Upload bank statement PDF(s) + GL file(s), run reconciliation.
@@ -1365,6 +1371,21 @@ async def bank_v2_run(
     stmt_rows, stmt_opening, stmt_closing, bank_code = merge_statements(list(stmt_results))
     gl_rows, gl_accounts, gl_opening, gl_closing = merge_gl_files(list(gl_results), gl_account)
 
+    # BUG-B v118.35.0.36 · 用户在前端 anchor TEXT BOX 填了值就用用户的 · OCR 的降级成参考
+    _anchor_used = {}  # 用于落库 summary._anchor_overrides
+    if stmt_opening_override is not None:
+        _anchor_used["stmt_opening"] = {"ocr": stmt_opening, "user": stmt_opening_override}
+        stmt_opening = float(stmt_opening_override)
+    if gl_opening_override is not None:
+        _anchor_used["gl_opening"] = {"ocr": gl_opening, "user": gl_opening_override}
+        gl_opening = float(gl_opening_override)
+    if gl_closing_override is not None:
+        _anchor_used["gl_closing"] = {"ocr": gl_closing, "user": gl_closing_override}
+        gl_closing = float(gl_closing_override)
+    if _anchor_used:
+        logger.info(f"[bank_v2_run] anchor overrides applied: {_anchor_used} · "
+                    f"user_id={user.get('id')}")
+
     # No rows found → save diagnostic task, return 200 ok:false (not 422)
     if not stmt_rows or not gl_rows:
         err_key = "stmt_no_rows" if not stmt_rows else "gl_no_rows"
@@ -1394,6 +1415,9 @@ async def bank_v2_run(
     # summary_from_json filters out unknown keys, so this is non-invasive.
     if isinstance(summary_j, dict):
         summary_j["_parse_info"] = parse_info
+        # BUG-B v118.35.0.36 · 落库 anchor 覆盖痕迹 · 用户回查任务时能看出哪几个 anchor 是手填的
+        if _anchor_used:
+            summary_j["_anchor_overrides"] = _anchor_used
 
     # 6. Persist
     unmatched_gl   = summary.gl_debit_only_count + summary.gl_credit_only_count

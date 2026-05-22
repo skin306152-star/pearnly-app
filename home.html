@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835035">
+<link rel="stylesheet" href="/static/home.css?v=11835036">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -1972,6 +1972,83 @@ tr.brv2-row-warn      td { background: #fef2f2 !important; }
 tr.brv2-row-warn-soft td { background: #fff7ed !important; }
 tr.brv2-row-warn:hover td,
 tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
+
+/* BUG-B v118.35.0.36 (2026-05-22) · OCR 抽不准时手动录入 3 个 anchor 余额兜底
+   位置:brv2 上传卡和 action-bar 之间 · 跟 Pearnly 设计语言一致(暖灰底 / 黑 focus / 13px / tabular-nums) */
+.brv2-anchor-row {
+    background: #fafaf8;
+    border: 1px solid #e8e8e3;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 12px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.brv2-anchor-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-2, #6b7280);
+    line-height: 1.4;
+}
+.brv2-anchor-icon { display: inline-flex; color: var(--ink-2, #6b7280); }
+.brv2-anchor-title { font-weight: 500; }
+.brv2-anchor-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+.brv2-anchor-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.brv2-anchor-cell label {
+    font-size: 11px;
+    color: var(--ink-2, #6b7280);
+    letter-spacing: 0.2px;
+}
+.brv2-anchor-cell input {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: var(--ink, #111827);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    transition: border-color .15s, box-shadow .15s;
+    font-family: inherit;
+    outline: none;
+}
+.brv2-anchor-cell input:focus {
+    border-color: var(--ink, #111827);
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.08);
+}
+.brv2-anchor-cell input::-webkit-outer-spin-button,
+.brv2-anchor-cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.brv2-anchor-cell input[type="number"] { -moz-appearance: textfield; }
+.brv2-anchor-eq {
+    font-size: 12px;
+    color: var(--ink-2, #6b7280);
+    padding: 6px 0 0;
+    border-top: 1px dashed #e8e8e3;
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    flex-wrap: wrap;
+}
+.brv2-anchor-eq-lbl { color: var(--ink-2, #6b7280); }
+.brv2-anchor-eq-val {
+    color: var(--ink, #111827);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 720px) {
+    .brv2-anchor-grid { grid-template-columns: 1fr; }
+}
 
 /* v118.33.11.0 · 历史记录分页器 */
 .hist-pager { display: flex; align-items: center; gap: 8px; padding: 8px 14px 10px; justify-content: flex-end; }
@@ -4657,6 +4734,38 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                     </div>
                 </div>
 
+                <!-- BUG-B v118.35.0.36 (2026-05-22) · OCR 抽 GL/STATEMENT 3 个 anchor 余额不准时
+                     用户手动录入兜底 · 防 OCR 错位连锁整张报告废 · Zihao 拍板破例整顿期允许 -->
+                <div class="brv2-anchor-row" id="brv2-anchor-row">
+                    <div class="brv2-anchor-head">
+                        <span class="brv2-anchor-icon" aria-hidden="true">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                <path d="M8 1.5L14.5 4v4c0 4-3 6.5-6.5 6.5S1.5 12 1.5 8V4L8 1.5z"/>
+                                <path d="M6 8l1.5 1.5L10.5 6.5"/>
+                            </svg>
+                        </span>
+                        <span class="brv2-anchor-title" data-i18n="brv2-anchor-title">OCR 抽不准?手动录入 3 个余额(可选 · 留空走 OCR)</span>
+                    </div>
+                    <div class="brv2-anchor-grid">
+                        <div class="brv2-anchor-cell">
+                            <label for="brv2-anchor-gl-closing" data-i18n="brv2-anchor-gl-closing">GL 期末余额</label>
+                            <input type="number" id="brv2-anchor-gl-closing" step="any" inputmode="decimal" placeholder="0.00" autocomplete="off">
+                        </div>
+                        <div class="brv2-anchor-cell">
+                            <label for="brv2-anchor-stmt-opening" data-i18n="brv2-anchor-stmt-opening">期初 Statement 余额</label>
+                            <input type="number" id="brv2-anchor-stmt-opening" step="any" inputmode="decimal" placeholder="0.00" autocomplete="off">
+                        </div>
+                        <div class="brv2-anchor-cell">
+                            <label for="brv2-anchor-gl-opening" data-i18n="brv2-anchor-gl-opening">GL 期初余额</label>
+                            <input type="number" id="brv2-anchor-gl-opening" step="any" inputmode="decimal" placeholder="0.00" autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="brv2-anchor-eq" id="brv2-anchor-eq" style="display:none">
+                        <span class="brv2-anchor-eq-lbl" data-i18n="brv2-anchor-eq-lbl">期初差额(Statement 期初 − GL 期初):</span>
+                        <span class="brv2-anchor-eq-val" id="brv2-anchor-eq-val">—</span>
+                    </div>
+                </div>
+
                 <!-- 操作栏 -->
                 <div class="vex-action-bar">
                     <button class="btn btn-ghost" id="brv2-reset-btn" type="button" data-i18n="vex-btn-reset">清空</button>
@@ -6549,7 +6658,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11835035"></script>
+<script src="/static/home.js?v=11835036"></script>
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing 由 Vite bundle 成 static/dist/main.js ·
      ES module(type=module 自动 defer)· 必在 home.js 后执行 ·
      依赖 home.js 的全局:t / showToast / escapeHtml / subscribeI18n / _userInfo / loadDashboard -->

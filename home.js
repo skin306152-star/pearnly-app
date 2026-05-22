@@ -1962,6 +1962,12 @@ const I18N = {
         'brv2-acct-label':    'GL 科目',
         'brv2-acct-all':      '全部',
         'brv2-acct-hint':     '选择银行账户科目',
+        // BUG-B v118.35.0.36 · OCR 抽不准 3 anchor 余额时手动录入兜底
+        'brv2-anchor-title':         'OCR 抽不准?手动录入 3 个余额(可选 · 留空走 OCR)',
+        'brv2-anchor-gl-closing':    'GL 期末余额',
+        'brv2-anchor-stmt-opening':  '期初 Statement 余额',
+        'brv2-anchor-gl-opening':    'GL 期初余额',
+        'brv2-anchor-eq-lbl':        '期初差额(Statement 期初 − GL 期初):',
         'brv2-run-btn':       '开始对账',
         'brv2-processing':    '处理中…',
         'brv2-stat-matched':  '已匹配',
@@ -4378,6 +4384,12 @@ const I18N = {
         'brv2-acct-label':    'GL Account',
         'brv2-acct-all':      'All',
         'brv2-acct-hint':     'Select bank account code',
+        // BUG-B v118.35.0.36 · OCR-fallback manual anchor inputs
+        'brv2-anchor-title':         "OCR didn't pick these up? Enter the 3 balances manually (optional · leave blank to use OCR)",
+        'brv2-anchor-gl-closing':    'GL closing balance',
+        'brv2-anchor-stmt-opening':  'Statement opening balance',
+        'brv2-anchor-gl-opening':    'GL opening balance',
+        'brv2-anchor-eq-lbl':        'Opening difference (Stmt opening − GL opening):',
         'brv2-run-btn':       'Run Reconciliation',
         'brv2-processing':    'Processing…',
         'brv2-stat-matched':  'Matched',
@@ -6792,6 +6804,12 @@ const I18N = {
         'brv2-acct-label':    'รหัสบัญชี GL',
         'brv2-acct-all':      'ทั้งหมด',
         'brv2-acct-hint':     'เลือกบัญชีธนาคารที่ต้องการกระทบ',
+        // BUG-B v118.35.0.36 · OCR 抽ไม่ตรงตอนกรอกเอง 3 ช่อง anchor
+        'brv2-anchor-title':         'OCR อ่านไม่แม่น? กรอกยอด 3 ช่องเอง (ทางเลือก · ปล่อยว่างจะใช้ OCR)',
+        'brv2-anchor-gl-closing':    'ยอดยกไป GL',
+        'brv2-anchor-stmt-opening':  'ยอดยกมา STATEMENT',
+        'brv2-anchor-gl-opening':    'ยอดยกมา GL',
+        'brv2-anchor-eq-lbl':        'ผลต่างยอดยกมา (ยอดยกมา Statement − ยอดยกมา GL):',
         'brv2-run-btn':       'เริ่มกระทบยอด',
         'brv2-processing':    'กำลังประมวลผล…',
         'brv2-stat-matched':  'จับคู่แล้ว',
@@ -9202,6 +9220,12 @@ const I18N = {
         'brv2-acct-label':    'GL科目コード',
         'brv2-acct-all':      'すべて',
         'brv2-acct-hint':     '銀行口座科目を選択',
+        // BUG-B v118.35.0.36 · OCR で読めない時 3 つの anchor を手入力
+        'brv2-anchor-title':         'OCR が正しく読めない? 3 つの残高を手入力(任意 · 空欄なら OCR を使用)',
+        'brv2-anchor-gl-closing':    'GL 期末残高',
+        'brv2-anchor-stmt-opening':  'Statement 期首残高',
+        'brv2-anchor-gl-opening':    'GL 期首残高',
+        'brv2-anchor-eq-lbl':        '期首差額(Stmt 期首 − GL 期首):',
         'brv2-run-btn':       '照合開始',
         'brv2-processing':    '処理中…',
         'brv2-stat-matched':  '一致',
@@ -19231,6 +19255,14 @@ async function deleteEndpoint(endpointId) {
             fd.append('gl_account', acct);
             fd.append('lang', lang);
 
+            // BUG-B v118.35.0.36 · 3 个 anchor 余额手动录入 · 优先于 OCR 抽到的值
+            const aGlClose  = parseFloat(($('brv2-anchor-gl-closing')  || {}).value);
+            const aStmtOpen = parseFloat(($('brv2-anchor-stmt-opening')|| {}).value);
+            const aGlOpen   = parseFloat(($('brv2-anchor-gl-opening')  || {}).value);
+            if (Number.isFinite(aGlClose))  fd.append('gl_closing_override',   aGlClose);
+            if (Number.isFinite(aStmtOpen)) fd.append('stmt_opening_override', aStmtOpen);
+            if (Number.isFinite(aGlOpen))   fd.append('gl_opening_override',   aGlOpen);
+
             const res = await fetch('/api/recon/bank-v2/run', {
                 method: 'POST',
                 headers: { 'Authorization': 'Bearer ' + token },
@@ -19781,6 +19813,27 @@ async function deleteEndpoint(endpointId) {
         setupDrop('brv2-stmt-zone', 'brv2-stmt-input', 'stmt');
         setupDrop('brv2-gl-zone',   'brv2-gl-input',   'gl');
 
+        // BUG-B v118.35.0.36 · 3 个 anchor 余额手动录入 · 实时算期初差额
+        const anchorIds = ['brv2-anchor-gl-closing', 'brv2-anchor-stmt-opening', 'brv2-anchor-gl-opening'];
+        function _brv2UpdateAnchorEq() {
+            const stmtOpen = parseFloat(($('brv2-anchor-stmt-opening') || {}).value);
+            const glOpen   = parseFloat(($('brv2-anchor-gl-opening')   || {}).value);
+            const eq       = $('brv2-anchor-eq');
+            const eqVal    = $('brv2-anchor-eq-val');
+            if (!eq || !eqVal) return;
+            if (Number.isFinite(stmtOpen) && Number.isFinite(glOpen)) {
+                const diff = stmtOpen - glOpen;
+                eqVal.textContent = diff.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                eq.style.display = '';
+            } else {
+                eq.style.display = 'none';
+            }
+        }
+        anchorIds.forEach(id => {
+            const el = $(id);
+            if (el) el.addEventListener('input', _brv2UpdateAnchorEq);
+        });
+
         const runBtn = $('brv2-run-btn');
         if (runBtn) runBtn.addEventListener('click', runRecon);
 
@@ -19798,6 +19851,10 @@ async function deleteEndpoint(endpointId) {
             // 重置 acct select
             const sel = $('brv2-acct-select');
             if (sel) sel.style.display = 'none';
+            // BUG-B v118.35.0.36 · 重置 3 个 anchor 录入框 + 隐藏 eq 行
+            anchorIds.forEach(id => { const el = $(id); if (el) el.value = ''; });
+            const eq = $('brv2-anchor-eq');
+            if (eq) eq.style.display = 'none';
         });
 
         // 新建按钮（在折叠头里）

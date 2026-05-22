@@ -1,6 +1,6 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-22(第五会话) · **整顿模式 ON** · A7 依赖锁定落地 · 阶段 A 进度 4.5/10
+> **最近更新**:2026-05-22(第五会话续) · **整顿模式 ON** · A7 + BUG-A hotfix + BUG-B 破例新功能 · 阶段 A 进度 4.5/10
 
 ---
 
@@ -39,6 +39,66 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 **完成定义**:home.js < 200 行 / app.py < 500 行 / 测试覆盖 ≥ 70% / API p95 < 1s / 50-100 模块文件 / Google 级 90%+
 
 **自动统计脚本**:`python scripts/refactor_progress.py`(每窗口跑 1 次 · 看进度)
+
+---
+
+## 🆕 2026-05-22 第五会话续 · BUG-A hotfix(设置 modal)+ BUG-B 破例新功能(收入对账 3 anchor)· 2 commit
+
+> **接力规则**:换窗口先看本段
+
+### 2 个 commit
+
+| Commit | Type | 内容 |
+|---|---|---|
+| `4163408` | hotfix · BUG-A | settings modal 右栏在浏览器 zoom 67/75/80/90/100% 都看不到底部字段(LINE ID / 国家 / 公司信息 tab) · 根因 flex chain 在 px rounding 时高度解析失败 · overflow-y:auto 不触发。修法镜像 v118.34.39 左栏修法:直接 max-height: calc(min(85vh, 100vh - 64px) - 80px) · bypass flex chain。home.html L52-67 内联 defensive override + home.css L14273-14288 base rule 同步 · cache_bust 11835034 → 11835035 · release_notes 4 语 v118.35.0.35 |
+| `5ccd989` | feat · BUG-B(破例) | 收入对账(/bank-v2)加 3 个 anchor 余额手动录入兜底:GL 期末 / Statement 期初 / GL 期初。OCR 抽这 3 个『锚点』不准时整张对账报告废 · Zihao 拍板紧急 BUG 修复一级(整顿期破例 1 次)。前端 home.html 加 .brv2-anchor-row(3 input + 实时『期初差额』提示)· home.js 4 语 i18n × 5 key + runRecon FormData 加 3 个 override · home.css 暖灰底 + 黑 focus · 后端 recon_routes.py /bank-v2/run 加 3 个 Optional Form override · summary._anchor_overrides 落库 {ocr, user} 对照 · cache_bust 11835035 → 11835036 · release_notes 4 语 v118.35.0.36 |
+
+### BUG-B 客户原始诉求(2026-05-22)
+
+客户截图(本地 `D:\Users\Skin\Desktop\BUG\BUG-B\`):
+- 1.jpg 泰文聊天:OCR 算 ยอดยกไป GL / ผลต่างยอดยกมา 不准 · 报告对不上
+- 2.jpg Excel 模板 + Pearnly UI 对比 · 紫色 bracket 圈出 OCR 算错的 3 anchor 数据区域 · 红色注解 ① "OCR 不准" + ② "应建 TEXT BOX 让客户录入这 3 个数"
+
+### 重大决策(本会话续)
+
+- **BUG-A 修法跟左栏对齐**(2026-05-22):不要重新发明 · v118.34.39 修过左栏 max-height calc 卡死 · 右栏直接镜像同款修法 · 不要尝试别的方案(已经吃过 4-5 轮 flex chain 教训)
+- **BUG-B 破例新功能**(2026-05-22 Zihao 拍板):整顿期『0 新功能』红线 · 但客户对账报告对不上是 P0 影响付费用户准确率的紧急 BUG · 算紧急 BUG 修复一级 · 入档 ❗ 例外段(主计划)· 累计破例 1 次
+- **3 anchor 不强校验业务等式**(2026-05-22):本来想加『GL 期末 ↔ 期初差额 audit equation』· 但实际等式还要扣除未匹配项 · 简单 == 校验会误报。改成单纯显示『期初差额 = stmt_opening - gl_opening』info 提示 · 不强制 · 让会计师肉眼判断
+- **override 落库 {ocr, user} 对照**(2026-05-22):落 summary_j["_anchor_overrides"] · 用户回查任务能看出哪几个数是 OCR 抽的 / 哪几个是手填的 · 给业务对账信任度兜底
+
+### 守门(BUG-A 跑 3 道 · BUG-B 跑 4 道)
+
+- BUG-A:imports / i18n / unit 293 OK · 跳 playwright / node(没改 JS)
+- BUG-B:imports / i18n(20 新 key × 4 语 0 missing 0 extra)/ unit 293 OK / node --check home.js EXIT=0 · 跳 playwright(E2E 跑 prod 着陆页不覆盖收入对账)
+
+### 整顿期账(铁律 #18 跟踪)
+
+- 累计破例次数:**1 次**(BUG-B `5ccd989`)
+- 整顿期代码规模影响:home.js +57 行 / home.html +113 行 / app.py +8 行 / recon_routes.py +24 行 · 整顿期目标方向相反(home.js < 200 行)· 但缓解措施=阶段 C 拆 home.js 时 brv2 模块独立文件迁出 · 一并搬
+
+### 必测清单(Zihao 自测 · 每项 ≤30 秒)
+
+**BUG-A**(设置 modal 滚动):
+1. 浏览器打开 https://pearnly.com · 登录 · 点头像 → 设置
+2. Ctrl++ / Ctrl+- 切换浏览器缩放 67% / 75% / 80% / 90% / 100% / 125%
+3. 每个缩放下点开『设置』· 右栏滚动到底部 · 看是否能看到 LINE ID / 公司信息 tab
+4. 左栏导航(账户 / 公司 / 工作流 / 系统 / 关于)滚动看是否还正常(无回归)
+5. 切 zh / en / th / ja 4 语 · 每语切一次 · 看 modal 没崩
+
+**BUG-B**(收入对账 3 anchor 录入):
+1. 进收入对账 tab(/home#/recon)· 上传 Statement PDF + GL · 不填 anchor · 跑对账 · 看跟以前一样走 OCR
+2. 上传 + 填 1 个 anchor(随便填 9999.99)· 跑对账 · 看公式 KPI 用的是你填的 9999.99 不是 OCR 抽的
+3. 上传 + 填 3 个 anchor 都不一样 · 跑对账 · 看 3 个都生效
+4. 切 4 语 · 看 anchor label 都对(GL 期末余额 / ยอดยกไป GL / GL closing balance / GL 期末残高)
+5. 手机端浏览器(devtools 切 iPhone 12)· 看 3 input 堆 1 列 · 不溢出
+6. 填 Statement 期初 + GL 期初 · 第 3 个不填 · 看下面『期初差额』实时算出来
+
+### 下窗口接力(给下个 Claude 窗口看)
+
+- **当前 task**:REFACTOR-A5 CI lint(半天 · 风险中 · 涉及 black + ruff 自动 reformat 现有 .py · 建议先 `--check` 模式跑出 diff 给 Zihao 看 · 拍板再上自动 fix)
+- **备选**:A3 环境分级(1-2 天 · 重)/ A8 Code Coverage(半天 · 依赖 A5)
+- **本会话续遗留**:BUG-A / BUG-B 都需要 Zihao 部署后实测确认 · 若 BUG-A 任一缩放仍报告滚不动 → 看是否是其它 modal 同款病(brv2-formula / .modal / .upg-modal · 已扫但未修)· 若 BUG-B 业务等式有更复杂的稽核公式 · 加 ผลต่าง 校验(目前只 info display)
+- **整顿期账**:本会话续破例 1 次(BUG-B)· 累计破例 1 次 · MASTER_PLAN ❗ 例外段已入档
 
 ---
 

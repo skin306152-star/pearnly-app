@@ -480,6 +480,23 @@ python scripts/refactor_progress.py
 
 ---
 
+## ❗ 例外段 · 整顿期破例做的新功能(铁律 #18 例外条款)
+
+整顿期『0 新功能』红线 · 但 Zihao 可拍板『破例做某新功能』(铁律 #18 例外条款)·
+本段记录每条破例 · 入档原因 · 防接力 agent 看见就以为闸开了。
+
+| 日期 | 破例 task | commit | 原因 |
+|---|---|---|---|
+| 2026-05-22 | **BUG-B** · 收入对账 3 个 anchor 余额(GL 期末 / Statement 期初 / GL 期初)手动录入兜底 | `5ccd989` | OCR 抽这 3 个『锚点』数字不准时整张对账报告废 · 影响付费用户对账准确率 · 业务等式破坏一连串错位 · Zihao 拍板紧急 BUG 修复一级 · 破例做。客户原始诉求图见 D:\Users\Skin\Desktop\BUG\BUG-B\(1.jpg + 2.jpg + 紫色 bracket)|
+
+**破例的代价**(继续整顿期记账):
+- 整顿期破例次数累计:1 次(2026-05-22)
+- 跟整顿期目标(home.js < 200 行 / app.py < 500 行)冲突:本次 +57 行 home.js / +8 行 app.py / +113 行 home.html / +24 行 recon_routes.py · home.js / home.html 都长 · 跟阶段 C 拆解目标背道而驰
+- 缓解措施:整顿期结束(2026-12 左右)纳入 home.js 拆出后的 brv2 模块独立文件 · 同步迁出
+- 闸不再开:Zihao 必须明确说『再破例 X』· 接力 agent 看到 MODULE_ROADMAP / 用户报新功能 → 立即停 · 跟 Zihao 确认
+
+---
+
 ## 🚀 下一个 task
 
 **当前**:REFACTOR-A7 ✅ 完成(commit `296c074` · 2026-05-22 第五会话)

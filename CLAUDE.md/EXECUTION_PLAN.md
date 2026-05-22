@@ -9,7 +9,7 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + 阶段 3 ✅ + 阶段 4 ✅ + **阶段 5 全 ✅(Task 5.1 ✅ + 5.2 ✅ + 5.3 ✅)**(本会话 2026-05-22 同窗口 · 7 个 commit `fa5e0ea` / `767ade9` / `e676c01` / `8ca78f9` / `876649d` 等)➡️ **下一接力点:阶段 6 收尾 · 或 NAV-IA 主线遗留 · 或 P0-VAT v4.9.6 bug 修复**
+**当前位置**：阶段 0-5 ✅ + **阶段 6 Task 6.1 ✅**(2026-05-22 本会话 8 个 commit · 累积 app.py 减 850 行 + 25 个 ensure_* 全盘点入档)➡️ **下一接力点:阶段 6 Task 6.2 写 Alembic 迁移设计文档(2h · blocked unlocked)· 或回 P0-VAT v4.9.6 主线**
 
 **当前 CI 状态**（GitHub Actions · commit `767ade9` · run #13 完整 4 step 全绿 161s）：
 - ✅ Step "Static import check" → 绿（修了 BOM 之后)
@@ -286,12 +286,28 @@
 
 > **为什么放到第 6 阶段**：当前 `ensure_*` 模式跑得稳 · 不紧迫。但启动时执行 schema 变更没有版本表 = 一次 schema 错就难回滚。等业务变化够大时再上 Alembic。
 
-### Task 6.1 · 盘点 `db.py` 所有 `ensure_*`（P2-03）
-- **状态**：blocked by 阶段 5
-- **类型**：只读盘点
-- **产出**：`docs/architecture/db-ensure-inventory.md`
-- **完成判定**：每个 ensure_* 列出表/字段/索引 · 是否启动调用 · 是否幂等 · 迁移优先级
-- **工作量**：1-2 小时
+### Task 6.1 · 盘点 `db.py` 所有 `ensure_*`（P2-03）✅ 2026-05-22 完成
+- **状态**：✅ completed · 阶段 5 解锁后立即做
+- **类型**：纯只读盘点 · 0 代码改动 · 1 个 markdown 文档
+- **产出**：`docs/architecture/db-ensure-inventory.md`(178 行 · 8 段:总览 / 启动顺序 / 按需调用 / 幂等分类 / 表清单 6 域 / Alembic 优先级 / 已知风险 / Task 6.2 接力)
+- **关键发现**:
+  - **25 个 ensure_*** · 23 个启动时 lifespan 调用(app.py L463-609 顺序) · 1 个按需(ensure_tenant_credits 注册时) · 1 个已注释禁用(ensure_demo_account)
+  - **全部幂等**(IF NOT EXISTS / ON CONFLICT / pg_catalog 探测) · 错误处理一致(try/except + logger.warning · 不阻塞启动)
+  - 操作 **~28 张表 + 多组扩展列** · 覆盖 6 大域(用户认证 / 客户 / 多租户 / ERP / 异常通知 / 对账 / 计费)
+- **幂等性 4 类**:
+  - A 完全幂等(20 个 · 标准 PG IF NOT EXISTS)
+  - B 半幂等 constraint 探测(2 个 · adapter CHECK)
+  - C 半幂等 UPDATE 重设(1 个 · ensure_credits_tables 末尾设豁免账号 · 每次重启重设但数据安全)
+  - D 数据初始化(2 个 · ON CONFLICT INSERT)
+- **Alembic 迁移优先级建议**(为 Task 6.2 打底):
+  - P0:credits_tables(体量最大) + membership_tables + vat_recon_tables
+  - P1:erp_mapping(4 表) + erp_oauth(2 表) + exceptions / notification / clients
+  - P2:简单 ALTER 单列函数 · 可合并迁移
+  - P3:**保留 ensure 模式**(adapter constraint 动态扩白名单 · Alembic 不擅长)
+- **已知风险**(切 Alembic 前要解的 5 条):顺序敏感性 / 跨表 ALTER / dual-write 灰度期 / 数据迁移分离 / Supabase 限制实测
+- **完成判定**：✅ docs/architecture/db-ensure-inventory.md 已建 · 每个 ensure_* 都列出(表/字段/索引/幂等性/启动调用/迁移优先级)
+- **真实工作量**：≈55 分钟(原估 1-2h · 中位偏好 · grep 1 遍找全 ensure_* + sample 4 个不同类型实现 + 写 178 行文档)
+- **不会触发生产部署**(git-deploy.sh 只 cp *.py 和 static/ · 不动 docs/)
 
 ### Task 6.2 · 迁移体系设计文档（P2-04）
 - **状态**：blocked by 6.1

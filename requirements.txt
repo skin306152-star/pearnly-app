@@ -35,7 +35,7 @@ psycopg2-binary
 # 设计:docs/architecture/db-migration-plan.md(阶段 6 Task 6.2 已产出)
 # A2.1 = 装包 + env.py + 001 baseline 空迁移 · 不动 git-deploy.sh
 # A2.2 = 阶段 B 真迁 25 个 ensure_* 时再启用钩子
-alembic>=1.13,<2.0
+alembic>=1.18.4,<2.0
 SQLAlchemy>=2.0,<3.0  # Alembic 强依赖 · 本项目不用 ORM · 只为让 Alembic 跑
 
 # ============================================================

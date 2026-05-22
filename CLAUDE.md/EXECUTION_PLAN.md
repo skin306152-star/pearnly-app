@@ -411,7 +411,16 @@
 - ✅ home.js 共 52 个 `catch (_) {}` 清单
 - ✅ 15 个『真吞』(localStorage 私模/配额、AbortController.abort 已 abort、URL.revokeObjectURL 已 revoke、element.focus 不可 focus、CustomEvent dispatch、classList、element.remove)加内联注释 `/* silent · <reason> */`
 - ✅ 0 业务变化 · 守门 5 道全绿
-- 🟡 剩 37 个 silent block 待后续 batch 处理 · 其中部分是『应日志』候选(网络错误细节解析等)需逐个评估
+
+**Batch 2 进度**(2026-05-22 第三会话)：
+- ✅ 12 个『真吞』续清(测试中心 callback / log dispatch / 进度条 callback / summary toast 外层 / forEach abort / RFC 5987 decode / refreshSessions 顺手 / `_refreshExcClientFilter` × 2 / `_refreshClientSwitcher` / `_rerenderExceptions` / showToast 兜 alert)
+- ✅ 3 个『应日志』改 `catch (e) { console.warn('[<module>]', e); }`:
+  - `[export] resp.json err.detail parse failed`(L14130 · Excel 导出 fetch err.detail 解析)
+  - `[i18n] t() failed for key:`(L15632 · err.<code> 翻译 fail)
+  - `[batch-export] resp.json err.detail parse failed`(L21296 · batch OCR export 同款)
+- ✅ Playwright smoke 只 watch `console.error` 不管 `console.warn`(已 grep 确认)· 新 warn 调用 ✓ 安全
+- ✅ 0 业务变化 · 守门 5 道全绿(node + import + i18n + 293 unit tests + Playwright)
+- 🟡 剩 21 个 silent block · 主要是 cross-tab CustomEvent / 路由切换通知 / decodeURIComponent 兜底 / 嵌套 silent — 留 batch 3+ 处理
 
 ---
 

@@ -12,8 +12,8 @@
             // 通知测试中心红点 + 列表(若已渲染)
             try {
                 if (typeof window._tcOnNewLog === 'function') window._tcOnNewLog(entry);
-            } catch (_) {}
-        } catch (_) {}
+            } catch (_) { /* silent · 测试中心 callback 极少 fail */ }
+        } catch (_) { /* silent · log entry 处理外层兜底 */ }
     }
     window._pearnlyTcLogs = buf;
     window._pearnlyTcPush = _push;
@@ -133,7 +133,7 @@
                     summary: parts.join(' ').slice(0, 200),
                     detail: { full: parts.join(' ').slice(0, 1500) },
                 });
-            } catch (_) {}
+            } catch (_) { /* silent · log CustomEvent dispatch 极少 fail */ }
             return orig.apply(console, arguments);
         };
     });
@@ -12877,7 +12877,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
     if (btnStopEl) btnStopEl.style.display = '';
 
     // v118.27.8.1.15 · 大批量(>100 张)进度条 + 关页警告 + 首次一次性提示
-    try { if (typeof window._bigBatchStart === 'function') window._bigBatchStart(pendingFiles); } catch(_) {}
+    try { if (typeof window._bigBatchStart === 'function') window._bigBatchStart(pendingFiles); } catch(_) { /* silent · 进度条 callback 极少 fail */ }
 
     const workers = [];
     for (let i = 0; i < Math.min(PARALLEL_LIMIT, pendingFiles.length); i++) {
@@ -12886,7 +12886,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
     await Promise.all(workers);
 
     // v118.27.8.1.15 · 批量结束 · 拆进度条 + 拆关页警告
-    try { if (typeof window._bigBatchStop === 'function') window._bigBatchStop(); } catch(_) {}
+    try { if (typeof window._bigBatchStop === 'function') window._bigBatchStop(); } catch(_) { /* silent · 进度条 callback 极少 fail */ }
 
     // v118.20.6 · 还原按钮显示 · 清理状态
     if (btnStartEl) btnStartEl.style.display = '';
@@ -12924,7 +12924,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
         } else if (total > 1 && (sum.network + sum.timeout + sum.quota + sum.overloaded + sum.rate + sum.other) > 0) {
             showToast(_summaryFailToast(sum), 'error', 4500);
         }
-    } catch(_) {}
+    } catch(_) { /* silent · summary toast 失败外层兜底 */ }
 
     // v0.13 · 批量识别完成后 · 弹重复警告对话框(逐个处理)
     if (window._dupQueue && window._dupQueue.length) {
@@ -12957,7 +12957,7 @@ document.addEventListener('click', (e) => {
     if (window._ocrAborted) return;  // 防双击
     window._ocrAborted = true;
     if (window._ocrCtrls && window._ocrCtrls.size) {
-        window._ocrCtrls.forEach(c => { try { c.abort('user_stop'); } catch(_) {} });
+        window._ocrCtrls.forEach(c => { try { c.abort('user_stop'); } catch(_) { /* silent · 已 abort */ } });
     }
     const btnStopEl = document.getElementById('btn-stop');
     if (btnStopEl) btnStopEl.disabled = true;
@@ -14127,7 +14127,7 @@ async function _runExport(templateId) {
             try {
                 const err = await resp.json();
                 if (err && err.detail) detail = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
-            } catch (_) {}
+            } catch (e) { console.warn('[export] resp.json err.detail parse failed:', e); }
             const key = typeof detail === 'string' && detail.indexOf('.') > 0 ? 'err.' + detail : null;
             showToast(key ? t(key) : (t('toast-export-error') + ' · ' + detail), 'error');
             return;
@@ -14141,7 +14141,7 @@ async function _runExport(templateId) {
             const cd = resp.headers.get('Content-Disposition') || '';
             const m1 = cd.match(/filename\*=UTF-8''([^;]+)/i);
             if (m1) {
-                try { filename = decodeURIComponent(m1[1]); } catch (_) {}
+                try { filename = decodeURIComponent(m1[1]); } catch (_) { /* silent · RFC 5987 decode · 用默认 filename */ }
             }
         }
         const url = URL.createObjectURL(blob);
@@ -15629,7 +15629,7 @@ function _humanizeBackendError(detail, fallback) {
             try {
                 const tr = t(k, detail);
                 if (tr && tr !== k) return tr;
-            } catch (_) {}
+            } catch (e) { console.warn('[i18n] t() failed for key:', k, e); }
             return detail.code;
         }
         if (detail.message) return detail.message;
@@ -18634,7 +18634,7 @@ async function deleteEndpoint(endpointId) {
             showToast(t('bank-client-changed'), 'success');
             _closeClientPicker();
             // 顺手刷新会话列表(让列表也带新 client_id)
-            try { await refreshSessions(); } catch (_) {}
+            try { await refreshSessions(); } catch (_) { /* silent · 顺手刷新会话列表 */ }
         } catch (e) {
             console.warn('[bank-recon] save client failed', e);
             showToast(t('bank-client-change-failed'), 'error');
@@ -20424,9 +20424,9 @@ async function deleteEndpoint(endpointId) {
             _clients = [];
         }
         // v118.21.0 · 通知异常栏客户下拉刷新
-        try { if (typeof window._refreshExcClientFilter === 'function') window._refreshExcClientFilter(); } catch(_) {}
+        try { if (typeof window._refreshExcClientFilter === 'function') window._refreshExcClientFilter(); } catch(_) { /* silent · 通知下游刷新 */ }
         // v118.28.0 · 通知顶栏客户切换器刷新
-        try { if (typeof window._refreshClientSwitcher === 'function') window._refreshClientSwitcher(); } catch(_) {}
+        try { if (typeof window._refreshClientSwitcher === 'function') window._refreshClientSwitcher(); } catch(_) { /* silent · 通知下游刷新 */ }
         return _clients;
     }
 
@@ -21293,7 +21293,7 @@ async function deleteEndpoint(endpointId) {
                 try {
                     const err = await resp.json();
                     if (err && err.detail) detail = err.detail;
-                } catch (_) {}
+                } catch (e) { console.warn('[batch-export] resp.json err.detail parse failed:', e); }
                 if (resp.status === 404) {
                     showToast(t('report-toast-empty'), 'info');
                 } else {
@@ -24940,7 +24940,7 @@ try { window.I18N = I18N; } catch(e) {}
     // 切语言时用缓存重渲(不发请求 · 即时无闪烁)
     window._rerenderExceptions = function() {
         // v118.21.0.1 · 客户下拉的「全部客户」选项也是 t() 渲染 · 切语言要刷
-        try { _refreshExcClientFilter(); } catch(_) {}
+        try { _refreshExcClientFilter(); } catch(_) { /* silent · 通知下游刷新 */ }
         if (_excState.statsCache) {
             renderKpis(_excState.statsCache);
             renderChips(_excState.statsCache);
@@ -26769,7 +26769,7 @@ try { window.I18N = I18N; } catch(e) {}
         try {
             if (typeof showToast === 'function') showToast(msg, type || 'info');
             else alert(msg);
-        } catch (_) {}
+        } catch (_) { /* silent · toast 失败兜 alert 也失败 · 外层吞 */ }
     }
 
     function _copyToClipboard(text) {

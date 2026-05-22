@@ -121,7 +121,7 @@
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
 | **A0** | 整顿主计划落档(本文档 + 铁律 #18-20 + STATE 标识 + 统计脚本) | 2-3h | — | ✅ 2026-05-22 · commit `613ea23` |
-| A1 | Vite + ES modules 落地(装包 + 配 esbuild + CI 加 build step + 把已抽 dashboard.js/billing.js 改 ES modules) | 1-2 天 | A0 | 🟡 A1.1 ✅ `e11e81d` · A1.2 ✅(待补 hash)· A1.3-4 待启动 |
+| A1 | Vite + ES modules 落地(装包 + 配 esbuild + CI 加 build step + 把已抽 dashboard.js/billing.js 改 ES modules) | 1-2 天 | A0 | 🟡 A1.1 ✅ `e11e81d` · A1.2 ✅ `cfbb7d5` · A1.3 ✅(待补 hash)· A1.4 部署后验证 |
 | A2 | Alembic 落地(装包 + `env.py` + 001 试点迁移 + git-deploy.sh 钩子) | 2.5h | A0 | ⚪ 待启动 |
 | A3 | 环境分级(prod / staging / dev 三套 · Docker 本地或 Vultr 第二台) | 1-2 天 | A0 | ⚪ |
 | A4 | Secrets 管理(`.env` → Doppler 或 1Password Secrets · 给多人协作铺垫) | 2-3 天 | A3 | ⚪ |
@@ -263,7 +263,7 @@
 
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
-| **A 工具链** | 🟡 1.5/10 | A0 ✅(`613ea23`)· A1.1 ✅ `e11e81d` · A1.2 ✅(待补 hash)· A1.3 待启动 | CI 加 vite build step · 共 5 关守门 |
+| **A 工具链** | 🟡 1.75/10 | A0 ✅ · A1.1-3 ✅(`e11e81d`/`cfbb7d5`/待补)· A1.4 部署后验证 | dashboard + billing 进 Vite bundle · 15kB gzip 5kB |
 | B 后端 | ⚪ 0/10 | — | 依赖 A1, A5 |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
@@ -482,15 +482,15 @@ python scripts/refactor_progress.py
 
 ## 🚀 下一个 task
 
-**当前**:REFACTOR-A1.2 ✅ 完成(待补 hash · 2026-05-22)
+**当前**:REFACTOR-A1.3 ✅ 完成(待补 hash · 2026-05-22)
 
-**下一个**:REFACTOR-A1.3 · dashboard.js / billing.js 改 ES modules(半天 · 同窗口接力)
+**下一个**:REFACTOR-A1.4 · 验证 prod 全跑通(push 后等 CI + webhook 部署 + curl /api/version)
 
 **子拆分**(REFACTOR-A1 整体)
 - A1.1 · 装 Vite + 配 esbuild · ✅ `e11e81d` 2026-05-22(Vite 6.4.2 + 本地 build)
-- A1.2 · CI 加 build step · ✅ 2026-05-22(ci.yml 加 vite build · 5 关守门)
-- A1.3 · dashboard.js / billing.js 改 ES modules · 半天 · 待启动
-- A1.4 · 验证 prod 全跑通 · 半天 · 待启动
+- A1.2 · CI 加 build step · ✅ `cfbb7d5` 2026-05-22(ci.yml 加 vite build · 5 关守门)
+- A1.3 · dashboard.js / billing.js 改 ES modules · ✅ 2026-05-22(git mv 到 src/home/ · Vite bundle · home.html 改 script · cache_bust ++ · release_notes v118.35.0.32 4 语)
+- A1.4 · 验证 prod 全跑通 · 部署后跑
 
 ---
 

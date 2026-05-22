@@ -1,15 +1,14 @@
-// REFACTOR-A1.1 (2026-05-22) · Vite entry 占位
+// REFACTOR-A1.3 (2026-05-22) · Vite entry · side-effect imports
 //
-// 本文件是 Vite build 的入口 · 当前只验证工具链跑通
-// 后续:
-// - A1.3 真 import dashboard / billing 模块(改自 static/home/*.js IIFE)
-// - 阶段 C 持续 import 从 home.js 抽出的小模块
+// 把已抽出的 ES module 集中到这里 · Vite bundle 成 static/dist/main.js
+// 加载顺序:home.html <script src=home.js> 同步 → <script type=module src=/static/dist/main.js> defer
+// 所以 dashboard / billing 执行时 · home.js 提供的全局(t/showToast/escapeHtml/...)已就绪
 //
-// home.js 33000 行不进 Vite(铁律 #18 · 渐进翻新)· 仍走 <script src> 老路
-// 本 bundle 输出到 static/dist/main.js · home.html 用 <script type=module> 加载
+// 后续阶段 C 持续从 home.js 抽模块 → 都进 src/home/ → 在这里 import
+
+import './home/dashboard.js';
+import './home/billing.js';
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
-  console.info('[pearnly] vite bundle loaded · REFACTOR-A1.1');
+  console.info('[pearnly] vite bundle loaded · dashboard + billing');
 }
-
-export {};

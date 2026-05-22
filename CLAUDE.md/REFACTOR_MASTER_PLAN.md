@@ -122,7 +122,7 @@
 |---|---|---|---|---|
 | **A0** | 整顿主计划落档(本文档 + 铁律 #18-20 + STATE 标识 + 统计脚本) | 2-3h | — | ✅ 2026-05-22 · commit `613ea23` |
 | A1 | Vite + ES modules 落地(装包 + 配 esbuild + CI 加 build step + 把已抽 dashboard.js/billing.js 改 ES modules) | 1-2 天 | A0 | ✅ 全 4 子完成 · `e11e81d` / `cfbb7d5` / `1c4c3bd` · prod 11835032 部署成功 · 等 Zihao 人工测 dashboard + 充值 |
-| A2 | Alembic 落地(装包 + `env.py` + 001 试点迁移 + git-deploy.sh 钩子) | 2.5h | A0 | ⚪ 待启动 |
+| A2 | Alembic 落地(装包 + `env.py` + 001 试点迁移 + git-deploy.sh 钩子) | 2.5h | A0 | 🟡 A2.1 ✅(待补 hash · 装 alembic 1.18 / SQLAlchemy 2 / env.py 从 env var 读 DATABASE_URL / 001_baseline 空迁移)· A2.2 git-deploy.sh 钩子并入 B3(真迁第一个 ensure_* 时再加)|
 | A3 | 环境分级(prod / staging / dev 三套 · Docker 本地或 Vultr 第二台) | 1-2 天 | A0 | ⚪ |
 | A4 | Secrets 管理(`.env` → Doppler 或 1Password Secrets · 给多人协作铺垫) | 2-3 天 | A3 | ⚪ |
 | A5 | CI 加 lint + format(black + ruff + ESLint + Prettier) | 半天 | A0 | ⚪ |
@@ -263,7 +263,7 @@
 
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
-| **A 工具链** | 🟡 2/10 | A0 ✅ · A1 ✅ 全 4 子完成 · A2 待启动 | Vite 工具链落地 · dashboard + billing 进 ES module bundle · prod 11835032 通 |
+| **A 工具链** | 🟡 2.5/10 | A0 ✅ · A1 ✅ · A2.1 ✅(待补 hash)· A2.2 并入 B3 · A3 待启动 | Alembic 1.18 装好 · env.py 配好 · 001_baseline 空迁移就位 · 等 B3 真迁 ensure_* 时再加 git-deploy.sh 钩子 |
 | B 后端 | ⚪ 0/10 | — | 依赖 A1, A5 |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
@@ -482,9 +482,14 @@ python scripts/refactor_progress.py
 
 ## 🚀 下一个 task
 
-**当前**:REFACTOR-A1 ✅ 全 4 子完成(2026-05-22 · 1 个会话内做完)
+**当前**:REFACTOR-A2.1 ✅ 完成(待补 hash · 2026-05-22 · 同会话接力)
 
-**下一个**:REFACTOR-A2 · Alembic 落地(2.5h · 装包 + env.py + 001 试点 + git-deploy.sh 钩子)
+**下一个**:REFACTOR-A3 · 环境分级(prod / staging / dev 三套 · 1-2 天)· 或先做 A5 CI lint(半天 · 不阻塞)
+
+**A2.2 钩子并入 B3**(2026-05-22 决策):
+- A2.1 装好 Alembic + 001 空 baseline 后 · 没真迁移之前 git-deploy.sh 加 `alembic upgrade head` 是 no-op
+- 把 hook 加在"真要跑第一条迁移"时(= B3 第一个 ensure_* 迁 Alembic 时)· 降低风险 + 不空动 prod 部署链
+- 同步 B3 入参:本任务 commit hash + 001_baseline 已就位 + env.py 读 DATABASE_URL 已配好
 
 **REFACTOR-A1 4 子拆分(全 ✅)**
 - A1.1 · 装 Vite + 配 esbuild · ✅ `e11e81d`(Vite 6.4.2 + 本地 build)

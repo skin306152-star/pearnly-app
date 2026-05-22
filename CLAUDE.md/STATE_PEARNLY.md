@@ -1,6 +1,86 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-22(第二会话) · EXECUTION_PLAN 阶段 4-6 一波打完 · 7 个阶段任务 · 11 commit · app.py 减 850 行
+> **最近更新**:2026-05-22(第三会话) · **整顿模式 ON** · 立 REFACTOR_MASTER_PLAN + 铁律 #18-20
+
+---
+
+## 🔴🔴🔴 整顿模式 ON(2026-05-22 起到约 2026-12)
+
+**Zihao 2026-05-22 拍板**:封锁整顿 5-8 个月 · 路径 B 上 Vite + ES modules · 工程标准化到 Google / Anthropic Claude code 级。
+
+**核心文档**:[`CLAUDE.md/REFACTOR_MASTER_PLAN.md`](REFACTOR_MASTER_PLAN.md)(整顿单一权威源 · 9 阶段 A-I · 60+ task)
+
+**当前状态**:
+- **阶段 A 工具链** 🟡 1/10(A0 整顿主计划落档 ✅ 本会话)
+- **下一个 task**:**REFACTOR-A1 Vite + ES modules 落地**(1-2 天 · 2-4 个窗口)
+
+**封锁条款**(铁律 #18):
+- ❌ 0 新功能开发(P0-VAT v4.9.6 / Phase 6 进项管理 / MODULE_ROADMAP 全 hold)
+- ✅ 只做 REFACTOR_MASTER_PLAN.md 9 阶段 task
+- ✅ 紧急 BUG 修复允许(影响付费用户 / 数据安全 / 服务中断)
+
+**接力 agent 必读 4 文档**(铁律 #19):
+1. CLAUDE.md/CLAUDE.md(20 条铁律 · 重点看 #18-20)
+2. 本文档头部(整顿模式段)
+3. REFACTOR_MASTER_PLAN.md(找下一个 task + 完成判定)
+4. 对应 task 的"完成判定"段
+
+**commit message 格式**(铁律 #20):
+```
+<type>(<scope>): <subject> · REFACTOR-<task-id>
+
+<body>
+
+守门 5 道全绿:imports / i18n / unit / playwright / node
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+```
+
+**完成定义**:home.js < 200 行 / app.py < 500 行 / 测试覆盖 ≥ 70% / API p95 < 1s / 50-100 模块文件 / Google 级 90%+
+
+**自动统计脚本**:`python scripts/refactor_progress.py`(每窗口跑 1 次 · 看进度)
+
+---
+
+## 🆕 2026-05-22 本会话(第三轮) · 阶段 7-8 推进 + 整顿期立项 · 6 个 task
+
+> **接力规则**:换窗口先看本段
+
+### 6 个 commit 全绿
+
+| Commit | Task | 内容 | home.js Δ |
+|---|---|---|---|
+| `558a326` | 原 7.1 → REFACTOR-C1 部分 | dashboard 抽出 `static/home/dashboard.js`(196 行) | −197 |
+| `0bd1f1b` | 原 7.2 → REFACTOR-C1 部分 | billing 抽出 `static/home/billing.js`(320 行) | −320 |
+| `ae3e846` | 原 7.3 batch 1 → REFACTOR-I1 部分 | 15 个 `catch (_) {}` 加 silent 注释 | +6 注释 |
+| `7c163ca` | 原 7.3 batch 2 → REFACTOR-I1 部分 | 12 silent 注释 + 3 console.warn | +12 注释 +3 warn |
+| `0ba0acf` | 原 8.1 → REFACTOR-G1 前置 | docs/README 索引 40 文件 | 0 |
+| **本次** | **REFACTOR-A0** | **整顿主计划落档**(REFACTOR_MASTER_PLAN + 铁律 18-20 + 统计脚本) | 0 |
+
+### 累计成果(本会话第三轮 · 整顿期立项前)
+- home.js **33768 → 33251 行**(减 517 行)
+- 静默吞错处理 **30/52**(已注释)
+- docs/ 全索引(40 markdown)
+- 5 道守门全绿(每个 commit)
+- 4 个 cache_bust 进位 + 4 语 release_notes 4 版
+
+### 整顿期立项产出(本次 REFACTOR-A0)
+- ✅ `CLAUDE.md/REFACTOR_MASTER_PLAN.md`(60+ task · 9 阶段 A-I · 单一权威源)
+- ✅ 铁律 #18(封锁新功能)+ #19(必读 4 文档)+ #20(commit 必含 task ID)
+- ✅ STATE_PEARNLY 头部加"整顿模式 ON"
+- ✅ `scripts/refactor_progress.py`(自动统计 · 防偷懒)
+
+### 下窗口接力 = REFACTOR-A1 Vite 落地
+
+子拆分:
+- A1.1 · 装 Vite + 配 esbuild(半天 · 1 窗口)
+- A1.2 · CI 加 build step(1h · 同 1 窗口)
+- A1.3 · dashboard.js / billing.js 改 ES modules(半天 · 1 窗口)
+- A1.4 · 验证 prod 全跑通(半天 · 1 窗口)
+
+---
+
+## 历史 STATE(整顿模式立项前 · 仅供参考)
 
 ---
 

@@ -1,7 +1,25 @@
 # CLAUDE.md · Pearnly 项目大脑
 > 每次启动 Claude Code 必须完整读完本文件再开始任何任务
 > 本文件 = 项目宪法 · 优先级高于一切临时指令
-> 最后更新：2026-05-16
+> 最后更新:2026-05-22(整顿模式 ON · 加铁律 #18-20)
+
+---
+
+## 🔴🔴🔴 整顿模式 ON(2026-05-22 起 · 5-8 个月)
+
+**当前状态**:**封锁整顿期** · 0 新功能开发 · 仅做工程标准化
+
+**主计划**:[`CLAUDE.md/REFACTOR_MASTER_PLAN.md`](REFACTOR_MASTER_PLAN.md)(60+ task · 9 阶段 A-I · 单一权威源)
+
+**接力 agent 进窗口顺序**:
+1. 读本文件(看铁律 #18-20 段)
+2. 读 `STATE_PEARNLY.md`(头部"整顿模式"段)
+3. 读 `REFACTOR_MASTER_PLAN.md`(找当前 task)
+4. 干活 → 5 道守门 → push → 更新 STATE + 主计划进度看板
+
+**禁止**:任何 `MODULE_ROADMAP.md` 新功能 · 任何 P0-VAT 主线 · 任何 Phase 6 进项管理 MVP
+
+**整顿期目标**:Pearnly 工程标准化到 "Google / Anthropic Claude code 级 90%+" · home.js < 200 行 · app.py < 500 行 · 测试覆盖 ≥ 70% · API p95 < 1s
 
 ---
 
@@ -332,6 +350,83 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 **为什么这条铁律拖到 5.22 才立**:屎山治理铁律(5.15)说"不推倒重来 · 渐进翻新" · 但"新功能去哪里"那时没说清。Task 5.1 抽 billing router 完成 · 验证了"独立 router + include_router" pattern 跑得通(本机 + CI + 生产三层验证)· 现在有信心强制要求。
 
 **附:CONTRIBUTING.md**:同时新建项目根 `CONTRIBUTING.md` 给协作者(包括所有 Claude 窗口)看 · 是这条铁律的完整版本 + 真实文件结构示例。
+
+---
+
+### 18. 整顿期封锁 · 0 新功能开发(2026-05-22 拍板 · 路径 B · 最高优先级)
+
+**背景**:Zihao 2026-05-22 决策"封锁整顿 5-8 个月 · 路径 B 上 Vite + ES modules · 把项目工程标准化到 Google / Anthropic Claude code 级"。立项理由:
+- 当前 1 个真实付费用户(mrerp@outlook.co.th) · 没大量真实用户 · 是工程整顿的黄金窗口
+- 切换 3-5s 延迟 / BUG 反复修 / 砍掉功能死灰复燃 · 都是地基不稳的症状
+- AI vibe-code 项目通病:前期快速跑业务 · 后期烂得改不动 · 现在不整顿后面更难
+
+**铁律**:整顿期(2026-05-22 起到约 2026-12)**0 新功能开发**:
+- ❌ **禁止**回 P0-VAT v4.9.6 主线(等整顿完再做)
+- ❌ **禁止**开 Phase 6 进项管理 v118.40 MVP(等整顿完)
+- ❌ **禁止**任何 `MODULE_ROADMAP.md` 里的新功能 task
+- ❌ **禁止**为 LINE / Gmail / Gemini API 加新业务
+- ✅ **只做**`REFACTOR_MASTER_PLAN.md` 里的 9 阶段 task
+- ✅ **允许例外**:紧急 BUG 修复(影响付费用户 / 数据安全 / 服务中断)
+
+**接力 agent 自检**:进窗口先 grep `MODULE_ROADMAP.md` 想做新功能 → **立即停** · 跟 Zihao 确认。
+
+**例外条款**:Zihao 明确说"破例做某新功能" → 加到 REFACTOR_MASTER_PLAN.md 进度看板的 ❗ 例外段 + 入档原因。
+
+---
+
+### 19. 整顿期接力 agent 必读 4 文档(2026-05-22 拍板 · 防接力跑偏)
+
+**背景**:9 阶段 100+ task 不在一个窗口能干完 · 跨窗口接力时如果文档不读全 · 必然跑偏(找不到下个 task / 重复做 / 跳过依赖)。
+
+**铁律**:整顿期每个接力 agent 进窗口**必读**这 4 文档(顺序):
+1. **`CLAUDE.md/CLAUDE.md`**(本文件 · 20 条铁律 · 看完铁律 18-20 这段)
+2. **`CLAUDE.md/STATE_PEARNLY.md`** 头部("整顿模式 ON" 段 · 当前阶段 · 上窗口完成的 commit)
+3. **`CLAUDE.md/REFACTOR_MASTER_PLAN.md`**(整顿主计划 · 单一权威源 · 看"当前进度看板" + "下一个 task")
+4. 当前 task 的"完成判定"段(在主计划对应 task 行)
+
+**进窗口前检查**(60 秒):
+```
+1. git branch --show-current → master(铁律 #14)
+2. 读上面 4 文档
+3. TaskCreate 创建本窗口任务列表(基于主计划下一个 task)
+```
+
+**触发"不读文档"违规**:
+- commit message 没 REFACTOR-XX task ID → 没读主计划
+- 改了 `MODULE_ROADMAP.md` 里的新功能 → 没读铁律 #18
+- 没跑 5 道守门就 push → 没读铁律 #19 接力 protocol
+
+---
+
+### 20. 整顿期 commit message 必含 REFACTOR-<task-id>(2026-05-22 拍板 · grep 防偷懒)
+
+**背景**:屎山治理需要可追溯 · 必须能 git log grep 出哪些 commit 在做整顿 · 哪些在偷做新功能。
+
+**铁律**:整顿期 commit message **必含**对应 task ID:
+
+格式:
+```
+<type>(<scope>): <subject> · REFACTOR-<task-id>
+
+<body 说改了什么 · 为啥 · 怎么验证>
+
+守门 5 道全绿:imports / i18n / unit / playwright / node
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+```
+
+**例子**(整顿期标准 commit):
+- `refactor(frontend): 装 Vite + 配 esbuild · REFACTOR-A1`
+- `refactor(backend): 抽 settings router · REFACTOR-B1`
+- `test(e2e): 加登录 E2E · REFACTOR-D1`
+- `chore(ci): 加 black + ruff lint · REFACTOR-A5`
+- `docs(adr): ADR-001 选 Vite 不选 Webpack · REFACTOR-G1`
+
+**唯一例外**(整顿期允许不带 task ID):
+- 紧急 BUG 修复(影响付费用户)· commit message 必须以 `hotfix:` 开头
+- 文档微调(typo / 链接修)· commit message 以 `docs:` 开头即可
+
+**审计**:每月末 Zihao 跑 `git log --since='1 month ago' --grep='REFACTOR-' --oneline | wc -l` 看整顿 commit 数 · grep 不出 task ID 的 commit 单独看 · 不该出现"偷做新功能"。
 
 ---
 

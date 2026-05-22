@@ -1,6 +1,6 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-22(第四会话续) · **整顿模式 ON** · A1/A2.1/A9 三件基础设施 + CLEANUP-PLAN 老订阅残留全清(Zihao 截图发现)
+> **最近更新**:2026-05-22(第五会话) · **整顿模式 ON** · A7 依赖锁定落地 · 阶段 A 进度 4.5/10
 
 ---
 
@@ -11,8 +11,8 @@
 **核心文档**:[`CLAUDE.md/REFACTOR_MASTER_PLAN.md`](REFACTOR_MASTER_PLAN.md)(整顿单一权威源 · 9 阶段 A-I · 60+ task)
 
 **当前状态**:
-- **阶段 A 工具链** 🟡 3.5/10(A0 ✅ + A1 ✅ + A2.1 ✅ + A9 ✅)· 阶段 A 已超 1/3
-- **下一个 task**:**REFACTOR-A7 依赖锁定**(1-2h · pip-tools 生成 requirements.lock.txt)· 或 A5 CI lint(半天)/ A3 环境分级(1-2 天)
+- **阶段 A 工具链** 🟡 4.5/10(A0 ✅ + A1 ✅ + A2.1 ✅ + A7 ✅ + A9 ✅)· 阶段 A 已近 1/2
+- **下一个 task**:**REFACTOR-A5 CI lint**(半天 · black + ruff + ESLint + Prettier)· 或 A3 环境分级(1-2 天)/ A8 Code Coverage(半天 · 依赖 A5)
 
 **封锁条款**(铁律 #18):
 - ❌ 0 新功能开发(P0-VAT v4.9.6 / Phase 6 进项管理 / MODULE_ROADMAP 全 hold)
@@ -39,6 +39,58 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 **完成定义**:home.js < 200 行 / app.py < 500 行 / 测试覆盖 ≥ 70% / API p95 < 1s / 50-100 模块文件 / Google 级 90%+
 
 **自动统计脚本**:`python scripts/refactor_progress.py`(每窗口跑 1 次 · 看进度)
+
+---
+
+## 🆕 2026-05-22 第五会话 · REFACTOR-A7 依赖锁定落地(1 commit)
+
+> **接力规则**:换窗口先看本段
+
+### 1 个 commit · pip-compile 全传递依赖钉死
+
+| Commit | Task | 内容 |
+|---|---|---|
+| `296c074` | REFACTOR-A7 | 本机装 pip-tools 7.5.3 · pip-compile requirements.txt → requirements.lock.txt(299 行 · LF · 0 BOM · 全传递依赖钉死)· ci.yml `pip install -r` 改装 lock · cache-dependency-path 同步 · dependabot.yml 加注释说明 Dependabot 只改源 · CONTRIBUTING.md 加 §依赖管理 段(两层文件 + 改依赖流程 + Dependabot PR 处理) |
+
+### 两层文件设计
+
+| 文件 | 角色 | 谁改 |
+|---|---|---|
+| `requirements.txt` | **源** · 顶层依赖 + 大版本约束(`alembic>=1.13,<2.0`)· 人读 | 人 / Dependabot |
+| `requirements.lock.txt` | **产物** · pip-compile 出 · 所有传递依赖钉死(`urllib3==2.7.0`)· CI / prod 装 | pip-compile 自动 · 不手改 |
+
+### 重大决策(本会话)
+
+- **pip-tools 7.5.3 不进 requirements.txt**(2026-05-22):本机 dev 工具 · 跟 alembic 一样不入 prod 依赖
+- **lock 用 Python 3.10 生成 · CI 跑 Python 3.11**:大部分 pure-Python 包跨版本 OK · torch / openpyxl / cryptography 等核心都有 3.10/3.11 双 wheel · 若 CI 红再切 Linux 容器 regen
+- **Dependabot 只改 requirements.txt 源 · lock 不动**:Dependabot 不原生跑 pip-compile · reviewer 合 PR 前手动 `python -m piptools compile` · 不然 CI 装老版本看不到升级效果(铁律 + CONTRIBUTING.md 入档)
+- **不开 `--generate-hashes`**:加哈希后 lock 5967 字节 → 数十 KB · 编辑难 · 暂时不上 · 等阶段 B/C 后期再补
+
+### 守门 3 道全绿(本会话)
+
+- `python scripts/check_imports.py --quiet` → EXIT=0
+- `python scripts/check_i18n.py --strict --quiet` → 0 missing 0 extra
+- `PEARNLY_SKIP_HEAVY_INIT=1 python -m unittest discover -s tests/unit` → **Ran 293 tests in 2.154s · OK (skipped=2)**
+- 跳 playwright + node:本 commit 未改 JS / login.html / home.js / 4 语切换
+
+### 进度指标(refactor_progress.py 本会话末跑出)
+
+- **工程化就绪**:4/8(50%) → **5/8(62%)**(加 requirements.lock ✅)
+- **Google 级达标综合**:43%(代码规模 1% / 模块化 73% / 测试 22% / 静默 57% / 工程化 62%)
+- 代码规模没动(本任务不改业务代码)· 测试 288→293 unit(+5 是历史漂移 · 不是本会话加的)
+
+### 必测清单(本会话不必跑 · 纯配置改动)
+
+- 无新 UI / 无前端改 → Zihao 不需要手测
+- 等 GitHub Actions CI 跑 `cadb4b2..296c074` 全绿即视为生产可用
+- 若 CI 红 · 看头部 step 是 import / install · 大概率 3.10→3.11 跨版本 deps 冲突 · 切 Linux 容器 regen lock
+
+### 下窗口接力(给下个 Claude 窗口看)
+
+- **当前 task**:REFACTOR-A5 CI lint(半天 · 风险中 · 涉及 black + ruff 自动 reformat 现有 .py · 建议先 `--check` 模式跑出 diff 给 Zihao 看 · 拍板再上自动 fix)
+- **备选**:A3 环境分级(1-2 天 · 重 · 涉及 Docker / Vultr 第二台)/ A8 Code Coverage(半天 · 依赖 A5 · 简单)
+- **本会话遗留**:Dependabot PR 第一次跑(下周一早 8 点 Bangkok 时区)· 合 PR 前必须 reviewer 跑 `python -m piptools compile ... -o requirements.lock.txt` regen lock
+- **CI 守门**:`scripts/refactor_progress.py` 工程化 check 还差 3 项:Black / ESLint / Code coverage · 是 A5/A8 的事
 
 ---
 

@@ -127,9 +127,9 @@
 | A4 | Secrets 管理(`.env` → Doppler 或 1Password Secrets · 给多人协作铺垫) | 2-3 天 | A3 | ⚪ |
 | A5 | CI 加 lint + format(black + ruff + ESLint + Prettier) | 半天 | A0 | ⚪ |
 | A6 | CI 加安全扫描(bandit + safety + npm audit) | 半天 | A5 | ⚪ |
-| A7 | 依赖锁定(`requirements.lock.txt` pip-tools) | 1-2h | A0 | ⚪ |
+| A7 | 依赖锁定(`requirements.lock.txt` pip-tools) | 1-2h | A0 | ✅ 2026-05-22 · commit `296c074`(pip-tools 7.5.3 · 299 行 lock · ci.yml 装 lock · dependabot.yml 注释 + CONTRIBUTING.md §依赖管理) |
 | A8 | Code Coverage(pytest-cov + 上传 codecov · baseline) | 半天 | A5 | ⚪ |
-| A9 | Dependabot / Renovate 配置(自动 PR 升级依赖 · 每周一开) | 1h | A0 | ✅(待补 hash)· .github/dependabot.yml · pip + npm + github-actions 3 ecosystem · 周一 08:00 Asia/Bangkok 开 PR · patch/minor 分组 |
+| A9 | Dependabot / Renovate 配置(自动 PR 升级依赖 · 每周一开) | 1h | A0 | ✅ 2026-05-22 · commit `e57993a`(.github/dependabot.yml · pip + npm + github-actions 3 ecosystem · 周一 08:00 Asia/Bangkok 开 PR · patch/minor 分组)|
 
 **A 阶段完成判定**:Vite 跑通 / Alembic 迁过 001 / staging 能 deploy / CI 加了 lint+安全扫描 / requirements.lock 已生成 / Dependabot 跑过一次
 
@@ -263,7 +263,7 @@
 
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
-| **A 工具链** | 🟡 3.5/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A9 ✅(待补 hash)· A2.2 并入 B3 · A3/A5/A6/A7/A8 待启动 | Vite + Alembic + Dependabot 3 件基础设施落地 · 阶段 A 已超过 1/3 |
+| **A 工具链** | 🟡 4.5/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A7 ✅ `296c074` · A9 ✅ `e57993a` · A2.2 并入 B3 · A3/A5/A6/A8 待启动 | Vite + Alembic + Dependabot + pip-tools 4 件基础设施落地 · 阶段 A 已近 1/2 |
 | B 后端 | ⚪ 0/10 | — | 依赖 A1, A5 |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
@@ -273,7 +273,7 @@
 | H 合规 | ⚪ 0/6 | — | 靠后 |
 | I 抛光 | 🟡 1.3/5(部分 I1 + 部分 I2) | — | I1 30/52 silent + I2 老订阅残留 admin/home 用户可见全清(2026-05-22) |
 
-**累计 task 数**:60 主 task · 已完成约 4 个 + 进行中约 3 个 · 待启动 53 个
+**累计 task 数**:60 主 task · 已完成约 5 个(A0/A1/A2.1/A7/A9)+ 进行中约 3 个(C1/D1/I1)· 待启动 52 个
 
 **当前累积成果**(从 2026-05-21 EXECUTION_PLAN 开始):
 - `app.py` 10,060 → 9,211 行(减 849 · 阶段 5 后端拆 router)
@@ -482,9 +482,11 @@ python scripts/refactor_progress.py
 
 ## 🚀 下一个 task
 
-**当前**:REFACTOR-A9 ✅ 完成(待补 hash · 2026-05-22 · 同会话接力)
+**当前**:REFACTOR-A7 ✅ 完成(commit `296c074` · 2026-05-22 第五会话)
 
-**下一个**:REFACTOR-A7 · 依赖锁定(pip-tools 生成 requirements.lock.txt · 1-2h · 同会话可继续)· 或留给下窗口做 A5 CI lint(半天)/ A3 环境分级(1-2 天)
+**下一个**:REFACTOR-A5 · CI lint(半天 · 风险中 · 涉及 black + ruff 自动 reformat 现有 .py · 建议先 `--check` 模式跑出 diff 给 Zihao 看 · 拍板再上自动 fix)· 或 A3 环境分级(1-2 天 · 重)/ A8 Code Coverage(半天 · 依赖 A5)
+
+**A 阶段下一步建议顺序**:A5(CI lint)→ A8(coverage)→ A6(安全扫描)→ A3(环境分级)→ A4(secrets)· A2.2 等 B3 真迁第一条 ensure_* 时再做。
 
 **A2.2 钩子并入 B3**(2026-05-22 决策):
 - A2.1 装好 Alembic + 001 空 baseline 后 · 没真迁移之前 git-deploy.sh 加 `alembic upgrade head` 是 no-op

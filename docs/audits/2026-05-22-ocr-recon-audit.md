@@ -394,3 +394,127 @@ Dext 的核心壁垒:同一家供应商的发票模板记住 → 下次秒识别
 **接力 agent 必读**:本文档 + STATE_PEARNLY.md 头部"整改模式 ON" 段 + 当前 Phase 任务行。
 
 **最后更新**:2026-05-22 · Claude Opus 4.7 (1M context) + Zihao 拍板。
+
+---
+
+## 10. FAQ · OCR 训练战略(2026-05-22 Zihao 提问)
+
+> 本节为本审计文档锚定『OCR 训练』方向的战略决策点 · 防接力 agent 走偏到训模型路线上。
+
+### Q1 · Pearnly 走真训模型还是训记忆?
+
+**答**:**走训记忆路线**(行业称『memory-based / RAG-based learning』或『prompt-engineered fine-tuning』)。
+
+**原因**:
+- 真训模型需要 ฿数百万 + 上万标注样本 + ML 工程师团队 · Pearnly 1 人 dev + 1 个事务所玩不动
+- 训记忆路线 = 5-20 个样本/vendor 就够 · 1 个事务所 1 月 100+ 张发票 = 足够喂养 10-20 个 vendor 记忆库
+- 行业 90% SaaS 走训记忆 + 真训(锦上添花)· Pearnly 阶段只做训记忆
+
+**永久不做**(Phase 4 ❌ X3):**不自训 OCR 模型** · 不上 Vertex AI fine-tuning · 不上自家神经网络。
+
+### Q2 · 知识存哪?
+
+**答**:**Pearnly DB 里 · 不在谷歌 / Anthropic 任何外部 OCR 厂商手里**。
+
+**当前已有**:
+- `buyer_to_client_memory` 表(db.py L4315)· 已学客户名 + 税号 → client_id
+
+**Phase 1+2 要扩展**:
+- 新表 `field_correction_memory`(P2.1):key = `buyer_tax + field_name` · value = 用户纠正过的值 + 次数
+- 新表 `vendor_template_memory`(P3.3):key = `buyer_tax` · value = 该 vendor 的发票字段位置 + 常见错认模式
+- 新表 `bank_template_memory`(P3.2):key = `bank_code` · value = 该银行账单的固定字段 + 解析规则
+
+**所有记忆全部在 Pearnly DB · 跟 Google API 调用解耦** · Google API 是 stateless 调用 · 不记数据。
+
+### Q3 · 知识便携吗?换 OCR 厂商保不保得住?
+
+**答**:**完全便携**(只要严格走训记忆路线)。
+
+**换 OCR 厂商的迁移路径**(假设某天换 Claude Vision):
+1. 改 `services/ocr/layer1_vision.py` 调用方 · 把 Google Vision API client 换成 Anthropic Vision client
+2. 改 prompt 构建函数 · 把 Gemini prompt 格式换成 Claude messages 格式
+3. **记忆库不动** · DB 里的 `field_correction_memory` / `vendor_template_memory` 等表零损失
+4. 把记忆塞进 Claude prompt 的代码不变 · 因为这是『SELECT memory + 拼 prompt』的模式 · 跟具体厂商无关
+
+**护城河理解**:
+- OCR 引擎 = 商品(commodity)· 谁强用谁
+- **Pearnly 真正的 IP = 泰国本地化记忆 + 4 语 + 多 ERP 中立 + 用户校对反馈机制**
+- 这就是为啥 Phase 4 ❌ X3 自训 OCR 永久不做 · 训了就被锁死 · 失去便携性
+
+### Q4 · 1 个事务所够吗?
+
+**答**:**足够**(只要走训记忆路线)。
+
+**数据量需求(训记忆方案)**:
+- 一家公司发票模板 ≈ **5-10 张**
+- 一家银行账单格式 ≈ **3-5 份**
+- 一种 GL Excel 模板 ≈ **2-3 份**
+- 一种 OCR 错认模式(I→1)≈ **2 次纠正**
+
+**当前事务所(BUG-B 用户)**:1 个月 100+ 张发票 · 完全足够养出『懂泰国 SME 模板』的 Pearnly。
+
+**真正的瓶颈不是数据量 · 是 Phase 1+2 的机制**:
+- P1.1 schema · 让用户改有地方存
+- P1.3 历史对照 · 让审计能查
+- P2.1 全字段学习 · 让改了能复用
+- P2.2 vendor hint 注入 · 让记忆真用上
+
+**机制建好 + 1 个事务所 + 6 个月** ≈ 一份 OCR 准确率高于通用 Gemini 的『懂泰国 SME 的 Pearnly』。
+
+### Q5 · 谷歌 Vision / Gemini 当前能不能直接微调?
+
+**答**:
+- **Google Cloud Vision API**:**不能** · 是通用 OCR · 别人训好的 · 你只能调用 · 没 fine-tune 入口
+- **标准 Gemini API**(`google-generativeai` 包 · Pearnly 在用):**不能** · 只能 prompt engineering + few-shot
+- **Vertex AI** Gemini fine-tuning:**能** · 但要换 SDK · 上传标注样本 · 谷歌帮你训副本 · **Pearnly 不上 Vertex**(Phase 4 ❌ X3)
+
+### Q6 · 真训模型的玩家(Dext / Hubdoc / Hyperscience)是怎么玩的?
+
+**答**:他们 4 个轮子并转:
+1. **大数据预训练**(他们自己喂上亿样本到自家神经网络 · 训了几年的家底)
+2. **租户级 fine-tune**(同一家事务所多次纠正 → 模型记住这家)
+3. **vendor 级学习**(同一供应商发票格式 → 下次秒识别 = Pearnly 走的路 B)
+4. **rule-based 兜底**(税号必 13 位 / 日期必合法 / 金额等式 = Pearnly 已有)
+
+**Pearnly 现状**:1/4(轮子 4)已有 · 1/4(轮子 3 部分 buyer_to_client)· **2 + 1 不走**(我们不训神经网络)
+
+**这不是 Pearnly 缺点 · 是 Pearnly 的设计选择**:用 Gemini Vision 2026 这种 SOTA 通用模型当『预训练轮子』· 自己只做轮子 3+4 · 这是泰国 SaaS 阶段最优解。
+
+---
+
+**FAQ 决策锚定**(2026-05-22 Zihao 跟 Claude 战略对话):
+- ✅ 走训记忆路线
+- ✅ 知识存 Pearnly DB
+- ✅ 知识便携 · 不锁死任何 OCR 厂商
+- ✅ 1 个事务所 + 6 个月 = 够养
+- ❌ 永远不自训 OCR 模型(Phase 4 ❌ X3 永久不做)
+- ❌ 永远不上 Vertex AI fine-tuning
+
+### Q7 · Claude 能不能帮做训练? 分工咋样?
+
+**短答**:**能** · 几乎全部机制 Claude 能写。**不能**:Claude 不会自己上网爬数据 · 不会跑 fine-tuning · 不会有持续后台学习(每次会话才"活")。
+
+**Claude 能做**:
+1. 设计 + 写 3 张记忆表 schema(`field_correction_memory` / `vendor_template_memory` / `bank_template_memory`)+ alembic 迁移
+2. 写代码:用户改字段 → 自动 INSERT 记忆表(改了就存)
+3. 写代码:Gemini 调用前 · SELECT 记忆 · 拼进 prompt
+4. 给 BBL / KBank / SCB / Krungsri / TMB 各写 per-bank parser
+5. 给客户 top 10 供应商各写 per-vendor prompt
+6. 写脚本帮 Zihao 从 ocr_history 选 top 50 vendor
+
+**Claude 不能做**:
+1. 自己上网爬泰国发票样本(没浏览器)
+2. 训神经网络权重(不是 ML 训练框架)
+3. 跑 Vertex AI fine-tuning(也不该走这路)
+4. 直连 Supabase 扒生产数据(没 credential · 让 Zihao 跑脚本 · Claude 读输出)
+5. 后台持续学(每次会话独立 · 没 cron)
+
+**真分工**(每个 vendor / bank 模板):
+- **Zihao** 收集 5-10 张真实样本(从客户 · 或 ocr_history 导出)· 给 Claude
+- **Claude** 分析 + 写 prompt / parser / 规则
+- **Zihao** 跑生产真数据 · 报结果
+- **Claude** 根据错误改 · 再跑 · 3-5 轮迭代后入库
+
+单 vendor / bank 工时 ≈ 1-3 小时 Claude + 0.5-1 小时 Zihao 给样本测试。50 家 = 大约 1-2 月慢推。
+
+**结论**:**Zihao 不缺训练能力** · 缺的是 "建机制(P1+P2 · Claude 写)" + "收集真样本(P3 · 只 Zihao 能干 · 因为客户授权 · Claude 看不到)"。

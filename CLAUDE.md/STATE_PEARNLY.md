@@ -99,20 +99,58 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 - **4 模块统一命名**(2026-05-22):M1-M4 · 文档 + 代码注释 + commit message 都用
 - **每个 Phase 0/1 task 独立 commit**(2026-05-22):拆 commit · 防一波带崩 · 5 道守门一波过
 
-### 下窗口接力(给下个 Claude 窗口看)
+### 下窗口接力 · ⚠️ 必读!(给下个 Claude 窗口看)
 
-- **当前位置**:**Phase 0 待启动**(4 个 task · 大约 2 小时)
-- **顺序**:P0.1 → P0.2 → P0.3(BUG-B 闭环)→ P0.4(BUG-A 扫 modal)
-- **每个 task 独立 commit · 跑 5 道守门 · 接力 agent 看 `docs/audits/2026-05-22-ocr-recon-audit.md` § Phase 0**
-- **整顿期暂停**:REFACTOR-A5(原下一个 task)推到 2027-02 大约
-- **决策点**:用户已拍板整改 > 整顿 · 但 Phase 0 是否本会话做完?Phase 1 拆 7 commit?Phase 3 模板收集谁来做?三个问题等 Zihao 回
+**今天 Zihao 决定不开干 · 只做战略对齐 + 审计文档锚定 OCR 训练方向。Phase 0 没动一行代码。**
 
-### Decision Points · 等 Zihao 在审计文档 §8 拍板
+**下窗口启动顺序**:
+1. ✅ `git branch --show-current` → 确认 master(铁律 #14)
+2. ✅ 读 `CLAUDE.md/CLAUDE.md` 顶部 20 条铁律(尤其 #18 整顿期 / #20 commit 格式)
+3. ✅ 读 **`docs/audits/2026-05-22-ocr-recon-audit.md`**(整改单一权威源 · ~12000 字 · 含 OCR 训练 7 问 FAQ)
+4. ✅ 读本文档头部 + 第五会话续 2 段
+5. ✅ **先催 Zihao 回审计文档 §8 的 4 个 Decision Points · 否则不开干**(下面列)
+6. ✅ Zihao 确认后 → Phase 0 4 个 task(P0.1-P0.4 · 约 2 小时)
 
-1. Phase 0 本会话就开始做吗(2 小时左右)?
-2. Phase 1 拆 7 commit 还是 1 个?
-3. 泰国 top 50 供应商样本谁来收集?
-4. Phase 4 ❌ 3 条永久不做是否确认?
+**Phase 0 4 个待启动 task**(都在 TaskList 里):
+- #9 · P0.1 · BUG-B-T1 OCR 抽到的 anchor 预填 input(半天)
+- #10 · P0.2 · BUG-B-T2 Excel 标黄被覆盖 anchor cell(半天)
+- #11 · P0.3 · BUG-B-T3 历史详情 OCR vs user 对照(半天)
+- #12 · P0.4 · BUG-A 扫其它 modal 同款 flex chain 病(1-2h)
+
+**commit 格式**(整改期):
+```
+<type>(<scope>): <subject> · BUG-FIX-P0.X
+...
+守门 5 道:imports / i18n / unit / playwright / node
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+```
+
+**OCR 训练战略已锚定**(见审计文档 §10 FAQ):
+- ✅ 走训记忆路线(memory-based / RAG)· 不走真训模型
+- ✅ 知识存 Pearnly DB · 跨 OCR 厂商便携
+- ✅ 1 个事务所 + 6 个月 = 够养记忆库
+- ❌ **永远不自训 OCR 模型**(Phase 4 ❌ X3 永久不做)
+- ❌ **永远不上 Vertex AI fine-tuning**
+- **Claude 能做**:全部机制(schema / prompt 注入 / per-bank parser / per-vendor prompt)
+- **Claude 不能做**:自己爬数据 / 训神经网络 / 后台持续学(每会话独立)
+- **Zihao 必须做**:给真发票 / 真银行账单样本(每 vendor 5-10 张 · 每 bank 3-5 份)· 跑生产测试 · 报错给 Claude 迭代 prompt
+
+### 🟡 Decision Points · 等 Zihao 拍板(下窗口开干前必催)
+
+1. **Phase 0 本会话/下会话就做吗?**(4 个 task · 约 2 小时 · 推荐拆 4 commit)
+2. **Phase 1 7 个 task 怎么拆 commit?**(推荐 1 task = 1 commit · 拆 7 commit · 防一波带崩)
+3. **Phase 3 · 泰国 top 50 供应商发票样本谁收集?**(推荐:从 ocr_history 自动抽 top 50 · 你导出给 Claude)
+4. **Phase 4 ❌ 3 条永久不做确认吗?**(用户自定义公式 / 100% 自动化 / 自训 OCR · 默认锁死)
+
+**Zihao 在 2026-05-22 暂未答这 4 个问题** · 因为先问了 OCR 训练机制问题 · 现在战略已对齐 · 等 Zihao 回 4 个 Decision Points 就开 Phase 0。
+
+### 防偷懒(整改期专属)
+
+- ❌ 整改期 grep `MODULE_ROADMAP.md` 想做新功能 → 立即停 · 整改也是『新功能闸口关』
+- ❌ 整改期不做 REFACTOR-A5 等整顿 task · A 阶段冻结
+- ❌ commit 不含 BUG-FIX-P0.X / P1.X 编号 → 偷整顿 · 算违规
+- ❌ 帮 Zihao 训自家 OCR 模型 · 上 Vertex AI · 等任何走"真训"路的事情(Phase 4 ❌ 锁死)
+- ❌ 帮 Zihao 爬数据(没浏览器 · 也不该)
 
 ---
 

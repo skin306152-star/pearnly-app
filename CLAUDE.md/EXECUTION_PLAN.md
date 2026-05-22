@@ -11,10 +11,11 @@
 
 **当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + **阶段 3 ✅ + 阶段 4 Task 4.1 ✅** ➡️ **下一接力点：阶段 4 Task 4.2 Playwright smoke · 或 阶段 5 Task 5.1 抽 billing router**
 
-**当前 CI 状态**（GitHub Actions · commit `d1912aa` 已 push · 等 run #4 出结果）：
-- ✅ Step "check_imports" → 绿
-- ✅ Step "check_i18n --strict" → 绿
-- 🟢 Step "unit tests" → 本机已绿 `Ran 293 tests in 1.883s · OK (skipped=2)` · CI 应同步绿（本机修复也修了 CI 上潜在风险）
+**当前 CI 状态**（GitHub Actions · commit `cadb4b2` 已 push · 等 run #6 出结果）：
+- ✅ Step "check_imports" → 绿（run #4 / #5 都过）
+- ✅ Step "check_i18n --strict" → 绿（run #4 / #5 都过）
+- 🟢 Step "unit tests" → 本机最新 `Ran 293 tests in 1.953s · OK (skipped=2) · EXIT=0` · 期待 run #6 同步绿
+- 本会话经历 run #4 (python-multipart 缺) → #5 (Python 3.11 event-loop 污染) → #6 等结果 · 共 4 个 fix commit 一波一波剥洋葱
 
 **2026-05-22 本机 OOM 链路最终修复总结**（commit `d1912aa`）：
 本机用 CI 同款命令 `python -m unittest discover -s tests/unit` 复现失败时,Claude Code 被 OOM-kill 多次。复盘 + 修复 4 个独立问题：
@@ -296,7 +297,10 @@
 **预计总工时**：35-50 小时（按每天 2-3 小时投入 · 约 3-4 周完成阶段 1-6 · 7-8 长期持续）
 
 **完成的 commits**（按时间倒序）：
-- `d1912aa` · 阶段 3 Task 3.2 收官 · 本机 unit tests 全绿 · 修 erp_retry OOM 死循环 + 3 个 dev/Windows 测试问题
+- `cadb4b2` · 阶段 3 Task 3.2 修 CI run #5 Python 3.11 event-loop 污染 · PushMRERPAsyncContextTests 改 sync TestCase + asyncio.run() · 绕开 IsolatedAsyncioTestCase 跨版本 hook 差异
+- `bc6688c` · 阶段 3 Task 3.2 修 CI run #4 import app 挂 · 补 python-multipart 到 requirements
+- `10df685` · 阶段 3 Task 3.2 完成入档 + 本机 OOM 链路 4 修总结(本次会话第 1 次入档)
+- `d1912aa` · 阶段 3 Task 3.2 收官第一波 · 本机 unit tests 全绿 · 修 erp_retry OOM 死循环 + 3 个 dev/Windows 测试问题
 - `245b04e` · 阶段 3 Task 3.2 + 阶段 4 Task 4.1 进度入档 + 本机 OOM follow-ups 备注
 - `24e2a90` · 阶段 3 Task 3.2 修 CI 依赖：加 reportlab（usage_report.py 用于生成使用明细 PDF）
 - `be0474c` · 阶段 3 Task 3.2 修 CI 依赖：commit usage_report.py 进 git + 加 python-docx 到 requirements

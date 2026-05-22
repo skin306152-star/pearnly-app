@@ -1,6 +1,56 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-16(深夜) · **v118.32.5.5.30** 在线 ✅ · cache bust **v=11841123** · 折叠头白色 + 导出按钮移位 + Excel差异明细表头美化(下窗口)
+> **最近更新**:2026-05-22 · 阶段 3 Task 3.2 CI 收官 · 4 轮 push 修 6 层依赖洋葱
+
+---
+
+## 🆕 2026-05-22 本会话完成清单(CI 收官 · 本机 OOM 链路深挖)
+
+> **接力规则**:换窗口先看本段
+
+### 核心产出
+
+**主线任务**:阶段 3 Task 3.2 GitHub Actions 最小 CI 三 step(import + i18n + unit tests)从 1.7/2 推进到 **2/2 完成**(等 CI run #6 commit `cadb4b2` 出最终绿)
+
+### 4 个 commit · 修了 6 层依赖洋葱
+
+| Commit | 改 | 修了什么 |
+|---|---|---|
+| `d1912aa` | app.py + tests/unit/test_erp_test_connection_route_dispatch.py | 真 OOM 元凶(`_erp_retry_loop` 加 `PEARNLY_SKIP_HEAVY_INIT` env gate)+ KMS_KEY setUpClass 加临时 Fernet key + Python 3.10 event-loop 污染 workaround + chromium binary 缺转 skipTest |
+| `10df685` | CLAUDE.md/EXECUTION_PLAN.md | 阶段 3 Task 3.2 完成入档 + 本机 OOM 链路 4 修总结 |
+| `bc6688c` | requirements.txt | 加 `python-multipart`(recon_routes.py `/upload_report` Form 字段触发 FastAPI 检查 · CI 干净 venv 撞 import 挂) |
+| `cadb4b2` | tests/unit/test_erp_test_connection_route_dispatch.py | `PushMRERPAsyncContextTests` 改 sync `TestCase` + `asyncio.run()` · 修 Python 3.11 `_tearDownAsyncioRunner` 撞 `_check_running`(我之前的 `_setupAsyncioLoop` override 是 3.10 hook · CI 用 3.11.15 完全不被调用) |
+
+### 真 OOM 元凶(本会话起因)
+
+用户在跑 CI 同款 `python -m unittest discover -s tests/unit` 时,Claude Code 被 OOM-kill 多次,内存任务管理器显示 PowerShell ~3.8GB + Python ~3.8GB · 系统 94%:
+
+- 测试用 `with TestClient(app) as c:` 进 lifespan · 同时全局 `patch("asyncio.sleep")` 短路 30s 间隔
+- → `_erp_retry_loop` 从 30s 一次变成 CPU 死循环
+- → `list_logs_due_for_retry` 每秒被调约 **2 万次** raise(`DATABASE_URL` 未设)
+- → stderr 缓冲 21 分钟攒 **1.6 GB / 840 万行**日志
+- → OS OOM-kill 整个 shell + Claude Code
+
+修法:lifespan 看 `PEARNLY_SKIP_HEAVY_INIT=1` 就不 create_task(测试 setUpClass 早就 setdefault 这个 env · 但 app.py 之前根本没读它 · 死字段)。
+
+### 收获的经验值(下窗口接力时要记得)
+
+1. **本机绿 ≠ CI 绿**:本机 venv 装了一堆传递依赖把问题盖住 · CI 干净 venv 一层层剥洋葱。新加 import 必须显式 `pip install <pkg>` 后再 `pip freeze | grep` 同步到 requirements.txt
+2. **跨 Python 版本 hook 差异**:本机 Python 3.10 · CI Python 3.11.15 · `IsolatedAsyncioTestCase` 内部 hook 完全不同。能用普通 `TestCase` + `asyncio.run()` 就别继承 `IsolatedAsyncioTestCase`
+3. **stderr 缓冲会 OOM**:测试别 tee 完整输出到管道 · 写文件或 `--tb=short` · 21 分钟 1.6GB 日志就是 PowerShell 缓冲爆的
+4. **task 不退干净会污染下个 case**:starlette TestClient `with` 块退出时 portal loop 在某些 OS/版本组合下不清 `asyncio.events._running_loop` 标志
+
+### 待下窗口
+
+接力点(EXECUTION_PLAN.md 已更新):
+- 阶段 4 Task 4.2:第一个 Playwright smoke 测试(2h)
+- 或 阶段 5 Task 5.1:抽 billing router(2-3h)
+
+如 CI run #6 `cadb4b2` 仍红 · 看 log 头部判断是新一层洋葱还是同问题没修透。
+
+### 顺便发现的硬件问题(non-prod)
+
+用户笔记本(联想小新 Air 14 ITL 2021 · 16GB 双通道 · MT 82FF)实测 8GB 跑 Claude Code + 浏览器 + Python 测试常 OOM · 已建议买 2 条 DDR4-3200 16GB SO-DIMM 替换原有 2×4GB · 32GB 双通道彻底解决。用户 2026-05-22 14:00 左右带电脑去线下修电脑/加内存。
 
 ---
 

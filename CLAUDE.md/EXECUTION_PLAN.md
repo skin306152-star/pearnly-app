@@ -9,13 +9,14 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + **阶段 3 ✅ + 阶段 4 Task 4.1 ✅** ➡️ **下一接力点：阶段 4 Task 4.2 Playwright smoke · 或 阶段 5 Task 5.1 抽 billing router**
+**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + 阶段 3 ✅ + **阶段 4 Task 4.1 ✅ + Task 4.2 ✅**（commit `7778afb` · 2026-05-22）➡️ **下一接力点：阶段 5 Task 5.1 抽 billing router（2-3h · 第一次把 app.py 瘦身）· 或 阶段 5 Task 5.2 抽 admin diagnostics router · 或 阶段 6 收尾**
 
-**当前 CI 状态**（GitHub Actions · commit `cadb4b2` 已 push · 等 run #6 出结果）：
-- ✅ Step "check_imports" → 绿（run #4 / #5 都过）
-- ✅ Step "check_i18n --strict" → 绿（run #4 / #5 都过）
-- 🟢 Step "unit tests" → 本机最新 `Ran 293 tests in 1.953s · OK (skipped=2) · EXIT=0` · 期待 run #6 同步绿
-- 本会话经历 run #4 (python-multipart 缺) → #5 (Python 3.11 event-loop 污染) → #6 等结果 · 共 4 个 fix commit 一波一波剥洋葱
+**当前 CI 状态**（GitHub Actions · commit `7778afb` 已 push · 等 run #10 出结果）：
+- ✅ Step "check_imports" → 历史已绿（run #9 commit `068c5f0` 整条 8m26s 全绿）
+- ✅ Step "check_i18n --strict" → 历史已绿
+- ✅ Step "unit tests" → 历史已绿（本机 `Ran 293 tests in 1.883s · OK (skipped=2)`）
+- 🟡 Step "E2E smoke (Playwright)" → 新加 · 等 run #10 第一次跑（本机 `1 passed (4.4s)`）
+- 历史红 run（#1-4 / #7）= CI 接入剥洋葱遗留 · `068c5f0` 起已经绿勾，无需清理
 
 **2026-05-22 本机 OOM 链路最终修复总结**（commit `d1912aa`）：
 本机用 CI 同款命令 `python -m unittest discover -s tests/unit` 复现失败时,Claude Code 被 OOM-kill 多次。复盘 + 修复 4 个独立问题：
@@ -29,9 +30,9 @@
 两个 skip 都是 dev-only(chromium binary 缺、PEARNLY_DATABASE_URL 未设)· 不算回退。
 
 **新窗口"继续"时直接做的事**：
-1. 刷 https://github.com/skin306152-star/pearnly-app/actions 看 run #4(commit `d1912aa`)是否 3 step 全绿
-2. 全绿 → 阶段 3/4 真正收官 → 跳到 阶段 4 Task 4.2(Playwright smoke 2h)或 阶段 5 Task 5.1(抽 billing router 2-3h)按用户偏好挑
-3. 不绿 → 看具体哪个 step,本机已经验证过 unit tests 全绿,大概率是新挖出来的另一种问题
+1. 刷 https://github.com/skin306152-star/pearnly-app/actions 看 run #10（commit `7778afb`）4 step 是否全绿（新加 E2E smoke step 是关键看点）
+2. 全绿 → 阶段 4 真正收官 → 跳到 阶段 5 Task 5.1（抽 billing router 2-3h · 第一次把 app.py 瘦身）按用户偏好挑
+3. e2e step 红 → 大概率：（a）pearnly.com 本身有 JS console.error 漏到 spec 守门里（subscribeI18n 类陷阱）；（b）CI ubuntu 跑无头 chromium 跟本机 Windows 行为差；（c）playwright cache miss 导致超时。先看 GitHub Actions 自动 upload 的 `playwright-report` artifact 里 `index.html` trace 拆原因
 
 **⚠️ 本机环境风险（必读 · 详见文末 F-02/F-03）**：
 - 用户机器 8GB RAM 偏小 · 长会话 + 1M context + 并行工具 → Bun OOM 实测 7-8 次 crash
@@ -167,13 +168,28 @@
 - **完成判定**：CI 上 `--strict` 模式跑过 · 退出 0
 - **关联 commit**：`e01129c`（CI workflow 创建时一并接入）
 
-### Task 4.2 · 第一个 Playwright smoke（P1-04）
-- **状态**：pending
-- **类型**：新建 E2E 框架 + 1 个 smoke
-- **产出**：`package.json` · `playwright.config.js` · `tests/e2e/smoke.spec.js`
-- **覆盖**：登录页加载 · 语言切换 · 关键输入框存在 · 无 JS runtime error
-- **完成判定**：`npx playwright test` 本地通过 · 不依赖生产账号
-- **工作量**：2 小时
+### Task 4.2 · 第一个 Playwright smoke（P1-04）✅ 2026-05-22 完成
+- **状态**：✅ completed · commit `7778afb` · 本机 `npx playwright test` 1 passed (4.4s) · CI run #10 等结果
+- **类型**：新建 E2E 框架 + 1 个 smoke + CI 接入
+- **产出**（6 文件 · +257/-3）：
+  - `package.json`（私有 · devDep `@playwright/test ^1.49.1` · 实装 1.60.0）
+  - `package-lock.json`（78 行 · 锁定 4 个 npm package）
+  - `playwright.config.js`（workers=1 · chromium-only · baseURL `process.env.PEARNLY_E2E_BASE_URL || 'https://pearnly.com'` · CI retries=2）
+  - `tests/e2e/smoke.spec.js`（83 行 · 1 个测试覆盖 4 件事）
+  - `.gitignore` 加 `node_modules/`
+  - `.github/workflows/ci.yml` 加 5 step（setup-node@v4 + npm ci + cache playwright browsers + install chromium + install-deps + e2e run + 失败 upload-artifact playwright-report）
+- **覆盖 4 件事**：
+  1. 着陆页 GET / 状态 < 400 + title 含 Pearnly + `.brand-name` 可见
+  2. 顶栏关键 CTA（`[data-open-auth="login"]` / `[data-open-auth="signup"]`）+ 语言 dropdown（`#lang-dd-btn`）可见
+  3. 4 语切换（zh/en/th/ja）· `<html lang>` 真变 + `[data-i18n="topbar-login"]` 文字字符集真换（zh=汉字非假名 · en=纯 ASCII 含字母 · ja=平/片假名 · th=泰文 Unicode 块）
+  4. 全程无 `console.error` / `pageerror`（`subscribeI18n` 类陷阱守门）
+- **完成判定**：本机 `npx playwright test` 1 passed (4.4s) ✅ · CI run #10 4 step 全绿（等结果）
+- **真实工作量**：≈45 分钟（原估 2h · 大幅好于预期 · node/npm 已装 + selector 一次摸清 + 测试一次过）
+- **关键决策**：
+  - baseURL 默认 prod `pearnly.com`（公开着陆页 · 无副作用 · 不依赖测试账号 · `PEARNLY_E2E_BASE_URL` env 可覆盖到 localhost）
+  - chromium-only（省 firefox/webkit ~400MB · 用户 8GB 机器友好）
+  - 字符集判定不验具体词（文案可能改 · 字符集稳定）
+  - CI cache `~/.cache/ms-playwright` 按 `package-lock.json` hash · 装包提速
 
 ---
 

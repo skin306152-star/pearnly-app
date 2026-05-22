@@ -1,6 +1,6 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-22(第四会话) · **整顿模式 ON** · REFACTOR-A1 Vite + A2.1 Alembic + A9 Dependabot 三件基础设施落地
+> **最近更新**:2026-05-22(第四会话续) · **整顿模式 ON** · A1/A2.1/A9 三件基础设施 + CLEANUP-PLAN 老订阅残留全清(Zihao 截图发现)
 
 ---
 
@@ -86,6 +86,29 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 3. 点充值 · 看 3 步 modal 能开 · 输金额 + 看银行账号 + 关闭(不用真传)
 4. F12 Console · 应该看到 `[pearnly] vite bundle loaded · dashboard + billing` · 没 ERROR
 5. F12 Network · 看到 `/static/dist/main.js?v=11835033` 200 · 旧 `/static/home/dashboard.js` 不再 fetch
+
+## 🆕 2026-05-22 第四会话续 · CLEANUP-PLAN 老订阅残留全清 · 2 commit
+
+> **背景**:Zihao 截图 /admin/users 仍能看到 Trial/Pro/Firm KPI + 套餐分布 + Trial 即将到期 + 修改套餐 modal + 点确认升级真的写库。之前 v118.35.0.4/0.9/0.16 三次清理只清用户端 home.* · admin 后台漏。
+
+### 2 个 commit
+
+| Commit | Task | 内容 |
+|---|---|---|
+| `3cb8675` | CLEANUP-PLAN-01 + 02 | 后端 auth_signup.py 删 4 老订阅路由(/api/admin/users/upgrade · /payments/pending · /payments/{id}/screenshot · /payments/{id}/review) + AdminUpgradeRequest · funnel 改瘦 · admin SPA 三件套(admin.html/admin.js/admin-i18n.js)删套餐 KPI/修改套餐 modal/套餐 badge/升级按钮/36 i18n key · 净减 457 行 |
+| 本 commit | CLEANUP-PLAN-03 + 04 | home.* 用户可见 3 处改文案 · home.html "订阅 & 套餐" → "账户 & 余额" · 设置页"套餐 & 用量" → "用量" · home.js 4 语 i18n value 12 处改 · cache_bust 11835033 → 11835034 · vite rebuild · release_notes v118.35.0.33 4 语 · 主计划 I2 ✅ 部分 · 本档 |
+
+### 留下窗口清的(2026-05-22 截至:home.js 死代码)
+- L22200+ admin SPA 独立前老 loadAdminUsersPage 逻辑(NAV-IA Phase 8 留)· 估 500+ 行
+- 27 个 unused 订阅 i18n key(× 4 语 = 108 处)· 含 upgrade-plan-tag-* / settings-sub-* / admin-type-byo / err.ocr.plan_not_supported 等
+- PLAN_CONFIG / LEGACY_PLAN_MAP / _get_plan / get_plan_features(auth_signup.py 常量 + helper · 仍被 /api/me/plan 用户端调用 · 一起清需要同时改 home.js 多处)
+- 都是死代码 · 但 home.js 33k 行结构敏感 · 这次会话不安全做 · 留 REFACTOR-C1 阶段拆 home.js 时一并
+
+### 重大决策(本会话续 · 2026-05-22)
+- **删除不是隐藏**(Zihao 拍板 · 跟历史决策一致):4 后端路由整段 git rm · admin SPA UI 整段 git rm · 不留 deprecated 注释 · git log 是历史
+- **DB schema 字段保留**:users.plan / monthly_quota / trial_expires_at / plan_expires_at / upgraded_at / subscription_log 表 / payment_pending 表都不删 · 留 REFACTOR-B3 Alembic 时按"删字段先 Optional + default · 一个迭代后再真删"流程做(铁律 #15)
+- **/api/me/plan 路由留**:home.js 4 处调用 · 强删会炸 · 留 C1
+- **不动 home.js 死代码大块**:风险大 · 留 C1 拆时一并
 
 ### 下窗口接力(给下个 Claude 窗口看)
 - **当前 task**:REFACTOR-A7 依赖锁定(1-2h · pip-tools 生成 requirements.lock.txt + CI 改用 lock)

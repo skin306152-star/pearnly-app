@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835033">
+<link rel="stylesheet" href="/static/home.css?v=11835034">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -2109,7 +2109,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                         <line x1="2.5" y1="9" x2="17.5" y2="9"/>
                         <line x1="5.5" y1="13" x2="8" y2="13"/>
                     </svg>
-                    <span data-i18n="avatar-menu-billing">订阅 &amp; 套餐</span>
+                    <span data-i18n="avatar-menu-billing">账户 &amp; 余额</span>
                 </button>
                 <button type="button" class="avatar-popup-item" data-action="shortcuts" id="avatar-menu-shortcuts" role="menuitem">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -3780,7 +3780,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 </button>
                 <button class="settings-tab settings-nav-item" data-tab="plan" data-i18n="set-tab-plan">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="10" rx="1.5"/><path d="M3 9h14M7 13h2"/></svg>
-                    <span>套餐 & 用量</span>
+                    <span>用量</span>
                 </button>
             </div>
             <div class="settings-nav-group">
@@ -4009,11 +4009,11 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 </div>
             </div>
 
-            <!-- Tab 5 · 套餐 & 用量 -->
+            <!-- Tab 5 · 用量(CLEANUP-PLAN-03 · 2026-05-22 · 老"套餐 & 用量" 改) -->
             <div class="settings-pane" data-pane="plan">
                 <div class="card">
                     <div class="section-head">
-                        <div class="section-title" data-i18n="set-plan-title">套餐 & 用量</div>
+                        <div class="section-title" data-i18n="set-plan-title">用量</div>
                     </div>
                     <div id="settings-info"></div>
                 </div>
@@ -6542,11 +6542,11 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11835033"></script>
+<script src="/static/home.js?v=11835034"></script>
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing 由 Vite bundle 成 static/dist/main.js ·
      ES module(type=module 自动 defer)· 必在 home.js 后执行 ·
      依赖 home.js 的全局:t / showToast / escapeHtml / subscribeI18n / _userInfo / loadDashboard -->
-<script type="module" src="/static/dist/main.js?v=11835033"></script>
+<script type="module" src="/static/dist/main.js?v=11835034"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·

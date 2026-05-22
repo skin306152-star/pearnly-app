@@ -39,12 +39,12 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: requirements.lock.txt
 
-      - name: Install dependencies
+      - name: Install dependencies (REFACTOR-A7 · 装 pip-compile 锁好的版本)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.lock.txt
 
       - name: Static import check
         run: python scripts/check_imports.py --quiet

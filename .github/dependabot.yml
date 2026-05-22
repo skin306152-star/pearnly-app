@@ -12,6 +12,9 @@ version: 2
 
 updates:
   # === Python · requirements.txt ===
+  # ⚠️ REFACTOR-A7 (2026-05-22):Dependabot 只改 requirements.txt(源)·
+  # requirements.lock.txt(pip-compile 产物)需 reviewer 合并 PR 前手动 regen ·
+  # 流程见 CONTRIBUTING.md §依赖管理 段。
   - package-ecosystem: "pip"
     directory: "/"
     schedule:

@@ -166,6 +166,41 @@ pearnly_project/
 
 ---
 
+## 📦 依赖管理(REFACTOR-A7 · 2026-05-22 落地)
+
+整顿期把 Python 依赖锁到具体版本 · 防"同样代码不同时间装出不同结果"。
+
+**两层文件**:
+
+| 文件 | 角色 | 谁改 |
+|---|---|---|
+| `requirements.txt` | **源** · 顶层依赖 + 大版本约束(`alembic>=1.13,<2.0`)· 人读 | 人 / Dependabot |
+| `requirements.lock.txt` | **产物** · pip-compile 出 · 所有传递依赖钉死(`urllib3==2.5.0`)· 给 CI / prod 装 | pip-compile 自动 · 不手改 |
+
+**CI 装包**用 `requirements.lock.txt`(确定性)· **本机开发**装哪个都行(锁文件更稳)。
+
+**改依赖流程**:
+
+```bash
+# 1) 改源(加 / 删 / 升级)
+vim requirements.txt
+
+# 2) 重新编译 lock
+python -m piptools compile requirements.txt -o requirements.lock.txt \
+    --resolver=backtracking --strip-extras --no-emit-index-url \
+    --no-emit-options --no-emit-trusted-host --allow-unsafe --newline lf
+
+# 3) 同时 commit 两个文件
+git add requirements.txt requirements.lock.txt
+git commit -m "chore(deps): bump alembic to 2.x · REFACTOR-A7"
+```
+
+**Dependabot PR 处理**:Dependabot 改的是 `requirements.txt`,合并前**必须**在分支上跑一次 `pip-compile` 同步 `requirements.lock.txt` · 不然 CI 红。
+
+**没装 pip-tools**:`python -m pip install pip-tools`(本机一次性 · 不进 requirements.txt)。
+
+---
+
 ## 🚫 不要做的
 
 - `git push --force` 到 master(可能擦掉别人未推 commit)

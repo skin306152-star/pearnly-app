@@ -22,6 +22,10 @@
 # ============================================================
 fastapi
 uvicorn
+# FastAPI Form/File 字段需要(recon_routes.py /upload_report 用 Form
+# 字段触发 ensure_multipart_is_installed)· 本机靠传递依赖装上了
+# 但 CI 干净 venv 不装 · run #4 import app 直接挂。
+python-multipart
 
 # ============================================================
 # === 数据库 ===

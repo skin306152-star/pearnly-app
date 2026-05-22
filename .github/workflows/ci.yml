@@ -1,11 +1,12 @@
 name: CI
 
-# 阶段 3 Task 3.2 + 阶段 4 Task 4.1 + 阶段 4 Task 4.2 · 最小 CI 自动化保险
-# 防"v0.20 db pool 5 重演" · 每次 push / PR 必须四关都过:
+# 阶段 3-4 + REFACTOR-A1.2 · 最小 CI 自动化保险
+# 防"v0.20 db pool 5 重演" · 每次 push / PR 必须五关都过:
 #   1) import 静态检查
 #   2) home.js i18n 4 语完整性(zh/en/th/ja key 集合一致)
 #   3) unit tests 全绿
-#   4) Playwright E2E smoke(pearnly.com 着陆页 · 顶栏 + 4 语切换 + 无 console error)
+#   4) Vite build 跑通(REFACTOR-A1.2 加 · npm run build · 防本地 build 漏跑)
+#   5) Playwright E2E smoke(pearnly.com 着陆页 · 顶栏 + 4 语切换 + 无 console error)
 # 不依赖生产 secret · 不调后端业务(integ contract tests 全部 stub · e2e 只 GET 公开页)
 
 on:
@@ -21,7 +22,7 @@ concurrency:
 
 jobs:
   test:
-    name: import-check + i18n + unit-tests
+    name: import + i18n + unit + vite-build + e2e
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -62,6 +63,13 @@ jobs:
 
       - name: Install Node deps (npm ci · 严格按 lockfile)
         run: npm ci
+
+      - name: Vite build (REFACTOR-A1.2 · 防本地 build 产物没提交)
+        run: |
+          npm run build
+          # static/dist/main.js 是 A1.1 起的 Vite 产物 · 本地 build 后必须 commit
+          # CI 这步重 build 一次 · 跑通 = 配置无脏 · 失败 = vite.config.mjs / src/main.js 有问题
+          test -f static/dist/main.js || { echo "::error::vite build did not produce static/dist/main.js"; exit 1; }
 
       - name: Cache Playwright browsers
         id: playwright-cache

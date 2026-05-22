@@ -9,7 +9,7 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0-6 ✅ + **阶段 7 Task 7.1 ✅ 第一次拆前端落地**(2026-05-22 第三会话 · home.js 减 197 行 · `static/home/dashboard.js` 196 行独立模块) ➡️ **下一接力点:Task 7.2 抽 home.js billing/topup 模块(3-4h · 跟 5.1 抽 billing router 是镜像)· 或 Task 6.3 实际落地 Alembic(2.5h)· 或回 P0-VAT v4.9.6 主线**
+**当前位置**：阶段 0-6 ✅ + **阶段 7 Task 7.1 + 7.2 ✅ 连续两炮落地**(2026-05-22 第三会话 · home.js 累计减 517 行 · `dashboard.js` 196 行 + `billing.js` 320 行 · 阶段 7 2/3) ➡️ **下一接力点:Task 7.3 静默吞错清理(每批 30min · 长期持续)· 或 Task 6.3 实际落地 Alembic(2.5h)· 或回 P0-VAT v4.9.6 主线**
 
 **当前 CI 状态**（GitHub Actions · commit `767ade9` · run #13 完整 4 step 全绿 161s）：
 - ✅ Step "Static import check" → 绿（修了 BOM 之后)
@@ -370,12 +370,36 @@
 - **CI 演进**:本次 push 等 commit 后 GitHub Actions run · 4 step 应全绿(import / i18n / unit / e2e)
 - **生产验证 TODO**(push 部署后做):curl `/api/version` 看 cache bust 已升到 11835028 · 浏览器登录 skin → `#/dashboard` 看 4 KPI 卡显示数字 · DevTools console 无 error · 切 4 语 dashboard 文案重渲染正常
 
-### Task 7.2 · 抽出 billing/topup 前端模块（P2-07）
-- **状态**：blocked by 5.1 + 7.1
-- **产出**：`static/home/billing.js`
-- **范围**：余额卡片 · 充值弹窗 · slip 上传 · usage history
-- **完成判定**：API path / DOM 行为 / 4 语文案 / 价格规则不变
-- **工作量**：3-4 小时
+### Task 7.2 · 抽出 billing/topup 前端模块（P2-07）✅ 2026-05-22 完成
+- **状态**：✅ completed · 紧随 7.1 落地(本会话 2026-05-22 同窗口)· 阶段 7 第二炮
+- **类型**：纯搬家 · 0 业务逻辑改动 · IIFE 整片搬走
+- **产出**：新文件 `static/home/billing.js`(320 行 · 含 `_startPoll` / `_stopPoll` / `_render` / `_applyText` / `_setStep` / `_bindEvents` / `_step1Next` / `_step3Submit` / `_close` 9 函数 + subscribeI18n 注册)
+- **范围**：充值 modal v2(3-step flow) + 余额实时轮询(30s setInterval) · 不碰 OCR/对账/ERP
+- **改动清单**:
+  - 新建 `static/home/billing.js`(独立 IIFE · 0 业务变化)
+  - `home.html` 加 `<script src="/static/home/billing.js?v=11835029" defer>` 在 dashboard.js 之后
+  - `home.html` cache bust 11835028 → 11835029(home.css + home.js + dashboard.js + billing.js)
+  - `home.js` 删 L33252-33571(320 行 · 整个 topup IIFE)· 33571 → 33251 行(净减 320)
+  - `app.py` 4 语 release_notes 加 v118.35.0.29 entry(铁律 #6 强制)
+- **外部依赖(home.js 必须先加载)**:
+  - 全局 7:`window.t` · `window.showToast` · `window._userInfo`(billing_exempt 检查) · `window.loadDashboard`(余额涨时刷 dashboard) · `window._refreshBalanceAlerts`(可选) · `window.subscribeI18n` · `localStorage`
+  - 后端 API 3:`/api/me/credits` · `/api/credits/topup/request` · `/api/credits/topup/upload-slip/{id}`(不动后端)
+  - i18n key 21 个 `topup-*` 在 home.js 翻译块(留 home.js · billing.js 通过 `t()` 取)
+- **输出全局 3**:`window._openTopupModal` · `window._startCreditsPoll` · `window._stopCreditsPoll`(模块加载即启动轮询)
+- **callsites**:`_openTopupModal` 唯一调用方在 dashboard.js(已抽出)· 余额 KPI 卡上的"充值 →"链接(L154 + L183)走 `window._openTopupModal` 桥
+- **completion gate(本机 5 道全绿)**:
+  - ✅ `python scripts/check_imports.py --quiet` → EXIT 0
+  - ✅ `python scripts/check_i18n.py --strict` → 4 lang 2324 keys · 0 missing 0 extra
+  - ✅ `python -m unittest discover -s tests/unit` → 293 tests · OK (skipped=2) · 2.0s
+  - ✅ `npx playwright test` → 1 passed (5.3s) · prod 着陆页 4 件事
+  - ✅ `node --check` → billing.js + home.js 语法都合法
+- **字节级删除防 BOM 重演**(同 7.1):Python 读 bytes → split CRLF → del 切片 → join CRLF → 写 bytes · 全程 CRLF 不变 · 无 BOM
+- **真实工作量**:≈40 分钟(原估 3-4h · 大幅好于预期 · 因为 Task 7.1 趟过的坑全部避开 · IIFE 已天然独立 · 已有 3 个 `window.*` 桥)
+- **关键决策**:
+  - 加载顺序:`billing.js?defer` 在 `dashboard.js?defer` 之后 · 都晚于 `home.js`(无 defer · 阻塞解析) · 全局已就绪
+  - `_startPoll()` 在 module 加载即调用(L48)· defer 下变成 DOM 解析完才启动 · 比之前(随 home.js 解析时立即启动)慢 ~毫秒级 · 对 30s 轮询无感知影响
+  - 21 个 `topup-*` i18n key 留在 home.js 翻译块 · billing.js 通过 `t()` 取 · 0 改翻译字典(保证 4 语完整性 check 通过)
+- **生产验证 TODO**(push 部署后做):curl `/api/version` 看 cache bust 已升到 11835029 · 浏览器登录 skin → 点首页"充值 →" 弹 3-step modal · 实测 step 1 → 2 → 3 → submit 全链路 · DevTools console 无 error · 切 4 语 modal 文案重渲染正常
 
 ### Task 7.3 · 静默吞错清理（P3-01 · 分批）
 - **状态**：长期持续
@@ -425,7 +449,7 @@
 | **4 · i18n + E2E** | 🟡 部分完成 | **1/2** | Task 4.1 ✅（随 3.2 接入 CI）+ 4.2 Playwright 仍 pending |
 | 5 · 后端路由拆 | ✅ 完成 | **3/3** | 2026-05-22 第二会话(`fa5e0ea` `876649d` `8ca78f9`)· app.py 减 850 行 |
 | 6 · DB 迁移规范 | ✅ 完成 | **2/2** | 2026-05-22 第二会话(`3ab1684` `96c38c2`)· 25 个 ensure_* 全清单 + Alembic 设计 |
-| **7 · 前端拆分** | 🟡 部分完成 | **1/3** | Task 7.1 ✅(2026-05-22 第三会话)· dashboard 抽出 · home.js 减 197 行 |
+| **7 · 前端拆分** | 🟡 部分完成 | **2/3** | Task 7.1 ✅ + 7.2 ✅(2026-05-22 第三会话)· dashboard + billing 抽出 · home.js 累计减 517 行 |
 | 8 · 治理收尾 | ⚪ 待启动 | 0/2 | |
 
 **预计总工时**：35-50 小时（按每天 2-3 小时投入 · 约 3-4 周完成阶段 1-6 · 7-8 长期持续）

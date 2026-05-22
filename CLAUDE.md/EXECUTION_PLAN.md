@@ -401,11 +401,17 @@
   - 21 个 `topup-*` i18n key 留在 home.js 翻译块 · billing.js 通过 `t()` 取 · 0 改翻译字典(保证 4 语完整性 check 通过)
 - **生产验证 TODO**(push 部署后做):curl `/api/version` 看 cache bust 已升到 11835029 · 浏览器登录 skin → 点首页"充值 →" 弹 3-step modal · 实测 step 1 → 2 → 3 → submit 全链路 · DevTools console 无 error · 切 4 语 modal 文案重渲染正常
 
-### Task 7.3 · 静默吞错清理（P3-01 · 分批）
-- **状态**：长期持续
-- **类型**：每批只清 10-20 个 `catch (_) {}` / `except Exception: pass`
+### Task 7.3 · 静默吞错清理（P3-01 · 分批）🟡 batch 1 完成 · 长期持续
+- **状态**：🟡 batch 1 ✅(2026-05-22)· 共 ~5-10 批 · 长期持续
+- **类型**：每批清 10-20 个 `catch (_) {}` / `except Exception: pass`
 - **完成判定**：每批改动小 · 真吞要加注释 · 不吞要加日志
-- **工作量**：每批 30 分钟 · 共 5-10 批
+- **工作量**：每批 30 分钟
+
+**Batch 1 进度**(2026-05-22 第三会话)：
+- ✅ home.js 共 52 个 `catch (_) {}` 清单
+- ✅ 15 个『真吞』(localStorage 私模/配额、AbortController.abort 已 abort、URL.revokeObjectURL 已 revoke、element.focus 不可 focus、CustomEvent dispatch、classList、element.remove)加内联注释 `/* silent · <reason> */`
+- ✅ 0 业务变化 · 守门 5 道全绿
+- 🟡 剩 37 个 silent block 待后续 batch 处理 · 其中部分是『应日志』候选(网络错误细节解析等)需逐个评估
 
 ---
 

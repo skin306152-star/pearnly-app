@@ -10221,7 +10221,7 @@ function applyLang(lang) {
         if (token) {
             // 取消上一次未完成的请求
             if (window.__langSyncCtrl) {
-                try { window.__langSyncCtrl.abort(); } catch (_) {}
+                try { window.__langSyncCtrl.abort(); } catch (_) { /* silent · 已 abort / race */ }
             }
             // 取消上一次 debounce timer
             if (window.__langSyncTimer) {
@@ -10857,7 +10857,7 @@ async function loadAll() {
             if (p) window._planState = p;
             window.PEARNLY_ADMIN_MODE = true;
             // 暴露 _userInfo 给 admin.js / 业务模块用
-            try { window._userInfoForAdmin = u; } catch (_) {}
+            try { window._userInfoForAdmin = u; } catch (_) { /* silent · window 属性赋值 */ }
             return;
         }
 
@@ -10885,7 +10885,7 @@ async function loadAll() {
             // v118.28.2.1 · admin mode 启动 force 路由到「用户管理」
             // 防止 localStorage 残留 / 浏览器 hash 把 Earn 带到客户业务页(如 settings/learned)
             if (_isAdminPath) {
-                try { localStorage.removeItem('mrpilot_settings_tab'); } catch(_){}
+                try { localStorage.removeItem('mrpilot_settings_tab'); } catch(_){ /* silent · localStorage 私模/配额 */ }
                 const _h = location.hash || '';
                 const _adminAllowedRoutes = ['#/admin-users', '#/admin-cost', '#/settings'];
                 if (!_adminAllowedRoutes.some(r => _h.startsWith(r))) {
@@ -12813,7 +12813,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
             return {};
         } catch (e) {
             clearTimeout(timeoutId);
-            try { window._ocrCtrls && window._ocrCtrls.delete(ctrl); } catch(_) {}
+            try { window._ocrCtrls && window._ocrCtrls.delete(ctrl); } catch(_) { /* silent · Set 已删 */ }
             // v0.10.1 · 区分错误类型 · v92 · Bug 7 · 加超时
             console.error('[Upload] failed for', f.file.name, e);
             const isAbort = e && (e.name === 'AbortError' || e === 'timeout');
@@ -24970,7 +24970,7 @@ try { window.I18N = I18N; } catch(e) {}
 
     function _revokeDrawerPdf() {
         if (_drawer.pdfUrl) {
-            try { URL.revokeObjectURL(_drawer.pdfUrl); } catch(_) {}
+            try { URL.revokeObjectURL(_drawer.pdfUrl); } catch(_) { /* silent · 已 revoke */ }
             _drawer.pdfUrl = null;
         }
         _drawer.pdfStatus = 'idle';
@@ -26352,7 +26352,7 @@ try { window.I18N = I18N; } catch(e) {}
             window.dispatchEvent(new CustomEvent('pearnly:client-changed', {
                 detail: { clientId: next, previous: old }
             }));
-        } catch (_) {}
+        } catch (_) { /* silent · CustomEvent dispatch 极少 fail */ }
     }
 
     window.getCurrentClientId = getCurrentClientId;
@@ -26514,7 +26514,7 @@ try { window.I18N = I18N; } catch(e) {}
         const inp = document.getElementById('cs-search');
         if (inp) {
             inp.value = '';
-            setTimeout(() => { try { inp.focus(); } catch(_){} }, 50);
+            setTimeout(() => { try { inp.focus(); } catch(_){ /* silent · 元素不可 focus */ } }, 50);
         }
         _renderList();
     }
@@ -26750,7 +26750,7 @@ try { window.I18N = I18N; } catch(e) {}
         } catch (_) { _results = {}; }
     }
     function _saveResults() {
-        try { localStorage.setItem(LS_RESULTS, JSON.stringify(_results)); } catch (_) {}
+        try { localStorage.setItem(LS_RESULTS, JSON.stringify(_results)); } catch (_) { /* silent · localStorage 私模/配额 */ }
     }
 
     function _fmtTime(ts) {
@@ -29251,13 +29251,13 @@ window.pearnlyConfirm = function (message, title) {
     function _maybeShowFirstTip(total) {
         try {
             if (localStorage.getItem(TIP_STORAGE_KEY) === '1') return;
-        } catch (_) {}
+        } catch (_) { /* silent · localStorage 私模 / 兜底默认 */ }
         const estMin = Math.max(1, Math.ceil(total * PER_FILE_SEC / 6 / 60));
         const msg = t('big-batch-first-tip')
             .replace('{n}', total)
             .replace('{min}', estMin);
         if (typeof showToast === 'function') showToast(msg, 'info', 8000);
-        try { localStorage.setItem(TIP_STORAGE_KEY, '1'); } catch (_) {}
+        try { localStorage.setItem(TIP_STORAGE_KEY, '1'); } catch (_) { /* silent · localStorage 私模/配额 */ }
     }
 
     function _start(pendingFiles) {
@@ -29379,7 +29379,7 @@ window.pearnlyConfirm = function (message, title) {
         if (_shownThisSession) return;
         try {
             if (localStorage.getItem(STORAGE_KEY) === '1') return;
-        } catch (_) {}
+        } catch (_) { /* silent · localStorage 私模 / 兜底默认 */ }
         // 已有 endpoint = 老用户 · 不打扰
         if (_hasAnyEndpoint()) return;
         _shownThisSession = true;
@@ -31749,8 +31749,8 @@ window.addEventListener('DOMContentLoaded', () => {
                     if (helpModal) helpModal.style.display = 'flex';
                     break;
                 case 'logout':
-                    try { localStorage.removeItem('mrpilot_token'); } catch (_) {}
-                    try { localStorage.removeItem('mrpilot_user'); } catch (_) {}
+                    try { localStorage.removeItem('mrpilot_token'); } catch (_) { /* silent · localStorage 私模/配额 */ }
+                    try { localStorage.removeItem('mrpilot_user'); } catch (_) { /* silent · localStorage 私模/配额 */ }
                     window.location.href = '/';
                     break;
             }
@@ -31942,7 +31942,7 @@ window.addEventListener('DOMContentLoaded', () => {
         var ua = (navigator.userAgent || '').toLowerCase();
         var isMac = ua.indexOf('mac') >= 0 || ua.indexOf('iphone') >= 0 || ua.indexOf('ipad') >= 0;
         if (!isMac) document.body.classList.add('is-windows');
-    } catch (_) {}
+    } catch (_) { /* silent · classList 极少 fail */ }
 
     // ---- 初始化 ----
     function _init() {
@@ -33223,7 +33223,7 @@ window.addEventListener('DOMContentLoaded', () => {
         _injectStyle();
         SELECTORS.forEach(_setupOne);
         // 清掉 v5.5.20 残留的独立 banner(如果之前部署过)
-        document.querySelectorAll('.recon-batch-bar').forEach(function (el) { try { el.remove(); } catch (_) {} });
+        document.querySelectorAll('.recon-batch-bar').forEach(function (el) { try { el.remove(); } catch (_) { /* silent · 已移除 */ } });
     }
 
     if (document.readyState === 'loading') {

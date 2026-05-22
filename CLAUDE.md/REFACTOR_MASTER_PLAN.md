@@ -120,7 +120,7 @@
 
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
-| **A0** | 整顿主计划落档(本文档 + 铁律 #18-20 + STATE 标识 + 统计脚本) | 2-3h | — | 🟡 进行中(本次) |
+| **A0** | 整顿主计划落档(本文档 + 铁律 #18-20 + STATE 标识 + 统计脚本) | 2-3h | — | ✅ 2026-05-22 · commit `613ea23` |
 | A1 | Vite + ES modules 落地(装包 + 配 esbuild + CI 加 build step + 把已抽 dashboard.js/billing.js 改 ES modules) | 1-2 天 | A0 | ⚪ 待启动 |
 | A2 | Alembic 落地(装包 + `env.py` + 001 试点迁移 + git-deploy.sh 钩子) | 2.5h | A0 | ⚪ 待启动 |
 | A3 | 环境分级(prod / staging / dev 三套 · Docker 本地或 Vultr 第二台) | 1-2 天 | A0 | ⚪ |
@@ -263,7 +263,7 @@
 
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
-| **A 工具链** | 🟡 1/10 | A0 进行中(本会话) | 整顿主计划落档 · 然后 A1 装 Vite |
+| **A 工具链** | 🟡 1/10 | A0 ✅(`613ea23`)· A1 待启动 | 主计划落档完成 · 下一步装 Vite |
 | B 后端 | ⚪ 0/10 | — | 依赖 A1, A5 |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
@@ -482,7 +482,7 @@ python scripts/refactor_progress.py
 
 ## 🚀 下一个 task
 
-**当前**:REFACTOR-A0 进行中(本文档 + 铁律 #18-20 + STATE 更新 + 统计脚本)
+**当前**:REFACTOR-A0 ✅ 完成(`613ea23` · 2026-05-22)
 
 **下一个**:REFACTOR-A1 · Vite + ES modules 落地(1-2 天 · 2-4 个窗口)
 

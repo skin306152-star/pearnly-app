@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Pearnly · Billing 路由模块(EXECUTION_PLAN 阶段 5 Task 5.1 · 2026-05-22 抽出)
 

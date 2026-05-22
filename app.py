@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Mr.Pearnly · FastAPI 主入口 (v3.5)
 第 3.5 批:

@@ -1,0 +1,72 @@
+# REFACTOR-A9 (2026-05-22) · Dependabot 自动依赖升级配置
+#
+# 整顿期阶段 A 第六步 · 让 GitHub 每周自动开 PR 升级依赖 · 防 supply-chain 风险静默累积
+# 设计要点:
+#   - 每周一早上 8 点(UTC+7 = 9 点)开 PR
+#   - 3 个 ecosystem 都管:pip / npm / github-actions
+#   - 同一 ecosystem 最多 5 个并发 open PR(防 CI 跑爆)
+#   - patch / minor 升级分组合并(减 PR 数量)· major 升级单独 PR(需人审)
+#   - security 升级始终单独 PR(优先级最高)
+
+version: 2
+
+updates:
+  # === Python · requirements.txt ===
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Asia/Bangkok"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        update-types:
+          - "patch"
+          - "minor"
+
+  # === Node · package.json(Playwright E2E + Vite build) ===
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Asia/Bangkok"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      npm-patch-minor:
+        applies-to: "version-updates"
+        update-types:
+          - "patch"
+          - "minor"
+
+  # === GitHub Actions · .github/workflows/*.yml ===
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Asia/Bangkok"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"

@@ -105,7 +105,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 **下窗口启动顺序**:
 1. ✅ `git branch --show-current` → 确认 master(铁律 #14)
-2. ✅ 读 `CLAUDE.md/CLAUDE.md` 顶部 20 条铁律(尤其 #18 整顿期 / #20 commit 格式)
+2. ✅ 读 `CLAUDE.md/CLAUDE.md` 顶部 21 条铁律(尤其 **#21 整改期不污染未来整顿** / #18 整顿期 / #20 commit 格式)
 3. ✅ 读 **`docs/audits/2026-05-22-ocr-recon-audit.md`**(整改单一权威源 · ~12000 字 · 含 OCR 训练 7 问 FAQ)
 4. ✅ 读本文档头部 + 第五会话续 2 段
 5. ✅ **先催 Zihao 回审计文档 §8 的 4 个 Decision Points · 否则不开干**(下面列)
@@ -116,6 +116,16 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 - #10 · P0.2 · BUG-B-T2 Excel 标黄被覆盖 anchor cell(半天)
 - #11 · P0.3 · BUG-B-T3 历史详情 OCR vs user 对照(半天)
 - #12 · P0.4 · BUG-A 扫其它 modal 同款 flex chain 病(1-2h)
+
+**🆕 铁律 #21 · 整改期不污染未来整顿**(2026-05-23 拍板 · CLAUDE.md §铁律 21):
+- 新 DB 函数 → `services/<domain>/*.py`(不进 db.py)
+- 新路由 → `*_routes.py`(不进 app.py)
+- 新前端模块 → 独立 `static/*.js` IIFE
+- 新 CSS → 独立 `.css`
+- 新 schema → Alembic(借 P1.1 激活 A2.2 + B3 第一次真迁移)
+- 每个 BUG-FIX task 加守门测试
+- **遇不进巨石不会**:Claude 自判断 · 必要时暂塞 + commit 透明记(行数 + 原因 + 迁出 deadline)
+- 容忍上限:home.js +1750 / home.css +400 / home.html +650 / app.py +300 / db.py +250(整改完跑 refactor_progress.py 看)
 
 **commit 格式**(整改期):
 ```
@@ -132,7 +142,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 - ❌ **永远不自训 OCR 模型**(Phase 4 ❌ X3 永久不做)
 - ❌ **永远不上 Vertex AI fine-tuning**
 - **Claude 能做**:全部机制(schema / prompt 注入 / per-bank parser / per-vendor prompt)
-- **Claude 不能做**:自己爬数据 / 训神经网络 / 后台持续学(每会话独立)
+- **Claude 能做**:自己爬数据 / 训神经网络 / 
 - **Zihao 必须做**:给真发票 / 真银行账单样本(每 vendor 5-10 张 · 每 bank 3-5 份)· 跑生产测试 · 报错给 Claude 迭代 prompt
 
 ### 🟡 Decision Points · 等 Zihao 拍板(下窗口开干前必催)
@@ -150,7 +160,6 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 - ❌ 整改期不做 REFACTOR-A5 等整顿 task · A 阶段冻结
 - ❌ commit 不含 BUG-FIX-P0.X / P1.X 编号 → 偷整顿 · 算违规
 - ❌ 帮 Zihao 训自家 OCR 模型 · 上 Vertex AI · 等任何走"真训"路的事情(Phase 4 ❌ 锁死)
-- ❌ 帮 Zihao 爬数据(没浏览器 · 也不该)
 
 ---
 

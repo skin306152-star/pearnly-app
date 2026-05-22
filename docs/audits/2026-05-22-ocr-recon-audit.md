@@ -518,3 +518,45 @@ Dext 的核心壁垒:同一家供应商的发票模板记住 → 下次秒识别
 单 vendor / bank 工时 ≈ 1-3 小时 Claude + 0.5-1 小时 Zihao 给样本测试。50 家 = 大约 1-2 月慢推。
 
 **结论**:**Zihao 不缺训练能力** · 缺的是 "建机制(P1+P2 · Claude 写)" + "收集真样本(P3 · 只 Zihao 能干 · 因为客户授权 · Claude 看不到)"。
+
+---
+
+## 11. 整改期纪律 · 铁律 #21 全文(2026-05-23 拍板)
+
+> 详见 `CLAUDE.md/CLAUDE.md` §铁律 #21 · 此处摘录给整改工作流用
+
+**目的**:整改期写新代码 / 改老代码时 · 不污染未来整顿期。整改完 home.js / app.py / db.py / home.css / home.html 净增长可控 · 整顿期 deadline 不大幅延后。
+
+**7 条执行规则**(整改期所有 commit 必守):
+
+1. ❌ **新 DB 业务函数禁止进 `db.py`** → 进 `services/<domain>/*.py`
+2. ❌ **新路由禁止进 `app.py`** → 建 `*_routes.py`
+3. ❌ **新前端模块禁止进 `home.js`** → 独立 IIFE `static/*.js`
+4. ❌ **新 CSS 禁止进 `home.css`** → 独立 `.css` 或 scoped 组件
+5. ✅ **新 schema 走 Alembic**(借此激活 A2.2 + B3 第一次真迁移)
+6. ✅ **删字段先 Optional + default None**(铁律 #15)
+7. ✅ **每个 BUG-FIX-P task 必加守门测试**(契约 + 集成)
+
+**遇到不进巨石不会**(2026-05-23 Zihao 拍板):
+- Claude 自判断 · 能独立尽量独立
+- 真不行(改老 modal 现有 DOM 等)就暂塞 · **但 commit message 必须透明记录**:
+  - 暂塞位置 + 行数 + 原因 + 迁出 deadline(通常指向 REFACTOR-C1 / B1 等阶段)
+- 不透明记录 = 偷渡 = 违规
+
+**整改帮整顿的部分**(reward · 不全是损失):
+- REFACTOR-A2.2 + B3 第一次 Alembic 真迁移 ← 借 P1.1
+- REFACTOR-D1 集成测试 +5-10 个 ← 借整改守门
+- REFACTOR-C 模块化 +3-5 个文件 ← 借 P2 新服务
+
+**净账目预期**:整改完 · 整顿期 deadline 顺延约 3 月(原 2026-12 → 2027-02)。
+
+**容忍上限**(整改完判定 · 超出 = 没按铁律 #21 走):
+```
+home.js   +1750 行(33254 → ≤35000)
+home.css  +400 行  (16124 → ≤16500)
+home.html +650 行  (6566 → ≤7200)
+app.py    +300 行  (9212 → ≤9500)
+db.py     +250 行  (9255 → ≤9500)
+```
+
+每月跑 `python scripts/refactor_progress.py` 看代码规模 · 超容忍 Zihao 拉回。

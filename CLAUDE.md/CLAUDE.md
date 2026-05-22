@@ -1,7 +1,7 @@
 # CLAUDE.md · Pearnly 项目大脑
 > 每次启动 Claude Code 必须完整读完本文件再开始任何任务
 > 本文件 = 项目宪法 · 优先级高于一切临时指令
-> 最后更新:2026-05-22(整顿模式 ON · 加铁律 #18-20)
+> 最后更新:2026-05-23(整改模式 ON · 加铁律 #21 · 整改期不污染未来整顿)
 
 ---
 
@@ -427,6 +427,56 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 - 文档微调(typo / 链接修)· commit message 以 `docs:` 开头即可
 
 **审计**:每月末 Zihao 跑 `git log --since='1 month ago' --grep='REFACTOR-' --oneline | wc -l` 看整顿 commit 数 · grep 不出 task ID 的 commit 单独看 · 不该出现"偷做新功能"。
+
+---
+
+### 21. 整改期不污染未来整顿(2026-05-23 拍板 · 整改期专属 · 防整改变新整改对象)
+
+**背景**:2026-05-22 启动 OCR + 对账 4 模块整改(`docs/audits/2026-05-22-ocr-recon-audit.md`)· 整改优先级 > 整顿。但整改本身要写新代码 / 改老代码 · 如果不严格执行 · 整改完 home.js + app.py 又胖一圈 · 等于给未来整顿期 +2 月。本铁律就是『整改新代码必须按整顿期"理想形态"写』· 一次写对 · 整顿期省事。
+
+**触发**:整改期(Phase 0-3 期间 · 大约 2026-05-22 → 2027-02)所有 commit 必守。
+
+**7 条执行规则**:
+
+1. ❌ **新 DB 业务函数禁止进 `db.py`** · 必须进 `services/<domain>/*.py`(如 `services/memory/field_correction.py` / `services/ocr/template_memory.py`)
+2. ❌ **新路由禁止进 `app.py`** · 必须建 `*_routes.py`(如 `memory_routes.py` / `correction_routes.py`)· 用 `app.include_router()` 接入
+3. ❌ **新前端模块禁止进 `home.js`** · 必须独立 IIFE 文件(如 `static/correction-panel.js` / `static/memory-feedback.js`)· 跟 `static/version-banner.js` 同款
+4. ❌ **新 CSS 禁止进 `home.css`** · 必须独立 `.css`(如 `static/correction-panel.css`)或 scoped 到组件 HTML
+5. ✅ **新 DB schema 走 Alembic**(借整改 P1.1 之机激活 A2.2 + B3 第一次真迁移 · 不再 `ensure_*` 偷渡 · 同步加 git-deploy.sh 钩子)
+6. ✅ **删字段先 Optional + default None · 一个迭代后再真删**(铁律 #15 渐进删除范式 · 老 `_anchor_overrides` 等不直删)
+7. ✅ **每个 BUG-FIX-P 任务必加守门测试**(契约测试 + 集成测试 · 给整顿期 D 阶段免费加分)
+
+**遇到"不进巨石不会"怎么办**(2026-05-23 Zihao 拍板):
+- **Claude 自判断**:能独立尽量独立(优先)· 真的不行(比如改老 modal 现有 DOM)就在巨石里加 · **但必须在 commit message 透明说明**:
+  ```
+  ⚠️ 暂塞 home.js L29630-29812(+183 行) · 原因:本次改老 settings modal 现有抽屉 ·
+  抽出新 IIFE 要重写 250 行 vendor binding 逻辑 · 工时超本 task 2 倍
+  迁出 deadline:REFACTOR-C1 阶段拆 home.js 时一并搬出
+  ```
+- 透明 = 整顿期 grep 能找到 · 不偷渡
+- 不透明 = 算违规 · 接力 agent 看不出 · 等于偷渡新债
+
+**整改期净增长账(每月跑 1 次)**:
+```bash
+# 整改 Phase 0-3 启动前 baseline:
+home.js  33254 行 · home.css 16124 行 · home.html 6566 行 · app.py 9212 行 · db.py 9255 行
+
+# 整改完判定(预期):
+home.js  35000 行(+1750 容忍范围 · 全部走铁律 #21 透明记录)
+home.css 16500 行(+400 容忍 · 同上)
+home.html 7200 行(+650 容忍 · 同上)
+app.py   9500 行(+300 容忍 · 严守独立 router)
+db.py    9500 行(+250 容忍 · 严守 services/ 化)
+```
+
+超出容忍 = 整改没按铁律 #21 走 · Zihao 拉回。
+
+**整改帮整顿提前的部分**(reward 不只是损失):
+- **REFACTOR-A2.2 + B3 第一次 Alembic 真迁移**:借整改 P1.1 schema 完成 · 整顿期 -2 个 task
+- **REFACTOR-D1 集成测试 +5-10 个**:整改加守门 = 整顿测试覆盖率提升 3-5%
+- **REFACTOR-C 模块化目标 +3-5 个文件**:`services/memory/*.py` / `memory_routes.py` / `correction-panel.js` 等
+
+净账目预期:整改完 · 整顿期 deadline 顺延约 3 月(原 2026-12 → 2027-02-03)· 不是 6 月。
 
 ---
 

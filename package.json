@@ -1,14 +1,17 @@
 {
-  "name": "pearnly-e2e",
+  "name": "pearnly",
   "private": true,
   "version": "0.0.0",
-  "description": "Pearnly E2E smoke tests (Playwright). Not a runtime package.",
+  "description": "Pearnly · Vite build + Playwright E2E smoke. Not a runtime package.",
   "scripts": {
+    "build": "vite build",
+    "build:watch": "vite build --watch",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.1"
+    "@playwright/test": "^1.49.1",
+    "vite": "^6.0.7"
   }
 }

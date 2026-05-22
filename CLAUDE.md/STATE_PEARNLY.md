@@ -1,6 +1,10 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-22(第五会话续) · **整顿模式 ON** · A7 + BUG-A hotfix + BUG-B 破例新功能 · 阶段 A 进度 4.5/10
+> **最近更新**:2026-05-22(第五会话续 2) · **🚨 整改模式 ON · 整顿模式暂停**(用户投诉触发 · 整改优先级 > REFACTOR_MASTER_PLAN.md)
+>
+> **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(4 模块摸排 + Phase 0-4 整改清单)
+>
+> **整顿期(REFACTOR_MASTER_PLAN.md)**:暂停 · A 阶段进度冻结在 4.5/10 · 整改完后(预计 2027-02)继续 A5
 
 ---
 
@@ -39,6 +43,76 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 **完成定义**:home.js < 200 行 / app.py < 500 行 / 测试覆盖 ≥ 70% / API p95 < 1s / 50-100 模块文件 / Google 级 90%+
 
 **自动统计脚本**:`python scripts/refactor_progress.py`(每窗口跑 1 次 · 看进度)
+
+---
+
+## 🆕 2026-05-22 第五会话续 2 · 🚨 整改模式开启 · 4 模块 OCR / 对账深度审计 + Phase 0-4 整改路线图
+
+> **触发**:用户(Zihao)收到 1 个付费客户 OCR 不准投诉(BUG-B 是触发点)· 拍板整改 > 整顿
+> **接力规则**:换窗口先读 [`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)
+
+### 1 个 commit + 审计文档
+
+- 审计文档:`docs/audits/2026-05-22-ocr-recon-audit.md`(~ 9000 字 · 4 模块摸排 + 横向对比 + 5 共性 gap + Phase 0-4 整改清单 + 跟整顿期协调 + 周计划)
+- STATE 头部:整顿模式 → **🚨 整改模式 ON**(整顿暂停 · 整改优先)
+
+### 4 模块边界澄清(本次定的标准命名)
+
+| 编号 | 模块名 | 路由 |
+|---|---|---|
+| M1 | 上传发票区(OCR → ERP) | `POST /api/ocr/upload` + ERP push 路由 |
+| M2 | **销售税对账**(销项税报告核查 · 发票 vs VAT 报告)| `/api/recon/*` + `/api/vat_excel/*` |
+| M3 | **收入对账**(总账 GL vs VAT 报告)| `POST /api/recon/gl-vat/run` |
+| M4 | **银行对账**(银行账单 vs GL)| `POST /api/recon/bank-v2/run` |
+
+下文 + 整改清单都用 M1-M4 编号。
+
+### 共性 Gap(整改的核心战场)
+
+- **Gap A · OCR vs 手改痕迹** 4 模块全缺(M4 BUG-B 落库了但没导出展示)
+- **Gap B · 字段级 confidence UI** 4 模块全缺(只有 M2/M4 有行级 · 没字段级)
+- **Gap C · 用户改→OCR 学** 只有 M1 部分有(`buyer_to_client_memory` 客户名学习 · 别的字段不学)
+- **Gap D · per-vendor / per-bank 模板学习** 4 模块全缺
+- **Gap E · 统一校对面板** M2 有 row_action · M4 有 anchor 录入 · M3 完全没用户校对入口
+
+### 整改 Phase 0-4 总览(详见审计文档)
+
+- **Phase 0**(本周 · 4 个 task):BUG-B 3 个尾巴 + BUG-A 扫其他 modal
+- **Phase 1**(2-3 周 · 7 个 task):4 模块加 OCR 痕迹 + 字段 confidence + 校对统一
+- **Phase 2**(1 个月):用户改→OCR 学(扩展 `buyer_to_client_memory` → 全字段)
+- **Phase 3**(2-3 个月):per-vendor / per-bank 模板库
+- **Phase 4**(永久不做):用户自定义公式 / 100% straight-through / 自训 OCR 模型
+
+### 整顿期 vs 整改
+
+| | 整顿期(REFACTOR_MASTER_PLAN.md) | 整改(本次) |
+|---|---|---|
+| 状态 | **暂停**(冻结在 A 阶段 4.5/10) | **🚨 ON**(优先级最高) |
+| 单一权威源 | REFACTOR_MASTER_PLAN.md | docs/audits/2026-05-22-ocr-recon-audit.md |
+| commit 标记 | `REFACTOR-A7` 等 | `BUG-FIX-P0.1` / `BUG-FIX-P1.3` 等 |
+| 完成时间 | 整改完后接着做 | Phase 0-1 大约 4 周 · 全 Phase 0-3 大约 4-5 月 |
+
+### 重大决策(本会话续 2)
+
+- **整改优先级 > 整顿**(2026-05-22 Zihao):1 个付费客户投诉直击 Pearnly 核心信任问题 · 不立刻修就跑路 · 整顿期推后无所谓
+- **Phase 4 永久不做 3 条**(2026-05-22 Zihao 默认):用户自定义公式 / 100% 自动化 / 自训 OCR · 都明确不做 · 防接力 agent 反悔
+- **4 模块统一命名**(2026-05-22):M1-M4 · 文档 + 代码注释 + commit message 都用
+- **每个 Phase 0/1 task 独立 commit**(2026-05-22):拆 commit · 防一波带崩 · 5 道守门一波过
+
+### 下窗口接力(给下个 Claude 窗口看)
+
+- **当前位置**:**Phase 0 待启动**(4 个 task · 大约 2 小时)
+- **顺序**:P0.1 → P0.2 → P0.3(BUG-B 闭环)→ P0.4(BUG-A 扫 modal)
+- **每个 task 独立 commit · 跑 5 道守门 · 接力 agent 看 `docs/audits/2026-05-22-ocr-recon-audit.md` § Phase 0**
+- **整顿期暂停**:REFACTOR-A5(原下一个 task)推到 2027-02 大约
+- **决策点**:用户已拍板整改 > 整顿 · 但 Phase 0 是否本会话做完?Phase 1 拆 7 commit?Phase 3 模板收集谁来做?三个问题等 Zihao 回
+
+### Decision Points · 等 Zihao 在审计文档 §8 拍板
+
+1. Phase 0 本会话就开始做吗(2 小时左右)?
+2. Phase 1 拆 7 commit 还是 1 个?
+3. 泰国 top 50 供应商样本谁来收集?
+4. Phase 4 ❌ 3 条永久不做是否确认?
 
 ---
 

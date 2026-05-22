@@ -9,7 +9,7 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + 阶段 3 ✅ + 阶段 4 ✅ + **阶段 5 Task 5.1 ✅ + Task 5.3 ✅**（commit `fa5e0ea` + `767ade9` + `e676c01` · 铁律 #17 这次入档 · 2026-05-22）➡️ **下一接力点：阶段 5 Task 5.2 抽 admin diagnostics router(2h · 本次没做)· 或 阶段 6 收尾**
+**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + 阶段 3 ✅ + 阶段 4 ✅ + **阶段 5 全 ✅(Task 5.1 ✅ + 5.2 ✅ + 5.3 ✅)**(本会话 2026-05-22 同窗口 · 7 个 commit `fa5e0ea` / `767ade9` / `e676c01` / `8ca78f9` / `876649d` 等)➡️ **下一接力点:阶段 6 收尾 · 或 NAV-IA 主线遗留 · 或 P0-VAT v4.9.6 bug 修复**
 
 **当前 CI 状态**（GitHub Actions · commit `767ade9` · run #13 完整 4 step 全绿 161s）：
 - ✅ Step "Static import check" → 绿（修了 BOM 之后)
@@ -30,9 +30,13 @@
 两个 skip 都是 dev-only(chromium binary 缺、PEARNLY_DATABASE_URL 未设)· 不算回退。
 
 **新窗口"继续"时直接做的事**：
-1. 刷 GitHub Actions 看最新 run 是不是 4 step 全绿(应该是 · `767ade9` 已经稳定)
-2. 全绿 → 直接进 **阶段 5 Task 5.2 抽 admin diagnostics router**(2h · 把 admin/credits/{overview,tenants,daily_trend,export} + admin/migration/* + internal/* 等 admin 路由搬到 `admin_diagnostics_routes.py`)
-3. 或者跳到 **阶段 5 Task 5.3** 加铁律 #17 "新功能禁止塞巨石文件"(0.5h · 用 token 投资防住下次新功能往 app.py 怼)
+1. 刷 GitHub Actions 看最新 run 是不是 4 step 全绿(本次 Task 5.2 commit `876649d` · CI #16 已 success 312s)
+2. **阶段 5 已完整收官**(5.1 / 5.2 / 5.3 全 ✅)· `app.py` 累积减 850 行(10060 → 9211)
+3. 候选下一步:
+   - **阶段 6 收尾** · 总结今天 5+ 阶段任务 · 入档 STATE_PEARNLY.md · 关窗口休息
+   - **回 NAV-IA 主线遗留** · 见 CLAUDE.md L335 NAV-IA Phase 8 已完成 · 但可能还有视觉精修
+   - **回 P0-VAT v4.9.6** · STATE 主线说 v4.9.5 等下个版本 · 6 bug 修复 + UI 美化 + 真实 PDF 504 fix
+   - **继续屎山治理** · 抽 admin credits(overview/tenants/daily_trend/export 4 个夹断的路由)· 或者抽 admin tenants/users/employees 大块
 
 **Task 5.1 教训(必读 · 下次拆 router 不再踩)**：
 - 改 line ending 工具:**绝对不要**用 `[System.IO.File]::WriteAllText` 默认 UTF-8 encoder(会加 BOM)
@@ -226,13 +230,39 @@
 - **CI 演进**：CI #12(`fa5e0ea`)首次 push 红 → BOM 问题 → `767ade9` 去 BOM → CI #13 全绿
 - **生产验证**：webhook 自动部署成功 · 短暂 502 后服务恢复 · cpython 容忍 BOM 没影响 prod · CI 红只是静态检查工具更严
 
-### Task 5.2 · 抽出 admin diagnostics router（P2-02）
-- **状态**：blocked by 5.1
-- **类型**：只移动代码
-- **产出**：`admin_diagnostics_routes.py`（或 `modules/admin/diagnostics.py`）
-- **迁移路由**：`/api/admin/diagnostics/runtime`（今天 P0-02 加的）· `/internal/deploy*` · `/internal/install-playwright` · 部署 log
-- **完成判定**：URL 不变 · 统一 secret 校验 helper · `app.py` 进一步瘦身
-- **工作量**：2 小时
+### Task 5.2 · 抽出 admin diagnostics router（P2-02）✅ 2026-05-22 完成
+- **状态**：✅ completed · commit `876649d` · CI #16 success 312s · 本机 3 关全过
+- **类型**：纯搬家 · 0 业务逻辑改动 · 抽 1 个统一 secret helper(EXECUTION_PLAN 拍板的)
+- **产出**：新文件 `admin_diagnostics_routes.py`(303 行 · 5 个 handler + 6 个 routes + `_require_super_admin` 复制 8 行 + 新 `_require_internal_token` 5 行)
+- **迁移路由 5 个 handler · 6 个 routes**:
+  - `GET  /api/admin/diagnostics/runtime`(超管诊断 · playwright/last_500/version · 用 lazy import 解循环 import)
+  - `POST /internal/deploy`(GitHub webhook · HMAC SHA-256 签名)
+  - `GET  /internal/deploy/manual`(浏览器手动触发 · token)
+  - `GET  /internal/deploy/log`(查看部署日志 · token)
+  - `GET+POST /internal/install-playwright`(Playwright + chromium 一键装 · token · 双 decorator 注册 2 routes)
+- **统一 secret 校验 helper(EXECUTION_PLAN 拍板)**:
+  - `_require_internal_token(token)`(5 行) · 3 个 `/internal/*` 路由共用 · 比对 `GITHUB_WEBHOOK_SECRET` env · 不等就 403
+  - `/internal/deploy` POST 用 HMAC SHA-256 签名(GitHub webhook 协议) · **不走** helper · 保留原 inline 校验
+- **循环 import 解法**:
+  - `admin_diagnostics_routes` 顶层 **不** import app(避免循环)
+  - `admin_diagnostics_runtime` handler 内部用 lazy `import app as _app` 拿 `_last_500_event`(mutable global dict · 被 exception handler 实时写)、`_read_playwright_status`、`PEARNLY_FRONTEND_VERSION`
+  - handler 执行时 app module 已经 init 完成 · lazy import 安全
+- **字节级删除防 BOM 重演**(吸取 Task 5.1 教训):
+  - 用 Python 读 bytes → `split(b'\r\n')` → 切片删 L5438-5678 → `join(b'\r\n')` → 写 bytes
+  - 严格保持 CRLF · 永不加 BOM · 全程不调 PowerShell `WriteAllText`(那个 default 加 BOM)
+  - 写完 `head -1 app.py | xxd` 验首字节非 `EF BB BF`
+- **完成判定**:
+  - ✅ 本机 `python scripts/check_imports.py --quiet` → EXIT=0
+  - ✅ 本机 `python -m unittest discover -s tests/unit` → 293 tests · OK (skipped=2)
+  - ✅ 本机 `python -c "import app"` → 261 routes(搬走的 5 个由新 router 注册回来)
+  - ✅ CI #16 4 step 全绿(import + i18n + unit + e2e)· 312s
+  - ✅ 生产 5 endpoint 验证:`/api/version` 200 · `/api/admin/diagnostics/runtime` 401(未登录)· 3 个 `/internal/*?token=invalid` 全 403(`_require_internal_token` 真在工作)
+  - ✅ `app.py` 9451 → 9211 行(净减 241 行 · 累积 Task 5.1 + 5.2 共减 850 行)
+- **真实工作量**:≈75 分钟(原估 2h · 好于预期 · Task 5.1 趟过的坑全部避开:BOM 用 Python bytes-level 删除 · 循环 import 用 lazy import 模式)
+- **关键决策**:
+  - 5 个路由整片连续 L5438-5678 · 没有插入其他模块 · 整片搬走最干净(对比 Task 5.1 的 admin credits 4 个被 admin_monitoring 夹断)
+  - `_require_super_admin` 第二次复制 8 行(同 billing_routes 模式)· 严格"纯搬家"原则 · 等未来 helper 数 ≥3 时再抽公共
+  - 抽 `_require_internal_token` 是 EXECUTION_PLAN 明确要求 · 不算"重构"超范围 · 3 处 inline 4 行变 1 处 5 行 helper + 3 处 1 行调用 · 净减 6 行 · 代码可读性 + 修改局部性都提升
 
 ### Task 5.3 · 加铁律 #17 · 新功能禁止塞巨石文件（P2-05）✅ 2026-05-22 完成
 - **状态**：✅ completed · 紧随 5.1 落地(本会话 2026-05-22 同窗口)

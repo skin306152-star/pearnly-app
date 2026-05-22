@@ -9,7 +9,7 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0-5 ✅ + **阶段 6 Task 6.1 ✅**(2026-05-22 本会话 8 个 commit · 累积 app.py 减 850 行 + 25 个 ensure_* 全盘点入档)➡️ **下一接力点:阶段 6 Task 6.2 写 Alembic 迁移设计文档(2h · blocked unlocked)· 或回 P0-VAT v4.9.6 主线**
+**当前位置**：阶段 0-5 ✅ + **阶段 6 ✅ 全收官(Task 6.1 ✅ + 6.2 ✅)**(2026-05-22 本会话 10+ commit · 累积 app.py 减 850 行 + DB 迁移设计文档完整) ➡️ **下一接力点:阶段 7 Task 7.1 抽 home.js dashboard 模块(3-4h · 第一次拆前端)· 或 Task 6.3 实际落地 Alembic(2.5h · 本设计提出 · 未在原 EXECUTION_PLAN · 风险中)· 或回 P0-VAT v4.9.6 主线**
 
 **当前 CI 状态**（GitHub Actions · commit `767ade9` · run #13 完整 4 step 全绿 161s）：
 - ✅ Step "Static import check" → 绿（修了 BOM 之后)
@@ -309,12 +309,26 @@
 - **真实工作量**：≈55 分钟(原估 1-2h · 中位偏好 · grep 1 遍找全 ensure_* + sample 4 个不同类型实现 + 写 178 行文档)
 - **不会触发生产部署**(git-deploy.sh 只 cp *.py 和 static/ · 不动 docs/)
 
-### Task 6.2 · 迁移体系设计文档（P2-04）
-- **状态**：blocked by 6.1
-- **类型**：方案设计
-- **产出**：`docs/architecture/db-migration-plan.md`
-- **决策点**：Alembic vs 自研 migrations 表 · 当前 ensure_* 分批迁移 · 生产库确认已执行 · 回滚策略 · 第一批试点表
-- **工作量**：2 小时
+### Task 6.2 · 迁移体系设计文档（P2-04）✅ 2026-05-22 完成
+- **状态**：✅ completed · 阶段 6 收官 · 紧随 6.1 落地(本会话 2026-05-22 同窗口)
+- **类型**：方案设计 · 0 代码改动 · 1 个 markdown 文档 · 不触发生产部署
+- **产出**：`docs/architecture/db-migration-plan.md`(338 行 · 11 段:摘要 / Alembic vs 自研 / 集成方案 / 试点 / 回滚 / 灰度 / 数据分离 / Supabase 兼容 / 路线图 / 回退点 / Task 6.3 接力)
+- **5 个决策点全答**:
+  1. **Alembic vs 自研** → 选 **Alembic**(权重:回滚 + 版本表 + 行业标准 + 数据迁移分离)
+  2. **第一批试点** → `ensure_vat_recon_tasks_table`(新表 + 0 数据 + 无依赖 · 风险最低)
+  3. **回滚策略** → 每个迁移写 `downgrade()` · 不可逆数据操作加文档警告 · 紧急回滚走 psql 手动 + UPDATE alembic_version
+  4. **灰度期** → 3 周 / 每个迁移(Phase 1 双跑 2 周 + Phase 2 deprecation 1 周 + Phase 3 删 ensure)
+  5. **数据迁移分离** → DDL 进 Alembic 常规;数据迁移独立文件 `_data` 后缀;Fixture(豁免账号等)写 `setup_fixtures.py` 不入 Alembic
+- **Supabase 兼容性 4 项已知风险 + 实测计划**(Task 6.3 落地时执行):
+  - RLS(只在 Alembic 改 · 不用 Web UI · 写成铁律)
+  - Extensions(`CREATE EXTENSION IF NOT EXISTS`)
+  - Pooler vs Direct(Alembic env.py 用 direct connection)
+  - Connection 超时(NullPool · 用完即断)
+- **路线图**:试点 4 周 + 第一批 8 周 + 第二批 8 周 = ~20 周(每周 1-2h)
+- **决策回退点**:Alembic 不兼容 Supabase → 退自研 migrations 表 / SQLAlchemy 表达式不通 → 全用 `op.execute()` raw SQL
+- **完成判定**：✅ docs/architecture/db-migration-plan.md 已建 · 5 个决策点全答
+- **真实工作量**：≈60 分钟(原估 2h · 大幅好于预期 · Task 6.1 盘点为输入 + 设计文档不需要实测)
+- **Task 6.3(未在 EXECUTION_PLAN · 本设计提出)**:Alembic 落地实施(装包 + env.py + 001/002 迁移 + staging 闭环测试 + git-deploy.sh 钩子) · 2.5h · 等 Zihao 拍板时间
 
 ---
 

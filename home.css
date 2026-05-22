@@ -14273,8 +14273,14 @@ body.settings-modal-open { overflow: hidden; }
 .settings-modal-overlay #page-settings #settings-content,
 .settings-modal-overlay #page-settings .settings-content-wrap,
 .settings-modal-overlay #page-settings .settings-content {
+    /* v118.35.0.35 (2026-05-22) · 真正修响应式 bug · 跟 side-nav (L14253) 同款修法
+       根因: 之前靠 flex:1 + min-height:0 推 overflow · 在浏览器 zoom 67-100% 范围内 flex chain
+       高度解析失败 · overflow-y:auto 不触发 · 用户看不到 LINE ID / 国家 / 公司信息 tab 字段。
+       v118.34.39 已用同款 calc 卡死 max-height 修过左栏 · 这次轮到右栏。
+       Inline override (home.html L52-63) 是 defensive layer · 这里是 base rule 同步. */
+    max-height: calc(min(85vh, 100vh - 64px) - 80px);
     flex: 1;
-    min-width: 0;  /* v118.34.35 · 防 flex item 自然宽度撑爆 · 让右侧内容可缩 */
+    min-width: 0;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;

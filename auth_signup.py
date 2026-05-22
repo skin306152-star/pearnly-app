@@ -746,11 +746,8 @@ class PaymentSubmitRequest(BaseModel):
     # 截图通过 multipart 上传 · 见路由
 
 
-class AdminUpgradeRequest(BaseModel):
-    user_id: str
-    target_plan: str  # free / pro / firm / enterprise
-    duration_days: Optional[int] = None
-    note: Optional[str] = None
+# CLEANUP-PLAN-01 (2026-05-22) · AdminUpgradeRequest 整段删
+# 老订阅模式 admin "升级套餐" pydantic model · credits 模式不再需要
 
 
 # ============================================================
@@ -1509,24 +1506,15 @@ def get_my_plan(request: Request):
 
 
 # v118.35.0.11 · /api/payment/submit 路由永久下线 · credits 系统不再走升级模式 · 用户冲入是 /api/credits/topup/request
+# CLEANUP-PLAN-01 (2026-05-22) · funnel 改瘦:删 by_plan / trial_expiring_soon / conversion_pct
+#   credits 模式不再有"套餐"概念 · admin 只看用户增长 + 国家分布
 @router.get("/api/admin/users/funnel")
 def admin_user_funnel(request: Request):
-    """注册漏斗 + 套餐分布"""
+    """admin 用户增长 + 国家分布(credits 模式 · 不再有套餐分布)"""
     try:
         _require_super_admin(request)
         import db as _db
         with _db.get_cursor(commit=True) as cur:
-                # 套餐分布
-                cur.execute("""
-                    SELECT COALESCE(plan,'free') AS p, COUNT(*) AS n FROM users GROUP BY p
-                """)
-                by_plan = {}
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        by_plan[r.get("p") or "free"] = r.get("n", 0)
-                    else:
-                        by_plan[r[0]] = r[1]
-
                 # 今日/本周/本月新增
                 cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE")
                 today = _row_count(cur.fetchone())
@@ -1547,46 +1535,12 @@ def admin_user_funnel(request: Request):
                     else:
                         by_country.append({"country": r[0], "count": r[1]})
 
-                # Trial 即将到期(剩余 ≤ 3 天)
-                cur.execute("""
-                    SELECT id, COALESCE(email, username) AS email, company_name, line_id, trial_expires_at
-                    FROM users
-                    WHERE plan='trial' AND trial_expires_at IS NOT NULL
-                      AND trial_expires_at > NOW()
-                      AND trial_expires_at < NOW() + INTERVAL '3 days'
-                    ORDER BY trial_expires_at ASC
-                    LIMIT 50
-                """)
-                expiring = []
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        rid = r.get("id"); rem = r.get("email"); rcomp = r.get("company_name")
-                        rline = r.get("line_id"); rte = r.get("trial_expires_at")
-                    else:
-                        rid, rem, rcomp, rline, rte = r[0], r[1], r[2], r[3], r[4]
-                    expiring.append({
-                        "id": str(rid),
-                        "email": rem,
-                        "company_name": rcomp,
-                        "line_id": rline,
-                        "trial_expires_at": rte.isoformat() if rte else None,
-                        "hours_left": int((rte - _now()).total_seconds() // 3600) if rte else None,
-                    })
-
-                # 转化率
-                total_users = sum(by_plan.values()) or 1
-                paid = by_plan.get("pro", 0) + by_plan.get("firm", 0) + by_plan.get("enterprise", 0)
-                conversion = round(paid / total_users * 100, 1)
-
         return {
             "ok": True,
-            "by_plan": by_plan,
             "new_today": today,
             "new_week": week,
             "new_month": month,
             "by_country": by_country,
-            "trial_expiring_soon": expiring,
-            "conversion_pct": conversion,
         }
     except HTTPException:
         raise
@@ -1596,249 +1550,14 @@ def admin_user_funnel(request: Request):
 
 
 # ============================================================
-# 后台 · 待审核付款
+# CLEANUP-PLAN-01 (2026-05-22) · 4 个老订阅 admin 路由整段删:
+#   - GET  /api/admin/payments/pending       (payment_pending 表 · 老订阅付款审核 list)
+#   - POST /api/admin/users/upgrade          (admin 升级用户套餐 · 写 users.plan)
+#   - GET  /api/admin/payments/{id}/screenshot  (看付款截图)
+#   - POST /api/admin/payments/{id}/review   (审批 = 升级 plan · 写 subscription_log)
+# credits 模式不再有套餐升级 · 充值审核走 billing_routes.py admin_topup_list
+# payment_pending / subscription_log 表保留(DB schema 改动留 REFACTOR-B3 Alembic 时再做)
 # ============================================================
-@router.get("/api/admin/payments/pending")
-def admin_pending_payments(request: Request):
-    try:
-        _require_super_admin(request)
-        import db as _db
-        with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
-                    SELECT p.id, p.user_id, p.target_plan, p.amount_thb,
-                           p.screenshot_path, p.payer_name, p.payer_note,
-                           p.status, p.created_at,
-                           COALESCE(u.email, u.username) AS user_email,
-                           u.company_name, u.line_id, u.plan AS current_plan
-                    FROM payment_pending p
-                    LEFT JOIN users u ON u.id = p.user_id
-                    ORDER BY p.created_at DESC
-                    LIMIT 100
-                """)
-                rows = []
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        rows.append({
-                            "id": r.get("id"),
-                            "user_id": str(r.get("user_id")) if r.get("user_id") else None,
-                            "target_plan": r.get("target_plan"),
-                            "amount_thb": float(r.get("amount_thb")) if r.get("amount_thb") else 0,
-                            "screenshot_path": r.get("screenshot_path"),
-                            "payer_name": r.get("payer_name"),
-                            "payer_note": r.get("payer_note"),
-                            "status": r.get("status"),
-                            "created_at": r.get("created_at").isoformat() if r.get("created_at") else None,
-                            "user_email": r.get("user_email"),
-                            "company_name": r.get("company_name"),
-                            "line_id": r.get("line_id"),
-                            "current_plan": r.get("current_plan"),
-                        })
-                    else:
-                        rows.append({
-                            "id": r[0],
-                            "user_id": str(r[1]),
-                            "target_plan": r[2],
-                            "amount_thb": float(r[3]) if r[3] else 0,
-                            "screenshot_path": r[4],
-                            "payer_name": r[5],
-                            "payer_note": r[6],
-                            "status": r[7],
-                            "created_at": r[8].isoformat() if r[8] else None,
-                            "user_email": r[9],
-                            "company_name": r[10],
-                            "line_id": r[11],
-                            "current_plan": r[12],
-                        })
-        return {"ok": True, "payments": rows}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"admin_pending_payments: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================================
-# 后台 · 1 键升级用户(批准付款 / 手动开通)
-# ============================================================
-@router.post("/api/admin/users/upgrade")
-def admin_upgrade_user(req: AdminUpgradeRequest, request: Request):
-    try:
-        admin = _require_super_admin(request)
-        import db as _db
-
-        # v111.2 · 统一从 PLAN_CONFIG 取参数 · 老 plan 名自动 map
-        target = LEGACY_PLAN_MAP.get(req.target_plan, req.target_plan)
-        if target not in ("trial", "monthly", "yearly", "lifetime"):
-            raise HTTPException(status_code=400, detail="invalid_plan")
-
-        features = PLAN_CONFIG[target]
-        # lifetime 永久 · plan_expires_at = NULL · 其它取 duration_days
-        if target == "lifetime":
-            new_exp = None
-        else:
-            days = req.duration_days or features.get("duration_days") or 30
-            new_exp = _now() + timedelta(days=days)
-        new_quota = features.get("ocr_per_period", 0)
-        cfg = {"seats": features.get("seats_max", 1)}
-
-        with _db.get_cursor(commit=True) as cur:
-            # 先拿现状 + tenant_id
-            cur.execute("SELECT plan, tenant_id FROM users WHERE id=%s", (req.user_id,))
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="user_not_found")
-            old_plan = (row.get("plan") if isinstance(row, dict) else row[0]) or "free"
-            tenant_id = row.get("tenant_id") if isinstance(row, dict) else (row[1] if len(row) > 1 else None)
-
-            # v109.4 · 全字段同步更新 · v111.2 · 一律用 target(已 map)
-            if target == "trial":
-                cur.execute("""
-                    UPDATE users SET
-                        plan = %s,
-                        monthly_quota = %s,
-                        used_this_month = 0,
-                        trial_expires_at = %s,
-                        plan_expires_at = NULL
-                    WHERE id = %s
-                """, (target, new_quota, new_exp, req.user_id))
-            else:
-                # 付费套餐 · 清掉 trial 标记 + 设置 plan_expires_at(lifetime 时为 NULL)
-                cur.execute("""
-                    UPDATE users SET
-                        plan = %s,
-                        monthly_quota = %s,
-                        used_this_month = 0,
-                        trial_expires_at = NULL,
-                        plan_expires_at = %s,
-                        upgraded_at = COALESCE(upgraded_at, NOW())
-                    WHERE id = %s
-                """, (target, new_quota, new_exp, req.user_id))
-
-            # v109.4 · 同步更新 tenant 表(防数据矛盾的核心)
-            # v118.26.2.3 修补:tenants 表实际没有 plan/max_seats 列 · 去掉 · 否则整条 SQL 抛错被吞
-            # v118.27.8.1.17 修补:之前漏更 subscription_expires_at · 导致 tenant 表过期永远停在注册值
-            if tenant_id:
-                try:
-                    cur.execute("""
-                        UPDATE tenants SET
-                            monthly_quota = %s,
-                            used_this_month = 0,
-                            subscription_expires_at = %s,
-                            updated_at = NOW()
-                        WHERE id = %s
-                    """, (new_quota, new_exp, tenant_id))
-                except Exception as te:
-                    logger.warning(f"admin_upgrade_user: tenant update failed: {te}")
-
-            # 订阅日志
-            amt = PLAN_CONFIG.get(target, {}).get("price_thb")
-            try:
-                cur.execute("""
-                    INSERT INTO subscription_log(user_id, from_plan, to_plan, changed_by, reason, amount_thb, note)
-                    VALUES (%s, %s, %s, %s, 'admin_upgrade', %s, %s)
-                """, (req.user_id, old_plan, target, admin.get("id"), amt, req.note))
-            except Exception as le:
-                logger.warning(f"admin_upgrade_user: log insert failed: {le}")
-
-        return {
-            "ok": True,
-            "user_id": req.user_id,
-            "old_plan": old_plan,
-            "new_plan": target,
-            "new_quota": new_quota,
-            "expires_at": new_exp.isoformat() if new_exp else None,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"admin_upgrade_user: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================================
-# 后台 · 审核待付款(批准/拒绝)
-# ============================================================
-# ============================================================
-# v111.3 · 后台 · 看付款截图(只 super_admin 可访问)
-# ============================================================
-@router.get("/api/admin/payments/{payment_id}/screenshot")
-def admin_payment_screenshot(payment_id: int, request: Request):
-    from fastapi.responses import FileResponse
-    _require_super_admin(request)
-    import db as _db
-    with _db.get_cursor() as cur:
-        cur.execute("SELECT screenshot_path FROM payment_pending WHERE id=%s", (payment_id,))
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="payment_not_found")
-        path = row.get("screenshot_path") if isinstance(row, dict) else row[0]
-        if not path or not os.path.exists(path):
-            raise HTTPException(status_code=404, detail="screenshot_not_found")
-        return FileResponse(path)
-
-
-@router.post("/api/admin/payments/{payment_id}/review")
-def admin_review_payment(payment_id: int, request: Request, action: str = Query("approve")):
-    try:
-        admin = _require_super_admin(request)
-        import db as _db
-
-        if action not in ("approve", "reject"):
-            raise HTTPException(status_code=400, detail="invalid_action")
-
-        with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
-                    SELECT user_id, target_plan, amount_thb, status FROM payment_pending WHERE id=%s
-                """, (payment_id,))
-                row = cur.fetchone()
-                if not row:
-                    raise HTTPException(status_code=404, detail="payment_not_found")
-                if isinstance(row, dict):
-                    user_id = row.get("user_id")
-                    target_plan = row.get("target_plan")
-                    amt = row.get("amount_thb")
-                    status = row.get("status")
-                else:
-                    user_id, target_plan, amt, status = row
-                if status != "pending":
-                    raise HTTPException(status_code=400, detail="already_reviewed")
-
-                if action == "approve":
-                    # v111.2 · lifetime 永久 · plan_expires_at = NULL
-                    if target_plan == "lifetime":
-                        new_exp = None
-                    else:
-                        days = PLAN_CONFIG.get(target_plan, {}).get("duration_days") or 30
-                        new_exp = _now() + timedelta(days=days)
-                    cur.execute("SELECT plan FROM users WHERE id=%s", (user_id,))
-                    old_plan = _row_get(cur.fetchone(), "plan", 0, "free") or "free"
-                    cur.execute("""
-                        UPDATE users SET plan=%s, plan_expires_at=%s,
-                            trial_expires_at=NULL,
-                            upgraded_at=COALESCE(upgraded_at, NOW())
-                        WHERE id=%s
-                    """, (target_plan, new_exp, user_id))
-                    cur.execute("""
-                        INSERT INTO subscription_log(user_id, from_plan, to_plan, changed_by, reason, amount_thb)
-                        VALUES (%s, %s, %s, %s, 'payment_approved', %s)
-                    """, (user_id, old_plan, target_plan, admin.get("id"), amt))
-                    cur.execute("""
-                        UPDATE payment_pending SET status='approved', reviewed_at=NOW(), reviewed_by=%s
-                        WHERE id=%s
-                    """, (admin.get("id"), payment_id))
-                else:
-                    cur.execute("""
-                        UPDATE payment_pending SET status='rejected', reviewed_at=NOW(), reviewed_by=%s
-                        WHERE id=%s
-                    """, (admin.get("id"), payment_id))
-
-        return {"ok": True, "action": action}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"admin_review_payment: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 # ============================================================
 # 后台 · 删除测试 demo 数据(一次性 · 保留 earn)

@@ -256,7 +256,6 @@
                     const avg = u.total_invoices ? (u.total_cost_thb / u.total_invoices) : 0;
                     return '<tr>' +
                         '<td><strong>' + _esc(u.username || '—') + '</strong></td>' +
-                        '<td>' + _esc(u.plan || '—') + '</td>' +
                         '<td>' + _fmtBaht(u.today_cost_thb) + '</td>' +
                         '<td>' + _fmtBaht(u.month_cost_thb) + '</td>' +
                         '<td>' + _fmtBaht(u.total_cost_thb) + '</td>' +
@@ -424,16 +423,12 @@
         const tok = localStorage.getItem('mrpilot_token');
         if (!tok) return;
         const _hd = { headers: { 'Authorization': 'Bearer ' + tok } };
+        // CLEANUP-PLAN-02 (2026-05-22) · 删 /api/admin/payments/pending fetch + _renderAdmExpiring 调用
         fetch('/api/admin/users/funnel', _hd).then(r => r.json()).then(d => {
             _admPageState.funnel = d;
             _renderAdmKpi(d);
-            _renderAdmExpiring(d.trial_expiring_soon || []);
         }).catch(_ => {});
-        fetch('/api/admin/payments/pending', _hd).then(r => r.json()).then(d => {
-            _admPageState.pay = d;
-            _renderAdmPending((d && d.payments) || []);
-        }).catch(_ => {});
-        fetch('/api/admin/users?plan=all&search=&limit=100', _hd).then(r => r.json()).then(d => {
+        fetch('/api/admin/users?search=&limit=100', _hd).then(r => r.json()).then(d => {
             _admPageState.users = (d && d.users) || [];
             _renderAdmUserList(_admPageState.users);
         }).catch(_ => {
@@ -446,21 +441,16 @@
         }).catch(_ => {});
     }
 
+    // CLEANUP-PLAN-02 (2026-05-22) · KPI 改瘦 · 删 Trial/Free/Pro/Firm/conversion · 留用户增长 + 国家
     function _renderAdmKpi(f) {
         const wrap = document.getElementById('adm-kpi-grid');
         if (!wrap) return;
-        const bp = (f && f.by_plan) || {};
         const cards = [
             { lbl: _t('adm-kpi-today'), val: (f && f.new_today) || 0, color: '#111111' },
             { lbl: _t('adm-kpi-week'), val: (f && f.new_week) || 0, color: '#111111' },
             { lbl: _t('adm-kpi-month'), val: (f && f.new_month) || 0, color: '#111111' },
-            { lbl: _t('plan-trial'), val: bp.trial || 0, color: '#f59e0b' },
-            { lbl: _t('plan-free'), val: bp.free || 0, color: '#64748b' },
-            { lbl: _t('plan-pro'), val: bp.pro || 0, color: '#10b981' },
-            { lbl: _t('plan-firm'), val: bp.firm || 0, color: '#8b5cf6' },
-            { lbl: _t('adm-kpi-conv'), val: ((f && f.conversion_pct) || 0) + '%', color: '#dc2626' },
         ];
-        wrap.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0';
+        wrap.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0';
         wrap.innerHTML = cards.map(c =>
             '<div style="background:#fff;border:1px solid #e8e8e3;border-top:3px solid ' + c.color + ';border-radius:10px;padding:14px 16px">' +
                 '<div style="font-size:22px;font-weight:700;color:' + c.color + '">' + _esc(c.val) + '</div>' +
@@ -469,61 +459,17 @@
         ).join('');
     }
 
-    function _renderAdmPending(rows) {
-        const wrap = document.getElementById('adm-pending-list');
-        if (!wrap) return;
-        const pending = rows.filter(r => r.status === 'pending');
-        if (!pending.length) {
-            wrap.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-pending-empty')) + '</div>';
-            return;
-        }
-        wrap.innerHTML = pending.map(r =>
-            '<div style="background:#fff;border:1px solid #e8e8e3;border-radius:6px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:12px">' +
-                '<div style="flex:1;min-width:0"><strong>' + _esc(r.user_email || '?') + '</strong> · ' + _esc(r.company_name || '') +
-                ' <span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:4px;font-size:11px;margin-left:4px">' + _esc((r.target_plan || '').toUpperCase()) + '</span>' +
-                '<div style="color:#6b7280;font-size:12px;margin-top:3px">฿' + _esc(r.amount_thb) + ' · ' + _esc(r.payer_name || '—') + ' · ' + _esc(r.payer_note || '') + '</div></div>' +
-                '<div style="display:flex;gap:6px;flex-shrink:0">' +
-                    (r.screenshot_path ? '<button class="btn btn-ghost btn-sm" onclick="window.__admViewSlip(' + r.id + ')">' + _esc(_t('adm-view-slip')) + '</button>' : '') +
-                    '<button class="btn btn-primary btn-sm" onclick="window.__admApprovePay(' + r.id + ')">' + _esc(_t('adm-approve')) + '</button>' +
-                    '<button class="btn btn-danger btn-sm" onclick="window.__admRejectPay(' + r.id + ')">' + _esc(_t('adm-reject')) + '</button>' +
-                '</div>' +
-            '</div>'
-        ).join('');
-    }
+    // CLEANUP-PLAN-02 (2026-05-22) · 整删 _renderAdmPending / _renderAdmExpiring / _planLabel
+    //   - admin.html adm-pending-list / adm-expiring-list 段落已删
+    //   - 后端 /api/admin/payments/pending + 升级路由全删
+    //   - _planLabel 没人调(套餐 badge 已删)
 
-    function _renderAdmExpiring(rows) {
-        const wrap = document.getElementById('adm-expiring-list');
-        if (!wrap) return;
-        if (!rows.length) {
-            wrap.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-expiring-empty')) + '</div>';
-            return;
-        }
-        wrap.innerHTML = rows.map(r =>
-            '<div style="background:#fff;border:1px solid #e8e8e3;border-radius:6px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">' +
-                '<div><strong>' + _esc(r.email) + '</strong> · ' + _esc(r.company_name || '') +
-                ' <span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:4px;font-size:11px;margin-left:4px">' + r.hours_left + 'h</span></div>' +
-                '<button class="btn btn-primary btn-sm" onclick="window.__admQuickUpgrade(\'' + _esc(r.id) + '\',\'' + _esc(r.email) + '\')">' + _esc(_t('adm-quick-upgrade')) + '</button>' +
-            '</div>'
-        ).join('');
-    }
-
-    function _planLabel(plan) {
-        const map = {
-            'trial': 'Trial', 'free': 'Trial',
-            'solo': 'Pearnly Solo', 'pro': 'Pearnly Solo', 'plus': 'Pearnly Solo',
-            'team': 'Pearnly Team', 'firm': 'Pearnly Firm', 'enterprise': 'Enterprise',
-            'monthly': 'Monthly', 'yearly': 'Yearly', 'lifetime': 'Lifetime',
-        };
-        return map[plan] || (plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : '—');
-    }
-
+    // CLEANUP-PLAN-02 (2026-05-22) · 删 plan 列 / plan 筛选 / 升级按钮 / 套餐 badge
     function _renderAdmUserList(users) {
         const wrap = document.getElementById('adm-users-table');
         if (!wrap) return;
         const sq = (document.getElementById('adm-user-search')?.value || '').toLowerCase().trim();
-        const pf = document.getElementById('adm-plan-filter')?.value || 'all';
         let filtered = users || [];
-        if (pf !== 'all') filtered = filtered.filter(u => u.plan === pf);
         if (sq) filtered = filtered.filter(u =>
             (u.email || '').toLowerCase().includes(sq) ||
             (u.username || '').toLowerCase().includes(sq) ||
@@ -537,7 +483,6 @@
             '<div class="adm-table-head">' +
                 '<div>' + _esc(_t('adm-col-email')) + '</div>' +
                 '<div>' + _esc(_t('adm-col-company')) + '</div>' +
-                '<div>' + _esc(_t('adm-col-plan')) + '</div>' +
                 '<div>' + _esc(_t('adm-col-usage')) + '</div>' +
                 '<div>' + _esc(_t('adm-col-country')) + '</div>' +
                 '<div>' + _esc(_t('adm-col-actions')) + '</div>' +
@@ -548,11 +493,9 @@
                 const lineBadge = u.line_id ? ' · LINE' : '';
                 const actions = isAdmin
                     ? '<div class="adm-row-actions" title="' + _esc(_t('admin-self-disabled-tip')) + '">' +
-                        '<button class="btn btn-ghost btn-sm" disabled>' + _esc(_t('adm-upgrade')) + '</button>' +
                         '<button class="btn btn-ghost btn-sm" disabled>' + _esc(_t('adm-ban')) + '</button>' +
                     '</div>'
                     : '<div class="adm-row-actions">' +
-                        '<button class="btn btn-ghost btn-sm" onclick="window.__admQuickUpgrade(\'' + _esc(u.id) + '\',\'' + _esc(u.email || '') + '\')">' + _esc(_t('adm-upgrade')) + '</button>' +
                         (u.is_active === false
                             ? '<button class="btn btn-ghost btn-sm" onclick="window.__admUnbanUser(\'' + _esc(u.id) + '\')">' + _esc(_t('adm-drawer-btn-unban')) + '</button>'
                             : '<button class="btn btn-ghost btn-sm" onclick="window.__admBanUser(\'' + _esc(u.id) + '\',\'' + _esc(u.email || '') + '\')">' + _esc(_t('adm-ban')) + '</button>'
@@ -565,10 +508,6 @@
                         '<div class="adm-cell-mute">' + (u.created_at ? new Date(u.created_at).toLocaleDateString() : '—') + adminBadge + '</div>' +
                     '</div>' +
                     '<div>' + _esc(u.company_name || '—') + '</div>' +
-                    '<div>' +
-                        '<span class="adm-plan-badge adm-plan-' + _esc(u.plan || 'trial') + '">' + _esc(_planLabel(u.plan)) + '</span>' +
-                        (u.days_left != null ? '<div class="adm-cell-mute">' + u.days_left + 'd</div>' : '') +
-                    '</div>' +
                     '<div>' + (u.ocr_used_month || 0) + '</div>' +
                     '<div>' + _esc(u.country || '—') + lineBadge + '</div>' +
                     actions +
@@ -645,7 +584,7 @@
             '<div class="adm-risk-row">' +
                 '<div class="adm-risk-row-main">' +
                     '<div><strong>' + _esc(x.email) + '</strong> ' + (x.is_banned ? '<span class="adm-pill-banned">' + _esc(_t('adm-risk-banned-tag')) + '</span>' : '') + '</div>' +
-                    '<div class="adm-risk-row-sub">' + _esc(x.plan || '') + ' · ' + x.ocr_today + ' ' + _esc(_t('adm-risk-ocr-24h')) + '</div>' +
+                    '<div class="adm-risk-row-sub">' + x.ocr_today + ' ' + _esc(_t('adm-risk-ocr-24h')) + '</div>' +
                 '</div>' +
                 (x.is_banned
                     ? '<button class="adm-risk-detail-btn" onclick="window.__admUnbanUser(\'' + _esc(x.user_id) + '\')">' + _esc(_t('adm-drawer-btn-unban')) + '</button>'
@@ -695,7 +634,7 @@
                                     '<div><strong>' + _esc(a.email) + '</strong>' +
                                         (a.is_banned ? ' <span class="adm-pill-banned">' + _esc(_t('adm-risk-banned-tag')) + '</span>' : '') +
                                     '</div>' +
-                                    '<div class="adm-risk-detail-sub">' + _esc(a.plan || '') + ' · ' + _esc((a.created_at || '').slice(0, 10)) + '</div>' +
+                                    '<div class="adm-risk-detail-sub">' + _esc((a.created_at || '').slice(0, 10)) + '</div>' +
                                 '</div>' +
                                 '<div class="adm-risk-detail-actions">' +
                                     (a.is_banned
@@ -911,7 +850,7 @@
                 '</div>' +
             '</div>' +
             sec(_t('adm-drawer-sec-account'),
-                row(_t('adm-drawer-plan'), '<span class="adm-plan-badge adm-plan-' + _esc(u.plan || 'trial') + '">' + _esc(_planLabel(u.plan)) + '</span>' + (u.days_left != null ? ' · ' + u.days_left + 'd' : '')) +
+                // CLEANUP-PLAN-02 · 删 adm-drawer-plan(套餐 badge)· credits 模式没套餐
                 row(_t('adm-drawer-status'), u.is_active === false ? _esc(_t('adm-drawer-banned')) : _esc(_t('adm-drawer-active'))) +
                 row(_t('adm-drawer-line'), lineStatus) +
                 row(_t('adm-drawer-role'), u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner'))
@@ -943,7 +882,7 @@
                 '<div class="adm-drawer-section adm-drawer-actions-section">' +
                     '<div class="adm-drawer-section-title">' + _esc(_t('adm-drawer-sec-actions')) + '</div>' +
                     '<div class="adm-drawer-actions-grid">' +
-                        '<button class="btn btn-primary" onclick="window.__admQuickUpgrade(\'' + _esc(u.id) + '\',\'' + _esc(u.email || '') + '\')">' + _esc(_t('adm-drawer-btn-upgrade')) + '</button>' +
+                        // CLEANUP-PLAN-02 · 删抽屉里"升级套餐"按钮 · credits 模式不再升级
                         (u.is_active === false
                             ? '<button class="btn btn-ghost" onclick="window.__admUnbanUser(\'' + _esc(u.id) + '\')">' + _esc(_t('adm-drawer-btn-unban')) + '</button>'
                             : '<button class="btn btn-danger" onclick="window.__admBanUser(\'' + _esc(u.id) + '\',\'' + _esc(u.email || '') + '\')">' + _esc(_t('adm-drawer-btn-ban')) + '</button>'
@@ -955,63 +894,10 @@
             );
     }
 
-    // ============ v118.44.1 升级 modal ============
-    window.__admQuickUpgrade = function(uid, email) {
-        const old = document.getElementById('adm-upgrade-overlay');
-        if (old) old.remove();
-        const plans = [
-            { id: 'trial', label: _t('upg-plan-trial'), desc: _t('upg-plan-trial-desc') },
-            { id: 'monthly', label: _t('upg-plan-monthly'), desc: _t('upg-plan-monthly-desc') },
-            { id: 'yearly', label: _t('upg-plan-yearly'), desc: _t('upg-plan-yearly-desc') },
-            { id: 'lifetime', label: _t('upg-plan-lifetime'), desc: _t('upg-plan-lifetime-desc') },
-        ];
-        const ov = document.createElement('div');
-        ov.id = 'adm-upgrade-overlay';
-        ov.className = 'cpw-forgot-overlay';
-        ov.innerHTML =
-            '<div class="cpw-forgot-modal" style="max-width:480px">' +
-                '<div class="cpw-forgot-head"><div class="cpw-forgot-title">' + _esc(_t('adm-upgrade-title')) + '</div>' +
-                    '<button class="cpw-forgot-close" id="adm-upg-close"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg></button>' +
-                '</div>' +
-                '<div class="cpw-forgot-body">' +
-                    '<p class="cpw-forgot-desc">' + _esc(email) + '</p>' +
-                    '<div class="adm-plan-options">' +
-                        plans.map(p =>
-                            '<label class="adm-plan-option">' +
-                                '<input type="radio" name="adm-target-plan" value="' + p.id + '">' +
-                                '<div class="adm-plan-option-body">' +
-                                    '<div class="adm-plan-option-label">' + _esc(p.label) + '</div>' +
-                                    '<div class="adm-plan-option-desc">' + _esc(p.desc) + '</div>' +
-                                '</div>' +
-                            '</label>'
-                        ).join('') +
-                    '</div>' +
-                '</div>' +
-                '<div class="cpw-forgot-foot">' +
-                    '<button class="btn btn-ghost" id="adm-upg-cancel">' + _esc(_t('cpw-forgot-cancel')) + '</button>' +
-                    '<button class="btn btn-primary" id="adm-upg-confirm">' + _esc(_t('adm-upg-confirm')) + '</button>' +
-                '</div>' +
-            '</div>';
-        document.body.appendChild(ov);
-        const close = () => ov.remove();
-        ov.querySelector('#adm-upg-close').addEventListener('click', close);
-        ov.querySelector('#adm-upg-cancel').addEventListener('click', close);
-        ov.addEventListener('click', e => { if (e.target === ov) close(); });
-        ov.querySelector('#adm-upg-confirm').addEventListener('click', async () => {
-            const sel = ov.querySelector('input[name="adm-target-plan"]:checked');
-            if (!sel) { _toast(_t('adm-pick-plan'), 'error'); return; }
-            const tok = localStorage.getItem('mrpilot_token');
-            try {
-                const r = await fetch('/api/admin/users/upgrade', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: uid, target_plan: sel.value, note: 'manual_admin' }),
-                });
-                if (r.ok) { _toast(_t('adm-upgrade-ok'), 'success'); close(); _renderUsersPage(); }
-                else { const d = await r.json().catch(() => ({})); _toast(d.detail || _t('adm-upgrade-fail'), 'error'); }
-            } catch (e) { _toast(_t('adm-upgrade-fail'), 'error'); }
-        });
-    };
+    // CLEANUP-PLAN-02 (2026-05-22) · 整删 __admQuickUpgrade 函数(78 行)
+    //   - 后端 /api/admin/users/upgrade 路由已删
+    //   - admin.html 里"升级套餐"按钮全删
+    //   - credits 模式 admin 只能 ban / unban / cascade-delete 用户 · 不再调整 plan
 
     // ============ v118.44.1 封停 modal ============
     window.__admBanUser = function(uid, email) {
@@ -1354,11 +1240,7 @@
                 }, 350);
             }
         });
-        document.addEventListener('change', function(ev) {
-            if (ev.target && ev.target.id === 'adm-plan-filter') {
-                _renderAdmUserList(_admPageState.users || []);
-            }
-        });
+        // CLEANUP-PLAN-02 · adm-plan-filter change listener 删 · select 已从 admin.html 删
     }
 
     // ============ v118.44.1 CSV 下载 ============

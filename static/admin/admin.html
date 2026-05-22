@@ -5,8 +5,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly · 平台后台</title>
-<link rel="stylesheet" href="/static/home.css?v=11841096">
-<link rel="stylesheet" href="/static/admin/admin.css?v=11841096">
+<link rel="stylesheet" href="/static/home.css?v=11841097">
+<link rel="stylesheet" href="/static/admin/admin.css?v=11841097">
 <script>
 // admin layout 标志 · home.js loadAll() 检测此 flag 走精简路径(不跑 home 渲染)
 window.PEARNLY_ADMIN_MODE = true;
@@ -198,7 +198,6 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                         <thead>
                             <tr>
                                 <th data-i18n="cost-th-user">用户</th>
-                                <th data-i18n="cost-th-plan">套餐</th>
                                 <th data-i18n="cost-th-today">今日</th>
                                 <th data-i18n="cost-th-month">本月</th>
                                 <th data-i18n="cost-th-total">累计</th>
@@ -209,7 +208,7 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                             </tr>
                         </thead>
                         <tbody id="cost-by-user-tbody">
-                            <tr><td colspan="9" class="cost-table-empty" data-i18n="cost-loading">加载中…</td></tr>
+                            <tr><td colspan="8" class="cost-table-empty" data-i18n="cost-loading">加载中…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -368,26 +367,15 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                 </div>
                 <div class="page-head-text">
                     <h1 class="page-title" data-i18n="admin-users-title">用户管理</h1>
-                    <div class="page-subtitle" data-i18n="admin-users-sub">注册用户 · 套餐分布 · 待审核付款 · 风控</div>
+                    <div class="page-subtitle" data-i18n="admin-users-sub">注册用户 · 用户增长 · 风控</div>
                 </div>
             </div>
 
             <div class="adm-kpi-grid" id="adm-kpi-grid"></div>
 
-            <div class="adm-section">
-                <div class="adm-section-head">
-                    <div class="adm-section-title" data-i18n="adm-pending-title">待审核付款</div>
-                    <button class="btn btn-ghost btn-sm" id="adm-refresh-pending"><span data-i18n="adm-refresh">刷新</span></button>
-                </div>
-                <div class="adm-pending-list" id="adm-pending-list"></div>
-            </div>
-
-            <div class="adm-section">
-                <div class="adm-section-head">
-                    <div class="adm-section-title" data-i18n="adm-expiring-title">Trial 即将到期(≤ 3 天)</div>
-                </div>
-                <div class="adm-expiring-list" id="adm-expiring-list"></div>
-            </div>
+            <!-- CLEANUP-PLAN-02 (2026-05-22) · 待审核付款 + Trial 即将到期段整删
+                 - 待审核付款:走 billing_routes.py admin_topup_list(credits 模式 · 不在用户管理页)
+                 - Trial 即将到期:credits 模式没 Trial 概念 -->
 
             <div class="adm-section">
                 <div class="adm-section-head">
@@ -397,13 +385,7 @@ window.PEARNLY_ADMIN_LAYOUT = true;
                         <button class="adm-tab" data-adm-tab="logs" data-i18n="adm-tab-logs">操作日志</button>
                     </div>
                     <div class="adm-filters" data-adm-tab-filter="customers">
-                        <select class="adm-filter" id="adm-plan-filter">
-                            <option value="all" data-i18n="adm-filter-all">全部</option>
-                            <option value="trial" data-i18n="plan-trial">Trial</option>
-                            <option value="solo" data-i18n="adm-plan-solo">Solo</option>
-                            <option value="team" data-i18n="adm-plan-team">Team</option>
-                            <option value="firm" data-i18n="plan-firm">Firm</option>
-                        </select>
+                        <!-- CLEANUP-PLAN-02 · adm-plan-filter 套餐筛选删 · credits 模式没"套餐" -->
                         <input type="text" class="adm-search" id="adm-user-search" data-i18n-placeholder="adm-search-ph">
                         <button class="btn btn-ghost btn-sm" id="adm-users-csv-btn" type="button">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;">
@@ -452,9 +434,9 @@ window.PEARNLY_ADMIN_LAYOUT = true;
 
 <!-- v118.44.0.7 救援版 · admin SPA 完全独立 · 不引 home.js(避开 30k 行屎山的 248 处 null bug)-->
 <!-- 轻量 i18n 字典(zh + th)· 暴露 window.ADMIN_I18N -->
-<script src="/static/admin/admin-i18n.js?v=11841096"></script>
+<script src="/static/admin/admin-i18n.js?v=11841097"></script>
 <!-- admin 主逻辑 · 鉴权 + 路由 + UI + 业务 fetch · 自包含 -->
-<script src="/static/admin/admin.js?v=11841096" defer></script>
+<script src="/static/admin/admin.js?v=11841097" defer></script>
 
 </body>
 </html>

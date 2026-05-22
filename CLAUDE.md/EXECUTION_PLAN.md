@@ -9,14 +9,14 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + 阶段 3 ✅ + **阶段 4 Task 4.1 ✅ + Task 4.2 ✅**（commit `7778afb` · 2026-05-22）➡️ **下一接力点：阶段 5 Task 5.1 抽 billing router（2-3h · 第一次把 app.py 瘦身）· 或 阶段 5 Task 5.2 抽 admin diagnostics router · 或 阶段 6 收尾**
+**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + 阶段 3 ✅ + 阶段 4 ✅ + **阶段 5 Task 5.1 ✅**（commit `fa5e0ea` + `767ade9` · 2026-05-22）➡️ **下一接力点：阶段 5 Task 5.2 抽 admin diagnostics router(2h)· 或 阶段 5 Task 5.3 写铁律 #17 防新功能塞巨石文件 · 或 阶段 6 收尾**
 
-**当前 CI 状态**（GitHub Actions · commit `7778afb` 已 push · 等 run #10 出结果）：
-- ✅ Step "check_imports" → 历史已绿（run #9 commit `068c5f0` 整条 8m26s 全绿）
-- ✅ Step "check_i18n --strict" → 历史已绿
-- ✅ Step "unit tests" → 历史已绿（本机 `Ran 293 tests in 1.883s · OK (skipped=2)`）
-- 🟡 Step "E2E smoke (Playwright)" → 新加 · 等 run #10 第一次跑（本机 `1 passed (4.4s)`）
-- 历史红 run（#1-4 / #7）= CI 接入剥洋葱遗留 · `068c5f0` 起已经绿勾，无需清理
+**当前 CI 状态**（GitHub Actions · commit `767ade9` · run #13 完整 4 step 全绿 161s）：
+- ✅ Step "Static import check" → 绿（修了 BOM 之后)
+- ✅ Step "i18n completeness check" → 绿
+- ✅ Step "Run unit tests" → 绿(293 个 unit tests)
+- ✅ Step "E2E smoke (Playwright)" → 绿(prod 着陆页 4 件事)
+- 历史红 #12(`fa5e0ea`)= 我 PowerShell 转 CRLF 时加了 UTF-8 BOM · Python 容忍但 ast.parse 不容忍 · `767ade9` 去 BOM 后 CI 恢复绿
 
 **2026-05-22 本机 OOM 链路最终修复总结**（commit `d1912aa`）：
 本机用 CI 同款命令 `python -m unittest discover -s tests/unit` 复现失败时,Claude Code 被 OOM-kill 多次。复盘 + 修复 4 个独立问题：
@@ -30,9 +30,16 @@
 两个 skip 都是 dev-only(chromium binary 缺、PEARNLY_DATABASE_URL 未设)· 不算回退。
 
 **新窗口"继续"时直接做的事**：
-1. 刷 https://github.com/skin306152-star/pearnly-app/actions 看 run #10（commit `7778afb`）4 step 是否全绿（新加 E2E smoke step 是关键看点）
-2. 全绿 → 阶段 4 真正收官 → 跳到 阶段 5 Task 5.1（抽 billing router 2-3h · 第一次把 app.py 瘦身）按用户偏好挑
-3. e2e step 红 → 大概率：（a）pearnly.com 本身有 JS console.error 漏到 spec 守门里（subscribeI18n 类陷阱）；（b）CI ubuntu 跑无头 chromium 跟本机 Windows 行为差；（c）playwright cache miss 导致超时。先看 GitHub Actions 自动 upload 的 `playwright-report` artifact 里 `index.html` trace 拆原因
+1. 刷 GitHub Actions 看最新 run 是不是 4 step 全绿(应该是 · `767ade9` 已经稳定)
+2. 全绿 → 直接进 **阶段 5 Task 5.2 抽 admin diagnostics router**(2h · 把 admin/credits/{overview,tenants,daily_trend,export} + admin/migration/* + internal/* 等 admin 路由搬到 `admin_diagnostics_routes.py`)
+3. 或者跳到 **阶段 5 Task 5.3** 加铁律 #17 "新功能禁止塞巨石文件"(0.5h · 用 token 投资防住下次新功能往 app.py 怼)
+
+**Task 5.1 教训(必读 · 下次拆 router 不再踩)**：
+- 改 line ending 工具:**绝对不要**用 `[System.IO.File]::WriteAllText` 默认 UTF-8 encoder(会加 BOM)
+  - 正确:`New-Object System.Text.UTF8Encoding $false` 明确 no-BOM 编码
+  - 或者:字节级 `[System.IO.File]::ReadAllBytes` / `WriteAllBytes` 配 manual CRLF 替换
+- 本机过 ≠ CI 过 · cpython 解释器和 ast.parse 标准不一致 · 改 line ending / encoding 后**必须**重跑 `python scripts/check_imports.py --quiet` 再 push
+- 改 app.py 跨大块代码用 `sed -i` 快但会改 line ending · 改完必复转 CRLF 并复跑 check_imports
 
 **⚠️ 本机环境风险（必读 · 详见文末 F-02/F-03）**：
 - 用户机器 8GB RAM 偏小 · 长会话 + 1M context + 并行工具 → Bun OOM 实测 7-8 次 crash
@@ -197,13 +204,27 @@
 
 > **为什么放到第 5 阶段**：到这里前 4 阶段已经写了一批测试当安全网 · 拆代码不再裸奔。**此前任何拆分 = 给自己埋雷**。
 
-### Task 5.1 · 抽出 billing router（P2-01）
-- **状态**：pending（建议先做）
-- **类型**：只移动代码 · 不改 API 行为 · 不改业务逻辑
-- **产出**：新文件 `billing_routes.py`（或 `modules/billing/routes.py`）
-- **迁移路由**：`/api/me/credits` · `/api/my-companies` · `/api/switch-company` · `/api/credits/topup/*` · `/api/credits/usage-*` · `/api/admin/credits/topup/*`
-- **完成判定**：所有 URL / response shape / 鉴权逻辑不变 · `app.py` 行数减少 · `check_imports` 通过
-- **工作量**：2-3 小时
+### Task 5.1 · 抽出 billing router（P2-01）✅ 2026-05-22 完成
+- **状态**：✅ completed · commit `fa5e0ea`（refactor 主体）+ `767ade9`（BOM fix）· CI #13 success 161s
+- **类型**：纯搬家 · 不改 API 行为 / response shape / 鉴权
+- **产出**：新文件 `billing_routes.py`(673 行 · 含 `APIRouter()` + 11 路由 + 2 helper + 4 model + 复制版 `_require_super_admin` 8 行)
+- **迁移路由 11 个**（不是原估的 6 个 · 实际 grep 出 16 个 credits 相关 · 本次只搬连续片 11 个）：
+  - 个人(8):`/api/me/credits` · `/api/my-companies` · `/api/switch-company` · `/api/credits/topup/{request,upload-slip/{id},history}` · `/api/credits/usage-{history,report}`
+  - Admin(3):`/api/admin/credits/topup/{requests,approve/{id},reject/{id}}`
+- **未搬留 Task 5.2**:`/api/admin/credits/{overview,tenants,daily_trend,export}` 这 4 个夹在 `admin_monitoring_overview` 中间不连续 · 跟 admin 模块一起处理更干净
+- **完成判定**：
+  - ✅ 本机 `python scripts/check_imports.py --quiet` → EXIT=0
+  - ✅ 本机 43 个 billing contract tests `Ran 43 tests in 0.003s · OK`
+  - ✅ 本机全量 293 unit tests `Ran 293 tests in 2.195s · OK (skipped=2)`
+  - ✅ CI #13 4 step 全绿(import + i18n + unit + e2e)· 161s
+  - ✅ 生产 `pearnly.com/api/version` 200 · `pearnly.com/api/me/credits` 401(路由注册 + 鉴权正常)· `pearnly.com/api/admin/credits/topup/requests` 401
+  - ✅ `app.py` 10060 → 9451 行(净减 609 行)
+- **真实工作量**：≈100 分钟(原估 2-3h · 中位数好于预期 · 单连续片搬家 + 守门测试齐备)
+- **关键决策**：
+  - `_require_super_admin` 故意 8 行复制到 billing_routes.py(不抽公共 helper)· 严格遵循"纯搬家"原则 · Task 5.2 时再 refactor
+  - 跨平台 line ending 风险:用 `sed -i` 删 LF 化后用 PowerShell `WriteAllText` 转 CRLF · 后者 default 加 UTF-8 BOM(U+FEFF)· cpython 容忍但 `ast.parse` 不容忍 → CI #12 红 · 教训:转 CRLF 用 `[System.IO.File]::WriteAllBytes` 字节级或 `New-Object System.Text.UTF8Encoding $false` 明确 no-BOM
+- **CI 演进**：CI #12(`fa5e0ea`)首次 push 红 → BOM 问题 → `767ade9` 去 BOM → CI #13 全绿
+- **生产验证**：webhook 自动部署成功 · 短暂 502 后服务恢复 · cpython 容忍 BOM 没影响 prod · CI 红只是静态检查工具更严
 
 ### Task 5.2 · 抽出 admin diagnostics router（P2-02）
 - **状态**：blocked by 5.1

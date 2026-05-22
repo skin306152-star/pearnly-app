@@ -9,7 +9,7 @@
 
 # 🚀 下次窗口入口（明天 Claude 进来先看这段）
 
-**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + 阶段 3 ✅ + 阶段 4 ✅ + **阶段 5 Task 5.1 ✅**（commit `fa5e0ea` + `767ade9` · 2026-05-22）➡️ **下一接力点：阶段 5 Task 5.2 抽 admin diagnostics router(2h)· 或 阶段 5 Task 5.3 写铁律 #17 防新功能塞巨石文件 · 或 阶段 6 收尾**
+**当前位置**：阶段 0 ✅ + P0 ✅ + 阶段 1 ✅ + 阶段 2 ✅ + 阶段 3 ✅ + 阶段 4 ✅ + **阶段 5 Task 5.1 ✅ + Task 5.3 ✅**（commit `fa5e0ea` + `767ade9` + `e676c01` · 铁律 #17 这次入档 · 2026-05-22）➡️ **下一接力点：阶段 5 Task 5.2 抽 admin diagnostics router(2h · 本次没做)· 或 阶段 6 收尾**
 
 **当前 CI 状态**（GitHub Actions · commit `767ade9` · run #13 完整 4 step 全绿 161s）：
 - ✅ Step "Static import check" → 绿（修了 BOM 之后)
@@ -234,11 +234,21 @@
 - **完成判定**：URL 不变 · 统一 secret 校验 helper · `app.py` 进一步瘦身
 - **工作量**：2 小时
 
-### Task 5.3 · 加铁律 #17 · 新功能禁止塞巨石文件（P2-05）
-- **状态**：和 5.1 同步做
-- **产出**：`CLAUDE.md/CLAUDE.md` 铁律 17 + `CONTRIBUTING.md`
-- **规则**：新后端路由进独立 router · 新前端进独立 .js · 新业务 SQL 不进 `db.py` 尾部 · 例外必须说明迁出计划
-- **工作量**：30 分钟
+### Task 5.3 · 加铁律 #17 · 新功能禁止塞巨石文件（P2-05）✅ 2026-05-22 完成
+- **状态**：✅ completed · 紧随 5.1 落地(本会话 2026-05-22 同窗口)
+- **类型**：文档级 · 0 代码改动 · 把规则写死防未来踩
+- **产出**：
+  - `CLAUDE.md/CLAUDE.md` 铁律 #17(加在铁律 #16 后)· 4 不许 + 例外条款 + 自检清单 + 历史溯源
+  - `CONTRIBUTING.md`(项目根新建 · 协作者快速参考卡 · GitHub PR 时自动显示)
+- **4 不许规则**:
+  1. 新后端路由不进 `app.py` · 必须 `xxx_routes.py` + `app.include_router`(参考 Task 5.1 的 `billing_routes.py` pattern)
+  2. 新前端 JS 不进 `home.js` · 必须独立 `.js`(IIFE 模式 · 参考 `version-banner.js`)
+  3. 新 CSS 不进 `home.css` · 独立 `.css` 或 scoped 到组件
+  4. 新业务 SQL 不进 `db.py` 尾部 · 复杂业务 → `services/<domain>/<feature>.py`
+- **例外条款**：必须 commit message 写迁出 deadline + 入档 TECH_DEBT 或 EXECUTION_PLAN
+- **完成判定**：✅ CLAUDE.md 铁律 17 已写入(L302-345)· ✅ CONTRIBUTING.md 已建项目根
+- **真实工作量**：≈25 分钟(原估 30min · 准点)
+- **关键考量**：屎山治理铁律(2026-05-15)说"不推倒重来 · 渐进翻新"· 但没说"新功能去哪里" — 铁律 #17 补这块。Task 5.1 验证了 router pattern 可行 · 现在有信心强制要求所有未来新功能走独立模块
 
 ---
 

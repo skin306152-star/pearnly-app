@@ -301,6 +301,40 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 
 ---
 
+### 17. 新功能禁止塞巨石文件 · 必须独立模块(2026-05-22 拍板 · EXECUTION_PLAN 阶段 5 Task 5.3 落地)
+
+**背景**:Pearnly 当前现状 — `app.py` 10k 行 · `home.js` 30k 行(单函数 12,694 行)· `home.css` 7k 行 · `db.py` 4k 行 · 改一处容易牵连 · 我用屎山治理铁律(2026-05-15)开始渐进翻新,但**新功能继续往巨石里怼**就治标不治本。这条铁律封死"再往大文件加内容"路径。
+
+**铁律 · 4 不许**:
+1. **新后端路由不进 `app.py`** · 必须建独立 router(`xxx_routes.py`)· 顶部 `from xxx_routes import router as xxx_router; app.include_router(xxx_router)`
+   - ✅ 例:`billing_routes.py`(Task 5.1) · `report_routes.py` · `auth_signup.py` · `recon_routes.py` · `vat_excel_routes.py`
+   - ❌ 反例:在 `app.py` L9XXX 新加 `@app.get("/api/new-feature")`
+2. **新前端 JS 不进 `home.js`** · 必须独立 `.js` 文件(IIFE 模式 · 跟 `static/version-banner.js` 同款)
+   - ✅ 例:`static/version-banner.js` · `static/admin/admin.js` · `static/admin/admin-i18n.js`
+   - ❌ 反例:在 `home.js` 加新 module 函数
+3. **新 CSS 不进 `home.css`** · 必须独立 `.css` 或 scoped 到组件 `.html`
+   - ❌ 反例:在 `home.css` 加新 `.new-feature-card { ... }` 类
+4. **新业务 SQL 不进 `db.py` 尾部** · 复杂业务封装到 `services/<domain>/<feature>.py`
+   - ✅ 例:`services/erp/mrerp_product_sync.py` · `services/monitoring.py`
+   - ❌ 反例:在 `db.py` L4XXX 加 `def get_new_feature_data():`
+
+**例外条款**(允许暂塞 · 但必须留迁出计划):
+- 必须在 commit message 显式说"暂存 app.py / home.js · 迁出 deadline = vXXX 或 YYYY-MM-DD"
+- 必须建 `TECH_DEBT.md` entry 或 `EXECUTION_PLAN.md` 任务
+- 超过 deadline 没迁出 = 下个窗口必须先迁再做新事
+
+**自检清单**(Claude 每次开新功能前内心 checklist):
+- [ ] 这是后端 API?→ 不许加在 `app.py`,建 `xxx_routes.py`
+- [ ] 这是前端模块?→ 不许加在 `home.js`,建 `static/xxx.js` 或独立 `.html`
+- [ ] 这是 db helper 函数?→ 简单 CRUD 可以加 `db.py`(数十行)· 复杂业务建 `services/`
+- [ ] 全过 → 写代码;有任意一条违反 → 停下选独立文件 / 跟用户讨论
+
+**为什么这条铁律拖到 5.22 才立**:屎山治理铁律(5.15)说"不推倒重来 · 渐进翻新" · 但"新功能去哪里"那时没说清。Task 5.1 抽 billing router 完成 · 验证了"独立 router + include_router" pattern 跑得通(本机 + CI + 生产三层验证)· 现在有信心强制要求。
+
+**附:CONTRIBUTING.md**:同时新建项目根 `CONTRIBUTING.md` 给协作者(包括所有 Claude 窗口)看 · 是这条铁律的完整版本 + 真实文件结构示例。
+
+---
+
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)
 
 **Pearnly 全局导航 = 跟着 `D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html` 走**

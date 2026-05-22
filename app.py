@@ -787,8 +787,16 @@ exit 1
         logger.info("[email_ingest] 定时抓取已禁用(HF Space 不支持 IMAP 出站 · 迁 VPS 后设 EMAIL_INGEST_ENABLED=1)")
 
     # v118.25 · ERP 推送自动重试后台 worker(每 30 秒扫到期失败 log)
-    erp_retry_task = asyncio.create_task(_erp_retry_loop())
-    logger.info("[erp_retry] 自动重试后台 worker 已启动")
+    # PEARNLY_SKIP_HEAVY_INIT=1 时不启动 · 防止 unit test 用 TestClient
+    # 进 lifespan 时若再全局 patch asyncio.sleep,会把 30 秒 sleep 短路成
+    # CPU 死循环 → list_logs_due_for_retry 每秒被调几万次 → stderr 缓冲爆
+    # 内存(本机 OOM)。CI/生产不设这个 env,正常启动。
+    erp_retry_task = None
+    if os.environ.get("PEARNLY_SKIP_HEAVY_INIT", "").lower() not in ("1", "true", "yes"):
+        erp_retry_task = asyncio.create_task(_erp_retry_loop())
+        logger.info("[erp_retry] 自动重试后台 worker 已启动")
+    else:
+        logger.info("[erp_retry] 跳过启动(PEARNLY_SKIP_HEAVY_INIT=1)")
 
     logger.info(f"✅ Mr.Pearnly 已就绪 v0.21.0-v108 (Google 余额追踪 · 半自动校准)")
     yield

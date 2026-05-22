@@ -601,14 +601,27 @@ class ChromiumActualLaunchTests(unittest.TestCase):
         browser = None
         try:
             pw = sync_playwright().start()
-            browser = pw.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                ],
-            )
+            try:
+                browser = pw.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                    ],
+                )
+            except Exception as _launch_err:
+                # v118.35.0.29(2026-05-22)·chromium 二进制未下载是 dev-only
+                # 跳过场景(CI ubuntu / 本机均可能),只有真的 launch 失败
+                # (系统 libs 缺、--no-sandbox 失败等)才算这个守门测试不通过。
+                _msg = str(_launch_err)
+                if "Executable doesn't exist" in _msg or "playwright install" in _msg.lower():
+                    self.skipTest(
+                        f"chromium binary not installed in this env "
+                        f"(run `python -m playwright install chromium`): "
+                        f"{_launch_err}"
+                    )
+                raise
             # Browser.version is a property in playwright-python sync
             # API, not a method.
             version = browser.version
@@ -623,6 +636,10 @@ class ChromiumActualLaunchTests(unittest.TestCase):
             page = ctx.new_page()
             page.goto("about:blank")
             ctx.close()
+        except unittest.SkipTest:
+            # 内层把 binary-missing 转 skipTest 了 · 不要被这里的 catch 抓
+            # 回去再 self.fail 覆盖掉。
+            raise
         except Exception as e:
             # Bubble up the EXACT chromium error so the failure message
             # tells operators what to install.
@@ -1157,6 +1174,22 @@ class PushMRERPAsyncContextTests(unittest.IsolatedAsyncioTestCase):
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app   # noqa
         cls.app_module = app
+
+    def _setupAsyncioLoop(self):
+        # v118.35.0.29(2026-05-22 本机 OOM 链路尾巴)·Windows + Python 3.10 +
+        # starlette TestClient 用 `with TestClient(app) as c:` 跑 lifespan
+        # 后,asyncio.events._running_loop 没被清回 None,导致下一个
+        # IsolatedAsyncioTestCase.run_until_complete 撞 _check_running 报
+        # "Cannot run the event loop while another loop is running"·
+        # 本类按 alpha 顺序紧跟在多个 with-TestClient sync TestCase 后面,
+        # 是污染靶点。CI ubuntu-latest 不复现(用户图 run #3 三个 step
+        # 全绿)·这里只是补本机一致性。
+        import asyncio.events as _aevents
+        try:
+            _aevents._set_running_loop(None)
+        except Exception:
+            pass
+        super()._setupAsyncioLoop()
 
     async def _make_async_client(self):
         import httpx
@@ -1693,6 +1726,14 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
     def setUpClass(cls):
         import os
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        # v118.35.0.29(2026-05-22)· 单元测试用一个临时 Fernet key,让
+        # kms_helper 顶层 import 不 raise。否则 PATCH 路由里 lazy
+        # `from kms_helper import encrypt_str` 报 ImportError → 500 →
+        # 测试拿不到 200,且 with TestClient 异常退出会污染 event loop,
+        # 害死后面的 IsolatedAsyncioTestCase("loop already running")。
+        if not os.environ.get("PEARNLY_KMS_KEY"):
+            from cryptography.fernet import Fernet
+            os.environ["PEARNLY_KMS_KEY"] = Fernet.generate_key().decode()
         import app
         cls.app_module = app
 

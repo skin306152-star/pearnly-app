@@ -193,6 +193,11 @@ NAV-IA Phase 6 → 进项模块
 - [✅] 2026-05-15 · 诊断完成 · 写 TECH_DEBT.md · @NAV-IA Phase 1 窗口
 - [✅] 2026-05-15 · 修 `showToast` 重复定义(删 home.js:13461 旧版 · 276 调用点全兼容新版 line 14894) · @NAV-IA Phase 1 窗口
 - [✅] 2026-05-15 · 记录"部署铁律的系统层例外"(§4.5) · @NAV-IA Phase 1 窗口
+- [✅] 2026-05-22 · **app.py 拆分第一波**(EXECUTION_PLAN 阶段 5 Task 5.1):11 个 billing 路由抽到 `billing_routes.py`(673 行)· `/api/me/credits` + `/api/my-companies` + `/api/switch-company` + `/api/credits/*` + 3 个 admin topup · `app.py` 10060 → 9451 行 · commit `fa5e0ea` + BOM fix `767ade9` · @EXECUTION_PLAN 阶段 5 窗口
+- [✅] 2026-05-22 · **app.py 拆分第二波**(EXECUTION_PLAN 阶段 5 Task 5.2):5 个 admin diagnostics + internal/deploy 路由抽到 `admin_diagnostics_routes.py`(303 行)· `/api/admin/diagnostics/runtime` + `/internal/deploy*` + `/internal/install-playwright` · 新抽 `_require_internal_token` 统一 secret 校验 helper · `app.py` 9451 → 9211 行 · 累积 Task 5.1+5.2 共减 **850 行**(8.4%)· commit `876649d` · @EXECUTION_PLAN 阶段 5 窗口
+- [✅] 2026-05-22 · **立铁律 #17 防屎山扩张**(Task 5.3):新功能禁止塞 app.py / home.js / home.css / db.py 尾部 · 必须独立模块 · CLAUDE.md 铁律 #17 + 新建 `CONTRIBUTING.md` · 配合 5.1/5.2 验证的 router pattern 跑得通 · commit `8ca78f9` · @EXECUTION_PLAN 阶段 5 窗口
+- [✅] 2026-05-22 · **首个 E2E smoke 安全网**(Task 4.2):新建 `tests/e2e/smoke.spec.js`(Playwright)· 测 prod 着陆页加载 + 顶栏 + 4 语切换 + 无 console error · CI 加 e2e step · 给未来拆 home.js 提供基础守门 · commit `7778afb` · @EXECUTION_PLAN 阶段 4 窗口
+- [✅] 2026-05-22 · **DB schema 治理打底**(阶段 6 Task 6.1+6.2):盘点 25 个 ensure_* 函数 → `docs/architecture/db-ensure-inventory.md`(178 行)· 设计 Alembic 迁移方案 → `docs/architecture/db-migration-plan.md`(338 行 · 5 决策点全答 · 3 周灰度策略) · 等 Task 6.3 落地 · commit `3ab1684` + `96c38c2` · @EXECUTION_PLAN 阶段 6 窗口
 
 (以下空 · 等后续窗口补)
 

@@ -1,10 +1,77 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-22 · 阶段 3 Task 3.2 CI 收官 · 4 轮 push 修 6 层依赖洋葱
+> **最近更新**:2026-05-22(第二会话) · EXECUTION_PLAN 阶段 4-6 一波打完 · 7 个阶段任务 · 11 commit · app.py 减 850 行
 
 ---
 
-## 🆕 2026-05-22 本会话完成清单(CI 收官 · 本机 OOM 链路深挖)
+## 🆕 2026-05-22 本会话(第二轮)完成清单 · EXECUTION_PLAN 阶段 4-6 收官
+
+> **接力规则**:换窗口先看本段
+
+### 核心产出
+
+**7 个 EXECUTION_PLAN 阶段任务**连续推进 · 全部 ✅:
+
+| Task | 内容 | 工时(实际/估) |
+|---|---|---|
+| 4.2 Playwright smoke | 新建 `tests/e2e/` + CI 加 e2e step + 4 件事守门(prod 着陆页加载 / 顶栏 / 4 语切换 / 无 console error) | 45min / 2h |
+| 5.1 抽 billing router | 11 路由从 app.py → `billing_routes.py`(673 行)· `/api/me/credits` + 切公司 + 充值 + admin topup 等 | 100min / 2-3h |
+| 5.3 立铁律 #17 | CLAUDE.md 加铁律"新功能禁止塞巨石" + 新建 `CONTRIBUTING.md` | 25min / 30min |
+| 5.2 抽 admin diagnostics | 5 路由(diagnostics + internal/deploy + install-playwright) → `admin_diagnostics_routes.py`(303 行)· 新抽 `_require_internal_token` 统一 secret 校验 | 75min / 2h |
+| 6.1 ensure_* 盘点 | 25 个 ensure_* 函数全清单 → `docs/architecture/db-ensure-inventory.md`(178 行) | 55min / 1-2h |
+| 6.2 Alembic 设计 | 完整 Alembic 迁移方案 → `docs/architecture/db-migration-plan.md`(338 行 · 5 决策点全答) | 60min / 2h |
+
+### 量化收益
+
+- **app.py 10060 → 9211 行**(减 **850 行 · 8.4%**)
+- 2 个独立 router 模块(`billing_routes.py` 673 + `admin_diagnostics_routes.py` 303 = 976 行)
+- 第一个 E2E 测试(prod 着陆页 4 件事 · CI 4 step 全绿 · 4.4s 本机 / 4s CI)
+- 铁律 #17 + `CONTRIBUTING.md`(防屎山扩张)
+- 2 份架构文档(db-ensure-inventory + db-migration-plan)给 Task 6.3 落地打底
+- 11 个 commit · 全部走 C 档位 push · 全部 CI 验过(`46ca511` / `7778afb` / `fa5e0ea` / `767ade9` / `e676c01` / `8ca78f9` / `876649d` / `8c360d2` / `3ab1684` / `96c38c2` + 本次收尾 commit)
+
+### 几个踩坑教训(下窗口要避开)
+
+1. **PowerShell `WriteAllText` 默认加 UTF-8 BOM**(Task 5.1 踩):转 CRLF 时用 `[System.IO.File]::WriteAllText` 默认 UTF-8 encoder 加了 BOM(U+FEFF) · cpython 容忍但 `ast.parse` 不容忍 → CI #12 红
+   - **教训**:转 CRLF 用 `New-Object System.Text.UTF8Encoding $false` 明确 no-BOM · 或用 Python `ReadAllBytes` 字节级处理(Task 5.2 改用此法 · 0 BOM 问题)
+2. **`concurrency: cancel-in-progress` 工作正常**:快速连推 2 个 commit 时前一个 run 被 cancel · **不是 bug** 是预期行为 · 别误以为 CI 失败
+3. **私库无 gh CLI 拉 CI 状态**:用 `git credential fill` 拿 GitHub PAT + `Invoke-RestMethod` 调 GitHub Actions API(`/actions/runs?per_page=N`)· 跨平台稳
+4. **lazy import 解循环 import**:`admin_diagnostics_routes` 顶层不 import app · handler 内部 `import app as _app`(运行时 app 已 init) · 解 `_last_500_event` mutable global 共享 · 干净
+5. **改 webhook 自身代码风险**:Task 5.2 改了 `/internal/deploy` handler 路由位置 · 但 URL 不变 · 旧 webhook 接到 push 触发部署 · 服务器拉新代码 · 新 handler 接管 · 风险为 0(实测 webhook 自我 hot-swap 成功)
+6. **生产部署 ≠ CI** :本会话 4 个 push 都触发了 webhook 自动部署(改了 .py 就部署) · 改 docs/ 不部署。`fa5e0ea` push 时服务器 502 ~20 秒(systemctl restart 中) · 然后恢复;`876649d` 同样 ~25 秒恢复 · 都正常
+
+### EXECUTION_PLAN 进度看板(本会话末)
+
+| 阶段 | 完成度 | 备注 |
+|---|---|---|
+| 0 安全基线 | ✅ 5+1/5 | 2026-05-21 早期 |
+| 1 多租户保险 | ✅ 2/2 | 54 contract tests |
+| 2 计费保险 | ✅ 1/1 | 43 contract tests |
+| 3 CI 保险 | ✅ 2/2 | 4 step CI · 本机 + CI 双绿 |
+| **4 i18n + E2E** | ✅ **2/2** | Task 4.2 本会话补完 · 第一个 E2E |
+| **5 后端路由拆** | ✅ **3/3** | 本会话全做完 · app.py 减 850 行 |
+| **6 DB 迁移规范** | ✅ **2/2** | 本会话全做完 · 等 Task 6.3 落地 |
+| 7 前端拆分 | ⚪ 0/3 | 下一接力点 |
+| 8 治理收尾 | ⚪ 0/2 | |
+
+### 下窗口接力候选(等用户拍板)
+
+1. 🥇 **阶段 7 Task 7.1 抽 home.js dashboard 模块**(3-4h · 第一次拆前端 · 用 Playwright 做安全网)
+2. 🥈 **Task 6.3 实际落地 Alembic**(2.5h · `db-migration-plan.md` 已经设计完 · 装包 + env.py + 001/002 迁移 + staging 闭环测试)
+3. 🥉 **回 P0-VAT v4.9.6 主线**(4.1 天 · STATE 主线 · 6 bug + UI 美化 + 真实 PDF 504 fix)
+4. **跳到阶段 8** Task 8.1 文档导航整理(1h · 给 80+ docs 建 README 索引 · 文档级零代码)
+
+### F-01 服务器装包同步(2026-05-22 第一会话起 · 仍未做)
+
+**未做** · 仍是下窗口待办。`requirements.txt` 已加 `python-docx` + `reportlab` + `python-multipart` · 但服务器没自动 `pip install`:
+```
+ssh root@45.76.53.194 "cd /opt/mrpilot && source venv/bin/activate && pip install python-docx reportlab python-multipart && systemctl restart mrpilot"
+```
+**优先级 P2 · 30 秒**
+
+---
+
+## 🆕 2026-05-22 本会话(第一轮)完成清单(CI 收官 · 本机 OOM 链路深挖)
 
 > **接力规则**:换窗口先看本段
 

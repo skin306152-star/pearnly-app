@@ -1,6 +1,6 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-22(第三会话) · **整顿模式 ON** · 立 REFACTOR_MASTER_PLAN + 铁律 #18-20
+> **最近更新**:2026-05-22(第四会话) · **整顿模式 ON** · REFACTOR-A1 Vite 落地全 4 子完成
 
 ---
 
@@ -11,8 +11,8 @@
 **核心文档**:[`CLAUDE.md/REFACTOR_MASTER_PLAN.md`](REFACTOR_MASTER_PLAN.md)(整顿单一权威源 · 9 阶段 A-I · 60+ task)
 
 **当前状态**:
-- **阶段 A 工具链** 🟡 1/10(A0 整顿主计划落档 ✅ 本会话)
-- **下一个 task**:**REFACTOR-A1 Vite + ES modules 落地**(1-2 天 · 2-4 个窗口)
+- **阶段 A 工具链** 🟡 2/10(A0 ✅ + A1 ✅ 全 4 子)
+- **下一个 task**:**REFACTOR-A2 Alembic 落地**(2.5h · 装包 + env.py + 001 试点 + git-deploy.sh 钩子)
 
 **封锁条款**(铁律 #18):
 - ❌ 0 新功能开发(P0-VAT v4.9.6 / Phase 6 进项管理 / MODULE_ROADMAP 全 hold)
@@ -42,7 +42,40 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ---
 
-## 🆕 2026-05-22 本会话(第三轮) · 阶段 7-8 推进 + 整顿期立项 · 6 个 task
+## 🆕 2026-05-22 第四会话 · REFACTOR-A1 Vite 落地全 4 子(1 个会话内完成 · 3 commit)
+
+> **接力规则**:换窗口先看本段
+
+### 3 个 commit · push 后 prod 11835032 部署成功
+
+| Commit | Task | 内容 |
+|---|---|---|
+| `e11e81d` | REFACTOR-A1.1 | 装 Vite 6.4.2 + 配 esbuild · 本地 build · src/main.js 占位 · src/package.json 局部 ESM scope · vite.config.mjs · 不动 playwright |
+| `cfbb7d5` | REFACTOR-A1.2 | CI 加 vite build step(npm ci 后 / Playwright 前) · 守门从 4 关升到 5 关 · 防本地 build 漏跑 |
+| `1c4c3bd` | REFACTOR-A1.3 | dashboard.js / billing.js 从 static/home/ 搬到 src/home/ · 改 ES module(去 IIFE)· Vite bundle 到 static/dist/main.js 15.11kB(gzip 5.03kB · 减 37%)· home.html cache_bust 11835031→11835032 · script tag 改 type=module · release_notes v118.35.0.32 4 语 · A1.4 自动验证 prod 通 |
+
+### A1.4 prod 自动验证(本会话)
+- ✅ /api/version 返 version=11835032
+- ✅ /static/dist/main.js?v=11835032 fetch 200 · 15107 bytes
+- ✅ 旧路径 /static/home/{dashboard,billing}.js 404 · home.html 不再引用 · 无害
+- ⏳ 等 Zihao 人工测 dashboard + 充值 modal UI 跑通
+
+### 重大决策(本会话拍板)
+- **Vite build 方案 = 本地 build · 产物 static/dist/* 进 git · 服务器零改动**
+- **home.js 33k 行不进 Vite · 阶段 C 后再纳入**(铁律 #18 渐进翻新)
+- **顶层 package.json 不加 type:module · src/package.json 局部 ESM**(避免炸 playwright.config.js CJS)
+- **A1.3 改 script tag 顺序**:home.js 同步 → main.js type=module 自动 defer · 等价原 dashboard/billing defer
+
+### 必测清单(Zihao 自测 · 每项 ≤30 秒)
+1. 浏览器打开 https://pearnly.com · 看头部"立即更新"横幅是否弹出
+2. 点更新 + 登录 · 首页 #/dashboard 路由 · 看 KPI 卡片有数据(本月发票 / 余额 / 用量)
+3. 点充值 · 看 3 步 modal 能开 · 输金额 + 看银行账号 + 关闭(不用真传)
+4. F12 DevTools Console · 应该看到 `[pearnly] vite bundle loaded · dashboard + billing` · 没 ERROR
+5. F12 Network · 应该看到 `/static/dist/main.js?v=11835032` 加载成功 200 · 旧 `/static/home/dashboard.js` 不再 fetch
+
+---
+
+## 🆕 2026-05-22 第三会话 · 阶段 7-8 推进 + 整顿期立项 · 6 个 task
 
 > **接力规则**:换窗口先看本段
 

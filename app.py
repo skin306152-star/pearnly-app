@@ -5417,10 +5417,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已进一步优化『银行对账』的准确性。\n\n此前在同一天存在两笔金额与摘要完全相同的交易时,可能被误判为重复而少算一笔;现已修复,两笔都会被正确保留。同时,对账单中省略了日期的同日交易也不再被遗漏。\n\n配合上一版的改进,上传对账单的部分页面时也不会再误报『余额核对未通过』。即日生效。",
-            "th": "ระบบได้ปรับปรุงความแม่นยำของ『การกระทบยอดบัญชีธนาคาร』เพิ่มเติม\n\nก่อนหน้านี้ หากในวันเดียวกันมีสองรายการที่จำนวนเงินและรายละเอียดเหมือนกันทุกประการ อาจถูกระบุผิดว่าเป็นรายการซ้ำและนับขาดไปหนึ่งรายการ ได้รับการแก้ไขแล้ว ทั้งสองรายการจะถูกเก็บไว้อย่างถูกต้อง และรายการในวันเดียวกันที่ละเว้นวันที่จะไม่ถูกตกหล่นอีกต่อไป\n\nร่วมกับการปรับปรุงในเวอร์ชันก่อน การอัปโหลดบางหน้าของใบแจ้งยอดจะไม่แจ้ง『ตรวจยอดคงเหลือไม่ผ่าน』ผิดพลาดอีกต่อไป มีผลทันที",
-            "en": "The accuracy of『Bank Reconciliation』has been further improved.\n\nPreviously, when two transactions on the same day had identical amounts and descriptions, one could be mistaken for a duplicate and missed; this is now fixed and both are correctly kept. Same-day transactions that omit the date are also no longer dropped.\n\nTogether with the previous improvement, uploading partial pages of a statement no longer triggers a false『balance check failed』warning. Effective immediately.",
-            "ja": "『銀行照合』の精度をさらに改善しました。\n\nこれまで、同じ日に金額と摘要が完全に一致する取引が2件あると、一方が重複と誤判定されて欠落することがありました。今回修正し、両方が正しく保持されます。日付が省略された同日取引も欠落しなくなりました。\n\n前バージョンの改善と合わせ、明細の一部のページをアップロードしても『残高照合エラー』が誤表示されることはなくなりました。即日有効。"
+            "zh": "系统已大幅提升『银行对账』的识别准确性。\n\n部分银行对账单(尤其是多栏的扫描件)在识别时,存款与取款的方向偶尔会被读反。系统现在会依据余额的变化自动校正方向,使对账结果与原始对账单一致。对于金额与余额变化对不上的少数行,仍会保留提醒,便于您逐笔核对。\n\n即日生效。",
+            "th": "ระบบได้ปรับปรุงความแม่นยำของ『การกระทบยอดบัญชีธนาคาร』อย่างมาก\n\nใบแจ้งยอดบางธนาคาร (โดยเฉพาะไฟล์สแกนที่มีหลายคอลัมน์) บางครั้งทิศทางเงินฝาก/เงินถอนถูกอ่านสลับกัน ขณะนี้ระบบจะแก้ไขทิศทางให้อัตโนมัติตามการเปลี่ยนแปลงของยอดคงเหลือ เพื่อให้ผลตรงกับใบแจ้งยอดต้นฉบับ ส่วนรายการที่จำนวนเงินไม่ตรงกับการเปลี่ยนแปลงของยอดคงเหลือ จะยังคงมีการแจ้งเตือนเพื่อให้ท่านตรวจสอบทีละรายการ\n\nมีผลทันที",
+            "en": "The accuracy of『Bank Reconciliation』has been significantly improved.\n\nFor some bank statements (especially multi-column scanned files), the deposit/withdrawal direction was occasionally read in reverse. The system now automatically corrects the direction based on how the running balance changes, so the result matches the original statement. For the few rows whose amount does not match the balance change, a review reminder is kept so you can verify them one by one.\n\nEffective immediately.",
+            "ja": "『銀行照合』の認識精度を大幅に改善しました。\n\n一部の銀行明細(特に複数列のスキャン画像)で、入金/出金の方向が逆に読み取られることがありました。今後は残高の増減に基づいて方向を自動的に補正し、元の明細と一致するようにします。金額が残高の増減と一致しない一部の行については、確認のための注意表示を残します。\n\n即日有効。"
         }
     }
 

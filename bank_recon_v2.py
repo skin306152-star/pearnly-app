@@ -99,6 +99,8 @@ class StatementRow:
     # v118.33.13.0 · accuracy verification fields
     confidence: str = "high"          # 'high'|'medium'|'low' (set by OCR engine)
     balance_ok: Optional[bool] = None # True/False (arithmetic verified)/None (cannot verify)
+    # v118.35.0.50 · 系统按余额涨跌自动校正了借贷方向(OCR 把提款/存款列读反)· 让 UI/Excel 透明标注
+    direction_autocorrected: bool = False
 
     def __post_init__(self):
         if not self.row_hash:
@@ -942,6 +944,9 @@ def parse_bank_statement_pdf(
     for r in rows:
         r.source_file = filename
 
+    # v118.35.0.50 · 先用余额涨跌纠正 OCR 把借贷方向读反的行(必须在余额验证之前)
+    _correct_direction_from_balance(rows, opening)
+
     # v118.33.13.0 · row-by-row balance arithmetic verification
     # For each row: prev_balance + deposit - withdrawal should equal current balance.
     # If it doesn't, set balance_ok=False so the UI can flag for human review.
@@ -969,6 +974,51 @@ def parse_bank_statement_pdf(
         "balance_warn_count": balance_warn_count,
         "low_conf_count": low_conf_count,
     }
+
+
+def _correct_direction_from_balance(rows: List[StatementRow], opening: float) -> None:
+    """v118.35.0.50 · 用运行余额的涨跌反推真实借贷方向 · 纠正 OCR 把提款/存款列读反的行。
+
+    真实案例(BBL 2697 / 2645 · 90° 旋转扫描图 · Gemini 借贷两列对错位):
+      余额从 9,473,662 跌到 8,067,653(明明是提款),却被记成存款 1,406,008。
+      金额跟余额涨跌完全吻合 · 只有方向放反 → 明显的列错位 · 系统按余额纠正(不算替用户判断)。
+
+    纠正条件(全满足才动 · 否则不碰 · 留给 _verify 标异常让用户核对):
+      1. 有可靠的上一行余额(opening 不可靠时 · 第一笔有金额行不纠 · 无从比较)
+      2. 本行余额涨跌方向 与 记录的提款/存款方向 相反
+      3. 记录的金额 与 |余额涨跌| 完全吻合(差 ≤ 0.02)· 排除漏行 / 金额识别错的情况
+
+    就地修改 · 纠正的行打 direction_autocorrected=True(UI/Excel 透明标注)。
+    """
+    if not rows:
+        return
+    prev = opening
+    opening_reliable = (opening != 0.0)
+    first_movement_seen = False
+    for r in rows:
+        if r.balance is None:
+            continue  # 无余额 · 无从反推
+        dep = r.deposit or 0
+        wd = r.withdrawal or 0
+        if dep == 0 and wd == 0:
+            prev = r.balance  # 无动行(期初/总计/表头)· 只更新 prev
+            continue
+        if not first_movement_seen and not opening_reliable:
+            first_movement_seen = True
+            prev = r.balance  # 续页首笔 · 无 prev 可比 · 不纠
+            continue
+        first_movement_seen = True
+        delta = round(r.balance - prev, 2)
+        amt = max(dep, wd)
+        # 金额吻合 |delta| · 仅方向相反 → 按余额涨跌摆正
+        if amt > 0 and abs(abs(delta) - amt) <= AMOUNT_TOL:
+            if delta > 0 and wd > 0:        # 余额涨却记成提款 → 改存款
+                r.deposit, r.withdrawal = amt, 0.0
+                r.direction_autocorrected = True
+            elif delta < 0 and dep > 0:     # 余额跌却记成存款 → 改提款
+                r.withdrawal, r.deposit = amt, 0.0
+                r.direction_autocorrected = True
+        prev = r.balance
 
 
 def _verify_row_balances(rows: List[StatementRow], opening: float) -> None:

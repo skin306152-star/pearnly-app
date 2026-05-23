@@ -12,6 +12,14 @@ venv/
 .env.*.local
 *.egg-info/
 
+# 本地密钥(绝不进 git · 2026-05-23)
+_gemini_key.local
+_gemini_key.local/
+*.local
+pearnly-vision-key*.json
+*-key.json
+_probe_ocr.py
+
 # Playwright(Python · 探测脚本副产物)
 playwright-report/
 test-results/

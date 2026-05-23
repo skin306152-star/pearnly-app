@@ -1965,6 +1965,7 @@ const I18N = {
         // BUG-B v118.35.0.36 · OCR 抽不准 3 anchor 余额时手动录入兜底
         'brv2-anchor-title':         'OCR 抽不准?手动录入 3 个余额(可选 · 留空走 OCR)',
         'brv2-anchor-gl-closing':    'GL 期末余额',
+        'brv2-anchor-stmt-closing':  'Statement 期末余额',
         'brv2-anchor-stmt-opening':  '期初 Statement 余额',
         'brv2-anchor-gl-opening':    'GL 期初余额',
         'brv2-anchor-eq-lbl':        '期初差额(Statement 期初 − GL 期初):',
@@ -4393,6 +4394,7 @@ const I18N = {
         // BUG-B v118.35.0.36 · OCR-fallback manual anchor inputs
         'brv2-anchor-title':         "OCR didn't pick these up? Enter the 3 balances manually (optional · leave blank to use OCR)",
         'brv2-anchor-gl-closing':    'GL closing balance',
+        'brv2-anchor-stmt-closing':  'Statement closing balance',
         'brv2-anchor-stmt-opening':  'Statement opening balance',
         'brv2-anchor-gl-opening':    'GL opening balance',
         'brv2-anchor-eq-lbl':        'Opening difference (Stmt opening − GL opening):',
@@ -6819,6 +6821,7 @@ const I18N = {
         // BUG-B v118.35.0.36 · OCR 抽ไม่ตรงตอนกรอกเอง 3 ช่อง anchor
         'brv2-anchor-title':         'OCR อ่านไม่แม่น? กรอกยอด 3 ช่องเอง (ทางเลือก · ปล่อยว่างจะใช้ OCR)',
         'brv2-anchor-gl-closing':    'ยอดยกไป GL',
+        'brv2-anchor-stmt-closing':  'ยอดยกไป STATEMENT',
         'brv2-anchor-stmt-opening':  'ยอดยกมา STATEMENT',
         'brv2-anchor-gl-opening':    'ยอดยกมา GL',
         'brv2-anchor-eq-lbl':        'ผลต่างยอดยกมา (ยอดยกมา Statement − ยอดยกมา GL):',
@@ -9241,6 +9244,7 @@ const I18N = {
         // BUG-B v118.35.0.36 · OCR で読めない時 3 つの anchor を手入力
         'brv2-anchor-title':         'OCR が正しく読めない? 3 つの残高を手入力(任意 · 空欄なら OCR を使用)',
         'brv2-anchor-gl-closing':    'GL 期末残高',
+        'brv2-anchor-stmt-closing':  'Statement 期末残高',
         'brv2-anchor-stmt-opening':  'Statement 期首残高',
         'brv2-anchor-gl-opening':    'GL 期首残高',
         'brv2-anchor-eq-lbl':        '期首差額(Stmt 期首 − GL 期首):',
@@ -19182,6 +19186,7 @@ async function deleteEndpoint(endpointId) {
                 stmt_opening: Number.isFinite(+ocr.stmt_opening) ? +ocr.stmt_opening : null,
                 gl_opening:   Number.isFinite(+ocr.gl_opening)   ? +ocr.gl_opening   : null,
                 gl_closing:   Number.isFinite(+ocr.gl_closing)   ? +ocr.gl_closing   : null,
+                stmt_closing: Number.isFinite(+ocr.stmt_closing) ? +ocr.stmt_closing : null,  // BUG-FIX-T3 v118.35.0.44
                 ts: Date.now(),
             };
             localStorage.setItem(_BRV2_ANCHOR_KEY, JSON.stringify(payload));
@@ -19203,6 +19208,7 @@ async function deleteEndpoint(endpointId) {
             'brv2-anchor-stmt-opening': p.stmt_opening,
             'brv2-anchor-gl-opening':   p.gl_opening,
             'brv2-anchor-gl-closing':   p.gl_closing,
+            'brv2-anchor-stmt-closing': p.stmt_closing,  // BUG-FIX-T3 v118.35.0.44 · 加 4th anchor 预填
         };
         Object.keys(map).forEach(function (id) {
             var el = document.getElementById(id);
@@ -19232,6 +19238,7 @@ async function deleteEndpoint(endpointId) {
         ['stmt_opening', 'brv2-anchor-stmt-opening'],
         ['gl_opening',   'brv2-anchor-gl-opening'],
         ['gl_closing',   'brv2-anchor-gl-closing'],
+        ['stmt_closing', 'brv2-anchor-stmt-closing'],   // BUG-FIX-T3 v118.35.0.44 · 加 4th anchor
     ];
     function _brv2T(key, fallback) {
         return (window.t && window.t(key)) || fallback;
@@ -19419,12 +19426,15 @@ async function deleteEndpoint(endpointId) {
             fd.append('lang', lang);
 
             // BUG-B v118.35.0.36 · 3 个 anchor 余额手动录入 · 优先于 OCR 抽到的值
-            const aGlClose  = parseFloat(($('brv2-anchor-gl-closing')  || {}).value);
-            const aStmtOpen = parseFloat(($('brv2-anchor-stmt-opening')|| {}).value);
-            const aGlOpen   = parseFloat(($('brv2-anchor-gl-opening')  || {}).value);
-            if (Number.isFinite(aGlClose))  fd.append('gl_closing_override',   aGlClose);
-            if (Number.isFinite(aStmtOpen)) fd.append('stmt_opening_override', aStmtOpen);
-            if (Number.isFinite(aGlOpen))   fd.append('gl_opening_override',   aGlOpen);
+            // BUG-FIX-T3 v118.35.0.44 · 加第 4 个 anchor stmt_closing(Statement 期末)
+            const aGlClose   = parseFloat(($('brv2-anchor-gl-closing')   || {}).value);
+            const aStmtClose = parseFloat(($('brv2-anchor-stmt-closing') || {}).value);
+            const aStmtOpen  = parseFloat(($('brv2-anchor-stmt-opening') || {}).value);
+            const aGlOpen    = parseFloat(($('brv2-anchor-gl-opening')   || {}).value);
+            if (Number.isFinite(aGlClose))   fd.append('gl_closing_override',   aGlClose);
+            if (Number.isFinite(aStmtClose)) fd.append('stmt_closing_override', aStmtClose);
+            if (Number.isFinite(aStmtOpen))  fd.append('stmt_opening_override', aStmtOpen);
+            if (Number.isFinite(aGlOpen))    fd.append('gl_opening_override',   aGlOpen);
 
             const res = await fetch('/api/recon/bank-v2/run', {
                 method: 'POST',
@@ -19984,7 +19994,7 @@ async function deleteEndpoint(endpointId) {
         setupDrop('brv2-gl-zone',   'brv2-gl-input',   'gl');
 
         // BUG-B v118.35.0.36 · 3 个 anchor 余额手动录入 · 实时算期初差额
-        const anchorIds = ['brv2-anchor-gl-closing', 'brv2-anchor-stmt-opening', 'brv2-anchor-gl-opening'];
+        const anchorIds = ['brv2-anchor-gl-closing', 'brv2-anchor-stmt-closing', 'brv2-anchor-stmt-opening', 'brv2-anchor-gl-opening'];
         function _brv2UpdateAnchorEq() {
             const stmtOpen = parseFloat(($('brv2-anchor-stmt-opening') || {}).value);
             const glOpen   = parseFloat(($('brv2-anchor-gl-opening')   || {}).value);

@@ -2741,6 +2741,9 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
                               "zh": "GL 期初余额", "ja": "GL 期首"},
     "lbl_anchor_gl_close":   {"th": "ยอดยกไป GL", "en": "GL Closing",
                               "zh": "GL 期末余额", "ja": "GL 期末"},
+    # BUG-FIX-T3 v118.35.0.44 · 加第 4 个 anchor · Statement 期末(客户反馈缺这个录入框)
+    "lbl_anchor_stmt_close": {"th": "ยอดยกไป STATEMENT", "en": "Statement Closing",
+                              "zh": "Statement 期末余额", "ja": "Statement 期末"},
 }
 
 
@@ -3238,6 +3241,7 @@ def export_bank_recon_excel(
             ("stmt_opening", "lbl_anchor_stmt_open"),
             ("gl_opening",   "lbl_anchor_gl_open"),
             ("gl_closing",   "lbl_anchor_gl_close"),
+            ("stmt_closing", "lbl_anchor_stmt_close"),  # BUG-FIX-T3 v118.35.0.44 · 4th anchor
         ]
         YELLOW_FILL = PatternFill("solid", fgColor="FFE082")
         for idx, (anchor_key, lbl_key) in enumerate(_ANCHOR_LABEL_KEYS):

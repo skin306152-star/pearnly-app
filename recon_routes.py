@@ -1201,21 +1201,26 @@ def _brv2_err(key: str, lang: str = "th", **fmt) -> str:
 
 
 def _apply_anchor_overrides(
-    stmt_opening: float, gl_opening: float, gl_closing: float,
+    stmt_opening: float, gl_opening: float, gl_closing: float, stmt_closing: float,
     stmt_opening_override: Optional[float],
     gl_opening_override: Optional[float],
     gl_closing_override: Optional[float],
+    stmt_closing_override: Optional[float] = None,
 ):
     """
     P0.1 BUG-B-T1 v118.35.0.37 · 把『OCR snapshot + override 替换』封装成纯函数 · 守门测试容易
+    BUG-FIX-T3 v118.35.0.44 · 加第 4 个 anchor stmt_closing(Statement 期末)· 客户反馈 OCR 95% 准
+                                · 5% 抽不准时需要兜底框
     Always returns the OCR snapshot (even when no override) so the frontend can prefill
-    the 3 anchor inputs next time (localStorage) and Excel/history can show OCR vs user.
-    Returns: (final_stmt_open, final_gl_open, final_gl_close, anchor_ocr_dict, anchor_overrides_dict)
+    the 4 anchor inputs next time (localStorage) and Excel/history can show OCR vs user.
+    Returns: (final_stmt_open, final_gl_open, final_gl_close, final_stmt_close,
+              anchor_ocr_dict, anchor_overrides_dict)
     """
     anchor_ocr = {
         "stmt_opening": stmt_opening,
         "gl_opening": gl_opening,
         "gl_closing": gl_closing,
+        "stmt_closing": stmt_closing,
     }
     anchor_overrides = {}
     if stmt_opening_override is not None:
@@ -1227,7 +1232,10 @@ def _apply_anchor_overrides(
     if gl_closing_override is not None:
         anchor_overrides["gl_closing"] = {"ocr": gl_closing, "user": float(gl_closing_override)}
         gl_closing = float(gl_closing_override)
-    return stmt_opening, gl_opening, gl_closing, anchor_ocr, anchor_overrides
+    if stmt_closing_override is not None:
+        anchor_overrides["stmt_closing"] = {"ocr": stmt_closing, "user": float(stmt_closing_override)}
+        stmt_closing = float(stmt_closing_override)
+    return stmt_opening, gl_opening, gl_closing, stmt_closing, anchor_ocr, anchor_overrides
 
 
 @router.post("/bank-v2/run")
@@ -1240,9 +1248,11 @@ async def bank_v2_run(
     # BUG-B v118.35.0.36 (2026-05-22) · OCR 抽 3 个 anchor 余额不准时 · 前端用户手动录入兜底
     # 任意一个 override 非 None · 用 override 替换 OCR/parse 抽到的值传给 bank_reconcile
     # 整顿期 (铁律 #18) Zihao 拍板破例做 · 业务等式锚点错位会让整张对账报告废 · 算紧急
+    # BUG-FIX-T3 v118.35.0.44 · 加第 4 个 anchor stmt_closing(Statement 期末)· 客户反馈
     stmt_opening_override: Optional[float] = Form(None),
     gl_opening_override: Optional[float] = Form(None),
     gl_closing_override: Optional[float] = Form(None),
+    stmt_closing_override: Optional[float] = Form(None),
 ):
     """
     Upload bank statement PDF(s) + GL file(s), run reconciliation.
@@ -1403,10 +1413,12 @@ async def bank_v2_run(
 
     # BUG-B v118.35.0.36 · 用户在前端 anchor TEXT BOX 填了值就用用户的 · OCR 的降级成参考
     # P0.1 BUG-B-T1 v118.35.0.37 · 抽成 _apply_anchor_overrides 纯函数 · 总是 snapshot OCR 给前端预填用
-    (stmt_opening, gl_opening, gl_closing,
+    # BUG-FIX-T3 v118.35.0.44 · 加第 4 个 anchor stmt_closing
+    (stmt_opening, gl_opening, gl_closing, stmt_closing,
      _anchor_ocr_snapshot, _anchor_used) = _apply_anchor_overrides(
-        stmt_opening, gl_opening, gl_closing,
+        stmt_opening, gl_opening, gl_closing, stmt_closing,
         stmt_opening_override, gl_opening_override, gl_closing_override,
+        stmt_closing_override,
     )
     if _anchor_used:
         logger.info(f"[bank_v2_run] anchor overrides applied: {_anchor_used} · "

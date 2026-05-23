@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835043">
+<link rel="stylesheet" href="/static/home.css?v=11835044">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -1997,7 +1997,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 .brv2-anchor-title { font-weight: 500; }
 .brv2-anchor-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr); /* BUG-FIX-T3 v118.35.0.44 · 3→4 列 · 加 Statement 期末 anchor */
     gap: 10px;
 }
 .brv2-anchor-cell {
@@ -4765,6 +4765,10 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                             <input type="number" id="brv2-anchor-gl-closing" step="any" inputmode="decimal" placeholder="0.00" autocomplete="off">
                         </div>
                         <div class="brv2-anchor-cell">
+                            <label for="brv2-anchor-stmt-closing" data-i18n="brv2-anchor-stmt-closing">Statement 期末余额</label>
+                            <input type="number" id="brv2-anchor-stmt-closing" step="any" inputmode="decimal" placeholder="0.00" autocomplete="off">
+                        </div>
+                        <div class="brv2-anchor-cell">
                             <label for="brv2-anchor-stmt-opening" data-i18n="brv2-anchor-stmt-opening">期初 Statement 余额</label>
                             <input type="number" id="brv2-anchor-stmt-opening" step="any" inputmode="decimal" placeholder="0.00" autocomplete="off">
                         </div>
@@ -6671,7 +6675,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11835043"></script>
+<script src="/static/home.js?v=11835044"></script>
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing 由 Vite bundle 成 static/dist/main.js ·
      ES module(type=module 自动 defer)· 必在 home.js 后执行 ·
      依赖 home.js 的全局:t / showToast / escapeHtml / subscribeI18n / _userInfo / loadDashboard -->

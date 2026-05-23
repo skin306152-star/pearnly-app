@@ -1969,6 +1969,11 @@ const I18N = {
         'brv2-anchor-gl-opening':    'GL 期初余额',
         'brv2-anchor-eq-lbl':        '期初差额(Statement 期初 − GL 期初):',
         'brv2-anchor-prefill-hint':  '已用上次 OCR 抽到的值预填 · 不准点一下就能改',
+        'brv2-anchor-audit-title':     '⚠ 本次对账含手动录入(OCR 抽不准时你改的)',
+        'brv2-anchor-audit-col-field': 'Anchor 字段',
+        'brv2-anchor-audit-col-ocr':   'OCR 抽到的(参考)',
+        'brv2-anchor-audit-col-user':  '你填的(实际用)',
+        'brv2-anchor-audit-col-diff':  '差额',
         'brv2-run-btn':       '开始对账',
         'brv2-processing':    '处理中…',
         'brv2-stat-matched':  '已匹配',
@@ -4392,6 +4397,11 @@ const I18N = {
         'brv2-anchor-gl-opening':    'GL opening balance',
         'brv2-anchor-eq-lbl':        'Opening difference (Stmt opening − GL opening):',
         'brv2-anchor-prefill-hint':  'Prefilled from your last OCR scan · click to edit if wrong',
+        'brv2-anchor-audit-title':     '⚠ This run contains manually entered anchors (you fixed what OCR misread)',
+        'brv2-anchor-audit-col-field': 'Anchor Field',
+        'brv2-anchor-audit-col-ocr':   'OCR Value (reference)',
+        'brv2-anchor-audit-col-user':  'Your Value (used)',
+        'brv2-anchor-audit-col-diff':  'Diff',
         'brv2-run-btn':       'Run Reconciliation',
         'brv2-processing':    'Processing…',
         'brv2-stat-matched':  'Matched',
@@ -6813,6 +6823,11 @@ const I18N = {
         'brv2-anchor-gl-opening':    'ยอดยกมา GL',
         'brv2-anchor-eq-lbl':        'ผลต่างยอดยกมา (ยอดยกมา Statement − ยอดยกมา GL):',
         'brv2-anchor-prefill-hint':  'เติมค่าจาก OCR ครั้งก่อนให้แล้ว · คลิกเพื่อแก้ถ้าไม่ตรง',
+        'brv2-anchor-audit-title':     '⚠ การกระทบยอดครั้งนี้มีการกรอกเอง (แก้ที่ OCR อ่านไม่ตรง)',
+        'brv2-anchor-audit-col-field': 'ฟิลด์ Anchor',
+        'brv2-anchor-audit-col-ocr':   'ค่า OCR (อ้างอิง)',
+        'brv2-anchor-audit-col-user':  'ค่าที่คุณกรอก (ใช้จริง)',
+        'brv2-anchor-audit-col-diff':  'ผลต่าง',
         'brv2-run-btn':       'เริ่มกระทบยอด',
         'brv2-processing':    'กำลังประมวลผล…',
         'brv2-stat-matched':  'จับคู่แล้ว',
@@ -9230,6 +9245,11 @@ const I18N = {
         'brv2-anchor-gl-opening':    'GL 期首残高',
         'brv2-anchor-eq-lbl':        '期首差額(Stmt 期首 − GL 期首):',
         'brv2-anchor-prefill-hint':  '前回 OCR の値で自動入力済 · 違えばクリックして修正',
+        'brv2-anchor-audit-title':     '⚠ 今回の照合は手入力アンカーを含む(OCR 誤読を修正)',
+        'brv2-anchor-audit-col-field': 'アンカー項目',
+        'brv2-anchor-audit-col-ocr':   'OCR 値(参考)',
+        'brv2-anchor-audit-col-user':  '入力値(実使用)',
+        'brv2-anchor-audit-col-diff':  '差額',
         'brv2-run-btn':       '照合開始',
         'brv2-processing':    '処理中…',
         'brv2-stat-matched':  '一致',
@@ -19205,6 +19225,91 @@ async function deleteEndpoint(endpointId) {
         }
     }
 
+    // P0.3 BUG-B-T3 v118.35.0.39 · 历史详情 / 跑完结果 显示『手动录入 anchor 对照表』
+    //   读 summary._anchor_overrides · 列每个被改 anchor 的 OCR 值 vs 用户值 vs 差额
+    //   动态创建 DOM 插入到 brv2-summary-collapse 之后 · 不动 home.html
+    var _BRV2_ANCHOR_LABEL_KEYS = [
+        ['stmt_opening', 'brv2-anchor-stmt-opening'],
+        ['gl_opening',   'brv2-anchor-gl-opening'],
+        ['gl_closing',   'brv2-anchor-gl-closing'],
+    ];
+    function _brv2T(key, fallback) {
+        return (window.t && window.t(key)) || fallback;
+    }
+    function _brv2EscHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function _brv2FmtNum(v) {
+        if (!Number.isFinite(+v)) return '—';
+        return (+v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function _brv2RenderAnchorAudit(summary) {
+        var host = document.getElementById('brv2-summary-collapse');
+        if (!host || !host.parentNode) return;
+        var panel = document.getElementById('brv2-anchor-audit');
+        var overrides = summary && summary._anchor_overrides;
+        // 没 override → 移除既有 panel(切换不同 task 时清理)
+        if (!overrides || typeof overrides !== 'object' || Object.keys(overrides).length === 0) {
+            if (panel && panel.parentNode) panel.parentNode.removeChild(panel);
+            return;
+        }
+        // 没 panel → 动态创建 · 插到 summary collapse 之后
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'brv2-anchor-audit';
+            panel.style.cssText = 'margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;'
+                + 'border-radius:8px;padding:14px 16px;';
+            host.parentNode.insertBefore(panel, host.nextSibling);
+        }
+        // 渲染内容
+        var rows = _BRV2_ANCHOR_LABEL_KEYS
+            .map(function (pair) {
+                var ov = overrides[pair[0]];
+                if (!ov) return '';
+                var ocr = +ov.ocr || 0;
+                var usr = +ov.user || 0;
+                var diff = usr - ocr;
+                var sign = diff > 0 ? '+' : (diff < 0 ? '' : '');
+                var diffColor = Math.abs(diff) < 0.005 ? '#6b7280'
+                    : (diff > 0 ? '#16a34a' : '#dc2626');
+                return '<tr>'
+                    + '<td style="padding:6px 10px;color:#111827;font-size:13px">'
+                    +   _brv2EscHtml(_brv2T(pair[1], pair[0])) + '</td>'
+                    + '<td style="padding:6px 10px;color:#6b7280;font-size:13px;text-align:right;'
+                    +   'font-variant-numeric:tabular-nums">' + _brv2EscHtml(_brv2FmtNum(ocr)) + '</td>'
+                    + '<td style="padding:6px 10px;background:#fef08a;color:#92400e;font-weight:600;'
+                    +   'font-size:13px;text-align:right;font-variant-numeric:tabular-nums">'
+                    +   _brv2EscHtml(_brv2FmtNum(usr)) + '</td>'
+                    + '<td style="padding:6px 10px;color:' + diffColor + ';font-weight:500;font-size:13px;'
+                    +   'text-align:right;font-variant-numeric:tabular-nums">'
+                    +   _brv2EscHtml(sign + _brv2FmtNum(diff)) + '</td>'
+                    + '</tr>';
+            })
+            .join('');
+        panel.innerHTML =
+            '<div style="font-weight:600;color:#92400e;font-size:13px;margin-bottom:10px">'
+            + _brv2EscHtml(_brv2T('brv2-anchor-audit-title',
+                '⚠ This run contains manually entered anchors'))
+            + '</div>'
+            + '<table style="width:100%;border-collapse:collapse;font-family:inherit">'
+            + '<thead><tr>'
+            + '<th style="padding:6px 10px;text-align:left;color:#6b7280;font-size:11px;'
+            +   'font-weight:500;border-bottom:1px solid #fed7aa">'
+            +   _brv2EscHtml(_brv2T('brv2-anchor-audit-col-field', 'Field')) + '</th>'
+            + '<th style="padding:6px 10px;text-align:right;color:#6b7280;font-size:11px;'
+            +   'font-weight:500;border-bottom:1px solid #fed7aa">'
+            +   _brv2EscHtml(_brv2T('brv2-anchor-audit-col-ocr', 'OCR')) + '</th>'
+            + '<th style="padding:6px 10px;text-align:right;color:#6b7280;font-size:11px;'
+            +   'font-weight:500;border-bottom:1px solid #fed7aa">'
+            +   _brv2EscHtml(_brv2T('brv2-anchor-audit-col-user', 'User')) + '</th>'
+            + '<th style="padding:6px 10px;text-align:right;color:#6b7280;font-size:11px;'
+            +   'font-weight:500;border-bottom:1px solid #fed7aa">'
+            +   _brv2EscHtml(_brv2T('brv2-anchor-audit-col-diff', 'Diff')) + '</th>'
+            + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
     function _initBrv2TogglePreview() {
         const btn = $('brv2-toggle-preview');
         if (btn && !btn._reconBound) {
@@ -19603,6 +19708,9 @@ async function deleteEndpoint(endpointId) {
                 _brv2Export(_currentTask.task_id);
             };
         }
+
+        // P0.3 BUG-B-T3 v118.35.0.39 · 渲染 anchor 手动录入对照(只在 summary._anchor_overrides 非空时显示)
+        _brv2RenderAnchorAudit(summary);
 
         showResultSections(true);
         renderTable();

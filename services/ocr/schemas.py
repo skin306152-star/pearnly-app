@@ -283,6 +283,20 @@ class GeneralLedgerDocument(BaseModel):
     closing_balance: str = Field(default="")
     entries: List[GLEntry] = Field(default_factory=list)
 
+    # v118.35.0.51 · 顶层 str 字段 None→"" 兜底(同 BankStatementDocument)
+    @field_validator(
+        "period_start", "period_end", "account_name", "account_number",
+        "opening_balance", "closing_balance",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_gl_doc_str(cls, v):
+        if v is None:
+            return ""
+        if isinstance(v, (int, float)):
+            return str(v)
+        return v
+
     @field_validator("entries", mode="before")
     @classmethod
     def _coerce_entries(cls, v):
@@ -353,6 +367,20 @@ class BankStatementDocument(BaseModel):
     opening_balance: str = Field(default="")
     closing_balance: str = Field(default="")
     entries: List[BankStatementEntry] = Field(default_factory=list)
+
+    # v118.35.0.51 · 顶层 str 字段 None→"" 兜底(Gemini 对续页/无期初常返 null · 否则 schema 崩)
+    @field_validator(
+        "bank_name", "bank_code", "account_name", "account_number", "account_last4",
+        "period_start", "period_end", "opening_balance", "closing_balance",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_doc_str(cls, v):
+        if v is None:
+            return ""
+        if isinstance(v, (int, float)):
+            return str(v)
+        return v
 
     @field_validator("entries", mode="before")
     @classmethod

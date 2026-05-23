@@ -5417,10 +5417,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已大幅提升『银行对账』的识别准确性。\n\n部分银行对账单(尤其是多栏的扫描件)在识别时,存款与取款的方向偶尔会被读反。系统现在会依据余额的变化自动校正方向,使对账结果与原始对账单一致。对于金额与余额变化对不上的少数行,仍会保留提醒,便于您逐笔核对。\n\n即日生效。",
-            "th": "ระบบได้ปรับปรุงความแม่นยำของ『การกระทบยอดบัญชีธนาคาร』อย่างมาก\n\nใบแจ้งยอดบางธนาคาร (โดยเฉพาะไฟล์สแกนที่มีหลายคอลัมน์) บางครั้งทิศทางเงินฝาก/เงินถอนถูกอ่านสลับกัน ขณะนี้ระบบจะแก้ไขทิศทางให้อัตโนมัติตามการเปลี่ยนแปลงของยอดคงเหลือ เพื่อให้ผลตรงกับใบแจ้งยอดต้นฉบับ ส่วนรายการที่จำนวนเงินไม่ตรงกับการเปลี่ยนแปลงของยอดคงเหลือ จะยังคงมีการแจ้งเตือนเพื่อให้ท่านตรวจสอบทีละรายการ\n\nมีผลทันที",
-            "en": "The accuracy of『Bank Reconciliation』has been significantly improved.\n\nFor some bank statements (especially multi-column scanned files), the deposit/withdrawal direction was occasionally read in reverse. The system now automatically corrects the direction based on how the running balance changes, so the result matches the original statement. For the few rows whose amount does not match the balance change, a review reminder is kept so you can verify them one by one.\n\nEffective immediately.",
-            "ja": "『銀行照合』の認識精度を大幅に改善しました。\n\n一部の銀行明細(特に複数列のスキャン画像)で、入金/出金の方向が逆に読み取られることがありました。今後は残高の増減に基づいて方向を自動的に補正し、元の明細と一致するようにします。金額が残高の増減と一致しない一部の行については、確認のための注意表示を残します。\n\n即日有効。"
+            "zh": "系统提升了『银行对账』在不同文件格式下的稳定性。\n\n此前个别没有列示期初余额的对账单(图片或 Excel 等格式)可能无法解析,现已修复。配合近期更新,存款/取款方向识别更准确,部分页面上传也不再误报。\n\n即日生效。",
+            "th": "ระบบได้ปรับปรุงเสถียรภาพของ『การกระทบยอดบัญชีธนาคาร』สำหรับไฟล์รูปแบบต่าง ๆ\n\nก่อนหน้านี้ ใบแจ้งยอดบางไฟล์ (รูปภาพหรือ Excel) ที่ไม่ได้แสดงยอดยกมา อาจประมวลผลไม่ได้ ขณะนี้แก้ไขแล้ว ร่วมกับการอัปเดตล่าสุด การอ่านทิศทางเงินฝาก/เงินถอนแม่นยำขึ้น และการอัปโหลดบางหน้าจะไม่แจ้งเตือนผิดพลาดอีก\n\nมีผลทันที",
+            "en": "The『Bank Reconciliation』feature is now more robust across file formats.\n\nPreviously, certain statements (image or Excel files) that did not show an opening balance could fail to process; this is now fixed. Combined with recent updates, deposit/withdrawal direction is read more accurately and uploading partial pages no longer triggers false warnings.\n\nEffective immediately.",
+            "ja": "『銀行照合』のさまざまなファイル形式での安定性を向上しました。\n\nこれまで、期首残高が記載されていない一部の明細(画像や Excel ファイル)が処理できないことがありましたが、修正しました。最近の更新と合わせ、入金/出金方向の認識がより正確になり、一部ページのアップロードでも誤った警告が出なくなりました。\n\n即日有効。"
         }
     }
 

@@ -35,6 +35,12 @@ updates:
         update-types:
           - "patch"
           - "minor"
+    # 2026-05-23 · 永久 ignore 列表(关 PR #11 时加 · 防 dependabot 每周再开同样的红 PR)
+    ignore:
+      # google-ai-generativelanguage 是 google-generativeai 的传递依赖
+      # google-generativeai 0.8.x 强制 pin 0.6.15 · dependabot 想升 0.6→0.11 会撞 pip ResolutionImpossible
+      # 等我们升级 google-generativeai 主依赖到 0.9+ 时(它支持 0.11)再放开此 ignore
+      - dependency-name: "google-ai-generativelanguage"
 
   # === Node · package.json(Playwright E2E + Vite build) ===
   - package-ecosystem: "npm"

@@ -54,6 +54,44 @@ def _cache_put(cache: "_collections.OrderedDict[str, Dict[str, Any]]",
     while len(cache) > _GEMINI_CACHE_MAX:
         cache.popitem(last=False)
 
+
+# v118.35.0.64 · 持久化磁盘缓存:跨进程/重启/多 worker 都一致。
+# temp=0 保证『同图每次识别结果相同』· 磁盘缓存进一步保证『同图永不重算 + 永久一致』
+# (内存缓存随进程重启清空 · 服务重启/多 worker 时会重新掷一次;磁盘缓存补这个洞)。
+# 目录可用 PEARNLY_OCR_CACHE_DIR 覆盖 · 默认 cwd/.ocr_cache(生产 /opt/mrpilot · 跨重启持久)。
+import os as _os
+import json as _json
+_OCR_DISK_CACHE_DIR = (_os.environ.get("PEARNLY_OCR_CACHE_DIR", "").strip()
+                       or _os.path.join(_os.getcwd(), ".ocr_cache"))
+
+
+def _disk_cache_path(key: str) -> str:
+    safe = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return _os.path.join(_OCR_DISK_CACHE_DIR, safe + ".json")
+
+
+def _disk_cache_get(key: str) -> Optional[Dict[str, Any]]:
+    try:
+        p = _disk_cache_path(key)
+        if _os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                return _json.load(f)
+    except Exception:
+        pass
+    return None
+
+
+def _disk_cache_put(key: str, value: Dict[str, Any]) -> None:
+    try:
+        _os.makedirs(_OCR_DISK_CACHE_DIR, exist_ok=True)
+        p = _disk_cache_path(key)
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            _json.dump(value, f, ensure_ascii=False)
+        _os.replace(tmp, p)   # 原子替换 · 防并发写半截
+    except Exception:
+        pass
+
 # Thai month names (full + abbreviated)
 _TH_MONTHS = {
     "มกราคม": 1, "กุมภาพันธ์": 2, "มีนาคม": 3, "เมษายน": 4,
@@ -980,6 +1018,7 @@ def parse_bank_statement_pdf(
     if _need_gemini:
         logger.info(f"[stmt_parse][{filename}] step5 gemini: api_key_present={bool(api_key)} "
                     f"text_chars={len(all_text)} free_rows={len(rows)} free_bad={_free_bad:.2f}")
+    printed_totals = None   # v118.35.0.63 · 账单印刷页脚汇总(仅 Gemini 路径有)· 完整性交叉校验用
     if _need_gemini and api_key:
         gemini_result = _gemini_parse_statement(file_bytes, filename, api_key)
         g_rows = gemini_result.get("rows") or []
@@ -994,6 +1033,7 @@ def parse_bank_statement_pdf(
                 opening = g_op
                 closing = gemini_result.get("closing", closing)
                 bank_code = gemini_result.get("bank_code", bank_code)
+                printed_totals = gemini_result.get("printed_totals")
             else:
                 logger.info(f"[stmt_parse][{filename}] 保留免费解析(更可信 · gemini_bad={g_bad:.2f})")
                 rows, opening, closing, bank_code = _free_rows, _free_op, _free_cl, _free_bank
@@ -1027,6 +1067,11 @@ def parse_bank_statement_pdf(
         return {"ok": False, "error": f"No statement rows found in PDF{hint}",
                 "rows": [], "opening": 0.0, "closing": 0.0}
 
+    # v118.35.0.63 · 完整性交叉校验(印刷合计/笔数 + 期末平衡)· 主动发现漏行
+    completeness = _audit_completeness(rows, opening, closing, printed_totals)
+    if not completeness["ok"]:
+        logger.info(f"[stmt_parse][{filename}] completeness issues: {completeness['issues']}")
+
     return {
         "ok": True,
         "rows": rows,
@@ -1036,6 +1081,7 @@ def parse_bank_statement_pdf(
         "row_count": len(rows),
         "balance_warn_count": balance_warn_count,
         "low_conf_count": low_conf_count,
+        "completeness": completeness,   # v118.35.0.63
     }
 
 
@@ -1186,6 +1232,66 @@ def _repair_amount_from_balance(rows: List[StatementRow], opening: float) -> Non
             r.balance_ok = True
 
 
+def _audit_completeness(rows: List[StatementRow], opening: float, closing: float,
+                        printed: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """v118.35.0.63 · 用账单『印刷页脚汇总 + 期末』交叉校验提取结果 · 主动发现漏行/读错。
+
+    三道独立闸门(任何一道不过 = 提取可能不完整 · 标警告让用户核对):
+      1. 期末平衡:opening + Σ存 − Σ取 ?= closing(opening/closing 都拿到才校验)
+      2. 印刷合计:Σ存 ?= printed_total_credit · Σ取 ?= printed_total_debit
+      3. 印刷笔数:存款笔数 ?= printed_credit_count · 取款笔数 ?= printed_debit_count
+         ← 笔数对不上是『漏了一整笔』最硬的证据(BAY 那种残留 ⚠ 的元凶)
+
+    返回 {ok, issues:[{type, ...}], sums/counts}。issues 非空 → 路由加警告 + Excel 标注。
+    """
+    sum_dep = round(sum(r.deposit or 0 for r in rows), 2)
+    sum_wd = round(sum(r.withdrawal or 0 for r in rows), 2)
+    n_dep = sum(1 for r in rows if (r.deposit or 0) > 0)
+    n_wd = sum(1 for r in rows if (r.withdrawal or 0) > 0)
+    issues: List[Dict[str, Any]] = []
+
+    def _tol(x):
+        return max(1.0, abs(x) * 0.001)
+
+    if opening and closing:
+        calc = round(opening + sum_dep - sum_wd, 2)
+        if abs(calc - closing) > _tol(closing):
+            issues.append({"type": "closing_mismatch", "calc": calc,
+                           "printed": closing, "diff": round(calc - closing, 2)})
+    p = printed or {}
+    pt_cr, pt_dr = p.get("total_credit"), p.get("total_debit")
+    pc_cr, pc_dr = p.get("credit_count"), p.get("debit_count")
+
+    # v118.35.0.63 · 防 Gemini 把『期末/期初余额』错填进合计字段(实测 BAY 把 closing
+    # 919384.8 同时填进 total_credit 和 total_debit)· 这种被污染的合计不可信 · 跳过 sum 校验。
+    # 笔数(count)不会跟金额混 · 是最可靠的『漏行』信号 · 始终校验。
+    def _sum_reliable(t, other):
+        if t is None or t <= 0:
+            return False
+        if other is not None and abs(t - other) < 0.01:   # 两个合计相同 = 八成是误填的余额
+            return False
+        if closing and abs(t - closing) < _tol(closing):   # 等于期末 = 误填
+            return False
+        if opening and abs(t - opening) < _tol(opening):
+            return False
+        return True
+
+    if _sum_reliable(pt_cr, pt_dr) and abs(sum_dep - pt_cr) > _tol(pt_cr):
+        issues.append({"type": "credit_sum_mismatch", "sum": sum_dep,
+                       "printed": pt_cr, "diff": round(sum_dep - pt_cr, 2)})
+    if _sum_reliable(pt_dr, pt_cr) and abs(sum_wd - pt_dr) > _tol(pt_dr):
+        issues.append({"type": "debit_sum_mismatch", "sum": sum_wd,
+                       "printed": pt_dr, "diff": round(sum_wd - pt_dr, 2)})
+    # 笔数:同样防误填(count 不应等于某个余额这种大数)· >0 且像计数(<100000)才信
+    if pc_cr is not None and 0 <= pc_cr < 100000 and int(pc_cr) != n_dep:
+        issues.append({"type": "credit_count_mismatch", "count": n_dep, "printed": int(pc_cr)})
+    if pc_dr is not None and 0 <= pc_dr < 100000 and int(pc_dr) != n_wd:
+        issues.append({"type": "debit_count_mismatch", "count": n_wd, "printed": int(pc_dr)})
+    return {"ok": len(issues) == 0, "issues": issues,
+            "sum_deposit": sum_dep, "sum_withdrawal": sum_wd,
+            "count_deposit": n_dep, "count_withdrawal": n_wd}
+
+
 def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> Dict[str, Any]:
     """
     Gemini fallback: extract bank statement data from scanned PDF.
@@ -1196,9 +1302,15 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
     """
     # Check cache first — instant return if same PDF was OCR'd before
     # v118.35.0.60 · 缓存键带提示词版本 · 改提示词后旧缓存自动失效(否则返回旧结果)
-    _STMT_PROMPT_VER = "v60-complete"
+    _STMT_PROMPT_VER = "v63-totals"
     cache_key = hashlib.sha256(file_bytes).hexdigest() + ":" + _STMT_PROMPT_VER
     cached = _cache_get(_GEMINI_STMT_CACHE, cache_key)
+    if cached is None:
+        # v118.35.0.64 · 内存没有 → 查磁盘(跨重启/多 worker 一致)· 命中则回填内存
+        cached = _disk_cache_get(cache_key)
+        if cached is not None:
+            _cache_put(_GEMINI_STMT_CACHE, cache_key, cached)
+            logger.info(f"[stmt_parse][{filename}] gemini DISK cache HIT key={cache_key[:12]}")
     if cached is not None:
         logger.info(f"[stmt_parse][{filename}] gemini cache HIT key={cache_key[:12]}")
         # Re-materialize StatementRow objects (cache stores dicts)
@@ -1218,6 +1330,7 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
             "opening": cached.get("opening", 0.0),
             "closing": cached.get("closing", 0.0),
             "bank_code": cached.get("bank_code", "generic"),
+            "printed_totals": cached.get("printed_totals"),  # v118.35.0.63
         }
     try:
         import google.generativeai as genai
@@ -1246,7 +1359,11 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
             "± its amount. Use this to verify you did NOT miss a row: if two consecutive balances "
             "differ by more than one transaction's amount, you missed a row in between — look again.\n"
             "5. Do NOT output summary/total rows (e.g. 'Total', 'Total Credit/Debit/Deposit', "
-            "'รวมรายการ', 'ยอดรวม', 'grand total', 合计/总计). Output ONLY individual transactions.\n"
+            "'รวมรายการ', 'ยอดรวม', 'grand total', 合计/总计) as transactions. Output ONLY individual "
+            "transactions. BUT capture the statement's PRINTED footer summary numbers separately "
+            "(see schema: printed_total_*/printed_*_count) — these are the bank's own totals used "
+            "to verify completeness. If the footer prints 'No. of Credits 4 / Total Credit 8,000.00', "
+            "set printed_credit_count=4 and printed_total_credit=8000.00. null if not printed.\n"
             "6. Thai number formats: '115.586,50' and '115,586.50' both mean 115586.50. "
             "'115.586.50' (dot thousands separator) also means 115586.50.\n"
             "7. withdrawal and deposit are MUTUALLY EXCLUSIVE — one is the amount, the other 0. "
@@ -1258,6 +1375,10 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
             '  "bank_code": "kbank"|"bbl"|"kkp"|"ktb"|"scb"|"generic",\n'
             '  "opening_balance": number|null,\n'
             '  "closing_balance": number|null,\n'
+            '  "printed_total_debit": number|null,\n'
+            '  "printed_total_credit": number|null,\n'
+            '  "printed_debit_count": number|null,\n'
+            '  "printed_credit_count": number|null,\n'
             '  "rows": [{"date":"YYYY-MM-DD"|null, "description":"text exactly as printed",'
             '"withdrawal":number|null, "deposit":number|null, "balance":number|null,'
             '"confidence":"high"|"medium"|"low"}]\n'
@@ -1271,7 +1392,8 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
         # 设 0 后大幅稳定且通常更准 · top_p=1 candidate_count=1。
         resp = model.generate_content(
             [{"mime_type": "application/pdf", "data": b64}, prompt],
-            generation_config={"temperature": 0.0, "top_p": 1.0, "candidate_count": 1},
+            generation_config={"temperature": 0.0, "top_p": 1.0, "candidate_count": 1,
+                                "max_output_tokens": 32768},
         )
         text = (resp.text or "").strip()
         if text.startswith("```"):
@@ -1328,13 +1450,26 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
 
         result_closing = float(data.get("closing_balance", 0) or 0)
         result_bank = data.get("bank_code", "generic")
+        # v118.35.0.63 · 账单印刷页脚汇总(笔数/合计)· 用来交叉校验完整性(抓漏行)
+        def _nz(v):
+            try:
+                return float(v) if v is not None else None
+            except (TypeError, ValueError):
+                return None
+        printed_totals = {
+            "total_debit":  _nz(data.get("printed_total_debit")),
+            "total_credit": _nz(data.get("printed_total_credit")),
+            "debit_count":  _nz(data.get("printed_debit_count")),
+            "credit_count": _nz(data.get("printed_credit_count")),
+        }
         # v118.33.13.1 · Save raw row dicts to cache (StatementRow has datetime — store str)
         try:
-            _cache_put(_GEMINI_STMT_CACHE, cache_key, {
+            _cache_val = {
                 "ok": True,
                 "opening": opening_extracted,
                 "closing": result_closing,
                 "bank_code": result_bank,
+                "printed_totals": printed_totals,
                 "_rows_raw": [
                     {"date": rr.date.isoformat() if rr.date else None,
                      "description": rr.description,
@@ -1344,7 +1479,9 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
                      "confidence": rr.confidence}
                     for rr in rows
                 ],
-            })
+            }
+            _cache_put(_GEMINI_STMT_CACHE, cache_key, _cache_val)
+            _disk_cache_put(cache_key, _cache_val)   # v118.35.0.64 · 落磁盘 · 跨重启持久
             logger.info(f"[stmt_parse][{filename}] gemini cache STORED key={cache_key[:12]} rows={len(rows)}")
         except Exception as _e:
             logger.warning(f"[stmt_parse][{filename}] cache store failed: {_e}")
@@ -1355,6 +1492,7 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
             "opening": opening_extracted,
             "closing": result_closing,
             "bank_code": data.get("bank_code", "generic"),
+            "printed_totals": printed_totals,
         }
 
     except Exception as e:
@@ -2395,7 +2533,8 @@ def _gemini_parse_gl(file_bytes: bytes, filename: str,
         # v118.35.0.62 · temperature=0 · GL 抽取同样要确定性(同源 PDF 每次结果一致)
         resp = model.generate_content(
             [{"mime_type": "application/pdf", "data": b64}, prompt],
-            generation_config={"temperature": 0.0, "top_p": 1.0, "candidate_count": 1},
+            generation_config={"temperature": 0.0, "top_p": 1.0, "candidate_count": 1,
+                                "max_output_tokens": 32768},
         )
         text = (resp.text or "").strip()
         if text.startswith("```"):

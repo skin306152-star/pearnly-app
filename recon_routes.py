@@ -1242,6 +1242,13 @@ _BRV2_WARN = {
         "th": "⚠️ ไม่มีรายการใดจับคู่สำเร็จ กรุณายืนยันว่า GL กับใบแจ้งยอดเป็นบัญชีและช่วงเวลาเดียวกัน",
         "ja": "⚠️ 一致したレコードがありません。GL と明細が同じ口座・同じ期間か確認してください。",
     },
+    # v118.35.0.63 · 提取行与账单印刷合计/笔数/期末对不上 → 多半漏行或读错 · 主动提示核对
+    "completeness": {
+        "zh": "⚠️ 对账单完整性检查未通过:{detail}。这通常意味着有交易未被识别(漏行)或金额读错,请对照原始账单核对,必要时手动补充。",
+        "en": "⚠️ Statement completeness check failed: {detail}. This usually means a transaction was missed or an amount misread — please check against the original statement and add any missing rows.",
+        "th": "⚠️ การตรวจความครบถ้วนของใบแจ้งยอดไม่ผ่าน: {detail} มักหมายถึงมีรายการตกหล่นหรืออ่านยอดผิด กรุณาตรวจกับใบแจ้งยอดต้นฉบับและเพิ่มรายการที่ขาด",
+        "ja": "⚠️ 明細の完全性チェックに失敗: {detail}。取引の取りこぼしや金額の誤読の可能性があります。元の明細と照合し、不足行を補ってください。",
+    },
     # v118.35.0.61 · 一个文件含多个账户(每 sheet 一个)· 已分账户独立校验余额 · 提示用户
     "multi_account": {
         "zh": "⚠️ 此对账单文件含 {n} 个账户({codes})。系统已『分账户』独立核对各自余额,但银行对账需 GL 与单一账户对应。若 GL 只含其中某一个账户,请只看对应账户的结果。",
@@ -1269,6 +1276,38 @@ def _brv2_warn(key: str, lang: str = "th", **fmt) -> str:
     lang = lang if lang in ("zh", "en", "th", "ja") else "th"
     msg = (_BRV2_WARN.get(key) or {}).get(lang) or (_BRV2_WARN.get(key) or {}).get("en") or key
     return msg.format(**fmt) if fmt else msg
+
+
+_COMP_LBL = {
+    "credit": {"zh": "存款", "en": "credits", "th": "ฝาก", "ja": "入金"},
+    "debit":  {"zh": "取款", "en": "debits", "th": "ถอน", "ja": "出金"},
+    "cnt":    {"zh": "笔数", "en": "count", "th": "จำนวน", "ja": "件数"},
+    "sum":    {"zh": "合计", "en": "sum", "th": "ยอดรวม", "ja": "合計"},
+    "printed": {"zh": "账单印", "en": "stmt prints", "th": "ใบแจ้งยอด", "ja": "明細表記"},
+    "got":    {"zh": "识别", "en": "extracted", "th": "อ่านได้", "ja": "抽出"},
+    "close":  {"zh": "期末", "en": "closing", "th": "ยอดปิด", "ja": "期末"},
+    "calc":   {"zh": "算得", "en": "calculated", "th": "คำนวณ", "ja": "計算"},
+}
+
+
+def _completeness_details(issues, lang) -> list:
+    """v118.35.0.63 · 把完整性 issue 列表转成简短可读的提示片段(跟 lang 走)。"""
+    def L(k):
+        return (_COMP_LBL.get(k) or {}).get(lang) or (_COMP_LBL.get(k) or {}).get("en") or k
+    out = []
+    for it in (issues or []):
+        t = it.get("type", "")
+        if t == "credit_count_mismatch":
+            out.append(f"{L('credit')}{L('cnt')}({L('printed')}{it['printed']}/{L('got')}{it['count']})")
+        elif t == "debit_count_mismatch":
+            out.append(f"{L('debit')}{L('cnt')}({L('printed')}{it['printed']}/{L('got')}{it['count']})")
+        elif t == "credit_sum_mismatch":
+            out.append(f"{L('credit')}{L('sum')}({L('printed')}{it['printed']:,.0f}/{L('got')}{it['sum']:,.0f})")
+        elif t == "debit_sum_mismatch":
+            out.append(f"{L('debit')}{L('sum')}({L('printed')}{it['printed']:,.0f}/{L('got')}{it['sum']:,.0f})")
+        elif t == "closing_mismatch":
+            out.append(f"{L('close')}({L('printed')}{it['printed']:,.0f}/{L('calc')}{it['calc']:,.0f})")
+    return out
 
 
 def _detect_recon_mismatch(stmt_rows, gl_rows, matched_count, lang) -> list:
@@ -1559,6 +1598,16 @@ async def bank_v2_run(
         _seen = list(dict.fromkeys(_stmt_accts))  # 去重保序
         brv2_warnings.append(_brv2_warn(
             "multi_account", lang, n=len(_seen), codes="、".join(_seen)))
+
+    # v118.35.0.63 · 完整性交叉校验:提取行 vs 账单印刷合计/笔数/期末对不上 → 主动提示漏行
+    _comp_details = []
+    for _r in stmt_results:
+        comp = _r.get("completeness") if _r.get("ok") else None
+        if comp and not comp.get("ok"):
+            _comp_details.extend(_completeness_details(comp["issues"], lang))
+    if _comp_details:
+        brv2_warnings.append(_brv2_warn(
+            "completeness", lang, detail="；".join(_comp_details[:4])))
 
     # 5. Serialize
     detail_j = rows_to_json(recon_rows)

@@ -5427,10 +5427,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "银行对账单的识别更稳定、更省心了。\n\n现在同一份对账单每次识别的结果都保持一致(不再每次略有出入);当某一笔的金额看花了眼、但凭前后余额能唯一推算出正确值时,系统会自动更正并清楚标注『已修正』,方便您一眼复核。账单底部的『合计/总计』等汇总行也会自动跳过。综合下来,需要您手动核对的地方进一步减少。\n\n即日生效。",
-            "th": "การอ่านใบแจ้งยอดธนาคารเสถียรและสะดวกขึ้น\n\nตอนนี้ใบแจ้งยอดเดียวกันจะให้ผลการอ่านที่คงที่ทุกครั้ง และเมื่ออ่านยอดผิดไปแต่สามารถคำนวณค่าที่ถูกต้องได้จากยอดคงเหลือก่อน-หลัง ระบบจะแก้ให้อัตโนมัติพร้อมระบุว่า 'แก้แล้ว' เพื่อให้ท่านตรวจทานง่าย แถวสรุปท้ายใบแจ้งยอดก็ข้ามอัตโนมัติ โดยรวมสิ่งที่ต้องตรวจเองลดลงอีก\n\nมีผลทันที",
-            "en": "Bank-statement reading is now more stable and less work for you.\n\nThe same statement now produces the same result every time (no more run-to-run variation). When an amount was misread but the correct value can be uniquely worked out from the surrounding balances, the system fixes it automatically and clearly labels it 'corrected' so you can double-check at a glance. Bottom-of-statement summary rows are skipped automatically. Overall, there's even less for you to check by hand.\n\nEffective immediately.",
-            "ja": "銀行明細の読み取りがより安定し、手間が減りました。\n\n同じ明細なら毎回同じ結果になります(実行ごとのばらつきを解消)。金額を読み違えても前後の残高から正しい値が一意に算出できる場合は自動修正し、『修正済み』と明示するので一目で確認できます。明細末尾の集計行も自動でスキップします。全体として、手動確認はさらに減ります。\n\n即日有効。"
+            "zh": "银行对账更让人放心了。\n\n现在系统会拿账单底部印的『笔数、合计』和我们读出来的内容对一遍——如果发现可能漏读了某笔交易,会主动提醒您去核对,而不是让错误悄悄溜过去。配合之前的『同一份账单每次结果一致』和『金额可推算时自动更正并标注』,需要您操心的地方更少、也更托底。\n\n即日生效。",
+            "th": "การกระทบยอดธนาคารน่าวางใจยิ่งขึ้น\n\nระบบจะนำ 'จำนวนรายการและยอดรวม' ที่พิมพ์ท้ายใบแจ้งยอดมาเทียบกับสิ่งที่อ่านได้ หากพบว่าอาจมีรายการตกหล่น จะแจ้งเตือนให้ท่านตรวจสอบ แทนที่จะปล่อยให้ผิดพลาดเงียบ ๆ เมื่อรวมกับ 'ผลคงที่ทุกครั้ง' และ 'แก้ยอดอัตโนมัติพร้อมระบุ' ที่ทำไปก่อนหน้า ท่านจึงต้องกังวลน้อยลงและอุ่นใจขึ้น\n\nมีผลทันที",
+            "en": "Bank reconciliation is now more reassuring.\n\nThe system now cross-checks the transaction count and totals printed at the bottom of the statement against what it read — if a transaction may have been missed, it proactively alerts you to verify, instead of letting an error slip through silently. Together with the earlier 'same result every time' and 'auto-correct with a clear label', there's less for you to worry about and more of a safety net.\n\nEffective immediately.",
+            "ja": "銀行照合がさらに安心になりました。\n\n明細末尾に印字された『件数・合計』と読み取り結果を突き合わせ、取引の取りこぼしの可能性があれば自動で注意喚起します。エラーをそっと見逃しません。先の『毎回同じ結果』『自動修正＋明示』と合わせ、気をもむことが減り、より安心して使えます。\n\n即日有効。"
         }
     }
 

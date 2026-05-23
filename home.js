@@ -19551,6 +19551,9 @@ async function deleteEndpoint(endpointId) {
         if (eb) eb.style.display = show ? '' : 'none';
         if (nb) nb.style.display = show ? '' : 'none';
         if (!show && pi) pi.style.display = 'none';
+        // v118.35.0.56 · 重置时一并清掉警告条(不匹配/跳过提示)· 防残留误导
+        const wn = $('brv2-warnings');
+        if (!show && wn) { wn.style.display = 'none'; wn.innerHTML = ''; }
     }
 
     // ── 文件解析诊断表 ────────────────────────────────────────────────

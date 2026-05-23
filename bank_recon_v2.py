@@ -196,7 +196,8 @@ class StatementRow:
                 f"{self.account_no}|{self.date}|{self.withdrawal:.2f}|{self.deposit:.2f}"
                 f"|{self.balance:.2f}|{self.description[:40]}"
             )
-            self.row_hash = hashlib.md5(key.encode()).hexdigest()[:12]
+            # 行指纹去重用 · 非安全用途(故 usedforsecurity=False)
+            self.row_hash = hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 @dataclass
@@ -215,7 +216,8 @@ class GlRow:
             key = (
                 f"{self.date}|{self.doc_no}|{self.account_code}|{self.debit:.2f}|{self.credit:.2f}"
             )
-            self.row_hash = hashlib.md5(key.encode()).hexdigest()[:12]
+            # 行指纹去重用 · 非安全用途(故 usedforsecurity=False)
+            self.row_hash = hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 @dataclass

@@ -83,3 +83,21 @@ show_missing = false
 skip_covered = false
 # baseline 2026-05-23(REFACTOR-A8 · 403 unit tests)· 棘轮:只升不降
 fail_under = 21
+
+# ── REFACTOR-A6 · 安全扫描(bandit 静态)──
+# CI 跑 `bandit -r . -c pyproject.toml --severity-level high`:只对 HIGH 严重度拦门 ·
+# MEDIUM/LOW 仅日志报告(存量 59 MEDIUM + 95 LOW 留后续 stage 逐步清)。
+# 2026-05-23 baseline:tracked 代码 0 HIGH(2 处 md5 行指纹已加 usedforsecurity=False)。
+[tool.bandit]
+exclude_dirs = [
+    "tests",
+    "probes",
+    "node_modules",
+    "_pkg",
+    "_pkg_tmpstatic",
+    "scripts/probe",
+    "alembic",
+    "_test_reports",
+    "_deploy_nginx",
+    "_bank_samples",
+]

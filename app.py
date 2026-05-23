@@ -5417,10 +5417,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统提升了『银行对账』在不同文件格式下的稳定性。\n\n此前个别没有列示期初余额的对账单(图片或 Excel 等格式)可能无法解析,现已修复。配合近期更新,存款/取款方向识别更准确,部分页面上传也不再误报。\n\n即日生效。",
-            "th": "ระบบได้ปรับปรุงเสถียรภาพของ『การกระทบยอดบัญชีธนาคาร』สำหรับไฟล์รูปแบบต่าง ๆ\n\nก่อนหน้านี้ ใบแจ้งยอดบางไฟล์ (รูปภาพหรือ Excel) ที่ไม่ได้แสดงยอดยกมา อาจประมวลผลไม่ได้ ขณะนี้แก้ไขแล้ว ร่วมกับการอัปเดตล่าสุด การอ่านทิศทางเงินฝาก/เงินถอนแม่นยำขึ้น และการอัปโหลดบางหน้าจะไม่แจ้งเตือนผิดพลาดอีก\n\nมีผลทันที",
-            "en": "The『Bank Reconciliation』feature is now more robust across file formats.\n\nPreviously, certain statements (image or Excel files) that did not show an opening balance could fail to process; this is now fixed. Combined with recent updates, deposit/withdrawal direction is read more accurately and uploading partial pages no longer triggers false warnings.\n\nEffective immediately.",
-            "ja": "『銀行照合』のさまざまなファイル形式での安定性を向上しました。\n\nこれまで、期首残高が記載されていない一部の明細(画像や Excel ファイル)が処理できないことがありましたが、修正しました。最近の更新と合わせ、入金/出金方向の認識がより正確になり、一部ページのアップロードでも誤った警告が出なくなりました。\n\n即日有効。"
+            "zh": "系统进一步提升了银行对账单的识别准确性与稳定性。\n\n对于部分数字版 PDF 对账单,此前因表格栏位识别偏差,可能出现余额或金额读取错误。现在系统会自动评估每份对账单的识别质量,在发现栏位错位时自动改用更强的识别方式重新读取,确保结果与原始对账单一致,大幅减少需要您手动核对的情况。\n\n即日生效。",
+            "th": "ระบบได้ปรับปรุงความแม่นยำและเสถียรภาพในการอ่านใบแจ้งยอดธนาคารเพิ่มเติม\n\nสำหรับใบแจ้งยอด PDF แบบดิจิทัลบางไฟล์ ก่อนหน้านี้อาจอ่านยอดคงเหลือหรือจำนวนเงินผิดพลาดเนื่องจากการระบุคอลัมน์คลาดเคลื่อน ขณะนี้ระบบจะประเมินคุณภาพการอ่านของแต่ละไฟล์โดยอัตโนมัติ และเปลี่ยนไปใช้วิธีการอ่านที่แม่นยำกว่าเมื่อพบความคลาดเคลื่อน เพื่อให้ผลตรงกับใบแจ้งยอดต้นฉบับ และลดกรณีที่ต้องตรวจสอบเองอย่างมาก\n\nมีผลทันที",
+            "en": "The accuracy and stability of bank-statement reading has been further improved.\n\nFor some digital PDF statements, column-detection drift could previously cause balances or amounts to be read incorrectly. The system now automatically assesses the reading quality of each statement and switches to a stronger reading method when column misalignment is detected, ensuring the result matches the original statement and greatly reducing cases that need your manual review.\n\nEffective immediately.",
+            "ja": "銀行明細の読み取り精度と安定性をさらに改善しました。\n\n一部のデジタル PDF 明細で、列の認識ずれにより残高や金額が誤って読み取られることがありました。今後はシステムが各明細の読み取り品質を自動的に評価し、列のずれを検出した場合はより強力な読み取り方式に自動的に切り替えて、結果が元の明細と一致するようにします。手動確認が必要なケースも大幅に減少します。\n\n即日有効。"
         }
     }
 

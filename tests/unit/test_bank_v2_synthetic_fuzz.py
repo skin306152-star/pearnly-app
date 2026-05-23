@@ -19,7 +19,7 @@ from datetime import date, timedelta
 
 from bank_recon_v2 import (
     StatementRow, GlRow, _correct_direction_from_balance, _verify_row_balances,
-    merge_statements, reconcile,
+    merge_statements, reconcile, _stmt_bad_ratio,
 )
 
 ITERS = 300
@@ -213,6 +213,41 @@ class SyntheticFuzzTests(unittest.TestCase):
             recon_rows, summary = reconcile(stmt_rows, gl_rows)
             unmatched = [r for r in recon_rows if r.match_status != "matched"]
             self.assertEqual(unmatched, [], "干净对齐的 stmt+GL 应全部匹配")
+
+
+class QualityGateTests(unittest.TestCase):
+    """v118.35.0.52 · _stmt_bad_ratio 质量闸门 · 决定免费解析是否回退 Gemini"""
+
+    def test_clean_low_ratio(self):
+        """干净自洽账单 → bad_ratio ≈ 0 · 不触发 Gemini"""
+        rng = random.Random(11)
+        seq = _gen_clean(rng, 12, 100000.0)
+        rows = _to_rows(seq)
+        self.assertLess(_stmt_bad_ratio(rows, 100000.0), 0.30)
+
+    def test_zero_balances_high_ratio(self):
+        """余额列读成 0(BAY/KBank 真实失败)→ bad_ratio 高 · 触发 Gemini"""
+        rows = [StatementRow(date=date(2025, 1, i + 1), description="x",
+                             withdrawal=700.0, deposit=0, balance=0.0) for i in range(10)]
+        self.assertGreater(_stmt_bad_ratio(rows, 0.0), 0.30)
+
+    def test_direction_only_wrong_stays_low(self):
+        """只是方向反、余额正确(SCB)→ bad_ratio 低 · 不浪费 Gemini(交给 v0.50 纠正)"""
+        rng = random.Random(12)
+        seq = _gen_clean(rng, 12, 100000.0)
+        n = len(seq)
+        rows = _to_rows(seq, swap_idx=set(range(n)))  # 全部方向反 · 但余额对
+        self.assertLess(_stmt_bad_ratio(rows, 100000.0), 0.30)
+
+    def test_id_as_amount_high_ratio(self):
+        """把交易ID当金额(KBank 20位数)→ 金额对不上余额 → bad_ratio 高"""
+        rows = [
+            StatementRow(date=date(2025, 1, 1), description="x", withdrawal=0, deposit=0, balance=100000.0),
+            StatementRow(date=date(2025, 1, 2), description="id", withdrawal=2.026e19, deposit=0, balance=99000.0),
+            StatementRow(date=date(2025, 1, 3), description="id", withdrawal=1.5e18, deposit=0, balance=98000.0),
+            StatementRow(date=date(2025, 1, 4), description="id", withdrawal=9.9e18, deposit=0, balance=97000.0),
+        ]
+        self.assertGreater(_stmt_bad_ratio(rows, 100000.0), 0.30)
 
 
 if __name__ == "__main__":

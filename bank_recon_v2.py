@@ -833,6 +833,43 @@ def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, flo
     return rows, opening, closing
 
 
+def _stmt_bad_ratio(rows: List["StatementRow"], opening: float) -> float:
+    """v118.35.0.52 · 衡量解析结果的『余额链可信度』· 返回对不上的 movement 行占比(0..1)。
+
+    用途:免费规则解析器在某些银行版式上会把列对错位(余额读成 0 / 把交易ID当金额)·
+    余额链整片对不上 → 该结果不可信 → 应回退到 Gemini。
+
+    只看金额 magnitude 是否吻合余额涨跌(忽略方向 · 方向错由 _correct_direction 兜底)·
+    所以『只是方向反、余额是对的』(如 SCB)不会被误判为坏 → 不会浪费 Gemini。
+    """
+    movement = [r for r in rows if r.balance is not None and (r.withdrawal or r.deposit)]
+    if len(movement) < 3:
+        return 0.0  # 行太少不判
+    opening_reliable = bool(opening)
+    pv = opening
+    first_seen = False
+    bad = 0
+    total = 0
+    for r in rows:
+        if r.balance is None:
+            continue
+        amt = max(r.withdrawal or 0.0, r.deposit or 0.0)
+        if amt == 0.0:
+            pv = r.balance  # 无动行 · 更新 prev
+            continue
+        if r.balance == 0.0:
+            bad += 1; total += 1; pv = r.balance; continue  # 有金额却余额=0 · 几乎肯定没读到余额列
+        if not first_seen and not opening_reliable:
+            first_seen = True; pv = r.balance; continue  # 续页首笔无可靠 prev · 不计
+        first_seen = True
+        delta = round(r.balance - pv, 2)
+        if abs(abs(delta) - amt) > 1.0:
+            bad += 1
+        total += 1
+        pv = r.balance
+    return (bad / total) if total else 0.0
+
+
 def parse_bank_statement_pdf(
     file_bytes: bytes, filename: str, api_key: str = ""
 ) -> Dict[str, Any]:
@@ -929,17 +966,32 @@ def parse_bank_statement_pdf(
         if len(text_rows) > len(rows):
             rows, opening, closing = text_rows, text_op, text_cl
 
-    # ── Step 5: Gemini fallback (OCR for scanned PDFs) ──
-    if len(rows) < MIN_PLUMBER_ROWS:
-        logger.info(f"[stmt_parse][{filename}] step5 gemini: api_key_present={bool(api_key)} text_chars={len(all_text)}")
-    if len(rows) < MIN_PLUMBER_ROWS and api_key:
+    # ── Step 5: Gemini fallback ──
+    # v118.35.0.52 · 触发条件升级:行数不足 OR 免费解析余额链大面积对不上(列错位 · 如
+    # BAY/Krungsri 余额读成 0、KBank 把交易ID当金额)· 用余额链可信度做仲裁 · 取更优者。
+    _free_rows, _free_op, _free_cl, _free_bank = rows, opening, closing, bank_code
+    _free_bad = _stmt_bad_ratio(rows, opening)
+    _need_gemini = (len(rows) < MIN_PLUMBER_ROWS) or (_free_bad > 0.30)
+    if _need_gemini:
+        logger.info(f"[stmt_parse][{filename}] step5 gemini: api_key_present={bool(api_key)} "
+                    f"text_chars={len(all_text)} free_rows={len(rows)} free_bad={_free_bad:.2f}")
+    if _need_gemini and api_key:
         gemini_result = _gemini_parse_statement(file_bytes, filename, api_key)
-        logger.info(f"[stmt_parse][{filename}] step5 gemini result: ok={gemini_result.get('ok')} rows={len(gemini_result.get('rows', []))}")
-        if gemini_result.get("ok") and gemini_result.get("rows"):
-            rows = gemini_result["rows"]
-            opening = gemini_result.get("opening", opening)
-            closing = gemini_result.get("closing", closing)
-            bank_code = gemini_result.get("bank_code", bank_code)
+        g_rows = gemini_result.get("rows") or []
+        logger.info(f"[stmt_parse][{filename}] step5 gemini result: ok={gemini_result.get('ok')} rows={len(g_rows)}")
+        if gemini_result.get("ok") and g_rows:
+            g_op = gemini_result.get("opening", opening)
+            g_bad = _stmt_bad_ratio(g_rows, g_op)
+            # 免费行数不足 → 直接用 Gemini;否则谁的余额链更可信用谁
+            if len(_free_rows) < MIN_PLUMBER_ROWS or g_bad < _free_bad:
+                logger.info(f"[stmt_parse][{filename}] 采用 Gemini(free_bad={_free_bad:.2f} > gemini_bad={g_bad:.2f})")
+                rows = g_rows
+                opening = g_op
+                closing = gemini_result.get("closing", closing)
+                bank_code = gemini_result.get("bank_code", bank_code)
+            else:
+                logger.info(f"[stmt_parse][{filename}] 保留免费解析(更可信 · gemini_bad={g_bad:.2f})")
+                rows, opening, closing, bank_code = _free_rows, _free_op, _free_cl, _free_bank
 
     for r in rows:
         r.source_file = filename

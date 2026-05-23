@@ -135,5 +135,52 @@ class ParseDateBuddhistEraTests(unittest.TestCase):
         self.assertEqual(result.get("closing"), 3000.0)
 
 
+class M3GlVatBuddhistEraTests(unittest.TestCase):
+    """BUG-FIX-T5 v118.35.0.46 · M3 (收入对账) parse_gl_excel 也加 datetime + BE→CE 处理
+    根因:M3 用独立的 parse_gl_excel(gl_vat_reconciler.py)· _get('date') 直接 str(datetime)
+          → "2568-12-31 00:00:00" garbage 字符串显示 + Excel/历史详情看着别扭
+    修法:_get 加 isinstance(v, datetime) 处理 + BE→CE(同 M4 T1 修法)
+    影响:M3 GlRow.date 字段从 garbage 变干净 ISO date 字符串
+    业务影响:M3 用 doc_no 匹配 · date 仅 sort key · 修前不影响匹配 · 修后显示干净
+    """
+
+    def test_m3_parse_gl_excel_datetime_be_year_converts(self):
+        """M3 parse_gl_excel 接收 BE datetime cell → 输出 CE ISO date 字符串"""
+        import gl_vat_reconciler as glvr
+
+        wb = openpyxl.Workbook(); ws = wb.active
+        ws.append(['วันที่', 'ใบสำคัญ', 'รหัสบัญชี', 'รายการ', 'เดบิต', 'เครดิต'])
+        ws.append([datetime(2568, 12, 31), 'JV001', '4110-01', 'sale1', 0, 1000])
+        ws.append([datetime(2569, 1, 15), 'JV002', '4110-01', 'sale2', 0, 2000])
+        buf = io.BytesIO(); wb.save(buf)
+
+        result = glvr.parse_gl_excel(buf.getvalue())
+        self.assertTrue(result.get("ok"))
+        self.assertEqual(result.get("row_count"), 2)
+        rows = result.get("rows") or []
+        # date 必须是 CE ISO 字符串 · 不是 "2568-12-31 00:00:00" garbage
+        self.assertEqual(rows[0].date, "2025-12-31",
+            f"M3 BE 2568 应转 CE 2025 · 实际 {rows[0].date!r}")
+        self.assertEqual(rows[1].date, "2026-01-15",
+            f"M3 BE 2569 应转 CE 2026 · 实际 {rows[1].date!r}")
+
+    def test_m3_parse_gl_excel_string_date_passes_through(self):
+        """M3 字符串 date 原样通过(不破坏老格式 GL · 用 M3 真实 header 关键词)"""
+        import gl_vat_reconciler as glvr
+
+        wb = openpyxl.Workbook(); ws = wb.active
+        # 用 M3 _GL_*_H 字典里真实关键词: voucher / gl account / debit / credit
+        ws.append(['Date', 'Voucher', 'GL Account', 'Description', 'Debit', 'Credit'])
+        ws.append(['2025-01-15', 'V001', '4110-01', 'sale1', 0, 1000])
+        buf = io.BytesIO(); wb.save(buf)
+
+        result = glvr.parse_gl_excel(buf.getvalue())
+        self.assertTrue(result.get("ok"))
+        rows = result.get("rows") or []
+        self.assertGreaterEqual(len(rows), 1, f"应识别 ≥1 row · 实际 {len(rows)}")
+        self.assertEqual(rows[0].date, "2025-01-15",
+            "M3 string date 应原样通过 · 不被改")
+
+
 if __name__ == "__main__":
     unittest.main()

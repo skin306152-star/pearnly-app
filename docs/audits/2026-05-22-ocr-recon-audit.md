@@ -307,6 +307,35 @@ Dext 的核心壁垒:同一家供应商的发票模板记住 → 下次秒识别
 **累计净增长**:home.js +181 / home.html +17 / home.css +2 / app.py 0 / db.py 0(铁律 #21 容忍 10% 用量)。
 **累计守门**:imports + i18n 0/0 + unit 306 OK + node check 全绿 · 新加 4 套契约测试。
 
+### Phase 0 收尾后 · 2026-05-23 4 模块同步 audit · 紧急 BUG-FIX-T1/T2/T3/T4/T5
+
+> 触发:付费用户 2026-05-23 反馈 2 个问题 · 紧急 hotfix 链(铁律 #18 整顿期破例)
+
+**反馈 1**:GL Excel 上传显示 0 行(根因泰国佛历 datetime cell 解析挂)
+**反馈 2**:Excel 顶部余额 OCR 抽不准 · 缺第 4 个 anchor『Statement 期末』录入框
+
+**5 个 hotfix(累计上线 v0.42 → v0.46)**:
+
+| ID | 内容 | 模块 | Commit |
+|---|---|---|---|
+| T1 | M4 _parse_date 加 datetime/date 直通 + ISO 字符串 fallback + 4 层 BE→CE 转换 | M4 | `138d73e` v118.35.0.42 |
+| T2 | M4 _map_gl_cols 加 balance 列识别 · opening + closing 优先读 balance · release_notes 新规则 | M4 | `456e381` v118.35.0.43 |
+| T3 | M4 加第 4 个 anchor `stmt_closing` + Excel lang 跟随守门 | M4 | `21486c2` v118.35.0.44 |
+| T4 | M4 预填 UX 加强(橙色 banner + 浅橙底 cell + 暖棕字 + 来源标识 4 语) | M4 | `8b4cfd0` v118.35.0.45 |
+| T5 | M3 parse_gl_excel `_get` 加 datetime/date 处理 + BE→CE(显示干净 ISO date) + M2/M3 export lang 守门 | M3 | 本次 commit v118.35.0.46 |
+
+**2026-05-23 audit 4 模块同步检查结论**(防遗漏):
+
+| 风险点 | M1 上传发票 | M2 销售税对账 | M3 收入对账 | M4 银行对账 |
+|---|---|---|---|---|
+| Excel datetime cell 佛历解析 | N/A (OCR 路径) | ✅ Gemini prompt 已处理 BE→CE | ✅ T5 修(本次) | ✅ T1+T2 修 |
+| 第 4 个 anchor 录入框 | N/A | N/A | N/A (P1.7 才规划) | ✅ T3 加 |
+| Excel 表头 lang 跟随 UI | N/A | ✅ `_curLang` 动态(L30720) | ✅ `_lang()` 动态(L32260) | ✅ `window._currentLang` 动态(L19643) |
+| OCR 预填 UX(banner / 浅橙底 / 来源标识) | N/A | N/A | N/A (P1.7 才有 anchor) | ✅ T4 加 |
+| 守门契约锁 | N/A | ✅ T5 加(M2 export lang 静态契约) | ✅ T5 加(M3 export lang + datetime 集成) | ✅ T3+T4 锁 |
+
+**4 模块同步 audit 结论**:M1/M2 不撞同款问题 · M3 撞 datetime cell 问题已修 · M4 完整闭环 · 3 模块 export lang 全跟 UI + 守门契约全锁。
+
 ### Phase 1 · 4 模块全部加『OCR 痕迹 + 字段置信度』 紧急(2-3 周 · 直接答客户痛点)
 
 | ID | 内容 | 模块 | 工时 | 优先级 |

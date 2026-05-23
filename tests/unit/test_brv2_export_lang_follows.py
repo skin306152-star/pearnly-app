@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-BUG-FIX-T3 v118.35.0.44 · 守门测试 · _brv2Export 导出 Excel 传 lang 跟随 UI 当前语言
+BUG-FIX-T3 v118.35.0.44 · 守门测试 · M4 _brv2Export 导出 Excel 传 lang 跟随 UI 当前语言
+BUG-FIX-T5 v118.35.0.46 · 扩展锁 M2 / M3 export lang 也跟 UI 走(2026-05-23 audit 4 模块同步)
 
-锁定 2 个契约:
-  1. home.js _brv2Export 函数必须 fetch 时拼 ?lang=window._currentLang(不能 hardcode 任何语言)
-  2. export_bank_recon_excel 接收 lang 参数 · 4 语字典 _RECON_TITLE 都齐(zh/th/en/ja)
+锁定 4 个契约:
+  1. M4 home.js _brv2Export 必须 fetch 时拼 ?lang=window._currentLang(不能 hardcode)
+  2. M4 export_bank_recon_excel 4 语 _RECON_TITLE 都齐(zh/th/en/ja)
+  3. M2 export URL `/api/recon/export/<tid>` 必须用 _curLang 动态(不能 hardcode)
+  4. M3 export URL `/api/recon/gl-vat/<tid>/export` 必须用 _lang() 动态(不能 hardcode)
 """
 import io
 import os
@@ -88,6 +91,42 @@ class ExportLangFollowsUiTests(unittest.TestCase):
         self.assertIn("Bank Reconciliation", titles["en"])
         self.assertIn("กระทบยอด", titles["th"])
         self.assertIn("銀行照合", titles["ja"])
+
+    def test_m2_export_uses_dynamic_lang_not_hardcoded(self):
+        """BUG-FIX-T5 契约 3 · M2 (销售税对账) export URL 必须用 _curLang · 不能 hardcode 单一语言
+        触发场景: home.js L30720 附近的 M2 export 函数
+        """
+        # M2 export URL 关键模式: '/api/recon/export/' + taskId + '?lang=' + _curLang
+        m2_pattern = re.search(
+            r"/api/recon/export/['\"]?\s*\+\s*[\w.()\[\]]+\s*\+\s*['\"]\?lang=['\"]\s*\+\s*([\w()._]+)",
+            self.home_js,
+        )
+        self.assertIsNotNone(m2_pattern,
+            "M2 export URL pattern not found in home.js · 可能被改成 hardcode lang=xxx")
+        lang_expr = m2_pattern.group(1)
+        # lang 表达式必须含 _curLang 或 currentLang 等动态变量 · 不能是字面 'th'/'en' 等
+        self.assertRegex(lang_expr, r"(?:_curLang|currentLang|_lang)",
+            f"M2 export lang 表达式应该动态({lang_expr})· 不能 hardcode")
+
+    def test_m3_export_uses_dynamic_lang_not_hardcoded(self):
+        """BUG-FIX-T5 契约 4 · M3 (收入对账) export URL 必须用 _lang() · 不能 hardcode
+        触发场景: home.js L32737 / L32845 附近的 M3 gl-vat export 函数
+        """
+        # M3 export URL 关键模式: '/api/recon/gl-vat/' + taskId + '/export?lang=' + _lang()
+        m3_pattern = re.findall(
+            r"/api/recon/gl-vat/[^?]+\?lang=['\"]?\s*\+\s*[^,)]+",
+            self.home_js,
+        )
+        self.assertGreater(len(m3_pattern), 0,
+            "M3 gl-vat export URL pattern not found in home.js")
+        # 至少 1 处含动态 lang
+        any_dynamic = False
+        for snippet in m3_pattern:
+            if re.search(r"(?:_lang\(\)|_curLang|currentLang|encodeURIComponent\(_lang)", snippet):
+                any_dynamic = True
+                break
+        self.assertTrue(any_dynamic,
+            f"M3 gl-vat export lang 必须用 _lang() 动态 · 实际 patterns: {m3_pattern}")
 
 
 if __name__ == "__main__":

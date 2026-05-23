@@ -12,6 +12,7 @@ GL(总账) vs 销项税报告 对账核心引擎
 import io
 import re
 import logging
+from datetime import date, datetime  # BUG-FIX-T5 v118.35.0.46 · M3 date cell datetime 处理
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
 from collections import defaultdict
@@ -541,7 +542,20 @@ def parse_gl_excel(file_bytes: bytes, revenue_prefix: str = "4") -> Dict[str, An
                     if idx is None or idx >= len(cells):
                         return ""
                     v = cells[idx]
-                    return str(v).strip() if v is not None else ""
+                    if v is None:
+                        return ""
+                    # BUG-FIX-T5 v118.35.0.46 · datetime cell 转 ISO date 字符串 + 佛历→公历
+                    # 同 M4 BUG-FIX-T1 修法(bank_recon_v2._parse_date)· 让 M3 GlRow.date 字段
+                    # 不再显示 "2568-12-31 00:00:00" garbage · 改 "2025-12-31" 公历干净
+                    if isinstance(v, (datetime, date)):
+                        y = v.year
+                        if y >= 2500:
+                            y -= 543
+                        try:
+                            return date(y, v.month, v.day).isoformat()
+                        except (ValueError, AttributeError):
+                            pass
+                    return str(v).strip()
 
                 # 决定 account_code
                 if has_acct_col:

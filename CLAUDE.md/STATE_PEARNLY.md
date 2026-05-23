@@ -23,6 +23,98 @@
 
 ---
 
+## 🔧 2026-05-23 新增能力 · Claude 可直接看 GitHub Actions CI(gh CLI 已装 + 已登录)
+
+**全文** 见 `CLAUDE.md/CLAUDE.md` §22(铁律 #22 · CI 状态可视化能力)
+
+**接力 agent quick reference**:
+- gh CLI 路径:`C:\Program Files\GitHub CLI\gh.exe`(绝对路径调 · 不依赖 PATH)
+- 已登录:`skin306152-star`(keyring 持久 · 跨 session 不丢)
+- Repo:`skin306152-star/pearnly-app`(私库)
+- **优先用 PowerShell tool 调** · 不用 Bash(PATH 没刷新到 gh)
+
+**最常用命令**:
+```powershell
+# 看 master 最近 CI 状态(push 后必跑 verify)
+& "C:\Program Files\GitHub CLI\gh.exe" run list --repo skin306152-star/pearnly-app --branch master --limit 5
+```
+
+---
+
+## 🆕 2026-05-23 第六会话累计交接(用户换窗口前)· ⚠️ 下窗口必读
+
+**会话主题**:整改 Phase 0 + Phase 1 P1.1 + GL Excel 紧急 hotfix(5 个 T1-T5)+ 4 anchor 完整化 + 规则铁律升级 + CI 能力入档
+
+### 📦 第六会话累计 commit list(12 个 · 全 push master · webhook 自动 deploy 生效)
+
+| Commit | 版本 | 内容 | 类别 |
+|---|---|---|---|
+| `64a84ca` | v0.37 | P0.1 OCR 抽到的 3 anchor 值预填 input(localStorage 跨会话)| 整改 Phase 0 |
+| `ffd15b4` | v0.38 | P0.2 Excel 末尾加『手动录入痕迹』section + 标黄被覆盖 cell | 整改 Phase 0 |
+| `735c834` | v0.39 | P0.3 历史详情/结果页显示『OCR vs User 对照表』+ 4 语 | 整改 Phase 0 |
+| `eb2a55a` | v0.40 | P0.4 6 类 modal flex-chain audit + .modal/.drawer 防御性 min-height:0 | 整改 Phase 0 |
+| `a8d24d7` | docs | Phase 0 整改全收官 · 4 commit + 4 Decision Points 全敲定入档 | 文档 |
+| `5ca45a0` | v0.41 | P1.1 4 模块 task 表加 field_overrides JSONB(**Alembic 002 首次真迁移**)| 整改 Phase 1 |
+| `714a1cc` | (无) | Dependabot ignore google-ai-generativelanguage + close 红 PR #11 | CI |
+| `138d73e` | v0.42 | **T1** GL Excel 上传 0 行(根因泰国佛历 datetime cell)+ _parse_date 4 层兜底 | 紧急 hotfix |
+| `456e381` | v0.43 | **T2** GL Excel 期初/期末读 balance 列 + release_notes 覆盖式新规则落地 + CLAUDE.md §6 升级 | 紧急 hotfix + 规则 |
+| `21486c2` | v0.44 | **T3** 加第 4 个 anchor `stmt_closing`(Statement 期末)+ Excel lang 跟随守门契约 | 紧急 hotfix |
+| `8b4cfd0` | v0.45 | **T4** anchor 预填 UX 加强(橙色 banner + 浅橙底 cell + 来源标识)| 紧急 hotfix UX |
+| 本次 | v0.46 | **T5** M3 parse_gl_excel datetime BE→CE 同步 + M2/M3 export lang 守门契约 + CLAUDE.md §22 CI 能力入档 + 本交接段 | 同步 + 文档 |
+
+### 🟡 下窗口接力 · 待跟进 / 未完成清单
+
+**A · 待客户验证(等 Zihao 转发付费用户测)**:
+1. **T1+T2 GL Excel 0 行修复**:客户重新上传同款 GL Excel 看『แถวที่พบ』≥1 行 + opening/closing 都对(完整闭环 · 不用 anchor 兜底)
+2. **T3 第 4 个 anchor 上线**:对账页面看到 4 个录入框(横排:GL期末 / Statement期末 / Statement期初 / GL期初)
+3. **T4 预填 UX 加强**:橙色 banner + 4 input 浅橙底 + label 后缀『· OCR』· 点击改字色变黑
+4. **T5 M3 收入对账 date 显示**:GL Excel 文件含 BE datetime cell 时 · M3 历史详情 / Excel 显示 ISO CE date(不再 garbage)
+
+**B · 我未完成的工作(stopped at)**:
+- **Phase 1 P1.2-M2**(销售税对账 Excel 加来源列 + 标黄)· 我之前看到 `recon_routes.py L786 row_action` 路由就停下处理 T1-T5 紧急 BUG · **0 代码改**
+- 下窗口接 P1.2-M2:看 vat_excel_exporter.py · 升级 row_action 写入 reconciliation_row.field_overrides + Excel 加 OCR vs 手改 layout · 1 commit 完闭环
+
+**C · Phase 1 整改剩余 task list**(audit doc §5):
+- P1.2 ✅ 4 模块 Excel 加来源列 + 标黄(M4 已 P0.2 + M2 我停在路上 · M3/M1 未开始)
+- P1.3 历史详情显示对照 + 用户改痕迹时间线(4 模块)
+- P1.4 字段级 confidence 接到前端(M1+M2+M4)
+- P1.5 低置信度警告 toast(M1+M2+M4 · 依赖 P1.4)
+- P1.6 M3 加用户校对 UI(跟 M2 row_action 对齐)
+- P1.7 M3 加 3 anchor 余额手动录入(跟 BUG-B 同款 · 现在加上后还要扩到 4 anchor)
+
+**D · 整顿期(REFACTOR_MASTER_PLAN.md)冻结状态**:A 阶段 4.5/10 · 整改完后继续 A5(CI lint)/ A6(依赖锁定加固)等
+
+**E · Dependabot 未处理 PR**(`gh pr list --state open` 看)· 整顿期 A5/A6 统一清:
+- 2 红:#8 pdfminer-six / #5 vite major(major upgrade · 大概率 breaking · 需 ignore 锁版本范围)
+- 6 绿:#10 sqlalchemy / #9 alembic / #7 cryptography / #4 actions/upload-artifact / #3 actions/setup-node / #2 actions/setup-python
+- 6 绿合并要本地 pip-compile regen lock(CONTRIBUTING.md §依赖管理)· 不是 1 commit 能搞定
+- **#2/#3/#4 升 Node 24 兼容版本能解 2026-09-16 Node 20 deprecation**(到期前必须合)
+
+**F · 整改决策 4 个全锁(防接力反悔)**:
+1. ✅ Phase 0 立刻干 → 已完成
+2. ✅ Phase 1 拆 7 commit 接力 → 下窗口接 P1.2 起
+3. ✅ Phase 3 P3.1 分工:Claude 写脚本从 ocr_history 抽 top 50 vendor + Zihao 跑 Supabase 导出
+4. ✅ Phase 4 X1/X2/X3 全永久锁死(用户自定义公式 / 100% 自动化 / 自训 OCR)
+
+### 📋 下窗口启动顺序(60 秒 checklist)
+
+1. `git branch --show-current` → 确认 master(铁律 #14)
+2. 读 `CLAUDE.md/CLAUDE.md` 顶部 22 条铁律(重点 #21 整改不污染 / #22 CI 能力 / #6 release_notes 覆盖式)
+3. 读 `docs/audits/2026-05-22-ocr-recon-audit.md` 整改单一权威源(更新到 T5 后状态)
+4. 读本文档(STATE_PEARNLY.md)头部到此交接段
+5. **跑 `& "C:\Program Files\GitHub CLI\gh.exe" run list --repo skin306152-star/pearnly-app --branch master --limit 5`** 看 T1-T5 CI 状态(确认 5 个 push 全绿)
+6. 跑 `python -m unittest discover -s tests/unit 2>&1 | tail -5`(应该 331+ tests OK)
+7. 看 Zihao 反馈:客户测 T1-T5 结果 / 是否继续 Phase 1 P1.2 / 是否处理 dependabot 堆积
+8. 按拍板顺序接 Phase 1 P1.2-M2(或 Zihao 改优先级再调)
+
+### ⚠ 关键铁律提醒(下窗口最易踩坑)
+
+- **铁律 #6** release_notes:**必须覆盖式**(不能 prepend 老版本)· **必须官方语言**(禁 🚨/客户反馈/hotfix/BUG-FIX-XX 编号)· 守门契约 `test_release_notes_no_history.py` 会自动 fail 强制改
+- **铁律 #21** 整改不污染:新 schema 走 Alembic + 新业务函数禁进 db.py(进 `services/db_migrations/`)+ 新路由禁进 app.py(独立 `*_routes.py`)+ 新前端禁进 home.js(独立 IIFE)+ 新 CSS 禁进 home.css(独立 .css 或 scoped 组件 HTML)
+- **铁律 #14** branch:每次启动 check `git branch --show-current` = master · 不在就切回去
+
+---
+
 ---
 
 ## 🔴🔴🔴 整顿模式 ON(2026-05-22 起到约 2026-12)

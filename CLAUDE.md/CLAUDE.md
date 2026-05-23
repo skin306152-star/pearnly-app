@@ -444,6 +444,54 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ---
 
+### 22. CI 状态可视化能力(2026-05-23 拍板 · 接力 agent 入门必读)
+
+**触发**:Zihao 2026-05-23 装 gh CLI + 登录 · Claude 可以直接看 GitHub Actions CI 状态(之前没装 · 一直靠用户贴日志)
+
+**能力**:在 Claude Code session 用 PowerShell tool 调 gh CLI:
+- 路径:`C:\Program Files\GitHub CLI\gh.exe`(absolute · 不依赖 PATH 刷新)
+- 已登录账号:`skin306152-star`(token 存 keyring · 跨 session 持久)
+- Repo:`skin306152-star/pearnly-app`(私库 · gh 已认证)
+
+**关键命令**(接力 agent 进窗口可直接用):
+
+```powershell
+# 1. 看 master 最近 N 个 CI run 状态(快速排查 push 后是不是绿)
+& "C:\Program Files\GitHub CLI\gh.exe" run list --repo skin306152-star/pearnly-app --branch master --limit 5
+
+# 2. 看某个 failed run 的详细日志(找哪 step 挂了)
+& "C:\Program Files\GitHub CLI\gh.exe" run view <RUN_ID> --repo skin306152-star/pearnly-app
+
+# 3. 看 failed step 的具体错误输出
+& "C:\Program Files\GitHub CLI\gh.exe" run view <RUN_ID> --repo skin306152-star/pearnly-app --log-failed | grep -E "FAIL|ERROR|AssertionError" | head -20
+
+# 4. 列所有 open PR + CI 状态(查 dependabot 等堆积)
+& "C:\Program Files\GitHub CLI\gh.exe" pr list --repo skin306152-star/pearnly-app --state open --json number,title,statusCheckRollup
+
+# 5. 关 PR(如 dependabot 红 PR · 加 ignore 规则后清理)
+& "C:\Program Files\GitHub CLI\gh.exe" pr close <NUMBER> --repo skin306152-star/pearnly-app --comment "<reason>"
+
+# 6. 重跑 CI(transient checkout fail / network 抖动)
+& "C:\Program Files\GitHub CLI\gh.exe" run rerun <RUN_ID> --repo skin306152-star/pearnly-app
+```
+
+**优先用 PowerShell tool 调** · 不用 Bash(bash session PATH 没刷新到 gh)。
+
+**典型场景**:
+- 用户问 "CI 红了什么意思" → 跑命令 1 + 2 + 3 · 一次性给报告
+- Push 完想 verify → 跑命令 1
+- Dependabot 红 PR 堆积 → 跑命令 4 + 5(改 .github/dependabot.yml 加 ignore 后关 PR)
+- CI transient fail(`/usr/bin/git exit 128` · 网络抖动)→ 跑命令 6 重跑
+
+**bash 调用兜底**:gh.exe 在 git bash 也能用 · 用绝对路径 `/c/Program\ Files/GitHub\ CLI/gh.exe ...`(注意 escape 空格)。但 PowerShell tool 调更稳。
+
+**已知 dependabot 配置**(2026-05-23 状态 · 接力 agent 接手时确认):
+- `.github/dependabot.yml` 含 ignore 规则 · 排除 `google-ai-generativelanguage`(防 google-generativeai 0.8.x pin 冲突)
+- 8 个 open dependabot PR 堆积(2 红 + 6 绿)· 6 绿需要本地 `pip-compile` regen lock 才能 merge(REFACTOR-A7 流程 · CONTRIBUTING.md §依赖管理)
+- Node 20 deprecation 2026-09-16 到期 · #2/#3/#4 PR 已开升级 actions/checkout@v5+ / setup-python@v6 等 · 留给 REFACTOR-A5/A6 整顿期统一升
+
+---
+
 ### 21. 整改期不污染未来整顿(2026-05-23 拍板 · 整改期专属 · 防整改变新整改对象)
 
 **背景**:2026-05-22 启动 OCR + 对账 4 模块整改(`docs/audits/2026-05-22-ocr-recon-audit.md`)· 整改优先级 > 整顿。但整改本身要写新代码 / 改老代码 · 如果不严格执行 · 整改完 home.js + app.py 又胖一圈 · 等于给未来整顿期 +2 月。本铁律就是『整改新代码必须按整顿期"理想形态"写』· 一次写对 · 整顿期省事。

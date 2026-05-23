@@ -75,6 +75,9 @@ class MultiSheetXlsxTests(unittest.TestCase):
         self.assertEqual(len(deps), 2)
         self.assertEqual(len(wds), 2)
         self.assertEqual(wds[0].withdrawal, 500.0)  # -500 → 取款 500
+        # v118.35.0.59 · Excel 路径也要跑余额校验(不再全 None/"—")
+        self.assertTrue(any(r.balance_ok is not None for r in rows),
+                        "Excel 路径应做余额校验 · 不应所有行都未校验")
 
 
 if __name__ == "__main__":

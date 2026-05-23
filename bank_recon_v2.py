@@ -1478,6 +1478,11 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
         return {"ok": False, "error_code": "stmt_headers_not_found",
                 "error": "No bank-statement table found in any sheet"}
 
+    # v118.35.0.59 · Excel 路径也跑方向纠正 + 余额校验(此前只 PDF 路径有 · Excel 全 "—")
+    # · 跟 PDF 路径一致 · 给用户余额校验状态 + 兜底列识别错(用余额涨跌反推)
+    _correct_direction_from_balance(all_rows, opening_balance)
+    _verify_row_balances(all_rows, opening_balance)
+
     return {
         "ok": True,
         "rows": all_rows,

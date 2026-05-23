@@ -178,7 +178,7 @@
 
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
-| B1 | `app.py` 拆完 9k → < 500 行(20-30 个 router) | 4-6 周 | A1, A5 | ⚪ |
+| B1 | `app.py` 拆完 9k → < 500 行(20-30 个 router) | 4-6 周 | A1, A5 | 🟡 进行中 · 2026-05-24 抽第 1 个 `notification_routes.py`(通知规则 6 路由)commit `c0b29eb` · app.py ~10075→9923 · 守门测试 5 个 · 生产存活验证 ✓ |
 | B2 | `db.py` 拆完 4k → < 500 行(业务 SQL 迁 `services/`) | 3-4 周 | A1 | ⚪ |
 | B3 | 所有 `ensure_*` 迁 Alembic(25 个 · schema 完全版本化) | 3-4 周 | A2 | ⚪ |
 | B4 | 健康检查端点 `/health` + `/ready`(DB / Gemini / SMTP / LINE 各 check) | 半天 | — | ⚪ |
@@ -303,7 +303,7 @@
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
-| B 后端 | ⚪ 0/10 | — | 依赖 A1, A5 |
+| B 后端 | 🟡 0.3/10 | B1 抽 notification(6 路由)`c0b29eb` | 依赖 A1/A5 已满足 · app.py 10075→9923 · 已有 7 个 *_routes.py |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |

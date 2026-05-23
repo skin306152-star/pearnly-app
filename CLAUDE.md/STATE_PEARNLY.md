@@ -26,7 +26,14 @@
 
 **守门**:imports/i18n/unit 全绿(403 tests)· 纯新增 infra 配置/文档 · 0 业务代码改动。
 
-**下窗口可做**:① 帮 Zihao 完成 A4 第 2 步(doppler CLI 本地验证)+ A3 build 验证;② **或直接开 B/C 长任务**(后端拆 app.py router / 前端拆 home.js → src/home/* · 依赖 A1/A5 已满足 · 不卡 A3/A4)。
+**🆕 同窗续作 · B1 后端拆 router 开工**(Zihao 授权长跑):
+- 抽出**第 1 个** `notification_routes.py`(通知规则 6 路由:GET/POST /rules · PATCH/DELETE /rules/{id} · POST /rules/{id}/test · GET /logs)· commit `c0b29eb`。
+- 纯搬家不改逻辑 · `_tid`/`NOTIF_TEMPLATE_*` 复制防循环 import(app.py 保留)· models + `_validate_template_params` 整移。
+- **app.py ~10075→9923 行**(净 -152)· 守门测试 `test_notification_routes_contract.py`(5 个 · 路由契约+include挂载+校验逻辑)。
+- 守门全绿:imports/i18n/unit(**408**)· black/ruff · **生产 /api/version 存活验证 ✓** · CI lint job 绿(test job 跑中)。
+- **B1 模式已跑通**(照 billing_routes 范式 · 从 auth 拿 current_user 防循环)· 后续 router 照此抽:候选 /api/clients(4)、/api/team(7)、/api/history(7)、/api/exceptions(6)等边界清晰组。
+
+**下窗口可做**:① 续抽后端 router(B1 模式已验证 · 低风险)或转前端 C(home.js→src/home/*);② 帮 Zihao 完成 A4 第 2 步(doppler CLI 本地验证)+ A3 build 验证。
 
 ---
 

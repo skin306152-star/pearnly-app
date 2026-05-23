@@ -50,6 +50,9 @@ from recon_routes import router as recon_router  # v118.32.0
 from vat_excel_routes import router as vat_excel_router  # v118.32.4.9.5 · Excel 公式对账内测
 from notification_routes import router as notification_router  # REFACTOR-B1 · 2026-05-24
 from clients_routes import router as clients_router  # REFACTOR-B1 · 客户管理 5 路由 · 2026-05-24
+from exceptions_routes import (
+    router as exceptions_router,
+)  # REFACTOR-B1 · 异常处理 8 路由 · 2026-05-24
 from billing_routes import (
     router as billing_router,
 )  # 阶段 5 Task 5.1 · 抽 11 个 billing 路由(2026-05-22)
@@ -1042,6 +1045,7 @@ app.include_router(recon_router)  # v118.32.0 · 销项税对账
 app.include_router(vat_excel_router)  # v118.32.4.9.5 · Excel 公式对账内测(skin306152 only)
 app.include_router(notification_router)  # REFACTOR-B1 · 通知规则 6 路由(2026-05-24)
 app.include_router(clients_router)  # REFACTOR-B1 · 客户管理 5 路由(2026-05-24)
+app.include_router(exceptions_router)  # REFACTOR-B1 · 异常处理 8 路由(2026-05-24)
 app.include_router(billing_router)  # 阶段 5 Task 5.1 · billing 11 路由(2026-05-22)
 app.include_router(
     admin_diagnostics_router
@@ -3505,157 +3509,6 @@ async def _notify_large_invoice(
 
 
 # ─── API 端点 ───────────────────────────────────────────
-
-
-class ExceptionResolvePayload(BaseModel):
-    # 可选字段:仅当 ignore_rule=True 时 · 把 (seller, rule) 加入白名单
-    ignore_rule: bool = False
-
-
-@app.get("/api/exceptions/list")
-async def api_list_exceptions(
-    request: Request,
-    status: str = "pending",
-    rule_code: Optional[str] = None,
-    client_id: Optional[int] = None,
-    limit: int = 100,
-    offset: int = 0,
-):
-    """列异常(同 tenant 共享视图)· status=all 看全部 · client_id 给了只看该客户"""
-    user = get_current_user_from_request(request)
-    items = db.list_exceptions(
-        user_id=str(user["id"]),
-        tenant_id=_tid(user),
-        status=status,
-        rule_code=rule_code,
-        client_id=client_id,
-        limit=min(int(limit), 500),
-        offset=max(int(offset), 0),
-        restrict_client_ids=db.get_visible_client_ids_for_user(user),  # v118.28.1 · 员工分配
-    )
-    return {"items": items, "count": len(items)}
-
-
-@app.get("/api/exceptions/stats")
-async def api_exceptions_stats(
-    request: Request, client_id: Optional[int] = None, status: Optional[str] = "pending"
-):
-    """顶部 KPI + 筛选 chip 的数字 · 同 tenant 共享 · 可按 client 收口
-    status:控制 chip 计数(by_rule)归属哪个状态 · 顶部 KPI 整体计数不受影响
-    """
-    user = get_current_user_from_request(request)
-    by_rule_status = status if status in ("pending", "resolved", "ignored") else "pending"
-    stats = db.count_exceptions_by_status_and_rule(
-        str(user["id"]),
-        tenant_id=_tid(user),
-        client_id=client_id,
-        by_rule_status=by_rule_status,
-    )
-    stats["learned_rules"] = db.count_whitelist_rules(str(user["id"]), tenant_id=_tid(user))
-    return stats
-
-
-@app.get("/api/exceptions/{exception_id}")
-async def api_get_exception(exception_id: int, request: Request):
-    """单条异常详情(给抽屉用)"""
-    user = get_current_user_from_request(request)
-    ex = db.get_exception(str(user["id"]), int(exception_id), tenant_id=_tid(user))
-    if not ex:
-        raise HTTPException(404, detail="exception.not_found")
-    return ex
-
-
-@app.post("/api/exceptions/{exception_id}/resolve")
-async def api_resolve_exception(exception_id: int, request: Request):
-    """会计「✓ 确认放行」· 标记为 resolved · 不写白名单"""
-    user = get_current_user_from_request(request)
-    ok = db.resolve_exception(
-        str(user["id"]), int(exception_id), tenant_id=_tid(user), new_status="resolved"
-    )
-    if not ok:
-        raise HTTPException(404, detail="exception.not_found")
-    return {"ok": True}
-
-
-@app.post("/api/exceptions/{exception_id}/ignore")
-async def api_ignore_exception(exception_id: int, request: Request):
-    """会计「⊘ 忽略此类」· 标 ignored + 把 (seller, rule) 写入白名单 · 下次同类不拦"""
-    user = get_current_user_from_request(request)
-    ex = db.get_exception(str(user["id"]), int(exception_id), tenant_id=_tid(user))
-    if not ex:
-        raise HTTPException(404, detail="exception.not_found")
-    # 1. 标 ignored
-    db.resolve_exception(
-        str(user["id"]), int(exception_id), tenant_id=_tid(user), new_status="ignored"
-    )
-    # 2. 写白名单(供应商名 + 规则码 · 缺供应商时只标 ignored 不写白名单)
-    seller = ex.get("seller_name")
-    rule_code = ex.get("rule_code")
-    wl_added = False
-    if seller and rule_code:
-        wl_added = db.add_exception_whitelist(str(user["id"]), _tid(user), seller, rule_code)
-    return {"ok": True, "whitelist_added": wl_added}
-
-
-# v118.20.5 · P0-3 · 批量复核(全部放行 / 全部忽略此类)
-@app.post("/api/exceptions/batch")
-async def api_batch_exceptions(request: Request):
-    """批量处理异常 · body: { ids: [int], action: "resolve"|"ignore" }
-    返回:{ ok, processed, ids_done, whitelist_added }
-    - resolve:批量标 resolved · 不写白名单
-    - ignore:批量标 ignored · 同时按 (seller, rule) 去重写白名单(缺 seller 的仅 ignored)
-    """
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(400, detail="invalid_json")
-    ids = payload.get("ids") or []
-    action = payload.get("action") or ""
-    if action not in ("resolve", "ignore"):
-        raise HTTPException(400, detail="invalid_action")
-    if not isinstance(ids, list) or not ids:
-        raise HTTPException(400, detail="empty_ids")
-    if len(ids) > 500:
-        raise HTTPException(400, detail="too_many")
-    user = get_current_user_from_request(request)
-    new_status = "resolved" if action == "resolve" else "ignored"
-    res = db.batch_resolve_exceptions(
-        user_id=str(user["id"]),
-        exception_ids=ids,
-        tenant_id=_tid(user),
-        new_status=new_status,
-    )
-    # ignored → 写白名单(去重在 db 已做 · 这里仅插入)
-    wl_added = 0
-    if action == "ignore":
-        for seller, rc in res.get("whitelist_pairs") or []:
-            if db.add_exception_whitelist(str(user["id"]), _tid(user), seller, rc):
-                wl_added += 1
-    return {
-        "ok": True,
-        "processed": int(res.get("processed", 0)),
-        "ids_done": res.get("ids_done", []),
-        "whitelist_added": wl_added,
-    }
-
-
-# v118.21.2 · 学习规则面板 · 列表 + 删除(撤销学过的白名单)
-@app.get("/api/exception-whitelist")
-async def api_list_exception_whitelist(request: Request):
-    """列出当前 user/tenant 学过的白名单"""
-    user = get_current_user_from_request(request)
-    items = db.list_exception_whitelist(str(user["id"]), tenant_id=_tid(user))
-    return {"items": items, "count": len(items)}
-
-
-@app.delete("/api/exception-whitelist/{wl_id}")
-async def api_delete_exception_whitelist(wl_id: int, request: Request):
-    """删除一条白名单(撤销学习)"""
-    user = get_current_user_from_request(request)
-    ok = db.delete_exception_whitelist(str(user["id"]), int(wl_id), tenant_id=_tid(user))
-    if not ok:
-        raise HTTPException(404, detail="whitelist.not_found")
-    return {"ok": True}
 
 
 def _tid(user: dict) -> Optional[str]:

@@ -86,7 +86,7 @@ grpcio==1.80.0
     # via
     #   google-api-core
     #   grpcio-status
-grpcio-status==1.71.2
+grpcio-status==1.80.0
     # via google-api-core
 h11==0.16.0
     # via
@@ -123,15 +123,15 @@ markupsafe==3.0.3
     # via
     #   jinja2
     #   mako
-mpmath==1.3.0
+mpmath==1.4.1
     # via sympy
-networkx==3.4.2
+networkx==3.6.1
     # via
     #   scikit-image
     #   torch
 ninja==1.13.0
     # via easyocr
-numpy==2.2.6
+numpy==2.4.6
     # via
     #   easyocr
     #   imageio
@@ -141,7 +141,7 @@ numpy==2.2.6
     #   shapely
     #   tifffile
     #   torchvision
-openai==2.32.0
+openai==2.38.0
     # via -r requirements.txt
 opencv-python-headless==4.13.0.92
     # via easyocr
@@ -192,23 +192,23 @@ pyclipper==1.4.0
     # via easyocr
 pycparser==3.0
     # via cffi
-pydantic==2.13.2
+pydantic==2.13.4
     # via
     #   -r requirements.txt
     #   fastapi
     #   google-generativeai
     #   openai
-pydantic-core==2.46.2
+pydantic-core==2.47.0
     # via pydantic
 pyee==13.0.1
     # via playwright
 pyjwt==2.13.0
     # via -r requirements.txt
-pymupdf==1.20.2
+pymupdf==1.27.2.3
     # via -r requirements.txt
 pyparsing==3.3.2
     # via httplib2
-pypdf==6.10.2
+pypdf==6.12.1
     # via -r requirements.txt
 pypdfium2==5.8.0
     # via pdfplumber
@@ -224,13 +224,13 @@ pyyaml==6.0.3
     # via easyocr
 reportlab==4.5.1
     # via -r requirements.txt
-requests==2.33.1
+requests==2.34.2
     # via
     #   -r requirements.txt
     #   google-api-core
-scikit-image==0.25.2
+scikit-image==0.26.0
     # via easyocr
-scipy==1.15.3
+scipy==1.17.1
     # via
     #   easyocr
     #   scikit-image

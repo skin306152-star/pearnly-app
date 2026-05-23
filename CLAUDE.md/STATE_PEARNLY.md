@@ -1,10 +1,31 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-24(**第十会话**) · **🟢 Zihao 拍板 A3=本地 Docker / A4=Doppler · 两项推进(commit `df727f6`)· A 阶段 8/10**
+> **最近更新**:2026-05-24(**第十一会话** · 自主长跑)· **🟢 B1 后端拆 router 连抽 2 个:clients(5)+ exceptions(8)· app.py 9923→9546 · 全绿上线**
 >
-> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **8/10**(A0/A1/A2.1/A5/A6/A7/A8/A9 完成 · A3/A4 进行中)· A3 Docker 配置就绪待 build 验证 · A4 生产 39 密钥已收拢进 Doppler `prd` · **B/C 阶段可开工**(不依赖 A3/A4 收官)
+> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **8/10**(A3/A4 卡 Zihao 手动验证)· **B 阶段 0.5/10**(B1 已抽 notification+clients+exceptions = 19 路由 · 9 个 *_routes.py)· C 前端未动
 >
 > **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(M4 银行对账已闭环 · M1/M2/M3 暂缓等用户反馈)
+
+---
+
+## 🆕 2026-05-24 第十一会话 · 自主长跑 · B1 连抽 clients + exceptions 两个 router · ⚠️ 下窗口必读
+
+**模式**:Zihao 授权"自主长跑到上下文 80% 自动收尾"· 任务 = 前后端搬家(B1 拆 router + C1 拆 home.js)。
+
+**实际做了(全 push master · 已部署 · CI clients ✅ / exceptions 跑中)**:
+- **clients_routes.py**(commit `f27ac38`)· 抽 /api/clients 5 路由(GET/POST/PATCH/DELETE + /export)· 搬 ClientCreate/Update + _serialize_client · contract 测试 5 个 · 生产存活 ✓
+- **exceptions_routes.py**(commit `30f114f`)· 抽 /api/exceptions 6 + /api/exception-whitelist 2 = 8 路由 · 顺手清死代码 ExceptionResolvePayload · contract 测试 3 个 · 生产存活 ✓
+- 范式照 B1 notification:`APIRouter()` + 从 auth 拿 get_current_user_from_request + `_tid` 复制防循环 import · 纯搬家不改逻辑/URL/response。
+- **app.py 9923→9546 行**(净 -377)· 守门:imports/i18n(0/0)/unit(**416**)/black/ruff 全绿。
+
+**⚠️ 必须知道的一个债(CRLF→LF)**:抽 clients 那次我用 Python 整写 app.py · 把它从 CRLF 误转成 LF · commit `f27ac38` 出现一次性"全文件 diff"(10044+/9921-)· 因 **force-push 是铁律 #16 红线没回改** · 之后 app.py 统一 LF · 后续 diff 已恢复干净(exceptions 那次 4+/151-)。**教训:改 app.py 一律用 Edit 工具(保留 LF)· 不要再用 Python readlines/writelines 整写带 CRLF 的大文件。**
+
+**为什么没做前端 C + team/history(自主长跑下的稳妥取舍)**:
+- **前端 C1(home.js→src/home/*)主动不做**:要 Vite build + 改 home.html script + cache_bust + 4 语 release_notes + 部署**付费用户实时 UI** · 且没有像后端 /api/version 那样的廉价验证(需真浏览器测)· 无人值守自动关机前部署前端风险过高 · 留 Zihao 在场时做。
+- **team(7 路由)**:依赖 `_require_owner_or_super`(用 20 次)/`_log_op`(13 次)等共享 helper · 干净做法要先抽公共 helper 模块(`route_helpers.py`)· 是更大的活 · 半途遇关机会把 app.py 弄坏 · 没在长跑里硬塞。
+- **history(7 路由 · 含 assign_client)**:依赖 `_async_run_exception_checks`/`_check_history_access`→`_plan_permissions` 较缠 · 同上。
+
+**下窗口可做**:① 抽 `route_helpers.py`(把 `_require_owner_or_super`/`_require_super_admin`/`_log_op`/`_get_client_ip`/`_check_password_strength` 集中)→ 解锁 team/history/admin 一大批 router(B 阶段提速关键)② 或 Zihao 在场时开 C1 前端拆第一个 home.js 模块 ③ 帮 Zihao 收 A3/A4(Docker build + doppler CLI 验证)。
 
 ---
 

@@ -1595,8 +1595,13 @@ async def bank_v2_export(task_id: int, request: Request, lang: str = "th"):
                 for f in (task.get("gl_files") or "").split(";") if f.strip()
             ],
         }
+    # P0.2 BUG-B-T2 v118.35.0.38 · summary_raw 还含 _anchor_overrides + _anchor_ocr · 单独传给 export
+    # bank_summary_from_json 过滤掉 `_` 开头字段 · 所以这里要从原 summary_raw 拿
+    _ao = summary_raw.get("_anchor_overrides") if isinstance(summary_raw, dict) else None
+    _aocr = summary_raw.get("_anchor_ocr") if isinstance(summary_raw, dict) else None
     excel_bytes = export_bank_recon_excel(recon_rows, summary, lang=lang,
-                                          task_info=task, parse_info=task_parse_info)
+                                          task_info=task, parse_info=task_parse_info,
+                                          anchor_overrides=_ao, anchor_ocr=_aocr)
 
     bank_code = task.get("bank_code") or "bank"
     ascii_name = f"BankRecon_v2_{task_id}_{bank_code.upper()}.xlsx"

@@ -2665,6 +2665,26 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
                                 "en": "Statement Deposit Only (not in GL)",
                                 "zh": "仅对账单有存款（GL 中缺失）",
                                 "ja": "明細の入金のみ（GL にない）"},
+    # P0.2 BUG-B-T2 v118.35.0.38 · 手动录入痕迹 section · 标黄被覆盖的 anchor cell
+    "sec_manual_entry":   {"th": "ร่องรอยการกรอกยอดเอง (3 อันคอร์)",
+                           "en": "Manual Entry Audit Trail (3 anchors)",
+                           "zh": "手动录入痕迹（3 个 anchor）",
+                           "ja": "手入力履歴（3 アンカー）"},
+    "lbl_manual_warn":    {"th": "⚠ รายงานนี้มีการกรอกยอด anchor เอง · ดูตารางท้ายไฟล์",
+                           "en": "⚠ This report contains manually entered anchor values · see audit trail at bottom",
+                           "zh": "⚠ 本报告含手动录入 anchor · 看末尾对照表",
+                           "ja": "⚠ 本レポートは手入力アンカーを含む · ファイル末尾の照合表参照"},
+    "col_manual_ocr":     {"th": "ค่า OCR (อ้างอิง)", "en": "OCR Value (reference)",
+                           "zh": "OCR 抽到的（参考）", "ja": "OCR 値(参考)"},
+    "col_manual_user":    {"th": "ค่าที่คุณกรอก (ใช้จริง)", "en": "Your Value (used)",
+                           "zh": "你填的（实际用）", "ja": "入力値(実使用)"},
+    "col_manual_diff":    {"th": "ผลต่าง", "en": "Diff", "zh": "差额", "ja": "差額"},
+    "lbl_anchor_stmt_open":  {"th": "ยอดยกมา Statement", "en": "Statement Opening",
+                              "zh": "Statement 期初余额", "ja": "Statement 期首"},
+    "lbl_anchor_gl_open":    {"th": "ยอดยกมา GL", "en": "GL Opening",
+                              "zh": "GL 期初余额", "ja": "GL 期首"},
+    "lbl_anchor_gl_close":   {"th": "ยอดยกไป GL", "en": "GL Closing",
+                              "zh": "GL 期末余额", "ja": "GL 期末"},
 }
 
 
@@ -2805,8 +2825,15 @@ def export_bank_recon_excel(
     lang: str = "th",
     task_info: Optional[Dict[str, Any]] = None,
     parse_info: Optional[Dict[str, Any]] = None,
+    anchor_overrides: Optional[Dict[str, Dict[str, float]]] = None,
+    anchor_ocr: Optional[Dict[str, float]] = None,
 ) -> bytes:
-    """Generate Excel report with File Info + 4 data sheets, all headers i18n."""
+    """Generate Excel report with File Info + 4 data sheets, all headers i18n.
+
+    P0.2 BUG-B-T2 v118.35.0.38 · anchor_overrides + anchor_ocr 来自 summary_json
+    · anchor_overrides 非空时 · sheet 1 顶部加警示行 + 末尾加 "手动录入痕迹" section
+    · 标黄(FFE082)被用户覆盖的 cell · 灰字显示 OCR 原值参考
+    """
     try:
         import openpyxl
         from openpyxl.styles import (
@@ -2979,7 +3006,18 @@ def export_bank_recon_excel(
     _info_row(r, _t("lbl_bank", lang), summary.bank_code.upper())
     r += 1
     _info_row(r, _t("lbl_gl_acct", lang), summary.gl_account_code or "—")
-    r += 2  # blank-row spacer
+    r += 1
+    # P0.2 BUG-B-T2 v118.35.0.38 · 有 anchor 被覆盖 → 顶部一行警示『含手动录入 · 看末尾对照』
+    if anchor_overrides:
+        r += 1  # 警示前空 1 行 · 视觉舒服
+        ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
+        warn_cell = ws1.cell(row=r, column=1, value=_t("lbl_manual_warn", lang))
+        warn_cell.font = Font(bold=True, size=10, color="92400E")
+        warn_cell.fill = PatternFill("solid", fgColor="FEF3C7")  # 浅黄底
+        warn_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1, wrap_text=True)
+        ws1.row_dimensions[r].height = 24
+        r += 1
+    r += 1  # blank-row spacer
 
     # ── 3. Column headers: 项目说明 | 金额 ──
     _header_row(r, _t("col_summary_item", lang), _t("col_summary_amount", lang))
@@ -3129,6 +3167,61 @@ def export_bank_recon_excel(
         a.font = Font(size=9, italic=True, color="9CA3AF")
         a.fill = PatternFill("solid", fgColor=INFO_BG)
         a.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        r += 1
+
+    # ── 11b. P0.2 BUG-B-T2 v118.35.0.38 · 手动录入痕迹 section
+    # 只在 anchor_overrides 非空时显示 · 列 3 个 anchor 的 OCR 值 vs 用户填值 vs 差额
+    # cell user_value 标黄 (FFE082) · cell ocr_value 灰字 · 给 P0.3 历史详情对照同款数据
+    if anchor_overrides:
+        r += 2  # spacer
+        _section_row(r, _t("sec_manual_entry", lang))
+        r += 1
+        # 4 列 mini-header(label | OCR | user | diff)· 暂借 2 列 layout · 一行 4 segment 用单元格 + 文本
+        # 因 Sheet 1 是 2 列 layout · 这里特殊用 cell A 写 anchor label · cell B 写 'OCR XXX → 用户 YYY (差 ZZZ)' 标黄
+        _ANCHOR_LABEL_KEYS = [
+            ("stmt_opening", "lbl_anchor_stmt_open"),
+            ("gl_opening",   "lbl_anchor_gl_open"),
+            ("gl_closing",   "lbl_anchor_gl_close"),
+        ]
+        YELLOW_FILL = PatternFill("solid", fgColor="FFE082")
+        for idx, (anchor_key, lbl_key) in enumerate(_ANCHOR_LABEL_KEYS):
+            ov = (anchor_overrides or {}).get(anchor_key)
+            if not ov:
+                continue
+            ocr_val = float(ov.get("ocr") or 0.0)
+            user_val = float(ov.get("user") or 0.0)
+            diff = user_val - ocr_val
+            # cell A · anchor label
+            a = ws1.cell(r, 1, "  · " + _t(lbl_key, lang))
+            a.font = Font(size=10, color="111827")
+            a.fill = PatternFill("solid", fgColor=DETAIL_BG)
+            a.alignment = Alignment(horizontal="left", vertical="center", indent=2)
+            # cell B · 黄底 · user 值粗体 + 后跟灰色 OCR 原值 + diff
+            b = ws1.cell(r, 2, user_val)
+            b.font = Font(size=11, bold=True, color="92400E")  # 暖棕色文字
+            b.fill = YELLOW_FILL
+            b.alignment = Alignment(horizontal="right", vertical="center", indent=1)
+            b.number_format = NUM_FORMAT
+            # cell comment 写完整对照(hover Excel 看)
+            try:
+                from openpyxl.comments import Comment as _XLComment
+                b.comment = _XLComment(
+                    f"OCR: {ocr_val:,.2f}\nUser: {user_val:,.2f}\nDiff: {diff:+,.2f}",
+                    "Pearnly"
+                )
+            except Exception:
+                pass  # comment 失败不阻塞导出 · 数据本身已经在 cell value 里
+            ws1.row_dimensions[r].height = 22
+            r += 1
+        # 3 行 "OCR 原值" 灰字小字提示行(每 anchor 1 行)· cell A 留空 · cell B 显示 OCR 值
+        # 简化:不加 OCR 原值小字行 · 已有 comment + 后续历史详情(P0.3)可看
+        # 列头提示(标在 section 末尾)· 4 语
+        ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
+        ref_cell = ws1.cell(r, 1, "ℹ " + _t("col_manual_ocr", lang) + " / " + _t("col_manual_user", lang) + " · " + _t("col_manual_diff", lang))
+        ref_cell.font = Font(size=9, italic=True, color="6B7280")
+        ref_cell.fill = PatternFill("solid", fgColor=INFO_BG)
+        ref_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        ws1.row_dimensions[r].height = 18
         r += 1
 
     # ── 12. How to Use sub-section ──

@@ -63,7 +63,7 @@ class ParseDateBuddhistEraTests(unittest.TestCase):
         """BUG-FIX-T1 复现 · in-memory 构造客户同款 xlsx(BE datetime cells)· 验证至少 1 row + CE date
 
         客户文件结构(已隐私化):
-        - Row 1 header (vat/doc_no/account/desc/debit/credit/balance/source 8 列泰文)
+        - Row 1 header (date/doc_no/account/desc/debit/credit/balance/source 8 列泰文)
         - Row 2 期初 ยอดยกมา (BE datetime · 余额列有值)
         - Row 3 1 笔交易 (BE datetime · debit 列有值)
 
@@ -97,6 +97,42 @@ class ParseDateBuddhistEraTests(unittest.TestCase):
             f"date 应转 CE 公历 · 实际 {rows[0].date}(若为 2568-* 则 BE → CE 转换没起效)")
         self.assertEqual(rows[0].account_code, "1112-10")
         self.assertEqual(rows[0].debit, 500.00)
+
+    def test_parse_gl_excel_reads_opening_and_closing_from_balance_column(self):
+        """BUG-FIX-T2 v118.35.0.43 · 期初余额读 balance 列 + 期末读最后一笔 balance 列
+
+        老逻辑:opening 检测只读 debit/credit · Row 2 期初 ยอดยกมา 借贷列空 → opening=0
+        老逻辑:closing = opening + credit - debit · 对资产科目方向反 → closing 错
+        修法:_map_gl_cols 识别 คงเหลือ/balance · opening 优先读 balance · closing 优先读最后一笔 balance
+        """
+        wb = openpyxl.Workbook(); ws = wb.active
+        ws.append(["วันที่","เลขที่เอกสาร","รหัสบัญชี","รายการ","เดบิต","เครดิต","คงเหลือ","ไฟล์ต้นทาง"])
+        ws.append([datetime(2568,12,1), None, None, "ยอดยกมา", None, None, 39749.85, None])
+        ws.append([datetime(2568,12,31), "JV001", "1112-10", "anon", 24472.92, 0, 64222.77, None])
+        buf = io.BytesIO(); wb.save(buf)
+
+        result = brv2.parse_gl_excel(buf.getvalue(), "be_test_with_bal.xlsx", "")
+        self.assertTrue(result.get("ok"))
+        # opening · 从 balance 列 Row 2 读到(不是 0)
+        self.assertEqual(result.get("opening"), 39749.85,
+            f"opening 应从 balance 列读 39749.85 · 实际 {result.get('opening')}")
+        # closing · 从最后一笔 balance 读到(不走公式)
+        self.assertEqual(result.get("closing"), 64222.77,
+            f"closing 应从最后一笔 balance 读 64222.77 · 实际 {result.get('closing')}")
+
+    def test_parse_gl_excel_no_balance_column_falls_back_to_formula(self):
+        """BUG-FIX-T2 regression · 老格式 GL(没 balance 列)走老公式不变"""
+        wb = openpyxl.Workbook(); ws = wb.active
+        ws.append(["Date", "Doc", "Acct", "Desc", "Debit", "Credit"])
+        ws.append(["2025-01-15", "V001", "4001", "sale1", 0, 1000])
+        ws.append(["2025-01-20", "V002", "4001", "sale2", 0, 2000])
+        buf = io.BytesIO(); wb.save(buf)
+
+        result = brv2.parse_gl_excel(buf.getvalue(), "old_no_bal.xlsx", "")
+        self.assertTrue(result.get("ok"))
+        self.assertEqual(result.get("row_count"), 2)
+        # 老公式: 0 + 3000 - 0 = 3000
+        self.assertEqual(result.get("closing"), 3000.0)
 
 
 if __name__ == "__main__":

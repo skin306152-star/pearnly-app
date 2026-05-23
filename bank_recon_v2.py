@@ -1174,6 +1174,9 @@ _GL_DESC_H  = {"คำอธิบาย", "รายการ", "description", 
 _GL_DEBIT_H = {"เดบิต", "เดบิท", "debit", "dr", "借方", "ถอน", "จ่าย"}
 _GL_CRED_H  = {"เครดิต", "credit", "cr", "贷方", "ฝาก", "รับ"}
 _GL_ACCT_H  = {"รหัสบัญชี", "account", "gl account", "เลขที่บัญชี", "รหัส", "账号", "科目"}
+# BUG-FIX-T2 v118.35.0.43 · balance/余额 列识别 · 给 opening 检测读期初余额用
+# (老逻辑只看 debit/credit · Row 2 期初 ยอดยกมา 余额列填 39749.85 没读到 → opening=0 → closing 全错)
+_GL_BAL_H   = {"คงเหลือ", "ยอดคงเหลือ", "balance", "running balance", "余额", "残高"}
 
 _ACCT_RE = re.compile(r'(?<![\d.])([1-9]\d{3,6}(?:[-–]\d{2,3})?)(?![\d.])')
 
@@ -1349,6 +1352,8 @@ def _map_gl_cols(header_row: List) -> Dict[str, int]:
             col_map["credit"] = i
         elif "account" not in col_map and _hit(h, _GL_ACCT_H):
             col_map["account"] = i
+        elif "balance" not in col_map and _hit(h, _GL_BAL_H):
+            col_map["balance"] = i  # BUG-FIX-T2 v118.35.0.43 · 给 opening 检测读期初余额
     return col_map
 
 
@@ -1400,6 +1405,7 @@ def parse_gl_excel(
     closing = 0.0
     gl_opening_found = False
     last_row_date = None  # carry-forward for blank date cells (Mr.erp style)
+    last_balance_seen = None  # BUG-FIX-T2 v118.35.0.43 · 给 closing 兜底用最后一笔交易行的余额
 
     for row in all_rows_raw[header_idx + 1:]:
         if not any(row):
@@ -1410,13 +1416,21 @@ def parse_gl_excel(
             desc_idx = col_map.get("description", col_map.get("doc_no", -1))
             desc = row_list[desc_idx] if desc_idx >= 0 and desc_idx < len(row_list) else ""
             if any(kw in desc.lower() for kw in ["ยอดยกมา", "brought forward", "opening"]):
-                cr_idx = col_map.get("credit", -1)
-                dr_idx = col_map.get("debit", -1)
-                if cr_idx >= 0 and cr_idx < len(row_list):
-                    cr = _to_float(row_list[cr_idx])
-                    dr = _to_float(row_list[dr_idx] if dr_idx >= 0 and dr_idx < len(row_list) else 0)
-                    opening = cr - dr  # net opening
+                # BUG-FIX-T2 v118.35.0.43 · 期初余额优先读 balance 列(如 Mr.erp 把期初放 คงเหลือ 列)
+                # 老逻辑只读 debit/credit · Row 2 期初 ยอดยกมา 借贷列空 → opening=0 → closing 全错
+                bal_idx = col_map.get("balance", -1)
+                if bal_idx >= 0 and bal_idx < len(row_list) and row_list[bal_idx]:
+                    opening = _to_float(row_list[bal_idx])
                     gl_opening_found = True
+                else:
+                    # fallback · credit - debit(老逻辑保留 · 兼容期初放借贷列的格式)
+                    cr_idx = col_map.get("credit", -1)
+                    dr_idx = col_map.get("debit", -1)
+                    if cr_idx >= 0 and cr_idx < len(row_list):
+                        cr = _to_float(row_list[cr_idx])
+                        dr = _to_float(row_list[dr_idx] if dr_idx >= 0 and dr_idx < len(row_list) else 0)
+                        opening = cr - dr  # net opening
+                        gl_opening_found = True
             continue
 
         # Extract fields
@@ -1453,13 +1467,22 @@ def parse_gl_excel(
             date=d, doc_no=doc_no, account_code=acct,
             description=desc, debit=abs(debit), credit=abs(credit),
         ))
+        # BUG-FIX-T2 v118.35.0.43 · 顺手记最后一笔的 balance(给下面 closing 兜底用)
+        if "balance" in col_map and col_map["balance"] < len(row_list) and row_list[col_map["balance"]]:
+            last_balance_seen = _to_float(row_list[col_map["balance"]])
 
     # Calculate opening/closing if not found
     if not gl_opening_found:
         opening = 0.0
-    total_credit = sum(r.credit for r in rows)
-    total_debit = sum(r.debit for r in rows)
-    closing = round(opening + total_credit - total_debit, 2)
+    # BUG-FIX-T2 v118.35.0.43 · closing 优先用 balance 列最后一笔(防方向算反 · 资产 vs 收入科目)
+    # 老公式 opening + credit - debit 对收入科目正确 · 对资产科目反 · balance 列直接读最稳
+    # 没识别 balance 列(老文件无 คงเหลือ header)走老公式 · 0 regression
+    if last_balance_seen is not None:
+        closing = round(last_balance_seen, 2)
+    else:
+        total_credit = sum(r.credit for r in rows)
+        total_debit = sum(r.debit for r in rows)
+        closing = round(opening + total_credit - total_debit, 2)
 
     return {
         "ok": True,

@@ -1,10 +1,27 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-22(第五会话续 2) · **🚨 整改模式 ON · 整顿模式暂停**(用户投诉触发 · 整改优先级 > REFACTOR_MASTER_PLAN.md)
+> **最近更新**:2026-05-23(第六会话) · **🚨 整改模式 ON · 整顿模式暂停**(用户投诉触发 · 整改优先级 > REFACTOR_MASTER_PLAN.md)
 >
 > **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(4 模块摸排 + Phase 0-4 整改清单)
 >
 > **整顿期(REFACTOR_MASTER_PLAN.md)**:暂停 · A 阶段进度冻结在 4.5/10 · 整改完后(预计 2027-02)继续 A5
+
+---
+
+## 🆕 2026-05-23 拍板新铁律 · release_notes 覆盖式 + 官方语言(CLAUDE.md §6 升级)
+
+**触发**:Zihao 2026-05-23 反馈 release_notes prepend 链太长 + 内部叙事 / emoji 不够专业
+
+**新规则全文** 见 `CLAUDE.md/CLAUDE.md` §6 中段「🔒 2026-05-23 Zihao 升级铁律(覆盖式 + 官方语言)」
+
+**核心 3 条**:
+1. ❌ 禁止 prepend 老版本说明 · 每次部署 4 语字段**完全覆盖** · 只剩本次更新
+2. ❌ 禁止口语化 / emoji(🚨 / 客户反馈 / 大白话 / hotfix / BUG-FIX 编号)· 用**标准官方语言**(已优化 / 即日生效 / 系统更新)
+3. ❌ 禁止开发术语(根因 / 修法 / datetime / regex 等)· 用用户能懂的描述
+
+**守门测试**:`tests/unit/test_release_notes_no_history.py`(4 契约 · 锁住未来 agent 不能再 prepend / 加 emoji / 加开发术语)
+
+---
 
 ---
 

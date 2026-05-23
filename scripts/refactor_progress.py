@@ -102,6 +102,18 @@ def count_unit_tests() -> int:
     return total
 
 
+def count_integration_tests() -> int:
+    """统计 tests/integration/ 下 def test_* 总数 · 目录不存在返 0(诚实)"""
+    test_dir = PROJECT_ROOT / "tests" / "integration"
+    if not test_dir.exists():
+        return 0
+    total = 0
+    for py_file in test_dir.rglob("*.py"):
+        with py_file.open("r", encoding="utf-8", errors="replace") as f:
+            total += len(re.findall(r"^\s*def\s+test_\w+", f.read(), re.MULTILINE))
+    return total
+
+
 def count_e2e_tests() -> int:
     """统计 tests/e2e/ 下 test('...' Playwright"""
     e2e_dir = PROJECT_ROOT / "tests" / "e2e"
@@ -144,16 +156,28 @@ def main():
     # ── 模块文件数 ──
     print("📦 模块文件数(目标 50-100 个前端 + 20-30 个 router + 10+ services)")
     print("-" * 70)
-    home_modules = count_files_glob("static/home/*.js", PROJECT_ROOT)
+    # REFACTOR-A5 修正:Vite/A1 后新前端模块在 src/home/*(不再是 static/home/*)
+    home_modules = count_files_glob("src/home/**/*.js", PROJECT_ROOT)
     routers = count_files_glob("*_routes.py", PROJECT_ROOT)
     services = count_files_glob("services/**/*.py", PROJECT_ROOT)
-    component_css = count_files_glob("static/home/*.css", PROJECT_ROOT)
-    print(f"  static/home/*.js    : {home_modules:3d}  (目标 50-100)")
+    component_css = count_files_glob("src/home/**/*.css", PROJECT_ROOT)
+    print(f"  src/home/**/*.js    : {home_modules:3d}  (目标 50-100)")
     print(f"  *_routes.py         : {routers:3d}  (目标 20-30)")
     print(f"  services/**/*.py    : {services:3d}  (目标 10+)")
-    print(f"  static/home/*.css   : {component_css:3d}  (目标 20-30)")
+    print(f"  src/home/**/*.css   : {component_css:3d}  (目标 20-30)")
+    # REFACTOR-A5:每类按目标封顶 1.0 · 防某类超额(如 services 31/10)掩盖未动的类
     module_score = min(
-        100, int(100 * (home_modules / 50 + routers / 20 + services / 10 + component_css / 20) / 4)
+        100,
+        int(
+            100
+            * (
+                min(1.0, home_modules / 50)
+                + min(1.0, routers / 20)
+                + min(1.0, services / 10)
+                + min(1.0, component_css / 20)
+            )
+            / 4
+        ),
     )
     print(f"\n  模块化进度: {module_score}%")
     print()
@@ -163,11 +187,16 @@ def main():
     print("-" * 70)
     unit = count_unit_tests()
     e2e = count_e2e_tests()
-    integration = 0  # TODO: 等 tests/integration/ 建好后补
+    # REFACTOR-A5 修正:不再写死 0 · 真数 tests/integration/(目录不存在则诚实返 0)
+    integration = count_integration_tests()
     print(f"  Unit tests          : {unit:3d}  (目标 500+)")
     print(f"  Integration tests   : {integration:3d}  (目标 20+)")
     print(f"  E2E tests           : {e2e:3d}  (目标 10+)")
-    test_score = min(100, int(100 * (unit / 500 + e2e / 10 + integration / 20) / 3))
+    # REFACTOR-A5:同样每类封顶 1.0 · 防 integration 达标掩盖 e2e 几乎为 0
+    test_score = min(
+        100,
+        int(100 * (min(1.0, unit / 500) + min(1.0, e2e / 10) + min(1.0, integration / 20)) / 3),
+    )
     print(f"\n  测试覆盖进度: {test_score}%")
     print()
 
@@ -206,7 +235,19 @@ def main():
             "ESLint(.eslintrc 或 eslint.config)",
             any(
                 (PROJECT_ROOT / f).exists()
-                for f in [".eslintrc.json", ".eslintrc.js", "eslint.config.js"]
+                for f in [
+                    ".eslintrc.json",
+                    ".eslintrc.js",
+                    "eslint.config.js",
+                    "eslint.config.mjs",  # REFACTOR-A5 · flat config(ESM)
+                ]
+            ),
+        ),
+        (
+            "Prettier(.prettierrc)",
+            any(
+                (PROJECT_ROOT / f).exists()
+                for f in [".prettierrc", ".prettierrc.json", ".prettierrc.js", "prettier.config.js"]
             ),
         ),
         ("requirements.lock(pip-tools)", (PROJECT_ROOT / "requirements.lock.txt").exists()),

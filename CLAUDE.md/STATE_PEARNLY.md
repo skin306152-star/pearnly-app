@@ -1,10 +1,32 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-23(**第八会话**) · **🟢 OCR/对账改善计划收尾 · 下窗口回归工程整顿**
+> **最近更新**:2026-05-23(**第九会话**) · **🟢 整顿 A5 完成(CI lint 全量落地)+ 立 8 条硬门槛**
 >
-> **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(M4 银行对账已闭环 · M1/M2/M3 暂缓等用户反馈 · 学习机制设计已出但不建)
+> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **5.5/10**(A0/A1/A2.1/A5/A7/A9 完成)· **下窗口从 A8 续**(coverage baseline)
 >
-> **整顿期(REFACTOR_MASTER_PLAN.md)**:**可恢复** · 下窗口从 A5 续(改善计划告一段落 · Zihao 2026-05-23 拍板收尾)
+> **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(M4 银行对账已闭环 · M1/M2/M3 暂缓等用户反馈)
+
+---
+
+## 🆕 2026-05-23 第九会话 · 整顿 REFACTOR-A5(CI lint)+ 8 条硬门槛 · ⚠️ 下窗口必读
+
+**主线**:回归工程整顿 · 完成 REFACTOR-A5(CI 加 lint + format)· Zihao 拍板"全量 auto-fix 一次到位"。
+
+**做了什么(commit `5ae7bd0` · push master · CI 双 job 全绿 · 已部署)**:
+- **后端**:`pyproject.toml` 配 black(line-length 100)+ ruff(select=F 起步集)· **129 个 .py 全量 black 格式化** + ruff 99 处安全自动修。
+- **lint 顺手修出 2 个真 bug**(Zihao 拍板修):① `db.py` 对账降级查询 `date` 未导入 → 每次 NameError 恒返空;② `bank_recon_v2.py` GL 提示词 `.format()` 把 JSON 示例 `{date:...}` 当占位符 → KeyError 崩 → GL 解析永久失败。
+- **前端**:`.prettierrc`(tabWidth 4 配现状)+ `.prettierignore` + `eslint.config.mjs` · 格式化 **18 个可维护文件**(src/home · static · e2e · 配置)· **巨石 home.js/css/html + login.html + nav 原型经 .prettierignore 豁免**(阶段 C 拆解目标 · 现格式化=20万行丢弃 diff + 毁 git blame · 已标 C1/C2/C3)。eslint 0 error(58 warning 仅提示 = 静默吞错债 I1)。
+- **CI**:`ci.yml` 加并行 lint job(black --check / ruff / prettier --check / eslint)· `requirements-dev.txt` 锁 black/ruff · prettier/eslint 进 devDependencies。
+- i18n 守门验证不破(prettier 不动 home.js · check_i18n 0/0)。
+
+**🔑 同窗 Zihao 拍板:整顿期 8 条硬门槛**(见 `REFACTOR_MASTER_PLAN.md` 专段 + 铁律 #23):
+- 止血:app.py 不许新增路由(进 *_routes.py)· db.py 不许新增 ensure_*(只 Alembic)· home.js 不许新增业务模块(进 **src/home/*** · 更正旧"static/*.js IIFE"措辞)。
+- 测试:每拆模块带守门测试 · 核心路径至少 1 个 E2E/integration。
+- 度量:coverage 不死磕 70% 改"每月只升不降"棘轮 · /ready 必须能真失败 · 进度脚本必须诚实。
+
+**顺手修 `scripts/refactor_progress.py`**(硬门槛 #8 · commit 同批):① 数对位置(`static/home/*`→`src/home/*`)② integration 不再写死 0(真数 `tests/integration/` · **实际有 20 个 · 之前一直误报 0**)③ ESLint 检测加 `eslint.config.mjs` + 加 Prettier 检测 ④ 模块/测试得分每类按目标封顶(防 services 31/10 超额掩盖 home 模块化 2/50 · 模块化进度从虚高 84% 修为诚实 32%)。修后**综合进度 48%**。
+
+**下窗口第一步**:读 `REFACTOR_MASTER_PLAN.md`"当前进度看板" → REFACTOR-A8(coverage baseline · pytest-cov · 按硬门槛 #6 立只升不降棘轮)。
 
 ---
 

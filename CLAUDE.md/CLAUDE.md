@@ -542,6 +542,27 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 
 ---
 
+### 23. 整顿期 8 条硬门槛(2026-05-23 Zihao 拍板 · 比一般规矩更硬)
+
+**背景**:Zihao 2026-05-23 在 A5(CI lint)收尾时拍板,把 8 条工程标准升级为整顿期"硬门槛"——违反任意一条 = 偷渡新债。**权威详版见 `REFACTOR_MASTER_PLAN.md` 顶部"🔒 整顿期 8 条硬门槛"段**,本条是浓缩索引。
+
+**A. 止血(不让旧债继续长)**
+1. `app.py` 封死:不许新增 `@app.*` 路由 · 新路由进 `*_routes.py`(强化铁律 #17 / #21)
+2. `db.py` 封死:不许新增 `ensure_*` · 新 schema 只能 Alembic(强化铁律 #21 #5)
+3. `home.js` 封死:不许新增业务模块 · 新前端业务逻辑只能进 `src/home/*`(Vite ES 模块)
+   - ⚠️ **此条更正铁律 #17 / #21 旧措辞"放 static/xxx.js IIFE"**:自 A1 上 Vite 后,新业务逻辑一律 `src/home/*`;只有完全独立的小组件(version-banner 类)才留 `static/*.js`。
+
+**B. 测试(每动一处留网)**
+4. 每拆一个模块,必须带一个守门测试(无测试不算拆完)
+5. 每个核心业务路径至少一个 E2E / integration 测试(登录 / 注册 / 上传识别 / 销项核查 / 收入对账 / ERP 推送 / 充值)
+
+**C. 度量(数字不许造假)**
+6. coverage 不死磕 70% · A8 先建 baseline · 之后**每月只准升不准降**(棘轮 · 降了 CI 红)
+7. `/ready` 必须能真实失败(B4 落地时)· 任一依赖挂 → 返非 200 · 永远 ok = 没有
+8. `scripts/refactor_progress.py` 必须诚实(数对位置 `src/home/*` · 不写死指标 · 每类按目标封顶)· ✅ A5 已修
+
+---
+
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)
 
 **Pearnly 全局导航 = 跟着 `D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html` 走**

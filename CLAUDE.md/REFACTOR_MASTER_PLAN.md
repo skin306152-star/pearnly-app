@@ -6,7 +6,7 @@
 >
 > **整改单一权威源(已收尾)**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(看顶部"改善计划收尾"段)。
 >
-> **整顿期状态**:**恢复** · A 阶段在 4.5/10(A0/A1/A2.1/A7/A9 完成)· **下窗口从 A5 续**。
+> **整顿期状态**:**恢复** · A 阶段在 5.5/10(A0/A1/A2.1/A5/A7/A9 完成)· **下窗口从 A8 续**(coverage baseline)· 另已立"8 条硬门槛"(见下方专段 + 铁律 #23)。
 >
 > **接力 agent 进窗口先做**:读本文档"当前进度看板" + 找 A5 · 干活。改善已收尾 · 不再以审计文档为主线。
 >
@@ -50,6 +50,31 @@
    - 删超过 30 个文件 → 停下问
    - 升级核心框架版本(FastAPI / Python 大版本)→ 停下问
    - 改 git-deploy.sh / webhook → 停下问
+
+---
+
+## 🔒 整顿期 8 条硬门槛(2026-05-23 Zihao 拍板 · 不可商量)
+
+> 这 8 条是整顿期的"硬标准" · 比一般规矩更硬 · 接力 agent 违反任意一条 = 偷渡新债 · Zihao 追责。
+> CLAUDE.md 铁律 #23 是本段的浓缩版 · 本段是权威详版。
+
+**A. 止血(不让旧债继续长大)**
+
+1. **`app.py` 封死** · 不许新增 `@app.*` 路由 · 新路由必须建 `*_routes.py` + `app.include_router()`。(强化铁律 #17 / #21)
+2. **`db.py` 封死** · 不许新增 `ensure_*` 函数 · 新 schema 只能走 Alembic 迁移(借 A2.2 / B3 激活)。(强化铁律 #21 #5)
+3. **`home.js` 封死** · 不许新增业务模块 · 新前端业务逻辑只能进 `src/home/*`(Vite ES 模块)。
+   - ⚠️ **本条更正铁律 #17 / #21 的旧措辞"放 static/xxx.js IIFE"**:自 A1 上了 Vite + ES modules,**新业务逻辑一律进 `src/home/*`**;只有"完全独立、不依赖主应用"的小组件(如 version-banner)才允许留 `static/*.js` IIFE。
+
+**B. 测试(每动一处都留安全网)**
+
+4. **每拆出一个模块,必须同时带一个守门测试**(契约 / 单元)· 没测试 = 不算拆完 · 不许 commit。
+5. **每个核心业务路径至少一个 E2E 或 integration 测试** · 核心路径 = 登录 / 注册 / 上传识别 / 销项税核查 / 收入对账 / ERP 推送 / 充值。
+
+**C. 度量(数字不许造假 / 不许误导)**
+
+6. **coverage 不死磕 70%** · 先按 A8 建 baseline · 之后**每月只准升不准降**(棘轮机制)· 降了 = CI 红 / Zihao 追。比一刀切 70% 更实在、更难造数据。
+7. **`/ready` 必须能真实失败**(B4 落地时执行)· DB / Gemini / SMTP / LINE 任一挂 → `/ready` 返非 200 · **永远返 ok 的健康检查等于没有**。
+8. **`scripts/refactor_progress.py` 必须诚实** · 数对位置(`src/home/*` 不是 `static/home/*`)· 不写死任何指标(integration 不许写死 0)· 每类按目标封顶(防某类超额掩盖未动的类)。**✅ REFACTOR-A5 已修(commit 见进度看板)**。
 
 ---
 
@@ -139,7 +164,7 @@
 | A2 | Alembic 落地(装包 + `env.py` + 001 试点迁移 + git-deploy.sh 钩子) | 2.5h | A0 | 🟡 A2.1 ✅ `4d5c8ba`(装 alembic 1.18 / SQLAlchemy 2 / env.py 从 env var 读 DATABASE_URL / 001_baseline 空迁移)· A2.2 git-deploy.sh 钩子并入 B3(真迁第一个 ensure_* 时再加)|
 | A3 | 环境分级(prod / staging / dev 三套 · Docker 本地或 Vultr 第二台) | 1-2 天 | A0 | ⚪ |
 | A4 | Secrets 管理(`.env` → Doppler 或 1Password Secrets · 给多人协作铺垫) | 2-3 天 | A3 | ⚪ |
-| A5 | CI 加 lint + format(black + ruff + ESLint + Prettier) | 半天 | A0 | ⚪ |
+| A5 | CI 加 lint + format(black + ruff + ESLint + Prettier) | 半天 | A0 | ✅ 2026-05-23 · commit `5ae7bd0`(black/ruff 全量格式化 129 .py + 顺手修 2 真 bug · prettier/eslint 格 18 可维护文件 · 巨石按 C1/C2/C3 豁免 · ci.yml 加并行 lint job · CI 双 job 全绿)|
 | A6 | CI 加安全扫描(bandit + safety + npm audit) | 半天 | A5 | ⚪ |
 | A7 | 依赖锁定(`requirements.lock.txt` pip-tools) | 1-2h | A0 | ✅ 2026-05-22 · commit `296c074`(pip-tools 7.5.3 · 299 行 lock · ci.yml 装 lock · dependabot.yml 注释 + CONTRIBUTING.md §依赖管理) |
 | A8 | Code Coverage(pytest-cov + 上传 codecov · baseline) | 半天 | A5 | ⚪ |
@@ -277,7 +302,7 @@
 
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
-| **A 工具链** | 🟡 4.5/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A7 ✅ `296c074` · A9 ✅ `e57993a` · A2.2 并入 B3 · A3/A5/A6/A8 待启动 | Vite + Alembic + Dependabot + pip-tools 4 件基础设施落地 · 阶段 A 已近 1/2 |
+| **A 工具链** | 🟡 5.5/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A7 ✅ `296c074` · A9 ✅ `e57993a` · A2.2 并入 B3 · A3/A6/A8 待启动 | Vite + Alembic + lint(black/ruff/prettier/eslint)+ Dependabot + pip-tools 5 件基础设施落地 · 阶段 A 过半 |
 | B 后端 | ⚪ 0/10 | — | 依赖 A1, A5 |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
@@ -513,11 +538,11 @@ python scripts/refactor_progress.py
 
 ## 🚀 下一个 task
 
-**当前**:REFACTOR-A7 ✅ 完成(commit `296c074` · 2026-05-22 第五会话)
+**当前**:REFACTOR-A5 ✅ 完成(commit `5ae7bd0` · 2026-05-23 · CI 双 job 全绿)· Zihao 拍板全量 auto-fix · 顺手修 2 真 bug · 巨石按 C1/C2/C3 豁免 · 同窗补立"8 条硬门槛"。
 
-**下一个**:REFACTOR-A5 · CI lint(半天 · 风险中 · 涉及 black + ruff 自动 reformat 现有 .py · 建议先 `--check` 模式跑出 diff 给 Zihao 看 · 拍板再上自动 fix)· 或 A3 环境分级(1-2 天 · 重)/ A8 Code Coverage(半天 · 依赖 A5)
+**下一个**:REFACTOR-A8 · Code Coverage(半天 · 依赖 A5 已满足 · 建 baseline + pytest-cov · 按硬门槛 #6 立"只升不降"棘轮)· 或 A6 安全扫描(bandit + safety + npm audit · 半天)/ A3 环境分级(1-2 天 · 重)
 
-**A 阶段下一步建议顺序**:A5(CI lint)→ A8(coverage)→ A6(安全扫描)→ A3(环境分级)→ A4(secrets)· A2.2 等 B3 真迁第一条 ensure_* 时再做。
+**A 阶段下一步建议顺序**:A8(coverage baseline)→ A6(安全扫描)→ A3(环境分级)→ A4(secrets)· A2.2 等 B3 真迁第一条 ensure_* 时再做。
 
 **A2.2 钩子并入 B3**(2026-05-22 决策):
 - A2.1 装好 Alembic + 001 空 baseline 后 · 没真迁移之前 git-deploy.sh 加 `alembic upgrade head` 是 no-op

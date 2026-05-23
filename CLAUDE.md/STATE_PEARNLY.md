@@ -101,21 +101,57 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ### 下窗口接力 · ⚠️ 必读!(给下个 Claude 窗口看)
 
-**今天 Zihao 决定不开干 · 只做战略对齐 + 审计文档锚定 OCR 训练方向。Phase 0 没动一行代码。**
+**Phase 0 4 task 全部 commit + push 完成(2026-05-23 第六会话)· Decision Points 4 个全敲定:**
+- ✅ Phase 0 本会话立刻干(完)
+- ✅ Phase 1 拆 7 commit
+- ✅ Phase 3 P3.1 Claude 写脚本 + Zihao 跑 + 导出
+- ✅ Phase 4 X1 / X2 / X3 全锁死
+
+**Phase 0 commits**:
+- P0.1 · 64a84ca · v118.35.0.37 · OCR snapshot 落库 + 前端 localStorage 预填(M4)
+- P0.2 · ffd15b4 · v118.35.0.38 · Excel 末尾加『手动录入痕迹』+ 标黄 + comment(M4)
+- P0.3 · 735c834 · v118.35.0.39 · 历史详情 + 结果页显示 OCR vs User 对照表(M4)
+- P0.4 · eb2a55a · v118.35.0.40 · 6 类 modal flex-chain audit + min-height:0 防御(全局 UI)
+
+**净增长账**(铁律 #21 容忍上限内):
+- home.js +181 行 / +1750 容忍 (10% 用量)
+- home.html +17 行 / +650 容忍 (3% 用量)
+- home.css +2 行 / +400 容忍 (0.5% 用量)
+- app.py 0 净逻辑(只 release_notes 4 语 prepend)
+- recon_routes.py +55 行(独立路由 · 非 app.py)
+- bank_recon_v2.py +97 行(独立模块 · 非巨石)
+- 新文档 docs/audits/2026-05-23-modal-flex-chain-audit.md +133 行
+- 新测试 tests/unit/*.py +4 文件 +368 行(D 阶段 reward)
+
+**守门累计**:imports / i18n 0/0 / unit 306 OK / node check 全绿 · 4 个 commit 均合规
+
+**M4 银行对账『OCR vs 手改痕迹』Gap A 完整闭环** → 共性 Gap A 4/4 模块完成 1/4
+
+---
 
 **下窗口启动顺序**:
 1. ✅ `git branch --show-current` → 确认 master(铁律 #14)
-2. ✅ 读 `CLAUDE.md/CLAUDE.md` 顶部 21 条铁律(尤其 **#21 整改期不污染未来整顿** / #18 整顿期 / #20 commit 格式)
-3. ✅ 读 **`docs/audits/2026-05-22-ocr-recon-audit.md`**(整改单一权威源 · ~12000 字 · 含 OCR 训练 7 问 FAQ)
-4. ✅ 读本文档头部 + 第五会话续 2 段
-5. ✅ **先催 Zihao 回审计文档 §8 的 4 个 Decision Points · 否则不开干**(下面列)
-6. ✅ Zihao 确认后 → Phase 0 4 个 task(P0.1-P0.4 · 约 2 小时)
+2. ✅ 读 `CLAUDE.md/CLAUDE.md` 顶部 21 条铁律(尤其 #21 整改期不污染未来整顿)
+3. ✅ 读 **`docs/audits/2026-05-22-ocr-recon-audit.md`**(整改单一权威源 · Phase 0 已 ✅ · 重点 §5 Phase 1)
+4. ✅ 读 `docs/audits/2026-05-23-modal-flex-chain-audit.md`(P0.4 audit + 未来 modal bug 修法预案)
+5. ✅ 读本文档头部 + 第五会话续 2 段
+6. ✅ Zihao 拍板:开 Phase 1?还是先让本周 Zihao 跑生产测 Phase 0 的 4 个新功能再开 Phase 1?
+7. ✅ 开 Phase 1 → 按拆 7 commit 跑 P1.1 schema(借此激活 REFACTOR-A2.2 + B3 Alembic 真迁移)
 
-**Phase 0 4 个待启动 task**(都在 TaskList 里):
-- #9 · P0.1 · BUG-B-T1 OCR 抽到的 anchor 预填 input(半天)
-- #10 · P0.2 · BUG-B-T2 Excel 标黄被覆盖 anchor cell(半天)
-- #11 · P0.3 · BUG-B-T3 历史详情 OCR vs user 对照(半天)
-- #12 · P0.4 · BUG-A 扫其它 modal 同款 flex chain 病(1-2h)
+**Phase 0 4 个 task 已收尾** ✅(都在 TaskList 历史里 completed):
+- P0.1 · BUG-B-T1 ✅ v118.35.0.37 64a84ca
+- P0.2 · BUG-B-T2 ✅ v118.35.0.38 ffd15b4
+- P0.3 · BUG-B-T3 ✅ v118.35.0.39 735c834
+- P0.4 · BUG-A-T1 ✅ v118.35.0.40 eb2a55a
+
+**Phase 1 7 个 task 待启动**(详见审计文档 §5):
+- #P1.1 · 统一 _field_overrides JSONB schema(1 天 · 借此激活 Alembic 真迁移 · 4 模块)
+- #P1.2 · Excel 导出全部加来源列 + 标黄(2 天 · 跟 BUG-B-T2 同款 · 4 模块)
+- #P1.3 · 历史详情显示对照 + 用户改痕迹时间线(2 天 · 跟 P0.3 同款 · 4 模块)
+- #P1.4 · 字段级 confidence 接到前端(2 天 · M1+M2+M4)
+- #P1.5 · 低置信度警告 toast(半天 · M1+M2+M4)
+- #P1.6 · M3 加用户校对 UI(2 天 · 跟 M2 row_action 对齐)
+- #P1.7 · M3 加 3 anchor 余额手动录入(1 天 · 跟 BUG-B 同款)
 
 **🆕 铁律 #21 · 整改期不污染未来整顿**(2026-05-23 拍板 · CLAUDE.md §铁律 21):
 - 新 DB 函数 → `services/<domain>/*.py`(不进 db.py)
@@ -145,14 +181,12 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 - **Claude 能做**:自己爬数据 / 训神经网络 / 
 - **Zihao 必须做**:给真发票 / 真银行账单样本(每 vendor 5-10 张 · 每 bank 3-5 份)· 跑生产测试 · 报错给 Claude 迭代 prompt
 
-### 🟡 Decision Points · 等 Zihao 拍板(下窗口开干前必催)
+### ✅ Decision Points · Zihao 2026-05-23 全部敲定(下窗口直接按拍板执行)
 
-1. **Phase 0 本会话/下会话就做吗?**(4 个 task · 约 2 小时 · 推荐拆 4 commit)
-2. **Phase 1 7 个 task 怎么拆 commit?**(推荐 1 task = 1 commit · 拆 7 commit · 防一波带崩)
-3. **Phase 3 · 泰国 top 50 供应商发票样本谁收集?**(推荐:从 ocr_history 自动抽 top 50 · 你导出给 Claude)
-4. **Phase 4 ❌ 3 条永久不做确认吗?**(用户自定义公式 / 100% 自动化 / 自训 OCR · 默认锁死)
-
-**Zihao 在 2026-05-22 暂未答这 4 个问题** · 因为先问了 OCR 训练机制问题 · 现在战略已对齐 · 等 Zihao 回 4 个 Decision Points 就开 Phase 0。
+1. ✅ **Phase 0 立刻干** → 已完成(4 commit · 4 task · 2026-05-23 第六会话)
+2. ✅ **Phase 1 拆 7 commit**(1 task = 1 commit · 防一波带崩) → 下窗口接 P1.1 起
+3. ✅ **Phase 3 P3.1**:Claude 写脚本从 ocr_history 自动抽 top 50 vendor · Zihao 跑 Supabase 导出给 Claude · Claude 做 prompt(分工锁定)
+4. ✅ **Phase 4 X1/X2/X3 全锁死**(用户自定义公式 / 100% 自动化 / 自训 OCR · 永久不做)· 详见审计文档 §5 Phase 4 段
 
 ### 防偷懒(整改期专属)
 

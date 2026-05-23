@@ -294,14 +294,18 @@ Dext 的核心壁垒:同一家供应商的发票模板记住 → 下次秒识别
 >
 > **整改完成判定**:4 模块全部解决 Gap A + B · M3 加用户校对入口 · M4 BUG-B 闭环。
 
-### Phase 0 · 收尾我之前留的 BUG-A / BUG-B 尾巴(本周 · 2-3 commit)
+### Phase 0 · 收尾我之前留的 BUG-A / BUG-B 尾巴 · ✅ **全完成 2026-05-23**
 
-| ID | 内容 | 模块 | 工时 | 状态 |
-|---|---|---|---|---|
-| P0.1 | **BUG-B-T1 · OCR 抽到的 3 anchor 值预填到 input**(用户改/不改都行 · 不留空逼用户从零填) | M4 | 半天 | ⚪ |
-| P0.2 | **BUG-B-T2 · Excel 导出标黄被用户覆盖的 anchor cell + 顶部一行提示『含手动录入』** | M4 | 半天 | ⚪ |
-| P0.3 | **BUG-B-T3 · 历史详情(bank-v2/{task_id} 抽屉)显示 `{ocr, user}` 对照**(给老板审计用) | M4 | 半天 | ⚪ |
-| P0.4 | **BUG-A-T1 · 扫其它 modal 是否同款 flex chain 病** | 全局 UI | 1-2h | ⚪ |
+| ID | 内容 | 模块 | 工时 | 状态 | Commit |
+|---|---|---|---|---|---|
+| P0.1 | **BUG-B-T1 · OCR 抽到的 3 anchor 值预填到 input** | M4 | 半天 | ✅ | `64a84ca` v118.35.0.37 |
+| P0.2 | **BUG-B-T2 · Excel 导出标黄被用户覆盖的 anchor cell + 顶部一行提示** | M4 | 半天 | ✅ | `ffd15b4` v118.35.0.38 |
+| P0.3 | **BUG-B-T3 · 历史详情(bank-v2/{task_id} 抽屉)显示 `{ocr, user}` 对照** | M4 | 半天 | ✅ | `735c834` v118.35.0.39 |
+| P0.4 | **BUG-A-T1 · 扫其它 modal 是否同款 flex chain 病 + 防御性 min-height:0** | 全局 UI | 1-2h | ✅ | `eb2a55a` v118.35.0.40 + `docs/audits/2026-05-23-modal-flex-chain-audit.md` |
+
+**M4 银行对账『OCR vs 手改痕迹』Gap A 完整闭环** → 共性 Gap A 4/4 模块完成 **1/4**。
+**累计净增长**:home.js +181 / home.html +17 / home.css +2 / app.py 0 / db.py 0(铁律 #21 容忍 10% 用量)。
+**累计守门**:imports + i18n 0/0 + unit 306 OK + node check 全绿 · 新加 4 套契约测试。
 
 ### Phase 1 · 4 模块全部加『OCR 痕迹 + 字段置信度』 紧急(2-3 周 · 直接答客户痛点)
 
@@ -368,12 +372,12 @@ Dext 的核心壁垒:同一家供应商的发票模板记住 → 下次秒识别
 
 ---
 
-## 8. Decision Points · 等 Zihao 拍板
+## 8. Decision Points · ✅ Zihao 2026-05-23 全敲定
 
-1. **Phase 0 现在就做吗?**(我可以这次会话做完 BUG-B 3 个尾巴 + BUG-A 扫 modal · 1.5-2 小时)
-2. **Phase 1 是 1 个 commit 一起做还是拆 7 个 commit?**(我建议拆 · 每个 P1.X 独立 commit · 防一波带崩)
-3. **泰国 top 50 供应商样本收集** Phase 3 P3.1 谁来做?Zihao 提供发票样本 · 我做 prompt? · 或外包标注?
-4. **是否破 Phase 4 ❌ X1 X2 X3 任何一条?**(明确说 No 或 Yes · 接力 agent 看)
+1. ✅ **Phase 0 立刻干**(已完成 · 4 commit · 见 Phase 0 表)
+2. ✅ **Phase 1 拆 7 commit**(1 task = 1 commit · 防一波带崩) → 下窗口 P1.1 起
+3. ✅ **Phase 3 P3.1 分工**:Claude 写 SQL/Python 脚本从 ocr_history 抽 top 50 vendor · Zihao 跑 Supabase 导出 csv 给 Claude · Claude 做 prompt(锁死)
+4. ✅ **Phase 4 X1 / X2 / X3 全锁死**:用户自定义公式 / 100% 自动化 / 自训 OCR · 永久不做 · 接力 agent 看到不许反悔(详 §5 Phase 4 段)
 
 ---
 

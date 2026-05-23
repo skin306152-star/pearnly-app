@@ -5427,10 +5427,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "银行对账更让人放心了。\n\n现在系统会拿账单底部印的『笔数、合计』和我们读出来的内容对一遍——如果发现可能漏读了某笔交易,会主动提醒您去核对,而不是让错误悄悄溜过去。配合之前的『同一份账单每次结果一致』和『金额可推算时自动更正并标注』,需要您操心的地方更少、也更托底。\n\n即日生效。",
-            "th": "การกระทบยอดธนาคารน่าวางใจยิ่งขึ้น\n\nระบบจะนำ 'จำนวนรายการและยอดรวม' ที่พิมพ์ท้ายใบแจ้งยอดมาเทียบกับสิ่งที่อ่านได้ หากพบว่าอาจมีรายการตกหล่น จะแจ้งเตือนให้ท่านตรวจสอบ แทนที่จะปล่อยให้ผิดพลาดเงียบ ๆ เมื่อรวมกับ 'ผลคงที่ทุกครั้ง' และ 'แก้ยอดอัตโนมัติพร้อมระบุ' ที่ทำไปก่อนหน้า ท่านจึงต้องกังวลน้อยลงและอุ่นใจขึ้น\n\nมีผลทันที",
-            "en": "Bank reconciliation is now more reassuring.\n\nThe system now cross-checks the transaction count and totals printed at the bottom of the statement against what it read — if a transaction may have been missed, it proactively alerts you to verify, instead of letting an error slip through silently. Together with the earlier 'same result every time' and 'auto-correct with a clear label', there's less for you to worry about and more of a safety net.\n\nEffective immediately.",
-            "ja": "銀行照合がさらに安心になりました。\n\n明細末尾に印字された『件数・合計』と読み取り結果を突き合わせ、取引の取りこぼしの可能性があれば自動で注意喚起します。エラーをそっと見逃しません。先の『毎回同じ結果』『自動修正＋明示』と合わせ、気をもむことが減り、より安心して使えます。\n\n即日有効。"
+            "zh": "银行对账读得更全、更准了。\n\n遇到页数很多、密密麻麻的账单,以前可能会漏掉一些交易、或把存款和取款弄反;现在能把每一页、每一笔都完整读出来,存取方向也对得上。多个账户放在同一个 Excel、某个账户月底结清为 0 的情况,期末余额也能显示正确了。如果某份账单仍可能有遗漏,系统会主动提醒您核对,不让错误悄悄溜过去。\n\n即日生效。",
+            "th": "การกระทบยอดธนาคารอ่านได้ครบและแม่นยำขึ้น\n\nกับใบแจ้งยอดที่มีหลายหน้าและรายการแน่น เมื่อก่อนอาจตกหล่นบางรายการหรือสลับฝาก/ถอน ตอนนี้อ่านได้ครบทุกหน้าทุกรายการ ทิศทางฝาก/ถอนถูกต้อง กรณีหลายบัญชีในไฟล์ Excel เดียวและบางบัญชีถูกตัดยอดเป็น 0 สิ้นเดือน ยอดคงเหลือก็แสดงถูกต้องแล้ว หากยังมีโอกาสตกหล่น ระบบจะเตือนให้ท่านตรวจสอบ ไม่ปล่อยให้ผิดพลาดเงียบ ๆ\n\nมีผลทันที",
+            "en": "Bank reconciliation now reads statements more completely and accurately.\n\nFor long, densely packed statements, it could previously miss some transactions or swap deposits and withdrawals; now it reads every page and every line in full, with the deposit/withdrawal direction correct. For multiple accounts in one Excel file — including an account swept to zero at month-end — the closing balance now shows correctly too. If a statement might still have a gap, the system proactively prompts you to verify, so nothing slips through silently.\n\nEffective immediately.",
+            "ja": "銀行照合が、より漏れなく正確に読めるようになりました。\n\nページ数が多く明細が密な明細書では、以前は一部の取引を取りこぼしたり入金・出金を取り違えることがありましたが、今は全ページ・全明細を漏れなく読み取り、入出金の向きも正確です。1つのExcelに複数口座があり、月末に残高が0へ清算される口座でも、期末残高が正しく表示されます。なお取りこぼしの可能性が残る場合は、自動で確認を促し、エラーをそっと見逃しません。\n\n即日有効。"
         }
     }
 

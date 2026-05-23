@@ -82,5 +82,53 @@ class MultiAccountParseTests(unittest.TestCase):
         self.assertFalse(res.get("multi_account"), "单账户不应被标多账户")
 
 
+def _build_zero_close_blank_opening():
+    """v118.35.0.66 真实案例(KTB 8258):期初汇总区被银行清空(无 ยกมา 标签),
+    末笔 Sweep 把账户余额归零(期末真值 = 0.0)。锁定:
+      - 期末 0.0 不被当成『空单元格』丢掉(此前 str(c or '') 把 0.0 变 '')
+      - 期初被首笔『余额 − 净额』数学反推回来(39.15)"""
+    wb = openpyxl.Workbook()
+    ws = wb.active; ws.title = "984-2-99825-8"
+    ws.append(["Account No.", "984-2-99825-8"])
+    ws.append([])                                            # 期初汇总区留白(无标签)
+    ws.append(["Date", "Description", "Amount", "Balance"])  # 单一带符号金额
+    ws.append(["01/01/2026", "dep", 2000.0, 2039.15])        # 首笔 → 反推期初 39.15
+    ws.append(["31/01/2026", "Sweep MINBAL to xxx", -2039.15, 0.0])  # 归零 → 期末 0.0
+    bio = io.BytesIO(); wb.save(bio); return bio.getvalue()
+
+
+def _build_known_opening_with_gap():
+    """期初有印刷标签(ยกมา 1000)但中间一笔余额跳变与金额对不上(模拟漏读/读错),
+    锁定完整性交叉校验会产出 closing_mismatch(不再静默)。"""
+    wb = openpyxl.Workbook()
+    ws = wb.active; ws.title = "111-1-11111-1"
+    ws.append(["Account No.", "111-1-11111-1"])
+    ws.append(["", "", "", "", "ยอดยกมา", 1000.0])
+    ws.append(["Date", "Description", "Amount", "Balance"])
+    ws.append(["01/01/2026", "ok", 500.0, 1500.0])     # 1000+500=1500 ✓
+    ws.append(["02/01/2026", "bad", 500.0, 3000.0])    # 余额跳 1500 但金额只 500 → 缺口
+    bio = io.BytesIO(); wb.save(bio); return bio.getvalue()
+
+
+class XlsxClosingAndCompletenessTests(unittest.TestCase):
+    """v118.35.0.66 · .xls 期末 0 归零 + 空期初反推 + 完整性交叉校验。"""
+
+    def test_zero_closing_preserved_and_opening_derived(self):
+        res = parse_bank_stmt_xlsx_direct(_build_zero_close_blank_opening(), "ktb8258.xlsx")
+        self.assertTrue(res["ok"])
+        a = res["accounts"][0]
+        self.assertAlmostEqual(a["closing"], 0.0, places=2)   # 期末真值 0(此前误报 2039.15)
+        self.assertTrue(a["opening_known"])                   # 期初被反推
+        self.assertAlmostEqual(a["opening"], 39.15, places=2)
+        self.assertTrue(res["completeness"]["ok"])            # 链对平 · 无误报
+
+    def test_completeness_catches_mismatch(self):
+        res = parse_bank_stmt_xlsx_direct(_build_known_opening_with_gap(), "gap.xlsx")
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["completeness"]["ok"], "余额链对不上必须被抓到 · 不能静默")
+        types = [it["type"] for it in res["completeness"]["issues"]]
+        self.assertIn("closing_mismatch", types)
+
+
 if __name__ == "__main__":
     unittest.main()

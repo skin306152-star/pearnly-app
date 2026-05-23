@@ -913,6 +913,212 @@ def _stmt_bad_ratio(rows: List["StatementRow"], opening: float) -> float:
     return (bad / total) if total else 0.0
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# v118.35.0.66 · 坐标感知内嵌文本解析(密集多页文本 PDF 漏读根治 · 免费 + 确定性)
+# ─────────────────────────────────────────────────────────────────────────────
+_COORD_WD_KW  = ("ถอนเงิน", "ถอน", "withdrawal", "withdraw", "debit")
+_COORD_DEP_KW = ("ฝากเงิน", "ฝาก", "deposit", "credit")
+_COORD_BAL_KW = ("ยอดเงินในบัญชี", "ยอดคงเหลือ", "balance", "คงเหลือ")
+_COORD_DATE   = re.compile(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$")
+_COORD_AMT    = re.compile(r"^\(?-?[\d,]+\.\d{2}\)?-?$")
+
+
+def _coord_amt(tok: str) -> float:
+    """'1,255.00'→1255.0 · '(500.00)'/'500.00-'→-500.0(会计负数记法)。"""
+    neg = tok.startswith("(") or tok.rstrip().endswith("-")
+    v = float(re.sub(r"[(),\s\-]", "", tok) or 0)
+    return -v if neg else v
+
+
+def _coord_find_columns(words):
+    """从『同一文本行同时出现余额列 + 至少一个存/取列关键词』的表头行取各列 x 中心。
+    返回 {wd?, dep?, bal} 或 None。要求存/取为分立列(x 间距>20)· 否则(KBank 那种
+    『ถอนเงิน / ฝากเงิน』合并列 · 无法靠 x 区分)返回 None · 交回上层走原路径/Gemini。
+
+    用 y 容差(<8px)聚合表头词 · 不用固定分箱(泰文/拉丁字形上沿不同会被错分到相邻箱)。"""
+    kw: list = []   # (y0, kind, x_center)
+    for w in words:
+        t = w[4]; tl = t.lower(); cx = (w[0] + w[2]) / 2
+        if any(k in t or k in tl for k in _COORD_BAL_KW):
+            kw.append((w[1], "bal", cx))
+        elif any(k in t or k in tl for k in _COORD_WD_KW):
+            kw.append((w[1], "wd", cx))
+        elif any(k in t or k in tl for k in _COORD_DEP_KW):
+            kw.append((w[1], "dep", cx))
+    kw.sort()
+    for y0, _k0, _c0 in kw:
+        cols: Dict[str, float] = {}
+        for y1, k1, c1 in kw:
+            if abs(y1 - y0) < 8 and k1 not in cols:   # 同一表头行(y 容差)
+                cols[k1] = c1
+        if "bal" in cols and ("wd" in cols or "dep" in cols):
+            if "wd" in cols and "dep" in cols and abs(cols["wd"] - cols["dep"]) < 20:
+                return None      # 存取合并列 · x 无法区分 · 放弃
+            return cols
+    return None
+
+
+def _coord_cluster(centers, gap=12):
+    """把金额 token 的 x 中心做一维聚类:相邻间距 ≤gap 归同簇。
+    返回 [(mean_x, count, min_x, max_x)](按 x 升序)。"""
+    cl: List[list] = []
+    for x in sorted(centers):
+        if cl and x - cl[-1][-1] <= gap:
+            cl[-1].append(x)
+        else:
+            cl.append([x])
+    return [(sum(c) / len(c), len(c), min(c), max(c)) for c in cl]
+
+
+def _coords_by_xcluster(doc):
+    """v118.35.0.66 · 数据驱动列检测(表头法拿不到分立列时的兜底 · 主治 KBank 那种
+    『ถอนเงิน / ฝากเงิน』合并列 + 表头无独立余额列)。
+
+    思路:金额 token 的 x 一维聚类 → 最右显著簇 = 余额列、其余显著簇 = 金额列(存/取
+    挨得近的子列会自然并入同一金额列)。以『余额 token』为行锚(每笔恰一个运行余额)·
+    同 y 配金额 · 无配对金额的余额 = 期初/承上行(只更新 prev · 不当交易)· 方向由
+    余额涨跌定(不靠 x 区分存取 → 合并列也能切对)。
+
+    安全性:若把余额/金额列认错 → 余额涨跌与金额对不上 → _stmt_bad_ratio 高 → 上层弃用。
+    返回 (rows, opening, closing) 或 ([],0,0)。
+    """
+    per_page = []
+    amt_centers: List[float] = []
+    for pno in range(doc.page_count):
+        words = doc[pno].get_text("words")
+        amts = [((w[0] + w[2]) / 2, w[1], w[4]) for w in words if _COORD_AMT.match(w[4])]
+        dates = [((w[0] + w[2]) / 2, w[1], w[4]) for w in words if _COORD_DATE.match(w[4])]
+        per_page.append((amts, dates))
+        amt_centers.extend(a[0] for a in amts)
+    if len(amt_centers) < MIN_PLUMBER_ROWS * 2:
+        return [], 0.0, 0.0
+    clusters = _coord_cluster(amt_centers)
+    thr = max(5, len(amt_centers) * 0.02)
+    sig = [c for c in clusters if c[1] >= thr]
+    if len(sig) < 2:
+        return [], 0.0, 0.0          # 至少要『金额列 + 余额列』
+    bal_c = sig[-1]; amt_cs = sig[:-1]
+
+    def in_bal(x):
+        return bal_c[2] - 6 <= x <= bal_c[3] + 6
+
+    def in_amt(x):
+        return any(c[2] - 6 <= x <= c[3] + 6 for c in amt_cs)
+
+    rows: List[StatementRow] = []
+    prev = None
+    for amts, dates in per_page:
+        bals = sorted([a for a in amts if in_bal(a[0])], key=lambda a: a[1])
+        for _bx, by, bv in bals:
+            b = _coord_amt(bv)
+            paired = [a for a in amts if in_amt(a[0]) and abs(a[1] - by) < 5]
+            if not paired:
+                if prev is None:
+                    prev = b             # 期初 B/F(无配对金额)· 设基准
+                continue
+            amt = abs(_coord_amt(paired[0][2]))
+            dt = [x for x in dates if abs(x[1] - by) < 6]
+            d = _parse_date(dt[0][2]) if dt else None
+            # 方向按余额涨跌(prev 未知时暂记存款 · 交 _correct_direction 兜底)
+            if prev is not None and b < prev:
+                rows.append(StatementRow(date=d, description="", withdrawal=amt,
+                                         deposit=0.0, balance=b))
+            else:
+                rows.append(StatementRow(date=d, description="", withdrawal=0.0,
+                                         deposit=amt, balance=b))
+            prev = b
+    if len(rows) < MIN_PLUMBER_ROWS:
+        return [], 0.0, 0.0
+    fr = rows[0]
+    opening = round((fr.balance or 0) - (fr.deposit - fr.withdrawal), 2)
+    closing = rows[-1].balance or 0.0
+    return rows, opening, closing
+
+
+def _coords_by_header(doc):
+    """v118.35.0.66 · 表头法:从表头定位 取/存/余额 三列 x · 金额按 x 归到对应列。
+    适合存/取分立成列、表头列中心能代表数据列的版式(BAY/SCB)。返回 (rows, opening, closing)。"""
+    cols = None
+    rows: List[StatementRow] = []
+    for pno in range(doc.page_count):
+        words = doc[pno].get_text("words")   # (x0,y0,x1,y1,text,block,line,word)
+        pg_cols = _coord_find_columns(words)
+        if pg_cols:
+            cols = pg_cols                   # 每页若有表头就刷新 · 否则沿用上一页
+        if not cols:
+            continue
+        bal_x = cols["bal"]
+        dates = sorted([(w[1], w[4]) for w in words if _COORD_DATE.match(w[4])])
+        amts = [((w[0] + w[2]) / 2, w[1], w[4]) for w in words if _COORD_AMT.match(w[4])]
+        texts = [(w[0], w[1], w[4]) for w in words
+                 if not _COORD_AMT.match(w[4]) and not _COORD_DATE.match(w[4])]
+        for i, (dy, dval) in enumerate(dates):
+            d = _parse_date(dval)
+            if d is None:
+                continue
+            nxt = dates[i + 1][0] if i + 1 < len(dates) else dy + 9999
+            near = [a for a in amts if abs(a[1] - dy) < 14]
+            if not near:
+                continue                     # 表头日期范围 / 无金额行 · 跳过
+            wd = dep = 0.0; bal = None
+            for cx, _y, v in near:
+                col = min(cols, key=lambda k: abs(cols[k] - cx))
+                if col == "bal":
+                    bal = _coord_amt(v)
+                elif col == "wd":
+                    wd = abs(_coord_amt(v))
+                else:
+                    dep = abs(_coord_amt(v))
+            if wd == 0.0 and dep == 0.0:
+                continue                     # 只有余额没动额(期初/小计)· 不当交易
+            # 描述:本行 y 区间内、余额列右侧的文字 token 拼接(best-effort)
+            desc = " ".join(t for x, y, t in texts
+                            if dy - 2 <= y < nxt - 2 and x > bal_x + 15)[:120]
+            rows.append(StatementRow(date=d, description=desc, withdrawal=wd,
+                                     deposit=dep,
+                                     balance=bal if bal is not None else 0.0))
+    if len(rows) < MIN_PLUMBER_ROWS:
+        return [], 0.0, 0.0
+    fr = rows[0]
+    opening = round((fr.balance or 0) - (fr.deposit - fr.withdrawal), 2)  # 数学反推期初
+    closing = rows[-1].balance or 0.0
+    return rows, opening, closing
+
+
+def _parse_stmt_text_coords(file_bytes: bytes):
+    """v118.35.0.66 · 用 PyMuPDF words 的 x 坐标按列还原密集文本 PDF(BAY/SCB/KBank 等)。
+
+    根因:get_text() 线性化丢列位置 → 存/取无法区分(BAY 314 存被全判成取 → 余额链坏
+    → 触发 Gemini · 再被 Gemini 漏读 30-40%)。
+
+    两套策略都跑、按『余额链可信度』取优(不靠猜哪套适用):
+      A) 表头法 `_coords_by_header`:表头列中心 → 金额按 x 归列(BAY/SCB)。
+      B) 数据驱动 `_coords_by_xcluster`:金额 x 聚类找列、方向由余额涨跌定(KBank 那种
+         存取子列挨太近、表头列中心代表不了数据列的版式)。
+    取 `_stmt_bad_ratio` 更低者(并列取行数更多)· 都拿不到 → 返回空交回上层。
+    返回 (rows, opening, closing)。
+    """
+    try:
+        import fitz
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+    except Exception:
+        return [], 0.0, 0.0
+    cands = []
+    for fn in (_coords_by_header, _coords_by_xcluster):
+        try:
+            r, op, cl = fn(doc)
+        except Exception:
+            r, op, cl = [], 0.0, 0.0
+        if len(r) >= MIN_PLUMBER_ROWS:
+            # 排序键:余额链坏占比升序 · 再按行数降序(并列取更全)
+            cands.append((round(_stmt_bad_ratio(r, op), 3), -len(r), r, op, cl))
+    if not cands:
+        return [], 0.0, 0.0
+    cands.sort(key=lambda c: (c[0], c[1]))
+    _bad, _n, rows, opening, closing = cands[0]
+    return rows, opening, closing
+
+
 def parse_bank_statement_pdf(
     file_bytes: bytes, filename: str, api_key: str = ""
 ) -> Dict[str, Any]:
@@ -1008,6 +1214,24 @@ def parse_bank_statement_pdf(
         logger.info(f"[stmt_parse][{filename}] step4b text-line: tbl_rows={len(rows)} text_rows={len(text_rows)} bank={bank_code}")
         if len(text_rows) > len(rows):
             rows, opening, closing = text_rows, text_op, text_cl
+
+    # ── Step 4c: 坐标感知文本解析(密集多页文本 PDF · BAY/SCB 等)v118.35.0.66 ──
+    # 行级解析对存/取分立列的文本 PDF 易把列对错位(BAY 314 存全判成取 → 触发 Gemini
+    # 再漏读)。坐标解析按表头列 x 归位 · 跨全部页 · 取『行数更多且余额链不更差』者。
+    if all_text.strip():
+        try:
+            coord_rows, coord_op, coord_cl = _parse_stmt_text_coords(file_bytes)
+        except Exception as e:
+            coord_rows, coord_op, coord_cl = [], 0.0, 0.0
+            logger.warning(f"[stmt_parse][{filename}] step4c coords skipped: {e}")
+        if coord_rows:
+            coord_bad = _stmt_bad_ratio(coord_rows, coord_op)
+            cur_bad = _stmt_bad_ratio(rows, opening)
+            logger.info(f"[stmt_parse][{filename}] step4c coords: rows={len(coord_rows)} "
+                        f"bad={coord_bad:.2f} vs cur rows={len(rows)} bad={cur_bad:.2f}")
+            # 坐标解析行数更多 · 且余额链不比现有更坏 → 采用(更全 + 列对位正确)
+            if len(coord_rows) > len(rows) and coord_bad <= max(cur_bad, 0.05):
+                rows, opening, closing = coord_rows, coord_op, coord_cl
 
     # ── Step 5: Gemini fallback ──
     # v118.35.0.52 · 触发条件升级:行数不足 OR 免费解析余额链大面积对不上(列错位 · 如
@@ -1713,7 +1937,12 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
             description=desc, withdrawal=withdrawal, deposit=deposit,
             balance=balance, source_file=filename, account_no=account_no,
         ))
-        if bal_raw.strip():   # 末行常是无余额的 Sweep 行 · 只记『有余额』行做期末
+        # v118.35.0.66 · 区分『余额真的是 0』(Sweep 归零户合法期末)和『余额单元格空着』。
+        # row_list 用 str(c or "") 会把数值 0.0 变成 ""(0.0 为假值)→ 此前把归零户那一行
+        # 的期末 0 当成空 · 误退回上一行余额(KTB 8258 期末被报成 3845.3 而非真值 0)。
+        # 这里直接看『原始单元格』判空 · 而非被 or 改写过的字符串。
+        raw_bal_cell = raw[bal_idx] if 0 <= bal_idx < len(raw) else None
+        if raw_bal_cell is not None and str(raw_bal_cell).strip() != "":
             last_valid_closing = balance
     return rows, opening_balance, last_valid_closing
 
@@ -1747,7 +1976,18 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
         s_rows = [r for r in s_rows if not _is_summary_row(r.description)]
         if not s_rows:
             continue
-        s_open = s_opening if s_opening is not None else 0.0
+        # v118.35.0.66 · 期初汇总区被银行清空(KTB 8258 那种 ยกมา/คงเหลือ 整块留白 ·
+        # 只剩净额 -39.15)时,用首笔交易『余额 − 净额』数学反推期初余额 ——
+        # 这是唯一可证的算术(非猜测),给余额链一个正确锚点;否则期初默认 0 会让
+        # 第一行无从核对、且期末交叉校验失真,错误悄悄溜过去。
+        opening_known = s_opening is not None
+        if not opening_known and s_rows[0].balance is not None:
+            fr = s_rows[0]
+            s_open = round(fr.balance - ((fr.deposit or 0) - (fr.withdrawal or 0)), 2)
+            opening_known = True
+        else:
+            s_open = s_opening if s_opening is not None else 0.0
+        closing_known = s_closing is not None
         # 末期:优先用最后一个『有余额』行;退回末行余额
         s_close = s_closing if s_closing is not None else s_rows[-1].balance
         # 关键:每账户用自己的期初做方向纠正 + 余额校验 + 自动修复 · 不跨账户
@@ -1757,6 +1997,7 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
         accounts.append({
             "account_no": acct, "rows": s_rows,
             "opening": s_open, "closing": s_close,
+            "opening_known": opening_known, "closing_known": closing_known,
         })
         sheets_with_data += 1
 
@@ -1770,6 +2011,24 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
     opening_balance = sum(a["opening"] for a in accounts)
     closing_balance = sum(a["closing"] for a in accounts)
 
+    # v118.35.0.66 · .xls 直读路径过去『没有』完整性交叉校验(_audit_completeness 只跑 PDF),
+    # 多账户余额链对不上时悄无声息 —— 违背『0 静默错误』铁律。这里逐账户做期末平衡校验:
+    #   期初 + Σ存 − Σ取 ?= 期末。对不上 = 可能漏行/读错金额 → 产出 closing_mismatch issue,
+    #   路由(recon_routes)会据此自动弹『请核对原件』警告条(已支持 closing_mismatch 类型)。
+    comp_issues: List[Dict[str, Any]] = []
+    for a in accounts:
+        if not (a.get("opening_known") and a.get("closing_known")):
+            continue   # 期初/期末有一头没拿到真值 · 无从交叉校验 · 不误报
+        sdep = round(sum(r.deposit or 0 for r in a["rows"]), 2)
+        swd = round(sum(r.withdrawal or 0 for r in a["rows"]), 2)
+        calc = round(a["opening"] + sdep - swd, 2)
+        tol = max(1.0, abs(a["closing"]) * 0.001)
+        if abs(calc - a["closing"]) > tol:
+            comp_issues.append({
+                "type": "closing_mismatch", "calc": calc, "printed": a["closing"],
+                "diff": round(calc - a["closing"], 2), "account": a["account_no"],
+            })
+
     return {
         "ok": True,
         "rows": all_rows,
@@ -1782,6 +2041,8 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
         "accounts": accounts,                          # v118.35.0.61 · 分账户明细
         "account_codes": [a["account_no"] for a in accounts if a["account_no"]],
         "multi_account": multi_account,                # v118.35.0.61 · 多账户标志
+        "completeness": {"ok": len(comp_issues) == 0,  # v118.35.0.66 · 期末交叉校验
+                         "issues": comp_issues},
         "needs_review": False,
     }
 

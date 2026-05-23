@@ -1416,11 +1416,18 @@ async def bank_v2_run(
         except Exception:
             return None
 
-    # Hard parse errors (file couldn't be read at all) → save diagnostic task, return 200 ok:false
+    # v118.35.0.53 · 部分文件失败容错:一个坏文件不再拖垮整批。
+    # merge_statements/merge_gl_files 本就跳过 not-ok 的结果 · 这里只在『某一侧全部失败』时硬报错。
+    # 部分失败 → 跳过坏文件、用成功的继续 · 失败文件在 parse_info 里逐个标出(前端可显示)。
+    stmt_ok_n = sum(1 for r in stmt_results if r.get("ok"))
+    gl_ok_n   = sum(1 for r in gl_results if r.get("ok"))
     stmt_errors = [r.get("error") for r in stmt_results if not r.get("ok")]
     gl_errors   = [r.get("error") for r in gl_results if not r.get("ok")]
-    if stmt_errors or gl_errors:
-        err_key = "stmt_parse_fail" if stmt_errors else "gl_parse_fail"
+    skipped_files = [fn for r, (_, fn) in zip(stmt_results, stmt_data) if not r.get("ok")] + \
+                    [fn for r, (_, fn) in zip(gl_results, gl_data) if not r.get("ok")]
+    if stmt_ok_n == 0 or gl_ok_n == 0:
+        # 整侧全失败才真失败(对账单全坏 或 GL 全坏)
+        err_key = "stmt_parse_fail" if stmt_ok_n == 0 else "gl_parse_fail"
         err_msg = _brv2_err(err_key, lang,
                             e="; ".join(filter(None, (stmt_errors + gl_errors)[:2])))
         failed_id = _save_failed_task()
@@ -1512,6 +1519,7 @@ async def bank_v2_run(
         "gl_accounts": gl_accounts,
         "stmt_row_count": len(stmt_rows),
         "gl_row_count": len(gl_rows),
+        "skipped_files": skipped_files,  # v118.35.0.53 · 部分失败被跳过的文件 · 前端可提示
         "parse_info": parse_info,
         "stats": {
             "matched": summary.matched_count,

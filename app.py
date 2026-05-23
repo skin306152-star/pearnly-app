@@ -5417,10 +5417,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统进一步提升了银行对账单的识别准确性与稳定性。\n\n对于部分数字版 PDF 对账单,此前因表格栏位识别偏差,可能出现余额或金额读取错误。现在系统会自动评估每份对账单的识别质量,在发现栏位错位时自动改用更强的识别方式重新读取,确保结果与原始对账单一致,大幅减少需要您手动核对的情况。\n\n即日生效。",
-            "th": "ระบบได้ปรับปรุงความแม่นยำและเสถียรภาพในการอ่านใบแจ้งยอดธนาคารเพิ่มเติม\n\nสำหรับใบแจ้งยอด PDF แบบดิจิทัลบางไฟล์ ก่อนหน้านี้อาจอ่านยอดคงเหลือหรือจำนวนเงินผิดพลาดเนื่องจากการระบุคอลัมน์คลาดเคลื่อน ขณะนี้ระบบจะประเมินคุณภาพการอ่านของแต่ละไฟล์โดยอัตโนมัติ และเปลี่ยนไปใช้วิธีการอ่านที่แม่นยำกว่าเมื่อพบความคลาดเคลื่อน เพื่อให้ผลตรงกับใบแจ้งยอดต้นฉบับ และลดกรณีที่ต้องตรวจสอบเองอย่างมาก\n\nมีผลทันที",
-            "en": "The accuracy and stability of bank-statement reading has been further improved.\n\nFor some digital PDF statements, column-detection drift could previously cause balances or amounts to be read incorrectly. The system now automatically assesses the reading quality of each statement and switches to a stronger reading method when column misalignment is detected, ensuring the result matches the original statement and greatly reducing cases that need your manual review.\n\nEffective immediately.",
-            "ja": "銀行明細の読み取り精度と安定性をさらに改善しました。\n\n一部のデジタル PDF 明細で、列の認識ずれにより残高や金額が誤って読み取られることがありました。今後はシステムが各明細の読み取り品質を自動的に評価し、列のずれを検出した場合はより強力な読み取り方式に自動的に切り替えて、結果が元の明細と一致するようにします。手動確認が必要なケースも大幅に減少します。\n\n即日有効。"
+            "zh": "系统提升了银行对账批量上传的稳定性。\n\n此前当一次上传的多份对账单中有任意一份无法识别时,整批对账会被中断、结果显示为空。现已修复:系统会自动跳过无法识别的文件,用其余成功识别的对账单继续对账,并在文件状态中标明被跳过的文件,不再因单个文件影响全部结果。\n\n即日生效。",
+            "th": "ระบบได้ปรับปรุงเสถียรภาพของการอัปโหลดใบแจ้งยอดหลายไฟล์พร้อมกัน\n\nก่อนหน้านี้ หากในการอัปโหลดมีใบแจ้งยอดไฟล์ใดไฟล์หนึ่งที่อ่านไม่ได้ การกระทบยอดทั้งชุดจะถูกยกเลิกและผลลัพธ์ว่างเปล่า ขณะนี้แก้ไขแล้ว ระบบจะข้ามไฟล์ที่อ่านไม่ได้โดยอัตโนมัติ และใช้ใบแจ้งยอดที่อ่านสำเร็จที่เหลือทำการกระทบยอดต่อ พร้อมระบุไฟล์ที่ถูกข้ามในสถานะไฟล์ จะไม่ให้ไฟล์เดียวกระทบต่อผลทั้งหมดอีก\n\nมีผลทันที",
+            "en": "Batch upload of bank statements is now more stable.\n\nPreviously, if any single statement in an upload could not be read, the entire reconciliation was aborted and the result came back empty. This is now fixed: the system automatically skips files it cannot read and continues reconciliation with the remaining successfully-read statements, marking the skipped files in the file status. A single problem file no longer affects the whole result.\n\nEffective immediately.",
+            "ja": "銀行明細の一括アップロードの安定性を向上しました。\n\nこれまで、アップロードした複数の明細のうち1件でも読み取れないものがあると、照合全体が中断され結果が空になっていました。今回修正し、読み取れないファイルは自動的にスキップして、残りの読み取れた明細で照合を続行し、スキップしたファイルをファイル状態に明示します。1件の問題ファイルが全体の結果に影響することはなくなりました。\n\n即日有効。"
         }
     }
 

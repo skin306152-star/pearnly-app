@@ -48,6 +48,7 @@ from report_routes import router as reports_router  # v109.0
 from auth_signup import router as signup_router  # v109.3
 from recon_routes import router as recon_router  # v118.32.0
 from vat_excel_routes import router as vat_excel_router  # v118.32.4.9.5 · Excel 公式对账内测
+from notification_routes import router as notification_router  # REFACTOR-B1 · 2026-05-24
 from billing_routes import (
     router as billing_router,
 )  # 阶段 5 Task 5.1 · 抽 11 个 billing 路由(2026-05-22)
@@ -1038,6 +1039,7 @@ app.include_router(reports_router)  # v109.0
 app.include_router(signup_router)  # v109.3
 app.include_router(recon_router)  # v118.32.0 · 销项税对账
 app.include_router(vat_excel_router)  # v118.32.4.9.5 · Excel 公式对账内测(skin306152 only)
+app.include_router(notification_router)  # REFACTOR-B1 · 通知规则 6 路由(2026-05-24)
 app.include_router(billing_router)  # 阶段 5 Task 5.1 · billing 11 路由(2026-05-22)
 app.include_router(
     admin_diagnostics_router
@@ -9296,160 +9298,7 @@ async def api_list_used_categories(request: Request):
 # 模板常量已在 v118.22.1.1 helper 段(本文件 1900 多行处)统一声明
 
 
-class NotificationRuleCreate(BaseModel):
-    name: str
-    template_code: str
-    params: Optional[Dict[str, Any]] = None
-    enabled: bool = True
-
-
-class NotificationRuleUpdate(BaseModel):
-    name: Optional[str] = None
-    params: Optional[Dict[str, Any]] = None
-    enabled: Optional[bool] = None
-
-
-def _validate_template_params(
-    template_code: str, params: Optional[Dict[str, Any]]
-) -> Dict[str, Any]:
-    """模板特定参数校验 · 失败 raise HTTPException 400"""
-    p = dict(params or {})
-    if template_code == NOTIF_TEMPLATE_LARGE_INVOICE:
-        thr = p.get("threshold")
-        try:
-            thr_f = float(thr) if thr is not None else 0.0
-        except Exception:
-            raise HTTPException(400, detail="notification.threshold_invalid")
-        if thr_f <= 0:
-            raise HTTPException(400, detail="notification.threshold_required")
-        p["threshold"] = thr_f
-    # exception_high 暂无必填参数
-    return p
-
-
-@app.get("/api/notifications/rules")
-async def api_notif_list_rules(request: Request):
-    """列规则 · 同 tenant 共享视图"""
-    user = get_current_user_from_request(request)
-    rules = db.list_notification_rules(str(user["id"]), tenant_id=_tid(user))
-    return {"items": rules, "count": len(rules)}
-
-
-@app.post("/api/notifications/rules")
-async def api_notif_create_rule(req: NotificationRuleCreate, request: Request):
-    """新建规则 · 必须选内置模板之一"""
-    user = get_current_user_from_request(request)
-    name = (req.name or "").strip()
-    if not name:
-        raise HTTPException(400, detail="notification.name_required")
-    if len(name) > 100:
-        raise HTTPException(400, detail="notification.name_too_long")
-    if req.template_code not in NOTIF_TEMPLATE_WHITELIST:
-        raise HTTPException(400, detail="notification.template_invalid")
-    params = _validate_template_params(req.template_code, req.params)
-    rule_id = db.create_notification_rule(
-        user_id=str(user["id"]),
-        tenant_id=_tid(user),
-        name=name,
-        template_code=req.template_code,
-        params=params,
-        enabled=req.enabled,
-    )
-    if not rule_id:
-        raise HTTPException(500, detail="notification.create_failed")
-    return {"ok": True, "id": rule_id}
-
-
-@app.patch("/api/notifications/rules/{rule_id}")
-async def api_notif_update_rule(rule_id: int, req: NotificationRuleUpdate, request: Request):
-    """改规则 · 任一字段非 None 即更新"""
-    user = get_current_user_from_request(request)
-    rule = db.get_notification_rule(rule_id, str(user["id"]), tenant_id=_tid(user))
-    if not rule:
-        raise HTTPException(404, detail="notification.not_found")
-    name_new = None
-    if req.name is not None:
-        name_new = req.name.strip()
-        if not name_new:
-            raise HTTPException(400, detail="notification.name_required")
-        if len(name_new) > 100:
-            raise HTTPException(400, detail="notification.name_too_long")
-    params_new = None
-    if req.params is not None:
-        params_new = _validate_template_params(rule["template_code"], req.params)
-    ok = db.update_notification_rule(
-        rule_id=rule_id,
-        user_id=str(user["id"]),
-        tenant_id=_tid(user),
-        name=name_new,
-        params=params_new,
-        enabled=req.enabled,
-    )
-    if not ok:
-        raise HTTPException(500, detail="notification.update_failed")
-    return {"ok": True}
-
-
-@app.delete("/api/notifications/rules/{rule_id}")
-async def api_notif_delete_rule(rule_id: int, request: Request):
-    """删规则 · logs 里的 rule_id 置空保留发送历史"""
-    user = get_current_user_from_request(request)
-    rule = db.get_notification_rule(rule_id, str(user["id"]), tenant_id=_tid(user))
-    if not rule:
-        raise HTTPException(404, detail="notification.not_found")
-    ok = db.delete_notification_rule(rule_id, str(user["id"]), tenant_id=_tid(user))
-    if not ok:
-        raise HTTPException(500, detail="notification.delete_failed")
-    return {"ok": True}
-
-
-@app.post("/api/notifications/rules/{rule_id}/test")
-async def api_notif_test_send(rule_id: int, request: Request):
-    """测试发送 · 渲染 test_send 模板 + 推到当前用户绑定的 LINE"""
-    user = get_current_user_from_request(request)
-    rule = db.get_notification_rule(rule_id, str(user["id"]), tenant_id=_tid(user))
-    if not rule:
-        raise HTTPException(404, detail="notification.not_found")
-    binding = db.get_line_binding_by_user(str(user["id"]))
-    if not binding or not binding.get("line_user_id"):
-        raise HTTPException(400, detail="notification.line_not_bound")
-    line_user_id = binding["line_user_id"]
-    # v118.25.4 · fallback 改 th(主市场泰国)而非 zh
-    lang = user.get("preferred_lang") or "th"
-    text = line_client.render_notification(
-        lang,
-        "test_send",
-        {
-            "rule_name": rule.get("name") or "-",
-        },
-    )
-    ok = line_client.push_text(line_user_id, text)
-    db.log_notification(
-        user_id=str(user["id"]),
-        tenant_id=_tid(user),
-        rule_id=rule_id,
-        template_code=rule.get("template_code") or "test_send",
-        event_type="test_send",
-        event_ref=None,
-        line_user_id=line_user_id,
-        status="sent" if ok else "failed",
-        error=None if ok else "line_push_failed",
-    )
-    if not ok:
-        raise HTTPException(502, detail="notification.line_push_failed")
-    return {"ok": True}
-
-
-@app.get("/api/notifications/logs")
-async def api_notif_list_logs(request: Request, limit: int = 50):
-    """列发送日志 · 同 tenant 共享 · 默认最近 50"""
-    user = get_current_user_from_request(request)
-    logs = db.list_notification_logs(
-        str(user["id"]),
-        tenant_id=_tid(user),
-        limit=min(int(limit), 200),
-    )
-    return {"items": logs, "count": len(logs)}
+# 通知规则 models/校验/6 路由已抽到 notification_routes.py(REFACTOR-B1 · 2026-05-24)
 
 
 # ============================================================

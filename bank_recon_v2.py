@@ -95,6 +95,7 @@ class StatementRow:
     deposit: float           # money in (≥ 0)
     balance: float
     source_file: str = ""
+    account_no: str = ""     # v118.35.0.61 · 所属账户(多账户文件分账户对账/校验用)
     row_hash: str = ""       # for deduplication
     # v118.33.13.0 · accuracy verification fields
     confidence: str = "high"          # 'high'|'medium'|'low' (set by OCR engine)
@@ -106,7 +107,7 @@ class StatementRow:
         if not self.row_hash:
             # v118.35.0.49 · 哈希含余额 · 防同日/同额/同描述的两笔合法交易被误判重复删掉
             # (真实案例 KKP 30/12 两笔一样的 SWD 65,573.75 · 余额不同 = 不同笔)
-            key = (f"{self.date}|{self.withdrawal:.2f}|{self.deposit:.2f}"
+            key = (f"{self.account_no}|{self.date}|{self.withdrawal:.2f}|{self.deposit:.2f}"
                    f"|{self.balance:.2f}|{self.description[:40]}")
             self.row_hash = hashlib.md5(key.encode()).hexdigest()[:12]
 
@@ -1422,12 +1423,52 @@ def _find_stmt_header(raw_rows):
     return -1, {}
 
 
-def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename):
-    """v118.35.0.55 · 解析单个 sheet 的流水行 · 返回 (rows, opening or None)
-    支持单一带符号 amount 列(正=存 负=取)"""
+_STMT_ACCT_LABEL = ("account no", "account number", "เลขที่บัญชี", "บัญชีเงินฝาก", "账号", "账户", "口座")
+
+
+def _extract_sheet_account(raw_rows, header_idx, sheet_name=""):
+    """v118.35.0.61 · 从表头之前的行里找『Account No. : xxx』· 找不到退回 sheet 名。
+    多账户 .xls 每个 sheet 一个账户 · 账户号在表头上方的 label 行。"""
+    for raw in raw_rows[:max(header_idx, 0)]:
+        cells = [str(c or "").strip() for c in raw]
+        for i, cell in enumerate(cells):
+            cl = cell.lower()
+            if any(lbl in cl for lbl in _STMT_ACCT_LABEL):
+                # 同行右侧第一个非空值即账户号
+                for v in cells[i + 1:]:
+                    if v:
+                        return v
+    # 退回 sheet 名(KTB 把账户号当 sheet 名:984-2-99825-8)
+    sn = str(sheet_name or "").strip()
+    return sn if any(ch.isdigit() for ch in sn) else ""
+
+
+_STMT_OPEN_KW = ("ยอดยกมา", "ยกมา", "brought forward", "balance b/f", "b/f", "opening", "期初", "上期")
+
+
+def _scan_preheader_opening(raw_rows, header_idx):
+    """v118.35.0.61 · 表头上方找带标签的期初余额(ยกมา / opening / b/f)。
+    KTB 多账户 .xls 把期初放在表头上方汇总区(ยกมา -7,409,714.58)· 返回 float 或 None。"""
+    for raw in raw_rows[:max(header_idx, 0)]:
+        cells = [str(c or "").strip() for c in raw]
+        line = " ".join(cells).lower()
+        if any(kw in line for kw in _STMT_OPEN_KW):
+            for c in cells:
+                v = _to_float(c)
+                if v != 0.0 or c.strip() in ("0", "0.00", "0.0"):
+                    return v
+    return None
+
+
+def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
+    """v118.35.0.55 · 解析单个 sheet 的流水行 · 返回 (rows, opening or None, closing or None)
+    支持单一带符号 amount 列(正=存 负=取)· v118.35.0.61 每行打 account_no 标签 +
+    表头上方期初 + 末期取最后一个『有余额』的行(末行常是无余额的 Sweep 行)"""
     rows: List[StatementRow] = []
-    opening_balance = None
-    opening_found = False
+    # v118.35.0.61 · 先看表头上方有没有带标签的期初(KTB 等汇总区)
+    opening_balance = _scan_preheader_opening(raw_rows, header_idx)
+    opening_found = opening_balance is not None
+    last_valid_closing = None
     last_date = None
     d_idx = col_map["date"]; bal_idx = col_map["balance"]
     wd_idx = col_map.get("withdrawal", -1); dp_idx = col_map.get("deposit", -1)
@@ -1444,7 +1485,8 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename):
         d = _parse_date(d_str) if d_str else None
         if d is not None:
             last_date = d
-        balance = _to_float(_cell(row_list, bal_idx))
+        bal_raw = _cell(row_list, bal_idx)
+        balance = _to_float(bal_raw)
         withdrawal = _to_float(_cell(row_list, wd_idx)) if wd_idx >= 0 else 0.0
         deposit    = _to_float(_cell(row_list, dp_idx)) if dp_idx >= 0 else 0.0
         # 单一带符号 amount 列(无独立存/取列)· 正=存款 负=取款
@@ -1471,9 +1513,11 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename):
         rows.append(StatementRow(
             date=d if d is not None else last_date,
             description=desc, withdrawal=withdrawal, deposit=deposit,
-            balance=balance, source_file=filename,
+            balance=balance, source_file=filename, account_no=account_no,
         ))
-    return rows, opening_balance
+        if bal_raw.strip():   # 末行常是无余额的 Sweep 行 · 只记『有余额』行做期末
+            last_valid_closing = balance
+    return rows, opening_balance, last_valid_closing
 
 
 def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, Any]:
@@ -1488,43 +1532,57 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
         return {"ok": False, "error_code": "file_unreadable",
                 "error": "Cannot read Excel (legacy .xls / corrupt / unsupported format)"}
 
-    all_rows: List[StatementRow] = []
-    opening_balance = 0.0
-    opening_found_any = False
+    # v118.35.0.61 · 分账户解析 + 逐账户独立余额校验。
+    # 一个文件可能含多个账户(每 sheet 一个)· 各账户期初/余额链互不相干 ——
+    # 此前合并成一条链 + 用首账户期初校验全部 · 真实案例 KTB(8258 期初 -39 /
+    # 8606 期初 -740万)余额从几万跳到 -737万整链作废。现在每账户独立 verify。
+    accounts: List[Dict[str, Any]] = []   # [{account_no, rows, opening, closing}]
     sheets_with_data = 0
     for _sheet_name, raw_rows in sheets:
         header_idx, col_map = _find_stmt_header(raw_rows)
         if not col_map:
             continue  # 该 sheet 无流水表头(汇总页/空页)· 跳过
-        s_rows, s_opening = _parse_stmt_sheet(raw_rows, header_idx, col_map, filename)
-        if s_rows:
-            all_rows.extend(s_rows)
-            sheets_with_data += 1
-            if not opening_found_any and s_opening is not None:
-                opening_balance = s_opening
-                opening_found_any = True
+        acct = _extract_sheet_account(raw_rows, header_idx, _sheet_name)
+        s_rows, s_opening, s_closing = _parse_stmt_sheet(
+            raw_rows, header_idx, col_map, filename, acct)
+        # v118.35.0.60 · 跳过底部汇总/合计行(同 PDF 路径)
+        s_rows = [r for r in s_rows if not _is_summary_row(r.description)]
+        if not s_rows:
+            continue
+        s_open = s_opening if s_opening is not None else 0.0
+        # 末期:优先用最后一个『有余额』行;退回末行余额
+        s_close = s_closing if s_closing is not None else s_rows[-1].balance
+        # 关键:每账户用自己的期初做方向纠正 + 余额校验 · 不跨账户
+        _correct_direction_from_balance(s_rows, s_open)
+        _verify_row_balances(s_rows, s_open)
+        accounts.append({
+            "account_no": acct, "rows": s_rows,
+            "opening": s_open, "closing": s_close,
+        })
+        sheets_with_data += 1
 
-    # v118.35.0.60 · 跳过底部汇总/合计行(同 PDF 路径)
-    all_rows = [r for r in all_rows if not _is_summary_row(r.description)]
-
-    if not all_rows:
+    if not accounts:
         return {"ok": False, "error_code": "stmt_headers_not_found",
                 "error": "No bank-statement table found in any sheet"}
 
-    # v118.35.0.59 · Excel 路径也跑方向纠正 + 余额校验(此前只 PDF 路径有 · Excel 全 "—")
-    # · 跟 PDF 路径一致 · 给用户余额校验状态 + 兜底列识别错(用余额涨跌反推)
-    _correct_direction_from_balance(all_rows, opening_balance)
-    _verify_row_balances(all_rows, opening_balance)
+    all_rows: List[StatementRow] = [r for a in accounts for r in a["rows"]]
+    multi_account = len([a for a in accounts if a["account_no"]]) > 1 or len(accounts) > 1
+    # 单账户:opening/closing 照旧。多账户:期初/期末取各账户合计(聚合口径 · 配合警告)
+    opening_balance = sum(a["opening"] for a in accounts)
+    closing_balance = sum(a["closing"] for a in accounts)
 
     return {
         "ok": True,
         "rows": all_rows,
         "row_count": len(all_rows),
         "opening": opening_balance,
-        "closing": all_rows[-1].balance,
+        "closing": closing_balance,
         "bank_code": "generic",
-        "parser_version": "bank_recon_v2+xlsx_direct_v2",
+        "parser_version": "bank_recon_v2+xlsx_direct_v3",
         "sheets_parsed": sheets_with_data,
+        "accounts": accounts,                          # v118.35.0.61 · 分账户明细
+        "account_codes": [a["account_no"] for a in accounts if a["account_no"]],
+        "multi_account": multi_account,                # v118.35.0.61 · 多账户标志
         "needs_review": False,
     }
 
@@ -2859,6 +2917,25 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     "fi_ok":            {"th": "✓ สำเร็จ", "en": "✓ OK", "zh": "✓ 成功", "ja": "✓ 成功"},
     "fi_warn":          {"th": "⚠ 0 แถว", "en": "⚠ 0 Rows", "zh": "⚠ 0行", "ja": "⚠ 0行"},
     "fi_fail":          {"th": "✗ ล้มเหลว", "en": "✗ Failed", "zh": "✗ 失败", "ja": "✗ 失敗"},
+    # v118.35.0.61 · 匹配率诚实化 · 防『diff=0 恒等式假象』误导用户
+    "lbl_match_section": {"th": "ผลการจับคู่ (กระทบยอด)", "en": "Matching Result",
+                          "zh": "勾稽匹配情况", "ja": "照合結果"},
+    "lbl_matched_n":    {"th": "จับคู่สำเร็จ", "en": "Matched",
+                         "zh": "已匹配笔数", "ja": "一致件数"},
+    "lbl_match_rate":   {"th": "อัตราจับคู่", "en": "Match Rate",
+                         "zh": "匹配率", "ja": "一致率"},
+    "banner_no_match":  {"th": "⚠ จับคู่สำเร็จ 0 รายการ · ค่า『ผลต่าง』ด้านล่างแม้แสดง 0 ก็เป็นเพียงผลของสมการบัญชี ไม่ได้กระทบยอดตรงกันจริง · GL กับใบแจ้งยอดอาจไม่ใช่บัญชี/ช่วงเวลาเดียวกัน กรุณาตรวจสอบ",
+                         "en": "⚠ 0 items matched. Even if the Difference below shows 0, that is only an accounting identity — NOT a true reconciliation. The GL and statement may not be the same account/period. Please verify.",
+                         "zh": "⚠ 本次 0 笔成功匹配。下方『差异』即便显示 0,也只是会计恒等式的结果,并非真正对平——很可能 GL 与对账单不是同一账户或同一期间,请核对。",
+                         "ja": "⚠ 一致 0 件。下の『差異』が 0 でも会計恒等式の結果にすぎず、真の照合ではありません。GL と明細が同一口座・同一期間か確認してください。"},
+    "banner_low_match": {"th": "⚠ จับคู่ได้เพียง {n} รายการ ({r}%) ส่วนใหญ่ยังไม่ตรงกัน · กรุณายืนยันว่า GL กับใบแจ้งยอดเป็นบัญชี/ช่วงเวลาเดียวกัน",
+                         "en": "⚠ Only {n} item(s) matched ({r}%); most records did not correspond. Please confirm the GL and statement are the same account/period.",
+                         "zh": "⚠ 仅 {n} 笔匹配(匹配率 {r}%),绝大多数记录未能对应。请确认 GL 与对账单是否同一账户、同一期间。",
+                         "ja": "⚠ 一致は {n} 件のみ({r}%)。大半が対応していません。GL と明細が同一口座・同一期間か確認してください。"},
+    "diff_identity_note": {"th": "(จับคู่ {n} รายการ · ผลต่าง≈0 ไม่ได้แปลว่ากระทบยอดตรง)",
+                         "en": "({n} matched · diff≈0 does NOT mean reconciled)",
+                         "zh": "(仅 {n} 笔匹配 · 差异≈0 不代表已对平)",
+                         "ja": "({n} 件一致 · 差異≈0 でも照合済みではない)"},
     # v118.33.13.0 · OCR verification labels
     "lbl_ocr_check":    {"th": "ตรวจสอบความถูกต้องของ OCR", "en": "OCR Accuracy Check",
                          "zh": "OCR 准确性核查", "ja": "OCR精度チェック"},
@@ -3084,6 +3161,7 @@ def export_bank_recon_excel(
     parse_info: Optional[Dict[str, Any]] = None,
     anchor_overrides: Optional[Dict[str, Dict[str, float]]] = None,
     anchor_ocr: Optional[Dict[str, float]] = None,
+    warnings: Optional[List[str]] = None,
 ) -> bytes:
     """Generate Excel report with File Info + 4 data sheets, all headers i18n.
 
@@ -3264,6 +3342,37 @@ def export_bank_recon_excel(
     r += 1
     _info_row(r, _t("lbl_gl_acct", lang), summary.gl_account_code or "—")
     r += 1
+
+    # ── 2b. v118.35.0.61 · 勾稽匹配诚实化:0/极低匹配时顶部红字横幅 ──
+    # 防『差异=0 是会计恒等式假象』误导用户以为对平。matched/总项 自算 · 历史任务也生效。
+    _matched_n = sum(1 for rr in recon_rows if rr.match_status == "matched")
+    _total_items = len(recon_rows) or 1
+    _match_rate = _matched_n / _total_items
+    _low_match = (_matched_n == 0) or (_match_rate < 0.10 and _total_items >= 10)
+
+    def _banner(row, text, *, bg="FEE2E2", fg="991B1B"):
+        ws1.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+        c = ws1.cell(row=row, column=1, value=text)
+        c.font = Font(bold=True, size=10, color=fg)
+        c.fill = PatternFill("solid", fgColor=bg)
+        c.alignment = Alignment(horizontal="left", vertical="center", indent=1, wrap_text=True)
+        ws1.row_dimensions[row].height = 46
+
+    _banner_msgs = []
+    if _matched_n == 0:
+        _banner_msgs.append(_t("banner_no_match", lang))
+    elif _low_match:
+        _banner_msgs.append(
+            _t("banner_low_match", lang).format(n=_matched_n, r=round(_match_rate * 100, 1)))
+    # 调用方传入的输入不匹配警告(期间/科目/规模)· 与前端提示条同源
+    for _w in (warnings or []):
+        if _w:
+            _banner_msgs.append(str(_w))
+    if _banner_msgs:
+        r += 1  # spacer
+        for _bm in _banner_msgs:
+            _banner(r, _bm)
+            r += 1
     # P0.2 BUG-B-T2 v118.35.0.38 · 有 anchor 被覆盖 → 顶部一行警示『含手动录入 · 看末尾对照』
     if anchor_overrides:
         r += 1  # 警示前空 1 行 · 视觉舒服
@@ -3334,13 +3443,26 @@ def export_bank_recon_excel(
     _anchor_row(r, _t("lbl_stmt_close", lang), summary.stmt_closing, bg=NAVY, size=12)
     r += 1
 
-    # ── 9. Final: 差异 (green if 0, red otherwise) ──
-    diff_ok = abs(summary.formula_diff) < 0.05
+    # ── 8b. v118.35.0.61 · 真实勾稽指标:已匹配笔数 + 匹配率(诚实化核心) ──
+    _info_row(r, _t("lbl_matched_n", lang), f"{_matched_n} / {len(recon_rows)}")
+    r += 1
+    _info_row(r, _t("lbl_match_rate", lang), f"{round(_match_rate * 100, 1)}%")
+    r += 1
+
+    # ── 9. Final: 差异 ──
+    # v118.35.0.61 · 诚实化:diff≈0 但匹配率极低时 → 不染绿(那只是会计恒等式 · 不是真对平)
+    diff_zero = abs(summary.formula_diff) < 0.05
+    diff_ok = diff_zero and not _low_match
     diff_bg = DIFF_OK_BG if diff_ok else DIFF_BAD_BG
     diff_fg = "065F46" if diff_ok else "991B1B"
     _anchor_row(r, _t("lbl_formula_diff", lang), summary.formula_diff,
                 bg=diff_bg, fg=diff_fg, size=13)
     r += 1
+    if diff_zero and _low_match:
+        # diff 为 0 却几乎没匹配 → 明确告知这是恒等式 · 不代表勾稽成功
+        _detail_row(r, _t("diff_identity_note", lang).format(n=_matched_n), "",
+                    italic=True, color="991B1B")
+        r += 1
 
     # ── 10. OCR accuracy check (only if any warnings) ──
     warn_balance = sum(1 for rr in recon_rows if rr.stmt_balance_ok is False)

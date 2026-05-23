@@ -1242,6 +1242,13 @@ _BRV2_WARN = {
         "th": "⚠️ ไม่มีรายการใดจับคู่สำเร็จ กรุณายืนยันว่า GL กับใบแจ้งยอดเป็นบัญชีและช่วงเวลาเดียวกัน",
         "ja": "⚠️ 一致したレコードがありません。GL と明細が同じ口座・同じ期間か確認してください。",
     },
+    # v118.35.0.61 · 一个文件含多个账户(每 sheet 一个)· 已分账户独立校验余额 · 提示用户
+    "multi_account": {
+        "zh": "⚠️ 此对账单文件含 {n} 个账户({codes})。系统已『分账户』独立核对各自余额,但银行对账需 GL 与单一账户对应。若 GL 只含其中某一个账户,请只看对应账户的结果。",
+        "en": "⚠️ This statement file contains {n} accounts ({codes}). Each account's balance was verified separately, but reconciliation requires the GL to match a single account. If your GL covers only one of them, refer to that account's result only.",
+        "th": "⚠️ ไฟล์ใบแจ้งยอดนี้มี {n} บัญชี ({codes}) ระบบตรวจยอดแต่ละบัญชีแยกกันแล้ว แต่การกระทบยอดต้องให้ GL ตรงกับบัญชีเดียว หาก GL มีเพียงบัญชีเดียว ให้ดูเฉพาะผลของบัญชีนั้น",
+        "ja": "⚠️ この明細ファイルには {n} 口座（{codes}）が含まれます。各口座の残高は個別に検証済みですが、照合には GL が単一口座に対応している必要があります。GL が 1 口座のみの場合、その口座の結果のみを参照してください。",
+    },
 }
 
 
@@ -1275,9 +1282,11 @@ def _detect_recon_mismatch(stmt_rows, gl_rows, matched_count, lang) -> list:
             if smax < gmin or gmax < smin:  # 完全不重叠
                 warnings.append(_brv2_warn("period_mismatch", lang,
                                            g=f"{gmin}~{gmax}", s=f"{smin}~{smax}"))
-        if len(gl_rows) <= 2 and len(stmt_rows) >= 20:
+        # v118.35.0.61 · 改比例阈值:GL 行数 < 对账单 20% 且账单≥20 行 → 规模悬殊预警
+        # (旧阈值 GL≤2 太严 · 12 行 GL 对 237 行账单这种明显不对应的情况漏报)
+        if len(stmt_rows) >= 20 and len(gl_rows) * 5 < len(stmt_rows):
             warnings.append(_brv2_warn("gl_too_few", lang, n=len(gl_rows), m=len(stmt_rows)))
-        elif matched_count == 0 and (len(stmt_rows) + len(gl_rows)) >= 10:
+        if matched_count == 0 and (len(stmt_rows) + len(gl_rows)) >= 10:
             warnings.append(_brv2_warn("no_match", lang))
     except Exception:
         pass
@@ -1540,6 +1549,17 @@ async def bank_v2_run(
     # v118.35.0.54 · 输入不匹配检测(期间/科目/规模对不上)· 主动警告 · 不让用户看不懂差额
     brv2_warnings = _detect_recon_mismatch(stmt_rows, gl_rows, summary.matched_count, lang)
 
+    # v118.35.0.61 · 多账户文件检测(一个文件塞多个账户 · 每 sheet 一个)· 已分账户独立校验
+    # · 主动提示『需 GL 对应单一账户』· 避免用户拿多账户文件对单账户 GL 还以为系统坏了。
+    _stmt_accts: list = []
+    for _r in stmt_results:
+        if _r.get("ok") and _r.get("multi_account"):
+            _stmt_accts.extend(_r.get("account_codes") or [])
+    if len(_stmt_accts) > 1:
+        _seen = list(dict.fromkeys(_stmt_accts))  # 去重保序
+        brv2_warnings.append(_brv2_warn(
+            "multi_account", lang, n=len(_seen), codes="、".join(_seen)))
+
     # 5. Serialize
     detail_j = rows_to_json(recon_rows)
     summary_j = bank_summary_to_json(summary)
@@ -1554,6 +1574,9 @@ async def bank_v2_run(
         # BUG-B v118.35.0.36 · 落库 anchor 覆盖痕迹 · 用户回查任务时能看出哪几个 anchor 是手填的
         if _anchor_used:
             summary_j["_anchor_overrides"] = _anchor_used
+        # v118.35.0.61 · 落库输入不匹配警告 · 导出 Excel 时重传 · 让文件与前端提示同源
+        if brv2_warnings:
+            summary_j["_brv2_warnings"] = brv2_warnings
 
     # 6. Persist
     unmatched_gl   = summary.gl_debit_only_count + summary.gl_credit_only_count
@@ -1709,9 +1732,11 @@ async def bank_v2_export(task_id: int, request: Request, lang: str = "th"):
     # bank_summary_from_json 过滤掉 `_` 开头字段 · 所以这里要从原 summary_raw 拿
     _ao = summary_raw.get("_anchor_overrides") if isinstance(summary_raw, dict) else None
     _aocr = summary_raw.get("_anchor_ocr") if isinstance(summary_raw, dict) else None
+    _warns = summary_raw.get("_brv2_warnings") if isinstance(summary_raw, dict) else None
     excel_bytes = export_bank_recon_excel(recon_rows, summary, lang=lang,
                                           task_info=task, parse_info=task_parse_info,
-                                          anchor_overrides=_ao, anchor_ocr=_aocr)
+                                          anchor_overrides=_ao, anchor_ocr=_aocr,
+                                          warnings=_warns)
 
     bank_code = task.get("bank_code") or "bank"
     ascii_name = f"BankRecon_v2_{task_id}_{bank_code.upper()}.xlsx"

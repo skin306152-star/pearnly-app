@@ -5427,10 +5427,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统进一步提升了银行对账单的识别准确性。\n\n现在能更完整地读取每一笔交易、减少漏读;并自动跳过对账单底部的『合计 / 总计』等汇总行,不再把它们当成交易。综合下来,需要您手动核对的行明显减少。\n\n即日生效。",
-            "th": "ระบบได้ปรับปรุงความแม่นยำในการอ่านใบแจ้งยอดธนาคารเพิ่มเติม\n\nขณะนี้อ่านทุกรายการได้ครบถ้วนยิ่งขึ้น ลดการตกหล่น และข้ามแถวสรุปท้ายใบแจ้งยอด (เช่น 'รวมรายการ / ยอดรวม') โดยอัตโนมัติ ไม่นับเป็นรายการอีกต่อไป โดยรวมแล้วรายการที่ต้องตรวจสอบเองลดลงอย่างเห็นได้ชัด\n\nมีผลทันที",
-            "en": "The accuracy of bank-statement reading has been further improved.\n\nThe system now reads every transaction more completely (fewer missed rows) and automatically skips bottom-of-statement summary rows (e.g. 'Total / Grand Total'), no longer counting them as transactions. Overall, the number of rows you need to review manually is noticeably reduced.\n\nEffective immediately.",
-            "ja": "銀行明細の読み取り精度をさらに改善しました。\n\n各取引をより漏れなく読み取り、明細末尾の『合計・総計』などの集計行は自動的にスキップして取引として数えないようにしました。全体として、手動確認が必要な行が大幅に減少します。\n\n即日有効。"
+            "zh": "银行对账的结果更可信、更易读了。\n\n现在对账报告会清楚显示『成功核对上的笔数与比例』:当总账与对账单其实对不上时,即使差额显示为 0,也会明确提醒您『这并非真正对平』,不再让人误以为没问题。同一个文件里若包含多个银行账户,系统会分别核对每个账户的余额。综合下来,需要您自己费心核对的地方更少了。\n\n即日生效。",
+            "th": "ผลการกระทบยอดธนาคารน่าเชื่อถือและอ่านง่ายขึ้น\n\nรายงานจะแสดง 'จำนวนและสัดส่วนรายการที่จับคู่สำเร็จ' อย่างชัดเจน หากบัญชีแยกประเภทกับใบแจ้งยอดไม่ตรงกันจริง แม้ผลต่างจะเป็น 0 ระบบก็จะเตือนว่า 'นี่ไม่ใช่การกระทบยอดที่ตรงกันจริง' และหากไฟล์เดียวมีหลายบัญชี ระบบจะตรวจยอดแต่ละบัญชีแยกกัน โดยรวมแล้วสิ่งที่คุณต้องตรวจเองลดลง\n\nมีผลทันที",
+            "en": "Bank reconciliation results are now more trustworthy and easier to read.\n\nThe report now clearly shows how many items actually matched (and the match rate). When the ledger and statement don't truly correspond, the report makes it explicit that a zero difference does NOT mean reconciled — so it no longer gives false reassurance. If a single file contains several bank accounts, each account's balance is checked separately. Overall, there's less for you to verify by hand.\n\nEffective immediately.",
+            "ja": "銀行照合の結果が、より信頼でき、読みやすくなりました。\n\nレポートに「実際に一致した件数と一致率」を明示するようにしました。元帳と明細が本当は対応していない場合、差額が 0 でも『真の照合ではない』とはっきり知らせ、誤った安心感を与えません。1 つのファイルに複数の口座が含まれる場合は、各口座の残高を個別に検証します。全体として、手動で確認する手間が減ります。\n\n即日有効。"
         }
     }
 

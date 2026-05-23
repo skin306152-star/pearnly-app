@@ -18,7 +18,7 @@ _gemini_key.local/
 *.local
 pearnly-vision-key*.json
 *-key.json
-_probe_ocr.py
+_probe_*.py
 
 # Playwright(Python · 探测脚本副产物)
 playwright-report/
@@ -74,3 +74,6 @@ scripts/probe/_debug/armas_copy_*.json
 scripts/probe/_debug/armas_copy_v2_*.json
 scripts/probe/_debug/product_listing_*.html
 scripts/probe/_debug/product_form_*.json
+
+# 本地真实账单样本(绝不进 git · 隐私)
+_bank_samples/

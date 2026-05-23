@@ -1970,6 +1970,7 @@ const I18N = {
         'brv2-anchor-gl-opening':    'GL 期初余额',
         'brv2-anchor-eq-lbl':        '期初差额(Statement 期初 − GL 期初):',
         'brv2-anchor-prefill-hint':  '已用上次 OCR 抽到的值预填 · 不准点一下就能改',
+        'brv2-anchor-prefill-banner': '⚠ 下面带橙色背景的数字是上次 OCR 识别的(浏览器本地缓存)· 不对请点击修改 · 修改后变黑字',
         'brv2-anchor-audit-title':     '⚠ 本次对账含手动录入(OCR 抽不准时你改的)',
         'brv2-anchor-audit-col-field': 'Anchor 字段',
         'brv2-anchor-audit-col-ocr':   'OCR 抽到的(参考)',
@@ -4399,6 +4400,7 @@ const I18N = {
         'brv2-anchor-gl-opening':    'GL opening balance',
         'brv2-anchor-eq-lbl':        'Opening difference (Stmt opening − GL opening):',
         'brv2-anchor-prefill-hint':  'Prefilled from your last OCR scan · click to edit if wrong',
+        'brv2-anchor-prefill-banner': '⚠ The orange-highlighted numbers below are from your last OCR scan (cached locally) · click to edit if wrong · turns black once edited',
         'brv2-anchor-audit-title':     '⚠ This run contains manually entered anchors (you fixed what OCR misread)',
         'brv2-anchor-audit-col-field': 'Anchor Field',
         'brv2-anchor-audit-col-ocr':   'OCR Value (reference)',
@@ -6826,6 +6828,7 @@ const I18N = {
         'brv2-anchor-gl-opening':    'ยอดยกมา GL',
         'brv2-anchor-eq-lbl':        'ผลต่างยอดยกมา (ยอดยกมา Statement − ยอดยกมา GL):',
         'brv2-anchor-prefill-hint':  'เติมค่าจาก OCR ครั้งก่อนให้แล้ว · คลิกเพื่อแก้ถ้าไม่ตรง',
+        'brv2-anchor-prefill-banner': '⚠ ตัวเลขที่มีพื้นหลังสีส้มด้านล่างเป็นค่าจาก OCR ครั้งก่อน (แคชในเบราว์เซอร์) · คลิกเพื่อแก้ถ้าไม่ตรง · เปลี่ยนเป็นสีดำเมื่อแก้แล้ว',
         'brv2-anchor-audit-title':     '⚠ การกระทบยอดครั้งนี้มีการกรอกเอง (แก้ที่ OCR อ่านไม่ตรง)',
         'brv2-anchor-audit-col-field': 'ฟิลด์ Anchor',
         'brv2-anchor-audit-col-ocr':   'ค่า OCR (อ้างอิง)',
@@ -9249,6 +9252,7 @@ const I18N = {
         'brv2-anchor-gl-opening':    'GL 期首残高',
         'brv2-anchor-eq-lbl':        '期首差額(Stmt 期首 − GL 期首):',
         'brv2-anchor-prefill-hint':  '前回 OCR の値で自動入力済 · 違えばクリックして修正',
+        'brv2-anchor-prefill-banner': '⚠ 下のオレンジ背景の数値は前回 OCR の値です(ブラウザにキャッシュ)· 違えばクリックして修正 · 修正後は黒文字になります',
         'brv2-anchor-audit-title':     '⚠ 今回の照合は手入力アンカーを含む(OCR 誤読を修正)',
         'brv2-anchor-audit-col-field': 'アンカー項目',
         'brv2-anchor-audit-col-ocr':   'OCR 値(参考)',
@@ -19210,6 +19214,7 @@ async function deleteEndpoint(endpointId) {
             'brv2-anchor-gl-closing':   p.gl_closing,
             'brv2-anchor-stmt-closing': p.stmt_closing,  // BUG-FIX-T3 v118.35.0.44 · 加 4th anchor 预填
         };
+        var prefilledCount = 0;
         Object.keys(map).forEach(function (id) {
             var el = document.getElementById(id);
             if (!el) return;
@@ -19220,6 +19225,7 @@ async function deleteEndpoint(endpointId) {
             el.value = v.toFixed(2);
             var cell = el.closest && el.closest('.brv2-anchor-cell');
             if (cell) cell.classList.add('is-prefilled');
+            prefilledCount += 1;
         });
         // 触发期初差额提示行(如果 stmt + gl opening 都预填了)
         var eq = document.getElementById('brv2-anchor-eq');
@@ -19229,6 +19235,24 @@ async function deleteEndpoint(endpointId) {
             eqVal.textContent = diff.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             eq.style.display = '';
         }
+        // BUG-FIX-T4 v118.35.0.45 · 至少 1 个 cell 被预填 → 显示橙色 banner 提示来源
+        if (prefilledCount > 0) {
+            var banner = document.getElementById('brv2-anchor-prefill-banner');
+            if (banner) banner.classList.add('show');
+        }
+    }
+    // BUG-FIX-T4 v118.35.0.45 · 用户改了任意一个 anchor 后 · 如果全部 cell 都没 is-prefilled · 隐藏 banner
+    function _brv2UpdatePrefillBannerVisibility() {
+        var banner = document.getElementById('brv2-anchor-prefill-banner');
+        if (!banner) return;
+        var anyPrefilled = false;
+        ['brv2-anchor-gl-closing','brv2-anchor-stmt-closing','brv2-anchor-stmt-opening','brv2-anchor-gl-opening'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            var cell = el.closest && el.closest('.brv2-anchor-cell');
+            if (cell && cell.classList.contains('is-prefilled')) anyPrefilled = true;
+        });
+        banner.classList.toggle('show', anyPrefilled);
     }
 
     // P0.3 BUG-B-T3 v118.35.0.39 · 历史详情 / 跑完结果 显示『手动录入 anchor 对照表』
@@ -20014,9 +20038,11 @@ async function deleteEndpoint(endpointId) {
             if (!el) return;
             el.addEventListener('input', _brv2UpdateAnchorEq);
             // P0.1 BUG-B-T1 v118.35.0.37 · 用户敲一个字 = 真用户输入 · 移除 prefilled 灰字态
+            // BUG-FIX-T4 v118.35.0.45 · 同时检查 banner 是否还要显示(全 cell 都被用户改 → 隐藏 banner)
             el.addEventListener('input', () => {
                 const cell = el.closest('.brv2-anchor-cell');
                 if (cell) cell.classList.remove('is-prefilled');
+                _brv2UpdatePrefillBannerVisibility();
             });
         });
 
@@ -20040,10 +20066,20 @@ async function deleteEndpoint(endpointId) {
             // 重置 acct select
             const sel = $('brv2-acct-select');
             if (sel) sel.style.display = 'none';
-            // BUG-B v118.35.0.36 · 重置 3 个 anchor 录入框 + 隐藏 eq 行
-            anchorIds.forEach(id => { const el = $(id); if (el) el.value = ''; });
+            // BUG-B v118.35.0.36 · 重置 anchor 录入框 + 隐藏 eq 行
+            // BUG-FIX-T4 v118.35.0.45 · 清空时也移除 .is-prefilled + 隐藏 banner
+            anchorIds.forEach(id => {
+                const el = $(id);
+                if (el) {
+                    el.value = '';
+                    const cell = el.closest && el.closest('.brv2-anchor-cell');
+                    if (cell) cell.classList.remove('is-prefilled');
+                }
+            });
             const eq = $('brv2-anchor-eq');
             if (eq) eq.style.display = 'none';
+            const banner = $('brv2-anchor-prefill-banner');
+            if (banner) banner.classList.remove('show');
         });
 
         // 新建按钮（在折叠头里）

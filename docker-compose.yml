@@ -1,0 +1,62 @@
+# ============================================================
+# Pearnly · 本地 staging 环境(REFACTOR-A3 · 环境分级)
+# ============================================================
+# 用途:本地起一套 prod 同款环境(app + 本地 PostgreSQL)· push 前完整跑一遍。
+# 不碰生产部署链 · prod 仍是真服务器 git pull + systemctl。
+#
+# 用法(staging · 生产同款 · 不热重载):
+#   docker compose up --build
+#
+# 用法(dev · 挂源码 + 热重载):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# 环境变量:从 .env.local 读(.env.example 是模板)· DATABASE_URL 在此被
+# 覆盖指向容器内 postgres · 真实第三方密钥(GEMINI/LINE/SMTP 等)从 .env.local 带入。
+# ============================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pearnly-db
+    environment:
+      POSTGRES_USER: pearnly
+      POSTGRES_PASSWORD: pearnly_local_dev
+      POSTGRES_DB: pearnly
+    ports:
+      - "5432:5432"
+    volumes:
+      - pearnly-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pearnly -d pearnly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pearnly-app
+    # .env.local 提供第三方密钥(GEMINI / LINE / SMTP / JWT_SECRET 等)·
+    # 文件不存在时 docker compose 会报错 · 首次用先 cp .env.example .env.local。
+    env_file:
+      - .env.local
+    environment:
+      # 覆盖 .env.local · 指向容器内 postgres(服务名 db)
+      DATABASE_URL: postgres://pearnly:pearnly_local_dev@db:5432/pearnly
+      PORT: "7860"
+      # 本地 staging 不跑邮件 worker · 避免误发
+      EMAIL_INGEST_ENABLED: "0"
+      PDF_STORAGE_DIR: /app/storage/pdfs
+    ports:
+      - "7860:7860"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # 上传 PDF 落盘持久化(prod 是 /opt/mrpilot/storage)
+      - pearnly-storage:/app/storage
+
+volumes:
+  pearnly-pgdata:
+  pearnly-storage:

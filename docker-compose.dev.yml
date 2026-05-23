@@ -1,0 +1,25 @@
+# ============================================================
+# Pearnly · 本地 dev override(REFACTOR-A3)
+# ============================================================
+# 叠在 docker-compose.yml 之上 · 把源码挂进容器 + 开 uvicorn 热重载 ·
+# 改 .py 立即生效 · 不用每次 rebuild。
+#
+# 用法:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# 注意:前端 home.* 改动需重新 cp 到 static/(镜像 build 时做的)·
+# dev 下挂载了根目录 · 改 home.html 后在容器里跑:
+#   docker compose exec app cp home.html home.js home.css static/
+# ============================================================
+
+services:
+  app:
+    # 挂载源码:改 .py 触发热重载(node_modules / .git 等由匿名卷遮蔽)
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - pearnly-storage:/app/storage
+    # 开热重载(开发用 · 生产不开)
+    command: ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-7860} --reload"]
+    environment:
+      LOG_LEVEL: DEBUG

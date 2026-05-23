@@ -1,0 +1,54 @@
+# ============================================================
+# Pearnly · Docker build context 排除清单(REFACTOR-A3)
+# ============================================================
+# 目的:缩小 build context + 避免把本地密钥 / 缓存 / 样本 / 第三方包打进镜像。
+# 与 pyproject.toml 的 black/ruff/bandit extend-exclude 思路一致。
+
+# ── 版本控制 / IDE ──
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# ── Node(镜像不需要 · dist 产物已 COPY)──
+node_modules
+npm-debug.log
+
+# ── Python 缓存 / 虚拟环境 ──
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+.pytest_cache
+.ruff_cache
+
+# ── 本地密钥(绝不入镜像)──
+.env
+.env.local
+_gemini_key.local
+
+# ── 打包 / 部署临时产物 ──
+_pkg
+_pkg_tmpstatic
+_deploy_nginx
+
+# ── 运行期 / 测试产物 / 本地样本 ──
+.ocr_cache
+_bank_samples
+_test_reports
+probes
+tests/eval/_runs
+tests/eval/ground_truth_local
+playwright-report
+test-results
+
+# ── 文档 / 截图(运行不需要)──
+yichang
+*.md
+
+# ── Docker 自身 ──
+Dockerfile
+.dockerignore
+docker-compose*.yml

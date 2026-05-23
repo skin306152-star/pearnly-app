@@ -1,0 +1,63 @@
+# 银行对账 OCR 评测集(v118.35.0.65)
+
+**目的**:让每次 OCR 改动都能用**数字**证明有没有提升、有没有引入新问题——而不是靠"感觉"或人肉抽查。这是把"还有很多未发现的问题"系统性挖出来的工具。
+
+## 为什么需要它
+
+OCR 是概率性的,改一个提示词/参数可能这里好了那里坏了。没有评测集,我们只能抽查几行就拍脑袋说"提升了"。有了它:
+- 跑一条命令 → 得到「逐行召回率 X% / 笔数对不对 / 期末对不对」
+- 改完再跑 → **对比数字**,确认是真提升还是按下葫芦浮起瓢
+- 也是将来 **Gemini vs Document AI 打擂台**的裁判
+
+## 隐私边界(重要)
+
+| 内容 | 位置 | 进 git? |
+|---|---|---|
+| 运行器、比对逻辑、本说明 | `tests/eval/run_eval.py` `README.md` | ✅ 进 |
+| 格式示例(假数据) | `tests/eval/ground_truth/example_synthetic.json` | ✅ 进 |
+| **真实标准答案(真金额)** | `tests/eval/ground_truth_local/*.json` | ❌ gitignored |
+| 真实账单样本 | `_bank_samples/` 或自定义目录 | ❌ gitignored |
+| 运行结果 | `tests/eval/_runs/*.json` | ❌ gitignored |
+
+## 标准答案 JSON 格式
+
+放到 `tests/eval/ground_truth_local/<名>.json`(参考 `ground_truth/example_synthetic.json`):
+
+```json
+{
+  "name": "AM_1-69",                       // 唯一名
+  "file": "AM 1-69.pdf",                   // 样本目录里的文件名(或子串)
+  "opening": 2786.33,
+  "closing": 10786.33,
+  "credit_count": 4,                       // 账单页脚印的存款笔数(强信号)
+  "debit_count": 0,
+  "total_credit": 8000.00,                 // 可选
+  "total_debit": 0.00,
+  "expected_rows": [                       // 可选 · 给了就算逐行召回率
+    {"date": "2026-01-08", "deposit": 2000.0, "withdrawal": 0.0, "balance": 4786.33}
+  ]
+}
+```
+
+- **最低要求**:`file` + `credit_count`/`debit_count`(或 `closing`)。只填这些就能测"有没有漏行"。
+- **完整**:再填 `expected_rows`,能算逐行召回率(最精确)。
+- `expected_rows` 比对用 `(date, 净金额)` 宽松匹配,容差 0.05,不要求描述逐字一致。
+
+## 怎么跑
+
+```bash
+# 扫描件 PDF 需要 Gemini key;xlsx 直读不需要
+set GEMINI_API_KEY=AIza...        # Windows: set / PowerShell: $env:GEMINI_API_KEY=
+python tests/eval/run_eval.py --samples "D:/Users/Skin/Desktop/账单"
+```
+
+输出每个文件的笔数/期末/逐行召回 + 汇总召回率,并写 `_runs/<时间戳>.json` 供回归对比。
+
+## 已知待标注(交接给下个窗口)
+
+skin 桌面 `D:\Users\Skin\Desktop\账单` 有 7 份真实账单。建议优先标注:
+- **AM 1-69**(最易 · 页脚明确:4 笔存款 / 合计 8000 / 期末 10786.33)——可作第一个完整 `expected_rows`。
+- **BAY 9789 / KBank 8477**(密集扫描件 · 已知被漏读 30-40%)——至少填 `credit_count`/`debit_count`(从页脚读:BAY 314/31,KBank 266/33),用来量化"逐页识别"改造前后的召回提升。
+- AMK(已对平 diff=0)、SCB(已对平)、AMZ、KTB(多账户 xls)。
+
+标注 `expected_rows` 时**以原始账单 PDF 为准逐行核对**,这是体力活但一次投入长期受益。

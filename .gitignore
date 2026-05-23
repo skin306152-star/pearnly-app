@@ -81,5 +81,7 @@ _bank_samples/
 # v118.35.0.64 · OCR 持久化缓存目录(运行期产物 · 不进 git)
 .ocr_cache/
 
-# v118.35.0.65 · OCR 评测集运行产物(ground truth 进 git · 运行结果不进)
+# v118.35.0.65 · OCR 评测集:运行产物 + 真实标准答案(隐私)不进 git;
+#   只有 run_eval.py / README / ground_truth/example_synthetic.json 进 git
 tests/eval/_runs/
+tests/eval/ground_truth_local/

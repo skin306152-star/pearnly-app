@@ -1,0 +1,17 @@
+{
+  "name": "example_synthetic",
+  "file": "__SYNTHETIC_DOES_NOT_EXIST__.pdf",
+  "_comment": "格式示例(假数据 · 进 git)。真实标准答案放 tests/eval/ground_truth_local/(不进 git · 隐私)。",
+  "opening": 2786.33,
+  "closing": 10786.33,
+  "credit_count": 4,
+  "debit_count": 0,
+  "total_credit": 8000.00,
+  "total_debit": 0.00,
+  "expected_rows": [
+    {"date": "2026-01-08", "deposit": 2000.0, "withdrawal": 0.0, "balance": 4786.33},
+    {"date": "2026-01-15", "deposit": 2000.0, "withdrawal": 0.0, "balance": 6786.33},
+    {"date": "2026-01-22", "deposit": 2000.0, "withdrawal": 0.0, "balance": 8786.33},
+    {"date": "2026-01-29", "deposit": 2000.0, "withdrawal": 0.0, "balance": 10786.33}
+  ]
+}

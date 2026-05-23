@@ -712,6 +712,16 @@ echo "playwright install-deps chromium..." >> "$LOG"
 timeout 180 "$PY" -m playwright install-deps chromium >> "$LOG" 2>&1 || \
     echo "playwright install-deps chromium non-fatal failure" >> "$LOG"
 
+# 4.8. v118.35.0.57 · 装齐 requirements.txt 全部依赖(防新依赖漏装 · 如 xlrd 这次就漏了)
+#     幂等(已装的 pip 自动跳过)· 非致命(pip 失败不挡部署)· timeout 防卡死
+#     用同一个 $PY(venv 优先)· 保证装到服务真正用的 python
+echo "pip install -r requirements.txt..." >> "$LOG"
+if [ -f requirements.txt ]; then
+    timeout 240 "$PY" -m pip install -r requirements.txt >> "$LOG" 2>&1 || \
+        timeout 240 "$PY" -m pip install -r requirements.txt --break-system-packages >> "$LOG" 2>&1 || \
+        echo "pip install -r requirements.txt non-fatal failure" >> "$LOG"
+fi
+
 # 5. 重启服务
 echo "restarting mrpilot..." >> "$LOG"
 systemctl restart mrpilot >> "$LOG" 2>&1

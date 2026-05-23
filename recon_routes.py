@@ -1245,6 +1245,19 @@ _BRV2_WARN = {
 }
 
 
+_ROWS_PER_PAGE_BILLING = 40  # v0.58 · 居中计费:一页约 40 笔 · 防密集账单按页低估
+
+
+def _pdf_billing_units(page_count: int, row_count: int) -> int:
+    """v118.35.0.58 · 银行对账 PDF/图片计费『页数』· 居中口径 max(实际页数, ⌈行数/N⌉)。
+    对齐 ฿1.5/页规则 · 修复此前误按交易行数计费(超收 10-34 倍)的 bug。
+    既不让多页大账单超收 · 也不让一页塞很多笔的密集账单被低估 · 图片=1 页。"""
+    import math as _m
+    pages = max(1, int(page_count or 0))
+    rows = max(0, int(row_count or 0))
+    return max(pages, _m.ceil(rows / _ROWS_PER_PAGE_BILLING))
+
+
 def _brv2_warn(key: str, lang: str = "th", **fmt) -> str:
     lang = lang if lang in ("zh", "en", "th", "ja") else "th"
     msg = (_BRV2_WARN.get(key) or {}).get(lang) or (_BRV2_WARN.get(key) or {}).get("en") or key
@@ -1402,8 +1415,10 @@ async def bank_v2_run(
     if not _billing_bv2.get("is_exempt"):
         try:
             import db as _db_chg
+            from services.ocr.pdf_utils import count_pdf_pages as _count_pages_chg
             _tid_chg = user.get("tenant_id")
             _excel_exts = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv", ".txt", ".docx", ".doc"}
+            # v118.35.0.58 · BUG 修复:PDF/图片改按『页』计费(对齐 ฿1.5/页规则)· 此前误按交易行数收 · 超收 10-34 倍
             _pdf_units = 0
             _excel_units = 0
             for r, (b, fn) in list(zip(stmt_results, stmt_data)) + list(zip(gl_results, gl_data)):
@@ -1416,12 +1431,12 @@ async def bank_v2_run(
                 if ext in _excel_exts:
                     _excel_units += _db_chg._excel_char_count_estimate(b, fn)
                 else:
-                    _pdf_units += row_count
+                    _pdf_units += _pdf_billing_units(_count_pages_chg(b) or 1, row_count)
             if _pdf_units > 0:
                 asyncio.create_task(asyncio.to_thread(
                     _db_chg.charge_ocr_async,
                     str(user.get("id")), _tid_chg, "pdf", _pdf_units,
-                    None, f"银行对账 PDF · {_pdf_units} 行"))
+                    None, f"银行对账 PDF · {_pdf_units} 页"))
             if _excel_units > 0:
                 asyncio.create_task(asyncio.to_thread(
                     _db_chg.charge_ocr_async,

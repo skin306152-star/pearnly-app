@@ -49,7 +49,6 @@ from services.ocr.pipeline import (  # noqa: E402
     run_on_path,
 )
 
-
 # ============================================================
 # Same 49 files as run_pipeline_batches.py
 # ============================================================
@@ -89,6 +88,7 @@ def _peak_mem_mb():
     """Return peak RSS in MB. Linux only via stdlib `resource`; fall back to 0."""
     try:
         import resource  # noqa: E501
+
         # ru_maxrss on Linux is in KB, on macOS in bytes; this is for Linux server.
         return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
     except Exception:
@@ -148,20 +148,26 @@ def benchmark(files, concurrency: int) -> dict:
         for fp in files:
             r = _run_one(fp, pattern_memory)
             results.append(r)
-            print(f"  [{len(results)}/{len(files)}] {r['filename'][:50]:50s} "
-                  f"{r['elapsed_s']:6.2f}s  pages={r['pages']}  cost=฿{r['cost_thb']}"
-                  + ("  RATE_LIMITED" if r["rate_limited"] else "")
-                  + (f"  ERR={r['error'][:50]}" if r["error"] else ""), flush=True)
+            print(
+                f"  [{len(results)}/{len(files)}] {r['filename'][:50]:50s} "
+                f"{r['elapsed_s']:6.2f}s  pages={r['pages']}  cost=฿{r['cost_thb']}"
+                + ("  RATE_LIMITED" if r["rate_limited"] else "")
+                + (f"  ERR={r['error'][:50]}" if r["error"] else ""),
+                flush=True,
+            )
     else:
         with ThreadPoolExecutor(max_workers=concurrency) as ex:
             futures = {ex.submit(_run_one, fp, pattern_memory): fp for fp in files}
             for fut in as_completed(futures):
                 r = fut.result()
                 results.append(r)
-                print(f"  [{len(results)}/{len(files)}] {r['filename'][:50]:50s} "
-                      f"{r['elapsed_s']:6.2f}s  pages={r['pages']}  cost=฿{r['cost_thb']}"
-                      + ("  RATE_LIMITED" if r["rate_limited"] else "")
-                      + (f"  ERR={r['error'][:50]}" if r["error"] else ""), flush=True)
+                print(
+                    f"  [{len(results)}/{len(files)}] {r['filename'][:50]:50s} "
+                    f"{r['elapsed_s']:6.2f}s  pages={r['pages']}  cost=฿{r['cost_thb']}"
+                    + ("  RATE_LIMITED" if r["rate_limited"] else "")
+                    + (f"  ERR={r['error'][:50]}" if r["error"] else ""),
+                    flush=True,
+                )
     total_wall_s = time.time() - t_start
     peak_mb = _peak_mem_mb()
 
@@ -174,6 +180,7 @@ def benchmark(files, concurrency: int) -> dict:
             page_elapsed.append(r["elapsed_s"] / r["pages"])
     page_elapsed.sort()
     n = len(page_elapsed)
+
     def _pct(p):
         if not n:
             return 0
@@ -195,7 +202,9 @@ def benchmark(files, concurrency: int) -> dict:
         "total_pages": total_pages,
         "total_wall_s": round(total_wall_s, 2),
         "throughput_pages_per_s": round(total_pages / total_wall_s, 3) if total_wall_s else 0,
-        "throughput_pages_per_min": round(total_pages / total_wall_s * 60, 1) if total_wall_s else 0,
+        "throughput_pages_per_min": (
+            round(total_pages / total_wall_s * 60, 1) if total_wall_s else 0
+        ),
         "per_page_elapsed_s": {
             "min": round(page_elapsed[0], 2) if n else 0,
             "p50": round(_pct(0.50), 2),
@@ -259,16 +268,20 @@ def main():
         print(f"Synthesizing {args.large_target_pages}-page PDF from {src.name}...")
         synthesize_large_pdf(src, args.large_target_pages, output_pdf)
         files = [output_pdf]
-        out_path = Path(args.out) if args.out else (
-            Path(__file__).resolve().parent / "pipeline-benchmark-large.json"
+        out_path = (
+            Path(args.out)
+            if args.out
+            else (Path(__file__).resolve().parent / "pipeline-benchmark-large.json")
         )
     else:
         files = discover_all_files()
         if not files:
             print("FAIL: no files discovered")
             return 2
-        out_path = Path(args.out) if args.out else (
-            Path(__file__).resolve().parent / f"pipeline-benchmark-c{args.concurrency}.json"
+        out_path = (
+            Path(args.out)
+            if args.out
+            else (Path(__file__).resolve().parent / f"pipeline-benchmark-c{args.concurrency}.json")
         )
 
     bench = benchmark(files, args.concurrency)
@@ -277,9 +290,11 @@ def main():
     print(f"\nJSON saved to: {out_path}")
     # Print summary
     print("\n" + "=" * 78)
-    print(f"SUMMARY (concurrency={args.concurrency}"
-          + (f", large-file synth from {Path(args.large_source).name}" if args.large_source else "")
-          + ")")
+    print(
+        f"SUMMARY (concurrency={args.concurrency}"
+        + (f", large-file synth from {Path(args.large_source).name}" if args.large_source else "")
+        + ")"
+    )
     print("=" * 78)
     summary = {k: v for k, v in bench.items() if k != "results"}
     print(json.dumps(summary, ensure_ascii=False, indent=2))

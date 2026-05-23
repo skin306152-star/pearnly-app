@@ -21,13 +21,12 @@ from unittest.mock import MagicMock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp.mrerp_customer_sync import (   # noqa: E402
+from services.erp.mrerp_customer_sync import (  # noqa: E402
     BuyerInfo,
     CustomerSyncResult,
     MRERPCustomerSyncService,
     parse_armas_listing,
 )
-
 
 # Real HTML captured from MR.ERP TEST2019 DB on 2026-05-18 (scrubbed of
 # session tokens; the only customer-bearing payload). Two real rows +
@@ -129,9 +128,15 @@ class LookupLayerTests(unittest.TestCase):
     def test_l1_db_mapping_hit_without_browser(self):
         svc, _adapter, page = self._make_service()
         buyer = BuyerInfo(name="Anything", client_id=99, tenant_id="t1")
-        mappings = {"clients": [{
-            "erp_type": "mrerp", "client_id": 99, "erp_code": "0006",
-        }]}
+        mappings = {
+            "clients": [
+                {
+                    "erp_type": "mrerp",
+                    "client_id": 99,
+                    "erp_code": "0006",
+                }
+            ]
+        }
         out = svc.lookup(buyer, mappings)
         self.assertIsNotNone(out)
         self.assertEqual(out.customer_code, "0006")
@@ -143,7 +148,8 @@ class LookupLayerTests(unittest.TestCase):
         svc, _adapter, page = self._make_service()
         buyer = BuyerInfo(
             name="Skin Trading Co., Ltd.",
-            client_id=200, tenant_id="t1",
+            client_id=200,
+            tenant_id="t1",
         )
         out = svc.lookup(buyer, {"clients": []})
         self.assertIsNotNone(out)
@@ -158,7 +164,9 @@ class LookupLayerTests(unittest.TestCase):
         # already be 1.0 thanks to normalization, so this exercises
         # genuine fuzzy: introduce a typo.
         buyer = BuyerInfo(
-            name="Skn Tradng Co., Ltd.", client_id=300, tenant_id="t1",
+            name="Skn Tradng Co., Ltd.",
+            client_id=300,
+            tenant_id="t1",
         )
         out = svc.lookup(buyer, {"clients": []})
         self.assertIsNotNone(out)
@@ -172,7 +180,8 @@ class LookupLayerTests(unittest.TestCase):
         svc, _adapter, _page = self._make_service()
         buyer = BuyerInfo(
             name="Completely Different Manufacturing PLC",
-            client_id=400, tenant_id="t1",
+            client_id=400,
+            tenant_id="t1",
         )
         out = svc.lookup(buyer, {"clients": []})
         self.assertIsNone(out)
@@ -181,7 +190,8 @@ class LookupLayerTests(unittest.TestCase):
         svc, _adapter, page = self._make_service()
         buyer = BuyerInfo(
             name="Skin Trading Co., Ltd.",
-            client_id=500, tenant_id="t1",
+            client_id=500,
+            tenant_id="t1",
         )
         svc.lookup(buyer, {"clients": []})
         page.goto.reset_mock()
@@ -194,7 +204,8 @@ class LookupLayerTests(unittest.TestCase):
         svc, _adapter, page = self._make_service()
         buyer = BuyerInfo(
             name="Skin Trading Co., Ltd.",
-            client_id=600, tenant_id="t1",
+            client_id=600,
+            tenant_id="t1",
         )
         svc.lookup(buyer, {"clients": []})
         svc.invalidate()

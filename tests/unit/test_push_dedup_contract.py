@@ -46,11 +46,20 @@ if "psycopg2" not in sys.modules:
     fake_pg.extras.execute_values = lambda *a, **k: None
     fake_pg.extras.Json = lambda x: x
     fake_pg.pool = types.ModuleType("psycopg2.pool")
+
     class _StubPool:
-        def __init__(self, *a, **k): pass
-        def getconn(self): raise RuntimeError("stub")
-        def putconn(self, *a, **k): pass
-        def closeall(self): pass
+        def __init__(self, *a, **k):
+            pass
+
+        def getconn(self):
+            raise RuntimeError("stub")
+
+        def putconn(self, *a, **k):
+            pass
+
+        def closeall(self):
+            pass
+
     fake_pg.pool.ThreadedConnectionPool = _StubPool
     fake_pg.pool.SimpleConnectionPool = _StubPool
     fake_pg.sql = types.ModuleType("psycopg2.sql")
@@ -102,15 +111,19 @@ class HasRecentSuccessfulPushPositiveTests(unittest.TestCase):
     """正向 · 命中 success log."""
 
     def test_returns_dict_when_success_log_found(self):
-        cursor = _MockCursor(result={
-            "id": "log-abc",
-            "response_body": {"bill_no": "SI690519-957345"},
-            "created_at": "2026-05-19T10:30:00",
-            "invoice_no": "INV2026030001",
-        })
+        cursor = _MockCursor(
+            result={
+                "id": "log-abc",
+                "response_body": {"bill_no": "SI690519-957345"},
+                "created_at": "2026-05-19T10:30:00",
+                "invoice_no": "INV2026030001",
+            }
+        )
         with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
             r = db.has_recent_successful_push(
-                history_id="hist-1", endpoint_id="ep-1", user_id="user-1",
+                history_id="hist-1",
+                endpoint_id="ep-1",
+                user_id="user-1",
             )
         self.assertIsNotNone(r)
         self.assertEqual(r["id"], "log-abc")
@@ -122,9 +135,11 @@ class HasRecentSuccessfulPushPositiveTests(unittest.TestCase):
             db.has_recent_successful_push("h", "e", "u")
         self.assertEqual(len(cursor.executed), 1)
         sql, _ = cursor.executed[0]
-        self.assertIn("status = 'success'", sql,
-                      "去重必须只看 success log · 其他状态(failed/skipped_dup) "
-                      "不能算撞")
+        self.assertIn(
+            "status = 'success'",
+            sql,
+            "去重必须只看 success log · 其他状态(failed/skipped_dup) " "不能算撞",
+        )
 
     def test_sql_filters_by_user_id(self):
         """user_id 必须出现在 WHERE · 否则跨账号读到他人 success log."""

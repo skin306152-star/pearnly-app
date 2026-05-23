@@ -23,13 +23,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp.mrerp_adapter import MRERPAdapter   # noqa: E402
-from services.erp.mrerp_product_sync import (   # noqa: E402
+from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
+from services.erp.mrerp_product_sync import (  # noqa: E402
     ItemInfo,
     MRERPProductSyncService,
 )
 
-from tests.integration._mrerp_common import require_credentials   # noqa: E402
+from tests.integration._mrerp_common import require_credentials  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,12 +76,16 @@ class ProductSyncLookupIntegrationTest(unittest.TestCase):
             name="some custom name from OCR",
             tenant_id="test-tenant",
         )
-        mappings = {"products": [{
-            "erp_type": "mrerp",
-            "item_name": "some custom name from OCR",
-            "item_name_norm": "some custom name from ocr",
-            "erp_code": KNOWN_PRODUCT_CODE,
-        }]}
+        mappings = {
+            "products": [
+                {
+                    "erp_type": "mrerp",
+                    "item_name": "some custom name from OCR",
+                    "item_name_norm": "some custom name from ocr",
+                    "erp_code": KNOWN_PRODUCT_CODE,
+                }
+            ]
+        }
         out = self.svc.lookup(item, mappings)
         self.assertIsNotNone(out)
         self.assertEqual(out.product_code, KNOWN_PRODUCT_CODE)
@@ -104,7 +108,7 @@ class ProductSyncLookupIntegrationTest(unittest.TestCase):
         """Layer 3 — single-char typo in 'Pepsi' should still match at
         the 0.90 threshold (ratio ~0.91 on a 9-char normalized form)."""
         item = ItemInfo(
-            name="Peosi 500ml",   # 'Peosi' instead of 'Pepsi'
+            name="Peosi 500ml",  # 'Peosi' instead of 'Pepsi'
             tenant_id="test-tenant",
         )
         out = self.svc.lookup(item, {"products": []})

@@ -4,9 +4,9 @@ v118.32.x · Pearnly · Korn 模板克隆 Excel 导出
 铁律 60-VAT: VAT 对账 Excel 永远用 Korn 模板克隆 · 不许 openpyxl 直接 save
 但因为 Korn 老师还没给我们参考模板 · v1 先用 openpyxl 严格按 PRD §7 复刻
 """
+
 import io
 import logging
-from datetime import datetime
 from typing import Dict, Any, List
 
 from openpyxl import Workbook
@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 # Korn 样本观察到的样式
 HDR_FILL = PatternFill("solid", start_color="1E3A5F")
 HDR_FONT = Font(bold=True, color="FFFFFF", name="Arial", size=10)
-BOLD     = Font(bold=True, name="Arial", size=10)
-NORMAL   = Font(name="Arial", size=10)
-SMALL    = Font(name="Arial", size=9)
-RED      = Font(name="Arial", size=10, color="C0392B", bold=True)
+BOLD = Font(bold=True, name="Arial", size=10)
+NORMAL = Font(name="Arial", size=10)
+SMALL = Font(name="Arial", size=9)
+RED = Font(name="Arial", size=10, color="C0392B", bold=True)
 SUB_FILL = PatternFill("solid", start_color="F3F4F6")
 DIFF_FILL = PatternFill("solid", start_color="FEF2F2")  # 差异行底色
 # P1.2-M2 · 用户手改的发票侧 cell 标黄(同 M4 bank_recon_v2 FFE082)
@@ -30,116 +30,193 @@ OVERRIDE_FONT = Font(name="Arial", size=10, bold=True, color="92400E")  # 暖棕
 
 # P1.2-M2 · 发票侧可校正字段 → Excel 列号 / 列标签 key(报告侧不许改)
 _OVERRIDE_FIELD_COL = {
-    "invoice_date": 2, "invoice_no": 3, "buyer_name": 4,
-    "buyer_tax_id": 5, "buyer_branch": 6, "amount_pre_vat": 7, "vat_amount": 8,
+    "invoice_date": 2,
+    "invoice_no": 3,
+    "buyer_name": 4,
+    "buyer_tax_id": 5,
+    "buyer_branch": 6,
+    "amount_pre_vat": 7,
+    "vat_amount": 8,
 }
 _OVERRIDE_FIELD_LABEL = {
-    "invoice_date": "c_date", "invoice_no": "c_inv_no", "buyer_name": "c_buyer_name",
-    "buyer_tax_id": "c_buyer_tid", "buyer_branch": "c_buyer_branch",
-    "amount_pre_vat": "c_pre_vat", "vat_amount": "c_vat",
+    "invoice_date": "c_date",
+    "invoice_no": "c_inv_no",
+    "buyer_name": "c_buyer_name",
+    "buyer_tax_id": "c_buyer_tid",
+    "buyer_branch": "c_buyer_branch",
+    "amount_pre_vat": "c_pre_vat",
+    "vat_amount": "c_vat",
 }
 
-THIN = Side(style='thin', color='B0BEC5')
+THIN = Side(style="thin", color="B0BEC5")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 
 CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
-LEFT   = Alignment(horizontal="left",   vertical="center", wrap_text=True)
-RIGHT  = Alignment(horizontal="right",  vertical="center", wrap_text=True)
-
+LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
+RIGHT = Alignment(horizontal="right", vertical="center", wrap_text=True)
 
 
 # v118.32.3 · F2 · Excel 表头 4 语 i18n
 # 数据本身(客户名/发票号等)保持 OCR 原文 · 只翻译标签
 _LABELS = {
     "th": {  # 泰文(默认 · 给税局看)
-        "biz_name":"ชื่อผู้ประกอบการ", "biz_address":"ที่อยู่สถานประกอบการ",
-        "tax_id":"เลขประจำตัวผู้เสียภาษี", "branch":"สาขา",
-        "period":"เดือน ปี งวดภาษี", "report_title":"รายงานภาษีขาย",
-        "main_office":"สำนักงานใหญ่",
-        "invoice_side":"ฝั่งใบกำกับภาษี (Invoice Side)",
-        "check_marks":"✓ ช่องตรวจสอบ (Check Marks)",
-        "report_side":"ฝั่งรายงาน (Report Side)",
-        "note":"หมายเหตุ",
-        "c_seq":"ลำดับ", "c_date":"วันที่", "c_inv_no":"เลขที่ใบกำกับ",
-        "c_buyer_name":"ชื่อผู้ซื้อ", "c_buyer_tid":"เลขประจำตัวผู้เสียภาษี",
-        "c_buyer_branch":"สาขาผู้ซื้อ",
-        "c_pre_vat":"ยอดก่อน VAT", "c_vat":"ภาษี 7%", "c_total":"ยอดรวม",
-        "c_category":"หมวดหมู่", "c_source":"แหล่งที่มา",
-        "rc_date":"วันที่", "rc_no":"เลขที่", "rc_name":"ชื่อ",
-        "rc_tid":"เลขภาษี", "rc_branch":"สาขา",
-        "rc_pre":"ก่อน VAT", "rc_vat":"ภาษี 7%",
-        "grand_total":"รวมยอดทั้งสิ้น",
-        "sig_prepared":"ผู้จัดทำ", "sig_reviewer":"ผู้ตรวจสอบ", "sig_approver":"ผู้อนุมัติ",
-        "sec_manual_entry":"ร่องรอยการแก้ไขเอง (ฝั่งใบกำกับ)", "mc_field":"ช่อง",
-        "col_manual_ocr":"ค่า OCR (เดิม)", "col_manual_user":"ค่าที่คุณแก้ (ใช้จริง)",
+        "biz_name": "ชื่อผู้ประกอบการ",
+        "biz_address": "ที่อยู่สถานประกอบการ",
+        "tax_id": "เลขประจำตัวผู้เสียภาษี",
+        "branch": "สาขา",
+        "period": "เดือน ปี งวดภาษี",
+        "report_title": "รายงานภาษีขาย",
+        "main_office": "สำนักงานใหญ่",
+        "invoice_side": "ฝั่งใบกำกับภาษี (Invoice Side)",
+        "check_marks": "✓ ช่องตรวจสอบ (Check Marks)",
+        "report_side": "ฝั่งรายงาน (Report Side)",
+        "note": "หมายเหตุ",
+        "c_seq": "ลำดับ",
+        "c_date": "วันที่",
+        "c_inv_no": "เลขที่ใบกำกับ",
+        "c_buyer_name": "ชื่อผู้ซื้อ",
+        "c_buyer_tid": "เลขประจำตัวผู้เสียภาษี",
+        "c_buyer_branch": "สาขาผู้ซื้อ",
+        "c_pre_vat": "ยอดก่อน VAT",
+        "c_vat": "ภาษี 7%",
+        "c_total": "ยอดรวม",
+        "c_category": "หมวดหมู่",
+        "c_source": "แหล่งที่มา",
+        "rc_date": "วันที่",
+        "rc_no": "เลขที่",
+        "rc_name": "ชื่อ",
+        "rc_tid": "เลขภาษี",
+        "rc_branch": "สาขา",
+        "rc_pre": "ก่อน VAT",
+        "rc_vat": "ภาษี 7%",
+        "grand_total": "รวมยอดทั้งสิ้น",
+        "sig_prepared": "ผู้จัดทำ",
+        "sig_reviewer": "ผู้ตรวจสอบ",
+        "sig_approver": "ผู้อนุมัติ",
+        "sec_manual_entry": "ร่องรอยการแก้ไขเอง (ฝั่งใบกำกับ)",
+        "mc_field": "ช่อง",
+        "col_manual_ocr": "ค่า OCR (เดิม)",
+        "col_manual_user": "ค่าที่คุณแก้ (ใช้จริง)",
     },
     "zh": {
-        "biz_name":"经营者名", "biz_address":"经营场所地址",
-        "tax_id":"税号", "branch":"分支",
-        "period":"纳税期间", "report_title":"销项税报告",
-        "main_office":"总部",
-        "invoice_side":"发票侧 (Invoice Side)",
-        "check_marks":"✓ 核对标记 (Check Marks)",
-        "report_side":"报告侧 (Report Side)",
-        "note":"备注",
-        "c_seq":"序号", "c_date":"日期", "c_inv_no":"发票号",
-        "c_buyer_name":"客户名", "c_buyer_tid":"客户税号",
-        "c_buyer_branch":"客户分支",
-        "c_pre_vat":"前税金额", "c_vat":"VAT 7%", "c_total":"含税总额",
-        "c_category":"分类", "c_source":"来源",
-        "rc_date":"日期", "rc_no":"号码", "rc_name":"名称",
-        "rc_tid":"税号", "rc_branch":"分支",
-        "rc_pre":"前税", "rc_vat":"VAT 7%",
-        "grand_total":"合计",
-        "sig_prepared":"制作人", "sig_reviewer":"审核人", "sig_approver":"批准人",
-        "sec_manual_entry":"手动修改痕迹（发票侧）", "mc_field":"字段",
-        "col_manual_ocr":"OCR 原值", "col_manual_user":"你改的（实际用）",
+        "biz_name": "经营者名",
+        "biz_address": "经营场所地址",
+        "tax_id": "税号",
+        "branch": "分支",
+        "period": "纳税期间",
+        "report_title": "销项税报告",
+        "main_office": "总部",
+        "invoice_side": "发票侧 (Invoice Side)",
+        "check_marks": "✓ 核对标记 (Check Marks)",
+        "report_side": "报告侧 (Report Side)",
+        "note": "备注",
+        "c_seq": "序号",
+        "c_date": "日期",
+        "c_inv_no": "发票号",
+        "c_buyer_name": "客户名",
+        "c_buyer_tid": "客户税号",
+        "c_buyer_branch": "客户分支",
+        "c_pre_vat": "前税金额",
+        "c_vat": "VAT 7%",
+        "c_total": "含税总额",
+        "c_category": "分类",
+        "c_source": "来源",
+        "rc_date": "日期",
+        "rc_no": "号码",
+        "rc_name": "名称",
+        "rc_tid": "税号",
+        "rc_branch": "分支",
+        "rc_pre": "前税",
+        "rc_vat": "VAT 7%",
+        "grand_total": "合计",
+        "sig_prepared": "制作人",
+        "sig_reviewer": "审核人",
+        "sig_approver": "批准人",
+        "sec_manual_entry": "手动修改痕迹（发票侧）",
+        "mc_field": "字段",
+        "col_manual_ocr": "OCR 原值",
+        "col_manual_user": "你改的（实际用）",
     },
     "en": {
-        "biz_name":"Business Name", "biz_address":"Business Address",
-        "tax_id":"Tax ID", "branch":"Branch",
-        "period":"Tax Period", "report_title":"Output VAT Report",
-        "main_office":"Head Office",
-        "invoice_side":"Invoice Side",
-        "check_marks":"✓ Check Marks",
-        "report_side":"Report Side",
-        "note":"Note",
-        "c_seq":"#", "c_date":"Date", "c_inv_no":"Invoice No",
-        "c_buyer_name":"Buyer", "c_buyer_tid":"Buyer Tax ID",
-        "c_buyer_branch":"Buyer Branch",
-        "c_pre_vat":"Pre-VAT", "c_vat":"VAT 7%", "c_total":"Total",
-        "c_category":"Category", "c_source":"Source",
-        "rc_date":"Date", "rc_no":"No", "rc_name":"Name",
-        "rc_tid":"Tax ID", "rc_branch":"Branch",
-        "rc_pre":"Pre-VAT", "rc_vat":"VAT 7%",
-        "grand_total":"Grand Total",
-        "sig_prepared":"Prepared by", "sig_reviewer":"Reviewed by", "sig_approver":"Approved by",
-        "sec_manual_entry":"Manual Edit Trail (Invoice Side)", "mc_field":"Field",
-        "col_manual_ocr":"OCR Value (original)", "col_manual_user":"Your Value (used)",
+        "biz_name": "Business Name",
+        "biz_address": "Business Address",
+        "tax_id": "Tax ID",
+        "branch": "Branch",
+        "period": "Tax Period",
+        "report_title": "Output VAT Report",
+        "main_office": "Head Office",
+        "invoice_side": "Invoice Side",
+        "check_marks": "✓ Check Marks",
+        "report_side": "Report Side",
+        "note": "Note",
+        "c_seq": "#",
+        "c_date": "Date",
+        "c_inv_no": "Invoice No",
+        "c_buyer_name": "Buyer",
+        "c_buyer_tid": "Buyer Tax ID",
+        "c_buyer_branch": "Buyer Branch",
+        "c_pre_vat": "Pre-VAT",
+        "c_vat": "VAT 7%",
+        "c_total": "Total",
+        "c_category": "Category",
+        "c_source": "Source",
+        "rc_date": "Date",
+        "rc_no": "No",
+        "rc_name": "Name",
+        "rc_tid": "Tax ID",
+        "rc_branch": "Branch",
+        "rc_pre": "Pre-VAT",
+        "rc_vat": "VAT 7%",
+        "grand_total": "Grand Total",
+        "sig_prepared": "Prepared by",
+        "sig_reviewer": "Reviewed by",
+        "sig_approver": "Approved by",
+        "sec_manual_entry": "Manual Edit Trail (Invoice Side)",
+        "mc_field": "Field",
+        "col_manual_ocr": "OCR Value (original)",
+        "col_manual_user": "Your Value (used)",
     },
     "ja": {
-        "biz_name":"事業者名", "biz_address":"事業所住所",
-        "tax_id":"税番号", "branch":"支店",
-        "period":"課税期間", "report_title":"売上 VAT レポート",
-        "main_office":"本社",
-        "invoice_side":"請求書側 (Invoice Side)",
-        "check_marks":"✓ チェック欄 (Check Marks)",
-        "report_side":"レポート側 (Report Side)",
-        "note":"備考",
-        "c_seq":"番号", "c_date":"日付", "c_inv_no":"請求書番号",
-        "c_buyer_name":"顧客名", "c_buyer_tid":"顧客税番号",
-        "c_buyer_branch":"顧客支店",
-        "c_pre_vat":"税抜金額", "c_vat":"VAT 7%（消費税相当）", "c_total":"税込合計",
-        "c_category":"分類", "c_source":"出所",
-        "rc_date":"日付", "rc_no":"番号", "rc_name":"名称",
-        "rc_tid":"税番号", "rc_branch":"支店",
-        "rc_pre":"税抜", "rc_vat":"VAT 7%（消費税相当）",
-        "grand_total":"総合計",
-        "sig_prepared":"作成者", "sig_reviewer":"確認者", "sig_approver":"承認者",
-        "sec_manual_entry":"手入力修正履歴（請求書側）", "mc_field":"項目",
-        "col_manual_ocr":"OCR 値(元)", "col_manual_user":"修正値(実使用)",
+        "biz_name": "事業者名",
+        "biz_address": "事業所住所",
+        "tax_id": "税番号",
+        "branch": "支店",
+        "period": "課税期間",
+        "report_title": "売上 VAT レポート",
+        "main_office": "本社",
+        "invoice_side": "請求書側 (Invoice Side)",
+        "check_marks": "✓ チェック欄 (Check Marks)",
+        "report_side": "レポート側 (Report Side)",
+        "note": "備考",
+        "c_seq": "番号",
+        "c_date": "日付",
+        "c_inv_no": "請求書番号",
+        "c_buyer_name": "顧客名",
+        "c_buyer_tid": "顧客税番号",
+        "c_buyer_branch": "顧客支店",
+        "c_pre_vat": "税抜金額",
+        "c_vat": "VAT 7%（消費税相当）",
+        "c_total": "税込合計",
+        "c_category": "分類",
+        "c_source": "出所",
+        "rc_date": "日付",
+        "rc_no": "番号",
+        "rc_name": "名称",
+        "rc_tid": "税番号",
+        "rc_branch": "支店",
+        "rc_pre": "税抜",
+        "rc_vat": "VAT 7%（消費税相当）",
+        "grand_total": "総合計",
+        "sig_prepared": "作成者",
+        "sig_reviewer": "確認者",
+        "sig_approver": "承認者",
+        "sec_manual_entry": "手入力修正履歴（請求書側）",
+        "mc_field": "項目",
+        "col_manual_ocr": "OCR 値(元)",
+        "col_manual_user": "修正値(実使用)",
     },
 }
+
 
 def _t(lang: str, key: str) -> str:
     """取 i18n 文字 · 不存在的语言或 key 自动 fallback 到泰文"""
@@ -157,11 +234,13 @@ def _num(v):
         return 0.0
 
 
-def export_recon_task(task: Dict[str, Any],
-                       rows: List[Dict[str, Any]],
-                       client: Dict[str, Any],
-                       vat_report: Dict[str, Any] = None,
-                       lang: str = "th") -> bytes:
+def export_recon_task(
+    task: Dict[str, Any],
+    rows: List[Dict[str, Any]],
+    client: Dict[str, Any],
+    vat_report: Dict[str, Any] = None,
+    lang: str = "th",
+) -> bytes:
     """
     返回 .xlsx 二进制
     严格按 PRD §7 出 Korn 模板:
@@ -182,12 +261,12 @@ def export_recon_task(task: Dict[str, Any],
     title_main = _t(lang, "report_title")
     title_with_th = title_main if lang == "th" else f"{title_main}  ·  รายงานภาษีขาย"
     header_meta = [
-        (_t(lang, "biz_name"),    client.get("name") or "-"),
+        (_t(lang, "biz_name"), client.get("name") or "-"),
         (_t(lang, "biz_address"), client.get("address") or "-"),
-        (_t(lang, "tax_id"),      client.get("tax_id") or "-"),
-        (_t(lang, "branch"),      f"{_t(lang, 'main_office')} (00000)"),
-        (_t(lang, "period"),      period_str),
-        ("",                       title_with_th),
+        (_t(lang, "tax_id"), client.get("tax_id") or "-"),
+        (_t(lang, "branch"), f"{_t(lang, 'main_office')} (00000)"),
+        (_t(lang, "period"), period_str),
+        ("", title_with_th),
     ]
     for r, (a, b) in enumerate(header_meta, 1):
         ws.cell(r, 1, a).font = BOLD
@@ -221,16 +300,35 @@ def export_recon_task(task: Dict[str, Any],
     R += 1
     # 第二层 · 列名(28 列)
     col_headers = [
-        _t(lang, "c_seq"), _t(lang, "c_date"), _t(lang, "c_inv_no"), _t(lang, "c_buyer_name"),
-        _t(lang, "c_buyer_tid"), _t(lang, "c_buyer_branch"),
-        _t(lang, "c_pre_vat"), _t(lang, "c_vat"), _t(lang, "c_total"),
-        _t(lang, "c_category"), _t(lang, "c_source"),
+        _t(lang, "c_seq"),
+        _t(lang, "c_date"),
+        _t(lang, "c_inv_no"),
+        _t(lang, "c_buyer_name"),
+        _t(lang, "c_buyer_tid"),
+        _t(lang, "c_buyer_branch"),
+        _t(lang, "c_pre_vat"),
+        _t(lang, "c_vat"),
+        _t(lang, "c_total"),
+        _t(lang, "c_category"),
+        _t(lang, "c_source"),
         # 9 个标记列(数字标记 · 不需要翻译)
-        "1", "2.1", "2.2", "2.3", "2.4", "3", "4", "5/6/7", "8/9",
+        "1",
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "3",
+        "4",
+        "5/6/7",
+        "8/9",
         # 报告侧 7 列
-        _t(lang, "rc_date"), _t(lang, "rc_no"), _t(lang, "rc_name"),
-        _t(lang, "rc_tid"), _t(lang, "rc_branch"),
-        _t(lang, "rc_pre"), _t(lang, "rc_vat"),
+        _t(lang, "rc_date"),
+        _t(lang, "rc_no"),
+        _t(lang, "rc_name"),
+        _t(lang, "rc_tid"),
+        _t(lang, "rc_branch"),
+        _t(lang, "rc_pre"),
+        _t(lang, "rc_vat"),
         # 备注
         _t(lang, "note"),
     ]
@@ -254,6 +352,7 @@ def export_recon_task(task: Dict[str, Any],
         if isinstance(diff_fields, str):
             try:
                 import json as _j
+
                 diff_fields = _j.loads(diff_fields)
             except Exception:
                 diff_fields = {}
@@ -263,6 +362,7 @@ def export_recon_task(task: Dict[str, Any],
         if isinstance(field_overrides, str):
             try:
                 import json as _j
+
                 field_overrides = _j.loads(field_overrides)
             except Exception:
                 field_overrides = {}
@@ -280,15 +380,17 @@ def export_recon_task(task: Dict[str, Any],
         diff_cats = [c.strip() for c in diff_cats if c.strip()]
 
         # 发票侧字段(用户校正值优先 · 只覆盖发票侧)
-        inv_no       = _safe(_disp("invoice_no", row.get("invoice_no")))
-        inv_date     = _safe(_disp("invoice_date", row.get("invoice_date")))
-        buyer_name   = _safe(_disp("buyer_name", row.get("buyer_name") or row.get("seller_name")))
-        buyer_tax    = _safe(_disp("buyer_tax_id", row.get("buyer_tax_id")))
+        inv_no = _safe(_disp("invoice_no", row.get("invoice_no")))
+        inv_date = _safe(_disp("invoice_date", row.get("invoice_date")))
+        buyer_name = _safe(_disp("buyer_name", row.get("buyer_name") or row.get("seller_name")))
+        buyer_tax = _safe(_disp("buyer_tax_id", row.get("buyer_tax_id")))
         buyer_branch = _safe(_disp("buyer_branch", row.get("buyer_branch") or "00000"))
-        amt_pre      = _num(_disp("amount_pre_vat", row.get("amount_pre_vat") or row.get("total_amount")))
-        amt_vat      = _num(_disp("vat_amount", row.get("vat_amount")))
-        amt_total    = _num(row.get("total_amount"))
-        source       = row.get("invoice_filename") or "-"
+        amt_pre = _num(
+            _disp("amount_pre_vat", row.get("amount_pre_vat") or row.get("total_amount"))
+        )
+        amt_vat = _num(_disp("vat_amount", row.get("vat_amount")))
+        amt_total = _num(row.get("total_amount"))
+        source = row.get("invoice_filename") or "-"
 
         # 收集本行手改痕迹(给底部 section)
         for _f, _lbl in _OVERRIDE_FIELD_LABEL.items():
@@ -296,8 +398,8 @@ def export_recon_task(task: Dict[str, Any],
             if isinstance(_ov, dict) and _ov.get("user") not in (None, ""):
                 manual_trail.append((idx, _lbl, _ov.get("ocr"), _ov.get("user")))
 
-        sum_pre   += amt_pre
-        sum_vat   += amt_vat
+        sum_pre += amt_pre
+        sum_vat += amt_vat
         sum_total += amt_total
 
         # 决定要写几行(铁律 PRD §7.2:每差异一行)
@@ -324,16 +426,18 @@ def export_recon_task(task: Dict[str, Any],
                 amt_pre if is_first else "",
                 amt_vat if is_first else "",
                 amt_total if is_first else "",
-                "" ,  # 分类 · 待自动归类后填
+                "",  # 分类 · 待自动归类后填
                 source if is_first else "",
             ]
             for c, v in enumerate(cells, 1):
                 cell = ws.cell(R, c, v)
-                cell.alignment = RIGHT if c in (1,7,8,9) else LEFT
+                cell.alignment = RIGHT if c in (1, 7, 8, 9) else LEFT
                 cell.font = NORMAL
                 cell.border = BORDER
-                if bg: cell.fill = bg
-                if c in (7,8,9): cell.number_format = '#,##0.00'
+                if bg:
+                    cell.fill = bg
+                if c in (7, 8, 9):
+                    cell.number_format = "#,##0.00"
 
             # 1b. P1.2-M2 · 用户手改的发票侧 cell 标黄 + OCR/User 批注(只第一行有发票侧数据)
             if is_first and field_overrides:
@@ -346,6 +450,7 @@ def export_recon_task(task: Dict[str, Any],
                     ocell.font = OVERRIDE_FONT
                     try:
                         from openpyxl.comments import Comment as _XLC
+
                         _ocr = _ov.get("ocr")
                         ocell.comment = _XLC(
                             f"OCR: {_ocr if _ocr not in (None, '') else '—'}\nUser: {_ov.get('user')}",
@@ -360,16 +465,17 @@ def export_recon_task(task: Dict[str, Any],
                 cell.alignment = CENTER
                 cell.font = NORMAL
                 cell.border = BORDER
-                if bg: cell.fill = bg
+                if bg:
+                    cell.fill = bg
 
             # 3. 报告侧 7 列(只在第一行填)
-            rep_date    = _safe(row.get("report_date"))    if is_first else ""
-            rep_inv     = _safe(row.get("report_invoice_no")) if is_first else ""
-            rep_name    = _safe(row.get("report_buyer_name")) if is_first else ""
-            rep_tax     = _safe(row.get("report_buyer_tax_id")) if is_first else ""
-            rep_branch  = _safe(row.get("report_buyer_branch")) if is_first else ""
-            rep_pre     = _num(row.get("report_amount_pre_vat")) if is_first else ""
-            rep_vat     = _num(row.get("report_vat_amount")) if is_first else ""
+            rep_date = _safe(row.get("report_date")) if is_first else ""
+            rep_inv = _safe(row.get("report_invoice_no")) if is_first else ""
+            rep_name = _safe(row.get("report_buyer_name")) if is_first else ""
+            rep_tax = _safe(row.get("report_buyer_tax_id")) if is_first else ""
+            rep_branch = _safe(row.get("report_buyer_branch")) if is_first else ""
+            rep_pre = _num(row.get("report_amount_pre_vat")) if is_first else ""
+            rep_vat = _num(row.get("report_vat_amount")) if is_first else ""
 
             rep_cells = [rep_date, rep_inv, rep_name, rep_tax, rep_branch, rep_pre, rep_vat]
             for ci, v in enumerate(rep_cells):
@@ -378,8 +484,10 @@ def export_recon_task(task: Dict[str, Any],
                 cell.alignment = RIGHT if c in (26, 27) else LEFT
                 cell.font = NORMAL
                 cell.border = BORDER
-                if bg: cell.fill = bg
-                if c in (26, 27): cell.number_format = '#,##0.00'
+                if bg:
+                    cell.fill = bg
+                if c in (26, 27):
+                    cell.number_format = "#,##0.00"
 
             # 4. 备注列(写差异说明)
             note = _category_to_thai_note(cat) if cat else ""
@@ -387,16 +495,20 @@ def export_recon_task(task: Dict[str, Any],
             cell.font = RED if is_diff_row else NORMAL
             cell.alignment = LEFT
             cell.border = BORDER
-            if bg: cell.fill = bg
+            if bg:
+                cell.fill = bg
 
             R += 1
 
     # ─── 总计行 ──────────────────────────────────────
     ws.cell(R, 1, _t(lang, "grand_total")).font = BOLD
     ws.merge_cells(start_row=R, start_column=1, end_row=R, end_column=6)
-    ws.cell(R, 7, sum_pre).font = BOLD;   ws.cell(R, 7).number_format = '#,##0.00'
-    ws.cell(R, 8, sum_vat).font = BOLD;   ws.cell(R, 8).number_format = '#,##0.00'
-    ws.cell(R, 9, sum_total).font = BOLD; ws.cell(R, 9).number_format = '#,##0.00'
+    ws.cell(R, 7, sum_pre).font = BOLD
+    ws.cell(R, 7).number_format = "#,##0.00"
+    ws.cell(R, 8, sum_vat).font = BOLD
+    ws.cell(R, 8).number_format = "#,##0.00"
+    ws.cell(R, 9, sum_total).font = BOLD
+    ws.cell(R, 9).number_format = "#,##0.00"
     for c in range(1, 29):
         ws.cell(R, c).border = BORDER
         ws.cell(R, c).fill = SUB_FILL
@@ -412,30 +524,71 @@ def export_recon_task(task: Dict[str, Any],
         R += 3
         ws.merge_cells(start_row=R, start_column=1, end_row=R, end_column=4)
         sec = ws.cell(R, 1, _t(lang, "sec_manual_entry"))
-        sec.fill = HDR_FILL; sec.font = HDR_FONT; sec.alignment = LEFT
+        sec.fill = HDR_FILL
+        sec.font = HDR_FONT
+        sec.alignment = LEFT
         R += 1
-        mini_hdr = [_t(lang, "c_seq"), _t(lang, "mc_field"),
-                    _t(lang, "col_manual_ocr"), _t(lang, "col_manual_user")]
+        mini_hdr = [
+            _t(lang, "c_seq"),
+            _t(lang, "mc_field"),
+            _t(lang, "col_manual_ocr"),
+            _t(lang, "col_manual_user"),
+        ]
         for ci, h in enumerate(mini_hdr, 1):
             cell = ws.cell(R, ci, h)
-            cell.fill = SUB_FILL; cell.font = BOLD; cell.alignment = CENTER; cell.border = BORDER
+            cell.fill = SUB_FILL
+            cell.font = BOLD
+            cell.alignment = CENTER
+            cell.border = BORDER
         R += 1
-        for (seq, lbl_key, ocr_v, user_v) in manual_trail:
+        for seq, lbl_key, ocr_v, user_v in manual_trail:
             ws.cell(R, 1, seq).alignment = CENTER
             ws.cell(R, 1).border = BORDER
-            fc = ws.cell(R, 2, _t(lang, lbl_key)); fc.font = NORMAL; fc.alignment = LEFT; fc.border = BORDER
+            fc = ws.cell(R, 2, _t(lang, lbl_key))
+            fc.font = NORMAL
+            fc.alignment = LEFT
+            fc.border = BORDER
             oc = ws.cell(R, 3, ocr_v if ocr_v not in (None, "") else "—")
-            oc.font = SMALL; oc.alignment = LEFT; oc.border = BORDER
+            oc.font = SMALL
+            oc.alignment = LEFT
+            oc.border = BORDER
             uc = ws.cell(R, 4, user_v)
-            uc.fill = OVERRIDE_FILL; uc.font = OVERRIDE_FONT; uc.alignment = LEFT; uc.border = BORDER
+            uc.fill = OVERRIDE_FILL
+            uc.font = OVERRIDE_FONT
+            uc.alignment = LEFT
+            uc.border = BORDER
             R += 1
 
     # ─── 列宽 ────────────────────────────────────────
     widths = {
-        1:6, 2:11, 3:18, 4:30, 5:18, 6:10, 7:11, 8:10, 9:11, 10:14, 11:18,
-        12:5, 13:5, 14:5, 15:5, 16:5, 17:5, 18:5, 19:5, 20:5,
-        21:11, 22:16, 23:24, 24:18, 25:8, 26:11, 27:10,
-        28:30,
+        1: 6,
+        2: 11,
+        3: 18,
+        4: 30,
+        5: 18,
+        6: 10,
+        7: 11,
+        8: 10,
+        9: 11,
+        10: 14,
+        11: 18,
+        12: 5,
+        13: 5,
+        14: 5,
+        15: 5,
+        16: 5,
+        17: 5,
+        18: 5,
+        19: 5,
+        20: 5,
+        21: 11,
+        22: 16,
+        23: 24,
+        24: 18,
+        25: 8,
+        26: 11,
+        27: 10,
+        28: 30,
     }
     for c, w in widths.items():
         ws.column_dimensions[get_column_letter(c)].width = w
@@ -457,17 +610,17 @@ def export_recon_task(task: Dict[str, Any],
 def _category_to_thai_note(cat: str) -> str:
     """差异类别 → 泰语备注"""
     return {
-        "date_diff":            "วันที่ไม่ตรงกัน",
+        "date_diff": "วันที่ไม่ตรงกัน",
         "date_period_mismatch": "วันที่ข้ามงวดภาษี",
-        "invoice_no_prefix":    "เลขที่ใบกำกับต่างเพียงคำนำหน้า",
-        "invoice_no_mismatch":  "เลขที่ใบกำกับไม่ถูกต้อง",
-        "name_fuzzy":           "ชื่อผู้ซื้อใกล้เคียง · ไม่ตรงทุกตัวอักษร",
-        "name_mismatch":        "ชื่อผู้ซื้อไม่ถูกต้อง",
-        "tax_id_mismatch":      "เลขประจำตัวผู้เสียภาษีไม่ถูกต้อง",
-        "branch_mismatch":      "สาขาผู้ซื้อไม่ถูกต้อง",
-        "amount_diff":          "ยอดเงินไม่ตรงกัน",
-        "vat_precision":        "ภาษีมูลค่าเพิ่มต่างเพราะปัดเศษ",
-        "vat_calc_wrong":       "ภาษีมูลค่าเพิ่มคำนวณผิด",
-        "invoice_orphan":       "พบใบกำกับ แต่ไม่พบในรายงาน",
-        "report_orphan":        "พบในรายงาน แต่ไม่พบใบกำกับ",
+        "invoice_no_prefix": "เลขที่ใบกำกับต่างเพียงคำนำหน้า",
+        "invoice_no_mismatch": "เลขที่ใบกำกับไม่ถูกต้อง",
+        "name_fuzzy": "ชื่อผู้ซื้อใกล้เคียง · ไม่ตรงทุกตัวอักษร",
+        "name_mismatch": "ชื่อผู้ซื้อไม่ถูกต้อง",
+        "tax_id_mismatch": "เลขประจำตัวผู้เสียภาษีไม่ถูกต้อง",
+        "branch_mismatch": "สาขาผู้ซื้อไม่ถูกต้อง",
+        "amount_diff": "ยอดเงินไม่ตรงกัน",
+        "vat_precision": "ภาษีมูลค่าเพิ่มต่างเพราะปัดเศษ",
+        "vat_calc_wrong": "ภาษีมูลค่าเพิ่มคำนวณผิด",
+        "invoice_orphan": "พบใบกำกับ แต่ไม่พบในรายงาน",
+        "report_orphan": "พบในรายงาน แต่ไม่พบใบกำกับ",
     }.get(cat, cat)

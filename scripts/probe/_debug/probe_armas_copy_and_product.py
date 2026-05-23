@@ -39,6 +39,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+
 load_dotenv(PROJECT_ROOT / ".env.local")
 
 from services.erp.mrerp_adapter import MRERPAdapter
@@ -102,35 +103,39 @@ with MRERPAdapter(
     print("=" * 60)
 
     captured_resp = []
+
     def on_resp(r):
         try:
             url = r.url or ""
         except Exception:
             return
         if "armas" in url and (
-            "bshlistboxdata" in url or "allform" in url
-            or "allsave" in url or "showdata" in url
+            "bshlistboxdata" in url or "allform" in url or "allsave" in url or "showdata" in url
         ):
             body = ""
             try:
                 body = (r.text() or "")[:5000]
             except Exception:
                 pass
-            captured_resp.append({
-                "url": url, "status": r.status,
-                "method": r.request.method if r.request else None,
-                "body_preview": body,
-            })
+            captured_resp.append(
+                {
+                    "url": url,
+                    "status": r.status,
+                    "method": r.request.method if r.request else None,
+                    "body_preview": body,
+                }
+            )
+
     ctx.on("response", on_resp)
 
-    page.goto(adapter.login_url + "/armas/allform.php",
-              wait_until="networkidle", timeout=15_000)
+    page.goto(adapter.login_url + "/armas/allform.php", wait_until="networkidle", timeout=15_000)
     page.wait_for_timeout(2_000)
 
     # State A: blank form
     state_blank = dump_inputs(page)
-    print(f"  blank inputs: {len(state_blank['inputs'])}, "
-          f"selects: {len(state_blank['selects'])}")
+    print(
+        f"  blank inputs: {len(state_blank['inputs'])}, " f"selects: {len(state_blank['selects'])}"
+    )
 
     # Inspect the inpdupdata button — what does it do?
     btn_info = page.evaluate("""
@@ -173,7 +178,7 @@ with MRERPAdapter(
 
     # Try clicking inpdupdata
     try:
-        page.locator('input#inpdupdata').click(timeout=5_000)
+        page.locator("input#inpdupdata").click(timeout=5_000)
         page.wait_for_timeout(1_500)
         # After click, check what new elements/popups appeared
         popup_state = page.evaluate("""
@@ -194,8 +199,7 @@ with MRERPAdapter(
                 return overlays;
             }
         """)
-        print(f"\n  After clicking inpdupdata - popup elements: "
-              f"{len(popup_state)} matches")
+        print(f"\n  After clicking inpdupdata - popup elements: " f"{len(popup_state)} matches")
         for p in popup_state[:3]:
             print(f"    tag={p['tag']} class={p['class']} id={p['id']}")
             print(f"    html: {p['html'][:300]}")
@@ -234,17 +238,17 @@ with MRERPAdapter(
 
     # State B: after picking 0006
     state_after = dump_inputs(page)
-    print(f"\n  After-pick inputs: {len(state_after['inputs'])}, "
-          f"selects: {len(state_after['selects'])}")
+    print(
+        f"\n  After-pick inputs: {len(state_after['inputs'])}, "
+        f"selects: {len(state_after['selects'])}"
+    )
 
     # Diff blank vs after — which fields changed?
-    blank_map = {(i['name'] or i['id']): i['value'] or ''
-                 for i in state_blank['inputs']}
-    after_map = {(i['name'] or i['id']): i['value'] or ''
-                 for i in state_after['inputs']}
+    blank_map = {(i["name"] or i["id"]): i["value"] or "" for i in state_blank["inputs"]}
+    after_map = {(i["name"] or i["id"]): i["value"] or "" for i in state_after["inputs"]}
     changes = []
     for k, av in after_map.items():
-        bv = blank_map.get(k, '')
+        bv = blank_map.get(k, "")
         if av != bv and (av or bv):
             changes.append({"field": k, "blank": bv, "after": av})
     print(f"\n  {len(changes)} fields changed:")
@@ -253,14 +257,18 @@ with MRERPAdapter(
 
     # Save full state
     (base / f"armas_copy_{ts}.json").write_text(
-        json.dumps({
-            "blank_inputs": state_blank,
-            "after_pick_inputs": state_after,
-            "changes": changes,
-            "btn_info": btn_info,
-            "bshlist_src": bshlist_src,
-            "captured_responses": captured_resp[-20:],
-        }, ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "blank_inputs": state_blank,
+                "after_pick_inputs": state_after,
+                "changes": changes,
+                "btn_info": btn_info,
+                "bshlist_src": bshlist_src,
+                "captured_responses": captured_resp[-20:],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
     print(f"\n  → wrote armas_copy_{ts}.json")
@@ -273,9 +281,12 @@ with MRERPAdapter(
     print("=" * 60)
 
     # Step 1: Navigate to mainmenu and find product-master menu link
-    page.goto(adapter.login_url + "/login/mainmenu.php"
-              f"?comidyear={adapter.comidyear}&seldb={adapter.seldb}",
-              wait_until="networkidle", timeout=15_000)
+    page.goto(
+        adapter.login_url + "/login/mainmenu.php"
+        f"?comidyear={adapter.comidyear}&seldb={adapter.seldb}",
+        wait_until="networkidle",
+        timeout=15_000,
+    )
 
     # Look for product-related links / menu items via JS
     product_menu = page.evaluate("""
@@ -328,8 +339,7 @@ with MRERPAdapter(
             # check if it has showdata
             if 'id="showdata"' in html or "allform.php" in html:
                 product_listing_url = c
-                (base / f"product_listing_{ts}.html").write_text(
-                    html, encoding="utf-8")
+                (base / f"product_listing_{ts}.html").write_text(html, encoding="utf-8")
                 print(f"\n  ✓ found product listing at {c} ({len(html)} bytes)")
                 break
         except Exception as e:
@@ -340,22 +350,23 @@ with MRERPAdapter(
     # If found, also probe the create form
     if product_listing_url:
         form_url = product_listing_url.replace("allview.php", "allform.php")
-        page.goto(adapter.login_url + form_url,
-                  wait_until="networkidle", timeout=15_000)
+        page.goto(adapter.login_url + form_url, wait_until="networkidle", timeout=15_000)
         page.wait_for_timeout(1_500)
         state_product = dump_inputs(page)
         # Try to grab checknull source
-        cn_src = page.evaluate(
-            "typeof checknull === 'function' ? checknull.toString() : null"
-        )
+        cn_src = page.evaluate("typeof checknull === 'function' ? checknull.toString() : null")
         (base / f"product_form_{ts}.json").write_text(
-            json.dumps({
-                "listing_url": product_listing_url,
-                "form_url": form_url,
-                "inputs": state_product["inputs"],
-                "selects": state_product["selects"],
-                "checknull": cn_src,
-            }, ensure_ascii=False, indent=2),
+            json.dumps(
+                {
+                    "listing_url": product_listing_url,
+                    "form_url": form_url,
+                    "inputs": state_product["inputs"],
+                    "selects": state_product["selects"],
+                    "checknull": cn_src,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
             encoding="utf-8",
         )
         print(f"  → wrote product_form_{ts}.json")

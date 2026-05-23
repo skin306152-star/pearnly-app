@@ -29,8 +29,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, Set, Tuple
-
+from typing import Dict, Set
 
 HOME_JS = Path(__file__).resolve().parents[1] / "home.js"
 
@@ -111,12 +110,11 @@ def diff_keysets(blocks: Dict[str, Set[str]], source: str = "zh") -> Dict[str, D
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--strict", action="store_true",
-                   help="missing/extra 任何就 fail (默认: 只 missing fail)")
-    p.add_argument("--quiet", action="store_true",
-                   help="只输出汇总 + 退出码 (CI 模式)")
-    p.add_argument("--source", default="zh",
-                   help="source of truth language (default zh)")
+    p.add_argument(
+        "--strict", action="store_true", help="missing/extra 任何就 fail (默认: 只 missing fail)"
+    )
+    p.add_argument("--quiet", action="store_true", help="只输出汇总 + 退出码 (CI 模式)")
+    p.add_argument("--source", default="zh", help="source of truth language (default zh)")
     args = p.parse_args(argv)
 
     if not HOME_JS.exists():
@@ -149,14 +147,18 @@ def main(argv=None) -> int:
                 if len(m) > 20:
                     print(f"     ... 还有 {len(m) - 20} 个 · 用 --strict 看全部")
             if e:
-                print(f"[!] [{lang}] extra {len(e)} keys (在 {lang} 但不在 {args.source} · 可能 zh 漏了):")
+                print(
+                    f"[!] [{lang}] extra {len(e)} keys (在 {lang} 但不在 {args.source} · 可能 zh 漏了):"
+                )
                 for k in e[:20]:
                     print(f"     - {k}")
                 if len(e) > 20:
                     print(f"     ... 还有 {len(e) - 20} 个")
 
     if args.quiet:
-        print(f"i18n: source={args.source} · total_missing={total_missing} · total_extra={total_extra}")
+        print(
+            f"i18n: source={args.source} · total_missing={total_missing} · total_extra={total_extra}"
+        )
     else:
         print()
         print(f"汇总: {total_missing} missing · {total_extra} extra")

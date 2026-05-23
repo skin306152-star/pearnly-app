@@ -28,6 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+
 load_dotenv(PROJECT_ROOT / ".env.local")
 
 from services.erp.mrerp_adapter import MRERPAdapter
@@ -36,14 +37,13 @@ from services.erp.mrerp_adapter import MRERPAdapter
 def summarize_form(html: str) -> dict:
     inputs = []
     for m in re.finditer(
-        r'<input\b([^>]*?)>',
+        r"<input\b([^>]*?)>",
         html,
         re.DOTALL | re.IGNORECASE,
     ):
         attrs = m.group(1)
         rec = {}
-        for k in ("name", "id", "type", "value", "placeholder", "onclick",
-                  "onchange"):
+        for k in ("name", "id", "type", "value", "placeholder", "onclick", "onchange"):
             mm = re.search(
                 rf'\b{k}\s*=\s*["\']([^"\']*)["\']',
                 attrs,
@@ -55,7 +55,7 @@ def summarize_form(html: str) -> dict:
             inputs.append(rec)
     buttons = []
     for m in re.finditer(
-        r'<button\b([^>]*?)>(.*?)</button>',
+        r"<button\b([^>]*?)>(.*?)</button>",
         html,
         re.DOTALL | re.IGNORECASE,
     ):
@@ -74,7 +74,7 @@ def summarize_form(html: str) -> dict:
             buttons.append(rec)
     selects = []
     for m in re.finditer(
-        r'<select\b([^>]*?)>',
+        r"<select\b([^>]*?)>",
         html,
         re.DOTALL | re.IGNORECASE,
     ):
@@ -116,15 +116,21 @@ with MRERPAdapter(
     (base / f"armas_create_{ts}.html").write_text(html, encoding="utf-8")
     summary = summarize_form(html)
     (base / f"armas_create_{ts}.json").write_text(
-        json.dumps({
-            "url": page.url,
-            "html_size": len(html),
-            **summary,
-        }, ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "url": page.url,
+                "html_size": len(html),
+                **summary,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
     print(f"saved armas_create_{ts}.html ({len(html)} bytes)")
-    print(f"inputs={len(summary['inputs'])} buttons={len(summary['buttons'])} selects={len(summary['selects'])}")
+    print(
+        f"inputs={len(summary['inputs'])} buttons={len(summary['buttons'])} selects={len(summary['selects'])}"
+    )
     print("\n--- first 20 inputs ---")
     for inp in summary["inputs"][:20]:
         print(json.dumps(inp, ensure_ascii=False)[:200])

@@ -17,11 +17,9 @@ import hashlib
 import json
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Request, Query, UploadFile, File, Form
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, EmailStr, Field
+from fastapi import APIRouter, HTTPException, Request, Query
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger("mrpilot.signup")
 router = APIRouter(tags=["signup-v109.3"])
@@ -52,149 +50,186 @@ PLAN_CONFIG = {
     # 现有 quota/features 链路不空 · features.ocr_per_period=999999 避免
     # check_ocr_quota 误判超额 · 真实计量由 credits 系统在 OCR 端点扣
     "credits": {
-        "ocr_per_period":     999999,
-        "max_upload_files":   500,
+        "ocr_per_period": 999999,
+        "max_upload_files": 500,
         "max_pages_per_file": 50,
-        "max_mb_per_file":    100,
-        "clients_max":        999,
-        "seats_max":          5,
-        "automation":         True,
+        "max_mb_per_file": 100,
+        "clients_max": 999,
+        "seats_max": 5,
+        "automation": True,
         "advanced_templates": True,
-        "batch_export":       True,
-        "line_bot":           True,
-        "duration_days":      None,
-        "needs_own_key":      False,
-        "price_thb":          0,
-        "billing":            "credits",
+        "batch_export": True,
+        "line_bot": True,
+        "duration_days": None,
+        "needs_own_key": False,
+        "price_thb": 0,
+        "billing": "credits",
     },
     # === 新 5 档 ===
     "trial": {
-        "ocr_per_period":     30,   # v118.32.5.5.14 · Korn 反薅闸 · 100→30 张/月
-        "max_upload_files":   30,
+        "ocr_per_period": 30,  # v118.32.5.5.14 · Korn 反薅闸 · 100→30 张/月
+        "max_upload_files": 30,
         "max_pages_per_file": 50,
-        "max_mb_per_file":    100,
-        "clients_max":        3,
-        "seats_max":          1,
-        "automation":         False,
+        "max_mb_per_file": 100,
+        "clients_max": 3,
+        "seats_max": 1,
+        "automation": False,
         "advanced_templates": False,
-        "batch_export":       True,
-        "line_bot":           False,
-        "duration_days":      3,   # v118.32.5.5.14 · Korn 反薅闸 · 7→3 天
-        "needs_own_key":      False,
-        "price_thb":          0,
-        "billing":            "trial",
+        "batch_export": True,
+        "line_bot": False,
+        "duration_days": 3,  # v118.32.5.5.14 · Korn 反薅闸 · 7→3 天
+        "needs_own_key": False,
+        "price_thb": 0,
+        "billing": "trial",
         # 兼容老字段(/api/me/plan 用)· 不再依赖 LINE 双轨制
-        "ocr_with_line":          30,  # v118.32.5.5.14 · 同步缩
-        "clients_max_with_line":  3,
+        "ocr_with_line": 30,  # v118.32.5.5.14 · 同步缩
+        "clients_max_with_line": 3,
     },
     "monthly": {
-        "ocr_per_period":     500,
-        "max_upload_files":   500,  # v118.27.8.1.15 · 30→500 · 月付 500 张 · Korn 反馈月底 300-700 张要一次跑完
+        "ocr_per_period": 500,
+        "max_upload_files": 500,  # v118.27.8.1.15 · 30→500 · 月付 500 张 · Korn 反馈月底 300-700 张要一次跑完
         "max_pages_per_file": 50,
-        "max_mb_per_file":    100,
-        "clients_max":        10,
-        "seats_max":          1,
-        "automation":         True,
+        "max_mb_per_file": 100,
+        "clients_max": 10,
+        "seats_max": 1,
+        "automation": True,
         "advanced_templates": True,
-        "batch_export":       True,
-        "line_bot":           True,
-        "duration_days":      30,
-        "needs_own_key":      False,
-        "price_thb":          299,
-        "billing":            "monthly",
+        "batch_export": True,
+        "line_bot": True,
+        "duration_days": 30,
+        "needs_own_key": False,
+        "price_thb": 299,
+        "billing": "monthly",
     },
     "yearly": {
-        "ocr_per_period":     1500,
-        "max_upload_files":   800,  # v118.27.8.1.15 · 50→800 · 年付高峰月 800 张一锅端
+        "ocr_per_period": 1500,
+        "max_upload_files": 800,  # v118.27.8.1.15 · 50→800 · 年付高峰月 800 张一锅端
         "max_pages_per_file": 50,
-        "max_mb_per_file":    100,
-        "clients_max":        30,
-        "seats_max":          3,
-        "automation":         True,
+        "max_mb_per_file": 100,
+        "clients_max": 30,
+        "seats_max": 3,
+        "automation": True,
         "advanced_templates": True,
-        "batch_export":       True,
-        "line_bot":           True,
-        "duration_days":      365,
-        "needs_own_key":      False,
-        "price_thb":          2990,
-        "billing":            "yearly",
+        "batch_export": True,
+        "line_bot": True,
+        "duration_days": 365,
+        "needs_own_key": False,
+        "price_thb": 2990,
+        "billing": "yearly",
     },
     "lifetime": {
-        "ocr_per_period":     999999,
-        "max_upload_files":   1000, # v118.27.8.1.15 · 100→1000 · 买断不限月 · 单次也开大
+        "ocr_per_period": 999999,
+        "max_upload_files": 1000,  # v118.27.8.1.15 · 100→1000 · 买断不限月 · 单次也开大
         "max_pages_per_file": 100,
-        "max_mb_per_file":    200,
-        "clients_max":        999999,
-        "seats_max":          5,
-        "automation":         True,
+        "max_mb_per_file": 200,
+        "clients_max": 999999,
+        "seats_max": 5,
+        "automation": True,
         "advanced_templates": True,
-        "batch_export":       True,
-        "line_bot":           True,
-        "duration_days":      None,           # 永久
-        "needs_own_key":      True,           # 必须自己填 Gemini key
-        "price_thb":          9900,
-        "billing":            "lifetime",
+        "batch_export": True,
+        "line_bot": True,
+        "duration_days": None,  # 永久
+        "needs_own_key": True,  # 必须自己填 Gemini key
+        "price_thb": 9900,
+        "billing": "lifetime",
     },
     "admin": {
-        "ocr_per_period":     999999,
-        "max_upload_files":   9999, # v118.27.8.1.15 · 999→9999 · admin 必须 >= lifetime(1000)· 内部不变式
+        "ocr_per_period": 999999,
+        "max_upload_files": 9999,  # v118.27.8.1.15 · 999→9999 · admin 必须 >= lifetime(1000)· 内部不变式
         "max_pages_per_file": 999,
-        "max_mb_per_file":    500,
-        "clients_max":        999999,
-        "seats_max":          999999,
-        "automation":         True,
+        "max_mb_per_file": 500,
+        "clients_max": 999999,
+        "seats_max": 999999,
+        "automation": True,
         "advanced_templates": True,
-        "batch_export":       True,
-        "line_bot":           True,
-        "duration_days":      None,
-        "needs_own_key":      False,
-        "price_thb":          0,
-        "billing":            "admin",
+        "batch_export": True,
+        "line_bot": True,
+        "duration_days": None,
+        "needs_own_key": False,
+        "price_thb": 0,
+        "billing": "admin",
     },
     # === 老 plan 别名(数据库还有这些值 · 兼容直接读)===
     # 实际不会被 _get_plan 返回(已通过 LEGACY_PLAN_MAP 映射)· 仅为保险
     "free": {
         # v118.32.5.5.14 · 跟 trial 同步缩(防有老用户卡在 free 别名)
-        "ocr_per_period": 30, "max_upload_files": 30, "max_pages_per_file": 50,
-        "max_mb_per_file": 100, "clients_max": 3, "seats_max": 1,
-        "automation": False, "advanced_templates": False, "batch_export": True,
-        "line_bot": False, "duration_days": 3, "needs_own_key": False,
-        "price_thb": 0, "billing": "trial",
-        "ocr_with_line": 30, "clients_max_with_line": 3,
+        "ocr_per_period": 30,
+        "max_upload_files": 30,
+        "max_pages_per_file": 50,
+        "max_mb_per_file": 100,
+        "clients_max": 3,
+        "seats_max": 1,
+        "automation": False,
+        "advanced_templates": False,
+        "batch_export": True,
+        "line_bot": False,
+        "duration_days": 3,
+        "needs_own_key": False,
+        "price_thb": 0,
+        "billing": "trial",
+        "ocr_with_line": 30,
+        "clients_max_with_line": 3,
         "_legacy_alias": "trial",
     },
     "pro": {
-        "ocr_per_period": 500, "max_upload_files": 500, "max_pages_per_file": 50,
-        "max_mb_per_file": 100, "clients_max": 10, "seats_max": 1,
-        "automation": True, "advanced_templates": True, "batch_export": True,
-        "line_bot": True, "duration_days": 30, "needs_own_key": False,
-        "price_thb": 299, "billing": "monthly",
+        "ocr_per_period": 500,
+        "max_upload_files": 500,
+        "max_pages_per_file": 50,
+        "max_mb_per_file": 100,
+        "clients_max": 10,
+        "seats_max": 1,
+        "automation": True,
+        "advanced_templates": True,
+        "batch_export": True,
+        "line_bot": True,
+        "duration_days": 30,
+        "needs_own_key": False,
+        "price_thb": 299,
+        "billing": "monthly",
         "_legacy_alias": "monthly",
     },
     "firm": {
-        "ocr_per_period": 1500, "max_upload_files": 800, "max_pages_per_file": 50,
-        "max_mb_per_file": 100, "clients_max": 30, "seats_max": 3,
-        "automation": True, "advanced_templates": True, "batch_export": True,
-        "line_bot": True, "duration_days": 365, "needs_own_key": False,
-        "price_thb": 2990, "billing": "yearly",
+        "ocr_per_period": 1500,
+        "max_upload_files": 800,
+        "max_pages_per_file": 50,
+        "max_mb_per_file": 100,
+        "clients_max": 30,
+        "seats_max": 3,
+        "automation": True,
+        "advanced_templates": True,
+        "batch_export": True,
+        "line_bot": True,
+        "duration_days": 365,
+        "needs_own_key": False,
+        "price_thb": 2990,
+        "billing": "yearly",
         "_legacy_alias": "yearly",
     },
     "enterprise": {
-        "ocr_per_period": 999999, "max_upload_files": 1000, "max_pages_per_file": 100,
-        "max_mb_per_file": 200, "clients_max": 999999, "seats_max": 5,
-        "automation": True, "advanced_templates": True, "batch_export": True,
-        "line_bot": True, "duration_days": None, "needs_own_key": True,
-        "price_thb": 9900, "billing": "lifetime",
+        "ocr_per_period": 999999,
+        "max_upload_files": 1000,
+        "max_pages_per_file": 100,
+        "max_mb_per_file": 200,
+        "clients_max": 999999,
+        "seats_max": 5,
+        "automation": True,
+        "advanced_templates": True,
+        "batch_export": True,
+        "line_bot": True,
+        "duration_days": None,
+        "needs_own_key": True,
+        "price_thb": 9900,
+        "billing": "lifetime",
         "_legacy_alias": "lifetime",
     },
 }
 
 # 老 plan → 新 plan 字符串映射(_get_plan 出口处用)
 LEGACY_PLAN_MAP = {
-    "free":       "trial",
-    "plus":       "trial",
-    "pro":        "monthly",
-    "firm":       "yearly",
+    "free": "trial",
+    "plus": "trial",
+    "pro": "monthly",
+    "firm": "yearly",
     "enterprise": "lifetime",
 }
 
@@ -204,25 +239,71 @@ LEGACY_PLAN_MAP = {
 # ============================================================
 # 临时邮箱黑名单(常见 60+ 域名 · 持续维护)
 DISPOSABLE_EMAIL_DOMAINS = {
-    "tempmail.com", "tempmail.net", "10minutemail.com", "10minutemail.net",
-    "guerrillamail.com", "guerrillamail.net", "guerrillamail.org",
-    "mailinator.com", "mailinator.net", "mailinator.org",
-    "throwawaymail.com", "yopmail.com", "yopmail.net", "yopmail.fr",
-    "trashmail.com", "trashmail.net", "trashmail.de",
-    "fakeinbox.com", "sharklasers.com", "grr.la", "guerrillamailblock.com",
-    "mintemail.com", "tempinbox.com", "spambox.us", "spam4.me",
-    "mailcatch.com", "maildrop.cc", "mailnesia.com",
-    "getairmail.com", "getnada.com", "inboxkitten.com", "mvrht.com",
-    "tempmailaddress.com", "temp-mail.org", "temp-mail.io", "tempr.email",
-    "dispostable.com", "discard.email", "discardmail.com",
-    "moakt.com", "tempemail.co", "fakemail.net", "fakemailgenerator.com",
-    "throwaway.email", "burnermail.io", "emailondeck.com",
-    "harakirimail.com", "spamgourmet.com", "deadaddress.com",
-    "anonbox.net", "spamcorptastic.com", "spamfree24.org",
-    "armyspy.com", "cuvox.de", "dayrep.com", "einrot.com",
-    "fleckens.hu", "gustr.com", "jourrapide.com", "rhyta.com",
-    "superrito.com", "teleworm.us",
-    "mohmal.com", "mailtothis.com", "mytemp.email",
+    "tempmail.com",
+    "tempmail.net",
+    "10minutemail.com",
+    "10minutemail.net",
+    "guerrillamail.com",
+    "guerrillamail.net",
+    "guerrillamail.org",
+    "mailinator.com",
+    "mailinator.net",
+    "mailinator.org",
+    "throwawaymail.com",
+    "yopmail.com",
+    "yopmail.net",
+    "yopmail.fr",
+    "trashmail.com",
+    "trashmail.net",
+    "trashmail.de",
+    "fakeinbox.com",
+    "sharklasers.com",
+    "grr.la",
+    "guerrillamailblock.com",
+    "mintemail.com",
+    "tempinbox.com",
+    "spambox.us",
+    "spam4.me",
+    "mailcatch.com",
+    "maildrop.cc",
+    "mailnesia.com",
+    "getairmail.com",
+    "getnada.com",
+    "inboxkitten.com",
+    "mvrht.com",
+    "tempmailaddress.com",
+    "temp-mail.org",
+    "temp-mail.io",
+    "tempr.email",
+    "dispostable.com",
+    "discard.email",
+    "discardmail.com",
+    "moakt.com",
+    "tempemail.co",
+    "fakemail.net",
+    "fakemailgenerator.com",
+    "throwaway.email",
+    "burnermail.io",
+    "emailondeck.com",
+    "harakirimail.com",
+    "spamgourmet.com",
+    "deadaddress.com",
+    "anonbox.net",
+    "spamcorptastic.com",
+    "spamfree24.org",
+    "armyspy.com",
+    "cuvox.de",
+    "dayrep.com",
+    "einrot.com",
+    "fleckens.hu",
+    "gustr.com",
+    "jourrapide.com",
+    "rhyta.com",
+    "superrito.com",
+    "teleworm.us",
+    "mohmal.com",
+    "mailtothis.com",
+    "mytemp.email",
 }
 
 
@@ -293,7 +374,7 @@ def get_ip_subnet24(ip: str) -> str:
 def check_signup_abuse(email_norm: str, ip: str, fingerprint: str = None) -> Optional[str]:
     """
     防薅检查 · 返回错误代码或 None(通过)
-    
+
     检查项:
     1. 同 IP 24 小时 ≥ 3 个账号 → 拒绝
     2. 同 /24 网段 24 小时 ≥ 10 个 → 拒绝
@@ -302,50 +383,63 @@ def check_signup_abuse(email_norm: str, ip: str, fingerprint: str = None) -> Opt
     """
     try:
         import db as _db
+
         with _db.get_cursor(commit=True) as cur:
-                # 1. 归一化邮箱重复
-                cur.execute("""
+            # 1. 归一化邮箱重复
+            cur.execute(
+                """
                     SELECT 1 FROM users
                     WHERE LOWER(COALESCE(email_normalized, '')) = %s
                        OR LOWER(COALESCE(email, '')) = %s
                        OR LOWER(username) = %s
                     LIMIT 1
-                """, (email_norm, email_norm, email_norm))
-                if cur.fetchone():
-                    return "email_already_registered"
+                """,
+                (email_norm, email_norm, email_norm),
+            )
+            if cur.fetchone():
+                return "email_already_registered"
 
-                # 2. 同 IP 24h 上限
-                cur.execute("""
+            # 2. 同 IP 24h 上限
+            cur.execute(
+                """
                     SELECT COUNT(*) FROM users
                     WHERE signup_ip = %s
                       AND created_at > NOW() - INTERVAL '24 hours'
-                """, (ip,))
-                same_ip = _row_count(cur.fetchone(), 0)
-                if same_ip >= 3:
-                    return "ip_rate_limit"
+                """,
+                (ip,),
+            )
+            same_ip = _row_count(cur.fetchone(), 0)
+            if same_ip >= 3:
+                return "ip_rate_limit"
 
-                # 3. 同 /24 段 24h 上限
-                subnet = get_ip_subnet24(ip)
-                if subnet != ip:  # 仅 IPv4
-                    cur.execute("""
+            # 3. 同 /24 段 24h 上限
+            subnet = get_ip_subnet24(ip)
+            if subnet != ip:  # 仅 IPv4
+                cur.execute(
+                    """
                         SELECT COUNT(*) FROM users
                         WHERE signup_ip_subnet = %s
                           AND created_at > NOW() - INTERVAL '24 hours'
-                    """, (subnet,))
-                    same_subnet = _row_count(cur.fetchone(), 0)
-                    if same_subnet >= 10:
-                        return "subnet_rate_limit"
+                    """,
+                    (subnet,),
+                )
+                same_subnet = _row_count(cur.fetchone(), 0)
+                if same_subnet >= 10:
+                    return "subnet_rate_limit"
 
-                # 4. 同浏览器指纹 7 天上限
-                if fingerprint and len(fingerprint) > 8:
-                    cur.execute("""
+            # 4. 同浏览器指纹 7 天上限
+            if fingerprint and len(fingerprint) > 8:
+                cur.execute(
+                    """
                         SELECT COUNT(*) FROM users
                         WHERE signup_fingerprint = %s
                           AND created_at > NOW() - INTERVAL '7 days'
-                    """, (fingerprint,))
-                    same_fp = _row_count(cur.fetchone(), 0)
-                    if same_fp >= 2:
-                        return "device_rate_limit"
+                    """,
+                    (fingerprint,),
+                )
+                same_fp = _row_count(cur.fetchone(), 0)
+                if same_fp >= 2:
+                    return "device_rate_limit"
 
         return None
     except Exception as e:
@@ -362,7 +456,6 @@ def is_signup_globally_disabled() -> bool:
         return False
 
 
-
 # ============================================================
 # DB Schema 迁移(启动时自动跑)
 # ============================================================
@@ -370,6 +463,7 @@ def _ensure_schema():
     """v109.3.2 数据库迁移 · 每条独立事务 · 失败不影响后续"""
     try:
         import db as _db
+
         sqls = [
             # users 表新增字段(原有)
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'free'",
@@ -506,8 +600,14 @@ def _hash_password(password: str) -> str:
     """
     try:
         import auth as _a
-        for fn_name in ("hash_password", "get_password_hash", "make_password",
-                        "create_password_hash", "password_hash"):
+
+        for fn_name in (
+            "hash_password",
+            "get_password_hash",
+            "make_password",
+            "create_password_hash",
+            "password_hash",
+        ):
             fn = getattr(_a, fn_name, None)
             if callable(fn):
                 return fn(password)
@@ -516,6 +616,7 @@ def _hash_password(password: str) -> str:
     # 第二选 · passlib bcrypt(项目大概率装了)
     try:
         from passlib.context import CryptContext
+
         ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
         return ctx.hash(password)
     except Exception:
@@ -530,6 +631,7 @@ def _hash_password(password: str) -> str:
 def _get_user_safe(request: Request):
     try:
         from auth import get_current_user_from_request
+
         u = get_current_user_from_request(request)
         return u
     except Exception:
@@ -582,52 +684,61 @@ def _get_plan(user_id: str) -> str:
     """
     try:
         import db as _db
+
         with _db.get_cursor(commit=True) as cur:
-                # v111.2 · super_admin 第一关 · 一律 admin plan
-                cur.execute("""
+            # v111.2 · super_admin 第一关 · 一律 admin plan
+            cur.execute(
+                """
                     SELECT COALESCE(is_super_admin, false) AS sa,
                            plan, trial_expires_at, plan_expires_at
                     FROM users WHERE id=%s
-                """, (user_id,))
-                row = cur.fetchone()
-                if not row:
-                    return "trial"
-                if isinstance(row, dict):
-                    sa = row.get("sa")
-                    raw_plan = row.get("plan")
-                    trial_exp = row.get("trial_expires_at")
-                    plan_exp = row.get("plan_expires_at")
-                else:
-                    sa, raw_plan, trial_exp, plan_exp = row
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return "trial"
+            if isinstance(row, dict):
+                sa = row.get("sa")
+                raw_plan = row.get("plan")
+                trial_exp = row.get("trial_expires_at")
+                plan_exp = row.get("plan_expires_at")
+            else:
+                sa, raw_plan, trial_exp, plan_exp = row
 
-                # v111.2 · super_admin 一律 admin · 享受 999 限制
-                if sa:
-                    return "admin"
+            # v111.2 · super_admin 一律 admin · 享受 999 限制
+            if sa:
+                return "admin"
 
-                # v111.1 · 老 plan 自动 map 到新 plan
-                mapped_plan = LEGACY_PLAN_MAP.get(raw_plan or "trial", raw_plan or "trial")
+            # v111.1 · 老 plan 自动 map 到新 plan
+            mapped_plan = LEGACY_PLAN_MAP.get(raw_plan or "trial", raw_plan or "trial")
 
-                now = _now()
+            now = _now()
 
-                # trial 到期 → 保持 trial · 让 check_ocr_quota 拒绝
-                # (用户还能看历史 · 引导付款)
-                if mapped_plan == "trial" and trial_exp and trial_exp < now:
-                    # 不改库 · 仅返回 trial(quota 检查会拒绝)
-                    return "trial"
+            # trial 到期 → 保持 trial · 让 check_ocr_quota 拒绝
+            # (用户还能看历史 · 引导付款)
+            if mapped_plan == "trial" and trial_exp and trial_exp < now:
+                # 不改库 · 仅返回 trial(quota 检查会拒绝)
+                return "trial"
 
-                # monthly/yearly 到期 → 转回 trial · 让用户重新付款
-                if mapped_plan in ("monthly", "yearly") and plan_exp and plan_exp < now:
-                    cur.execute("UPDATE users SET plan='trial', plan_expires_at=NULL WHERE id=%s", (user_id,))
-                    cur.execute("""
+            # monthly/yearly 到期 → 转回 trial · 让用户重新付款
+            if mapped_plan in ("monthly", "yearly") and plan_exp and plan_exp < now:
+                cur.execute(
+                    "UPDATE users SET plan='trial', plan_expires_at=NULL WHERE id=%s", (user_id,)
+                )
+                cur.execute(
+                    """
                         INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
                         VALUES (%s, %s, 'trial', 'plan_expired')
-                    """, (user_id, mapped_plan))
-                    logger.info(f"[v111.1] User {str(user_id)[:8]} {mapped_plan} 过期 · 自动转 trial")
-                    return "trial"
+                    """,
+                    (user_id, mapped_plan),
+                )
+                logger.info(f"[v111.1] User {str(user_id)[:8]} {mapped_plan} 过期 · 自动转 trial")
+                return "trial"
 
-                # lifetime 永不过期(plan_expires_at 应为 NULL)
-                # admin 永不过期
-                return mapped_plan if mapped_plan in PLAN_CONFIG else "trial"
+            # lifetime 永不过期(plan_expires_at 应为 NULL)
+            # admin 永不过期
+            return mapped_plan if mapped_plan in PLAN_CONFIG else "trial"
     except Exception as e:
         logger.error(f"_get_plan failed: {e}")
         return "trial"
@@ -639,10 +750,9 @@ def _get_plan(user_id: str) -> str:
 # 用户加员工/查 tenant 数据时被 _require_owner_or_super 拦或懒建。
 # 3 个注册路径(email signup / Google OAuth / LINE OAuth)统一调此函数。
 # ============================================================
-def _ensure_tenant_for_new_user(cur, user_id, plan: str,
-                                  company_name: str = None,
-                                  full_name: str = None,
-                                  username: str = None) -> Optional[str]:
+def _ensure_tenant_for_new_user(
+    cur, user_id, plan: str, company_name: str = None, full_name: str = None, username: str = None
+) -> Optional[str]:
     """新用户注册同事务建 tenant + 回填 user.tenant_id
     cur: 已开 commit=True 模式的 cursor(跟 user INSERT 同事务)
     返回 new_tenant_id · 失败返 None(不抛 · 让 _require_owner_or_super 懒建兜底)
@@ -663,13 +773,16 @@ def _ensure_tenant_for_new_user(cur, user_id, plan: str,
         monthly_quota = int(features.get("ocr_per_period") or 100)
 
         # 建 tenant(同事务)
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO tenants (
                 name, owner_user_id, tenant_type, monthly_quota,
                 used_this_month, status, member_count
             ) VALUES (%s, %s, 'shared_api', %s, 0, 'active', 1)
             RETURNING id
-        """, (tenant_name, str(user_id), monthly_quota))
+        """,
+            (tenant_name, str(user_id), monthly_quota),
+        )
         row = cur.fetchone()
         if row:
             new_tenant_id = row["id"] if isinstance(row, dict) else row[0]
@@ -681,15 +794,15 @@ def _ensure_tenant_for_new_user(cur, user_id, plan: str,
         # 回填 user.tenant_id
         cur.execute(
             "UPDATE users SET tenant_id = %s WHERE id = %s AND tenant_id IS NULL",
-            (str(new_tenant_id), str(user_id))
+            (str(new_tenant_id), str(user_id)),
         )
-        logger.info(f"[v118.26.2.5 ensure-tenant] +tenant {str(new_tenant_id)[:8]}.. user={str(user_id)[:8]}.. plan={plan} quota={monthly_quota}")
+        logger.info(
+            f"[v118.26.2.5 ensure-tenant] +tenant {str(new_tenant_id)[:8]}.. user={str(user_id)[:8]}.. plan={plan} quota={monthly_quota}"
+        )
         return str(new_tenant_id)
     except Exception as e:
         logger.warning(f"[v118.26.2.5 ensure-tenant] fail user={user_id} plan={plan}: {e}")
         return None
-
-
 
 
 def get_plan_features(plan: str) -> Dict[str, Any]:
@@ -705,7 +818,7 @@ class SignupRequest(BaseModel):
     email: str
     password: str
     verification_code: Optional[str] = None  # v118.27.6 · 邮箱验证码(必填 · 走 send_email_code 后)
-    company_name: Optional[str] = None   # v118.9 · 选填 · 空时后端用 email 前缀兜底
+    company_name: Optional[str] = None  # v118.9 · 选填 · 空时后端用 email 前缀兜底
     full_name: Optional[str] = None
     role: Optional[str] = None
     monthly_volume: Optional[str] = None
@@ -791,11 +904,14 @@ def signup(req: SignupRequest, request: Request):
             raise HTTPException(status_code=400, detail="verification_code_required")
         try:
             with _db.get_cursor(commit=True) as _cur_v276:
-                _cur_v276.execute("""
+                _cur_v276.execute(
+                    """
                     SELECT id, expires_at, used FROM email_codes
                     WHERE email = %s AND code = %s AND purpose = 'signup'
                     ORDER BY id DESC LIMIT 1
-                """, (email_raw, code_input))
+                """,
+                    (email_raw, code_input),
+                )
                 _row_v276 = _cur_v276.fetchone()
                 if not _row_v276:
                     raise HTTPException(status_code=400, detail="verification_code_invalid")
@@ -804,13 +920,17 @@ def signup(req: SignupRequest, request: Request):
                     raise HTTPException(status_code=400, detail="verification_code_used")
                 _cur_v276.execute("SELECT NOW() > %s AS expired", (_r_v276["expires_at"],))
                 _exp_v276 = _cur_v276.fetchone()
-                _expired_v276 = _exp_v276.get("expired") if isinstance(_exp_v276, dict) else (_exp_v276[0] if _exp_v276 else True)
+                _expired_v276 = (
+                    _exp_v276.get("expired")
+                    if isinstance(_exp_v276, dict)
+                    else (_exp_v276[0] if _exp_v276 else True)
+                )
                 if _expired_v276:
                     raise HTTPException(status_code=400, detail="verification_code_expired")
                 # 标已用(防多账号复用同一 code)
                 _cur_v276.execute(
                     "UPDATE email_codes SET used = TRUE, used_at = NOW() WHERE id = %s",
-                    (_r_v276["id"],)
+                    (_r_v276["id"],),
                 )
         except HTTPException:
             raise
@@ -829,10 +949,17 @@ def signup(req: SignupRequest, request: Request):
 
         abuse = check_signup_abuse(email_norm, ip, fingerprint)
         if abuse:
-            _log_risk(None, abuse, request, {
-                "email_norm": email_norm, "ip": ip, "subnet": subnet,
-                "fingerprint": fingerprint,
-            })
+            _log_risk(
+                None,
+                abuse,
+                request,
+                {
+                    "email_norm": email_norm,
+                    "ip": ip,
+                    "subnet": subnet,
+                    "fingerprint": fingerprint,
+                },
+            )
             # 友好转译 · 不暴露具体规则
             if abuse == "email_already_registered":
                 raise HTTPException(status_code=409, detail="email_already_registered")
@@ -840,123 +967,134 @@ def signup(req: SignupRequest, request: Request):
                 raise HTTPException(status_code=429, detail="rate_limited_try_later")
 
         with _db.get_cursor(commit=True) as cur:
-                # 创建用户
-                username = email_raw
-                password_hash = _hash_password(req.password)
+            # 创建用户
+            username = email_raw
+            password_hash = _hash_password(req.password)
 
-                # 邀请码处理 · v118.35.0.4 默认 credits(pay-as-you-go)· 不再 trial
-                invite_plan = "credits"
-                if req.invite_code:
-                    code = req.invite_code.strip().upper()
-                    if code in ("PARTNER2026", "VIP2026"):
-                        invite_plan = "pro"
-                    elif code in ("FIRM2026",):
-                        invite_plan = "firm"
+            # 邀请码处理 · v118.35.0.4 默认 credits(pay-as-you-go)· 不再 trial
+            invite_plan = "credits"
+            if req.invite_code:
+                code = req.invite_code.strip().upper()
+                if code in ("PARTNER2026", "VIP2026"):
+                    invite_plan = "pro"
+                elif code in ("FIRM2026",):
+                    invite_plan = "firm"
 
-                # v118.35.0.4 · credits 不设 trial 到期 · 走充值余额
-                trial_exp = None
-                plan_exp = None
-                if invite_plan in ("pro", "firm"):
-                    plan_exp = _now() + timedelta(days=30)
+            # v118.35.0.4 · credits 不设 trial 到期 · 走充值余额
+            trial_exp = None
+            plan_exp = None
+            if invite_plan in ("pro", "firm"):
+                plan_exp = _now() + timedelta(days=30)
 
-                # 取 users 表实际有的列(避免插入不存在的字段触发 transaction abort)
-                cur.execute("""
+            # 取 users 表实际有的列(避免插入不存在的字段触发 transaction abort)
+            cur.execute("""
                     SELECT column_name FROM information_schema.columns
                     WHERE table_name='users' AND table_schema='public'
                 """)
-                cols_raw = cur.fetchall()
-                existing_cols = set()
-                for r in cols_raw:
-                    if isinstance(r, dict):
-                        existing_cols.add(r.get("column_name"))
-                    else:
-                        existing_cols.add(r[0])
+            cols_raw = cur.fetchall()
+            existing_cols = set()
+            for r in cols_raw:
+                if isinstance(r, dict):
+                    existing_cols.add(r.get("column_name"))
+                else:
+                    existing_cols.add(r[0])
 
-                # 准备完整字段 · 但只用实际存在的
-                all_fields = {
-                    "username": username,
-                    "password_hash": password_hash,
-                    "email": email_raw,
-                    "email_normalized": email_norm,
-                    "company_name": company,
-                    "full_name": full_name_safe,
-                    "user_role": (req.role or "").strip() or None,
-                    "monthly_volume": (req.monthly_volume or "").strip() or None,
-                    "phone": (req.phone or "").strip() or None,
-                    "signup_source": (req.signup_source or "").strip() or None,
-                    "newsletter_opt_in": bool(req.newsletter_opt_in),
-                    "plan": invite_plan,
-                    "trial_expires_at": trial_exp,
-                    "plan_expires_at": plan_exp,
-                    "signup_country": country,
-                    "line_id": (req.line_id or "").strip() or None,
-                    "signup_ip": ip,
-                    "signup_ip_subnet": subnet,
-                    "signup_fingerprint": fingerprint,
-                    "signup_user_agent": ua,
-                    "role": "owner",
-                    "is_super_admin": False,
-                    "is_active": True,  # v109.3.2 · 显式设 true · 防止 NULL 触发 403
-                }
-                # 过滤出只在表里实际存在的字段
-                use_fields = {k: v for k, v in all_fields.items() if k in existing_cols}
-                col_names = list(use_fields.keys())
-                col_values = [use_fields[k] for k in col_names]
+            # 准备完整字段 · 但只用实际存在的
+            all_fields = {
+                "username": username,
+                "password_hash": password_hash,
+                "email": email_raw,
+                "email_normalized": email_norm,
+                "company_name": company,
+                "full_name": full_name_safe,
+                "user_role": (req.role or "").strip() or None,
+                "monthly_volume": (req.monthly_volume or "").strip() or None,
+                "phone": (req.phone or "").strip() or None,
+                "signup_source": (req.signup_source or "").strip() or None,
+                "newsletter_opt_in": bool(req.newsletter_opt_in),
+                "plan": invite_plan,
+                "trial_expires_at": trial_exp,
+                "plan_expires_at": plan_exp,
+                "signup_country": country,
+                "line_id": (req.line_id or "").strip() or None,
+                "signup_ip": ip,
+                "signup_ip_subnet": subnet,
+                "signup_fingerprint": fingerprint,
+                "signup_user_agent": ua,
+                "role": "owner",
+                "is_super_admin": False,
+                "is_active": True,  # v109.3.2 · 显式设 true · 防止 NULL 触发 403
+            }
+            # 过滤出只在表里实际存在的字段
+            use_fields = {k: v for k, v in all_fields.items() if k in existing_cols}
+            col_names = list(use_fields.keys())
+            col_values = [use_fields[k] for k in col_names]
 
-                # 时间字段单独加(用 NOW())
-                created_clause = ""
-                if "created_at" in existing_cols:
-                    col_names.append("created_at")
-                    created_clause = ""  # 直接在 SQL 里写 NOW()
-                if "last_seen_at" in existing_cols:
-                    col_names.append("last_seen_at")
+            # 时间字段单独加(用 NOW())
+            created_clause = ""
+            if "created_at" in existing_cols:
+                col_names.append("created_at")
+                created_clause = ""  # 直接在 SQL 里写 NOW()
+            if "last_seen_at" in existing_cols:
+                col_names.append("last_seen_at")
 
-                placeholders = ", ".join(["%s"] * len(col_values))
-                # 加上 NOW() 占位
-                ts_placeholders = []
-                if "created_at" in existing_cols:
-                    ts_placeholders.append("NOW()")
-                if "last_seen_at" in existing_cols:
-                    ts_placeholders.append("NOW()")
-                if ts_placeholders:
-                    placeholders = placeholders + ", " + ", ".join(ts_placeholders)
+            placeholders = ", ".join(["%s"] * len(col_values))
+            # 加上 NOW() 占位
+            ts_placeholders = []
+            if "created_at" in existing_cols:
+                ts_placeholders.append("NOW()")
+            if "last_seen_at" in existing_cols:
+                ts_placeholders.append("NOW()")
+            if ts_placeholders:
+                placeholders = placeholders + ", " + ", ".join(ts_placeholders)
 
-                col_sql = ", ".join(col_names)
-                insert_sql = f"INSERT INTO users({col_sql}) VALUES ({placeholders}) RETURNING id"
-                logger.info(f"signup insert · fields used: {len(use_fields)}/{len(all_fields)}")
-                cur.execute(insert_sql, col_values)
-                user_id = _row_count(cur.fetchone())
+            col_sql = ", ".join(col_names)
+            insert_sql = f"INSERT INTO users({col_sql}) VALUES ({placeholders}) RETURNING id"
+            logger.info(f"signup insert · fields used: {len(use_fields)}/{len(all_fields)}")
+            cur.execute(insert_sql, col_values)
+            user_id = _row_count(cur.fetchone())
 
-                # v118.26.2.5 · 同事务建 tenant + 回填 tenant_id(失败不阻塞)
-                _new_tid = _ensure_tenant_for_new_user(
-                    cur, str(user_id), invite_plan,
-                    company_name=company,
-                    full_name=full_name_safe,
-                    username=username,
-                )
+            # v118.26.2.5 · 同事务建 tenant + 回填 tenant_id(失败不阻塞)
+            _new_tid = _ensure_tenant_for_new_user(
+                cur,
+                str(user_id),
+                invite_plan,
+                company_name=company,
+                full_name=full_name_safe,
+                username=username,
+            )
 
-                # 订阅日志(同一事务 · 不能 try/except)
-                # v118.35.0.4 · credits + trial 都算自然注册 · 邀请码升级才算 invite_code
-                cur.execute("""
+            # 订阅日志(同一事务 · 不能 try/except)
+            # v118.35.0.4 · credits + trial 都算自然注册 · 邀请码升级才算 invite_code
+            cur.execute(
+                """
                     INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
                     VALUES (%s, NULL, %s, %s)
-                """, (user_id, invite_plan,
-                       "signup" if invite_plan in ("credits", "trial") else "invite_code"))
+                """,
+                (
+                    user_id,
+                    invite_plan,
+                    "signup" if invite_plan in ("credits", "trial") else "invite_code",
+                ),
+            )
 
-                # v118.35.0.4 · credits 新公司初始化 0 余额 · pay-as-you-go 待充值
-                if invite_plan == "credits" and _new_tid:
-                    try:
-                        _db.ensure_tenant_credits(_new_tid)
-                    except Exception as ce:
-                        logger.warning(f"[signup] ensure_tenant_credits skip: {ce}")
+            # v118.35.0.4 · credits 新公司初始化 0 余额 · pay-as-you-go 待充值
+            if invite_plan == "credits" and _new_tid:
+                try:
+                    _db.ensure_tenant_credits(_new_tid)
+                except Exception as ce:
+                    logger.warning(f"[signup] ensure_tenant_credits skip: {ce}")
 
         # 自动创建 1 个示例客户(独立事务 · 失败不影响主注册)
         try:
             with _db.get_cursor(commit=True) as cur2:
-                cur2.execute("""
+                cur2.execute(
+                    """
                     INSERT INTO clients(user_id, name, color, is_active, created_at)
                     VALUES (%s, %s, '#3b82f6', true, NOW())
-                """, (user_id, "ลูกค้าตัวอย่าง / Sample Client"))
+                """,
+                    (user_id, "ลูกค้าตัวอย่าง / Sample Client"),
+                )
         except Exception as ce:
             logger.warning(f"signup sample client skip: {ce}")
 
@@ -994,9 +1132,11 @@ def signup(req: SignupRequest, request: Request):
 # 跳过密码 / 跳过 5 层防薅(Google 邮箱已验证) · 默认 trial 7 天
 # 仅供 app.py 的 /api/auth/google/callback 在用户首次用 Google 登录且未注册时调用
 # ============================================================
-def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
-                                  ip: str = None, ua: str = None) -> Optional[Dict[str, Any]]:
+def create_user_via_google_oauth(
+    email: str, full_name: str, google_sub: str, ip: str = None, ua: str = None
+) -> Optional[Dict[str, Any]]:
     import db as _db
+
     try:
         # 紧急止血:全局禁用注册
         if is_signup_globally_disabled():
@@ -1069,14 +1209,18 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
 
             col_sql = ", ".join(col_names)
             insert_sql = f"INSERT INTO users({col_sql}) VALUES ({placeholders}) RETURNING id"
-            logger.info(f"[google_oauth_signup] insert · fields used: {len(use_fields)}/{len(all_fields)}")
+            logger.info(
+                f"[google_oauth_signup] insert · fields used: {len(use_fields)}/{len(all_fields)}"
+            )
             cur.execute(insert_sql, col_values)
             row = cur.fetchone()
             user_id = _row_count(row) if not isinstance(row, dict) else row.get("id")
 
             # v118.26.2.5 · 同事务建 tenant · v118.35.0.4 拿返回 tenant_id 给 credits 初始化用
             _new_tid_g = _ensure_tenant_for_new_user(
-                cur, str(user_id), invite_plan,
+                cur,
+                str(user_id),
+                invite_plan,
                 company_name=company,
                 full_name=full_name_safe,
                 username=email_raw,
@@ -1084,10 +1228,13 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
 
             # 订阅日志
             try:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
                     VALUES (%s, NULL, %s, 'google_oauth_signup')
-                """, (user_id, invite_plan))
+                """,
+                    (user_id, invite_plan),
+                )
             except Exception as ce:
                 logger.warning(f"[google_oauth_signup] subscription_log skip: {ce}")
 
@@ -1101,10 +1248,13 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
         # 自动建 1 个示例客户(独立事务 · 失败不影响主注册)
         try:
             with _db.get_cursor(commit=True) as cur2:
-                cur2.execute("""
+                cur2.execute(
+                    """
                     INSERT INTO clients(user_id, name, color, is_active, created_at)
                     VALUES (%s, %s, '#3b82f6', true, NOW())
-                """, (user_id, "ลูกค้าตัวอย่าง / Sample Client"))
+                """,
+                    (user_id, "ลูกค้าตัวอย่าง / Sample Client"),
+                )
         except Exception as ce:
             logger.warning(f"[google_oauth_signup] sample client skip: {ce}")
 
@@ -1121,10 +1271,16 @@ def create_user_via_google_oauth(email: str, full_name: str, google_sub: str,
 # LINE email scope 需单独申请 · 没拿到时用 line_<sub>@line.local 占位 username
 # 用户登录后可在 settings 改邮箱
 # ============================================================
-def create_user_via_line_oauth(line_uid: str, display_name: str = None,
-                                email: str = None, picture: str = None,
-                                ip: str = None, ua: str = None) -> Optional[Dict[str, Any]]:
+def create_user_via_line_oauth(
+    line_uid: str,
+    display_name: str = None,
+    email: str = None,
+    picture: str = None,
+    ip: str = None,
+    ua: str = None,
+) -> Optional[Dict[str, Any]]:
     import db as _db
+
     try:
         if is_signup_globally_disabled():
             logger.warning("[line_oauth_signup] global signup disabled · refused")
@@ -1203,24 +1359,31 @@ def create_user_via_line_oauth(line_uid: str, display_name: str = None,
 
             col_sql = ", ".join(col_names)
             insert_sql = f"INSERT INTO users({col_sql}) VALUES ({placeholders}) RETURNING id"
-            logger.info(f"[line_oauth_signup] insert · fields used: {len(use_fields)}/{len(all_fields)}")
+            logger.info(
+                f"[line_oauth_signup] insert · fields used: {len(use_fields)}/{len(all_fields)}"
+            )
             cur.execute(insert_sql, col_values)
             row = cur.fetchone()
             user_id = _row_count(row) if not isinstance(row, dict) else row.get("id")
 
             # v118.26.2.5 · 同事务建 tenant · v118.35.0.4 拿返回 tenant_id
             _new_tid_l = _ensure_tenant_for_new_user(
-                cur, str(user_id), invite_plan,
+                cur,
+                str(user_id),
+                invite_plan,
                 company_name=company,
                 full_name=full_name_safe,
                 username=username_use,
             )
 
             try:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
                     VALUES (%s, NULL, %s, 'line_oauth_signup')
-                """, (user_id, invite_plan))
+                """,
+                    (user_id, invite_plan),
+                )
             except Exception as ce:
                 logger.warning(f"[line_oauth_signup] subscription_log skip: {ce}")
 
@@ -1233,10 +1396,13 @@ def create_user_via_line_oauth(line_uid: str, display_name: str = None,
 
         try:
             with _db.get_cursor(commit=True) as cur2:
-                cur2.execute("""
+                cur2.execute(
+                    """
                     INSERT INTO clients(user_id, name, color, is_active, created_at)
                     VALUES (%s, %s, '#3b82f6', true, NOW())
-                """, (user_id, "ลูกค้าตัวอย่าง / Sample Client"))
+                """,
+                    (user_id, "ลูกค้าตัวอย่าง / Sample Client"),
+                )
         except Exception as ce:
             logger.warning(f"[line_oauth_signup] sample client skip: {ce}")
 
@@ -1252,6 +1418,7 @@ def _log_risk(user_id, event_type, request, detail_dict=None):
     """记录风控事件"""
     try:
         import db as _db
+
         ip = get_client_ip_safe(request) if request else None
         fp = None
         if request:
@@ -1261,10 +1428,13 @@ def _log_risk(user_id, event_type, request, detail_dict=None):
             except Exception:
                 pass  # 占位 stub · fingerprint 提取未实现
         with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
+            cur.execute(
+                """
                     INSERT INTO risk_log(user_id, event_type, ip, fingerprint, detail)
                     VALUES (%s, %s, %s, %s, %s)
-                """, (user_id, event_type, ip, fp, json.dumps(detail_dict or {}, ensure_ascii=False)))
+                """,
+                (user_id, event_type, ip, fp, json.dumps(detail_dict or {}, ensure_ascii=False)),
+            )
     except Exception as e:
         logger.warning(f"_log_risk skip: {e}")
 
@@ -1276,7 +1446,7 @@ def _log_risk(user_id, event_type, request, detail_dict=None):
 def link_line(req: LineLinkRequest, request: Request):
     """
     用户绑定 LINE userId · 解锁完整配额
-    
+
     流程:
     1. 前端通过 LINE OAuth 拿到 userId(由 LINE Login API 返回)
     2. 调本接口 · 把 userId 跟当前用户绑定
@@ -1292,21 +1462,28 @@ def link_line(req: LineLinkRequest, request: Request):
             raise HTTPException(status_code=400, detail="line_user_id_invalid")
 
         import db as _db
-        with _db.get_cursor(commit=True) as cur:
-                # 检查 LINE userId 是否已被其他账号绑定
-                cur.execute("""
-                    SELECT id FROM users WHERE line_user_id = %s AND id <> %s LIMIT 1
-                """, (line_user_id, u.get("id")))
-                if cur.fetchone():
-                    raise HTTPException(status_code=409, detail="line_already_linked_other_account")
 
-                cur.execute("""
+        with _db.get_cursor(commit=True) as cur:
+            # 检查 LINE userId 是否已被其他账号绑定
+            cur.execute(
+                """
+                    SELECT id FROM users WHERE line_user_id = %s AND id <> %s LIMIT 1
+                """,
+                (line_user_id, u.get("id")),
+            )
+            if cur.fetchone():
+                raise HTTPException(status_code=409, detail="line_already_linked_other_account")
+
+            cur.execute(
+                """
                     UPDATE users SET
                         line_user_id = %s,
                         line_verified_at = NOW(),
                         line_id = COALESCE(line_id, %s)
                     WHERE id = %s
-                """, (line_user_id, req.line_display_name or None, u.get("id")))
+                """,
+                (line_user_id, req.line_display_name or None, u.get("id")),
+            )
 
         return {"ok": True, "line_user_id": line_user_id, "verified": True}
     except HTTPException:
@@ -1330,20 +1507,24 @@ def link_line_dev(request: Request):
 
         # 生成一个伪随机 ID(防止同一用户多次绑出多个不同 ID)
         import db as _db
-        with _db.get_cursor(commit=True) as cur:
-                cur.execute("SELECT line_user_id FROM users WHERE id=%s", (u.get("id"),))
-                row = cur.fetchone()
-                existing = None
-                if row:
-                    existing = row.get("line_user_id") if isinstance(row, dict) else row[0]
-                if existing:
-                    return {"ok": True, "line_user_id": existing, "already_linked": True}
 
-                fake_id = f"DEV_{secrets.token_hex(10)}"
-                cur.execute("""
+        with _db.get_cursor(commit=True) as cur:
+            cur.execute("SELECT line_user_id FROM users WHERE id=%s", (u.get("id"),))
+            row = cur.fetchone()
+            existing = None
+            if row:
+                existing = row.get("line_user_id") if isinstance(row, dict) else row[0]
+            if existing:
+                return {"ok": True, "line_user_id": existing, "already_linked": True}
+
+            fake_id = f"DEV_{secrets.token_hex(10)}"
+            cur.execute(
+                """
                     UPDATE users SET line_user_id=%s, line_verified_at=NOW()
                     WHERE id=%s
-                """, (fake_id, u.get("id")))
+                """,
+                (fake_id, u.get("id")),
+            )
         return {"ok": True, "line_user_id": fake_id, "dev_mode": True}
     except HTTPException:
         raise
@@ -1368,73 +1549,95 @@ def get_my_plan(request: Request):
         features = get_plan_features(plan)
 
         import db as _db
+
         used = 0
         clients_count = 0
         line_verified = False
         with _db.get_cursor(commit=True) as cur:
-                # 取用户详情(包括 LINE 绑定状态)
-                cur.execute("""
+            # 取用户详情(包括 LINE 绑定状态)
+            cur.execute(
+                """
                     SELECT trial_expires_at, plan_expires_at, company_name, email,
                            line_id, line_user_id, line_verified_at, signup_country,
                            is_banned, ban_reason
                     FROM users WHERE id=%s
-                """, (user_id,))
-                row = cur.fetchone()
-                if isinstance(row, dict):
-                    trial_exp = row.get("trial_expires_at")
-                    plan_exp = row.get("plan_expires_at")
-                    company = row.get("company_name")
-                    email = row.get("email")
-                    line_id = row.get("line_id")
-                    line_user_id = row.get("line_user_id")
-                    line_verified_at = row.get("line_verified_at")
-                    country = row.get("signup_country")
-                    is_banned = row.get("is_banned")
-                    ban_reason = row.get("ban_reason")
-                elif row:
-                    (trial_exp, plan_exp, company, email,
-                     line_id, line_user_id, line_verified_at, country,
-                     is_banned, ban_reason) = row
-                else:
-                    trial_exp = plan_exp = company = email = None
-                    line_id = line_user_id = line_verified_at = country = None
-                    is_banned = False
-                    ban_reason = None
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if isinstance(row, dict):
+                trial_exp = row.get("trial_expires_at")
+                plan_exp = row.get("plan_expires_at")
+                company = row.get("company_name")
+                email = row.get("email")
+                line_id = row.get("line_id")
+                line_user_id = row.get("line_user_id")
+                line_verified_at = row.get("line_verified_at")
+                country = row.get("signup_country")
+                is_banned = row.get("is_banned")
+                ban_reason = row.get("ban_reason")
+            elif row:
+                (
+                    trial_exp,
+                    plan_exp,
+                    company,
+                    email,
+                    line_id,
+                    line_user_id,
+                    line_verified_at,
+                    country,
+                    is_banned,
+                    ban_reason,
+                ) = row
+            else:
+                trial_exp = plan_exp = company = email = None
+                line_id = line_user_id = line_verified_at = country = None
+                is_banned = False
+                ban_reason = None
 
-                line_verified = bool(line_user_id and line_verified_at)
+            line_verified = bool(line_user_id and line_verified_at)
 
-                # 被封停 · 直接报错
-                if is_banned:
-                    raise HTTPException(status_code=403, detail=f"account_banned: {ban_reason or ''}")
+            # 被封停 · 直接报错
+            if is_banned:
+                raise HTTPException(status_code=403, detail=f"account_banned: {ban_reason or ''}")
 
-                # v111.1 · 去掉 LINE 双轨制 · features 直接用 PLAN_CONFIG · 不再覆盖
+            # v111.1 · 去掉 LINE 双轨制 · features 直接用 PLAN_CONFIG · 不再覆盖
 
-                # OCR 用量 · v111.1 trial 也按月统计(以前是累计)
-                cur.execute("""
+            # OCR 用量 · v111.1 trial 也按月统计(以前是累计)
+            cur.execute(
+                """
                     SELECT COUNT(*) FROM ocr_history
                     WHERE user_id=%s
                       AND date_trunc('month', created_at) = date_trunc('month', NOW())
-                """, (user_id,))
-                used = _row_count(cur.fetchone(), 0)
+                """,
+                (user_id,),
+            )
+            used = _row_count(cur.fetchone(), 0)
 
-                # 客户数
-                try:
-                    cur.execute("SELECT COUNT(*) FROM clients WHERE user_id=%s AND COALESCE(is_active,true)=true", (user_id,))
-                    clients_count = _row_count(cur.fetchone(), 0)
-                except Exception as e:
-                    logger.warning(f"[admin_user_detail] clients 计数失败: {e}")
+            # 客户数
+            try:
+                cur.execute(
+                    "SELECT COUNT(*) FROM clients WHERE user_id=%s AND COALESCE(is_active,true)=true",
+                    (user_id,),
+                )
+                clients_count = _row_count(cur.fetchone(), 0)
+            except Exception as e:
+                logger.warning(f"[admin_user_detail] clients 计数失败: {e}")
 
         # v111.1 · trial 7 天倒计时
         days_left = None
         if plan == "trial":
-            from datetime import datetime, timezone, timedelta
+            from datetime import datetime, timedelta
+
             base_exp = trial_exp
             if not base_exp:
                 # 没设 trial_expires_at · 用 created_at + 7 天兜底
-                created_at_for_calc = (u.get("created_at") if isinstance(u, dict) else None)
+                created_at_for_calc = u.get("created_at") if isinstance(u, dict) else None
                 if created_at_for_calc and isinstance(created_at_for_calc, str):
                     try:
-                        created_at_for_calc = datetime.fromisoformat(created_at_for_calc.replace('Z', '+00:00'))
+                        created_at_for_calc = datetime.fromisoformat(
+                            created_at_for_calc.replace("Z", "+00:00")
+                        )
                     except Exception:
                         created_at_for_calc = None
                 if created_at_for_calc:
@@ -1448,7 +1651,7 @@ def get_my_plan(request: Request):
         # v111.1 · monthly / yearly 剩余天数 · lifetime 永久(返回 -1 标识)
         plan_days_left = None
         if plan == "lifetime":
-            plan_days_left = -1   # 前端显示"永久"
+            plan_days_left = -1  # 前端显示"永久"
         elif plan in ("monthly", "yearly") and plan_exp:
             delta = plan_exp - _now()
             plan_days_left = max(0, int(delta.total_seconds() // 86400))
@@ -1458,7 +1661,7 @@ def get_my_plan(request: Request):
             "plan": plan,
             "features": features,
             "line_verified": line_verified,
-            "needs_line_verify": False,   # v111.1 · 新模型不再依赖 LINE 解锁
+            "needs_line_verify": False,  # v111.1 · 新模型不再依赖 LINE 解锁
             "usage": {
                 "ocr_used": used,
                 "ocr_limit": features.get("ocr_per_period", 0),
@@ -1467,9 +1670,9 @@ def get_my_plan(request: Request):
             },
             # v111.1 · 暴露上传限制(前端 getMaxFiles 用)
             "limits": {
-                "max_upload_files":   features.get("max_upload_files", 5),
+                "max_upload_files": features.get("max_upload_files", 5),
                 "max_pages_per_file": features.get("max_pages_per_file", 50),
-                "max_mb_per_file":    features.get("max_mb_per_file", 100),
+                "max_mb_per_file": features.get("max_mb_per_file", 100),
             },
             "trial_days_left": days_left,
             "plan_days_left": plan_days_left,
@@ -1483,11 +1686,11 @@ def get_my_plan(request: Request):
             },
             # v111.1 · 新 3 档定价(替换老 pro/firm)
             "pricing": {
-                "monthly_thb":  PLAN_CONFIG["monthly"].get("price_thb"),
-                "yearly_thb":   PLAN_CONFIG["yearly"].get("price_thb"),
+                "monthly_thb": PLAN_CONFIG["monthly"].get("price_thb"),
+                "yearly_thb": PLAN_CONFIG["yearly"].get("price_thb"),
                 "lifetime_thb": PLAN_CONFIG["lifetime"].get("price_thb"),
                 # 兼容 v110 老前端 · 别立刻 break
-                "pro_thb":  PLAN_CONFIG["monthly"].get("price_thb"),
+                "pro_thb": PLAN_CONFIG["monthly"].get("price_thb"),
                 "firm_thb": PLAN_CONFIG["yearly"].get("price_thb"),
             },
             "payment_info": {
@@ -1514,26 +1717,31 @@ def admin_user_funnel(request: Request):
     try:
         _require_super_admin(request)
         import db as _db
-        with _db.get_cursor(commit=True) as cur:
-                # 今日/本周/本月新增
-                cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE")
-                today = _row_count(cur.fetchone())
-                cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'")
-                week = _row_count(cur.fetchone())
-                cur.execute("SELECT COUNT(*) FROM users WHERE date_trunc('month', created_at) = date_trunc('month', NOW())")
-                month = _row_count(cur.fetchone())
 
-                # 国家分布
-                cur.execute("""
+        with _db.get_cursor(commit=True) as cur:
+            # 今日/本周/本月新增
+            cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE")
+            today = _row_count(cur.fetchone())
+            cur.execute(
+                "SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'"
+            )
+            week = _row_count(cur.fetchone())
+            cur.execute(
+                "SELECT COUNT(*) FROM users WHERE date_trunc('month', created_at) = date_trunc('month', NOW())"
+            )
+            month = _row_count(cur.fetchone())
+
+            # 国家分布
+            cur.execute("""
                     SELECT COALESCE(signup_country,'?') AS country, COUNT(*) AS n FROM users
                     GROUP BY 1 ORDER BY 2 DESC
                 """)
-                by_country = []
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        by_country.append({"country": r.get("country") or "?", "count": r.get("n", 0)})
-                    else:
-                        by_country.append({"country": r[0], "count": r[1]})
+            by_country = []
+            for r in cur.fetchall():
+                if isinstance(r, dict):
+                    by_country.append({"country": r.get("country") or "?", "count": r.get("n", 0)})
+                else:
+                    by_country.append({"country": r[0], "count": r[1]})
 
         return {
             "ok": True,
@@ -1559,6 +1767,7 @@ def admin_user_funnel(request: Request):
 # payment_pending / subscription_log 表保留(DB schema 改动留 REFACTOR-B3 Alembic 时再做)
 # ============================================================
 
+
 # ============================================================
 # 后台 · 删除测试 demo 数据(一次性 · 保留 earn)
 # ============================================================
@@ -1568,44 +1777,51 @@ def admin_cleanup_demo(request: Request):
     try:
         admin = _require_super_admin(request)
         import db as _db
+
         deleted = {"users": 0, "ocr_history": 0, "clients": 0}
         with _db.get_cursor(commit=True) as cur:
-                # 找出要删的用户(demo / demo_plus / 任何 username 以 demo_ 开头)
-                cur.execute("""
+            # 找出要删的用户(demo / demo_plus / 任何 username 以 demo_ 开头)
+            cur.execute("""
                     SELECT id, username FROM users
                     WHERE (username='demo' OR username LIKE 'demo_%')
                       AND COALESCE(is_super_admin, false) = false
                 """)
-                ids = []
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        ids.append(str(r.get("id")))
-                    else:
-                        ids.append(str(r[0]))
-                if not ids:
-                    return {"ok": True, "deleted": deleted, "message": "no demo accounts found"}
+            ids = []
+            for r in cur.fetchall():
+                if isinstance(r, dict):
+                    ids.append(str(r.get("id")))
+                else:
+                    ids.append(str(r[0]))
+            if not ids:
+                return {"ok": True, "deleted": deleted, "message": "no demo accounts found"}
 
-                placeholders = ",".join(["%s"] * len(ids))
-                # 级联删
+            placeholders = ",".join(["%s"] * len(ids))
+            # 级联删
+            try:
+                cur.execute(f"DELETE FROM ocr_history WHERE user_id IN ({placeholders})", ids)
+                deleted["ocr_history"] = cur.rowcount
+            except Exception as e:
+                logger.warning(f"cleanup ocr_history skip: {e}")
+            try:
+                cur.execute(f"DELETE FROM clients WHERE user_id IN ({placeholders})", ids)
+                deleted["clients"] = cur.rowcount
+            except Exception as e:
+                logger.warning(f"cleanup clients skip: {e}")
+            # 其他可能的关联表(安全 try)
+            for tbl in [
+                "ocr_cost_log",
+                "subscription_log",
+                "payment_pending",
+                "push_log",
+                "billing_balance_log",
+            ]:
                 try:
-                    cur.execute(f"DELETE FROM ocr_history WHERE user_id IN ({placeholders})", ids)
-                    deleted["ocr_history"] = cur.rowcount
-                except Exception as e:
-                    logger.warning(f"cleanup ocr_history skip: {e}")
-                try:
-                    cur.execute(f"DELETE FROM clients WHERE user_id IN ({placeholders})", ids)
-                    deleted["clients"] = cur.rowcount
-                except Exception as e:
-                    logger.warning(f"cleanup clients skip: {e}")
-                # 其他可能的关联表(安全 try)
-                for tbl in ["ocr_cost_log", "subscription_log", "payment_pending", "push_log", "billing_balance_log"]:
-                    try:
-                        cur.execute(f"DELETE FROM {tbl} WHERE user_id IN ({placeholders})", ids)
-                    except Exception:
-                        pass  # 表可能不存在 · 安全跳过
-                # 最后删用户
-                cur.execute(f"DELETE FROM users WHERE id IN ({placeholders})", ids)
-                deleted["users"] = cur.rowcount
+                    cur.execute(f"DELETE FROM {tbl} WHERE user_id IN ({placeholders})", ids)
+                except Exception:
+                    pass  # 表可能不存在 · 安全跳过
+            # 最后删用户
+            cur.execute(f"DELETE FROM users WHERE id IN ({placeholders})", ids)
+            deleted["users"] = cur.rowcount
         return {"ok": True, "deleted": deleted}
     except HTTPException:
         raise
@@ -1630,6 +1846,7 @@ def check_ocr_quota(user_id: str) -> Dict[str, Any]:
     # 取代硬编码 user_id · 数据库已标记两个邮箱:skin306152 + mrerp@outlook.co.th
     try:
         import db as _db_wl
+
         if _db_wl.is_user_billing_exempt(user_id):
             return {
                 "allowed": True,
@@ -1646,12 +1863,15 @@ def check_ocr_quota(user_id: str) -> Dict[str, Any]:
 
         # v111.1 · 一次拉齐所需字段
         with _db.get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(is_super_admin, false) AS sa,
                        plan, gemini_api_key, is_banned, ban_reason,
                        trial_expires_at, plan_expires_at, created_at
                 FROM users WHERE id=%s
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             row = cur.fetchone()
             if not row:
                 return {"allowed": False, "reason": "user_not_found", "plan": "unknown"}
@@ -1666,22 +1886,32 @@ def check_ocr_quota(user_id: str) -> Dict[str, Any]:
                 plan_exp = row.get("plan_expires_at")
                 created_at = row.get("created_at")
             else:
-                sa, raw_plan, gemini_key, is_banned, ban_reason, trial_exp, plan_exp, created_at = row
+                sa, raw_plan, gemini_key, is_banned, ban_reason, trial_exp, plan_exp, created_at = (
+                    row
+                )
                 gemini_key = (gemini_key or "").strip()
 
             # ---- super_admin → admin plan(无限)----
             if sa:
                 f = PLAN_CONFIG["admin"]
                 return {
-                    "allowed": True, "used": 0, "limit": 999999, "plan": "admin",
-                    "max_upload_files":   f["max_upload_files"],
+                    "allowed": True,
+                    "used": 0,
+                    "limit": 999999,
+                    "plan": "admin",
+                    "max_upload_files": f["max_upload_files"],
                     "max_pages_per_file": f["max_pages_per_file"],
-                    "max_mb_per_file":    f["max_mb_per_file"],
+                    "max_mb_per_file": f["max_mb_per_file"],
                 }
 
             # ---- 封禁 ----
             if is_banned:
-                return {"allowed": False, "reason": "banned", "ban_reason": ban_reason, "plan": "banned"}
+                return {
+                    "allowed": False,
+                    "reason": "banned",
+                    "ban_reason": ban_reason,
+                    "plan": "banned",
+                }
 
             # ---- map 到新 plan ----
             # v118.35.0.4 · 未知 plan / 误植 admin 兜底改成 credits(新注册默认)
@@ -1695,65 +1925,83 @@ def check_ocr_quota(user_id: str) -> Dict[str, Any]:
             if plan == "lifetime":
                 if not gemini_key:
                     return {
-                        "allowed": False, "reason": "needs_own_key", "plan": "lifetime",
-                        "used": 0, "limit": 999999,
-                        "max_upload_files":   features["max_upload_files"],
+                        "allowed": False,
+                        "reason": "needs_own_key",
+                        "plan": "lifetime",
+                        "used": 0,
+                        "limit": 999999,
+                        "max_upload_files": features["max_upload_files"],
                         "max_pages_per_file": features["max_pages_per_file"],
-                        "max_mb_per_file":    features["max_mb_per_file"],
+                        "max_mb_per_file": features["max_mb_per_file"],
                     }
                 # 有 key · 无限
                 return {
-                    "allowed": True, "used": 0, "limit": 999999, "plan": "lifetime",
-                    "max_upload_files":   features["max_upload_files"],
+                    "allowed": True,
+                    "used": 0,
+                    "limit": 999999,
+                    "plan": "lifetime",
+                    "max_upload_files": features["max_upload_files"],
                     "max_pages_per_file": features["max_pages_per_file"],
-                    "max_mb_per_file":    features["max_mb_per_file"],
+                    "max_mb_per_file": features["max_mb_per_file"],
                 }
 
             # ---- trial 7 天到期检查 ----
             if plan == "trial":
                 from datetime import datetime, timezone, timedelta
+
                 now = datetime.now(timezone.utc)
                 expire_at = trial_exp
                 if not expire_at and created_at:
                     if isinstance(created_at, str):
-                        created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
                     expire_at = created_at + timedelta(days=features["duration_days"])
                 if expire_at:
                     if isinstance(expire_at, str):
-                        expire_at = datetime.fromisoformat(expire_at.replace('Z', '+00:00'))
+                        expire_at = datetime.fromisoformat(expire_at.replace("Z", "+00:00"))
                     if expire_at < now:
                         return {
-                            "allowed": False, "reason": "trial_expired", "plan": "trial",
+                            "allowed": False,
+                            "reason": "trial_expired",
+                            "plan": "trial",
                             "trial_days": features["duration_days"],
-                            "max_upload_files":   features["max_upload_files"],
+                            "max_upload_files": features["max_upload_files"],
                             "max_pages_per_file": features["max_pages_per_file"],
-                            "max_mb_per_file":    features["max_mb_per_file"],
+                            "max_mb_per_file": features["max_mb_per_file"],
                         }
 
             # ---- 月配额检查(trial / monthly / yearly)----
             with _db.get_cursor() as cur2:
-                cur2.execute("""
+                cur2.execute(
+                    """
                     SELECT COUNT(*) FROM ocr_history
                     WHERE user_id=%s
                       AND date_trunc('month', created_at) = date_trunc('month', NOW())
-                """, (user_id,))
+                """,
+                    (user_id,),
+                )
                 used = _row_count(cur2.fetchone(), 0)
 
             limit = features.get("ocr_per_period", 0)
             if used >= limit:
                 return {
-                    "allowed": False, "reason": "quota_exceeded",
-                    "plan": plan, "used": used, "limit": limit,
-                    "max_upload_files":   features["max_upload_files"],
+                    "allowed": False,
+                    "reason": "quota_exceeded",
+                    "plan": plan,
+                    "used": used,
+                    "limit": limit,
+                    "max_upload_files": features["max_upload_files"],
                     "max_pages_per_file": features["max_pages_per_file"],
-                    "max_mb_per_file":    features["max_mb_per_file"],
+                    "max_mb_per_file": features["max_mb_per_file"],
                 }
 
             return {
-                "allowed": True, "plan": plan, "used": used, "limit": limit,
-                "max_upload_files":   features["max_upload_files"],
+                "allowed": True,
+                "plan": plan,
+                "used": used,
+                "limit": limit,
+                "max_upload_files": features["max_upload_files"],
                 "max_pages_per_file": features["max_pages_per_file"],
-                "max_mb_per_file":    features["max_mb_per_file"],
+                "max_mb_per_file": features["max_mb_per_file"],
             }
     except Exception as e:
         logger.error(f"check_ocr_quota: {e}", exc_info=True)
@@ -1771,9 +2019,10 @@ def admin_suspicious_users(request: Request):
     try:
         _require_super_admin(request)
         import db as _db
+
         with _db.get_cursor(commit=True) as cur:
-                # 1. 同 IP 注册多个账号
-                cur.execute("""
+            # 1. 同 IP 注册多个账号
+            cur.execute("""
                     SELECT signup_ip, COUNT(*) AS n,
                            jsonb_agg(jsonb_build_object(
                                'user_id', id::text,
@@ -1791,23 +2040,32 @@ def admin_suspicious_users(request: Request):
                     ORDER BY n DESC
                     LIMIT 50
                 """)
-                same_ip = []
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        accounts = r.get("accounts") or []
-                        same_ip.append({
-                            "ip": r.get("signup_ip"), "count": r.get("n", 0),
+            same_ip = []
+            for r in cur.fetchall():
+                if isinstance(r, dict):
+                    accounts = r.get("accounts") or []
+                    same_ip.append(
+                        {
+                            "ip": r.get("signup_ip"),
+                            "count": r.get("n", 0),
                             "accounts": accounts if isinstance(accounts, list) else [],
-                            "last_signup": r.get("last_signup").isoformat() if r.get("last_signup") else None,
-                        })
-                    else:
-                        same_ip.append({
-                            "ip": r[0], "count": r[1], "accounts": (r[2] or []),
+                            "last_signup": (
+                                r.get("last_signup").isoformat() if r.get("last_signup") else None
+                            ),
+                        }
+                    )
+                else:
+                    same_ip.append(
+                        {
+                            "ip": r[0],
+                            "count": r[1],
+                            "accounts": (r[2] or []),
                             "last_signup": r[3].isoformat() if r[3] else None,
-                        })
+                        }
+                    )
 
-                # 2. 同指纹注册多个账号
-                cur.execute("""
+            # 2. 同指纹注册多个账号
+            cur.execute("""
                     SELECT signup_fingerprint, COUNT(*) AS n,
                            jsonb_agg(jsonb_build_object(
                                'user_id', id::text,
@@ -1824,27 +2082,32 @@ def admin_suspicious_users(request: Request):
                     ORDER BY n DESC
                     LIMIT 50
                 """)
-                same_fp = []
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        fp = r.get("signup_fingerprint") or ""
-                        accounts = r.get("accounts") or []
-                        same_fp.append({
+            same_fp = []
+            for r in cur.fetchall():
+                if isinstance(r, dict):
+                    fp = r.get("signup_fingerprint") or ""
+                    accounts = r.get("accounts") or []
+                    same_fp.append(
+                        {
                             "fingerprint": fp,
                             "fingerprint_short": fp[:20] + "..." if len(fp) > 20 else fp,
                             "count": r.get("n", 0),
                             "accounts": accounts if isinstance(accounts, list) else [],
-                        })
-                    else:
-                        fp = (r[0] or "")
-                        same_fp.append({
+                        }
+                    )
+                else:
+                    fp = r[0] or ""
+                    same_fp.append(
+                        {
                             "fingerprint": fp,
                             "fingerprint_short": fp[:20] + "..." if len(fp) > 20 else fp,
-                            "count": r[1], "accounts": (r[2] or []),
-                        })
+                            "count": r[1],
+                            "accounts": (r[2] or []),
+                        }
+                    )
 
-                # 3. OCR 用量异常(单日 > 30 张)
-                cur.execute("""
+            # 3. OCR 用量异常(单日 > 30 张)
+            cur.execute("""
                     SELECT u.id, COALESCE(u.email, u.username) AS user_email, u.plan,
                            u.is_banned,
                            COUNT(o.id) AS today_count
@@ -1856,35 +2119,43 @@ def admin_suspicious_users(request: Request):
                     ORDER BY today_count DESC
                     LIMIT 30
                 """)
-                heavy = []
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        heavy.append({
-                            "user_id": str(r.get("id")), "email": r.get("user_email"),
+            heavy = []
+            for r in cur.fetchall():
+                if isinstance(r, dict):
+                    heavy.append(
+                        {
+                            "user_id": str(r.get("id")),
+                            "email": r.get("user_email"),
                             "plan": r.get("plan"),
                             "is_banned": r.get("is_banned", False),
                             "ocr_today": r.get("today_count"),
-                        })
-                    else:
-                        heavy.append({
-                            "user_id": str(r[0]), "email": r[1], "plan": r[2],
-                            "is_banned": r[3], "ocr_today": r[4],
-                        })
+                        }
+                    )
+                else:
+                    heavy.append(
+                        {
+                            "user_id": str(r[0]),
+                            "email": r[1],
+                            "plan": r[2],
+                            "is_banned": r[3],
+                            "ocr_today": r[4],
+                        }
+                    )
 
-                # 4. 风控事件最近 24h
-                cur.execute("""
+            # 4. 风控事件最近 24h
+            cur.execute("""
                     SELECT event_type, COUNT(*) AS n
                     FROM risk_log
                     WHERE created_at > NOW() - INTERVAL '24 hours'
                     GROUP BY event_type
                     ORDER BY n DESC
                 """)
-                events_24h = []
-                for r in cur.fetchall():
-                    if isinstance(r, dict):
-                        events_24h.append({"event": r.get("event_type"), "count": r.get("n", 0)})
-                    else:
-                        events_24h.append({"event": r[0], "count": r[1]})
+            events_24h = []
+            for r in cur.fetchall():
+                if isinstance(r, dict):
+                    events_24h.append({"event": r.get("event_type"), "count": r.get("n", 0)})
+                else:
+                    events_24h.append({"event": r[0], "count": r[1]})
 
         return {
             "ok": True,
@@ -1905,14 +2176,21 @@ def admin_ban_user(user_id: str, request: Request, reason: str = Query("")):
     try:
         admin = _require_super_admin(request)
         import db as _db
+
         with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
+            cur.execute(
+                """
                     UPDATE users SET is_banned=true, ban_reason=%s WHERE id=%s
-                """, (reason or "manual_ban", user_id))
-                cur.execute("""
+                """,
+                (reason or "manual_ban", user_id),
+            )
+            cur.execute(
+                """
                     INSERT INTO risk_log(user_id, event_type, detail)
                     VALUES (%s, 'admin_ban', %s)
-                """, (user_id, json.dumps({"reason": reason, "by": str(admin.get("id"))})))
+                """,
+                (user_id, json.dumps({"reason": reason, "by": str(admin.get("id"))})),
+            )
         return {"ok": True}
     except HTTPException:
         raise
@@ -1926,10 +2204,14 @@ def admin_unban_user(user_id: str, request: Request):
     try:
         _require_super_admin(request)
         import db as _db
+
         with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
+            cur.execute(
+                """
                     UPDATE users SET is_banned=false, ban_reason=NULL WHERE id=%s
-                """, (user_id,))
+                """,
+                (user_id,),
+            )
         return {"ok": True}
     except HTTPException:
         raise
@@ -1950,32 +2232,39 @@ def admin_risk_batch_ban(req: RiskBatchBanRequest, request: Request):
     try:
         admin = _require_super_admin(request)
         import db as _db
+
         banned = 0
         skipped = []
         with _db.get_cursor(commit=True) as cur:
-                for uid in req.user_ids:
-                    try:
-                        # 跳过超管自己 + 已经封禁的
-                        cur.execute("SELECT is_super_admin, is_banned FROM users WHERE id=%s", (uid,))
-                        row = cur.fetchone()
-                        if not row:
-                            skipped.append({"user_id": uid, "reason": "not_found"})
-                            continue
-                        is_super = row.get("is_super_admin") if isinstance(row, dict) else row[0]
-                        if is_super:
-                            skipped.append({"user_id": uid, "reason": "is_super_admin"})
-                            continue
-                        cur.execute("""
+            for uid in req.user_ids:
+                try:
+                    # 跳过超管自己 + 已经封禁的
+                    cur.execute("SELECT is_super_admin, is_banned FROM users WHERE id=%s", (uid,))
+                    row = cur.fetchone()
+                    if not row:
+                        skipped.append({"user_id": uid, "reason": "not_found"})
+                        continue
+                    is_super = row.get("is_super_admin") if isinstance(row, dict) else row[0]
+                    if is_super:
+                        skipped.append({"user_id": uid, "reason": "is_super_admin"})
+                        continue
+                    cur.execute(
+                        """
                             UPDATE users SET is_banned=true, ban_reason=%s WHERE id=%s
-                        """, (req.reason, uid))
-                        cur.execute("""
+                        """,
+                        (req.reason, uid),
+                    )
+                    cur.execute(
+                        """
                             INSERT INTO risk_log(user_id, event_type, detail)
                             VALUES (%s, 'admin_batch_ban', %s)
-                        """, (uid, json.dumps({"reason": req.reason, "by": str(admin.get("id"))})))
-                        banned += 1
-                    except Exception as inner_e:
-                        logger.warning(f"batch_ban {uid} failed: {inner_e}")
-                        skipped.append({"user_id": uid, "reason": "error"})
+                        """,
+                        (uid, json.dumps({"reason": req.reason, "by": str(admin.get("id"))})),
+                    )
+                    banned += 1
+                except Exception as inner_e:
+                    logger.warning(f"batch_ban {uid} failed: {inner_e}")
+                    skipped.append({"user_id": uid, "reason": "error"})
         return {"ok": True, "banned": banned, "skipped": skipped}
     except HTTPException:
         raise
@@ -1987,7 +2276,7 @@ def admin_risk_batch_ban(req: RiskBatchBanRequest, request: Request):
 # ============================================================
 # v109.3.2 · 密码重置体系
 # ============================================================
-import secrets
+
 
 def _send_password_reset_via_line(user: dict, reset_url: str) -> bool:
     """通过 LINE Bot 推送密码重置链接 · 返回是否成功"""
@@ -2043,6 +2332,7 @@ def _send_password_reset_via_email(email: str, reset_url: str, user_name: str = 
     # 优先 · SMTP(系统主通道 · Gmail · 跟注册验证码一样)
     try:
         from app import _smtp_send_email
+
         ok, err = _smtp_send_email(email, subject, html)
         if ok:
             return True
@@ -2080,8 +2370,9 @@ def _send_password_reset_via_email(email: str, reset_url: str, user_name: str = 
 # 大厂惯例:Xero/QuickBooks/Stripe 超管完全不碰客户密码 · 此函数仅供老板调用
 # 链接复用现有 password_reset_log 机制 · token 15 分钟 · 单次使用
 # ============================================================
-def send_reset_link_for_employee(user_id: str, request_host: str = "pearnly.com",
-                                   actor_username: str = None) -> Dict[str, Any]:
+def send_reset_link_for_employee(
+    user_id: str, request_host: str = "pearnly.com", actor_username: str = None
+) -> Dict[str, Any]:
     """
     给员工发改密链接 · 不返回密码
     返回:{ok, channel, has_email, has_line, error}
@@ -2089,6 +2380,7 @@ def send_reset_link_for_employee(user_id: str, request_host: str = "pearnly.com"
     没渠道(目标既无 email 也无 line_user_id)→ ok=False · error=no_channel
     """
     import db as _db
+
     out = {"ok": False, "channel": "none", "has_email": False, "has_line": False, "error": None}
     if not user_id:
         out["error"] = "no_user_id"
@@ -2141,19 +2433,22 @@ def send_reset_link_for_employee(user_id: str, request_host: str = "pearnly.com"
 
         try:
             with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO password_reset_log
                     (token, user_id, email, expires_at, requester_ip, requester_fingerprint, delivery_method)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    token,
-                    str(target["id"]),
-                    target.get("email") or "",
-                    expires_at,
-                    f"actor:{actor_username or '?'}:reason:owner_employee_reset"[:64],
-                    "",
-                    delivery,
-                ))
+                """,
+                    (
+                        token,
+                        str(target["id"]),
+                        target.get("email") or "",
+                        expires_at,
+                        f"actor:{actor_username or '?'}:reason:owner_employee_reset"[:64],
+                        "",
+                        delivery,
+                    ),
+                )
         except Exception as e:
             logger.error(f"send_reset_link_for_employee · log: {e}")
 
@@ -2180,10 +2475,13 @@ def forgot_password(req: ForgotPasswordRequest, request: Request):
         # 限流:同邮箱 1 小时只能 3 次
         try:
             with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT COUNT(*) AS n FROM password_reset_log
                     WHERE email = %s AND created_at > NOW() - INTERVAL '1 hour'
-                """, (email_norm,))
+                """,
+                    (email_norm,),
+                )
                 row = cur.fetchone()
                 n = row.get("n") if isinstance(row, dict) else (row[0] if row else 0)
                 if n and int(n) >= 3:
@@ -2195,12 +2493,15 @@ def forgot_password(req: ForgotPasswordRequest, request: Request):
         user = None
         try:
             with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, username, email, full_name, line_user_id
                     FROM users
                     WHERE email_normalized = %s OR LOWER(email) = %s
                     LIMIT 1
-                """, (email_norm, email_norm))
+                """,
+                    (email_norm, email_norm),
+                )
                 user = cur.fetchone()
         except Exception as e:
             logger.warning(f"forgot_password user lookup: {e}")
@@ -2241,19 +2542,22 @@ def forgot_password(req: ForgotPasswordRequest, request: Request):
         # 写入 log(管理员可看 · 兜底)
         try:
             with _db.get_cursor(commit=True) as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO password_reset_log
                     (token, user_id, email, expires_at, requester_ip, requester_fingerprint, delivery_method)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    token,
-                    str(user["id"]),
-                    user.get("email") or req.email,
-                    expires_at,
-                    ip,
-                    (req.fingerprint or "")[:128],
-                    delivery,
-                ))
+                """,
+                    (
+                        token,
+                        str(user["id"]),
+                        user.get("email") or req.email,
+                        expires_at,
+                        ip,
+                        (req.fingerprint or "")[:128],
+                        delivery,
+                    ),
+                )
         except Exception as e:
             logger.error(f"forgot_password log insert: {e}")
 
@@ -2279,12 +2583,15 @@ def reset_password(req: ResetPasswordRequest, request: Request):
 
         # 查 token
         with _db.get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, user_id, email, expires_at, used
                 FROM password_reset_log
                 WHERE token = %s
                 LIMIT 1
-            """, (req.token,))
+            """,
+                (req.token,),
+            )
             log_row = cur.fetchone()
 
         if not log_row:
@@ -2300,23 +2607,35 @@ def reset_password(req: ResetPasswordRequest, request: Request):
         # 改密
         new_hash = _hash_password(req.new_password)
         with _db.get_cursor(commit=True) as cur:
-            cur.execute("UPDATE users SET password_hash = %s, password_changed_at = NOW() WHERE id = %s", (new_hash, str(user_id)))
-            cur.execute("""
+            cur.execute(
+                "UPDATE users SET password_hash = %s, password_changed_at = NOW() WHERE id = %s",
+                (new_hash, str(user_id)),
+            )
+            cur.execute(
+                """
                 UPDATE password_reset_log SET used = true, used_at = NOW()
                 WHERE token = %s
-            """, (req.token,))
+            """,
+                (req.token,),
+            )
             # 同邮箱所有未用 token 也作废
             email_val = log_row.get("email") if isinstance(log_row, dict) else log_row[2]
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE password_reset_log SET used = true, used_at = NOW()
                 WHERE email = %s AND used = false
-            """, (email_val,))
+            """,
+                (email_val,),
+            )
             # 清空登录失败记录
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM login_failure_log
                 WHERE email_or_username = LOWER(%s)
                    OR email_or_username = LOWER((SELECT username FROM users WHERE id=%s))
-            """, (email_val, str(user_id)))
+            """,
+                (email_val, str(user_id)),
+            )
 
         return {"ok": True, "message": "password_reset_success"}
     except HTTPException:
@@ -2336,6 +2655,7 @@ def change_password(req: ChangePasswordRequest, request: Request):
     """已登录用户改密码"""
     try:
         from auth import get_current_user_from_request, verify_password
+
         user = get_current_user_from_request(request)
         if not user:
             raise HTTPException(401, detail="unauthorized")
@@ -2348,10 +2668,13 @@ def change_password(req: ChangePasswordRequest, request: Request):
             raise HTTPException(400, detail="password_too_weak")
 
         import db as _db
+
         new_hash = _hash_password(req.new_password)
         with _db.get_cursor(commit=True) as cur:
-            cur.execute("UPDATE users SET password_hash = %s, password_changed_at = NOW() WHERE id = %s",
-                        (new_hash, str(user["id"])))
+            cur.execute(
+                "UPDATE users SET password_hash = %s, password_changed_at = NOW() WHERE id = %s",
+                (new_hash, str(user["id"])),
+            )
         return {"ok": True}
     except HTTPException:
         raise
@@ -2366,6 +2689,7 @@ def admin_password_resets(request: Request):
     try:
         _require_super_admin(request)
         import db as _db
+
         with _db.get_cursor(commit=True) as cur:
             cur.execute("""
                 SELECT
@@ -2380,7 +2704,7 @@ def admin_password_resets(request: Request):
             rows = cur.fetchall() or []
         out = []
         for r in rows:
-            d = dict(r) if hasattr(r, 'keys') else {}
+            d = dict(r) if hasattr(r, "keys") else {}
             for k in ("expires_at", "used_at", "created_at"):
                 if d.get(k):
                     try:
@@ -2402,6 +2726,7 @@ def admin_signup_sources(request: Request):
     try:
         _require_super_admin(request)
         import db as _db
+
         with _db.get_cursor(commit=True) as cur:
             cur.execute("""
                 SELECT
@@ -2417,7 +2742,7 @@ def admin_signup_sources(request: Request):
             rows = cur.fetchall() or []
         out = []
         for r in rows:
-            d = dict(r) if hasattr(r, 'keys') else {}
+            d = dict(r) if hasattr(r, "keys") else {}
             for k in ("user_count", "paid_count", "week_count"):
                 if k in d:
                     d[k] = int(d[k] or 0)

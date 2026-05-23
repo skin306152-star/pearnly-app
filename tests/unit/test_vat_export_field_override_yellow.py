@@ -8,6 +8,7 @@ P1.2-M2 v118.35.0.47 · 守门测试 · vat_excel_exporter 发票侧字段校正
   3. 被改的发票侧 cell 标黄(FFE082)+ comment 含 OCR / User
   4. 发票侧列显示用户校正值(覆盖 OCR 原值)
 """
+
 import io
 import unittest
 
@@ -26,11 +27,19 @@ def _client():
 
 def _row(field_overrides=None):
     return {
-        "id": 1, "invoice_no": "INV-001", "invoice_date": "2025-03-15",
-        "buyer_name": "ABC Co", "buyer_tax_id": "0100000000001",
-        "buyer_branch": "00000", "amount_pre_vat": 1000.0, "vat_amount": 70.0,
-        "total_amount": 1070.0, "invoice_filename": "a.pdf",
-        "diff_fields": {}, "diff_categories": "", "status": "matched",
+        "id": 1,
+        "invoice_no": "INV-001",
+        "invoice_date": "2025-03-15",
+        "buyer_name": "ABC Co",
+        "buyer_tax_id": "0100000000001",
+        "buyer_branch": "00000",
+        "amount_pre_vat": 1000.0,
+        "vat_amount": 70.0,
+        "total_amount": 1070.0,
+        "invoice_filename": "a.pdf",
+        "diff_fields": {},
+        "diff_categories": "",
+        "status": "matched",
         "field_overrides": field_overrides or {},
     }
 

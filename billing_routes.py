@@ -65,7 +65,9 @@ def _require_super_admin(request: Request) -> Dict[str, Any]:
 
 def send_topup_approved_email(tenant_id, amount_thb, new_balance):
     """v118.35.0.6 · 占位 noop · v36 真接邮件再实现."""
-    logger.info(f"[email-stub] topup_approved tenant={str(tenant_id)[:8]} amt={amount_thb} bal={new_balance}")
+    logger.info(
+        f"[email-stub] topup_approved tenant={str(tenant_id)[:8]} amt={amount_thb} bal={new_balance}"
+    )
 
 
 # ============================================================
@@ -75,6 +77,7 @@ def send_topup_approved_email(tenant_id, amount_thb, new_balance):
 async def get_my_credits(request: Request):
     """查询账户余额和用量（区分老板/员工视角）"""
     import datetime as _dt
+
     user = get_current_user_from_request(request)
     user_id = str(user.get("id", ""))
     tenant_id = user.get("tenant_id")
@@ -113,7 +116,8 @@ async def get_my_credits(request: Request):
         user_breakdown = []
         try:
             with db.get_cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT h.user_id::text,
                            COALESCE(u.username, split_part(u.email, '@', 1)) AS name,
                            COUNT(*) AS invoice_count
@@ -126,11 +130,12 @@ async def get_my_credits(request: Request):
                     GROUP BY h.user_id, u.username, u.email
                     ORDER BY invoice_count DESC
                     LIMIT 10
-                """, (tid,))
+                """,
+                    (tid,),
+                )
                 rows = cur.fetchall()
                 user_breakdown = [
-                    {"name": r["name"], "count": int(r["invoice_count"])}
-                    for r in rows
+                    {"name": r["name"], "count": int(r["invoice_count"])} for r in rows
                 ]
         except Exception as e:
             logger.warning(f"get_my_credits breakdown: {e}")
@@ -150,12 +155,15 @@ async def get_my_credits(request: Request):
         my_count = 0
         try:
             with db.get_cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT COUNT(*) AS cnt
                     FROM ocr_history
                     WHERE user_id::text = %s
                       AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
-                """, (user_id,))
+                """,
+                    (user_id,),
+                )
                 row = cur.fetchone()
                 if row:
                     my_count = int(row[0])
@@ -173,16 +181,22 @@ async def get_my_credits(request: Request):
 # 充值申请 · 用户端 + 管理端
 # ============================================================
 
+
 async def _verify_slip_with_slipok(slip_abs_path: str, expected_amount_thb: float) -> dict:
     """验证泰国转账截图. ok=None → 未配置key, 走人工审核; ok=False → 验证未通过; ok=True → 自动approve."""
     import httpx as _httpx
+
     api_key = os.environ.get("SLIPOK_API_KEY", "")
     branch_id = os.environ.get("SLIPOK_BRANCH_ID", "")
     if not api_key or not branch_id:
         return {"ok": None, "error": "SLIPOK_API_KEY/SLIPOK_BRANCH_ID not configured"}
     try:
         fname = os.path.basename(slip_abs_path)
-        mime = "image/png" if fname.endswith(".png") else "application/pdf" if fname.endswith(".pdf") else "image/jpeg"
+        mime = (
+            "image/png"
+            if fname.endswith(".png")
+            else "application/pdf" if fname.endswith(".pdf") else "image/jpeg"
+        )
         with open(slip_abs_path, "rb") as f:
             file_data = f.read()
         async with _httpx.AsyncClient(timeout=15.0) as client:
@@ -205,14 +219,18 @@ async def _verify_slip_with_slipok(slip_abs_path: str, expected_amount_thb: floa
         receiver = (d.get("receiver") or {}).get("displayName", "")
         transaction_id = d.get("transRef", "")
         amount_ok = abs(verified_amount - expected_amount_thb) <= 1.0
-        logger.info(f"SlipOK result: verified={verified_amount} expected={expected_amount_thb} ok={amount_ok} ref={transaction_id}")
+        logger.info(
+            f"SlipOK result: verified={verified_amount} expected={expected_amount_thb} ok={amount_ok} ref={transaction_id}"
+        )
         return {
             "ok": amount_ok,
             "verified_amount": verified_amount,
             "sender": sender,
             "receiver": receiver,
             "transaction_id": transaction_id,
-            "error": "" if amount_ok else f"amount {verified_amount} ≠ expected {expected_amount_thb}",
+            "error": (
+                "" if amount_ok else f"amount {verified_amount} ≠ expected {expected_amount_thb}"
+            ),
         }
     except Exception as e:
         logger.warning(f"_verify_slip_with_slipok exception: {e}")
@@ -224,9 +242,11 @@ class _TopupRequestBody(BaseModel):
     payer_name: str = Field("", max_length=200)
     note: str = Field("", max_length=500)
 
+
 class _AdminTopupApproveBody(BaseModel):
     actual_amount_thb: float = Field(..., gt=0)
     note: str = Field("", max_length=500)
+
 
 class _AdminTopupRejectBody(BaseModel):
     note: str = Field("", max_length=500)
@@ -235,6 +255,7 @@ class _AdminTopupRejectBody(BaseModel):
 # ============================================================
 # Multi-company (Task 3 · 不动 JWT · 用 users.active_tenant_id)
 # ============================================================
+
 
 class _SwitchCompanyBody(BaseModel):
     tenant_id: str = Field(..., min_length=8)
@@ -255,8 +276,7 @@ async def my_companies(request: Request):
     try:
         with db.get_cursor() as cur:
             cur.execute(
-                "SELECT active_tenant_id, tenant_id FROM users WHERE id = %s::uuid",
-                (user_id,)
+                "SELECT active_tenant_id, tenant_id FROM users WHERE id = %s::uuid", (user_id,)
             )
             row = cur.fetchone()
             if row:
@@ -267,15 +287,17 @@ async def my_companies(request: Request):
     # admin 才看 balance · member 屏蔽 balance 字段(置 None)
     out = []
     for it in items:
-        is_admin = (it.get("role") == "admin")
-        out.append({
-            "tenant_id": it["tenant_id"],
-            "name": it["name"],
-            "role": it["role"],
-            "balance_thb": (it["balance_thb"] if is_admin else None),
-            "pages_this_month": it["pages_this_month"],
-            "is_active_tenant": (it["tenant_id"] == active_tid),
-        })
+        is_admin = it.get("role") == "admin"
+        out.append(
+            {
+                "tenant_id": it["tenant_id"],
+                "name": it["name"],
+                "role": it["role"],
+                "balance_thb": (it["balance_thb"] if is_admin else None),
+                "pages_this_month": it["pages_this_month"],
+                "is_active_tenant": (it["tenant_id"] == active_tid),
+            }
+        )
     return {"companies": out, "active_tenant_id": active_tid}
 
 
@@ -301,22 +323,34 @@ async def credits_topup_request(req: _TopupRequestBody, request: Request):
     if not tenant_id:
         raise HTTPException(400, detail="credits.no_tenant")
     with db.get_cursor(commit=True) as cur:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO topup_requests (tenant_id, requested_by, amount_thb, payer_name, note)
             VALUES (%s, %s, %s, %s, %s) RETURNING id
-        """, (str(tenant_id), str(user["id"]), req.amount_thb,
-              req.payer_name.strip(), req.note.strip()))
+        """,
+            (
+                str(tenant_id),
+                str(user["id"]),
+                req.amount_thb,
+                req.payer_name.strip(),
+                req.note.strip(),
+            ),
+        )
         request_id = cur.fetchone()["id"]
     return {"request_id": request_id, "status": "pending"}
 
 
 @router.post("/api/credits/topup/upload-slip/{request_id}")
-async def credits_topup_upload_slip(request_id: int, request: Request, file: UploadFile = File(...)):
+async def credits_topup_upload_slip(
+    request_id: int, request: Request, file: UploadFile = File(...)
+):
     user = get_current_user_from_request(request)
     uid = str(user.get("id", ""))
     tid = str(user.get("tenant_id") or "")
     with db.get_cursor() as cur:
-        cur.execute("SELECT tenant_id, status, amount_thb FROM topup_requests WHERE id = %s", (request_id,))
+        cur.execute(
+            "SELECT tenant_id, status, amount_thb FROM topup_requests WHERE id = %s", (request_id,)
+        )
         row = cur.fetchone()
     if not row:
         raise HTTPException(404, detail="topup.not_found")
@@ -337,8 +371,10 @@ async def credits_topup_upload_slip(request_id: int, request: Request, file: Upl
     with open(slip_abs, "wb") as fp:
         fp.write(content)
     with db.get_cursor(commit=True) as cur:
-        cur.execute("UPDATE topup_requests SET slip_path = %s WHERE id = %s",
-                    (f"slips/{slip_filename}", request_id))
+        cur.execute(
+            "UPDATE topup_requests SET slip_path = %s WHERE id = %s",
+            (f"slips/{slip_filename}", request_id),
+        )
     # ── SlipOK 自动验证 ──────────────────────────────────────────
     slipok = await _verify_slip_with_slipok(slip_abs, expected_amount)
     if slipok.get("ok") is True:
@@ -346,22 +382,40 @@ async def credits_topup_upload_slip(request_id: int, request: Request, file: Upl
         ref = slipok.get("transaction_id", "")
         try:
             with db.get_cursor(commit=True) as cur:
-                cur.execute("""UPDATE topup_requests SET status='approved', reviewed_at=NOW(),
+                cur.execute(
+                    """UPDATE topup_requests SET status='approved', reviewed_at=NOW(),
                     review_note=%s, amount_thb=%s WHERE id=%s""",
-                    (f"SlipOK auto-approved · ref={ref}", verified_amount, request_id))
-                cur.execute("""INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
+                    (f"SlipOK auto-approved · ref={ref}", verified_amount, request_id),
+                )
+                cur.execute(
+                    """INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
                     ON CONFLICT (tenant_id) DO UPDATE
                     SET balance_thb = tenant_credits.balance_thb + %s, updated_at = NOW()
-                    RETURNING balance_thb""", (tid, verified_amount, verified_amount))
+                    RETURNING balance_thb""",
+                    (tid, verified_amount, verified_amount),
+                )
                 new_balance = float(cur.fetchone()["balance_thb"])
-                cur.execute("""INSERT INTO credit_transactions
+                cur.execute(
+                    """INSERT INTO credit_transactions
                     (tenant_id, user_id, type, amount_thb, balance_after, description)
                     VALUES (%s::uuid, %s::uuid, 'topup', %s, %s, %s)""",
-                    (tid, uid, verified_amount, new_balance,
-                     f"SlipOK自动充值 · #{request_id} · ref={ref}"))
-            logger.info(f"[topup] SlipOK auto-approved #{request_id} ฿{verified_amount} tenant={tid[:8]}")
-            return {"ok": True, "auto_approved": True, "balance_thb": new_balance,
-                    "slip_path": f"slips/{slip_filename}"}
+                    (
+                        tid,
+                        uid,
+                        verified_amount,
+                        new_balance,
+                        f"SlipOK自动充值 · #{request_id} · ref={ref}",
+                    ),
+                )
+            logger.info(
+                f"[topup] SlipOK auto-approved #{request_id} ฿{verified_amount} tenant={tid[:8]}"
+            )
+            return {
+                "ok": True,
+                "auto_approved": True,
+                "balance_thb": new_balance,
+                "slip_path": f"slips/{slip_filename}",
+            }
         except Exception as e:
             logger.error(f"SlipOK auto-approve DB error: {e}")
             # Fall through to manual review
@@ -376,30 +430,47 @@ async def credits_topup_history(request: Request):
     if not tid:
         return []
     with db.get_cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT id, amount_thb, payer_name, note, status, slip_path,
                    review_note, created_at, reviewed_at
             FROM topup_requests WHERE tenant_id = %s
             ORDER BY created_at DESC LIMIT 20
-        """, (tid,))
+        """,
+            (tid,),
+        )
         rows = cur.fetchall()
     return [
-        {"id": r["id"], "amount_thb": float(r["amount_thb"]),
-         "payer_name": r["payer_name"] or "", "note": r["note"] or "",
-         "status": r["status"], "slip_path": r["slip_path"],
-         "review_note": r["review_note"] or "",
-         "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-         "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None}
+        {
+            "id": r["id"],
+            "amount_thb": float(r["amount_thb"]),
+            "payer_name": r["payer_name"] or "",
+            "note": r["note"] or "",
+            "status": r["status"],
+            "slip_path": r["slip_path"],
+            "review_note": r["review_note"] or "",
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None,
+        }
         for r in rows
     ]
 
 
 @router.get("/api/credits/usage-history")
-async def credits_usage_history(request: Request, page: int = 1, per_page: int = 20, user_id: str = None):
+async def credits_usage_history(
+    request: Request, page: int = 1, per_page: int = 20, user_id: str = None
+):
     user = get_current_user_from_request(request)
     tid = str(user.get("tenant_id") or "")
     if not tid:
-        return {"rows": [], "total": 0, "page": page, "per_page": per_page, "is_owner": False, "members": []}
+        return {
+            "rows": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page,
+            "is_owner": False,
+            "members": [],
+        }
     is_owner = user.get("invited_by") is None
     if not is_owner:
         user_id = str(user["id"])
@@ -409,12 +480,16 @@ async def credits_usage_history(request: Request, page: int = 1, per_page: int =
     uid_params = [user_id] if user_id else []
     try:
         with db.get_cursor() as cur:
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT COUNT(*) AS n FROM credit_transactions ct
                 WHERE ct.tenant_id = %s::uuid AND ct.type = 'usage' {uid_sql}
-            """, [tid] + uid_params)
+            """,
+                [tid] + uid_params,
+            )
             total = int(cur.fetchone()["n"])
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     ct.created_at, ct.pages, ct.amount_thb AS cost_thb, ct.balance_after,
                     u.email AS user_email, u.username AS user_name,
@@ -428,33 +503,53 @@ async def credits_usage_history(request: Request, page: int = 1, per_page: int =
                 WHERE ct.tenant_id = %s::uuid AND ct.type = 'usage' {uid_sql}
                 ORDER BY ct.created_at DESC
                 LIMIT %s OFFSET %s
-            """, [tid] + uid_params + [per_page, offset])
+            """,
+                [tid] + uid_params + [per_page, offset],
+            )
             rows = cur.fetchall()
     except Exception as e:
         logger.warning(f"credits_usage_history: {e}")
-        return {"rows": [], "total": 0, "page": page, "per_page": per_page, "is_owner": is_owner, "members": []}
+        return {
+            "rows": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page,
+            "is_owner": is_owner,
+            "members": [],
+        }
     members = []
     if is_owner:
         try:
             with db.get_cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, email, username FROM users
                     WHERE tenant_id = %s::uuid AND is_active = TRUE ORDER BY email
-                """, (tid,))
-                members = [{"id": str(r["id"]), "email": r["email"] or "", "username": r["username"] or ""} for r in cur.fetchall()]
+                """,
+                    (tid,),
+                )
+                members = [
+                    {"id": str(r["id"]), "email": r["email"] or "", "username": r["username"] or ""}
+                    for r in cur.fetchall()
+                ]
         except Exception:
             pass
     return {
         "is_owner": is_owner,
-        "rows": [{
-            "date": r["created_at"].isoformat() if r["created_at"] else None,
-            "user_email": r["user_email"] or "",
-            "user_name": r["user_name"] or "",
-            "filename": r["filename"] or "",
-            "pages": int(r["pages"] or 0),
-            "cost_thb": float(r["cost_thb"] or 0),
-            "balance_after": float(r["balance_after"]) if r["balance_after"] is not None else None,
-        } for r in rows],
+        "rows": [
+            {
+                "date": r["created_at"].isoformat() if r["created_at"] else None,
+                "user_email": r["user_email"] or "",
+                "user_name": r["user_name"] or "",
+                "filename": r["filename"] or "",
+                "pages": int(r["pages"] or 0),
+                "cost_thb": float(r["cost_thb"] or 0),
+                "balance_after": (
+                    float(r["balance_after"]) if r["balance_after"] is not None else None
+                ),
+            }
+            for r in rows
+        ],
         "total": total,
         "page": page,
         "per_page": per_page,
@@ -522,7 +617,8 @@ async def credits_usage_report(
             trow = cur.fetchone()
             if trow:
                 company = trow.get("name") or ""
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     ct.user_id::text AS user_id,
                     ct.created_at,
@@ -543,40 +639,53 @@ async def credits_usage_report(
                   AND ct.created_at < %s
                   {uid_sql}
                 ORDER BY u.email NULLS LAST, ct.created_at ASC
-            """, [tid, sd, ed_exclusive] + uid_params)
+            """,
+                [tid, sd, ed_exclusive] + uid_params,
+            )
             for r in cur.fetchall():
-                rows.append({
-                    "user_id": r["user_id"],
-                    "date": r["created_at"].isoformat() if r["created_at"] else None,
-                    "pages": int(r["pages"] or 0),
-                    "cost_thb": float(r["cost_thb"] or 0),
-                    "user_email": r["user_email"] or "",
-                    "user_name": r["user_name"] or "",
-                    "filename": r["filename"] or "",
-                })
+                rows.append(
+                    {
+                        "user_id": r["user_id"],
+                        "date": r["created_at"].isoformat() if r["created_at"] else None,
+                        "pages": int(r["pages"] or 0),
+                        "cost_thb": float(r["cost_thb"] or 0),
+                        "user_email": r["user_email"] or "",
+                        "user_name": r["user_name"] or "",
+                        "filename": r["filename"] or "",
+                    }
+                )
     except HTTPException:
         raise
     except Exception as e:
         logger.warning(f"credits_usage_report query: {e}")
         raise HTTPException(status_code=500, detail="query_failed")
 
-    safe_tenant = "".join(ch for ch in (company or "tenant") if ch.isalnum() or ch in "-_")[:24] or "tenant"
+    safe_tenant = (
+        "".join(ch for ch in (company or "tenant") if ch.isalnum() or ch in "-_")[:24] or "tenant"
+    )
     fname_stem = f"pearnly_usage_{safe_tenant}_{sd.strftime('%Y%m%d')}_{ed.strftime('%Y%m%d')}"
 
     try:
         if fmt == "pdf":
             data = _ur.build_pdf(
-                lang=lang, company=company or "—",
-                start_date=sd.isoformat(), end_date=ed.isoformat(), rows=rows,
+                lang=lang,
+                company=company or "—",
+                start_date=sd.isoformat(),
+                end_date=ed.isoformat(),
+                rows=rows,
             )
             return Response(
-                content=data, media_type="application/pdf",
+                content=data,
+                media_type="application/pdf",
                 headers={"Content-Disposition": f'attachment; filename="{fname_stem}.pdf"'},
             )
         else:
             data = _ur.build_xlsx(
-                lang=lang, company=company or "—",
-                start_date=sd.isoformat(), end_date=ed.isoformat(), rows=rows,
+                lang=lang,
+                company=company or "—",
+                start_date=sd.isoformat(),
+                end_date=ed.isoformat(),
+                rows=rows,
             )
             return Response(
                 content=data,
@@ -594,7 +703,8 @@ async def admin_topup_list(request: Request, status: str = "pending"):
     where = "" if status == "all" else "WHERE tr.status = %s"
     params = () if status == "all" else (status,)
     with db.get_cursor() as cur:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT tr.id, tr.amount_thb, tr.payer_name, tr.note,
                    tr.status, tr.slip_path, tr.review_note,
                    tr.created_at, tr.reviewed_at,
@@ -604,17 +714,25 @@ async def admin_topup_list(request: Request, status: str = "pending"):
             LEFT JOIN tenants t ON t.id = tr.tenant_id
             {where}
             ORDER BY tr.created_at DESC LIMIT 100
-        """, params)
+        """,
+            params,
+        )
         rows = cur.fetchall()
     return [
-        {"id": r["id"], "amount_thb": float(r["amount_thb"]),
-         "payer_name": r["payer_name"] or "", "note": r["note"] or "",
-         "status": r["status"], "slip_path": r["slip_path"] or "",
-         "review_note": r["review_note"] or "",
-         "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-         "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None,
-         "username": r["username"] or "", "email": r["email"] or "",
-         "tenant_name": r["tenant_name"] or ""}
+        {
+            "id": r["id"],
+            "amount_thb": float(r["amount_thb"]),
+            "payer_name": r["payer_name"] or "",
+            "note": r["note"] or "",
+            "status": r["status"],
+            "slip_path": r["slip_path"] or "",
+            "review_note": r["review_note"] or "",
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None,
+            "username": r["username"] or "",
+            "email": r["email"] or "",
+            "tenant_name": r["tenant_name"] or "",
+        }
         for r in rows
     ]
 
@@ -626,8 +744,8 @@ async def admin_topup_approve(request_id: int, body: _AdminTopupApproveBody, req
     admin_id = str(admin_user["id"])
     with db.get_cursor(commit=True) as cur:
         cur.execute(
-            "SELECT tenant_id, status FROM topup_requests WHERE id = %s FOR UPDATE",
-            (request_id,))
+            "SELECT tenant_id, status FROM topup_requests WHERE id = %s FOR UPDATE", (request_id,)
+        )
         row = cur.fetchone()
         if not row:
             raise HTTPException(404, detail="topup.not_found")
@@ -635,18 +753,25 @@ async def admin_topup_approve(request_id: int, body: _AdminTopupApproveBody, req
             raise HTTPException(400, detail="topup.already_reviewed")
         tid = str(row["tenant_id"])
         amt = body.actual_amount_thb
-        cur.execute("""UPDATE topup_requests SET status='approved', reviewed_by=%s,
+        cur.execute(
+            """UPDATE topup_requests SET status='approved', reviewed_by=%s,
             reviewed_at=NOW(), review_note=%s, amount_thb=%s WHERE id=%s""",
-            (admin_id, body.note, amt, request_id))
-        cur.execute("""INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
+            (admin_id, body.note, amt, request_id),
+        )
+        cur.execute(
+            """INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
             ON CONFLICT (tenant_id) DO UPDATE
             SET balance_thb = tenant_credits.balance_thb + %s, updated_at = NOW()
-            RETURNING balance_thb""", (tid, amt, amt))
+            RETURNING balance_thb""",
+            (tid, amt, amt),
+        )
         new_balance = float(cur.fetchone()["balance_thb"])
-        cur.execute("""INSERT INTO credit_transactions
+        cur.execute(
+            """INSERT INTO credit_transactions
             (tenant_id, user_id, type, amount_thb, balance_after, description)
             VALUES (%s, %s, 'topup', %s, %s, %s)""",
-            (tid, admin_id, amt, new_balance, f"充值审核通过 · 申请#{request_id}"))
+            (tid, admin_id, amt, new_balance, f"充值审核通过 · 申请#{request_id}"),
+        )
     # Task 5 · 通知 tenant owner(失败不影响主流程)
     try:
         send_topup_approved_email(tid, amt, new_balance)
@@ -667,7 +792,9 @@ async def admin_topup_reject(request_id: int, body: _AdminTopupRejectBody, reque
             raise HTTPException(404, detail="topup.not_found")
         if row["status"] != "pending":
             raise HTTPException(400, detail="topup.already_reviewed")
-        cur.execute("""UPDATE topup_requests SET status='rejected', reviewed_by=%s,
+        cur.execute(
+            """UPDATE topup_requests SET status='rejected', reviewed_by=%s,
             reviewed_at=NOW(), review_note=%s WHERE id=%s""",
-            (admin_id, body.note, request_id))
+            (admin_id, body.note, request_id),
+        )
     return {"ok": True}

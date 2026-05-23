@@ -30,7 +30,7 @@ from __future__ import annotations
 import io
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from openpyxl import load_workbook
 
@@ -45,6 +45,7 @@ PRIMARY_SHEET_NAME = "Worksheet"
 @dataclass
 class ImportReportRow:
     """One invoice's outcome aggregated across all sheets in the report."""
+
     invoice_no: str
     reasons: List[str] = field(default_factory=list)
     # Per-sheet breakdown so the UI can show "Sheet X said: ...".
@@ -62,6 +63,7 @@ class ImportReport:
     success: list of invoice_no strings (DB write confirmed)
     failed:  list of ImportReportRow, each with reasons[] + details[]
     """
+
     success: List[str] = field(default_factory=list)
     failed: List[ImportReportRow] = field(default_factory=list)
 
@@ -93,8 +95,7 @@ def parse_import_report(xlsx_bytes: bytes) -> ImportReport:
 
     if PRIMARY_SHEET_NAME not in wb.sheetnames:
         raise ValueError(
-            f"report xlsx missing primary sheet {PRIMARY_SHEET_NAME!r}; "
-            f"got {wb.sheetnames}"
+            f"report xlsx missing primary sheet {PRIMARY_SHEET_NAME!r}; " f"got {wb.sheetnames}"
         )
 
     invoices: Dict[str, ImportReportRow] = {}

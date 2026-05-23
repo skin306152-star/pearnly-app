@@ -7,6 +7,7 @@ Locks down the Excel/CSV/Word direct-read path (no OCR) added in the
 table_headers preserved so Layer 2's GL prompt can identify the Debit /
 Credit columns by header — Excel/CSV must NEVER be sent through Vision OCR.
 """
+
 import csv
 import io
 import unittest
@@ -21,15 +22,17 @@ class TablePathExcelTests(unittest.TestCase):
 
     def setUp(self):
         import openpyxl
+
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "GL"
-        ws.append(["Date", "Voucher No.", "Account Code", "Description",
-                   "Debit", "Credit", "Balance"])
-        ws.append(["2026-05-21", "JV681130.1", "1112-07",
-                   "6091 - Sales revenue", 1500.00, None, 10000.00])
-        ws.append(["2026-05-22", "JV681130.2", "5001-01",
-                   "Office supplies", None, 250.00, 9750.00])
+        ws.append(
+            ["Date", "Voucher No.", "Account Code", "Description", "Debit", "Credit", "Balance"]
+        )
+        ws.append(
+            ["2026-05-21", "JV681130.1", "1112-07", "6091 - Sales revenue", 1500.00, None, 10000.00]
+        )
+        ws.append(["2026-05-22", "JV681130.2", "5001-01", "Office supplies", None, 250.00, 9750.00])
         buf = io.BytesIO()
         wb.save(buf)
         self.xlsx_bytes = buf.getvalue()
@@ -44,8 +47,7 @@ class TablePathExcelTests(unittest.TestCase):
         page = res.pages[0]
         self.assertEqual(
             page.table_headers,
-            ["Date", "Voucher No.", "Account Code", "Description",
-             "Debit", "Credit", "Balance"],
+            ["Date", "Voucher No.", "Account Code", "Description", "Debit", "Credit", "Balance"],
         )
 
     def test_excel_6091_stays_in_description_row(self):
@@ -89,8 +91,7 @@ class TablePathCSVTests(unittest.TestCase):
         res = extract_from_table_file(csv_bytes, "gl.csv")
         self.assertEqual(res.engine, "table_path_csv")
         page = res.pages[0]
-        self.assertEqual(page.table_headers,
-                         ["วันที่", "ใบสำคัญ", "รายการ", "เดบิต", "เครดิต"])
+        self.assertEqual(page.table_headers, ["วันที่", "ใบสำคัญ", "รายการ", "เดบิต", "เครดิต"])
         self.assertEqual(page.table_rows[0]["รายการ"], "6091 ขายสินค้า")
         self.assertEqual(page.table_rows[0]["เดบิต"], "1500.00")
 
@@ -104,8 +105,11 @@ class TablePathDispatchTests(unittest.TestCase):
 
     def test_supported_extensions_cover_user_request(self):
         for required in (".xlsx", ".xls", ".csv", ".tsv", ".docx", ".doc", ".txt"):
-            self.assertIn(required, SUPPORTED_TABLE_EXTENSIONS,
-                          f"{required} must be in SUPPORTED_TABLE_EXTENSIONS")
+            self.assertIn(
+                required,
+                SUPPORTED_TABLE_EXTENSIONS,
+                f"{required} must be in SUPPORTED_TABLE_EXTENSIONS",
+            )
 
     def test_unsupported_extension_raises(self):
         with self.assertRaises(ValueError):

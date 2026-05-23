@@ -2,6 +2,7 @@
 """
 v118.32.x · Pearnly · VAT 差异 AI 分析(懒加载 · 用户点开行才调 Gemini)
 """
+
 import os
 import json
 import logging
@@ -38,9 +39,7 @@ def analyze_diff(row: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str
     except ImportError:
         return {"ok": False, "error": "google-generativeai 未安装"}
 
-    key = (api_key
-           or os.environ.get("GEMINI_API_KEY")
-           or os.environ.get("GOOGLE_API_KEY"))
+    key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         return {"ok": False, "error": "Gemini API key 未配置"}
 
@@ -57,19 +56,19 @@ def analyze_diff(row: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str
         "diff_categories": row.get("diff_categories"),
         "pair_confidence": row.get("pair_confidence"),
         "invoice": {
-            "no":        row.get("invoice_no"),
-            "date":      str(row.get("invoice_date") or ""),
-            "buyer":     row.get("buyer_name") or row.get("seller_name"),
-            "tax_id":    row.get("buyer_tax_id"),
-            "amount":    row.get("total_amount"),
+            "no": row.get("invoice_no"),
+            "date": str(row.get("invoice_date") or ""),
+            "buyer": row.get("buyer_name") or row.get("seller_name"),
+            "tax_id": row.get("buyer_tax_id"),
+            "amount": row.get("total_amount"),
         },
         "report": {
-            "no":        row.get("report_invoice_no"),
-            "date":      row.get("report_date"),
-            "buyer":     row.get("report_buyer_name"),
-            "tax_id":    row.get("report_buyer_tax_id"),
-            "amount":    row.get("report_amount"),
-            "vat":       row.get("report_vat_amount"),
+            "no": row.get("report_invoice_no"),
+            "date": row.get("report_date"),
+            "buyer": row.get("report_buyer_name"),
+            "tax_id": row.get("report_buyer_tax_id"),
+            "amount": row.get("report_amount"),
+            "vat": row.get("report_vat_amount"),
         },
         "field_diff": diff_fields,
     }
@@ -89,9 +88,9 @@ def analyze_diff(row: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str
         text = (response.text or "").strip()
         data = json.loads(text)
         return {
-            "ok":       True,
-            "cause":    data.get("cause", ""),
-            "action":   data.get("action", ""),
+            "ok": True,
+            "cause": data.get("cause", ""),
+            "action": data.get("action", ""),
             "email_th": data.get("email_th", ""),
         }
     except json.JSONDecodeError as e:

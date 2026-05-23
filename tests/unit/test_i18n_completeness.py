@@ -26,7 +26,6 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from check_i18n import diff_keysets, parse_i18n_blocks  # noqa: E402
 
-
 HOME_JS = PROJECT_ROOT / "home.js"
 
 
@@ -48,9 +47,7 @@ class I18nDictCompletenessTests(unittest.TestCase):
     def test_no_missing_keys_in_any_lang(self):
         """zh 里有的 key · en/th/ja 都必须有."""
         diffs = diff_keysets(self.blocks, source="zh")
-        missing_summary = {
-            lang: d["missing"] for lang, d in diffs.items() if d["missing"]
-        }
+        missing_summary = {lang: d["missing"] for lang, d in diffs.items() if d["missing"]}
         if missing_summary:
             lines = ["以下 i18n key 缺失 · 必须补全:"]
             for lang, keys in missing_summary.items():
@@ -64,9 +61,7 @@ class I18nDictCompletenessTests(unittest.TestCase):
     def test_no_extra_keys_in_non_source_lang(self):
         """en/th/ja 里有的 key · zh 也应该有 (反向防漏)."""
         diffs = diff_keysets(self.blocks, source="zh")
-        extra_summary = {
-            lang: d["extra"] for lang, d in diffs.items() if d["extra"]
-        }
+        extra_summary = {lang: d["extra"] for lang, d in diffs.items() if d["extra"]}
         if extra_summary:
             lines = ["以下 i18n key 在 non-zh 但 zh 缺 · 反向漏译:"]
             for lang, keys in extra_summary.items():

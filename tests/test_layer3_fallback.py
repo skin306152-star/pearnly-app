@@ -96,10 +96,15 @@ def _print_compare(label: str, baseline, corrupted, corrected) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--file", help="single PDF path (overrides --limit)")
-    parser.add_argument("--limit", type=int, default=2,
-                        help="when iterating storage/pdfs/, process at most N files (default 2)")
-    parser.add_argument("--dpi", type=int, default=200,
-                        help="layer 1 + layer 3 PDF render DPI (default 200)")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=2,
+        help="when iterating storage/pdfs/, process at most N files (default 2)",
+    )
+    parser.add_argument(
+        "--dpi", type=int, default=200, help="layer 1 + layer 3 PDF render DPI (default 200)"
+    )
     args = parser.parse_args()
 
     # Env sanity
@@ -146,7 +151,7 @@ def main() -> int:
             fail_count += 1
             continue
         if not l1.pages:
-            print(f"  SETUP FAIL: layer 1 returned 0 pages")
+            print("  SETUP FAIL: layer 1 returned 0 pages")
             fail_count += 1
             continue
 
@@ -159,9 +164,11 @@ def main() -> int:
 
         baseline_page = l1.pages[0]
         baseline_invoice = l2.pages[0].invoice
-        print(f"  baseline: invoice_no={baseline_invoice.invoice_number!r} "
-              f"total={baseline_invoice.total_amount!r} "
-              f"seller_tax={baseline_invoice.seller_tax!r}")
+        print(
+            f"  baseline: invoice_no={baseline_invoice.invoice_number!r} "
+            f"total={baseline_invoice.total_amount!r} "
+            f"seller_tax={baseline_invoice.seller_tax!r}"
+        )
 
         # Step 2: corrupt — wipe invoice_number, replace total_amount with wrong value
         corrupted = baseline_invoice.model_copy(deep=True)
@@ -176,7 +183,7 @@ def main() -> int:
             "total_amount in previous extraction (99999.99) does not match subtotal + vat from the image; please re-read the totals line",
             "seller_tax is missing in previous extraction; please find the 13-digit tax ID near the seller header",
         ]
-        print(f"  corrupted: invoice_no=None  total='99999.99'  seller_tax=''")
+        print("  corrupted: invoice_no=None  total='99999.99'  seller_tax=''")
         print(f"  triggers ({len(trigger_reasons)}):")
         for t in trigger_reasons:
             print(f"    - {t[:80]}{'...' if len(t) > 80 else ''}")
@@ -204,27 +211,32 @@ def main() -> int:
             fail_count += 1
             continue
 
-        print(f"\n  Layer 3 result:")
+        print("\n  Layer 3 result:")
         print(f"    elapsed:        {l3.elapsed_ms}ms")
-        print(f"    tokens:         in={l3.input_tokens}  out={l3.output_tokens}  "
-              f"(retries={l3.retries})")
+        print(
+            f"    tokens:         in={l3.input_tokens}  out={l3.output_tokens}  "
+            f"(retries={l3.retries})"
+        )
         print(f"    model:          {l3.model}")
 
         # Step 5: side-by-side comparison
         corrected = l3.invoice
-        print(f"\n  Comparison (baseline vs corrupted vs corrected):")
-        _print_compare("invoice_number",
-                       baseline_invoice.invoice_number,
-                       corrupted.invoice_number,
-                       corrected.invoice_number)
-        _print_compare("total_amount",
-                       baseline_invoice.total_amount,
-                       corrupted.total_amount,
-                       corrected.total_amount)
-        _print_compare("seller_tax",
-                       original_seller_tax,
-                       corrupted.seller_tax,
-                       corrected.seller_tax)
+        print("\n  Comparison (baseline vs corrupted vs corrected):")
+        _print_compare(
+            "invoice_number",
+            baseline_invoice.invoice_number,
+            corrupted.invoice_number,
+            corrected.invoice_number,
+        )
+        _print_compare(
+            "total_amount",
+            baseline_invoice.total_amount,
+            corrupted.total_amount,
+            corrected.total_amount,
+        )
+        _print_compare(
+            "seller_tax", original_seller_tax, corrupted.seller_tax, corrected.seller_tax
+        )
 
         # Quick eyeball summary
         match_score = 0

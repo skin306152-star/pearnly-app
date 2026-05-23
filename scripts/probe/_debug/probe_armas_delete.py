@@ -26,10 +26,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+
 load_dotenv(PROJECT_ROOT / ".env.local")
 
 from services.erp.mrerp_adapter import MRERPAdapter
-
 
 with MRERPAdapter(
     login_url=os.environ["MRERP_LOGIN_URL"],
@@ -46,12 +46,12 @@ with MRERPAdapter(
     report = {}
 
     # 1. Look at listing HTML for any onclick handlers that look like delete
-    page.goto(adapter.login_url + "/armas/allview.php",
-              wait_until="networkidle", timeout=15_000)
+    page.goto(adapter.login_url + "/armas/allview.php", wait_until="networkidle", timeout=15_000)
     listing = page.content() or ""
     matches = re.findall(
         r'(?:href|onclick)=["\']([^"\']*(?:del|delete|edit|view|allform)[^"\']*)["\']',
-        listing, re.IGNORECASE,
+        listing,
+        re.IGNORECASE,
     )
     report["listing_link_patterns"] = list(set(matches))[:30]
 
@@ -95,7 +95,6 @@ with MRERPAdapter(
 
     ts = int(time.time())
     out = Path(__file__).parent / f"armas_delete_probe_{ts}.json"
-    out.write_text(json.dumps(report, ensure_ascii=False, indent=2),
-                   encoding="utf-8")
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"saved {out.name}")
     print(json.dumps(report, ensure_ascii=False, indent=2)[:3000])

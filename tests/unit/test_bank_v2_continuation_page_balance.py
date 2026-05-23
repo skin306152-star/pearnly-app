@@ -15,28 +15,29 @@ v118.35.0.48 · 守门测试 · M4 银行对账余额验证 续页/缺期初 不
   2. opening 已知 · 第一笔交易照常验证(True/False)
   3. merge_statements 同日多笔保持 PDF 原始顺序(稳定排序 · 不按金额重排)
 """
+
 import unittest
 from datetime import date
 
 from bank_recon_v2 import StatementRow, _verify_row_balances, merge_statements
 
-
 # BBL 2697 Page 9/9 续页真实数据(PDF 顶到底顺序 · 余额链自洽)
 _BBL2697 = [
-    ("TRF", 713733.48,  0,         9316618.47),
-    ("MSC", 0,          157043.90, 9473662.37),
-    ("TRF", 1406008.89, 0,         8067653.48),
-    ("TRF", 2157441.00, 0,         5910212.48),
-    ("TRF", 100660.25,  0,         5809552.23),
-    ("MSC", 0,          535000.00, 6344552.23),
-    ("MSC", 3463776.72, 0,         2880775.51),
+    ("TRF", 713733.48, 0, 9316618.47),
+    ("MSC", 0, 157043.90, 9473662.37),
+    ("TRF", 1406008.89, 0, 8067653.48),
+    ("TRF", 2157441.00, 0, 5910212.48),
+    ("TRF", 100660.25, 0, 5809552.23),
+    ("MSC", 0, 535000.00, 6344552.23),
+    ("MSC", 3463776.72, 0, 2880775.51),
 ]
 
 
 def _rows():
-    return [StatementRow(date=date(2025, 12, 30), description=d,
-                         withdrawal=w, deposit=dep, balance=b)
-            for (d, w, dep, b) in _BBL2697]
+    return [
+        StatementRow(date=date(2025, 12, 30), description=d, withdrawal=w, deposit=dep, balance=b)
+        for (d, w, dep, b) in _BBL2697
+    ]
 
 
 class ContinuationPageBalanceTests(unittest.TestCase):
@@ -46,8 +47,9 @@ class ContinuationPageBalanceTests(unittest.TestCase):
         rows = _rows()
         _verify_row_balances(rows, 0.0)
         self.assertIsNone(rows[0].balance_ok, "续页首笔应为 None(无从核对上一行余额)")
-        self.assertEqual(sum(1 for r in rows if r.balance_ok is False), 0,
-                         "续页不应有任何 False 误报")
+        self.assertEqual(
+            sum(1 for r in rows if r.balance_ok is False), 0, "续页不应有任何 False 误报"
+        )
         # 后续行用 PDF 印出来的真实余额逐行核对 · 全通过
         self.assertTrue(all(r.balance_ok is True for r in rows[1:]))
 
@@ -68,12 +70,15 @@ class ContinuationPageBalanceTests(unittest.TestCase):
 
     def test_merge_keeps_pdf_order_same_date(self):
         """merge_statements 同日多笔保持原始顺序(不按金额重排)"""
-        parsed = [{"ok": True, "bank_code": "bbl", "rows": _rows(),
-                   "opening": 0.0, "closing": 2880775.51}]
+        parsed = [
+            {"ok": True, "bank_code": "bbl", "rows": _rows(), "opening": 0.0, "closing": 2880775.51}
+        ]
         merged, _op, _cl, _bc = merge_statements(parsed)
-        self.assertEqual([r.balance for r in merged],
-                         [d[3] for d in _BBL2697],
-                         "同日多笔合并后顺序应与 PDF 原序一致")
+        self.assertEqual(
+            [r.balance for r in merged],
+            [d[3] for d in _BBL2697],
+            "同日多笔合并后顺序应与 PDF 原序一致",
+        )
 
 
 class RowHashDedupTests(unittest.TestCase):
@@ -82,25 +87,47 @@ class RowHashDedupTests(unittest.TestCase):
 
     def test_same_amount_diff_balance_not_deduped(self):
         """同日 / 同额 / 同描述 · 但余额不同 → 视为不同笔 · 不去重"""
-        a = StatementRow(date=date(2025, 12, 30), description="SWD",
-                         withdrawal=65573.75, deposit=0, balance=429666.83)
-        b = StatementRow(date=date(2025, 12, 30), description="SWD",
-                         withdrawal=65573.75, deposit=0, balance=364093.08)
+        a = StatementRow(
+            date=date(2025, 12, 30),
+            description="SWD",
+            withdrawal=65573.75,
+            deposit=0,
+            balance=429666.83,
+        )
+        b = StatementRow(
+            date=date(2025, 12, 30),
+            description="SWD",
+            withdrawal=65573.75,
+            deposit=0,
+            balance=364093.08,
+        )
         self.assertNotEqual(a.row_hash, b.row_hash, "余额不同应产生不同 row_hash")
-        parsed = [{"ok": True, "bank_code": "kkp", "rows": [a, b],
-                   "opening": 0.0, "closing": 364093.08}]
+        parsed = [
+            {"ok": True, "bank_code": "kkp", "rows": [a, b], "opening": 0.0, "closing": 364093.08}
+        ]
         merged, _op, _cl, _bc = merge_statements(parsed)
         self.assertEqual(len(merged), 2, "两笔合法交易不应被去重删成 1 笔")
 
     def test_true_duplicate_still_deduped(self):
         """完全相同(含余额)的真重复 · 仍去重(防同份文件传两次)"""
-        a = StatementRow(date=date(2025, 12, 30), description="SWD",
-                         withdrawal=65573.75, deposit=0, balance=429666.83)
-        b = StatementRow(date=date(2025, 12, 30), description="SWD",
-                         withdrawal=65573.75, deposit=0, balance=429666.83)
+        a = StatementRow(
+            date=date(2025, 12, 30),
+            description="SWD",
+            withdrawal=65573.75,
+            deposit=0,
+            balance=429666.83,
+        )
+        b = StatementRow(
+            date=date(2025, 12, 30),
+            description="SWD",
+            withdrawal=65573.75,
+            deposit=0,
+            balance=429666.83,
+        )
         self.assertEqual(a.row_hash, b.row_hash)
-        parsed = [{"ok": True, "bank_code": "kkp", "rows": [a, b],
-                   "opening": 0.0, "closing": 429666.83}]
+        parsed = [
+            {"ok": True, "bank_code": "kkp", "rows": [a, b], "opening": 0.0, "closing": 429666.83}
+        ]
         merged, _op, _cl, _bc = merge_statements(parsed)
         self.assertEqual(len(merged), 1, "真重复应去重")
 

@@ -14,6 +14,7 @@ v118.35.0.55 · 守门测试 · 银行流水 Excel 多 sheet + 旧.xls + 单一�
   3. 多 sheet 工作簿 → 所有 sheet 的行都被解析合并
   4. 带符号金额 → 正存负取
 """
+
 import io
 import unittest
 
@@ -38,8 +39,17 @@ class HitWholeWordTests(unittest.TestCase):
 class KtbHeaderMapTests(unittest.TestCase):
 
     def test_ktb_header_maps_amount_not_initbr(self):
-        header = ["Date", "Teller Id", "Transaction Code", "Description",
-                  "Cheque No.", "Amount", "Tax", "Balance", "Init Br."]
+        header = [
+            "Date",
+            "Teller Id",
+            "Transaction Code",
+            "Description",
+            "Cheque No.",
+            "Amount",
+            "Tax",
+            "Balance",
+            "Init Br.",
+        ]
         cm = _map_bank_stmt_cols(header)
         self.assertEqual(cm.get("amount"), 5)
         self.assertEqual(cm.get("balance"), 7)
@@ -50,18 +60,36 @@ class MultiSheetXlsxTests(unittest.TestCase):
 
     def _build(self):
         wb = openpyxl.Workbook()
-        for si, (acct, txns) in enumerate([
-            ("ACC-1", [("01/01/2026", "dep1", 1000.0, 11000.0), ("02/01/2026", "wd1", -500.0, 10500.0)]),
-            ("ACC-2", [("01/01/2026", "dep2", 2000.0, 22000.0), ("02/01/2026", "wd2", -700.0, 21300.0)]),
-        ]):
+        for si, (acct, txns) in enumerate(
+            [
+                (
+                    "ACC-1",
+                    [
+                        ("01/01/2026", "dep1", 1000.0, 11000.0),
+                        ("02/01/2026", "wd1", -500.0, 10500.0),
+                    ],
+                ),
+                (
+                    "ACC-2",
+                    [
+                        ("01/01/2026", "dep2", 2000.0, 22000.0),
+                        ("02/01/2026", "wd2", -700.0, 21300.0),
+                    ],
+                ),
+            ]
+        ):
             ws = wb.create_sheet(acct) if si else wb.active
             if si == 0:
                 ws.title = acct
-            ws.append(["Account No.", acct]); ws.append([]); ws.append([])
+            ws.append(["Account No.", acct])
+            ws.append([])
+            ws.append([])
             ws.append(["Date", "Description", "Amount", "Balance"])  # 单一带符号金额列
             for d, desc, amt, bal in txns:
                 ws.append([d, desc, amt, bal])
-        bio = io.BytesIO(); wb.save(bio); return bio.getvalue()
+        bio = io.BytesIO()
+        wb.save(bio)
+        return bio.getvalue()
 
     def test_all_sheets_parsed_signed_amount(self):
         res = parse_bank_stmt_xlsx_direct(self._build(), "multi.xlsx")
@@ -76,8 +104,10 @@ class MultiSheetXlsxTests(unittest.TestCase):
         self.assertEqual(len(wds), 2)
         self.assertEqual(wds[0].withdrawal, 500.0)  # -500 → 取款 500
         # v118.35.0.59 · Excel 路径也要跑余额校验(不再全 None/"—")
-        self.assertTrue(any(r.balance_ok is not None for r in rows),
-                        "Excel 路径应做余额校验 · 不应所有行都未校验")
+        self.assertTrue(
+            any(r.balance_ok is not None for r in rows),
+            "Excel 路径应做余额校验 · 不应所有行都未校验",
+        )
 
 
 if __name__ == "__main__":

@@ -29,13 +29,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp.mrerp_adapter import MRERPAdapter   # noqa: E402
-from services.erp.mrerp_customer_sync import (    # noqa: E402
+from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
+from services.erp.mrerp_customer_sync import (  # noqa: E402
     BuyerInfo,
     MRERPCustomerSyncService,
 )
 
-from tests.integration._mrerp_common import require_credentials   # noqa: E402
+from tests.integration._mrerp_common import require_credentials  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -83,11 +83,15 @@ class CustomerSyncLookupIntegrationTest(unittest.TestCase):
             client_id=99,
             tenant_id="test-tenant",
         )
-        mappings = {"clients": [{
-            "erp_type": "mrerp",
-            "client_id": 99,
-            "erp_code": KNOWN_CUSTOMER_CODE,
-        }]}
+        mappings = {
+            "clients": [
+                {
+                    "erp_type": "mrerp",
+                    "client_id": 99,
+                    "erp_code": KNOWN_CUSTOMER_CODE,
+                }
+            ]
+        }
         out = self.svc.lookup(buyer, mappings)
         self.assertIsNotNone(out, "L1 lookup must find the pre-set mapping")
         self.assertEqual(out.customer_code, KNOWN_CUSTOMER_CODE)
@@ -100,12 +104,11 @@ class CustomerSyncLookupIntegrationTest(unittest.TestCase):
         scores 1.0 against the listing → 'erp_name_match'."""
         buyer = BuyerInfo(
             name=KNOWN_CUSTOMER_NAME,
-            client_id=1001,           # unmapped client id
+            client_id=1001,  # unmapped client id
             tenant_id="test-tenant",
         )
         out = self.svc.lookup(buyer, {"clients": []})
-        self.assertIsNotNone(out,
-                             "L2 should find Skin Trading by name")
+        self.assertIsNotNone(out, "L2 should find Skin Trading by name")
         self.assertEqual(out.customer_code, KNOWN_CUSTOMER_CODE)
         self.assertIn(out.source, ("erp_name_match", "erp_fuzzy_match"))
         self.assertGreaterEqual(out.confidence, 0.95)

@@ -31,6 +31,7 @@ PUSH_TIMEOUT_SEC = int(os.environ.get("ERP_PUSH_TIMEOUT_SEC", "30"))
 # 标准化 payload
 # ============================================================
 
+
 def build_standard_payload(history_record: Dict[str, Any]) -> Dict[str, Any]:
     """
     把 ocr_history 一行数据转成对外推送的标准 JSON。
@@ -71,13 +72,15 @@ def build_standard_payload(history_record: Dict[str, Any]) -> Dict[str, Any]:
         "address": fields.get("buyer_addr") or "",
     }
     items = []
-    for it in (fields.get("items") or []):
-        items.append({
-            "name": it.get("name", ""),
-            "qty": it.get("qty", ""),
-            "price": it.get("price", ""),
-            "subtotal": it.get("subtotal", ""),
-        })
+    for it in fields.get("items") or []:
+        items.append(
+            {
+                "name": it.get("name", ""),
+                "qty": it.get("qty", ""),
+                "price": it.get("price", ""),
+                "subtotal": it.get("subtotal", ""),
+            }
+        )
 
     payload = {
         "source": "mrpilot",
@@ -103,7 +106,9 @@ def build_standard_payload(history_record: Dict[str, Any]) -> Dict[str, Any]:
     return payload
 
 
-def build_payload_with_idempotency(history_record: Dict[str, Any], endpoint_id: str) -> Dict[str, Any]:
+def build_payload_with_idempotency(
+    history_record: Dict[str, Any], endpoint_id: str
+) -> Dict[str, Any]:
     """build_standard_payload 的包装 · 额外注入 idempotency_key 供接收端去重"""
     payload = build_standard_payload(history_record)
     history_id = str(history_record.get("id") or "")
@@ -125,6 +130,7 @@ def _iso(dt) -> Optional[str]:
 # ============================================================
 # 适配器:Webhook(通用)
 # ============================================================
+
 
 def push_webhook(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tuple[bool, int, str]:
     """
@@ -195,7 +201,10 @@ def _apply_field_map(payload: Dict[str, Any], field_map: Dict[str, str]) -> Dict
 # 适配器:FlowAccount(以后做,先占位)
 # ============================================================
 
-def push_flowaccount(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tuple[bool, int, str]:
+
+def push_flowaccount(
+    endpoint_config: Dict[str, Any], payload: Dict[str, Any]
+) -> Tuple[bool, int, str]:
     """FlowAccount API · 以后做"""
     return False, 0, "flowaccount adapter not implemented yet"
 
@@ -203,6 +212,7 @@ def push_flowaccount(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -
 # ============================================================
 # 适配器分发器
 # ============================================================
+
 
 def push_mrerp(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tuple[bool, int, str]:
     """MR.ERP push entry · stub kept for ADAPTER_REGISTRY back-compat.
@@ -217,9 +227,13 @@ def push_mrerp(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tupl
     the test fires — forcing the auditor to re-check whether
     push_to_endpoint's early-return is still in place. Don't remove the
     stub even after the real path lands."""
-    return False, 0, (
-        "mrerp push is not wired into push_to_endpoint yet; "
-        "use MRERPAdapter.upload_invoice_batch directly"
+    return (
+        False,
+        0,
+        (
+            "mrerp push is not wired into push_to_endpoint yet; "
+            "use MRERPAdapter.upload_invoice_batch directly"
+        ),
     )
 
 
@@ -270,19 +284,25 @@ def push_mrerp_history(
         import db as _db
     except Exception as e:
         logger.exception("push_mrerp_history: db import failed")
-        return _mrerp_result_dict(False, 0, "",
-                                  error_msg=f"ERR_DB_IMPORT: {e}",
-                                  elapsed_ms=int((time.time() - t0) * 1000),
-                                  endpoint_id=endpoint_id,
-                                  history_id=str(history_record.get("id") or ""))
+        return _mrerp_result_dict(
+            False,
+            0,
+            "",
+            error_msg=f"ERR_DB_IMPORT: {e}",
+            elapsed_ms=int((time.time() - t0) * 1000),
+            endpoint_id=endpoint_id,
+            history_id=str(history_record.get("id") or ""),
+        )
 
     tenant_id = _db.get_user_tenant_id(user_id) if user_id else None
     if tenant_id:
         history_flat["tenant_id"] = tenant_id
 
-    mappings = _db.get_mrerp_mappings_bundle(tenant_id) if tenant_id else {
-        "clients": [], "products": [], "accounts": [], "taxes": []
-    }
+    mappings = (
+        _db.get_mrerp_mappings_bundle(tenant_id)
+        if tenant_id
+        else {"clients": [], "products": [], "accounts": [], "taxes": []}
+    )
 
     request_body = {
         "history_id": str(history_record.get("id") or ""),
@@ -292,9 +312,12 @@ def push_mrerp_history(
         "adapter": "mrerp",
     }
 
-    def _resp(success: bool, http_status: int, body, error_msg: Optional[str] = None,
-              **extra) -> Dict[str, Any]:
-        body_str = body if isinstance(body, str) else json.dumps(body, default=str, ensure_ascii=False)
+    def _resp(
+        success: bool, http_status: int, body, error_msg: Optional[str] = None, **extra
+    ) -> Dict[str, Any]:
+        body_str = (
+            body if isinstance(body, str) else json.dumps(body, default=str, ensure_ascii=False)
+        )
         return {
             "success": success,
             "http_status": http_status,
@@ -309,11 +332,13 @@ def push_mrerp_history(
     # ── lazy adapter import (Playwright may be missing on dev boxes).
     try:
         from services.erp.mrerp_adapter import (
-            MRERPAdapter, MRERPAuthError, MRERPTechnicalError, MRERPBusinessError,
+            MRERPAdapter,
+            MRERPAuthError,
+            MRERPTechnicalError,
+            MRERPBusinessError,
         )
     except ImportError as e:
-        return _resp(False, 0, f"playwright_missing: {e}",
-                     error_msg=f"ERR_PLAYWRIGHT_MISSING: {e}")
+        return _resp(False, 0, f"playwright_missing: {e}", error_msg=f"ERR_PLAYWRIGHT_MISSING: {e}")
 
     # ── credentials. Accept both shapes:
     #    enc_user/enc_pass (Fernet ciphertext via wizard POST encryption)
@@ -328,6 +353,7 @@ def push_mrerp_history(
     # the decrypt path. Heuristic: gAAAAA* prefix.
     try:
         from kms_helper import is_encrypted as _is_enc
+
         if enc_user and not _is_enc(enc_user):
             # username_enc field holds plaintext (PATCH path didn't encrypt yet).
             plain_user, enc_user = enc_user, ""
@@ -344,9 +370,7 @@ def push_mrerp_history(
         retry_attempts=2,
         retry_delays_seconds=(2.0,),
         enable_master_data_sync=True,
-        master_data_auto_create=bool(
-            config.get("master_data_auto_create", True)
-        ),
+        master_data_auto_create=bool(config.get("master_data_auto_create", True)),
         seed_customer_code=(config.get("seed_customer_code") or None),
         seed_product_code=(config.get("seed_product_code") or None),
     )
@@ -360,19 +384,27 @@ def push_mrerp_history(
             )
         elif plain_user and plain_pass:
             adapter = MRERPAdapter(
-                username=plain_user, password=plain_pass,
+                username=plain_user,
+                password=plain_pass,
                 **common_kwargs,
             )
         else:
-            return _resp(False, 401, "no_credentials",
-                         error_msg="ERR_NO_CREDS: username/password missing in endpoint.config")
+            return _resp(
+                False,
+                401,
+                "no_credentials",
+                error_msg="ERR_NO_CREDS: username/password missing in endpoint.config",
+            )
     except ValueError as e:
-        return _resp(False, 401, f"decrypt_failed: {e}",
-                     error_msg=f"ERR_CRED_DECRYPT: {e}")
+        return _resp(False, 401, f"decrypt_failed: {e}", error_msg=f"ERR_CRED_DECRYPT: {e}")
     except Exception as e:
         logger.exception("push_mrerp_history: adapter construct failed")
-        return _resp(False, 0, f"adapter_construct: {type(e).__name__}: {e}",
-                     error_msg=f"ERR_UNEXPECTED: adapter construct: {e}")
+        return _resp(
+            False,
+            0,
+            f"adapter_construct: {type(e).__name__}: {e}",
+            error_msg=f"ERR_UNEXPECTED: adapter construct: {e}",
+        )
 
     # ── run the batch (sync · MUST be off the event loop · the caller
     #    in app.py wraps push_to_endpoint with asyncio.to_thread).
@@ -380,18 +412,16 @@ def push_mrerp_history(
         with adapter:
             result = adapter.upload_invoice_batch([history_flat], mappings)
     except MRERPAuthError as e:
-        return _resp(False, 401, f"auth: {e}",
-                     error_msg=f"ERR_AUTH: {e}")
+        return _resp(False, 401, f"auth: {e}", error_msg=f"ERR_AUTH: {e}")
     except MRERPTechnicalError as e:
-        return _resp(False, 0, f"technical: {e}",
-                     error_msg=f"ERR_TECHNICAL: {e}")
+        return _resp(False, 0, f"technical: {e}", error_msg=f"ERR_TECHNICAL: {e}")
     except MRERPBusinessError as e:
-        return _resp(False, 200, f"business: {e}",
-                     error_msg=f"ERR_BUSINESS: {e}")
+        return _resp(False, 200, f"business: {e}", error_msg=f"ERR_BUSINESS: {e}")
     except Exception as e:
         logger.exception("push_mrerp_history: upload_invoice_batch raised")
-        return _resp(False, 0, f"unexpected: {type(e).__name__}: {e}",
-                     error_msg=f"ERR_UNEXPECTED: {e}")
+        return _resp(
+            False, 0, f"unexpected: {type(e).__name__}: {e}", error_msg=f"ERR_UNEXPECTED: {e}"
+        )
 
     # ── translate ImportResult → response dict
     if result.all_success and result.success:
@@ -403,9 +433,7 @@ def push_mrerp_history(
             "elapsed_ms": result.elapsed_ms,
             "xlsx_size_bytes": result.xlsx_size_bytes,
         }
-        return _resp(True, 200, body,
-                     mrerp_bill_no=s.mrerp_bill_no,
-                     invoice_no=s.invoice_no)
+        return _resp(True, 200, body, mrerp_bill_no=s.mrerp_bill_no, invoice_no=s.invoice_no)
 
     # Failure (preflight reject, or report.php หมายเหตุ rejection)
     failed = result.failed[0] if result.failed else None
@@ -419,21 +447,30 @@ def push_mrerp_history(
         "screenshot": screenshot,
         "elapsed_ms": result.elapsed_ms,
     }
-    return _resp(False, 200, body,
-                 error_msg="; ".join(reasons)[:500])
+    return _resp(False, 200, body, error_msg="; ".join(reasons)[:500])
 
 
-def _mrerp_result_dict(success: bool, http_status: int, body: str, *,
-                       error_msg: Optional[str], elapsed_ms: int,
-                       endpoint_id: str, history_id: str) -> Dict[str, Any]:
+def _mrerp_result_dict(
+    success: bool,
+    http_status: int,
+    body: str,
+    *,
+    error_msg: Optional[str],
+    elapsed_ms: int,
+    endpoint_id: str,
+    history_id: str,
+) -> Dict[str, Any]:
     """Minimal early-error response builder · used only when even
     `import db` fails (catastrophic) so we can't build the richer dict."""
     return {
-        "success": success, "http_status": http_status,
-        "response_body": body[:4000], "error_msg": error_msg,
+        "success": success,
+        "http_status": http_status,
+        "response_body": body[:4000],
+        "error_msg": error_msg,
         "elapsed_ms": elapsed_ms,
         "request_body": {
-            "history_id": history_id, "endpoint_id": endpoint_id,
+            "history_id": history_id,
+            "endpoint_id": endpoint_id,
             "adapter": "mrerp",
         },
         "adapter": "mrerp",
@@ -441,9 +478,9 @@ def _mrerp_result_dict(success: bool, http_status: int, body: str, *,
 
 
 ADAPTER_REGISTRY = {
-    "webhook":     push_webhook,
+    "webhook": push_webhook,
     "flowaccount": push_flowaccount,
-    "mrerp":       push_mrerp,
+    "mrerp": push_mrerp,
 }
 
 # Adapters whose endpoint.config carries Fernet-encrypted credentials.
@@ -530,6 +567,7 @@ def push_to_endpoint(endpoint: Dict[str, Any], history_record: Dict[str, Any]) -
 # 测试连接(给前端「测试连接」按钮用)
 # ============================================================
 
+
 def test_mrerp_endpoint(
     config: Dict[str, Any],
 ) -> Dict[str, Any]:
@@ -567,6 +605,7 @@ def test_mrerp_endpoint(
     always has something to render and we never surface a 500 to the UI.
     """
     import time as _time
+
     t0 = _time.time()
 
     def _elapsed():
@@ -612,6 +651,7 @@ def test_mrerp_endpoint(
     def _friendly(code: str) -> Dict[str, str]:
         try:
             from services.erp.mrerp_business_friendly import get_friendly
+
             f = get_friendly(code)
             if f:
                 return f
@@ -636,15 +676,15 @@ def test_mrerp_endpoint(
         try:
             import re as _re
             from services.erp.mrerp_adapter import (
-                MRERPAdapter, MRERPAuthError, MRERPBusinessError,
+                MRERPAdapter,
+                MRERPAuthError,
+                MRERPBusinessError,
                 MRERPTechnicalError,
             )
         except ImportError as e:
             logger.exception("test_mrerp_endpoint import failure")
             msg = f"{type(e).__name__}: {e}"
-            code = ("ERR_PLAYWRIGHT_MISSING"
-                    if "playwright" in str(e).lower()
-                    else "ERR_UNEXPECTED")
+            code = "ERR_PLAYWRIGHT_MISSING" if "playwright" in str(e).lower() else "ERR_UNEXPECTED"
             return _fail(code, msg)
 
         cfg = config or {}
@@ -665,6 +705,7 @@ def test_mrerp_endpoint(
         # endpoint" flow where the form pre-fills with stored ciphertext.
         try:
             from kms_helper import is_encrypted as _is_enc
+
             if plain_user and _is_enc(plain_user) and not enc_user:
                 enc_user, plain_user = plain_user, ""
             if plain_pass and _is_enc(plain_pass) and not enc_pass:
@@ -674,8 +715,7 @@ def test_mrerp_endpoint(
             pass
 
         if not ((plain_user and plain_pass) or (enc_user and enc_pass)):
-            return _fail("ERR_NO_CREDS",
-                         "username/password missing (neither plain nor encrypted)")
+            return _fail("ERR_NO_CREDS", "username/password missing (neither plain nor encrypted)")
 
         # ── adapter construction (caught individually so we can
         #    distinguish decrypt failure from constructor failure) ──
@@ -750,20 +790,24 @@ def test_mrerp_endpoint(
                         label = _re.sub(r"\s+", " ", m.group("label")).strip()
                         if not label or label.startswith("&"):
                             continue
-                        companies.append({
-                            "label": label[:80],
-                            "comidyear": m.group("y"),
-                            "seldb": m.group("s"),
-                        })
+                        companies.append(
+                            {
+                                "label": label[:80],
+                                "comidyear": m.group("y"),
+                                "seldb": m.group("s"),
+                            }
+                        )
                     # If the regex finds nothing, fall back to a single
                     # configured entry so the wizard at least shows the
                     # tenant's saved choice.
                     if not companies:
-                        companies.append({
-                            "label": f"TEST{comidyear}-{seldb}",
-                            "comidyear": comidyear,
-                            "seldb": seldb,
-                        })
+                        companies.append(
+                            {
+                                "label": f"TEST{comidyear}-{seldb}",
+                                "comidyear": comidyear,
+                                "seldb": seldb,
+                            }
+                        )
                 except Exception as e:
                     logger.warning("company scrape failed: %s", e)
                     companies = []
@@ -823,7 +867,9 @@ def list_mrerp_customers(
     """
     import time as _time
     from services.erp.mrerp_adapter import (
-        MRERPAdapter, MRERPAuthError, MRERPBusinessError,
+        MRERPAdapter,
+        MRERPAuthError,
+        MRERPBusinessError,
         MRERPTechnicalError,
     )
     from services.erp.mrerp_customer_sync import MRERPCustomerSyncService
@@ -838,7 +884,9 @@ def list_mrerp_customers(
 
     if not (enc_user and enc_pass):
         return {
-            "ok": False, "elapsed_ms": 0, "customers": [],
+            "ok": False,
+            "elapsed_ms": 0,
+            "customers": [],
             "error_code": "ERR_NO_CREDS",
             "error_friendly": get_friendly("ERR_NO_CREDS"),
             "raw_error": "username_enc / password_enc missing in config",
@@ -850,9 +898,11 @@ def list_mrerp_customers(
             login_url=login_url,
             encrypted_username=enc_user,
             encrypted_password=enc_pass,
-            comidyear=comidyear, seldb=seldb,
+            comidyear=comidyear,
+            seldb=seldb,
             headless=True,
-            retry_attempts=1, retry_delays_seconds=(0.5,),
+            retry_attempts=1,
+            retry_delays_seconds=(0.5,),
         )
     except Exception as e:
         return {
@@ -868,12 +918,15 @@ def list_mrerp_customers(
         with adapter:
             svc = MRERPCustomerSyncService(adapter)
             rows = svc._fetch_listing()
-        customers = [{
-            "code": r.code,
-            "name": r.name,
-            "type_name": r.type_name,
-            "prefix": r.prefix,
-        } for r in rows]
+        customers = [
+            {
+                "code": r.code,
+                "name": r.name,
+                "type_name": r.type_name,
+                "prefix": r.prefix,
+            }
+            for r in rows
+        ]
     except MRERPAuthError as e:
         return {
             "ok": False,
@@ -939,7 +992,9 @@ def list_mrerp_products(
     """
     import time as _time
     from services.erp.mrerp_adapter import (
-        MRERPAdapter, MRERPAuthError, MRERPBusinessError,
+        MRERPAdapter,
+        MRERPAuthError,
+        MRERPBusinessError,
         MRERPTechnicalError,
     )
     from services.erp.mrerp_product_sync import MRERPProductSyncService
@@ -954,7 +1009,9 @@ def list_mrerp_products(
 
     if not (enc_user and enc_pass):
         return {
-            "ok": False, "elapsed_ms": 0, "products": [],
+            "ok": False,
+            "elapsed_ms": 0,
+            "products": [],
             "error_code": "ERR_NO_CREDS",
             "error_friendly": get_friendly("ERR_NO_CREDS"),
             "raw_error": "username_enc / password_enc missing in config",
@@ -966,9 +1023,11 @@ def list_mrerp_products(
             login_url=login_url,
             encrypted_username=enc_user,
             encrypted_password=enc_pass,
-            comidyear=comidyear, seldb=seldb,
+            comidyear=comidyear,
+            seldb=seldb,
             headless=True,
-            retry_attempts=1, retry_delays_seconds=(0.5,),
+            retry_attempts=1,
+            retry_delays_seconds=(0.5,),
         )
     except Exception as e:
         return {
@@ -984,46 +1043,60 @@ def list_mrerp_products(
         with adapter:
             svc = MRERPProductSyncService(adapter)
             rows = svc._fetch_listing()
-        products = [{
-            "code": r.code,
-            "name": r.name,
-            "category_code": r.category_code,
-            "category_name": r.category_name,
-        } for r in rows]
+        products = [
+            {
+                "code": r.code,
+                "name": r.name,
+                "category_code": r.category_code,
+                "category_name": r.category_name,
+            }
+            for r in rows
+        ]
     except MRERPAuthError as e:
         return {
-            "ok": False, "elapsed_ms": int((_time.time() - t0) * 1000),
-            "products": [], "error_code": "ERR_AUTH",
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "products": [],
+            "error_code": "ERR_AUTH",
             "error_friendly": get_friendly("ERR_AUTH"),
             "raw_error": str(e)[:300],
         }
     except MRERPTechnicalError as e:
         return {
-            "ok": False, "elapsed_ms": int((_time.time() - t0) * 1000),
-            "products": [], "error_code": "ERR_TECHNICAL",
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "products": [],
+            "error_code": "ERR_TECHNICAL",
             "error_friendly": get_friendly("ERR_TECHNICAL"),
             "raw_error": str(e)[:300],
         }
     except MRERPBusinessError as e:
         return {
-            "ok": False, "elapsed_ms": int((_time.time() - t0) * 1000),
-            "products": [], "error_code": "ERR_BUSINESS",
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "products": [],
+            "error_code": "ERR_BUSINESS",
             "error_friendly": get_friendly("ERR_BUSINESS"),
             "raw_error": str(e)[:300],
         }
     except Exception as e:
         logger.exception("list_mrerp_products unexpected error")
         return {
-            "ok": False, "elapsed_ms": int((_time.time() - t0) * 1000),
-            "products": [], "error_code": "ERR_UNEXPECTED",
+            "ok": False,
+            "elapsed_ms": int((_time.time() - t0) * 1000),
+            "products": [],
+            "error_code": "ERR_UNEXPECTED",
             "error_friendly": get_friendly("ERR_UNEXPECTED"),
             "raw_error": f"{type(e).__name__}: {str(e)[:200]}",
         }
 
     return {
-        "ok": True, "elapsed_ms": int((_time.time() - t0) * 1000),
-        "products": products, "error_code": None,
-        "error_friendly": None, "raw_error": None,
+        "ok": True,
+        "elapsed_ms": int((_time.time() - t0) * 1000),
+        "products": products,
+        "error_code": None,
+        "error_friendly": None,
+        "raw_error": None,
     }
 
 
@@ -1048,8 +1121,12 @@ def test_endpoint_connection(adapter: str, config: Dict[str, Any]) -> Dict[str, 
     }
     push_fn = ADAPTER_REGISTRY.get(adapter)
     if push_fn is None:
-        return {"success": False, "http_status": 0, "response_body": "",
-                "error_msg": f"unknown adapter: {adapter}"}
+        return {
+            "success": False,
+            "http_status": 0,
+            "response_body": "",
+            "error_msg": f"unknown adapter: {adapter}",
+        }
 
     t0 = time.time()
     try:

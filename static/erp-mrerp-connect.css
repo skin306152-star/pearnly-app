@@ -29,21 +29,21 @@
  * ============================================================ */
 
 .ic-mrerp {
-    /* MR.ERP 品牌色 · 深蓝偏紫 · 跟 Xero 的浅蓝拉开区分 */
-    background: #ebe9ff;
-    color: #4338ca;
+  /* MR.ERP 品牌色 · 深蓝偏紫 · 跟 Xero 的浅蓝拉开区分 */
+  background: #ebe9ff;
+  color: #4338ca;
 }
 
 .ic-flowaccount {
-    /* FlowAccount 品牌色 · 橙绿混合 (用绿色调更接近他们 logo) */
-    background: #e6f5ea;
-    color: #06834b;
+  /* FlowAccount 品牌色 · 橙绿混合 (用绿色调更接近他们 logo) */
+  background: #e6f5ea;
+  color: #06834b;
 }
 
 .ic-xero {
-    /* Xero 品牌色 · 浅蓝 (跟官网视觉对齐) */
-    background: #e0f2fe;
-    color: #0284c7;
+  /* Xero 品牌色 · 浅蓝 (跟官网视觉对齐) */
+  background: #e0f2fe;
+  color: #0284c7;
 }
 
 /* ============================================================
@@ -52,81 +52,106 @@
  * ============================================================ */
 
 .mrerp-card-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 999px;
-    line-height: 1.4;
-    white-space: nowrap;
-    letter-spacing: 0.1px;
-    flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  line-height: 1.4;
+  white-space: nowrap;
+  letter-spacing: 0.1px;
+  flex-shrink: 0;
 }
 
-.mrerp-pill-ok       { background: #d6f5e0; color: #0a7a2c; }
-.mrerp-pill-warn     { background: #fdebcb; color: #8a5a00; }
-.mrerp-pill-err      { background: #fbd6d6; color: #921616; }
-.mrerp-pill-neutral  { background: #eaeae5; color: #5d5d57; }
-.mrerp-pill-info     { background: #DBEAFE; color: #1E40AF; }
-.mrerp-pill-testing  { background: #eef2ff; color: #4338ca; }
+.mrerp-pill-ok {
+  background: #d6f5e0;
+  color: #0a7a2c;
+}
+.mrerp-pill-warn {
+  background: #fdebcb;
+  color: #8a5a00;
+}
+.mrerp-pill-err {
+  background: #fbd6d6;
+  color: #921616;
+}
+.mrerp-pill-neutral {
+  background: #eaeae5;
+  color: #5d5d57;
+}
+.mrerp-pill-info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.mrerp-pill-testing {
+  background: #eef2ff;
+  color: #4338ca;
+}
 
 /* "即将上线" 用 info 色 + 半透明效果整行 */
-.integration-row.is-coming-soon { opacity: 0.65; cursor: not-allowed; }
+.integration-row.is-coming-soon {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 .integration-row.is-coming-soon .int-btn-configure {
-    pointer-events: none; opacity: 0.55;
+  pointer-events: none;
+  opacity: 0.55;
 }
 
 /* v118.34.34 (Zihao 2026-05-19 拍板 · 批 2 改动 7) · 已停用卡片 ·
    整行灰化 · 但「启用」按钮要保持可点 · 不然没法重新启用. */
 .integration-row.is-disabled {
-    opacity: 0.55;
-    background: var(--bg, #f4f4f0);
+  opacity: 0.55;
+  background: var(--bg, #f4f4f0);
 }
 .integration-row.is-disabled .int-icon {
-    filter: grayscale(0.7);
+  filter: grayscale(0.7);
 }
 /* "启用" 按钮一定要点得到 · 跳出灰化叠加 · 用 brand 色突出 */
 .integration-row.is-disabled .mrerp-card-toggle-enable {
-    opacity: 1;
-    background: var(--ink, #111111);
-    color: #ffffff;
-    border-color: var(--ink, #111111);
+  opacity: 1;
+  background: var(--ink, #111111);
+  color: #ffffff;
+  border-color: var(--ink, #111111);
 }
 
 /* 启用/停用 toggle button · 复用 int-btn-configure 的 ghost 风格但更紧凑 */
 .mrerp-card-toggle {
-    background: transparent;
-    border: 1px solid var(--line, #e8e8e3);
-    color: var(--ink, #111111);
-    font-size: 12px;
-    font-family: inherit;
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  background: transparent;
+  border: 1px solid var(--line, #e8e8e3);
+  color: var(--ink, #111111);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 .mrerp-card-toggle:hover:not(:disabled) {
-    background: var(--ink, #111111);
-    color: #ffffff;
-    border-color: var(--ink, #111111);
+  background: var(--ink, #111111);
+  color: #ffffff;
+  border-color: var(--ink, #111111);
 }
 .mrerp-card-toggle:disabled {
-    opacity: 0.5;
-    cursor: wait;
+  opacity: 0.5;
+  cursor: wait;
 }
 /* 停用动作 = 红/橙警示色,提醒用户这是会让自动推送停的操作 */
 .mrerp-card-toggle-disable:hover:not(:disabled) {
-    background: #b45309;
-    color: #ffffff;
-    border-color: #b45309;
+  background: #b45309;
+  color: #ffffff;
+  border-color: #b45309;
 }
 /* 启用动作 = 绿色 ok 色,正向反馈 */
 .mrerp-card-toggle-enable:hover:not(:disabled) {
-    background: #0a7a2c;
-    color: #ffffff;
-    border-color: #0a7a2c;
+  background: #0a7a2c;
+  color: #ffffff;
+  border-color: #0a7a2c;
 }
 
 /* ============================================================
@@ -136,219 +161,236 @@
  * ============================================================ */
 
 .mrerp-wizard-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(17, 17, 17, 0.45);
-    z-index: 11000;            /* v118.34.4 · 之前是 4000,被抽屉(10000)遮 */
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 17, 17, 0.45);
+  z-index: 11000; /* v118.34.4 · 之前是 4000,被抽屉(10000)遮 */
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
 }
 
-.mrerp-wizard-overlay.is-open { display: flex; }
+.mrerp-wizard-overlay.is-open {
+  display: flex;
+}
 
 .mrerp-wizard {
-    background: #ffffff;
-    border-radius: 10px;
-    box-shadow: 0 18px 40px rgba(17, 17, 17, 0.22);
-    width: min(820px, 100%);
-    max-height: 100%;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 18px 40px rgba(17, 17, 17, 0.22);
+  width: min(820px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .mrerp-wizard-head {
-    padding: 18px 22px;
-    border-bottom: 1px solid var(--line, #e8e8e3);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line, #e8e8e3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
 
 .mrerp-wizard-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--ink, #111111);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink, #111111);
 }
 
 .mrerp-wizard-progress {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 1;
-    margin-left: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  margin-left: 18px;
 }
 
 .mrerp-wizard-step-dot {
-    width: 10px; height: 10px;
-    border-radius: 999px;
-    background: var(--line, #e8e8e3);
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--line, #e8e8e3);
 }
 
-.mrerp-wizard-step-dot.is-active { background: var(--ink, #111111); }
-.mrerp-wizard-step-dot.is-done   { background: #16A34A; }
+.mrerp-wizard-step-dot.is-active {
+  background: var(--ink, #111111);
+}
+.mrerp-wizard-step-dot.is-done {
+  background: #16a34a;
+}
 
 .mrerp-wizard-step-sep {
-    flex: 0 0 28px;
-    height: 1px;
-    background: var(--line, #e8e8e3);
+  flex: 0 0 28px;
+  height: 1px;
+  background: var(--line, #e8e8e3);
 }
 
 .mrerp-wizard-close {
-    background: transparent;
-    border: 0;
-    padding: 4px;
-    cursor: pointer;
-    color: var(--ink-3, #6B7280);
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--ink-3, #6b7280);
 }
 
-.mrerp-wizard-close:hover { color: var(--ink, #111111); }
+.mrerp-wizard-close:hover {
+  color: var(--ink, #111111);
+}
 
 .mrerp-wizard-body {
-    padding: 22px;
-    overflow: auto;
-    flex: 1;
+  padding: 22px;
+  overflow: auto;
+  flex: 1;
 }
 
-.mrerp-wizard-step       { display: none; }
-.mrerp-wizard-step.is-active { display: block; }
+.mrerp-wizard-step {
+  display: none;
+}
+.mrerp-wizard-step.is-active {
+  display: block;
+}
 
 .mrerp-wizard-step-h {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--ink, #111111);
-    margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink, #111111);
+  margin: 0 0 14px;
 }
 
 .mrerp-wizard-hint {
-    font-size: 12px;
-    color: var(--ink-3, #6B7280);
-    margin: 6px 0 14px;
+  font-size: 12px;
+  color: var(--ink-3, #6b7280);
+  margin: 6px 0 14px;
 }
 
-.mrerp-wizard-field { margin: 0 0 14px; }
+.mrerp-wizard-field {
+  margin: 0 0 14px;
+}
 
 .mrerp-wizard-label {
-    display: block;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--ink, #111111);
-    margin: 0 0 6px;
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink, #111111);
+  margin: 0 0 6px;
 }
 
 .mrerp-wizard-input,
 .mrerp-wizard-select {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--line, #e8e8e3);
-    border-radius: 6px;
-    font-size: 13px;
-    background: #ffffff;
-    color: var(--ink, #111111);
-    font-family: inherit;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line, #e8e8e3);
+  border-radius: 6px;
+  font-size: 13px;
+  background: #ffffff;
+  color: var(--ink, #111111);
+  font-family: inherit;
 }
 
 .mrerp-wizard-input:focus,
 .mrerp-wizard-select:focus {
-    outline: none;
-    border-color: var(--ink, #111111);
+  outline: none;
+  border-color: var(--ink, #111111);
 }
 
 .mrerp-wizard-checkboxes {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 260px;
-    overflow: auto;
-    padding: 10px;
-    border: 1px solid var(--line, #e8e8e3);
-    border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--line, #e8e8e3);
+  border-radius: 6px;
 }
 
 .mrerp-wizard-checkbox-row,
 .mrerp-wizard-radio-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .mrerp-wizard-radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .mrerp-wizard-test-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
 }
 
 .mrerp-wizard-test-status {
-    font-size: 12px;
-    color: var(--ink-3, #6B7280);
+  font-size: 12px;
+  color: var(--ink-3, #6b7280);
 }
 
 .mrerp-wizard-test-error {
-    margin-top: 6px;
-    padding: 10px 12px;
-    background: #fbd6d6;
-    border-left: 3px solid #921616;
-    border-radius: 4px;
-    font-size: 12px;
-    color: #921616;
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: #fbd6d6;
+  border-left: 3px solid #921616;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #921616;
 }
 
 .mrerp-wizard-test-error-raw {
-    margin-top: 6px;
-    font-size: 11px;
-    color: var(--ink-3, #6B7280);
-    font-family: monospace;
-    white-space: pre-wrap;
-    word-break: break-all;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-3, #6b7280);
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* v118.34.32 (Zihao 2026-05-19 拍板) · seed input fail-over 视觉强化 ·
    橙色边框 + 浅黄背景 · 让用户一眼看出这是"上次保存的值需要确认/手动改"
    · 不是普通输入框 · 配合 fb hint dynamic 文案. */
 .mrerp-seed-input-saved {
-    border: 2px solid #F59E0B !important;
-    background: #FFFBEB !important;
-    font-weight: 500;
+  border: 2px solid #f59e0b !important;
+  background: #fffbeb !important;
+  font-weight: 500;
 }
 .mrerp-seed-input-saved:focus {
-    border-color: #D97706 !important;
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+  border-color: #d97706 !important;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
 }
 
 /* P-4 (v118.34.21) · 失败截图路径单独高亮 · 让用户能 scp 给客服 */
 .mrerp-wizard-test-error-screenshot {
-    margin-top: 6px;
-    padding: 6px 8px;
-    background: rgba(146, 22, 22, 0.08);
-    border-left: 2px solid #D97706;
-    font-size: 11px;
-    color: #921616;
-    font-family: monospace;
-    word-break: break-all;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: rgba(146, 22, 22, 0.08);
+  border-left: 2px solid #d97706;
+  font-size: 11px;
+  color: #921616;
+  font-family: monospace;
+  word-break: break-all;
 }
 
 .mrerp-wizard-foot {
-    padding: 16px 22px;
-    border-top: 1px solid var(--line, #e8e8e3);
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    align-items: center;
+  padding: 16px 22px;
+  border-top: 1px solid var(--line, #e8e8e3);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
 }
 
-.mrerp-wizard-foot-spacer { flex: 1; }
+.mrerp-wizard-foot-spacer {
+  flex: 1;
+}
 
 /* ============================================================
  * Push log enhancements (C-4)
@@ -357,29 +399,29 @@
  * ============================================================ */
 
 .mrerp-logs-row-friendly {
-    font-size: 12px;
-    color: var(--ink, #111111);
-    margin: 4px 0;
+  font-size: 12px;
+  color: var(--ink, #111111);
+  margin: 4px 0;
 }
 
 .mrerp-logs-row-raw-toggle {
-    font-size: 11px;
-    color: var(--ink-3, #6B7280);
-    cursor: pointer;
-    margin-top: 2px;
-    text-decoration: underline dotted;
+  font-size: 11px;
+  color: var(--ink-3, #6b7280);
+  cursor: pointer;
+  margin-top: 2px;
+  text-decoration: underline dotted;
 }
 
 .mrerp-logs-row-raw {
-    margin-top: 4px;
-    padding: 8px;
-    background: var(--bg, #f4f4f0);
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 11px;
-    color: #5d5d57;
-    white-space: pre-wrap;
-    word-break: break-word;
+  margin-top: 4px;
+  padding: 8px;
+  background: var(--bg, #f4f4f0);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 11px;
+  color: #5d5d57;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ============================================================
@@ -388,19 +430,19 @@
  * ============================================================ */
 
 .mrerp-card-see-logs {
-    background: transparent;
-    border: 0;
-    color: var(--ink-3, #6B7280);
-    font-size: 12px;
-    font-family: inherit;
-    padding: 6px 8px;
-    cursor: pointer;
-    text-decoration: underline dotted;
+  background: transparent;
+  border: 0;
+  color: var(--ink-3, #6b7280);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-decoration: underline dotted;
 }
 
 .mrerp-card-see-logs:hover {
-    color: var(--ink, #111111);
-    text-decoration: underline;
+  color: var(--ink, #111111);
+  text-decoration: underline;
 }
 
 /* ============================================================
@@ -413,7 +455,7 @@
 #endpoint-modal,
 .btn-add-endpoint,
 .erp-endpoint-card {
-    display: none !important;
+  display: none !important;
 }
 
 /* ============================================================
@@ -423,27 +465,37 @@
  * ============================================================ */
 
 @media (max-width: 800px) {
-    .mrerp-wizard {
-        width: 100%;
-        max-width: 100%;
-        height: 100%;
-        max-height: 100%;
-        border-radius: 0;
-    }
-    .mrerp-wizard-overlay { padding: 0; }
-    .mrerp-wizard-body { padding: 16px; }
-    .mrerp-wizard-checkboxes { max-height: 220px; }
-    .mrerp-wizard-foot {
-        padding: 12px 16px;
-        flex-wrap: wrap;
-    }
-    .mrerp-wizard-progress {
-        flex: 0 0 auto;
-        margin-left: 0;
-    }
+  .mrerp-wizard {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  .mrerp-wizard-overlay {
+    padding: 0;
+  }
+  .mrerp-wizard-body {
+    padding: 16px;
+  }
+  .mrerp-wizard-checkboxes {
+    max-height: 220px;
+  }
+  .mrerp-wizard-foot {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .mrerp-wizard-progress {
+    flex: 0 0 auto;
+    margin-left: 0;
+  }
 }
 
 @media (max-width: 360px) {
-    .mrerp-wizard-title { font-size: 15px; }
-    .mrerp-wizard-step-h { font-size: 13px; }
+  .mrerp-wizard-title {
+    font-size: 15px;
+  }
+  .mrerp-wizard-step-h {
+    font-size: 13px;
+  }
 }

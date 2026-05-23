@@ -25,7 +25,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 _PYDANTIC_DOC_RE = re.compile(r"https?://errors\.pydantic\.dev/\S+", re.IGNORECASE)
 _MAX_LEN = 160
 
@@ -37,6 +36,7 @@ def short_error(e: BaseException) -> str:
     """
     try:
         from pydantic import ValidationError  # local import, avoids hard dep cycle
+
         if isinstance(e, ValidationError):
             return _fmt_validation(e)
     except Exception:

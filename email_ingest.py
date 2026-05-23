@@ -14,6 +14,7 @@ Mr.Pilot · v0.17 · M6 邮箱附件抓取
 本模块本轮只做骨架 + 加密工具 · 真实抓取逻辑放到 _fetch_imap_attachments
 下一轮再接到 FastAPI 定时任务和前端接口
 """
+
 import os
 import time
 import base64
@@ -42,7 +43,9 @@ def _get_fernet():
     try:
         from cryptography.fernet import Fernet
     except ImportError:
-        logger.error("[email_ingest] cryptography 未安装 · 密码将降级 base64 明文存储(不安全 · 仅开发用)")
+        logger.error(
+            "[email_ingest] cryptography 未安装 · 密码将降级 base64 明文存储(不安全 · 仅开发用)"
+        )
         return None
 
     key = os.environ.get("EMAIL_ENCRYPTION_KEY", "").strip()
@@ -51,7 +54,7 @@ def _get_fernet():
         generated = Fernet.generate_key().decode()
         logger.error("=" * 60)
         logger.error("[email_ingest] EMAIL_ENCRYPTION_KEY 未配置!")
-        logger.error(f"请在 HF Space Secrets 中添加:")
+        logger.error("请在 HF Space Secrets 中添加:")
         logger.error(f"  EMAIL_ENCRYPTION_KEY = {generated}")
         logger.error("未配置前邮箱抓取功能将禁用")
         logger.error("=" * 60)
@@ -103,14 +106,14 @@ def is_available() -> bool:
 # IMAP 预设(主流服务的默认配置 · 前端下拉选)
 # ============================================================
 IMAP_PRESETS = {
-    "gmail":   {"host": "imap.gmail.com",         "port": 993, "ssl": True},
-    "outlook": {"host": "outlook.office365.com",  "port": 993, "ssl": True},
-    "yahoo":   {"host": "imap.mail.yahoo.com",    "port": 993, "ssl": True},
-    "icloud":  {"host": "imap.mail.me.com",       "port": 993, "ssl": True},
-    "qq":      {"host": "imap.qq.com",            "port": 993, "ssl": True},
-    "163":     {"host": "imap.163.com",           "port": 993, "ssl": True},
+    "gmail": {"host": "imap.gmail.com", "port": 993, "ssl": True},
+    "outlook": {"host": "outlook.office365.com", "port": 993, "ssl": True},
+    "yahoo": {"host": "imap.mail.yahoo.com", "port": 993, "ssl": True},
+    "icloud": {"host": "imap.mail.me.com", "port": 993, "ssl": True},
+    "qq": {"host": "imap.qq.com", "port": 993, "ssl": True},
+    "163": {"host": "imap.163.com", "port": 993, "ssl": True},
     # 通用 · 用户自填
-    "custom":  {"host": "",                       "port": 993, "ssl": True},
+    "custom": {"host": "", "port": 993, "ssl": True},
 }
 
 
@@ -193,7 +196,9 @@ def _connect_imap(account: Dict[str, Any]) -> Optional[imaplib.IMAP4]:
         return None
 
 
-def _search_unread_with_attachments(conn: imaplib.IMAP4, folder: str, since_days: int) -> List[bytes]:
+def _search_unread_with_attachments(
+    conn: imaplib.IMAP4, folder: str, since_days: int
+) -> List[bytes]:
     """搜未读邮件 · 返回 UID 列表"""
     try:
         conn.select(folder, readonly=False)
@@ -243,6 +248,7 @@ def _ingest_one_attachment(
     返回 history_id(第一条)· 失败返回 None
     """
     import db
+
     # PDF 或图片 · 图片需要先转 PDF(复用 jsPDF 方案不行 · 用 PIL + reportlab 简化:只支持 PDF)
     ext = os.path.splitext(filename.lower())[1]
     if ext != ".pdf":
@@ -259,6 +265,7 @@ def _ingest_one_attachment(
     # 页数检查(复用 ocr_engine)
     try:
         from services.ocr.pdf_utils import count_pdf_pages
+
         page_count = count_pdf_pages(content)
         if page_count == 0:
             logger.warning(f"[email_ingest] 无法解析 PDF · {filename}")
@@ -280,7 +287,9 @@ def _ingest_one_attachment(
             return None
         used = db.get_user_monthly_usage(user_id)
         if used + page_count > monthly_quota:
-            logger.warning(f"[email_ingest] 用户 {user_id} 额度不足 · 跳过 · used={used} quota={monthly_quota}")
+            logger.warning(
+                f"[email_ingest] 用户 {user_id} 额度不足 · 跳过 · used={used} quota={monthly_quota}"
+            )
             return None
 
     # 调 OCR · 新 pipeline 唯一路径
@@ -292,6 +301,7 @@ def _ingest_one_attachment(
     try:
         from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+
         _pipe_res = _pipeline_run(content, max_pages=50, api_key=api_key)
         result = pipeline_result_to_legacy_dict(_pipe_res)
         _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
@@ -333,7 +343,10 @@ def _ingest_one_attachment(
     category_tag = None
     try:
         import archive as archive_mod
-        first_main = next((p for p in pages if not p.get("is_duplicate") and not p.get("is_copy")), None)
+
+        first_main = next(
+            (p for p in pages if not p.get("is_duplicate") and not p.get("is_copy")), None
+        )
         if first_main:
             merged = first_main.get("fields") or {}
             tpl = db.get_archive_template(user_id) or archive_mod.DEFAULT_TEMPLATE
@@ -389,6 +402,7 @@ def _auto_push_if_configured(user_id: str, history_id: str):
     try:
         import db
         import erp_push
+
         auto_eps = db.list_erp_endpoints(user_id, auto_push_only=True)
         if not auto_eps:
             return
@@ -423,6 +437,8 @@ def _auto_push_if_configured(user_id: str, history_id: str):
                 db.update_history_push_status(history_id, "failed")
     except Exception as e:
         logger.warning(f"[email_ingest] 自动推送失败 (非致命): {e}")
+
+
 def run_account_ingest(account: Dict[str, Any], trigger: str = "auto") -> Dict[str, Any]:
     """
     对一个账号执行一次抓取
@@ -480,7 +496,9 @@ def run_account_ingest(account: Dict[str, Any], trigger: str = "auto") -> Dict[s
 
         # 限幅
         if len(uids) > MAX_EMAILS_PER_RUN:
-            logger.info(f"[email_ingest] 未读 {len(uids)} 封 · 本次只处理前 {MAX_EMAILS_PER_RUN} 封")
+            logger.info(
+                f"[email_ingest] 未读 {len(uids)} 封 · 本次只处理前 {MAX_EMAILS_PER_RUN} 封"
+            )
             uids = uids[:MAX_EMAILS_PER_RUN]
 
         for uid in uids:
@@ -496,7 +514,11 @@ def run_account_ingest(account: Dict[str, Any], trigger: str = "auto") -> Dict[s
                 filter_subject_str = (account.get("filter_subject") or "").strip()
                 # 发件人白名单:逗号 / 换行 / 分号 分隔 · 任意 substring 匹配
                 if filter_sender_str:
-                    senders = [s.strip().lower() for s in filter_sender_str.replace(";", ",").replace("\n", ",").split(",") if s.strip()]
+                    senders = [
+                        s.strip().lower()
+                        for s in filter_sender_str.replace(";", ",").replace("\n", ",").split(",")
+                        if s.strip()
+                    ]
                     sender_lower = (sender or "").lower()
                     if senders and not any(s in sender_lower for s in senders):
                         logger.info(f"[email_ingest] 跳过 · 发件人不在白名单: {sender[:60]}")
@@ -505,7 +527,11 @@ def run_account_ingest(account: Dict[str, Any], trigger: str = "auto") -> Dict[s
                         continue
                 # 主题关键词:任一关键词在主题里出现即通过
                 if filter_subject_str:
-                    keywords = [k.strip().lower() for k in filter_subject_str.replace(";", ",").replace("\n", ",").split(",") if k.strip()]
+                    keywords = [
+                        k.strip().lower()
+                        for k in filter_subject_str.replace(";", ",").replace("\n", ",").split(",")
+                        if k.strip()
+                    ]
                     subject_lower = (subject or "").lower()
                     if keywords and not any(k in subject_lower for k in keywords):
                         logger.info(f"[email_ingest] 跳过 · 主题不含关键词: {subject[:60]}")
@@ -523,6 +549,7 @@ def run_account_ingest(account: Dict[str, Any], trigger: str = "auto") -> Dict[s
                 result["attachments_found"] += len(attachments)
 
                 import db
+
                 for filename, content in attachments:
                     try:
                         # 幂等:如果这封邮件 UID 之前已经处理过 · 跳过
@@ -553,29 +580,35 @@ def run_account_ingest(account: Dict[str, Any], trigger: str = "auto") -> Dict[s
                             _auto_push_if_configured(account["user_id"], history_id)
                         else:
                             result["ocr_failed"] += 1
-                            result["error_details"].append({
-                                "uid": uid.decode(),
-                                "subject": subject[:80] if subject else "",
-                                "filename": filename,
-                                "error": "ocr_failed_or_skipped",
-                            })
+                            result["error_details"].append(
+                                {
+                                    "uid": uid.decode(),
+                                    "subject": subject[:80] if subject else "",
+                                    "filename": filename,
+                                    "error": "ocr_failed_or_skipped",
+                                }
+                            )
                     except Exception as e:
                         result["ocr_failed"] += 1
-                        result["error_details"].append({
-                            "uid": uid.decode() if isinstance(uid, bytes) else str(uid),
-                            "subject": (subject or "")[:80],
-                            "filename": filename,
-                            "error": f"{type(e).__name__}: {str(e)[:200]}",
-                        })
+                        result["error_details"].append(
+                            {
+                                "uid": uid.decode() if isinstance(uid, bytes) else str(uid),
+                                "subject": (subject or "")[:80],
+                                "filename": filename,
+                                "error": f"{type(e).__name__}: {str(e)[:200]}",
+                            }
+                        )
 
                 if account.get("mark_as_read", True):
                     _mark_seen(conn, uid)
 
             except Exception as e:
-                result["error_details"].append({
-                    "uid": uid.decode() if isinstance(uid, bytes) else str(uid),
-                    "error": f"{type(e).__name__}: {str(e)[:200]}",
-                })
+                result["error_details"].append(
+                    {
+                        "uid": uid.decode() if isinstance(uid, bytes) else str(uid),
+                        "error": f"{type(e).__name__}: {str(e)[:200]}",
+                    }
+                )
 
         # 粗略判决 status
         if result["ocr_failed"] > 0 and result["ocr_succeeded"] > 0:
@@ -609,9 +642,14 @@ def run_account_ingest(account: Dict[str, Any], trigger: str = "auto") -> Dict[s
 # ============================================================
 # 测试连接(给前端"测试连接"按钮用 · 只登录不抓附件)
 # ============================================================
-def test_connection(email_addr: str, password: str, imap_host: str,
-                    imap_port: int = 993, imap_use_ssl: bool = True,
-                    folder: str = "INBOX") -> Dict[str, Any]:
+def test_connection(
+    email_addr: str,
+    password: str,
+    imap_host: str,
+    imap_port: int = 993,
+    imap_use_ssl: bool = True,
+    folder: str = "INBOX",
+) -> Dict[str, Any]:
     t0 = time.time()
     result = {"success": False, "error_msg": None, "elapsed_ms": 0, "folder_count": None}
     try:

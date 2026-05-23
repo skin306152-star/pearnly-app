@@ -40,11 +40,20 @@ if "psycopg2" not in sys.modules:
     fake_pg.extras.execute_values = lambda *a, **k: None
     fake_pg.extras.Json = lambda x: x
     fake_pg.pool = types.ModuleType("psycopg2.pool")
+
     class _StubPool:
-        def __init__(self, *a, **k): pass
-        def getconn(self): raise RuntimeError("stub")
-        def putconn(self, *a, **k): pass
-        def closeall(self): pass
+        def __init__(self, *a, **k):
+            pass
+
+        def getconn(self):
+            raise RuntimeError("stub")
+
+        def putconn(self, *a, **k):
+            pass
+
+        def closeall(self):
+            pass
+
     fake_pg.pool.ThreadedConnectionPool = _StubPool
     fake_pg.pool.SimpleConnectionPool = _StubPool
     fake_pg.sql = types.ModuleType("psycopg2.sql")
@@ -92,29 +101,22 @@ class IsUserDataErrorPositiveTests(unittest.TestCase):
     def test_err_code_in_compound_message(self):
         self.assertTrue(
             DB.is_user_data_error(
-                "ERR_NO_CLIENT: history.client_id is None, "
-                "wizard 让用户先指定 Pearnly 客户"
+                "ERR_NO_CLIENT: history.client_id is None, " "wizard 让用户先指定 Pearnly 客户"
             )
         )
 
     def test_duplicate_invoice_err_code(self):
-        self.assertTrue(
-            DB.is_user_data_error("ERR_DUPLICATE_INVOICE: invoice_no 已存在")
-        )
+        self.assertTrue(DB.is_user_data_error("ERR_DUPLICATE_INVOICE: invoice_no 已存在"))
 
     def test_thai_raw_duplicate_pattern_1(self):
         # MR.ERP 报错的 raw 泰文 · 直接命中 USER_DATA_ERROR_THAI_PATTERNS
-        self.assertTrue(
-            DB.is_user_data_error("เลขที่ดังกล่าวมีอยู่ในระบบแล้ว")
-        )
+        self.assertTrue(DB.is_user_data_error("เลขที่ดังกล่าวมีอยู่ในระบบแล้ว"))
 
     def test_thai_raw_duplicate_pattern_2(self):
         self.assertTrue(DB.is_user_data_error("เลขที่เอกสารซ้ำ"))
 
     def test_thai_raw_customer_missing(self):
-        self.assertTrue(
-            DB.is_user_data_error("ไม่พบข้อมูลรหัสลูกค้า")
-        )
+        self.assertTrue(DB.is_user_data_error("ไม่พบข้อมูลรหัสลูกค้า"))
 
     def test_all_required_codes_individually(self):
         for code in UserDataErrorCodeCoverageTests.REQUIRED_CODES:
@@ -141,17 +143,11 @@ class IsUserDataErrorNegativeTests(unittest.TestCase):
 
     def test_playwright_session_expired(self):
         # session 丢失是技术错 · re-login 后能恢复
-        self.assertFalse(
-            DB.is_user_data_error(
-                "Page navigated to login.php · session expired"
-            )
-        )
+        self.assertFalse(DB.is_user_data_error("Page navigated to login.php · session expired"))
 
     def test_listing_fetch_timeout(self):
         # listing 30s × 3 retries 失败 · 不是用户数据错 · MR.ERP 慢的事
-        self.assertFalse(
-            DB.is_user_data_error("listing fetch failed: wait_for_selector timeout")
-        )
+        self.assertFalse(DB.is_user_data_error("listing fetch failed: wait_for_selector timeout"))
 
     def test_random_text(self):
         self.assertFalse(DB.is_user_data_error("totally unrelated text"))

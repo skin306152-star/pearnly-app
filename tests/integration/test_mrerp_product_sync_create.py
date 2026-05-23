@@ -26,14 +26,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp.exceptions import MRERPBusinessError   # noqa: E402
-from services.erp.mrerp_adapter import MRERPAdapter   # noqa: E402
-from services.erp.mrerp_product_sync import (   # noqa: E402
+from services.erp.exceptions import MRERPBusinessError  # noqa: E402
+from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
+from services.erp.mrerp_product_sync import (  # noqa: E402
     ItemInfo,
     MRERPProductSyncService,
 )
 
-from tests.integration._mrerp_common import require_credentials   # noqa: E402
+from tests.integration._mrerp_common import require_credentials  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,7 +42,7 @@ logging.basicConfig(
 )
 
 
-SEED_PRODUCT_CODE = "P001"   # Pepsi 500ml
+SEED_PRODUCT_CODE = "P001"  # Pepsi 500ml
 
 
 def _unique_item_name() -> str:
@@ -88,7 +88,9 @@ class ProductAutoCreateIntegrationTest(unittest.TestCase):
                     )
             except Exception as e:
                 logging.warning(
-                    "teardown delete %s raised: %s", code, e,
+                    "teardown delete %s raised: %s",
+                    code,
+                    e,
                 )
 
     def test_product_auto_create_via_seed_success(self):
@@ -104,7 +106,8 @@ class ProductAutoCreateIntegrationTest(unittest.TestCase):
 
         # Auto-create.
         out = self.svc.lookup_or_create(
-            item, mappings,
+            item,
+            mappings,
             seed_product_code=SEED_PRODUCT_CODE,
         )
 
@@ -132,7 +135,8 @@ class ProductAutoCreateIntegrationTest(unittest.TestCase):
 
         # Second call must hit L1 / cache.
         again = self.svc.lookup_or_create(
-            item, mappings,
+            item,
+            mappings,
             seed_product_code=SEED_PRODUCT_CODE,
         )
         self.assertEqual(again.product_code, out.product_code)
@@ -160,11 +164,12 @@ class ProductAutoCreateIntegrationTest(unittest.TestCase):
         item = ItemInfo(
             name=_unique_item_name(),
             tenant_id="test-tenant",
-            unit_code="PEARNLY-NONEXISTENT-UNIT-9Z",   # never matches seed
+            unit_code="PEARNLY-NONEXISTENT-UNIT-9Z",  # never matches seed
         )
         with self.assertRaises(MRERPBusinessError) as ctx:
             self.svc.lookup_or_create(
-                item, {"products": []},
+                item,
+                {"products": []},
                 seed_product_code=SEED_PRODUCT_CODE,
             )
         self.assertIn("ERR_PRODUCT_UNIT_NOT_FOUND", str(ctx.exception))
@@ -180,7 +185,8 @@ class ProductAutoCreateIntegrationTest(unittest.TestCase):
         item = ItemInfo(name=long_name, tenant_id="test-tenant")
 
         out = self.svc.lookup_or_create(
-            item, {"products": []},
+            item,
+            {"products": []},
             seed_product_code=SEED_PRODUCT_CODE,
         )
         self._created_codes.append(out.product_code)

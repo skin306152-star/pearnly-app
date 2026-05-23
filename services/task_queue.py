@@ -14,6 +14,7 @@ v118.35.0.27 · 任务队列基础架构(最小版 · 内存实现)
 - consumer worker 独立进程(systemd 加 unit)
 - 跨 uvicorn worker 共享队列
 """
+
 from __future__ import annotations
 import time
 import uuid
@@ -21,7 +22,7 @@ import logging
 import threading
 from collections import deque
 from dataclasses import dataclass, field, asdict
-from typing import Any, Callable, Dict, Optional, List
+from typing import Any, Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,9 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Task:
     id: str
-    kind: str                                  # 'ocr' / 'erp_push' / 'recon' 等
+    kind: str  # 'ocr' / 'erp_push' / 'recon' 等
     payload: Dict[str, Any]
-    state: str = "pending"                     # pending / running / done / failed
+    state: str = "pending"  # pending / running / done / failed
     attempts: int = 0
     max_attempts: int = 3
     error: str = ""
@@ -46,10 +47,10 @@ class InMemoryQueue:
     """
 
     def __init__(self, max_size: int = 10000):
-        self._pending: deque = deque()             # 待消费
-        self._running: Dict[str, Task] = {}        # 处理中
-        self._done: deque = deque(maxlen=200)      # 最近 200 条 done(给 dashboard 看)
-        self._failed: deque = deque(maxlen=200)    # 最近 200 条 failed
+        self._pending: deque = deque()  # 待消费
+        self._running: Dict[str, Task] = {}  # 处理中
+        self._done: deque = deque(maxlen=200)  # 最近 200 条 done(给 dashboard 看)
+        self._failed: deque = deque(maxlen=200)  # 最近 200 条 failed
         self._max_size = max_size
         self._lock = threading.Lock()
 
@@ -121,7 +122,7 @@ class InMemoryQueue:
             out = []
             for t in list(self._failed)[-limit:]:
                 out.append(asdict(t))
-            for t in list(self._done)[-(limit - len(out)):]:
+            for t in list(self._done)[-(limit - len(out)) :]:
                 out.append(asdict(t))
             out.sort(key=lambda x: x["updated_at"], reverse=True)
             return out[:limit]

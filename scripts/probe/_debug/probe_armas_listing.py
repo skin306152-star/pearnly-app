@@ -27,6 +27,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+
 load_dotenv(PROJECT_ROOT / ".env.local")
 
 from services.erp.mrerp_adapter import MRERPAdapter
@@ -58,36 +59,38 @@ with MRERPAdapter(
     # (<p>...code...<a href="allform.php?id=N&status=del">).
     rows = []
     pattern = re.compile(
-        r'<p\b[^>]*>(?P<body>.*?)</p>',
+        r"<p\b[^>]*>(?P<body>.*?)</p>",
         re.DOTALL,
     )
     for m in pattern.finditer(html):
         body = m.group("body")
         # Detect rows that hold customer references
-        if "allform.php?id=" in body and "armas" in m.group(0).lower() or \
-           "allform.php?id=" in body:
+        if "allform.php?id=" in body and "armas" in m.group(0).lower() or "allform.php?id=" in body:
             spans = re.findall(r"<span\b[^>]*>(.*?)</span>", body, re.DOTALL)
             del_match = re.search(
                 r'allform\.php\?id=(\d+)[^"]*status=del',
                 body,
             )
-            rows.append({
-                "spans": [
-                    re.sub(r"<[^>]+>", "", s).strip()[:80]
-                    for s in spans
-                ],
-                "delete_id": del_match.group(1) if del_match else None,
-                "raw_html_preview": body[:300].strip(),
-            })
+            rows.append(
+                {
+                    "spans": [re.sub(r"<[^>]+>", "", s).strip()[:80] for s in spans],
+                    "delete_id": del_match.group(1) if del_match else None,
+                    "raw_html_preview": body[:300].strip(),
+                }
+            )
 
     out_json = Path(__file__).parent / f"armas_listing_{ts}.json"
     out_json.write_text(
-        json.dumps({
-            "url": page.url,
-            "html_size": len(html),
-            "row_count": len(rows),
-            "rows_sample": rows[:5],
-        }, ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "url": page.url,
+                "html_size": len(html),
+                "row_count": len(rows),
+                "rows_sample": rows[:5],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
     print(f"saved {out_json.name} ({len(rows)} rows)")

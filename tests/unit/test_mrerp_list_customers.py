@@ -21,7 +21,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from erp_push import list_mrerp_customers   # noqa: E402
+from erp_push import list_mrerp_customers  # noqa: E402
 
 
 class ContractTests(unittest.TestCase):
@@ -45,19 +45,20 @@ class ContractTests(unittest.TestCase):
     def test_bad_encrypted_creds_returns_decrypt_error(self):
         # Garbage Fernet tokens — should raise InvalidToken inside
         # MRERPAdapter.from_encrypted and surface as ERR_CRED_DECRYPT.
-        r = list_mrerp_customers({
-            "username_enc": "not-a-real-fernet-token",
-            "password_enc": "not-a-real-fernet-token-either",
-            "system_url": "https://www.mrerp4sme.com",
-        })
+        r = list_mrerp_customers(
+            {
+                "username_enc": "not-a-real-fernet-token",
+                "password_enc": "not-a-real-fernet-token-either",
+                "system_url": "https://www.mrerp4sme.com",
+            }
+        )
         self.assertFalse(r["ok"])
         self.assertEqual(r["error_code"], "ERR_CRED_DECRYPT")
         self.assertIn("zh", r["error_friendly"])
 
     def test_shape_has_required_keys(self):
         r = list_mrerp_customers({})
-        for k in ("ok", "elapsed_ms", "customers", "error_code",
-                  "error_friendly", "raw_error"):
+        for k in ("ok", "elapsed_ms", "customers", "error_code", "error_friendly", "raw_error"):
             self.assertIn(k, r, f"missing key: {k}")
 
 

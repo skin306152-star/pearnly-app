@@ -24,6 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv(PROJECT_ROOT / ".env.local")
 except ImportError:
     pass
@@ -31,9 +32,7 @@ except ImportError:
 
 # Where integration-test screenshots land. Kept under docs/integrations/ so
 # Zihao can browse them like the probe artifacts.
-SCREENSHOT_ROOT = (
-    PROJECT_ROOT / "docs" / "integrations" / "screenshots" / "_tests"
-)
+SCREENSHOT_ROOT = PROJECT_ROOT / "docs" / "integrations" / "screenshots" / "_tests"
 
 
 def require_credentials() -> Tuple[str, str, str, str, str]:
@@ -75,12 +74,14 @@ def make_test_history(invoice_no: str) -> Dict[str, Any]:
         "subtotal": "100.00",
         "vat": "7.00",
         "total_amount": "107.00",
-        "items": [{
-            "name": f"PEARNLY TEST ITEM ({invoice_no})",
-            "qty": 1,
-            "unit_price": 100.00,
-            "amount": 100.00,
-        }],
+        "items": [
+            {
+                "name": f"PEARNLY TEST ITEM ({invoice_no})",
+                "qty": 1,
+                "unit_price": 100.00,
+                "amount": 100.00,
+            }
+        ],
     }
 
 
@@ -89,11 +90,13 @@ def make_test_mappings(erp_code: str) -> Dict[str, Any]:
     MR.ERP customer code. Pass '0006' for the happy path, a deliberately
     non-existent code for the business-error path."""
     return {
-        "clients": [{
-            "erp_type": "mrerp",
-            "client_id": 99,
-            "erp_code": erp_code,
-        }],
+        "clients": [
+            {
+                "erp_type": "mrerp",
+                "client_id": 99,
+                "erp_code": erp_code,
+            }
+        ],
         "accounts": [],
         "taxes": [],
         "products": [],

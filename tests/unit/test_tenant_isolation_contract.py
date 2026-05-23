@@ -55,10 +55,17 @@ def _ensure_stub_psycopg2():
     fake_pg.pool = types.ModuleType("psycopg2.pool")
 
     class _StubPool:
-        def __init__(self, *a, **k): pass
-        def getconn(self): raise RuntimeError("stub")
-        def putconn(self, *a, **k): pass
-        def closeall(self): pass
+        def __init__(self, *a, **k):
+            pass
+
+        def getconn(self):
+            raise RuntimeError("stub")
+
+        def putconn(self, *a, **k):
+            pass
+
+        def closeall(self):
+            pass
 
     fake_pg.pool.ThreadedConnectionPool = _StubPool
     fake_pg.pool.SimpleConnectionPool = _StubPool
@@ -167,8 +174,7 @@ class OcrHistoryIsolationTests(unittest.TestCase):
         sql = _all_sql(cur)
         params = _all_params(cur)
         # tenant 模式: SQL 必含 tenant 子查询
-        self.assertIn("tenant_id = %s", sql,
-                      "tenant 模式必须按 tenant 过滤 · 不能裸 user 查")
+        self.assertIn("tenant_id = %s", sql, "tenant 模式必须按 tenant 过滤 · 不能裸 user 查")
         self.assertIn(TENANT_A, [str(p) for p in params])
 
     def test_list_ocr_history_user_mode_filters_by_user(self):
@@ -177,12 +183,12 @@ class OcrHistoryIsolationTests(unittest.TestCase):
             db.list_ocr_history(USER_A, retention_days=90, tenant_id=None)
         sql = _all_sql(cur)
         params = _all_params(cur)
-        self.assertIn("user_id = %s", sql,
-                      "user 模式必须按 user_id 过滤")
+        self.assertIn("user_id = %s", sql, "user 模式必须按 user_id 过滤")
         self.assertIn(USER_A, [str(p) for p in params])
         # 不能误带 tenant_id (否则相当于绕过权限)
-        self.assertNotIn("tenant_id = %s", sql,
-                         "user 模式 SQL 不应注入 tenant 过滤(老板/员工逻辑由 caller 决定)")
+        self.assertNotIn(
+            "tenant_id = %s", sql, "user 模式 SQL 不应注入 tenant 过滤(老板/员工逻辑由 caller 决定)"
+        )
 
     def test_get_ocr_history_detail_tenant_mode(self):
         cur = _Cursor()
@@ -209,8 +215,7 @@ class OcrHistoryIsolationTests(unittest.TestCase):
         self.assertIn("DELETE FROM ocr_history", sql)
         self.assertIn("tenant_id = %s", sql)
         # 验证不存在裸 DELETE (`WHERE id = %s` 后无 AND)
-        self.assertIn("AND", sql.upper(),
-                      "delete 必须 AND 一个 scope · 不能裸 WHERE id")
+        self.assertIn("AND", sql.upper(), "delete 必须 AND 一个 scope · 不能裸 WHERE id")
 
     def test_delete_ocr_history_always_scoped_user(self):
         cur = _Cursor(rowcount=1)
@@ -246,9 +251,11 @@ class ClientsIsolationTests(unittest.TestCase):
         self.assertIn("tenant_id = %s", sql)
         self.assertIn(TENANT_A, [str(p) for p in _all_params(cur)])
         # 不能裸列所有
-        self.assertNotIn("WHERE is_active", sql.replace(" ", "").replace("\n", "")
-                         .replace("AND", "&"),
-                         "list 不能跳过 scope 直接 WHERE is_active")
+        self.assertNotIn(
+            "WHERE is_active",
+            sql.replace(" ", "").replace("\n", "").replace("AND", "&"),
+            "list 不能跳过 scope 直接 WHERE is_active",
+        )
 
     def test_list_clients_user_mode(self):
         cur = _Cursor()
@@ -305,8 +312,7 @@ class ErpEndpointsSingleUserIsolationTests(unittest.TestCase):
         sql = _all_sql(cur)
         self.assertIn("user_id = %s", sql)
         # 单 User 模式: 不应有 tenant 过滤
-        self.assertNotIn("tenant_id", sql,
-                         "erp_endpoints 单 User 模式 · 不应引入 tenant 过滤")
+        self.assertNotIn("tenant_id", sql, "erp_endpoints 单 User 模式 · 不应引入 tenant 过滤")
         self.assertIn(USER_A, [str(p) for p in _all_params(cur)])
 
     def test_get_erp_endpoint_user_only(self):
@@ -326,8 +332,9 @@ class ErpEndpointsSingleUserIsolationTests(unittest.TestCase):
             db.delete_erp_endpoint(USER_A, "ep-1")
         self.assertGreaterEqual(len(cur.executed), 2)
         for sql, _ in cur.executed:
-            self.assertIn("user_id = %s", sql,
-                          f"删 ERP 端点关联操作必须 user_id scoped · SQL: {sql[:80]}")
+            self.assertIn(
+                "user_id = %s", sql, f"删 ERP 端点关联操作必须 user_id scoped · SQL: {sql[:80]}"
+            )
 
     def test_get_default_erp_endpoint_user_only(self):
         cur = _Cursor()
@@ -424,9 +431,10 @@ class GlVatTaskIsolationTests(unittest.TestCase):
     def test_get_gl_vat_task_requires_user_id_positional(self):
         """🔴 P0 防回归: 旧签名 get_gl_vat_task(task_id) 无权限校验 ·
         现强制 user_id 是 positional · 漏传 = TypeError · 物理上不允许越权读."""
-        with self.assertRaises(TypeError,
-                               msg="get_gl_vat_task 签名必须强制 user_id "
-                                   "· 漏传必须 TypeError 防 P0 漏洞回归"):
+        with self.assertRaises(
+            TypeError,
+            msg="get_gl_vat_task 签名必须强制 user_id " "· 漏传必须 TypeError 防 P0 漏洞回归",
+        ):
             db.get_gl_vat_task(123)  # 缺 user_id
 
     def test_get_gl_vat_task_user_mode_scopes_by_user(self):
@@ -434,9 +442,11 @@ class GlVatTaskIsolationTests(unittest.TestCase):
         with _patch_cursor(cur):
             db.get_gl_vat_task(123, USER_A)
         sql = _all_sql(cur)
-        self.assertIn("user_id = %s::uuid", sql,
-                      "user 模式 get_gl_vat_task 必须 WHERE user_id "
-                      "· 否则 P0 越权读漏洞回归")
+        self.assertIn(
+            "user_id = %s::uuid",
+            sql,
+            "user 模式 get_gl_vat_task 必须 WHERE user_id " "· 否则 P0 越权读漏洞回归",
+        )
         self.assertIn("id = %s", sql)
 
     def test_get_gl_vat_task_tenant_mode_scopes_by_tenant(self):
@@ -455,8 +465,7 @@ class GlVatTaskIsolationTests(unittest.TestCase):
             db.delete_gl_vat_task(123, USER_A)
         sql = _all_sql(cur)
         self.assertIn("DELETE FROM gl_vat_task", sql)
-        self.assertIn("user_id = %s::uuid", sql,
-                      "delete_gl_vat_task 必须 user_id scoped")
+        self.assertIn("user_id = %s::uuid", sql, "delete_gl_vat_task 必须 user_id scoped")
 
     def test_delete_gl_vat_tasks_batch_scoped_by_user(self):
         cur = _Cursor(rowcount=2)
@@ -473,8 +482,7 @@ class GlVatTaskIsolationTests(unittest.TestCase):
         with _patch_cursor(cur):
             r = db.delete_gl_vat_tasks_batch(["not-a-number"], USER_A)
         self.assertEqual(r, 0)
-        self.assertEqual(len(cur.executed), 0,
-                         "全是 garbage id 时不应触发任何 DB 查询")
+        self.assertEqual(len(cur.executed), 0, "全是 garbage id 时不应触发任何 DB 查询")
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -499,8 +507,7 @@ class BankReconV2TaskIsolationTests(unittest.TestCase):
     # ────── P0 防回归 ──────
     def test_get_bank_recon_v2_task_requires_user_id_positional(self):
         """🔴 P0 防回归: 同 get_gl_vat_task · 镜像漏洞."""
-        with self.assertRaises(TypeError,
-                               msg="get_bank_recon_v2_task 必须强制 user_id"):
+        with self.assertRaises(TypeError, msg="get_bank_recon_v2_task 必须强制 user_id"):
             db.get_bank_recon_v2_task(123)  # 缺 user_id
 
     def test_get_bank_recon_v2_task_user_mode_scopes_by_user(self):
@@ -508,8 +515,7 @@ class BankReconV2TaskIsolationTests(unittest.TestCase):
         with _patch_cursor(cur):
             db.get_bank_recon_v2_task(123, USER_A)
         sql = _all_sql(cur)
-        self.assertIn("user_id = %s::uuid", sql,
-                      "user 模式必须 WHERE user_id · 防 P0 越权读回归")
+        self.assertIn("user_id = %s::uuid", sql, "user 模式必须 WHERE user_id · 防 P0 越权读回归")
         self.assertIn("id = %s", sql)
 
     def test_get_bank_recon_v2_task_tenant_mode_scopes_by_tenant(self):
@@ -557,8 +563,9 @@ class NotificationRulesIsolationTests(unittest.TestCase):
             db.list_notification_rules(USER_A, tenant_id=None)
         sql = _all_sql(cur)
         self.assertIn("user_id = %s", sql)
-        self.assertIn("tenant_id IS NULL", sql,
-                      "user 模式必须 AND tenant_id IS NULL · 三层防 NULL 注入")
+        self.assertIn(
+            "tenant_id IS NULL", sql, "user 模式必须 AND tenant_id IS NULL · 三层防 NULL 注入"
+        )
 
     def test_get_notification_rule_tenant_mode(self):
         cur = _Cursor()
@@ -580,8 +587,7 @@ class NotificationRulesIsolationTests(unittest.TestCase):
         cur = _Cursor(rowcount=1)
         with _patch_cursor(cur):
             db.delete_notification_rule(42, USER_A, tenant_id=TENANT_A)
-        delete_sqls = [s for s, _ in cur.executed
-                       if "DELETE FROM notification_rules" in s]
+        delete_sqls = [s for s, _ in cur.executed if "DELETE FROM notification_rules" in s]
         self.assertEqual(len(delete_sqls), 1)
         self.assertIn("tenant_id = %s", delete_sqls[0])
 
@@ -589,13 +595,14 @@ class NotificationRulesIsolationTests(unittest.TestCase):
         cur = _Cursor(rowcount=1)
         with _patch_cursor(cur):
             db.delete_notification_rule(42, USER_A, tenant_id=None)
-        delete_sqls = [s for s, _ in cur.executed
-                       if "DELETE FROM notification_rules" in s]
+        delete_sqls = [s for s, _ in cur.executed if "DELETE FROM notification_rules" in s]
         self.assertEqual(len(delete_sqls), 1)
         self.assertIn("user_id = %s", delete_sqls[0])
-        self.assertIn("tenant_id IS NULL", delete_sqls[0],
-                      "delete user 模式必须 AND tenant_id IS NULL"
-                      "· 防误删 owner 同 user_id 的 tenant 规则")
+        self.assertIn(
+            "tenant_id IS NULL",
+            delete_sqls[0],
+            "delete user 模式必须 AND tenant_id IS NULL" "· 防误删 owner 同 user_id 的 tenant 规则",
+        )
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -612,11 +619,8 @@ class CrossTenantNegativeTests(unittest.TestCase):
         # cursor 模拟 "tenant B 的 WHERE 不匹配" · 返 None
         cur = _Cursor(fetchone_results=[None])
         with _patch_cursor(cur):
-            r = db.get_ocr_history_detail(USER_B, "rec-owned-by-A",
-                                          tenant_id=TENANT_B)
-        self.assertIsNone(r,
-                          "DB 层未返 row · 函数必须返 None · 不能凭 record_id "
-                          "凭空构造 dict")
+            r = db.get_ocr_history_detail(USER_B, "rec-owned-by-A", tenant_id=TENANT_B)
+        self.assertIsNone(r, "DB 层未返 row · 函数必须返 None · 不能凭 record_id " "凭空构造 dict")
         # 同时验证 SQL 真的带了 tenant_B 过滤
         sql = _all_sql(cur)
         self.assertIn(TENANT_B, [str(p) for p in _all_params(cur)])
@@ -638,9 +642,9 @@ class CrossTenantNegativeTests(unittest.TestCase):
         cur = _Cursor(fetchone_results=[None])
         with _patch_cursor(cur):
             r = db.get_gl_vat_task(123, USER_B, tenant_id=TENANT_B)
-        self.assertIsNone(r,
-                          "tenant B 用户喂 tenant A 的 task_id · DB 层 WHERE "
-                          "不匹配 · 必须返 None")
+        self.assertIsNone(
+            r, "tenant B 用户喂 tenant A 的 task_id · DB 层 WHERE " "不匹配 · 必须返 None"
+        )
 
     def test_get_bank_recon_v2_task_tenant_b_cannot_read_tenant_a(self):
         """🔴 P0 核心防回归: 镜像漏洞."""
@@ -664,10 +668,8 @@ class CrossTenantNegativeTests(unittest.TestCase):
         """delete 也是 fail-safe: WHERE 不匹配 → rowcount=0 → 返 False."""
         cur = _Cursor(rowcount=0)
         with _patch_cursor(cur):
-            r = db.delete_ocr_history(USER_B, "rec-owned-by-A",
-                                      tenant_id=TENANT_B)
-        self.assertFalse(r,
-                         "跨 tenant delete 必须 WHERE 不匹配 → rowcount=0 → False")
+            r = db.delete_ocr_history(USER_B, "rec-owned-by-A", tenant_id=TENANT_B)
+        self.assertFalse(r, "跨 tenant delete 必须 WHERE 不匹配 → rowcount=0 → False")
 
     def test_delete_gl_vat_task_user_b_cannot_delete_user_a_task(self):
         cur = _Cursor(rowcount=0)
@@ -695,20 +697,18 @@ class DeleteAlwaysScopedContractTests(unittest.TestCase):
             except Exception:
                 pass  # 我们只关心 SQL shape · 不关心返回值
         delete_sqls = [s for s, _ in cur.executed if "DELETE FROM" in s.upper()]
-        self.assertGreater(len(delete_sqls), 0,
-                           f"{fn.__name__} 应该至少 issue 1 条 DELETE 语句")
+        self.assertGreater(len(delete_sqls), 0, f"{fn.__name__} 应该至少 issue 1 条 DELETE 语句")
         for sql in delete_sqls:
             self.assertTrue(
                 any(token in sql for token in self.SCOPE_TOKENS),
-                f"{fn.__name__} 的 DELETE 必须含 scope · 实际: {sql[:120]}"
+                f"{fn.__name__} 的 DELETE 必须含 scope · 实际: {sql[:120]}",
             )
 
     def test_all_delete_fns_have_scope(self):
         cases = [
             (db.delete_ocr_history, (USER_A, "rec-1"), {"tenant_id": TENANT_A}),
             (db.delete_ocr_history, (USER_A, "rec-1"), {"tenant_id": None}),
-            (db.delete_ocr_history_with_pdf_paths, (USER_A, ["rec-1"]),
-             {"tenant_id": TENANT_A}),
+            (db.delete_ocr_history_with_pdf_paths, (USER_A, ["rec-1"]), {"tenant_id": TENANT_A}),
             (db.delete_client, (USER_A, 42), {"tenant_id": TENANT_A}),
             (db.delete_client, (USER_A, 42), {"tenant_id": None}),
             (db.delete_erp_endpoint, (USER_A, "ep-1"), {}),

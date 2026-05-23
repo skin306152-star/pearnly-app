@@ -74,35 +74,52 @@ def _normalize_tin(s: str) -> Optional[str]:
 # 缓存
 # ============================================================
 
+
 def _cache_get(tax_id: str, branch: int, service: str) -> Optional[dict]:
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT payload, is_success, error_msg
                 FROM rd_cache
                 WHERE tax_id = %s AND branch_no = %s AND service = %s
                   AND expires_at > NOW()
                 LIMIT 1
-            """, (tax_id, branch, service))
+            """,
+                (tax_id, branch, service),
+            )
             row = cur.fetchone()
             if not row:
                 logger.info(f"  [RD Cache MISS] tax_id={tax_id[:6]}..., service={service}")
                 return None
             if row["is_success"]:
-                logger.info(f"  [RD Cache HIT SUCCESS] tax_id={tax_id[:6]}..., service={service}, payload={row['payload']}")
+                logger.info(
+                    f"  [RD Cache HIT SUCCESS] tax_id={tax_id[:6]}..., service={service}, payload={row['payload']}"
+                )
                 return {"ok": True, "data": row["payload"], "cached": True}
-            logger.info(f"  [RD Cache HIT FAIL] tax_id={tax_id[:6]}..., service={service}, error={row['error_msg']}")
+            logger.info(
+                f"  [RD Cache HIT FAIL] tax_id={tax_id[:6]}..., service={service}, error={row['error_msg']}"
+            )
             return {"ok": False, "error": row["error_msg"] or "cached_error", "cached": True}
     except Exception as e:
         logger.warning(f"rd_cache 读失败: {e}")
         return None
 
 
-def _cache_set(tax_id: str, branch: int, service: str, payload: Any, is_success: bool, error_msg: Optional[str] = None):
+def _cache_set(
+    tax_id: str,
+    branch: int,
+    service: str,
+    payload: Any,
+    is_success: bool,
+    error_msg: Optional[str] = None,
+):
     import json as _json
+
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO rd_cache (tax_id, branch_no, service, payload, is_success, error_msg, cached_at, expires_at)
                 VALUES (%s, %s, %s, %s::jsonb, %s, %s, NOW(), NOW() + INTERVAL '7 days')
                 ON CONFLICT (tax_id, branch_no, service)
@@ -112,7 +129,16 @@ def _cache_set(tax_id: str, branch: int, service: str, payload: Any, is_success:
                     error_msg  = EXCLUDED.error_msg,
                     cached_at  = NOW(),
                     expires_at = NOW() + INTERVAL '7 days'
-            """, (tax_id, branch, service, _json.dumps(payload, ensure_ascii=False), is_success, error_msg))
+            """,
+                (
+                    tax_id,
+                    branch,
+                    service,
+                    _json.dumps(payload, ensure_ascii=False),
+                    is_success,
+                    error_msg,
+                ),
+            )
     except Exception as e:
         logger.warning(f"rd_cache 写失败: {e}")
 
@@ -120,6 +146,7 @@ def _cache_set(tax_id: str, branch: int, service: str, payload: Any, is_success:
 # ============================================================
 # SOAP 调用 + XML 解析
 # ============================================================
+
 
 def _soap_post(url: str, body: str) -> Optional[str]:
     """发 SOAP 1.2 请求,返回 XML 字符串(失败返回 None)"""
@@ -136,7 +163,9 @@ def _soap_post(url: str, body: str) -> Optional[str]:
             last_err = f"HTTP {r.status_code}"
             # 打印请求和响应的关键信息,方便排查
             body_snippet = (r.text or "")[:400].replace("\n", " ").replace("  ", " ")
-            logger.warning(f"  RD SOAP 返回 {last_err} · 响应头={dict(r.headers)} · body={body_snippet}")
+            logger.warning(
+                f"  RD SOAP 返回 {last_err} · 响应头={dict(r.headers)} · body={body_snippet}"
+            )
         except requests.Timeout:
             last_err = "timeout"
             logger.warning(f"  RD SOAP 超时 (timeout={TIMEOUT_SEC}s)")
@@ -187,12 +216,26 @@ def _flatten_vat_response(xml_text: str) -> Optional[Dict[str, Any]]:
 
     # 所有 VAT 字段(带 v 前缀的版本是实际返回的)
     known_tags_lower = {
-        "nid", "branchnumber",
-        "branchtitlename", "branchtitle", "branchname",
-        "buildingname", "roomnumber", "floornumber", "villagename",
-        "housenumber", "moonumber", "soiname", "streetname",
-        "thumbolname", "amphurname", "provincename", "postcode",
-        "businessfirstdate", "msgerr", "messageerr",
+        "nid",
+        "branchnumber",
+        "branchtitlename",
+        "branchtitle",
+        "branchname",
+        "buildingname",
+        "roomnumber",
+        "floornumber",
+        "villagename",
+        "housenumber",
+        "moonumber",
+        "soiname",
+        "streetname",
+        "thumbolname",
+        "amphurname",
+        "provincename",
+        "postcode",
+        "businessfirstdate",
+        "msgerr",
+        "messageerr",
     }
 
     def _inner_value(elem) -> Optional[str]:
@@ -286,13 +329,16 @@ def _flatten_tin_response(xml_text: str) -> Optional[Dict[str, Any]]:
 
     # valid = 数字格式对 + 确实存在
     result["valid"] = result.get("exists", False) and result.get("digit_ok", True)
-    logger.info(f"  [RD TIN] 解析结果: valid={result['valid']}, exists={result['exists']}, raw={result['raw_tags']}")
+    logger.info(
+        f"  [RD TIN] 解析结果: valid={result['valid']}, exists={result['exists']}, raw={result['raw_tags']}"
+    )
     return result
 
 
 # ============================================================
 # 对外 API
 # ============================================================
+
 
 def verify_tin(raw_tax_id: str) -> Dict[str, Any]:
     """
@@ -320,7 +366,7 @@ def verify_tin(raw_tax_id: str) -> Dict[str, Any]:
 
     # 如果 raw_tags 为空或只有空字段,说明解析有 bug,不要缓存
     if not parsed.get("raw_tags"):
-        logger.warning(f"  [RD TIN] raw_tags 为空,可能是解析 bug,暂不缓存")
+        logger.warning("  [RD TIN] raw_tags 为空,可能是解析 bug,暂不缓存")
         return {"ok": False, "error": "parse_empty", "debug_raw": xml[:500]}
 
     _cache_set(tin, 0, "tin", parsed, True)
@@ -354,9 +400,20 @@ def lookup_vat(raw_tax_id: str, branch: int = 0) -> Dict[str, Any]:
 
     # 拼装 mr-pilot 友好的字段(给前端用)
     addr_parts = []
-    for k in ("HouseNumber", "MooNumber", "VillageName", "BuildingName",
-              "RoomNumber", "FloorNumber", "SoiName", "StreetName",
-              "ThumbolName", "AmphurName", "ProvinceName", "PostCode"):
+    for k in (
+        "HouseNumber",
+        "MooNumber",
+        "VillageName",
+        "BuildingName",
+        "RoomNumber",
+        "FloorNumber",
+        "SoiName",
+        "StreetName",
+        "ThumbolName",
+        "AmphurName",
+        "ProvinceName",
+        "PostCode",
+    ):
         v = fields.get(k, "").strip()
         if v and v != "-":
             addr_parts.append(v)

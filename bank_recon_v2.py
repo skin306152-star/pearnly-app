@@ -11,13 +11,12 @@ Export           : 4-sheet openpyxl · i18n th/en/zh/ja
 
 import io
 import re
-import os
 import json
 import logging
 import hashlib
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict
 
 # v118.35.0.3 · 包装 pipeline 抛出的 pydantic ValidationError · 不再把
 # "Input should be a valid string ... https://errors.pydantic.dev/2.13/v/..."
@@ -29,26 +28,31 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # CONSTANTS
 # ─────────────────────────────────────────────────────────────────────────────
-AMOUNT_TOL = 0.02          # baht tolerance for amount matching
-DATE_TOL_DAYS = 3          # days tolerance for layer-2 matching
-MIN_PLUMBER_ROWS = 3       # fallback to Gemini if pdfplumber yields < this
+AMOUNT_TOL = 0.02  # baht tolerance for amount matching
+DATE_TOL_DAYS = 3  # days tolerance for layer-2 matching
+MIN_PLUMBER_ROWS = 3  # fallback to Gemini if pdfplumber yields < this
 
 # v118.33.13.1 · in-memory cache for Gemini OCR results, keyed by SHA-256 of file bytes.
 # Same PDF re-uploaded -> instant. Capped at 256 entries (~80 MB worst case), LRU eviction.
 import collections as _collections
+
 _GEMINI_STMT_CACHE: "_collections.OrderedDict[str, Dict[str, Any]]" = _collections.OrderedDict()
-_GEMINI_GL_CACHE:   "_collections.OrderedDict[str, Dict[str, Any]]" = _collections.OrderedDict()
+_GEMINI_GL_CACHE: "_collections.OrderedDict[str, Dict[str, Any]]" = _collections.OrderedDict()
 _GEMINI_CACHE_MAX = 256
 
-def _cache_get(cache: "_collections.OrderedDict[str, Dict[str, Any]]",
-               key: str) -> Optional[Dict[str, Any]]:
+
+def _cache_get(
+    cache: "_collections.OrderedDict[str, Dict[str, Any]]", key: str
+) -> Optional[Dict[str, Any]]:
     if key in cache:
         cache.move_to_end(key)
         return cache[key]
     return None
 
-def _cache_put(cache: "_collections.OrderedDict[str, Dict[str, Any]]",
-               key: str, value: Dict[str, Any]) -> None:
+
+def _cache_put(
+    cache: "_collections.OrderedDict[str, Dict[str, Any]]", key: str, value: Dict[str, Any]
+) -> None:
     cache[key] = value
     cache.move_to_end(key)
     while len(cache) > _GEMINI_CACHE_MAX:
@@ -61,8 +65,10 @@ def _cache_put(cache: "_collections.OrderedDict[str, Dict[str, Any]]",
 # 目录可用 PEARNLY_OCR_CACHE_DIR 覆盖 · 默认 cwd/.ocr_cache(生产 /opt/mrpilot · 跨重启持久)。
 import os as _os
 import json as _json
-_OCR_DISK_CACHE_DIR = (_os.environ.get("PEARNLY_OCR_CACHE_DIR", "").strip()
-                       or _os.path.join(_os.getcwd(), ".ocr_cache"))
+
+_OCR_DISK_CACHE_DIR = _os.environ.get("PEARNLY_OCR_CACHE_DIR", "").strip() or _os.path.join(
+    _os.getcwd(), ".ocr_cache"
+)
 
 
 def _disk_cache_path(key: str) -> str:
@@ -88,39 +94,78 @@ def _disk_cache_put(key: str, value: Dict[str, Any]) -> None:
         tmp = p + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             _json.dump(value, f, ensure_ascii=False)
-        _os.replace(tmp, p)   # 原子替换 · 防并发写半截
+        _os.replace(tmp, p)  # 原子替换 · 防并发写半截
     except Exception:
         pass
 
+
 # Thai month names (full + abbreviated)
 _TH_MONTHS = {
-    "มกราคม": 1, "กุมภาพันธ์": 2, "มีนาคม": 3, "เมษายน": 4,
-    "พฤษภาคม": 5, "มิถุนายน": 6, "กรกฎาคม": 7, "สิงหาคม": 8,
-    "กันยายน": 9, "ตุลาคม": 10, "พฤศจิกายน": 11, "ธันวาคม": 12,
-    "ม.ค.": 1, "ก.พ.": 2, "มี.ค.": 3, "เม.ย.": 4, "พ.ค.": 5,
-    "มิ.ย.": 6, "ก.ค.": 7, "ส.ค.": 8, "ก.ย.": 9, "ต.ค.": 10,
-    "พ.ย.": 11, "ธ.ค.": 12,
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    "มกราคม": 1,
+    "กุมภาพันธ์": 2,
+    "มีนาคม": 3,
+    "เมษายน": 4,
+    "พฤษภาคม": 5,
+    "มิถุนายน": 6,
+    "กรกฎาคม": 7,
+    "สิงหาคม": 8,
+    "กันยายน": 9,
+    "ตุลาคม": 10,
+    "พฤศจิกายน": 11,
+    "ธันวาคม": 12,
+    "ม.ค.": 1,
+    "ก.พ.": 2,
+    "มี.ค.": 3,
+    "เม.ย.": 4,
+    "พ.ค.": 5,
+    "มิ.ย.": 6,
+    "ก.ค.": 7,
+    "ส.ค.": 8,
+    "ก.ย.": 9,
+    "ต.ค.": 10,
+    "พ.ย.": 11,
+    "ธ.ค.": 12,
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
 }
 
 # Bank detection keywords
 _BANK_SIGNATURES = {
-    "kbank":  ["กสิกรไทย", "kasikorn", "kbank", "k-bank"],
-    "bbl":    ["กรุงเทพ", "bangkok bank", "bbl"],
-    "kkp":    ["เกียรตินาคิน", "kiatnakin", "kkp"],
-    "ktb":    ["กรุงไทย", "krungthai", "ktb"],
-    "scb":    ["ไทยพาณิชย์", "siam commercial", "scb"],
-    "bay":    ["กรุงศรี", "bank of ayudhya", "bay", "krungsri"],
-    "tmb":    ["ทหารไทย", "tmbthanachart", "ttb"],
+    "kbank": ["กสิกรไทย", "kasikorn", "kbank", "k-bank"],
+    "bbl": ["กรุงเทพ", "bangkok bank", "bbl"],
+    "kkp": ["เกียรตินาคิน", "kiatnakin", "kkp"],
+    "ktb": ["กรุงไทย", "krungthai", "ktb"],
+    "scb": ["ไทยพาณิชย์", "siam commercial", "scb"],
+    "bay": ["กรุงศรี", "bank of ayudhya", "bay", "krungsri"],
+    "tmb": ["ทหารไทย", "tmbthanachart", "ttb"],
 }
 
 # GL skip rows
 _GL_SKIP_KW = {
-    "ยอดยกมา", "ยอดยกไป", "ยอดรวม", "balance forward", "carried forward",
-    "brought forward", "subtotal", "opening balance", "closing balance",
-    "รวมประจำเดือน", "รวมทั้งสิ้น", "รวมแต่ละหน้า",
+    "ยอดยกมา",
+    "ยอดยกไป",
+    "ยอดรวม",
+    "balance forward",
+    "carried forward",
+    "brought forward",
+    "subtotal",
+    "opening balance",
+    "closing balance",
+    "รวมประจำเดือน",
+    "รวมทั้งสิ้น",
+    "รวมแต่ละหน้า",
 }
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DATA CLASSES
@@ -129,15 +174,15 @@ _GL_SKIP_KW = {
 class StatementRow:
     date: Optional[date]
     description: str
-    withdrawal: float        # money out (≥ 0)
-    deposit: float           # money in (≥ 0)
+    withdrawal: float  # money out (≥ 0)
+    deposit: float  # money in (≥ 0)
     balance: float
     source_file: str = ""
-    account_no: str = ""     # v118.35.0.61 · 所属账户(多账户文件分账户对账/校验用)
-    row_hash: str = ""       # for deduplication
+    account_no: str = ""  # v118.35.0.61 · 所属账户(多账户文件分账户对账/校验用)
+    row_hash: str = ""  # for deduplication
     # v118.33.13.0 · accuracy verification fields
-    confidence: str = "high"          # 'high'|'medium'|'low' (set by OCR engine)
-    balance_ok: Optional[bool] = None # True/False (arithmetic verified)/None (cannot verify)
+    confidence: str = "high"  # 'high'|'medium'|'low' (set by OCR engine)
+    balance_ok: Optional[bool] = None  # True/False (arithmetic verified)/None (cannot verify)
     # v118.35.0.50 · 系统按余额涨跌自动校正了借贷方向(OCR 把提款/存款列读反)· 让 UI/Excel 透明标注
     direction_autocorrected: bool = False
     # v118.35.0.62 · 系统按前后余额反推 · 自动修正了读错的金额(差异小 + 前后余额都对得上才动)
@@ -147,8 +192,10 @@ class StatementRow:
         if not self.row_hash:
             # v118.35.0.49 · 哈希含余额 · 防同日/同额/同描述的两笔合法交易被误判重复删掉
             # (真实案例 KKP 30/12 两笔一样的 SWD 65,573.75 · 余额不同 = 不同笔)
-            key = (f"{self.account_no}|{self.date}|{self.withdrawal:.2f}|{self.deposit:.2f}"
-                   f"|{self.balance:.2f}|{self.description[:40]}")
+            key = (
+                f"{self.account_no}|{self.date}|{self.withdrawal:.2f}|{self.deposit:.2f}"
+                f"|{self.balance:.2f}|{self.description[:40]}"
+            )
             self.row_hash = hashlib.md5(key.encode()).hexdigest()[:12]
 
 
@@ -158,20 +205,22 @@ class GlRow:
     doc_no: str
     account_code: str
     description: str
-    debit: float             # money out (≥ 0)
-    credit: float            # money in (≥ 0)
+    debit: float  # money out (≥ 0)
+    credit: float  # money in (≥ 0)
     source_file: str = ""
     row_hash: str = ""
 
     def __post_init__(self):
         if not self.row_hash:
-            key = f"{self.date}|{self.doc_no}|{self.account_code}|{self.debit:.2f}|{self.credit:.2f}"
+            key = (
+                f"{self.date}|{self.doc_no}|{self.account_code}|{self.debit:.2f}|{self.credit:.2f}"
+            )
             self.row_hash = hashlib.md5(key.encode()).hexdigest()[:12]
 
 
 @dataclass
 class BankReconRow:
-    match_status: str        # matched|gl_debit_only|gl_credit_only|stmt_withdrawal_only|stmt_deposit_only
+    match_status: str  # matched|gl_debit_only|gl_credit_only|stmt_withdrawal_only|stmt_deposit_only
     match_layer: Optional[int]  # 1=exact, 2=date_tol, 3=amount_only, None=unmatched
     # Statement side
     stmt_date: Optional[date] = None
@@ -191,7 +240,7 @@ class BankReconRow:
     source_stmt_file: str = ""
     source_gl_file: str = ""
     # v118.33.13.0 · OCR accuracy verification (from StatementRow)
-    stmt_confidence: str = "high"        # 'high'|'medium'|'low'
+    stmt_confidence: str = "high"  # 'high'|'medium'|'low'
     stmt_balance_ok: Optional[bool] = None  # True/False/None
     # v118.35.0.62 · 系统按余额自动修正过本行(金额或方向)· 透明标注让用户知情可复核
     stmt_autocorrected: bool = False
@@ -223,9 +272,9 @@ class BankReconSummary:
     stmt_withdrawal_only_amount: float = 0.0
     stmt_deposit_only_amount: float = 0.0
     # Reconciliation check
-    opening_diff: float = 0.0     # stmt_opening - gl_opening
-    formula_stmt_closing: float = 0.0   # calculated from formula
-    formula_diff: float = 0.0           # stmt_closing - formula_stmt_closing (ideally 0)
+    opening_diff: float = 0.0  # stmt_opening - gl_opening
+    formula_stmt_closing: float = 0.0  # calculated from formula
+    formula_diff: float = 0.0  # stmt_closing - formula_stmt_closing (ideally 0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -245,10 +294,10 @@ def _to_float(val) -> float:
         neg = True
         s = s[1:]
     # Handle Thai dot-as-thousands-separator: "115.586.50" → "115586.50"
-    dot_count = s.count('.')
+    dot_count = s.count(".")
     if dot_count > 1:
-        last_dot = s.rfind('.')
-        s = s[:last_dot].replace('.', '') + s[last_dot:]
+        last_dot = s.rfind(".")
+        s = s[:last_dot].replace(".", "") + s[last_dot:]
     try:
         v = round(float(s), 2)
         return -v if neg else v
@@ -403,7 +452,7 @@ def _parse_kbank_pages(tables: List) -> Tuple[List[StatementRow], float, float]:
         if header_idx is None or col_date < 0:
             continue
 
-        for row in table[header_idx + 1:]:
+        for row in table[header_idx + 1 :]:
             if not row or len(row) <= max(col_date, col_bal):
                 continue
             raw_date = str(row[col_date] or "").strip()
@@ -428,8 +477,11 @@ def _parse_kbank_pages(tables: List) -> Tuple[List[StatementRow], float, float]:
             if not opening and rows:
                 pass  # will compute from first balance - first txn
             closing = bal
-            rows.append(StatementRow(date=d, description=desc,
-                                     withdrawal=abs(wd), deposit=abs(dep), balance=bal))
+            rows.append(
+                StatementRow(
+                    date=d, description=desc, withdrawal=abs(wd), deposit=abs(dep), balance=bal
+                )
+            )
     # Infer opening from first transaction
     if rows and opening == 0.0:
         first = rows[0]
@@ -461,7 +513,10 @@ def _parse_bbl_pages(tables: List) -> Tuple[List[StatementRow], float, float]:
                 for j, c in enumerate(cells):
                     if any(k in c for k in ["วันที่", "date", "tran date"]) and col_date < 0:
                         col_date = j
-                    if any(k in c for k in ["รายการ", "description", "particular", "detail"]) and col_desc < 0:
+                    if (
+                        any(k in c for k in ["รายการ", "description", "particular", "detail"])
+                        and col_desc < 0
+                    ):
                         col_desc = j
                     if any(k in c for k in ["ถอน", "debit", "withdrawal"]) and col_wd < 0:
                         col_wd = j
@@ -474,14 +529,16 @@ def _parse_bbl_pages(tables: List) -> Tuple[List[StatementRow], float, float]:
         if header_idx is None or col_date < 0:
             continue
 
-        for row in table[header_idx + 1:]:
+        for row in table[header_idx + 1 :]:
             if not row:
                 continue
             raw_date = str(row[col_date] if col_date < len(row) else "").strip()
             if not raw_date:
                 continue
             desc = str(row[col_desc] if col_desc >= 0 and col_desc < len(row) else "").strip()
-            if any(kw in desc.lower() for kw in ["ยอดยกมา", "ยอดนำมา", "brought forward", "opening"]):
+            if any(
+                kw in desc.lower() for kw in ["ยอดยกมา", "ยอดนำมา", "brought forward", "opening"]
+            ):
                 bal = _to_float(row[col_bal] if col_bal >= 0 and col_bal < len(row) else 0)
                 if not opening:
                     opening = bal
@@ -495,8 +552,11 @@ def _parse_bbl_pages(tables: List) -> Tuple[List[StatementRow], float, float]:
             if wd == 0.0 and dep == 0.0:
                 continue
             closing = bal
-            rows.append(StatementRow(date=d, description=desc,
-                                     withdrawal=abs(wd), deposit=abs(dep), balance=bal))
+            rows.append(
+                StatementRow(
+                    date=d, description=desc, withdrawal=abs(wd), deposit=abs(dep), balance=bal
+                )
+            )
 
     if rows and opening == 0.0:
         first = rows[0]
@@ -529,7 +589,9 @@ def _parse_generic_pages(tables: List) -> Tuple[List[StatementRow], float, float
                 for j, c in enumerate(cells):
                     if col_date < 0 and any(k in c for k in ["date", "วันที่", "วัน"]):
                         col_date = j
-                    elif col_desc < 0 and any(k in c for k in ["desc", "รายการ", "detail", "particular"]):
+                    elif col_desc < 0 and any(
+                        k in c for k in ["desc", "รายการ", "detail", "particular"]
+                    ):
                         col_desc = j
                     elif col_wd < 0 and any(k in c for k in ["withdraw", "debit", "ถอน", "จ่าย"]):
                         col_wd = j
@@ -542,7 +604,7 @@ def _parse_generic_pages(tables: List) -> Tuple[List[StatementRow], float, float
         if col_date < 0:
             continue
 
-        for row in table[header_idx + 1:]:
+        for row in table[header_idx + 1 :]:
             if not row or len(row) < 3:
                 continue
             raw_date = str(row[col_date] if col_date < len(row) else "").strip()
@@ -556,8 +618,11 @@ def _parse_generic_pages(tables: List) -> Tuple[List[StatementRow], float, float
             if wd == 0.0 and dep == 0.0:
                 continue
             closing = bal
-            rows.append(StatementRow(date=d, description=desc,
-                                     withdrawal=abs(wd), deposit=abs(dep), balance=bal))
+            rows.append(
+                StatementRow(
+                    date=d, description=desc, withdrawal=abs(wd), deposit=abs(dep), balance=bal
+                )
+            )
 
     if rows and opening == 0.0 and rows[0].balance != 0.0:
         first = rows[0]
@@ -583,23 +648,23 @@ def _parse_stmt_text_lines(
     prev_balance: Optional[float] = None
 
     def _tok_to_float(tok: str) -> Optional[float]:
-        s = tok.replace(',', '').replace(' ', '')
+        s = tok.replace(",", "").replace(" ", "")
         if not s:
             return None
-        neg = s.startswith('-')
+        neg = s.startswith("-")
         if neg:
             s = s[1:]
-        dot_count = s.count('.')
+        dot_count = s.count(".")
         if dot_count > 1:
-            last_dot = s.rfind('.')
-            s = s[:last_dot].replace('.', '') + s[last_dot:]
+            last_dot = s.rfind(".")
+            s = s[:last_dot].replace(".", "") + s[last_dot:]
         try:
             v = float(s)
             return -v if neg else v
         except ValueError:
             return None
 
-    _DATE_PREFIX = re.compile(r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$')
+    _DATE_PREFIX = re.compile(r"^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$")
 
     for line in text.splitlines():
         line = line.strip()
@@ -682,7 +747,9 @@ def _parse_stmt_text_lines(
             else:
                 # Balance delta doesn't match amount exactly — use description hints
                 desc_low = desc.lower()
-                if any(kw in desc_low for kw in ["จ่าย", "ถอน", "debit", "withdraw", "โอนออก", "ชำระ"]):
+                if any(
+                    kw in desc_low for kw in ["จ่าย", "ถอน", "debit", "withdraw", "โอนออก", "ชำระ"]
+                ):
                     withdrawal = amount
                 else:
                     deposit = amount
@@ -693,10 +760,15 @@ def _parse_stmt_text_lines(
         prev_balance = balance
         closing = balance
 
-        rows.append(StatementRow(
-            date=d, description=desc,
-            withdrawal=withdrawal, deposit=deposit, balance=balance,
-        ))
+        rows.append(
+            StatementRow(
+                date=d,
+                description=desc,
+                withdrawal=withdrawal,
+                deposit=deposit,
+                balance=balance,
+            )
+        )
 
     if not opening and rows:
         first = rows[0]
@@ -709,7 +781,6 @@ def _parse_stmt_text_lines(
         closing = rows[-1].balance
 
     return rows, opening, closing
-
 
 
 def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, float]:
@@ -730,8 +801,8 @@ def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, flo
     """
     lines = [l.strip() for l in text.splitlines() if l.strip()]
 
-    DATE_RE = re.compile(r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$')
-    TIME_RE = re.compile(r'^\d{1,2}:\d{2}$')
+    DATE_RE = re.compile(r"^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$")
+    TIME_RE = re.compile(r"^\d{1,2}:\d{2}$")
 
     # Headers start at the FIRST date line in the document
     hdr_start = 0
@@ -743,7 +814,7 @@ def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, flo
     # 3 summary numbers — closing balance, total withdrawal, total deposit)
     val_start = hdr_start
     for i, line in enumerate(lines):
-        if 'รายละเอียด' in line and i > 0:
+        if "รายละเอียด" in line and i > 0:
             val_start = i + 1
             break
 
@@ -752,12 +823,12 @@ def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, flo
     data = hdr_data  # used by header extraction below
 
     def _is_num(s: str) -> bool:
-        s = s.replace(',', '').replace(' ', '').lstrip('-')
+        s = s.replace(",", "").replace(" ", "").lstrip("-")
         if not s:
             return False
-        if s.count('.') > 1:
-            last = s.rfind('.')
-            s = s[:last].replace('.', '') + s[last:]
+        if s.count(".") > 1:
+            last = s.rfind(".")
+            s = s[:last].replace(".", "") + s[last:]
         try:
             float(s)
             return True
@@ -773,18 +844,18 @@ def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, flo
             if d_obj is None:
                 i += 1
                 continue
-            time_str = ''
-            desc = ''
+            time_str = ""
+            desc = ""
             j = i + 1
             if j < len(data) and TIME_RE.match(data[j]):
                 time_str = data[j]
                 j += 1
             if j < len(data) and not DATE_RE.match(data[j]):
-                first_tok = data[j].split()[0] if data[j].split() else ''
+                first_tok = data[j].split()[0] if data[j].split() else ""
                 if not _is_num(first_tok):
                     desc = data[j]
                     j += 1
-            headers.append({'date': d_obj, 'time': time_str, 'desc': desc})
+            headers.append({"date": d_obj, "time": time_str, "desc": desc})
             i = j
         else:
             i += 1
@@ -802,35 +873,35 @@ def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, flo
         if v is None:
             continue
         if len(toks) == 1:
-            values.append(('num', v, ''))
+            values.append(("num", v, ""))
         else:
-            rest = ' '.join(toks[1:])
-            values.append(('bal', v, rest))
+            rest = " ".join(toks[1:])
+            values.append(("bal", v, rest))
 
     # Phase 3: pattern-match opening then alternating amt/bal
     opening = 0.0
     pairs = []
-    state = 'opening'
+    state = "opening"
     cur_amt = None
     for kind, val, rest in values:
-        if state == 'opening':
-            if kind == 'num':
+        if state == "opening":
+            if kind == "num":
                 opening = val
-                state = 'amt'
-        elif state == 'amt':
-            if kind == 'num':
+                state = "amt"
+        elif state == "amt":
+            if kind == "num":
                 cur_amt = val
-                state = 'bal'
-        elif state == 'bal':
-            if kind == 'bal':
+                state = "bal"
+        elif state == "bal":
+            if kind == "bal":
                 pairs.append((cur_amt, val, rest))
                 cur_amt = None
-                state = 'amt'
-            elif kind == 'num':
+                state = "amt"
+            elif kind == "num":
                 cur_amt = val
 
     # Phase 4: drop first header if it's the opening (no time)
-    if headers and not headers[0]['time']:
+    if headers and not headers[0]["time"]:
         headers = headers[1:]
 
     # Phase 5: build StatementRows by zipping headers with pairs
@@ -850,10 +921,10 @@ def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, flo
         elif abs(diff + amt) <= AMOUNT_TOL:
             wd = amt
         else:
-            text_blob = (h['desc'] + ' ' + channel).lower()
-            if ('รับโอน' in text_blob) or ('ฝาก' in text_blob and 'ฝากด้วยเช็ค' not in text_blob):
+            text_blob = (h["desc"] + " " + channel).lower()
+            if ("รับโอน" in text_blob) or ("ฝาก" in text_blob and "ฝากด้วยเช็ค" not in text_blob):
                 dep = amt
-            elif ('โอนเงิน' in text_blob) or ('ถอน' in text_blob) or ('จ่าย' in text_blob):
+            elif ("โอนเงิน" in text_blob) or ("ถอน" in text_blob) or ("จ่าย" in text_blob):
                 wd = amt
             else:
                 if diff > 0:
@@ -861,16 +932,18 @@ def _parse_kbank_text_columns(text: str) -> Tuple[List[StatementRow], float, flo
                 else:
                     wd = amt
         prev_balance = bal
-        full_desc = h['desc']
+        full_desc = h["desc"]
         if channel:
-            full_desc = (full_desc + ' ' + channel).strip()
-        rows.append(StatementRow(
-            date=h['date'],
-            description=full_desc,
-            withdrawal=wd,
-            deposit=dep,
-            balance=bal,
-        ))
+            full_desc = (full_desc + " " + channel).strip()
+        rows.append(
+            StatementRow(
+                date=h["date"],
+                description=full_desc,
+                withdrawal=wd,
+                deposit=dep,
+                balance=bal,
+            )
+        )
 
     closing = rows[-1].balance if rows else 0.0
     return rows, opening, closing
@@ -901,9 +974,14 @@ def _stmt_bad_ratio(rows: List["StatementRow"], opening: float) -> float:
             pv = r.balance  # 无动行 · 更新 prev
             continue
         if r.balance == 0.0:
-            bad += 1; total += 1; pv = r.balance; continue  # 有金额却余额=0 · 几乎肯定没读到余额列
+            bad += 1
+            total += 1
+            pv = r.balance
+            continue  # 有金额却余额=0 · 几乎肯定没读到余额列
         if not first_seen and not opening_reliable:
-            first_seen = True; pv = r.balance; continue  # 续页首笔无可靠 prev · 不计
+            first_seen = True
+            pv = r.balance
+            continue  # 续页首笔无可靠 prev · 不计
         first_seen = True
         delta = round(r.balance - pv, 2)
         if abs(abs(delta) - amt) > 1.0:
@@ -916,11 +994,11 @@ def _stmt_bad_ratio(rows: List["StatementRow"], opening: float) -> float:
 # ─────────────────────────────────────────────────────────────────────────────
 # v118.35.0.66 · 坐标感知内嵌文本解析(密集多页文本 PDF 漏读根治 · 免费 + 确定性)
 # ─────────────────────────────────────────────────────────────────────────────
-_COORD_WD_KW  = ("ถอนเงิน", "ถอน", "withdrawal", "withdraw", "debit")
+_COORD_WD_KW = ("ถอนเงิน", "ถอน", "withdrawal", "withdraw", "debit")
 _COORD_DEP_KW = ("ฝากเงิน", "ฝาก", "deposit", "credit")
 _COORD_BAL_KW = ("ยอดเงินในบัญชี", "ยอดคงเหลือ", "balance", "คงเหลือ")
-_COORD_DATE   = re.compile(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$")
-_COORD_AMT    = re.compile(r"^\(?-?[\d,]+\.\d{2}\)?-?$")
+_COORD_DATE = re.compile(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$")
+_COORD_AMT = re.compile(r"^\(?-?[\d,]+\.\d{2}\)?-?$")
 
 
 def _coord_amt(tok: str) -> float:
@@ -936,9 +1014,11 @@ def _coord_find_columns(words):
     『ถอนเงิน / ฝากเงิน』合并列 · 无法靠 x 区分)返回 None · 交回上层走原路径/Gemini。
 
     用 y 容差(<8px)聚合表头词 · 不用固定分箱(泰文/拉丁字形上沿不同会被错分到相邻箱)。"""
-    kw: list = []   # (y0, kind, x_center)
+    kw: list = []  # (y0, kind, x_center)
     for w in words:
-        t = w[4]; tl = t.lower(); cx = (w[0] + w[2]) / 2
+        t = w[4]
+        tl = t.lower()
+        cx = (w[0] + w[2]) / 2
         if any(k in t or k in tl for k in _COORD_BAL_KW):
             kw.append((w[1], "bal", cx))
         elif any(k in t or k in tl for k in _COORD_WD_KW):
@@ -949,11 +1029,11 @@ def _coord_find_columns(words):
     for y0, _k0, _c0 in kw:
         cols: Dict[str, float] = {}
         for y1, k1, c1 in kw:
-            if abs(y1 - y0) < 8 and k1 not in cols:   # 同一表头行(y 容差)
+            if abs(y1 - y0) < 8 and k1 not in cols:  # 同一表头行(y 容差)
                 cols[k1] = c1
         if "bal" in cols and ("wd" in cols or "dep" in cols):
             if "wd" in cols and "dep" in cols and abs(cols["wd"] - cols["dep"]) < 20:
-                return None      # 存取合并列 · x 无法区分 · 放弃
+                return None  # 存取合并列 · x 无法区分 · 放弃
             return cols
     return None
 
@@ -996,8 +1076,9 @@ def _coords_by_xcluster(doc):
     thr = max(5, len(amt_centers) * 0.02)
     sig = [c for c in clusters if c[1] >= thr]
     if len(sig) < 2:
-        return [], 0.0, 0.0          # 至少要『金额列 + 余额列』
-    bal_c = sig[-1]; amt_cs = sig[:-1]
+        return [], 0.0, 0.0  # 至少要『金额列 + 余额列』
+    bal_c = sig[-1]
+    amt_cs = sig[:-1]
 
     def in_bal(x):
         return bal_c[2] - 6 <= x <= bal_c[3] + 6
@@ -1014,18 +1095,20 @@ def _coords_by_xcluster(doc):
             paired = [a for a in amts if in_amt(a[0]) and abs(a[1] - by) < 5]
             if not paired:
                 if prev is None:
-                    prev = b             # 期初 B/F(无配对金额)· 设基准
+                    prev = b  # 期初 B/F(无配对金额)· 设基准
                 continue
             amt = abs(_coord_amt(paired[0][2]))
             dt = [x for x in dates if abs(x[1] - by) < 6]
             d = _parse_date(dt[0][2]) if dt else None
             # 方向按余额涨跌(prev 未知时暂记存款 · 交 _correct_direction 兜底)
             if prev is not None and b < prev:
-                rows.append(StatementRow(date=d, description="", withdrawal=amt,
-                                         deposit=0.0, balance=b))
+                rows.append(
+                    StatementRow(date=d, description="", withdrawal=amt, deposit=0.0, balance=b)
+                )
             else:
-                rows.append(StatementRow(date=d, description="", withdrawal=0.0,
-                                         deposit=amt, balance=b))
+                rows.append(
+                    StatementRow(date=d, description="", withdrawal=0.0, deposit=amt, balance=b)
+                )
             prev = b
     if len(rows) < MIN_PLUMBER_ROWS:
         return [], 0.0, 0.0
@@ -1041,17 +1124,20 @@ def _coords_by_header(doc):
     cols = None
     rows: List[StatementRow] = []
     for pno in range(doc.page_count):
-        words = doc[pno].get_text("words")   # (x0,y0,x1,y1,text,block,line,word)
+        words = doc[pno].get_text("words")  # (x0,y0,x1,y1,text,block,line,word)
         pg_cols = _coord_find_columns(words)
         if pg_cols:
-            cols = pg_cols                   # 每页若有表头就刷新 · 否则沿用上一页
+            cols = pg_cols  # 每页若有表头就刷新 · 否则沿用上一页
         if not cols:
             continue
         bal_x = cols["bal"]
         dates = sorted([(w[1], w[4]) for w in words if _COORD_DATE.match(w[4])])
         amts = [((w[0] + w[2]) / 2, w[1], w[4]) for w in words if _COORD_AMT.match(w[4])]
-        texts = [(w[0], w[1], w[4]) for w in words
-                 if not _COORD_AMT.match(w[4]) and not _COORD_DATE.match(w[4])]
+        texts = [
+            (w[0], w[1], w[4])
+            for w in words
+            if not _COORD_AMT.match(w[4]) and not _COORD_DATE.match(w[4])
+        ]
         for i, (dy, dval) in enumerate(dates):
             d = _parse_date(dval)
             if d is None:
@@ -1059,8 +1145,9 @@ def _coords_by_header(doc):
             nxt = dates[i + 1][0] if i + 1 < len(dates) else dy + 9999
             near = [a for a in amts if abs(a[1] - dy) < 14]
             if not near:
-                continue                     # 表头日期范围 / 无金额行 · 跳过
-            wd = dep = 0.0; bal = None
+                continue  # 表头日期范围 / 无金额行 · 跳过
+            wd = dep = 0.0
+            bal = None
             for cx, _y, v in near:
                 col = min(cols, key=lambda k: abs(cols[k] - cx))
                 if col == "bal":
@@ -1070,13 +1157,20 @@ def _coords_by_header(doc):
                 else:
                     dep = abs(_coord_amt(v))
             if wd == 0.0 and dep == 0.0:
-                continue                     # 只有余额没动额(期初/小计)· 不当交易
+                continue  # 只有余额没动额(期初/小计)· 不当交易
             # 描述:本行 y 区间内、余额列右侧的文字 token 拼接(best-effort)
-            desc = " ".join(t for x, y, t in texts
-                            if dy - 2 <= y < nxt - 2 and x > bal_x + 15)[:120]
-            rows.append(StatementRow(date=d, description=desc, withdrawal=wd,
-                                     deposit=dep,
-                                     balance=bal if bal is not None else 0.0))
+            desc = " ".join(t for x, y, t in texts if dy - 2 <= y < nxt - 2 and x > bal_x + 15)[
+                :120
+            ]
+            rows.append(
+                StatementRow(
+                    date=d,
+                    description=desc,
+                    withdrawal=wd,
+                    deposit=dep,
+                    balance=bal if bal is not None else 0.0,
+                )
+            )
     if len(rows) < MIN_PLUMBER_ROWS:
         return [], 0.0, 0.0
     fr = rows[0]
@@ -1100,6 +1194,7 @@ def _parse_stmt_text_coords(file_bytes: bytes):
     """
     try:
         import fitz
+
         doc = fitz.open(stream=file_bytes, filetype="pdf")
     except Exception:
         return [], 0.0, 0.0
@@ -1119,9 +1214,7 @@ def _parse_stmt_text_coords(file_bytes: bytes):
     return rows, opening, closing
 
 
-def parse_bank_statement_pdf(
-    file_bytes: bytes, filename: str, api_key: str = ""
-) -> Dict[str, Any]:
+def parse_bank_statement_pdf(file_bytes: bytes, filename: str, api_key: str = "") -> Dict[str, Any]:
     """
     Parse a bank statement.
 
@@ -1135,6 +1228,7 @@ def parse_bank_statement_pdf(
     Strategy for PDF: (1) safe text extraction (2) pdfplumber tables (3) text-line fallback (4) Gemini
     """
     import os as _os
+
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     if ext != "pdf":
         return _parse_bank_stmt_via_pipeline(file_bytes, filename)
@@ -1157,20 +1251,26 @@ def parse_bank_statement_pdf(
     all_text = "\n".join(page_texts)
     bank_code = _detect_bank(all_text) if all_text.strip() else "generic"
     # DEBUG v118.33.11.1
-    logger.info(f"[stmt_parse][{filename}] pages={len(page_texts)} chars={len(all_text)} bank={bank_code}")
-    if all_text.strip(): logger.info(f"[stmt_parse][{filename}] first600: " + repr(all_text[:600]))
+    logger.info(
+        f"[stmt_parse][{filename}] pages={len(page_texts)} chars={len(all_text)} bank={bank_code}"
+    )
+    if all_text.strip():
+        logger.info(f"[stmt_parse][{filename}] first600: " + repr(all_text[:600]))
     if all_text.strip():
         try:
             import os
-            os.makedirs('/tmp/stmt_debug', exist_ok=True)
-            with open(f'/tmp/stmt_debug/{filename}.txt', 'w') as _df:
+
+            os.makedirs("/tmp/stmt_debug", exist_ok=True)
+            with open(f"/tmp/stmt_debug/{filename}.txt", "w") as _df:
                 _df.write(all_text)
-        except Exception: pass
+        except Exception:
+            pass
 
     # ── Step 2: try pdfplumber table extraction ──
     all_tables: List = []
     try:
         import pdfplumber
+
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             if not all_text.strip():
                 all_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
@@ -1203,7 +1303,7 @@ def parse_bank_statement_pdf(
                 rows, opening, closing = rows2, op2, cl2
 
     # ── Step 4a: KBank column-stacked text (pdfminer-extracted) ──
-    if len(rows) < MIN_PLUMBER_ROWS and all_text.strip() and bank_code == 'kbank':
+    if len(rows) < MIN_PLUMBER_ROWS and all_text.strip() and bank_code == "kbank":
         col_rows, col_op, col_cl = _parse_kbank_text_columns(all_text)
         logger.info(f"[stmt_parse][{filename}] step4a kbank-columns: rows={len(col_rows)}")
         if len(col_rows) > len(rows):
@@ -1211,7 +1311,9 @@ def parse_bank_statement_pdf(
     # ── Step 4b: generic text-line fallback ──
     if len(rows) < MIN_PLUMBER_ROWS and all_text.strip():
         text_rows, text_op, text_cl = _parse_stmt_text_lines(all_text, bank_code)
-        logger.info(f"[stmt_parse][{filename}] step4b text-line: tbl_rows={len(rows)} text_rows={len(text_rows)} bank={bank_code}")
+        logger.info(
+            f"[stmt_parse][{filename}] step4b text-line: tbl_rows={len(rows)} text_rows={len(text_rows)} bank={bank_code}"
+        )
         if len(text_rows) > len(rows):
             rows, opening, closing = text_rows, text_op, text_cl
 
@@ -1227,8 +1329,10 @@ def parse_bank_statement_pdf(
         if coord_rows:
             coord_bad = _stmt_bad_ratio(coord_rows, coord_op)
             cur_bad = _stmt_bad_ratio(rows, opening)
-            logger.info(f"[stmt_parse][{filename}] step4c coords: rows={len(coord_rows)} "
-                        f"bad={coord_bad:.2f} vs cur rows={len(rows)} bad={cur_bad:.2f}")
+            logger.info(
+                f"[stmt_parse][{filename}] step4c coords: rows={len(coord_rows)} "
+                f"bad={coord_bad:.2f} vs cur rows={len(rows)} bad={cur_bad:.2f}"
+            )
             # 坐标解析行数更多 · 且余额链不比现有更坏 → 采用(更全 + 列对位正确)
             if len(coord_rows) > len(rows) and coord_bad <= max(cur_bad, 0.05):
                 rows, opening, closing = coord_rows, coord_op, coord_cl
@@ -1240,26 +1344,34 @@ def parse_bank_statement_pdf(
     _free_bad = _stmt_bad_ratio(rows, opening)
     _need_gemini = (len(rows) < MIN_PLUMBER_ROWS) or (_free_bad > 0.30)
     if _need_gemini:
-        logger.info(f"[stmt_parse][{filename}] step5 gemini: api_key_present={bool(api_key)} "
-                    f"text_chars={len(all_text)} free_rows={len(rows)} free_bad={_free_bad:.2f}")
-    printed_totals = None   # v118.35.0.63 · 账单印刷页脚汇总(仅 Gemini 路径有)· 完整性交叉校验用
+        logger.info(
+            f"[stmt_parse][{filename}] step5 gemini: api_key_present={bool(api_key)} "
+            f"text_chars={len(all_text)} free_rows={len(rows)} free_bad={_free_bad:.2f}"
+        )
+    printed_totals = None  # v118.35.0.63 · 账单印刷页脚汇总(仅 Gemini 路径有)· 完整性交叉校验用
     if _need_gemini and api_key:
         gemini_result = _gemini_parse_statement(file_bytes, filename, api_key)
         g_rows = gemini_result.get("rows") or []
-        logger.info(f"[stmt_parse][{filename}] step5 gemini result: ok={gemini_result.get('ok')} rows={len(g_rows)}")
+        logger.info(
+            f"[stmt_parse][{filename}] step5 gemini result: ok={gemini_result.get('ok')} rows={len(g_rows)}"
+        )
         if gemini_result.get("ok") and g_rows:
             g_op = gemini_result.get("opening", opening)
             g_bad = _stmt_bad_ratio(g_rows, g_op)
             # 免费行数不足 → 直接用 Gemini;否则谁的余额链更可信用谁
             if len(_free_rows) < MIN_PLUMBER_ROWS or g_bad < _free_bad:
-                logger.info(f"[stmt_parse][{filename}] 采用 Gemini(free_bad={_free_bad:.2f} > gemini_bad={g_bad:.2f})")
+                logger.info(
+                    f"[stmt_parse][{filename}] 采用 Gemini(free_bad={_free_bad:.2f} > gemini_bad={g_bad:.2f})"
+                )
                 rows = g_rows
                 opening = g_op
                 closing = gemini_result.get("closing", closing)
                 bank_code = gemini_result.get("bank_code", bank_code)
                 printed_totals = gemini_result.get("printed_totals")
             else:
-                logger.info(f"[stmt_parse][{filename}] 保留免费解析(更可信 · gemini_bad={g_bad:.2f})")
+                logger.info(
+                    f"[stmt_parse][{filename}] 保留免费解析(更可信 · gemini_bad={g_bad:.2f})"
+                )
                 rows, opening, closing, bank_code = _free_rows, _free_op, _free_cl, _free_bank
 
     for r in rows:
@@ -1288,8 +1400,13 @@ def parse_bank_statement_pdf(
 
     if not rows:
         hint = " (PDF has no extractable text)" if not all_text.strip() else ""
-        return {"ok": False, "error": f"No statement rows found in PDF{hint}",
-                "rows": [], "opening": 0.0, "closing": 0.0}
+        return {
+            "ok": False,
+            "error": f"No statement rows found in PDF{hint}",
+            "rows": [],
+            "opening": 0.0,
+            "closing": 0.0,
+        }
 
     # v118.35.0.66 · 期初/期末兜底回填:Gemini 有时不回传 opening/closing 字段(实测 AM:
     # 4 笔交易全对、B/F 行也读到了,但 opening/closing 仍是 0 → 汇总区显示 0、期末交叉校验跳过)。
@@ -1298,12 +1415,16 @@ def parse_bank_statement_pdf(
     if not opening:
         first = rows[0]
         fd = (first.description or "").lower()
-        if (first.deposit or 0) == 0 and (first.withdrawal or 0) == 0 and first.balance \
-                and any(k in fd for k in _OPEN_KW):
-            opening = first.balance                       # 显式 B/F 行余额
+        if (
+            (first.deposit or 0) == 0
+            and (first.withdrawal or 0) == 0
+            and first.balance
+            and any(k in fd for k in _OPEN_KW)
+        ):
+            opening = first.balance  # 显式 B/F 行余额
         else:
             fm = next((r for r in rows if (r.deposit or 0) or (r.withdrawal or 0)), None)
-            if fm and fm.balance:                         # 退路:首笔有动行『余额−净额』反推
+            if fm and fm.balance:  # 退路:首笔有动行『余额−净额』反推
                 opening = round(fm.balance - ((fm.deposit or 0) - (fm.withdrawal or 0)), 2)
     if not closing:
         closing = next((r.balance for r in reversed(rows) if r.balance), closing)
@@ -1322,7 +1443,7 @@ def parse_bank_statement_pdf(
         "row_count": len(rows),
         "balance_warn_count": balance_warn_count,
         "low_conf_count": low_conf_count,
-        "completeness": completeness,   # v118.35.0.63
+        "completeness": completeness,  # v118.35.0.63
     }
 
 
@@ -1343,7 +1464,7 @@ def _correct_direction_from_balance(rows: List[StatementRow], opening: float) ->
     if not rows:
         return
     prev = opening
-    opening_reliable = (opening != 0.0)
+    opening_reliable = opening != 0.0
     first_movement_seen = False
     for r in rows:
         if r.balance is None:
@@ -1362,10 +1483,10 @@ def _correct_direction_from_balance(rows: List[StatementRow], opening: float) ->
         amt = max(dep, wd)
         # 金额吻合 |delta| · 仅方向相反 → 按余额涨跌摆正
         if amt > 0 and abs(abs(delta) - amt) <= AMOUNT_TOL:
-            if delta > 0 and wd > 0:        # 余额涨却记成提款 → 改存款
+            if delta > 0 and wd > 0:  # 余额涨却记成提款 → 改存款
                 r.deposit, r.withdrawal = amt, 0.0
                 r.direction_autocorrected = True
-            elif delta < 0 and dep > 0:     # 余额跌却记成存款 → 改提款
+            elif delta < 0 and dep > 0:  # 余额跌却记成存款 → 改提款
                 r.withdrawal, r.deposit = amt, 0.0
                 r.direction_autocorrected = True
         prev = r.balance
@@ -1384,23 +1505,31 @@ def _verify_row_balances(rows: List[StatementRow], opening: float) -> None:
     still update prev=row.balance so subsequent rows verify against it."""
     if not rows:
         return
-    _OPENING_KW = ("ยอดยกมา", "ยอดคงเหลือยกมา", "brought forward",
-                   "opening balance", "balance b/f", "期初余额", "上期结转")
+    _OPENING_KW = (
+        "ยอดยกมา",
+        "ยอดคงเหลือยกมา",
+        "brought forward",
+        "opening balance",
+        "balance b/f",
+        "期初余额",
+        "上期结转",
+    )
     prev = opening
     # v118.35.0.48 · 续页/缺期初兜底:opening==0 视为"没拿到真实期初余额"
     # (典型:用户只上传对账单某一页/续页 · 没有『ยอดยกมา/期初余额』行)
     # 此时第一笔有金额的交易无从核对"上一行余额" · 不能误标 False(原件其实没错)
-    opening_reliable = (opening != 0.0)
+    opening_reliable = opening != 0.0
     first_movement_seen = False
     for r in rows:
         if r.balance is None:
             r.balance_ok = None
             continue
         dep = r.deposit or 0
-        wd  = r.withdrawal or 0
+        wd = r.withdrawal or 0
         desc_low = (r.description or "").lower()
-        is_opening_row = any(kw in r.description for kw in _OPENING_KW) or \
-                         any(kw in desc_low for kw in (k.lower() for k in _OPENING_KW))
+        is_opening_row = any(kw in r.description for kw in _OPENING_KW) or any(
+            kw in desc_low for kw in (k.lower() for k in _OPENING_KW)
+        )
         # No-movement rows (opening/closing/headers) — record balance, skip verify
         if (dep == 0 and wd == 0) or is_opening_row:
             r.balance_ok = None
@@ -1459,7 +1588,7 @@ def _repair_amount_from_balance(rows: List[StatementRow], opening: float) -> Non
         nxt_tol = min(max(AMOUNT_TOL, nxt_amt * 0.005), 1.0)
         if abs(nxt_expected - nxt.balance) > nxt_tol:
             continue  # 本行余额未被佐证 → 不动
-        corrected = round(r.balance - prev.balance, 2)   # 真实变动(带符号)
+        corrected = round(r.balance - prev.balance, 2)  # 真实变动(带符号)
         if abs(corrected) < AMOUNT_TOL:
             continue
         printed = _mv(r)
@@ -1473,8 +1602,12 @@ def _repair_amount_from_balance(rows: List[StatementRow], opening: float) -> Non
             r.balance_ok = True
 
 
-def _audit_completeness(rows: List[StatementRow], opening: float, closing: float,
-                        printed: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _audit_completeness(
+    rows: List[StatementRow],
+    opening: float,
+    closing: float,
+    printed: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """v118.35.0.63 · 用账单『印刷页脚汇总 + 期末』交叉校验提取结果 · 主动发现漏行/读错。
 
     三道独立闸门(任何一道不过 = 提取可能不完整 · 标警告让用户核对):
@@ -1497,8 +1630,14 @@ def _audit_completeness(rows: List[StatementRow], opening: float, closing: float
     if opening and closing:
         calc = round(opening + sum_dep - sum_wd, 2)
         if abs(calc - closing) > _tol(closing):
-            issues.append({"type": "closing_mismatch", "calc": calc,
-                           "printed": closing, "diff": round(calc - closing, 2)})
+            issues.append(
+                {
+                    "type": "closing_mismatch",
+                    "calc": calc,
+                    "printed": closing,
+                    "diff": round(calc - closing, 2),
+                }
+            )
     p = printed or {}
     pt_cr, pt_dr = p.get("total_credit"), p.get("total_debit")
     pc_cr, pc_dr = p.get("credit_count"), p.get("debit_count")
@@ -1509,28 +1648,45 @@ def _audit_completeness(rows: List[StatementRow], opening: float, closing: float
     def _sum_reliable(t, other):
         if t is None or t <= 0:
             return False
-        if other is not None and abs(t - other) < 0.01:   # 两个合计相同 = 八成是误填的余额
+        if other is not None and abs(t - other) < 0.01:  # 两个合计相同 = 八成是误填的余额
             return False
-        if closing and abs(t - closing) < _tol(closing):   # 等于期末 = 误填
+        if closing and abs(t - closing) < _tol(closing):  # 等于期末 = 误填
             return False
         if opening and abs(t - opening) < _tol(opening):
             return False
         return True
 
     if _sum_reliable(pt_cr, pt_dr) and abs(sum_dep - pt_cr) > _tol(pt_cr):
-        issues.append({"type": "credit_sum_mismatch", "sum": sum_dep,
-                       "printed": pt_cr, "diff": round(sum_dep - pt_cr, 2)})
+        issues.append(
+            {
+                "type": "credit_sum_mismatch",
+                "sum": sum_dep,
+                "printed": pt_cr,
+                "diff": round(sum_dep - pt_cr, 2),
+            }
+        )
     if _sum_reliable(pt_dr, pt_cr) and abs(sum_wd - pt_dr) > _tol(pt_dr):
-        issues.append({"type": "debit_sum_mismatch", "sum": sum_wd,
-                       "printed": pt_dr, "diff": round(sum_wd - pt_dr, 2)})
+        issues.append(
+            {
+                "type": "debit_sum_mismatch",
+                "sum": sum_wd,
+                "printed": pt_dr,
+                "diff": round(sum_wd - pt_dr, 2),
+            }
+        )
     # 笔数:同样防误填(count 不应等于某个余额这种大数)· >0 且像计数(<100000)才信
     if pc_cr is not None and 0 <= pc_cr < 100000 and int(pc_cr) != n_dep:
         issues.append({"type": "credit_count_mismatch", "count": n_dep, "printed": int(pc_cr)})
     if pc_dr is not None and 0 <= pc_dr < 100000 and int(pc_dr) != n_wd:
         issues.append({"type": "debit_count_mismatch", "count": n_wd, "printed": int(pc_dr)})
-    return {"ok": len(issues) == 0, "issues": issues,
-            "sum_deposit": sum_dep, "sum_withdrawal": sum_wd,
-            "count_deposit": n_dep, "count_withdrawal": n_wd}
+    return {
+        "ok": len(issues) == 0,
+        "issues": issues,
+        "sum_deposit": sum_dep,
+        "sum_withdrawal": sum_wd,
+        "count_deposit": n_dep,
+        "count_withdrawal": n_wd,
+    }
 
 
 def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> Dict[str, Any]:
@@ -1557,14 +1713,16 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
         # Re-materialize StatementRow objects (cache stores dicts)
         rebuilt = []
         for d in cached.get("_rows_raw", []):
-            rebuilt.append(StatementRow(
-                date=_parse_date(d["date"]) if d.get("date") else None,
-                description=d.get("description", ""),
-                withdrawal=float(d.get("withdrawal", 0) or 0),
-                deposit=float(d.get("deposit", 0) or 0),
-                balance=float(d.get("balance", 0) or 0),
-                confidence=d.get("confidence", "high"),
-            ))
+            rebuilt.append(
+                StatementRow(
+                    date=_parse_date(d["date"]) if d.get("date") else None,
+                    description=d.get("description", ""),
+                    withdrawal=float(d.get("withdrawal", 0) or 0),
+                    deposit=float(d.get("deposit", 0) or 0),
+                    balance=float(d.get("balance", 0) or 0),
+                    confidence=d.get("confidence", "high"),
+                )
+            )
         return {
             "ok": cached.get("ok", True),
             "rows": rebuilt,
@@ -1633,8 +1791,12 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
         # 设 0 后大幅稳定且通常更准 · top_p=1 candidate_count=1。
         resp = model.generate_content(
             [{"mime_type": "application/pdf", "data": b64}, prompt],
-            generation_config={"temperature": 0.0, "top_p": 1.0, "candidate_count": 1,
-                                "max_output_tokens": 32768},
+            generation_config={
+                "temperature": 0.0,
+                "top_p": 1.0,
+                "candidate_count": 1,
+                "max_output_tokens": 32768,
+            },
         )
         text = (resp.text or "").strip()
         if text.startswith("```"):
@@ -1643,8 +1805,14 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
 
         raw_rows = data.get("rows") or []
         rows = []
-        _OPENING_KW = ("ยอดยกมา", "brought forward", "opening balance",
-                       "balance b/f", "期初余额", "上期结转")
+        _OPENING_KW = (
+            "ยอดยกมา",
+            "brought forward",
+            "opening balance",
+            "balance b/f",
+            "期初余额",
+            "上期结转",
+        )
         # If Gemini missed opening_balance, try to recover from the first no-movement row
         opening_extracted = float(data.get("opening_balance", 0) or 0)
         last_date = None  # v118.35.0.49 · 同日多笔银行常省略重复日期 · 沿用上一行
@@ -1668,7 +1836,7 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
                 conf = "low"
             if bal_raw is None:
                 conf = "low"
-            wd_v  = float(wd_raw or 0)
+            wd_v = float(wd_raw or 0)
             dep_v = float(dep_raw or 0)
             bal_v = float(bal_raw or 0)
             # v118.33.13.1 · Detect opening-balance row: no movement + keyword
@@ -1680,27 +1848,31 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
                 if not opening_extracted and bal_v:
                     opening_extracted = bal_v
                 continue
-            rows.append(StatementRow(
-                date=d,
-                description=desc,
-                withdrawal=wd_v,
-                deposit=dep_v,
-                balance=bal_v,
-                confidence=conf,
-            ))
+            rows.append(
+                StatementRow(
+                    date=d,
+                    description=desc,
+                    withdrawal=wd_v,
+                    deposit=dep_v,
+                    balance=bal_v,
+                    confidence=conf,
+                )
+            )
 
         result_closing = float(data.get("closing_balance", 0) or 0)
         result_bank = data.get("bank_code", "generic")
+
         # v118.35.0.63 · 账单印刷页脚汇总(笔数/合计)· 用来交叉校验完整性(抓漏行)
         def _nz(v):
             try:
                 return float(v) if v is not None else None
             except (TypeError, ValueError):
                 return None
+
         printed_totals = {
-            "total_debit":  _nz(data.get("printed_total_debit")),
+            "total_debit": _nz(data.get("printed_total_debit")),
             "total_credit": _nz(data.get("printed_total_credit")),
-            "debit_count":  _nz(data.get("printed_debit_count")),
+            "debit_count": _nz(data.get("printed_debit_count")),
             "credit_count": _nz(data.get("printed_credit_count")),
         }
         # v118.33.13.1 · Save raw row dicts to cache (StatementRow has datetime — store str)
@@ -1712,18 +1884,22 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
                 "bank_code": result_bank,
                 "printed_totals": printed_totals,
                 "_rows_raw": [
-                    {"date": rr.date.isoformat() if rr.date else None,
-                     "description": rr.description,
-                     "withdrawal": rr.withdrawal,
-                     "deposit": rr.deposit,
-                     "balance": rr.balance,
-                     "confidence": rr.confidence}
+                    {
+                        "date": rr.date.isoformat() if rr.date else None,
+                        "description": rr.description,
+                        "withdrawal": rr.withdrawal,
+                        "deposit": rr.deposit,
+                        "balance": rr.balance,
+                        "confidence": rr.confidence,
+                    }
                     for rr in rows
                 ],
             }
             _cache_put(_GEMINI_STMT_CACHE, cache_key, _cache_val)
-            _disk_cache_put(cache_key, _cache_val)   # v118.35.0.64 · 落磁盘 · 跨重启持久
-            logger.info(f"[stmt_parse][{filename}] gemini cache STORED key={cache_key[:12]} rows={len(rows)}")
+            _disk_cache_put(cache_key, _cache_val)  # v118.35.0.64 · 落磁盘 · 跨重启持久
+            logger.info(
+                f"[stmt_parse][{filename}] gemini cache STORED key={cache_key[:12]} rows={len(rows)}"
+            )
         except Exception as _e:
             logger.warning(f"[stmt_parse][{filename}] cache store failed: {_e}")
 
@@ -1744,38 +1920,88 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
 # ─────────────────────────────────────────────────────────────────────────────
 # GL PARSERS
 # ─────────────────────────────────────────────────────────────────────────────
-_GL_DATE_H  = {"วันที่", "date", "วัน", "日期"}
-_GL_DOC_H   = {"ใบสำคัญ", "เลขที่เอกสาร", "doc", "voucher", "reference", "เอกสาร", "凭证", "ref"}
-_GL_DESC_H  = {"คำอธิบาย", "รายการ", "description", "detail", "รายละเอียด", "摘要"}
+_GL_DATE_H = {"วันที่", "date", "วัน", "日期"}
+_GL_DOC_H = {"ใบสำคัญ", "เลขที่เอกสาร", "doc", "voucher", "reference", "เอกสาร", "凭证", "ref"}
+_GL_DESC_H = {"คำอธิบาย", "รายการ", "description", "detail", "รายละเอียด", "摘要"}
 _GL_DEBIT_H = {"เดบิต", "เดบิท", "debit", "dr", "借方", "ถอน", "จ่าย"}
-_GL_CRED_H  = {"เครดิต", "credit", "cr", "贷方", "ฝาก", "รับ"}
-_GL_ACCT_H  = {"รหัสบัญชี", "account", "gl account", "เลขที่บัญชี", "รหัส", "账号", "科目"}
+_GL_CRED_H = {"เครดิต", "credit", "cr", "贷方", "ฝาก", "รับ"}
+_GL_ACCT_H = {"รหัสบัญชี", "account", "gl account", "เลขที่บัญชี", "รหัส", "账号", "科目"}
 # BUG-FIX-T2 v118.35.0.43 · balance/余额 列识别 · 给 opening 检测读期初余额用
 # (老逻辑只看 debit/credit · Row 2 期初 ยอดยกมา 余额列填 39749.85 没读到 → opening=0 → closing 全错)
-_GL_BAL_H   = {"คงเหลือ", "ยอดคงเหลือ", "balance", "running balance", "余额", "残高"}
+_GL_BAL_H = {"คงเหลือ", "ยอดคงเหลือ", "balance", "running balance", "余额", "残高"}
 
-_ACCT_RE = re.compile(r'(?<![\d.])([1-9]\d{3,6}(?:[-–]\d{2,3})?)(?![\d.])')
+_ACCT_RE = re.compile(r"(?<![\d.])([1-9]\d{3,6}(?:[-–]\d{2,3})?)(?![\d.])")
 
 # v118.35.0.19 · 银行流水 xlsx 直读 fallback · 表头列名词典(4 语)
-_STMT_DATE_H  = {"วันที่", "วัน", "date", "trans date", "transaction date", "日期", "交易日", "ngày"}
-_STMT_DESC_H  = {"รายการ", "รายละเอียด", "description", "detail", "particulars", "narration",
-                 "memo", "摘要", "描述", "交易摘要", "diễn giải"}
-_STMT_WITHDRAW_H = {"ถอนเงิน", "ถอน", "withdrawal", "withdrawals", "debit", "dr", "out", "paid out",
-                    "取款", "出账", "支出", "借方", "rút"}
-_STMT_DEPOSIT_H = {"ฝากเงิน", "ฝาก", "deposit", "deposits", "credit", "cr", "in", "paid in",
-                   "存款", "入账", "收入", "贷方", "gửi"}
+_STMT_DATE_H = {"วันที่", "วัน", "date", "trans date", "transaction date", "日期", "交易日", "ngày"}
+_STMT_DESC_H = {
+    "รายการ",
+    "รายละเอียด",
+    "description",
+    "detail",
+    "particulars",
+    "narration",
+    "memo",
+    "摘要",
+    "描述",
+    "交易摘要",
+    "diễn giải",
+}
+_STMT_WITHDRAW_H = {
+    "ถอนเงิน",
+    "ถอน",
+    "withdrawal",
+    "withdrawals",
+    "debit",
+    "dr",
+    "out",
+    "paid out",
+    "取款",
+    "出账",
+    "支出",
+    "借方",
+    "rút",
+}
+_STMT_DEPOSIT_H = {
+    "ฝากเงิน",
+    "ฝาก",
+    "deposit",
+    "deposits",
+    "credit",
+    "cr",
+    "in",
+    "paid in",
+    "存款",
+    "入账",
+    "收入",
+    "贷方",
+    "gửi",
+}
 _STMT_BALANCE_H = {"ยอดคงเหลือ", "คงเหลือ", "balance", "running balance", "余额", "结余", "số dư"}
 # v118.35.0.55 · 单一带符号金额列(KTB 等:正=存款 负=取款)· 无独立存/取列时用它
-_STMT_AMOUNT_H  = {"amount", "จำนวนเงิน", "จำนวน", "金额", "金額", "số เงิน", "số tiền"}
+_STMT_AMOUNT_H = {"amount", "จำนวนเงิน", "จำนวน", "金额", "金額", "số เงิน", "số tiền"}
 
 
 # v118.35.0.60 · 汇总/合计行关键词 · 这类行不是交易 · 解析时跳过(防被当成交易行误标)
 # 真实案例:AM 1-69 的 "จำนวนเงินฝาก/Total Credit"、"Total Deposit" 被当成交易 · 余额对不上
 _SUMMARY_ROW_KW = (
-    "total credit", "total debit", "total deposit", "total withdrawal",
-    "total transaction", "grand total", "subtotal", "sub total",
-    "รวมรายการ", "ยอดรวม", "รวมยอด", "รวมเงิน",
-    "总计", "合计", "小计", "本期合计", "累计",
+    "total credit",
+    "total debit",
+    "total deposit",
+    "total withdrawal",
+    "total transaction",
+    "grand total",
+    "subtotal",
+    "sub total",
+    "รวมรายการ",
+    "ยอดรวม",
+    "รวมยอด",
+    "รวมเงิน",
+    "总计",
+    "合计",
+    "小计",
+    "本期合计",
+    "累计",
 )
 
 
@@ -1833,15 +2059,21 @@ def _load_excel_all_sheets(file_bytes: bytes):
     先 openpyxl(.xlsx)· 退 xlrd(旧 .xls)· 都失败返 []"""
     try:
         import openpyxl
+
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
-        out = [(ws.title, [list(r) for r in ws.iter_rows(values_only=True)]) for ws in wb.worksheets]
-        try: wb.close()
-        except Exception: pass
+        out = [
+            (ws.title, [list(r) for r in ws.iter_rows(values_only=True)]) for ws in wb.worksheets
+        ]
+        try:
+            wb.close()
+        except Exception:
+            pass
         return out
     except Exception:
         pass
     try:
         import xlrd
+
         wb = xlrd.open_workbook(file_contents=file_bytes)
         out = []
         for i in range(wb.nsheets):
@@ -1857,24 +2089,36 @@ def _find_stmt_header(raw_rows):
     for i, row in enumerate(raw_rows[:16]):
         row_list = [str(c or "").strip() for c in row]
         cm = _map_bank_stmt_cols(row_list)
-        if "date" in cm and "balance" in cm and ("withdrawal" in cm or "deposit" in cm or "amount" in cm):
+        if (
+            "date" in cm
+            and "balance" in cm
+            and ("withdrawal" in cm or "deposit" in cm or "amount" in cm)
+        ):
             return i, cm
     return -1, {}
 
 
-_STMT_ACCT_LABEL = ("account no", "account number", "เลขที่บัญชี", "บัญชีเงินฝาก", "账号", "账户", "口座")
+_STMT_ACCT_LABEL = (
+    "account no",
+    "account number",
+    "เลขที่บัญชี",
+    "บัญชีเงินฝาก",
+    "账号",
+    "账户",
+    "口座",
+)
 
 
 def _extract_sheet_account(raw_rows, header_idx, sheet_name=""):
     """v118.35.0.61 · 从表头之前的行里找『Account No. : xxx』· 找不到退回 sheet 名。
     多账户 .xls 每个 sheet 一个账户 · 账户号在表头上方的 label 行。"""
-    for raw in raw_rows[:max(header_idx, 0)]:
+    for raw in raw_rows[: max(header_idx, 0)]:
         cells = [str(c or "").strip() for c in raw]
         for i, cell in enumerate(cells):
             cl = cell.lower()
             if any(lbl in cl for lbl in _STMT_ACCT_LABEL):
                 # 同行右侧第一个非空值即账户号
-                for v in cells[i + 1:]:
+                for v in cells[i + 1 :]:
                     if v:
                         return v
     # 退回 sheet 名(KTB 把账户号当 sheet 名:984-2-99825-8)
@@ -1882,13 +2126,22 @@ def _extract_sheet_account(raw_rows, header_idx, sheet_name=""):
     return sn if any(ch.isdigit() for ch in sn) else ""
 
 
-_STMT_OPEN_KW = ("ยอดยกมา", "ยกมา", "brought forward", "balance b/f", "b/f", "opening", "期初", "上期")
+_STMT_OPEN_KW = (
+    "ยอดยกมา",
+    "ยกมา",
+    "brought forward",
+    "balance b/f",
+    "b/f",
+    "opening",
+    "期初",
+    "上期",
+)
 
 
 def _scan_preheader_opening(raw_rows, header_idx):
     """v118.35.0.61 · 表头上方找带标签的期初余额(ยกมา / opening / b/f)。
     KTB 多账户 .xls 把期初放在表头上方汇总区(ยกมา -7,409,714.58)· 返回 float 或 None。"""
-    for raw in raw_rows[:max(header_idx, 0)]:
+    for raw in raw_rows[: max(header_idx, 0)]:
         cells = [str(c or "").strip() for c in raw]
         line = " ".join(cells).lower()
         if any(kw in line for kw in _STMT_OPEN_KW):
@@ -1909,14 +2162,17 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
     opening_found = opening_balance is not None
     last_valid_closing = None
     last_date = None
-    d_idx = col_map["date"]; bal_idx = col_map["balance"]
-    wd_idx = col_map.get("withdrawal", -1); dp_idx = col_map.get("deposit", -1)
-    amt_idx = col_map.get("amount", -1); desc_idx = col_map.get("description", -1)
+    d_idx = col_map["date"]
+    bal_idx = col_map["balance"]
+    wd_idx = col_map.get("withdrawal", -1)
+    dp_idx = col_map.get("deposit", -1)
+    amt_idx = col_map.get("amount", -1)
+    desc_idx = col_map.get("description", -1)
 
     def _cell(row_list, idx):
         return row_list[idx] if 0 <= idx < len(row_list) else ""
 
-    for raw in raw_rows[header_idx + 1:]:
+    for raw in raw_rows[header_idx + 1 :]:
         if not any(raw):
             continue
         row_list = [str(c or "").strip() for c in raw]
@@ -1927,19 +2183,29 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
         bal_raw = _cell(row_list, bal_idx)
         balance = _to_float(bal_raw)
         withdrawal = _to_float(_cell(row_list, wd_idx)) if wd_idx >= 0 else 0.0
-        deposit    = _to_float(_cell(row_list, dp_idx)) if dp_idx >= 0 else 0.0
+        deposit = _to_float(_cell(row_list, dp_idx)) if dp_idx >= 0 else 0.0
         # 单一带符号 amount 列(无独立存/取列)· 正=存款 负=取款
         if amt_idx >= 0 and wd_idx < 0 and dp_idx < 0:
             amt = _to_float(_cell(row_list, amt_idx))
-            if amt > 0: deposit = amt
-            elif amt < 0: withdrawal = abs(amt)
+            if amt > 0:
+                deposit = amt
+            elif amt < 0:
+                withdrawal = abs(amt)
         desc = _cell(row_list, desc_idx)
 
         is_opening = (
-            not opening_found and d is None and withdrawal == 0.0 and deposit == 0.0 and balance != 0.0
+            not opening_found
+            and d is None
+            and withdrawal == 0.0
+            and deposit == 0.0
+            and balance != 0.0
         ) or (
-            not opening_found and desc and any(
-                kw in desc.lower() for kw in ["ยอดยกมา", "ยกมา", "brought forward", "opening", "期初"])
+            not opening_found
+            and desc
+            and any(
+                kw in desc.lower()
+                for kw in ["ยอดยกมา", "ยกมา", "brought forward", "opening", "期初"]
+            )
         )
         if is_opening:
             opening_balance = balance
@@ -1949,11 +2215,17 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
             continue
         if withdrawal == 0.0 and deposit == 0.0:
             continue
-        rows.append(StatementRow(
-            date=d if d is not None else last_date,
-            description=desc, withdrawal=withdrawal, deposit=deposit,
-            balance=balance, source_file=filename, account_no=account_no,
-        ))
+        rows.append(
+            StatementRow(
+                date=d if d is not None else last_date,
+                description=desc,
+                withdrawal=withdrawal,
+                deposit=deposit,
+                balance=balance,
+                source_file=filename,
+                account_no=account_no,
+            )
+        )
         # v118.35.0.66 · 区分『余额真的是 0』(Sweep 归零户合法期末)和『余额单元格空着』。
         # row_list 用 str(c or "") 会把数值 0.0 变成 ""(0.0 为假值)→ 此前把归零户那一行
         # 的期末 0 当成空 · 误退回上一行余额(KTB 8258 期末被报成 3845.3 而非真值 0)。
@@ -1973,14 +2245,17 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
     """
     sheets = _load_excel_all_sheets(file_bytes)
     if not sheets:
-        return {"ok": False, "error_code": "file_unreadable",
-                "error": "Cannot read Excel (legacy .xls / corrupt / unsupported format)"}
+        return {
+            "ok": False,
+            "error_code": "file_unreadable",
+            "error": "Cannot read Excel (legacy .xls / corrupt / unsupported format)",
+        }
 
     # v118.35.0.61 · 分账户解析 + 逐账户独立余额校验。
     # 一个文件可能含多个账户(每 sheet 一个)· 各账户期初/余额链互不相干 ——
     # 此前合并成一条链 + 用首账户期初校验全部 · 真实案例 KTB(8258 期初 -39 /
     # 8606 期初 -740万)余额从几万跳到 -737万整链作废。现在每账户独立 verify。
-    accounts: List[Dict[str, Any]] = []   # [{account_no, rows, opening, closing}]
+    accounts: List[Dict[str, Any]] = []  # [{account_no, rows, opening, closing}]
     sheets_with_data = 0
     for _sheet_name, raw_rows in sheets:
         header_idx, col_map = _find_stmt_header(raw_rows)
@@ -1988,7 +2263,8 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
             continue  # 该 sheet 无流水表头(汇总页/空页)· 跳过
         acct = _extract_sheet_account(raw_rows, header_idx, _sheet_name)
         s_rows, s_opening, s_closing = _parse_stmt_sheet(
-            raw_rows, header_idx, col_map, filename, acct)
+            raw_rows, header_idx, col_map, filename, acct
+        )
         # v118.35.0.60 · 跳过底部汇总/合计行(同 PDF 路径)
         s_rows = [r for r in s_rows if not _is_summary_row(r.description)]
         if not s_rows:
@@ -2011,16 +2287,24 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
         _correct_direction_from_balance(s_rows, s_open)
         _verify_row_balances(s_rows, s_open)
         _repair_amount_from_balance(s_rows, s_open)
-        accounts.append({
-            "account_no": acct, "rows": s_rows,
-            "opening": s_open, "closing": s_close,
-            "opening_known": opening_known, "closing_known": closing_known,
-        })
+        accounts.append(
+            {
+                "account_no": acct,
+                "rows": s_rows,
+                "opening": s_open,
+                "closing": s_close,
+                "opening_known": opening_known,
+                "closing_known": closing_known,
+            }
+        )
         sheets_with_data += 1
 
     if not accounts:
-        return {"ok": False, "error_code": "stmt_headers_not_found",
-                "error": "No bank-statement table found in any sheet"}
+        return {
+            "ok": False,
+            "error_code": "stmt_headers_not_found",
+            "error": "No bank-statement table found in any sheet",
+        }
 
     all_rows: List[StatementRow] = [r for a in accounts for r in a["rows"]]
     multi_account = len([a for a in accounts if a["account_no"]]) > 1 or len(accounts) > 1
@@ -2035,16 +2319,21 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
     comp_issues: List[Dict[str, Any]] = []
     for a in accounts:
         if not (a.get("opening_known") and a.get("closing_known")):
-            continue   # 期初/期末有一头没拿到真值 · 无从交叉校验 · 不误报
+            continue  # 期初/期末有一头没拿到真值 · 无从交叉校验 · 不误报
         sdep = round(sum(r.deposit or 0 for r in a["rows"]), 2)
         swd = round(sum(r.withdrawal or 0 for r in a["rows"]), 2)
         calc = round(a["opening"] + sdep - swd, 2)
         tol = max(1.0, abs(a["closing"]) * 0.001)
         if abs(calc - a["closing"]) > tol:
-            comp_issues.append({
-                "type": "closing_mismatch", "calc": calc, "printed": a["closing"],
-                "diff": round(calc - a["closing"], 2), "account": a["account_no"],
-            })
+            comp_issues.append(
+                {
+                    "type": "closing_mismatch",
+                    "calc": calc,
+                    "printed": a["closing"],
+                    "diff": round(calc - a["closing"], 2),
+                    "account": a["account_no"],
+                }
+            )
 
     return {
         "ok": True,
@@ -2055,11 +2344,13 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
         "bank_code": "generic",
         "parser_version": "bank_recon_v2+xlsx_direct_v3",
         "sheets_parsed": sheets_with_data,
-        "accounts": accounts,                          # v118.35.0.61 · 分账户明细
+        "accounts": accounts,  # v118.35.0.61 · 分账户明细
         "account_codes": [a["account_no"] for a in accounts if a["account_no"]],
-        "multi_account": multi_account,                # v118.35.0.61 · 多账户标志
-        "completeness": {"ok": len(comp_issues) == 0,  # v118.35.0.66 · 期末交叉校验
-                         "issues": comp_issues},
+        "multi_account": multi_account,  # v118.35.0.61 · 多账户标志
+        "completeness": {
+            "ok": len(comp_issues) == 0,  # v118.35.0.66 · 期末交叉校验
+            "issues": comp_issues,
+        },
         "needs_review": False,
     }
 
@@ -2092,21 +2383,21 @@ def _extract_acct_code(text: str) -> str:
     return m.group(1) if m else ""
 
 
-def parse_gl_excel(
-    file_bytes: bytes, filename: str, account_code: str = ""
-) -> Dict[str, Any]:
+def parse_gl_excel(file_bytes: bytes, filename: str, account_code: str = "") -> Dict[str, Any]:
     """
     Parse GL from Excel file.
     Returns {ok, rows, accounts, opening, closing, row_count, error}
     """
     try:
         import openpyxl
+
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
         ws = wb.active
         all_rows_raw = list(ws.values)
     except Exception:
         try:
             import xlrd
+
             wb = xlrd.open_workbook(file_contents=file_bytes)
             ws = wb.sheet_by_index(0)
             all_rows_raw = [ws.row_values(i) for i in range(ws.nrows)]
@@ -2126,8 +2417,11 @@ def parse_gl_excel(
 
     if not col_map:
         # v118.35.0.19 · 加 error_code 让前端能翻译成友好文案
-        return {"ok": False, "error_code": "gl_headers_not_found",
-                "error": "Cannot detect GL column headers"}
+        return {
+            "ok": False,
+            "error_code": "gl_headers_not_found",
+            "error": "Cannot detect GL column headers",
+        }
 
     rows = []
     accounts_seen = set()
@@ -2137,7 +2431,7 @@ def parse_gl_excel(
     last_row_date = None  # carry-forward for blank date cells (Mr.erp style)
     last_balance_seen = None  # BUG-FIX-T2 v118.35.0.43 · 给 closing 兜底用最后一笔交易行的余额
 
-    for row in all_rows_raw[header_idx + 1:]:
+    for row in all_rows_raw[header_idx + 1 :]:
         if not any(row):
             continue
         row_list = [str(c or "").strip() for c in row]
@@ -2158,13 +2452,19 @@ def parse_gl_excel(
                     dr_idx = col_map.get("debit", -1)
                     if cr_idx >= 0 and cr_idx < len(row_list):
                         cr = _to_float(row_list[cr_idx])
-                        dr = _to_float(row_list[dr_idx] if dr_idx >= 0 and dr_idx < len(row_list) else 0)
+                        dr = _to_float(
+                            row_list[dr_idx] if dr_idx >= 0 and dr_idx < len(row_list) else 0
+                        )
                         opening = cr - dr  # net opening
                         gl_opening_found = True
             continue
 
         # Extract fields
-        d_str = row_list[col_map["date"]] if "date" in col_map and col_map["date"] < len(row_list) else ""
+        d_str = (
+            row_list[col_map["date"]]
+            if "date" in col_map and col_map["date"] < len(row_list)
+            else ""
+        )
         d = _parse_date(d_str) if d_str else None
         if d is not None:
             last_row_date = d
@@ -2173,10 +2473,26 @@ def parse_gl_excel(
         else:
             continue
 
-        doc_no = row_list[col_map["doc_no"]] if "doc_no" in col_map and col_map["doc_no"] < len(row_list) else ""
-        desc = row_list[col_map["description"]] if "description" in col_map and col_map["description"] < len(row_list) else ""
-        debit = _to_float(row_list[col_map["debit"]] if "debit" in col_map and col_map["debit"] < len(row_list) else 0)
-        credit = _to_float(row_list[col_map["credit"]] if "credit" in col_map and col_map["credit"] < len(row_list) else 0)
+        doc_no = (
+            row_list[col_map["doc_no"]]
+            if "doc_no" in col_map and col_map["doc_no"] < len(row_list)
+            else ""
+        )
+        desc = (
+            row_list[col_map["description"]]
+            if "description" in col_map and col_map["description"] < len(row_list)
+            else ""
+        )
+        debit = _to_float(
+            row_list[col_map["debit"]]
+            if "debit" in col_map and col_map["debit"] < len(row_list)
+            else 0
+        )
+        credit = _to_float(
+            row_list[col_map["credit"]]
+            if "credit" in col_map and col_map["credit"] < len(row_list)
+            else 0
+        )
 
         # Account code: from column or auto-extract from description
         acct = ""
@@ -2193,12 +2509,22 @@ def parse_gl_excel(
             continue
 
         accounts_seen.add(acct or "?")
-        rows.append(GlRow(
-            date=d, doc_no=doc_no, account_code=acct,
-            description=desc, debit=abs(debit), credit=abs(credit),
-        ))
+        rows.append(
+            GlRow(
+                date=d,
+                doc_no=doc_no,
+                account_code=acct,
+                description=desc,
+                debit=abs(debit),
+                credit=abs(credit),
+            )
+        )
         # BUG-FIX-T2 v118.35.0.43 · 顺手记最后一笔的 balance(给下面 closing 兜底用)
-        if "balance" in col_map and col_map["balance"] < len(row_list) and row_list[col_map["balance"]]:
+        if (
+            "balance" in col_map
+            and col_map["balance"] < len(row_list)
+            and row_list[col_map["balance"]]
+        ):
             last_balance_seen = _to_float(row_list[col_map["balance"]])
 
     # Calculate opening/closing if not found
@@ -2233,6 +2559,7 @@ def _pdf_extract_text_safe(file_bytes: bytes) -> List[str]:
     # pdfminer is a dependency of pdfplumber and doesn't have the KeyError('date') bug
     try:
         from pdfminer.high_level import extract_text as _pm_extract
+
         text = _pm_extract(io.BytesIO(file_bytes)) or ""
         if text.strip():
             return [text]
@@ -2241,6 +2568,7 @@ def _pdf_extract_text_safe(file_bytes: bytes) -> List[str]:
     # pypdf fallback
     try:
         import pypdf
+
         reader = pypdf.PdfReader(io.BytesIO(file_bytes))
         return [pg.extract_text() or "" for pg in reader.pages]
     except Exception:
@@ -2257,16 +2585,17 @@ def _norm_thai(s: str) -> str:
     or other Thai tokens. Maps PUA glyphs back to standard combining marks."""
     if not s:
         return s
-    return (s
-             .replace("\uf70a", "\u0e48")   # mai-ek
-             .replace("\uf70b", "\u0e49")   # mai-tho
-             .replace("\uf70c", "\u0e4a")   # mai-tri
-             .replace("\uf70d", "\u0e4b")   # mai-chattawa
-             .replace("\uf70e", "\u0e4c")   # thantakhat
-             .replace("\uf710", "\u0e4d")   # nikhahit
-             .replace("\uf711", "\u0e31")   # mai-han-akat
-             .replace("\uf712", "\u0e47")   # mai-taikhu
-            )
+    return (
+        s.replace("\uf70a", "\u0e48")  # mai-ek
+        .replace("\uf70b", "\u0e49")  # mai-tho
+        .replace("\uf70c", "\u0e4a")  # mai-tri
+        .replace("\uf70d", "\u0e4b")  # mai-chattawa
+        .replace("\uf70e", "\u0e4c")  # thantakhat
+        .replace("\uf710", "\u0e4d")  # nikhahit
+        .replace("\uf711", "\u0e31")  # mai-han-akat
+        .replace("\uf712", "\u0e47")  # mai-taikhu
+    )
+
 
 def _is_numeric_tok(tok: str) -> bool:
     """v118.33.13.4 · Strict numeric-token test (unlike _to_float which returns 0.0
@@ -2291,7 +2620,9 @@ def _is_numeric_tok(tok: str) -> bool:
         return False
 
 
-def _parse_gl_mrerp_table(table_rows, account_code: str = "") -> Tuple[List["GlRow"], List[str], float]:
+def _parse_gl_mrerp_table(
+    table_rows, account_code: str = ""
+) -> Tuple[List["GlRow"], List[str], float]:
     """
     v118.33.13.4 · Parse Mr.erp-style Thai GL PDFs where pdfplumber outputs
     each transaction as a SINGLE merged cell containing the whole row text.
@@ -2325,14 +2656,20 @@ def _parse_gl_mrerp_table(table_rows, account_code: str = "") -> Tuple[List["GlR
     # transaction descriptions (e.g. "รับล่วงหน้า" = "advance receipt"), so we
     # only use phrase-level patterns that are unique to header/footer rows.
     SKIP_KEYWORDS = (
-        "รายงานแยกประเภท", "(รวมแผนก)", "วันที่จาก", "เลขที่บัญชี",
-        "รวมทั้งสิ้น", "หมายเหตุ ในช่อง",
-        "ชื่อบัญชี", ">>>>", "<<<<",
+        "รายงานแยกประเภท",
+        "(รวมแผนก)",
+        "วันที่จาก",
+        "เลขที่บัญชี",
+        "รวมทั้งสิ้น",
+        "หมายเหตุ ในช่อง",
+        "ชื่อบัญชี",
+        ">>>>",
+        "<<<<",
     )
     # Page header pattern: "หน้า : 1" (always has the colon)
     SKIP_REGEX = re.compile(r"หน้า\s*[:：]\s*\d|^\s*Page\s+\d|^E\s+จะหมายถึง")
 
-    for table_row in (table_rows or []):
+    for table_row in table_rows or []:
         # Each pdfplumber row is a list of cells. For Mr.erp PDFs the whole
         # transaction is in cell 0; cells 1+ are typically None or fragments.
         cells = [str(c).strip() for c in table_row if c is not None and str(c).strip()]
@@ -2352,7 +2689,9 @@ def _parse_gl_mrerp_table(table_rows, account_code: str = "") -> Tuple[List["GlR
         if SKIP_REGEX.search(line):
             continue
         # Skip the column-header row
-        if ("วันที่" in line and "สมุด" in line) or ("เดบิท" in line and "เครดิต" in line and "ยอดคงเหลือ" in line):
+        if ("วันที่" in line and "สมุด" in line) or (
+            "เดบิท" in line and "เครดิต" in line and "ยอดคงเหลือ" in line
+        ):
             continue
         # Skip pure totals rows: "รวม 1,689,872.00 1,780,000.00" or two numbers only
         if line.startswith("รวม") and len(line.split()) <= 6:
@@ -2423,7 +2762,7 @@ def _parse_gl_mrerp_table(table_rows, account_code: str = "") -> Tuple[List["GlR
         if d is None:
             continue
 
-        after = front[d_idx + 1:] if d_idx >= 0 else front
+        after = front[d_idx + 1 :] if d_idx >= 0 else front
         if not after:
             continue
 
@@ -2473,10 +2812,16 @@ def _parse_gl_mrerp_table(table_rows, account_code: str = "") -> Tuple[List["GlR
             continue
 
         accounts_seen.add(acct or "?")
-        rows.append(GlRow(
-            date=d, doc_no=doc_no, account_code=acct,
-            description=desc, debit=abs(debit_v), credit=abs(credit_v),
-        ))
+        rows.append(
+            GlRow(
+                date=d,
+                doc_no=doc_no,
+                account_code=acct,
+                description=desc,
+                debit=abs(debit_v),
+                credit=abs(credit_v),
+            )
+        )
 
     return rows, sorted(accounts_seen - {"?"}), opening
 
@@ -2502,13 +2847,17 @@ def _gl_direction_sanity_check(rows: List["GlRow"]) -> Optional[str]:
 
     # All on one side (no opposite transactions at all)
     if total_credit == 0 and n_debit >= 3:
-        return ("GL appears to be debit-only (no credit entries). This is likely "
-                "an expense or asset ledger, not the cash/bank account ledger. "
-                "Bank reconciliation expects the BANK ACCOUNT ledger where "
-                "withdrawals appear as credits.")
+        return (
+            "GL appears to be debit-only (no credit entries). This is likely "
+            "an expense or asset ledger, not the cash/bank account ledger. "
+            "Bank reconciliation expects the BANK ACCOUNT ledger where "
+            "withdrawals appear as credits."
+        )
     if total_debit == 0 and n_credit >= 3:
-        return ("GL appears to be credit-only (no debit entries). This is likely "
-                "a revenue or liability ledger, not the cash/bank account ledger.")
+        return (
+            "GL appears to be credit-only (no debit entries). This is likely "
+            "a revenue or liability ledger, not the cash/bank account ledger."
+        )
     # Heavily imbalanced (>= 95% one side) — less certain but worth noting
     if debit_ratio >= 0.95 and total_credit > 0:
         return f"GL is {debit_ratio*100:.0f}% debit-side — verify this is the bank-account ledger."
@@ -2536,6 +2885,7 @@ def parse_gl_pdf(
     all_tables: List = []
     try:
         import pdfplumber
+
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             for p in pdf.pages:
                 try:
@@ -2569,7 +2919,9 @@ def parse_gl_pdf(
             rows = mr_rows
             accounts_seen = set(mr_accts)
             opening = mr_open
-            logger.info(f"[gl_parse][{filename}] step3a mrerp: rows={len(rows)} accts={len(accounts_seen)}")
+            logger.info(
+                f"[gl_parse][{filename}] step3a mrerp: rows={len(rows)} accts={len(accounts_seen)}"
+            )
 
     # Step 3b · Fall back to column-mapped table parser (other GL formats where
     # pdfplumber DOES split columns correctly)
@@ -2589,13 +2941,17 @@ def parse_gl_pdf(
                 continue
 
             last_tbl_date = None
-            for row in table[header_idx + 1:]:
+            for row in table[header_idx + 1 :]:
                 if not row:
                     continue
                 row_list = [str(c or "").strip() for c in row]
                 if _is_gl_skip_row(row_list):
                     continue
-                d_str = row_list[col_map["date"]] if "date" in col_map and col_map["date"] < len(row_list) else ""
+                d_str = (
+                    row_list[col_map["date"]]
+                    if "date" in col_map and col_map["date"] < len(row_list)
+                    else ""
+                )
                 d = _parse_date(d_str) if d_str else None
                 if d is not None:
                     last_tbl_date = d
@@ -2603,10 +2959,26 @@ def parse_gl_pdf(
                     d = last_tbl_date
                 else:
                     continue
-                doc_no = row_list[col_map["doc_no"]] if "doc_no" in col_map and col_map["doc_no"] < len(row_list) else ""
-                desc = row_list[col_map["description"]] if "description" in col_map and col_map["description"] < len(row_list) else ""
-                debit = _to_float(row_list[col_map["debit"]] if "debit" in col_map and col_map["debit"] < len(row_list) else 0)
-                credit = _to_float(row_list[col_map["credit"]] if "credit" in col_map and col_map["credit"] < len(row_list) else 0)
+                doc_no = (
+                    row_list[col_map["doc_no"]]
+                    if "doc_no" in col_map and col_map["doc_no"] < len(row_list)
+                    else ""
+                )
+                desc = (
+                    row_list[col_map["description"]]
+                    if "description" in col_map and col_map["description"] < len(row_list)
+                    else ""
+                )
+                debit = _to_float(
+                    row_list[col_map["debit"]]
+                    if "debit" in col_map and col_map["debit"] < len(row_list)
+                    else 0
+                )
+                credit = _to_float(
+                    row_list[col_map["credit"]]
+                    if "credit" in col_map and col_map["credit"] < len(row_list)
+                    else 0
+                )
                 acct = ""
                 if "account" in col_map and col_map["account"] < len(row_list):
                     acct = str(row_list[col_map["account"]]).strip()
@@ -2617,10 +2989,20 @@ def parse_gl_pdf(
                 if account_code and acct and not acct.startswith(account_code):
                     continue
                 accounts_seen.add(acct or "?")
-                rows.append(GlRow(date=d, doc_no=doc_no, account_code=acct,
-                                  description=desc, debit=abs(debit), credit=abs(credit)))
+                rows.append(
+                    GlRow(
+                        date=d,
+                        doc_no=doc_no,
+                        account_code=acct,
+                        description=desc,
+                        debit=abs(debit),
+                        credit=abs(credit),
+                    )
+                )
         if rows:
-            logger.info(f"[gl_parse][{filename}] step3b col-map: rows={len(rows)} accts={len(accounts_seen)}")
+            logger.info(
+                f"[gl_parse][{filename}] step3b col-map: rows={len(rows)} accts={len(accounts_seen)}"
+            )
 
     # ── Step 4: text-line fallback (Mr.erp Thai GL format) ──
     if len(rows) < MIN_PLUMBER_ROWS and page_texts:
@@ -2649,18 +3031,19 @@ def parse_gl_pdf(
     if direction_warning:
         logger.warning(f"[gl_parse][{filename}] {direction_warning}")
     result = {
-        "ok": True, "rows": rows,
+        "ok": True,
+        "rows": rows,
         "accounts": sorted(accounts_seen - {"?"}),
-        "opening": opening, "closing": closing, "row_count": len(rows),
+        "opening": opening,
+        "closing": closing,
+        "row_count": len(rows),
     }
     if direction_warning:
         result["warning"] = direction_warning
     return result
 
 
-def _parse_gl_text_lines(
-    text: str, account_code: str = ""
-) -> Tuple[List[GlRow], List[str], float]:
+def _parse_gl_text_lines(text: str, account_code: str = "") -> Tuple[List[GlRow], List[str], float]:
     """
     Text-line fallback for Mr.erp Thai GL PDFs.
     Format: วันที่  สมุด  ใบสำคัญ  คำอธิบาย  เดบิต  เครดิต  สถานะ  ยอดคงเหลือ
@@ -2679,14 +3062,28 @@ def _parse_gl_text_lines(
 
         # Skip header/report title/total lines
         low = line.lower()
-        if any(kw in low for kw in ["รายงาน", "account", "page", "หน้า", "บัญชี:", "ชื่อ",
-                                     "รวม", "total", "สรุป", "หมายเหตุ", "note"]):
+        if any(
+            kw in low
+            for kw in [
+                "รายงาน",
+                "account",
+                "page",
+                "หน้า",
+                "บัญชี:",
+                "ชื่อ",
+                "รวม",
+                "total",
+                "สรุป",
+                "หมายเหตุ",
+                "note",
+            ]
+        ):
             continue
 
         # Account code header: "1112-01 CA K-BANK006-8-83962-9 215,228.06"
         # Starts with 3-6 digits then dash (NOT a date like "02/06/68")
-        if re.match(r'^\d{3,6}-\d', line):
-            nums = re.findall(r'[\d,]+\.\d+', line)
+        if re.match(r"^\d{3,6}-\d", line):
+            nums = re.findall(r"[\d,]+\.\d+", line)
             if nums and not opening:
                 opening = _to_float(nums[-1])
             continue
@@ -2721,7 +3118,7 @@ def _parse_gl_text_lines(
                 continue
 
         # After date token, remaining parts: book, doc_no, description, amounts...
-        rest = parts[d_offset + 1:] if d_offset >= 0 else parts
+        rest = parts[d_offset + 1 :] if d_offset >= 0 else parts
         if len(rest) < 2:
             continue
 
@@ -2778,16 +3175,23 @@ def _parse_gl_text_lines(
             continue
 
         accounts_seen.add(acct or "?")
-        rows.append(GlRow(
-            date=d, doc_no=doc_no, account_code=acct,
-            description=desc, debit=abs(debit), credit=abs(credit),
-        ))
+        rows.append(
+            GlRow(
+                date=d,
+                doc_no=doc_no,
+                account_code=acct,
+                description=desc,
+                debit=abs(debit),
+                credit=abs(credit),
+            )
+        )
 
     return rows, sorted(accounts_seen - {"?"}), opening
 
 
-def _gemini_parse_gl(file_bytes: bytes, filename: str,
-                     account_code: str, api_key: str) -> Dict[str, Any]:
+def _gemini_parse_gl(
+    file_bytes: bytes, filename: str, account_code: str, api_key: str
+) -> Dict[str, Any]:
     """Gemini fallback for GL PDF parsing."""
     try:
         import google.generativeai as genai
@@ -2797,22 +3201,28 @@ def _gemini_parse_gl(file_bytes: bytes, filename: str,
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         b64 = base64.b64encode(file_bytes).decode()
-        acct_hint = f" Filter to account code starting with '{account_code}'." if account_code else ""
+        acct_hint = (
+            f" Filter to account code starting with '{account_code}'." if account_code else ""
+        )
         prompt = (
             "This is a General Ledger (GL) document.{hint} "
             "Extract ALL transaction rows as JSON with keys:\n"
             '  "opening_balance": number,\n'
             '  "accounts": [list of account codes found],\n'
-            '  "rows": [{date:"YYYY-MM-DD", doc_no:string, account_code:string, '
-            "description:string, debit:number, credit:number}]\n"
+            '  "rows": [{{date:"YYYY-MM-DD", doc_no:string, account_code:string, '
+            "description:string, debit:number, credit:number}}]\n"
             "Return ONLY valid JSON."
         ).format(hint=acct_hint)
 
         # v118.35.0.62 · temperature=0 · GL 抽取同样要确定性(同源 PDF 每次结果一致)
         resp = model.generate_content(
             [{"mime_type": "application/pdf", "data": b64}, prompt],
-            generation_config={"temperature": 0.0, "top_p": 1.0, "candidate_count": 1,
-                                "max_output_tokens": 32768},
+            generation_config={
+                "temperature": 0.0,
+                "top_p": 1.0,
+                "candidate_count": 1,
+                "max_output_tokens": 32768,
+            },
         )
         text = (resp.text or "").strip()
         if text.startswith("```"):
@@ -2830,19 +3240,26 @@ def _gemini_parse_gl(file_bytes: bytes, filename: str,
             if account_code and acct and not acct.startswith(account_code):
                 continue
             accounts_seen.add(acct or "?")
-            rows.append(GlRow(
-                date=d, doc_no=str(r.get("doc_no", "")),
-                account_code=acct, description=str(r.get("description", "")),
-                debit=float(r.get("debit", 0) or 0),
-                credit=float(r.get("credit", 0) or 0),
-            ))
+            rows.append(
+                GlRow(
+                    date=d,
+                    doc_no=str(r.get("doc_no", "")),
+                    account_code=acct,
+                    description=str(r.get("description", "")),
+                    debit=float(r.get("debit", 0) or 0),
+                    credit=float(r.get("credit", 0) or 0),
+                )
+            )
 
         opening = float(data.get("opening_balance", 0) or 0)
         closing = round(opening + sum(r.credit for r in rows) - sum(r.debit for r in rows), 2)
         return {
-            "ok": True, "rows": rows,
+            "ok": True,
+            "rows": rows,
             "accounts": sorted(accounts_seen - {"?"}),
-            "opening": opening, "closing": closing, "row_count": len(rows),
+            "opening": opening,
+            "closing": closing,
+            "row_count": len(rows),
         }
 
     except Exception as e:
@@ -2850,8 +3267,9 @@ def _gemini_parse_gl(file_bytes: bytes, filename: str,
         return {"ok": False, "rows": [], "error": str(e)}
 
 
-def parse_gl(file_bytes: bytes, filename: str,
-             account_code: str = "", api_key: str = "") -> Dict[str, Any]:
+def parse_gl(
+    file_bytes: bytes, filename: str, account_code: str = "", api_key: str = ""
+) -> Dict[str, Any]:
     """Route to Excel / PDF / pipeline GL parser based on file extension.
 
     2026-05-21 multi-format refactor:
@@ -2862,6 +3280,7 @@ def parse_gl(file_bytes: bytes, filename: str,
       description-column numbers (e.g. 6091) from being parsed as amounts.
     """
     import os as _os
+
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     if ext in ("xlsx", "xls", "xlsm"):
         result = parse_gl_excel(file_bytes, filename, account_code)
@@ -2902,12 +3321,18 @@ def _parse_bank_stmt_via_pipeline(file_bytes: bytes, filename: str) -> Dict[str,
         from services.ocr.pipeline import (
             run_on_image_bytes as _run_image,
             run_on_table_bytes as _run_table,
-            IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+            IMAGE_EXTENSIONS,
+            TABLE_EXTENSIONS,
         )
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
     except ImportError as e:
-        return {"ok": False, "rows": [], "row_count": 0, "bank_code": "generic",
-                "error": f"pipeline import failed: {e}"}
+        return {
+            "ok": False,
+            "rows": [],
+            "row_count": 0,
+            "bank_code": "generic",
+            "error": f"pipeline import failed: {e}",
+        }
 
     ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
 
@@ -2917,30 +3342,48 @@ def _parse_bank_stmt_via_pipeline(file_bytes: bytes, filename: str) -> Dict[str,
     if ext_dot in (".xlsx", ".xls", ".xlsm"):
         direct = parse_bank_stmt_xlsx_direct(file_bytes, filename)
         if direct.get("ok"):
-            logger.info(f"[stmt_parse][{filename}] xlsx_direct OK · {direct['row_count']} rows · skip Gemini")
+            logger.info(
+                f"[stmt_parse][{filename}] xlsx_direct OK · {direct['row_count']} rows · skip Gemini"
+            )
             return direct
-        logger.info(f"[stmt_parse][{filename}] xlsx_direct miss({direct.get('error_code')}) · falling back to Gemini")
+        logger.info(
+            f"[stmt_parse][{filename}] xlsx_direct miss({direct.get('error_code')}) · falling back to Gemini"
+        )
 
     try:
         if ext_dot in IMAGE_EXTENSIONS:
             pr = _run_image(file_bytes, document_type="bank_statement")
         elif ext_dot in TABLE_EXTENSIONS:
-            pr = _run_table(file_bytes, filename=filename or "stmt",
-                            document_type="bank_statement")
+            pr = _run_table(file_bytes, filename=filename or "stmt", document_type="bank_statement")
         else:
-            return {"ok": False, "rows": [], "row_count": 0, "bank_code": "generic",
-                    "error_code": "file_not_supported",
-                    "error": f"unsupported format {ext_dot}"}
+            return {
+                "ok": False,
+                "rows": [],
+                "row_count": 0,
+                "bank_code": "generic",
+                "error_code": "file_not_supported",
+                "error": f"unsupported format {ext_dot}",
+            }
     except Exception as e:
-        return {"ok": False, "rows": [], "row_count": 0, "bank_code": "generic",
-                "error_code": "ocr_failed",
-                "error": _short_err(e)}
+        return {
+            "ok": False,
+            "rows": [],
+            "row_count": 0,
+            "bank_code": "generic",
+            "error_code": "ocr_failed",
+            "error": _short_err(e),
+        }
 
     legacy = pipeline_result_to_legacy_dict(pr)
     pages = legacy.get("pages") or []
     if not pages:
-        return {"ok": False, "rows": [], "row_count": 0, "bank_code": "generic",
-                "error": "no pages parsed"}
+        return {
+            "ok": False,
+            "rows": [],
+            "row_count": 0,
+            "bank_code": "generic",
+            "error": "no pages parsed",
+        }
     doc = (pages[0] or {}).get("document") or {}
     bank_name_l = (doc.get("bank_name") or "").lower()
     bank_code = "generic"
@@ -2950,7 +3393,7 @@ def _parse_bank_stmt_via_pipeline(file_bytes: bytes, filename: str) -> Dict[str,
             break
 
     rows: List[StatementRow] = []
-    for e in (doc.get("entries") or []):
+    for e in doc.get("entries") or []:
         deposit = _to_float(e.get("deposit"))
         withdrawal = _to_float(e.get("withdrawal"))
         balance = _to_float(e.get("balance"))
@@ -2963,14 +3406,16 @@ def _parse_bank_stmt_via_pipeline(file_bytes: bytes, filename: str) -> Dict[str,
                 tx_date = date(int(yy), int(mm), int(dd))
             except (ValueError, AttributeError):
                 tx_date = _parse_date(e.get("transaction_date_raw") or "")
-        rows.append(StatementRow(
-            date=tx_date,
-            description=e.get("description") or "",
-            withdrawal=withdrawal,
-            deposit=deposit,
-            balance=balance,
-            source_file=filename,
-        ))
+        rows.append(
+            StatementRow(
+                date=tx_date,
+                description=e.get("description") or "",
+                withdrawal=withdrawal,
+                deposit=deposit,
+                balance=balance,
+                source_file=filename,
+            )
+        )
     return {
         "ok": True,
         "rows": rows,
@@ -2981,35 +3426,51 @@ def _parse_bank_stmt_via_pipeline(file_bytes: bytes, filename: str) -> Dict[str,
     }
 
 
-def _parse_gl_via_pipeline(file_bytes: bytes, filename: str,
-                            account_code: str = "") -> Dict[str, Any]:
+def _parse_gl_via_pipeline(
+    file_bytes: bytes, filename: str, account_code: str = ""
+) -> Dict[str, Any]:
     """Bank-recon-v2 adapter: route GL through services/ocr/pipeline with
     document_type='general_ledger', then convert to List[GlRow]."""
     try:
         from services.ocr.pipeline import (
             run_on_image_bytes as _run_image,
             run_on_table_bytes as _run_table,
-            IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+            IMAGE_EXTENSIONS,
+            TABLE_EXTENSIONS,
         )
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
     except ImportError as e:
-        return {"ok": False, "rows": [], "row_count": 0, "accounts": [],
-                "error": f"pipeline import failed: {e}"}
+        return {
+            "ok": False,
+            "rows": [],
+            "row_count": 0,
+            "accounts": [],
+            "error": f"pipeline import failed: {e}",
+        }
     ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
     try:
         if ext_dot in IMAGE_EXTENSIONS:
             pr = _run_image(file_bytes, document_type="general_ledger")
         elif ext_dot in TABLE_EXTENSIONS:
-            pr = _run_table(file_bytes, filename=filename or "gl",
-                            document_type="general_ledger")
+            pr = _run_table(file_bytes, filename=filename or "gl", document_type="general_ledger")
         else:
-            return {"ok": False, "rows": [], "row_count": 0, "accounts": [],
-                    "error_code": "file_not_supported",
-                    "error": f"unsupported format {ext_dot}"}
+            return {
+                "ok": False,
+                "rows": [],
+                "row_count": 0,
+                "accounts": [],
+                "error_code": "file_not_supported",
+                "error": f"unsupported format {ext_dot}",
+            }
     except Exception as e:
-        return {"ok": False, "rows": [], "row_count": 0, "accounts": [],
-                "error_code": "ocr_failed",
-                "error": _short_err(e)}
+        return {
+            "ok": False,
+            "rows": [],
+            "row_count": 0,
+            "accounts": [],
+            "error_code": "ocr_failed",
+            "error": _short_err(e),
+        }
 
     legacy = pipeline_result_to_legacy_dict(pr)
     rows = gl_rows_from_pipeline_legacy(legacy)
@@ -3029,7 +3490,9 @@ def _parse_gl_via_pipeline(file_bytes: bytes, filename: str,
 # ─────────────────────────────────────────────────────────────────────────────
 # MULTI-FILE MERGE
 # ─────────────────────────────────────────────────────────────────────────────
-def merge_statements(parsed_list: List[Dict[str, Any]]) -> Tuple[List[StatementRow], float, float, str]:
+def merge_statements(
+    parsed_list: List[Dict[str, Any]],
+) -> Tuple[List[StatementRow], float, float, str]:
     """Merge multiple parsed bank statements, deduplicate, sort by date."""
     seen_hashes = set()
     all_rows: List[StatementRow] = []
@@ -3044,7 +3507,7 @@ def merge_statements(parsed_list: List[Dict[str, Any]]) -> Tuple[List[StatementR
             continue
         if p.get("bank_code") and p["bank_code"] != "generic":
             bank_code = p["bank_code"]
-        for r in (p.get("rows") or []):
+        for r in p.get("rows") or []:
             if r.row_hash in seen_hashes:
                 continue
             seen_hashes.add(r.row_hash)
@@ -3086,8 +3549,9 @@ def merge_statements(parsed_list: List[Dict[str, Any]]) -> Tuple[List[StatementR
     return all_rows, opening, closing, bank_code
 
 
-def merge_gl_files(parsed_list: List[Dict[str, Any]],
-                   account_code: str = "") -> Tuple[List[GlRow], List[str], float, float]:
+def merge_gl_files(
+    parsed_list: List[Dict[str, Any]], account_code: str = ""
+) -> Tuple[List[GlRow], List[str], float, float]:
     """Merge multiple parsed GL files, deduplicate, sort by date."""
     seen_hashes = set()
     all_rows: List[GlRow] = []
@@ -3099,9 +3563,9 @@ def merge_gl_files(parsed_list: List[Dict[str, Any]],
             continue
         if p.get("opening", 0.0) != 0.0 and opening == 0.0:
             opening = p["opening"]
-        for acct in (p.get("accounts") or []):
+        for acct in p.get("accounts") or []:
             all_accounts.add(acct)
-        for r in (p.get("rows") or []):
+        for r in p.get("rows") or []:
             if account_code and r.account_code and not r.account_code.startswith(account_code):
                 continue
             if r.row_hash in seen_hashes:
@@ -3188,17 +3652,29 @@ def reconcile(
             gr = gl_rows[gi]
             stmt_used[si] = True
             gl_used[gi] = True
-            recon_rows.append(BankReconRow(
-                match_status="matched", match_layer=1,
-                stmt_date=sr.date, stmt_desc=sr.description,
-                stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
-                stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
-                stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
-                gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
-                gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
-                date_diff_days=0,
-                source_stmt_file=sr.source_file, source_gl_file=gr.source_file,
-            ))
+            recon_rows.append(
+                BankReconRow(
+                    match_status="matched",
+                    match_layer=1,
+                    stmt_date=sr.date,
+                    stmt_desc=sr.description,
+                    stmt_withdrawal=sr.withdrawal,
+                    stmt_deposit=sr.deposit,
+                    stmt_balance=sr.balance,
+                    stmt_confidence=sr.confidence,
+                    stmt_balance_ok=sr.balance_ok,
+                    stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
+                    gl_date=gr.date,
+                    gl_doc_no=gr.doc_no,
+                    gl_account_code=gr.account_code,
+                    gl_desc=gr.description,
+                    gl_debit=gr.debit,
+                    gl_credit=gr.credit,
+                    date_diff_days=0,
+                    source_stmt_file=sr.source_file,
+                    source_gl_file=gr.source_file,
+                )
+            )
 
     # Layer 2: ±3-day tolerance
     for si, sr in enumerate(stmt_rows):
@@ -3210,17 +3686,29 @@ def reconcile(
             stmt_used[si] = True
             gl_used[gi] = True
             dd = _day_diff(sr.date, gr.date) or 0
-            recon_rows.append(BankReconRow(
-                match_status="matched", match_layer=2,
-                stmt_date=sr.date, stmt_desc=sr.description,
-                stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
-                stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
-                stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
-                gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
-                gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
-                date_diff_days=dd,
-                source_stmt_file=sr.source_file, source_gl_file=gr.source_file,
-            ))
+            recon_rows.append(
+                BankReconRow(
+                    match_status="matched",
+                    match_layer=2,
+                    stmt_date=sr.date,
+                    stmt_desc=sr.description,
+                    stmt_withdrawal=sr.withdrawal,
+                    stmt_deposit=sr.deposit,
+                    stmt_balance=sr.balance,
+                    stmt_confidence=sr.confidence,
+                    stmt_balance_ok=sr.balance_ok,
+                    stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
+                    gl_date=gr.date,
+                    gl_doc_no=gr.doc_no,
+                    gl_account_code=gr.account_code,
+                    gl_desc=gr.description,
+                    gl_debit=gr.debit,
+                    gl_credit=gr.credit,
+                    date_diff_days=dd,
+                    source_stmt_file=sr.source_file,
+                    source_gl_file=gr.source_file,
+                )
+            )
 
     # Layer 3: amount only (no date constraint) — flagged
     for si, sr in enumerate(stmt_rows):
@@ -3232,43 +3720,69 @@ def reconcile(
             stmt_used[si] = True
             gl_used[gi] = True
             dd = _day_diff(sr.date, gr.date)
-            recon_rows.append(BankReconRow(
-                match_status="matched", match_layer=3,
-                stmt_date=sr.date, stmt_desc=sr.description,
-                stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
-                stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
-                stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
-                gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
-                gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
-                date_diff_days=dd,
-                source_stmt_file=sr.source_file, source_gl_file=gr.source_file,
-            ))
+            recon_rows.append(
+                BankReconRow(
+                    match_status="matched",
+                    match_layer=3,
+                    stmt_date=sr.date,
+                    stmt_desc=sr.description,
+                    stmt_withdrawal=sr.withdrawal,
+                    stmt_deposit=sr.deposit,
+                    stmt_balance=sr.balance,
+                    stmt_confidence=sr.confidence,
+                    stmt_balance_ok=sr.balance_ok,
+                    stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
+                    gl_date=gr.date,
+                    gl_doc_no=gr.doc_no,
+                    gl_account_code=gr.account_code,
+                    gl_desc=gr.description,
+                    gl_debit=gr.debit,
+                    gl_credit=gr.credit,
+                    date_diff_days=dd,
+                    source_stmt_file=sr.source_file,
+                    source_gl_file=gr.source_file,
+                )
+            )
 
     # Remaining unmatched statement rows
     for si, sr in enumerate(stmt_rows):
         if stmt_used[si]:
             continue
         status = "stmt_withdrawal_only" if sr.withdrawal > 0 else "stmt_deposit_only"
-        recon_rows.append(BankReconRow(
-            match_status=status, match_layer=None,
-            stmt_date=sr.date, stmt_desc=sr.description,
-            stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
-            stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
-            stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
-            source_stmt_file=sr.source_file,
-        ))
+        recon_rows.append(
+            BankReconRow(
+                match_status=status,
+                match_layer=None,
+                stmt_date=sr.date,
+                stmt_desc=sr.description,
+                stmt_withdrawal=sr.withdrawal,
+                stmt_deposit=sr.deposit,
+                stmt_balance=sr.balance,
+                stmt_confidence=sr.confidence,
+                stmt_balance_ok=sr.balance_ok,
+                stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
+                source_stmt_file=sr.source_file,
+            )
+        )
 
     # Remaining unmatched GL rows
     for gi, gr in enumerate(gl_rows):
         if gl_used[gi]:
             continue
         status = "gl_debit_only" if gr.debit > 0 else "gl_credit_only"
-        recon_rows.append(BankReconRow(
-            match_status=status, match_layer=None,
-            gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
-            gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
-            source_gl_file=gr.source_file,
-        ))
+        recon_rows.append(
+            BankReconRow(
+                match_status=status,
+                match_layer=None,
+                gl_date=gr.date,
+                gl_doc_no=gr.doc_no,
+                gl_account_code=gr.account_code,
+                gl_desc=gr.description,
+                gl_debit=gr.debit,
+                gl_credit=gr.credit,
+                source_gl_file=gr.source_file,
+            )
+        )
 
     # Sort: matched first (by stmt_date), then unmatched
     def _sort_key(r: BankReconRow):
@@ -3295,10 +3809,13 @@ def reconcile(
     #                           - stmt_wd_only + stmt_dep_only
     opening_diff = round(stmt_opening - gl_opening, 2)
     formula_closing = round(
-        gl_closing + opening_diff
-        - gl_debit_only_amt + gl_credit_only_amt
-        - stmt_wd_only_amt + stmt_dep_only_amt,
-        2
+        gl_closing
+        + opening_diff
+        - gl_debit_only_amt
+        + gl_credit_only_amt
+        - stmt_wd_only_amt
+        + stmt_dep_only_amt,
+        2,
     )
     formula_diff = round(stmt_closing - formula_closing, 2)
 
@@ -3335,178 +3852,378 @@ def reconcile(
 # ─────────────────────────────────────────────────────────────────────────────
 _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     # Sheet names
-    "sh_summary":      {"th": "สรุป", "en": "Summary", "zh": "汇总", "ja": "サマリー"},
-    "sh_matched":      {"th": "จับคู่แล้ว", "en": "Matched", "zh": "已匹配", "ja": "一致"},
-    "sh_unmatched_gl": {"th": "GL ที่จับคู่ไม่ได้", "en": "Unmatched GL", "zh": "GL未匹配", "ja": "GL不一致"},
-    "sh_unmatched_st": {"th": "Statement ที่จับคู่ไม่ได้", "en": "Unmatched Statement", "zh": "账单未匹配", "ja": "明細不一致"},
+    "sh_summary": {"th": "สรุป", "en": "Summary", "zh": "汇总", "ja": "サマリー"},
+    "sh_matched": {"th": "จับคู่แล้ว", "en": "Matched", "zh": "已匹配", "ja": "一致"},
+    "sh_unmatched_gl": {
+        "th": "GL ที่จับคู่ไม่ได้",
+        "en": "Unmatched GL",
+        "zh": "GL未匹配",
+        "ja": "GL不一致",
+    },
+    "sh_unmatched_st": {
+        "th": "Statement ที่จับคู่ไม่ได้",
+        "en": "Unmatched Statement",
+        "zh": "账单未匹配",
+        "ja": "明細不一致",
+    },
     # v118.34 · Consolidated Match Results sheet (matched + gl-only + stmt-only with Status col)
-    "sh_match_results": {"th": "ผลการจับคู่", "en": "Match Results", "zh": "对账结果", "ja": "照合結果"},
-    "status_matched":   {"th": "✓ จับคู่แล้ว", "en": "✓ Matched", "zh": "✓ 已匹配", "ja": "✓ 一致"},
+    "sh_match_results": {
+        "th": "ผลการจับคู่",
+        "en": "Match Results",
+        "zh": "对账结果",
+        "ja": "照合結果",
+    },
+    "status_matched": {"th": "✓ จับคู่แล้ว", "en": "✓ Matched", "zh": "✓ 已匹配", "ja": "✓ 一致"},
     # Column headers
-    "col_date":        {"th": "วันที่", "en": "Date", "zh": "日期", "ja": "日付"},
-    "col_desc":        {"th": "รายการ", "en": "Description", "zh": "摘要", "ja": "摘要"},
-    "col_withdrawal":  {"th": "ถอนเงิน", "en": "Withdrawal", "zh": "提款", "ja": "出金"},
-    "col_deposit":     {"th": "ฝากเงิน", "en": "Deposit", "zh": "存款", "ja": "入金"},
-    "col_balance":     {"th": "ยอดคงเหลือ", "en": "Balance", "zh": "余额", "ja": "残高"},
-    "col_gl_date":     {"th": "วันที่ GL", "en": "GL Date", "zh": "GL日期", "ja": "GL日付"},
-    "col_gl_doc":      {"th": "เลขที่ GL", "en": "GL Doc No", "zh": "GL凭证号", "ja": "GL伝票番号"},
-    "col_gl_acct":     {"th": "รหัสบัญชี", "en": "Account Code", "zh": "科目代码", "ja": "科目コード"},
-    "col_gl_desc":     {"th": "รายการ GL", "en": "GL Description", "zh": "GL摘要", "ja": "GL摘要"},
-    "col_gl_debit":    {"th": "เดบิต GL", "en": "GL Debit", "zh": "GL借方", "ja": "GL借方"},
-    "col_gl_credit":   {"th": "เครดิต GL", "en": "GL Credit", "zh": "GL贷方", "ja": "GL貸方"},
+    "col_date": {"th": "วันที่", "en": "Date", "zh": "日期", "ja": "日付"},
+    "col_desc": {"th": "รายการ", "en": "Description", "zh": "摘要", "ja": "摘要"},
+    "col_withdrawal": {"th": "ถอนเงิน", "en": "Withdrawal", "zh": "提款", "ja": "出金"},
+    "col_deposit": {"th": "ฝากเงิน", "en": "Deposit", "zh": "存款", "ja": "入金"},
+    "col_balance": {"th": "ยอดคงเหลือ", "en": "Balance", "zh": "余额", "ja": "残高"},
+    "col_gl_date": {"th": "วันที่ GL", "en": "GL Date", "zh": "GL日期", "ja": "GL日付"},
+    "col_gl_doc": {"th": "เลขที่ GL", "en": "GL Doc No", "zh": "GL凭证号", "ja": "GL伝票番号"},
+    "col_gl_acct": {"th": "รหัสบัญชี", "en": "Account Code", "zh": "科目代码", "ja": "科目コード"},
+    "col_gl_desc": {"th": "รายการ GL", "en": "GL Description", "zh": "GL摘要", "ja": "GL摘要"},
+    "col_gl_debit": {"th": "เดบิต GL", "en": "GL Debit", "zh": "GL借方", "ja": "GL借方"},
+    "col_gl_credit": {"th": "เครดิต GL", "en": "GL Credit", "zh": "GL贷方", "ja": "GL貸方"},
     "col_match_layer": {"th": "ชั้นจับคู่", "en": "Match Layer", "zh": "匹配层", "ja": "マッチ層"},
-    "col_date_diff":   {"th": "ต่างวัน", "en": "Day Diff", "zh": "日期差", "ja": "日付差"},
-    "col_status":      {"th": "สถานะ", "en": "Status", "zh": "状态", "ja": "状態"},
-    "col_source_stmt": {"th": "ไฟล์บัญชี", "en": "Statement File", "zh": "对账单文件", "ja": "明細ファイル"},
-    "col_source_gl":   {"th": "ไฟล์ GL", "en": "GL File", "zh": "GL文件", "ja": "GLファイル"},
+    "col_date_diff": {"th": "ต่างวัน", "en": "Day Diff", "zh": "日期差", "ja": "日付差"},
+    "col_status": {"th": "สถานะ", "en": "Status", "zh": "状态", "ja": "状態"},
+    "col_source_stmt": {
+        "th": "ไฟล์บัญชี",
+        "en": "Statement File",
+        "zh": "对账单文件",
+        "ja": "明細ファイル",
+    },
+    "col_source_gl": {"th": "ไฟล์ GL", "en": "GL File", "zh": "GL文件", "ja": "GLファイル"},
     # Summary labels
-    "lbl_bank":        {"th": "ธนาคาร", "en": "Bank", "zh": "银行", "ja": "銀行"},
-    "lbl_gl_acct":     {"th": "รหัสบัญชี GL", "en": "GL Account", "zh": "GL科目", "ja": "GL科目"},
-    "lbl_stmt_open":   {"th": "ยอดยกมา (Statement)", "en": "Stmt Opening Balance", "zh": "对账单期初余额", "ja": "明細期首残高"},
-    "lbl_stmt_close":  {"th": "ยอดยกไป (Statement)", "en": "Stmt Closing Balance", "zh": "对账单期末余额", "ja": "明細期末残高"},
-    "lbl_gl_open":     {"th": "ยอดยกมา (GL)", "en": "GL Opening Balance", "zh": "GL期初余额", "ja": "GL期首残高"},
-    "lbl_gl_close":    {"th": "ยอดยกไป (GL)", "en": "GL Closing Balance", "zh": "GL期末余额", "ja": "GL期末残高"},
-    "lbl_open_diff":   {"th": "ผลต่างยอดยกมา", "en": "Opening Diff", "zh": "期初差异", "ja": "期首差異"},
-    "lbl_matched":     {"th": "รายการที่จับคู่ได้", "en": "Matched Items", "zh": "已匹配项目", "ja": "一致項目"},
-    "lbl_gl_debit_only": {"th": "GL เดบิตเท่านั้น (ไม่มีในบัญชีธนาคาร)", "en": "GL Debit Only (not in Statement)", "zh": "仅 GL 有借方（对账单中缺失）", "ja": "GL の借方のみ（明細にない）"},
-    "lbl_gl_credit_only": {"th": "GL เครดิตเท่านั้น (ไม่มีในบัญชีธนาคาร)", "en": "GL Credit Only (not in Statement)", "zh": "仅 GL 有贷方（对账单中缺失）", "ja": "GL の貸方のみ（明細にない）"},
-    "lbl_stmt_wd_only": {"th": "รายการถอนใน Statement เท่านั้น (ไม่มีใน GL)", "en": "Stmt Withdrawal Only (not in GL)", "zh": "仅对账单有提款（GL 中缺失）", "ja": "明細の出金のみ（GL にない）"},
-    "lbl_stmt_dep_only": {"th": "รายการฝากใน Statement เท่านั้น (ไม่มีใน GL)", "en": "Stmt Deposit Only (not in GL)", "zh": "仅对账单有存款（GL 中缺失）", "ja": "明細の入金のみ（GL にない）"},
-    "lbl_formula_calc": {"th": "ยอดปิดคำนวณ (สูตร)", "en": "Calculated Closing (formula)", "zh": "公式计算期末余额", "ja": "計算期末残高（計算式）"},
-    "lbl_formula_diff": {"th": "ผลต่าง (ควรเป็น 0)", "en": "Difference (should be 0)", "zh": "差异（应为0）", "ja": "差異（0が理想）"},
-    "lbl_count":        {"th": "จำนวน", "en": "Count", "zh": "数量", "ja": "件数"},
-    "lbl_amount":       {"th": "จำนวนเงิน", "en": "Amount", "zh": "金额", "ja": "金額"},
-    "lbl_formula_title": {"th": "สูตรการกระทบยอด", "en": "Reconciliation Formula", "zh": "对账公式", "ja": "照合計算式"},
-    "lbl_stats":        {"th": "สถิติ", "en": "Statistics", "zh": "统计", "ja": "統計"},
+    "lbl_bank": {"th": "ธนาคาร", "en": "Bank", "zh": "银行", "ja": "銀行"},
+    "lbl_gl_acct": {"th": "รหัสบัญชี GL", "en": "GL Account", "zh": "GL科目", "ja": "GL科目"},
+    "lbl_stmt_open": {
+        "th": "ยอดยกมา (Statement)",
+        "en": "Stmt Opening Balance",
+        "zh": "对账单期初余额",
+        "ja": "明細期首残高",
+    },
+    "lbl_stmt_close": {
+        "th": "ยอดยกไป (Statement)",
+        "en": "Stmt Closing Balance",
+        "zh": "对账单期末余额",
+        "ja": "明細期末残高",
+    },
+    "lbl_gl_open": {
+        "th": "ยอดยกมา (GL)",
+        "en": "GL Opening Balance",
+        "zh": "GL期初余额",
+        "ja": "GL期首残高",
+    },
+    "lbl_gl_close": {
+        "th": "ยอดยกไป (GL)",
+        "en": "GL Closing Balance",
+        "zh": "GL期末余额",
+        "ja": "GL期末残高",
+    },
+    "lbl_open_diff": {
+        "th": "ผลต่างยอดยกมา",
+        "en": "Opening Diff",
+        "zh": "期初差异",
+        "ja": "期首差異",
+    },
+    "lbl_matched": {
+        "th": "รายการที่จับคู่ได้",
+        "en": "Matched Items",
+        "zh": "已匹配项目",
+        "ja": "一致項目",
+    },
+    "lbl_gl_debit_only": {
+        "th": "GL เดบิตเท่านั้น (ไม่มีในบัญชีธนาคาร)",
+        "en": "GL Debit Only (not in Statement)",
+        "zh": "仅 GL 有借方（对账单中缺失）",
+        "ja": "GL の借方のみ（明細にない）",
+    },
+    "lbl_gl_credit_only": {
+        "th": "GL เครดิตเท่านั้น (ไม่มีในบัญชีธนาคาร)",
+        "en": "GL Credit Only (not in Statement)",
+        "zh": "仅 GL 有贷方（对账单中缺失）",
+        "ja": "GL の貸方のみ（明細にない）",
+    },
+    "lbl_stmt_wd_only": {
+        "th": "รายการถอนใน Statement เท่านั้น (ไม่มีใน GL)",
+        "en": "Stmt Withdrawal Only (not in GL)",
+        "zh": "仅对账单有提款（GL 中缺失）",
+        "ja": "明細の出金のみ（GL にない）",
+    },
+    "lbl_stmt_dep_only": {
+        "th": "รายการฝากใน Statement เท่านั้น (ไม่มีใน GL)",
+        "en": "Stmt Deposit Only (not in GL)",
+        "zh": "仅对账单有存款（GL 中缺失）",
+        "ja": "明細の入金のみ（GL にない）",
+    },
+    "lbl_formula_calc": {
+        "th": "ยอดปิดคำนวณ (สูตร)",
+        "en": "Calculated Closing (formula)",
+        "zh": "公式计算期末余额",
+        "ja": "計算期末残高（計算式）",
+    },
+    "lbl_formula_diff": {
+        "th": "ผลต่าง (ควรเป็น 0)",
+        "en": "Difference (should be 0)",
+        "zh": "差异（应为0）",
+        "ja": "差異（0が理想）",
+    },
+    "lbl_count": {"th": "จำนวน", "en": "Count", "zh": "数量", "ja": "件数"},
+    "lbl_amount": {"th": "จำนวนเงิน", "en": "Amount", "zh": "金额", "ja": "金額"},
+    "lbl_formula_title": {
+        "th": "สูตรการกระทบยอด",
+        "en": "Reconciliation Formula",
+        "zh": "对账公式",
+        "ja": "照合計算式",
+    },
+    "lbl_stats": {"th": "สถิติ", "en": "Statistics", "zh": "统计", "ja": "統計"},
     # Match layer labels
-    "layer_1":  {"th": "L1-ตรงวันที่", "en": "L1 - Exact Date", "zh": "L1-精确日期", "ja": "L1-日付一致"},
-    "layer_2":  {"th": "L2-ใกล้วันที่", "en": "L2 - Date Tolerance", "zh": "L2-日期容差", "ja": "L2-日付許容"},
-    "layer_3":  {"th": "L3-เฉพาะยอด", "en": "L3 - Amount Only", "zh": "L3-仅金额", "ja": "L3-金額のみ"},
+    "layer_1": {
+        "th": "L1-ตรงวันที่",
+        "en": "L1 - Exact Date",
+        "zh": "L1-精确日期",
+        "ja": "L1-日付一致",
+    },
+    "layer_2": {
+        "th": "L2-ใกล้วันที่",
+        "en": "L2 - Date Tolerance",
+        "zh": "L2-日期容差",
+        "ja": "L2-日付許容",
+    },
+    "layer_3": {
+        "th": "L3-เฉพาะยอด",
+        "en": "L3 - Amount Only",
+        "zh": "L3-仅金额",
+        "ja": "L3-金額のみ",
+    },
     # Status labels
-    "st_gl_debit_only": {"th": "GL เดบิตเท่านั้น", "en": "GL Debit Only", "zh": "仅 GL 借方", "ja": "GL の借方のみ"},
-    "st_gl_credit_only": {"th": "GL เครดิตเท่านั้น", "en": "GL Credit Only", "zh": "仅 GL 贷方", "ja": "GL の貸方のみ"},
-    "st_stmt_wd_only": {"th": "รายการถอนเท่านั้น", "en": "Stmt Withdrawal Only", "zh": "仅对账单提款", "ja": "明細の出金のみ"},
-    "st_stmt_dep_only": {"th": "รายการฝากเท่านั้น", "en": "Stmt Deposit Only", "zh": "仅对账单存款", "ja": "明細の入金のみ"},
+    "st_gl_debit_only": {
+        "th": "GL เดบิตเท่านั้น",
+        "en": "GL Debit Only",
+        "zh": "仅 GL 借方",
+        "ja": "GL の借方のみ",
+    },
+    "st_gl_credit_only": {
+        "th": "GL เครดิตเท่านั้น",
+        "en": "GL Credit Only",
+        "zh": "仅 GL 贷方",
+        "ja": "GL の貸方のみ",
+    },
+    "st_stmt_wd_only": {
+        "th": "รายการถอนเท่านั้น",
+        "en": "Stmt Withdrawal Only",
+        "zh": "仅对账单提款",
+        "ja": "明細の出金のみ",
+    },
+    "st_stmt_dep_only": {
+        "th": "รายการฝากเท่านั้น",
+        "en": "Stmt Deposit Only",
+        "zh": "仅对账单存款",
+        "ja": "明細の入金のみ",
+    },
     # File-info diagnostics sheet
-    "sh_fileinfo":      {"th": "ข้อมูลไฟล์", "en": "File Info", "zh": "文件信息", "ja": "ファイル情報"},
-    "fi_type":          {"th": "ประเภท", "en": "Type", "zh": "类型", "ja": "種別"},
-    "fi_file":          {"th": "ชื่อไฟล์", "en": "File", "zh": "文件名", "ja": "ファイル"},
-    "fi_rows":          {"th": "แถวที่พบ", "en": "Rows Found", "zh": "解析行数", "ja": "解析行数"},
-    "fi_bank_acct":     {"th": "ธนาคาร/บัญชี", "en": "Bank/Account", "zh": "银行/科目", "ja": "銀行/科目"},
-    "fi_status":        {"th": "สถานะ", "en": "Status", "zh": "状态", "ja": "状態"},
-    "fi_error":         {"th": "ข้อผิดพลาด", "en": "Error", "zh": "错误", "ja": "エラー"},
-    "fi_stmt_type":     {"th": "Statement ธนาคาร", "en": "Bank Statement", "zh": "银行对账单", "ja": "銀行明細"},
-    "fi_gl_type":       {"th": "GL", "en": "GL", "zh": "总账（GL）", "ja": "GL"},
-    "fi_ok":            {"th": "✓ สำเร็จ", "en": "✓ OK", "zh": "✓ 成功", "ja": "✓ 成功"},
-    "fi_warn":          {"th": "⚠ 0 แถว", "en": "⚠ 0 Rows", "zh": "⚠ 0行", "ja": "⚠ 0行"},
-    "fi_fail":          {"th": "✗ ล้มเหลว", "en": "✗ Failed", "zh": "✗ 失败", "ja": "✗ 失敗"},
+    "sh_fileinfo": {"th": "ข้อมูลไฟล์", "en": "File Info", "zh": "文件信息", "ja": "ファイル情報"},
+    "fi_type": {"th": "ประเภท", "en": "Type", "zh": "类型", "ja": "種別"},
+    "fi_file": {"th": "ชื่อไฟล์", "en": "File", "zh": "文件名", "ja": "ファイル"},
+    "fi_rows": {"th": "แถวที่พบ", "en": "Rows Found", "zh": "解析行数", "ja": "解析行数"},
+    "fi_bank_acct": {
+        "th": "ธนาคาร/บัญชี",
+        "en": "Bank/Account",
+        "zh": "银行/科目",
+        "ja": "銀行/科目",
+    },
+    "fi_status": {"th": "สถานะ", "en": "Status", "zh": "状态", "ja": "状態"},
+    "fi_error": {"th": "ข้อผิดพลาด", "en": "Error", "zh": "错误", "ja": "エラー"},
+    "fi_stmt_type": {
+        "th": "Statement ธนาคาร",
+        "en": "Bank Statement",
+        "zh": "银行对账单",
+        "ja": "銀行明細",
+    },
+    "fi_gl_type": {"th": "GL", "en": "GL", "zh": "总账（GL）", "ja": "GL"},
+    "fi_ok": {"th": "✓ สำเร็จ", "en": "✓ OK", "zh": "✓ 成功", "ja": "✓ 成功"},
+    "fi_warn": {"th": "⚠ 0 แถว", "en": "⚠ 0 Rows", "zh": "⚠ 0行", "ja": "⚠ 0行"},
+    "fi_fail": {"th": "✗ ล้มเหลว", "en": "✗ Failed", "zh": "✗ 失败", "ja": "✗ 失敗"},
     # v118.35.0.61 · 匹配率诚实化 · 防『diff=0 恒等式假象』误导用户
-    "lbl_match_section": {"th": "ผลการจับคู่ (กระทบยอด)", "en": "Matching Result",
-                          "zh": "勾稽匹配情况", "ja": "照合結果"},
-    "lbl_matched_n":    {"th": "จับคู่สำเร็จ", "en": "Matched",
-                         "zh": "已匹配笔数", "ja": "一致件数"},
-    "lbl_match_rate":   {"th": "อัตราจับคู่", "en": "Match Rate",
-                         "zh": "匹配率", "ja": "一致率"},
-    "banner_no_match":  {"th": "⚠ จับคู่สำเร็จ 0 รายการ · ค่า『ผลต่าง』ด้านล่างแม้แสดง 0 ก็เป็นเพียงผลของสมการบัญชี ไม่ได้กระทบยอดตรงกันจริง · GL กับใบแจ้งยอดอาจไม่ใช่บัญชี/ช่วงเวลาเดียวกัน กรุณาตรวจสอบ",
-                         "en": "⚠ 0 items matched. Even if the Difference below shows 0, that is only an accounting identity — NOT a true reconciliation. The GL and statement may not be the same account/period. Please verify.",
-                         "zh": "⚠ 本次 0 笔成功匹配。下方『差异』即便显示 0,也只是会计恒等式的结果,并非真正对平——很可能 GL 与对账单不是同一账户或同一期间,请核对。",
-                         "ja": "⚠ 一致 0 件。下の『差異』が 0 でも会計恒等式の結果にすぎず、真の照合ではありません。GL と明細が同一口座・同一期間か確認してください。"},
-    "banner_low_match": {"th": "⚠ จับคู่ได้เพียง {n} รายการ ({r}%) ส่วนใหญ่ยังไม่ตรงกัน · กรุณายืนยันว่า GL กับใบแจ้งยอดเป็นบัญชี/ช่วงเวลาเดียวกัน",
-                         "en": "⚠ Only {n} item(s) matched ({r}%); most records did not correspond. Please confirm the GL and statement are the same account/period.",
-                         "zh": "⚠ 仅 {n} 笔匹配(匹配率 {r}%),绝大多数记录未能对应。请确认 GL 与对账单是否同一账户、同一期间。",
-                         "ja": "⚠ 一致は {n} 件のみ({r}%)。大半が対応していません。GL と明細が同一口座・同一期間か確認してください。"},
-    "diff_identity_note": {"th": "(จับคู่ {n} รายการ · ผลต่าง≈0 ไม่ได้แปลว่ากระทบยอดตรง)",
-                         "en": "({n} matched · diff≈0 does NOT mean reconciled)",
-                         "zh": "(仅 {n} 笔匹配 · 差异≈0 不代表已对平)",
-                         "ja": "({n} 件一致 · 差異≈0 でも照合済みではない)"},
+    "lbl_match_section": {
+        "th": "ผลการจับคู่ (กระทบยอด)",
+        "en": "Matching Result",
+        "zh": "勾稽匹配情况",
+        "ja": "照合結果",
+    },
+    "lbl_matched_n": {"th": "จับคู่สำเร็จ", "en": "Matched", "zh": "已匹配笔数", "ja": "一致件数"},
+    "lbl_match_rate": {"th": "อัตราจับคู่", "en": "Match Rate", "zh": "匹配率", "ja": "一致率"},
+    "banner_no_match": {
+        "th": "⚠ จับคู่สำเร็จ 0 รายการ · ค่า『ผลต่าง』ด้านล่างแม้แสดง 0 ก็เป็นเพียงผลของสมการบัญชี ไม่ได้กระทบยอดตรงกันจริง · GL กับใบแจ้งยอดอาจไม่ใช่บัญชี/ช่วงเวลาเดียวกัน กรุณาตรวจสอบ",
+        "en": "⚠ 0 items matched. Even if the Difference below shows 0, that is only an accounting identity — NOT a true reconciliation. The GL and statement may not be the same account/period. Please verify.",
+        "zh": "⚠ 本次 0 笔成功匹配。下方『差异』即便显示 0,也只是会计恒等式的结果,并非真正对平——很可能 GL 与对账单不是同一账户或同一期间,请核对。",
+        "ja": "⚠ 一致 0 件。下の『差異』が 0 でも会計恒等式の結果にすぎず、真の照合ではありません。GL と明細が同一口座・同一期間か確認してください。",
+    },
+    "banner_low_match": {
+        "th": "⚠ จับคู่ได้เพียง {n} รายการ ({r}%) ส่วนใหญ่ยังไม่ตรงกัน · กรุณายืนยันว่า GL กับใบแจ้งยอดเป็นบัญชี/ช่วงเวลาเดียวกัน",
+        "en": "⚠ Only {n} item(s) matched ({r}%); most records did not correspond. Please confirm the GL and statement are the same account/period.",
+        "zh": "⚠ 仅 {n} 笔匹配(匹配率 {r}%),绝大多数记录未能对应。请确认 GL 与对账单是否同一账户、同一期间。",
+        "ja": "⚠ 一致は {n} 件のみ({r}%)。大半が対応していません。GL と明細が同一口座・同一期間か確認してください。",
+    },
+    "diff_identity_note": {
+        "th": "(จับคู่ {n} รายการ · ผลต่าง≈0 ไม่ได้แปลว่ากระทบยอดตรง)",
+        "en": "({n} matched · diff≈0 does NOT mean reconciled)",
+        "zh": "(仅 {n} 笔匹配 · 差异≈0 不代表已对平)",
+        "ja": "({n} 件一致 · 差異≈0 でも照合済みではない)",
+    },
     # v118.33.13.0 · OCR verification labels
-    "lbl_ocr_check":    {"th": "ตรวจสอบความถูกต้องของ OCR", "en": "OCR Accuracy Check",
-                         "zh": "OCR 准确性核查", "ja": "OCR精度チェック"},
-    "lbl_ocr_bal_warn": {"th": "ยอดคงเหลือไม่ตรง (โปรดตรวจสอบ)", "en": "Balance mismatch (review)",
-                         "zh": "余额验证未通过", "ja": "残高検証エラー"},
-    "lbl_ocr_lowconf":  {"th": "ความมั่นใจต่ำ (เลือนราง)", "en": "Low confidence (blurry)",
-                         "zh": "低置信度（模糊）", "ja": "信頼度低（不鮮明）"},
-    "lbl_ocr_autofixed": {"th": "ระบบแก้ยอดอัตโนมัติตามยอดคงเหลือ (ควรตรวจ)",
-                          "en": "Auto-corrected by balance (review)",
-                          "zh": "系统按余额自动修正（建议复核）", "ja": "残高で自動修正（要確認）"},
-    "col_confidence":   {"th": "ความมั่นใจ", "en": "Confidence", "zh": "置信度", "ja": "信頼度"},
-    "col_balance_ok":   {"th": "ตรวจยอด", "en": "Balance Check", "zh": "余额校验", "ja": "残高検証"},
+    "lbl_ocr_check": {
+        "th": "ตรวจสอบความถูกต้องของ OCR",
+        "en": "OCR Accuracy Check",
+        "zh": "OCR 准确性核查",
+        "ja": "OCR精度チェック",
+    },
+    "lbl_ocr_bal_warn": {
+        "th": "ยอดคงเหลือไม่ตรง (โปรดตรวจสอบ)",
+        "en": "Balance mismatch (review)",
+        "zh": "余额验证未通过",
+        "ja": "残高検証エラー",
+    },
+    "lbl_ocr_lowconf": {
+        "th": "ความมั่นใจต่ำ (เลือนราง)",
+        "en": "Low confidence (blurry)",
+        "zh": "低置信度（模糊）",
+        "ja": "信頼度低（不鮮明）",
+    },
+    "lbl_ocr_autofixed": {
+        "th": "ระบบแก้ยอดอัตโนมัติตามยอดคงเหลือ (ควรตรวจ)",
+        "en": "Auto-corrected by balance (review)",
+        "zh": "系统按余额自动修正（建议复核）",
+        "ja": "残高で自動修正（要確認）",
+    },
+    "col_confidence": {"th": "ความมั่นใจ", "en": "Confidence", "zh": "置信度", "ja": "信頼度"},
+    "col_balance_ok": {"th": "ตรวจยอด", "en": "Balance Check", "zh": "余额校验", "ja": "残高検証"},
     # Statement detail sheet
-    "sh_stmt_detail":   {"th": "รายละเอียดSTATEMENT", "en": "Statement Detail",
-                         "zh": "银行对账单明细", "ja": "明細"},
-    "sh_gl_detail":     {"th": "รายละเอียดบัญชีแยกประเภท", "en": "GL Detail",
-                         "zh": "总账明细", "ja": "元帳明細"},
+    "sh_stmt_detail": {
+        "th": "รายละเอียดSTATEMENT",
+        "en": "Statement Detail",
+        "zh": "银行对账单明细",
+        "ja": "明細",
+    },
+    "sh_gl_detail": {
+        "th": "รายละเอียดบัญชีแยกประเภท",
+        "en": "GL Detail",
+        "zh": "总账明细",
+        "ja": "元帳明細",
+    },
     # v118.34 · GL Detail Sheet column labels (no "GL" suffix · Sheet name already implies context)
-    "col_doc_no":       {"th": "เลขที่เอกสาร", "en": "Doc No",
-                         "zh": "凭证号", "ja": "伝票番号"},
-    "col_account_code": {"th": "รหัสบัญชี", "en": "Account Code",
-                         "zh": "科目代码", "ja": "科目コード"},
-    "col_debit":        {"th": "เดบิต", "en": "Debit",
-                         "zh": "借方", "ja": "借方"},
-    "col_credit":       {"th": "เครดิต", "en": "Credit",
-                         "zh": "贷方", "ja": "貸方"},
-    "sh_usage":         {"th": "วิธีใช้งาน", "en": "How to Use",
-                         "zh": "使用说明", "ja": "使い方"},
-    "col_source_file":  {"th": "ไฟล์ต้นทาง", "en": "Source File",
-                         "zh": "原文件", "ja": "ファイル"},
-    "conf_high":        {"th": "✓ สูง", "en": "✓ High", "zh": "✓ 高", "ja": "✓ 高"},
-    "conf_medium":      {"th": "△ กลาง", "en": "△ Medium", "zh": "△ 中", "ja": "△ 中"},
-    "conf_low":         {"th": "◌ ต่ำ", "en": "◌ Low", "zh": "◌ 低", "ja": "◌ 低"},
-    "bal_ok":           {"th": "✓ ผ่าน", "en": "✓ Pass", "zh": "✓ 通过", "ja": "✓ 合格"},
-    "bal_warn":         {"th": "⚠ ตรวจ", "en": "⚠ Review", "zh": "⚠ 核对", "ja": "⚠ 要確認"},
+    "col_doc_no": {"th": "เลขที่เอกสาร", "en": "Doc No", "zh": "凭证号", "ja": "伝票番号"},
+    "col_account_code": {
+        "th": "รหัสบัญชี",
+        "en": "Account Code",
+        "zh": "科目代码",
+        "ja": "科目コード",
+    },
+    "col_debit": {"th": "เดบิต", "en": "Debit", "zh": "借方", "ja": "借方"},
+    "col_credit": {"th": "เครดิต", "en": "Credit", "zh": "贷方", "ja": "貸方"},
+    "sh_usage": {"th": "วิธีใช้งาน", "en": "How to Use", "zh": "使用说明", "ja": "使い方"},
+    "col_source_file": {"th": "ไฟล์ต้นทาง", "en": "Source File", "zh": "原文件", "ja": "ファイル"},
+    "conf_high": {"th": "✓ สูง", "en": "✓ High", "zh": "✓ 高", "ja": "✓ 高"},
+    "conf_medium": {"th": "△ กลาง", "en": "△ Medium", "zh": "△ 中", "ja": "△ 中"},
+    "conf_low": {"th": "◌ ต่ำ", "en": "◌ Low", "zh": "◌ 低", "ja": "◌ 低"},
+    "bal_ok": {"th": "✓ ผ่าน", "en": "✓ Pass", "zh": "✓ 通过", "ja": "✓ 合格"},
+    "bal_warn": {"th": "⚠ ตรวจ", "en": "⚠ Review", "zh": "⚠ 核对", "ja": "⚠ 要確認"},
     # v118.35.0.62 · 系统按余额反推自动修正了金额/方向 · 标『已修正』· 黄底 · 建议复核
-    "bal_fixed":        {"th": "✎ แก้อัตโนมัติ", "en": "✎ Auto-fixed", "zh": "✎ 已修正", "ja": "✎ 自動修正"},
-    "bal_na":           {"th": "—", "en": "—", "zh": "—", "ja": "—"},
+    "bal_fixed": {
+        "th": "✎ แก้อัตโนมัติ",
+        "en": "✎ Auto-fixed",
+        "zh": "✎ 已修正",
+        "ja": "✎ 自動修正",
+    },
+    "bal_na": {"th": "—", "en": "—", "zh": "—", "ja": "—"},
     # v118.33.13.2 · Vertical itemized summary labels
-    "col_summary_item":   {"th": "รายการ", "en": "Item Description",
-                           "zh": "项目说明", "ja": "項目"},
-    "col_summary_amount": {"th": "จำนวนเงิน", "en": "Amount",
-                           "zh": "金额", "ja": "金額"},
-    "detail_no_items":    {"th": "ไม่มี", "en": "(none)",
-                           "zh": "无", "ja": "なし"},
-    "sec_open_diff_expand": {"th": "ผลต่างยอดยกมา (ยอดยกมา Statement − ยอดยกมา GL)",
-                             "en": "Opening Diff (Statement Open − GL Open)",
-                             "zh": "期初差异（对账单期初 − GL 期初）",
-                             "ja": "期首差異（明細期首 − GL 期首）"},
-    "sec_gl_debit_only_full":  {"th": "GL เดบิตเท่านั้น (ไม่มีใน Statement)",
-                                "en": "GL Debit Only (not in Statement)",
-                                "zh": "仅 GL 有借方（对账单中缺失）",
-                                "ja": "GL の借方のみ（明細にない）"},
-    "sec_gl_credit_only_full": {"th": "GL เครดิตเท่านั้น (ไม่มีใน Statement)",
-                                "en": "GL Credit Only (not in Statement)",
-                                "zh": "仅 GL 有贷方（对账单中缺失）",
-                                "ja": "GL の貸方のみ（明細にない）"},
-    "sec_stmt_wd_only_full":   {"th": "รายการถอนใน Statement เท่านั้น (ไม่มีใน GL)",
-                                "en": "Statement Withdrawal Only (not in GL)",
-                                "zh": "仅对账单有提款（GL 中缺失）",
-                                "ja": "明細の出金のみ（GL にない）"},
-    "sec_stmt_dep_only_full":  {"th": "รายการฝากใน Statement เท่านั้น (ไม่มีใน GL)",
-                                "en": "Statement Deposit Only (not in GL)",
-                                "zh": "仅对账单有存款（GL 中缺失）",
-                                "ja": "明細の入金のみ（GL にない）"},
+    "col_summary_item": {"th": "รายการ", "en": "Item Description", "zh": "项目说明", "ja": "項目"},
+    "col_summary_amount": {"th": "จำนวนเงิน", "en": "Amount", "zh": "金额", "ja": "金額"},
+    "detail_no_items": {"th": "ไม่มี", "en": "(none)", "zh": "无", "ja": "なし"},
+    "sec_open_diff_expand": {
+        "th": "ผลต่างยอดยกมา (ยอดยกมา Statement − ยอดยกมา GL)",
+        "en": "Opening Diff (Statement Open − GL Open)",
+        "zh": "期初差异（对账单期初 − GL 期初）",
+        "ja": "期首差異（明細期首 − GL 期首）",
+    },
+    "sec_gl_debit_only_full": {
+        "th": "GL เดบิตเท่านั้น (ไม่มีใน Statement)",
+        "en": "GL Debit Only (not in Statement)",
+        "zh": "仅 GL 有借方（对账单中缺失）",
+        "ja": "GL の借方のみ（明細にない）",
+    },
+    "sec_gl_credit_only_full": {
+        "th": "GL เครดิตเท่านั้น (ไม่มีใน Statement)",
+        "en": "GL Credit Only (not in Statement)",
+        "zh": "仅 GL 有贷方（对账单中缺失）",
+        "ja": "GL の貸方のみ（明細にない）",
+    },
+    "sec_stmt_wd_only_full": {
+        "th": "รายการถอนใน Statement เท่านั้น (ไม่มีใน GL)",
+        "en": "Statement Withdrawal Only (not in GL)",
+        "zh": "仅对账单有提款（GL 中缺失）",
+        "ja": "明細の出金のみ（GL にない）",
+    },
+    "sec_stmt_dep_only_full": {
+        "th": "รายการฝากใน Statement เท่านั้น (ไม่มีใน GL)",
+        "en": "Statement Deposit Only (not in GL)",
+        "zh": "仅对账单有存款（GL 中缺失）",
+        "ja": "明細の入金のみ（GL にない）",
+    },
     # P0.2 BUG-B-T2 v118.35.0.38 · 手动录入痕迹 section · 标黄被覆盖的 anchor cell
-    "sec_manual_entry":   {"th": "ร่องรอยการกรอกยอดเอง (3 อันคอร์)",
-                           "en": "Manual Entry Audit Trail (3 anchors)",
-                           "zh": "手动录入痕迹（3 个 anchor）",
-                           "ja": "手入力履歴（3 アンカー）"},
-    "lbl_manual_warn":    {"th": "⚠ รายงานนี้มีการกรอกยอด anchor เอง · ดูตารางท้ายไฟล์",
-                           "en": "⚠ This report contains manually entered anchor values · see audit trail at bottom",
-                           "zh": "⚠ 本报告含手动录入 anchor · 看末尾对照表",
-                           "ja": "⚠ 本レポートは手入力アンカーを含む · ファイル末尾の照合表参照"},
-    "col_manual_ocr":     {"th": "ค่า OCR (อ้างอิง)", "en": "OCR Value (reference)",
-                           "zh": "OCR 抽到的（参考）", "ja": "OCR 値(参考)"},
-    "col_manual_user":    {"th": "ค่าที่คุณกรอก (ใช้จริง)", "en": "Your Value (used)",
-                           "zh": "你填的（实际用）", "ja": "入力値(実使用)"},
-    "col_manual_diff":    {"th": "ผลต่าง", "en": "Diff", "zh": "差额", "ja": "差額"},
-    "lbl_anchor_stmt_open":  {"th": "ยอดยกมา Statement", "en": "Statement Opening",
-                              "zh": "Statement 期初余额", "ja": "Statement 期首"},
-    "lbl_anchor_gl_open":    {"th": "ยอดยกมา GL", "en": "GL Opening",
-                              "zh": "GL 期初余额", "ja": "GL 期首"},
-    "lbl_anchor_gl_close":   {"th": "ยอดยกไป GL", "en": "GL Closing",
-                              "zh": "GL 期末余额", "ja": "GL 期末"},
+    "sec_manual_entry": {
+        "th": "ร่องรอยการกรอกยอดเอง (3 อันคอร์)",
+        "en": "Manual Entry Audit Trail (3 anchors)",
+        "zh": "手动录入痕迹（3 个 anchor）",
+        "ja": "手入力履歴（3 アンカー）",
+    },
+    "lbl_manual_warn": {
+        "th": "⚠ รายงานนี้มีการกรอกยอด anchor เอง · ดูตารางท้ายไฟล์",
+        "en": "⚠ This report contains manually entered anchor values · see audit trail at bottom",
+        "zh": "⚠ 本报告含手动录入 anchor · 看末尾对照表",
+        "ja": "⚠ 本レポートは手入力アンカーを含む · ファイル末尾の照合表参照",
+    },
+    "col_manual_ocr": {
+        "th": "ค่า OCR (อ้างอิง)",
+        "en": "OCR Value (reference)",
+        "zh": "OCR 抽到的（参考）",
+        "ja": "OCR 値(参考)",
+    },
+    "col_manual_user": {
+        "th": "ค่าที่คุณกรอก (ใช้จริง)",
+        "en": "Your Value (used)",
+        "zh": "你填的（实际用）",
+        "ja": "入力値(実使用)",
+    },
+    "col_manual_diff": {"th": "ผลต่าง", "en": "Diff", "zh": "差额", "ja": "差額"},
+    "lbl_anchor_stmt_open": {
+        "th": "ยอดยกมา Statement",
+        "en": "Statement Opening",
+        "zh": "Statement 期初余额",
+        "ja": "Statement 期首",
+    },
+    "lbl_anchor_gl_open": {
+        "th": "ยอดยกมา GL",
+        "en": "GL Opening",
+        "zh": "GL 期初余额",
+        "ja": "GL 期首",
+    },
+    "lbl_anchor_gl_close": {
+        "th": "ยอดยกไป GL",
+        "en": "GL Closing",
+        "zh": "GL 期末余额",
+        "ja": "GL 期末",
+    },
     # BUG-FIX-T3 v118.35.0.44 · 加第 4 个 anchor · Statement 期末(客户反馈缺这个录入框)
-    "lbl_anchor_stmt_close": {"th": "ยอดยกไป STATEMENT", "en": "Statement Closing",
-                              "zh": "Statement 期末余额", "ja": "Statement 期末"},
+    "lbl_anchor_stmt_close": {
+        "th": "ยอดยกไป STATEMENT",
+        "en": "Statement Closing",
+        "zh": "Statement 期末余额",
+        "ja": "Statement 期末",
+    },
 }
 
 
@@ -3536,45 +4253,90 @@ _USAGE_BLOCKS: Dict[str, List[Tuple[str, bool]]] = {
         ("• 余额校验 —    : 无法校验 (首行或缺失余额)", False),
         ("", False),
         ("对账公式:", True),
-        ("  GL 期末 + 期初差异 − 仅 GL 借方 + 仅 GL 贷方 − 仅对账单提款 + 仅对账单存款 = 计算期末", False),
+        (
+            "  GL 期末 + 期初差异 − 仅 GL 借方 + 仅 GL 贷方 − 仅对账单提款 + 仅对账单存款 = 计算期末",
+            False,
+        ),
         ("  计算期末 应等于 对账单期末; 差异 = 计算期末 − 对账单期末 (应为 0)", False),
         ("", False),
-        ("重要提示: 扫描件 PDF 通过 AI OCR 识别 · 不可避免存在识别风险 · 凡是看到 ⚠ 或 ◌ 的行必须人工核对原 PDF 后才能采信。"
-         "Pearnly 永远不会自行填充模糊的数字 — 看不清就标红,决不替你猜。", False),
+        (
+            "重要提示: 扫描件 PDF 通过 AI OCR 识别 · 不可避免存在识别风险 · 凡是看到 ⚠ 或 ◌ 的行必须人工核对原 PDF 后才能采信。"
+            "Pearnly 永远不会自行填充模糊的数字 — 看不清就标红,决不替你猜。",
+            False,
+        ),
     ],
     "en": [
         ("Bank Reconciliation · How to Use", True),
         ("", False),
         ("Sheet structure (4 total):", True),
-        ("• 'Summary'              This sheet · file info, reconciliation formula, stats, these instructions", False),
-        ("• 'Match Results'        Matched + Unmatched GL + Unmatched Statement, distinguished by Status column", False),
-        ("• 'Statement Detail'     All OCR-extracted statement rows + confidence + balance check", False),
+        (
+            "• 'Summary'              This sheet · file info, reconciliation formula, stats, these instructions",
+            False,
+        ),
+        (
+            "• 'Match Results'        Matched + Unmatched GL + Unmatched Statement, distinguished by Status column",
+            False,
+        ),
+        (
+            "• 'Statement Detail'     All OCR-extracted statement rows + confidence + balance check",
+            False,
+        ),
         ("• 'GL Detail'            All OCR-extracted GL ledger rows", False),
         ("", False),
         ("OCR Accuracy legend:", True),
         ("• Confidence ✓High: every digit is clear, can be trusted", False),
         ("• Confidence △Medium: mostly clear with minor doubts", False),
-        ("• Confidence ◌Low: digit was blurry or hard to read — verify against the original PDF", False),
-        ("• Balance check ✓Pass: prev_balance ± amount == this row balance (tolerance 0.05)", False),
-        ("• Balance check ⚠Review: not balanced — likely a misread digit. Verify against the original PDF", False),
+        (
+            "• Confidence ◌Low: digit was blurry or hard to read — verify against the original PDF",
+            False,
+        ),
+        (
+            "• Balance check ✓Pass: prev_balance ± amount == this row balance (tolerance 0.05)",
+            False,
+        ),
+        (
+            "• Balance check ⚠Review: not balanced — likely a misread digit. Verify against the original PDF",
+            False,
+        ),
         ("• Balance check —      : cannot verify (first row or missing balance)", False),
         ("", False),
         ("Reconciliation formula:", True),
-        ("  GL_close + Open_diff − GL_debit_only + GL_credit_only − Stmt_WD_only + Stmt_Dep_only = Calc_close", False),
-        ("  Calc_close should equal Statement_close; Diff = Calc_close − Statement_close (should be 0)", False),
+        (
+            "  GL_close + Open_diff − GL_debit_only + GL_credit_only − Stmt_WD_only + Stmt_Dep_only = Calc_close",
+            False,
+        ),
+        (
+            "  Calc_close should equal Statement_close; Diff = Calc_close − Statement_close (should be 0)",
+            False,
+        ),
         ("", False),
-        ("IMPORTANT: Scanned PDFs go through AI OCR. There is always residual OCR risk. "
-         "Any row marked ⚠ or ◌ MUST be cross-checked against the original PDF before trusting it. "
-         "Pearnly will NEVER auto-fill an unclear digit — if we can't read it, we flag it; we don't guess for you.", False),
+        (
+            "IMPORTANT: Scanned PDFs go through AI OCR. There is always residual OCR risk. "
+            "Any row marked ⚠ or ◌ MUST be cross-checked against the original PDF before trusting it. "
+            "Pearnly will NEVER auto-fill an unclear digit — if we can't read it, we flag it; we don't guess for you.",
+            False,
+        ),
     ],
     "th": [
         ("รายงานการกระทบยอด GL กับบัญชีธนาคาร · วิธีใช้งาน", True),
         ("", False),
         ("โครงสร้าง Sheet (รวม 4 แผ่น):", True),
-        ("• 'สรุป'                          แผ่นนี้ · ข้อมูลไฟล์ สูตรกระทบยอด สถิติ และคำแนะนำการใช้งาน", False),
-        ("• 'ผลการจับคู่'                   รายการจับคู่ + GL ที่จับคู่ไม่ได้ + Statement ที่จับคู่ไม่ได้ พร้อมคอลัมน์สถานะ", False),
-        ("• 'รายละเอียดSTATEMENT'           รายการบัญชีที่ OCR อ่านได้ทั้งหมด + ความมั่นใจ + ผลตรวจยอด", False),
-        ("• 'รายละเอียดบัญชีแยกประเภท'      รายการบัญชีแยกประเภท (GL) ที่ OCR อ่านได้ทั้งหมด", False),
+        (
+            "• 'สรุป'                          แผ่นนี้ · ข้อมูลไฟล์ สูตรกระทบยอด สถิติ และคำแนะนำการใช้งาน",
+            False,
+        ),
+        (
+            "• 'ผลการจับคู่'                   รายการจับคู่ + GL ที่จับคู่ไม่ได้ + Statement ที่จับคู่ไม่ได้ พร้อมคอลัมน์สถานะ",
+            False,
+        ),
+        (
+            "• 'รายละเอียดSTATEMENT'           รายการบัญชีที่ OCR อ่านได้ทั้งหมด + ความมั่นใจ + ผลตรวจยอด",
+            False,
+        ),
+        (
+            "• 'รายละเอียดบัญชีแยกประเภท'      รายการบัญชีแยกประเภท (GL) ที่ OCR อ่านได้ทั้งหมด",
+            False,
+        ),
         ("", False),
         ("คำอธิบายสัญลักษณ์ OCR:", True),
         ("• ความมั่นใจ ✓สูง: ตัวเลขชัดเจน ไว้ใจได้", False),
@@ -3585,12 +4347,21 @@ _USAGE_BLOCKS: Dict[str, List[Tuple[str, bool]]] = {
         ("• ตรวจยอด —    : ตรวจไม่ได้ (บรรทัดแรกหรือไม่มียอด)", False),
         ("", False),
         ("สูตรการกระทบยอด:", True),
-        ("  ปิด GL + ผลต่างยอดยกมา − GL เดบิตเท่านั้น + GL เครดิตเท่านั้น − รายการถอนเท่านั้น + รายการฝากเท่านั้น = ปิดคำนวณ", False),
-        ("  ปิดคำนวณ ควรเท่ากับ ยอดยกไป Statement; ผลต่าง = ปิดคำนวณ − ยอดยกไป Statement (ควรเป็น 0)", False),
+        (
+            "  ปิด GL + ผลต่างยอดยกมา − GL เดบิตเท่านั้น + GL เครดิตเท่านั้น − รายการถอนเท่านั้น + รายการฝากเท่านั้น = ปิดคำนวณ",
+            False,
+        ),
+        (
+            "  ปิดคำนวณ ควรเท่ากับ ยอดยกไป Statement; ผลต่าง = ปิดคำนวณ − ยอดยกไป Statement (ควรเป็น 0)",
+            False,
+        ),
         ("", False),
-        ("สำคัญ: PDF ที่สแกนผ่าน AI OCR ย่อมมีความเสี่ยงในการอ่านผิดเสมอ "
-         "แถวที่ติด ⚠ หรือ ◌ ต้องตรวจสอบกับ PDF ต้นฉบับก่อนเชื่อถือทุกครั้ง "
-         "Pearnly จะไม่เติมตัวเลขที่ไม่ชัดเจนเอง — ถ้าอ่านไม่ออก เราติดสัญลักษณ์ ไม่เดาแทนคุณ", False),
+        (
+            "สำคัญ: PDF ที่สแกนผ่าน AI OCR ย่อมมีความเสี่ยงในการอ่านผิดเสมอ "
+            "แถวที่ติด ⚠ หรือ ◌ ต้องตรวจสอบกับ PDF ต้นฉบับก่อนเชื่อถือทุกครั้ง "
+            "Pearnly จะไม่เติมตัวเลขที่ไม่ชัดเจนเอง — ถ้าอ่านไม่ออก เราติดสัญลักษณ์ ไม่เดาแทนคุณ",
+            False,
+        ),
     ],
     "ja": [
         ("銀行照合レポート · 使い方", True),
@@ -3610,12 +4381,18 @@ _USAGE_BLOCKS: Dict[str, List[Tuple[str, bool]]] = {
         ("• 残高検証 —      : 検証不可 (初行または残高欠落)", False),
         ("", False),
         ("照合計算式:", True),
-        ("  GL 期末 + 期首差 − GL の借方のみ + GL の貸方のみ − 明細の出金のみ + 明細の入金のみ = 計算期末", False),
+        (
+            "  GL 期末 + 期首差 − GL の借方のみ + GL の貸方のみ − 明細の出金のみ + 明細の入金のみ = 計算期末",
+            False,
+        ),
         ("  計算期末 は 明細期末 と等しいはず; 差異 = 計算期末 − 明細期末 (0 が理想)", False),
         ("", False),
-        ("重要: スキャンPDFはAI OCRを使用 · OCR誤読リスクは常に存在します "
-         "⚠ または ◌ が付いた行は必ず元のPDFと照合してから利用してください "
-         "Pearnly は不明瞭な数字を自動で埋めません — 読めないものはマークし、推測しません", False),
+        (
+            "重要: スキャンPDFはAI OCRを使用 · OCR誤読リスクは常に存在します "
+            "⚠ または ◌ が付いた行は必ず元のPDFと照合してから利用してください "
+            "Pearnly は不明瞭な数字を自動で埋めません — 読めないものはマークし、推測しません",
+            False,
+        ),
     ],
 }
 
@@ -3659,9 +4436,7 @@ def export_bank_recon_excel(
     """
     try:
         import openpyxl
-        from openpyxl.styles import (
-            Font, Alignment, PatternFill, Border, Side, numbers
-        )
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         from openpyxl.utils import get_column_letter
     except ImportError:
         raise RuntimeError("openpyxl not installed")
@@ -3671,16 +4446,16 @@ def export_bank_recon_excel(
     wb = openpyxl.Workbook()
 
     # ── Color palette ──────────────────────────────────────────────────
-    COLOR_HEADER   = "2D6A4F"   # dark green
-    COLOR_SUBHEAD  = "52B788"   # medium green
-    COLOR_MATCHED  = "D8F3DC"   # light green
-    COLOR_L2       = "FFF3CD"   # amber (date tolerance)
-    COLOR_L3       = "FFE0CC"   # orange (amount only)
-    COLOR_GL_ONLY  = "E8D5F5"   # purple
-    COLOR_ST_ONLY  = "D4E6F1"   # blue
-    COLOR_DIFF     = "FFDAD6"   # red for non-zero diff
-    COLOR_OK       = "D8F3DC"   # green for zero diff
-    COLOR_ROW_ALT  = "F8F9FA"   # alternating row
+    COLOR_HEADER = "2D6A4F"  # dark green
+    COLOR_SUBHEAD = "52B788"  # medium green
+    COLOR_MATCHED = "D8F3DC"  # light green
+    COLOR_L2 = "FFF3CD"  # amber (date tolerance)
+    COLOR_L3 = "FFE0CC"  # orange (amount only)
+    COLOR_GL_ONLY = "E8D5F5"  # purple
+    COLOR_ST_ONLY = "D4E6F1"  # blue
+    COLOR_DIFF = "FFDAD6"  # red for non-zero diff
+    COLOR_OK = "D8F3DC"  # green for zero diff
+    COLOR_ROW_ALT = "F8F9FA"  # alternating row
 
     def _hdr_style(ws, row, col, text, color=COLOR_HEADER, bold=True, size=10):
         cell = ws.cell(row=row, column=col, value=text)
@@ -3707,9 +4482,7 @@ def export_bank_recon_excel(
         thin = Side(style="thin", color="CCCCCC")
         for r in range(min_row, max_row + 1):
             for c in range(min_col, max_col + 1):
-                ws.cell(r, c).border = Border(
-                    left=thin, right=thin, top=thin, bottom=thin
-                )
+                ws.cell(r, c).border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     def _fmt_date(d: Optional[date]) -> str:
         if d is None:
@@ -3729,24 +4502,24 @@ def export_bank_recon_excel(
     #   - Blue: subtotal (计算期末余额)
     #   - Red/green: final diff
     # ══════════════════════════════════════════════════════════════════
-    ws1 = wb.active   # reuse auto-created first sheet (was File Info pre-v118.34)
+    ws1 = wb.active  # reuse auto-created first sheet (was File Info pre-v118.34)
     ws1.title = _t("sh_summary", lang)
     ws1.sheet_view.showGridLines = False
     ws1.column_dimensions["A"].width = 78
     ws1.column_dimensions["B"].width = 22  # v118.33.13.6 · fit (7-digit) amounts with parens
 
     # Color palette
-    NAVY        = "1F2937"   # dark slate - main anchor rows
-    NAVY_LIGHT  = "374151"   # slightly lighter for sub-anchor
-    SECTION_BG  = "EEF2F6"   # very light blue-gray for section headers
-    DETAIL_BG   = "FFFFFF"
-    DETAIL_ALT  = "FAFBFC"
-    SUBTOTAL_BG = "DBEAFE"   # soft blue for calc-close subtotal
-    DIFF_OK_BG  = "D1FAE5"   # mint green for zero diff
-    DIFF_BAD_BG = "FEE2E2"   # soft red for non-zero diff
-    INFO_BG     = "F9FAFB"   # very subtle gray for bank/acct info
+    NAVY = "1F2937"  # dark slate - main anchor rows
+    NAVY_LIGHT = "374151"  # slightly lighter for sub-anchor
+    SECTION_BG = "EEF2F6"  # very light blue-gray for section headers
+    DETAIL_BG = "FFFFFF"
+    DETAIL_ALT = "FAFBFC"
+    SUBTOTAL_BG = "DBEAFE"  # soft blue for calc-close subtotal
+    DIFF_OK_BG = "D1FAE5"  # mint green for zero diff
+    DIFF_BAD_BG = "FEE2E2"  # soft red for non-zero diff
+    INFO_BG = "F9FAFB"  # very subtle gray for bank/acct info
 
-    NUM_FORMAT = '#,##0.00;[Red](#,##0.00)'
+    NUM_FORMAT = "#,##0.00;[Red](#,##0.00)"
 
     def _fmt_d(d):
         if not d:
@@ -3797,8 +4570,7 @@ def export_bank_recon_excel(
         a = ws1.cell(row, 1, "  · " + (label if label else ""))
         a.font = Font(size=9, color=color, italic=italic)
         a.fill = PatternFill("solid", fgColor=bg)
-        a.alignment = Alignment(horizontal="left", vertical="center",
-                                indent=2, wrap_text=False)
+        a.alignment = Alignment(horizontal="left", vertical="center", indent=2, wrap_text=False)
         b = ws1.cell(row, 2, value)
         b.font = Font(size=10, color=color, italic=italic)
         b.fill = PatternFill("solid", fgColor=bg)
@@ -3819,8 +4591,12 @@ def export_bank_recon_excel(
         ws1.row_dimensions[row].height = 20
 
     # ── 1. Title ──
-    _RECON_TITLE = {"en": "Bank Reconciliation", "zh": "银行对账",
-                    "th": "กระทบยอด GL กับบัญชีธนาคาร", "ja": "銀行照合"}
+    _RECON_TITLE = {
+        "en": "Bank Reconciliation",
+        "zh": "银行对账",
+        "th": "กระทบยอด GL กับบัญชีธนาคาร",
+        "ja": "銀行照合",
+    }
     r = 1
     _title_row(r, f"{_RECON_TITLE.get(lang, 'Bank Reconciliation')} · {summary.bank_code.upper()}")
     r += 1
@@ -3851,9 +4627,10 @@ def export_bank_recon_excel(
         _banner_msgs.append(_t("banner_no_match", lang))
     elif _low_match:
         _banner_msgs.append(
-            _t("banner_low_match", lang).format(n=_matched_n, r=round(_match_rate * 100, 1)))
+            _t("banner_low_match", lang).format(n=_matched_n, r=round(_match_rate * 100, 1))
+        )
     # 调用方传入的输入不匹配警告(期间/科目/规模)· 与前端提示条同源
-    for _w in (warnings or []):
+    for _w in warnings or []:
         if _w:
             _banner_msgs.append(str(_w))
     if _banner_msgs:
@@ -3868,7 +4645,9 @@ def export_bank_recon_excel(
         warn_cell = ws1.cell(row=r, column=1, value=_t("lbl_manual_warn", lang))
         warn_cell.font = Font(bold=True, size=10, color="92400E")
         warn_cell.fill = PatternFill("solid", fgColor="FEF3C7")  # 浅黄底
-        warn_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1, wrap_text=True)
+        warn_cell.alignment = Alignment(
+            horizontal="left", vertical="center", indent=1, wrap_text=True
+        )
         ws1.row_dimensions[r].height = 24
         r += 1
     r += 1  # blank-row spacer
@@ -3916,15 +4695,21 @@ def export_bank_recon_excel(
         amt = rr.stmt_withdrawal if rr.match_status == "stmt_withdrawal_only" else rr.stmt_deposit
         return _fmt_d(rr.stmt_date), "", rr.stmt_desc or "", amt
 
-    _add_itemized(-1, "sec_gl_debit_only_full",  "gl_debit_only",  _gl_fields)
+    _add_itemized(-1, "sec_gl_debit_only_full", "gl_debit_only", _gl_fields)
     _add_itemized(+1, "sec_gl_credit_only_full", "gl_credit_only", _gl_fields)
-    _add_itemized(-1, "sec_stmt_wd_only_full",   "stmt_withdrawal_only", _stmt_fields)
-    _add_itemized(+1, "sec_stmt_dep_only_full",  "stmt_deposit_only",    _stmt_fields)
+    _add_itemized(-1, "sec_stmt_wd_only_full", "stmt_withdrawal_only", _stmt_fields)
+    _add_itemized(+1, "sec_stmt_dep_only_full", "stmt_deposit_only", _stmt_fields)
 
     # ── 7. Subtotal: 计算期末余额 (light blue) ──
     r += 1  # spacer
-    _anchor_row(r, _t("lbl_formula_calc", lang), summary.formula_stmt_closing,
-                bg=SUBTOTAL_BG, fg="1E3A8A", size=12)
+    _anchor_row(
+        r,
+        _t("lbl_formula_calc", lang),
+        summary.formula_stmt_closing,
+        bg=SUBTOTAL_BG,
+        fg="1E3A8A",
+        size=12,
+    )
     r += 1
 
     # ── 8. Target: 账单期末余额 (dark anchor, same style as GL_close) ──
@@ -3943,13 +4728,15 @@ def export_bank_recon_excel(
     diff_ok = diff_zero and not _low_match
     diff_bg = DIFF_OK_BG if diff_ok else DIFF_BAD_BG
     diff_fg = "065F46" if diff_ok else "991B1B"
-    _anchor_row(r, _t("lbl_formula_diff", lang), summary.formula_diff,
-                bg=diff_bg, fg=diff_fg, size=13)
+    _anchor_row(
+        r, _t("lbl_formula_diff", lang), summary.formula_diff, bg=diff_bg, fg=diff_fg, size=13
+    )
     r += 1
     if diff_zero and _low_match:
         # diff 为 0 却几乎没匹配 → 明确告知这是恒等式 · 不代表勾稽成功
-        _detail_row(r, _t("diff_identity_note", lang).format(n=_matched_n), "",
-                    italic=True, color="991B1B")
+        _detail_row(
+            r, _t("diff_identity_note", lang).format(n=_matched_n), "", italic=True, color="991B1B"
+        )
         r += 1
 
     # ── 10. OCR accuracy check (only if any warnings) ──
@@ -3978,18 +4765,30 @@ def export_bank_recon_excel(
 
     fi_pairs: List[Tuple[str, str]] = []
     if parse_info:
-        for f in (parse_info.get("stmt_files") or []):
-            ok_status = _t("fi_ok", lang) if (f.get("ok") and f.get("rows", 0) > 0) \
-                else (_t("fi_warn", lang) if (f.get("ok") and f.get("rows", 0) == 0) \
-                else _t("fi_fail", lang))
+        for f in parse_info.get("stmt_files") or []:
+            ok_status = (
+                _t("fi_ok", lang)
+                if (f.get("ok") and f.get("rows", 0) > 0)
+                else (
+                    _t("fi_warn", lang)
+                    if (f.get("ok") and f.get("rows", 0) == 0)
+                    else _t("fi_fail", lang)
+                )
+            )
             bank_part = f" · {f.get('bank_code')}" if f.get("bank_code") else ""
             err_part = f" · {f.get('error')}" if f.get("error") else ""
             label = f"{_t('fi_stmt_type', lang)}: {f.get('file', '')} · {f.get('rows', 0)} {_t('fi_rows', lang).lower()}{bank_part}{err_part}"
             fi_pairs.append((label, ok_status))
-        for f in (parse_info.get("gl_files") or []):
-            ok_status = _t("fi_ok", lang) if (f.get("ok") and f.get("rows", 0) > 0) \
-                else (_t("fi_warn", lang) if (f.get("ok") and f.get("rows", 0) == 0) \
-                else _t("fi_fail", lang))
+        for f in parse_info.get("gl_files") or []:
+            ok_status = (
+                _t("fi_ok", lang)
+                if (f.get("ok") and f.get("rows", 0) > 0)
+                else (
+                    _t("fi_warn", lang)
+                    if (f.get("ok") and f.get("rows", 0) == 0)
+                    else _t("fi_fail", lang)
+                )
+            )
             accts = ", ".join(f.get("accounts") or [])
             acct_part = f" · {accts}" if accts else ""
             err_part = f" · {f.get('error')}" if f.get("error") else ""
@@ -4014,11 +4813,13 @@ def export_bank_recon_excel(
             ok_status = _t("fi_ok", lang) if rc > 0 else _t("fi_warn", lang)
             gl_acct = task_info.get("gl_account", "")
             acct_part = f" · {gl_acct}" if gl_acct else ""
-            label = f"{_t('fi_gl_type', lang)}: {fname} · {rc} {_t('fi_rows', lang).lower()}{acct_part}"
+            label = (
+                f"{_t('fi_gl_type', lang)}: {fname} · {rc} {_t('fi_rows', lang).lower()}{acct_part}"
+            )
             fi_pairs.append((label, ok_status))
 
     _fi_status_colors = {
-        _t("fi_ok", lang):   "D8F3DC",
+        _t("fi_ok", lang): "D8F3DC",
         _t("fi_warn", lang): "FFF3CD",
         _t("fi_fail", lang): "FFDAD6",
     }
@@ -4052,8 +4853,8 @@ def export_bank_recon_excel(
         # 因 Sheet 1 是 2 列 layout · 这里特殊用 cell A 写 anchor label · cell B 写 'OCR XXX → 用户 YYY (差 ZZZ)' 标黄
         _ANCHOR_LABEL_KEYS = [
             ("stmt_opening", "lbl_anchor_stmt_open"),
-            ("gl_opening",   "lbl_anchor_gl_open"),
-            ("gl_closing",   "lbl_anchor_gl_close"),
+            ("gl_opening", "lbl_anchor_gl_open"),
+            ("gl_closing", "lbl_anchor_gl_close"),
             ("stmt_closing", "lbl_anchor_stmt_close"),  # BUG-FIX-T3 v118.35.0.44 · 4th anchor
         ]
         YELLOW_FILL = PatternFill("solid", fgColor="FFE082")
@@ -4078,9 +4879,9 @@ def export_bank_recon_excel(
             # cell comment 写完整对照(hover Excel 看)
             try:
                 from openpyxl.comments import Comment as _XLComment
+
                 b.comment = _XLComment(
-                    f"OCR: {ocr_val:,.2f}\nUser: {user_val:,.2f}\nDiff: {diff:+,.2f}",
-                    "Pearnly"
+                    f"OCR: {ocr_val:,.2f}\nUser: {user_val:,.2f}\nDiff: {diff:+,.2f}", "Pearnly"
                 )
             except Exception:
                 pass  # comment 失败不阻塞导出 · 数据本身已经在 cell value 里
@@ -4090,7 +4891,16 @@ def export_bank_recon_excel(
         # 简化:不加 OCR 原值小字行 · 已有 comment + 后续历史详情(P0.3)可看
         # 列头提示(标在 section 末尾)· 4 语
         ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
-        ref_cell = ws1.cell(r, 1, "ℹ " + _t("col_manual_ocr", lang) + " / " + _t("col_manual_user", lang) + " · " + _t("col_manual_diff", lang))
+        ref_cell = ws1.cell(
+            r,
+            1,
+            "ℹ "
+            + _t("col_manual_ocr", lang)
+            + " / "
+            + _t("col_manual_user", lang)
+            + " · "
+            + _t("col_manual_diff", lang),
+        )
         ref_cell.font = Font(size=9, italic=True, color="6B7280")
         ref_cell.fill = PatternFill("solid", fgColor=INFO_BG)
         ref_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -4162,7 +4972,11 @@ def export_bank_recon_excel(
         key=lambda x: (x.gl_date or date.min, x.gl_doc_no or ""),
     )
     stmt_only_rows_for_export = sorted(
-        [rr for rr in recon_rows if rr.match_status in ("stmt_withdrawal_only", "stmt_deposit_only")],
+        [
+            rr
+            for rr in recon_rows
+            if rr.match_status in ("stmt_withdrawal_only", "stmt_deposit_only")
+        ],
         key=lambda x: (x.stmt_date or date.min, x.stmt_desc or ""),
     )
 
@@ -4171,8 +4985,11 @@ def export_bank_recon_excel(
     ri = 2
     # Matched block (tinted by match layer)
     for row in matched_rows_for_export:
-        layer_fill_color = COLOR_MATCHED if row.match_layer == 1 else \
-                           COLOR_L2 if row.match_layer == 2 else COLOR_L3
+        layer_fill_color = (
+            COLOR_MATCHED
+            if row.match_layer == 1
+            else COLOR_L2 if row.match_layer == 2 else COLOR_L3
+        )
         fill = PatternFill("solid", fgColor=layer_fill_color)
         vals = [
             _t("status_matched", lang),
@@ -4292,15 +5109,21 @@ def export_bank_recon_excel(
         ws5.column_dimensions[get_column_letter(ci)].width = width
 
     CONF_LBL = {
-        "high":   _t("conf_high", lang),
+        "high": _t("conf_high", lang),
         "medium": _t("conf_medium", lang),
-        "low":    _t("conf_low", lang),
+        "low": _t("conf_low", lang),
     }
     CONF_FILL = {"high": "D8F3DC", "medium": "FFF3CD", "low": "FFDAD6"}
 
     # Source: stmt-side rows (all of them — matched + stmt-only)
-    stmt_side_rows = [r for r in recon_rows if r.stmt_date is not None or r.stmt_balance != 0
-                      or r.stmt_withdrawal != 0 or r.stmt_deposit != 0]
+    stmt_side_rows = [
+        r
+        for r in recon_rows
+        if r.stmt_date is not None
+        or r.stmt_balance != 0
+        or r.stmt_withdrawal != 0
+        or r.stmt_deposit != 0
+    ]
     # Sort by stmt_date
     stmt_side_rows.sort(key=lambda x: (x.stmt_date or date.min, x.stmt_desc))
 
@@ -4308,13 +5131,17 @@ def export_bank_recon_excel(
         conf = (row.stmt_confidence or "high").lower()
         if getattr(row, "stmt_autocorrected", False):
             # v118.35.0.62 · 系统按余额自动修正过 · 显式标黄『已修正』· 透明 · 提示可复核
-            bal_str = _t("bal_fixed", lang); bal_fill = "FFE082"
+            bal_str = _t("bal_fixed", lang)
+            bal_fill = "FFE082"
         elif row.stmt_balance_ok is True:
-            bal_str = _t("bal_ok", lang); bal_fill = "D8F3DC"
+            bal_str = _t("bal_ok", lang)
+            bal_fill = "D8F3DC"
         elif row.stmt_balance_ok is False:
-            bal_str = _t("bal_warn", lang); bal_fill = "FFDAD6"
+            bal_str = _t("bal_warn", lang)
+            bal_fill = "FFDAD6"
         else:
-            bal_str = _t("bal_na", lang); bal_fill = None
+            bal_str = _t("bal_na", lang)
+            bal_fill = None
         vals = [
             _fmt_date(row.stmt_date),
             row.stmt_desc,
@@ -4371,9 +5198,9 @@ def export_bank_recon_excel(
     # (matched rows + gl_debit_only + gl_credit_only).
     # Stmt-only rows have no GL data → excluded.
     gl_data_rows = [
-        r for r in recon_rows
-        if r.match_status == "matched"
-        or r.match_status in ("gl_debit_only", "gl_credit_only")
+        r
+        for r in recon_rows
+        if r.match_status == "matched" or r.match_status in ("gl_debit_only", "gl_credit_only")
     ]
     gl_data_rows.sort(
         key=lambda x: (x.gl_date or date.min, x.gl_doc_no or "", x.gl_account_code or "")
@@ -4428,55 +5255,59 @@ def _date_from_str(s: Optional[str]) -> Optional[date]:
 def rows_to_json(rows: List[BankReconRow]) -> List[Dict[str, Any]]:
     result = []
     for r in rows:
-        result.append({
-            "match_status": r.match_status,
-            "match_layer": r.match_layer,
-            "stmt_date": _date_str(r.stmt_date),
-            "stmt_desc": r.stmt_desc,
-            "stmt_withdrawal": r.stmt_withdrawal,
-            "stmt_deposit": r.stmt_deposit,
-            "stmt_balance": r.stmt_balance,
-            "gl_date": _date_str(r.gl_date),
-            "gl_doc_no": r.gl_doc_no,
-            "gl_account_code": r.gl_account_code,
-            "gl_desc": r.gl_desc,
-            "gl_debit": r.gl_debit,
-            "gl_credit": r.gl_credit,
-            "date_diff_days": r.date_diff_days,
-            "source_stmt_file": r.source_stmt_file,
-            "source_gl_file": r.source_gl_file,
-            # v118.33.13.0 · OCR accuracy verification
-            "stmt_confidence": r.stmt_confidence,
-            "stmt_balance_ok": r.stmt_balance_ok,
-            "stmt_autocorrected": getattr(r, "stmt_autocorrected", False),
-        })
+        result.append(
+            {
+                "match_status": r.match_status,
+                "match_layer": r.match_layer,
+                "stmt_date": _date_str(r.stmt_date),
+                "stmt_desc": r.stmt_desc,
+                "stmt_withdrawal": r.stmt_withdrawal,
+                "stmt_deposit": r.stmt_deposit,
+                "stmt_balance": r.stmt_balance,
+                "gl_date": _date_str(r.gl_date),
+                "gl_doc_no": r.gl_doc_no,
+                "gl_account_code": r.gl_account_code,
+                "gl_desc": r.gl_desc,
+                "gl_debit": r.gl_debit,
+                "gl_credit": r.gl_credit,
+                "date_diff_days": r.date_diff_days,
+                "source_stmt_file": r.source_stmt_file,
+                "source_gl_file": r.source_gl_file,
+                # v118.33.13.0 · OCR accuracy verification
+                "stmt_confidence": r.stmt_confidence,
+                "stmt_balance_ok": r.stmt_balance_ok,
+                "stmt_autocorrected": getattr(r, "stmt_autocorrected", False),
+            }
+        )
     return result
 
 
 def rows_from_json(data: List[Dict[str, Any]]) -> List[BankReconRow]:
     rows = []
-    for d in (data or []):
-        rows.append(BankReconRow(
-            match_status=d.get("match_status", ""),
-            match_layer=d.get("match_layer"),
-            stmt_date=_date_from_str(d.get("stmt_date")),
-            stmt_desc=d.get("stmt_desc", ""),
-            stmt_withdrawal=float(d.get("stmt_withdrawal", 0) or 0),
-            stmt_deposit=float(d.get("stmt_deposit", 0) or 0),
-            stmt_balance=float(d.get("stmt_balance", 0) or 0),
-            gl_date=_date_from_str(d.get("gl_date")),
-            gl_doc_no=d.get("gl_doc_no", ""),
-            gl_account_code=d.get("gl_account_code", ""),
-            gl_desc=d.get("gl_desc", ""),
-            gl_debit=float(d.get("gl_debit", 0) or 0),
-            gl_credit=float(d.get("gl_credit", 0) or 0),
-            date_diff_days=d.get("date_diff_days"),
-            source_stmt_file=d.get("source_stmt_file", ""),
-            source_gl_file=d.get("source_gl_file", ""),
-            stmt_confidence=d.get("stmt_confidence", "high"),
-            stmt_balance_ok=d.get("stmt_balance_ok"),
-            stmt_autocorrected=bool(d.get("stmt_autocorrected", False)),
-        ))
+    for d in data or []:
+        rows.append(
+            BankReconRow(
+                match_status=d.get("match_status", ""),
+                match_layer=d.get("match_layer"),
+                stmt_date=_date_from_str(d.get("stmt_date")),
+                stmt_desc=d.get("stmt_desc", ""),
+                stmt_withdrawal=float(d.get("stmt_withdrawal", 0) or 0),
+                stmt_deposit=float(d.get("stmt_deposit", 0) or 0),
+                stmt_balance=float(d.get("stmt_balance", 0) or 0),
+                gl_date=_date_from_str(d.get("gl_date")),
+                gl_doc_no=d.get("gl_doc_no", ""),
+                gl_account_code=d.get("gl_account_code", ""),
+                gl_desc=d.get("gl_desc", ""),
+                gl_debit=float(d.get("gl_debit", 0) or 0),
+                gl_credit=float(d.get("gl_credit", 0) or 0),
+                date_diff_days=d.get("date_diff_days"),
+                source_stmt_file=d.get("source_stmt_file", ""),
+                source_gl_file=d.get("source_gl_file", ""),
+                stmt_confidence=d.get("stmt_confidence", "high"),
+                stmt_balance_ok=d.get("stmt_balance_ok"),
+                stmt_autocorrected=bool(d.get("stmt_autocorrected", False)),
+            )
+        )
     return rows
 
 
@@ -4488,9 +5319,12 @@ def summary_from_json(d: Dict[str, Any]) -> BankReconSummary:
     if not d:
         return BankReconSummary()
     try:
-        return BankReconSummary(**{k: v for k, v in d.items() if k in BankReconSummary.__dataclass_fields__})
+        return BankReconSummary(
+            **{k: v for k, v in d.items() if k in BankReconSummary.__dataclass_fields__}
+        )
     except Exception:
         return BankReconSummary()
+
 
 # -----------------------------------------------------------------------------
 # v118.34 - LEGACY BANK RECONCILIATION (migrated from bank_reconcile.py)
@@ -4504,10 +5338,11 @@ def summary_from_json(d: Dict[str, Any]) -> BankReconSummary:
 @dataclass
 class BankTransaction:
     """一条银行流水(解析后的标准结构)"""
+
     row_no: int
-    tx_date: Optional[str]          # YYYY-MM-DD 字符串
+    tx_date: Optional[str]  # YYYY-MM-DD 字符串
     value_date: Optional[str]
-    direction: str                  # "IN" / "OUT"
+    direction: str  # "IN" / "OUT"
     amount: float
     balance_after: Optional[float]
     description: str
@@ -4519,7 +5354,8 @@ class BankTransaction:
 @dataclass
 class ParsedStatement:
     """对账单完整解析结果"""
-    bank_code: str                  # KBANK / SCB / BBL / OTHER
+
+    bank_code: str  # KBANK / SCB / BBL / OTHER
     account_last4: Optional[str]
     statement_month: Optional[str]  # YYYY-MM-01
     period_start: Optional[str]
@@ -4530,7 +5366,7 @@ class ParsedStatement:
     total_outflow: float
     transactions: List[BankTransaction]
     pages: int
-    parse_method: str               # "text_layer" / "gemini_vision"
+    parse_method: str  # "text_layer" / "gemini_vision"
 
     def as_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -4541,8 +5377,7 @@ class ParsedStatement:
 # ============================================================
 # 2026-05-21 multi-format refactor · adapter for the unified pipeline
 # ============================================================
-def parsed_from_pipeline_legacy(legacy_dict: Dict[str, Any],
-                                 filename: str) -> ParsedStatement:
+def parsed_from_pipeline_legacy(legacy_dict: Dict[str, Any], filename: str) -> ParsedStatement:
     """Build a ParsedStatement from services/ocr/pipeline legacy dict output.
 
     The unified pipeline returns one normalized JSON per uploaded file with
@@ -4558,11 +5393,18 @@ def parsed_from_pipeline_legacy(legacy_dict: Dict[str, Any],
     pages = legacy_dict.get("pages") or []
     if not pages:
         return ParsedStatement(
-            bank_code="OTHER", account_last4=None, statement_month=None,
-            period_start=None, period_end=None,
-            opening_balance=None, closing_balance=None,
-            total_inflow=0.0, total_outflow=0.0,
-            transactions=[], pages=0, parse_method="pipeline_v1_empty",
+            bank_code="OTHER",
+            account_last4=None,
+            statement_month=None,
+            period_start=None,
+            period_end=None,
+            opening_balance=None,
+            closing_balance=None,
+            total_inflow=0.0,
+            total_outflow=0.0,
+            transactions=[],
+            pages=0,
+            parse_method="pipeline_v1_empty",
         )
 
     # The unified pipeline preserves the source ParsedStatement-shaped doc
@@ -4572,7 +5414,11 @@ def parsed_from_pipeline_legacy(legacy_dict: Dict[str, Any],
 
     bank_name = (first_doc.get("bank_name") or "").lower()
     bank_code = "OTHER"
-    if "kasikorn" in bank_name or "kbank" in bank_name or "กสิกร" in (first_doc.get("bank_name") or ""):
+    if (
+        "kasikorn" in bank_name
+        or "kbank" in bank_name
+        or "กสิกร" in (first_doc.get("bank_name") or "")
+    ):
         bank_code = "KBANK"
     elif "siam commercial" in bank_name or "scb" in bank_name:
         bank_code = "SCB"
@@ -4600,30 +5446,41 @@ def parsed_from_pipeline_legacy(legacy_dict: Dict[str, Any],
             total_in += amount
         else:
             total_out += amount
-        transactions.append(BankTransaction(
-            row_no=idx,
-            tx_date=e.get("transaction_date") or None,
-            value_date=None,
-            direction=direction,
-            amount=amount,
-            balance_after=balance,
-            description=e.get("description") or "",
-            counterparty=None,
-            ref_no=e.get("reference") or None,
-            channel=None,
-        ))
+        transactions.append(
+            BankTransaction(
+                row_no=idx,
+                tx_date=e.get("transaction_date") or None,
+                value_date=None,
+                direction=direction,
+                amount=amount,
+                balance_after=balance,
+                description=e.get("description") or "",
+                counterparty=None,
+                ref_no=e.get("reference") or None,
+                channel=None,
+            )
+        )
 
     return ParsedStatement(
         bank_code=bank_code,
         account_last4=first_doc.get("account_last4") or None,
-        statement_month=(first_doc.get("period_start") or "")[:7] + "-01"
-            if first_doc.get("period_start") else None,
+        statement_month=(
+            (first_doc.get("period_start") or "")[:7] + "-01"
+            if first_doc.get("period_start")
+            else None
+        ),
         period_start=first_doc.get("period_start") or None,
         period_end=first_doc.get("period_end") or None,
-        opening_balance=_to_float(first_doc.get("opening_balance"))
-            if first_doc.get("opening_balance") else None,
-        closing_balance=_to_float(first_doc.get("closing_balance"))
-            if first_doc.get("closing_balance") else None,
+        opening_balance=(
+            _to_float(first_doc.get("opening_balance"))
+            if first_doc.get("opening_balance")
+            else None
+        ),
+        closing_balance=(
+            _to_float(first_doc.get("closing_balance"))
+            if first_doc.get("closing_balance")
+            else None
+        ),
         total_inflow=total_in,
         total_outflow=total_out,
         transactions=transactions,
@@ -4642,9 +5499,9 @@ def gl_rows_from_pipeline_legacy(legacy_dict: Dict[str, Any]) -> List[GlRow]:
         - description-column digits (e.g. '6091') are NOT parsed as amount
     """
     out: List[GlRow] = []
-    for page in (legacy_dict.get("pages") or []):
+    for page in legacy_dict.get("pages") or []:
         doc = (page or {}).get("document") or {}
-        for e in (doc.get("entries") or []):
+        for e in doc.get("entries") or []:
             debit = _to_float(e.get("debit"))
             credit = _to_float(e.get("credit"))
             if debit == 0.0 and credit == 0.0:
@@ -4657,15 +5514,17 @@ def gl_rows_from_pipeline_legacy(legacy_dict: Dict[str, Any]) -> List[GlRow]:
                     tx_date = date(int(yy), int(mm), int(dd))
                 except (ValueError, AttributeError):
                     tx_date = _parse_date(e.get("transaction_date_raw") or tx_date_str)
-            out.append(GlRow(
-                date=tx_date,
-                doc_no=e.get("voucher_no") or "",
-                account_code=e.get("account_code") or "",
-                description=e.get("description") or "",
-                debit=debit,
-                credit=credit,
-                source_file="",
-            ))
+            out.append(
+                GlRow(
+                    date=tx_date,
+                    doc_no=e.get("voucher_no") or "",
+                    account_code=e.get("account_code") or "",
+                    description=e.get("description") or "",
+                    debit=debit,
+                    credit=credit,
+                    source_file="",
+                )
+            )
     return out
 
 
@@ -4735,6 +5594,7 @@ def _extract_text_layer(pdf_bytes: bytes) -> str:
     try:
         from io import BytesIO
         from pdfminer.high_level import extract_text
+
         return extract_text(BytesIO(pdf_bytes)) or ""
     except Exception as e:
         logger.warning(f"[bank_recon] pdfminer 提取失败: {e}")
@@ -4745,6 +5605,7 @@ def _count_pages(pdf_bytes: bytes) -> int:
     try:
         from io import BytesIO
         from pypdf import PdfReader
+
         return len(PdfReader(BytesIO(pdf_bytes)).pages)
     except Exception:
         return 0
@@ -4756,11 +5617,11 @@ def _count_pages(pdf_bytes: bytes) -> int:
 # 示例行:01/12/24  TRANSFER FROM XXXX1234  5,000.00  123,456.78
 # KBank 对账单一般是 DD/MM/YY 或 DD/MM/YYYY
 _KBANK_ROW = re.compile(
-    r"(\d{1,2}/\d{1,2}/\d{2,4})\s+"       # date
-    r"(.+?)\s+"                            # description
-    r"(?:([\d,]+\.\d{2})\s+)?"             # deposit (optional)
-    r"(?:([\d,]+\.\d{2})\s+)?"             # withdrawal (optional)
-    r"([\d,]+\.\d{2})"                     # balance
+    r"(\d{1,2}/\d{1,2}/\d{2,4})\s+"  # date
+    r"(.+?)\s+"  # description
+    r"(?:([\d,]+\.\d{2})\s+)?"  # deposit (optional)
+    r"(?:([\d,]+\.\d{2})\s+)?"  # withdrawal (optional)
+    r"([\d,]+\.\d{2})"  # balance
 )
 
 
@@ -4822,16 +5683,18 @@ def _parse_kbank_text(text: str, pages: int) -> ParsedStatement:
         else:
             total_out += amount
 
-        txs.append(BankTransaction(
-            row_no=len(txs) + 1,
-            tx_date=tx_date,
-            value_date=tx_date,
-            direction=direction,
-            amount=amount,
-            balance_after=balance,
-            description=desc.strip(),
-            channel=_guess_channel(desc),
-        ))
+        txs.append(
+            BankTransaction(
+                row_no=len(txs) + 1,
+                tx_date=tx_date,
+                value_date=tx_date,
+                direction=direction,
+                amount=amount,
+                balance_after=balance,
+                description=desc.strip(),
+                channel=_guess_channel(desc),
+            )
+        )
         prev_balance = balance
 
     return ParsedStatement(
@@ -4855,9 +5718,21 @@ def _looks_like_outflow(desc: str) -> bool:
     if not desc:
         return False
     u = desc.upper()
-    out_kw = ["WITHDRAW", "WDRL", "FEE", "CHARGE", "PAY", "PAYMENT",
-              "OUT", "DEBIT", "PURCHASE", "BUY",
-              "ถอน", "ค่าธรรมเนียม", "ชำระ"]
+    out_kw = [
+        "WITHDRAW",
+        "WDRL",
+        "FEE",
+        "CHARGE",
+        "PAY",
+        "PAYMENT",
+        "OUT",
+        "DEBIT",
+        "PURCHASE",
+        "BUY",
+        "ถอน",
+        "ค่าธรรมเนียม",
+        "ชำระ",
+    ]
     return any(k in u or k in desc for k in out_kw)
 
 
@@ -4865,13 +5740,13 @@ def _looks_like_outflow(desc: str) -> bool:
 # SCB 模板 · 列顺序:Date | Time | Code | Channel | Description | Debit | Credit | Balance
 # ============================================================
 _SCB_ROW = re.compile(
-    r"(\d{1,2}/\d{1,2}/\d{2,4})\s+"                 # date
-    r"(?:\d{1,2}:\d{2}\s+)?"                         # time (optional)
-    r"(?:([A-Z]{2,}\d*)\s+)?"                        # code (optional, like X0)
-    r"(.+?)\s+"                                      # description
-    r"(?:([\d,]+\.\d{2})\s+)?"                       # debit
-    r"(?:([\d,]+\.\d{2})\s+)?"                       # credit
-    r"([\d,]+\.\d{2})"                               # balance
+    r"(\d{1,2}/\d{1,2}/\d{2,4})\s+"  # date
+    r"(?:\d{1,2}:\d{2}\s+)?"  # time (optional)
+    r"(?:([A-Z]{2,}\d*)\s+)?"  # code (optional, like X0)
+    r"(.+?)\s+"  # description
+    r"(?:([\d,]+\.\d{2})\s+)?"  # debit
+    r"(?:([\d,]+\.\d{2})\s+)?"  # credit
+    r"([\d,]+\.\d{2})"  # balance
 )
 
 
@@ -4929,16 +5804,18 @@ def _parse_scb_text(text: str, pages: int) -> ParsedStatement:
         else:
             total_out += amount
 
-        txs.append(BankTransaction(
-            row_no=len(txs) + 1,
-            tx_date=tx_date,
-            value_date=tx_date,
-            direction=direction,
-            amount=amount,
-            balance_after=balance,
-            description=desc.strip(),
-            channel=code or _guess_channel(desc),
-        ))
+        txs.append(
+            BankTransaction(
+                row_no=len(txs) + 1,
+                tx_date=tx_date,
+                value_date=tx_date,
+                direction=direction,
+                amount=amount,
+                balance_after=balance,
+                description=desc.strip(),
+                channel=code or _guess_channel(desc),
+            )
+        )
         prev_balance = balance
 
     return ParsedStatement(
@@ -4962,11 +5839,11 @@ def _parse_scb_text(text: str, pages: int) -> ParsedStatement:
 # ============================================================
 _BBL_ROW = re.compile(
     r"(\d{1,2}/\d{1,2}/\d{2,4})\s+"
-    r"([A-Z]{2,5})?\s*"                              # channel code(可选)
+    r"([A-Z]{2,5})?\s*"  # channel code(可选)
     r"(.+?)\s+"
-    r"(?:([\d,]+\.\d{2})\s+)?"                       # withdrawal
-    r"(?:([\d,]+\.\d{2})\s+)?"                       # deposit
-    r"([\d,]+\.\d{2})"                               # balance
+    r"(?:([\d,]+\.\d{2})\s+)?"  # withdrawal
+    r"(?:([\d,]+\.\d{2})\s+)?"  # deposit
+    r"([\d,]+\.\d{2})"  # balance
 )
 
 
@@ -5023,16 +5900,18 @@ def _parse_bbl_text(text: str, pages: int) -> ParsedStatement:
         else:
             total_out += amount
 
-        txs.append(BankTransaction(
-            row_no=len(txs) + 1,
-            tx_date=tx_date,
-            value_date=tx_date,
-            direction=direction,
-            amount=amount,
-            balance_after=balance,
-            description=desc.strip(),
-            channel=channel or _guess_channel(desc),
-        ))
+        txs.append(
+            BankTransaction(
+                row_no=len(txs) + 1,
+                tx_date=tx_date,
+                value_date=tx_date,
+                direction=direction,
+                amount=amount,
+                balance_after=balance,
+                description=desc.strip(),
+                channel=channel or _guess_channel(desc),
+            )
+        )
         prev_balance = balance
 
     return ParsedStatement(
@@ -5057,8 +5936,8 @@ def _parse_bbl_text(text: str, pages: int) -> ParsedStatement:
 _GENERIC_ROW = re.compile(
     r"(\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4})\s+"
     r"(.+?)\s+"
-    r"(-?[\d,]+\.\d{2})\s+"                          # 金额(可带负号)
-    r"([\d,]+\.\d{2})"                                # 余额
+    r"(-?[\d,]+\.\d{2})\s+"  # 金额(可带负号)
+    r"([\d,]+\.\d{2})"  # 余额
 )
 
 
@@ -5091,16 +5970,18 @@ def _parse_generic_text(text: str, pages: int, bank_code: str) -> ParsedStatemen
         else:
             total_out += amount
 
-        txs.append(BankTransaction(
-            row_no=len(txs) + 1,
-            tx_date=tx_date,
-            value_date=tx_date,
-            direction=direction,
-            amount=amount,
-            balance_after=balance,
-            description=desc.strip(),
-            channel=_guess_channel(desc),
-        ))
+        txs.append(
+            BankTransaction(
+                row_no=len(txs) + 1,
+                tx_date=tx_date,
+                value_date=tx_date,
+                direction=direction,
+                amount=amount,
+                balance_after=balance,
+                description=desc.strip(),
+                channel=_guess_channel(desc),
+            )
+        )
 
     return ParsedStatement(
         bank_code=bank_code,
@@ -5215,7 +6096,8 @@ def _find_period(text: str) -> Tuple[Optional[str], Optional[str]]:
     m = re.search(
         r"(?:Period|Statement\s*Period|Date\s*Range)[:\s]*"
         r"(\d{1,2}/\d{1,2}/\d{2,4})\s*(?:-|to|ถึง)\s*(\d{1,2}/\d{1,2}/\d{2,4})",
-        text, re.IGNORECASE
+        text,
+        re.IGNORECASE,
     )
     if m:
         return _normalize_thai_date(m.group(1)), _normalize_thai_date(m.group(2))
@@ -5289,20 +6171,20 @@ def _guess_channel(desc: str) -> str:
 # ============================================================
 
 # 权重配置(总和 100)
-_W_AMOUNT    = 50
-_W_DATE      = 30
+_W_AMOUNT = 50
+_W_DATE = 30
 _W_DIRECTION = 15
-_W_KEYWORD   = 5
+_W_KEYWORD = 5
 
 # 阈值
-THRESH_AUTO     = 85  # 自动选中
-THRESH_SUGGEST  = 60  # 可显示为疑似
+THRESH_AUTO = 85  # 自动选中
+THRESH_SUGGEST = 60  # 可显示为疑似
 
 # 发票金额/日期误差容忍
-AMOUNT_TOL_EQUAL    = 0.01    # 小于这个差值 = 金额精确一致
-AMOUNT_TOL_SMALL    = 1.00    # 1 泰铢内
-AMOUNT_TOL_MEDIUM   = 10.00   # 10 泰铢内(手续费差 / 汇率小差)
-DATE_TOL_DAYS       = 7       # 超过 7 天不计候选
+AMOUNT_TOL_EQUAL = 0.01  # 小于这个差值 = 金额精确一致
+AMOUNT_TOL_SMALL = 1.00  # 1 泰铢内
+AMOUNT_TOL_MEDIUM = 10.00  # 10 泰铢内(手续费差 / 汇率小差)
+DATE_TOL_DAYS = 7  # 超过 7 天不计候选
 
 
 def score_amount(bank_amount: float, invoice_amount: float) -> float:
@@ -5311,11 +6193,11 @@ def score_amount(bank_amount: float, invoice_amount: float) -> float:
         return 0.0
     diff = abs(float(bank_amount) - float(invoice_amount))
     if diff <= AMOUNT_TOL_EQUAL:
-        return float(_W_AMOUNT)                     # 完全一致
+        return float(_W_AMOUNT)  # 完全一致
     if diff <= AMOUNT_TOL_SMALL:
-        return float(_W_AMOUNT) - 5                 # 1 泰铢内:45
+        return float(_W_AMOUNT) - 5  # 1 泰铢内:45
     if diff <= AMOUNT_TOL_MEDIUM:
-        return float(_W_AMOUNT) - 15                # 10 泰铢内:35
+        return float(_W_AMOUNT) - 15  # 10 泰铢内:35
     # 更大差距:按比例打分(误差 ≤ 1% 给 20 分,≤ 5% 给 10 分)
     pct = diff / max(float(invoice_amount), 0.01)
     if pct <= 0.01:
@@ -5336,7 +6218,7 @@ def score_date(bank_date: Optional[str], invoice_date: Optional[str]) -> float:
         return 0.0
     days = abs((d1 - d2).days)
     if days == 0:
-        return float(_W_DATE)                       # 同日:30
+        return float(_W_DATE)  # 同日:30
     if days <= 1:
         return 25.0
     if days <= 3:
@@ -5357,8 +6239,7 @@ def score_direction(bank_direction: str, invoice_meta: Dict[str, Any]) -> float:
     cat = (invoice_meta.get("category_tag") or "").lower()
     # 简单分类:销售/收入类 vs 采购/费用类
     income_words = ["sale", "sales", "revenue", "income", "销售", "收入"]
-    expense_words = ["purchase", "expense", "cost", "fee",
-                     "采购", "费用", "开支"]
+    expense_words = ["purchase", "expense", "cost", "fee", "采购", "费用", "开支"]
     is_income = any(w in cat for w in income_words)
     is_expense = any(w in cat for w in expense_words)
 
@@ -5368,9 +6249,9 @@ def score_direction(bank_direction: str, invoice_meta: Dict[str, Any]) -> float:
         return float(_W_DIRECTION)
     if bank_direction == "OUT" and not is_income:
         # 大多数 OCR 历史是采购发票(默认场景)
-        return float(_W_DIRECTION) * 0.7            # 约 10 分
+        return float(_W_DIRECTION) * 0.7  # 约 10 分
     # 其他情况:不扣分但不加分
-    return float(_W_DIRECTION) * 0.3                # 约 4.5 分
+    return float(_W_DIRECTION) * 0.3  # 约 4.5 分
 
 
 def score_keyword(bank_desc: str, invoice_meta: Dict[str, Any]) -> float:
@@ -5395,18 +6276,18 @@ def score_keyword(bank_desc: str, invoice_meta: Dict[str, Any]) -> float:
     return min(score, float(_W_KEYWORD))
 
 
-def match_one_tx(bank_tx: Dict[str, Any],
-                 candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def match_one_tx(bank_tx: Dict[str, Any], candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """对一条银行流水 · 在候选发票集合中打分排序 · 返回 [{history_id, score, reason, breakdown}, ...]"""
     scored: List[Dict[str, Any]] = []
     for inv in candidates:
-        s_amt = score_amount(bank_tx.get("amount") or 0,
-                              inv.get("amount_total") or inv.get("total") or 0)
+        s_amt = score_amount(
+            bank_tx.get("amount") or 0, inv.get("amount_total") or inv.get("total") or 0
+        )
         if s_amt <= 0:
-            continue                                 # 金额差太大 · 直接跳过
+            continue  # 金额差太大 · 直接跳过
         s_date = score_date(bank_tx.get("tx_date"), inv.get("invoice_date"))
-        s_dir  = score_direction(bank_tx.get("direction") or "", inv)
-        s_kw   = score_keyword(bank_tx.get("description") or "", inv)
+        s_dir = score_direction(bank_tx.get("direction") or "", inv)
+        s_kw = score_keyword(bank_tx.get("description") or "", inv)
         total = round(s_amt + s_date + s_dir + s_kw, 2)
 
         # 生成人类可读原因
@@ -5427,20 +6308,22 @@ def match_one_tx(bank_tx: Dict[str, Any],
             parts.append("描述匹配")
         reason = " + ".join(parts) if parts else "低置信"
 
-        scored.append({
-            "history_id": inv["id"],
-            "score": total,
-            "reason": reason,
-            "breakdown": {
-                "amount":    s_amt,
-                "date":      s_date,
-                "direction": s_dir,
-                "keyword":   s_kw,
-            },
-        })
+        scored.append(
+            {
+                "history_id": inv["id"],
+                "score": total,
+                "reason": reason,
+                "breakdown": {
+                    "amount": s_amt,
+                    "date": s_date,
+                    "direction": s_dir,
+                    "keyword": s_kw,
+                },
+            }
+        )
     # 按分降序
     scored.sort(key=lambda x: x["score"], reverse=True)
-    return scored[:5]                                # 最多留 5 个候选
+    return scored[:5]  # 最多留 5 个候选
 
 
 # ============================================================
@@ -5457,8 +6340,14 @@ def run_matching_for_session(session_id: str, user_id: str) -> Dict[str, Any]:
     t0 = time.time()
     txs = db.list_bank_recon_transactions(session_id, user_id, limit=2000)
     if not txs:
-        return {"tx_total": 0, "matched": 0, "suggested": 0, "unmatched": 0,
-                "elapsed_ms": 0, "error": "no_transactions"}
+        return {
+            "tx_total": 0,
+            "matched": 0,
+            "suggested": 0,
+            "unmatched": 0,
+            "elapsed_ms": 0,
+            "error": "no_transactions",
+        }
 
     stat = {"matched": 0, "suggested": 0, "unmatched": 0}
 
@@ -5489,25 +6378,22 @@ def run_matching_for_session(session_id: str, user_id: str) -> Dict[str, Any]:
         )
 
         if not candidates:
-            db.save_match_result(tx["id"], [],
-                                  THRESH_AUTO, THRESH_SUGGEST)
+            db.save_match_result(tx["id"], [], THRESH_AUTO, THRESH_SUGGEST)
             stat["unmatched"] += 1
             continue
 
         # 打分
         tx_for_score = {
-            "amount":      float(amt),
-            "tx_date":     tx_date_str,
-            "direction":   tx.get("direction") or "",
+            "amount": float(amt),
+            "tx_date": tx_date_str,
+            "direction": tx.get("direction") or "",
             "description": tx.get("description") or "",
         }
         scored = match_one_tx(tx_for_score, candidates)
 
         # 写结果(算法内只保留 ≥ THRESH_SUGGEST 的)
         scored_kept = [s for s in scored if s["score"] >= THRESH_SUGGEST]
-        final_status = db.save_match_result(
-            tx["id"], scored_kept, THRESH_AUTO, THRESH_SUGGEST
-        )
+        final_status = db.save_match_result(tx["id"], scored_kept, THRESH_AUTO, THRESH_SUGGEST)
         stat[final_status] = stat.get(final_status, 0) + 1
 
     # 更新 session 头统计
@@ -5515,9 +6401,9 @@ def run_matching_for_session(session_id: str, user_id: str) -> Dict[str, Any]:
 
     elapsed = int((time.time() - t0) * 1000)
     return {
-        "tx_total":   len(txs),
-        "matched":    stat.get("matched", 0),
-        "suggested":  stat.get("suggested", 0),
-        "unmatched":  stat.get("unmatched", 0),
+        "tx_total": len(txs),
+        "matched": stat.get("matched", 0),
+        "suggested": stat.get("suggested", 0),
+        "unmatched": stat.get("unmatched", 0),
         "elapsed_ms": elapsed,
     }

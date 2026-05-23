@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Dict, List, Literal, Optional
@@ -65,14 +64,15 @@ from services.erp.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-PRODUCT_LEVENSHTEIN_THRESHOLD_DEFAULT = 0.90   # Zihao 2026-05-18 拍板
-PRODUCT_NAME_MAX = 100                          # MR.ERP UI ceiling
-DEFAULT_PRODUCT_CODE_PREFIX = "P"               # P{YYMM}{SEQ4}
+PRODUCT_LEVENSHTEIN_THRESHOLD_DEFAULT = 0.90  # Zihao 2026-05-18 拍板
+PRODUCT_NAME_MAX = 100  # MR.ERP UI ceiling
+DEFAULT_PRODUCT_CODE_PREFIX = "P"  # P{YYMM}{SEQ4}
 
 
 @dataclass
 class ItemInfo:
     """Input for product sync — pulled from OCR `items[].name`."""
+
     name: str
     tenant_id: str = ""
     unit_code: Optional[str] = None
@@ -86,6 +86,7 @@ class ItemInfo:
 @dataclass
 class ListingProduct:
     """One row scraped from stkmas/allview.php."""
+
     code: str
     name: str
     category_code: str = ""
@@ -96,6 +97,7 @@ class ListingProduct:
 @dataclass
 class ProductSyncResult:
     """What lookup / lookup_or_create returns to the adapter."""
+
     product_code: str
     source: Literal[
         "cache_hit",
@@ -127,7 +129,7 @@ class ProductSyncResult:
 # ============================================================
 
 _ROW_PATTERN = re.compile(
-    r'<p\b[^>]*>(?P<body>(?:(?!<p\b)(?!</p>).)*?)</p>',
+    r"<p\b[^>]*>(?P<body>(?:(?!<p\b)(?!</p>).)*?)</p>",
     re.DOTALL,
 )
 
@@ -166,7 +168,7 @@ def _extract_top_level_spans(body: str, *, limit: int = 5) -> List[str]:
             else:
                 depth -= 1
                 if depth == 0:
-                    out.append(body[gt + 1:next_close])
+                    out.append(body[gt + 1 : next_close])
                     j = next_close + len("</span>")
                 else:
                     j = next_close + len("</span>")
@@ -202,19 +204,22 @@ def parse_stkmas_listing(html: str) -> List[ListingProduct]:
             continue
         if not code or not name:
             continue
-        products.append(ListingProduct(
-            code=code,
-            name=name,
-            category_code=cat_code,
-            category_name=cat_name,
-            name_norm=normalize_item_name(name),
-        ))
+        products.append(
+            ListingProduct(
+                code=code,
+                name=name,
+                category_code=cat_code,
+                category_name=cat_name,
+                name_norm=normalize_item_name(name),
+            )
+        )
     return products
 
 
 # ============================================================
 # The service
 # ============================================================
+
 
 class MRERPProductSyncService:
     """Lookup + auto-create helper for product master data.
@@ -276,7 +281,8 @@ class MRERPProductSyncService:
         except MRERPTechnicalError as e:
             logger.warning(
                 "product _fetch_listing failed in lookup · skipping L2/L3 · "
-                "fall through to None (caller will go L4 auto-create): %s", e,
+                "fall through to None (caller will go L4 auto-create): %s",
+                e,
             )
             return None
 
@@ -318,10 +324,12 @@ class MRERPProductSyncService:
                 f"(ERR_NO_SEED_PRODUCT) — pick one in the ERP "
                 f"connection wizard or pass seed_product_code "
                 f"explicitly. item={item.name!r}",
-                failed_rows=[{
-                    "item_name": item.name,
-                    "reason_code": "ERR_NO_SEED_PRODUCT",
-                }],
+                failed_rows=[
+                    {
+                        "item_name": item.name,
+                        "reason_code": "ERR_NO_SEED_PRODUCT",
+                    }
+                ],
             )
 
         result = self._layer4_auto_create(item, seed_product_code)
@@ -350,13 +358,9 @@ class MRERPProductSyncService:
         if not product_code:
             return False
         page = self.adapter._page
-        del_url = (
-            f"{self.adapter.login_url}{self.DELETE_PATH}"
-            f"?id={product_code}"
-        )
+        del_url = f"{self.adapter.login_url}{self.DELETE_PATH}" f"?id={product_code}"
         try:
-            page.goto(del_url, wait_until="networkidle",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(del_url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
         except (PWTimeout, PWError) as e:
             logger.warning("delete_product nav failed: %s", e)
             return False
@@ -400,8 +404,7 @@ class MRERPProductSyncService:
         for m in (mappings or {}).get("products") or []:
             if m.get("erp_type") != "mrerp":
                 continue
-            cand_norm = (m.get("item_name_norm")
-                         or normalize_item_name(m.get("item_name", "")))
+            cand_norm = m.get("item_name_norm") or normalize_item_name(m.get("item_name", ""))
             if cand_norm == name_norm:
                 code = str(m.get("erp_code") or "").strip()
                 if code:
@@ -474,10 +477,12 @@ class MRERPProductSyncService:
         if not seed_product_code:
             raise MRERPBusinessError(
                 "ERR_NO_SEED_PRODUCT — seed_product_code is required",
-                failed_rows=[{
-                    "item_name": item.name,
-                    "reason_code": "ERR_NO_SEED_PRODUCT",
-                }],
+                failed_rows=[
+                    {
+                        "item_name": item.name,
+                        "reason_code": "ERR_NO_SEED_PRODUCT",
+                    }
+                ],
             )
 
         page = self.adapter._page
@@ -491,16 +496,16 @@ class MRERPProductSyncService:
             warnings.append("WARN_PRODUCT_NAME_TRUNCATED")
             logger.info(
                 "product name truncated %d→%d chars: %r",
-                len(raw_name), PRODUCT_NAME_MAX, raw_name[:60],
+                len(raw_name),
+                PRODUCT_NAME_MAX,
+                raw_name[:60],
             )
 
         target = self.adapter.login_url + self.FORM_PATH
         try:
-            page.goto(target, wait_until="networkidle",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(target, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"product-create form nav timeout: {e}") from e
+            raise MRERPTechnicalError(f"product-create form nav timeout: {e}") from e
 
         # Bug 8 fix (Zihao 2026-05-19 拍板 · v118.34.23) · MR.ERP PHP session
         # 偶尔在 customer-sync 跑完后 · 进到 stkmas 模块时被服务端无声 invalidate.
@@ -509,9 +514,7 @@ class MRERPProductSyncService:
         # 仍失败才抛 ERR_TECHNICAL · 给用户清晰路径(刷新重试 / 等几分钟).
         landed_url = page.url or ""
         if "/login/login.php" in landed_url:
-            logger.warning(
-                "[product-create] nav bounced to login.php · attempt re-login + retry"
-            )
+            logger.warning("[product-create] nav bounced to login.php · attempt re-login + retry")
             warnings.append("WARN_SESSION_REFRESHED")
             try:
                 # Force re-login by toggling _logged_in flag · adapter.login()
@@ -520,8 +523,7 @@ class MRERPProductSyncService:
                 self.adapter._company_selected = False
                 self.adapter.login()
                 self.adapter.select_company()
-                page.goto(target, wait_until="networkidle",
-                          timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+                page.goto(target, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
             except Exception as e:
                 raise MRERPTechnicalError(
                     f"product-create session re-login failed: {type(e).__name__}: {e}"
@@ -539,14 +541,12 @@ class MRERPProductSyncService:
         except MRERPBusinessError:
             raise
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"product copy-from-seed timeout: {e}") from e
+            raise MRERPTechnicalError(f"product copy-from-seed timeout: {e}") from e
 
         try:
             self._override_after_copy(page, product_code, truncated_name)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"product override-after-copy timeout: {e}") from e
+            raise MRERPTechnicalError(f"product override-after-copy timeout: {e}") from e
 
         # Zihao Q3: OCR unit mismatch — if item.unit_code is set AND
         # differs from the seed's unit, raise ERR_PRODUCT_UNIT_NOT_FOUND
@@ -556,39 +556,38 @@ class MRERPProductSyncService:
                 inherited_unit = page.evaluate(
                     "document.getElementById('txtunit_usell')?.value || ''"
                 )
-                if (inherited_unit
-                        and item.unit_code.strip()
-                        and item.unit_code.strip() != inherited_unit.strip()):
+                if (
+                    inherited_unit
+                    and item.unit_code.strip()
+                    and item.unit_code.strip() != inherited_unit.strip()
+                ):
                     raise MRERPBusinessError(
                         f"ERR_PRODUCT_UNIT_NOT_FOUND — OCR unit "
                         f"{item.unit_code!r} differs from seed's "
                         f"{inherited_unit!r}; either pick a seed with "
                         f"the right unit or strip the OCR unit hint",
-                        failed_rows=[{
-                            "item_name": item.name,
-                            "reason_code": "ERR_PRODUCT_UNIT_NOT_FOUND",
-                            "ocr_unit": item.unit_code,
-                            "seed_unit": inherited_unit,
-                        }],
+                        failed_rows=[
+                            {
+                                "item_name": item.name,
+                                "reason_code": "ERR_PRODUCT_UNIT_NOT_FOUND",
+                                "ocr_unit": item.unit_code,
+                                "seed_unit": inherited_unit,
+                            }
+                        ],
                     )
             except MRERPBusinessError:
                 raise
             except Exception:
                 pass
 
-        dialogs_before = (
-            len(self.adapter._session.dialogs)
-            if self.adapter._session else 0
-        )
+        dialogs_before = len(self.adapter._session.dialogs) if self.adapter._session else 0
         try:
             page.click('button[id="btnsave"]', timeout=5_000)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"product save click timeout: {e}") from e
+            raise MRERPTechnicalError(f"product save click timeout: {e}") from e
 
         try:
-            page.wait_for_load_state("networkidle",
-                                      timeout=self.SAVE_TIMEOUT_MS)
+            page.wait_for_load_state("networkidle", timeout=self.SAVE_TIMEOUT_MS)
         except PWTimeout:
             pass
         page.wait_for_timeout(1_500)
@@ -607,7 +606,9 @@ class MRERPProductSyncService:
         if any(r.code == product_code for r in listing):
             logger.info(
                 "auto-created product %s (seed=%s, name=%s)",
-                product_code, seed_product_code, item.name[:60],
+                product_code,
+                seed_product_code,
+                item.name[:60],
             )
             return ProductSyncResult(
                 product_code=product_code,
@@ -624,12 +625,14 @@ class MRERPProductSyncService:
             f"product auto-create did not appear in listing "
             f"(code={product_code}, seed={seed_product_code}, "
             f"dialogs={dialog_text!r})",
-            failed_rows=[{
-                "item_name": item.name,
-                "product_code_attempted": product_code,
-                "seed_product_code": seed_product_code,
-                "dialogs": new_dialogs,
-            }],
+            failed_rows=[
+                {
+                    "item_name": item.name,
+                    "product_code_attempted": product_code,
+                    "seed_product_code": seed_product_code,
+                    "dialogs": new_dialogs,
+                }
+            ],
         )
 
     def _copy_from_seed(self, page, seed_product_code: str) -> None:
@@ -641,11 +644,10 @@ class MRERPProductSyncService:
         `#bshlistboxinpsearch` field to filter down to just the seed
         before clicking, which works regardless of tenant size.
         """
-        loc = page.locator('input#inpdupdata')
+        loc = page.locator("input#inpdupdata")
         if loc.count() == 0:
             raise MRERPTechnicalError(
-                "stkmas inpdupdata (copy) button missing — MR.ERP UI "
-                "may have changed"
+                "stkmas inpdupdata (copy) button missing — MR.ERP UI " "may have changed"
             )
         loc.first.click(timeout=5_000)
         try:
@@ -655,66 +657,61 @@ class MRERPProductSyncService:
                 timeout=10_000,
             )
         except PWTimeout as e:
-            raise MRERPTechnicalError(
-                f"product copy picker popup did not render: {e}") from e
+            raise MRERPTechnicalError(f"product copy picker popup did not render: {e}") from e
         page.wait_for_timeout(500)
 
         # Type the seed code into the popup's search input. The onkeyup
         # handler `bshdatalistbox()` re-filters the visible rows in
         # real time.
-        search = page.locator('input#bshlistboxinpsearch')
+        search = page.locator("input#bshlistboxinpsearch")
         try:
             search.fill(seed_product_code)
             # bshdatalistbox is wired to onkeyup — fire one to trigger
             # the filter, then settle.
             search.press("End")
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"product copy picker search input failed: {e}") from e
+            raise MRERPTechnicalError(f"product copy picker search input failed: {e}") from e
         page.wait_for_timeout(800)
 
         row = page.locator(
-            "#bshlistboxdetailshow p"
-            f":has(span:text-is({seed_product_code!r}))"
+            "#bshlistboxdetailshow p" f":has(span:text-is({seed_product_code!r}))"
         ).first
         # Fallback selector: less strict (substring match) in case the
         # code contains characters that confuse text-is().
         if row.count() == 0:
-            row = page.locator(
-                "#bshlistboxdetailshow p"
-                f":has-text({seed_product_code!r})"
-            ).first
+            row = page.locator("#bshlistboxdetailshow p" f":has-text({seed_product_code!r})").first
         if row.count() == 0:
             raise MRERPBusinessError(
                 f"ERR_SEED_PRODUCT_NOT_FOUND — seed product "
                 f"{seed_product_code!r} not visible in the copy picker "
                 f"(searched via bshlistboxinpsearch)",
-                failed_rows=[{
-                    "reason_code": "ERR_SEED_PRODUCT_NOT_FOUND",
-                    "seed_product_code": seed_product_code,
-                }],
+                failed_rows=[
+                    {
+                        "reason_code": "ERR_SEED_PRODUCT_NOT_FOUND",
+                        "seed_product_code": seed_product_code,
+                    }
+                ],
             )
         try:
             row.click(timeout=3_000)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"product seed row click failed: {e}") from e
+            raise MRERPTechnicalError(f"product seed row click failed: {e}") from e
         page.wait_for_timeout(2_500)
 
         try:
-            populated_name = page.locator(
-                'input#txtstkname'
-            ).first.input_value()
+            populated_name = page.locator("input#txtstkname").first.input_value()
         except Exception:
             populated_name = ""
         if not populated_name:
             raise MRERPTechnicalError(
-                "product copy picker click did not populate "
-                "(txtstkname still empty)"
+                "product copy picker click did not populate " "(txtstkname still empty)"
             )
 
     def _override_after_copy(
-        self, page, product_code: str, item_name: str,
+        self,
+        page,
+        product_code: str,
+        item_name: str,
     ) -> None:
         """Replace seed identity fields with the new product's. Per
         mrerp-product-form-fields.md §4.4: 6 fields override, all
@@ -745,7 +742,7 @@ class MRERPProductSyncService:
         existing_seqs: List[int] = []
         for row in listing:
             if row.code.startswith(prefix):
-                tail = row.code[len(prefix):]
+                tail = row.code[len(prefix) :]
                 if tail.isdigit():
                     existing_seqs.append(int(tail))
         next_seq = (max(existing_seqs) + 1) if existing_seqs else 1
@@ -766,17 +763,19 @@ class MRERPProductSyncService:
         for m in products:
             if (
                 m.get("erp_type") == "mrerp"
-                and (m.get("item_name_norm")
-                     or normalize_item_name(m.get("item_name", ""))) == name_norm
+                and (m.get("item_name_norm") or normalize_item_name(m.get("item_name", "")))
+                == name_norm
             ):
                 m["erp_code"] = product_code
                 return
-        products.append({
-            "erp_type": "mrerp",
-            "item_name": item.name,
-            "item_name_norm": name_norm,
-            "erp_code": product_code,
-        })
+        products.append(
+            {
+                "erp_type": "mrerp",
+                "item_name": item.name,
+                "item_name_norm": name_norm,
+                "erp_code": product_code,
+            }
+        )
         if isinstance(mappings, dict):
             mappings["products"] = products
 
@@ -793,6 +792,7 @@ class MRERPProductSyncService:
           - cache TTL 由 caller 控制(app.py 改 600s)
         """
         import time as _time
+
         cached = self.cache.get(self._listing_cache_key)
         if cached is not None:
             return cached
@@ -816,21 +816,25 @@ class MRERPProductSyncService:
                         timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
                     )
                 page.wait_for_selector(
-                    "#showdata p", state="attached", timeout=30_000,
+                    "#showdata p",
+                    state="attached",
+                    timeout=30_000,
                 )
                 html = page.content() or ""
                 rows = parse_stkmas_listing(html)
                 self.cache.set(self._listing_cache_key, rows)
                 logger.info(
                     "fetched stkmas listing: %d rows (attempt %d)",
-                    len(rows), attempt,
+                    len(rows),
+                    attempt,
                 )
                 return rows
             except PWTimeout as e:
                 last_err = e
                 logger.warning(
                     "product listing fetch attempt %d/3 timed out: %s",
-                    attempt, e,
+                    attempt,
+                    e,
                 )
                 continue
             except Exception as e:

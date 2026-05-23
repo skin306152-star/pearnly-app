@@ -44,43 +44,101 @@ logger = logging.getLogger(__name__)
 # column for an amount/debit/credit/balance field. Multi-language to cover
 # real-world Thai / English / Chinese GL templates.
 _DESCRIPTION_COLUMN_KEYWORDS: Set[str] = {
-    "description", "remark", "remarks", "note", "notes", "detail", "details",
-    "particulars", "narrative",
-    "รายการ", "คําอธิบาย", "คำอธิบาย", "หมายเหตุ",
-    "摘要", "说明", "备注",
-    "tekijä", "memo",
+    "description",
+    "remark",
+    "remarks",
+    "note",
+    "notes",
+    "detail",
+    "details",
+    "particulars",
+    "narrative",
+    "รายการ",
+    "คําอธิบาย",
+    "คำอธิบาย",
+    "หมายเหตุ",
+    "摘要",
+    "说明",
+    "备注",
+    "tekijä",
+    "memo",
 }
 _VOUCHER_COLUMN_KEYWORDS: Set[str] = {
-    "voucher", "voucher no", "voucher no.", "voucherno", "vch", "vch no",
-    "doc no", "doc no.", "document no", "journal no", "jv", "jv no",
-    "reference", "ref", "ref no", "ref no.",
-    "เลขที่เอกสาร", "เลขที่ใบสำคัญ", "เลขที่อ้างอิง", "เลขที่",
-    "凭证号", "凭证编号",
+    "voucher",
+    "voucher no",
+    "voucher no.",
+    "voucherno",
+    "vch",
+    "vch no",
+    "doc no",
+    "doc no.",
+    "document no",
+    "journal no",
+    "jv",
+    "jv no",
+    "reference",
+    "ref",
+    "ref no",
+    "ref no.",
+    "เลขที่เอกสาร",
+    "เลขที่ใบสำคัญ",
+    "เลขที่อ้างอิง",
+    "เลขที่",
+    "凭证号",
+    "凭证编号",
 }
 _ACCOUNT_CODE_COLUMN_KEYWORDS: Set[str] = {
-    "account code", "acc code", "a/c code", "account no", "a/c no",
-    "รหัสบัญชี", "เลขที่บัญชี",
-    "科目代码", "科目编号",
+    "account code",
+    "acc code",
+    "a/c code",
+    "account no",
+    "a/c no",
+    "รหัสบัญชี",
+    "เลขที่บัญชี",
+    "科目代码",
+    "科目编号",
 }
 
 # Allowed source columns for GL amount/debit/credit
 _GL_DEBIT_COLUMNS: Set[str] = {"debit", "dr", "เดบิต", "借方", "借"}
 _GL_CREDIT_COLUMNS: Set[str] = {"credit", "cr", "เครดิต", "贷方", "贷"}
 _GL_BALANCE_COLUMNS: Set[str] = {
-    "balance", "running balance", "ending balance",
-    "ยอดคงเหลือ", "คงเหลือ", "余额",
+    "balance",
+    "running balance",
+    "ending balance",
+    "ยอดคงเหลือ",
+    "คงเหลือ",
+    "余额",
 }
 
 # Allowed source columns for Bank Statement amount/deposit/withdrawal
 _BANK_DEPOSIT_COLUMNS: Set[str] = {
-    "deposit", "credit", "in", "money in", "amount in", "received",
-    "เงินเข้า", "ฝาก", "รับ",
-    "存入", "存款", "收入",
+    "deposit",
+    "credit",
+    "in",
+    "money in",
+    "amount in",
+    "received",
+    "เงินเข้า",
+    "ฝาก",
+    "รับ",
+    "存入",
+    "存款",
+    "收入",
 }
 _BANK_WITHDRAWAL_COLUMNS: Set[str] = {
-    "withdrawal", "debit", "out", "money out", "amount out", "paid",
-    "เงินออก", "ถอน", "จ่าย",
-    "支出", "取款", "提款",
+    "withdrawal",
+    "debit",
+    "out",
+    "money out",
+    "amount out",
+    "paid",
+    "เงินออก",
+    "ถอน",
+    "จ่าย",
+    "支出",
+    "取款",
+    "提款",
 }
 _BANK_BALANCE_COLUMNS: Set[str] = _GL_BALANCE_COLUMNS
 
@@ -159,8 +217,10 @@ def _value_appears_in_description(value: str, description: str) -> bool:
     # Strip trailing .0 / .00 zeros and try integer form
     if "." in v:
         v_int = v.rstrip("0").rstrip(".")
-        if v_int and v_int != v and re.search(
-            r"(?<!\d)" + re.escape(v_int) + r"(?!\d)", description
+        if (
+            v_int
+            and v_int != v
+            and re.search(r"(?<!\d)" + re.escape(v_int) + r"(?!\d)", description)
         ):
             return True
     return False
@@ -198,9 +258,7 @@ def validate_gl_document(doc: GeneralLedgerDocument, page: Page) -> List[str]:
             # Reject when sourced from description/voucher/account
             reason = _is_forbidden_amount_source(ref.source_column)
             if reason:
-                warnings.append(
-                    f"GL {row_id}: {ref_name}={ref.value!r} {reason} — rejected"
-                )
+                warnings.append(f"GL {row_id}: {ref_name}={ref.value!r} {reason} — rejected")
                 _clear_amount_field(entry, ref_name)
                 continue
             # Verify it's the right amount column
@@ -221,10 +279,9 @@ def validate_gl_document(doc: GeneralLedgerDocument, page: Page) -> List[str]:
                 # _value_appears_in_description function already does that.
                 # Additional sanity: skip if it appears in voucher_no /
                 # account_code too (those are legitimately numeric).
-                if (
-                    _value_appears_in_description(value, entry.voucher_no)
-                    or _value_appears_in_description(value, entry.account_code)
-                ):
+                if _value_appears_in_description(
+                    value, entry.voucher_no
+                ) or _value_appears_in_description(value, entry.account_code):
                     pass  # ambiguous — skip
                 else:
                     warnings.append(
@@ -267,8 +324,7 @@ def validate_gl_document(doc: GeneralLedgerDocument, page: Page) -> List[str]:
                 expected = d if d > 0 else c
                 if abs(a - expected) > 0.01 and (d > 0 or c > 0):
                     warnings.append(
-                        f"GL {row_id}: amount={a} doesn't match "
-                        f"debit-or-credit={expected}"
+                        f"GL {row_id}: amount={a} doesn't match " f"debit-or-credit={expected}"
                     )
             except ValueError:
                 warnings.append(f"GL {row_id}: amount={entry.amount!r} not numeric")
@@ -316,9 +372,7 @@ def validate_bank_document(doc: BankStatementDocument, page: Page) -> List[str]:
                 continue
             reason = _is_forbidden_amount_source(ref.source_column)
             if reason:
-                warnings.append(
-                    f"Bank {row_id}: {ref_name}={ref.value!r} {reason} — rejected"
-                )
+                warnings.append(f"Bank {row_id}: {ref_name}={ref.value!r} {reason} — rejected")
                 _clear_bank_amount_field(entry, ref_name)
                 continue
             if not _is_allowed_bank_amount_source(ref.source_column, expected_kind):
@@ -347,9 +401,7 @@ def validate_bank_document(doc: BankStatementDocument, page: Page) -> List[str]:
             d = w = 0.0
         else:
             if d > 0 and w > 0:
-                warnings.append(
-                    f"Bank {row_id}: both deposit ({d}) AND withdrawal ({w}) non-zero"
-                )
+                warnings.append(f"Bank {row_id}: both deposit ({d}) AND withdrawal ({w}) non-zero")
 
     return warnings
 
@@ -386,7 +438,5 @@ def validate_invoice(inv: ThaiInvoice, page: Page) -> List[str]:
             continue
         reason = _is_forbidden_amount_source(ref.source_column)
         if reason:
-            warnings.append(
-                f"Invoice {fname}={ref.value!r} {reason} — likely mis-sourced"
-            )
+            warnings.append(f"Invoice {fname}={ref.value!r} {reason} — likely mis-sourced")
     return warnings

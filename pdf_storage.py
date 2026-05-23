@@ -13,6 +13,7 @@ v114 · PDF 留底存储模块
 环境变量:
   PDF_STORAGE_DIR (默认 /opt/mrpilot/storage/pdfs)
 """
+
 import os
 import uuid
 import logging
@@ -28,11 +29,11 @@ PDF_STORAGE_BASE = os.environ.get("PDF_STORAGE_DIR", "/opt/mrpilot/storage/pdfs"
 def save_pdf(user_id: str, content: bytes) -> Tuple[Optional[str], int]:
     """
     保存 PDF 到本地文件系统。
-    
+
     Args:
         user_id: 用户 UUID(我们只用前 8 位作为目录名)
         content: PDF 字节流
-    
+
     Returns:
         (相对路径, 字节数) · 失败返回 (None, 0)
     """

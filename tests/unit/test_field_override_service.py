@@ -9,6 +9,7 @@ P1.2-M2 v118.35.0.47 · 守门测试 · services.recon.field_override 写入逻�
   4. 撤销:user_value 空 或 等于 OCR 原值 → 该字段被删
   5. OCR 原值锁定:第二次改时复用最初 ocr · 不会把上次 user 值当 ocr(铁律 #15)
 """
+
 import unittest
 from contextlib import contextmanager
 from unittest import mock
@@ -45,8 +46,10 @@ class FieldOverrideServiceTests(unittest.TestCase):
 
     def test_record_sets_ocr_and_user(self):
         row = {"buyer_name": "ABC Co", "field_overrides": {}}
-        with mock.patch("db.get_recon_row", return_value=row), \
-             mock.patch("db.get_cursor", _fake_get_cursor):
+        with (
+            mock.patch("db.get_recon_row", return_value=row),
+            mock.patch("db.get_cursor", _fake_get_cursor),
+        ):
             r = fo.record_field_override(1, "buyer_name", "ABC Company Ltd")
         self.assertTrue(r["ok"])
         ov = r["field_overrides"]["buyer_name"]
@@ -55,29 +58,41 @@ class FieldOverrideServiceTests(unittest.TestCase):
         self.assertIn("ts", ov)
 
     def test_revert_when_user_equals_ocr(self):
-        row = {"buyer_name": "ABC Co",
-               "field_overrides": {"buyer_name": {"ocr": "ABC Co", "user": "X", "ts": "t"}}}
-        with mock.patch("db.get_recon_row", return_value=row), \
-             mock.patch("db.get_cursor", _fake_get_cursor):
+        row = {
+            "buyer_name": "ABC Co",
+            "field_overrides": {"buyer_name": {"ocr": "ABC Co", "user": "X", "ts": "t"}},
+        }
+        with (
+            mock.patch("db.get_recon_row", return_value=row),
+            mock.patch("db.get_cursor", _fake_get_cursor),
+        ):
             r = fo.record_field_override(1, "buyer_name", "ABC Co")
         self.assertTrue(r["ok"])
         self.assertNotIn("buyer_name", r["field_overrides"])
 
     def test_revert_when_user_empty(self):
-        row = {"buyer_name": "ABC Co",
-               "field_overrides": {"buyer_name": {"ocr": "ABC Co", "user": "X", "ts": "t"}}}
-        with mock.patch("db.get_recon_row", return_value=row), \
-             mock.patch("db.get_cursor", _fake_get_cursor):
+        row = {
+            "buyer_name": "ABC Co",
+            "field_overrides": {"buyer_name": {"ocr": "ABC Co", "user": "X", "ts": "t"}},
+        }
+        with (
+            mock.patch("db.get_recon_row", return_value=row),
+            mock.patch("db.get_cursor", _fake_get_cursor),
+        ):
             r = fo.record_field_override(1, "buyer_name", "")
         self.assertTrue(r["ok"])
         self.assertNotIn("buyer_name", r["field_overrides"])
 
     def test_ocr_locked_on_second_edit(self):
         """第二次改时 ocr 仍是最初的 ABC Co · 不能变成上次 user 值"""
-        row = {"buyer_name": "should_not_be_used",
-               "field_overrides": {"buyer_name": {"ocr": "ABC Co", "user": "First Edit", "ts": "t"}}}
-        with mock.patch("db.get_recon_row", return_value=row), \
-             mock.patch("db.get_cursor", _fake_get_cursor):
+        row = {
+            "buyer_name": "should_not_be_used",
+            "field_overrides": {"buyer_name": {"ocr": "ABC Co", "user": "First Edit", "ts": "t"}},
+        }
+        with (
+            mock.patch("db.get_recon_row", return_value=row),
+            mock.patch("db.get_cursor", _fake_get_cursor),
+        ):
             r = fo.record_field_override(1, "buyer_name", "Second Edit")
         ov = r["field_overrides"]["buyer_name"]
         self.assertEqual(ov["ocr"], "ABC Co")

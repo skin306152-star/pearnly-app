@@ -1,0 +1,58 @@
+# REFACTOR-A5 · 后端代码规范工具链(black 格式化 + ruff lint)
+# 2026-05-23 拍板:整顿期统一 Python 代码风格 · CI 守门防风格回退。
+# black = 唯一格式化权威(line-length 100)· ruff = lint(pyflakes/pycodestyle)。
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311"]
+# 不格式化的目录:运行期产物 / 本地样本 / 第三方 / 临时包
+extend-exclude = '''
+/(
+    node_modules
+  | _pkg
+  | _pkg_tmpstatic
+  | _deploy_nginx
+  | _gemini_key\.local
+  | _bank_samples
+  | _test_reports
+  | \.ocr_cache
+  | \.pytest_cache
+  | probes
+  | tests/eval/_runs
+)/
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [
+    "node_modules",
+    "_pkg",
+    "_pkg_tmpstatic",
+    "_deploy_nginx",
+    "_gemini_key.local",
+    "_bank_samples",
+    "_test_reports",
+    ".ocr_cache",
+    ".pytest_cache",
+    "probes",
+    "tests/eval/_runs",
+]
+
+[tool.ruff.lint]
+# 整顿期起步规则集:只开 pyflakes(F)抓真 bug ——
+#   F401 未用导入 · F811 重复定义 · F821 未定义名 · F524/F-series .format 参数缺失 等。
+# 所有"格式/风格"(缩进/空白/行长/单行多语句)一律交给 black 这个唯一权威 ·
+# 不在 ruff 开 E/W,避免 black 与 ruff 双重抱怨 + CI 因纯风格常红。
+# 后续 stage B/C 拆文件时可逐步收紧(加 E722 bare-except / B 系列等)。
+select = ["F"]
+ignore = [
+    "F403",  # 'from x import *' · 存量再清
+    "F405",  # may be undefined from star import · 同上
+    "F841",  # 局部变量赋值未用 · 存量 21 处 · 非 bug(RHS 可能有副作用)· 留 stage 清
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试 / 探测脚本里允许未用导入(fixture 副作用)与重定义
+"tests/**" = ["F401", "F811"]
+"scripts/probe/**" = ["F401"]

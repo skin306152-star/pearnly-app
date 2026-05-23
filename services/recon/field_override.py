@@ -12,6 +12,7 @@ M2 销项税对账 · 发票侧字段级用户校正记录。
 铁律 #15 ✅:OCR 原值首次校正时锁定 · 多次改不会丢真原值
 docs/audits/2026-05-22-ocr-recon-audit.md §5 Phase 1 P1.2
 """
+
 import json
 import logging
 from datetime import datetime, timezone
@@ -21,8 +22,13 @@ logger = logging.getLogger(__name__)
 
 # 只允许校正发票 OCR 侧的 7 个字段 · 跟 vat_excel_exporter / 前端对照表字段一一对应
 ALLOWED_FIELDS = (
-    "invoice_date", "invoice_no", "buyer_name", "buyer_tax_id",
-    "buyer_branch", "amount_pre_vat", "vat_amount",
+    "invoice_date",
+    "invoice_no",
+    "buyer_name",
+    "buyer_tax_id",
+    "buyer_branch",
+    "amount_pre_vat",
+    "vat_amount",
 )
 
 
@@ -45,8 +51,7 @@ def parse_overrides(raw) -> Dict[str, Any]:
     return {}
 
 
-def record_field_override(row_id: int, field: str,
-                          user_value: Optional[str]) -> Dict[str, Any]:
+def record_field_override(row_id: int, field: str, user_value: Optional[str]) -> Dict[str, Any]:
     """
     记录用户对发票侧某字段的校正。
 
@@ -90,6 +95,7 @@ def record_field_override(row_id: int, field: str,
 
 def _write_overrides(row_id: int, overrides: Dict[str, Any]) -> bool:
     import db
+
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute(

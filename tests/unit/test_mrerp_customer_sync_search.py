@@ -32,7 +32,7 @@ from unittest.mock import MagicMock, call
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp.mrerp_customer_sync import MRERPCustomerSyncService   # noqa: E402
+from services.erp.mrerp_customer_sync import MRERPCustomerSyncService  # noqa: E402
 
 
 def _make_picker_locator(*, count_returns_1=True):
@@ -62,8 +62,7 @@ class CopyFromSeedSearchFlowTests(unittest.TestCase):
         svc = MRERPCustomerSyncService(adapter)
         return svc, adapter
 
-    def _wire_page(self, page, seed_code: str, *, name_populated=True,
-                   row_count=1):
+    def _wire_page(self, page, seed_code: str, *, name_populated=True, row_count=1):
         """Set up page.locator(...) to return the right chained mocks
         for each selector our flow queries."""
         inp_btn = _make_picker_locator()
@@ -83,11 +82,11 @@ class CopyFromSeedSearchFlowTests(unittest.TestCase):
         txtname_loc.first = first_name
 
         def locator_side_effect(selector):
-            if selector == 'input#inpdupdata':
+            if selector == "input#inpdupdata":
                 return inp_btn
-            if selector == 'input#bshlistboxinpsearch':
+            if selector == "input#bshlistboxinpsearch":
                 return search
-            if selector == 'input#txtname':
+            if selector == "input#txtname":
                 return txtname_loc
             # First row selector tries text-is, fallback uses :has-text.
             # In our wiring both fire; return the strict one first, then
@@ -134,10 +133,7 @@ class CopyFromSeedSearchFlowTests(unittest.TestCase):
             f"row locator never queried with seed={seed}",
         )
         # 4. The row's click was invoked at least once.
-        clicked = (
-            m["row_strict"].first.click.called
-            or m["row_fallback"].first.click.called
-        )
+        clicked = m["row_strict"].first.click.called or m["row_fallback"].first.click.called
         self.assertTrue(
             clicked,
             "neither the strict nor fallback row selector was clicked",
@@ -179,6 +175,7 @@ class CopyFromSeedSearchFlowTests(unittest.TestCase):
         seed row, raise MRERPBusinessError with the ERR_SEED_NOT_FOUND
         reason code — same contract as Product Sync's equivalent."""
         from services.erp.exceptions import MRERPBusinessError
+
         svc, adapter = self._make_svc()
         page = adapter._page
         self._wire_page(page, "0006", row_count=0)
@@ -193,6 +190,7 @@ class CopyFromSeedSearchFlowTests(unittest.TestCase):
         method must raise rather than continue with a half-filled
         form."""
         from services.erp.exceptions import MRERPTechnicalError
+
         svc, adapter = self._make_svc()
         page = adapter._page
         self._wire_page(page, "0006", name_populated=False)

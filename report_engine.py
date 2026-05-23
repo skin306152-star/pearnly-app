@@ -26,18 +26,17 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from i18n_reports import i18n_get, i18n_format
 
-
 # ============================================================
 # 常量样式
 # ============================================================
-COLOR_HEADER_BG = "1E3A8A"      # 深蓝表头(更专业 · 比老 #2C5282 深一档)
+COLOR_HEADER_BG = "1E3A8A"  # 深蓝表头(更专业 · 比老 #2C5282 深一档)
 COLOR_HEADER_FG = "FFFFFF"
-COLOR_ZEBRA = "F9FAFB"          # 斑马行灰
+COLOR_ZEBRA = "F9FAFB"  # 斑马行灰
 COLOR_BORDER = "D1D5DB"
-COLOR_TOTAL_BG = "DBEAFE"       # 合计行浅蓝
-COLOR_TITLE_FG = "111827"       # 顶部大标题深灰
-COLOR_INFO_FG = "374151"        # 信息块灰
-COLOR_WARN_AMOUNT = "DC2626"    # 大额警告红(>50 万)
+COLOR_TOTAL_BG = "DBEAFE"  # 合计行浅蓝
+COLOR_TITLE_FG = "111827"  # 顶部大标题深灰
+COLOR_INFO_FG = "374151"  # 信息块灰
+COLOR_WARN_AMOUNT = "DC2626"  # 大额警告红(>50 万)
 
 # 字体优先级:Tahoma 泰文支持好;退回 Calibri / Arial
 FONT_NAME = "Tahoma"
@@ -75,26 +74,85 @@ REPORT_TEMPLATES = {
         "category_key": "tpl-cat-tax",
         "title_key": "tpl-input-vat-title",
         "recommended": True,
-        "show_info_block": True,        # 顶部信息块(公司名 / 税号 / 月份 / 共 X 张)
-        "show_summary_sheet": True,     # 第二 Sheet 汇总
-        "show_signature_block": True,   # 底部签名栏
-        "freeze_panes": "A4",           # 冻结到信息块下面
+        "show_info_block": True,  # 顶部信息块(公司名 / 税号 / 月份 / 共 X 张)
+        "show_summary_sheet": True,  # 第二 Sheet 汇总
+        "show_signature_block": True,  # 底部签名栏
+        "freeze_panes": "A4",  # 冻结到信息块下面
         "columns": [
-            {"key": "no",                "header_key": "col-no",                "width":  6, "align": "center", "type": "int"},
-            {"key": "invoice_date",      "header_key": "col-invoice-date",      "width": 12, "align": "center", "type": "date"},
-            {"key": "invoice_no",        "header_key": "col-invoice-no",        "width": 18, "align": "left",   "type": "text"},
-            {"key": "seller_name",       "header_key": "col-seller-name",       "width": 32, "align": "left",   "type": "text"},
-            {"key": "seller_tax_id",     "header_key": "col-seller-tax-id",     "width": 18, "align": "center", "type": "tax_id"},
-            {"key": "seller_branch",     "header_key": "col-seller-branch",     "width": 14, "align": "center", "type": "branch"},
-            {"key": "amount_before_vat", "header_key": "col-amount-before-vat", "width": 14, "align": "right",  "type": "money"},
-            {"key": "vat_amount",        "header_key": "col-vat-amount",        "width": 12, "align": "right",  "type": "money"},
-            {"key": "total_amount",      "header_key": "col-total-amount",      "width": 14, "align": "right",  "type": "money"},
-            {"key": "category",          "header_key": "col-category",          "width": 12, "align": "center", "type": "text"},
-            {"key": "source",            "header_key": "col-source",            "width": 10, "align": "center", "type": "source"},
+            {"key": "no", "header_key": "col-no", "width": 6, "align": "center", "type": "int"},
+            {
+                "key": "invoice_date",
+                "header_key": "col-invoice-date",
+                "width": 12,
+                "align": "center",
+                "type": "date",
+            },
+            {
+                "key": "invoice_no",
+                "header_key": "col-invoice-no",
+                "width": 18,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "seller_name",
+                "header_key": "col-seller-name",
+                "width": 32,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "seller_tax_id",
+                "header_key": "col-seller-tax-id",
+                "width": 18,
+                "align": "center",
+                "type": "tax_id",
+            },
+            {
+                "key": "seller_branch",
+                "header_key": "col-seller-branch",
+                "width": 14,
+                "align": "center",
+                "type": "branch",
+            },
+            {
+                "key": "amount_before_vat",
+                "header_key": "col-amount-before-vat",
+                "width": 14,
+                "align": "right",
+                "type": "money",
+            },
+            {
+                "key": "vat_amount",
+                "header_key": "col-vat-amount",
+                "width": 12,
+                "align": "right",
+                "type": "money",
+            },
+            {
+                "key": "total_amount",
+                "header_key": "col-total-amount",
+                "width": 14,
+                "align": "right",
+                "type": "money",
+            },
+            {
+                "key": "category",
+                "header_key": "col-category",
+                "width": 12,
+                "align": "center",
+                "type": "text",
+            },
+            {
+                "key": "source",
+                "header_key": "col-source",
+                "width": 10,
+                "align": "center",
+                "type": "source",
+            },
         ],
         "total_columns": ["amount_before_vat", "vat_amount", "total_amount"],
     },
-
     # ----- 模板 2 · 标准明细(老板 / 内部审核) -----
     "standard": {
         "code": "standard",
@@ -107,25 +165,90 @@ REPORT_TEMPLATES = {
         "show_summary_sheet": True,
         "show_signature_block": False,
         "freeze_panes": "A4",
-        "auto_filter": True,            # 列首加 Excel 自动筛选
-        "warn_amount_threshold": 500000, # 大额警告阈值
+        "auto_filter": True,  # 列首加 Excel 自动筛选
+        "warn_amount_threshold": 500000,  # 大额警告阈值
         "columns": [
-            {"key": "no",                "header_key": "col-no",                "width":  6, "align": "center", "type": "int"},
-            {"key": "invoice_date",      "header_key": "col-invoice-date",      "width": 12, "align": "center", "type": "date"},
-            {"key": "invoice_no",        "header_key": "col-invoice-no",        "width": 18, "align": "left",   "type": "text"},
-            {"key": "filename",          "header_key": "col-filename",          "width": 22, "align": "left",   "type": "text"},
-            {"key": "seller_name",       "header_key": "col-seller-name",       "width": 30, "align": "left",   "type": "text"},
-            {"key": "seller_tax_id",     "header_key": "col-seller-tax-id",     "width": 18, "align": "center", "type": "tax_id"},
-            {"key": "amount_before_vat", "header_key": "col-amount-before-vat", "width": 14, "align": "right",  "type": "money"},
-            {"key": "vat_amount",        "header_key": "col-vat-amount",        "width": 12, "align": "right",  "type": "money"},
-            {"key": "total_amount",      "header_key": "col-total-amount",      "width": 14, "align": "right",  "type": "money"},
-            {"key": "category",          "header_key": "col-category",          "width": 12, "align": "center", "type": "text"},
-            {"key": "source",            "header_key": "col-source",            "width": 10, "align": "center", "type": "source"},
-            {"key": "notes",             "header_key": "col-notes",             "width": 20, "align": "left",   "type": "text"},
+            {"key": "no", "header_key": "col-no", "width": 6, "align": "center", "type": "int"},
+            {
+                "key": "invoice_date",
+                "header_key": "col-invoice-date",
+                "width": 12,
+                "align": "center",
+                "type": "date",
+            },
+            {
+                "key": "invoice_no",
+                "header_key": "col-invoice-no",
+                "width": 18,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "filename",
+                "header_key": "col-filename",
+                "width": 22,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "seller_name",
+                "header_key": "col-seller-name",
+                "width": 30,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "seller_tax_id",
+                "header_key": "col-seller-tax-id",
+                "width": 18,
+                "align": "center",
+                "type": "tax_id",
+            },
+            {
+                "key": "amount_before_vat",
+                "header_key": "col-amount-before-vat",
+                "width": 14,
+                "align": "right",
+                "type": "money",
+            },
+            {
+                "key": "vat_amount",
+                "header_key": "col-vat-amount",
+                "width": 12,
+                "align": "right",
+                "type": "money",
+            },
+            {
+                "key": "total_amount",
+                "header_key": "col-total-amount",
+                "width": 14,
+                "align": "right",
+                "type": "money",
+            },
+            {
+                "key": "category",
+                "header_key": "col-category",
+                "width": 12,
+                "align": "center",
+                "type": "text",
+            },
+            {
+                "key": "source",
+                "header_key": "col-source",
+                "width": 10,
+                "align": "center",
+                "type": "source",
+            },
+            {
+                "key": "notes",
+                "header_key": "col-notes",
+                "width": 20,
+                "align": "left",
+                "type": "text",
+            },
         ],
         "total_columns": ["amount_before_vat", "vat_amount", "total_amount"],
     },
-
     # ----- 模板 3 · ERP 录入格式(数据导向) -----
     "erp": {
         "code": "erp",
@@ -134,28 +257,90 @@ REPORT_TEMPLATES = {
         "category_key": "tpl-cat-erp",
         "title_key": "tpl-erp-title",
         "recommended": False,
-        "show_info_block": False,       # ERP 不要装饰
+        "show_info_block": False,  # ERP 不要装饰
         "show_summary_sheet": False,
         "show_signature_block": False,
         "freeze_panes": "A2",
-        "ascii_only": True,             # 列名严格 ASCII
-        "iso_date": True,               # 日期 ISO 格式
-        "no_thousand_sep": True,        # 金额不带千位分隔
+        "ascii_only": True,  # 列名严格 ASCII
+        "iso_date": True,  # 日期 ISO 格式
+        "no_thousand_sep": True,  # 金额不带千位分隔
         "first_row_marker": "<!-- ERP_IMPORT_FORMAT_v1 · Mr.Pilot -->",
         "columns": [
-            {"key": "invoice_date",      "header_key": "col-invoice-date",      "header_ascii": "Date",        "width": 12, "align": "center", "type": "date_iso"},
-            {"key": "invoice_no",        "header_key": "col-doc-no",            "header_ascii": "DocNo",       "width": 18, "align": "left",   "type": "text"},
-            {"key": "seller_name",       "header_key": "col-vendor-name",       "header_ascii": "VendorName",  "width": 30, "align": "left",   "type": "text"},
-            {"key": "seller_tax_id",     "header_key": "col-vendor-tax",        "header_ascii": "VendorTaxID", "width": 16, "align": "left",   "type": "text"},
-            {"key": "seller_branch",     "header_key": "col-seller-branch",     "header_ascii": "Branch",      "width": 12, "align": "center", "type": "branch_code"},
-            {"key": "amount_before_vat", "header_key": "col-net-amount",        "header_ascii": "NetAmount",   "width": 12, "align": "right",  "type": "money_raw"},
-            {"key": "vat_amount",        "header_key": "col-vat-amount",        "header_ascii": "VAT",         "width": 12, "align": "right",  "type": "money_raw"},
-            {"key": "total_amount",      "header_key": "col-total-amount",      "header_ascii": "TotalAmount", "width": 12, "align": "right",  "type": "money_raw"},
-            {"key": "category",          "header_key": "col-category",          "header_ascii": "Category",    "width": 12, "align": "left",   "type": "text"},
+            {
+                "key": "invoice_date",
+                "header_key": "col-invoice-date",
+                "header_ascii": "Date",
+                "width": 12,
+                "align": "center",
+                "type": "date_iso",
+            },
+            {
+                "key": "invoice_no",
+                "header_key": "col-doc-no",
+                "header_ascii": "DocNo",
+                "width": 18,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "seller_name",
+                "header_key": "col-vendor-name",
+                "header_ascii": "VendorName",
+                "width": 30,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "seller_tax_id",
+                "header_key": "col-vendor-tax",
+                "header_ascii": "VendorTaxID",
+                "width": 16,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "seller_branch",
+                "header_key": "col-seller-branch",
+                "header_ascii": "Branch",
+                "width": 12,
+                "align": "center",
+                "type": "branch_code",
+            },
+            {
+                "key": "amount_before_vat",
+                "header_key": "col-net-amount",
+                "header_ascii": "NetAmount",
+                "width": 12,
+                "align": "right",
+                "type": "money_raw",
+            },
+            {
+                "key": "vat_amount",
+                "header_key": "col-vat-amount",
+                "header_ascii": "VAT",
+                "width": 12,
+                "align": "right",
+                "type": "money_raw",
+            },
+            {
+                "key": "total_amount",
+                "header_key": "col-total-amount",
+                "header_ascii": "TotalAmount",
+                "width": 12,
+                "align": "right",
+                "type": "money_raw",
+            },
+            {
+                "key": "category",
+                "header_key": "col-category",
+                "header_ascii": "Category",
+                "width": 12,
+                "align": "left",
+                "type": "text",
+            },
         ],
-        "total_columns": [],            # ERP 不要合计行
+        "total_columns": [],  # ERP 不要合计行
     },
-
     # ----- 模板 4 · 凭证装订清单(打印) -----
     "print": {
         "code": "print",
@@ -168,15 +353,45 @@ REPORT_TEMPLATES = {
         "show_summary_sheet": False,
         "show_signature_block": True,
         "freeze_panes": "A4",
-        "row_height": 32,               # 行高大 · 签名空间
+        "row_height": 32,  # 行高大 · 签名空间
         "page_setup": "A4_landscape",
         "columns": [
-            {"key": "no",                "header_key": "col-no",                "width":  6, "align": "center", "type": "int"},
-            {"key": "invoice_date",      "header_key": "col-invoice-date",      "width": 14, "align": "center", "type": "date"},
-            {"key": "invoice_no",        "header_key": "col-invoice-no",        "width": 22, "align": "left",   "type": "text"},
-            {"key": "seller_name",       "header_key": "col-seller-name",       "width": 36, "align": "left",   "type": "text"},
-            {"key": "total_amount",      "header_key": "col-total-amount",      "width": 16, "align": "right",  "type": "money"},
-            {"key": "signature",         "header_key": "col-signature",         "width": 20, "align": "center", "type": "blank"},
+            {"key": "no", "header_key": "col-no", "width": 6, "align": "center", "type": "int"},
+            {
+                "key": "invoice_date",
+                "header_key": "col-invoice-date",
+                "width": 14,
+                "align": "center",
+                "type": "date",
+            },
+            {
+                "key": "invoice_no",
+                "header_key": "col-invoice-no",
+                "width": 22,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "seller_name",
+                "header_key": "col-seller-name",
+                "width": 36,
+                "align": "left",
+                "type": "text",
+            },
+            {
+                "key": "total_amount",
+                "header_key": "col-total-amount",
+                "width": 16,
+                "align": "right",
+                "type": "money",
+            },
+            {
+                "key": "signature",
+                "header_key": "col-signature",
+                "width": 20,
+                "align": "center",
+                "type": "blank",
+            },
         ],
         "total_columns": ["total_amount"],
     },
@@ -257,9 +472,12 @@ def _source_label(src: str, lang: str) -> str:
         return ""
     src_l = str(src).lower()
     mapping = {
-        "email": "source-email", "imap": "source-email",
-        "folder": "source-folder", "watch": "source-folder",
-        "scan": "source-scan", "scanner": "source-scan",
+        "email": "source-email",
+        "imap": "source-email",
+        "folder": "source-folder",
+        "watch": "source-folder",
+        "scan": "source-scan",
+        "scanner": "source-scan",
         "upload": "source-upload",
         "manual": "source-manual",
         "api": "source-api",
@@ -311,25 +529,25 @@ def _normalize_row(rec: Dict[str, Any], idx: int) -> Dict[str, Any]:
 
     return {
         "no": idx,
-        "filename":          pick("filename", "archive_name", "file_name") or "",
-        "invoice_no":        pick("invoice_no", "invoice_number", "doc_no") or "",
-        "invoice_date":      pick("invoice_date", "date") or "",
-        "seller_name":       pick("seller_name", "vendor_name") or "",
-        "seller_tax_id":     pick("seller_tax_id", "seller_tax", "vendor_tax_id") or "",
-        "seller_branch":     pick("seller_branch", "branch") or "",
-        "seller_addr":       pick("seller_addr", "seller_address") or "",
-        "buyer_name":        pick("buyer_name") or "",
-        "buyer_tax_id":      pick("buyer_tax_id", "buyer_tax") or "",
-        "buyer_addr":        pick("buyer_addr", "buyer_address") or "",
+        "filename": pick("filename", "archive_name", "file_name") or "",
+        "invoice_no": pick("invoice_no", "invoice_number", "doc_no") or "",
+        "invoice_date": pick("invoice_date", "date") or "",
+        "seller_name": pick("seller_name", "vendor_name") or "",
+        "seller_tax_id": pick("seller_tax_id", "seller_tax", "vendor_tax_id") or "",
+        "seller_branch": pick("seller_branch", "branch") or "",
+        "seller_addr": pick("seller_addr", "seller_address") or "",
+        "buyer_name": pick("buyer_name") or "",
+        "buyer_tax_id": pick("buyer_tax_id", "buyer_tax") or "",
+        "buyer_addr": pick("buyer_addr", "buyer_address") or "",
         "amount_before_vat": subtotal,
-        "vat_amount":        vat,
-        "total_amount":      total,
-        "wht_rate":          pick("wht_rate") or "",
-        "wht_amount":        _to_float(pick("wht_amount")),
-        "category":          pick("category", "category_tag") or "",
-        "source":            pick("source") or "",
-        "notes":             pick("notes", "remark") or "",
-        "items":             pick("items") or [],
+        "vat_amount": vat,
+        "total_amount": total,
+        "wht_rate": pick("wht_rate") or "",
+        "wht_amount": _to_float(pick("wht_amount")),
+        "category": pick("category", "category_tag") or "",
+        "source": pick("source") or "",
+        "notes": pick("notes", "remark") or "",
+        "items": pick("items") or [],
     }
 
 
@@ -362,7 +580,13 @@ def _render_cell_value(value: Any, col_type: str, lang: str, no_thousand: bool =
     return value if value not in (None,) else ""
 
 
-def _apply_cell_style(cell, col_def: dict, is_zebra: bool = False, warn_amount: bool = False, no_thousand: bool = False):
+def _apply_cell_style(
+    cell,
+    col_def: dict,
+    is_zebra: bool = False,
+    warn_amount: bool = False,
+    no_thousand: bool = False,
+):
     """单元格样式"""
     cell.font = CELL_FONT
     cell.border = BORDER_ALL
@@ -394,7 +618,8 @@ def _write_info_block(ws: Worksheet, template: dict, meta: dict, lang: str, n_co
 
     # 第 1 行:大标题(合并)
     title = i18n_format(
-        lang, template["title_key"],
+        lang,
+        template["title_key"],
         client=meta.get("client_name") or i18n_get(lang, "client-default"),
         month=meta.get("period_label") or i18n_get(lang, "month-all"),
     )
@@ -407,12 +632,18 @@ def _write_info_block(ws: Worksheet, template: dict, meta: dict, lang: str, n_co
     # 第 2 行:元信息(税号 + 分公司 + 张数 + 生成时间)
     info_parts = []
     if meta.get("client_tax_id"):
-        info_parts.append(f"{i18n_get(lang, 'info-tax-id')}: {_format_tax_id(meta['client_tax_id'])}")
+        info_parts.append(
+            f"{i18n_get(lang, 'info-tax-id')}: {_format_tax_id(meta['client_tax_id'])}"
+        )
     if meta.get("client_branch"):
-        info_parts.append(f"{i18n_get(lang, 'info-branch')}: {_format_branch(meta['client_branch'], lang)}")
+        info_parts.append(
+            f"{i18n_get(lang, 'info-branch')}: {_format_branch(meta['client_branch'], lang)}"
+        )
     if meta.get("doc_count"):
         info_parts.append(i18n_format(lang, "info-doc-count", n=meta["doc_count"]))
-    info_parts.append(f"{i18n_get(lang, 'info-generated-at')}: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    info_parts.append(
+        f"{i18n_get(lang, 'info-generated-at')}: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    )
 
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=n_cols)
     cell = ws.cell(row=2, column=1, value="    ".join(info_parts))
@@ -471,7 +702,7 @@ def _write_main_sheet(wb: Workbook, template: dict, rows: List[Dict], meta: dict
     data_start = header_row + 1
     for i, row_data in enumerate(rows):
         excel_row = data_start + i
-        is_zebra = (i % 2 == 1)
+        is_zebra = i % 2 == 1
         for col_idx, col in enumerate(columns, start=1):
             raw_value = row_data.get(col["key"], "")
             value = _render_cell_value(raw_value, col["type"], lang, no_thousand)
@@ -482,7 +713,9 @@ def _write_main_sheet(wb: Workbook, template: dict, rows: List[Dict], meta: dict
                 and isinstance(value, (int, float))
                 and value > warn_threshold
             )
-            _apply_cell_style(cell, col, is_zebra=is_zebra, warn_amount=warn, no_thousand=no_thousand)
+            _apply_cell_style(
+                cell, col, is_zebra=is_zebra, warn_amount=warn, no_thousand=no_thousand
+            )
         if template.get("row_height"):
             ws.row_dimensions[excel_row].height = template["row_height"]
 
@@ -500,7 +733,12 @@ def _write_main_sheet(wb: Workbook, template: dict, rows: List[Dict], meta: dict
                 break
 
         if first_money_idx and first_money_idx > 1:
-            ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=first_money_idx - 1)
+            ws.merge_cells(
+                start_row=total_row,
+                start_column=1,
+                end_row=total_row,
+                end_column=first_money_idx - 1,
+            )
             cell = ws.cell(row=total_row, column=1, value=i18n_get(lang, "report-grand-total"))
             cell.font = TOTAL_FONT
             cell.alignment = Alignment(horizontal="right", vertical="center")
@@ -615,7 +853,11 @@ def _write_summary_sheet(wb: Workbook, rows: List[Dict], lang: str):
             c = ws.cell(row=cur_row, column=ci, value=v)
             c.font = CELL_FONT
             c.border = BORDER_ALL
-            c.alignment = ALIGN_CENTER if align == "center" else (ALIGN_RIGHT if align == "right" else ALIGN_LEFT)
+            c.alignment = (
+                ALIGN_CENTER
+                if align == "center"
+                else (ALIGN_RIGHT if align == "right" else ALIGN_LEFT)
+            )
             if t == "money":
                 c.number_format = "#,##0.00"
         cur_row += 1
@@ -646,7 +888,9 @@ def _write_summary_sheet(wb: Workbook, rows: List[Dict], lang: str):
         ws.row_dimensions[cur_row].height = 24
         cur_row += 1
 
-        for rank, (cat, agg) in enumerate(sorted(by_cat.items(), key=lambda x: x[1]["amount"], reverse=True), start=1):
+        for rank, (cat, agg) in enumerate(
+            sorted(by_cat.items(), key=lambda x: x[1]["amount"], reverse=True), start=1
+        ):
             pct = (agg["amount"] / total_amount * 100) if total_amount > 0 else 0
             cells = [rank, cat, agg["count"], round(agg["amount"], 2), f"{pct:.1f}%"]
             aligns = [ALIGN_CENTER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, ALIGN_RIGHT]
@@ -686,7 +930,9 @@ def _write_summary_sheet(wb: Workbook, rows: List[Dict], lang: str):
         cur_row += 1
 
         total_count = sum(v["count"] for v in by_src.values())
-        for rank, (src, agg) in enumerate(sorted(by_src.items(), key=lambda x: x[1]["count"], reverse=True), start=1):
+        for rank, (src, agg) in enumerate(
+            sorted(by_src.items(), key=lambda x: x[1]["count"], reverse=True), start=1
+        ):
             pct = (agg["count"] / total_count * 100) if total_count > 0 else 0
             cells = [rank, src, agg["count"], round(agg["amount"], 2), f"{pct:.1f}%"]
             aligns = [ALIGN_CENTER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, ALIGN_RIGHT]
@@ -714,14 +960,16 @@ def list_templates(lang: str = "zh") -> List[Dict[str, Any]]:
     """前端模板选择弹窗用"""
     out = []
     for code, t in REPORT_TEMPLATES.items():
-        out.append({
-            "code": code,
-            "name": i18n_get(lang, t["name_key"]),
-            "desc": i18n_get(lang, t["desc_key"]),
-            "category": i18n_get(lang, t["category_key"]),
-            "category_code": t["category_key"].replace("tpl-cat-", ""),
-            "recommended": bool(t.get("recommended")),
-        })
+        out.append(
+            {
+                "code": code,
+                "name": i18n_get(lang, t["name_key"]),
+                "desc": i18n_get(lang, t["desc_key"]),
+                "category": i18n_get(lang, t["category_key"]),
+                "category_code": t["category_key"].replace("tpl-cat-", ""),
+                "recommended": bool(t.get("recommended")),
+            }
+        )
     return out
 
 

@@ -15,12 +15,19 @@
 // ============================================================
 
 function _t(k, fb) {
-    try { return (typeof window.t === 'function') ? window.t(k) : fb; }
-    catch (_) { return fb; }
+    try {
+        return typeof window.t === 'function' ? window.t(k) : fb;
+    } catch (_) {
+        return fb;
+    }
 }
 function _fmtNum(n) {
     if (n == null || isNaN(n)) return '—';
-    try { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); } catch(_) { return String(n); }
+    try {
+        return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    } catch (_) {
+        return String(n);
+    }
 }
 function _ago(iso) {
     if (!iso) return '';
@@ -29,10 +36,12 @@ function _ago(iso) {
         if (!t) return '';
         const s = Math.floor((Date.now() - t) / 1000);
         if (s < 60) return _t('time-just-now', '刚刚');
-        if (s < 3600) return Math.floor(s/60) + (_t('time-min-ago-suffix', ' 分钟前'));
-        if (s < 86400) return Math.floor(s/3600) + (_t('time-hour-ago-suffix', ' 小时前'));
-        return Math.floor(s/86400) + (_t('time-day-ago-suffix', ' 天前'));
-    } catch (_) { return ''; }
+        if (s < 3600) return Math.floor(s / 60) + _t('time-min-ago-suffix', ' 分钟前');
+        if (s < 86400) return Math.floor(s / 3600) + _t('time-hour-ago-suffix', ' 小时前');
+        return Math.floor(s / 86400) + _t('time-day-ago-suffix', ' 天前');
+    } catch (_) {
+        return '';
+    }
 }
 async function loadDashboard() {
     // v118.35.0.9 · 第二排 credits KPI · 余额 + 用量
@@ -46,12 +55,18 @@ async function loadDashboard() {
     const elExcBadge = document.getElementById('dash-quick-exc-badge');
     // 1. 拿 plan + 最近识别(并行 · 已有 endpoint · 不动后端)
     try {
-        const auth = { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
+        const auth = { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
         // 修正: /api/me/plan 不存在 → 用 /api/me/tenant-usage + /api/history
         const [usage, recent, excStats] = await Promise.all([
-            fetch('/api/me/tenant-usage', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
-            fetch('/api/history?limit=20', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
-            fetch('/api/exceptions/stats?status=pending', { headers: auth }).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch('/api/me/tenant-usage', { headers: auth })
+                .then((r) => (r.ok ? r.json() : null))
+                .catch(() => null),
+            fetch('/api/history?limit=20', { headers: auth })
+                .then((r) => (r.ok ? r.json() : null))
+                .catch(() => null),
+            fetch('/api/exceptions/stats?status=pending', { headers: auth })
+                .then((r) => (r.ok ? r.json() : null))
+                .catch(() => null),
         ]);
         // 本月发票 = tenant-usage 里的 ocr_this_month
         const mInv = (usage && usage.ocr_this_month) || 0;
@@ -59,17 +74,22 @@ async function loadDashboard() {
         let pending = 0;
         const rows = (recent && (recent.items || recent.history || recent)) || [];
         const list = Array.isArray(rows) ? rows : [];
-        list.forEach(r => {
+        list.forEach((r) => {
             if (r.status === 'pending' || r.status === 'reviewing') pending++;
         });
         // 异常 = exceptions/stats
-        const excCount = (excStats && (excStats.total || excStats.count || excStats.pending || 0)) || 0;
+        const excCount =
+            (excStats && (excStats.total || excStats.count || excStats.pending || 0)) || 0;
         if (elInv) elInv.textContent = _fmtNum(mInv);
         if (elPend) elPend.textContent = _fmtNum(pending);
         if (elExc) elExc.textContent = _fmtNum(excCount);
         if (elExcBadge) {
-            if (excCount > 0) { elExcBadge.style.display = ''; elExcBadge.textContent = excCount; }
-            else { elExcBadge.style.display = 'none'; }
+            if (excCount > 0) {
+                elExcBadge.style.display = '';
+                elExcBadge.textContent = excCount;
+            } else {
+                elExcBadge.style.display = 'none';
+            }
         }
         // 配额显示 · 来自 tenant-usage
         if (elPlan && usage) {
@@ -77,27 +97,68 @@ async function loadDashboard() {
             const quota = usage.quota || 0;
             elPlan.textContent = _fmtNum(used);
             if (elPlanSub) {
-                elPlanSub.textContent = quota ? (used + ' / ' + _fmtNum(quota) + ' 张') : _t('dash-kpi-plan-sub', '本月用量');
+                elPlanSub.textContent = quota
+                    ? used + ' / ' + _fmtNum(quota) + ' 张'
+                    : _t('dash-kpi-plan-sub', '本月用量');
             }
         }
         // 最近 5 条
         if (elList) {
             if (list.length === 0) {
-                elList.innerHTML = '<div class="dash-recent-empty">' + _t('dash-recent-empty', '还没有识别记录 · 去上传第一张吧') + '</div>';
+                elList.innerHTML =
+                    '<div class="dash-recent-empty">' +
+                    _t('dash-recent-empty', '还没有识别记录 · 去上传第一张吧') +
+                    '</div>';
             } else {
-                const html = list.slice(0, 5).map(r => {
-                    const key = (r.invoice_no || r.filename || r.id || '').toString();
-                    const mid = (r.supplier_name || r.buyer_name || r.client_name || r.notes || '').toString();
-                    const t = _ago(r.created_at || r.upload_time || r.date);
-                    const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-                    return '<div class="dash-recent-row"><span class="dash-recent-key" title="' + esc(key) + '">' + esc(key) + '</span><span class="dash-recent-mid" title="' + esc(mid) + '">' + esc(mid) + '</span><span class="dash-recent-time">' + esc(t) + '</span></div>';
-                }).join('');
+                const html = list
+                    .slice(0, 5)
+                    .map((r) => {
+                        const key = (r.invoice_no || r.filename || r.id || '').toString();
+                        const mid = (
+                            r.supplier_name ||
+                            r.buyer_name ||
+                            r.client_name ||
+                            r.notes ||
+                            ''
+                        ).toString();
+                        const t = _ago(r.created_at || r.upload_time || r.date);
+                        const esc = (s) =>
+                            String(s).replace(
+                                /[&<>"']/g,
+                                (c) =>
+                                    ({
+                                        '&': '&amp;',
+                                        '<': '&lt;',
+                                        '>': '&gt;',
+                                        '"': '&quot;',
+                                        "'": '&#39;',
+                                    })[c]
+                            );
+                        return (
+                            '<div class="dash-recent-row"><span class="dash-recent-key" title="' +
+                            esc(key) +
+                            '">' +
+                            esc(key) +
+                            '</span><span class="dash-recent-mid" title="' +
+                            esc(mid) +
+                            '">' +
+                            esc(mid) +
+                            '</span><span class="dash-recent-time">' +
+                            esc(t) +
+                            '</span></div>'
+                        );
+                    })
+                    .join('');
                 elList.innerHTML = html;
             }
         }
     } catch (e) {
         // 失败静默 · 显示 — · 不打扰用户
-        if (elList) elList.innerHTML = '<div class="dash-recent-empty">' + _t('dash-recent-empty', '还没有识别记录 · 去上传第一张吧') + '</div>';
+        if (elList)
+            elList.innerHTML =
+                '<div class="dash-recent-empty">' +
+                _t('dash-recent-empty', '还没有识别记录 · 去上传第一张吧') +
+                '</div>';
     }
 }
 window.loadDashboard = loadDashboard;
@@ -121,7 +182,7 @@ async function loadCreditsCard() {
     const usageSub = document.getElementById('dash-kpi-usage-sub');
     if (!balCard || !usageCard) return;
     try {
-        const auth = { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
+        const auth = { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
         const resp = await fetch('/api/me/credits', { headers: auth });
         if (!resp.ok) {
             // 鉴权失败或服务异常 · 默认隐藏余额 · 用量显示 "—"
@@ -145,35 +206,63 @@ async function loadCreditsCard() {
                     balVal.className = 'dash-kpi-val dash-green';
                 }
                 if (balSub) {
-                    balSub.textContent = (typeof window.t === 'function') ? window.t('dash-kpi-balance-exempt') : 'Billing exempt';
+                    balSub.textContent =
+                        typeof window.t === 'function'
+                            ? window.t('dash-kpi-balance-exempt')
+                            : 'Billing exempt';
                 }
             } else {
-                const bal = (typeof data.balance_thb === 'number') ? data.balance_thb : 0;
+                const bal = typeof data.balance_thb === 'number' ? data.balance_thb : 0;
                 if (balVal) {
                     balVal.textContent = '฿' + bal.toFixed(2);
-                    balVal.className = (bal < 50) ? 'dash-kpi-val dash-red' : 'dash-kpi-val';
+                    balVal.className = bal < 50 ? 'dash-kpi-val dash-red' : 'dash-kpi-val';
                 }
                 if (balSub) {
                     // v118.35.0.24 · 充值入口永远显示(老逻辑只在 <50 时显示 · 转化率低)
                     // 低余额红色高亮 · 正常余额灰色低调
-                    const linkTxt = (typeof window.t === 'function') ? window.t('dash-kpi-balance-topup') : 'Top up →';
-                    const linkColor = (bal < 50) ? '#dc2626' : '#6b7280';
+                    const linkTxt =
+                        typeof window.t === 'function'
+                            ? window.t('dash-kpi-balance-topup')
+                            : 'Top up →';
+                    const linkColor = bal < 50 ? '#dc2626' : '#6b7280';
                     // ES module 不再依赖 IIFE 外的 escapeHtml 词法引用 · 显式走 window.escapeHtml
-                    const esc = (s) => (typeof window.escapeHtml === 'function') ? window.escapeHtml(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-                    balSub.innerHTML = '<a href="#" id="kpi-balance-topup-link" style="color:' + linkColor + ';text-decoration:underline;cursor:pointer;" onclick="event.preventDefault();window._openTopupModal&&window._openTopupModal();return false;">' + esc(linkTxt) + '</a>';
+                    const esc = (s) =>
+                        typeof window.escapeHtml === 'function'
+                            ? window.escapeHtml(s)
+                            : String(s).replace(
+                                  /[&<>"']/g,
+                                  (c) =>
+                                      ({
+                                          '&': '&amp;',
+                                          '<': '&lt;',
+                                          '>': '&gt;',
+                                          '"': '&quot;',
+                                          "'": '&#39;',
+                                      })[c]
+                              );
+                    balSub.innerHTML =
+                        '<a href="#" id="kpi-balance-topup-link" style="color:' +
+                        linkColor +
+                        ';text-decoration:underline;cursor:pointer;" onclick="event.preventDefault();window._openTopupModal&&window._openTopupModal();return false;">' +
+                        esc(linkTxt) +
+                        '</a>';
                 }
             }
         }
 
         // === 卡 2 · 本月用量(所有人显示) ===
-        const pages = (typeof data.pages_this_month === 'number') ? data.pages_this_month
-                    : (typeof data.my_invoice_count === 'number') ? data.my_invoice_count
-                    : 0;
+        const pages =
+            typeof data.pages_this_month === 'number'
+                ? data.pages_this_month
+                : typeof data.my_invoice_count === 'number'
+                  ? data.my_invoice_count
+                  : 0;
         usageCard.style.display = '';
         if (usageVal) usageVal.textContent = String(pages);
         if (usageSub) {
-            const key = (pages >= 200) ? 'dash-kpi-usage-sub-high' : 'dash-kpi-usage-sub-low';
-            const tpl = (typeof window.t === 'function') ? window.t(key, { used: pages }) : (pages + ' pages');
+            const key = pages >= 200 ? 'dash-kpi-usage-sub-high' : 'dash-kpi-usage-sub-low';
+            const tpl =
+                typeof window.t === 'function' ? window.t(key, { used: pages }) : pages + ' pages';
             usageSub.textContent = tpl;
         }
     } catch (e) {

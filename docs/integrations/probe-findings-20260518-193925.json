@@ -16,9 +16,7 @@
     "preview_row_count": 1,
     "confirm_clicked_count": 1,
     "report_captured": false,
-    "confirm_dialogs": [
-      "[confirm] ยืนยันการ \"นำเข้าข้อมูลชุดที่ 1\""
-    ],
+    "confirm_dialogs": ["[confirm] ยืนยันการ \"นำเข้าข้อมูลชุดที่ 1\""],
     "confirm_result": {
       "success": true,
       "n_rows": 1,

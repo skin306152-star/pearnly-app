@@ -3,6 +3,7 @@
 v118.32.4.10.0 · Excel 公式对账 · 路由层
 全网开放(撤 email gate) · 任务持久化(vat_recon_tasks)
 """
+
 import io
 import os
 import time
@@ -28,7 +29,7 @@ router = APIRouter(prefix="/api/vat_excel", tags=["vat-excel"])
 
 # 上限
 MAX_INVOICES = 1000
-MAX_REPORTS  = 30
+MAX_REPORTS = 30
 
 # Excel 存储根目录(服务器端)
 EXCEL_STORE_DIR = "/opt/mrpilot/uploads/vat_recon"
@@ -50,8 +51,7 @@ def _require_user(request: Request):
 
 
 def _user_key(user) -> Optional[str]:
-    return (user.get("gemini_api_key") or user.get("custom_gemini_api_key")
-            or "").strip() or None
+    return (user.get("gemini_api_key") or user.get("custom_gemini_api_key") or "").strip() or None
 
 
 def _tenant_user(user):
@@ -87,8 +87,8 @@ async def check_access(request: Request):
 async def build_excel_endpoint(
     request: Request,
     invoices: List[UploadFile] = File(default=[]),
-    reports:  List[UploadFile] = File(default=[]),
-    lang:     str = Form("th"),
+    reports: List[UploadFile] = File(default=[]),
+    lang: str = Form("th"),
 ):
     """接发票 + 报告 → 并行 OCR → 生成 Excel + 存任务记录"""
     user = _require_user(request)
@@ -109,14 +109,18 @@ async def build_excel_endpoint(
         _billing_vex = db.get_billing_status_combined(str(user_id), tenant_id)
         if not _billing_vex.get("allowed") and not _billing_vex.get("is_exempt"):
             _est_pages = len(invoices) + len(reports)
-            _est_cost = float(db.estimate_pdf_cost_thb(
-                _billing_vex.get("pages_used_this_month", 0), _est_pages))
-            raise HTTPException(402, detail={
-                "code": "insufficient_balance",
-                "balance": _billing_vex.get("balance_thb", 0.0),
-                "estimated_cost": _est_cost,
-                "pages_used_this_month": _billing_vex.get("pages_used_this_month", 0),
-            })
+            _est_cost = float(
+                db.estimate_pdf_cost_thb(_billing_vex.get("pages_used_this_month", 0), _est_pages)
+            )
+            raise HTTPException(
+                402,
+                detail={
+                    "code": "insufficient_balance",
+                    "balance": _billing_vex.get("balance_thb", 0.0),
+                    "estimated_cost": _est_cost,
+                    "pages_used_this_month": _billing_vex.get("pages_used_this_month", 0),
+                },
+            )
     except HTTPException:
         raise
     except Exception as _be:
@@ -132,13 +136,14 @@ async def build_excel_endpoint(
         report_files.append({"filename": f.filename or "report.pdf", "bytes": b})
 
     loop = asyncio.get_event_loop()
-    rep_result = await loop.run_in_executor(
-        None, merge_vat_reports, report_files, api_key)
+    rep_result = await loop.run_in_executor(None, merge_vat_reports, report_files, api_key)
     if not rep_result.get("ok"):
         raise HTTPException(422, rep_result.get("error", "报告解析失败"))
 
-    logger.info(f"[vex.build] 报告合并 OK · {len(report_files)} 份 → "
-                f"{rep_result['row_count']} 行 · seller={rep_result.get('seller_tax_id')}")
+    logger.info(
+        f"[vex.build] 报告合并 OK · {len(report_files)} 份 → "
+        f"{rep_result['row_count']} 行 · seller={rep_result.get('seller_tax_id')}"
+    )
 
     # 发票并行 OCR
     invoice_files = []
@@ -153,34 +158,47 @@ async def build_excel_endpoint(
         parsed_invoices = await loop.run_in_executor(
             None,
             lambda: extract_invoices_batched_parallel(
-                invoice_files, api_key=api_key, batch_size=5, max_workers=4,
+                invoice_files,
+                api_key=api_key,
+                batch_size=5,
+                max_workers=4,
             ),
         )
     else:
         parsed_invoices = await loop.run_in_executor(
-            None, extract_invoices_parallel, invoice_files, api_key, 10)
+            None, extract_invoices_parallel, invoice_files, api_key, 10
+        )
 
-    ok_invoices  = [r for r in parsed_invoices if r.get("ok")]
+    ok_invoices = [r for r in parsed_invoices if r.get("ok")]
     fail_invoices = [r for r in parsed_invoices if not r.get("ok")]
-    logger.info(f"[vex.build] 发票 OCR · ok={len(ok_invoices)} fail={len(fail_invoices)} "
-                f"· 总耗时 {time.time()-t0:.1f}s")
+    logger.info(
+        f"[vex.build] 发票 OCR · ok={len(ok_invoices)} fail={len(fail_invoices)} "
+        f"· 总耗时 {time.time()-t0:.1f}s"
+    )
 
     # v118.35.0.21 · 异步扣费 · 失败发票不扣 · 豁免账号自动跳过
     if not _billing_vex.get("is_exempt"):
         try:
             _billed_pages = len(ok_invoices) + len(reports)
             if _billed_pages > 0:
-                asyncio.create_task(asyncio.to_thread(
-                    db.charge_ocr_async,
-                    str(user_id), tenant_id, "pdf", _billed_pages,
-                    None, f"VAT 对账 · {len(ok_invoices)} 张发票 + {len(reports)} 份报告"
-                ))
+                asyncio.create_task(
+                    asyncio.to_thread(
+                        db.charge_ocr_async,
+                        str(user_id),
+                        tenant_id,
+                        "pdf",
+                        _billed_pages,
+                        None,
+                        f"VAT 对账 · {len(ok_invoices)} 张发票 + {len(reports)} 份报告",
+                    )
+                )
         except Exception as _ce:
             logger.warning(f"💳 vex.build async charge skip: {_ce}")
 
     # 生成 Excel (返回 tuple)
     xlsx_bytes, task_summary = await loop.run_in_executor(
-        None, build_excel,
+        None,
+        build_excel,
         ok_invoices,
         rep_result["rows"],
         rep_result.get("seller_name", ""),
@@ -194,19 +212,22 @@ async def build_excel_endpoint(
 
     # v4.10.14 · VEX OCR 成本记录(真实 token · 统一 OCR_PRICING 口径)
     try:
-        _inv_in  = sum(int(r.get("_input_tokens")  or 0) for r in ok_invoices)
+        _inv_in = sum(int(r.get("_input_tokens") or 0) for r in ok_invoices)
         _inv_out = sum(int(r.get("_output_tokens") or 0) for r in ok_invoices)
-        _rep_in  = int(rep_result.get("_input_tokens")  or 0)
+        _rep_in = int(rep_result.get("_input_tokens") or 0)
         _rep_out = int(rep_result.get("_output_tokens") or 0)
-        _total_in  = _inv_in + _rep_in
+        _total_in = _inv_in + _rep_in
         _total_out = _inv_out + _rep_out
         try:
-            _bal   = db.get_latest_balance()
+            _bal = db.get_latest_balance()
             _calib = float((_bal.get("calibration_factor") or 1.10)) if _bal else 1.10
         except Exception:
             _calib = 1.10
         # v4.10.14 过渡 · calib 校准系数 v4.10.15 admin 改造时统一砍
-        _cost_usd = (_total_in * db.OCR_PRICING["input_per_m_usd"] + _total_out * db.OCR_PRICING["output_per_m_usd"]) / 1_000_000
+        _cost_usd = (
+            _total_in * db.OCR_PRICING["input_per_m_usd"]
+            + _total_out * db.OCR_PRICING["output_per_m_usd"]
+        ) / 1_000_000
         _cost_thb = _cost_usd * db.OCR_PRICING["usd_thb"] * _calib
         db.log_ocr_cost(
             user_id=str(user_id),
@@ -219,7 +240,9 @@ async def build_excel_endpoint(
             cost_thb=round(_cost_thb, 4),
             elapsed_ms=int(elapsed * 1000),
         )
-        logger.info(f"[vex] 成本记录 · inv_in={_inv_in} rep_in={_rep_in} out={_total_out} · ≈THB {_cost_thb:.4f}")
+        logger.info(
+            f"[vex] 成本记录 · inv_in={_inv_in} rep_in={_rep_in} out={_total_out} · ≈THB {_cost_thb:.4f}"
+        )
     except Exception as _ce:
         logger.warning(f"[vex] cost log failed (non-blocking): {_ce}")
 
@@ -233,8 +256,7 @@ async def build_excel_endpoint(
     fname_clean = "".join(c if c not in '/\\:*?"<>|' else "_" for c in fname)
     fname_encoded = quote(fname_clean.encode("utf-8"))
     content_disposition = (
-        f"attachment; filename=\"vat_recon.xlsx\"; "
-        f"filename*=UTF-8''{fname_encoded}"
+        f'attachment; filename="vat_recon.xlsx"; ' f"filename*=UTF-8''{fname_encoded}"
     )
 
     # ── 异步存库(try/except · 不阻断下载) ──
@@ -242,11 +264,11 @@ async def build_excel_endpoint(
     try:
         period_label = f"{py}-{pm:02d}" if (py and pm) else ""
         raw_data = {
-            "invoices":    ok_invoices,
+            "invoices": ok_invoices,
             "report_rows": rep_result["rows"],
             "seller_name": rep_result.get("seller_name", ""),
             "seller_tax_id": rep_result.get("seller_tax_id", ""),
-            "period_year":  rep_result.get("period_year"),
+            "period_year": rep_result.get("period_year"),
             "period_month": rep_result.get("period_month"),
             "lang": lang,
             **task_summary,  # n_total / n_ok / n_diff / diff_amount_total / rows
@@ -262,7 +284,7 @@ async def build_excel_endpoint(
             mismatched=task_summary["n_diff"],
             mismatch_amount=task_summary["diff_amount_total"],
             elapsed_seconds=elapsed,
-            excel_path=None,   # 先 None · 文件写好后更新
+            excel_path=None,  # 先 None · 文件写好后更新
             raw_data_json=raw_data,
             lang=lang,
         )
@@ -271,11 +293,11 @@ async def build_excel_endpoint(
             if excel_path:
                 # 更新 excel_path
                 try:
-                    import psycopg2
                     with db.get_cursor(commit=True) as cur:
                         cur.execute(
                             "UPDATE vat_recon_tasks SET excel_path=%s WHERE id=%s::uuid",
-                            (excel_path, task_id))
+                            (excel_path, task_id),
+                        )
                 except Exception as _e:
                     logger.warning(f"[vex] excel_path 更新失败: {_e}")
             logger.info(f"[vex.build] 任务存库 OK · task_id={task_id}")
@@ -284,16 +306,17 @@ async def build_excel_endpoint(
 
     headers = {
         "Content-Disposition": content_disposition,
-        "X-Vex-Invoices-Ok":   str(len(ok_invoices)),
+        "X-Vex-Invoices-Ok": str(len(ok_invoices)),
         "X-Vex-Invoices-Fail": str(len(fail_invoices)),
-        "X-Vex-Report-Rows":   str(rep_result.get("row_count", 0)),
-        "X-Vex-Elapsed-Ms":    str(int(elapsed * 1000)),
-        "X-Vex-Task-Id":       task_id or "",
+        "X-Vex-Report-Rows": str(rep_result.get("row_count", 0)),
+        "X-Vex-Elapsed-Ms": str(int(elapsed * 1000)),
+        "X-Vex-Task-Id": task_id or "",
     }
     if fail_invoices:
-        import base64, json as _json
-        fail_brief = [{"f": r.get("filename"), "e": r.get("error", "")[:80]}
-                      for r in fail_invoices]
+        import base64
+        import json as _json
+
+        fail_brief = [{"f": r.get("filename"), "e": r.get("error", "")[:80]} for r in fail_invoices]
         b64 = base64.b64encode(_json.dumps(fail_brief).encode("utf-8")).decode("ascii")
         headers["X-Vex-Fail-List-B64"] = b64
 
@@ -308,17 +331,20 @@ async def build_excel_endpoint(
 @router.get("/tasks")
 async def list_tasks(
     request: Request,
-    page:      int = Query(1, ge=1),
+    page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status:    Optional[str] = Query(None),
-    period:    Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    period: Optional[str] = Query(None),
 ):
     user = _require_user(request)
     tenant_id, user_id = _tenant_user(user)
     result = db.list_vat_recon_tasks(
-        tenant_id=tenant_id, user_id=str(user_id),
-        page=page, page_size=page_size,
-        status=status, period=period,
+        tenant_id=tenant_id,
+        user_id=str(user_id),
+        page=page,
+        page_size=page_size,
+        status=status,
+        period=period,
     )
     kpi = db.get_vat_recon_tasks_kpi(tenant_id=tenant_id, user_id=str(user_id))
     # UUID/datetime 序列化
@@ -367,7 +393,8 @@ async def clear_old_tasks(
     user = _require_user(request)
     tenant_id, user_id = _tenant_user(user)
     deleted_count, excel_paths = db.delete_vat_recon_tasks_older_than(
-        days=days, tenant_id=tenant_id, user_id=str(user_id))
+        days=days, tenant_id=tenant_id, user_id=str(user_id)
+    )
     for p in excel_paths:
         try:
             if p and os.path.exists(p):
@@ -383,7 +410,8 @@ async def delete_task(task_id: str, request: Request):
     user = _require_user(request)
     tenant_id, user_id = _tenant_user(user)
     excel_path = db.delete_vat_recon_task(
-        task_id=task_id, tenant_id=tenant_id, user_id=str(user_id))
+        task_id=task_id, tenant_id=tenant_id, user_id=str(user_id)
+    )
     if excel_path is None:
         raise HTTPException(404, "任务不存在")
     # 删文件(忽略失败)
@@ -410,7 +438,7 @@ async def download_task(task_id: str, request: Request):
     # 热存文件存在 → 直接 serve
     if excel_path and os.path.exists(excel_path):
         client_name = (task.get("client_name") or "client")[:20]
-        period      = task.get("period") or "unknown"
+        period = task.get("period") or "unknown"
         fname_prefix = _FNAME_PREFIX.get(lang, "销项税对账表")
         fname = f"{fname_prefix}_{client_name}_{period}.xlsx"
         fname_clean = "".join(c if c not in '/\\:*?"<>|' else "_" for c in fname)
@@ -420,22 +448,22 @@ async def download_task(task_id: str, request: Request):
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
                 "Content-Disposition": (
-                    f"attachment; filename=\"vat_recon.xlsx\"; "
-                    f"filename*=UTF-8''{fname_encoded}"
+                    f'attachment; filename="vat_recon.xlsx"; ' f"filename*=UTF-8''{fname_encoded}"
                 )
             },
         )
 
     # 文件不存在 → 从 raw_data_json 重新生成
     raw = task.get("raw_data_json") or {}
-    invoices_data   = raw.get("invoices") or []
+    invoices_data = raw.get("invoices") or []
     report_rows_data = raw.get("report_rows") or []
     if not invoices_data or not report_rows_data:
         raise HTTPException(410, "对账数据已过期 · 请重新对账")
 
     loop = asyncio.get_event_loop()
     xlsx_bytes, _ = await loop.run_in_executor(
-        None, build_excel,
+        None,
+        build_excel,
         invoices_data,
         report_rows_data,
         raw.get("seller_name", ""),
@@ -445,8 +473,8 @@ async def download_task(task_id: str, request: Request):
         lang,
     )
 
-    client_name  = (task.get("client_name") or "client")[:20]
-    period       = task.get("period") or "unknown"
+    client_name = (task.get("client_name") or "client")[:20]
+    period = task.get("period") or "unknown"
     fname_prefix = _FNAME_PREFIX.get(lang, "销项税对账表")
     fname = f"{fname_prefix}_{client_name}_{period}.xlsx"
     fname_clean = "".join(c if c not in '/\\:*?"<>|' else "_" for c in fname)
@@ -457,8 +485,7 @@ async def download_task(task_id: str, request: Request):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": (
-                f"attachment; filename=\"vat_recon.xlsx\"; "
-                f"filename*=UTF-8''{fname_encoded}"
+                f'attachment; filename="vat_recon.xlsx"; ' f"filename*=UTF-8''{fname_encoded}"
             )
         },
     )
@@ -473,7 +500,7 @@ async def regenerate_task(task_id: str, request: Request):
     if not task:
         raise HTTPException(404, "任务不存在")
     raw = task.get("raw_data_json") or {}
-    invoices_data    = raw.get("invoices") or []
+    invoices_data = raw.get("invoices") or []
     report_rows_data = raw.get("report_rows") or []
     if not invoices_data or not report_rows_data:
         raise HTTPException(410, "对账数据已过期 · 请重新对账")
@@ -482,7 +509,8 @@ async def regenerate_task(task_id: str, request: Request):
     loop = asyncio.get_event_loop()
     t0 = time.time()
     xlsx_bytes, task_summary = await loop.run_in_executor(
-        None, build_excel,
+        None,
+        build_excel,
         invoices_data,
         report_rows_data,
         raw.get("seller_name", ""),
@@ -497,24 +525,27 @@ async def regenerate_task(task_id: str, request: Request):
     try:
         excel_path = _save_excel_file(tenant_id, task_id, xlsx_bytes)
         with db.get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE vat_recon_tasks
                 SET excel_path=%s, matched=%s, mismatched=%s, mismatch_amount=%s,
                     elapsed_seconds=%s, updated_at=NOW()
                 WHERE id=%s::uuid
-            """, (
-                excel_path,
-                task_summary["n_ok"],
-                task_summary["n_diff"],
-                task_summary["diff_amount_total"],
-                elapsed,
-                task_id,
-            ))
+            """,
+                (
+                    excel_path,
+                    task_summary["n_ok"],
+                    task_summary["n_diff"],
+                    task_summary["diff_amount_total"],
+                    elapsed,
+                    task_id,
+                ),
+            )
     except Exception as e:
         logger.error(f"[vex.regen] 更新任务失败: {e}")
 
-    client_name  = (task.get("client_name") or "client")[:20]
-    period       = task.get("period") or "unknown"
+    client_name = (task.get("client_name") or "client")[:20]
+    period = task.get("period") or "unknown"
     fname_prefix = _FNAME_PREFIX.get(lang, "销项税对账表")
     fname = f"{fname_prefix}_{client_name}_{period}.xlsx"
     fname_clean = "".join(c if c not in '/\\:*?"<>|' else "_" for c in fname)
@@ -525,8 +556,7 @@ async def regenerate_task(task_id: str, request: Request):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": (
-                f"attachment; filename=\"vat_recon.xlsx\"; "
-                f"filename*=UTF-8''{fname_encoded}"
+                f'attachment; filename="vat_recon.xlsx"; ' f"filename*=UTF-8''{fname_encoded}"
             ),
             "X-Vex-Elapsed-Ms": str(int(elapsed * 1000)),
         },

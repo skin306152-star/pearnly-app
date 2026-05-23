@@ -45,7 +45,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 try:
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment
+    from openpyxl.styles import Font
 except ImportError:
     Workbook = None  # type: ignore
 
@@ -60,10 +60,11 @@ logger = logging.getLogger(__name__)
 # ============================================================
 _PRODUCT_NAME_NORM_RE = re.compile(r"[\s\.,\-_/\\()&\"'`*]+")
 
+
 def _norm_product_name(s: Any) -> str:
     if not s:
         return ""
-    out = _PRODUCT_NAME_NORM_RE.sub('', str(s))
+    out = _PRODUCT_NAME_NORM_RE.sub("", str(s))
     return out.lower().strip()[:256]
 
 
@@ -74,17 +75,17 @@ def _build_product_lookup(mappings: Optional[Dict[str, Any]]) -> Dict[str, str]:
     out: Dict[str, str] = {}
     if not mappings:
         return out
-    products = mappings.get('products') if isinstance(mappings, dict) else None
+    products = mappings.get("products") if isinstance(mappings, dict) else None
     if not isinstance(products, list):
         return out
     for p in products:
         if not isinstance(p, dict):
             continue
-        erp_code = p.get('erp_code')
+        erp_code = p.get("erp_code")
         if not erp_code:
             continue
         # 优先用 DB 算好的 norm · 退到自己算
-        norm = p.get('item_name_norm') or _norm_product_name(p.get('item_name') or '')
+        norm = p.get("item_name_norm") or _norm_product_name(p.get("item_name") or "")
         if norm:
             out[norm] = str(erp_code).strip()
     return out
@@ -98,6 +99,7 @@ def _resolve_product_code(item_name: Any, lookup: Dict[str, str]) -> Optional[st
         return None
     norm = _norm_product_name(item_name)
     return lookup.get(norm) if norm else None
+
 
 # ============================================================
 # 铁律 29 · 字段格式工具
@@ -118,9 +120,9 @@ MRERP_CUSTOMER_BILL_MAX = 20
 MRERP_VALID_TAX_KINDS_SC = ("vat_7", "vat_0", "vat_exempt", "non_vat")
 
 # 日期检查阈值(单位:天)
-MRERP_DATE_FUTURE_HARD_REJECT_DAYS = 30   # > today + 30d → ERR_DATE_FUTURE
-MRERP_DATE_FUTURE_WARN_DAYS = 7           # > today + 7d → 警告(不拒)
-MRERP_DATE_PAST_WARN_DAYS = 730           # < today - 730d → 警告(2 年前)
+MRERP_DATE_FUTURE_HARD_REJECT_DAYS = 30  # > today + 30d → ERR_DATE_FUTURE
+MRERP_DATE_FUTURE_WARN_DAYS = 7  # > today + 7d → 警告(不拒)
+MRERP_DATE_PAST_WARN_DAYS = 730  # < today - 730d → 警告(2 年前)
 
 
 def fmt_date(value: Any) -> str:
@@ -188,8 +190,7 @@ def fmt_number_strict(value: Any) -> float:
         )
     if n > MAX_AMOUNT:
         raise ValueError(
-            f"amount {n} exceeds MR.ERP ceiling {MAX_AMOUNT}; "
-            "split the invoice or escalate"
+            f"amount {n} exceeds MR.ERP ceiling {MAX_AMOUNT}; " "split the invoice or escalate"
         )
     return float(n)
 
@@ -203,7 +204,7 @@ def derive_mrerp_invoice_no(history: Dict[str, Any]) -> str:
     第一笔成功后第二笔重复就 "เลขที่ดังกล่าวมีอยู่ในระบบแล้ว".
     序号现在按 docstring 设计取 history.id 末 3 位 hex 转 dec mod 1000 ·
     同一 history 重传幂等 · 不同 history 序号不同."""
-    inv_date_str = fmt_date(history.get('invoice_date'))
+    inv_date_str = fmt_date(history.get("invoice_date"))
     if inv_date_str and len(inv_date_str) >= 10:
         try:
             ce_year = int(inv_date_str[:4])
@@ -215,6 +216,7 @@ def derive_mrerp_invoice_no(history: Dict[str, Any]) -> str:
             date_part = "690101"
     else:
         from datetime import datetime as _dt
+
         d = _dt.utcnow()
         date_part = f"{(d.year + 543) % 100:02d}{d.month:02d}{d.day:02d}"
 
@@ -222,10 +224,10 @@ def derive_mrerp_invoice_no(history: Dict[str, Any]) -> str:
     # mod 999999 + 1 (1-999999 · 6 位 seq) · MR.ERP test 数据库累计 push 多 ·
     # 5 位也撞 · 6 位几乎不撞 (撞率 ~ 1/百万). 同 history 仍幂等 (确定算法).
     # invoice_no 总长 6+1+6 = 13 char · 还在 18 字符上限内.
-    hist_id = str(history.get('id') or '').replace('-', '')
+    hist_id = str(history.get("id") or "").replace("-", "")
     if hist_id:
         try:
-            seq_int = int(hist_id[-8:], 16) % 999999 + 1   # 1-999999
+            seq_int = int(hist_id[-8:], 16) % 999999 + 1  # 1-999999
             seq = f"{seq_int:06d}"
         except ValueError:
             seq = "000001"
@@ -247,213 +249,226 @@ def derive_mrerp_invoice_no(history: Dict[str, Any]) -> str:
 # }
 
 MRERP_SHEET_SCHEMAS: Dict[str, Dict[str, Any]] = {
-
     # ✅ 销售-赊销(物料 1 真实样本对齐 v27.8.1.4 · Korn 实际导出 SC 单)
     # Worksheet: 18 列 · Worksheet 1: 8 列 · Worksheet 2: 3 列
-    'sales_credit': {
-        'stub': False,
-        'sheet_count_expected': 3,
-        'label_zh': '销售-赊销',
-        'label_th': 'ขายเชื่อ',
-        'label_en': 'Sales (credit)',
-        'label_ja': '売上(掛)',
+    "sales_credit": {
+        "stub": False,
+        "sheet_count_expected": 3,
+        "label_zh": "销售-赊销",
+        "label_th": "ขายเชื่อ",
+        "label_en": "Sales (credit)",
+        "label_ja": "売上(掛)",
         # Worksheet · 单据头(严格按 Korn 真样本列顺序)
-        'header_columns': [
-            {'key': 'invoice_no',     'label': 'เลขที่',           'type': 'str',  'max': 30},
-            {'key': 'invoice_date',   'label': 'วันที่',            'type': 'date'},
-            {'key': 'tax_rate_str',   'label': 'อัตราภาษี',         'type': 'str',  'max': 14, 'default': '7 (แยก)'},
-            {'key': 'branch_code',    'label': 'สาขา',             'type': 'str',  'max': 14, 'default': '00000'},
-            {'key': 'department',     'label': 'แผนก',             'type': 'str',  'max': 14, 'default': 'BOI1'},
-            {'key': 'job',            'label': 'งาน',              'type': 'str',  'max': 14, 'default': '00002'},
-            {'key': 'salesman',       'label': 'พนักงานขาย',        'type': 'str',  'max': 30, 'default': 'กร ทดสอบ'},
-            {'key': 'delivery_date',  'label': 'กำหนดส่งสินค้า',     'type': 'date'},
-            {'key': 'customer_code',  'label': 'รหัสลูกค้า',        'type': 'str',  'max': 50},
-            {'key': 'customer_bill',  'label': 'รหัสลูกค้า (บิล)',  'type': 'str',  'max': 50},
-            {'key': 'bill_no',        'label': 'เลขที่บิล',         'type': 'str',  'max': 30},
-            {'key': 'bill_date',      'label': 'วันที่',            'type': 'date'},
-            {'key': 'sales_area',     'label': 'พื้นที่การขาย',     'type': 'str',  'max': 30, 'default': 'สุพรรณบุรี'},
-            {'key': 'shipping_type',  'label': 'ประเภทขนส่ง',       'type': 'str',  'max': 30, 'default': 'ขนส่งโดยบริษัท'},
-            {'key': 'discount',       'label': 'หักส่วนลด',          'type': 'num', 'default': 0},
-            {'key': 'note1',          'label': 'หมายเหตุ 1',        'type': 'str',  'max': 50},
-            {'key': 'note2',          'label': 'หมายเหตุ 2',        'type': 'str',  'max': 50},
-            {'key': 'note3',          'label': 'หมายเหตุ 3',        'type': 'str',  'max': 50},
+        "header_columns": [
+            {"key": "invoice_no", "label": "เลขที่", "type": "str", "max": 30},
+            {"key": "invoice_date", "label": "วันที่", "type": "date"},
+            {
+                "key": "tax_rate_str",
+                "label": "อัตราภาษี",
+                "type": "str",
+                "max": 14,
+                "default": "7 (แยก)",
+            },
+            {"key": "branch_code", "label": "สาขา", "type": "str", "max": 14, "default": "00000"},
+            {"key": "department", "label": "แผนก", "type": "str", "max": 14, "default": "BOI1"},
+            {"key": "job", "label": "งาน", "type": "str", "max": 14, "default": "00002"},
+            {
+                "key": "salesman",
+                "label": "พนักงานขาย",
+                "type": "str",
+                "max": 30,
+                "default": "กร ทดสอบ",
+            },
+            {"key": "delivery_date", "label": "กำหนดส่งสินค้า", "type": "date"},
+            {"key": "customer_code", "label": "รหัสลูกค้า", "type": "str", "max": 50},
+            {"key": "customer_bill", "label": "รหัสลูกค้า (บิล)", "type": "str", "max": 50},
+            {"key": "bill_no", "label": "เลขที่บิล", "type": "str", "max": 30},
+            {"key": "bill_date", "label": "วันที่", "type": "date"},
+            {
+                "key": "sales_area",
+                "label": "พื้นที่การขาย",
+                "type": "str",
+                "max": 30,
+                "default": "สุพรรณบุรี",
+            },
+            {
+                "key": "shipping_type",
+                "label": "ประเภทขนส่ง",
+                "type": "str",
+                "max": 30,
+                "default": "ขนส่งโดยบริษัท",
+            },
+            {"key": "discount", "label": "หักส่วนลด", "type": "num", "default": 0},
+            {"key": "note1", "label": "หมายเหตุ 1", "type": "str", "max": 50},
+            {"key": "note2", "label": "หมายเหตุ 2", "type": "str", "max": 50},
+            {"key": "note3", "label": "หมายเหตุ 3", "type": "str", "max": 50},
         ],
         # Worksheet 1 · 商品明细(每行 1 件商品 · 关联 invoice_no)
-        'detail_columns': [
-            {'key': 'invoice_no',   'label': 'เลขที่',         'type': 'str', 'max': 30},
-            {'key': 'product_code', 'label': 'รหัสสินค้า',     'type': 'str', 'max': 30, 'default': '123'},
-            {'key': 'department',   'label': 'แผนก',          'type': 'str', 'max': 14, 'default': 'BOI1'},
-            {'key': 'job',          'label': 'งาน',           'type': 'str', 'max': 14, 'default': '00002'},
-            {'key': 'warehouse',    'label': 'คลัง',          'type': 'str', 'max': 14, 'default': '0000'},
-            {'key': 'qty',          'label': 'จำนวน',         'type': 'num'},
-            {'key': 'unit_price',   'label': 'ราคา/หน่วย',     'type': 'num'},
-            {'key': 'amount',       'label': 'จำนวนเงิน',     'type': 'num'},
+        "detail_columns": [
+            {"key": "invoice_no", "label": "เลขที่", "type": "str", "max": 30},
+            {
+                "key": "product_code",
+                "label": "รหัสสินค้า",
+                "type": "str",
+                "max": 30,
+                "default": "123",
+            },
+            {"key": "department", "label": "แผนก", "type": "str", "max": 14, "default": "BOI1"},
+            {"key": "job", "label": "งาน", "type": "str", "max": 14, "default": "00002"},
+            {"key": "warehouse", "label": "คลัง", "type": "str", "max": 14, "default": "0000"},
+            {"key": "qty", "label": "จำนวน", "type": "num"},
+            {"key": "unit_price", "label": "ราคา/หน่วย", "type": "num"},
+            {"key": "amount", "label": "จำนวนเงิน", "type": "num"},
         ],
         # Worksheet 2 · 尾(押金 / 是否开销售单)
-        'tail_columns': [
-            {'key': 'invoice_no',     'label': 'เลขที่',           'type': 'str', 'max': 30},
-            {'key': 'deposit_no',     'label': 'เลขที่เงินมัดจำ',   'type': 'str', 'max': 30},
-            {'key': 'is_sales_issued','label': 'ออกใบขาย',         'type': 'str', 'max': 14},
+        "tail_columns": [
+            {"key": "invoice_no", "label": "เลขที่", "type": "str", "max": 30},
+            {"key": "deposit_no", "label": "เลขที่เงินมัดจำ", "type": "str", "max": 30},
+            {"key": "is_sales_issued", "label": "ออกใบขาย", "type": "str", "max": 14},
         ],
     },
-
     # 🟡 销售-现金(stub · TODO 物料 1 · 7 列收款方式待定 · 预期 3 sheet)
-    'sales_cash': {
-        'stub': True,
-        'sheet_count_expected': 3,
-        'label_zh': '销售-现金 · 待物料',
-        'label_th': 'ขายสด · รอตัวอย่าง',
-        'label_en': 'Sales (cash) · WAIT MATERIAL',
-        'label_ja': '売上(現金) · 物料待ち',
+    "sales_cash": {
+        "stub": True,
+        "sheet_count_expected": 3,
+        "label_zh": "销售-现金 · 待物料",
+        "label_th": "ขายสด · รอตัวอย่าง",
+        "label_en": "Sales (cash) · WAIT MATERIAL",
+        "label_ja": "売上(現金) · 物料待ち",
         # TODO 物料 1 · 现金销售真实样本到达后填:头 18 列 + 7 列收款方式 + 明细 8 + 尾 3
-        'header_columns': [],
-        'detail_columns': [],
-        'tail_columns': [],
+        "header_columns": [],
+        "detail_columns": [],
+        "tail_columns": [],
     },
-
     # 🟡 采购-赊购(stub · TODO 物料 2 · 头 16 + 明细 8 + 尾 3 · 预期 3 sheet)
-    'purchase_credit': {
-        'stub': True,
-        'sheet_count_expected': 3,
-        'label_zh': '采购-赊购 · 待物料',
-        'label_th': 'ซื้อเชื่อ · รอตัวอย่าง',
-        'label_en': 'Purchase (credit) · WAIT MATERIAL',
-        'label_ja': '仕入(掛) · 物料待ち',
+    "purchase_credit": {
+        "stub": True,
+        "sheet_count_expected": 3,
+        "label_zh": "采购-赊购 · 待物料",
+        "label_th": "ซื้อเชื่อ · รอตัวอย่าง",
+        "label_en": "Purchase (credit) · WAIT MATERIAL",
+        "label_ja": "仕入(掛) · 物料待ち",
         # TODO 物料 2 · 采购赊购样本到达后填字段名
-        'header_columns': [],
-        'detail_columns': [],
-        'tail_columns': [],
+        "header_columns": [],
+        "detail_columns": [],
+        "tail_columns": [],
     },
-
     # 🟡 采购-现金(stub · TODO 物料 2 · 预期 3 sheet)
-    'purchase_cash': {
-        'stub': True,
-        'sheet_count_expected': 3,
-        'label_zh': '采购-现金 · 待物料',
-        'label_th': 'ซื้อสด · รอตัวอย่าง',
-        'label_en': 'Purchase (cash) · WAIT MATERIAL',
-        'label_ja': '仕入(現金) · 物料待ち',
+    "purchase_cash": {
+        "stub": True,
+        "sheet_count_expected": 3,
+        "label_zh": "采购-现金 · 待物料",
+        "label_th": "ซื้อสด · รอตัวอย่าง",
+        "label_en": "Purchase (cash) · WAIT MATERIAL",
+        "label_ja": "仕入(現金) · 物料待ち",
         # TODO 物料 2 · 采购现金样本到达后填字段名
-        'header_columns': [],
-        'detail_columns': [],
-        'tail_columns': [],
+        "header_columns": [],
+        "detail_columns": [],
+        "tail_columns": [],
     },
-
     # ✅ 客户档案(已有完整 25 列样本)· 1 sheet
-    'customer': {
-        'stub': False,
-        'sheet_count_expected': 1,
-        'label_zh': '客户档案',
-        'label_th': 'แฟ้มลูกค้า',
-        'label_en': 'Customer master',
-        'label_ja': '取引先マスタ',
-        'header_columns': [
-            {'key': 'customer_code',  'label': 'รหัสลูกค้า',     'type': 'str', 'max': 50},
-            {'key': 'customer_name',  'label': 'ชื่อลูกค้า',      'type': 'str', 'max': 50},
-            {'key': 'tax_id',         'label': 'เลขผู้เสียภาษี',  'type': 'str', 'max': 20},
-            {'key': 'branch_code',    'label': 'สาขา',           'type': 'str', 'max': 14, 'default': '00000'},
-            {'key': 'address1',       'label': 'ที่อยู่ 1',      'type': 'str', 'max': 50},
-            {'key': 'address2',       'label': 'ที่อยู่ 2',      'type': 'str', 'max': 50},
-            {'key': 'address3',       'label': 'ที่อยู่ 3',      'type': 'str', 'max': 50},
-            {'key': 'phone',          'label': 'โทรศัพท์',       'type': 'str', 'max': 30},
-            {'key': 'fax',            'label': 'แฟกซ์',          'type': 'str', 'max': 30},
-            {'key': 'email',          'label': 'อีเมล',          'type': 'str', 'max': 50},
-            {'key': 'contact_person', 'label': 'ผู้ติดต่อ',      'type': 'str', 'max': 50},
-            {'key': 'credit_limit',   'label': 'วงเงินเครดิต',   'type': 'num'},
-            {'key': 'credit_days',    'label': 'เครดิต(วัน)',    'type': 'num'},
-            {'key': 'salesman_code',  'label': 'พนักงานขาย',     'type': 'str', 'max': 14},
-            {'key': 'group_code',     'label': 'กลุ่มลูกค้า',    'type': 'str', 'max': 14},
-            {'key': 'zone_code',      'label': 'เขตการขาย',      'type': 'str', 'max': 14},
-            {'key': 'price_level',    'label': 'ระดับราคา',      'type': 'str', 'max': 14},
-            {'key': 'tax_rate_str',   'label': 'อัตราภาษี',      'type': 'str', 'max': 14},
-            {'key': 'is_wht',         'label': 'หัก ณ ที่จ่าย',  'type': 'str', 'max': 14},
-            {'key': 'wht_rate_str',   'label': 'อัตราหัก',       'type': 'str', 'max': 14},
-            {'key': 'bank_name',      'label': 'ธนาคาร',         'type': 'str', 'max': 30},
-            {'key': 'bank_account',   'label': 'เลขบัญชี',       'type': 'str', 'max': 30},
-            {'key': 'note',           'label': 'หมายเหตุ',       'type': 'str', 'max': 50},
-            {'key': 'is_active',      'label': 'สถานะ',          'type': 'str', 'max': 14, 'default': 'A'},
-            {'key': 'created_date',   'label': 'วันที่สร้าง',    'type': 'date'},
+    "customer": {
+        "stub": False,
+        "sheet_count_expected": 1,
+        "label_zh": "客户档案",
+        "label_th": "แฟ้มลูกค้า",
+        "label_en": "Customer master",
+        "label_ja": "取引先マスタ",
+        "header_columns": [
+            {"key": "customer_code", "label": "รหัสลูกค้า", "type": "str", "max": 50},
+            {"key": "customer_name", "label": "ชื่อลูกค้า", "type": "str", "max": 50},
+            {"key": "tax_id", "label": "เลขผู้เสียภาษี", "type": "str", "max": 20},
+            {"key": "branch_code", "label": "สาขา", "type": "str", "max": 14, "default": "00000"},
+            {"key": "address1", "label": "ที่อยู่ 1", "type": "str", "max": 50},
+            {"key": "address2", "label": "ที่อยู่ 2", "type": "str", "max": 50},
+            {"key": "address3", "label": "ที่อยู่ 3", "type": "str", "max": 50},
+            {"key": "phone", "label": "โทรศัพท์", "type": "str", "max": 30},
+            {"key": "fax", "label": "แฟกซ์", "type": "str", "max": 30},
+            {"key": "email", "label": "อีเมล", "type": "str", "max": 50},
+            {"key": "contact_person", "label": "ผู้ติดต่อ", "type": "str", "max": 50},
+            {"key": "credit_limit", "label": "วงเงินเครดิต", "type": "num"},
+            {"key": "credit_days", "label": "เครดิต(วัน)", "type": "num"},
+            {"key": "salesman_code", "label": "พนักงานขาย", "type": "str", "max": 14},
+            {"key": "group_code", "label": "กลุ่มลูกค้า", "type": "str", "max": 14},
+            {"key": "zone_code", "label": "เขตการขาย", "type": "str", "max": 14},
+            {"key": "price_level", "label": "ระดับราคา", "type": "str", "max": 14},
+            {"key": "tax_rate_str", "label": "อัตราภาษี", "type": "str", "max": 14},
+            {"key": "is_wht", "label": "หัก ณ ที่จ่าย", "type": "str", "max": 14},
+            {"key": "wht_rate_str", "label": "อัตราหัก", "type": "str", "max": 14},
+            {"key": "bank_name", "label": "ธนาคาร", "type": "str", "max": 30},
+            {"key": "bank_account", "label": "เลขบัญชี", "type": "str", "max": 30},
+            {"key": "note", "label": "หมายเหตุ", "type": "str", "max": 50},
+            {"key": "is_active", "label": "สถานะ", "type": "str", "max": 14, "default": "A"},
+            {"key": "created_date", "label": "วันที่สร้าง", "type": "date"},
         ],
-        'detail_columns': None,
-        'tail_columns': None,
+        "detail_columns": None,
+        "tail_columns": None,
     },
-
     # ✅ 商品档案(已知 29 列结构)· 1 sheet
-    'product': {
-        'stub': False,
-        'sheet_count_expected': 1,
-        'label_zh': '商品档案',
-        'label_th': 'แฟ้มสินค้า',
-        'label_en': 'Product master',
-        'label_ja': '商品マスタ',
-        'header_columns': [
-            {'key': f'col_{i}', 'label': f'Col{i}', 'type': 'str', 'max': 50}
-            for i in range(1, 30)
+    "product": {
+        "stub": False,
+        "sheet_count_expected": 1,
+        "label_zh": "商品档案",
+        "label_th": "แฟ้มสินค้า",
+        "label_en": "Product master",
+        "label_ja": "商品マスタ",
+        "header_columns": [
+            {"key": f"col_{i}", "label": f"Col{i}", "type": "str", "max": 50} for i in range(1, 30)
         ],
-        'detail_columns': None,
-        'tail_columns': None,
+        "detail_columns": None,
+        "tail_columns": None,
     },
-
     # ✅ 财务收款(已知 头20 + 核销3 + 支票5)· 3 sheet
-    'receipt': {
-        'stub': False,
-        'sheet_count_expected': 3,
-        'label_zh': '财务收款',
-        'label_th': 'รับชำระ',
-        'label_en': 'Receipt',
-        'label_ja': '入金',
-        'header_columns': [
-            {'key': f'h_{i}', 'label': f'H{i}', 'type': 'str', 'max': 50}
-            for i in range(1, 21)
+    "receipt": {
+        "stub": False,
+        "sheet_count_expected": 3,
+        "label_zh": "财务收款",
+        "label_th": "รับชำระ",
+        "label_en": "Receipt",
+        "label_ja": "入金",
+        "header_columns": [
+            {"key": f"h_{i}", "label": f"H{i}", "type": "str", "max": 50} for i in range(1, 21)
         ],
-        'detail_columns': [
-            {'key': f'd_{i}', 'label': f'D{i}', 'type': 'str', 'max': 50}
-            for i in range(1, 4)
+        "detail_columns": [
+            {"key": f"d_{i}", "label": f"D{i}", "type": "str", "max": 50} for i in range(1, 4)
         ],
-        'tail_columns': [
-            {'key': f't_{i}', 'label': f'T{i}', 'type': 'str', 'max': 50}
-            for i in range(1, 6)
+        "tail_columns": [
+            {"key": f"t_{i}", "label": f"T{i}", "type": "str", "max": 50} for i in range(1, 6)
         ],
     },
-
     # ✅ 财务付款(已知 多 Sheet4 = 15 列代扣税)· 4 sheet
     # 当前 stub-ish:Sheet1-3 列名待物料 · Sheet4 用 P1-P15 占位
-    'payment': {
-        'stub': False,
-        'sheet_count_expected': 4,
-        'label_zh': '财务付款',
-        'label_th': 'จ่ายชำระ',
-        'label_en': 'Payment',
-        'label_ja': '出金',
-        'header_columns': [
-            {'key': f'h_{i}', 'label': f'H{i}', 'type': 'str', 'max': 50}
-            for i in range(1, 21)
+    "payment": {
+        "stub": False,
+        "sheet_count_expected": 4,
+        "label_zh": "财务付款",
+        "label_th": "จ่ายชำระ",
+        "label_en": "Payment",
+        "label_ja": "出金",
+        "header_columns": [
+            {"key": f"h_{i}", "label": f"H{i}", "type": "str", "max": 50} for i in range(1, 21)
         ],
-        'detail_columns': [
-            {'key': f'd_{i}', 'label': f'D{i}', 'type': 'str', 'max': 50}
-            for i in range(1, 4)
+        "detail_columns": [
+            {"key": f"d_{i}", "label": f"D{i}", "type": "str", "max": 50} for i in range(1, 4)
         ],
-        'tail_columns': [
-            {'key': f't_{i}', 'label': f'T{i}', 'type': 'str', 'max': 50}
-            for i in range(1, 6)
+        "tail_columns": [
+            {"key": f"t_{i}", "label": f"T{i}", "type": "str", "max": 50} for i in range(1, 6)
         ],
-        'sheet4_columns': [
-            {'key': f'wht_{i}', 'label': f'WHT{i}', 'type': 'str', 'max': 50}
-            for i in range(1, 16)
+        "sheet4_columns": [
+            {"key": f"wht_{i}", "label": f"WHT{i}", "type": "str", "max": 50} for i in range(1, 16)
         ],
     },
-
     # 🟡 会计凭证(stub · TODO 物料 3 · 头 6 + 分录 7 · 预期 2 sheet)
-    'journal': {
-        'stub': True,
-        'sheet_count_expected': 2,
-        'label_zh': '会计凭证 · 待物料',
-        'label_th': 'สมุดรายวัน · รอตัวอย่าง',
-        'label_en': 'Journal · WAIT MATERIAL',
-        'label_ja': '仕訳 · 物料待ち',
+    "journal": {
+        "stub": True,
+        "sheet_count_expected": 2,
+        "label_zh": "会计凭证 · 待物料",
+        "label_th": "สมุดรายวัน · รอตัวอย่าง",
+        "label_en": "Journal · WAIT MATERIAL",
+        "label_ja": "仕訳 · 物料待ち",
         # TODO 物料 3 · 会计凭证样本到达后填字段名
-        'header_columns': [],
-        'detail_columns': [],
+        "header_columns": [],
+        "detail_columns": [],
     },
 }
 
@@ -464,10 +479,10 @@ MRERP_SHEET_SCHEMAS: Dict[str, Dict[str, Any]] = {
 MRERP_ERROR_FRIENDLY: Dict[str, Dict[str, str]] = {}
 
 
-def get_error_friendly(error_code: str, lang: str = 'zh') -> str:
+def get_error_friendly(error_code: str, lang: str = "zh") -> str:
     """物料 4 未到时 fallback · 直接显示原始错误码"""
     entry = MRERP_ERROR_FRIENDLY.get(error_code or "", {})
-    return entry.get(lang) or entry.get('en') or (error_code or "")
+    return entry.get(lang) or entry.get("en") or (error_code or "")
 
 
 # ============================================================
@@ -475,52 +490,52 @@ def get_error_friendly(error_code: str, lang: str = 'zh') -> str:
 # ============================================================
 def lookup_customer_code(client_id: int, mappings: Dict[str, Any]) -> str:
     """从 erp_client_mappings 拿当前 client 在 mrerp 下的代码 · 没配返回空"""
-    cli = (mappings or {}).get('clients') or []
+    cli = (mappings or {}).get("clients") or []
     for m in cli:
-        if m.get('erp_type') == 'mrerp' and int(m.get('client_id') or 0) == int(client_id or 0):
-            return fmt_str(m.get('erp_code'), 50)
+        if m.get("erp_type") == "mrerp" and int(m.get("client_id") or 0) == int(client_id or 0):
+            return fmt_str(m.get("erp_code"), 50)
     return ""
 
 
 def lookup_account_code(category: str, mappings: Dict[str, Any]) -> str:
-    acc = (mappings or {}).get('accounts') or []
+    acc = (mappings or {}).get("accounts") or []
     for m in acc:
-        if m.get('erp_type') == 'mrerp' and m.get('pearnly_category') == category:
-            return fmt_str(m.get('erp_code'), 50)
+        if m.get("erp_type") == "mrerp" and m.get("pearnly_category") == category:
+            return fmt_str(m.get("erp_code"), 50)
     return ""
 
 
 def lookup_tax_code(tax_kind: str, mappings: Dict[str, Any]) -> str:
     """从 erp_tax_mappings 拿税种字符串(铁律 29 · 税率字符串枚举)"""
-    tax = (mappings or {}).get('taxes') or []
+    tax = (mappings or {}).get("taxes") or []
     for m in tax:
-        if m.get('erp_type') == 'mrerp' and m.get('pearnly_tax_kind') == tax_kind:
-            return fmt_str(m.get('erp_code'), 14)
+        if m.get("erp_type") == "mrerp" and m.get("pearnly_tax_kind") == tax_kind:
+            return fmt_str(m.get("erp_code"), 14)
     return ""
 
 
 def derive_tax_kind(history: Dict[str, Any]) -> str:
     """从 OCR 结果推断 Pearnly tax_kind 枚举"""
-    rate = history.get('tax_rate_pct') or history.get('vat_rate')
-    wht = history.get('wht_rate_pct') or history.get('wht_rate')
+    rate = history.get("tax_rate_pct") or history.get("vat_rate")
+    wht = history.get("wht_rate_pct") or history.get("wht_rate")
     try:
         if wht:
             w = int(float(wht))
-            return f'wht_{w}' if w in (1, 3, 5) else 'wht_3'
+            return f"wht_{w}" if w in (1, 3, 5) else "wht_3"
     except Exception:
         pass
     try:
         if rate is not None:
             r = float(rate)
             if r == 7:
-                return 'vat_7'
+                return "vat_7"
             if r == 0:
-                return 'vat_0'
+                return "vat_0"
             if r < 0:
-                return 'vat_exempt'
+                return "vat_exempt"
     except Exception:
         pass
-    return 'vat_7'
+    return "vat_7"
 
 
 # ============================================================
@@ -529,32 +544,34 @@ def derive_tax_kind(history: Dict[str, Any]) -> str:
 def build_sales_credit_row(history: Dict[str, Any], mappings: Dict[str, Any]) -> Dict[str, Any]:
     """v27.8.1.4 · 严格对齐 Korn 真实样本 18 列 header
     v27.8.1.5 · invoice_no 转 MR.ERP YYMMDD-NNN 标准格式"""
-    cid = history.get('client_id') or 0
+    cid = history.get("client_id") or 0
     customer_code = lookup_customer_code(cid, mappings)
 
     # v27.8.1.5 · invoice_no 转 MR.ERP 标准格式(原 OCR 号 'INV-...' 不被认)
     mrerp_invoice_no = derive_mrerp_invoice_no(history)
-    inv_date = fmt_date(history.get('invoice_date'))
+    inv_date = fmt_date(history.get("invoice_date"))
 
     return {
-        'invoice_no':     mrerp_invoice_no,
-        'invoice_date':   inv_date,
+        "invoice_no": mrerp_invoice_no,
+        "invoice_date": inv_date,
         # 'tax_rate_str' / 'branch_code' / 'department' / 'job' / 'salesman'
         # / 'sales_area' / 'shipping_type' 都用 schema default(TEST2019 已知存在的值)
-        'delivery_date':  inv_date,  # 通常 = 开票日(没运单时)
-        'customer_code':  customer_code,
-        'customer_bill':  customer_code,
-        'bill_no':        ('SI' + mrerp_invoice_no)[:30],   # 'SI690415-501'
-        'bill_date':      inv_date,
+        "delivery_date": inv_date,  # 通常 = 开票日(没运单时)
+        "customer_code": customer_code,
+        "customer_bill": customer_code,
+        "bill_no": ("SI" + mrerp_invoice_no)[:30],  # 'SI690415-501'
+        "bill_date": inv_date,
         # 'discount' default = 0
         # v27.8.1.6 · 严格对齐 Korn 真样本 · 三个 note 都留空(MR.ERP 可能对备注字段格式有限制)
-        'note1':          '',
-        'note2':          '',
-        'note3':          '',
+        "note1": "",
+        "note2": "",
+        "note3": "",
     }
 
 
-def build_sales_credit_detail_rows(history: Dict[str, Any], mappings: Dict[str, Any]) -> List[Dict[str, Any]]:
+def build_sales_credit_detail_rows(
+    history: Dict[str, Any], mappings: Dict[str, Any]
+) -> List[Dict[str, Any]]:
     """v27.8.1.4 · OCR items → detail rows · v27.8.1.5 · invoice_no 同步用 MR.ERP 标准格式
     v27.8.1.17 · 加 product_code · 从 mappings['products'] 查 item_name → erp_code · 找不到 fallback '123'(下游 korn_clone 已 fallback)
     """
@@ -565,21 +582,25 @@ def build_sales_credit_detail_rows(history: Dict[str, Any], mappings: Dict[str, 
 
     items = []
     for src_field in (
-        history.get('items'),
-        (history.get('fields') or {}).get('items') if isinstance(history.get('fields'), dict) else None,
+        history.get("items"),
+        (
+            (history.get("fields") or {}).get("items")
+            if isinstance(history.get("fields"), dict)
+            else None
+        ),
     ):
         if isinstance(src_field, list) and src_field:
             items = src_field
             break
     if not items:
-        pages = history.get('pages')
+        pages = history.get("pages")
         if isinstance(pages, list):
             for p in pages:
                 if not isinstance(p, dict):
                     continue
-                pf = p.get('fields') or {}
+                pf = p.get("fields") or {}
                 if isinstance(pf, dict):
-                    pi = pf.get('items')
+                    pi = pf.get("items")
                     if isinstance(pi, list) and pi:
                         items = pi
                         break
@@ -589,9 +610,9 @@ def build_sales_credit_detail_rows(history: Dict[str, Any], mappings: Dict[str, 
         for it in items:
             if not isinstance(it, dict):
                 continue
-            qty = fmt_number(it.get('qty') or it.get('quantity'))
-            price = fmt_number(it.get('unit_price') or it.get('price'))
-            amt = fmt_number(it.get('amount') or it.get('total'))
+            qty = fmt_number(it.get("qty") or it.get("quantity"))
+            price = fmt_number(it.get("unit_price") or it.get("price"))
+            amt = fmt_number(it.get("amount") or it.get("total"))
             if qty is None and price is not None and amt is not None and price != 0:
                 qty = round(amt / price, 4)
             if price is None and qty is not None and amt is not None and qty != 0:
@@ -599,30 +620,34 @@ def build_sales_credit_detail_rows(history: Dict[str, Any], mappings: Dict[str, 
             if amt is None and qty is not None and price is not None:
                 amt = round(qty * price, 2)
             # v27.8.1.17 · 查商品映射 · 找不到返 None · 下游 korn_clone 兜底 '123'
-            item_name = it.get('name') or it.get('description') or ''
+            item_name = it.get("name") or it.get("description") or ""
             erp_code = _resolve_product_code(item_name, product_lookup)
-            rows.append({
-                'invoice_no':   mrerp_invoice_no,
-                'qty':          qty if qty is not None else 1,
-                'unit_price':   price if price is not None else 0,
-                'amount':       amt if amt is not None else 0,
-                'product_code': erp_code,
-                'item_name':    str(item_name or ''),
-            })
+            rows.append(
+                {
+                    "invoice_no": mrerp_invoice_no,
+                    "qty": qty if qty is not None else 1,
+                    "unit_price": price if price is not None else 0,
+                    "amount": amt if amt is not None else 0,
+                    "product_code": erp_code,
+                    "item_name": str(item_name or ""),
+                }
+            )
     if not rows:
-        sub = fmt_number(history.get('subtotal') or history.get('amount_before_tax'))
-        tot = fmt_number(history.get('total_amount'))
+        sub = fmt_number(history.get("subtotal") or history.get("amount_before_tax"))
+        tot = fmt_number(history.get("total_amount"))
         if sub is None and tot is not None:
             sub = round(tot / 1.07, 2)
         unit = sub or tot or 0
-        rows.append({
-            'invoice_no':   mrerp_invoice_no,
-            'qty':          1,
-            'unit_price':   unit,
-            'amount':       unit,
-            'product_code': None,
-            'item_name':    '',
-        })
+        rows.append(
+            {
+                "invoice_no": mrerp_invoice_no,
+                "qty": 1,
+                "unit_price": unit,
+                "amount": unit,
+                "product_code": None,
+                "item_name": "",
+            }
+        )
     return rows
 
 
@@ -630,9 +655,9 @@ def build_sales_credit_tail_row(history: Dict[str, Any]) -> Dict[str, Any]:
     """v27.8.1.4 · tail · v27.8.1.5 同步 invoice_no 格式"""
     mrerp_invoice_no = derive_mrerp_invoice_no(history)
     return {
-        'invoice_no':     mrerp_invoice_no,
-        'deposit_no':     '',
-        'is_sales_issued': '',
+        "invoice_no": mrerp_invoice_no,
+        "deposit_no": "",
+        "is_sales_issued": "",
     }
 
 
@@ -669,54 +694,54 @@ def validate_history_for_sales_credit(
     (length → existence → enum → date) so error messages line up.
     """
     if not history:
-        return False, 'ERR_NO_HISTORY', []
-    cid = history.get('client_id') or 0
+        return False, "ERR_NO_HISTORY", []
+    cid = history.get("client_id") or 0
     if not cid:
-        return False, 'ERR_NO_CLIENT', []
+        return False, "ERR_NO_CLIENT", []
     customer_code = lookup_customer_code(cid, mappings)
     if not customer_code:
-        return False, 'ERR_NO_CUSTOMER_MAPPING', []
-    if not (history.get('invoice_no') or history.get('invoice_number')):
-        return False, 'ERR_NO_INVOICE_NO', []
-    if not history.get('invoice_date'):
-        return False, 'ERR_NO_INVOICE_DATE', []
+        return False, "ERR_NO_CUSTOMER_MAPPING", []
+    if not (history.get("invoice_no") or history.get("invoice_number")):
+        return False, "ERR_NO_INVOICE_NO", []
+    if not history.get("invoice_date"):
+        return False, "ERR_NO_INVOICE_DATE", []
 
     # Amount: strict mode rejects negative + overflow.
     try:
-        total = fmt_number_strict(history.get('total_amount'))
+        total = fmt_number_strict(history.get("total_amount"))
     except ValueError as e:
         msg = str(e).lower()
-        if 'negative' in msg:
-            return False, 'ERR_NEGATIVE_AMOUNT', []
-        if 'exceeds' in msg or 'missing' in msg:
-            return False, 'ERR_NO_TOTAL_AMOUNT', []
-        return False, 'ERR_NO_TOTAL_AMOUNT', []
+        if "negative" in msg:
+            return False, "ERR_NEGATIVE_AMOUNT", []
+        if "exceeds" in msg or "missing" in msg:
+            return False, "ERR_NO_TOTAL_AMOUNT", []
+        return False, "ERR_NO_TOTAL_AMOUNT", []
     if total <= 0:
-        return False, 'ERR_NO_TOTAL_AMOUNT', []
+        return False, "ERR_NO_TOTAL_AMOUNT", []
 
     # Length pre-flight (P1-A §3.1).
     invoice_no = derive_mrerp_invoice_no(history)
     if len(invoice_no) > MRERP_INVOICE_NO_MAX:
-        return False, 'ERR_INVOICE_NO_TOO_LONG', []
-    bill_no = 'SI' + invoice_no
+        return False, "ERR_INVOICE_NO_TOO_LONG", []
+    bill_no = "SI" + invoice_no
     if len(bill_no) > MRERP_BILL_NO_MAX:
-        return False, 'ERR_BILL_NO_TOO_LONG', []
+        return False, "ERR_BILL_NO_TOO_LONG", []
     if len(customer_code) > MRERP_CUSTOMER_CODE_MAX:
-        return False, 'ERR_CUSTOMER_CODE_TOO_LONG', []
+        return False, "ERR_CUSTOMER_CODE_TOO_LONG", []
     # customer_bill defaults to customer_code; allow override via mapping
     # if a future schema introduces it.
     customer_bill = customer_code
     if len(customer_bill) > MRERP_CUSTOMER_BILL_MAX:
-        return False, 'ERR_CUSTOMER_BILL_TOO_LONG', []
+        return False, "ERR_CUSTOMER_BILL_TOO_LONG", []
 
     # Tax rate enum gate (P1-A §3.2).
     tax_kind = derive_tax_kind(history)
     if tax_kind not in MRERP_VALID_TAX_KINDS_SC:
-        return False, 'ERR_TAX_RATE_INVALID', []
+        return False, "ERR_TAX_RATE_INVALID", []
 
     # Date sanity (P1-A §3.5).
     warnings: List[str] = []
-    inv_date_str = fmt_date(history.get('invoice_date'))
+    inv_date_str = fmt_date(history.get("invoice_date"))
     parsed_inv: Optional[date] = None
     if inv_date_str and len(inv_date_str) >= 10:
         try:
@@ -727,11 +752,11 @@ def validate_history_for_sales_credit(
         today = date.today()
         delta = (parsed_inv - today).days
         if delta > MRERP_DATE_FUTURE_HARD_REJECT_DAYS:
-            return False, 'ERR_DATE_FUTURE', []
+            return False, "ERR_DATE_FUTURE", []
         if delta > MRERP_DATE_FUTURE_WARN_DAYS:
-            warnings.append('WARN_DATE_NEAR_FUTURE')
+            warnings.append("WARN_DATE_NEAR_FUTURE")
         if delta < -MRERP_DATE_PAST_WARN_DAYS:
-            warnings.append('WARN_DATE_TOO_OLD')
+            warnings.append("WARN_DATE_TOO_OLD")
 
     return True, None, warnings
 
@@ -746,15 +771,15 @@ def _collect_sheet_groups(schema: Dict[str, Any]) -> List[Tuple[str, List[Dict[s
       detail → Worksheet 1
       tail   → Worksheet 2
       sheet4 → Worksheet 3
-    
+
     某段为空(None / 空 list)→ 不创建该 sheet。
     返回:[(group_name, columns), ...] · 至少 1 个(否则报错)
     """
     groups: List[Tuple[str, List[Dict[str, Any]]]] = []
-    for key in ('header_columns', 'detail_columns', 'tail_columns', 'sheet4_columns'):
+    for key in ("header_columns", "detail_columns", "tail_columns", "sheet4_columns"):
         cols = schema.get(key)
         if cols:  # 非空 list / None / [] 都跳过
-            group_name = key.replace('_columns', '')
+            group_name = key.replace("_columns", "")
             groups.append((group_name, cols))
     return groups
 
@@ -772,15 +797,15 @@ def _sheet_title(idx: int) -> str:
 def generate_xlsx(
     histories: List[Dict[str, Any]],
     mappings: Dict[str, Any],
-    sheet_kind: str = 'sales_credit',
+    sheet_kind: str = "sales_credit",
 ) -> bytes:
     """
     返回 .xlsx 二进制字节 · 调用方负责发给前端
-    
+
     histories: List of OCR history dicts(1 个文件可多行 · 同 sheet 类型)
     mappings:  {'clients': [...], 'accounts': [...], 'taxes': [...]}(从 db 拿)
     sheet_kind: 9 选 1 · 默认销售-赊销
-    
+
     🔴 铁律 28 修订(v118.27.4.2):
       根据 schema 实际有的 columns 段动态创建 1-4 sheet · 不再硬编码 3 sheet
       命名严格 = `Worksheet` / `Worksheet 1` / `Worksheet 2` / `Worksheet 3`(空格分隔)
@@ -791,12 +816,12 @@ def generate_xlsx(
     schema = MRERP_SHEET_SCHEMAS.get(sheet_kind)
     if not schema:
         raise ValueError(f"unknown sheet_kind: {sheet_kind}")
-    if schema.get('stub') and not schema.get('header_columns'):
+    if schema.get("stub") and not schema.get("header_columns"):
         raise RuntimeError(f"sheet_kind={sheet_kind} 物料未到 · 字段未填")
 
     # sales_credit 走 Korn 真样本克隆路径(100% PhpSpreadsheet 兼容)
     # 详见 docs/integrations/mrerp-known-facts.md §6 xlsx 字节级冷知识
-    if sheet_kind == 'sales_credit':
+    if sheet_kind == "sales_credit":
         try:
             return _generate_xlsx_sales_credit_korn_clone(histories, mappings)
         except FileNotFoundError as e:
@@ -822,44 +847,44 @@ def generate_xlsx(
             ws = wb.create_sheet(title)
         # 标题行
         for i, col in enumerate(cols, start=1):
-            c = ws.cell(row=1, column=i, value=col['label'])
+            c = ws.cell(row=1, column=i, value=col["label"])
             c.font = bold
         sheets.append((group_name, ws, cols))
 
     # v27.8.1.11 · 空 cell 直接返 None · 让 openpyxl skip cell
     # 后处理时再把缺的 cell 补成完全空 cell `<c r="X#"/>`(对齐 Korn 风格)
     def _safe_val(val, col):
-        if val is None or val == '':
-            val = col.get('default', None)
-        if val is None or val == '':
+        if val is None or val == "":
+            val = col.get("default", None)
+        if val is None or val == "":
             return None  # ← skip cell · 后处理插完全空 cell
         return val
 
     for group_name, ws, cols in sheets:
-        if sheet_kind == 'sales_credit' and group_name == 'header':
+        if sheet_kind == "sales_credit" and group_name == "header":
             for row_idx, history in enumerate(histories, start=2):
                 row_data = build_sales_credit_row(history, mappings)
                 for col_idx, col in enumerate(cols, start=1):
-                    val = _safe_val(row_data.get(col['key']), col)
+                    val = _safe_val(row_data.get(col["key"]), col)
                     if val is None:
-                        continue   # v27.8.1.11 · 完全 skip · 后处理补完全空 cell
+                        continue  # v27.8.1.11 · 完全 skip · 后处理补完全空 cell
                     cell = ws.cell(row=row_idx, column=col_idx, value=val)
-                    if col['type'] in ('str', 'date'):
-                        cell.number_format = '@'
-        elif sheet_kind == 'sales_credit' and group_name == 'detail':
+                    if col["type"] in ("str", "date"):
+                        cell.number_format = "@"
+        elif sheet_kind == "sales_credit" and group_name == "detail":
             cur_row = 2
             for history in histories:
                 detail_rows = build_sales_credit_detail_rows(history, mappings)
                 for row_data in detail_rows:
                     for col_idx, col in enumerate(cols, start=1):
-                        val = _safe_val(row_data.get(col['key']), col)
+                        val = _safe_val(row_data.get(col["key"]), col)
                         if val is None:
                             continue
                         cell = ws.cell(row=cur_row, column=col_idx, value=val)
-                        if col['type'] in ('str', 'date'):
-                            cell.number_format = '@'
+                        if col["type"] in ("str", "date"):
+                            cell.number_format = "@"
                     cur_row += 1
-        elif sheet_kind == 'sales_credit' and group_name == 'tail':
+        elif sheet_kind == "sales_credit" and group_name == "tail":
             # v27.8.1.11 · Korn 真样本 tail sheet 只 header · 没 data row
             # MR.ERP 期望 tail 是「条件可选」(押金/已开销售单)· 没数据就别写
             pass
@@ -877,7 +902,7 @@ def generate_xlsx(
     # 2. 缺失 cell 补「完全空 cell <c r='X#'/>」(让 row 显式声明每列存在)
     # 3. row 加 spans 属性(跟 Korn 真样本对齐)
     # 4. sheet1 末尾 col 19 加完全空 cell(让 dim=A1:S2)
-    if sheet_kind == 'sales_credit':
+    if sheet_kind == "sales_credit":
         try:
             sheet_col_map = {}
             # idx 对应 sheets 列表 · sheet1=header sheet2=detail sheet3=tail
@@ -901,12 +926,13 @@ def _convert_inline_to_shared_strings(xlsx_bytes: bytes, sheet_col_map=None) -> 
 
     sheet_col_map: {'sheet1': 18, 'sheet2': 8, 'sheet3': 3} · 各 sheet schema 列数
     """
-    import zipfile, re as _re
+    import zipfile
+    import re as _re
     from collections import OrderedDict
 
     src_buf = io.BytesIO(xlsx_bytes)
     files = {}
-    with zipfile.ZipFile(src_buf, 'r') as src_zip:
+    with zipfile.ZipFile(src_buf, "r") as src_zip:
         for name in src_zip.namelist():
             files[name] = src_zip.read(name)
 
@@ -918,13 +944,15 @@ def _convert_inline_to_shared_strings(xlsx_bytes: bytes, sheet_col_map=None) -> 
         return shared[text]
 
     def _decode_xml_entities(s):
-        s = (s.replace('&amp;', '&')
-              .replace('&lt;', '<')
-              .replace('&gt;', '>')
-              .replace('&quot;', '"')
-              .replace('&apos;', "'"))
-        s = _re.sub(r'&#(\d+);', lambda m: chr(int(m.group(1))), s)
-        s = _re.sub(r'&#x([0-9a-fA-F]+);', lambda m: chr(int(m.group(1), 16)), s)
+        s = (
+            s.replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", '"')
+            .replace("&apos;", "'")
+        )
+        s = _re.sub(r"&#(\d+);", lambda m: chr(int(m.group(1))), s)
+        s = _re.sub(r"&#x([0-9a-fA-F]+);", lambda m: chr(int(m.group(1), 16)), s)
         return s
 
     inline_full_re = _re.compile(
@@ -946,13 +974,14 @@ def _convert_inline_to_shared_strings(xlsx_bytes: bytes, sheet_col_map=None) -> 
     def _replace_empty(m):
         pre, post = m.group(1), m.group(2)
         # v27.8.1.11 · 直接输出完全空 cell(无 t 无 v · 跟 Korn 风格一致)
-        return f'<c{pre}{post}/>'
+        return f"<c{pre}{post}/>"
 
     # 去掉数值 cell 的 t="n" 属性(Korn 不带 t)
     numeric_t_re = _re.compile(r'<c([^>]*?)\st="n"([^>]*?)>(<v>[^<]*</v>)</c>')
+
     def _strip_numeric_t(m):
         pre, post, vtag = m.group(1), m.group(2), m.group(3)
-        return f'<c{pre}{post}>{vtag}</c>'
+        return f"<c{pre}{post}>{vtag}</c>"
 
     def _col_letter(n):
         s = ""
@@ -972,7 +1001,7 @@ def _convert_inline_to_shared_strings(xlsx_bytes: bytes, sheet_col_map=None) -> 
             return xml
 
         # sheet1 末尾 +1 占位 cell(对齐 Korn dim=A1:S2)
-        if sheet_name == 'sheet1':
+        if sheet_name == "sheet1":
             col_target_total = col_target + 1
         else:
             col_target_total = col_target
@@ -994,12 +1023,12 @@ def _convert_inline_to_shared_strings(xlsx_bytes: bytes, sheet_col_map=None) -> 
                 if letter not in existing_cols:
                     missing.append(f'<c r="{letter}{row_num}"/>')
             if missing:
-                row_inner = row_inner + ''.join(missing)
-            if 'spans=' not in row_attr:
+                row_inner = row_inner + "".join(missing)
+            if "spans=" not in row_attr:
                 row_attr = row_attr + f' spans="1:{col_target_total}"'
-            return f'<row{row_attr}>{row_inner}</row>'
+            return f"<row{row_attr}>{row_inner}</row>"
 
-        xml = _re.sub(r'<row([^>]*)>(.*?)</row>', _process_row, xml, flags=_re.DOTALL)
+        xml = _re.sub(r"<row([^>]*)>(.*?)</row>", _process_row, xml, flags=_re.DOTALL)
 
         # 阶段 3:重算 dimension
         new_dim_letter = _col_letter(col_target_total)
@@ -1008,89 +1037,95 @@ def _convert_inline_to_shared_strings(xlsx_bytes: bytes, sheet_col_map=None) -> 
             rn = int(rm.group(1))
             if rn > max_row:
                 max_row = rn
-        new_dim = f'A1:{new_dim_letter}{max_row}'
+        new_dim = f"A1:{new_dim_letter}{max_row}"
         xml = _re.sub(r'<dimension ref="[^"]+"', f'<dimension ref="{new_dim}"', xml)
         return xml
 
     for name in list(files.keys()):
-        if name.startswith('xl/worksheets/sheet') and name.endswith('.xml'):
-            xml = files[name].decode('utf-8')
-            sheet_name = name.split('/')[-1].replace('.xml', '')
+        if name.startswith("xl/worksheets/sheet") and name.endswith(".xml"):
+            xml = files[name].decode("utf-8")
+            sheet_name = name.split("/")[-1].replace(".xml", "")
             xml = _process_sheet_xml(xml, sheet_name)
-            files[name] = xml.encode('utf-8')
+            files[name] = xml.encode("utf-8")
 
     if shared:
+
         def _xml_escape(s):
-            return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-        parts = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-                 f'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
-                 f'count="{len(shared)}" uniqueCount="{len(shared)}">']
+            return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        parts = [
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+            f'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            f'count="{len(shared)}" uniqueCount="{len(shared)}">',
+        ]
         for text in shared:
             parts.append(f'<si><t xml:space="preserve">{_xml_escape(text)}</t></si>')
-        parts.append('</sst>')
-        files['xl/sharedStrings.xml'] = ''.join(parts).encode('utf-8')
+        parts.append("</sst>")
+        files["xl/sharedStrings.xml"] = "".join(parts).encode("utf-8")
 
-        ct = files['[Content_Types].xml'].decode('utf-8')
-        if 'sharedStrings.xml' not in ct:
+        ct = files["[Content_Types].xml"].decode("utf-8")
+        if "sharedStrings.xml" not in ct:
             ct = ct.replace(
-                '</Types>',
+                "</Types>",
                 '<Override PartName="/xl/sharedStrings.xml" '
                 'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'
-                '</Types>'
+                "</Types>",
             )
-            files['[Content_Types].xml'] = ct.encode('utf-8')
+            files["[Content_Types].xml"] = ct.encode("utf-8")
 
-        rels_path = 'xl/_rels/workbook.xml.rels'
+        rels_path = "xl/_rels/workbook.xml.rels"
         if rels_path in files:
-            rels = files[rels_path].decode('utf-8')
-            if 'sharedStrings.xml' not in rels:
+            rels = files[rels_path].decode("utf-8")
+            if "sharedStrings.xml" not in rels:
                 rid_nums = [int(m.group(1)) for m in _re.finditer(r'Id="rId(\d+)"', rels)]
                 new_rid = (max(rid_nums) if rid_nums else 0) + 1
                 rels = rels.replace(
-                    '</Relationships>',
+                    "</Relationships>",
                     f'<Relationship Id="rId{new_rid}" '
                     f'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" '
-                    f'Target="sharedStrings.xml"/></Relationships>'
+                    f'Target="sharedStrings.xml"/></Relationships>',
                 )
-                files[rels_path] = rels.encode('utf-8')
+                files[rels_path] = rels.encode("utf-8")
 
     out_buf = io.BytesIO()
-    with zipfile.ZipFile(out_buf, 'w', zipfile.ZIP_DEFLATED) as out_zip:
+    with zipfile.ZipFile(out_buf, "w", zipfile.ZIP_DEFLATED) as out_zip:
         for name, data in files.items():
             out_zip.writestr(name, data)
     return out_buf.getvalue()
 
 
-def _generate_xlsx_sales_credit_korn_clone(histories: List[Dict[str, Any]],
-                                            mappings: Dict[str, Any]) -> bytes:
+def _generate_xlsx_sales_credit_korn_clone(
+    histories: List[Dict[str, Any]], mappings: Dict[str, Any]
+) -> bytes:
     """v27.8.1.12 · 用 Korn 真样本作模板 · 克隆方式生成 sales_credit xlsx
-    
+
     根因:openpyxl 输出 workbook.xml / [Content_Types].xml 跟 PhpSpreadsheet 期望差异大
     解法:克隆 Korn 真样本(已验证可 import) · 只重写 sharedStrings + sheetData
     保留 metadata:workbook.xml / styles.xml / theme.xml / [Content_Types].xml 等全部不动
     """
-    import zipfile, os, re as _re
+    import zipfile
+    import os
+    import re as _re
     from collections import OrderedDict
 
     template_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        'test_data_mrerp_sample_SC.xlsx'
+        os.path.dirname(os.path.abspath(__file__)), "test_data_mrerp_sample_SC.xlsx"
     )
     if not os.path.exists(template_path):
         raise FileNotFoundError(f"Korn template missing: {template_path}")
 
-    with open(template_path, 'rb') as f:
+    with open(template_path, "rb") as f:
         template_bytes = f.read()
 
     files: Dict[str, bytes] = {}
-    with zipfile.ZipFile(io.BytesIO(template_bytes), 'r') as zf:
+    with zipfile.ZipFile(io.BytesIO(template_bytes), "r") as zf:
         for name in zf.namelist():
             files[name] = zf.read(name)
 
     shared: "OrderedDict[str, int]" = OrderedDict()
 
     def _get_idx(text: str) -> int:
-        text = str(text) if text is not None else ''
+        text = str(text) if text is not None else ""
         if text not in shared:
             shared[text] = len(shared)
         return shared[text]
@@ -1103,18 +1138,32 @@ def _generate_xlsx_sales_credit_korn_clone(histories: List[Dict[str, Any]],
         return s
 
     def _xml_escape(s: str) -> str:
-        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     # ─── Sheet 1 (header) ──────────────────────────────────────────
-    HEADERS_1 = ['เลขที่', 'วันที่', 'อัตราภาษี', 'สาขา', 'แผนก', 'งาน',
-                 'พนักงานขาย', 'กำหนดส่งสินค้า', 'รหัสลูกค้า', 'รหัสลูกค้า (บิล)',
-                 'เลขที่บิล', 'วันที่', 'พื้นที่การขาย', 'ประเภทขนส่ง',
-                 'หักส่วนลด', 'หมายเหตุ 1', 'หมายเหตุ 2', 'หมายเหตุ 3']
+    HEADERS_1 = [
+        "เลขที่",
+        "วันที่",
+        "อัตราภาษี",
+        "สาขา",
+        "แผนก",
+        "งาน",
+        "พนักงานขาย",
+        "กำหนดส่งสินค้า",
+        "รหัสลูกค้า",
+        "รหัสลูกค้า (บิล)",
+        "เลขที่บิล",
+        "วันที่",
+        "พื้นที่การขาย",
+        "ประเภทขนส่ง",
+        "หักส่วนลด",
+        "หมายเหตุ 1",
+        "หมายเหตุ 2",
+        "หมายเหตุ 3",
+    ]
     row1_cells = []
     for i, lbl in enumerate(HEADERS_1, 1):
-        row1_cells.append(
-            f'<c r="{_col_letter(i)}1" s="2" t="s"><v>{_get_idx(lbl)}</v></c>'
-        )
+        row1_cells.append(f'<c r="{_col_letter(i)}1" s="2" t="s"><v>{_get_idx(lbl)}</v></c>')
     rows_xml = [
         f'<row r="1" spans="1:19" ht="23.1" customHeight="1" '
         f'x14ac:dyDescent="0.2">{"".join(row1_cells)}</row>'
@@ -1122,20 +1171,30 @@ def _generate_xlsx_sales_credit_korn_clone(histories: List[Dict[str, Any]],
 
     for ridx, history in enumerate(histories, start=2):
         row_data = build_sales_credit_row(history, mappings)
-        invoice_no = row_data.get('invoice_no', '')
-        invoice_date = row_data.get('invoice_date', '')
-        bill_no = row_data.get('bill_no', '')
-        cust_code = row_data.get('customer_code', '')
+        invoice_no = row_data.get("invoice_no", "")
+        invoice_date = row_data.get("invoice_date", "")
+        bill_no = row_data.get("bill_no", "")
+        cust_code = row_data.get("customer_code", "")
         STR_VALUES = [
-            invoice_no, invoice_date, '7 (แยก)', '00000', 'BOI1', '00002',
-            'กร ทดสอบ', invoice_date, cust_code, cust_code, bill_no,
-            invoice_date, 'สุพรรณบุรี', 'ขนส่งโดยบริษัท',
+            invoice_no,
+            invoice_date,
+            "7 (แยก)",
+            "00000",
+            "BOI1",
+            "00002",
+            "กร ทดสอบ",
+            invoice_date,
+            cust_code,
+            cust_code,
+            bill_no,
+            invoice_date,
+            "สุพรรณบุรี",
+            "ขนส่งโดยบริษัท",
         ]
         cells = []
         for i, val in enumerate(STR_VALUES, 1):
             cells.append(
-                f'<c r="{_col_letter(i)}{ridx}" s="3" t="s">'
-                f'<v>{_get_idx(val)}</v></c>'
+                f'<c r="{_col_letter(i)}{ridx}" s="3" t="s">' f"<v>{_get_idx(val)}</v></c>"
             )
         # 第 15 列(O)= 折扣 0(数值 · 不带 t)
         cells.append(f'<c r="O{ridx}" s="5"><v>0</v></c>')
@@ -1149,22 +1208,18 @@ def _generate_xlsx_sales_credit_korn_clone(histories: List[Dict[str, Any]],
             f'x14ac:dyDescent="0.2">{"".join(cells)}</row>'
         )
 
-    new_sheet_data = '<sheetData>' + ''.join(rows_xml) + '</sheetData>'
-    s1 = files['xl/worksheets/sheet1.xml'].decode('utf-8')
-    s1 = _re.sub(r'<sheetData>.+?</sheetData>', new_sheet_data, s1, flags=_re.DOTALL)
-    s1 = _re.sub(r'<dimension ref="[^"]+"',
-                 f'<dimension ref="A1:S{1 + len(histories)}"', s1)
-    files['xl/worksheets/sheet1.xml'] = s1.encode('utf-8')
+    new_sheet_data = "<sheetData>" + "".join(rows_xml) + "</sheetData>"
+    s1 = files["xl/worksheets/sheet1.xml"].decode("utf-8")
+    s1 = _re.sub(r"<sheetData>.+?</sheetData>", new_sheet_data, s1, flags=_re.DOTALL)
+    s1 = _re.sub(r'<dimension ref="[^"]+"', f'<dimension ref="A1:S{1 + len(histories)}"', s1)
+    files["xl/worksheets/sheet1.xml"] = s1.encode("utf-8")
 
     # ─── Sheet 2 (detail) ──────────────────────────────────────────
-    HEADERS_2 = ['เลขที่', 'รหัสสินค้า', 'แผนก', 'งาน', 'คลัง',
-                 'จำนวน', 'ราคา/หน่วย', 'จำนวนเงิน']
+    HEADERS_2 = ["เลขที่", "รหัสสินค้า", "แผนก", "งาน", "คลัง", "จำนวน", "ราคา/หน่วย", "จำนวนเงิน"]
     rows2 = []
     h_cells = []
     for i, lbl in enumerate(HEADERS_2, 1):
-        h_cells.append(
-            f'<c r="{_col_letter(i)}1" s="2" t="s"><v>{_get_idx(lbl)}</v></c>'
-        )
+        h_cells.append(f'<c r="{_col_letter(i)}1" s="2" t="s"><v>{_get_idx(lbl)}</v></c>')
     rows2.append(
         f'<row r="1" spans="1:8" ht="23.1" customHeight="1" '
         f'x14ac:dyDescent="0.2">{"".join(h_cells)}</row>'
@@ -1176,10 +1231,10 @@ def _generate_xlsx_sales_credit_korn_clone(histories: List[Dict[str, Any]],
         invoice_no = derive_mrerp_invoice_no(history)
         detail_rows = build_sales_credit_detail_rows(history, mappings)
         for row_data in detail_rows:
-            qty = row_data.get('qty', 0) or 0
-            unit_price = row_data.get('unit_price', 0) or 0
-            amount = row_data.get('amount', 0) or 0
-            product_code = row_data.get('product_code') or '123'
+            qty = row_data.get("qty", 0) or 0
+            unit_price = row_data.get("unit_price", 0) or 0
+            amount = row_data.get("amount", 0) or 0
+            product_code = row_data.get("product_code") or "123"
             cells = [
                 f'<c r="A{cur_row}" s="3" t="s"><v>{_get_idx(invoice_no)}</v></c>',
                 f'<c r="B{cur_row}" s="3" t="s"><v>{_get_idx(product_code)}</v></c>',
@@ -1201,42 +1256,41 @@ def _generate_xlsx_sales_credit_korn_clone(histories: List[Dict[str, Any]],
         # 至少留 header · 否则 MR.ERP 可能拒
         total_detail_rows = 0  # row 1 only
 
-    new_sheet2_data = '<sheetData>' + ''.join(rows2) + '</sheetData>'
-    s2 = files['xl/worksheets/sheet2.xml'].decode('utf-8')
-    s2 = _re.sub(r'<sheetData>.+?</sheetData>', new_sheet2_data, s2, flags=_re.DOTALL)
+    new_sheet2_data = "<sheetData>" + "".join(rows2) + "</sheetData>"
+    s2 = files["xl/worksheets/sheet2.xml"].decode("utf-8")
+    s2 = _re.sub(r"<sheetData>.+?</sheetData>", new_sheet2_data, s2, flags=_re.DOTALL)
     s2_max_row = 1 + total_detail_rows
-    s2 = _re.sub(r'<dimension ref="[^"]+"',
-                 f'<dimension ref="A1:H{max(s2_max_row, 1)}"', s2)
-    files['xl/worksheets/sheet2.xml'] = s2.encode('utf-8')
+    s2 = _re.sub(r'<dimension ref="[^"]+"', f'<dimension ref="A1:H{max(s2_max_row, 1)}"', s2)
+    files["xl/worksheets/sheet2.xml"] = s2.encode("utf-8")
 
     # ─── Sheet 3 (tail) · 只 header(跟 Korn 真样本完全一致) ──────
-    HEADERS_3 = ['เลขที่', 'เลขที่เงินมัดจำ', 'ออกใบขาย']
+    HEADERS_3 = ["เลขที่", "เลขที่เงินมัดจำ", "ออกใบขาย"]
     h3_cells = []
     for i, lbl in enumerate(HEADERS_3, 1):
-        h3_cells.append(
-            f'<c r="{_col_letter(i)}1" s="2" t="s"><v>{_get_idx(lbl)}</v></c>'
-        )
+        h3_cells.append(f'<c r="{_col_letter(i)}1" s="2" t="s"><v>{_get_idx(lbl)}</v></c>')
     new_sheet3_data = (
         f'<sheetData><row r="1" spans="1:3" ht="23.1" customHeight="1" '
         f'x14ac:dyDescent="0.2">{"".join(h3_cells)}</row></sheetData>'
     )
-    s3 = files['xl/worksheets/sheet3.xml'].decode('utf-8')
-    s3 = _re.sub(r'<sheetData>.+?</sheetData>', new_sheet3_data, s3, flags=_re.DOTALL)
+    s3 = files["xl/worksheets/sheet3.xml"].decode("utf-8")
+    s3 = _re.sub(r"<sheetData>.+?</sheetData>", new_sheet3_data, s3, flags=_re.DOTALL)
     s3 = _re.sub(r'<dimension ref="[^"]+"', '<dimension ref="A1:C1"', s3)
-    files['xl/worksheets/sheet3.xml'] = s3.encode('utf-8')
+    files["xl/worksheets/sheet3.xml"] = s3.encode("utf-8")
 
     # ─── 重写 sharedStrings.xml ────────────────────────────────────
-    parts = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n',
-             f'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
-             f'count="{len(shared)}" uniqueCount="{len(shared)}">']
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n',
+        f'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        f'count="{len(shared)}" uniqueCount="{len(shared)}">',
+    ]
     for text in shared:
         parts.append(f'<si><t xml:space="preserve">{_xml_escape(text)}</t></si>')
-    parts.append('</sst>')
-    files['xl/sharedStrings.xml'] = ''.join(parts).encode('utf-8')
+    parts.append("</sst>")
+    files["xl/sharedStrings.xml"] = "".join(parts).encode("utf-8")
 
     # ─── 重新打包(保留 Korn 所有其他文件不动)──────────────────
     out_buf = io.BytesIO()
-    with zipfile.ZipFile(out_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(out_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for name, data in files.items():
             zf.writestr(name, data)
     return out_buf.getvalue()
@@ -1250,7 +1304,7 @@ def _format_num(n):
             return str(int(f))
         return repr(f)
     except (ValueError, TypeError):
-        return '0'
+        return "0"
 
 
 def make_filename(sheet_kind: str, history_id: str) -> str:
@@ -1259,7 +1313,7 @@ def make_filename(sheet_kind: str, history_id: str) -> str:
     例:Pearnly_MRERP_sales_credit_20260510_a1b2c3.xlsx
     """
     schema = MRERP_SHEET_SCHEMAS.get(sheet_kind, {})
-    is_stub = bool(schema.get('stub'))
+    is_stub = bool(schema.get("stub"))
     today = datetime.utcnow().strftime("%Y%m%d")
     sid = (history_id or "")[:8]
     suffix = "-DRAFT" if is_stub else ""

@@ -100,7 +100,8 @@ def try_extract(
     except Exception as e:
         logger.info(
             "text_path: pypdf cannot parse PDF — fallback to Vision · %s: %s",
-            type(e).__name__, str(e)[:100],
+            type(e).__name__,
+            str(e)[:100],
         )
         return None
 
@@ -123,14 +124,17 @@ def try_extract(
     if avg < min_text_per_page:
         logger.info(
             "text_path: avg %d chars/page < %d threshold — fallback to Vision",
-            int(avg), min_text_per_page,
+            int(avg),
+            min_text_per_page,
         )
         return None
 
     elapsed_ms = int((time.time() - t0) * 1000)
     logger.info(
         "text_path: HIT · %d page(s) · avg %d chars/page · %d ms",
-        len(page_texts), int(avg), elapsed_ms,
+        len(page_texts),
+        int(avg),
+        elapsed_ms,
     )
 
     pages = [

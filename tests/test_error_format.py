@@ -46,11 +46,11 @@ class ShortErrorTests(unittest.TestCase):
         self.assertLessEqual(len(out), 160)
         # Should still tell the user *something* (count) so we don't return
         # an empty/cryptic string.
-        self.assertTrue(any(ch.isdigit() for ch in out),
-                        f"expected a field count in: {out!r}")
+        self.assertTrue(any(ch.isdigit() for ch in out), f"expected a field count in: {out!r}")
 
     def test_value_error_with_long_message_truncates(self):
         from services.ocr.error_format import short_error
+
         long_msg = "layer2: page 1: layer2 " + ("x" * 400)
         out = short_error(ValueError(long_msg))
         self.assertNotIn("\n", out)
@@ -58,9 +58,9 @@ class ShortErrorTests(unittest.TestCase):
 
     def test_strips_pydantic_doc_urls_from_wrapped_text(self):
         from services.ocr.error_format import short_error
+
         wrapped = ValueError(
-            "field_x: bad value "
-            "https://errors.pydantic.dev/2.13/v/string_type extra trailing"
+            "field_x: bad value " "https://errors.pydantic.dev/2.13/v/string_type extra trailing"
         )
         out = short_error(wrapped)
         self.assertNotIn("pydantic.dev", out)
@@ -68,6 +68,7 @@ class ShortErrorTests(unittest.TestCase):
 
     def test_handles_empty_exception(self):
         from services.ocr.error_format import short_error
+
         out = short_error(RuntimeError(""))
         self.assertTrue(out)  # falls back to class name
 

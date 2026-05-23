@@ -22,6 +22,7 @@ Pearnly · v118.20.4.3 · PDF 文本预筛(完整字段抽取版)
   · 行级匹配公司名(`บริษัท ...` 开头 · 排除「ในนาม」签名段)
   · items 用「数量 单位 单价 总价」格式抓 · 描述从前行回看
 """
+
 import io
 import re
 import time
@@ -42,52 +43,49 @@ MAX_ITEMS = 50
 # 正则集合
 # ============================================================
 RE_INVOICE_NO = re.compile(
-    r'(?:Invoice\s*(?:No\.?|Number|#)|Tax\s*Invoice\s*No\.?|Inv\.?\s*No\.?|'
-    r'เลขที่(?:ใบกำกับ)?|เลขที่|发票号码?|発票号码|請求書番号)'
-    r'\s*[:.：]?\s*([A-Z0-9][A-Z0-9\-/]{2,})',
-    re.IGNORECASE
+    r"(?:Invoice\s*(?:No\.?|Number|#)|Tax\s*Invoice\s*No\.?|Inv\.?\s*No\.?|"
+    r"เลขที่(?:ใบกำกับ)?|เลขที่|发票号码?|発票号码|請求書番号)"
+    r"\s*[:.：]?\s*([A-Z0-9][A-Z0-9\-/]{2,})",
+    re.IGNORECASE,
 )
-RE_DATE_ISO = re.compile(r'\b(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})\b')
-RE_DATE_DMY = re.compile(r'\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b')
-RE_TAX_ID_TH = re.compile(r'\b(\d{13})\b')
-RE_TAX_ID_LABELED = re.compile(
-    r'เลข(?:ประจำำ?าตัว|ประจำตัว|)?ผู้เสียภาษี[\s:]*(\d{13})'
-)
+RE_DATE_ISO = re.compile(r"\b(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})\b")
+RE_DATE_DMY = re.compile(r"\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b")
+RE_TAX_ID_TH = re.compile(r"\b(\d{13})\b")
+RE_TAX_ID_LABELED = re.compile(r"เลข(?:ประจำำ?าตัว|ประจำตัว|)?ผู้เสียภาษี[\s:]*(\d{13})")
 
 RE_TOTAL = re.compile(
-    r'(?:\bGrand\s*Total|\bTotal\s*Amount|\bTotal(?!\s*VAT)|'
-    r'จำ?านวนเงินรวม(?:ทั้งสิ้น|ทัง้สิน้)?|รวมทั้งสิ้น|รวมทัง้สิน้|'
-    r'总金额|合计金额|合計金額|総額)'
-    r'\s*[:.：฿$¥]?\s*([\d,]+\.\d{2})',
-    re.IGNORECASE
+    r"(?:\bGrand\s*Total|\bTotal\s*Amount|\bTotal(?!\s*VAT)|"
+    r"จำ?านวนเงินรวม(?:ทั้งสิ้น|ทัง้สิน้)?|รวมทั้งสิ้น|รวมทัง้สิน้|"
+    r"总金额|合计金额|合計金額|総額)"
+    r"\s*[:.：฿$¥]?\s*([\d,]+\.\d{2})",
+    re.IGNORECASE,
 )
 RE_SUBTOTAL = re.compile(
-    r'(?:Sub\s*[-]?\s*Total|Subtotal|Net\s*(?:Amount|Total)|Amount\s*before\s*VAT|'
-    r'รวมเป็นเงิน|ยอดก่อน(?:\s*VAT)?|มูลค่าก่อนภาษี|未税(?:金额)?|税抜)'
-    r'\s*[:.：฿$¥]?\s*([\d,]+\.\d{2})',
-    re.IGNORECASE
+    r"(?:Sub\s*[-]?\s*Total|Subtotal|Net\s*(?:Amount|Total)|Amount\s*before\s*VAT|"
+    r"รวมเป็นเงิน|ยอดก่อน(?:\s*VAT)?|มูลค่าก่อนภาษี|未税(?:金额)?|税抜)"
+    r"\s*[:.：฿$¥]?\s*([\d,]+\.\d{2})",
+    re.IGNORECASE,
 )
 RE_VAT = re.compile(
-    r'(?:VAT|Tax\s*Amount|ภาษีมูลค่าเพิ่ม|ภาษีมูลค่า|税额|消費税(?:額)?)'
-    r'(?:\s+\d+\s*%?)?'
-    r'\s*[:.：฿$¥]?\s*([\d,]+\.\d{2})',
-    re.IGNORECASE
+    r"(?:VAT|Tax\s*Amount|ภาษีมูลค่าเพิ่ม|ภาษีมูลค่า|税额|消費税(?:額)?)"
+    r"(?:\s+\d+\s*%?)?"
+    r"\s*[:.：฿$¥]?\s*([\d,]+\.\d{2})",
+    re.IGNORECASE,
 )
 
 RE_ITEM_PRICE_LINE = re.compile(
-    r'^\s*(\d+)\s+(\S{1,12})\s+([\d,]+\.\d{2,3})\s+([\d,]+\.\d{2,3})\s*$'
+    r"^\s*(\d+)\s+(\S{1,12})\s+([\d,]+\.\d{2,3})\s+([\d,]+\.\d{2,3})\s*$"
 )
 # 单行完整 items:行号 描述 数量 单位 单价 总价(常见于服务类发票 1-2 行 items)
 RE_ITEM_INLINE = re.compile(
-    r'^\s*\d+\s+(.{2,80}?)\s+(\d+)\s+(\S{1,12})\s+([\d,]+\.\d{2,3})\s+([\d,]+\.\d{2,3})\s*$'
+    r"^\s*\d+\s+(.{2,80}?)\s+(\d+)\s+(\S{1,12})\s+([\d,]+\.\d{2,3})\s+([\d,]+\.\d{2,3})\s*$"
 )
-RE_ITEM_DESC_LINE = re.compile(
-    r'^\s*(\d+)\s+([A-Za-zก-๙][^\n]{2,200})$'
-)
+RE_ITEM_DESC_LINE = re.compile(r"^\s*(\d+)\s+([A-Za-zก-๙][^\n]{2,200})$")
 
 
 def _parse_money(s: Optional[str]) -> Optional[float]:
-    if not s: return None
+    if not s:
+        return None
     try:
         v = float(str(s).replace(",", "").strip())
         # pypdf 字符顺序 bug 可能让 .80 变成 .803 · 强制 round 到 2 位
@@ -103,8 +101,10 @@ def _extract_basic_fields(text: str) -> Dict[str, Any]:
     candidates = []
     for m in RE_INVOICE_NO.finditer(text):
         v = m.group(1).strip()
-        if re.match(r'^\d+/\d{1,3}$', v): continue
-        if v.isdigit() and len(v) < 6: continue
+        if re.match(r"^\d+/\d{1,3}$", v):
+            continue
+        if v.isdigit() and len(v) < 6:
+            continue
         candidates.append(v)
     if candidates:
         with_alpha = [v for v in candidates if any(c.isalpha() for c in v)]
@@ -115,11 +115,14 @@ def _extract_basic_fields(text: str) -> Dict[str, Any]:
         fields["date"] = m.group(1).strip()
 
     m = RE_TOTAL.search(text)
-    if m: fields["total_amount"] = m.group(1).replace(",", "")
+    if m:
+        fields["total_amount"] = m.group(1).replace(",", "")
     m = RE_SUBTOTAL.search(text)
-    if m: fields["subtotal"] = m.group(1).replace(",", "")
+    if m:
+        fields["subtotal"] = m.group(1).replace(",", "")
     m = RE_VAT.search(text)
-    if m: fields["vat"] = m.group(1).replace(",", "")
+    if m:
+        fields["vat"] = m.group(1).replace(",", "")
 
     return fields
 
@@ -133,7 +136,7 @@ def _extract_seller(text: str):
         tax_pos = tm.start()
         tax_id = tm.group(1)
     else:
-        m = re.search(r'\b(\d{13})\b', text)
+        m = re.search(r"\b(\d{13})\b", text)
         if not m:
             return None
         tax_pos = m.start()
@@ -144,10 +147,14 @@ def _extract_seller(text: str):
     company_idx = -1
     for li, line in enumerate(lines):
         stripped = line.strip()
-        if not stripped: continue
-        if not stripped.startswith("บริษัท"): continue
-        if "ในนาม" in stripped: continue
-        if stripped.count("บริษัท") > 1: continue
+        if not stripped:
+            continue
+        if not stripped.startswith("บริษัท"):
+            continue
+        if "ในนาม" in stripped:
+            continue
+        if stripped.count("บริษัท") > 1:
+            continue
         company_name = stripped[:MAX_NAME_LEN]
         company_idx = li
         # 不 break · 取最后一个匹配(最靠近 tax_id · 最准确)
@@ -156,15 +163,18 @@ def _extract_seller(text: str):
         return {"name": None, "address": None, "tax_id": tax_id}
 
     addr_lines = []
-    for line in lines[company_idx + 1:]:
+    for line in lines[company_idx + 1 :]:
         stripped = line.strip()
-        if not stripped: continue
-        if re.match(r'^(โทร|Tel|Fax|www\.|http|email|@)', stripped, re.I): continue
+        if not stripped:
+            continue
+        if re.match(r"^(โทร|Tel|Fax|www\.|http|email|@)", stripped, re.I):
+            continue
         # 遇到「ลูกค้า」标志 · seller 块到此结束
         if stripped == "ลูกค้า" or stripped.startswith("ลูกค้า"):
             break
         addr_lines.append(stripped)
-        if len(addr_lines) >= 5: break
+        if len(addr_lines) >= 5:
+            break
 
     return {
         "name": company_name,
@@ -178,21 +188,22 @@ def _extract_buyer(text: str):
     用 'ลูกค้า\\n' 标记定位 buyer 块 · 第 1 行 = name(任意格式:公司/店家/个人/姓名)
     后续行 = address · 直到 เลขประจำตัว <13位> 收尾
     """
-    bm = re.search(r'\bลูกค้า\s*\n', text)
+    bm = re.search(r"\bลูกค้า\s*\n", text)
     if not bm:
         return None
-    after = text[bm.end():bm.end() + 800]
+    after = text[bm.end() : bm.end() + 800]
     lines = after.split("\n")
     name = None
     addr_lines = []
     tax_id = None
     for line in lines:
         line = line.strip()
-        if not line: continue
+        if not line:
+            continue
         # 遇到税号行 → buyer 块结束
         # v118.32.5.5.8 · BAKELAB 兼容:pypdf 抽泰文字符顺序乱 · 关键词匹配易失败 ·
         # 改成简单 13 位匹配(buyer 块内只有税号是 13 位 · 邮编 5 位 / 电话 10 位 不冲突)
-        tm = re.search(r'\b(\d{13})\b', line)
+        tm = re.search(r"\b(\d{13})\b", line)
         if tm:
             tax_id = tm.group(1)
             break
@@ -201,7 +212,8 @@ def _extract_buyer(text: str):
             name = line[:MAX_NAME_LEN]
         else:
             addr_lines.append(line)
-        if len(addr_lines) >= 6: break
+        if len(addr_lines) >= 6:
+            break
 
     if not name:
         return None
@@ -233,46 +245,57 @@ def _extract_items(text: str) -> List[Dict[str, Any]]:
         if mb:
             unit_price = _parse_money(mb.group(4))
             subtotal = _parse_money(mb.group(5))
-            if unit_price is None or subtotal is None: continue
-            items.append({
-                "name": re.sub(r'\s{2,}', ' ', mb.group(1).strip())[:80] or "(明细)",
-                "qty": int(mb.group(2)),
-                "unit": mb.group(3),
-                "unit_price": unit_price,
-                "subtotal": subtotal,
-            })
-            if len(items) >= MAX_ITEMS: break
+            if unit_price is None or subtotal is None:
+                continue
+            items.append(
+                {
+                    "name": re.sub(r"\s{2,}", " ", mb.group(1).strip())[:80] or "(明细)",
+                    "qty": int(mb.group(2)),
+                    "unit": mb.group(3),
+                    "unit_price": unit_price,
+                    "subtotal": subtotal,
+                }
+            )
+            if len(items) >= MAX_ITEMS:
+                break
             continue
 
         # 模式 A:数量 单位 单价 总价(描述从前行回看)
         m = RE_ITEM_PRICE_LINE.match(ln)
-        if not m: continue
+        if not m:
+            continue
         qty = int(m.group(1))
         unit = m.group(2)
         unit_price = _parse_money(m.group(3))
         subtotal = _parse_money(m.group(4))
-        if unit_price is None or subtotal is None: continue
+        if unit_price is None or subtotal is None:
+            continue
 
         desc = ""
         for back in range(1, 5):
-            if i - back < 0: break
+            if i - back < 0:
+                break
             prev = lines[i - back].strip()
-            if not prev: continue
-            if RE_ITEM_PRICE_LINE.match(prev): break
+            if not prev:
+                continue
+            if RE_ITEM_PRICE_LINE.match(prev):
+                break
             md = RE_ITEM_DESC_LINE.match(prev)
             if md:
-                desc = re.sub(r'\s{2,}', ' ', md.group(2).strip())
+                desc = re.sub(r"\s{2,}", " ", md.group(2).strip())
                 break
             if not desc and len(prev) > 3:
-                desc = re.sub(r'\s{2,}', ' ', prev[:80])
+                desc = re.sub(r"\s{2,}", " ", prev[:80])
 
-        items.append({
-            "name": (desc or "(明细)")[:80],
-            "qty": qty,
-            "unit": unit,
-            "unit_price": unit_price,
-            "subtotal": subtotal,
-        })
+        items.append(
+            {
+                "name": (desc or "(明细)")[:80],
+                "qty": qty,
+                "unit": unit,
+                "unit_price": unit_price,
+                "subtotal": subtotal,
+            }
+        )
         if len(items) >= MAX_ITEMS:
             break
 
@@ -281,7 +304,8 @@ def _extract_items(text: str) -> List[Dict[str, Any]]:
     unique = []
     for it in items:
         key = (it["qty"], it["unit_price"], it["subtotal"], it["name"][:30])
-        if key in seen: continue
+        if key in seen:
+            continue
         seen.add(key)
         unique.append(it)
     return unique
@@ -290,29 +314,34 @@ def _extract_items(text: str) -> List[Dict[str, Any]]:
 def _extract_notes(text: str) -> Optional[str]:
     """抽 หมายเหตุ(备注)段:标记后到下一个空行/关键词为止
     过滤:过敏原标注 / 联系电话 / 引号包围段(BAKELAB 模板自带噪音)"""
-    m = re.search(r'หมายเหตุ\s*\n', text)
+    m = re.search(r"หมายเหตุ\s*\n", text)
     if not m:
         return None
-    after = text[m.end():m.end() + 400]
+    after = text[m.end() : m.end() + 400]
     lines = []
     saw_content = False
     for ln in after.split("\n"):
         s = ln.strip()
         if not s:
-            if saw_content: break
+            if saw_content:
+                break
             continue
         # 撞到下一段关键词 = 备注结束
         if any(kw in s for kw in ["บริษัท", "ในนาม", "ลูกค้า", "เลขประจำ", "ธนาคาร"]):
             break
         # 过滤模板噪音(过敏原 / 联系信息)
-        if any(kw in s for kw in ["แพ้", "อาจมี", "ข้อมูลเพิ่มเติม", "ข้อมูลเพิม่เติม", "ข้อมูลสำำ?าหรับ"]):
+        if any(
+            kw in s
+            for kw in ["แพ้", "อาจมี", "ข้อมูลเพิ่มเติม", "ข้อมูลเพิม่เติม", "ข้อมูลสำำ?าหรับ"]
+        ):
             continue
         # 跳过纯引号 / 短噪音
         if s in ('"', "'") or len(s) < 3:
             continue
         lines.append(s)
         saw_content = True
-        if len(lines) >= 3: break
+        if len(lines) >= 3:
+            break
     out = " ".join(lines).strip()[:200]
     return out or None
 
@@ -321,13 +350,19 @@ def _extract_fields_from_text(text: str) -> Dict[str, Any]:
     fields = _extract_basic_fields(text)
     seller, buyer = _extract_parties(text)
     if seller:
-        if seller.get("name"):    fields["seller_name"] = seller["name"]
-        if seller.get("address"): fields["seller_addr"] = seller["address"]
-        if seller.get("tax_id"):  fields["seller_tax"] = seller["tax_id"]
+        if seller.get("name"):
+            fields["seller_name"] = seller["name"]
+        if seller.get("address"):
+            fields["seller_addr"] = seller["address"]
+        if seller.get("tax_id"):
+            fields["seller_tax"] = seller["tax_id"]
     if buyer:
-        if buyer.get("name"):     fields["buyer_name"] = buyer["name"]
-        if buyer.get("address"):  fields["buyer_addr"] = buyer["address"]
-        if buyer.get("tax_id"):   fields["buyer_tax"] = buyer["tax_id"]
+        if buyer.get("name"):
+            fields["buyer_name"] = buyer["name"]
+        if buyer.get("address"):
+            fields["buyer_addr"] = buyer["address"]
+        if buyer.get("tax_id"):
+            fields["buyer_tax"] = buyer["tax_id"]
     items = _extract_items(text)
     if items:
         fields["items"] = items
@@ -341,6 +376,7 @@ def try_text_extraction(pdf_bytes: bytes, strict: bool = True) -> Optional[Dict[
     t0 = time.time()
     try:
         import pypdf
+
         reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
     except ImportError:
         logger.info("[text_path] pypdf 未安装 · fallback Gemini")
@@ -397,10 +433,7 @@ def try_text_extraction(pdf_bytes: bytes, strict: bool = True) -> Optional[Dict[
             and full_fields.get("buyer_tax")
         )
     else:
-        ok = bool(
-            full_fields.get("invoice_number")
-            and full_fields.get("total_amount")
-        )
+        ok = bool(full_fields.get("invoice_number") and full_fields.get("total_amount"))
     if not ok:
         logger.info(
             f"[text_path] 关键字段缺失 · fallback Gemini · 已抽:{sorted(full_fields.keys())}"
@@ -409,15 +442,17 @@ def try_text_extraction(pdf_bytes: bytes, strict: bool = True) -> Optional[Dict[
 
     pages_out = []
     for idx, text in enumerate(page_texts):
-        pages_out.append({
-            "page": idx + 1,
-            "fields": dict(full_fields),
-            "raw_text": text,
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "is_copy": False,
-            "is_duplicate": False,
-        })
+        pages_out.append(
+            {
+                "page": idx + 1,
+                "fields": dict(full_fields),
+                "raw_text": text,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "is_copy": False,
+                "is_duplicate": False,
+            }
+        )
 
     elapsed = int((time.time() - t0) * 1000)
     n_fields = len(full_fields)

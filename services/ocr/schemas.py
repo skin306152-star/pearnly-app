@@ -21,7 +21,6 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-
 # ============================================================
 # Document-type discriminator (2026-05-21 multi-schema refactor)
 # ============================================================
@@ -98,9 +97,7 @@ class Word(BaseModel):
     """A single OCR-detected word with its confidence and bbox."""
 
     text: str = Field(..., description="word text (concatenated symbols)")
-    confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="Vision API confidence, 0-1"
-    )
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Vision API confidence, 0-1")
     bbox: BoundingBox
 
 
@@ -175,7 +172,9 @@ class Layer1Result(BaseModel):
 
     pages: List[Page]
     page_count: int = Field(..., ge=0)
-    elapsed_ms: int = Field(..., ge=0, description="wall-clock for all Vision calls + PDF rendering")
+    elapsed_ms: int = Field(
+        ..., ge=0, description="wall-clock for all Vision calls + PDF rendering"
+    )
     engine: str = Field(default="layer1_vision", description="for cost log / audit")
     language_hints: List[str] = Field(
         default_factory=lambda: ["th", "en"],
@@ -198,6 +197,7 @@ class Layer1Result(BaseModel):
 # statement, etc.) — this is what prevents 6091-style description numbers
 # from being mis-parsed as amounts.
 
+
 class GLEntry(BaseModel):
     """One row of a General Ledger.
 
@@ -218,8 +218,12 @@ class GLEntry(BaseModel):
         description="row description text — may contain numbers like '6091' "
         "that MUST NOT be treated as amounts",
     )
-    debit: str = Field(default="", description="debit amount, number-as-string no commas; empty = no debit")
-    credit: str = Field(default="", description="credit amount, number-as-string no commas; empty = no credit")
+    debit: str = Field(
+        default="", description="debit amount, number-as-string no commas; empty = no debit"
+    )
+    credit: str = Field(
+        default="", description="credit amount, number-as-string no commas; empty = no credit"
+    )
     amount: str = Field(
         default="",
         description="derived: debit if debit>0 else credit (number-as-string). "
@@ -242,8 +246,15 @@ class GLEntry(BaseModel):
     )
 
     @field_validator(
-        "transaction_date", "transaction_date_raw", "voucher_no",
-        "account_code", "description", "debit", "credit", "amount", "balance",
+        "transaction_date",
+        "transaction_date_raw",
+        "voucher_no",
+        "account_code",
+        "description",
+        "debit",
+        "credit",
+        "amount",
+        "balance",
         mode="before",
     )
     @classmethod
@@ -285,8 +296,12 @@ class GeneralLedgerDocument(BaseModel):
 
     # v118.35.0.51 · 顶层 str 字段 None→"" 兜底(同 BankStatementDocument)
     @field_validator(
-        "period_start", "period_end", "account_name", "account_number",
-        "opening_balance", "closing_balance",
+        "period_start",
+        "period_end",
+        "account_name",
+        "account_number",
+        "opening_balance",
+        "closing_balance",
         mode="before",
     )
     @classmethod
@@ -331,8 +346,14 @@ class BankStatementEntry(BaseModel):
     # 预算砍掉一半 · 跟 max_output_tokens 16384 一起把截断率压到 0
 
     @field_validator(
-        "transaction_date", "transaction_date_raw", "description",
-        "reference", "deposit", "withdrawal", "amount", "balance",
+        "transaction_date",
+        "transaction_date_raw",
+        "description",
+        "reference",
+        "deposit",
+        "withdrawal",
+        "amount",
+        "balance",
         mode="before",
     )
     @classmethod
@@ -370,8 +391,15 @@ class BankStatementDocument(BaseModel):
 
     # v118.35.0.51 · 顶层 str 字段 None→"" 兜底(Gemini 对续页/无期初常返 null · 否则 schema 崩)
     @field_validator(
-        "bank_name", "bank_code", "account_name", "account_number", "account_last4",
-        "period_start", "period_end", "opening_balance", "closing_balance",
+        "bank_name",
+        "bank_code",
+        "account_name",
+        "account_number",
+        "account_last4",
+        "period_start",
+        "period_end",
+        "opening_balance",
+        "closing_balance",
         mode="before",
     )
     @classmethod
@@ -410,9 +438,16 @@ class VatReportEntry(BaseModel):
     raw_row_data: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator(
-        "seq_no", "transaction_date", "transaction_date_raw", "invoice_no",
-        "customer_name", "customer_tax", "customer_branch",
-        "subtotal", "vat", "total",
+        "seq_no",
+        "transaction_date",
+        "transaction_date_raw",
+        "invoice_no",
+        "customer_name",
+        "customer_tax",
+        "customer_branch",
+        "subtotal",
+        "vat",
+        "total",
         mode="before",
     )
     @classmethod
@@ -509,9 +544,7 @@ class LineItem(BaseModel):
     subtotal: str = Field(default="", description="line subtotal, number-as-string, no commas")
 
     # Gemini may return null / number for any of these; coerce defensively.
-    _str_coerce = field_validator("name", "qty", "price", "subtotal", mode="before")(
-        _coerce_to_str
-    )
+    _str_coerce = field_validator("name", "qty", "price", "subtotal", mode="before")(_coerce_to_str)
 
 
 class ThaiInvoice(BaseModel):
@@ -787,7 +820,9 @@ class PipelinePageResult(BaseModel):
         "needs_review (<0.90 — into manual review queue)",
     )
     final_confidence: float = Field(
-        default=0.0, ge=0.0, le=1.0,
+        default=0.0,
+        ge=0.0,
+        le=1.0,
         description="aggregate page confidence (min of critical-field confidences)",
     )
     validation_warnings: List[str] = Field(

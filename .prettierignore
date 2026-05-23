@@ -1,0 +1,37 @@
+# REFACTOR-A5 · Prettier 忽略清单
+# 构建产物 / 第三方 / 锁文件 / 运行期产物 —— 不格式化
+node_modules/
+static/dist/
+package-lock.json
+*.min.js
+*.min.css
+
+# 运行期 / 本地样本 / 临时
+_pkg/
+_pkg_tmpstatic/
+_deploy_nginx/
+_gemini_key.local/
+_bank_samples/
+_test_reports/
+.ocr_cache/
+probes/
+test-results/
+playwright-report/
+
+# ─────────────────────────────────────────────────────────────
+# Stage C 拆解目标(REFACTOR_MASTER_PLAN.md 阶段 C)· 暂不格式化
+# 理由:这些巨石本就要在阶段 C 拆成 50-100 个模块 · 现在 prettier
+#       会产生 20 万+ 行丢弃式 diff 并毁掉 git blame · 待拆出模块时
+#       新文件不在本忽略表内 · 自然纳入 prettier --check 强制。
+# 注:.prettierignore 用 .gitignore 语法 · 行内注释无效 · 故说明独立成行。
+# ─────────────────────────────────────────────────────────────
+# REFACTOR-C1 · home.js 33k 行 IIFE → 拆 src/home/*.js
+home.js
+# REFACTOR-C2 · home.css → 拆 component CSS
+home.css
+# REFACTOR-C3 · home.html → 组件化
+home.html
+# C 阶段相邻 · login.html 242KB · 未来模块化
+login.html
+# 设计参考件(导航 IA 基准 · 非 app 代码 · 永久豁免)
+pearnly_nav_prototype_final.html

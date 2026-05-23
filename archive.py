@@ -4,6 +4,7 @@ Mr.Pilot · v0.7 智能归档模块
 职责:根据用户的命名模板和一条 ocr_history 记录,生成合法的归档文件名。
 此版本不处理 ZIP 打包(v0.7.2 再做),只负责"给文件起个好名字"。
 """
+
 import re
 import logging
 from typing import Any, Dict, List, Optional
@@ -13,13 +14,13 @@ logger = logging.getLogger(__name__)
 # 默认命名模板 · 所有新用户初始就是这套规则
 # 例:2026-04-15_DHL_运费_THB1250
 DEFAULT_TEMPLATE: List[Dict[str, Any]] = [
-    {"type": "date",     "format": "YYYY-MM-DD"},
-    {"type": "sep",      "val": "_"},
-    {"type": "seller",   "short": True},
-    {"type": "sep",      "val": "_"},
+    {"type": "date", "format": "YYYY-MM-DD"},
+    {"type": "sep", "val": "_"},
+    {"type": "seller", "short": True},
+    {"type": "sep", "val": "_"},
     {"type": "category"},
-    {"type": "sep",      "val": "_"},
-    {"type": "amount",   "with_currency": True},
+    {"type": "sep", "val": "_"},
+    {"type": "amount", "with_currency": True},
 ]
 
 # 默认文件夹策略
@@ -54,11 +55,17 @@ def _short_seller(name: str) -> str:
     s = name.strip()
     # 去掉常见的公司后缀词
     patterns = [
-        r"\s*บริษัท\s*", r"\s*จำกัด\s*", r"\s*\(มหาชน\)\s*",
-        r"\s*Co\.?,?\s*Ltd\.?\s*$", r"\s*Company\s*Limited\s*$",
-        r"\s*Public\s+Company\s+Limited\s*$", r"\s*PCL\.?\s*$",
-        r"\s*Inc\.?\s*$", r"\s*Ltd\.?\s*$",
-        r"\s*有限公司\s*", r"\s*股份有限公司\s*",
+        r"\s*บริษัท\s*",
+        r"\s*จำกัด\s*",
+        r"\s*\(มหาชน\)\s*",
+        r"\s*Co\.?,?\s*Ltd\.?\s*$",
+        r"\s*Company\s*Limited\s*$",
+        r"\s*Public\s+Company\s+Limited\s*$",
+        r"\s*PCL\.?\s*$",
+        r"\s*Inc\.?\s*$",
+        r"\s*Ltd\.?\s*$",
+        r"\s*有限公司\s*",
+        r"\s*股份有限公司\s*",
     ]
     for p in patterns:
         s = re.sub(p, " ", s, flags=re.IGNORECASE).strip()
@@ -76,16 +83,19 @@ def _format_date(raw: str, fmt: str) -> str:
         return ""
     # 试着解析常见格式
     import datetime
+
     raw = str(raw).strip()
     for parse_fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y"):
         try:
             d = datetime.datetime.strptime(raw[:10], parse_fmt)
             # 转换用户的输出格式
-            out_fmt = (fmt or "YYYY-MM-DD") \
-                .replace("YYYY", "%Y") \
-                .replace("YY",   "%y") \
-                .replace("MM",   "%m") \
-                .replace("DD",   "%d")
+            out_fmt = (
+                (fmt or "YYYY-MM-DD")
+                .replace("YYYY", "%Y")
+                .replace("YY", "%y")
+                .replace("MM", "%m")
+                .replace("DD", "%d")
+            )
             return d.strftime(out_fmt)
         except ValueError:
             continue
@@ -105,8 +115,9 @@ def _format_amount(value: Any, with_currency: bool) -> str:
         return ""
 
 
-def build_archive_name(history_record: Dict[str, Any],
-                       template: Optional[List[Dict[str, Any]]] = None) -> str:
+def build_archive_name(
+    history_record: Dict[str, Any], template: Optional[List[Dict[str, Any]]] = None
+) -> str:
     """
     核心:按模板+一条历史记录生成归档名(不含 .pdf 后缀)
 
@@ -183,7 +194,8 @@ def build_archive_name(history_record: Dict[str, Any],
     return name
 
 
-def preview_name(merged_fields: Dict[str, Any],
-                 template: Optional[List[Dict[str, Any]]] = None) -> str:
+def preview_name(
+    merged_fields: Dict[str, Any], template: Optional[List[Dict[str, Any]]] = None
+) -> str:
     """给前端实时预览用 · 传 merged_fields 直接出名字"""
     return build_archive_name({"merged_fields": merged_fields}, template)

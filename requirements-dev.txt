@@ -1,0 +1,5 @@
+# REFACTOR-A5 · 开发期 lint/format 工具(不进生产 requirements.lock.txt)
+# CI lint job 装这个 · 本地 `pip install -r requirements-dev.txt` 同款版本。
+# 升级时 black/ruff 同步 bump · 防 CI 与本地格式化结果漂移。
+black==26.5.1
+ruff==0.15.14

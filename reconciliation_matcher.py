@@ -9,12 +9,14 @@ v118.32.4.9 · Pearnly · 逐字段对照模式 · 两轮强配对
 - 配对只用"用户一眼能看出是同一笔"的强键 · 不做模糊匹配
 - 弱关联留给用户在 orphan 区自己对照
 """
+
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from field_comparator import (
-    normalize_invoice_no, normalize_tax_id,
-    parse_date, normalize_str,
+    normalize_invoice_no,
+    normalize_tax_id,
+    parse_date,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,7 +59,8 @@ def run_matching(
     rep_no_idx: Dict[str, List[int]] = {}
     for ri in unmatched_rep:
         key = normalize_invoice_no(
-            report_rows[ri].get("report_invoice_no") or report_rows[ri].get("invoice_no") or "")
+            report_rows[ri].get("report_invoice_no") or report_rows[ri].get("invoice_no") or ""
+        )
         if key:
             rep_no_idx.setdefault(key, []).append(ri)
 
@@ -106,11 +109,11 @@ def run_matching(
     return {
         "pairs": pairs,
         "invoice_orphans": [invoice_rows[i].get("id") for i in unmatched_inv],
-        "report_orphans":  [report_rows[i].get("row_no") for i in unmatched_rep],
+        "report_orphans": [report_rows[i].get("row_no") for i in unmatched_rep],
         "stats": {
-            "total_invoices":      len(invoice_rows),
-            "total_report_rows":   len(report_rows),
-            "matched":             len(pairs),
+            "total_invoices": len(invoice_rows),
+            "total_report_rows": len(report_rows),
+            "matched": len(pairs),
             "invoice_orphan_count": len(unmatched_inv),
             "report_orphan_count": len(unmatched_rep),
             "pass1_count": sum(1 for p in pairs if p["pass"] == 1),
@@ -120,14 +123,19 @@ def run_matching(
     }
 
 
-def _make_pair(ii: int, ri: int,
-               invoice_rows: List[Dict], report_rows: List[Dict],
-               confidence: float, pass_no: int) -> Dict:
+def _make_pair(
+    ii: int,
+    ri: int,
+    invoice_rows: List[Dict],
+    report_rows: List[Dict],
+    confidence: float,
+    pass_no: int,
+) -> Dict:
     return {
-        "invoice_idx":    ii,
-        "report_idx":     ri,
-        "invoice_id":     invoice_rows[ii].get("id"),
-        "report_row_no":  report_rows[ri].get("row_no"),
+        "invoice_idx": ii,
+        "report_idx": ri,
+        "invoice_id": invoice_rows[ii].get("id"),
+        "report_row_no": report_rows[ri].get("row_no"),
         "pair_confidence": confidence,
-        "pass":           pass_no,
+        "pass": pass_no,
     }

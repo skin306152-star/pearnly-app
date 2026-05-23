@@ -18,6 +18,7 @@ v115 · Searchable PDF 生成模块
 - 一张 5MB image-PDF · 处理 + 重压缩 · 大概 200-500ms
 - PyMuPDF 默认 garbage=4 + deflate · 输出文件通常会比原始 image-PDF 小
 """
+
 import logging
 from pathlib import Path
 from typing import Optional, List
@@ -50,7 +51,7 @@ if not _thai_font_path:
 def extract_searchable_text_from_pages(pages: list) -> List[str]:
     """
     从 OCR 结果的 pages 提取每页用于搜索的文本。
-    
+
     Returns:
         每页一个字符串 · 长度 == len(pages)
     """
@@ -64,12 +65,22 @@ def extract_searchable_text_from_pages(pages: list) -> List[str]:
         # 字段也加进去 · 强化关键搜索能力
         f = p.get("fields") or {}
         for key in [
-            "invoice_number", "invoice_no",
-            "date", "due_date",
-            "total_amount", "subtotal", "vat_amount",
-            "seller_name", "seller_tax", "seller_address", "seller_phone",
-            "buyer_name", "buyer_tax", "buyer_address",
-            "po_number", "reference_no",
+            "invoice_number",
+            "invoice_no",
+            "date",
+            "due_date",
+            "total_amount",
+            "subtotal",
+            "vat_amount",
+            "seller_name",
+            "seller_tax",
+            "seller_address",
+            "seller_phone",
+            "buyer_name",
+            "buyer_tax",
+            "buyer_address",
+            "po_number",
+            "reference_no",
         ]:
             v = f.get(key)
             if v is None:
@@ -96,11 +107,11 @@ def extract_searchable_text_from_pages(pages: list) -> List[str]:
 def make_searchable_pdf(image_pdf_bytes: bytes, pages_texts: List[str]) -> Optional[bytes]:
     """
     把 image-PDF + 每页文字 → searchable PDF。
-    
+
     Args:
         image_pdf_bytes: 原 image-PDF 字节流(jsPDF 生成的那种)
         pages_texts: 每页对应的搜索文字 · len 通常应 == 页数 · 不等也兼容
-    
+
     Returns:
         新 PDF 字节流(invisible 文字层 + 重压缩)· 失败返回 None
     """
@@ -132,9 +143,10 @@ def make_searchable_pdf(image_pdf_bytes: bytes, pages_texts: List[str]) -> Optio
             if _thai_font_path:
                 try:
                     page.insert_textbox(
-                        rect, text,
+                        rect,
+                        text,
                         fontsize=2,
-                        render_mode=3,        # invisible · 不可见但可搜索/复制
+                        render_mode=3,  # invisible · 不可见但可搜索/复制
                         fontfile=_thai_font_path,
                         fontname="thai",
                     )
@@ -147,7 +159,8 @@ def make_searchable_pdf(image_pdf_bytes: bytes, pages_texts: List[str]) -> Optio
                 # fallback · helv 字体(英数字 OK · 泰文会被丢弃 · 但仍是 invisible)
                 try:
                     page.insert_textbox(
-                        rect, text,
+                        rect,
+                        text,
                         fontsize=2,
                         render_mode=3,
                         fontname="helv",
@@ -180,6 +193,7 @@ def health_check() -> dict:
     }
     try:
         import fitz
+
         info["pymupdf_available"] = True
         info["pymupdf_version"] = getattr(fitz, "__version__", "unknown")
     except Exception:
@@ -191,4 +205,5 @@ def health_check() -> dict:
 # 部署后用法: /opt/mrpilot/venv/bin/python /opt/mrpilot/pdf_searchable.py
 if __name__ == "__main__":
     import json
+
     print(json.dumps(health_check(), indent=2, ensure_ascii=False))

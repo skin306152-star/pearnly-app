@@ -27,12 +27,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp.exceptions import (   # noqa: E402
+from services.erp.exceptions import (  # noqa: E402
     MRERPAuthError,
     MRERPBusinessError,
     MRERPTechnicalError,
 )
-from services.erp.mrerp_adapter import MRERPAdapter   # noqa: E402
+from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,9 +68,9 @@ class TechnicalErrorTest(unittest.TestCase):
         # Sanity check: we ran two attempts, separated by ~0.1s, each
         # with a ~3s timeout — well under 30s in total.
         self.assertLess(
-            elapsed, 30.0,
-            f"technical retries took {elapsed:.1f}s; "
-            f"too slow for unit-test CI",
+            elapsed,
+            30.0,
+            f"technical retries took {elapsed:.1f}s; " f"too slow for unit-test CI",
         )
         self.assertNotIsInstance(ctx.exception, MRERPAuthError)
         self.assertNotIsInstance(ctx.exception, MRERPBusinessError)

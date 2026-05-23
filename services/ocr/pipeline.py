@@ -64,7 +64,6 @@ from .table_path import (
     extract_from_table_file as _table_extract,
 )
 from .layer2_structure import (
-    Layer2Error,
     extract_from_page as _l2_extract_page,
 )
 from .layer3_fallback import (
@@ -101,9 +100,7 @@ THB_PER_USD = float(os.environ.get("OCR_PIPELINE_THB_PER_USD", "35"))
 # Template (invoice_number prefix) familiarity check — minimum seen instances
 # before flagging a new pattern as anomalous, to avoid flagging the first
 # invoice ever for a given seller.
-MIN_INSTANCES_BEFORE_FLAGGING = int(
-    os.environ.get("OCR_PIPELINE_PATTERN_MIN_INSTANCES", "2")
-)
+MIN_INSTANCES_BEFORE_FLAGGING = int(os.environ.get("OCR_PIPELINE_PATTERN_MIN_INSTANCES", "2"))
 
 # Critical fields whose word-level confidence we check (B1 fix: replaces the
 # page-avg confidence trigger which was too coarse).
@@ -125,9 +122,9 @@ DEFAULT_MAX_PAGES = 50
 # embedded text layer (avg chars/page >= 200), pipeline skips Vision API
 # entirely — only Flash-Lite (+ optional Flash) runs. See text_path.py.
 # Default False; production toggles via env once verified on real traffic.
-DEFAULT_ENABLE_TEXT_PATH = os.environ.get(
-    "OCR_FAST_PATH_ENABLED", "false"
-).strip().lower() == "true"
+DEFAULT_ENABLE_TEXT_PATH = (
+    os.environ.get("OCR_FAST_PATH_ENABLED", "false").strip().lower() == "true"
+)
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".tiff", ".tif", ".bmp", ".gif"}
 PDF_EXTENSIONS = {".pdf"}
@@ -342,9 +339,7 @@ def run_on_pdf_bytes(
     try:
         import fitz  # PyMuPDF
     except ImportError as e:  # pragma: no cover
-        raise ImportError(
-            "pipeline: PyMuPDF (fitz) required for PDF rendering"
-        ) from e
+        raise ImportError("pipeline: PyMuPDF (fitz) required for PDF rendering") from e
 
     t0 = time.time()
 
@@ -367,9 +362,7 @@ def run_on_pdf_bytes(
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     except Exception as e:
-        raise Layer1PDFError(
-            f"pipeline: cannot open PDF: {type(e).__name__}: {e}"
-        ) from e
+        raise Layer1PDFError(f"pipeline: cannot open PDF: {type(e).__name__}: {e}") from e
 
     page_image_bytes_list: List[bytes] = []
     try:
@@ -378,9 +371,7 @@ def run_on_pdf_bytes(
             raise Layer1PDFError("pipeline: PDF has 0 pages")
         process = min(total, max_pages)
         if total > max_pages:
-            logger.warning(
-                "pipeline: PDF has %d pages, processing first %d", total, max_pages
-            )
+            logger.warning("pipeline: PDF has %d pages, processing first %d", total, max_pages)
         matrix = fitz.Matrix(dpi / 72.0, dpi / 72.0)
         for i in range(process):
             try:
@@ -389,8 +380,7 @@ def run_on_pdf_bytes(
                 page_image_bytes_list.append(pix.tobytes("png"))
             except Exception as e:
                 raise Layer1PDFError(
-                    f"pipeline: render page {i + 1}/{total} failed: "
-                    f"{type(e).__name__}: {e}"
+                    f"pipeline: render page {i + 1}/{total} failed: " f"{type(e).__name__}: {e}"
                 ) from e
     finally:
         doc.close()
@@ -398,9 +388,8 @@ def run_on_pdf_bytes(
     # Defensive: if text_path returned a different page count than render
     # (rare — implies pypdf and fitz disagree about page count), drop the
     # override and run full Vision to keep them consistent.
-    if (
-        layer1_pages_override is not None
-        and len(layer1_pages_override) != len(page_image_bytes_list)
+    if layer1_pages_override is not None and len(layer1_pages_override) != len(
+        page_image_bytes_list
     ):
         logger.warning(
             "pipeline: text_path/render page count mismatch (%d vs %d) — "
@@ -412,11 +401,7 @@ def run_on_pdf_bytes(
 
     page_results: List[PipelinePageResult] = []
     for i, image_bytes in enumerate(page_image_bytes_list, start=1):
-        l1_override = (
-            layer1_pages_override[i - 1]
-            if layer1_pages_override is not None
-            else None
-        )
+        l1_override = layer1_pages_override[i - 1] if layer1_pages_override is not None else None
         pr = _process_one_page(
             image_bytes,
             page_number=i,
@@ -624,9 +609,7 @@ def _process_one_page(
             raise
         except Layer3FallbackError as e:
             error_msg = f"L3 fallback error: {e}"
-            logger.warning(
-                "pipeline: L3 fallback error on page %d: %s", page_number, e
-            )
+            logger.warning("pipeline: L3 fallback error on page %d: %s", page_number, e)
             if fallback_to_layer2_on_layer3_error:
                 layer_chain = [l1_layer_name, "L2", "L3_failed"]
                 needs_manual_review = True
@@ -642,9 +625,7 @@ def _process_one_page(
                 raise
         except Layer3TransientError as e:
             error_msg = f"L3 transient: {e}"
-            logger.warning(
-                "pipeline: L3 transient on page %d: %s", page_number, e
-            )
+            logger.warning("pipeline: L3 transient on page %d: %s", page_number, e)
             if fallback_to_layer2_on_layer3_error:
                 layer_chain = [l1_layer_name, "L2", "L3_transient"]
                 needs_manual_review = True
@@ -795,8 +776,7 @@ def _evaluate_triggers(
     if invoice.seller_tax:
         if not invoice.seller_tax.isdigit() or len(invoice.seller_tax) != 13:
             triggers.append(
-                f"seller_tax format invalid: {invoice.seller_tax!r} "
-                "(expected 13 digits)"
+                f"seller_tax format invalid: {invoice.seller_tax!r} " "(expected 13 digits)"
             )
 
     # Rule 4 (NEW): per-critical-field word-level confidence
@@ -843,9 +823,7 @@ def _evaluate_triggers(
     # Rule 6 (NEW): template / pattern familiarity. Skipped silently if no
     # memory passed in or no baseline yet.
     if pattern_memory is not None and invoice.invoice_number:
-        anomaly = pattern_memory.check_anomaly(
-            invoice.seller_tax, invoice.invoice_number
-        )
+        anomaly = pattern_memory.check_anomaly(invoice.seller_tax, invoice.invoice_number)
         if anomaly:
             triggers.append(anomaly)
 

@@ -31,14 +31,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp.exceptions import MRERPBusinessError   # noqa: E402
-from services.erp.mrerp_adapter import MRERPAdapter   # noqa: E402
-from services.erp.mrerp_customer_sync import (   # noqa: E402
+from services.erp.exceptions import MRERPBusinessError  # noqa: E402
+from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
+from services.erp.mrerp_customer_sync import (  # noqa: E402
     BuyerInfo,
     MRERPCustomerSyncService,
 )
 
-from tests.integration._mrerp_common import require_credentials   # noqa: E402
+from tests.integration._mrerp_common import require_credentials  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,7 +47,7 @@ logging.basicConfig(
 )
 
 
-SEED_CUSTOMER_CODE = "0006"   # Skin Trading Co., Ltd. (pre-created)
+SEED_CUSTOMER_CODE = "0006"  # Skin Trading Co., Ltd. (pre-created)
 
 
 def _unique_buyer_name() -> str:
@@ -93,7 +93,9 @@ class CustomerAutoCreateIntegrationTest(unittest.TestCase):
                     )
             except Exception as e:
                 logging.warning(
-                    "teardown delete %s raised: %s", code, e,
+                    "teardown delete %s raised: %s",
+                    code,
+                    e,
                 )
 
     def test_auto_create_via_seed_success(self):
@@ -119,7 +121,8 @@ class CustomerAutoCreateIntegrationTest(unittest.TestCase):
 
         # Auto-create.
         out = self.svc.lookup_or_create(
-            buyer, mappings,
+            buyer,
+            mappings,
             seed_customer_code=SEED_CUSTOMER_CODE,
         )
 
@@ -133,20 +136,19 @@ class CustomerAutoCreateIntegrationTest(unittest.TestCase):
         # Mapping persisted into the mappings dict.
         self.assertTrue(out.erp_code_persisted)
         clients_for_buyer = [
-            m for m in mappings["clients"]
-            if int(m.get("client_id", 0)) == buyer.client_id
-            and m.get("erp_type") == "mrerp"
+            m
+            for m in mappings["clients"]
+            if int(m.get("client_id", 0)) == buyer.client_id and m.get("erp_type") == "mrerp"
         ]
         self.assertEqual(len(clients_for_buyer), 1)
         self.assertEqual(clients_for_buyer[0]["erp_code"], out.customer_code)
 
         # Second call must hit L1 / cache without touching the network
         # (we drop the cache to force L1 from mappings).
-        self.svc.cache.invalidate(
-            ("by_name", buyer.tenant_id, _norm(buyer_name))
-        )
+        self.svc.cache.invalidate(("by_name", buyer.tenant_id, _norm(buyer_name)))
         again = self.svc.lookup_or_create(
-            buyer, mappings,
+            buyer,
+            mappings,
             seed_customer_code=SEED_CUSTOMER_CODE,
         )
         self.assertEqual(again.customer_code, out.customer_code)
@@ -164,7 +166,8 @@ class CustomerAutoCreateIntegrationTest(unittest.TestCase):
         )
         with self.assertRaises(MRERPBusinessError) as ctx:
             self.svc.lookup_or_create(
-                buyer, {"clients": []},
+                buyer,
+                {"clients": []},
                 # seed_customer_code intentionally omitted
             )
         msg = str(ctx.exception)
@@ -181,17 +184,18 @@ class CustomerAutoCreateIntegrationTest(unittest.TestCase):
             tenant_id="test-tenant",
         )
         out = self.svc.lookup_or_create(
-            buyer, {"clients": []},
+            buyer,
+            {"clients": []},
             seed_customer_code=SEED_CUSTOMER_CODE,
         )
         self.assertEqual(out.customer_code, "0006")
         self.assertFalse(out.is_new)
-        self.assertIn(out.source,
-                      ("erp_name_match", "erp_fuzzy_match", "cache_hit"))
+        self.assertIn(out.source, ("erp_name_match", "erp_fuzzy_match", "cache_hit"))
 
 
 def _norm(s):
     from services.erp._matching import normalize_company_name
+
     return normalize_company_name(s)
 
 

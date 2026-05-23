@@ -43,6 +43,7 @@ router = APIRouter()
 def _require_super_admin(request: Request) -> Dict[str, Any]:
     """超级管理员守门员 · 非超管 403"""
     from fastapi import status
+
     user = get_current_user_from_request(request)
     if not user.get("is_super_admin"):
         raise HTTPException(
@@ -75,9 +76,11 @@ def _require_internal_token(token: str) -> None:
 async def admin_diagnostics_runtime(request: Request):
     _require_super_admin(request)
     import time as _t
+
     # Lazy import 解循环 import:app.py 也 import 本模块 · 顶层不能 import app
     # 此时(handler 执行时)app module 已经完成 init · 全局变量都已就绪
     import app as _app
+
     return {
         "ok": True,
         "ts": int(_t.time()),
@@ -101,7 +104,11 @@ async def github_deploy_webhook(request: Request):
     GITHUB_WEBHOOK_SECRET 缺失时直接 503 拒服务 · 不再降级成无鉴权 ·
     避免运维忘记配 secret 时被任意人触发 git pull + restart。
     """
-    import hmac as _hmac, hashlib as _hashlib, subprocess as _subprocess, os as _os
+    import hmac as _hmac
+    import hashlib as _hashlib
+    import subprocess as _subprocess
+    import os as _os
+
     body = await request.body()
     secret = _os.environ.get("GITHUB_WEBHOOK_SECRET", "")
     if not secret:
@@ -119,9 +126,13 @@ async def github_deploy_webhook(request: Request):
     # 父进程（mrpilot）被 systemctl restart 杀掉后，子进程仍然存活，
     # 能完成 git pull + cp + systemctl restart 整个流程。
     _subprocess.Popen(
-        ["bash", "-c", "sleep 3 && bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1"],
+        [
+            "bash",
+            "-c",
+            "sleep 3 && bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1",
+        ],
         close_fds=True,
-        start_new_session=True,   # 脱离父进程组，父死子不死
+        start_new_session=True,  # 脱离父进程组，父死子不死
     )
     return {"ok": True, "status": "deploy scheduled in 3 s"}
 
@@ -135,9 +146,14 @@ async def manual_deploy_trigger(token: str = ""):
     """
     _require_internal_token(token)
     import subprocess as _subprocess
+
     logger.info("[git-deploy] manual trigger")
     _subprocess.Popen(
-        ["bash", "-c", "sleep 1 && bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1"],
+        [
+            "bash",
+            "-c",
+            "sleep 1 && bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1",
+        ],
         close_fds=True,
         start_new_session=True,
     )
@@ -149,10 +165,13 @@ async def deploy_log(token: str = "", lines: int = 50):
     """查看最近部署日志。"""
     _require_internal_token(token)
     import subprocess as _subprocess
+
     try:
         result = _subprocess.run(
             ["tail", f"-{lines}", "/var/log/mrpilot-deploy.log"],
-            capture_output=True, text=True, timeout=5
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return {"ok": True, "log": result.stdout}
     except Exception as e:
@@ -216,7 +235,8 @@ async def install_playwright(token: str = "", with_deps: bool = False, restart: 
         _log("pip install playwright", r1)
         if r1.returncode != 0:
             return {
-                "ok": False, "step": "pip_install",
+                "ok": False,
+                "step": "pip_install",
                 "hint": "pip install failed — check stderr above. May need sudo or pip path fix.",
                 "log": "\n".join(log_lines),
             }
@@ -235,7 +255,8 @@ async def install_playwright(token: str = "", with_deps: bool = False, restart: 
         _log("playwright install chromium", r2)
         if r2.returncode != 0:
             return {
-                "ok": False, "step": "browser_install",
+                "ok": False,
+                "step": "browser_install",
                 "hint": (
                     "Browser download failed. If you see 'missing libgbm/libnss',"
                     " re-run this URL with &with_deps=true to install system libs."
@@ -245,9 +266,10 @@ async def install_playwright(token: str = "", with_deps: bool = False, restart: 
 
         # ── 3. verify import works (in a clean subprocess) ──
         verify_cmd = [
-            py_bin, "-c",
+            py_bin,
+            "-c",
             "from playwright.sync_api import sync_playwright; "
-            "print('IMPORT_OK · version', sync_playwright.__module__)"
+            "print('IMPORT_OK · version', sync_playwright.__module__)",
         ]
         log_lines.append(f"\n$ {' '.join(verify_cmd)}")
         r3 = _subprocess.run(verify_cmd, capture_output=True, text=True, timeout=15)
@@ -256,9 +278,10 @@ async def install_playwright(token: str = "", with_deps: bool = False, restart: 
 
         if not import_ok:
             return {
-                "ok": False, "step": "verify",
+                "ok": False,
+                "step": "verify",
                 "hint": "pip + browser installed but import still fails. Check that "
-                        "mrpilot's Python interpreter matches the one that ran pip.",
+                "mrpilot's Python interpreter matches the one that ran pip.",
                 "log": "\n".join(log_lines),
             }
 
@@ -267,37 +290,42 @@ async def install_playwright(token: str = "", with_deps: bool = False, restart: 
         if restart:
             log_lines.append("\n--- scheduling mrpilot restart in 3 s ---")
             _subprocess.Popen(
-                ["bash", "-c",
-                 "sleep 3 && systemctl restart mrpilot "
-                 ">> /var/log/mrpilot-deploy.log 2>&1"],
-                close_fds=True, start_new_session=True,
+                [
+                    "bash",
+                    "-c",
+                    "sleep 3 && systemctl restart mrpilot " ">> /var/log/mrpilot-deploy.log 2>&1",
+                ],
+                close_fds=True,
+                start_new_session=True,
             )
         else:
-            next_step_url = (
-                "https://pearnly.com/internal/deploy/manual?token=<your-secret>"
-            )
+            next_step_url = "https://pearnly.com/internal/deploy/manual?token=<your-secret>"
 
         return {
-            "ok": True, "step": "complete",
+            "ok": True,
+            "step": "complete",
             "restart_scheduled": bool(restart),
             "next_step": (
                 "Wait ~10 s for the restart, then click 「测试连接」in the wizard. "
                 "If you still see ERR_PLAYWRIGHT_MISSING, retry with &with_deps=true."
-                if restart else f"Trigger restart manually: {next_step_url}"
+                if restart
+                else f"Trigger restart manually: {next_step_url}"
             ),
             "log": "\n".join(log_lines),
         }
 
     except _subprocess.TimeoutExpired as e:
         return {
-            "ok": False, "step": "timeout",
+            "ok": False,
+            "step": "timeout",
             "hint": f"Step timed out after {e.timeout}s. Re-run; pip/playwright "
-                    f"resume partial downloads.",
+            f"resume partial downloads.",
             "log": "\n".join(log_lines),
         }
     except Exception as e:
         logger.exception("install_playwright endpoint failure")
         return {
-            "ok": False, "step": "exception",
+            "ok": False,
+            "step": "exception",
             "log": "\n".join(log_lines) + f"\n\nEXCEPTION: {type(e).__name__}: {e}",
         }

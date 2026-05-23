@@ -17,13 +17,12 @@ from unittest.mock import MagicMock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp.mrerp_product_sync import (   # noqa: E402
+from services.erp.mrerp_product_sync import (  # noqa: E402
     ItemInfo,
     ProductSyncResult,
     MRERPProductSyncService,
     parse_stkmas_listing,
 )
-
 
 SAMPLE_HTML = """<!DOCTYPE html><html><body><div id="container"><div id="body">
 <div id="detail-box">
@@ -96,8 +95,7 @@ class ParseStkmasListingTests(unittest.TestCase):
         self.assertEqual(parse_stkmas_listing(""), [])
 
     def test_real_fixture_parses_all_rows(self):
-        path = (PROJECT_ROOT / "scripts" / "probe" / "_debug"
-                / "product_listing_1779116422.html")
+        path = PROJECT_ROOT / "scripts" / "probe" / "_debug" / "product_listing_1779116422.html"
         if not path.exists():
             self.skipTest("real fixture missing (gitignored)")
         rows = parse_stkmas_listing(path.read_text(encoding="utf-8"))
@@ -128,17 +126,21 @@ class LookupLayerTests(unittest.TestCase):
     def test_l1_db_mapping_hit_without_browser(self):
         svc, _adapter, page = self._make_service()
         item = ItemInfo(name="Anything Goes", tenant_id="t1")
-        mappings = {"products": [{
-            "erp_type": "mrerp",
-            "item_name": "Anything Goes",
-            "item_name_norm": "anything goes",
-            "erp_code": "P001",
-        }]}
+        mappings = {
+            "products": [
+                {
+                    "erp_type": "mrerp",
+                    "item_name": "Anything Goes",
+                    "item_name_norm": "anything goes",
+                    "erp_code": "P001",
+                }
+            ]
+        }
         out = svc.lookup(item, mappings)
         self.assertIsNotNone(out)
         self.assertEqual(out.product_code, "P001")
         self.assertEqual(out.source, "db_mapping")
-        page.goto.assert_not_called()   # L1 doesn't hit network
+        page.goto.assert_not_called()  # L1 doesn't hit network
 
     def test_l2_exact_name_hit(self):
         svc, _adapter, _page = self._make_service()
@@ -183,6 +185,7 @@ class LookupLayerTests(unittest.TestCase):
 
     def test_lookup_or_create_without_seed_raises(self):
         from services.erp.exceptions import MRERPBusinessError
+
         svc, _adapter, _page = self._make_service()
         item = ItemInfo(name="brand-new uuid product 9c8b7a", tenant_id="t1")
         with self.assertRaises(MRERPBusinessError) as ctx:
@@ -207,19 +210,24 @@ class UpsertMappingTests(unittest.TestCase):
         self.assertEqual(len(mappings["products"]), 1)
         self.assertEqual(mappings["products"][0]["erp_code"], "P001")
         self.assertEqual(
-            mappings["products"][0]["item_name_norm"], "pepsi 500ml",
+            mappings["products"][0]["item_name_norm"],
+            "pepsi 500ml",
         )
 
     def test_updates_existing_mapping(self):
         adapter = MagicMock()
         adapter._page = MagicMock()
         svc = MRERPProductSyncService(adapter)
-        mappings = {"products": [{
-            "erp_type": "mrerp",
-            "item_name": "Pepsi 500ml",
-            "item_name_norm": "pepsi 500ml",
-            "erp_code": "OLD",
-        }]}
+        mappings = {
+            "products": [
+                {
+                    "erp_type": "mrerp",
+                    "item_name": "Pepsi 500ml",
+                    "item_name_norm": "pepsi 500ml",
+                    "erp_code": "OLD",
+                }
+            ]
+        }
         svc._upsert_mapping(
             mappings,
             ItemInfo(name="Pepsi 500ml", tenant_id="t1"),

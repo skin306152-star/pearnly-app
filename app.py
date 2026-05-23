@@ -20,30 +20,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 import db  # v0.6.4 修复:新增 ERP 路由用到了 db.xxx 命名空间
+
 try:
     import line_client  # T1 · LINE Bot(v0.19.0)
 except ImportError:
     line_client = None  # line_client.py 不在 pearnly 仓库 · 文件需单独部署到服务器
 from db import (
-    ensure_demo_account,
     find_user_by_username,
     update_last_login,
-    get_ip_usage_today,
-    increment_ip_usage,
     increment_user_monthly_usage,
     insert_ocr_history,
     list_ocr_history,
     get_ocr_history_detail,
     update_ocr_history_pages,
-    delete_ocr_history,
     delete_ocr_history_with_pdf_paths,  # v114 · PDF 留底
-    get_history_pdf_info,                # v114
+    get_history_pdf_info,  # v114
     find_ocr_by_hash,
-    # T1 · LINE Bot(v0.19.0)
-    generate_line_binding_code,
-    get_line_binding_by_user,
-    unbind_line_by_user,
-    update_user_preferred_lang,
 )
 import pdf_storage  # v114 · PDF 留底存储模块
 from auth import (
@@ -56,11 +48,16 @@ from report_routes import router as reports_router  # v109.0
 from auth_signup import router as signup_router  # v109.3
 from recon_routes import router as recon_router  # v118.32.0
 from vat_excel_routes import router as vat_excel_router  # v118.32.4.9.5 · Excel 公式对账内测
-from billing_routes import router as billing_router  # 阶段 5 Task 5.1 · 抽 11 个 billing 路由(2026-05-22)
-from admin_diagnostics_routes import router as admin_diagnostics_router  # 阶段 5 Task 5.2 · 抽 5 个 admin diagnostics + internal/deploy* 路由(2026-05-22)
+from billing_routes import (
+    router as billing_router,
+)  # 阶段 5 Task 5.1 · 抽 11 个 billing 路由(2026-05-22)
+from admin_diagnostics_routes import (
+    router as admin_diagnostics_router,
+)  # 阶段 5 Task 5.2 · 抽 5 个 admin diagnostics + internal/deploy* 路由(2026-05-22)
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass  # dotenv 可选 · 未装则用系统环境变量
@@ -86,6 +83,7 @@ def _record_500(*, path: str = "", method: str = "", detail: str = ""):
     import sys as _sys
     import time as _t
     import traceback as _tb
+
     tb_str = ""
     exc_type = ""
     try:
@@ -99,14 +97,16 @@ def _record_500(*, path: str = "", method: str = "", detail: str = ""):
         tb_str = f"(no traceback) {detail}"
     # Trim to last 1500 chars — the tail is where the actual error is.
     _last_500_event.clear()
-    _last_500_event.update({
-        "ts": int(_t.time()),
-        "path": str(path or "")[:200],
-        "method": str(method or "")[:10],
-        "detail": str(detail or "")[:200],
-        "exc_type": exc_type,
-        "traceback": (tb_str or "")[-1500:],
-    })
+    _last_500_event.update(
+        {
+            "ts": int(_t.time()),
+            "path": str(path or "")[:200],
+            "method": str(method or "")[:10],
+            "detail": str(detail or "")[:200],
+            "exc_type": exc_type,
+            "traceback": (tb_str or "")[-1500:],
+        }
+    )
 
 
 def _read_last_500() -> Dict[str, Any]:
@@ -114,6 +114,7 @@ def _read_last_500() -> Dict[str, Any]:
     if not _last_500_event:
         return {}
     return dict(_last_500_event)
+
 
 DEMO_IP_DAILY_LIMIT = int(os.environ.get("DEMO_IP_DAILY_LIMIT", "20"))
 OCR_MAX_PAGES_PER_UPLOAD = int(os.environ.get("OCR_MAX_PAGES_PER_UPLOAD", "5"))
@@ -214,27 +215,22 @@ def _ensure_playwright_installed():
         importlib.import_module("playwright.sync_api")
         pip_importable = True
         try:
-            pip_version = getattr(
-                importlib.import_module("playwright"), "__version__", None
-            )
+            pip_version = getattr(importlib.import_module("playwright"), "__version__", None)
         except Exception:
             pip_version = None
     except ImportError:
         pip_importable = False
 
     # ── Quick probe: chromium binary on disk? ──
-    cache_root = (
-        _os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
-        or _os.path.expanduser("~/.cache/ms-playwright")
+    cache_root = _os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or _os.path.expanduser(
+        "~/.cache/ms-playwright"
     )
     chromium_installed = False
     chromium_dir = None
     try:
         if _os.path.isdir(cache_root):
             for name in _os.listdir(cache_root):
-                if name.startswith("chromium") and _os.path.isdir(
-                    _os.path.join(cache_root, name)
-                ):
+                if name.startswith("chromium") and _os.path.isdir(_os.path.join(cache_root, name)):
                     chromium_installed = True
                     chromium_dir = _os.path.join(cache_root, name)
                     break
@@ -281,7 +277,8 @@ def _ensure_playwright_installed():
         if not launch_result["ok"]:
             logger.warning(
                 "[playwright-bootstrap] chromium launch FAILED at startup: %s · "
-                "spawning install-deps in background", launch_result.get("error"),
+                "spawning install-deps in background",
+                launch_result.get("error"),
             )
         else:
             return  # All three pieces verified · nothing to spawn.
@@ -349,8 +346,10 @@ def _ensure_playwright_installed():
     try:
         subprocess.Popen(
             ["bash", "-c", cmd],
-            close_fds=True, start_new_session=True,
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            close_fds=True,
+            start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         logger.warning(
@@ -374,6 +373,7 @@ def _read_playwright_status():
     progress in real time without waiting for the next restart."""
     import json
     import os as _os
+
     status_path = "/tmp/pearnly-playwright-status.json"
     payload = {}
     try:
@@ -385,9 +385,8 @@ def _read_playwright_status():
     # Re-probe chromium live (cheap dir check); pip import status is
     # what was true at startup and shouldn't change without a restart.
     try:
-        cache_root = (
-            _os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
-            or _os.path.expanduser("~/.cache/ms-playwright")
+        cache_root = _os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or _os.path.expanduser(
+            "~/.cache/ms-playwright"
         )
         live_chromium = False
         if _os.path.isdir(cache_root):
@@ -451,6 +450,7 @@ async def lifespan(app: FastAPI):
     # /internal/deploy 现在 fail-closed · secret 缺失会拒服务 ·
     # 启动时早期告警 · 不要等到 GitHub webhook 来才发现没配。
     import os as _os
+
     if not _os.environ.get("GITHUB_WEBHOOK_SECRET"):
         logger.critical(
             "⚠️ GITHUB_WEBHOOK_SECRET missing — /internal/deploy will return 503 · "
@@ -609,6 +609,7 @@ async def lifespan(app: FastAPI):
     # 铁律 #21 ✅:新 schema 函数独立 services/db_migrations/ · 不进 db.py
     try:
         from services.db_migrations.field_overrides import ensure_field_overrides_columns
+
         ensure_field_overrides_columns()
     except Exception as e:
         logger.warning(f"启动 field_overrides 列就绪失败 (等 alembic 002): {e}")
@@ -639,6 +640,7 @@ async def lifespan(app: FastAPI):
     # · 这样下次部署的 deploy.sh 已经会自己 pip install + 装 chromium
     try:
         import os as _os
+
         _deploy_sh = "/opt/mrpilot/git-deploy.sh"
         _new_content = r"""#!/bin/bash
 # ============================================================
@@ -750,7 +752,7 @@ if [ -n "$PREV_HEAD" ]; then
 fi
 exit 1
 """
-        with open(_deploy_sh, 'w') as _f:
+        with open(_deploy_sh, "w") as _f:
             _f.write(_new_content)
         _os.chmod(_deploy_sh, 0o755)
         logger.info("[v118.33.7] git-deploy.sh updated (with rollback + health check)")
@@ -766,10 +768,13 @@ exit 1
     # start · chromium_can_launch 假阴性(实际能起,但探测炸)。
     try:
         import asyncio as _asyncio
+
         await _asyncio.to_thread(_ensure_playwright_installed)
     except Exception as e:
-        logger.warning(f"[playwright-bootstrap] failed (will surface as "
-                       f"ERR_PLAYWRIGHT_MISSING in wizard): {e}")
+        logger.warning(
+            f"[playwright-bootstrap] failed (will surface as "
+            f"ERR_PLAYWRIGHT_MISSING in wizard): {e}"
+        )
 
     # v110.7 · 启动确保 users 表有欢迎向导用的 profile 字段(幂等 · 已有字段无影响)
     try:
@@ -783,12 +788,9 @@ exit 1
     try:
         with db.get_cursor(commit=True) as cur:
             recovered = 0
-            for tbl in ['ocr_history', 'reconciliation_task', 'gl_vat_task']:
+            for tbl in ["ocr_history", "reconciliation_task", "gl_vat_task"]:
                 try:
-                    cur.execute(
-                        f"UPDATE {tbl} SET status='interrupted' "
-                        f"WHERE status='running'"
-                    )
+                    cur.execute(f"UPDATE {tbl} SET status='interrupted' " f"WHERE status='running'")
                     recovered += cur.rowcount or 0
                 except Exception as _inner:
                     logger.warning(f"启动恢复 {tbl} 中断任务失败(表可能不存在): {_inner}")
@@ -800,12 +802,15 @@ exit 1
     # v0.17 · M6 · 启动邮箱抓取定时任务(每 tick 扫到期账号)
     # v0.17.11 · HF Space 禁止 IMAP 993 出站 · 环境变量控制
     import asyncio
+
     email_task = None
     if os.environ.get("EMAIL_INGEST_ENABLED", "0") == "1":
         email_task = asyncio.create_task(_email_ingest_loop())
         logger.info("[email_ingest] 定时抓取已启用")
     else:
-        logger.info("[email_ingest] 定时抓取已禁用(HF Space 不支持 IMAP 出站 · 迁 VPS 后设 EMAIL_INGEST_ENABLED=1)")
+        logger.info(
+            "[email_ingest] 定时抓取已禁用(HF Space 不支持 IMAP 出站 · 迁 VPS 后设 EMAIL_INGEST_ENABLED=1)"
+        )
 
     # v118.25 · ERP 推送自动重试后台 worker(每 30 秒扫到期失败 log)
     # PEARNLY_SKIP_HEAVY_INIT=1 时不启动 · 防止 unit test 用 TestClient
@@ -819,7 +824,7 @@ exit 1
     else:
         logger.info("[erp_retry] 跳过启动(PEARNLY_SKIP_HEAVY_INIT=1)")
 
-    logger.info(f"✅ Mr.Pearnly 已就绪 v0.21.0-v108 (Google 余额追踪 · 半自动校准)")
+    logger.info("✅ Mr.Pearnly 已就绪 v0.21.0-v108 (Google 余额追踪 · 半自动校准)")
     yield
     # 关闭时停定时
     if email_task is not None:
@@ -843,6 +848,7 @@ exit 1
 async def _erp_retry_loop():
     """每 30 秒跑一次重试 tick"""
     import asyncio
+
     # 启动时先等 30 秒 · 避开和其他 startup 竞争
     await asyncio.sleep(30)
     interval_sec = int(os.environ.get("ERP_RETRY_TICK_SEC", "30"))
@@ -860,6 +866,7 @@ async def _erp_retry_loop():
 async def _run_erp_retry_tick():
     """单次 tick:找到期失败 log · 重新调用 erp_push 推送 · 更新 log 状态"""
     import asyncio as _asyncio
+
     try:
         due = db.list_logs_due_for_retry(limit=20)
         if not due:
@@ -869,13 +876,23 @@ async def _run_erp_retry_tick():
         for log in due:
             try:
                 # 取上下文(history + endpoint)
-                history = db.get_ocr_history_detail(
-                    str(log["user_id"]), str(log["history_id"]),
-                    tenant_id=None,
-                ) if log.get("history_id") else None
-                endpoint = db.get_erp_endpoint(
-                    str(log["user_id"]), str(log["endpoint_id"]),
-                ) if log.get("endpoint_id") else None
+                history = (
+                    db.get_ocr_history_detail(
+                        str(log["user_id"]),
+                        str(log["history_id"]),
+                        tenant_id=None,
+                    )
+                    if log.get("history_id")
+                    else None
+                )
+                endpoint = (
+                    db.get_erp_endpoint(
+                        str(log["user_id"]),
+                        str(log["endpoint_id"]),
+                    )
+                    if log.get("endpoint_id")
+                    else None
+                )
 
                 if not history or not endpoint:
                     # 关联实体已删 · 终止此 log 的重试
@@ -885,7 +902,9 @@ async def _run_erp_retry_tick():
 
                 # 在 worker 线程里跑同步 push(避免阻塞事件循环)
                 result = await _asyncio.to_thread(
-                    _erp.push_to_endpoint, endpoint, history,
+                    _erp.push_to_endpoint,
+                    endpoint,
+                    history,
                 )
 
                 # 自增 retry_count · 更新 log 状态(直接覆盖原行 · 不写新行)
@@ -916,9 +935,9 @@ async def _run_erp_retry_tick():
                     if db.is_user_data_error(result.get("error_msg")):
                         db.clear_retry_schedule(str(log["id"]))
                         logger.info(
-                            "[erp_retry] log %s 重试 #%d 命中 user-data 错 · "
-                            "停止队列 (err=%r)",
-                            log["id"], new_count,
+                            "[erp_retry] log %s 重试 #%d 命中 user-data 错 · " "停止队列 (err=%r)",
+                            log["id"],
+                            new_count,
                             (result.get("error_msg") or "")[:80],
                         )
                     else:
@@ -927,10 +946,14 @@ async def _run_erp_retry_tick():
                         if next_delay is None:
                             # 用完 3 次 · 不再调度 · 等用户手动
                             db.clear_retry_schedule(str(log["id"]))
-                            logger.warning(f"[erp_retry] log {log['id']} 重试 {new_count} 次仍失败 · 停止")
+                            logger.warning(
+                                f"[erp_retry] log {log['id']} 重试 {new_count} 次仍失败 · 停止"
+                            )
                         else:
                             db.schedule_log_retry(str(log["id"]), next_delay)
-                            logger.info(f"[erp_retry] log {log['id']} 重试 #{new_count} 失败 · {next_delay}s 后再试")
+                            logger.info(
+                                f"[erp_retry] log {log['id']} 重试 #{new_count} 失败 · {next_delay}s 后再试"
+                            )
             except Exception as e_inner:
                 logger.warning(f"[erp_retry] 单条处理失败 log_id={log.get('id')}: {e_inner}")
                 # 单条失败不影响其它
@@ -941,6 +964,7 @@ async def _run_erp_retry_tick():
 
 async def _email_ingest_loop():
     import asyncio
+
     # 启动时先等 60 秒避免和其他启动动作抢资源
     await asyncio.sleep(60)
     # tick 粒度固定 5 分钟(最小档)· 每账号根据自己 interval_min 判断是否到期
@@ -960,8 +984,10 @@ async def _run_email_ingest_tick():
     """一个 tick · 扫所有启用账号 · 按 interval_min 决定哪些到期需处理"""
     import asyncio
     from datetime import datetime, timezone, timedelta
+
     try:
         import email_ingest
+
         if not email_ingest.is_available():
             return  # 未配 EMAIL_ENCRYPTION_KEY
         accounts = db.list_enabled_email_accounts()
@@ -988,9 +1014,7 @@ async def _run_email_ingest_tick():
         for account in due_accounts:
             try:
                 # 阻塞 IO 放到线程池 · 避免卡住 asyncio loop
-                result = await asyncio.to_thread(
-                    email_ingest.run_account_ingest, account, "auto"
-                )
+                result = await asyncio.to_thread(email_ingest.run_account_ingest, account, "auto")
                 db.insert_email_ingest_log(
                     account_id=account["id"],
                     user_id=account["user_id"],
@@ -1012,10 +1036,12 @@ async def _run_email_ingest_tick():
 app = FastAPI(title="Mr.Pearnly API", version="0.3.5-mvp", lifespan=lifespan)
 app.include_router(reports_router)  # v109.0
 app.include_router(signup_router)  # v109.3
-app.include_router(recon_router)   # v118.32.0 · 销项税对账
+app.include_router(recon_router)  # v118.32.0 · 销项税对账
 app.include_router(vat_excel_router)  # v118.32.4.9.5 · Excel 公式对账内测(skin306152 only)
 app.include_router(billing_router)  # 阶段 5 Task 5.1 · billing 11 路由(2026-05-22)
-app.include_router(admin_diagnostics_router)  # 阶段 5 Task 5.2 · admin diagnostics + internal/deploy* 5 路由(2026-05-22)
+app.include_router(
+    admin_diagnostics_router
+)  # 阶段 5 Task 5.2 · admin diagnostics + internal/deploy* 5 路由(2026-05-22)
 # v118.35.0.28 P0-04 CORS 收紧 (体检 2026-05-21):
 # 旧 allow_origins=["*"] + allow_credentials=True 浏览器会自动拒绝凭据请求,
 # 但无凭据跨域 fetch 仍放行 · 收紧到生产白名单 + env 覆盖 + dev 自动放 localhost
@@ -1048,6 +1074,7 @@ async def _capture_unhandled_500(request: Request, exc: Exception):
     但客户端只收到稳定错误码 · 不再回传异常类型/text/diag_url ·
     内部诊断由超管接口 /api/admin/diagnostics/runtime 提供"""
     from fastapi.responses import JSONResponse
+
     try:
         _record_500(
             path=str(request.url.path),
@@ -1058,7 +1085,9 @@ async def _capture_unhandled_500(request: Request, exc: Exception):
         pass
     logger.exception(
         "[capture-500] %s %s · %s",
-        request.method, request.url.path, type(exc).__name__,
+        request.method,
+        request.url.path,
+        type(exc).__name__,
     )
     return JSONResponse(
         status_code=500,
@@ -1072,6 +1101,7 @@ async def _capture_unhandled_500(request: Request, exc: Exception):
 # ============================================================
 def _read_frontend_version() -> str:
     import re
+
     try:
         with open("static/home.html", "r", encoding="utf-8") as _f:
             _content = _f.read()
@@ -1084,6 +1114,7 @@ def _read_frontend_version() -> str:
     except Exception as e:
         logger.warning(f"_read_frontend_version 读取失败: {e}")
     return "0"
+
 
 PEARNLY_FRONTEND_VERSION = _read_frontend_version()
 logger.info(f"📌 前端版本 PEARNLY_FRONTEND_VERSION = {PEARNLY_FRONTEND_VERSION}")
@@ -1100,7 +1131,9 @@ logger.info(f"📌 前端版本 PEARNLY_FRONTEND_VERSION = {PEARNLY_FRONTEND_VER
 # 修: 每次 app 启动时删掉 static 下所有 .gz · 让 nginx 退回到 gzip on the fly
 # 性能影响: 微小 (CSS/JS 文件本来就有 nginx 自身的 in-memory cache)
 def _purge_stale_static_gz():
-    import os as _os, glob as _glob
+    import os as _os
+    import glob as _glob
+
     try:
         deleted = 0
         for fp in _glob.glob("static/**/*.gz", recursive=True):
@@ -1110,9 +1143,12 @@ def _purge_stale_static_gz():
             except Exception:
                 pass
         if deleted:
-            logger.info(f"🧹 启动清除 static/**/*.gz · 删了 {deleted} 个陈旧预压缩文件 · nginx 将动态 gzip 当前源文件")
+            logger.info(
+                f"🧹 启动清除 static/**/*.gz · 删了 {deleted} 个陈旧预压缩文件 · nginx 将动态 gzip 当前源文件"
+            )
     except Exception as _e:
         logger.warning(f"_purge_stale_static_gz 失败: {_e}")
+
 
 _purge_stale_static_gz()
 
@@ -1185,9 +1221,9 @@ class UserInfo(BaseModel):
     # v22 · 多租户
     tenant_id: Optional[str] = None
     tenant_name: Optional[str] = None
-    tenant_type: Optional[str] = None          # shared_api / byo_api / admin
-    tenant_status: Optional[str] = None        # active / warning / suspended / frozen
-    role: Optional[str] = None                 # owner / member
+    tenant_type: Optional[str] = None  # shared_api / byo_api / admin
+    tenant_status: Optional[str] = None  # active / warning / suspended / frozen
+    role: Optional[str] = None  # owner / member
     is_super_admin: bool = False
     # v118.8.4 · 公司名 + 真实姓名(注册时填的) · 顶栏归属感用
     company_name: Optional[str] = None
@@ -1209,16 +1245,16 @@ class UserInfo(BaseModel):
     is_billing_exempt: bool = False
     active_tenant_id: Optional[str] = None
     # === 老字段全部 Optional · _build_user_info 已不返回 · credits 系统接管 ===
-    plan: Optional[str] = None                 # v0.11 删 · 仅保 Optional 兼容老前端
-    monthly_quota: Optional[int] = None        # v0.11 删
-    effective_plan: Optional[str] = None       # v0.11 删
-    plan_expires_at: Optional[str] = None      # v0.11 删
-    plan_days_left: Optional[int] = None       # v0.11 删
-    trial_expires_at: Optional[str] = None     # v0.11 删
-    trial_days_left: Optional[float] = None    # v0.11 删
-    tenant_quota: Optional[int] = None         # v0.11 删
-    tenant_used: Optional[int] = None          # v0.11 删
-    expires_at: Optional[str] = None           # v0.11 删
+    plan: Optional[str] = None  # v0.11 删 · 仅保 Optional 兼容老前端
+    monthly_quota: Optional[int] = None  # v0.11 删
+    effective_plan: Optional[str] = None  # v0.11 删
+    plan_expires_at: Optional[str] = None  # v0.11 删
+    plan_days_left: Optional[int] = None  # v0.11 删
+    trial_expires_at: Optional[str] = None  # v0.11 删
+    trial_days_left: Optional[float] = None  # v0.11 删
+    tenant_quota: Optional[int] = None  # v0.11 删
+    tenant_used: Optional[int] = None  # v0.11 删
+    expires_at: Optional[str] = None  # v0.11 删
 
 
 class QuotaResponse(BaseModel):
@@ -1257,6 +1293,7 @@ def _calc_trial_days_left(user) -> Optional[float]:
         return None
     try:
         from datetime import datetime, timezone
+
         if isinstance(exp, str):
             # 处理可能的字符串格式
             exp = datetime.fromisoformat(exp.replace("Z", "+00:00"))
@@ -1326,7 +1363,7 @@ def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
         "invited_by": user.get("invited_by"),
         "is_billing_exempt": bool(user.get("is_billing_exempt", False)),
         "active_tenant_id": str(user["active_tenant_id"]) if user.get("active_tenant_id") else None,
-        "account_type": account_type,     # v0.15.5 · 明确的账号类型 · 供前端显示判断
+        "account_type": account_type,  # v0.15.5 · 明确的账号类型 · 供前端显示判断
         "used_this_month": int(user.get("used_this_month", 0) or 0),
         "ip_used_today": ip_used,
         "ip_daily_limit": ip_limit,
@@ -1374,7 +1411,9 @@ def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
         "is_super_admin": is_super,
         # v118.8.4 · 公司名 + 真实姓名(注册时填的) · 顶栏归属感 + 设置页显示
         # v118.12 · 员工的 company_name 应继承自 tenant(他不该自己有公司)
-        "company_name": (tenant_info.get("name") if tenant_info else None) or user.get("company_name") or None,
+        "company_name": (tenant_info.get("name") if tenant_info else None)
+        or user.get("company_name")
+        or None,
         "full_name": user.get("full_name") or None,
         # v118.27.6 · Google 头像 URL(OAuth 注册时同步)
         "avatar_url": user.get("avatar_url") or None,
@@ -1398,7 +1437,7 @@ def _plan_permissions(plan: str = None) -> dict:
     return {
         # 这里的 monthly_quota 是 "权限层默认值" · 实际配额以 user.monthly_quota 为准
         # 下游代码应读 user.monthly_quota · 而不是 perms["monthly_quota"]
-        "monthly_quota": None,                # 权限层不限 · 实际配额看 user
+        "monthly_quota": None,  # 权限层不限 · 实际配额看 user
         "max_pages_per_upload": 50,
         "max_file_size_mb": 100,
         "can_edit_fields": True,
@@ -1462,35 +1501,51 @@ def _check_user_quota(user: dict) -> tuple:
     # v118.35.0.21 · 白名单查 users.is_billing_exempt(单一数据源 + 5min cache)
     try:
         if db.is_user_billing_exempt(user.get("id")):
-            return True, None, {
-                "mode": "billing_exempt",
-                "monthly_quota": None,
-                "used_this_month": 0,
-                "remaining": 999999,
-            }
+            return (
+                True,
+                None,
+                {
+                    "mode": "billing_exempt",
+                    "monthly_quota": None,
+                    "used_this_month": 0,
+                    "remaining": 999999,
+                },
+            )
     except Exception as _wle:
         logger.warning(f"_check_user_quota whitelist lookup skip: {_wle}")
     # 老路径 fallback(防 is_billing_exempt 读取异常)
     if str(user.get("id") or "") == "468b50c1-5593-4fd6-990d-515ce8085563":
-        return True, None, {
-            "mode": "skin_test_whitelist",
-            "monthly_quota": None,
-            "used_this_month": 0,
-        }
+        return (
+            True,
+            None,
+            {
+                "mode": "skin_test_whitelist",
+                "monthly_quota": None,
+                "used_this_month": 0,
+            },
+        )
 
     # v118.26.2.4 · 安全闸 · 被禁用 / 封禁账号绝对不能 OCR
     if user.get("is_banned"):
-        return False, "account.banned", {
-            "mode": "banned",
-            "monthly_quota": 0,
-            "used_this_month": 0,
-        }
+        return (
+            False,
+            "account.banned",
+            {
+                "mode": "banned",
+                "monthly_quota": 0,
+                "used_this_month": 0,
+            },
+        )
     if user.get("is_active") is False:
-        return False, "account.inactive", {
-            "mode": "inactive",
-            "monthly_quota": 0,
-            "used_this_month": 0,
-        }
+        return (
+            False,
+            "account.inactive",
+            {
+                "mode": "inactive",
+                "monthly_quota": 0,
+                "used_this_month": 0,
+            },
+        )
 
     # v118.26.2.2 紧急放行 · 有效 plan 用户(_v109_quota 已查过试用期/月配额)
     # v118.26.2.4 · 员工 role=member 时 · 取老板 plan(继承 · 跟 _build_user_info 同步)
@@ -1504,18 +1559,22 @@ def _check_user_quota(user: dict) -> tuple:
                 )
                 _row = _cur.fetchone()
                 if _row:
-                    _owner_plan = (_row["plan"] if isinstance(_row, dict) else _row[0])
+                    _owner_plan = _row["plan"] if isinstance(_row, dict) else _row[0]
                     if _owner_plan:
                         user_plan = _owner_plan
         except Exception as _e:
             logger.warning(f"_check_user_quota: lookup owner plan failed: {_e}")
 
     if user.get("is_super_admin") or user_plan == "admin":
-        return True, None, {
-            "mode": "admin",
-            "monthly_quota": None,
-            "used_this_month": 0,
-        }
+        return (
+            True,
+            None,
+            {
+                "mode": "admin",
+                "monthly_quota": None,
+                "used_this_month": 0,
+            },
+        )
     if user_plan == "lifetime":
         # lifetime 必须自带 Gemini key(员工继承时 · 看老板 key)
         _gk = user.get("gemini_api_key")
@@ -1528,28 +1587,39 @@ def _check_user_quota(user: dict) -> tuple:
                     )
                     _row = _cur.fetchone()
                     if _row:
-                        _gk = (_row["gemini_api_key"] if isinstance(_row, dict) else _row[0])
+                        _gk = _row["gemini_api_key"] if isinstance(_row, dict) else _row[0]
             except Exception as e:
                 logger.warning(f"[user_info] 读取老板 gemini_api_key 失败: {e}")
         has_own_key = bool((_gk or "").strip())
         if has_own_key:
-            return True, None, {
-                "mode": "lifetime",
+            return (
+                True,
+                None,
+                {
+                    "mode": "lifetime",
+                    "monthly_quota": None,
+                    "used_this_month": int(user.get("used_this_month") or 0),
+                },
+            )
+        return (
+            False,
+            "quota.need_api_key",
+            {
+                "mode": "need_setup",
+                "monthly_quota": 0,
+                "used_this_month": 0,
+            },
+        )
+    if user_plan in ("trial", "free", "pro", "firm", "enterprise", "monthly", "yearly"):
+        return (
+            True,
+            None,
+            {
+                "mode": "v109_plan",
                 "monthly_quota": None,
                 "used_this_month": int(user.get("used_this_month") or 0),
-            }
-        return False, "quota.need_api_key", {
-            "mode": "need_setup",
-            "monthly_quota": 0,
-            "used_this_month": 0,
-        }
-    if user_plan in ("trial", "free", "pro", "firm", "enterprise",
-                     "monthly", "yearly"):
-        return True, None, {
-            "mode": "v109_plan",
-            "monthly_quota": None,
-            "used_this_month": int(user.get("used_this_month") or 0),
-        }
+            },
+        )
 
     # === 以下为老多租户兜底(plan 字段为 NULL 或非标值的极旧用户)===
     # v87 · 多租户优先分支
@@ -1564,60 +1634,97 @@ def _check_user_quota(user: dict) -> tuple:
             tt = tenant.get("tenant_type")
             # 超管 · 无限
             if tt == "admin" or user.get("is_super_admin"):
-                return True, None, {
-                    "mode": "admin",
-                    "monthly_quota": None,
-                    "used_this_month": 0,
-                }
+                return (
+                    True,
+                    None,
+                    {
+                        "mode": "admin",
+                        "monthly_quota": None,
+                        "used_this_month": 0,
+                    },
+                )
             # 买断自带 key
             if tt == "byo_api":
                 has_own_key = bool((user.get("gemini_api_key") or "").strip())
                 if has_own_key:
-                    return True, None, {
-                        "mode": "lifetime",
-                        "monthly_quota": None,
-                        "used_this_month": int(user.get("used_this_month") or 0),
-                    }
-                return False, "quota.need_api_key", {
-                    "mode": "need_setup",
-                    "monthly_quota": 0,
-                    "used_this_month": 0,
-                }
+                    return (
+                        True,
+                        None,
+                        {
+                            "mode": "lifetime",
+                            "monthly_quota": None,
+                            "used_this_month": int(user.get("used_this_month") or 0),
+                        },
+                    )
+                return (
+                    False,
+                    "quota.need_api_key",
+                    {
+                        "mode": "need_setup",
+                        "monthly_quota": 0,
+                        "used_this_month": 0,
+                    },
+                )
             # 月付共用系统 key(shared_api)· 配额在 tenant 层
             if tt == "shared_api":
                 t_quota = int(tenant.get("monthly_quota") or 0)
                 t_used = int(tenant.get("used_this_month") or 0)
                 if t_quota <= 0:
                     # 月付但管理员没配额度 · 联系管理员
-                    return False, "quota.need_api_key", {
-                        "mode": "need_setup",
-                        "monthly_quota": 0,
-                        "used_this_month": 0,
-                    }
+                    return (
+                        False,
+                        "quota.need_api_key",
+                        {
+                            "mode": "need_setup",
+                            "monthly_quota": 0,
+                            "used_this_month": 0,
+                        },
+                    )
                 if t_used >= t_quota:
-                    return False, "quota.exhausted", {
+                    return (
+                        False,
+                        "quota.exhausted",
+                        {
+                            "mode": "shared",
+                            "monthly_quota": t_quota,
+                            "used_this_month": t_used,
+                        },
+                    )
+                return (
+                    True,
+                    None,
+                    {
                         "mode": "shared",
                         "monthly_quota": t_quota,
                         "used_this_month": t_used,
-                    }
-                return True, None, {
-                    "mode": "shared",
-                    "monthly_quota": t_quota,
-                    "used_this_month": t_used,
-                }
+                    },
+                )
 
     # 老规则(兜底)· 保持向后兼容
     # === v109.3 · 新 plan 系统的用户(trial/free/pro/firm/enterprise)走新逻辑 ===
     # === v111.1 · 加 monthly/yearly/lifetime/admin 新档名 ===
     # 这些用户已经在前面被 v109.3 quota check 检查过 · 这里直接放行
     user_plan = user.get("plan")
-    if user_plan in ("trial", "free", "pro", "firm", "enterprise",
-                     "monthly", "yearly", "lifetime", "admin"):
-        return True, None, {
-            "mode": "v109_plan",
-            "monthly_quota": None,
-            "used_this_month": int(user.get("used_this_month") or 0),
-        }
+    if user_plan in (
+        "trial",
+        "free",
+        "pro",
+        "firm",
+        "enterprise",
+        "monthly",
+        "yearly",
+        "lifetime",
+        "admin",
+    ):
+        return (
+            True,
+            None,
+            {
+                "mode": "v109_plan",
+                "monthly_quota": None,
+                "used_this_month": int(user.get("used_this_month") or 0),
+            },
+        )
 
     has_own_key = bool((user.get("gemini_api_key") or "").strip())
     quota = user.get("monthly_quota")
@@ -1625,34 +1732,50 @@ def _check_user_quota(user: dict) -> tuple:
 
     # 情况 1 · 自带 key(买断)· 无限制
     if has_own_key:
-        return True, None, {
-            "mode": "lifetime",
-            "monthly_quota": None,
-            "used_this_month": used,
-        }
+        return (
+            True,
+            None,
+            {
+                "mode": "lifetime",
+                "monthly_quota": None,
+                "used_this_month": used,
+            },
+        )
 
     # 情况 2 · 无 key · 无配额(或配额 <= 0)· 需要填 API Key
     if not quota or quota <= 0:
-        return False, "quota.need_api_key", {
-            "mode": "need_setup",
-            "monthly_quota": 0,
-            "used_this_month": used,
-        }
+        return (
+            False,
+            "quota.need_api_key",
+            {
+                "mode": "need_setup",
+                "monthly_quota": 0,
+                "used_this_month": used,
+            },
+        )
 
     # 情况 3 · 月付 · 超额
     if used >= quota:
-        return False, "quota.exhausted", {
+        return (
+            False,
+            "quota.exhausted",
+            {
+                "mode": "monthly",
+                "monthly_quota": int(quota),
+                "used_this_month": used,
+            },
+        )
+
+    # 情况 4 · 月付 · 正常
+    return (
+        True,
+        None,
+        {
             "mode": "monthly",
             "monthly_quota": int(quota),
             "used_this_month": used,
-        }
-
-    # 情况 4 · 月付 · 正常
-    return True, None, {
-        "mode": "monthly",
-        "monthly_quota": int(quota),
-        "used_this_month": used,
-    }
+        },
+    )
 
 
 # ============================================================
@@ -1667,7 +1790,10 @@ async def health():
     elif _creds:
         credentials_status = {"available": False, "error": f"file not found: {_creds}"}
     else:
-        credentials_status = {"available": False, "error": "GOOGLE_APPLICATION_CREDENTIALS env not set"}
+        credentials_status = {
+            "available": False,
+            "error": "GOOGLE_APPLICATION_CREDENTIALS env not set",
+        }
     return {
         "status": "ok",
         "version": "0.18.5-v105",
@@ -1701,12 +1827,16 @@ async def login(req: LoginRequest, request: Request):
     # v109.3.2 · 登录失败次数检查(同邮箱 5 次/30 分钟)
     try:
         import db as _db
+
         with _db.get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COUNT(*) AS n FROM login_failure_log
                 WHERE email_or_username = %s
                   AND created_at > NOW() - INTERVAL '30 minutes'
-            """, (req.username.lower().strip(),))
+            """,
+                (req.username.lower().strip(),),
+            )
             row = cur.fetchone()
             n = row.get("n") if isinstance(row, dict) else (row[0] if row else 0)
             if n and int(n) >= 5:
@@ -1730,11 +1860,14 @@ async def login(req: LoginRequest, request: Request):
         raise HTTPException(403, detail="auth.account_disabled")
 
     from datetime import datetime, timezone
+
     if user.get("expires_at"):
         try:
             exp = user["expires_at"]
-            exp_dt = exp if hasattr(exp, "tzinfo") else datetime.fromisoformat(
-                str(exp).replace("Z", "+00:00")
+            exp_dt = (
+                exp
+                if hasattr(exp, "tzinfo")
+                else datetime.fromisoformat(str(exp).replace("Z", "+00:00"))
             )
             if exp_dt < datetime.now(timezone.utc):
                 raise HTTPException(403, detail="auth.account_expired")
@@ -1765,6 +1898,7 @@ async def login(req: LoginRequest, request: Request):
     # 登录成功 · 清空失败记录
     try:
         import db as _db
+
         with _db.get_cursor() as cur:
             cur.execute(
                 "DELETE FROM login_failure_log WHERE email_or_username = %s",
@@ -1775,26 +1909,32 @@ async def login(req: LoginRequest, request: Request):
 
     # 返回 · 同时提供 token 和 access_token 两个键(向前兼容)
     user_info = {"id": str(user["id"]), "username": user["username"], "plan": user["plan"]}
-    return JSONResponse({
-        "token": token,
-        "access_token": token,
-        "user": user_info,
-        "must_change_password": must_change_password,
-        "is_super_admin": bool(user.get("is_super_admin")),
-    })
+    return JSONResponse(
+        {
+            "token": token,
+            "access_token": token,
+            "user": user_info,
+            "must_change_password": must_change_password,
+            "is_super_admin": bool(user.get("is_super_admin")),
+        }
+    )
 
 
 def _record_login_failure(username: str, request: Request):
     """记录登录失败 · 用于锁定逻辑"""
     try:
         import db as _db
+
         ip = request.client.host if request.client else None
         ua = request.headers.get("user-agent", "")[:200]
         with _db.get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO login_failure_log(email_or_username, ip, user_agent)
                 VALUES (%s, %s, %s)
-            """, (username.lower().strip(), ip, ua))
+            """,
+                (username.lower().strip(), ip, ua),
+            )
     except Exception as e:
         logger.warning(f"login fail log skip: {e}")
 
@@ -1904,8 +2044,11 @@ async def ocr_recognize(
 
     # 1. 基本校验 (2026-05-21 multi-format refactor: PDF + image + Excel + CSV + Word)
     from services.ocr.pipeline import (
-        PDF_EXTENSIONS, IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+        PDF_EXTENSIONS,
+        IMAGE_EXTENSIONS,
+        TABLE_EXTENSIONS,
     )
+
     _all_exts = PDF_EXTENSIONS | IMAGE_EXTENSIONS | TABLE_EXTENSIONS
     _fname = (file.filename or "").lower()
     _ext = "." + _fname.rsplit(".", 1)[-1] if "." in _fname else ""
@@ -1927,14 +2070,19 @@ async def ocr_recognize(
     # 3. 页数校验 — only meaningful for PDFs. Excel/CSV/Word/image skip this.
     if _ext in PDF_EXTENSIONS:
         from services.ocr.pdf_utils import count_pdf_pages
+
         page_count = count_pdf_pages(content)
         if page_count == 0:
             raise HTTPException(400, detail="ocr.invalid_pdf")
         if page_count > max_pages:
-            raise HTTPException(400, detail={
-                "code": "ocr.too_many_pages",
-                "max": max_pages, "actual": page_count,
-            })
+            raise HTTPException(
+                400,
+                detail={
+                    "code": "ocr.too_many_pages",
+                    "max": max_pages,
+                    "actual": page_count,
+                },
+            )
     else:
         page_count = 1  # images / single-CSV / single-DOCX count as 1 page
 
@@ -1942,14 +2090,20 @@ async def ocr_recognize(
     # === v109.3 · 新套餐配额检查(防薅 + 真实计量) ===
     try:
         from auth_signup import check_ocr_quota as _v109_quota
+
         _q = _v109_quota(str(user.get("id")))
         if not _q.get("allowed"):
             reason = _q.get("reason", "quota_exceeded")
-            raise HTTPException(status_code=429, detail={
-                "code": f"v109.{reason}",
-                "used": _q.get("used"), "limit": _q.get("limit"), "plan": _q.get("plan"),
-                "needs_line_verify": reason == "needs_line_verify",
-            })
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "code": f"v109.{reason}",
+                    "used": _q.get("used"),
+                    "limit": _q.get("limit"),
+                    "plan": _q.get("plan"),
+                    "needs_line_verify": reason == "needs_line_verify",
+                },
+            )
     except HTTPException:
         raise
     except Exception as _v109e:
@@ -1959,17 +2113,23 @@ async def ocr_recognize(
     if not ok:
         if err_code == "quota.need_api_key":
             # 买断账号未填 key
-            raise HTTPException(403, detail={
-                "code": "quota.need_api_key",
-            })
+            raise HTTPException(
+                403,
+                detail={
+                    "code": "quota.need_api_key",
+                },
+            )
         elif err_code == "quota.exhausted":
-            raise HTTPException(429, detail={
-                "code": "ocr.monthly_limit_exceeded",
-                "limit": quota_info["monthly_quota"],
-                "used": quota_info["used_this_month"],
-                "remaining": 0,
-                "requested": page_count,
-            })
+            raise HTTPException(
+                429,
+                detail={
+                    "code": "ocr.monthly_limit_exceeded",
+                    "limit": quota_info["monthly_quota"],
+                    "used": quota_info["used_this_month"],
+                    "remaining": 0,
+                    "requested": page_count,
+                },
+            )
         else:
             raise HTTPException(429, detail={"code": err_code or "quota.unknown"})
 
@@ -1978,36 +2138,48 @@ async def ocr_recognize(
         mq = quota_info["monthly_quota"]
         um = quota_info["used_this_month"]
         if um + page_count > mq:
-            raise HTTPException(429, detail={
-                "code": "ocr.monthly_limit_exceeded",
-                "limit": mq,
-                "used": um,
-                "remaining": max(0, mq - um),
-                "requested": page_count,
-            })
+            raise HTTPException(
+                429,
+                detail={
+                    "code": "ocr.monthly_limit_exceeded",
+                    "limit": mq,
+                    "used": um,
+                    "remaining": max(0, mq - um),
+                    "requested": page_count,
+                },
+            )
 
     monthly_quota = quota_info.get("monthly_quota")  # 兼容下游(None=不限)
     used_today = None
     used_month = quota_info.get("used_this_month")
 
     # v118.35.0.21 · Credits 余额前置检查(v0.20 重做 · 1 次 SELECT · 修连接池超时)
-    _billing = {"allowed": True, "is_exempt": True, "balance_thb": 0.0,
-                "pages_used_this_month": 0, "error_code": None}
+    _billing = {
+        "allowed": True,
+        "is_exempt": True,
+        "balance_thb": 0.0,
+        "pages_used_this_month": 0,
+        "error_code": None,
+    }
     try:
         _billing = db.get_billing_status_combined(str(user.get("id")), _tid(user))
         if not _billing.get("allowed") and not _billing.get("is_exempt"):
             if _ext in PDF_EXTENSIONS:
-                _est_cost = float(db.estimate_pdf_cost_thb(
-                    _billing.get("pages_used_this_month", 0), page_count))
+                _est_cost = float(
+                    db.estimate_pdf_cost_thb(_billing.get("pages_used_this_month", 0), page_count)
+                )
             else:
                 _chars = db._excel_char_count_estimate(content, file.filename or "")
                 _est_cost = float(db.estimate_excel_cost_thb(_chars))
-            raise HTTPException(402, detail={
-                "code": "insufficient_balance",
-                "balance": _billing.get("balance_thb", 0.0),
-                "estimated_cost": _est_cost,
-                "pages_used_this_month": _billing.get("pages_used_this_month", 0),
-            })
+            raise HTTPException(
+                402,
+                detail={
+                    "code": "insufficient_balance",
+                    "balance": _billing.get("balance_thb", 0.0),
+                    "estimated_cost": _est_cost,
+                    "pages_used_this_month": _billing.get("pages_used_this_month", 0),
+                },
+            )
     except HTTPException:
         raise
     except Exception as _be:
@@ -2016,6 +2188,7 @@ async def ocr_recognize(
     # 4.5. 文件指纹缓存 · v0.8 改:所有 plan 都启用(按 user_id 隔离,不跨用户)
     # v92 · 缓存窗口从 24h 扩到 30 天(默认) · 月末复核上月票也能命中 · 省 Gemini 配额
     import hashlib
+
     file_hash = hashlib.sha256(content).hexdigest()
     cached = find_ocr_by_hash(str(user["id"]), file_hash, tenant_id=_tid(user))
     if cached:
@@ -2028,7 +2201,12 @@ async def ocr_recognize(
                 auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
                 if auto_eps:
                     import asyncio
-                    asyncio.create_task(_auto_push_history(str(user["id"]), cached["id"], auto_eps, tenant_id=_tid(user)))
+
+                    asyncio.create_task(
+                        _auto_push_history(
+                            str(user["id"]), cached["id"], auto_eps, tenant_id=_tid(user)
+                        )
+                    )
                     cache_auto_pushed = True
                     logger.info(f"🚀 [Cache] 自动推送已入队 · history={cached['id']}")
             except Exception as e:
@@ -2043,8 +2221,12 @@ async def ocr_recognize(
         # 这是关键 · 否则:历史已识别 + 这次重传 → 缓存命中 → 异常栏永远收不到这张
         try:
             import asyncio as _asyncio_exc_c
+
             _cached_pages = cached.get("pages") or []
-            _primary = next((p for p in _cached_pages if not p.get("is_duplicate") and not p.get("is_copy")), None)
+            _primary = next(
+                (p for p in _cached_pages if not p.get("is_duplicate") and not p.get("is_copy")),
+                None,
+            )
             _primary = _primary or (_cached_pages[0] if _cached_pages else None)
             _cf = (_primary or {}).get("fields") or {}
             _exc_total_c = None
@@ -2054,17 +2236,19 @@ async def ocr_recognize(
                     _exc_total_c = float(str(_raw_t_c).replace(",", "").strip())
                 except Exception as e:
                     logger.warning(f"[cache_hit] total_amount 解析失败: {e}")
-            _asyncio_exc_c.create_task(_async_run_exception_checks(
-                history_id=str(cached["id"]),
-                user_id=str(user["id"]),
-                tenant_id=_tid(user),
-                seller_name=_cf.get("seller_name"),
-                invoice_no=_cf.get("invoice_number"),
-                total_amount=_exc_total_c,
-                confidence=cached.get("confidence"),
-                duplicate=None,  # 缓存命中说明 hash 全等 · 由专门的 duplicate 路径处理(本身已是同张)
-                fields=_cf,
-            ))
+            _asyncio_exc_c.create_task(
+                _async_run_exception_checks(
+                    history_id=str(cached["id"]),
+                    user_id=str(user["id"]),
+                    tenant_id=_tid(user),
+                    seller_name=_cf.get("seller_name"),
+                    invoice_no=_cf.get("invoice_number"),
+                    total_amount=_exc_total_c,
+                    confidence=cached.get("confidence"),
+                    duplicate=None,  # 缓存命中说明 hash 全等 · 由专门的 duplicate 路径处理(本身已是同张)
+                    fields=_cf,
+                )
+            )
             logger.info(f"  🛡  [Cache] 异常检测已入队 · hid={cached['id']}")
         except Exception as _e_c:
             logger.warning(f"[Cache] 异常检测入队失败(不影响识别): {_e_c}")
@@ -2126,12 +2310,15 @@ async def ocr_recognize(
             run_on_table_bytes as _pipeline_run_table,
         )
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+
         if _ext in PDF_EXTENSIONS:
             _pipe_res = _pipeline_run_pdf(content, max_pages=max_pages, api_key=api_key)
         elif _ext in IMAGE_EXTENSIONS:
             _pipe_res = _pipeline_run_image(content, api_key=api_key)
         else:  # TABLE_EXTENSIONS — Excel / CSV / Word / TXT
-            _pipe_res = _pipeline_run_table(content, filename=file.filename or "upload", api_key=api_key)
+            _pipe_res = _pipeline_run_table(
+                content, filename=file.filename or "upload", api_key=api_key
+            )
             chain_info = ["pipeline_v1_table"]
         result = pipeline_result_to_legacy_dict(_pipe_res)
         _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
@@ -2144,6 +2331,7 @@ async def ocr_recognize(
         if not _billing.get("is_exempt"):
             try:
                 import asyncio as _asyncio_chg
+
                 if _ext in PDF_EXTENSIONS:
                     _chg_kind = "pdf"
                     _chg_units = int(_pipe_res.page_count or page_count)
@@ -2151,11 +2339,17 @@ async def ocr_recognize(
                     _chg_kind = "excel"
                     _chg_units = db._excel_char_count_estimate(content, file.filename or "")
                 if _chg_units > 0:
-                    _asyncio_chg.create_task(_asyncio_chg.to_thread(
-                        db.charge_ocr_async,
-                        str(user.get("id")), _tid(user), _chg_kind, _chg_units,
-                        None, f"OCR {_chg_kind} · {file.filename}"
-                    ))
+                    _asyncio_chg.create_task(
+                        _asyncio_chg.to_thread(
+                            db.charge_ocr_async,
+                            str(user.get("id")),
+                            _tid(user),
+                            _chg_kind,
+                            _chg_units,
+                            None,
+                            f"OCR {_chg_kind} · {file.filename}",
+                        )
+                    )
             except Exception as _ce:
                 logger.warning(f"💳 async charge dispatch skip: {_ce}")
     except HTTPException:
@@ -2211,15 +2405,22 @@ async def ocr_recognize(
     def _page_confidence(p):
         f = p.get("fields", {}) or {}
         s = 0
-        if f.get("invoice_number"): s += 1
-        if f.get("date"): s += 1
-        if f.get("total_amount"): s += 1
-        if f.get("seller_name") or f.get("seller_tax"): s += 1
-        if f.get("buyer_name") or f.get("buyer_tax"): s += 1
+        if f.get("invoice_number"):
+            s += 1
+        if f.get("date"):
+            s += 1
+        if f.get("total_amount"):
+            s += 1
+        if f.get("seller_name") or f.get("seller_tax"):
+            s += 1
+        if f.get("buyer_name") or f.get("buyer_tax"):
+            s += 1
         items = f.get("items") or []
-        if items: s += 2
+        if items:
+            s += 2
         # v118.20.4.2 · 文本路径补偿:subtotal + vat 双有 → 等价 items(发票结构完整)
-        elif f.get("subtotal") and f.get("vat"): s += 2
+        elif f.get("subtotal") and f.get("vat"):
+            s += 2
         return s
 
     # 副本/签字页过滤(去重)
@@ -2286,11 +2487,13 @@ async def ocr_recognize(
         logger.info(f"📑 识别结果拆分为 {len(invoice_groups)} 张发票")
     except Exception as e:
         logger.warning(f"发票分组失败,回退为单张: {e}")
-        invoice_groups = [{
-            "invoice_fields": {},
-            "source_pages": result["pages"],
-            "page_indices": list(range(1, result["page_count"] + 1)),
-        }]
+        invoice_groups = [
+            {
+                "invoice_fields": {},
+                "source_pages": result["pages"],
+                "page_indices": list(range(1, result["page_count"] + 1)),
+            }
+        ]
 
     invoice_count = len(invoice_groups)
     source_pdf_id = str(_uuid.uuid4()) if invoice_count > 1 else None
@@ -2302,8 +2505,8 @@ async def ocr_recognize(
         template = _archive.DEFAULT_TEMPLATE
 
     history_ids = []
-    duplicate_warnings = []         # v0.13 · 收集所有发票的重复警告
-    primary_history_id = None       # 第一张发票的 history_id · 兼容老前端字段
+    duplicate_warnings = []  # v0.13 · 收集所有发票的重复警告
+    primary_history_id = None  # 第一张发票的 history_id · 兼容老前端字段
     primary_archive_name = None
     primary_category_tag = None
 
@@ -2322,6 +2525,7 @@ async def ocr_recognize(
         _pdf_to_save = content
         try:
             import pdf_searchable
+
             _pages_texts = pdf_searchable.extract_searchable_text_from_pages(
                 result.get("pages") or []
             )
@@ -2391,6 +2595,7 @@ async def ocr_recognize(
                 if raw_date:
                     try:
                         from datetime import datetime as _dt
+
                         s = str(raw_date).replace("/", "-")[:10]
                         _dt.strptime(s, "%Y-%m-%d")
                         date_iso = s
@@ -2413,27 +2618,33 @@ async def ocr_recognize(
                     total_amount=total_f,
                 )
                 if dup:
-                    duplicate_warnings.append({
-                        "invoice_index": idx,           # 第几张
-                        "invoice_total": invoice_count, # 共几张
-                        "level": dup["level"],          # exact / likely
-                        "matched_fields": dup["matched_fields"],
-                        "match": dup["match"],
-                        "current": {
-                            "invoice_no": inv_no,
-                            "invoice_date": date_iso,
-                            "seller_name": seller,
-                            "total_amount": total_f,
-                        },
-                    })
-                    logger.info(f"⚠️ 检测到重复发票 (idx={idx} · {dup['level']} · 匹配于历史 {dup['match']['id']})")
+                    duplicate_warnings.append(
+                        {
+                            "invoice_index": idx,  # 第几张
+                            "invoice_total": invoice_count,  # 共几张
+                            "level": dup["level"],  # exact / likely
+                            "matched_fields": dup["matched_fields"],
+                            "match": dup["match"],
+                            "current": {
+                                "invoice_no": inv_no,
+                                "invoice_date": date_iso,
+                                "seller_name": seller,
+                                "total_amount": total_f,
+                            },
+                        }
+                    )
+                    logger.info(
+                        f"⚠️ 检测到重复发票 (idx={idx} · {dup['level']} · 匹配于历史 {dup['match']['id']})"
+                    )
             except Exception as e:
                 logger.warning(f"重复检测失败(已忽略): {e}")
 
         # v92 · Bug 1 第 1 层防御 · 识别成功才带 file_hash · 防止空结果污染缓存
         _gf = g_fields or {}
         _has_inv = bool(str(_gf.get("invoice_number") or "").strip())
-        _has_amt = _gf.get("total_amount") is not None and bool(str(_gf.get("total_amount")).strip())
+        _has_amt = _gf.get("total_amount") is not None and bool(
+            str(_gf.get("total_amount")).strip()
+        )
         _has_seller = bool(str(_gf.get("seller_name") or "").strip())
         _recognized_ok = _has_inv or _has_amt or _has_seller
         _cache_hash = file_hash if (idx == 1 and _recognized_ok) else None
@@ -2459,7 +2670,9 @@ async def ocr_recognize(
             pdf_storage_path=_pdf_rel_path,
             pdf_size_bytes=_pdf_size_bytes,
             # v27.8.1.13a · 右上角客户切换器选中时自动归属(多发票同一 PDF 共享同一 client_id)
-            client_id=(int(client_id) if (client_id and str(client_id).strip().isdigit()) else None),
+            client_id=(
+                int(client_id) if (client_id and str(client_id).strip().isdigit()) else None
+            ),
         )
         if hid:
             history_ids.append(hid)
@@ -2483,8 +2696,7 @@ async def ocr_recognize(
             _auto_resolved_client = False
             try:
                 history_existing_client = (
-                    int(client_id) if (client_id and str(client_id).strip().isdigit())
-                    else None
+                    int(client_id) if (client_id and str(client_id).strip().isdigit()) else None
                 )
                 if not history_existing_client:
                     _buyer_name = (g_fields or {}).get("buyer_name")
@@ -2501,19 +2713,27 @@ async def ocr_recognize(
                         if conf >= 0.95 and rcid:
                             # 自动绑 + 学习
                             db.update_history_client_id(
-                                hid, rcid, str(user["id"]),
+                                hid,
+                                rcid,
+                                str(user["id"]),
                                 tenant_id=_tid(user),
                             )
                             db.learn_buyer_to_client(
-                                _buyer_name, _buyer_tax, rcid,
-                                str(user["id"]), tenant_id=_tid(user),
+                                _buyer_name,
+                                _buyer_tax,
+                                rcid,
+                                str(user["id"]),
+                                tenant_id=_tid(user),
                             )
                             _auto_resolved_client = True
                             logger.info(
                                 "[auto-resolve] history=%s client_id=%s "
                                 "name=%r conf=%.2f source=%s",
-                                hid[:8], rcid, resolved.get("client_name"),
-                                conf, resolved.get("match_source"),
+                                hid[:8],
+                                rcid,
+                                resolved.get("client_name"),
+                                conf,
+                                resolved.get("match_source"),
                             )
                         elif conf >= 0.80 and rcid:
                             # 建议归属 · 不 auto-assign · 标 suggestion
@@ -2521,7 +2741,10 @@ async def ocr_recognize(
                             logger.info(
                                 "[auto-resolve] SUGGEST history=%s client_id=%s "
                                 "name=%r conf=%.2f",
-                                hid[:8], rcid, resolved.get("client_name"), conf,
+                                hid[:8],
+                                rcid,
+                                resolved.get("client_name"),
+                                conf,
                             )
                             # 把 suggestion stash 到 history.pages[0].fields 让前端读
                             try:
@@ -2533,7 +2756,9 @@ async def ocr_recognize(
                                     _f["_suggested_client_confidence"] = conf
                                     _new_pages[0] = {**_new_pages[0], "fields": _f}
                                     db.update_ocr_history_pages(
-                                        str(user["id"]), hid, _new_pages,
+                                        str(user["id"]),
+                                        hid,
+                                        _new_pages,
                                         tenant_id=_tid(user),
                                     )
                             except Exception as _se:
@@ -2541,7 +2766,8 @@ async def ocr_recognize(
                     else:
                         logger.info(
                             "[auto-resolve] no match history=%s buyer=%r",
-                            hid[:8], (_buyer_name or "")[:40],
+                            hid[:8],
+                            (_buyer_name or "")[:40],
                         )
             except Exception as _are:
                 logger.warning(f"auto-resolve client_id failed (history={hid[:8]}): {_are}")
@@ -2549,6 +2775,7 @@ async def ocr_recognize(
             # v118.20.1 · 异常栏 · 异步跑零成本规则(不阻塞 OCR 主流程)
             try:
                 import asyncio as _asyncio_exc
+
                 # 安全解析 total · 不依赖外层 try 块里的 total_f
                 _exc_total = None
                 _raw_t = (g_fields or {}).get("total_amount")
@@ -2557,17 +2784,19 @@ async def ocr_recognize(
                         _exc_total = float(str(_raw_t).replace(",", "").strip())
                     except Exception as e:
                         logger.warning(f"[exc_check] total_amount 解析失败: {e}")
-                _asyncio_exc.create_task(_async_run_exception_checks(
-                    history_id=str(hid),
-                    user_id=str(user["id"]),
-                    tenant_id=_tid(user),
-                    seller_name=(g_fields or {}).get("seller_name"),
-                    invoice_no=(g_fields or {}).get("invoice_number"),
-                    total_amount=_exc_total,
-                    confidence=confidence,
-                    duplicate=_dup_for_idx,
-                    fields=g_fields or {},  # v118.20.1.5 · 全字段 · 给自洽性规则用
-                ))
+                _asyncio_exc.create_task(
+                    _async_run_exception_checks(
+                        history_id=str(hid),
+                        user_id=str(user["id"]),
+                        tenant_id=_tid(user),
+                        seller_name=(g_fields or {}).get("seller_name"),
+                        invoice_no=(g_fields or {}).get("invoice_number"),
+                        total_amount=_exc_total,
+                        confidence=confidence,
+                        duplicate=_dup_for_idx,
+                        fields=g_fields or {},  # v118.20.1.5 · 全字段 · 给自洽性规则用
+                    )
+                )
             except Exception as _exc_e:
                 logger.warning(f"异常检测入队失败(不影响识别): {_exc_e}")
 
@@ -2585,7 +2814,9 @@ async def ocr_recognize(
                 pushable_ids = []
                 for hid in history_ids:
                     h = db.get_ocr_history_detail(
-                        str(user["id"]), hid, tenant_id=_tid(user),
+                        str(user["id"]),
+                        hid,
+                        tenant_id=_tid(user),
                     )
                     if h and h.get("client_id"):
                         pushable_ids.append(hid)
@@ -2596,18 +2827,22 @@ async def ocr_recognize(
                         )
                 if pushable_ids:
                     import asyncio
+
                     for hid in pushable_ids:
                         asyncio.create_task(
                             _auto_push_history(
-                                str(user["id"]), hid, auto_eps,
+                                str(user["id"]),
+                                hid,
+                                auto_eps,
                                 tenant_id=_tid(user),
                             ),
                         )
                     auto_pushed = True
                     logger.info(
-                        "🚀 自动推送已入队 · %d/%d 张发票 × %d 端点 "
-                        "(没归属的发票跳过)",
-                        len(pushable_ids), len(history_ids), len(auto_eps),
+                        "🚀 自动推送已入队 · %d/%d 张发票 × %d 端点 " "(没归属的发票跳过)",
+                        len(pushable_ids),
+                        len(history_ids),
+                        len(auto_eps),
                     )
         except Exception as e:
             logger.warning(f"自动推送入队失败(不影响识别): {e}")
@@ -2638,7 +2873,9 @@ async def ocr_recognize(
             cost_thb=cost_thb,
             elapsed_ms=int(result.get("elapsed_ms") or 0),
         )
-        logger.info(f"💰 成本记录 · {total_pages} 页 · in={total_input_tokens} out={total_output_tokens} · ≈THB {cost_thb:.4f}")
+        logger.info(
+            f"💰 成本记录 · {total_pages} 页 · in={total_input_tokens} out={total_output_tokens} · ≈THB {cost_thb:.4f}"
+        )
     except Exception as _cost_err:
         logger.warning(f"成本记录写入失败(不影响识别): {_cost_err}")
 
@@ -2649,9 +2886,9 @@ async def ocr_recognize(
         "engine": result["engine"],
         "pages": result["pages"],
         "confidence": confidence,
-        "history_id": primary_history_id,        # 兼容老前端
-        "history_ids": history_ids,              # v0.11 · 全部 id 列表
-        "invoice_count": invoice_count,          # v0.11 · 识别出几张发票
+        "history_id": primary_history_id,  # 兼容老前端
+        "history_ids": history_ids,  # v0.11 · 全部 id 列表
+        "invoice_count": invoice_count,  # v0.11 · 识别出几张发票
         # v118.27.5.1 · 多发票拆分修复 · 给前端每张独立 fields(导出/抽屉用)
         # 之前只返回扁平 pages · 前端 mergeFields 把多发票合并成 1 个 → 导出丢字段
         "invoices": [
@@ -2679,7 +2916,11 @@ async def ocr_recognize(
         "quota": {
             "ip_used_today": None,
             "ip_daily_limit": None,
-            "used_this_month": new_month_used if new_month_used is not None else int(user.get("used_this_month") or 0),
+            "used_this_month": (
+                new_month_used
+                if new_month_used is not None
+                else int(user.get("used_this_month") or 0)
+            ),
             "monthly_quota": monthly_quota,
         },
     }
@@ -2701,6 +2942,7 @@ async def ocr_export(req: ExportRequest, request: Request):
     if template_name == "standard":
         try:
             from excel_export import build_xlsx, default_filename
+
             xlsx_bytes = build_xlsx(req.records, lang=req.lang)
             filename = default_filename()
         except Exception as e:
@@ -2710,6 +2952,7 @@ async def ocr_export(req: ExportRequest, request: Request):
         # 泰国销售明细模板(每商品 1 行 + Excel 公式)· 跟泰国本地销售清单习惯一致
         try:
             from excel_template_th import build_sales_detail_xlsx, sales_detail_filename
+
             xlsx_bytes = build_sales_detail_xlsx(req.records, lang=req.lang)
             filename = sales_detail_filename()
         except Exception as e:
@@ -2795,11 +3038,13 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
                 mf["seller_name"] = h.get("seller_name")
             if h.get("total_amount") and not mf.get("total_amount"):
                 mf["total_amount"] = h.get("total_amount")
-            records.append({
-                "filename": h.get("filename") or f"history-{hid}",
-                "engine": "",
-                "merged_fields": mf,
-            })
+            records.append(
+                {
+                    "filename": h.get("filename") or f"history-{hid}",
+                    "engine": "",
+                    "merged_fields": mf,
+                }
+            )
         except Exception as e:
             logger.warning(f"export-by-history-ids · history {hid} 拉取失败: {e}")
             continue
@@ -2809,6 +3054,7 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
 
     try:
         from excel_template_th import build_sales_detail_xlsx, sales_detail_filename
+
         xlsx_bytes = build_sales_detail_xlsx(records, lang=req.lang)
         filename = sales_detail_filename()
     except Exception as e:
@@ -2823,6 +3069,8 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
             "X-Filename": filename,
         },
     )
+
+
 # ============================================================
 # /api/v1/ 别名(未来升级用,当前只是路由别名)
 # ============================================================
@@ -2867,6 +3115,7 @@ async def v1_contact():
 # 第 5 批 · 历史记录路由(Plus/Pro · Free 禁用)
 # ============================================================
 
+
 class HistoryUpdateRequest(BaseModel):
     pages: List[Any] = Field(..., description="完整 pages 数组(会计修改后的)")
 
@@ -2882,11 +3131,11 @@ class HistoryUpdateRequest(BaseModel):
 # ============================================================
 
 # 规则码 · 集中常量(后续阶段 4 加 tax_invalid / large_amount 在这里追加)
-EXC_RULE_CONFIDENCE_LOW    = "confidence_low"
-EXC_RULE_DUPLICATE         = "duplicate"
-EXC_RULE_AMOUNT_MISSING    = "amount_missing"
-EXC_RULE_MATH_MISMATCH     = "math_mismatch"
-EXC_RULE_TAX_ID_FORMAT     = "tax_id_format_invalid"
+EXC_RULE_CONFIDENCE_LOW = "confidence_low"
+EXC_RULE_DUPLICATE = "duplicate"
+EXC_RULE_AMOUNT_MISSING = "amount_missing"
+EXC_RULE_MATH_MISMATCH = "math_mismatch"
+EXC_RULE_TAX_ID_FORMAT = "tax_id_format_invalid"
 
 
 def _parse_money(raw) -> Optional[float]:
@@ -2910,14 +3159,17 @@ def _is_valid_thai_tax_id(tax_id: Optional[str]) -> bool:
     return len(s) == 13 and s.isdigit()
 
 
-async def _async_run_exception_checks(history_id: str, user_id: str,
-                                       tenant_id: Optional[str],
-                                       seller_name: Optional[str],
-                                       invoice_no: Optional[str],
-                                       total_amount: Optional[float],
-                                       confidence: Optional[str],
-                                       duplicate: Optional[Dict[str, Any]],
-                                       fields: Optional[Dict[str, Any]] = None):
+async def _async_run_exception_checks(
+    history_id: str,
+    user_id: str,
+    tenant_id: Optional[str],
+    seller_name: Optional[str],
+    invoice_no: Optional[str],
+    total_amount: Optional[float],
+    confidence: Optional[str],
+    duplicate: Optional[Dict[str, Any]],
+    fields: Optional[Dict[str, Any]] = None,
+):
     """OCR 完成后异步跑规则 · 任何失败都吞掉 · 绝不影响主流程"""
     try:
         fields = fields or {}
@@ -2933,13 +3185,19 @@ async def _async_run_exception_checks(history_id: str, user_id: str,
         # ── Rule 1 · confidence_low(非 high 即拦)
         # v118.22.0.6 · 修暗坑:conf=None / 空串 时前端显示「请复核」但 hook 原本跳过 · 现在也拦
         if (not confidence) or confidence != "high":
-            if not db.is_exception_whitelisted(user_id, tenant_id, seller_name, EXC_RULE_CONFIDENCE_LOW):
+            if not db.is_exception_whitelisted(
+                user_id, tenant_id, seller_name, EXC_RULE_CONFIDENCE_LOW
+            ):
                 _sev_1 = "medium" if confidence == "medium" else "high"
                 _ex_id_1 = db.insert_exception(
-                    user_id=user_id, tenant_id=tenant_id, history_id=history_id,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    history_id=history_id,
                     rule_code=EXC_RULE_CONFIDENCE_LOW,
                     severity=_sev_1,
-                    seller_name=seller_name, invoice_no=invoice_no, total_amount=total_amount,
+                    seller_name=seller_name,
+                    invoice_no=invoice_no,
+                    total_amount=total_amount,
                     detail={"confidence": confidence},
                 )
                 if _ex_id_1 and _sev_1 == "high":
@@ -2949,10 +3207,14 @@ async def _async_run_exception_checks(history_id: str, user_id: str,
             if not db.is_exception_whitelisted(user_id, tenant_id, seller_name, EXC_RULE_DUPLICATE):
                 _sev_2 = "high" if duplicate.get("level") == "exact" else "medium"
                 _ex_id_2 = db.insert_exception(
-                    user_id=user_id, tenant_id=tenant_id, history_id=history_id,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    history_id=history_id,
                     rule_code=EXC_RULE_DUPLICATE,
                     severity=_sev_2,
-                    seller_name=seller_name, invoice_no=invoice_no, total_amount=total_amount,
+                    seller_name=seller_name,
+                    invoice_no=invoice_no,
+                    total_amount=total_amount,
                     detail={
                         "level": duplicate.get("level"),
                         "matched_fields": duplicate.get("matched_fields"),
@@ -2964,33 +3226,47 @@ async def _async_run_exception_checks(history_id: str, user_id: str,
                 if _ex_id_2 and _sev_2 == "high":
                     _high_inserted.append(EXC_RULE_DUPLICATE)
         # ── Rule 3 · amount_missing(总金额 + 发票号 都为空 → 严重异常)
-        _no_amount = (total_amount is None)
-        _no_invno = (not invoice_no or not str(invoice_no).strip())
+        _no_amount = total_amount is None
+        _no_invno = not invoice_no or not str(invoice_no).strip()
         if _no_amount and _no_invno:
-            if not db.is_exception_whitelisted(user_id, tenant_id, seller_name, EXC_RULE_AMOUNT_MISSING):
+            if not db.is_exception_whitelisted(
+                user_id, tenant_id, seller_name, EXC_RULE_AMOUNT_MISSING
+            ):
                 _ex_id_3 = db.insert_exception(
-                    user_id=user_id, tenant_id=tenant_id, history_id=history_id,
-                    rule_code=EXC_RULE_AMOUNT_MISSING, severity="high",
-                    seller_name=seller_name, invoice_no=None, total_amount=None,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    history_id=history_id,
+                    rule_code=EXC_RULE_AMOUNT_MISSING,
+                    severity="high",
+                    seller_name=seller_name,
+                    invoice_no=None,
+                    total_amount=None,
                     detail={"missing": ["total_amount", "invoice_no"]},
                 )
                 if _ex_id_3:
                     _high_inserted.append(EXC_RULE_AMOUNT_MISSING)
         # ── Rule 4 · math_mismatch(自洽性 · 未税 + 税额 ≠ 总额 → 假数据嫌疑)
-        _sub  = _parse_money(fields.get("subtotal"))
-        _vat  = _parse_money(fields.get("vat"))
+        _sub = _parse_money(fields.get("subtotal"))
+        _vat = _parse_money(fields.get("vat"))
         if _sub is not None and _vat is not None and total_amount is not None:
             _expected = round(_sub + _vat, 2)
             _diff = abs(_expected - total_amount)
             if _diff > 1.0:  # ±1฿ 舍入容差
-                if not db.is_exception_whitelisted(user_id, tenant_id, seller_name, EXC_RULE_MATH_MISMATCH):
+                if not db.is_exception_whitelisted(
+                    user_id, tenant_id, seller_name, EXC_RULE_MATH_MISMATCH
+                ):
                     _ex_id_4 = db.insert_exception(
-                        user_id=user_id, tenant_id=tenant_id, history_id=history_id,
+                        user_id=user_id,
+                        tenant_id=tenant_id,
+                        history_id=history_id,
                         rule_code=EXC_RULE_MATH_MISMATCH,
                         severity="high",  # 数学不自洽 = OCR 数据可能编的 · 高危
-                        seller_name=seller_name, invoice_no=invoice_no, total_amount=total_amount,
+                        seller_name=seller_name,
+                        invoice_no=invoice_no,
+                        total_amount=total_amount,
                         detail={
-                            "subtotal": _sub, "vat": _vat,
+                            "subtotal": _sub,
+                            "vat": _vat,
                             "total_actual": total_amount,
                             "total_expected": _expected,
                             "diff": round(_diff, 2),
@@ -3001,12 +3277,19 @@ async def _async_run_exception_checks(history_id: str, user_id: str,
         # ── Rule 5 · tax_id_format_invalid(卖方税号不是 13 位 → OCR 读错 / 假票)
         _stax = fields.get("seller_tax")
         if _stax and not _is_valid_thai_tax_id(_stax):
-            if not db.is_exception_whitelisted(user_id, tenant_id, seller_name, EXC_RULE_TAX_ID_FORMAT):
+            if not db.is_exception_whitelisted(
+                user_id, tenant_id, seller_name, EXC_RULE_TAX_ID_FORMAT
+            ):
                 _clean = str(_stax).strip().replace("-", "").replace(" ", "")
                 db.insert_exception(
-                    user_id=user_id, tenant_id=tenant_id, history_id=history_id,
-                    rule_code=EXC_RULE_TAX_ID_FORMAT, severity="medium",
-                    seller_name=seller_name, invoice_no=invoice_no, total_amount=total_amount,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    history_id=history_id,
+                    rule_code=EXC_RULE_TAX_ID_FORMAT,
+                    severity="medium",
+                    seller_name=seller_name,
+                    invoice_no=invoice_no,
+                    total_amount=total_amount,
                     detail={
                         "tax_id_raw": _stax,
                         "tax_id_normalized": _clean,
@@ -3018,19 +3301,31 @@ async def _async_run_exception_checks(history_id: str, user_id: str,
         # v118.22.1.1 · 智能提醒触发(异步 fire-and-forget · 失败吞)
         try:
             import asyncio as _asyncio_notif
+
             for _hi_rule in _high_inserted:
-                _asyncio_notif.create_task(_notify_exception_high(
-                    user_id=user_id, tenant_id=tenant_id, history_id=history_id,
-                    rule_code=_hi_rule, seller_name=seller_name,
-                    invoice_no=invoice_no, total_amount=total_amount,
-                ))
+                _asyncio_notif.create_task(
+                    _notify_exception_high(
+                        user_id=user_id,
+                        tenant_id=tenant_id,
+                        history_id=history_id,
+                        rule_code=_hi_rule,
+                        seller_name=seller_name,
+                        invoice_no=invoice_no,
+                        total_amount=total_amount,
+                    )
+                )
             # 大额发票通知触发(独立于异常 · 只要 total 非空就检查)
             if total_amount is not None:
-                _asyncio_notif.create_task(_notify_large_invoice(
-                    user_id=user_id, tenant_id=tenant_id, history_id=history_id,
-                    seller_name=seller_name, invoice_no=invoice_no,
-                    total_amount=total_amount,
-                ))
+                _asyncio_notif.create_task(
+                    _notify_large_invoice(
+                        user_id=user_id,
+                        tenant_id=tenant_id,
+                        history_id=history_id,
+                        seller_name=seller_name,
+                        invoice_no=invoice_no,
+                        total_amount=total_amount,
+                    )
+                )
         except Exception as _ne:
             logger.warning(f"notify trigger enqueue failed (hid={history_id}): {_ne}")
     except Exception as e:
@@ -3042,7 +3337,7 @@ async def _async_run_exception_checks(history_id: str, user_id: str,
 
 # 内置模板代码常量(对应 line_client.NOTIFICATION_TEMPLATES)
 NOTIF_TEMPLATE_EXCEPTION_HIGH = "exception_high"
-NOTIF_TEMPLATE_LARGE_INVOICE  = "large_invoice"
+NOTIF_TEMPLATE_LARGE_INVOICE = "large_invoice"
 NOTIF_TEMPLATE_WHITELIST = {NOTIF_TEMPLATE_EXCEPTION_HIGH, NOTIF_TEMPLATE_LARGE_INVOICE}
 
 
@@ -3060,7 +3355,7 @@ def _user_lang_safe(user_id: str) -> str:
     """取用户首选语言 · v118.25.3 · 默认 th(主市场泰国 · 之前 fallback 中文是 bug)"""
     try:
         u = db.find_user_by_id(user_id) or {}
-        return (u.get("preferred_lang") or "th")
+        return u.get("preferred_lang") or "th"
     except Exception:
         return "th"
 
@@ -3076,11 +3371,15 @@ def _rule_belongs_to(rule: dict, target_user_id: str, target_tenant_id: Optional
     return (str(rule.get("user_id") or "") == str(target_user_id)) and (r_tenant is None)
 
 
-async def _notify_exception_high(user_id: str, tenant_id: Optional[str],
-                                 history_id: str, rule_code: str,
-                                 seller_name: Optional[str],
-                                 invoice_no: Optional[str],
-                                 total_amount: Optional[float]):
+async def _notify_exception_high(
+    user_id: str,
+    tenant_id: Optional[str],
+    history_id: str,
+    rule_code: str,
+    seller_name: Optional[str],
+    invoice_no: Optional[str],
+    total_amount: Optional[float],
+):
     """异常 high 触发 · 给该 user/tenant 所有启用 exception_high 规则推 LINE"""
     try:
         rules = db.list_active_notification_rules_by_template(NOTIF_TEMPLATE_EXCEPTION_HIGH)
@@ -3092,27 +3391,39 @@ async def _notify_exception_high(user_id: str, tenant_id: Optional[str],
             binding = db.get_line_binding_by_user(r_user)
             if not binding or not binding.get("line_user_id"):
                 db.log_notification(
-                    user_id=r_user, tenant_id=r_tenant,
-                    rule_id=r["id"], template_code=NOTIF_TEMPLATE_EXCEPTION_HIGH,
-                    event_type="exception_high", event_ref=str(history_id),
-                    line_user_id=None, status="failed", error="line_not_bound",
+                    user_id=r_user,
+                    tenant_id=r_tenant,
+                    rule_id=r["id"],
+                    template_code=NOTIF_TEMPLATE_EXCEPTION_HIGH,
+                    event_type="exception_high",
+                    event_ref=str(history_id),
+                    line_user_id=None,
+                    status="failed",
+                    error="line_not_bound",
                 )
                 continue
             line_uid = binding["line_user_id"]
             lang = _user_lang_safe(r_user)
             rule_label = line_client.t_notify(lang, f"rule_label_{rule_code}")
-            text = line_client.render_notification(lang, "exception_high", {
-                "seller": seller_name or "-",
-                "invoice_no": invoice_no or "-",
-                "rule_label": rule_label,
-                "amount": _format_thb(total_amount),
-                "url": "https://pearnly.com",
-            })
+            text = line_client.render_notification(
+                lang,
+                "exception_high",
+                {
+                    "seller": seller_name or "-",
+                    "invoice_no": invoice_no or "-",
+                    "rule_label": rule_label,
+                    "amount": _format_thb(total_amount),
+                    "url": "https://pearnly.com",
+                },
+            )
             ok = line_client.push_text(line_uid, text)
             db.log_notification(
-                user_id=r_user, tenant_id=r_tenant,
-                rule_id=r["id"], template_code=NOTIF_TEMPLATE_EXCEPTION_HIGH,
-                event_type="exception_high", event_ref=str(history_id),
+                user_id=r_user,
+                tenant_id=r_tenant,
+                rule_id=r["id"],
+                template_code=NOTIF_TEMPLATE_EXCEPTION_HIGH,
+                event_type="exception_high",
+                event_ref=str(history_id),
                 line_user_id=line_uid,
                 status="sent" if ok else "failed",
                 error=None if ok else "line_push_failed",
@@ -3121,11 +3432,14 @@ async def _notify_exception_high(user_id: str, tenant_id: Optional[str],
         logger.warning(f"_notify_exception_high failed (hid={history_id}): {e}")
 
 
-async def _notify_large_invoice(user_id: str, tenant_id: Optional[str],
-                                history_id: str,
-                                seller_name: Optional[str],
-                                invoice_no: Optional[str],
-                                total_amount: Optional[float]):
+async def _notify_large_invoice(
+    user_id: str,
+    tenant_id: Optional[str],
+    history_id: str,
+    seller_name: Optional[str],
+    invoice_no: Optional[str],
+    total_amount: Optional[float],
+):
     """大额发票触发 · 比对该 user/tenant 所有启用 large_invoice 规则的阈值"""
     if total_amount is None:
         return
@@ -3146,26 +3460,38 @@ async def _notify_large_invoice(user_id: str, tenant_id: Optional[str],
             binding = db.get_line_binding_by_user(r_user)
             if not binding or not binding.get("line_user_id"):
                 db.log_notification(
-                    user_id=r_user, tenant_id=r_tenant,
-                    rule_id=r["id"], template_code=NOTIF_TEMPLATE_LARGE_INVOICE,
-                    event_type="large_invoice", event_ref=str(history_id),
-                    line_user_id=None, status="failed", error="line_not_bound",
+                    user_id=r_user,
+                    tenant_id=r_tenant,
+                    rule_id=r["id"],
+                    template_code=NOTIF_TEMPLATE_LARGE_INVOICE,
+                    event_type="large_invoice",
+                    event_ref=str(history_id),
+                    line_user_id=None,
+                    status="failed",
+                    error="line_not_bound",
                 )
                 continue
             line_uid = binding["line_user_id"]
             lang = _user_lang_safe(r_user)
-            text = line_client.render_notification(lang, "large_invoice", {
-                "seller": seller_name or "-",
-                "invoice_no": invoice_no or "-",
-                "amount": _format_thb(total_amount),
-                "threshold": _format_thb(threshold),
-                "url": "https://pearnly.com",
-            })
+            text = line_client.render_notification(
+                lang,
+                "large_invoice",
+                {
+                    "seller": seller_name or "-",
+                    "invoice_no": invoice_no or "-",
+                    "amount": _format_thb(total_amount),
+                    "threshold": _format_thb(threshold),
+                    "url": "https://pearnly.com",
+                },
+            )
             ok = line_client.push_text(line_uid, text)
             db.log_notification(
-                user_id=r_user, tenant_id=r_tenant,
-                rule_id=r["id"], template_code=NOTIF_TEMPLATE_LARGE_INVOICE,
-                event_type="large_invoice", event_ref=str(history_id),
+                user_id=r_user,
+                tenant_id=r_tenant,
+                rule_id=r["id"],
+                template_code=NOTIF_TEMPLATE_LARGE_INVOICE,
+                event_type="large_invoice",
+                event_ref=str(history_id),
                 line_user_id=line_uid,
                 status="sent" if ok else "failed",
                 error=None if ok else "line_push_failed",
@@ -3176,40 +3502,49 @@ async def _notify_large_invoice(user_id: str, tenant_id: Optional[str],
 
 # ─── API 端点 ───────────────────────────────────────────
 
+
 class ExceptionResolvePayload(BaseModel):
     # 可选字段:仅当 ignore_rule=True 时 · 把 (seller, rule) 加入白名单
     ignore_rule: bool = False
 
 
 @app.get("/api/exceptions/list")
-async def api_list_exceptions(request: Request,
-                               status: str = "pending",
-                               rule_code: Optional[str] = None,
-                               client_id: Optional[int] = None,
-                               limit: int = 100, offset: int = 0):
+async def api_list_exceptions(
+    request: Request,
+    status: str = "pending",
+    rule_code: Optional[str] = None,
+    client_id: Optional[int] = None,
+    limit: int = 100,
+    offset: int = 0,
+):
     """列异常(同 tenant 共享视图)· status=all 看全部 · client_id 给了只看该客户"""
     user = get_current_user_from_request(request)
     items = db.list_exceptions(
         user_id=str(user["id"]),
         tenant_id=_tid(user),
-        status=status, rule_code=rule_code,
+        status=status,
+        rule_code=rule_code,
         client_id=client_id,
-        limit=min(int(limit), 500), offset=max(int(offset), 0),
+        limit=min(int(limit), 500),
+        offset=max(int(offset), 0),
         restrict_client_ids=db.get_visible_client_ids_for_user(user),  # v118.28.1 · 员工分配
     )
     return {"items": items, "count": len(items)}
 
 
 @app.get("/api/exceptions/stats")
-async def api_exceptions_stats(request: Request, client_id: Optional[int] = None,
-                                status: Optional[str] = "pending"):
+async def api_exceptions_stats(
+    request: Request, client_id: Optional[int] = None, status: Optional[str] = "pending"
+):
     """顶部 KPI + 筛选 chip 的数字 · 同 tenant 共享 · 可按 client 收口
     status:控制 chip 计数(by_rule)归属哪个状态 · 顶部 KPI 整体计数不受影响
     """
     user = get_current_user_from_request(request)
     by_rule_status = status if status in ("pending", "resolved", "ignored") else "pending"
     stats = db.count_exceptions_by_status_and_rule(
-        str(user["id"]), tenant_id=_tid(user), client_id=client_id,
+        str(user["id"]),
+        tenant_id=_tid(user),
+        client_id=client_id,
         by_rule_status=by_rule_status,
     )
     stats["learned_rules"] = db.count_whitelist_rules(str(user["id"]), tenant_id=_tid(user))
@@ -3230,8 +3565,9 @@ async def api_get_exception(exception_id: int, request: Request):
 async def api_resolve_exception(exception_id: int, request: Request):
     """会计「✓ 确认放行」· 标记为 resolved · 不写白名单"""
     user = get_current_user_from_request(request)
-    ok = db.resolve_exception(str(user["id"]), int(exception_id),
-                              tenant_id=_tid(user), new_status="resolved")
+    ok = db.resolve_exception(
+        str(user["id"]), int(exception_id), tenant_id=_tid(user), new_status="resolved"
+    )
     if not ok:
         raise HTTPException(404, detail="exception.not_found")
     return {"ok": True}
@@ -3245,16 +3581,15 @@ async def api_ignore_exception(exception_id: int, request: Request):
     if not ex:
         raise HTTPException(404, detail="exception.not_found")
     # 1. 标 ignored
-    db.resolve_exception(str(user["id"]), int(exception_id),
-                         tenant_id=_tid(user), new_status="ignored")
+    db.resolve_exception(
+        str(user["id"]), int(exception_id), tenant_id=_tid(user), new_status="ignored"
+    )
     # 2. 写白名单(供应商名 + 规则码 · 缺供应商时只标 ignored 不写白名单)
     seller = ex.get("seller_name")
     rule_code = ex.get("rule_code")
     wl_added = False
     if seller and rule_code:
-        wl_added = db.add_exception_whitelist(
-            str(user["id"]), _tid(user), seller, rule_code
-        )
+        wl_added = db.add_exception_whitelist(str(user["id"]), _tid(user), seller, rule_code)
     return {"ok": True, "whitelist_added": wl_added}
 
 
@@ -3289,7 +3624,7 @@ async def api_batch_exceptions(request: Request):
     # ignored → 写白名单(去重在 db 已做 · 这里仅插入)
     wl_added = 0
     if action == "ignore":
-        for seller, rc in (res.get("whitelist_pairs") or []):
+        for seller, rc in res.get("whitelist_pairs") or []:
             if db.add_exception_whitelist(str(user["id"]), _tid(user), seller, rc):
                 wl_added += 1
     return {
@@ -3394,8 +3729,10 @@ async def history_update(record_id: str, req: HistoryUpdateRequest, request: Req
             cat = (f.get("category") or "").strip()
             if seller and cat:
                 db.upsert_supplier_category(
-                    seller_name=seller, category=cat,
-                    user_id=str(user["id"]), tenant_id=_tid(user),
+                    seller_name=seller,
+                    category=cat,
+                    user_id=str(user["id"]),
+                    tenant_id=_tid(user),
                 )
             break  # 只学主页 · 多页发票其他页是副本不学
     except Exception as _ue:
@@ -3419,7 +3756,9 @@ async def history_update(record_id: str, req: HistoryUpdateRequest, request: Req
             detail_now = get_ocr_history_detail(str(user["id"]), record_id, tenant_id=_tid(user))
             confidence = (detail_now or {}).get("confidence")
             # 1. 删该 history 下所有 pending 异常
-            db.delete_pending_exceptions_by_history(record_id, tenant_id=_tid(user), user_id=str(user["id"]))
+            db.delete_pending_exceptions_by_history(
+                record_id, tenant_id=_tid(user), user_id=str(user["id"])
+            )
             # 2. 同步重跑规则(duplicate 不重检 · 因为依赖 OCR 时的指纹比对 · 此处保留为 None)
             await _async_run_exception_checks(
                 history_id=record_id,
@@ -3443,7 +3782,9 @@ async def history_delete(record_id: str, request: Request):
     user = get_current_user_from_request(request)
     _check_history_access(user)
     # v114 · 删除时同步清掉留底的 PDF 文件
-    deleted, pdf_paths = delete_ocr_history_with_pdf_paths(str(user["id"]), [record_id], tenant_id=_tid(user))
+    deleted, pdf_paths = delete_ocr_history_with_pdf_paths(
+        str(user["id"]), [record_id], tenant_id=_tid(user)
+    )
     if deleted == 0:
         raise HTTPException(404, detail="history.not_found")
     # v114 · 检查这个 PDF 是否还被其他记录引用(多发票拆分场景共享同一 PDF)· 没人引用才真正删
@@ -3451,6 +3792,7 @@ async def history_delete(record_id: str, request: Request):
         try:
             still_used = False
             from db import get_cursor
+
             with get_cursor() as cur:
                 cur.execute("SELECT 1 FROM ocr_history WHERE pdf_storage_path = %s LIMIT 1", (p,))
                 still_used = cur.fetchone() is not None
@@ -3465,6 +3807,7 @@ async def history_delete(record_id: str, request: Request):
 @app.get("/api/history/{record_id}/pdf")
 async def history_pdf_download(record_id: str, request: Request):
     from fastapi.responses import FileResponse
+
     user = get_current_user_from_request(request)
     _check_history_access(user)
     info = get_history_pdf_info(str(user["id"]), record_id, tenant_id=_tid(user))
@@ -3500,10 +3843,13 @@ async def history_batch_delete(req: HistoryBatchDeleteRequest, request: Request)
     if pdf_paths:
         try:
             from db import get_cursor
+
             for p in set(pdf_paths):
                 try:
                     with get_cursor() as cur:
-                        cur.execute("SELECT 1 FROM ocr_history WHERE pdf_storage_path = %s LIMIT 1", (p,))
+                        cur.execute(
+                            "SELECT 1 FROM ocr_history WHERE pdf_storage_path = %s LIMIT 1", (p,)
+                        )
                         still_used = cur.fetchone() is not None
                     if not still_used:
                         pdf_storage.delete_pdf(p)
@@ -3516,7 +3862,9 @@ async def history_batch_delete(req: HistoryBatchDeleteRequest, request: Request)
 
 # v1 别名
 @app.get("/api/v1/history")
-async def v1_history_list(request: Request, keyword: Optional[str] = None, limit: int = 50, offset: int = 0):
+async def v1_history_list(
+    request: Request, keyword: Optional[str] = None, limit: int = 50, offset: int = 0
+):
     return await history_list(request, keyword, limit, offset)
 
 
@@ -3614,10 +3962,13 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
         if ep_limit != -1:
             existing = db.list_erp_endpoints(user["id"])
             if len(existing) >= ep_limit:
-                raise HTTPException(403, detail={
-                    "code": "erp.endpoint_limit_reached",
-                    "limit": ep_limit,
-                })
+                raise HTTPException(
+                    403,
+                    detail={
+                        "code": "erp.endpoint_limit_reached",
+                        "limit": ep_limit,
+                    },
+                )
 
         # v0.8 · 自动推送权限
         if req.auto_push and not p.get("can_auto_push_erp"):
@@ -3647,6 +3998,7 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
         if req.adapter == "mrerp":
             try:
                 from kms_helper import encrypt_str, is_encrypted
+
                 for fld in ("username_enc", "password_enc"):
                     v = config.get(fld)
                     if v and isinstance(v, str) and not is_encrypted(v):
@@ -3655,7 +4007,8 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
                 # kms_helper 不可用(env 缺 KMS_KEY)· 记录并报清晰错误,
                 # 别让 500 给用户看一片空白。
                 _record_500(
-                    path="/api/erp/endpoints", method="POST",
+                    path="/api/erp/endpoints",
+                    method="POST",
                     detail=f"kms_helper unavailable: {e}",
                 )
                 raise HTTPException(
@@ -3664,16 +4017,22 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
                 )
             except Exception as e:
                 _record_500(
-                    path="/api/erp/endpoints", method="POST",
+                    path="/api/erp/endpoints",
+                    method="POST",
                     detail=f"encrypt failed: {type(e).__name__}: {e}",
                 )
                 raise HTTPException(
-                    500, detail=f"erp.encrypt_failed: {type(e).__name__}",
+                    500,
+                    detail=f"erp.encrypt_failed: {type(e).__name__}",
                 )
 
         new_id = db.create_erp_endpoint(
-            user["id"], req.name, req.adapter, config,
-            is_default=req.is_default, auto_push=req.auto_push,
+            user["id"],
+            req.name,
+            req.adapter,
+            config,
+            is_default=req.is_default,
+            auto_push=req.auto_push,
         )
         if not new_id:
             # db.create_erp_endpoint swallowed the underlying DB error
@@ -3681,7 +4040,8 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
             # module global if available, otherwise mark as opaque.
             last = getattr(db, "_last_create_endpoint_error", None) or "unknown"
             _record_500(
-                path="/api/erp/endpoints", method="POST",
+                path="/api/erp/endpoints",
+                method="POST",
                 detail=f"db.create_erp_endpoint returned None · {last}",
             )
             raise HTTPException(
@@ -3696,7 +4056,8 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
         # Last-resort capture so /api/version's last_500_traceback
         # shows the real stack instead of opaque "create_failed".
         _record_500(
-            path="/api/erp/endpoints", method="POST",
+            path="/api/erp/endpoints",
+            method="POST",
             detail=f"{type(e).__name__}: {str(e)[:200]}",
         )
         logger.exception("[erp_endpoints_create] unhandled error")
@@ -3754,13 +4115,15 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
         if target_adapter == "mrerp":
             try:
                 from kms_helper import encrypt_str, is_encrypted
+
                 for fld in ("username_enc", "password_enc"):
                     v = new_cfg.get(fld)
                     if v and isinstance(v, str) and not is_encrypted(v):
                         new_cfg[fld] = encrypt_str(v)
             except ImportError as e:
                 _record_500(
-                    path=f"/api/erp/endpoints/{endpoint_id}", method="PATCH",
+                    path=f"/api/erp/endpoints/{endpoint_id}",
+                    method="PATCH",
                     detail=f"kms_helper unavailable: {e}",
                 )
                 raise HTTPException(
@@ -3769,11 +4132,13 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
                 )
             except Exception as e:
                 _record_500(
-                    path=f"/api/erp/endpoints/{endpoint_id}", method="PATCH",
+                    path=f"/api/erp/endpoints/{endpoint_id}",
+                    method="PATCH",
                     detail=f"encrypt failed: {type(e).__name__}: {e}",
                 )
                 raise HTTPException(
-                    500, detail=f"erp.encrypt_failed: {type(e).__name__}",
+                    500,
+                    detail=f"erp.encrypt_failed: {type(e).__name__}",
                 )
 
         fields["config"] = new_cfg
@@ -3832,6 +4197,7 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
     # initialise cleanly. Same applies to every other route in this
     # file that touches MRERPAdapter.
     import asyncio as _asyncio
+
     if req.adapter == "mrerp":
         try:
             return await _asyncio.to_thread(_erp.test_mrerp_endpoint, cfg)
@@ -3862,6 +4228,7 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
 # once per 60s per (user_id, endpoint_id); the wizard / cards UI hits
 # this aggressively, so the cache keeps MR.ERP traffic sane.
 from services.erp._master_data_cache import TTLCache as _EndpointTestCache  # noqa: E402
+
 _endpoint_test_cache = _EndpointTestCache(max_size=512, ttl_seconds=60.0)
 # 问题 2 (Zihao 2026-05-19 拍板 · v118.34.24) · 客户/商品 listing 缓存 TTL
 # 60s → 600s (10 分钟). 同一 tenant 10 分钟内 listing 基本不变 · 频繁拉
@@ -3911,6 +4278,7 @@ async def erp_endpoint_test_connection(
     # v118.34.10 · asyncio.to_thread keeps Playwright's sync API off
     # the FastAPI event loop (refuses to start otherwise).
     import asyncio as _asyncio
+
     try:
         if adapter == "mrerp":
             result = await _asyncio.to_thread(_erp.test_mrerp_endpoint, config)
@@ -3943,6 +4311,7 @@ async def erp_endpoint_test_connection(
         }
 
     from datetime import datetime as _dt
+
     result["last_tested_at"] = _dt.utcnow().isoformat() + "Z"
     result["cached"] = False
     _endpoint_test_cache.set(cache_key, result)
@@ -3971,6 +4340,7 @@ async def _fetch_listing_with_retry(
     shape; never raises.
     """
     import asyncio as _asyncio
+
     transient_codes = {"ERR_TECHNICAL", "ERR_UNEXPECTED", "ERR_NETWORK"}
     result: dict = {}
     for attempt in range(1, max_attempts + 1):
@@ -3978,13 +4348,18 @@ async def _fetch_listing_with_retry(
             await _asyncio.sleep(delay_seconds)
             logger.info(
                 "[listing-retry] %s attempt %d/%d after %.1fs delay",
-                listing_kind, attempt, max_attempts, delay_seconds,
+                listing_kind,
+                attempt,
+                max_attempts,
+                delay_seconds,
             )
         try:
             result = await _asyncio.to_thread(fetch_fn, config)
         except Exception as e:
             logger.exception(
-                "[listing-retry] %s attempt %d raised", listing_kind, attempt,
+                "[listing-retry] %s attempt %d raised",
+                listing_kind,
+                attempt,
             )
             result = {
                 "ok": False,
@@ -4005,11 +4380,16 @@ async def _fetch_listing_with_retry(
         code = result.get("error_code")
         raw = str(result.get("raw_error") or "")
         import re as _re
+
         shot_match = _re.search(r"screenshot=(\S+\.png)", raw, _re.IGNORECASE)
         shot_path = shot_match.group(1) if shot_match else None
         logger.info(
             "[listing-retry] %s attempt %d → ok=%s code=%s screenshot=%s",
-            listing_kind, attempt, ok_flag, code, shot_path or "-",
+            listing_kind,
+            attempt,
+            ok_flag,
+            code,
+            shot_path or "-",
         )
         if ok_flag:
             return result
@@ -4017,7 +4397,9 @@ async def _fetch_listing_with_retry(
         if code not in transient_codes:
             logger.info(
                 "[listing-retry] %s attempt %d code=%s non-transient · bail out",
-                listing_kind, attempt, code,
+                listing_kind,
+                attempt,
+                code,
             )
             return result
         # Transient: loop will retry (unless we just exhausted attempts).
@@ -4055,7 +4437,8 @@ async def erp_endpoint_customers(
         # equivalent; surface 200 with empty list so the wizard can
         # render gracefully.
         return {
-            "ok": False, "customers": [],
+            "ok": False,
+            "customers": [],
             "error_code": "ERR_ADAPTER_NO_CUSTOMERS",
             "error_friendly": {
                 "zh": "此适配器没有客户列表接口",
@@ -4083,6 +4466,7 @@ async def erp_endpoint_customers(
         listing_kind="customers",
     )
     from datetime import datetime as _dt
+
     result["last_fetched_at"] = _dt.utcnow().isoformat() + "Z"
     result["cached"] = False
     # Only cache success — sticky failure was the user-reported "first
@@ -4110,7 +4494,8 @@ async def erp_endpoint_products(
     adapter = (ep.get("adapter") or "").strip().lower()
     if adapter != "mrerp":
         return {
-            "ok": False, "products": [],
+            "ok": False,
+            "products": [],
             "error_code": "ERR_ADAPTER_NO_PRODUCTS",
             "error_friendly": {
                 "zh": "此适配器没有商品列表接口",
@@ -4135,6 +4520,7 @@ async def erp_endpoint_products(
         listing_kind="products",
     )
     from datetime import datetime as _dt
+
     result["last_fetched_at"] = _dt.utcnow().isoformat() + "Z"
     result["cached"] = False
     if result.get("ok"):
@@ -4175,7 +4561,9 @@ async def erp_push(req: ErpPushRequest, request: Request):
     # 同 history × endpoint 已经 success 过 → 写 skipped_dup log + 静默
     # 返回原成功的 bill_no. 防同张发票被自动 + 手动 + 重试反复推到 MR.ERP.
     existing = db.has_recent_successful_push(
-        req.history_id, endpoint["id"], user["id"],
+        req.history_id,
+        endpoint["id"],
+        user["id"],
     )
     if existing:
         log_id = db.insert_push_log(
@@ -4187,9 +4575,11 @@ async def erp_push(req: ErpPushRequest, request: Request):
             total_amount=history.get("total_amount"),
             status="skipped_dup",
             http_status=200,
-            request_body={"adapter": endpoint.get("adapter"),
-                          "skipped_reason": "already_success",
-                          "prior_log_id": str(existing.get("id"))},
+            request_body={
+                "adapter": endpoint.get("adapter"),
+                "skipped_reason": "already_success",
+                "prior_log_id": str(existing.get("id")),
+            },
             response_body=existing.get("response_body"),
             error_msg=None,
             attempt=1,
@@ -4197,9 +4587,9 @@ async def erp_push(req: ErpPushRequest, request: Request):
             trigger="manual",
         )
         logger.info(
-            "[push-dedup] skipped manual push · history=%s endpoint=%s "
-            "(prior log=%s)",
-            req.history_id[:8], endpoint["id"][:8],
+            "[push-dedup] skipped manual push · history=%s endpoint=%s " "(prior log=%s)",
+            req.history_id[:8],
+            endpoint["id"][:8],
             str(existing.get("id"))[:8],
         )
         return {
@@ -4215,6 +4605,7 @@ async def erp_push(req: ErpPushRequest, request: Request):
     # (which may call Playwright via push_mrerp once C-1 wires it,
     # plus uses sync `requests` for webhook adapters) off the event loop.
     import asyncio as _asyncio
+
     result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
 
     # 4) 写日志
@@ -4236,8 +4627,7 @@ async def erp_push(req: ErpPushRequest, request: Request):
 
     # 5) 更新 endpoint 统计 + history 推送状态
     db.update_endpoint_stats(endpoint["id"], result["success"])
-    db.update_history_push_status(req.history_id,
-                                  "success" if result["success"] else "failed")
+    db.update_history_push_status(req.history_id, "success" if result["success"] else "failed")
 
     # v118.25 · 手动推送失败 · 也进重试队列(给用户"扔出去就不管"的体验)
     # 批 1 改动 3 (v118.34.33) · 用户数据错(ERR_NO_CLIENT 等)不入重试 ·
@@ -4246,7 +4636,8 @@ async def erp_push(req: ErpPushRequest, request: Request):
         if db.is_user_data_error(result.get("error_msg")):
             logger.info(
                 "[push] user-data error · NOT scheduling retry · log=%s err=%r",
-                str(log_id)[:8], (result.get("error_msg") or "")[:80],
+                str(log_id)[:8],
+                (result.get("error_msg") or "")[:80],
             )
         else:
             first_delay = db.get_erp_retry_delay_sec(0)
@@ -4266,7 +4657,9 @@ async def erp_push(req: ErpPushRequest, request: Request):
 # ============================================================
 # v0.9 · 自动推送(识别完成后后台异步触发)
 # ============================================================
-async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict[str, Any]], tenant_id: Optional[str] = None):
+async def _auto_push_history(
+    user_id: str, history_id: str, endpoints: List[Dict[str, Any]], tenant_id: Optional[str] = None
+):
     """
     后台异步任务 · 对 auto_push=TRUE 的端点批量推送一条历史记录
     失败不影响识别返回,只写入日志 · Plus/Pro 才会走这里
@@ -4286,7 +4679,9 @@ async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict
             # 批 2 改动 2 (v118.34.34) · 推送去重 · 同 history × endpoint
             # 已 success 过 → 静默跳过 + 写 skipped_dup log.
             existing = db.has_recent_successful_push(
-                history_id, ep["id"], user_id,
+                history_id,
+                ep["id"],
+                user_id,
             )
             if existing:
                 db.insert_push_log(
@@ -4298,9 +4693,11 @@ async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict
                     total_amount=history.get("total_amount"),
                     status="skipped_dup",
                     http_status=200,
-                    request_body={"adapter": ep.get("adapter"),
-                                  "skipped_reason": "already_success",
-                                  "prior_log_id": str(existing.get("id"))},
+                    request_body={
+                        "adapter": ep.get("adapter"),
+                        "skipped_reason": "already_success",
+                        "prior_log_id": str(existing.get("id")),
+                    },
                     response_body=existing.get("response_body"),
                     error_msg=None,
                     attempt=1,
@@ -4308,9 +4705,9 @@ async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict
                     trigger="auto",
                 )
                 logger.info(
-                    "[AutoPush-dedup] skipped · history=%s endpoint=%s "
-                    "(prior=%s)",
-                    history_id[:8], ep["id"][:8],
+                    "[AutoPush-dedup] skipped · history=%s endpoint=%s " "(prior=%s)",
+                    history_id[:8],
+                    ep["id"][:8],
                     str(existing.get("id"))[:8],
                 )
                 continue
@@ -4334,7 +4731,7 @@ async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict
                 error_msg=result.get("error_msg"),
                 attempt=1,
                 elapsed_ms=result.get("elapsed_ms", 0),
-                trigger="auto",   # 标记自动触发
+                trigger="auto",  # 标记自动触发
             )
 
             db.update_endpoint_stats(ep["id"], result["success"])
@@ -4348,15 +4745,17 @@ async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict
             if not result["success"] and new_log_id:
                 if db.is_user_data_error(result.get("error_msg")):
                     logger.info(
-                        "[AutoPush] user-data error · NOT scheduling retry · "
-                        "log=%s err=%r", str(new_log_id)[:8],
+                        "[AutoPush] user-data error · NOT scheduling retry · " "log=%s err=%r",
+                        str(new_log_id)[:8],
                         (result.get("error_msg") or "")[:80],
                     )
                 else:
                     first_delay = db.get_erp_retry_delay_sec(0)
                     if first_delay is not None:
                         db.schedule_log_retry(str(new_log_id), first_delay)
-                        logger.info(f"[AutoPush] 失败入重试队列 · log={new_log_id} · {first_delay}s 后第 1 次重试")
+                        logger.info(
+                            f"[AutoPush] 失败入重试队列 · log={new_log_id} · {first_delay}s 后第 1 次重试"
+                        )
 
             logger.info(
                 f"[AutoPush] user={user_id[:8]}.. history={history_id[:8]}.. "
@@ -4372,6 +4771,7 @@ async def _auto_push_history(user_id: str, history_id: str, endpoints: List[Dict
 async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: str):
     """v27.8.1.3 · 自动推 Xero(后台 · 失败只写日志不抛)"""
     import time
+
     if not tenant_id:
         return
     t0 = time.time()
@@ -4386,21 +4786,26 @@ async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: 
         mappings = db.get_mrerp_mappings_bundle(tenant_id)
         cid = history.get("client_id") or 0
         contact_name = None
-        for m in (mappings.get("clients") or []):
+        for m in mappings.get("clients") or []:
             if m.get("erp_type") == "xero" and int(m.get("client_id") or 0) == int(cid):
                 contact_name = (m.get("erp_code") or "").strip()
                 break
         if not contact_name:
             try:
                 db.insert_push_log(
-                    user_id=user_id, endpoint_id=None, history_id=history_id,
+                    user_id=user_id,
+                    endpoint_id=None,
+                    history_id=history_id,
                     invoice_no=history.get("invoice_no"),
                     seller_name=history.get("seller_name"),
                     total_amount=history.get("total_amount"),
-                    status="failed", http_status=400,
+                    status="failed",
+                    http_status=400,
                     request_body={"adapter": "xero_auto", "stage": "mapping"},
-                    response_body=None, error_msg="no_client_mapping",
-                    attempt=1, elapsed_ms=int((time.time() - t0) * 1000),
+                    response_body=None,
+                    error_msg="no_client_mapping",
+                    attempt=1,
+                    elapsed_ms=int((time.time() - t0) * 1000),
                     trigger="auto",
                 )
             except Exception as e:
@@ -4410,9 +4815,11 @@ async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: 
         try:
             access_token, xero_org_id = _ensure_fresh_xero_token(tenant_id)
             from xero_pusher import (
-                find_contact_by_name, build_invoice_payload,
-                push_invoice, parse_xero_error,
+                find_contact_by_name,
+                build_invoice_payload,
+                push_invoice,
             )
+
             contact = find_contact_by_name(access_token, xero_org_id, contact_name)
             if not contact:
                 raise RuntimeError("contact_not_found")
@@ -4420,7 +4827,9 @@ async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: 
             result = push_invoice(access_token, xero_org_id, payload)
             ok = bool(result.get("success"))
             db.insert_push_log(
-                user_id=user_id, endpoint_id=None, history_id=history_id,
+                user_id=user_id,
+                endpoint_id=None,
+                history_id=history_id,
                 invoice_no=history.get("invoice_no"),
                 seller_name=history.get("seller_name"),
                 total_amount=history.get("total_amount"),
@@ -4429,7 +4838,8 @@ async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: 
                 request_body={"adapter": "xero_auto"},
                 response_body=str(result.get("invoice_id") or "")[:500],
                 error_msg=(None if ok else str(result.get("error") or "")[:500]),
-                attempt=1, elapsed_ms=int((time.time() - t0) * 1000),
+                attempt=1,
+                elapsed_ms=int((time.time() - t0) * 1000),
                 trigger="auto",
             )
             if ok:
@@ -4438,14 +4848,19 @@ async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: 
             logger.warning(f"[AutoPushXero] failed history={history_id[:8]}: {e}")
             try:
                 db.insert_push_log(
-                    user_id=user_id, endpoint_id=None, history_id=history_id,
+                    user_id=user_id,
+                    endpoint_id=None,
+                    history_id=history_id,
                     invoice_no=history.get("invoice_no"),
                     seller_name=history.get("seller_name"),
                     total_amount=history.get("total_amount"),
-                    status="failed", http_status=500,
+                    status="failed",
+                    http_status=500,
                     request_body={"adapter": "xero_auto"},
-                    response_body=None, error_msg=str(e)[:500],
-                    attempt=1, elapsed_ms=int((time.time() - t0) * 1000),
+                    response_body=None,
+                    error_msg=str(e)[:500],
+                    attempt=1,
+                    elapsed_ms=int((time.time() - t0) * 1000),
                     trigger="auto",
                 )
             except Exception as _le:
@@ -4460,6 +4875,7 @@ def _trigger_auto_push_all(user_id: str, tenant_id: Optional[str], history_id: s
     if not tenant_id:
         return
     import asyncio
+
     # Xero
     try:
         if db.get_xero_auto_push(tenant_id):
@@ -4476,13 +4892,16 @@ async def erp_log_debug_xlsx(log_id: str, request: Request):
     tid = _tid(user)
     try:
         with db.get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT pl.id, pl.user_id, pl.history_id, pl.request_body, pl.invoice_no,
                        u.tenant_id::text AS tid
                 FROM push_logs pl
                 LEFT JOIN users u ON u.id = pl.user_id
                 WHERE pl.id = %s LIMIT 1
-            """, (log_id,))
+            """,
+                (log_id,),
+            )
             row = cur.fetchone()
     except Exception as e:
         raise HTTPException(500, detail=f"db.error:{e}")
@@ -4495,6 +4914,7 @@ async def erp_log_debug_xlsx(log_id: str, request: Request):
     if isinstance(rb, str):
         try:
             import json as _json
+
             rb = _json.loads(rb)
         except Exception:
             rb = {}
@@ -4502,11 +4922,13 @@ async def erp_log_debug_xlsx(log_id: str, request: Request):
     if not b64:
         raise HTTPException(404, detail="log.no_debug_xlsx")
     import base64 as _b64
+
     try:
         xlsx_bytes = _b64.b64decode(b64)
     except Exception:
         raise HTTPException(500, detail="log.decode_failed")
     from fastapi.responses import Response as _Resp
+
     safe_inv = (row.get("invoice_no") or "unknown").replace("/", "_").replace(" ", "_")[:40]
     fname = f"pearnly_debug_{safe_inv}_{log_id[:8]}.xlsx"
     return _Resp(
@@ -4525,26 +4947,37 @@ async def erp_history_push_status(history_id: str, request: Request):
     items = result.get("items", [])
     if items:
         item = items[0]
-        return {"pushed": True, "pushed_at": str(item["created_at"]), "push_log_id": str(item["id"])}
+        return {
+            "pushed": True,
+            "pushed_at": str(item["created_at"]),
+            "push_log_id": str(item["id"]),
+        }
     return {"pushed": False, "pushed_at": None, "push_log_id": None}
 
 
 @app.get("/api/erp/logs")
-async def erp_logs(request: Request,
-                   history_id: Optional[str] = None,
-                   endpoint_id: Optional[str] = None,
-                   status: Optional[str] = None,
-                   trigger: Optional[str] = None,
-                   adapter: Optional[str] = None,
-                   limit: int = 50, offset: int = 0):
+async def erp_logs(
+    request: Request,
+    history_id: Optional[str] = None,
+    endpoint_id: Optional[str] = None,
+    status: Optional[str] = None,
+    trigger: Optional[str] = None,
+    adapter: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
     """批 3 改动 6 (v118.34.34) · 新增 adapter 参数 · 让前端按 ERP 类型筛日志."""
     user = get_current_user_from_request(request)
     _check_push_access(user)
     return db.list_push_logs(
-        user["id"], history_id=history_id, endpoint_id=endpoint_id,
-        status_filter=status, trigger_filter=trigger,
+        user["id"],
+        history_id=history_id,
+        endpoint_id=endpoint_id,
+        status_filter=status,
+        trigger_filter=trigger,
         adapter_filter=adapter,
-        limit=min(limit, 200), offset=max(0, offset),
+        limit=min(limit, 200),
+        offset=max(0, offset),
     )
 
 
@@ -4575,13 +5008,13 @@ class EmailAccountBindRequest(BaseModel):
     imap_host: str = Field(..., min_length=3, max_length=200)
     imap_port: int = Field(993, ge=1, le=65535)
     imap_use_ssl: bool = True
-    password: Optional[str] = None         # 不传 = 只改配置 · 不改密码
+    password: Optional[str] = None  # 不传 = 只改配置 · 不改密码
     folder: str = Field("INBOX", max_length=100)
     filter_subject: Optional[str] = Field(None, max_length=200)
     filter_sender: Optional[str] = Field(None, max_length=500)
     mark_as_read: bool = True
     enabled: bool = True
-    interval_min: int = Field(15)          # v0.17.9 · 仅 5/15/60 三档 · db 层兜底
+    interval_min: int = Field(15)  # v0.17.9 · 仅 5/15/60 三档 · db 层兜底
 
 
 class EmailTestConnRequest(BaseModel):
@@ -4606,6 +5039,7 @@ async def email_account_bind(req: EmailAccountBindRequest, request: Request):
     """创建或更新邮箱绑定"""
     user = get_current_user_from_request(request)
     import email_ingest
+
     if not email_ingest.is_available():
         raise HTTPException(503, detail="email.encryption_not_configured")
 
@@ -4647,6 +5081,7 @@ async def email_account_test(req: EmailTestConnRequest, request: Request):
     user = get_current_user_from_request(request)  # 仅用于鉴权
     import email_ingest
     import asyncio
+
     # IMAP 是阻塞 IO · 扔线程池
     result = await asyncio.to_thread(
         email_ingest.test_connection,
@@ -4672,6 +5107,7 @@ async def email_account_trigger(request: Request):
 
     import email_ingest
     import asyncio
+
     if not email_ingest.is_available():
         raise HTTPException(503, detail="email.encryption_not_configured")
     try:
@@ -4710,6 +5146,7 @@ def _email_presets():
     """返回常用邮箱预设 · 不暴露任何敏感信息"""
     try:
         import email_ingest
+
         return email_ingest.IMAP_PRESETS
     except Exception:
         return {}
@@ -4718,6 +5155,7 @@ def _email_presets():
 # ============================================================
 # v0.18 · M10 · 银行对账 API
 # ============================================================
+
 
 @app.post("/api/bank-recon/upload")
 async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
@@ -4733,8 +5171,11 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
     # existing parser; tabular formats go through the unified pipeline
     # with document_type=bank_statement.
     from services.ocr.pipeline import (
-        PDF_EXTENSIONS, IMAGE_EXTENSIONS, TABLE_EXTENSIONS,
+        PDF_EXTENSIONS,
+        IMAGE_EXTENSIONS,
+        TABLE_EXTENSIONS,
     )
+
     _bank_all_exts = PDF_EXTENSIONS | IMAGE_EXTENSIONS | TABLE_EXTENSIONS
     _bank_fname_l = filename.lower()
     _bank_ext = "." + _bank_fname_l.rsplit(".", 1)[-1] if "." in _bank_fname_l else ""
@@ -4763,6 +5204,7 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
                 run_on_table_bytes as _bank_run_table,
             )
             from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+
             if _bank_ext in IMAGE_EXTENSIONS:
                 _pipe_res = await asyncio.to_thread(
                     _bank_run_image, pdf_bytes, document_type="bank_statement"
@@ -4788,25 +5230,23 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
 
     if parsed.parse_method == "gemini_vision_pending":
         # 轮 2 未接通 vision · 标记 "scanned not supported yet"
-        db.mark_recon_parse_failed(session_id,
-            "扫描件暂未支持 · 请上传带文字层的 PDF")
+        db.mark_recon_parse_failed(session_id, "扫描件暂未支持 · 请上传带文字层的 PDF")
         return {
             "session_id": session_id,
-            "bank_code":  parsed.bank_code,
+            "bank_code": parsed.bank_code,
             "parse_status": "parse_failed",
-            "tx_count":   0,
-            "error":      "scanned_pdf_not_yet",
+            "tx_count": 0,
+            "error": "scanned_pdf_not_yet",
         }
 
     if not parsed.transactions:
-        db.mark_recon_parse_failed(session_id,
-            "没有解析到任何流水 · 可能格式不支持 · 请反馈给我们")
+        db.mark_recon_parse_failed(session_id, "没有解析到任何流水 · 可能格式不支持 · 请反馈给我们")
         return {
             "session_id": session_id,
-            "bank_code":  parsed.bank_code,
+            "bank_code": parsed.bank_code,
             "parse_status": "parse_failed",
-            "tx_count":   0,
-            "error":      "no_transactions_parsed",
+            "tx_count": 0,
+            "error": "no_transactions_parsed",
         }
 
     ok = db.save_bank_recon_parse(session_id, parsed.as_dict())
@@ -4815,17 +5255,17 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
         raise HTTPException(500, detail="bank_recon.save_failed")
 
     return {
-        "session_id":       session_id,
-        "bank_code":        parsed.bank_code,
-        "account_last4":    parsed.account_last4,
-        "period_start":     parsed.period_start,
-        "period_end":       parsed.period_end,
-        "opening_balance":  parsed.opening_balance,
-        "closing_balance":  parsed.closing_balance,
-        "total_inflow":     parsed.total_inflow,
-        "total_outflow":    parsed.total_outflow,
-        "tx_count":         len(parsed.transactions),
-        "parse_status":     "parsed",
+        "session_id": session_id,
+        "bank_code": parsed.bank_code,
+        "account_last4": parsed.account_last4,
+        "period_start": parsed.period_start,
+        "period_end": parsed.period_end,
+        "opening_balance": parsed.opening_balance,
+        "closing_balance": parsed.closing_balance,
+        "total_inflow": parsed.total_inflow,
+        "total_outflow": parsed.total_outflow,
+        "tx_count": len(parsed.transactions),
+        "parse_status": "parsed",
     }
 
 
@@ -4837,8 +5277,7 @@ async def bank_recon_list_sessions(request: Request, limit: int = 30):
     user = get_current_user_from_request(request)
     limit = max(1, min(int(limit), 100))
     restrict = db.get_visible_client_ids_for_user(user)
-    return db.list_bank_recon_sessions(user["id"], limit,
-                                        restrict_client_ids=restrict)
+    return db.list_bank_recon_sessions(user["id"], limit, restrict_client_ids=restrict)
 
 
 # v118.26.0 · 对账中心首页统计 · 当月概览
@@ -4859,8 +5298,7 @@ async def bank_recon_stats(request: Request):
 
 
 @app.get("/api/bank-recon/sessions/{session_id}")
-async def bank_recon_session_detail(session_id: str, request: Request,
-                                     filter: str = "all"):
+async def bank_recon_session_detail(session_id: str, request: Request, filter: str = "all"):
     """会话详情 · 含流水列表 · 可按 match_status 过滤"""
     user = get_current_user_from_request(request)
     session = db.get_bank_recon_session(user["id"], session_id)
@@ -4868,8 +5306,9 @@ async def bank_recon_session_detail(session_id: str, request: Request,
         raise HTTPException(404, detail="bank_recon.session_not_found")
 
     match_filter = filter if filter in ("matched", "suggested", "unmatched") else None
-    txs = db.list_bank_recon_transactions(session_id, user["id"],
-                                            match_filter=match_filter, limit=2000)
+    txs = db.list_bank_recon_transactions(
+        session_id, user["id"], match_filter=match_filter, limit=2000
+    )
     return {"session": session, "transactions": txs}
 
 
@@ -4895,10 +5334,10 @@ async def bank_recon_run_match(session_id: str, request: Request):
 
     import bank_recon_v2 as br
     import asyncio
+
     try:
         stats = await asyncio.wait_for(
-            asyncio.to_thread(br.run_matching_for_session,
-                               session_id, str(user["id"])),
+            asyncio.to_thread(br.run_matching_for_session, session_id, str(user["id"])),
             timeout=60.0,
         )
     except asyncio.TimeoutError:
@@ -4916,9 +5355,9 @@ async def bank_recon_tx_override(tx_id: str, request: Request):
     history_id = body.get("history_id")
     if status not in ("matched", "unmatched", "ignored"):
         raise HTTPException(400, detail="bank_recon.invalid_status")
-    ok = db.override_tx_match(tx_id, str(user["id"]),
-                               history_id if status == "matched" else None,
-                               status)
+    ok = db.override_tx_match(
+        tx_id, str(user["id"]), history_id if status == "matched" else None, status
+    )
     if not ok:
         raise HTTPException(404, detail="bank_recon.tx_not_found")
     return {"ok": True}
@@ -4967,6 +5406,7 @@ _TEST_USER_IDS = {
     "468b50c1-5593-4fd6-990d-515ce8085563",  # skin306152@gmail.com
 }
 
+
 @app.post("/api/bank-recon/_dev/seed")
 async def bank_recon_dev_seed(request: Request):
     """skin 白名单 · 插一份 KBANK mock session(8 条流水)· 用于演示对账 UI"""
@@ -5013,6 +5453,7 @@ async def erp_retry_push(log_id: str, request: Request):
 
     # v118.34.10 · asyncio.to_thread keeps push_to_endpoint off the loop.
     import asyncio as _asyncio
+
     result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
 
     # 写新一条日志(attempt 递增)
@@ -5033,8 +5474,7 @@ async def erp_retry_push(log_id: str, request: Request):
         trigger="retry",
     )
     db.update_endpoint_stats(endpoint["id"], result["success"])
-    db.update_history_push_status(log["history_id"],
-                                  "success" if result["success"] else "failed")
+    db.update_history_push_status(log["history_id"], "success" if result["success"] else "failed")
 
     # v118.25 · 手动重试结果同步到原 log 的 retry 状态
     # 成功 → 清队列(终止自动重试)· 失败 → 也清队列(用户已经手动管了 · 不再交给 worker)
@@ -5096,6 +5536,7 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
 
             # v118.34.10 · asyncio.to_thread keeps push_to_endpoint off the loop.
             import asyncio as _asyncio
+
             result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
             db.insert_push_log(
                 user_id=user["id"],
@@ -5114,8 +5555,9 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
                 trigger="retry",
             )
             db.update_endpoint_stats(endpoint["id"], result["success"])
-            db.update_history_push_status(log["history_id"],
-                                          "success" if result["success"] else "failed")
+            db.update_history_push_status(
+                log["history_id"], "success" if result["success"] else "failed"
+            )
             # 跟单个手动重推一样:用户已经亲自管了 · 把原 log 的自动重试队列摘掉
             if log.get("next_retry_at"):
                 db.clear_retry_schedule(log["id"])
@@ -5125,8 +5567,9 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
                 details.append({"log_id": log_id, "result": "success"})
             else:
                 failed += 1
-                details.append({"log_id": log_id, "result": "failed",
-                                "error": result.get("error_msg")})
+                details.append(
+                    {"log_id": log_id, "result": "failed", "error": result.get("error_msg")}
+                )
         except Exception as e:
             failed += 1
             details.append({"log_id": log_id, "result": "failed", "error": str(e)})
@@ -5170,6 +5613,7 @@ async def erp_batch_delete(req: ErpBatchDeleteRequest, request: Request):
 # 第 5.1 批 · 泰国 RD 税务 API(校验 + 同步)
 # ============================================================
 
+
 class RdQueryRequest(BaseModel):
     tax_id: str = Field(..., description="13 位税号")
     branch: Optional[int] = Field(0, description="分支号 · 默认 0(总部)")
@@ -5189,11 +5633,14 @@ def _check_rd_access(user: dict):
     # 当日用量(从 Redis/内存都没有,直接查 DB 简表)
     used = db.get_rd_daily_usage(str(user["id"]))
     if used >= daily_limit:
-        raise HTTPException(429, detail={
-            "code": "rd.daily_limit_reached",
-            "limit": daily_limit,
-            "used": used,
-        })
+        raise HTTPException(
+            429,
+            detail={
+                "code": "rd.daily_limit_reached",
+                "limit": daily_limit,
+                "used": used,
+            },
+        )
 
 
 @app.post("/api/rd/verify")
@@ -5202,6 +5649,7 @@ async def rd_verify(req: RdQueryRequest, request: Request):
     user = get_current_user_from_request(request)
     _check_rd_access(user)
     from rd_api import verify_tin
+
     result = verify_tin(req.tax_id)
     # v0.8.1 · 只计成功的查询,失败不算日限
     if (result or {}).get("valid"):
@@ -5215,6 +5663,7 @@ async def rd_lookup(req: RdQueryRequest, request: Request):
     user = get_current_user_from_request(request)
     _check_rd_access(user)
     from rd_api import lookup_vat
+
     result = lookup_vat(req.tax_id, req.branch or 0)
     # v0.8.1 · 只计查到公司信息的请求
     if (result or {}).get("found") or (result or {}).get("name"):
@@ -5267,6 +5716,7 @@ async def archive_settings_get(request: Request):
     user = get_current_user_from_request(request)
     _check_archive_access(user)
     import archive as _archive
+
     s = db.get_archive_settings(str(user["id"]))
     if not s:
         # 没配过 · 返回默认
@@ -5285,7 +5735,7 @@ async def archive_settings_get(request: Request):
 @app.put("/api/archive/settings")
 async def archive_settings_put(payload: ArchiveSettingsPayload, request: Request):
     user = get_current_user_from_request(request)
-    _check_archive_customize(user)   # v0.8 · 只有 Plus/Pro 能改模板
+    _check_archive_customize(user)  # v0.8 · 只有 Plus/Pro 能改模板
     # 基本校验:模板不能是空的
     if not payload.name_template:
         raise HTTPException(400, detail="archive.template_empty")
@@ -5336,6 +5786,7 @@ async def archive_rename_preview(payload: ArchivePreviewRequest, request: Reques
     user = get_current_user_from_request(request)
     _check_archive_access(user)
     import archive as _archive
+
     template = payload.name_template
     if not template:
         # 没传模板 · 用用户当前设置(或默认)
@@ -5395,6 +5846,7 @@ async def home():
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page():
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/admin/cost", status_code=301)
 
 
@@ -5423,6 +5875,7 @@ async def admin_layout_page(rest: str):
 @app.get("/api/version")
 async def get_frontend_version():
     import time as _t
+
     return {
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
@@ -5430,11 +5883,9 @@ async def get_frontend_version():
             "zh": "银行对账读得更全、更准了。\n\n遇到页数很多、密密麻麻的账单,以前可能会漏掉一些交易、或把存款和取款弄反;现在能把每一页、每一笔都完整读出来,存取方向也对得上。多个账户放在同一个 Excel、某个账户月底结清为 0 的情况,期末余额也能显示正确了;期初/期末余额也会自动补全显示。如果上传的账单只传了部分页(缺页),或仍可能有遗漏,系统会明确提醒您核对,不让错误悄悄溜过去。\n\n即日生效。",
             "th": "การกระทบยอดธนาคารอ่านได้ครบและแม่นยำขึ้น\n\nกับใบแจ้งยอดที่มีหลายหน้าและรายการแน่น เมื่อก่อนอาจตกหล่นบางรายการหรือสลับฝาก/ถอน ตอนนี้อ่านได้ครบทุกหน้าทุกรายการ ทิศทางฝาก/ถอนถูกต้อง กรณีหลายบัญชีในไฟล์ Excel เดียวและบางบัญชีถูกตัดยอดเป็น 0 สิ้นเดือน ยอดคงเหลือก็แสดงถูกต้อง และเติมยอดยกมา/ยกไปให้อัตโนมัติ หากอัปโหลดมาไม่ครบหน้า (ขาดหน้า) หรืออาจยังตกหล่น ระบบจะเตือนให้ท่านตรวจสอบอย่างชัดเจน ไม่ปล่อยให้ผิดพลาดเงียบ ๆ\n\nมีผลทันที",
             "en": "Bank reconciliation now reads statements more completely and accurately.\n\nFor long, densely packed statements, it could previously miss some transactions or swap deposits and withdrawals; now it reads every page and every line in full, with the deposit/withdrawal direction correct. For multiple accounts in one Excel file — including an account swept to zero at month-end — the closing balance now shows correctly too, and opening/closing balances are auto-filled. If you upload only some pages of a statement (missing pages), or a gap may remain, the system clearly prompts you to verify, so nothing slips through silently.\n\nEffective immediately.",
-            "ja": "銀行照合が、より漏れなく正確に読めるようになりました。\n\nページ数が多く明細が密な明細書では、以前は一部の取引を取りこぼしたり入金・出金を取り違えることがありましたが、今は全ページ・全明細を漏れなく読み取り、入出金の向きも正確です。1つのExcelに複数口座があり、月末に残高が0へ清算される口座でも、期末残高が正しく表示され、期首・期末残高も自動補完します。明細の一部ページのみをアップロード(ページ欠落)した場合や取りこぼしの可能性がある場合は、明確に確認を促し、エラーをそっと見逃しません。\n\n即日有効。"
-        }
+            "ja": "銀行照合が、より漏れなく正確に読めるようになりました。\n\nページ数が多く明細が密な明細書では、以前は一部の取引を取りこぼしたり入金・出金を取り違えることがありましたが、今は全ページ・全明細を漏れなく読み取り、入出金の向きも正確です。1つのExcelに複数口座があり、月末に残高が0へ清算される口座でも、期末残高が正しく表示され、期首・期末残高も自動補完します。明細の一部ページのみをアップロード(ページ欠落)した場合や取りこぼしの可能性がある場合は、明確に確認を促し、エラーをそっと見逃しません。\n\n即日有効。",
+        },
     }
-
-
 
 
 @app.get("/reset", response_class=HTMLResponse)
@@ -5463,8 +5914,11 @@ from fastapi.responses import RedirectResponse as _RedirectResp
 
 _GOOGLE_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
 _GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
-_GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "https://pearnly.com/api/auth/google/callback")
+_GOOGLE_REDIRECT_URI = os.getenv(
+    "GOOGLE_OAUTH_REDIRECT_URI", "https://pearnly.com/api/auth/google/callback"
+)
 _oauth_state_cache: Dict[str, float] = {}
+
 
 def _gen_oauth_state() -> str:
     s = _secrets.token_urlsafe(32)
@@ -5474,6 +5928,7 @@ def _gen_oauth_state() -> str:
         if _oauth_state_cache[k] < cutoff:
             _oauth_state_cache.pop(k, None)
     return s
+
 
 def _verify_oauth_state(s: str) -> bool:
     if not s or s not in _oauth_state_cache:
@@ -5514,14 +5969,18 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
     # code → access_token → userinfo
     try:
         import httpx as _httpx
+
         async with _httpx.AsyncClient(timeout=15) as client:
-            tr = await client.post("https://oauth2.googleapis.com/token", data={
-                "code": code,
-                "client_id": _GOOGLE_CLIENT_ID,
-                "client_secret": _GOOGLE_CLIENT_SECRET,
-                "redirect_uri": _GOOGLE_REDIRECT_URI,
-                "grant_type": "authorization_code",
-            })
+            tr = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": _GOOGLE_CLIENT_ID,
+                    "client_secret": _GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": _GOOGLE_REDIRECT_URI,
+                    "grant_type": "authorization_code",
+                },
+            )
             if tr.status_code != 200:
                 logger.error(f"[OAuth] token exchange failed {tr.status_code}: {tr.text[:300]}")
                 return _RedirectResp("/login?oauth_error=token_fail", status_code=302)
@@ -5531,7 +5990,7 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
                 return _RedirectResp("/login?oauth_error=no_access_token", status_code=302)
             ur = await client.get(
                 "https://openidconnect.googleapis.com/v1/userinfo",
-                headers={"Authorization": f"Bearer {access_token}"}
+                headers={"Authorization": f"Bearer {access_token}"},
             )
             if ur.status_code != 200:
                 return _RedirectResp("/login?oauth_error=userinfo_fail", status_code=302)
@@ -5558,6 +6017,7 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
             # 3) v118.27.5.1 · 全新用户 · Google 一键注册(主流 SaaS 标准做法)
             try:
                 from auth_signup import create_user_via_google_oauth
+
                 _name = (uinfo.get("name") or "").strip() or None
                 user = create_user_via_google_oauth(
                     email=email,
@@ -5595,7 +6055,7 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
     # v118.28.2 · 超管 → /admin · 普通用户 → /home
     safe_token = json.dumps(token)
     _redirect_path = "/admin" if bool(user.get("is_super_admin")) else "/home"
-    return HTMLResponse(f'''<!doctype html>
+    return HTMLResponse(f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Pearnly · Signing in...</title></head>
 <body style="font-family:-apple-system,sans-serif;background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
 <div>Signing you in...</div>
@@ -5603,7 +6063,7 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
 try {{ localStorage.setItem("mrpilot_token", {safe_token}); }} catch(e) {{}}
 window.location.replace("{_redirect_path}");
 </script>
-</body></html>''')
+</body></html>""")
 
 
 # ============================================================
@@ -5613,7 +6073,9 @@ window.location.replace("{_redirect_path}");
 # ============================================================
 _LINE_LOGIN_CHANNEL_ID = os.getenv("LINE_LOGIN_CHANNEL_ID", "")
 _LINE_LOGIN_CHANNEL_SECRET = os.getenv("LINE_LOGIN_CHANNEL_SECRET", "")
-_LINE_LOGIN_REDIRECT_URI = os.getenv("LINE_LOGIN_REDIRECT_URI", "https://pearnly.com/api/auth/line/callback")
+_LINE_LOGIN_REDIRECT_URI = os.getenv(
+    "LINE_LOGIN_REDIRECT_URI", "https://pearnly.com/api/auth/line/callback"
+)
 
 
 @app.get("/api/auth/line/start")
@@ -5647,6 +6109,7 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
     # code → access_token + id_token
     try:
         import httpx as _httpx
+
         async with _httpx.AsyncClient(timeout=15) as client:
             tr = await client.post(
                 "https://api.line.me/oauth2/v2.1/token",
@@ -5657,10 +6120,12 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                     "redirect_uri": _LINE_LOGIN_REDIRECT_URI,
                     "client_id": _LINE_LOGIN_CHANNEL_ID,
                     "client_secret": _LINE_LOGIN_CHANNEL_SECRET,
-                }
+                },
             )
             if tr.status_code != 200:
-                logger.error(f"[LINE OAuth] token exchange failed {tr.status_code}: {tr.text[:300]}")
+                logger.error(
+                    f"[LINE OAuth] token exchange failed {tr.status_code}: {tr.text[:300]}"
+                )
                 return _RedirectResp("/login?oauth_error=line_token_fail", status_code=302)
             tok_data = tr.json()
             id_token = tok_data.get("id_token")
@@ -5674,10 +6139,12 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                 data={
                     "id_token": id_token,
                     "client_id": _LINE_LOGIN_CHANNEL_ID,
-                }
+                },
             )
             if vr.status_code != 200:
-                logger.error(f"[LINE OAuth] id_token verify failed {vr.status_code}: {vr.text[:300]}")
+                logger.error(
+                    f"[LINE OAuth] id_token verify failed {vr.status_code}: {vr.text[:300]}"
+                )
                 return _RedirectResp("/login?oauth_error=line_verify_fail", status_code=302)
             payload = vr.json()
     except Exception as e:
@@ -5704,6 +6171,7 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
             # 3) 全新用户 · LINE 一键注册
             try:
                 from auth_signup import create_user_via_line_oauth
+
                 user = create_user_via_line_oauth(
                     line_uid=line_uid,
                     display_name=line_name or None,
@@ -5739,7 +6207,7 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
     safe_token = json.dumps(token)
     # v118.28.2 · 超管 → /admin · 普通用户 → /home
     _redirect_path = "/admin" if bool(user.get("is_super_admin")) else "/home"
-    return HTMLResponse(f'''<!doctype html>
+    return HTMLResponse(f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Pearnly · Signing in...</title></head>
 <body style="font-family:-apple-system,sans-serif;background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
 <div>Signing you in...</div>
@@ -5747,7 +6215,7 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
 try {{ localStorage.setItem("mrpilot_token", {safe_token}); }} catch(e) {{}}
 window.location.replace("{_redirect_path}");
 </script>
-</body></html>''')
+</body></html>""")
 
 
 # ============================================================
@@ -5767,9 +6235,9 @@ async def me_needs_email(request: Request):
 class _LinePostEmail(BaseModel):
     email: str
 
+
 @app.post("/api/me/line_complete_email")
 async def me_line_complete_email(payload: _LinePostEmail, request: Request):
-    from auth_signup import normalize_email as _norm_email
     user = get_current_user_from_request(request)
     cur_username = user.get("username") or ""
     if not db.is_line_placeholder_username(cur_username):
@@ -5881,7 +6349,8 @@ def _build_verification_email_html(code: str, lang: str) -> tuple:
             "lead": "用于创建 Pearnly 账户 · 10 分钟内有效",
             "ignore": "如非本人操作 · 请忽略此邮件 · 您的账户安全无风险",
             "brand_full": "Pearnly · 泰国会计自动化平台",
-            "tos": "服务条款", "privacy": "隐私政策",
+            "tos": "服务条款",
+            "privacy": "隐私政策",
             "copyright": "© 2026 Pearnly. All rights reserved.",
         },
         "th": {
@@ -5891,7 +6360,8 @@ def _build_verification_email_html(code: str, lang: str) -> tuple:
             "lead": "ใช้รหัสนี้เพื่อสมัครบัญชี Pearnly · ใช้ได้ 10 นาที",
             "ignore": "หากคุณไม่ได้ทำรายการนี้ · โปรดเพิกเฉยอีเมลฉบับนี้",
             "brand_full": "Pearnly · ระบบอัตโนมัติบัญชีไทย",
-            "tos": "ข้อกำหนด", "privacy": "นโยบายความเป็นส่วนตัว",
+            "tos": "ข้อกำหนด",
+            "privacy": "นโยบายความเป็นส่วนตัว",
             "copyright": "© 2026 Pearnly · สงวนลิขสิทธิ์",
         },
         "en": {
@@ -5901,7 +6371,8 @@ def _build_verification_email_html(code: str, lang: str) -> tuple:
             "lead": "Use this code to create your Pearnly account · valid for 10 minutes",
             "ignore": "If you didn't request this · please ignore this email",
             "brand_full": "Pearnly · Accounting automation for Thailand",
-            "tos": "Terms", "privacy": "Privacy",
+            "tos": "Terms",
+            "privacy": "Privacy",
             "copyright": "© 2026 Pearnly. All rights reserved.",
         },
         "ja": {
@@ -5911,12 +6382,13 @@ def _build_verification_email_html(code: str, lang: str) -> tuple:
             "lead": "Pearnly アカウント作成用 · 10 分間有効",
             "ignore": "心当たりのない場合 · このメールを無視してください",
             "brand_full": "Pearnly · タイ会計自動化プラットフォーム",
-            "tos": "利用規約", "privacy": "プライバシーポリシー",
+            "tos": "利用規約",
+            "privacy": "プライバシーポリシー",
             "copyright": "© 2026 Pearnly. All rights reserved.",
         },
     }
     tt = L.get(lang, L["zh"])
-    html = f'''<!doctype html><html><body style="margin:0;padding:0;background:#f1f5f9;">
+    html = f"""<!doctype html><html><body style="margin:0;padding:0;background:#f1f5f9;">
 <div style="font-family:Inter,-apple-system,'PingFang SC',Sarabun,'Hiragino Sans',sans-serif;max-width:560px;margin:0 auto;padding:32px 16px;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,0.08);">
     <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#2563eb 100%);padding:44px 40px 38px;text-align:center;">
@@ -5953,7 +6425,7 @@ def _build_verification_email_html(code: str, lang: str) -> tuple:
     </td></tr>
   </table>
 </div>
-</body></html>'''
+</body></html>"""
     return (tt["subject"], html)
 
 
@@ -5987,7 +6459,7 @@ def send_email_code(req: SendEmailCodeRequest, request: Request):
             with db.get_cursor() as cur:
                 cur.execute(
                     "SELECT 1 FROM users WHERE email_normalized = %s OR LOWER(email) = %s LIMIT 1",
-                    (email, email)
+                    (email, email),
                 )
                 if cur.fetchone():
                     raise HTTPException(status_code=409, detail="email_already_registered")
@@ -5999,18 +6471,24 @@ def send_email_code(req: SendEmailCodeRequest, request: Request):
         # 限流 · 60s 内只能发 1 次 · 1 小时最多 5 次
         try:
             with db.get_cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT 1 FROM email_codes
                     WHERE email = %s AND purpose = %s AND sent_at > NOW() - INTERVAL '60 seconds'
                     LIMIT 1
-                """, (email, req.purpose))
+                """,
+                    (email, req.purpose),
+                )
                 if cur.fetchone():
                     raise HTTPException(status_code=429, detail="resend_too_fast")
 
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT COUNT(*) AS n FROM email_codes
                     WHERE email = %s AND purpose = %s AND sent_at > NOW() - INTERVAL '1 hour'
-                """, (email, req.purpose))
+                """,
+                    (email, req.purpose),
+                )
                 row = cur.fetchone()
                 n = row.get("n") if isinstance(row, dict) else (row[0] if row else 0)
                 if n and int(n) >= 5:
@@ -6031,14 +6509,20 @@ def send_email_code(req: SendEmailCodeRequest, request: Request):
             logger.warning(f"[email_code] 读取客户端 IP 失败: {e}")
         try:
             with db.get_cursor(commit=True) as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE email_codes SET used = TRUE, used_at = NOW()
                     WHERE email = %s AND purpose = %s AND used = FALSE
-                """, (email, req.purpose))
-                cur.execute("""
+                """,
+                    (email, req.purpose),
+                )
+                cur.execute(
+                    """
                     INSERT INTO email_codes (email, code, purpose, expires_at, sender_ip)
                     VALUES (%s, %s, %s, NOW() + INTERVAL '10 minutes', %s)
-                """, (email, code, req.purpose, ip))
+                """,
+                    (email, code, req.purpose, ip),
+                )
         except Exception as e:
             logger.error(f"send_email_code db insert: {e}")
             raise HTTPException(status_code=500, detail="db_error")
@@ -6049,10 +6533,13 @@ def send_email_code(req: SendEmailCodeRequest, request: Request):
         if not ok:
             try:
                 with db.get_cursor(commit=True) as cur:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         UPDATE email_codes SET used = TRUE, used_at = NOW()
                         WHERE email = %s AND code = %s AND purpose = %s
-                    """, (email, code, req.purpose))
+                    """,
+                        (email, code, req.purpose),
+                    )
             except Exception as e:
                 logger.warning(f"[email_code] 标记 code 已用失败: {e}")
             logger.error(f"send_email_code smtp failed for {email}: {err}")
@@ -6079,11 +6566,14 @@ def verify_email_code(req: VerifyEmailCodeRequest):
             raise HTTPException(status_code=400, detail="code_invalid")
 
         with db.get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, expires_at, used FROM email_codes
                 WHERE email = %s AND code = %s AND purpose = %s
                 ORDER BY id DESC LIMIT 1
-            """, (email, code, req.purpose))
+            """,
+                (email, code, req.purpose),
+            )
             row = cur.fetchone()
             if not row:
                 raise HTTPException(status_code=400, detail="code_invalid")
@@ -6092,7 +6582,11 @@ def verify_email_code(req: VerifyEmailCodeRequest):
                 raise HTTPException(status_code=400, detail="code_used")
             cur.execute("SELECT NOW() > %s AS expired", (r["expires_at"],))
             exp_row = cur.fetchone()
-            expired = exp_row.get("expired") if isinstance(exp_row, dict) else (exp_row[0] if exp_row else True)
+            expired = (
+                exp_row.get("expired")
+                if isinstance(exp_row, dict)
+                else (exp_row[0] if exp_row else True)
+            )
             if expired:
                 raise HTTPException(status_code=400, detail="code_expired")
         return {"ok": True}
@@ -6106,6 +6600,7 @@ def verify_email_code(req: VerifyEmailCodeRequest):
 # ============================================================
 # T1 · LINE Bot · 绑定 API(v0.19.0)
 # ============================================================
+
 
 class LineBindingCodeResponse(BaseModel):
     code: str = Field(..., description="6 位绑定码")
@@ -6176,6 +6671,7 @@ async def delete_line_binding(request: Request):
 # 用于 LINE Bot / 邮件等非网页场景回复
 # ------------------------------------------------------------
 
+
 class UpdateLangRequest(BaseModel):
     lang: str = Field(..., description="zh / en / th / ja")
 
@@ -6194,6 +6690,7 @@ async def update_my_lang(req: UpdateLangRequest, request: Request):
 # T1 · LINE Webhook(v0.19.0 · 签名校验 + 事件分发)
 # 图片 OCR 留到 T1 轮 3
 # ------------------------------------------------------------
+
 
 @app.post("/api/line/webhook")
 async def line_webhook(request: Request):
@@ -6339,12 +6836,15 @@ async def _handle_line_event(ev: dict):
 
             # 启后台任务跑 OCR + push 结果
             import asyncio
-            asyncio.create_task(_handle_line_image_ocr(
-                bound_user=bound_user,
-                line_user_id=line_user_id,
-                message_id=message_id,
-                lang=lang,
-            ))
+
+            asyncio.create_task(
+                _handle_line_image_ocr(
+                    bound_user=bound_user,
+                    line_user_id=line_user_id,
+                    message_id=message_id,
+                    lang=lang,
+                )
+            )
             return
 
         # 其他类型消息
@@ -6405,7 +6905,8 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
         line_client.reply_text(
             reply_token,
             line_client.t_line(
-                lang, "bind_success",
+                lang,
+                "bind_success",
                 username=username,
                 display_name=display_name or (line_user_id[:8] + "…"),
             ),
@@ -6434,8 +6935,8 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
 # T1 轮 3 · LINE 图片 OCR 后台任务(v0.19.0)
 # ============================================================
 
-async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
-                                   message_id: str, lang: str):
+
+async def _handle_line_image_ocr(bound_user: dict, line_user_id: str, message_id: str, lang: str):
     """
     异步处理 LINE 图片消息:
       1. 下载图片
@@ -6486,6 +6987,7 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
         # 3.5 · 文件指纹缓存查找(v118.22.0.3 · 与网页入口对齐)
         # LINE 同图重传 / 用户传过的票再发 → 命中则跳 Gemini · 省配额
         import hashlib as _hashlib_l
+
         file_hash = _hashlib_l.sha256(pdf_bytes).hexdigest()
         cached = find_ocr_by_hash(
             str(user_fresh["id"]),
@@ -6497,8 +6999,16 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
             # 跑异常 hook(同网页缓存命中分支 · 不重复扣配额)
             try:
                 import asyncio as _asyncio_exc_lc
+
                 _cached_pages = cached.get("pages") or []
-                _primary = next((p for p in _cached_pages if not p.get("is_duplicate") and not p.get("is_copy")), None)
+                _primary = next(
+                    (
+                        p
+                        for p in _cached_pages
+                        if not p.get("is_duplicate") and not p.get("is_copy")
+                    ),
+                    None,
+                )
                 _primary = _primary or (_cached_pages[0] if _cached_pages else None)
                 _cf = (_primary or {}).get("fields") or {}
                 _exc_total_c = None
@@ -6508,17 +7018,23 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
                         _exc_total_c = float(str(_raw_t_c).replace(",", "").strip())
                     except Exception as e:
                         logger.warning(f"[line_cache] total_amount 解析失败: {e}")
-                _asyncio_exc_lc.create_task(_async_run_exception_checks(
-                    history_id=str(cached["id"]),
-                    user_id=str(user_fresh["id"]),
-                    tenant_id=str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None,
-                    seller_name=_cf.get("seller_name"),
-                    invoice_no=_cf.get("invoice_number"),
-                    total_amount=_exc_total_c,
-                    confidence=cached.get("confidence"),
-                    duplicate=None,
-                    fields=_cf,
-                ))
+                _asyncio_exc_lc.create_task(
+                    _async_run_exception_checks(
+                        history_id=str(cached["id"]),
+                        user_id=str(user_fresh["id"]),
+                        tenant_id=(
+                            str(user_fresh.get("tenant_id"))
+                            if user_fresh.get("tenant_id")
+                            else None
+                        ),
+                        seller_name=_cf.get("seller_name"),
+                        invoice_no=_cf.get("invoice_number"),
+                        total_amount=_exc_total_c,
+                        confidence=cached.get("confidence"),
+                        duplicate=None,
+                        fields=_cf,
+                    )
+                )
                 logger.info(f"  🛡  [LINE Cache] 异常检测已入队 · hid={cached['id']}")
             except Exception as _e_lc:
                 logger.warning(f"[line_ocr] 缓存异常检测入队失败: {_e_lc}")
@@ -6530,8 +7046,9 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
             return
 
         # 4. OCR · 新 pipeline 唯一路径
-        own_key = (user_fresh.get("gemini_api_key")
-                   or user_fresh.get("custom_gemini_api_key") or "").strip()
+        own_key = (
+            user_fresh.get("gemini_api_key") or user_fresh.get("custom_gemini_api_key") or ""
+        ).strip()
         api_key = own_key or None
         # 检查 API key 可用性(用户自带或系统默认)
         if not api_key and not os.environ.get("GEMINI_API_KEY", "").strip():
@@ -6541,6 +7058,7 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
         try:
             from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
             from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+
             _pipe_res = _pipeline_run(pdf_bytes, max_pages=1, api_key=api_key)
             result = pipeline_result_to_legacy_dict(_pipe_res)
             _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
@@ -6601,6 +7119,7 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
         if hid:
             try:
                 import asyncio as _asyncio_exc_l
+
                 _primary = pages[0] if pages else {}
                 _f = _primary.get("fields") or {}
                 _exc_total = None
@@ -6629,18 +7148,26 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
                         }
                 except Exception as _e_dup:
                     logger.warning(f"[line_ocr] duplicate 检测失败(不影响 hook): {_e_dup}")
-                _asyncio_exc_l.create_task(_async_run_exception_checks(
-                    history_id=str(hid),
-                    user_id=str(user_fresh["id"]),
-                    tenant_id=str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None,
-                    seller_name=_f.get("seller_name"),
-                    invoice_no=_f.get("invoice_number"),
-                    total_amount=_exc_total,
-                    confidence=result.get("confidence"),
-                    duplicate=_dup,
-                    fields=_f,
-                ))
-                logger.info(f"  🛡  [LINE] 异常检测已入队 · hid={hid} · dup={'有' if _dup else '无'}")
+                _asyncio_exc_l.create_task(
+                    _async_run_exception_checks(
+                        history_id=str(hid),
+                        user_id=str(user_fresh["id"]),
+                        tenant_id=(
+                            str(user_fresh.get("tenant_id"))
+                            if user_fresh.get("tenant_id")
+                            else None
+                        ),
+                        seller_name=_f.get("seller_name"),
+                        invoice_no=_f.get("invoice_number"),
+                        total_amount=_exc_total,
+                        confidence=result.get("confidence"),
+                        duplicate=_dup,
+                        fields=_f,
+                    )
+                )
+                logger.info(
+                    f"  🛡  [LINE] 异常检测已入队 · hid={hid} · dup={'有' if _dup else '无'}"
+                )
             except Exception as _e:
                 logger.warning(f"[line_ocr] 异常检测入队失败(不影响推送): {_e}")
 
@@ -6677,6 +7204,7 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str,
 # 这是唯一有权限查看 / 修改所有租户的入口
 # ============================================================
 
+
 def _require_super_admin(request: Request) -> Dict[str, Any]:
     """超级管理员守门员 · 非超管 403"""
     user = get_current_user_from_request(request)
@@ -6695,6 +7223,7 @@ def _require_super_admin(request: Request) -> Dict[str, Any]:
 #   2. POST /api/admin/migration/execute  · 真执行 · 写 memberships
 # 失败可回滚:DELETE FROM memberships;(memberships 表空 = 系统自动 fallback 到老 user.tenant_id)
 # ============================================================
+
 
 @app.post("/api/admin/migration/dry_run")
 async def admin_migration_dry_run(request: Request):
@@ -6721,6 +7250,7 @@ async def admin_migration_execute(request: Request):
 # v118.27.7.1 · 孤立用户(tenant_id IS NULL)盘点 + 修复路由(仅超管)
 # ============================================================
 
+
 @app.get("/api/admin/migration/orphan_list")
 async def admin_orphan_list(request: Request):
     """v27.7.1 · 列出所有孤立用户(tenant_id IS NULL)+ 每人数据量统计"""
@@ -6741,6 +7271,7 @@ async def admin_fix_orphans(request: Request, dry_run: bool = True):
 # ============================================================
 # v118.27.8.0 · RLS 行级安全(P1 试点)· 仅超管
 # ============================================================
+
 
 @app.get("/api/admin/rls/status")
 async def admin_rls_status(request: Request):
@@ -6791,27 +7322,36 @@ async def admin_list_tenants(request: Request):
     # 序列化
     result = []
     for t in tenants:
-        result.append({
-            "id": str(t["id"]),
-            "name": t.get("name"),
-            "display_name": t.get("display_name"),
-            "tenant_type": t.get("tenant_type"),
-            "status": t.get("status"),
-            "monthly_quota": int(t.get("monthly_quota") or 0),
-            "used_this_month": int(t.get("used_this_month") or 0),
-            "member_count": int(t.get("actual_member_count") or 0),
-            "ocr_this_month": int(t.get("ocr_this_month") or 0),
-            "last_active_at": t["last_active_at"].isoformat() if t.get("last_active_at") else None,
-            "subscription_expires_at": t["subscription_expires_at"].isoformat() if t.get("subscription_expires_at") else None,
-            "notes": t.get("notes"),
-            "created_at": t["created_at"].isoformat() if t.get("created_at") else None,
-        })
+        result.append(
+            {
+                "id": str(t["id"]),
+                "name": t.get("name"),
+                "display_name": t.get("display_name"),
+                "tenant_type": t.get("tenant_type"),
+                "status": t.get("status"),
+                "monthly_quota": int(t.get("monthly_quota") or 0),
+                "used_this_month": int(t.get("used_this_month") or 0),
+                "member_count": int(t.get("actual_member_count") or 0),
+                "ocr_this_month": int(t.get("ocr_this_month") or 0),
+                "last_active_at": (
+                    t["last_active_at"].isoformat() if t.get("last_active_at") else None
+                ),
+                "subscription_expires_at": (
+                    t["subscription_expires_at"].isoformat()
+                    if t.get("subscription_expires_at")
+                    else None
+                ),
+                "notes": t.get("notes"),
+                "created_at": t["created_at"].isoformat() if t.get("created_at") else None,
+            }
+        )
     return {"tenants": result, "total": len(result)}
 
 
 # ============================================================
 # v106 · 管理员成本追踪面板 · 4 个路由 · 仅 super_admin 可访问
 # ============================================================
+
 
 @app.get("/api/admin/cost/overview")
 async def admin_cost_overview(request: Request):
@@ -6852,6 +7392,7 @@ async def admin_cost_debug(request: Request):
             tz = cur.fetchone()
         # 序列化(datetime → str)
         from datetime import datetime as _dt
+
         def _ser(v):
             if isinstance(v, _dt):
                 return v.isoformat()
@@ -6860,6 +7401,7 @@ async def admin_cost_debug(request: Request):
                 return str(v)
             except:
                 return v
+
         return {
             "table_stats": {k: _ser(v) for k, v in stats.items()},
             "postgres_timezone": dict(tz) if tz else {},
@@ -6867,6 +7409,7 @@ async def admin_cost_debug(request: Request):
         }
     except Exception as e:
         import traceback
+
         return {"error": str(e), "traceback": traceback.format_exc()}
 
 
@@ -6935,6 +7478,7 @@ async def admin_monitoring_overview(request: Request):
     """监控数据 · Gemini 调用统计 + DB 连接池(超管登录后看)"""
     _require_super_admin(request)
     from services.monitoring import get_monitoring_overview
+
     return get_monitoring_overview()
 
 
@@ -6945,7 +7489,8 @@ async def admin_credits_export(request: Request, days: int = 30):
     days = max(1, min(int(days), 365))
     try:
         with db.get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     ct.id, ct.tenant_id::text, t.name AS tenant_name,
                     ct.user_id::text, u.username,
@@ -6956,25 +7501,51 @@ async def admin_credits_export(request: Request, days: int = 30):
                 LEFT JOIN users u ON u.id = ct.user_id
                 WHERE ct.created_at >= NOW() - INTERVAL %s
                 ORDER BY ct.created_at DESC
-            """, (f"{days} days",))
+            """,
+                (f"{days} days",),
+            )
             rows = cur.fetchall() or []
     except Exception as e:
         raise HTTPException(500, detail=f"export_failed: {e}")
 
-    import io, csv
+    import io
+    import csv
+
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["id", "tenant_id", "tenant_name", "user_id", "username",
-                "type", "amount_thb", "pages", "balance_after", "description", "created_at"])
+    w.writerow(
+        [
+            "id",
+            "tenant_id",
+            "tenant_name",
+            "user_id",
+            "username",
+            "type",
+            "amount_thb",
+            "pages",
+            "balance_after",
+            "description",
+            "created_at",
+        ]
+    )
     for r in rows:
-        w.writerow([
-            r["id"], r["tenant_id"] or "", r["tenant_name"] or "",
-            r["user_id"] or "", r["username"] or "",
-            r["type"], float(r["amount_thb"] or 0), int(r["pages"] or 0),
-            float(r["balance_after"] or 0), r["description"] or "",
-            r["created_at"].isoformat() if r["created_at"] else "",
-        ])
+        w.writerow(
+            [
+                r["id"],
+                r["tenant_id"] or "",
+                r["tenant_name"] or "",
+                r["user_id"] or "",
+                r["username"] or "",
+                r["type"],
+                float(r["amount_thb"] or 0),
+                int(r["pages"] or 0),
+                float(r["balance_after"] or 0),
+                r["description"] or "",
+                r["created_at"].isoformat() if r["created_at"] else "",
+            ]
+        )
     from fastapi.responses import Response
+
     return Response(
         content="﻿" + buf.getvalue(),  # BOM 让 Excel 识别 UTF-8
         media_type="text/csv; charset=utf-8",
@@ -7001,21 +7572,25 @@ async def admin_cost_export(request: Request, days: int = 30):
         # 拼 CSV
         import io
         import csv
+
         buf = io.StringIO()
         w = csv.writer(buf)
         w.writerow(["时间", "用户", "引擎", "页数", "输入Token", "输出Token", "成本THB", "耗时ms"])
         for r in rows:
-            w.writerow([
-                r["created_at"].strftime("%Y-%m-%d %H:%M:%S") if r["created_at"] else "",
-                r.get("username") or "(已删)",
-                r.get("engine") or "",
-                int(r.get("pages") or 0),
-                int(r.get("input_tokens") or 0),
-                int(r.get("output_tokens") or 0),
-                f"{float(r.get('cost_thb') or 0):.4f}",
-                int(r.get("elapsed_ms") or 0),
-            ])
+            w.writerow(
+                [
+                    r["created_at"].strftime("%Y-%m-%d %H:%M:%S") if r["created_at"] else "",
+                    r.get("username") or "(已删)",
+                    r.get("engine") or "",
+                    int(r.get("pages") or 0),
+                    int(r.get("input_tokens") or 0),
+                    int(r.get("output_tokens") or 0),
+                    f"{float(r.get('cost_thb') or 0):.4f}",
+                    int(r.get("elapsed_ms") or 0),
+                ]
+            )
         from fastapi.responses import Response
+
         return Response(
             content="\ufeff" + buf.getvalue(),  # BOM 让 Excel 正确识别中文
             media_type="text/csv; charset=utf-8",
@@ -7030,6 +7605,7 @@ async def admin_cost_export(request: Request, days: int = 30):
 # v108 · Google AI Studio 余额追踪 · 3 个 API 路由
 # 半自动 · 管理员每周更新真实余额 · 系统自动校准
 # ============================================================
+
 
 class BalanceUpdateRequest(BaseModel):
     real_balance_thb: float = Field(..., ge=0, le=10_000_000)
@@ -7082,13 +7658,16 @@ async def admin_balance_history(request: Request, limit: int = 20):
     _require_super_admin(request)
     try:
         with db.get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, real_balance_thb, estimated_used_since_last,
                        real_used_since_last, calibration_factor, notes, created_at
                 FROM billing_balance_log
                 ORDER BY created_at DESC
                 LIMIT %s
-            """, (max(1, min(int(limit), 100)),))
+            """,
+                (max(1, min(int(limit), 100)),),
+            )
             rows = cur.fetchall()
         return {
             "history": [
@@ -7113,6 +7692,7 @@ async def admin_balance_history(request: Request, limit: int = 20):
 # v107 · 客户(Client)实体 API · 6 个路由
 # 多客户事务所核心 · 用户登录后看自己的客户
 # ============================================================
+
 
 class ClientCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
@@ -7234,7 +7814,9 @@ async def api_assign_client(history_id: str, req: AssignClientRequest, request: 
         visible = db.get_visible_client_ids_for_user(user)
         if visible is not None and int(req.client_id) not in set(visible):
             raise HTTPException(403, detail="client.no_access")
-    ok = db.assign_invoice_to_client(str(user["id"]), history_id, req.client_id, tenant_id=_tid(user))
+    ok = db.assign_invoice_to_client(
+        str(user["id"]), history_id, req.client_id, tenant_id=_tid(user)
+    )
     if not ok:
         raise HTTPException(400, detail="client.assign_failed")
 
@@ -7244,15 +7826,20 @@ async def api_assign_client(history_id: str, req: AssignClientRequest, request: 
     if req.client_id is not None:
         try:
             h = db.get_ocr_history_detail(
-                str(user["id"]), history_id, tenant_id=_tid(user),
+                str(user["id"]),
+                history_id,
+                tenant_id=_tid(user),
             )
             if h:
                 _pages = h.get("pages") or []
                 _primary = next(
-                    (p for p in _pages
-                     if isinstance(p, dict)
-                     and not p.get("is_duplicate")
-                     and not p.get("is_copy")),
+                    (
+                        p
+                        for p in _pages
+                        if isinstance(p, dict)
+                        and not p.get("is_duplicate")
+                        and not p.get("is_copy")
+                    ),
                     _pages[0] if _pages else {},
                 )
                 _f = (_primary or {}).get("fields") or {}
@@ -7260,12 +7847,16 @@ async def api_assign_client(history_id: str, req: AssignClientRequest, request: 
                 _buyer_tax = _f.get("buyer_tax") or ""
                 if _buyer_name:
                     db.learn_buyer_to_client(
-                        _buyer_name, _buyer_tax, int(req.client_id),
-                        str(user["id"]), tenant_id=_tid(user),
+                        _buyer_name,
+                        _buyer_tax,
+                        int(req.client_id),
+                        str(user["id"]),
+                        tenant_id=_tid(user),
                     )
                     logger.info(
                         "[assign_client] learned buyer→client: %r → %s",
-                        _buyer_name[:40], req.client_id,
+                        _buyer_name[:40],
+                        req.client_id,
                     )
         except Exception as e:
             logger.warning(f"learn buyer→client failed (history={history_id[:8]}): {e}")
@@ -7274,8 +7865,7 @@ async def api_assign_client(history_id: str, req: AssignClientRequest, request: 
 
 
 @app.get("/api/clients/{client_id}/export")
-async def api_export_client_invoices(client_id: int, request: Request,
-                                       month: Optional[str] = None):
+async def api_export_client_invoices(client_id: int, request: Request, month: Optional[str] = None):
     """按客户导出发票 Excel(VAT 报表格式)
     month 格式 · YYYY-MM(默认本月)· 不带 month 参数则导出全部
     v108.3 · 防御性加固 + 详细日志
@@ -7285,14 +7875,14 @@ async def api_export_client_invoices(client_id: int, request: Request,
     client = db.get_client(str(user["id"]), client_id, tenant_id=_tid(user))
     if not client:
         raise HTTPException(404, detail="client.not_found")
-    
+
     # 月份过滤 · 空 / "all" 表示全部
     if month and month.lower() == "all":
         month = None
     if not month:
         # 默认导出最近 90 天(更宽容 · 而不是仅本月)
         month = None
-    
+
     try:
         # v118.15 · tenant 共享:同 tenant 内任意成员对该客户识别的发票都算
         tid = _tid(user)
@@ -7305,7 +7895,8 @@ async def api_export_client_invoices(client_id: int, request: Request,
         with db.get_cursor() as cur:
             if month:
                 # 按月份过滤 · 同时兼容 invoice_date 为 NULL 的情况(用 created_at fallback)
-                cur.execute(f"""
+                cur.execute(
+                    f"""
                     SELECT h.id, h.invoice_no, h.invoice_date, h.seller_name, 
                            h.total_amount, h.filename, h.created_at
                     FROM ocr_history h
@@ -7315,22 +7906,29 @@ async def api_export_client_invoices(client_id: int, request: Request,
                           OR (h.invoice_date IS NULL AND TO_CHAR(h.created_at, 'YYYY-MM') = %s)
                       )
                     ORDER BY h.invoice_date ASC NULLS LAST, h.created_at ASC
-                """, (client_id, user_filter_param, month, month))
+                """,
+                    (client_id, user_filter_param, month, month),
+                )
             else:
                 # 不过滤月份 · 全部
-                cur.execute(f"""
+                cur.execute(
+                    f"""
                     SELECT h.id, h.invoice_no, h.invoice_date, h.seller_name, 
                            h.total_amount, h.filename, h.created_at
                     FROM ocr_history h
                     WHERE h.client_id = %s AND {user_filter_sql}
                     ORDER BY h.invoice_date ASC NULLS LAST, h.created_at ASC
-                """, (client_id, user_filter_param))
+                """,
+                    (client_id, user_filter_param),
+                )
             rows = cur.fetchall()
-        
+
         logger.info(f"[client_export] client_id={client_id} month={month} rows={len(rows)}")
-        
+
         # 拼 CSV(Excel 兼容)
-        import io, csv
+        import io
+        import csv
+
         buf = io.StringIO()
         w = csv.writer(buf)
         title_month = month or "All"
@@ -7352,20 +7950,24 @@ async def api_export_client_invoices(client_id: int, request: Request,
                     inv_date = r["invoice_date"].strftime("%Y-%m-%d")
                 except AttributeError:
                     inv_date = str(r["invoice_date"])[:10]
-            w.writerow([
-                i,
-                inv_date,
-                r.get("invoice_no") or "",
-                r.get("seller_name") or "",
-                f"{amount:.2f}",
-                r.get("filename") or "",
-            ])
+            w.writerow(
+                [
+                    i,
+                    inv_date,
+                    r.get("invoice_no") or "",
+                    r.get("seller_name") or "",
+                    f"{amount:.2f}",
+                    r.get("filename") or "",
+                ]
+            )
         w.writerow([])
         w.writerow(["合计", "", "", "", f"{total:.2f}"])
         from fastapi.responses import Response
+
         client_name_safe = (client.get("name") or "client").replace("/", "_")[:50]
         # ASCII 安全的 filename(中泰文用 RFC 5987 filename* 编码)
         import urllib.parse as _up
+
         ascii_name = "client_export"
         encoded = _up.quote(f"{client_name_safe}_{title_month}.csv")
         return Response(
@@ -7379,6 +7981,7 @@ async def api_export_client_invoices(client_id: int, request: Request,
         raise
     except Exception as e:
         import traceback
+
         logger.error(f"export_client_invoices failed: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=f"client.export_failed: {str(e)[:200]}")
 
@@ -7399,7 +8002,9 @@ async def admin_create_tenant(req: AdminCreateTenantRequest, request: Request):
 
 
 @app.patch("/api/admin/tenants/{tenant_id}/quota")
-async def admin_update_tenant_quota(tenant_id: str, req: AdminUpdateTenantQuotaRequest, request: Request):
+async def admin_update_tenant_quota(
+    tenant_id: str, req: AdminUpdateTenantQuotaRequest, request: Request
+):
     """改租户限额 · 仅超管"""
     _require_super_admin(request)
     ok = db.update_tenant_quota(tenant_id, req.monthly_quota)
@@ -7409,7 +8014,9 @@ async def admin_update_tenant_quota(tenant_id: str, req: AdminUpdateTenantQuotaR
 
 
 @app.patch("/api/admin/tenants/{tenant_id}/status")
-async def admin_update_tenant_status(tenant_id: str, req: AdminUpdateTenantStatusRequest, request: Request):
+async def admin_update_tenant_status(
+    tenant_id: str, req: AdminUpdateTenantStatusRequest, request: Request
+):
     """改租户状态 · 仅超管"""
     _require_super_admin(request)
     ok = db.update_tenant_status(tenant_id, req.status)
@@ -7481,6 +8088,7 @@ async def get_my_tenant_usage(request: Request):
 # v23 · 用户管理(超管)· 员工管理(老板)· 操作日志
 # ============================================================
 
+
 class AdminCreateUserRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, pattern="^[a-zA-Z0-9_.-]+$")
     password: str = Field(..., min_length=6, max_length=100)
@@ -7514,7 +8122,9 @@ class EmployeeToggleRequest(BaseModel):
     is_active: bool
 
 
-def _log_op(request: Request, user, action, target_type=None, target_id=None, target_name=None, details=None):
+def _log_op(
+    request: Request, user, action, target_type=None, target_id=None, target_name=None, details=None
+):
     """记操作日志的便捷函数"""
     try:
         db.insert_operation_log(
@@ -7547,6 +8157,7 @@ async def admin_list_users(request: Request):
     """v118.12 · 仅返回客户(owner / 老数据 role NULL) · 员工走 /api/admin/employees"""
     _require_super_admin(request)
     import db as _db
+
     rows = []
     try:
         with _db.get_cursor() as cur:
@@ -7578,26 +8189,38 @@ async def admin_list_users(request: Request):
             db_rows = cur.fetchall()
         for r in db_rows:
             tenant_plan = r.get("plan") or "free"
-            rows.append({
-                "user_id": str(r["user_id"]),
-                "id": str(r["user_id"]),                      # v118.12.1 · 兼容前端 u.id 字段
-                "username": r.get("username"),
-                "email": r.get("email"),
-                "company_name": r.get("company_name"),
-                "tenant_id": str(r["tenant_id"]) if r.get("tenant_id") else None,
-                "tenant_type": r.get("tenant_type"),
-                "tenant_status": r.get("tenant_status"),
-                "plan": tenant_plan,                          # v118.12 · 客户列表用 user.plan(实际套餐字段)
-                "is_active": r.get("is_active"),
-                "country": r.get("country"),
-                "monthly_quota": int(r.get("tenant_quota") or 0),
-                "used_this_month": int(r.get("tenant_used") or 0),
-                "employees_count": int(r.get("employees_count") or 0),
-                "trial_expires_at": r["subscription_expires_at"].isoformat() if r.get("subscription_expires_at") else None,
-                "subscription_expires_at": r["subscription_expires_at"].isoformat() if r.get("subscription_expires_at") else None,
-                "last_login_at": r["last_login_at"].isoformat() if r.get("last_login_at") else None,
-                "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
-            })
+            rows.append(
+                {
+                    "user_id": str(r["user_id"]),
+                    "id": str(r["user_id"]),  # v118.12.1 · 兼容前端 u.id 字段
+                    "username": r.get("username"),
+                    "email": r.get("email"),
+                    "company_name": r.get("company_name"),
+                    "tenant_id": str(r["tenant_id"]) if r.get("tenant_id") else None,
+                    "tenant_type": r.get("tenant_type"),
+                    "tenant_status": r.get("tenant_status"),
+                    "plan": tenant_plan,  # v118.12 · 客户列表用 user.plan(实际套餐字段)
+                    "is_active": r.get("is_active"),
+                    "country": r.get("country"),
+                    "monthly_quota": int(r.get("tenant_quota") or 0),
+                    "used_this_month": int(r.get("tenant_used") or 0),
+                    "employees_count": int(r.get("employees_count") or 0),
+                    "trial_expires_at": (
+                        r["subscription_expires_at"].isoformat()
+                        if r.get("subscription_expires_at")
+                        else None
+                    ),
+                    "subscription_expires_at": (
+                        r["subscription_expires_at"].isoformat()
+                        if r.get("subscription_expires_at")
+                        else None
+                    ),
+                    "last_login_at": (
+                        r["last_login_at"].isoformat() if r.get("last_login_at") else None
+                    ),
+                    "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+                }
+            )
     except Exception as e:
         logger.error(f"admin_list_users: {e}")
         raise HTTPException(500, detail="admin.list_failed")
@@ -7609,6 +8232,7 @@ async def admin_list_employees(request: Request):
     """v118.12 · 超管查所有员工(role=member) · 显示属于哪个老板/事务所"""
     _require_super_admin(request)
     import db as _db
+
     rows = []
     try:
         with _db.get_cursor() as cur:
@@ -7636,20 +8260,24 @@ async def admin_list_employees(request: Request):
             """)
             db_rows = cur.fetchall()
         for r in db_rows:
-            rows.append({
-                "employee_id": str(r["employee_id"]),
-                "username": r.get("username"),
-                "email": r.get("email"),
-                "tenant_id": str(r["tenant_id"]) if r.get("tenant_id") else None,
-                "tenant_name": r.get("tenant_name"),
-                "tenant_plan": r.get("tenant_plan"),
-                "owner_id": str(r["owner_id"]) if r.get("owner_id") else None,
-                "owner_username": r.get("owner_username"),
-                "owner_email": r.get("owner_email"),
-                "is_active": r.get("is_active"),
-                "last_login_at": r["last_login_at"].isoformat() if r.get("last_login_at") else None,
-                "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
-            })
+            rows.append(
+                {
+                    "employee_id": str(r["employee_id"]),
+                    "username": r.get("username"),
+                    "email": r.get("email"),
+                    "tenant_id": str(r["tenant_id"]) if r.get("tenant_id") else None,
+                    "tenant_name": r.get("tenant_name"),
+                    "tenant_plan": r.get("tenant_plan"),
+                    "owner_id": str(r["owner_id"]) if r.get("owner_id") else None,
+                    "owner_username": r.get("owner_username"),
+                    "owner_email": r.get("owner_email"),
+                    "is_active": r.get("is_active"),
+                    "last_login_at": (
+                        r["last_login_at"].isoformat() if r.get("last_login_at") else None
+                    ),
+                    "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+                }
+            )
     except Exception as e:
         logger.error(f"admin_list_employees: {e}")
         raise HTTPException(500, detail="admin.list_failed")
@@ -7673,8 +8301,19 @@ async def admin_create_user(req: AdminCreateUserRequest, request: Request):
         if err == "username_exists":
             raise HTTPException(409, detail="admin.username_exists")
         raise HTTPException(400, detail="admin.create_failed")
-    _log_op(request, admin, "user.create", "user", result["user_id"], req.username,
-            {"company_name": req.company_name, "tenant_type": req.tenant_type, "quota": req.monthly_quota})
+    _log_op(
+        request,
+        admin,
+        "user.create",
+        "user",
+        result["user_id"],
+        req.username,
+        {
+            "company_name": req.company_name,
+            "tenant_type": req.tenant_type,
+            "quota": req.monthly_quota,
+        },
+    )
     return {"ok": True, "user_id": result["user_id"], "tenant_id": result["tenant_id"]}
 
 
@@ -7695,18 +8334,27 @@ async def admin_user_detail(user_id: str, request: Request):
     last_payment_at = None
     try:
         import db as _db
+
         with _db.get_cursor() as cur:
-            cur.execute("SELECT COUNT(*) AS n, MAX(created_at) AS last FROM ocr_history WHERE user_id = %s", (user_id,))
+            cur.execute(
+                "SELECT COUNT(*) AS n, MAX(created_at) AS last FROM ocr_history WHERE user_id = %s",
+                (user_id,),
+            )
             r = cur.fetchone()
             if r:
                 cumulative_ocr = int(r.get("n") or 0) if isinstance(r, dict) else int(r[0] or 0)
                 last_raw = r.get("last") if isinstance(r, dict) else r[1]
                 last_ocr_at = last_raw.isoformat() if last_raw else None
             try:
-                cur.execute("SELECT COUNT(*) AS n, MAX(created_at) AS last FROM payment_log WHERE user_id = %s AND status = 'approved'", (user_id,))
+                cur.execute(
+                    "SELECT COUNT(*) AS n, MAX(created_at) AS last FROM payment_log WHERE user_id = %s AND status = 'approved'",
+                    (user_id,),
+                )
                 r2 = cur.fetchone()
                 if r2:
-                    payment_count = int(r2.get("n") or 0) if isinstance(r2, dict) else int(r2[0] or 0)
+                    payment_count = (
+                        int(r2.get("n") or 0) if isinstance(r2, dict) else int(r2[0] or 0)
+                    )
                     last_pay_raw = r2.get("last") if isinstance(r2, dict) else r2[1]
                     last_payment_at = last_pay_raw.isoformat() if last_pay_raw else None
             except Exception:
@@ -7747,15 +8395,19 @@ async def admin_user_detail(user_id: str, request: Request):
         "has_risk_signal": bool(user.get("is_suspicious") or user.get("risk_score", 0) > 0),
         # tenant 信息(嵌套)
         "tenant_id": str(user["tenant_id"]) if user.get("tenant_id") else None,
-        "tenant": {
-            "id": str(tenant["id"]) if tenant else None,
-            "name": tenant.get("name") if tenant else None,
-            "tenant_type": tenant.get("tenant_type") if tenant else None,
-            "status": tenant.get("status") if tenant else None,
-            "monthly_quota": int(tenant.get("monthly_quota") or 0) if tenant else 0,
-            "used_this_month": int(tenant.get("used_this_month") or 0) if tenant else 0,
-            "notes": tenant.get("notes") if tenant else None,
-        } if tenant else None,
+        "tenant": (
+            {
+                "id": str(tenant["id"]) if tenant else None,
+                "name": tenant.get("name") if tenant else None,
+                "tenant_type": tenant.get("tenant_type") if tenant else None,
+                "status": tenant.get("status") if tenant else None,
+                "monthly_quota": int(tenant.get("monthly_quota") or 0) if tenant else 0,
+                "used_this_month": int(tenant.get("used_this_month") or 0) if tenant else 0,
+                "notes": tenant.get("notes") if tenant else None,
+            }
+            if tenant
+            else None
+        ),
         "tenant_name": tenant.get("name") if tenant else None,
         "tenant_type": tenant.get("tenant_type") if tenant else None,
         "tenant_status": tenant.get("status") if tenant else None,
@@ -7771,14 +8423,17 @@ async def admin_user_detail(user_id: str, request: Request):
                 "is_active": e.get("is_active"),
                 "last_login_at": e["last_login_at"].isoformat() if e.get("last_login_at") else None,
                 "created_at": e["created_at"].isoformat() if e.get("created_at") else None,
-            } for e in employees
+            }
+            for e in employees
         ],
     }
 
 
 # 改配额(超管)· tenant_id 路径可从用户详情得到 · 但这里简化 · 按 user_id
 @app.patch("/api/admin/users/{user_id}/quota")
-async def admin_update_user_quota(user_id: str, req: AdminUpdateTenantQuotaRequest, request: Request):
+async def admin_update_user_quota(
+    user_id: str, req: AdminUpdateTenantQuotaRequest, request: Request
+):
     admin = _require_super_admin(request)
     user = db.find_user_by_id(user_id)
     if not user or not user.get("tenant_id"):
@@ -7786,14 +8441,23 @@ async def admin_update_user_quota(user_id: str, req: AdminUpdateTenantQuotaReque
     ok = db.update_tenant_quota(str(user["tenant_id"]), req.monthly_quota)
     if not ok:
         raise HTTPException(500, detail="admin.update_failed")
-    _log_op(request, admin, "user.update_quota", "user", user_id, user.get("username"),
-            {"new_quota": req.monthly_quota})
+    _log_op(
+        request,
+        admin,
+        "user.update_quota",
+        "user",
+        user_id,
+        user.get("username"),
+        {"new_quota": req.monthly_quota},
+    )
     return {"ok": True}
 
 
 # 改状态(超管)
 @app.patch("/api/admin/users/{user_id}/status")
-async def admin_update_user_status(user_id: str, req: AdminUpdateTenantStatusRequest, request: Request):
+async def admin_update_user_status(
+    user_id: str, req: AdminUpdateTenantStatusRequest, request: Request
+):
     admin = _require_super_admin(request)
     user = db.find_user_by_id(user_id)
     if not user or not user.get("tenant_id"):
@@ -7801,8 +8465,15 @@ async def admin_update_user_status(user_id: str, req: AdminUpdateTenantStatusReq
     ok = db.update_tenant_status(str(user["tenant_id"]), req.status)
     if not ok:
         raise HTTPException(500, detail="admin.update_failed")
-    _log_op(request, admin, "user.update_status", "user", user_id, user.get("username"),
-            {"new_status": req.status})
+    _log_op(
+        request,
+        admin,
+        "user.update_status",
+        "user",
+        user_id,
+        user.get("username"),
+        {"new_status": req.status},
+    )
     return {"ok": True}
 
 
@@ -7828,8 +8499,15 @@ async def admin_delete_user(user_id: str, req: AdminDeleteUserRequest, request: 
     ok = db.delete_owner_user_cascade(user_id)
     if not ok:
         raise HTTPException(500, detail="admin.delete_failed")
-    _log_op(request, admin, "user.delete", "user", user_id, user.get("username"),
-            {"company_name": user.get("company_name")})
+    _log_op(
+        request,
+        admin,
+        "user.delete",
+        "user",
+        user_id,
+        user.get("username"),
+        {"company_name": user.get("company_name")},
+    )
     return {"ok": True}
 
 
@@ -7837,7 +8515,7 @@ async def admin_delete_user(user_id: str, req: AdminDeleteUserRequest, request: 
 @app.post("/api/admin/users/{user_id}/reset-password")
 async def admin_reset_user_password(user_id: str, request: Request):
     """v118.28.7 · 砍 · 大厂惯例(Xero/QuickBooks/Stripe)超管不碰客户密码
-       客户忘密码请走登录页「忘记密码」自助 · 邮箱也丢了走身份验证申诉(人工流程)"""
+    客户忘密码请走登录页「忘记密码」自助 · 邮箱也丢了走身份验证申诉(人工流程)"""
     _require_super_admin(request)
     raise HTTPException(410, detail="admin.password_reset_removed")
 
@@ -7849,7 +8527,9 @@ async def admin_user_logs(user_id: str, request: Request):
     user = db.find_user_by_id(user_id)
     if not user:
         raise HTTPException(404, detail="admin.user_not_found")
-    logs = db.list_operation_logs(tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None, limit=200)
+    logs = db.list_operation_logs(
+        tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None, limit=200
+    )
     return {
         "logs": [
             {
@@ -7862,7 +8542,8 @@ async def admin_user_logs(user_id: str, request: Request):
                 "details": l.get("details"),
                 "ip": l.get("ip"),
                 "created_at": l["created_at"].isoformat() if l.get("created_at") else None,
-            } for l in logs
+            }
+            for l in logs
         ],
         "total": len(logs),
     }
@@ -7883,9 +8564,12 @@ async def admin_global_logs(
     _require_super_admin(request)
     res = db.list_operation_logs_paged(
         tenant_id=None,
-        page=page, per_page=per_page,
-        q=q or None, action=action or None,
-        date_from=date_from or None, date_to=date_to or None,
+        page=page,
+        per_page=per_page,
+        q=q or None,
+        action=action or None,
+        date_from=date_from or None,
+        date_to=date_to or None,
     )
     return {
         "logs": [
@@ -7900,7 +8584,8 @@ async def admin_global_logs(
                 "details": l.get("details"),
                 "ip": l.get("ip"),
                 "created_at": l["created_at"].isoformat() if l.get("created_at") else None,
-            } for l in res["rows"]
+            }
+            for l in res["rows"]
         ],
         "total": res["total"],
         "page": res["page"],
@@ -7920,33 +8605,51 @@ async def admin_logs_csv(
     _require_super_admin(request)
     res = db.list_operation_logs_paged(
         tenant_id=None,
-        q=q or None, action=action or None,
-        date_from=date_from or None, date_to=date_to or None,
+        q=q or None,
+        action=action or None,
+        date_from=date_from or None,
+        date_to=date_to or None,
         limit_all=5000,
     )
     import csv as _csv
     from io import StringIO as _StringIO
+
     buf = _StringIO()
     buf.write("\ufeff")  # BOM · Excel 中文不乱码
     w = _csv.writer(buf)
-    w.writerow(["created_at", "actor_username", "actor_is_super", "action", "target_type", "target_name", "tenant_id", "ip", "details"])
+    w.writerow(
+        [
+            "created_at",
+            "actor_username",
+            "actor_is_super",
+            "action",
+            "target_type",
+            "target_name",
+            "tenant_id",
+            "ip",
+            "details",
+        ]
+    )
     for l in res["rows"]:
-        w.writerow([
-            l["created_at"].isoformat() if l.get("created_at") else "",
-            l.get("actor_username") or "",
-            "1" if l.get("actor_is_super") else "0",
-            l.get("action") or "",
-            l.get("target_type") or "",
-            l.get("target_name") or "",
-            str(l["tenant_id"]) if l.get("tenant_id") else "",
-            l.get("ip") or "",
-            json.dumps(l.get("details"), ensure_ascii=False) if l.get("details") else "",
-        ])
+        w.writerow(
+            [
+                l["created_at"].isoformat() if l.get("created_at") else "",
+                l.get("actor_username") or "",
+                "1" if l.get("actor_is_super") else "0",
+                l.get("action") or "",
+                l.get("target_type") or "",
+                l.get("target_name") or "",
+                str(l["tenant_id"]) if l.get("tenant_id") else "",
+                l.get("ip") or "",
+                json.dumps(l.get("details"), ensure_ascii=False) if l.get("details") else "",
+            ]
+        )
     from fastapi.responses import Response as _Resp
+
     return _Resp(
         content=buf.getvalue(),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="pearnly_logs.csv"'}
+        headers={"Content-Disposition": 'attachment; filename="pearnly_logs.csv"'},
     )
 
 
@@ -7972,7 +8675,8 @@ async def me_access_log(
 
     res = db.list_operation_logs_paged(
         tenant_id=tenant_id,
-        page=page, per_page=per_page,
+        page=page,
+        per_page=per_page,
         q=q or None,
         actor_is_super=True,  # 关键 · 只看 Pearnly 超管的操作
     )
@@ -7987,7 +8691,8 @@ async def me_access_log(
                 "details": l.get("details"),
                 "ip": l.get("ip"),
                 "created_at": l["created_at"].isoformat() if l.get("created_at") else None,
-            } for l in res["rows"]
+            }
+            for l in res["rows"]
         ],
         "total": res["total"],
         "page": res["page"],
@@ -8004,6 +8709,7 @@ async def me_access_log_csv(request: Request, q: str = ""):
     tenant_id = str(user["tenant_id"]) if user.get("tenant_id") else None
     if not tenant_id:
         from fastapi.responses import Response as _Resp
+
         return _Resp(content="\ufeff", media_type="text/csv; charset=utf-8")
 
     res = db.list_operation_logs_paged(
@@ -8014,25 +8720,31 @@ async def me_access_log_csv(request: Request, q: str = ""):
     )
     import csv as _csv
     from io import StringIO as _StringIO
+
     buf = _StringIO()
     buf.write("\ufeff")
     w = _csv.writer(buf)
-    w.writerow(["created_at", "actor_username", "action", "target_type", "target_name", "ip", "details"])
+    w.writerow(
+        ["created_at", "actor_username", "action", "target_type", "target_name", "ip", "details"]
+    )
     for l in res["rows"]:
-        w.writerow([
-            l["created_at"].isoformat() if l.get("created_at") else "",
-            l.get("actor_username") or "",
-            l.get("action") or "",
-            l.get("target_type") or "",
-            l.get("target_name") or "",
-            l.get("ip") or "",
-            json.dumps(l.get("details"), ensure_ascii=False) if l.get("details") else "",
-        ])
+        w.writerow(
+            [
+                l["created_at"].isoformat() if l.get("created_at") else "",
+                l.get("actor_username") or "",
+                l.get("action") or "",
+                l.get("target_type") or "",
+                l.get("target_name") or "",
+                l.get("ip") or "",
+                json.dumps(l.get("details"), ensure_ascii=False) if l.get("details") else "",
+            ]
+        )
     from fastapi.responses import Response as _Resp
+
     return _Resp(
         content=buf.getvalue(),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="pearnly_access_log.csv"'}
+        headers={"Content-Disposition": 'attachment; filename="pearnly_access_log.csv"'},
     )
 
 
@@ -8041,6 +8753,7 @@ async def me_access_log_csv(request: Request, q: str = ""):
 async def admin_users_csv(request: Request):
     _require_super_admin(request)
     import db as _db
+
     rows = []
     try:
         with _db.get_cursor() as cur:
@@ -8076,34 +8789,57 @@ async def admin_users_csv(request: Request):
 
     import csv as _csv
     from io import StringIO as _StringIO
+
     buf = _StringIO()
     buf.write("\ufeff")
     w = _csv.writer(buf)
-    w.writerow(["created_at", "username", "email", "company_name", "country", "plan",
-                "tenant_status", "is_active", "monthly_quota", "used_this_month",
-                "employees_count", "subscription_expires_at", "last_login_at", "tenant_id"])
+    w.writerow(
+        [
+            "created_at",
+            "username",
+            "email",
+            "company_name",
+            "country",
+            "plan",
+            "tenant_status",
+            "is_active",
+            "monthly_quota",
+            "used_this_month",
+            "employees_count",
+            "subscription_expires_at",
+            "last_login_at",
+            "tenant_id",
+        ]
+    )
     for r in rows:
-        w.writerow([
-            r["created_at"].isoformat() if r.get("created_at") else "",
-            r.get("username") or "",
-            r.get("email") or "",
-            r.get("company_name") or "",
-            r.get("country") or "",
-            r.get("plan") or "free",
-            r.get("tenant_status") or "",
-            "1" if r.get("is_active") else "0",
-            int(r.get("tenant_quota") or 0),
-            int(r.get("tenant_used") or 0),
-            int(r.get("employees_count") or 0),
-            r["subscription_expires_at"].isoformat() if r.get("subscription_expires_at") else "",
-            r["last_login_at"].isoformat() if r.get("last_login_at") else "",
-            str(r["tenant_id"]) if r.get("tenant_id") else "",
-        ])
+        w.writerow(
+            [
+                r["created_at"].isoformat() if r.get("created_at") else "",
+                r.get("username") or "",
+                r.get("email") or "",
+                r.get("company_name") or "",
+                r.get("country") or "",
+                r.get("plan") or "free",
+                r.get("tenant_status") or "",
+                "1" if r.get("is_active") else "0",
+                int(r.get("tenant_quota") or 0),
+                int(r.get("tenant_used") or 0),
+                int(r.get("employees_count") or 0),
+                (
+                    r["subscription_expires_at"].isoformat()
+                    if r.get("subscription_expires_at")
+                    else ""
+                ),
+                r["last_login_at"].isoformat() if r.get("last_login_at") else "",
+                str(r["tenant_id"]) if r.get("tenant_id") else "",
+            ]
+        )
     from fastapi.responses import Response as _Resp
+
     return _Resp(
         content=buf.getvalue(),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="pearnly_users.csv"'}
+        headers={"Content-Disposition": 'attachment; filename="pearnly_users.csv"'},
     )
 
 
@@ -8113,11 +8849,38 @@ async def admin_users_csv(request: Request):
 
 # v118.11 · 弱密码黑名单 + 强度校验(共享给员工创建/重置/首登改密)
 _WEAK_PASSWORDS = {
-    "111111", "112233", "121212", "123123", "123321", "123456", "1234567",
-    "12345678", "123456789", "1234567890", "131313", "147258", "159753",
-    "654321", "666666", "888888", "987654", "abc123", "abcd1234", "admin",
-    "admin123", "iloveyou", "letmein", "monkey", "password", "password1",
-    "password123", "qazwsx", "qwerty", "qwerty123", "qwertyuiop", "welcome",
+    "111111",
+    "112233",
+    "121212",
+    "123123",
+    "123321",
+    "123456",
+    "1234567",
+    "12345678",
+    "123456789",
+    "1234567890",
+    "131313",
+    "147258",
+    "159753",
+    "654321",
+    "666666",
+    "888888",
+    "987654",
+    "abc123",
+    "abcd1234",
+    "admin",
+    "admin123",
+    "iloveyou",
+    "letmein",
+    "monkey",
+    "password",
+    "password1",
+    "password123",
+    "qazwsx",
+    "qwerty",
+    "qwerty123",
+    "qwertyuiop",
+    "welcome",
     "zxcvbnm",
 }
 
@@ -8153,10 +8916,12 @@ def _require_owner_or_super(request: Request) -> Dict[str, Any]:
     if not user.get("tenant_id"):
         # v118.26.2.4 · 懒建 tenant · 只在首次需要时
         try:
-            tenant_name = (user.get("company_name")
-                           or user.get("full_name")
-                           or user.get("username")
-                           or f"user_{str(user['id'])[:8]}")[:100]
+            tenant_name = (
+                user.get("company_name")
+                or user.get("full_name")
+                or user.get("username")
+                or f"user_{str(user['id'])[:8]}"
+            )[:100]
             new_tid = db.create_tenant(
                 name=tenant_name,
                 owner_user_id=str(user["id"]),
@@ -8171,7 +8936,9 @@ def _require_owner_or_super(request: Request) -> Dict[str, Any]:
                         (new_tid, str(user["id"])),
                     )
                 user["tenant_id"] = new_tid
-                logger.info(f"[v118.26.2.4 lazy-tenant] +tenant {new_tid[:8]}.. for user {user.get('username')!r}")
+                logger.info(
+                    f"[v118.26.2.4 lazy-tenant] +tenant {new_tid[:8]}.. for user {user.get('username')!r}"
+                )
         except Exception as _e:
             logger.error(f"_require_owner_or_super lazy-tenant fail: {_e}")
             raise HTTPException(500, detail="team.tenant_create_failed")
@@ -8197,7 +8964,8 @@ async def team_list_employees(request: Request):
                 "last_login_at": e["last_login_at"].isoformat() if e.get("last_login_at") else None,
                 "created_at": e["created_at"].isoformat() if e.get("created_at") else None,
                 "assigned_client_count": len(assignments.get(str(e["id"]), [])),
-            } for e in employees
+            }
+            for e in employees
         ],
         "total": len(employees),
     }
@@ -8224,9 +8992,9 @@ async def team_get_employee_assignments(employee_id: str, request: Request):
 
 
 @app.post("/api/team/employees/{employee_id}/assignments")
-async def team_set_employee_assignments(employee_id: str,
-                                          req: EmployeeAssignmentsRequest,
-                                          request: Request):
+async def team_set_employee_assignments(
+    employee_id: str, req: EmployeeAssignmentsRequest, request: Request
+):
     """老板覆盖式设置某员工的客户分配 · 写审计日志"""
     owner = _require_owner_or_super(request)
     tid = str(owner.get("tenant_id") or "")
@@ -8279,8 +9047,11 @@ async def team_add_employee(req: EmployeeAddRequest, request: Request):
     if req.email:
         try:
             import db as _db
+
             with _db.get_cursor() as cur:
-                cur.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s) LIMIT 1", (req.email,))
+                cur.execute(
+                    "SELECT id FROM users WHERE LOWER(email) = LOWER(%s) LIMIT 1", (req.email,)
+                )
                 if cur.fetchone():
                     raise HTTPException(409, detail="team.email_exists")
         except HTTPException:
@@ -8299,9 +9070,11 @@ async def team_add_employee(req: EmployeeAddRequest, request: Request):
     if req.email:
         try:
             import db as _db
+
             with _db.get_cursor(commit=True) as cur:
-                cur.execute("UPDATE users SET email = %s WHERE id = %s",
-                            (req.email.strip().lower(), new_id))
+                cur.execute(
+                    "UPDATE users SET email = %s WHERE id = %s", (req.email.strip().lower(), new_id)
+                )
         except Exception as _ex:
             logger.warning(f"set employee email failed: {_ex}")
     _log_op(request, owner, "employee.add", "employee", new_id, req.username, {})
@@ -8312,7 +9085,7 @@ async def team_add_employee(req: EmployeeAddRequest, request: Request):
 @app.post("/api/team/employees/{employee_id}/reset-password")
 async def team_reset_employee_password(employee_id: str, request: Request):
     """v118.28.7 · 老板给员工发改密链接 · 老板永远拿不到密码
-       员工没邮箱也没 LINE 关联 → 拒绝 · 提示先补邮箱(对齐大厂)"""
+    员工没邮箱也没 LINE 关联 → 拒绝 · 提示先补邮箱(对齐大厂)"""
     owner = _require_owner_or_super(request)
     target = db.find_user_by_id(employee_id)
     if not target:
@@ -8324,6 +9097,7 @@ async def team_reset_employee_password(employee_id: str, request: Request):
         raise HTTPException(400, detail="team.cannot_reset_owner")
 
     from auth_signup import send_reset_link_for_employee
+
     host = request.headers.get("host", "pearnly.com")
     res = send_reset_link_for_employee(
         user_id=employee_id,
@@ -8333,17 +9107,38 @@ async def team_reset_employee_password(employee_id: str, request: Request):
 
     if res.get("error") == "no_channel":
         # 员工既无邮箱也无 LINE 关联 · 拒绝重置 · 让老板先帮员工补邮箱
-        _log_op(request, owner, "employee.password_reset_blocked_no_channel", "employee",
-                employee_id, target.get("username"), {})
+        _log_op(
+            request,
+            owner,
+            "employee.password_reset_blocked_no_channel",
+            "employee",
+            employee_id,
+            target.get("username"),
+            {},
+        )
         raise HTTPException(400, detail="team.reset_no_channel")
 
     if not res.get("ok"):
-        _log_op(request, owner, "employee.password_reset_link_failed", "employee",
-                employee_id, target.get("username"), {"error": res.get("error")})
+        _log_op(
+            request,
+            owner,
+            "employee.password_reset_link_failed",
+            "employee",
+            employee_id,
+            target.get("username"),
+            {"error": res.get("error")},
+        )
         raise HTTPException(500, detail="team.reset_link_send_failed")
 
-    _log_op(request, owner, "employee.password_reset_link_sent", "employee",
-            employee_id, target.get("username"), {"channel": res.get("channel")})
+    _log_op(
+        request,
+        owner,
+        "employee.password_reset_link_sent",
+        "employee",
+        employee_id,
+        target.get("username"),
+        {"channel": res.get("channel")},
+    )
     return {
         "ok": True,
         "channel": res.get("channel"),  # line / email
@@ -8374,8 +9169,15 @@ async def team_toggle_employee(employee_id: str, req: EmployeeToggleRequest, req
     ok = db.toggle_employee_active(str(owner["tenant_id"]), employee_id, req.is_active)
     if not ok:
         raise HTTPException(404, detail="team.employee_not_found")
-    _log_op(request, owner, "employee.toggle", "employee", employee_id, target_name,
-            {"is_active": req.is_active})
+    _log_op(
+        request,
+        owner,
+        "employee.toggle",
+        "employee",
+        employee_id,
+        target_name,
+        {"is_active": req.is_active},
+    )
     return {"ok": True}
 
 
@@ -8385,8 +9187,11 @@ async def team_toggle_employee(employee_id: str, req: EmployeeToggleRequest, req
 # 数据走同一张表 (users WHERE role='member') · 操作后老板的「设置 → 团队管理」也立刻看到
 # ============================================================
 
+
 @app.patch("/api/admin/employees/{employee_id}/active")
-async def admin_toggle_employee_active(employee_id: str, req: EmployeeToggleRequest, request: Request):
+async def admin_toggle_employee_active(
+    employee_id: str, req: EmployeeToggleRequest, request: Request
+):
     """v118.28.6 · 砍 · 行业惯例(Xero/QuickBooks/Stripe)超管不直接管客户员工 · 由所属老板自行操作"""
     _require_super_admin(request)
     raise HTTPException(410, detail="admin.employee_action_removed")
@@ -8406,11 +9211,10 @@ async def admin_remove_employee(employee_id: str, request: Request):
     raise HTTPException(410, detail="admin.employee_action_removed")
 
 
-
-
 # ============================================================
 # v118.16 · 超管级联删除老板账号 · 影响范围预查 + 双重确认
 # ============================================================
+
 
 @app.get("/api/admin/users/{user_id}/cascade-preview")
 async def admin_cascade_preview(user_id: str, request: Request):
@@ -8458,14 +9262,22 @@ async def admin_cascade_delete(user_id: str, req: CascadeDeleteRequest, request:
     if not ok:
         raise HTTPException(500, detail="admin.cascade_delete_failed")
     # 7) 操作日志(deletion 之后写 · 因为 tenant_id 已删)
-    _log_op(request, admin, "admin.user.cascade_delete", "user", user_id, target_name,
-            {"counts": preview.get("counts", {}), "tenant_id": (preview.get("tenant") or {}).get("id")})
+    _log_op(
+        request,
+        admin,
+        "admin.user.cascade_delete",
+        "user",
+        user_id,
+        target_name,
+        {"counts": preview.get("counts", {}), "tenant_id": (preview.get("tenant") or {}).get("id")},
+    )
     return {"ok": True, "deleted_username": target_name}
 
 
 # ============================================================
 # v118.18 · 推荐分类(supplier_categories)前端 API
 # ============================================================
+
 
 @app.get("/api/categories")
 async def api_list_used_categories(request: Request):
@@ -8475,7 +9287,6 @@ async def api_list_used_categories(request: Request):
     cats = db.list_used_categories(user_id=str(user["id"]), tenant_id=tid, limit=30)
     n_mappings = db.count_supplier_mappings(user_id=str(user["id"]), tenant_id=tid)
     return {"categories": cats, "supplier_count": n_mappings}
-
 
 
 # ============================================================
@@ -8498,7 +9309,9 @@ class NotificationRuleUpdate(BaseModel):
     enabled: Optional[bool] = None
 
 
-def _validate_template_params(template_code: str, params: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def _validate_template_params(
+    template_code: str, params: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
     """模板特定参数校验 · 失败 raise HTTPException 400"""
     p = dict(params or {})
     if template_code == NOTIF_TEMPLATE_LARGE_INVOICE:
@@ -8535,9 +9348,12 @@ async def api_notif_create_rule(req: NotificationRuleCreate, request: Request):
         raise HTTPException(400, detail="notification.template_invalid")
     params = _validate_template_params(req.template_code, req.params)
     rule_id = db.create_notification_rule(
-        user_id=str(user["id"]), tenant_id=_tid(user),
-        name=name, template_code=req.template_code,
-        params=params, enabled=req.enabled,
+        user_id=str(user["id"]),
+        tenant_id=_tid(user),
+        name=name,
+        template_code=req.template_code,
+        params=params,
+        enabled=req.enabled,
     )
     if not rule_id:
         raise HTTPException(500, detail="notification.create_failed")
@@ -8562,8 +9378,12 @@ async def api_notif_update_rule(rule_id: int, req: NotificationRuleUpdate, reque
     if req.params is not None:
         params_new = _validate_template_params(rule["template_code"], req.params)
     ok = db.update_notification_rule(
-        rule_id=rule_id, user_id=str(user["id"]), tenant_id=_tid(user),
-        name=name_new, params=params_new, enabled=req.enabled,
+        rule_id=rule_id,
+        user_id=str(user["id"]),
+        tenant_id=_tid(user),
+        name=name_new,
+        params=params_new,
+        enabled=req.enabled,
     )
     if not ok:
         raise HTTPException(500, detail="notification.update_failed")
@@ -8595,15 +9415,22 @@ async def api_notif_test_send(rule_id: int, request: Request):
         raise HTTPException(400, detail="notification.line_not_bound")
     line_user_id = binding["line_user_id"]
     # v118.25.4 · fallback 改 th(主市场泰国)而非 zh
-    lang = (user.get("preferred_lang") or "th")
-    text = line_client.render_notification(lang, "test_send", {
-        "rule_name": rule.get("name") or "-",
-    })
+    lang = user.get("preferred_lang") or "th"
+    text = line_client.render_notification(
+        lang,
+        "test_send",
+        {
+            "rule_name": rule.get("name") or "-",
+        },
+    )
     ok = line_client.push_text(line_user_id, text)
     db.log_notification(
-        user_id=str(user["id"]), tenant_id=_tid(user),
-        rule_id=rule_id, template_code=rule.get("template_code") or "test_send",
-        event_type="test_send", event_ref=None,
+        user_id=str(user["id"]),
+        tenant_id=_tid(user),
+        rule_id=rule_id,
+        template_code=rule.get("template_code") or "test_send",
+        event_type="test_send",
+        event_ref=None,
         line_user_id=line_user_id,
         status="sent" if ok else "failed",
         error=None if ok else "line_push_failed",
@@ -8618,7 +9445,8 @@ async def api_notif_list_logs(request: Request, limit: int = 50):
     """列发送日志 · 同 tenant 共享 · 默认最近 50"""
     user = get_current_user_from_request(request)
     logs = db.list_notification_logs(
-        str(user["id"]), tenant_id=_tid(user),
+        str(user["id"]),
+        tenant_id=_tid(user),
         limit=min(int(limit), 200),
     )
     return {"items": logs, "count": len(logs)}
@@ -8632,6 +9460,7 @@ async def api_notif_list_logs(request: Request, limit: int = 50):
 #   - 科目/税码映射:tenant 共享 · GET 全员可调
 #   - POST/DELETE 全部要 _require_owner_or_super(老板/超管才能改)
 # ============================================================
+
 
 # ─── 客户映射 ────────────────────────────────────────────
 @app.get("/api/erp/mappings/clients")
@@ -8751,12 +9580,13 @@ async def erp_map_delete_tax(mapping_id: str, request: Request):
 
 # ─── 商品映射 CRUD ──────────────────────────────────────────
 
+
 class ErpProductMappingReq(BaseModel):
-    erp_type:  str
+    erp_type: str
     item_name: str
-    erp_code:  str
-    erp_name:  Optional[str] = None
-    notes:     Optional[str] = None
+    erp_code: str
+    erp_name: Optional[str] = None
+    notes: Optional[str] = None
 
 
 @app.get("/api/erp/mappings/products")
@@ -8772,16 +9602,18 @@ async def list_mappings_products(request: Request, erp_type: str = ""):
     rows = db.list_erp_product_mappings(tid, erp_type=(erp_type.strip() or None))
     out = []
     for r in rows:
-        out.append({
-            "id":         str(r.get("id")) if r.get("id") else None,
-            "erp_type":   r.get("erp_type"),
-            "item_name":  r.get("item_name"),
-            "erp_code":   r.get("erp_code"),
-            "erp_name":   r.get("erp_name"),
-            "notes":      r.get("notes"),
-            "created_at": r.get("created_at").isoformat() if r.get("created_at") else None,
-            "updated_at": r.get("updated_at").isoformat() if r.get("updated_at") else None,
-        })
+        out.append(
+            {
+                "id": str(r.get("id")) if r.get("id") else None,
+                "erp_type": r.get("erp_type"),
+                "item_name": r.get("item_name"),
+                "erp_code": r.get("erp_code"),
+                "erp_name": r.get("erp_name"),
+                "notes": r.get("notes"),
+                "created_at": r.get("created_at").isoformat() if r.get("created_at") else None,
+                "updated_at": r.get("updated_at").isoformat() if r.get("updated_at") else None,
+            }
+        )
     return {"ok": True, "items": out, "total": len(out)}
 
 
@@ -8830,14 +9662,14 @@ async def erp_connectors_status(request: Request):
     """
     统一返回当前用户/租户所有「已配置的 ERP 连接器」 · 不管它走的是
     OAuth API(Xero) / 老 webhook endpoints 表(自定义/flowaccount)
-    
+
     返回:
     {
       connectors: [
         { id, type, name, method, status, push_endpoint, ... }
       ]
     }
-    
+
     method:
       - "api"      → 直接 fetch(后端推送 · 完成即结束)
       - "download" → fetch + 浏览器下载 .xlsx
@@ -8852,20 +9684,24 @@ async def erp_connectors_status(request: Request):
         if tid:
             xero_tokens = db.list_oauth_tokens(tid, "xero") or []
             if xero_tokens:
-                default_token = next((tk for tk in xero_tokens if tk.get("is_default")), xero_tokens[0])
-                connectors.append({
-                    "id": "xero",
-                    "type": "xero",
-                    "name": "Xero",
-                    "method": "api",
-                    "status": "connected",
-                    "is_default": False,
-                    "push_endpoint": "/api/erp/xero/push/{history_id}",
-                    "meta": {
-                        "organisation_count": len(xero_tokens),
-                        "default_org": (default_token or {}).get("organisation_name"),
-                    },
-                })
+                default_token = next(
+                    (tk for tk in xero_tokens if tk.get("is_default")), xero_tokens[0]
+                )
+                connectors.append(
+                    {
+                        "id": "xero",
+                        "type": "xero",
+                        "name": "Xero",
+                        "method": "api",
+                        "status": "connected",
+                        "is_default": False,
+                        "push_endpoint": "/api/erp/xero/push/{history_id}",
+                        "meta": {
+                            "organisation_count": len(xero_tokens),
+                            "default_org": (default_token or {}).get("organisation_name"),
+                        },
+                    }
+                )
     except Exception as e:
         logger.warning(f"connectors_status xero failed: {e}")
 
@@ -8876,19 +9712,21 @@ async def erp_connectors_status(request: Request):
             if not ep.get("enabled", True):
                 continue
             adapter = ep.get("adapter") or "webhook"
-            connectors.append({
-                "id": f"endpoint_{ep['id']}",
-                "type": adapter,
-                "endpoint_id": str(ep["id"]),
-                "name": ep.get("name") or "Webhook",
-                "method": "webhook",
-                "status": "connected",
-                "is_default": bool(ep.get("is_default")),
-                "push_endpoint": "/api/erp/push",
-                "meta": {
-                    "auto_push": bool(ep.get("auto_push")),
-                },
-            })
+            connectors.append(
+                {
+                    "id": f"endpoint_{ep['id']}",
+                    "type": adapter,
+                    "endpoint_id": str(ep["id"]),
+                    "name": ep.get("name") or "Webhook",
+                    "method": "webhook",
+                    "status": "connected",
+                    "is_default": bool(ep.get("is_default")),
+                    "push_endpoint": "/api/erp/push",
+                    "meta": {
+                        "auto_push": bool(ep.get("auto_push")),
+                    },
+                }
+            )
     except Exception as e:
         logger.warning(f"connectors_status endpoints failed: {e}")
 
@@ -8901,6 +9739,7 @@ async def erp_connectors_status(request: Request):
 # 5 接口:auth/start · auth/callback · select_org · disconnect · status · push
 # 复用 v118.27.0 的 3 张映射表(erp_type='xero')
 # ============================================================
+
 
 @app.get("/api/erp/xero/auth/start")
 async def xero_auth_start(request: Request):
@@ -8922,13 +9761,15 @@ async def xero_auth_start(request: Request):
 
 
 @app.get("/api/erp/xero/auth/callback")
-async def xero_auth_callback(request: Request, code: str = "", state: str = "",
-                              error: str = "", error_description: str = ""):
+async def xero_auth_callback(
+    request: Request, code: str = "", state: str = "", error: str = "", error_description: str = ""
+):
     """
     Xero 重定向回来 · 用 code 换 token · 拿 organisations · 存 db
     完成后 302 redirect 用户回前端 hash 路由 + 提示
     """
     from fastapi.responses import RedirectResponse
+
     base = (os.environ.get("PEARNLY_BASE_URL") or "https://pearnly.com").rstrip("/")
     fail_url = f"{base}/#automation?xero=err"
 
@@ -8940,12 +9781,14 @@ async def xero_auth_callback(request: Request, code: str = "", state: str = "",
         return RedirectResponse(url=fail_url, status_code=302)
 
     consumed = db.consume_oauth_state(state)
-    if not consumed or consumed.get('erp_type') != 'xero':
+    if not consumed or consumed.get("erp_type") != "xero":
         return RedirectResponse(url=fail_url + "&reason=bad_state", status_code=302)
 
     try:
         from xero_pusher import (
-            exchange_code_for_token, list_organisations, compute_expires_at,
+            exchange_code_for_token,
+            list_organisations,
+            compute_expires_at,
         )
     except ImportError:
         return RedirectResponse(url=fail_url + "&reason=module", status_code=302)
@@ -8966,12 +9809,16 @@ async def xero_auth_callback(request: Request, code: str = "", state: str = "",
         if not org_id:
             continue
         ok = db.upsert_oauth_token(
-            tenant_id=consumed['tenant_id'], erp_type="xero",
-            organisation_id=str(org_id), organisation_name=org_name,
-            access_token=tok["access_token"], refresh_token=tok["refresh_token"],
-            expires_at=expires_at, scope=tok.get("scope") or "",
+            tenant_id=consumed["tenant_id"],
+            erp_type="xero",
+            organisation_id=str(org_id),
+            organisation_name=org_name,
+            access_token=tok["access_token"],
+            refresh_token=tok["refresh_token"],
+            expires_at=expires_at,
+            scope=tok.get("scope") or "",
             is_default=(i == 0),  # 第 1 个先设默认 · 用户回去可改
-            user_id=consumed['user_id'],
+            user_id=consumed["user_id"],
         )
         if ok:
             saved += 1
@@ -9004,13 +9851,16 @@ async def xero_status(request: Request):
     rows = db.list_oauth_tokens(tid, "xero")
     if rows:
         out["connected"] = True
-        out["organisations"] = [{
-            "id": str(r["id"]),
-            "organisation_id": r["organisation_id"],
-            "organisation_name": r["organisation_name"],
-            "is_default": bool(r["is_default"]),
-            "expires_at": r["expires_at"].isoformat() if r["expires_at"] else None,
-        } for r in rows]
+        out["organisations"] = [
+            {
+                "id": str(r["id"]),
+                "organisation_id": r["organisation_id"],
+                "organisation_name": r["organisation_name"],
+                "is_default": bool(r["is_default"]),
+                "expires_at": r["expires_at"].isoformat() if r["expires_at"] else None,
+            }
+            for r in rows
+        ]
         for r in rows:
             if r["is_default"]:
                 out["default_org_id"] = r["organisation_id"]
@@ -9057,6 +9907,7 @@ def _ensure_fresh_xero_token(tenant_id):
     返回 (access_token, organisation_id)
     """
     from xero_pusher import refresh_access_token, compute_expires_at
+
     tok = db.get_default_oauth_token(tenant_id, "xero")
     if not tok:
         raise HTTPException(400, detail="xero.err_not_connected")
@@ -9066,10 +9917,11 @@ def _ensure_fresh_xero_token(tenant_id):
     if exp:
         try:
             from datetime import datetime, timezone
+
             now = datetime.now(timezone.utc)
             if exp.tzinfo is None:
                 exp = exp.replace(tzinfo=timezone.utc)
-            need_refresh = (exp <= now)
+            need_refresh = exp <= now
         except Exception:
             need_refresh = True
     if need_refresh:
@@ -9091,6 +9943,7 @@ def _ensure_fresh_xero_token(tenant_id):
 async def xero_push(history_id: str, request: Request):
     """单张 OCR history → Xero ACCREC Invoice(DRAFT 状态)"""
     import time
+
     t0 = time.time()
     user = get_current_user_from_request(request)
     tid = _tid(user)
@@ -9111,7 +9964,7 @@ async def xero_push(history_id: str, request: Request):
     mappings = db.get_mrerp_mappings_bundle(tid)  # 通用 3 表映射拼装
     cid = history.get("client_id") or 0
     contact_name = None
-    for m in (mappings.get("clients") or []):
+    for m in mappings.get("clients") or []:
         if m.get("erp_type") == "xero" and int(m.get("client_id") or 0) == int(cid):
             contact_name = (m.get("erp_code") or "").strip()
             break
@@ -9124,7 +9977,9 @@ async def xero_push(history_id: str, request: Request):
     # 找 contact
     try:
         from xero_pusher import (
-            find_contact_by_name, build_invoice_payload, push_invoice,
+            find_contact_by_name,
+            build_invoice_payload,
+            push_invoice,
             parse_xero_error,
         )
     except ImportError:
@@ -9135,14 +9990,19 @@ async def xero_push(history_id: str, request: Request):
         # 写失败日志
         try:
             db.insert_push_log(
-                user_id=str(user["id"]), endpoint_id=None, history_id=history_id,
+                user_id=str(user["id"]),
+                endpoint_id=None,
+                history_id=history_id,
                 invoice_no=history.get("invoice_no"),
                 seller_name=history.get("seller_name"),
                 total_amount=history.get("total_amount"),
-                status="failed", http_status=400,
+                status="failed",
+                http_status=400,
                 request_body={"adapter": "xero", "stage": "find_contact", "name": contact_name},
-                response_body=None, error_msg="contact_not_found",
-                attempt=1, elapsed_ms=int((time.time() - t0) * 1000),
+                response_body=None,
+                error_msg="contact_not_found",
+                attempt=1,
+                elapsed_ms=int((time.time() - t0) * 1000),
                 trigger="manual",
             )
         except Exception as e:
@@ -9163,14 +10023,18 @@ async def xero_push(history_id: str, request: Request):
             logger.warning(f"[xero_manual] 解析 InvoiceID 失败: {e}")
         try:
             db.insert_push_log(
-                user_id=str(user["id"]), endpoint_id=None, history_id=history_id,
+                user_id=str(user["id"]),
+                endpoint_id=None,
+                history_id=history_id,
                 invoice_no=history.get("invoice_no"),
                 seller_name=history.get("seller_name"),
                 total_amount=history.get("total_amount"),
-                status="success", http_status=200,
+                status="success",
+                http_status=200,
                 request_body={"adapter": "xero", "stage": "push_invoice"},
                 response_body=str(invoice_id)[:200],
-                error_msg=None, attempt=1,
+                error_msg=None,
+                attempt=1,
                 elapsed_ms=int((time.time() - t0) * 1000),
                 trigger="manual",
             )
@@ -9183,14 +10047,18 @@ async def xero_push(history_id: str, request: Request):
     err_code = parse_xero_error(http_st or 400, body.get("body") if isinstance(body, dict) else {})
     try:
         db.insert_push_log(
-            user_id=str(user["id"]), endpoint_id=None, history_id=history_id,
+            user_id=str(user["id"]),
+            endpoint_id=None,
+            history_id=history_id,
             invoice_no=history.get("invoice_no"),
             seller_name=history.get("seller_name"),
             total_amount=history.get("total_amount"),
-            status="failed", http_status=http_st or 400,
+            status="failed",
+            http_status=http_st or 400,
             request_body={"adapter": "xero", "stage": "push_invoice"},
             response_body=str(body)[:500],
-            error_msg=err_code, attempt=1,
+            error_msg=err_code,
+            attempt=1,
             elapsed_ms=int((time.time() - t0) * 1000),
             trigger="manual",
         )
@@ -9199,12 +10067,7 @@ async def xero_push(history_id: str, request: Request):
     raise HTTPException(http_st or 400, detail=f"xero.{err_code.lower()}")
 
 
-
-
-
-
-
-
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app:app", host="0.0.0.0", port=int(os.environ.get("PORT", "7860")), reload=True)

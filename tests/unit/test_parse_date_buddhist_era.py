@@ -12,6 +12,7 @@ docs/audits/2026-05-23-bug-fix-t1-gl-excel-be-year.md(根因分析)
   7. dd/mm/yy 短年仍走老路径(BE 67/68/69 → CE 2024/2025/2026)
   8. parse_gl_excel 跑 in-memory 构造的客户同款 xlsx · 至少 1 row · date 是公历
 """
+
 import io
 import unittest
 from datetime import date, datetime
@@ -73,14 +74,24 @@ class ParseDateBuddhistEraTests(unittest.TestCase):
         wb = openpyxl.Workbook()
         ws = wb.active
         # Header (Thai)
-        ws.append(["วันที่", "เลขที่เอกสาร", "รหัสบัญชี", "รายการ",
-                   "เดบิต", "เครดิต", "คงเหลือ", "ไฟล์ต้นทาง"])
+        ws.append(
+            [
+                "วันที่",
+                "เลขที่เอกสาร",
+                "รหัสบัญชี",
+                "รายการ",
+                "เดบิต",
+                "เครดิต",
+                "คงเหลือ",
+                "ไฟล์ต้นทาง",
+            ]
+        )
         # Row 2 · 期初(BE datetime + 余额列填)
-        ws.append([datetime(2568, 12, 1), None, None, "ยอดยกมา",
-                   None, None, 1000.00, None])
+        ws.append([datetime(2568, 12, 1), None, None, "ยอดยกมา", None, None, 1000.00, None])
         # Row 3 · 1 笔(BE datetime + 借方填 · 余额公式)
-        ws.append([datetime(2568, 12, 31), "TST001", "1112-10", "anon test",
-                   500.00, 0, 1500.00, None])
+        ws.append(
+            [datetime(2568, 12, 31), "TST001", "1112-10", "anon test", 500.00, 0, 1500.00, None]
+        )
 
         buf = io.BytesIO()
         wb.save(buf)
@@ -88,13 +99,17 @@ class ParseDateBuddhistEraTests(unittest.TestCase):
 
         result = brv2.parse_gl_excel(data, "be_test.xlsx", "")
         self.assertTrue(result.get("ok"), f"parse failed: {result.get('error')}")
-        self.assertGreaterEqual(result.get("row_count", 0), 1,
-            "至少 1 row 应被识别(BUG-FIX-T1 主修)")
+        self.assertGreaterEqual(
+            result.get("row_count", 0), 1, "至少 1 row 应被识别(BUG-FIX-T1 主修)"
+        )
         rows = result.get("rows") or []
         self.assertTrue(rows)
         # date 必须是 CE 公历(2025-12-31)· 不是 BE (2568-12-31)
-        self.assertEqual(rows[0].date, date(2025, 12, 31),
-            f"date 应转 CE 公历 · 实际 {rows[0].date}(若为 2568-* 则 BE → CE 转换没起效)")
+        self.assertEqual(
+            rows[0].date,
+            date(2025, 12, 31),
+            f"date 应转 CE 公历 · 实际 {rows[0].date}(若为 2568-* 则 BE → CE 转换没起效)",
+        )
         self.assertEqual(rows[0].account_code, "1112-10")
         self.assertEqual(rows[0].debit, 500.00)
 
@@ -105,28 +120,49 @@ class ParseDateBuddhistEraTests(unittest.TestCase):
         老逻辑:closing = opening + credit - debit · 对资产科目方向反 → closing 错
         修法:_map_gl_cols 识别 คงเหลือ/balance · opening 优先读 balance · closing 优先读最后一笔 balance
         """
-        wb = openpyxl.Workbook(); ws = wb.active
-        ws.append(["วันที่","เลขที่เอกสาร","รหัสบัญชี","รายการ","เดบิต","เครดิต","คงเหลือ","ไฟล์ต้นทาง"])
-        ws.append([datetime(2568,12,1), None, None, "ยอดยกมา", None, None, 39749.85, None])
-        ws.append([datetime(2568,12,31), "JV001", "1112-10", "anon", 24472.92, 0, 64222.77, None])
-        buf = io.BytesIO(); wb.save(buf)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(
+            [
+                "วันที่",
+                "เลขที่เอกสาร",
+                "รหัสบัญชี",
+                "รายการ",
+                "เดบิต",
+                "เครดิต",
+                "คงเหลือ",
+                "ไฟล์ต้นทาง",
+            ]
+        )
+        ws.append([datetime(2568, 12, 1), None, None, "ยอดยกมา", None, None, 39749.85, None])
+        ws.append([datetime(2568, 12, 31), "JV001", "1112-10", "anon", 24472.92, 0, 64222.77, None])
+        buf = io.BytesIO()
+        wb.save(buf)
 
         result = brv2.parse_gl_excel(buf.getvalue(), "be_test_with_bal.xlsx", "")
         self.assertTrue(result.get("ok"))
         # opening · 从 balance 列 Row 2 读到(不是 0)
-        self.assertEqual(result.get("opening"), 39749.85,
-            f"opening 应从 balance 列读 39749.85 · 实际 {result.get('opening')}")
+        self.assertEqual(
+            result.get("opening"),
+            39749.85,
+            f"opening 应从 balance 列读 39749.85 · 实际 {result.get('opening')}",
+        )
         # closing · 从最后一笔 balance 读到(不走公式)
-        self.assertEqual(result.get("closing"), 64222.77,
-            f"closing 应从最后一笔 balance 读 64222.77 · 实际 {result.get('closing')}")
+        self.assertEqual(
+            result.get("closing"),
+            64222.77,
+            f"closing 应从最后一笔 balance 读 64222.77 · 实际 {result.get('closing')}",
+        )
 
     def test_parse_gl_excel_no_balance_column_falls_back_to_formula(self):
         """BUG-FIX-T2 regression · 老格式 GL(没 balance 列)走老公式不变"""
-        wb = openpyxl.Workbook(); ws = wb.active
+        wb = openpyxl.Workbook()
+        ws = wb.active
         ws.append(["Date", "Doc", "Acct", "Desc", "Debit", "Credit"])
         ws.append(["2025-01-15", "V001", "4001", "sale1", 0, 1000])
         ws.append(["2025-01-20", "V002", "4001", "sale2", 0, 2000])
-        buf = io.BytesIO(); wb.save(buf)
+        buf = io.BytesIO()
+        wb.save(buf)
 
         result = brv2.parse_gl_excel(buf.getvalue(), "old_no_bal.xlsx", "")
         self.assertTrue(result.get("ok"))
@@ -148,38 +184,43 @@ class M3GlVatBuddhistEraTests(unittest.TestCase):
         """M3 parse_gl_excel 接收 BE datetime cell → 输出 CE ISO date 字符串"""
         import gl_vat_reconciler as glvr
 
-        wb = openpyxl.Workbook(); ws = wb.active
-        ws.append(['วันที่', 'ใบสำคัญ', 'รหัสบัญชี', 'รายการ', 'เดบิต', 'เครดิต'])
-        ws.append([datetime(2568, 12, 31), 'JV001', '4110-01', 'sale1', 0, 1000])
-        ws.append([datetime(2569, 1, 15), 'JV002', '4110-01', 'sale2', 0, 2000])
-        buf = io.BytesIO(); wb.save(buf)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["วันที่", "ใบสำคัญ", "รหัสบัญชี", "รายการ", "เดบิต", "เครดิต"])
+        ws.append([datetime(2568, 12, 31), "JV001", "4110-01", "sale1", 0, 1000])
+        ws.append([datetime(2569, 1, 15), "JV002", "4110-01", "sale2", 0, 2000])
+        buf = io.BytesIO()
+        wb.save(buf)
 
         result = glvr.parse_gl_excel(buf.getvalue())
         self.assertTrue(result.get("ok"))
         self.assertEqual(result.get("row_count"), 2)
         rows = result.get("rows") or []
         # date 必须是 CE ISO 字符串 · 不是 "2568-12-31 00:00:00" garbage
-        self.assertEqual(rows[0].date, "2025-12-31",
-            f"M3 BE 2568 应转 CE 2025 · 实际 {rows[0].date!r}")
-        self.assertEqual(rows[1].date, "2026-01-15",
-            f"M3 BE 2569 应转 CE 2026 · 实际 {rows[1].date!r}")
+        self.assertEqual(
+            rows[0].date, "2025-12-31", f"M3 BE 2568 应转 CE 2025 · 实际 {rows[0].date!r}"
+        )
+        self.assertEqual(
+            rows[1].date, "2026-01-15", f"M3 BE 2569 应转 CE 2026 · 实际 {rows[1].date!r}"
+        )
 
     def test_m3_parse_gl_excel_string_date_passes_through(self):
         """M3 字符串 date 原样通过(不破坏老格式 GL · 用 M3 真实 header 关键词)"""
         import gl_vat_reconciler as glvr
 
-        wb = openpyxl.Workbook(); ws = wb.active
+        wb = openpyxl.Workbook()
+        ws = wb.active
         # 用 M3 _GL_*_H 字典里真实关键词: voucher / gl account / debit / credit
-        ws.append(['Date', 'Voucher', 'GL Account', 'Description', 'Debit', 'Credit'])
-        ws.append(['2025-01-15', 'V001', '4110-01', 'sale1', 0, 1000])
-        buf = io.BytesIO(); wb.save(buf)
+        ws.append(["Date", "Voucher", "GL Account", "Description", "Debit", "Credit"])
+        ws.append(["2025-01-15", "V001", "4110-01", "sale1", 0, 1000])
+        buf = io.BytesIO()
+        wb.save(buf)
 
         result = glvr.parse_gl_excel(buf.getvalue())
         self.assertTrue(result.get("ok"))
         rows = result.get("rows") or []
         self.assertGreaterEqual(len(rows), 1, f"应识别 ≥1 row · 实际 {len(rows)}")
-        self.assertEqual(rows[0].date, "2025-01-15",
-            "M3 string date 应原样通过 · 不被改")
+        self.assertEqual(rows[0].date, "2025-01-15", "M3 string date 应原样通过 · 不被改")
 
 
 if __name__ == "__main__":

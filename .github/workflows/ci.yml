@@ -21,6 +21,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # REFACTOR-A5 · 代码规范守门(与 test 并行 · 独立信号)
+  #   black --check  : Python 格式化唯一权威
+  #   ruff check     : Python pyflakes 真 bug(未定义名/未用导入/format 参数等)
+  #   prettier --check: 前端代码格式(巨石 home.* 经 .prettierignore 豁免 · 阶段 C 拆解再纳入)
+  #   eslint         : 前端模块真 bug(0 error 放行 · warning 仅提示)
+  lint:
+    name: lint (black + ruff + prettier + eslint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install lint tools (REFACTOR-A5 · pinned black + ruff)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: black --check (Python 格式化)
+        run: black --check .
+
+      - name: ruff check (Python lint)
+        run: ruff check .
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Node deps (npm ci)
+        run: npm ci
+
+      - name: prettier --check (前端格式 · 巨石豁免)
+        run: npm run format:check
+
+      - name: eslint (前端模块 lint)
+        run: npm run lint
+
   test:
     name: import + i18n + unit + vite-build + e2e
     runs-on: ubuntu-latest

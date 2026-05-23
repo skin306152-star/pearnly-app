@@ -195,8 +195,7 @@ def extract_from_pdf_bytes(
         import fitz  # PyMuPDF
     except ImportError as e:  # pragma: no cover
         raise ImportError(
-            "layer1: PyMuPDF (fitz) required for PDF rendering. "
-            "Install: pip install pymupdf"
+            "layer1: PyMuPDF (fitz) required for PDF rendering. " "Install: pip install pymupdf"
         ) from e
 
     t0 = time.time()
@@ -204,9 +203,7 @@ def extract_from_pdf_bytes(
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     except Exception as e:
-        raise Layer1PDFError(
-            f"layer1: cannot open PDF: {type(e).__name__}: {e}"
-        ) from e
+        raise Layer1PDFError(f"layer1: cannot open PDF: {type(e).__name__}: {e}") from e
 
     try:
         total_pages = doc.page_count
@@ -230,8 +227,7 @@ def extract_from_pdf_bytes(
                 png_bytes = pix.tobytes("png")
             except Exception as e:
                 raise Layer1PDFError(
-                    f"layer1: render page {i + 1}/{total_pages} failed: "
-                    f"{type(e).__name__}: {e}"
+                    f"layer1: render page {i + 1}/{total_pages} failed: " f"{type(e).__name__}: {e}"
                 ) from e
 
             page_result = _call_vision_for_image(
@@ -332,8 +328,7 @@ def _call_vision_for_image(
         from google.api_core import exceptions as gax
     except ImportError as e:  # pragma: no cover
         raise ImportError(
-            "layer1: google-cloud-vision required. "
-            "Install: pip install google-cloud-vision"
+            "layer1: google-cloud-vision required. " "Install: pip install google-cloud-vision"
         ) from e
 
     client = _get_client()
@@ -347,18 +342,12 @@ def _call_vision_for_image(
             timeout=timeout,
         )
     except gax.Unauthenticated as e:
-        raise Layer1AuthError(
-            f"layer1: page {page_number}: Unauthenticated: {e}"
-        ) from e
+        raise Layer1AuthError(f"layer1: page {page_number}: Unauthenticated: {e}") from e
     except gax.PermissionDenied as e:
         # Includes BILLING_DISABLED and SA missing IAM role
-        raise Layer1AuthError(
-            f"layer1: page {page_number}: PermissionDenied: {e}"
-        ) from e
+        raise Layer1AuthError(f"layer1: page {page_number}: PermissionDenied: {e}") from e
     except gax.ResourceExhausted as e:
-        raise Layer1QuotaError(
-            f"layer1: page {page_number}: quota / rate limit: {e}"
-        ) from e
+        raise Layer1QuotaError(f"layer1: page {page_number}: quota / rate limit: {e}") from e
     except gax.DeadlineExceeded as e:
         raise Layer1TransientError(
             f"layer1: page {page_number}: timeout after {timeout}s: {e}"
@@ -368,13 +357,9 @@ def _call_vision_for_image(
             f"layer1: page {page_number}: server error: {type(e).__name__}: {e}"
         ) from e
     except gax.GoogleAPICallError as e:
-        raise Layer1Error(
-            f"layer1: page {page_number}: API error: {type(e).__name__}: {e}"
-        ) from e
+        raise Layer1Error(f"layer1: page {page_number}: API error: {type(e).__name__}: {e}") from e
     except Exception as e:
-        raise Layer1Error(
-            f"layer1: page {page_number}: unexpected: {type(e).__name__}: {e}"
-        ) from e
+        raise Layer1Error(f"layer1: page {page_number}: unexpected: {type(e).__name__}: {e}") from e
 
     # API-level error embedded in response (rare but possible)
     error = getattr(response, "error", None)
@@ -383,20 +368,12 @@ def _call_vision_for_image(
         code = error.code
         msg = error.message
         if code in (7, 16):
-            raise Layer1AuthError(
-                f"layer1: page {page_number}: API error code {code}: {msg}"
-            )
+            raise Layer1AuthError(f"layer1: page {page_number}: API error code {code}: {msg}")
         if code == 8:
-            raise Layer1QuotaError(
-                f"layer1: page {page_number}: API error code {code}: {msg}"
-            )
+            raise Layer1QuotaError(f"layer1: page {page_number}: API error code {code}: {msg}")
         if code in (4, 13, 14):
-            raise Layer1TransientError(
-                f"layer1: page {page_number}: API error code {code}: {msg}"
-            )
-        raise Layer1Error(
-            f"layer1: page {page_number}: API error code {code}: {msg}"
-        )
+            raise Layer1TransientError(f"layer1: page {page_number}: API error code {code}: {msg}")
+        raise Layer1Error(f"layer1: page {page_number}: API error code {code}: {msg}")
 
     return _response_to_page(response, page_number=page_number)
 

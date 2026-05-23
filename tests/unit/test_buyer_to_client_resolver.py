@@ -57,11 +57,20 @@ if "psycopg2" not in sys.modules:
     fake_pg.extras.execute_values = lambda *a, **k: None
     fake_pg.extras.Json = lambda x: x
     fake_pg.pool = types.ModuleType("psycopg2.pool")
+
     class _StubPool:
-        def __init__(self, *a, **k): pass
-        def getconn(self): raise RuntimeError("stub")
-        def putconn(self, *a, **k): pass
-        def closeall(self): pass
+        def __init__(self, *a, **k):
+            pass
+
+        def getconn(self):
+            raise RuntimeError("stub")
+
+        def putconn(self, *a, **k):
+            pass
+
+        def closeall(self):
+            pass
+
     fake_pg.pool.ThreadedConnectionPool = _StubPool
     fake_pg.pool.SimpleConnectionPool = _StubPool
     fake_pg.sql = types.ModuleType("psycopg2.sql")
@@ -156,12 +165,16 @@ class LayerHitTests(unittest.TestCase):
 
     def test_layer_1_memory_hit_confidence_1_0(self):
         # 第 1 个 query (memory) 命中 → short-circuit · confidence 1.0
-        cur = _LayeredCursor([
-            {"client_id": 7, "client_name": "บริษัท X จำกัด"},
-        ])
+        cur = _LayeredCursor(
+            [
+                {"client_id": 7, "client_name": "บริษัท X จำกัด"},
+            ]
+        )
         with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
-                "บริษัท X จำกัด", None, "user-1",
+                "บริษัท X จำกัด",
+                None,
+                "user-1",
             )
         self.assertIsNotNone(r)
         self.assertEqual(r["client_id"], 7)
@@ -170,14 +183,16 @@ class LayerHitTests(unittest.TestCase):
 
     def test_layer_2_tax_id_hit_confidence_0_98(self):
         # memory miss(None) → tax_id hit
-        cur = _LayeredCursor([
-            None,                              # L1 memory miss
-            {"id": 42, "name": "Acme Co Ltd"}, # L2 tax_id hit
-        ])
+        cur = _LayeredCursor(
+            [
+                None,  # L1 memory miss
+                {"id": 42, "name": "Acme Co Ltd"},  # L2 tax_id hit
+            ]
+        )
         with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
                 "Different Name Here",
-                "0105543123456",   # 13-digit tax → tax_clean ≥10 触发 L2
+                "0105543123456",  # 13-digit tax → tax_clean ≥10 触发 L2
                 "user-1",
             )
         self.assertIsNotNone(r)
@@ -187,15 +202,18 @@ class LayerHitTests(unittest.TestCase):
 
     def test_layer_3_name_exact_hit_confidence_0_95(self):
         # L1 miss + 无 tax_id (skip L2) + L3 name exact 命中
-        cur = _LayeredCursor([
-            None,   # L1 memory miss
-            # L2 跳过 (没 tax)
-            [{"id": 88, "name": "Acme Co", "short_name": None}],  # L3-5 fetchall
-        ])
+        cur = _LayeredCursor(
+            [
+                None,  # L1 memory miss
+                # L2 跳过 (没 tax)
+                [{"id": 88, "name": "Acme Co", "short_name": None}],  # L3-5 fetchall
+            ]
+        )
         with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
-                "ACME CO",   # case-insensitive 完全匹配
-                None, "user-1",
+                "ACME CO",  # case-insensitive 完全匹配
+                None,
+                "user-1",
             )
         self.assertIsNotNone(r)
         self.assertEqual(r["client_id"], 88)
@@ -204,10 +222,12 @@ class LayerHitTests(unittest.TestCase):
 
     def test_layer_3_5_short_name_exact_confidence_0_90(self):
         # L3 name exact 不命中 · L3.5 short_name exact 命中
-        cur = _LayeredCursor([
-            None,
-            [{"id": 99, "name": "Long Full Company Name Ltd", "short_name": "LFC"}],
-        ])
+        cur = _LayeredCursor(
+            [
+                None,
+                [{"id": 99, "name": "Long Full Company Name Ltd", "short_name": "LFC"}],
+            ]
+        )
         with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client("LFC", None, "user-1")
         self.assertIsNotNone(r)
@@ -217,14 +237,18 @@ class LayerHitTests(unittest.TestCase):
 
     def test_layer_4_name_substring_in_range_0_80_to_0_90(self):
         # name substring 命中 · confidence 落在 0.80-0.90
-        cur = _LayeredCursor([
-            None,
-            [{"id": 11, "name": "Acme", "short_name": None}],
-        ])
+        cur = _LayeredCursor(
+            [
+                None,
+                [{"id": 11, "name": "Acme", "short_name": None}],
+            ]
+        )
         with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
             # "Acme Corporation Ltd" 含 "Acme" · 反向 substring
             r = db.try_resolve_buyer_to_client(
-                "Acme Corporation Ltd", None, "user-1",
+                "Acme Corporation Ltd",
+                None,
+                "user-1",
             )
         self.assertIsNotNone(r)
         self.assertEqual(r["client_id"], 11)
@@ -238,26 +262,33 @@ class NoMatchTests(unittest.TestCase):
     """没匹配返 None."""
 
     def test_no_match_anywhere(self):
-        cur = _LayeredCursor([
-            None,   # L1 memory miss
-            # L2 tax 跳过
-            [{"id": 1, "name": "Apple Inc", "short_name": None}],  # L3-5 rows
-        ])
+        cur = _LayeredCursor(
+            [
+                None,  # L1 memory miss
+                # L2 tax 跳过
+                [{"id": 1, "name": "Apple Inc", "short_name": None}],  # L3-5 rows
+            ]
+        )
         with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
-                "Banana Co",   # 跟 Apple Inc 完全无关
-                None, "user-1",
+                "Banana Co",  # 跟 Apple Inc 完全无关
+                None,
+                "user-1",
             )
         self.assertIsNone(r)
 
     def test_no_clients_at_all(self):
-        cur = _LayeredCursor([
-            None,    # L1 miss
-            [],      # L3-5 rows 空
-        ])
+        cur = _LayeredCursor(
+            [
+                None,  # L1 miss
+                [],  # L3-5 rows 空
+            ]
+        )
         with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
-                "Whatever Co", None, "user-empty",
+                "Whatever Co",
+                None,
+                "user-empty",
             )
         self.assertIsNone(r)
 
@@ -269,8 +300,13 @@ class DbExceptionTests(unittest.TestCase):
         class _ExplodingCursor:
             def execute(self, *a, **k):
                 raise RuntimeError("simulated DB outage")
-            def fetchone(self): return None
-            def fetchall(self): return []
+
+            def fetchone(self):
+                return None
+
+            def fetchall(self):
+                return []
+
         with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(_ExplodingCursor())):
             r = db.try_resolve_buyer_to_client("Any Co", None, "user-1")
         self.assertIsNone(r)

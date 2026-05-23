@@ -55,14 +55,10 @@ from typing import List, Optional, Tuple
 from pydantic import ValidationError
 
 from .schemas import (
-    BankStatementDocument,
     BusinessDocumentType,
-    GeneralLedgerDocument,
-    GenericTableDocument,
     Layer3PageResult,
     Page,
     ThaiInvoice,
-    VatReportDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -178,12 +174,18 @@ CRITICAL RULES (same as previous extraction; pay attention):
 """
 
 
-def _build_user_prompt(layer1_text: str, layer2_invoice: ThaiInvoice, trigger_reasons: List[str]) -> str:
+def _build_user_prompt(
+    layer1_text: str, layer2_invoice: ThaiInvoice, trigger_reasons: List[str]
+) -> str:
     """Assemble the user-message text block (image is sent separately)."""
     if len(layer1_text) > MAX_TEXT_LENGTH:
         layer1_text = layer1_text[:MAX_TEXT_LENGTH] + "\n[...truncated]"
 
-    triggers_block = "\n".join(f"  - {t}" for t in trigger_reasons) if trigger_reasons else "  - (no specific trigger; general visual review)"
+    triggers_block = (
+        "\n".join(f"  - {t}" for t in trigger_reasons)
+        if trigger_reasons
+        else "  - (no specific trigger; general visual review)"
+    )
 
     prev_json = layer2_invoice.model_dump(mode="json")
     prev_json_str = json.dumps(prev_json, ensure_ascii=False, indent=2)
@@ -247,19 +249,14 @@ def refine_with_image(
         TypeError: bad input types
     """
     if not isinstance(image_bytes, (bytes, bytearray)):
-        raise TypeError(
-            f"layer3: image_bytes must be bytes, got {type(image_bytes).__name__}"
-        )
+        raise TypeError(f"layer3: image_bytes must be bytes, got {type(image_bytes).__name__}")
     if not image_bytes:
         raise TypeError("layer3: image_bytes is empty")
     if not isinstance(layer1_text, str):
-        raise TypeError(
-            f"layer3: layer1_text must be str, got {type(layer1_text).__name__}"
-        )
+        raise TypeError(f"layer3: layer1_text must be str, got {type(layer1_text).__name__}")
     if not isinstance(layer2_invoice, ThaiInvoice):
         raise TypeError(
-            f"layer3: layer2_invoice must be ThaiInvoice, got "
-            f"{type(layer2_invoice).__name__}"
+            f"layer3: layer2_invoice must be ThaiInvoice, got " f"{type(layer2_invoice).__name__}"
         )
 
     # 2026-05-21 multi-schema refactor: Layer 3 visual fallback currently
@@ -277,15 +274,9 @@ def refine_with_image(
             document_type,
         )
 
-    key = (
-        api_key
-        or os.environ.get("GOOGLE_API_KEY")
-        or os.environ.get("GEMINI_API_KEY")
-    )
+    key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     if not key:
-        raise Layer3AuthError(
-            "layer3: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set"
-        )
+        raise Layer3AuthError("layer3: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set")
 
     data, meta = _call_gemini_with_retry(
         image_bytes=bytes(image_bytes),
@@ -391,8 +382,7 @@ def _call_gemini_with_retry(
         from PIL import Image
     except ImportError as e:  # pragma: no cover
         raise ImportError(
-            "layer3: Pillow (PIL) required for image input. "
-            "Install: pip install pillow"
+            "layer3: Pillow (PIL) required for image input. " "Install: pip install pillow"
         ) from e
 
     try:
@@ -400,9 +390,7 @@ def _call_gemini_with_retry(
         # Force load so we catch decode errors here, not deep in Gemini SDK
         pil_image.load()
     except Exception as e:
-        raise TypeError(
-            f"layer3: image_bytes not a valid image: {type(e).__name__}: {e}"
-        ) from e
+        raise TypeError(f"layer3: image_bytes not a valid image: {type(e).__name__}: {e}") from e
 
     base_user_prompt = _build_user_prompt(layer1_text, layer2_invoice, trigger_reasons)
     model = _get_model(api_key=api_key, model_name=model_name)
@@ -434,7 +422,8 @@ def _call_gemini_with_retry(
             current_user_prompt = base_user_prompt
         else:
             current_user_prompt = (
-                base_user_prompt + _RETRY_HINT_BASE
+                base_user_prompt
+                + _RETRY_HINT_BASE
                 + f"\n\nPrevious parse error: {last_parse_error}"
             )
         try:
@@ -469,8 +458,7 @@ def _call_gemini_with_retry(
             if attempt < max_retries:
                 continue
             raise Layer3FallbackError(
-                f"layer3: Gemini returned empty response after "
-                f"{max_retries + 1} attempts"
+                f"layer3: Gemini returned empty response after " f"{max_retries + 1} attempts"
             )
 
         try:
@@ -499,9 +487,7 @@ def _call_gemini_with_retry(
             "retries": attempt,
         }
 
-    raise Layer3FallbackError(
-        f"layer3: unreachable; last parse error: {last_parse_error}"
-    )
+    raise Layer3FallbackError(f"layer3: unreachable; last parse error: {last_parse_error}")
 
 
 def _parse_json(text: str) -> dict:
@@ -599,8 +585,7 @@ def _get_model(api_key: str, model_name: str):
             import google.generativeai as genai
         except ImportError as e:
             raise ImportError(
-                "layer3: google-generativeai required. "
-                "Install: pip install google-generativeai"
+                "layer3: google-generativeai required. " "Install: pip install google-generativeai"
             ) from e
 
         # Direct endpoint (no Cloudflare proxy). If/when dev machine cannot

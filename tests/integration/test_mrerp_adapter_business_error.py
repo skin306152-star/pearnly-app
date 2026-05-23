@@ -29,11 +29,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import mrerp_xlsx_generator   # noqa: E402
+import mrerp_xlsx_generator  # noqa: E402
 
-from services.erp.mrerp_adapter import MRERPAdapter   # noqa: E402
+from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
 
-from tests.integration._mrerp_common import (   # noqa: E402
+from tests.integration._mrerp_common import (  # noqa: E402
     SCREENSHOT_ROOT,
     make_test_history,
     make_test_invoice_no,
@@ -96,7 +96,8 @@ class BusinessErrorTest(unittest.TestCase):
 
         self.assertEqual(result.total, 1)
         self.assertEqual(
-            len(result.success), 0,
+            len(result.success),
+            0,
             f"expected zero successes; got {result.success!r}",
         )
         self.assertEqual(len(result.failed), 1)
@@ -110,8 +111,11 @@ class BusinessErrorTest(unittest.TestCase):
             fr.evidence_screenshot,
             "failed row should carry an evidence screenshot path",
         )
-        self.assertEqual(fr.original.get("invoice_number"), self.invoice_no,
-                         "original invoice dict should round-trip")
+        self.assertEqual(
+            fr.original.get("invoice_number"),
+            self.invoice_no,
+            "original invoice dict should round-trip",
+        )
 
 
 if __name__ == "__main__":

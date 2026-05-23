@@ -9,6 +9,7 @@ must NEVER have that number assigned to debit/credit/amount/balance.
 If this test starts failing, the validators in services/ocr/validators.py
 are no longer catching mis-sourced amounts — the bug is back.
 """
+
 import unittest
 
 from services.ocr.schemas import (
@@ -29,8 +30,12 @@ from services.ocr.validators import (
 
 def _empty_page():
     return Page(
-        page_number=1, width=0, height=0,
-        full_text="", avg_confidence=1.0, blocks=[],
+        page_number=1,
+        width=0,
+        height=0,
+        full_text="",
+        avg_confidence=1.0,
+        blocks=[],
     )
 
 
@@ -47,13 +52,13 @@ class GLDescription6091RegressionTests(unittest.TestCase):
             credit="",
             amount="1500.00",
             direction="deposit",
-            debit_ref=FieldRef(value="1500.00", source_column="Debit",
-                               source_text="1,500.00"),
+            debit_ref=FieldRef(value="1500.00", source_column="Debit", source_text="1,500.00"),
         )
         doc = GeneralLedgerDocument(entries=[entry])
         warnings = validate_gl_document(doc, _empty_page())
-        self.assertEqual(warnings, [],
-                         f"clean GL row with 6091 in desc should pass — got {warnings}")
+        self.assertEqual(
+            warnings, [], f"clean GL row with 6091 in desc should pass — got {warnings}"
+        )
         # Original fields untouched
         self.assertEqual(entry.debit, "1500.00")
         self.assertEqual(entry.amount, "1500.00")
@@ -63,12 +68,11 @@ class GLDescription6091RegressionTests(unittest.TestCase):
             transaction_date="2026-05-21",
             voucher_no="JV681130.1",
             description="6091 - Sales revenue",
-            debit="6091.00",   # WRONG — same number as description
+            debit="6091.00",  # WRONG — same number as description
             credit="",
             amount="6091.00",
             direction="deposit",
-            debit_ref=FieldRef(value="6091.00",
-                               source_column="Description"),  # gives it away
+            debit_ref=FieldRef(value="6091.00", source_column="Description"),  # gives it away
         )
         doc = GeneralLedgerDocument(entries=[entry])
         warnings = validate_gl_document(doc, _empty_page())
@@ -167,8 +171,10 @@ class GLDescription6091RegressionTests(unittest.TestCase):
         )
         doc = GeneralLedgerDocument(entries=[entry])
         warnings = validate_gl_document(doc, _empty_page())
-        self.assertTrue(any("description" in w for w in warnings),
-                        f"expected description-leak warning, got {warnings}")
+        self.assertTrue(
+            any("description" in w for w in warnings),
+            f"expected description-leak warning, got {warnings}",
+        )
 
 
 class BankStatementValidatorTests(unittest.TestCase):
@@ -200,7 +206,9 @@ class BankStatementValidatorTests(unittest.TestCase):
         doc = BankStatementDocument(entries=[entry])
         warnings = validate_bank_document(doc, _empty_page())
         self.assertEqual(len(warnings), 1)
-        self.assertIn("voucher-number column", warnings[0])  # Reference falls under voucher-keyword set
+        self.assertIn(
+            "voucher-number column", warnings[0]
+        )  # Reference falls under voucher-keyword set
         self.assertEqual(entry.withdrawal, "")
 
     def test_deposit_from_description_column_rejected(self):
@@ -221,8 +229,7 @@ class InvoiceValidatorSourceColumnTests(unittest.TestCase):
         inv = ThaiInvoice(
             total_amount="6091.00",
             source_refs={
-                "total_amount": FieldRef(value="6091.00",
-                                          source_column="Description"),
+                "total_amount": FieldRef(value="6091.00", source_column="Description"),
             },
         )
         warnings = validate_invoice(inv, _empty_page())

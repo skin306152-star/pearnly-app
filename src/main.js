@@ -10,5 +10,5 @@ import './home/dashboard.js';
 import './home/billing.js';
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
-  console.info('[pearnly] vite bundle loaded · dashboard + billing');
+    console.info('[pearnly] vite bundle loaded · dashboard + billing');
 }

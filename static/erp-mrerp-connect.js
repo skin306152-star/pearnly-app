@@ -28,52 +28,116 @@
     const T = {
         // Card labels
         'mrerp-card-name': {
-            zh: 'MR.ERP', en: 'MR.ERP', th: 'MR.ERP', zh_TW: 'MR.ERP', ja: 'MR.ERP',
+            zh: 'MR.ERP',
+            en: 'MR.ERP',
+            th: 'MR.ERP',
+            zh_TW: 'MR.ERP',
+            ja: 'MR.ERP',
         },
         'flow-card-name': {
-            zh: 'FlowAccount', en: 'FlowAccount', th: 'FlowAccount', zh_TW: 'FlowAccount', ja: 'FlowAccount',
+            zh: 'FlowAccount',
+            en: 'FlowAccount',
+            th: 'FlowAccount',
+            zh_TW: 'FlowAccount',
+            ja: 'FlowAccount',
         },
         'card-coming-soon': {
-            zh: '即将上线', en: 'Coming soon', th: 'เร็วๆ นี้', zh_TW: '即將上線', ja: '近日公開',
+            zh: '即将上线',
+            en: 'Coming soon',
+            th: 'เร็วๆ นี้',
+            zh_TW: '即將上線',
+            ja: '近日公開',
         },
         'card-not-configured': {
-            zh: '未连接', en: 'Not connected', th: 'ยังไม่เชื่อม', zh_TW: '未連接', ja: '未接続',
+            zh: '未连接',
+            en: 'Not connected',
+            th: 'ยังไม่เชื่อม',
+            zh_TW: '未連接',
+            ja: '未接続',
         },
         'card-connected': {
-            zh: '已连接', en: 'Connected', th: 'เชื่อมแล้ว', zh_TW: '已連接', ja: '接続済み',
+            zh: '已连接',
+            en: 'Connected',
+            th: 'เชื่อมแล้ว',
+            zh_TW: '已連接',
+            ja: '接続済み',
         },
         'card-checking': {
-            zh: '检查中…', en: 'Checking…', th: 'กำลังตรวจสอบ…', zh_TW: '檢查中…', ja: '確認中…',
+            zh: '检查中…',
+            en: 'Checking…',
+            th: 'กำลังตรวจสอบ…',
+            zh_TW: '檢查中…',
+            ja: '確認中…',
         },
         'card-needs-attention': {
-            zh: '需关注', en: 'Needs attention', th: 'ต้องตรวจสอบ', zh_TW: '需關注', ja: '要確認',
+            zh: '需关注',
+            en: 'Needs attention',
+            th: 'ต้องตรวจสอบ',
+            zh_TW: '需關注',
+            ja: '要確認',
         },
         'card-btn-connect': {
-            zh: '连接', en: 'Connect', th: 'เชื่อมต่อ', zh_TW: '連接', ja: '接続',
+            zh: '连接',
+            en: 'Connect',
+            th: 'เชื่อมต่อ',
+            zh_TW: '連接',
+            ja: '接続',
         },
         'card-btn-edit': {
-            zh: '修改', en: 'Edit', th: 'แก้ไข', zh_TW: '修改', ja: '編集',
+            zh: '修改',
+            en: 'Edit',
+            th: 'แก้ไข',
+            zh_TW: '修改',
+            ja: '編集',
         },
         'card-btn-retest': {
-            zh: '重新测试', en: 'Re-test', th: 'ทดสอบใหม่', zh_TW: '重新測試', ja: '再テスト',
+            zh: '重新测试',
+            en: 'Re-test',
+            th: 'ทดสอบใหม่',
+            zh_TW: '重新測試',
+            ja: '再テスト',
         },
         'card-stat-last-push': {
-            zh: '上次推送', en: 'Last push', th: 'ส่งล่าสุด', zh_TW: '上次推送', ja: '最終送信',
+            zh: '上次推送',
+            en: 'Last push',
+            th: 'ส่งล่าสุด',
+            zh_TW: '上次推送',
+            ja: '最終送信',
         },
         'card-stat-month-pushed': {
-            zh: '本月已推', en: 'This month', th: 'เดือนนี้', zh_TW: '本月已推', ja: '今月',
+            zh: '本月已推',
+            en: 'This month',
+            th: 'เดือนนี้',
+            zh_TW: '本月已推',
+            ja: '今月',
         },
         'card-stat-month-failed': {
-            zh: '失败', en: 'Failures', th: 'ล้มเหลว', zh_TW: '失敗', ja: '失敗',
+            zh: '失败',
+            en: 'Failures',
+            th: 'ล้มเหลว',
+            zh_TW: '失敗',
+            ja: '失敗',
         },
         'card-stat-mode-auto': {
-            zh: '自动推送', en: 'Auto push', th: 'ส่งอัตโนมัติ', zh_TW: '自動推送', ja: '自動送信',
+            zh: '自动推送',
+            en: 'Auto push',
+            th: 'ส่งอัตโนมัติ',
+            zh_TW: '自動推送',
+            ja: '自動送信',
         },
         'card-stat-mode-manual': {
-            zh: '手动推送', en: 'Manual push', th: 'ส่งด้วยตนเอง', zh_TW: '手動推送', ja: '手動送信',
+            zh: '手动推送',
+            en: 'Manual push',
+            th: 'ส่งด้วยตนเอง',
+            zh_TW: '手動推送',
+            ja: '手動送信',
         },
         'card-stat-mode-none': {
-            zh: '未配置', en: 'Not set', th: 'ยังไม่ตั้งค่า', zh_TW: '未設定', ja: '未設定',
+            zh: '未配置',
+            en: 'Not set',
+            th: 'ยังไม่ตั้งค่า',
+            zh_TW: '未設定',
+            ja: '未設定',
         },
         // Empty state
         'empty-banner-title': {
@@ -92,7 +156,11 @@
         },
         // Wizard
         'wiz-title-connect': {
-            zh: '连接 MR.ERP', en: 'Connect MR.ERP', th: 'เชื่อมต่อ MR.ERP', zh_TW: '連接 MR.ERP', ja: 'MR.ERP に接続',
+            zh: '连接 MR.ERP',
+            en: 'Connect MR.ERP',
+            th: 'เชื่อมต่อ MR.ERP',
+            zh_TW: '連接 MR.ERP',
+            ja: 'MR.ERP に接続',
         },
         'wiz-step-1-h': {
             zh: '这个连接用于哪些客户?',
@@ -109,7 +177,11 @@
             ja: 'これらの取引先の請求書を MR.ERP に送信します',
         },
         'wiz-step-1-select-all': {
-            zh: '全选', en: 'Select all', th: 'เลือกทั้งหมด', zh_TW: '全選', ja: 'すべて選択',
+            zh: '全选',
+            en: 'Select all',
+            th: 'เลือกทั้งหมด',
+            zh_TW: '全選',
+            ja: 'すべて選択',
         },
         // Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · Step 1 必选 ≥1 客户
         'wiz-step-1-need-client': {
@@ -127,26 +199,46 @@
             ja: 'MR.ERP のログイン情報を入力',
         },
         'wiz-username': {
-            zh: '用户名', en: 'Username', th: 'ชื่อผู้ใช้', zh_TW: '使用者名稱', ja: 'ユーザー名',
+            zh: '用户名',
+            en: 'Username',
+            th: 'ชื่อผู้ใช้',
+            zh_TW: '使用者名稱',
+            ja: 'ユーザー名',
         },
         'wiz-password': {
-            zh: '密码', en: 'Password', th: 'รหัสผ่าน', zh_TW: '密碼', ja: 'パスワード',
+            zh: '密码',
+            en: 'Password',
+            th: 'รหัสผ่าน',
+            zh_TW: '密碼',
+            ja: 'パスワード',
         },
         'wiz-pwd-hint': {
             zh: '密码会用我们的密钥加密 · 数据库里不存明文',
-            en: "Password is encrypted with our key — we never store it in plain text",
+            en: 'Password is encrypted with our key — we never store it in plain text',
             th: 'รหัสผ่านถูกเข้ารหัสด้วยคีย์ของเรา — ไม่เก็บเป็น plain text',
             zh_TW: '密碼會用我們的金鑰加密 · 資料庫不存明文',
             ja: 'パスワードは弊社のキーで暗号化されます · 平文では保存しません',
         },
         'wiz-test-btn': {
-            zh: '测试连接', en: 'Test connection', th: 'ทดสอบการเชื่อม', zh_TW: '測試連線', ja: '接続テスト',
+            zh: '测试连接',
+            en: 'Test connection',
+            th: 'ทดสอบการเชื่อม',
+            zh_TW: '測試連線',
+            ja: '接続テスト',
         },
         'wiz-test-pending': {
-            zh: '尚未测试', en: 'Not tested yet', th: 'ยังไม่ได้ทดสอบ', zh_TW: '尚未測試', ja: '未テスト',
+            zh: '尚未测试',
+            en: 'Not tested yet',
+            th: 'ยังไม่ได้ทดสอบ',
+            zh_TW: '尚未測試',
+            ja: '未テスト',
         },
         'wiz-test-running': {
-            zh: '正在测试…', en: 'Testing…', th: 'กำลังทดสอบ…', zh_TW: '正在測試…', ja: 'テスト中…',
+            zh: '正在测试…',
+            en: 'Testing…',
+            th: 'กำลังทดสอบ…',
+            zh_TW: '正在測試…',
+            ja: 'テスト中…',
         },
         'wiz-test-ok': {
             zh: '✓ 已连接 · 看到 {n} 个公司',
@@ -171,10 +263,18 @@
             ja: '会社と送信モードを選択',
         },
         'wiz-company': {
-            zh: '公司', en: 'Company', th: 'บริษัท', zh_TW: '公司', ja: '会社',
+            zh: '公司',
+            en: 'Company',
+            th: 'บริษัท',
+            zh_TW: '公司',
+            ja: '会社',
         },
         'wiz-mode': {
-            zh: '推送模式', en: 'Push mode', th: 'โหมดการส่ง', zh_TW: '推送模式', ja: '送信モード',
+            zh: '推送模式',
+            en: 'Push mode',
+            th: 'โหมดการส่ง',
+            zh_TW: '推送模式',
+            ja: '送信モード',
         },
         'wiz-mode-auto': {
             zh: '识别后自动推送(不需要手动)',
@@ -309,16 +409,32 @@
             ja: '商品コード (例: P001)',
         },
         'btn-cancel': {
-            zh: '取消', en: 'Cancel', th: 'ยกเลิก', zh_TW: '取消', ja: 'キャンセル',
+            zh: '取消',
+            en: 'Cancel',
+            th: 'ยกเลิก',
+            zh_TW: '取消',
+            ja: 'キャンセル',
         },
         'btn-prev': {
-            zh: '← 上一步', en: '← Previous', th: '← ก่อนหน้า', zh_TW: '← 上一步', ja: '← 前へ',
+            zh: '← 上一步',
+            en: '← Previous',
+            th: '← ก่อนหน้า',
+            zh_TW: '← 上一步',
+            ja: '← 前へ',
         },
         'btn-next': {
-            zh: '下一步 →', en: 'Next →', th: 'ถัดไป →', zh_TW: '下一步 →', ja: '次へ →',
+            zh: '下一步 →',
+            en: 'Next →',
+            th: 'ถัดไป →',
+            zh_TW: '下一步 →',
+            ja: '次へ →',
         },
         'btn-finish': {
-            zh: '完成 ✓', en: 'Finish ✓', th: 'เสร็จสิ้น ✓', zh_TW: '完成 ✓', ja: '完了 ✓',
+            zh: '完成 ✓',
+            en: 'Finish ✓',
+            th: 'เสร็จสิ้น ✓',
+            zh_TW: '完成 ✓',
+            ja: '完了 ✓',
         },
         // v118.34.4 · new strings for the integration-row card style.
         'mrerp-card-desc': {
@@ -416,7 +532,11 @@
             ja: '保存失敗 · ステータス {status}',
         },
         'wiz-saved': {
-            zh: '已保存', en: 'Saved', th: 'บันทึกแล้ว', zh_TW: '已儲存', ja: '保存しました',
+            zh: '已保存',
+            en: 'Saved',
+            th: 'บันทึกแล้ว',
+            zh_TW: '已儲存',
+            ja: '保存しました',
         },
         // v118.34.4 · the new 3-way ERP subtab split (连接 / 推送日志 /
         // 字段映射). "推送日志" reuses home.js's existing erp-logs-title
@@ -425,13 +545,18 @@
         // now misleading. We don't touch home.js dict per Zihao's rule,
         // so we localize this tab from our own IIFE in _localizeSubtabs().
         'auto-erp-subtab-connect-only': {
-            zh: '连接', en: 'Connect', th: 'เชื่อมต่อ', zh_TW: '連接', ja: '接続',
+            zh: '连接',
+            en: 'Connect',
+            th: 'เชื่อมต่อ',
+            zh_TW: '連接',
+            ja: '接続',
         },
     };
 
     function _activeLang() {
         try {
-            if (typeof window.currentLang === 'string' && window.currentLang) return window.currentLang;
+            if (typeof window.currentLang === 'string' && window.currentLang)
+                return window.currentLang;
             const ls = localStorage.getItem('mrpilot_lang');
             if (ls) return ls;
         } catch (e) {}
@@ -451,17 +576,23 @@
     }
 
     function _esc(s) {
-        return (typeof window.escapeHtml === 'function')
+        return typeof window.escapeHtml === 'function'
             ? window.escapeHtml(s == null ? '' : String(s))
             : String(s == null ? '' : s);
     }
 
     function _toast(msg, kind) {
-        try { if (typeof window.showToast === 'function') window.showToast(msg, kind || 'info'); } catch (e) {}
+        try {
+            if (typeof window.showToast === 'function') window.showToast(msg, kind || 'info');
+        } catch (e) {}
     }
 
     function _tk() {
-        try { return localStorage.getItem('mrpilot_token') || ''; } catch (e) { return ''; }
+        try {
+            return localStorage.getItem('mrpilot_token') || '';
+        } catch (e) {
+            return '';
+        }
     }
 
     function _authHeaders() {
@@ -492,18 +623,26 @@
             if (!r.ok) return [];
             const data = await r.json();
             return Array.isArray(data.items) ? data.items : [];
-        } catch (e) { return []; }
+        } catch (e) {
+            return [];
+        }
     }
 
     async function _testConnection(endpointId, refresh) {
         try {
             const q = refresh ? '?refresh=1' : '';
-            const r = await fetch('/api/erp/endpoints/' + encodeURIComponent(endpointId) + '/test-connection' + q, {
-                method: 'POST', headers: _authHeaders(),
-            });
+            const r = await fetch(
+                '/api/erp/endpoints/' + encodeURIComponent(endpointId) + '/test-connection' + q,
+                {
+                    method: 'POST',
+                    headers: _authHeaders(),
+                }
+            );
             if (!r.ok) return { ok: false, error_code: 'ERR_HTTP_' + r.status };
             return await r.json();
-        } catch (e) { return { ok: false, error_code: 'ERR_NETWORK', raw_error: String(e).slice(0, 200) }; }
+        } catch (e) {
+            return { ok: false, error_code: 'ERR_NETWORK', raw_error: String(e).slice(0, 200) };
+        }
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -520,9 +659,7 @@
         // host 是 #erp-connect-cards · 我们渲染 MR.ERP 卡片。
         // Xero 卡片由另一个 IIFE 在 host 内单独 prepend · 我们不动它,只 append 自己的。
         // v118.34.35 · FlowAccount "即将上线" 空卡片移除
-        const cardsHtml = [
-            _renderMrerpCard(mrerpEp),
-        ].join('');
+        const cardsHtml = [_renderMrerpCard(mrerpEp)].join('');
 
         // Find or create our own append zone (not interfering with
         // anything Xero IIFE put in there).
@@ -542,43 +679,51 @@
 
     // The MR.ERP icon — small grid glyph matching the Pearnly visual
     // style (1.8px stroke, currentColor, viewBox 24).
-    const _MRERP_ICON_SVG = (
+    const _MRERP_ICON_SVG =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-          '<rect x="3" y="3" width="18" height="18" rx="3"/>' +
-          '<path d="M7 8h10M7 12h10M7 16h6"/>' +
-        '</svg>'
-    );
+        '<rect x="3" y="3" width="18" height="18" rx="3"/>' +
+        '<path d="M7 8h10M7 12h10M7 16h6"/>' +
+        '</svg>';
 
     // FlowAccount icon — circular play-style glyph.
-    const _FLOW_ICON_SVG = (
+    const _FLOW_ICON_SVG =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-          '<circle cx="12" cy="12" r="9"/>' +
-          '<path d="M10 8l5 4-5 4z" fill="currentColor"/>' +
-        '</svg>'
-    );
+        '<circle cx="12" cy="12" r="9"/>' +
+        '<path d="M10 8l5 4-5 4z" fill="currentColor"/>' +
+        '</svg>';
 
     function _renderMrerpCard(ep) {
         const configured = !!ep;
         // v118.34.34 (Zihao 2026-05-19 拍板) · 启用/停用 toggle 状态.
         // ep.enabled 默认 true · 老数据无此字段也按 true 处理.
-        const enabled = configured ? (ep.enabled !== false) : true;
+        const enabled = configured ? ep.enabled !== false : true;
 
         // Status pill — shown next to the card name (matches the
         // pattern used by other Pearnly cards: name + small inline pill).
         let pill;
         if (!configured) {
-            pill = '<span class="mrerp-card-pill mrerp-pill-neutral">' +
-                _esc(t('card-not-configured')) + '</span>';
+            pill =
+                '<span class="mrerp-card-pill mrerp-pill-neutral">' +
+                _esc(t('card-not-configured')) +
+                '</span>';
         } else if (!enabled) {
             // v118.34.34 · 已停用 · 用 neutral 灰 pill · 不显示 checking 状态
             // (停用时不该跑 health check)· title 让 hover 看到原因.
-            pill = '<span class="mrerp-card-pill mrerp-pill-neutral" '
-                + 'title="' + _esc(t('card-disabled-tip')) + '">' +
-                _esc(t('card-disabled-pill')) + '</span>';
+            pill =
+                '<span class="mrerp-card-pill mrerp-pill-neutral" ' +
+                'title="' +
+                _esc(t('card-disabled-tip')) +
+                '">' +
+                _esc(t('card-disabled-pill')) +
+                '</span>';
         } else {
-            pill = '<span class="mrerp-card-pill mrerp-pill-testing" '
-                + 'data-mrerp-test-pill="' + _esc(ep.id) + '">' +
-                _esc(t('card-checking')) + '</span>';
+            pill =
+                '<span class="mrerp-card-pill mrerp-pill-testing" ' +
+                'data-mrerp-test-pill="' +
+                _esc(ep.id) +
+                '">' +
+                _esc(t('card-checking')) +
+                '</span>';
         }
 
         // Action buttons — right side. Use Pearnly's .int-btn-configure
@@ -592,43 +737,59 @@
             const toggleClass = enabled
                 ? 'mrerp-card-toggle mrerp-card-toggle-disable'
                 : 'mrerp-card-toggle mrerp-card-toggle-enable';
-            actionsHtml = (
-                '<button type="button" class="' + toggleClass + '" '
-                  + 'data-mrerp-card-action="toggle-enabled" '
-                  + 'data-mrerp-enabled="' + (enabled ? '1' : '0') + '" '
-                  + 'title="' + _esc(t('card-disabled-tip')) + '">' +
-                  _esc(toggleLabel) +
+            actionsHtml =
+                '<button type="button" class="' +
+                toggleClass +
+                '" ' +
+                'data-mrerp-card-action="toggle-enabled" ' +
+                'data-mrerp-enabled="' +
+                (enabled ? '1' : '0') +
+                '" ' +
+                'title="' +
+                _esc(t('card-disabled-tip')) +
+                '">' +
+                _esc(toggleLabel) +
                 '</button>' +
                 '<button type="button" class="int-btn-configure" data-mrerp-card-action="edit">' +
-                  _esc(t('card-btn-edit')) +
-                '</button>'
-            );
+                _esc(t('card-btn-edit')) +
+                '</button>';
         } else {
-            actionsHtml = (
+            actionsHtml =
                 '<button type="button" class="int-btn-configure" data-mrerp-card-action="connect">' +
-                  _esc(t('card-btn-connect')) +
-                '</button>'
-            );
+                _esc(t('card-btn-connect')) +
+                '</button>';
         }
 
         // v118.34.34 · 停用时整行加 is-disabled class 让 CSS 灰掉.
-        const rowCls = 'integration-row'
-            + (configured ? ' connected' : '')
-            + ((configured && !enabled) ? ' is-disabled' : '');
+        const rowCls =
+            'integration-row' +
+            (configured ? ' connected' : '') +
+            (configured && !enabled ? ' is-disabled' : '');
 
         return (
-            '<div class="' + rowCls + '" '
-                + 'data-mrerp-card="mrerp"'
-                + (ep ? ' data-mrerp-endpoint-id="' + _esc(ep.id) + '"' : '') + '>' +
-              '<div class="int-icon ic-mrerp">' + _MRERP_ICON_SVG + '</div>' +
-              '<div class="int-info">' +
-                '<div class="int-name">' +
-                  '<span>' + _esc(t('mrerp-card-name')) + '</span>' +
-                  pill +
-                '</div>' +
-                '<div class="int-desc">' + _esc(t('mrerp-card-desc')) + '</div>' +
-              '</div>' +
-              '<div class="int-actions">' + actionsHtml + '</div>' +
+            '<div class="' +
+            rowCls +
+            '" ' +
+            'data-mrerp-card="mrerp"' +
+            (ep ? ' data-mrerp-endpoint-id="' + _esc(ep.id) + '"' : '') +
+            '>' +
+            '<div class="int-icon ic-mrerp">' +
+            _MRERP_ICON_SVG +
+            '</div>' +
+            '<div class="int-info">' +
+            '<div class="int-name">' +
+            '<span>' +
+            _esc(t('mrerp-card-name')) +
+            '</span>' +
+            pill +
+            '</div>' +
+            '<div class="int-desc">' +
+            _esc(t('mrerp-card-desc')) +
+            '</div>' +
+            '</div>' +
+            '<div class="int-actions">' +
+            actionsHtml +
+            '</div>' +
             '</div>'
         );
     }
@@ -637,7 +798,9 @@
 
     function _bindCardEvents(zone, mrerpEp) {
         // Card-level "Connect" / "Edit" → open wizard
-        zone.querySelectorAll('[data-mrerp-card-action="connect"], [data-mrerp-card-action="edit"]').forEach(function (btn) {
+        zone.querySelectorAll(
+            '[data-mrerp-card-action="connect"], [data-mrerp-card-action="edit"]'
+        ).forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -667,7 +830,9 @@
                     let confirmed = false;
                     try {
                         if (typeof window.pearnlyConfirm === 'function') {
-                            confirmed = await window.pearnlyConfirm(t('card-toggle-disable-confirm'));
+                            confirmed = await window.pearnlyConfirm(
+                                t('card-toggle-disable-confirm')
+                            );
                         } else {
                             confirmed = window.confirm(t('card-toggle-disable-confirm'));
                         }
@@ -679,21 +844,20 @@
                 // Optimistic UI lock — disable the button while patching.
                 btn.disabled = true;
                 try {
-                    const r = await fetch(
-                        '/api/erp/endpoints/' + encodeURIComponent(mrerpEp.id),
-                        {
-                            method: 'PATCH',
-                            headers: _authHeaders(),
-                            body: JSON.stringify({ enabled: newEnabled }),
-                        }
-                    );
+                    const r = await fetch('/api/erp/endpoints/' + encodeURIComponent(mrerpEp.id), {
+                        method: 'PATCH',
+                        headers: _authHeaders(),
+                        body: JSON.stringify({ enabled: newEnabled }),
+                    });
                     if (!r.ok) {
                         _toast(t('card-toggle-failed'), 'error');
                         btn.disabled = false;
                         return;
                     }
                     _toast(
-                        newEnabled ? t('card-toggle-enable-success') : t('card-toggle-disable-success'),
+                        newEnabled
+                            ? t('card-toggle-enable-success')
+                            : t('card-toggle-disable-success'),
                         'success'
                     );
                     // Reload endpoints & re-render the whole card area so
@@ -733,7 +897,9 @@
     }
 
     async function _refreshCardHealth(endpointId, force) {
-        const pill = document.querySelector('[data-mrerp-test-pill="' + CSS.escape(endpointId) + '"]');
+        const pill = document.querySelector(
+            '[data-mrerp-test-pill="' + CSS.escape(endpointId) + '"]'
+        );
         if (!pill) return;
         pill.className = 'mrerp-card-pill mrerp-pill-testing';
         pill.textContent = t('card-checking');
@@ -747,7 +913,12 @@
             pill.className = 'mrerp-card-pill mrerp-pill-err';
             pill.textContent = t('card-needs-attention');
             const friendly = result.error_friendly || {};
-            pill.title = (friendly[_activeLang()] || friendly.en || result.error_code || '').toString();
+            pill.title = (
+                friendly[_activeLang()] ||
+                friendly.en ||
+                result.error_code ||
+                ''
+            ).toString();
         }
         pill.setAttribute('data-mrerp-test-pill', endpointId);
     }
@@ -761,9 +932,10 @@
         // v118.34.4 · localize the new "连接" tab (key not in home.js dict).
         _localizeSubtabs();
         const endpoints = await _loadEndpoints();
-        const mrerpEp = endpoints.find(function (e) {
-            return (e.adapter || '').toLowerCase() === 'mrerp';
-        }) || null;
+        const mrerpEp =
+            endpoints.find(function (e) {
+                return (e.adapter || '').toLowerCase() === 'mrerp';
+            }) || null;
         _renderCards(host, mrerpEp);
         if (mrerpEp && mrerpEp.enabled !== false) {
             // v118.34.34 · 停用的 endpoint 不跑 health check ·
@@ -779,9 +951,7 @@
     // home.js's applyLang() handles it automatically. "连接" uses a
     // new key (auto-erp-subtab-connect-only) we own here.
     function _localizeSubtabs() {
-        const connectTab = document.querySelector(
-            '.erp-subtab[data-erp-subtab="connect"]'
-        );
+        const connectTab = document.querySelector('.erp-subtab[data-erp-subtab="connect"]');
         if (connectTab) connectTab.textContent = t('auto-erp-subtab-connect-only');
     }
 
@@ -798,7 +968,7 @@
     // ─────────────────────────────────────────────────────────────
     function _applyMappingsTabVisibility(endpoints) {
         const eps = (endpoints || []).filter(function (e) {
-            return e && (e.enabled !== false);
+            return e && e.enabled !== false;
         });
         const adapters = eps.map(function (e) {
             return (e.adapter || '').toLowerCase();
@@ -808,13 +978,9 @@
         });
 
         // Tab pill in .erp-subtabs
-        const mappingsTabPill = document.querySelector(
-            '.erp-subtabs [data-erp-subtab="mappings"]'
-        );
+        const mappingsTabPill = document.querySelector('.erp-subtabs [data-erp-subtab="mappings"]');
         // Sub-panel
-        const mappingsPanel = document.querySelector(
-            '.erp-subpanel[data-erp-subpanel="mappings"]'
-        );
+        const mappingsPanel = document.querySelector('.erp-subpanel[data-erp-subpanel="mappings"]');
         if (!mappingsTabPill || !mappingsPanel) return;
 
         const shouldHide = !hasNonMrerp;
@@ -822,9 +988,7 @@
         mappingsPanel.style.display = shouldHide ? 'none' : '';
         if (shouldHide) {
             // If the mappings tab was active, switch back to connect.
-            const connectTab = document.querySelector(
-                '.erp-subtabs [data-erp-subtab="connect"]'
-            );
+            const connectTab = document.querySelector('.erp-subtabs [data-erp-subtab="connect"]');
             const connectPanel = document.querySelector(
                 '.erp-subpanel[data-erp-subpanel="connect"]'
             );
@@ -858,9 +1022,11 @@
 
     // Public hook for the wizard module (defined further below in
     // the same file — C-3).
-    window._mrerpOpenWizard = window._mrerpOpenWizard || function () {
-        console.log('[mrerp] wizard not yet attached');
-    };
+    window._mrerpOpenWizard =
+        window._mrerpOpenWizard ||
+        function () {
+            console.log('[mrerp] wizard not yet attached');
+        };
 
     // ─────────────────────────────────────────────────────────────
     // Auto-bind: render on initial load + whenever the ERP tab
@@ -880,11 +1046,17 @@
     // Re-bootstrap when the ERP tab is shown (the existing tab
     // switcher just toggles CSS; we listen to the same hash / class
     // mutation home.js uses).
-    document.addEventListener('click', function (e) {
-        const tabEl = e.target.closest && e.target.closest('[data-auto-panel="erp"], .auto-tab[data-tab="erp"]');
-        if (!tabEl) return;
-        setTimeout(_bootstrap, 80);
-    }, true);
+    document.addEventListener(
+        'click',
+        function (e) {
+            const tabEl =
+                e.target.closest &&
+                e.target.closest('[data-auto-panel="erp"], .auto-tab[data-tab="erp"]');
+            if (!tabEl) return;
+            setTimeout(_bootstrap, 80);
+        },
+        true
+    );
 
     // ─────────────────────────────────────────────────────────────
     // v118.34.4 · 跟随 Pearnly 语言切换重新渲染。
@@ -913,25 +1085,42 @@
             if (e && e.key === 'mrpilot_lang') _maybeRerenderForLang();
         });
         window.addEventListener('mrpilot:lang-changed', _maybeRerenderForLang);
-        document.addEventListener('click', function (e) {
-            // Any element whose data-lang attribute looks like a 2-letter
-            // code (e.g. zh/en/th/ja/zh_TW) is treated as a lang switch
-            // candidate. Cheap heuristic — false positives are harmless
-            // because _maybeRerenderForLang short-circuits when nothing
-            // actually changed.
-            const sw = e.target.closest && e.target.closest('[data-lang], .lang-switcher button, .lang-option');
-            if (!sw) return;
-            // Give home.js a tick to commit the change before we read.
-            setTimeout(_maybeRerenderForLang, 120);
-        }, true);
+        document.addEventListener(
+            'click',
+            function (e) {
+                // Any element whose data-lang attribute looks like a 2-letter
+                // code (e.g. zh/en/th/ja/zh_TW) is treated as a lang switch
+                // candidate. Cheap heuristic — false positives are harmless
+                // because _maybeRerenderForLang short-circuits when nothing
+                // actually changed.
+                const sw =
+                    e.target.closest &&
+                    e.target.closest('[data-lang], .lang-switcher button, .lang-option');
+                if (!sw) return;
+                // Give home.js a tick to commit the change before we read.
+                setTimeout(_maybeRerenderForLang, 120);
+            },
+            true
+        );
         // Safety-net poll — 800 ms is invisible to humans, and the
         // _bootstrap call only fires when the lang actually changed.
         setInterval(_maybeRerenderForLang, 800);
-    } catch (_e) { /* environment without window/document — noop */ }
+    } catch (_e) {
+        /* environment without window/document — noop */
+    }
 
     // Expose i18n / fetch helpers for the wizard module to share.
-    window._mrerpConnectShared = { T, t, _esc, _toast, _tk, _authHeaders, _loadEndpoints, _testConnection, _activeLang };
-
+    window._mrerpConnectShared = {
+        T,
+        t,
+        _esc,
+        _toast,
+        _tk,
+        _authHeaders,
+        _loadEndpoints,
+        _testConnection,
+        _activeLang,
+    };
 
     // =============================================================
     // C-3 · 3-step connect wizard (Zihao 2026-05-18 拍板)
@@ -960,34 +1149,33 @@
         wrap.className = 'mrerp-wizard-overlay';
         wrap.setAttribute('role', 'dialog');
         wrap.setAttribute('aria-modal', 'true');
-        wrap.innerHTML = (
+        wrap.innerHTML =
             '<div class="mrerp-wizard">' +
-              '<div class="mrerp-wizard-head">' +
-                '<div class="mrerp-wizard-title" data-mw-title></div>' +
-                '<div class="mrerp-wizard-progress">' +
-                  '<span class="mrerp-wizard-step-dot is-active" data-mw-dot="1"></span>' +
-                  '<span class="mrerp-wizard-step-sep"></span>' +
-                  '<span class="mrerp-wizard-step-dot" data-mw-dot="2"></span>' +
-                  '<span class="mrerp-wizard-step-sep"></span>' +
-                  '<span class="mrerp-wizard-step-dot" data-mw-dot="3"></span>' +
-                '</div>' +
-                '<button class="mrerp-wizard-close" data-mw-close type="button" aria-label="close">' +
-                  '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>' +
-                '</button>' +
-              '</div>' +
-              '<div class="mrerp-wizard-body">' +
-                _buildStep1Html() +
-                _buildStep2Html() +
-                _buildStep3Html() +
-              '</div>' +
-              '<div class="mrerp-wizard-foot">' +
-                '<button class="btn btn-ghost" data-mw-cancel type="button"></button>' +
-                '<div class="mrerp-wizard-foot-spacer"></div>' +
-                '<button class="btn btn-ghost" data-mw-prev type="button" style="display:none;"></button>' +
-                '<button class="btn btn-primary" data-mw-next type="button"></button>' +
-              '</div>' +
-            '</div>'
-        );
+            '<div class="mrerp-wizard-head">' +
+            '<div class="mrerp-wizard-title" data-mw-title></div>' +
+            '<div class="mrerp-wizard-progress">' +
+            '<span class="mrerp-wizard-step-dot is-active" data-mw-dot="1"></span>' +
+            '<span class="mrerp-wizard-step-sep"></span>' +
+            '<span class="mrerp-wizard-step-dot" data-mw-dot="2"></span>' +
+            '<span class="mrerp-wizard-step-sep"></span>' +
+            '<span class="mrerp-wizard-step-dot" data-mw-dot="3"></span>' +
+            '</div>' +
+            '<button class="mrerp-wizard-close" data-mw-close type="button" aria-label="close">' +
+            '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>' +
+            '</button>' +
+            '</div>' +
+            '<div class="mrerp-wizard-body">' +
+            _buildStep1Html() +
+            _buildStep2Html() +
+            _buildStep3Html() +
+            '</div>' +
+            '<div class="mrerp-wizard-foot">' +
+            '<button class="btn btn-ghost" data-mw-cancel type="button"></button>' +
+            '<div class="mrerp-wizard-foot-spacer"></div>' +
+            '<button class="btn btn-ghost" data-mw-prev type="button" style="display:none;"></button>' +
+            '<button class="btn btn-primary" data-mw-next type="button"></button>' +
+            '</div>' +
+            '</div>';
         document.body.appendChild(wrap);
         _wizardEl = wrap;
         _bindWizardEvents();
@@ -997,11 +1185,11 @@
     function _buildStep1Html() {
         return (
             '<div class="mrerp-wizard-step is-active" data-mw-step="1">' +
-              '<h3 class="mrerp-wizard-step-h" data-mw-step1-h></h3>' +
-              '<p class="mrerp-wizard-hint" data-mw-step1-hint></p>' +
-              '<div class="mrerp-wizard-checkboxes" data-mw-clients>' +
-                '<div class="mrerp-card-empty">—</div>' +
-              '</div>' +
+            '<h3 class="mrerp-wizard-step-h" data-mw-step1-h></h3>' +
+            '<p class="mrerp-wizard-hint" data-mw-step1-hint></p>' +
+            '<div class="mrerp-wizard-checkboxes" data-mw-clients>' +
+            '<div class="mrerp-card-empty">—</div>' +
+            '</div>' +
             '</div>'
         );
     }
@@ -1009,25 +1197,25 @@
     function _buildStep2Html() {
         return (
             '<div class="mrerp-wizard-step" data-mw-step="2">' +
-              '<h3 class="mrerp-wizard-step-h" data-mw-step2-h></h3>' +
-              '<div class="mrerp-wizard-field">' +
-                '<label class="mrerp-wizard-label" data-mw-user-label></label>' +
-                '<input type="text" class="mrerp-wizard-input" data-mw-user autocomplete="username">' +
-              '</div>' +
-              '<div class="mrerp-wizard-field">' +
-                '<label class="mrerp-wizard-label" data-mw-pass-label></label>' +
-                '<input type="password" class="mrerp-wizard-input" data-mw-pass autocomplete="new-password">' +
-                '<div class="mrerp-wizard-hint" data-mw-pwd-hint></div>' +
-              '</div>' +
-              '<div class="mrerp-wizard-test-row">' +
-                '<button class="btn btn-ghost btn-tiny" type="button" data-mw-test></button>' +
-                '<span class="mrerp-wizard-test-status" data-mw-test-status></span>' +
-              '</div>' +
-              '<div class="mrerp-wizard-test-error" data-mw-test-error style="display:none;">' +
-                '<div data-mw-test-error-friendly></div>' +
-                '<div class="mrerp-wizard-test-error-screenshot" data-mw-test-error-screenshot style="display:none;"></div>' +
-                '<div class="mrerp-wizard-test-error-raw" data-mw-test-error-raw></div>' +
-              '</div>' +
+            '<h3 class="mrerp-wizard-step-h" data-mw-step2-h></h3>' +
+            '<div class="mrerp-wizard-field">' +
+            '<label class="mrerp-wizard-label" data-mw-user-label></label>' +
+            '<input type="text" class="mrerp-wizard-input" data-mw-user autocomplete="username">' +
+            '</div>' +
+            '<div class="mrerp-wizard-field">' +
+            '<label class="mrerp-wizard-label" data-mw-pass-label></label>' +
+            '<input type="password" class="mrerp-wizard-input" data-mw-pass autocomplete="new-password">' +
+            '<div class="mrerp-wizard-hint" data-mw-pwd-hint></div>' +
+            '</div>' +
+            '<div class="mrerp-wizard-test-row">' +
+            '<button class="btn btn-ghost btn-tiny" type="button" data-mw-test></button>' +
+            '<span class="mrerp-wizard-test-status" data-mw-test-status></span>' +
+            '</div>' +
+            '<div class="mrerp-wizard-test-error" data-mw-test-error style="display:none;">' +
+            '<div data-mw-test-error-friendly></div>' +
+            '<div class="mrerp-wizard-test-error-screenshot" data-mw-test-error-screenshot style="display:none;"></div>' +
+            '<div class="mrerp-wizard-test-error-raw" data-mw-test-error-raw></div>' +
+            '</div>' +
             '</div>'
         );
     }
@@ -1040,42 +1228,42 @@
         // (no id yet) or when the fetch fails.
         return (
             '<div class="mrerp-wizard-step" data-mw-step="3">' +
-              '<h3 class="mrerp-wizard-step-h" data-mw-step3-h></h3>' +
-              '<div class="mrerp-wizard-field">' +
-                '<label class="mrerp-wizard-label" data-mw-company-label></label>' +
-                '<select class="mrerp-wizard-select" data-mw-company></select>' +
-              '</div>' +
-              '<div class="mrerp-wizard-field">' +
-                '<label class="mrerp-wizard-label" data-mw-mode-label></label>' +
-                '<div class="mrerp-wizard-radio-group">' +
-                  '<label class="mrerp-wizard-radio-row">' +
-                    '<input type="radio" name="mrerp-mode" value="auto" checked>' +
-                    '<span data-mw-mode-auto></span>' +
-                  '</label>' +
-                  '<label class="mrerp-wizard-radio-row">' +
-                    '<input type="radio" name="mrerp-mode" value="manual">' +
-                    '<span data-mw-mode-manual></span>' +
-                  '</label>' +
-                '</div>' +
-              '</div>' +
-              '<div class="mrerp-wizard-field">' +
-                '<label class="mrerp-wizard-label" data-mw-seed-label></label>' +
-                '<select class="mrerp-wizard-select" data-mw-seed style="display:none;">' +
-                  '<option value="" data-mw-seed-empty></option>' +
-                '</select>' +
-                '<input type="text" class="mrerp-wizard-input" data-mw-seed-input style="display:none;" autocomplete="off">' +
-                '<div class="mrerp-wizard-hint" data-mw-seed-hint></div>' +
-                '<div class="mrerp-wizard-hint" data-mw-seed-fallback-hint style="display:none;color:#8a5a00;"></div>' +
-              '</div>' +
-              '<div class="mrerp-wizard-field">' +
-                '<label class="mrerp-wizard-label" data-mw-seedp-label></label>' +
-                '<select class="mrerp-wizard-select" data-mw-seedp style="display:none;">' +
-                  '<option value="" data-mw-seedp-empty></option>' +
-                '</select>' +
-                '<input type="text" class="mrerp-wizard-input" data-mw-seedp-input style="display:none;" autocomplete="off">' +
-                '<div class="mrerp-wizard-hint" data-mw-seedp-hint></div>' +
-                '<div class="mrerp-wizard-hint" data-mw-seedp-fallback-hint style="display:none;color:#8a5a00;"></div>' +
-              '</div>' +
+            '<h3 class="mrerp-wizard-step-h" data-mw-step3-h></h3>' +
+            '<div class="mrerp-wizard-field">' +
+            '<label class="mrerp-wizard-label" data-mw-company-label></label>' +
+            '<select class="mrerp-wizard-select" data-mw-company></select>' +
+            '</div>' +
+            '<div class="mrerp-wizard-field">' +
+            '<label class="mrerp-wizard-label" data-mw-mode-label></label>' +
+            '<div class="mrerp-wizard-radio-group">' +
+            '<label class="mrerp-wizard-radio-row">' +
+            '<input type="radio" name="mrerp-mode" value="auto" checked>' +
+            '<span data-mw-mode-auto></span>' +
+            '</label>' +
+            '<label class="mrerp-wizard-radio-row">' +
+            '<input type="radio" name="mrerp-mode" value="manual">' +
+            '<span data-mw-mode-manual></span>' +
+            '</label>' +
+            '</div>' +
+            '</div>' +
+            '<div class="mrerp-wizard-field">' +
+            '<label class="mrerp-wizard-label" data-mw-seed-label></label>' +
+            '<select class="mrerp-wizard-select" data-mw-seed style="display:none;">' +
+            '<option value="" data-mw-seed-empty></option>' +
+            '</select>' +
+            '<input type="text" class="mrerp-wizard-input" data-mw-seed-input style="display:none;" autocomplete="off">' +
+            '<div class="mrerp-wizard-hint" data-mw-seed-hint></div>' +
+            '<div class="mrerp-wizard-hint" data-mw-seed-fallback-hint style="display:none;color:#8a5a00;"></div>' +
+            '</div>' +
+            '<div class="mrerp-wizard-field">' +
+            '<label class="mrerp-wizard-label" data-mw-seedp-label></label>' +
+            '<select class="mrerp-wizard-select" data-mw-seedp style="display:none;">' +
+            '<option value="" data-mw-seedp-empty></option>' +
+            '</select>' +
+            '<input type="text" class="mrerp-wizard-input" data-mw-seedp-input style="display:none;" autocomplete="off">' +
+            '<div class="mrerp-wizard-hint" data-mw-seedp-hint></div>' +
+            '<div class="mrerp-wizard-hint" data-mw-seedp-fallback-hint style="display:none;color:#8a5a00;"></div>' +
+            '</div>' +
             '</div>'
         );
     }
@@ -1126,8 +1314,7 @@
         const seedSelEl = w.querySelector('[data-mw-seed]');
         if (seedSelEl) {
             seedSelEl.innerHTML =
-                '<option value="" data-mw-seed-empty>' +
-                _esc(t('wiz-seed-empty')) + '</option>';
+                '<option value="" data-mw-seed-empty>' + _esc(t('wiz-seed-empty')) + '</option>';
         }
         const seedInput = w.querySelector('[data-mw-seed-input]');
         if (seedInput) seedInput.placeholder = t('wiz-seed-input-placeholder');
@@ -1141,8 +1328,7 @@
         const spSelEl = w.querySelector('[data-mw-seedp]');
         if (spSelEl) {
             spSelEl.innerHTML =
-                '<option value="" data-mw-seedp-empty>' +
-                _esc(t('wiz-seedp-empty')) + '</option>';
+                '<option value="" data-mw-seedp-empty>' + _esc(t('wiz-seedp-empty')) + '</option>';
         }
         const spInput = w.querySelector('[data-mw-seedp-input]');
         if (spInput) spInput.placeholder = t('wiz-seedp-input-placeholder');
@@ -1163,12 +1349,13 @@
     async function _fetchSeedCustomers(endpointId) {
         if (!endpointId) return null;
         const ctrl = new AbortController();
-        const tid = setTimeout(function () { ctrl.abort(); }, 60_000);
+        const tid = setTimeout(function () {
+            ctrl.abort();
+        }, 60_000);
         try {
             const r = await fetch(
-                '/api/erp/endpoints/' + encodeURIComponent(endpointId)
-                + '/customers',
-                { headers: _authHeaders(), signal: ctrl.signal },
+                '/api/erp/endpoints/' + encodeURIComponent(endpointId) + '/customers',
+                { headers: _authHeaders(), signal: ctrl.signal }
             );
             if (!r.ok) return null;
             const data = await r.json();
@@ -1192,13 +1379,11 @@
         inputEl.style.display = 'none';
         fbHintEl.style.display = 'none';
 
-        const endpointId = _wizardState && _wizardState.endpoint
-            ? _wizardState.endpoint.id : null;
+        const endpointId = _wizardState && _wizardState.endpoint ? _wizardState.endpoint.id : null;
 
         // Stage 1: loading
         if (endpointId) {
-            selectEl.innerHTML =
-                '<option value="">' + _esc(t('wiz-seed-loading')) + '</option>';
+            selectEl.innerHTML = '<option value="">' + _esc(t('wiz-seed-loading')) + '</option>';
             selectEl.style.display = '';
             selectEl.disabled = true;
         } else {
@@ -1229,32 +1414,34 @@
 
         // Populate the dropdown.
         const opts = ['<option value="">' + _esc(t('wiz-seed-empty')) + '</option>'];
-        const inList = !!(currentSeedCode && customers.some(function (c) {
-            return c.code === currentSeedCode;
-        }));
+        const inList = !!(
+            currentSeedCode &&
+            customers.some(function (c) {
+                return c.code === currentSeedCode;
+            })
+        );
         // Bug 2 (Zihao 2026-05-19 拍板 · v118.34.22) · 已保存的 seed_customer_code
         // 不在当前 listing 时(可能在分页 page 2+)· 插一个合成 option 在顶部
         // 标记 "(已保存 · 未在当前列表)"· 用户能看出来 endpoint 配置里就是这个 ·
         // 不会被 fallback 到 listing[0] 误以为换了.
         if (currentSeedCode && !inList) {
             opts.push(
-                '<option value="' + _esc(currentSeedCode) + '">' +
-                _esc(currentSeedCode + ' · ' + t('wiz-seed-saved-not-in-list')) + '</option>'
+                '<option value="' +
+                    _esc(currentSeedCode) +
+                    '">' +
+                    _esc(currentSeedCode + ' · ' + t('wiz-seed-saved-not-in-list')) +
+                    '</option>'
             );
         }
         customers.forEach(function (c) {
-            const label = (c.prefix ? c.prefix + ' ' : '')
-                + (c.name || '') + ' (' + c.code + ')';
-            opts.push(
-                '<option value="' + _esc(c.code) + '">' +
-                _esc(label) + '</option>'
-            );
+            const label = (c.prefix ? c.prefix + ' ' : '') + (c.name || '') + ' (' + c.code + ')';
+            opts.push('<option value="' + _esc(c.code) + '">' + _esc(label) + '</option>');
         });
         selectEl.innerHTML = opts.join('');
         if (currentSeedCode) {
-            selectEl.value = currentSeedCode;   // 总是显式 select 已保存的
+            selectEl.value = currentSeedCode; // 总是显式 select 已保存的
         } else {
-            selectEl.value = '';   // 没设 · 留 placeholder 选中
+            selectEl.value = ''; // 没设 · 留 placeholder 选中
         }
         // 问题 B (Zihao 2026-05-19 拍板 · v118.34.25) · success path 显式 hide
         // input + fallback hint · 防 race / 上次 fallback 状态残留 → 下拉跟 hint
@@ -1281,19 +1468,23 @@
     async function _fetchSeedProducts(endpointId) {
         if (!endpointId) return null;
         const ctrl = new AbortController();
-        const tid = setTimeout(function () { ctrl.abort(); }, 60_000);
+        const tid = setTimeout(function () {
+            ctrl.abort();
+        }, 60_000);
         try {
             const r = await fetch(
-                '/api/erp/endpoints/' + encodeURIComponent(endpointId)
-                + '/products',
-                { headers: _authHeaders(), signal: ctrl.signal },
+                '/api/erp/endpoints/' + encodeURIComponent(endpointId) + '/products',
+                { headers: _authHeaders(), signal: ctrl.signal }
             );
             if (!r.ok) return null;
             const data = await r.json();
             if (!data || !data.ok) return null;
             return Array.isArray(data.products) ? data.products : [];
-        } catch (e) { return null; }
-        finally { clearTimeout(tid); }
+        } catch (e) {
+            return null;
+        } finally {
+            clearTimeout(tid);
+        }
     }
 
     async function _populateSeedProductSelector(currentSeedCode) {
@@ -1307,11 +1498,9 @@
         inputEl.style.display = 'none';
         fbHintEl.style.display = 'none';
 
-        const endpointId = _wizardState && _wizardState.endpoint
-            ? _wizardState.endpoint.id : null;
+        const endpointId = _wizardState && _wizardState.endpoint ? _wizardState.endpoint.id : null;
         if (endpointId) {
-            selectEl.innerHTML =
-                '<option value="">' + _esc(t('wiz-seedp-loading')) + '</option>';
+            selectEl.innerHTML = '<option value="">' + _esc(t('wiz-seedp-loading')) + '</option>';
             selectEl.style.display = '';
             selectEl.disabled = true;
         } else {
@@ -1326,7 +1515,7 @@
             selectEl.style.display = 'none';
             inputEl.style.display = '';
             inputEl.value = currentSeedCode || '';
-            inputEl.classList.add('mrerp-seed-input-saved');   // 橙色边框 · 提示用户这是 fallback
+            inputEl.classList.add('mrerp-seed-input-saved'); // 橙色边框 · 提示用户这是 fallback
             // v118.34.32 (Zihao 2026-05-19 拍板) · fb hint 文案 dynamic ·
             // 把 currentSeedCode 嵌入 · 让用户看出来是 "上次保存的值 · 可改"
             if (currentSeedCode) {
@@ -1340,22 +1529,25 @@
         // success path · clean input visual state
         inputEl.classList.remove('mrerp-seed-input-saved');
         const opts = ['<option value="">' + _esc(t('wiz-seedp-empty')) + '</option>'];
-        const inList = !!(currentSeedCode && products.some(function (p) {
-            return p.code === currentSeedCode;
-        }));
+        const inList = !!(
+            currentSeedCode &&
+            products.some(function (p) {
+                return p.code === currentSeedCode;
+            })
+        );
         // Bug 2 (v118.34.22) · 已保存 seed_product_code 不在 listing 时合成 option
         if (currentSeedCode && !inList) {
             opts.push(
-                '<option value="' + _esc(currentSeedCode) + '">' +
-                _esc(currentSeedCode + ' · ' + t('wiz-seed-saved-not-in-list')) + '</option>'
+                '<option value="' +
+                    _esc(currentSeedCode) +
+                    '">' +
+                    _esc(currentSeedCode + ' · ' + t('wiz-seed-saved-not-in-list')) +
+                    '</option>'
             );
         }
         products.forEach(function (p) {
             const label = (p.name || '') + ' (' + p.code + ')';
-            opts.push(
-                '<option value="' + _esc(p.code) + '">' +
-                _esc(label) + '</option>'
-            );
+            opts.push('<option value="' + _esc(p.code) + '">' + _esc(label) + '</option>');
         });
         selectEl.innerHTML = opts.join('');
         if (currentSeedCode) {
@@ -1394,7 +1586,7 @@
             else if (dn === n) el.classList.add('is-active');
         });
         w.querySelector('[data-mw-prev]').style.display = n > 1 ? '' : 'none';
-        w.querySelector('[data-mw-next]').textContent = (n === 3) ? t('btn-finish') : t('btn-next');
+        w.querySelector('[data-mw-next]').textContent = n === 3 ? t('btn-finish') : t('btn-next');
     }
 
     function _closeWizard() {
@@ -1409,7 +1601,7 @@
         _wizardState = {
             step: 1,
             endpoint: endpoint || null,
-            client_ids: ((endpoint && endpoint.config && endpoint.config.client_ids) || []),
+            client_ids: (endpoint && endpoint.config && endpoint.config.client_ids) || [],
             companies: [],
         };
         // Reset inputs
@@ -1433,16 +1625,24 @@
                 if (items.length === 0) {
                     clientsBox.innerHTML = '<div class="mrerp-card-empty">—</div>';
                 } else {
-                    clientsBox.innerHTML = items.map(function (c) {
-                        const id = String(c.id || c.client_id || '');
-                        const checked = preSelected.has(id) ? ' checked' : '';
-                        return (
-                            '<label class="mrerp-wizard-checkbox-row">' +
-                              '<input type="checkbox" data-mw-client value="' + _esc(id) + '"' + checked + '>' +
-                              '<span>' + _esc(c.name || c.client_name || ('#' + id)) + '</span>' +
-                            '</label>'
-                        );
-                    }).join('');
+                    clientsBox.innerHTML = items
+                        .map(function (c) {
+                            const id = String(c.id || c.client_id || '');
+                            const checked = preSelected.has(id) ? ' checked' : '';
+                            return (
+                                '<label class="mrerp-wizard-checkbox-row">' +
+                                '<input type="checkbox" data-mw-client value="' +
+                                _esc(id) +
+                                '"' +
+                                checked +
+                                '>' +
+                                '<span>' +
+                                _esc(c.name || c.client_name || '#' + id) +
+                                '</span>' +
+                                '</label>'
+                            );
+                        })
+                        .join('');
                 }
             } else {
                 clientsBox.innerHTML = '<div class="mrerp-card-empty">—</div>';
@@ -1464,8 +1664,11 @@
     async function _wizardNext() {
         if (_wizardState.step === 1) {
             // Collect selected clients
-            const ids = [].slice.call(_wizardEl.querySelectorAll('[data-mw-client]:checked'))
-                .map(function (cb) { return cb.value; });
+            const ids = [].slice
+                .call(_wizardEl.querySelectorAll('[data-mw-client]:checked'))
+                .map(function (cb) {
+                    return cb.value;
+                });
             // Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · 至少选 1 客户才能 Next ·
             // 否则保存的 endpoint 没绑任何客户 · 推送时 history.client_id 找不到
             // 关联 → ERR_NO_CLIENT 一连串失败。前端先拦住 · 配合后端 validator 双保险.
@@ -1475,7 +1678,9 @@
             }
             _wizardState.client_ids = ids;
             _gotoStep(2);
-            setTimeout(function () { _wizardEl.querySelector('[data-mw-user]').focus(); }, 30);
+            setTimeout(function () {
+                _wizardEl.querySelector('[data-mw-user]').focus();
+            }, 30);
             return;
         }
         if (_wizardState.step === 2) {
@@ -1483,10 +1688,19 @@
             const companies = _wizardState.companies || [];
             const sel = _wizardEl.querySelector('[data-mw-company]');
             sel.innerHTML = companies.length
-                ? companies.map(function (c) {
-                    return '<option value="' + _esc(c.comidyear) + ':' + _esc(c.seldb) +
-                        '">' + _esc(c.label) + '</option>';
-                  }).join('')
+                ? companies
+                      .map(function (c) {
+                          return (
+                              '<option value="' +
+                              _esc(c.comidyear) +
+                              ':' +
+                              _esc(c.seldb) +
+                              '">' +
+                              _esc(c.label) +
+                              '</option>'
+                          );
+                      })
+                      .join('')
                 : '<option value="6:1">' + _esc('TEST2019') + '</option>';
 
             _gotoStep(3);
@@ -1494,14 +1708,18 @@
             // /api/erp/endpoints/:id/customers when editing an
             // existing endpoint. Falls back to text input on new
             // wizard or fetch failure.
-            const currentSeed = (_wizardState.endpoint
-                && _wizardState.endpoint.config
-                && _wizardState.endpoint.config.seed_customer_code) || '';
+            const currentSeed =
+                (_wizardState.endpoint &&
+                    _wizardState.endpoint.config &&
+                    _wizardState.endpoint.config.seed_customer_code) ||
+                '';
             _populateSeedSelector(currentSeed);
             // Seed product dropdown (Task 2 Phase 5).
-            const currentSeedP = (_wizardState.endpoint
-                && _wizardState.endpoint.config
-                && _wizardState.endpoint.config.seed_product_code) || '';
+            const currentSeedP =
+                (_wizardState.endpoint &&
+                    _wizardState.endpoint.config &&
+                    _wizardState.endpoint.config.seed_product_code) ||
+                '';
             _populateSeedProductSelector(currentSeedP);
             return;
         }
@@ -1542,7 +1760,8 @@
                         // round-trip and shrinks the failure surface.
                         username: username,
                         password: password,
-                        comidyear: '6', seldb: '1',
+                        comidyear: '6',
+                        seldb: '1',
                     },
                 }),
             });
@@ -1550,7 +1769,11 @@
             try {
                 data = await r.json();
             } catch (_je) {
-                data = { ok: false, error_code: 'ERR_HTTP_' + r.status, raw_error: await r.text().catch(()=>'') };
+                data = {
+                    ok: false,
+                    error_code: 'ERR_HTTP_' + r.status,
+                    raw_error: await r.text().catch(() => ''),
+                };
             }
             if (!r.ok && !data) {
                 data = { ok: false, error_code: 'ERR_HTTP_' + r.status };
@@ -1560,23 +1783,29 @@
                 statusEl.textContent = t('wiz-test-ok', { n: (data.companies || []).length || 1 });
                 // 成功时清掉旧截图提示
                 const shotEl = w.querySelector('[data-mw-test-error-screenshot]');
-                if (shotEl) { shotEl.textContent = ''; shotEl.style.display = 'none'; }
+                if (shotEl) {
+                    shotEl.textContent = '';
+                    shotEl.style.display = 'none';
+                }
             } else {
                 // v118.34.1 (Zihao 2026-05-19 拍板) · 错误条不能空白。
                 // 优先级:friendly[lang] > friendly.en > raw_error >
                 // error_msg (legacy shape) > response_body (legacy stub) >
                 // error_code > generic fallback。至少一条文字一定要落出。
                 const f = data.error_friendly || {};
-                const friendly = f[_activeLang()] || f.en
-                    || data.raw_error
-                    || data.error_msg
-                    || data.response_body
-                    || data.error_code
-                    || ('HTTP ' + (r.status || 0) + ' · connection failed');
+                const friendly =
+                    f[_activeLang()] ||
+                    f.en ||
+                    data.raw_error ||
+                    data.error_msg ||
+                    data.response_body ||
+                    data.error_code ||
+                    'HTTP ' + (r.status || 0) + ' · connection failed';
                 statusEl.textContent = '✗';
                 errBox.style.display = '';
-                w.querySelector('[data-mw-test-error-friendly]').textContent =
-                    String(friendly).slice(0, 400);
+                w.querySelector('[data-mw-test-error-friendly]').textContent = String(
+                    friendly
+                ).slice(0, 400);
                 // P-4 (Zihao 2026-05-19 拍板 · v118.34.21) · login-form 失败后端把
                 // 截图路径塞进 raw_error 字串("...screenshot=/tmp/mrerp_login_fail_<ts>.png")
                 // 在 dense raw_error block 里被 hidden。这里把它正则抽出来 ·
@@ -1593,17 +1822,20 @@
                         shotEl.style.display = 'none';
                     }
                 }
-                w.querySelector('[data-mw-test-error-raw]').textContent =
-                    rawText.slice(0, 400);
+                w.querySelector('[data-mw-test-error-raw]').textContent = rawText.slice(0, 400);
             }
         } catch (e) {
             statusEl.textContent = '✗';
             errBox.style.display = '';
-            w.querySelector('[data-mw-test-error-friendly]').textContent =
-                String(e && e.message || e || 'connection failed').slice(0, 200);
+            w.querySelector('[data-mw-test-error-friendly]').textContent = String(
+                (e && e.message) || e || 'connection failed'
+            ).slice(0, 200);
             w.querySelector('[data-mw-test-error-raw]').textContent = '';
             const shotEl = w.querySelector('[data-mw-test-error-screenshot]');
-            if (shotEl) { shotEl.textContent = ''; shotEl.style.display = 'none'; }
+            if (shotEl) {
+                shotEl.textContent = '';
+                shotEl.style.display = 'none';
+            }
         }
     }
 

@@ -27,11 +27,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import mrerp_xlsx_generator   # noqa: E402
+import mrerp_xlsx_generator  # noqa: E402
 
-from services.erp.mrerp_adapter import MRERPAdapter   # noqa: E402
+from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
 
-from tests.integration._mrerp_common import (   # noqa: E402
+from tests.integration._mrerp_common import (  # noqa: E402
     SCREENSHOT_ROOT,
     make_test_history,
     make_test_invoice_no,
@@ -98,7 +98,7 @@ class AdapterWithSyncIntegrationTest(unittest.TestCase):
         # History has buyer_name but NO matching client mapping.
         history = make_test_history(self.invoice_no)
         history["buyer_name"] = "Skin Trading Co., Ltd."
-        history["buyer_tax"] = "0123456789012"   # OCR-style fake TIN
+        history["buyer_tax"] = "0123456789012"  # OCR-style fake TIN
 
         # Empty mappings — adapter must enrich via sync.
         mappings = {
@@ -112,7 +112,8 @@ class AdapterWithSyncIntegrationTest(unittest.TestCase):
 
         self.assertEqual(result.total, 1)
         self.assertEqual(
-            len(result.failed), 0,
+            len(result.failed),
+            0,
             f"unexpected failures: {[f.reasons for f in result.failed]}",
         )
         self.assertEqual(len(result.success), 1)
@@ -120,12 +121,10 @@ class AdapterWithSyncIntegrationTest(unittest.TestCase):
 
         # Sync should have written 0006 into the mappings dict.
         clients = mappings["clients"]
-        client_codes = [
-            m.get("erp_code") for m in clients
-            if m.get("erp_type") == "mrerp"
-        ]
+        client_codes = [m.get("erp_code") for m in clients if m.get("erp_type") == "mrerp"]
         self.assertIn(
-            "0006", client_codes,
+            "0006",
+            client_codes,
             f"sync did not enrich mappings; got {clients!r}",
         )
 

@@ -16,7 +16,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp._matching import (   # noqa: E402
+from services.erp._matching import (  # noqa: E402
     fuzzy_match,
     levenshtein,
     levenshtein_ratio,
@@ -55,7 +55,8 @@ class LevenshteinTests(unittest.TestCase):
     def test_ratio_one_typo_in_short(self):
         # 1 char off out of 6 → 1 - 1/6 = 0.833...
         self.assertAlmostEqual(
-            levenshtein_ratio("kitten", "sitten"), 1 - 1 / 6,
+            levenshtein_ratio("kitten", "sitten"),
+            1 - 1 / 6,
         )
 
     def test_ratio_both_empty(self):
@@ -123,12 +124,10 @@ class CompanyNormalizationTests(unittest.TestCase):
 class ItemNormalizationTests(unittest.TestCase):
 
     def test_basic(self):
-        self.assertEqual(normalize_item_name("Coca-Cola 330ml"),
-                         "coca cola 330ml")
+        self.assertEqual(normalize_item_name("Coca-Cola 330ml"), "coca cola 330ml")
 
     def test_punctuation_collapse(self):
-        self.assertEqual(normalize_item_name("Item / 1"),
-                         "item 1")
+        self.assertEqual(normalize_item_name("Item / 1"), "item 1")
 
     def test_handles_none(self):
         self.assertEqual(normalize_item_name(None), "")

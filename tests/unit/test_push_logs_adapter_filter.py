@@ -43,11 +43,20 @@ if "psycopg2" not in sys.modules:
     fake_pg.extras.execute_values = lambda *a, **k: None
     fake_pg.extras.Json = lambda x: x
     fake_pg.pool = types.ModuleType("psycopg2.pool")
+
     class _StubPool:
-        def __init__(self, *a, **k): pass
-        def getconn(self): raise RuntimeError("stub")
-        def putconn(self, *a, **k): pass
-        def closeall(self): pass
+        def __init__(self, *a, **k):
+            pass
+
+        def getconn(self):
+            raise RuntimeError("stub")
+
+        def putconn(self, *a, **k):
+            pass
+
+        def closeall(self):
+            pass
+
     fake_pg.pool.ThreadedConnectionPool = _StubPool
     fake_pg.pool.SimpleConnectionPool = _StubPool
     fake_pg.sql = types.ModuleType("psycopg2.sql")
@@ -109,8 +118,9 @@ class AdapterFilterShapeTests(unittest.TestCase):
         # 注意: 主查询 SELECT 里有 `e.adapter AS endpoint_adapter` · 是合法的 ·
         # 我们只检 WHERE 子句不该出现 adapter filter.
         for sql, _ in cur.executed:
-            self.assertNotIn("LOWER(e.adapter)", sql,
-                             "未指定 adapter_filter 时不该加 LOWER(e.adapter) 过滤")
+            self.assertNotIn(
+                "LOWER(e.adapter)", sql, "未指定 adapter_filter 时不该加 LOWER(e.adapter) 过滤"
+            )
         # 返回结构应 OK (空结果)
         self.assertEqual(r, {"items": [], "total": 0})
 
@@ -118,12 +128,14 @@ class AdapterFilterShapeTests(unittest.TestCase):
         cur, _ = self._run(adapter_filter="mrerp")
         # 每条 SQL 都该有 LOWER(e.adapter) = LOWER(%s) (COUNT + main 两条)
         for sql, params in cur.executed:
-            self.assertIn("LOWER(e.adapter)", sql,
-                          f"adapter filter 必须用 LOWER 大小写不敏感 SQL: {sql}")
+            self.assertIn(
+                "LOWER(e.adapter)", sql, f"adapter filter 必须用 LOWER 大小写不敏感 SQL: {sql}"
+            )
             self.assertIn("LOWER(%s)", sql)
             # params 应包含 "mrerp" 字符串
-            self.assertIn("mrerp", [str(p) for p in params],
-                          f"params 应包含 adapter 值 mrerp: {params}")
+            self.assertIn(
+                "mrerp", [str(p) for p in params], f"params 应包含 adapter 值 mrerp: {params}"
+            )
 
     def test_adapter_filter_case_insensitive_value(self):
         """前端可能传 "MR.ERP" 或 "MRERP" · 后端 LOWER 应都匹配."""
@@ -137,18 +149,25 @@ class AdapterFilterShapeTests(unittest.TestCase):
         """COUNT + main 都必须 LEFT JOIN erp_endpoints e · 否则 e.adapter 引用不到."""
         cur, _ = self._run(adapter_filter="xero")
         for sql, _ in cur.executed:
-            self.assertIn("LEFT JOIN erp_endpoints", sql,
-                          f"SQL 缺 LEFT JOIN erp_endpoints (e): {sql[:200]}")
+            self.assertIn(
+                "LEFT JOIN erp_endpoints", sql, f"SQL 缺 LEFT JOIN erp_endpoints (e): {sql[:200]}"
+            )
 
     def test_user_id_always_in_where(self):
         """无论 adapter_filter 给没给 · user_id 必须出现在 WHERE 防 cross-tenant."""
         for af in (None, "", "mrerp", "xero"):
             cur, _ = self._run(adapter_filter=af)
             for sql, params in cur.executed:
-                self.assertIn("user_id = %s", sql,
-                              f"user_id WHERE 必须存在 (adapter_filter={af!r}): {sql[:200]}")
-                self.assertIn("user-X", [str(p) for p in params],
-                              f"params 必须包含 user-X (adapter_filter={af!r})")
+                self.assertIn(
+                    "user_id = %s",
+                    sql,
+                    f"user_id WHERE 必须存在 (adapter_filter={af!r}): {sql[:200]}",
+                )
+                self.assertIn(
+                    "user-X",
+                    [str(p) for p in params],
+                    f"params 必须包含 user-X (adapter_filter={af!r})",
+                )
 
 
 class AdapterFilterCombinedWithStatusTests(unittest.TestCase):

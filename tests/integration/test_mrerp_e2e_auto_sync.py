@@ -50,13 +50,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import mrerp_xlsx_generator   # noqa: E402
+import mrerp_xlsx_generator  # noqa: E402
 
-from services.erp.mrerp_adapter import MRERPAdapter   # noqa: E402
-from services.erp.mrerp_customer_sync import MRERPCustomerSyncService   # noqa: E402
-from services.erp.mrerp_product_sync import MRERPProductSyncService   # noqa: E402
+from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
+from services.erp.mrerp_customer_sync import MRERPCustomerSyncService  # noqa: E402
+from services.erp.mrerp_product_sync import MRERPProductSyncService  # noqa: E402
 
-from tests.integration._mrerp_common import (   # noqa: E402
+from tests.integration._mrerp_common import (  # noqa: E402
     SCREENSHOT_ROOT,
     make_test_invoice_no,
     require_credentials,
@@ -127,8 +127,7 @@ class EndToEndAutoSyncTest(unittest.TestCase):
         try:
             if self._cleanup_invoice_db_id is not None:
                 ok = self.adapter.delete_invoice(self._cleanup_invoice_db_id)
-                logging.info("teardown delete invoice %s -> %s",
-                             self._cleanup_invoice_db_id, ok)
+                logging.info("teardown delete invoice %s -> %s", self._cleanup_invoice_db_id, ok)
             else:
                 # Mid-flight failure may have left an invoice row;
                 # try a search-and-delete rescue.
@@ -191,12 +190,14 @@ class EndToEndAutoSyncTest(unittest.TestCase):
             "subtotal": "100.00",
             "vat": "7.00",
             "total_amount": "107.00",
-            "items": [{
-                "name": item_name,
-                "qty": 1,
-                "unit_price": 100.00,
-                "amount": 100.00,
-            }],
+            "items": [
+                {
+                    "name": item_name,
+                    "qty": 1,
+                    "unit_price": 100.00,
+                    "amount": 100.00,
+                }
+            ],
         }
         # No pre-stitched mappings. Sync must populate both clients
         # and products in-place during preflight.
@@ -209,19 +210,22 @@ class EndToEndAutoSyncTest(unittest.TestCase):
 
         logging.info(
             "E2E starting · invoice=%s · buyer=%s · item=%s",
-            self.invoice_no, buyer_name, item_name,
+            self.invoice_no,
+            buyer_name,
+            item_name,
         )
         result = self.adapter.upload_invoice_batch([history], mappings)
 
         # 1. ImportResult shape
         self.assertEqual(
-            result.total, 1,
+            result.total,
+            1,
             f"unexpected total; result={result.to_dict()}",
         )
         self.assertEqual(
-            len(result.failed), 0,
-            f"unexpected failures: "
-            f"{[(f.invoice_no, f.reasons) for f in result.failed]}",
+            len(result.failed),
+            0,
+            f"unexpected failures: " f"{[(f.invoice_no, f.reasons) for f in result.failed]}",
         )
         self.assertEqual(len(result.success), 1)
         self.assertTrue(result.all_success)
@@ -230,19 +234,19 @@ class EndToEndAutoSyncTest(unittest.TestCase):
         #    preflight, and the new customer code follows the
         #    P{YYMM}XXXX namespace.
         client_entries = [
-            m for m in mappings["clients"]
-            if m.get("erp_type") == "mrerp"
-            and int(m.get("client_id", 0)) == history["client_id"]
+            m
+            for m in mappings["clients"]
+            if m.get("erp_type") == "mrerp" and int(m.get("client_id", 0)) == history["client_id"]
         ]
         self.assertEqual(
-            len(client_entries), 1,
+            len(client_entries),
+            1,
             f"customer mapping not enriched; clients={mappings['clients']}",
         )
         new_customer_code = client_entries[0]["erp_code"]
         self.assertTrue(
             new_customer_code.startswith("P"),
-            f"customer code didn't follow auto-create namespace: "
-            f"{new_customer_code!r}",
+            f"customer code didn't follow auto-create namespace: " f"{new_customer_code!r}",
         )
         self.assertLessEqual(len(new_customer_code), 20)
         self._cleanup_customer_codes.append(new_customer_code)
@@ -252,21 +256,22 @@ class EndToEndAutoSyncTest(unittest.TestCase):
         #    only) item's normalized name should now map to a new
         #    code.
         from services.erp._matching import normalize_item_name
+
         product_entries = [
-            m for m in mappings["products"]
+            m
+            for m in mappings["products"]
             if m.get("erp_type") == "mrerp"
-            and (m.get("item_name_norm") or "")
-            == normalize_item_name(item_name)
+            and (m.get("item_name_norm") or "") == normalize_item_name(item_name)
         ]
         self.assertEqual(
-            len(product_entries), 1,
+            len(product_entries),
+            1,
             f"product mapping not enriched; products={mappings['products']}",
         )
         new_product_code = product_entries[0]["erp_code"]
         self.assertTrue(
             new_product_code.startswith("P"),
-            f"product code didn't follow auto-create namespace: "
-            f"{new_product_code!r}",
+            f"product code didn't follow auto-create namespace: " f"{new_product_code!r}",
         )
         self.assertLessEqual(len(new_product_code), 20)
         self._cleanup_product_codes.append(new_product_code)
@@ -282,14 +287,15 @@ class EndToEndAutoSyncTest(unittest.TestCase):
         # 5. The invoice is actually queryable via listing — proves
         #    importpc=1 wasn't a phantom success.
         rec = self.adapter.search_invoice(self.invoice_no)
-        self.assertIsNotNone(rec,
-                             "invoice should appear in artran listing")
+        self.assertIsNotNone(rec, "invoice should appear in artran listing")
         self.assertEqual(rec.invoice_no, self.invoice_no)
         self._cleanup_invoice_db_id = rec.db_row_id
 
         logging.info(
             "E2E success · invoice db_row_id=%s · customer=%s · product=%s",
-            rec.db_row_id, new_customer_code, new_product_code,
+            rec.db_row_id,
+            new_customer_code,
+            new_product_code,
         )
 
 

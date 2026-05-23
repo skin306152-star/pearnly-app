@@ -28,7 +28,9 @@
 (function () {
     'use strict';
 
-    function _shared() { return window._mrerpConnectShared || null; }
+    function _shared() {
+        return window._mrerpConnectShared || null;
+    }
 
     // v118.34.4 · i18n for the strings this file owns. Reuses the
     // shared t() helper from erp-mrerp-connect.js when available, but
@@ -93,13 +95,55 @@
         // a tiny substring-match table here mirroring the Python catalog.
         const lang = sh._activeLang();
         const table = [
-            { match: 'ไม่พบข้อมูลรหัสลูกค้า (บิล)', en: 'Customer billing code not found in MR.ERP — create the customer first', zh: 'MR.ERP 主数据找不到客户账单码 · 需先创建客户', th: 'ไม่พบรหัสลูกค้า (บิล) ในระบบ — สร้างลูกค้าก่อน', zh_TW: 'MR.ERP 主資料找不到客戶帳單碼 · 需先建立客戶' },
-            { match: 'ไม่พบข้อมูลรหัสลูกค้า', en: 'Customer code not found in MR.ERP — create the customer first', zh: 'MR.ERP 主数据找不到客户码 · 需先创建客户', th: 'ไม่พบรหัสลูกค้าในระบบ — สร้างลูกค้าก่อน', zh_TW: 'MR.ERP 主資料找不到客戶碼 · 需先建立客戶' },
-            { match: 'ไม่พบข้อมูลรหัสสินค้า', en: 'Product code not found in MR.ERP — create the product first', zh: 'MR.ERP 主数据找不到商品码 · 需先创建商品', th: 'ไม่พบรหัสสินค้าในระบบ — สร้างสินค้าก่อน', zh_TW: 'MR.ERP 主資料找不到商品碼 · 需先建立商品' },
-            { match: 'ไม่พบข้อมูลพนักงานขาย', en: 'Salesman not found in MR.ERP master data', zh: 'MR.ERP 主数据找不到销售员', th: 'ไม่พบพนักงานขายในระบบ', zh_TW: 'MR.ERP 主資料找不到業務員' },
-            { match: 'เลขที่ดังกล่าวมีอยู่ในระบบแล้ว', en: 'This invoice number already exists in MR.ERP', zh: '该发票号已存在于 MR.ERP', th: 'เลขที่ใบกำกับมีอยู่ในระบบแล้ว', zh_TW: '該發票號已存在於 MR.ERP' },
-            { match: 'รหัสลูกค้าต้องไม่เกิน 20', en: 'Customer code exceeds the 20-character limit', zh: '客户码超过 20 字符限制', th: 'รหัสลูกค้ายาวเกิน 20 ตัวอักษร', zh_TW: '客戶碼超過 20 字元限制' },
-            { match: 'เลขที่ต้องไม่เกิน 18', en: 'Invoice number exceeds the 18-character limit', zh: '发票号超过 18 字符限制', th: 'เลขที่ใบกำกับยาวเกิน 18 ตัวอักษร', zh_TW: '發票號超過 18 字元限制' },
+            {
+                match: 'ไม่พบข้อมูลรหัสลูกค้า (บิล)',
+                en: 'Customer billing code not found in MR.ERP — create the customer first',
+                zh: 'MR.ERP 主数据找不到客户账单码 · 需先创建客户',
+                th: 'ไม่พบรหัสลูกค้า (บิล) ในระบบ — สร้างลูกค้าก่อน',
+                zh_TW: 'MR.ERP 主資料找不到客戶帳單碼 · 需先建立客戶',
+            },
+            {
+                match: 'ไม่พบข้อมูลรหัสลูกค้า',
+                en: 'Customer code not found in MR.ERP — create the customer first',
+                zh: 'MR.ERP 主数据找不到客户码 · 需先创建客户',
+                th: 'ไม่พบรหัสลูกค้าในระบบ — สร้างลูกค้าก่อน',
+                zh_TW: 'MR.ERP 主資料找不到客戶碼 · 需先建立客戶',
+            },
+            {
+                match: 'ไม่พบข้อมูลรหัสสินค้า',
+                en: 'Product code not found in MR.ERP — create the product first',
+                zh: 'MR.ERP 主数据找不到商品码 · 需先创建商品',
+                th: 'ไม่พบรหัสสินค้าในระบบ — สร้างสินค้าก่อน',
+                zh_TW: 'MR.ERP 主資料找不到商品碼 · 需先建立商品',
+            },
+            {
+                match: 'ไม่พบข้อมูลพนักงานขาย',
+                en: 'Salesman not found in MR.ERP master data',
+                zh: 'MR.ERP 主数据找不到销售员',
+                th: 'ไม่พบพนักงานขายในระบบ',
+                zh_TW: 'MR.ERP 主資料找不到業務員',
+            },
+            {
+                match: 'เลขที่ดังกล่าวมีอยู่ในระบบแล้ว',
+                en: 'This invoice number already exists in MR.ERP',
+                zh: '该发票号已存在于 MR.ERP',
+                th: 'เลขที่ใบกำกับมีอยู่ในระบบแล้ว',
+                zh_TW: '該發票號已存在於 MR.ERP',
+            },
+            {
+                match: 'รหัสลูกค้าต้องไม่เกิน 20',
+                en: 'Customer code exceeds the 20-character limit',
+                zh: '客户码超过 20 字符限制',
+                th: 'รหัสลูกค้ายาวเกิน 20 ตัวอักษร',
+                zh_TW: '客戶碼超過 20 字元限制',
+            },
+            {
+                match: 'เลขที่ต้องไม่เกิน 18',
+                en: 'Invoice number exceeds the 18-character limit',
+                zh: '发票号超过 18 字符限制',
+                th: 'เลขที่ใบกำกับยาวเกิน 18 ตัวอักษร',
+                zh_TW: '發票號超過 18 字元限制',
+            },
         ];
         for (const row of table) {
             if (raw.indexOf(row.match) >= 0) {
@@ -147,7 +191,9 @@
     function _scan() {
         const list = document.getElementById('erp-logs-list');
         if (!list) return;
-        list.querySelectorAll('.erp-log-row, .log-row, [data-log-id], [data-erp-log-row]').forEach(_enhanceRow);
+        list.querySelectorAll('.erp-log-row, .log-row, [data-log-id], [data-erp-log-row]').forEach(
+            _enhanceRow
+        );
     }
 
     function _observe() {

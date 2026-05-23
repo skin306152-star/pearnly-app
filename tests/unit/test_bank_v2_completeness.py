@@ -13,6 +13,7 @@ v118.35.0.63 · 守门测试 · 完整性交叉校验(_audit_completeness)· 主
   4. opening+Σ存−Σ取 ≠ closing → closing_mismatch
   5. 没有印刷汇总 + 期末也没给 → 不误报(ok=True)
 """
+
 import unittest
 
 from bank_recon_v2 import StatementRow, _audit_completeness
@@ -25,28 +26,33 @@ def _r(dep=0.0, wd=0.0, bal=0.0):
 class CompletenessTests(unittest.TestCase):
 
     def test_all_consistent_ok(self):
-        rows = [_r(dep=2000, bal=4786), _r(dep=2000, bal=6786),
-                _r(dep=2000, bal=8786), _r(dep=2000, bal=10786)]
-        printed = {"total_credit": 8000, "total_debit": 0,
-                   "credit_count": 4, "debit_count": 0}
+        rows = [
+            _r(dep=2000, bal=4786),
+            _r(dep=2000, bal=6786),
+            _r(dep=2000, bal=8786),
+            _r(dep=2000, bal=10786),
+        ]
+        printed = {"total_credit": 8000, "total_debit": 0, "credit_count": 4, "debit_count": 0}
         res = _audit_completeness(rows, opening=2786, closing=10786, printed=printed)
         self.assertTrue(res["ok"], res["issues"])
 
     def test_credit_count_mismatch_detects_missed_row(self):
         # 账单印 4 笔存款 · 只识别 3 笔 → 漏了一笔
         rows = [_r(dep=2000, bal=4786), _r(dep=2000, bal=6786), _r(dep=2000, bal=8786)]
-        printed = {"total_credit": 8000, "credit_count": 4,
-                   "total_debit": 0, "debit_count": 0}
+        printed = {"total_credit": 8000, "credit_count": 4, "total_debit": 0, "debit_count": 0}
         res = _audit_completeness(rows, opening=2786, closing=10786, printed=printed)
         self.assertFalse(res["ok"])
         types = {i["type"] for i in res["issues"]}
         self.assertIn("credit_count_mismatch", types)
 
     def test_sum_mismatch_detects_misread(self):
-        rows = [_r(dep=2000, bal=4786), _r(dep=1800, bal=6586),  # 第二笔读成1800
-                _r(dep=2000, bal=8586), _r(dep=2000, bal=10586)]
-        printed = {"total_credit": 8000, "credit_count": 4,
-                   "total_debit": 0, "debit_count": 0}
+        rows = [
+            _r(dep=2000, bal=4786),
+            _r(dep=1800, bal=6586),  # 第二笔读成1800
+            _r(dep=2000, bal=8586),
+            _r(dep=2000, bal=10586),
+        ]
+        printed = {"total_credit": 8000, "credit_count": 4, "total_debit": 0, "debit_count": 0}
         res = _audit_completeness(rows, opening=2786, closing=10786, printed=printed)
         self.assertFalse(res["ok"])
         types = {i["type"] for i in res["issues"]}
@@ -68,8 +74,12 @@ class CompletenessTests(unittest.TestCase):
         # 真实案例 BAY:Gemini 把 closing(919384.8)同时填进 total_credit + total_debit
         # → sum 校验不可信必须跳过;但 count(314 vs 179)是真信号必须保留
         rows = [_r(dep=100, bal=100) for _ in range(179)]
-        printed = {"total_credit": 919384.8, "total_debit": 919384.8,
-                   "credit_count": 314, "debit_count": 31}
+        printed = {
+            "total_credit": 919384.8,
+            "total_debit": 919384.8,
+            "credit_count": 314,
+            "debit_count": 31,
+        }
         res = _audit_completeness(rows, opening=500, closing=919384.8, printed=printed)
         types = {i["type"] for i in res["issues"]}
         self.assertNotIn("credit_sum_mismatch", types)

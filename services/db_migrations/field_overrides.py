@@ -16,6 +16,7 @@ Schema:`field_overrides JSONB`
 docs/audits/2026-05-22-ocr-recon-audit.md §5 Phase 1 P1.1
 docs/architecture/db-migration-plan.md §0 双跑灰度策略
 """
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,7 @@ def ensure_field_overrides_columns() -> None:
     for table in TARGET_TABLES:
         try:
             with _db.get_cursor(commit=True) as cur:
-                cur.execute(
-                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS field_overrides JSONB"
-                )
+                cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS field_overrides JSONB")
             logger.info(f"✅ {table}.field_overrides JSONB 已就绪 (P1.1 v118.35.0.41)")
         except Exception as e:
             logger.warning(

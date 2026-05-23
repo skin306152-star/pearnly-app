@@ -30,37 +30,37 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+
 load_dotenv(PROJECT_ROOT / ".env.local")
 
 from playwright.sync_api import sync_playwright, Page, TimeoutError as PWTimeout
-
 
 # ============================================================
 # 配置
 # ============================================================
 LOGIN_URL = (os.environ.get("MRERP_LOGIN_URL") or "").rstrip("/")
-USERNAME  = os.environ.get("MRERP_USERNAME") or ""
-PASSWORD  = os.environ.get("MRERP_PASSWORD") or ""
+USERNAME = os.environ.get("MRERP_USERNAME") or ""
+PASSWORD = os.environ.get("MRERP_PASSWORD") or ""
 COMIDYEAR = os.environ.get("MRERP_COMIDYEAR") or "6"
-SELDB     = os.environ.get("MRERP_SELDB") or "1"
-IDMENU_SC  = os.environ.get("MRERP_IDMENU_SALES_CREDIT") or "370"
+SELDB = os.environ.get("MRERP_SELDB") or "1"
+IDMENU_SC = os.environ.get("MRERP_IDMENU_SALES_CREDIT") or "370"
 SELMENU_SC = os.environ.get("MRERP_SELMENU_SALES_CREDIT") or "118"
 
 HEADED = (os.environ.get("MRERP_HEADED") or "1") != "0"
 VIEWPORT = {"width": 1440, "height": 900}
 
-DOCS_DIR        = PROJECT_ROOT / "docs" / "integrations"
+DOCS_DIR = PROJECT_ROOT / "docs" / "integrations"
 SCREENSHOTS_DIR = DOCS_DIR / "screenshots"
-TEMPLATES_DIR   = DOCS_DIR / "templates"
+TEMPLATES_DIR = DOCS_DIR / "templates"
 SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
-TEST_INVOICE_NO     = "PEARNLY-TEST-001"
+TEST_INVOICE_NO = "PEARNLY-TEST-001"
 # 2026-05-18 Zihao 手动建客户 "0006" / Skin Trading Co., Ltd.
 # 客户码格式不是三段式 · 是公司自定义 4 位数字(见 known-facts §1 修订)
-TEST_CUSTOMER_CODE  = "0006"
-TEST_CUSTOMER_NAME  = "Skin Trading Co., Ltd."
-TEST_RUN_ID         = datetime.now().strftime("%Y%m%d-%H%M%S")
+TEST_CUSTOMER_CODE = "0006"
+TEST_CUSTOMER_NAME = "Skin Trading Co., Ltd."
+TEST_RUN_ID = datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
 # ============================================================
@@ -80,9 +80,9 @@ class CredStripFilter(logging.Filter):
         return True
 
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s [%(levelname)s] %(message)s",
-                    datefmt="%H:%M:%S")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"
+)
 log = logging.getLogger("probe-mrerp")
 log.addFilter(CredStripFilter())
 
@@ -93,10 +93,10 @@ log.addFilter(CredStripFilter())
 class ProbeState:
     def __init__(self):
         self.step = 0
-        self.shots: List[Tuple[str, str]] = []   # [(filename, scenario)]
+        self.shots: List[Tuple[str, str]] = []  # [(filename, scenario)]
         self.findings: Dict[str, Any] = {}
         self.errors: List[str] = []
-        self.dialogs: List[str] = []   # JS alert/confirm 消息(实测发现 frmupload 用 alert 报错)
+        self.dialogs: List[str] = []  # JS alert/confirm 消息(实测发现 frmupload 用 alert 报错)
 
     def shot(self, page: Page, name: str, scenario: str = ""):
         self.step += 1
@@ -141,8 +141,9 @@ STATE = ProbeState()
 # ============================================================
 def step_01_landing(page: Page):
     log.info(f"→ STEP 01 · 预热 GET {LOGIN_URL}")
-    page.goto(LOGIN_URL or "https://www.mrerp4sme.com/",
-              wait_until="domcontentloaded", timeout=30000)
+    page.goto(
+        LOGIN_URL or "https://www.mrerp4sme.com/", wait_until="domcontentloaded", timeout=30000
+    )
     try:
         page.wait_for_load_state("networkidle", timeout=8000)
     except PWTimeout:
@@ -165,12 +166,10 @@ def step_01_landing(page: Page):
             STATE.findings["login_nav_method"] = "click 'เข้าสู่ระบบ' link"
         except Exception as e:
             log.warning(f"  click 失败 ({e}) · fallback nav")
-            page.goto(f"{LOGIN_URL}/login/login.php",
-                      wait_until="networkidle", timeout=15000)
+            page.goto(f"{LOGIN_URL}/login/login.php", wait_until="networkidle", timeout=15000)
             STATE.findings["login_nav_method"] = "direct nav (fallback)"
     else:
-        page.goto(f"{LOGIN_URL}/login/login.php",
-                  wait_until="networkidle", timeout=15000)
+        page.goto(f"{LOGIN_URL}/login/login.php", wait_until="networkidle", timeout=15000)
         STATE.findings["login_nav_method"] = "direct nav (no link)"
 
     STATE.shot(page, "login-page", f"URL={page.url}")
@@ -192,10 +191,12 @@ def step_02_login(page: Page):
     STATE.shot(page, "login-filled", "登录表单已填(凭据已遮)")
 
     # 提交按钮 · 多 selector 兜底
-    submit_sels = ['input[name="btnsubmit"]',
-                   'input[type="submit"]',
-                   'button[type="submit"]',
-                   'button:has-text("Submit")']
+    submit_sels = [
+        'input[name="btnsubmit"]',
+        'input[type="submit"]',
+        'button[type="submit"]',
+        'button:has-text("Submit")',
+    ]
     clicked = False
     for sel in submit_sels:
         btn = page.locator(sel)
@@ -246,8 +247,7 @@ def step_02_login(page: Page):
         raise RuntimeError(f"login failed · 仍在公共区 · URL={page.url}")
 
     # 验证:试访问 selectdb.php · 看是否被踢回 login(double check)
-    page.goto(f"{LOGIN_URL}/login/selectdb.php",
-              wait_until="networkidle", timeout=10000)
+    page.goto(f"{LOGIN_URL}/login/selectdb.php", wait_until="networkidle", timeout=10000)
     if "login.php" in page.url.lower() and "selectdb" not in page.url.lower():
         STATE.shot(page, "login-failed-bounce", f"访 selectdb 被踢 → {page.url}")
         raise RuntimeError(f"login failed (selectdb bounce) · URL={page.url}")
@@ -355,12 +355,14 @@ def step_05_inspect_form(page: Page):
     except Exception as e:
         log.warning(f"  dump HTML 失败: {e}")
 
-    STATE.findings.update({
-        "idus": idus_val,
-        "has_file_input": has_file_input,
-        "template_link": template_link,
-        "form_html_dump": str(html_path),
-    })
+    STATE.findings.update(
+        {
+            "idus": idus_val,
+            "has_file_input": has_file_input,
+            "template_link": template_link,
+            "form_html_dump": str(html_path),
+        }
+    )
     STATE.shot(page, "form-inspected", f"idus={idus_val} file_in={has_file_input}")
 
 
@@ -372,7 +374,7 @@ def build_test_xlsx() -> Tuple[bytes, str]:
     import mrerp_xlsx_generator as gen
 
     original_derive = gen.derive_mrerp_invoice_no
-    gen.derive_mrerp_invoice_no = lambda h: TEST_INVOICE_NO   # type: ignore
+    gen.derive_mrerp_invoice_no = lambda h: TEST_INVOICE_NO  # type: ignore
 
     try:
         test_history = {
@@ -382,19 +384,23 @@ def build_test_xlsx() -> Tuple[bytes, str]:
             "subtotal": "100.00",
             "vat": "7.00",
             "total_amount": "107.00",
-            "items": [{
-                "name": f"PEARNLY TEST ITEM · {TEST_RUN_ID}",
-                "qty": 1,
-                "unit_price": 100.00,
-                "amount": 100.00,
-            }],
+            "items": [
+                {
+                    "name": f"PEARNLY TEST ITEM · {TEST_RUN_ID}",
+                    "qty": 1,
+                    "unit_price": 100.00,
+                    "amount": 100.00,
+                }
+            ],
         }
         test_mappings = {
-            "clients": [{
-                "erp_type": "mrerp",
-                "client_id": 99,
-                "erp_code": TEST_CUSTOMER_CODE,
-            }],
+            "clients": [
+                {
+                    "erp_type": "mrerp",
+                    "client_id": 99,
+                    "erp_code": TEST_CUSTOMER_CODE,
+                }
+            ],
             "accounts": [],
             "taxes": [],
             "products": [],
@@ -426,7 +432,7 @@ def step_06_upload(page: Page, xlsx_path: str):
         'input[name="btnuploadfile"]',
         'input[id="btnuploadfile"]',
         'input[onclick*="frmupload"]',
-        'input[value*="อัพโหลด"]',         # 注意:อัพโหลด(MR.ERP 拼写)≠ อัปโหลด(标准)
+        'input[value*="อัพโหลด"]',  # 注意:อัพโหลด(MR.ERP 拼写)≠ อัปโหลด(标准)
         'input[value*="อัปโหลด"]',
         'input[type="submit"]',
         'button[type="submit"]',
@@ -463,7 +469,7 @@ def step_06_upload(page: Page, xlsx_path: str):
     # 等待 URL 变化(成功)或检测 alert(失败 · 已挂全局 dialog handler)
     try:
         page.wait_for_url("**/formrdpc.php**", timeout=10000)
-        log.info(f"  ✓ AJAX 成功 · 自动跳 formrdpc")
+        log.info("  ✓ AJAX 成功 · 自动跳 formrdpc")
     except PWTimeout:
         log.warning(f"  ⚠ AJAX 没跳 formrdpc · 当前 URL={page.url}")
         if STATE.dialogs:
@@ -490,9 +496,14 @@ def step_07_preview_confirm(page: Page, xlsx_path: str = ""):
             log.info("  等 45s 后 retry from formupload.php")
             time.sleep(45)
             try:
-                page.goto(f"{LOGIN_URL}/impartran/formupload.php?idmenu={IDMENU_SC}",
-                          wait_until="networkidle", timeout=15000)
-                page.locator('input[type="file"], input[name="uploadfile"]').first.set_input_files(xlsx_path)
+                page.goto(
+                    f"{LOGIN_URL}/impartran/formupload.php?idmenu={IDMENU_SC}",
+                    wait_until="networkidle",
+                    timeout=15000,
+                )
+                page.locator('input[type="file"], input[name="uploadfile"]').first.set_input_files(
+                    xlsx_path
+                )
                 page.locator('input[name="btnuploadfile"]').click()
                 page.wait_for_url("**/formrdpc.php**", timeout=15000)
                 log.info(f"  ✓ retry 后 URL={page.url}")
@@ -505,10 +516,12 @@ def step_07_preview_confirm(page: Page, xlsx_path: str = ""):
 
     # 如果还没在 preview 页 · 找 preview 入口点
     if "formrdpc" not in page.url.lower():
-        for sel in ['a:has-text("ดูข้อมูล")',
-                    'a:has-text("Preview")',
-                    'button:has-text("Preview")',
-                    'a:has-text("ตรวจสอบ")']:
+        for sel in [
+            'a:has-text("ดูข้อมูล")',
+            'a:has-text("Preview")',
+            'button:has-text("Preview")',
+            'a:has-text("ตรวจสอบ")',
+        ]:
             loc = page.locator(sel)
             if loc.count() > 0:
                 try:
@@ -526,8 +539,17 @@ def step_07_preview_confirm(page: Page, xlsx_path: str = ""):
         body_text = page.locator("body").inner_text(timeout=3000) or ""
     except Exception:
         body_text = ""
-    error_keywords = ["ไม่พบ", "ผิดพลาด", "ไม่ถูกต้อง", "ห้าม", "ซ้ำ",
-                      "error", "invalid", "duplicate", "fail"]
+    error_keywords = [
+        "ไม่พบ",
+        "ผิดพลาด",
+        "ไม่ถูกต้อง",
+        "ห้าม",
+        "ซ้ำ",
+        "error",
+        "invalid",
+        "duplicate",
+        "fail",
+    ]
     detected = [kw for kw in error_keywords if kw.lower() in body_text.lower()]
     if detected:
         log.warning(f"  ⚠ preview 上发现错误关键词: {detected}")
@@ -544,7 +566,9 @@ def step_07_preview_confirm(page: Page, xlsx_path: str = ""):
         # 尝试抓红字 / alert 错误
         red_text = []
         try:
-            for el in page.locator('font[color="red"], span[style*="red"], div.error, .alert').all():
+            for el in page.locator(
+                'font[color="red"], span[style*="red"], div.error, .alert'
+            ).all():
                 t = el.inner_text() or ""
                 if t.strip() and len(t) < 300:
                     red_text.append(t.strip())
@@ -598,9 +622,11 @@ def step_07_preview_confirm(page: Page, xlsx_path: str = ""):
                 log.warning(f"  uploadfrm({fid}) JS 失败: {e}")
     except Exception as e:
         log.warning(f"  JS evaluate 路径失败: {e} · 兜底 click")
-        for sel in ['button[id^="btnuploadfrm"]',
-                    'button[onclick^="uploadfrm("]',
-                    'button:has-text("นำเข้าข้อมูล")']:
+        for sel in [
+            'button[id^="btnuploadfrm"]',
+            'button[onclick^="uploadfrm("]',
+            'button:has-text("นำเข้าข้อมูล")',
+        ]:
             btns = page.locator(sel).all()
             for btn in btns:
                 try:
@@ -637,14 +663,21 @@ def step_07_preview_confirm(page: Page, xlsx_path: str = ""):
     except PWTimeout:
         log.warning(f"  ⚠ 没跳 report.php · 当前 URL={page.url}")
 
-    STATE.shot(page, "after-confirm", f"clicks={confirmed_count} · URL={page.url} · dialogs={STATE.dialogs[-2:] if STATE.dialogs else []}")
+    STATE.shot(
+        page,
+        "after-confirm",
+        f"clicks={confirmed_count} · URL={page.url} · dialogs={STATE.dialogs[-2:] if STATE.dialogs else []}",
+    )
     STATE.findings["confirm_clicked_count"] = confirmed_count
     STATE.findings["report_captured"] = report_captured
     if STATE.dialogs:
         STATE.findings["confirm_dialogs"] = list(STATE.dialogs[-5:])
-    return {"success": confirmed_count > 0, "n_rows": n,
-            "confirmed_count": confirmed_count,
-            "report_captured": report_captured}
+    return {
+        "success": confirmed_count > 0,
+        "n_rows": n,
+        "confirmed_count": confirmed_count,
+        "report_captured": report_captured,
+    }
 
 
 # ============================================================
@@ -677,13 +710,15 @@ def step_08_search_listing(page: Page):
     # listing row 用 `<p><span>SIPEARNLY-TEST-001</span><span>18/05/2569</span>...<a href="allform.php?id=N&status=del"></a>`
     # 抓 SIPEARNLY... row 的 delete 链接 id
     html = page.content() or ""
-    bill_no = f"SI{TEST_INVOICE_NO}"   # generator 自动 SI 前缀
+    bill_no = f"SI{TEST_INVOICE_NO}"  # generator 自动 SI 前缀
     test_db_id: Optional[str] = None
     import re as _re
+
     # find row containing bill_no
     p_pattern = _re.compile(
-        r'<p\b[^>]*>(?:(?!</p>).){0,3000}' + _re.escape(bill_no) +
-        r'(?:(?!</p>).){0,3000}allform\.php\?id=(\d+)&[^"]*status=del',
+        r"<p\b[^>]*>(?:(?!</p>).){0,3000}"
+        + _re.escape(bill_no)
+        + r'(?:(?!</p>).){0,3000}allform\.php\?id=(\d+)&[^"]*status=del',
         _re.DOTALL,
     )
     m = p_pattern.search(html)
@@ -692,17 +727,20 @@ def step_08_search_listing(page: Page):
         log.info(f"  ✓ 找到 row · db_id={test_db_id}")
     else:
         # fallback · 任意 PEARNLY+del id pattern
-        m2 = _re.search(r'PEARNLY-TEST.{0,2000}allform\.php\?id=(\d+)&[^"]*status=del',
-                        html, _re.DOTALL)
+        m2 = _re.search(
+            r'PEARNLY-TEST.{0,2000}allform\.php\?id=(\d+)&[^"]*status=del', html, _re.DOTALL
+        )
         if m2:
             test_db_id = m2.group(1)
             log.info(f"  fallback ✓ db_id={test_db_id}")
 
     STATE.findings["found_in_listing"] = test_db_id is not None
     STATE.findings["test_db_id"] = test_db_id
-    STATE.shot(page, "search-result",
-               f"row found · db_id={test_db_id}" if test_db_id
-               else "PEARNLY row NOT in listing")
+    STATE.shot(
+        page,
+        "search-result",
+        f"row found · db_id={test_db_id}" if test_db_id else "PEARNLY row NOT in listing",
+    )
     return test_db_id is not None
 
 
@@ -758,12 +796,16 @@ def step_10_verify_deletion(page: Page):
     html = page.content() or ""
     # 在 HTML 而非 inner_text 里搜 SIPEARNLY 或 PEARNLY-TEST(避开 search input 的 false positive)
     bill_no = f"SI{TEST_INVOICE_NO}"
-    still_in_rows = (bill_no in html) or (TEST_INVOICE_NO in html and "searchdataval" not in html.split(TEST_INVOICE_NO)[0][-300:])
+    still_in_rows = (bill_no in html) or (
+        TEST_INVOICE_NO in html and "searchdataval" not in html.split(TEST_INVOICE_NO)[0][-300:]
+    )
     log.info(f"  删除后 listing 仍含 SIPEARNLY? {still_in_rows}")
     STATE.findings["deletion_verified"] = not still_in_rows
-    STATE.shot(page, "verify-deletion",
-               "✅ 删除成功 · listing 不含 PEARNLY" if not still_in_rows
-               else "⚠ listing 仍含 PEARNLY")
+    STATE.shot(
+        page,
+        "verify-deletion",
+        "✅ 删除成功 · listing 不含 PEARNLY" if not still_in_rows else "⚠ listing 仍含 PEARNLY",
+    )
     return not still_in_rows
 
 
@@ -792,8 +834,7 @@ def main() -> int:
         return 3
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not HEADED,
-                                    slow_mo=150 if HEADED else 0)
+        browser = p.chromium.launch(headless=not HEADED, slow_mo=150 if HEADED else 0)
         ctx = browser.new_context(viewport=VIEWPORT, locale="th-TH")
 
         # 实测(2026-05-18) · 上下文级 init script 在每个 page load 后自动 patch sdpt
@@ -836,6 +877,7 @@ def main() -> int:
                 d.accept()
             except Exception:
                 pass
+
         page.on("dialog", _on_dialog)
 
         fatal: Optional[BaseException] = None
@@ -877,17 +919,23 @@ def main() -> int:
 
         # 写 screenshot 清单 + findings JSON
         try:
-            (SCREENSHOTS_DIR / "manifest.txt").write_text(
-                STATE.manifest(), encoding="utf-8")
+            (SCREENSHOTS_DIR / "manifest.txt").write_text(STATE.manifest(), encoding="utf-8")
             import json
+
             findings_path = DOCS_DIR / f"probe-findings-{TEST_RUN_ID}.json"
             findings_path.write_text(
-                json.dumps({"run_id": TEST_RUN_ID,
-                            "findings": STATE.findings,
-                            "errors": STATE.errors,
-                            "shots": [{"file": f, "scenario": s} for f, s in STATE.shots]},
-                           ensure_ascii=False, indent=2),
-                encoding="utf-8")
+                json.dumps(
+                    {
+                        "run_id": TEST_RUN_ID,
+                        "findings": STATE.findings,
+                        "errors": STATE.errors,
+                        "shots": [{"file": f, "scenario": s} for f, s in STATE.shots],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
             log.info(f"📋 findings → {findings_path.name}")
         except Exception as e:
             log.warning(f"manifest/findings 写盘失败: {e}")

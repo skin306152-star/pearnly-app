@@ -33,11 +33,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import mrerp_xlsx_generator   # noqa: E402
+import mrerp_xlsx_generator  # noqa: E402
 
-from services.erp.mrerp_adapter import MRERPAdapter   # noqa: E402
+from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
 
-from tests.integration._mrerp_common import (   # noqa: E402
+from tests.integration._mrerp_common import (  # noqa: E402
     SCREENSHOT_ROOT,
     make_test_history,
     make_test_invoice_no,
@@ -52,7 +52,7 @@ logging.basicConfig(
 )
 
 
-KNOWN_GOOD_CUSTOMER_CODE = "0006"   # Skin DB, Skin Trading Co., Ltd.
+KNOWN_GOOD_CUSTOMER_CODE = "0006"  # Skin DB, Skin Trading Co., Ltd.
 
 
 class HappyPathTest(unittest.TestCase):
@@ -96,7 +96,8 @@ class HappyPathTest(unittest.TestCase):
                 except Exception as e:
                     logging.warning(
                         "teardown delete_invoice(%s) failed: %s",
-                        self._cleanup_db_id, e,
+                        self._cleanup_db_id,
+                        e,
                     )
             else:
                 # Search by invoice_no in case mid-flight failure left a row.
@@ -105,9 +106,7 @@ class HappyPathTest(unittest.TestCase):
                     if found is not None:
                         self.adapter.delete_invoice(found.db_row_id)
                 except Exception as e:
-                    logging.warning(
-                        "teardown rescue search/delete failed: %s", e
-                    )
+                    logging.warning("teardown rescue search/delete failed: %s", e)
         finally:
             try:
                 self.adapter.__exit__(None, None, None)
@@ -120,12 +119,11 @@ class HappyPathTest(unittest.TestCase):
 
         result = self.adapter.upload_invoice_batch([history], mappings)
 
-        self.assertEqual(result.total, 1,
-                         f"expected 1 input row; result={result.to_dict()}")
+        self.assertEqual(result.total, 1, f"expected 1 input row; result={result.to_dict()}")
         self.assertEqual(
-            len(result.failed), 0,
-            f"unexpected business failures: "
-            f"{[f.reasons for f in result.failed]}",
+            len(result.failed),
+            0,
+            f"unexpected business failures: " f"{[f.reasons for f in result.failed]}",
         )
         self.assertEqual(len(result.success), 1)
         sr = result.success[0]

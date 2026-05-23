@@ -20,19 +20,17 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from openpyxl import Workbook   # noqa: E402
+from openpyxl import Workbook  # noqa: E402
 
-from services.erp.mrerp_report_parser import (   # noqa: E402
+from services.erp.mrerp_report_parser import (  # noqa: E402
     HEADER_INVOICE_NO,
     HEADER_NOTE,
     ImportReport,
     parse_import_report,
 )
 
-
 FAILURE_SAMPLE = (
-    PROJECT_ROOT / "docs" / "integrations" / "samples"
-    / "report_failure_customer_not_found.xlsx"
+    PROJECT_ROOT / "docs" / "integrations" / "samples" / "report_failure_customer_not_found.xlsx"
 )
 
 
@@ -41,8 +39,7 @@ class RealFailureSampleTests(unittest.TestCase):
     99-PEARNLYTEST-001 does not exist."""
 
     def test_one_invoice_two_reasons(self):
-        self.assertTrue(FAILURE_SAMPLE.exists(),
-                        f"fixture missing: {FAILURE_SAMPLE}")
+        self.assertTrue(FAILURE_SAMPLE.exists(), f"fixture missing: {FAILURE_SAMPLE}")
         xlsx_bytes = FAILURE_SAMPLE.read_bytes()
 
         report = parse_import_report(xlsx_bytes)
@@ -87,13 +84,18 @@ class SyntheticReportTests(unittest.TestCase):
         return buf.getvalue()
 
     def test_all_success(self):
-        xlsx = self._build([
-            ("Worksheet", [
-                (HEADER_INVOICE_NO, HEADER_NOTE),
-                ("OK-INV-001", None),
-                ("OK-INV-002", None),
-            ]),
-        ])
+        xlsx = self._build(
+            [
+                (
+                    "Worksheet",
+                    [
+                        (HEADER_INVOICE_NO, HEADER_NOTE),
+                        ("OK-INV-001", None),
+                        ("OK-INV-002", None),
+                    ],
+                ),
+            ]
+        )
         report = parse_import_report(xlsx)
         self.assertEqual(report.total, 2)
         self.assertEqual(sorted(report.success), ["OK-INV-001", "OK-INV-002"])
@@ -101,13 +103,18 @@ class SyntheticReportTests(unittest.TestCase):
         self.assertTrue(report.all_success)
 
     def test_mixed_with_multiline_error(self):
-        xlsx = self._build([
-            ("Worksheet", [
-                (HEADER_INVOICE_NO, HEADER_NOTE),
-                ("GOOD-001", None),
-                ("BAD-001", "reason A\nreason B\nreason C"),
-            ]),
-        ])
+        xlsx = self._build(
+            [
+                (
+                    "Worksheet",
+                    [
+                        (HEADER_INVOICE_NO, HEADER_NOTE),
+                        ("GOOD-001", None),
+                        ("BAD-001", "reason A\nreason B\nreason C"),
+                    ],
+                ),
+            ]
+        )
         report = parse_import_report(xlsx)
         self.assertEqual(report.success, ["GOOD-001"])
         self.assertEqual(len(report.failed), 1)
@@ -117,16 +124,24 @@ class SyntheticReportTests(unittest.TestCase):
         self.assertFalse(report.all_success)
 
     def test_detail_sheet_note_aggregates_to_same_invoice(self):
-        xlsx = self._build([
-            ("Worksheet", [
-                (HEADER_INVOICE_NO, HEADER_NOTE),
-                ("INV-X", None),
-            ]),
-            ("Worksheet 1", [
-                (HEADER_INVOICE_NO, "other", HEADER_NOTE),
-                ("INV-X", "ignored", "product missing"),
-            ]),
-        ])
+        xlsx = self._build(
+            [
+                (
+                    "Worksheet",
+                    [
+                        (HEADER_INVOICE_NO, HEADER_NOTE),
+                        ("INV-X", None),
+                    ],
+                ),
+                (
+                    "Worksheet 1",
+                    [
+                        (HEADER_INVOICE_NO, "other", HEADER_NOTE),
+                        ("INV-X", "ignored", "product missing"),
+                    ],
+                ),
+            ]
+        )
         report = parse_import_report(xlsx)
         self.assertEqual(report.success, [])
         self.assertEqual(len(report.failed), 1)

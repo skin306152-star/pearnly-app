@@ -43,8 +43,7 @@ from __future__ import annotations
 
 import logging
 import re
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from typing import Any, Dict, List, Literal, Optional
 
@@ -55,7 +54,6 @@ from playwright.sync_api import (
 
 from services.erp._master_data_cache import TTLCache
 from services.erp._matching import (
-    fuzzy_match,
     levenshtein_ratio,
     normalize_company_name,
 )
@@ -67,7 +65,7 @@ from services.erp.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-CUSTOMER_LEVENSHTEIN_THRESHOLD_DEFAULT = 0.82   # Zihao 2026-05-18 拍板
+CUSTOMER_LEVENSHTEIN_THRESHOLD_DEFAULT = 0.82  # Zihao 2026-05-18 拍板
 
 # Per [mrerp-master-data-sync-design.md §3.4](../../docs/integrations/mrerp-master-data-sync-design.md):
 # Default customer code template is P{YYMM}{SEQ4} = 9 chars (well under
@@ -78,9 +76,9 @@ DEFAULT_CUSTOMER_CODE_PREFIX = "P"
 # Default values for required MR.ERP fields the OCR doesn't provide.
 # Tunable per-tenant in a future settings table (see design §8). The
 # values here mirror what Zihao manually set when creating customer 0006.
-DEFAULT_CUSTOMER_TYPE_CODE = "1-11"           # ลูกหนี้การค้า
+DEFAULT_CUSTOMER_TYPE_CODE = "1-11"  # ลูกหนี้การค้า
 DEFAULT_CUSTOMER_TYPE_LABEL = "ลูกหนี้การค้า"
-DEFAULT_BRANCH_CODE = "00000"                  # สำนักงานใหญ่
+DEFAULT_BRANCH_CODE = "00000"  # สำนักงานใหญ่
 DEFAULT_BRANCH_LABEL = "สำนักงานใหญ่"
 DEFAULT_COUNTRY = "ไทย"
 
@@ -101,12 +99,13 @@ DEFAULT_CREDIT_TERM = "0"
 DEFAULT_EXCHANGE_RATE = "1.00"
 DEFAULT_CUSTOMER_RANK = "-"
 
-CUSTOMER_NAME_MAX = 100   # MR.ERP UI accepts up to ~100; conservative
+CUSTOMER_NAME_MAX = 100  # MR.ERP UI accepts up to ~100; conservative
 
 
 @dataclass
 class BuyerInfo:
     """Input for customer sync — pulled from OCR + Pearnly client context."""
+
     name: str
     tenant_id: str = ""
     client_id: int = 0
@@ -118,6 +117,7 @@ class BuyerInfo:
 @dataclass
 class ListingCustomer:
     """One row scraped from armas/allview.php."""
+
     code: str
     type_name: str
     prefix: str
@@ -128,6 +128,7 @@ class ListingCustomer:
 @dataclass
 class CustomerSyncResult:
     """What lookup / lookup_or_create returns to the adapter."""
+
     customer_code: str
     source: Literal[
         "cache_hit",
@@ -159,18 +160,17 @@ class CustomerSyncResult:
 # Per the armas/allview.php structure documented above. The header <p>
 # (first one) has literal Thai labels; data rows have actual values.
 _ROW_PATTERN = re.compile(
-    r'<p\b[^>]*>(?P<body>(?:(?!<p\b)(?!</p>).)*?)</p>',
+    r"<p\b[^>]*>(?P<body>(?:(?!<p\b)(?!</p>).)*?)</p>",
     re.DOTALL,
 )
 # Top-level spans only — exclude the nested URA review spans by
 # stripping anything after the first 5 top-level <span>s. We capture by
 # matching balanced spans iteratively.
 _TOP_SPAN_PATTERN = re.compile(
-    r'<span\b(?P<attrs>[^>]*)>(?P<inner>.*?)</span>',
+    r"<span\b(?P<attrs>[^>]*)>(?P<inner>.*?)</span>",
     re.DOTALL,
 )
-_HEADER_LABELS = {"รหัสลูกค้า", "ชื่อประเภทลูกค้า", "คำนำหน้า",
-                  "ชื่อลูกค้า", "URA"}
+_HEADER_LABELS = {"รหัสลูกค้า", "ชื่อประเภทลูกค้า", "คำนำหน้า", "ชื่อลูกค้า", "URA"}
 
 
 def _strip_tags(s: str) -> str:
@@ -212,10 +212,15 @@ def parse_armas_listing(html: str) -> List[ListingCustomer]:
             continue
         if not code or not name:
             continue
-        customers.append(ListingCustomer(
-            code=code, type_name=type_name, prefix=prefix, name=name,
-            name_norm=normalize_company_name(name),
-        ))
+        customers.append(
+            ListingCustomer(
+                code=code,
+                type_name=type_name,
+                prefix=prefix,
+                name=name,
+                name_norm=normalize_company_name(name),
+            )
+        )
     return customers
 
 
@@ -250,7 +255,7 @@ def _extract_top_level_spans(body: str, *, limit: int = 5) -> List[str]:
             else:
                 depth -= 1
                 if depth == 0:
-                    out.append(body[gt + 1:next_close])
+                    out.append(body[gt + 1 : next_close])
                     j = next_close + len("</span>")
                 else:
                     j = next_close + len("</span>")
@@ -261,6 +266,7 @@ def _extract_top_level_spans(body: str, *, limit: int = 5) -> List[str]:
 # ============================================================
 # Service
 # ============================================================
+
 
 class MRERPCustomerSyncService:
     """Lookup helper for customer master data.
@@ -309,8 +315,7 @@ class MRERPCustomerSyncService:
         cache_key = ("by_name", buyer.tenant_id, name_norm)
         cached_code = self.cache.get(cache_key) if name_norm else None
         if cached_code:
-            logger.debug("customer cache hit: %s -> %s",
-                         name_norm, cached_code)
+            logger.debug("customer cache hit: %s -> %s", name_norm, cached_code)
             return CustomerSyncResult(
                 customer_code=cached_code,
                 source="cache_hit",
@@ -333,7 +338,8 @@ class MRERPCustomerSyncService:
         except MRERPTechnicalError as e:
             logger.warning(
                 "customer _fetch_listing failed in lookup · skipping L2/L3 · "
-                "fall through to None (caller goes L4 auto-create): %s", e,
+                "fall through to None (caller goes L4 auto-create): %s",
+                e,
             )
             return None
 
@@ -389,8 +395,7 @@ class MRERPCustomerSyncService:
                 f"(ERR_NO_SEED_CUSTOMER) — pick one in the ERP "
                 f"connection wizard or pass seed_customer_code "
                 f"explicitly. buyer={buyer.name!r}",
-                failed_rows=[{"buyer_name": buyer.name,
-                              "reason_code": "ERR_NO_SEED_CUSTOMER"}],
+                failed_rows=[{"buyer_name": buyer.name, "reason_code": "ERR_NO_SEED_CUSTOMER"}],
             )
 
         # Layer 4: copy-from-seed.
@@ -435,12 +440,9 @@ class MRERPCustomerSyncService:
         if not customer_code:
             return False
         page = self.adapter._page
-        del_url = (
-            f"{self.adapter.login_url}/armas/alldel.php?id={customer_code}"
-        )
+        del_url = f"{self.adapter.login_url}/armas/alldel.php?id={customer_code}"
         try:
-            page.goto(del_url, wait_until="networkidle",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(del_url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
         except (PWTimeout, PWError) as e:
             logger.warning("delete_customer nav failed: %s", e)
             return False
@@ -576,8 +578,7 @@ class MRERPCustomerSyncService:
         if not seed_customer_code:
             raise MRERPBusinessError(
                 "ERR_NO_SEED_CUSTOMER — seed_customer_code is required",
-                failed_rows=[{"buyer_name": buyer.name,
-                              "reason_code": "ERR_NO_SEED_CUSTOMER"}],
+                failed_rows=[{"buyer_name": buyer.name, "reason_code": "ERR_NO_SEED_CUSTOMER"}],
             )
 
         page = self.adapter._page
@@ -587,27 +588,22 @@ class MRERPCustomerSyncService:
 
         target = self.adapter.login_url + self.FORM_PATH
         try:
-            page.goto(target, wait_until="networkidle",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(target, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"customer-create form nav timeout: {e}") from e
+            raise MRERPTechnicalError(f"customer-create form nav timeout: {e}") from e
 
         # Bug 8 fix (Zihao 2026-05-19 拍板 · v118.34.23) · session bounce 检测 ·
         # 跟 mrerp_product_sync 镜像 · armas/allform.php 也可能在长 batch 后被
         # MR.ERP 服务端无声 invalidate session.
         landed_url = page.url or ""
         if "/login/login.php" in landed_url:
-            logger.warning(
-                "[customer-create] nav bounced to login.php · re-login + retry"
-            )
+            logger.warning("[customer-create] nav bounced to login.php · re-login + retry")
             try:
                 self.adapter._logged_in = False
                 self.adapter._company_selected = False
                 self.adapter.login()
                 self.adapter.select_company()
-                page.goto(target, wait_until="networkidle",
-                          timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+                page.goto(target, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
             except Exception as e:
                 raise MRERPTechnicalError(
                     f"customer-create session re-login failed: {type(e).__name__}: {e}"
@@ -627,30 +623,23 @@ class MRERPCustomerSyncService:
         except MRERPBusinessError:
             raise
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"copy-from-seed flow timeout: {e}") from e
+            raise MRERPTechnicalError(f"copy-from-seed flow timeout: {e}") from e
 
         # 6) Override the fields that must be unique to the new row.
         try:
             self._override_after_copy(page, customer_code, buyer)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"override-after-copy timeout: {e}") from e
+            raise MRERPTechnicalError(f"override-after-copy timeout: {e}") from e
 
         # 7) Click save.
-        dialogs_before = (
-            len(self.adapter._session.dialogs)
-            if self.adapter._session else 0
-        )
+        dialogs_before = len(self.adapter._session.dialogs) if self.adapter._session else 0
         try:
             page.click('button[id="btnsave"]', timeout=5_000)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"customer-create save click timeout: {e}") from e
+            raise MRERPTechnicalError(f"customer-create save click timeout: {e}") from e
 
         try:
-            page.wait_for_load_state("networkidle",
-                                      timeout=self.SAVE_TIMEOUT_MS)
+            page.wait_for_load_state("networkidle", timeout=self.SAVE_TIMEOUT_MS)
         except PWTimeout:
             pass
         page.wait_for_timeout(1_500)
@@ -666,7 +655,9 @@ class MRERPCustomerSyncService:
         if any(r.code == customer_code for r in listing):
             logger.info(
                 "auto-created customer %s (seed=%s, buyer=%s)",
-                customer_code, seed_customer_code, buyer.name,
+                customer_code,
+                seed_customer_code,
+                buyer.name,
             )
             return CustomerSyncResult(
                 customer_code=customer_code,
@@ -682,12 +673,14 @@ class MRERPCustomerSyncService:
             f"customer auto-create did not appear in listing "
             f"(code={customer_code}, seed={seed_customer_code}, "
             f"dialogs={dialog_text!r})",
-            failed_rows=[{
-                "buyer_name": buyer.name,
-                "customer_code_attempted": customer_code,
-                "seed_customer_code": seed_customer_code,
-                "dialogs": new_dialogs,
-            }],
+            failed_rows=[
+                {
+                    "buyer_name": buyer.name,
+                    "customer_code_attempted": customer_code,
+                    "seed_customer_code": seed_customer_code,
+                    "dialogs": new_dialogs,
+                }
+            ],
         )
 
     def _copy_from_seed(self, page, seed_customer_code: str) -> None:
@@ -702,11 +695,10 @@ class MRERPCustomerSyncService:
         down to just the seed before clicking, mirroring the
         `mrerp_product_sync._copy_from_seed` implementation.
         """
-        loc = page.locator('input#inpdupdata')
+        loc = page.locator("input#inpdupdata")
         if loc.count() == 0:
             raise MRERPTechnicalError(
-                "inpdupdata (copy) button missing — MR.ERP UI may have "
-                "changed"
+                "inpdupdata (copy) button missing — MR.ERP UI may have " "changed"
             )
         loc.first.click(timeout=5_000)
 
@@ -720,72 +712,67 @@ class MRERPCustomerSyncService:
                 timeout=10_000,
             )
         except PWTimeout as e:
-            raise MRERPTechnicalError(
-                f"copy picker popup did not render: {e}") from e
+            raise MRERPTechnicalError(f"copy picker popup did not render: {e}") from e
         page.wait_for_timeout(500)
 
         # Type the seed code into the popup's search input. The onkeyup
         # handler `bshdatalistbox()` re-renders the visible rows in
         # real time — only matching ones survive.
-        search = page.locator('input#bshlistboxinpsearch')
+        search = page.locator("input#bshlistboxinpsearch")
         try:
             search.fill(seed_customer_code)
             # bshdatalistbox is wired to onkeyup — fire one to trigger
             # the filter, then settle.
             search.press("End")
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"copy picker search input failed: {e}") from e
+            raise MRERPTechnicalError(f"copy picker search input failed: {e}") from e
         page.wait_for_timeout(800)
 
         # Stricter selector first (exact text-is on the code span), then
         # a fallback substring match in case the code contains
         # characters that confuse text-is().
         row = page.locator(
-            "#bshlistboxdetailshow p"
-            f":has(span:text-is({seed_customer_code!r}))"
+            "#bshlistboxdetailshow p" f":has(span:text-is({seed_customer_code!r}))"
         ).first
         if row.count() == 0:
-            row = page.locator(
-                "#bshlistboxdetailshow p"
-                f":has-text({seed_customer_code!r})"
-            ).first
+            row = page.locator("#bshlistboxdetailshow p" f":has-text({seed_customer_code!r})").first
         if row.count() == 0:
             raise MRERPBusinessError(
                 f"seed customer {seed_customer_code!r} not visible in "
                 f"the copy picker — confirm the code exists in this "
                 f"tenant's customer master (searched via "
                 f"bshlistboxinpsearch)",
-                failed_rows=[{
-                    "reason_code": "ERR_SEED_NOT_FOUND",
-                    "seed_customer_code": seed_customer_code,
-                }],
+                failed_rows=[
+                    {
+                        "reason_code": "ERR_SEED_NOT_FOUND",
+                        "seed_customer_code": seed_customer_code,
+                    }
+                ],
             )
 
         try:
             row.click(timeout=3_000)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"seed row click failed: {e}") from e
+            raise MRERPTechnicalError(f"seed row click failed: {e}") from e
 
         # bshlistboxafterselectdata fires an AJAX fetch to populate the
         # form with the seed's full field set. ~1-2s.
         page.wait_for_timeout(2_500)
 
         try:
-            populated_name = page.locator(
-                'input#txtname'
-            ).first.input_value()
+            populated_name = page.locator("input#txtname").first.input_value()
         except Exception:
             populated_name = ""
         if not populated_name:
             raise MRERPTechnicalError(
-                "copy picker click did not populate the form "
-                "(txtname still empty)"
+                "copy picker click did not populate the form " "(txtname still empty)"
             )
 
     def _override_after_copy(
-        self, page, customer_code: str, buyer: BuyerInfo,
+        self,
+        page,
+        customer_code: str,
+        buyer: BuyerInfo,
     ) -> None:
         """Replace the seed's identity fields with the new customer's.
 
@@ -796,7 +783,8 @@ class MRERPCustomerSyncService:
         self._fill_field(page, "txtarcode", customer_code)
         # Customer name — truncate to MR.ERP's ceiling.
         self._fill_field(
-            page, "txtname",
+            page,
+            "txtname",
             (buyer.name or "")[:CUSTOMER_NAME_MAX],
         )
 
@@ -806,9 +794,8 @@ class MRERPCustomerSyncService:
             self._fill_field(page, "txttaxid", tax_id)
         else:
             import secrets
-            rand_tin = str(
-                secrets.randbelow(10 ** 12) + 10 ** 12
-            )[:13]
+
+            rand_tin = str(secrets.randbelow(10**12) + 10**12)[:13]
             self._fill_field(page, "txttaxid", rand_tin)
 
         # Address override — only when buyer has one (otherwise inherit
@@ -823,8 +810,12 @@ class MRERPCustomerSyncService:
         loc.first.fill(value)
 
     def _fill_code_detail_pair(
-        self, page, code_field_id: str, code_value: str,
-        *, fallback_detail: str = "",
+        self,
+        page,
+        code_field_id: str,
+        code_value: str,
+        *,
+        fallback_detail: str = "",
     ) -> None:
         """For inputs that live in a "code + hidden val + detail label"
         triplet (e.g. txtrectype/rectypeval/txtrectypedetail), inject the
@@ -852,6 +843,7 @@ class MRERPCustomerSyncService:
         detail_id = f"{code_field_id}detail"
 
         import json as _json
+
         js = """(function(code, fallback, codeId, hiddenId, detailId) {
             var f = document.getElementById(codeId);
             if (f) {
@@ -876,11 +868,15 @@ class MRERPCustomerSyncService:
         try:
             result = page.evaluate(js)
             logger.debug(
-                "code-detail fill %s -> %s", code_field_id, result,
+                "code-detail fill %s -> %s",
+                code_field_id,
+                result,
             )
         except Exception as e:
             logger.warning(
-                "JS fill for %s failed: %s", code_field_id, e,
+                "JS fill for %s failed: %s",
+                code_field_id,
+                e,
             )
 
     def _fill_addresses(self, page, address: str) -> None:
@@ -908,7 +904,7 @@ class MRERPCustomerSyncService:
         existing_seqs: List[int] = []
         for row in listing:
             if row.code.startswith(prefix):
-                tail = row.code[len(prefix):]
+                tail = row.code[len(prefix) :]
                 if tail.isdigit():
                     existing_seqs.append(int(tail))
         next_seq = (max(existing_seqs) + 1) if existing_seqs else 1
@@ -920,23 +916,23 @@ class MRERPCustomerSyncService:
         return candidate
 
     def _upsert_mapping(
-        self, mappings: Dict[str, Any],
+        self,
+        mappings: Dict[str, Any],
         client_id: int,
         customer_code: str,
     ) -> None:
         clients = (mappings or {}).get("clients") or []
         for m in clients:
-            if (
-                m.get("erp_type") == "mrerp"
-                and int(m.get("client_id") or 0) == int(client_id)
-            ):
+            if m.get("erp_type") == "mrerp" and int(m.get("client_id") or 0) == int(client_id):
                 m["erp_code"] = customer_code
                 return
-        clients.append({
-            "erp_type": "mrerp",
-            "client_id": int(client_id),
-            "erp_code": customer_code,
-        })
+        clients.append(
+            {
+                "erp_type": "mrerp",
+                "client_id": int(client_id),
+                "erp_code": customer_code,
+            }
+        )
         if isinstance(mappings, dict):
             mappings["clients"] = clients
 
@@ -968,6 +964,7 @@ class MRERPCustomerSyncService:
         # 问题 2 加固 (Zihao 2026-05-19 拍板 · v118.34.24):
         # attempts 2 → 3 · wait_for_selector 10s → 30s · 间隔 5s 退让 server.
         import time as _time
+
         for attempt in (1, 2, 3):
             try:
                 if attempt == 1:
@@ -986,21 +983,25 @@ class MRERPCustomerSyncService:
                     )
                 # Wait specifically for the listing rows to attach (30s).
                 page.wait_for_selector(
-                    "#showdata p", state="attached", timeout=30_000,
+                    "#showdata p",
+                    state="attached",
+                    timeout=30_000,
                 )
                 html = page.content() or ""
                 rows = parse_armas_listing(html)
                 self.cache.set(self._listing_cache_key, rows)
                 logger.info(
                     "fetched armas listing: %d rows (attempt %d)",
-                    len(rows), attempt,
+                    len(rows),
+                    attempt,
                 )
                 return rows
             except PWTimeout as e:
                 last_err = e
                 logger.warning(
                     "customer listing fetch attempt %d/3 timed out: %s",
-                    attempt, e,
+                    attempt,
+                    e,
                 )
                 continue
             except Exception as e:

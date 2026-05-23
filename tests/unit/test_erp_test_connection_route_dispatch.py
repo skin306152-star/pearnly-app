@@ -43,7 +43,7 @@ from unittest.mock import patch, MagicMock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import erp_push as _erp   # noqa: E402
+import erp_push as _erp  # noqa: E402
 
 
 class StubContractTests(unittest.TestCase):
@@ -55,7 +55,9 @@ class StubContractTests(unittest.TestCase):
         start pushing test invoices when the user clicks the test button.
         Catch that change here so the reviewer is forced to rethink."""
         success, http_status, body = _erp.push_mrerp({}, {"test": True})
-        self.assertFalse(success, "push_mrerp suddenly returns success — re-audit test-connection routing")
+        self.assertFalse(
+            success, "push_mrerp suddenly returns success — re-audit test-connection routing"
+        )
         self.assertEqual(http_status, 0)
         self.assertIn("not wired", body.lower())
 
@@ -87,28 +89,44 @@ class StubContractTests(unittest.TestCase):
         """
         result = _erp.test_mrerp_endpoint({})
         # ── Shape: rich, not stub ──
-        for required_key in ("ok", "companies", "error_code",
-                             "error_friendly", "raw_error", "elapsed_ms"):
-            self.assertIn(required_key, result,
-                          f"rich shape missing {required_key!r}; "
-                          f"someone may have routed mrerp through "
-                          f"push_to_endpoint again: {result!r}")
+        for required_key in (
+            "ok",
+            "companies",
+            "error_code",
+            "error_friendly",
+            "raw_error",
+            "elapsed_ms",
+        ):
+            self.assertIn(
+                required_key,
+                result,
+                f"rich shape missing {required_key!r}; "
+                f"someone may have routed mrerp through "
+                f"push_to_endpoint again: {result!r}",
+            )
         # The stub-shape keys must NOT leak through.
         for stub_key in ("response_body", "http_status"):
-            self.assertNotIn(stub_key, result,
-                             f"stub-shape key {stub_key!r} leaked into "
-                             f"test_mrerp_endpoint result; mrerp branch "
-                             f"is delegating through push_mrerp again: "
-                             f"{result!r}")
+            self.assertNotIn(
+                stub_key,
+                result,
+                f"stub-shape key {stub_key!r} leaked into "
+                f"test_mrerp_endpoint result; mrerp branch "
+                f"is delegating through push_mrerp again: "
+                f"{result!r}",
+            )
         # The smoking-gun substring from the user's F12 trace.
-        joined = " ".join([
-            str(result.get("raw_error") or ""),
-            str(result.get("error_code") or ""),
-            " ".join((result.get("error_friendly") or {}).values()),
-        ]).lower()
-        self.assertNotIn("not wired into push_to_endpoint", joined,
-                         f"stub message leaked into mrerp test-connection: "
-                         f"{result!r}")
+        joined = " ".join(
+            [
+                str(result.get("raw_error") or ""),
+                str(result.get("error_code") or ""),
+                " ".join((result.get("error_friendly") or {}).values()),
+            ]
+        ).lower()
+        self.assertNotIn(
+            "not wired into push_to_endpoint",
+            joined,
+            f"stub message leaked into mrerp test-connection: " f"{result!r}",
+        )
         # And empty-config short-circuit returns ERR_NO_CREDS, not
         # ERR_PUSH_NOT_WIRED — proves we went through test_mrerp_endpoint
         # not push_mrerp.
@@ -121,16 +139,20 @@ class StubContractTests(unittest.TestCase):
         """This is the bug shape we ship to prevent: if the route ever
         routes mrerp through test_endpoint_connection, the user sees
         the stub message instead of a real login attempt."""
-        result = _erp.test_endpoint_connection("mrerp", {
-            "system_url": "https://example.invalid",
-            "username_enc": "u", "password_enc": "p",
-        })
+        result = _erp.test_endpoint_connection(
+            "mrerp",
+            {
+                "system_url": "https://example.invalid",
+                "username_enc": "u",
+                "password_enc": "p",
+            },
+        )
         self.assertFalse(result["success"])
         # The exact phrase the user reported in the F12 Response trace.
-        self.assertIn("not wired into push_to_endpoint",
-                      (result.get("response_body") or "")
-                      + " "
-                      + (result.get("error_msg") or ""))
+        self.assertIn(
+            "not wired into push_to_endpoint",
+            (result.get("response_body") or "") + " " + (result.get("error_msg") or ""),
+        )
 
 
 class TestMrerpEndpointDoesNotUseStubTests(unittest.TestCase):
@@ -153,10 +175,8 @@ class TestMrerpEndpointDoesNotUseStubTests(unittest.TestCase):
         a legacy {success, response_body, ...} shape, the UI silently
         renders blank error bars."""
         result = _erp.test_mrerp_endpoint({})
-        for key in ("ok", "elapsed_ms", "companies", "error_code",
-                    "error_friendly", "raw_error"):
-            self.assertIn(key, result,
-                          f"missing rich-shape key {key!r}; result={result!r}")
+        for key in ("ok", "elapsed_ms", "companies", "error_code", "error_friendly", "raw_error"):
+            self.assertIn(key, result, f"missing rich-shape key {key!r}; result={result!r}")
 
 
 class HardeningContractTests(unittest.TestCase):
@@ -171,8 +191,8 @@ class HardeningContractTests(unittest.TestCase):
         cases = [
             None,
             {},
-            {"username": "u"},   # missing password
-            {"password": "p"},   # missing username
+            {"username": "u"},  # missing password
+            {"password": "p"},  # missing username
             {"username": "", "password": ""},  # both empty strings
             {"username": "u", "password": "p", "system_url": ""},  # empty url
             {"username_enc": "garbage", "password_enc": "more-garbage"},
@@ -183,8 +203,7 @@ class HardeningContractTests(unittest.TestCase):
                 result = _erp.test_mrerp_endpoint(cfg)
             except Exception as e:
                 self.fail(
-                    f"test_mrerp_endpoint raised {type(e).__name__} on "
-                    f"input {cfg!r}: {e!s}"
+                    f"test_mrerp_endpoint raised {type(e).__name__} on " f"input {cfg!r}: {e!s}"
                 )
             self.assertIsInstance(result, dict, f"non-dict for {cfg!r}")
             self.assertIn("ok", result)
@@ -194,7 +213,8 @@ class HardeningContractTests(unittest.TestCase):
             )
             # Friendly error is always populated when ok=False.
             self.assertIsInstance(
-                result.get("error_friendly"), dict,
+                result.get("error_friendly"),
+                dict,
                 f"missing error_friendly for {cfg!r}: {result!r}",
             )
 
@@ -202,30 +222,36 @@ class HardeningContractTests(unittest.TestCase):
         """Wizard sends {username, password} (plain). Backend must not
         complain about missing _enc fields — it should attempt
         construction and fail downstream (auth/network), not ERR_NO_CREDS."""
-        result = _erp.test_mrerp_endpoint({
-            "system_url": "https://invalid.example.org",
-            "username": "user-xyz",
-            "password": "pass-xyz",
-            "comidyear": "6", "seldb": "1",
-        })
+        result = _erp.test_mrerp_endpoint(
+            {
+                "system_url": "https://invalid.example.org",
+                "username": "user-xyz",
+                "password": "pass-xyz",
+                "comidyear": "6",
+                "seldb": "1",
+            }
+        )
         self.assertFalse(result["ok"])
         # Either we got past creds and hit a network/auth/playwright
         # error, OR Playwright is missing on this host. Both are fine —
         # the important thing is we DIDN'T report ERR_NO_CREDS for a
         # request that supplied creds in the plaintext shape.
         self.assertNotEqual(
-            result["error_code"], "ERR_NO_CREDS",
+            result["error_code"],
+            "ERR_NO_CREDS",
             f"plaintext shape rejected as missing creds: {result!r}",
         )
 
     def test_garbage_in_plaintext_field_routes_through_to_login(self):
         """Garbage value typed into 'username' is NOT a decrypt issue;
         it should reach the login attempt (and fail there)."""
-        result = _erp.test_mrerp_endpoint({
-            "system_url": "https://invalid.example.org",
-            "username": "definitely-not-a-real-account",
-            "password": "x",
-        })
+        result = _erp.test_mrerp_endpoint(
+            {
+                "system_url": "https://invalid.example.org",
+                "username": "definitely-not-a-real-account",
+                "password": "x",
+            }
+        )
         self.assertFalse(result["ok"])
         # Not a decrypt issue because we sent plain.
         self.assertNotEqual(result["error_code"], "ERR_CRED_DECRYPT")
@@ -236,6 +262,7 @@ class HardeningContractTests(unittest.TestCase):
         an ERR_PLAYWRIGHT_MISSING / ERR_UNEXPECTED with a friendly
         catalogue — NOT raise (which becomes a 500 to the UI)."""
         import builtins
+
         real_import = builtins.__import__
 
         def boom(name, *a, **kw):
@@ -244,19 +271,23 @@ class HardeningContractTests(unittest.TestCase):
             return real_import(name, *a, **kw)
 
         with patch.object(builtins, "__import__", side_effect=boom):
-            result = _erp.test_mrerp_endpoint({
-                "username": "u", "password": "p",
-            })
+            result = _erp.test_mrerp_endpoint(
+                {
+                    "username": "u",
+                    "password": "p",
+                }
+            )
         self.assertIsInstance(result, dict)
         self.assertFalse(result["ok"])
-        self.assertIn(result["error_code"],
-                      ("ERR_PLAYWRIGHT_MISSING", "ERR_UNEXPECTED"))
+        self.assertIn(result["error_code"], ("ERR_PLAYWRIGHT_MISSING", "ERR_UNEXPECTED"))
         self.assertIsInstance(result["error_friendly"], dict)
         # Friendly text must mention playwright OR mention server error.
         any_lang_text = " ".join(result["error_friendly"].values()).lower()
         self.assertTrue(
-            "playwright" in any_lang_text or "server" in any_lang_text
-            or "服务器" in any_lang_text or "伺服器" in any_lang_text,
+            "playwright" in any_lang_text
+            or "server" in any_lang_text
+            or "服务器" in any_lang_text
+            or "伺服器" in any_lang_text,
             f"friendly message uninformative: {result['error_friendly']!r}",
         )
 
@@ -275,40 +306,61 @@ class RouteDispatchTests(unittest.TestCase):
         # Importing app boots the whole FastAPI stack; do it once for
         # the suite.
         import os
+
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
-        import app   # noqa: F401
+        import app  # noqa: F401
+
         cls.app_module = app
 
     def _make_client(self):
         from fastapi.testclient import TestClient
+
         return TestClient(self.app_module.app)
 
     def test_route_calls_test_mrerp_endpoint_not_legacy_for_mrerp(self):
         """The actual bug: mrerp adapter must NOT route through
         test_endpoint_connection (which falls into push_mrerp stub)."""
         app = self.app_module
-        mrerp_mock = MagicMock(return_value={
-            "ok": True, "elapsed_ms": 100, "companies": [],
-            "error_code": None, "error_friendly": None, "raw_error": None,
-        })
-        legacy_mock = MagicMock(return_value={
-            "success": False, "http_status": 0, "response_body": "stub",
-            "error_msg": "stub", "elapsed_ms": 0,
-        })
+        mrerp_mock = MagicMock(
+            return_value={
+                "ok": True,
+                "elapsed_ms": 100,
+                "companies": [],
+                "error_code": None,
+                "error_friendly": None,
+                "raw_error": None,
+            }
+        )
+        legacy_mock = MagicMock(
+            return_value={
+                "success": False,
+                "http_status": 0,
+                "response_body": "stub",
+                "error_msg": "stub",
+                "elapsed_ms": 0,
+            }
+        )
 
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u-test", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app._erp, "test_mrerp_endpoint", mrerp_mock), \
-             patch.object(app._erp, "test_endpoint_connection", legacy_mock):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u-test", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app._erp, "test_mrerp_endpoint", mrerp_mock),
+            patch.object(app._erp, "test_endpoint_connection", legacy_mock),
+        ):
             with self._make_client() as client:
-                r = client.post("/api/erp/test-connection", json={
-                    "adapter": "mrerp",
-                    "config": {
-                        "system_url": "https://x.invalid",
-                        "username_enc": "u", "password_enc": "p",
+                r = client.post(
+                    "/api/erp/test-connection",
+                    json={
+                        "adapter": "mrerp",
+                        "config": {
+                            "system_url": "https://x.invalid",
+                            "username_enc": "u",
+                            "password_enc": "p",
+                        },
                     },
-                })
+                )
 
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
@@ -322,21 +374,32 @@ class RouteDispatchTests(unittest.TestCase):
         test_endpoint_connection."""
         app = self.app_module
         mrerp_mock = MagicMock()
-        legacy_mock = MagicMock(return_value={
-            "success": True, "http_status": 200, "response_body": "ok",
-            "error_msg": None, "elapsed_ms": 5,
-        })
+        legacy_mock = MagicMock(
+            return_value={
+                "success": True,
+                "http_status": 200,
+                "response_body": "ok",
+                "error_msg": None,
+                "elapsed_ms": 5,
+            }
+        )
 
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u-test", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app._erp, "test_mrerp_endpoint", mrerp_mock), \
-             patch.object(app._erp, "test_endpoint_connection", legacy_mock):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u-test", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app._erp, "test_mrerp_endpoint", mrerp_mock),
+            patch.object(app._erp, "test_endpoint_connection", legacy_mock),
+        ):
             with self._make_client() as client:
-                r = client.post("/api/erp/test-connection", json={
-                    "adapter": "webhook",
-                    "config": {"url": "https://example.invalid/hook"},
-                })
+                r = client.post(
+                    "/api/erp/test-connection",
+                    json={
+                        "adapter": "webhook",
+                        "config": {"url": "https://example.invalid/hook"},
+                    },
+                )
 
         self.assertEqual(r.status_code, 200, r.text)
         legacy_mock.assert_called_once()
@@ -384,8 +447,10 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
         import os
+
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
-        import app   # noqa
+        import app  # noqa
+
         cls.app_module = app
 
     @staticmethod
@@ -397,6 +462,7 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         code is happy — we don't want to mask the bug behind a different
         failure mode."""
         import asyncio
+
         try:
             loop = asyncio.get_running_loop()
             # We're inside an event loop — route did NOT offload.
@@ -413,17 +479,28 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
                 raise
             # No running loop — we're in a thread. Good.
         return {
-            "ok": True, "elapsed_ms": 12, "companies": [],
-            "error_code": None, "error_friendly": None, "raw_error": None,
-            "customers": [], "products": [],
-            "success": True, "http_status": 200, "response_body": "ok",
-            "error_msg": None, "request_body": None, "adapter": "mrerp",
+            "ok": True,
+            "elapsed_ms": 12,
+            "companies": [],
+            "error_code": None,
+            "error_friendly": None,
+            "raw_error": None,
+            "customers": [],
+            "products": [],
+            "success": True,
+            "http_status": 200,
+            "response_body": "ok",
+            "error_msg": None,
+            "request_body": None,
+            "adapter": "mrerp",
         }
 
     async def _make_async_client(self):
         import httpx
+
         try:
             from httpx import ASGITransport
+
             transport = ASGITransport(app=self.app_module.app)
             return httpx.AsyncClient(transport=transport, base_url="http://test")
         except ImportError:
@@ -435,17 +512,22 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         /api/erp/test-connection route with adapter=mrerp from a real
         async client and asserts the route offloads to a thread."""
         app = self.app_module
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app._erp, "test_mrerp_endpoint",
-                          side_effect=self._tripwire_sync_helper):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app._erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
+        ):
             client = await self._make_async_client()
             async with client:
-                r = await client.post("/api/erp/test-connection", json={
-                    "adapter": "mrerp",
-                    "config": {"username": "u", "password": "p"},
-                })
+                r = await client.post(
+                    "/api/erp/test-connection",
+                    json={
+                        "adapter": "mrerp",
+                        "config": {"username": "u", "password": "p"},
+                    },
+                )
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
         self.assertTrue(
@@ -457,15 +539,19 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         """Same tripwire on the per-endpoint variant."""
         app = self.app_module
         fake_ep = {
-            "id": "ep-1", "adapter": "mrerp", "config": {"username": "u"},
+            "id": "ep-1",
+            "adapter": "mrerp",
+            "config": {"username": "u"},
             "enabled": True,
         }
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
-             patch.object(app._erp, "test_mrerp_endpoint",
-                          side_effect=self._tripwire_sync_helper):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
+            patch.object(app._erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
+        ):
             client = await self._make_async_client()
             async with client:
                 r = await client.post(
@@ -481,12 +567,14 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
     async def test_customers_route_offloads(self):
         app = self.app_module
         fake_ep = {"id": "ep-1", "adapter": "mrerp", "config": {}, "enabled": True}
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
-             patch.object(app._erp, "list_mrerp_customers",
-                          side_effect=self._tripwire_sync_helper):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
+            patch.object(app._erp, "list_mrerp_customers", side_effect=self._tripwire_sync_helper),
+        ):
             client = await self._make_async_client()
             async with client:
                 r = await client.get(
@@ -505,12 +593,14 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
     async def test_products_route_offloads(self):
         app = self.app_module
         fake_ep = {"id": "ep-1", "adapter": "mrerp", "config": {}, "enabled": True}
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
-             patch.object(app._erp, "list_mrerp_products",
-                          side_effect=self._tripwire_sync_helper):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
+            patch.object(app._erp, "list_mrerp_products", side_effect=self._tripwire_sync_helper),
+        ):
             client = await self._make_async_client()
             async with client:
                 r = await client.get(
@@ -527,34 +617,45 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         """`push_to_endpoint` MUST also be offloaded because once the
         mrerp branch lights up it will drive MRERPAdapter the same way."""
         app = self.app_module
-        fake_ep = {"id": "ep-1", "adapter": "webhook",
-                   "config": {"url": "http://example/"}, "enabled": True}
-        fake_history = {
-            "id": "h-1", "invoice_no": "INV-1",
-            "seller_name": "S", "total_amount": "100",
+        fake_ep = {
+            "id": "ep-1",
+            "adapter": "webhook",
+            "config": {"url": "http://example/"},
+            "enabled": True,
         }
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history), \
-             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
-             patch.object(app.db, "insert_push_log", return_value="log-1"), \
-             patch.object(app.db, "update_endpoint_stats", return_value=None), \
-             patch.object(app.db, "update_history_push_status", return_value=None), \
-             patch.object(app._erp, "push_to_endpoint",
-                          side_effect=self._tripwire_sync_helper):
+        fake_history = {
+            "id": "h-1",
+            "invoice_no": "INV-1",
+            "seller_name": "S",
+            "total_amount": "100",
+        }
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
+            patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
+            patch.object(app.db, "insert_push_log", return_value="log-1"),
+            patch.object(app.db, "update_endpoint_stats", return_value=None),
+            patch.object(app.db, "update_history_push_status", return_value=None),
+            patch.object(app._erp, "push_to_endpoint", side_effect=self._tripwire_sync_helper),
+        ):
             client = await self._make_async_client()
             async with client:
-                r = await client.post("/api/erp/push", json={
-                    "history_id": "h-1", "endpoint_id": "ep-1",
-                })
+                r = await client.post(
+                    "/api/erp/push",
+                    json={
+                        "history_id": "h-1",
+                        "endpoint_id": "ep-1",
+                    },
+                )
         # Route returns ok status; key thing is the route DIDN'T hit
         # the tripwire (which would've raised RuntimeError).
         self.assertIn(r.status_code, (200, 500), r.text)
         if r.status_code == 500:
             # Inspect what raised; tripwire-fired indicates the bug.
-            self.assertNotIn("Playwright Sync API", r.text,
-                             f"push route did NOT offload: {r.text}")
+            self.assertNotIn("Playwright Sync API", r.text, f"push route did NOT offload: {r.text}")
 
 
 @unittest.skipUnless(
@@ -627,7 +728,8 @@ class ChromiumActualLaunchTests(unittest.TestCase):
             version = browser.version
             # Sanity check the version string looks plausible.
             self.assertRegex(
-                version, r"^\d+\.",
+                version,
+                r"^\d+\.",
                 f"chromium reported odd version string: {version!r}",
             )
             # Open + close a page to exercise the full surface, not
@@ -696,6 +798,7 @@ class MrerpAdapterConstraintTests(unittest.TestCase):
         # without psycopg2 / postgres reachability.
         try:
             import db as _db
+
             self._db = _db
         except Exception as e:
             self.skipTest(f"db module unavailable: {e}")
@@ -720,7 +823,8 @@ class MrerpAdapterConstraintTests(unittest.TestCase):
             "system_url": "https://www.mrerp4sme.com",
             "username_enc": "gAAAAA_dummy_ciphertext_for_test_only",
             "password_enc": "gAAAAA_dummy_ciphertext_for_test_only",
-            "comidyear": "6", "seldb": "1",
+            "comidyear": "6",
+            "seldb": "1",
             "seed_customer_code": "0006",
             "seed_product_code": "P001",
         }
@@ -742,7 +846,8 @@ class MrerpAdapterConstraintTests(unittest.TestCase):
                             "mrerp-constraint-test-" + uuid.uuid4().hex[:8],
                             "mrerp",
                             _json.dumps(config),
-                            False, False,
+                            False,
+                            False,
                         ),
                     )
                     row = cur.fetchone()
@@ -834,7 +939,8 @@ class LoginFormRetryTests(unittest.TestCase):
         cls._server = socketserver.TCPServer(("127.0.0.1", 0), _SlowMrErpHandler)
         cls._port = cls._server.server_address[1]
         cls._thread = threading.Thread(
-            target=cls._server.serve_forever, daemon=True,
+            target=cls._server.serve_forever,
+            daemon=True,
         )
         cls._thread.start()
 
@@ -854,7 +960,8 @@ class LoginFormRetryTests(unittest.TestCase):
         try:
             from services.erp.mrerp_adapter import MRERPAdapter
             from services.erp.exceptions import (
-                MRERPAuthError, MRERPTechnicalError,
+                MRERPAuthError,
+                MRERPTechnicalError,
             )
         except ImportError as e:
             self.skipTest(f"mrerp_adapter import unavailable: {e}")
@@ -864,9 +971,10 @@ class LoginFormRetryTests(unittest.TestCase):
             login_url=url,
             username="probe",
             password="probe",
-            comidyear="6", seldb="1",
+            comidyear="6",
+            seldb="1",
             headless=True,
-            retry_attempts=1,           # outer-layer retry off — we
+            retry_attempts=1,  # outer-layer retry off — we
             retry_delays_seconds=(0,),  # only want to test the inner wait
         )
         # We expect EITHER a successful form fill (and then an auth
@@ -885,18 +993,20 @@ class LoginFormRetryTests(unittest.TestCase):
             observed_msg = f"{type(e).__name__}: {e}"
 
         self.assertNotIn(
-            "login form missing", observed_msg.lower(),
+            "login form missing",
+            observed_msg.lower(),
             f"wait_for_selector regression — the login probe gave up "
-            f"before the slow-server form rendered: {observed_msg!r}"
+            f"before the slow-server form rendered: {observed_msg!r}",
         )
         # Also: 'after reload' would mean we tried once, reloaded, and
         # still didn't see it. With a 3s delay and 15s budget, this
         # shouldn't happen.
         self.assertNotIn(
-            "after reload", observed_msg.lower(),
+            "after reload",
+            observed_msg.lower(),
             f"wait_for_selector reload-retry regression — even the "
             f"reload-and-retry path gave up on a 3s-delayed form: "
-            f"{observed_msg!r}"
+            f"{observed_msg!r}",
         )
 
 
@@ -949,8 +1059,10 @@ class PushMRERPRouteContractTests(unittest.TestCase):
             "adapter": "mrerp",
             "config": {
                 "system_url": "https://www.mrerp4sme.com",
-                "username": "u", "password": "p",  # plaintext path
-                "comidyear": "6", "seldb": "1",
+                "username": "u",
+                "password": "p",  # plaintext path
+                "comidyear": "6",
+                "seldb": "1",
                 "seed_customer_code": "0006",
                 "seed_product_code": "P001",
             },
@@ -962,18 +1074,28 @@ class PushMRERPRouteContractTests(unittest.TestCase):
             "invoice_date": "2026-05-19",
             "total_amount": 107.00,
             "client_id": 1,
-            "pages": [{
-                "fields": {
-                    "buyer_name": "Skin Trading Co., Ltd.",
-                    "buyer_tax": "0123456789012",
-                    "items": [{"name": "Pepsi 500ml", "qty": 1,
-                               "unit_price": 100.00, "amount": 100.00}],
-                },
-            }],
+            "pages": [
+                {
+                    "fields": {
+                        "buyer_name": "Skin Trading Co., Ltd.",
+                        "buyer_tax": "0123456789012",
+                        "items": [
+                            {
+                                "name": "Pepsi 500ml",
+                                "qty": 1,
+                                "unit_price": 100.00,
+                                "amount": 100.00,
+                            }
+                        ],
+                    },
+                }
+            ],
         }
         mappings = {
             "clients": [{"erp_type": "mrerp", "client_id": 1, "erp_code": "0006"}],
-            "products": [], "accounts": [], "taxes": [],
+            "products": [],
+            "accounts": [],
+            "taxes": [],
         }
 
         # push_mrerp_history does `import db as _db` lazily. Locally,
@@ -986,8 +1108,10 @@ class PushMRERPRouteContractTests(unittest.TestCase):
         original_db = sys.modules.get("db")
         sys.modules["db"] = fake_db
         try:
-            with patch.object(_mrerp_mod, "MRERPAdapter", _FakeMRERPAdapterForPushTests), \
-                 patch.object(_erp_mod, "logger", MagicMock()):
+            with (
+                patch.object(_mrerp_mod, "MRERPAdapter", _FakeMRERPAdapterForPushTests),
+                patch.object(_erp_mod, "logger", MagicMock()),
+            ):
                 result = _erp_mod.push_to_endpoint(endpoint, history)
         finally:
             if original_db is None:
@@ -997,20 +1121,28 @@ class PushMRERPRouteContractTests(unittest.TestCase):
 
         # ── Shape: must be the full push_to_endpoint dict.
         self.assertIsInstance(result, dict)
-        for key in ("success", "http_status", "response_body", "error_msg",
-                    "elapsed_ms", "request_body", "adapter"):
-            self.assertIn(key, result,
-                          f"push_to_endpoint result missing {key!r}: {result!r}")
-        self.assertEqual(result["adapter"], "mrerp",
-                         f"adapter field clobbered: {result!r}")
+        for key in (
+            "success",
+            "http_status",
+            "response_body",
+            "error_msg",
+            "elapsed_ms",
+            "request_body",
+            "adapter",
+        ):
+            self.assertIn(key, result, f"push_to_endpoint result missing {key!r}: {result!r}")
+        self.assertEqual(result["adapter"], "mrerp", f"adapter field clobbered: {result!r}")
 
         # ── Smoking-gun: the stub message MUST NOT appear anywhere.
-        joined = " ".join([
-            str(result.get("response_body") or ""),
-            str(result.get("error_msg") or ""),
-        ]).lower()
+        joined = " ".join(
+            [
+                str(result.get("response_body") or ""),
+                str(result.get("error_msg") or ""),
+            ]
+        ).lower()
         self.assertNotIn(
-            "not wired into push_to_endpoint", joined,
+            "not wired into push_to_endpoint",
+            joined,
             f"push_to_endpoint(mrerp) still hits the stub: {result!r}",
         )
 
@@ -1021,14 +1153,16 @@ class PushMRERPRouteContractTests(unittest.TestCase):
             f"failure (probably caught an exception): {result!r}",
         )
         self.assertEqual(
-            result.get("mrerp_bill_no"), "SI-TEST-OK",
+            result.get("mrerp_bill_no"),
+            "SI-TEST-OK",
             f"mrerp_bill_no not propagated from ImportResult to "
             f"push_to_endpoint result: {result!r}",
         )
 
         # ── The fake adapter must have been invoked exactly once.
         self.assertEqual(
-            _FakeMRERPAdapterForPushTests.upload_call_count, 1,
+            _FakeMRERPAdapterForPushTests.upload_call_count,
+            1,
             "MRERPAdapter.upload_invoice_batch wasn't called — "
             "push_to_endpoint(mrerp) is not actually going through "
             "MRERPAdapter.",
@@ -1037,7 +1171,8 @@ class PushMRERPRouteContractTests(unittest.TestCase):
         last_call_histories = _FakeMRERPAdapterForPushTests.last_call_histories
         self.assertIsInstance(last_call_histories, list)
         self.assertEqual(
-            len(last_call_histories), 1,
+            len(last_call_histories),
+            1,
             "MRERPAdapter received !=1 histories — push_mrerp_history "
             "must wrap the single history in a 1-item list.",
         )
@@ -1049,12 +1184,18 @@ class PushMRERPRouteContractTests(unittest.TestCase):
         import erp_push as _erp_mod
 
         endpoint = {
-            "id": "ep-test-wh", "user_id": "u",
+            "id": "ep-test-wh",
+            "user_id": "u",
             "adapter": "webhook",
             "config": {"url": "https://example.invalid/hook"},
         }
-        history = {"id": "h1", "invoice_no": "INV1", "seller_name": "S",
-                   "total_amount": 100.0, "pages": []}
+        history = {
+            "id": "h1",
+            "invoice_no": "INV1",
+            "seller_name": "S",
+            "total_amount": 100.0,
+            "pages": [],
+        }
 
         # ADAPTER_REGISTRY holds a frozen reference to push_webhook,
         # captured at module-load time. To intercept the call we must
@@ -1082,6 +1223,7 @@ class _FakeMRERPAdapterForPushTests:
     Class-level state is reset by `reset()` between tests; that's fine
     because the test class runs them sequentially.
     """
+
     upload_call_count: int = 0
     last_call_histories = None
     last_call_mappings = None
@@ -1115,20 +1257,21 @@ class _FakeMRERPAdapterForPushTests:
         """Return a happy-path ImportResult with one SuccessRow per
         history. Records args so assertions can check the shape."""
         from services.erp.mrerp_adapter import ImportResult, SuccessRow
+
         cls = type(self)
         cls.upload_call_count += 1
         cls.last_call_histories = list(histories)
         cls.last_call_mappings = dict(mappings) if isinstance(mappings, dict) else mappings
-        result = ImportResult(total=len(histories), elapsed_ms=42,
-                              xlsx_size_bytes=1024)
+        result = ImportResult(total=len(histories), elapsed_ms=42, xlsx_size_bytes=1024)
         for h in histories:
-            inv_no = (h.get("invoice_no") or h.get("invoice_number")
-                      or "TEST-INV")
-            result.success.append(SuccessRow(
-                invoice_no=inv_no,
-                mrerp_bill_no="SI-TEST-OK",
-                original=h,
-            ))
+            inv_no = h.get("invoice_no") or h.get("invoice_number") or "TEST-INV"
+            result.success.append(
+                SuccessRow(
+                    invoice_no=inv_no,
+                    mrerp_bill_no="SI-TEST-OK",
+                    original=h,
+                )
+            )
         return result
 
 
@@ -1139,8 +1282,10 @@ def _can_import_app_for_async_tests() -> bool:
     chain fails — server-side / CI has the deps and runs the test."""
     try:
         import os
+
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app  # noqa
+
         return True
     except Exception:
         return False
@@ -1181,14 +1326,18 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import os
+
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
-        import app   # noqa
+        import app  # noqa
+
         cls.app_module = app
 
     async def _make_async_client(self):
         import httpx
+
         try:
             from httpx import ASGITransport
+
             transport = ASGITransport(app=self.app_module.app)
             return httpx.AsyncClient(transport=transport, base_url="http://test")
         except ImportError:
@@ -1197,9 +1346,11 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
     def test_push_to_endpoint_in_async_context_pushes_real_invoice(self):
         """Sync wrapper · asyncio.run() 跑真正的 async 验证体。"""
         import asyncio
+
         # 先清掉前面 sync TestClient 可能残留的 running_loop 标志,
         # 否则 asyncio.run() 自己也会撞 _check_running。
         import asyncio.events as _aevents
+
         try:
             _aevents._set_running_loop(None)
         except Exception:
@@ -1224,8 +1375,10 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
             "adapter": "mrerp",
             "config": {
                 "system_url": "https://www.mrerp4sme.com",
-                "username_enc": "u", "password_enc": "p",
-                "comidyear": "6", "seldb": "1",
+                "username_enc": "u",
+                "password_enc": "p",
+                "comidyear": "6",
+                "seldb": "1",
             },
             "enabled": True,
         }
@@ -1235,44 +1388,52 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
             "invoice_date": "2026-05-19",
             "total_amount": 107.0,
             "client_id": 1,
-            "pages": [{"fields": {
-                "buyer_name": "Skin Trading Co., Ltd.",
-                "buyer_tax": "0123456789012",
-                "items": [{"name": "Pepsi 500ml", "qty": 1,
-                           "unit_price": 100.0, "amount": 100.0}],
-            }}],
+            "pages": [
+                {
+                    "fields": {
+                        "buyer_name": "Skin Trading Co., Ltd.",
+                        "buyer_tax": "0123456789012",
+                        "items": [
+                            {"name": "Pepsi 500ml", "qty": 1, "unit_price": 100.0, "amount": 100.0}
+                        ],
+                    }
+                }
+            ],
         }
 
         fake_mappings = {
-            "clients": [{"erp_type": "mrerp", "client_id": 1,
-                         "erp_code": "0006"}],
-            "products": [], "accounts": [], "taxes": [],
+            "clients": [{"erp_type": "mrerp", "client_id": 1, "erp_code": "0006"}],
+            "products": [],
+            "accounts": [],
+            "taxes": [],
         }
 
         _AsyncTripwireAdapter.reset()
 
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_ocr_history_detail",
-                          return_value=fake_history), \
-             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
-             patch.object(app.db, "get_user_tenant_id",
-                          return_value="tenant-1"), \
-             patch.object(app.db, "get_mrerp_mappings_bundle",
-                          return_value=fake_mappings), \
-             patch.object(app.db, "insert_push_log", return_value="log-1"), \
-             patch.object(app.db, "update_endpoint_stats", return_value=None), \
-             patch.object(app.db, "update_history_push_status",
-                          return_value=None), \
-             patch.object(app.db, "get_erp_retry_delay_sec",
-                          return_value=None), \
-             patch.object(_mrerp_mod, "MRERPAdapter", _AsyncTripwireAdapter):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
+            patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
+            patch.object(app.db, "get_user_tenant_id", return_value="tenant-1"),
+            patch.object(app.db, "get_mrerp_mappings_bundle", return_value=fake_mappings),
+            patch.object(app.db, "insert_push_log", return_value="log-1"),
+            patch.object(app.db, "update_endpoint_stats", return_value=None),
+            patch.object(app.db, "update_history_push_status", return_value=None),
+            patch.object(app.db, "get_erp_retry_delay_sec", return_value=None),
+            patch.object(_mrerp_mod, "MRERPAdapter", _AsyncTripwireAdapter),
+        ):
             client = await self._make_async_client()
             async with client:
-                r = await client.post("/api/erp/push", json={
-                    "history_id": "h-1", "endpoint_id": "ep-mrerp-1",
-                })
+                r = await client.post(
+                    "/api/erp/push",
+                    json={
+                        "history_id": "h-1",
+                        "endpoint_id": "ep-mrerp-1",
+                    },
+                )
 
         # We accept either 200 (happy path) or 500 (some db wiring
         # didn't mock perfectly) but NEVER the tripwire message. That
@@ -1280,7 +1441,8 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
         # loop — the bug we're catching.
         body_text = r.text or ""
         self.assertNotIn(
-            "Sync API inside the asyncio loop", body_text,
+            "Sync API inside the asyncio loop",
+            body_text,
             f"push_to_endpoint(mrerp) ran on the event loop. The route "
             f"must wrap it in asyncio.to_thread. Response: {body_text}",
         )
@@ -1300,9 +1462,9 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
                 f"push response not ok despite tripwire silent: {body!r}",
             )
             self.assertEqual(
-                _AsyncTripwireAdapter.enter_call_count, 1,
-                f"adapter __enter__ not called once: "
-                f"{_AsyncTripwireAdapter.enter_call_count}",
+                _AsyncTripwireAdapter.enter_call_count,
+                1,
+                f"adapter __enter__ not called once: " f"{_AsyncTripwireAdapter.enter_call_count}",
             )
 
 
@@ -1331,6 +1493,7 @@ class _AsyncTripwireAdapter:
 
     def __enter__(self):
         import asyncio
+
         type(self).enter_call_count += 1
         try:
             loop = asyncio.get_running_loop()
@@ -1351,17 +1514,18 @@ class _AsyncTripwireAdapter:
 
     def upload_invoice_batch(self, histories, mappings):
         from services.erp.mrerp_adapter import ImportResult, SuccessRow
+
         type(self).upload_call_count += 1
-        result = ImportResult(total=len(histories), elapsed_ms=10,
-                              xlsx_size_bytes=512)
+        result = ImportResult(total=len(histories), elapsed_ms=10, xlsx_size_bytes=512)
         for h in histories:
-            inv_no = (h.get("invoice_no") or h.get("invoice_number")
-                      or "ASYNC-TEST")
-            result.success.append(SuccessRow(
-                invoice_no=inv_no,
-                mrerp_bill_no="SI-ASYNC-OK",
-                original=h,
-            ))
+            inv_no = h.get("invoice_no") or h.get("invoice_number") or "ASYNC-TEST"
+            result.success.append(
+                SuccessRow(
+                    invoice_no=inv_no,
+                    mrerp_bill_no="SI-ASYNC-OK",
+                    original=h,
+                )
+            )
         return result
 
 
@@ -1398,12 +1562,15 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import os
+
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app
+
         cls.app_module = app
 
     def _make_client(self):
         from fastapi.testclient import TestClient
+
         return TestClient(self.app_module.app)
 
     def test_push_failure_returns_200_with_body_ok_false(self):
@@ -1413,13 +1580,18 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
         app = self.app_module
 
         fake_ep = {
-            "id": "ep-1", "user_id": "u",
-            "adapter": "mrerp", "config": {}, "name": "MR.ERP",
+            "id": "ep-1",
+            "user_id": "u",
+            "adapter": "mrerp",
+            "config": {},
+            "name": "MR.ERP",
             "enabled": True,
         }
         fake_history = {
-            "id": "h-1", "invoice_no": "INV-FAIL",
-            "seller_name": "Seller", "total_amount": 100.0,
+            "id": "h-1",
+            "invoice_no": "INV-FAIL",
+            "seller_name": "Seller",
+            "total_amount": 100.0,
         }
         # The actual smoking-gun: push_to_endpoint returns success=False
         # with the realistic error_msg shape from a failed business
@@ -1434,31 +1606,35 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
             "adapter": "mrerp",
         }
 
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_ocr_history_detail",
-                          return_value=fake_history), \
-             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
-             patch.object(app.db, "insert_push_log",
-                          return_value="log-1") as insert_log_mock, \
-             patch.object(app.db, "update_endpoint_stats",
-                          return_value=None) as stats_mock, \
-             patch.object(app.db, "update_history_push_status",
-                          return_value=None) as history_status_mock, \
-             patch.object(app.db, "get_erp_retry_delay_sec",
-                          return_value=60), \
-             patch.object(app.db, "schedule_log_retry", return_value=None), \
-             patch.object(app._erp, "push_to_endpoint",
-                          return_value=failed_result):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
+            patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
+            patch.object(app.db, "insert_push_log", return_value="log-1") as insert_log_mock,
+            patch.object(app.db, "update_endpoint_stats", return_value=None) as stats_mock,
+            patch.object(
+                app.db, "update_history_push_status", return_value=None
+            ) as history_status_mock,
+            patch.object(app.db, "get_erp_retry_delay_sec", return_value=60),
+            patch.object(app.db, "schedule_log_retry", return_value=None),
+            patch.object(app._erp, "push_to_endpoint", return_value=failed_result),
+        ):
             with self._make_client() as client:
-                r = client.post("/api/erp/push", json={
-                    "history_id": "h-1", "endpoint_id": "ep-1",
-                })
+                r = client.post(
+                    "/api/erp/push",
+                    json={
+                        "history_id": "h-1",
+                        "endpoint_id": "ep-1",
+                    },
+                )
 
         # ── Contract 1: HTTP 200 (not 4xx — business failure is logged)
         self.assertEqual(
-            r.status_code, 200,
+            r.status_code,
+            200,
             f"failed push returned non-200 — the JS can't distinguish "
             f"business-failure (which should land in push log) from a "
             f"true HTTP error: {r.status_code} {r.text}",
@@ -1467,7 +1643,8 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
         # ── Contract 2: body.ok=False (the SoT field the JS must read)
         body = r.json()
         self.assertEqual(
-            body["ok"], False,
+            body["ok"],
+            False,
             f"push failed but body.ok != False — JS will show a green "
             f"success toast on a failure: {body!r}",
         )
@@ -1477,24 +1654,25 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
         insert_log_mock.assert_called_once()
         log_kwargs = insert_log_mock.call_args.kwargs
         self.assertEqual(
-            log_kwargs.get("status"), "failed",
-            f"erp_push_logs.status != 'failed' on failed push: "
-            f"{log_kwargs!r}",
+            log_kwargs.get("status"),
+            "failed",
+            f"erp_push_logs.status != 'failed' on failed push: " f"{log_kwargs!r}",
         )
 
         stats_mock.assert_called_once()
         # update_endpoint_stats is positional: (endpoint_id, success_bool)
         stats_success_arg = stats_mock.call_args.args[1]
         self.assertEqual(
-            stats_success_arg, False,
-            f"update_endpoint_stats success!=False on failed push: "
-            f"{stats_mock.call_args!r}",
+            stats_success_arg,
+            False,
+            f"update_endpoint_stats success!=False on failed push: " f"{stats_mock.call_args!r}",
         )
 
         history_status_mock.assert_called_once()
         history_status_arg = history_status_mock.call_args.args[1]
         self.assertEqual(
-            history_status_arg, "failed",
+            history_status_arg,
+            "failed",
             f"ocr_history.last_push_status != 'failed' on failed push "
             f"(this is the field the drawer reads — if it says "
             f"'success' the drawer renders the green '已推送' badge "
@@ -1509,13 +1687,18 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
         app = self.app_module
 
         fake_ep = {
-            "id": "ep-1", "user_id": "u",
-            "adapter": "mrerp", "config": {}, "name": "MR.ERP",
+            "id": "ep-1",
+            "user_id": "u",
+            "adapter": "mrerp",
+            "config": {},
+            "name": "MR.ERP",
             "enabled": True,
         }
         fake_history = {
-            "id": "h-1", "invoice_no": "INV-OK",
-            "seller_name": "Seller", "total_amount": 107.0,
+            "id": "h-1",
+            "invoice_no": "INV-OK",
+            "seller_name": "Seller",
+            "total_amount": 107.0,
         }
         success_result = {
             "success": True,
@@ -1528,31 +1711,34 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
             "mrerp_bill_no": "SI-OK",
         }
 
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_ocr_history_detail",
-                          return_value=fake_history), \
-             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep), \
-             patch.object(app.db, "insert_push_log",
-                          return_value="log-1") as insert_log_mock, \
-             patch.object(app.db, "update_endpoint_stats",
-                          return_value=None) as stats_mock, \
-             patch.object(app.db, "update_history_push_status",
-                          return_value=None) as history_status_mock, \
-             patch.object(app._erp, "push_to_endpoint",
-                          return_value=success_result):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
+            patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
+            patch.object(app.db, "insert_push_log", return_value="log-1") as insert_log_mock,
+            patch.object(app.db, "update_endpoint_stats", return_value=None) as stats_mock,
+            patch.object(
+                app.db, "update_history_push_status", return_value=None
+            ) as history_status_mock,
+            patch.object(app._erp, "push_to_endpoint", return_value=success_result),
+        ):
             with self._make_client() as client:
-                r = client.post("/api/erp/push", json={
-                    "history_id": "h-1", "endpoint_id": "ep-1",
-                })
+                r = client.post(
+                    "/api/erp/push",
+                    json={
+                        "history_id": "h-1",
+                        "endpoint_id": "ep-1",
+                    },
+                )
 
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
         self.assertTrue(body["ok"], f"success push body.ok != True: {body!r}")
 
-        self.assertEqual(
-            insert_log_mock.call_args.kwargs.get("status"), "success")
+        self.assertEqual(insert_log_mock.call_args.kwargs.get("status"), "success")
         self.assertEqual(stats_mock.call_args.args[1], True)
         self.assertEqual(history_status_mock.call_args.args[1], "success")
 
@@ -1580,12 +1766,15 @@ class ListingRetryContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import os
+
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app
+
         cls.app_module = app
 
     def _make_client(self):
         from fastapi.testclient import TestClient
+
         return TestClient(self.app_module.app)
 
     def _patch_common(self):
@@ -1594,16 +1783,24 @@ class ListingRetryContractTests(unittest.TestCase):
         ExitStack so each test can `with stack:` apply them all."""
         app = self.app_module
         fake_ep = {
-            "id": "ep-1", "user_id": "u",
-            "adapter": "mrerp", "config": {
-                "username_enc": "u", "password_enc": "p",
+            "id": "ep-1",
+            "user_id": "u",
+            "adapter": "mrerp",
+            "config": {
+                "username_enc": "u",
+                "password_enc": "p",
             },
-            "name": "MR.ERP", "enabled": True,
+            "name": "MR.ERP",
+            "enabled": True,
         }
         import contextlib
+
         stack = contextlib.ExitStack()
-        stack.enter_context(patch.object(app, "get_current_user_from_request",
-                                         return_value={"id": "u", "plan": "pro"}))
+        stack.enter_context(
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            )
+        )
         stack.enter_context(patch.object(app, "_check_push_access", return_value=None))
         stack.enter_context(patch.object(app.db, "get_erp_endpoint", return_value=fake_ep))
         return stack
@@ -1611,19 +1808,33 @@ class ListingRetryContractTests(unittest.TestCase):
     def test_customers_route_retries_on_transient_failure(self):
         app = self.app_module
         # First call: ERR_TECHNICAL (transient). Second call: success.
-        results_to_return = iter([
-            {"ok": False, "customers": [], "error_code": "ERR_TECHNICAL",
-             "error_friendly": {"zh": "技术错误"}, "raw_error": "timeout",
-             "elapsed_ms": 100},
-            {"ok": True, "customers": [{"code": "0006", "name": "Skin"}],
-             "error_code": None, "error_friendly": None, "raw_error": None,
-             "elapsed_ms": 200},
-        ])
+        results_to_return = iter(
+            [
+                {
+                    "ok": False,
+                    "customers": [],
+                    "error_code": "ERR_TECHNICAL",
+                    "error_friendly": {"zh": "技术错误"},
+                    "raw_error": "timeout",
+                    "elapsed_ms": 100,
+                },
+                {
+                    "ok": True,
+                    "customers": [{"code": "0006", "name": "Skin"}],
+                    "error_code": None,
+                    "error_friendly": None,
+                    "raw_error": None,
+                    "elapsed_ms": 200,
+                },
+            ]
+        )
         fetch_mock = MagicMock(side_effect=lambda cfg: next(results_to_return))
 
-        with self._patch_common(), \
-             patch.object(app._erp, "list_mrerp_customers", fetch_mock), \
-             patch("asyncio.sleep", side_effect=lambda s: None):
+        with (
+            self._patch_common(),
+            patch.object(app._erp, "list_mrerp_customers", fetch_mock),
+            patch("asyncio.sleep", side_effect=lambda s: None),
+        ):
             with self._make_client() as client:
                 r = client.get(
                     "/api/erp/endpoints/ep-1/customers?refresh=1",
@@ -1636,9 +1847,9 @@ class ListingRetryContractTests(unittest.TestCase):
             f"retry didn't recover on second attempt: {body!r}",
         )
         self.assertEqual(
-            fetch_mock.call_count, 2,
-            f"expected exactly 2 fetch calls (1 fail + 1 retry), "
-            f"got {fetch_mock.call_count}",
+            fetch_mock.call_count,
+            2,
+            f"expected exactly 2 fetch calls (1 fail + 1 retry), " f"got {fetch_mock.call_count}",
         )
         self.assertEqual(body["customers"][0]["code"], "0006")
 
@@ -1646,15 +1857,22 @@ class ListingRetryContractTests(unittest.TestCase):
         """ERR_AUTH is non-transient · retry would just fail again ·
         bail out after 1 attempt."""
         app = self.app_module
-        fetch_mock = MagicMock(return_value={
-            "ok": False, "customers": [], "error_code": "ERR_AUTH",
-            "error_friendly": {"zh": "凭据错误"}, "raw_error": "401",
-            "elapsed_ms": 50,
-        })
+        fetch_mock = MagicMock(
+            return_value={
+                "ok": False,
+                "customers": [],
+                "error_code": "ERR_AUTH",
+                "error_friendly": {"zh": "凭据错误"},
+                "raw_error": "401",
+                "elapsed_ms": 50,
+            }
+        )
 
-        with self._patch_common(), \
-             patch.object(app._erp, "list_mrerp_customers", fetch_mock), \
-             patch("asyncio.sleep", side_effect=lambda s: None):
+        with (
+            self._patch_common(),
+            patch.object(app._erp, "list_mrerp_customers", fetch_mock),
+            patch("asyncio.sleep", side_effect=lambda s: None),
+        ):
             with self._make_client() as client:
                 r = client.get(
                     "/api/erp/endpoints/ep-1/customers?refresh=1",
@@ -1665,7 +1883,8 @@ class ListingRetryContractTests(unittest.TestCase):
         self.assertFalse(body["ok"])
         self.assertEqual(body["error_code"], "ERR_AUTH")
         self.assertEqual(
-            fetch_mock.call_count, 1,
+            fetch_mock.call_count,
+            1,
             f"ERR_AUTH should NOT be retried — wasting MR.ERP login "
             f"attempts is bad — got {fetch_mock.call_count} calls",
         )
@@ -1676,11 +1895,16 @@ class ListingRetryContractTests(unittest.TestCase):
         though MR.ERP is fine. Asserts failure responses bypass the cache
         so the next click retries fresh."""
         app = self.app_module
-        fetch_mock = MagicMock(return_value={
-            "ok": False, "customers": [], "error_code": "ERR_TECHNICAL",
-            "error_friendly": {"zh": "技术错误"}, "raw_error": "timeout",
-            "elapsed_ms": 100,
-        })
+        fetch_mock = MagicMock(
+            return_value={
+                "ok": False,
+                "customers": [],
+                "error_code": "ERR_TECHNICAL",
+                "error_friendly": {"zh": "技术错误"},
+                "raw_error": "timeout",
+                "elapsed_ms": 100,
+            }
+        )
 
         # Clear any existing cache for this key.
         try:
@@ -1688,9 +1912,11 @@ class ListingRetryContractTests(unittest.TestCase):
         except AttributeError:
             pass
 
-        with self._patch_common(), \
-             patch.object(app._erp, "list_mrerp_customers", fetch_mock), \
-             patch("asyncio.sleep", side_effect=lambda s: None):
+        with (
+            self._patch_common(),
+            patch.object(app._erp, "list_mrerp_customers", fetch_mock),
+            patch("asyncio.sleep", side_effect=lambda s: None),
+        ):
             with self._make_client() as client:
                 r1 = client.get("/api/erp/endpoints/ep-1/customers")
                 r2 = client.get("/api/erp/endpoints/ep-1/customers")
@@ -1701,7 +1927,8 @@ class ListingRetryContractTests(unittest.TestCase):
         # (once for r1's two retry attempts; r2 would hit cache). We
         # require it called 4 times (2 retries × 2 requests).
         self.assertEqual(
-            fetch_mock.call_count, 4,
+            fetch_mock.call_count,
+            4,
             f"failure response was cached — second request didn't hit "
             f"the backend ({fetch_mock.call_count} calls instead of 4)",
         )
@@ -1731,6 +1958,7 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import os
+
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         # v118.35.0.29(2026-05-22)· 单元测试用一个临时 Fernet key,让
         # kms_helper 顶层 import 不 raise。否则 PATCH 路由里 lazy
@@ -1739,12 +1967,15 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
         # 害死后面的 IsolatedAsyncioTestCase("loop already running")。
         if not os.environ.get("PEARNLY_KMS_KEY"):
             from cryptography.fernet import Fernet
+
             os.environ["PEARNLY_KMS_KEY"] = Fernet.generate_key().decode()
         import app
+
         cls.app_module = app
 
     def _make_client(self):
         from fastapi.testclient import TestClient
+
         return TestClient(self.app_module.app)
 
     def test_patch_mrerp_endpoint_encrypts_plaintext_credentials(self):
@@ -1752,33 +1983,42 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
         receives ciphertext in username_enc/password_enc."""
         app = self.app_module
         existing_ep = {
-            "id": "ep-1", "user_id": "u",
+            "id": "ep-1",
+            "user_id": "u",
             "adapter": "mrerp",
             "config": {
                 "system_url": "https://www.mrerp4sme.com",
                 "username_enc": "gAAAAA_old_user_ciphertext",
                 "password_enc": "gAAAAA_old_pass_ciphertext",
-                "comidyear": "6", "seldb": "1",
+                "comidyear": "6",
+                "seldb": "1",
             },
-            "enabled": True, "name": "MR.ERP",
+            "enabled": True,
+            "name": "MR.ERP",
         }
 
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep), \
-             patch.object(app.db, "update_erp_endpoint",
-                          return_value=True) as update_mock:
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_erp_endpoint", return_value=existing_ep),
+            patch.object(app.db, "update_erp_endpoint", return_value=True) as update_mock,
+        ):
             with self._make_client() as client:
-                r = client.patch("/api/erp/endpoints/ep-1", json={
-                    "config": {
-                        "system_url": "https://www.mrerp4sme.com",
-                        # Plaintext freshly typed by user via wizard re-edit
-                        "username_enc": "test01",
-                        "password_enc": "newpassword01",
-                        "comidyear": "6", "seldb": "1",
+                r = client.patch(
+                    "/api/erp/endpoints/ep-1",
+                    json={
+                        "config": {
+                            "system_url": "https://www.mrerp4sme.com",
+                            # Plaintext freshly typed by user via wizard re-edit
+                            "username_enc": "test01",
+                            "password_enc": "newpassword01",
+                            "comidyear": "6",
+                            "seldb": "1",
+                        },
                     },
-                })
+                )
 
         self.assertEqual(r.status_code, 200, r.text)
         update_mock.assert_called_once()
@@ -1805,42 +2045,52 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
         endpoint produces ciphertext-of-ciphertext that fails to decrypt."""
         app = self.app_module
         existing_ep = {
-            "id": "ep-1", "user_id": "u",
+            "id": "ep-1",
+            "user_id": "u",
             "adapter": "mrerp",
             "config": {"system_url": "https://www.mrerp4sme.com"},
-            "enabled": True, "name": "MR.ERP",
+            "enabled": True,
+            "name": "MR.ERP",
         }
         # Generate a real-looking Fernet ciphertext for the test (using
         # the same kms_helper the route uses).
         try:
             from kms_helper import encrypt_str
+
             already_ct_user = encrypt_str("test01")
             already_ct_pass = encrypt_str("test01pass")
         except Exception as e:
             self.skipTest(f"kms_helper unavailable: {e}")
 
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "pro"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep), \
-             patch.object(app.db, "update_erp_endpoint",
-                          return_value=True) as update_mock:
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_erp_endpoint", return_value=existing_ep),
+            patch.object(app.db, "update_erp_endpoint", return_value=True) as update_mock,
+        ):
             with self._make_client() as client:
-                r = client.patch("/api/erp/endpoints/ep-1", json={
-                    "config": {
-                        "username_enc": already_ct_user,
-                        "password_enc": already_ct_pass,
+                r = client.patch(
+                    "/api/erp/endpoints/ep-1",
+                    json={
+                        "config": {
+                            "username_enc": already_ct_user,
+                            "password_enc": already_ct_pass,
+                        },
                     },
-                })
+                )
 
         self.assertEqual(r.status_code, 200, r.text)
         sent_config = update_mock.call_args.kwargs.get("config", {})
         self.assertEqual(
-            sent_config["username_enc"], already_ct_user,
+            sent_config["username_enc"],
+            already_ct_user,
             "PATCH double-encrypted already-encrypted username",
         )
         self.assertEqual(
-            sent_config["password_enc"], already_ct_pass,
+            sent_config["password_enc"],
+            already_ct_pass,
             "PATCH double-encrypted already-encrypted password",
         )
 
@@ -1867,57 +2117,79 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import os
+
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app
+
         cls.app_module = app
 
     def _make_client(self):
         from fastapi.testclient import TestClient
+
         return TestClient(self.app_module.app)
 
     def test_post_mrerp_with_empty_client_ids_is_rejected(self):
         app = self.app_module
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "lifetime"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "list_erp_endpoints", return_value=[]):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "lifetime"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "list_erp_endpoints", return_value=[]),
+        ):
             with self._make_client() as client:
-                r = client.post("/api/erp/endpoints", json={
-                    "name": "MR.ERP No-Client",
-                    "adapter": "mrerp",
-                    "config": {
-                        "system_url": "https://www.mrerp4sme.com",
-                        "username_enc": "u", "password_enc": "p",
-                        "client_ids": [],
+                r = client.post(
+                    "/api/erp/endpoints",
+                    json={
+                        "name": "MR.ERP No-Client",
+                        "adapter": "mrerp",
+                        "config": {
+                            "system_url": "https://www.mrerp4sme.com",
+                            "username_enc": "u",
+                            "password_enc": "p",
+                            "client_ids": [],
+                        },
                     },
-                })
+                )
         self.assertEqual(r.status_code, 400, r.text)
         body = r.json()
         # Detail can be a string or dict — accept both shapes as long as
         # it carries the no_clients code.
         detail = body.get("detail")
-        flat = str(detail) if isinstance(detail, (str, int)) else json.dumps(detail) if isinstance(detail, dict) else ""
+        flat = (
+            str(detail)
+            if isinstance(detail, (str, int))
+            else json.dumps(detail) if isinstance(detail, dict) else ""
+        )
         self.assertIn(
-            "endpoint_no_clients", flat,
+            "endpoint_no_clients",
+            flat,
             f"expected endpoint_no_clients in detail, got {detail!r}",
         )
 
     def test_post_mrerp_with_missing_client_ids_is_rejected(self):
         app = self.app_module
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "lifetime"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "list_erp_endpoints", return_value=[]):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "lifetime"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "list_erp_endpoints", return_value=[]),
+        ):
             with self._make_client() as client:
-                r = client.post("/api/erp/endpoints", json={
-                    "name": "MR.ERP No-Client-Key",
-                    "adapter": "mrerp",
-                    "config": {
-                        "system_url": "https://www.mrerp4sme.com",
-                        "username_enc": "u", "password_enc": "p",
-                        # no client_ids key at all
+                r = client.post(
+                    "/api/erp/endpoints",
+                    json={
+                        "name": "MR.ERP No-Client-Key",
+                        "adapter": "mrerp",
+                        "config": {
+                            "system_url": "https://www.mrerp4sme.com",
+                            "username_enc": "u",
+                            "password_enc": "p",
+                            # no client_ids key at all
+                        },
                     },
-                })
+                )
         self.assertEqual(r.status_code, 400, r.text)
 
     def test_patch_mrerp_clearing_client_ids_is_rejected(self):
@@ -1926,20 +2198,28 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
         because the wizard might Re-render an empty checkbox state."""
         app = self.app_module
         existing_ep = {
-            "id": "ep-1", "user_id": "u",
+            "id": "ep-1",
+            "user_id": "u",
             "adapter": "mrerp",
             "config": {"client_ids": ["49"]},
-            "enabled": True, "name": "MR.ERP",
+            "enabled": True,
+            "name": "MR.ERP",
         }
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "lifetime"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep), \
-             patch.object(app.db, "update_erp_endpoint", return_value=True):
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "lifetime"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_erp_endpoint", return_value=existing_ep),
+            patch.object(app.db, "update_erp_endpoint", return_value=True),
+        ):
             with self._make_client() as client:
-                r = client.patch("/api/erp/endpoints/ep-1", json={
-                    "config": {"client_ids": []},
-                })
+                r = client.patch(
+                    "/api/erp/endpoints/ep-1",
+                    json={
+                        "config": {"client_ids": []},
+                    },
+                )
         self.assertEqual(r.status_code, 400, r.text)
 
     def test_post_non_mrerp_adapter_allows_empty_client_ids(self):
@@ -1947,20 +2227,32 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
         mrerp-specific (because mrerp push needs to resolve client_id
         to a customer code mapping)."""
         app = self.app_module
-        with patch.object(app, "get_current_user_from_request",
-                          return_value={"id": "u", "plan": "lifetime"}), \
-             patch.object(app, "_check_push_access", return_value=None), \
-             patch.object(app.db, "list_erp_endpoints", return_value=[]), \
-             patch.object(app.db, "create_erp_endpoint", return_value="new-ep-id"), \
-             patch.object(app.db, "get_erp_endpoint",
-                          return_value={"id": "new-ep-id", "adapter": "webhook",
-                                        "config": {"url": "https://example/"}}):
-            with self._make_client() as client:
-                r = client.post("/api/erp/endpoints", json={
-                    "name": "Generic webhook",
+        with (
+            patch.object(
+                app, "get_current_user_from_request", return_value={"id": "u", "plan": "lifetime"}
+            ),
+            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(app.db, "list_erp_endpoints", return_value=[]),
+            patch.object(app.db, "create_erp_endpoint", return_value="new-ep-id"),
+            patch.object(
+                app.db,
+                "get_erp_endpoint",
+                return_value={
+                    "id": "new-ep-id",
                     "adapter": "webhook",
-                    "config": {"url": "https://example.invalid/hook"},
-                })
+                    "config": {"url": "https://example/"},
+                },
+            ),
+        ):
+            with self._make_client() as client:
+                r = client.post(
+                    "/api/erp/endpoints",
+                    json={
+                        "name": "Generic webhook",
+                        "adapter": "webhook",
+                        "config": {"url": "https://example.invalid/hook"},
+                    },
+                )
         # Webhook with no client_ids should pass — restriction is mrerp-only.
         self.assertEqual(r.status_code, 200, r.text)
 

@@ -7,6 +7,7 @@ REFACTOR-A2.1 (2026-05-22) · Alembic env.py · 从 env var 读 DATABASE_URL
 
 设计文档:docs/architecture/db-migration-plan.md §2.3
 """
+
 import os
 from logging.config import fileConfig
 

@@ -28,7 +28,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import mrerp_xlsx_generator as gen   # noqa: E402
+import mrerp_xlsx_generator as gen  # noqa: E402
 
 
 def _today_iso() -> str:
@@ -43,10 +43,14 @@ def _good_history(**overrides):
         "subtotal": "100.00",
         "vat": "7.00",
         "total_amount": "107.00",
-        "items": [{
-            "name": "TEST ITEM",
-            "qty": 1, "unit_price": 100, "amount": 100,
-        }],
+        "items": [
+            {
+                "name": "TEST ITEM",
+                "qty": 1,
+                "unit_price": 100,
+                "amount": 100,
+            }
+        ],
     }
     h.update(overrides)
     return h
@@ -54,11 +58,16 @@ def _good_history(**overrides):
 
 def _good_mappings(customer_code: str = "0006"):
     return {
-        "clients": [{
-            "erp_type": "mrerp", "client_id": 99,
-            "erp_code": customer_code,
-        }],
-        "accounts": [], "taxes": [], "products": [],
+        "clients": [
+            {
+                "erp_type": "mrerp",
+                "client_id": 99,
+                "erp_code": customer_code,
+            }
+        ],
+        "accounts": [],
+        "taxes": [],
+        "products": [],
     }
 
 
@@ -66,7 +75,8 @@ class HappyPathTests(unittest.TestCase):
 
     def test_legitimate_history_passes_with_no_warnings(self):
         ok, err, warns = gen.validate_history_for_sales_credit(
-            _good_history(), _good_mappings(),
+            _good_history(),
+            _good_mappings(),
         )
         self.assertTrue(ok)
         self.assertIsNone(err)
@@ -76,7 +86,8 @@ class HappyPathTests(unittest.TestCase):
         # +14 days is within reject window (30) but past warn threshold (7).
         d = (date.today() + timedelta(days=14)).isoformat()
         ok, err, warns = gen.validate_history_for_sales_credit(
-            _good_history(invoice_date=d), _good_mappings(),
+            _good_history(invoice_date=d),
+            _good_mappings(),
         )
         self.assertTrue(ok)
         self.assertIsNone(err)
@@ -85,7 +96,8 @@ class HappyPathTests(unittest.TestCase):
     def test_warning_for_very_old_date(self):
         d = (date.today() - timedelta(days=900)).isoformat()
         ok, err, warns = gen.validate_history_for_sales_credit(
-            _good_history(invoice_date=d), _good_mappings(),
+            _good_history(invoice_date=d),
+            _good_mappings(),
         )
         self.assertTrue(ok)
         self.assertIsNone(err)
@@ -97,14 +109,16 @@ class LegacyErrorCoverageTests(unittest.TestCase):
 
     def test_no_history(self):
         ok, err, _ = gen.validate_history_for_sales_credit(
-            {}, _good_mappings(),
+            {},
+            _good_mappings(),
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_NO_HISTORY")
 
     def test_no_client(self):
         ok, err, _ = gen.validate_history_for_sales_credit(
-            _good_history(client_id=0), _good_mappings(),
+            _good_history(client_id=0),
+            _good_mappings(),
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_NO_CLIENT")
@@ -112,7 +126,8 @@ class LegacyErrorCoverageTests(unittest.TestCase):
     def test_no_customer_mapping(self):
         empty_mappings = {"clients": [], "accounts": [], "taxes": [], "products": []}
         ok, err, _ = gen.validate_history_for_sales_credit(
-            _good_history(), empty_mappings,
+            _good_history(),
+            empty_mappings,
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_NO_CUSTOMER_MAPPING")
@@ -122,7 +137,8 @@ class LegacyErrorCoverageTests(unittest.TestCase):
         h["invoice_number"] = None
         h.pop("invoice_no", None)
         ok, err, _ = gen.validate_history_for_sales_credit(
-            h, _good_mappings(),
+            h,
+            _good_mappings(),
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_NO_INVOICE_NO")
@@ -131,14 +147,16 @@ class LegacyErrorCoverageTests(unittest.TestCase):
         h = _good_history()
         h["invoice_date"] = None
         ok, err, _ = gen.validate_history_for_sales_credit(
-            h, _good_mappings(),
+            h,
+            _good_mappings(),
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_NO_INVOICE_DATE")
 
     def test_zero_total_is_rejected(self):
         ok, err, _ = gen.validate_history_for_sales_credit(
-            _good_history(total_amount="0"), _good_mappings(),
+            _good_history(total_amount="0"),
+            _good_mappings(),
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_NO_TOTAL_AMOUNT")
@@ -154,9 +172,10 @@ class FieldLengthTests(unittest.TestCase):
         gen.derive_mrerp_invoice_no = self._orig_derive
 
     def test_invoice_no_too_long(self):
-        gen.derive_mrerp_invoice_no = lambda h: "X" * 19   # 19 > 18 max
+        gen.derive_mrerp_invoice_no = lambda h: "X" * 19  # 19 > 18 max
         ok, err, _ = gen.validate_history_for_sales_credit(
-            _good_history(), _good_mappings(),
+            _good_history(),
+            _good_mappings(),
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_INVOICE_NO_TOO_LONG")
@@ -175,7 +194,8 @@ class FieldLengthTests(unittest.TestCase):
         try:
             gen.derive_mrerp_invoice_no = lambda h: "Y" * 19
             ok, err, _ = gen.validate_history_for_sales_credit(
-                _good_history(), _good_mappings(),
+                _good_history(),
+                _good_mappings(),
             )
             self.assertFalse(ok)
             self.assertEqual(err, "ERR_BILL_NO_TOO_LONG")
@@ -211,20 +231,23 @@ class TaxRateEnumTests(unittest.TestCase):
     def test_default_vat_7_is_valid(self):
         # No tax_rate_pct supplied → derive_tax_kind defaults to vat_7.
         ok, err, _ = gen.validate_history_for_sales_credit(
-            _good_history(), _good_mappings(),
+            _good_history(),
+            _good_mappings(),
         )
         self.assertTrue(ok)
         self.assertIsNone(err)
 
     def test_explicit_vat_0_is_valid(self):
         ok, err, _ = gen.validate_history_for_sales_credit(
-            _good_history(tax_rate_pct=0), _good_mappings(),
+            _good_history(tax_rate_pct=0),
+            _good_mappings(),
         )
         self.assertTrue(ok)
 
     def test_wht_kind_is_rejected_for_sales_credit(self):
         ok, err, _ = gen.validate_history_for_sales_credit(
-            _good_history(wht_rate_pct=3), _good_mappings(),
+            _good_history(wht_rate_pct=3),
+            _good_mappings(),
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_TAX_RATE_INVALID")
@@ -235,7 +258,8 @@ class NegativeAmountTests(unittest.TestCase):
 
     def test_negative_total_rejected(self):
         ok, err, _ = gen.validate_history_for_sales_credit(
-            _good_history(total_amount="-50.00"), _good_mappings(),
+            _good_history(total_amount="-50.00"),
+            _good_mappings(),
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_NEGATIVE_AMOUNT")
@@ -246,7 +270,7 @@ class NegativeAmountTests(unittest.TestCase):
 
     def test_fmt_number_strict_raises_on_overflow(self):
         with self.assertRaises(ValueError):
-            gen.fmt_number_strict("1000000000.00")   # > 999_999_999.99
+            gen.fmt_number_strict("1000000000.00")  # > 999_999_999.99
 
     def test_fmt_number_strict_accepts_normal(self):
         self.assertAlmostEqual(gen.fmt_number_strict("123.45"), 123.45)
@@ -258,7 +282,8 @@ class FutureDateTests(unittest.TestCase):
     def test_far_future_rejected(self):
         d = (date.today() + timedelta(days=60)).isoformat()
         ok, err, _ = gen.validate_history_for_sales_credit(
-            _good_history(invoice_date=d), _good_mappings(),
+            _good_history(invoice_date=d),
+            _good_mappings(),
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_DATE_FUTURE")
@@ -267,7 +292,8 @@ class FutureDateTests(unittest.TestCase):
         # 30d exactly is still within the warn band (>= 7, <= 30), accepted.
         d = (date.today() + timedelta(days=30)).isoformat()
         ok, err, warns = gen.validate_history_for_sales_credit(
-            _good_history(invoice_date=d), _good_mappings(),
+            _good_history(invoice_date=d),
+            _good_mappings(),
         )
         self.assertTrue(ok)
         self.assertIn("WARN_DATE_NEAR_FUTURE", warns)

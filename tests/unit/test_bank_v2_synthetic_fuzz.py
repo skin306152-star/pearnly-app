@@ -13,13 +13,19 @@ v118.35.0.52 · 合成账单模糊测试(property-based)· 系统性压测银行
   D 同日同额但余额不同的两笔 → 不被去重删除
   E 续页(期初未知)干净账单 → 0 误报(首行 None)
 """
+
 import random
 import unittest
 from datetime import date, timedelta
 
 from bank_recon_v2 import (
-    StatementRow, GlRow, _correct_direction_from_balance, _verify_row_balances,
-    merge_statements, reconcile, _stmt_bad_ratio,
+    StatementRow,
+    GlRow,
+    _correct_direction_from_balance,
+    _verify_row_balances,
+    merge_statements,
+    reconcile,
+    _stmt_bad_ratio,
 )
 
 ITERS = 300
@@ -34,9 +40,11 @@ def _gen_clean(rng, n, opening):
         # 偏向存款使余额不至于一直为负(但允许偶尔透支)
         is_dep = rng.random() < 0.55 or bal < amt
         if is_dep:
-            bal = round(bal + amt, 2); out.append(("dep", amt, bal))
+            bal = round(bal + amt, 2)
+            out.append(("dep", amt, bal))
         else:
-            bal = round(bal - amt, 2); out.append(("wd", amt, bal))
+            bal = round(bal - amt, 2)
+            out.append(("wd", amt, bal))
     return out
 
 
@@ -46,13 +54,20 @@ def _to_rows(seq, swap_idx=None, base_day=date(2025, 1, 2)):
     for i, (d, amt, bal) in enumerate(seq):
         dep = wd = 0.0
         flip = swap_idx is not None and i in swap_idx
-        real_dep = (d == "dep")
-        if real_dep != flip:   # flip 时取反
+        real_dep = d == "dep"
+        if real_dep != flip:  # flip 时取反
             dep = amt
         else:
             wd = amt
-        rows.append(StatementRow(date=base_day + timedelta(days=i),
-                                 description=f"tx{i}", withdrawal=wd, deposit=dep, balance=bal))
+        rows.append(
+            StatementRow(
+                date=base_day + timedelta(days=i),
+                description=f"tx{i}",
+                withdrawal=wd,
+                deposit=dep,
+                balance=bal,
+            )
+        )
     return rows
 
 
@@ -66,10 +81,10 @@ class SyntheticFuzzTests(unittest.TestCase):
             rows = _to_rows(seq)
             _correct_direction_from_balance(rows, opening)
             _verify_row_balances(rows, opening)
-            self.assertEqual([r for r in rows if r.balance_ok is False], [],
-                             "干净账单不应有误报")
-            self.assertEqual([r for r in rows if r.direction_autocorrected], [],
-                             "干净账单不应被误纠正")
+            self.assertEqual([r for r in rows if r.balance_ok is False], [], "干净账单不应有误报")
+            self.assertEqual(
+                [r for r in rows if r.direction_autocorrected], [], "干净账单不应被误纠正"
+            )
 
     def test_B_direction_swap_fully_corrected(self):
         rng = random.Random(2)
@@ -83,8 +98,11 @@ class SyntheticFuzzTests(unittest.TestCase):
             rows = _to_rows(seq, swap_idx=swap)
             _correct_direction_from_balance(rows, opening)
             _verify_row_balances(rows, opening)
-            self.assertEqual([i for i, r in enumerate(rows) if r.balance_ok is False], [],
-                             "方向反但金额对 → 应被全部摆正 · 不该有误报")
+            self.assertEqual(
+                [i for i, r in enumerate(rows) if r.balance_ok is False],
+                [],
+                "方向反但金额对 → 应被全部摆正 · 不该有误报",
+            )
 
     def test_C_wrong_amount_is_flagged(self):
         rng = random.Random(3)
@@ -105,8 +123,7 @@ class SyntheticFuzzTests(unittest.TestCase):
             _correct_direction_from_balance(rows, opening)
             _verify_row_balances(rows, opening)
             # 被篡改的行必须被标 False(不能被掩盖)· 续页首行(k==0且opening可靠这里opening可靠)
-            self.assertFalse(rows[k].balance_ok,
-                             f"金额读错的行(idx={k})必须被标 False")
+            self.assertFalse(rows[k].balance_ok, f"金额读错的行(idx={k})必须被标 False")
             flagged_ok += 1
         self.assertEqual(flagged_ok, ITERS)
 
@@ -117,12 +134,15 @@ class SyntheticFuzzTests(unittest.TestCase):
             amt = round(rng.uniform(10, 100000), 2)
             b1 = round(opening - amt, 2)
             b2 = round(b1 - amt, 2)
-            a = StatementRow(date=date(2025, 3, 30), description="FEE",
-                             withdrawal=amt, deposit=0, balance=b1)
-            b = StatementRow(date=date(2025, 3, 30), description="FEE",
-                             withdrawal=amt, deposit=0, balance=b2)
+            a = StatementRow(
+                date=date(2025, 3, 30), description="FEE", withdrawal=amt, deposit=0, balance=b1
+            )
+            b = StatementRow(
+                date=date(2025, 3, 30), description="FEE", withdrawal=amt, deposit=0, balance=b2
+            )
             merged, _o, _c, _bc = merge_statements(
-                [{"ok": True, "bank_code": "x", "rows": [a, b], "opening": opening, "closing": b2}])
+                [{"ok": True, "bank_code": "x", "rows": [a, b], "opening": opening, "closing": b2}]
+            )
             self.assertEqual(len(merged), 2, "同额不同余额的两笔不应被去重")
 
     def test_E_continuation_clean_no_false(self):
@@ -133,19 +153,25 @@ class SyntheticFuzzTests(unittest.TestCase):
             n = rng.randint(2, 15)
             seq = []
             bal = start_bal
-            seq.append(("wd" if rng.random() < 0.5 else "dep",
-                        round(rng.uniform(1, 100000), 2), bal))
+            seq.append(
+                ("wd" if rng.random() < 0.5 else "dep", round(rng.uniform(1, 100000), 2), bal)
+            )
             for _ in range(n - 1):
                 amt = round(rng.uniform(1, 500000), 2)
                 if rng.random() < 0.55 or bal < amt:
-                    bal = round(bal + amt, 2); seq.append(("dep", amt, bal))
+                    bal = round(bal + amt, 2)
+                    seq.append(("dep", amt, bal))
                 else:
-                    bal = round(bal - amt, 2); seq.append(("wd", amt, bal))
+                    bal = round(bal - amt, 2)
+                    seq.append(("wd", amt, bal))
             rows = _to_rows(seq)
-            _correct_direction_from_balance(rows, 0.0)   # opening 未知
+            _correct_direction_from_balance(rows, 0.0)  # opening 未知
             _verify_row_balances(rows, 0.0)
-            self.assertEqual([i for i, r in enumerate(rows) if r.balance_ok is False], [],
-                             "续页干净账单不应有误报")
+            self.assertEqual(
+                [i for i, r in enumerate(rows) if r.balance_ok is False],
+                [],
+                "续页干净账单不应有误报",
+            )
 
     def test_F_mixed_swap_and_wrong_amount(self):
         """混合:部分行方向反(金额对)+ 1 行金额错 → 方向反的全纠正 · 金额错的被标 False · 不互相污染"""
@@ -160,14 +186,19 @@ class SyntheticFuzzTests(unittest.TestCase):
             # 篡改 bad_idx 金额(余额不变)
             orig = rows[bad_idx].withdrawal or rows[bad_idx].deposit
             newv = round(orig + rng.uniform(10, 1000), 2)
-            if rows[bad_idx].withdrawal > 0: rows[bad_idx].withdrawal = newv
-            else: rows[bad_idx].deposit = newv
+            if rows[bad_idx].withdrawal > 0:
+                rows[bad_idx].withdrawal = newv
+            else:
+                rows[bad_idx].deposit = newv
             _correct_direction_from_balance(rows, opening)
             _verify_row_balances(rows, opening)
             false_idx = [i for i, r in enumerate(rows) if r.balance_ok is False]
             self.assertIn(bad_idx, false_idx, "金额错的行必须被标")
-            self.assertEqual([i for i in false_idx if i != bad_idx], [],
-                             "除金额错的行外不应有其它误报(方向反的应已纠正)")
+            self.assertEqual(
+                [i for i in false_idx if i != bad_idx],
+                [],
+                "除金额错的行外不应有其它误报(方向反的应已纠正)",
+            )
 
     def test_G_dropped_row_is_flagged(self):
         """OCR 漏掉中间一笔 → 缺口处下一行余额对不上 → 被标 False(不被掩盖)"""
@@ -178,7 +209,7 @@ class SyntheticFuzzTests(unittest.TestCase):
             n = rng.randint(4, 18)
             seq = _gen_clean(rng, n, opening)
             drop = rng.randrange(1, n - 1)  # 不删首尾
-            kept = seq[:drop] + seq[drop + 1:]
+            kept = seq[:drop] + seq[drop + 1 :]
             rows = _to_rows(kept)
             _correct_direction_from_balance(rows, opening)
             _verify_row_balances(rows, opening)
@@ -187,8 +218,7 @@ class SyntheticFuzzTests(unittest.TestCase):
             if rows[drop].balance_ok is False:
                 caught += 1
         # 漏行绝大多数应被标(允许极少数巧合)
-        self.assertGreater(caught, ITERS * 0.9,
-                           f"漏行应绝大多数被标 · 实际 {caught}/{ITERS}")
+        self.assertGreater(caught, ITERS * 0.9, f"漏行应绝大多数被标 · 实际 {caught}/{ITERS}")
 
     def test_H_reconcile_matches_clean(self):
         """对账配对:干净的 stmt+GL(金额/日期/方向都对)→ 全部 matched · 无孤立项"""
@@ -203,13 +233,39 @@ class SyntheticFuzzTests(unittest.TestCase):
                 is_dep = rng.random() < 0.5
                 if is_dep:
                     bal = round(bal + amt, 2)
-                    stmt_rows.append(StatementRow(date=d, description=f"s{i}", withdrawal=0, deposit=amt, balance=bal))
+                    stmt_rows.append(
+                        StatementRow(
+                            date=d, description=f"s{i}", withdrawal=0, deposit=amt, balance=bal
+                        )
+                    )
                     # 存款(钱进银行)= GL 借方
-                    gl_rows.append(GlRow(date=d, doc_no=f"G{i}", account_code="1111", description=f"g{i}", debit=amt, credit=0))
+                    gl_rows.append(
+                        GlRow(
+                            date=d,
+                            doc_no=f"G{i}",
+                            account_code="1111",
+                            description=f"g{i}",
+                            debit=amt,
+                            credit=0,
+                        )
+                    )
                 else:
                     bal = round(bal - amt, 2)
-                    stmt_rows.append(StatementRow(date=d, description=f"s{i}", withdrawal=amt, deposit=0, balance=bal))
-                    gl_rows.append(GlRow(date=d, doc_no=f"G{i}", account_code="1111", description=f"g{i}", debit=0, credit=amt))
+                    stmt_rows.append(
+                        StatementRow(
+                            date=d, description=f"s{i}", withdrawal=amt, deposit=0, balance=bal
+                        )
+                    )
+                    gl_rows.append(
+                        GlRow(
+                            date=d,
+                            doc_no=f"G{i}",
+                            account_code="1111",
+                            description=f"g{i}",
+                            debit=0,
+                            credit=amt,
+                        )
+                    )
             recon_rows, summary = reconcile(stmt_rows, gl_rows)
             unmatched = [r for r in recon_rows if r.match_status != "matched"]
             self.assertEqual(unmatched, [], "干净对齐的 stmt+GL 应全部匹配")
@@ -227,8 +283,12 @@ class QualityGateTests(unittest.TestCase):
 
     def test_zero_balances_high_ratio(self):
         """余额列读成 0(BAY/KBank 真实失败)→ bad_ratio 高 · 触发 Gemini"""
-        rows = [StatementRow(date=date(2025, 1, i + 1), description="x",
-                             withdrawal=700.0, deposit=0, balance=0.0) for i in range(10)]
+        rows = [
+            StatementRow(
+                date=date(2025, 1, i + 1), description="x", withdrawal=700.0, deposit=0, balance=0.0
+            )
+            for i in range(10)
+        ]
         self.assertGreater(_stmt_bad_ratio(rows, 0.0), 0.30)
 
     def test_direction_only_wrong_stays_low(self):
@@ -242,10 +302,30 @@ class QualityGateTests(unittest.TestCase):
     def test_id_as_amount_high_ratio(self):
         """把交易ID当金额(KBank 20位数)→ 金额对不上余额 → bad_ratio 高"""
         rows = [
-            StatementRow(date=date(2025, 1, 1), description="x", withdrawal=0, deposit=0, balance=100000.0),
-            StatementRow(date=date(2025, 1, 2), description="id", withdrawal=2.026e19, deposit=0, balance=99000.0),
-            StatementRow(date=date(2025, 1, 3), description="id", withdrawal=1.5e18, deposit=0, balance=98000.0),
-            StatementRow(date=date(2025, 1, 4), description="id", withdrawal=9.9e18, deposit=0, balance=97000.0),
+            StatementRow(
+                date=date(2025, 1, 1), description="x", withdrawal=0, deposit=0, balance=100000.0
+            ),
+            StatementRow(
+                date=date(2025, 1, 2),
+                description="id",
+                withdrawal=2.026e19,
+                deposit=0,
+                balance=99000.0,
+            ),
+            StatementRow(
+                date=date(2025, 1, 3),
+                description="id",
+                withdrawal=1.5e18,
+                deposit=0,
+                balance=98000.0,
+            ),
+            StatementRow(
+                date=date(2025, 1, 4),
+                description="id",
+                withdrawal=9.9e18,
+                deposit=0,
+                balance=97000.0,
+            ),
         ]
         self.assertGreater(_stmt_bad_ratio(rows, 100000.0), 0.30)
 

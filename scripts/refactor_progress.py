@@ -16,7 +16,6 @@ Pearnly 整顿期进度自动统计脚本
 """
 
 import io
-import os
 import re
 import sys
 from pathlib import Path
@@ -31,20 +30,20 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # ── 目标(Google 级 90%+ 完成定义)──
 TARGETS = {
-    "home.js":   {"target": 200,  "label": "home.js"},
-    "app.py":    {"target": 500,  "label": "app.py"},
-    "db.py":     {"target": 500,  "label": "db.py"},
-    "home.css":  {"target": 500,  "label": "home.css"},
+    "home.js": {"target": 200, "label": "home.js"},
+    "app.py": {"target": 500, "label": "app.py"},
+    "db.py": {"target": 500, "label": "db.py"},
+    "home.css": {"target": 500, "label": "home.css"},
     "home.html": {"target": 1000, "label": "home.html"},
 }
 
 # 2026-05-22 整顿模式立项时的真实基线(本会话开始前的行数)
 START_BASELINE = {
-    "home.js":   33768,   # 本会话拆 dashboard + billing 前
-    "app.py":    10060,   # 阶段 5 完成后
-    "db.py":     9255,    # 真实测量
-    "home.css":  16124,   # 真实测量(比估计大 2 倍)
-    "home.html": 6568,    # 真实测量
+    "home.js": 33768,  # 本会话拆 dashboard + billing 前
+    "app.py": 10060,  # 阶段 5 完成后
+    "db.py": 9255,  # 真实测量
+    "home.css": 16124,  # 真实测量(比估计大 2 倍)
+    "home.html": 6568,  # 真实测量
 }
 
 
@@ -153,7 +152,9 @@ def main():
     print(f"  *_routes.py         : {routers:3d}  (目标 20-30)")
     print(f"  services/**/*.py    : {services:3d}  (目标 10+)")
     print(f"  static/home/*.css   : {component_css:3d}  (目标 20-30)")
-    module_score = min(100, int(100 * (home_modules / 50 + routers / 20 + services / 10 + component_css / 20) / 4))
+    module_score = min(
+        100, int(100 * (home_modules / 50 + routers / 20 + services / 10 + component_css / 20) / 4)
+    )
     print(f"\n  模块化进度: {module_score}%")
     print()
 
@@ -180,7 +181,9 @@ def main():
     print(f"  home.js 未注释 silent : {silent_unannotated:3d}  (目标 0)")
     print(f"  home.js 已注释 silent : {silent_annotated:3d}  (无要求)")
     print(f"  合计                  : {silent_total:3d}")
-    silent_score = 100 if silent_unannotated == 0 else max(0, int(100 * silent_annotated / silent_total))
+    silent_score = (
+        100 if silent_unannotated == 0 else max(0, int(100 * silent_annotated / silent_total))
+    )
     print(f"\n  静默吞错清理进度: {silent_score}%")
     print()
 
@@ -188,14 +191,43 @@ def main():
     print("🔧 工程化(目标:Vite / Alembic / lint / 安全扫描 / 依赖锁定 / 监控 全就绪)")
     print("-" * 70)
     checks = [
-        ("Vite(package.json 有 vite)",       (PROJECT_ROOT / "package.json").exists() and "vite" in (PROJECT_ROOT / "package.json").read_text(encoding="utf-8", errors="replace")),
-        ("Alembic(alembic.ini)",            (PROJECT_ROOT / "alembic.ini").exists()),
-        ("Black(pyproject 或 .flake8)",      any((PROJECT_ROOT / f).exists() for f in ["pyproject.toml", ".flake8"])),
-        ("ESLint(.eslintrc 或 eslint.config)", any((PROJECT_ROOT / f).exists() for f in [".eslintrc.json", ".eslintrc.js", "eslint.config.js"])),
-        ("requirements.lock(pip-tools)",      (PROJECT_ROOT / "requirements.lock.txt").exists()),
-        ("Code coverage(.coveragerc 或 codecov)", any((PROJECT_ROOT / f).exists() for f in [".coveragerc", "codecov.yml", ".codecov.yml"])),
-        ("Dependabot(.github/dependabot.yml)", (PROJECT_ROOT / ".github" / "dependabot.yml").exists()),
-        ("Health endpoint(grep app.py)",      "/health" in (PROJECT_ROOT / "app.py").read_text(encoding="utf-8", errors="replace") if (PROJECT_ROOT / "app.py").exists() else False),
+        (
+            "Vite(package.json 有 vite)",
+            (PROJECT_ROOT / "package.json").exists()
+            and "vite"
+            in (PROJECT_ROOT / "package.json").read_text(encoding="utf-8", errors="replace"),
+        ),
+        ("Alembic(alembic.ini)", (PROJECT_ROOT / "alembic.ini").exists()),
+        (
+            "Black(pyproject 或 .flake8)",
+            any((PROJECT_ROOT / f).exists() for f in ["pyproject.toml", ".flake8"]),
+        ),
+        (
+            "ESLint(.eslintrc 或 eslint.config)",
+            any(
+                (PROJECT_ROOT / f).exists()
+                for f in [".eslintrc.json", ".eslintrc.js", "eslint.config.js"]
+            ),
+        ),
+        ("requirements.lock(pip-tools)", (PROJECT_ROOT / "requirements.lock.txt").exists()),
+        (
+            "Code coverage(.coveragerc 或 codecov)",
+            any(
+                (PROJECT_ROOT / f).exists() for f in [".coveragerc", "codecov.yml", ".codecov.yml"]
+            ),
+        ),
+        (
+            "Dependabot(.github/dependabot.yml)",
+            (PROJECT_ROOT / ".github" / "dependabot.yml").exists(),
+        ),
+        (
+            "Health endpoint(grep app.py)",
+            (
+                "/health" in (PROJECT_ROOT / "app.py").read_text(encoding="utf-8", errors="replace")
+                if (PROJECT_ROOT / "app.py").exists()
+                else False
+            ),
+        ),
     ]
     ready = sum(1 for _, ok in checks if ok)
     for label, ok in checks:
@@ -217,7 +249,7 @@ def main():
     print(f"   静默吞错清理  : {silent_score:3d}%")
     print(f"   工程化就绪    : {engineering_score:3d}%")
     print()
-    print(f"   目标: 90%+ · 路径 B + 5-8 个月封锁整顿(2026-05-22 起)")
+    print("   目标: 90%+ · 路径 B + 5-8 个月封锁整顿(2026-05-22 起)")
     print()
     print("=" * 70)
     print("用法:")

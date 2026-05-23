@@ -3,6 +3,7 @@
 v118.32.0 · Pearnly · 销项税对账字段级对比引擎
 9 字段 compare + 标准化工具
 """
+
 import re
 import unicodedata
 from datetime import date, datetime
@@ -25,7 +26,7 @@ def normalize_name(s) -> str:
     if not s:
         return ""
     v = unicodedata.normalize("NFKC", str(s)).lower()
-    return re.sub(r'\s+', '', v)
+    return re.sub(r"\s+", "", v)
 
 
 def normalize_invoice_no(s) -> str:
@@ -39,7 +40,7 @@ def normalize_invoice_no(s) -> str:
 
 def normalize_tax_id(s) -> str:
     """去连字符和空格,只留数字"""
-    return re.sub(r'[^0-9]', '', str(s or ""))
+    return re.sub(r"[^0-9]", "", str(s or ""))
 
 
 def normalize_branch(s) -> str:
@@ -64,8 +65,7 @@ def parse_date(s) -> Optional[date]:
     if not s:
         return None
     s = str(s).strip()
-    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y",
-                "%Y/%m/%d", "%d %b %Y", "%d %B %Y"):
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y", "%Y/%m/%d", "%d %b %Y", "%d %B %Y"):
         try:
             d = datetime.strptime(s, fmt).date()
             return d.replace(year=_thai_to_gregorian(d.year))
@@ -85,9 +85,12 @@ def fuzzy_ratio(a: str, b: str) -> float:
 def levenshtein(a: str, b: str) -> int:
     """v118.32.4.9.6 · 编辑距离 · 用于税号 fuzzy 疑似匹配(Bug 4)
     a/b 都是数字串(已 normalize_tax_id 过)· 不考虑 unicode 重码"""
-    if a == b: return 0
-    if not a: return len(b)
-    if not b: return len(a)
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
     if len(a) < len(b):
         a, b = b, a
     prev = list(range(len(b) + 1))
@@ -95,7 +98,7 @@ def levenshtein(a: str, b: str) -> int:
         cur = [i]
         for j, cb in enumerate(b, 1):
             cost = 0 if ca == cb else 1
-            cur.append(min(cur[-1] + 1, prev[j] + 1, prev[j-1] + cost))
+            cur.append(min(cur[-1] + 1, prev[j] + 1, prev[j - 1] + cost))
         prev = cur
     return prev[-1]
 
@@ -212,18 +215,19 @@ def compare_field(field_name: str, invoice_val, report_val) -> Dict[str, Any]:
 
 # 字段名 → (invoice_key, report_key) 映射
 _FIELD_MAP = [
-    ("date",          "invoice_date",    "report_date"),
-    ("invoice_no",    "invoice_no",      "report_invoice_no"),
-    ("buyer_name",    "buyer_name",      "report_buyer_name"),
-    ("buyer_tax_id",  "buyer_tax_id",    "report_buyer_tax_id"),
-    ("buyer_branch",  "buyer_branch",    "report_buyer_branch"),
-    ("amount_pre_vat","amount_pre_vat",  "report_amount_pre_vat"),
-    ("vat_amount",    "vat_amount",      "report_vat_amount"),
+    ("date", "invoice_date", "report_date"),
+    ("invoice_no", "invoice_no", "report_invoice_no"),
+    ("buyer_name", "buyer_name", "report_buyer_name"),
+    ("buyer_tax_id", "buyer_tax_id", "report_buyer_tax_id"),
+    ("buyer_branch", "buyer_branch", "report_buyer_branch"),
+    ("amount_pre_vat", "amount_pre_vat", "report_amount_pre_vat"),
+    ("vat_amount", "vat_amount", "report_vat_amount"),
 ]
 
 
-def compare_all_fields(invoice_row: Dict, report_row: Dict,
-                       skip_buyer: bool = False) -> Dict[str, Any]:
+def compare_all_fields(
+    invoice_row: Dict, report_row: Dict, skip_buyer: bool = False
+) -> Dict[str, Any]:
     """
     对一对已配对的行跑全部字段对比
     skip_buyer=True → 跳过字段 6/7(个人买家,铁律 61-VAT)

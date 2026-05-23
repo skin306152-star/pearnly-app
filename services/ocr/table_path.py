@@ -34,9 +34,13 @@ logger = logging.getLogger(__name__)
 
 
 SUPPORTED_TABLE_EXTENSIONS = {
-    ".xlsx", ".xls", ".xlsm",
-    ".csv", ".tsv",
-    ".docx", ".doc",
+    ".xlsx",
+    ".xls",
+    ".xlsm",
+    ".csv",
+    ".tsv",
+    ".docx",
+    ".doc",
     ".txt",
 }
 
@@ -91,8 +95,7 @@ def _read_excel(file_bytes: bytes) -> List[Page]:
         import openpyxl
     except ImportError as e:
         raise ImportError(
-            "table_path: openpyxl required for Excel files. "
-            "Install: pip install openpyxl"
+            "table_path: openpyxl required for Excel files. " "Install: pip install openpyxl"
         ) from e
 
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
@@ -137,12 +140,18 @@ def _read_excel(file_bytes: bytes) -> List[Page]:
 
     if not pages:
         # Empty workbook
-        pages = [Page(
-            page_number=1, width=0, height=0,
-            full_text="(empty workbook)",
-            avg_confidence=1.0, blocks=[],
-            table_headers=[], table_rows=[],
-        )]
+        pages = [
+            Page(
+                page_number=1,
+                width=0,
+                height=0,
+                full_text="(empty workbook)",
+                avg_confidence=1.0,
+                blocks=[],
+                table_headers=[],
+                table_rows=[],
+            )
+        ]
     return pages
 
 
@@ -155,11 +164,18 @@ def _read_csv(file_bytes: bytes, delimiter: str) -> List[Page]:
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
     rows = [r for r in reader]
     if not rows:
-        return [Page(
-            page_number=1, width=0, height=0,
-            full_text="(empty csv)", avg_confidence=1.0,
-            blocks=[], table_headers=[], table_rows=[],
-        )]
+        return [
+            Page(
+                page_number=1,
+                width=0,
+                height=0,
+                full_text="(empty csv)",
+                avg_confidence=1.0,
+                blocks=[],
+                table_headers=[],
+                table_rows=[],
+            )
+        ]
     headers = [_normalize_header(c) for c in rows[0]]
     body = rows[1:]
     table_rows = []
@@ -169,11 +185,18 @@ def _read_csv(file_bytes: bytes, delimiter: str) -> List[Page]:
         padded = (r + [""] * len(headers))[: len(headers)]
         table_rows.append({h: v for h, v in zip(headers, padded)})
     full_text = _render_grid_text("csv", headers, body)
-    return [Page(
-        page_number=1, width=0, height=0,
-        full_text=full_text, avg_confidence=1.0,
-        blocks=[], table_headers=headers, table_rows=table_rows,
-    )]
+    return [
+        Page(
+            page_number=1,
+            width=0,
+            height=0,
+            full_text=full_text,
+            avg_confidence=1.0,
+            blocks=[],
+            table_headers=headers,
+            table_rows=table_rows,
+        )
+    ]
 
 
 # ============================================================
@@ -184,8 +207,7 @@ def _read_docx(file_bytes: bytes) -> List[Page]:
         import docx  # python-docx
     except ImportError as e:
         raise ImportError(
-            "table_path: python-docx required for .docx files. "
-            "Install: pip install python-docx"
+            "table_path: python-docx required for .docx files. " "Install: pip install python-docx"
         ) from e
 
     doc = docx.Document(io.BytesIO(file_bytes))
@@ -215,13 +237,18 @@ def _read_docx(file_bytes: bytes) -> List[Page]:
                 text_parts.append(" | ".join(c.text for c in row.cells))
 
     full_text = "\n".join(text_parts).strip() or "(empty docx)"
-    return [Page(
-        page_number=1, width=0, height=0,
-        full_text=full_text, avg_confidence=1.0,
-        blocks=[],
-        table_headers=table_headers or None,
-        table_rows=table_rows or None,
-    )]
+    return [
+        Page(
+            page_number=1,
+            width=0,
+            height=0,
+            full_text=full_text,
+            avg_confidence=1.0,
+            blocks=[],
+            table_headers=table_headers or None,
+            table_rows=table_rows or None,
+        )
+    ]
 
 
 def _read_doc_fallback(file_bytes: bytes) -> List[Page]:
@@ -230,26 +257,34 @@ def _read_doc_fallback(file_bytes: bytes) -> List[Page]:
     text = _decode_bytes(file_bytes)
     # Strip non-printable bytes
     text = "".join(ch for ch in text if ch.isprintable() or ch in "\n\t ")
-    return [Page(
-        page_number=1, width=0, height=0,
-        full_text=text or "(legacy .doc — limited extraction)",
-        avg_confidence=0.7,  # legacy format, not fully trustable
-        blocks=[],
-        table_headers=None,
-        table_rows=None,
-    )]
+    return [
+        Page(
+            page_number=1,
+            width=0,
+            height=0,
+            full_text=text or "(legacy .doc — limited extraction)",
+            avg_confidence=0.7,  # legacy format, not fully trustable
+            blocks=[],
+            table_headers=None,
+            table_rows=None,
+        )
+    ]
 
 
 def _read_txt(file_bytes: bytes) -> List[Page]:
     text = _decode_bytes(file_bytes)
-    return [Page(
-        page_number=1, width=0, height=0,
-        full_text=text,
-        avg_confidence=1.0,
-        blocks=[],
-        table_headers=None,
-        table_rows=None,
-    )]
+    return [
+        Page(
+            page_number=1,
+            width=0,
+            height=0,
+            full_text=text,
+            avg_confidence=1.0,
+            blocks=[],
+            table_headers=None,
+            table_rows=None,
+        )
+    ]
 
 
 # ============================================================

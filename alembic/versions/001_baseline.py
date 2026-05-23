@@ -16,6 +16,7 @@ Revision ID: 001_baseline
 Revises:
 Create Date: 2026-05-22
 """
+
 from typing import Sequence, Union
 
 revision: str = "001_baseline"

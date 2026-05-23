@@ -74,10 +74,17 @@ def _ensure_stub_psycopg2():
     fake_pg.pool = types.ModuleType("psycopg2.pool")
 
     class _StubPool:
-        def __init__(self, *a, **k): pass
-        def getconn(self): raise RuntimeError("stub")
-        def putconn(self, *a, **k): pass
-        def closeall(self): pass
+        def __init__(self, *a, **k):
+            pass
+
+        def getconn(self):
+            raise RuntimeError("stub")
+
+        def putconn(self, *a, **k):
+            pass
+
+        def closeall(self):
+            pass
 
     fake_pg.pool.ThreadedConnectionPool = _StubPool
     fake_pg.pool.SimpleConnectionPool = _StubPool
@@ -210,8 +217,9 @@ class PdfCostEstimationTests(unittest.TestCase):
 
     def test_pricing_constants_locked(self):
         """价格常量必须等于 Korn 2026-05-21 拍板的值 · 改了请同步改本测试 + commit message 说明."""
-        self.assertEqual(db.PDF_TIER1_LIMIT_V21, 200,
-                         "PDF tier1 阈值改了 = 业务模型变 · 请 Zihao 拍板")
+        self.assertEqual(
+            db.PDF_TIER1_LIMIT_V21, 200, "PDF tier1 阈值改了 = 业务模型变 · 请 Zihao 拍板"
+        )
         self.assertEqual(db.PDF_TIER1_PRICE_V21, Decimal("1.50"))
         self.assertEqual(db.PDF_TIER2_PRICE_V21, Decimal("0.75"))
 
@@ -270,8 +278,7 @@ class BillingStatusCombinedTests(unittest.TestCase):
         self.assertTrue(r["allowed"])
         self.assertTrue(r["is_exempt"])
         # 只该有 1 次 DB 查询 (exempt SELECT) · 不查 balance
-        self.assertEqual(len(cur.executed), 1,
-                         "exempt user 不应查 balance · v0.21 性能要求")
+        self.assertEqual(len(cur.executed), 1, "exempt user 不应查 balance · v0.21 性能要求")
 
     def test_no_tenant_rejected_with_no_tenant_code(self):
         """无 tenant: 拒绝 + error_code=no_tenant"""
@@ -284,10 +291,12 @@ class BillingStatusCombinedTests(unittest.TestCase):
 
     def test_positive_balance_allowed(self):
         """余额 > 0 → allowed=True · error_code=None"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},  # exempt = False
-            {"balance_thb": 100.0, "pages_used": 50},
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},  # exempt = False
+                {"balance_thb": 100.0, "pages_used": 50},
+            ]
+        )
         with _patch_cursor(cur):
             r = db.get_billing_status_combined(USER_A, TENANT_A)
         self.assertTrue(r["allowed"])
@@ -297,22 +306,25 @@ class BillingStatusCombinedTests(unittest.TestCase):
 
     def test_zero_balance_rejected_with_insufficient_code(self):
         """余额 = 0 → 拒绝 + insufficient_balance (P0 漏洞防回归 · 之前 0 余额能用 OCR)"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},
-            {"balance_thb": 0.0, "pages_used": 0},
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},
+                {"balance_thb": 0.0, "pages_used": 0},
+            ]
+        )
         with _patch_cursor(cur):
             r = db.get_billing_status_combined(USER_A, TENANT_A)
-        self.assertFalse(r["allowed"],
-                         "🔴 P0 防回归: 余额 0 不能放行 OCR (历史 v0.20 真出过)")
+        self.assertFalse(r["allowed"], "🔴 P0 防回归: 余额 0 不能放行 OCR (历史 v0.20 真出过)")
         self.assertEqual(r["error_code"], "insufficient_balance")
 
     def test_negative_balance_rejected(self):
         """余额负 (透支后) → 拒绝"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},
-            {"balance_thb": -10.0, "pages_used": 200},
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},
+                {"balance_thb": -10.0, "pages_used": 200},
+            ]
+        )
         with _patch_cursor(cur):
             r = db.get_billing_status_combined(USER_A, TENANT_A)
         self.assertFalse(r["allowed"])
@@ -320,22 +332,28 @@ class BillingStatusCombinedTests(unittest.TestCase):
 
     def test_balance_lookup_uses_single_combined_query(self):
         """v0.21 性能要求: balance + pages_used 一次 SELECT 拿到 · 不能拆 3 次查"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},
-            {"balance_thb": 50.0, "pages_used": 100},
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},
+                {"balance_thb": 50.0, "pages_used": 100},
+            ]
+        )
         with _patch_cursor(cur):
             db.get_billing_status_combined(USER_A, TENANT_A)
         # 应该 = 2 次 (1 次 exempt + 1 次 combined) · 不能 > 2
-        self.assertEqual(len(cur.executed), 2,
-                         "v0.21 性能要求: 非 exempt 用户最多 2 次 DB 查询 "
-                         "(exempt + combined). 否则会触发连接池打满 (v0.20 真出过)")
+        self.assertEqual(
+            len(cur.executed),
+            2,
+            "v0.21 性能要求: 非 exempt 用户最多 2 次 DB 查询 "
+            "(exempt + combined). 否则会触发连接池打满 (v0.20 真出过)",
+        )
         # 第 2 次必须是合并查询: tenant_credits LEFT JOIN monthly_page_usage
         second_sql = cur.executed[1][0]
         self.assertIn("tenant_credits", second_sql)
         self.assertIn("monthly_page_usage", second_sql)
-        self.assertIn("LEFT JOIN", second_sql,
-                      "必须 LEFT JOIN · 即使表无 row 也能返 0 而不是 KeyError")
+        self.assertIn(
+            "LEFT JOIN", second_sql, "必须 LEFT JOIN · 即使表无 row 也能返 0 而不是 KeyError"
+        )
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -372,14 +390,17 @@ class IsBillingExemptTests(unittest.TestCase):
     def test_db_error_fails_safe_to_false(self):
         """🔴 安全: DB 挂了 → 返 False (=不豁免 = 走付费逻辑) ·
         而非 fail-open 返 True (会让所有人免费用)."""
+
         class _RaisingCursor(_Cursor):
             def execute(self, sql, params=None):
                 raise RuntimeError("DB exploded")
 
         cur = _RaisingCursor()
         with _patch_cursor(cur):
-            self.assertFalse(db.is_user_billing_exempt(USER_A),
-                             "DB 失败必须 fail-closed 到 not-exempt · 不能给所有人放行")
+            self.assertFalse(
+                db.is_user_billing_exempt(USER_A),
+                "DB 失败必须 fail-closed 到 not-exempt · 不能给所有人放行",
+            )
 
     def test_cache_hit_skips_db_lookup(self):
         """v0.21 性能: 5 分钟 cache · 同 user 第 2 次不查 DB"""
@@ -389,8 +410,7 @@ class IsBillingExemptTests(unittest.TestCase):
             r2 = db.is_user_billing_exempt(USER_A)
         self.assertTrue(r1)
         self.assertTrue(r2)
-        self.assertEqual(len(cur.executed), 1,
-                         "cache 命中应跳过 DB · v0.21 性能优化")
+        self.assertEqual(len(cur.executed), 1, "cache 命中应跳过 DB · v0.21 性能优化")
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -408,8 +428,7 @@ class ChargeOcrFailsCleanlyTests(unittest.TestCase):
             r = db.charge_ocr(USER_A, None, "pdf", 100)
         self.assertFalse(r["ok"])
         self.assertEqual(r["error"], "no_tenant")
-        self.assertEqual(len(cur.executed), 0,
-                         "no_tenant 失败不允许任何 DB 写")
+        self.assertEqual(len(cur.executed), 0, "no_tenant 失败不允许任何 DB 写")
 
     def test_unknown_kind_returns_error_no_db_write(self):
         # 必须先让 exempt 返 False · 否则会走 exempt 早期 return
@@ -461,12 +480,14 @@ class ChargeOcrSuccessPathTests(unittest.TestCase):
 
     def test_pdf_charge_writes_all_three_tables(self):
         """PDF 100 页 (0 used) = ฿150 · 必写 tenant_credits + credit_transactions + monthly_page_usage"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},                  # is_user_billing_exempt
-            {"u": 0},                       # monthly pages_used lookup
-            {"balance_thb": Decimal("500")},  # SELECT FOR UPDATE
-            {"id": "txn-1"},                # INSERT credit_transactions RETURNING id
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},  # is_user_billing_exempt
+                {"u": 0},  # monthly pages_used lookup
+                {"balance_thb": Decimal("500")},  # SELECT FOR UPDATE
+                {"id": "txn-1"},  # INSERT credit_transactions RETURNING id
+            ]
+        )
         with _patch_cursor(cur):
             r = db.charge_ocr(USER_A, TENANT_A, "pdf", 100, history_id="h-1")
 
@@ -478,22 +499,23 @@ class ChargeOcrSuccessPathTests(unittest.TestCase):
         sql_all = _all_sql(cur)
         # 必须写到 3 个目标表
         self.assertIn("SELECT balance_thb FROM tenant_credits", sql_all)
-        self.assertIn("FOR UPDATE", sql_all,
-                      "必须 SELECT FOR UPDATE 锁行 · 防并发双扣")
+        self.assertIn("FOR UPDATE", sql_all, "必须 SELECT FOR UPDATE 锁行 · 防并发双扣")
         self.assertIn("UPDATE tenant_credits", sql_all)
         self.assertIn("INSERT INTO credit_transactions", sql_all)
-        self.assertIn("monthly_page_usage", sql_all,
-                      "PDF 必须更新月度页数统计 · 否则 tier1/tier2 算错")
-        self.assertIn("ON CONFLICT", sql_all,
-                      "monthly_page_usage 必须 UPSERT · 防当月第一次扣报错")
+        self.assertIn(
+            "monthly_page_usage", sql_all, "PDF 必须更新月度页数统计 · 否则 tier1/tier2 算错"
+        )
+        self.assertIn("ON CONFLICT", sql_all, "monthly_page_usage 必须 UPSERT · 防当月第一次扣报错")
 
     def test_excel_charge_writes_only_credits_no_page_usage(self):
         """Excel 100 字符 = ฿0.02 · 写 tenant_credits + credit_transactions · 不写 monthly_page_usage"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},
-            {"balance_thb": Decimal("100")},
-            {"id": "txn-2"},
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},
+                {"balance_thb": Decimal("100")},
+                {"id": "txn-2"},
+            ]
+        )
         with _patch_cursor(cur):
             r = db.charge_ocr(USER_A, TENANT_A, "excel", 100)
 
@@ -505,17 +527,18 @@ class ChargeOcrSuccessPathTests(unittest.TestCase):
         self.assertIn("INSERT INTO credit_transactions", sql_all)
         # Excel 不该写月度页数表 (那是 PDF 专用)
         self.assertNotIn(
-            "INSERT INTO monthly_page_usage", sql_all,
-            "Excel 扣费不应该写 PDF 月度页数表"
+            "INSERT INTO monthly_page_usage", sql_all, "Excel 扣费不应该写 PDF 月度页数表"
         )
 
     def test_charge_writes_negative_amount_to_transaction(self):
         """credit_transactions.amount_thb 必须是负数 (扣费 · 不是充值)"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},
-            {"balance_thb": Decimal("100")},
-            {"id": "txn-3"},
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},
+                {"balance_thb": Decimal("100")},
+                {"id": "txn-3"},
+            ]
+        )
         with _patch_cursor(cur):
             db.charge_ocr(USER_A, TENANT_A, "excel", 5000)  # = ฿1.00
 
@@ -525,20 +548,23 @@ class ChargeOcrSuccessPathTests(unittest.TestCase):
                 # params 里第 3 个是 amount_thb (按 INSERT 列顺序: tenant_id, user_id, type, amount_thb, ...)
                 # 应是 "-1.00" 字符串
                 amt_str = str(params[2])
-                self.assertTrue(amt_str.startswith("-"),
-                                f"扣费 amount_thb 必须负数 · 实际: {amt_str}")
+                self.assertTrue(
+                    amt_str.startswith("-"), f"扣费 amount_thb 必须负数 · 实际: {amt_str}"
+                )
                 return
         self.fail("没找到 INSERT INTO credit_transactions")
 
     def test_charge_handles_missing_tenant_credits_row_with_upsert(self):
         """tenant_credits 没行 → 自动 INSERT 0 → 再继续扣"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},                # exempt
-            {"u": 0},                     # monthly_page_usage = 0
-            None,                          # SELECT FOR UPDATE 没行
-            {"balance_thb": Decimal("0")},  # INSERT 返 0
-            {"id": "txn-4"},              # INSERT credit_transactions
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},  # exempt
+                {"u": 0},  # monthly_page_usage = 0
+                None,  # SELECT FOR UPDATE 没行
+                {"balance_thb": Decimal("0")},  # INSERT 返 0
+                {"id": "txn-4"},  # INSERT credit_transactions
+            ]
+        )
         with _patch_cursor(cur):
             r = db.charge_ocr(USER_A, TENANT_A, "pdf", 10)
 
@@ -572,14 +598,14 @@ class DuplicateRequestSemanticsTests(unittest.TestCase):
         注意: is_user_billing_exempt 有 5 分钟 cache · 第 2 次不查 DB ·
         所以 fixture 池不放 call 2 的 {x: False}."""
         results_pool = [
-            {"x": False},                  # call 1: exempt (DB 查 · 结果被缓存)
-            {"u": 0},                       # call 1: monthly used
+            {"x": False},  # call 1: exempt (DB 查 · 结果被缓存)
+            {"u": 0},  # call 1: monthly used
             {"balance_thb": Decimal("100")},  # call 1: SELECT FOR UPDATE
-            {"id": "txn-A"},                # call 1: INSERT credit_transactions
+            {"id": "txn-A"},  # call 1: INSERT credit_transactions
             # call 2: exempt 走 cache · 不消耗 fixture
-            {"u": 10},                      # call 2: monthly used (累加后)
+            {"u": 10},  # call 2: monthly used (累加后)
             {"balance_thb": Decimal("85")},  # call 2: balance
-            {"id": "txn-B"},                # call 2: INSERT credit_transactions
+            {"id": "txn-B"},  # call 2: INSERT credit_transactions
         ]
         cur = _Cursor(fetchone_results=results_pool)
         with _patch_cursor(cur):
@@ -592,21 +618,23 @@ class DuplicateRequestSemanticsTests(unittest.TestCase):
         self.assertNotEqual(r1["transaction_id"], r2["transaction_id"])
 
         # 流水表应该有 2 个 INSERT
-        insert_count = sum(
-            1 for sql, _ in cur.executed
-            if "INSERT INTO credit_transactions" in sql
+        insert_count = sum(1 for sql, _ in cur.executed if "INSERT INTO credit_transactions" in sql)
+        self.assertEqual(
+            insert_count,
+            2,
+            "当前契约: charge_ocr 不幂等 · 重复调 = 2 笔流水. "
+            "去重在 app.py file_hash 缓存层 (find_ocr_by_hash). "
+            "若未来想改幂等 · 请先改本测试 + 给 credit_transactions 加 unique index.",
         )
-        self.assertEqual(insert_count, 2,
-                         "当前契约: charge_ocr 不幂等 · 重复调 = 2 笔流水. "
-                         "去重在 app.py file_hash 缓存层 (find_ocr_by_hash). "
-                         "若未来想改幂等 · 请先改本测试 + 给 credit_transactions 加 unique index.")
 
     def test_file_hash_cache_dedup_path_exists(self):
         """🔵 验证去重路径在: find_ocr_by_hash 函数存在 + 可被 app.py 调用
         (实际命中后 OCR 不跑 · charge_ocr 不调 · 由 OCR 路由集成测试覆盖)"""
-        self.assertTrue(hasattr(db, "find_ocr_by_hash"),
-                        "去重路径函数必须存在: db.find_ocr_by_hash · "
-                        "app.py 上游靠它跳过重复 OCR + 跳过重复扣费")
+        self.assertTrue(
+            hasattr(db, "find_ocr_by_hash"),
+            "去重路径函数必须存在: db.find_ocr_by_hash · "
+            "app.py 上游靠它跳过重复 OCR + 跳过重复扣费",
+        )
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -620,36 +648,45 @@ class ConcurrencySafetyContractTests(unittest.TestCase):
 
     def test_charge_uses_for_update_lock(self):
         """SELECT FOR UPDATE 是单原子事务核心 · 必须存在"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},
-            {"u": 0},
-            {"balance_thb": Decimal("100")},
-            {"id": "txn-1"},
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},
+                {"u": 0},
+                {"balance_thb": Decimal("100")},
+                {"id": "txn-1"},
+            ]
+        )
         with _patch_cursor(cur):
             db.charge_ocr(USER_A, TENANT_A, "pdf", 10)
         # 找出 balance SELECT 那条
-        select_sqls = [s for s, _ in cur.executed
-                       if "SELECT balance_thb FROM tenant_credits" in s]
+        select_sqls = [s for s, _ in cur.executed if "SELECT balance_thb FROM tenant_credits" in s]
         self.assertEqual(len(select_sqls), 1)
-        self.assertIn("FOR UPDATE", select_sqls[0],
-                      "🔴 必须 SELECT FOR UPDATE · 否则并发 OCR 完成时 "
-                      "可能双扣 (读到同一 balance · 各扣一次).")
+        self.assertIn(
+            "FOR UPDATE",
+            select_sqls[0],
+            "🔴 必须 SELECT FOR UPDATE · 否则并发 OCR 完成时 "
+            "可能双扣 (读到同一 balance · 各扣一次).",
+        )
 
     def test_pdf_monthly_usage_uses_upsert(self):
         """monthly_page_usage UPSERT (ON CONFLICT) · 不能用 INSERT OR UPDATE 两次"""
-        cur = _Cursor(fetchone_results=[
-            {"x": False},
-            {"u": 0},
-            {"balance_thb": Decimal("100")},
-            {"id": "txn-1"},
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},
+                {"u": 0},
+                {"balance_thb": Decimal("100")},
+                {"id": "txn-1"},
+            ]
+        )
         with _patch_cursor(cur):
             db.charge_ocr(USER_A, TENANT_A, "pdf", 5)
         sql_all = _all_sql(cur)
-        self.assertIn("ON CONFLICT", sql_all,
-                      "monthly_page_usage 必须用 ON CONFLICT 单语句 · "
-                      "防 SELECT-then-INSERT 的 TOCTOU race condition.")
+        self.assertIn(
+            "ON CONFLICT",
+            sql_all,
+            "monthly_page_usage 必须用 ON CONFLICT 单语句 · "
+            "防 SELECT-then-INSERT 的 TOCTOU race condition.",
+        )
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -663,27 +700,39 @@ class CrossTenantBillingIsolationTests(unittest.TestCase):
         _clear_exempt_cache()
 
     def test_charge_uses_passed_tenant_id_for_all_writes(self):
-        cur = _Cursor(fetchone_results=[
-            {"x": False},
-            {"u": 0},
-            {"balance_thb": Decimal("500")},
-            {"id": "txn-1"},
-        ])
+        cur = _Cursor(
+            fetchone_results=[
+                {"x": False},
+                {"u": 0},
+                {"balance_thb": Decimal("500")},
+                {"id": "txn-1"},
+            ]
+        )
         with _patch_cursor(cur):
             db.charge_ocr(USER_A, TENANT_A, "pdf", 50)
 
         # 所有写入操作的 params 里必须含 TENANT_A
-        write_sqls = [(s, p) for s, p in cur.executed
-                      if any(verb in s for verb in
-                             ("UPDATE tenant_credits",
-                              "INSERT INTO credit_transactions",
-                              "INSERT INTO monthly_page_usage",
-                              "SELECT balance_thb"))]
+        write_sqls = [
+            (s, p)
+            for s, p in cur.executed
+            if any(
+                verb in s
+                for verb in (
+                    "UPDATE tenant_credits",
+                    "INSERT INTO credit_transactions",
+                    "INSERT INTO monthly_page_usage",
+                    "SELECT balance_thb",
+                )
+            )
+        ]
         for sql, params in write_sqls:
             params_str = [str(p) for p in (params or ())]
-            self.assertIn(TENANT_A, params_str,
-                          f"扣费 SQL 必须按调用方 tenant_id 写入 · "
-                          f"SQL: {sql[:60]}... · params: {params_str}")
+            self.assertIn(
+                TENANT_A,
+                params_str,
+                f"扣费 SQL 必须按调用方 tenant_id 写入 · "
+                f"SQL: {sql[:60]}... · params: {params_str}",
+            )
 
 
 if __name__ == "__main__":

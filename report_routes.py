@@ -17,10 +17,9 @@ import logging
 import traceback
 from typing import List, Optional, Any, Dict
 from urllib.parse import quote
-from datetime import datetime, date
 
 from fastapi import APIRouter, HTTPException, Request, Query
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from report_engine import build_report, list_templates, default_filename, REPORT_TEMPLATES
@@ -58,6 +57,7 @@ def _get_user(request: Request):
     try:
         # lazy import · 避免循环
         from auth import get_current_user_from_request
+
         user = get_current_user_from_request(request)  # 注意:同步函数 · 不要 await
         if not user:
             raise HTTPException(status_code=401, detail="未登录或 token 失效")
@@ -140,7 +140,9 @@ def export_records(req: ExportRequest, request: Request):
             meta["client_name"] = i18n_get(req.lang, "client-default")
 
         data = build_report(req.template, req.records, meta, req.lang)
-        fname = default_filename(req.template, meta.get("client_name", ""), meta.get("period_label", ""))
+        fname = default_filename(
+            req.template, meta.get("client_name", ""), meta.get("period_label", "")
+        )
         return _xlsx_response(data, fname)
 
     except HTTPException:
@@ -187,10 +189,12 @@ def export_client_report(
 
         # 过滤月份(YYYY-MM)
         if month and month != "all":
+
             def _match_month(r):
                 d = r.get("invoice_date") or r.get("created_at") or ""
                 d_str = str(d)[:7] if d else ""
                 return d_str == month
+
             rows = [r for r in rows if _match_month(r)]
 
         if not rows:
@@ -204,7 +208,9 @@ def export_client_report(
             "doc_count": len(rows),
         }
         data = build_report(template, rows, meta, lang)
-        fname = default_filename(template, client.get("name") or "", month if month != "all" else "")
+        fname = default_filename(
+            template, client.get("name") or "", month if month != "all" else ""
+        )
         return _xlsx_response(data, fname)
 
     except HTTPException:
@@ -263,7 +269,9 @@ def batch_export_history(req: HistoryBatchExportRequest, request: Request):
                     meta["client_tax_id"] = c.get("tax_id") or ""
                     meta["client_branch"] = c.get("branch") or ""
             except Exception as e:
-                logger.warning(f"[report_routes] batch_export client lookup failed (client_id={req.client_id}): {e}")
+                logger.warning(
+                    f"[report_routes] batch_export client lookup failed (client_id={req.client_id}): {e}"
+                )
 
         data = build_report(req.template, rows, meta, req.lang)
         fname = default_filename(req.template, meta.get("client_name", ""), "")

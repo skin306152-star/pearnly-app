@@ -10,7 +10,6 @@ import bcrypt
 from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
 
-import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import SimpleConnectionPool
 
@@ -18,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 # v4.10.14 · Gemini 2.5 Flash 计费单价(USD · 2026-05)
 OCR_PRICING = {
-    "input_per_m_usd":  0.30,
+    "input_per_m_usd": 0.30,
     "output_per_m_usd": 2.50,
-    "usd_thb":          36.5,   # v4.10.14 过渡 · v4.10.15 admin 改造时统一砍
+    "usd_thb": 36.5,  # v4.10.14 过渡 · v4.10.15 admin 改造时统一砍
 }
 
 _pool: Optional[SimpleConnectionPool] = None
@@ -45,8 +44,11 @@ def get_pool() -> SimpleConnectionPool:
         # 5 个并发 OCR 就把连接池打满 · 后续请求阻塞 → 累积 → 全站超时
         # Supabase 默认允许 ~60 个连接 · 30 安全有冗余
         _pool = SimpleConnectionPool(
-            minconn=2, maxconn=30, dsn=url,
-            connect_timeout=10, sslmode="require",
+            minconn=2,
+            maxconn=30,
+            dsn=url,
+            connect_timeout=10,
+            sslmode="require",
         )
         logger.info("✅ PostgreSQL 连接池已建立(minconn=2 maxconn=30)")
     return _pool
@@ -89,7 +91,7 @@ def ensure_demo_account():
         typhoon_quota_monthly=0,
         history_retention_days=0,
         custom_template_limit=0,
-        notes='公共测试账号 · Free · 按 IP 每天限流',
+        notes="公共测试账号 · Free · 按 IP 每天限流",
     )
     _ensure_one_account(
         username=os.environ.get("DEMO_PLUS_USERNAME", "demo_plus"),
@@ -108,16 +110,27 @@ def ensure_demo_account():
         typhoon_quota_monthly=0,
         history_retention_days=90,
         custom_template_limit=3,
-        notes='Plus 测试账号 · 200 张/月 · Gemini Flash',
+        notes="Plus 测试账号 · 200 张/月 · Gemini Flash",
     )
 
 
 def _ensure_one_account(
-    username, password, plan, monthly_quota,
-    can_use_gemini, can_edit_fields, can_verify_tax,
-    can_use_custom_template, can_view_history, can_use_typhoon,
-    can_push_erp, can_use_automation, can_manage_api_keys,
-    typhoon_quota_monthly, history_retention_days, custom_template_limit,
+    username,
+    password,
+    plan,
+    monthly_quota,
+    can_use_gemini,
+    can_edit_fields,
+    can_verify_tax,
+    can_use_custom_template,
+    can_view_history,
+    can_use_typhoon,
+    can_push_erp,
+    can_use_automation,
+    can_manage_api_keys,
+    typhoon_quota_monthly,
+    history_retention_days,
+    custom_template_limit,
     notes,
 ):
     correct_hash = bcrypt.hashpw(
@@ -131,7 +144,8 @@ def _ensure_one_account(
             row = cur.fetchone()
 
             if row:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE users SET
                         password_hash = %s,
                         plan = %s,
@@ -150,17 +164,30 @@ def _ensure_one_account(
                         custom_template_limit = %s,
                         is_active = TRUE
                     WHERE id = %s
-                """, (
-                    correct_hash, plan, monthly_quota,
-                    can_use_gemini, can_edit_fields, can_verify_tax,
-                    can_use_custom_template, can_view_history, can_use_typhoon,
-                    can_push_erp, can_use_automation, can_manage_api_keys,
-                    typhoon_quota_monthly, history_retention_days, custom_template_limit,
-                    row["id"],
-                ))
+                """,
+                    (
+                        correct_hash,
+                        plan,
+                        monthly_quota,
+                        can_use_gemini,
+                        can_edit_fields,
+                        can_verify_tax,
+                        can_use_custom_template,
+                        can_view_history,
+                        can_use_typhoon,
+                        can_push_erp,
+                        can_use_automation,
+                        can_manage_api_keys,
+                        typhoon_quota_monthly,
+                        history_retention_days,
+                        custom_template_limit,
+                        row["id"],
+                    ),
+                )
                 logger.info(f"✅ {username} 账号已同步({plan} 权限)")
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO users (
                         username, password_hash, plan, monthly_quota,
                         can_use_gemini, can_edit_fields, can_verify_tax,
@@ -176,14 +203,27 @@ def _ensure_one_account(
                         %s, %s, %s,
                         %s, TRUE
                     )
-                """, (
-                    username, correct_hash, plan, monthly_quota,
-                    can_use_gemini, can_edit_fields, can_verify_tax,
-                    can_use_custom_template, can_view_history, can_use_typhoon,
-                    can_push_erp, can_use_automation, can_manage_api_keys,
-                    typhoon_quota_monthly, history_retention_days, custom_template_limit,
-                    notes,
-                ))
+                """,
+                    (
+                        username,
+                        correct_hash,
+                        plan,
+                        monthly_quota,
+                        can_use_gemini,
+                        can_edit_fields,
+                        can_verify_tax,
+                        can_use_custom_template,
+                        can_view_history,
+                        can_use_typhoon,
+                        can_push_erp,
+                        can_use_automation,
+                        can_manage_api_keys,
+                        typhoon_quota_monthly,
+                        history_retention_days,
+                        custom_template_limit,
+                        notes,
+                    ),
+                )
                 logger.info(f"✅ {username} 账号已创建({plan})")
     except Exception as e:
         logger.error(f"❌ 初始化账号失败 ({username}): {e}")
@@ -233,10 +273,7 @@ def link_google_sub_to_user(user_id: str, google_sub: str) -> bool:
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute(
-                "UPDATE users SET google_sub = %s WHERE id = %s",
-                (google_sub, user_id)
-            )
+            cur.execute("UPDATE users SET google_sub = %s WHERE id = %s", (google_sub, user_id))
         return True
     except Exception as e:
         logger.error(f"绑定 google_sub 失败 (user_id={user_id}): {e}")
@@ -245,11 +282,13 @@ def link_google_sub_to_user(user_id: str, google_sub: str) -> bool:
 
 def ensure_google_sub_column():
     """v118.27.5 · 启动时自动加 google_sub 列(幂等 · IF NOT EXISTS)
-       v118.27.5.3 · 同时加 avatar_url 列(Google OAuth picture URL)"""
+    v118.27.5.3 · 同时加 avatar_url 列(Google OAuth picture URL)"""
     try:
         with get_cursor(commit=True) as cur:
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL"
+            )
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT")
         logger.info("[v118.27.5.3] users.google_sub + avatar_url 列就绪")
         return True
@@ -263,10 +302,7 @@ def update_user_avatar(user_id: str, avatar_url: str) -> bool:
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute(
-                "UPDATE users SET avatar_url = %s WHERE id = %s",
-                (avatar_url, user_id)
-            )
+            cur.execute("UPDATE users SET avatar_url = %s WHERE id = %s", (avatar_url, user_id))
         return True
     except Exception as e:
         logger.error(f"更新 avatar_url 失败 (user_id={user_id}): {e}")
@@ -294,10 +330,7 @@ def link_line_uid_to_user(user_id: str, line_uid: str) -> bool:
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute(
-                "UPDATE users SET line_uid = %s WHERE id = %s",
-                (line_uid, user_id)
-            )
+            cur.execute("UPDATE users SET line_uid = %s WHERE id = %s", (line_uid, user_id))
         return True
     except Exception as e:
         logger.error(f"绑定 line_uid 失败 (user_id={user_id}): {e}")
@@ -329,7 +362,9 @@ def ensure_line_uid_column():
     try:
         with get_cursor(commit=True) as cur:
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS line_uid TEXT")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_users_line_uid ON users(line_uid) WHERE line_uid IS NOT NULL")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_users_line_uid ON users(line_uid) WHERE line_uid IS NOT NULL"
+            )
         logger.info("[v118.28.4] users.line_uid 列就绪")
         return True
     except Exception as e:
@@ -357,10 +392,13 @@ def update_user_email_and_username(user_id: str, new_email: str) -> bool:
     new_email_norm = _norm_email(new_email_clean)
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE users SET username = %s, email = %s, email_normalized = %s
                 WHERE id = %s
-            """, (new_email_clean, new_email_clean, new_email_norm, user_id))
+            """,
+                (new_email_clean, new_email_clean, new_email_norm, user_id),
+            )
         return True
     except Exception as e:
         logger.error(f"更新 email/username 失败 (user_id={user_id}): {e}")
@@ -369,7 +407,7 @@ def update_user_email_and_username(user_id: str, new_email: str) -> bool:
 
 def merge_line_account_into_existing(temp_user_id: str, target_user_id: str, line_uid: str) -> bool:
     """LINE 补邮箱发现该 email 已绑定老账号 · 把 line_uid 转移到老账号 + 删临时账号
-       注意:临时账号只是刚创建的 · 没有发票/客户/任何业务数据 · 直接删
+    注意:临时账号只是刚创建的 · 没有发票/客户/任何业务数据 · 直接删
     """
     if not temp_user_id or not target_user_id or not line_uid:
         return False
@@ -388,7 +426,9 @@ def merge_line_account_into_existing(temp_user_id: str, target_user_id: str, lin
                 pass  # 表可能不存在 · 安全跳过
             # 5) 删临时账号
             cur.execute("DELETE FROM users WHERE id = %s", (temp_user_id,))
-        logger.info(f"[v118.28.4.1] merged line_uid={line_uid} from temp={temp_user_id} → target={target_user_id}")
+        logger.info(
+            f"[v118.28.4.1] merged line_uid={line_uid} from temp={temp_user_id} → target={target_user_id}"
+        )
         return True
     except Exception as e:
         logger.error(f"合并 LINE 账号失败 (temp={temp_user_id} → target={target_user_id}): {e}")
@@ -412,8 +452,12 @@ def ensure_email_codes_table():
                     sender_ip TEXT
                 )
             """)
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes(email, purpose, used)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_email_codes_expires ON email_codes(expires_at)")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes(email, purpose, used)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_email_codes_expires ON email_codes(expires_at)"
+            )
         logger.info("[v118.27.6] email_codes 表就绪")
         return True
     except Exception as e:
@@ -432,10 +476,13 @@ def update_last_login(user_id: str):
 def get_ip_usage_today(ip: str) -> int:
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT count FROM ip_usage
                 WHERE ip_address = %s AND usage_date = CURRENT_DATE LIMIT 1
-            """, (ip,))
+            """,
+                (ip,),
+            )
             row = cur.fetchone()
             return row["count"] if row else 0
     except Exception as e:
@@ -446,13 +493,16 @@ def get_ip_usage_today(ip: str) -> int:
 def increment_ip_usage(ip: str, n: int = 1) -> int:
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO ip_usage (ip_address, usage_date, count)
                 VALUES (%s, CURRENT_DATE, %s)
                 ON CONFLICT (ip_address, usage_date)
                 DO UPDATE SET count = ip_usage.count + %s
                 RETURNING count
-            """, (ip, n, n))
+            """,
+                (ip, n, n),
+            )
             row = cur.fetchone()
             return row["count"] if row else 0
     except Exception as e:
@@ -468,7 +518,8 @@ def increment_user_monthly_usage(user_id: str, n: int = 1) -> int:
     """
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE users SET
                     used_this_month = CASE
                         WHEN last_usage_month IS NULL
@@ -479,7 +530,9 @@ def increment_user_monthly_usage(user_id: str, n: int = 1) -> int:
                     last_usage_month = DATE_TRUNC('month', NOW())::date
                 WHERE id = %s
                 RETURNING used_this_month
-            """, (n, n, user_id))
+            """,
+                (n, n, user_id),
+            )
             row = cur.fetchone()
             return row["used_this_month"] if row else 0
     except Exception as e:
@@ -494,7 +547,8 @@ def increment_typhoon_usage(user_id: str, n: int = 1) -> int:
     """
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE users SET
                     typhoon_used_this_month = CASE
                         WHEN typhoon_last_usage_month IS NULL
@@ -505,7 +559,9 @@ def increment_typhoon_usage(user_id: str, n: int = 1) -> int:
                     typhoon_last_usage_month = DATE_TRUNC('month', NOW())::date
                 WHERE id = %s
                 RETURNING typhoon_used_this_month
-            """, (n, n, user_id))
+            """,
+                (n, n, user_id),
+            )
             row = cur.fetchone()
             return row["typhoon_used_this_month"] if row else 0
     except Exception as e:
@@ -517,7 +573,8 @@ def get_user_monthly_usage(user_id: str) -> int:
     """查询某用户本月已用次数(若跨月返回 0)"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     CASE
                         WHEN last_usage_month IS NULL
@@ -526,7 +583,9 @@ def get_user_monthly_usage(user_id: str) -> int:
                         ELSE COALESCE(used_this_month, 0)
                     END AS used
                 FROM users WHERE id = %s LIMIT 1
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             row = cur.fetchone()
             return row["used"] if row else 0
     except Exception as e:
@@ -539,19 +598,19 @@ def get_user_monthly_usage(user_id: str) -> int:
 # ============================================================
 
 import json as _json
-from datetime import datetime as _datetime, timedelta as _timedelta
+from datetime import datetime as _datetime
 
 
 def _extract_summary_fields(pages: list) -> dict:
     """从 pages 抽出列表展示用的核心字段
-    v106.2 修复:多联发票(底单/发票/收据 3 页) Gemini 可能把所有页都标 is_copy=true · 
+    v106.2 修复:多联发票(底单/发票/收据 3 页) Gemini 可能把所有页都标 is_copy=true ·
     导致摘要字段全 None · 列表显示「未识别到 · 金额 · 发票号 · 日期 · 卖方」误报
     改进:先找非副本主页 · 找不到再用 is_duplicate=False 的页 · 最后兜底用第 1 页
     """
     pages = pages or []
-    
+
     def _build_from_page(p):
-        f = (p.get("fields") or {})
+        f = p.get("fields") or {}
         raw_date = f.get("date")
         invoice_date = None
         if raw_date:
@@ -574,29 +633,33 @@ def _extract_summary_fields(pages: list) -> dict:
             "seller_name": (f.get("seller_name") or "")[:200] or None,
             "total_amount": total,
         }
-    
+
     # 1. 优先 · 非副本主页(是非 is_copy 也非 is_duplicate)
     for p in pages:
         if not p.get("is_copy") and not p.get("is_duplicate"):
             f = p.get("fields") or {}
             if f.get("invoice_number") or f.get("total_amount") or f.get("seller_name"):
                 return _build_from_page(p)
-    
+
     # 2. 兜底 · 全部 is_copy/is_duplicate 时 · 选有最多关键字段的那页
     def _score(p):
         f = p.get("fields") or {}
         s = 0
-        if f.get("invoice_number"): s += 1
-        if f.get("total_amount"): s += 1
-        if f.get("seller_name"): s += 1
-        if f.get("date"): s += 1
+        if f.get("invoice_number"):
+            s += 1
+        if f.get("total_amount"):
+            s += 1
+        if f.get("seller_name"):
+            s += 1
+        if f.get("date"):
+            s += 1
         return s
-    
+
     if pages:
         best = max(pages, key=_score)
         if _score(best) > 0:
             return _build_from_page(best)
-    
+
     return {"invoice_no": None, "invoice_date": None, "seller_name": None, "total_amount": None}
 
 
@@ -633,7 +696,8 @@ def insert_ocr_history(
         try:
             cid = int(client_id)
             with get_cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id FROM clients
                     WHERE id = %s
                       AND user_id IN (
@@ -642,14 +706,19 @@ def insert_ocr_history(
                             OR id = %s
                       )
                     LIMIT 1
-                """, (cid, user_id, user_id))
+                """,
+                    (cid, user_id, user_id),
+                )
                 if cur.fetchone():
                     safe_client_id = cid
         except Exception as e:
-            logger.warning(f"insert_ocr_history client_id 校验失败 (user_id={user_id}, client_id={client_id}): {e}")
+            logger.warning(
+                f"insert_ocr_history client_id 校验失败 (user_id={user_id}, client_id={client_id}): {e}"
+            )
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO ocr_history (
                     user_id, filename, page_count, file_size_kb, file_hash,
                     pages, confidence, elapsed_ms,
@@ -670,19 +739,34 @@ def insert_ocr_history(
                     %s
                 )
                 RETURNING id
-            """, (
-                user_id, filename, page_count, file_size_kb, file_hash,
-                _json.dumps(pages, ensure_ascii=False), confidence, elapsed_ms,
-                summary["invoice_no"], summary["invoice_date"],
-                summary["seller_name"], summary["total_amount"],
-                archive_name, category_tag, archive_name,
-                source_pdf_id,
-                _json.dumps(source_page_indices) if source_page_indices else None,
-                source_index, source_total,
-                source, source_ref,
-                pdf_storage_path, pdf_size_bytes,
-                safe_client_id,
-            ))
+            """,
+                (
+                    user_id,
+                    filename,
+                    page_count,
+                    file_size_kb,
+                    file_hash,
+                    _json.dumps(pages, ensure_ascii=False),
+                    confidence,
+                    elapsed_ms,
+                    summary["invoice_no"],
+                    summary["invoice_date"],
+                    summary["seller_name"],
+                    summary["total_amount"],
+                    archive_name,
+                    category_tag,
+                    archive_name,
+                    source_pdf_id,
+                    _json.dumps(source_page_indices) if source_page_indices else None,
+                    source_index,
+                    source_total,
+                    source,
+                    source_ref,
+                    pdf_storage_path,
+                    pdf_size_bytes,
+                    safe_client_id,
+                ),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -690,26 +774,34 @@ def insert_ocr_history(
         return None
 
 
-def get_history_pdf_info(user_id: str, record_id: str, tenant_id: Optional[str] = None) -> Optional[dict]:
+def get_history_pdf_info(
+    user_id: str, record_id: str, tenant_id: Optional[str] = None
+) -> Optional[dict]:
     """v114 · 取一条历史的 PDF 留底信息(只查路径 · 鉴权用 user_id)
     v118.14 · tenant_id 给了 → 同 tenant 任意成员可下载 PDF
     """
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT pdf_storage_path, pdf_size_bytes, filename
                     FROM ocr_history
                     WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
                     LIMIT 1
-                """, (record_id, tenant_id))
+                """,
+                    (record_id, tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT pdf_storage_path, pdf_size_bytes, filename
                     FROM ocr_history
                     WHERE id = %s AND user_id = %s
                     LIMIT 1
-                """, (record_id, user_id))
+                """,
+                    (record_id, user_id),
+                )
             r = cur.fetchone()
             if not r or not r.get("pdf_storage_path"):
                 return None
@@ -723,7 +815,9 @@ def get_history_pdf_info(user_id: str, record_id: str, tenant_id: Optional[str] 
         return None
 
 
-def find_ocr_by_hash(user_id: str, file_hash: str, max_age_hours: int = 24 * 30, tenant_id: Optional[str] = None) -> Optional[dict]:
+def find_ocr_by_hash(
+    user_id: str, file_hash: str, max_age_hours: int = 24 * 30, tenant_id: Optional[str] = None
+) -> Optional[dict]:
     """
     按文件哈希查最近的识别结果。
     用于避免重复识别相同文件(省 Gemini 额度)
@@ -737,7 +831,8 @@ def find_ocr_by_hash(user_id: str, file_hash: str, max_age_hours: int = 24 * 30,
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, filename, page_count, confidence, elapsed_ms, pages,
                            archive_name, category_tag, created_at
                     FROM ocr_history
@@ -749,9 +844,12 @@ def find_ocr_by_hash(user_id: str, file_hash: str, max_age_hours: int = 24 * 30,
                       AND (total_amount IS NOT NULL OR invoice_no IS NOT NULL OR seller_name IS NOT NULL)
                     ORDER BY created_at DESC
                     LIMIT 1
-                """ % ("%s", "%s", int(max_age_hours)), (tenant_id, file_hash))
+                """ % ("%s", "%s", int(max_age_hours)),
+                    (tenant_id, file_hash),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, filename, page_count, confidence, elapsed_ms, pages,
                            archive_name, category_tag, created_at
                     FROM ocr_history
@@ -763,7 +861,9 @@ def find_ocr_by_hash(user_id: str, file_hash: str, max_age_hours: int = 24 * 30,
                       AND (total_amount IS NOT NULL OR invoice_no IS NOT NULL OR seller_name IS NOT NULL)
                     ORDER BY created_at DESC
                     LIMIT 1
-                """ % ("%s", "%s", int(max_age_hours)), (user_id, file_hash))
+                """ % ("%s", "%s", int(max_age_hours)),
+                    (user_id, file_hash),
+                )
             r = cur.fetchone()
             if not r:
                 return None
@@ -815,7 +915,8 @@ def check_duplicate_invoice(
                 if exclude_id:
                     where_extra = " AND id != %s"
                     params.append(exclude_id)
-                cur.execute(f"""
+                cur.execute(
+                    f"""
                     SELECT id, filename, invoice_no, invoice_date, seller_name,
                            total_amount, created_at
                     FROM ocr_history
@@ -826,7 +927,9 @@ def check_duplicate_invoice(
                       {where_extra}
                     ORDER BY created_at DESC
                     LIMIT 1
-                """, params)
+                """,
+                    params,
+                )
                 row = cur.fetchone()
                 if row:
                     return {
@@ -836,9 +939,15 @@ def check_duplicate_invoice(
                             "id": str(row["id"]),
                             "filename": row["filename"],
                             "invoice_no": row["invoice_no"],
-                            "invoice_date": row["invoice_date"].isoformat() if row["invoice_date"] else None,
+                            "invoice_date": (
+                                row["invoice_date"].isoformat() if row["invoice_date"] else None
+                            ),
                             "seller_name": row["seller_name"],
-                            "total_amount": float(row["total_amount"]) if row["total_amount"] is not None else None,
+                            "total_amount": (
+                                float(row["total_amount"])
+                                if row["total_amount"] is not None
+                                else None
+                            ),
                             "created_at": row["created_at"].isoformat(),
                         },
                     }
@@ -853,7 +962,8 @@ def check_duplicate_invoice(
                 if exclude_id:
                     where_extra = " AND id != %s"
                     params.append(exclude_id)
-                cur.execute(f"""
+                cur.execute(
+                    f"""
                     SELECT id, filename, invoice_no, invoice_date, seller_name,
                            total_amount, created_at
                     FROM ocr_history
@@ -865,7 +975,9 @@ def check_duplicate_invoice(
                       {where_extra}
                     ORDER BY created_at DESC
                     LIMIT 1
-                """, params)
+                """,
+                    params,
+                )
                 row = cur.fetchone()
                 if row:
                     return {
@@ -875,9 +987,15 @@ def check_duplicate_invoice(
                             "id": str(row["id"]),
                             "filename": row["filename"],
                             "invoice_no": row["invoice_no"],
-                            "invoice_date": row["invoice_date"].isoformat() if row["invoice_date"] else None,
+                            "invoice_date": (
+                                row["invoice_date"].isoformat() if row["invoice_date"] else None
+                            ),
                             "seller_name": row["seller_name"],
-                            "total_amount": float(row["total_amount"]) if row["total_amount"] is not None else None,
+                            "total_amount": (
+                                float(row["total_amount"])
+                                if row["total_amount"] is not None
+                                else None
+                            ),
                             "created_at": row["created_at"].isoformat(),
                         },
                     }
@@ -904,8 +1022,9 @@ def get_user_dup_check_enabled(user_id: str) -> bool:
 def set_user_dup_check_enabled(user_id: str, enabled: bool) -> bool:
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("UPDATE users SET dup_check_enabled = %s WHERE id = %s",
-                        (bool(enabled), user_id))
+            cur.execute(
+                "UPDATE users SET dup_check_enabled = %s WHERE id = %s", (bool(enabled), user_id)
+            )
         return True
     except Exception as e:
         logger.error(f"更新重复检测开关失败: {e}")
@@ -923,8 +1042,7 @@ def set_user_gemini_key(user_id: str, api_key: Optional[str]) -> bool:
     val = (api_key or "").strip() or None
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("UPDATE users SET gemini_api_key = %s WHERE id = %s",
-                        (val, user_id))
+            cur.execute("UPDATE users SET gemini_api_key = %s WHERE id = %s", (val, user_id))
         return True
     except Exception as e:
         logger.error(f"保存 Gemini key 失败: {e}")
@@ -1043,7 +1161,8 @@ def list_ocr_history(
             total = cur.fetchone()["c"]
 
             # 列表(不带 pages 字段,省流量)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT id, filename, page_count, confidence, elapsed_ms,
                        invoice_no, invoice_date, seller_name, total_amount,
                        archive_name, category_tag,
@@ -1055,48 +1174,61 @@ def list_ocr_history(
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT %s OFFSET %s
-            """, params + [limit, offset])
+            """,
+                params + [limit, offset],
+            )
             items = []
             for r in cur.fetchall():
-                items.append({
-                    "id": str(r["id"]),
-                    "filename": r["filename"],
-                    "page_count": r["page_count"],
-                    "confidence": r["confidence"],
-                    "elapsed_ms": r["elapsed_ms"],
-                    "invoice_no": r["invoice_no"],
-                    "invoice_date": r["invoice_date"].isoformat() if r["invoice_date"] else None,
-                    "seller_name": r["seller_name"],
-                    "total_amount": float(r["total_amount"]) if r["total_amount"] is not None else None,
-                    "archive_name": r["archive_name"],
-                    "category_tag": r["category_tag"],
-                    "edited": r["fields_edited_at"] is not None,
-                    "edit_count": r["edit_count"],
-                    "created_at": r["created_at"].isoformat(),
-                    # v0.11 · 多发票拆分字段
-                    "source_pdf_id": str(r["source_pdf_id"]) if r.get("source_pdf_id") else None,
-                    "source_index": r.get("source_index"),
-                    "source_total": r.get("source_total"),
-                    # v95 · 来源标识
-                    "source": r.get("source") or "manual",
-                    "source_ref": r.get("source_ref"),
-                    # v114 · 是否有 PDF 留底(前端用来决定是否显示「下载 PDF」按钮)
-                    "has_pdf": bool(r.get("pdf_storage_path")),
-                })
+                items.append(
+                    {
+                        "id": str(r["id"]),
+                        "filename": r["filename"],
+                        "page_count": r["page_count"],
+                        "confidence": r["confidence"],
+                        "elapsed_ms": r["elapsed_ms"],
+                        "invoice_no": r["invoice_no"],
+                        "invoice_date": (
+                            r["invoice_date"].isoformat() if r["invoice_date"] else None
+                        ),
+                        "seller_name": r["seller_name"],
+                        "total_amount": (
+                            float(r["total_amount"]) if r["total_amount"] is not None else None
+                        ),
+                        "archive_name": r["archive_name"],
+                        "category_tag": r["category_tag"],
+                        "edited": r["fields_edited_at"] is not None,
+                        "edit_count": r["edit_count"],
+                        "created_at": r["created_at"].isoformat(),
+                        # v0.11 · 多发票拆分字段
+                        "source_pdf_id": (
+                            str(r["source_pdf_id"]) if r.get("source_pdf_id") else None
+                        ),
+                        "source_index": r.get("source_index"),
+                        "source_total": r.get("source_total"),
+                        # v95 · 来源标识
+                        "source": r.get("source") or "manual",
+                        "source_ref": r.get("source_ref"),
+                        # v114 · 是否有 PDF 留底(前端用来决定是否显示「下载 PDF」按钮)
+                        "has_pdf": bool(r.get("pdf_storage_path")),
+                    }
+                )
             return {"items": items, "total": total}
     except Exception as e:
         logger.error(f"查询历史失败 (user_id={user_id}): {e}")
         return {"items": [], "total": 0}
 
 
-def get_ocr_history_detail(user_id: str, record_id: str, tenant_id: Optional[str] = None) -> Optional[dict]:
+def get_ocr_history_detail(
+    user_id: str, record_id: str, tenant_id: Optional[str] = None
+) -> Optional[dict]:
     """取单条详情(含完整 pages)
     v118.14 · tenant_id 给了 → 同 tenant 任意成员可查 · 否则只能查自己的
     """
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, filename, page_count, confidence, elapsed_ms,
                            pages, invoice_no, invoice_date, seller_name, total_amount,
                            archive_name, category_tag,
@@ -1105,9 +1237,12 @@ def get_ocr_history_detail(user_id: str, record_id: str, tenant_id: Optional[str
                     FROM ocr_history
                     WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
                     LIMIT 1
-                """, (record_id, tenant_id))
+                """,
+                    (record_id, tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, filename, page_count, confidence, elapsed_ms,
                            pages, invoice_no, invoice_date, seller_name, total_amount,
                            archive_name, category_tag,
@@ -1116,7 +1251,9 @@ def get_ocr_history_detail(user_id: str, record_id: str, tenant_id: Optional[str
                     FROM ocr_history
                     WHERE id = %s AND user_id = %s
                     LIMIT 1
-                """, (record_id, user_id))
+                """,
+                    (record_id, user_id),
+                )
             r = cur.fetchone()
             if not r:
                 return None
@@ -1145,7 +1282,9 @@ def get_ocr_history_detail(user_id: str, record_id: str, tenant_id: Optional[str
         return None
 
 
-def update_ocr_history_pages(user_id: str, record_id: str, new_pages: list, tenant_id: Optional[str] = None) -> bool:
+def update_ocr_history_pages(
+    user_id: str, record_id: str, new_pages: list, tenant_id: Optional[str] = None
+) -> bool:
     """会计修改字段后保存。同步刷新冗余字段 + v0.7 重算归档名
     v118.14 · tenant_id 给了 → 同 tenant 任意成员可改 · 否则只能改自己的
     """
@@ -1156,11 +1295,12 @@ def update_ocr_history_pages(user_id: str, record_id: str, new_pages: list, tena
     new_category_tag = None
     try:
         import archive as _archive
+
         merged = {}
         for p in new_pages or []:
             if p.get("is_duplicate") or p.get("is_copy"):
                 continue
-            merged = (p.get("fields") or {})
+            merged = p.get("fields") or {}
             break
         template = get_archive_template(user_id) or _archive.DEFAULT_TEMPLATE
         new_archive_name = _archive.preview_name(merged, template)
@@ -1176,7 +1316,8 @@ def update_ocr_history_pages(user_id: str, record_id: str, new_pages: list, tena
             else:
                 where_sql = "id = %s AND user_id = %s"
                 where_params = [record_id, user_id]
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 UPDATE ocr_history
                 SET pages = %s::jsonb,
                     invoice_no = %s,
@@ -1190,13 +1331,19 @@ def update_ocr_history_pages(user_id: str, record_id: str, new_pages: list, tena
                     edit_count = edit_count + 1,
                     updated_at = NOW()
                 WHERE {where_sql}
-            """, (
-                _json.dumps(new_pages, ensure_ascii=False),
-                summary["invoice_no"], summary["invoice_date"],
-                summary["seller_name"], summary["total_amount"],
-                new_archive_name, new_category_tag, new_archive_name,
-                *where_params,
-            ))
+            """,
+                (
+                    _json.dumps(new_pages, ensure_ascii=False),
+                    summary["invoice_no"],
+                    summary["invoice_date"],
+                    summary["seller_name"],
+                    summary["total_amount"],
+                    new_archive_name,
+                    new_category_tag,
+                    new_archive_name,
+                    *where_params,
+                ),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"更新历史失败 (id={record_id}): {e}")
@@ -1224,7 +1371,9 @@ def delete_ocr_history(user_id: str, record_id: str, tenant_id: Optional[str] = 
         return False
 
 
-def delete_ocr_history_with_pdf_paths(user_id: str, record_ids: list, tenant_id: Optional[str] = None) -> tuple:
+def delete_ocr_history_with_pdf_paths(
+    user_id: str, record_ids: list, tenant_id: Optional[str] = None
+) -> tuple:
     """
     v114 · 批量删除 + 返回被删记录的 PDF 路径列表(给上层清理本地文件)
     v118.14 · tenant_id 给了 → 同 tenant 任意成员可删
@@ -1267,6 +1416,7 @@ def delete_ocr_history_with_pdf_paths(user_id: str, record_ids: list, tenant_id:
 # v0.6.0 · ERP 端点 + 推送日志
 # ============================================================
 
+
 def list_erp_endpoints(user_id: str, auto_push_only: bool = False) -> List[Dict[str, Any]]:
     """列出用户的所有 ERP 端点(默认排前面)· auto_push_only=True 时只返回开启自动推且 enabled 的"""
     try:
@@ -1291,14 +1441,17 @@ def list_erp_endpoints(user_id: str, auto_push_only: bool = False) -> List[Dict[
 def get_erp_endpoint(user_id: str, endpoint_id: str) -> Optional[Dict[str, Any]]:
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, name, adapter, config, is_default, auto_push, enabled,
                        last_used_at, last_status, success_count, failure_count,
                        created_at, updated_at, user_id
                 FROM erp_endpoints
                 WHERE user_id = %s AND id = %s
                 LIMIT 1
-            """, (user_id, endpoint_id))
+            """,
+                (user_id, endpoint_id),
+            )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -1310,13 +1463,16 @@ def get_default_erp_endpoint(user_id: str) -> Optional[Dict[str, Any]]:
     """拿用户默认且启用的端点"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, name, adapter, config, is_default, auto_push, enabled
                 FROM erp_endpoints
                 WHERE user_id = %s AND enabled = true
                 ORDER BY is_default DESC, created_at ASC
                 LIMIT 1
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -1330,28 +1486,39 @@ def get_default_erp_endpoint(user_id: str) -> Optional[Dict[str, Any]]:
 _last_create_endpoint_error: Optional[str] = None
 
 
-def create_erp_endpoint(user_id: str, name: str, adapter: str, config: Dict[str, Any],
-                        is_default: bool = False, auto_push: bool = False) -> Optional[str]:
+def create_erp_endpoint(
+    user_id: str,
+    name: str,
+    adapter: str,
+    config: Dict[str, Any],
+    is_default: bool = False,
+    auto_push: bool = False,
+) -> Optional[str]:
     """创建端点。如果 is_default=True,会自动取消其他端点的默认状态。返回新 id"""
     import json as _json
     import traceback as _tb
+
     global _last_create_endpoint_error
     try:
         with get_cursor(commit=True) as cur:
             if is_default:
-                cur.execute("UPDATE erp_endpoints SET is_default = false WHERE user_id = %s", (user_id,))
-            cur.execute("""
+                cur.execute(
+                    "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s", (user_id,)
+                )
+            cur.execute(
+                """
                 INSERT INTO erp_endpoints (user_id, name, adapter, config, is_default, auto_push)
                 VALUES (%s, %s, %s, %s::jsonb, %s, %s)
                 RETURNING id
-            """, (user_id, name, adapter, _json.dumps(config), is_default, auto_push))
+            """,
+                (user_id, name, adapter, _json.dumps(config), is_default, auto_push),
+            )
             row = cur.fetchone()
             _last_create_endpoint_error = None
             return str(row["id"]) if row else None
     except Exception as e:
         _last_create_endpoint_error = (
-            f"{type(e).__name__}: {str(e)[:200]} | "
-            + _tb.format_exc()[-400:]
+            f"{type(e).__name__}: {str(e)[:200]} | " + _tb.format_exc()[-400:]
         )
         # logger.exception captures the full stack — visible in
         # journalctl. The module global gives the route a short
@@ -1363,6 +1530,7 @@ def create_erp_endpoint(user_id: str, name: str, adapter: str, config: Dict[str,
 def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
     """支持改 name/config/is_default/auto_push/enabled"""
     import json as _json
+
     allowed = {"name", "config", "is_default", "auto_push", "enabled"}
     sets = []
     vals = []
@@ -1381,8 +1549,10 @@ def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
         with get_cursor(commit=True) as cur:
             # 如果设为默认,先取消其他默认
             if fields.get("is_default"):
-                cur.execute("UPDATE erp_endpoints SET is_default = false WHERE user_id = %s AND id <> %s",
-                            (user_id, endpoint_id))
+                cur.execute(
+                    "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s AND id <> %s",
+                    (user_id, endpoint_id),
+                )
             sql = f"UPDATE erp_endpoints SET {', '.join(sets)} WHERE user_id = %s AND id = %s"
             vals.extend([user_id, endpoint_id])
             cur.execute(sql, tuple(vals))
@@ -1396,40 +1566,69 @@ def delete_erp_endpoint(user_id: str, endpoint_id: str) -> bool:
     try:
         with get_cursor(commit=True) as cur:
             # v118.25.0.2 · 删端点前 · 先把这个端点所有挂起的重试停掉(避免 worker 继续跑)
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE erp_push_logs
                 SET next_retry_at = NULL
                 WHERE user_id = %s AND endpoint_id = %s AND next_retry_at IS NOT NULL
-            """, (user_id, endpoint_id))
-            cur.execute("DELETE FROM erp_endpoints WHERE user_id = %s AND id = %s",
-                        (user_id, endpoint_id))
+            """,
+                (user_id, endpoint_id),
+            )
+            cur.execute(
+                "DELETE FROM erp_endpoints WHERE user_id = %s AND id = %s", (user_id, endpoint_id)
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"delete_erp_endpoint failed: {e}")
         return False
 
 
-def insert_push_log(user_id: str, endpoint_id: Optional[str], history_id: Optional[str],
-                    invoice_no: Optional[str], seller_name: Optional[str],
-                    total_amount: Optional[float],
-                    status: str, http_status: Optional[int],
-                    request_body: Optional[Dict], response_body: Optional[str],
-                    error_msg: Optional[str], attempt: int, elapsed_ms: int,
-                    trigger: str = "manual") -> Optional[str]:
+def insert_push_log(
+    user_id: str,
+    endpoint_id: Optional[str],
+    history_id: Optional[str],
+    invoice_no: Optional[str],
+    seller_name: Optional[str],
+    total_amount: Optional[float],
+    status: str,
+    http_status: Optional[int],
+    request_body: Optional[Dict],
+    response_body: Optional[str],
+    error_msg: Optional[str],
+    attempt: int,
+    elapsed_ms: int,
+    trigger: str = "manual",
+) -> Optional[str]:
     import json as _json
+
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO erp_push_logs (
                     user_id, endpoint_id, history_id, invoice_no, seller_name,
                     total_amount, status, http_status, request_body, response_body,
                     error_msg, attempt, elapsed_ms, trigger
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (user_id, endpoint_id, history_id, invoice_no, seller_name,
-                  total_amount, status, http_status,
-                  _json.dumps(request_body) if request_body else None,
-                  response_body, error_msg, attempt, elapsed_ms, trigger))
+            """,
+                (
+                    user_id,
+                    endpoint_id,
+                    history_id,
+                    invoice_no,
+                    seller_name,
+                    total_amount,
+                    status,
+                    http_status,
+                    _json.dumps(request_body) if request_body else None,
+                    response_body,
+                    error_msg,
+                    attempt,
+                    elapsed_ms,
+                    trigger,
+                ),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -1438,7 +1637,9 @@ def insert_push_log(user_id: str, endpoint_id: Optional[str], history_id: Option
 
 
 def has_recent_successful_push(
-    history_id: str, endpoint_id: str, user_id: str,
+    history_id: str,
+    endpoint_id: str,
+    user_id: str,
 ) -> Optional[Dict[str, Any]]:
     """批 2 改动 2 (Zihao 2026-05-19 拍板 · v118.34.34) · 推送去重 check.
     返回最近一次 success log (含 mrerp_bill_no 等)· 没有返 None.
@@ -1452,14 +1653,17 @@ def has_recent_successful_push(
         return None
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, response_body, created_at, invoice_no
                 FROM erp_push_logs
                 WHERE history_id = %s AND endpoint_id = %s
                   AND user_id = %s AND status = 'success'
                 ORDER BY created_at DESC
                 LIMIT 1
-            """, (history_id, endpoint_id, str(user_id)))
+            """,
+                (history_id, endpoint_id, str(user_id)),
+            )
             r = cur.fetchone()
             return dict(r) if r else None
     except Exception as e:
@@ -1472,21 +1676,27 @@ def update_endpoint_stats(endpoint_id: str, success: bool):
     try:
         with get_cursor(commit=True) as cur:
             if success:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE erp_endpoints
                     SET success_count = success_count + 1,
                         last_used_at = NOW(),
                         last_status = 'success'
                     WHERE id = %s
-                """, (endpoint_id,))
+                """,
+                    (endpoint_id,),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE erp_endpoints
                     SET failure_count = failure_count + 1,
                         last_used_at = NOW(),
                         last_status = 'failed'
                     WHERE id = %s
-                """, (endpoint_id,))
+                """,
+                    (endpoint_id,),
+                )
     except Exception as e:
         logger.error(f"update_endpoint_stats failed: {e}")
 
@@ -1495,11 +1705,14 @@ def update_history_push_status(history_id: str, status: str):
     """更新 ocr_history 的 last_push_status / last_pushed_at"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE ocr_history
                 SET last_pushed_at = NOW(), last_push_status = %s
                 WHERE id = %s
-            """, (status, history_id))
+            """,
+                (status, history_id),
+            )
     except Exception as e:
         logger.error(f"update_history_push_status failed: {e}")
 
@@ -1537,20 +1750,13 @@ def ensure_erp_endpoints_adapter_constraint():
             current_def = " ".join((r["def"] or "").lower() for r in rows)
             # 2. 已经包含 'mrerp' 就不动 — 幂等
             if "'mrerp'" in current_def:
-                logger.info(
-                    "✅ erp_endpoints adapter CHECK already includes mrerp (skip)"
-                )
+                logger.info("✅ erp_endpoints adapter CHECK already includes mrerp (skip)")
                 return
             # 3. drop 所有现存 adapter-related CHECK,然后建新的
             for r in rows:
                 name = r["conname"]
-                cur.execute(
-                    f"ALTER TABLE erp_endpoints DROP CONSTRAINT IF EXISTS "
-                    f"{name}"
-                )
-                logger.info(
-                    "[migration] dropped old erp_endpoints CHECK: %s", name
-                )
+                cur.execute(f"ALTER TABLE erp_endpoints DROP CONSTRAINT IF EXISTS " f"{name}")
+                logger.info("[migration] dropped old erp_endpoints CHECK: %s", name)
             # 4. 建新约束 · 名字回归 canonical
             in_list = ", ".join(f"'{a}'" for a in canonical)
             cur.execute(
@@ -1562,7 +1768,7 @@ def ensure_erp_endpoints_adapter_constraint():
                 "✅ erp_endpoints adapter CHECK rewritten · whitelist=%s",
                 canonical,
             )
-    except Exception as e:
+    except Exception:
         logger.exception("ensure_erp_endpoints_adapter_constraint failed")
         # 不抛 · 让启动继续 · 但下一次创建 mrerp endpoint 仍会 500 ·
         # 现场会进 last_500 traceback · 操作者能拿到。
@@ -1585,25 +1791,16 @@ def ensure_erp_push_logs_adapter_constraint():
             """)
             rows = cur.fetchall() or []
             if not rows:
-                logger.info(
-                    "ℹ erp_push_logs has no adapter CHECK constraint (nothing to migrate)"
-                )
+                logger.info("ℹ erp_push_logs has no adapter CHECK constraint (nothing to migrate)")
                 return
             current_def = " ".join((r["def"] or "").lower() for r in rows)
             if "'mrerp'" in current_def:
-                logger.info(
-                    "✅ erp_push_logs adapter CHECK already includes mrerp (skip)"
-                )
+                logger.info("✅ erp_push_logs adapter CHECK already includes mrerp (skip)")
                 return
             for r in rows:
                 name = r["conname"]
-                cur.execute(
-                    f"ALTER TABLE erp_push_logs DROP CONSTRAINT IF EXISTS "
-                    f"{name}"
-                )
-                logger.info(
-                    "[migration] dropped old erp_push_logs CHECK: %s", name
-                )
+                cur.execute(f"ALTER TABLE erp_push_logs DROP CONSTRAINT IF EXISTS " f"{name}")
+                logger.info("[migration] dropped old erp_push_logs CHECK: %s", name)
             in_list = ", ".join(f"'{a}'" for a in canonical)
             cur.execute(
                 f"ALTER TABLE erp_push_logs "
@@ -1614,7 +1811,7 @@ def ensure_erp_push_logs_adapter_constraint():
                 "✅ erp_push_logs adapter CHECK rewritten · whitelist=%s",
                 canonical,
             )
-    except Exception as e:
+    except Exception:
         logger.exception("ensure_erp_push_logs_adapter_constraint failed")
 
 
@@ -1668,11 +1865,11 @@ USER_DATA_ERROR_CODES = {
 
 # Thai raw error patterns that map to user-data errors (报错可能直接是 raw 泰文)
 USER_DATA_ERROR_THAI_PATTERNS = (
-    "เลขที่ดังกล่าวมีอยู่ในระบบแล้ว",   # duplicate
-    "เลขที่เอกสารซ้ำ",                # duplicate
-    "ไม่พบข้อมูลรหัสลูกค้า",          # customer mapping missing
-    "ลูกค้าไม่ระบุ",                   # client missing
-    "เลขที่ต้องไม่เกิน",               # length limit
+    "เลขที่ดังกล่าวมีอยู่ในระบบแล้ว",  # duplicate
+    "เลขที่เอกสารซ้ำ",  # duplicate
+    "ไม่พบข้อมูลรหัสลูกค้า",  # customer mapping missing
+    "ลูกค้าไม่ระบุ",  # client missing
+    "เลขที่ต้องไม่เกิน",  # length limit
 )
 
 
@@ -1707,11 +1904,14 @@ def schedule_log_retry(log_id: str, delay_sec: int) -> bool:
     """把一条失败日志加入重试队列 · next_retry_at = NOW + delay"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE erp_push_logs
                 SET next_retry_at = NOW() + (%s * INTERVAL '1 second')
                 WHERE id = %s AND status = 'failed'
-            """, (int(delay_sec), log_id))
+            """,
+                (int(delay_sec), log_id),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"schedule_log_retry failed: {e}")
@@ -1722,11 +1922,14 @@ def clear_retry_schedule(log_id: str):
     """重试成功 / 达到上限后调用 · 清空 next_retry_at(从队列里摘出来)"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE erp_push_logs
                 SET next_retry_at = NULL
                 WHERE id = %s
-            """, (log_id,))
+            """,
+                (log_id,),
+            )
     except Exception as e:
         logger.error(f"clear_retry_schedule failed: {e}")
 
@@ -1735,7 +1938,8 @@ def list_logs_due_for_retry(limit: int = 20) -> List[Dict[str, Any]]:
     """找到当下到期需要重试的失败日志 · 按到期时间正序"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT l.id, l.user_id, l.endpoint_id, l.history_id,
                        l.invoice_no, l.seller_name, l.total_amount,
                        l.retry_count, l.max_retries, l.next_retry_at
@@ -1746,7 +1950,9 @@ def list_logs_due_for_retry(limit: int = 20) -> List[Dict[str, Any]]:
                   AND l.retry_count < l.max_retries
                 ORDER BY l.next_retry_at ASC
                 LIMIT %s
-            """, (int(limit),))
+            """,
+                (int(limit),),
+            )
             rows = cur.fetchall() or []
             return [dict(r) for r in rows]
     except Exception as e:
@@ -1758,12 +1964,15 @@ def increment_retry_count(log_id: str) -> int:
     """重试一次后自增 retry_count · 返回新值"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE erp_push_logs
                 SET retry_count = retry_count + 1
                 WHERE id = %s
                 RETURNING retry_count
-            """, (log_id,))
+            """,
+                (log_id,),
+            )
             row = cur.fetchone()
             return int(row["retry_count"]) if row else 0
     except Exception as e:
@@ -1771,15 +1980,19 @@ def increment_retry_count(log_id: str) -> int:
         return 0
 
 
-def update_log_status_after_retry(log_id: str, success: bool,
-                                  http_status: Optional[int],
-                                  response_body: Optional[str],
-                                  error_msg: Optional[str],
-                                  elapsed_ms: int):
+def update_log_status_after_retry(
+    log_id: str,
+    success: bool,
+    http_status: Optional[int],
+    response_body: Optional[str],
+    error_msg: Optional[str],
+    elapsed_ms: int,
+):
     """重试完成后更新原 log 的 status / http_status / response · 不写新行"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE erp_push_logs
                 SET status = %s,
                     http_status = %s,
@@ -1787,8 +2000,16 @@ def update_log_status_after_retry(log_id: str, success: bool,
                     error_msg = %s,
                     elapsed_ms = %s
                 WHERE id = %s
-            """, ("success" if success else "failed",
-                  http_status, response_body, error_msg, int(elapsed_ms), log_id))
+            """,
+                (
+                    "success" if success else "failed",
+                    http_status,
+                    response_body,
+                    error_msg,
+                    int(elapsed_ms),
+                    log_id,
+                ),
+            )
     except Exception as e:
         logger.error(f"update_log_status_after_retry failed: {e}")
 
@@ -1810,12 +2031,16 @@ def delete_push_logs(user_id: str, log_ids: List[str]) -> int:
         return 0
 
 
-def list_push_logs(user_id: str, history_id: Optional[str] = None,
-                   endpoint_id: Optional[str] = None,
-                   status_filter: Optional[str] = None,
-                   trigger_filter: Optional[str] = None,
-                   adapter_filter: Optional[str] = None,
-                   limit: int = 50, offset: int = 0) -> Dict[str, Any]:
+def list_push_logs(
+    user_id: str,
+    history_id: Optional[str] = None,
+    endpoint_id: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    trigger_filter: Optional[str] = None,
+    adapter_filter: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> Dict[str, Any]:
     """查询推送日志,支持按 history/endpoint/status/trigger/adapter 过滤
 
     批 3 改动 6 (Zihao 2026-05-19 拍板 · v118.34.34) · 新增 adapter_filter.
@@ -1848,16 +2073,21 @@ def list_push_logs(user_id: str, history_id: Optional[str] = None,
             # 批 1 改动 5/8 (Zihao 2026-05-19 拍板 · v118.34.33) · JOIN clients
             # 拿 Pearnly 客户名 (改动 5) + JOIN erp_endpoints 拿 endpoint
             # name (改动 8). where_sql 字段全部 prefix 成 l.* 防 join 后 ambig.
-            joined_where = (where_sql
-                .replace("user_id = %s", "l.user_id = %s")
+            joined_where = (
+                where_sql.replace("user_id = %s", "l.user_id = %s")
                 .replace("history_id = %s", "l.history_id = %s")
                 .replace("endpoint_id = %s", "l.endpoint_id = %s")
                 .replace("status = 'success'", "l.status = 'success'")
-                .replace("status = 'failed' AND next_retry_at IS NOT NULL",
-                         "l.status = 'failed' AND l.next_retry_at IS NOT NULL")
-                .replace("status = 'failed' AND next_retry_at IS NULL",
-                         "l.status = 'failed' AND l.next_retry_at IS NULL")
-                .replace("trigger = %s", "l.trigger = %s"))
+                .replace(
+                    "status = 'failed' AND next_retry_at IS NOT NULL",
+                    "l.status = 'failed' AND l.next_retry_at IS NOT NULL",
+                )
+                .replace(
+                    "status = 'failed' AND next_retry_at IS NULL",
+                    "l.status = 'failed' AND l.next_retry_at IS NULL",
+                )
+                .replace("trigger = %s", "l.trigger = %s")
+            )
             # 批 3 改动 6 · adapter filter · 走 JOIN 后的 e.adapter (e 是 endpoint).
             # NULL-safe: LOWER(e.adapter) = LOWER(%s) 自动滤掉孤儿 log.
             if adapter_filter:
@@ -1874,7 +2104,8 @@ def list_push_logs(user_id: str, history_id: Optional[str] = None,
                 tuple(params),
             )
             total = cur.fetchone()["n"]
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT l.id, l.endpoint_id, l.history_id, l.invoice_no,
                        l.seller_name, l.total_amount, l.status, l.http_status,
                        l.error_msg, l.attempt, l.elapsed_ms, l.trigger,
@@ -1891,7 +2122,9 @@ def list_push_logs(user_id: str, history_id: Optional[str] = None,
                 WHERE {joined_where}
                 ORDER BY l.created_at DESC
                 LIMIT %s OFFSET %s
-            """, tuple(params) + (limit, offset))
+            """,
+                tuple(params) + (limit, offset),
+            )
             items = [dict(r) for r in cur.fetchall()]
             return {"items": items, "total": total}
     except Exception as e:
@@ -1903,7 +2136,8 @@ def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
     """单条推送日志完整详情(含 request_body / response_body)"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, endpoint_id, history_id, invoice_no, seller_name,
                        total_amount, status, http_status,
                        request_body, response_body, error_msg,
@@ -1911,7 +2145,9 @@ def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
                        retry_count, max_retries, next_retry_at
                 FROM erp_push_logs
                 WHERE id = %s AND user_id = %s
-            """, (log_id, user_id))
+            """,
+                (log_id, user_id),
+            )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -1923,7 +2159,8 @@ def get_push_stats_today(user_id: str) -> Dict[str, Any]:
     """今日推送统计(总数 · 成功 · 失败)"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE status='success') AS success,
@@ -1932,7 +2169,9 @@ def get_push_stats_today(user_id: str) -> Dict[str, Any]:
                 FROM erp_push_logs
                 WHERE user_id = %s
                   AND created_at >= CURRENT_DATE
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             row = cur.fetchone()
             return dict(row) if row else {"total": 0, "success": 0, "failed": 0, "auto_cnt": 0}
     except Exception as e:
@@ -1947,10 +2186,13 @@ def get_archive_settings(user_id: str) -> Optional[Dict[str, Any]]:
     """读用户的归档设置。没配过就返回 None(调用方用默认)"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT user_id, name_template, folder_strategy
                 FROM archive_settings WHERE user_id = %s
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             r = cur.fetchone()
             return dict(r) if r else None
     except Exception as e:
@@ -1967,22 +2209,25 @@ def get_archive_template(user_id: str) -> Optional[List[Dict[str, Any]]]:
     return tpl if isinstance(tpl, list) and tpl else None
 
 
-def upsert_archive_settings(user_id: str,
-                            name_template: List[Dict[str, Any]],
-                            folder_strategy: str) -> bool:
+def upsert_archive_settings(
+    user_id: str, name_template: List[Dict[str, Any]], folder_strategy: str
+) -> bool:
     """创建或更新归档设置"""
     if folder_strategy not in ("none", "by_month", "by_seller", "by_month_seller"):
         folder_strategy = "by_month_seller"
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO archive_settings (user_id, name_template, folder_strategy)
                 VALUES (%s, %s::jsonb, %s)
                 ON CONFLICT (user_id) DO UPDATE
                   SET name_template = EXCLUDED.name_template,
                       folder_strategy = EXCLUDED.folder_strategy,
                       updated_at = NOW()
-            """, (user_id, _json.dumps(name_template or []), folder_strategy))
+            """,
+                (user_id, _json.dumps(name_template or []), folder_strategy),
+            )
             return True
     except Exception as e:
         logger.error(f"upsert_archive_settings failed: {e}")
@@ -1996,10 +2241,13 @@ def get_rd_daily_usage(user_id: str) -> int:
     """返回今天用户已调 RD 的次数"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT count FROM rd_daily_usage
                 WHERE user_id = %s AND day = CURRENT_DATE
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             r = cur.fetchone()
             return int(r["count"]) if r else 0
     except Exception as e:
@@ -2011,13 +2259,16 @@ def increment_rd_daily_usage(user_id: str, n: int = 1) -> int:
     """RD 调用成功后 +1 · 自动按当天聚合"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO rd_daily_usage (user_id, day, count)
                 VALUES (%s, CURRENT_DATE, %s)
                 ON CONFLICT (user_id, day) DO UPDATE
                 SET count = rd_daily_usage.count + EXCLUDED.count
                 RETURNING count
-            """, (user_id, n))
+            """,
+                (user_id, n),
+            )
             r = cur.fetchone()
             return int(r["count"]) if r else n
     except Exception as e:
@@ -2034,25 +2285,34 @@ def cleanup_expired_history(free_days: int = 7, plus_days: int = 90, pro_days: i
     try:
         with get_cursor(commit=True) as cur:
             # Free
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM ocr_history
                 WHERE user_id IN (SELECT id FROM users WHERE plan = 'free')
                   AND created_at < NOW() - (%s || ' days')::interval
-            """, (str(free_days),))
+            """,
+                (str(free_days),),
+            )
             total += cur.rowcount
             # Plus
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM ocr_history
                 WHERE user_id IN (SELECT id FROM users WHERE plan = 'plus')
                   AND created_at < NOW() - (%s || ' days')::interval
-            """, (str(plus_days),))
+            """,
+                (str(plus_days),),
+            )
             total += cur.rowcount
             # Pro
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM ocr_history
                 WHERE user_id IN (SELECT id FROM users WHERE plan = 'pro')
                   AND created_at < NOW() - (%s || ' days')::interval
-            """, (str(pro_days),))
+            """,
+                (str(pro_days),),
+            )
             total += cur.rowcount
         return total
     except Exception as e:
@@ -2067,7 +2327,8 @@ def get_email_account(user_id: str) -> Optional[Dict[str, Any]]:
     """读当前用户绑定的邮箱账号(第一版一人一个)· 返回完整行(含 password_enc)"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, user_id, email_address, imap_host, imap_port, imap_use_ssl,
                        password_enc, folder, filter_subject, filter_sender, mark_as_read,
                        enabled, last_check_at, last_error,
@@ -2077,7 +2338,9 @@ def get_email_account(user_id: str) -> Optional[Dict[str, Any]]:
                 FROM email_ingest_accounts
                 WHERE user_id = %s
                 LIMIT 1
-            """, (str(user_id),))
+            """,
+                (str(user_id),),
+            )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -2095,15 +2358,20 @@ def get_email_account_safe(user_id: str) -> Optional[Dict[str, Any]]:
     return row
 
 
-def upsert_email_account(user_id: str, email_address: str, imap_host: str,
-                          imap_port: int, imap_use_ssl: bool,
-                          password_enc: Optional[bytes],
-                          folder: str = "INBOX",
-                          filter_subject: Optional[str] = None,
-                          filter_sender: Optional[str] = None,
-                          mark_as_read: bool = True,
-                          enabled: bool = True,
-                          interval_min: int = 15) -> Optional[str]:
+def upsert_email_account(
+    user_id: str,
+    email_address: str,
+    imap_host: str,
+    imap_port: int,
+    imap_use_ssl: bool,
+    password_enc: Optional[bytes],
+    folder: str = "INBOX",
+    filter_subject: Optional[str] = None,
+    filter_sender: Optional[str] = None,
+    mark_as_read: bool = True,
+    enabled: bool = True,
+    interval_min: int = 15,
+) -> Optional[str]:
     """新增或更新邮箱账号 · 返回 id(若未传 password_enc 则保留旧密码)"""
     # 限制 interval_min 只能是 5/15/60 · 其他值兜底成 15
     if interval_min not in (5, 15, 60):
@@ -2111,7 +2379,8 @@ def upsert_email_account(user_id: str, email_address: str, imap_host: str,
     try:
         with get_cursor(commit=True) as cur:
             if password_enc is not None:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO email_ingest_accounts
                         (user_id, email_address, imap_host, imap_port, imap_use_ssl,
                          password_enc, folder, filter_subject, filter_sender,
@@ -2131,13 +2400,26 @@ def upsert_email_account(user_id: str, email_address: str, imap_host: str,
                         interval_min  = EXCLUDED.interval_min,
                         updated_at    = NOW()
                     RETURNING id
-                """, (str(user_id), email_address, imap_host, int(imap_port),
-                       bool(imap_use_ssl), password_enc, folder,
-                       filter_subject, filter_sender, bool(mark_as_read),
-                       bool(enabled), interval_min))
+                """,
+                    (
+                        str(user_id),
+                        email_address,
+                        imap_host,
+                        int(imap_port),
+                        bool(imap_use_ssl),
+                        password_enc,
+                        folder,
+                        filter_subject,
+                        filter_sender,
+                        bool(mark_as_read),
+                        bool(enabled),
+                        interval_min,
+                    ),
+                )
             else:
                 # 不改密码的更新(用户只改配置)
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO email_ingest_accounts
                         (user_id, email_address, imap_host, imap_port, imap_use_ssl,
                          password_enc, folder, filter_subject, filter_sender,
@@ -2156,10 +2438,21 @@ def upsert_email_account(user_id: str, email_address: str, imap_host: str,
                         interval_min  = EXCLUDED.interval_min,
                         updated_at    = NOW()
                     RETURNING id
-                """, (str(user_id), email_address, imap_host, int(imap_port),
-                       bool(imap_use_ssl), folder,
-                       filter_subject, filter_sender, bool(mark_as_read),
-                       bool(enabled), interval_min))
+                """,
+                    (
+                        str(user_id),
+                        email_address,
+                        imap_host,
+                        int(imap_port),
+                        bool(imap_use_ssl),
+                        folder,
+                        filter_subject,
+                        filter_sender,
+                        bool(mark_as_read),
+                        bool(enabled),
+                        interval_min,
+                    ),
+                )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -2170,9 +2463,12 @@ def upsert_email_account(user_id: str, email_address: str, imap_host: str,
 def delete_email_account(user_id: str) -> bool:
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM email_ingest_accounts WHERE user_id = %s
-            """, (str(user_id),))
+            """,
+                (str(user_id),),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"delete_email_account failed: {e}")
@@ -2197,15 +2493,16 @@ def list_enabled_email_accounts() -> List[Dict[str, Any]]:
         return []
 
 
-def update_email_account_status(account_id: str, success: bool,
-                                 error_msg: Optional[str] = None,
-                                 fetched_any: bool = False):
+def update_email_account_status(
+    account_id: str, success: bool, error_msg: Optional[str] = None, fetched_any: bool = False
+):
     """每次抓取完更新账号状态"""
     try:
         with get_cursor(commit=True) as cur:
             if success:
                 if fetched_any:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         UPDATE email_ingest_accounts
                         SET last_check_at   = NOW(),
                             last_fetched_at = NOW(),
@@ -2213,52 +2510,66 @@ def update_email_account_status(account_id: str, success: bool,
                             success_count   = success_count + 1,
                             updated_at      = NOW()
                         WHERE id = %s
-                    """, (account_id,))
+                    """,
+                        (account_id,),
+                    )
                 else:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         UPDATE email_ingest_accounts
                         SET last_check_at = NOW(),
                             last_error    = NULL,
                             updated_at    = NOW()
                         WHERE id = %s
-                    """, (account_id,))
+                    """,
+                        (account_id,),
+                    )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE email_ingest_accounts
                     SET last_check_at   = NOW(),
                         last_error      = %s,
                         failure_count   = failure_count + 1,
                         updated_at      = NOW()
                     WHERE id = %s
-                """, (error_msg, account_id))
+                """,
+                    (error_msg, account_id),
+                )
     except Exception as e:
         logger.error(f"update_email_account_status failed: {e}")
 
 
-def insert_email_ingest_log(account_id: str, user_id: str, stats: Dict[str, Any],
-                             trigger: str = "auto") -> Optional[str]:
+def insert_email_ingest_log(
+    account_id: str, user_id: str, stats: Dict[str, Any], trigger: str = "auto"
+) -> Optional[str]:
     """写一条抓取日志"""
     import json as _json
+
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO email_ingest_logs
                     (account_id, user_id, status, emails_scanned, attachments_found,
                      ocr_succeeded, ocr_failed, elapsed_ms, error_message, error_details, trigger)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
                 RETURNING id
-            """, (
-                account_id, user_id,
-                stats.get("status"),
-                int(stats.get("emails_scanned") or 0),
-                int(stats.get("attachments_found") or 0),
-                int(stats.get("ocr_succeeded") or 0),
-                int(stats.get("ocr_failed") or 0),
-                int(stats.get("elapsed_ms") or 0),
-                stats.get("error_message"),
-                _json.dumps(stats.get("error_details") or [], ensure_ascii=False),
-                trigger,
-            ))
+            """,
+                (
+                    account_id,
+                    user_id,
+                    stats.get("status"),
+                    int(stats.get("emails_scanned") or 0),
+                    int(stats.get("attachments_found") or 0),
+                    int(stats.get("ocr_succeeded") or 0),
+                    int(stats.get("ocr_failed") or 0),
+                    int(stats.get("elapsed_ms") or 0),
+                    stats.get("error_message"),
+                    _json.dumps(stats.get("error_details") or [], ensure_ascii=False),
+                    trigger,
+                ),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -2270,7 +2581,8 @@ def list_email_ingest_logs(user_id: str, limit: int = 20) -> List[Dict[str, Any]
     """前端用 · 最近的抓取日志"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, status, emails_scanned, attachments_found,
                        ocr_succeeded, ocr_failed, elapsed_ms,
                        error_message, trigger, created_at
@@ -2278,7 +2590,9 @@ def list_email_ingest_logs(user_id: str, limit: int = 20) -> List[Dict[str, Any]
                 WHERE user_id = %s
                 ORDER BY created_at DESC
                 LIMIT %s
-            """, (str(user_id), int(limit)))
+            """,
+                (str(user_id), int(limit)),
+            )
             return [dict(r) for r in (cur.fetchall() or [])]
     except Exception as e:
         logger.error(f"list_email_ingest_logs failed: {e}")
@@ -2289,27 +2603,38 @@ def is_email_uid_seen(account_id: str, uid: str) -> bool:
     """查这封邮件是否抓过"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT 1 FROM email_ingest_seen_uids
                 WHERE account_id = %s AND uid = %s LIMIT 1
-            """, (account_id, uid))
+            """,
+                (account_id, uid),
+            )
             return cur.fetchone() is not None
     except Exception as e:
         logger.error(f"is_email_uid_seen failed: {e}")
         return False
 
 
-def mark_email_uid_seen(account_id: str, uid: str, history_id: Optional[str],
-                         subject: Optional[str], sender: Optional[str]) -> bool:
+def mark_email_uid_seen(
+    account_id: str,
+    uid: str,
+    history_id: Optional[str],
+    subject: Optional[str],
+    sender: Optional[str],
+) -> bool:
     """标记这封邮件处理过 · history_id 可为空(无附件/OCR 失败场景)"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO email_ingest_seen_uids
                     (account_id, uid, history_id, subject, sender)
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (account_id, uid) DO NOTHING
-            """, (account_id, uid, history_id, (subject or "")[:500], (sender or "")[:200]))
+            """,
+                (account_id, uid, history_id, (subject or "")[:500], (sender or "")[:200]),
+            )
             return True
     except Exception as e:
         logger.error(f"mark_email_uid_seen failed: {e}")
@@ -2319,6 +2644,7 @@ def mark_email_uid_seen(account_id: str, uid: str, history_id: Optional[str],
 # ============================================================
 # v0.18 · M10 · 银行对账
 # ============================================================
+
 
 # v118.26.2 · 给 bank_reconcile_sessions 加 client_id 列(幂等)
 #   行业标配:Xero/QB 一个 bank account 属于一个 organisation
@@ -2340,17 +2666,21 @@ def ensure_bank_recon_client_id_column():
         logger.warning(f"ensure_bank_recon_client_id_column failed: {e}")
 
 
-def create_bank_recon_session(user_id: str, bank_code: str, filename: str,
-                               pages: int) -> Optional[str]:
+def create_bank_recon_session(
+    user_id: str, bank_code: str, filename: str, pages: int
+) -> Optional[str]:
     """创建一条会话 · 返回 id"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO bank_reconcile_sessions
                     (user_id, bank_code, source_filename, source_pages, parse_status)
                 VALUES (%s, %s, %s, %s, 'pending')
                 RETURNING id
-            """, (str(user_id), bank_code, (filename or "")[:200], int(pages)))
+            """,
+                (str(user_id), bank_code, (filename or "")[:200], int(pages)),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -2366,7 +2696,8 @@ def save_bank_recon_parse(session_id: str, parsed: Dict[str, Any]) -> bool:
             # 更新会话头信息
             # v118.26.1 · 补 unmatched_count = tx_n / matched_count = 0
             #   因为流水落库默认 match_status='unmatched' · 不写这俩字段会让顶部 chip 计数永远 0
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE bank_reconcile_sessions SET
                     bank_code       = %s,
                     account_last4   = %s,
@@ -2384,20 +2715,22 @@ def save_bank_recon_parse(session_id: str, parsed: Dict[str, Any]) -> bool:
                     updated_at      = NOW()
                 WHERE id = %s
                 RETURNING user_id
-            """, (
-                parsed.get("bank_code") or "OTHER",
-                parsed.get("account_last4"),
-                parsed.get("statement_month"),
-                parsed.get("period_start"),
-                parsed.get("period_end"),
-                parsed.get("opening_balance"),
-                parsed.get("closing_balance"),
-                parsed.get("total_inflow") or 0,
-                parsed.get("total_outflow") or 0,
-                tx_n,
-                tx_n,           # unmatched_count = 全部初始未匹配
-                session_id,
-            ))
+            """,
+                (
+                    parsed.get("bank_code") or "OTHER",
+                    parsed.get("account_last4"),
+                    parsed.get("statement_month"),
+                    parsed.get("period_start"),
+                    parsed.get("period_end"),
+                    parsed.get("opening_balance"),
+                    parsed.get("closing_balance"),
+                    parsed.get("total_inflow") or 0,
+                    parsed.get("total_outflow") or 0,
+                    tx_n,
+                    tx_n,  # unmatched_count = 全部初始未匹配
+                    session_id,
+                ),
+            )
             row = cur.fetchone()
             if not row:
                 return False
@@ -2406,21 +2739,28 @@ def save_bank_recon_parse(session_id: str, parsed: Dict[str, Any]) -> bool:
             # 批量插入流水
             txs = parsed.get("transactions") or []
             for tx in txs:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO bank_reconcile_transactions
                         (session_id, user_id, row_no, tx_date, value_date, direction,
                          amount, balance_after, description, counterparty, ref_no, channel)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    session_id, user_id, tx.get("row_no"),
-                    tx.get("tx_date"), tx.get("value_date") or tx.get("tx_date"),
-                    tx.get("direction"), tx.get("amount"),
-                    tx.get("balance_after"),
-                    (tx.get("description") or "")[:500],
-                    (tx.get("counterparty") or "")[:200] if tx.get("counterparty") else None,
-                    (tx.get("ref_no") or "")[:100] if tx.get("ref_no") else None,
-                    (tx.get("channel") or "")[:50] if tx.get("channel") else None,
-                ))
+                """,
+                    (
+                        session_id,
+                        user_id,
+                        tx.get("row_no"),
+                        tx.get("tx_date"),
+                        tx.get("value_date") or tx.get("tx_date"),
+                        tx.get("direction"),
+                        tx.get("amount"),
+                        tx.get("balance_after"),
+                        (tx.get("description") or "")[:500],
+                        (tx.get("counterparty") or "")[:200] if tx.get("counterparty") else None,
+                        (tx.get("ref_no") or "")[:100] if tx.get("ref_no") else None,
+                        (tx.get("channel") or "")[:50] if tx.get("channel") else None,
+                    ),
+                )
             return True
     except Exception as e:
         logger.error(f"save_bank_recon_parse failed: {e}")
@@ -2430,13 +2770,16 @@ def save_bank_recon_parse(session_id: str, parsed: Dict[str, Any]) -> bool:
 def mark_recon_parse_failed(session_id: str, error_msg: str) -> bool:
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE bank_reconcile_sessions
                 SET parse_status = 'parse_failed',
                     parse_error  = %s,
                     updated_at   = NOW()
                 WHERE id = %s
-            """, ((error_msg or "")[:500], session_id))
+            """,
+                ((error_msg or "")[:500], session_id),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"mark_recon_parse_failed failed: {e}")
@@ -2447,10 +2790,13 @@ def get_bank_recon_session(user_id: str, session_id: str) -> Optional[Dict[str, 
     """获取会话头(鉴权)"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT * FROM bank_reconcile_sessions
                 WHERE id = %s AND user_id = %s
-            """, (session_id, str(user_id)))
+            """,
+                (session_id, str(user_id)),
+            )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -2458,9 +2804,9 @@ def get_bank_recon_session(user_id: str, session_id: str) -> Optional[Dict[str, 
         return None
 
 
-def list_bank_recon_sessions(user_id: str, limit: int = 30,
-                              restrict_client_ids: Optional[List[int]] = None
-                              ) -> List[Dict[str, Any]]:
+def list_bank_recon_sessions(
+    user_id: str, limit: int = 30, restrict_client_ids: Optional[List[int]] = None
+) -> List[Dict[str, Any]]:
     """列最近会话
     v118.26.2 · 加 restrict_client_ids 参数(v28.1 客户分配 filter)
       None       → 不限(老板/超管)
@@ -2500,8 +2846,9 @@ def list_bank_recon_sessions(user_id: str, limit: int = 30,
 
 
 # v118.26.2 · 给一个 session 绑客户(老板分客户给员工 · 流水进 client filter)
-def update_bank_recon_session_client(user_id: str, session_id: str,
-                                      client_id: Optional[int]) -> bool:
+def update_bank_recon_session_client(
+    user_id: str, session_id: str, client_id: Optional[int]
+) -> bool:
     """
     更新 session 的 client_id · None 表示解绑
     鉴权:session 必须属于本 user
@@ -2509,11 +2856,14 @@ def update_bank_recon_session_client(user_id: str, session_id: str,
     """
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE bank_reconcile_sessions
                 SET client_id = %s, updated_at = NOW()
                 WHERE id = %s AND user_id = %s
-            """, (client_id, session_id, str(user_id)))
+            """,
+                (client_id, session_id, str(user_id)),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"update_bank_recon_session_client failed: {e}")
@@ -2540,12 +2890,14 @@ def get_bank_recon_stats(user_id: str) -> Dict[str, Any]:
     try:
         # BKK 月初 · 转 UTC 给 PG(s.created_at 是 timestamptz)
         from datetime import datetime, timezone, timedelta
+
         bkk = timezone(timedelta(hours=7))
         now_bkk = datetime.now(bkk)
         month_start_bkk = now_bkk.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                   COUNT(*) FILTER (WHERE t.match_status = 'suggested') AS pending,
                   COUNT(*) FILTER (WHERE t.match_status = 'matched')   AS matched,
@@ -2557,7 +2909,9 @@ def get_bank_recon_stats(user_id: str) -> Dict[str, Any]:
                   ON t.session_id = s.id AND t.user_id = s.user_id
                 WHERE s.user_id = %s
                   AND s.created_at >= %s
-            """, (str(user_id), month_start_bkk))
+            """,
+                (str(user_id), month_start_bkk),
+            )
             row = cur.fetchone()
             if not row:
                 return default
@@ -2567,7 +2921,9 @@ def get_bank_recon_stats(user_id: str) -> Dict[str, Any]:
                 "matched": int(d.get("matched") or 0),
                 "unmatched": int(d.get("unmatched") or 0),
                 "total_sessions": int(d.get("total_sessions") or 0),
-                "last_activity_at": d["last_activity_at"].isoformat() if d.get("last_activity_at") else None,
+                "last_activity_at": (
+                    d["last_activity_at"].isoformat() if d.get("last_activity_at") else None
+                ),
             }
     except Exception as e:
         # v118.26.0.1 · 完整 traceback 进日志 · 方便定位
@@ -2575,9 +2931,9 @@ def get_bank_recon_stats(user_id: str) -> Dict[str, Any]:
         return default
 
 
-def list_bank_recon_transactions(session_id: str, user_id: str,
-                                  match_filter: Optional[str] = None,
-                                  limit: int = 500) -> List[Dict[str, Any]]:
+def list_bank_recon_transactions(
+    session_id: str, user_id: str, match_filter: Optional[str] = None, limit: int = 500
+) -> List[Dict[str, Any]]:
     """列一个会话下的流水 · 可按 match_status 过滤"""
     try:
         with get_cursor() as cur:
@@ -2604,20 +2960,22 @@ def list_bank_recon_transactions(session_id: str, user_id: str,
 def delete_bank_recon_session(user_id: str, session_id: str) -> bool:
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM bank_reconcile_sessions
                 WHERE id = %s AND user_id = %s
-            """, (session_id, str(user_id)))
+            """,
+                (session_id, str(user_id)),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"delete_bank_recon_session failed: {e}")
         return False
 
 
-def find_invoice_candidates_for_tx(user_id: str, amount: float,
-                                    tx_date: str,
-                                    amount_tol: float = 10.0,
-                                    date_tol_days: int = 7) -> List[Dict[str, Any]]:
+def find_invoice_candidates_for_tx(
+    user_id: str, amount: float, tx_date: str, amount_tol: float = 10.0, date_tol_days: int = 7
+) -> List[Dict[str, Any]]:
     """
     匹配算法用 · 在 ocr_history 里粗筛候选发票(用索引高效过滤)
     条件:同用户 · 金额差 ≤ amount_tol · 日期差 ≤ date_tol_days
@@ -2629,7 +2987,8 @@ def find_invoice_candidates_for_tx(user_id: str, amount: float,
         with get_cursor() as cur:
             # pages 字段里 JSON 可能保存了 amount / total / invoice_date / vendor
             # 我们从 history 表的标量字段取(status=success 的)· 容忍 JSONB 结构
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT h.id, h.pages, h.filename, h.category_tag, h.created_at,
                        h.amount_total, h.invoice_date, h.vendor, h.invoice_no
                 FROM ocr_history h
@@ -2641,33 +3000,40 @@ def find_invoice_candidates_for_tx(user_id: str, amount: float,
                        OR h.invoice_date BETWEEN %s::date - %s::interval
                                              AND %s::date + %s::interval)
                 LIMIT 200
-            """, (
-                str(user_id),
-                float(amount) - float(amount_tol),
-                float(amount) + float(amount_tol),
-                tx_date, f"{date_tol_days} days",
-                tx_date, f"{date_tol_days} days",
-            ))
+            """,
+                (
+                    str(user_id),
+                    float(amount) - float(amount_tol),
+                    float(amount) + float(amount_tol),
+                    tx_date,
+                    f"{date_tol_days} days",
+                    tx_date,
+                    f"{date_tol_days} days",
+                ),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         # 如果 ocr_history 里没有这些标量字段(旧版),降级从 pages JSONB 查
         logger.warning(f"find_invoice_candidates_for_tx SQL 降级: {e}")
-        return _find_candidates_from_pages_jsonb(user_id, amount, tx_date,
-                                                  amount_tol, date_tol_days)
+        return _find_candidates_from_pages_jsonb(
+            user_id, amount, tx_date, amount_tol, date_tol_days
+        )
 
 
-def _find_candidates_from_pages_jsonb(user_id: str, amount: float,
-                                       tx_date: str, amount_tol: float,
-                                       date_tol_days: int) -> List[Dict[str, Any]]:
+def _find_candidates_from_pages_jsonb(
+    user_id: str, amount: float, tx_date: str, amount_tol: float, date_tol_days: int
+) -> List[Dict[str, Any]]:
     """降级查询:从 pages JSONB 里找 · 效率稍低 · 适合历史数据少(< 5000)"""
     try:
-        from datetime import timedelta
+        from datetime import date, timedelta
+
         d = date.fromisoformat(tx_date)
         d_start = (d - timedelta(days=date_tol_days)).isoformat()
-        d_end   = (d + timedelta(days=date_tol_days)).isoformat()
+        d_end = (d + timedelta(days=date_tol_days)).isoformat()
 
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, pages, filename, category_tag, created_at
                 FROM ocr_history
                 WHERE user_id = %s
@@ -2675,7 +3041,9 @@ def _find_candidates_from_pages_jsonb(user_id: str, amount: float,
                   AND created_at BETWEEN %s::date - interval '60 days'
                                    AND %s::date + interval '30 days'
                 LIMIT 500
-            """, (str(user_id), d_start, d_end))
+            """,
+                (str(user_id), d_start, d_end),
+            )
             rows = cur.fetchall()
 
         out = []
@@ -2687,9 +3055,8 @@ def _find_candidates_from_pages_jsonb(user_id: str, amount: float,
             for p in pages:
                 if not isinstance(p, dict):
                     continue
-                amt = (p.get("amount_total") or p.get("total")
-                       or p.get("amount"))
-                inv_date = (p.get("invoice_date") or p.get("date"))
+                amt = p.get("amount_total") or p.get("total") or p.get("amount")
+                inv_date = p.get("invoice_date") or p.get("date")
                 if amt is None:
                     continue
                 try:
@@ -2706,15 +3073,17 @@ def _find_candidates_from_pages_jsonb(user_id: str, amount: float,
                             continue
                     except ValueError:
                         pass  # 日期格式异常 · 跳过日期过滤(保留候选)
-                out.append({
-                    "id": row["id"],
-                    "amount_total": amt_f,
-                    "invoice_date": inv_date,
-                    "vendor":       p.get("vendor") or p.get("seller"),
-                    "invoice_no":   p.get("invoice_no") or p.get("number"),
-                    "category_tag": row.get("category_tag"),
-                    "filename":     row.get("filename"),
-                })
+                out.append(
+                    {
+                        "id": row["id"],
+                        "amount_total": amt_f,
+                        "invoice_date": inv_date,
+                        "vendor": p.get("vendor") or p.get("seller"),
+                        "invoice_no": p.get("invoice_no") or p.get("number"),
+                        "category_tag": row.get("category_tag"),
+                        "filename": row.get("filename"),
+                    }
+                )
                 break  # 一份历史只取一次
         return out
     except Exception as e:
@@ -2722,8 +3091,9 @@ def _find_candidates_from_pages_jsonb(user_id: str, amount: float,
         return []
 
 
-def save_match_result(tx_id: str, scored: List[Dict[str, Any]],
-                       thresh_auto: float = 85, thresh_suggest: float = 60) -> str:
+def save_match_result(
+    tx_id: str, scored: List[Dict[str, Any]], thresh_auto: float = 85, thresh_suggest: float = 60
+) -> str:
     """
     写入匹配结果
     - 清空该 tx 之前的 candidates
@@ -2736,7 +3106,8 @@ def save_match_result(tx_id: str, scored: List[Dict[str, Any]],
             cur.execute("DELETE FROM bank_reconcile_candidates WHERE tx_id = %s", (tx_id,))
 
             if not scored:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE bank_reconcile_transactions
                     SET match_status = 'unmatched',
                         matched_history_id = NULL,
@@ -2744,7 +3115,9 @@ def save_match_result(tx_id: str, scored: List[Dict[str, Any]],
                         match_reason = NULL,
                         updated_at = NOW()
                     WHERE id = %s
-                """, (tx_id,))
+                """,
+                    (tx_id,),
+                )
                 return "unmatched"
 
             best = scored[0]
@@ -2752,12 +3125,15 @@ def save_match_result(tx_id: str, scored: List[Dict[str, Any]],
 
             # 写所有候选
             for i, c in enumerate(scored):
-                is_picked = (i == 0 and best_score >= thresh_suggest)
-                cur.execute("""
+                is_picked = i == 0 and best_score >= thresh_suggest
+                cur.execute(
+                    """
                     INSERT INTO bank_reconcile_candidates
                         (tx_id, history_id, score, reason, is_auto_picked)
                     VALUES (%s, %s, %s, %s, %s)
-                """, (tx_id, c["history_id"], c["score"], c["reason"], is_picked))
+                """,
+                    (tx_id, c["history_id"], c["score"], c["reason"], is_picked),
+                )
 
             # 决定 tx 的 match_status
             if best_score >= thresh_auto:
@@ -2770,7 +3146,8 @@ def save_match_result(tx_id: str, scored: List[Dict[str, Any]],
                 status = "unmatched"
                 matched_id = None
 
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE bank_reconcile_transactions
                 SET match_status = %s,
                     matched_history_id = %s,
@@ -2778,10 +3155,15 @@ def save_match_result(tx_id: str, scored: List[Dict[str, Any]],
                     match_reason = %s,
                     updated_at = NOW()
                 WHERE id = %s
-            """, (status, matched_id,
-                   best_score if matched_id else None,
-                   best["reason"] if matched_id else None,
-                   tx_id))
+            """,
+                (
+                    status,
+                    matched_id,
+                    best_score if matched_id else None,
+                    best["reason"] if matched_id else None,
+                    tx_id,
+                ),
+            )
             return status
     except Exception as e:
         logger.error(f"save_match_result failed: {e}")
@@ -2803,7 +3185,8 @@ def get_tx_candidates(tx_id: str, user_id: str) -> List[Dict[str, Any]]:
     try:
         with get_cursor() as cur:
             # 鉴权 + JOIN
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT c.history_id, c.score, c.reason, c.is_auto_picked,
                        h.invoice_no, h.vendor, h.amount_total, h.invoice_date,
                        h.filename, h.category_tag, h.created_at AS h_created_at
@@ -2813,7 +3196,9 @@ def get_tx_candidates(tx_id: str, user_id: str) -> List[Dict[str, Any]]:
                 WHERE c.tx_id = %s AND t.user_id = %s
                 ORDER BY c.score DESC
                 LIMIT 5
-            """, (tx_id, str(user_id)))
+            """,
+                (tx_id, str(user_id)),
+            )
             out = []
             for r in cur.fetchall():
                 d = dict(r)
@@ -2833,7 +3218,8 @@ def update_session_match_stats(session_id: str) -> bool:
     """重算 session 的 matched_count / unmatched_count"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE bank_reconcile_sessions s
                 SET matched_count = (
                         SELECT COUNT(*) FROM bank_reconcile_transactions
@@ -2846,16 +3232,16 @@ def update_session_match_stats(session_id: str) -> bool:
                     match_status = 'matched',
                     updated_at = NOW()
                 WHERE id = %s
-            """, (session_id,))
+            """,
+                (session_id,),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"update_session_match_stats failed: {e}")
         return False
 
 
-def override_tx_match(tx_id: str, user_id: str,
-                       history_id: Optional[str],
-                       status: str) -> bool:
+def override_tx_match(tx_id: str, user_id: str, history_id: Optional[str], status: str) -> bool:
     """用户手动重指派 · 或忽略一条流水
     status: matched / unmatched / ignored
     """
@@ -2863,7 +3249,8 @@ def override_tx_match(tx_id: str, user_id: str,
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE bank_reconcile_transactions
                 SET match_status = %s,
                     matched_history_id = %s,
@@ -2872,7 +3259,9 @@ def override_tx_match(tx_id: str, user_id: str,
                     match_reason = COALESCE(match_reason, 'user_override'),
                     updated_at = NOW()
                 WHERE id = %s AND user_id = %s
-            """, (status, history_id, str(user_id), tx_id, str(user_id)))
+            """,
+                (status, history_id, str(user_id), tx_id, str(user_id)),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"override_tx_match failed: {e}")
@@ -2891,13 +3280,15 @@ def seed_bank_recon_test_data(user_id: str) -> Dict[str, Any]:
     返回 {session_id, tx_count, ok}
     """
     from datetime import datetime, timedelta
+
     try:
         with get_cursor(commit=True) as cur:
             # 1. 建 session(标记 source_filename 含 _MOCK_ 易识别 · 用户能看到一目了然)
             today = datetime.now()
             period_start = (today.replace(day=1) - timedelta(days=30)).date()
             period_end = today.replace(day=1).date() - timedelta(days=1)
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO bank_reconcile_sessions
                     (user_id, bank_code, source_filename, source_pages,
                      parse_status, account_last4, statement_month,
@@ -2912,35 +3303,40 @@ def seed_bank_recon_test_data(user_id: str) -> Dict[str, Any]:
                         58420.50, 15100.00,
                         8, 0, 8)
                 RETURNING id
-            """, (
-                str(user_id),
-                f"_MOCK_KBANK_statement_{period_end.strftime('%Y%m')}.pdf",
-                period_end.strftime('%Y-%m'),
-                period_start, period_end,
-            ))
+            """,
+                (
+                    str(user_id),
+                    f"_MOCK_KBANK_statement_{period_end.strftime('%Y%m')}.pdf",
+                    period_end.strftime("%Y-%m"),
+                    period_start,
+                    period_end,
+                ),
+            )
             session_id = str(cur.fetchone()["id"])
 
             # 2. 8 条流水(混合金额 · 跨 30 天 · 让候选评分有变化)
             mock_txs = [
                 # (天偏移, 方向, 金额, 描述, 频道)
-                (-28, 'IN',  12500.00, 'TRF FROM ABC TRADING CO LTD',         'Mobile'),
-                (-25, 'OUT',  3200.00, 'PAY OFFICE RENT',                     'ATM'),
-                (-22, 'IN',   8900.00, 'XFER from XYZ Logistics',             'Mobile'),
-                (-18, 'IN',  21000.00, 'INWARD REMIT - DELTA SERVICES',       'Counter'),
-                (-14, 'OUT',  4800.00, 'BILL PAY - electricity',              'AutoDeb'),
-                (-10, 'IN',   3520.50, 'TRF FROM SOMCHAI ENTERPRISE',         'Mobile'),
-                (-6,  'OUT',  7100.00, 'PAY VENDOR - office supplies',        'Mobile'),
-                (-2,  'IN',  12500.00, 'TRF FROM ABC TRADING',                'Mobile'),  # 跟 -28 同金额 · 测多候选
+                (-28, "IN", 12500.00, "TRF FROM ABC TRADING CO LTD", "Mobile"),
+                (-25, "OUT", 3200.00, "PAY OFFICE RENT", "ATM"),
+                (-22, "IN", 8900.00, "XFER from XYZ Logistics", "Mobile"),
+                (-18, "IN", 21000.00, "INWARD REMIT - DELTA SERVICES", "Counter"),
+                (-14, "OUT", 4800.00, "BILL PAY - electricity", "AutoDeb"),
+                (-10, "IN", 3520.50, "TRF FROM SOMCHAI ENTERPRISE", "Mobile"),
+                (-6, "OUT", 7100.00, "PAY VENDOR - office supplies", "Mobile"),
+                (-2, "IN", 12500.00, "TRF FROM ABC TRADING", "Mobile"),  # 跟 -28 同金额 · 测多候选
             ]
             for off, direction, amt, desc, channel in mock_txs:
                 tx_date = (today + timedelta(days=off)).date()
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO bank_reconcile_transactions
                         (session_id, user_id, tx_date, direction, amount,
                          description, channel, match_status)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, 'unmatched')
-                """, (session_id, str(user_id), tx_date, direction,
-                       amt, desc, channel))
+                """,
+                    (session_id, str(user_id), tx_date, direction, amt, desc, channel),
+                )
             return {"ok": True, "session_id": session_id, "tx_count": 8}
     except Exception as e:
         logger.error(f"seed_bank_recon_test_data failed: {e}")
@@ -2951,10 +3347,13 @@ def clear_bank_recon_test_data(user_id: str) -> int:
     """清掉 skin 名下所有 _MOCK_ 开头的 session(含其下流水/候选 · 走 ON DELETE CASCADE)"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM bank_reconcile_sessions
                 WHERE user_id = %s AND source_filename LIKE '_MOCK_%%'
-            """, (str(user_id),))
+            """,
+                (str(user_id),),
+            )
             return cur.rowcount or 0
     except Exception as e:
         logger.error(f"clear_bank_recon_test_data failed: {e}")
@@ -2982,19 +3381,25 @@ def generate_line_binding_code(user_id: str, ttl_minutes: int = 10) -> Optional[
 
         with get_cursor(commit=True) as cur:
             # 先把该用户之前未使用的码作废(只保留最新一个)
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE line_binding_codes
                    SET used_at = NOW()
                  WHERE user_id = %s
                    AND used_at IS NULL
-            """, (str(user_id),))
+            """,
+                (str(user_id),),
+            )
 
             # 插入新码
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO line_binding_codes (code, user_id, expires_at)
                 VALUES (%s, %s, %s)
                 RETURNING code, expires_at
-            """, (code, str(user_id), expires_at))
+            """,
+                (code, str(user_id), expires_at),
+            )
             row = cur.fetchone()
             if not row:
                 return None
@@ -3018,14 +3423,17 @@ def consume_line_binding_code(code: str) -> Optional[str]:
         if not code or len(code) != 6 or not code.isdigit():
             return None
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE line_binding_codes
                    SET used_at = NOW()
                  WHERE code = %s
                    AND used_at IS NULL
                    AND expires_at > NOW()
                 RETURNING user_id
-            """, (code,))
+            """,
+                (code,),
+            )
             row = cur.fetchone()
             return str(row["user_id"]) if row else None
     except Exception as e:
@@ -3048,11 +3456,14 @@ def create_or_update_line_binding(
     try:
         with get_cursor(commit=True) as cur:
             # 检查冲突:该 LINE 账号是否已绑到别的 mrpilot user
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT user_id FROM line_bindings
                  WHERE line_user_id = %s
                  LIMIT 1
-            """, (line_user_id,))
+            """,
+                (line_user_id,),
+            )
             row = cur.fetchone()
             if row and str(row["user_id"]) != str(user_id):
                 logger.warning(
@@ -3062,14 +3473,18 @@ def create_or_update_line_binding(
                 return False
 
             # 先清空该 mrpilot user 已有的其他 LINE 绑定(换绑场景)
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM line_bindings
                  WHERE user_id = %s
                    AND line_user_id != %s
-            """, (str(user_id), line_user_id))
+            """,
+                (str(user_id), line_user_id),
+            )
 
             # upsert
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO line_bindings
                     (user_id, line_user_id, line_display_name, line_picture_url)
                 VALUES (%s, %s, %s, %s)
@@ -3078,7 +3493,9 @@ def create_or_update_line_binding(
                     line_display_name  = EXCLUDED.line_display_name,
                     line_picture_url   = EXCLUDED.line_picture_url,
                     last_active_at     = NOW()
-            """, (str(user_id), line_user_id, display_name, picture_url))
+            """,
+                (str(user_id), line_user_id, display_name, picture_url),
+            )
             return True
     except Exception as e:
         logger.error(f"create_or_update_line_binding failed: {e}")
@@ -3089,13 +3506,16 @@ def get_line_binding_by_user(user_id: str) -> Optional[Dict[str, Any]]:
     """查某 mrpilot 用户当前的 LINE 绑定信息"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT line_user_id, line_display_name, line_picture_url,
                        bound_at, last_active_at
                   FROM line_bindings
                  WHERE user_id = %s
                  LIMIT 1
-            """, (str(user_id),))
+            """,
+                (str(user_id),),
+            )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -3112,11 +3532,14 @@ def get_user_by_line_user_id(line_user_id: str) -> Optional[Dict[str, Any]]:
     try:
         with get_cursor(commit=True) as cur:
             # 更新活跃时间
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE line_bindings SET last_active_at = NOW()
                  WHERE line_user_id = %s
                 RETURNING user_id
-            """, (line_user_id,))
+            """,
+                (line_user_id,),
+            )
             row = cur.fetchone()
             if not row:
                 return None
@@ -3135,9 +3558,12 @@ def unbind_line_by_user(user_id: str) -> bool:
     """用户主动解绑 LINE"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM line_bindings WHERE user_id = %s
-            """, (str(user_id),))
+            """,
+                (str(user_id),),
+            )
             return True
     except Exception as e:
         logger.error(f"unbind_line_by_user failed: {e}")
@@ -3150,9 +3576,12 @@ def update_user_preferred_lang(user_id: str, lang: str) -> bool:
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE users SET preferred_lang = %s WHERE id = %s
-            """, (lang, str(user_id)))
+            """,
+                (lang, str(user_id)),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"update_user_preferred_lang failed: {e}")
@@ -3190,13 +3619,16 @@ def get_user_tenant(user_id: str) -> Optional[Dict[str, Any]]:
     """根据 user_id 查他所属的租户信息"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT t.*
                 FROM tenants t
                 JOIN users u ON u.tenant_id = t.id
                 WHERE u.id = %s
                 LIMIT 1
-            """, (str(user_id),))
+            """,
+                (str(user_id),),
+            )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -3210,7 +3642,8 @@ def list_all_tenants(limit: int = 200) -> List[Dict[str, Any]]:
     """
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     t.*,
                     (SELECT COUNT(*) FROM users WHERE tenant_id = t.id) AS actual_member_count,
@@ -3222,7 +3655,9 @@ def list_all_tenants(limit: int = 200) -> List[Dict[str, Any]]:
                 FROM tenants t
                 ORDER BY t.created_at DESC
                 LIMIT %s
-            """, (int(limit),))
+            """,
+                (int(limit),),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_all_tenants failed: {e}")
@@ -3246,7 +3681,8 @@ def create_tenant(
     """
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO tenants (
                     name, owner_user_id, tenant_type,
                     monthly_quota, used_this_month, status,
@@ -3257,13 +3693,15 @@ def create_tenant(
                     %s, 0
                 )
                 RETURNING id
-            """, (
-                name,
-                str(owner_user_id) if owner_user_id else None,
-                tenant_type,
-                int(monthly_quota) if monthly_quota else 0,
-                notes,
-            ))
+            """,
+                (
+                    name,
+                    str(owner_user_id) if owner_user_id else None,
+                    tenant_type,
+                    int(monthly_quota) if monthly_quota else 0,
+                    notes,
+                ),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -3315,10 +3753,13 @@ def get_tenant_monthly_usage(tenant_id: str) -> Dict[str, Any]:
     """
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT monthly_quota, used_this_month, quota_reset_at
                 FROM tenants WHERE id = %s LIMIT 1
-            """, (str(tenant_id),))
+            """,
+                (str(tenant_id),),
+            )
             row = cur.fetchone()
             if not row:
                 return {"used": 0, "quota": 0, "remaining": 0, "percent": 0}
@@ -3329,6 +3770,7 @@ def get_tenant_monthly_usage(tenant_id: str) -> Dict[str, Any]:
             # 跨月显示层检查
             reset_at = row.get("quota_reset_at")
             from datetime import date
+
             today = date.today()
             if reset_at and hasattr(reset_at, "year"):
                 if reset_at.year != today.year or reset_at.month != today.month:
@@ -3356,7 +3798,8 @@ def increment_tenant_monthly_usage(tenant_id: str, n: int = 1) -> int:
         return -1
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE tenants SET
                     used_this_month = CASE
                         WHEN quota_reset_at IS NULL
@@ -3369,7 +3812,9 @@ def increment_tenant_monthly_usage(tenant_id: str, n: int = 1) -> int:
                     updated_at = NOW()
                 WHERE id = %s
                 RETURNING used_this_month
-            """, (n, n, str(tenant_id)))
+            """,
+                (n, n, str(tenant_id)),
+            )
             row = cur.fetchone()
             return int(row["used_this_month"]) if row else -1
     except Exception as e:
@@ -3384,7 +3829,8 @@ def list_tenant_members(tenant_id: str) -> List[Dict[str, Any]]:
     """
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, username, email, role, is_active, is_super_admin,
                        last_login_at, created_at, invited_by
                 FROM users
@@ -3392,7 +3838,9 @@ def list_tenant_members(tenant_id: str) -> List[Dict[str, Any]]:
                 ORDER BY
                     CASE WHEN role = 'owner' THEN 0 ELSE 1 END,
                     created_at ASC
-            """, (str(tenant_id),))
+            """,
+                (str(tenant_id),),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_tenant_members failed (tenant_id={tenant_id}): {e}")
@@ -3411,7 +3859,8 @@ def get_tenant_usage_summary(tenant_id: str) -> Dict[str, Any]:
         quota = get_tenant_monthly_usage(tenant_id)
 
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     (SELECT COUNT(*) FROM users WHERE tenant_id = %s) AS user_count,
                     (SELECT COUNT(*) FROM ocr_history oh
@@ -3420,19 +3869,27 @@ def get_tenant_usage_summary(tenant_id: str) -> Dict[str, Any]:
                        AND oh.created_at >= DATE_TRUNC('month', NOW())
                     ) AS ocr_this_month,
                     (SELECT MAX(last_login_at) FROM users WHERE tenant_id = %s) AS last_login
-            """, (str(tenant_id), str(tenant_id), str(tenant_id)))
+            """,
+                (str(tenant_id), str(tenant_id), str(tenant_id)),
+            )
             stats = cur.fetchone()
 
         return {
             "quota": quota,
             "user_count": stats["user_count"] if stats else 0,
             "ocr_this_month": stats["ocr_this_month"] if stats else 0,
-            "last_login": stats["last_login"].isoformat() if stats and stats.get("last_login") else None,
+            "last_login": (
+                stats["last_login"].isoformat() if stats and stats.get("last_login") else None
+            ),
         }
     except Exception as e:
         logger.error(f"get_tenant_usage_summary failed: {e}")
-        return {"quota": {"used": 0, "quota": 0, "remaining": 0, "percent": 0},
-                "user_count": 0, "ocr_this_month": 0, "last_login": None}
+        return {
+            "quota": {"used": 0, "quota": 0, "remaining": 0, "percent": 0},
+            "user_count": 0,
+            "ocr_this_month": 0,
+            "last_login": None,
+        }
 
 
 # ============================================================
@@ -3448,7 +3905,8 @@ def list_all_owner_users(limit: int = 200) -> List[Dict[str, Any]]:
     """
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     u.id AS user_id,
                     u.username,
@@ -3469,7 +3927,9 @@ def list_all_owner_users(limit: int = 200) -> List[Dict[str, Any]]:
                 WHERE u.role = 'owner'
                 ORDER BY u.created_at DESC
                 LIMIT %s
-            """, (int(limit),))
+            """,
+                (int(limit),),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_all_owner_users failed: {e}")
@@ -3502,28 +3962,33 @@ def create_owner_user(
 
         with get_cursor(commit=True) as cur:
             # 1. 建 tenant
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO tenants (
                     name, tenant_type, monthly_quota, used_this_month,
                     status, notes, member_count
                 ) VALUES (%s, %s, %s, 0, 'active', %s, 1)
                 RETURNING id
-            """, (company_name, tenant_type, int(monthly_quota), notes))
+            """,
+                (company_name, tenant_type, int(monthly_quota), notes),
+            )
             tenant_id = str(cur.fetchone()["id"])
 
             # 2. 建老板 user
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO users (
                     username, password_hash, plan, is_active, is_super_admin,
                     tenant_id, role, company_name
                 ) VALUES (%s, %s, 'plus', TRUE, FALSE, %s, 'owner', %s)
                 RETURNING id
-            """, (username, pw_hash, tenant_id, company_name))
+            """,
+                (username, pw_hash, tenant_id, company_name),
+            )
             user_id = str(cur.fetchone()["id"])
 
             # 3. 把 tenant.owner_user_id 回填
-            cur.execute("UPDATE tenants SET owner_user_id = %s WHERE id = %s",
-                        (user_id, tenant_id))
+            cur.execute("UPDATE tenants SET owner_user_id = %s WHERE id = %s", (user_id, tenant_id))
 
             return {"ok": True, "user_id": user_id, "tenant_id": tenant_id}
     except Exception as e:
@@ -3540,8 +4005,11 @@ def preview_owner_cascade(user_id: str) -> Optional[Dict[str, Any]]:
     try:
         with get_cursor() as cur:
             # 取 tenant_id + 老板信息(role='owner' 或 NULL 都视为老板 · 兼容老数据)
-            cur.execute("""SELECT id, username, email, company_name, tenant_id, created_at
-                           FROM users WHERE id = %s AND (role = 'owner' OR role IS NULL) LIMIT 1""", (str(user_id),))
+            cur.execute(
+                """SELECT id, username, email, company_name, tenant_id, created_at
+                           FROM users WHERE id = %s AND (role = 'owner' OR role IS NULL) LIMIT 1""",
+                (str(user_id),),
+            )
             owner = cur.fetchone()
             if not owner:
                 return None
@@ -3557,25 +4025,73 @@ def preview_owner_cascade(user_id: str) -> Optional[Dict[str, Any]]:
             # 按 tenant_id(完整 cascade) 还是 按 user_id(孤立用户)选不同 SQL
             if tenant_id:
                 queries = [
-                    ("employees", "SELECT COUNT(*) AS n FROM users WHERE tenant_id = %s AND role = 'member'", (tenant_id,)),
-                    ("ocr_records", "SELECT COUNT(*) AS n FROM ocr_history WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)", (tenant_id,)),
-                    ("clients", "SELECT COUNT(*) AS n FROM clients WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)", (tenant_id,)),
-                    ("erp_endpoints", "SELECT COUNT(*) AS n FROM erp_endpoints WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)", (tenant_id,)),
-                    ("erp_push_logs", "SELECT COUNT(*) AS n FROM erp_push_logs WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)", (tenant_id,)),
-                    ("email_accounts", "SELECT COUNT(*) AS n FROM email_ingest_accounts WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)", (tenant_id,)),
-                    ("bank_recon_sessions", "SELECT COUNT(*) AS n FROM bank_reconcile_sessions WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)", (tenant_id,)),
+                    (
+                        "employees",
+                        "SELECT COUNT(*) AS n FROM users WHERE tenant_id = %s AND role = 'member'",
+                        (tenant_id,),
+                    ),
+                    (
+                        "ocr_records",
+                        "SELECT COUNT(*) AS n FROM ocr_history WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                        (tenant_id,),
+                    ),
+                    (
+                        "clients",
+                        "SELECT COUNT(*) AS n FROM clients WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                        (tenant_id,),
+                    ),
+                    (
+                        "erp_endpoints",
+                        "SELECT COUNT(*) AS n FROM erp_endpoints WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                        (tenant_id,),
+                    ),
+                    (
+                        "erp_push_logs",
+                        "SELECT COUNT(*) AS n FROM erp_push_logs WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                        (tenant_id,),
+                    ),
+                    (
+                        "email_accounts",
+                        "SELECT COUNT(*) AS n FROM email_ingest_accounts WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                        (tenant_id,),
+                    ),
+                    (
+                        "bank_recon_sessions",
+                        "SELECT COUNT(*) AS n FROM bank_reconcile_sessions WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                        (tenant_id,),
+                    ),
                 ]
             else:
                 # 孤立用户 · 只数自己的数据 · 没有 employees(没有 tenant)
                 uid_p = (str(user_id),)
                 queries = [
                     ("employees", None, None),  # 跳过 · 反正是 0
-                    ("ocr_records", "SELECT COUNT(*) AS n FROM ocr_history WHERE user_id = %s", uid_p),
+                    (
+                        "ocr_records",
+                        "SELECT COUNT(*) AS n FROM ocr_history WHERE user_id = %s",
+                        uid_p,
+                    ),
                     ("clients", "SELECT COUNT(*) AS n FROM clients WHERE user_id = %s", uid_p),
-                    ("erp_endpoints", "SELECT COUNT(*) AS n FROM erp_endpoints WHERE user_id = %s", uid_p),
-                    ("erp_push_logs", "SELECT COUNT(*) AS n FROM erp_push_logs WHERE user_id = %s", uid_p),
-                    ("email_accounts", "SELECT COUNT(*) AS n FROM email_ingest_accounts WHERE user_id = %s", uid_p),
-                    ("bank_recon_sessions", "SELECT COUNT(*) AS n FROM bank_reconcile_sessions WHERE user_id = %s", uid_p),
+                    (
+                        "erp_endpoints",
+                        "SELECT COUNT(*) AS n FROM erp_endpoints WHERE user_id = %s",
+                        uid_p,
+                    ),
+                    (
+                        "erp_push_logs",
+                        "SELECT COUNT(*) AS n FROM erp_push_logs WHERE user_id = %s",
+                        uid_p,
+                    ),
+                    (
+                        "email_accounts",
+                        "SELECT COUNT(*) AS n FROM email_ingest_accounts WHERE user_id = %s",
+                        uid_p,
+                    ),
+                    (
+                        "bank_recon_sessions",
+                        "SELECT COUNT(*) AS n FROM bank_reconcile_sessions WHERE user_id = %s",
+                        uid_p,
+                    ),
                 ]
             for k, sql, params in queries:
                 if sql is None:
@@ -3595,7 +4111,9 @@ def preview_owner_cascade(user_id: str) -> Optional[Dict[str, Any]]:
                     "username": owner.get("username"),
                     "email": owner.get("email"),
                     "company_name": owner.get("company_name"),
-                    "created_at": owner["created_at"].isoformat() if owner.get("created_at") else None,
+                    "created_at": (
+                        owner["created_at"].isoformat() if owner.get("created_at") else None
+                    ),
                 },
                 "tenant": {
                     "id": tenant_id,
@@ -3620,24 +4138,30 @@ def delete_owner_user_cascade(user_id: str) -> bool:
                 (单条 DELETE 失败时 · ROLLBACK TO SAVEPOINT · 主事务保持 active · 后续能继续)
     """
     import traceback
+
     try:
         with get_cursor(commit=True) as cur:
             # 取 tenant_id(role='owner' 或 NULL 都视为老板)
-            cur.execute("SELECT tenant_id, username FROM users WHERE id = %s AND (role = 'owner' OR role IS NULL) LIMIT 1",
-                        (str(user_id),))
+            cur.execute(
+                "SELECT tenant_id, username FROM users WHERE id = %s AND (role = 'owner' OR role IS NULL) LIMIT 1",
+                (str(user_id),),
+            )
             row = cur.fetchone()
             if not row:
                 logger.warning(f"delete_owner_user_cascade: user {user_id} 不是 owner 或不存在")
                 return False
             tenant_id = str(row["tenant_id"]) if row.get("tenant_id") else None
             target_username = row.get("username")
-            logger.info(f"[cascade-delete] 开始删除 owner={target_username} tenant_id={tenant_id or '(orphan)'}")
+            logger.info(
+                f"[cascade-delete] 开始删除 owner={target_username} tenant_id={tenant_id or '(orphan)'}"
+            )
 
             # ============================================================
             # SAVEPOINT 工具 · 每条 DELETE 独立成可回滚的子事务
             # 否则 PostgreSQL 一条错 · 后续全部 ignored(事务 aborted)
             # ============================================================
             sp_counter = [0]
+
             def _safe_delete(sql, params, label):
                 sp_counter[0] += 1
                 sp_name = f"sp_{sp_counter[0]}"
@@ -3654,39 +4178,104 @@ def delete_owner_user_cascade(user_id: str) -> bool:
                         cur.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
                     except Exception:
                         pass  # savepoint 已不存在 · 忽略
-                    logger.warning(f"[cascade-delete] {label} · 跳过(savepoint 已回滚): {str(e)[:200]}")
+                    logger.warning(
+                        f"[cascade-delete] {label} · 跳过(savepoint 已回滚): {str(e)[:200]}"
+                    )
                     return False
 
             if tenant_id:
                 # ========== 完整路径(有 tenant)· 按 tenant 维度级联 ==========
                 tables = [
-                    ("ocr_history", "DELETE FROM ocr_history WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("ocr_cost_log", "DELETE FROM ocr_cost_log WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("erp_push_logs", "DELETE FROM erp_push_logs WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("erp_endpoints", "DELETE FROM erp_endpoints WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("clients", "DELETE FROM clients WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("archive_settings", "DELETE FROM archive_settings WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("rd_daily_usage", "DELETE FROM rd_daily_usage WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("email_ingest_seen_uids", "DELETE FROM email_ingest_seen_uids WHERE account_id IN (SELECT id FROM email_ingest_accounts WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s))"),
-                    ("email_ingest_logs", "DELETE FROM email_ingest_logs WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("email_ingest_accounts", "DELETE FROM email_ingest_accounts WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("bank_reconcile_candidates", "DELETE FROM bank_reconcile_candidates WHERE session_id IN (SELECT id FROM bank_reconcile_sessions WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s))"),
-                    ("bank_reconcile_transactions", "DELETE FROM bank_reconcile_transactions WHERE session_id IN (SELECT id FROM bank_reconcile_sessions WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s))"),
-                    ("bank_reconcile_sessions", "DELETE FROM bank_reconcile_sessions WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("line_bindings", "DELETE FROM line_bindings WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("line_binding_codes", "DELETE FROM line_binding_codes WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("user_settings", "DELETE FROM user_settings WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("api_keys", "DELETE FROM api_keys WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("automation_rules", "DELETE FROM automation_rules WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
-                    ("excel_templates", "DELETE FROM excel_templates WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)"),
+                    (
+                        "ocr_history",
+                        "DELETE FROM ocr_history WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "ocr_cost_log",
+                        "DELETE FROM ocr_cost_log WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "erp_push_logs",
+                        "DELETE FROM erp_push_logs WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "erp_endpoints",
+                        "DELETE FROM erp_endpoints WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "clients",
+                        "DELETE FROM clients WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "archive_settings",
+                        "DELETE FROM archive_settings WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "rd_daily_usage",
+                        "DELETE FROM rd_daily_usage WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "email_ingest_seen_uids",
+                        "DELETE FROM email_ingest_seen_uids WHERE account_id IN (SELECT id FROM email_ingest_accounts WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s))",
+                    ),
+                    (
+                        "email_ingest_logs",
+                        "DELETE FROM email_ingest_logs WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "email_ingest_accounts",
+                        "DELETE FROM email_ingest_accounts WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "bank_reconcile_candidates",
+                        "DELETE FROM bank_reconcile_candidates WHERE session_id IN (SELECT id FROM bank_reconcile_sessions WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s))",
+                    ),
+                    (
+                        "bank_reconcile_transactions",
+                        "DELETE FROM bank_reconcile_transactions WHERE session_id IN (SELECT id FROM bank_reconcile_sessions WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s))",
+                    ),
+                    (
+                        "bank_reconcile_sessions",
+                        "DELETE FROM bank_reconcile_sessions WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "line_bindings",
+                        "DELETE FROM line_bindings WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "line_binding_codes",
+                        "DELETE FROM line_binding_codes WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "user_settings",
+                        "DELETE FROM user_settings WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "api_keys",
+                        "DELETE FROM api_keys WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "automation_rules",
+                        "DELETE FROM automation_rules WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
+                    (
+                        "excel_templates",
+                        "DELETE FROM excel_templates WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                    ),
                 ]
                 for label, sql in tables:
                     _safe_delete(sql, (tenant_id,), label)
 
                 # 关键步骤
                 _safe_delete("DELETE FROM users WHERE tenant_id = %s", (tenant_id,), "users")
-                _safe_delete("DELETE FROM operation_logs WHERE tenant_id = %s", (tenant_id,), "operation_logs")
-                ok_tenant = _safe_delete("DELETE FROM tenants WHERE id = %s", (tenant_id,), "tenants")
+                _safe_delete(
+                    "DELETE FROM operation_logs WHERE tenant_id = %s",
+                    (tenant_id,),
+                    "operation_logs",
+                )
+                ok_tenant = _safe_delete(
+                    "DELETE FROM tenants WHERE id = %s", (tenant_id,), "tenants"
+                )
                 logger.info(f"[cascade-delete] ✅ 完成 owner={target_username}")
                 return ok_tenant
             else:
@@ -3700,12 +4289,27 @@ def delete_owner_user_cascade(user_id: str) -> bool:
                     ("clients", "DELETE FROM clients WHERE user_id = %s"),
                     ("archive_settings", "DELETE FROM archive_settings WHERE user_id = %s"),
                     ("rd_daily_usage", "DELETE FROM rd_daily_usage WHERE user_id = %s"),
-                    ("email_ingest_seen_uids", "DELETE FROM email_ingest_seen_uids WHERE account_id IN (SELECT id FROM email_ingest_accounts WHERE user_id = %s)"),
+                    (
+                        "email_ingest_seen_uids",
+                        "DELETE FROM email_ingest_seen_uids WHERE account_id IN (SELECT id FROM email_ingest_accounts WHERE user_id = %s)",
+                    ),
                     ("email_ingest_logs", "DELETE FROM email_ingest_logs WHERE user_id = %s"),
-                    ("email_ingest_accounts", "DELETE FROM email_ingest_accounts WHERE user_id = %s"),
-                    ("bank_reconcile_candidates", "DELETE FROM bank_reconcile_candidates WHERE session_id IN (SELECT id FROM bank_reconcile_sessions WHERE user_id = %s)"),
-                    ("bank_reconcile_transactions", "DELETE FROM bank_reconcile_transactions WHERE session_id IN (SELECT id FROM bank_reconcile_sessions WHERE user_id = %s)"),
-                    ("bank_reconcile_sessions", "DELETE FROM bank_reconcile_sessions WHERE user_id = %s"),
+                    (
+                        "email_ingest_accounts",
+                        "DELETE FROM email_ingest_accounts WHERE user_id = %s",
+                    ),
+                    (
+                        "bank_reconcile_candidates",
+                        "DELETE FROM bank_reconcile_candidates WHERE session_id IN (SELECT id FROM bank_reconcile_sessions WHERE user_id = %s)",
+                    ),
+                    (
+                        "bank_reconcile_transactions",
+                        "DELETE FROM bank_reconcile_transactions WHERE session_id IN (SELECT id FROM bank_reconcile_sessions WHERE user_id = %s)",
+                    ),
+                    (
+                        "bank_reconcile_sessions",
+                        "DELETE FROM bank_reconcile_sessions WHERE user_id = %s",
+                    ),
                     ("line_bindings", "DELETE FROM line_bindings WHERE user_id = %s"),
                     ("line_binding_codes", "DELETE FROM line_binding_codes WHERE user_id = %s"),
                     ("user_settings", "DELETE FROM user_settings WHERE user_id = %s"),
@@ -3715,11 +4319,15 @@ def delete_owner_user_cascade(user_id: str) -> bool:
                 ]
                 for label, sql in tables:
                     _safe_delete(sql, (str(user_id),), label)
-                ok_user = _safe_delete("DELETE FROM users WHERE id = %s", (str(user_id),), "users-orphan")
+                ok_user = _safe_delete(
+                    "DELETE FROM users WHERE id = %s", (str(user_id),), "users-orphan"
+                )
                 logger.info(f"[cascade-delete] ✅ 完成 orphan owner={target_username}")
                 return ok_user
     except Exception as e:
-        logger.error(f"delete_owner_user_cascade failed (user_id={user_id}): {e}\n{traceback.format_exc()}")
+        logger.error(
+            f"delete_owner_user_cascade failed (user_id={user_id}): {e}\n{traceback.format_exc()}"
+        )
         return False
 
 
@@ -3744,7 +4352,7 @@ def reset_user_password(user_id: str, new_password: str) -> bool:
         with get_cursor(commit=True) as cur:
             cur.execute(
                 "UPDATE users SET password_hash = %s, password_changed_at = NOW() WHERE id = %s",
-                (pw_hash, str(user_id))
+                (pw_hash, str(user_id)),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -3768,19 +4376,27 @@ def insert_operation_log(
     """记一条操作日志 · 失败不阻塞主流程"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO operation_logs (
                     tenant_id, actor_user_id, actor_username, actor_is_super,
                     action, target_type, target_id, target_name, details, ip, ua
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
-            """, (
-                str(tenant_id) if tenant_id else None,
-                str(actor_user_id) if actor_user_id else None,
-                actor_username, bool(actor_is_super),
-                action, target_type, str(target_id) if target_id else None, target_name,
-                _json.dumps(details or {}, ensure_ascii=False),
-                ip, (ua or "")[:300],
-            ))
+            """,
+                (
+                    str(tenant_id) if tenant_id else None,
+                    str(actor_user_id) if actor_user_id else None,
+                    actor_username,
+                    bool(actor_is_super),
+                    action,
+                    target_type,
+                    str(target_id) if target_id else None,
+                    target_name,
+                    _json.dumps(details or {}, ensure_ascii=False),
+                    ip,
+                    (ua or "")[:300],
+                ),
+            )
             return True
     except Exception as e:
         logger.warning(f"insert_operation_log failed (action={action}): {e}")
@@ -3798,18 +4414,24 @@ def list_operation_logs(
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT * FROM operation_logs
                     WHERE tenant_id = %s
                     ORDER BY created_at DESC
                     LIMIT %s
-                """, (str(tenant_id), int(limit)))
+                """,
+                    (str(tenant_id), int(limit)),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT * FROM operation_logs
                     ORDER BY created_at DESC
                     LIMIT %s
-                """, (int(limit),))
+                """,
+                    (int(limit),),
+                )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_operation_logs failed: {e}")
@@ -3835,17 +4457,23 @@ def list_operation_logs_paged(
     where = []
     params: List[Any] = []
     if tenant_id:
-        where.append("tenant_id = %s"); params.append(str(tenant_id))
+        where.append("tenant_id = %s")
+        params.append(str(tenant_id))
     if q:
-        where.append("(LOWER(COALESCE(actor_username, '')) LIKE %s OR LOWER(COALESCE(action, '')) LIKE %s OR LOWER(COALESCE(target_name, '')) LIKE %s)")
+        where.append(
+            "(LOWER(COALESCE(actor_username, '')) LIKE %s OR LOWER(COALESCE(action, '')) LIKE %s OR LOWER(COALESCE(target_name, '')) LIKE %s)"
+        )
         like = f"%{q.lower()}%"
         params += [like, like, like]
     if action:
-        where.append("action = %s"); params.append(action)
+        where.append("action = %s")
+        params.append(action)
     if date_from:
-        where.append("created_at >= %s"); params.append(date_from)
+        where.append("created_at >= %s")
+        params.append(date_from)
     if date_to:
-        where.append("created_at <= %s"); params.append(date_to)
+        where.append("created_at <= %s")
+        params.append(date_to)
     if actor_is_super is True:
         where.append("COALESCE(actor_is_super, false) = true")
     elif actor_is_super is False:
@@ -3861,12 +4489,12 @@ def list_operation_logs_paged(
             if limit_all and limit_all > 0:
                 cur.execute(
                     f"SELECT * FROM operation_logs{where_sql} ORDER BY created_at DESC LIMIT %s",
-                    params + [int(limit_all)]
+                    params + [int(limit_all)],
                 )
             else:
                 cur.execute(
                     f"SELECT * FROM operation_logs{where_sql} ORDER BY created_at DESC LIMIT %s OFFSET %s",
-                    params + [per_page, offset]
+                    params + [per_page, offset],
                 )
             rows = [dict(r) for r in cur.fetchall()]
         return {"rows": rows, "total": total, "page": page, "per_page": per_page}
@@ -3882,12 +4510,15 @@ def list_employees(tenant_id: str) -> List[Dict[str, Any]]:
     """列某 tenant 下的员工(role=member)"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, username, role, is_active, last_login_at, created_at, invited_by
                 FROM users
                 WHERE tenant_id = %s AND role = 'member'
                 ORDER BY created_at ASC
-            """, (str(tenant_id),))
+            """,
+                (str(tenant_id),),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_employees failed: {e}")
@@ -3920,14 +4551,22 @@ def add_employee(
             row = cur.fetchone()
             company_name = row["name"] if row else None
 
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO users (
                     username, password_hash, plan, is_active, is_super_admin,
                     tenant_id, role, invited_by, company_name
                 ) VALUES (%s, %s, 'plus', TRUE, FALSE, %s, 'member', %s, %s)
                 RETURNING id
-            """, (username, pw_hash, str(tenant_id),
-                  str(invited_by) if invited_by else None, company_name))
+            """,
+                (
+                    username,
+                    pw_hash,
+                    str(tenant_id),
+                    str(invited_by) if invited_by else None,
+                    company_name,
+                ),
+            )
             return str(cur.fetchone()["id"])
     except Exception as e:
         logger.error(f"add_employee failed: {e}")
@@ -3942,11 +4581,14 @@ def remove_employee(tenant_id: str, employee_user_id: str) -> bool:
     try:
         with get_cursor(commit=True) as cur:
             # 先看员工是否存在且属于该 tenant
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id FROM users
                 WHERE id = %s AND tenant_id = %s AND role = 'member'
                 LIMIT 1
-            """, (str(employee_user_id), str(tenant_id)))
+            """,
+                (str(employee_user_id), str(tenant_id)),
+            )
             if not cur.fetchone():
                 return False
 
@@ -3978,10 +4620,13 @@ def toggle_employee_active(
     """老板启用/停用员工"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE users SET is_active = %s
                 WHERE id = %s AND tenant_id = %s AND role = 'member'
-            """, (bool(is_active), str(employee_user_id), str(tenant_id)))
+            """,
+                (bool(is_active), str(employee_user_id), str(tenant_id)),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"toggle_employee_active failed: {e}")
@@ -3992,6 +4637,7 @@ def toggle_employee_active(
 # v106 · 成本追踪 ocr_cost_log 表
 # 每次识别完成后写入一条 · 用于管理员成本面板
 # ============================================================
+
 
 def ensure_ocr_cost_log_table():
     """启动时建表 · 幂等 · v108.2 修 history_id 类型 BIGINT → TEXT(ocr_history.id 是 UUID)"""
@@ -4040,7 +4686,7 @@ def ensure_ocr_cost_log_table():
 def log_ocr_cost(
     user_id: str,
     tenant_id: Optional[str],
-    history_id: Optional[Any],   # v108.2 · 接受 str/UUID/int 都可
+    history_id: Optional[Any],  # v108.2 · 接受 str/UUID/int 都可
     engine: str,
     pages: int,
     input_tokens: int,
@@ -4051,23 +4697,34 @@ def log_ocr_cost(
     """每次识别完写一条成本记录"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO ocr_cost_log
                 (user_id, tenant_id, history_id, engine, pages,
                  input_tokens, output_tokens, cost_thb, elapsed_ms)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (
-                str(user_id), str(tenant_id) if tenant_id else None,
-                str(history_id) if history_id is not None else None,   # v108.2 · 强制转 str
-                engine, pages,
-                input_tokens, output_tokens, round(float(cost_thb), 4), elapsed_ms,
-            ))
+            """,
+                (
+                    str(user_id),
+                    str(tenant_id) if tenant_id else None,
+                    str(history_id) if history_id is not None else None,  # v108.2 · 强制转 str
+                    engine,
+                    pages,
+                    input_tokens,
+                    output_tokens,
+                    round(float(cost_thb), 4),
+                    elapsed_ms,
+                ),
+            )
             new_id = cur.fetchone()["id"]
-            logger.info(f"  ✅ ocr_cost_log 写入 id={new_id} user={user_id[:8]} engine={engine} cost=฿{cost_thb:.4f}")
+            logger.info(
+                f"  ✅ ocr_cost_log 写入 id={new_id} user={user_id[:8]} engine={engine} cost=฿{cost_thb:.4f}"
+            )
         return True
     except Exception as e:
         import traceback
+
         logger.error(f"  ❌ log_ocr_cost FAILED: {e}\n{traceback.format_exc()}")
         return False
 
@@ -4128,7 +4785,8 @@ def get_cost_by_user(limit: int = 50) -> List[Dict[str, Any]]:
     """按用户分组 · 找烧钱多的"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     c.user_id,
                     u.username,
@@ -4144,7 +4802,9 @@ def get_cost_by_user(limit: int = 50) -> List[Dict[str, Any]]:
                 GROUP BY c.user_id, u.username, u.plan
                 ORDER BY month_cost DESC, total_cost DESC
                 LIMIT %s
-            """, (limit,))
+            """,
+                (limit,),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"get_cost_by_user failed: {e}")
@@ -4184,6 +4844,7 @@ def get_cost_daily_trend(days: int = 30) -> List[Dict[str, Any]]:
 # v107 · 客户(Client)实体 · 多客户事务所核心功能
 # 会计 / 事务所给多家公司做账时 · 把每张发票归属到客户
 # ============================================================
+
 
 def ensure_clients_table():
     """启动时建客户表 · 加 client_id 列到 ocr_history · 幂等"""
@@ -4227,6 +4888,7 @@ def ensure_clients_table():
 # 唯一性:同 tenant(或孤立用户)下 · 同 seller_name 只有 1 条
 # ============================================================
 
+
 def ensure_supplier_categories_table():
     """启动时建表 · 幂等"""
     try:
@@ -4252,24 +4914,32 @@ def ensure_supplier_categories_table():
         logger.error(f"ensure_supplier_categories_table failed: {e}")
 
 
-def get_category_for_seller(seller_name: Optional[str], user_id: str, tenant_id: Optional[str] = None) -> Optional[str]:
+def get_category_for_seller(
+    seller_name: Optional[str], user_id: str, tenant_id: Optional[str] = None
+) -> Optional[str]:
     """识别时调:查同 seller 之前用过的 category(同 tenant 共享 · 否则查自己)"""
     if not seller_name or not seller_name.strip():
         return None
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT category FROM supplier_categories
                     WHERE tenant_id = %s AND LOWER(seller_name) = LOWER(%s)
                     ORDER BY last_used_at DESC LIMIT 1
-                """, (tenant_id, seller_name.strip()))
+                """,
+                    (tenant_id, seller_name.strip()),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT category FROM supplier_categories
                     WHERE user_id = %s AND tenant_id IS NULL AND LOWER(seller_name) = LOWER(%s)
                     ORDER BY last_used_at DESC LIMIT 1
-                """, (str(user_id), seller_name.strip()))
+                """,
+                    (str(user_id), seller_name.strip()),
+                )
             r = cur.fetchone()
             return r["category"] if r else None
     except Exception as e:
@@ -4333,7 +5003,8 @@ def learn_buyer_to_client(
     tax = (buyer_tax or "").strip()[:30] or None
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO buyer_to_client_memory
                     (tenant_id, user_id, buyer_name, buyer_tax, client_id)
                 VALUES (%s, %s, %s, %s, %s)
@@ -4342,7 +5013,9 @@ def learn_buyer_to_client(
                 DO UPDATE SET client_id = EXCLUDED.client_id,
                               use_count = buyer_to_client_memory.use_count + 1,
                               last_used_at = NOW()
-            """, (tenant_id, str(user_id), name, tax, int(client_id)))
+            """,
+                (tenant_id, str(user_id), name, tax, int(client_id)),
+            )
         return True
     except Exception as e:
         logger.warning(f"learn_buyer_to_client failed: {e}")
@@ -4387,7 +5060,8 @@ def try_resolve_buyer_to_client(
         with get_cursor() as cur:
             # Layer 1: 学习记忆完全匹配
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT m.client_id, c.name AS client_name
                     FROM buyer_to_client_memory m
                     JOIN clients c ON c.id = m.client_id
@@ -4397,9 +5071,12 @@ def try_resolve_buyer_to_client(
                       AND COALESCE(m.buyer_tax, '') = COALESCE(%s, '')
                       AND c.is_active = TRUE
                     LIMIT 1
-                """, (tenant_id, str(user_id), name, tax))
+                """,
+                    (tenant_id, str(user_id), name, tax),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT m.client_id, c.name AS client_name
                     FROM buyer_to_client_memory m
                     JOIN clients c ON c.id = m.client_id
@@ -4408,7 +5085,9 @@ def try_resolve_buyer_to_client(
                       AND COALESCE(m.buyer_tax, '') = COALESCE(%s, '')
                       AND c.is_active = TRUE
                     LIMIT 1
-                """, (str(user_id), name, tax))
+                """,
+                    (str(user_id), name, tax),
+                )
             r = cur.fetchone()
             if r:
                 return {
@@ -4422,21 +5101,27 @@ def try_resolve_buyer_to_client(
             if tax and len(tax.replace("-", "").replace(" ", "")) >= 10:
                 tax_clean = tax.replace("-", "").replace(" ", "")
                 if tenant_id:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT id, name FROM clients
                         WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)
                           AND REPLACE(REPLACE(COALESCE(tax_id, ''), '-', ''), ' ', '') = %s
                           AND is_active = TRUE
                         LIMIT 1
-                    """, (tenant_id, tax_clean))
+                    """,
+                        (tenant_id, tax_clean),
+                    )
                 else:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT id, name FROM clients
                         WHERE user_id = %s
                           AND REPLACE(REPLACE(COALESCE(tax_id, ''), '-', ''), ' ', '') = %s
                           AND is_active = TRUE
                         LIMIT 1
-                    """, (str(user_id), tax_clean))
+                    """,
+                        (str(user_id), tax_clean),
+                    )
                 r = cur.fetchone()
                 if r:
                     return {
@@ -4448,16 +5133,22 @@ def try_resolve_buyer_to_client(
 
             # Layer 3-5: 名字匹配
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, name, short_name FROM clients
                     WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)
                       AND is_active = TRUE
-                """, (tenant_id,))
+                """,
+                    (tenant_id,),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, name, short_name FROM clients
                     WHERE user_id = %s AND is_active = TRUE
-                """, (str(user_id),))
+                """,
+                    (str(user_id),),
+                )
             rows = cur.fetchall()
             if not rows:
                 return None
@@ -4489,17 +5180,19 @@ def try_resolve_buyer_to_client(
                         "match_source": "short_name_exact",
                     }
                 # Layer 4: substring 双向 (一个含另一个)
-                if (cname_lower in name_lower or name_lower in cname_lower):
+                if cname_lower in name_lower or name_lower in cname_lower:
                     # 取较短的占较长的比例当 confidence (越接近 1 越像)
-                    ratio = min(len(cname_lower), len(name_lower)) / \
-                            max(len(cname_lower), len(name_lower))
-                    conf = 0.80 + (ratio * 0.10)   # 0.80-0.90
+                    ratio = min(len(cname_lower), len(name_lower)) / max(
+                        len(cname_lower), len(name_lower)
+                    )
+                    conf = 0.80 + (ratio * 0.10)  # 0.80-0.90
                     if best is None or conf > best[0]:
                         best = (conf, int(r["id"]), cname, "name_substring")
                 # Layer 5: short_name substring
                 if sname_lower and (sname_lower in name_lower or name_lower in sname_lower):
-                    ratio = min(len(sname_lower), len(name_lower)) / \
-                            max(len(sname_lower), len(name_lower))
+                    ratio = min(len(sname_lower), len(name_lower)) / max(
+                        len(sname_lower), len(name_lower)
+                    )
                     conf = 0.78 + (ratio * 0.08)
                     if best is None or conf > best[0]:
                         best = (conf, int(r["id"]), cname, "short_substring")
@@ -4529,26 +5222,36 @@ def update_history_client_id(
     try:
         with get_cursor(commit=True) as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE ocr_history
                     SET client_id = %s, updated_at = NOW()
                     WHERE id = %s
                       AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
-                """, (client_id, history_id, tenant_id))
+                """,
+                    (client_id, history_id, tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE ocr_history
                     SET client_id = %s, updated_at = NOW()
                     WHERE id = %s AND user_id = %s
-                """, (client_id, history_id, str(user_id)))
+                """,
+                    (client_id, history_id, str(user_id)),
+                )
             return cur.rowcount > 0
     except Exception as e:
         logger.warning(f"update_history_client_id failed: {e}")
         return False
 
 
-def upsert_supplier_category(seller_name: Optional[str], category: Optional[str],
-                             user_id: str, tenant_id: Optional[str] = None) -> bool:
+def upsert_supplier_category(
+    seller_name: Optional[str],
+    category: Optional[str],
+    user_id: str,
+    tenant_id: Optional[str] = None,
+) -> bool:
     """保存编辑时调:记忆这个映射 · 已存在则更新 use_count 和 category"""
     if not seller_name or not seller_name.strip():
         return False
@@ -4560,45 +5263,59 @@ def upsert_supplier_category(seller_name: Optional[str], category: Optional[str]
         with get_cursor(commit=True) as cur:
             # 用 ON CONFLICT 利用 unique index
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO supplier_categories (tenant_id, user_id, seller_name, category)
                     VALUES (%s, %s, %s, %s)
                     ON CONFLICT (COALESCE(tenant_id::text, user_id::text), LOWER(seller_name))
                     DO UPDATE SET category = EXCLUDED.category,
                                   use_count = supplier_categories.use_count + 1,
                                   last_used_at = NOW()
-                """, (tenant_id, str(user_id), s, c))
+                """,
+                    (tenant_id, str(user_id), s, c),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO supplier_categories (tenant_id, user_id, seller_name, category)
                     VALUES (NULL, %s, %s, %s)
                     ON CONFLICT (COALESCE(tenant_id::text, user_id::text), LOWER(seller_name))
                     DO UPDATE SET category = EXCLUDED.category,
                                   use_count = supplier_categories.use_count + 1,
                                   last_used_at = NOW()
-                """, (str(user_id), s, c))
+                """,
+                    (str(user_id), s, c),
+                )
             return True
     except Exception as e:
         logger.warning(f"upsert_supplier_category failed: {e}")
         return False
 
 
-def list_used_categories(user_id: str, tenant_id: Optional[str] = None, limit: int = 30) -> List[str]:
+def list_used_categories(
+    user_id: str, tenant_id: Optional[str] = None, limit: int = 30
+) -> List[str]:
     """列出用户/tenant 用过的所有 category(去重 · 按使用次数倒序)· 给前端 datalist 自动补全"""
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT category, SUM(use_count) AS total FROM supplier_categories
                     WHERE tenant_id = %s
                     GROUP BY category ORDER BY total DESC LIMIT %s
-                """, (tenant_id, limit))
+                """,
+                    (tenant_id, limit),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT category, SUM(use_count) AS total FROM supplier_categories
                     WHERE user_id = %s AND tenant_id IS NULL
                     GROUP BY category ORDER BY total DESC LIMIT %s
-                """, (str(user_id), limit))
+                """,
+                    (str(user_id), limit),
+                )
             return [r["category"] for r in cur.fetchall()]
     except Exception as e:
         logger.warning(f"list_used_categories failed: {e}")
@@ -4610,16 +5327,24 @@ def count_supplier_mappings(user_id: str, tenant_id: Optional[str] = None) -> in
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("SELECT COUNT(*) AS n FROM supplier_categories WHERE tenant_id = %s", (tenant_id,))
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM supplier_categories WHERE tenant_id = %s",
+                    (tenant_id,),
+                )
             else:
-                cur.execute("SELECT COUNT(*) AS n FROM supplier_categories WHERE user_id = %s AND tenant_id IS NULL", (str(user_id),))
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM supplier_categories WHERE user_id = %s AND tenant_id IS NULL",
+                    (str(user_id),),
+                )
             r = cur.fetchone()
             return int(r["n"]) if r else 0
-    except Exception as e:
+    except Exception:
         return 0
 
 
-def list_clients(user_id: str, include_inactive: bool = False, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def list_clients(
+    user_id: str, include_inactive: bool = False, tenant_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """列出某用户的所有客户(按名字排序)
     v118.15 · tenant_id 给了 → 同 tenant 共享(老板员工看到同一份客户档案)
     """
@@ -4633,7 +5358,8 @@ def list_clients(user_id: str, include_inactive: bool = False, tenant_id: Option
                 params = [user_id]
             if not include_inactive:
                 where += " AND is_active = TRUE"
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT c.*,
                     (SELECT COUNT(*) FROM ocr_history WHERE client_id = c.id) AS invoice_count,
                     (SELECT COALESCE(SUM(total_amount), 0) FROM ocr_history 
@@ -4642,27 +5368,37 @@ def list_clients(user_id: str, include_inactive: bool = False, tenant_id: Option
                 FROM clients c
                 WHERE {where}
                 ORDER BY c.is_active DESC, c.name ASC
-            """, params)
+            """,
+                params,
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_clients failed: {e}")
         return []
 
 
-def get_client(user_id: str, client_id: int, tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def get_client(
+    user_id: str, client_id: int, tenant_id: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """获取单个客户
     v118.15 · tenant_id 给了 → 同 tenant 任意成员可查
     """
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT * FROM clients WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
-                """, (client_id, tenant_id))
+                """,
+                    (client_id, tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT * FROM clients WHERE id = %s AND user_id = %s
-                """, (client_id, user_id))
+                """,
+                    (client_id, user_id),
+                )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -4676,27 +5412,31 @@ def create_client(user_id: str, tenant_id: Optional[str], name: str, **kwargs) -
         return None
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO clients (user_id, tenant_id, name, short_name, tax_id, 
                     address, contact_person, contact_phone, contact_email, notes, color)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (
-                user_id,
-                tenant_id,
-                name.strip()[:200],
-                (kwargs.get("short_name") or "").strip()[:80] or None,
-                (kwargs.get("tax_id") or "").strip()[:20] or None,
-                (kwargs.get("address") or "").strip()[:500] or None,
-                (kwargs.get("contact_person") or "").strip()[:100] or None,
-                (kwargs.get("contact_phone") or "").strip()[:50] or None,
-                (kwargs.get("contact_email") or "").strip()[:200] or None,
-                (kwargs.get("notes") or "").strip()[:1000] or None,
-                kwargs.get("color") or "#3b82f6",
-            ))
+            """,
+                (
+                    user_id,
+                    tenant_id,
+                    name.strip()[:200],
+                    (kwargs.get("short_name") or "").strip()[:80] or None,
+                    (kwargs.get("tax_id") or "").strip()[:20] or None,
+                    (kwargs.get("address") or "").strip()[:500] or None,
+                    (kwargs.get("contact_person") or "").strip()[:100] or None,
+                    (kwargs.get("contact_phone") or "").strip()[:50] or None,
+                    (kwargs.get("contact_email") or "").strip()[:200] or None,
+                    (kwargs.get("notes") or "").strip()[:1000] or None,
+                    kwargs.get("color") or "#3b82f6",
+                ),
+            )
             return cur.fetchone()["id"]
     except Exception as e:
         import traceback
+
         logger.error(f"create_client failed: {e}\n{traceback.format_exc()}")
         return None
 
@@ -4705,9 +5445,18 @@ def update_client(user_id: str, client_id: int, tenant_id: Optional[str] = None,
     """更新客户信息 · 部分字段更新
     v118.15 · tenant_id 给了 → 同 tenant 任意成员可改
     """
-    allowed_fields = ["name", "short_name", "tax_id", "address",
-                      "contact_person", "contact_phone", "contact_email",
-                      "notes", "color", "is_active"]
+    allowed_fields = [
+        "name",
+        "short_name",
+        "tax_id",
+        "address",
+        "contact_person",
+        "contact_phone",
+        "contact_email",
+        "notes",
+        "color",
+        "is_active",
+    ]
     updates = []
     params = []
     for k in allowed_fields:
@@ -4717,12 +5466,19 @@ def update_client(user_id: str, client_id: int, tenant_id: Optional[str] = None,
             if isinstance(v, str):
                 v = v.strip()
                 # 字段长度限制
-                limits = {"name": 200, "short_name": 80, "tax_id": 20,
-                          "address": 500, "contact_person": 100,
-                          "contact_phone": 50, "contact_email": 200,
-                          "notes": 1000, "color": 20}
+                limits = {
+                    "name": 200,
+                    "short_name": 80,
+                    "tax_id": 20,
+                    "address": 500,
+                    "contact_person": 100,
+                    "contact_phone": 50,
+                    "contact_email": 200,
+                    "notes": 1000,
+                    "color": 20,
+                }
                 if k in limits:
-                    v = v[:limits[k]] or None
+                    v = v[: limits[k]] or None
             params.append(v)
     if not updates:
         return False
@@ -4735,17 +5491,22 @@ def update_client(user_id: str, client_id: int, tenant_id: Optional[str] = None,
         params.extend([client_id, user_id])
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 UPDATE clients SET {', '.join(updates)}
                 WHERE {where_sql}
-            """, params)
+            """,
+                params,
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"update_client failed: {e}")
         return False
 
 
-def delete_client(user_id: str, client_id: int, cascade_unlink: bool = True, tenant_id: Optional[str] = None) -> bool:
+def delete_client(
+    user_id: str, client_id: int, cascade_unlink: bool = True, tenant_id: Optional[str] = None
+) -> bool:
     """删除客户 · 默认级联解绑发票(把发票的 client_id 置 NULL · 不删发票)
     v118.15 · tenant_id 给了 → 同 tenant 任意成员可删
     """
@@ -4753,26 +5514,37 @@ def delete_client(user_id: str, client_id: int, cascade_unlink: bool = True, ten
         with get_cursor(commit=True) as cur:
             # 先解绑发票
             if cascade_unlink:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE ocr_history SET client_id = NULL
                     WHERE client_id = %s
-                """, (client_id,))
+                """,
+                    (client_id,),
+                )
             # 再删客户
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     DELETE FROM clients WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
-                """, (client_id, tenant_id))
+                """,
+                    (client_id, tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     DELETE FROM clients WHERE id = %s AND user_id = %s
-                """, (client_id, user_id))
+                """,
+                    (client_id, user_id),
+                )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"delete_client failed: {e}")
         return False
 
 
-def assign_invoice_to_client(user_id: str, history_id: str, client_id: Optional[int], tenant_id: Optional[str] = None) -> bool:
+def assign_invoice_to_client(
+    user_id: str, history_id: str, client_id: Optional[int], tenant_id: Optional[str] = None
+) -> bool:
     """把发票归属到客户(client_id=None 表示移除归属)
     v108.2 · history_id 是 UUID 字符串(ocr_history 主键是 UUID)
     v118.15 · tenant_id 给了 → 同 tenant 任意成员可标 · 客户和发票都按 tenant 过滤
@@ -4782,27 +5554,38 @@ def assign_invoice_to_client(user_id: str, history_id: str, client_id: Optional[
             # 验证客户属于该用户/tenant(防越权)
             if client_id is not None:
                 if tenant_id:
-                    cur.execute("SELECT id FROM clients WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
-                               (client_id, tenant_id))
+                    cur.execute(
+                        "SELECT id FROM clients WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                        (client_id, tenant_id),
+                    )
                 else:
-                    cur.execute("SELECT id FROM clients WHERE id = %s AND user_id = %s",
-                               (client_id, user_id))
+                    cur.execute(
+                        "SELECT id FROM clients WHERE id = %s AND user_id = %s",
+                        (client_id, user_id),
+                    )
                 if not cur.fetchone():
                     return False
             # 更新发票归属(同样按 tenant 过滤)
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE ocr_history SET client_id = %s
                     WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
-                """, (client_id, str(history_id), tenant_id))
+                """,
+                    (client_id, str(history_id), tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE ocr_history SET client_id = %s
                     WHERE id = %s AND user_id = %s
-                """, (client_id, str(history_id), str(user_id)))
+                """,
+                    (client_id, str(history_id), str(user_id)),
+                )
             return cur.rowcount > 0
     except Exception as e:
         import traceback
+
         logger.error(f"assign_invoice_to_client failed: {e}\n{traceback.format_exc()}")
         return False
 
@@ -4811,6 +5594,7 @@ def assign_invoice_to_client(user_id: str, history_id: str, client_id: Optional[
 # v108 · Google AI Studio 余额追踪 · 半自动校准
 # 管理员每周更新一次真实余额 · 系统自动反推校准系数
 # ============================================================
+
 
 def ensure_billing_balance_table():
     """启动时建余额追踪表 · 幂等"""
@@ -4850,7 +5634,12 @@ def get_latest_balance() -> Optional[Dict[str, Any]]:
         return None
 
 
-def add_balance_log(real_balance: float, user_id: str, notes: Optional[str] = None, calibration_override: Optional[float] = None) -> Optional[int]:
+def add_balance_log(
+    real_balance: float,
+    user_id: str,
+    notes: Optional[str] = None,
+    calibration_override: Optional[float] = None,
+) -> Optional[int]:
     """添加一条余额记录 · 自动算估算消耗 + 校准系数
     calibration_override: 不为 None 时跳过自动计算，直接使用该值（管理员手动覆盖）
     返回新记录 ID
@@ -4873,20 +5662,26 @@ def add_balance_log(real_balance: float, user_id: str, notes: Optional[str] = No
                 calibration = round(max(0.5, min(float(calibration_override), 2.0)), 4)
                 if prev:
                     real_used = float(prev["real_balance_thb"]) - float(real_balance)
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT COALESCE(SUM(cost_thb), 0) AS estimated FROM ocr_cost_log
                         WHERE created_at > %s
-                    """, (prev["created_at"],))
+                    """,
+                        (prev["created_at"],),
+                    )
                     est_row = cur.fetchone()
                     estimated_used = float(est_row["estimated"]) if est_row else 0.0
             elif prev:
                 # 算这段时间真实消耗
                 real_used = float(prev["real_balance_thb"]) - float(real_balance)
                 # 算这段时间我们估算的消耗
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT COALESCE(SUM(cost_thb), 0) AS estimated FROM ocr_cost_log
                     WHERE created_at > %s
-                """, (prev["created_at"],))
+                """,
+                    (prev["created_at"],),
+                )
                 est_row = cur.fetchone()
                 estimated_used = float(est_row["estimated"]) if est_row else 0.0
                 # 反推校准系数(防 0 除)
@@ -4894,25 +5689,29 @@ def add_balance_log(real_balance: float, user_id: str, notes: Optional[str] = No
                     calibration = round(real_used / estimated_used, 4)
                     # 限制范围 · 避免异常数据(如手抖输错)
                     calibration = max(0.5, min(calibration, 2.0))
-            
+
             # 2. 写新记录
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO billing_balance_log
                 (real_balance_thb, notes, estimated_used_since_last,
                  real_used_since_last, calibration_factor, updated_by_user_id)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (
-                round(real_balance, 4),
-                (notes or "")[:500] or None,
-                round(estimated_used, 4),
-                round(real_used, 4),
-                calibration,
-                user_id,
-            ))
+            """,
+                (
+                    round(real_balance, 4),
+                    (notes or "")[:500] or None,
+                    round(estimated_used, 4),
+                    round(real_used, 4),
+                    calibration,
+                    user_id,
+                ),
+            )
             return cur.fetchone()["id"]
     except Exception as e:
         import traceback
+
         logger.error(f"add_balance_log failed: {e}\n{traceback.format_exc()}")
         return None
 
@@ -4931,28 +5730,32 @@ def get_balance_summary() -> Dict[str, Any]:
                 "real_since_last": 0,
                 "accuracy_pct": None,
             }
-            
-            
-            
+
         # 算自上次更新以来 · 我们当前估算了多少
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(cost_thb), 0) AS estimated_since FROM ocr_cost_log
                 WHERE created_at > %s
-            """, (latest["created_at"],))
+            """,
+                (latest["created_at"],),
+            )
             est_since = float(cur.fetchone()["estimated_since"] or 0)
-        
+
         # 当前预估实际余额
         current_estimated_balance = float(latest["real_balance_thb"]) - est_since
-        
+
         # 准确度(上次)
         accuracy = None
-        if latest.get("estimated_used_since_last") and float(latest["estimated_used_since_last"]) > 0.001:
+        if (
+            latest.get("estimated_used_since_last")
+            and float(latest["estimated_used_since_last"]) > 0.001
+        ):
             real = float(latest.get("real_used_since_last") or 0)
             est = float(latest["estimated_used_since_last"])
             if real > 0:
                 accuracy = round(min(est, real) / max(est, real) * 100, 1)
-        
+
         return {
             "has_balance": True,
             "real_balance_thb": float(latest["real_balance_thb"]),
@@ -4975,6 +5778,7 @@ def get_balance_summary() -> Dict[str, Any]:
 #   - exception_whitelist:用户「忽略此类」后写入 · 同供应商+同规则下次不再拦
 #   设计:同 tenant 共享视图(老板员工看同一份异常池 + 同一份白名单)
 # ============================================================
+
 
 def ensure_exceptions_tables():
     """启动时建异常栏 2 张表 · 幂等 + 老 schema 自动迁移
@@ -5038,43 +5842,56 @@ def ensure_exceptions_tables():
         logger.error(f"ensure_exceptions_tables failed: {e}")
 
 
-def is_exception_whitelisted(user_id: str, tenant_id: Optional[str],
-                              seller_name: Optional[str], rule_code: str) -> bool:
+def is_exception_whitelisted(
+    user_id: str, tenant_id: Optional[str], seller_name: Optional[str], rule_code: str
+) -> bool:
     """检查 (seller, rule) 是否在白名单 · 命中则跳过该规则"""
     if not seller_name or not seller_name.strip() or not rule_code:
         return False
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT 1 FROM exception_whitelist
                     WHERE tenant_id = %s AND LOWER(seller_name) = LOWER(%s) AND rule_code = %s
                     LIMIT 1
-                """, (tenant_id, seller_name.strip(), rule_code))
+                """,
+                    (tenant_id, seller_name.strip(), rule_code),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT 1 FROM exception_whitelist
                     WHERE user_id = %s AND tenant_id IS NULL
                       AND LOWER(seller_name) = LOWER(%s) AND rule_code = %s
                     LIMIT 1
-                """, (user_id, seller_name.strip(), rule_code))
+                """,
+                    (user_id, seller_name.strip(), rule_code),
+                )
             return cur.fetchone() is not None
     except Exception as e:
         logger.warning(f"is_exception_whitelisted failed: {e}")
         return False
 
 
-def insert_exception(user_id: str, tenant_id: Optional[str], history_id: str,
-                     rule_code: str, severity: str = "medium",
-                     seller_name: Optional[str] = None,
-                     invoice_no: Optional[str] = None,
-                     total_amount: Optional[float] = None,
-                     detail: Optional[Dict[str, Any]] = None) -> Optional[int]:
+def insert_exception(
+    user_id: str,
+    tenant_id: Optional[str],
+    history_id: str,
+    rule_code: str,
+    severity: str = "medium",
+    seller_name: Optional[str] = None,
+    invoice_no: Optional[str] = None,
+    total_amount: Optional[float] = None,
+    detail: Optional[Dict[str, Any]] = None,
+) -> Optional[int]:
     """写入一条异常 · 同 history+rule 已有 pending 时直接 no-op(unique 索引保护)
     v118.20.1.6 · history_id 用 UUID 字符串(原 int 转换全失败)"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO exceptions
                     (user_id, tenant_id, history_id, rule_code, severity,
                      seller_name, invoice_no, total_amount, detail_json, status)
@@ -5082,15 +5899,25 @@ def insert_exception(user_id: str, tenant_id: Optional[str], history_id: str,
                 ON CONFLICT (history_id, rule_code) WHERE status = 'pending'
                 DO NOTHING
                 RETURNING id
-            """, (
-                str(user_id), tenant_id, str(history_id), rule_code, severity,
-                seller_name, invoice_no, total_amount,
-                _json.dumps(detail or {}, ensure_ascii=False, default=str),
-            ))
+            """,
+                (
+                    str(user_id),
+                    tenant_id,
+                    str(history_id),
+                    rule_code,
+                    severity,
+                    seller_name,
+                    invoice_no,
+                    total_amount,
+                    _json.dumps(detail or {}, ensure_ascii=False, default=str),
+                ),
+            )
             row = cur.fetchone()
             if row:
                 ex_id = int(row["id"])
-                logger.info(f"[exception] +1 ex_id={ex_id} rule={rule_code} sev={severity} hid={history_id} seller={seller_name!r}")
+                logger.info(
+                    f"[exception] +1 ex_id={ex_id} rule={rule_code} sev={severity} hid={history_id} seller={seller_name!r}"
+                )
                 return ex_id
             else:
                 # ON CONFLICT 触发 · 同 history+rule 已存在 pending · 静默忽略
@@ -5100,11 +5927,16 @@ def insert_exception(user_id: str, tenant_id: Optional[str], history_id: str,
         return None
 
 
-def list_exceptions(user_id: str, tenant_id: Optional[str] = None,
-                    status: str = "pending", rule_code: Optional[str] = None,
-                    limit: int = 100, offset: int = 0,
-                    client_id: Optional[int] = None,
-                    restrict_client_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
+def list_exceptions(
+    user_id: str,
+    tenant_id: Optional[str] = None,
+    status: str = "pending",
+    rule_code: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    client_id: Optional[int] = None,
+    restrict_client_ids: Optional[List[int]] = None,
+) -> List[Dict[str, Any]]:
     """列异常 · 同 tenant 共享视图 · 默认只看 pending
     v118.28.1 · restrict_client_ids = 员工只看分到的客户;None = 不限制
     """
@@ -5132,11 +5964,14 @@ def list_exceptions(user_id: str, tenant_id: Optional[str] = None,
                     where.append("(e.user_id = %s AND h.client_id IS NULL)")
                     params.append(user_id)
                 else:
-                    where.append("(h.client_id = ANY(%s::bigint[]) OR (e.user_id = %s AND h.client_id IS NULL))")
+                    where.append(
+                        "(h.client_id = ANY(%s::bigint[]) OR (e.user_id = %s AND h.client_id IS NULL))"
+                    )
                     params.append([int(c) for c in restrict_client_ids])
                     params.append(user_id)
             where_sql = " AND ".join(where)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT e.id, e.history_id, e.rule_code, e.severity,
                        e.seller_name, e.invoice_no, e.total_amount, e.detail_json,
                        e.status, e.created_at, e.resolved_at,
@@ -5148,50 +5983,66 @@ def list_exceptions(user_id: str, tenant_id: Optional[str] = None,
                   CASE e.severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
                   e.created_at DESC
                 LIMIT %s OFFSET %s
-            """, params + [int(limit), int(offset)])
+            """,
+                params + [int(limit), int(offset)],
+            )
             items = []
             for r in cur.fetchall():
-                items.append({
-                    "id": int(r["id"]),
-                    "history_id": str(r["history_id"]),
-                    "rule_code": r["rule_code"],
-                    "severity": r["severity"],
-                    "seller_name": r["seller_name"],
-                    "invoice_no": r["invoice_no"],
-                    "total_amount": float(r["total_amount"]) if r["total_amount"] is not None else None,
-                    "detail": r["detail_json"] or {},
-                    "status": r["status"],
-                    "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-                    "resolved_at": r["resolved_at"].isoformat() if r["resolved_at"] else None,
-                    "filename": r.get("filename"),
-                    "invoice_date": r["invoice_date"].isoformat() if r.get("invoice_date") else None,
-                    "confidence": r.get("confidence"),
-                    "client_id": int(r["client_id"]) if r.get("client_id") else None,
-                })
+                items.append(
+                    {
+                        "id": int(r["id"]),
+                        "history_id": str(r["history_id"]),
+                        "rule_code": r["rule_code"],
+                        "severity": r["severity"],
+                        "seller_name": r["seller_name"],
+                        "invoice_no": r["invoice_no"],
+                        "total_amount": (
+                            float(r["total_amount"]) if r["total_amount"] is not None else None
+                        ),
+                        "detail": r["detail_json"] or {},
+                        "status": r["status"],
+                        "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                        "resolved_at": r["resolved_at"].isoformat() if r["resolved_at"] else None,
+                        "filename": r.get("filename"),
+                        "invoice_date": (
+                            r["invoice_date"].isoformat() if r.get("invoice_date") else None
+                        ),
+                        "confidence": r.get("confidence"),
+                        "client_id": int(r["client_id"]) if r.get("client_id") else None,
+                    }
+                )
             return items
     except Exception as e:
         logger.error(f"list_exceptions failed: {e}")
         return []
 
 
-def get_exception(user_id: str, exception_id: int, tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def get_exception(
+    user_id: str, exception_id: int, tenant_id: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """取单条异常详情"""
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT e.*, h.filename, h.invoice_date, h.confidence
                     FROM exceptions e
                     LEFT JOIN ocr_history h ON h.id = e.history_id
                     WHERE e.id = %s AND e.tenant_id = %s
-                """, (int(exception_id), tenant_id))
+                """,
+                    (int(exception_id), tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT e.*, h.filename, h.invoice_date, h.confidence
                     FROM exceptions e
                     LEFT JOIN ocr_history h ON h.id = e.history_id
                     WHERE e.id = %s AND e.user_id = %s
-                """, (int(exception_id), user_id))
+                """,
+                    (int(exception_id), user_id),
+                )
             r = cur.fetchone()
             if not r:
                 return None
@@ -5215,43 +6066,54 @@ def get_exception(user_id: str, exception_id: int, tenant_id: Optional[str] = No
         return None
 
 
-def resolve_exception(user_id: str, exception_id: int, tenant_id: Optional[str] = None,
-                      new_status: str = "resolved") -> bool:
+def resolve_exception(
+    user_id: str, exception_id: int, tenant_id: Optional[str] = None, new_status: str = "resolved"
+) -> bool:
     """标记异常为已处理(resolved 或 ignored) · 同 tenant 内任意成员可处理"""
     if new_status not in ("resolved", "ignored", "pending"):
         return False
     try:
         with get_cursor(commit=True) as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE exceptions
                     SET status = %s, resolved_by = %s, resolved_at = NOW()
                     WHERE id = %s AND tenant_id = %s
-                """, (new_status, str(user_id), int(exception_id), tenant_id))
+                """,
+                    (new_status, str(user_id), int(exception_id), tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE exceptions
                     SET status = %s, resolved_by = %s, resolved_at = NOW()
                     WHERE id = %s AND user_id = %s
-                """, (new_status, str(user_id), int(exception_id), user_id))
+                """,
+                    (new_status, str(user_id), int(exception_id), user_id),
+                )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"resolve_exception failed: {e}")
         return False
 
 
-def add_exception_whitelist(user_id: str, tenant_id: Optional[str],
-                             seller_name: Optional[str], rule_code: str) -> bool:
+def add_exception_whitelist(
+    user_id: str, tenant_id: Optional[str], seller_name: Optional[str], rule_code: str
+) -> bool:
     """加入「忽略此类」白名单 · 下次同供应商同规则不再拦"""
     if not seller_name or not seller_name.strip() or not rule_code:
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO exception_whitelist (user_id, tenant_id, seller_name, rule_code)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT DO NOTHING
-            """, (str(user_id), tenant_id, seller_name.strip(), rule_code))
+            """,
+                (str(user_id), tenant_id, seller_name.strip(), rule_code),
+            )
             return True
     except Exception as e:
         logger.error(f"add_exception_whitelist failed: {e}")
@@ -5264,27 +6126,35 @@ def list_exception_whitelist(user_id: str, tenant_id: Optional[str] = None) -> L
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, seller_name, rule_code, created_at
                     FROM exception_whitelist
                     WHERE tenant_id = %s
                     ORDER BY created_at DESC
-                """, (tenant_id,))
+                """,
+                    (tenant_id,),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, seller_name, rule_code, created_at
                     FROM exception_whitelist
                     WHERE user_id = %s AND tenant_id IS NULL
                     ORDER BY created_at DESC
-                """, (str(user_id),))
+                """,
+                    (str(user_id),),
+                )
             items = []
             for r in cur.fetchall():
-                items.append({
-                    "id": int(r["id"]),
-                    "seller_name": r["seller_name"],
-                    "rule_code": r["rule_code"],
-                    "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-                })
+                items.append(
+                    {
+                        "id": int(r["id"]),
+                        "seller_name": r["seller_name"],
+                        "rule_code": r["rule_code"],
+                        "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                    }
+                )
             return items
     except Exception as e:
         logger.error(f"list_exception_whitelist failed: {e}")
@@ -5296,15 +6166,21 @@ def delete_exception_whitelist(user_id: str, wl_id: int, tenant_id: Optional[str
     try:
         with get_cursor(commit=True) as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     DELETE FROM exception_whitelist
                     WHERE id = %s AND tenant_id = %s
-                """, (int(wl_id), tenant_id))
+                """,
+                    (int(wl_id), tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     DELETE FROM exception_whitelist
                     WHERE id = %s AND user_id = %s AND tenant_id IS NULL
-                """, (int(wl_id), str(user_id)))
+                """,
+                    (int(wl_id), str(user_id)),
+                )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"delete_exception_whitelist failed: {e}")
@@ -5312,32 +6188,42 @@ def delete_exception_whitelist(user_id: str, wl_id: int, tenant_id: Optional[str
 
 
 # v118.21.3 · 字段编辑后清 pending 异常 · 让 hook 重跑写入新结果
-def delete_pending_exceptions_by_history(history_id: str, tenant_id: Optional[str] = None,
-                                          user_id: Optional[str] = None) -> int:
+def delete_pending_exceptions_by_history(
+    history_id: str, tenant_id: Optional[str] = None, user_id: Optional[str] = None
+) -> int:
     """删除某 history 下的所有 pending 异常 · 保留 resolved/ignored
     返回:删除的条数
     """
     try:
         with get_cursor(commit=True) as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     DELETE FROM exceptions
                     WHERE history_id = %s::uuid AND tenant_id = %s AND status = 'pending'
-                """, (history_id, tenant_id))
+                """,
+                    (history_id, tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     DELETE FROM exceptions
                     WHERE history_id = %s::uuid AND user_id = %s AND tenant_id IS NULL AND status = 'pending'
-                """, (history_id, str(user_id)))
+                """,
+                    (history_id, str(user_id)),
+                )
             return cur.rowcount
     except Exception as e:
         logger.error(f"delete_pending_exceptions_by_history failed: {e}")
         return 0
 
 
-def count_exceptions_by_status_and_rule(user_id: str, tenant_id: Optional[str] = None,
-                                          client_id: Optional[int] = None,
-                                          by_rule_status: str = "pending") -> Dict[str, Any]:
+def count_exceptions_by_status_and_rule(
+    user_id: str,
+    tenant_id: Optional[str] = None,
+    client_id: Optional[int] = None,
+    by_rule_status: str = "pending",
+) -> Dict[str, Any]:
     """统计 · 给前端筛选 chip 和顶部 KPI 用
     返回:{ pending: N, resolved: N, ignored: N,
            by_rule: { rule_code: count_at_by_rule_status } ,
@@ -5356,13 +6242,16 @@ def count_exceptions_by_status_and_rule(user_id: str, tenant_id: Optional[str] =
             if client_id:
                 where = where + " AND h.client_id = %s"
                 params = list(params) + [int(client_id)]
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT e.status, e.rule_code, e.severity, COUNT(*) AS n
                 FROM exceptions e
                 INNER JOIN ocr_history h ON h.id = e.history_id
                 WHERE {where}
                 GROUP BY e.status, e.rule_code, e.severity
-            """, params)
+            """,
+                params,
+            )
             by_status = {"pending": 0, "resolved": 0, "ignored": 0}
             by_rule: Dict[str, int] = {}
             high = 0
@@ -5394,21 +6283,30 @@ def count_whitelist_rules(user_id: str, tenant_id: Optional[str] = None) -> int:
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("SELECT COUNT(*) AS n FROM exception_whitelist WHERE tenant_id = %s", (tenant_id,))
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM exception_whitelist WHERE tenant_id = %s",
+                    (tenant_id,),
+                )
             else:
-                cur.execute("SELECT COUNT(*) AS n FROM exception_whitelist WHERE user_id = %s AND tenant_id IS NULL", (user_id,))
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM exception_whitelist WHERE user_id = %s AND tenant_id IS NULL",
+                    (user_id,),
+                )
             r = cur.fetchone()
             return int(r["n"]) if r else 0
-    except Exception as e:
+    except Exception:
         return 0
 
 
 # ============================================================
 # v118.20.5 · 异常栏 P0-3 · 批量复核
 # ============================================================
-def batch_resolve_exceptions(user_id: str, exception_ids: List[int],
-                             tenant_id: Optional[str] = None,
-                             new_status: str = "resolved") -> Dict[str, Any]:
+def batch_resolve_exceptions(
+    user_id: str,
+    exception_ids: List[int],
+    tenant_id: Optional[str] = None,
+    new_status: str = "resolved",
+) -> Dict[str, Any]:
     """批量标记异常状态 · 一次性 UPDATE + 同时拿 (seller, rule) 给白名单调用方用
     返回 { processed: N, ids_done: [...], whitelist_pairs: [(seller, rule), ...] }
     whitelist_pairs 仅 new_status=='ignored' 且 seller_name 非空时返回 · 调用方自行去重写白名单
@@ -5425,34 +6323,46 @@ def batch_resolve_exceptions(user_id: str, exception_ids: List[int],
         with get_cursor(commit=True) as cur:
             # 先查满足条件的 (id, seller, rule) · 过滤掉跨 tenant 的(防越权)
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, seller_name, rule_code
                     FROM exceptions
                     WHERE id = ANY(%s) AND tenant_id = %s AND status = 'pending'
-                """, (safe_ids, tenant_id))
+                """,
+                    (safe_ids, tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, seller_name, rule_code
                     FROM exceptions
                     WHERE id = ANY(%s) AND user_id = %s AND tenant_id IS NULL AND status = 'pending'
-                """, (safe_ids, user_id))
+                """,
+                    (safe_ids, user_id),
+                )
             rows = cur.fetchall()
             ids_done = [int(r["id"]) for r in rows]
             if not ids_done:
                 return {"processed": 0, "ids_done": [], "whitelist_pairs": []}
             # 批量 UPDATE
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE exceptions
                     SET status = %s, resolved_by = %s, resolved_at = NOW()
                     WHERE id = ANY(%s) AND tenant_id = %s AND status = 'pending'
-                """, (new_status, str(user_id), ids_done, tenant_id))
+                """,
+                    (new_status, str(user_id), ids_done, tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE exceptions
                     SET status = %s, resolved_by = %s, resolved_at = NOW()
                     WHERE id = ANY(%s) AND user_id = %s AND tenant_id IS NULL AND status = 'pending'
-                """, (new_status, str(user_id), ids_done, user_id))
+                """,
+                    (new_status, str(user_id), ids_done, user_id),
+                )
             # 收集 ignored 对应的 (seller, rule) · 缺 seller 的不进白名单
             wl_pairs: List[tuple] = []
             if new_status == "ignored":
@@ -5478,6 +6388,7 @@ def batch_resolve_exceptions(user_id: str, exception_ids: List[int],
 # ============================================================
 # v118.22.1 · 智能提醒数据底座(notification_rules + notification_logs)
 # ============================================================
+
 
 def ensure_notification_tables():
     """启动时建智能提醒 2 张表 · 幂等 + IF NOT EXISTS · 风格对齐异常栏"""
@@ -5526,27 +6437,32 @@ def ensure_notification_tables():
         logger.error(f"ensure_notification_tables failed: {e}")
 
 
-def list_notification_rules(user_id: str,
-                            tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def list_notification_rules(user_id: str, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """列规则 · 同 tenant 共享视图(老板员工同租户共看共改)· 同异常栏隔离规则"""
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, name, template_code, params,
                            enabled, created_at, updated_at
                       FROM notification_rules
                      WHERE tenant_id = %s
                      ORDER BY created_at DESC
-                """, (tenant_id,))
+                """,
+                    (tenant_id,),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, name, template_code, params,
                            enabled, created_at, updated_at
                       FROM notification_rules
                      WHERE user_id = %s AND tenant_id IS NULL
                      ORDER BY created_at DESC
-                """, (str(user_id),))
+                """,
+                    (str(user_id),),
+                )
             rows = cur.fetchall()
             return [dict(r) for r in rows]
     except Exception as e:
@@ -5554,27 +6470,34 @@ def list_notification_rules(user_id: str,
         return []
 
 
-def get_notification_rule(rule_id: int, user_id: str,
-                          tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def get_notification_rule(
+    rule_id: int, user_id: str, tenant_id: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """取一条规则 · 鉴权:必须属于本人或本租户"""
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, name, template_code, params,
                            enabled, created_at, updated_at
                       FROM notification_rules
                      WHERE id = %s AND tenant_id = %s
                      LIMIT 1
-                """, (int(rule_id), tenant_id))
+                """,
+                    (int(rule_id), tenant_id),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, name, template_code, params,
                            enabled, created_at, updated_at
                       FROM notification_rules
                      WHERE id = %s AND user_id = %s AND tenant_id IS NULL
                      LIMIT 1
-                """, (int(rule_id), str(user_id)))
+                """,
+                    (int(rule_id), str(user_id)),
+                )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -5582,22 +6505,33 @@ def get_notification_rule(rule_id: int, user_id: str,
         return None
 
 
-def create_notification_rule(user_id: str, tenant_id: Optional[str],
-                             name: str, template_code: str,
-                             params: Optional[Dict[str, Any]] = None,
-                             enabled: bool = True) -> Optional[int]:
+def create_notification_rule(
+    user_id: str,
+    tenant_id: Optional[str],
+    name: str,
+    template_code: str,
+    params: Optional[Dict[str, Any]] = None,
+    enabled: bool = True,
+) -> Optional[int]:
     """新建规则 · 返回新 id"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO notification_rules
                     (user_id, tenant_id, name, template_code, params, enabled)
                 VALUES (%s, %s, %s, %s, %s::jsonb, %s)
                 RETURNING id
-            """, (
-                str(user_id), tenant_id, name.strip(), template_code,
-                _json.dumps(params or {}, ensure_ascii=False), bool(enabled),
-            ))
+            """,
+                (
+                    str(user_id),
+                    tenant_id,
+                    name.strip(),
+                    template_code,
+                    _json.dumps(params or {}, ensure_ascii=False),
+                    bool(enabled),
+                ),
+            )
             row = cur.fetchone()
             return int(row["id"]) if row else None
     except Exception as e:
@@ -5605,20 +6539,26 @@ def create_notification_rule(user_id: str, tenant_id: Optional[str],
         return None
 
 
-def update_notification_rule(rule_id: int, user_id: str,
-                             tenant_id: Optional[str],
-                             name: Optional[str] = None,
-                             params: Optional[Dict[str, Any]] = None,
-                             enabled: Optional[bool] = None) -> bool:
+def update_notification_rule(
+    rule_id: int,
+    user_id: str,
+    tenant_id: Optional[str],
+    name: Optional[str] = None,
+    params: Optional[Dict[str, Any]] = None,
+    enabled: Optional[bool] = None,
+) -> bool:
     """改规则 · 任一字段非 None 即更新 · 鉴权同 get"""
     sets = []
     vals: list = []
     if name is not None:
-        sets.append("name = %s"); vals.append(name.strip())
+        sets.append("name = %s")
+        vals.append(name.strip())
     if params is not None:
-        sets.append("params = %s::jsonb"); vals.append(_json.dumps(params, ensure_ascii=False))
+        sets.append("params = %s::jsonb")
+        vals.append(_json.dumps(params, ensure_ascii=False))
     if enabled is not None:
-        sets.append("enabled = %s"); vals.append(bool(enabled))
+        sets.append("enabled = %s")
+        vals.append(bool(enabled))
     if not sets:
         return True  # 没要改的 · 直接 OK
     sets.append("updated_at = NOW()")
@@ -5627,8 +6567,7 @@ def update_notification_rule(rule_id: int, user_id: str,
         with get_cursor(commit=True) as cur:
             if tenant_id:
                 cur.execute(
-                    f"UPDATE notification_rules SET {set_sql} "
-                    f"WHERE id = %s AND tenant_id = %s",
+                    f"UPDATE notification_rules SET {set_sql} " f"WHERE id = %s AND tenant_id = %s",
                     (*vals, int(rule_id), tenant_id),
                 )
             else:
@@ -5643,8 +6582,7 @@ def update_notification_rule(rule_id: int, user_id: str,
         return False
 
 
-def delete_notification_rule(rule_id: int, user_id: str,
-                             tenant_id: Optional[str]) -> bool:
+def delete_notification_rule(rule_id: int, user_id: str, tenant_id: Optional[str]) -> bool:
     """删规则 · 同 get 鉴权 · 同时删 logs 里的引用(SET NULL · 保留发送历史)"""
     try:
         with get_cursor(commit=True) as cur:
@@ -5670,26 +6608,40 @@ def delete_notification_rule(rule_id: int, user_id: str,
         return False
 
 
-def log_notification(user_id: str, tenant_id: Optional[str],
-                     rule_id: Optional[int], template_code: str,
-                     event_type: Optional[str], event_ref: Optional[str],
-                     line_user_id: Optional[str], status: str,
-                     error: Optional[str] = None) -> Optional[int]:
+def log_notification(
+    user_id: str,
+    tenant_id: Optional[str],
+    rule_id: Optional[int],
+    template_code: str,
+    event_type: Optional[str],
+    event_ref: Optional[str],
+    line_user_id: Optional[str],
+    status: str,
+    error: Optional[str] = None,
+) -> Optional[int]:
     """写一条发送记录 · 失败也吞(不影响主流程)"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO notification_logs
                     (user_id, tenant_id, rule_id, template_code,
                      event_type, event_ref, line_user_id, status, error)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (
-                str(user_id), tenant_id,
-                int(rule_id) if rule_id is not None else None,
-                template_code,
-                event_type, event_ref, line_user_id, status, error,
-            ))
+            """,
+                (
+                    str(user_id),
+                    tenant_id,
+                    int(rule_id) if rule_id is not None else None,
+                    template_code,
+                    event_type,
+                    event_ref,
+                    line_user_id,
+                    status,
+                    error,
+                ),
+            )
             row = cur.fetchone()
             return int(row["id"]) if row else None
     except Exception as e:
@@ -5697,27 +6649,34 @@ def log_notification(user_id: str, tenant_id: Optional[str],
         return None
 
 
-def list_notification_logs(user_id: str, tenant_id: Optional[str] = None,
-                           limit: int = 50) -> List[Dict[str, Any]]:
+def list_notification_logs(
+    user_id: str, tenant_id: Optional[str] = None, limit: int = 50
+) -> List[Dict[str, Any]]:
     """列发送日志 · 同 tenant 共享 · 默认最近 50 条"""
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, rule_id, template_code,
                            event_type, event_ref, line_user_id, status, error, sent_at
                       FROM notification_logs
                      WHERE tenant_id = %s
                      ORDER BY sent_at DESC LIMIT %s
-                """, (tenant_id, int(limit)))
+                """,
+                    (tenant_id, int(limit)),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, rule_id, template_code,
                            event_type, event_ref, line_user_id, status, error, sent_at
                       FROM notification_logs
                      WHERE user_id = %s AND tenant_id IS NULL
                      ORDER BY sent_at DESC LIMIT %s
-                """, (str(user_id), int(limit)))
+                """,
+                    (str(user_id), int(limit)),
+                )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_notification_logs failed: {e}")
@@ -5728,11 +6687,14 @@ def list_active_notification_rules_by_template(template_code: str) -> List[Dict[
     """v118.22.1.1 hook 用 · 取所有启用的某模板规则(跨 user 全表 · 异步触发匹配)"""
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, user_id, tenant_id, name, template_code, params, enabled
                   FROM notification_rules
                  WHERE template_code = %s AND enabled = true
-            """, (template_code,))
+            """,
+                (template_code,),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_active_notification_rules_by_template failed: {e}")
@@ -5752,6 +6714,7 @@ def list_active_notification_rules_by_template(template_code: str) -> List[Dict[
 #   - Q1 决定:1 人 1 事务所 · UNIQUE(user_id) · 未来放宽改成 (user_id, tenant_id)
 #   - Q2 决定:client 不需要登录 · client_assignments 仅约束员工可见客户
 # ============================================================
+
 
 def ensure_membership_tables():
     """启动时建 3 张表 + 灌系统角色 + ALTER 老表加列 · 幂等"""
@@ -5816,7 +6779,9 @@ def ensure_membership_tables():
 
             # ── 5. clients 表 · tenant_id 列已存在(v107 ensure_clients_table 已建)· 不重复 ALTER
 
-            logger.info("✅ v118.27.7 · memberships / client_assignments / roles 表已就绪 · 3 系统角色已灌入")
+            logger.info(
+                "✅ v118.27.7 · memberships / client_assignments / roles 表已就绪 · 3 系统角色已灌入"
+            )
     except Exception as e:
         logger.error(f"ensure_membership_tables failed: {e}")
 
@@ -5842,10 +6807,7 @@ def get_visible_client_ids_for_user(user: dict):
         return []
     try:
         with get_cursor() as cur:
-            cur.execute(
-                "SELECT client_id FROM client_assignments WHERE user_id = %s",
-                (user_id,)
-            )
+            cur.execute("SELECT client_id FROM client_assignments WHERE user_id = %s", (user_id,))
             rows = cur.fetchall() or []
             return [int(r["client_id"] if isinstance(r, dict) else r[0]) for r in rows]
     except Exception as e:
@@ -5862,13 +6824,16 @@ def list_assignments_by_employees(tenant_id: str):
         return out
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT ca.user_id, ca.client_id
                 FROM client_assignments ca
                 JOIN users u ON u.id = ca.user_id
                 WHERE u.tenant_id = %s
-            """, (str(tenant_id),))
-            for r in (cur.fetchall() or []):
+            """,
+                (str(tenant_id),),
+            )
+            for r in cur.fetchall() or []:
                 uid = str(r["user_id"] if isinstance(r, dict) else r[0])
                 cid = int(r["client_id"] if isinstance(r, dict) else r[1])
                 out.setdefault(uid, []).append(cid)
@@ -5877,8 +6842,9 @@ def list_assignments_by_employees(tenant_id: str):
     return out
 
 
-def set_employee_assignments(employee_user_id: str, client_ids,
-                              assigned_by: str, tenant_id: str) -> bool:
+def set_employee_assignments(
+    employee_user_id: str, client_ids, assigned_by: str, tenant_id: str
+) -> bool:
     """覆盖式设置员工的客户列表
     安全:校验员工和所有 client_id 都在 tenant_id 内 · 防跨租户
     """
@@ -5887,8 +6853,9 @@ def set_employee_assignments(employee_user_id: str, client_ids,
     try:
         with get_cursor(commit=True) as cur:
             # 校验员工属于本租户
-            cur.execute("SELECT tenant_id FROM users WHERE id = %s LIMIT 1",
-                       (str(employee_user_id),))
+            cur.execute(
+                "SELECT tenant_id FROM users WHERE id = %s LIMIT 1", (str(employee_user_id),)
+            )
             row = cur.fetchone()
             if not row:
                 return False
@@ -5897,29 +6864,38 @@ def set_employee_assignments(employee_user_id: str, client_ids,
                 return False
 
             # 删现有所有
-            cur.execute("DELETE FROM client_assignments WHERE user_id = %s",
-                       (str(employee_user_id),))
+            cur.execute(
+                "DELETE FROM client_assignments WHERE user_id = %s", (str(employee_user_id),)
+            )
 
             # 校验要分配的 client_ids 都在本租户(防越权写)
             valid_ids = []
             if client_ids:
                 int_ids = [int(c) for c in client_ids if c is not None]
                 if int_ids:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT id FROM clients
                         WHERE id = ANY(%s::bigint[])
                           AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
-                    """, (int_ids, str(tenant_id)))
-                    valid_ids = [int(r["id"] if isinstance(r, dict) else r[0])
-                                for r in (cur.fetchall() or [])]
+                    """,
+                        (int_ids, str(tenant_id)),
+                    )
+                    valid_ids = [
+                        int(r["id"] if isinstance(r, dict) else r[0])
+                        for r in (cur.fetchall() or [])
+                    ]
 
             # 批插
             for cid in valid_ids:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO client_assignments (user_id, client_id, assigned_by)
                     VALUES (%s, %s, %s)
                     ON CONFLICT (user_id, client_id) DO NOTHING
-                """, (str(employee_user_id), cid, str(assigned_by)))
+                """,
+                    (str(employee_user_id), cid, str(assigned_by)),
+                )
             return True
     except Exception as e:
         logger.error(f"set_employee_assignments failed: {e}")
@@ -5933,11 +6909,14 @@ def auto_assign_client_to_creator(creator_user_id: str, client_id: int) -> bool:
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO client_assignments (user_id, client_id, assigned_by)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (user_id, client_id) DO NOTHING
-            """, (str(creator_user_id), int(client_id), str(creator_user_id)))
+            """,
+                (str(creator_user_id), int(client_id), str(creator_user_id)),
+            )
         return True
     except Exception as e:
         logger.error(f"auto_assign_client_to_creator failed: {e}")
@@ -5953,11 +6932,14 @@ def get_user_tenant_id(user_id: str) -> Optional[str]:
     try:
         with get_cursor() as cur:
             # 优先读 memberships(新模型)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT tenant_id FROM memberships
                 WHERE user_id = %s AND status = 'active'
                 LIMIT 1
-            """, (str(user_id),))
+            """,
+                (str(user_id),),
+            )
             r = cur.fetchone()
             if r and r.get("tenant_id"):
                 return str(r["tenant_id"])
@@ -6040,37 +7022,48 @@ def migrate_to_membership_model(dry_run: bool = True) -> Dict[str, Any]:
                 if new_role_name not in role_map:
                     missing_set.add(new_role_name)
                     continue
-                eligible_rows.append({
-                    "user_id": str(r["id"]),
-                    "username": r.get("username"),
-                    "tenant_id": str(r["tenant_id"]),
-                    "role": new_role_name,
-                    "role_id": role_map[new_role_name],
-                })
+                eligible_rows.append(
+                    {
+                        "user_id": str(r["id"]),
+                        "username": r.get("username"),
+                        "tenant_id": str(r["tenant_id"]),
+                        "role": new_role_name,
+                        "role_id": role_map[new_role_name],
+                    }
+                )
 
             out["eligible"] = len(eligible_rows)
             out["role_distribution"] = role_count
             out["missing_role"] = sorted(missing_set)
             out["sample_inserts"] = [
-                {"user_id": e["user_id"], "username": e["username"],
-                 "tenant_id": e["tenant_id"], "role": e["role"]}
+                {
+                    "user_id": e["user_id"],
+                    "username": e["username"],
+                    "tenant_id": e["tenant_id"],
+                    "role": e["role"],
+                }
                 for e in eligible_rows[:5]
             ]
 
             if dry_run:
                 out["ok"] = True
-                logger.info(f"[v27.7 migration] DRY-RUN · scanned={out['scanned']} eligible={out['eligible']} already={out['already_migrated']}")
+                logger.info(
+                    f"[v27.7 migration] DRY-RUN · scanned={out['scanned']} eligible={out['eligible']} already={out['already_migrated']}"
+                )
                 return out
 
             # 真执行 · 逐条插入(批量插入风险大 · 单条可继续)
             inserted = 0
             for e in eligible_rows:
                 try:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         INSERT INTO memberships (user_id, tenant_id, role_id, status)
                         VALUES (%s, %s, %s, 'active')
                         ON CONFLICT (user_id) DO NOTHING
-                    """, (e["user_id"], e["tenant_id"], e["role_id"]))
+                    """,
+                        (e["user_id"], e["tenant_id"], e["role_id"]),
+                    )
                     if cur.rowcount > 0:
                         inserted += 1
                 except Exception as e_one:
@@ -6078,7 +7071,9 @@ def migrate_to_membership_model(dry_run: bool = True) -> Dict[str, Any]:
 
             out["inserted"] = inserted
             out["ok"] = True
-            logger.info(f"[v27.7 migration] EXECUTED · inserted={inserted}/{len(eligible_rows)} errors={len(out['errors'])}")
+            logger.info(
+                f"[v27.7 migration] EXECUTED · inserted={inserted}/{len(eligible_rows)} errors={len(out['errors'])}"
+            )
             return out
     except Exception as e:
         logger.error(f"migrate_to_membership_model failed (dry_run={dry_run}): {e}")
@@ -6092,6 +7087,7 @@ def migrate_to_membership_model(dry_run: bool = True) -> Dict[str, Any]:
 #   - 完整继承 user.plan / monthly_quota / expires(防付费用户掉级)
 #   - 单用户独立事务 · 一个失败不影响其他
 # ============================================================
+
 
 def list_orphan_users() -> List[Dict[str, Any]]:
     """列出所有 tenant_id IS NULL 的用户(过滤超管)+ 每个用户的数据量统计
@@ -6116,25 +7112,33 @@ def list_orphan_users() -> List[Dict[str, Any]]:
             rows = cur.fetchall() or []
             out = []
             for r in rows:
-                out.append({
-                    "user_id": str(r["id"]),
-                    "username": r.get("username"),
-                    "email": r.get("email"),
-                    "full_name": r.get("full_name"),
-                    "company_name": r.get("company_name"),
-                    "plan": r.get("plan") or "free",
-                    "monthly_quota": int(r.get("monthly_quota") or 0),
-                    "used_this_month": int(r.get("used_this_month") or 0),
-                    "role": r.get("role"),
-                    "country": r.get("signup_country"),
-                    "trial_expires_at": r["trial_expires_at"].isoformat() if r.get("trial_expires_at") else None,
-                    "plan_expires_at": r["plan_expires_at"].isoformat() if r.get("plan_expires_at") else None,
-                    "last_login_at": r["last_login_at"].isoformat() if r.get("last_login_at") else None,
-                    "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
-                    "ocr_count": int(r.get("ocr_count") or 0),
-                    "client_count": int(r.get("client_count") or 0),
-                    "erp_count": int(r.get("erp_count") or 0),
-                })
+                out.append(
+                    {
+                        "user_id": str(r["id"]),
+                        "username": r.get("username"),
+                        "email": r.get("email"),
+                        "full_name": r.get("full_name"),
+                        "company_name": r.get("company_name"),
+                        "plan": r.get("plan") or "free",
+                        "monthly_quota": int(r.get("monthly_quota") or 0),
+                        "used_this_month": int(r.get("used_this_month") or 0),
+                        "role": r.get("role"),
+                        "country": r.get("signup_country"),
+                        "trial_expires_at": (
+                            r["trial_expires_at"].isoformat() if r.get("trial_expires_at") else None
+                        ),
+                        "plan_expires_at": (
+                            r["plan_expires_at"].isoformat() if r.get("plan_expires_at") else None
+                        ),
+                        "last_login_at": (
+                            r["last_login_at"].isoformat() if r.get("last_login_at") else None
+                        ),
+                        "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+                        "ocr_count": int(r.get("ocr_count") or 0),
+                        "client_count": int(r.get("client_count") or 0),
+                        "erp_count": int(r.get("erp_count") or 0),
+                    }
+                )
             return out
     except Exception as e:
         logger.error(f"list_orphan_users failed: {e}")
@@ -6169,7 +7173,12 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
             cur.execute("SELECT id FROM roles WHERE name = 'owner' AND is_system = TRUE LIMIT 1")
             r = cur.fetchone()
             if not r:
-                out["errors"].append({"user_id": None, "msg": "owner_role_not_found · run ensure_membership_tables() first"})
+                out["errors"].append(
+                    {
+                        "user_id": None,
+                        "msg": "owner_role_not_found · run ensure_membership_tables() first",
+                    }
+                )
                 return out
             owner_role_id = str(r["id"])
 
@@ -6203,7 +7212,9 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
 
         if dry_run:
             out["ok"] = True
-            logger.info(f"[v27.7.1 fix_orphan] DRY-RUN · scanned={out['scanned']} plans={len(out['plan'])}")
+            logger.info(
+                f"[v27.7.1 fix_orphan] DRY-RUN · scanned={out['scanned']} plans={len(out['plan'])}"
+            )
             return out
 
         # 真执行 · 每个用户独立事务
@@ -6212,7 +7223,8 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
                 with get_cursor(commit=True) as cur:
                     # 1. 建 tenant · v27.7.2 修:tenants 表只有 subscription_expires_at · 没有 trial_expires_at
                     # 用户的 trial / plan 到期都收敛到 tenant.subscription_expires_at(优先 plan_expires_at)
-                    cur.execute("""
+                    cur.execute(
+                        """
                         INSERT INTO tenants (
                             name, owner_user_id, tenant_type, monthly_quota,
                             used_this_month, status, member_count,
@@ -6221,44 +7233,59 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
                         VALUES (%s, %s, 'shared_api', %s, 0, 'active', 1,
                                 'firm', %s)
                         RETURNING id
-                    """, (
-                        p["tenant_name_to_create"],
-                        p["user_id"],
-                        p["quota_inherit"],
-                        p.get("plan_expires_at") or p.get("trial_expires_at"),
-                    ))
+                    """,
+                        (
+                            p["tenant_name_to_create"],
+                            p["user_id"],
+                            p["quota_inherit"],
+                            p.get("plan_expires_at") or p.get("trial_expires_at"),
+                        ),
+                    )
                     new_tenant_id = str(cur.fetchone()["id"])
 
                     # 2. UPDATE user.tenant_id + role(竞态保护:tenant_id 必须仍是 NULL)
-                    cur.execute("""
+                    cur.execute(
+                        """
                         UPDATE users SET tenant_id = %s, role = COALESCE(role, 'owner')
                         WHERE id = %s AND tenant_id IS NULL
-                    """, (new_tenant_id, p["user_id"]))
+                    """,
+                        (new_tenant_id, p["user_id"]),
+                    )
                     if cur.rowcount == 0:
                         # 用户在我们处理过程中被别的流程绑了 tenant · 删掉刚建的孤儿 tenant · 跳过
                         cur.execute("DELETE FROM tenants WHERE id = %s", (new_tenant_id,))
-                        out["errors"].append({"user_id": p["user_id"], "msg": "user_already_has_tenant_skip"})
+                        out["errors"].append(
+                            {"user_id": p["user_id"], "msg": "user_already_has_tenant_skip"}
+                        )
                         continue
 
                     # 3. 写 membership
-                    cur.execute("""
+                    cur.execute(
+                        """
                         INSERT INTO memberships (user_id, tenant_id, role_id, status)
                         VALUES (%s, %s, %s, 'active')
                         ON CONFLICT (user_id) DO NOTHING
-                    """, (p["user_id"], new_tenant_id, owner_role_id))
+                    """,
+                        (p["user_id"], new_tenant_id, owner_role_id),
+                    )
 
                     out["executed"] += 1
                     p["new_tenant_id"] = new_tenant_id
-                    logger.info(f"[v27.7.1 fix_orphan] +tenant {new_tenant_id[:8]}.. for user {p.get('username')!r} email={p.get('email')!r}")
+                    logger.info(
+                        f"[v27.7.1 fix_orphan] +tenant {new_tenant_id[:8]}.. for user {p.get('username')!r} email={p.get('email')!r}"
+                    )
             except Exception as e_one:
                 logger.error(f"[v27.7.1 fix_orphan] user_id={p['user_id']} failed: {e_one}")
                 out["errors"].append({"user_id": p["user_id"], "msg": str(e_one)[:200]})
 
         out["ok"] = True
-        logger.info(f"[v27.7.1 fix_orphan] EXECUTED · executed={out['executed']}/{len(out['plan'])} errors={len(out['errors'])}")
+        logger.info(
+            f"[v27.7.1 fix_orphan] EXECUTED · executed={out['executed']}/{len(out['plan'])} errors={len(out['errors'])}"
+        )
         return out
     except Exception as e:
         import traceback
+
         logger.error(f"fix_orphan_users failed (dry_run={dry_run}): {e}\n{traceback.format_exc()}")
         out["errors"].append({"user_id": None, "msg": str(e)[:300]})
         return out
@@ -6271,6 +7298,7 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
 #   - run_rls_isolation_tests · 临时启用 clients 表 RLS 跑 5 条穿透测试 · 测完关
 #   - 不改任何现有 db 函数 · 现有代码继续工作 · v27.8.1 才永久启用
 # ============================================================
+
 
 def _is_rls_enabled() -> bool:
     """RLS 总开关 · ENABLE_RLS 环境变量 · 默认关"""
@@ -6367,10 +7395,18 @@ def run_rls_isolation_tests() -> Dict[str, Any]:
             return out
         out["preflight"] = {
             "ok": True,
-            "tenant_a": {"id": str(samples[0]["tenant_id"]), "name": samples[0].get("tenant_name"),
-                          "client_id": int(samples[0]["client_id"]), "client_name": samples[0].get("client_name")},
-            "tenant_b": {"id": str(samples[1]["tenant_id"]), "name": samples[1].get("tenant_name"),
-                          "client_id": int(samples[1]["client_id"]), "client_name": samples[1].get("client_name")},
+            "tenant_a": {
+                "id": str(samples[0]["tenant_id"]),
+                "name": samples[0].get("tenant_name"),
+                "client_id": int(samples[0]["client_id"]),
+                "client_name": samples[0].get("client_name"),
+            },
+            "tenant_b": {
+                "id": str(samples[1]["tenant_id"]),
+                "name": samples[1].get("tenant_name"),
+                "client_id": int(samples[1]["client_id"]),
+                "client_name": samples[1].get("client_name"),
+            },
         }
         tenant_a_id = str(samples[0]["tenant_id"])
         tenant_b_id = str(samples[1]["tenant_id"])
@@ -6481,8 +7517,9 @@ def run_rls_isolation_tests() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"run_rls_isolation_tests fatal: {e}")
-        out["tests"].append({"name": "fatal", "ok": False,
-                              "expected": "test 框架正常", "actual": str(e)[:300]})
+        out["tests"].append(
+            {"name": "fatal", "ok": False, "expected": "test 框架正常", "actual": str(e)[:300]}
+        )
         out["failed"] += 1
     finally:
         # 永远关 RLS(无论测试结果) · 恢复测前状态
@@ -6493,7 +7530,9 @@ def run_rls_isolation_tests() -> Dict[str, Any]:
                     cur.execute("ALTER TABLE clients DISABLE ROW LEVEL SECURITY;")
                 logger.info("[v27.8.0 rls_test] 测试完成 · 已关 clients RLS · 恢复测前状态")
             except Exception as e:
-                logger.error(f"[v27.8.0 rls_test] 关 RLS 失败 · 需手动:ALTER TABLE clients DISABLE ROW LEVEL SECURITY; · 错误: {e}")
+                logger.error(
+                    f"[v27.8.0 rls_test] 关 RLS 失败 · 需手动:ALTER TABLE clients DISABLE ROW LEVEL SECURITY; · 错误: {e}"
+                )
                 out["cleanup_error"] = str(e)[:200]
 
     out["rls_state_after"] = get_clients_rls_status()
@@ -6508,6 +7547,7 @@ def run_rls_isolation_tests() -> Dict[str, Any]:
 #   - 影响:clients / ocr_cost_log / supplier_categories / exceptions / 等等
 #   - 不论 RLS 启不启用 · 这个 bug 都该修(否则跨 tenant 统计可能不准)
 # ============================================================
+
 
 def backfill_tenant_ids(dry_run: bool = True) -> Dict[str, Any]:
     """自动扫所有有 user_id + tenant_id 双列的表 · 把 tenant_id 按 user 回填
@@ -6571,10 +7611,13 @@ def backfill_tenant_ids(dry_run: bool = True) -> Dict[str, Any]:
         if dry_run:
             logger.info(f"[v27.8.1 backfill] DRY-RUN · scanned {len(tables)} tables")
         else:
-            logger.info(f"[v27.8.1 backfill] EXECUTED · total updated={out['total_updated']} errors={len(out['errors'])}")
+            logger.info(
+                f"[v27.8.1 backfill] EXECUTED · total updated={out['total_updated']} errors={len(out['errors'])}"
+            )
         return out
     except Exception as e:
         import traceback
+
         logger.error(f"backfill_tenant_ids fatal: {e}\n{traceback.format_exc()}")
         out["errors"].append({"table": None, "msg": str(e)[:300]})
         return out
@@ -6592,8 +7635,12 @@ def backfill_tenant_ids(dry_run: bool = True) -> Dict[str, Any]:
 
 ERP_TYPES_VALID = {"flowaccount", "peak", "xero", "quickbooks", "express", "mrerp"}
 PEARNLY_TAX_KINDS_VALID = {
-    "vat_7", "vat_0", "vat_exempt",
-    "wht_1", "wht_3", "wht_5",
+    "vat_7",
+    "vat_0",
+    "vat_exempt",
+    "wht_1",
+    "wht_3",
+    "wht_5",
     "non_vat",
 }
 
@@ -6728,14 +7775,18 @@ def upsert_erp_client_mapping(tenant_id, client_id, erp_type, erp_code, notes, u
     try:
         with get_cursor(commit=True) as cur:
             # 校验 client 属于 tenant
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT 1 FROM clients c
                 JOIN users u ON u.id = c.user_id
                 WHERE c.id = %s AND u.tenant_id = %s
-            """, (int(client_id), str(tenant_id)))
+            """,
+                (int(client_id), str(tenant_id)),
+            )
             if not cur.fetchone():
                 return None
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO erp_client_mappings
                     (tenant_id, client_id, erp_type, erp_code, notes, created_by)
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -6745,10 +7796,16 @@ def upsert_erp_client_mapping(tenant_id, client_id, erp_type, erp_code, notes, u
                     notes = EXCLUDED.notes,
                     updated_at = NOW()
                 RETURNING id
-            """, (
-                str(tenant_id), int(client_id), erp_type, erp_code,
-                notes_clean, str(user_id) if user_id else None,
-            ))
+            """,
+                (
+                    str(tenant_id),
+                    int(client_id),
+                    erp_type,
+                    erp_code,
+                    notes_clean,
+                    str(user_id) if user_id else None,
+                ),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -6763,7 +7820,7 @@ def delete_erp_client_mapping(tenant_id, mapping_id):
         with get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_client_mappings WHERE id = %s AND tenant_id = %s",
-                (str(mapping_id), str(tenant_id))
+                (str(mapping_id), str(tenant_id)),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -6777,20 +7834,25 @@ def list_erp_account_mappings(tenant_id):
         return []
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, tenant_id, erp_type, pearnly_category, erp_code,
                        erp_name, notes, created_at, updated_at
                 FROM erp_account_mappings
                 WHERE tenant_id = %s
                 ORDER BY erp_type ASC, pearnly_category ASC
-            """, (str(tenant_id),))
+            """,
+                (str(tenant_id),),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_erp_account_mappings failed: {e}")
         return []
 
 
-def upsert_erp_account_mapping(tenant_id, erp_type, pearnly_category, erp_code, erp_name, notes, user_id):
+def upsert_erp_account_mapping(
+    tenant_id, erp_type, pearnly_category, erp_code, erp_name, notes, user_id
+):
     if not tenant_id or not erp_type or not pearnly_category or not erp_code:
         return None
     erp_type = (erp_type or "").strip().lower()
@@ -6804,7 +7866,8 @@ def upsert_erp_account_mapping(tenant_id, erp_type, pearnly_category, erp_code, 
     notes_clean = (notes or "").strip()[:500]
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO erp_account_mappings
                     (tenant_id, erp_type, pearnly_category, erp_code, erp_name, notes, created_by)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -6815,10 +7878,17 @@ def upsert_erp_account_mapping(tenant_id, erp_type, pearnly_category, erp_code, 
                     notes = EXCLUDED.notes,
                     updated_at = NOW()
                 RETURNING id
-            """, (
-                str(tenant_id), erp_type, cat, code, name_clean, notes_clean,
-                str(user_id) if user_id else None,
-            ))
+            """,
+                (
+                    str(tenant_id),
+                    erp_type,
+                    cat,
+                    code,
+                    name_clean,
+                    notes_clean,
+                    str(user_id) if user_id else None,
+                ),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -6833,7 +7903,7 @@ def delete_erp_account_mapping(tenant_id, mapping_id):
         with get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_account_mappings WHERE id = %s AND tenant_id = %s",
-                (str(mapping_id), str(tenant_id))
+                (str(mapping_id), str(tenant_id)),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -6847,13 +7917,16 @@ def list_erp_tax_mappings(tenant_id):
         return []
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, tenant_id, erp_type, pearnly_tax_kind, erp_code,
                        notes, created_at, updated_at
                 FROM erp_tax_mappings
                 WHERE tenant_id = %s
                 ORDER BY erp_type ASC, pearnly_tax_kind ASC
-            """, (str(tenant_id),))
+            """,
+                (str(tenant_id),),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_erp_tax_mappings failed: {e}")
@@ -6875,7 +7948,8 @@ def upsert_erp_tax_mapping(tenant_id, erp_type, pearnly_tax_kind, erp_code, note
     notes_clean = (notes or "").strip()[:500]
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO erp_tax_mappings
                     (tenant_id, erp_type, pearnly_tax_kind, erp_code, notes, created_by)
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -6885,10 +7959,16 @@ def upsert_erp_tax_mapping(tenant_id, erp_type, pearnly_tax_kind, erp_code, note
                     notes = EXCLUDED.notes,
                     updated_at = NOW()
                 RETURNING id
-            """, (
-                str(tenant_id), erp_type, kind, code, notes_clean,
-                str(user_id) if user_id else None,
-            ))
+            """,
+                (
+                    str(tenant_id),
+                    erp_type,
+                    kind,
+                    code,
+                    notes_clean,
+                    str(user_id) if user_id else None,
+                ),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -6903,7 +7983,7 @@ def delete_erp_tax_mapping(tenant_id, mapping_id):
         with get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_tax_mappings WHERE id = %s AND tenant_id = %s",
-                (str(mapping_id), str(tenant_id))
+                (str(mapping_id), str(tenant_id)),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -6919,7 +7999,8 @@ def _product_name_norm_for_db(s):
     if not s:
         return ""
     import re as _re
-    out = _re.sub(r"[\s\.,\-_/\\()&\"'`*]+", '', str(s))
+
+    out = _re.sub(r"[\s\.,\-_/\\()&\"'`*]+", "", str(s))
     return out.lower().strip()[:256]
 
 
@@ -6930,21 +8011,27 @@ def list_erp_product_mappings(tenant_id, erp_type=None):
     try:
         with get_cursor() as cur:
             if erp_type:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, tenant_id, erp_type, item_name, erp_code, erp_name, notes,
                            created_by, created_at, updated_at
                     FROM erp_product_mappings
                     WHERE tenant_id = %s AND erp_type = %s
                     ORDER BY created_at DESC
-                """, (str(tenant_id), erp_type.strip().lower()))
+                """,
+                    (str(tenant_id), erp_type.strip().lower()),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, tenant_id, erp_type, item_name, erp_code, erp_name, notes,
                            created_by, created_at, updated_at
                     FROM erp_product_mappings
                     WHERE tenant_id = %s
                     ORDER BY erp_type, created_at DESC
-                """, (str(tenant_id),))
+                """,
+                    (str(tenant_id),),
+                )
             return cur.fetchall() or []
     except Exception as e:
         logger.error(f"list_erp_product_mappings failed: {e}")
@@ -6969,7 +8056,8 @@ def upsert_erp_product_mapping(tenant_id, erp_type, item_name, erp_code, erp_nam
     notes_clean = (notes or "").strip()[:500]
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO erp_product_mappings
                     (tenant_id, erp_type, item_name, item_name_norm, erp_code, erp_name, notes, created_by)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -6981,10 +8069,18 @@ def upsert_erp_product_mapping(tenant_id, erp_type, item_name, erp_code, erp_nam
                     notes = EXCLUDED.notes,
                     updated_at = NOW()
                 RETURNING id
-            """, (
-                str(tenant_id), erp_type, item_name, item_name_norm, erp_code_clean,
-                erp_name_clean, notes_clean, str(user_id) if user_id else None,
-            ))
+            """,
+                (
+                    str(tenant_id),
+                    erp_type,
+                    item_name,
+                    item_name_norm,
+                    erp_code_clean,
+                    erp_name_clean,
+                    notes_clean,
+                    str(user_id) if user_id else None,
+                ),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -6999,7 +8095,7 @@ def delete_erp_product_mapping(tenant_id, mapping_id):
         with get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_product_mappings WHERE id = %s AND tenant_id = %s",
-                (str(mapping_id), str(tenant_id))
+                (str(mapping_id), str(tenant_id)),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -7023,11 +8119,14 @@ def find_erp_product_mappings_batch(tenant_id, erp_type, item_names):
         return {}
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT item_name, item_name_norm, erp_code, erp_name
                 FROM erp_product_mappings
                 WHERE tenant_id = %s AND erp_type = %s AND item_name_norm = ANY(%s)
-            """, (str(tenant_id), erp_type, norms))
+            """,
+                (str(tenant_id), erp_type, norms),
+            )
             rows = cur.fetchall() or []
             out = {}
             for r in rows:
@@ -7047,17 +8146,17 @@ def get_mrerp_mappings_bundle(tenant_id):
     供推送引擎(Xero 等)使用
     """
     if not tenant_id:
-        return {'clients': [], 'accounts': [], 'taxes': [], 'products': []}
+        return {"clients": [], "accounts": [], "taxes": [], "products": []}
     try:
         return {
-            'clients':  list_erp_client_mappings(tenant_id, restrict_client_ids=None),
-            'accounts': list_erp_account_mappings(tenant_id),
-            'taxes':    list_erp_tax_mappings(tenant_id),
-            'products': list_erp_product_mappings(tenant_id),
+            "clients": list_erp_client_mappings(tenant_id, restrict_client_ids=None),
+            "accounts": list_erp_account_mappings(tenant_id),
+            "taxes": list_erp_tax_mappings(tenant_id),
+            "products": list_erp_product_mappings(tenant_id),
         }
     except Exception as e:
         logger.error(f"get_mrerp_mappings_bundle failed: {e}")
-        return {'clients': [], 'accounts': [], 'taxes': [], 'products': []}
+        return {"clients": [], "accounts": [], "taxes": [], "products": []}
 
 
 # ============================================================
@@ -7068,6 +8167,7 @@ def get_mrerp_mappings_bundle(tenant_id):
 #   - 但有 1 个 is_default 行 · 用于推送时拿默认
 #   - token_version=1 → base64 编码 · 升 AES 时改 2(P1 安全债务)
 # ============================================================
+
 
 def ensure_erp_oauth_tables():
     """v118.27.4 · OAuth token 表 + state 临时表 · 启动时幂等建
@@ -7111,7 +8211,9 @@ def ensure_erp_oauth_tables():
                 );
                 CREATE INDEX IF NOT EXISTS idx_oauth_states_created ON erp_oauth_states(created_at);
             """)
-            logger.info("✅ v118.27.4 · erp_oauth_tokens / erp_oauth_states 表已就绪(含 v27.8.1.3 auto_push)")
+            logger.info(
+                "✅ v118.27.4 · erp_oauth_tokens / erp_oauth_states 表已就绪(含 v27.8.1.3 auto_push)"
+            )
     except Exception as e:
         logger.error(f"ensure_erp_oauth_tables failed: {e}")
 
@@ -7122,10 +8224,13 @@ def set_xero_auto_push(tenant_id: str, on: bool) -> bool:
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE erp_oauth_tokens SET auto_push = %s, updated_at = NOW()
                 WHERE tenant_id = %s AND erp_type = 'xero'
-            """, (bool(on), tenant_id))
+            """,
+                (bool(on), tenant_id),
+            )
         return True
     except Exception as e:
         logger.error(f"set_xero_auto_push failed: {e}")
@@ -7138,10 +8243,13 @@ def get_xero_auto_push(tenant_id: str) -> bool:
         return False
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT 1 FROM erp_oauth_tokens
                 WHERE tenant_id = %s AND erp_type = 'xero' AND auto_push = TRUE LIMIT 1
-            """, (tenant_id,))
+            """,
+                (tenant_id,),
+            )
             return cur.fetchone() is not None
     except Exception:
         return False
@@ -7162,16 +8270,16 @@ def list_tenants_xero_auto_push_on() -> list:
         return []
 
 
-
-
 def _b64_encode(s: str) -> str:
     """v118.27.4 · token_version=1 · base64 编码(P1 升 AES)"""
     import base64
+
     return base64.b64encode((s or "").encode("utf-8")).decode("ascii")
 
 
 def _b64_decode(s: str) -> str:
     import base64
+
     try:
         return base64.b64decode((s or "").encode("ascii")).decode("utf-8")
     except Exception:
@@ -7185,8 +8293,11 @@ def save_oauth_state(state, tenant_id, user_id, erp_type):
     try:
         with get_cursor(commit=True) as cur:
             # 顺手清掉 5 分钟前的 state(轻量 GC)
-            cur.execute("DELETE FROM erp_oauth_states WHERE created_at < NOW() - INTERVAL '5 minutes'")
-            cur.execute("""
+            cur.execute(
+                "DELETE FROM erp_oauth_states WHERE created_at < NOW() - INTERVAL '5 minutes'"
+            )
+            cur.execute(
+                """
                 INSERT INTO erp_oauth_states (state, tenant_id, user_id, erp_type)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (state) DO UPDATE SET
@@ -7194,7 +8305,9 @@ def save_oauth_state(state, tenant_id, user_id, erp_type):
                     user_id = EXCLUDED.user_id,
                     erp_type = EXCLUDED.erp_type,
                     created_at = NOW()
-            """, (str(state), str(tenant_id), str(user_id), str(erp_type)))
+            """,
+                (str(state), str(tenant_id), str(user_id), str(erp_type)),
+            )
             return True
     except Exception as e:
         logger.error(f"save_oauth_state failed: {e}")
@@ -7207,31 +8320,49 @@ def consume_oauth_state(state):
         return None
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM erp_oauth_states
                 WHERE state = %s AND created_at >= NOW() - INTERVAL '5 minutes'
                 RETURNING tenant_id, user_id, erp_type
-            """, (str(state),))
+            """,
+                (str(state),),
+            )
             row = cur.fetchone()
             if not row:
                 return None
             return {
-                'tenant_id': str(row['tenant_id']),
-                'user_id':   str(row['user_id']),
-                'erp_type':  str(row['erp_type']),
+                "tenant_id": str(row["tenant_id"]),
+                "user_id": str(row["user_id"]),
+                "erp_type": str(row["erp_type"]),
             }
     except Exception as e:
         logger.error(f"consume_oauth_state failed: {e}")
         return None
 
 
-def upsert_oauth_token(tenant_id, erp_type, organisation_id, organisation_name,
-                       access_token, refresh_token, expires_at, scope,
-                       is_default, user_id):
+def upsert_oauth_token(
+    tenant_id,
+    erp_type,
+    organisation_id,
+    organisation_name,
+    access_token,
+    refresh_token,
+    expires_at,
+    scope,
+    is_default,
+    user_id,
+):
     """存/更新 OAuth token · 同 (tenant, erp, org) 覆盖
     expires_at: datetime aware 或 ISO 字符串
     """
-    if not tenant_id or not erp_type or not organisation_id or not access_token or not refresh_token:
+    if (
+        not tenant_id
+        or not erp_type
+        or not organisation_id
+        or not access_token
+        or not refresh_token
+    ):
         return None
     try:
         with get_cursor(commit=True) as cur:
@@ -7241,7 +8372,8 @@ def upsert_oauth_token(tenant_id, erp_type, organisation_id, organisation_name,
                     "UPDATE erp_oauth_tokens SET is_default = FALSE WHERE tenant_id = %s AND erp_type = %s",
                     (str(tenant_id), str(erp_type)),
                 )
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO erp_oauth_tokens
                     (tenant_id, erp_type, organisation_id, organisation_name,
                      access_token, refresh_token, expires_at, scope,
@@ -7257,18 +8389,22 @@ def upsert_oauth_token(tenant_id, erp_type, organisation_id, organisation_name,
                     is_default = EXCLUDED.is_default,
                     updated_at = NOW()
                 RETURNING id
-            """, (
-                str(tenant_id), str(erp_type), str(organisation_id),
-                (organisation_name or "")[:200],
-                _b64_encode(access_token),
-                _b64_encode(refresh_token),
-                expires_at,
-                (scope or "")[:500],
-                bool(is_default),
-                str(user_id) if user_id else None,
-            ))
+            """,
+                (
+                    str(tenant_id),
+                    str(erp_type),
+                    str(organisation_id),
+                    (organisation_name or "")[:200],
+                    _b64_encode(access_token),
+                    _b64_encode(refresh_token),
+                    expires_at,
+                    (scope or "")[:500],
+                    bool(is_default),
+                    str(user_id) if user_id else None,
+                ),
+            )
             row = cur.fetchone()
-            return str(row['id']) if row else None
+            return str(row["id"]) if row else None
     except Exception as e:
         logger.error(f"upsert_oauth_token failed: {e}")
         return None
@@ -7280,7 +8416,8 @@ def get_default_oauth_token(tenant_id, erp_type):
         return None
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, organisation_id, organisation_name,
                        access_token, refresh_token, expires_at, scope, is_default,
                        token_version, updated_at
@@ -7288,13 +8425,15 @@ def get_default_oauth_token(tenant_id, erp_type):
                 WHERE tenant_id = %s AND erp_type = %s
                 ORDER BY is_default DESC, updated_at DESC
                 LIMIT 1
-            """, (str(tenant_id), str(erp_type)))
+            """,
+                (str(tenant_id), str(erp_type)),
+            )
             row = cur.fetchone()
             if not row:
                 return None
             d = dict(row)
-            d['access_token']  = _b64_decode(d['access_token'])
-            d['refresh_token'] = _b64_decode(d['refresh_token'])
+            d["access_token"] = _b64_decode(d["access_token"])
+            d["refresh_token"] = _b64_decode(d["refresh_token"])
             return d
     except Exception as e:
         logger.error(f"get_default_oauth_token failed: {e}")
@@ -7307,13 +8446,16 @@ def list_oauth_tokens(tenant_id, erp_type):
         return []
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, organisation_id, organisation_name, expires_at,
                        is_default, scope, updated_at
                 FROM erp_oauth_tokens
                 WHERE tenant_id = %s AND erp_type = %s
                 ORDER BY is_default DESC, organisation_name ASC
-            """, (str(tenant_id), str(erp_type)))
+            """,
+                (str(tenant_id), str(erp_type)),
+            )
             return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.error(f"list_oauth_tokens failed: {e}")
@@ -7326,19 +8468,22 @@ def update_oauth_access_token(token_id, access_token, refresh_token, expires_at)
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE erp_oauth_tokens
                 SET access_token = %s,
                     refresh_token = %s,
                     expires_at = %s,
                     updated_at = NOW()
                 WHERE id = %s
-            """, (
-                _b64_encode(access_token),
-                _b64_encode(refresh_token),
-                expires_at,
-                str(token_id),
-            ))
+            """,
+                (
+                    _b64_encode(access_token),
+                    _b64_encode(refresh_token),
+                    expires_at,
+                    str(token_id),
+                ),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"update_oauth_access_token failed: {e}")
@@ -7395,6 +8540,7 @@ def set_default_oauth_token(tenant_id, erp_type, token_id):
 #   - 唯一约束:同 client × period 只允许 1 个非 failed 任务
 #   - reconciliation_row ON DELETE CASCADE 跟随 task 删除
 # ============================================================
+
 
 def ensure_vat_recon_tables():
     """v118.32.0 · 销项税对账 3 张表 · 启动时幂等建"""
@@ -7488,20 +8634,32 @@ def ensure_vat_recon_tables():
                     ON reconciliation_row(invoice_id) WHERE invoice_id IS NOT NULL;
             """)
 
-            logger.info("✅ vat_report + reconciliation_task + reconciliation_row 已就绪 (v118.32.0)")
+            logger.info(
+                "✅ vat_report + reconciliation_task + reconciliation_row 已就绪 (v118.32.0)"
+            )
     except Exception as e:
         logger.error(f"ensure_vat_recon_tables failed: {e}")
 
 
 # ── CRUD · vat_report ──────────────────────────────────────
 
-def create_vat_report(tenant_id, client_id: int, period_year: int, period_month: int,
-                      parsed_rows: list, meta: dict,
-                      source_filename: str = "", parser_version: str = "") -> Optional[int]:
+
+def create_vat_report(
+    tenant_id,
+    client_id: int,
+    period_year: int,
+    period_month: int,
+    parsed_rows: list,
+    meta: dict,
+    source_filename: str = "",
+    parser_version: str = "",
+) -> Optional[int]:
     import json as _j
+
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO vat_report (
                     tenant_id, client_id, period_year, period_month,
                     source_file_ids, parsed_rows,
@@ -7513,16 +8671,20 @@ def create_vat_report(tenant_id, client_id: int, period_year: int, period_month:
                     %s, %s, %s,
                     %s
                 ) RETURNING id
-            """, (
-                str(tenant_id) if tenant_id else None,
-                client_id, period_year, period_month,
-                _j.dumps([source_filename], ensure_ascii=False),
-                _j.dumps(parsed_rows, ensure_ascii=False, default=str),
-                meta.get("total_amount_pre_vat"),
-                meta.get("total_vat"),
-                meta.get("total_amount"),
-                parser_version,
-            ))
+            """,
+                (
+                    str(tenant_id) if tenant_id else None,
+                    client_id,
+                    period_year,
+                    period_month,
+                    _j.dumps([source_filename], ensure_ascii=False),
+                    _j.dumps(parsed_rows, ensure_ascii=False, default=str),
+                    meta.get("total_amount_pre_vat"),
+                    meta.get("total_vat"),
+                    meta.get("total_amount"),
+                    parser_version,
+                ),
+            )
             row = cur.fetchone()
             return int(row["id"]) if row else None
     except Exception as e:
@@ -7539,6 +8701,7 @@ def get_vat_report(report_id: int) -> Optional[Dict[str, Any]]:
                 return None
             r = dict(row)
             import json as _j
+
             if isinstance(r.get("parsed_rows"), str):
                 r["parsed_rows"] = _j.loads(r["parsed_rows"])
             return r
@@ -7549,22 +8712,30 @@ def get_vat_report(report_id: int) -> Optional[Dict[str, Any]]:
 
 # ── CRUD · reconciliation_task ─────────────────────────────
 
-def create_recon_task(tenant_id, user_id: str, client_id: int,
-                      period_year: int, period_month: int,
-                      vat_report_id: int) -> Optional[int]:
+
+def create_recon_task(
+    tenant_id, user_id: str, client_id: int, period_year: int, period_month: int, vat_report_id: int
+) -> Optional[int]:
     """创建对账任务 · 同 client+period 唯一约束失败时返回 None"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO reconciliation_task (
                     tenant_id, user_id, client_id,
                     period_year, period_month, vat_report_id
                 ) VALUES (%s, %s::uuid, %s, %s, %s, %s)
                 RETURNING id
-            """, (
-                str(tenant_id) if tenant_id else None,
-                user_id, client_id, period_year, period_month, vat_report_id,
-            ))
+            """,
+                (
+                    str(tenant_id) if tenant_id else None,
+                    user_id,
+                    client_id,
+                    period_year,
+                    period_month,
+                    vat_report_id,
+                ),
+            )
             row = cur.fetchone()
             return int(row["id"]) if row else None
     except Exception as e:
@@ -7586,8 +8757,9 @@ def get_recon_task(task_id: int) -> Optional[Dict[str, Any]]:
 def update_recon_task_status(task_id: int, status: str):
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("UPDATE reconciliation_task SET status = %s WHERE id = %s",
-                        (status, task_id))
+            cur.execute(
+                "UPDATE reconciliation_task SET status = %s WHERE id = %s", (status, task_id)
+            )
     except Exception as e:
         logger.error(f"update_recon_task_status failed: {e}")
 
@@ -7595,7 +8767,8 @@ def update_recon_task_status(task_id: int, status: str):
 def update_recon_task_completed(task_id: int, data: dict):
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE reconciliation_task SET
                     status                   = %s,
                     matched_count            = %s,
@@ -7606,40 +8779,49 @@ def update_recon_task_completed(task_id: int, data: dict):
                     report_row_count         = %s,
                     completed_at             = NOW()
                 WHERE id = %s
-            """, (
-                data.get("status", "completed"),
-                data.get("matched_count", 0),
-                data.get("mismatched_count", 0),
-                data.get("invoice_orphan_count", 0),
-                data.get("report_orphan_count", 0),
-                data.get("invoice_count_archived", 0),
-                data.get("report_row_count", 0),
-                task_id,
-            ))
+            """,
+                (
+                    data.get("status", "completed"),
+                    data.get("matched_count", 0),
+                    data.get("mismatched_count", 0),
+                    data.get("invoice_orphan_count", 0),
+                    data.get("report_orphan_count", 0),
+                    data.get("invoice_count_archived", 0),
+                    data.get("report_row_count", 0),
+                    task_id,
+                ),
+            )
     except Exception as e:
         logger.error(f"update_recon_task_completed failed: {e}")
 
 
-def list_recon_tasks(tenant_id=None, user_id: str = None,
-                     client_id: int = None) -> List[Dict[str, Any]]:
+def list_recon_tasks(
+    tenant_id=None, user_id: str = None, client_id: int = None
+) -> List[Dict[str, Any]]:
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT t.*, c.name AS client_name, c.color AS client_color
                     FROM reconciliation_task t
                     LEFT JOIN clients c ON c.id = t.client_id
                     WHERE t.tenant_id = %s::uuid
                     ORDER BY t.created_at DESC LIMIT 100
-                """, (str(tenant_id),))
+                """,
+                    (str(tenant_id),),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT t.*, c.name AS client_name, c.color AS client_color
                     FROM reconciliation_task t
                     LEFT JOIN clients c ON c.id = t.client_id
                     WHERE t.user_id = %s::uuid
                     ORDER BY t.created_at DESC LIMIT 100
-                """, (str(user_id),))
+                """,
+                    (str(user_id),),
+                )
             rows = cur.fetchall() or []
             return [dict(r) for r in rows]
     except Exception as e:
@@ -7649,28 +8831,33 @@ def list_recon_tasks(tenant_id=None, user_id: str = None,
 
 # ── CRUD · reconciliation_row ──────────────────────────────
 
+
 def bulk_insert_recon_rows(rows: List[Dict[str, Any]]):
     import json as _j
+
     if not rows:
         return
     try:
         with get_cursor(commit=True) as cur:
             for r in rows:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO reconciliation_row (
                         task_id, invoice_id, report_row_no,
                         pair_confidence, status,
                         diff_fields, diff_categories
                     ) VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s)
-                """, (
-                    r["task_id"],
-                    str(r["invoice_id"]) if r.get("invoice_id") else None,
-                    r.get("report_row_no"),
-                    r.get("pair_confidence"),
-                    r["status"],
-                    _j.dumps(r.get("diff_fields") or {}, ensure_ascii=False, default=str),
-                    r.get("diff_categories", ""),
-                ))
+                """,
+                    (
+                        r["task_id"],
+                        str(r["invoice_id"]) if r.get("invoice_id") else None,
+                        r.get("report_row_no"),
+                        r.get("pair_confidence"),
+                        r["status"],
+                        _j.dumps(r.get("diff_fields") or {}, ensure_ascii=False, default=str),
+                        r.get("diff_categories", ""),
+                    ),
+                )
     except Exception as e:
         logger.error(f"bulk_insert_recon_rows failed: {e}")
 
@@ -7678,7 +8865,8 @@ def bulk_insert_recon_rows(rows: List[Dict[str, Any]]):
 def list_recon_rows(task_id: int) -> List[Dict[str, Any]]:
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT r.*,
                        h.invoice_no, h.invoice_date, h.seller_name, h.total_amount,
                        h.filename AS invoice_filename
@@ -7686,7 +8874,9 @@ def list_recon_rows(task_id: int) -> List[Dict[str, Any]]:
                 LEFT JOIN ocr_history h ON h.id = r.invoice_id
                 WHERE r.task_id = %s
                 ORDER BY r.id
-            """, (task_id,))
+            """,
+                (task_id,),
+            )
             rows = cur.fetchall() or []
             return [dict(r) for r in rows]
     except Exception as e:
@@ -7696,10 +8886,14 @@ def list_recon_rows(task_id: int) -> List[Dict[str, Any]]:
 
 # ── 发票查询(供对账引擎使用)────────────────────────────────
 
-def list_invoices_for_recon(tenant_id=None, client_id: int = None,
-                            period_year: int = None,
-                            period_month: int = None,
-                            source_ref: str = None) -> List[Dict[str, Any]]:
+
+def list_invoices_for_recon(
+    tenant_id=None,
+    client_id: int = None,
+    period_year: int = None,
+    period_month: int = None,
+    source_ref: str = None,
+) -> List[Dict[str, Any]]:
     """
     拉取指定客户 × 纳税期间内已归档发票
     从 ocr_history 顶层字段 + pages[0].fields 提取买方信息
@@ -7731,13 +8925,18 @@ def list_invoices_for_recon(tenant_id=None, client_id: int = None,
                 )"""
                 params.extend([period_year, period_month])
             elif period_year:
-                base_where += " AND (h.invoice_date IS NULL OR EXTRACT(YEAR FROM h.invoice_date::date) = %s)"
+                base_where += (
+                    " AND (h.invoice_date IS NULL OR EXTRACT(YEAR FROM h.invoice_date::date) = %s)"
+                )
                 params.append(period_year)
             elif period_month:
-                base_where += " AND (h.invoice_date IS NULL OR EXTRACT(MONTH FROM h.invoice_date::date) = %s)"
+                base_where += (
+                    " AND (h.invoice_date IS NULL OR EXTRACT(MONTH FROM h.invoice_date::date) = %s)"
+                )
                 params.append(period_month)
 
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     h.id::text                                    AS id,
                     h.invoice_no,
@@ -7758,7 +8957,9 @@ def list_invoices_for_recon(tenant_id=None, client_id: int = None,
                   {base_where}
                 ORDER BY h.invoice_date, h.invoice_no
                 LIMIT 2000
-            """, params)
+            """,
+                params,
+            )
 
             rows = cur.fetchall() or []
             result = []
@@ -7782,6 +8983,7 @@ def list_invoices_for_recon(tenant_id=None, client_id: int = None,
 # ============================================================
 import json
 
+
 def find_client_by_tax_id(tenant_id, tax_id: str) -> Optional[Dict[str, Any]]:
     """按税号找客户 · 跨 tenant 隔离"""
     if not tax_id:
@@ -7789,11 +8991,14 @@ def find_client_by_tax_id(tenant_id, tax_id: str) -> Optional[Dict[str, Any]]:
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT * FROM clients
                     WHERE tax_id = %s AND tenant_id = %s::uuid
                     LIMIT 1
-                """, (tax_id, str(tenant_id)))
+                """,
+                    (tax_id, str(tenant_id)),
+                )
             else:
                 cur.execute("SELECT * FROM clients WHERE tax_id = %s LIMIT 1", (tax_id,))
             row = cur.fetchone()
@@ -7803,23 +9008,28 @@ def find_client_by_tax_id(tenant_id, tax_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def auto_create_client(user_id: str, tenant_id, tax_id: str, name: str,
-                       color: str = "#3b82f6") -> Optional[int]:
+def auto_create_client(
+    user_id: str, tenant_id, tax_id: str, name: str, color: str = "#3b82f6"
+) -> Optional[int]:
     """v118.32.x · 屏 B 遇到陌生税号自动建客户 · 名字从发票/报告 OCR 出来"""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO clients (
                     user_id, tenant_id, name, tax_id, color, is_active, notes
                 ) VALUES (%s::uuid, %s, %s, %s, %s, TRUE,
                           'v118.32.x · 自动创建 · 请确认信息')
                 RETURNING id
-            """, (
-                user_id,
-                str(tenant_id) if tenant_id else None,
-                (name or f"客户 {tax_id[:5]}")[:200],
-                tax_id, color,
-            ))
+            """,
+                (
+                    user_id,
+                    str(tenant_id) if tenant_id else None,
+                    (name or f"客户 {tax_id[:5]}")[:200],
+                    tax_id,
+                    color,
+                ),
+            )
             row = cur.fetchone()
             return int(row["id"]) if row else None
     except Exception as e:
@@ -7830,7 +9040,8 @@ def auto_create_client(user_id: str, tenant_id, tax_id: str, name: str,
 def get_recon_row(row_id: int) -> Optional[Dict[str, Any]]:
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT r.*,
                        h.invoice_no, h.invoice_date, h.seller_name, h.total_amount,
                        h.filename AS invoice_filename,
@@ -7845,7 +9056,9 @@ def get_recon_row(row_id: int) -> Optional[Dict[str, Any]]:
                 LEFT JOIN reconciliation_task t ON t.id = r.task_id
                 LEFT JOIN vat_report vr         ON vr.id = t.vat_report_id
                 WHERE r.id = %s
-            """, (row_id,))
+            """,
+                (row_id,),
+            )
             row = cur.fetchone()
             if not row:
                 return None
@@ -7853,15 +9066,21 @@ def get_recon_row(row_id: int) -> Optional[Dict[str, Any]]:
             # 把对应的 report row 也提出来
             try:
                 if r.get("report_rows") and r.get("report_row_no"):
-                    rows = r["report_rows"] if isinstance(r["report_rows"], list) else json.loads(r["report_rows"])
+                    rows = (
+                        r["report_rows"]
+                        if isinstance(r["report_rows"], list)
+                        else json.loads(r["report_rows"])
+                    )
                     matching = next((x for x in rows if x.get("row_no") == r["report_row_no"]), {})
                     r.update({k: v for k, v in matching.items() if k.startswith("report_")})
             except Exception:
                 pass  # report_rows JSON 解析 / 匹配失败 · 跳过该行 enrich
             # field_overrides jsonb 解开(P1.2-M2)
             if isinstance(r.get("field_overrides"), str):
-                try: r["field_overrides"] = json.loads(r["field_overrides"])
-                except Exception: r["field_overrides"] = {}
+                try:
+                    r["field_overrides"] = json.loads(r["field_overrides"])
+                except Exception:
+                    r["field_overrides"] = {}
             return r
     except Exception as e:
         logger.error(f"get_recon_row failed: {e}")
@@ -7870,13 +9089,17 @@ def get_recon_row(row_id: int) -> Optional[Dict[str, Any]]:
 
 def update_recon_row_ai_analysis(row_id: int, analysis: dict) -> bool:
     import json as _j
+
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE reconciliation_row
                 SET ai_analysis = %s, updated_at = NOW()
                 WHERE id = %s
-            """, (_j.dumps(analysis, ensure_ascii=False), row_id))
+            """,
+                (_j.dumps(analysis, ensure_ascii=False), row_id),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"update_recon_row_ai_analysis failed: {e}")
@@ -7889,11 +9112,14 @@ def update_recon_row_action(row_id: int, action: str, notes: str = "") -> bool:
         return False
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE reconciliation_row
                 SET accountant_action = %s, notes = %s, updated_at = NOW()
                 WHERE id = %s
-            """, (action, notes[:500], row_id))
+            """,
+                (action, notes[:500], row_id),
+            )
             return cur.rowcount > 0
     except Exception as e:
         logger.error(f"update_recon_row_action failed: {e}")
@@ -7903,21 +9129,32 @@ def update_recon_row_action(row_id: int, action: str, notes: str = "") -> bool:
 def list_recon_rows_detailed(task_id: int) -> List[Dict[str, Any]]:
     """v118.32.x · 拉取完整明细 · 含发票字段 + 报告字段 · 给屏 C 用"""
     import json as _j
+
     try:
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT t.vat_report_id FROM reconciliation_task t WHERE t.id = %s
-            """, (task_id,))
+            """,
+                (task_id,),
+            )
             t = cur.fetchone()
             report_rows_map = {}
             if t and t.get("vat_report_id"):
-                cur.execute("SELECT parsed_rows FROM vat_report WHERE id = %s", (t["vat_report_id"],))
+                cur.execute(
+                    "SELECT parsed_rows FROM vat_report WHERE id = %s", (t["vat_report_id"],)
+                )
                 vr = cur.fetchone()
                 if vr and vr.get("parsed_rows"):
-                    rows = vr["parsed_rows"] if isinstance(vr["parsed_rows"], list) else _j.loads(vr["parsed_rows"])
+                    rows = (
+                        vr["parsed_rows"]
+                        if isinstance(vr["parsed_rows"], list)
+                        else _j.loads(vr["parsed_rows"])
+                    )
                     report_rows_map = {r.get("row_no"): r for r in rows if isinstance(r, dict)}
 
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT r.*,
                        h.invoice_no, h.invoice_date, h.seller_name, h.total_amount,
                        h.filename AS invoice_filename,
@@ -7930,7 +9167,9 @@ def list_recon_rows_detailed(task_id: int) -> List[Dict[str, Any]]:
                 LEFT JOIN ocr_history h ON h.id = r.invoice_id
                 WHERE r.task_id = %s
                 ORDER BY r.id
-            """, (task_id,))
+            """,
+                (task_id,),
+            )
             rows = cur.fetchall() or []
             result = []
             for r in rows:
@@ -7949,16 +9188,22 @@ def list_recon_rows_detailed(task_id: int) -> List[Dict[str, Any]]:
                         d[nf] = None
                 # diff_fields jsonb 解开
                 if isinstance(d.get("diff_fields"), str):
-                    try: d["diff_fields"] = _j.loads(d["diff_fields"])
-                    except Exception: d["diff_fields"] = {}
+                    try:
+                        d["diff_fields"] = _j.loads(d["diff_fields"])
+                    except Exception:
+                        d["diff_fields"] = {}
                 # ai_analysis jsonb 解开
                 if isinstance(d.get("ai_analysis"), str):
-                    try: d["ai_analysis"] = _j.loads(d["ai_analysis"])
-                    except Exception: pass
+                    try:
+                        d["ai_analysis"] = _j.loads(d["ai_analysis"])
+                    except Exception:
+                        pass
                 # field_overrides jsonb 解开(P1.2-M2 · 发票侧字段用户校正)
                 if isinstance(d.get("field_overrides"), str):
-                    try: d["field_overrides"] = _j.loads(d["field_overrides"])
-                    except Exception: d["field_overrides"] = {}
+                    try:
+                        d["field_overrides"] = _j.loads(d["field_overrides"])
+                    except Exception:
+                        d["field_overrides"] = {}
                 result.append(d)
             return result
     except Exception as e:
@@ -7977,15 +9222,14 @@ def get_client_by_id(client_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
-
-
 # ============================================================
 # v118.32.2 · VAT 对账增强(只保留新增 · 已有的不复制)
 # ============================================================
 
 
-def find_or_create_client_by_tax_id(user_id: str, tenant_id: Optional[str],
-                                     tax_id: str, name: str = "") -> Optional[int]:
+def find_or_create_client_by_tax_id(
+    user_id: str, tenant_id: Optional[str], tax_id: str, name: str = ""
+) -> Optional[int]:
     """v118.32.2 · 屏 B 自动建客户:按税号找 · 找不到就建 · 复用 create_client"""
     if not tax_id or len(tax_id) != 13:
         return None
@@ -7995,12 +9239,14 @@ def find_or_create_client_by_tax_id(user_id: str, tenant_id: Optional[str],
                 cur.execute(
                     "SELECT id FROM clients WHERE tenant_id = %s AND tax_id = %s "
                     "AND is_active = TRUE LIMIT 1",
-                    (str(tenant_id), tax_id))
+                    (str(tenant_id), tax_id),
+                )
             else:
                 cur.execute(
                     "SELECT id FROM clients WHERE user_id = %s AND tax_id = %s "
                     "AND is_active = TRUE LIMIT 1",
-                    (str(user_id), tax_id))
+                    (str(user_id), tax_id),
+                )
             row = cur.fetchone()
             if row:
                 return int(row["id"])
@@ -8009,8 +9255,18 @@ def find_or_create_client_by_tax_id(user_id: str, tenant_id: Optional[str],
         return None
 
     # 没找到 · 建一个 · 复用现有 create_client
-    palette = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899",
-               "#14b8a6", "#f97316", "#06b6d4", "#a855f7"]
+    palette = [
+        "#3b82f6",
+        "#10b981",
+        "#f59e0b",
+        "#ef4444",
+        "#8b5cf6",
+        "#ec4899",
+        "#14b8a6",
+        "#f97316",
+        "#06b6d4",
+        "#a855f7",
+    ]
     color = palette[hash(tax_id) % len(palette)]
     new_id = create_client(
         user_id=str(user_id),
@@ -8024,10 +9280,10 @@ def find_or_create_client_by_tax_id(user_id: str, tenant_id: Optional[str],
     return new_id
 
 
-
 # ════════════════════════════════════════════════════════════════════════
 # v118.32.4.10.0 · vat_recon_tasks · Excel 对账任务持久化
 # ════════════════════════════════════════════════════════════════════════
+
 
 def ensure_vat_recon_tasks_table():
     """幂等建表 · 启动时调用"""
@@ -8087,30 +9343,34 @@ def create_vat_recon_task(
 ):
     """INSERT · 返回新 task UUID"""
     import json as _json
+
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO vat_recon_tasks
                     (tenant_id, user_id, client_name, period,
                      invoice_count, report_count, matched, mismatched,
                      mismatch_amount, elapsed_seconds, excel_path, raw_data_json, lang)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (
-                str(tenant_id) if tenant_id else None,
-                str(user_id),
-                client_name or "",
-                period or "",
-                invoice_count,
-                report_count,
-                matched,
-                mismatched,
-                round(float(mismatch_amount or 0), 2),
-                round(float(elapsed_seconds or 0), 2),
-                excel_path,
-                _json.dumps(raw_data_json, ensure_ascii=False) if raw_data_json else None,
-                lang,
-            ))
+            """,
+                (
+                    str(tenant_id) if tenant_id else None,
+                    str(user_id),
+                    client_name or "",
+                    period or "",
+                    invoice_count,
+                    report_count,
+                    matched,
+                    mismatched,
+                    round(float(mismatch_amount or 0), 2),
+                    round(float(elapsed_seconds or 0), 2),
+                    excel_path,
+                    _json.dumps(raw_data_json, ensure_ascii=False) if raw_data_json else None,
+                    lang,
+                ),
+            )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:
@@ -8148,7 +9408,8 @@ def list_vat_recon_tasks(
         with get_cursor() as cur:
             cur.execute(f"SELECT COUNT(*) AS n FROM vat_recon_tasks {where_sql}", params)
             total = int(cur.fetchone()["n"] or 0)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT id, tenant_id, user_id, client_name, period,
                        invoice_count, report_count, matched, mismatched,
                        mismatch_amount, status, elapsed_seconds, excel_path,
@@ -8157,7 +9418,9 @@ def list_vat_recon_tasks(
                 {where_sql}
                 ORDER BY created_at DESC
                 LIMIT %s OFFSET %s
-            """, params + [page_size, offset])
+            """,
+                params + [page_size, offset],
+            )
             rows = [dict(r) for r in cur.fetchall()]
         return {"rows": rows, "total": total, "page": page, "page_size": page_size}
     except Exception as e:
@@ -8172,11 +9435,13 @@ def get_vat_recon_task(task_id: str, tenant_id, user_id: str):
             if tenant_id:
                 cur.execute(
                     "SELECT * FROM vat_recon_tasks WHERE id = %s::uuid AND tenant_id = %s",
-                    (task_id, str(tenant_id)))
+                    (task_id, str(tenant_id)),
+                )
             else:
                 cur.execute(
                     "SELECT * FROM vat_recon_tasks WHERE id = %s::uuid AND user_id = %s::uuid",
-                    (task_id, str(user_id)))
+                    (task_id, str(user_id)),
+                )
             row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
@@ -8191,11 +9456,13 @@ def delete_vat_recon_task(task_id: str, tenant_id, user_id: str):
             if tenant_id:
                 cur.execute(
                     "DELETE FROM vat_recon_tasks WHERE id = %s::uuid AND tenant_id = %s RETURNING excel_path",
-                    (task_id, str(tenant_id)))
+                    (task_id, str(tenant_id)),
+                )
             else:
                 cur.execute(
                     "DELETE FROM vat_recon_tasks WHERE id = %s::uuid AND user_id = %s::uuid RETURNING excel_path",
-                    (task_id, str(user_id)))
+                    (task_id, str(user_id)),
+                )
             row = cur.fetchone()
             return row["excel_path"] if row else None
     except Exception as e:
@@ -8208,19 +9475,25 @@ def delete_vat_recon_tasks_older_than(days: int, tenant_id, user_id: str):
     try:
         with get_cursor(commit=True) as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     DELETE FROM vat_recon_tasks
                     WHERE tenant_id = %s
                       AND created_at < NOW() - (%s || ' days')::interval
                     RETURNING excel_path
-                """, (str(tenant_id), str(int(days))))
+                """,
+                    (str(tenant_id), str(int(days))),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     DELETE FROM vat_recon_tasks
                     WHERE user_id = %s::uuid
                       AND created_at < NOW() - (%s || ' days')::interval
                     RETURNING excel_path
-                """, (str(user_id), str(int(days))))
+                """,
+                    (str(user_id), str(int(days))),
+                )
             rows = cur.fetchall()
             paths = [r["excel_path"] for r in rows if r.get("excel_path")]
             return len(rows), paths
@@ -8234,23 +9507,29 @@ def get_vat_recon_tasks_kpi(tenant_id, user_id: str):
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT
                         COUNT(*) FILTER (WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())) AS this_month,
                         COUNT(*) FILTER (WHERE status = 'running') AS running,
                         COUNT(*) FILTER (WHERE status = 'done') AS done,
                         COUNT(*) FILTER (WHERE status = 'failed') AS failed
                     FROM vat_recon_tasks WHERE tenant_id = %s
-                """, (str(tenant_id),))
+                """,
+                    (str(tenant_id),),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT
                         COUNT(*) FILTER (WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())) AS this_month,
                         COUNT(*) FILTER (WHERE status = 'running') AS running,
                         COUNT(*) FILTER (WHERE status = 'done') AS done,
                         COUNT(*) FILTER (WHERE status = 'failed') AS failed
                     FROM vat_recon_tasks WHERE user_id = %s::uuid
-                """, (str(user_id),))
+                """,
+                    (str(user_id),),
+                )
             row = cur.fetchone()
             if row:
                 return {k: int(row[k] or 0) for k in ("this_month", "running", "done", "failed")}
@@ -8263,6 +9542,7 @@ def get_vat_recon_tasks_kpi(tenant_id, user_id: str):
 # ════════════════════════════════════════════════════════════════════
 # v118.32.5 · GL vs 销项税报告 对账（新功能）
 # ════════════════════════════════════════════════════════════════════
+
 
 def ensure_gl_vat_task_table():
     """v118.32.5 · GL对账任务表 · 单表存任务元数据 + 明细JSON + 汇总JSON"""
@@ -8287,8 +9567,12 @@ def ensure_gl_vat_task_table():
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
             """)
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_gl_vat_task_user ON gl_vat_task(user_id, created_at DESC)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_gl_vat_task_tenant ON gl_vat_task(tenant_id, created_at DESC)")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_gl_vat_task_user ON gl_vat_task(user_id, created_at DESC)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_gl_vat_task_tenant ON gl_vat_task(tenant_id, created_at DESC)"
+            )
         logger.info("[v118.32.5] gl_vat_task 表就绪")
         return True
     except Exception as e:
@@ -8311,9 +9595,11 @@ def create_gl_vat_task(
 ) -> Optional[int]:
     """落库 GL 对账任务结果 · 返回 task_id"""
     import json as _j
+
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO gl_vat_task (
                     user_id, tenant_id, gl_filename, vat_filename,
                     gl_row_count, vat_row_count,
@@ -8324,15 +9610,21 @@ def create_gl_vat_task(
                     %s::jsonb, %s::jsonb, 'done'
                 )
                 RETURNING id
-            """, (
-                str(user_id),
-                str(tenant_id) if tenant_id else None,
-                gl_filename, vat_filename,
-                int(gl_row_count or 0), int(vat_row_count or 0),
-                int(matched_count or 0), int(unmatched_count or 0), int(diff_count or 0),
-                _j.dumps(detail_json or [], ensure_ascii=False, default=str),
-                _j.dumps(summary_json or {}, ensure_ascii=False, default=str),
-            ))
+            """,
+                (
+                    str(user_id),
+                    str(tenant_id) if tenant_id else None,
+                    gl_filename,
+                    vat_filename,
+                    int(gl_row_count or 0),
+                    int(vat_row_count or 0),
+                    int(matched_count or 0),
+                    int(unmatched_count or 0),
+                    int(diff_count or 0),
+                    _j.dumps(detail_json or [], ensure_ascii=False, default=str),
+                    _j.dumps(summary_json or {}, ensure_ascii=False, default=str),
+                ),
+            )
             row = cur.fetchone()
             return int(row["id"]) if row else None
     except Exception as e:
@@ -8369,7 +9661,8 @@ def list_gl_vat_tasks(user_id: str, tenant_id=None, limit: int = 50) -> List[Dic
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, gl_filename, vat_filename,
                            gl_row_count, vat_row_count,
                            matched_count, unmatched_count, diff_count,
@@ -8377,9 +9670,12 @@ def list_gl_vat_tasks(user_id: str, tenant_id=None, limit: int = 50) -> List[Dic
                     FROM gl_vat_task
                     WHERE tenant_id = %s::uuid
                     ORDER BY created_at DESC LIMIT %s
-                """, (str(tenant_id), int(limit)))
+                """,
+                    (str(tenant_id), int(limit)),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, gl_filename, vat_filename,
                            gl_row_count, vat_row_count,
                            matched_count, unmatched_count, diff_count,
@@ -8387,7 +9683,9 @@ def list_gl_vat_tasks(user_id: str, tenant_id=None, limit: int = 50) -> List[Dic
                     FROM gl_vat_task
                     WHERE user_id = %s::uuid
                     ORDER BY created_at DESC LIMIT %s
-                """, (str(user_id), int(limit)))
+                """,
+                    (str(user_id), int(limit)),
+                )
             rows = cur.fetchall() or []
             return [dict(r) for r in rows]
     except Exception as e:
@@ -8400,7 +9698,7 @@ def delete_gl_vat_task(task_id: int, user_id: str) -> bool:
         with get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM gl_vat_task WHERE id = %s AND user_id = %s::uuid",
-                (task_id, str(user_id))
+                (task_id, str(user_id)),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -8420,7 +9718,7 @@ def delete_gl_vat_tasks_batch(ids: list, user_id: str) -> int:
         with get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM gl_vat_task WHERE id = ANY(%s) AND user_id = %s::uuid",
-                (clean_ids, str(user_id))
+                (clean_ids, str(user_id)),
             )
             return cur.rowcount or 0
     except Exception as e:
@@ -8431,6 +9729,7 @@ def delete_gl_vat_tasks_batch(ids: list, user_id: str) -> int:
 # ══════════════════════════════════════════════════════════════════════════════
 # v118.33.6 · Bank Reconciliation v2 (Statement vs GL)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def ensure_bank_recon_v2_table():
     """幂等 DDL · 建 bank_recon_v2_task 表（首次启动时调用）"""
@@ -8496,9 +9795,11 @@ def create_bank_recon_v2_task(
     summary_json: dict,
 ) -> Optional[int]:
     import json as _j
+
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO bank_recon_v2_task (
                     user_id, tenant_id, bank_code, gl_account,
                     stmt_files, gl_files,
@@ -8512,26 +9813,28 @@ def create_bank_recon_v2_task(
                     %s, %s, %s, %s, %s,
                     %s::jsonb, %s::jsonb, 'done'
                 ) RETURNING id
-            """, (
-                str(user_id),
-                str(tenant_id) if tenant_id else None,
-                bank_code or "",
-                gl_account or "",
-                stmt_files or "",
-                gl_files or "",
-                int(stmt_row_count or 0),
-                int(gl_row_count or 0),
-                int(matched_count or 0),
-                int(unmatched_gl or 0),
-                int(unmatched_stmt or 0),
-                float(stmt_opening or 0),
-                float(stmt_closing or 0),
-                float(gl_opening or 0),
-                float(gl_closing or 0),
-                float(formula_diff or 0),
-                _j.dumps(detail_json or [], ensure_ascii=False, default=str),
-                _j.dumps(summary_json or {}, ensure_ascii=False, default=str),
-            ))
+            """,
+                (
+                    str(user_id),
+                    str(tenant_id) if tenant_id else None,
+                    bank_code or "",
+                    gl_account or "",
+                    stmt_files or "",
+                    gl_files or "",
+                    int(stmt_row_count or 0),
+                    int(gl_row_count or 0),
+                    int(matched_count or 0),
+                    int(unmatched_gl or 0),
+                    int(unmatched_stmt or 0),
+                    float(stmt_opening or 0),
+                    float(stmt_closing or 0),
+                    float(gl_opening or 0),
+                    float(gl_closing or 0),
+                    float(formula_diff or 0),
+                    _j.dumps(detail_json or [], ensure_ascii=False, default=str),
+                    _j.dumps(summary_json or {}, ensure_ascii=False, default=str),
+                ),
+            )
             row = cur.fetchone()
             return int(row["id"]) if row else None
     except Exception as e:
@@ -8566,7 +9869,8 @@ def list_bank_recon_v2_tasks(user_id: str, tenant_id=None, limit: int = 50) -> L
     try:
         with get_cursor() as cur:
             if tenant_id:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, bank_code, gl_account,
                            stmt_files, gl_files,
                            stmt_row_count, gl_row_count,
@@ -8576,9 +9880,12 @@ def list_bank_recon_v2_tasks(user_id: str, tenant_id=None, limit: int = 50) -> L
                     FROM bank_recon_v2_task
                     WHERE tenant_id = %s::uuid
                     ORDER BY created_at DESC LIMIT %s
-                """, (str(tenant_id), int(limit)))
+                """,
+                    (str(tenant_id), int(limit)),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, user_id, tenant_id, bank_code, gl_account,
                            stmt_files, gl_files,
                            stmt_row_count, gl_row_count,
@@ -8588,7 +9895,9 @@ def list_bank_recon_v2_tasks(user_id: str, tenant_id=None, limit: int = 50) -> L
                     FROM bank_recon_v2_task
                     WHERE user_id = %s::uuid
                     ORDER BY created_at DESC LIMIT %s
-                """, (str(user_id), int(limit)))
+                """,
+                    (str(user_id), int(limit)),
+                )
             rows = cur.fetchall() or []
             return [dict(r) for r in rows]
     except Exception as e:
@@ -8601,7 +9910,7 @@ def delete_bank_recon_v2_task(task_id: int, user_id: str) -> bool:
         with get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM bank_recon_v2_task WHERE id = %s AND user_id = %s::uuid",
-                (task_id, str(user_id))
+                (task_id, str(user_id)),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -8619,7 +9928,7 @@ def delete_bank_recon_v2_tasks_batch(ids: list, user_id: str) -> int:
         with get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM bank_recon_v2_task WHERE id = ANY(%s) AND user_id = %s::uuid",
-                (clean_ids, str(user_id))
+                (clean_ids, str(user_id)),
             )
             return cur.rowcount or 0
     except Exception as e:
@@ -8645,7 +9954,9 @@ def ensure_credits_tables():
                 )
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_ucr_user ON user_company_roles(user_id)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_ucr_tenant ON user_company_roles(tenant_id)")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ucr_tenant ON user_company_roles(tenant_id)"
+            )
 
             # 2. 公司钱包余额
             cur.execute("""
@@ -8670,8 +9981,12 @@ def ensure_credits_tables():
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 )
             """)
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_ctx_tenant ON credit_transactions(tenant_id, created_at DESC)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_ctx_user ON credit_transactions(user_id, created_at DESC)")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ctx_tenant ON credit_transactions(tenant_id, created_at DESC)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ctx_user ON credit_transactions(user_id, created_at DESC)"
+            )
 
             # 4. 月用量统计（月初重置）
             cur.execute("""
@@ -8708,7 +10023,6 @@ def ensure_credits_tables():
                 ALTER TABLE users
                 ADD COLUMN IF NOT EXISTS is_billing_exempt BOOLEAN NOT NULL DEFAULT FALSE
             """)
-
 
             # 6a. v118.35.0.6 · users 表新增 active_tenant_id(multi-company 切换 ·
             #     auth.py 在 JWT.tenant_id 上 overlay 这个字段 · 不动 token)
@@ -8759,7 +10073,7 @@ def ensure_tenant_credits(tenant_id) -> None:
             cur.execute(
                 "INSERT INTO tenant_credits (tenant_id, balance_thb) "
                 "VALUES (%s, 0) ON CONFLICT (tenant_id) DO NOTHING",
-                (str(tenant_id),)
+                (str(tenant_id),),
             )
         logger.info(f"[credits] ensure_tenant_credits tenant={str(tenant_id)[:8]}.. balance=0")
     except Exception as e:
@@ -8772,7 +10086,9 @@ def ensure_tenant_credits(tenant_id) -> None:
 # 其他 check/deduct/owner/state 等下个版本 v36 拉前端 + OCR 扣费时一起接
 # ============================================================
 from datetime import datetime as _v36_dt, timedelta as _v36_td, timezone as _v36_tz
+
 _BKK_TZ_V36 = _v36_tz(_v36_td(hours=7))
+
 
 def _bkk_year_month() -> str:
     """Asia/Bangkok timezone · YYYY-MM · 月度统计锚定 UTC+7."""
@@ -8788,7 +10104,8 @@ def list_user_companies(user_id: str) -> list:
     try:
         year_month = _bkk_year_month()
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     ucr.tenant_id::text AS tenant_id,
                     t.name AS name,
@@ -8803,18 +10120,22 @@ def list_user_companies(user_id: str) -> list:
                        ON mpu.tenant_id = ucr.tenant_id AND mpu.year_month = %s
                 WHERE ucr.user_id = %s::uuid AND ucr.is_active = TRUE
                 ORDER BY t.name
-            """, (year_month, str(user_id)))
+            """,
+                (year_month, str(user_id)),
+            )
             rows = cur.fetchall() or []
         out = []
         for r in rows:
-            out.append({
-                "tenant_id": r["tenant_id"],
-                "name": r["name"] or "",
-                "role": r["role"] or "member",
-                "balance_thb": float(r["balance_thb"] or 0),
-                "pages_this_month": int(r["pages_this_month"] or 0),
-                "is_active": bool(r["is_active"]),
-            })
+            out.append(
+                {
+                    "tenant_id": r["tenant_id"],
+                    "name": r["name"] or "",
+                    "role": r["role"] or "member",
+                    "balance_thb": float(r["balance_thb"] or 0),
+                    "pages_this_month": int(r["pages_this_month"] or 0),
+                    "is_active": bool(r["is_active"]),
+                }
+            )
         return out
     except Exception as e:
         logger.error(f"list_user_companies failed: {e}")
@@ -8825,17 +10146,23 @@ def set_user_active_tenant(user_id: str, tenant_id: str) -> bool:
     """Validate user belongs to tenant; if yes set active_tenant_id."""
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT 1 FROM user_company_roles
                 WHERE user_id = %s::uuid AND tenant_id = %s::uuid AND is_active = TRUE
                 LIMIT 1
-            """, (str(user_id), str(tenant_id)))
+            """,
+                (str(user_id), str(tenant_id)),
+            )
             if not cur.fetchone():
                 return False
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE users SET active_tenant_id = %s::uuid
                 WHERE id = %s::uuid
-            """, (str(tenant_id), str(user_id)))
+            """,
+                (str(tenant_id), str(user_id)),
+            )
         return True
     except Exception as e:
         logger.error(f"set_user_active_tenant failed: {e}")
@@ -8889,7 +10216,7 @@ def is_user_billing_exempt(user_id) -> bool:
             cur.execute(
                 "SELECT COALESCE(is_billing_exempt, FALSE) AS x "
                 "FROM users WHERE id = %s::uuid LIMIT 1",
-                (str(user_id),)
+                (str(user_id),),
             )
             row = cur.fetchone()
             result = bool(row["x"]) if row else False
@@ -8910,16 +10237,27 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
     """
     # 白名单走 cache(不查 DB · 0 RTT)
     if is_user_billing_exempt(user_id):
-        return {"allowed": True, "is_exempt": True, "balance_thb": 0.0,
-                "pages_used_this_month": 0, "error_code": None}
+        return {
+            "allowed": True,
+            "is_exempt": True,
+            "balance_thb": 0.0,
+            "pages_used_this_month": 0,
+            "error_code": None,
+        }
     if not tenant_id:
-        return {"allowed": False, "is_exempt": False, "balance_thb": 0.0,
-                "pages_used_this_month": 0, "error_code": "no_tenant"}
+        return {
+            "allowed": False,
+            "is_exempt": False,
+            "balance_thb": 0.0,
+            "pages_used_this_month": 0,
+            "error_code": "no_tenant",
+        }
     try:
         ym = _bkk_year_month()
         with get_cursor() as cur:
             # 一次 SELECT 合并两个 LEFT JOIN · 一次 DB roundtrip
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     COALESCE(tc.balance_thb, 0) AS balance_thb,
                     COALESCE(mpu.pages_used, 0) AS pages_used
@@ -8928,20 +10266,37 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
                 LEFT JOIN monthly_page_usage mpu
                        ON mpu.tenant_id = %s::uuid AND mpu.year_month = %s
                 LIMIT 1
-            """, (str(tenant_id), str(tenant_id), ym))
+            """,
+                (str(tenant_id), str(tenant_id), ym),
+            )
             row = cur.fetchone()
             bal = float(row["balance_thb"] if row else 0)
             used = int(row["pages_used"] if row else 0)
         if bal <= 0:
-            return {"allowed": False, "is_exempt": False, "balance_thb": bal,
-                    "pages_used_this_month": used, "error_code": "insufficient_balance"}
-        return {"allowed": True, "is_exempt": False, "balance_thb": bal,
-                "pages_used_this_month": used, "error_code": None}
+            return {
+                "allowed": False,
+                "is_exempt": False,
+                "balance_thb": bal,
+                "pages_used_this_month": used,
+                "error_code": "insufficient_balance",
+            }
+        return {
+            "allowed": True,
+            "is_exempt": False,
+            "balance_thb": bal,
+            "pages_used_this_month": used,
+            "error_code": None,
+        }
     except Exception as e:
         logger.warning(f"get_billing_status_combined error tenant={tenant_id}: {e}")
         # 失败时不阻塞 OCR(降级到允许 · 但 log 警报)
-        return {"allowed": True, "is_exempt": False, "balance_thb": 0.0,
-                "pages_used_this_month": 0, "error_code": "lookup_error"}
+        return {
+            "allowed": True,
+            "is_exempt": False,
+            "balance_thb": 0.0,
+            "pages_used_this_month": 0,
+            "error_code": "lookup_error",
+        }
 
 
 def estimate_pdf_cost_thb(pages_used_this_month: int, page_count: int) -> _DecV21:
@@ -8968,8 +10323,9 @@ def estimate_excel_cost_thb(char_count: int) -> _DecV21:
     return (EXCEL_SATANG_PRICE_V21 * satang).quantize(_DecV21("0.01"), rounding=_RH_V21)
 
 
-def charge_ocr(user_id, tenant_id, kind: str, units: int,
-               history_id: str = None, description: str = "") -> dict:
+def charge_ocr(
+    user_id, tenant_id, kind: str, units: int, history_id: str = None, description: str = ""
+) -> dict:
     """OCR 完成后扣费 · v0.21 由调用端用 asyncio.create_task 异步触发
     单原子事务(SELECT FOR UPDATE 防并发)· 内部仍持有连接 · 但已脱离 OCR 关键路径
     kind: 'pdf' (units=page_count) | 'excel' (units=char_count)
@@ -8978,8 +10334,15 @@ def charge_ocr(user_id, tenant_id, kind: str, units: int,
     if not tenant_id:
         return {"ok": False, "error": "no_tenant"}
     if is_user_billing_exempt(user_id):
-        return {"ok": True, "charged_thb": 0.0, "balance_after": None,
-                "kind": kind, "units": units, "transaction_id": None, "exempt": True}
+        return {
+            "ok": True,
+            "charged_thb": 0.0,
+            "balance_after": None,
+            "kind": kind,
+            "units": units,
+            "transaction_id": None,
+            "exempt": True,
+        }
 
     if kind == "pdf":
         used = 0
@@ -8988,7 +10351,7 @@ def charge_ocr(user_id, tenant_id, kind: str, units: int,
                 _c.execute(
                     "SELECT COALESCE(pages_used, 0) AS u FROM monthly_page_usage "
                     "WHERE tenant_id = %s::uuid AND year_month = %s",
-                    (str(tenant_id), _bkk_year_month())
+                    (str(tenant_id), _bkk_year_month()),
                 )
                 _r = _c.fetchone()
                 used = int(_r["u"]) if _r else 0
@@ -9003,23 +10366,28 @@ def charge_ocr(user_id, tenant_id, kind: str, units: int,
         return {"ok": False, "error": f"unknown_kind:{kind}"}
 
     if cost <= _DecV21("0"):
-        return {"ok": True, "charged_thb": 0.0, "balance_after": None,
-                "kind": kind, "units": units, "transaction_id": None}
+        return {
+            "ok": True,
+            "charged_thb": 0.0,
+            "balance_after": None,
+            "kind": kind,
+            "units": units,
+            "transaction_id": None,
+        }
 
     ym = _bkk_year_month()
     try:
         with get_cursor(commit=True) as cur:
             cur.execute(
-                "SELECT balance_thb FROM tenant_credits "
-                "WHERE tenant_id = %s::uuid FOR UPDATE",
-                (str(tenant_id),)
+                "SELECT balance_thb FROM tenant_credits " "WHERE tenant_id = %s::uuid FOR UPDATE",
+                (str(tenant_id),),
             )
             row = cur.fetchone()
             if not row:
                 cur.execute(
                     "INSERT INTO tenant_credits (tenant_id, balance_thb) "
                     "VALUES (%s::uuid, 0) RETURNING balance_thb",
-                    (str(tenant_id),)
+                    (str(tenant_id),),
                 )
                 row = cur.fetchone()
             current_bal = _DecV21(str(row["balance_thb"]))
@@ -9028,15 +10396,20 @@ def charge_ocr(user_id, tenant_id, kind: str, units: int,
             cur.execute(
                 "UPDATE tenant_credits SET balance_thb = %s, updated_at = NOW() "
                 "WHERE tenant_id = %s::uuid",
-                (str(new_bal), str(tenant_id))
+                (str(new_bal), str(tenant_id)),
             )
             cur.execute(
                 "INSERT INTO credit_transactions "
                 "(tenant_id, user_id, type, amount_thb, pages, balance_after, description) "
                 "VALUES (%s::uuid, %s::uuid, 'usage', %s, %s, %s, %s) RETURNING id",
-                (str(tenant_id), str(user_id) if user_id else None,
-                 str(-cost), pages_inc, str(new_bal),
-                 description or f"OCR {kind} units={units} hid={history_id or ''}")
+                (
+                    str(tenant_id),
+                    str(user_id) if user_id else None,
+                    str(-cost),
+                    pages_inc,
+                    str(new_bal),
+                    description or f"OCR {kind} units={units} hid={history_id or ''}",
+                ),
             )
             tx_id = cur.fetchone()["id"]
 
@@ -9047,12 +10420,20 @@ def charge_ocr(user_id, tenant_id, kind: str, units: int,
                     "ON CONFLICT (tenant_id, year_month) DO UPDATE "
                     "SET pages_used = monthly_page_usage.pages_used + EXCLUDED.pages_used, "
                     "    updated_at = NOW()",
-                    (str(tenant_id), ym, pages_inc)
+                    (str(tenant_id), ym, pages_inc),
                 )
-        logger.info(f"[charge_ocr] OK tenant={str(tenant_id)[:8]} kind={kind} "
-                    f"units={units} cost=฿{cost} bal_after=฿{new_bal}")
-        return {"ok": True, "charged_thb": float(cost), "balance_after": float(new_bal),
-                "kind": kind, "units": units, "transaction_id": tx_id}
+        logger.info(
+            f"[charge_ocr] OK tenant={str(tenant_id)[:8]} kind={kind} "
+            f"units={units} cost=฿{cost} bal_after=฿{new_bal}"
+        )
+        return {
+            "ok": True,
+            "charged_thb": float(cost),
+            "balance_after": float(new_bal),
+            "kind": kind,
+            "units": units,
+            "transaction_id": tx_id,
+        }
     except Exception as e:
         logger.error(f"[charge_ocr] FAIL tenant={tenant_id} kind={kind} units={units}: {e}")
         return {"ok": False, "error": str(e)[:200]}
@@ -9066,7 +10447,9 @@ def _excel_char_count_estimate(file_bytes: bytes, filename: str) -> int:
     try:
         if fn.endswith(".xlsx") or fn.endswith(".xlsm") or fn.endswith(".xls"):
             try:
-                import openpyxl, io
+                import openpyxl
+                import io
+
                 wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
                 total = 0
                 for ws in wb.worksheets:
@@ -9084,7 +10467,9 @@ def _excel_char_count_estimate(file_bytes: bytes, filename: str) -> int:
                 return 0
         elif fn.endswith(".docx") or fn.endswith(".doc"):
             try:
-                import docx, io
+                import docx
+                import io
+
                 doc = docx.Document(io.BytesIO(file_bytes))
                 return sum(len(p.text) for p in doc.paragraphs)
             except Exception:
@@ -9094,11 +10479,12 @@ def _excel_char_count_estimate(file_bytes: bytes, filename: str) -> int:
     return 0
 
 
-def charge_ocr_async(user_id, tenant_id, kind: str, units: int,
-                     history_id: str = None, description: str = "") -> None:
+def charge_ocr_async(
+    user_id, tenant_id, kind: str, units: int, history_id: str = None, description: str = ""
+) -> None:
     """v0.21 · 异步扣费包装 · 调用方:
-       asyncio.create_task(asyncio.to_thread(db.charge_ocr_async, ...))
-       fire-and-forget · 不阻塞 OCR 关键路径 · 失败仅 log 不影响用户
+    asyncio.create_task(asyncio.to_thread(db.charge_ocr_async, ...))
+    fire-and-forget · 不阻塞 OCR 关键路径 · 失败仅 log 不影响用户
     """
     try:
         result = charge_ocr(user_id, tenant_id, kind, units, history_id, description)
@@ -9114,6 +10500,7 @@ def charge_ocr_async(user_id, tenant_id, kind: str, units: int,
 # 新 credit_transactions = 用户扣费(公司收入 · 跟用户结算)
 # 两套数据互补 · 超管看完整商业全景
 # ============================================================================
+
 
 def get_credits_revenue_overview() -> dict:
     """v0.22 · 收入端 KPI(今日/本月/总计) · 从 credit_transactions 拉
@@ -9171,7 +10558,13 @@ def get_credits_revenue_overview() -> dict:
             }
     except Exception as e:
         logger.error(f"get_credits_revenue_overview failed: {e}")
-        return {"today": {}, "month": {}, "total": {}, "pool_balance_thb": 0, "overdraft_tenants": 0}
+        return {
+            "today": {},
+            "month": {},
+            "total": {},
+            "pool_balance_thb": 0,
+            "overdraft_tenants": 0,
+        }
 
 
 def get_tenants_credits_summary(limit: int = 100) -> list:
@@ -9181,7 +10574,8 @@ def get_tenants_credits_summary(limit: int = 100) -> list:
     try:
         ym = _bkk_year_month()
         with get_cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     t.id::text AS tenant_id,
                     t.name AS tenant_name,
@@ -9207,24 +10601,30 @@ def get_tenants_credits_summary(limit: int = 100) -> list:
                        ON mpu.tenant_id = t.id AND mpu.year_month = %s
                 ORDER BY balance_thb DESC NULLS LAST
                 LIMIT %s
-            """, (ym, limit))
+            """,
+                (ym, limit),
+            )
             rows = cur.fetchall() or []
 
         out = []
         for r in rows:
             bal = float(r["balance_thb"] or 0)
-            out.append({
-                "tenant_id": r["tenant_id"],
-                "tenant_name": r["tenant_name"] or "(无名)",
-                "balance_thb": bal,
-                "pages_this_month": int(r["pages_this_month"] or 0),
-                "month_usage_thb": float(r["month_usage_thb"] or 0),
-                "lifetime_topup_thb": float(r["lifetime_topup_thb"] or 0),
-                "last_usage_at": r["last_usage_at"].isoformat() if r["last_usage_at"] else None,
-                "tenant_created_at": r["tenant_created_at"].isoformat() if r["tenant_created_at"] else None,
-                "is_overdraft": bal <= 0,
-                "is_low_balance": 0 < bal < 50,
-            })
+            out.append(
+                {
+                    "tenant_id": r["tenant_id"],
+                    "tenant_name": r["tenant_name"] or "(无名)",
+                    "balance_thb": bal,
+                    "pages_this_month": int(r["pages_this_month"] or 0),
+                    "month_usage_thb": float(r["month_usage_thb"] or 0),
+                    "lifetime_topup_thb": float(r["lifetime_topup_thb"] or 0),
+                    "last_usage_at": r["last_usage_at"].isoformat() if r["last_usage_at"] else None,
+                    "tenant_created_at": (
+                        r["tenant_created_at"].isoformat() if r["tenant_created_at"] else None
+                    ),
+                    "is_overdraft": bal <= 0,
+                    "is_low_balance": 0 < bal < 50,
+                }
+            )
         return out
     except Exception as e:
         logger.error(f"get_tenants_credits_summary failed: {e}")
@@ -9260,4 +10660,3 @@ def get_credits_daily_trend(days: int = 30) -> list:
     except Exception as e:
         logger.error(f"get_credits_daily_trend failed: {e}")
         return []
-

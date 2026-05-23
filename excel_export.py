@@ -12,31 +12,30 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-
 # ============================================================
 # 普通模板列定义
 # ============================================================
 STANDARD_COLUMNS = [
     # (key, 中文, 英文, 泰文, 日文, width)
-    ("no",            "序号",    "No.",          "ลำดับ",          "番号",    6),
-    ("filename",      "文件名",  "Filename",     "ชื่อไฟล์",       "ファイル名", 28),
-    ("invoice_no",    "发票号",  "Invoice No.",  "เลขที่",         "請求書番号", 18),
-    ("invoice_date",  "日期",    "Date",         "วันที่",         "日付",    14),
-    ("invoice_date_raw","原始日期","Date (raw)", "วันที่ต้นฉบับ",  "原文日付", 14),
-    ("seller_name",   "卖方名称","Seller Name",  "ผู้ขาย",         "売主名称", 30),
-    ("seller_tax",    "卖方税号","Seller Tax ID","เลขภาษีผู้ขาย",  "売主税番号", 16),
-    ("seller_addr",   "卖方地址","Seller Addr.", "ที่อยู่ผู้ขาย",  "売主住所", 30),
-    ("buyer_name",    "买方名称","Buyer Name",   "ผู้ซื้อ",        "買主名称", 30),
-    ("buyer_tax",     "买方税号","Buyer Tax ID", "เลขภาษีผู้ซื้อ", "買主税番号", 16),
-    ("buyer_addr",    "买方地址","Buyer Addr.",  "ที่อยู่ผู้ซื้อ", "買主住所", 30),
-    ("subtotal",      "未税金额","Subtotal",     "ยอดก่อน VAT",    "税抜金額", 14),
-    ("vat",           "税额",    "VAT",          "ภาษี",           "税額",    12),
-    ("wht_rate",      "预扣税率","WHT %",        "อัตรา หัก ณ ที่จ่าย", "源泉%",  10),
-    ("wht_amount",    "预扣税额","WHT Amount",   "ภาษีหัก ณ ที่จ่าย",   "源泉額", 14),
-    ("total",         "总金额",  "Total",        "ยอดรวม",         "合計",    14),
-    ("item_count",    "明细数", "Items",        "จำนวนรายการ",    "明細数",  10),
-    ("items",         "商品明细","Line Items",   "รายการสินค้า",   "明細",    40),
-    ("notes",         "备注",    "Notes",        "หมายเหตุ",       "備考",    20),
+    ("no", "序号", "No.", "ลำดับ", "番号", 6),
+    ("filename", "文件名", "Filename", "ชื่อไฟล์", "ファイル名", 28),
+    ("invoice_no", "发票号", "Invoice No.", "เลขที่", "請求書番号", 18),
+    ("invoice_date", "日期", "Date", "วันที่", "日付", 14),
+    ("invoice_date_raw", "原始日期", "Date (raw)", "วันที่ต้นฉบับ", "原文日付", 14),
+    ("seller_name", "卖方名称", "Seller Name", "ผู้ขาย", "売主名称", 30),
+    ("seller_tax", "卖方税号", "Seller Tax ID", "เลขภาษีผู้ขาย", "売主税番号", 16),
+    ("seller_addr", "卖方地址", "Seller Addr.", "ที่อยู่ผู้ขาย", "売主住所", 30),
+    ("buyer_name", "买方名称", "Buyer Name", "ผู้ซื้อ", "買主名称", 30),
+    ("buyer_tax", "买方税号", "Buyer Tax ID", "เลขภาษีผู้ซื้อ", "買主税番号", 16),
+    ("buyer_addr", "买方地址", "Buyer Addr.", "ที่อยู่ผู้ซื้อ", "買主住所", 30),
+    ("subtotal", "未税金额", "Subtotal", "ยอดก่อน VAT", "税抜金額", 14),
+    ("vat", "税额", "VAT", "ภาษี", "税額", 12),
+    ("wht_rate", "预扣税率", "WHT %", "อัตรา หัก ณ ที่จ่าย", "源泉%", 10),
+    ("wht_amount", "预扣税额", "WHT Amount", "ภาษีหัก ณ ที่จ่าย", "源泉額", 14),
+    ("total", "总金额", "Total", "ยอดรวม", "合計", 14),
+    ("item_count", "明细数", "Items", "จำนวนรายการ", "明細数", 10),
+    ("items", "商品明细", "Line Items", "รายการสินค้า", "明細", 40),
+    ("notes", "备注", "Notes", "หมายเหตุ", "備考", 20),
 ]
 
 COLUMN_LABEL_BY_LANG = {
@@ -68,10 +67,14 @@ def _fmt_items(items: List[Dict[str, Any]]) -> str:
         price = it.get("price") or it.get("unit_price") or ""
         sub = it.get("subtotal") or it.get("total") or ""
         parts = [f"{i}."]
-        if name: parts.append(str(name))
-        if qty: parts.append(f"×{qty}")
-        if price: parts.append(f"@{price}")
-        if sub: parts.append(f"={sub}")
+        if name:
+            parts.append(str(name))
+        if qty:
+            parts.append(f"×{qty}")
+        if price:
+            parts.append(f"@{price}")
+        if sub:
+            parts.append(f"={sub}")
         lines.append(" ".join(parts))
     return "\n".join(lines)
 

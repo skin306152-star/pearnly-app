@@ -32,7 +32,6 @@ from typing import List, Optional
 
 from .schemas import Page, Word
 
-
 # Minimum overlap (in chars, after normalization) required to count a word
 # as "matching" a field value. Avoids spurious matches on common short
 # substrings like single digits or short tokens.

@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+
 load_dotenv(PROJECT_ROOT / ".env.local")
 
 from services.erp.mrerp_adapter import MRERPAdapter
@@ -27,13 +28,16 @@ with MRERPAdapter(
     login_url=os.environ["MRERP_LOGIN_URL"],
     username=os.environ["MRERP_USERNAME"],
     password=os.environ["MRERP_PASSWORD"],
-    comidyear="6", seldb="1", headless=True,
+    comidyear="6",
+    seldb="1",
+    headless=True,
 ) as a:
     page = a._page
     ctx = a._session._ctx
 
     # Capture all responses + their bodies for armas paths
     captured = []
+
     def on_resp(r):
         try:
             url = r.url or ""
@@ -43,23 +47,32 @@ with MRERPAdapter(
             return
         body_text = ""
         try:
-            body_text = (r.text() or "")
+            body_text = r.text() or ""
         except Exception:
             pass
-        captured.append({
-            "url": url, "status": r.status,
-            "ct": r.headers.get("content-type", ""),
-            "body_preview": body_text[:2000],
-            "method": r.request.method if r.request else "",
-        })
+        captured.append(
+            {
+                "url": url,
+                "status": r.status,
+                "ct": r.headers.get("content-type", ""),
+                "body_preview": body_text[:2000],
+                "method": r.request.method if r.request else "",
+            }
+        )
+
     ctx.on("response", on_resp)
 
     # Look at form action attribute too
-    a.login(); a.select_company()
+    a.login()
+    a.select_company()
     page.goto(a.login_url + "/armas/allform.php", wait_until="networkidle")
 
-    action = page.evaluate('document.getElementById("frm") ? document.getElementById("frm").action : null')
-    method = page.evaluate('document.getElementById("frm") ? document.getElementById("frm").method : null')
+    action = page.evaluate(
+        'document.getElementById("frm") ? document.getElementById("frm").action : null'
+    )
+    method = page.evaluate(
+        'document.getElementById("frm") ? document.getElementById("frm").method : null'
+    )
     print(f"form action: {action}")
     print(f"form method: {method}")
 
@@ -67,7 +80,9 @@ with MRERPAdapter(
     svc = MRERPCustomerSyncService(a)
     buyer = BuyerInfo(
         name=f"Pearnly Probe Save Test {os.urandom(4).hex().upper()}",
-        client_id=99999, tenant_id="probe", tax_id="1234567890123",
+        client_id=99999,
+        tenant_id="probe",
+        tax_id="1234567890123",
     )
     try:
         out = svc.lookup_or_create(buyer, {"clients": []})
@@ -79,12 +94,12 @@ with MRERPAdapter(
     print(f"\n--- {len(captured)} armas responses ---")
     for r in captured[-10:]:
         print(f"[{r['method']}] {r['status']} {r['url'][:100]}  ct={r['ct'][:40]}")
-        if r['body_preview']:
+        if r["body_preview"]:
             # Look for the alert string
-            if 'Data is' in r['body_preview']:
-                idx = r['body_preview'].find('Data is')
-                snippet = r['body_preview'][max(0, idx-200):idx+500]
+            if "Data is" in r["body_preview"]:
+                idx = r["body_preview"].find("Data is")
+                snippet = r["body_preview"][max(0, idx - 200) : idx + 500]
                 print(f"  >>> Data is alert context: {snippet[:700]}")
             else:
-                first_300 = re.sub(r'\s+', ' ', r['body_preview'][:300])
+                first_300 = re.sub(r"\s+", " ", r["body_preview"][:300])
                 print(f"  body[:300]: {first_300}")

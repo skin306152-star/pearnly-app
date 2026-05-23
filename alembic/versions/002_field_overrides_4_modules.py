@@ -19,6 +19,7 @@ Revision ID: 002_field_overrides_4_modules
 Revises: 001_baseline
 Create Date: 2026-05-23
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -37,14 +38,10 @@ def upgrade() -> None:
     """加 field_overrides JSONB 列(允许 NULL · 老数据不动)"""
     for table in _TABLES:
         # IF NOT EXISTS 保 idempotent · 防 ensure_field_overrides_columns() 双跑撞车
-        op.execute(
-            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS field_overrides JSONB"
-        )
+        op.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS field_overrides JSONB")
 
 
 def downgrade() -> None:
     """删 field_overrides JSONB 列(回滚 · 老数据不动)"""
     for table in _TABLES:
-        op.execute(
-            f"ALTER TABLE {table} DROP COLUMN IF EXISTS field_overrides"
-        )
+        op.execute(f"ALTER TABLE {table} DROP COLUMN IF EXISTS field_overrides")

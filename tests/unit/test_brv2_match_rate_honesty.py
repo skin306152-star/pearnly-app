@@ -11,6 +11,7 @@ v118.35.0.61 · 守门测试 · 勾稽匹配诚实化(防 diff=0 恒等式假象
   3. 正常匹配(diff≈0 且匹配率高)→ 仍染绿 ✓(不误伤正常对账)
   4. 始终输出『已匹配笔数 / 匹配率』指标行
 """
+
 import io
 import unittest
 
@@ -18,31 +19,47 @@ import openpyxl
 
 from bank_recon_v2 import BankReconSummary, BankReconRow, export_bank_recon_excel
 
-DIFF_OK_BG = "D1FAE5"   # mint green (对平)
+DIFF_OK_BG = "D1FAE5"  # mint green (对平)
 DIFF_BAD_BG = "FEE2E2"  # soft red (未对平/可疑)
 
 
 def _summary(diff=0.0):
     return BankReconSummary(
-        bank_code="scb", gl_account_code="1112-01",
-        stmt_opening=0.0, gl_opening=0.0,
-        stmt_closing=1000.0, gl_closing=1000.0,
-        opening_diff=0.0, formula_stmt_closing=1000.0, formula_diff=diff,
+        bank_code="scb",
+        gl_account_code="1112-01",
+        stmt_opening=0.0,
+        gl_opening=0.0,
+        stmt_closing=1000.0,
+        gl_closing=1000.0,
+        opening_diff=0.0,
+        formula_stmt_closing=1000.0,
+        formula_diff=diff,
     )
 
 
 def _stmt_only_row(i):
     return BankReconRow(
-        match_status="stmt_deposit_only", match_layer=None,
-        stmt_date=None, stmt_desc=f"dep{i}", stmt_withdrawal=0.0, stmt_deposit=100.0,
+        match_status="stmt_deposit_only",
+        match_layer=None,
+        stmt_date=None,
+        stmt_desc=f"dep{i}",
+        stmt_withdrawal=0.0,
+        stmt_deposit=100.0,
     )
 
 
 def _matched_row(i):
     return BankReconRow(
-        match_status="matched", match_layer=1,
-        stmt_date=None, stmt_desc=f"m{i}", stmt_withdrawal=0.0, stmt_deposit=100.0,
-        gl_doc_no=f"V{i}", gl_desc="gl", gl_debit=100.0, gl_credit=0.0,
+        match_status="matched",
+        match_layer=1,
+        stmt_date=None,
+        stmt_desc=f"m{i}",
+        stmt_withdrawal=0.0,
+        stmt_deposit=100.0,
+        gl_doc_no=f"V{i}",
+        gl_desc="gl",
+        gl_debit=100.0,
+        gl_credit=0.0,
     )
 
 
@@ -60,8 +77,11 @@ def _diff_cell_fill(ws):
     注:横幅文案里也含『差异』二字 · 故只认 B 列为数值的锚点行(横幅是合并单元格 · B 为 None)。"""
     for row in ws.iter_rows():
         a = row[0].value
-        if (isinstance(a, str) and a.strip().startswith("差异（应为0")
-                and isinstance(row[1].value, (int, float))):
+        if (
+            isinstance(a, str)
+            and a.strip().startswith("差异（应为0")
+            and isinstance(row[1].value, (int, float))
+        ):
             fill = row[1].fill.fgColor.rgb
             return (fill or "")[-6:].upper()
     return None

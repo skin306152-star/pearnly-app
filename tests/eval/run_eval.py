@@ -20,6 +20,7 @@ v118.35.0.65 · 银行对账 OCR 评测集运行器(让每次改进都可量化 
     - 本运行器 + 合成示例 + README = 进 git(无隐私)
     - 比对用 (date, 金额) 宽松匹配 · 容差 0.05 · 不强求描述逐字一致
 """
+
 import argparse
 import datetime as _dt
 import glob
@@ -27,7 +28,7 @@ import json
 import os
 import sys
 
-try:                       # Windows 控制台默认 GBK · 强制 UTF-8 防中文/符号崩
+try:  # Windows 控制台默认 GBK · 强制 UTF-8 防中文/符号崩
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
     pass
@@ -37,8 +38,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from bank_recon_v2 import parse_bank_statement_pdf  # noqa: E402
 
 _HERE = os.path.dirname(__file__)
-_GT_DIRS = [os.path.join(_HERE, "ground_truth_local"),  # 真实(gitignored · 优先)
-            os.path.join(_HERE, "ground_truth")]        # 合成示例(git)
+_GT_DIRS = [
+    os.path.join(_HERE, "ground_truth_local"),  # 真实(gitignored · 优先)
+    os.path.join(_HERE, "ground_truth"),
+]  # 合成示例(git)
 _RUNS_DIR = os.path.join(_HERE, "_runs")
 _TOL = 0.05
 
@@ -46,7 +49,7 @@ _TOL = 0.05
 def _load_ground_truth():
     """读所有标准答案 · 同名以 _local 优先。返回 {name: gt_dict}。"""
     gts = {}
-    for d in reversed(_GT_DIRS):   # 先读 git 示例 · 再用 local 覆盖
+    for d in reversed(_GT_DIRS):  # 先读 git 示例 · 再用 local 覆盖
         for f in sorted(glob.glob(os.path.join(d, "*.json"))):
             try:
                 gt = json.load(open(f, encoding="utf-8"))
@@ -72,11 +75,16 @@ def _find_sample(samples_dir, gt):
 
 def _row_recall(extracted_rows, expected_rows):
     """逐行召回:expected 里每笔(date+金额)能否在 extracted 找到。返回 (命中, 总数, 漏的列表)。"""
+
     def key(r):
-        amt = round(float(r.get("deposit") or 0) - float(r.get("withdrawal") or 0), 2) \
-            if isinstance(r, dict) else round((r.deposit or 0) - (r.withdrawal or 0), 2)
+        amt = (
+            round(float(r.get("deposit") or 0) - float(r.get("withdrawal") or 0), 2)
+            if isinstance(r, dict)
+            else round((r.deposit or 0) - (r.withdrawal or 0), 2)
+        )
         d = r.get("date") if isinstance(r, dict) else (r.date.isoformat() if r.date else None)
         return (str(d), amt)
+
     pool = {}
     for r in extracted_rows:
         pool.setdefault(key(r), 0)
@@ -120,9 +128,13 @@ def main():
         rows = res.get("rows") or []
         n_dep = sum(1 for r in rows if (r.deposit or 0) > 0)
         n_wd = sum(1 for r in rows if (r.withdrawal or 0) > 0)
-        line = {"name": name, "extracted_rows": len(rows),
-                "credit_count": n_dep, "debit_count": n_wd,
-                "closing": res.get("closing")}
+        line = {
+            "name": name,
+            "extracted_rows": len(rows),
+            "credit_count": n_dep,
+            "debit_count": n_wd,
+            "closing": res.get("closing"),
+        }
         flags = []
         if "credit_count" in gt and gt["credit_count"] != n_dep:
             flags.append(f"存款笔数 期望{gt['credit_count']}/实得{n_dep}")
@@ -141,13 +153,15 @@ def main():
         line["flags"] = flags
         report["files"].append(line)
         status = "✓" if not flags else "✗"
-        print(f"{status} {name}: rows={len(rows)} dep={n_dep} wd={n_wd} closing={res.get('closing')}")
+        print(
+            f"{status} {name}: rows={len(rows)} dep={n_dep} wd={n_wd} closing={res.get('closing')}"
+        )
         for fl in flags:
             print(f"     ⚠ {fl}")
 
     if agg_total:
         print(f"\n=== 汇总 · 逐行召回率 {agg_hit}/{agg_total} = {agg_hit/agg_total*100:.1f}% ===")
-    report["aggregate_row_recall"] = (f"{agg_hit}/{agg_total}" if agg_total else None)
+    report["aggregate_row_recall"] = f"{agg_hit}/{agg_total}" if agg_total else None
 
     os.makedirs(_RUNS_DIR, exist_ok=True)
     out = os.path.join(_RUNS_DIR, _dt.datetime.now().strftime("%Y%m%d_%H%M%S") + ".json")

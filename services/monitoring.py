@@ -9,6 +9,7 @@ v118.35.0.25 · 进程内监控模块
 - 线程安全(threading.Lock)
 - 进程重启清零(可接受 · 长期统计走 credit_transactions)
 """
+
 from __future__ import annotations
 import time
 import threading
@@ -65,19 +66,16 @@ class GeminiCallStats:
             self._gc(now)
             recent_60s = sum(1 for c in self._calls if c[0] >= now - 60)
             recent_5min = sum(1 for c in self._calls if c[0] >= now - 300)
-            recent_5min_429 = sum(
-                1 for c in self._calls
-                if c[0] >= now - 300 and c[2] == 429
-            )
-            recent_5min_err = sum(
-                1 for c in self._calls if c[0] >= now - 300 and not c[1]
-            )
+            recent_5min_429 = sum(1 for c in self._calls if c[0] >= now - 300 and c[2] == 429)
+            recent_5min_err = sum(1 for c in self._calls if c[0] >= now - 300 and not c[1])
             # 平均延迟(最近 5 分钟)
             recent_latencies = [c[3] for c in self._calls if c[0] >= now - 300 and c[3] > 0]
-            avg_latency = int(sum(recent_latencies) / len(recent_latencies)) if recent_latencies else 0
+            avg_latency = (
+                int(sum(recent_latencies) / len(recent_latencies)) if recent_latencies else 0
+            )
 
             return {
-                "rpm_now": recent_60s,           # 当前每分钟请求数
+                "rpm_now": recent_60s,  # 当前每分钟请求数
                 "recent_5min_total": recent_5min,
                 "recent_5min_429": recent_5min_429,
                 "recent_5min_errors": recent_5min_err,
@@ -97,6 +95,7 @@ class DBPoolStats:
     def get_stats() -> Dict[str, Any]:
         try:
             import db as _db
+
             pool = _db._pool
             if pool is None:
                 return {"available": False}
@@ -131,6 +130,7 @@ def get_os_stats() -> Dict[str, Any]:
     out = {"available": False}
     try:
         import os
+
         # Linux /proc 读法 · 0 额外依赖
         # 内存
         with open("/proc/meminfo") as f:
@@ -152,10 +152,13 @@ def get_os_stats() -> Dict[str, Any]:
         # 进程数
         try:
             import subprocess
-            uvc = int(subprocess.run(
-                ["pgrep", "-cf", "uvicorn app:app"],
-                capture_output=True, text=True, timeout=3
-            ).stdout.strip() or "0")
+
+            uvc = int(
+                subprocess.run(
+                    ["pgrep", "-cf", "uvicorn app:app"], capture_output=True, text=True, timeout=3
+                ).stdout.strip()
+                or "0"
+            )
         except Exception:
             uvc = 0
         out = {
@@ -178,6 +181,7 @@ def get_queue_stats() -> Dict[str, Any]:
     """v0.27 · 任务队列状态(最小版 · 接口契约稳定)"""
     try:
         from services.task_queue import get_queue_stats as _q
+
         return _q()
     except Exception:
         return {"available": False}

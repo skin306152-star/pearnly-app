@@ -26,7 +26,7 @@
             later: '稍后',
             notesTitle: '更新说明',
             notesEmpty: '本次更新无说明',
-            close: '关闭'
+            close: '关闭',
         },
         en: {
             title: 'Pearnly · new version available',
@@ -35,7 +35,7 @@
             later: 'Later',
             notesTitle: 'Release notes',
             notesEmpty: 'No release notes for this version',
-            close: 'Close'
+            close: 'Close',
         },
         th: {
             title: 'Pearnly · มีเวอร์ชันใหม่',
@@ -44,7 +44,7 @@
             later: 'ภายหลัง',
             notesTitle: 'รายละเอียดอัปเดต',
             notesEmpty: 'ไม่มีรายละเอียดสำหรับเวอร์ชันนี้',
-            close: 'ปิด'
+            close: 'ปิด',
         },
         ja: {
             title: 'Pearnly · 新バージョン利用可能',
@@ -53,13 +53,16 @@
             later: '後で',
             notesTitle: 'リリースノート',
             notesEmpty: 'このバージョンの更新内容はありません',
-            close: '閉じる'
-        }
+            close: '閉じる',
+        },
     };
 
     function _curLang() {
-        try { return localStorage.getItem('mrpilot_lang') || document.documentElement.lang || 'zh'; }
-        catch (_) { return 'zh'; }
+        try {
+            return localStorage.getItem('mrpilot_lang') || document.documentElement.lang || 'zh';
+        } catch (_) {
+            return 'zh';
+        }
     }
     function _t(key) {
         var lang = _curLang();
@@ -150,7 +153,8 @@
     function _snooze() {
         try {
             localStorage.setItem(LS_SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
-            if (window._vbLatestVersion) localStorage.setItem(LS_SNOOZE_VER, window._vbLatestVersion);
+            if (window._vbLatestVersion)
+                localStorage.setItem(LS_SNOOZE_VER, window._vbLatestVersion);
         } catch (_) {}
         _hideBanner();
     }
@@ -166,14 +170,19 @@
                 '<div id="vb-modal-foot"><button id="vb-modal-foot-close" class="btn" type="button" style="background:#111;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit"></button></div>' +
                 '</div>';
             document.body.appendChild(mask);
-            var closeFn = function () { document.getElementById('vb-mask').classList.remove('show'); };
+            var closeFn = function () {
+                document.getElementById('vb-mask').classList.remove('show');
+            };
             document.getElementById('vb-modal-close').addEventListener('click', closeFn);
             document.getElementById('vb-modal-foot-close').addEventListener('click', closeFn);
-            mask.addEventListener('click', function (e) { if (e.target === mask) closeFn(); });
+            mask.addEventListener('click', function (e) {
+                if (e.target === mask) closeFn();
+            });
         }
-        var notes = (window._vbLatestNotes && window._vbLatestNotes[_curLang()]) ||
-                    (window._vbLatestNotes && window._vbLatestNotes.zh) ||
-                    _t('notesEmpty');
+        var notes =
+            (window._vbLatestNotes && window._vbLatestNotes[_curLang()]) ||
+            (window._vbLatestNotes && window._vbLatestNotes.zh) ||
+            _t('notesEmpty');
         document.getElementById('vb-modal-title').textContent = _t('notesTitle');
         document.getElementById('vb-modal-body').textContent = notes;
         document.getElementById('vb-modal-foot-close').textContent = _t('close');
@@ -185,22 +194,30 @@
             var until = parseInt(localStorage.getItem(LS_SNOOZE_KEY) || '0', 10);
             var ver = localStorage.getItem(LS_SNOOZE_VER) || '';
             return until > Date.now() && ver === version;
-        } catch (_) { return false; }
+        } catch (_) {
+            return false;
+        }
     }
 
     function _check() {
         fetch('/api/version', { cache: 'no-store' })
-            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (r) {
+                return r.ok ? r.json() : null;
+            })
             .then(function (j) {
                 if (!j || !j.version) return;
                 var cur = String(j.version);
                 window._vbLatestVersion = cur;
                 window._vbLatestNotes = j.release_notes || null;
                 var lastSeen = '';
-                try { lastSeen = localStorage.getItem(LS_LAST_SEEN) || ''; } catch (_) {}
+                try {
+                    lastSeen = localStorage.getItem(LS_LAST_SEEN) || '';
+                } catch (_) {}
                 if (!lastSeen) {
                     // 首次启动 · 不弹 · 记 baseline
-                    try { localStorage.setItem(LS_LAST_SEEN, cur); } catch (_) {}
+                    try {
+                        localStorage.setItem(LS_LAST_SEEN, cur);
+                    } catch (_) {}
                     return;
                 }
                 if (cur === lastSeen) return; // 版本未变
@@ -208,7 +225,9 @@
                 if (_isSnoozedFor(cur)) return;
                 _showBanner();
             })
-            .catch(function () { /* silent */ });
+            .catch(function () {
+                /* silent */
+            });
     }
 
     // 切语言时同步更新已显示文本
@@ -241,6 +260,6 @@
         show: _showBanner,
         hide: _hideBanner,
         snooze: _snooze,
-        showModal: _showModal
+        showModal: _showModal,
     };
 })();

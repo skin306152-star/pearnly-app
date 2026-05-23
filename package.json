@@ -8,10 +8,17 @@
     "build:watch": "vite build --watch",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "lint": "eslint .",
+    "format": "prettier --write \"**/*.{js,mjs,css,html,json}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,css,html,json}\""
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.49.1",
+    "eslint": "^10.4.0",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
     "vite": "^6.0.7"
   }
 }

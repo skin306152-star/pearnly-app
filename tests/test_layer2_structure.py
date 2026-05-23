@@ -53,10 +53,14 @@ def _print_invoice(invoice, indent: str = "    ") -> None:
     print(f"{indent}date:               {invoice.date!r} (raw: {invoice.date_raw!r})")
     print(f"{indent}seller_name:        {invoice.seller_name!r}")
     print(f"{indent}seller_tax:         {invoice.seller_tax!r}")
-    print(f"{indent}seller_addr:        {invoice.seller_addr[:70]!r}{'...' if len(invoice.seller_addr) > 70 else ''}")
+    print(
+        f"{indent}seller_addr:        {invoice.seller_addr[:70]!r}{'...' if len(invoice.seller_addr) > 70 else ''}"
+    )
     print(f"{indent}buyer_name:         {invoice.buyer_name!r}")
     print(f"{indent}buyer_tax:          {invoice.buyer_tax!r}")
-    print(f"{indent}buyer_addr:         {invoice.buyer_addr[:70]!r}{'...' if len(invoice.buyer_addr) > 70 else ''}")
+    print(
+        f"{indent}buyer_addr:         {invoice.buyer_addr[:70]!r}{'...' if len(invoice.buyer_addr) > 70 else ''}"
+    )
     print(f"{indent}subtotal:           {invoice.subtotal!r}")
     print(f"{indent}vat:                {invoice.vat!r}")
     print(f"{indent}wht_rate / amount:  {invoice.wht_rate!r} / {invoice.wht_amount!r}")
@@ -64,10 +68,14 @@ def _print_invoice(invoice, indent: str = "    ") -> None:
     print(f"{indent}category:           {invoice.category!r}")
     if invoice.notes:
         notes_preview = invoice.notes[:120]
-        print(f"{indent}notes:              {notes_preview!r}{'...' if len(invoice.notes) > 120 else ''}")
+        print(
+            f"{indent}notes:              {notes_preview!r}{'...' if len(invoice.notes) > 120 else ''}"
+        )
     print(f"{indent}items:              {len(invoice.items)} item(s)")
     for j, it in enumerate(invoice.items[:5], 1):
-        print(f"{indent}  [{j}] name={it.name!r} qty={it.qty!r} price={it.price!r} subtotal={it.subtotal!r}")
+        print(
+            f"{indent}  [{j}] name={it.name!r} qty={it.qty!r} price={it.price!r} subtotal={it.subtotal!r}"
+        )
     if len(invoice.items) > 5:
         print(f"{indent}  ... and {len(invoice.items) - 5} more")
 
@@ -75,12 +83,14 @@ def _print_invoice(invoice, indent: str = "    ") -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--file", help="single PDF/image path (overrides --limit)")
-    parser.add_argument("--limit", type=int, default=2,
-                        help="when iterating storage/pdfs/, process at most N files (default 2)")
-    parser.add_argument("--max-pages", type=int, default=2,
-                        help="max pages per PDF (default 2)")
-    parser.add_argument("--dpi", type=int, default=200,
-                        help="layer 1 PDF render DPI (default 200)")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=2,
+        help="when iterating storage/pdfs/, process at most N files (default 2)",
+    )
+    parser.add_argument("--max-pages", type=int, default=2, help="max pages per PDF (default 2)")
+    parser.add_argument("--dpi", type=int, default=200, help="layer 1 PDF render DPI (default 200)")
     args = parser.parse_args()
 
     # Env sanity
@@ -107,11 +117,13 @@ def main() -> int:
             print(f"FAIL: no *.pdf in {storage}")
             return 2
 
-    print(f"Layer 1 + Layer 2 chained run")
+    print("Layer 1 + Layer 2 chained run")
     print(f"Files:       {len(files)}")
     print(f"Max pages:   {args.max_pages}")
     print(f"DPI (l1):    {args.dpi}")
-    print(f"Model (l2):  {os.environ.get('OCR_FLASHLITE_MODEL', 'gemini-2.5-flash-lite (default)')}")
+    print(
+        f"Model (l2):  {os.environ.get('OCR_FLASHLITE_MODEL', 'gemini-2.5-flash-lite (default)')}"
+    )
     print("=" * 72)
 
     fail_count = 0
@@ -128,8 +140,10 @@ def main() -> int:
             traceback.print_exc()
             fail_count += 1
             continue
-        print(f"  layer1: {l1.page_count} page(s), {l1.elapsed_ms}ms, "
-              f"avg_conf={sum(p.avg_confidence for p in l1.pages) / max(len(l1.pages), 1):.3f}")
+        print(
+            f"  layer1: {l1.page_count} page(s), {l1.elapsed_ms}ms, "
+            f"avg_conf={sum(p.avg_confidence for p in l1.pages) / max(len(l1.pages), 1):.3f}"
+        )
 
         # Layer 2
         try:
@@ -142,14 +156,18 @@ def main() -> int:
         total_in = sum(p.input_tokens for p in l2.pages)
         total_out = sum(p.output_tokens for p in l2.pages)
         total_retries = sum(p.retries for p in l2.pages)
-        print(f"  layer2: {l2.elapsed_ms}ms, model={l2.model}, "
-              f"tokens={total_in}+{total_out}, retries={total_retries}")
+        print(
+            f"  layer2: {l2.elapsed_ms}ms, model={l2.model}, "
+            f"tokens={total_in}+{total_out}, retries={total_retries}"
+        )
 
         # Per-page details
         for pr in l2.pages:
-            print(f"\n  --- Page {pr.page_number} (l2 elapsed={pr.elapsed_ms}ms, "
-                  f"in={pr.input_tokens}, out={pr.output_tokens}, "
-                  f"retries={pr.retries}, skipped={pr.skipped}) ---")
+            print(
+                f"\n  --- Page {pr.page_number} (l2 elapsed={pr.elapsed_ms}ms, "
+                f"in={pr.input_tokens}, out={pr.output_tokens}, "
+                f"retries={pr.retries}, skipped={pr.skipped}) ---"
+            )
             _print_invoice(pr.invoice)
 
     print("\n" + "=" * 72)

@@ -34,7 +34,6 @@ from services.ocr.pipeline import (  # noqa: E402
     run_on_path,
 )
 
-
 # ============================================================
 # Batch file lists
 # ============================================================
@@ -234,12 +233,9 @@ def summarize_batch(batch_name, results):
     min_conf = min(confidence_dist) if confidence_dist else 0
     max_conf = max(confidence_dist) if confidence_dist else 0
 
-    layer3_pages = sum(
-        v for chain, v in chains.items() if "L3" in chain
-    )
+    layer3_pages = sum(v for chain, v in chains.items() if "L3" in chain)
     layer3_failed_pages = sum(
-        v for chain, v in chains.items()
-        if any(c.startswith("L3_") for c in chain)
+        v for chain, v in chains.items() if any(c.startswith("L3_") for c in chain)
     )
     l3_trigger_rate = (layer3_pages / total_pages) if total_pages else 0
     cost_over_cap = avg_cost > COST_CAP_THB_PER_PAGE
@@ -277,16 +273,24 @@ def print_summary(batches_summary, all_results):
         print(f"\n[ batch: {s['batch']} ]")
         print(f"  files:        {s['files_total']}  (ok={s['files_ok']}, fail={s['files_fail']})")
         print(f"  pages:        {s['pages_total']}")
-        print(f"  cost:         ฿{s['total_cost_thb']}  avg ฿{s['avg_cost_thb_per_page']}/page"
-              + ("  ⚠ OVER CAP" if s['cost_over_cap'] else ""))
-        print(f"  elapsed:      {s['total_elapsed_ms']}ms  avg {s['avg_elapsed_ms_per_page']}ms/page")
-        print(f"  L1 avg conf:  mean={s['layer1_avg_conf_mean']}  "
-              f"min={s['layer1_avg_conf_min']}  max={s['layer1_avg_conf_max']}")
+        print(
+            f"  cost:         ฿{s['total_cost_thb']}  avg ฿{s['avg_cost_thb_per_page']}/page"
+            + ("  ⚠ OVER CAP" if s["cost_over_cap"] else "")
+        )
+        print(
+            f"  elapsed:      {s['total_elapsed_ms']}ms  avg {s['avg_elapsed_ms_per_page']}ms/page"
+        )
+        print(
+            f"  L1 avg conf:  mean={s['layer1_avg_conf_mean']}  "
+            f"min={s['layer1_avg_conf_min']}  max={s['layer1_avg_conf_max']}"
+        )
         print(f"  layer chains: {s['layer_chain_distribution']}")
         print(f"  triggers:     {s['trigger_buckets']}")
-        print(f"  L3 triggered: {s['layer3_triggered_pages']}/{s['pages_total']} "
-              f"({s['layer3_trigger_rate'] * 100:.0f}%) "
-              f"(failed: {s['layer3_failed_pages']})")
+        print(
+            f"  L3 triggered: {s['layer3_triggered_pages']}/{s['pages_total']} "
+            f"({s['layer3_trigger_rate'] * 100:.0f}%) "
+            f"(failed: {s['layer3_failed_pages']})"
+        )
         print(f"  manual review: {s['needs_manual_review_pages']} page(s)")
 
     # Grand total
@@ -295,11 +299,13 @@ def print_summary(batches_summary, all_results):
     grand_ms = sum(s["total_elapsed_ms"] for s in batches_summary)
     grand_avg_cost = grand_cost / grand_pages if grand_pages else 0
     grand_avg_ms = grand_ms / grand_pages if grand_pages else 0
-    print(f"\n[ GRAND TOTAL ]")
+    print("\n[ GRAND TOTAL ]")
     print(f"  pages:        {grand_pages}")
     print(f"  cost:         ฿{round(grand_cost, 4)}  avg ฿{round(grand_avg_cost, 4)}/page")
-    print(f"  cap (avg/p):  ฿{COST_CAP_THB_PER_PAGE}  "
-          + ("⚠ EXCEEDED" if grand_avg_cost > COST_CAP_THB_PER_PAGE else "OK"))
+    print(
+        f"  cap (avg/p):  ฿{COST_CAP_THB_PER_PAGE}  "
+        + ("⚠ EXCEEDED" if grand_avg_cost > COST_CAP_THB_PER_PAGE else "OK")
+    )
     print(f"  elapsed:      {grand_ms}ms  avg {grand_avg_ms:.0f}ms/page")
 
 
@@ -320,16 +326,29 @@ def main():
         if not files:
             print(f"\n=== batch '{name}' is empty — skipping ===")
             all_results[name] = []
-            summaries.append({
-                "batch": name, "files_total": 0, "files_ok": 0, "files_fail": 0,
-                "pages_total": 0, "total_cost_thb": 0, "avg_cost_thb_per_page": 0,
-                "total_elapsed_ms": 0, "avg_elapsed_ms_per_page": 0,
-                "layer_chain_distribution": {}, "trigger_buckets": {},
-                "layer3_triggered_pages": 0, "layer3_failed_pages": 0,
-                "layer3_trigger_rate": 0, "needs_manual_review_pages": 0,
-                "layer1_avg_conf_mean": 0, "layer1_avg_conf_min": 0,
-                "layer1_avg_conf_max": 0, "cost_over_cap": False,
-            })
+            summaries.append(
+                {
+                    "batch": name,
+                    "files_total": 0,
+                    "files_ok": 0,
+                    "files_fail": 0,
+                    "pages_total": 0,
+                    "total_cost_thb": 0,
+                    "avg_cost_thb_per_page": 0,
+                    "total_elapsed_ms": 0,
+                    "avg_elapsed_ms_per_page": 0,
+                    "layer_chain_distribution": {},
+                    "trigger_buckets": {},
+                    "layer3_triggered_pages": 0,
+                    "layer3_failed_pages": 0,
+                    "layer3_trigger_rate": 0,
+                    "needs_manual_review_pages": 0,
+                    "layer1_avg_conf_mean": 0,
+                    "layer1_avg_conf_min": 0,
+                    "layer1_avg_conf_max": 0,
+                    "cost_over_cap": False,
+                }
+            )
             continue
         print(f"\n=== batch '{name}' ({len(files)} files) ===", flush=True)
         results = run_batch(name, files, pattern_memory=shared_pattern_memory)

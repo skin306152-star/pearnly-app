@@ -11,6 +11,7 @@ Pearnly 启动检查 · 用 importlib.util.find_spec 静态查每个根目录 .p
   0 = 所有 import 可解析(本地模块存在 + 第三方包已装)
   1 = 有 import 解析失败 / 文件解析失败
 """
+
 import argparse
 import ast
 import os
@@ -94,7 +95,7 @@ def main():
     print("Pearnly 启动检查报告")
     print("=" * 70)
     print()
-    print(f"## 总结")
+    print("## 总结")
     print(f"- 项目本地 .py 文件总数:{len(py_files)}")
     print(f"- 全部 import 能解析:{len(ok_files)}")
     print(f"- 有 import 解析失败:{len(broken_files)}")
@@ -128,7 +129,15 @@ def main():
                 print(f"      - {f}")
         print()
 
-        known_third_party_missing = {"fastapi", "uvicorn", "psycopg2", "bcrypt", "jwt", "passlib", "xlrd"}
+        known_third_party_missing = {
+            "fastapi",
+            "uvicorn",
+            "psycopg2",
+            "bcrypt",
+            "jwt",
+            "passlib",
+            "xlrd",
+        }
         local_looking_missing = {m for m in all_missing if m not in known_third_party_missing}
 
         print("=" * 70)

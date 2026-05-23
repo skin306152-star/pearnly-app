@@ -179,8 +179,7 @@ class BrowserSession:
             ],
         )
         self._ctx = self._browser.new_context(
-            viewport={"width": self.viewport_width,
-                      "height": self.viewport_height},
+            viewport={"width": self.viewport_width, "height": self.viewport_height},
             locale=self.locale,
             accept_downloads=True,
         )

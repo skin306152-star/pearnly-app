@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 7
-JWT_REMEMBER_DAYS = 30   # v0.17 · 勾选"记住我"时的长有效期
+JWT_REMEMBER_DAYS = 30  # v0.17 · 勾选"记住我"时的长有效期
 
 
 def _jwt_secret() -> str:
@@ -77,6 +77,7 @@ def create_access_token(
     # 写入 users.active_jti(失败不阻塞登录 · 老用户兼容)
     try:
         import db as _db
+
         with _db.get_cursor(commit=True) as cur:
             cur.execute("UPDATE users SET active_jti=%s WHERE id=%s", (jti, user_id))
         logger.info(f"[session] new login · user={user_id} jti={jti[:8]}...")
@@ -120,6 +121,7 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
 
     # 从 DB 查最新的用户信息(防止 JWT 过期后权限还有效)
     from db import find_user_by_id
+
     user = find_user_by_id(payload["sub"])
     if not user:
         raise HTTPException(
@@ -147,11 +149,7 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
                 pwd_ts = int(pwd_at.timestamp())
             else:
                 # 兜底:字符串 ISO 格式
-                pwd_ts = int(
-                    datetime.fromisoformat(
-                        str(pwd_at).replace("Z", "+00:00")
-                    ).timestamp()
-                )
+                pwd_ts = int(datetime.fromisoformat(str(pwd_at).replace("Z", "+00:00")).timestamp())
             if int(iat) < pwd_ts:
                 logger.info(
                     f"[v118.28.9] token 被改密事件作废 · user={user.get('id')} "

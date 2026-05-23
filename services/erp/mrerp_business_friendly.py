@@ -38,9 +38,7 @@ FailedRow.reasons list.
 
 from __future__ import annotations
 
-import re
 from typing import Dict, List, Optional
-
 
 SUPPORTED_LANGS = ("th", "en", "zh", "zh_TW")
 DEFAULT_LANG = "zh"
@@ -99,7 +97,7 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
     "ERR_NEGATIVE_AMOUNT": {
         "th": "ยอดรวมติดลบ ห้ามใช้กับใบกำกับขาย",
         "en": "Negative total amount — sales_credit upload requires "
-              "positive total (use a credit note workflow instead)",
+        "positive total (use a credit note workflow instead)",
         "zh": "总金额为负 · 销项发票不允许(请走红字发票流程)",
         "zh_TW": "總金額為負 · 銷項發票不允許(請走紅字發票流程)",
     },
@@ -129,8 +127,7 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
     },
     "ERR_TAX_RATE_INVALID": {
         "th": "อัตราภาษีไม่อยู่ในรายการที่อนุญาต",
-        "en": "Tax rate is not in the allowed set "
-              "{vat_7, vat_0, vat_exempt, non_vat}",
+        "en": "Tax rate is not in the allowed set " "{vat_7, vat_0, vat_exempt, non_vat}",
         "zh": "税率不在允许枚举内(vat_7 / vat_0 / vat_exempt / non_vat)",
         "zh_TW": "稅率不在允許列舉內(vat_7 / vat_0 / vat_exempt / non_vat)",
     },
@@ -154,15 +151,13 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
     },
     "ERR_NO_SEED_CUSTOMER": {
         "th": "ต้องเลือกลูกค้าต้นแบบในวิซาร์ดเชื่อม ERP ก่อนสร้างลูกค้าใหม่อัตโนมัติ",
-        "en": "Auto-create needs a seed customer. Pick one in the ERP "
-              "connection wizard.",
+        "en": "Auto-create needs a seed customer. Pick one in the ERP " "connection wizard.",
         "zh": "自动建客户需先选模板 · 请到 ERP 连接向导挑一个种子客户",
         "zh_TW": "自動建立客戶需先選範本 · 請到 ERP 連線精靈挑一個種子客戶",
     },
     "ERR_SEED_NOT_FOUND": {
         "th": "ไม่พบลูกค้าต้นแบบในระบบ MR.ERP — ตรวจสอบรหัสและเลือกใหม่",
-        "en": "Seed customer not found in MR.ERP — verify the code and "
-              "reselect.",
+        "en": "Seed customer not found in MR.ERP — verify the code and " "reselect.",
         "zh": "MR.ERP 里没找到所选种子客户 · 请核对客户码并重新选择",
         "zh_TW": "MR.ERP 裡沒找到所選種子客戶 · 請核對客戶碼並重新選擇",
     },
@@ -206,23 +201,20 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
     # Product-sync buckets (Task 2 · Zihao 2026-05-18 拍板)
     "ERR_NO_SEED_PRODUCT": {
         "th": "ต้องเลือกสินค้าต้นแบบในวิซาร์ดเชื่อม ERP ก่อนสร้างสินค้าใหม่อัตโนมัติ",
-        "en": "Auto-create needs a seed product. Pick one in the ERP "
-              "connection wizard.",
+        "en": "Auto-create needs a seed product. Pick one in the ERP " "connection wizard.",
         "zh": "自动建商品需先选模板 · 请到 ERP 连接向导挑一个种子商品",
         "zh_TW": "自動建立商品需先選範本 · 請到 ERP 連線精靈挑一個種子商品",
     },
     "ERR_SEED_PRODUCT_NOT_FOUND": {
         "th": "ไม่พบสินค้าต้นแบบในระบบ MR.ERP — ตรวจสอบรหัสและเลือกใหม่",
-        "en": "Seed product not found in MR.ERP — verify the code and "
-              "reselect.",
+        "en": "Seed product not found in MR.ERP — verify the code and " "reselect.",
         "zh": "MR.ERP 里没找到所选种子商品 · 请核对商品码并重新选择",
         "zh_TW": "MR.ERP 裡沒找到所選種子商品 · 請核對商品碼並重新選擇",
     },
     "ERR_PRODUCT_UNIT_NOT_FOUND": {
-        "th": "หน่วย OCR ไม่ตรงกับหน่วยของสินค้าต้นแบบ — เปลี่ยนต้นแบบ"
-              "หรือเอา hint หน่วยออก",
+        "th": "หน่วย OCR ไม่ตรงกับหน่วยของสินค้าต้นแบบ — เปลี่ยนต้นแบบ" "หรือเอา hint หน่วยออก",
         "en": "OCR unit does not match the seed product's unit — pick "
-              "a seed with the right unit or drop the OCR unit hint",
+        "a seed with the right unit or drop the OCR unit hint",
         "zh": "OCR 单位与种子商品单位不符 · 换个种子或删去 OCR 单位提示",
         "zh_TW": "OCR 單位與種子商品單位不符 · 換個種子或刪去 OCR 單位提示",
     },
@@ -234,8 +226,7 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
     },
     "WARN_PRODUCT_PRICE_INHERITED_FROM_SEED": {
         "th": "ราคาขายสืบทอดจากสินค้าต้นแบบ — โปรดตรวจสอบในระบบ MR.ERP",
-        "en": "Sales price inherited from the seed product — please "
-              "review in MR.ERP",
+        "en": "Sales price inherited from the seed product — please " "review in MR.ERP",
         "zh": "销售价继承自种子商品 · 请到 MR.ERP 核对",
         "zh_TW": "銷售價繼承自種子商品 · 請到 MR.ERP 核對",
     },
@@ -251,7 +242,7 @@ _THAI_REASON_CATALOG: List[tuple] = [
         {
             "th": "ไม่พบรหัสลูกค้า (บิล) ในระบบ — สร้างลูกค้าก่อน",
             "en": "Customer billing code not found in MR.ERP master data — "
-                  "create the customer first",
+            "create the customer first",
             "zh": "MR.ERP 主数据找不到客户账单码 · 需先创建客户",
             "zh_TW": "MR.ERP 主資料找不到客戶帳單碼 · 需先建立客戶",
         },
@@ -260,8 +251,7 @@ _THAI_REASON_CATALOG: List[tuple] = [
         "ไม่พบข้อมูลรหัสลูกค้า",
         {
             "th": "ไม่พบรหัสลูกค้าในระบบ — สร้างลูกค้าก่อน",
-            "en": "Customer code not found in MR.ERP master data — "
-                  "create the customer first",
+            "en": "Customer code not found in MR.ERP master data — " "create the customer first",
             "zh": "MR.ERP 主数据找不到客户码 · 需先创建客户",
             "zh_TW": "MR.ERP 主資料找不到客戶碼 · 需先建立客戶",
         },
@@ -270,8 +260,7 @@ _THAI_REASON_CATALOG: List[tuple] = [
         "ไม่พบข้อมูลรหัสสินค้า",
         {
             "th": "ไม่พบรหัสสินค้าในระบบ — สร้างสินค้าก่อน",
-            "en": "Product code not found in MR.ERP master data — "
-                  "create the product first",
+            "en": "Product code not found in MR.ERP master data — " "create the product first",
             "zh": "MR.ERP 主数据找不到商品码 · 需先创建商品",
             "zh_TW": "MR.ERP 主資料找不到商品碼 · 需先建立商品",
         },

@@ -6,7 +6,7 @@ v118.32.x · Pearnly · 屏 B 文件智能分类
   1. 文件名/路径快速规则(零成本)
   2. 不确定 → Gemini 1 次轻量调用(只看首页)
 """
-import io
+
 import os
 import re
 import json
@@ -16,10 +16,25 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 # 文件名关键词
-_INVOICE_HINTS = [r'\binvoice\b', r'\binv\b', r'ใบกำกับ', r'tax_?inv',
-                  r'\bIV\d', r'\bINV\d', r'receipt']
-_REPORT_HINTS  = [r'\breport\b', r'รายงาน', r'\bvat\b', r'sales_tax',
-                  r'sale_vat', r'ภาษีขาย', r'pp30', r'ภ\.พ\.30']
+_INVOICE_HINTS = [
+    r"\binvoice\b",
+    r"\binv\b",
+    r"ใบกำกับ",
+    r"tax_?inv",
+    r"\bIV\d",
+    r"\bINV\d",
+    r"receipt",
+]
+_REPORT_HINTS = [
+    r"\breport\b",
+    r"รายงาน",
+    r"\bvat\b",
+    r"sales_tax",
+    r"sale_vat",
+    r"ภาษีขาย",
+    r"pp30",
+    r"ภ\.พ\.30",
+]
 
 
 def _filename_guess(filename: str) -> Optional[str]:
@@ -65,23 +80,27 @@ def _excel_quick_meta(file_bytes: bytes):
     """v118.32.4.4 · Excel 头部轻量扫:税号(13 位数字) + 期间(MM/YYYY) + 卖方名
     不走 Gemini · 仅看前 30 行 · 失败返回全空"""
     try:
-        import openpyxl, io
+        import openpyxl
+        import io
+
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
         ws = wb.active
         tax_id, year, month, name = "", None, None, ""
         company_kw = ("บริษัท", "ห้างหุ้นส่วน", "co.", "ltd.", "company")
         for i, row in enumerate(ws.iter_rows(min_row=1, max_row=30, values_only=True), 1):
             cells = [str(c) for c in row if c is not None]
-            if not cells: continue
+            if not cells:
+                continue
             text = " ".join(cells)
-            cleaned = re.sub(r'[\s\-]', '', text)
+            cleaned = re.sub(r"[\s\-]", "", text)
             # 1. 13 位连续数字 = 税号(优先第一个出现的 · 通常是页眉的卖方税号)
             if not tax_id:
-                m = re.search(r'(\d{13})(?!\d)', cleaned)
-                if m: tax_id = m.group(1)
+                m = re.search(r"(\d{13})(?!\d)", cleaned)
+                if m:
+                    tax_id = m.group(1)
             # 2. 期间 MM/YYYY 或 MM/2569(佛历)
             if not (year and month):
-                m = re.search(r'(?<!\d)(\d{1,2})\s*/\s*(\d{4})(?!\d)', text)
+                m = re.search(r"(?<!\d)(\d{1,2})\s*/\s*(\d{4})(?!\d)", text)
                 if m:
                     mm, yy = int(m.group(1)), int(m.group(2))
                     if 1 <= mm <= 12 and 2020 <= yy <= 2030:
@@ -101,17 +120,16 @@ def _excel_quick_meta(file_bytes: bytes):
         return "", None, None, ""
 
 
-def classify_with_gemini(file_bytes: bytes, mime_type: str,
-                          api_key: Optional[str] = None) -> Dict[str, Any]:
+def classify_with_gemini(
+    file_bytes: bytes, mime_type: str, api_key: Optional[str] = None
+) -> Dict[str, Any]:
     """用 Gemini 看首页判断 · 返回 {type, confidence, tax_id, name, year, month}"""
     try:
         import google.generativeai as genai
     except ImportError:
         return {"ok": False, "error": "google-generativeai 未安装", "type": "unknown"}
 
-    key = (api_key
-           or os.environ.get("GEMINI_API_KEY")
-           or os.environ.get("GOOGLE_API_KEY"))
+    key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         return {"ok": False, "error": "Gemini key 未配置", "type": "unknown"}
 
@@ -135,13 +153,13 @@ def classify_with_gemini(file_bytes: bytes, mime_type: str,
         text = (response.text or "").strip()
         data = json.loads(text)
         return {
-            "ok":         True,
-            "type":       data.get("type", "unknown"),
+            "ok": True,
+            "type": data.get("type", "unknown"),
             "confidence": float(data.get("confidence") or 0.5),
-            "tax_id":     re.sub(r'[^0-9]', '', str(data.get("tax_id") or ""))[:13],
-            "name":       str(data.get("name") or "").strip(),
-            "year":       int(data.get("year") or 0) or None,
-            "month":      int(data.get("month") or 0) or None,
+            "tax_id": re.sub(r"[^0-9]", "", str(data.get("tax_id") or ""))[:13],
+            "name": str(data.get("name") or "").strip(),
+            "year": int(data.get("year") or 0) or None,
+            "month": int(data.get("month") or 0) or None,
         }
     except json.JSONDecodeError as e:
         logger.warning(f"[classify] JSON fail: {e} · raw={text[:200]}")
@@ -151,10 +169,13 @@ def classify_with_gemini(file_bytes: bytes, mime_type: str,
         return {"ok": False, "error": str(e), "type": "unknown"}
 
 
-def classify_file(file_bytes: bytes, filename: str,
-                  api_key: Optional[str] = None,
-                  always_use_gemini: bool = False,
-                  fast_mode_invoice: bool = True) -> Dict[str, Any]:
+def classify_file(
+    file_bytes: bytes,
+    filename: str,
+    api_key: Optional[str] = None,
+    always_use_gemini: bool = False,
+    fast_mode_invoice: bool = True,
+) -> Dict[str, Any]:
     """
     分类入口
     优先用文件名规则(零成本) · 不确定 → Gemini
@@ -174,13 +195,13 @@ def classify_file(file_bytes: bytes, filename: str,
 
     # MIME 类型推断
     mime_map = {
-        "pdf":  "application/pdf",
-        "jpg":  "image/jpeg",
+        "pdf": "application/pdf",
+        "jpg": "image/jpeg",
         "jpeg": "image/jpeg",
-        "png":  "image/png",
+        "png": "image/png",
         "webp": "image/webp",
         "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "xls":  "application/vnd.ms-excel",
+        "xls": "application/vnd.ms-excel",
     }
     mime = mime_map.get(ext)
 
@@ -188,14 +209,20 @@ def classify_file(file_bytes: bytes, filename: str,
     # v118.32.4.4 · 轻量扫前 30 行抽税号/期间 · 避免 Excel 卡"无法分组"
     if ext in ("xlsx", "xls"):
         tax_id, year, month, name = _excel_quick_meta(file_bytes)
-        return {"ok": True, "type": "vat_report", "confidence": 0.9,
-                "tax_id": tax_id, "name": name, "year": year, "month": month,
-                "method": "ext_excel" + ("+meta" if tax_id else "")}
+        return {
+            "ok": True,
+            "type": "vat_report",
+            "confidence": 0.9,
+            "tax_id": tax_id,
+            "name": name,
+            "year": year,
+            "month": month,
+            "method": "ext_excel" + ("+meta" if tax_id else ""),
+        }
 
     # 不支持的格式
     if not mime:
-        return {"ok": False, "type": "unknown",
-                "error": f"不支持的格式 .{ext}"}
+        return {"ok": False, "type": "unknown", "error": f"不支持的格式 .{ext}"}
 
     # 文件名快速规则
     if not always_use_gemini:
@@ -204,9 +231,16 @@ def classify_file(file_bytes: bytes, filename: str,
             # v118.32.5.3 · 关键优化：文件名清楚是发票 + 默认快速模式 → 跳 Gemini
             # 发票 tax_id 后续 OCR 阶段会重新抽 · 不需要 classify 阶段抽
             if fast_mode_invoice:
-                return {"ok": True, "type": "invoice", "confidence": 0.95,
-                        "tax_id": "", "name": "", "year": None, "month": None,
-                        "method": "filename_only"}
+                return {
+                    "ok": True,
+                    "type": "invoice",
+                    "confidence": 0.95,
+                    "tax_id": "",
+                    "name": "",
+                    "year": None,
+                    "month": None,
+                    "method": "filename_only",
+                }
             # 兼容模式:文件名提示 invoice 还是跑 Gemini 提取 tax_id(多 VAT 报告场景)
             r = classify_with_gemini(file_bytes, mime, api_key=api_key)
             if r.get("ok"):

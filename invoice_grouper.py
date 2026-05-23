@@ -14,6 +14,7 @@ Mr.Pilot · v0.11 发票智能分组模块
 - items:所有页的 items 按顺序拼接
 - notes:拼接(换行分隔)
 """
+
 from typing import List, Dict, Any
 
 
@@ -68,7 +69,12 @@ def _merge_items(pages: List[Dict]) -> List[Dict]:
                     pname = str(prev.get("name", "") or "").strip()
                     pqty = str(prev.get("qty", "") or "").strip()
                     pprice = str(prev.get("price", "") or "").strip()
-                    if pqty == qty and pprice == price and pname and (name in pname or pname in name):
+                    if (
+                        pqty == qty
+                        and pprice == price
+                        and pname
+                        and (name in pname or pname in name)
+                    ):
                         is_dup = True
                         # 保留更长的 name(通常更详细)
                         if len(name) > len(pname):
@@ -89,18 +95,18 @@ def _build_invoice_from_pages(pages_group: List[Dict]) -> Dict[str, Any]:
     # 基础字段取第一个非空
     merged_fields = {
         "invoice_number": _first_non_empty(pages_group, "invoice_number"),
-        "date":           _first_non_empty(pages_group, "date"),
-        "seller_name":    _first_non_empty(pages_group, "seller_name"),
-        "seller_tax":     _first_non_empty(pages_group, "seller_tax"),
-        "seller_addr":    _first_non_empty(pages_group, "seller_addr"),
-        "buyer_name":     _first_non_empty(pages_group, "buyer_name"),
-        "buyer_tax":      _first_non_empty(pages_group, "buyer_tax"),
-        "buyer_addr":     _first_non_empty(pages_group, "buyer_addr"),
-        "subtotal":       _first_non_empty(pages_group, "subtotal"),
-        "vat":            _first_non_empty(pages_group, "vat"),
-        "total_amount":   _first_non_empty(pages_group, "total_amount"),
-        "category":       _first_non_empty(pages_group, "category"),
-        "items":          _merge_items(pages_group),
+        "date": _first_non_empty(pages_group, "date"),
+        "seller_name": _first_non_empty(pages_group, "seller_name"),
+        "seller_tax": _first_non_empty(pages_group, "seller_tax"),
+        "seller_addr": _first_non_empty(pages_group, "seller_addr"),
+        "buyer_name": _first_non_empty(pages_group, "buyer_name"),
+        "buyer_tax": _first_non_empty(pages_group, "buyer_tax"),
+        "buyer_addr": _first_non_empty(pages_group, "buyer_addr"),
+        "subtotal": _first_non_empty(pages_group, "subtotal"),
+        "vat": _first_non_empty(pages_group, "vat"),
+        "total_amount": _first_non_empty(pages_group, "total_amount"),
+        "category": _first_non_empty(pages_group, "category"),
+        "items": _merge_items(pages_group),
     }
     # notes 拼接
     notes = []
@@ -163,11 +169,13 @@ def group_pages_to_invoices(pages: List[Dict]) -> List[Dict[str, Any]]:
 
         for inv_no in seen_order:
             group_pages = groups_by_inv[inv_no]
-            result.append({
-                "invoice_fields": _build_invoice_from_pages(group_pages),
-                "source_pages": group_pages,
-                "page_indices": [p["page_index"] for p in group_pages],
-            })
+            result.append(
+                {
+                    "invoice_fields": _build_invoice_from_pages(group_pages),
+                    "source_pages": group_pages,
+                    "page_indices": [p["page_index"] for p in group_pages],
+                }
+            )
 
         # 没有发票号的页:附加到第一组(假设是附加说明/空白页)
         if pages_without_inv and result:
@@ -181,9 +189,7 @@ def group_pages_to_invoices(pages: List[Dict]) -> List[Dict[str, Any]]:
     # ------ 策略 2:按金额页分界 ------
     # 没有发票号 · 看每页是否有 total_amount
     # 规则:有 total 的页作为一张发票的"结束页" · 它和前面所有无 total 的页合并
-    has_total_any = any(
-        not _is_empty((p.get("fields") or {}).get("total_amount")) for p in pages
-    )
+    has_total_any = any(not _is_empty((p.get("fields") or {}).get("total_amount")) for p in pages)
 
     if has_total_any:
         result = []
@@ -194,11 +200,13 @@ def group_pages_to_invoices(pages: List[Dict]) -> List[Dict[str, Any]]:
             total = f.get("total_amount")
             if not _is_empty(total):
                 # 这是一张发票的结束
-                result.append({
-                    "invoice_fields": _build_invoice_from_pages(buffer),
-                    "source_pages": buffer,
-                    "page_indices": [pp["page_index"] for pp in buffer],
-                })
+                result.append(
+                    {
+                        "invoice_fields": _build_invoice_from_pages(buffer),
+                        "source_pages": buffer,
+                        "page_indices": [pp["page_index"] for pp in buffer],
+                    }
+                )
                 buffer = []
         # 剩余的 buffer(结尾无 total 的页)· 附加到最后一张
         if buffer:
@@ -207,16 +215,20 @@ def group_pages_to_invoices(pages: List[Dict]) -> List[Dict[str, Any]]:
                 result[-1]["page_indices"].extend([p["page_index"] for p in buffer])
             else:
                 # 理论上不会到这里 · 但保险
-                result.append({
-                    "invoice_fields": _build_invoice_from_pages(buffer),
-                    "source_pages": buffer,
-                    "page_indices": [p["page_index"] for p in buffer],
-                })
+                result.append(
+                    {
+                        "invoice_fields": _build_invoice_from_pages(buffer),
+                        "source_pages": buffer,
+                        "page_indices": [p["page_index"] for p in buffer],
+                    }
+                )
         return result
 
     # ------ 策略 3:fallback 全部作为一张 ------
-    return [{
-        "invoice_fields": _build_invoice_from_pages(pages),
-        "source_pages": pages,
-        "page_indices": [p["page_index"] for p in pages],
-    }]
+    return [
+        {
+            "invoice_fields": _build_invoice_from_pages(pages),
+            "source_pages": pages,
+            "page_indices": [p["page_index"] for p in pages],
+        }
+    ]

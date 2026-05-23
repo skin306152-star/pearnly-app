@@ -27,7 +27,6 @@ import re
 import unicodedata
 from typing import List, Optional, Tuple
 
-
 # ============================================================
 # Legal suffix patterns (case-insensitive)
 # ============================================================
@@ -91,9 +90,7 @@ _CHINESE_LEGAL_SUFFIXES = (
 )
 
 # Punctuation we always strip from normalized names.
-_PUNCT_RE = re.compile(
-    r"[\s\.,\-_/\\()&\"'`*\[\]{}!?:;@#$%\^+=<>|~・·、。]+"
-)
+_PUNCT_RE = re.compile(r"[\s\.,\-_/\\()&\"'`*\[\]{}!?:;@#$%\^+=<>|~・·、。]+")
 
 
 def _strip_suffix_set(s: str, suffixes: Tuple[str, ...]) -> str:
@@ -163,6 +160,7 @@ def normalize_item_name(s: Optional[str]) -> str:
 # Levenshtein
 # ============================================================
 
+
 def levenshtein(a: str, b: str) -> int:
     """Edit distance between two strings (substitution / insertion /
     deletion all cost 1). O(len(a) * len(b)) time, O(min(len(a), len(b)))
@@ -203,6 +201,7 @@ def levenshtein_ratio(a: str, b: str) -> float:
 # ============================================================
 # Convenience: best fuzzy match in a list
 # ============================================================
+
 
 def fuzzy_match(
     query: str,

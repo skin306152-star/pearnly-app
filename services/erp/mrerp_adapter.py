@@ -67,18 +67,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import mrerp_xlsx_generator                              # noqa: E402
-from services.erp._browser import BrowserSession        # noqa: E402
-from services.erp.exceptions import (                   # noqa: E402
+import mrerp_xlsx_generator  # noqa: E402
+from services.erp._browser import BrowserSession  # noqa: E402
+from services.erp.exceptions import (  # noqa: E402
     MRERPAuthError,
     MRERPBusinessError,
     MRERPError,
     MRERPTechnicalError,
 )
-from services.erp.mrerp_business_friendly import (      # noqa: E402
+from services.erp.mrerp_business_friendly import (  # noqa: E402
     translate_reasons,
 )
-from services.erp.mrerp_report_parser import (          # noqa: E402
+from services.erp.mrerp_report_parser import (  # noqa: E402
     ImportReport,
     parse_import_report,
 )
@@ -92,9 +92,11 @@ T = TypeVar("T")
 # Result dataclasses
 # ============================================================
 
+
 @dataclass
 class InvoiceRecord:
     """One row found via search_invoice()."""
+
     invoice_no: str
     bill_no: str
     db_row_id: str
@@ -113,6 +115,7 @@ class FailedRow:
     `reasons_friendly` is a parallel list of `{lang: translation}` dicts
     sourced from `services.erp.mrerp_business_friendly`; the UI picks
     whichever language matches the viewer."""
+
     invoice_no: str
     reasons: List[str]
     original: Dict[str, Any]
@@ -126,6 +129,7 @@ class FailedRow:
 @dataclass
 class SuccessRow:
     """One invoice that landed in MR.ERP's DB."""
+
     invoice_no: str
     mrerp_bill_no: str
     original: Dict[str, Any]
@@ -137,6 +141,7 @@ class SuccessRow:
 @dataclass
 class ImportResult:
     """Return value of upload_invoice_batch."""
+
     total: int
     success: List[SuccessRow] = field(default_factory=list)
     failed: List[FailedRow] = field(default_factory=list)
@@ -164,6 +169,7 @@ class ImportResult:
 # The adapter
 # ============================================================
 
+
 class MRERPAdapter:
 
     SC_PATH_FORMUPLOAD = "/impartran/formupload.php"
@@ -176,7 +182,7 @@ class MRERPAdapter:
 
     UPLOAD_TIMEOUT_MS = 20_000
     PREVIEW_TIMEOUT_MS = 20_000
-    REPORT_DOWNLOAD_TIMEOUT_MS = 120_000   # PHP first-call warmup can run >60s
+    REPORT_DOWNLOAD_TIMEOUT_MS = 120_000  # PHP first-call warmup can run >60s
     DEFAULT_PAGE_TIMEOUT_MS = 15_000
 
     def __init__(
@@ -235,14 +241,10 @@ class MRERPAdapter:
         # on the persisted MR.ERP connection.
         self.enable_master_data_sync = bool(enable_master_data_sync)
         self.master_data_auto_create = bool(master_data_auto_create)
-        self.seed_customer_code = (
-            (seed_customer_code or "").strip() or None
-        )
-        self.seed_product_code = (
-            (seed_product_code or "").strip() or None
-        )
-        self._customer_sync = None     # lazy-created on first use
-        self._product_sync = None      # lazy-created on first use
+        self.seed_customer_code = (seed_customer_code or "").strip() or None
+        self.seed_product_code = (seed_product_code or "").strip() or None
+        self._customer_sync = None  # lazy-created on first use
+        self._product_sync = None  # lazy-created on first use
 
         self._session: Optional[BrowserSession] = None
         self._logged_in = False
@@ -264,9 +266,10 @@ class MRERPAdapter:
         Decryption uses services-wide kms_helper (`PEARNLY_KMS_KEY` env).
         The plaintext only lives in this adapter's memory; nothing logs it.
         """
-        from kms_helper import decrypt_str   # import here so unit tests
-                                              # that don't need encryption
-                                              # don't require PEARNLY_KMS_KEY
+        from kms_helper import decrypt_str  # import here so unit tests
+
+        # that don't need encryption
+        # don't require PEARNLY_KMS_KEY
         return cls(
             login_url=login_url,
             username=decrypt_str(encrypted_username),
@@ -322,14 +325,16 @@ class MRERPAdapter:
                 if attempt < self.retry_attempts:
                     delay = self._delay_for_attempt(attempt)
                     logger.warning(
-                        "%s technical failure (attempt %d/%d): %s; "
-                        "sleeping %.1fs",
-                        op_name, attempt, self.retry_attempts, e, delay,
+                        "%s technical failure (attempt %d/%d): %s; " "sleeping %.1fs",
+                        op_name,
+                        attempt,
+                        self.retry_attempts,
+                        e,
+                        delay,
                     )
                     time.sleep(delay)
         assert last is not None
-        logger.error("%s failed after %d attempts: %s",
-                     op_name, self.retry_attempts, last)
+        logger.error("%s failed after %d attempts: %s", op_name, self.retry_attempts, last)
         raise last
 
     def _delay_for_attempt(self, attempt: int) -> float:
@@ -355,9 +360,11 @@ class MRERPAdapter:
 
         # Step 1: warm-up GET. Old PHP needs a session cookie before any POST.
         try:
-            page.goto(self.login_url + "/",
-                      wait_until="domcontentloaded",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(
+                self.login_url + "/",
+                wait_until="domcontentloaded",
+                timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+            )
         except (PWTimeout, PWError) as e:
             raise MRERPTechnicalError(f"landing GET timeout: {e}") from e
 
@@ -370,13 +377,17 @@ class MRERPAdapter:
                 try:
                     link.click(timeout=5_000)
                 except Exception:
-                    page.goto(self.login_url + self.LOGIN_PATH,
-                              wait_until="networkidle",
-                              timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+                    page.goto(
+                        self.login_url + self.LOGIN_PATH,
+                        wait_until="networkidle",
+                        timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+                    )
             else:
-                page.goto(self.login_url + self.LOGIN_PATH,
-                          wait_until="networkidle",
-                          timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+                page.goto(
+                    self.login_url + self.LOGIN_PATH,
+                    wait_until="networkidle",
+                    timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+                )
         except (PWTimeout, PWError) as e:
             raise MRERPTechnicalError(f"nav to login form timeout: {e}") from e
 
@@ -440,23 +451,21 @@ class MRERPAdapter:
         # (no 302), so URL + body inspection is required.
         if self._is_login_bounced():
             self._shot("login-bounced", f"URL={page.url}")
-            raise MRERPAuthError(
-                f"login bounced back to public area; URL={page.url}")
+            raise MRERPAuthError(f"login bounced back to public area; URL={page.url}")
 
         # Double-check: try selectdb.php. If that bounces too, definite fail.
         try:
-            page.goto(self.login_url + self.SELECTDB_PATH,
-                      wait_until="networkidle",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(
+                self.login_url + self.SELECTDB_PATH,
+                wait_until="networkidle",
+                timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+            )
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"selectdb verification timeout: {e}") from e
+            raise MRERPTechnicalError(f"selectdb verification timeout: {e}") from e
 
-        if ("login.php" in page.url.lower()
-                and "selectdb" not in page.url.lower()):
+        if "login.php" in page.url.lower() and "selectdb" not in page.url.lower():
             self._shot("login-bounced-selectdb", f"URL={page.url}")
-            raise MRERPAuthError(
-                f"selectdb requires login; URL={page.url}")
+            raise MRERPAuthError(f"selectdb requires login; URL={page.url}")
 
         self._shot("login-ok", f"URL={page.url}")
         logger.info("login ok; landed at %s", page.url)
@@ -485,8 +494,8 @@ class MRERPAdapter:
     # detection early so we raise a specific "MR.ERP under maintenance"
     # message instead of the generic technical error.
     _MAINTENANCE_HINTS = (
-        "ปิดปรับปรุง",       # under maintenance (Thai)
-        "ปรับปรุงระบบ",       # system upgrade (Thai)
+        "ปิดปรับปรุง",  # under maintenance (Thai)
+        "ปรับปรุงระบบ",  # system upgrade (Thai)
         "อยู่ระหว่างปรับปรุง",  # currently being upgraded
         "under maintenance",
         "scheduled maintenance",
@@ -552,6 +561,7 @@ class MRERPAdapter:
         wizard's test-connection path). Path is returned so the error
         message includes it."""
         import time as _time
+
         try:
             path = f"/tmp/mrerp_login_fail_{int(_time.time())}.png"
             self._page.screenshot(path=path, full_page=True)
@@ -570,6 +580,7 @@ class MRERPAdapter:
         filename so support can grep the right file.
         """
         import time as _time
+
         if self._page is None:
             return None
         try:
@@ -613,8 +624,7 @@ class MRERPAdapter:
             page.url,
         )
         try:
-            page.reload(wait_until="networkidle",
-                        timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.reload(wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
         except (PWTimeout, PWError) as e:
             shot_path = self._save_login_fail_screenshot()
             raise MRERPTechnicalError(
@@ -659,23 +669,20 @@ class MRERPAdapter:
         public_urls = ("checklogin", "/login/index", "/login/?", "/login.php")
         looks_public = any(kw in url_low for kw in public_urls)
         # Marketing root is also "public" for our purposes.
-        if (url_low.rstrip("/").endswith("/index.php")
-                or url_low.rstrip("/").endswith("mrerp4sme.com")):
+        if url_low.rstrip("/").endswith("/index.php") or url_low.rstrip("/").endswith(
+            "mrerp4sme.com"
+        ):
             looks_public = True
 
-        login_form_in_body = (
-            "txtusers" in body_html or "txtpasswords" in body_html
-        )
-        has_logout = ("ออกจากระบบ" in body_text or "logout" in body_html)
+        login_form_in_body = "txtusers" in body_html or "txtpasswords" in body_html
+        has_logout = "ออกจากระบบ" in body_text or "logout" in body_html
         protected_url = any(
-            kw in url_low
-            for kw in ("selectdb", "mainmenu", "impartran", "imparse", "armas")
+            kw in url_low for kw in ("selectdb", "mainmenu", "impartran", "imparse", "armas")
         )
 
         if has_logout or protected_url:
             return False
-        return looks_public and (login_form_in_body
-                                  or "เข้าสู่ระบบ" in body_text)
+        return looks_public and (login_form_in_body or "เข้าสู่ระบบ" in body_text)
 
     # ----- select company --------------------------------------------
 
@@ -694,21 +701,16 @@ class MRERPAdapter:
             f"?comidyear={self.comidyear}&seldb={self.seldb}"
         )
         try:
-            page.goto(target,
-                      wait_until="networkidle",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(target, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"company selection nav timeout: {e}") from e
+            raise MRERPTechnicalError(f"company selection nav timeout: {e}") from e
 
         if self._is_login_bounced():
             # Session evaporated between login and select_company.
             self._logged_in = False
-            raise MRERPAuthError(
-                f"company selection bounced to login; URL={page.url}")
+            raise MRERPAuthError(f"company selection bounced to login; URL={page.url}")
 
-        self._shot("company-selected",
-                   f"comidyear={self.comidyear} seldb={self.seldb}")
+        self._shot("company-selected", f"comidyear={self.comidyear} seldb={self.seldb}")
 
     # ----- upload batch ----------------------------------------------
 
@@ -757,10 +759,9 @@ class MRERPAdapter:
         preflight_failed: List[FailedRow] = []
         valid_histories: List[Dict[str, Any]] = []
         for h in histories:
-            ok, err_code, warnings = (
-                mrerp_xlsx_generator.validate_history_for_sales_credit(
-                    h, mappings,
-                )
+            ok, err_code, warnings = mrerp_xlsx_generator.validate_history_for_sales_credit(
+                h,
+                mappings,
             )
             if warnings:
                 logger.info(
@@ -773,16 +774,18 @@ class MRERPAdapter:
                 continue
             inv_no = (
                 mrerp_xlsx_generator.derive_mrerp_invoice_no(h)
-                if h.get("invoice_date") else
-                (h.get("invoice_number") or h.get("invoice_no") or "?")
+                if h.get("invoice_date")
+                else (h.get("invoice_number") or h.get("invoice_no") or "?")
             )
             reasons = [err_code or "ERR_UNKNOWN_PREFLIGHT"]
-            preflight_failed.append(FailedRow(
-                invoice_no=inv_no,
-                reasons=reasons,
-                reasons_friendly=translate_reasons(reasons),
-                original=h,
-            ))
+            preflight_failed.append(
+                FailedRow(
+                    invoice_no=inv_no,
+                    reasons=reasons,
+                    reasons_friendly=translate_reasons(reasons),
+                    original=h,
+                )
+            )
 
         if not valid_histories:
             # Every history was rejected at preflight; nothing to upload.
@@ -796,8 +799,7 @@ class MRERPAdapter:
         )
 
         expected_invoices = [
-            mrerp_xlsx_generator.derive_mrerp_invoice_no(h)
-            for h in valid_histories
+            mrerp_xlsx_generator.derive_mrerp_invoice_no(h) for h in valid_histories
         ]
 
         # Upload runs UN-retried: MR.ERP enforces uniqueness on invoice_no,
@@ -810,17 +812,15 @@ class MRERPAdapter:
         )
 
         if kind == "report":
-            evidence = self._shot(
-                "report-captured", "report.php xlsx parsed"
-            )
-            report = parse_import_report(payload)   # type: ignore[arg-type]
+            evidence = self._shot("report-captured", "report.php xlsx parsed")
+            report = parse_import_report(payload)  # type: ignore[arg-type]
             result = self._classify_against_inputs(
-                valid_histories, report, evidence_screenshot=evidence,
+                valid_histories,
+                report,
+                evidence_screenshot=evidence,
             )
             if self.screenshot_dir and payload:
-                report_save = (
-                    self.screenshot_dir / f"report-{int(time.time())}.xlsx"
-                )
+                report_save = self.screenshot_dir / f"report-{int(time.time())}.xlsx"
                 try:
                     report_save.write_bytes(payload)
                     result.report_xlsx_path = str(report_save)
@@ -828,30 +828,31 @@ class MRERPAdapter:
                     pass
         elif kind == "all_success":
             # importpc.php returned "1" — every row committed; no report.
-            evidence = self._shot(
-                "all-success", "importpc=1 (no report generated)"
-            )
+            evidence = self._shot("all-success", "importpc=1 (no report generated)")
             result = ImportResult(total=len(valid_histories))
             for h, inv in zip(valid_histories, expected_invoices):
-                result.success.append(SuccessRow(
-                    invoice_no=inv,
-                    mrerp_bill_no=f"SI{inv}",
-                    original=h,
-                ))
+                result.success.append(
+                    SuccessRow(
+                        invoice_no=inv,
+                        mrerp_bill_no=f"SI{inv}",
+                        original=h,
+                    )
+                )
         else:  # "listing_verified"
             evidence = self._shot(
                 "listing-verified",
                 "post-confirm timeout fallback to listing",
             )
             result = self._classify_via_listing(
-                valid_histories, expected_invoices,
+                valid_histories,
+                expected_invoices,
                 evidence_screenshot=evidence,
             )
 
         # Merge preflight failures into the final result.
         if preflight_failed:
             result.failed.extend(preflight_failed)
-        result.total = len(histories)   # full input count, not just valid
+        result.total = len(histories)  # full input count, not just valid
         result.elapsed_ms = int((time.time() - t0) * 1000)
         result.xlsx_size_bytes = len(xlsx_bytes)
         return result
@@ -892,14 +893,9 @@ class MRERPAdapter:
         page = self._page
 
         # Step A: navigate to the SC bulk-import form.
-        upload_url = (
-            f"{self.login_url}{self.SC_PATH_FORMUPLOAD}"
-            f"?idmenu={self.idmenu_sc}"
-        )
+        upload_url = f"{self.login_url}{self.SC_PATH_FORMUPLOAD}" f"?idmenu={self.idmenu_sc}"
         try:
-            page.goto(upload_url,
-                      wait_until="networkidle",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(upload_url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
         except (PWTimeout, PWError) as e:
             raise MRERPTechnicalError(f"formupload nav timeout: {e}") from e
 
@@ -909,48 +905,39 @@ class MRERPAdapter:
         # MRERPAuthError. 改:detect bounce + auto re-login + retry once ·
         # 让 push 跨过 session 真过期场景 · 不报 ERR_AUTH 给用户.
         if self._is_login_bounced():
-            logger.warning(
-                "[upload] nav bounced to login · attempting re-login + retry"
-            )
+            logger.warning("[upload] nav bounced to login · attempting re-login + retry")
             self._logged_in = False
             self._company_selected = False
             try:
                 self.login()
                 self.select_company()
-                page.goto(upload_url,
-                          wait_until="networkidle",
-                          timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+                page.goto(
+                    upload_url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS
+                )
             except Exception as e:
                 raise MRERPAuthError(
                     f"upload nav session re-login failed: {type(e).__name__}: {e}"
                 ) from e
             if self._is_login_bounced():
                 self._logged_in = self._company_selected = False
-                raise MRERPAuthError(
-                    "session expired before upload (re-login did not recover)"
-                )
+                raise MRERPAuthError("session expired before upload (re-login did not recover)")
 
         # Step B: write xlsx bytes to a temp file (set_input_files requires
         # a path) and feed it to the file input.
         import tempfile
-        with tempfile.NamedTemporaryFile(
-            suffix=".xlsx", delete=False
-        ) as tmp:
+
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
             tmp.write(xlsx_bytes)
             tmp_path = tmp.name
 
         try:
-            file_in = page.locator(
-                'input[type="file"], input[name="uploadfile"]'
-            )
+            file_in = page.locator('input[type="file"], input[name="uploadfile"]')
             if file_in.count() == 0:
-                raise MRERPTechnicalError(
-                    "upload form missing file input element")
+                raise MRERPTechnicalError("upload form missing file input element")
             try:
                 file_in.first.set_input_files(tmp_path)
             except (PWTimeout, PWError) as e:
-                raise MRERPTechnicalError(
-                    f"set_input_files timeout: {e}") from e
+                raise MRERPTechnicalError(f"set_input_files timeout: {e}") from e
             self._shot("file-chosen", f"size={len(xlsx_bytes)}B")
 
             # Step C: click the upload button. frmupload() fires an AJAX POST
@@ -965,25 +952,21 @@ class MRERPAdapter:
             if upload_btn.count() == 0:
                 # JS fallback (still browser-driven, still §7 compliant).
                 try:
-                    page.evaluate(
-                        "typeof frmupload === 'function' && frmupload()"
-                    )
+                    page.evaluate("typeof frmupload === 'function' && frmupload()")
                 except Exception as e:
                     raise MRERPTechnicalError(
-                        f"upload button missing and JS fallback "
-                        f"failed: {e}") from e
+                        f"upload button missing and JS fallback " f"failed: {e}"
+                    ) from e
             else:
                 try:
                     upload_btn.first.click(timeout=5_000)
                 except (PWTimeout, PWError) as e:
-                    raise MRERPTechnicalError(
-                        f"upload click timeout: {e}") from e
+                    raise MRERPTechnicalError(f"upload click timeout: {e}") from e
 
             # Wait for AJAX to settle and the navigation to fire.
             dialogs_before = len(self._session.dialogs) if self._session else 0
             try:
-                page.wait_for_url("**/formrdpc.php**",
-                                  timeout=self.UPLOAD_TIMEOUT_MS)
+                page.wait_for_url("**/formrdpc.php**", timeout=self.UPLOAD_TIMEOUT_MS)
             except PWTimeout:
                 # If frmupload alerted an error, it lives in our dialog log.
                 if self._session and len(self._session.dialogs) > dialogs_before:
@@ -994,8 +977,7 @@ class MRERPAdapter:
                         failed_rows=[],
                     )
                 self._shot("upload-no-nav", f"URL={page.url}")
-                raise MRERPTechnicalError(
-                    f"upload did not navigate to formrdpc; URL={page.url}")
+                raise MRERPTechnicalError(f"upload did not navigate to formrdpc; URL={page.url}")
         finally:
             try:
                 Path(tmp_path).unlink(missing_ok=True)
@@ -1021,8 +1003,7 @@ class MRERPAdapter:
             red_msgs: List[str] = []
             try:
                 for el in page.locator(
-                    'font[color="red"], span[style*="red"], '
-                    '.error, .alert'
+                    'font[color="red"], span[style*="red"], ' ".error, .alert"
                 ).all():
                     t = (el.inner_text() or "").strip()
                     if t and len(t) < 300:
@@ -1030,8 +1011,7 @@ class MRERPAdapter:
             except Exception:
                 pass
             raise MRERPBusinessError(
-                f"preview shows 0 importable rows; "
-                f"hints={red_msgs or 'none'}",
+                f"preview shows 0 importable rows; " f"hints={red_msgs or 'none'}",
                 failed_rows=[],
             )
 
@@ -1069,8 +1049,7 @@ class MRERPAdapter:
         # independent of how the browser handles the report attachment.
         form_count = page.locator('form[id^="frmimport"]').count()
         if form_count == 0:
-            raise MRERPTechnicalError(
-                "preview has rows but no frmimport form")
+            raise MRERPTechnicalError("preview has rows but no frmimport form")
 
         ctx = self._session._ctx if self._session else None
 
@@ -1094,14 +1073,9 @@ class MRERPAdapter:
                 try:
                     importpc_body = (r.text() or "").strip()
                 except Exception as e:
-                    logger.warning(
-                        "could not read importpc.php body: %s", e
-                    )
+                    logger.warning("could not read importpc.php body: %s", e)
                     importpc_body = ""
-            elif (
-                "report.php" in url
-                and report_response_body is None
-            ):
+            elif "report.php" in url and report_response_body is None:
                 # Try the inline path; download path handled separately.
                 try:
                     report_response_body = r.body()
@@ -1120,13 +1094,10 @@ class MRERPAdapter:
             try:
                 page.evaluate(f"uploadfrm({fid})")
             except Exception as e:
-                raise MRERPTechnicalError(
-                    f"uploadfrm({fid}) raised: {e}") from e
+                raise MRERPTechnicalError(f"uploadfrm({fid}) raised: {e}") from e
 
         # Phase 1: wait for importpc to reply (it tells us the branch).
-        importpc_deadline = time.time() + (
-            self.REPORT_DOWNLOAD_TIMEOUT_MS / 1000.0
-        )
+        importpc_deadline = time.time() + (self.REPORT_DOWNLOAD_TIMEOUT_MS / 1000.0)
         while importpc_body is None and time.time() < importpc_deadline:
             try:
                 page.wait_for_timeout(250)
@@ -1138,15 +1109,15 @@ class MRERPAdapter:
             # have written though, so check listing before bailing.
             self._shot(
                 "importpc-no-response",
-                f"importpc.php silent after "
-                f"{self.REPORT_DOWNLOAD_TIMEOUT_MS}ms",
+                f"importpc.php silent after " f"{self.REPORT_DOWNLOAD_TIMEOUT_MS}ms",
             )
             if self._any_invoice_in_listing(expected_invoices):
                 return "listing_verified", None
             raise MRERPTechnicalError(
                 f"importpc.php did not respond within "
                 f"{self.REPORT_DOWNLOAD_TIMEOUT_MS}ms and no expected "
-                f"invoice appears in listing")
+                f"invoice appears in listing"
+            )
 
         body = importpc_body.strip()
         logger.info("importpc.php returned %r", body[:50])
@@ -1165,18 +1136,15 @@ class MRERPAdapter:
                 return "listing_verified", None
             raise MRERPTechnicalError(
                 f"importpc.php returned unexpected body "
-                f"({body[:200]!r}); no fallback listing match")
+                f"({body[:200]!r}); no fallback listing match"
+            )
 
         # Phase 2: importpc said "2" - wait for the report. Either:
         #   - download event fires (attachment), or
         #   - inline response body fires (rare; some builds may serve
         #     the xlsx without Content-Disposition).
         report_deadline = time.time() + 60.0
-        while (
-            not downloads
-            and report_response_body is None
-            and time.time() < report_deadline
-        ):
+        while not downloads and report_response_body is None and time.time() < report_deadline:
             try:
                 page.wait_for_timeout(250)
             except Exception:
@@ -1187,30 +1155,27 @@ class MRERPAdapter:
         if downloads:
             d = downloads[0]
             try:
-                dl_path = d.path()   # blocks until download completes
+                dl_path = d.path()  # blocks until download completes
                 if dl_path:
                     report_bytes_captured = Path(dl_path).read_bytes()
             except Exception as e:
                 logger.warning("download.path()/read failed: %s", e)
 
-        if (
-            report_bytes_captured is None
-            and report_response_body is not None
-        ):
+        if report_bytes_captured is None and report_response_body is not None:
             report_bytes_captured = report_response_body
 
         if report_bytes_captured is None:
             self._shot(
                 "report-response-missed",
-                "importpc returned '2' but no report download nor "
-                "inline body within 60s",
+                "importpc returned '2' but no report download nor " "inline body within 60s",
             )
             if self._any_invoice_in_listing(expected_invoices):
                 return "listing_verified", None
             raise MRERPTechnicalError(
                 "importpc.php returned '2' but neither a download "
                 "event nor a report.php response arrived within 60s "
-                "and no expected invoice appears in listing")
+                "and no expected invoice appears in listing"
+            )
 
         if not report_bytes_captured:
             self._shot(
@@ -1222,9 +1187,7 @@ class MRERPAdapter:
             raise MRERPTechnicalError("report.php capture is empty")
 
         if report_bytes_captured[:2] != b"PK":
-            preview = report_bytes_captured[:200].decode(
-                "utf-8", errors="replace"
-            )
+            preview = report_bytes_captured[:200].decode("utf-8", errors="replace")
             logger.warning(
                 "report.php returned non-xlsx body (preview): %s",
                 preview,
@@ -1236,8 +1199,8 @@ class MRERPAdapter:
             if self._any_invoice_in_listing(expected_invoices):
                 return "listing_verified", None
             raise MRERPTechnicalError(
-                "report.php returned non-xlsx body and no expected "
-                "invoice appears in listing")
+                "report.php returned non-xlsx body and no expected " "invoice appears in listing"
+            )
 
         return "report", report_bytes_captured
 
@@ -1250,8 +1213,7 @@ class MRERPAdapter:
         """
         try:
             list_url = (
-                f"{self.login_url}{self.SC_PATH_LISTING}"
-                f"?idmenu={self.listing_idmenu}&mode=l"
+                f"{self.login_url}{self.SC_PATH_LISTING}" f"?idmenu={self.listing_idmenu}&mode=l"
             )
             self._page.goto(
                 list_url,
@@ -1287,8 +1249,7 @@ class MRERPAdapter:
 
         try:
             list_url = (
-                f"{self.login_url}{self.SC_PATH_LISTING}"
-                f"?idmenu={self.listing_idmenu}&mode=l"
+                f"{self.login_url}{self.SC_PATH_LISTING}" f"?idmenu={self.listing_idmenu}&mode=l"
             )
             self._page.goto(
                 list_url,
@@ -1302,24 +1263,28 @@ class MRERPAdapter:
 
         for inv, original in by_invoice.items():
             if (f"SI{inv}" in html) or (inv in html):
-                result.success.append(SuccessRow(
-                    invoice_no=inv,
-                    mrerp_bill_no=f"SI{inv}",
-                    original=original,
-                ))
+                result.success.append(
+                    SuccessRow(
+                        invoice_no=inv,
+                        mrerp_bill_no=f"SI{inv}",
+                        original=original,
+                    )
+                )
             else:
                 reasons = [
                     "import status uncertain: report.php download "
                     "did not arrive and listing does not contain "
                     "this invoice",
                 ]
-                result.failed.append(FailedRow(
-                    invoice_no=inv,
-                    reasons=reasons,
-                    reasons_friendly=translate_reasons(reasons),
-                    original=original,
-                    evidence_screenshot=evidence_screenshot,
-                ))
+                result.failed.append(
+                    FailedRow(
+                        invoice_no=inv,
+                        reasons=reasons,
+                        reasons_friendly=translate_reasons(reasons),
+                        original=original,
+                        evidence_screenshot=evidence_screenshot,
+                    )
+                )
         return result
 
     def _classify_against_inputs(
@@ -1343,36 +1308,41 @@ class MRERPAdapter:
 
         for inv in report.success:
             original = by_invoice.get(inv, {})
-            result.success.append(SuccessRow(
-                invoice_no=inv,
-                mrerp_bill_no=f"SI{inv}",
-                original=original,
-            ))
+            result.success.append(
+                SuccessRow(
+                    invoice_no=inv,
+                    mrerp_bill_no=f"SI{inv}",
+                    original=original,
+                )
+            )
         for row in report.failed:
             original = by_invoice.get(row.invoice_no, {})
             reasons = list(row.reasons)
-            result.failed.append(FailedRow(
-                invoice_no=row.invoice_no,
-                reasons=reasons,
-                reasons_friendly=translate_reasons(reasons),
-                original=original,
-                evidence_screenshot=evidence_screenshot,
-            ))
-
-        # Inputs that didn't appear in the report at all (shouldn't happen
-        # under §9 semantics but defend anyway).
-        seen = {s.invoice_no for s in result.success} | \
-               {f.invoice_no for f in result.failed}
-        for inv, original in by_invoice.items():
-            if inv not in seen:
-                reasons = ["report did not mention this invoice"]
-                result.failed.append(FailedRow(
-                    invoice_no=inv,
+            result.failed.append(
+                FailedRow(
+                    invoice_no=row.invoice_no,
                     reasons=reasons,
                     reasons_friendly=translate_reasons(reasons),
                     original=original,
                     evidence_screenshot=evidence_screenshot,
-                ))
+                )
+            )
+
+        # Inputs that didn't appear in the report at all (shouldn't happen
+        # under §9 semantics but defend anyway).
+        seen = {s.invoice_no for s in result.success} | {f.invoice_no for f in result.failed}
+        for inv, original in by_invoice.items():
+            if inv not in seen:
+                reasons = ["report did not mention this invoice"]
+                result.failed.append(
+                    FailedRow(
+                        invoice_no=inv,
+                        reasons=reasons,
+                        reasons_friendly=translate_reasons(reasons),
+                        original=original,
+                        evidence_screenshot=evidence_screenshot,
+                    )
+                )
         return result
 
     # ----- search ----------------------------------------------------
@@ -1388,16 +1358,12 @@ class MRERPAdapter:
         def attempt() -> Optional[InvoiceRecord]:
             page = self._page
             list_url = (
-                f"{self.login_url}{self.SC_PATH_LISTING}"
-                f"?idmenu={self.listing_idmenu}&mode=l"
+                f"{self.login_url}{self.SC_PATH_LISTING}" f"?idmenu={self.listing_idmenu}&mode=l"
             )
             try:
-                page.goto(list_url,
-                          wait_until="networkidle",
-                          timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+                page.goto(list_url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
             except (PWTimeout, PWError) as e:
-                raise MRERPTechnicalError(
-                    f"listing nav timeout: {e}") from e
+                raise MRERPTechnicalError(f"listing nav timeout: {e}") from e
 
             if self._is_login_bounced():
                 self._logged_in = self._company_selected = False
@@ -1406,14 +1372,13 @@ class MRERPAdapter:
             try:
                 html = page.content() or ""
             except Exception as e:
-                raise MRERPTechnicalError(
-                    f"listing content() failed: {e}") from e
+                raise MRERPTechnicalError(f"listing content() failed: {e}") from e
 
             bill_no = f"SI{invoice_no}"
             # listing rows look like
             #   <p><span>SIPEARNLY-TEST-001</span>...<a href="allform.php?id=N&...status=del">
             row_re = re.compile(
-                r'<p\b[^>]*>(?:(?!</p>).){0,3000}'
+                r"<p\b[^>]*>(?:(?!</p>).){0,3000}"
                 + re.escape(bill_no)
                 + r'(?:(?!</p>).){0,3000}allform\.php\?id=(\d+)&[^"]*status=del',
                 re.DOTALL,
@@ -1422,8 +1387,7 @@ class MRERPAdapter:
             if not m:
                 # fallback for embedding variations
                 fb_re = re.compile(
-                    re.escape(invoice_no)
-                    + r'.{0,2000}allform\.php\?id=(\d+)&[^"]*status=del',
+                    re.escape(invoice_no) + r'.{0,2000}allform\.php\?id=(\d+)&[^"]*status=del',
                     re.DOTALL,
                 )
                 m = fb_re.search(html)
@@ -1445,8 +1409,7 @@ class MRERPAdapter:
         """Click through the 2-step delete flow for one row. Returns True
         if the row is gone from the listing afterwards."""
         if not db_row_id or not str(db_row_id).isdigit():
-            raise ValueError(f"db_row_id must be a numeric string, "
-                             f"got {db_row_id!r}")
+            raise ValueError(f"db_row_id must be a numeric string, " f"got {db_row_id!r}")
         self.select_company()
         return self._retry_technical(
             lambda: self._delete_once(str(db_row_id)),
@@ -1455,14 +1418,9 @@ class MRERPAdapter:
 
     def _delete_once(self, db_row_id: str) -> bool:
         page = self._page
-        del_form_url = (
-            f"{self.login_url}{self.SC_PATH_FORM}"
-            f"?id={db_row_id}&status=del"
-        )
+        del_form_url = f"{self.login_url}{self.SC_PATH_FORM}" f"?id={db_row_id}&status=del"
         try:
-            page.goto(del_form_url,
-                      wait_until="networkidle",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(del_form_url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
         except (PWTimeout, PWError) as e:
             raise MRERPTechnicalError(f"delete form nav timeout: {e}") from e
 
@@ -1472,16 +1430,13 @@ class MRERPAdapter:
 
         btn = page.locator('button[id="btndel"]')
         if btn.count() == 0:
-            self._shot("delete-btn-missing",
-                       f"db_row_id={db_row_id} has no btndel")
-            raise MRERPTechnicalError(
-                f"delete form for id={db_row_id} has no btndel button")
+            self._shot("delete-btn-missing", f"db_row_id={db_row_id} has no btndel")
+            raise MRERPTechnicalError(f"delete form for id={db_row_id} has no btndel button")
 
         try:
             btn.first.click(timeout=5_000)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"btndel click timeout: {e}") from e
+            raise MRERPTechnicalError(f"btndel click timeout: {e}") from e
 
         # The confirmdel() JS pops a confirm dialog; the global handler
         # accepts it. The server then POSTs and bounces us back to allview.
@@ -1493,17 +1448,11 @@ class MRERPAdapter:
         self._shot("after-delete", f"URL={page.url}")
 
         # Verification: re-fetch listing and ensure the bill_no is gone.
-        list_url = (
-            f"{self.login_url}{self.SC_PATH_LISTING}"
-            f"?idmenu={self.listing_idmenu}&mode=l"
-        )
+        list_url = f"{self.login_url}{self.SC_PATH_LISTING}" f"?idmenu={self.listing_idmenu}&mode=l"
         try:
-            page.goto(list_url,
-                      wait_until="networkidle",
-                      timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.goto(list_url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
         except (PWTimeout, PWError) as e:
-            raise MRERPTechnicalError(
-                f"post-delete listing verification timeout: {e}") from e
+            raise MRERPTechnicalError(f"post-delete listing verification timeout: {e}") from e
         html = page.content() or ""
         still_there = f"allform.php?id={db_row_id}" in html
         self._shot(
@@ -1547,6 +1496,7 @@ class MRERPAdapter:
             from services.erp.mrerp_customer_sync import (
                 MRERPCustomerSyncService,
             )
+
             self._customer_sync = MRERPCustomerSyncService(self)
         for h in histories:
             buyer = self._extract_buyer(h)
@@ -1565,7 +1515,8 @@ class MRERPAdapter:
             try:
                 if self.master_data_auto_create:
                     result = self._customer_sync.lookup_or_create(
-                        buyer, mappings,
+                        buyer,
+                        mappings,
                         seed_customer_code=self.seed_customer_code,
                     )
                 else:
@@ -1575,7 +1526,9 @@ class MRERPAdapter:
                 # Persist into mappings so validate_history finds it.
                 if buyer.client_id:
                     self._customer_sync._upsert_mapping(
-                        mappings, buyer.client_id, result.customer_code,
+                        mappings,
+                        buyer.client_id,
+                        result.customer_code,
                     )
             except MRERPBusinessError as e:
                 # Auto-create raised — let validate catch the missing
@@ -1583,7 +1536,8 @@ class MRERPAdapter:
                 # specific invoice.
                 logger.info(
                     "master-data sync skipped for buyer=%r: %s",
-                    buyer.name, e,
+                    buyer.name,
+                    e,
                 )
             except MRERPTechnicalError as e:
                 # 问题 a (Zihao 2026-05-19 拍板 · v118.34.26) · listing fetch
@@ -1592,7 +1546,8 @@ class MRERPAdapter:
                 # ERR_NO_CUSTOMER_MAPPING preflight 早返友好错给用户.
                 logger.warning(
                     "master-data sync technical fail (continuing) for buyer=%r: %s",
-                    buyer.name, e,
+                    buyer.name,
+                    e,
                 )
 
         # Phase 5 extension: per-item product enrichment. Same
@@ -1601,18 +1556,20 @@ class MRERPAdapter:
             from services.erp.mrerp_product_sync import (
                 MRERPProductSyncService,
             )
+
             self._product_sync = MRERPProductSyncService(self)
         for h in histories:
             # 问题 A 镜像 (v118.34.25) · 没 client_id 也跳过 product sync ·
             # 没归属到客户的发票 · 推都推不出去 · 没必要预先拉 stkmas listing.
-            if not (h.get('client_id') and int(h.get('client_id') or 0) > 0):
+            if not (h.get("client_id") and int(h.get("client_id") or 0) > 0):
                 continue
             items = self._extract_items(h)
             for item in items:
                 try:
                     if self.master_data_auto_create:
                         result = self._product_sync.lookup_or_create(
-                            item, mappings,
+                            item,
+                            mappings,
                             seed_product_code=self.seed_product_code,
                         )
                     else:
@@ -1620,19 +1577,23 @@ class MRERPAdapter:
                     if result is None:
                         continue
                     self._product_sync._upsert_mapping(
-                        mappings, item, result.product_code,
+                        mappings,
+                        item,
+                        result.product_code,
                     )
                 except MRERPBusinessError as e:
                     logger.info(
                         "product master-data sync skipped for item=%r: %s",
-                        item.name, e,
+                        item.name,
+                        e,
                     )
                 except MRERPTechnicalError as e:
                     # 问题 a 镜像 (v118.34.26) · listing fetch timeout 不炸整批 ·
                     # validate 接下来 ERR_NO_CUSTOMER_MAPPING 早返友好错.
                     logger.warning(
                         "product master-data sync technical fail (continuing) for item=%r: %s",
-                        item.name, e,
+                        item.name,
+                        e,
                     )
 
     @staticmethod
@@ -1674,8 +1635,7 @@ class MRERPAdapter:
         for it in candidates:
             if not isinstance(it, dict):
                 continue
-            name = (it.get("name") or it.get("description")
-                    or it.get("item_name") or "")
+            name = it.get("name") or it.get("description") or it.get("item_name") or ""
             name = str(name or "").strip()
             if not name:
                 continue
@@ -1683,12 +1643,14 @@ class MRERPAdapter:
             if norm in seen_norm:
                 continue
             seen_norm.add(norm)
-            items.append(ItemInfo(
-                name=name,
-                tenant_id=tenant_id,
-                unit_code=(it.get("unit") or it.get("unit_code") or None),
-                client_id=int(history.get("client_id") or 0),
-            ))
+            items.append(
+                ItemInfo(
+                    name=name,
+                    tenant_id=tenant_id,
+                    unit_code=(it.get("unit") or it.get("unit_code") or None),
+                    client_id=int(history.get("client_id") or 0),
+                )
+            )
         return items
 
     @staticmethod
@@ -1699,21 +1661,21 @@ class MRERPAdapter:
         the customer-sync service loaded (e.g. older callers).
         """
         from services.erp.mrerp_customer_sync import BuyerInfo
+
         f = history.get("fields") if isinstance(history, dict) else {}
         f = f if isinstance(f, dict) else {}
-        name = (
-            history.get("buyer_name") or f.get("buyer_name") or ""
-        )
+        name = history.get("buyer_name") or f.get("buyer_name") or ""
         name = str(name or "").strip()
         if not name:
             return None
         tax_id = (
-            history.get("buyer_tax") or f.get("buyer_tax")
-            or history.get("buyer_tax_id") or f.get("buyer_tax_id") or ""
+            history.get("buyer_tax")
+            or f.get("buyer_tax")
+            or history.get("buyer_tax_id")
+            or f.get("buyer_tax_id")
+            or ""
         )
-        addr = (
-            history.get("buyer_addr") or f.get("buyer_addr") or ""
-        )
+        addr = history.get("buyer_addr") or f.get("buyer_addr") or ""
         return BuyerInfo(
             name=name,
             client_id=int(history.get("client_id") or 0),

@@ -39,8 +39,7 @@ LINE_I18N = {
         ),
         "bind_invalid": "❌ 绑定码无效或已过期。\n请回网站重新获取。",
         "bind_conflict": (
-            "❌ 绑定失败 · 此 LINE 账号可能已绑到其他 Mr.Pilot 用户。\n"
-            "请先在原账号解绑再试。"
+            "❌ 绑定失败 · 此 LINE 账号可能已绑到其他 Mr.Pilot 用户。\n" "请先在原账号解绑再试。"
         ),
         "bind_success": (
             "✅ 绑定成功!\n\n"
@@ -50,8 +49,7 @@ LINE_I18N = {
             "(图片识别功能即将上线)"
         ),
         "already_bound_hint": (
-            "Hi {username} · 已绑定。\n"
-            "把发票照片发给我 · 即可自动识别(功能即将上线)。"
+            "Hi {username} · 已绑定。\n" "把发票照片发给我 · 即可自动识别(功能即将上线)。"
         ),
         "need_bind": (
             "👋 请先绑定账号:\n"
@@ -242,6 +240,7 @@ def _get_channel_token() -> str:
 # 签名校验
 # ============================================================
 
+
 def verify_signature(body: bytes, signature: str) -> bool:
     """
     校验 LINE webhook 请求合法性。
@@ -268,6 +267,7 @@ def verify_signature(body: bytes, signature: str) -> bool:
 # 回复消息(reply · 用 replyToken · 免费)
 # ============================================================
 
+
 def reply_text(reply_token: str, text: str) -> bool:
     """用 replyToken 回复纯文字(replyToken 一次性 · 60 秒内用)"""
     return _reply_messages(reply_token, [{"type": "text", "text": text[:5000]}])
@@ -283,10 +283,12 @@ def _reply_messages(reply_token: str, messages: List[Dict[str, Any]]) -> bool:
     if not token or not reply_token:
         return False
     url = "https://api.line.me/v2/bot/message/reply"
-    payload = json.dumps({
-        "replyToken": reply_token,
-        "messages": messages,
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "replyToken": reply_token,
+            "messages": messages,
+        }
+    ).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=payload,
@@ -316,16 +318,19 @@ def _reply_messages(reply_token: str, messages: List[Dict[str, Any]]) -> bool:
 # 推送消息(push · 要收费 · 免费套餐每月 500 条)
 # ============================================================
 
+
 def push_text(to_line_user_id: str, text: str) -> bool:
     """用 userId 主动推送文字(绑定完成通知 / 异常提醒用)"""
     token = _get_channel_token()
     if not token or not to_line_user_id:
         return False
     url = "https://api.line.me/v2/bot/message/push"
-    payload = json.dumps({
-        "to": to_line_user_id,
-        "messages": [{"type": "text", "text": text[:5000]}],
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "to": to_line_user_id,
+            "messages": [{"type": "text", "text": text[:5000]}],
+        }
+    ).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=payload,
@@ -346,6 +351,7 @@ def push_text(to_line_user_id: str, text: str) -> bool:
 # ============================================================
 # 获取用户资料(拿昵称 / 头像)
 # ============================================================
+
 
 def get_user_profile(line_user_id: str) -> Optional[Dict[str, Any]]:
     """
@@ -380,6 +386,7 @@ def get_user_profile(line_user_id: str) -> Optional[Dict[str, Any]]:
 # 下载图片消息内容(T1 轮 3 OCR 用 · 本轮未用)
 # ============================================================
 
+
 def download_message_content(message_id: str) -> Optional[bytes]:
     """下载图片 / 视频 / 音频消息的原始字节"""
     token = _get_channel_token()
@@ -405,6 +412,7 @@ def download_message_content(message_id: str) -> Optional[bytes]:
 # T1 轮 3 · 图片 → PDF 转换(复用网页 OCR 流程)
 # ============================================================
 
+
 def image_to_pdf_bytes(img_bytes: bytes) -> Optional[bytes]:
     """
     把 LINE 传来的图片 bytes 包成单页 PDF bytes · 直接喂给现有 OCR 引擎。
@@ -412,6 +420,7 @@ def image_to_pdf_bytes(img_bytes: bytes) -> Optional[bytes]:
     """
     try:
         import fitz  # pymupdf
+
         # 打开图片
         img_doc = fitz.open(stream=img_bytes, filetype=None)
         # 先把图片转 pixmap 拿尺寸 · 再创建 PDF 页
@@ -533,7 +542,7 @@ def format_ocr_result_for_line(lang: str, pages: list, invoice_count: int = 1) -
 
     vendor = _pick("seller_name", "vendor", "supplier") or t_ocr(lang, "no_data")
     inv_no = _pick("invoice_no", "invoice_number") or t_ocr(lang, "no_data")
-    date   = _pick("invoice_date", "date") or t_ocr(lang, "no_data")
+    date = _pick("invoice_date", "date") or t_ocr(lang, "no_data")
     amount = _pick("total_amount", "amount", "total") or t_ocr(lang, "no_data")
 
     lines = [

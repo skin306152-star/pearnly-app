@@ -9,21 +9,21 @@ import { fileURLToPath } from 'url';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
-  build: {
-    outDir: 'static/dist',
-    emptyOutDir: true,
-    sourcemap: true,
-    minify: 'esbuild',
-    target: 'es2020',
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'src/main.js'),
-      },
-      output: {
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js',
-        assetFileNames: '[name].[ext]',
-      },
+    build: {
+        outDir: 'static/dist',
+        emptyOutDir: true,
+        sourcemap: true,
+        minify: 'esbuild',
+        target: 'es2020',
+        rollupOptions: {
+            input: {
+                main: resolve(__dirname, 'src/main.js'),
+            },
+            output: {
+                entryFileNames: '[name].js',
+                chunkFileNames: '[name].js',
+                assetFileNames: '[name].[ext]',
+            },
+        },
     },
-  },
 });

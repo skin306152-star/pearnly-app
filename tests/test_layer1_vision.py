@@ -119,7 +119,7 @@ def main() -> int:
             print(f"FAIL: no *.pdf files (recursive) in {storage}")
             return 2
 
-    print(f"Layer 1 (Vision API) debug run")
+    print("Layer 1 (Vision API) debug run")
     print(f"Files:       {len(files)}")
     print(f"Max pages:   {args.max_pages}")
     print(f"DPI:         {args.dpi}")
@@ -161,7 +161,7 @@ def main() -> int:
 
             samples = _sample_words(page, n=5)
             if samples:
-                print(f"    sample words (first 5):")
+                print("    sample words (first 5):")
                 for w in samples:
                     bb = w.bbox.vertices
                     bb_str = "[" + ", ".join(f"({x},{y})" for x, y in bb) + "]"

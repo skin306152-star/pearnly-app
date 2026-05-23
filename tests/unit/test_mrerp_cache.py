@@ -16,7 +16,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp._master_data_cache import TTLCache   # noqa: E402
+from services.erp._master_data_cache import TTLCache  # noqa: E402
 
 
 class BasicTests(unittest.TestCase):
@@ -44,11 +44,12 @@ class BasicTests(unittest.TestCase):
         c.set("k", "v")
         self.assertTrue(c.invalidate("k"))
         self.assertIsNone(c.get("k"))
-        self.assertFalse(c.invalidate("k"))   # already gone
+        self.assertFalse(c.invalidate("k"))  # already gone
 
     def test_clear(self):
         c = TTLCache()
-        c.set("a", 1); c.set("b", 2)
+        c.set("a", 1)
+        c.set("b", 2)
         c.clear()
         self.assertEqual(len(c), 0)
         self.assertEqual(c.hits, 0)
@@ -61,7 +62,7 @@ class LRUTests(unittest.TestCase):
         c = TTLCache(max_size=2, ttl_seconds=30)
         c.set("a", 1)
         c.set("b", 2)
-        c.set("c", 3)   # evicts "a" (oldest)
+        c.set("c", 3)  # evicts "a" (oldest)
         self.assertIsNone(c.get("a"))
         self.assertEqual(c.get("b"), 2)
         self.assertEqual(c.get("c"), 3)
@@ -71,8 +72,8 @@ class LRUTests(unittest.TestCase):
         c = TTLCache(max_size=2, ttl_seconds=30)
         c.set("a", 1)
         c.set("b", 2)
-        c.get("a")       # touches "a"; now "b" is oldest
-        c.set("c", 3)    # should evict "b", not "a"
+        c.get("a")  # touches "a"; now "b" is oldest
+        c.set("c", 3)  # should evict "b", not "a"
         self.assertEqual(c.get("a"), 1)
         self.assertIsNone(c.get("b"))
 
@@ -86,7 +87,7 @@ class TTLTests(unittest.TestCase):
         self.assertEqual(c.get("k"), "v")
         time.sleep(0.1)
         self.assertIsNone(c.get("k"))
-        self.assertEqual(len(c), 0)   # expired entry was purged on get
+        self.assertEqual(len(c), 0)  # expired entry was purged on get
 
 
 class ValidationTests(unittest.TestCase):

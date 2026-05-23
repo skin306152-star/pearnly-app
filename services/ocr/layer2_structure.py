@@ -627,19 +627,15 @@ def _extract_doc_internal(
     if len(cleaned) > MAX_TEXT_LENGTH:
         logger.warning(
             "layer2: input text %d chars truncated to %d (doc_type=%s)",
-            len(cleaned), MAX_TEXT_LENGTH, document_type,
+            len(cleaned),
+            MAX_TEXT_LENGTH,
+            document_type,
         )
         cleaned = cleaned[:MAX_TEXT_LENGTH]
 
-    key = (
-        api_key
-        or os.environ.get("GOOGLE_API_KEY")
-        or os.environ.get("GEMINI_API_KEY")
-    )
+    key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     if not key:
-        raise Layer2AuthError(
-            "layer2: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set"
-        )
+        raise Layer2AuthError("layer2: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set")
 
     prompt_prefix = _DOC_PROMPTS[document_type]
     schema_cls = _DOC_SCHEMAS[document_type]
@@ -698,15 +694,9 @@ def _extract_internal(
         )
         cleaned = cleaned[:MAX_TEXT_LENGTH]
 
-    key = (
-        api_key
-        or os.environ.get("GOOGLE_API_KEY")
-        or os.environ.get("GEMINI_API_KEY")
-    )
+    key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     if not key:
-        raise Layer2AuthError(
-            "layer2: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set"
-        )
+        raise Layer2AuthError("layer2: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set")
 
     data, meta = _call_gemini_with_retry(
         cleaned,
@@ -719,9 +709,7 @@ def _extract_internal(
     try:
         invoice = ThaiInvoice(**data)
     except ValidationError as e:
-        raise ValueError(
-            f"layer2: Gemini JSON parsed but failed ThaiInvoice schema: {e}"
-        ) from e
+        raise ValueError(f"layer2: Gemini JSON parsed but failed ThaiInvoice schema: {e}") from e
 
     return invoice, meta
 
@@ -758,6 +746,7 @@ def _call_gemini_with_retry(
         prompt = base_prompt + (_RETRY_TRIM_HINT if attempt > 0 else "")
         # v118.35.0.25 · 埋点 · 记 Gemini 调用统计(给 Earn 监控面板 + LINE 告警用)
         import time as _t_v25
+
         _t_start = _t_v25.time()
         try:
             response = model.generate_content(
@@ -766,16 +755,22 @@ def _call_gemini_with_retry(
             )
             try:
                 from services.monitoring import record_gemini_call as _rec
-                _rec(success=True, http_status=200,
-                     latency_ms=int((_t_v25.time() - _t_start) * 1000))
+
+                _rec(
+                    success=True, http_status=200, latency_ms=int((_t_v25.time() - _t_start) * 1000)
+                )
             except Exception:
                 pass
         except Exception as e:
             try:
                 from services.monitoring import record_gemini_call as _rec
+
                 _http = 429 if ("ResourceExhausted" in type(e).__name__ or "429" in str(e)) else 500
-                _rec(success=False, http_status=_http,
-                     latency_ms=int((_t_v25.time() - _t_start) * 1000))
+                _rec(
+                    success=False,
+                    http_status=_http,
+                    latency_ms=int((_t_v25.time() - _t_start) * 1000),
+                )
             except Exception:
                 pass
             # Network / auth / quota / unknown — classify and propagate
@@ -805,8 +800,7 @@ def _call_gemini_with_retry(
             if attempt < max_retries:
                 continue
             raise ValueError(
-                f"layer2: Gemini returned empty response after "
-                f"{max_retries + 1} attempts"
+                f"layer2: Gemini returned empty response after " f"{max_retries + 1} attempts"
             )
 
         try:
@@ -836,9 +830,7 @@ def _call_gemini_with_retry(
         }
 
     # Defensive fallback (loop should always either return or raise above)
-    raise ValueError(
-        f"layer2: unreachable; last parse error: {last_parse_error}"
-    )
+    raise ValueError(f"layer2: unreachable; last parse error: {last_parse_error}")
 
 
 def _parse_json(text: str) -> dict:
@@ -946,8 +938,7 @@ def _get_model(api_key: str, model_name: str):
             import google.generativeai as genai
         except ImportError as e:
             raise ImportError(
-                "layer2: google-generativeai required. "
-                "Install: pip install google-generativeai"
+                "layer2: google-generativeai required. " "Install: pip install google-generativeai"
             ) from e
 
         # Note: direct endpoint (no Cloudflare proxy). If/when dev machine

@@ -5417,10 +5417,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已优化『银行对账』。\n\n此前当只上传银行对账单的部分页面(例如最后一页或中间某页)时,部分本来正确的交易可能被误标为『余额核对未通过』。现已修复:这类缺少上一页结转余额的情况会标记为『无法核对』,不再误报为异常。\n\n同时,同一天的多笔交易现在严格按对账单上的原始顺序显示。即日生效。",
-            "th": "ระบบได้ปรับปรุง『การกระทบยอดบัญชีธนาคาร』\n\nก่อนหน้านี้ เมื่ออัปโหลดเฉพาะบางหน้าของ statement (เช่น หน้าสุดท้ายหรือหน้ากลาง) รายการที่ถูกต้องบางรายการอาจถูกระบุผิดว่า『ตรวจยอดคงเหลือไม่ผ่าน』ได้รับการแก้ไขแล้ว: กรณีที่ไม่มียอดยกมาจากหน้าก่อนจะถูกระบุเป็น『ตรวจสอบไม่ได้』แทนการแจ้งเตือนผิดพลาด\n\nนอกจากนี้ รายการหลายรายการในวันเดียวกันจะแสดงตามลำดับเดิมในใบแจ้งยอดอย่างเคร่งครัด มีผลทันที",
-            "en": "The『Bank Reconciliation』feature has been improved.\n\nPreviously, when only part of a bank statement was uploaded (e.g. the last page or a middle page), some genuinely correct transactions could be mistakenly flagged as『balance check failed』. This is now fixed: when the carried-forward balance from the previous page is missing, those rows are marked『cannot verify』instead of being reported as an error.\n\nIn addition, multiple transactions on the same day now display strictly in the original statement order. Effective immediately.",
-            "ja": "『銀行照合』機能を改善しました。\n\nこれまで、銀行明細の一部のページ(最終ページや中間ページなど)のみをアップロードした場合に、本来正しい一部の取引が『残高照合エラー』と誤表示されることがありました。今回修正し、前ページからの繰越残高がない場合は『照合不可』と表示し、誤ったエラー報告を行わないようにしました。\n\nまた、同じ日付の複数取引は明細の元の順序どおりに表示されます。即日有効。"
+            "zh": "系统已进一步优化『银行对账』的准确性。\n\n此前在同一天存在两笔金额与摘要完全相同的交易时,可能被误判为重复而少算一笔;现已修复,两笔都会被正确保留。同时,对账单中省略了日期的同日交易也不再被遗漏。\n\n配合上一版的改进,上传对账单的部分页面时也不会再误报『余额核对未通过』。即日生效。",
+            "th": "ระบบได้ปรับปรุงความแม่นยำของ『การกระทบยอดบัญชีธนาคาร』เพิ่มเติม\n\nก่อนหน้านี้ หากในวันเดียวกันมีสองรายการที่จำนวนเงินและรายละเอียดเหมือนกันทุกประการ อาจถูกระบุผิดว่าเป็นรายการซ้ำและนับขาดไปหนึ่งรายการ ได้รับการแก้ไขแล้ว ทั้งสองรายการจะถูกเก็บไว้อย่างถูกต้อง และรายการในวันเดียวกันที่ละเว้นวันที่จะไม่ถูกตกหล่นอีกต่อไป\n\nร่วมกับการปรับปรุงในเวอร์ชันก่อน การอัปโหลดบางหน้าของใบแจ้งยอดจะไม่แจ้ง『ตรวจยอดคงเหลือไม่ผ่าน』ผิดพลาดอีกต่อไป มีผลทันที",
+            "en": "The accuracy of『Bank Reconciliation』has been further improved.\n\nPreviously, when two transactions on the same day had identical amounts and descriptions, one could be mistaken for a duplicate and missed; this is now fixed and both are correctly kept. Same-day transactions that omit the date are also no longer dropped.\n\nTogether with the previous improvement, uploading partial pages of a statement no longer triggers a false『balance check failed』warning. Effective immediately.",
+            "ja": "『銀行照合』の精度をさらに改善しました。\n\nこれまで、同じ日に金額と摘要が完全に一致する取引が2件あると、一方が重複と誤判定されて欠落することがありました。今回修正し、両方が正しく保持されます。日付が省略された同日取引も欠落しなくなりました。\n\n前バージョンの改善と合わせ、明細の一部のページをアップロードしても『残高照合エラー』が誤表示されることはなくなりました。即日有効。"
         }
     }
 

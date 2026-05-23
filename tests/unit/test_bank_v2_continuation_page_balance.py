@@ -76,5 +76,34 @@ class ContinuationPageBalanceTests(unittest.TestCase):
                          "同日多笔合并后顺序应与 PDF 原序一致")
 
 
+class RowHashDedupTests(unittest.TestCase):
+    """v118.35.0.49 · 去重哈希含余额 · 防同日同额同描述的合法两笔被误删
+    (真实案例 KKP 30/12 两笔一样的 SWD 65,573.75 · 余额不同 = 不同笔)"""
+
+    def test_same_amount_diff_balance_not_deduped(self):
+        """同日 / 同额 / 同描述 · 但余额不同 → 视为不同笔 · 不去重"""
+        a = StatementRow(date=date(2025, 12, 30), description="SWD",
+                         withdrawal=65573.75, deposit=0, balance=429666.83)
+        b = StatementRow(date=date(2025, 12, 30), description="SWD",
+                         withdrawal=65573.75, deposit=0, balance=364093.08)
+        self.assertNotEqual(a.row_hash, b.row_hash, "余额不同应产生不同 row_hash")
+        parsed = [{"ok": True, "bank_code": "kkp", "rows": [a, b],
+                   "opening": 0.0, "closing": 364093.08}]
+        merged, _op, _cl, _bc = merge_statements(parsed)
+        self.assertEqual(len(merged), 2, "两笔合法交易不应被去重删成 1 笔")
+
+    def test_true_duplicate_still_deduped(self):
+        """完全相同(含余额)的真重复 · 仍去重(防同份文件传两次)"""
+        a = StatementRow(date=date(2025, 12, 30), description="SWD",
+                         withdrawal=65573.75, deposit=0, balance=429666.83)
+        b = StatementRow(date=date(2025, 12, 30), description="SWD",
+                         withdrawal=65573.75, deposit=0, balance=429666.83)
+        self.assertEqual(a.row_hash, b.row_hash)
+        parsed = [{"ok": True, "bank_code": "kkp", "rows": [a, b],
+                   "opening": 0.0, "closing": 429666.83}]
+        merged, _op, _cl, _bc = merge_statements(parsed)
+        self.assertEqual(len(merged), 1, "真重复应去重")
+
+
 if __name__ == "__main__":
     unittest.main()

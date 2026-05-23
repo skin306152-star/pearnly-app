@@ -102,7 +102,10 @@ class StatementRow:
 
     def __post_init__(self):
         if not self.row_hash:
-            key = f"{self.date}|{self.withdrawal:.2f}|{self.deposit:.2f}|{self.description[:40]}"
+            # v118.35.0.49 · 哈希含余额 · 防同日/同额/同描述的两笔合法交易被误判重复删掉
+            # (真实案例 KKP 30/12 两笔一样的 SWD 65,573.75 · 余额不同 = 不同笔)
+            key = (f"{self.date}|{self.withdrawal:.2f}|{self.deposit:.2f}"
+                   f"|{self.balance:.2f}|{self.description[:40]}")
             self.row_hash = hashlib.md5(key.encode()).hexdigest()[:12]
 
 
@@ -1106,13 +1109,19 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
                        "balance b/f", "期初余额", "上期结转")
         # If Gemini missed opening_balance, try to recover from the first no-movement row
         opening_extracted = float(data.get("opening_balance", 0) or 0)
+        last_date = None  # v118.35.0.49 · 同日多笔银行常省略重复日期 · 沿用上一行
         for r in raw_rows:
             d = _parse_date(str(r.get("date", "")))
-            if d is None:
-                continue
+            if d is not None:
+                last_date = d
+            else:
+                d = last_date  # 缺日期 → 沿用上一行(别丢交易/断余额链)· 首行无可沿用则保持 None
             wd_raw = r.get("withdrawal")
             dep_raw = r.get("deposit")
             bal_raw = r.get("balance")
+            # v118.35.0.49 · 纯噪声行(无日期可继承 + 无金额 + 无余额)才跳过 · 有金额/余额必保留
+            if d is None and not wd_raw and not dep_raw and bal_raw is None:
+                continue
             desc = str(r.get("description", ""))
             conf = (r.get("confidence") or "high").lower()
             if conf not in ("high", "medium", "low"):

@@ -3,3 +3,5 @@
 # 升级时 black/ruff 同步 bump · 防 CI 与本地格式化结果漂移。
 black==26.5.1
 ruff==0.15.14
+# REFACTOR-A8 · 测试覆盖率(coverage run -m unittest + fail_under 棘轮)
+coverage==7.14.0

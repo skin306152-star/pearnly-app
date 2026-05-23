@@ -56,3 +56,30 @@ ignore = [
 # 测试 / 探测脚本里允许未用导入(fixture 副作用)与重定义
 "tests/**" = ["F401", "F811"]
 "scripts/probe/**" = ["F401"]
+
+# ── REFACTOR-A8 · 测试覆盖率(coverage.py)──
+# 整顿期硬门槛 #6:不死磕 70% · 先建 baseline · 之后"只升不降"棘轮。
+# fail_under = 当前 baseline · 覆盖率掉到它以下 → CI 红。
+# 覆盖率提升后 · 手动上调 fail_under(只准升不准降 · 改 commit 必说明新 baseline)。
+[tool.coverage.run]
+source = ["."]
+branch = false
+omit = [
+    "tests/*",
+    "probes/*",
+    "scripts/probe/*",
+    "alembic/*",
+    "_pkg/*",
+    "_pkg_tmpstatic/*",
+    "node_modules/*",
+    "*/site-packages/*",
+    "_probe_*.py",
+    "conftest.py",
+]
+
+[tool.coverage.report]
+precision = 1
+show_missing = false
+skip_covered = false
+# baseline 2026-05-23(REFACTOR-A8 · 403 unit tests)· 棘轮:只升不降
+fail_under = 21

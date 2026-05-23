@@ -6,6 +6,12 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# REFACTOR-A8 · coverage.py 产物(不进 git · CI 现算)
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 venv/
 .env
 .env.local

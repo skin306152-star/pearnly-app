@@ -7858,6 +7858,10 @@ def get_recon_row(row_id: int) -> Optional[Dict[str, Any]]:
                     r.update({k: v for k, v in matching.items() if k.startswith("report_")})
             except Exception:
                 pass  # report_rows JSON 解析 / 匹配失败 · 跳过该行 enrich
+            # field_overrides jsonb 解开(P1.2-M2)
+            if isinstance(r.get("field_overrides"), str):
+                try: r["field_overrides"] = json.loads(r["field_overrides"])
+                except Exception: r["field_overrides"] = {}
             return r
     except Exception as e:
         logger.error(f"get_recon_row failed: {e}")
@@ -7951,6 +7955,10 @@ def list_recon_rows_detailed(task_id: int) -> List[Dict[str, Any]]:
                 if isinstance(d.get("ai_analysis"), str):
                     try: d["ai_analysis"] = _j.loads(d["ai_analysis"])
                     except Exception: pass
+                # field_overrides jsonb 解开(P1.2-M2 · 发票侧字段用户校正)
+                if isinstance(d.get("field_overrides"), str):
+                    try: d["field_overrides"] = _j.loads(d["field_overrides"])
+                    except Exception: d["field_overrides"] = {}
                 result.append(d)
             return result
     except Exception as e:

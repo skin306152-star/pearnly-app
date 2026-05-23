@@ -2250,6 +2250,13 @@ const I18N = {
         'svc-chip-incomplete':     '🔴 OCR 不完整',
         'svc-act-take-both':       '两边都对 · 是同一笔',
         'svc-act-accepted-both':   '已确认两边都对',
+        'svc-edit-tip':            '校正此字段（发票侧 OCR）',
+        'svc-edited-flag':         '已改',
+        'svc-edit-ocr':            'OCR 原值',
+        'svc-edit-save':           '保存',
+        'svc-edit-cancel':         '取消',
+        'svc-edit-saved':          '已保存校正',
+        'svc-edit-fail':           '保存失败',
         'svc-cat-date-diff':            '日期差',
         'svc-cat-date-period-mismatch': '日期跨期',
         'svc-cat-date-parse-error':     '日期无法解析',
@@ -4668,6 +4675,13 @@ const I18N = {
         'svc-chip-incomplete':     '🔴 OCR incomplete',
         'svc-act-take-both':       'Both correct · same entry',
         'svc-act-accepted-both':   'Marked: both correct',
+        'svc-edit-tip':            'Correct this field (invoice-side OCR)',
+        'svc-edited-flag':         'edited',
+        'svc-edit-ocr':            'OCR value',
+        'svc-edit-save':           'Save',
+        'svc-edit-cancel':         'Cancel',
+        'svc-edit-saved':          'Correction saved',
+        'svc-edit-fail':           'Save failed',
         'svc-cat-date-diff':            'Date diff',
         'svc-cat-date-period-mismatch': 'Cross-period date',
         'svc-cat-date-parse-error':     'Date unparsable',
@@ -7093,6 +7107,13 @@ const I18N = {
         'svc-chip-incomplete':     '🔴 OCR ไม่ครบ',
         'svc-act-take-both':       'ทั้งสองฝั่งถูก · งานเดียวกัน',
         'svc-act-accepted-both':   'ยืนยันแล้ว: ทั้งสองถูก',
+        'svc-edit-tip':            'แก้ไขช่องนี้ (OCR ฝั่งใบกำกับ)',
+        'svc-edited-flag':         'แก้แล้ว',
+        'svc-edit-ocr':            'ค่า OCR เดิม',
+        'svc-edit-save':           'บันทึก',
+        'svc-edit-cancel':         'ยกเลิก',
+        'svc-edit-saved':          'บันทึกการแก้ไขแล้ว',
+        'svc-edit-fail':           'บันทึกไม่สำเร็จ',
         'svc-cat-date-diff':            'วันที่ต่าง',
         'svc-cat-date-period-mismatch': 'วันที่ข้ามงวดภาษี',
         'svc-cat-date-parse-error':     'อ่านวันที่ไม่ได้',
@@ -9518,6 +9539,13 @@ const I18N = {
         'svc-chip-incomplete':     '🔴 OCR 不完全',
         'svc-act-take-both':       '両方正しい · 同一の取引',
         'svc-act-accepted-both':   '両方正しいと確認済み',
+        'svc-edit-tip':            'この項目を修正（請求書側 OCR）',
+        'svc-edited-flag':         '修正済',
+        'svc-edit-ocr':            'OCR 元値',
+        'svc-edit-save':           '保存',
+        'svc-edit-cancel':         'キャンセル',
+        'svc-edit-saved':          '修正を保存しました',
+        'svc-edit-fail':           '保存に失敗しました',
         'svc-cat-date-diff':            '日付差',
         'svc-cat-date-period-mismatch': '期跨ぎ日付',
         'svc-cat-date-parse-error':     '日付解析不可',
@@ -30505,6 +30533,10 @@ window.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('#sv-rows .btn-ai-analyze').forEach(b => {
             b.addEventListener('click', _onAnalyze);
         });
+        // P1.2-M2 · 绑发票侧字段内联编辑铅笔
+        document.querySelectorAll('#sv-rows .sv-edit-btn').forEach(b => {
+            b.addEventListener('click', _onEditField);
+        });
     }
 
     function _rowHtml(r) {
@@ -30546,6 +30578,12 @@ window.addEventListener('DOMContentLoaded', () => {
         </div>`;
     }
 
+    // P1.2-M2 · 取某字段的用户校正值(无则 null)
+    function _ovUser(r, field) {
+        const ov = (r.field_overrides || {})[field];
+        return (ov && ov.user != null && ov.user !== '') ? ov.user : null;
+    }
+
     function _diffTableHtml(r) {
         const df = r.diff_fields || {};
         const fields = [
@@ -30567,15 +30605,112 @@ window.addEventListener('DOMContentLoaded', () => {
             <tbody>
                 ${fields.map(([k, ik, rk, di]) => {
                     const matched = !di || di.matched;
+                    // P1.2-M2 · 发票侧字段可内联校正(只发票侧 · 报告侧国税局原始数据只读)
+                    const userVal = _ovUser(r, ik);
+                    const edited = userVal != null;
+                    const invShown = edited ? userVal : (r[ik] || '');
+                    const ocrOrig = edited ? ((r.field_overrides[ik] || {}).ocr) : null;
+                    const flag = edited
+                        ? `<span class="sv-edit-flag" title="${t('svc-edit-ocr')}: ${_esc(ocrOrig == null ? '—' : ocrOrig)}" style="margin-left:6px;font-size:10px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 5px">${t('svc-edited-flag')}</span>`
+                        : '';
+                    const invStyle = edited ? ' style="background:#FFF8E1"' : '';
                     return `<tr>
                         <td>${t(k)}</td>
-                        <td class="${matched ? 'ok' : 'diff'}">${_esc(r[ik] || '—')}</td>
+                        <td class="${matched ? 'ok' : 'diff'}"${invStyle}>
+                            <span class="sv-inv-val" data-field="${ik}">${_esc(invShown || '—')}</span>${flag}
+                            <button class="sv-edit-btn" data-field="${ik}" title="${t('svc-edit-tip')}" style="margin-left:6px;border:none;background:none;cursor:pointer;color:#6b7280;font-size:12px;padding:0 2px;line-height:1">✎</button>
+                        </td>
                         <td class="${matched ? 'ok' : 'diff'}">${_esc(r[rk] || '—')}</td>
                         <td class="delta">${matched ? '✓' : _esc(di && di.delta || '')}</td>
                     </tr>`;
                 }).join('')}
             </tbody>
         </table>`;
+    }
+
+    // P1.2-M2 · 重新绑定某 td 内的编辑铅笔(取消编辑后用)
+    function _bindCellEdit(scope) {
+        (scope || document).querySelectorAll('.sv-edit-btn').forEach(b => {
+            b.addEventListener('click', _onEditField);
+        });
+    }
+
+    // P1.2-M2 · 点铅笔 → 把发票侧 cell 变成内联输入框
+    function _onEditField(ev) {
+        ev.stopPropagation();
+        const btn = ev.currentTarget;
+        const field = btn.dataset.field;
+        const td = btn.closest('td');
+        const rowEl = btn.closest('.sv-row');
+        if (!td || !rowEl || td.dataset.editing === '1') return;
+        const rowId = rowEl.dataset.rowId;
+        const valSpan = td.querySelector('.sv-inv-val');
+        let cur = valSpan ? valSpan.textContent : '';
+        if (cur === '—') cur = '';
+        const prevHtml = td.innerHTML;
+        td.dataset.editing = '1';
+        td.innerHTML = '';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = cur;
+        input.className = 'sv-edit-input';
+        input.style.cssText = 'width:78%;font-size:12px;padding:2px 4px;border:1px solid #2563EB;border-radius:4px';
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = '✓'; saveBtn.title = t('svc-edit-save');
+        saveBtn.style.cssText = 'margin-left:4px;border:none;background:none;cursor:pointer;color:#16a34a;font-size:13px';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '✕'; cancelBtn.title = t('svc-edit-cancel');
+        cancelBtn.style.cssText = 'margin-left:2px;border:none;background:none;cursor:pointer;color:#9ca3af;font-size:13px';
+        td.appendChild(input); td.appendChild(saveBtn); td.appendChild(cancelBtn);
+        input.focus(); input.select();
+        const cancel = () => { td.dataset.editing = ''; td.innerHTML = prevHtml; _bindCellEdit(td); };
+        const save = () => { td.dataset.editing = ''; _saveField(rowId, field, input.value); };
+        saveBtn.addEventListener('click', (e) => { e.stopPropagation(); save(); });
+        cancelBtn.addEventListener('click', (e) => { e.stopPropagation(); cancel(); });
+        input.addEventListener('click', (e) => e.stopPropagation());
+        input.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') save();
+            else if (e.key === 'Escape') cancel();
+        });
+    }
+
+    // P1.2-M2 · 调 PATCH 写 field_overrides(发票侧 OCR 校正)
+    async function _saveField(rowId, field, value) {
+        try {
+            const res = await fetch('/api/recon/row/' + rowId + '/field', {
+                method: 'PATCH',
+                headers: { ..._authHeader(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ field, user_value: value }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'fail');
+            const row = _currentResult.rows.find(r => r.id == rowId);
+            if (row) row.field_overrides = data.field_overrides || {};
+            _rerenderRow(rowId);
+            showToast(t('svc-edit-saved'), 'success');
+        } catch (e) {
+            showToast(t('svc-edit-fail') + ': ' + e.message, 'error');
+            _rerenderRow(rowId);
+        }
+    }
+
+    // P1.2-M2 · 整行重渲 + 重新绑定全部事件(动作 / 编辑 / AI)
+    function _rerenderRow(rowId) {
+        const row = _currentResult.rows.find(r => r.id == rowId);
+        const oldEl = document.querySelector(`.sv-row[data-row-id="${rowId}"]`);
+        if (!row || !oldEl) return;
+        const wasOpen = oldEl.classList.contains('open');
+        oldEl.outerHTML = _rowHtml(row);
+        const newEl = document.querySelector(`.sv-row[data-row-id="${rowId}"]`);
+        if (newEl) {
+            if (wasOpen) newEl.classList.add('open');
+            newEl.querySelector('.sv-row-head')?.addEventListener('click', () => newEl.classList.toggle('open'));
+            newEl.querySelectorAll('.sv-act-btn').forEach(b => b.addEventListener('click', _onAction));
+            newEl.querySelectorAll('.sv-edit-btn').forEach(b => b.addEventListener('click', _onEditField));
+            newEl.querySelectorAll('.btn-ai-analyze').forEach(b => b.addEventListener('click', _onAnalyze));
+        }
+        _renderKpis();
     }
 
     function _aiCardHtml(r) {
@@ -30684,21 +30819,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 row.accountant_action = payload.action;
                 row.accountant_notes = payload.source ? ('source=' + payload.source) : null;
             }
-            // 整行重渲(更新 badge / actions / 视觉) + KPI 刷新
-            const oldEl = document.querySelector(`.sv-row[data-row-id="${rowId}"]`);
-            if (oldEl && row) {
-                oldEl.outerHTML = _rowHtml(row);
-                // 重新绑事件(因为 outerHTML 替换了节点)
-                const newEl = document.querySelector(`.sv-row[data-row-id="${rowId}"]`);
-                if (newEl) {
-                    newEl.classList.add('open');
-                    newEl.querySelector('.sv-row-head')?.addEventListener('click',
-                        () => newEl.classList.toggle('open'));
-                    newEl.querySelectorAll('.sv-act-btn').forEach(b =>
-                        b.addEventListener('click', _onAction));
-                }
-            }
-            _renderKpis();
+            // 整行重渲(更新 badge / actions / 视觉) + KPI 刷新 · P1.2-M2 统一走 _rerenderRow
+            _rerenderRow(rowId);
         } catch (e) {
             showToast(t('svc-act-fail') + ': ' + e.message, 'error');
         }

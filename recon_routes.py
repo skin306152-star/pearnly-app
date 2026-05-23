@@ -20,6 +20,8 @@ from field_comparator import compare_all_fields
 from vat_file_classifier import classify_file
 from vat_excel_exporter import export_recon_task
 from vat_ai_analyzer import analyze_diff
+# P1.2-M2 · 发票侧字段级用户校正(铁律 #21 独立 service)
+from services.recon.field_override import record_field_override, ALLOWED_FIELDS as _OVERRIDE_FIELDS
 # v118.32.5 · GL vs 销项税报告 对账
 from gl_vat_reconciler import (
     parse_gl, reconcile_gl_vat, export_gl_vat_excel,
@@ -796,6 +798,25 @@ async def row_action(row_id: int, body: RowActionBody, request: Request):
         notes_payload = prefix + (" · " + body.notes if body.notes else "")
     db.update_recon_row_action(row_id, body.action, notes_payload or None)
     return {"ok": True}
+
+
+class FieldOverrideBody(BaseModel):
+    field: str
+    user_value: Optional[str] = None  # 空/None = 撤销该字段校正(还原 OCR)
+
+
+@router.patch("/row/{row_id}/field")
+async def row_field_override(row_id: int, body: FieldOverrideBody, request: Request):
+    """P1.2-M2 · 用户校正发票侧 OCR 字段 · 记 OCR 原值 vs 用户值到 field_overrides"""
+    user = get_current_user_from_request(request)
+    if not user: raise HTTPException(401, "未登录")
+    if body.field not in _OVERRIDE_FIELDS:
+        raise HTTPException(400, "field not allowed")
+    result = record_field_override(row_id, body.field, body.user_value)
+    if not result.get("ok"):
+        err = result.get("error", "update failed")
+        raise HTTPException(404 if err == "row_not_found" else 400, err)
+    return {"ok": True, "field_overrides": result["field_overrides"]}
 
 
 # ======================================================================

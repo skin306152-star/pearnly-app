@@ -24,6 +24,20 @@ SMALL    = Font(name="Arial", size=9)
 RED      = Font(name="Arial", size=10, color="C0392B", bold=True)
 SUB_FILL = PatternFill("solid", start_color="F3F4F6")
 DIFF_FILL = PatternFill("solid", start_color="FEF2F2")  # 差异行底色
+# P1.2-M2 · 用户手改的发票侧 cell 标黄(同 M4 bank_recon_v2 FFE082)
+OVERRIDE_FILL = PatternFill("solid", start_color="FFE082")
+OVERRIDE_FONT = Font(name="Arial", size=10, bold=True, color="92400E")  # 暖棕字
+
+# P1.2-M2 · 发票侧可校正字段 → Excel 列号 / 列标签 key(报告侧不许改)
+_OVERRIDE_FIELD_COL = {
+    "invoice_date": 2, "invoice_no": 3, "buyer_name": 4,
+    "buyer_tax_id": 5, "buyer_branch": 6, "amount_pre_vat": 7, "vat_amount": 8,
+}
+_OVERRIDE_FIELD_LABEL = {
+    "invoice_date": "c_date", "invoice_no": "c_inv_no", "buyer_name": "c_buyer_name",
+    "buyer_tax_id": "c_buyer_tid", "buyer_branch": "c_buyer_branch",
+    "amount_pre_vat": "c_pre_vat", "vat_amount": "c_vat",
+}
 
 THIN = Side(style='thin', color='B0BEC5')
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
@@ -56,6 +70,8 @@ _LABELS = {
         "rc_pre":"ก่อน VAT", "rc_vat":"ภาษี 7%",
         "grand_total":"รวมยอดทั้งสิ้น",
         "sig_prepared":"ผู้จัดทำ", "sig_reviewer":"ผู้ตรวจสอบ", "sig_approver":"ผู้อนุมัติ",
+        "sec_manual_entry":"ร่องรอยการแก้ไขเอง (ฝั่งใบกำกับ)", "mc_field":"ช่อง",
+        "col_manual_ocr":"ค่า OCR (เดิม)", "col_manual_user":"ค่าที่คุณแก้ (ใช้จริง)",
     },
     "zh": {
         "biz_name":"经营者名", "biz_address":"经营场所地址",
@@ -76,6 +92,8 @@ _LABELS = {
         "rc_pre":"前税", "rc_vat":"VAT 7%",
         "grand_total":"合计",
         "sig_prepared":"制作人", "sig_reviewer":"审核人", "sig_approver":"批准人",
+        "sec_manual_entry":"手动修改痕迹（发票侧）", "mc_field":"字段",
+        "col_manual_ocr":"OCR 原值", "col_manual_user":"你改的（实际用）",
     },
     "en": {
         "biz_name":"Business Name", "biz_address":"Business Address",
@@ -96,6 +114,8 @@ _LABELS = {
         "rc_pre":"Pre-VAT", "rc_vat":"VAT 7%",
         "grand_total":"Grand Total",
         "sig_prepared":"Prepared by", "sig_reviewer":"Reviewed by", "sig_approver":"Approved by",
+        "sec_manual_entry":"Manual Edit Trail (Invoice Side)", "mc_field":"Field",
+        "col_manual_ocr":"OCR Value (original)", "col_manual_user":"Your Value (used)",
     },
     "ja": {
         "biz_name":"事業者名", "biz_address":"事業所住所",
@@ -116,6 +136,8 @@ _LABELS = {
         "rc_pre":"税抜", "rc_vat":"VAT 7%（消費税相当）",
         "grand_total":"総合計",
         "sig_prepared":"作成者", "sig_reviewer":"確認者", "sig_approver":"承認者",
+        "sec_manual_entry":"手入力修正履歴（請求書側）", "mc_field":"項目",
+        "col_manual_ocr":"OCR 値(元)", "col_manual_user":"修正値(実使用)",
     },
 }
 
@@ -225,6 +247,8 @@ def export_recon_task(task: Dict[str, Any],
     sum_vat = 0.0
     sum_total = 0.0
 
+    manual_trail = []  # P1.2-M2 · (序号, field_label_key, OCR 原值, 用户值) · 底部痕迹 section 用
+
     for idx, row in enumerate(rows, 1):
         diff_fields = row.get("diff_fields") or {}
         if isinstance(diff_fields, str):
@@ -234,19 +258,43 @@ def export_recon_task(task: Dict[str, Any],
             except Exception:
                 diff_fields = {}
 
+        # P1.2-M2 · 发票侧字段用户校正 · {field: {ocr, user, ts}}
+        field_overrides = row.get("field_overrides") or {}
+        if isinstance(field_overrides, str):
+            try:
+                import json as _j
+                field_overrides = _j.loads(field_overrides)
+            except Exception:
+                field_overrides = {}
+        if not isinstance(field_overrides, dict):
+            field_overrides = {}
+
+        def _disp(field, fallback):
+            """有用户校正值就用 · 否则用 OCR 原值"""
+            ov = field_overrides.get(field)
+            if isinstance(ov, dict) and ov.get("user") not in (None, ""):
+                return ov.get("user")
+            return fallback
+
         diff_cats = (row.get("diff_categories") or "").split(",")
         diff_cats = [c.strip() for c in diff_cats if c.strip()]
 
-        # 发票侧字段
-        inv_no       = _safe(row.get("invoice_no"))
-        inv_date     = _safe(row.get("invoice_date"))
-        buyer_name   = _safe(row.get("buyer_name") or row.get("seller_name"))
-        buyer_tax    = _safe(row.get("buyer_tax_id"))
-        buyer_branch = _safe(row.get("buyer_branch") or "00000")
-        amt_pre      = _num(row.get("amount_pre_vat") or row.get("total_amount"))
-        amt_vat      = _num(row.get("vat_amount"))
+        # 发票侧字段(用户校正值优先 · 只覆盖发票侧)
+        inv_no       = _safe(_disp("invoice_no", row.get("invoice_no")))
+        inv_date     = _safe(_disp("invoice_date", row.get("invoice_date")))
+        buyer_name   = _safe(_disp("buyer_name", row.get("buyer_name") or row.get("seller_name")))
+        buyer_tax    = _safe(_disp("buyer_tax_id", row.get("buyer_tax_id")))
+        buyer_branch = _safe(_disp("buyer_branch", row.get("buyer_branch") or "00000"))
+        amt_pre      = _num(_disp("amount_pre_vat", row.get("amount_pre_vat") or row.get("total_amount")))
+        amt_vat      = _num(_disp("vat_amount", row.get("vat_amount")))
         amt_total    = _num(row.get("total_amount"))
         source       = row.get("invoice_filename") or "-"
+
+        # 收集本行手改痕迹(给底部 section)
+        for _f, _lbl in _OVERRIDE_FIELD_LABEL.items():
+            _ov = field_overrides.get(_f)
+            if isinstance(_ov, dict) and _ov.get("user") not in (None, ""):
+                manual_trail.append((idx, _lbl, _ov.get("ocr"), _ov.get("user")))
 
         sum_pre   += amt_pre
         sum_vat   += amt_vat
@@ -286,6 +334,25 @@ def export_recon_task(task: Dict[str, Any],
                 cell.border = BORDER
                 if bg: cell.fill = bg
                 if c in (7,8,9): cell.number_format = '#,##0.00'
+
+            # 1b. P1.2-M2 · 用户手改的发票侧 cell 标黄 + OCR/User 批注(只第一行有发票侧数据)
+            if is_first and field_overrides:
+                for _f, _col in _OVERRIDE_FIELD_COL.items():
+                    _ov = field_overrides.get(_f)
+                    if not (isinstance(_ov, dict) and _ov.get("user") not in (None, "")):
+                        continue
+                    ocell = ws.cell(R, _col)
+                    ocell.fill = OVERRIDE_FILL
+                    ocell.font = OVERRIDE_FONT
+                    try:
+                        from openpyxl.comments import Comment as _XLC
+                        _ocr = _ov.get("ocr")
+                        ocell.comment = _XLC(
+                            f"OCR: {_ocr if _ocr not in (None, '') else '—'}\nUser: {_ov.get('user')}",
+                            "Pearnly",
+                        )
+                    except Exception:
+                        pass  # 批注失败不阻塞导出 · 数据已在 cell + 底部痕迹 section
 
             # 2. 9 个 / 标记列(全部打 / 表示"已核对")
             for c in range(12, 21):
@@ -339,6 +406,29 @@ def export_recon_task(task: Dict[str, Any],
     ws.cell(R, 1, f"{_t(lang, 'sig_prepared')}: ____________________").font = NORMAL
     ws.cell(R, 12, f"{_t(lang, 'sig_reviewer')}: ____________________").font = NORMAL
     ws.cell(R, 22, f"{_t(lang, 'sig_approver')}: ____________________").font = NORMAL
+
+    # ─── P1.2-M2 · 手动修改痕迹 section(只在有用户校正时显示) ──────────
+    if manual_trail:
+        R += 3
+        ws.merge_cells(start_row=R, start_column=1, end_row=R, end_column=4)
+        sec = ws.cell(R, 1, _t(lang, "sec_manual_entry"))
+        sec.fill = HDR_FILL; sec.font = HDR_FONT; sec.alignment = LEFT
+        R += 1
+        mini_hdr = [_t(lang, "c_seq"), _t(lang, "mc_field"),
+                    _t(lang, "col_manual_ocr"), _t(lang, "col_manual_user")]
+        for ci, h in enumerate(mini_hdr, 1):
+            cell = ws.cell(R, ci, h)
+            cell.fill = SUB_FILL; cell.font = BOLD; cell.alignment = CENTER; cell.border = BORDER
+        R += 1
+        for (seq, lbl_key, ocr_v, user_v) in manual_trail:
+            ws.cell(R, 1, seq).alignment = CENTER
+            ws.cell(R, 1).border = BORDER
+            fc = ws.cell(R, 2, _t(lang, lbl_key)); fc.font = NORMAL; fc.alignment = LEFT; fc.border = BORDER
+            oc = ws.cell(R, 3, ocr_v if ocr_v not in (None, "") else "—")
+            oc.font = SMALL; oc.alignment = LEFT; oc.border = BORDER
+            uc = ws.cell(R, 4, user_v)
+            uc.fill = OVERRIDE_FILL; uc.font = OVERRIDE_FONT; uc.alignment = LEFT; uc.border = BORDER
+            R += 1
 
     # ─── 列宽 ────────────────────────────────────────
     widths = {

@@ -5417,10 +5417,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统现在会在银行对账时主动检查 GL 与对账单是否匹配。\n\n当两者期间不一致(例如一个是上月、一个是本月),或 GL 记录数与对账单严重不符时,系统会在结果上方给出明确提示,帮助您及时发现是否上传了错误或不对应的文件,避免得到看不懂的对账差额。同时,无法识别的文件会被自动跳过并标明,不影响其余文件的对账。\n\n即日生效。",
-            "th": "ระบบจะตรวจสอบความเข้ากันของ GL กับใบแจ้งยอดโดยอัตโนมัติในการกระทบยอดธนาคาร\n\nหากช่วงเวลาไม่ตรงกัน (เช่น ไฟล์หนึ่งเป็นเดือนก่อน อีกไฟล์เป็นเดือนนี้) หรือจำนวนรายการ GL ต่างจากใบแจ้งยอดมาก ระบบจะแสดงคำเตือนไว้ด้านบนของผลลัพธ์ เพื่อช่วยให้ท่านพบว่าอัปโหลดไฟล์ผิดหรือไม่ตรงกันได้ทันที หลีกเลี่ยงผลต่างที่ดูไม่เข้าใจ และไฟล์ที่อ่านไม่ได้จะถูกข้ามและระบุไว้โดยไม่กระทบไฟล์อื่น\n\nมีผลทันที",
-            "en": "Bank reconciliation now automatically checks whether the GL and the statement match.\n\nWhen their periods differ (e.g. one is last month and the other is this month), or the GL row count differs greatly from the statement, the system shows a clear notice above the result, helping you quickly spot if a wrong or mismatched file was uploaded and avoid a confusing difference figure. Unreadable files are also automatically skipped and labelled, without affecting the rest.\n\nEffective immediately.",
-            "ja": "銀行照合で、GL と明細が一致しているかを自動的にチェックするようになりました。\n\n期間が異なる場合(例:一方が先月、もう一方が今月)や、GL の件数が明細と大きく異なる場合は、結果の上部に明確な注意を表示し、誤ったファイルや不一致のファイルをアップロードしていないかをすぐに把握でき、意味の分からない差額を避けられます。読み取れないファイルも自動的にスキップして明示し、他のファイルには影響しません。\n\n即日有効。"
+            "zh": "系统扩展了对银行对账单 Excel 文件的支持。\n\n现在支持:旧版 .xls 格式;一个文件包含多个账户(多个工作表,自动逐个识别);以及只有单一『金额』列、用正负号区分存取的银行格式。此前这类文件可能无法识别或读取错误,现已修复。\n\n即日生效。",
+            "th": "ระบบได้ขยายการรองรับไฟล์ Excel ของใบแจ้งยอดธนาคาร\n\nขณะนี้รองรับ: ไฟล์ .xls รุ่นเก่า; ไฟล์เดียวที่มีหลายบัญชี (หลายชีต ระบบอ่านทีละชีตอัตโนมัติ); และรูปแบบที่มีคอลัมน์ 'จำนวนเงิน' เพียงคอลัมน์เดียวโดยใช้เครื่องหมายบวก/ลบแยกฝาก/ถอน ก่อนหน้านี้ไฟล์เหล่านี้อาจอ่านไม่ได้หรืออ่านผิด ขณะนี้แก้ไขแล้ว\n\nมีผลทันที",
+            "en": "Support for bank-statement Excel files has been expanded.\n\nThe system now handles: legacy .xls files; a single file containing multiple accounts (multiple sheets, read automatically one by one); and bank formats with a single 'Amount' column that uses positive/negative signs for deposits/withdrawals. Such files could previously fail to be recognized or be read incorrectly — now fixed.\n\nEffective immediately.",
+            "ja": "銀行明細 Excel ファイルのサポートを拡張しました。\n\n旧形式の .xls ファイル、1つのファイルに複数口座(複数シート、自動で1枚ずつ読み取り)、入出金を正負の符号で区別する単一の『金額』列形式に対応しました。これまで認識できなかったり誤って読み取られたファイルが、修正されました。\n\n即日有効。"
         }
     }
 

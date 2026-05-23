@@ -1313,11 +1313,27 @@ _STMT_WITHDRAW_H = {"ถอนเงิน", "ถอน", "withdrawal", "withdra
 _STMT_DEPOSIT_H = {"ฝากเงิน", "ฝาก", "deposit", "deposits", "credit", "cr", "in", "paid in",
                    "存款", "入账", "收入", "贷方", "gửi"}
 _STMT_BALANCE_H = {"ยอดคงเหลือ", "คงเหลือ", "balance", "running balance", "余额", "结余", "số dư"}
+# v118.35.0.55 · 单一带符号金额列(KTB 等:正=存款 负=取款)· 无独立存/取列时用它
+_STMT_AMOUNT_H  = {"amount", "จำนวนเงิน", "จำนวน", "金额", "金額", "số เงิน", "số tiền"}
 
 
 def _hit(header: str, hints: set) -> bool:
+    # v118.35.0.55 · 短 ASCII 词(in/out/cr/dr)必须整词匹配 · 防 'in' 误命中 'Init Br.'
+    # (KTB 真实 bug:分行号列 'Init Br.' 被当成存款列)· 长词 / 泰文仍用子串
     h = str(header or "").strip().lower()
-    return any(hint.lower() in h for hint in hints)
+    if not h:
+        return False
+    tokens = None
+    for hint in hints:
+        hl = hint.lower()
+        if hl.isascii() and len(hl) <= 3:
+            if tokens is None:
+                tokens = set(re.split(r"[\s/().,_\-]+", h))
+            if hl in tokens:
+                return True
+        elif hl in h:
+            return True
+    return False
 
 
 def _map_bank_stmt_cols(header_row: List) -> Dict[str, int]:
@@ -1337,123 +1353,140 @@ def _map_bank_stmt_cols(header_row: List) -> Dict[str, int]:
             col_map["deposit"] = i
         elif "balance" not in col_map and _hit(h, _STMT_BALANCE_H):
             col_map["balance"] = i
+        elif "amount" not in col_map and _hit(h, _STMT_AMOUNT_H):
+            col_map["amount"] = i
     return col_map
 
 
-def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, Any]:
-    """v118.35.0.19 · 银行流水 Excel 直读 fallback(零成本 · 跳过 Gemini)
-
-    用户上传的 Excel 是结构化表(自家导出 / 银行下载 / 自己整理)· 表头清晰时
-    完全可以直读 · 没必要塞给 Gemini 浪费 token + 撞截断。
-
-    成功条件: 找到 date + (withdrawal or deposit) + balance 三列
-    返回: {ok, rows: [StatementRow], row_count, bank_code, parser_version}
-          失败: {ok: False, error_code, error}
-    """
+def _load_excel_all_sheets(file_bytes: bytes):
+    """v118.35.0.55 · 读出所有 sheet · 返回 [(sheet_name, [row_list,...]),...]
+    先 openpyxl(.xlsx)· 退 xlrd(旧 .xls)· 都失败返 []"""
     try:
         import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
-        ws = wb.active
-        all_rows_raw = list(ws.values)
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+        out = [(ws.title, [list(r) for r in ws.iter_rows(values_only=True)]) for ws in wb.worksheets]
+        try: wb.close()
+        except Exception: pass
+        return out
     except Exception:
-        try:
-            import xlrd
-            wb = xlrd.open_workbook(file_contents=file_bytes)
-            ws = wb.sheet_by_index(0)
-            all_rows_raw = [ws.row_values(i) for i in range(ws.nrows)]
-        except Exception as e:
-            return {"ok": False, "error_code": "file_unreadable",
-                    "error": f"Cannot read Excel: {e}"}
+        pass
+    try:
+        import xlrd
+        wb = xlrd.open_workbook(file_contents=file_bytes)
+        out = []
+        for i in range(wb.nsheets):
+            ws = wb.sheet_by_index(i)
+            out.append((ws.name, [ws.row_values(r) for r in range(ws.nrows)]))
+        return out
+    except Exception:
+        return []
 
-    # 找表头(前 10 行)
-    header_idx = -1
-    col_map: Dict[str, int] = {}
-    for i, row in enumerate(all_rows_raw[:10]):
+
+def _find_stmt_header(raw_rows):
+    """v118.35.0.55 · 前 16 行找流水表头(KTB 等表头在第 11 行)· 返回 (idx, col_map)"""
+    for i, row in enumerate(raw_rows[:16]):
         row_list = [str(c or "").strip() for c in row]
         cm = _map_bank_stmt_cols(row_list)
-        # 至少要有 date + balance + (withdrawal or deposit)
-        if "date" in cm and "balance" in cm and ("withdrawal" in cm or "deposit" in cm):
-            col_map = cm
-            header_idx = i
-            break
+        if "date" in cm and "balance" in cm and ("withdrawal" in cm or "deposit" in cm or "amount" in cm):
+            return i, cm
+    return -1, {}
 
-    if not col_map:
-        return {"ok": False, "error_code": "stmt_headers_not_found",
-                "error": "Cannot detect bank statement column headers"}
 
-    # 解析数据行
+def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename):
+    """v118.35.0.55 · 解析单个 sheet 的流水行 · 返回 (rows, opening or None)
+    支持单一带符号 amount 列(正=存 负=取)"""
     rows: List[StatementRow] = []
-    opening_balance = 0.0
+    opening_balance = None
     opening_found = False
     last_date = None
-    for raw in all_rows_raw[header_idx + 1:]:
+    d_idx = col_map["date"]; bal_idx = col_map["balance"]
+    wd_idx = col_map.get("withdrawal", -1); dp_idx = col_map.get("deposit", -1)
+    amt_idx = col_map.get("amount", -1); desc_idx = col_map.get("description", -1)
+
+    def _cell(row_list, idx):
+        return row_list[idx] if 0 <= idx < len(row_list) else ""
+
+    for raw in raw_rows[header_idx + 1:]:
         if not any(raw):
             continue
         row_list = [str(c or "").strip() for c in raw]
-        d_idx = col_map["date"]
-        bal_idx = col_map["balance"]
-        wd_idx = col_map.get("withdrawal", -1)
-        dp_idx = col_map.get("deposit", -1)
-        desc_idx = col_map.get("description", -1)
-
-        d_str = row_list[d_idx] if d_idx < len(row_list) else ""
+        d_str = _cell(row_list, d_idx)
         d = _parse_date(d_str) if d_str else None
         if d is not None:
             last_date = d
+        balance = _to_float(_cell(row_list, bal_idx))
+        withdrawal = _to_float(_cell(row_list, wd_idx)) if wd_idx >= 0 else 0.0
+        deposit    = _to_float(_cell(row_list, dp_idx)) if dp_idx >= 0 else 0.0
+        # 单一带符号 amount 列(无独立存/取列)· 正=存款 负=取款
+        if amt_idx >= 0 and wd_idx < 0 and dp_idx < 0:
+            amt = _to_float(_cell(row_list, amt_idx))
+            if amt > 0: deposit = amt
+            elif amt < 0: withdrawal = abs(amt)
+        desc = _cell(row_list, desc_idx)
 
-        bal_raw = row_list[bal_idx] if bal_idx < len(row_list) else ""
-        balance = _to_float(bal_raw)
-        wd_raw = row_list[wd_idx] if 0 <= wd_idx < len(row_list) else ""
-        dp_raw = row_list[dp_idx] if 0 <= dp_idx < len(row_list) else ""
-        withdrawal = _to_float(wd_raw)
-        deposit = _to_float(dp_raw)
-        desc = row_list[desc_idx] if 0 <= desc_idx < len(row_list) else ""
-
-        # opening balance 行: 日期空 + 描述空 + 只有 balance · 或者描述含"yyyมา/forward/opening"
         is_opening = (
-            not opening_found
-            and d is None
-            and (withdrawal == 0.0 and deposit == 0.0)
-            and balance != 0.0
+            not opening_found and d is None and withdrawal == 0.0 and deposit == 0.0 and balance != 0.0
         ) or (
-            not opening_found
-            and desc
-            and any(kw in desc.lower() for kw in ["ยอดยกมา", "brought forward", "opening", "期初"])
+            not opening_found and desc and any(
+                kw in desc.lower() for kw in ["ยอดยกมา", "ยกมา", "brought forward", "opening", "期初"])
         )
         if is_opening:
             opening_balance = balance
             opening_found = True
             continue
-
-        # 没有日期 + 没有金额 = 跳过
         if d is None and last_date is None:
             continue
         if withdrawal == 0.0 and deposit == 0.0:
             continue
-
-        eff_date = d if d is not None else last_date
         rows.append(StatementRow(
-            date=eff_date,
-            description=desc,
-            withdrawal=withdrawal,
-            deposit=deposit,
-            balance=balance,
-            source_file=filename,
+            date=d if d is not None else last_date,
+            description=desc, withdrawal=withdrawal, deposit=deposit,
+            balance=balance, source_file=filename,
         ))
+    return rows, opening_balance
 
-    if not rows:
-        return {"ok": False, "error_code": "stmt_no_rows",
-                "error": "No transaction rows found"}
 
-    closing_balance = rows[-1].balance if rows else 0.0
+def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, Any]:
+    """v118.35.0.55 · 银行流水 Excel 直读(零成本 · 跳过 Gemini)· 多 sheet 版
+
+    遍历『所有』sheet(用户可能把多个账户塞一个文件 · 每 sheet 一个账户)·
+    每个 sheet 独立找表头 + 解析 · 合并所有行。
+    支持:.xlsx + 旧 .xls(xlrd)· 表头在前 16 行任意位置 · 单一带符号 amount 列。
+    """
+    sheets = _load_excel_all_sheets(file_bytes)
+    if not sheets:
+        return {"ok": False, "error_code": "file_unreadable",
+                "error": "Cannot read Excel (legacy .xls / corrupt / unsupported format)"}
+
+    all_rows: List[StatementRow] = []
+    opening_balance = 0.0
+    opening_found_any = False
+    sheets_with_data = 0
+    for _sheet_name, raw_rows in sheets:
+        header_idx, col_map = _find_stmt_header(raw_rows)
+        if not col_map:
+            continue  # 该 sheet 无流水表头(汇总页/空页)· 跳过
+        s_rows, s_opening = _parse_stmt_sheet(raw_rows, header_idx, col_map, filename)
+        if s_rows:
+            all_rows.extend(s_rows)
+            sheets_with_data += 1
+            if not opening_found_any and s_opening is not None:
+                opening_balance = s_opening
+                opening_found_any = True
+
+    if not all_rows:
+        return {"ok": False, "error_code": "stmt_headers_not_found",
+                "error": "No bank-statement table found in any sheet"}
+
     return {
         "ok": True,
-        "rows": rows,
-        "row_count": len(rows),
+        "rows": all_rows,
+        "row_count": len(all_rows),
         "opening": opening_balance,
-        "closing": closing_balance,
+        "closing": all_rows[-1].balance,
         "bank_code": "generic",
-        "parser_version": "bank_recon_v2+xlsx_direct_v1",
+        "parser_version": "bank_recon_v2+xlsx_direct_v2",
+        "sheets_parsed": sheets_with_data,
         "needs_review": False,
     }
 

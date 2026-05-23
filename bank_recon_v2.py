@@ -102,6 +102,8 @@ class StatementRow:
     balance_ok: Optional[bool] = None # True/False (arithmetic verified)/None (cannot verify)
     # v118.35.0.50 · 系统按余额涨跌自动校正了借贷方向(OCR 把提款/存款列读反)· 让 UI/Excel 透明标注
     direction_autocorrected: bool = False
+    # v118.35.0.62 · 系统按前后余额反推 · 自动修正了读错的金额(差异小 + 前后余额都对得上才动)
+    amount_autocorrected: bool = False
 
     def __post_init__(self):
         if not self.row_hash:
@@ -153,6 +155,8 @@ class BankReconRow:
     # v118.33.13.0 · OCR accuracy verification (from StatementRow)
     stmt_confidence: str = "high"        # 'high'|'medium'|'low'
     stmt_balance_ok: Optional[bool] = None  # True/False/None
+    # v118.35.0.62 · 系统按余额自动修正过本行(金额或方向)· 透明标注让用户知情可复核
+    stmt_autocorrected: bool = False
 
 
 @dataclass
@@ -1008,6 +1012,8 @@ def parse_bank_statement_pdf(
     # For each row: prev_balance + deposit - withdrawal should equal current balance.
     # If it doesn't, set balance_ok=False so the UI can flag for human review.
     _verify_row_balances(rows, opening)
+    # v118.35.0.62 · 余额链自动修复『数字读错的金额』· 把可证的 ⚠ 变成自动修正
+    _repair_amount_from_balance(rows, opening)
     balance_warn_count = sum(1 for r in rows if r.balance_ok is False)
     low_conf_count = sum(1 for r in rows if r.confidence == "low")
     if balance_warn_count or low_conf_count:
@@ -1129,6 +1135,57 @@ def _verify_row_balances(rows: List[StatementRow], opening: float) -> None:
         prev = r.balance
 
 
+_REPAIR_RATIO = 0.30  # 反推金额 vs 原读数差异比例上限 · 超过视为可能漏行(不自动改)
+
+
+def _repair_amount_from_balance(rows: List[StatementRow], opening: float) -> None:
+    """v118.35.0.62 · 余额链自动修复『读错的金额』(零成本 · 不依赖重新 OCR)。
+
+    仅在数学上唯一可证 + 差异小(像数字读错 · 非整行漏读)时才动:
+      1. 上一行余额可靠(已过校验 · 或可靠期初 seed)· 不可靠则无从反推
+      2. 本行余额被『下一行』佐证(下一行用本行余额能对上)
+         → 本行前后两个余额都可信 · 真实变动 = 本行余额 − 上行余额
+      3. 反推值与 OCR 读数差异 < 30%(数字读错)· 差太大可能漏一整笔 → 留 ⚠ 给用户
+
+    命中则金额改成反推值(方向按余额涨跌)· 打 amount_autocorrected=True + balance_ok=True。
+    B 类(大额不符/疑似漏行)一律保持 balance_ok=False 让用户核对 · 决不瞎改。
+    必须在 _verify_row_balances 之后调用(依赖它标好的 balance_ok)。"""
+    if not rows or len(rows) < 2:
+        return
+
+    def _mv(r):
+        return (r.deposit or 0) - (r.withdrawal or 0)
+
+    for i in range(1, len(rows) - 1):
+        r = rows[i]
+        if r.balance_ok is not False or r.balance is None:
+            continue
+        prev = rows[i - 1]
+        if prev.balance is None or prev.balance_ok is False:
+            continue  # 上一行不可靠 → 无从反推
+        nxt = rows[i + 1]
+        if nxt.balance is None:
+            continue
+        # 下一行必须用『本行余额』对得上 → 佐证本行余额可信
+        nxt_expected = round(r.balance + _mv(nxt), 2)
+        nxt_amt = max(abs(nxt.deposit or 0), abs(nxt.withdrawal or 0))
+        nxt_tol = min(max(AMOUNT_TOL, nxt_amt * 0.005), 1.0)
+        if abs(nxt_expected - nxt.balance) > nxt_tol:
+            continue  # 本行余额未被佐证 → 不动
+        corrected = round(r.balance - prev.balance, 2)   # 真实变动(带符号)
+        if abs(corrected) < AMOUNT_TOL:
+            continue
+        printed = _mv(r)
+        # 差异像『数字读错』(<30%)才修;太大 → 可能漏一整笔 → 保持 ⚠
+        if abs(corrected - printed) <= max(AMOUNT_TOL, abs(corrected) * _REPAIR_RATIO):
+            if corrected > 0:
+                r.deposit, r.withdrawal = abs(corrected), 0.0
+            else:
+                r.withdrawal, r.deposit = abs(corrected), 0.0
+            r.amount_autocorrected = True
+            r.balance_ok = True
+
+
 def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> Dict[str, Any]:
     """
     Gemini fallback: extract bank statement data from scanned PDF.
@@ -1209,10 +1266,13 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
             "unclear characters. Mark confidence='medium' if mostly clear but you had "
             "minor doubts. Mark 'high' only when every digit is unambiguous."
         )
-        resp = model.generate_content([
-            {"mime_type": "application/pdf", "data": b64},
-            prompt,
-        ])
+        # v118.35.0.62 · temperature=0 · 抽取任务要确定性,不要"创造性"。
+        # 默认温度~1.0 导致同一扫描件每次识别结果不同(实测 BAY 行数 212↔274 飘)·
+        # 设 0 后大幅稳定且通常更准 · top_p=1 candidate_count=1。
+        resp = model.generate_content(
+            [{"mime_type": "application/pdf", "data": b64}, prompt],
+            generation_config={"temperature": 0.0, "top_p": 1.0, "candidate_count": 1},
+        )
         text = (resp.text or "").strip()
         if text.startswith("```"):
             text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
@@ -1552,9 +1612,10 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
         s_open = s_opening if s_opening is not None else 0.0
         # 末期:优先用最后一个『有余额』行;退回末行余额
         s_close = s_closing if s_closing is not None else s_rows[-1].balance
-        # 关键:每账户用自己的期初做方向纠正 + 余额校验 · 不跨账户
+        # 关键:每账户用自己的期初做方向纠正 + 余额校验 + 自动修复 · 不跨账户
         _correct_direction_from_balance(s_rows, s_open)
         _verify_row_balances(s_rows, s_open)
+        _repair_amount_from_balance(s_rows, s_open)
         accounts.append({
             "account_no": acct, "rows": s_rows,
             "opening": s_open, "closing": s_close,
@@ -2331,10 +2392,11 @@ def _gemini_parse_gl(file_bytes: bytes, filename: str,
             "Return ONLY valid JSON."
         ).format(hint=acct_hint)
 
-        resp = model.generate_content([
-            {"mime_type": "application/pdf", "data": b64},
-            prompt,
-        ])
+        # v118.35.0.62 · temperature=0 · GL 抽取同样要确定性(同源 PDF 每次结果一致)
+        resp = model.generate_content(
+            [{"mime_type": "application/pdf", "data": b64}, prompt],
+            generation_config={"temperature": 0.0, "top_p": 1.0, "candidate_count": 1},
+        )
         text = (resp.text or "").strip()
         if text.startswith("```"):
             text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
@@ -2714,6 +2776,7 @@ def reconcile(
                 stmt_date=sr.date, stmt_desc=sr.description,
                 stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
                 stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
+                stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
                 gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
                 gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
                 date_diff_days=0,
@@ -2735,6 +2798,7 @@ def reconcile(
                 stmt_date=sr.date, stmt_desc=sr.description,
                 stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
                 stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
+                stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
                 gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
                 gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
                 date_diff_days=dd,
@@ -2756,6 +2820,7 @@ def reconcile(
                 stmt_date=sr.date, stmt_desc=sr.description,
                 stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
                 stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
+                stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
                 gl_date=gr.date, gl_doc_no=gr.doc_no, gl_account_code=gr.account_code,
                 gl_desc=gr.description, gl_debit=gr.debit, gl_credit=gr.credit,
                 date_diff_days=dd,
@@ -2772,6 +2837,7 @@ def reconcile(
             stmt_date=sr.date, stmt_desc=sr.description,
             stmt_withdrawal=sr.withdrawal, stmt_deposit=sr.deposit, stmt_balance=sr.balance,
             stmt_confidence=sr.confidence, stmt_balance_ok=sr.balance_ok,
+            stmt_autocorrected=(sr.amount_autocorrected or sr.direction_autocorrected),
             source_stmt_file=sr.source_file,
         ))
 
@@ -2943,6 +3009,9 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
                          "zh": "余额验证未通过", "ja": "残高検証エラー"},
     "lbl_ocr_lowconf":  {"th": "ความมั่นใจต่ำ (เลือนราง)", "en": "Low confidence (blurry)",
                          "zh": "低置信度（模糊）", "ja": "信頼度低（不鮮明）"},
+    "lbl_ocr_autofixed": {"th": "ระบบแก้ยอดอัตโนมัติตามยอดคงเหลือ (ควรตรวจ)",
+                          "en": "Auto-corrected by balance (review)",
+                          "zh": "系统按余额自动修正（建议复核）", "ja": "残高で自動修正（要確認）"},
     "col_confidence":   {"th": "ความมั่นใจ", "en": "Confidence", "zh": "置信度", "ja": "信頼度"},
     "col_balance_ok":   {"th": "ตรวจยอด", "en": "Balance Check", "zh": "余额校验", "ja": "残高検証"},
     # Statement detail sheet
@@ -2968,6 +3037,8 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     "conf_low":         {"th": "◌ ต่ำ", "en": "◌ Low", "zh": "◌ 低", "ja": "◌ 低"},
     "bal_ok":           {"th": "✓ ผ่าน", "en": "✓ Pass", "zh": "✓ 通过", "ja": "✓ 合格"},
     "bal_warn":         {"th": "⚠ ตรวจ", "en": "⚠ Review", "zh": "⚠ 核对", "ja": "⚠ 要確認"},
+    # v118.35.0.62 · 系统按余额反推自动修正了金额/方向 · 标『已修正』· 黄底 · 建议复核
+    "bal_fixed":        {"th": "✎ แก้อัตโนมัติ", "en": "✎ Auto-fixed", "zh": "✎ 已修正", "ja": "✎ 自動修正"},
     "bal_na":           {"th": "—", "en": "—", "zh": "—", "ja": "—"},
     # v118.33.13.2 · Vertical itemized summary labels
     "col_summary_item":   {"th": "รายการ", "en": "Item Description",
@@ -3467,10 +3538,15 @@ def export_bank_recon_excel(
     # ── 10. OCR accuracy check (only if any warnings) ──
     warn_balance = sum(1 for rr in recon_rows if rr.stmt_balance_ok is False)
     warn_lowconf = sum(1 for rr in recon_rows if rr.stmt_confidence == "low")
-    if warn_balance or warn_lowconf:
+    fixed_n = sum(1 for rr in recon_rows if getattr(rr, "stmt_autocorrected", False))
+    if warn_balance or warn_lowconf or fixed_n:
         r += 1  # spacer
         _section_row(r, _t("lbl_ocr_check", lang))
         r += 1
+        if fixed_n:
+            # v118.35.0.62 · 系统按余额自动修正的行 · 黄字 · 建议复核
+            _detail_row(r, _t("lbl_ocr_autofixed", lang), fixed_n, color="B45309")
+            r += 1
         if warn_balance:
             _detail_row(r, _t("lbl_ocr_bal_warn", lang), warn_balance, color="DC2626")
             r += 1
@@ -3813,7 +3889,10 @@ def export_bank_recon_excel(
 
     for ri, row in enumerate(stmt_side_rows, 2):
         conf = (row.stmt_confidence or "high").lower()
-        if row.stmt_balance_ok is True:
+        if getattr(row, "stmt_autocorrected", False):
+            # v118.35.0.62 · 系统按余额自动修正过 · 显式标黄『已修正』· 透明 · 提示可复核
+            bal_str = _t("bal_fixed", lang); bal_fill = "FFE082"
+        elif row.stmt_balance_ok is True:
             bal_str = _t("bal_ok", lang); bal_fill = "D8F3DC"
         elif row.stmt_balance_ok is False:
             bal_str = _t("bal_warn", lang); bal_fill = "FFDAD6"
@@ -3952,6 +4031,7 @@ def rows_to_json(rows: List[BankReconRow]) -> List[Dict[str, Any]]:
             # v118.33.13.0 · OCR accuracy verification
             "stmt_confidence": r.stmt_confidence,
             "stmt_balance_ok": r.stmt_balance_ok,
+            "stmt_autocorrected": getattr(r, "stmt_autocorrected", False),
         })
     return result
 
@@ -3978,6 +4058,7 @@ def rows_from_json(data: List[Dict[str, Any]]) -> List[BankReconRow]:
             source_gl_file=d.get("source_gl_file", ""),
             stmt_confidence=d.get("stmt_confidence", "high"),
             stmt_balance_ok=d.get("stmt_balance_ok"),
+            stmt_autocorrected=bool(d.get("stmt_autocorrected", False)),
         ))
     return rows
 

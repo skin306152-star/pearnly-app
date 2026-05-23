@@ -5427,10 +5427,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统扩展了对银行对账单 Excel 文件的支持。\n\n现在支持:旧版 .xls 格式;一个文件包含多个账户(多个工作表,自动逐个识别);以及只有单一『金额』列、用正负号区分存取的银行格式。此前这类文件可能无法识别或读取错误,现已修复。\n\n即日生效。",
-            "th": "ระบบได้ขยายการรองรับไฟล์ Excel ของใบแจ้งยอดธนาคาร\n\nขณะนี้รองรับ: ไฟล์ .xls รุ่นเก่า; ไฟล์เดียวที่มีหลายบัญชี (หลายชีต ระบบอ่านทีละชีตอัตโนมัติ); และรูปแบบที่มีคอลัมน์ 'จำนวนเงิน' เพียงคอลัมน์เดียวโดยใช้เครื่องหมายบวก/ลบแยกฝาก/ถอน ก่อนหน้านี้ไฟล์เหล่านี้อาจอ่านไม่ได้หรืออ่านผิด ขณะนี้แก้ไขแล้ว\n\nมีผลทันที",
-            "en": "Support for bank-statement Excel files has been expanded.\n\nThe system now handles: legacy .xls files; a single file containing multiple accounts (multiple sheets, read automatically one by one); and bank formats with a single 'Amount' column that uses positive/negative signs for deposits/withdrawals. Such files could previously fail to be recognized or be read incorrectly — now fixed.\n\nEffective immediately.",
-            "ja": "銀行明細 Excel ファイルのサポートを拡張しました。\n\n旧形式の .xls ファイル、1つのファイルに複数口座(複数シート、自動で1枚ずつ読み取り)、入出金を正負の符号で区別する単一の『金額』列形式に対応しました。これまで認識できなかったり誤って読み取られたファイルが、修正されました。\n\n即日有効。"
+            "zh": "系统进一步提升了银行对账单的识别准确性。\n\n现在能更完整地读取每一笔交易、减少漏读;并自动跳过对账单底部的『合计 / 总计』等汇总行,不再把它们当成交易。综合下来,需要您手动核对的行明显减少。\n\n即日生效。",
+            "th": "ระบบได้ปรับปรุงความแม่นยำในการอ่านใบแจ้งยอดธนาคารเพิ่มเติม\n\nขณะนี้อ่านทุกรายการได้ครบถ้วนยิ่งขึ้น ลดการตกหล่น และข้ามแถวสรุปท้ายใบแจ้งยอด (เช่น 'รวมรายการ / ยอดรวม') โดยอัตโนมัติ ไม่นับเป็นรายการอีกต่อไป โดยรวมแล้วรายการที่ต้องตรวจสอบเองลดลงอย่างเห็นได้ชัด\n\nมีผลทันที",
+            "en": "The accuracy of bank-statement reading has been further improved.\n\nThe system now reads every transaction more completely (fewer missed rows) and automatically skips bottom-of-statement summary rows (e.g. 'Total / Grand Total'), no longer counting them as transactions. Overall, the number of rows you need to review manually is noticeably reduced.\n\nEffective immediately.",
+            "ja": "銀行明細の読み取り精度をさらに改善しました。\n\n各取引をより漏れなく読み取り、明細末尾の『合計・総計』などの集計行は自動的にスキップして取引として数えないようにしました。全体として、手動確認が必要な行が大幅に減少します。\n\n即日有効。"
         }
     }
 

@@ -996,6 +996,10 @@ def parse_bank_statement_pdf(
     for r in rows:
         r.source_file = filename
 
+    # v118.35.0.60 · 跳过底部汇总/合计行(Total/รวมรายการ/合计)· 不是交易 · 防被当交易误标 + 污染余额链
+    #   汇合点统一过滤 · 覆盖 table/text/Gemini 全部解析路径
+    rows = [r for r in rows if not _is_summary_row(r.description)]
+
     # v118.35.0.50 · 先用余额涨跌纠正 OCR 把借贷方向读反的行(必须在余额验证之前)
     _correct_direction_from_balance(rows, opening)
 
@@ -1133,7 +1137,9 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
     API call entirely. Uses gemini-2.5-flash-lite (faster + cheaper than 2.5-flash).
     """
     # Check cache first — instant return if same PDF was OCR'd before
-    cache_key = hashlib.sha256(file_bytes).hexdigest()
+    # v118.35.0.60 · 缓存键带提示词版本 · 改提示词后旧缓存自动失效(否则返回旧结果)
+    _STMT_PROMPT_VER = "v60-complete"
+    cache_key = hashlib.sha256(file_bytes).hexdigest() + ":" + _STMT_PROMPT_VER
     cached = _cache_get(_GEMINI_STMT_CACHE, cache_key)
     if cached is not None:
         logger.info(f"[stmt_parse][{filename}] gemini cache HIT key={cache_key[:12]}")
@@ -1166,22 +1172,28 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
         b64 = base64.b64encode(file_bytes).decode()
         # v118.33.13.0 · strict accounting-grade prompt — no guessing, no hallucination
         prompt = (
-            "You are extracting bank statement data from a scanned PDF for FINANCIAL "
-            "RECONCILIATION. Wrong digits cause hours of debugging — accuracy beats "
-            "completeness.\n"
+            "You are extracting EVERY transaction row from a bank statement (scanned PDF) for "
+            "FINANCIAL RECONCILIATION. Both ACCURACY and COMPLETENESS matter: never invent "
+            "digits, but also never drop a real transaction row.\n"
             "\n"
-            "CRITICAL ACCURACY RULES:\n"
-            "1. NEVER guess or fill in unclear digits. If a number is blurry, partially "
-            "obscured, ambiguous, or you cannot read it with FULL confidence, return null "
-            "for that field and mark confidence='low'.\n"
-            "2. NEVER infer values from context — do NOT 'fix' balance math by adjusting "
-            "amounts. Extract exactly what is printed, even if the math looks wrong.\n"
-            "3. NEVER add rows that aren't clearly visible. If you're unsure whether a row "
-            "exists at all, skip it.\n"
-            "4. Thai number formats: '115.586,50' and '115,586.50' both mean 115586.50. "
+            "RULES:\n"
+            "1. Extract EVERY transaction row, top to bottom, on EVERY page. Do NOT skip a row "
+            "just because one field is unclear — extract the row, set only the unclear field to "
+            "null, and mark confidence='low'. Missing one real transaction breaks reconciliation.\n"
+            "2. NEVER guess or fabricate digits. If a number is blurry/ambiguous, return null "
+            "for THAT field (not a guess) and mark confidence='low'.\n"
+            "3. NEVER 'fix' the math by adjusting amounts — extract exactly what is printed, "
+            "even if the running balance looks off.\n"
+            "4. RUNNING-BALANCE SELF-CHECK: normally each row's balance = previous row's balance "
+            "± its amount. Use this to verify you did NOT miss a row: if two consecutive balances "
+            "differ by more than one transaction's amount, you missed a row in between — look again.\n"
+            "5. Do NOT output summary/total rows (e.g. 'Total', 'Total Credit/Debit/Deposit', "
+            "'รวมรายการ', 'ยอดรวม', 'grand total', 合计/总计). Output ONLY individual transactions.\n"
+            "6. Thai number formats: '115.586,50' and '115,586.50' both mean 115586.50. "
             "'115.586.50' (dot thousands separator) also means 115586.50.\n"
-            "5. withdrawal and deposit are MUTUALLY EXCLUSIVE — one is the amount, the "
-            "other must be 0.\n"
+            "7. withdrawal and deposit are MUTUALLY EXCLUSIVE — one is the amount, the other 0. "
+            "Use the printed column; if direction is ambiguous, use the running balance "
+            "(balance went DOWN = withdrawal; UP = deposit).\n"
             "\n"
             "Return JSON only (no markdown fences) with this exact schema:\n"
             "{\n"
@@ -1315,6 +1327,24 @@ _STMT_DEPOSIT_H = {"ฝากเงิน", "ฝาก", "deposit", "deposits", 
 _STMT_BALANCE_H = {"ยอดคงเหลือ", "คงเหลือ", "balance", "running balance", "余额", "结余", "số dư"}
 # v118.35.0.55 · 单一带符号金额列(KTB 等:正=存款 负=取款)· 无独立存/取列时用它
 _STMT_AMOUNT_H  = {"amount", "จำนวนเงิน", "จำนวน", "金额", "金額", "số เงิน", "số tiền"}
+
+
+# v118.35.0.60 · 汇总/合计行关键词 · 这类行不是交易 · 解析时跳过(防被当成交易行误标)
+# 真实案例:AM 1-69 的 "จำนวนเงินฝาก/Total Credit"、"Total Deposit" 被当成交易 · 余额对不上
+_SUMMARY_ROW_KW = (
+    "total credit", "total debit", "total deposit", "total withdrawal",
+    "total transaction", "grand total", "subtotal", "sub total",
+    "รวมรายการ", "ยอดรวม", "รวมยอด", "รวมเงิน",
+    "总计", "合计", "小计", "本期合计", "累计",
+)
+
+
+def _is_summary_row(desc: str) -> bool:
+    """识别底部汇总/合计行(Total/รวมรายการ/合计 等)· 这类不是交易 · 应跳过。"""
+    d = (desc or "").strip().lower()
+    if not d:
+        return False
+    return any(kw in d for kw in _SUMMARY_ROW_KW)
 
 
 def _hit(header: str, hints: set) -> bool:
@@ -1473,6 +1503,9 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
             if not opening_found_any and s_opening is not None:
                 opening_balance = s_opening
                 opening_found_any = True
+
+    # v118.35.0.60 · 跳过底部汇总/合计行(同 PDF 路径)
+    all_rows = [r for r in all_rows if not _is_summary_row(r.description)]
 
     if not all_rows:
         return {"ok": False, "error_code": "stmt_headers_not_found",

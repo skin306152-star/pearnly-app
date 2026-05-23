@@ -27,13 +27,26 @@
 
 ---
 
-## ⏳ 待 Zihao 做的(只能你做 · AI 无法代办)
+## 📍 迁移进度(单一权威源 · 防删错)
 
-1. **注册 Doppler**:https://dashboard.doppler.com/ (个人免费 tier)
-2. **建 project**:名字 `pearnly` · 自动带 3 个 config:`dev` / `stg` / `prd`
-3. **导入现有密钥**:把 `.env.local` + `_gemini_key.local/` 里的真实值填进对应 config
-   (`.env.example` 是字段清单 · 见下方"迁移清单")
-4. 告诉我"注册好了" · 我接着做 CLI 集成 + 本地/prod 注入 + 文档
+**4 步顺序迁移 · 绝不能跳到第 4 步清理**(否则 Doppler 还没接管 · 服务读不到密钥 → 网站挂 → 付费用户受影响):
+
+| 步 | 做什么 | 状态 |
+|---|---|---|
+| 1️⃣ 收拢 | 生产 39 条密钥导入 Doppler `prd` config | ✅ 2026-05-24 完成 |
+| 2️⃣ 验证本地 | 装 doppler CLI · 本地 `doppler run` 跑通应用 | ⏳ 待做 |
+| 3️⃣ 验证生产 | 服务器改从 Doppler 取(**动 systemd 启动 = 碰红线 #16 · 必走流程问 Zihao**) | ⏳ 待做 |
+| 4️⃣ 清理旧的 | 两边跑通后**才**删:服务器 `/opt/mrpilot/.env` + 本地 `_gemini_key.local/` + `.env.local` 的 MRERP(**删前先备份**) | ⏳ 待做 · ⛔ 不可提前 |
+
+**已收拢的 39 条**(2026-05-24 · 导入 `prd`):DATABASE_URL / GEMINI_API_KEY / JWT_SECRET / PEARNLY_KMS_KEY /
+GITHUB_WEBHOOK_SECRET / EMAIL_ENCRYPTION_KEY / LINE 全套 / SMTP 全套 / Google OAuth / Xero / Supabase /
+RESEND / NVIDIA / TYPHOON / GPG / OCR 开关 / MRERP 全套。**剔除了 2 条死代码** demo 账号密码(`db.py`
+`ensure_demo_account` 用老套餐模型建 · 已登不上 · 待整顿 I2 单独铲)。
+
+**Doppler 账号**:Developer(个人免费)· project `pearnly` · 三环境 config `dev`/`stg`/`prd` · 生产密钥放 `prd`。
+
+> ⚠️ 桌面导入用的明文临时文件(`pearnly_secrets_TEMP.env` / `pearnly_doppler_import.env`)已于
+> 2026-05-24 导入成功后删除 · 明文密钥不留本地。
 
 ---
 

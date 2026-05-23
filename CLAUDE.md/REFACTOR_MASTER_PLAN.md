@@ -162,8 +162,8 @@
 | **A0** | 整顿主计划落档(本文档 + 铁律 #18-20 + STATE 标识 + 统计脚本) | 2-3h | — | ✅ 2026-05-22 · commit `613ea23` |
 | A1 | Vite + ES modules 落地(装包 + 配 esbuild + CI 加 build step + 把已抽 dashboard.js/billing.js 改 ES modules) | 1-2 天 | A0 | ✅ 全 4 子完成 · `e11e81d` / `cfbb7d5` / `1c4c3bd` · prod 11835032 部署成功 · 等 Zihao 人工测 dashboard + 充值 |
 | A2 | Alembic 落地(装包 + `env.py` + 001 试点迁移 + git-deploy.sh 钩子) | 2.5h | A0 | 🟡 A2.1 ✅ `4d5c8ba`(装 alembic 1.18 / SQLAlchemy 2 / env.py 从 env var 读 DATABASE_URL / 001_baseline 空迁移)· A2.2 git-deploy.sh 钩子并入 B3(真迁第一个 ensure_* 时再加)|
-| A3 | 环境分级(prod / staging / dev 三套 · Docker 本地或 Vultr 第二台) | 1-2 天 | A0 | ⚪ |
-| A4 | Secrets 管理(`.env` → Doppler 或 1Password Secrets · 给多人协作铺垫) | 2-3 天 | A3 | ⚪ |
+| A3 | 环境分级(prod / staging / dev 三套 · Docker 本地或 Vultr 第二台) | 1-2 天 | A0 | 🟡 2026-05-24 · commit `df727f6`(Zihao 拍板**本地 Docker · 不开第二台 Vultr**)· Dockerfile + .dockerignore + docker-compose(staging)+ docker-compose.dev(热重载)+ ADR-003 · **本机未装 Docker · build 验证待 Zihao 装 Docker Desktop 后跑**(验证清单在 ADR-003)· prod 部署链未动 |
+| A4 | Secrets 管理(`.env` → Doppler 或 1Password Secrets · 给多人协作铺垫) | 2-3 天 | A3 | 🟡 2026-05-24 · commit `df727f6`(Zihao 拍板 **Doppler · 个人免费**)· ADR-004 + 迁移 4 步计划 · **第 1 步收拢已完成**:生产 39 条密钥导入 Doppler `prd`(剔除 2 条死代码 demo 密码)· 桌面明文已删 · **剩第 2-4 步**:装 CLI / 本地 `doppler run` 验证 / 生产改用(碰红线)/ 清理旧密钥(都待做) |
 | A5 | CI 加 lint + format(black + ruff + ESLint + Prettier) | 半天 | A0 | ✅ 2026-05-23 · commit `5ae7bd0`(black/ruff 全量格式化 129 .py + 顺手修 2 真 bug · prettier/eslint 格 18 可维护文件 · 巨石按 C1/C2/C3 豁免 · ci.yml 加并行 lint job · CI 双 job 全绿)|
 | A6 | CI 加安全扫描(bandit + safety + npm audit) | 半天 | A5 | ✅ 2026-05-23 · commit `ed8b5af`(bandit HIGH 拦门 · 顺手清 2 处 md5 HIGH · pip-audit 代 safety 免账号 · npm audit · 三件套 baseline 全 0 · CI 绿)|
 | A7 | 依赖锁定(`requirements.lock.txt` pip-tools) | 1-2h | A0 | ✅ 2026-05-22 · commit `296c074`(pip-tools 7.5.3 · 299 行 lock · ci.yml 装 lock · dependabot.yml 注释 + CONTRIBUTING.md §依赖管理) |
@@ -302,7 +302,7 @@
 
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
-| **A 工具链** | 🟡 7.5/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **剩 A3/A4 待 Zihao 决策** | Vite + Alembic + lint + 安全扫描 + 覆盖率 + Dependabot + pip-tools 7 件落地 · **A 阶段只剩 A3(环境分级·需服务器/钱)+ A4(secrets·需付费账号)· 都卡 Zihao** |
+| **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
 | B 后端 | ⚪ 0/10 | — | 依赖 A1, A5 |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
@@ -538,16 +538,17 @@ python scripts/refactor_progress.py
 
 ## 🚀 下一个 task
 
-**当前**:第九会话长跑自主跑完 A5 + A8 + A6(3 个 commit · CI 全绿)· A 阶段 7.5/10。
-- A5 `5ae7bd0` · 全量 black/ruff/prettier/eslint + CI lint job + 修 2 真 bug + 立 8 硬门槛
-- A8 `c818578` · 覆盖率 baseline 22.5% + fail_under=21 棘轮
-- A6 `ed8b5af` · bandit + pip-audit + npm audit 三件套(baseline 全 0)
+**当前**:第十会话(2026-05-24)· Zihao 拍板 **A3=本地 Docker / A4=Doppler** · 推进两项(commit `df727f6`):
+- **A3** · Docker 三件套(Dockerfile + .dockerignore + docker-compose + docker-compose.dev)+ ADR-003 · 配置就绪 · prod 部署链未动 · **待 Zihao 装 Docker Desktop 跑 `docker compose build` 验证**(清单见 ADR-003)
+- **A4** · Doppler 收拢完成 · 生产 **39 密钥导入 `prd`**(剔除 2 死代码 demo 密码)· 桌面明文已删 · ADR-004 列迁移 4 步进度
 
-**下一个(⚠️ 都卡 Zihao 决策 · 不能自主跑)**:
-- **REFACTOR-A3 · 环境分级**(prod/staging/dev)· 需 Zihao 定:① 开第二台 Vultr(花钱)还是上 Docker 本地?② 会动部署链(git-deploy/webhook)= 触红线。**等 Zihao 拍板方向再做。**
-- **REFACTOR-A4 · Secrets 管理**(.env → Doppler/1Password)· 需 Zihao 注册付费账号 + 迁移真密钥。**等 Zihao 提供账号。**
+**下一个(A3/A4 收官 · 部分需 Zihao 手动)**:
+- **A4 第 2 步**:Zihao 装 doppler CLI → 本地 `doppler run` 跑通(验证注入)
+- **A3 验证**:Zihao 装 Docker Desktop → `docker compose build` + `up`(ADR-003 清单)
+- **A4 第 3-4 步**:生产改从 Doppler 取(**碰红线 #16 · 走流程**)+ 清理旧密钥(删前备份)· 待本地验证后做
+- **可并行**:不等 A3/A4 收官 · 直接开 **B 阶段**(后端拆 router · 依赖 A1/A5 已满足)或 **C 阶段**(前端拆 home.js → src/home/*)
 
-**A 阶段收官就差这两步** · 都要 Zihao 先决策(钱/服务器/账号)· AI 无法自主推进。其余 A 全绿。
+**遗留小债**:demo 账号死代码(`db.py` `ensure_demo_account` · 老套餐模型 · 已登不上)· 归整顿 I2 · 待清理。
 
 **A2.2** 等 B3 真迁第一条 ensure_* 时再做(已并入 B3)。
 

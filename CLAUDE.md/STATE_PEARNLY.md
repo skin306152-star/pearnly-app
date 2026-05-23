@@ -1,10 +1,32 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-23(**第九会话**) · **🟢 长跑自主跑完 A5 + A8 + A6 · 立 8 条硬门槛 · A 阶段只剩 A3/A4(卡 Zihao)**
+> **最近更新**:2026-05-24(**第十会话**) · **🟢 Zihao 拍板 A3=本地 Docker / A4=Doppler · 两项推进(commit `df727f6`)· A 阶段 8/10**
 >
-> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **7.5/10**(A0/A1/A2.1/A5/A6/A7/A8/A9 完成)· **A 阶段收官就差 A3(环境分级·需服务器/钱)+ A4(secrets·需付费账号)· 都要 Zihao 先决策**
+> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **8/10**(A0/A1/A2.1/A5/A6/A7/A8/A9 完成 · A3/A4 进行中)· A3 Docker 配置就绪待 build 验证 · A4 生产 39 密钥已收拢进 Doppler `prd` · **B/C 阶段可开工**(不依赖 A3/A4 收官)
 >
 > **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(M4 银行对账已闭环 · M1/M2/M3 暂缓等用户反馈)
+
+---
+
+## 🆕 2026-05-24 第十会话 · A3 本地 Docker + A4 Doppler 密钥收拢 · ⚠️ 下窗口必读
+
+**主线**:Zihao 拍板 A3/A4 方向 · 推进两项(commit `df727f6` · push master)。
+
+**A3 环境分级 = 本地 Docker**(Zihao 拍板不开第二台 Vultr):
+- 交付:`Dockerfile`(python:3.11-slim 对齐 CI + lock 依赖)+ `.dockerignore` + `docker-compose.yml`(staging:app + 本地 postgres16)+ `docker-compose.dev.yml`(挂源码热重载)+ `docs/refactor/adr-003-local-docker-env.md`。
+- **prod 部署链完全未动**(仍 git pull + systemctl)· Docker 只做本地 staging/dev。
+- ⚠️ **本机未装 Docker · build 未验证** · 待 Zihao 装 Docker Desktop 后跑 ADR-003 验证清单(镜像含 torch ML 栈 · 首次 build 慢/大属正常)。
+
+**A4 Secrets = Doppler**(Zihao 拍板 · 个人免费):
+- Zihao 注册 Doppler + 建 project `pearnly`(三环境 dev/stg/prd)。
+- **第 1 步收拢完成**:生产 `/opt/mrpilot/.env` 经 scp(Zihao 自己跑 · 密钥不经 AI)→ 去重 + 补本地 MRERP + 剔除 2 条死代码 demo 密码 → **39 条导入 Doppler `prd`** · 桌面明文临时文件已删。
+- 迁移 4 步计划(防删错)见 `docs/refactor/adr-004-doppler-secrets.md`:① 收拢 ✅ → ② 本地 `doppler run` 验证 → ③ 生产改用(碰红线)→ ④ 清理旧密钥(都待做 · ⛔ 不可提前删)。
+
+**遗留小债**:demo 账号死代码(`db.py` `ensure_demo_account` · 老套餐 free/plus 模型建 · credits 迁移后登不上)· 删环境变量无用(代码有默认值)· 真清要改代码 · 归整顿 I2。
+
+**守门**:imports/i18n/unit 全绿(403 tests)· 纯新增 infra 配置/文档 · 0 业务代码改动。
+
+**下窗口可做**:① 帮 Zihao 完成 A4 第 2 步(doppler CLI 本地验证)+ A3 build 验证;② **或直接开 B/C 长任务**(后端拆 app.py router / 前端拆 home.js → src/home/* · 依赖 A1/A5 已满足 · 不卡 A3/A4)。
 
 ---
 

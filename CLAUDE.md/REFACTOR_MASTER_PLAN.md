@@ -6,7 +6,7 @@
 >
 > **整改单一权威源(已收尾)**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(看顶部"改善计划收尾"段)。
 >
-> **整顿期状态**:**恢复** · A 阶段在 5.5/10(A0/A1/A2.1/A5/A7/A9 完成)· **下窗口从 A8 续**(coverage baseline)· 另已立"8 条硬门槛"(见下方专段 + 铁律 #23)。
+> **整顿期状态**:**恢复** · A 阶段 7.5/10(A0/A1/A2.1/A5/A6/A7/A8/A9 完成)· **A 阶段只剩 A3 + A4 · 都卡 Zihao 决策(服务器/钱/账号)** · 另已立"8 条硬门槛"(见下方专段 + 铁律 #23)。
 >
 > **接力 agent 进窗口先做**:读本文档"当前进度看板" + 找 A5 · 干活。改善已收尾 · 不再以审计文档为主线。
 >
@@ -165,9 +165,9 @@
 | A3 | 环境分级(prod / staging / dev 三套 · Docker 本地或 Vultr 第二台) | 1-2 天 | A0 | ⚪ |
 | A4 | Secrets 管理(`.env` → Doppler 或 1Password Secrets · 给多人协作铺垫) | 2-3 天 | A3 | ⚪ |
 | A5 | CI 加 lint + format(black + ruff + ESLint + Prettier) | 半天 | A0 | ✅ 2026-05-23 · commit `5ae7bd0`(black/ruff 全量格式化 129 .py + 顺手修 2 真 bug · prettier/eslint 格 18 可维护文件 · 巨石按 C1/C2/C3 豁免 · ci.yml 加并行 lint job · CI 双 job 全绿)|
-| A6 | CI 加安全扫描(bandit + safety + npm audit) | 半天 | A5 | ⚪ |
+| A6 | CI 加安全扫描(bandit + safety + npm audit) | 半天 | A5 | ✅ 2026-05-23 · commit `ed8b5af`(bandit HIGH 拦门 · 顺手清 2 处 md5 HIGH · pip-audit 代 safety 免账号 · npm audit · 三件套 baseline 全 0 · CI 绿)|
 | A7 | 依赖锁定(`requirements.lock.txt` pip-tools) | 1-2h | A0 | ✅ 2026-05-22 · commit `296c074`(pip-tools 7.5.3 · 299 行 lock · ci.yml 装 lock · dependabot.yml 注释 + CONTRIBUTING.md §依赖管理) |
-| A8 | Code Coverage(pytest-cov + 上传 codecov · baseline) | 半天 | A5 | ⚪ |
+| A8 | Code Coverage(pytest-cov + 上传 codecov · baseline) | 半天 | A5 | ✅ 2026-05-23 · commit `c818578`(coverage.py 跑 unittest · baseline 22.5% · fail_under=21 棘轮只升不降 · ci 加 coverage 步骤 · codecov 上传需账号 token 暂缓)|
 | A9 | Dependabot / Renovate 配置(自动 PR 升级依赖 · 每周一开) | 1h | A0 | ✅ 2026-05-22 · commit `e57993a`(.github/dependabot.yml · pip + npm + github-actions 3 ecosystem · 周一 08:00 Asia/Bangkok 开 PR · patch/minor 分组)|
 
 **A 阶段完成判定**:Vite 跑通 / Alembic 迁过 001 / staging 能 deploy / CI 加了 lint+安全扫描 / requirements.lock 已生成 / Dependabot 跑过一次
@@ -302,7 +302,7 @@
 
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
-| **A 工具链** | 🟡 5.5/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A7 ✅ `296c074` · A9 ✅ `e57993a` · A2.2 并入 B3 · A3/A6/A8 待启动 | Vite + Alembic + lint(black/ruff/prettier/eslint)+ Dependabot + pip-tools 5 件基础设施落地 · 阶段 A 过半 |
+| **A 工具链** | 🟡 7.5/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **剩 A3/A4 待 Zihao 决策** | Vite + Alembic + lint + 安全扫描 + 覆盖率 + Dependabot + pip-tools 7 件落地 · **A 阶段只剩 A3(环境分级·需服务器/钱)+ A4(secrets·需付费账号)· 都卡 Zihao** |
 | B 后端 | ⚪ 0/10 | — | 依赖 A1, A5 |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
@@ -538,11 +538,18 @@ python scripts/refactor_progress.py
 
 ## 🚀 下一个 task
 
-**当前**:REFACTOR-A5 ✅ 完成(commit `5ae7bd0` · 2026-05-23 · CI 双 job 全绿)· Zihao 拍板全量 auto-fix · 顺手修 2 真 bug · 巨石按 C1/C2/C3 豁免 · 同窗补立"8 条硬门槛"。
+**当前**:第九会话长跑自主跑完 A5 + A8 + A6(3 个 commit · CI 全绿)· A 阶段 7.5/10。
+- A5 `5ae7bd0` · 全量 black/ruff/prettier/eslint + CI lint job + 修 2 真 bug + 立 8 硬门槛
+- A8 `c818578` · 覆盖率 baseline 22.5% + fail_under=21 棘轮
+- A6 `ed8b5af` · bandit + pip-audit + npm audit 三件套(baseline 全 0)
 
-**下一个**:REFACTOR-A8 · Code Coverage(半天 · 依赖 A5 已满足 · 建 baseline + pytest-cov · 按硬门槛 #6 立"只升不降"棘轮)· 或 A6 安全扫描(bandit + safety + npm audit · 半天)/ A3 环境分级(1-2 天 · 重)
+**下一个(⚠️ 都卡 Zihao 决策 · 不能自主跑)**:
+- **REFACTOR-A3 · 环境分级**(prod/staging/dev)· 需 Zihao 定:① 开第二台 Vultr(花钱)还是上 Docker 本地?② 会动部署链(git-deploy/webhook)= 触红线。**等 Zihao 拍板方向再做。**
+- **REFACTOR-A4 · Secrets 管理**(.env → Doppler/1Password)· 需 Zihao 注册付费账号 + 迁移真密钥。**等 Zihao 提供账号。**
 
-**A 阶段下一步建议顺序**:A8(coverage baseline)→ A6(安全扫描)→ A3(环境分级)→ A4(secrets)· A2.2 等 B3 真迁第一条 ensure_* 时再做。
+**A 阶段收官就差这两步** · 都要 Zihao 先决策(钱/服务器/账号)· AI 无法自主推进。其余 A 全绿。
+
+**A2.2** 等 B3 真迁第一条 ensure_* 时再做(已并入 B3)。
 
 **A2.2 钩子并入 B3**(2026-05-22 决策):
 - A2.1 装好 Alembic + 001 空 baseline 后 · 没真迁移之前 git-deploy.sh 加 `alembic upgrade head` 是 no-op

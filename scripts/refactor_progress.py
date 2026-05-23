@@ -252,10 +252,13 @@ def main():
         ),
         ("requirements.lock(pip-tools)", (PROJECT_ROOT / "requirements.lock.txt").exists()),
         (
-            "Code coverage(.coveragerc 或 codecov)",
-            any(
-                (PROJECT_ROOT / f).exists() for f in [".coveragerc", "codecov.yml", ".codecov.yml"]
-            ),
+            "Code coverage(.coveragerc / codecov / pyproject [tool.coverage])",
+            any((PROJECT_ROOT / f).exists() for f in [".coveragerc", "codecov.yml", ".codecov.yml"])
+            or (
+                (PROJECT_ROOT / "pyproject.toml").exists()
+                and "[tool.coverage"
+                in (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8", errors="replace")
+            ),  # REFACTOR-A8 · 覆盖率配在 pyproject [tool.coverage]
         ),
         (
             "Dependabot(.github/dependabot.yml)",

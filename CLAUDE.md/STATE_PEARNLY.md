@@ -1,8 +1,8 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-23(**第九会话**) · **🟢 整顿 A5 完成(CI lint 全量落地)+ 立 8 条硬门槛**
+> **最近更新**:2026-05-23(**第九会话**) · **🟢 长跑自主跑完 A5 + A8 + A6 · 立 8 条硬门槛 · A 阶段只剩 A3/A4(卡 Zihao)**
 >
-> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **5.5/10**(A0/A1/A2.1/A5/A7/A9 完成)· **下窗口从 A8 续**(coverage baseline)
+> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **7.5/10**(A0/A1/A2.1/A5/A6/A7/A8/A9 完成)· **A 阶段收官就差 A3(环境分级·需服务器/钱)+ A4(secrets·需付费账号)· 都要 Zihao 先决策**
 >
 > **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(M4 银行对账已闭环 · M1/M2/M3 暂缓等用户反馈)
 
@@ -26,7 +26,16 @@
 
 **顺手修 `scripts/refactor_progress.py`**(硬门槛 #8 · commit 同批):① 数对位置(`static/home/*`→`src/home/*`)② integration 不再写死 0(真数 `tests/integration/` · **实际有 20 个 · 之前一直误报 0**)③ ESLint 检测加 `eslint.config.mjs` + 加 Prettier 检测 ④ 模块/测试得分每类按目标封顶(防 services 31/10 超额掩盖 home 模块化 2/50 · 模块化进度从虚高 84% 修为诚实 32%)。修后**综合进度 48%**。
 
-**下窗口第一步**:读 `REFACTOR_MASTER_PLAN.md`"当前进度看板" → REFACTOR-A8(coverage baseline · pytest-cov · 按硬门槛 #6 立只升不降棘轮)。
+**🆕 同窗长跑续作 · 自主跑完 A8 + A6(CI 全绿 · 无需 Zihao 介入)**:
+- **A8 覆盖率 baseline**(commit `c818578`)· coverage.py 跑 unittest · **baseline 22.5%**(403 tests)· `pyproject [tool.coverage]` 配 `fail_under=21`(留 1.5pt 缓冲 · 真地板 · 硬门槛 #6 棘轮:覆盖率掉到 21% 以下 CI 红 · 提升后手动上调)· ci test job 改在 coverage 下跑 + `coverage report` 强制 · codecov 上传需账号暂缓。
+- **A6 安全扫描**(commit `ed8b5af`)· **bandit**(HIGH 拦门 · 顺手清 2 处 md5 行指纹 HIGH 加 `usedforsecurity=False`)+ **pip-audit**(代 safety · 免注册账号 · `-r lock --no-deps`)+ **npm audit**(high 拦门)· 三件套 baseline **全 0** · CI 绿。
+- master plan 原写 "safety" · 改用 pip-audit(safety 新版需注册账号 · 与自主跑冲突 · 已入档说明)。
+
+**⛔ A 阶段收官只剩 A3 + A4 · 都卡 Zihao 决策(AI 无法自主)**:
+- **A3 环境分级**(prod/staging/dev):需 Zihao 定 ① 开第二台 Vultr(花钱)还是 Docker 本地 ② 会动部署链(git-deploy/webhook)触红线。
+- **A4 Secrets**(.env → Doppler/1Password):需 Zihao 注册付费账号 + 迁真密钥。
+
+**下窗口第一步**:读 `REFACTOR_MASTER_PLAN.md`"当前进度看板"。A 阶段要往下走 = 先找 Zihao 拍 A3 方向(服务器 vs Docker);否则可跳去 **B 阶段**(后端拆 router · 依赖 A1/A5 已满足)或 **C 阶段**(前端拆巨石 home.js → src/home/*)。
 
 ---
 

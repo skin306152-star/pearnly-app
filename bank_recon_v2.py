@@ -984,6 +984,11 @@ def _verify_row_balances(rows: List[StatementRow], opening: float) -> None:
     _OPENING_KW = ("ยอดยกมา", "ยอดคงเหลือยกมา", "brought forward",
                    "opening balance", "balance b/f", "期初余额", "上期结转")
     prev = opening
+    # v118.35.0.48 · 续页/缺期初兜底:opening==0 视为"没拿到真实期初余额"
+    # (典型:用户只上传对账单某一页/续页 · 没有『ยอดยกมา/期初余额』行)
+    # 此时第一笔有金额的交易无从核对"上一行余额" · 不能误标 False(原件其实没错)
+    opening_reliable = (opening != 0.0)
+    first_movement_seen = False
     for r in rows:
         if r.balance is None:
             r.balance_ok = None
@@ -998,6 +1003,14 @@ def _verify_row_balances(rows: List[StatementRow], opening: float) -> None:
             r.balance_ok = None
             prev = r.balance
             continue
+        # 第一笔有金额的交易 · 若没拿到真实期初 → 无从核对上一行余额 · 标 None(非 False)
+        # 之后从本行真实余额 seed prev · 后续行照常用 PDF 印出来的余额逐行核对
+        if not first_movement_seen and not opening_reliable:
+            r.balance_ok = None
+            prev = r.balance
+            first_movement_seen = True
+            continue
+        first_movement_seen = True
         expected = round(prev + dep - wd, 2)
         diff = abs(expected - r.balance)
         amt = max(abs(dep), abs(wd))
@@ -2323,8 +2336,11 @@ def merge_statements(parsed_list: List[Dict[str, Any]]) -> Tuple[List[StatementR
                 if latest_date is None or r.date > latest_date:
                     latest_date = r.date
 
-    # Sort by date then by deposit/withdrawal (date first, then the transactions)
-    all_rows.sort(key=lambda r: (r.date or date.min, r.withdrawal, r.deposit))
+    # v118.35.0.48 · 只按日期稳定排序 · 保留对账单原始打印顺序(同日多笔不重排)
+    # 旧版按 (date, withdrawal, deposit) 排 · 把同一天的存/取款按金额重排 · 打乱了
+    # 对账单的"上一行余额 ± 金额 = 本行余额"链条 · 导致余额验证误报 + 显示顺序错乱。
+    # Python sort 稳定 → 同日行保持 append(= 解析 = PDF 顶到底)顺序。
+    all_rows.sort(key=lambda r: (r.date or date.min,))
 
     # Opening: from first parsed file that has an opening balance
     for p in parsed_list:

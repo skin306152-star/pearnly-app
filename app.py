@@ -5417,10 +5417,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已优化『销售税对账』模块。\n\n现在您可以在对账明细中直接校正发票一侧的字段(如客户名称、发票号、金额)。系统会保留您的修改并记录原始数值,导出的 Excel 文件中,经您修改的内容会以黄色高亮,并在表格末尾附上修改前后的对照,便于复核与存档。\n\n报告一侧的原始数据保持不变。即日生效。",
-            "th": "ระบบได้ปรับปรุงโมดูล『กระทบยอดภาษีขาย』\n\nขณะนี้คุณสามารถแก้ไขข้อมูลฝั่งใบกำกับ (เช่น ชื่อลูกค้า เลขที่ใบกำกับ จำนวนเงิน) ได้โดยตรงในรายละเอียดการกระทบยอด ระบบจะบันทึกการแก้ไขของคุณพร้อมเก็บค่าเดิมไว้ และในไฟล์ Excel ที่ส่งออก ข้อมูลที่คุณแก้ไขจะถูกไฮไลต์สีเหลือง พร้อมตารางเปรียบเทียบค่าเดิมกับค่าที่แก้ไขท้ายไฟล์ เพื่อความสะดวกในการตรวจสอบ\n\nข้อมูลต้นฉบับฝั่งรายงานยังคงเดิม มีผลทันที",
-            "en": "The『VAT-Output Reconciliation』module has been improved.\n\nYou can now correct invoice-side fields (such as customer name, invoice number, and amounts) directly within the reconciliation details. The system keeps your correction while preserving the original value. In the exported Excel file, corrected entries are highlighted in yellow, with a before-and-after comparison table at the end for easy review and record-keeping.\n\nThe original report-side data remains unchanged. Effective immediately.",
-            "ja": "『売上税照合』モジュールを改善しました。\n\n照合の明細画面で、請求書側の項目(顧客名・請求書番号・金額など)を直接修正できるようになりました。修正内容は元の値を保持したまま記録され、出力する Excel ファイルでは修正箇所が黄色でハイライトされ、ファイル末尾に修正前後の対照表が付きます。確認・保管に便利です。\n\nレポート側の元データは変更されません。即日有効。"
+            "zh": "系统已优化『银行对账』。\n\n此前当只上传银行对账单的部分页面(例如最后一页或中间某页)时,部分本来正确的交易可能被误标为『余额核对未通过』。现已修复:这类缺少上一页结转余额的情况会标记为『无法核对』,不再误报为异常。\n\n同时,同一天的多笔交易现在严格按对账单上的原始顺序显示。即日生效。",
+            "th": "ระบบได้ปรับปรุง『การกระทบยอดบัญชีธนาคาร』\n\nก่อนหน้านี้ เมื่ออัปโหลดเฉพาะบางหน้าของ statement (เช่น หน้าสุดท้ายหรือหน้ากลาง) รายการที่ถูกต้องบางรายการอาจถูกระบุผิดว่า『ตรวจยอดคงเหลือไม่ผ่าน』ได้รับการแก้ไขแล้ว: กรณีที่ไม่มียอดยกมาจากหน้าก่อนจะถูกระบุเป็น『ตรวจสอบไม่ได้』แทนการแจ้งเตือนผิดพลาด\n\nนอกจากนี้ รายการหลายรายการในวันเดียวกันจะแสดงตามลำดับเดิมในใบแจ้งยอดอย่างเคร่งครัด มีผลทันที",
+            "en": "The『Bank Reconciliation』feature has been improved.\n\nPreviously, when only part of a bank statement was uploaded (e.g. the last page or a middle page), some genuinely correct transactions could be mistakenly flagged as『balance check failed』. This is now fixed: when the carried-forward balance from the previous page is missing, those rows are marked『cannot verify』instead of being reported as an error.\n\nIn addition, multiple transactions on the same day now display strictly in the original statement order. Effective immediately.",
+            "ja": "『銀行照合』機能を改善しました。\n\nこれまで、銀行明細の一部のページ(最終ページや中間ページなど)のみをアップロードした場合に、本来正しい一部の取引が『残高照合エラー』と誤表示されることがありました。今回修正し、前ページからの繰越残高がない場合は『照合不可』と表示し、誤ったエラー報告を行わないようにしました。\n\nまた、同じ日付の複数取引は明細の元の順序どおりに表示されます。即日有効。"
         }
     }
 

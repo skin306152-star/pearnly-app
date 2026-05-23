@@ -1291,6 +1291,23 @@ def parse_bank_statement_pdf(
         return {"ok": False, "error": f"No statement rows found in PDF{hint}",
                 "rows": [], "opening": 0.0, "closing": 0.0}
 
+    # v118.35.0.66 · 期初/期末兜底回填:Gemini 有时不回传 opening/closing 字段(实测 AM:
+    # 4 笔交易全对、B/F 行也读到了,但 opening/closing 仍是 0 → 汇总区显示 0、期末交叉校验跳过)。
+    # 行里已有 B/F 余额 + 末行余额时,数学补回(只在拿到 0/未知时补 · 不覆盖已知值)。
+    _OPEN_KW = ("b/f", "brought forward", "ยอดยกมา", "ยกมา", "opening", "期初", "上期")
+    if not opening:
+        first = rows[0]
+        fd = (first.description or "").lower()
+        if (first.deposit or 0) == 0 and (first.withdrawal or 0) == 0 and first.balance \
+                and any(k in fd for k in _OPEN_KW):
+            opening = first.balance                       # 显式 B/F 行余额
+        else:
+            fm = next((r for r in rows if (r.deposit or 0) or (r.withdrawal or 0)), None)
+            if fm and fm.balance:                         # 退路:首笔有动行『余额−净额』反推
+                opening = round(fm.balance - ((fm.deposit or 0) - (fm.withdrawal or 0)), 2)
+    if not closing:
+        closing = next((r.balance for r in reversed(rows) if r.balance), closing)
+
     # v118.35.0.63 · 完整性交叉校验(印刷合计/笔数 + 期末平衡)· 主动发现漏行
     completeness = _audit_completeness(rows, opening, closing, printed_totals)
     if not completeness["ok"]:

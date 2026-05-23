@@ -1290,23 +1290,43 @@ _COMP_LBL = {
 }
 
 
+# v118.35.0.66 · 笔数缺口巨大(读到的远少于页脚印的)→ 多半是『只上传了部分页』· 醒目提示缺页
+_MISSPAGE_LBL = {
+    "zh": "(疑似缺页 · 请确认上传了完整页数)",
+    "en": "(likely missing pages — please upload all pages)",
+    "th": "(อาจขาดหน้า — กรุณาอัปโหลดให้ครบทุกหน้า)",
+    "ja": "(ページ欠落の可能性 — 全ページをアップロードしてください)",
+}
+
+
 def _completeness_details(issues, lang) -> list:
-    """v118.35.0.63 · 把完整性 issue 列表转成简短可读的提示片段(跟 lang 走)。"""
+    """v118.35.0.63 · 把完整性 issue 列表转成简短可读的提示片段(跟 lang 走)。
+    v118.35.0.66 · 笔数缺口巨大时追加『疑似缺页』提示(BBL 只上传末页那种)。"""
     def L(k):
         return (_COMP_LBL.get(k) or {}).get(lang) or (_COMP_LBL.get(k) or {}).get("en") or k
+
+    def _misspage(printed, got):
+        # 印的笔数 ≥ 读到的 2 倍、且缺口 ≥ 20 → 几乎肯定整页缺失,而非个别漏行
+        return isinstance(printed, (int, float)) and printed >= max(got * 2, got + 20)
+
     out = []
+    miss = False
     for it in (issues or []):
         t = it.get("type", "")
         if t == "credit_count_mismatch":
             out.append(f"{L('credit')}{L('cnt')}({L('printed')}{it['printed']}/{L('got')}{it['count']})")
+            miss = miss or _misspage(it["printed"], it["count"])
         elif t == "debit_count_mismatch":
             out.append(f"{L('debit')}{L('cnt')}({L('printed')}{it['printed']}/{L('got')}{it['count']})")
+            miss = miss or _misspage(it["printed"], it["count"])
         elif t == "credit_sum_mismatch":
             out.append(f"{L('credit')}{L('sum')}({L('printed')}{it['printed']:,.0f}/{L('got')}{it['sum']:,.0f})")
         elif t == "debit_sum_mismatch":
             out.append(f"{L('debit')}{L('sum')}({L('printed')}{it['printed']:,.0f}/{L('got')}{it['sum']:,.0f})")
         elif t == "closing_mismatch":
             out.append(f"{L('close')}({L('printed')}{it['printed']:,.0f}/{L('calc')}{it['calc']:,.0f})")
+    if miss:
+        out.append(_MISSPAGE_LBL.get(lang, _MISSPAGE_LBL["en"]))
     return out
 
 

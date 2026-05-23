@@ -58,7 +58,7 @@ jobs:
         run: pip-audit -r requirements.lock.txt --no-deps --progress-spinner off
 
       - name: Setup Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: npm
@@ -116,7 +116,7 @@ jobs:
           coverage xml
 
       - name: Setup Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: npm

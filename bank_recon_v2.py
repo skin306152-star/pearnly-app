@@ -208,11 +208,40 @@ def _to_float(val) -> float:
         return 0.0
 
 
-def _parse_date(raw: str) -> Optional[date]:
-    """Parse Thai/English date strings into date objects."""
+def _parse_date(raw) -> Optional[date]:
+    """Parse Thai/English date strings into date objects.
+
+    BUG-FIX-T1 v118.35.0.42 · 加 datetime/date 直通 + ISO 字符串 fallback
+    防 openpyxl 返 datetime cell str() 化变 '2568-12-01 00:00:00' · split 出 4 parts 失败
+    """
+    if raw is None:
+        return None
+    # datetime / date 类型直接转(佛历 BE 自动转公历 CE · -543)
+    if isinstance(raw, datetime):
+        y = raw.year
+        if y >= 2500:
+            y -= 543
+        try:
+            return date(y, raw.month, raw.day)
+        except ValueError:
+            return None
+    if isinstance(raw, date):
+        y = raw.year
+        if y >= 2500:
+            y -= 543
+        try:
+            return date(y, raw.month, raw.day)
+        except ValueError:
+            return None
+    raw = str(raw).strip()
     if not raw:
         return None
-    raw = str(raw).strip()
+
+    # BUG-FIX-T1 v118.35.0.42 · ISO datetime 字符串去掉时分秒部分
+    # 处理 'YYYY-MM-DD HH:MM:SS' / 'YYYY-MM-DDTHH:MM:SS' / 'YYYY/MM/DD HH:MM'
+    # 防 split 出 4+ parts 让下面 len(parts)==3 检测失败
+    if " " in raw or "T" in raw:
+        raw = raw.split(" ")[0].split("T")[0]
 
     # Replace common separators
     clean = raw.replace("/", "-").replace(".", "-").strip()
@@ -244,6 +273,10 @@ def _parse_date(raw: str) -> Optional[date]:
             # yyyy-mm-dd
             if len(p0) == 4 and int(p0) > 1900:
                 yr, mo, dy = int(p0), int(p1), int(p2)
+                # BUG-FIX-T1 v118.35.0.42 · yyyy 路径也加佛历 BE → 公历 CE 转换
+                # 防 openpyxl 把佛历 datetime str 化变 '2568-12-31' · 直通也要减 543
+                if yr >= 2500:
+                    yr -= 543
             # dd-mm-yyyy or dd-mm-yy
             elif len(p2) == 4 or len(p2) == 2:
                 dy, mo = int(p0), int(p1)

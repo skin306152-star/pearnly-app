@@ -19692,9 +19692,33 @@ async function deleteEndpoint(endpointId) {
     }
 
     // ── Render results ────────────────────────────────────────────────
+    // v118.35.0.54 · 输入不匹配 / 跳过文件 警告条(期间/规模对不上 · 不让用户看不懂差额)
+    function _brv2RenderWarnings(warnings, skipped) {
+        const host = $('brv2-summary-collapse');
+        let box = $('brv2-warnings');
+        const _l = window._currentLang || 'zh';
+        const skipLbl = { zh: '⏭ 已跳过无法识别的文件:', th: '⏭ ข้ามไฟล์ที่อ่านไม่ได้:',
+                          en: '⏭ Skipped unreadable file:', ja: '⏭ 読み取れないファイルをスキップ:' }[_l] || '⏭ ';
+        const msgs = [];
+        (skipped || []).forEach(fn => msgs.push(skipLbl + ' ' + fn));
+        (warnings || []).forEach(w => msgs.push(w));
+        if (!msgs.length) { if (box) box.style.display = 'none'; return; }
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'brv2-warnings';
+            if (host && host.parentNode) host.parentNode.insertBefore(box, host);
+            else return;
+        }
+        box.style.cssText = 'display:block;margin:10px 0;padding:10px 14px;background:#FEF3C7;' +
+            'border:1px solid #FCD34D;border-radius:8px;color:#92400E;font-size:13px;line-height:1.6';
+        box.innerHTML = msgs.map(m => '<div>' + esc2(m) + '</div>').join('');
+    }
+
     function renderResults(data) {
         // Always render parse diagnostics (shown on both success and failure)
         renderParseInfo(data);
+        // v118.35.0.54 · 输入不匹配 / 跳过文件 警告条
+        _brv2RenderWarnings(data.warnings || [], data.skipped_files || []);
 
         // If parse failed, show error toast but still display the diagnostics panel
         if (!data.ok && data.error) {

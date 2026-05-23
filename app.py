@@ -5417,10 +5417,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统提升了银行对账批量上传的稳定性。\n\n此前当一次上传的多份对账单中有任意一份无法识别时,整批对账会被中断、结果显示为空。现已修复:系统会自动跳过无法识别的文件,用其余成功识别的对账单继续对账,并在文件状态中标明被跳过的文件,不再因单个文件影响全部结果。\n\n即日生效。",
-            "th": "ระบบได้ปรับปรุงเสถียรภาพของการอัปโหลดใบแจ้งยอดหลายไฟล์พร้อมกัน\n\nก่อนหน้านี้ หากในการอัปโหลดมีใบแจ้งยอดไฟล์ใดไฟล์หนึ่งที่อ่านไม่ได้ การกระทบยอดทั้งชุดจะถูกยกเลิกและผลลัพธ์ว่างเปล่า ขณะนี้แก้ไขแล้ว ระบบจะข้ามไฟล์ที่อ่านไม่ได้โดยอัตโนมัติ และใช้ใบแจ้งยอดที่อ่านสำเร็จที่เหลือทำการกระทบยอดต่อ พร้อมระบุไฟล์ที่ถูกข้ามในสถานะไฟล์ จะไม่ให้ไฟล์เดียวกระทบต่อผลทั้งหมดอีก\n\nมีผลทันที",
-            "en": "Batch upload of bank statements is now more stable.\n\nPreviously, if any single statement in an upload could not be read, the entire reconciliation was aborted and the result came back empty. This is now fixed: the system automatically skips files it cannot read and continues reconciliation with the remaining successfully-read statements, marking the skipped files in the file status. A single problem file no longer affects the whole result.\n\nEffective immediately.",
-            "ja": "銀行明細の一括アップロードの安定性を向上しました。\n\nこれまで、アップロードした複数の明細のうち1件でも読み取れないものがあると、照合全体が中断され結果が空になっていました。今回修正し、読み取れないファイルは自動的にスキップして、残りの読み取れた明細で照合を続行し、スキップしたファイルをファイル状態に明示します。1件の問題ファイルが全体の結果に影響することはなくなりました。\n\n即日有効。"
+            "zh": "系统现在会在银行对账时主动检查 GL 与对账单是否匹配。\n\n当两者期间不一致(例如一个是上月、一个是本月),或 GL 记录数与对账单严重不符时,系统会在结果上方给出明确提示,帮助您及时发现是否上传了错误或不对应的文件,避免得到看不懂的对账差额。同时,无法识别的文件会被自动跳过并标明,不影响其余文件的对账。\n\n即日生效。",
+            "th": "ระบบจะตรวจสอบความเข้ากันของ GL กับใบแจ้งยอดโดยอัตโนมัติในการกระทบยอดธนาคาร\n\nหากช่วงเวลาไม่ตรงกัน (เช่น ไฟล์หนึ่งเป็นเดือนก่อน อีกไฟล์เป็นเดือนนี้) หรือจำนวนรายการ GL ต่างจากใบแจ้งยอดมาก ระบบจะแสดงคำเตือนไว้ด้านบนของผลลัพธ์ เพื่อช่วยให้ท่านพบว่าอัปโหลดไฟล์ผิดหรือไม่ตรงกันได้ทันที หลีกเลี่ยงผลต่างที่ดูไม่เข้าใจ และไฟล์ที่อ่านไม่ได้จะถูกข้ามและระบุไว้โดยไม่กระทบไฟล์อื่น\n\nมีผลทันที",
+            "en": "Bank reconciliation now automatically checks whether the GL and the statement match.\n\nWhen their periods differ (e.g. one is last month and the other is this month), or the GL row count differs greatly from the statement, the system shows a clear notice above the result, helping you quickly spot if a wrong or mismatched file was uploaded and avoid a confusing difference figure. Unreadable files are also automatically skipped and labelled, without affecting the rest.\n\nEffective immediately.",
+            "ja": "銀行照合で、GL と明細が一致しているかを自動的にチェックするようになりました。\n\n期間が異なる場合(例:一方が先月、もう一方が今月)や、GL の件数が明細と大きく異なる場合は、結果の上部に明確な注意を表示し、誤ったファイルや不一致のファイルをアップロードしていないかをすぐに把握でき、意味の分からない差額を避けられます。読み取れないファイルも自動的にスキップして明示し、他のファイルには影響しません。\n\n即日有効。"
         }
     }
 

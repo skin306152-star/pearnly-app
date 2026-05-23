@@ -1221,6 +1221,56 @@ def _brv2_err(key: str, lang: str = "th", **fmt) -> str:
     return msg.format(**fmt) if fmt else msg
 
 
+# v118.35.0.54 · 输入不匹配警告(GL 与对账单期间/科目对不上)· 防止系统闷头算出
+# 让用户看不懂的差额、误以为系统坏了。返回 warnings 数组 · 前端显示提示条。
+_BRV2_WARN = {
+    "period_mismatch": {
+        "zh": "⚠️ GL 与对账单的期间不重叠(GL:{g};对账单:{s})。很可能上传了不同期间的文件,请核对后重新上传同一期间的 GL 与对账单。",
+        "en": "⚠️ The GL and bank statement periods do not overlap (GL: {g}; statement: {s}). You may have uploaded files from different periods — please re-upload the GL and statement for the same period.",
+        "th": "⚠️ ช่วงเวลาของ GL กับใบแจ้งยอดไม่ตรงกัน (GL: {g}; ใบแจ้งยอด: {s}) อาจอัปโหลดไฟล์คนละช่วงเวลา กรุณาตรวจสอบและอัปโหลด GL กับใบแจ้งยอดของช่วงเวลาเดียวกัน",
+        "ja": "⚠️ GL と明細の期間が重なっていません(GL:{g};明細:{s})。異なる期間のファイルをアップロードした可能性があります。同じ期間の GL と明細を再アップロードしてください。",
+    },
+    "gl_too_few": {
+        "zh": "⚠️ GL 只有 {n} 行,而对账单有 {m} 行,差距过大。可能上传了不完整或不对应的 GL,对账结果可能无意义。",
+        "en": "⚠️ The GL has only {n} row(s) but the statement has {m}. This large gap suggests an incomplete or mismatched GL — the reconciliation result may be meaningless.",
+        "th": "⚠️ GL มีเพียง {n} รายการ แต่ใบแจ้งยอดมี {m} รายการ ความต่างมากเกินไป อาจเป็น GL ที่ไม่สมบูรณ์หรือไม่ตรงกัน ผลกระทบยอดอาจไม่มีความหมาย",
+        "ja": "⚠️ GL は {n} 行のみですが明細は {m} 行あります。差が大きすぎるため、不完全または不一致の GL の可能性があり、照合結果が無意味になる場合があります。",
+    },
+    "no_match": {
+        "zh": "⚠️ 没有任何记录匹配成功。请确认 GL 与对账单是否为同一账户、同一期间。",
+        "en": "⚠️ No records matched at all. Please confirm the GL and statement are for the same account and period.",
+        "th": "⚠️ ไม่มีรายการใดจับคู่สำเร็จ กรุณายืนยันว่า GL กับใบแจ้งยอดเป็นบัญชีและช่วงเวลาเดียวกัน",
+        "ja": "⚠️ 一致したレコードがありません。GL と明細が同じ口座・同じ期間か確認してください。",
+    },
+}
+
+
+def _brv2_warn(key: str, lang: str = "th", **fmt) -> str:
+    lang = lang if lang in ("zh", "en", "th", "ja") else "th"
+    msg = (_BRV2_WARN.get(key) or {}).get(lang) or (_BRV2_WARN.get(key) or {}).get("en") or key
+    return msg.format(**fmt) if fmt else msg
+
+
+def _detect_recon_mismatch(stmt_rows, gl_rows, matched_count, lang) -> list:
+    """v118.35.0.54 · 检测 GL 与对账单是否明显不匹配 · 返回 4 语警告字符串列表(可空)。"""
+    warnings = []
+    try:
+        s_dates = [r.date for r in stmt_rows if getattr(r, "date", None)]
+        g_dates = [r.date for r in gl_rows if getattr(r, "date", None)]
+        if s_dates and g_dates:
+            smin, smax, gmin, gmax = min(s_dates), max(s_dates), min(g_dates), max(g_dates)
+            if smax < gmin or gmax < smin:  # 完全不重叠
+                warnings.append(_brv2_warn("period_mismatch", lang,
+                                           g=f"{gmin}~{gmax}", s=f"{smin}~{smax}"))
+        if len(gl_rows) <= 2 and len(stmt_rows) >= 20:
+            warnings.append(_brv2_warn("gl_too_few", lang, n=len(gl_rows), m=len(stmt_rows)))
+        elif matched_count == 0 and (len(stmt_rows) + len(gl_rows)) >= 10:
+            warnings.append(_brv2_warn("no_match", lang))
+    except Exception:
+        pass
+    return warnings
+
+
 def _apply_anchor_overrides(
     stmt_opening: float, gl_opening: float, gl_closing: float, stmt_closing: float,
     stmt_opening_override: Optional[float],
@@ -1472,6 +1522,9 @@ async def bank_v2_run(
         bank_code=bank_code, gl_account_code=gl_account,
     )
 
+    # v118.35.0.54 · 输入不匹配检测(期间/科目/规模对不上)· 主动警告 · 不让用户看不懂差额
+    brv2_warnings = _detect_recon_mismatch(stmt_rows, gl_rows, summary.matched_count, lang)
+
     # 5. Serialize
     detail_j = rows_to_json(recon_rows)
     summary_j = bank_summary_to_json(summary)
@@ -1520,6 +1573,7 @@ async def bank_v2_run(
         "stmt_row_count": len(stmt_rows),
         "gl_row_count": len(gl_rows),
         "skipped_files": skipped_files,  # v118.35.0.53 · 部分失败被跳过的文件 · 前端可提示
+        "warnings": brv2_warnings,       # v118.35.0.54 · 输入不匹配警告(期间/规模)· 前端显示提示条
         "parse_info": parse_info,
         "stats": {
             "matched": summary.matched_count,

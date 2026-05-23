@@ -1968,6 +1968,7 @@ const I18N = {
         'brv2-anchor-stmt-opening':  '期初 Statement 余额',
         'brv2-anchor-gl-opening':    'GL 期初余额',
         'brv2-anchor-eq-lbl':        '期初差额(Statement 期初 − GL 期初):',
+        'brv2-anchor-prefill-hint':  '已用上次 OCR 抽到的值预填 · 不准点一下就能改',
         'brv2-run-btn':       '开始对账',
         'brv2-processing':    '处理中…',
         'brv2-stat-matched':  '已匹配',
@@ -4390,6 +4391,7 @@ const I18N = {
         'brv2-anchor-stmt-opening':  'Statement opening balance',
         'brv2-anchor-gl-opening':    'GL opening balance',
         'brv2-anchor-eq-lbl':        'Opening difference (Stmt opening − GL opening):',
+        'brv2-anchor-prefill-hint':  'Prefilled from your last OCR scan · click to edit if wrong',
         'brv2-run-btn':       'Run Reconciliation',
         'brv2-processing':    'Processing…',
         'brv2-stat-matched':  'Matched',
@@ -6810,6 +6812,7 @@ const I18N = {
         'brv2-anchor-stmt-opening':  'ยอดยกมา STATEMENT',
         'brv2-anchor-gl-opening':    'ยอดยกมา GL',
         'brv2-anchor-eq-lbl':        'ผลต่างยอดยกมา (ยอดยกมา Statement − ยอดยกมา GL):',
+        'brv2-anchor-prefill-hint':  'เติมค่าจาก OCR ครั้งก่อนให้แล้ว · คลิกเพื่อแก้ถ้าไม่ตรง',
         'brv2-run-btn':       'เริ่มกระทบยอด',
         'brv2-processing':    'กำลังประมวลผล…',
         'brv2-stat-matched':  'จับคู่แล้ว',
@@ -9226,6 +9229,7 @@ const I18N = {
         'brv2-anchor-stmt-opening':  'Statement 期首残高',
         'brv2-anchor-gl-opening':    'GL 期首残高',
         'brv2-anchor-eq-lbl':        '期首差額(Stmt 期首 − GL 期首):',
+        'brv2-anchor-prefill-hint':  '前回 OCR の値で自動入力済 · 違えばクリックして修正',
         'brv2-run-btn':       '照合開始',
         'brv2-processing':    '処理中…',
         'brv2-stat-matched':  '一致',
@@ -19147,6 +19151,60 @@ async function deleteEndpoint(endpointId) {
         return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
+    // P0.1 BUG-B-T1 v118.35.0.37 · 3 anchor 预填 cache 跨会话 · localStorage 单 key 兜底
+    //   不分 bank · 1 个事务所 1-2 个银行 · 简化(后续 Phase 1 P1.4 加 confidence 时再 per-bank scope)
+    var _BRV2_ANCHOR_KEY = 'pearnly.brv2.lastAnchorOcr';
+    function _brv2SaveLastAnchorOcr(summary) {
+        try {
+            var ocr = summary && summary._anchor_ocr;
+            if (!ocr || typeof ocr !== 'object') return;
+            var payload = {
+                stmt_opening: Number.isFinite(+ocr.stmt_opening) ? +ocr.stmt_opening : null,
+                gl_opening:   Number.isFinite(+ocr.gl_opening)   ? +ocr.gl_opening   : null,
+                gl_closing:   Number.isFinite(+ocr.gl_closing)   ? +ocr.gl_closing   : null,
+                ts: Date.now(),
+            };
+            localStorage.setItem(_BRV2_ANCHOR_KEY, JSON.stringify(payload));
+        } catch (_) { /* 私模 localStorage / quota / JSON 异常 · 静默(下次跑还能再存)*/ }
+    }
+    function _brv2ReadLastAnchorOcr() {
+        try {
+            var raw = localStorage.getItem(_BRV2_ANCHOR_KEY);
+            if (!raw) return null;
+            var p = JSON.parse(raw);
+            if (!p || typeof p !== 'object') return null;
+            return p;
+        } catch (_) { return null; }
+    }
+    function _brv2RestoreAnchorPrefill() {
+        var p = _brv2ReadLastAnchorOcr();
+        if (!p) return;
+        var map = {
+            'brv2-anchor-stmt-opening': p.stmt_opening,
+            'brv2-anchor-gl-opening':   p.gl_opening,
+            'brv2-anchor-gl-closing':   p.gl_closing,
+        };
+        Object.keys(map).forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            // 用户已经手填了任何值 → 不覆盖
+            if (el.value !== '') return;
+            var v = map[id];
+            if (!Number.isFinite(v)) return;
+            el.value = v.toFixed(2);
+            var cell = el.closest && el.closest('.brv2-anchor-cell');
+            if (cell) cell.classList.add('is-prefilled');
+        });
+        // 触发期初差额提示行(如果 stmt + gl opening 都预填了)
+        var eq = document.getElementById('brv2-anchor-eq');
+        var eqVal = document.getElementById('brv2-anchor-eq-val');
+        if (eq && eqVal && Number.isFinite(p.stmt_opening) && Number.isFinite(p.gl_opening)) {
+            var diff = p.stmt_opening - p.gl_opening;
+            eqVal.textContent = diff.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            eq.style.display = '';
+        }
+    }
+
     function _initBrv2TogglePreview() {
         const btn = $('brv2-toggle-preview');
         if (btn && !btn._reconBound) {
@@ -19288,6 +19346,10 @@ async function deleteEndpoint(endpointId) {
             document.querySelectorAll('.brv2-filter-btn').forEach(b =>
                 b.classList.toggle('active', b.dataset.filter === 'all')
             );
+
+            // P0.1 BUG-B-T1 v118.35.0.37 · 后端总是落 summary._anchor_ocr · 存到 localStorage
+            //   下次进对账 tab 自动预填 3 个 input · 不让用户从零填
+            _brv2SaveLastAnchorOcr(data && data.summary);
 
             showProgress(false);
             renderResults(data);
@@ -19831,8 +19893,17 @@ async function deleteEndpoint(endpointId) {
         }
         anchorIds.forEach(id => {
             const el = $(id);
-            if (el) el.addEventListener('input', _brv2UpdateAnchorEq);
+            if (!el) return;
+            el.addEventListener('input', _brv2UpdateAnchorEq);
+            // P0.1 BUG-B-T1 v118.35.0.37 · 用户敲一个字 = 真用户输入 · 移除 prefilled 灰字态
+            el.addEventListener('input', () => {
+                const cell = el.closest('.brv2-anchor-cell');
+                if (cell) cell.classList.remove('is-prefilled');
+            });
         });
+
+        // P0.1 BUG-B-T1 v118.35.0.37 · 进 tab 时用上次 OCR 抽到的 3 anchor 值预填 input
+        _brv2RestoreAnchorPrefill();
 
         const runBtn = $('brv2-run-btn');
         if (runBtn) runBtn.addEventListener('click', runRecon);

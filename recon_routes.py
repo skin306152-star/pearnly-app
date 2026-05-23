@@ -1200,6 +1200,36 @@ def _brv2_err(key: str, lang: str = "th", **fmt) -> str:
     return msg.format(**fmt) if fmt else msg
 
 
+def _apply_anchor_overrides(
+    stmt_opening: float, gl_opening: float, gl_closing: float,
+    stmt_opening_override: Optional[float],
+    gl_opening_override: Optional[float],
+    gl_closing_override: Optional[float],
+):
+    """
+    P0.1 BUG-B-T1 v118.35.0.37 · 把『OCR snapshot + override 替换』封装成纯函数 · 守门测试容易
+    Always returns the OCR snapshot (even when no override) so the frontend can prefill
+    the 3 anchor inputs next time (localStorage) and Excel/history can show OCR vs user.
+    Returns: (final_stmt_open, final_gl_open, final_gl_close, anchor_ocr_dict, anchor_overrides_dict)
+    """
+    anchor_ocr = {
+        "stmt_opening": stmt_opening,
+        "gl_opening": gl_opening,
+        "gl_closing": gl_closing,
+    }
+    anchor_overrides = {}
+    if stmt_opening_override is not None:
+        anchor_overrides["stmt_opening"] = {"ocr": stmt_opening, "user": float(stmt_opening_override)}
+        stmt_opening = float(stmt_opening_override)
+    if gl_opening_override is not None:
+        anchor_overrides["gl_opening"] = {"ocr": gl_opening, "user": float(gl_opening_override)}
+        gl_opening = float(gl_opening_override)
+    if gl_closing_override is not None:
+        anchor_overrides["gl_closing"] = {"ocr": gl_closing, "user": float(gl_closing_override)}
+        gl_closing = float(gl_closing_override)
+    return stmt_opening, gl_opening, gl_closing, anchor_ocr, anchor_overrides
+
+
 @router.post("/bank-v2/run")
 async def bank_v2_run(
     request: Request,
@@ -1372,16 +1402,12 @@ async def bank_v2_run(
     gl_rows, gl_accounts, gl_opening, gl_closing = merge_gl_files(list(gl_results), gl_account)
 
     # BUG-B v118.35.0.36 · 用户在前端 anchor TEXT BOX 填了值就用用户的 · OCR 的降级成参考
-    _anchor_used = {}  # 用于落库 summary._anchor_overrides
-    if stmt_opening_override is not None:
-        _anchor_used["stmt_opening"] = {"ocr": stmt_opening, "user": stmt_opening_override}
-        stmt_opening = float(stmt_opening_override)
-    if gl_opening_override is not None:
-        _anchor_used["gl_opening"] = {"ocr": gl_opening, "user": gl_opening_override}
-        gl_opening = float(gl_opening_override)
-    if gl_closing_override is not None:
-        _anchor_used["gl_closing"] = {"ocr": gl_closing, "user": gl_closing_override}
-        gl_closing = float(gl_closing_override)
+    # P0.1 BUG-B-T1 v118.35.0.37 · 抽成 _apply_anchor_overrides 纯函数 · 总是 snapshot OCR 给前端预填用
+    (stmt_opening, gl_opening, gl_closing,
+     _anchor_ocr_snapshot, _anchor_used) = _apply_anchor_overrides(
+        stmt_opening, gl_opening, gl_closing,
+        stmt_opening_override, gl_opening_override, gl_closing_override,
+    )
     if _anchor_used:
         logger.info(f"[bank_v2_run] anchor overrides applied: {_anchor_used} · "
                     f"user_id={user.get('id')}")
@@ -1415,6 +1441,8 @@ async def bank_v2_run(
     # summary_from_json filters out unknown keys, so this is non-invasive.
     if isinstance(summary_j, dict):
         summary_j["_parse_info"] = parse_info
+        # P0.1 BUG-B-T1 v118.35.0.37 · 总是落库 OCR snapshot · 给前端 localStorage 预填 + P0.3 历史详情对照用
+        summary_j["_anchor_ocr"] = _anchor_ocr_snapshot
         # BUG-B v118.35.0.36 · 落库 anchor 覆盖痕迹 · 用户回查任务时能看出哪几个 anchor 是手填的
         if _anchor_used:
             summary_j["_anchor_overrides"] = _anchor_used

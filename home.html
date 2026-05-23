@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835036">
+<link rel="stylesheet" href="/static/home.css?v=11835037">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -2048,6 +2048,19 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 }
 @media (max-width: 720px) {
     .brv2-anchor-grid { grid-template-columns: 1fr; }
+}
+/* P0.1 BUG-B-T1 v118.35.0.37 · OCR 预填态:input value 用灰字显示 · focus / 用户输入即恢复黑字
+   配合 home.js _brv2PrefillAnchorsFromLastOcr + input 事件移除 .is-prefilled */
+.brv2-anchor-cell.is-prefilled input {
+    color: var(--ink-2, #6b7280);
+    font-style: italic;
+}
+.brv2-anchor-cell.is-prefilled input:focus { color: var(--ink, #111827); font-style: normal; }
+.brv2-anchor-cell.is-prefilled label::after {
+    content: " · OCR";
+    color: var(--ink-3, #9ca3af);
+    font-size: 10px;
+    letter-spacing: 0.3px;
 }
 
 /* v118.33.11.0 · 历史记录分页器 */
@@ -6658,7 +6671,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11835036"></script>
+<script src="/static/home.js?v=11835037"></script>
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing 由 Vite bundle 成 static/dist/main.js ·
      ES module(type=module 自动 defer)· 必在 home.js 后执行 ·
      依赖 home.js 的全局:t / showToast / escapeHtml / subscribeI18n / _userInfo / loadDashboard -->

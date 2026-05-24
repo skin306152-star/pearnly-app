@@ -37,12 +37,17 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         import admin_diagnostics_routes
         import app
         import billing_routes
+        import erp_xero_routes
         import team_routes
 
         self.assertIs(app._require_super_admin, route_helpers._require_super_admin)
-        self.assertIs(app._require_owner_or_super, route_helpers._require_owner_or_super)
         self.assertIs(app._log_op, route_helpers._log_op)
         self.assertIs(app._plan_permissions, route_helpers._plan_permissions)
+        # REFACTOR-B1(2026-05-25):_require_owner_or_super 在 app.py 的最后消费者(Xero 路由)
+        # 已随 erp_xero_routes 搬出 · app.py 不再 import(ruff F401)· 单一来源断言跟到新消费者。
+        self.assertIs(
+            erp_xero_routes._require_owner_or_super, route_helpers._require_owner_or_super
+        )
         self.assertIs(billing_routes._require_super_admin, route_helpers._require_super_admin)
         self.assertIs(
             admin_diagnostics_routes._require_super_admin,

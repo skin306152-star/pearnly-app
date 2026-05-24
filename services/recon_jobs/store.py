@@ -144,7 +144,9 @@ def enqueue(
     except Exception as e:
         # 自愈:表不存在(部署后首次/启动建表失败)→ 现场建表重试一次。
         msg = str(e).lower()
-        if "recon_jobs" in msg and ("does not exist" in msg or "undefined" in msg or "relation" in msg):
+        if "recon_jobs" in msg and (
+            "does not exist" in msg or "undefined" in msg or "relation" in msg
+        ):
             logger.warning(f"enqueue: recon_jobs missing · ensure_table + retry ({e})")
             if ensure_table():
                 try:

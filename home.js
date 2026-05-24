@@ -19110,7 +19110,8 @@ async function deleteEndpoint(endpointId) {
             if (job) {
                 softFails = 0;
                 if (opts.onProgress) { try { opts.onProgress(job.progress || {}, job); } catch (_) {} }
-                if (job.status === 'done' || job.status === 'failed') return job;
+                // S8 · needs_review 也终止轮询 · 交调用方弹逐行核对面板
+                if (job.status === 'done' || job.status === 'failed' || job.status === 'needs_review') return job;
             } else {
                 // 瞬时错误容忍 · 连续 10 次(~15s)拿不到才放弃
                 if (++softFails >= 10) return { ok: false, status: 'failed', error_code: 'poll_unreachable' };
@@ -19591,45 +19592,74 @@ async function deleteEndpoint(endpointId) {
             const job = await window._reconPollJob(sub.job_id, token, {
                 onProgress: (p) => { if (_subEl) _subEl.textContent = window._reconProgressText(p, lang); },
             });
-            if (!job || job.status !== 'done' || !job.result_id) {
+            // ADR-006 S8 · OCR 低信心/不完整 → 弹逐行核对纠错面板 · 用户改完用修正行重对账
+            //   (不重 OCR、不重扣费;干净 OCR 不会到这里)· 守铁律「不静默出错」
+            if (job && job.status === 'needs_review' && job.review) {
                 showProgress(false);
-                showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
+                if (window.ReconReview) {
+                    window.ReconReview.show(job.review, {
+                        token: token, lang: lang, jobId: sub.job_id,
+                        onConfirmed: async function (newJobId) {
+                            showProgress(true);
+                            const j2 = await window._reconPollJob(newJobId, token, {
+                                onProgress: (p) => { if (_subEl) _subEl.textContent = window._reconProgressText(p, lang); },
+                            });
+                            await _processBankJob(j2);
+                        },
+                    });
+                } else {
+                    showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
+                }
                 return;
             }
+            await _processBankJob(job);
 
-            // 用 result_id 调现有结果接口(GET 已补齐顶层 stats/parse_info/warnings · 与同步跑同源)
-            const res = await fetch('/api/recon/bank-v2/' + encodeURIComponent(job.result_id), {
-                headers: { 'Authorization': 'Bearer ' + token },
-            });
-            let data = null;
-            try { data = await res.json(); } catch (_) { data = null; }
-            if (!res.ok || data === null || !data.ok) {
+            // 轮询完成后:取结果 + 渲染(初次 + S8 确认重对账共用)
+            async function _processBankJob(job) {
+              try {
+                if (!job || job.status !== 'done' || !job.result_id) {
+                    showProgress(false);
+                    showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
+                    return;
+                }
+                // 用 result_id 调现有结果接口(GET 已补齐顶层 stats/parse_info/warnings · 与同步跑同源)
+                const res = await fetch('/api/recon/bank-v2/' + encodeURIComponent(job.result_id), {
+                    headers: { 'Authorization': 'Bearer ' + token },
+                });
+                let data = null;
+                try { data = await res.json(); } catch (_) { data = null; }
+                if (!res.ok || data === null || !data.ok) {
+                    showProgress(false);
+                    showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
+                    return;
+                }
+
+                // 多账户文件:GET 不回传 gl_accounts 列表 · 单账户(绝大多数)无影响
+                if ((data.gl_accounts || []).length > 1) {
+                    populateAcctSelect(data.gl_accounts);
+                }
+
+                _currentTask   = data;
+                _allRows       = data.detail || [];
+                _currentFilter = 'all';
+                document.querySelectorAll('.brv2-filter-btn').forEach(b =>
+                    b.classList.toggle('active', b.dataset.filter === 'all')
+                );
+
+                // P0.1 BUG-B-T1 v118.35.0.37 · 后端总是落 summary._anchor_ocr · 存到 localStorage
+                //   下次进对账 tab 自动预填 3 个 input · 不让用户从零填
+                _brv2SaveLastAnchorOcr(data && data.summary);
+
                 showProgress(false);
-                showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
-                return;
+                renderResults(data);
+                loadHistory();
+                const sc = $('brv2-summary-collapse');
+                if (sc) sc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              } catch (e) {
+                showProgress(false);
+                showError(e.message || 'Network error');
+              }
             }
-
-            // 多账户文件:GET 不回传 gl_accounts 列表 · 单账户(绝大多数)无影响
-            if ((data.gl_accounts || []).length > 1) {
-                populateAcctSelect(data.gl_accounts);
-            }
-
-            _currentTask   = data;
-            _allRows       = data.detail || [];
-            _currentFilter = 'all';
-            document.querySelectorAll('.brv2-filter-btn').forEach(b =>
-                b.classList.toggle('active', b.dataset.filter === 'all')
-            );
-
-            // P0.1 BUG-B-T1 v118.35.0.37 · 后端总是落 summary._anchor_ocr · 存到 localStorage
-            //   下次进对账 tab 自动预填 3 个 input · 不让用户从零填
-            _brv2SaveLastAnchorOcr(data && data.summary);
-
-            showProgress(false);
-            renderResults(data);
-            loadHistory();
-            const sc = $('brv2-summary-collapse');
-            if (sc) sc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
         } catch (e) {
             showError(e.message || 'Network error');

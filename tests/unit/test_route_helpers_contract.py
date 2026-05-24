@@ -36,16 +36,21 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         import admin_diagnostics_routes
         import app
         import billing_routes
+        import team_routes
 
         self.assertIs(app._require_super_admin, route_helpers._require_super_admin)
         self.assertIs(app._require_owner_or_super, route_helpers._require_owner_or_super)
         self.assertIs(app._log_op, route_helpers._log_op)
-        self.assertIs(app._check_password_strength, route_helpers._check_password_strength)
         self.assertIs(billing_routes._require_super_admin, route_helpers._require_super_admin)
         self.assertIs(
             admin_diagnostics_routes._require_super_admin,
             route_helpers._require_super_admin,
         )
+        # REFACTOR-B1(2026-05-25):team_add_employee 随 7 路由从 app.py 搬到 team_routes ·
+        # _check_password_strength 的消费者随之转移 · 单一来源断言跟到 team_routes。
+        self.assertIs(team_routes._require_owner_or_super, route_helpers._require_owner_or_super)
+        self.assertIs(team_routes._log_op, route_helpers._log_op)
+        self.assertIs(team_routes._check_password_strength, route_helpers._check_password_strength)
 
 
 class PasswordStrengthContractTests(unittest.TestCase):

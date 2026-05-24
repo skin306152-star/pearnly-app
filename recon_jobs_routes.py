@@ -87,7 +87,7 @@ def _cleanup_on_fail(job_id: str):
         pass
 
 
-_EXCEL_EXTS = {".xlsx", ".xls", ".xlsm"}
+_EXCEL_EXTS = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv"}  # S6a · CSV/TSV 也走表格预检
 
 
 def _preflight_stmt_mapping(input_ref, scope_id):

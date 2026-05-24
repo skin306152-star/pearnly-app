@@ -2088,6 +2088,40 @@ def _load_excel_all_sheets(file_bytes: bytes):
         return []
 
 
+def _load_csv_sheets(file_bytes: bytes):
+    """ADR-006 S6a · CSV/TSV → [("csv", rows)]。处理编码(UTF-8 BOM/泰 cp874/中 gbk)+ 分隔符嗅探。
+
+    返回 [] 表示读不了。数字里的千分位逗号靠 csv 引号字段处理(正规 CSV 会给 "10,620.53" 加引号)。
+    """
+    import csv as _csv
+    import io as _io
+
+    text = None
+    for enc in ("utf-8-sig", "utf-8", "cp874", "gbk", "latin-1"):
+        try:
+            text = file_bytes.decode(enc)
+            break
+        except Exception:
+            continue
+    if text is None:
+        return []
+    # 分隔符嗅探(逗号/分号/制表/竖线)· 失败退回逗号
+    sample = text[:4096]
+    delim = ","
+    try:
+        delim = _csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+    except Exception:
+        for d in (";", "\t", "|"):
+            if sample.count(d) > sample.count(","):
+                delim = d
+                break
+    try:
+        rows = [row for row in _csv.reader(_io.StringIO(text), delimiter=delim)]
+        return [("csv", rows)] if rows else []
+    except Exception:
+        return []
+
+
 def _find_stmt_header(raw_rows):
     """v118.35.0.55 · 前 16 行找流水表头(KTB 等表头在第 11 行)· 返回 (idx, col_map)"""
     for i, row in enumerate(raw_rows[:16]):
@@ -2265,10 +2299,15 @@ def parse_bank_stmt_xlsx_direct(
     """
     sheets = _load_excel_all_sheets(file_bytes)
     if not sheets:
+        # ADR-006 S6a · Excel 读不出且是 CSV/TSV → 用 CSV 加载器(编码+分隔符)· 同一套三层识别
+        _ext = (filename or "").lower().rsplit(".", 1)[-1]
+        if _ext in ("csv", "tsv", "txt"):
+            sheets = _load_csv_sheets(file_bytes)
+    if not sheets:
         return {
             "ok": False,
             "error_code": "file_unreadable",
-            "error": "Cannot read Excel (legacy .xls / corrupt / unsupported format)",
+            "error": "Cannot read Excel/CSV (legacy .xls / corrupt / unsupported format)",
         }
     # ADR-006 · 学习层惰性 import(防循环 · 失败不致命退回原行为)
     try:
@@ -3410,7 +3449,7 @@ def _parse_bank_stmt_via_pipeline(
     # v118.35.0.19 · xlsx/xls 优先走直读 fallback(零成本 · 跳 Gemini)
     # 用户上传自家导出 / 银行下载 / 自己整理的 Excel · 表头清晰时直读即可
     # 直读不命中(表头识别不出) → 自动降级到 Gemini pipeline
-    if ext_dot in (".xlsx", ".xls", ".xlsm"):
+    if ext_dot in (".xlsx", ".xls", ".xlsm", ".csv", ".tsv"):
         direct = parse_bank_stmt_xlsx_direct(file_bytes, filename, tenant_id=tenant_id)
         if direct.get("ok"):
             logger.info(

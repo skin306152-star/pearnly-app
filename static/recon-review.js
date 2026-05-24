@@ -134,7 +134,7 @@
 
     function show(payload, opts) {
         opts = opts || {};
-        lang = opts.lang || window._currentLang || 'zh';
+        lang = opts.lang || window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
         injectCSS();
         var rows = (payload.rows || []).map(function (r) {
             return {

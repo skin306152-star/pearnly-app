@@ -19080,10 +19080,13 @@ async function deleteEndpoint(endpointId) {
     // 「转圈处理中」旁的实时进度文案 · parse 阶段显示「共 X/Y 个文件」(Zihao 拍板:不加进度条)
     window._reconProgressText = function (progress, lang) {
         progress = progress || {};
-        lang = lang || 'zh';
+        // 2026-05-24 修:旧版默认 zh + 调用方传的是启动时捕获的 lang → 泰语界面进度副文案显示中文。
+        //   改为实时优先读当前 UI 语言 · 默认 th(首发市场)· 非法值兜底 th。
+        lang = window._currentLang || lang || localStorage.getItem('mrpilot_lang') || 'th';
+        if (!_STAGE_LBL.parse[lang]) lang = 'th';
         const stage = progress.stage || 'parse';
         const lbl = (_STAGE_LBL[stage] || _STAGE_LBL.parse);
-        const label = lbl[lang] || lbl.en;
+        const label = lbl[lang] || lbl.th || lbl.en;
         const total = progress.stage_total, done = progress.stage_done;
         if (stage === 'parse' && Number.isFinite(total) && total > 0) {
             const cntL = { zh: '共 {d}/{t} 个文件', th: '{d}/{t} ไฟล์', en: '{d}/{t} files', ja: '{d}/{t} ファイル' }[lang] || '{d}/{t} files';

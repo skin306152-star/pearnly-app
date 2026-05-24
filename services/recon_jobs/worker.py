@@ -82,7 +82,11 @@ def _run_one(job: Dict) -> None:
     try:
         result = handler(job.get("params") or {}, job.get("input_ref") or [], progress_cb)
         # S8 · handler 返回 ("__needs_review__", payload) → 暂停等用户核对 OCR 行
-        if isinstance(result, (tuple, list)) and len(result) == 2 and result[0] == "__needs_review__":
+        if (
+            isinstance(result, (tuple, list))
+            and len(result) == 2
+            and result[0] == "__needs_review__"
+        ):
             store.set_needs_review(job_id, result[1])
             keep_stage = True
             logger.info(f"[recon-worker] job {job_id} ({jtype}) -> needs_review(待用户核对)")

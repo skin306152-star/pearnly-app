@@ -173,9 +173,7 @@ def run_bank_recon(
         try:
             from services.importer import stmt_review as _sr
 
-            _review = _sr.build_bank_review_payload(
-                stmt_results, [fn for _, fn in stmt_data]
-            )
+            _review = _sr.build_bank_review_payload(stmt_results, [fn for _, fn in stmt_data])
             if _review:
                 logger.info(
                     f"[bank] needs_review · files={_review.get('files')} "

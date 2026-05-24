@@ -15,6 +15,7 @@ review-row 规范字段:
   idx, date("YYYY-MM-DD"|None), description, withdrawal, deposit, balance,
   confidence, balance_ok, direction_autocorrected, amount_autocorrected, account_no
 """
+
 from __future__ import annotations
 
 import datetime as _dt

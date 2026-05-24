@@ -83,9 +83,7 @@ class CsvStatementTests(unittest.TestCase):
 
     def test_thai_cp874_encoding(self):
         # 泰文 CSV 常见 cp874(TIS-620)编码 · 不能读成乱码
-        res = brv2.parse_bank_stmt_xlsx_direct(
-            _csv_bytes(_THAI_ROWS, encoding="cp874"), "stmt.csv"
-        )
+        res = brv2.parse_bank_stmt_xlsx_direct(_csv_bytes(_THAI_ROWS, encoding="cp874"), "stmt.csv")
         self.assertTrue(res.get("ok"), res.get("error_code"))
         self.assertGreaterEqual(res["row_count"], 4)
 

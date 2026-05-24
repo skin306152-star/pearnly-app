@@ -73,6 +73,7 @@ from admin_diagnostics_routes import (
 )  # 阶段 5 Task 5.2 · 抽 5 个 admin diagnostics + internal/deploy* 路由(2026-05-22)
 from route_helpers import (  # REFACTOR-B1 · 公共鉴权/日志/校验 helper(2026-05-24)
     _log_op,
+    _plan_permissions,
     _require_owner_or_super,
     _require_super_admin,
 )
@@ -1494,42 +1495,8 @@ def _build_user_info(user, ip_used=None, ip_limit=None) -> dict:
     }
 
 
-def _plan_permissions(plan: str = None) -> dict:
-    """
-    v0.15 · 彻底扁平化 · 不再有套餐概念
-    所有用户功能完全一样 · 配额由 user.monthly_quota 单独控制
-    plan 参数保留仅为兼容 · 忽略其值 · 永远返回全开权限
-    """
-    return {
-        # 这里的 monthly_quota 是 "权限层默认值" · 实际配额以 user.monthly_quota 为准
-        # 下游代码应读 user.monthly_quota · 而不是 perms["monthly_quota"]
-        "monthly_quota": None,  # 权限层不限 · 实际配额看 user
-        "max_pages_per_upload": 50,
-        "max_file_size_mb": 100,
-        "can_edit_fields": True,
-        "can_verify_tax": True,
-        "rd_daily_limit": None,
-        "can_extract_items": True,
-        "can_view_history": True,
-        "history_retention_days": 365,
-        "can_push_erp": True,
-        "can_auto_push_erp": True,
-        "endpoints_limit": -1,
-        "can_archive": True,
-        "can_customize_archive": True,
-        "zip_batch_limit": -1,
-        "can_use_email_ingest": True,
-        "can_use_folder_watch": True,
-        "can_use_smart_alert": True,
-        "can_use_custom_template": True,
-        "custom_template_limit": -1,
-        "typhoon_quota_monthly": 500,
-        "can_manage_api_keys": True,
-        "can_auto_classify": True,
-        "can_duplicate_detect": True,
-        "can_ai_query": True,
-        "can_voucher_draft": True,
-    }
+# _plan_permissions 已抽到 route_helpers.py(REFACTOR-B1 · 2026-05-25)·
+# app.py 从 route_helpers import 回来 · 13 处调用点不变。
 
 
 def _check_user_quota(user: dict) -> tuple:

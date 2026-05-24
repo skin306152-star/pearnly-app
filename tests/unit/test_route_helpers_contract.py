@@ -28,6 +28,7 @@ class RouteHelpersImportContractTests(unittest.TestCase):
             "_get_client_ip",
             "_check_password_strength",
             "_WEAK_PASSWORDS",
+            "_plan_permissions",
         ):
             self.assertTrue(hasattr(route_helpers, name), f"route_helpers 缺 {name}")
 
@@ -41,6 +42,7 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         self.assertIs(app._require_super_admin, route_helpers._require_super_admin)
         self.assertIs(app._require_owner_or_super, route_helpers._require_owner_or_super)
         self.assertIs(app._log_op, route_helpers._log_op)
+        self.assertIs(app._plan_permissions, route_helpers._plan_permissions)
         self.assertIs(billing_routes._require_super_admin, route_helpers._require_super_admin)
         self.assertIs(
             admin_diagnostics_routes._require_super_admin,
@@ -51,6 +53,22 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         self.assertIs(team_routes._require_owner_or_super, route_helpers._require_owner_or_super)
         self.assertIs(team_routes._log_op, route_helpers._log_op)
         self.assertIs(team_routes._check_password_strength, route_helpers._check_password_strength)
+
+
+class PlanPermissionsContractTests(unittest.TestCase):
+    """REFACTOR-B1 · _plan_permissions 搬到 route_helpers · 锁定『扁平化全开』契约不变。"""
+
+    def test_returns_all_open_flat(self):
+        p = route_helpers._plan_permissions()
+        # 扁平化:忽略 plan 入参 · 任意 plan 返回同一份全开权限
+        self.assertEqual(route_helpers._plan_permissions("free"), p)
+        self.assertEqual(route_helpers._plan_permissions("pro"), p)
+        # 权限层不限配额(实际配额看 user.monthly_quota)
+        self.assertIsNone(p["monthly_quota"])
+        self.assertIsNone(p["rd_daily_limit"])
+        # 关键能力开关全开(rd / archive / email-ingest 等 router 依赖)
+        for flag in ("can_verify_tax", "can_archive", "can_customize_archive", "can_view_history"):
+            self.assertTrue(p[flag], f"{flag} 应为 True")
 
 
 class PasswordStrengthContractTests(unittest.TestCase):

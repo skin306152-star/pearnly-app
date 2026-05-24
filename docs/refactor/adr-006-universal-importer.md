@@ -90,21 +90,118 @@ CREATE TABLE import_template_mappings (
 直接复用 `bank_recon_v2.StatementRow` / `GlRow`(字段已对齐)· 本层只产 `col_map`,行对象由现有
 `_parse_stmt_sheet` / GL 解析产出。**不引入新行结构。**
 
-## 6. 实施切片(每片做完即测 · 端到端打通再下一片)
+## 6. 实施进度(2026-05-24 · 第十三会话)
 
-- **S1 本地推断引擎**(纯函数 · 可离线测真实文件):`template_learning` 的 signature + 更强 stmt 推断
-  + 余额链校验。守门:用真实失败样本 + 合成样本验证产出正确 col_map。**不接 DB/路由/UI。**
-- **S2 模板库**:Alembic 004 + `template_store`(find/save)+ 单测。
-- **S3 接入 statement 解析**:`parse_bank_stmt_xlsx_direct` 三层识别(透传 tenant_id)· 守门:
-  saved 命中 / 本地高信心自动 / 都不行返 needs_mapping · **现有能解析的文件不受影响(回归测)**。
-- **S4 preflight + needs_mapping 响应 + save-mapping 接口**:submit 同步预检 · 真站点 API E2E。
-- **S5 前端确认列面板**:needs_mapping → 面板 → 存 → 重提交 · **真 UI E2E 全打通**。
-- **S6 GL 同套** + **S7 AI 建议 hook 填 Gemini**(本地低信心自动一次)。
+**S1–S6 全部完成 · 已上线 · 真站点 + 大文件压测验证通过(v118.35.0.71 · recon-mapping.js?v=11835072)。**
 
-V1 验收 = S1–S5 端到端:新格式 statement Excel 不再"解析失败",确认一次后下次自动,现有模板零回归。
+| 切片 | 内容 | 状态 |
+|---|---|---|
+| S1 | `services/importer/template_learning.py` 本地推断(同义词+数据形状+余额链)| ✅ 上线 |
+| S2 | Alembic 004 `import_template_mappings` + `services/importer/template_store.py` | ✅ 上线 |
+| S3 | `parse_bank_stmt_xlsx_direct` 三层识别(saved→本地高信心→needs_mapping)· 透传 tenant_id | ✅ 上线 |
+| S4 | `recon_jobs_routes` submit 预检 + `import_routes.py`(save-mapping/list/delete)| ✅ 上线 |
+| S5 | `static/recon-mapping.js` 列映射确认面板 · 真 UI E2E 通过 | ✅ 上线 |
+| S6a | CSV 银行账单(编码+分隔符 `_load_csv_sheets`)| ✅ 上线 |
+| S6b | GL 总账(`infer_gl_col_map` + `parse_gl_excel` 三层 + CSV + 单列净额)| ✅ 上线 |
 
-## 7. 明确不做(防蔓延)
+**真实/压测验证**:① 真实投诉件 `เงินสดย่อย`(泰文小现金)端到端真 UI 通过(162 行/平衡)· ② 12 个大文件
+压测(bank/GL · CSV/XLSX · 4000–15000 行)全过 · 性能 15000 行 2.1s。压测共抓出并修掉 5 个真 bug(见 §10)。
+
+### 6.1 代码地图(下个窗口必读)
+- `services/importer/template_learning.py` —— 引擎(自包含 · 不 import bank_recon_v2 防循环):
+  `load_tabular_sheets`(csv/xlsx/xls)· `build_header_signature` · `infer_stmt_col_map`(返回
+  `(header_idx, col_map, conf, bal_rate, reasons)`)· `infer_gl_col_map`(返回 `(idx, col_map, conf, reasons)`)·
+  `validate_by_balance`(余额链)· `suggest_mapping_with_ai`(**S7 的 hook · 现返回 None**)。
+  col_map 键:stmt=`date/description/withdrawal/deposit/balance/amount`;gl=`date/doc_no/account/description/debit/credit/balance/amount`。
+- `services/importer/template_store.py` —— `find_mapping/save_mapping/list_mappings/delete_mapping/ensure_table`
+  · 作用域 = `tenant_id or user_id`(UUID)· 自愈建表。
+- `bank_recon_v2.py`:
+  - `parse_bank_stmt_xlsx_direct(bytes, filename, tenant_id=None)` —— 账单三层识别(§2)· 含 CSV。
+  - `parse_gl_excel(bytes, filename, account_code, tenant_id=None)` —— GL 三层识别 · 含 CSV · 单列净额按符号拆借贷。
+  - `parse_bank_statement_pdf` / `parse_gl` / `_parse_bank_stmt_via_pipeline` —— 都透传 tenant_id · needs_mapping 不降级 Gemini。
+  - `_load_csv_sheets` —— CSV 编码(utf-8-sig/cp874/gbk/latin-1)+ 分隔符嗅探。
+- `recon_jobs_routes.py` `_preflight_stmt_mapping(input_ref, scope)` —— submit 同步预检(stmt Excel/CSV + gl Excel)→ needs_mapping 不建任务。
+- `import_routes.py` —— `POST /api/recon/import/save-mapping` · `GET/DELETE /api/recon/import/mappings`。
+- `static/recon-mapping.js` —— `window.ReconMapping.show(resp, {token,lang,onConfirmed})` · 按 `document_type` 切字段(账单 vs 总账)。
+- 守门测试:`tests/unit/test_template_learning.py` · `test_template_store_contract.py` · `test_stmt_template_integration.py`
+  · `test_csv_stmt.py` · `test_gl_template_integration.py` · `test_import_routes_contract.py`(共 ~40 个)。
+
+---
+
+## 7. S7 接手指南 · AI 低信心自动建议一次
+
+**目标**:本地推断 `conf == "low"`(账单)或 GL 拿不准时,**自动调一次 Gemini** 要 column mapping 建议,
+再用余额公式/形状本地校验;**校验过才用并自动存**,过不了仍走用户确认面板。保存后同 signature 第二次不再调 AI。
+
+**改哪里**(hook 已留好):
+1. `template_learning.suggest_mapping_with_ai(document_type, sheet_name, headers, sample_rows, local_guess)`
+   现返回 None。填 Gemini 调用:**只发** sheet 名 + 表头 + 前 20 行预览 + 本地猜测(`local_guess`)· **绝不发整份文件/密钥**。
+   要 AI 只回 JSON col_map(键同上)。复用项目现有 Gemini 客户端(见 `bank_recon_v2._gemini_*` 或 `services/ocr`)·
+   temp=0 · 加磁盘缓存(按 signature 缓存 · 避免重复烧)。
+2. 接入点在 `parse_bank_stmt_xlsx_direct` / `parse_gl_excel` 的"否则 needs_mapping"分支**之前**:
+   `conf == "low"` 时先调 `suggest_mapping_with_ai` → 拿到 ai_cm → `validate_by_balance`(账单)
+   或形状校验(GL)→ 过则 `col_map = ai_cm` + `save_mapping(source="ai")`;不过才返 needs_mapping。
+   ⚠️ 注意 AI 调用是**同步阻塞**且要钱:① 只在 submit 预检阶段调(已是同步)· 不在异步 worker 里调;
+   ② 加 `RECON_AI_MAPPING` flag 可关 · 默认开;③ 失败/超时静默退回 needs_mapping(不阻断)。
+3. 前端面板已支持 needs_mapping;AI 命中则直接出结果,无需面板。可选:面板加"智能建议"按钮手动触发
+   (调一个新轻量接口 `POST /api/recon/import/ai-suggest`)。
+
+**S7 风险/边界**:① 烧钱(务必缓存 + flag)· ② AI 回错 col_map(余额链/形状校验把关 · 校验不过不用)·
+③ GL 没余额链 → AI 建议只能形状校验 → 更易回到用户确认(可接受)· ④ 预览 20 行含真实交易数据发给 Gemini
+(与现有 OCR 同等暴露 · 不更糟 · 但文档需说明)。
+
+---
+
+## 8. S8 接手指南 · PDF / 图片 / 扫描件
+
+**与 Excel 列映射机制不同** —— PDF/图片没有固定列,由 Gemini/coords 整体读版面(已有 `parse_bank_statement_pdf`
+的 coords + Gemini 路径,本身不挑格式)。S8 不是"列映射",是 **OCR 结果的确认/纠错**:让用户对读出的行/列/
+期初期末做确认或修正。
+
+**建议做法**(下个窗口先摸清现有 PDF 路径再定):
+- PDF/图片继续走现有 OCR(coords/Gemini),不强行套列映射面板。
+- 加一层"结果确认/纠错"UI:OCR 读完展示行表 + 可编辑(改金额/方向/期初期末)· 用户改完重算余额链。
+- 低信心(余额链对不上/缺页)时**主动弹确认**,而非静默出结果(守 0 静默错误)。
+- 可复用 `recon-mapping.js` 的面板骨架,但内容是"逐行核对/纠正"而非"列下拉"。
+
+**S8 风险**:大改交互 · 单独一阶段 · 不要和 S7 混。**先读** `bank_recon_v2.parse_bank_statement_pdf`
+(coords + Gemini)+ `_audit_completeness` + 缺页提示逻辑,理解现状再设计。
+
+---
+
+## 9. 🧪 测试方法论(Zihao 硬性要求 · 每片都照做)
+
+> **"边做边测,测真实 UI,发现问题立即修,不要等上线再修,端到端 100% 打通为止。设计和执行每一步都要应对,
+> 不要做到一半发现不适配遇到无法继续开发的问题。测-修-测-修。"**
+
+1. **每片做完即测**,不攒到最后。先单元测(mock 不算真执行 —— mock 证明不了 SQL/真解析,见 ADR-005 的
+   "tuple index out of range" 教训),再用**真实文件 + 真站点 UI** 端到端验。
+2. **真站点 UI 测法**:用 Playwright(`@playwright/test` 已装 · chromium 在
+   `C:\Users\skin3\AppData\Local\ms-playwright`)· 注入 token 到 localStorage(`mrpilot_token`)·
+   goto `https://pearnly.com/#/reconcile` → bank tab → setInputFiles → 验证面板/结果/截图。
+   token 找 Zihao 要(他在浏览器 F12 跑 `localStorage.getItem('mrpilot_token')` · 临时文件用完即删 · 别提交)。
+3. **大文件压测 + 自审**:Zihao 会给边界测试文件(`D:\Users\Skin\Desktop\Pearnly_Bank_GL_Test_Templates_*`)·
+   每个文件对照 README/manifest 的 expected 逐项自查(rows / opening / closing / 余额链 / needs_mapping /
+   性能耗时)· 抓出问题当场修 + 加守门测试 + 回归(KTB 等现有件零回归)。
+4. **测出真 bug 必加守门测试**锁住,防回归。
+5. **诚实**:做不到/没测到要直说,不画饼。
+
+**当前已知边界/限制(诚实记录)**:
+- 噪声表头(F1/F2..)若余额链能数学证明列对应 → **自动读对**(不弹确认)· 这是对的(零摩擦);needs_mapping
+  只在余额链证明不了时触发。
+- 单列净额 GL 按"正=借 负=贷"约定拆 · 个别 GL 符号约定相反时可能反 · 余额链不可证(GL 无链)· 真遇到靠用户确认。
+- PDF/图片新格式 **不在 S1–S6 范围**(S8 才做)· 现走 OCR。
+- AI 建议(S7)未做 · 现 `suggest_mapping_with_ai` 返回 None(纯本地)。
+
+## 10. 压测抓出并已修的真 bug(编年)
+1. 期初承前 `ยกยอดมา` 被当存款 + `รวมยอด` 合计行污染期末(真实小现金件)→ c2cd145。
+2. 列推断排序须按表头词密度,防数据行被当表头 → 918b36b。
+3. GL CSV 绕过学习层(直接丢 Gemini)→ 523d7e1。
+4. 单列净额 GL 解析 0 行(首轮表头判定太松 + 不支持单列净额)→ 523d7e1。
+5. 错余额只行级标 ⚠、摘要不提示 → balance_break 摘要警告 → 523d7e1。
+
+## 11. 明确不做(防蔓延)
 - 不重写对账/匹配/汇总/导出/差异分类。
 - 不把 Excel/CSV 默认丢给 Gemini(本地优先 · 高信心 0 成本)。
-- 不在 V1 承诺任意 PDF 新格式自动化(PDF 走现有 OCR · 后续接同一面板)。
+- 不在 S1–S6 承诺任意 PDF 新格式自动化(PDF 走现有 OCR · S8 才接确认/纠错)。
 - 不把 mapping 写死代码 · 不无限堆银行专用 parser。

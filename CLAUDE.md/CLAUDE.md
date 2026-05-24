@@ -563,6 +563,20 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 
 ---
 
+### 24. 部署磁盘卫生 · 防 /tmp 撑爆硬盘(2026-05-24 拍板 · 血泪根因 · 高优先级)
+
+**背景**:2026-05-24 付费用户 mrerp 银行对账报 `Unexpected token '<', "<html>..." is not valid JSON`。一路彻查(排除超时/大文件/内存/代码 bug)· 真因 = **服务器 52G 硬盘 100% 满**(`df -h /` 显示 `Avail 0 / Use% 100%`)→ Nginx 写不下上传文件请求体(`/var/lib/nginx/body/` `pwrite() failed (28: No space left on device)`)→ 直接返回 HTML 500 → 前端 `res.json()` 解析 HTML 抛 `Unexpected token '<'`。罪魁 = `/tmp` 堆了 28G 的 `pip-unpack-*` / `pip-install-*`(每次部署 pip 解压 torch ~2.7G 不清理 · ~9 次部署累积撑爆)。
+
+**铁律**:
+1. **每次部署前看一眼磁盘**:`ssh root@45.76.53.194 "df -h /"` · 用量 > 85% 必须先清理再部署(别等 100% 崩)。
+2. **每次部署后清 pip 临时残留**:部署流程 / git-deploy.sh 末尾 `rm -rf /tmp/pip-*`(pip 解压 torch 残渣,删了下次自建)。
+3. **报"上传/对账 500 + `Unexpected token '<'`"第一反应查磁盘**:`df -h /` + nginx error.log 找 `No space left on device` —— 这是头号嫌疑,**不是代码 bug、不是超时、不是文件大**。
+4. **排障经验值**(2026-05-24 实战):① 500 而非 504 = 不是超时;② uvicorn 日志里查不到那个 POST = 请求卡在 Nginx 没到应用;③ nginx 默认日志 `/var/log/nginx/{access,error}.log` 半夜轮转后可能 0 字节(logrotate 没 `nginx -s reopen`)· 真错误在 `error.log.1` 里;④ `du -sh /tmp/* | sort -rh` 一眼看出谁吃光磁盘。
+
+**根治措施(2026-05-24 起落地)**:git-deploy.sh 加部署后 `rm -rf /tmp/pip-*` + 每日 cron 清 1 天前 pip-* 残留 + 磁盘 85% 告警。
+
+---
+
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)
 
 **Pearnly 全局导航 = 跟着 `D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html` 走**

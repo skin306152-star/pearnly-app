@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pearnly · 平台后台</title>
     <link rel="stylesheet" href="/static/home.css?v=11841099" />
-    <link rel="stylesheet" href="/static/admin/admin.css?v=11841100" />
+    <link rel="stylesheet" href="/static/admin/admin.css?v=11841101" />
     <script>
       // admin layout 标志 · home.js loadAll() 检测此 flag 走精简路径(不跑 home 渲染)
       window.PEARNLY_ADMIN_MODE = true;
@@ -176,6 +176,22 @@
           </svg>
           <span data-i18n="adm-sidebar-topup">充值审核</span>
         </a>
+        <a class="admin-layout-nav-item" data-admin-route="monitor" href="/admin/monitor">
+          <svg
+            viewBox="0 0 20 20"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M2 11h3l2 5 3-10 2 7 2-3h4" />
+          </svg>
+          <span data-i18n="adm-sidebar-monitor">系统监控</span>
+        </a>
         <!-- v118.44.0.4 · 删除「返回普通视图」按钮(Earn 是超管 · 不该回普通用户视图 · 且老逻辑会死循环跳回 /admin/cost) -->
       </aside>
 
@@ -203,53 +219,93 @@
             </div>
           </div>
 
-          <!-- 引擎计费入口 · 余额以 Google 官方为准(两套计费面:Cloud Vision + Gemini AI Studio) -->
-          <div class="billing-card" id="billing-card">
-            <div class="billing-card-head">
-              <div class="billing-card-title">
+          <!-- 引擎计费入口 · 卡片化(与下方花费卡同款视觉)· 余额去 Google 官方查 -->
+          <div class="cost-engine-entries" id="billing-card">
+            <a
+              class="cost-engine-entry"
+              href="https://console.cloud.google.com/billing"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="cost-engine-icon">
                 <svg
                   viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="2.5" y="3" width="15" height="11" rx="2" />
+                  <path d="M2.5 14l4-4 3 3 4-5 4 4" />
+                  <circle cx="13" cy="7" r="1.3" />
+                </svg>
+              </span>
+              <span class="cost-engine-text">
+                <span class="cost-engine-name">Google Cloud Vision</span>
+                <span class="cost-engine-desc" data-i18n="billing-engine-vision-desc"
+                  >主 OCR 引擎 · 扫描件 / 图片识别</span
+                >
+                <span class="cost-engine-cta" data-i18n="billing-engine-vision-cta"
+                  >查看计费与余额</span
+                >
+              </span>
+              <span class="cost-engine-arrow">
+                <svg
+                  viewBox="0 0 16 16"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="1.8"
                   stroke-linecap="round"
                   stroke-linejoin="round"
                 >
-                  <rect x="2" y="5" width="16" height="11" rx="2" />
-                  <path d="M2 9h16M5 13h3" />
+                  <path d="M5 11l6-6M6 5h5v5" />
                 </svg>
-                <span data-i18n="billing-title">引擎计费入口</span>
-              </div>
-            </div>
-            <div class="billing-card-body" id="billing-card-body">
-              <div class="billing-engine-links">
-                <a
-                  class="billing-engine-link"
-                  href="https://console.cloud.google.com/billing"
-                  target="_blank"
-                  rel="noopener"
+              </span>
+            </a>
+            <a
+              class="cost-engine-entry"
+              href="https://aistudio.google.com/app/billing"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="cost-engine-icon">
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 >
-                  <span class="billing-engine-name" data-i18n="billing-engine-vision"
-                    >OCR 主引擎 · Google Cloud Vision</span
-                  >
-                  <span class="billing-engine-go">↗</span>
-                </a>
-                <a
-                  class="billing-engine-link"
-                  href="https://aistudio.google.com/app/billing"
-                  target="_blank"
-                  rel="noopener"
+                  <path d="M10 2.5l1.8 4.7 4.7 1.8-4.7 1.8L10 15.5l-1.8-4.7L3.5 9l4.7-1.8z" />
+                </svg>
+              </span>
+              <span class="cost-engine-text">
+                <span class="cost-engine-name">Gemini AI Studio</span>
+                <span class="cost-engine-desc" data-i18n="billing-engine-gemini-desc"
+                  >结构化兜底 · 复杂版式 / 低置信度场景</span
                 >
-                  <span class="billing-engine-name" data-i18n="billing-engine-gemini"
-                    >Gemini · AI Studio(对账兜底)</span
-                  >
-                  <span class="billing-engine-go">↗</span>
-                </a>
-              </div>
-              <div class="billing-hint" data-i18n="billing-hint">
-                余额以 Google 官方为准 · 点击直达计费页查看
-              </div>
-            </div>
+                <span class="cost-engine-cta" data-i18n="billing-engine-gemini-cta"
+                  >查看用量与价格</span
+                >
+              </span>
+              <span class="cost-engine-arrow">
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 11l6-6M6 5h5v5" />
+                </svg>
+              </span>
+            </a>
+          </div>
+          <div class="cost-engine-hint" data-i18n="billing-engine-hint">
+            余额与官方账单可能有延迟，以 Google 控制台为准。
           </div>
 
           <!-- 顶部 KPI 卡片 -->
@@ -269,18 +325,40 @@
               <div class="cost-kpi-value" id="kpi-total-cost">—</div>
               <div class="cost-kpi-sub" id="kpi-total-sub">—</div>
             </div>
-            <div class="cost-kpi-card">
-              <div class="cost-kpi-label" data-i18n="cost-engines">内部识别成本构成(本月)</div>
-              <div class="cost-kpi-value cost-engines-mini" id="kpi-engines">—</div>
-              <div class="cost-kpi-sub" data-i18n="cost-engines-sub">主备引擎使用情况</div>
+          </div>
+
+          <!-- 本月引擎成本构成 · 排行列表(2026-05-25) -->
+          <div class="cost-section">
+            <div class="cost-section-head">
+              <h3 data-i18n="cost-engines">本月引擎成本构成</h3>
+            </div>
+            <div class="cost-engine-rank" id="kpi-engines"></div>
+            <div class="cost-engine-rank-note" data-i18n="cost-engines-sub">
+              仅统计内部识别链路成本,不等同于用户扣费金额。
             </div>
           </div>
 
           <!-- 趋势图 + 操作 -->
           <div class="cost-section">
-            <div class="cost-section-head">
-              <h3 data-i18n="cost-trend-title">最近 30 天趋势</h3>
+            <div class="cost-section-head cost-trend-head">
+              <div class="cost-trend-titles">
+                <h3 data-i18n="cost-trend-title">最近 30 天趋势</h3>
+                <div class="cost-section-hint" data-i18n="cost-trend-sub">
+                  按 Bangkok 时间统计 OCR / AI 引擎成本、调用次数与页数
+                </div>
+              </div>
               <div class="cost-actions">
+                <div class="cost-trend-seg" id="cost-trend-seg">
+                  <button class="ct-seg-btn active" data-metric="cost" data-i18n="cost-metric-cost">
+                    花费
+                  </button>
+                  <button class="ct-seg-btn" data-metric="count" data-i18n="cost-metric-count">
+                    调用次数
+                  </button>
+                  <button class="ct-seg-btn" data-metric="pages" data-i18n="cost-metric-pages">
+                    页数
+                  </button>
+                </div>
                 <button class="btn btn-ghost" id="btn-cost-refresh">
                   <svg
                     viewBox="0 0 16 16"
@@ -383,86 +461,6 @@
                 <div class="cost-kpi-label" data-i18n="rev-overdraft">透支公司</div>
                 <div class="cost-kpi-value" id="kpi-rev-overdraft">—</div>
                 <div class="cost-kpi-sub" data-i18n="rev-overdraft-sub">余额 ≤ 0 的公司</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- v118.35.0.25 · 系统监控 + LINE 告警 -->
-          <div class="cost-section" style="margin-top: 24px">
-            <div class="cost-section-head">
-              <h3 data-i18n="mon-title">系统监控</h3>
-              <span class="cost-section-hint" data-i18n="mon-hint">实时数据 · 30 秒刷新</span>
-            </div>
-            <div class="cost-kpi-grid">
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-rpm">当前 RPM</div>
-                <div class="cost-kpi-value" id="mon-rpm">—</div>
-                <div class="cost-kpi-sub" data-i18n="mon-rpm-sub">最近 60 秒识别请求数</div>
-              </div>
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-429">5 分钟撞限流</div>
-                <div class="cost-kpi-value" id="mon-429">—</div>
-                <div class="cost-kpi-sub" data-i18n="mon-429-sub">≥10 触发 LINE 告警</div>
-              </div>
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-today">本进程识别数</div>
-                <div class="cost-kpi-value" id="mon-today">—</div>
-                <div class="cost-kpi-sub" id="mon-today-sub">—</div>
-              </div>
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-db">数据库连接占用</div>
-                <div class="cost-kpi-value" id="mon-db">—</div>
-                <div class="cost-kpi-sub" data-i18n="mon-db-sub">高于 25/30 触发告警</div>
-              </div>
-            </div>
-            <!-- v118.35.0.26 · OS 指标(CPU/内存/进程) -->
-            <div class="cost-kpi-grid" style="margin-top: 12px">
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-mem">内存使用</div>
-                <div class="cost-kpi-value" id="mon-mem">—</div>
-                <div class="cost-kpi-sub" id="mon-mem-sub">—</div>
-              </div>
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-load">CPU 负载</div>
-                <div class="cost-kpi-value" id="mon-load">—</div>
-                <div class="cost-kpi-sub" id="mon-load-sub" data-i18n="mon-load-sub">
-                  1分钟 / 5分钟 / 15分钟
-                </div>
-              </div>
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-cores">CPU 核数</div>
-                <div class="cost-kpi-value" id="mon-cores">—</div>
-                <div class="cost-kpi-sub" data-i18n="mon-cores-sub">服务器配置</div>
-              </div>
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-procs">Worker 进程</div>
-                <div class="cost-kpi-value" id="mon-procs">—</div>
-                <div class="cost-kpi-sub" data-i18n="mon-procs-sub">uvicorn master + worker</div>
-              </div>
-            </div>
-            <!-- v118.35.0.27 · 任务队列(最小版 · 接口契约 · 未接 OCR) -->
-            <div class="cost-kpi-grid" style="margin-top: 12px">
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-q-pending">队列待处理</div>
-                <div class="cost-kpi-value" id="mon-q-pending">—</div>
-                <div class="cost-kpi-sub" id="mon-q-pending-sub" data-i18n="mon-q-sub-notconnected">
-                  待接入 · 当前 0
-                </div>
-              </div>
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-q-running">队列处理中</div>
-                <div class="cost-kpi-value" id="mon-q-running">—</div>
-                <div class="cost-kpi-sub" data-i18n="mon-q-sub-notconnected">待接入 · 当前 0</div>
-              </div>
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-q-done">最近成功</div>
-                <div class="cost-kpi-value" id="mon-q-done">—</div>
-                <div class="cost-kpi-sub" data-i18n="mon-q-sub-recent">最近 200 条</div>
-              </div>
-              <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-q-failed">最近失败</div>
-                <div class="cost-kpi-value" id="mon-q-failed">—</div>
-                <div class="cost-kpi-sub" data-i18n="mon-q-sub-recent">最近 200 条</div>
               </div>
             </div>
           </div>
@@ -628,13 +626,6 @@
               style="display: none"
             ></div>
           </div>
-
-          <div class="adm-section">
-            <div class="adm-section-head">
-              <div class="adm-section-title" data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</div>
-            </div>
-            <div id="adm-risk-content"></div>
-          </div>
         </section>
 
         <!-- ============ 充值审核(billing_routes credits 模式 · 接 /api/admin/credits/topup/*)============ -->
@@ -684,6 +675,116 @@
             <div id="adm-topup-list"></div>
           </div>
         </section>
+        <!-- 系统监控 + 风控(2026-05-25 · 从成本页/用户页搬出 · 独立模块)-->
+        <section class="page" id="page-admin-monitor">
+          <div class="page-head">
+            <div class="page-head-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M3 12h4l3 8 4-16 3 8h4" />
+              </svg>
+            </div>
+            <div class="page-head-text">
+              <h1 class="page-title" data-i18n="mon-page-title">系统监控</h1>
+              <div class="page-subtitle" data-i18n="mon-page-sub">
+                实时健康 · 任务队列 · 风控可疑活动
+              </div>
+            </div>
+          </div>
+          <!-- v118.35.0.25 · 系统监控 + LINE 告警 -->
+          <div class="cost-section" style="margin-top: 24px">
+            <div class="cost-section-head">
+              <h3 data-i18n="mon-title">系统监控</h3>
+              <span class="cost-section-hint" data-i18n="mon-hint">实时数据 · 30 秒刷新</span>
+            </div>
+            <div class="cost-kpi-grid">
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-rpm">当前 RPM</div>
+                <div class="cost-kpi-value" id="mon-rpm">—</div>
+                <div class="cost-kpi-sub" data-i18n="mon-rpm-sub">最近 60 秒识别请求数</div>
+              </div>
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-429">5 分钟撞限流</div>
+                <div class="cost-kpi-value" id="mon-429">—</div>
+                <div class="cost-kpi-sub" data-i18n="mon-429-sub">≥10 触发 LINE 告警</div>
+              </div>
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-today">本进程识别数</div>
+                <div class="cost-kpi-value" id="mon-today">—</div>
+                <div class="cost-kpi-sub" id="mon-today-sub">—</div>
+              </div>
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-db">数据库连接占用</div>
+                <div class="cost-kpi-value" id="mon-db">—</div>
+                <div class="cost-kpi-sub" data-i18n="mon-db-sub">高于 25/30 触发告警</div>
+              </div>
+            </div>
+            <!-- v118.35.0.26 · OS 指标(CPU/内存/进程) -->
+            <div class="cost-kpi-grid" style="margin-top: 12px">
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-mem">内存使用</div>
+                <div class="cost-kpi-value" id="mon-mem">—</div>
+                <div class="cost-kpi-sub" id="mon-mem-sub">—</div>
+              </div>
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-load">CPU 负载</div>
+                <div class="cost-kpi-value" id="mon-load">—</div>
+                <div class="cost-kpi-sub" id="mon-load-sub" data-i18n="mon-load-sub">
+                  1分钟 / 5分钟 / 15分钟
+                </div>
+              </div>
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-cores">CPU 核数</div>
+                <div class="cost-kpi-value" id="mon-cores">—</div>
+                <div class="cost-kpi-sub" data-i18n="mon-cores-sub">服务器配置</div>
+              </div>
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-procs">Worker 进程</div>
+                <div class="cost-kpi-value" id="mon-procs">—</div>
+                <div class="cost-kpi-sub" data-i18n="mon-procs-sub">uvicorn master + worker</div>
+              </div>
+            </div>
+            <!-- v118.35.0.27 · 任务队列(最小版 · 接口契约 · 未接 OCR) -->
+            <div class="cost-kpi-grid" style="margin-top: 12px">
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-q-pending">队列待处理</div>
+                <div class="cost-kpi-value" id="mon-q-pending">—</div>
+                <div class="cost-kpi-sub" id="mon-q-pending-sub" data-i18n="mon-q-sub-notconnected">
+                  待接入 · 当前 0
+                </div>
+              </div>
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-q-running">队列处理中</div>
+                <div class="cost-kpi-value" id="mon-q-running">—</div>
+                <div class="cost-kpi-sub" data-i18n="mon-q-sub-notconnected">待接入 · 当前 0</div>
+              </div>
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-q-done">最近成功</div>
+                <div class="cost-kpi-value" id="mon-q-done">—</div>
+                <div class="cost-kpi-sub" data-i18n="mon-q-sub-recent">最近 200 条</div>
+              </div>
+              <div class="cost-kpi-card">
+                <div class="cost-kpi-label" data-i18n="mon-q-failed">最近失败</div>
+                <div class="cost-kpi-value" id="mon-q-failed">—</div>
+                <div class="cost-kpi-sub" data-i18n="mon-q-sub-recent">最近 200 条</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 风控·可疑活动(从用户管理页搬来)-->
+          <div class="cost-section">
+            <div class="cost-section-head">
+              <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
+            </div>
+            <div id="adm-risk-content"></div>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -692,8 +793,8 @@
 
     <!-- v118.44.0.7 救援版 · admin SPA 完全独立 · 不引 home.js(避开 30k 行屎山的 248 处 null bug)-->
     <!-- 轻量 i18n 字典(zh + th)· 暴露 window.ADMIN_I18N -->
-    <script src="/static/admin/admin-i18n.js?v=11841100"></script>
+    <script src="/static/admin/admin-i18n.js?v=11841101"></script>
     <!-- admin 主逻辑 · 鉴权 + 路由 + UI + 业务 fetch · 自包含 -->
-    <script src="/static/admin/admin.js?v=11841100" defer></script>
+    <script src="/static/admin/admin.js?v=11841101" defer></script>
   </body>
 </html>

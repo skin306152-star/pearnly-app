@@ -4843,6 +4843,38 @@ def get_cost_daily_trend(days: int = 30) -> List[Dict[str, Any]]:
         return []
 
 
+def get_cost_daily_by_engine(days: int = 30) -> List[Dict[str, Any]]:
+    """每天 × 引擎 成本明细(成本趋势堆叠图用)· 纯只读聚合 · 不涉任何扣费逻辑。
+    返回 [{day, engine, cost_thb, pages, invoices}] · 前端按引擎归一/堆叠。"""
+    try:
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT
+                    created_at::date AS day,
+                    COALESCE(engine, 'other') AS engine,
+                    COALESCE(SUM(cost_thb), 0) AS cost,
+                    COALESCE(SUM(pages), 0) AS pages,
+                    COUNT(*) AS invoices
+                FROM ocr_cost_log
+                WHERE created_at >= NOW() - INTERVAL '%s days'
+                GROUP BY day, engine
+                ORDER BY day ASC
+            """ % int(days))
+            return [
+                {
+                    "day": str(r["day"]),
+                    "engine": r["engine"],
+                    "cost_thb": float(r["cost"] or 0),
+                    "pages": int(r["pages"] or 0),
+                    "invoices": int(r["invoices"] or 0),
+                }
+                for r in cur.fetchall()
+            ]
+    except Exception as e:
+        logger.error(f"get_cost_daily_by_engine failed: {e}")
+        return []
+
+
 # ============================================================
 # v107 · 客户(Client)实体 · 多客户事务所核心功能
 # 会计 / 事务所给多家公司做账时 · 把每张发票归属到客户

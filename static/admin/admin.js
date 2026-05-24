@@ -141,6 +141,7 @@
         const p = location.pathname;
         if (p === '/admin/users' || p === '/admin/users/') return 'users';
         if (p === '/admin/topup' || p === '/admin/topup/') return 'topup';
+        if (p === '/admin/monitor' || p === '/admin/monitor/') return 'monitor';
         return 'cost';
     }
 
@@ -148,9 +149,11 @@
         const costPage = document.getElementById('page-admin-cost');
         const usersPage = document.getElementById('page-admin-users');
         const topupPage = document.getElementById('page-admin-topup');
+        const monitorPage = document.getElementById('page-admin-monitor');
         if (costPage) costPage.classList.toggle('active', route === 'cost');
         if (usersPage) usersPage.classList.toggle('active', route === 'users');
         if (topupPage) topupPage.classList.toggle('active', route === 'topup');
+        if (monitorPage) monitorPage.classList.toggle('active', route === 'monitor');
         document
             .querySelectorAll('.admin-layout-nav-item[data-admin-route]')
             .forEach(function (el) {
@@ -159,6 +162,7 @@
         if (route === 'cost') _renderCostPage();
         if (route === 'users') _renderUsersPage();
         if (route === 'topup') _renderTopupPage();
+        if (route === 'monitor') _renderMonitorPage();
     }
 
     function _bindSidebar() {
@@ -247,6 +251,7 @@
                 const _r = _resolveRoute();
                 if (_r === 'users') _renderUsersPage();
                 else if (_r === 'topup') _renderTopupPage();
+                else if (_r === 'monitor') _renderMonitorPage();
                 else _renderCostPage();
             });
         });
@@ -271,6 +276,29 @@
     // ============ 顶栏右侧 SLA 文字 ============
     function _renderUptime() {
         _setText('admin-uptime', 'SLA · 平台运维视图');
+    }
+
+    // ============ 引擎归一 + 配色(成本构成 / 趋势图共用 · 2026-05-25)============
+    // ocr_cost_log.engine 原始值:pipeline_v1 / pipeline_v1_table / gemini-vex / cache / text_path 等
+    // 归一到 4 桶 + 其他 · 文字色块不全黑(满足"图例小色块")
+    const _ENGINE_META = {
+        google_vision: { label: 'Google Vision', color: '#2563EB' },
+        pipeline_v1: { label: 'Pipeline V1', color: '#0891B2' },
+        gemini: { label: 'Gemini', color: '#16A34A' },
+        'gemini-vex': { label: 'Gemini VEX', color: '#7C3AED' },
+        other: { label: '其他', color: '#9CA3AF' },
+    };
+    const _ENGINE_ORDER = ['google_vision', 'pipeline_v1', 'gemini', 'gemini-vex', 'other'];
+    function _canonEngine(e) {
+        e = (e || '').toLowerCase();
+        if (e.indexOf('vision') >= 0) return 'google_vision';
+        if (e === 'gemini-vex') return 'gemini-vex';
+        if (e.indexOf('gemini') === 0) return 'gemini';
+        if (e.indexOf('pipeline') === 0) return 'pipeline_v1';
+        return 'other';
+    }
+    function _engineMeta(e) {
+        return _ENGINE_META[_canonEngine(e)] || _ENGINE_META.other;
     }
 
     // ============ 成本追踪页业务 ============
@@ -299,30 +327,59 @@
                 'kpi-total-sub',
                 (total.invoices || 0) + invSuffix + ' · ' + (total.pages || 0) + pageSuffix
             );
+            // 引擎成本构成排行:原始引擎名归一到桶 → 金额/调用/占比条(2026-05-25)
             const engines = d.engines || [];
-            if (!engines.length) {
+            const _bk = {};
+            engines.forEach((e) => {
+                const k = _canonEngine(e.engine);
+                if (!_bk[k]) _bk[k] = { cost: 0, count: 0 };
+                _bk[k].cost += e.cost_thb || 0;
+                _bk[k].count += e.count || 0;
+            });
+            const rankRows = Object.keys(_bk)
+                .map((k) => ({ key: k, cost: _bk[k].cost, count: _bk[k].count }))
+                .filter((r) => r.cost > 0 || r.count > 0)
+                .sort((a, b) => b.cost - a.cost);
+            const totalC = rankRows.reduce((s, r) => s + r.cost, 0) || 1;
+            const cntLbl = _curLang === 'th' ? ' ครั้ง' : ' 次';
+            if (!rankRows.length) {
                 _setHtml(
                     'kpi-engines',
-                    '<span style="font-size:12px;color:#a0aec0">' + _t('adm-empty') + '</span>'
+                    '<div class="cost-engine-rank-empty">' + _esc(_t('adm-empty')) + '</div>'
                 );
             } else {
-                const sorted = engines
-                    .slice()
-                    .sort((a, b) => (b.cost_thb || 0) - (a.cost_thb || 0));
                 _setHtml(
                     'kpi-engines',
-                    sorted
-                        .slice(0, 3)
-                        .map(
-                            (e) =>
-                                '<div style="font-size:11px;line-height:1.5"><strong>' +
-                                _esc(e.engine || '') +
-                                '</strong> ฿' +
-                                _fmt(e.cost_thb || 0, 4) +
-                                ' · ' +
-                                (e.count || 0) +
+                    rankRows
+                        .map((r) => {
+                            const meta = _ENGINE_META[r.key] || _ENGINE_META.other;
+                            const pct = Math.round((r.cost / totalC) * 100);
+                            return (
+                                '<div class="cost-engine-rank-row">' +
+                                '<span class="cost-engine-rank-dot" style="background:' +
+                                meta.color +
+                                '"></span>' +
+                                '<span class="cost-engine-rank-name">' +
+                                _esc(meta.label) +
+                                '</span>' +
+                                '<span class="cost-engine-rank-amt">฿' +
+                                _fmt(r.cost, 2) +
+                                '</span>' +
+                                '<span class="cost-engine-rank-cnt">' +
+                                r.count +
+                                cntLbl +
+                                '</span>' +
+                                '<span class="cost-engine-rank-bar"><span class="cost-engine-rank-fill" style="width:' +
+                                pct +
+                                '%;background:' +
+                                meta.color +
+                                '"></span></span>' +
+                                '<span class="cost-engine-rank-pct">' +
+                                pct +
+                                '%</span>' +
                                 '</div>'
-                        )
+                            );
+                        })
                         .join('')
                 );
             }
@@ -383,47 +440,343 @@
                     _t('adm-load-fail') +
                     '</td></tr>';
         }
-        // trend
-        try {
-            const d = await _adminFetch('/api/admin/cost/daily_trend?days=30');
-            const wrap = document.getElementById('cost-trend-chart');
-            if (!wrap) return;
-            // 后端 /api/admin/cost/daily_trend 返 {days:[...]}· 旧前端只读 points/data → 恒"暂无数据"(2026-05-25 修)
-            const points = (d && d.days) || (d && d.points) || (d && d.data) || [];
-            if (!points.length) {
-                wrap.innerHTML =
-                    '<div style="text-align:center;padding:30px;color:#a0aec0;font-size:13px">' +
-                    _t('adm-empty') +
-                    '</div>';
-            } else {
-                const max = points.reduce((m, p) => Math.max(m, p.cost_thb || 0), 0) || 1;
-                wrap.innerHTML =
-                    '<div style="display:flex;align-items:flex-end;gap:3px;height:140px;padding:14px 10px">' +
-                    points
-                        .map((p) => {
-                            const h = Math.max(2, ((p.cost_thb || 0) / max) * 100);
-                            return (
-                                '<div style="flex:1;background:#111;height:' +
-                                h +
-                                '%;border-radius:2px;min-width:6px" title="' +
-                                _esc(p.day || p.date || '') +
-                                ': ฿' +
-                                _fmt(p.cost_thb || 0, 2) +
-                                '"></div>'
-                            );
-                        })
-                        .join('') +
-                    '</div>';
-            }
-        } catch (e) {
-            /* trend 失败不致命 */
-        }
+        // 趋势图(堆叠柱+总花费折线 · 见 _renderCostTrend)· 失败不致命
+        _renderCostTrend();
 
         // v118.35.0.22 · Credits 收入 KPI + 公司清单(并行拉)
         _renderCreditsRevenue();
         _renderCreditsTenants();
-        // v118.35.0.25 · 系统监控(只看 · 不接 LINE)
+        // 系统监控已搬到独立「系统监控」模块(_renderMonitorPage)· 成本页不再渲染
+    }
+
+    // ============ 系统监控页(2026-05-25 · 独立模块 · 监控 + 风控合并)============
+    function _renderMonitorPage() {
         _renderMonitoring();
+        const tok = localStorage.getItem('mrpilot_token');
+        if (tok) {
+            fetch('/api/admin/risk/suspicious', { headers: { Authorization: 'Bearer ' + tok } })
+                .then((r) => r.json())
+                .then((d) => {
+                    _admPageState.risk = d;
+                    _renderAdmRisk(d);
+                })
+                .catch((_) => {});
+        }
+    }
+
+    // ============ 30 天成本趋势(堆叠柱 + 总花费折线 · 2026-05-25 重做)============
+    // 纯 UI/前端聚合:不改任何扣费逻辑。数据 = /api/admin/cost/daily_trend?days=30 → {days,by_engine}
+    const _ctState = { metric: 'cost', hidden: {}, days: [], byEngine: [], bound: false };
+    const _CT_METRIC = {
+        cost: { f: 'cost_thb', money: true },
+        count: { f: 'invoices', money: false },
+        pages: { f: 'pages', money: false },
+    };
+
+    function _ctBindControls() {
+        if (_ctState.bound) return;
+        _ctState.bound = true;
+        document.querySelectorAll('#cost-trend-seg .ct-seg-btn').forEach(function (b) {
+            b.addEventListener('click', function () {
+                _ctState.metric = b.dataset.metric || 'cost';
+                document
+                    .querySelectorAll('#cost-trend-seg .ct-seg-btn')
+                    .forEach((x) => x.classList.toggle('active', x === b));
+                _drawCostTrend();
+            });
+        });
+    }
+
+    async function _renderCostTrend() {
+        _ctBindControls();
+        const wrap = document.getElementById('cost-trend-chart');
+        if (!wrap) return;
+        try {
+            const d = await _adminFetch('/api/admin/cost/daily_trend?days=30');
+            _ctState.days = (d && d.days) || [];
+            _ctState.byEngine = (d && d.by_engine) || [];
+        } catch (e) {
+            _ctState.days = [];
+            _ctState.byEngine = [];
+        }
+        _drawCostTrend();
+    }
+
+    function _drawCostTrend() {
+        const wrap = document.getElementById('cost-trend-chart');
+        if (!wrap) return;
+        const days = _ctState.days || [];
+        const metric = _ctState.metric || 'cost';
+        const mf = (_CT_METRIC[metric] || _CT_METRIC.cost).f;
+        const money = (_CT_METRIC[metric] || _CT_METRIC.cost).money;
+        // 空状态
+        if (!days.length) {
+            wrap.innerHTML =
+                '<div class="ct-empty">' +
+                '<div class="ct-empty-title">' +
+                _esc(_t('cost-trend-empty-title')) +
+                '</div>' +
+                '<div class="ct-empty-desc">' +
+                _esc(_t('cost-trend-empty-desc')) +
+                '</div>' +
+                '<button class="btn btn-ghost btn-sm" id="ct-empty-refresh">' +
+                _esc(_t('cost-refresh')) +
+                '</button>' +
+                '</div>';
+            const rb = document.getElementById('ct-empty-refresh');
+            if (rb) rb.addEventListener('click', _renderCostTrend);
+            return;
+        }
+        // 1. 按天聚合引擎(归一桶)
+        const engByDay = {};
+        (_ctState.byEngine || []).forEach((r) => {
+            const k = _canonEngine(r.engine);
+            (engByDay[r.day] = engByDay[r.day] || {})[k] = (engByDay[r.day][k] || 0) + (r[mf] || 0);
+        });
+        // 2. 出现过的引擎(按固定顺序 · 排除被图例隐藏的)
+        const present = _ENGINE_ORDER.filter((k) =>
+            days.some((d) => (engByDay[d.day] || {})[k] > 0)
+        );
+        const visible = present.filter((k) => !_ctState.hidden[k]);
+        // 3. 每天总值(用 days 的口径 · 折线走真总值) + 可见堆叠值
+        const dayTotal = days.map((d) => d[mf] || 0);
+        const maxTotal = Math.max(1, ...dayTotal);
+        // nice 上界
+        const niceMax = _ctNiceMax(maxTotal);
+        const avg =
+            dayTotal.filter((v) => v > 0).reduce((a, b) => a + b, 0) /
+            (dayTotal.filter((v) => v > 0).length || 1);
+        // 4. 几何
+        const W = 800,
+            H = 240,
+            padL = money ? 50 : 42,
+            padR = 12,
+            padT = 12,
+            padB = 26;
+        const plotW = W - padL - padR,
+            plotH = H - padT - padB,
+            baseY = padT + plotH;
+        const n = days.length;
+        const colW = plotW / n;
+        const bw = Math.max(3, Math.min(22, colW * 0.62));
+        const yOf = (v) => baseY - (v / niceMax) * plotH;
+        const fmtTick = (v) => (money ? '฿' + _ctShort(v) : _ctShort(v));
+        // 5. Y 轴刻度 + 网格
+        let svg = '';
+        const ticks = 4;
+        for (let t = 0; t <= ticks; t++) {
+            const val = (niceMax / ticks) * t;
+            const y = yOf(val);
+            svg +=
+                '<line x1="' +
+                padL +
+                '" y1="' +
+                y +
+                '" x2="' +
+                (W - padR) +
+                '" y2="' +
+                y +
+                '" stroke="#eee" stroke-width="1"/>';
+            svg +=
+                '<text x="' +
+                (padL - 6) +
+                '" y="' +
+                (y + 3) +
+                '" text-anchor="end" font-size="9" fill="#9ca3af">' +
+                fmtTick(val) +
+                '</text>';
+        }
+        // 6. 堆叠柱 + X 轴标签 + 异常点 + hover 热区
+        const linePts = [];
+        for (let i = 0; i < n; i++) {
+            const cx = padL + colW * i + colW / 2;
+            const eng = engByDay[days[i].day] || {};
+            let acc = 0;
+            visible.forEach((k) => {
+                const v = eng[k] || 0;
+                if (v <= 0) return;
+                const h = (v / niceMax) * plotH;
+                const y = baseY - acc - h;
+                svg +=
+                    '<rect x="' +
+                    (cx - bw / 2) +
+                    '" y="' +
+                    y +
+                    '" width="' +
+                    bw +
+                    '" height="' +
+                    Math.max(0.5, h) +
+                    '" fill="' +
+                    _ENGINE_META[k].color +
+                    '" rx="1"/>';
+                acc += h;
+            });
+            linePts.push(cx + ',' + yOf(dayTotal[i]));
+            // 异常峰值:> 日均 2 倍
+            if (dayTotal[i] > avg * 2 && dayTotal[i] > 0) {
+                svg +=
+                    '<circle cx="' +
+                    cx +
+                    '" cy="' +
+                    (yOf(dayTotal[i]) - 6) +
+                    '" r="2.6" fill="#DC2626"/>';
+            }
+            // X 标签:每 5 天 + 末日
+            if (i % 5 === 0 || i === n - 1) {
+                svg +=
+                    '<text x="' +
+                    cx +
+                    '" y="' +
+                    (baseY + 14) +
+                    '" text-anchor="middle" font-size="9" fill="#9ca3af">' +
+                    _esc(String(days[i].day).slice(5)) +
+                    '</text>';
+            }
+        }
+        // 7. 总花费折线 + 端点
+        svg +=
+            '<polyline points="' +
+            linePts.join(' ') +
+            '" fill="none" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/>';
+        // 8. hover 热区(透明 · 全高 · 带 data-i)
+        for (let i = 0; i < n; i++) {
+            const x = padL + colW * i;
+            svg +=
+                '<rect class="ct-hit" data-i="' +
+                i +
+                '" x="' +
+                x +
+                '" y="' +
+                padT +
+                '" width="' +
+                colW +
+                '" height="' +
+                plotH +
+                '" fill="transparent"/>';
+        }
+        // 9. 图例(可点切)
+        const legend = present
+            .map((k) => {
+                const off = _ctState.hidden[k] ? ' ct-legend-off' : '';
+                return (
+                    '<button class="ct-legend-item' +
+                    off +
+                    '" data-eng="' +
+                    k +
+                    '"><span class="ct-legend-dot" style="background:' +
+                    _ENGINE_META[k].color +
+                    '"></span>' +
+                    _esc(_ENGINE_META[k].label) +
+                    '</button>'
+                );
+            })
+            .join('');
+        wrap.innerHTML =
+            '<div class="ct-legend">' +
+            legend +
+            '</div>' +
+            '<div class="ct-plot">' +
+            '<svg viewBox="0 0 ' +
+            W +
+            ' ' +
+            H +
+            '" preserveAspectRatio="none" class="ct-svg">' +
+            svg +
+            '</svg>' +
+            '<div class="ct-tooltip" id="ct-tooltip" style="display:none"></div>' +
+            '</div>';
+        // 图例点击切换
+        wrap.querySelectorAll('.ct-legend-item').forEach((b) => {
+            b.addEventListener('click', () => {
+                const k = b.dataset.eng;
+                _ctState.hidden[k] = !_ctState.hidden[k];
+                _drawCostTrend();
+            });
+        });
+        // hover tooltip
+        const plot = wrap.querySelector('.ct-plot');
+        const tip = wrap.querySelector('#ct-tooltip');
+        if (plot && tip) {
+            plot.addEventListener('mousemove', (ev) => {
+                const tgt = ev.target;
+                if (!tgt || !tgt.classList || !tgt.classList.contains('ct-hit')) {
+                    tip.style.display = 'none';
+                    return;
+                }
+                const i = parseInt(tgt.dataset.i, 10);
+                tip.innerHTML = _ctTooltip(i, money);
+                tip.style.display = 'block';
+                const pr = plot.getBoundingClientRect();
+                let lx = ev.clientX - pr.left + 12;
+                if (lx > pr.width - 150) lx = ev.clientX - pr.left - 150;
+                tip.style.left = Math.max(0, lx) + 'px';
+                tip.style.top = Math.max(0, ev.clientY - pr.top + 8) + 'px';
+            });
+            plot.addEventListener('mouseleave', () => {
+                tip.style.display = 'none';
+            });
+        }
+    }
+
+    function _ctTooltip(i, money) {
+        const d = _ctState.days[i];
+        if (!d) return '';
+        const mf = (_CT_METRIC[_ctState.metric] || _CT_METRIC.cost).f;
+        const eng = {};
+        (_ctState.byEngine || []).forEach((r) => {
+            if (r.day !== d.day) return;
+            const k = _canonEngine(r.engine);
+            eng[k] = (eng[k] || 0) + (r[mf] || 0);
+        });
+        const val = (v) => (money ? '฿' + _fmt(v || 0, 2) : String(v || 0));
+        const cntLbl = _curLang === 'th' ? '次' : '次';
+        let h =
+            '<div class="ct-tt-day">' +
+            _esc(d.day) +
+            '</div>' +
+            '<div class="ct-tt-row"><span>' +
+            _esc(_t('cost-tt-total')) +
+            '</span><b>' +
+            val(d[mf]) +
+            '</b></div>' +
+            '<div class="ct-tt-row"><span>' +
+            _esc(_t('cost-tt-calls')) +
+            '</span><b>' +
+            (d.invoices || 0) +
+            '</b></div>' +
+            '<div class="ct-tt-row"><span>' +
+            _esc(_t('cost-tt-pages')) +
+            '</span><b>' +
+            (d.pages || 0) +
+            '</b></div>';
+        const present = _ENGINE_ORDER.filter((k) => (eng[k] || 0) > 0);
+        if (present.length) {
+            h += '<div class="ct-tt-sep"></div>';
+            present.forEach((k) => {
+                h +=
+                    '<div class="ct-tt-row"><span><span class="ct-legend-dot" style="background:' +
+                    _ENGINE_META[k].color +
+                    '"></span>' +
+                    _esc(_ENGINE_META[k].label) +
+                    '</span><b>' +
+                    val(eng[k]) +
+                    '</b></div>';
+            });
+        }
+        return h;
+    }
+
+    function _ctNiceMax(v) {
+        if (v <= 0) return 1;
+        const pow = Math.pow(10, Math.floor(Math.log10(v)));
+        const n = v / pow;
+        const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+        return step * pow;
+    }
+    function _ctShort(v) {
+        if (v >= 1000) return (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k';
+        if (v === Math.floor(v)) return String(v);
+        return v.toFixed(v < 10 ? 1 : 0);
     }
 
     // v118.35.0.25 · 系统监控渲染(每 30 秒自动刷新)
@@ -633,13 +986,7 @@
                         _t('adm-load-fail') +
                         '</div>';
             });
-        fetch('/api/admin/risk/suspicious', _hd)
-            .then((r) => r.json())
-            .then((d) => {
-                _admPageState.risk = d;
-                _renderAdmRisk(d);
-            })
-            .catch((_) => {});
+        // 风控·可疑活动已搬到「系统监控」独立模块(_renderMonitorPage)· 用户页不再拉
     }
 
     // CLEANUP-PLAN-02 (2026-05-22) · KPI 改瘦 · 删 Trial/Free/Pro/Firm/conversion · 留用户增长 + 国家

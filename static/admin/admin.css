@@ -448,72 +448,91 @@ body.admin-layout-body .lang-switching-overlay {
 }
 
 /* ============================================================
- * 引擎计费入口卡(2026-05-25 · 替代旧 Google 实际余额卡)
- * 两套 Google 计费面:Cloud Vision(OCR主引擎) + Gemini AI Studio(对账兜底)
+ * 引擎计费入口(2026-05-25 改 · 卡片化 · 与下方花费统计卡同款视觉)
+ * 两套 Google 计费面:Cloud Vision(OCR主引擎) + Gemini AI Studio(结构化兜底)
  * 余额以 Google 官方为准 · 卡片只放直达入口
  * ============================================================ */
-.billing-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 16px 18px;
-  margin-bottom: 16px;
-}
-.billing-card-head {
-  margin-bottom: 12px;
-}
-.billing-card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.billing-card-title svg {
-  width: 18px;
-  height: 18px;
-  color: #6b7280;
-}
-.billing-engine-links {
+.cost-engine-entries {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
-@media (max-width: 640px) {
-  .billing-engine-links {
+@media (max-width: 720px) {
+  .cost-engine-entries {
     grid-template-columns: 1fr;
   }
 }
-.billing-engine-link {
+.cost-engine-entry {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   padding: 12px 14px;
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--bg);
-  color: var(--ink);
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--ink);
   transition:
-    border-color 0.15s,
-    background 0.15s;
+    box-shadow 0.15s,
+    border-color 0.15s;
 }
-.billing-engine-link:hover {
-  border-color: var(--ink);
-  background: #fff;
+.cost-engine-entry:hover {
+  border-color: #d6d6d0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
-.billing-engine-go {
-  color: #9ca3af;
-  font-size: 14px;
+.cost-engine-icon {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #f4f4f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #111;
 }
-.billing-hint {
-  margin-top: 10px;
-  font-size: 12px;
+.cost-engine-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.cost-engine-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cost-engine-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cost-engine-desc {
+  font-size: 11px;
   color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cost-engine-cta {
+  font-size: 11px;
+  font-weight: 500;
+  color: #2563eb;
+  margin-top: 1px;
+}
+.cost-engine-arrow {
+  flex: 0 0 auto;
+  color: #9ca3af;
+}
+.cost-engine-arrow svg {
+  width: 15px;
+  height: 15px;
+}
+.cost-engine-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 0 0 16px 2px;
 }
 
 /* ============================================================
@@ -590,4 +609,216 @@ body.admin-layout-body .lang-switching-overlay {
   text-align: right;
   max-width: 260px;
   word-break: break-word;
+}
+
+/* ============================================================
+ * 本月引擎成本构成 · 排行列表(2026-05-25)
+ * ============================================================ */
+.cost-engine-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.cost-engine-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.cost-engine-rank-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.cost-engine-rank-name {
+  flex: 0 0 110px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cost-engine-rank-amt {
+  flex: 0 0 86px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.cost-engine-rank-cnt {
+  flex: 0 0 72px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #6b7280;
+  font-size: 12px;
+}
+.cost-engine-rank-bar {
+  flex: 1 1 auto;
+  height: 7px;
+  background: #f0f0ec;
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 40px;
+}
+.cost-engine-rank-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+.cost-engine-rank-pct {
+  flex: 0 0 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #6b7280;
+  font-size: 12px;
+}
+.cost-engine-rank-note {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+.cost-engine-rank-empty {
+  font-size: 13px;
+  color: #9ca3af;
+  padding: 8px 0;
+}
+@media (max-width: 600px) {
+  .cost-engine-rank-cnt {
+    display: none;
+  }
+  .cost-engine-rank-name {
+    flex-basis: 84px;
+  }
+}
+
+/* ============================================================
+ * 30 天成本趋势图(2026-05-25 · 堆叠柱+折线+图例+tooltip+segmented)
+ * ============================================================ */
+.cost-trend-head {
+  align-items: flex-start;
+}
+.cost-trend-titles h3 {
+  margin: 0;
+}
+.cost-trend-seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--card);
+}
+.ct-seg-btn {
+  border: 0;
+  background: transparent;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  font-family: inherit;
+  border-right: 1px solid var(--line);
+}
+.ct-seg-btn:last-child {
+  border-right: 0;
+}
+.ct-seg-btn.active {
+  background: #111;
+  color: #fff;
+}
+.ct-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 10px;
+}
+.ct-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+.ct-legend-item.ct-legend-off {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+.ct-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.ct-plot {
+  position: relative;
+  width: 100%;
+}
+.ct-svg {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+.ct-tooltip {
+  position: absolute;
+  z-index: 20;
+  min-width: 150px;
+  max-width: 200px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  padding: 8px 10px;
+  font-size: 11px;
+  pointer-events: none;
+}
+.ct-tt-day {
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.ct-tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+.ct-tt-row b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ct-tt-row .ct-legend-dot {
+  margin-right: 4px;
+}
+.ct-tt-sep {
+  border-top: 1px solid var(--line-soft, #eee);
+  margin: 5px 0;
+}
+.ct-empty {
+  text-align: center;
+  padding: 36px 16px;
+}
+.ct-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.ct-empty-desc {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 14px;
+}
+@media (max-width: 720px) {
+  .cost-trend-head {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .ct-svg {
+    height: 170px;
+  }
 }

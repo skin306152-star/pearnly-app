@@ -7286,7 +7286,11 @@ async def admin_cost_daily_trend(request: Request, days: int = 30):
     """每天趋势 · 默认最近 30 天"""
     _require_super_admin(request)
     days = max(1, min(int(days), 365))
-    return {"days": db.get_cost_daily_trend(days=days)}
+    # by_engine:按天×引擎只读聚合(成本趋势堆叠图用)· 不涉扣费 · 前端归一/堆叠
+    return {
+        "days": db.get_cost_daily_trend(days=days),
+        "by_engine": db.get_cost_daily_by_engine(days=days),
+    }
 
 
 # ============================================================

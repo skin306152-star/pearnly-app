@@ -5783,10 +5783,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "银行对账现在能识别更多格式的账单 Excel。遇到系统第一次见到的格式时,会显示文件内容并请您确认每一列的含义,确认一次后,以后相同格式会自动读取,不再出现『读不到内容』。\n\n即日生效。",
-            "th": "การกระทบยอดธนาคารรองรับไฟล์ Excel รายการเดินบัญชีได้หลากหลายรูปแบบมากขึ้น เมื่อพบรูปแบบที่ระบบเห็นครั้งแรก จะแสดงเนื้อหาไฟล์และให้ท่านยืนยันความหมายของแต่ละคอลัมน์ ยืนยันครั้งเดียว ครั้งต่อไปรูปแบบเดียวกันจะอ่านอัตโนมัติ ไม่มีปัญหา『อ่านข้อมูลไม่ได้』อีกต่อไป\n\nมีผลทันที",
-            "en": "Bank reconciliation now recognizes many more statement Excel formats. When the system sees a format for the first time, it shows the file content and asks you to confirm what each column means; after confirming once, the same format is read automatically next time — no more 'cannot read content'.\n\nEffective immediately.",
-            "ja": "銀行照合がより多くの形式の明細 Excel を読み取れるようになりました。システムが初めて見る形式の場合、ファイル内容を表示し各列の意味の確認をお願いします。一度確認すれば、次回から同じ形式は自動で読み取り、「内容を読み取れません」が解消されます。\n\n即日有効。",
+            "zh": "对账中心现在能识别更多格式的账单与总账文件,包括 Excel 和 CSV。遇到系统第一次见到的格式时,会显示文件内容并请您确认每一列的含义,确认一次后,以后相同格式会自动读取,不再出现『读不到内容』。\n\n即日生效。",
+            "th": "ศูนย์กระทบยอดรองรับไฟล์รายการเดินบัญชีและบัญชีแยกประเภทได้หลากหลายรูปแบบมากขึ้น ทั้ง Excel และ CSV เมื่อพบรูปแบบที่ระบบเห็นครั้งแรก จะแสดงเนื้อหาไฟล์และให้ท่านยืนยันความหมายของแต่ละคอลัมน์ ยืนยันครั้งเดียว ครั้งต่อไปรูปแบบเดียวกันจะอ่านอัตโนมัติ ไม่มีปัญหา『อ่านข้อมูลไม่ได้』อีกต่อไป\n\nมีผลทันที",
+            "en": "The Reconciliation Center now recognizes many more statement and general-ledger file formats, including Excel and CSV. When the system sees a format for the first time, it shows the file content and asks you to confirm what each column means; after confirming once, the same format is read automatically next time — no more 'cannot read content'.\n\nEffective immediately.",
+            "ja": "照合センターが、明細・総勘定元帳ファイルのより多くの形式(Excel・CSV)を読み取れるようになりました。システムが初めて見る形式の場合、ファイル内容を表示し各列の意味の確認をお願いします。一度確認すれば、次回から同じ形式は自動で読み取り、「内容を読み取れません」が解消されます。\n\n即日有効。",
         },
     }
 

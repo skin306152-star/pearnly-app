@@ -41,6 +41,12 @@
             en: 'Set at least one of Deposit / Withdrawal / Amount',
             ja: '入金 / 出金 / 金額 のいずれかを指定してください',
         },
+        needDrCr: {
+            zh: '请至少指定『借方』或『贷方』中的一列',
+            th: 'กรุณาระบุอย่างน้อยหนึ่งคอลัมน์: เดบิต / เครดิต',
+            en: 'Set at least one of Debit / Credit',
+            ja: '借方 / 貸方 のいずれかを指定してください',
+        },
         saving: { zh: '保存中…', th: 'กำลังบันทึก…', en: 'Saving…', ja: '保存中…' },
         saveFail: {
             zh: '保存失败,请重试',
@@ -49,23 +55,49 @@
             ja: '保存に失敗しました',
         },
     };
-    // 列可指认的字段(顺序即下拉顺序)
-    var FIELDS = [
-        { v: 'ignore', zh: '忽略(不用)', th: 'ไม่ใช้', en: 'Ignore', ja: '使わない' },
-        { v: 'date', zh: '日期', th: 'วันที่', en: 'Date', ja: '日付' },
-        { v: 'description', zh: '描述/摘要', th: 'รายละเอียด', en: 'Description', ja: '摘要' },
-        { v: 'deposit', zh: '存入/收入', th: 'ฝาก/รับ', en: 'Deposit', ja: '入金' },
-        { v: 'withdrawal', zh: '支出/取款', th: 'ถอน/จ่าย', en: 'Withdrawal', ja: '出金' },
-        {
+    var F = {
+        ignore: { v: 'ignore', zh: '忽略(不用)', th: 'ไม่ใช้', en: 'Ignore', ja: '使わない' },
+        date: { v: 'date', zh: '日期', th: 'วันที่', en: 'Date', ja: '日付' },
+        description: {
+            v: 'description',
+            zh: '描述/摘要',
+            th: 'รายละเอียด',
+            en: 'Description',
+            ja: '摘要',
+        },
+        deposit: { v: 'deposit', zh: '存入/收入', th: 'ฝาก/รับ', en: 'Deposit', ja: '入金' },
+        withdrawal: {
+            v: 'withdrawal',
+            zh: '支出/取款',
+            th: 'ถอน/จ่าย',
+            en: 'Withdrawal',
+            ja: '出金',
+        },
+        amount: {
             v: 'amount',
             zh: '金额(含正负)',
             th: 'จำนวนเงิน(±)',
             en: 'Amount (signed)',
             ja: '金額(±)',
         },
-        { v: 'balance', zh: '余额', th: 'คงเหลือ', en: 'Balance', ja: '残高' },
-    ];
-    var SINGLE = ['date', 'description', 'deposit', 'withdrawal', 'amount', 'balance']; // 每个字段只能选一列
+        balance: { v: 'balance', zh: '余额', th: 'คงเหลือ', en: 'Balance', ja: '残高' },
+        // GL 总账专用
+        doc_no: {
+            v: 'doc_no',
+            zh: '凭证/单据号',
+            th: 'เลขที่เอกสาร',
+            en: 'Voucher/Doc No',
+            ja: '伝票番号',
+        },
+        account: { v: 'account', zh: '科目/账号', th: 'รหัสบัญชี', en: 'Account', ja: '科目' },
+        debit: { v: 'debit', zh: '借方', th: 'เดบิต', en: 'Debit', ja: '借方' },
+        credit: { v: 'credit', zh: '贷方', th: 'เครดิต', en: 'Credit', ja: '貸方' },
+    };
+    // 按文档类型给不同字段选项:账单(statement) vs 总账(gl)
+    var FIELDS_BY_TYPE = {
+        statement: ['ignore', 'date', 'description', 'deposit', 'withdrawal', 'amount', 'balance'],
+        gl: ['ignore', 'date', 'doc_no', 'account', 'description', 'debit', 'credit', 'balance'],
+    };
 
     function t(d, lang) {
         return d[lang] || d.en || d.zh;
@@ -114,6 +146,15 @@
         var preview = resp.preview_rows || [];
         var suggested = resp.suggested_mapping || {};
         var ncols = headers.length || (preview[0] ? preview[0].length : 0);
+
+        // 按文档类型选字段集(账单 vs 总账)
+        var docType = resp.document_type === 'gl' ? 'gl' : 'statement';
+        var FIELDS = FIELDS_BY_TYPE[docType].map(function (k) {
+            return F[k];
+        });
+        var SINGLE = FIELDS_BY_TYPE[docType].filter(function (k) {
+            return k !== 'ignore';
+        }); // 每个字段只能选一列
 
         // 反查:列 -> 建议字段
         var colField = {};
@@ -219,12 +260,14 @@
                 errEl.textContent = t(L.needDate, lang);
                 return;
             }
-            if (
-                typeof mapping.deposit !== 'number' &&
-                typeof mapping.withdrawal !== 'number' &&
-                typeof mapping.amount !== 'number'
-            ) {
-                errEl.textContent = t(L.needAmt, lang);
+            var hasAmt =
+                docType === 'gl'
+                    ? typeof mapping.debit === 'number' || typeof mapping.credit === 'number'
+                    : typeof mapping.deposit === 'number' ||
+                      typeof mapping.withdrawal === 'number' ||
+                      typeof mapping.amount === 'number';
+            if (!hasAmt) {
+                errEl.textContent = t(docType === 'gl' ? L.needDrCr : L.needAmt, lang);
                 return;
             }
             errEl.textContent = '';

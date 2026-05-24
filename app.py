@@ -56,6 +56,9 @@ from team_routes import (  # REFACTOR-B1 · 员工管理 7 路由 · 2026-05-25
     router as team_router,
     EmployeeToggleRequest,  # admin 410 stub 仍在 app.py · 用此 model
 )
+from erp_mappings_routes import (
+    router as erp_mappings_router,
+)  # REFACTOR-B1 · ERP 映射 12 路由 · 2026-05-25
 from exceptions_routes import (
     router as exceptions_router,
 )  # REFACTOR-B1 · 异常处理 8 路由 · 2026-05-24
@@ -1093,6 +1096,7 @@ app.include_router(vat_excel_router)  # v118.32.4.9.5 · Excel 公式对账内�
 app.include_router(notification_router)  # REFACTOR-B1 · 通知规则 6 路由(2026-05-24)
 app.include_router(clients_router)  # REFACTOR-B1 · 客户管理 5 路由(2026-05-24)
 app.include_router(team_router)  # REFACTOR-B1 · 员工管理 7 路由(2026-05-25)
+app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2026-05-25)
 app.include_router(exceptions_router)  # REFACTOR-B1 · 异常处理 8 路由(2026-05-24)
 app.include_router(billing_router)  # 阶段 5 Task 5.1 · billing 11 路由(2026-05-22)
 app.include_router(
@@ -8493,205 +8497,10 @@ async def api_list_used_categories(request: Request):
 
 
 # ============================================================
-# v118.27.0 · ERP 映射底座(客户 / 科目 / 税码 3 个 sub-tab)
+# v118.27.0 · ERP 映射底座(客户/科目/税码/商品 12 路由)
+# 已抽到 erp_mappings_routes.py(REFACTOR-B1 · 2026-05-25)·
+# @router 注册 + app.include_router(erp_mappings_router)
 # ============================================================
-# 权限:
-#   - 客户映射:接 client_assignments filter(员工只看自己客户)· GET 全员可调
-#   - 科目/税码映射:tenant 共享 · GET 全员可调
-#   - POST/DELETE 全部要 _require_owner_or_super(老板/超管才能改)
-# ============================================================
-
-
-# ─── 客户映射 ────────────────────────────────────────────
-@app.get("/api/erp/mappings/clients")
-async def erp_map_list_clients(request: Request):
-    user = get_current_user_from_request(request)
-    tid = _tid(user)
-    if not tid:
-        return {"items": []}
-    visible = db.get_visible_client_ids_for_user(user)
-    rows = db.list_erp_client_mappings(tid, restrict_client_ids=visible)
-    return {"items": rows, "count": len(rows)}
-
-
-@app.post("/api/erp/mappings/clients")
-async def erp_map_upsert_client(request: Request):
-    owner = _require_owner_or_super(request)
-    body = await request.json()
-    cid = body.get("client_id")
-    erp_type = body.get("erp_type")
-    erp_code = body.get("erp_code")
-    notes = body.get("notes") or ""
-    if not cid or not erp_type or not erp_code:
-        raise HTTPException(400, detail="erp_map.missing_fields")
-    new_id = db.upsert_erp_client_mapping(
-        str(owner["tenant_id"]), int(cid), erp_type, erp_code, notes, str(owner["id"])
-    )
-    if not new_id:
-        raise HTTPException(400, detail="erp_map.upsert_failed")
-    return {"ok": True, "id": new_id}
-
-
-@app.delete("/api/erp/mappings/clients/{mapping_id}")
-async def erp_map_delete_client(mapping_id: str, request: Request):
-    owner = _require_owner_or_super(request)
-    ok = db.delete_erp_client_mapping(str(owner["tenant_id"]), mapping_id)
-    if not ok:
-        raise HTTPException(404, detail="erp_map.not_found")
-    return {"ok": True}
-
-
-# ─── 科目映射 ────────────────────────────────────────────
-@app.get("/api/erp/mappings/accounts")
-async def erp_map_list_accounts(request: Request):
-    user = get_current_user_from_request(request)
-    tid = _tid(user)
-    if not tid:
-        return {"items": []}
-    rows = db.list_erp_account_mappings(tid)
-    return {"items": rows, "count": len(rows)}
-
-
-@app.post("/api/erp/mappings/accounts")
-async def erp_map_upsert_account(request: Request):
-    owner = _require_owner_or_super(request)
-    body = await request.json()
-    erp_type = body.get("erp_type")
-    cat = body.get("pearnly_category")
-    code = body.get("erp_code")
-    name = body.get("erp_name") or ""
-    notes = body.get("notes") or ""
-    if not erp_type or not cat or not code:
-        raise HTTPException(400, detail="erp_map.missing_fields")
-    new_id = db.upsert_erp_account_mapping(
-        str(owner["tenant_id"]), erp_type, cat, code, name, notes, str(owner["id"])
-    )
-    if not new_id:
-        raise HTTPException(400, detail="erp_map.upsert_failed")
-    return {"ok": True, "id": new_id}
-
-
-@app.delete("/api/erp/mappings/accounts/{mapping_id}")
-async def erp_map_delete_account(mapping_id: str, request: Request):
-    owner = _require_owner_or_super(request)
-    ok = db.delete_erp_account_mapping(str(owner["tenant_id"]), mapping_id)
-    if not ok:
-        raise HTTPException(404, detail="erp_map.not_found")
-    return {"ok": True}
-
-
-# ─── 税码映射 ────────────────────────────────────────────
-@app.get("/api/erp/mappings/taxes")
-async def erp_map_list_taxes(request: Request):
-    user = get_current_user_from_request(request)
-    tid = _tid(user)
-    if not tid:
-        return {"items": []}
-    rows = db.list_erp_tax_mappings(tid)
-    return {"items": rows, "count": len(rows)}
-
-
-@app.post("/api/erp/mappings/taxes")
-async def erp_map_upsert_tax(request: Request):
-    owner = _require_owner_or_super(request)
-    body = await request.json()
-    erp_type = body.get("erp_type")
-    kind = body.get("pearnly_tax_kind")
-    code = body.get("erp_code")
-    notes = body.get("notes") or ""
-    if not erp_type or not kind or not code:
-        raise HTTPException(400, detail="erp_map.missing_fields")
-    new_id = db.upsert_erp_tax_mapping(
-        str(owner["tenant_id"]), erp_type, kind, code, notes, str(owner["id"])
-    )
-    if not new_id:
-        raise HTTPException(400, detail="erp_map.upsert_failed")
-    return {"ok": True, "id": new_id}
-
-
-@app.delete("/api/erp/mappings/taxes/{mapping_id}")
-async def erp_map_delete_tax(mapping_id: str, request: Request):
-    owner = _require_owner_or_super(request)
-    ok = db.delete_erp_tax_mapping(str(owner["tenant_id"]), mapping_id)
-    if not ok:
-        raise HTTPException(404, detail="erp_map.not_found")
-    return {"ok": True}
-
-
-# ─── 商品映射 CRUD ──────────────────────────────────────────
-
-
-class ErpProductMappingReq(BaseModel):
-    erp_type: str
-    item_name: str
-    erp_code: str
-    erp_name: Optional[str] = None
-    notes: Optional[str] = None
-
-
-@app.get("/api/erp/mappings/products")
-async def list_mappings_products(request: Request, erp_type: str = ""):
-    """列商品映射 · 可选 erp_type 过滤 · 默认列全部"""
-    user = get_current_user_from_request(request)
-    tid = _tid(user)
-    if not tid:
-        raise HTTPException(400, detail="no_tenant")
-    role = (user.get("role") or "owner").lower()
-    if role != "owner" and not user.get("is_super_admin"):
-        raise HTTPException(403, detail="owner_only")
-    rows = db.list_erp_product_mappings(tid, erp_type=(erp_type.strip() or None))
-    out = []
-    for r in rows:
-        out.append(
-            {
-                "id": str(r.get("id")) if r.get("id") else None,
-                "erp_type": r.get("erp_type"),
-                "item_name": r.get("item_name"),
-                "erp_code": r.get("erp_code"),
-                "erp_name": r.get("erp_name"),
-                "notes": r.get("notes"),
-                "created_at": r.get("created_at").isoformat() if r.get("created_at") else None,
-                "updated_at": r.get("updated_at").isoformat() if r.get("updated_at") else None,
-            }
-        )
-    return {"ok": True, "items": out, "total": len(out)}
-
-
-@app.post("/api/erp/mappings/products")
-async def upsert_mapping_product(req: ErpProductMappingReq, request: Request):
-    """加/改商品映射"""
-    user = get_current_user_from_request(request)
-    tid = _tid(user)
-    if not tid:
-        raise HTTPException(400, detail="no_tenant")
-    role = (user.get("role") or "owner").lower()
-    if role != "owner" and not user.get("is_super_admin"):
-        raise HTTPException(403, detail="owner_only")
-    mid = db.upsert_erp_product_mapping(
-        tenant_id=tid,
-        erp_type=req.erp_type,
-        item_name=req.item_name,
-        erp_code=req.erp_code,
-        erp_name=req.erp_name,
-        notes=req.notes,
-        user_id=str(user["id"]),
-    )
-    if not mid:
-        raise HTTPException(400, detail="upsert_failed")
-    return {"ok": True, "id": mid}
-
-
-@app.delete("/api/erp/mappings/products/{mapping_id}")
-async def delete_mapping_product(mapping_id: str, request: Request):
-    user = get_current_user_from_request(request)
-    tid = _tid(user)
-    if not tid:
-        raise HTTPException(400, detail="no_tenant")
-    role = (user.get("role") or "owner").lower()
-    if role != "owner" and not user.get("is_super_admin"):
-        raise HTTPException(403, detail="owner_only")
-    ok = db.delete_erp_product_mapping(tid, mapping_id)
-    return {"ok": bool(ok)}
 
 
 # ============================================================

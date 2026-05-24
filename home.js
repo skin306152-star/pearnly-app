@@ -19563,6 +19563,19 @@ async function deleteEndpoint(endpointId) {
             //   res.json() 会抛 "Unexpected token '<'" · 不再原样弹给用户 · 改友好 4 语提示
             let sub = null;
             try { sub = await submitRes.json(); } catch (_) { sub = null; }
+            // ADR-006 · 新模板 → 弹"确认列对应"面板(确认并保存后自动重跑)· 不再报"解析失败"
+            if (sub && sub.needs_mapping) {
+                showProgress(false);
+                if (window.ReconMapping) {
+                    window.ReconMapping.show(sub, {
+                        token: token, lang: lang,
+                        onConfirmed: function () { runRecon(); },
+                    });
+                } else {
+                    showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
+                }
+                return;
+            }
             if (!submitRes.ok || !sub || !sub.ok || !sub.job_id) {
                 showProgress(false);
                 if (sub && (sub.detail || sub.error)) {

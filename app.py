@@ -5783,10 +5783,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "『对账中心』(银行对账、收入对账、销项税对账)已升级处理方式:上传文件后系统立即开始后台处理,期间可继续操作其他功能,大文件不再出现卡住或长时间等待。处理过程中会实时显示已处理的文件进度。\n\n即日生效。",
-            "th": "『ศูนย์กระทบยอด』(กระทบยอดธนาคาร กระทบยอดรายได้ และกระทบยอดภาษีขาย)ได้ปรับปรุงวิธีประมวลผล หลังอัปโหลดไฟล์ ระบบจะเริ่มประมวลผลเบื้องหลังทันที สามารถใช้งานฟังก์ชันอื่นต่อได้ ไฟล์ขนาดใหญ่จะไม่ค้างหรือรอนานอีกต่อไป และจะแสดงความคืบหน้าของไฟล์ที่ประมวลผลแล้วแบบเรียลไทม์\n\nมีผลทันที",
-            "en": "The Reconciliation Center (bank, revenue, and output-VAT reconciliation) has an improved processing method: after you upload files, the system starts processing in the background immediately so you can continue using other features, and large files no longer freeze or keep you waiting. Real-time progress of processed files is shown during processing.\n\nEffective immediately.",
-            "ja": "『照合センター』(銀行照合・収入照合・売上VAT照合)の処理方式を改善しました。ファイルをアップロードすると、システムがすぐにバックグラウンドで処理を開始するため、その間も他の機能を続けてご利用いただけます。大きなファイルでも固まったり長く待たされたりすることがなくなり、処理済みファイルの進捗をリアルタイムで表示します。\n\n即日有効。",
+            "zh": "银行对账现在能识别更多格式的账单 Excel。遇到系统第一次见到的格式时,会显示文件内容并请您确认每一列的含义,确认一次后,以后相同格式会自动读取,不再出现『读不到内容』。\n\n即日生效。",
+            "th": "การกระทบยอดธนาคารรองรับไฟล์ Excel รายการเดินบัญชีได้หลากหลายรูปแบบมากขึ้น เมื่อพบรูปแบบที่ระบบเห็นครั้งแรก จะแสดงเนื้อหาไฟล์และให้ท่านยืนยันความหมายของแต่ละคอลัมน์ ยืนยันครั้งเดียว ครั้งต่อไปรูปแบบเดียวกันจะอ่านอัตโนมัติ ไม่มีปัญหา『อ่านข้อมูลไม่ได้』อีกต่อไป\n\nมีผลทันที",
+            "en": "Bank reconciliation now recognizes many more statement Excel formats. When the system sees a format for the first time, it shows the file content and asks you to confirm what each column means; after confirming once, the same format is read automatically next time — no more 'cannot read content'.\n\nEffective immediately.",
+            "ja": "銀行照合がより多くの形式の明細 Excel を読み取れるようになりました。システムが初めて見る形式の場合、ファイル内容を表示し各列の意味の確認をお願いします。一度確認すれば、次回から同じ形式は自動で読み取り、「内容を読み取れません」が解消されます。\n\n即日有効。",
         },
     }
 

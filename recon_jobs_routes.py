@@ -315,15 +315,74 @@ async def get_job(job_id: str, request: Request):
     job = store.get(job_id, user_id=str(user["id"]), tenant_id=user.get("tenant_id"))
     if not job:
         raise HTTPException(404, "任务不存在")
+    _progress = job.get("progress") or {}
     return {
         "ok": True,
         "job_id": job["id"],
         "job_type": job.get("job_type"),
         "status": job.get("status"),
-        "progress": job.get("progress") or {},
+        "progress": _progress,
+        # S8 · needs_review 时携带核对载荷(前端据此弹逐行核对面板)
+        "review": _progress.get("review") if job.get("status") == "needs_review" else None,
         "result_table": job.get("result_table"),
         "result_id": job.get("result_id"),
         "error_code": job.get("error_code"),
         "created_at": job.get("created_at"),
         "finished_at": job.get("finished_at"),
     }
+
+
+# ════ M4 银行对账 · S8 用户核对纠错后重对账 ════
+@router.post("/api/recon/bank-v2/confirm-rows/{job_id}")
+async def bank_v2_confirm_rows(job_id: str, request: Request):
+    """ADR-006 S8 · 用户在核对面板改完 OCR 行 → 用修正行重对账(不重 OCR、不重扣费)。
+
+    body: {"rows": [review-row dict...]}。复制原任务暂存的 gl 文件到新任务暂存(自包含)·
+    新任务注入 confirmed_stmt_rows → handler 跳过 stmt OCR · gl 仍正常解析 · 照旧对账落库。
+    """
+    import shutil
+
+    user = get_current_user_from_request(request)
+    if not user:
+        raise HTTPException(401, "未登录")
+    body = await request.json()
+    rows = body.get("rows") or []
+    if not rows:
+        raise HTTPException(422, "无修正行")
+    orig = store.get(job_id, user_id=str(user["id"]), tenant_id=user.get("tenant_id"))
+    if not orig:
+        raise HTTPException(404, "任务不存在")
+    if orig.get("status") != "needs_review":
+        raise HTTPException(400, "该任务无需核对")
+    review = (orig.get("progress") or {}).get("review") or {}
+
+    new_job = str(uuid.uuid4())
+    new_dir = worker.stage_dir_for(new_job)
+    os.makedirs(new_dir, exist_ok=True)
+    new_input: List[dict] = []
+    for r in orig.get("input_ref") or []:
+        if r.get("role") != "gl":
+            continue
+        src = r.get("path")
+        if not src or not os.path.exists(src):
+            continue
+        dst = os.path.join(new_dir, os.path.basename(src))
+        try:
+            shutil.copy2(src, dst)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[confirm-rows] copy gl skip: {e}")
+            continue
+        new_input.append({"path": dst, "filename": r.get("filename"), "role": "gl"})
+
+    params = dict(orig.get("params") or {})
+    params["confirmed_stmt_rows"] = rows
+    params["confirmed_opening"] = review.get("opening", 0.0)
+    rid = store.enqueue(
+        "bank", str(user["id"]), user.get("tenant_id"), params, new_input, job_id=new_job
+    )
+    # 原暂存清理(gl 已复制到新任务)
+    worker._cleanup_stage(job_id)
+    if not rid:
+        worker._cleanup_stage(new_job)
+        raise HTTPException(500, "重对账任务创建失败,请稍后重试")
+    return {"ok": True, "job_id": rid}

@@ -38,6 +38,7 @@ class RouteContractTests(unittest.TestCase):
                 ("POST", "/api/recon/gl-vat/submit"),
                 ("POST", "/api/vat_excel/submit"),
                 ("GET", "/api/recon/jobs/{job_id}"),
+                ("POST", "/api/recon/bank-v2/confirm-rows/{job_id}"),  # S8
             },
         )
 

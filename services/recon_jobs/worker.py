@@ -78,8 +78,15 @@ def _run_one(job: Dict) -> None:
     def progress_cb(p: dict) -> None:
         store.update_progress(job_id, p, worker_id=WORKER_ID, lease_seconds=LEASE_SEC)
 
+    keep_stage = False  # S8 · needs_review 时留暂存(confirm 重对账复用 gl 文件)
     try:
         result = handler(job.get("params") or {}, job.get("input_ref") or [], progress_cb)
+        # S8 · handler 返回 ("__needs_review__", payload) → 暂停等用户核对 OCR 行
+        if isinstance(result, (tuple, list)) and len(result) == 2 and result[0] == "__needs_review__":
+            store.set_needs_review(job_id, result[1])
+            keep_stage = True
+            logger.info(f"[recon-worker] job {job_id} ({jtype}) -> needs_review(待用户核对)")
+            return
         result_table: Optional[str] = None
         result_id = None
         if isinstance(result, (tuple, list)) and len(result) == 2:
@@ -90,7 +97,8 @@ def _run_one(job: Dict) -> None:
         logger.error(f"[recon-worker] job {job_id} ({jtype}) FAILED: {e}\n{traceback.format_exc()}")
         store.fail(job_id, "processing_error")
     finally:
-        _cleanup_stage(job_id)
+        if not keep_stage:
+            _cleanup_stage(job_id)
 
 
 async def run_worker(stop_event: Optional[asyncio.Event] = None) -> None:

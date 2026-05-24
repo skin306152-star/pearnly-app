@@ -248,6 +248,32 @@ def finish(job_id: str, result_table: str, result_id: Any, progress: Optional[di
         return False
 
 
+def set_needs_review(job_id: str, payload: dict) -> bool:
+    """ADR-006 S8 · 任务暂停等用户核对 OCR 行 · 状态 needs_review · 载荷存 progress.review。
+    (复用 progress 列 · 暂停后无后续进度更新 · 零 schema 改动。)
+    """
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE recon_jobs
+                SET status = 'needs_review',
+                    progress = %s::jsonb,
+                    lease_until = NULL,
+                    updated_at = now()
+                WHERE id = %s::uuid
+                """,
+                (
+                    _json.dumps({"review": payload or {}}, ensure_ascii=False, default=str),
+                    str(job_id),
+                ),
+            )
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"set_needs_review failed ({job_id}): {e}")
+        return False
+
+
 def fail(job_id: str, error_code: str) -> bool:
     """任务失败 · 还有重试次数则回 queued · 否则 failed。"""
     try:

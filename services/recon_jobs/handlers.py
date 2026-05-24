@@ -95,6 +95,9 @@ def run_bank_recon(
     tenant_id = params.get("tenant_id")
     is_exempt = bool(params.get("is_exempt", True))
 
+    # ADR-006 S8 · 用户核对纠错后的重对账:注入修正行 → 跳过 stmt OCR(不重读、不重扣费)
+    confirmed_rows = params.get("confirmed_stmt_rows")
+
     stmt_data = _read_inputs(input_ref, "stmt")
     gl_data = _read_inputs(input_ref, "gl")
     total = len(stmt_data) + len(gl_data)
@@ -103,9 +106,25 @@ def run_bank_recon(
     # 1. 解析(并行)· ADR-006 模板学习层作用域 = 租户优先,无租户退回 user_id
     #    (必须与 submit 预检 / save-mapping 用同一作用域,否则确认过的映射 worker 找不到)
     _scope = tenant_id or user_id
-    stmt_results = _parallel(
-        lambda bf: parse_bank_statement_pdf(bf[0], bf[1], api_key, tenant_id=_scope), stmt_data
-    )
+    if confirmed_rows:
+        from services.importer.stmt_review import review_rows_to_statement_rows
+
+        _srows = review_rows_to_statement_rows(confirmed_rows)
+        _last_bal = _srows[-1].balance if _srows else 0.0
+        stmt_results = [
+            {
+                "ok": True,
+                "rows": _srows,
+                "opening": float(params.get("confirmed_opening") or 0.0),
+                "closing": _last_bal,
+                "bank_code": params.get("confirmed_bank_code") or "generic",
+                "completeness": {"ok": True},
+            }
+        ]
+    else:
+        stmt_results = _parallel(
+            lambda bf: parse_bank_statement_pdf(bf[0], bf[1], api_key, tenant_id=_scope), stmt_data
+        )
     progress_cb({"stage": "parse", "stage_done": len(stmt_data), "stage_total": total})
     gl_results = _parallel(
         lambda bf: parse_gl_v2(bf[0], bf[1], gl_account, api_key, tenant_id=_scope), gl_data
@@ -113,7 +132,8 @@ def run_bank_recon(
     progress_cb({"stage": "parse", "stage_done": total, "stage_total": total})
 
     # 异步扣费 · 按扩展名分 pdf/excel(原路由 create_task · 此处工人线程内同步调用)
-    if not is_exempt:
+    # S8 · 确认重对账不重扣费(首次 OCR 已扣)
+    if not is_exempt and not confirmed_rows:
         try:
             from services.ocr.pdf_utils import count_pdf_pages as _count_pages
 
@@ -146,6 +166,24 @@ def run_bank_recon(
                 )
         except Exception as _ce:  # noqa: BLE001
             logger.warning(f"💳 bank async charge skip: {_ce}")
+
+    # ADR-006 S8 · 核对闸:PDF/图片账单 OCR 低信心或完整性不过 → 暂停等用户逐行核对纠错
+    #   (干净 OCR / Excel / 确认重跑 → 不触发 · 照旧对账)· 守铁律「低信心主动喊停·不静默出错」
+    if not confirmed_rows:
+        try:
+            from services.importer import stmt_review as _sr
+
+            _review = _sr.build_bank_review_payload(
+                stmt_results, [fn for _, fn in stmt_data]
+            )
+            if _review:
+                logger.info(
+                    f"[bank] needs_review · files={_review.get('files')} "
+                    f"rows={_review.get('row_count')} low_conf={_review.get('low_conf_count')}"
+                )
+                return ("__needs_review__", _review)
+        except Exception as _re:  # noqa: BLE001
+            logger.warning(f"[bank] review gate skip(tolerated): {_re}")
 
     parse_info = {
         "stmt_files": [

@@ -33,9 +33,13 @@ router = APIRouter(tags=["recon-jobs"])
 
 
 def _user_key(user) -> str:
+    # 回退兼容服务器两种环境变量名(OCR 历史上 GEMINI_API_KEY / GOOGLE_API_KEY 混用)
+    # → S7 AI 在生产不管服务器配哪个都能拿到 key · 否则静默退回 needs_mapping
     return (
-        user.get("gemini_api_key") or user.get("custom_gemini_api_key") or ""
-    ).strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+        (user.get("gemini_api_key") or user.get("custom_gemini_api_key") or "").strip()
+        or os.environ.get("GEMINI_API_KEY", "").strip()
+        or os.environ.get("GOOGLE_API_KEY", "").strip()
+    )
 
 
 async def _stage_uploads(job_id: str, files: List[UploadFile], role: str, default_name: str):

@@ -489,8 +489,9 @@ async def credits_usage_history(
                 LEFT JOIN users u ON u.id = ct.user_id::uuid
                 LEFT JOIN ocr_history oh
                     ON oh.user_id = ct.user_id::uuid
-                    AND oh.tenant_id = ct.tenant_id::uuid
                     AND ct.description LIKE '%% · ' || LEFT(oh.id::text, 8)
+                    -- 2026-05-24 去掉 oh.tenant_id=ct.tenant_id:ocr_history.tenant_id 现为 NULL
+                    -- (insert_ocr_history 未存)· user_id + 描述里 history_id 前8位已唯一
                 WHERE ct.tenant_id = %s::uuid AND ct.type = 'usage' {uid_sql}
                 ORDER BY ct.created_at DESC
                 LIMIT %s OFFSET %s
@@ -622,8 +623,9 @@ async def credits_usage_report(
                 LEFT JOIN users u ON u.id = ct.user_id::uuid
                 LEFT JOIN ocr_history oh
                     ON oh.user_id = ct.user_id::uuid
-                    AND oh.tenant_id = ct.tenant_id::uuid
                     AND ct.description LIKE '%% · ' || LEFT(oh.id::text, 8)
+                    -- 2026-05-24 去掉 oh.tenant_id=ct.tenant_id:ocr_history.tenant_id 现为 NULL
+                    -- (insert_ocr_history 未存)· user_id + 描述里 history_id 前8位已唯一
                 WHERE ct.tenant_id = %s::uuid
                   AND ct.type = 'usage'
                   AND ct.created_at >= %s

@@ -89,14 +89,17 @@ async def get_my_credits(request: Request, response: Response):
                 cur.execute("SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s", (tid,))
                 row = cur.fetchone()
                 if row:
-                    balance_thb = float(row[0])
+                    # 2026-05-24 真因修复:get_cursor() 是 RealDictCursor · row[0] 抛 KeyError
+                    # → 被下方 except 吞掉 → 余额永远停在默认 0 → 所有老板读自己余额都是 0
+                    # (后台/my-companies 用 row["..."] 故正确显示 · 唯独这里读错)
+                    balance_thb = float(row["balance_thb"])
                 cur.execute(
                     "SELECT pages_used FROM monthly_page_usage WHERE tenant_id = %s AND year_month = %s",
                     (tid, year_month),
                 )
                 row = cur.fetchone()
                 if row:
-                    pages_this_month = int(row[0])
+                    pages_this_month = int(row["pages_used"])
         except Exception as e:
             logger.warning(f"get_my_credits owner DB: {e}")
 
@@ -154,7 +157,7 @@ async def get_my_credits(request: Request, response: Response):
                 )
                 row = cur.fetchone()
                 if row:
-                    my_count = int(row[0])
+                    my_count = int(row["cnt"])  # RealDictCursor · 同 row[0] bug · 用列名
         except Exception as e:
             logger.warning(f"get_my_credits employee count: {e}")
 

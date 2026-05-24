@@ -18,7 +18,7 @@
 - 现象链:磁盘满 → Nginx 写不下上传文件请求体(`/var/lib/nginx/body/` `pwrite() failed (28: No space left on device)`)→ Nginx 返回 HTML 500 → 前端 `res.json()` 解析 HTML 抛 `Unexpected token '<'`。
 - **排错走过的弯路(教训记牢)**:先猜超时(❌ 是 500 不是 504)→ 猜大文件(❌ 文件才 226KB 文字版 · 本地全链路 2.25s 跑通)→ 猜内存 OOM(❌ 服务才占 190M/峰值 397M · dmesg 无 OOM)→ 本地 TestClient 跑完整路由 200(❌ 代码无 bug)→ 查 nginx 日志(默认 access/error.log 半夜轮转后 0 字节 · logrotate 没 reopen)→ **`error.log.1` 里抓到 `[crit] pwrite ... No space left on device`** = 铁证。
 - 罪魁:`/tmp` 堆 28G `pip-unpack-*`/`pip-install-*`(每次部署 pip 解压 torch ~2.7G 不清理 · 9 次累积撑爆)。
-- **已修复**:① 清 /tmp pip 残渣 100%→44%(对账当场复活 · Zihao 确认)② **铁律 #24** 入档 ③ git-deploy.sh 生成器(app.py L728)加部署后 `rm -rf /tmp/pip-*` + 磁盘体检(已上线 · 部署日志见 `disk usage after cleanup: 44%`)④ `nginx -s reopen` 恢复日志 ⑤ 每日 cron `/etc/cron.d/clean-tmp` 兜底 ⑥ `/root/.cache`(pip 缓存 5.4G)待清(`rm -rf /root/.cache`)。
+- **已修复**:① 清 /tmp pip 残渣 100%→44%(对账当场复活 · Zihao 确认)② **铁律 #24** 入档 ③ git-deploy.sh 生成器(app.py L728)加部署后 `rm -rf /tmp/pip-*` + 磁盘体检(已上线 · 部署日志见 `disk usage after cleanup: 44%`)④ `nginx -s reopen` 恢复日志 ⑤ 每日 cron `/etc/cron.d/clean-tmp` 兜底 ⑥ `/root/.cache`(pip 缓存 5.4G)已清。**当前磁盘 40% · 30G 可用 · 健康**(从 100% 满恢复)。
 - **前端兜底已上线 v118.35.0.68**(`a4f10de`):`runRecon` 的 `res.json()` 加 try/catch · 非 JSON 响应显示友好 4 语 `brv2-err-server`(服务器繁忙/请稍后重试或分批上传)· 不再弹乱码。
 - **遗留小债**:每次部署 `pip install -r requirements.txt` 重编 **PyMuPDF** wheel 失败(非致命 · 不挡部署 · 但白跑+丢报错)· 回头钉版本/已装跳过。
 

@@ -2640,6 +2640,7 @@ async def ocr_recognize(
 
         hid = insert_ocr_history(
             user_id=str(user["id"]),
+            tenant_id=_tid(user),  # 2026-05-24 · 多租户归属(原缺 → tenant_id 恒 NULL)
             filename=file.filename or "untitled",
             page_count=len(g_pages),
             pages=g_pages_for_save,

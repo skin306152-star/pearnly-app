@@ -687,6 +687,8 @@ def insert_ocr_history(
     pdf_size_bytes: Optional[int] = None,
     # v27.8.1.13a · 上传时自动归属客户(右上角客户切换器选中 / 文件夹绑定 / 邮件别名等)
     client_id: Optional[int] = None,
+    # 2026-05-24 · 多租户:历史归属租户(原缺失 → tenant_id 恒 NULL → 按租户查历史/对账漏)
+    tenant_id: Optional[str] = None,
 ) -> Optional[str]:
     """写入一条历史记录,返回新记录的 id(失败返回 None,不影响主流程)"""
     summary = _extract_summary_fields(pages)
@@ -720,7 +722,7 @@ def insert_ocr_history(
             cur.execute(
                 """
                 INSERT INTO ocr_history (
-                    user_id, filename, page_count, file_size_kb, file_hash,
+                    user_id, tenant_id, filename, page_count, file_size_kb, file_hash,
                     pages, confidence, elapsed_ms,
                     invoice_no, invoice_date, seller_name, total_amount,
                     archive_name, category_tag, archived_at,
@@ -729,7 +731,7 @@ def insert_ocr_history(
                     pdf_storage_path, pdf_size_bytes,
                     client_id
                 ) VALUES (
-                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s,
                     %s::jsonb, %s, %s,
                     %s, %s, %s, %s,
                     %s, %s, CASE WHEN %s IS NOT NULL THEN NOW() ELSE NULL END,
@@ -742,6 +744,7 @@ def insert_ocr_history(
             """,
                 (
                     user_id,
+                    str(tenant_id) if tenant_id else None,
                     filename,
                     page_count,
                     file_size_kb,
@@ -9940,6 +9943,10 @@ def ensure_credits_tables():
     """按量付费系统 - 新增表结构，不影响任何现有逻辑"""
     try:
         with get_cursor(commit=True) as cur:
+            # 2026-05-24 · 事务级 advisory lock 串行化建表 DDL · 防多 worker 并发启动时
+            #   CREATE/ALTER 互锁 deadlock(原现象:启动日志 ensure_credits_tables failed:
+            #   deadlock detected)· 第二个 worker 等第一个建完再跑 IF NOT EXISTS 空操作。
+            cur.execute("SELECT pg_advisory_xact_lock(906024)")
 
             # 1. 用户-公司多对多关系表
             cur.execute("""

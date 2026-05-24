@@ -127,6 +127,11 @@ def make_searchable_pdf(image_pdf_bytes: bytes, pages_texts: List[str]) -> Optio
         doc = fitz.open(stream=image_pdf_bytes, filetype="pdf")
         n_pages = len(doc)
         n_text = 0
+        if n_pages == 0:
+            # 退化/空 PDF · 没法做搜索层 · 直接返 None(caller 用原文件)· 防 tobytes "no objects"
+            doc.close()
+            logger.warning("v115 · make_searchable_pdf: 0 页 · 跳过搜索层")
+            return None
 
         for page_idx in range(n_pages):
             text = ""
@@ -170,7 +175,12 @@ def make_searchable_pdf(image_pdf_bytes: bytes, pages_texts: List[str]) -> Optio
                     logger.warning(f"v115 · helv fallback failed page {page_idx}: {e}")
 
         # garbage=4 + deflate · 重压缩 · 通常输出比原始更小
-        out_bytes = doc.tobytes(garbage=4, deflate=True)
+        try:
+            out_bytes = doc.tobytes(garbage=4, deflate=True)
+        except Exception as _tb:
+            # 个别退化 PDF garbage 回收报 "no objects found" · 退回不回收的简单导出
+            logger.warning(f"v115 · tobytes(garbage) 失败 · 退回简单导出: {_tb}")
+            out_bytes = doc.tobytes()
         doc.close()
 
         old_kb = len(image_pdf_bytes) // 1024
@@ -181,7 +191,8 @@ def make_searchable_pdf(image_pdf_bytes: bytes, pages_texts: List[str]) -> Optio
         )
         return out_bytes
     except Exception as e:
-        logger.error(f"❌ v115 · make_searchable_pdf failed: {e}")
+        # 非致命:搜索层做不出就用原文件 · 降级为 warning 不刷 ERROR
+        logger.warning(f"v115 · make_searchable_pdf 跳过(用原文件): {e}")
         return None
 
 

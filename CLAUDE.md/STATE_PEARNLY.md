@@ -1,6 +1,22 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-24(**第十三会话**)· **🟢 通用模板学习层 ADR-006 S1–S6 全部完成并上线(v118.35.0.71 · recon-mapping.js?v=11835072)· 账单/总账 · Excel/CSV 新格式不再"解析失败" → 确认列一次 → 记住 → 下次自动 · 真站点 UI + 12 个大文件压测全过(抓修 5 个真 bug)· KTB/小现金零回归。**
+> **最近更新**:2026-05-24(**第十四会话**)· **🟢 大量计费/导入器整改完成并上线验证。**
+> ⚠️⚠️ **下个窗口:别急着回整顿期(REFACTOR_MASTER_PLAN)· Zihao 还有整改要做 · 继续 BUG/整改 > 整顿。**
+>
+> **本会话(第十四)成果(全部已上线 + 生产真验)**:
+> 1. **充值真因修复**:`/api/me/credits` 用 `row[0]` 取 RealDictCursor → KeyError 被吞 → **所有老板余额恒显 0**(钱在/能用/就是看不到)· 改 `row["balance_thb"]` · AK UI 实测显示正常。
+> 2. **充值审核模块重建**:Earn 后台 `/admin/topup`(CLEANUP 误删前端 · 重建接 billing_routes credits/topup/*)· tab 样式按设计语言重做。
+> 3. **ADR-006 S7 上线**:AI 低信心列映射建议 · 真 Gemini 实证(线上 GL medium→AI 补 doc_no→形状校验 1.0→存 source=ai)。
+> 4. **ADR-006 S8 上线**:PDF/扫描件「逐行核对纠错」· 真扫描件 BBL2697 端到端通(needs_review→confirm-rows→重对账)。
+> 5. **OCR 改纯 credits 按量扣费**(Zihao 拍板:全平台只此一个套餐·0起步)· 删旧 plan/quota/key/trial 双闸 · 准入只看余额 · 新账号默认 plan='credits' · 图片按页扣 · 扣费传 history_id(usage-history 显示文件名)· 非发票不扣费 · 5 个 QA 验收问题全修+真账号验。
+> 6. **根因/数据修**:PyMuPDF 1.20.2→1.24.10(根治部署 pip 中断→python-docx 装不上→DOCX 500)· ocr_history.tenant_id 补存 · ensure_credits_tables 加 advisory lock 防 deadlock · make_searchable_pdf 守门降噪 · 异步对账进度副文案语言修(泰语界面显示中文)。
+> 7. **新铁律 #25**:Claude 自己跑测试-日志-修复-复测全闭环(不再把命令丢用户)· 详见 ADR-006 §9。
+> 8. 加了 `Bash(git push:*)` 权限(免每次「授权 push」)。
+>
+> **遗留(未做·诚实记录)**:① 200页后 ฿0.75/页 仅本地函数验证·未烧真实 OCR ② ocr_history 旧记录 tenant_id 仍 NULL(不回填·新记录已修)③ 整改审计 Phase1 剩余/Phase2-3 = Zihao 早前拍板暂缓/不做。
+>
+> ---
+> **(第十三会话)** · **🟢 通用模板学习层 ADR-006 S1–S6 全部完成并上线(v118.35.0.71 · recon-mapping.js?v=11835072)· 账单/总账 · Excel/CSV 新格式不再"解析失败" → 确认列一次 → 记住 → 下次自动 · 真站点 UI + 12 个大文件压测全过(抓修 5 个真 bug)· KTB/小现金零回归。**
 >
 > **⚠️ 下窗口接 S7/S8:单一权威源 = [`docs/refactor/adr-006-universal-importer.md`](../docs/refactor/adr-006-universal-importer.md)**(§6 进度+代码地图 · §7 S7 AI 建议接手指南 · §8 S8 PDF/图片接手指南 · §9 Zihao 测试方法论必照做 · §10 已修 bug 编年)。**S7=AI 低信心自动建议一次(hook 已留 `suggest_mapping_with_ai`)· S8=PDF/图片扫描件确认/纠错(机制不同 · 先摸现有 PDF 路径)。**
 >

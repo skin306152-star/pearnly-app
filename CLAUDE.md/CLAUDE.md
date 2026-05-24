@@ -577,6 +577,21 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 
 ---
 
+### 25. Claude 自己跑测试-修复-验证全闭环(2026-05-24 拍板 · 不再把命令丢给用户)
+
+**背景**:Zihao 2026-05-24 原话「下次自己跑测试,自己跑日志,自己修复,自己复测,自己修复」。以前 Claude 把 ssh/测试命令贴给用户手动跑,来回慢且割裂。现在 Claude 端到端自驱。
+
+**铁律(改 bug / 验功能时全程自己来)**:
+1. **自己 SSH 进生产抓真因**:报 500/异常 → `ssh root@45.76.53.194 "journalctl -u mrpilot --since '5 min ago' | grep -iE 'Error|Traceback'"` 抓真实栈,**不猜根因**(本轮 DOCX 500 即如此抓到 `ModuleNotFoundError: docx`)。只读诊断(查日志/查库/git push/跑脚本)自己跑;**仅 prod 写操作**(装包/重启/改数据)被安全闸拦时才请 Zihao 点一下。
+2. **自己跑真站点验**:真 token(找 Zihao 要·用完即弃·别提交)+ 真文件 + 真账号打 `pearnly.com` 真接口,自己读返回/扣费/余额/日志,**不靠 sync mock 蒙**(呼应铁律 #13)。
+3. **复测必在「重启后的新进程」上**:后端改动部署慢,`/api/version`=200 ≠ 新码生效 → 用 `systemctl show mrpilot -p ActiveEnterTimestamp` ≥ push 时间再复测(本轮踩过:旧进程上测出假结果)。
+4. **测真扣费/写库用唯一内容**:防文件指纹缓存命中导致复验失真(塞 nonce)。
+5. **测→修→复测→修,直到真站点真账号端到端 PASS**才算完。测出真 bug 必加守门测试(铁律 #21.7)。
+6. **诚实**:做不到/没测到直说,不画饼。
+> 详细测试方法论模板见 `docs/refactor/adr-006-universal-importer.md` §9(每片都照做)。
+
+---
+
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)
 
 **Pearnly 全局导航 = 跟着 `D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html` 走**

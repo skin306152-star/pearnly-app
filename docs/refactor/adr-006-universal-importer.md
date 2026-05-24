@@ -209,6 +209,15 @@ CREATE TABLE import_template_mappings (
 4. **测出真 bug 必加守门测试**锁住,防回归。
 5. **诚实**:做不到/没测到要直说,不画饼。
 
+**6. 🆕 Claude 自己跑全闭环(2026-05-24 Zihao 硬性升级 · 不再把命令丢给用户)**
+> 原话:「下次自己跑测试,自己跑日志,自己修复,自己复测,自己修复。」
+- **自己 SSH 进生产**查真实栈:报 500/异常 → `ssh root@45.76.53.194 "journalctl -u mrpilot --since '5 min ago' | grep -iE 'Error|Traceback|...'"` 抓真因,**不猜**(本轮 DOCX 500 就是这样抓到 `ModuleNotFoundError: docx`)。
+- **自己跑真站点验**:用真 token(找 Zihao 要,用完即弃·别提交)+ 真 QA 文件(`C:\tmp\pearnly_billing_acceptance\qa_invoice_*`)+ 真账号(如 AK)打 `pearnly.com` 真接口,自己读返回/扣费/余额/usage-history,**不靠 mock 蒙**。
+- **自己改生产 / 自己复测**:装包/重启/灰度,被安全闸拦时才请 Zihao 点一下(prod 写操作需显式授权);其余只读诊断、git push、跑脚本自己来。
+- **复测必在「重启后的新进程」上做**:后端改动部署慢(PyMuPDF 等),`/api/version` 返 200 ≠ 新码已生效 → 用 `systemctl show mrpilot -p ActiveEnterTimestamp` 判断重启时间 ≥ push 时间,再复测(本轮踩过:在旧进程上测出假结果)。
+- **测真扣费要用唯一内容**:同内容命中文件指纹缓存 → 不产生新扣费/流水 → 复验失真(CSV 里塞时间戳 nonce)。
+- **闭环判定**:测→修→复测→修,直到「真站点真账号端到端 PASS」才算完(本轮 5 个计费 bug 全照此闭环)。
+
 **当前已知边界/限制(诚实记录)**:
 - 噪声表头(F1/F2..)若余额链能数学证明列对应 → **自动读对**(不弹确认)· 这是对的(零摩擦);needs_mapping
   只在余额链证明不了时触发。

@@ -87,6 +87,39 @@ def _cleanup_on_fail(job_id: str):
         pass
 
 
+_EXCEL_EXTS = {".xlsx", ".xls", ".xlsm"}
+
+
+def _preflight_stmt_mapping(input_ref, scope_id):
+    """ADR-006 submit 同步预检:暂存的 Excel 银行账单是否需用户确认列对应。
+
+    返回 needs_mapping 响应 dict(交前端弹"确认列对应")· 或 None(都能理解 · 继续 enqueue)。
+    只检 Excel 银行账单(stmt)· PDF/图片不预检(走现有 OCR)· 毫秒级、不烧 Gemini。
+    """
+    try:
+        from bank_recon_v2 import parse_bank_stmt_xlsx_direct
+    except Exception:  # noqa: BLE001
+        return None
+    for ref in input_ref or []:
+        if ref.get("role") != "stmt":
+            continue
+        fn = ref.get("filename") or ""
+        ext = ("." + fn.lower().rsplit(".", 1)[-1]) if "." in fn else ""
+        if ext not in _EXCEL_EXTS:
+            continue
+        try:
+            with open(ref["path"], "rb") as f:
+                b = f.read()
+            res = parse_bank_stmt_xlsx_direct(b, fn, tenant_id=scope_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[preflight] {fn} skip: {e}")
+            continue
+        if res.get("needs_mapping"):
+            mr = res.get("mapping_request") or {}
+            return {"ok": False, "needs_mapping": True, "file": fn, **mr}
+    return None
+
+
 # ════ M4 银行对账 submit ════
 @router.post("/api/recon/bank-v2/submit")
 async def bank_v2_submit(
@@ -114,6 +147,12 @@ async def bank_v2_submit(
     try:
         input_ref = await _stage_uploads(job_id, stmt_files, "stmt", "statement.pdf")
         input_ref += await _stage_uploads(job_id, gl_files, "gl", "gl.xlsx")
+        # ADR-006 · 同步预检:新模板 Excel 账单先确认列对应(不建任务 · 不烧 Gemini)
+        _scope = str(tenant_id or user["id"])
+        nm = _preflight_stmt_mapping(input_ref, _scope)
+        if nm:
+            _cleanup_on_fail(job_id)
+            return nm
         params = {
             "user_id": str(user["id"]),
             "tenant_id": tenant_id,

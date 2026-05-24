@@ -48,6 +48,7 @@ from report_routes import router as reports_router  # v109.0
 from auth_signup import router as signup_router  # v109.3
 from recon_routes import router as recon_router  # v118.32.0
 from recon_jobs_routes import router as recon_jobs_router  # ADR-005 #15 · 对账异步 submit/状态
+from import_routes import router as import_router  # ADR-006 · 通用模板学习层 列映射接口
 from vat_excel_routes import router as vat_excel_router  # v118.32.4.9.5 · Excel 公式对账内测
 from notification_routes import router as notification_router  # REFACTOR-B1 · 2026-05-24
 from clients_routes import router as clients_router  # REFACTOR-B1 · 客户管理 5 路由 · 2026-05-24
@@ -855,6 +856,13 @@ exit 1
 
             _recon_store.ensure_table()
             _recon_worker.start_embedded()
+            # ADR-006 · 模板学习层映射表(启动自动建 · 失败自愈)
+            try:
+                from services.importer import template_store as _tmpl_store
+
+                _tmpl_store.ensure_table()
+            except Exception as _te:
+                logger.warning(f"[importer] ensure_table 失败(不影响主服务): {_te}")
         except Exception as e:
             logger.warning(f"[recon-worker] embedded 启动失败(不影响主服务): {e}")
 
@@ -1087,6 +1095,7 @@ app.include_router(
     admin_diagnostics_router
 )  # 阶段 5 Task 5.2 · admin diagnostics + internal/deploy* 5 路由(2026-05-22)
 app.include_router(recon_jobs_router)  # ADR-005 #15 · 对账异步 submit + 统一状态查询
+app.include_router(import_router)  # ADR-006 · 通用模板学习层 列映射接口
 # v118.35.0.28 P0-04 CORS 收紧 (体检 2026-05-21):
 # 旧 allow_origins=["*"] + allow_credentials=True 浏览器会自动拒绝凭据请求,
 # 但无凭据跨域 fetch 仍放行 · 收紧到生产白名单 + env 覆盖 + dev 自动放 localhost

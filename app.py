@@ -98,6 +98,7 @@ from route_helpers import (  # REFACTOR-B1 · 公共鉴权/日志/校验 helper(
     _plan_permissions,
     _require_owner_or_super,
     _require_super_admin,
+    _tid,
 )
 
 try:
@@ -3518,16 +3519,7 @@ async def _notify_large_invoice(
 # ─── API 端点 ───────────────────────────────────────────
 
 
-def _tid(user: dict) -> Optional[str]:
-    """v118.14 · 多租户共享:返回用户的 tenant_id 字符串(用于 db 函数过滤同 tenant 数据)
-    给 list_ocr_history / get_ocr_history_detail / find_ocr_by_hash 等的 tenant_id 参数使用
-    传了 → 同 tenant 所有成员共享数据(老板看员工的发票)
-    没传 / NULL → fallback 单 user 老逻辑(向前兼容)
-    """
-    if not user:
-        return None
-    tid = user.get("tenant_id")
-    return str(tid) if tid else None
+# _tid 已搬到 route_helpers.py(REFACTOR-B1 · 2026-05-25)· 顶部 from route_helpers import _tid
 
 
 def _check_history_access(user: dict):

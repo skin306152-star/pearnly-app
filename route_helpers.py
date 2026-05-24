@@ -14,6 +14,7 @@ billing_routes / admin_diagnostics_routes 改成从这里 import(去掉各自的
   不 import app.py · 防循环 import。
 
 覆盖:
+  _tid                       · 取 user 的 tenant_id 字符串(多租户共享过滤)
   _require_super_admin       · 超管守门(非超管 403)
   _require_owner_or_super    · 老板或超管(含懒建 tenant 兜底)
   _log_op                    · 写操作日志便捷函数
@@ -44,6 +45,21 @@ def _require_super_admin(request: Request) -> Dict[str, Any]:
             detail="admin.not_super_admin",
         )
     return user
+
+
+def _tid(user: dict) -> Optional[str]:
+    """v118.14 · 多租户共享:返回用户的 tenant_id 字符串(用于 db 函数过滤同 tenant 数据)
+    给 list_ocr_history / get_ocr_history_detail / find_ocr_by_hash 等的 tenant_id 参数使用
+    传了 → 同 tenant 所有成员共享数据(老板看员工的发票)
+    没传 / NULL → fallback 单 user 老逻辑(向前兼容)
+
+    REFACTOR-B1(2026-05-25):从 app.py 搬到 route_helpers ·
+    让 categories / connectors-status / erp-xero 等 router 抽出时可直接 import · 不再绑 app.py。
+    """
+    if not user:
+        return None
+    tid = user.get("tenant_id")
+    return str(tid) if tid else None
 
 
 def _get_client_ip(request):

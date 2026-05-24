@@ -103,7 +103,10 @@ CREATE TABLE import_template_mappings (
 | S5 | `static/recon-mapping.js` 列映射确认面板 · 真 UI E2E 通过 | ✅ 上线 |
 | S6a | CSV 银行账单(编码+分隔符 `_load_csv_sheets`)| ✅ 上线 |
 | S6b | GL 总账(`infer_gl_col_map` + `parse_gl_excel` 三层 + CSV + 单列净额)| ✅ 上线 |
-| S7 | AI 低信心自动建议一次(`suggest_mapping_with_ai` + 余额链/形状把关 + 缓存 + flag + `allow_ai` 门控)| 🟡 代码完成 · 离线守门测试 14+51 全绿 · **待 §9 真验(真 AI key + 真 UI)+ 部署** |
+| S7 | AI 低信心自动建议一次(`suggest_mapping_with_ai` + 余额链/形状把关 + 缓存 + flag + `allow_ai` 门控)| ✅ 上线 · 真 AI 已证(线上 GL medium→AI 补 doc_no→形状校验 1.0→保存 `source=ai`,AK 名下实证) |
+| S8a | PDF/扫描件「逐行核对纠错」基础层 `services/importer/stmt_review.py`(判定/转换/余额链/载荷)+ wire 进 worker(needs_review 闸)+ `confirm-rows` 重对账 | ✅ 上线 · 守门 13+3 · 完整单测 524 |
+| S8b | 前端核对面板 `static/recon-review.js`(可编辑表+余额链实时标色+完整性横幅)+ home.js 接线(needs_review→面板→修正行重对账)| ✅ 上线(11835073)|
+| S8c | 线上真验(真扫描件 BBL 2697 → needs_review → confirm-rows 重对账)| 🟡 `probes/s8_ui_e2e.py` 待部署落地后跑 |
 
 **真实/压测验证**:① 真实投诉件 `เงินสดย่อย`(泰文小现金)端到端真 UI 通过(162 行/平衡)· ② 12 个大文件
 压测(bank/GL · CSV/XLSX · 4000–15000 行)全过 · 性能 15000 行 2.1s。压测共抓出并修掉 5 个真 bug(见 §10)。
@@ -162,20 +165,30 @@ CREATE TABLE import_template_mappings (
 
 ---
 
-## 8. S8 接手指南 · PDF / 图片 / 扫描件
+## 8. S8 · PDF / 图片 / 扫描件「逐行核对纠错」(✅ 已实现 · 方案①「对账前核对关」)
 
-**与 Excel 列映射机制不同** —— PDF/图片没有固定列,由 Gemini/coords 整体读版面(已有 `parse_bank_statement_pdf`
-的 coords + Gemini 路径,本身不挑格式)。S8 不是"列映射",是 **OCR 结果的确认/纠错**:让用户对读出的行/列/
-期初期末做确认或修正。
+**机制**(不是列映射):PDF/图片账单走现有 OCR(`parse_bank_statement_pdf` 的 pdfplumber/coords/Gemini · 已带
+每行 `confidence` + `_audit_completeness` 完整性三闸)。**OCR 低信心或完整性不过 → 对账前插核对关**,把读出的行
+摆成可编辑表给用户核对/纠正、改完用修正行重对账。干净 OCR / Excel(走 S1–S7)→ 不触发,照旧自动对账(零摩擦)。
 
-**建议做法**(下个窗口先摸清现有 PDF 路径再定):
-- PDF/图片继续走现有 OCR(coords/Gemini),不强行套列映射面板。
-- 加一层"结果确认/纠错"UI:OCR 读完展示行表 + 可编辑(改金额/方向/期初期末)· 用户改完重算余额链。
-- 低信心(余额链对不上/缺页)时**主动弹确认**,而非静默出结果(守 0 静默错误)。
-- 可复用 `recon-mapping.js` 的面板骨架,但内容是"逐行核对/纠正"而非"列下拉"。
+**代码地图(S8)**:
+- `services/importer/stmt_review.py`(纯函数 · 不顶层 import bank_recon_v2):
+  `needs_review`(低信心行 或 完整性不过)· `statement_rows_to_review` / `review_rows_to_statement_rows`(行 ⇄ 可编辑 dict)·
+  `recompute_balance_chain` / `balance_chain_ok`(余额链逐行自检 · 单行错不级联)· `build_bank_review_payload`
+  (只挑 PDF/图片需核对件 · 多文件 idx 全局唯一 · 带完整性问题)。
+- `services/recon_jobs/store.py` `set_needs_review(job_id, payload)` —— 新状态 `needs_review` · 载荷存 `progress.review`(零 schema 改动)。
+- `services/recon_jobs/worker.py` `_run_one` —— 识别 handler 返回 `("__needs_review__", payload)` 哨兵 → `set_needs_review` + **保留暂存**(confirm 重对账要 gl 文件)。
+- `services/recon_jobs/handlers.py` `run_bank_recon` —— 扣费后/对账前插核对闸(`build_bank_review_payload` · 仅 PDF · 非确认重跑)· `confirmed_stmt_rows` 时跳 stmt OCR + 跳扣费(首次已扣)。
+- `recon_jobs_routes.py` —— GET `/api/recon/jobs/{id}` 返 `review` 载荷;`POST /api/recon/bank-v2/confirm-rows/{id}`:复制原暂存 gl→新任务 + 注入修正行重对账 · 原暂存随后清。
+- `static/recon-review.js` —— `window.ReconReview.show(payload, {token,lang,jobId,onConfirmed})` · 可编辑表 + 余额链实时绿/红 + 完整性大白话横幅(4 语)。
+- `home.js` —— `_reconPollJob` 在 needs_review 终止;`runRecon` 抽 `_processBankJob` 复用于初次 + 确认重对账。
+- 守门:`tests/unit/test_stmt_review.py`(13)· `test_s8_review_gate.py`(3:低信心 PDF→哨兵 / Excel→不触发 / 确认→跳闸)。
+- 线上真验:`probes/s8_ui_e2e.py`(真扫描件 → needs_review → confirm-rows 重对账)。
 
-**S8 风险**:大改交互 · 单独一阶段 · 不要和 S7 混。**先读** `bank_recon_v2.parse_bank_statement_pdf`
-(coords + Gemini)+ `_audit_completeness` + 缺页提示逻辑,理解现状再设计。
+**S8 v1 边界(诚实记录)**:
+- 只做**银行账单 PDF**(有余额链引导用户改对)· **GL 总账 PDF 暂不核对**(无余额链不可自证 · 留后续)。
+- confirm 重对账复用原暂存 gl 文件(Excel 免费 · gl 若 PDF 会重 OCR)· stmt 用修正行不重 OCR/不重扣费。
+- 多 stmt 文件混 Excel+PDF 的极端情形:confirm 以合并后修正行为准(v1 假设单 stmt 件常态)。
 
 ---
 
@@ -200,9 +213,9 @@ CREATE TABLE import_template_mappings (
 - 噪声表头(F1/F2..)若余额链能数学证明列对应 → **自动读对**(不弹确认)· 这是对的(零摩擦);needs_mapping
   只在余额链证明不了时触发。
 - 单列净额 GL 按"正=借 负=贷"约定拆 · 个别 GL 符号约定相反时可能反 · 余额链不可证(GL 无链)· 真遇到靠用户确认。
-- PDF/图片新格式 **不在 S1–S6 范围**(S8 才做)· 现走 OCR。
-- AI 建议(S7)**代码已实现 + 离线测试全绿**,但 §9『真 AI key + 真 UI』尚未跑(待 Zihao 给 key/token/边界文件 + 部署)·
-  在真验通过前不算上线。注:真 UI 验 S7 需先部署(Playwright 打 pearnly.com 跑的是线上版,本地改动需上线才生效)。
+- PDF/图片银行账单:**S8 已接「逐行核对纠错」**(OCR 低信心/不完整 → 对账前弹核对面板)· GL 总账 PDF 暂不核对(无余额链)。
+- AI 建议(S7)**已上线 + 真 AI 实证**(线上 GL medium → AI 补 doc_no → 形状校验 1.0 → 保存 `source=ai`)· 充值累计也线上验过。
+- S8 线上端到端(`probes/s8_ui_e2e.py`)· 干净/高信心扫描件不触发核对关(直接对账)· 低信心/缺页才弹 —— 这是对的(零摩擦)。
 
 ## 10. 压测抓出并已修的真 bug(编年)
 1. 期初承前 `ยกยอดมา` 被当存款 + `รวมยอด` 合计行污染期末(真实小现金件)→ c2cd145。

@@ -400,6 +400,45 @@ body.admin-layout-body .lang-switching-overlay {
   display: none !important;
 }
 
+/* ============ 2026-05-24 · tab segmented control(客户/员工/操作日志 + 充值待审核/全部)
+   原样式只在 home.html 内联 <style> · admin SPA 引不到 → tab 是浏览器默认丑按钮。
+   按产品设计语言重做:暖灰 #f4f4f0 轨道 + 纯黑 #111 active 白胶囊 + 淡边框 #e8e8e3 ============ */
+.adm-tabs-bar {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: #f4f4f0;
+  border: 1px solid #e8e8e3;
+  border-radius: 9px;
+  margin-bottom: 16px;
+}
+.adm-tab {
+  padding: 7px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: #6b7280;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.adm-tab:hover {
+  color: #111111;
+}
+.adm-tab.active {
+  background: #fff;
+  color: #111111;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.06);
+}
+.adm-tab:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 1px;
+}
+
 /* ============ page-head-icon 复用(home.css 已定义 · 此处只是确保不被覆盖)============ */
 .admin-layout-main .page-head-icon {
   /* 沿用 home.css 11 轮视觉对齐的暖灰背景 · 不重复定义 */

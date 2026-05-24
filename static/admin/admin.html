@@ -5,8 +5,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pearnly · 平台后台</title>
-    <link rel="stylesheet" href="/static/home.css?v=11841097" />
-    <link rel="stylesheet" href="/static/admin/admin.css?v=11841097" />
+    <link rel="stylesheet" href="/static/home.css?v=11841099" />
+    <link rel="stylesheet" href="/static/admin/admin.css?v=11841099" />
     <script>
       // admin layout 标志 · home.js loadAll() 检测此 flag 走精简路径(不跑 home 渲染)
       window.PEARNLY_ADMIN_MODE = true;
@@ -157,6 +157,24 @@
             <path d="M11 13a3 3 0 013-3h2a3 3 0 013 3v3" />
           </svg>
           <span data-i18n="adm-sidebar-users">用户管理</span>
+        </a>
+        <a class="admin-layout-nav-item" data-admin-route="topup" href="/admin/topup">
+          <svg
+            viewBox="0 0 20 20"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="2.5" y="4" width="15" height="12" rx="2" />
+            <path d="M2.5 8h15" />
+            <path d="M6 12h3" />
+          </svg>
+          <span data-i18n="adm-sidebar-topup">充值审核</span>
         </a>
         <!-- v118.44.0.4 · 删除「返回普通视图」按钮(Earn 是超管 · 不该回普通用户视图 · 且老逻辑会死循环跳回 /admin/cost) -->
       </aside>
@@ -625,6 +643,50 @@
             <div id="adm-risk-content"></div>
           </div>
         </section>
+
+        <!-- ============ 充值审核(billing_routes credits 模式 · 接 /api/admin/credits/topup/*)============ -->
+        <section class="page" id="page-admin-topup">
+          <div class="page-head">
+            <div class="page-head-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="M3 10h18" />
+                <path d="M7 15h4" />
+              </svg>
+            </div>
+            <div class="page-head-text">
+              <h1 class="page-title" data-i18n="adm-topup-title">充值审核</h1>
+              <div class="page-subtitle" data-i18n="adm-topup-sub">
+                用户充值申请 · 核对转账截图后批准 · 批准即实时到账
+              </div>
+            </div>
+          </div>
+
+          <div class="adm-section">
+            <div class="adm-section-head">
+              <div class="adm-tabs-bar">
+                <button
+                  class="adm-tab active"
+                  data-adm-topup-status="pending"
+                  data-i18n="adm-topup-tab-pending"
+                >
+                  待审核
+                </button>
+                <button class="adm-tab" data-adm-topup-status="all" data-i18n="adm-topup-tab-all">
+                  全部
+                </button>
+              </div>
+            </div>
+            <div id="adm-topup-list"></div>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -633,8 +695,8 @@
 
     <!-- v118.44.0.7 救援版 · admin SPA 完全独立 · 不引 home.js(避开 30k 行屎山的 248 处 null bug)-->
     <!-- 轻量 i18n 字典(zh + th)· 暴露 window.ADMIN_I18N -->
-    <script src="/static/admin/admin-i18n.js?v=11841097"></script>
+    <script src="/static/admin/admin-i18n.js?v=11841099"></script>
     <!-- admin 主逻辑 · 鉴权 + 路由 + UI + 业务 fetch · 自包含 -->
-    <script src="/static/admin/admin.js?v=11841097" defer></script>
+    <script src="/static/admin/admin.js?v=11841099" defer></script>
   </body>
 </html>

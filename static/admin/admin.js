@@ -137,14 +137,17 @@
     function _resolveRoute() {
         const p = location.pathname;
         if (p === '/admin/users' || p === '/admin/users/') return 'users';
+        if (p === '/admin/topup' || p === '/admin/topup/') return 'topup';
         return 'cost';
     }
 
     function _switchView(route) {
         const costPage = document.getElementById('page-admin-cost');
         const usersPage = document.getElementById('page-admin-users');
+        const topupPage = document.getElementById('page-admin-topup');
         if (costPage) costPage.classList.toggle('active', route === 'cost');
         if (usersPage) usersPage.classList.toggle('active', route === 'users');
+        if (topupPage) topupPage.classList.toggle('active', route === 'topup');
         document
             .querySelectorAll('.admin-layout-nav-item[data-admin-route]')
             .forEach(function (el) {
@@ -152,6 +155,7 @@
             });
         if (route === 'cost') _renderCostPage();
         if (route === 'users') _renderUsersPage();
+        if (route === 'topup') _renderTopupPage();
     }
 
     function _bindSidebar() {
@@ -237,7 +241,9 @@
                 _applyI18n(lang);
                 _setLabel(lang);
                 popup.classList.remove('show');
-                if (location.pathname === '/admin/users') _renderUsersPage();
+                const _r = _resolveRoute();
+                if (_r === 'users') _renderUsersPage();
+                else if (_r === 'topup') _renderTopupPage();
                 else _renderCostPage();
             });
         });
@@ -1756,68 +1762,262 @@
         });
     };
 
-    // ============ v118.44.1 待审付款操作 ============
-    window.__admApprovePay = async function (id) {
+    // ============ 充值审核(credits 模式 · billing_routes /api/admin/credits/topup/*)============
+    // 2026-05-24 重建:CLEANUP-PLAN-01/02 删了老 /api/admin/payments/* 审核但没重建管理端 UI →
+    // Earn 后台看不到充值审核。这里接 billing_routes 新 topup 端点(list/approve/reject)。
+    let _topupStatus = 'pending';
+
+    async function _renderTopupPage() {
+        const wrap = document.getElementById('adm-topup-list');
+        if (!wrap) return;
+        // 状态 tab 只绑一次(page section 常驻 DOM)
+        document
+            .querySelectorAll('#page-admin-topup [data-adm-topup-status]')
+            .forEach(function (b) {
+                if (b.__topupBound) return;
+                b.__topupBound = true;
+                b.addEventListener('click', function () {
+                    _topupStatus = b.dataset.admTopupStatus || 'pending';
+                    document
+                        .querySelectorAll('#page-admin-topup [data-adm-topup-status]')
+                        .forEach((x) => x.classList.toggle('active', x === b));
+                    _renderTopupPage();
+                });
+            });
+        wrap.innerHTML = '<div class="adm-empty">' + _esc(_t('billing-loading')) + '</div>';
+        const tok = localStorage.getItem('mrpilot_token');
+        let rows = [];
+        try {
+            const r = await fetch(
+                '/api/admin/credits/topup/requests?status=' + encodeURIComponent(_topupStatus),
+                { headers: { Authorization: 'Bearer ' + tok } }
+            );
+            if (!r.ok) throw new Error('http ' + r.status);
+            rows = await r.json();
+        } catch (e) {
+            wrap.innerHTML =
+                '<div class="adm-empty" style="color:#ef4444">' +
+                _esc(_t('adm-load-fail')) +
+                '</div>';
+            return;
+        }
+        if (!rows || !rows.length) {
+            wrap.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-topup-empty')) + '</div>';
+            return;
+        }
+        wrap.innerHTML = rows.map(_topupCard).join('');
+    }
+
+    function _topupStatusBadge(s) {
+        const map = {
+            pending: ['#b45309', '#fef3c7', _t('adm-topup-st-pending')],
+            approved: ['#047857', '#d1fae5', _t('adm-topup-st-approved')],
+            rejected: ['#b91c1c', '#fee2e2', _t('adm-topup-st-rejected')],
+        };
+        const m = map[s] || ['#374151', '#f3f4f6', s || ''];
+        return (
+            '<span style="font-size:11px;font-weight:600;color:' +
+            m[0] +
+            ';background:' +
+            m[1] +
+            ';padding:2px 8px;border-radius:999px">' +
+            _esc(m[2]) +
+            '</span>'
+        );
+    }
+
+    function _topupCard(t) {
+        const when = t.created_at ? new Date(t.created_at).toLocaleString() : '';
+        const who = _esc(t.tenant_name || t.username || t.email || '#' + t.id);
+        const sub = _esc([t.username, t.email].filter(Boolean).join(' · '));
+        const amt = _fmt(t.amount_thb || 0, 2);
+        const slipBtn = t.slip_path
+            ? '<button class="btn btn-ghost btn-sm" onclick="__admTopupSlip(\'' +
+              _esc(t.slip_path) +
+              '\')">' +
+              _esc(_t('adm-topup-view-slip')) +
+              '</button>'
+            : '<span style="font-size:12px;color:#9ca3af">' +
+              _esc(_t('adm-topup-no-slip')) +
+              '</span>';
+        const actions =
+            t.status === 'pending'
+                ? '<button class="btn btn-primary btn-sm" onclick="__admTopupApprove(' +
+                  t.id +
+                  ',' +
+                  (t.amount_thb || 0) +
+                  ')">' +
+                  _esc(_t('adm-topup-approve')) +
+                  '</button>' +
+                  '<button class="btn btn-danger btn-sm" onclick="__admTopupReject(' +
+                  t.id +
+                  ')">' +
+                  _esc(_t('adm-topup-reject')) +
+                  '</button>'
+                : t.review_note
+                  ? '<span style="font-size:12px;color:#6b7280">' + _esc(t.review_note) + '</span>'
+                  : '';
+        return (
+            '<div style="background:#fff;border:1px solid #e8e8e3;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">' +
+            '<div style="flex:1 1 200px;min-width:160px">' +
+            '<div style="font-weight:700;color:#111">' +
+            who +
+            '</div>' +
+            (sub
+                ? '<div style="font-size:12px;color:#6b7280;margin-top:2px">' + sub + '</div>'
+                : '') +
+            (t.payer_name
+                ? '<div style="font-size:12px;color:#6b7280;margin-top:2px">' +
+                  _esc(_t('adm-topup-payer')) +
+                  ': ' +
+                  _esc(t.payer_name) +
+                  '</div>'
+                : '') +
+            (t.note
+                ? '<div style="font-size:12px;color:#6b7280;margin-top:2px">' +
+                  _esc(t.note) +
+                  '</div>'
+                : '') +
+            '</div>' +
+            '<div style="text-align:right;min-width:120px">' +
+            '<div style="font-size:20px;font-weight:800;color:#111">฿' +
+            amt +
+            '</div>' +
+            '<div style="font-size:11px;color:#9ca3af">' +
+            _esc(when) +
+            '</div>' +
+            '<div style="margin-top:4px">' +
+            _topupStatusBadge(t.status) +
+            '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+            slipBtn +
+            actions +
+            '</div>' +
+            '</div>'
+        );
+    }
+
+    window.__admTopupSlip = function (slipPath) {
+        const url = '/static/' + slipPath; // slip_path 形如 "slips/123.jpg"
+        const isPdf = /\.pdf$/i.test(slipPath);
+        const ov = document.createElement('div');
+        ov.style.cssText =
+            'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10001;display:flex;align-items:center;justify-content:center;padding:30px;cursor:pointer';
+        ov.innerHTML = isPdf
+            ? '<iframe src="' +
+              url +
+              '" style="width:90%;height:90%;border:0;border-radius:8px;background:#fff"></iframe>'
+            : '<img src="' + url + '" style="max-width:100%;max-height:100%;border-radius:8px">';
+        ov.addEventListener('click', () => ov.remove());
+        document.body.appendChild(ov);
+    };
+
+    window.__admTopupApprove = async function (id, defaultAmt) {
+        const res = await _admTopupApproveModal(defaultAmt);
+        if (!res) return;
         const tok = localStorage.getItem('mrpilot_token');
         try {
-            const r = await fetch('/api/admin/payments/' + id + '/review?action=approve', {
+            const r = await fetch('/api/admin/credits/topup/approve/' + id, {
                 method: 'POST',
-                headers: { Authorization: 'Bearer ' + tok },
+                headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actual_amount_thb: res.amount, note: res.note || '' }),
             });
+            const d = await r.json().catch(() => ({}));
             if (r.ok) {
-                _toast(_t('adm-approved'), 'success');
-                _renderUsersPage();
-            } else _toast(_t('adm-action-fail'), 'error');
+                _toast(
+                    _t('adm-topup-approved-toast') +
+                        (d.new_balance != null ? ' · ฿' + _fmt(d.new_balance, 2) : ''),
+                    'success'
+                );
+                _renderTopupPage();
+            } else {
+                _toast((d && d.detail) || _t('adm-action-fail'), 'error');
+            }
         } catch (e) {
             _toast(_t('adm-action-fail'), 'error');
         }
     };
-    window.__admRejectPay = async function (id) {
-        const ok = await _admConfirm(_t('adm-confirm-reject'), {
+
+    window.__admTopupReject = async function (id) {
+        const ok = await _admConfirm(_t('adm-topup-reject-confirm'), {
             danger: true,
-            title: _t('adm-reject'),
+            title: _t('adm-topup-reject'),
         });
         if (!ok) return;
         const tok = localStorage.getItem('mrpilot_token');
         try {
-            const r = await fetch('/api/admin/payments/' + id + '/review?action=reject', {
+            const r = await fetch('/api/admin/credits/topup/reject/' + id, {
                 method: 'POST',
-                headers: { Authorization: 'Bearer ' + tok },
+                headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note: '' }),
             });
             if (r.ok) {
-                _toast(_t('adm-rejected'), 'success');
-                _renderUsersPage();
+                _toast(_t('adm-topup-rejected-toast'), 'success');
+                _renderTopupPage();
             } else _toast(_t('adm-action-fail'), 'error');
         } catch (e) {
             _toast(_t('adm-action-fail'), 'error');
         }
     };
-    window.__admViewSlip = async function (id) {
-        const tok = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch('/api/admin/payments/' + id + '/screenshot', {
-                headers: { Authorization: 'Bearer ' + tok },
-            });
-            if (!r.ok) {
-                _toast(_t('adm-load-fail'), 'error');
-                return;
-            }
-            const blob = await r.blob();
-            const url = URL.createObjectURL(blob);
+
+    // 批准弹窗:确认/修改实际到账金额 + 备注 · 返回 {amount, note} 或 null
+    function _admTopupApproveModal(defaultAmt) {
+        return new Promise((resolve) => {
+            const old = document.getElementById('adm-topup-approve-modal');
+            if (old) old.remove();
             const ov = document.createElement('div');
-            ov.style.cssText =
-                'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10001;display:flex;align-items:center;justify-content:center;padding:30px;cursor:pointer';
+            ov.id = 'adm-topup-approve-modal';
+            ov.className = 'cpw-forgot-overlay';
             ov.innerHTML =
-                '<img src="' + url + '" style="max-width:100%;max-height:100%;border-radius:8px">';
-            ov.addEventListener('click', () => {
-                URL.revokeObjectURL(url);
-                ov.remove();
-            });
+                '<div class="cpw-forgot-modal" style="max-width:420px">' +
+                '<div class="cpw-forgot-head"><div class="cpw-forgot-title">' +
+                _esc(_t('adm-topup-approve-title')) +
+                '</div></div>' +
+                '<div class="cpw-forgot-body">' +
+                '<label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">' +
+                _esc(_t('adm-topup-actual-amount')) +
+                '</label>' +
+                '<input id="adm-topup-amt" type="number" step="0.01" min="0.01" value="' +
+                (Number(defaultAmt) || '') +
+                '" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;margin-bottom:12px">' +
+                '<label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">' +
+                _esc(_t('adm-topup-note')) +
+                '</label>' +
+                '<input id="adm-topup-note" type="text" maxlength="500" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">' +
+                '</div>' +
+                '<div class="cpw-forgot-foot">' +
+                '<button class="btn btn-ghost" id="adm-topup-cancel">' +
+                _esc(_t('confirm-cancel')) +
+                '</button>' +
+                '<button class="btn btn-primary" id="adm-topup-ok">' +
+                _esc(_t('adm-topup-approve')) +
+                '</button>' +
+                '</div></div>';
             document.body.appendChild(ov);
-        } catch (e) {
-            _toast(_t('adm-load-fail'), 'error');
-        }
-    };
+            const close = () => ov.remove();
+            ov.querySelector('#adm-topup-cancel').addEventListener('click', () => {
+                close();
+                resolve(null);
+            });
+            ov.querySelector('#adm-topup-ok').addEventListener('click', () => {
+                const amount = parseFloat(ov.querySelector('#adm-topup-amt').value);
+                if (!(amount > 0)) {
+                    _toast(_t('adm-topup-amount-invalid'), 'error');
+                    return;
+                }
+                const note = ov.querySelector('#adm-topup-note').value || '';
+                close();
+                resolve({ amount: amount, note: note });
+            });
+            ov.addEventListener('click', (e) => {
+                if (e.target === ov) {
+                    close();
+                    resolve(null);
+                }
+            });
+        });
+    }
 
     // ============ v118.44.1 员工 tab ============
     async function _loadAdmEmployees() {

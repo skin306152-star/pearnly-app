@@ -1,10 +1,44 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-24(**第十二会话**)· **🟢 B1 抽 route_helpers(公共鉴权/日志/校验 helper)· 去重 billing+admin_diagnostics 的拷贝 · app.py 9546→9417 · 解锁 team/history/admin · 全绿上线**
+> **最近更新**:2026-05-24(**第十二会话**)· **🔴 紧急:mrerp 银行对账 500 真因=服务器磁盘满(已修复+上线)· 🟡 异步大改地基已打好(待续做完)**
 >
-> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **8/10**(A3/A4 卡 Zihao 手动验证)· **B 阶段 ~1/10**(已抽 notification+clients+exceptions = 19 路由 + route_helpers 公共模块 · 10 个 *_routes.py/helper)· C 前端未动
+> **🚨 整顿/异步全部让位** · 当前最高优先级 = 把对账异步大改做完(下窗口接力 · 见下方"第十二会话"段)
 >
-> **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(M4 银行对账已闭环 · M1/M2/M3 暂缓等用户反馈)
+> **整顿期(REFACTOR_MASTER_PLAN.md)**:暂停(BUG>整顿)· A 阶段 **8/10** · B 阶段 ~1/10(notification+clients+exceptions+route_helpers)· C 前端未动
+>
+> **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)
+
+---
+
+## 🆕 2026-05-24 第十二会话 · mrerp 对账 500 彻查(磁盘满)+ 对账异步大改地基 · ⚠️⚠️ 下窗口必读必接
+
+### A. 核心 BUG 已彻底解决并上线 ✅(付费用户 mrerp 银行对账报 `Unexpected token '<', "<html>..." is not valid JSON`)
+
+**真因(一路排错 · 全靠数据非猜测)= 服务器 52G 硬盘 100% 满**:
+- 现象链:磁盘满 → Nginx 写不下上传文件请求体(`/var/lib/nginx/body/` `pwrite() failed (28: No space left on device)`)→ Nginx 返回 HTML 500 → 前端 `res.json()` 解析 HTML 抛 `Unexpected token '<'`。
+- **排错走过的弯路(教训记牢)**:先猜超时(❌ 是 500 不是 504)→ 猜大文件(❌ 文件才 226KB 文字版 · 本地全链路 2.25s 跑通)→ 猜内存 OOM(❌ 服务才占 190M/峰值 397M · dmesg 无 OOM)→ 本地 TestClient 跑完整路由 200(❌ 代码无 bug)→ 查 nginx 日志(默认 access/error.log 半夜轮转后 0 字节 · logrotate 没 reopen)→ **`error.log.1` 里抓到 `[crit] pwrite ... No space left on device`** = 铁证。
+- 罪魁:`/tmp` 堆 28G `pip-unpack-*`/`pip-install-*`(每次部署 pip 解压 torch ~2.7G 不清理 · 9 次累积撑爆)。
+- **已修复**:① 清 /tmp pip 残渣 100%→44%(对账当场复活 · Zihao 确认)② **铁律 #24** 入档 ③ git-deploy.sh 生成器(app.py L728)加部署后 `rm -rf /tmp/pip-*` + 磁盘体检(已上线 · 部署日志见 `disk usage after cleanup: 44%`)④ `nginx -s reopen` 恢复日志 ⑤ 每日 cron `/etc/cron.d/clean-tmp` 兜底 ⑥ `/root/.cache`(pip 缓存 5.4G)待清(`rm -rf /root/.cache`)。
+- **前端兜底已上线 v118.35.0.68**(`a4f10de`):`runRecon` 的 `res.json()` 加 try/catch · 非 JSON 响应显示友好 4 语 `brv2-err-server`(服务器繁忙/请稍后重试或分批上传)· 不再弹乱码。
+- **遗留小债**:每次部署 `pip install -r requirements.txt` 重编 **PyMuPDF** wheel 失败(非致命 · 不挡部署 · 但白跑+丢报错)· 回头钉版本/已装跳过。
+
+### B. 对账异步大改(ADR-005)· 地基已打好 · 剩余待做完 ⏳
+
+**为什么做**:三个对账(银行 bank-v2/run · 收入 gl-vat/run · 销项税 vat_excel/build)全是同步阻塞干等 · 慢任务占连接 · 多用户同时跑会拖垮。Zihao 拍板"做到端到端 100% · 不留半成品"。**(注:本次 500 真因是磁盘 · 不是同步阻塞 · 但异步对扛规模+体验仍值得做 · Zihao 要求做完。)**
+
+**已完成并入库(休眠安全 · 不影响线上)**:
+- `docs/refactor/adr-005-recon-async-jobs.md` —— 完整设计(单一权威源 · 下窗口先读)
+- Alembic `003_recon_jobs.py` —— `recon_jobs` 队列表(状态/进度/订单号 · 结果仍写老表)· **⚠️ 生产未建表**(git-deploy 不跑 alembic · 下窗口要手动 `alembic upgrade head` 或在 worker 启动时建)
+- `services/recon_jobs/store.py` —— 队列 CRUD(enqueue/claim_next SKIP LOCKED/update_progress/finish/fail/reclaim_stale/get/gc_old)
+- `services/recon_jobs/worker.py` —— 双模工人(embedded web内 + standalone)· 并发闸门 · 租约续期 · 暂存 GC · handler 注册表
+
+**剩余 4 步(下窗口做完)**:
+1. **#14 抽 run_***:`services/recon_jobs/handlers.py` —— 把 bank_v2_run/gl_vat_run/build_excel 的"解析+对账+写结果表"段抽成 `run_bank_recon/run_glvat/run_salesvat(params, input_ref, progress_cb)` 纯函数(0 改识别逻辑)· `register_handler` 接入 worker · 上传文件落盘暂存 `/opt/mrpilot/var/recon_jobs/<job_id>/`。**纯搬 · 守门测试锁行为**(本地已验证 bank 全链路 2.25s)。
+2. **#15 接口改 submit**:三个 run 接口 → 暂存文件+建 job+秒回 `{job_id}`(藏 `RECON_ASYNC` flag 后 · 默认可回滚回老同步)· 新增统一 `GET /api/recon/jobs/{id}` 返 status/progress/result_table/result_id/error_code。
+3. **#16 前端**:三个 run 前端 → submit→轮询 jobs/{id}→用 result_id 调现有结果接口渲染(渲染/导出/历史**不改**)· **Zihao 要求:不加进度条 · 在现有"转圈处理中"图标旁加"共 X/Y 页"实时进度**(两文件用连续编号区分 stmt→gl)· 三处 `.json()` 全加兜底(铁律 #1 · gl-vat/vat_excel 一并)· cache_bust+release_notes。
+4. **#17 测试+部署**:守门测试(生命周期/分发/SKIP LOCKED 并发/状态接口/端到端)+ 生产建表 + 启 embedded worker(单 1.9G 机内存够 · standalone 会双份 ML 内存慎用)+ 用 mrerp 真文件(`D:\Users\Skin\Desktop\银行对账需求\报错`)灰度验证端到端跑通。
+
+**关键约束**:embedded 工人优先(1.9G 内存机 standalone 会 OOM)· 结果写老表不动历史/导出 · RECON_ASYNC flag 可秒回滚 · 不碰 OCR/识别逻辑。
 
 ---
 

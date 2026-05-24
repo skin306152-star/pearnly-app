@@ -19061,6 +19061,67 @@ async function deleteEndpoint(endpointId) {
 })();
 
 /* ============================================================
+ * BUG-FIX-RECON-ASYNC #16 · 对账异步任务前端共用工具(三对账共用)
+ * submit 秒回 job_id → 轮询 GET /api/recon/jobs/{id} 到 done/failed →
+ * 用 result_id 调现有结果接口渲染。瞬时网络/网关错误容忍重试,只在超时/失败才停。
+ * ⚠️ 暂塞 home.js(全局 window 工具 · 三个 recon IIFE 共用)· 迁出 deadline = REFACTOR-C1
+ *    拆 home.js 时一并搬到 src/home/recon/job-poll.js(整顿期 C 阶段)。
+ * ============================================================ */
+(function () {
+    'use strict';
+    const _STAGE_LBL = {
+        parse:     { zh: '解析文件中', th: 'กำลังอ่านไฟล์', en: 'Parsing files', ja: 'ファイル解析中' },
+        report:    { zh: '读取报告中', th: 'กำลังอ่านรายงาน', en: 'Reading report', ja: 'レポート読込中' },
+        reconcile: { zh: '对账中',     th: 'กำลังกระทบยอด', en: 'Reconciling',   ja: '照合中' },
+        build:     { zh: '生成中',     th: 'กำลังสร้างไฟล์', en: 'Building',     ja: '作成中' },
+        persist:   { zh: '保存中',     th: 'กำลังบันทึก',   en: 'Saving',       ja: '保存中' },
+        done:      { zh: '完成',       th: 'เสร็จสิ้น',     en: 'Done',         ja: '完了' },
+    };
+    // 「转圈处理中」旁的实时进度文案 · parse 阶段显示「共 X/Y 个文件」(Zihao 拍板:不加进度条)
+    window._reconProgressText = function (progress, lang) {
+        progress = progress || {};
+        lang = lang || 'zh';
+        const stage = progress.stage || 'parse';
+        const lbl = (_STAGE_LBL[stage] || _STAGE_LBL.parse);
+        const label = lbl[lang] || lbl.en;
+        const total = progress.stage_total, done = progress.stage_done;
+        if (stage === 'parse' && Number.isFinite(total) && total > 0) {
+            const cntL = { zh: '共 {d}/{t} 个文件', th: '{d}/{t} ไฟล์', en: '{d}/{t} files', ja: '{d}/{t} ファイル' }[lang] || '{d}/{t} files';
+            return label + ' · ' + cntL.replace('{d}', done || 0).replace('{t}', total);
+        }
+        return label;
+    };
+    // 轮询任务到 done/failed · 返回最终 job(或 {status:'timeout'})。onProgress(progress, job) 每轮回调。
+    window._reconPollJob = async function (jobId, token, opts) {
+        opts = opts || {};
+        const intervalMs = opts.intervalMs || 1500;
+        const maxMs = opts.maxMs || 20 * 60 * 1000; // 20 分钟硬上限
+        const start = Date.now();
+        let softFails = 0;
+        for (;;) {
+            let job = null;
+            try {
+                const r = await fetch('/api/recon/jobs/' + encodeURIComponent(jobId), {
+                    headers: { 'Authorization': 'Bearer ' + token },
+                });
+                try { job = await r.json(); } catch (_) { job = null; }
+                if (!r.ok || !job || !job.ok) { job = null; }
+            } catch (_) { job = null; }
+            if (job) {
+                softFails = 0;
+                if (opts.onProgress) { try { opts.onProgress(job.progress || {}, job); } catch (_) {} }
+                if (job.status === 'done' || job.status === 'failed') return job;
+            } else {
+                // 瞬时错误容忍 · 连续 10 次(~15s)拿不到才放弃
+                if (++softFails >= 10) return { ok: false, status: 'failed', error_code: 'poll_unreachable' };
+            }
+            if (Date.now() - start > maxMs) return { ok: false, status: 'timeout', error_code: 'timeout' };
+            await new Promise(res => setTimeout(res, intervalMs));
+        }
+    };
+})();
+
+/* ============================================================
  * v118.33.6 · Bank Reconciliation v2 (Statement vs GL)
  * Two upload zones · 3-layer matching · Excel export
  * ============================================================ */
@@ -19492,28 +19553,50 @@ async function deleteEndpoint(endpointId) {
             if (Number.isFinite(aStmtOpen))  fd.append('stmt_opening_override', aStmtOpen);
             if (Number.isFinite(aGlOpen))    fd.append('gl_opening_override',   aGlOpen);
 
-            const res = await fetch('/api/recon/bank-v2/run', {
+            // BUG-FIX-RECON-ASYNC #16 · 改异步:submit 秒回 job_id → 轮询 → 用 result_id 取结果
+            const submitRes = await fetch('/api/recon/bank-v2/submit', {
                 method: 'POST',
                 headers: { 'Authorization': 'Bearer ' + token },
                 body: fd,
             });
             // v118.35.0.68 · 兜底:服务器返回非 JSON(网关 5xx/HTML 错误页 · 如磁盘满致 500)时
             //   res.json() 会抛 "Unexpected token '<'" · 不再原样弹给用户 · 改友好 4 语提示
-            let data = null;
-            try { data = await res.json(); } catch (_) { data = null; }
-
-            if (!res.ok || data === null) {
+            let sub = null;
+            try { sub = await submitRes.json(); } catch (_) { sub = null; }
+            if (!submitRes.ok || !sub || !sub.ok || !sub.job_id) {
                 showProgress(false);
-                if (data && (data.detail || data.error)) {
-                    // v118.35.0.23 · detail 可能是 {code,balance,...} 对象 · 用 _humanizeBackendError 防 [object Object]
-                    showError(_humanizeBackendError(data.detail || data.error, 'Error ' + res.status));
+                if (sub && (sub.detail || sub.error)) {
+                    showError(_humanizeBackendError(sub.detail || sub.error, 'Error ' + submitRes.status));
                 } else {
                     showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
                 }
                 return;
             }
 
-            // data.ok may be false (parse failure) but we still have parse_info to show
+            // 轮询后台任务 · 转圈旁实时显示「共 X/Y 个文件」
+            const _subEl = $('brv2-progress-sub');
+            const job = await window._reconPollJob(sub.job_id, token, {
+                onProgress: (p) => { if (_subEl) _subEl.textContent = window._reconProgressText(p, lang); },
+            });
+            if (!job || job.status !== 'done' || !job.result_id) {
+                showProgress(false);
+                showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
+                return;
+            }
+
+            // 用 result_id 调现有结果接口(GET 已补齐顶层 stats/parse_info/warnings · 与同步跑同源)
+            const res = await fetch('/api/recon/bank-v2/' + encodeURIComponent(job.result_id), {
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            let data = null;
+            try { data = await res.json(); } catch (_) { data = null; }
+            if (!res.ok || data === null || !data.ok) {
+                showProgress(false);
+                showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
+                return;
+            }
+
+            // 多账户文件:GET 不回传 gl_accounts 列表 · 单账户(绝大多数)无影响
             if ((data.gl_accounts || []).length > 1) {
                 populateAcctSelect(data.gl_accounts);
             }
@@ -31884,20 +31967,42 @@ window.addEventListener('DOMContentLoaded', () => {
                 || localStorage.getItem('mrpilot_lang') || 'th';
             fd.append('lang', _curLang);
 
-            const res = await fetch('/api/vat_excel/build', {
+            // BUG-FIX-RECON-ASYNC #16 · 改异步:submit 秒回 job_id → 轮询 → 取结果 + 下载已生成 Excel
+            const _vexTok = localStorage.getItem('mrpilot_token') || '';
+            const submitRes = await fetch('/api/vat_excel/submit', {
                 method: 'POST', headers: _authHeader(), body: fd,
             });
-            clearInterval(_tick);
-            if (!res.ok) {
-                let msg = res.status + '';
-                try { const j = await res.json(); msg = j.detail || msg; } catch(e) {}
-                throw new Error(msg);
+            // 兜底:网关非 JSON 错误页不再抛 "Unexpected token '<'"
+            let sub = null;
+            try { sub = await submitRes.json(); } catch (e) { sub = null; }
+            if (!submitRes.ok || !sub || !sub.ok || !sub.job_id) {
+                clearInterval(_tick);
+                throw new Error((sub && sub.detail) || ('HTTP ' + submitRes.status));
             }
-            const ok     = parseInt(res.headers.get('X-Vex-Invoices-Ok')    || '0', 10);
-            const fail   = parseInt(res.headers.get('X-Vex-Invoices-Fail') || '0', 10);
-            const rows   = parseInt(res.headers.get('X-Vex-Report-Rows')   || '0', 10);
-            const ms     = parseInt(res.headers.get('X-Vex-Elapsed-Ms')    || '0', 10);
-            const taskId = res.headers.get('X-Vex-Task-Id') || '';
+            // 轮询 · 转圈旁实时显示「共 X/Y 个文件」
+            const _vexSub = $('vex-progress-sub');
+            const job = await window._reconPollJob(sub.job_id, _vexTok, {
+                onProgress: (p) => { if (_vexSub) _vexSub.textContent = window._reconProgressText(p, _curLang); },
+            });
+            clearInterval(_tick);
+            if (!job || job.status !== 'done' || !job.result_id) {
+                throw new Error(t('vex-toast-fail') || '生成失败');
+            }
+            const taskId = job.result_id;
+
+            // 取任务结果拿失败计数(预览面板另行填充)
+            let fail = 0;
+            try {
+                const tr = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(taskId), { headers: _authHeader() });
+                let raw = (await tr.json()).raw_data_json;
+                if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { raw = {}; } }
+                raw = raw || {};
+                fail = Math.max(0, parseInt(raw.n_total || 0, 10) - parseInt(raw.n_ok || 0, 10));
+            } catch (e) { /* 计数取不到不致命 */ }
+
+            // 下载已生成的 Excel(GET 需带 token · 用 fetch+blob · 裸 <a href> 不会带 Authorization)
+            const res = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(taskId) + '/download', { headers: _authHeader() });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             const cd = res.headers.get('Content-Disposition') || '';
             const m  = cd.match(/filename="([^"]+)"/);
             const fname = (m && m[1]) || ('vat_recon_' + Date.now() + '.xlsx');
@@ -32960,13 +33065,33 @@ window.addEventListener('DOMContentLoaded', () => {
         fd.append('lang', _lang());  // v118.32.5 · 后端按 lang 返回错误消息
 
         try {
-            const res = await fetch('/api/recon/gl-vat/run', {
+            // BUG-FIX-RECON-ASYNC #16 · 改异步:submit 秒回 job_id → 轮询 → 用 result_id 取结果
+            const submitRes = await fetch('/api/recon/gl-vat/submit', {
                 method: 'POST',
                 headers: _authH(),
                 body: fd,
             });
-            const data = await res.json();
-            if (!res.ok || !data.ok) {
+            // 兜底:网关非 JSON 错误页不再抛 "Unexpected token '<'"
+            let sub = null;
+            try { sub = await submitRes.json(); } catch (_) { sub = null; }
+            if (!submitRes.ok || !sub || !sub.ok || !sub.job_id) {
+                throw new Error((sub && sub.detail) || (sub && sub.error) || ('HTTP ' + submitRes.status));
+            }
+            // 轮询 · 转圈旁实时显示「共 X/Y 个文件」
+            const _glvSub = $('glv-progress-sub');
+            const job = await window._reconPollJob(sub.job_id, _token(), {
+                onProgress: (p) => { if (_glvSub) _glvSub.textContent = window._reconProgressText(p, _lang()); },
+            });
+            if (!job || job.status !== 'done' || !job.result_id) {
+                throw new Error(_t('error') || 'Error');
+            }
+            // 用 result_id 调现有结果接口(GET 形状与 run 一致)
+            const res = await fetch('/api/recon/gl-vat/' + encodeURIComponent(job.result_id), {
+                headers: _authH(),
+            });
+            let data = null;
+            try { data = await res.json(); } catch (_) { data = null; }
+            if (!res.ok || !data || !data.ok) {
                 throw new Error((data && data.detail) || (data && data.error) || ('HTTP ' + res.status));
             }
             STATE.currentTaskId = data.task_id;

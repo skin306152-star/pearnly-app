@@ -5774,10 +5774,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "已修复『对账中心』上传文件时偶发的异常提示问题,对账功能恢复正常使用。\n\n此外,当系统繁忙或暂时无法处理时,会显示更清晰的提示,引导您稍后重试或将文件分批上传,不再出现看不懂的报错。\n\n即日生效。",
-            "th": "แก้ไขปัญหาการแจ้งข้อผิดพลาดที่เกิดขึ้นบางครั้งขณะอัปโหลดไฟล์ใน『ศูนย์กระทบยอด』แล้ว ใช้งานได้ตามปกติ\n\nนอกจากนี้ เมื่อระบบไม่ว่างหรือไม่สามารถประมวลผลได้ชั่วคราว จะแสดงข้อความที่ชัดเจนขึ้น เพื่อแนะนำให้ลองใหม่ภายหลังหรืออัปโหลดไฟล์ทีละชุด ไม่มีข้อความแสดงข้อผิดพลาดที่เข้าใจยากอีกต่อไป\n\nมีผลทันที",
-            "en": "Fixed an intermittent error that could appear when uploading files in the Reconciliation Center; the feature now works normally again.\n\nIn addition, when the system is busy or temporarily unable to process, it now shows a clearer message guiding you to retry shortly or upload files in smaller batches — no more confusing error text.\n\nEffective immediately.",
-            "ja": "『照合センター』でファイルをアップロードする際にまれに表示されていたエラーを修正し、正常にご利用いただけるようになりました。\n\nまた、システムが混雑中または一時的に処理できない場合は、しばらくして再試行するか、ファイルを分割してアップロードするよう促す、分かりやすいメッセージを表示します。分かりにくいエラー表示はなくなりました。\n\n即日有効。",
+            "zh": "『对账中心』(银行对账、收入对账、销项税对账)已升级处理方式:上传文件后系统立即开始后台处理,期间可继续操作其他功能,大文件不再出现卡住或长时间等待。处理过程中会实时显示已处理的文件进度。\n\n即日生效。",
+            "th": "『ศูนย์กระทบยอด』(กระทบยอดธนาคาร กระทบยอดรายได้ และกระทบยอดภาษีขาย)ได้ปรับปรุงวิธีประมวลผล หลังอัปโหลดไฟล์ ระบบจะเริ่มประมวลผลเบื้องหลังทันที สามารถใช้งานฟังก์ชันอื่นต่อได้ ไฟล์ขนาดใหญ่จะไม่ค้างหรือรอนานอีกต่อไป และจะแสดงความคืบหน้าของไฟล์ที่ประมวลผลแล้วแบบเรียลไทม์\n\nมีผลทันที",
+            "en": "The Reconciliation Center (bank, revenue, and output-VAT reconciliation) has an improved processing method: after you upload files, the system starts processing in the background immediately so you can continue using other features, and large files no longer freeze or keep you waiting. Real-time progress of processed files is shown during processing.\n\nEffective immediately.",
+            "ja": "『照合センター』(銀行照合・収入照合・売上VAT照合)の処理方式を改善しました。ファイルをアップロードすると、システムがすぐにバックグラウンドで処理を開始するため、その間も他の機能を続けてご利用いただけます。大きなファイルでも固まったり長く待たされたりすることがなくなり、処理済みファイルの進捗をリアルタイムで表示します。\n\n即日有効。",
         },
     }
 

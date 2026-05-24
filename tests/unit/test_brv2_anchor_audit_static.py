@@ -87,12 +87,19 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
         )
         self.assertIsNotNone(m, "bank_v2_get_task function not found in recon_routes.py")
         body = m.group(0)
-        # 必须 return 含 summary 字段(_safe_json + 完整 task summary_json)
+        # 必须 return 完整 summary(不经 pydantic 过滤掉 _anchor_overrides)。
+        # BUG-FIX-RECON-ASYNC #16 起 · summary 先 _safe_json 成 var 再原样返回(并顺带从中
+        # 还原顶层 stats/parse_info/warnings)· 这里校验「全量解析 + 原样返回」两点都在。
         self.assertIn(
-            '"summary": _safe_json(task.get("summary_json"))',
+            'summary = _safe_json(task.get("summary_json"))',
             body,
-            "bank_v2_get_task must return full summary_json (not filtered through pydantic) — "
+            "bank_v2_get_task must parse the full summary_json (not filtered through pydantic) — "
             "P0.3 anchor audit panel depends on summary._anchor_overrides",
+        )
+        self.assertIn(
+            '"summary": summary',
+            body,
+            "bank_v2_get_task must return the full summary unchanged (not a filtered subset)",
         )
 
     def test_get_export_route_forwards_anchor_overrides(self):

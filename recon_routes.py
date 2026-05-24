@@ -2069,6 +2069,11 @@ async def bank_v2_get_task(task_id: int, request: Request):
                 return v
         return v
 
+    summary = _safe_json(task.get("summary_json")) or {}
+    summary = summary if isinstance(summary, dict) else {}
+    # BUG-FIX-RECON-ASYNC #16 · 把 run 响应里的顶层 stats / parse_info / warnings 从 summary_json
+    # 还原出来 · 让"按 id 取结果"(异步完成 + 历史载入)渲染跟同步跑一模一样(不丢解析诊断表/
+    # 警告条/未匹配 KPI)· summary_json = asdict(BankReconSummary),含所有 *_count 字段。
     return {
         "ok": True,
         "task_id": task["id"],
@@ -2079,17 +2084,29 @@ async def bank_v2_get_task(task_id: int, request: Request):
         "stmt_row_count": task.get("stmt_row_count"),
         "gl_row_count": task.get("gl_row_count"),
         "stats": {
-            "matched": task.get("matched_count") or 0,
+            "matched": summary.get("matched_count", task.get("matched_count") or 0),
+            "gl_debit_only": summary.get("gl_debit_only_count", 0),
+            "gl_credit_only": summary.get("gl_credit_only_count", 0),
+            "stmt_withdrawal_only": summary.get("stmt_withdrawal_only_count", 0),
+            "stmt_deposit_only": summary.get("stmt_deposit_only_count", 0),
+            "total": (task.get("matched_count") or 0)
+            + (task.get("unmatched_gl") or 0)
+            + (task.get("unmatched_stmt") or 0),
+            "formula_diff": summary.get("formula_diff", task.get("formula_diff") or 0),
+            # 兼容老调用方(历史抽屉等可能读旧字段名)
             "unmatched_gl": task.get("unmatched_gl") or 0,
             "unmatched_stmt": task.get("unmatched_stmt") or 0,
         },
+        # 顶层 parse_info / warnings(renderResults 从顶层读)· 落库时存在 summary 里
+        "parse_info": summary.get("_parse_info"),
+        "warnings": summary.get("_brv2_warnings") or [],
         "stmt_opening": float(task.get("stmt_opening") or 0),
         "stmt_closing": float(task.get("stmt_closing") or 0),
         "gl_opening": float(task.get("gl_opening") or 0),
         "gl_closing": float(task.get("gl_closing") or 0),
         "formula_diff": float(task.get("formula_diff") or 0),
         "detail": _safe_json(task.get("detail_json")),
-        "summary": _safe_json(task.get("summary_json")),
+        "summary": summary,
         "created_at": str(task.get("created_at") or ""),
     }
 

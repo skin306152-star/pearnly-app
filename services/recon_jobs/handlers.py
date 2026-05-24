@@ -188,7 +188,9 @@ def run_bank_recon(
                 gl_closing=0,
                 formula_diff=0,
                 detail_json=[],
-                summary_json={},
+                # #16 · 存 parse_info 进 summary · 让失败任务的 GET 也能显示解析诊断表
+                #       (前端按 id 取结果时 renderResults 从 summary._parse_info 还原)
+                summary_json={"_parse_info": parse_info},
             )
         except Exception:  # noqa: BLE001
             return None

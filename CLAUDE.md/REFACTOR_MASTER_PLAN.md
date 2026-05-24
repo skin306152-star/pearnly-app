@@ -99,14 +99,16 @@
 
 ### 代码规模(7 项)
 
+> **行数目标分两层**:先达成"验收目标",能自然继续拆且职责更清晰时再冲"冲刺目标"。不允许为了凑行数制造过度抽象、空壳文件或跳转地狱。
+
 | 文件 | 当前(2026-05-22) | 目标 | 备注 |
 |---|---|---|---|
-| `home.js` | 33,251 行 | < 200 行(入口 + bootstrap) | 业务逻辑全拆到 `static/home/*` 50-100 个模块 |
-| `app.py` | 9,212 行 | < 500 行(init + middleware) | 业务路由全拆到 20-30 个 `*_routes.py` |
-| `db.py` | **9,255 行** | < 500 行(cursor + pool + 框架) | 业务 SQL 迁到 `services/<domain>/<feature>.py` · 实际比估的大 2 倍 |
-| `home.css` | **16,124 行** | < 500 行(变量 + reset) | component CSS 拆 20-30 个 · 实际比估的大 2 倍 |
-| `home.html` | 6,568 行 | < 1,000 行 | 组件化或服务端拼接 |
-| 模块文件数 | ~10 | 50-100 个 `static/home/*.js` + 20-30 个 `*_routes.py` + 10+ `services/*.py` + 20-30 component CSS | "Google 级"标志 |
+| `home.js` | 33,251 行 | 验收 < 200 行 / 冲刺 < 120 行(入口 + bootstrap) | 业务逻辑全拆到 `src/home/*` 50-100 个模块 |
+| `app.py` | 9,212 行 | 验收 < 500 行 / 冲刺 < 300 行(init + middleware) | 业务路由全拆到 20-30 个 `*_routes.py` |
+| `db.py` | **9,255 行** | 验收 < 500 行 / 冲刺 < 300 行(cursor + pool + 框架) | 业务 SQL 迁到 `services/<domain>/<feature>.py` · 实际比估的大 2 倍 |
+| `home.css` | **16,124 行** | 验收 < 500 行 / 冲刺 < 250 行(变量 + reset) | component CSS 拆 20-30 个 · 实际比估的大 2 倍 |
+| `home.html` | 6,568 行 | 验收 < 1,000 行 / 冲刺 < 500 行 | 组件化或服务端拼接 |
+| 模块文件数 | ~10 | 50-100 个 `src/home/*.js` + 20-30 个 `*_routes.py` + 10+ `services/*.py` + 20-30 component CSS | "Google 级"标志 |
 | 单文件平均 | 巨大 | 100-300 行 | 超 500 行 = 拆 |
 
 ### 质量(8 项)
@@ -178,8 +180,8 @@
 
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
-| B1 | `app.py` 拆完 9k → < 500 行(20-30 个 router) | 4-6 周 | A1, A5 | 🟡 进行中 · 已抽 3 个 router:notification(6 路由 `c0b29eb`)+ clients(5 路由 `f27ac38`)+ exceptions(8 路由 `30f114f`)· app.py 10075→**9546** · 三个均生产 /api/version 存活验证 ✓ · 守门测试各带 contract · ⚠️ clients 那次把 app.py 从 CRLF 误转 LF(一次性全文件 diff `f27ac38` · force-push 是红线未回改 · 此后 app.py 统一 LF · diff 已干净)· **下一组**:team(7 路由 · 需先抽公共 helper 模块 `_require_owner_or_super`/`_log_op`)、history(7 路由 · 依赖 `_async_run_exception_checks`/`_check_history_access` 较缠) |
-| B2 | `db.py` 拆完 4k → < 500 行(业务 SQL 迁 `services/`) | 3-4 周 | A1 | ⚪ |
+| B1 | `app.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(20-30 个 router) | 4-6 周 | A1, A5 | 🟡 进行中 · **已抽 8 个 router**:notification(6 `c0b29eb`)+ clients(5 `f27ac38`)+ exceptions(8 `30f114f`)+ **team(7 `b95372d`)+ erp_mappings(12 `0e17fa4`)+ email_ingest(6 `8358b72`)+ rd(4 `8fa55f7`)+ settings/archive+dup-check(5 `7686259`)** · 另把 `_plan_permissions` 搬进 route_helpers(`870290c` · 解锁 rd/archive/history)· **app.py 10075→9546→8589**(本会话 9350→8589 · 净 -761 · 34 路由)· 每组带 contract test(unit 530→552)· 守门 imports/i18n/unit/black/ruff 全绿 · LF 全程保持干净(逐次校验 CRLF=0)· ⚠️ **2026-05-25 会话:6 commit 全留本地未 push**(Zihao 指示)· **下一组**:history(7 路由 · 依赖 `_async_run_exception_checks`/`_check_history_access`→现 `_plan_permissions` 已在 route_helpers · 评估剩余 entangle)、`/api/bank-recon/*`、`/api/erp/*`(endpoints/push/logs)、`/api/admin/*` 大组 |
+| B2 | `db.py` 拆完 4k → 验收 < 500 行 / 冲刺 < 300 行(业务 SQL 迁 `services/`) | 3-4 周 | A1 | ⚪ |
 | B3 | 所有 `ensure_*` 迁 Alembic(25 个 · schema 完全版本化) | 3-4 周 | A2 | ⚪ |
 | B4 | 健康检查端点 `/health` + `/ready`(DB / Gemini / SMTP / LINE 各 check) | 半天 | — | ⚪ |
 | B5 | API 全局限流(每 IP / 每用户 / 每 endpoint · 比现有 PLG 反薅闸更全) | 1-2 天 | — | ⚪ |
@@ -189,7 +191,7 @@
 | B9 | DB 索引审计(EXPLAIN 慢查询 · 加缺索引 · 删没用的) | 2-3 天 | — | ⚪ |
 | B10 | DB 连接池调优(psycopg2 pool size + lifecycle) | 半天 | — | ⚪ |
 
-**B 阶段完成判定**:`app.py` < 500 行 / `db.py` < 500 行 / 25 个 ensure_* 全迁 Alembic / 4 个新端点端 + RLS / 9 个新机制全上线
+**B 阶段完成判定**:`app.py` / `db.py` 达到验收 < 500 行；若继续拆能让职责更清晰,冲刺 < 300 行 / 25 个 ensure_* 全迁 Alembic / 4 个新端点端 + RLS / 9 个新机制全上线
 
 ---
 
@@ -197,16 +199,16 @@
 
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
-| C1 | `home.js` 拆完 33k → < 200 行(50-100 个 ES module · 每个 100-300 行) | 6-8 周 | A1 | 🟡 部分(已抽 dashboard + billing) |
-| C2 | `home.css` 拆完 7k → < 500 行(20-30 个 component CSS) | 2-3 周 | A1 | ⚪ |
-| C3 | `home.html` 拆 6.5k → < 1000 行(`<template>` 或服务端拼接) | 2 周 | C1 | ⚪ |
+| C1 | `home.js` 拆完 33k → 验收 < 200 行 / 冲刺 < 120 行(50-100 个 ES module · 每个 100-300 行) | 6-8 周 | A1 | 🟡 部分(已抽 dashboard + billing) |
+| C2 | `home.css` 拆完 7k → 验收 < 500 行 / 冲刺 < 250 行(20-30 个 component CSS) | 2-3 周 | A1 | ⚪ |
+| C3 | `home.html` 拆 6.5k → 验收 < 1000 行 / 冲刺 < 500 行(`<template>` 或服务端拼接) | 2 周 | C1 | ⚪ |
 | C4 | Design System / 组件库(按钮 / 输入框 / Modal / Toast / Card / Table 抽通用 component) | 3-4 周 | C1 | ⚪ |
 | C5 | TypeScript 化前端(vanilla JS → TS · 80%+) | 4-6 周 · 跟 C1 并行 | A1 | ⚪ |
 | C6 | i18n 拆 .json(home.js 4 个翻译块各 2324 keys → `i18n/<lang>.json` + 按模块再拆) | 1-2 周 | C1 | ⚪ |
 | C7 | 可访问性 a11y(WCAG 2.1 AA · 屏幕阅读器 / 键盘导航 / 对比度) | 2-3 周 | C4 | ⚪ |
 | C8 | 移动端真适配(iPhone / Pixel 真测 · 触控目标 / 字号 / 横滚动) | 1-2 周 | C2 | ⚪ |
 
-**C 阶段完成判定**:`home.js` < 200 行 / `home.css` < 500 行 / `home.html` < 1000 行 / Design System 至少 8 个通用 component / TS 化 80%+ / i18n 拆到 .json / a11y AA / 移动端 4 浏览器全测过
+**C 阶段完成判定**:`home.js` / `home.css` / `home.html` 先达到验收目标；若继续拆能让职责更清晰,再冲刺更小目标 / Design System 至少 8 个通用 component / TS 化 80%+ / i18n 拆到 .json / a11y AA / 移动端 4 浏览器全测过
 
 ---
 
@@ -303,7 +305,7 @@
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
-| B 后端 | 🟡 0.5/10 | B1 已抽 notification+clients+exceptions(19 路由)`c0b29eb`/`f27ac38`/`30f114f` | 依赖 A1/A5 已满足 · app.py 10075→**9546** · 已有 **9** 个 *_routes.py · 顺手清死代码 ExceptionResolvePayload |
+| B 后端 | 🟡 1/10 | B1 已抽 8 router(53 路由)· app.py 10075→**8589** | 2026-05-25 会话 +5 router(team/erp_mappings/email_ingest/rd/settings)+ `_plan_permissions`→route_helpers · 本会话 app.py 9350→8589(-761)· 已有 **14** 个 *_routes.py · unit 530→552 · ⚠️ 本会话 6 commit 全留本地未 push(b95372d/0e17fa4/8358b72/870290c/8fa55f7/7686259) |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |
@@ -441,12 +443,12 @@ python scripts/refactor_progress.py
 
 ```
 # 代码规模 7 项
-[ ] home.js < 200 行
-[ ] app.py < 300 行
-[ ] db.py < 300 行
-[ ] home.css < 300 行
-[ ] home.html < 700 行
-[ ] 模块文件数 ≥ 100(50+ static/home/*.js + 20+ *_routes.py + 10+ services/ + 20+ component CSS)
+[ ] home.js 验收 < 200 行 / 冲刺 < 120 行
+[ ] app.py 验收 < 500 行 / 冲刺 < 300 行
+[ ] db.py 验收 < 500 行 / 冲刺 < 300 行
+[ ] home.css 验收 < 500 行 / 冲刺 < 250 行
+[ ] home.html 验收 < 1000 行 / 冲刺 < 500 行
+[ ] 模块文件数 ≥ 100(50+ src/home/*.js + 20+ *_routes.py + 10+ services/ + 20+ component CSS)
 [ ] 单文件平均 100-300 行 · 0 文件 > 500 行(除非有理由)
 
 # 质量 8 项
@@ -530,7 +532,7 @@ python scripts/refactor_progress.py
 
 **破例的代价**(继续整顿期记账):
 - 整顿期破例次数累计:1 次(2026-05-22)
-- 跟整顿期目标(home.js < 200 行 / app.py < 500 行)冲突:本次 +57 行 home.js / +8 行 app.py / +113 行 home.html / +24 行 recon_routes.py · home.js / home.html 都长 · 跟阶段 C 拆解目标背道而驰
+- 跟整顿期验收目标(home.js < 200 行 / app.py < 500 行)冲突:本次 +57 行 home.js / +8 行 app.py / +113 行 home.html / +24 行 recon_routes.py · home.js / home.html 都长 · 跟阶段 C 拆解目标背道而驰
 - 缓解措施:整顿期结束(2026-12 左右)纳入 home.js 拆出后的 brv2 模块独立文件 · 同步迁出
 - 闸不再开:Zihao 必须明确说『再破例 X』· 接力 agent 看到 MODULE_ROADMAP / 用户报新功能 → 立即停 · 跟 Zihao 确认
 

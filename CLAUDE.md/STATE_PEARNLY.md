@@ -1,6 +1,25 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十五会话**)· **🟢 ① 对账UI 5盲区修4个 ② Earn后台诊断报告整改 ③ 成本页UI重做+监控独立模块+列表分页搜索 · 全上线 · CI 全绿。**
+> **最近更新**:2026-05-25(**第十六会话**)· **🟢 整顿 REFACTOR-B1 长跑 · app.py 拆 router · 9350→8589 行(-761 · 34 路由 · 5 新 router 模块)· 6 commit 全绿全留本地未 push。**
+> ⚠️⚠️ **下个窗口:继续 B1 拆 app.py router(候选见下)· 或 Zihao 在场开 C 前端拆 home.js。先决定本会话 6 个本地 commit 是否 push。**
+>
+> **(第十六会话)整顿 B1 · app.py 拆 router 长跑(纯后端搬家 · 0 业务逻辑改 · 6 commit 全留本地 · ⚠️ 未 push)**:
+> 模式 = Zihao 指示「每完成一个安全 slice 就本地 commit · 不 push · 不因 push 权限拦截停下」。本会话从 app.py 抽出 5 个 router + 1 个 helper 搬家:
+> - **team_routes.py**(`b95372d`)· 7 路由 `/api/team/employees*`(列/分配/加/改密/删/启停)· EmployeeToggleRequest 被 admin 410 stub 复用 · app.py import 回去(单一来源)。
+> - **erp_mappings_routes.py**(`0e17fa4`)· 12 路由 `/api/erp/mappings/{clients,accounts,taxes,products}` CRUD · ErpProductMappingReq + _tid 本地副本。
+> - **email_ingest_routes.py**(`8358b72`)· 6 路由 `/api/email-ingest/*`(IMAP 邮箱抓取)· 2 model + _email_presets · email_ingest 懒 import。
+> - **`_plan_permissions`→route_helpers.py**(`870290c`)· 已是扁平化纯静态函数(忽略 plan 入参返全开权限)· 搬到 route_helpers · 13 处调用点不变 · **解锁 rd/archive/history**(它们 _check_*_access gate 在 _plan_permissions · 之前绑死 app.py 会循环 import)。
+> - **rd_routes.py**(`8fa55f7`)· 4 路由 `/api/(v1/)rd/{verify,lookup}`(泰国 RD 税务)· RdQueryRequest + _check_rd_access。
+> - **settings_routes.py**(`7686259`)· 5 路由 `/api/archive/{settings,rename-preview}` + `/api/settings/dup-check`(智能归档+查重设置)· 3 model + 2 archive helper · gemini-key 墓碑注释留 app.py。
+> - **范式**:每组 APIRouter() + 从 auth 拿 current_user + 从 route_helpers 拿公共 helper · `@router` 注册 · app.include_router · app.py 留 marker 注释指向新文件。原 URL/权限/返回格式/业务逻辑 100% 不动。
+> - **每组带 contract test**(路由 path+method 契约 + include_router 挂载 + 单一来源/字段契约)· unit 530→**552**。
+> - **守门**:每组 imports / i18n(0/0)/ unit / black / ruff(F)全绿 · **app.py 全程 LF 干净**(每次 splice 后校验 CRLF=0 · 不重蹈 clients 那次 CRLF→LF 全文件 diff)· 改 app.py 用 ReadAllLines+join`n`+UTF8-no-BOM 字节级 splice · 不用 Edit 大块匹配。
+> - **⚠️ 6 commit 全留本地未 push**:Zihao 本会话明确指示留本地 · 不 push(push 到 master 会 webhook 自动部署)。下窗口决定是否 push。**未 push = 未生产验证 /api/version**(但 check_imports 已证 app.py 新 import 结构能加载 · 路由搬家主要风险=启动 import · 已覆盖)。
+> - **当前行数**:app.py **8589** · db.py 10620(未动)· home.js 33867 · home.css 16131 · home.html 6726(前端本会话未动)。
+> - **下一组候选**(B1 续):history(7 路由 · `_plan_permissions` 已解一半 entangle · 评估 `_async_run_exception_checks`/`_check_history_access` 是否也要搬 route_helpers)· `/api/bank-recon/*` · `/api/erp/*`(endpoints/test-connection/push/logs · 注意铁律 #10 async tripwire)· `/api/admin/*` 大组(cost/credits/monitoring/tenants/users)。**详见 `CLAUDE.md/HANDOFF_REFACTOR_BC.md`**。
+>
+> ---
+> **(第十五会话)**· **🟢 ① 对账UI 5盲区修4个 ② Earn后台诊断报告整改 ③ 成本页UI重做+监控独立模块+列表分页搜索 · 全上线 · CI 全绿。**
 > ⚠️⚠️ **下个窗口:回归工程整顿 `CLAUDE.md/REFACTOR_MASTER_PLAN.md`(从当前阶段续 · 见该文件进度看板)。BUG/整改主线本会话告一段落。**
 > ⚠️ **唯一未验(跨整个第十五会话)**:Earn admin UI 浏览器实际渲染观感(成本页引擎卡/趋势图/抽屉/充值排版/监控独立页/分页)——前端均过语法/lint/逻辑+路由全通+后端活数据真验,但**没在浏览器点一遍**,需 Zihao 以 Earn 超管登录 `pearnly.com/admin` 扫一遍,或给超管 token 我来 Playwright 验。
 >

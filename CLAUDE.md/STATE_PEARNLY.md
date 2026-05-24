@@ -1,10 +1,30 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-24(**第十一会话** · 自主长跑)· **🟢 B1 后端拆 router 连抽 2 个:clients(5)+ exceptions(8)· app.py 9923→9546 · 全绿上线**
+> **最近更新**:2026-05-24(**第十二会话**)· **🟢 B1 抽 route_helpers(公共鉴权/日志/校验 helper)· 去重 billing+admin_diagnostics 的拷贝 · app.py 9546→9417 · 解锁 team/history/admin · 全绿上线**
 >
-> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **8/10**(A3/A4 卡 Zihao 手动验证)· **B 阶段 0.5/10**(B1 已抽 notification+clients+exceptions = 19 路由 · 9 个 *_routes.py)· C 前端未动
+> **整顿期(REFACTOR_MASTER_PLAN.md)**:进行中 · A 阶段 **8/10**(A3/A4 卡 Zihao 手动验证)· **B 阶段 ~1/10**(已抽 notification+clients+exceptions = 19 路由 + route_helpers 公共模块 · 10 个 *_routes.py/helper)· C 前端未动
 >
 > **整改单一权威源**:[`docs/audits/2026-05-22-ocr-recon-audit.md`](../docs/audits/2026-05-22-ocr-recon-audit.md)(M4 银行对账已闭环 · M1/M2/M3 暂缓等用户反馈)
+
+---
+
+## 🆕 2026-05-24 第十二会话 · B1 抽 route_helpers 公共模块 · ⚠️ 下窗口必读
+
+**模式**:Zihao 在场 · 选了上窗口推荐的"抽 route_helpers"(B 阶段提速关键 · 纯后端低风险)。
+
+**做了什么(commit `a295515` · push master · 已部署 · 生产存活 ✓)**:
+- 新建 **`route_helpers.py`** · 集中 5 个被多路由组共用的 helper:`_require_super_admin` / `_require_owner_or_super`(含懒建 tenant)/ `_log_op` / `_get_client_ip` / `_check_password_strength`(+ `_WEAK_PASSWORDS` 弱密码黑名单)· 从 `auth`/`db` import 防循环 · 纯搬家不改逻辑/返回值/异常 code。
+- **app.py** 删这 5 个定义 + 常量 · 改 `from route_helpers import ...`(只 import 它直接用的 4 个)· **9546→9417 行(净 -129)**。
+- **去重(铁律 #1 修一类)**:`billing_routes.py` 与 `admin_diagnostics_routes.py` 之前各自复制了一份 `_require_super_admin`(注释里早写了"待抽公共 helper 时合")· 删拷贝 · 改 import route_helpers · 三处共用同一对象。
+- 连带清掉因删函数产生的孤儿 import:app.py 的 `fastapi.status`(顺带消两个 F811)· billing 的 `typing.Any/Dict` · admin_diagnostics 的 `auth.get_current_user_from_request`。
+- 守门测试 `test_route_helpers_contract.py`(12 个:import 契约 / **单一来源 identity(防再各自拷贝漂移)** / 密码强度 5 分支 / client_ip XFF+回退+无 client / 超管 403+放行)。
+- 守门全绿:imports / i18n(0/0)/ **unit 428**(416+12)/ black / ruff(F 集)。
+
+**⚠️ 提交踩的一个坑(已自纠)**:`git add -A` 把之前遗留的未跟踪 scratch 目录(`_deploy_nginx/`/`_test_reports/`(含一堆 PNG)/`probes/`/`recon-i18n-fixes md`)一起扫进了 commit · 发现后 `git reset --soft HEAD~1` 回退 · 只 `git add` 我那 5 个文件重新提交(未 push 前自纠 · 没碰红线)。**教训:提交前用 `git add <具体文件>` 不要 `-A` · 本地有遗留未跟踪文件。这些 scratch 目录建议 Zihao 决定 gitignore 还是清理。**
+
+**为什么这次没动版本号/release_notes**:纯后端内部重构 · 0 用户可见变化 · 照 B1 前几次范式 · 验证点 = 生产 /api/version 仍 200(= 新 import 结构启动不崩 · 防循环 import/NameError)。
+
+**下窗口可做(route_helpers 已解锁)**:① 抽 **team_routes.py**(7 路由 · 现在可直接 `from route_helpers import _require_owner_or_super, _log_op`)② 抽 **history_routes.py**(7 路由 · 含 assign_client · 依赖 `_async_run_exception_checks`/`_check_history_access`→`_plan_permissions` · 这几个还在 app.py · 评估是否也搬 route_helpers 或单独处理)③ Zihao 在场时开 C1 前端拆 home.js ④ 帮 Zihao 收 A3/A4。
 
 ---
 

@@ -1,7 +1,7 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十六会话**)· **🟢 整顿 REFACTOR-B1 长跑 · app.py 拆 router · 9350→8589 行(-761 · 34 路由 · 5 新 router 模块)· 6 commit 全绿全留本地未 push。**
-> ⚠️⚠️ **下个窗口:继续 B1 拆 app.py router(候选见下)· 或 Zihao 在场开 C 前端拆 home.js。先决定本会话 6 个本地 commit 是否 push。**
+> **最近更新**:2026-05-25(**第十六会话**)· **🟢 整顿 REFACTOR-B1 长跑 · app.py 拆 router · 9350→8589 行(-761 · 34 路由 · 5 新 router 模块)· 7 commit 全绿 · ✅ 已 push master(`ad00b3c..fb68a6b`)· 生产验证通过(5 GET 401 + rd 422 · 无 404 · /api/version 200)。**
+> ⚠️⚠️ **下个窗口:继续 B1 拆 app.py router(候选见下:history/bank-recon/erp/admin)· 或 Zihao 在场开 C 前端拆 home.js。**
 >
 > **(第十六会话)整顿 B1 · app.py 拆 router 长跑(纯后端搬家 · 0 业务逻辑改 · 6 commit 全留本地 · ⚠️ 未 push)**:
 > 模式 = Zihao 指示「每完成一个安全 slice 就本地 commit · 不 push · 不因 push 权限拦截停下」。本会话从 app.py 抽出 5 个 router + 1 个 helper 搬家:
@@ -14,7 +14,7 @@
 > - **范式**:每组 APIRouter() + 从 auth 拿 current_user + 从 route_helpers 拿公共 helper · `@router` 注册 · app.include_router · app.py 留 marker 注释指向新文件。原 URL/权限/返回格式/业务逻辑 100% 不动。
 > - **每组带 contract test**(路由 path+method 契约 + include_router 挂载 + 单一来源/字段契约)· unit 530→**552**。
 > - **守门**:每组 imports / i18n(0/0)/ unit / black / ruff(F)全绿 · **app.py 全程 LF 干净**(每次 splice 后校验 CRLF=0 · 不重蹈 clients 那次 CRLF→LF 全文件 diff)· 改 app.py 用 ReadAllLines+join`n`+UTF8-no-BOM 字节级 splice · 不用 Edit 大块匹配。
-> - **⚠️ 6 commit 全留本地未 push**:Zihao 本会话明确指示留本地 · 不 push(push 到 master 会 webhook 自动部署)。下窗口决定是否 push。**未 push = 未生产验证 /api/version**(但 check_imports 已证 app.py 新 import 结构能加载 · 路由搬家主要风险=启动 import · 已覆盖)。
+> - **✅ 已 push master**(会话末 Zihao 授权)· `ad00b3c..fb68a6b`(7 commit:6 code + 1 docs)· webhook 自动部署 · ~5s 内 `/api/version` 恢复 200(版本 11835074 不变 · 无 UI 改)· **5 个搬出的 GET 路由全返 401(路由在 · 非 404)· `/api/rd/verify` 返 422** = 搬家零丢路由 · 生产验证通过。CI run 26370466959(commit fb68a6b)✅ completed success。
 > - **当前行数**:app.py **8589** · db.py 10620(未动)· home.js 33867 · home.css 16131 · home.html 6726(前端本会话未动)。
 > - **下一组候选**(B1 续):history(7 路由 · `_plan_permissions` 已解一半 entangle · 评估 `_async_run_exception_checks`/`_check_history_access` 是否也要搬 route_helpers)· `/api/bank-recon/*` · `/api/erp/*`(endpoints/test-connection/push/logs · 注意铁律 #10 async tripwire)· `/api/admin/*` 大组(cost/credits/monitoring/tenants/users)。**详见 `CLAUDE.md/HANDOFF_REFACTOR_BC.md`**。
 >

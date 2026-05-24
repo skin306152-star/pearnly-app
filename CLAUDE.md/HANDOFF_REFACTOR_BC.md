@@ -8,7 +8,7 @@
 ## 0. 一句话现状
 
 整顿期 · 在做 **REFACTOR-B1**(拆 `app.py` 巨石 router → 独立 `*_routes.py`)。
-第十六会话抽了 5 个 router + 搬了 1 个 helper · **app.py 9350 → 8589 行(-761)** · **6 个 commit 全绿但全留本地未 push**(Zihao 指示)。
+第十六会话抽了 5 个 router + 搬了 1 个 helper · **app.py 9350 → 8589 行(-761)** · **7 个 commit 全绿 · ✅ 会话末已 push master(`ad00b3c..fb68a6b`)· 生产验证通过**(5 GET 路由 401 + rd 422 + /api/version 200 · 零丢路由)。
 
 ---
 
@@ -41,15 +41,13 @@
 
 ---
 
-## 3. ⚠️ 第一件事:决定这 6 个本地 commit 怎么办
+## 3. ✅ 已 push + 生产验证(会话末完成)
 
-- 本会话 Zihao 指示「本地 commit · 不 push · 不因 push 权限弹窗停下」。
-- 这 6 个 commit **未经生产验证**(没 push → 没部署 → 没 curl /api/version)。
-- 但每轮跑过 `scripts/check_imports.py`(= 真 import app · 验证新 import 结构能加载)· 路由搬家最大风险(启动期 import 失败)已覆盖。纯后端搬家 · 0 业务逻辑改 · 0 URL/权限/返回值改。
-- **选项**:
-  - A:`git push origin master` → webhook 自动部署 → curl /api/version 看 cache_bust 翻新 + 抽查 `/api/team/employees`、`/api/erp/mappings/clients` 等返 401(未带 token = 路由在)→ 看 CI 绿。
-  - B:继续本地累积更多 B1 slice · 攒一批再一次 push。
-  - ⚠️ push 到 master 会被 auto-mode 权限分类器拦(本会话实测)· 需 Zihao 显式授权或加 `Bash(git push:*)` 权限规则。
+- 会话末 Zihao 授权 push · `git push origin master` → `ad00b3c..fb68a6b`(7 commit)。
+- webhook 自动部署:push 后短暂 502(重启窗口)· **~5s 内 `/api/version` 恢复 200**(版本 11835074 不变 = 无 UI 改 · 正确)。
+- **生产路由验证**(搬家零丢路由):`/api/team/employees`、`/api/erp/mappings/clients`、`/api/email-ingest/account`、`/api/archive/settings`、`/api/settings/dup-check` 全返 **401**(路由在 · 非 404)· `/api/rd/verify` POST 返 **422**(校验 · 路由在)。
+- CI:run `26370466959`(commit fb68a6b)· ✅ **completed success**(本地 black/ruff(F)/unit 552 全绿 · 远端确认)。
+- ⚠️ **提醒下窗口**:push 到 master 会被 auto-mode 权限分类器拦 · 需 Zihao 当场授权(或加 `Bash(git push:*)` 权限规则免询问)。
 
 ---
 
@@ -112,8 +110,8 @@
 
 ---
 
-## 8. 未跑的检查(诚实记录)
+## 8. 检查记录(诚实)
 
 - **playwright / node --check**:本会话 0 改 JS / 0 改 UI(纯后端 router 搬家)· 不适用 · 未跑。
-- **生产 /api/version + CI**:未 push · 故未验证(见 §3)。
-- **CI lint job**:本地已跑 black --check + ruff(F)全绿 · 等价覆盖 · CI 未实际跑(未 push)。
+- **生产 /api/version**:✅ push 后 200(11835074)· 5 GET 路由 401 + rd 422(零丢路由)。
+- **CI**:run 26370466959(fb68a6b)· ✅ completed **success**(已确认 · 与本地 black/ruff(F)/unit 552 全绿一致)。

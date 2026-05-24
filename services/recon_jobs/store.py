@@ -55,14 +55,24 @@ _DDL = [
 
 
 def ensure_table() -> bool:
-    """启动时幂等建表(web lifespan + standalone 工人都调)· 失败不致命(返 False)。"""
+    """启动时幂等建表(web lifespan + standalone 工人都调)· 失败不致命(返 False)。
+
+    pgcrypto:Supabase/PG13+ 的 gen_random_uuid 在 pgcrypto · 先确保扩展在(submit 走显式
+    job_id 不依赖它 · 但不传 job_id 的入队走 DEFAULT 会用到)· CREATE EXTENSION 受限则忽略。
+    """
+    # pgcrypto 单独一个事务 · 失败不能污染建表事务(PG 里一条语句报错会让整个事务作废)
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+    except Exception as _ee:  # noqa: BLE001
+        logger.warning(f"ensure_table: pgcrypto ext skip ({_ee})")
     try:
         with get_cursor(commit=True) as cur:
             for stmt in _DDL:
                 cur.execute(stmt)
         return True
     except Exception as e:  # noqa: BLE001
-        logger.warning(f"ensure_table failed: {e}")
+        logger.error(f"ensure_table failed [{type(e).__name__}]: {e}")
         return False
 
 
@@ -97,7 +107,13 @@ def enqueue(
     """
     if job_type not in VALID_JOB_TYPES:
         raise ValueError(f"unknown job_type: {job_type!r}")
-    try:
+    p = _json.dumps(params or {}, ensure_ascii=False, default=str)
+    ir = _json.dumps(input_ref or [], ensure_ascii=False, default=str)
+    ma = int(max_attempts or 1)
+    uid = str(user_id)
+    tid = str(tenant_id) if tenant_id else None
+
+    def _insert() -> Optional[str]:
         with get_cursor(commit=True) as cur:
             if job_id:
                 cur.execute(
@@ -108,15 +124,7 @@ def enqueue(
                             %s::jsonb, %s::jsonb, %s::jsonb, %s)
                     RETURNING id
                     """,
-                    (
-                        str(job_id),
-                        job_type,
-                        str(user_id),
-                        str(tenant_id) if tenant_id else None,
-                        _json.dumps(params or {}, ensure_ascii=False, default=str),
-                        _json.dumps(input_ref or [], ensure_ascii=False, default=str),
-                        int(max_attempts or 1),
-                    ),
+                    (str(job_id), job_type, uid, tid, p, ir, ma),
                 )
             else:
                 cur.execute(
@@ -126,18 +134,24 @@ def enqueue(
                     VALUES (%s, %s::uuid, %s, 'queued', %s::jsonb, %s::jsonb, %s::jsonb, %s)
                     RETURNING id
                     """,
-                    (
-                        job_type,
-                        str(user_id),
-                        str(tenant_id) if tenant_id else None,
-                        _json.dumps(params or {}, ensure_ascii=False, default=str),
-                        _json.dumps(input_ref or [], ensure_ascii=False, default=str),
-                        int(max_attempts or 1),
-                    ),
+                    (job_type, uid, tid, p, ir, ma),
                 )
             row = cur.fetchone()
             return str(row["id"]) if row else None
+
+    try:
+        return _insert()
     except Exception as e:
+        # 自愈:表不存在(部署后首次/启动建表失败)→ 现场建表重试一次。
+        msg = str(e).lower()
+        if "recon_jobs" in msg and ("does not exist" in msg or "undefined" in msg or "relation" in msg):
+            logger.warning(f"enqueue: recon_jobs missing · ensure_table + retry ({e})")
+            if ensure_table():
+                try:
+                    return _insert()
+                except Exception as e2:
+                    logger.error(f"enqueue retry after ensure_table failed: {e2}")
+                    return None
         logger.error(f"enqueue failed: {e}")
         return None
 

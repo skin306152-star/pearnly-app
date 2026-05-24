@@ -1,6 +1,20 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-24(**第十四会话**)· **🟢 大量计费/导入器整改完成并上线验证。**
+> **最近更新**:2026-05-25(**第十五会话**)· **🟢 Codex 对账UI全量测试抓出的 5 个盲区 · 核实 + 修 4 个 + 上线。**
+>
+> **本会话(第十五)成果(已上线 · 后端纯逻辑修 · 本地实跑+CI测试 job 双绿 · commit `661c82a`+`9b48c83`)**:
+> 触发 = Zihao 给的 `对账UI全量测试报告_20260524`(Codex 跑 23 个触发条件素材)。生产 JSON + 本地实跑双核实根因,修 4 个(⑤为验证项非bug)。单一权威源 [`docs/refactor/adr-006-universal-importer.md`](../docs/refactor/adr-006-universal-importer.md) §10.1。
+> 1. **②③ GL 认不出列不再静默"完成"**:无日期列 GL(A/B/C/D)原返 `gl_headers_not_found` → 对账当"0行GL"显示"完成"(XLSX);CSV 还降级 Gemini 把无表头硬读成 `gl_date=null` 行参与匹配(凭空造 matched=1)。修:`parse_gl_excel` 文件可读但认不出列且仍是张表 → 返 `needs_mapping`(原始表头+预览)· submit 预检弹"确认列"· CSV 不再降级 Gemini。
+> 2. **④ PDF 页脚合计写错触发 S8**:`_audit_completeness._sum_reliable` 用 0.1% 宽容差把"合计≈期初/期末"当误填余额跳过 · 测试件 Total Deposit=9999 恰落期初 10000 的 ±10 内被静默放过。修:误填判定改 0.5 元近精确容差 → 9999 正常触发 `credit_sum_mismatch`→S8 · BAY『两合计相同』主防护不动。
+> 3. **① 怪表头+余额链正确自动识别**:小文件存/取列各只2值被 `_fill_by_shape`『≥3行有钱』阈值漏掉 → 方向列没识别 → 余额链没跑 → 弹映射。修:`infer_stmt_col_map` 加方向列救援搜索(仅余额链验证不过时,枚举单列净额/存取两序 · 验证选最优 · 安全闸 · 零回归)。连带 S7 stmt AI fixture 调整。
+> 4. **⑤ 2行PDF走Gemini**:非bug · 本地证免费路径0行→生产必走Gemini · 日志已有 · 生产SSH确认待授权。
+> 5. **附带清 CI lint 债**:`9b48c83` black 格式化第十四会话遗留的 6 个文件(CI Python3.11 black 一直红的根因)· 纯格式化。
+>
+> **守门**:新增 5 个守门测试 · 全量单元 **529 passed**(+1 skipped)· black(py311)/ruff(F)/i18n(0/0)/app import 全绿 · CI 测试 job 绿。纯后端 · 不动前端(不bump cache_bust/release_notes · 版本横幅不重弹)。
+> **遗留(诚实)**:① 生产真站点 UI 复测需 token(本次靠本地对精确素材实跑验证后端逻辑 · 强于UI)· ② 生产 journalctl 确认 ⑤ 需授权 SSH。
+>
+> ---
+> **(第十四会话)** · **🟢 大量计费/导入器整改完成并上线验证。**
 > ⚠️⚠️ **下个窗口:别急着回整顿期(REFACTOR_MASTER_PLAN)· Zihao 还有整改要做 · 继续 BUG/整改 > 整顿。**
 >
 > **本会话(第十四)成果(全部已上线 + 生产真验)**:

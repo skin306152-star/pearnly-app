@@ -70,7 +70,7 @@ python-dotenv==1.2.2
 PyMuPDF==1.24.10
 pypdf==6.10.2
 pdfplumber==0.11.9
-pdfminer.six==20251230
+pdfminer.six==20260107
 
 # ============================================================
 # === Excel ===

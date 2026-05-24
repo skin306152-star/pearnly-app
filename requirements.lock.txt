@@ -153,7 +153,7 @@ packaging==26.2
     #   scikit-image
 passlib==1.7.4
     # via -r requirements.txt
-pdfminer-six==20251230
+pdfminer-six==20260107
     # via
     #   -r requirements.txt
     #   pdfplumber

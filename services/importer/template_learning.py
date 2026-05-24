@@ -426,10 +426,10 @@ def infer_stmt_col_map(
       low    = 关键列不齐 · 交用户确认
     """
     best = (-1, {}, "low", 0.0, ["no header found"])
-    best_key = (-1.0, -1.0)  # (balance_rate, score)
+    best_key = (-1.0, -1, -1.0)  # (balance_rate, header_word_hits, score)
     for i, row in enumerate(raw_rows[:max_scan]):
         cm = _map_by_header(row)
-        header_signal = len(cm)
+        header_signal = len(cm)  # 表头词命中数(真表头行远多于数据行 · 优先级高于 score)
         _fill_by_shape(raw_rows, i, cm)
         # 必备:date + (wd|dep|amount)。balance 缺则后面无法校验/解析,信心下调。
         if "date" not in cm or not any(k in cm for k in ("withdrawal", "deposit", "amount")):
@@ -450,7 +450,8 @@ def infer_stmt_col_map(
             f"score={score}",
             f"bal_rate={rate}",
         ]
-        key = (rate, score)
+        # 排序键:先看余额链对得上(数学可证)· 再看表头词命中数(防数据行被当表头)· 最后 score
+        key = (rate, header_signal, score)
         if key > best_key:
             best_key = key
             best = (i, {k: cm[k] for k in _STMT_KEYS if k in cm}, conf, rate, reasons)

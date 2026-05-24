@@ -108,6 +108,24 @@ class InferStatementTests(unittest.TestCase):
         # 形状能推出列且余额链成立 → 至少 medium,通常 high
         self.assertIn(conf, ("high", "medium"))
 
+    def test_no_balance_picks_real_header_not_data_row(self):
+        # 无余额列 + 数据值含同义词(Sale receipt 含 'receipt')· 排序须靠表头词密度选对真表头行,
+        # 不能把数据行当表头(否则面板给用户看错表头/错猜测)。
+        rows = [
+            ["Txn Date", "Particulars", "Amount"],
+            ["2025-11-01", "Sale receipt", "5000"],
+            ["2025-11-02", "Pay supplier", "-2000"],
+            ["2025-11-03", "Utility bill", "-1200"],
+            ["2025-11-04", "Customer transfer", "3000"],
+            ["2025-11-05", "Office rent", "-1500"],
+        ]
+        idx, cm, conf, rate, _ = tl.infer_stmt_col_map(rows)
+        self.assertEqual(idx, 0)  # 真表头在第 0 行
+        self.assertEqual(cm.get("date"), 0)
+        self.assertEqual(cm.get("description"), 1)
+        self.assertEqual(cm.get("amount"), 2)
+        self.assertNotIn("deposit", cm)  # 不能把 'Sale receipt' 误判成 deposit 列
+
     def test_garbage_low_confidence(self):
         rows = [
             ["a", "b", "c"],

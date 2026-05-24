@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pearnly · 平台后台</title>
     <link rel="stylesheet" href="/static/home.css?v=11841099" />
-    <link rel="stylesheet" href="/static/admin/admin.css?v=11841099" />
+    <link rel="stylesheet" href="/static/admin/admin.css?v=11841100" />
     <script>
       // admin layout 标志 · home.js loadAll() 检测此 flag 走精简路径(不跑 home 渲染)
       window.PEARNLY_ADMIN_MODE = true;
@@ -203,7 +203,7 @@
             </div>
           </div>
 
-          <!-- v108 · Google AI Studio 余额卡片 -->
+          <!-- 引擎计费入口 · 余额以 Google 官方为准(两套计费面:Cloud Vision + Gemini AI Studio) -->
           <div class="billing-card" id="billing-card">
             <div class="billing-card-head">
               <div class="billing-card-title">
@@ -218,44 +218,37 @@
                   <rect x="2" y="5" width="16" height="11" rx="2" />
                   <path d="M2 9h16M5 13h3" />
                 </svg>
-                <span data-i18n="billing-title">Google 实际余额</span>
-              </div>
-              <div class="billing-card-actions">
-                <button class="btn btn-ghost btn-sm" id="btn-billing-update">
-                  <svg
-                    viewBox="0 0 14 14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M9 2l3 3-7 7H2v-3z" />
-                  </svg>
-                  <span data-i18n="billing-update">更新余额</span>
-                </button>
-                <a
-                  class="btn btn-primary btn-sm"
-                  id="btn-billing-google"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <svg
-                    viewBox="0 0 14 14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M5 9l4-4M5 5h4v4" />
-                  </svg>
-                  <span data-i18n="billing-google-link">在 Google 查最新</span>
-                </a>
+                <span data-i18n="billing-title">引擎计费入口</span>
               </div>
             </div>
             <div class="billing-card-body" id="billing-card-body">
-              <div class="billing-loading" data-i18n="billing-loading">加载中…</div>
+              <div class="billing-engine-links">
+                <a
+                  class="billing-engine-link"
+                  href="https://console.cloud.google.com/billing"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <span class="billing-engine-name" data-i18n="billing-engine-vision"
+                    >OCR 主引擎 · Google Cloud Vision</span
+                  >
+                  <span class="billing-engine-go">↗</span>
+                </a>
+                <a
+                  class="billing-engine-link"
+                  href="https://aistudio.google.com/app/billing"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <span class="billing-engine-name" data-i18n="billing-engine-gemini"
+                    >Gemini · AI Studio(对账兜底)</span
+                  >
+                  <span class="billing-engine-go">↗</span>
+                </a>
+              </div>
+              <div class="billing-hint" data-i18n="billing-hint">
+                余额以 Google 官方为准 · 点击直达计费页查看
+              </div>
             </div>
           </div>
 
@@ -277,7 +270,7 @@
               <div class="cost-kpi-sub" id="kpi-total-sub">—</div>
             </div>
             <div class="cost-kpi-card">
-              <div class="cost-kpi-label" data-i18n="cost-engines">引擎占比(本月)</div>
+              <div class="cost-kpi-label" data-i18n="cost-engines">内部识别成本构成(本月)</div>
               <div class="cost-kpi-value cost-engines-mini" id="kpi-engines">—</div>
               <div class="cost-kpi-sub" data-i18n="cost-engines-sub">主备引擎使用情况</div>
             </div>
@@ -412,7 +405,7 @@
                 <div class="cost-kpi-sub" data-i18n="mon-429-sub">≥10 触发 LINE 告警</div>
               </div>
               <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="mon-today">今日识别总数</div>
+                <div class="cost-kpi-label" data-i18n="mon-today">本进程识别数</div>
                 <div class="cost-kpi-value" id="mon-today">—</div>
                 <div class="cost-kpi-sub" id="mon-today-sub">—</div>
               </div>
@@ -683,6 +676,10 @@
                   全部
                 </button>
               </div>
+              <label class="adm-topup-test-toggle">
+                <input type="checkbox" id="adm-topup-hide-test" checked />
+                <span data-i18n="adm-topup-hide-test">隐藏测试数据</span>
+              </label>
             </div>
             <div id="adm-topup-list"></div>
           </div>
@@ -695,8 +692,8 @@
 
     <!-- v118.44.0.7 救援版 · admin SPA 完全独立 · 不引 home.js(避开 30k 行屎山的 248 处 null bug)-->
     <!-- 轻量 i18n 字典(zh + th)· 暴露 window.ADMIN_I18N -->
-    <script src="/static/admin/admin-i18n.js?v=11841099"></script>
+    <script src="/static/admin/admin-i18n.js?v=11841100"></script>
     <!-- admin 主逻辑 · 鉴权 + 路由 + UI + 业务 fetch · 自包含 -->
-    <script src="/static/admin/admin.js?v=11841099" defer></script>
+    <script src="/static/admin/admin.js?v=11841100" defer></script>
   </body>
 </html>

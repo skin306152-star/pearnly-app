@@ -5637,142 +5637,9 @@ def get_latest_balance() -> Optional[Dict[str, Any]]:
         return None
 
 
-def add_balance_log(
-    real_balance: float,
-    user_id: str,
-    notes: Optional[str] = None,
-    calibration_override: Optional[float] = None,
-) -> Optional[int]:
-    """添加一条余额记录 · 自动算估算消耗 + 校准系数
-    calibration_override: 不为 None 时跳过自动计算，直接使用该值（管理员手动覆盖）
-    返回新记录 ID
-    """
-    try:
-        with get_cursor(commit=True) as cur:
-            # 1. 拿上一条记录 + 上次时间
-            cur.execute("""
-                SELECT real_balance_thb, created_at FROM billing_balance_log
-                ORDER BY created_at DESC LIMIT 1
-            """)
-            prev = cur.fetchone()
-
-            estimated_used = 0.0
-            real_used = 0.0
-            calibration = 1.0
-
-            if calibration_override is not None:
-                # 管理员手动覆盖 · 仍然统计消耗数据用于记录
-                calibration = round(max(0.5, min(float(calibration_override), 2.0)), 4)
-                if prev:
-                    real_used = float(prev["real_balance_thb"]) - float(real_balance)
-                    cur.execute(
-                        """
-                        SELECT COALESCE(SUM(cost_thb), 0) AS estimated FROM ocr_cost_log
-                        WHERE created_at > %s
-                    """,
-                        (prev["created_at"],),
-                    )
-                    est_row = cur.fetchone()
-                    estimated_used = float(est_row["estimated"]) if est_row else 0.0
-            elif prev:
-                # 算这段时间真实消耗
-                real_used = float(prev["real_balance_thb"]) - float(real_balance)
-                # 算这段时间我们估算的消耗
-                cur.execute(
-                    """
-                    SELECT COALESCE(SUM(cost_thb), 0) AS estimated FROM ocr_cost_log
-                    WHERE created_at > %s
-                """,
-                    (prev["created_at"],),
-                )
-                est_row = cur.fetchone()
-                estimated_used = float(est_row["estimated"]) if est_row else 0.0
-                # 反推校准系数(防 0 除)
-                if estimated_used > 0.001 and real_used > 0:
-                    calibration = round(real_used / estimated_used, 4)
-                    # 限制范围 · 避免异常数据(如手抖输错)
-                    calibration = max(0.5, min(calibration, 2.0))
-
-            # 2. 写新记录
-            cur.execute(
-                """
-                INSERT INTO billing_balance_log
-                (real_balance_thb, notes, estimated_used_since_last,
-                 real_used_since_last, calibration_factor, updated_by_user_id)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """,
-                (
-                    round(real_balance, 4),
-                    (notes or "")[:500] or None,
-                    round(estimated_used, 4),
-                    round(real_used, 4),
-                    calibration,
-                    user_id,
-                ),
-            )
-            return cur.fetchone()["id"]
-    except Exception as e:
-        import traceback
-
-        logger.error(f"add_balance_log failed: {e}\n{traceback.format_exc()}")
-        return None
-
-
-def get_balance_summary() -> Dict[str, Any]:
-    """成本面板用 · 拿余额 + 估算 vs 真实对比 + 当前校准系数"""
-    try:
-        latest = get_latest_balance()
-        if not latest:
-            return {
-                "has_balance": False,
-                "real_balance_thb": None,
-                "last_updated_at": None,
-                "calibration_factor": 1.0,
-                "estimated_since_last": 0,
-                "real_since_last": 0,
-                "accuracy_pct": None,
-            }
-
-        # 算自上次更新以来 · 我们当前估算了多少
-        with get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT COALESCE(SUM(cost_thb), 0) AS estimated_since FROM ocr_cost_log
-                WHERE created_at > %s
-            """,
-                (latest["created_at"],),
-            )
-            est_since = float(cur.fetchone()["estimated_since"] or 0)
-
-        # 当前预估实际余额
-        current_estimated_balance = float(latest["real_balance_thb"]) - est_since
-
-        # 准确度(上次)
-        accuracy = None
-        if (
-            latest.get("estimated_used_since_last")
-            and float(latest["estimated_used_since_last"]) > 0.001
-        ):
-            real = float(latest.get("real_used_since_last") or 0)
-            est = float(latest["estimated_used_since_last"])
-            if real > 0:
-                accuracy = round(min(est, real) / max(est, real) * 100, 1)
-
-        return {
-            "has_balance": True,
-            "real_balance_thb": float(latest["real_balance_thb"]),
-            "current_estimated_balance_thb": round(current_estimated_balance, 4),
-            "last_updated_at": latest["created_at"].isoformat(),
-            "calibration_factor": float(latest.get("calibration_factor") or 1.0),
-            "estimated_since_last": round(est_since, 4),
-            "real_used_since_last": float(latest.get("real_used_since_last") or 0),
-            "estimated_used_since_last": float(latest.get("estimated_used_since_last") or 0),
-            "accuracy_pct": accuracy,
-        }
-    except Exception as e:
-        logger.error(f"get_balance_summary failed: {e}")
-        return {"has_balance": False, "error": str(e)}
+# 2026-05-25 · Earn 后台改造删除:add_balance_log / get_balance_summary
+# (Google "实际余额" 卡下线 · 手动录入值会误导成自动余额 · 改由 admin 直达 Google 计费页自查)。
+# 保留 get_latest_balance(上方)+ 表 billing_balance_log:vat_excel_routes 仍读 calibration_factor 兜底。
 
 
 # ============================================================
@@ -10636,6 +10503,58 @@ def get_tenants_credits_summary(limit: int = 100) -> list:
     except Exception as e:
         logger.error(f"get_tenants_credits_summary failed: {e}")
         return []
+
+
+def get_tenant_credit_summary(tenant_id: str) -> Dict[str, Any]:
+    """单租户 credits 汇总(Earn 用户详情抽屉用)· 余额 + 本月扣费/页数 + 累计充值 + 充值次数。
+    取不到/出错返回 {} · 调用方按缺省隐藏(抽屉不做空壳)。"""
+    if not tenant_id:
+        return {}
+    try:
+        ym = _bkk_year_month()
+        with get_cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(tc.balance_thb, 0) AS balance_thb,
+                    COALESCE(mpu.pages_used, 0) AS pages_this_month,
+                    COALESCE(
+                        (SELECT SUM(-ct.amount_thb) FROM credit_transactions ct
+                         WHERE ct.tenant_id = t.id AND ct.type='usage'
+                         AND date_trunc('month', ct.created_at) = date_trunc('month', NOW())),
+                        0) AS month_usage_thb,
+                    COALESCE(
+                        (SELECT SUM(ct.amount_thb) FROM credit_transactions ct
+                         WHERE ct.tenant_id = t.id AND ct.type='topup'), 0) AS lifetime_topup_thb,
+                    (SELECT COUNT(*) FROM credit_transactions ct
+                     WHERE ct.tenant_id = t.id AND ct.type='topup') AS topup_count,
+                    (SELECT MAX(ct.created_at) FROM credit_transactions ct
+                     WHERE ct.tenant_id = t.id AND ct.type='topup') AS last_topup_at
+                FROM tenants t
+                LEFT JOIN tenant_credits tc ON tc.tenant_id = t.id
+                LEFT JOIN monthly_page_usage mpu
+                       ON mpu.tenant_id = t.id AND mpu.year_month = %s
+                WHERE t.id = %s
+                """,
+                (ym, tenant_id),
+            )
+            r = cur.fetchone()
+        if not r:
+            return {}
+        bal = float(r["balance_thb"] or 0)
+        return {
+            "balance_thb": bal,
+            "pages_this_month": int(r["pages_this_month"] or 0),
+            "month_usage_thb": float(r["month_usage_thb"] or 0),
+            "lifetime_topup_thb": float(r["lifetime_topup_thb"] or 0),
+            "topup_count": int(r["topup_count"] or 0),
+            "last_topup_at": r["last_topup_at"].isoformat() if r["last_topup_at"] else None,
+            "is_overdraft": bal <= 0,
+            "is_low_balance": 0 < bal < 50,
+        }
+    except Exception as e:
+        logger.error(f"get_tenant_credit_summary failed: {e}")
+        return {}
 
 
 def get_credits_daily_trend(days: int = 30) -> list:

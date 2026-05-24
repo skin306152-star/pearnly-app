@@ -446,3 +446,148 @@ body.admin-layout-body .lang-switching-overlay {
 .admin-layout-main .page-head-icon {
   /* 沿用 home.css 11 轮视觉对齐的暖灰背景 · 不重复定义 */
 }
+
+/* ============================================================
+ * 引擎计费入口卡(2026-05-25 · 替代旧 Google 实际余额卡)
+ * 两套 Google 计费面:Cloud Vision(OCR主引擎) + Gemini AI Studio(对账兜底)
+ * 余额以 Google 官方为准 · 卡片只放直达入口
+ * ============================================================ */
+.billing-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.billing-card-head {
+  margin-bottom: 12px;
+}
+.billing-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.billing-card-title svg {
+  width: 18px;
+  height: 18px;
+  color: #6b7280;
+}
+.billing-engine-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 640px) {
+  .billing-engine-links {
+    grid-template-columns: 1fr;
+  }
+}
+.billing-engine-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.billing-engine-link:hover {
+  border-color: var(--ink);
+  background: #fff;
+}
+.billing-engine-go {
+  color: #9ca3af;
+  font-size: 14px;
+}
+.billing-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ============================================================
+ * 充值审核卡 + 测试开关(2026-05-25 · #9 排版重排:右侧信息竖列对齐 · 审批备注独占一行)
+ * ============================================================ */
+.adm-topup-test-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  user-select: none;
+}
+.adm-topup-test-toggle input {
+  cursor: pointer;
+}
+.adm-topup-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.adm-topup-main {
+  flex: 1 1 220px;
+  min-width: 160px;
+}
+.adm-topup-who {
+  font-weight: 700;
+  color: var(--ink);
+}
+.adm-topup-meta {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+  word-break: break-word;
+}
+.adm-topup-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 160px;
+  margin-left: auto;
+}
+.adm-topup-amt {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.adm-topup-when {
+  font-size: 11px;
+  color: #9ca3af;
+}
+.adm-topup-ops {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.adm-topup-note {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 6px;
+  text-align: right;
+  max-width: 260px;
+  word-break: break-word;
+}

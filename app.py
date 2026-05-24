@@ -7452,85 +7452,11 @@ async def admin_cost_export(request: Request, days: int = 30):
 # ============================================================
 
 
-class BalanceUpdateRequest(BaseModel):
-    real_balance_thb: float = Field(..., ge=0, le=10_000_000)
-    notes: Optional[str] = Field(None, max_length=500)
-    calibration_factor: Optional[float] = Field(None, ge=0.5, le=2.0)
-
-
-@app.get("/api/admin/billing/balance")
-async def admin_get_balance(request: Request):
-    """获取最新余额 + 估算 vs 真实对比 + 当前校准系数"""
-    _require_super_admin(request)
-    summary = db.get_balance_summary()
-    # 拿当月估算总消耗(对照用)
-    try:
-        with db.get_cursor() as cur:
-            cur.execute("""
-                SELECT COALESCE(SUM(cost_thb), 0) AS month_estimated
-                FROM ocr_cost_log
-                WHERE date_trunc('month', created_at) = date_trunc('month', NOW())
-            """)
-            summary["month_estimated_thb"] = float(cur.fetchone()["month_estimated"] or 0)
-    except Exception:
-        summary["month_estimated_thb"] = 0
-    # Google 跳转链接(直达 Billing)
-    summary["google_billing_url"] = "https://aistudio.google.com/app/billing"
-    return summary
-
-
-@app.post("/api/admin/billing/balance")
-async def admin_update_balance(req: BalanceUpdateRequest, request: Request):
-    """管理员手动更新真实余额 · 系统自动算校准系数"""
-    _require_super_admin(request)
-    user = get_current_user_from_request(request)
-    payload = req.model_dump() if hasattr(req, "model_dump") else req.dict()
-    new_id = db.add_balance_log(
-        real_balance=payload["real_balance_thb"],
-        user_id=str(user["id"]),
-        notes=payload.get("notes"),
-        calibration_override=payload.get("calibration_factor"),
-    )
-    if not new_id:
-        raise HTTPException(500, detail="billing.update_failed")
-    summary = db.get_balance_summary()
-    return {"ok": True, "id": new_id, "summary": summary}
-
-
-@app.get("/api/admin/billing/history")
-async def admin_balance_history(request: Request, limit: int = 20):
-    """余额更新历史 · 看每次更新校准趋势"""
-    _require_super_admin(request)
-    try:
-        with db.get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT id, real_balance_thb, estimated_used_since_last,
-                       real_used_since_last, calibration_factor, notes, created_at
-                FROM billing_balance_log
-                ORDER BY created_at DESC
-                LIMIT %s
-            """,
-                (max(1, min(int(limit), 100)),),
-            )
-            rows = cur.fetchall()
-        return {
-            "history": [
-                {
-                    "id": int(r["id"]),
-                    "real_balance_thb": float(r["real_balance_thb"]),
-                    "estimated_used_since_last": float(r.get("estimated_used_since_last") or 0),
-                    "real_used_since_last": float(r.get("real_used_since_last") or 0),
-                    "calibration_factor": float(r.get("calibration_factor") or 1.0),
-                    "notes": r.get("notes"),
-                    "created_at": r["created_at"].isoformat(),
-                }
-                for r in rows
-            ]
-        }
-    except Exception as e:
-        logger.error(f"balance_history failed: {e}")
-        raise HTTPException(500, detail="billing.history_failed")
+# 2026-05-25 · Earn 后台改造:删 Google "实际余额" 卡(手动录入值会误导成自动余额)·
+# 余额改由 admin 直达两个 Google 计费页自查(Cloud Vision + Gemini AI Studio)· 见 admin.html 引擎计费入口卡。
+# 已删:GET/POST /api/admin/billing/balance + GET /api/admin/billing/history + BalanceUpdateRequest +
+#       db.get_balance_summary / db.add_balance_log。表 billing_balance_log 与 db.get_latest_balance 保留
+#       (vat_excel_routes 仍用 calibration_factor 兜底)。
 
 
 # ============================================================
@@ -7950,6 +7876,14 @@ async def admin_user_detail(user_id: str, request: Request):
     except Exception as _ee:
         logger.warning(f"admin_user_detail aux failed: {_ee}")
 
+    # 2026-05-25 · credits 模式:抽屉显示公司余额/本月扣费/本月页数/累计充值(替代老套餐配额)
+    credit = {}
+    if user.get("tenant_id"):
+        try:
+            credit = db.get_tenant_credit_summary(str(user["tenant_id"]))
+        except Exception as _ce:
+            logger.warning(f"admin_user_detail credit summary failed: {_ce}")
+
     return {
         # 平铺 user 字段 · 让前端 u.email / u.phone 等直接 work
         "id": str(user["id"]),
@@ -7974,6 +7908,8 @@ async def admin_user_detail(user_id: str, request: Request):
         "last_ocr_at": last_ocr_at,
         "payment_count": payment_count,
         "last_payment_at": last_payment_at,
+        # credits 汇总(公司级)· 抽屉「余额与计费」段用 · 取不到则为空 {}(前端隐藏该段)
+        "credit": credit,
         "trial_expires_at": str(user["trial_expires_at"]) if user.get("trial_expires_at") else None,
         "expires_at": str(user["expires_at"]) if user.get("expires_at") else None,
         "last_login_at": user["last_login_at"].isoformat() if user.get("last_login_at") else None,

@@ -18,9 +18,12 @@
     function _fmt(n, d) {
         if (n == null || isNaN(n)) return '—';
         d = d == null ? 2 : d;
-        return Number(n)
-            .toFixed(d)
-            .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        // 用 Intl 只给整数部分加千分位 · 旧实现 toFixed 后正则对整串加逗号会把小数也插逗号
+        // (10.6067 → 10.6,067)· 2026-05-25 修
+        return Number(n).toLocaleString('en-US', {
+            minimumFractionDigits: d,
+            maximumFractionDigits: d,
+        });
     }
     function _fmtBaht(n) {
         if (!n || n === 0) return '฿ 0';
@@ -272,30 +275,7 @@
 
     // ============ 成本追踪页业务 ============
     async function _renderCostPage() {
-        // Google 余额 · 正确 endpoint 是 /api/admin/billing/balance
-        try {
-            const d = await _adminFetch('/api/admin/billing/balance');
-            const bal = d && (d.real_balance_thb != null ? d.real_balance_thb : d.balance_thb);
-            const upd = d && (d.updated_at || d.last_updated || d.created_at);
-            _setHtml(
-                'billing-card-body',
-                '<div style="font-size:28px;font-weight:700;color:#fff">฿ ' +
-                    _fmt(bal || 0, 2) +
-                    '</div>' +
-                    (upd
-                        ? '<div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px">' +
-                          _esc(String(upd).slice(0, 16).replace('T', ' ')) +
-                          '</div>'
-                        : '')
-            );
-        } catch (e) {
-            _setHtml(
-                'billing-card-body',
-                '<div style="color:rgba(255,255,255,0.85);font-size:13px">— ' +
-                    _esc(e.message) +
-                    '</div>'
-            );
-        }
+        // 引擎计费入口卡 = admin.html 静态两个直达链接(Cloud Vision + Gemini AI Studio)· 无需 fetch。
         // overview KPI
         try {
             const d = await _adminFetch('/api/admin/cost/overview');
@@ -408,7 +388,8 @@
             const d = await _adminFetch('/api/admin/cost/daily_trend?days=30');
             const wrap = document.getElementById('cost-trend-chart');
             if (!wrap) return;
-            const points = (d && d.points) || (d && d.data) || [];
+            // 后端 /api/admin/cost/daily_trend 返 {days:[...]}· 旧前端只读 points/data → 恒"暂无数据"(2026-05-25 修)
+            const points = (d && d.days) || (d && d.points) || (d && d.data) || [];
             if (!points.length) {
                 wrap.innerHTML =
                     '<div style="text-align:center;padding:30px;color:#a0aec0;font-size:13px">' +
@@ -425,7 +406,7 @@
                                 '<div style="flex:1;background:#111;height:' +
                                 h +
                                 '%;border-radius:2px;min-width:6px" title="' +
-                                _esc(p.date || '') +
+                                _esc(p.day || p.date || '') +
                                 ': ฿' +
                                 _fmt(p.cost_thb || 0, 2) +
                                 '"></div>'
@@ -787,7 +768,8 @@
                         _esc(u.company_name || '—') +
                         '</div>' +
                         '<div>' +
-                        (u.ocr_used_month || 0) +
+                        // credits 模式无配额:显示本月真实识别次数(修字段名 used_this_month · 旧 ocr_used_month 恒 0)
+                        (u.used_this_month || 0) +
                         '</div>' +
                         '<div>' +
                         _esc(u.country || '—') +
@@ -1398,6 +1380,30 @@
             '</div><div class="adm-drawer-value">' +
             val +
             '</div>';
+        // 2026-05-25 credits 改造 · 空值不渲染该行/该段(抽屉不做空壳)· 金额统一 ฿ 千分位
+        const _has = (v) => v != null && String(v).trim() !== '' && String(v).trim() !== '—';
+        const rowIf = (lbl, val) => (_has(val) ? row(lbl, _esc(String(val))) : '');
+        const rowHtmlIf = (lbl, cond, html) => (cond ? row(lbl, html) : '');
+        const secIf = (title, rows, extra) => (rows && rows.trim() ? sec(title, rows, extra) : '');
+        const _money = (n) =>
+            '฿ ' +
+            (Number(n) || 0).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        const c = u.credit || {};
+        const hasCredit = c && Object.keys(c).length > 0;
+        const balColor = c.is_overdraft ? '#DC2626' : c.is_low_balance ? '#D97706' : '#111827';
+        const balTag = c.is_overdraft
+            ? ' <span class="adm-drawer-pill adm-pill-danger">' +
+              _esc(_t('adm-drawer-overdraft')) +
+              '</span>'
+            : c.is_low_balance
+              ? ' <span class="adm-drawer-pill adm-pill-warn">' +
+                _esc(_t('adm-drawer-low-balance')) +
+                '</span>'
+              : '';
+        const empCount = (u.employees && u.employees.length) || 0;
         body.innerHTML =
             '<div class="adm-drawer-header-row">' +
             '<div class="adm-drawer-avatar">' +
@@ -1427,48 +1433,70 @@
                         u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
                     )
             ) +
-            sec(
+            // 💰 余额与计费(credits 模式核心 · 公司级 · 取到才显示)
+            (hasCredit
+                ? sec(
+                      _t('adm-drawer-sec-billing'),
+                      row(
+                          _t('adm-drawer-balance'),
+                          '<strong style="color:' +
+                              balColor +
+                              '">' +
+                              _money(c.balance_thb) +
+                              '</strong>' +
+                              balTag
+                      ) +
+                          row(_t('adm-drawer-month-spend'), _money(c.month_usage_thb)) +
+                          row(_t('adm-drawer-month-pages'), (c.pages_this_month || 0) + '') +
+                          row(_t('adm-drawer-lifetime-topup'), _money(c.lifetime_topup_thb))
+                  )
+                : '') +
+            secIf(
                 _t('adm-drawer-sec-contact'),
-                row(_t('adm-drawer-email'), _esc(u.email || '—')) +
-                    row(_t('adm-drawer-phone'), _esc(u.phone || '—')) +
-                    row(_t('adm-drawer-line-id'), _esc(u.line_id || '—')) +
-                    row(_t('adm-drawer-country'), _esc(u.country || '—'))
+                rowIf(_t('adm-drawer-email'), u.email) +
+                    rowIf(_t('adm-drawer-phone'), u.phone) +
+                    rowIf(_t('adm-drawer-line-id'), u.line_id) +
+                    rowIf(_t('adm-drawer-country'), u.country)
             ) +
-            sec(
+            // 注册 + 风控:删死字段 signup_source(后端不返·恒"直接访问")· 修指纹字段名(device_fingerprint)·
+            // IP/指纹空则隐藏(不做空壳)· 全空整段隐藏
+            secIf(
                 _t('adm-drawer-sec-signup'),
-                row(_t('adm-drawer-signed-up'), _esc(fmt(u.created_at))) +
-                    row(
-                        _t('adm-drawer-source'),
-                        _esc(u.signup_source || _t('adm-drawer-source-direct'))
-                    ) +
-                    row(
+                rowIf(_t('adm-drawer-signed-up'), u.created_at ? fmt(u.created_at) : '') +
+                    rowHtmlIf(
                         _t('adm-drawer-ip'),
-                        '<span class="adm-drawer-mono">' + _esc(u.signup_ip || '—') + '</span>'
+                        _has(u.signup_ip),
+                        '<span class="adm-drawer-mono">' + _esc(u.signup_ip || '') + '</span>'
                     ) +
-                    row(
+                    rowHtmlIf(
                         _t('adm-drawer-fingerprint'),
+                        _has(u.device_fingerprint),
                         '<span class="adm-drawer-mono">' +
-                            _esc((u.signup_fingerprint || '—').slice(0, 16)) +
-                            (u.signup_fingerprint ? '...' : '') +
-                            '</span>'
+                            _esc(String(u.device_fingerprint || '').slice(0, 16)) +
+                            '...</span>'
                     ),
                 riskBadge
             ) +
             sec(
+                // credits 模式无配额:删「本月用量 0/无限」· 累计 OCR 修正字段名(cumulative_ocr)
                 _t('adm-drawer-sec-usage'),
-                row(
-                    _t('adm-drawer-month-ocr'),
-                    (u.ocr_used_month || 0) + ' / ' + (u.ocr_quota || _t('adm-drawer-unlimited'))
-                ) +
-                    row(_t('adm-drawer-total-ocr'), u.ocr_total || 0) +
-                    row(_t('adm-drawer-last-ocr'), _esc(fmt(u.last_ocr_at))) +
-                    row(_t('adm-drawer-last-login'), _esc(fmt(u.last_login_at)))
+                row(_t('adm-drawer-total-ocr'), (u.cumulative_ocr || 0) + '') +
+                    rowIf(_t('adm-drawer-last-ocr'), u.last_ocr_at ? fmt(u.last_ocr_at) : '') +
+                    rowIf(_t('adm-drawer-last-login'), u.last_login_at ? fmt(u.last_login_at) : '')
             ) +
-            sec(
-                _t('adm-drawer-sec-payment'),
-                row(_t('adm-drawer-payments'), u.payment_count || 0) +
-                    row(_t('adm-drawer-last-payment'), _esc(fmt(u.last_payment_at)))
+            // 充值记录(用 credits 流水 · 替代死表 payment_log)
+            secIf(
+                _t('adm-drawer-sec-topup'),
+                row(_t('adm-drawer-topups'), (c.topup_count || 0) + '') +
+                    rowIf(_t('adm-drawer-last-topup'), c.last_topup_at ? fmt(c.last_topup_at) : '')
             ) +
+            // 员工(owner 有员工才显示)
+            (empCount > 0
+                ? sec(
+                      _t('adm-drawer-sec-employees'),
+                      row(_t('adm-drawer-emp-count'), empCount + '')
+                  )
+                : '') +
             (!u.is_super_admin
                 ? '<div class="adm-drawer-section adm-drawer-actions-section">' +
                   '<div class="adm-drawer-section-title">' +
@@ -1766,6 +1794,7 @@
     // 2026-05-24 重建:CLEANUP-PLAN-01/02 删了老 /api/admin/payments/* 审核但没重建管理端 UI →
     // Earn 后台看不到充值审核。这里接 billing_routes 新 topup 端点(list/approve/reject)。
     let _topupStatus = 'pending';
+    let _topupHideTest = true; // 充值审核默认隐藏测试数据(QA/Codex/test/ui_recon)
 
     async function _renderTopupPage() {
         const wrap = document.getElementById('adm-topup-list');
@@ -1784,6 +1813,15 @@
                     _renderTopupPage();
                 });
             });
+        // "隐藏测试数据"开关只绑一次(默认勾选 · 过滤 QA/Codex/test/ui_recon 等测试记录)
+        const _hideTestEl = document.getElementById('adm-topup-hide-test');
+        if (_hideTestEl && !_hideTestEl.__bound) {
+            _hideTestEl.__bound = true;
+            _hideTestEl.addEventListener('change', function () {
+                _topupHideTest = _hideTestEl.checked;
+                _renderTopupPage();
+            });
+        }
         wrap.innerHTML = '<div class="adm-empty">' + _esc(_t('billing-loading')) + '</div>';
         const tok = localStorage.getItem('mrpilot_token');
         let rows = [];
@@ -1801,11 +1839,21 @@
                 '</div>';
             return;
         }
+        if (_topupHideTest) rows = (rows || []).filter((t) => !_isTestRecord(t));
         if (!rows || !rows.length) {
             wrap.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-topup-empty')) + '</div>';
             return;
         }
         wrap.innerHTML = rows.map(_topupCard).join('');
+    }
+
+    // 测试记录识别(名称模式 · 不动库)· QA / Codex 验收 / test / ui_recon 等
+    function _isTestRecord(t) {
+        const hay = [t.tenant_name, t.username, t.email, t.payer_name, t.note, t.review_note]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+        return /\bqa\b|qa_|codex|\btest\b|ui_recon|acceptance|_q100_|q100_/.test(hay);
     }
 
     function _topupStatusBadge(s) {
@@ -1840,7 +1888,8 @@
             : '<span style="font-size:12px;color:#9ca3af">' +
               _esc(_t('adm-topup-no-slip')) +
               '</span>';
-        const actions =
+        // 操作:pending → 批准/拒绝按钮;非 pending → 审批备注独占一行(不再塞按钮旁飘着)
+        const actionBtns =
             t.status === 'pending'
                 ? '<button class="btn btn-primary btn-sm" onclick="__admTopupApprove(' +
                   t.id +
@@ -1854,45 +1903,41 @@
                   ')">' +
                   _esc(_t('adm-topup-reject')) +
                   '</button>'
-                : t.review_note
-                  ? '<span style="font-size:12px;color:#6b7280">' + _esc(t.review_note) + '</span>'
-                  : '';
+                : '';
+        // 2026-05-25 #9 重排:左=申请详情 · 右=金额/日期/状态竖列 + 截图&操作一行 + 审批备注独占一行
         return (
-            '<div style="background:#fff;border:1px solid #e8e8e3;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">' +
-            '<div style="flex:1 1 200px;min-width:160px">' +
-            '<div style="font-weight:700;color:#111">' +
+            '<div class="adm-topup-card">' +
+            '<div class="adm-topup-main">' +
+            '<div class="adm-topup-who">' +
             who +
             '</div>' +
-            (sub
-                ? '<div style="font-size:12px;color:#6b7280;margin-top:2px">' + sub + '</div>'
-                : '') +
+            (sub ? '<div class="adm-topup-meta">' + sub + '</div>' : '') +
             (t.payer_name
-                ? '<div style="font-size:12px;color:#6b7280;margin-top:2px">' +
+                ? '<div class="adm-topup-meta">' +
                   _esc(_t('adm-topup-payer')) +
                   ': ' +
                   _esc(t.payer_name) +
                   '</div>'
                 : '') +
-            (t.note
-                ? '<div style="font-size:12px;color:#6b7280;margin-top:2px">' +
-                  _esc(t.note) +
-                  '</div>'
-                : '') +
+            (t.note ? '<div class="adm-topup-meta">' + _esc(t.note) + '</div>' : '') +
             '</div>' +
-            '<div style="text-align:right;min-width:120px">' +
-            '<div style="font-size:20px;font-weight:800;color:#111">฿' +
+            '<div class="adm-topup-side">' +
+            '<div class="adm-topup-amt">฿' +
             amt +
             '</div>' +
-            '<div style="font-size:11px;color:#9ca3af">' +
+            '<div class="adm-topup-when">' +
             _esc(when) +
             '</div>' +
-            '<div style="margin-top:4px">' +
+            '<div class="adm-topup-badge">' +
             _topupStatusBadge(t.status) +
             '</div>' +
-            '</div>' +
-            '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+            '<div class="adm-topup-ops">' +
             slipBtn +
-            actions +
+            actionBtns +
+            '</div>' +
+            (t.status !== 'pending' && t.review_note
+                ? '<div class="adm-topup-note">' + _esc(t.review_note) + '</div>'
+                : '') +
             '</div>' +
             '</div>'
         );
@@ -2317,40 +2362,8 @@
             _toast(_t('cost-refresh') + '…');
             _renderCostPage();
         });
-        // 在 Google 查最新
-        const gbtn = document.getElementById('btn-billing-google');
-        if (gbtn) {
-            gbtn.setAttribute('href', 'https://aistudio.google.com/app/apikey');
-            gbtn.setAttribute('target', '_blank');
-            gbtn.setAttribute('rel', 'noopener');
-        }
-        // 更新余额
-        _on('btn-billing-update', 'click', async function () {
-            const input = await _admPrompt(
-                _curLang === 'th' ? 'ยอดคงเหลือ Google จริง (THB):' : 'Google 实际余额(THB):',
-                {
-                    title: _curLang === 'th' ? 'อัปเดตยอดคงเหลือ Google' : '更新 Google 余额',
-                    type: 'number',
-                    placeholder: '0.00',
-                }
-            );
-            if (!input) return;
-            const bal = parseFloat(input);
-            if (isNaN(bal) || bal < 0) {
-                _toast(_curLang === 'th' ? 'ตัวเลขไม่ถูกต้อง' : '数字格式错误', 'error');
-                return;
-            }
-            try {
-                await _adminFetch('/api/admin/billing/balance', {
-                    method: 'POST',
-                    body: { real_balance_thb: bal },
-                });
-                _toast(_curLang === 'th' ? 'บันทึกแล้ว' : '已保存', 'success');
-                _renderCostPage();
-            } catch (e) {
-                _toast(_t('adm-load-fail') + ' · ' + e.message, 'error');
-            }
-        });
+        // 引擎计费入口卡:两个链接是静态 <a>(admin.html 写死直达 Cloud Vision / AI Studio 计费页)·
+        // 余额以 Google 官方为准 · 不再手动录入/估算(旧 /api/admin/billing/balance 已下线)。
         // 导出 CSV(成本)
         _on('btn-cost-export', 'click', async function () {
             try {

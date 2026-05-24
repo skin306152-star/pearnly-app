@@ -1749,9 +1749,13 @@ async def bank_v2_run(
         content = await f.read()
         gl_data.append((content, f.filename or "gl.xlsx"))
 
-    # 2. Parse statement files (parallel)
+    # 2. Parse statement files (parallel) · ADR-006 透传 tenant_id 给模板学习层
+    _tid_stmt = user.get("tenant_id")
+
     async def _parse_stmt(b, fname):
-        return await loop.run_in_executor(None, lambda: parse_bank_statement_pdf(b, fname, api_key))
+        return await loop.run_in_executor(
+            None, lambda: parse_bank_statement_pdf(b, fname, api_key, tenant_id=_tid_stmt)
+        )
 
     async def _parse_gl(b, fname):
         return await loop.run_in_executor(None, lambda: parse_gl_v2(b, fname, gl_account, api_key))

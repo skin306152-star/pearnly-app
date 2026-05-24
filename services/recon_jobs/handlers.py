@@ -100,8 +100,10 @@ def run_bank_recon(
     total = len(stmt_data) + len(gl_data)
     progress_cb({"stage": "parse", "stage_done": 0, "stage_total": total})
 
-    # 1. 解析(并行 · 原路由 run_in_executor + gather)
-    stmt_results = _parallel(lambda bf: parse_bank_statement_pdf(bf[0], bf[1], api_key), stmt_data)
+    # 1. 解析(并行 · 原路由 run_in_executor + gather)· ADR-006 透传 tenant_id 给模板学习层
+    stmt_results = _parallel(
+        lambda bf: parse_bank_statement_pdf(bf[0], bf[1], api_key, tenant_id=tenant_id), stmt_data
+    )
     progress_cb({"stage": "parse", "stage_done": len(stmt_data), "stage_total": total})
     gl_results = _parallel(lambda bf: parse_gl_v2(bf[0], bf[1], gl_account, api_key), gl_data)
     progress_cb({"stage": "parse", "stage_done": total, "stage_total": total})

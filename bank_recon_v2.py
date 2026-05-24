@@ -1216,7 +1216,9 @@ def _parse_stmt_text_coords(file_bytes: bytes):
     return rows, opening, closing
 
 
-def parse_bank_statement_pdf(file_bytes: bytes, filename: str, api_key: str = "") -> Dict[str, Any]:
+def parse_bank_statement_pdf(
+    file_bytes: bytes, filename: str, api_key: str = "", tenant_id: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Parse a bank statement.
 
@@ -1233,13 +1235,13 @@ def parse_bank_statement_pdf(file_bytes: bytes, filename: str, api_key: str = ""
 
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     if ext != "pdf":
-        return _parse_bank_stmt_via_pipeline(file_bytes, filename)
+        return _parse_bank_stmt_via_pipeline(file_bytes, filename, tenant_id=tenant_id)
 
     # 2026-05-21: PDF bank statement defaults to new pipeline (document_type
     # =bank_statement + validators). Set OCR_PDF_STMT_LEGACY=true to opt back
     # into the existing pdfplumber+Gemini path.
     if _os.environ.get("OCR_PDF_STMT_LEGACY", "").strip().lower() != "true":
-        pipeline_result = _parse_bank_stmt_via_pipeline(file_bytes, filename)
+        pipeline_result = _parse_bank_stmt_via_pipeline(file_bytes, filename, tenant_id=tenant_id)
         if pipeline_result.get("ok") and pipeline_result.get("rows"):
             return pipeline_result
         logger.warning(
@@ -2165,7 +2167,7 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
     last_valid_closing = None
     last_date = None
     d_idx = col_map["date"]
-    bal_idx = col_map["balance"]
+    bal_idx = col_map.get("balance", -1)  # ADR-006 · 学习层映射可能无余额列 · 缺则按 0(不崩)
     wd_idx = col_map.get("withdrawal", -1)
     dp_idx = col_map.get("deposit", -1)
     amt_idx = col_map.get("amount", -1)
@@ -2238,12 +2240,20 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
     return rows, opening_balance, last_valid_closing
 
 
-def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, Any]:
+def parse_bank_stmt_xlsx_direct(
+    file_bytes: bytes, filename: str, tenant_id: Optional[str] = None
+) -> Dict[str, Any]:
     """v118.35.0.55 · 银行流水 Excel 直读(零成本 · 跳过 Gemini)· 多 sheet 版
 
     遍历『所有』sheet(用户可能把多个账户塞一个文件 · 每 sheet 一个账户)·
     每个 sheet 独立找表头 + 解析 · 合并所有行。
     支持:.xlsx + 旧 .xls(xlrd)· 表头在前 16 行任意位置 · 单一带符号 amount 列。
+
+    ADR-006 模板学习层:固定词典 _find_stmt_header 找不到表头时,不再直接放弃,而是
+      ① 查已存映射(tenant + signature 命中)→ 直接套
+      ② 本地推断(同义词更全 + 数据形状 + 余额链校验)· 高信心 → 套 + 自动存
+      ③ 仍不行 → 返回 needs_mapping(带预览 + 系统猜测)· 交上层弹"确认列对应"
+    现有能识别的文件走原 _find_stmt_header · 一行不变 = 零回归。
     """
     sheets = _load_excel_all_sheets(file_bytes)
     if not sheets:
@@ -2252,6 +2262,12 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
             "error_code": "file_unreadable",
             "error": "Cannot read Excel (legacy .xls / corrupt / unsupported format)",
         }
+    # ADR-006 · 学习层惰性 import(防循环 · 失败不致命退回原行为)
+    try:
+        from services.importer import template_learning as _tl, template_store as _ts
+    except Exception:  # noqa: BLE001
+        _tl = _ts = None
+    needs_mapping_candidate: Optional[Dict[str, Any]] = None
 
     # v118.35.0.61 · 分账户解析 + 逐账户独立余额校验。
     # 一个文件可能含多个账户(每 sheet 一个)· 各账户期初/余额链互不相干 ——
@@ -2261,6 +2277,40 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
     sheets_with_data = 0
     for _sheet_name, raw_rows in sheets:
         header_idx, col_map = _find_stmt_header(raw_rows)
+        if not col_map and _tl is not None:
+            # ADR-006 学习层:固定词典没找到 → saved → 本地高信心推断 → 否则记 needs_mapping
+            try:
+                l_idx, l_cm, conf, _rate, _reasons = _tl.infer_stmt_col_map(raw_rows)
+            except Exception:  # noqa: BLE001
+                l_idx, l_cm, conf = -1, {}, "low"
+            if l_idx >= 0 and l_cm:
+                sig = _tl.build_header_signature(raw_rows[l_idx])
+                saved = (
+                    _ts.find_mapping(tenant_id, "statement", sig) if (tenant_id and _ts) else None
+                )
+                if saved:
+                    header_idx, col_map = l_idx, saved
+                elif conf == "high":
+                    header_idx, col_map = l_idx, l_cm
+                    if tenant_id and _ts:
+                        _ts.save_mapping(
+                            tenant_id,
+                            "statement",
+                            sig,
+                            l_cm,
+                            source="local",
+                            sample_headers=[str(c or "") for c in raw_rows[l_idx]],
+                        )
+                elif needs_mapping_candidate is None:
+                    needs_mapping_candidate = {
+                        "document_type": "statement",
+                        "template_signature": sig,
+                        "sheet_name": _sheet_name,
+                        "headers": [str(c or "").strip() for c in raw_rows[l_idx]],
+                        "preview_rows": _tl.preview_rows(raw_rows, l_idx, limit=20),
+                        "suggested_mapping": l_cm,
+                        "confidence": conf,
+                    }
         if not col_map:
             continue  # 该 sheet 无流水表头(汇总页/空页)· 跳过
         acct = _extract_sheet_account(raw_rows, header_idx, _sheet_name)
@@ -2302,6 +2352,15 @@ def parse_bank_stmt_xlsx_direct(file_bytes: bytes, filename: str) -> Dict[str, A
         sheets_with_data += 1
 
     if not accounts:
+        # ADR-006 · 有"像表格但拿不准"的 sheet → 不报死错 · 交上层弹"确认列对应"
+        if needs_mapping_candidate is not None:
+            return {
+                "ok": False,
+                "needs_mapping": True,
+                "error_code": "needs_mapping",
+                "error": "New template — please confirm column mapping",
+                "mapping_request": needs_mapping_candidate,
+            }
         return {
             "ok": False,
             "error_code": "stmt_headers_not_found",
@@ -3310,7 +3369,9 @@ def parse_gl(
     return result
 
 
-def _parse_bank_stmt_via_pipeline(file_bytes: bytes, filename: str) -> Dict[str, Any]:
+def _parse_bank_stmt_via_pipeline(
+    file_bytes: bytes, filename: str, tenant_id: Optional[str] = None
+) -> Dict[str, Any]:
     """Bank-recon-v2 adapter: route non-PDF bank statements through the
     unified pipeline with document_type='bank_statement', then convert to
     List[StatementRow] so the rest of bank-v2/run consumes it unchanged.
@@ -3342,11 +3403,15 @@ def _parse_bank_stmt_via_pipeline(file_bytes: bytes, filename: str) -> Dict[str,
     # 用户上传自家导出 / 银行下载 / 自己整理的 Excel · 表头清晰时直读即可
     # 直读不命中(表头识别不出) → 自动降级到 Gemini pipeline
     if ext_dot in (".xlsx", ".xls", ".xlsm"):
-        direct = parse_bank_stmt_xlsx_direct(file_bytes, filename)
+        direct = parse_bank_stmt_xlsx_direct(file_bytes, filename, tenant_id=tenant_id)
         if direct.get("ok"):
             logger.info(
                 f"[stmt_parse][{filename}] xlsx_direct OK · {direct['row_count']} rows · skip Gemini"
             )
+            return direct
+        # ADR-006 · 新模板拿不准 → 走"确认列对应"· 不烧 Gemini · 原样上抛
+        if direct.get("needs_mapping"):
+            logger.info(f"[stmt_parse][{filename}] xlsx_direct needs_mapping · skip Gemini")
             return direct
         logger.info(
             f"[stmt_parse][{filename}] xlsx_direct miss({direct.get('error_code')}) · falling back to Gemini"

@@ -58,9 +58,13 @@ def send_topup_approved_email(tenant_id, amount_thb, new_balance):
 # GET /api/me/credits · 账户余额和用量(老板 vs 员工视角)
 # ============================================================
 @router.get("/api/me/credits")
-async def get_my_credits(request: Request):
+async def get_my_credits(request: Request, response: Response):
     """查询账户余额和用量（区分老板/员工视角）"""
     import datetime as _dt
+
+    # 2026-05-24 · 余额是实时数据 · 禁止浏览器缓存
+    # (此前缺这头 → 充值审核通过后前端轮询/刷新仍读到旧余额 0 · 用户以为没到账)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
 
     user = get_current_user_from_request(request)
     user_id = str(user.get("id", ""))

@@ -183,7 +183,7 @@ async function loadCreditsCard() {
     if (!balCard || !usageCard) return;
     try {
         const auth = { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
-        const resp = await fetch('/api/me/credits', { headers: auth });
+        const resp = await fetch('/api/me/credits', { headers: auth, cache: 'no-store' });
         if (!resp.ok) {
             // 鉴权失败或服务异常 · 默认隐藏余额 · 用量显示 "—"
             balCard.style.display = 'none';

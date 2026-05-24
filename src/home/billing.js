@@ -34,7 +34,7 @@ function _startPoll() {
         var tok = _tok();
         if (!tok) return;
         if (window._userInfo && window._userInfo.is_billing_exempt) return;
-        fetch('/api/me/credits', { headers: { Authorization: 'Bearer ' + tok } })
+        fetch('/api/me/credits', { headers: { Authorization: 'Bearer ' + tok }, cache: 'no-store' })
             .then(function (r) {
                 return r.ok ? r.json() : null;
             })

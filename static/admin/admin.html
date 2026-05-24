@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pearnly · 平台后台</title>
     <link rel="stylesheet" href="/static/home.css?v=11841099" />
-    <link rel="stylesheet" href="/static/admin/admin.css?v=11841101" />
+    <link rel="stylesheet" href="/static/admin/admin.css?v=11841102" />
     <script>
       // admin layout 标志 · home.js loadAll() 检测此 flag 走精简路径(不跑 home 渲染)
       window.PEARNLY_ADMIN_MODE = true;
@@ -394,9 +394,12 @@
           <div class="cost-section">
             <div class="cost-section-head">
               <h3 data-i18n="cost-by-user-title">按用户分组</h3>
-              <span class="cost-section-hint" data-i18n="cost-by-user-hint"
-                >按本月花费排序 · 找烧钱多的用户</span
-              >
+              <input
+                type="text"
+                class="adm-search adm-list-search"
+                id="adm-byuser-search"
+                data-i18n-placeholder="adm-byuser-search-ph"
+              />
             </div>
             <div class="cost-table-wrap">
               <table class="cost-table">
@@ -469,7 +472,12 @@
           <div class="cost-section">
             <div class="cost-section-head">
               <h3 data-i18n="tn-list-title">公司余额清单</h3>
-              <span class="cost-section-hint" data-i18n="tn-list-hint">按余额降序 · 透支飘红</span>
+              <input
+                type="text"
+                class="adm-search adm-list-search"
+                id="adm-tenants-search"
+                data-i18n-placeholder="adm-tenants-search-ph"
+              />
             </div>
             <div class="cost-table-wrap">
               <table class="cost-table">
@@ -793,8 +801,8 @@
 
     <!-- v118.44.0.7 救援版 · admin SPA 完全独立 · 不引 home.js(避开 30k 行屎山的 248 处 null bug)-->
     <!-- 轻量 i18n 字典(zh + th)· 暴露 window.ADMIN_I18N -->
-    <script src="/static/admin/admin-i18n.js?v=11841101"></script>
+    <script src="/static/admin/admin-i18n.js?v=11841102"></script>
     <!-- admin 主逻辑 · 鉴权 + 路由 + UI + 业务 fetch · 自包含 -->
-    <script src="/static/admin/admin.js?v=11841101" defer></script>
+    <script src="/static/admin/admin.js?v=11841102" defer></script>
   </body>
 </html>

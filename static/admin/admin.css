@@ -822,3 +822,45 @@ body.admin-layout-body .lang-switching-overlay {
     height: 170px;
   }
 }
+
+/* ============================================================
+ * 列表分页 + 同款搜索框(2026-05-25)
+ * ============================================================ */
+.adm-list-search {
+  max-width: 220px;
+}
+.adm-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 0 2px;
+}
+.adm-pager-tr td {
+  border: 0 !important;
+  background: transparent !important;
+}
+.adm-pager-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 6px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  font-family: inherit;
+}
+.adm-pager-btn:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+.adm-pager-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.adm-pager-info {
+  font-size: 12px;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+}

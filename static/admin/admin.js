@@ -301,6 +301,69 @@
         return _ENGINE_META[_canonEngine(e)] || _ENGINE_META.other;
     }
 
+    // ============ 列表分页 + 搜索(2026-05-25 · 统一组件 · 客户端)============
+    const _PG_SIZE = 20;
+    const _pgState = { users: 1, tenants: 1, byuser: 1 };
+    function _pgSlice(key, arr) {
+        const pages = Math.max(1, Math.ceil((arr.length || 0) / _PG_SIZE));
+        if (_pgState[key] > pages) _pgState[key] = pages;
+        if (_pgState[key] < 1) _pgState[key] = 1;
+        const start = (_pgState[key] - 1) * _PG_SIZE;
+        return {
+            rows: arr.slice(start, start + _PG_SIZE),
+            page: _pgState[key],
+            pages,
+            total: arr.length || 0,
+        };
+    }
+    function _pgBar(key, info) {
+        if (info.total <= _PG_SIZE) return '';
+        const tot = (_t('adm-pager-total') || '共 {n} 条').replace('{n}', info.total);
+        return (
+            '<div class="adm-pager">' +
+            '<button class="adm-pager-btn" data-pg="' +
+            key +
+            '" data-act="prev"' +
+            (info.page <= 1 ? ' disabled' : '') +
+            '>‹</button>' +
+            '<span class="adm-pager-info">' +
+            info.page +
+            ' / ' +
+            info.pages +
+            ' · ' +
+            tot +
+            '</span>' +
+            '<button class="adm-pager-btn" data-pg="' +
+            key +
+            '" data-act="next"' +
+            (info.page >= info.pages ? ' disabled' : '') +
+            '>›</button>' +
+            '</div>'
+        );
+    }
+    // 统一搜索过滤(大小写不敏感 · 多字段 or)
+    function _listFilter(arr, q, keys) {
+        q = (q || '').toLowerCase().trim();
+        if (!q) return arr || [];
+        return (arr || []).filter((it) =>
+            keys.some((k) =>
+                String(it[k] == null ? '' : it[k])
+                    .toLowerCase()
+                    .includes(q)
+            )
+        );
+    }
+    // 翻页按钮委托(绑一次)· 按 key 重画对应列表
+    document.addEventListener('click', function (e) {
+        const b = e.target.closest && e.target.closest('.adm-pager-btn[data-pg]');
+        if (!b) return;
+        const key = b.dataset.pg;
+        _pgState[key] = (_pgState[key] || 1) + (b.dataset.act === 'next' ? 1 : -1);
+        if (key === 'users') _renderAdmUserList(_admPageState.users || []);
+        else if (key === 'tenants') _drawTenants();
+        else if (key === 'byuser') _drawByUser();
+    });
+
     // ============ 成本追踪页业务 ============
     async function _renderCostPage() {
         // 引擎计费入口卡 = admin.html 静态两个直达链接(Cloud Vision + Gemini AI Studio)· 无需 fetch。
@@ -386,60 +449,20 @@
         } catch (e) {
             console.error('cost overview', e);
         }
-        // by user
+        // by user(2026-05-25 · 取数与渲染分离 · 加搜索+分页 · 见 _drawByUser)
         try {
             const d = await _adminFetch('/api/admin/cost/by_user');
-            const users = (d && d.users) || [];
-            const tbody = document.getElementById('cost-by-user-tbody');
-            if (!tbody) return;
-            if (!users.length) {
-                tbody.innerHTML =
-                    '<tr><td colspan="9" style="text-align:center;padding:20px;color:#a0aec0">' +
-                    _t('adm-empty') +
-                    '</td></tr>';
-            } else {
-                tbody.innerHTML = users
-                    .map((u) => {
-                        const avg = u.total_invoices ? u.total_cost_thb / u.total_invoices : 0;
-                        return (
-                            '<tr>' +
-                            '<td><strong>' +
-                            _esc(u.username || '—') +
-                            '</strong></td>' +
-                            '<td>' +
-                            _fmtBaht(u.today_cost_thb) +
-                            '</td>' +
-                            '<td>' +
-                            _fmtBaht(u.month_cost_thb) +
-                            '</td>' +
-                            '<td>' +
-                            _fmtBaht(u.total_cost_thb) +
-                            '</td>' +
-                            '<td>' +
-                            (u.total_pages || 0) +
-                            '</td>' +
-                            '<td>' +
-                            (u.total_invoices || 0) +
-                            '</td>' +
-                            '<td>' +
-                            (avg ? '฿ ' + _fmt(avg, 4) : '—') +
-                            '</td>' +
-                            '<td>' +
-                            (u.last_used_at ? String(u.last_used_at).slice(0, 10) : '—') +
-                            '</td>' +
-                            '</tr>'
-                        );
-                    })
-                    .join('');
-            }
+            _byUserData = (d && d.users) || [];
         } catch (e) {
+            _byUserData = [];
             const tbody = document.getElementById('cost-by-user-tbody');
             if (tbody)
                 tbody.innerHTML =
-                    '<tr><td colspan="9" style="text-align:center;padding:20px;color:#dc2626">' +
+                    '<tr><td colspan="8" style="text-align:center;padding:20px;color:#dc2626">' +
                     _t('adm-load-fail') +
                     '</td></tr>';
         }
+        _drawByUser();
         // 趋势图(堆叠柱+总花费折线 · 见 _renderCostTrend)· 失败不致命
         _renderCostTrend();
 
@@ -462,6 +485,63 @@
                 })
                 .catch((_) => {});
         }
+    }
+
+    // 按用户分组(2026-05-25 · 搜索+分页)
+    let _byUserData = [];
+    function _drawByUser() {
+        const tbody = document.getElementById('cost-by-user-tbody');
+        if (!tbody) return;
+        const q = (document.getElementById('adm-byuser-search') || {}).value || '';
+        const filtered = _listFilter(_byUserData, q, ['username']);
+        if (!filtered.length) {
+            tbody.innerHTML =
+                '<tr><td colspan="8" style="text-align:center;padding:20px;color:#a0aec0">' +
+                _t('adm-empty') +
+                '</td></tr>';
+            return;
+        }
+        const info = _pgSlice('byuser', filtered);
+        const rows = info.rows
+            .map((u) => {
+                const avg = u.total_invoices ? u.total_cost_thb / u.total_invoices : 0;
+                return (
+                    '<tr>' +
+                    '<td><strong>' +
+                    _esc(u.username || '—') +
+                    '</strong></td>' +
+                    '<td>' +
+                    _fmtBaht(u.today_cost_thb) +
+                    '</td>' +
+                    '<td>' +
+                    _fmtBaht(u.month_cost_thb) +
+                    '</td>' +
+                    '<td>' +
+                    _fmtBaht(u.total_cost_thb) +
+                    '</td>' +
+                    '<td>' +
+                    (u.total_pages || 0) +
+                    '</td>' +
+                    '<td>' +
+                    (u.total_invoices || 0) +
+                    '</td>' +
+                    '<td>' +
+                    (avg ? '฿ ' + _fmt(avg, 4) : '—') +
+                    '</td>' +
+                    '<td>' +
+                    (u.last_used_at ? String(u.last_used_at).slice(0, 10) : '—') +
+                    '</td>' +
+                    '</tr>'
+                );
+            })
+            .join('');
+        const pager =
+            info.total > _PG_SIZE
+                ? '<tr class="adm-pager-tr"><td colspan="8">' +
+                  _pgBar('byuser', info) +
+                  '</td></tr>'
+                : '';
+        tbody.innerHTML = rows + pager;
     }
 
     // ============ 30 天成本趋势(堆叠柱 + 总花费折线 · 2026-05-25 重做)============
@@ -892,71 +972,88 @@
         }
     }
 
-    // v118.35.0.22 · 全公司余额清单渲染
+    // v118.35.0.22 · 全公司余额清单(2026-05-25 · 取数与渲染分离 · 加搜索+分页)
+    let _tenantsData = [];
     async function _renderCreditsTenants() {
         const tbody = document.getElementById('credits-tenants-tbody');
         if (!tbody) return;
         try {
             const d = await _adminFetch('/api/admin/credits/tenants?limit=200');
-            const tenants = (d && d.tenants) || [];
-            if (!tenants.length) {
-                tbody.innerHTML =
-                    '<tr><td colspan="7" style="text-align:center;padding:20px;color:#a0aec0">' +
-                    _t('adm-empty') +
-                    '</td></tr>';
-                return;
-            }
-            tbody.innerHTML = tenants
-                .map((t) => {
-                    const balColor = t.is_overdraft
-                        ? '#dc2626'
-                        : t.is_low_balance
-                          ? '#d97706'
-                          : '#059669';
-                    const statusLabel = t.is_overdraft
-                        ? '<span style="color:#dc2626;font-weight:600">' +
-                          _t('tn-status-overdraft') +
-                          '</span>'
-                        : t.is_low_balance
-                          ? '<span style="color:#d97706">' + _t('tn-status-low') + '</span>'
-                          : '<span style="color:#059669">' + _t('tn-status-ok') + '</span>';
-                    return (
-                        '<tr>' +
-                        '<td><strong>' +
-                        _esc(t.tenant_name || '—') +
-                        '</strong></td>' +
-                        '<td style="color:' +
-                        balColor +
-                        ';font-weight:600">฿ ' +
-                        _fmt(t.balance_thb || 0, 2) +
-                        '</td>' +
-                        '<td>฿ ' +
-                        _fmt(t.month_usage_thb || 0, 2) +
-                        '</td>' +
-                        '<td>' +
-                        (t.pages_this_month || 0) +
-                        '</td>' +
-                        '<td>฿ ' +
-                        _fmt(t.lifetime_topup_thb || 0, 2) +
-                        '</td>' +
-                        '<td>' +
-                        (t.last_usage_at
-                            ? String(t.last_usage_at).slice(0, 16).replace('T', ' ')
-                            : '—') +
-                        '</td>' +
-                        '<td>' +
-                        statusLabel +
-                        '</td>' +
-                        '</tr>'
-                    );
-                })
-                .join('');
+            _tenantsData = (d && d.tenants) || [];
         } catch (e) {
             tbody.innerHTML =
                 '<tr><td colspan="7" style="text-align:center;padding:20px;color:#dc2626">' +
                 _t('adm-load-fail') +
                 '</td></tr>';
+            return;
         }
+        _drawTenants();
+    }
+    function _drawTenants() {
+        const tbody = document.getElementById('credits-tenants-tbody');
+        if (!tbody) return;
+        const q = (document.getElementById('adm-tenants-search') || {}).value || '';
+        const filtered = _listFilter(_tenantsData, q, ['tenant_name']);
+        if (!filtered.length) {
+            tbody.innerHTML =
+                '<tr><td colspan="7" style="text-align:center;padding:20px;color:#a0aec0">' +
+                _t('adm-empty') +
+                '</td></tr>';
+            return;
+        }
+        const info = _pgSlice('tenants', filtered);
+        const rows = info.rows
+            .map((t) => {
+                const balColor = t.is_overdraft
+                    ? '#dc2626'
+                    : t.is_low_balance
+                      ? '#d97706'
+                      : '#059669';
+                const statusLabel = t.is_overdraft
+                    ? '<span style="color:#dc2626;font-weight:600">' +
+                      _t('tn-status-overdraft') +
+                      '</span>'
+                    : t.is_low_balance
+                      ? '<span style="color:#d97706">' + _t('tn-status-low') + '</span>'
+                      : '<span style="color:#059669">' + _t('tn-status-ok') + '</span>';
+                return (
+                    '<tr>' +
+                    '<td><strong>' +
+                    _esc(t.tenant_name || '—') +
+                    '</strong></td>' +
+                    '<td style="color:' +
+                    balColor +
+                    ';font-weight:600">฿ ' +
+                    _fmt(t.balance_thb || 0, 2) +
+                    '</td>' +
+                    '<td>฿ ' +
+                    _fmt(t.month_usage_thb || 0, 2) +
+                    '</td>' +
+                    '<td>' +
+                    (t.pages_this_month || 0) +
+                    '</td>' +
+                    '<td>฿ ' +
+                    _fmt(t.lifetime_topup_thb || 0, 2) +
+                    '</td>' +
+                    '<td>' +
+                    (t.last_usage_at
+                        ? String(t.last_usage_at).slice(0, 16).replace('T', ' ')
+                        : '—') +
+                    '</td>' +
+                    '<td>' +
+                    statusLabel +
+                    '</td>' +
+                    '</tr>'
+                );
+            })
+            .join('');
+        const pager =
+            info.total > _PG_SIZE
+                ? '<tr class="adm-pager-tr"><td colspan="7">' +
+                  _pgBar('tenants', info) +
+                  '</td></tr>'
+                : '';
+        tbody.innerHTML = rows + pager;
     }
 
     // ============ 用户管理页业务(v118.44.1 完整版)============
@@ -1041,6 +1138,7 @@
             wrap.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-users-empty')) + '</div>';
             return;
         }
+        const _uInfo = _pgSlice('users', filtered);
         wrap.innerHTML =
             '<div class="adm-table-head">' +
             '<div>' +
@@ -1059,7 +1157,7 @@
             _esc(_t('adm-col-actions')) +
             '</div>' +
             '</div>' +
-            filtered
+            _uInfo.rows
                 .map((u) => {
                     const isAdmin = u.is_super_admin || u.tenant_type === 'admin';
                     const adminBadge = isAdmin
@@ -1126,7 +1224,8 @@
                         '</div>'
                     );
                 })
-                .join('');
+                .join('') +
+            _pgBar('users', _uInfo);
     }
 
     function _renderAdmRisk(r) {
@@ -2660,7 +2759,16 @@
         document.addEventListener('input', function (ev) {
             if (!ev.target) return;
             if (ev.target.id === 'adm-user-search') {
+                _pgState.users = 1; // 搜索变化回第 1 页
                 _renderAdmUserList(_admPageState.users || []);
+            }
+            if (ev.target.id === 'adm-tenants-search') {
+                _pgState.tenants = 1;
+                _drawTenants();
+            }
+            if (ev.target.id === 'adm-byuser-search') {
+                _pgState.byuser = 1;
+                _drawByUser();
             }
             if (ev.target.id === 'adm-employee-search') {
                 _renderAdmEmployees();

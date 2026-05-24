@@ -1,6 +1,17 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十五会话**)· **🟢 ① 对账UI 5盲区修4个 ② Earn后台诊断报告整改(余额卡/用户抽屉/趋势图/充值审核/列表) · 全上线 · CI 全绿。**
+> **最近更新**:2026-05-25(**第十五会话**)· **🟢 ① 对账UI 5盲区修4个 ② Earn后台诊断报告整改 ③ 成本页UI重做+监控独立模块+列表分页搜索 · 全上线 · CI 全绿。**
+> ⚠️⚠️ **下个窗口:回归工程整顿 `CLAUDE.md/REFACTOR_MASTER_PLAN.md`(从当前阶段续 · 见该文件进度看板)。BUG/整改主线本会话告一段落。**
+> ⚠️ **唯一未验(跨整个第十五会话)**:Earn admin UI 浏览器实际渲染观感(成本页引擎卡/趋势图/抽屉/充值排版/监控独立页/分页)——前端均过语法/lint/逻辑+路由全通+后端活数据真验,但**没在浏览器点一遍**,需 Zihao 以 Earn 超管登录 `pearnly.com/admin` 扫一遍,或给超管 token 我来 Playwright 验。
+>
+> **(第十五会话·尾)成本追踪页UI重做 + 系统监控独立 + 列表分页搜索(commit `7dd4a82`+`9889cbd` · 已上线 · admin cache_bust 11841102 · admin-only · 仅UI/前端聚合 · 不改扣费)**:
+> - **引擎计费入口卡片化**:两入口改与花费统计卡同款(白底/边/圆角/hover阴影/左图标+标题说明CTA+右箭头)· "以官方为准"移卡片下方小提示。
+> - **30天趋势重做**:黑粗柱→SVG 堆叠柱(按引擎归一)+总花费折线+Y轴฿刻度+X轴每5天+hover tooltip+彩色图例(可点切)+segmented(花费/调用/页)+空状态卡+异常峰值红点(>日均2x)。后端 `db.get_cost_daily_by_engine` 只读聚合 · 端点加 `by_engine`。
+> - **成本构成排行**:文字堆→排行列表(引擎名|金额|调用|彩色占比条)。
+> - **系统监控独立模块**:从成本页搬出→`page-admin-monitor`+sidebar导航+`/admin/monitor`路由(catch-all+resolveRoute/switchView/renderMonitorPage 全通·已验 /admin/monitor 返SPA 200)。
+> - **风控可疑活动并入监控**:从用户页搬进监控模块。
+> - **列表分页+同款搜索**:统一组件(_pgSlice/_pgBar/_listFilter·每页20·客户端)。用户管理(+分页)、公司余额清单(+搜索+分页)、按用户分组(+搜索+分页)。
+> - 守门:全量529 passed · black/ruff/eslint(0err)/prettier 全绿 · 上批CI success。
 >
 > **(第十五会话·下半)Earn 后台诊断报告整改(commit `de048d3` · 已上线 · CI 全绿 · admin-only zh+th · 不碰客户端)**:
 > 来源 `Earn后台诊断报告_20260524`(Codex)。逐条核实后整改 5 块(单一权威源见该报告 + 本段):

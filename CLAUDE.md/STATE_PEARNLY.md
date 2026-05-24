@@ -1,6 +1,18 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十五会话**)· **🟢 Codex 对账UI全量测试抓出的 5 个盲区 · 核实 + 修 4 个 + 上线。**
+> **最近更新**:2026-05-25(**第十五会话**)· **🟢 ① 对账UI 5盲区修4个 ② Earn后台诊断报告整改(余额卡/用户抽屉/趋势图/充值审核/列表) · 全上线 · CI 全绿。**
+>
+> **(第十五会话·下半)Earn 后台诊断报告整改(commit `de048d3` · 已上线 · CI 全绿 · admin-only zh+th · 不碰客户端)**:
+> 来源 `Earn后台诊断报告_20260524`(Codex)。逐条核实后整改 5 块(单一权威源见该报告 + 本段):
+> - **A 删 Google "实际余额" 卡整套前后端**:手动录入值会被误认成自动余额。删 `/api/admin/billing/balance` GET/POST + `/history` + `BalanceUpdateRequest` + `db.get_balance_summary/add_balance_log`。换成两个引擎计费**直达入口**(查清 pipeline_v1 = Google Cloud Vision(OCR文字层·Cloud计费) + Gemini Flash(AI Studio计费) 两套面;对账 gemini-vex 走 AI Studio)。表 `billing_balance_log` + `get_latest_balance` 保留(vat_excel 用 calibration 兜底)。生产 `billing/balance` 已返 404。
+> - **B 用户详情抽屉重设计(前后端)**:修一堆**前后端字段名错位**(前端读 `ocr_used_month/ocr_total/signup_fingerprint`,后端返 `used_this_month/cumulative_ocr/device_fingerprint` → 累计OCR/设备指纹/本月用量恒0恒空)。新增「余额与计费」段(余额+本月扣费+本月页数+累计充值,来自 `db.get_tenant_credit_summary` 新函数,**生产真验返活数据**)。删 credits 模式无意义的「本月用量0/无限」配额 + 死字段 `signup_source`。空字段/空段隐藏(不做空壳)。加员工段。后端 `/api/admin/users/{uid}` 补 `credit`。
+> - **C 趋势图+金额**:趋势恒"暂无数据"(后端返 `{days:[]}` 前端只读 `points/data`)→ 读 `d.days` + tooltip 字段 `p.day`;金额 `฿10.6,067`(`_fmt` toFixed 后正则给整串加千分位连小数也加逗号)→ 改 `Intl.NumberFormat`。
+> - **D 充值审核**:右侧(金额/日期/状态/截图/操作/审批备注)重排成对齐竖列 + 备注独占一行(class 化);加"隐藏测试数据"开关(默认开 · 名称模式过滤 QA/Codex/test/ui_recon · 不动 schema)。
+> - **E**:用户列表本月用量改真实 `used_this_month`(旧恒0)+列名"本月识别";"引擎占比/主备引擎"→"内部识别成本构成·非用户可选引擎";监控"今日识别总数"→"本进程识别数"(内存统计·重启清零)。
+> - 守门:全量 **529 passed** · black(py311)/ruff/eslint(0err)/prettier 全绿 · CI 双 job 绿 · admin cache_bust 11841099→11841100。
+> - **⚠️ 唯一未验**:admin UI 浏览器实际渲染(抽屉/卡片/充值排版)需 Zihao 以 Earn 登录看,或给超管 token;前端代码已过语法/lint/逻辑 + 后端活数据真验。
+>
+> **(第十五会话·上半)对账UI 5盲区**:见下方原记录(②③④①⑤ · commit `661c82a`/`9b48c83`/`a3aee96` · CI 测试 job 绿;后顺带清 CI lint 积压债 black/bandit/prettier · CI 现完全绿)。
 >
 > **本会话(第十五)成果(已上线 · 后端纯逻辑修 · 本地实跑+CI测试 job 双绿 · commit `661c82a`+`9b48c83`)**:
 > 触发 = Zihao 给的 `对账UI全量测试报告_20260524`(Codex 跑 23 个触发条件素材)。生产 JSON + 本地实跑双核实根因,修 4 个(⑤为验证项非bug)。单一权威源 [`docs/refactor/adr-006-universal-importer.md`](../docs/refactor/adr-006-universal-importer.md) §10.1。

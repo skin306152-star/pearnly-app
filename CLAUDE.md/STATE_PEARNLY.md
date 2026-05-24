@@ -1,6 +1,8 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-24(**第十二会话**)· **🔴 紧急:mrerp 银行对账 500 真因=服务器磁盘满(已修复+上线)· 🟡 异步大改地基已打好(待续做完)**
+> **最近更新**:2026-05-24(**第十三会话**)· **🟡 对账异步大改 #14 完成(handlers.py 三纯函数 + 注册 + 守门 · 见下方第十二会话段"B. 剩余步骤")· 下一步 #15 接口改 submit**
+>
+> **(第十二会话)**· **🔴 紧急:mrerp 银行对账 500 真因=服务器磁盘满(已修复+上线)· 🟡 异步大改地基已打好(待续做完)**
 >
 > **🚨 整顿/异步全部让位** · 当前最高优先级 = 把对账异步大改做完(下窗口接力 · 见下方"第十二会话"段)
 >
@@ -32,9 +34,12 @@
 - `services/recon_jobs/store.py` —— 队列 CRUD(enqueue/claim_next SKIP LOCKED/update_progress/finish/fail/reclaim_stale/get/gc_old)
 - `services/recon_jobs/worker.py` —— 双模工人(embedded web内 + standalone)· 并发闸门 · 租约续期 · 暂存 GC · handler 注册表
 
-**剩余 4 步(下窗口做完)**:
-1. **#14 抽 run_***:`services/recon_jobs/handlers.py` —— 把 bank_v2_run/gl_vat_run/build_excel 的"解析+对账+写结果表"段抽成 `run_bank_recon/run_glvat/run_salesvat(params, input_ref, progress_cb)` 纯函数(0 改识别逻辑)· `register_handler` 接入 worker · 上传文件落盘暂存 `/opt/mrpilot/var/recon_jobs/<job_id>/`。**纯搬 · 守门测试锁行为**(本地已验证 bank 全链路 2.25s)。
-2. **#15 接口改 submit**:三个 run 接口 → 暂存文件+建 job+秒回 `{job_id}`(藏 `RECON_ASYNC` flag 后 · 默认可回滚回老同步)· 新增统一 `GET /api/recon/jobs/{id}` 返 status/progress/result_table/result_id/error_code。
+**剩余步骤(下窗口做完)**:
+1. **#14 抽 run_*** ✅ **完成(2026-05-24 第十三会话)**:`services/recon_jobs/handlers.py` 建好 `run_bank_recon/run_glvat/run_salesvat(params, input_ref, progress_cb)` 三纯函数 · **0 改识别逻辑**(解析/对账原样调用 · 写现有结果表)· import 即 `register_handler` 接入 worker(bank/glvat/salesvat)· `_read_inputs` 按 role 从暂存目录读文件 · `_parallel`(ThreadPoolExecutor)复刻原 asyncio.gather 多文件并行 · 进度走 parse→reconcile→persist→done · 扣费/成本记录从 `create_task` 改工人线程内同步调。守门测试 `tests/unit/test_recon_handlers_contract.py`(10 个:签名/注册同一对象/读暂存保序/_parallel 保序/bank 正常+整侧全失败存诊断/glvat 正常+GL/VAT 0 行抛/salesvat 正常落盘)。**单元 428→438 全绿 · black/ruff(F)绿 · app import 绿**。⚠️ embedded worker 仍未 wire 进 app.py · handlers 当前完全休眠不影响线上。**下一步接 #15。**
+   - ⚠️ **input_ref 约定(给 #15 落盘用)**:`[{"path","filename","role"}]` · role ∈ bank:`stmt`/`gl` · glvat:`gl`/`vat` · salesvat:`invoice`/`report`。
+   - ⚠️ **params 约定**:bank=`{user_id,tenant_id,api_key,is_exempt,lang,gl_account,stmt_opening_override,gl_opening_override,gl_closing_override,stmt_closing_override}` · glvat=`{user_id,tenant_id,api_key,revenue_prefix,lang}` · salesvat=`{user_id,tenant_id,api_key,is_exempt,lang}`。
+   - ⚠️ **result 指针**:bank→`("bank_recon_v2_task", id)` · glvat→`("gl_vat_task", id)` · salesvat→`("vat_recon_tasks", uuid)`(前端用现有 `/tasks/{id}/download` 取 Excel)。
+2. **#15 接口改 submit**:三个 run 接口 → 暂存文件+建 job+秒回 `{job_id}`(藏 `RECON_ASYNC` flag 后 · 默认可回滚回老同步)· 新增统一 `GET /api/recon/jobs/{id}` 返 status/progress/result_table/result_id/error_code · **同时把 embedded worker wire 进 app.py 启动事件(`worker.start_embedded()`)**。
 3. **#16 前端**:三个 run 前端 → submit→轮询 jobs/{id}→用 result_id 调现有结果接口渲染(渲染/导出/历史**不改**)· **Zihao 要求:不加进度条 · 在现有"转圈处理中"图标旁加"共 X/Y 页"实时进度**(两文件用连续编号区分 stmt→gl)· 三处 `.json()` 全加兜底(铁律 #1 · gl-vat/vat_excel 一并)· cache_bust+release_notes。
 4. **#17 测试+部署**:守门测试(生命周期/分发/SKIP LOCKED 并发/状态接口/端到端)+ 生产建表 + 启 embedded worker(单 1.9G 机内存够 · standalone 会双份 ML 内存慎用)+ 用 mrerp 真文件(`D:\Users\Skin\Desktop\银行对账需求\报错`)灰度验证端到端跑通。
 

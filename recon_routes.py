@@ -1758,7 +1758,9 @@ async def bank_v2_run(
         )
 
     async def _parse_gl(b, fname):
-        return await loop.run_in_executor(None, lambda: parse_gl_v2(b, fname, gl_account, api_key))
+        return await loop.run_in_executor(
+            None, lambda: parse_gl_v2(b, fname, gl_account, api_key, tenant_id=_tid_stmt)
+        )
 
     stmt_results = await asyncio.gather(*[_parse_stmt(b, fn) for b, fn in stmt_data])
     gl_results = await asyncio.gather(*[_parse_gl(b, fn) for b, fn in gl_data])

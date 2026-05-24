@@ -2491,10 +2491,15 @@ def _extract_acct_code(text: str) -> str:
     return m.group(1) if m else ""
 
 
-def parse_gl_excel(file_bytes: bytes, filename: str, account_code: str = "") -> Dict[str, Any]:
+def parse_gl_excel(
+    file_bytes: bytes, filename: str, account_code: str = "", tenant_id: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Parse GL from Excel file.
     Returns {ok, rows, accounts, opening, closing, row_count, error}
+
+    ADR-006 S6b · 固定词典找不到表头时,接模板学习层:saved → 本地推断(GL 无余额链 · 靠表头词+
+    形状 · 保守:借贷拿不准不自动套用)→ needs_mapping(交用户确认)。现有能认的 GL 走原路径零回归。
     """
     try:
         import openpyxl
@@ -2524,12 +2529,67 @@ def parse_gl_excel(file_bytes: bytes, filename: str, account_code: str = "") -> 
             break
 
     if not col_map:
-        # v118.35.0.19 · 加 error_code 让前端能翻译成友好文案
-        return {
-            "ok": False,
-            "error_code": "gl_headers_not_found",
-            "error": "Cannot detect GL column headers",
-        }
+        # ADR-006 S6b · 学习层(惰性 import · 失败退回原行为)
+        try:
+            from services.importer import template_learning as _tl, template_store as _ts
+        except Exception:  # noqa: BLE001
+            _tl = _ts = None
+        if _tl is not None:
+            try:
+                l_idx, l_cm, conf, _r = _tl.infer_gl_col_map(all_rows_raw)
+            except Exception:  # noqa: BLE001
+                l_idx, l_cm, conf = -1, {}, "low"
+            # parse_gl_excel 实际能用的键(不支持单列 amount · GL 借贷符号约定不一);
+            # 但建议给前端时保留全部猜测(含 amount)· 让用户在面板里改对。
+            usable = {
+                k: v
+                for k, v in (l_cm or {}).items()
+                if k in ("date", "doc_no", "description", "debit", "credit", "account", "balance")
+            }
+            if l_idx >= 0:  # 找到了像 GL 的表格(date + 钱形状)· 不再死错
+                sig = _tl.build_header_signature(all_rows_raw[l_idx])
+                saved = _ts.find_mapping(tenant_id, "gl", sig) if (tenant_id and _ts) else None
+                if saved:
+                    col_map, header_idx = saved, l_idx
+                elif (
+                    conf == "high"
+                    and "date" in usable
+                    and ("debit" in usable or "credit" in usable)
+                ):
+                    col_map, header_idx = usable, l_idx
+                    if tenant_id and _ts:
+                        _ts.save_mapping(
+                            tenant_id,
+                            "gl",
+                            sig,
+                            usable,
+                            source="local",
+                            sample_headers=[str(c or "") for c in all_rows_raw[l_idx]],
+                        )
+                else:
+                    # 拿不准(GL 无余额链可证 · 借贷/科目易判错)→ 交用户确认一次(不自动套用)
+                    return {
+                        "ok": False,
+                        "needs_mapping": True,
+                        "error_code": "needs_mapping",
+                        "error": "New GL template — please confirm column mapping",
+                        "mapping_request": {
+                            "document_type": "gl",
+                            "template_signature": sig,
+                            "sheet_name": "",
+                            "headers": [str(c or "").strip() for c in all_rows_raw[l_idx]],
+                            "preview_rows": _tl.preview_rows(all_rows_raw, l_idx, limit=20),
+                            "suggested_mapping": l_cm,  # 全部猜测(含 amount)· UI 预填
+                            "confidence": conf,
+                        },
+                    }
+        if not col_map:
+            # v118.35.0.19 · 加 error_code 让前端能翻译成友好文案
+            return {
+                "ok": False,
+                "error_code": "gl_headers_not_found",
+                "error": "Cannot detect GL column headers",
+            }
 
     rows = []
     accounts_seen = set()
@@ -3376,7 +3436,11 @@ def _gemini_parse_gl(
 
 
 def parse_gl(
-    file_bytes: bytes, filename: str, account_code: str = "", api_key: str = ""
+    file_bytes: bytes,
+    filename: str,
+    account_code: str = "",
+    api_key: str = "",
+    tenant_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Route to Excel / PDF / pipeline GL parser based on file extension.
 
@@ -3391,7 +3455,7 @@ def parse_gl(
 
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     if ext in ("xlsx", "xls", "xlsm"):
-        result = parse_gl_excel(file_bytes, filename, account_code)
+        result = parse_gl_excel(file_bytes, filename, account_code, tenant_id=tenant_id)
     elif ext == "pdf":
         # 2026-05-21: PDF GL defaults to new pipeline (document_type=
         # general_ledger + validators). OCR_PDF_GL_LEGACY=true rolls back

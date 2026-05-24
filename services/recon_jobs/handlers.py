@@ -107,7 +107,9 @@ def run_bank_recon(
         lambda bf: parse_bank_statement_pdf(bf[0], bf[1], api_key, tenant_id=_scope), stmt_data
     )
     progress_cb({"stage": "parse", "stage_done": len(stmt_data), "stage_total": total})
-    gl_results = _parallel(lambda bf: parse_gl_v2(bf[0], bf[1], gl_account, api_key), gl_data)
+    gl_results = _parallel(
+        lambda bf: parse_gl_v2(bf[0], bf[1], gl_account, api_key, tenant_id=_scope), gl_data
+    )
     progress_cb({"stage": "parse", "stage_done": total, "stage_total": total})
 
     # 异步扣费 · 按扩展名分 pdf/excel(原路由 create_task · 此处工人线程内同步调用)

@@ -90,33 +90,64 @@ def _cleanup_on_fail(job_id: str):
 _EXCEL_EXTS = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv"}  # S6a · CSV/TSV 也走表格预检
 
 
+_GL_EXTS = {".xlsx", ".xls", ".xlsm"}  # GL 预检只查 Excel(CSV GL 暂走原路径)
+
+
 def _preflight_stmt_mapping(input_ref, scope_id):
-    """ADR-006 submit 同步预检:暂存的 Excel 银行账单是否需用户确认列对应。
+    """ADR-006 submit 同步预检:暂存的 Excel/CSV 账单(stmt)+ Excel 总账(gl)是否需确认列对应。
 
     返回 needs_mapping 响应 dict(交前端弹"确认列对应")· 或 None(都能理解 · 继续 enqueue)。
-    只检 Excel 银行账单(stmt)· PDF/图片不预检(走现有 OCR)· 毫秒级、不烧 Gemini。
+    PDF/图片不预检(走现有 OCR)· 毫秒级、不烧 Gemini。账单先于总账检查。
     """
     try:
-        from bank_recon_v2 import parse_bank_stmt_xlsx_direct
+        from bank_recon_v2 import parse_bank_stmt_xlsx_direct, parse_gl_excel
     except Exception:  # noqa: BLE001
         return None
+
+    def _ext(fn):
+        return ("." + fn.lower().rsplit(".", 1)[-1]) if "." in (fn or "") else ""
+
+    # 1) 账单(stmt)· Excel + CSV/TSV
     for ref in input_ref or []:
         if ref.get("role") != "stmt":
             continue
         fn = ref.get("filename") or ""
-        ext = ("." + fn.lower().rsplit(".", 1)[-1]) if "." in fn else ""
-        if ext not in _EXCEL_EXTS:
+        if _ext(fn) not in _EXCEL_EXTS:
             continue
         try:
             with open(ref["path"], "rb") as f:
-                b = f.read()
-            res = parse_bank_stmt_xlsx_direct(b, fn, tenant_id=scope_id)
+                res = parse_bank_stmt_xlsx_direct(f.read(), fn, tenant_id=scope_id)
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[preflight] {fn} skip: {e}")
+            logger.warning(f"[preflight] stmt {fn} skip: {e}")
             continue
         if res.get("needs_mapping"):
-            mr = res.get("mapping_request") or {}
-            return {"ok": False, "needs_mapping": True, "file": fn, **mr}
+            return {
+                "ok": False,
+                "needs_mapping": True,
+                "file": fn,
+                **(res.get("mapping_request") or {}),
+            }
+
+    # 2) 总账(gl)· 仅 Excel(S6b)
+    for ref in input_ref or []:
+        if ref.get("role") != "gl":
+            continue
+        fn = ref.get("filename") or ""
+        if _ext(fn) not in _GL_EXTS:
+            continue
+        try:
+            with open(ref["path"], "rb") as f:
+                res = parse_gl_excel(f.read(), fn, tenant_id=scope_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[preflight] gl {fn} skip: {e}")
+            continue
+        if res.get("needs_mapping"):
+            return {
+                "ok": False,
+                "needs_mapping": True,
+                "file": fn,
+                **(res.get("mapping_request") or {}),
+            }
     return None
 
 

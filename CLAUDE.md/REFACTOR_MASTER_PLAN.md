@@ -180,7 +180,7 @@
 
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
-| B1 | `app.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(20-30 个 router) | 4-6 周 | A1, A5 | 🟡 进行中 · **已抽 8 个 router**:notification(6 `c0b29eb`)+ clients(5 `f27ac38`)+ exceptions(8 `30f114f`)+ **team(7 `b95372d`)+ erp_mappings(12 `0e17fa4`)+ email_ingest(6 `8358b72`)+ rd(4 `8fa55f7`)+ settings/archive+dup-check(5 `7686259`)** · 另把 `_plan_permissions` 搬进 route_helpers(`870290c` · 解锁 rd/archive/history)· **app.py 10075→9546→8589**(本会话 9350→8589 · 净 -761 · 34 路由)· 每组带 contract test(unit 530→552)· 守门 imports/i18n/unit/black/ruff 全绿 · LF 全程保持干净(逐次校验 CRLF=0)· ✅ **2026-05-25 会话末已 push master**(`ad00b3c..fb68a6b`)· 生产验证:5 GET 路由 401 + rd 422 + /api/version 200(零丢路由)· **下一组**:history(7 路由 · 依赖 `_async_run_exception_checks`/`_check_history_access`→现 `_plan_permissions` 已在 route_helpers · 评估剩余 entangle)、`/api/bank-recon/*`、`/api/erp/*`(endpoints/push/logs)、`/api/admin/*` 大组 |
+| B1 | `app.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(20-30 个 router) | 4-6 周 | A1, A5 | 🟡 进行中 · **已抽 14 个 router**:notification(6)+ clients(5)+ exceptions(8)+ team(7)+ erp_mappings(12)+ email_ingest(6)+ rd(4)+ settings(5)+ **bank_recon(11 `faaa536`)+ admin_migration(7 `b33dd58`)+ admin_cost(10 `13eded7`)+ tenant(6 `fac5f62`)+ admin_logs(4 `574c92d`)+ erp_xero(8 `569b534`)** · 另把 `_plan_permissions`(`870290c`)+ `_tid`(`4755af7`)搬进 route_helpers · `_ensure_fresh_xero_token` 随 erp_xero · **app.py 10075→9546→8589→7263**(第十七会话 8589→7263 · 净 -1326)· 每组带 contract test(unit 530→552→**580**)· 守门 imports/i18n/unit/black/ruff 全绿 · LF 全程干净 · ⚠️ **第十七会话 7 commit 全留本地未 push**(领先 origin/master 7 个 · `faaa536..569b534`)· **下一组(均较纠缠 · 需先搬共享 helper)**:history(7 路由 · `_async_run_exception_checks` 170 行 + `_notify_*`/EXC_RULE 依赖 · 被 upload 路由共用)、`/api/erp/*` endpoints/push/logs(`_check_push_access` 共享 + 铁律 #10 async tripwire)、`/api/admin/users\|employees` 大组(多 helper + 孤立 users.csv) |
 | B2 | `db.py` 拆完 4k → 验收 < 500 行 / 冲刺 < 300 行(业务 SQL 迁 `services/`) | 3-4 周 | A1 | ⚪ |
 | B3 | 所有 `ensure_*` 迁 Alembic(25 个 · schema 完全版本化) | 3-4 周 | A2 | ⚪ |
 | B4 | 健康检查端点 `/health` + `/ready`(DB / Gemini / SMTP / LINE 各 check) | 半天 | — | ⚪ |
@@ -305,7 +305,7 @@
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
-| B 后端 | 🟡 1/10 | B1 已抽 8 router(53 路由)· app.py 10075→**8589** | 2026-05-25 会话 +5 router(team/erp_mappings/email_ingest/rd/settings)+ `_plan_permissions`→route_helpers · 本会话 app.py 9350→8589(-761)· 已有 **14** 个 *_routes.py · unit 530→552 · ✅ 本会话 7 commit 已 push(b95372d/0e17fa4/8358b72/870290c/8fa55f7/7686259 + docs fb68a6b · 生产验证通过) |
+| B 后端 | 🟡 1/10 | B1 已抽 14 router(99 路由)· app.py 10075→**7263** | 第十七会话 +6 router(bank_recon/admin_migration/admin_cost/tenant/admin_logs/erp_xero · 47 路由)+ `_tid`→route_helpers · app.py 8589→7263(-1326)· 已有 **20** 个 *_routes.py · unit 552→580 · ⚠️ **7 commit 全留本地未 push**(`faaa536..569b534`)· 下一组均较纠缠(history/erp-push/admin-users · 需先搬共享 helper) |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |

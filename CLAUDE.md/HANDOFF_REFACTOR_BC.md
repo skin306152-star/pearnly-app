@@ -1,117 +1,129 @@
 # 🤝 HANDOFF · Pearnly 整顿 B-C 阶段长跑
 
 > 单一权威源:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板 + B1 行)。本文件 = B-C 长跑接力专用速查。
-> **最后更新**:2026-05-25(第十六会话收尾)
+> **最后更新**:2026-05-25(第十七会话收尾)
 
 ---
 
 ## 0. 一句话现状
 
 整顿期 · 在做 **REFACTOR-B1**(拆 `app.py` 巨石 router → 独立 `*_routes.py`)。
-第十六会话抽了 5 个 router + 搬了 1 个 helper · **app.py 9350 → 8589 行(-761)** · **7 个 commit 全绿 · ✅ 会话末已 push master(`ad00b3c..fb68a6b`)· 生产验证通过**(5 GET 路由 401 + rd 422 + /api/version 200 · 零丢路由)。
+第十七会话抽了 6 个 router + 搬了 1 个 helper(`_tid`)· **app.py 8589 → 7263 行(-1326)** · **7 个 commit 全绿** · ⚠️ **全留本地未 push**(领先 origin/master 7 个)。
 
 ---
 
-## 1. 当前行数(2026-05-25 会话末)
+## 1. 当前行数(2026-05-25 第十七会话末)
 
 | 文件 | 行数 | 验收目标 | 冲刺目标 |
 |---|---|---|---|
-| app.py | **8589** | < 500 | < 300 |
+| app.py | **7263** | < 500 | < 300 |
 | db.py | 10620 | < 500 | < 300 |
 | home.js | 33867 | < 200 | < 120 |
 | home.css | 16131 | < 500 | < 250 |
 | home.html | 6726 | < 1000 | < 500 |
 
-> 本会话只动后端(app.py / route_helpers / 5 新 router 模块 + 5 contract test + 改 1 个 test)· **前端 home.* / db.py 一行没动**。
+> 本会话只动后端(app.py / route_helpers / 6 新 router 模块 + 6 contract test + 改 1 个 test)· **前端 home.* / db.py 一行没动**。
 
 ---
 
-## 2. 本会话 6 个本地 commit(全绿 · ⚠️ 未 push · 在 master 本地领先 origin/master 6 个)
+## 2. 本会话 7 个本地 commit(全绿 · ⚠️ 未 push · 领先 origin/master 7 个)
 
 | commit | 内容 | app.py 行数变化 |
 |---|---|---|
-| `b95372d` | extract team_routes(7 路由 `/api/team/employees*`) | 9350→9113 |
-| `0e17fa4` | extract erp_mappings_routes(12 路由 `/api/erp/mappings/*`) | 9113→8922 |
-| `8358b72` | extract email_ingest_routes(6 路由 `/api/email-ingest/*`) | 8922→8781 |
-| `870290c` | move `_plan_permissions` → route_helpers(解锁 rd/archive/history) | 8781→8748 |
-| `8fa55f7` | extract rd_routes(4 路由 `/api/(v1/)rd/*`) | 8748→8683 |
-| `7686259` | extract settings_routes(5 路由 archive+dup-check) | 8683→8589 |
+| `faaa536` | extract bank_recon_routes(11 路由 `/api/bank-recon/*`) | 8589→8321 |
+| `b33dd58` | extract admin_migration_routes(7 路由 `/api/admin/{migration,rls}/*`) | 8321→8246 |
+| `13eded7` | extract admin_cost_routes(10 路由 `/api/admin/{cost,credits,monitoring}/*`) | 8246→7997 |
+| `fac5f62` | extract tenant_routes(6 路由 `/api/admin/tenants/*` + `/api/me/tenant-usage` + 3 model) | 7997→7865 |
+| `574c92d` | extract admin_logs_routes(4 路由 操作/审计日志) | 7865→7674 |
+| `4755af7` | move `_tid` → route_helpers(解锁 categories/connectors/xero) | 7674→7666 |
+| `569b534` | extract erp_xero_routes(8 路由 connectors/status + xero/* + `_ensure_fresh_xero_token`) | 7666→7263 |
 
-**测试**:unit 530 → **552**(每 router 一个 contract test · +新 PlanPermissions test)· imports / i18n(0/0)/ black / ruff(F)每轮全绿。
-
----
-
-## 3. ✅ 已 push + 生产验证(会话末完成)
-
-- 会话末 Zihao 授权 push · `git push origin master` → `ad00b3c..fb68a6b`(7 commit)。
-- webhook 自动部署:push 后短暂 502(重启窗口)· **~5s 内 `/api/version` 恢复 200**(版本 11835074 不变 = 无 UI 改 · 正确)。
-- **生产路由验证**(搬家零丢路由):`/api/team/employees`、`/api/erp/mappings/clients`、`/api/email-ingest/account`、`/api/archive/settings`、`/api/settings/dup-check` 全返 **401**(路由在 · 非 404)· `/api/rd/verify` POST 返 **422**(校验 · 路由在)。
-- CI:run `26370466959`(commit fb68a6b)· ✅ **completed success**(本地 black/ruff(F)/unit 552 全绿 · 远端确认)。
-- ⚠️ **提醒下窗口**:push 到 master 会被 auto-mode 权限分类器拦 · 需 Zihao 当场授权(或加 `Bash(git push:*)` 权限规则免询问)。
+**测试**:unit 552 → **580**(每 router 一个 contract test · +_tid single-source test · 改 1 个 route_helpers contract)· imports / i18n(0/0)/ black / ruff(F)每轮全绿。
 
 ---
 
-## 4. 已抽出的 router 全景(14 个 `*_routes.py`)
+## 3. ⚠️ 未 push · 下窗口第一件事
+
+- 7 个 commit(`faaa536..569b534`)全在本地 master · **领先 origin/master 7 个 · 0 behind**。
+- 下窗口:`git push origin master`。**会被 auto-mode 权限分类器拦** · 需 Zihao 当场授权(或加 `Bash(git push:*)` 权限规则免询问)。
+- push 后照例验:`/api/version` 200 + 抽几个搬出的路由确认 401/422(非 404)= 零丢路由。CI 看 `gh run list --branch master`。
+- 本窗口**未跑生产验证**(没 push · 没部署)· 全部是本地守门全绿。
+
+---
+
+## 4. 已抽出的 router 全景(20 个 `*_routes.py`)
 
 | 模块 | 路由数 | 来源会话 |
 |---|---|---|
-| report_routes / recon_routes / recon_jobs_routes / import_routes / vat_excel_routes | — | 早期 |
-| billing_routes / admin_diagnostics_routes | — | 阶段 5 / 早期 |
-| notification_routes(6)/ clients_routes(5)/ exceptions_routes(8) | 19 | 第十/十一/十二会话 |
-| **team_routes(7)/ erp_mappings_routes(12)/ email_ingest_routes(6)/ rd_routes(4)/ settings_routes(5)** | **34** | **第十六会话(本次)** |
+| report / recon / recon_jobs / import / vat_excel / billing / admin_diagnostics | — | 早期 / 阶段 5 |
+| notification(6)/ clients(5)/ exceptions(8) | 19 | 第十/十一/十二会话 |
+| team(7)/ erp_mappings(12)/ email_ingest(6)/ rd(4)/ settings(5) | 34 | 第十六会话 |
+| **bank_recon(11)/ admin_migration(7)/ admin_cost(10)/ tenant(6)/ admin_logs(4)/ erp_xero(8)** | **46** | **第十七会话(本次)** |
 
-**route_helpers.py**(公共 helper · 14 个 router 复用):`_require_super_admin` / `_require_owner_or_super` / `_log_op` / `_get_client_ip` / `_check_password_strength` / `_WEAK_PASSWORDS` / **`_plan_permissions`(本会话新搬入)**。
+**route_helpers.py**(公共 helper · 跨 router 复用):`_require_super_admin` / `_require_owner_or_super` / `_log_op` / `_get_client_ip` / `_check_password_strength` / `_WEAK_PASSWORDS` / `_plan_permissions` / **`_tid`(本会话新搬入)**。
 
 ---
 
-## 5. 下窗口 B1 续拆候选(按边界清晰度排序)
+## 5. 下窗口 B1 续拆候选(全部较纠缠 · 先评估共享 helper)
 
-1. **history(7 路由 `/api/history*`)**:依赖 `_async_run_exception_checks` / `_check_history_access`(用 `_plan_permissions` · 现已在 route_helpers · entangle 解了一半)· 评估这两个 helper 是否也搬 route_helpers 或随 history 走。含 `/api/history/{id}/assign_client`(clients test 锁了它仍在 app.py · 搬时要更新该断言)。
-2. **`/api/bank-recon/*`**(~10 路由 · 含 _dev/seed、_dev/clear · 部分逻辑较重 · 看 `_check_*` 依赖)。
-3. **`/api/erp/*`**(endpoints / test-connection / customers / products / push / logs)· ⚠️ **铁律 #10**:async 路由调 sync Playwright adapter · 搬完必须保留 async tripwire 守门测试(AsyncLoopOffloadTests)· 别破坏 `await asyncio.to_thread`。
-4. **`/api/admin/*` 大组**(cost / credits / monitoring / tenants / users / logs)· 多用 `_require_super_admin`(已在 route_helpers)· 量大 · 可拆成 admin_users_routes / admin_cost_routes 等多个。
-5. **`/api/erp/xero/*` + connectors/status**(OAuth · 有状态 · 谨慎)。
+> ⚠️ 本会话把所有「边界清晰 · 自包含」的组都拆完了。剩下的组都有共享 helper 纠缠 · 不能直接 splice · 必须先把共享 helper 搬到 route_helpers(像本会话的 `_tid`)· 再拆路由。
+
+1. **history(7 路由 `/api/history*` + `/api/v1/history*` + `/api/history/{id}/assign_client`)**:
+   - 卡点:`_async_run_exception_checks`(app.py ~L3154 · 170 行)被 history PUT 路由**和** upload/OCR 路由(L2223/2780/6553/6683 等 · 留 app.py)共用。它依赖 `_notify_exception_high` / `_notify_large_invoice` / `EXC_RULE_*` 常量 / `_parse_money` / `_is_valid_thai_tax_id`。
+   - `_check_history_access`(用 `_plan_permissions` · 现已在 route_helpers · 干净)只被 history 用 · 可随组走。
+   - assign_client 用 `_tid`(已在 route_helpers)+ `db.learn_buyer_to_client` · 自包含 · 可随 history 走。
+   - **建议**:要么把 `_async_run_exception_checks` 整条依赖链(含 `_notify_*` + EXC_RULE 常量)搬到一个 `services/exceptions/` 或 route_helpers · 要么 history 这组**先跳过**(纠缠最深)。
+2. **`/api/erp/*` endpoints/test-connection/customers/products/push/logs**(~15 路由 · L3781-4836 + retry/batch 在 L4862+):
+   - 卡点:`_check_push_access`(app.py ~L3733)被这一大片共用 · 先搬 route_helpers。
+   - ⚠️ **铁律 #10**:test-connection / customers / products / push 是 async 路由调 sync Playwright(MRERPAdapter)· 必须保留 `await asyncio.to_thread` + AsyncLoopOffloadTests(`test_erp_test_connection_route_dispatch.py`)。搬家别破坏 offload。
+   - app.py 还有 Xero 自动推送后台函数(用 `_ensure_fresh_xero_token` · 已 import from erp_xero_routes)在这片附近 · 别误搬。
+3. **`/api/admin/users` + `/api/admin/employees` 大组**(~14 路由 · L6618-7374):
+   - 卡点:用 `_user_by_id`?(其实多是 db 方法)+ models(AdminCreateUserRequest/AdminVerifyPasswordRequest/AdminDeleteUserRequest/AdminResetPasswordRequest · L6722+)+ `AdminUpdateTenantQuota/Status`(已在 tenant_routes · import)+ EmployeeToggleRequest(已在 team_routes · import)+ `_require_super_admin`/`_log_op`/`_get_client_ip`(route_helpers)。
+   - **孤立 users.csv**:`/api/admin/users.csv`(本会话特意留 app.py · 待这组拆时一并搬)· contract test 锁了它仍在 app.py · 搬时更新 `test_admin_logs_routes_contract.test_users_csv_stays_in_app`。
+   - 量大 · 建议拆成 admin_users_routes + admin_employees_routes 两个。
+4. **categories(1 路由 `/api/categories`)**:只用 `_tid`(已在 route_helpers)+ db · 现在完全自包含 · 可随便找个 misc 模块塞 · 但单路由偏薄。
 
 ---
 
 ## 6. 本会话验证过的安全范式(下窗口照抄)
 
 **抽 router 步骤**:
-1. grep 目标路由组 + 它用的 helper / model / 是否被组外引用(确认自包含)。
-2. 新建 `xxx_routes.py`:`from __future__ import annotations` · `router = APIRouter()` · `from auth import get_current_user_from_request` · `from route_helpers import ...` · 组专属 helper/model 整体搬入(组外用的留 app.py 或搬 route_helpers)。
-3. 路由体**逐字复制** · 只把 `@app.` → `@router.`。懒 import(asyncio / 第三方)保持原样。
-4. app.py 加 `from xxx_routes import router as xxx_router` + `app.include_router(xxx_router)`。
-5. **删 app.py 旧块**:用字节级 splice 保 LF —
+1. grep 目标路由组 + 它用的 helper / model / 是否被组外引用(确认自包含 · 重点查 helper 是否被留 app.py 的路由共用 → 是就先搬 route_helpers)。
+2. 新建 `xxx_routes.py`:`from __future__ import annotations` · `router = APIRouter()` · `from auth import get_current_user_from_request` · `from route_helpers import ...` · 组专属 helper/model 整体搬入。
+3. 路由体**逐字复制** · 只把 `@app.` → `@router.`。**大组(>200 行)用字节级 PowerShell 提取**:`$lines = ReadAllLines; $block = $lines[a..b] | %{ $_ -replace '^@app\.','@router.' }; 拼 header + block 写出`(本会话 erp_xero 411 行就这么干 · 避免手抄出错)。先 `python -c "import ast; ast.parse(...)"` + `import xxx_routes` 自测编译。
+4. app.py 加 `from xxx_routes import router as xxx_router`(+ 共享 helper/model import 回来)+ `app.include_router(xxx_router)`。
+5. **删 app.py 旧块**:字节级 splice 保 LF —
    ```powershell
-   $lines = [System.IO.File]::ReadAllLines("app.py")   # 丢 EOL
-   # 边界 assert(top 是 # ==== / def / @app · end 是 return 行)
+   $lines = [System.IO.File]::ReadAllLines("app.py")
+   # 边界 assert(top/end/tail 各校验一行字面量 · 0-indexed = grep行号-1)
    $out = $head + $marker + $tail
    $enc = New-Object System.Text.UTF8Encoding($false)
    [System.IO.File]::WriteAllText((Resolve-Path "app.py"), ($out -join "`n") + "`n", $enc)
    ```
-   删完 grep 确认 `@app.*("/api/xxx` 残留=0 · model/helper 残留=0(marker 注释里的同名词不算)。
-6. 写 `tests/unit/test_xxx_routes_contract.py`:路由 path+method 集合 == 期望 · `app.app.routes` 含路由(防漏挂)· helper 单一来源 `assertIs(xxx._helper, route_helpers._helper)` · model 字段契约。
-7. 守门:`python -m black <files>`(会 wrap 长 import 行 · 正常)→ `python -m ruff check <files>`(删块后常有孤儿 import F401 · 删掉)→ `python scripts/check_imports.py --quiet` → `python scripts/check_i18n.py --strict` → `python -m unittest discover -s tests/unit`。
-8. commit(**用 `-F _commitmsg.txt` 文件传 message**:这会话发现 here-string `@'...'@` 偶发触发沙箱 Remove-Item 误判 · 用文件最稳)· message 带 `· REFACTOR-B1`。
+   删完 grep 确认 `@app.*("/api/xxx` 残留=0 · helper def 残留=0。
+6. 写 `tests/unit/test_xxx_routes_contract.py`:路由 path+method 集合 == 期望 · `app.app.routes` 含路由 · helper 单一来源 `assertIs(xxx._helper, route_helpers._helper)` · model 字段契约。
+7. 守门:`black <files>` → `ruff check <files>`(删块后常有孤儿 import F401 · 删掉)→ `check_imports --quiet` → `check_i18n --strict` → `unittest discover -s tests/unit`。
+8. commit(**用 `-F _commitmsg.txt` 文件传 message** · 写完 `rm`)· message 带 `· REFACTOR-B1`。
 
-**坑**:
-- 改 app.py 别用大块 Edit 匹配(易 mismatch)· 用上面字节级 splice。
-- black 会把超 100 字符的新 import 行 wrap 成多行 · 之后再 Edit 那行要按 wrap 后的样子匹配。
-- 删块后跑 ruff 抓孤儿 import(本会话 `_check_password_strength` 就这样被抓出)。
-- 删 helper 后若有 contract test 断言 `app._helper is route_helpers._helper` · 消费者搬走了就把断言跟到新模块(本会话 _check_password_strength 这么处理的)。
+**本会话踩的坑(下窗口注意)**:
+- **共享 helper 反咬**:搬走某组后 · 它用的 helper 可能在 app.py 变成 unused → ruff F401。本会话 `_require_owner_or_super` 最后消费者随 xero 搬走 · app.py 去掉 import · 但 `test_route_helpers_contract` 有 `assertIs(app._require_owner_or_super, ...)` 断言挂了 → 把断言**跟到新消费者**(erp_xero_routes)。删 helper import 前先 grep 该 helper 是否还有 app.py 消费者 + 是否有 contract test 断言 app.X。
+- **model 被组外复用**:tenant 的 `AdminUpdateTenantQuota/Status` 被 admin user 路由(留 app.py)复用 → model 留 tenant_routes · app.py import 回去。搬 model 前 grep 它在 app.py 剩余引用。
+- **路由被夹断**:tenant 组被 history 的 assign_client 夹在中间 → 两段 splice(读一次数组 · 拼 segA+marker1+segB+marker2+segC)· 注意 0-indexed = grep行号-1(本会话有一次 assert literal 写错索引 · assert 当场拦下 · 没写坏文件)。
+- **CSV BOM**:`"﻿"` 与字面 BOM `"﻿"` 是同一 Python 字符串 · 不影响行为 · 不用纠结。
 
 ---
 
 ## 7. 红线 / 停止条件(本会话遵守的)
 
-- 不 push(本会话指示)· 不 force-push · 不动 db.py schema · 不动前端 home.*(留 Zihao 在场)· 不动 git-deploy/webhook。
-- 触发停止:上下文 ~80% / 不可抗阻碍 / 测试失败短时不可修 / 需改架构·部署·DB·付费·生产密钥 / 单轮 diff >30 文件 / 无法判断是否改变业务行为。
-- 本会话**停止原因 = 主动收尾保预算**:已做 6 个干净 slice · 留足上下文写本交接文档 · 非阻碍非失败。
+- 不 push(本会话自主长跑指示)· 不 force-push · 不动 db.py schema · 不动前端 home.*(留 Zihao 在场)· 不动 git-deploy/webhook。
+- 触发停止:上下文 ~80% / 不可抗阻碍 / 测试失败短时不可修 / 需改架构·部署·DB·付费·生产密钥 / 单轮 diff >30 文件 / 无法判断是否改变业务行为 / 连续 8-10 commit 且上下文不足以安全开下一组。
+- 本会话**停止原因**:7 个干净 slice 后 · 剩余组(history/erp-push/admin-users)都纠缠较深(需先搬 `_async_run_exception_checks`/`_check_push_access`/多 helper)· 按「安全第一 · 纠缠太深跳过 · 上下文不足不硬开下一组」主动收尾 · **非测试失败 · 非阻碍 · 非红线**。
 
 ---
 
 ## 8. 检查记录(诚实)
 
+- **black / ruff(F)/ check_imports / check_i18n(0/0)/ unit 580**:每个 commit 全绿 · 会话末跑了一次完整 consolidated gate(全 *_routes.py + route_helpers + app.py · 全绿)。
 - **playwright / node --check**:本会话 0 改 JS / 0 改 UI(纯后端 router 搬家)· 不适用 · 未跑。
-- **生产 /api/version**:✅ push 后 200(11835074)· 5 GET 路由 401 + rd 422(零丢路由)。
-- **CI**:run 26370466959(fb68a6b)· ✅ completed **success**(已确认 · 与本地 black/ruff(F)/unit 552 全绿一致)。
+- **生产 / CI**:本会话**未 push · 未部署** · 无生产/CI 验证(下窗口 push 后补)。
+- **git**:领先 origin/master 7 个 commit · 0 behind · 工作区只有这 7 个 commit 的内容 + 既有未跟踪 probes/ 等(非本会话产生)。

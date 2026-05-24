@@ -1,7 +1,21 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十六会话**)· **🟢 整顿 REFACTOR-B1 长跑 · app.py 拆 router · 9350→8589 行(-761 · 34 路由 · 5 新 router 模块)· 7 commit 全绿 · ✅ 已 push master(`ad00b3c..fb68a6b`)· 生产验证通过(5 GET 401 + rd 422 · 无 404 · /api/version 200)。**
-> ⚠️⚠️ **下个窗口:继续 B1 拆 app.py router(候选见下:history/bank-recon/erp/admin)· 或 Zihao 在场开 C 前端拆 home.js。**
+> **最近更新**:2026-05-25(**第十七会话**)· **🟢 整顿 REFACTOR-B1 长跑续 · app.py 拆 router · 8589→7263 行(-1326 · 6 新 router 模块 + 47 路由 + _tid 搬家)· 7 commit 全绿 · ⚠️ 全留本地未 push(领先 origin/master 7 个)。**
+> ⚠️⚠️ **下个窗口:① 先把本地 7 个 commit push master(需 Zihao 当场授权或加 `Bash(git push:*)` 权限规则)· ② 继续 B1 拆剩下的纠缠组(history / erp-endpoints-push / admin-users · 都需先搬共享 helper · 详见 HANDOFF)· 或 Zihao 在场开 C 前端拆 home.js。**
+>
+> **(第十七会话)整顿 B1 · app.py 拆 router 长跑续(纯后端搬家 · 0 业务逻辑改 · 7 commit 全留本地 · ⚠️ 未 push)**:
+> 模式 = 接力自主长跑「每完成一个安全 slice 本地 commit · 不 push · 只拆边界清晰组 · 纠缠太深跳过」。本会话从 app.py 抽出 6 个 router + 搬 1 个 helper:
+> - **bank_recon_routes.py**(`faaa536`)· 11 路由 `/api/bank-recon/*`(上传/会话/匹配/候选/客户绑定/dev seed)· _TEST_USER_IDS 随组搬 · 自包含(仅 db + auth)。
+> - **admin_migration_routes.py**(`b33dd58`)· 7 路由 `/api/admin/{migration,rls}/*`(超管多租户迁移/RLS)· 仅 _require_super_admin + db。
+> - **admin_cost_routes.py**(`13eded7`)· 10 路由 `/api/admin/{cost,credits,monitoring}/*`(成本/收入/监控面板 · 只读聚合 + CSV)· 仅 _require_super_admin + db。
+> - **tenant_routes.py**(`fac5f62`)· 6 路由 `/api/admin/tenants/*` + `/api/me/tenant-usage` + 3 model · 被 history 组 assign_client 夹断 · 两段 splice · AdminUpdateTenantQuota/Status model 被 app.py admin user 路由复用 · import 回去(单一来源)。
+> - **admin_logs_routes.py**(`574c92d`)· 4 路由 `/api/admin/logs(.csv)` + `/api/me/access_log(.csv)`(操作/审计日志)· users.csv 留 app.py。
+> - **`_tid`→route_helpers.py**(`4755af7`)· 取 user tenant_id 的纯函数 · 37 调用点不变 · 解锁 categories/connectors/xero。
+> - **erp_xero_routes.py**(`569b534`)· 8 路由 `/api/erp/connectors/status` + `/api/erp/xero/*`(OAuth 连接器聚合 + 推送)· _ensure_fresh_xero_token 随组搬(app.py 自动推送复用 · import 回去)· _require_owner_or_super 最后消费者搬走 · app.py 去掉该 import(更新 route_helpers contract 单一来源断言)。铁律 #10 核对:Xero 走 requests 非 Playwright · 无 async tripwire 适用。
+> - **范式**:字节级 splice(ReadAllLines + join`n` + UTF8-no-BOM · 边界 assert)· `@app.`→`@router.` · 每组带 contract test · app.py LF 全程干净。
+> - **守门**:每组 imports / i18n(0/0)/ unit / black / ruff(F)全绿 · unit 552→**580**。
+> - **当前行数**:app.py **7263**(-1326)· db.py 10620 · home.js 33867 · home.css 16131 · home.html 6726(db/前端本会话未动)。
+> - **停止原因**:剩余组(history/erp-endpoints-push/admin-users)都纠缠较深(各需先搬 `_async_run_exception_checks`/`_check_push_access`/多 helper)· 按「安全第一 · 纠缠太深跳过 · 上下文不足不硬开下一组」收尾 · 非测试失败非阻碍。**详见 `CLAUDE.md/HANDOFF_REFACTOR_BC.md`**。
 >
 > **(第十六会话)整顿 B1 · app.py 拆 router 长跑(纯后端搬家 · 0 业务逻辑改 · 6 commit 全留本地 · ⚠️ 未 push)**:
 > 模式 = Zihao 指示「每完成一个安全 slice 就本地 commit · 不 push · 不因 push 权限拦截停下」。本会话从 app.py 抽出 5 个 router + 1 个 helper 搬家:

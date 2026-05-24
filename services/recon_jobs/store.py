@@ -20,6 +20,51 @@ logger = logging.getLogger("recon_jobs")
 
 VALID_JOB_TYPES = ("bank", "glvat", "salesvat")
 
+# Alembic 003 是 schema 单一权威源;下面 DDL 与之逐字一致,只为『工人/web 启动时自动建表』
+# (Zihao 2026-05-24 拍板:不手动跑 alembic · 启动即建)· 全 IF NOT EXISTS 幂等。
+_DDL = [
+    """
+    CREATE TABLE IF NOT EXISTS recon_jobs (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_type      TEXT NOT NULL,
+        user_id       UUID NOT NULL,
+        tenant_id     UUID,
+        status        TEXT NOT NULL DEFAULT 'queued',
+        progress      JSONB,
+        params        JSONB,
+        input_ref     JSONB,
+        result_table  TEXT,
+        result_id     TEXT,
+        error_code    TEXT,
+        attempts      INTEGER NOT NULL DEFAULT 0,
+        max_attempts  INTEGER NOT NULL DEFAULT 1,
+        worker_id     TEXT,
+        lease_until   TIMESTAMPTZ,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+        started_at    TIMESTAMPTZ,
+        finished_at   TIMESTAMPTZ,
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_recon_jobs_status_created ON recon_jobs (status, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_recon_jobs_user_created "
+    "ON recon_jobs (user_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_recon_jobs_tenant_created "
+    "ON recon_jobs (tenant_id, created_at DESC) WHERE tenant_id IS NOT NULL",
+]
+
+
+def ensure_table() -> bool:
+    """启动时幂等建表(web lifespan + standalone 工人都调)· 失败不致命(返 False)。"""
+    try:
+        with get_cursor(commit=True) as cur:
+            for stmt in _DDL:
+                cur.execute(stmt)
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"ensure_table failed: {e}")
+        return False
+
 
 def _norm(row: Optional[dict]) -> Optional[Dict[str, Any]]:
     """RealDictCursor 行规范化:uuid/datetime → str · JSONB 已是 dict/list。"""
@@ -43,28 +88,53 @@ def enqueue(
     params: Optional[dict] = None,
     input_ref: Optional[list] = None,
     max_attempts: int = 1,
+    job_id: Optional[str] = None,
 ) -> Optional[str]:
-    """建一个 queued 任务 · 返回 job_id(uuid 字符串)。"""
+    """建一个 queued 任务 · 返回 job_id(uuid 字符串)。
+
+    job_id 可由调用方预生成(submit 接口先用它命名暂存目录 STAGE_DIR/<job_id>/ ·
+    工人完成后按同一 id 清理)· 不传则 DB gen_random_uuid()。
+    """
     if job_type not in VALID_JOB_TYPES:
         raise ValueError(f"unknown job_type: {job_type!r}")
     try:
         with get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                INSERT INTO recon_jobs (job_type, user_id, tenant_id, status,
-                                        progress, params, input_ref, max_attempts)
-                VALUES (%s, %s::uuid, %s, 'queued', %s::jsonb, %s::jsonb, %s::jsonb, %s)
-                RETURNING id
-                """,
-                (
-                    job_type,
-                    str(user_id),
-                    str(tenant_id) if tenant_id else None,
-                    _json.dumps(params or {}, ensure_ascii=False, default=str),
-                    _json.dumps(input_ref or [], ensure_ascii=False, default=str),
-                    int(max_attempts or 1),
-                ),
-            )
+            if job_id:
+                cur.execute(
+                    """
+                    INSERT INTO recon_jobs (id, job_type, user_id, tenant_id, status,
+                                            progress, params, input_ref, max_attempts)
+                    VALUES (%s::uuid, %s, %s::uuid, %s, 'queued',
+                            %s::jsonb, %s::jsonb, %s::jsonb, %s)
+                    RETURNING id
+                    """,
+                    (
+                        str(job_id),
+                        job_type,
+                        str(user_id),
+                        str(tenant_id) if tenant_id else None,
+                        _json.dumps(params or {}, ensure_ascii=False, default=str),
+                        _json.dumps(input_ref or [], ensure_ascii=False, default=str),
+                        int(max_attempts or 1),
+                    ),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO recon_jobs (job_type, user_id, tenant_id, status,
+                                            progress, params, input_ref, max_attempts)
+                    VALUES (%s, %s::uuid, %s, 'queued', %s::jsonb, %s::jsonb, %s::jsonb, %s)
+                    RETURNING id
+                    """,
+                    (
+                        job_type,
+                        str(user_id),
+                        str(tenant_id) if tenant_id else None,
+                        _json.dumps(params or {}, ensure_ascii=False, default=str),
+                        _json.dumps(input_ref or [], ensure_ascii=False, default=str),
+                        int(max_attempts or 1),
+                    ),
+                )
             row = cur.fetchone()
             return str(row["id"]) if row else None
     except Exception as e:

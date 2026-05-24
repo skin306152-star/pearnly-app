@@ -95,6 +95,10 @@ def _run_one(job: Dict) -> None:
 
 async def run_worker(stop_event: Optional[asyncio.Event] = None) -> None:
     """工人主循环 · embedded 与 standalone 共用。"""
+    try:
+        store.ensure_table()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[recon-worker] ensure_table at start failed: {e}")
     bootstrap_handlers()
     logger.info(
         f"[recon-worker] start id={WORKER_ID} concurrency={CONCURRENCY} poll={POLL_INTERVAL}s"

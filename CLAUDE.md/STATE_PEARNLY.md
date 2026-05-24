@@ -1,6 +1,6 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-24(**第十三会话**)· **🟡 对账异步大改 #14 完成(handlers.py 三纯函数 + 注册 + 守门 · 见下方第十二会话段"B. 剩余步骤")· 下一步 #15 接口改 submit**
+> **最近更新**:2026-05-24(**第十三会话**)· **🟡 对账异步大改 #14+#15 完成(handlers.py 三纯函数 + recon_jobs_routes.py submit/状态 + embedded worker 上线空转 + 守门 · 加性不破老流程)· 下一步 #16 前端改 submit(碰 live home.js · 建议在场做)+ #17 端到端灰度**
 >
 > **(第十二会话)**· **🔴 紧急:mrerp 银行对账 500 真因=服务器磁盘满(已修复+上线)· 🟡 异步大改地基已打好(待续做完)**
 >
@@ -39,7 +39,10 @@
    - ⚠️ **input_ref 约定(给 #15 落盘用)**:`[{"path","filename","role"}]` · role ∈ bank:`stmt`/`gl` · glvat:`gl`/`vat` · salesvat:`invoice`/`report`。
    - ⚠️ **params 约定**:bank=`{user_id,tenant_id,api_key,is_exempt,lang,gl_account,stmt_opening_override,gl_opening_override,gl_closing_override,stmt_closing_override}` · glvat=`{user_id,tenant_id,api_key,revenue_prefix,lang}` · salesvat=`{user_id,tenant_id,api_key,is_exempt,lang}`。
    - ⚠️ **result 指针**:bank→`("bank_recon_v2_task", id)` · glvat→`("gl_vat_task", id)` · salesvat→`("vat_recon_tasks", uuid)`(前端用现有 `/tasks/{id}/download` 取 Excel)。
-2. **#15 接口改 submit**:三个 run 接口 → 暂存文件+建 job+秒回 `{job_id}`(藏 `RECON_ASYNC` flag 后 · 默认可回滚回老同步)· 新增统一 `GET /api/recon/jobs/{id}` 返 status/progress/result_table/result_id/error_code · **同时把 embedded worker wire 进 app.py 启动事件(`worker.start_embedded()`)**。
+2. **#15 接口改 submit** ✅ **完成(2026-05-24 第十三会话 · 加性/不破老流程)**:新建 **`recon_jobs_routes.py`**(铁律 #17 独立 router)· 三个 submit 接口(`POST /api/recon/bank-v2/submit`、`/gl-vat/submit`、`POST /api/vat_excel/submit`):鉴权+校验+credits 前置检查 → 文件落盘暂存 `STAGE_DIR/<job_id>/`(job_id 预生成)→ `store.enqueue` 建 job → 秒回 `{ok, job_id}`。统一 `GET /api/recon/jobs/{id}` 返 status/progress/result_table/result_id/error_code(前端据 result_id 调现有结果接口渲染/下载)。`app.py` include 新 router + lifespan 启动事件 `store.ensure_table()` + `worker.start_embedded()`(`PEARNLY_SKIP_HEAVY_INIT` 下不起 · `RECON_ASYNC!=1` 可秒回滚)+ 关闭 `stop_embedded()`。`store.enqueue` 加 `job_id` 预生成参数 · `store.ensure_table()` 幂等建表(Zihao 拍板启动自动建 · 不手动 alembic · DDL 与 003 逐字一致)· `worker.run_worker` 启动也 ensure_table。守门测试 `test_recon_jobs_submit_contract.py`(9 个:4 路由契约+app 挂载/enqueue 显式 id/ensure_table DDL/bank submit 落盘+enqueue/credits 402/jobs 命中映射+404)。**单元 438→447 全绿 · black/ruff(F)绿 · app 4 路由注册验证 ✓**。
+   - ⚠️ **加性策略**:老 `/run` 接口**完全没动** · 现前端仍用它 · embedded worker 上线后只是空转(无 job 入队)· 对 mrerp 零影响。**真正切流量靠 #16 前端改调 submit。** 无版本号/release_notes(无用户可见变化)。
+   - ⚠️ **剩 #16**:三个 run 前端改 submit→轮询 jobs/{id}→用 result_id 调现有结果接口渲染 · 三处 `.json()` 兜底 · cache_bust + 4 语 release_notes · **碰 live home.js(付费用户)· 需浏览器实测 · 建议 Zihao 在场做**。
+3. **(原 #15 内容已并入上方)**
 3. **#16 前端**:三个 run 前端 → submit→轮询 jobs/{id}→用 result_id 调现有结果接口渲染(渲染/导出/历史**不改**)· **Zihao 要求:不加进度条 · 在现有"转圈处理中"图标旁加"共 X/Y 页"实时进度**(两文件用连续编号区分 stmt→gl)· 三处 `.json()` 全加兜底(铁律 #1 · gl-vat/vat_excel 一并)· cache_bust+release_notes。
 4. **#17 测试+部署**:守门测试(生命周期/分发/SKIP LOCKED 并发/状态接口/端到端)+ 生产建表 + 启 embedded worker(单 1.9G 机内存够 · standalone 会双份 ML 内存慎用)+ 用 mrerp 真文件(`D:\Users\Skin\Desktop\银行对账需求\报错`)灰度验证端到端跑通。
 

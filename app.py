@@ -47,6 +47,7 @@ from auth import (
 from report_routes import router as reports_router  # v109.0
 from auth_signup import router as signup_router  # v109.3
 from recon_routes import router as recon_router  # v118.32.0
+from recon_jobs_routes import router as recon_jobs_router  # ADR-005 #15 · 对账异步 submit/状态
 from vat_excel_routes import router as vat_excel_router  # v118.32.4.9.5 · Excel 公式对账内测
 from notification_routes import router as notification_router  # REFACTOR-B1 · 2026-05-24
 from clients_routes import router as clients_router  # REFACTOR-B1 · 客户管理 5 路由 · 2026-05-24
@@ -846,8 +847,26 @@ exit 1
     else:
         logger.info("[erp_retry] 跳过启动(PEARNLY_SKIP_HEAVY_INIT=1)")
 
+    # ADR-005 #15 · 对账异步后台工人(embedded)· 启动建表 + 起轮询任务
+    # RECON_ASYNC!=1 时 start_embedded 自己跳过(可秒回滚)· PEARNLY_SKIP_HEAVY_INIT 下不起
+    if os.environ.get("PEARNLY_SKIP_HEAVY_INIT", "").lower() not in ("1", "true", "yes"):
+        try:
+            from services.recon_jobs import store as _recon_store, worker as _recon_worker
+
+            _recon_store.ensure_table()
+            _recon_worker.start_embedded()
+        except Exception as e:
+            logger.warning(f"[recon-worker] embedded 启动失败(不影响主服务): {e}")
+
     logger.info("✅ Mr.Pearnly 已就绪 v0.21.0-v108 (Google 余额追踪 · 半自动校准)")
     yield
+    # ADR-005 #15 · 停 embedded 工人
+    try:
+        from services.recon_jobs import worker as _recon_worker
+
+        await _recon_worker.stop_embedded()
+    except Exception:
+        pass
     # 关闭时停定时
     if email_task is not None:
         email_task.cancel()
@@ -1067,6 +1086,7 @@ app.include_router(billing_router)  # 阶段 5 Task 5.1 · billing 11 路由(202
 app.include_router(
     admin_diagnostics_router
 )  # 阶段 5 Task 5.2 · admin diagnostics + internal/deploy* 5 路由(2026-05-22)
+app.include_router(recon_jobs_router)  # ADR-005 #15 · 对账异步 submit + 统一状态查询
 # v118.35.0.28 P0-04 CORS 收紧 (体检 2026-05-21):
 # 旧 allow_origins=["*"] + allow_credentials=True 浏览器会自动拒绝凭据请求,
 # 但无凭据跨域 fetch 仍放行 · 收紧到生产白名单 + env 覆盖 + dev 自动放 localhost

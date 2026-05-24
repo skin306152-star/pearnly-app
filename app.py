@@ -735,6 +735,17 @@ if [ -f requirements.txt ]; then
         echo "pip install -r requirements.txt non-fatal failure" >> "$LOG"
 fi
 
+# 4.9. v118.35.0.68 · 清 pip/playwright 解压临时残渣(铁律 #24 · 2026-05-24 血泪根因)
+#     pip 装大包(torch ~2.7G)往 /tmp 解压 · 装完不清会累积撑爆硬盘 →
+#     Nginx 写不下上传 body → 对账 500(mrerp 真因)。删了下次自建 · 顺带磁盘体检。
+echo "cleaning /tmp/pip-* residue..." >> "$LOG"
+rm -rf /tmp/pip-* >> "$LOG" 2>&1 || true
+DISK_USE=$(df --output=pcent / 2>/dev/null | tail -1 | tr -dc '0-9')
+echo "disk usage after cleanup: ${DISK_USE}%" >> "$LOG"
+if [ "${DISK_USE:-0}" -ge 85 ]; then
+    echo "WARNING: disk >= 85% after cleanup — investigate /tmp /root /var/log" >> "$LOG"
+fi
+
 # 5. 重启服务
 echo "restarting mrpilot..." >> "$LOG"
 systemctl restart mrpilot >> "$LOG" 2>&1

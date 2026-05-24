@@ -1978,6 +1978,7 @@ const I18N = {
         'brv2-anchor-audit-col-diff':  '差额',
         'brv2-run-btn':       '开始对账',
         'brv2-processing':    '处理中…',
+        'brv2-err-server':    '服务器繁忙或暂时无法处理,请稍后重试。若文件较多,可分批上传。',
         'brv2-stat-matched':  '已匹配',
         'brv2-stat-gl-only':  'GL仅有',
         'brv2-stat-stmt-only':'对账单仅有',
@@ -4415,6 +4416,7 @@ const I18N = {
         'brv2-anchor-audit-col-diff':  'Diff',
         'brv2-run-btn':       'Run Reconciliation',
         'brv2-processing':    'Processing…',
+        'brv2-err-server':    'The server is busy or temporarily unavailable. Please try again shortly. If you have many files, try uploading in smaller batches.',
         'brv2-stat-matched':  'Matched',
         'brv2-stat-gl-only':  'GL Only',
         'brv2-stat-stmt-only':'Stmt Only',
@@ -6850,6 +6852,7 @@ const I18N = {
         'brv2-anchor-audit-col-diff':  'ผลต่าง',
         'brv2-run-btn':       'เริ่มกระทบยอด',
         'brv2-processing':    'กำลังประมวลผล…',
+        'brv2-err-server':    'เซิร์ฟเวอร์ไม่ว่างหรือไม่สามารถประมวลผลได้ชั่วคราว กรุณาลองใหม่อีกครั้ง หากมีไฟล์จำนวนมากให้ลองอัปโหลดทีละชุด',
         'brv2-stat-matched':  'จับคู่แล้ว',
         'brv2-stat-gl-only':  'GL เท่านั้น',
         'brv2-stat-stmt-only':'บัญชีเท่านั้น',
@@ -9281,6 +9284,7 @@ const I18N = {
         'brv2-anchor-audit-col-diff':  '差額',
         'brv2-run-btn':       '照合開始',
         'brv2-processing':    '処理中…',
+        'brv2-err-server':    'サーバーが混雑しているか一時的に処理できません。しばらくしてから再度お試しください。ファイルが多い場合は分割してアップロードしてください。',
         'brv2-stat-matched':  '一致',
         'brv2-stat-gl-only':  'GLのみ',
         'brv2-stat-stmt-only':'明細のみ',
@@ -19493,12 +19497,19 @@ async function deleteEndpoint(endpointId) {
                 headers: { 'Authorization': 'Bearer ' + token },
                 body: fd,
             });
-            const data = await res.json();
+            // v118.35.0.68 · 兜底:服务器返回非 JSON(网关 5xx/HTML 错误页 · 如磁盘满致 500)时
+            //   res.json() 会抛 "Unexpected token '<'" · 不再原样弹给用户 · 改友好 4 语提示
+            let data = null;
+            try { data = await res.json(); } catch (_) { data = null; }
 
-            if (!res.ok) {
-                // v118.35.0.23 · detail 可能是 {code,balance,...} 对象 · 用 _humanizeBackendError 防 [object Object]
-                showError(_humanizeBackendError(data.detail || data.error, 'Error ' + res.status));
+            if (!res.ok || data === null) {
                 showProgress(false);
+                if (data && (data.detail || data.error)) {
+                    // v118.35.0.23 · detail 可能是 {code,balance,...} 对象 · 用 _humanizeBackendError 防 [object Object]
+                    showError(_humanizeBackendError(data.detail || data.error, 'Error ' + res.status));
+                } else {
+                    showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
+                }
                 return;
             }
 

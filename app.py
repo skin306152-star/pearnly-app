@@ -5754,10 +5754,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "银行对账读得更全、更准了。\n\n遇到页数很多、密密麻麻的账单,以前可能会漏掉一些交易、或把存款和取款弄反;现在能把每一页、每一笔都完整读出来,存取方向也对得上。多个账户放在同一个 Excel、某个账户月底结清为 0 的情况,期末余额也能显示正确了;期初/期末余额也会自动补全显示。如果上传的账单只传了部分页(缺页),或仍可能有遗漏,系统会明确提醒您核对,不让错误悄悄溜过去。\n\n即日生效。",
-            "th": "การกระทบยอดธนาคารอ่านได้ครบและแม่นยำขึ้น\n\nกับใบแจ้งยอดที่มีหลายหน้าและรายการแน่น เมื่อก่อนอาจตกหล่นบางรายการหรือสลับฝาก/ถอน ตอนนี้อ่านได้ครบทุกหน้าทุกรายการ ทิศทางฝาก/ถอนถูกต้อง กรณีหลายบัญชีในไฟล์ Excel เดียวและบางบัญชีถูกตัดยอดเป็น 0 สิ้นเดือน ยอดคงเหลือก็แสดงถูกต้อง และเติมยอดยกมา/ยกไปให้อัตโนมัติ หากอัปโหลดมาไม่ครบหน้า (ขาดหน้า) หรืออาจยังตกหล่น ระบบจะเตือนให้ท่านตรวจสอบอย่างชัดเจน ไม่ปล่อยให้ผิดพลาดเงียบ ๆ\n\nมีผลทันที",
-            "en": "Bank reconciliation now reads statements more completely and accurately.\n\nFor long, densely packed statements, it could previously miss some transactions or swap deposits and withdrawals; now it reads every page and every line in full, with the deposit/withdrawal direction correct. For multiple accounts in one Excel file — including an account swept to zero at month-end — the closing balance now shows correctly too, and opening/closing balances are auto-filled. If you upload only some pages of a statement (missing pages), or a gap may remain, the system clearly prompts you to verify, so nothing slips through silently.\n\nEffective immediately.",
-            "ja": "銀行照合が、より漏れなく正確に読めるようになりました。\n\nページ数が多く明細が密な明細書では、以前は一部の取引を取りこぼしたり入金・出金を取り違えることがありましたが、今は全ページ・全明細を漏れなく読み取り、入出金の向きも正確です。1つのExcelに複数口座があり、月末に残高が0へ清算される口座でも、期末残高が正しく表示され、期首・期末残高も自動補完します。明細の一部ページのみをアップロード(ページ欠落)した場合や取りこぼしの可能性がある場合は、明確に確認を促し、エラーをそっと見逃しません。\n\n即日有効。",
+            "zh": "已修复『对账中心』上传文件时偶发的异常提示问题,对账功能恢复正常使用。\n\n此外,当系统繁忙或暂时无法处理时,会显示更清晰的提示,引导您稍后重试或将文件分批上传,不再出现看不懂的报错。\n\n即日生效。",
+            "th": "แก้ไขปัญหาการแจ้งข้อผิดพลาดที่เกิดขึ้นบางครั้งขณะอัปโหลดไฟล์ใน『ศูนย์กระทบยอด』แล้ว ใช้งานได้ตามปกติ\n\nนอกจากนี้ เมื่อระบบไม่ว่างหรือไม่สามารถประมวลผลได้ชั่วคราว จะแสดงข้อความที่ชัดเจนขึ้น เพื่อแนะนำให้ลองใหม่ภายหลังหรืออัปโหลดไฟล์ทีละชุด ไม่มีข้อความแสดงข้อผิดพลาดที่เข้าใจยากอีกต่อไป\n\nมีผลทันที",
+            "en": "Fixed an intermittent error that could appear when uploading files in the Reconciliation Center; the feature now works normally again.\n\nIn addition, when the system is busy or temporarily unable to process, it now shows a clearer message guiding you to retry shortly or upload files in smaller batches — no more confusing error text.\n\nEffective immediately.",
+            "ja": "『照合センター』でファイルをアップロードする際にまれに表示されていたエラーを修正し、正常にご利用いただけるようになりました。\n\nまた、システムが混雑中または一時的に処理できない場合は、しばらくして再試行するか、ファイルを分割してアップロードするよう促す、分かりやすいメッセージを表示します。分かりにくいエラー表示はなくなりました。\n\n即日有効。",
         },
     }
 

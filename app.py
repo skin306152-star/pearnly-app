@@ -60,6 +60,9 @@ from email_ingest_routes import (
     router as email_ingest_router,
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25
 from rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税务 4 路由 · 2026-05-25
+from settings_routes import (
+    router as settings_router,
+)  # REFACTOR-B1 · 归档/查重设置 5 路由 · 2026-05-25
 from erp_mappings_routes import (
     router as erp_mappings_router,
 )  # REFACTOR-B1 · ERP 映射 12 路由 · 2026-05-25
@@ -1104,6 +1107,7 @@ app.include_router(team_router)  # REFACTOR-B1 · 员工管理 7 路由(2026-05-
 app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2026-05-25)
 app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(2026-05-25)
 app.include_router(rd_router)  # REFACTOR-B1 · 泰国 RD 税务 4 路由(2026-05-25)
+app.include_router(settings_router)  # REFACTOR-B1 · 归档/查重设置 5 路由(2026-05-25)
 app.include_router(exceptions_router)  # REFACTOR-B1 · 异常处理 8 路由(2026-05-24)
 app.include_router(billing_router)  # 阶段 5 Task 5.1 · billing 11 路由(2026-05-22)
 app.include_router(
@@ -5308,92 +5312,10 @@ async def erp_batch_delete(req: ErpBatchDeleteRequest, request: Request):
 
 
 # ============================================================
-# v0.7 · 智能归档
+# v0.7 智能归档 + v0.13 重复发票检测设置(3 model + 2 helper + 5 路由)
+# 已抽到 settings_routes.py(REFACTOR-B1 · 2026-05-25)· app.include_router(settings_router)
+# (注:/api/archive/rename-preview 也一并搬出 · 它原先排在下方 gemini-key 墓碑注释之后)
 # ============================================================
-class ArchiveSettingsPayload(BaseModel):
-    name_template: List[Dict[str, Any]] = Field(default_factory=list)
-    folder_strategy: str = "by_month_seller"
-
-
-class ArchivePreviewRequest(BaseModel):
-    merged_fields: Dict[str, Any] = Field(default_factory=dict)
-    name_template: Optional[List[Dict[str, Any]]] = None
-
-
-def _check_archive_access(user: dict):
-    """所有 plan 都能读归档设置 · 用默认模板"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_archive"):
-        raise HTTPException(403, detail="archive.upgrade_required")
-
-
-def _check_archive_customize(user: dict):
-    """只有 Plus/Pro 能改归档模板"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_customize_archive"):
-        raise HTTPException(403, detail="archive.customize_plus_required")
-
-
-@app.get("/api/archive/settings")
-async def archive_settings_get(request: Request):
-    user = get_current_user_from_request(request)
-    _check_archive_access(user)
-    import archive as _archive
-
-    s = db.get_archive_settings(str(user["id"]))
-    if not s:
-        # 没配过 · 返回默认
-        return {
-            "name_template": _archive.DEFAULT_TEMPLATE,
-            "folder_strategy": _archive.DEFAULT_FOLDER_STRATEGY,
-            "is_default": True,
-        }
-    return {
-        "name_template": s.get("name_template") or _archive.DEFAULT_TEMPLATE,
-        "folder_strategy": s.get("folder_strategy") or _archive.DEFAULT_FOLDER_STRATEGY,
-        "is_default": False,
-    }
-
-
-@app.put("/api/archive/settings")
-async def archive_settings_put(payload: ArchiveSettingsPayload, request: Request):
-    user = get_current_user_from_request(request)
-    _check_archive_customize(user)  # v0.8 · 只有 Plus/Pro 能改模板
-    # 基本校验:模板不能是空的
-    if not payload.name_template:
-        raise HTTPException(400, detail="archive.template_empty")
-    ok = db.upsert_archive_settings(
-        str(user["id"]),
-        payload.name_template,
-        payload.folder_strategy,
-    )
-    if not ok:
-        raise HTTPException(500, detail="archive.save_failed")
-    return {"ok": True}
-
-
-# ============================================================
-# v0.13 · 重复发票检测设置
-# ============================================================
-class DupCheckSettingPayload(BaseModel):
-    enabled: bool
-
-
-@app.get("/api/settings/dup-check")
-async def dup_check_get(request: Request):
-    user = get_current_user_from_request(request)
-    return {"enabled": db.get_user_dup_check_enabled(str(user["id"]))}
-
-
-@app.put("/api/settings/dup-check")
-async def dup_check_put(payload: DupCheckSettingPayload, request: Request):
-    user = get_current_user_from_request(request)
-    ok = db.set_user_dup_check_enabled(str(user["id"]), payload.enabled)
-    if not ok:
-        raise HTTPException(500, detail="settings.save_failed")
-    return {"ok": True, "enabled": payload.enabled}
 
 
 # ============================================================
@@ -5403,22 +5325,6 @@ async def dup_check_put(payload: DupCheckSettingPayload, request: Request):
 #   PUT  · 保存 key
 #   POST /test · 用 key 做一次最小调用验证有效
 # v118.35.0.16 · /api/settings/gemini-key GET/PUT/POST routes 永久下线 · credits 系统不需要用户自带 key
-
-
-@app.post("/api/archive/rename-preview")
-async def archive_rename_preview(payload: ArchivePreviewRequest, request: Request):
-    """给配置页实时预览用:传 merged_fields + 模板 → 返回名字"""
-    user = get_current_user_from_request(request)
-    _check_archive_access(user)
-    import archive as _archive
-
-    template = payload.name_template
-    if not template:
-        # 没传模板 · 用用户当前设置(或默认)
-        s = db.get_archive_settings(str(user["id"]))
-        template = (s or {}).get("name_template") or _archive.DEFAULT_TEMPLATE
-    name = _archive.preview_name(payload.merged_fields or {}, template)
-    return {"name": name}
 
 
 # ============================================================

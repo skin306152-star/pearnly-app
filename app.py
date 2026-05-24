@@ -59,6 +59,7 @@ from team_routes import (  # REFACTOR-B1 · 员工管理 7 路由 · 2026-05-25
 from email_ingest_routes import (
     router as email_ingest_router,
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25
+from rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税务 4 路由 · 2026-05-25
 from erp_mappings_routes import (
     router as erp_mappings_router,
 )  # REFACTOR-B1 · ERP 映射 12 路由 · 2026-05-25
@@ -1102,6 +1103,7 @@ app.include_router(clients_router)  # REFACTOR-B1 · 客户管理 5 路由(2026-
 app.include_router(team_router)  # REFACTOR-B1 · 员工管理 7 路由(2026-05-25)
 app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2026-05-25)
 app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(2026-05-25)
+app.include_router(rd_router)  # REFACTOR-B1 · 泰国 RD 税务 4 路由(2026-05-25)
 app.include_router(exceptions_router)  # REFACTOR-B1 · 异常处理 8 路由(2026-05-24)
 app.include_router(billing_router)  # 阶段 5 Task 5.1 · billing 11 路由(2026-05-22)
 app.include_router(
@@ -5300,76 +5302,9 @@ async def erp_batch_delete(req: ErpBatchDeleteRequest, request: Request):
 
 
 # ============================================================
-# 第 5.1 批 · 泰国 RD 税务 API(校验 + 同步)
+# 第 5.1 批 · 泰国 RD 税务 API(校验+同步)· RdQueryRequest + _check_rd_access + 4 路由
+# 已抽到 rd_routes.py(REFACTOR-B1 · 2026-05-25)· app.include_router(rd_router)
 # ============================================================
-
-
-class RdQueryRequest(BaseModel):
-    tax_id: str = Field(..., description="13 位税号")
-    branch: Optional[int] = Field(0, description="分支号 · 默认 0(总部)")
-
-
-def _check_rd_access(user: dict):
-    """v0.8 · 所有 plan 可用 · Free 有日限"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_verify_tax"):
-        raise HTTPException(403, detail="rd.upgrade_required")
-
-    daily_limit = p.get("rd_daily_limit")
-    if daily_limit is None:
-        return  # 无限
-
-    # 当日用量(从 Redis/内存都没有,直接查 DB 简表)
-    used = db.get_rd_daily_usage(str(user["id"]))
-    if used >= daily_limit:
-        raise HTTPException(
-            429,
-            detail={
-                "code": "rd.daily_limit_reached",
-                "limit": daily_limit,
-                "used": used,
-            },
-        )
-
-
-@app.post("/api/rd/verify")
-async def rd_verify(req: RdQueryRequest, request: Request):
-    """校验税号是否真实存在(快 · TIN Service)"""
-    user = get_current_user_from_request(request)
-    _check_rd_access(user)
-    from rd_api import verify_tin
-
-    result = verify_tin(req.tax_id)
-    # v0.8.1 · 只计成功的查询,失败不算日限
-    if (result or {}).get("valid"):
-        db.increment_rd_daily_usage(str(user["id"]))
-    return result
-
-
-@app.post("/api/rd/lookup")
-async def rd_lookup(req: RdQueryRequest, request: Request):
-    """查公司全信息(VAT Service · 17 字段 · 用于一键同步)"""
-    user = get_current_user_from_request(request)
-    _check_rd_access(user)
-    from rd_api import lookup_vat
-
-    result = lookup_vat(req.tax_id, req.branch or 0)
-    # v0.8.1 · 只计查到公司信息的请求
-    if (result or {}).get("found") or (result or {}).get("name"):
-        db.increment_rd_daily_usage(str(user["id"]))
-    return result
-
-
-# v1 别名
-@app.post("/api/v1/rd/verify")
-async def v1_rd_verify(req: RdQueryRequest, request: Request):
-    return await rd_verify(req, request)
-
-
-@app.post("/api/v1/rd/lookup")
-async def v1_rd_lookup(req: RdQueryRequest, request: Request):
-    return await rd_lookup(req, request)
 
 
 # ============================================================

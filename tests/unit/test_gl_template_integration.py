@@ -69,6 +69,34 @@ class GlParseIntegrationTests(unittest.TestCase):
         self.assertTrue(res.get("ok"), res.get("error_code"))
         self.assertGreaterEqual(res.get("row_count", 0), 3)
 
+    def test_signed_net_movement_single_amount(self):
+        # 压测发现:单列净额 GL(Net Movement,无独立借/贷列)· 旧路径只匹配 date+account+balance
+        # → 0 行静默;修后 → 学习层识别 amount → 按符号拆借贷 → 解析出行。
+        rows = [
+            ["Posting Date", "Voucher", "Account", "Memo", "Net Movement", "Running Balance"],
+            ["2026-01-02", "V1", "1101", "fee", "302.25", "10302.25"],
+            ["2026-01-03", "V2", "1101", "transfer", "-541.50", "9760.75"],
+            ["2026-01-04", "V3", "4000", "sale", "1200.00", "10960.75"],
+            ["2026-01-05", "V4", "5000", "buy", "-800.00", "10160.75"],
+            ["2026-01-06", "V5", "1101", "fee2", "50.00", "10210.75"],
+        ]
+        res = brv2.parse_gl_excel(_xlsx(rows), "gl.xlsx")
+        self.assertTrue(res.get("ok"), res.get("error_code") or res.get("error"))
+        self.assertGreaterEqual(res.get("row_count", 0), 5)  # 单列净额也能解析出行
+
+    def test_date_account_balance_no_money_not_silent_zero(self):
+        # date+account+balance 但无借贷/金额列 → 不能静默解析成 0 行(旧 len>=3 的坑)
+        rows = [
+            ["Date", "Account", "Balance"],
+            ["2026-01-02", "1101", "10302.25"],
+            ["2026-01-03", "1101", "9760.75"],
+            ["2026-01-04", "4000", "10960.75"],
+        ]
+        res = brv2.parse_gl_excel(_xlsx(rows), "gl.xlsx")
+        # 没钱列 · 旧路径会给 0 行 ok=True(静默)· 现在应 needs_mapping 或非静默失败
+        if res.get("ok"):
+            self.assertGreater(res.get("row_count", 0), 0)  # 若 ok 必须真有行
+
     def test_gl_regression_standard_headers(self):
         rows = [
             ["วันที่", "เลขที่เอกสาร", "รหัสบัญชี", "คำอธิบาย", "เดบิต", "เครดิต"],

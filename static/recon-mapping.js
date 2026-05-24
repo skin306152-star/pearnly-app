@@ -96,7 +96,17 @@
     // 按文档类型给不同字段选项:账单(statement) vs 总账(gl)
     var FIELDS_BY_TYPE = {
         statement: ['ignore', 'date', 'description', 'deposit', 'withdrawal', 'amount', 'balance'],
-        gl: ['ignore', 'date', 'doc_no', 'account', 'description', 'debit', 'credit', 'balance'],
+        gl: [
+            'ignore',
+            'date',
+            'doc_no',
+            'account',
+            'description',
+            'debit',
+            'credit',
+            'amount',
+            'balance',
+        ],
     };
 
     function t(d, lang) {
@@ -262,7 +272,9 @@
             }
             var hasAmt =
                 docType === 'gl'
-                    ? typeof mapping.debit === 'number' || typeof mapping.credit === 'number'
+                    ? typeof mapping.debit === 'number' ||
+                      typeof mapping.credit === 'number' ||
+                      typeof mapping.amount === 'number'
                     : typeof mapping.deposit === 'number' ||
                       typeof mapping.withdrawal === 'number' ||
                       typeof mapping.amount === 'number';

@@ -63,6 +63,24 @@ class CsvStatementTests(unittest.TestCase):
         # 千分位逗号在引号字段里 · 不该被切错列 · 余额读对
         self.assertAlmostEqual(res["accounts"][0]["closing"], 10000.53, places=2)
 
+    def test_balance_break_raises_summary_issue(self):
+        # 压测发现:行级余额对不上须在摘要也提示(balance_break)· 不止行级 ⚠
+        rows = [
+            ["Date", "Desc", "Deposit", "Withdrawal", "Balance"],
+            ["2025-11-01", "open", "", "", "10000.00"],
+            ["2025-11-02", "a", "", "1000.00", "9000.00"],
+            ["2025-11-03", "b", "", "500.00", "8500.00"],
+            ["2025-11-04", "c", "2000.00", "", "9999.99"],  # 故意错:应 10500,印 9999.99
+            ["2025-11-05", "d", "", "300.00", "9699.99"],
+            ["2025-11-06", "e", "", "200.00", "9499.99"],
+        ]
+        res = brv2.parse_bank_stmt_xlsx_direct(_csv_bytes(rows), "stmt.csv")
+        self.assertTrue(res.get("ok"), res.get("error_code"))
+        comp = res.get("completeness") or {}
+        types = [i.get("type") for i in comp.get("issues") or []]
+        self.assertIn("balance_break", types)  # 摘要层提示余额断链
+        self.assertFalse(comp.get("ok"))
+
     def test_thai_cp874_encoding(self):
         # 泰文 CSV 常见 cp874(TIS-620)编码 · 不能读成乱码
         res = brv2.parse_bank_stmt_xlsx_direct(

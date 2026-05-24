@@ -1589,6 +1589,16 @@ def _completeness_details(issues, lang) -> list:
             out.append(
                 f"{L('close')}({L('printed')}{it['printed']:,.0f}/{L('calc')}{it['calc']:,.0f})"
             )
+        elif t == "balance_break":
+            # ADR-006 压测发现 · N 行余额对不上 · 摘要也提示(不止行级 ⚠)
+            n = it.get("count", 0)
+            _bb = {
+                "zh": f"{n} 行余额对不上(已逐行标 ⚠ · 请核对)",
+                "en": f"{n} row(s) fail the balance chain (flagged ⚠ — please review)",
+                "th": f"{n} แถวยอดคงเหลือไม่ตรง (ทำเครื่องหมาย ⚠ แล้ว — โปรดตรวจสอบ)",
+                "ja": f"{n} 行で残高が一致しません(⚠ 表示済み — ご確認ください)",
+            }
+            out.append(_bb.get(lang, _bb["en"]))
     if miss:
         out.append(_MISSPAGE_LBL.get(lang, _MISSPAGE_LBL["en"]))
     return out

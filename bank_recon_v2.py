@@ -2443,6 +2443,12 @@ def parse_bank_stmt_xlsx_direct(
                 }
             )
 
+    # ADR-006 压测发现 · 行级余额对不上(balance_ok=False)此前只在明细行标 ⚠,摘要不提示 →
+    # 用户得逐行翻才发现。这里汇总:有 N 行余额链断 → 产出 balance_break issue,弹显眼警告条。
+    _bad_balance = sum(1 for r in all_rows if getattr(r, "balance_ok", None) is False)
+    if _bad_balance > 0:
+        comp_issues.append({"type": "balance_break", "count": _bad_balance})
+
     return {
         "ok": True,
         "rows": all_rows,
@@ -2501,21 +2507,34 @@ def parse_gl_excel(
     ADR-006 S6b · 固定词典找不到表头时,接模板学习层:saved → 本地推断(GL 无余额链 · 靠表头词+
     形状 · 保守:借贷拿不准不自动套用)→ needs_mapping(交用户确认)。现有能认的 GL 走原路径零回归。
     """
-    try:
-        import openpyxl
-
-        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
-        ws = wb.active
-        all_rows_raw = list(ws.values)
-    except Exception:
+    _ext = (filename or "").lower().rsplit(".", 1)[-1]
+    all_rows_raw = None
+    if _ext in ("csv", "tsv", "txt"):
+        # ADR-006 S6b · GL CSV 也走学习层(此前 CSV GL 直接丢 Gemini)
+        csv_sheets = _load_csv_sheets(file_bytes)
+        if csv_sheets:
+            all_rows_raw = csv_sheets[0][1]
+    if all_rows_raw is None:
         try:
-            import xlrd
+            import openpyxl
 
-            wb = xlrd.open_workbook(file_contents=file_bytes)
-            ws = wb.sheet_by_index(0)
-            all_rows_raw = [ws.row_values(i) for i in range(ws.nrows)]
-        except Exception as e:
-            return {"ok": False, "error": f"Cannot read Excel: {e}"}
+            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+            ws = wb.active
+            all_rows_raw = list(ws.values)
+        except Exception:
+            try:
+                import xlrd
+
+                wb = xlrd.open_workbook(file_contents=file_bytes)
+                ws = wb.sheet_by_index(0)
+                all_rows_raw = [ws.row_values(i) for i in range(ws.nrows)]
+            except Exception as e:
+                # 最后再试 CSV(扩展名没带对但内容是 CSV)
+                csv_sheets = _load_csv_sheets(file_bytes)
+                if csv_sheets:
+                    all_rows_raw = csv_sheets[0][1]
+                else:
+                    return {"ok": False, "error": f"Cannot read Excel/CSV: {e}"}
 
     # Find header row (within first 10 rows)
     header_idx = 0
@@ -2523,7 +2542,9 @@ def parse_gl_excel(
     for i, row in enumerate(all_rows_raw[:10]):
         row_list = [str(c or "").strip() for c in row]
         cm = _map_gl_cols(row_list)
-        if len(cm) >= 3:  # at least date + (debit or credit) + something
+        # ADR-006 压测发现 · 必须有 date + 钱列(借/贷)才算真表头;只匹配到 date+科目+余额(无借贷)
+        # 不算(否则解析出 0 行 · 如单列净额 GL)→ 交学习层(可识别单列净额 amount)。
+        if "date" in cm and ("debit" in cm or "credit" in cm):
             col_map = cm
             header_idx = i
             break
@@ -2539,12 +2560,22 @@ def parse_gl_excel(
                 l_idx, l_cm, conf, _r = _tl.infer_gl_col_map(all_rows_raw)
             except Exception:  # noqa: BLE001
                 l_idx, l_cm, conf = -1, {}, "low"
-            # parse_gl_excel 实际能用的键(不支持单列 amount · GL 借贷符号约定不一);
-            # 但建议给前端时保留全部猜测(含 amount)· 让用户在面板里改对。
+            # parse_gl_excel 能用的键(S6b 起支持单列 amount · 按符号拆借贷);
+            # 建议给前端时保留全部猜测 · 让用户在面板里改对。
             usable = {
                 k: v
                 for k, v in (l_cm or {}).items()
-                if k in ("date", "doc_no", "description", "debit", "credit", "account", "balance")
+                if k
+                in (
+                    "date",
+                    "doc_no",
+                    "description",
+                    "debit",
+                    "credit",
+                    "account",
+                    "balance",
+                    "amount",
+                )
             }
             if l_idx >= 0:  # 找到了像 GL 的表格(date + 钱形状)· 不再死错
                 sig = _tl.build_header_signature(all_rows_raw[l_idx])
@@ -2554,7 +2585,7 @@ def parse_gl_excel(
                 elif (
                     conf == "high"
                     and "date" in usable
-                    and ("debit" in usable or "credit" in usable)
+                    and ("debit" in usable or "credit" in usable or "amount" in usable)
                 ):
                     col_map, header_idx = usable, l_idx
                     if tenant_id and _ts:
@@ -2661,6 +2692,19 @@ def parse_gl_excel(
             if "credit" in col_map and col_map["credit"] < len(row_list)
             else 0
         )
+        # ADR-006 S6b · 单列净额(Net Movement)· 无独立借/贷列 → 按符号拆:正=借方 负=贷方
+        # (GL "movement" 列正数=借方增加的通用约定 · 让单列净额 GL 也能解析而非读不到)
+        if (
+            debit == 0.0
+            and credit == 0.0
+            and "amount" in col_map
+            and col_map["amount"] < len(row_list)
+        ):
+            _amt = _to_float(row_list[col_map["amount"]])
+            if _amt > 0:
+                debit = _amt
+            elif _amt < 0:
+                credit = abs(_amt)
 
         # Account code: from column or auto-extract from description
         acct = ""
@@ -3456,6 +3500,13 @@ def parse_gl(
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     if ext in ("xlsx", "xls", "xlsm"):
         result = parse_gl_excel(file_bytes, filename, account_code, tenant_id=tenant_id)
+    elif ext in ("csv", "tsv"):
+        # ADR-006 S6b · GL CSV 先走学习层(免费)· ok 或 needs_mapping 直接返回;
+        # 只有真读不出(非 needs_mapping 失败)才降级 Gemini pipeline。
+        result = parse_gl_excel(file_bytes, filename, account_code, tenant_id=tenant_id)
+        if not result.get("ok") and not result.get("needs_mapping"):
+            logger.info(f"[parse_gl] csv direct miss · falling back to pipeline: {filename}")
+            result = _parse_gl_via_pipeline(file_bytes, filename, account_code)
     elif ext == "pdf":
         # 2026-05-21: PDF GL defaults to new pipeline (document_type=
         # general_ledger + validators). OCR_PDF_GL_LEGACY=true rolls back

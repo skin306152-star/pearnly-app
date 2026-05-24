@@ -10,7 +10,12 @@
     'use strict';
 
     var L = {
-        title: { zh: '请核对识别结果', th: 'กรุณาตรวจสอบผลการอ่าน', en: 'Please review the scan', ja: '読み取り結果の確認' },
+        title: {
+            zh: '请核对识别结果',
+            th: 'กรุณาตรวจสอบผลการอ่าน',
+            en: 'Please review the scan',
+            ja: '読み取り結果の確認',
+        },
         sub: {
             zh: '系统对这份账单的部分内容不确定。请核对下表(可直接修改),确认后再对账。',
             th: 'ระบบไม่แน่ใจกับบางส่วนของรายการเดินบัญชีนี้ กรุณาตรวจสอบ/แก้ไขด้านล่างก่อนกระทบยอด',
@@ -24,19 +29,44 @@
         colBal: { zh: '余额', th: 'คงเหลือ', en: 'Balance', ja: '残高' },
         colChk: { zh: '余额校验', th: 'ตรวจยอด', en: 'Check', ja: '検算' },
         opening: { zh: '期初余额', th: 'ยอดยกมา', en: 'Opening', ja: '期首残高' },
-        confirm: { zh: '确认并对账', th: 'ยืนยันและกระทบยอด', en: 'Confirm & reconcile', ja: '確認して照合' },
+        confirm: {
+            zh: '确认并对账',
+            th: 'ยืนยันและกระทบยอด',
+            en: 'Confirm & reconcile',
+            ja: '確認して照合',
+        },
         cancel: { zh: '取消', th: 'ยกเลิก', en: 'Cancel', ja: 'キャンセル' },
-        chainOk: { zh: '余额链全部对上 ✓', th: 'ยอดคงเหลือถูกต้องทั้งหมด ✓', en: 'Balance chain all OK ✓', ja: '残高チェーン全て一致 ✓' },
+        chainOk: {
+            zh: '余额链全部对上 ✓',
+            th: 'ยอดคงเหลือถูกต้องทั้งหมด ✓',
+            en: 'Balance chain all OK ✓',
+            ja: '残高チェーン全て一致 ✓',
+        },
         chainBad: {
             zh: '还有 {n} 行余额对不上(红色行)· 仍可提交,但建议先核对',
             th: 'ยังมี {n} แถวที่ยอดไม่ตรง (แถวสีแดง) · ส่งได้ แต่ควรตรวจก่อน',
             en: '{n} row(s) still off (red) · you may submit, but please double-check',
             ja: '{n} 行が不一致(赤)· 送信可能ですが確認推奨',
         },
-        lowConf: { zh: '系统读这行时不太确定', th: 'ระบบไม่ค่อยแน่ใจกับแถวนี้', en: 'Low confidence on this row', ja: 'この行は信頼度が低い' },
+        lowConf: {
+            zh: '系统读这行时不太确定',
+            th: 'ระบบไม่ค่อยแน่ใจกับแถวนี้',
+            en: 'Low confidence on this row',
+            ja: 'この行は信頼度が低い',
+        },
         submitting: { zh: '提交中…', th: 'กำลังส่ง…', en: 'Submitting…', ja: '送信中…' },
-        submitFail: { zh: '提交失败,请重试', th: 'ส่งไม่สำเร็จ ลองใหม่', en: 'Submit failed, retry', ja: '送信に失敗' },
-        noRows: { zh: '没有可核对的行', th: 'ไม่มีแถวให้ตรวจ', en: 'No rows to review', ja: '確認する行がありません' },
+        submitFail: {
+            zh: '提交失败,请重试',
+            th: 'ส่งไม่สำเร็จ ลองใหม่',
+            en: 'Submit failed, retry',
+            ja: '送信に失敗',
+        },
+        noRows: {
+            zh: '没有可核对的行',
+            th: 'ไม่มีแถวให้ตรวจ',
+            en: 'No rows to review',
+            ja: '確認する行がありません',
+        },
     };
 
     // 完整性问题 → 大白话 4 语(后端 _audit_completeness 的 issue type)
@@ -74,13 +104,18 @@
     };
 
     var lang = 'zh';
-    function T(k) { return (L[k] && (L[k][lang] || L[k].zh)) || k; }
+    function T(k) {
+        return (L[k] && (L[k][lang] || L[k].zh)) || k;
+    }
     function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
         });
     }
-    function num(x) { var v = parseFloat(x); return isNaN(v) ? 0 : Math.round(v * 100) / 100; }
+    function num(x) {
+        var v = parseFloat(x);
+        return isNaN(v) ? 0 : Math.round(v * 100) / 100;
+    }
 
     function injectCSS() {
         if (document.getElementById('recon-review-css')) return;
@@ -138,8 +173,11 @@
         injectCSS();
         var rows = (payload.rows || []).map(function (r) {
             return {
-                date: r.date || '', description: r.description || '',
-                withdrawal: num(r.withdrawal), deposit: num(r.deposit), balance: num(r.balance),
+                date: r.date || '',
+                description: r.description || '',
+                withdrawal: num(r.withdrawal),
+                deposit: num(r.deposit),
+                balance: num(r.balance),
                 confidence: r.confidence || 'high',
             };
         });
@@ -154,49 +192,113 @@
         var issuesHtml = '';
         var issues = payload.completeness_issues || [];
         if (issues.length) {
-            var items = issues.map(function (it) {
-                var msg = (ISSUE[it.type] && (ISSUE[it.type][lang] || ISSUE[it.type].zh)) || it.type;
-                return '<li>' + esc(msg) + '</li>';
-            }).join('');
+            var items = issues
+                .map(function (it) {
+                    var msg =
+                        (ISSUE[it.type] && (ISSUE[it.type][lang] || ISSUE[it.type].zh)) || it.type;
+                    return '<li>' + esc(msg) + '</li>';
+                })
+                .join('');
             issuesHtml = '<div class="rrv-banner"><ul>' + items + '</ul></div>';
         }
 
-        var rowsHtml = rows.map(function (r, i) {
-            var lowCls = r.confidence === 'low' ? ' rrv-low' : '';
-            var lowTitle = r.confidence === 'low' ? ' title="' + esc(T('lowConf')) + '"' : '';
-            return '<tr data-row="' + i + '"' + lowTitle + ' class="' + lowCls.trim() + '">' +
-                '<td><input data-i="' + i + '" data-f="date" value="' + esc(r.date) + '" placeholder="YYYY-MM-DD"></td>' +
-                '<td><input data-i="' + i + '" data-f="description" value="' + esc(r.description) + '"></td>' +
-                '<td><input class="amt" data-i="' + i + '" data-f="withdrawal" type="number" step="0.01" value="' + (r.withdrawal || '') + '"></td>' +
-                '<td><input class="amt" data-i="' + i + '" data-f="deposit" type="number" step="0.01" value="' + (r.deposit || '') + '"></td>' +
-                '<td><input class="amt" data-i="' + i + '" data-f="balance" type="number" step="0.01" value="' + (r.balance || '') + '"></td>' +
-                '<td class="rrv-chk" data-chk="' + i + '">—</td>' +
-                '</tr>';
-        }).join('');
+        var rowsHtml = rows
+            .map(function (r, i) {
+                var lowCls = r.confidence === 'low' ? ' rrv-low' : '';
+                var lowTitle = r.confidence === 'low' ? ' title="' + esc(T('lowConf')) + '"' : '';
+                return (
+                    '<tr data-row="' +
+                    i +
+                    '"' +
+                    lowTitle +
+                    ' class="' +
+                    lowCls.trim() +
+                    '">' +
+                    '<td><input data-i="' +
+                    i +
+                    '" data-f="date" value="' +
+                    esc(r.date) +
+                    '" placeholder="YYYY-MM-DD"></td>' +
+                    '<td><input data-i="' +
+                    i +
+                    '" data-f="description" value="' +
+                    esc(r.description) +
+                    '"></td>' +
+                    '<td><input class="amt" data-i="' +
+                    i +
+                    '" data-f="withdrawal" type="number" step="0.01" value="' +
+                    (r.withdrawal || '') +
+                    '"></td>' +
+                    '<td><input class="amt" data-i="' +
+                    i +
+                    '" data-f="deposit" type="number" step="0.01" value="' +
+                    (r.deposit || '') +
+                    '"></td>' +
+                    '<td><input class="amt" data-i="' +
+                    i +
+                    '" data-f="balance" type="number" step="0.01" value="' +
+                    (r.balance || '') +
+                    '"></td>' +
+                    '<td class="rrv-chk" data-chk="' +
+                    i +
+                    '">—</td>' +
+                    '</tr>'
+                );
+            })
+            .join('');
 
         ov.innerHTML =
             '<div class="rrv-modal">' +
-            '<div class="rrv-hd"><h3>' + esc(T('title')) + '</h3><p>' + esc(T('sub')) + '</p></div>' +
+            '<div class="rrv-hd"><h3>' +
+            esc(T('title')) +
+            '</h3><p>' +
+            esc(T('sub')) +
+            '</p></div>' +
             '<div class="rrv-bd">' +
             issuesHtml +
-            '<div class="rrv-open">' + esc(T('opening')) + ': <input id="rrv-open-in" type="number" step="0.01" value="' + opening + '"></div>' +
-            (rows.length ?
-                '<table class="rrv-tbl"><thead><tr>' +
-                '<th>' + esc(T('colDate')) + '</th><th>' + esc(T('colDesc')) + '</th>' +
-                '<th>' + esc(T('colWd')) + '</th><th>' + esc(T('colDep')) + '</th>' +
-                '<th>' + esc(T('colBal')) + '</th><th>' + esc(T('colChk')) + '</th>' +
-                '</tr></thead><tbody>' + rowsHtml + '</tbody></table>'
-                : '<div style="color:#6b7280;padding:20px;text-align:center">' + esc(T('noRows')) + '</div>') +
+            '<div class="rrv-open">' +
+            esc(T('opening')) +
+            ': <input id="rrv-open-in" type="number" step="0.01" value="' +
+            opening +
+            '"></div>' +
+            (rows.length
+                ? '<table class="rrv-tbl"><thead><tr>' +
+                  '<th>' +
+                  esc(T('colDate')) +
+                  '</th><th>' +
+                  esc(T('colDesc')) +
+                  '</th>' +
+                  '<th>' +
+                  esc(T('colWd')) +
+                  '</th><th>' +
+                  esc(T('colDep')) +
+                  '</th>' +
+                  '<th>' +
+                  esc(T('colBal')) +
+                  '</th><th>' +
+                  esc(T('colChk')) +
+                  '</th>' +
+                  '</tr></thead><tbody>' +
+                  rowsHtml +
+                  '</tbody></table>'
+                : '<div style="color:#6b7280;padding:20px;text-align:center">' +
+                  esc(T('noRows')) +
+                  '</div>') +
             '</div>' +
             '<div class="rrv-ft"><div class="msg" id="rrv-msg"></div><div class="rrv-btns">' +
-            '<button class="rrv-btn" id="rrv-cancel">' + esc(T('cancel')) + '</button>' +
-            '<button class="rrv-btn primary" id="rrv-ok">' + esc(T('confirm')) + '</button>' +
+            '<button class="rrv-btn" id="rrv-cancel">' +
+            esc(T('cancel')) +
+            '</button>' +
+            '<button class="rrv-btn primary" id="rrv-ok">' +
+            esc(T('confirm')) +
+            '</button>' +
             '</div></div></div>';
         document.body.appendChild(ov);
 
         function readRows() {
             ov.querySelectorAll('.rrv-tbl input').forEach(function (inp) {
-                var i = +inp.getAttribute('data-i'), f = inp.getAttribute('data-f');
+                var i = +inp.getAttribute('data-i'),
+                    f = inp.getAttribute('data-f');
                 if (f === 'date' || f === 'description') rows[i][f] = inp.value;
                 else rows[i][f] = num(inp.value);
             });
@@ -209,54 +311,83 @@
             chk.forEach(function (c) {
                 var cell = ov.querySelector('[data-chk="' + c.idx + '"]');
                 var tr = ov.querySelector('tr[data-row="' + c.idx + '"]');
-                if (cell) { cell.textContent = c.ok ? '✓' : '✗'; cell.className = 'rrv-chk ' + (c.ok ? 'ok' : 'no'); }
+                if (cell) {
+                    cell.textContent = c.ok ? '✓' : '✗';
+                    cell.className = 'rrv-chk ' + (c.ok ? 'ok' : 'no');
+                }
                 if (tr) tr.classList.toggle('rrv-bad', !c.ok);
                 if (!c.ok) bad++;
             });
             var msg = ov.querySelector('#rrv-msg');
-            if (bad === 0) { msg.textContent = T('chainOk'); msg.className = 'msg ok'; }
-            else { msg.textContent = T('chainBad').replace('{n}', bad); msg.className = 'msg no'; }
+            if (bad === 0) {
+                msg.textContent = T('chainOk');
+                msg.className = 'msg ok';
+            } else {
+                msg.textContent = T('chainBad').replace('{n}', bad);
+                msg.className = 'msg no';
+            }
         }
         ov.querySelectorAll('.rrv-tbl input, #rrv-open-in').forEach(function (inp) {
             inp.addEventListener('input', refresh);
         });
         refresh();
 
-        function close() { ov.remove(); }
+        function close() {
+            ov.remove();
+        }
         ov.querySelector('#rrv-cancel').addEventListener('click', close);
-        ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+        ov.addEventListener('click', function (e) {
+            if (e.target === ov) close();
+        });
 
         ov.querySelector('#rrv-ok').addEventListener('click', async function () {
             readRows();
             var btn = this;
             btn.disabled = true;
             var msg = ov.querySelector('#rrv-msg');
-            msg.textContent = T('submitting'); msg.className = 'msg';
+            msg.textContent = T('submitting');
+            msg.className = 'msg';
             var out = rows.map(function (r, i) {
                 return {
-                    idx: i, date: r.date, description: r.description,
-                    withdrawal: num(r.withdrawal), deposit: num(r.deposit), balance: num(r.balance),
+                    idx: i,
+                    date: r.date,
+                    description: r.description,
+                    withdrawal: num(r.withdrawal),
+                    deposit: num(r.deposit),
+                    balance: num(r.balance),
                     confidence: r.confidence,
                 };
             });
             try {
-                var resp = await fetch('/api/recon/bank-v2/confirm-rows/' + encodeURIComponent(opts.jobId), {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + opts.token, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rows: out }),
-                });
+                var resp = await fetch(
+                    '/api/recon/bank-v2/confirm-rows/' + encodeURIComponent(opts.jobId),
+                    {
+                        method: 'POST',
+                        headers: {
+                            Authorization: 'Bearer ' + opts.token,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ rows: out }),
+                    }
+                );
                 var d = null;
-                try { d = await resp.json(); } catch (_) { d = null; }
+                try {
+                    d = await resp.json();
+                } catch (_) {
+                    d = null;
+                }
                 if (resp.ok && d && d.ok && d.job_id) {
                     close();
                     if (typeof opts.onConfirmed === 'function') opts.onConfirmed(d.job_id);
                 } else {
                     btn.disabled = false;
-                    msg.textContent = (d && d.detail) || T('submitFail'); msg.className = 'msg no';
+                    msg.textContent = (d && d.detail) || T('submitFail');
+                    msg.className = 'msg no';
                 }
             } catch (e) {
                 btn.disabled = false;
-                msg.textContent = T('submitFail'); msg.className = 'msg no';
+                msg.textContent = T('submitFail');
+                msg.className = 'msg no';
             }
         });
     }

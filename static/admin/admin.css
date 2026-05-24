@@ -423,7 +423,10 @@ body.admin-layout-body .lang-switching-overlay {
   color: #6b7280;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .adm-tab:hover {
   color: #111111;

@@ -3980,7 +3980,7 @@ def create_owner_user(
                 INSERT INTO users (
                     username, password_hash, plan, is_active, is_super_admin,
                     tenant_id, role, company_name
-                ) VALUES (%s, %s, 'plus', TRUE, FALSE, %s, 'owner', %s)
+                ) VALUES (%s, %s, 'credits', TRUE, FALSE, %s, 'owner', %s)
                 RETURNING id
             """,
                 (username, pw_hash, tenant_id, company_name),
@@ -4556,7 +4556,7 @@ def add_employee(
                 INSERT INTO users (
                     username, password_hash, plan, is_active, is_super_admin,
                     tenant_id, role, invited_by, company_name
-                ) VALUES (%s, %s, 'plus', TRUE, FALSE, %s, 'member', %s, %s)
+                ) VALUES (%s, %s, 'credits', TRUE, FALSE, %s, 'member', %s, %s)
                 RETURNING id
             """,
                 (

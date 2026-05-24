@@ -2141,71 +2141,15 @@ async def ocr_recognize(
         page_count = 1  # images / single-CSV / single-DOCX count as 1 page
 
     # 4. 配额检查 · v0.15 · 新双轨:自带 key → 不限 · 否则扣 user.monthly_quota
-    # === v109.3 · 新套餐配额检查(防薅 + 真实计量) ===
-    try:
-        from auth_signup import check_ocr_quota as _v109_quota
-
-        _q = _v109_quota(str(user.get("id")))
-        if not _q.get("allowed"):
-            reason = _q.get("reason", "quota_exceeded")
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "code": f"v109.{reason}",
-                    "used": _q.get("used"),
-                    "limit": _q.get("limit"),
-                    "plan": _q.get("plan"),
-                    "needs_line_verify": reason == "needs_line_verify",
-                },
-            )
-    except HTTPException:
-        raise
-    except Exception as _v109e:
-        logger.warning(f"v109 quota check skip: {_v109e}")
-
-    ok, err_code, quota_info = _check_user_quota(user)
-    if not ok:
-        if err_code == "quota.need_api_key":
-            # 买断账号未填 key
-            raise HTTPException(
-                403,
-                detail={
-                    "code": "quota.need_api_key",
-                },
-            )
-        elif err_code == "quota.exhausted":
-            raise HTTPException(
-                429,
-                detail={
-                    "code": "ocr.monthly_limit_exceeded",
-                    "limit": quota_info["monthly_quota"],
-                    "used": quota_info["used_this_month"],
-                    "remaining": 0,
-                    "requested": page_count,
-                },
-            )
-        else:
-            raise HTTPException(429, detail={"code": err_code or "quota.unknown"})
-
-    # 如果是月付用户 · 并且本次识别会超额 · 也要拒绝
-    if quota_info["mode"] == "monthly":
-        mq = quota_info["monthly_quota"]
-        um = quota_info["used_this_month"]
-        if um + page_count > mq:
-            raise HTTPException(
-                429,
-                detail={
-                    "code": "ocr.monthly_limit_exceeded",
-                    "limit": mq,
-                    "used": um,
-                    "remaining": max(0, mq - um),
-                    "requested": page_count,
-                },
-            )
-
-    monthly_quota = quota_info.get("monthly_quota")  # 兼容下游(None=不限)
+    # === v118.46 · 纯 credits 按量扣费(2026-05-24 Zihao 拍板:全平台只此一个套餐)===
+    #   OCR 准入只看「是否豁免 或 余额>0」· 旧 plan / monthly_quota / 自带 key / trial 反薅闸
+    #   全部下线(0 起步·必须充值才能用 → 没有免费额度可薅 → 天然防薅)。
+    #   旧函数 check_ocr_quota / _check_user_quota 不再用于 OCR 准入(保留供其它老路径兼容)。
+    #   下游若干变量(quota_info / monthly_quota / used_month)给 credits-mode 默认值兼容。
+    quota_info = {"mode": "credits", "monthly_quota": None, "used_this_month": 0}
+    monthly_quota = None  # None = 不限月配额(credits 模式按余额扣)
     used_today = None
-    used_month = quota_info.get("used_this_month")
+    used_month = 0
 
     # v118.35.0.21 · Credits 余额前置检查(v0.20 重做 · 1 次 SELECT · 修连接池超时)
     _billing = {
@@ -2357,6 +2301,8 @@ async def ocr_recognize(
     # bypass OCR via table_path.
     chain_info = ["pipeline_v1"]
     fallback_used = False
+    _chg_kind = None  # v118.46 · 扣费参数 · 算在此 · 实际扣费在 history 落库后
+    _chg_units = 0
     try:
         from services.ocr.pipeline import (
             run_on_pdf_bytes as _pipeline_run_pdf,
@@ -2381,31 +2327,18 @@ async def ocr_recognize(
             f"· cost=฿{_pipeline_cost_thb:.4f} · elapsed={_pipe_res.elapsed_ms}ms"
         )
 
-        # v118.35.0.21 · 异步扣费 · 关键路径不等扣费完成 · 失败仅 log 不影响 OCR 返回
+        # v118.46 · 算扣费参数(实际扣费挪到 history 落库后:才有 history_id + 已确认非发票通过)
+        #   图片(PNG/JPG/扫描)与 PDF 统一按页/张扣;CSV/XLSX/DOCX/TXT 按字符。
         if not _billing.get("is_exempt"):
             try:
-                import asyncio as _asyncio_chg
-
-                if _ext in PDF_EXTENSIONS:
+                if _ext in PDF_EXTENSIONS or _ext in IMAGE_EXTENSIONS:
                     _chg_kind = "pdf"
-                    _chg_units = int(_pipe_res.page_count or page_count)
+                    _chg_units = int(_pipe_res.page_count or page_count or 1)
                 else:
                     _chg_kind = "excel"
                     _chg_units = db._excel_char_count_estimate(content, file.filename or "")
-                if _chg_units > 0:
-                    _asyncio_chg.create_task(
-                        _asyncio_chg.to_thread(
-                            db.charge_ocr_async,
-                            str(user.get("id")),
-                            _tid(user),
-                            _chg_kind,
-                            _chg_units,
-                            None,
-                            f"OCR {_chg_kind} · {file.filename}",
-                        )
-                    )
             except Exception as _ce:
-                logger.warning(f"💳 async charge dispatch skip: {_ce}")
+                logger.warning(f"💳 扣费参数计算跳过: {_ce}")
     except HTTPException:
         raise
     except Exception as _pipe_err:
@@ -2739,6 +2672,25 @@ async def ocr_recognize(
                 primary_history_id = hid
                 primary_archive_name = g_archive_name
                 primary_category_tag = g_category_tag
+                # v118.46 · 扣费(成功识别 + 落库后 · 只扣一次 · 传 history_id 让 usage-history 显示文件名)
+                #   描述结尾带 history_id 前 8 位 → usage-history 的 LIKE join 能命中(修 filename 空)
+                if not _billing.get("is_exempt") and _chg_units > 0 and hid:
+                    try:
+                        import asyncio as _asyncio_chg
+
+                        _asyncio_chg.create_task(
+                            _asyncio_chg.to_thread(
+                                db.charge_ocr_async,
+                                str(user.get("id")),
+                                _tid(user),
+                                _chg_kind,
+                                _chg_units,
+                                str(hid),
+                                f"OCR {_chg_kind} · {file.filename} · {str(hid)[:8]}",
+                            )
+                        )
+                    except Exception as _ce:
+                        logger.warning(f"💳 async charge dispatch skip: {_ce}")
 
             # 批 1 改动 1 (Zihao 2026-05-19 拍板 · v118.34.33) · auto-resolve
             # client_id. 如果右上角客户切换器没选 client_id (常态) · 按

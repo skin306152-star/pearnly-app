@@ -114,14 +114,16 @@ def enqueue(
     tid = str(tenant_id) if tenant_id else None
 
     def _insert() -> Optional[str]:
+        # progress 不在 INSERT 里(可空 · 默认 NULL · 工人跑起来后 update_progress 再写)。
+        # 列数必须与占位符/值严格一一对应 —— 此前误带了 progress 列却没传值 →
+        # psycopg2 "tuple index out of range"(真站点 E2E 抓出的根因)。
         with get_cursor(commit=True) as cur:
             if job_id:
                 cur.execute(
                     """
                     INSERT INTO recon_jobs (id, job_type, user_id, tenant_id, status,
-                                            progress, params, input_ref, max_attempts)
-                    VALUES (%s::uuid, %s, %s::uuid, %s, 'queued',
-                            %s::jsonb, %s::jsonb, %s::jsonb, %s)
+                                            params, input_ref, max_attempts)
+                    VALUES (%s::uuid, %s, %s::uuid, %s, 'queued', %s::jsonb, %s::jsonb, %s)
                     RETURNING id
                     """,
                     (str(job_id), job_type, uid, tid, p, ir, ma),
@@ -130,8 +132,8 @@ def enqueue(
                 cur.execute(
                     """
                     INSERT INTO recon_jobs (job_type, user_id, tenant_id, status,
-                                            progress, params, input_ref, max_attempts)
-                    VALUES (%s, %s::uuid, %s, 'queued', %s::jsonb, %s::jsonb, %s::jsonb, %s)
+                                            params, input_ref, max_attempts)
+                    VALUES (%s, %s::uuid, %s, 'queued', %s::jsonb, %s::jsonb, %s)
                     RETURNING id
                     """,
                     (job_type, uid, tid, p, ir, ma),

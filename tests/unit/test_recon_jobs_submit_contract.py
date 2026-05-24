@@ -50,18 +50,29 @@ class RouteContractTests(unittest.TestCase):
 
 
 class StoreEnqueueTests(unittest.TestCase):
-    def test_enqueue_explicit_job_id(self):
+    def _run_enqueue(self, **kw):
         cur = mock.MagicMock()
         cur.fetchone.return_value = {"id": "fixed-uuid"}
         ctx = mock.MagicMock()
         ctx.__enter__.return_value = cur
         with mock.patch("services.recon_jobs.store.get_cursor", return_value=ctx):
-            rid = store.enqueue("bank", "u1", "t1", {"a": 1}, [{"path": "x"}], job_id="fixed-uuid")
+            rid = store.enqueue("bank", "u1", "t1", {"a": 1}, [{"path": "x"}], **kw)
+        return rid, cur.execute.call_args
+
+    def test_enqueue_explicit_job_id(self):
+        rid, call = self._run_enqueue(job_id="fixed-uuid")
         self.assertEqual(rid, "fixed-uuid")
-        sql = cur.execute.call_args[0][0]
+        sql, params = call[0][0], call[0][1]
         self.assertIn("INSERT INTO recon_jobs (id", sql)
-        # id 是第一个绑定参数
-        self.assertEqual(cur.execute.call_args[0][1][0], "fixed-uuid")
+        self.assertEqual(params[0], "fixed-uuid")  # id 是第一个绑定参数
+        # 关键守门:%s 占位符数必须 == 传入参数数(防『带了列却漏传值』→ tuple index out of range)
+        self.assertEqual(sql.count("%s"), len(params), f"placeholder/param mismatch: {sql}")
+
+    def test_enqueue_no_job_id_placeholder_param_match(self):
+        rid, call = self._run_enqueue()
+        sql, params = call[0][0], call[0][1]
+        self.assertNotIn("INSERT INTO recon_jobs (id", sql)  # 走 gen_random_uuid 默认 id
+        self.assertEqual(sql.count("%s"), len(params), f"placeholder/param mismatch: {sql}")
 
     def test_enqueue_rejects_bad_type(self):
         with self.assertRaises(ValueError):

@@ -460,7 +460,8 @@ def infer_stmt_col_map(
       low    = 关键列不齐 · 交用户确认
     """
     best = (-1, {}, "low", 0.0, ["no header found"])
-    best_key = (-1.0, -1, -1.0)  # (balance_rate, header_word_hits, score)
+    # (balance_rate, header_not_data, header_word_hits, score)
+    best_key = (-1.0, -1, -1, -1.0)
     for i, row in enumerate(raw_rows[:max_scan]):
         cm = _map_by_header(row)
         header_signal = len(cm)  # 表头词命中数(真表头行远多于数据行 · 优先级高于 score)
@@ -478,14 +479,21 @@ def infer_stmt_col_map(
             conf = "medium"
         else:
             conf = "low"
+        # 候选『表头行』的日期列若本身解析成真日期 → 这是数据行(描述里碰巧含 รายการ/balance 等
+        # 同义词会误得 header_signal),不能盖过真正的标签表头(压测 bank_large_3000:Column A..F 真表头
+        # signal=0,数据行描述含 รายการ signal=1 → 误选数据行当表头 → 静默吞掉首笔交易 + 期初错)。
+        d_idx = cm.get("date")
+        hdr_cell = row[d_idx] if (d_idx is not None and 0 <= d_idx < len(row)) else ""
+        header_not_data = 0 if parse_date(hdr_cell) is not None else 1
         reasons = [
             f"header_idx={i}",
             f"header_hits={header_signal}",
+            f"header_not_data={header_not_data}",
             f"score={score}",
             f"bal_rate={rate}",
         ]
-        # 排序键:先看余额链对得上(数学可证)· 再看表头词命中数(防数据行被当表头)· 最后 score
-        key = (rate, header_signal, score)
+        # 排序键:余额链(数学可证)> 真标签表头(非数据行)> 表头词命中数 > score
+        key = (rate, header_not_data, header_signal, score)
         if key > best_key:
             best_key = key
             best = (i, {k: cm[k] for k in _STMT_KEYS if k in cm}, conf, rate, reasons)
@@ -577,7 +585,7 @@ def infer_gl_col_map(
     保守:GL 读反借贷/科目错代价高,拿不准一律交用户确认(不自动套用)。
     """
     best = (-1, {}, "low", ["no gl header found"])
-    best_key = (-1, -1.0)
+    best_key = (-1, -1, -1.0)  # (header_not_data, header_word_hits, score)
     for i, row in enumerate(raw_rows[:max_scan]):
         cm = _map_gl_by_header(row)
         header_signal = len(cm)
@@ -618,14 +626,229 @@ def infer_gl_col_map(
             conf = "medium"
         else:
             conf = "low"
+        # 同账单:候选表头行的日期列若本身是真日期 → 数据行(描述含同义词会误得 signal)· 不盖过真标签表头
+        d_idx = cm.get("date")
+        hdr_cell = row[d_idx] if (d_idx is not None and 0 <= d_idx < len(row)) else ""
+        header_not_data = 0 if parse_date(hdr_cell) is not None else 1
         reasons = [
             f"header_idx={i}",
             f"header_hits={header_signal}",
+            f"header_not_data={header_not_data}",
             f"date={date_hits}",
             f"money={money_hits}",
         ]
-        key = (header_signal, score)
+        key = (header_not_data, header_signal, score)
         if shape_ok and key > best_key:
             best_key = key
             best = (i, {k: cm[k] for k in _GL_KEYS if k in cm}, conf, reasons)
     return best
+
+
+def validate_gl_shape(
+    raw_rows: List[List[Any]], header_idx: int, cm: Dict[str, int], min_checked: int = 3
+) -> Tuple[bool, float]:
+    """GL 形状校验(GL 无余额链 · 用数据形状代替):大部分数据行 日期可解析 + 借/贷/金额有值。
+
+    给 AI 建议的 col_map 把关用 —— 同 infer_gl_col_map 内联的 shape_ok 口径,抽出来复用。
+    返回 (是否通过, 命中率)。没有 date 或没有钱列 → (False, 0)。
+    """
+    if "date" not in cm or not any(k in cm for k in ("debit", "credit", "amount")):
+        return False, 0.0
+    body = raw_rows[header_idx + 1 : header_idx + 31]
+
+    def _cell(r, idx):
+        return r[idx] if 0 <= idx < len(r) else ""
+
+    date_hits = sum(1 for r in body if parse_date(_cell(r, cm["date"])) is not None)
+    money_hits = 0
+    for r in body:
+        vals = [to_float(_cell(r, cm[k])) for k in ("debit", "credit", "amount") if k in cm]
+        if any(v != 0 for v in vals):
+            money_hits += 1
+    checked = min(len(body), date_hits)  # 以可解析日期行做分母(空尾行不计)
+    if checked < min_checked or date_hits < min_checked or money_hits < min_checked:
+        return False, 0.0
+    rate = min(date_hits, money_hits) / max(checked, 1)
+    return True, round(rate, 3)
+
+
+# ── S7 · AI 低信心自动建议一次(ADR-006 §7)─────────────────────────
+# 本地推断拿不准时,把『表头 + 前 20 行预览 + 本地猜测』发给 Gemini 要 col_map 建议,
+# 再用余额链(账单)/ 形状(GL)本地校验;校验过才用并自动存。绝不发整份文件 / 密钥。
+#   · temp=0 · 按 signature 磁盘缓存(同模板第二次不再烧钱)
+#   · RECON_AI_MAPPING flag 可关(默认开)· 失败/超时静默返 None(退回用户确认 · 不阻断)
+import os as _os
+import json as _json
+
+_AI_MAPPING_MODEL = _os.environ.get("RECON_AI_MAPPING_MODEL", "gemini-2.5-flash-lite")
+_AI_MAPPING_PROMPT_VER = "v1"
+_AI_MAPPING_CACHE_DIR = _os.environ.get("RECON_AI_MAPPING_CACHE_DIR", "").strip() or _os.path.join(
+    _os.getcwd(), ".ai_mapping_cache"
+)
+
+
+def ai_mapping_enabled() -> bool:
+    """RECON_AI_MAPPING 默认开 · 设 0/false/no/off 关闭。"""
+    return _os.environ.get("RECON_AI_MAPPING", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def _ai_cache_path(cache_key: str) -> str:
+    safe = hashlib.sha256(cache_key.encode("utf-8")).hexdigest()
+    return _os.path.join(_AI_MAPPING_CACHE_DIR, safe + ".json")
+
+
+def _ai_cache_get(cache_key: str) -> Optional[Dict[str, int]]:
+    try:
+        p = _ai_cache_path(cache_key)
+        if _os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            # 缓存命中也可能是『AI 当时回了 None』· 用哨兵区分,避免反复重试烧钱
+            return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+    return None
+
+
+def _ai_cache_has(cache_key: str) -> bool:
+    try:
+        return _os.path.exists(_ai_cache_path(cache_key))
+    except Exception:
+        return False
+
+
+def _ai_cache_put(cache_key: str, value: Any) -> None:
+    try:
+        _os.makedirs(_AI_MAPPING_CACHE_DIR, exist_ok=True)
+        p = _ai_cache_path(cache_key)
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            _json.dump(value, f, ensure_ascii=False)
+        _os.replace(tmp, p)
+    except Exception:
+        pass
+
+
+def _valid_keys_for(document_type: str) -> Tuple[str, ...]:
+    return _GL_KEYS if document_type == "gl" else _STMT_KEYS
+
+
+def _coerce_ai_cm(raw: Any, document_type: str, n_cols: int) -> Optional[Dict[str, int]]:
+    """把 AI 回的对象规整成 {合法键: 0<=列号<n_cols}。无可用列 → None。"""
+    if not isinstance(raw, dict):
+        return None
+    valid = set(_valid_keys_for(document_type))
+    out: Dict[str, int] = {}
+    for k, v in raw.items():
+        if k not in valid or v is None:
+            continue
+        try:
+            idx = int(v)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= idx < n_cols:
+            out[k] = idx
+    # 必备:date + 至少一个钱列,否则建议没用
+    money_keys = ("debit", "credit", "amount") if document_type == "gl" else (
+        "withdrawal",
+        "deposit",
+        "amount",
+    )
+    if "date" not in out or not any(k in out for k in money_keys):
+        return None
+    return out
+
+
+def suggest_mapping_with_ai(
+    document_type: str,
+    sheet_name: str,
+    headers: List[Any],
+    sample_rows: List[List[Any]],
+    local_guess: Optional[Dict[str, int]] = None,
+    api_key: str = "",
+    signature: str = "",
+) -> Optional[Dict[str, int]]:
+    """ADR-006 §7 · 本地低信心时调一次 Gemini 要 column mapping 建议(列名→列号)。
+
+    只发:sheet 名 + 表头 + 前 20 行预览(已截断) + 本地猜测。绝不发整份文件 / 密钥。
+    返回规整后的 col_map(键见 _STMT_KEYS / _GL_KEYS)· 校验交调用方;任何异常/超时/关闭 → None。
+    缓存:按 signature(+doc_type+prompt_ver)· 命中(含『当时回 None』哨兵)直接返回,不再调 API。
+    """
+    if not ai_mapping_enabled() or not api_key:
+        return None
+    headers = list(headers or [])
+    n_cols = len(headers)
+    if n_cols == 0:
+        return None
+
+    sig = signature or build_header_signature(headers)
+    cache_key = f"{document_type}:{_AI_MAPPING_PROMPT_VER}:{sig}"
+    if _ai_cache_has(cache_key):
+        cached = _ai_cache_get(cache_key)  # 命中 None 哨兵 → 直接放弃(不重复烧钱)
+        return _coerce_ai_cm(cached, document_type, n_cols) if cached else None
+
+    result: Optional[Dict[str, int]] = None
+    try:
+        import google.generativeai as genai
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(_AI_MAPPING_MODEL)
+
+        # 表头带列号 · 让 AI 直接回列号(稳健 · 不用再按名字猜位置)
+        indexed_headers = [
+            {"col": i, "name": str(h if h is not None else "").strip()[:60]}
+            for i, h in enumerate(headers)
+        ]
+        preview = [
+            [str(c if c is not None else "").strip()[:60] for c in row[:n_cols]]
+            for row in (sample_rows or [])[:20]
+        ]
+        if document_type == "gl":
+            keys_doc = (
+                "date, doc_no, account, description, debit, credit, balance, amount. "
+                "debit/credit = 借方/贷方两列;若只有一列带符号净额(正=借 负=贷)用 amount(不要同时给 debit/credit)。"
+            )
+        else:
+            keys_doc = (
+                "date, description, withdrawal, deposit, balance, amount. "
+                "withdrawal/deposit = 取/存两列;若只有一列带符号金额用 amount(不要同时给 withdrawal/deposit)。"
+            )
+        prompt = (
+            "You map spreadsheet columns of a bank STATEMENT or general-ledger (GL) to standard "
+            "fields, for financial reconciliation. You are given the header row (each column with "
+            "its 0-based index), a preview of the first data rows, and a local heuristic guess.\n"
+            f"document_type = {document_type}\n"
+            f"sheet_name = {sheet_name!r}\n"
+            f"valid field keys = {keys_doc}\n"
+            "RULES:\n"
+            "1. Return ONLY a JSON object mapping field key -> the 0-based COLUMN INDEX. "
+            "Omit a field if no column matches. Do NOT invent columns.\n"
+            "2. Use the header names AND the preview data shape to decide (dates look like dates, "
+            "money columns hold numbers, balance is a near-every-row running number).\n"
+            "3. Indices must be within range [0, {n}). Output JSON only, no markdown fences.\n".format(
+                n=n_cols
+            )
+            + f"HEADER (col:name): {_json.dumps(indexed_headers, ensure_ascii=False)}\n"
+            + f"PREVIEW (first rows): {_json.dumps(preview, ensure_ascii=False)}\n"
+            + f"LOCAL_GUESS: {_json.dumps(local_guess or {}, ensure_ascii=False)}\n"
+            + 'Example output: {"date":0,"description":3,"withdrawal":4,"deposit":5,"balance":6}'
+        )
+        resp = model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": 0.0,
+                "top_p": 1.0,
+                "candidate_count": 1,
+                "max_output_tokens": 1024,
+            },
+        )
+        text = (getattr(resp, "text", "") or "").strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
+        result = _coerce_ai_cm(_json.loads(text), document_type, n_cols)
+    except Exception:
+        result = None
+
+    # 缓存结果(含 None → 存 {} 哨兵 · 同模板第二次不再调 API)
+    _ai_cache_put(cache_key, result if result else {})
+    return result

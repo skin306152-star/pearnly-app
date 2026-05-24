@@ -156,5 +156,42 @@ class InferStatementTests(unittest.TestCase):
         self.assertFalse(ok_swap)
 
 
+class HeaderNotDataRowTests(unittest.TestCase):
+    """S7 §9 压测发现:真表头无识别词(Column A..)时,描述里含同义词(รายการ)的数据行
+    会得 header_signal=1 盖过真表头 → 误把首笔交易当表头 → 静默吞行 + 期初错。
+    修:候选表头行若日期列本身是真日期 → 是数据行 · 不盖过真标签表头。"""
+
+    def test_data_row_with_synonym_not_chosen_as_header(self):
+        # 真表头 Column A.. 无识别词;数据行描述含 รายการ(=DESC 同义词)· 余额链成立(deposit=C2,withdrawal=C3)
+        rows = [
+            ["Column A", "Column B", "Column C", "Column D", "Column E"],
+            ["2026-01-02", "รายการ 00001 บริษัท", "5000.00", "", "15000.00"],
+            ["2026-01-03", "รายการ 00002 ASIA", "", "2000.00", "13000.00"],
+            ["2026-01-04", "รายการ 00003 ร้าน", "", "1000.00", "12000.00"],
+            ["2026-01-05", "รายการ 00004 CUST", "3000.00", "", "15000.00"],
+            ["2026-01-06", "รายการ 00005 SHOP", "", "500.00", "14500.00"],
+            ["2026-01-07", "รายการ 00006 FOO", "4000.00", "", "18500.00"],
+            ["2026-01-08", "รายการ 00007 BAR", "", "1500.00", "17000.00"],
+            ["2026-01-09", "รายการ 00008 BAZ", "2000.00", "", "19000.00"],
+        ]
+        idx, cm, conf, rate, _ = tl.infer_stmt_col_map(rows)
+        # 必须选第 0 行(真表头)· 不是第 1 行(数据行碰巧含 รายการ → 修前会被误选)
+        self.assertEqual(idx, 0)
+        self.assertEqual(cm.get("date"), 0)
+
+    def test_gl_data_row_with_synonym_not_chosen_as_header(self):
+        rows = [
+            ["Col1", "Col2", "Col3", "Col4", "Col5"],
+            ["2026-01-02", "JV001", "รายการ ซื้อของ", "", "5000"],
+            ["2026-01-03", "JV002", "รายการ ขายของ", "2000", ""],
+            ["2026-01-04", "JV003", "รายการ ค่าน้ำ", "300", ""],
+            ["2026-01-05", "JV004", "รายการ ค่าไฟ", "", "1500"],
+            ["2026-01-06", "JV005", "รายการ เงินเดือน", "8000", ""],
+            ["2026-01-07", "JV006", "รายการ ค่าเช่า", "", "1200"],
+        ]
+        idx, cm, conf, _ = tl.infer_gl_col_map(rows)
+        self.assertEqual(idx, 0)  # 真表头行 · 不被含 รายการ 的数据行盖过
+
+
 if __name__ == "__main__":
     unittest.main()

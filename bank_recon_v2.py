@@ -2283,7 +2283,11 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
 
 
 def parse_bank_stmt_xlsx_direct(
-    file_bytes: bytes, filename: str, tenant_id: Optional[str] = None
+    file_bytes: bytes,
+    filename: str,
+    tenant_id: Optional[str] = None,
+    allow_ai: bool = False,
+    api_key: str = "",
 ) -> Dict[str, Any]:
     """v118.35.0.55 · 银行流水 Excel 直读(零成本 · 跳过 Gemini)· 多 sheet 版
 
@@ -2348,16 +2352,44 @@ def parse_bank_stmt_xlsx_direct(
                             source="local",
                             sample_headers=[str(c or "") for c in raw_rows[l_idx]],
                         )
-                elif needs_mapping_candidate is None:
-                    needs_mapping_candidate = {
-                        "document_type": "statement",
-                        "template_signature": sig,
-                        "sheet_name": _sheet_name,
-                        "headers": [str(c or "").strip() for c in raw_rows[l_idx]],
-                        "preview_rows": _tl.preview_rows(raw_rows, l_idx, limit=20),
-                        "suggested_mapping": l_cm,
-                        "confidence": conf,
-                    }
+                else:
+                    # ADR-006 S7 · 本地拿不准(low/medium)· 仅在 submit 预检阶段(allow_ai)
+                    # 调一次 Gemini 要列映射 → 余额链把关 → 过才套用 + 存(source="ai")· 同步阻塞
+                    # + 要钱,异步 worker 永不触发(allow_ai 默认 False)。失败/校验不过 → needs_mapping。
+                    ai_cm = (
+                        _tl.suggest_mapping_with_ai(
+                            "statement",
+                            _sheet_name,
+                            raw_rows[l_idx],
+                            _tl.preview_rows(raw_rows, l_idx, limit=20),
+                            local_guess=l_cm,
+                            api_key=api_key,
+                            signature=sig,
+                        )
+                        if allow_ai
+                        else None
+                    )
+                    if ai_cm and _tl.validate_by_balance(raw_rows, l_idx, ai_cm)[0]:
+                        header_idx, col_map = l_idx, ai_cm
+                        if tenant_id and _ts:
+                            _ts.save_mapping(
+                                tenant_id,
+                                "statement",
+                                sig,
+                                ai_cm,
+                                source="ai",
+                                sample_headers=[str(c or "") for c in raw_rows[l_idx]],
+                            )
+                    elif needs_mapping_candidate is None:
+                        needs_mapping_candidate = {
+                            "document_type": "statement",
+                            "template_signature": sig,
+                            "sheet_name": _sheet_name,
+                            "headers": [str(c or "").strip() for c in raw_rows[l_idx]],
+                            "preview_rows": _tl.preview_rows(raw_rows, l_idx, limit=20),
+                            "suggested_mapping": l_cm,
+                            "confidence": conf,
+                        }
         if not col_map:
             continue  # 该 sheet 无流水表头(汇总页/空页)· 跳过
         acct = _extract_sheet_account(raw_rows, header_idx, _sheet_name)
@@ -2498,7 +2530,12 @@ def _extract_acct_code(text: str) -> str:
 
 
 def parse_gl_excel(
-    file_bytes: bytes, filename: str, account_code: str = "", tenant_id: Optional[str] = None
+    file_bytes: bytes,
+    filename: str,
+    account_code: str = "",
+    tenant_id: Optional[str] = None,
+    allow_ai: bool = False,
+    api_key: str = "",
 ) -> Dict[str, Any]:
     """
     Parse GL from Excel file.
@@ -2598,22 +2635,49 @@ def parse_gl_excel(
                             sample_headers=[str(c or "") for c in all_rows_raw[l_idx]],
                         )
                 else:
-                    # 拿不准(GL 无余额链可证 · 借贷/科目易判错)→ 交用户确认一次(不自动套用)
-                    return {
-                        "ok": False,
-                        "needs_mapping": True,
-                        "error_code": "needs_mapping",
-                        "error": "New GL template — please confirm column mapping",
-                        "mapping_request": {
-                            "document_type": "gl",
-                            "template_signature": sig,
-                            "sheet_name": "",
-                            "headers": [str(c or "").strip() for c in all_rows_raw[l_idx]],
-                            "preview_rows": _tl.preview_rows(all_rows_raw, l_idx, limit=20),
-                            "suggested_mapping": l_cm,  # 全部猜测(含 amount)· UI 预填
-                            "confidence": conf,
-                        },
-                    }
+                    # 拿不准(GL 无余额链可证 · 借贷/科目易判错)· ADR-006 S7:仅在 submit 预检
+                    # (allow_ai)调一次 Gemini 要列映射 → 形状校验把关(GL 无链)→ 过才套用 + 存。
+                    # 异步 worker 永不触发。失败/校验不过 → 交用户确认一次(不自动套用)。
+                    ai_cm = (
+                        _tl.suggest_mapping_with_ai(
+                            "gl",
+                            "",
+                            all_rows_raw[l_idx],
+                            _tl.preview_rows(all_rows_raw, l_idx, limit=20),
+                            local_guess=l_cm,
+                            api_key=api_key,
+                            signature=sig,
+                        )
+                        if allow_ai
+                        else None
+                    )
+                    if ai_cm and _tl.validate_gl_shape(all_rows_raw, l_idx, ai_cm)[0]:
+                        col_map, header_idx = ai_cm, l_idx
+                        if tenant_id and _ts:
+                            _ts.save_mapping(
+                                tenant_id,
+                                "gl",
+                                sig,
+                                ai_cm,
+                                source="ai",
+                                sample_headers=[str(c or "") for c in all_rows_raw[l_idx]],
+                            )
+                    else:
+                        return {
+                            "ok": False,
+                            "needs_mapping": True,
+                            "error_code": "needs_mapping",
+                            "error": "New GL template — please confirm column mapping",
+                            "mapping_request": {
+                                "document_type": "gl",
+                                "template_signature": sig,
+                                "sheet_name": "",
+                                "headers": [str(c or "").strip() for c in all_rows_raw[l_idx]],
+                                "preview_rows": _tl.preview_rows(all_rows_raw, l_idx, limit=20),
+                                "suggested_mapping": l_cm,  # 全部猜测(含 amount)· UI 预填
+                                "confidence": conf,
+                            },
+                        }
         if not col_map:
             # v118.35.0.19 · 加 error_code 让前端能翻译成友好文案
             return {

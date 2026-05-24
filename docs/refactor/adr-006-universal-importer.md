@@ -103,6 +103,7 @@ CREATE TABLE import_template_mappings (
 | S5 | `static/recon-mapping.js` 列映射确认面板 · 真 UI E2E 通过 | ✅ 上线 |
 | S6a | CSV 银行账单(编码+分隔符 `_load_csv_sheets`)| ✅ 上线 |
 | S6b | GL 总账(`infer_gl_col_map` + `parse_gl_excel` 三层 + CSV + 单列净额)| ✅ 上线 |
+| S7 | AI 低信心自动建议一次(`suggest_mapping_with_ai` + 余额链/形状把关 + 缓存 + flag + `allow_ai` 门控)| 🟡 代码完成 · 离线守门测试 14+51 全绿 · **待 §9 真验(真 AI key + 真 UI)+ 部署** |
 
 **真实/压测验证**:① 真实投诉件 `เงินสดย่อย`(泰文小现金)端到端真 UI 通过(162 行/平衡)· ② 12 个大文件
 压测(bank/GL · CSV/XLSX · 4000–15000 行)全过 · 性能 15000 行 2.1s。压测共抓出并修掉 5 个真 bug(见 §10)。
@@ -111,20 +112,29 @@ CREATE TABLE import_template_mappings (
 - `services/importer/template_learning.py` —— 引擎(自包含 · 不 import bank_recon_v2 防循环):
   `load_tabular_sheets`(csv/xlsx/xls)· `build_header_signature` · `infer_stmt_col_map`(返回
   `(header_idx, col_map, conf, bal_rate, reasons)`)· `infer_gl_col_map`(返回 `(idx, col_map, conf, reasons)`)·
-  `validate_by_balance`(余额链)· `suggest_mapping_with_ai`(**S7 的 hook · 现返回 None**)。
+  `validate_by_balance`(余额链)· `validate_gl_shape`(GL 形状校验 · S7 给 AI 建议把关)·
+  `suggest_mapping_with_ai`(**S7 已实现** · 只发表头+前20行+本地猜测 · temp=0 · 按 signature 磁盘缓存
+  `.ai_mapping_cache`(含『回 None』哨兵防重试)· `RECON_AI_MAPPING` flag 默认开 · `RECON_AI_MAPPING_MODEL`
+  默认 gemini-2.5-flash-lite · 无 key/关闭/异常/越界 → None)。
   col_map 键:stmt=`date/description/withdrawal/deposit/balance/amount`;gl=`date/doc_no/account/description/debit/credit/balance/amount`。
 - `services/importer/template_store.py` —— `find_mapping/save_mapping/list_mappings/delete_mapping/ensure_table`
   · 作用域 = `tenant_id or user_id`(UUID)· 自愈建表。
 - `bank_recon_v2.py`:
-  - `parse_bank_stmt_xlsx_direct(bytes, filename, tenant_id=None)` —— 账单三层识别(§2)· 含 CSV。
-  - `parse_gl_excel(bytes, filename, account_code, tenant_id=None)` —— GL 三层识别 · 含 CSV · 单列净额按符号拆借贷。
+  - `parse_bank_stmt_xlsx_direct(bytes, filename, tenant_id=None, allow_ai=False, api_key="")` —— 账单三层识别(§2)·
+    含 CSV · S7:`allow_ai=True` 时本地低信心调一次 AI → 余额链把关过才套用+存(source="ai")。
+  - `parse_gl_excel(bytes, filename, account_code, tenant_id=None, allow_ai=False, api_key="")` —— GL 三层识别 ·
+    含 CSV · 单列净额按符号拆借贷 · S7:`allow_ai=True` 时 AI + 形状把关。
+  - **S7 门控铁律**:`allow_ai` 仅 `recon_jobs_routes._preflight_stmt_mapping`(submit 同步阶段)传 True+api_key ·
+    异步 worker / pipeline / gl_vat 全走默认 False → **后台永不烧 AI**(守 §7 风险①)。
   - `parse_bank_statement_pdf` / `parse_gl` / `_parse_bank_stmt_via_pipeline` —— 都透传 tenant_id · needs_mapping 不降级 Gemini。
   - `_load_csv_sheets` —— CSV 编码(utf-8-sig/cp874/gbk/latin-1)+ 分隔符嗅探。
 - `recon_jobs_routes.py` `_preflight_stmt_mapping(input_ref, scope)` —— submit 同步预检(stmt Excel/CSV + gl Excel)→ needs_mapping 不建任务。
 - `import_routes.py` —— `POST /api/recon/import/save-mapping` · `GET/DELETE /api/recon/import/mappings`。
 - `static/recon-mapping.js` —— `window.ReconMapping.show(resp, {token,lang,onConfirmed})` · 按 `document_type` 切字段(账单 vs 总账)。
 - 守门测试:`tests/unit/test_template_learning.py` · `test_template_store_contract.py` · `test_stmt_template_integration.py`
-  · `test_csv_stmt.py` · `test_gl_template_integration.py` · `test_import_routes_contract.py`(共 ~40 个)。
+  · `test_csv_stmt.py` · `test_gl_template_integration.py` · `test_import_routes_contract.py` ·
+  **S7 `test_ai_mapping.py`**(hook 规整/缓存/flag/门控 + AI 命中经校验套用+存 + 校验不过仍 needs_mapping · 14 个)。
+- S7 真 AI 本地烟测:`probes/s7_ai_mapping_smoke.py`(给 GEMINI_API_KEY + 真文件 · 不依赖部署)。
 
 ---
 
@@ -191,7 +201,8 @@ CREATE TABLE import_template_mappings (
   只在余额链证明不了时触发。
 - 单列净额 GL 按"正=借 负=贷"约定拆 · 个别 GL 符号约定相反时可能反 · 余额链不可证(GL 无链)· 真遇到靠用户确认。
 - PDF/图片新格式 **不在 S1–S6 范围**(S8 才做)· 现走 OCR。
-- AI 建议(S7)未做 · 现 `suggest_mapping_with_ai` 返回 None(纯本地)。
+- AI 建议(S7)**代码已实现 + 离线测试全绿**,但 §9『真 AI key + 真 UI』尚未跑(待 Zihao 给 key/token/边界文件 + 部署)·
+  在真验通过前不算上线。注:真 UI 验 S7 需先部署(Playwright 打 pearnly.com 跑的是线上版,本地改动需上线才生效)。
 
 ## 10. 压测抓出并已修的真 bug(编年)
 1. 期初承前 `ยกยอดมา` 被当存款 + `รวมยอด` 合计行污染期末(真实小现金件)→ c2cd145。
@@ -199,6 +210,11 @@ CREATE TABLE import_template_mappings (
 3. GL CSV 绕过学习层(直接丢 Gemini)→ 523d7e1。
 4. 单列净额 GL 解析 0 行(首轮表头判定太松 + 不支持单列净额)→ 523d7e1。
 5. 错余额只行级标 ⚠、摘要不提示 → balance_break 摘要警告 → 523d7e1。
+6. **(S7 §9 压测发现)** 真表头无识别词(`Column A..`)时,数据行描述含同义词(`รายการ`)得 header_signal=1,
+   盖过真表头 → `infer_stmt_col_map` 误选数据行当表头 → **静默吞掉首笔交易 + 期初算错**(comp_ok 仍 True 掩盖)。
+   实测 `bank_large_3000_unknown_headers`:3000 行只读出 2999、期初 14697.75(应 15000)。
+   修:候选表头行若日期列本身解析成真日期 → 是数据行 · 排序键加 `header_not_data` 优先级(rate > 非数据行 >
+   词命中 > score)· 账单 + GL 同修 · 守门测试 `test_template_learning.HeaderNotDataRowTests`。
 
 ## 11. 明确不做(防蔓延)
 - 不重写对账/匹配/汇总/导出/差异分类。

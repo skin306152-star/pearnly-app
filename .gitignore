@@ -32,6 +32,10 @@ test-results/
 .playwright/
 playwright_browsers/
 
+# S7 运行时缓存 + 含 token 的本地实测脚本(绝不进 git · 2026-05-24)
+.ai_mapping_cache/
+_uitest/
+
 # 部署包（临时文件）
 _pkg/
 _pkg_tmpstatic/

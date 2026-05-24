@@ -2132,6 +2132,7 @@ def _extract_sheet_account(raw_rows, header_idx, sheet_name=""):
 
 _STMT_OPEN_KW = (
     "ยอดยกมา",
+    "ยกยอด",
     "ยกมา",
     "brought forward",
     "balance b/f",
@@ -2197,6 +2198,12 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
                 withdrawal = abs(amt)
         desc = _cell(row_list, desc_idx)
 
+        # ADR-006 · 合计/汇总行(รวมยอด/Total/合计)整行跳过 —— 否则其余额(常是大额合计,
+        # 如 รวมยอด 余额=1,651,950)会被当成期末污染余额链(真实小现金件 เงินสดย่อย 实测)。
+        # 此前 summary 过滤在 parse_bank_stmt_xlsx_direct 里事后做 · last_valid_closing 已被污染。
+        if desc and _is_summary_row(desc):
+            continue
+
         is_opening = (
             not opening_found
             and d is None
@@ -2207,8 +2214,9 @@ def _parse_stmt_sheet(raw_rows, header_idx, col_map, filename, account_no=""):
             not opening_found
             and desc
             and any(
+                # ยกยอด:泰文"承前结转/上期结转"另一常见写法(ยกยอดมา)· 之前漏 → 被当存款计入
                 kw in desc.lower()
-                for kw in ["ยอดยกมา", "ยกมา", "brought forward", "opening", "期初"]
+                for kw in ["ยอดยกมา", "ยกยอด", "ยกมา", "brought forward", "opening", "期初"]
             )
         )
         if is_opening:

@@ -97,6 +97,43 @@ class GlParseIntegrationTests(unittest.TestCase):
         if res.get("ok"):
             self.assertGreater(res.get("row_count", 0), 0)  # 若 ok 必须真有行
 
+    # ②③ 修复(2026-05-24)· GL 完全无日期列(A/B/C/D)· 学习层 infer_gl 返回 l_idx<0
+    # (找不到 GL 表头)· 此前 → gl_headers_not_found → 对账流程当"0 行 GL"显示"完成",
+    # CSV 路径还会降级 Gemini 把无表头数据硬读成空日期行参与匹配(凭空造 matched)。
+    # 修后:文件可读但认不出列 → needs_mapping(交用户确认)· 不静默"完成"、CSV 不降级 Gemini。
+    _NO_DATE_COL = [
+        ["A", "B", "C", "D"],
+        ["JV-001", "Customer receipt A", "5000.00", ""],
+        ["JV-001", "Customer receipt A", "", "5000.00"],
+        ["PV-001", "Supplier payment B", "1200.00", ""],
+        ["PV-001", "Supplier payment B", "", "999.99"],
+        ["JV-002", "Bank fee", "300.00", ""],
+    ]
+
+    def test_no_date_column_gl_needs_mapping_not_silent(self):
+        # infer_gl 因无日期列返回 l_idx<0 → 走新 fallback → needs_mapping(不死错/不静默)
+        idx, _cm, _conf, _r = tl.infer_gl_col_map(self._NO_DATE_COL)
+        self.assertEqual(idx, -1)  # 前提:确实找不到 GL 表头(无日期列)
+        res = brv2.parse_gl_excel(_xlsx(self._NO_DATE_COL), "gl.xlsx")
+        self.assertFalse(res.get("ok"))
+        self.assertEqual(res.get("error_code"), "needs_mapping")
+        self.assertTrue(res.get("needs_mapping"))
+        self.assertEqual(res["mapping_request"]["document_type"], "gl")
+        self.assertEqual(res["mapping_request"]["headers"], ["A", "B", "C", "D"])
+
+    def test_no_date_column_gl_csv_not_falls_back_to_gemini(self):
+        # parse_gl(worker 路径)· CSV 无表头不能降级 Gemini 造空日期行 → 直接返 needs_mapping
+        import csv as _csv
+        import io as _io
+
+        buf = _io.StringIO()
+        _csv.writer(buf).writerows(self._NO_DATE_COL)
+        data = buf.getvalue().encode("utf-8-sig")
+        # api_key 给值也不该调 Gemini(needs_mapping 在前面就拦住)
+        res = brv2.parse_gl(data, "gl.csv", "", api_key="dummy-should-not-be-used")
+        self.assertTrue(res.get("needs_mapping"))
+        self.assertEqual(res.get("error_code"), "needs_mapping")
+
     def test_gl_regression_standard_headers(self):
         rows = [
             ["วันที่", "เลขที่เอกสาร", "รหัสบัญชี", "คำอธิบาย", "เดบิต", "เครดิต"],

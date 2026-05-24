@@ -434,6 +434,47 @@ def validate_by_balance(
     return rate >= 0.8, round(rate, 3)
 
 
+def _rescue_direction_by_balance(
+    raw_rows: List[List[Any]], header_idx: int, cm: Dict[str, int]
+) -> Dict[str, int]:
+    """方向列救援搜索:已知 date+balance 但当前映射余额链对不上时,在剩余数字列里
+    枚举『单列净额 / 存-取两种顺序』· 用余额链验证选命中率最高的分配。
+
+    解决:小文件 / 怪表头(F1/F2..)里存/取列各只有 1-2 个值 → 被 _fill_by_shape 的『≥3 行有钱』
+    阈值漏掉 → 方向列没识别 → 余额链没机会跑(README #2 期望"余额链对就自动识别")。
+    安全性:余额链验证是闸门 —— 搜错了 rate 仍低,调用方只在『严格更优』时采用(见 infer_stmt_col_map),
+    已能验证通过的真实文件根本不进本函数,零回归。
+    """
+    if "date" not in cm or "balance" not in cm:
+        return cm
+    body = raw_rows[header_idx + 1 : header_idx + 31]
+    max_cols = max((len(r) for r in body), default=0)
+    fixed = {cm["date"], cm["balance"]}
+    if "description" in cm:
+        fixed.add(cm["description"])
+
+    def col(idx: int) -> List[Any]:
+        return [r[idx] if idx < len(r) else "" for r in body]
+
+    cands = [
+        c
+        for c in range(max_cols)
+        if c not in fixed and sum(1 for v in col(c) if is_amount_like(v)) >= 1
+    ]
+    base = {k: cm[k] for k in ("date", "balance", "description") if k in cm}
+    best_cm, best_rate = cm, validate_by_balance(raw_rows, header_idx, cm)[1]
+    trials: List[Dict[str, int]] = [{**base, "amount": c} for c in cands]
+    for a in cands:
+        for b in cands:
+            if a != b:
+                trials.append({**base, "deposit": a, "withdrawal": b})
+    for t in trials:
+        _passed, rate = validate_by_balance(raw_rows, header_idx, t)
+        if rate > best_rate:
+            best_cm, best_rate = t, rate
+    return best_cm
+
+
 def score_stmt(cm: Dict[str, int]) -> float:
     s = 0.0
     if "date" in cm:
@@ -467,6 +508,10 @@ def infer_stmt_col_map(
         header_signal = len(cm)  # 表头词命中数(真表头行远多于数据行 · 优先级高于 score)
         _fill_by_shape(raw_rows, i, cm)
         # 必备:date + (wd|dep|amount)。balance 缺则后面无法校验/解析,信心下调。
+        # 方向列救援:有 date+balance 但方向列没识别全(怪表头小文件 ≥3 阈值漏掉)·
+        # 在剩余数字列里搜余额链能验证通过的存/取分配。先于"必备列"判定 · 让被漏掉的方向列补回来。
+        if "balance" in cm and "date" in cm and not validate_by_balance(raw_rows, i, cm)[0]:
+            cm = _rescue_direction_by_balance(raw_rows, i, cm)
         if "date" not in cm or not any(k in cm for k in ("withdrawal", "deposit", "amount")):
             continue
         passed, rate = validate_by_balance(raw_rows, i, cm)
@@ -689,7 +734,12 @@ _AI_MAPPING_CACHE_DIR = _os.environ.get("RECON_AI_MAPPING_CACHE_DIR", "").strip(
 
 def ai_mapping_enabled() -> bool:
     """RECON_AI_MAPPING 默认开 · 设 0/false/no/off 关闭。"""
-    return _os.environ.get("RECON_AI_MAPPING", "1").strip().lower() not in ("0", "false", "no", "off")
+    return _os.environ.get("RECON_AI_MAPPING", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
 
 
 def _ai_cache_path(cache_key: str) -> str:
@@ -749,10 +799,14 @@ def _coerce_ai_cm(raw: Any, document_type: str, n_cols: int) -> Optional[Dict[st
         if 0 <= idx < n_cols:
             out[k] = idx
     # 必备:date + 至少一个钱列,否则建议没用
-    money_keys = ("debit", "credit", "amount") if document_type == "gl" else (
-        "withdrawal",
-        "deposit",
-        "amount",
+    money_keys = (
+        ("debit", "credit", "amount")
+        if document_type == "gl"
+        else (
+            "withdrawal",
+            "deposit",
+            "amount",
+        )
     )
     if "date" not in out or not any(k in out for k in money_keys):
         return None

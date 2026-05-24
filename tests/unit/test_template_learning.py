@@ -108,6 +108,27 @@ class InferStatementTests(unittest.TestCase):
         # 形状能推出列且余额链成立 → 至少 medium,通常 high
         self.assertIn(conf, ("high", "medium"))
 
+    def test_tiny_weird_headers_sparse_direction_cols_rescued(self):
+        # ① 修复(2026-05-24)· 怪表头 F1-F6 + 行数少:存列只 2 值(5000/700)、取列只 2 值(1200/300)·
+        # 被 _fill_by_shape『≥3 行有钱』阈值漏掉 → 此前方向列没识别 → 余额链没机会跑 → needs_mapping。
+        # 方向列救援搜索:在剩余数字列里枚举存/取两种顺序 · 余额链验证选对 → 自动识别(高信心)且方向正确。
+        rows = [
+            ["F1", "F2", "F3", "F4", "F5", "F6"],
+            ["2026-01-01", "OPENING BALANCE", "", "", "10000.00", "OB"],
+            ["2026-01-02", "Customer receipt A", "", "5000.00", "15000.00", "R001"],
+            ["2026-01-03", "Supplier payment B", "1200.00", "", "13800.00", "P001"],
+            ["2026-01-04", "Bank fee", "300.00", "", "13500.00", "FEE"],
+            ["2026-01-05", "Customer receipt C", "", "700.00", "14200.00", "R002"],
+        ]
+        idx, cm, conf, rate, _ = tl.infer_stmt_col_map(rows)
+        self.assertEqual(idx, 0)  # 真表头 F1-F6 那行(不是数据行)
+        self.assertEqual(cm.get("date"), 0)
+        self.assertEqual(cm.get("balance"), 4)
+        # 方向必须识别且摆对(F3=取 col2 / F4=存 col3)· 靠余额链验证定向
+        self.assertEqual(cm.get("withdrawal"), 2)
+        self.assertEqual(cm.get("deposit"), 3)
+        self.assertEqual(conf, "high")  # 余额链 100% 命中 → 自动识别不弹映射
+
     def test_no_balance_picks_real_header_not_data_row(self):
         # 无余额列 + 数据值含同义词(Sale receipt 含 'receipt')· 排序须靠表头词密度选对真表头行,
         # 不能把数据行当表头(否则面板给用户看错表头/错猜测)。

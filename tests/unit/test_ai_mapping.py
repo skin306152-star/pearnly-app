@@ -33,20 +33,19 @@ def _xlsx(rows):
     return buf.getvalue()
 
 
-# 表头不认识(Col*)· 两钱列方向与列序相反 → 本地形状猜反(余额链不成立 · 低信心)·
-# 正确映射(withdrawal=2, deposit=3)余额链成立 → 适合验证『AI 救回』。
+# ① 方向列救援搜索上线后(2026-05-24):凡余额链能验证的账单,本地救援就能免费认对列序
+# (不再需要 AI)。所以 stmt AI 测试 fixture 必须是『本地救援也认不回』的场景才有意义。
+# 本 fixture:Col3=带符号净额、Col4=余额,两列等密度 → _fill_by_shape 把 balance 认成 Col3(错)·
+# 救援只重排方向列、动不了被认错的 balance → 本地停在 low → 走 AI;AI 把 balance/amount 摆对 → 余额链验证通过。
 _STMT_AI = [
-    ["Col1", "Col2", "Col3", "Col4", "Col5"],
-    ["2025-11-01", "txn a", "", "5000", "15000"],
-    ["2025-11-02", "txn b", "2000", "", "13000"],
-    ["2025-11-03", "txn c", "1000", "", "12000"],
-    ["2025-11-04", "txn d", "", "3000", "15000"],
-    ["2025-11-05", "txn e", "500", "", "14500"],
-    ["2025-11-06", "txn f", "", "4000", "18500"],
-    ["2025-11-07", "txn g", "1500", "", "17000"],
-    ["2025-11-08", "txn h", "", "2000", "19000"],
+    ["Col1", "Col2", "Col3", "Col4"],
+    ["2025-11-01", "txn a", "5000", "15000"],
+    ["2025-11-02", "txn b", "-2000", "13000"],
+    ["2025-11-03", "txn c", "-1000", "12000"],
+    ["2025-11-04", "txn d", "3000", "15000"],
+    ["2025-11-05", "txn e", "-500", "14500"],
 ]
-_STMT_AI_CORRECT = {"date": 0, "description": 1, "withdrawal": 2, "deposit": 3, "balance": 4}
+_STMT_AI_CORRECT = {"date": 0, "description": 1, "amount": 2, "balance": 3}
 
 # 无余额列 → 余额链不可证 → AI 建议也过不了校验 → 应仍 needs_mapping
 _STMT_NO_BALANCE = [
@@ -110,9 +109,7 @@ class HookUnitTests(unittest.TestCase):
 
     def test_no_api_key_returns_none_no_call(self):
         with _patch_genai('{"date":0}'):
-            out = tl.suggest_mapping_with_ai(
-                "statement", "s", ["a", "b"], [["1", "2"]], api_key=""
-            )
+            out = tl.suggest_mapping_with_ai("statement", "s", ["a", "b"], [["1", "2"]], api_key="")
         self.assertIsNone(out)
         self.assertEqual(_FakeModel.calls, 0)  # 无 key · 根本不调 API
 
@@ -128,12 +125,16 @@ class HookUnitTests(unittest.TestCase):
     def test_parses_and_filters_indices(self):
         # 合法键留 · 非法键(foo)丢 · 越界列号(99)丢
         headers = ["d", "desc", "wd", "dep", "bal"]
-        script = '{"date":0,"description":1,"withdrawal":2,"deposit":3,"balance":4,"foo":1,"amount":99}'
+        script = (
+            '{"date":0,"description":1,"withdrawal":2,"deposit":3,"balance":4,"foo":1,"amount":99}'
+        )
         with _patch_genai(script):
             out = tl.suggest_mapping_with_ai(
                 "statement", "s", headers, [["x"] * 5], api_key="k", signature="sig1"
             )
-        self.assertEqual(out, {"date": 0, "description": 1, "withdrawal": 2, "deposit": 3, "balance": 4})
+        self.assertEqual(
+            out, {"date": 0, "description": 1, "withdrawal": 2, "deposit": 3, "balance": 4}
+        )
         self.assertEqual(_FakeModel.calls, 1)
 
     def test_missing_date_or_money_returns_none(self):
@@ -181,18 +182,14 @@ class WorkerPathNeverCallsAITests(unittest.TestCase):
     """安全线:默认 allow_ai=False(异步 worker 路径)· 绝不触发 AI。"""
 
     def test_stmt_worker_path_no_ai(self):
-        with mock.patch(
-            "services.importer.template_learning.suggest_mapping_with_ai"
-        ) as m:
+        with mock.patch("services.importer.template_learning.suggest_mapping_with_ai") as m:
             res = brv2.parse_bank_stmt_xlsx_direct(_xlsx(_STMT_AI), "w.xlsx")  # allow_ai 默认 False
         m.assert_not_called()
-        self.assertFalse(res.get("ok"))  # 本地低信心 + 无 AI → needs_mapping
+        self.assertFalse(res.get("ok"))  # 本地低信心(救援认错 balance)+ 无 AI → needs_mapping
         self.assertEqual(res.get("error_code"), "needs_mapping")
 
     def test_gl_worker_path_no_ai(self):
-        with mock.patch(
-            "services.importer.template_learning.suggest_mapping_with_ai"
-        ) as m:
+        with mock.patch("services.importer.template_learning.suggest_mapping_with_ai") as m:
             res = brv2.parse_gl_excel(_xlsx(_GL_AI), "w.xlsx")  # allow_ai 默认 False
         m.assert_not_called()
         self.assertEqual(res.get("error_code"), "needs_mapping")
@@ -209,25 +206,26 @@ class PreflightAIIntegrationTests(unittest.TestCase):
             saved["cm"] = cm
             saved["source"] = k.get("source")
 
-        with mock.patch(
-            "services.importer.template_learning.suggest_mapping_with_ai",
-            return_value=dict(_STMT_AI_CORRECT),
-        ) as m, mock.patch(
-            "services.importer.template_store.save_mapping", side_effect=_fake_save
+        with (
+            mock.patch(
+                "services.importer.template_learning.suggest_mapping_with_ai",
+                return_value=dict(_STMT_AI_CORRECT),
+            ) as m,
+            mock.patch("services.importer.template_store.save_mapping", side_effect=_fake_save),
         ):
             res = brv2.parse_bank_stmt_xlsx_direct(
                 _xlsx(_STMT_AI), "ai.xlsx", tenant_id="t1", allow_ai=True, api_key="k"
             )
         m.assert_called_once()
         self.assertTrue(res.get("ok"), res.get("error_code"))
-        self.assertGreaterEqual(res.get("row_count", 0), 5)
+        self.assertGreaterEqual(res.get("row_count", 0), 4)
         # 过余额链 → 自动存 source="ai"
         self.assertEqual(saved.get("source"), "ai")
         self.assertEqual(saved.get("doc"), "statement")
 
     def test_stmt_ai_fails_validation_still_needs_mapping(self):
-        # AI 给了余额链对不上的映射(把存取列读反)→ 校验不过 → 不套用 → needs_mapping
-        bad = {"date": 0, "description": 1, "withdrawal": 3, "deposit": 2, "balance": 4}
+        # AI 给了余额链对不上的映射(把 amount/balance 列认反)→ 校验不过 → 不套用 → needs_mapping
+        bad = {"date": 0, "description": 1, "amount": 3, "balance": 2}
         with mock.patch(
             "services.importer.template_learning.suggest_mapping_with_ai", return_value=bad
         ):
@@ -255,11 +253,12 @@ class PreflightAIIntegrationTests(unittest.TestCase):
             saved["doc"] = doc
             saved["source"] = k.get("source")
 
-        with mock.patch(
-            "services.importer.template_learning.suggest_mapping_with_ai",
-            return_value=dict(_GL_AI_CORRECT),
-        ) as m, mock.patch(
-            "services.importer.template_store.save_mapping", side_effect=_fake_save
+        with (
+            mock.patch(
+                "services.importer.template_learning.suggest_mapping_with_ai",
+                return_value=dict(_GL_AI_CORRECT),
+            ) as m,
+            mock.patch("services.importer.template_store.save_mapping", side_effect=_fake_save),
         ):
             res = brv2.parse_gl_excel(
                 _xlsx(_GL_AI), "ai.xlsx", tenant_id="t1", allow_ai=True, api_key="k"

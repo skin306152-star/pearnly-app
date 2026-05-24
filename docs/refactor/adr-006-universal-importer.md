@@ -238,6 +238,29 @@ CREATE TABLE import_template_mappings (
    修:候选表头行若日期列本身解析成真日期 → 是数据行 · 排序键加 `header_not_data` 优先级(rate > 非数据行 >
    词命中 > score)· 账单 + GL 同修 · 守门测试 `test_template_learning.HeaderNotDataRowTests`。
 
+### 10.1 Codex UI 全量测试(2026-05-24)抓出并已修(②③④①)
+触发:Codex 用 23 个触发条件素材跑生产 UI(`对账UI全量测试报告_20260524`)· 抓出 5 个判定盲区 · 经
+生产 JSON + 本地实跑双重核实根因 · 修了其中 4 个(⑤为验证项非 bug)。
+- **②③ GL 认不出列却显示"完成"/CSV 降级 Gemini 造空日期匹配**:无日期列 GL(A/B/C/D)·
+  `parse_gl_excel` 返回 `gl_headers_not_found` → 对账流程当"0 行 GL"显示"完成"(XLSX);CSV 还会经
+  `parse_gl` 降级 Gemini 把无表头数据硬读成 `gl_date=null` 行参与匹配(凭空造 matched=1)。
+  修:`parse_gl_excel` 文件可读但认不出列(`infer_gl` l_idx<0)且仍是张表(≥2 行 ≥2 列)→ 返
+  `needs_mapping`(带原始表头+预览+尽力猜测)· submit 预检据此弹"确认列对应"面板 · CSV 因此不再降级
+  Gemini。守门 `test_gl_template_integration`(无日期列 → needs_mapping · CSV 不调 Gemini)。
+- **④ PDF 页脚金额合计写错未触发 S8**:`_audit_completeness._sum_reliable` 用 0.1% 宽容差判
+  "合计≈期初/期末=误填的余额"而跳过校验 · 测试件 Total Deposit=9999 恰落在期初 10000 的 0.1%(±10)内 →
+  被当误填静默放过。修:误填判定改近乎精确的小绝对容差(0.5 元) · 9999 vs 10000(差 1)→ 正常触发
+  `credit_sum_mismatch` → S8;BAY『两合计相同』主防护不受影响。守门 `test_bank_v2_completeness`(近期初真错合计仍报 + 精确等期末仍跳过)。
+- **① 怪表头+余额链正确却弹映射**:怪表头小文件(F1/F2..)存/取列各只 2 个值 · 被 `_fill_by_shape`
+  『≥3 行有钱』阈值漏掉 → 方向列没识别 → 余额链没机会跑 → needs_mapping(README 期望自动识别)。
+  修:`infer_stmt_col_map` 加『方向列救援搜索』—— 仅当当前映射余额链验证不过时,在剩余数字列里枚举
+  单列净额/存-取两种顺序 · 用余额链验证选命中率最高且严格更优者(验证作安全闸 · 已能验证的真实文件不进救援 · 零回归)。
+  守门 `test_template_learning.test_tiny_weird_headers_sparse_direction_cols_rescued`。
+  连带:救援令"余额链可证"的账单本地即免费认对 → S7 stmt AI 仅在 date/balance 列本身被认错时才需要 ·
+  `test_ai_mapping` 的 stmt fixture 改成"本地认错 balance"场景以保持 AI 路径测试有效。
+- **⑤ 2 行文本 PDF 是否走 Gemini**:非 bug · 本地实跑证免费路径 0 行(文本列竖排错位)→ 生产有 key
+  必走 Gemini · `step5 gemini: api_key_present=...` 日志已存在 · 生产 journalctl 确认待授权 SSH。
+
 ## 11. 明确不做(防蔓延)
 - 不重写对账/匹配/汇总/导出/差异分类。
 - 不把 Excel/CSV 默认丢给 Gemini(本地优先 · 高信心 0 成本)。

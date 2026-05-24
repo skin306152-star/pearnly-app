@@ -1649,14 +1649,24 @@ def _audit_completeness(
     # v118.35.0.63 · 防 Gemini 把『期末/期初余额』错填进合计字段(实测 BAY 把 closing
     # 919384.8 同时填进 total_credit 和 total_debit)· 这种被污染的合计不可信 · 跳过 sum 校验。
     # 笔数(count)不会跟金额混 · 是最可靠的『漏行』信号 · 始终校验。
+    #
+    # 2026-05-24(④ 修复)· 旧实现用 _tol(=0.1% 宽容差)判"合计≈期初/期末"→ 误填,但 0.1%
+    # 对 1 万的期初就是 ±10 元,把『真错的合计 9999(应 5700)』当成误填的期初 10000 静默跳过,
+    # 漏报了完整性问题(测试 pdf_text_footer_total_mismatch:Total Deposit 9999 未触发 S8)。
+    # 收紧:误填判定改用近乎精确的小绝对容差(余额被原样复制进合计才跳过)· 不再用 0.1% 误伤真错合计。
+    # BAY 主防护靠『两合计相同』(abs(t-other)<0.01)· 与本容差无关 · 不受影响。
+    _BAL_MISFILE_EPS = (
+        0.5  # 合计与某余额相差 < 0.5 元才算"误填的余额"(原样复制)· 否则按真实合计校验
+    )
+
     def _sum_reliable(t, other):
         if t is None or t <= 0:
             return False
         if other is not None and abs(t - other) < 0.01:  # 两个合计相同 = 八成是误填的余额
             return False
-        if closing and abs(t - closing) < _tol(closing):  # 等于期末 = 误填
+        if closing and abs(t - closing) < _BAL_MISFILE_EPS:  # 几乎等于期末 = 误填余额
             return False
-        if opening and abs(t - opening) < _tol(opening):
+        if opening and abs(t - opening) < _BAL_MISFILE_EPS:
             return False
         return True
 
@@ -2679,6 +2689,39 @@ def parse_gl_excel(
                             },
                         }
         if not col_map:
+            # ADR-006 · 文件可读但认不出 GL 列(固定词典 + 学习层都没拿到可用表头 · 典型:
+            # 无日期列的 A/B/C/D 表)· 不再静默返回 gl_headers_not_found —— 那会被对账流程当
+            # "0 行 GL"一路跑到"完成",或在 CSV 路径降级 Gemini 把无表头数据硬读成空日期行参与匹配
+            # (凭空造出 matched)。只要还是张表格(≥2 行 + ≥2 列)→ 返回 needs_mapping · 让
+            # submit 预检弹"确认列对应"面板(用户手动指认 date/借/贷/科目)。CSV 因此也不再降级 Gemini。
+            _tabular = [r for r in (all_rows_raw or []) if any(str(c or "").strip() for c in r)]
+            _first_cols = max((len(r) for r in _tabular[:5]), default=0)
+            if _tl is not None and len(_tabular) >= 2 and _first_cols >= 2:
+                _hdr = 0
+                try:
+                    _guess = _tl._map_gl_by_header(all_rows_raw[_hdr])
+                    _tl._fill_gl_by_shape(all_rows_raw, _hdr, _guess)
+                except Exception:  # noqa: BLE001
+                    _guess = {}
+                try:
+                    _sig = _tl.build_header_signature(all_rows_raw[_hdr])
+                except Exception:  # noqa: BLE001
+                    _sig = ""
+                return {
+                    "ok": False,
+                    "needs_mapping": True,
+                    "error_code": "needs_mapping",
+                    "error": "New GL template — please confirm column mapping",
+                    "mapping_request": {
+                        "document_type": "gl",
+                        "template_signature": _sig,
+                        "sheet_name": "",
+                        "headers": [str(c or "").strip() for c in all_rows_raw[_hdr]],
+                        "preview_rows": _tl.preview_rows(all_rows_raw, _hdr, limit=20),
+                        "suggested_mapping": _guess,
+                        "confidence": "low",
+                    },
+                }
             # v118.35.0.19 · 加 error_code 让前端能翻译成友好文案
             return {
                 "ok": False,

@@ -13,7 +13,7 @@ import logging
 from typing import Optional, List, Any, Dict
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException, status, UploadFile, File, Form
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -59,6 +59,12 @@ from billing_routes import (
 from admin_diagnostics_routes import (
     router as admin_diagnostics_router,
 )  # 阶段 5 Task 5.2 · 抽 5 个 admin diagnostics + internal/deploy* 路由(2026-05-22)
+from route_helpers import (  # REFACTOR-B1 · 公共鉴权/日志/校验 helper(2026-05-24)
+    _check_password_strength,
+    _log_op,
+    _require_owner_or_super,
+    _require_super_admin,
+)
 
 try:
     from dotenv import load_dotenv
@@ -7062,17 +7068,6 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str, message_id
 # ============================================================
 
 
-def _require_super_admin(request: Request) -> Dict[str, Any]:
-    """超级管理员守门员 · 非超管 403"""
-    user = get_current_user_from_request(request)
-    if not user.get("is_super_admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="admin.not_super_admin",
-        )
-    return user
-
-
 # ============================================================
 # v118.27.7 · 多租户改造 P0 · 数据迁移路由(仅超管)
 # 流程:
@@ -7749,35 +7744,6 @@ class EmployeeAddRequest(BaseModel):
 
 class EmployeeToggleRequest(BaseModel):
     is_active: bool
-
-
-def _log_op(
-    request: Request, user, action, target_type=None, target_id=None, target_name=None, details=None
-):
-    """记操作日志的便捷函数"""
-    try:
-        db.insert_operation_log(
-            tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None,
-            actor_user_id=str(user["id"]),
-            actor_username=user.get("username"),
-            actor_is_super=bool(user.get("is_super_admin")),
-            action=action,
-            target_type=target_type,
-            target_id=target_id,
-            target_name=target_name,
-            details=details,
-            ip=_get_client_ip(request),
-            ua=request.headers.get("User-Agent", "")[:300],
-        )
-    except Exception as e:
-        logger.warning(f"_log_op failed: {e}")
-
-
-def _get_client_ip(request):
-    xff = request.headers.get("X-Forwarded-For", "")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.client.host if request.client else None
 
 
 # 列出所有 owner 用户(超管)
@@ -8475,105 +8441,7 @@ async def admin_users_csv(request: Request):
 # ============================================================
 # 员工管理(老板用)
 # ============================================================
-
-# v118.11 · 弱密码黑名单 + 强度校验(共享给员工创建/重置/首登改密)
-_WEAK_PASSWORDS = {
-    "111111",
-    "112233",
-    "121212",
-    "123123",
-    "123321",
-    "123456",
-    "1234567",
-    "12345678",
-    "123456789",
-    "1234567890",
-    "131313",
-    "147258",
-    "159753",
-    "654321",
-    "666666",
-    "888888",
-    "987654",
-    "abc123",
-    "abcd1234",
-    "admin",
-    "admin123",
-    "iloveyou",
-    "letmein",
-    "monkey",
-    "password",
-    "password1",
-    "password123",
-    "qazwsx",
-    "qwerty",
-    "qwerty123",
-    "qwertyuiop",
-    "welcome",
-    "zxcvbnm",
-}
-
-
-def _check_password_strength(password: str) -> Optional[str]:
-    """
-    返回 None 表示通过 · 返回错误 code 表示拒绝
-    code: pwd.too_short / pwd.too_weak_numeric / pwd.too_weak_common / pwd.too_weak
-    """
-    if not password or len(password) < 8:
-        return "pwd.too_short"
-    if password.lower() in _WEAK_PASSWORDS:
-        return "pwd.too_weak_common"
-    if password.isdigit():
-        return "pwd.too_weak_numeric"
-    has_letter = any(c.isalpha() for c in password)
-    has_digit = any(c.isdigit() for c in password)
-    if not (has_letter and has_digit):
-        return "pwd.too_weak"
-    return None
-
-
-def _require_owner_or_super(request: Request) -> Dict[str, Any]:
-    """老板或超管
-    v118.26.2.4 · BUG 4 修补:新注册老板 tenant_id=NULL · 加员工时被拒
-    懒建模式:首次需要 tenant 时自动建一个 + 回填 user.tenant_id · 不影响新签名 API
-    """
-    user = get_current_user_from_request(request)
-    if user.get("is_super_admin"):
-        return user
-    if user.get("role") != "owner":
-        raise HTTPException(403, detail="team.only_owner_or_super")
-    if not user.get("tenant_id"):
-        # v118.26.2.4 · 懒建 tenant · 只在首次需要时
-        try:
-            tenant_name = (
-                user.get("company_name")
-                or user.get("full_name")
-                or user.get("username")
-                or f"user_{str(user['id'])[:8]}"
-            )[:100]
-            new_tid = db.create_tenant(
-                name=tenant_name,
-                owner_user_id=str(user["id"]),
-                tenant_type="shared_api",
-                monthly_quota=100,
-                notes="auto-created on first owner action",
-            )
-            if new_tid:
-                with db.get_cursor(commit=True) as _cur:
-                    _cur.execute(
-                        "UPDATE users SET tenant_id = %s WHERE id = %s AND tenant_id IS NULL",
-                        (new_tid, str(user["id"])),
-                    )
-                user["tenant_id"] = new_tid
-                logger.info(
-                    f"[v118.26.2.4 lazy-tenant] +tenant {new_tid[:8]}.. for user {user.get('username')!r}"
-                )
-        except Exception as _e:
-            logger.error(f"_require_owner_or_super lazy-tenant fail: {_e}")
-            raise HTTPException(500, detail="team.tenant_create_failed")
-        if not user.get("tenant_id"):
-            raise HTTPException(400, detail="team.no_tenant")
-    return user
+# 鉴权/弱密码校验 helper 已抽到 route_helpers.py(REFACTOR-B1 · 2026-05-24)
 
 
 # 列员工

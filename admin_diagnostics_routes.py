@@ -27,30 +27,13 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Request
 
-from auth import get_current_user_from_request
+from route_helpers import _require_super_admin  # REFACTOR-B1 · 公共守门(2026-05-24)
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter()
-
-
-# ============================================================
-# 局部 helper · 跟 billing_routes.py 同款(8 行 super-admin 守门 · 复制不抽公共)
-# ============================================================
-def _require_super_admin(request: Request) -> Dict[str, Any]:
-    """超级管理员守门员 · 非超管 403"""
-    from fastapi import status
-
-    user = get_current_user_from_request(request)
-    if not user.get("is_super_admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="admin.not_super_admin",
-        )
-    return user
 
 
 # ============================================================

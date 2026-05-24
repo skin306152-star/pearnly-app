@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict
 
 from fastapi import (
     APIRouter,
@@ -37,30 +36,15 @@ from fastapi import (
     Request,
     Response,
     UploadFile,
-    status,
 )
 from pydantic import BaseModel, Field
 
 import db
 from auth import get_current_user_from_request
+from route_helpers import _require_super_admin  # REFACTOR-B1 · 公共守门(2026-05-24)
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter()
-
-
-# ============================================================
-# 局部 helper(app.py 也有同名 · 8 行 super-admin 守门)
-# 这里复制一份 · 不引 app.py 防循环 import · 跟 Task 5.2 抽公共 helper 时再合
-# ============================================================
-def _require_super_admin(request: Request) -> Dict[str, Any]:
-    """超级管理员守门员 · 非超管 403"""
-    user = get_current_user_from_request(request)
-    if not user.get("is_super_admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="admin.not_super_admin",
-        )
-    return user
 
 
 def send_topup_approved_email(tenant_id, amount_thb, new_balance):

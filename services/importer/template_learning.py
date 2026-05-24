@@ -298,7 +298,10 @@ def load_tabular_sheets(file_bytes: bytes, filename: str) -> List[Tuple[str, Lis
 # ── 指纹 + 预览 ─────────────────────────────────────────────────────
 def build_header_signature(headers: List[Any]) -> str:
     normalized = [_norm(h) for h in headers if _norm(h)]
-    return hashlib.sha1("|".join(normalized).encode("utf-8")).hexdigest()[:16]
+    # 表头指纹(非安全用途)· usedforsecurity=False 消除 bandit B324(摘要值不变 · 不影响已存映射键)
+    return hashlib.sha1("|".join(normalized).encode("utf-8"), usedforsecurity=False).hexdigest()[
+        :16
+    ]
 
 
 def preview_rows(raw_rows: List[List[Any]], start: int, limit: int = 20) -> List[List[str]]:

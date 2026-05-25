@@ -154,18 +154,22 @@
         if (!root) return;
         const mode = getWorkMode();
         const id = getActiveWorkspaceClientId();
-        let label;
+        let icon, text;
         if (mode === 'client' && id != null) {
             const list = window._workspaceClientsCache || [];
             const c = list.find((x) => Number(x.id) === Number(id));
-            label = '🏢 ' + (c ? c.name : _t('ws-current-label', '当前客户'));
+            icon = _icon('building');
+            text = c ? c.name : _t('ws-current-label', '当前客户');
         } else {
-            label = '👤 ' + _t('ws-personal', '个人事务');
+            icon = _icon('user');
+            text = _t('ws-personal', '个人事务');
         }
         root.innerHTML =
             '<button class="ws-ctrl-btn" id="ws-ctrl-btn" type="button">' +
-            label.replace(/</g, '&lt;') +
-            '</button>';
+            icon +
+            '<span class="ws-ctrl-label">' +
+            _esc(text) +
+            '</span></button>';
         const btn = root.querySelector('#ws-ctrl-btn');
         if (btn) btn.addEventListener('click', () => openWorkspaceChooser(null));
     }
@@ -176,6 +180,27 @@
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
         });
+    }
+
+    // 铁律(UI):只用 SVG line 图标(feather/lucide)· 禁止 emoji 当图标。
+    function _icon(name) {
+        const open =
+            '<svg class="ws-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+        if (name === 'building') {
+            // feather briefcase(客户业务)
+            return (
+                open +
+                '<rect x="2" y="7" width="20" height="14" rx="2"/>' +
+                '<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>'
+            );
+        }
+        // feather user(个人事务)
+        return (
+            open +
+            '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>' +
+            '<circle cx="12" cy="7" r="4"/></svg>'
+        );
     }
 
     function openWorkspaceChooserUI(opts) {
@@ -197,7 +222,7 @@
             '<button type="button" class="ws-modal-item' +
                 (personalActive ? ' active' : '') +
                 '" data-ws-personal="1">' +
-                '<span class="ws-modal-item-ic">👤</span>' +
+                '<span class="ws-modal-item-ic">' + _icon('user') + '</span>' +
                 '<span class="ws-modal-item-name">' +
                 _esc(_t('ws-personal', '个人事务')) +
                 '</span>' +
@@ -212,7 +237,7 @@
                     '" data-ws-pick="' +
                     _esc(c.id) +
                     '">' +
-                    '<span class="ws-modal-item-ic">🏢</span>' +
+                    '<span class="ws-modal-item-ic">' + _icon('building') + '</span>' +
                     '<span class="ws-modal-item-name">' +
                     _esc(c.name || '#' + c.id) +
                     '</span>' +

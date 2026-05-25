@@ -6018,7 +6018,9 @@ async function showLogDetail(logId) {
             const hintKey = 'erp-receipt-hint-' + extHint;
             const hintText = t(hintKey);
             if (hintText && hintText !== hintKey) {
-                hintHtml = `<div class="erp-receipt-hint">💡 ${escapeHtml(hintText)}</div>`;
+                // 铁律:线性 SVG 图标 · 不用 emoji
+                const infoIc = `<svg class="erp-receipt-hint-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
+                hintHtml = `<div class="erp-receipt-hint">${infoIc}<span>${escapeHtml(hintText)}</span></div>`;
             }
         }
 

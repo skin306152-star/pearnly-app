@@ -151,6 +151,8 @@ body.sidebar-collapsed .topbar-left { width: var(--sidebar-w-collapsed); padding
     border-color: var(--ink-4, #d1d5db);
     color: var(--ink, #111);
 }
+.ws-ic { width: 15px; height: 15px; flex-shrink: 0; }
+.ws-ctrl-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-modal {
     position: fixed;
     inset: 0;
@@ -217,7 +219,9 @@ body.sidebar-collapsed .topbar-left { width: var(--sidebar-w-collapsed); padding
     background: #f5f3ff;
     font-weight: 600;
 }
-.ws-modal-item-ic { font-size: 16px; }
+.ws-modal-item-ic { display: inline-flex; color: var(--ink-3, #6b7280); }
+.ws-modal-item-ic .ws-ic { width: 18px; height: 18px; }
+.ws-modal-item.active .ws-modal-item-ic { color: var(--brand, #4f46e5); }
 .ws-modal-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-modal-empty {
     padding: 8px 18px 12px;
@@ -3019,7 +3023,11 @@ button.btn-primary.btn-tiny:hover {
     font-size: 12px;
     line-height: 1.5;
     margin-bottom: 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
 }
+.erp-receipt-hint-ic { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
 .erp-receipt-primary-wrap {
     margin-bottom: 14px;
 }

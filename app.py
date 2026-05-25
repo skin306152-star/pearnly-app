@@ -51,7 +51,9 @@ from email_ingest_routes import (
     router as email_ingest_router,
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25
 from rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税务 4 路由 · 2026-05-25
-from workspace_routes import router as workspace_router  # B4 · workspace 账套主体(非破坏) · 2026-05-25
+from workspace_routes import (
+    router as workspace_router,
+)  # B4 · workspace 账套主体(非破坏) · 2026-05-25
 from categories_routes import router as categories_router  # REFACTOR-B1 · 分类 1 路由 · 2026-05-25
 from pages_routes import (
     router as pages_router,
@@ -1826,10 +1828,17 @@ async def ocr_recognize(
     request: Request,
     file: UploadFile = File(...),
     client_id: Optional[str] = Form(None),  # v27.8.1.13a · 右上角客户切换器选中时自动归属
+    # B1 相 1 (2026-05-26) · workspace 账套归属(在为哪家公司做账)· 可选 · Form 或 header
+    # X-Workspace-Client-Id · 带不上 NULL · 非强制(缺失不拦上传)· 与 client_id(买方)独立。
+    workspace_client_id: Optional[str] = Form(None),
 ):
     user = get_current_user_from_request(request)
     client_ip = get_client_ip(request)
     plan = user.get("plan", "free")
+
+    # B1 相 1 · 解析 workspace 账套归属:优先 Form,回退 header;非数字/缺失 → None(写 NULL)。
+    _ws_raw = workspace_client_id or request.headers.get("X-Workspace-Client-Id")
+    _ws_client_id = int(_ws_raw) if (_ws_raw and str(_ws_raw).strip().isdigit()) else None
 
     # 1. 基本校验 (2026-05-21 multi-format refactor: PDF + image + Excel + CSV + Word)
     from services.ocr.pipeline import (
@@ -2395,6 +2404,8 @@ async def ocr_recognize(
             client_id=(
                 int(client_id) if (client_id and str(client_id).strip().isdigit()) else None
             ),
+            # B1 相 1 · workspace 账套归属(可选·校验在 insert_ocr_history 内·带不上 NULL)
+            workspace_client_id=_ws_client_id,
         )
         if hid:
             history_ids.append(hid)

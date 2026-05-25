@@ -689,6 +689,9 @@ def insert_ocr_history(
     client_id: Optional[int] = None,
     # 2026-05-24 · 多租户:历史归属租户(原缺失 → tenant_id 恒 NULL → 按租户查历史/对账漏)
     tenant_id: Optional[str] = None,
+    # B1 相 1 (2026-05-26) · workspace 账套主体归属(在为哪家公司做账)· 可选 · 带不上 NULL ·
+    # 与 client_id(买方)是两个独立字段 · 非强制(缺失不报错·不拦上传)。
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[str]:
     """写入一条历史记录,返回新记录的 id(失败返回 None,不影响主流程)"""
     summary = _extract_summary_fields(pages)
@@ -717,6 +720,33 @@ def insert_ocr_history(
             logger.warning(
                 f"insert_ocr_history client_id 校验失败 (user_id={user_id}, client_id={client_id}): {e}"
             )
+    # B1 相 1 · workspace 账套归属校验(防越权:只接受属本 tenant/自己的 workspace)·
+    # 校验不过/缺失 → NULL · 绝不报错、不拦上传、不碰 client_id(买方)。
+    safe_workspace_client_id = None
+    if workspace_client_id is not None:
+        try:
+            wid = int(workspace_client_id)
+            with get_cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id FROM workspace_clients
+                    WHERE id = %s
+                      AND (
+                          (tenant_id IS NOT NULL
+                           AND tenant_id = (SELECT tenant_id FROM users WHERE id = %s))
+                          OR (tenant_id IS NULL AND user_id = %s)
+                      )
+                    LIMIT 1
+                    """,
+                    (wid, user_id, user_id),
+                )
+                if cur.fetchone():
+                    safe_workspace_client_id = wid
+        except Exception as e:
+            logger.warning(
+                f"insert_ocr_history workspace_client_id 校验失败 "
+                f"(user_id={user_id}, workspace_client_id={workspace_client_id}): {e}"
+            )
     try:
         with get_cursor(commit=True) as cur:
             cur.execute(
@@ -729,7 +759,7 @@ def insert_ocr_history(
                     source_pdf_id, source_page_indices, source_index, source_total,
                     source, source_ref,
                     pdf_storage_path, pdf_size_bytes,
-                    client_id
+                    client_id, workspace_client_id
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s,
                     %s::jsonb, %s, %s,
@@ -738,7 +768,7 @@ def insert_ocr_history(
                     %s, %s::jsonb, %s, %s,
                     %s, %s,
                     %s, %s,
-                    %s
+                    %s, %s
                 )
                 RETURNING id
             """,
@@ -768,6 +798,7 @@ def insert_ocr_history(
                     pdf_storage_path,
                     pdf_size_bytes,
                     safe_client_id,
+                    safe_workspace_client_id,
                 ),
             )
             row = cur.fetchone()

@@ -35,13 +35,18 @@ class RouteHelpersImportContractTests(unittest.TestCase):
     def test_single_source_of_truth(self):
         """app.py 与已抽出的 routes 必须复用 route_helpers 同一份对象 · 不许各自拷贝"""
         import admin_diagnostics_routes
+        import admin_users_routes
         import app
         import billing_routes
         import erp_xero_routes
         import team_routes
 
-        self.assertIs(app._require_super_admin, route_helpers._require_super_admin)
-        self.assertIs(app._log_op, route_helpers._log_op)
+        # REFACTOR-B1(2026-05-25):_require_super_admin / _log_op 在 app.py 的最后消费者
+        # (超管用户/员工路由)已随 admin_users_routes 搬出 · app.py 不再 import(ruff F401)·
+        # 单一来源断言跟到新消费者 admin_users_routes(_require_super_admin 另由 billing/
+        # admin_diagnostics 下方再覆盖)。
+        self.assertIs(admin_users_routes._require_super_admin, route_helpers._require_super_admin)
+        self.assertIs(admin_users_routes._log_op, route_helpers._log_op)
         self.assertIs(app._plan_permissions, route_helpers._plan_permissions)
         # REFACTOR-B1(2026-05-25):_require_owner_or_super 在 app.py 的最后消费者(Xero 路由)
         # 已随 erp_xero_routes 搬出 · app.py 不再 import(ruff F401)· 单一来源断言跟到新消费者。

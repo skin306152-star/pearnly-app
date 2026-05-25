@@ -68,11 +68,16 @@ class TenantRoutesContractTests(unittest.TestCase):
             AdminUpdateTenantStatusRequest(status="bogus")  # pattern
 
     def test_shared_models_single_source(self):
-        """admin user quota/status 路由复用的 2 model · app.py 用的就是 tenant_routes 的(单一来源)"""
-        import app
+        """admin user quota/status 路由复用的 2 model 是 tenant_routes 的(单一来源)。
+        REFACTOR-B1(2026-05-25):该 2 路由随 admin 组搬到 admin_users_routes · 断言跟到新消费者。"""
+        import admin_users_routes
 
-        self.assertIs(app.AdminUpdateTenantQuotaRequest, AdminUpdateTenantQuotaRequest)
-        self.assertIs(app.AdminUpdateTenantStatusRequest, AdminUpdateTenantStatusRequest)
+        self.assertIs(
+            admin_users_routes.AdminUpdateTenantQuotaRequest, AdminUpdateTenantQuotaRequest
+        )
+        self.assertIs(
+            admin_users_routes.AdminUpdateTenantStatusRequest, AdminUpdateTenantStatusRequest
+        )
 
     def test_assign_client_stays_in_app(self):
         """中间夹的 history 路由 assign_client 仍留 app.py · 不被误搬到 tenant_routes"""

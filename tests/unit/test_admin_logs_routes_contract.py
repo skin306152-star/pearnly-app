@@ -59,14 +59,16 @@ class AdminLogsRoutesContractTests(unittest.TestCase):
             auth.get_current_user_from_request,
         )
 
-    def test_users_csv_stays_in_app(self):
-        """相邻的 /api/admin/users.csv(属 admin users 组)仍留 app.py · 不被误搬"""
+    def test_users_csv_not_in_admin_logs_router(self):
+        """/api/admin/users.csv 属 admin users 组 · 不能跑进 admin_logs_router。
+        REFACTOR-B1(2026-05-25):users.csv 已随 admin users 组抽到 admin_users_routes.py ·
+        仍经 include 挂在 app 上 · 但绝不属于 admin_logs(操作/审计日志)组。"""
         import app
 
         paths = {r.path for r in app.app.routes if hasattr(r, "path")}
-        self.assertIn("/api/admin/users.csv", paths)
+        self.assertIn("/api/admin/users.csv", paths)  # 仍挂载(经 admin_users_router)
         log_paths = {r.path for r in router.routes if hasattr(r, "path")}
-        self.assertNotIn("/api/admin/users.csv", log_paths)
+        self.assertNotIn("/api/admin/users.csv", log_paths)  # 不在 admin_logs 组
 
 
 if __name__ == "__main__":

@@ -49,11 +49,12 @@ class TeamRoutesContractTests(unittest.TestCase):
         self.assertIn("/api/admin/employees/{employee_id}/active", paths)
 
     def test_employee_toggle_request_single_source(self):
-        """app.py 的 admin stub 用的 EmployeeToggleRequest 必须是 team_routes 那个对象
-        (单一来源 · 防接力 agent 又在 app.py 各自拷一份漂移)"""
-        import app
+        """超管员工 active 路由复用的 EmployeeToggleRequest 必须是 team_routes 那个对象
+        (单一来源 · 防接力 agent 各自拷一份漂移)。REFACTOR-B1(2026-05-25):该路由
+        随 admin 用户/员工组搬到 admin_users_routes · 断言跟到新消费者。"""
+        import admin_users_routes
 
-        self.assertIs(app.EmployeeToggleRequest, EmployeeToggleRequest)
+        self.assertIs(admin_users_routes.EmployeeToggleRequest, EmployeeToggleRequest)
         self.assertEqual(EmployeeToggleRequest.model_fields.keys(), {"is_active"})
 
 

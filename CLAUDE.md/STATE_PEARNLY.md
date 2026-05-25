@@ -1,8 +1,19 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十八会话 · 修复插曲**)· **🟢 codex 测试报告驱动的 3 批回归修复全部上线(GL CSV / 销项税 6 项+旧流程清理 / 收入对账 M3+ERP 6 项)· 部署 11835078 · 全量单测 596 passed · 浏览器冒烟通过。B1 的 7 个 commit 早已随部署 push(origin/master 与 HEAD 同步 0/0)。**
-> ⚠️⚠️ **下个窗口:回归整顿 `CLAUDE.md/REFACTOR_MASTER_PLAN.md` · 续 REFACTOR-B1 拆剩下的纠缠组(history / erp-endpoints-push / admin-users · 都需先搬共享 helper · 详见 `HANDOFF_REFACTOR_BC.md` §5)· 或 Zihao 在场开 C 前端拆 home.js。修复主线本会话告一段落。**
+> **最近更新**:2026-05-25(**第十九会话 · B1 续**)· **🟢 app.py 续拆 3 个 router(categories / erp 15 路由 / admin_users 15 路由)+ `_record_500` 三件套搬 route_helpers(共享状态单一来源)· app.py 7275→5530(-1745)· 3 commit 全绿 · 全量单测 612 passed · ⚠️ 全留本地未 push(领先 origin/master 3 个)。**
+> ⚠️⚠️ **下个窗口:① 先 push 本地 3 个 commit(`af9a2f4`/`c81f609`/`eadc121` · 需 Zihao 授权)· ② 续 B1 拆 **history 组**(唯一剩的大组 · 但纠缠最深 · 需先把 `_async_run_exception_checks` 整条链迁到共享模块 · 分两步 · 详见 `HANDOFF_REFACTOR_BC.md` §5)· 或拆 `assign_client` 单路由(干净但薄)· 或 Zihao 在场开 C 前端拆 home.js。**
 >
+> **(第十九会话 · B1 续)app.py 拆 router 长跑(纯后端搬家 · 0 业务逻辑改 · 3 commit 全留本地 · ⚠️ 未 push)**:
+> 模式 = 接力自主长跑「每完成一个安全 slice 本地 commit · 不 push · 只拆边界清晰组 · 纠缠太深跳过」。本会话从 app.py 抽出 3 个 router:
+> - **categories_routes.py**(`af9a2f4`)· 1 路由 `/api/categories`(供应商分类自动补全)· 用 `_tid`(route_helpers)· 完全自包含。
+> - **erp_routes.py**(`c81f609`)· 15 路由 `/api/erp/{endpoints,test-connection,customers,products,push,logs,stats,retry,batch}` + `_check_push_access`(独占)+ 6 model + `_strip_endpoint_for_response`/`_fetch_listing_with_retry` + 3 个 TTL 缓存。**铁律 #10 async tripwire**(test-connection/customers/products/push 调 sync Playwright 的 `asyncio.to_thread` offload)随路由体完整搬走 · offload 测试 33 passed。**自动推送后台 cluster**(`_auto_push_*` · OCR hook 触发 · 非路由)留 app.py · 两段 splice 绕开。**`_record_500`/`_read_last_500`/`_last_500_event`** 三件套(app 异常处理器 + erp + admin_diagnostics 三方共享 mutable 状态)搬到 route_helpers 做单一来源。启动缓存 flush 加 `flush_test_connection_caches()` 封装。
+> - **admin_users_routes.py**(`eadc121`)· 15 路由 admin users/employees(列/建/详情/删/改密/日志/quota/status/csv/cascade + 员工启停/改密/删)+ 4 自有 model + CascadeDeleteRequest · 复用 `_require_super_admin`/`_log_op`(route_helpers)+ `AdminUpdateTenant*`(tenant_routes)+ `EmployeeToggleRequest`(team_routes)· app.py 去掉随之 unused 的 5 个 import · 单一来源断言跟到新消费者(改 route_helpers/team/tenant/admin_logs 4 个 contract test)。
+> - **范式**:字节级 splice(ReadAllLines + 边界 assert + `@app.`→`@router.` + UTF8-no-BOM)· 每组带 contract test · app.py LF 全程干净(CRLF=0)。
+> - **守门**:每组 imports / i18n(0/0)/ unit / black / ruff(F)全绿 · unit 597→**612**(+2 新 contract · 改 4 既有)。
+> - **当前行数**:app.py **5530**(-1745)· db.py 10661 · 已有 **24** 个 `*_routes.py`(home.js/css/html 本会话未动)。
+> - **停止原因**:3 个干净 slice 后 · 唯一剩的大组 history 纠缠最深(需先做 `_async_run_exception_checks` 整条链迁移子工程)· 本窗口已大量分析 + 3 次提取(含 erp 共享状态迁移)· 按「上下文不足不硬开下一大组 · 不留半拆 app.py」收尾 · 非测试失败非阻碍。**详见 `CLAUDE.md/HANDOFF_REFACTOR_BC.md`**。
+>
+> ---
 > **(第十八会话 · 修复插曲)codex 测试报告驱动的 3 批回归修复(打断 B1 冻结期 · 已全部上线 + 部署)**:
 > 来源 = Zihao 转的 codex 实测报告。整顿期原则上 0 新功能,但生产回归 bug 优先于重构。本批修复均"修一类不修一处 + 守门全绿 + 4 语 release_notes + 部署后留 codex 生产复测"。
 > - **GL CSV 整侧失败不再静默完成(`672f748` + 前端 `0daebf6`)**:GL/VAT 任一侧 0 收入行原被吞成"完成" → 改 needs_mapping / failed 失败分流 · cache_bust 11835074→11835075。

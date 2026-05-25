@@ -51,6 +51,7 @@ from email_ingest_routes import (
     router as email_ingest_router,
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25
 from rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税务 4 路由 · 2026-05-25
+from workspace_routes import router as workspace_router  # B4 · workspace 账套主体(非破坏) · 2026-05-25
 from categories_routes import router as categories_router  # REFACTOR-B1 · 分类 1 路由 · 2026-05-25
 from pages_routes import (
     router as pages_router,
@@ -1115,6 +1116,7 @@ app.include_router(team_router)  # REFACTOR-B1 · 员工管理 7 路由(2026-05-
 app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2026-05-25)
 app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(2026-05-25)
 app.include_router(rd_router)  # REFACTOR-B1 · 泰国 RD 税务 4 路由(2026-05-25)
+app.include_router(workspace_router)  # B4 · workspace 账套主体读写(非破坏 · 2026-05-25)
 app.include_router(settings_router)  # REFACTOR-B1 · 归档/查重设置 5 路由(2026-05-25)
 app.include_router(categories_router)  # REFACTOR-B1 · 分类 1 路由(2026-05-25)
 app.include_router(pages_router)  # REFACTOR-B1 · 静态页面 + 公开 meta 12 路由(2026-05-25)

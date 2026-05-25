@@ -1,0 +1,57 @@
+# -*- coding: utf-8 -*-
+"""
+REFACTOR-B1 守门测试 · OCR 异常检测 + 智能提醒链从 app.py 抽到 exception_checks.py。
+
+锁定(防搬迁回归 + 防重复拷贝):
+  1. app.py 与 exception_checks 用同一份 _async_run_exception_checks / _parse_money
+     (单一来源 · OCR/LINE 上传路由 + history PUT 共用 · 不许各自拷一份漂移)
+  2. EXC_RULE_* 5 个规则码常量值不变(DB rule_code 契约)
+  3. _parse_money / _is_valid_thai_tax_id 行为契约不变
+  4. line_client 防御式 import(未部署降级 None · 不在 import 期炸)
+"""
+
+import unittest
+
+import exception_checks
+
+
+class ExceptionChecksContractTests(unittest.TestCase):
+    def test_single_source_with_app(self):
+        """app.py 调的就是 exception_checks 的同一份对象 · 单一来源"""
+        import app
+
+        self.assertIs(app._async_run_exception_checks, exception_checks._async_run_exception_checks)
+        self.assertIs(app._parse_money, exception_checks._parse_money)
+
+    def test_rule_code_constants(self):
+        """EXC_RULE_* 规则码值不变(DB rule_code 契约 · 改了会和历史数据/前端对不上)"""
+        self.assertEqual(exception_checks.EXC_RULE_CONFIDENCE_LOW, "confidence_low")
+        self.assertEqual(exception_checks.EXC_RULE_DUPLICATE, "duplicate")
+        self.assertEqual(exception_checks.EXC_RULE_AMOUNT_MISSING, "amount_missing")
+        self.assertEqual(exception_checks.EXC_RULE_MATH_MISMATCH, "math_mismatch")
+        self.assertEqual(exception_checks.EXC_RULE_TAX_ID_FORMAT, "tax_id_format_invalid")
+
+    def test_parse_money_behavior(self):
+        """_parse_money 容错解析 · 千分位/฿/THB 剥离 · 失败返 None"""
+        self.assertEqual(exception_checks._parse_money("1,234.50"), 1234.5)
+        self.assertEqual(exception_checks._parse_money("฿ 100"), 100.0)
+        self.assertEqual(exception_checks._parse_money("2,000 THB"), 2000.0)
+        self.assertIsNone(exception_checks._parse_money(None))
+        self.assertIsNone(exception_checks._parse_money(""))
+        self.assertIsNone(exception_checks._parse_money("abc"))
+
+    def test_thai_tax_id_validation(self):
+        """_is_valid_thai_tax_id · 13 位纯数字(允许 - / 空格分隔)· 其它不合规"""
+        self.assertTrue(exception_checks._is_valid_thai_tax_id("0105556000000"))
+        self.assertTrue(exception_checks._is_valid_thai_tax_id("0-1055-56000-00-0"))
+        self.assertFalse(exception_checks._is_valid_thai_tax_id("12345"))
+        self.assertFalse(exception_checks._is_valid_thai_tax_id("010555600000X"))
+        self.assertFalse(exception_checks._is_valid_thai_tax_id(None))
+
+    def test_line_client_defensive_import(self):
+        """line_client 防御式 import · 未部署时 None · 不在 import 期炸(模块属性存在)"""
+        self.assertTrue(hasattr(exception_checks, "line_client"))
+
+
+if __name__ == "__main__":
+    unittest.main()

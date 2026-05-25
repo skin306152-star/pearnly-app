@@ -591,6 +591,14 @@ def run_salesvat(
         "period_year": rep_result.get("period_year"),
         "period_month": rep_result.get("period_month"),
         "lang": lang,
+        # P1-4(2026-05-25):解析层 OCR 计数 · 前端只读这些显示"OCR 失败"· 不再用对账差异
+        #   (n_total-n_ok)误推。invoice_ocr_failed_count = 上传发票数 − OCR 成功数。
+        "invoice_file_count": len(invoice_files),
+        "invoice_ocr_ok_count": len(ok_invoices),
+        "invoice_ocr_failed_count": max(0, len(invoice_files) - len(ok_invoices)),
+        "invoice_failed_files": [
+            (r.get("filename") or "?") for r in parsed_invoices if not r.get("ok")
+        ],
         **task_summary,
     }
     task_id = db.create_vat_recon_task(

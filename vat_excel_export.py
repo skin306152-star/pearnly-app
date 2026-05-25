@@ -17,7 +17,7 @@ import re
 import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout, as_completed
 
 from vat_report_parser import parse_vat_report  # 复用但不修改
 from field_comparator import (
@@ -59,6 +59,62 @@ STRICT RULES:
 4. Date: BE years (2500+) stay as printed · period: convert BE → Gregorian (BE-543)
 5. Numbers: digits and dot only · no commas · no currency
 """
+
+
+def _extract_invoice_via_pipeline(
+    file_bytes: bytes, filename: str, api_key: Optional[str] = None
+) -> Dict[str, Any]:
+    """P1-1 · Excel/CSV/Word/TIFF 等表格/文档型销售发票 → 统一 pipeline(document_type=invoice)·
+    映射成 VEX 8 字段。OCR 失败 / 非发票 / 无页 → ok=False(计入 OCR 失败数)。"""
+    try:
+        from services.ocr.pipeline import (
+            IMAGE_EXTENSIONS,
+            TABLE_EXTENSIONS,
+            run_on_image_bytes as _run_image,
+            run_on_table_bytes as _run_table,
+        )
+        from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "filename": filename, "error": f"pipeline 不可用: {e}"}
+
+    ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
+    try:
+        if ext_dot in IMAGE_EXTENSIONS:
+            pr = _run_image(file_bytes, api_key=api_key, document_type="invoice")
+        elif ext_dot in TABLE_EXTENSIONS:
+            pr = _run_table(
+                file_bytes, filename=filename or "invoice", api_key=api_key, document_type="invoice"
+            )
+        else:
+            return {"ok": False, "filename": filename, "error": f"不支持的格式 {ext_dot}"}
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[vex.pipeline] {filename} 失败: {type(e).__name__}: {e}")
+        return {"ok": False, "filename": filename, "error": str(e)[:120]}
+
+    legacy = pipeline_result_to_legacy_dict(pr)
+    pages = legacy.get("pages") or []
+    fld = (pages[0].get("fields") if pages else None) or {}
+    if not pages or fld.get("is_not_invoice"):
+        return {"ok": False, "filename": filename, "error": "未识别到销售发票内容"}
+
+    # pipeline ThaiInvoice 字段 → VEX 8 字段(buyer_tax→buyer_tax_id 等 · date→period 推导)
+    date_str = str(fld.get("date") or "").strip()
+    return {
+        "ok": True,
+        "filename": filename,
+        "buyer_tax_id": str(fld.get("buyer_tax") or "").strip(),
+        "buyer_name": str(fld.get("buyer_name") or "").strip(),
+        "buyer_branch": "",  # pipeline 不抽分公司 · 空 → P0-1 归一为总部 00000
+        "invoice_no": str(fld.get("invoice_number") or "").strip(),
+        "invoice_date": date_str,
+        "period": _derive_period(date_str),
+        "amount_pre_vat": _to_float(fld.get("subtotal")),
+        "vat_amount": _to_float(fld.get("vat")),
+        "total_amount": _to_float(fld.get("total_amount")),
+        "_input_tokens": int(pages[0].get("input_tokens") or 0),
+        "_output_tokens": int(pages[0].get("output_tokens") or 0),
+        "_engine": "pipeline",
+    }
 
 
 def extract_invoice_fields(
@@ -125,7 +181,9 @@ def extract_invoice_fields(
         "webp": "image/webp",
     }.get(ext)
     if not mime:
-        return {"ok": False, "filename": filename, "error": f"不支持的格式 .{ext}"}
+        # P1-1(2026-05-25):Excel/CSV/Word/TIFF 等格式的销售发票走统一 pipeline(document_type=invoice)·
+        #   映射成 VEX 8 字段 · 此前直接报"不支持的格式"(配合前端 UI 宣传支持但静默丢弃)。
+        return _extract_invoice_via_pipeline(file_bytes, filename, api_key=api_key)
 
     try:
         import google.generativeai as genai
@@ -245,6 +303,26 @@ def _derive_period(date_str: str, period_str: str = "") -> str:
     if d:
         return f"{d.month:02d}/{d.year}"
     return ""
+
+
+def _dominant_report_period(parsed: Dict[str, Any]):
+    """单份 VAT 报告的主导期间 (year, month):meta 有 period 直接用 · 否则取各行 report_date 众数。
+
+    P1-2 修(2026-05-25):pdf_text_regex / pipeline 路径 meta={} · 此前期间永远拿不到 → 混月份不拦。
+    用行日期众数兜底:单文件内个别噪声日期不影响(取出现最多的年/月)· 真·两月文件才被跨文件比对拦下。
+    """
+    m = parsed.get("meta", {}) or {}
+    py, pm = m.get("period_year"), m.get("period_month")
+    if py and pm:
+        return (py, pm)
+    counts: Dict[tuple, int] = {}
+    for r in parsed.get("rows") or []:
+        d = parse_date(r.get("report_date") or "")
+        if d:
+            counts[(d.year, d.month)] = counts.get((d.year, d.month), 0) + 1
+    if not counts:
+        return None
+    return max(counts.items(), key=lambda kv: kv[1])[0]
 
 
 def _eq_amount(a, b, tol: float = 0.01) -> bool:
@@ -504,15 +582,20 @@ def _diff_dims(inv: Dict, rep: Dict) -> Dict[str, str]:
     b2 = (rep.get("report_buyer_branch") or "").strip()
 
     # 简单规范:总部相关词都归 00000
+    # P0-1 修(2026-05-25 销项税回归):空分公司 ≡ 00000(总部)。泰国税务惯例 ——
+    #   发票常不印分公司码,缺省即总部 สำนักงานใหญ่(00000)。此前空串归 "" ≠ "00000"
+    #   → 每张正常发票(报告侧标准化成 00000)被误判"分公司差异",TC01 全匹配资料判 matched=0。
+    #   归一后:空 vs 00000 视为相同(不报差);真实支店码(如 00001)vs 00000 仍正常报差。
     def _norm_branch(s):
         if not s:
-            return ""
+            return "00000"
         n = s.lower().replace(" ", "")
         if n in ("00000", "สำนักงานใหญ่", "head", "headoffice", "hq", "สนญ"):
             return "00000"
         return s
 
-    if _norm_branch(b1) != _norm_branch(b2) and (b1 or b2):
+    # 两侧都空时归一后同为 00000 · 不会进差异;只有一侧是真实非总部支店码才报差
+    if _norm_branch(b1) != _norm_branch(b2):
         out["branch"] = f"{b1 or '—'} ≠ {b2 or '—'}"
     # 客户名
     name1 = (inv.get("buyer_name") or "").strip()
@@ -522,25 +605,61 @@ def _diff_dims(inv: Dict, rep: Dict) -> Dict[str, str]:
     return out
 
 
+# P0-2 修(2026-05-25 销项税回归):Gemini SDK 的 request_options timeout 偶发不生效会让单张
+#   图片/发票 OCR 永久挂起 → as_completed 一直等不到 → salesvat job 无限 running(TC08 卡 18min+)。
+#   线程层加硬超时兜底:单文件超 PER_FILE_TIMEOUT 仍没回 → 落 ok=False(error_code=ocr_timeout)·
+#   job 仍能完成(失败的文件计入 OCR 失败数)。Python 杀不掉挂起线程 → 任其后台跑完(pool 不等待)。
+#   PER_FILE 取值高于各 OCR 自身 SDK 超时(发票 30s)· 正常情况 SDK 超时先生效 · 这里只兜真·挂死。
+_VEX_OCR_PER_FILE_TIMEOUT = int(os.environ.get("VEX_OCR_PER_FILE_TIMEOUT_SEC", "75"))
+
+
 def extract_invoices_parallel(
     invoice_files: List[Dict[str, Any]], api_key: Optional[str] = None, max_workers: int = 10
 ) -> List[Dict[str, Any]]:
     """v118.32.4.9.5 · 并行 10 路 OCR · 防止 1000 张串行跑死
     invoice_files: [{filename, bytes}]
-    返回:同顺序的结果列表"""
+    返回:同顺序的结果列表(每张带硬超时 · 超时落 ok=False 不阻塞整批)"""
+    if not invoice_files:
+        return []
     results: List[Optional[Dict]] = [None] * len(invoice_files)
-
-    def _one(idx: int, f: Dict):
-        results[idx] = extract_invoice_fields(f["bytes"], f["filename"], api_key=api_key)
-
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = [pool.submit(_one, i, f) for i, f in enumerate(invoice_files)]
-        for fut in as_completed(futures):
-            try:
-                fut.result()
-            except Exception as e:
-                logger.error(f"[vex.parallel] 单张抽取异常: {e}")
+    pool = ThreadPoolExecutor(max_workers=min(max_workers, len(invoice_files)))
+    fut_to_idx = {
+        pool.submit(extract_invoice_fields, f["bytes"], f["filename"], api_key=api_key): i
+        for i, f in enumerate(invoice_files)
+    }
+    for fut, idx in fut_to_idx.items():
+        fn = invoice_files[idx].get("filename") or f"invoice_{idx}"
+        try:
+            results[idx] = fut.result(timeout=_VEX_OCR_PER_FILE_TIMEOUT)
+        except FuturesTimeout:
+            logger.error(f"[vex.parallel] 单张 OCR 硬超时({_VEX_OCR_PER_FILE_TIMEOUT}s): {fn}")
+            results[idx] = {
+                "ok": False,
+                "filename": fn,
+                "error": f"OCR 超时(>{_VEX_OCR_PER_FILE_TIMEOUT}s)",
+                "error_code": "ocr_timeout",
+            }
+        except Exception as e:
+            logger.error(f"[vex.parallel] 单张抽取异常: {e}")
+            results[idx] = {"ok": False, "filename": fn, "error": str(e)}
+    pool.shutdown(wait=False)  # 不等挂起线程(Python 杀不掉)· 任其后台跑完 · job 不再卡死
     return [r or {"ok": False, "error": "worker_returned_none"} for r in results]
+
+
+def _ocr_with_hard_timeout(fn, timeout_sec: int, on_timeout):
+    """P0-2 · 在独立线程跑 fn · 超 timeout_sec 仍没返回 → 返回 on_timeout()(不阻塞调用方)。
+
+    用于报告侧 OCR(merge_vat_reports 串行解析每份报告)· 兜 Gemini 调用偶发永久挂起。
+    pool.shutdown(wait=False):挂起线程留后台 · 不拖住 job。
+    """
+    pool = ThreadPoolExecutor(max_workers=1)
+    fut = pool.submit(fn)
+    try:
+        return fut.result(timeout=timeout_sec)
+    except FuturesTimeout:
+        return on_timeout()
+    finally:
+        pool.shutdown(wait=False)
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -752,13 +871,26 @@ def extract_invoices_batched_parallel(
         for j, r in enumerate(out):
             results[start + j] = r
 
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = [pool.submit(_run_batch, s, c) for (s, c) in batches]
-        for fut in as_completed(futures):
-            try:
-                fut.result()
-            except Exception as e:
-                logger.error(f"[vex.batch.parallel] 批失败: {e}")
+    # P0-2:每批加硬超时(批含 batch_size 张 + 可能的单张 fallback)· 挂起的批不阻塞整体 · job 能完成
+    _batch_timeout = _VEX_OCR_PER_FILE_TIMEOUT * (batch_size + 1)
+    pool = ThreadPoolExecutor(max_workers=max_workers)
+    fut_to_batch = {pool.submit(_run_batch, s, c): (s, c) for (s, c) in batches}
+    for fut, (s, c) in fut_to_batch.items():
+        try:
+            fut.result(timeout=_batch_timeout)
+        except FuturesTimeout:
+            logger.error(f"[vex.batch.parallel] 批硬超时({_batch_timeout}s) · start={s} · 落 ok=False")
+            for j, f in enumerate(c):
+                if results[s + j] is None:
+                    results[s + j] = {
+                        "ok": False,
+                        "filename": f.get("filename") or f"invoice_{s + j}",
+                        "error": f"OCR 超时(>{_batch_timeout}s)",
+                        "error_code": "ocr_timeout",
+                    }
+        except Exception as e:
+            logger.error(f"[vex.batch.parallel] 批失败: {e}")
+    pool.shutdown(wait=False)
 
     return [r or {"ok": False, "error": "worker_returned_none"} for r in results]
 
@@ -782,7 +914,18 @@ def merge_vat_reports(
     _rep_in_tok = 0
     _rep_out_tok = 0
     for f in report_files:
-        r = parse_vat_report(f["bytes"], f["filename"], api_key=api_key)
+        # P0-2:报告 OCR 加线程层硬超时 · 偶发挂起的 Gemini 调用不再让 job 无限 running
+        _fb, _fn = f["bytes"], f["filename"]
+        r = _ocr_with_hard_timeout(
+            lambda fb=_fb, fn=_fn: parse_vat_report(fb, fn, api_key=api_key),
+            timeout_sec=int(os.environ.get("VEX_REPORT_OCR_TIMEOUT_SEC", "120")),
+            on_timeout=lambda: {
+                "ok": False,
+                "rows": [],
+                "error": "OCR 超时",
+                "error_code": "ocr_timeout",
+            },
+        )
         if not r.get("ok"):
             return {
                 "ok": False,
@@ -801,16 +944,20 @@ def merge_vat_reports(
         )
 
     # 校验:多份必须同卖方 + 同期间(从第 1 份起对照)
+    # P1-2 修(2026-05-25 销项税回归):此前 period 只在 meta 有时才比 · 但 pdf_text_regex /
+    #   pipeline 路径 meta={} → 永远拿不到 period → 混月份不拦(TC04 两月报告被合并成 6 行继续对账)。
+    #   改:每份报告用 _dominant_report_period(meta 优先 · 否则行日期众数)· 跨文件比对期间。
     metas = [p.get("meta", {}) for p in parsed_list]
     sellers = set()
-    periods = set()
     for m in metas:
         sid = m.get("seller_tax_id") or m.get("issuer_tax_id") or ""
         if sid:
             sellers.add(sid)
-        per = (m.get("period_year"), m.get("period_month"))
-        if all(per):
-            periods.add(per)
+    periods = set()
+    for p in parsed_list:
+        dp = _dominant_report_period(p)
+        if dp:
+            periods.add(dp)
 
     if len(sellers) > 1:
         return {
@@ -819,7 +966,8 @@ def merge_vat_reports(
             "error": f"多份报告卖方不一致(税号: {' / '.join(sorted(sellers))})· 请检查",
         }
     if len(periods) > 1:
-        return {"ok": False, "rows": [], "error": "多份报告期间不一致 · 请检查"}
+        _ps = " / ".join(f"{y}-{mn:02d}" for (y, mn) in sorted(periods))
+        return {"ok": False, "rows": [], "error": f"多份报告期间不一致({_ps})· 请检查"}
 
     # 合并 rows · 重排 row_no 连续递增
     # v118.35.0.27 · 多页 PDF 溯源:每行加 source_filename + source_page

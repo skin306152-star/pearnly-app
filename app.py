@@ -5159,10 +5159,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "对账中心现在能识别更多格式的账单与总账文件,包括 Excel 和 CSV。遇到系统第一次见到的格式时,会显示文件内容并请您确认每一列的含义,确认一次后,以后相同格式会自动读取,不再出现『读不到内容』。\n\n即日生效。",
-            "th": "ศูนย์กระทบยอดรองรับไฟล์รายการเดินบัญชีและบัญชีแยกประเภทได้หลากหลายรูปแบบมากขึ้น ทั้ง Excel และ CSV เมื่อพบรูปแบบที่ระบบเห็นครั้งแรก จะแสดงเนื้อหาไฟล์และให้ท่านยืนยันความหมายของแต่ละคอลัมน์ ยืนยันครั้งเดียว ครั้งต่อไปรูปแบบเดียวกันจะอ่านอัตโนมัติ ไม่มีปัญหา『อ่านข้อมูลไม่ได้』อีกต่อไป\n\nมีผลทันที",
-            "en": "The Reconciliation Center now recognizes many more statement and general-ledger file formats, including Excel and CSV. When the system sees a format for the first time, it shows the file content and asks you to confirm what each column means; after confirming once, the same format is read automatically next time — no more 'cannot read content'.\n\nEffective immediately.",
-            "ja": "照合センターが、明細・総勘定元帳ファイルのより多くの形式(Excel・CSV)を読み取れるようになりました。システムが初めて見る形式の場合、ファイル内容を表示し各列の意味の確認をお願いします。一度確認すれば、次回から同じ形式は自動で読み取り、「内容を読み取れません」が解消されます。\n\n即日有効。",
+            "zh": "销项税对账更准更稳:正常匹配的发票不再被误判为差异;支持上传 Excel / CSV / Word 格式的发票与报告;上传不同月份的报告会提示,不再悄悄合并;图片识别加了超时保护,不会再一直转圈卡住。\n\n即日生效。",
+            "th": "การกระทบยอดภาษีขายแม่นยำและเสถียรขึ้น: ใบกำกับที่ตรงกันจะไม่ถูกตัดสินว่าต่างกันอีก; รองรับการอัปโหลดใบกำกับและรายงานรูปแบบ Excel / CSV / Word; หากอัปโหลดรายงานคนละเดือนจะมีการแจ้งเตือน ไม่รวมให้เงียบ ๆ; การอ่านรูปภาพมีการกันค้าง ไม่หมุนค้างอีกต่อไป\n\nมีผลทันที",
+            "en": "Sales-VAT reconciliation is more accurate and stable: correctly matching invoices are no longer flagged as differences; you can now upload invoices and reports in Excel / CSV / Word; uploading reports from different months now warns you instead of silently merging; image reading has a timeout guard so it no longer spins forever.\n\nEffective immediately.",
+            "ja": "売上VAT照合がより正確・安定になりました:正しく一致する請求書が差異と誤判定されなくなりました;Excel / CSV / Word 形式の請求書・レポートのアップロードに対応;異なる月のレポートをアップロードすると警告し、勝手に結合しなくなりました;画像読み取りにタイムアウト保護を追加し、回り続けて止まらなくなりました。\n\n即日有効。",
         },
     }
 

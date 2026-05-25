@@ -31605,7 +31605,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const MAX_INV = 1000;
     const MAX_REP = 30;
-    const ALLOWED_EXT = /\.(pdf|jpe?g|png|webp)$/i;
+    // P1-1 修(2026-05-25 销项税回归):此前只允许 pdf/jpg/png/webp · 但 UI 文案 + accept 宣传
+    //   支持 Excel/CSV/Word → 用户选了被静默丢弃(开始按钮还禁用)。放开到与 accept 一致 ·
+    //   后端发票侧/报告侧都已能解析这些格式(报告 parse_vat_report 全格式 · 发票走 pipeline)。
+    const ALLOWED_EXT = /\.(pdf|jpe?g|png|webp|tiff?|xlsx?|xlsm|csv|tsv|docx?)$/i;
 
     const $ = id => document.getElementById(id);
     function _authHeader() {
@@ -31651,7 +31654,8 @@ window.addEventListener('DOMContentLoaded', () => {
     // ── 任务列表加载 ──
     async function _loadVexTaskList() {
         try {
-            const r = await fetch('/api/vat_excel/tasks?page=1&page_size=200', { headers: _authHeader() });
+            // P1-5 修(2026-05-25):后端限制 page_size le=100 · 此前发 200 → 持续 422。改 100。
+            const r = await fetch('/api/vat_excel/tasks?page=1&page_size=100', { headers: _authHeader() });
             if (!r.ok) return;
             const d = await r.json();
             _renderVexTaskList(d.rows || []);
@@ -31823,17 +31827,31 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // P1-1:不支持格式的明确提示(4 语)· 取代此前静默丢弃
+    function _vexToastRejected(n) {
+        const lang = window._currentLang || 'th';
+        const M = {
+            zh: `已忽略 ${n} 个不支持的文件 · 仅支持 PDF / 图片 / Excel / CSV / Word`,
+            th: `ข้ามไฟล์ที่ไม่รองรับ ${n} ไฟล์ · รองรับเฉพาะ PDF / รูปภาพ / Excel / CSV / Word`,
+            en: `Ignored ${n} unsupported file(s) · only PDF / image / Excel / CSV / Word are supported`,
+            ja: `非対応ファイル ${n} 件をスキップ · 対応形式は PDF / 画像 / Excel / CSV / Word のみ`,
+        };
+        showToast(M[lang] || M.th, 'warn');
+    }
+
     // ── 文件入队(去重 + 上限) ──
     function _addInvoices(files) {
         const seen = new Set(_invoiceFiles.map(f => f.name + '|' + f.size));
+        let _rejected = 0;  // P1-1:不支持格式不再静默丢弃 · 计数后给明确 toast
         for (const f of files) {
-            if (!ALLOWED_EXT.test(f.name)) continue;
+            if (!ALLOWED_EXT.test(f.name)) { _rejected++; continue; }
             const k = f.name + '|' + f.size;
             if (seen.has(k)) continue;
             seen.add(k);
             _invoiceFiles.push(f);
             if (_invoiceFiles.length >= MAX_INV) break;
         }
+        if (_rejected > 0) _vexToastRejected(_rejected);
         if (_invoiceFiles.length > MAX_INV) {
             _invoiceFiles = _invoiceFiles.slice(0, MAX_INV);
             showToast(t('vex-toast-cap-inv'), 'warn');
@@ -31843,14 +31861,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function _addReports(files) {
         const seen = new Set(_reportFiles.map(f => f.name + '|' + f.size));
+        let _rejected = 0;  // P1-1:不支持格式不再静默丢弃
         for (const f of files) {
-            if (!ALLOWED_EXT.test(f.name)) continue;
+            if (!ALLOWED_EXT.test(f.name)) { _rejected++; continue; }
             const k = f.name + '|' + f.size;
             if (seen.has(k)) continue;
             seen.add(k);
             _reportFiles.push(f);
             if (_reportFiles.length >= MAX_REP) break;
         }
+        if (_rejected > 0) _vexToastRejected(_rejected);
         if (_reportFiles.length > MAX_REP) {
             _reportFiles = _reportFiles.slice(0, MAX_REP);
             showToast(t('vex-toast-cap-rep'), 'warn');
@@ -32100,15 +32120,10 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             const taskId = job.result_id;
 
-            // 取任务结果拿失败计数(预览面板另行填充)
+            // P1-4 修(2026-05-25):OCR 失败数改用后端解析层字段 invoice_ocr_failed_count ·
+            //   此前用 n_total-n_ok(对账差异行数)当 OCR 失败数 → 正常匹配/普通差异都被误报"OCR 失败"。
+            //   失败数由 _fetchAndFillVexPreview 从 raw 读出并返回(顺带设 window._vexLastTask)。
             let fail = 0;
-            try {
-                const tr = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(taskId), { headers: _authHeader() });
-                let raw = (await tr.json()).raw_data_json;
-                if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { raw = {}; } }
-                raw = raw || {};
-                fail = Math.max(0, parseInt(raw.n_total || 0, 10) - parseInt(raw.n_ok || 0, 10));
-            } catch (e) { /* 计数取不到不致命 */ }
 
             // 下载已生成的 Excel(GET 需带 token · 用 fetch+blob · 裸 <a href> 不会带 Authorization)
             const res = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(taskId) + '/download', { headers: _authHeader() });
@@ -32134,6 +32149,9 @@ window.addEventListener('DOMContentLoaded', () => {
             $('vex-progress').style.display = 'none';
             var _dlBtn = document.getElementById('vex-download');
             if (_dlBtn) _dlBtn.style.display = '';
+            // P1-3 修:先 await 填好「当前任务」详情(设 window._vexLastTask + 返回 OCR 失败数)·
+            //   再触发结果展示/toast · 否则汇总卡和 toast 用的是上一轮任务数据(滞后一轮)。
+            if (taskId) fail = await _fetchAndFillVexPreview(taskId);
             if (window._onVexResultShown) window._onVexResultShown();
 
             if (fail > 0) {
@@ -32144,8 +32162,6 @@ window.addEventListener('DOMContentLoaded', () => {
             // 刷新 KPI 卡 + 任务列表
             _loadVexKpi();
             setTimeout(_loadVexTaskList, 800);
-            // 填预览面板
-            if (taskId) _fetchAndFillVexPreview(taskId, fail);
         } catch (e) {
             clearInterval(_tick);
             $('vex-progress').style.display = 'none';
@@ -32171,7 +32187,8 @@ window.addEventListener('DOMContentLoaded', () => {
         return isNaN(n) ? '—' : n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    async function _fetchAndFillVexPreview(taskId, failCount) {
+    async function _fetchAndFillVexPreview(taskId) {
+        // P1-4:返回发票 OCR 失败数(解析层真值 invoice_ocr_failed_count)· 调用方据此弹 toast。异常返回 0。
         try {
             var r = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(taskId), { headers: _authHeader() });
             if (!r.ok) throw new Error(r.status);
@@ -32195,10 +32212,12 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
             });
             var cashCount = backendRows.filter(function(row) { return row.kind === 'matched_cash'; }).length;
-            window._vexLastTask = { total: raw.n_total || 0, matched: raw.n_ok || 0, diff: raw.n_diff || 0, incomplete: failCount || 0, cash: cashCount, diff_rows: diffRows, task_id: taskId };
+            var failCount = Math.max(0, parseInt(raw.invoice_ocr_failed_count || 0, 10));
+            window._vexLastTask = { total: raw.n_total || 0, matched: raw.n_ok || 0, diff: raw.n_diff || 0, incomplete: failCount, cash: cashCount, diff_rows: diffRows, task_id: taskId };
             if (window._fillVexSummary) window._fillVexSummary();
             if (window._fillVexDetail)  window._fillVexDetail();
-        } catch(e) {}
+            return failCount;
+        } catch(e) { return 0; }
     }
 
     // ── i18n rerender ──

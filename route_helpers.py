@@ -21,6 +21,9 @@ billing_routes / admin_diagnostics_routes 改成从这里 import(去掉各自的
   _get_client_ip             · 从 X-Forwarded-For / client.host 取真实 IP
   _check_password_strength   · 密码强度校验(返 None 通过 / code 拒绝)
   _WEAK_PASSWORDS            · 常见弱密码黑名单
+  _tid                       · 取 user tenant_id(2026-05-25 第十七会话搬入)
+  _plan_permissions          · plan 权限(扁平化全开 · 2026-05-25 搬入)
+  _record_500 / _read_last_500 / _last_500_event · 最近 500 现场摘要(共享状态 · 2026-05-25 搬入)
 """
 
 from __future__ import annotations
@@ -229,3 +232,53 @@ def _require_owner_or_super(request: Request) -> Dict[str, Any]:
         if not user.get("tenant_id"):
             raise HTTPException(400, detail="team.no_tenant")
     return user
+
+
+# v118.34.13 (Zihao 2026-05-19 拍板) · 最近 500 错误的现场摘要 ·
+# 通过 /api/version 直接读 · 用户不用 SSH 看 journalctl 也能拿到根因。
+# 内容控制在 1500 字符内,堆栈尾巴优先(异常点附近)。
+# REFACTOR-B1(2026-05-25):从 app.py 搬来 · app.py(全局异常处理器)、erp_routes
+# (endpoints 创建/更新 500 兜底)、admin_diagnostics_routes(读 last_500)共享同一
+# _last_500_event 状态 → 必须单一来源,不能各持副本。
+_last_500_event: Dict[str, Any] = {}
+
+
+def _record_500(*, path: str = "", method: str = "", detail: str = ""):
+    """Capture the current traceback (if any) + request context into the
+    module-level snapshot that /api/version surfaces. Safe to call from
+    anywhere — uses sys.exc_info() to grab the active traceback, falls
+    back to a synthetic message when no exception is in flight."""
+    import sys as _sys
+    import time as _t
+    import traceback as _tb
+
+    tb_str = ""
+    exc_type = ""
+    try:
+        et, ev, etb = _sys.exc_info()
+        if et is not None and ev is not None:
+            exc_type = et.__name__
+            tb_str = "".join(_tb.format_exception(et, ev, etb))
+    except Exception:
+        pass
+    if not tb_str and detail:
+        tb_str = f"(no traceback) {detail}"
+    # Trim to last 1500 chars — the tail is where the actual error is.
+    _last_500_event.clear()
+    _last_500_event.update(
+        {
+            "ts": int(_t.time()),
+            "path": str(path or "")[:200],
+            "method": str(method or "")[:10],
+            "detail": str(detail or "")[:200],
+            "exc_type": exc_type,
+            "traceback": (tb_str or "")[-1500:],
+        }
+    )
+
+
+def _read_last_500() -> Dict[str, Any]:
+    """Snapshot copy of the last captured 500 event."""
+    if not _last_500_event:
+        return {}
+    return dict(_last_500_event)

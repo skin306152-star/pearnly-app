@@ -44,6 +44,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import erp_push as _erp  # noqa: E402
+import erp_routes  # noqa: E402  # REFACTOR-B1: erp 路由搬到此模块
 
 
 class StubContractTests(unittest.TestCase):
@@ -343,9 +344,11 @@ class RouteDispatchTests(unittest.TestCase):
 
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u-test", "plan": "pro"}
+                erp_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u-test", "plan": "pro"},
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app._erp, "test_mrerp_endpoint", mrerp_mock),
             patch.object(app._erp, "test_endpoint_connection", legacy_mock),
         ):
@@ -386,9 +389,11 @@ class RouteDispatchTests(unittest.TestCase):
 
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u-test", "plan": "pro"}
+                erp_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u-test", "plan": "pro"},
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app._erp, "test_mrerp_endpoint", mrerp_mock),
             patch.object(app._erp, "test_endpoint_connection", legacy_mock),
         ):
@@ -514,9 +519,9 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         app = self.app_module
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app._erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
         ):
             client = await self._make_async_client()
@@ -546,9 +551,9 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         }
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app._erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
         ):
@@ -569,9 +574,9 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         fake_ep = {"id": "ep-1", "adapter": "mrerp", "config": {}, "enabled": True}
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app._erp, "list_mrerp_customers", side_effect=self._tripwire_sync_helper),
         ):
@@ -595,9 +600,9 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         fake_ep = {"id": "ep-1", "adapter": "mrerp", "config": {}, "enabled": True}
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app._erp, "list_mrerp_products", side_effect=self._tripwire_sync_helper),
         ):
@@ -631,9 +636,9 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         }
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app.db, "insert_push_log", return_value="log-1"),
@@ -1412,9 +1417,9 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
 
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app.db, "get_user_tenant_id", return_value="tenant-1"),
@@ -1608,9 +1613,9 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
 
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app.db, "insert_push_log", return_value="log-1") as insert_log_mock,
@@ -1713,9 +1718,9 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
 
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app.db, "insert_push_log", return_value="log-1") as insert_log_mock,
@@ -1798,10 +1803,10 @@ class ListingRetryContractTests(unittest.TestCase):
         stack = contextlib.ExitStack()
         stack.enter_context(
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             )
         )
-        stack.enter_context(patch.object(app, "_check_push_access", return_value=None))
+        stack.enter_context(patch.object(erp_routes, "_check_push_access", return_value=None))
         stack.enter_context(patch.object(app.db, "get_erp_endpoint", return_value=fake_ep))
         return stack
 
@@ -1908,7 +1913,7 @@ class ListingRetryContractTests(unittest.TestCase):
 
         # Clear any existing cache for this key.
         try:
-            app._endpoint_customers_cache.clear()
+            erp_routes._endpoint_customers_cache.clear()  # REFACTOR-B1: 缓存随路由搬到 erp_routes
         except AttributeError:
             pass
 
@@ -1999,9 +2004,9 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
 
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep),
             patch.object(app.db, "update_erp_endpoint", return_value=True) as update_mock,
         ):
@@ -2064,9 +2069,9 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
 
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep),
             patch.object(app.db, "update_erp_endpoint", return_value=True) as update_mock,
         ):
@@ -2132,9 +2137,11 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
         app = self.app_module
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "lifetime"}
+                erp_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "lifetime"},
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "list_erp_endpoints", return_value=[]),
         ):
             with self._make_client() as client:
@@ -2171,9 +2178,11 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
         app = self.app_module
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "lifetime"}
+                erp_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "lifetime"},
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "list_erp_endpoints", return_value=[]),
         ):
             with self._make_client() as client:
@@ -2207,9 +2216,11 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
         }
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "lifetime"}
+                erp_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "lifetime"},
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep),
             patch.object(app.db, "update_erp_endpoint", return_value=True),
         ):
@@ -2229,9 +2240,11 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
         app = self.app_module
         with (
             patch.object(
-                app, "get_current_user_from_request", return_value={"id": "u", "plan": "lifetime"}
+                erp_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "lifetime"},
             ),
-            patch.object(app, "_check_push_access", return_value=None),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "list_erp_endpoints", return_value=[]),
             patch.object(app.db, "create_erp_endpoint", return_value="new-ep-id"),
             patch.object(

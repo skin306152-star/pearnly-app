@@ -30,7 +30,10 @@ import os
 
 from fastapi import APIRouter, HTTPException, Request
 
-from route_helpers import _require_super_admin  # REFACTOR-B1 · 公共守门(2026-05-24)
+from route_helpers import (  # REFACTOR-B1 · 公共守门(2026-05-24)· _read_last_500 搬入(2026-05-25)
+    _read_last_500,
+    _require_super_admin,
+)
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter()
@@ -69,7 +72,7 @@ async def admin_diagnostics_runtime(request: Request):
         "ts": int(_t.time()),
         "version": _app.PEARNLY_FRONTEND_VERSION,
         "playwright": _app._read_playwright_status(),
-        "last_500": _app._read_last_500(),
+        "last_500": _read_last_500(),  # REFACTOR-B1 · 单一来源 route_helpers(2026-05-25)
     }
 
 

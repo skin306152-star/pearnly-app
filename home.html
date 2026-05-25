@@ -5196,130 +5196,6 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             </div>
 
             <!-- ── 新建对账抽屉/模态(屏 A 核心) ── -->
-            <div id="sv-create-modal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true">
-                <div class="modal sv-modal-card">
-                    <!-- 模态头 -->
-                    <div class="modal-header">
-                        <div class="modal-title" data-i18n="sv-modal-title">新建销项税对账</div>
-                        <button class="modal-close" id="btn-sv-modal-close" type="button" aria-label="关闭">
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                                <path d="M3 3l10 10M13 3L3 13"/>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <!-- Step 1 · 选客户 + 期间 -->
-                    <div class="sv-step" id="sv-step-1">
-                        <div class="sv-step-label" data-i18n="sv-step1-label">第 1 步 · 选客户与纳税期间</div>
-
-                        <div class="form-group">
-                            <label class="form-label" data-i18n="sv-field-client">客户</label>
-                            <select class="form-select" id="sv-client-select">
-                                <option value="" data-i18n="sv-select-client-ph">请选择客户…</option>
-                            </select>
-                        </div>
-
-                        <!-- 客户色块预览 -->
-                        <div id="sv-client-preview" class="sv-client-preview" style="display:none">
-                            <div id="sv-client-avatar" class="sv-client-avatar"></div>
-                            <div class="sv-client-info">
-                                <div id="sv-client-name" class="sv-client-name"></div>
-                                <div id="sv-client-taxid" class="sv-client-taxid"></div>
-                            </div>
-                        </div>
-
-                        <div class="sv-period-row">
-                            <div class="form-group sv-period-group">
-                                <label class="form-label" data-i18n="sv-field-year">年份(西历)</label>
-                                <select class="form-select" id="sv-year-select"></select>
-                            </div>
-                            <div class="form-group sv-period-group">
-                                <label class="form-label" data-i18n="sv-field-month">月份</label>
-                                <select class="form-select" id="sv-month-select" data-i18n-months>
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3">3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="7">7</option>
-                                    <option value="8">8</option>
-                                    <option value="9">9</option>
-                                    <option value="10">10</option>
-                                    <option value="11">11</option>
-                                    <option value="12">12</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- 已归档发票概览卡(动态) -->
-                        <div id="sv-archived-preview" class="sv-archived-card" style="display:none">
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M3 4h10M3 8h10M3 12h6"/>
-                            </svg>
-                            <div class="sv-archived-text">
-                                <span data-i18n="sv-archived-found">已归档发票</span>
-                                <strong id="sv-archived-count">-</strong>
-                                <span data-i18n="sv-archived-unit">张</span>
-                                · <span data-i18n="sv-archived-total">合计</span>
-                                <strong id="sv-archived-total">-</strong> ฿
-                            </div>
-                        </div>
-                        <div id="sv-archived-none" class="sv-archived-none" style="display:none" data-i18n="sv-archived-none">该期间暂无已归档发票 · 仍可上传 VAT 报告对账</div>
-                    </div>
-
-                    <!-- Step 2 · 上传 VAT 报告 -->
-                    <div class="sv-step" id="sv-step-2">
-                        <div class="sv-step-label" data-i18n="sv-step2-label">第 2 步 · 上传客户 VAT 报告</div>
-
-                        <!-- 拖拽上传区 -->
-                        <div class="sv-dropzone" id="sv-dropzone">
-                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="6" y="8" width="36" height="32" rx="3"/>
-                                <path d="M16 28l8-8 8 8"/>
-                                <line x1="24" y1="20" x2="24" y2="36"/>
-                            </svg>
-                            <div class="sv-dropzone-text">
-                                <span data-i18n="sv-drop-hint">拖拽或点击上传 VAT 报告</span>
-                                <span class="sv-dropzone-ext">.xlsx / .xls / .pdf / .jpg / .png</span>
-                            </div>
-                            <input type="file" id="sv-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" multiple style="display:none">
-                        </div>
-
-                        <!-- 上传成功预览 -->
-                        <div id="sv-report-preview" class="sv-report-preview" style="display:none">
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:#10b981">
-                                <path d="M3 8l4 4 6-6"/>
-                            </svg>
-                            <div>
-                                <div id="sv-report-filename" class="sv-report-fname"></div>
-                                <div id="sv-report-rowcount" class="sv-report-rows"></div>
-                            </div>
-                            <button class="btn btn-ghost btn-tiny" id="btn-sv-clear-report" type="button" data-i18n="sv-btn-clear">重选</button>
-                        </div>
-
-                        <!-- 警告行 -->
-                        <div id="sv-report-warnings" class="sv-warnings" style="display:none"></div>
-                    </div>
-
-                    <!-- 模态底部按钮 -->
-                    <div class="modal-footer">
-                        <button class="btn btn-ghost" id="btn-sv-cancel" type="button" data-i18n="sv-btn-cancel">取消</button>
-                        <button class="btn btn-primary" id="btn-sv-start" type="button" disabled>
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="4,2 14,8 4,14"/>
-                            </svg>
-                            <span data-i18n="sv-btn-start">开始对账</span>
-                        </button>
-                    </div>
-
-                    <!-- 进行中遮罩 -->
-                    <div id="sv-running-overlay" style="display:none;position:absolute;inset:0;background:rgba(255,255,255,0.85);border-radius:inherit;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px">
-                        <div class="spinner"></div>
-                        <div class="sv-running-text" data-i18n="sv-running">对账进行中…</div>
-                    </div>
-                </div>
-            </div><!-- /sv-create-modal -->
 
         </div><!-- /recon-pane-sale-vat -->
 
@@ -5527,75 +5403,6 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 
     </section>
 
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!-- 屏 C · 对账结果详情模态 (v118.32.x) -->
-    <!-- ══════════════════════════════════════════════════════ -->
-    <div id="sv-result-modal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true">
-        <div class="modal sv-result-modal-card">
-            <!-- 模态头 -->
-            <div class="sv-result-head">
-                <div class="sv-result-head-left">
-                    <div id="sv-result-avatar" class="sv-task-avatar" style="background:#111111"></div>
-                    <div>
-                        <div id="sv-result-client" class="sv-result-client"></div>
-                        <div id="sv-result-period" class="sv-result-period"></div>
-                    </div>
-                </div>
-                <div class="sv-result-head-right">
-                    <button class="btn btn-ghost btn-small" id="btn-sv-export" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M8 2v9M4 7l4 4 4-4M3 14h10"/>
-                        </svg>
-                        <span data-i18n="sv-btn-export">导出 Excel</span>
-                    </button>
-                    <button class="modal-close" id="btn-sv-result-close" type="button" aria-label="关闭">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l10 10M13 3L3 13"/></svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- v118.32.4.9 · 此次汇总区(逐字段对照模式 · Zihao 拍板必备) -->
-            <div class="sv-summary" id="sv-summary">
-                <div class="sv-summary-head">
-                    <span class="sv-summary-title" data-i18n="svc-summary-title">此次汇总</span>
-                    <span class="sv-summary-total"><span data-i18n="svc-summary-total">总行数</span> <strong id="sv-sum-total">-</strong></span>
-                </div>
-                <div class="sv-summary-row">
-                    <div class="sv-sum-card matched">
-                        <div class="sv-sum-num" id="sv-sum-matched">-</div>
-                        <div class="sv-sum-label" data-i18n="svc-sum-matched">完全一致</div>
-                    </div>
-                    <div class="sv-sum-card mismatch">
-                        <div class="sv-sum-num" id="sv-sum-mismatch">-</div>
-                        <div class="sv-sum-label" data-i18n="svc-sum-mismatch">数据差异</div>
-                    </div>
-                    <div class="sv-sum-card incomplete">
-                        <div class="sv-sum-num" id="sv-sum-incomplete">-</div>
-                        <div class="sv-sum-label" data-i18n="svc-sum-incomplete">🔴 OCR 没识别完整</div>
-                    </div>
-                    <div class="sv-sum-card orphan">
-                        <div class="sv-sum-num" id="sv-sum-orphan">-</div>
-                        <div class="sv-sum-label" data-i18n="svc-sum-orphan">单边孤儿(发票/报告任一缺)</div>
-                    </div>
-                </div>
-                <!-- 数据差异细分(动态填) -->
-                <div class="sv-summary-breakdown" id="sv-sum-breakdown" style="display:none"></div>
-            </div>
-
-            <!-- 过滤芯片 -->
-            <div class="sv-chips" id="sv-chips">
-                <button class="sv-chip active" data-filter="all" data-i18n="svc-chip-all">全部</button>
-                <button class="sv-chip" data-filter="matched" data-i18n="svc-chip-matched">完全一致</button>
-                <button class="sv-chip" data-filter="mismatched" data-i18n="svc-chip-mismatched">数据差异</button>
-                <button class="sv-chip" data-filter="ocr_incomplete" data-i18n="svc-chip-incomplete">🔴 OCR 不完整</button>
-                <button class="sv-chip" data-filter="invoice_orphan" data-i18n="svc-chip-inv-orphan">发票孤儿</button>
-                <button class="sv-chip" data-filter="report_orphan" data-i18n="svc-chip-rep-orphan">报告孤儿</button>
-            </div>
-
-            <!-- 行列表 -->
-            <div class="sv-rows" id="sv-rows"></div>
-        </div>
-    </div>
 
     <!-- ============ 页面: 云盘同步(v108 上线)============ -->
     <section class="page" id="page-cloud">
@@ -6698,7 +6505,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
     </div>
 </div>
 
-<script src="/static/home.js?v=11835076"></script>
+<script src="/static/home.js?v=11835077"></script>
 <!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE 不引 home.js · runRecon 检测 needs_mapping 时调用 -->
 <script src="/static/recon-mapping.js?v=11835072" defer></script>
 <!-- ADR-006 S8 · PDF/扫描件逐行核对纠错面板 · 独立 IIFE · runRecon 检测 needs_review 时调用 -->

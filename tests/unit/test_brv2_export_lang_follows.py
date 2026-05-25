@@ -121,23 +121,31 @@ class ExportLangFollowsUiTests(unittest.TestCase):
         self.assertIn("銀行照合", titles["ja"])
 
     def test_m2_export_uses_dynamic_lang_not_hardcoded(self):
-        """BUG-FIX-T5 契约 3 · M2 (销售税对账) export URL 必须用 _curLang · 不能 hardcode 单一语言
-        触发场景: home.js L30720 附近的 M2 export 函数
+        """BUG-FIX-T5 契约 3(2026-05-25 P2 更新)· M2 销项税对账 export lang 必须动态 · 不能 hardcode。
+
+        旧 sv-result-modal 导出(/api/recon/export/<tid>?lang=)已随『旧客户期间流程』整体删除。
+        现 M2(VEX)在 build 时把 lang 传给 /api/vat_excel/submit · Excel 服务端按该 lang 生成 ·
+        所以契约改为:submit 的 fd.append('lang', <expr>) 中 <expr> 必须是动态变量(currentLang/
+        _currentLang 派生的 _curLang)· 不能是字面 'th'/'en' 等。
         """
-        # M2 export URL 关键模式: '/api/recon/export/' + taskId + '?lang=' + _curLang
-        m2_pattern = re.search(
-            r"/api/recon/export/['\"]?\s*\+\s*[\w.()\[\]]+\s*\+\s*['\"]\?lang=['\"]\s*\+\s*([\w()._]+)",
-            self.home_js,
+        self.assertIn(
+            "/api/vat_excel/submit", self.home_js, "VEX submit 端点缺失(M2 导出走 submit 时定 lang)"
         )
-        self.assertIsNotNone(
-            m2_pattern, "M2 export URL pattern not found in home.js · 可能被改成 hardcode lang=xxx"
+        idx = self.home_js.find("/api/vat_excel/submit")
+        head = self.home_js[max(0, idx - 1500) : idx]
+        m = re.search(r"fd\.append\(\s*['\"]lang['\"]\s*,\s*([\w.()]+)\s*\)", head)
+        self.assertIsNotNone(m, "VEX submit 前必须 fd.append('lang', <dynamic>) · 未找到")
+        lang_expr = m.group(1)
+        # 不能是字面量(以引号开头)
+        self.assertFalse(
+            lang_expr.startswith(("'", '"')),
+            f"VEX submit lang 不能 hardcode 字面量({lang_expr})",
         )
-        lang_expr = m2_pattern.group(1)
-        # lang 表达式必须含 _curLang 或 currentLang 等动态变量 · 不能是字面 'th'/'en' 等
+        # _curLang 必须派生自 currentLang / _currentLang(动态跟随 UI)
         self.assertRegex(
-            lang_expr,
-            r"(?:_curLang|currentLang|_lang)",
-            f"M2 export lang 表达式应该动态({lang_expr})· 不能 hardcode",
+            head,
+            r"_curLang\s*=.*(?:currentLang|_currentLang)",
+            "VEX lang(_curLang)必须来自 currentLang/_currentLang · 不能 hardcode",
         )
 
     def test_m3_export_uses_dynamic_lang_not_hardcoded(self):

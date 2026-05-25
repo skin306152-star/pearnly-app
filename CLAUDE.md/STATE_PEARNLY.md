@@ -1,7 +1,9 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十九会话 · B1 续**)· **🟢 app.py 拆 6 模块 · 10075→4888(-51%)。前半:categories/erp/admin_users 3 router + `_record_500`→route_helpers + 修 CI lint 红 · ✅ 已 push + CI 全绿 + 生产零丢路由。后半:history 组完成(exception_checks.py 异常链 + history_routes.py 11 路由)· unit 622 passed · ⚠️ 3 commit 未 push(`b264790`/`c5af58e`/`1835bce`)。**
-> ⚠️⚠️ **下个窗口:① 先 push 后半 3 commit(需 Zihao 授权)· ② B1 易摘果实已摘完(history 最深纠缠已拿下)· 剩 37 个 @app 全是核心耦合区(OCR recognize 850 行 / LINE webhook)或安全敏感区(auth/OAuth)· 详见 `HANDOFF_REFACTOR_BC.md` §5 · 建议转 C 前端拆 home.js(收益大)或谨慎评估 auth 组 · 不建议常规长跑碰 OCR 核心。开工 baseline:push 后 `origin/master...HEAD` = 0 0。**
+> **最近更新**:2026-05-25(**第二十会话 · B1 续**)· **🟢 app.py 再拆 3 模块 · 4888→4459(-429)。pages_routes(静态页面+公开 meta 12 路由)/ me_routes(/api/me 家族 3 路由+UserInfo · 铁律 #15 敏感区 verbatim 搬+字段快照)/ line_binding_routes(LINE 绑定+偏好语言 4 路由)· unit 634 passed · ⚠️ 3 commit 全未 push(auto-mode 拦了 push to master · 需显式授权)。**
+> ⚠️⚠️ **下个窗口:① 先 push 这 3 commit(`d73f21f`+2 · 需 Zihao 授权 · push 后验 /api/me、/api/line/binding、/(根)返 200/401 非 404 + CI 双 job 绿)· ② B1 易摘果实已【全部】摘完(pages/me/line_binding 是最后 3 块干净的)· 剩 22 个 @app 全是【安全敏感】(login/Google+LINE OAuth/email-code/line_complete_email 含 JWT 颁发+账号合并)或【勿碰】(OCR recognize 850 行/LINE webhook)或【故意留】(/api/version)。**app.py < 500 无法靠安全搬家达成** · 要继续压必须开 auth 专窗口(需 Zihao 在场 · 铁律 #16 登录关键路径)或转 C 前端拆 home.js(收益最大)。详见 `HANDOFF_REFACTOR_BC.md` §0/§5。开工 baseline:push 后 `origin/master...HEAD` = 0 0。**
+>
+> **(第十九会话)app.py 拆 6 模块 · 10075→4888**:categories/erp/admin_users 3 router(已 push)+ exception_checks+history 组(`b264790`/`c5af58e`/`1835bce` · 已于本会话前 push · origin 同步)。详见下方原记录。
 >
 > **(第十九会话后半)history 组拆分完成(两步法 · 纯后端搬家 · 0 业务逻辑改 · ⚠️ 3 commit 未 push)**:
 > - **步骤 A · exception_checks.py**(`b264790`):OCR 异常检测(5 类规则)+ LINE 智能提醒整条链(378 行:EXC_RULE 常量 / `_parse_money` / `_is_valid_thai_tax_id` / `_async_run_exception_checks` / `_notify_exception_high` / `_notify_large_invoice` / `_format_thb` / `_user_lang_safe` / `_rule_belongs_to`)从 app.py 搬出。此前在 app.py · 被 OCR/LINE 上传路由 + history PUT 共用 · 不搬出直接拆 history 会循环 import。`line_client` 防御式 import(未部署降级 None)。

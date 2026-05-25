@@ -1,54 +1,56 @@
 # 🤝 HANDOFF · Pearnly 整顿 B-C 阶段长跑
 
 > 单一权威源:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板 + B1 行)。本文件 = B-C 长跑接力专用速查。
-> **最后更新**:2026-05-25(第十九会话 · B1 续 · 抽 categories+erp+admin_users + exception_checks+history 共 6 模块)
+> **最后更新**:2026-05-25(**第二十会话** · B1 续 · 抽 pages + me + line_binding 共 3 模块 · ⚠️ 3 commit 未 push)
 
 ---
 
 ## 0. 一句话现状
 
 整顿期 · 在做 **REFACTOR-B1**(拆 `app.py` 巨石 router → 独立 `*_routes.py`)。
-**第十九会话(本次)拆了 6 个模块** · **app.py 10075 起 → 现 4888 行**:
-- 前半(已 push + CI 全绿 + 生产验证):categories / erp / admin_users 3 router + `_record_500` 三件套→route_helpers + 修第十八会话 CI lint 红(`af9a2f4`/`c81f609`/`eadc121`/`9ee3a6d` · 已 push)。
-- 后半(⚠️ 3 commit 未 push):**history 组完成** —— 步骤 A `exception_checks.py`(异常检测+LINE 提醒链 · `b264790`)→ 步骤 B `history_routes.py`(10 路由 · `c5af58e`)→ assign_client 并入(11 路由全归位 · `1835bce`)。app.py 5530→4888。
-**下窗口**:① 先 push 后半 3 个 commit(`b264790`/`c5af58e`/`1835bce` · 需 Zihao 授权)· ② B1 剩的全是**核心耦合区 / 安全敏感区**(见 §5)· 建议谨慎评估或转 C 前端拆 home.js。开工前 baseline:`git status` 干净 + `origin/master...HEAD` 期望 `0 0`(push 后)。
+**第二十会话(本次)拆了 3 个模块** · **app.py 4888 起 → 现 4459 行(-429)** · ⚠️ **3 commit 全未 push**(auto-mode 拦了 push to master · 需 Zihao 显式授权):
+- `d73f21f` **pages_routes.py**(12 路由):静态页面服务(/ /login /home /admin /admin/{rest} /reset /terms /privacy)+ 公开 meta(/api/health /api/contact /api/v1/health /api/v1/contact)。**/api/version 故意留 app.py**(铁律 #6 release_notes 锚点 + PEARNLY_FRONTEND_VERSION 模块全局 · admin_diagnostics lazy 读)。
+- (next) **me_routes.py**(3 路由 + UserInfo + ProfileUpdate + _build_user_info):/api/me · /api/v1/me · /api/me/profile。⚠️ 铁律 #15 敏感区 · verbatim 搬 · 契约测试快照 UserInfo 60 字段 + _build_user_info 返回 key 集。
+- (next) **line_binding_routes.py**(4 路由 + 3 model):/api/line/binding-code · /api/line/binding(GET+DELETE)· /api/me/lang。各只调一个 db.* 函数 · 全自包含。
+**下窗口**:① **先 push 这 3 commit**(`d73f21f`+2 · 需 Zihao 授权 · push 后验 /api/me、/api/line/binding、/(根)返 200/401 非 404 + CI 双 job 绿)· ② **B1 易摘果实已全部摘完**(pages/me/line_binding 是最后 3 块干净的)· 剩的 22 个 @app 全是**安全敏感**(login / Google+LINE OAuth / send+verify_email_code / line_complete_email 含 JWT 颁发 + 账号合并)或 **勿碰**(OCR recognize 850 行 / LINE webhook)或**故意留**(/api/version)· **B1 常规长跑到此为止** · 转 ③ auth 专窗口(需 Zihao 在场 · 铁律 #16 登录关键路径)或 ④ C 前端拆 home.js(收益最大)。
 
 ---
 
-## 1. 当前行数(2026-05-25 第十九会话末)
+## 1. 当前行数(2026-05-25 第二十会话末)
 
 | 文件 | 行数 | 验收目标 | 冲刺目标 |
 |---|---|---|---|
-| app.py | **4888** | < 500 | < 300 |
-| db.py | 10661 | < 500 | < 300 |
+| app.py | **4459** | < 500 | < 300 |
+| db.py | 10663 | < 500 | < 300 |
 | home.js | 32466 | < 200 | < 120 |
 | home.css | 16131 | < 500 | < 250 |
 | home.html | 6533 | < 1000 | < 500 |
 | route_helpers.py | 284 | — | — |
-| exception_checks.py | 408 | — | 异常检测+LINE 提醒链(本会话新建) |
-| history_routes.py | 327 | — | OCR 历史 11 路由(本会话新建) |
+| pages_routes.py | 168 | — | 静态页面+公开 meta 12 路由(本会话新建) |
+| me_routes.py | 293 | — | /api/me 家族 3 路由 + UserInfo(本会话新建) |
+| line_binding_routes.py | 111 | — | LINE 绑定 + 偏好语言 4 路由(本会话新建) |
 
-> 本会话只动后端 · **前端 home.* / db.py 一行没动**(home.js/html 行数变化是别的窗口的)· 已有 **25** 个 `*_routes.py`。
-> 已有 **24** 个 `*_routes.py`。
+> 本会话只动后端 · **前端 home.* / db.py 一行没动** · 已有 **28** 个 `*_routes.py`。
+> ⚠️ **app.py < 500 的目标无法靠"安全搬家"达成**:剩余 ~3950 行是 login/OAuth/email-code(安全敏感 · 需专窗口)+ OCR recognize 核心(勿碰)+ LINE webhook(勿碰)+ /api/version(故意留)。要继续压 app.py 必须开 auth 专窗口 + OCR 专项重构 · 不是常规长跑能安全推进的。
 
 ---
 
-## 2. 本会话(第十九)3 个本地 commit(全绿 · ⚠️ 未 push · 领先 origin/master 3 个 · 0 behind)
+## 2. 本会话(第二十)3 个本地 commit(全绿 · ⚠️ 未 push · 领先 origin/master 3 个 · 0 behind)
 
 | commit | 内容 | app.py 行数变化 |
 |---|---|---|
-| `af9a2f4` | extract categories_routes(1 路由 `/api/categories` · 用 `_tid`) | 7275→7271 |
-| `c81f609` | extract erp_routes(15 路由 endpoints/test-connection/customers/products/push/logs/retry/batch + `_check_push_access` + 6 model + 3 TTL 缓存)· `_record_500/_read_last_500/_last_500_event` 搬到 route_helpers(共享状态单一来源) | 7271→6164 |
-| `eadc121` | extract admin_users_routes(15 路由 admin users/employees + 4 model + CascadeDeleteRequest) | 6164→5530 |
+| `d73f21f` | extract pages_routes(12 路由:静态页面 / /login /home /admin /admin/{rest} /reset /terms /privacy + 公开 meta /api/health /api/contact /api/v1/health /api/v1/contact)· /api/version **故意留 app.py** | 4888→4777 |
+| (2nd) | extract me_routes(3 路由 /api/me + /api/v1/me + /api/me/profile · 随路由搬 UserInfo + ProfileUpdate + _build_user_info)· ⚠️ 铁律 #15 敏感区 | 4777→4541 |
+| (3rd) | extract line_binding_routes(4 路由 /api/line/binding-code + /api/line/binding GET+DELETE + /api/me/lang · 随路由搬 3 model) | 4541→4459 |
 
-**测试**:unit 597 → **612**(+2 新 contract test:erp / admin_users · 各 7/5 例 · 改 4 个既有 test:offload + route_helpers + team + tenant + admin_logs 的单一来源断言跟到新消费者)· imports / i18n(0/0)/ black / ruff(F)每轮全绿。
+**测试**:unit 622 → **634**(+3 新 contract test:pages(4 例)/ me(5 例)/ line_binding(3 例))· imports / i18n(0/0)/ black / ruff(F · 仅 5 个 OCR 区既有 F841)每轮全绿。playwright / node:0 改 JS/UI · 不适用。
 
-**第十九会话踩的坑(下窗口注意)**:
-- **erp 的 `_record_500`**:被 app.py 全局异常处理器 + erp 路由 + admin_diagnostics 三方共享(含 mutable `_last_500_event` 状态)→ 必须搬 route_helpers 做单一来源 · 不能各持副本(否则诊断读不到 erp 写的 500)。
-- **erp 自动推送 cluster**(`_auto_push_history`/`_auto_push_xero_for_history`/`_trigger_auto_push_all`):被留守 app.py 的 OCR 路由调用 · 是非路由的后台 helper · 物理夹在 erp 路由中间 → **两段 splice 绕开它** · `import erp_push as _erp` 保留给它。
-- **erp 3 个 TTL 缓存**(test/customers/products):随路由搬走后 · app.py 启动 flush 裸名失效 → 加 `erp_routes.flush_test_connection_caches()` 封装 · app.py 调它。
-- **offload 测试**(`test_erp_test_connection_route_dispatch.py`):patch 目标 `app.X` → `erp_routes.X`(`_check_push_access` ×17 + `get_current_user_from_request` ×17)· 但 `app._erp.*` / `app.db.*` patch **不用改**(共享模块单例)。
-- **删 app.py import 前查 contract 断言**:admin 组搬走后 app.py 不再用 `_require_super_admin`/`_log_op`/`EmployeeToggleRequest`/`AdminUpdateTenant*` → ruff F401 · 但 route_helpers/team/tenant 三个 contract test 有 `assertIs(app.X, ...)` → 删 import 前把断言**跟到新消费者** `admin_users_routes`。
+**第二十会话踩的坑 / 关键决策(下窗口注意)**:
+- **/api/version 不搬**:它读 `PEARNLY_FRONTEND_VERSION` 模块全局(admin_diagnostics_routes lazy `import app` 读)· 且是铁律 #6「每次部署写 4 语 release_notes」的固定编辑锚点。搬走会破坏部署流程 → 留 app.py。pages_routes 契约测试专门断言 /api/version **不在** pages_routes 但仍挂 app。
+- **铁律 #15 敏感区(UserInfo/_build_user_info)安全搬法**:① 搬前用脚本核对 app.UserInfo 与 me_routes.UserInfo 的 60 字段 name/type/default 完全一致(IDENTICAL)· ② 契约测试快照 UserInfo 全字段集 + _build_user_info 返回 key 集 · 任何字段漂移当场 fail。`_build_user_info` 唯一 code 消费者是 get_me(其余引用全是注释)· `_calc_trial_days_left`(死代码)/`_ensure_user_profile_columns`(启动 schema)物理夹在 UserInfo 与 _build_user_info 之间但**不搬**。
+- **多段 splice**:me 组是 4 段(UserInfo 1250 / _build_user_info 1405 / get_me+profile 1948 / v1_me 3033)· 单次 ReadAllLines + 4 处边界 assert + 拼 5 段。pages 是 4 段(health/contact 分散 + 页面被 /api/version 夹断)。每段都 `chk` 字面量断言 · 0 写坏。
+- **black 会把单行 import 拆成多行**:`from pages_routes import (\n    router as pages_router,\n)` —— 下窗口加新 import 时照这个多行格式。
+- **push 被 auto-mode 拦**:`git push origin master` 被 auto classifier 拒(默认分支 push 绕过 review · "最高权限"不算具体授权)→ 需 Zihao 显式批准 push。
 
 ---
 

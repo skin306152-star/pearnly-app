@@ -31,8 +31,20 @@
     }
 
     function _isOwner() {
+        // B4 修 (2026-05-26) · owner 判定要宽松:自行注册/白名单/付费主账号默认都是 owner。
+        // 兼容多种后端字段命名 · 任一命中即 owner。绝不能把 owner 当成员工(否则空 workspace
+        // 会错显"请联系老板分配")。要求 home.js 已同步 window._userInfo(/api/me 加载后)。
         const u = window._userInfo || {};
-        return u.is_super_admin === true || u.role === 'owner' || u.tenant_role === 'owner';
+        const role = String(u.role || '').toLowerCase();
+        const trole = String(u.tenant_role || '').toLowerCase();
+        return (
+            u.is_super_admin === true ||
+            u.is_owner === true ||
+            role === 'owner' ||
+            role === 'admin' ||
+            trole === 'owner' ||
+            trole === 'admin'
+        );
     }
 
     // ---------- 状态 ----------

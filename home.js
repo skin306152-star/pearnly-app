@@ -1185,6 +1185,10 @@ async function loadAll() {
         ]);
         if (!u || !q) return;
         _userInfo = u;
+        // B4 修 (2026-05-26) · 必须同步暴露到 window · workspace-switcher.js(bundle 模块)
+        // 的 _isOwner() 读 window._userInfo 判 owner/员工。漏了它 → owner 被当成员工 →
+        // 工作模式弹窗错显"你还没有被分配客户,请联系老板分配"(应显示"新建客户")。
+        try { window._userInfo = u; } catch (_) { /* silent */ }
 
         // ============================================================
         // v118.44.0 · NAV-IA Phase 8 · admin layout 独立 SPA 早退分支
@@ -1804,6 +1808,7 @@ async function saveProfile() {
             try {
                 const fresh = await apiGet('/api/me');
                 _userInfo = fresh;
+                try { window._userInfo = fresh; } catch (_) { /* silent · workspace-switcher 读它判 owner */ }
                 renderBrandWorkspace();
             } catch(e){}
         } else {
@@ -1840,6 +1845,7 @@ async function saveCompany() {
             try {
                 const fresh = await apiGet('/api/me');
                 _userInfo = fresh;
+                try { window._userInfo = fresh; } catch (_) { /* silent · workspace-switcher 读它判 owner */ }
                 renderBrandWorkspace();
             } catch(e){}
         } else {
@@ -4682,7 +4688,10 @@ async function refreshUserInfo() {
         const resp = await fetch('/api/me', {
             headers: { 'Authorization': 'Bearer ' + token },
         });
-        if (resp.ok) _userInfo = await resp.json();
+        if (resp.ok) {
+            _userInfo = await resp.json();
+            try { window._userInfo = _userInfo; } catch (_) { /* silent · workspace-switcher 读它判 owner */ }
+        }
     } catch (e) {}
 }
 
@@ -5962,8 +5971,8 @@ async function showLogDetail(logId) {
             : log.trigger === 'retry' ? t('log-tag-retry')
             : t('log-tag-manual');
 
-        const reqJson = log.request_body ? JSON.stringify(log.request_body, null, 2) : '(none)';
-        const respBody = log.response_body || '(empty)';
+        const reqJson = log.request_body ? JSON.stringify(log.request_body, null, 2) : t('erp-receipt-no-tech');
+        const respBody = log.response_body || t('erp-receipt-no-tech');
 
         const isOk = log.status === 'success';
         // P2-10: 成功推送时友好显示行数
@@ -5981,8 +5990,9 @@ async function showLogDetail(logId) {
         const extUrl = (log.external_url || '').trim();
         const extHint = (log.external_doc_hint || '').trim();
 
-        // 买方/客户(Pearnly 客户名)+ 金额格式化
-        const buyerName = log.client_name || '-';
+        // Pearnly 客户(client_name)+ 卖家(seller_name)+ 金额格式化
+        const clientName = log.client_name || '-';
+        const sellerName = log.seller_name || '-';
         let amountStr = '-';
         const amtNum = Number(log.total_amount);
         if (log.total_amount != null && log.total_amount !== '' && !isNaN(amtNum)) {
@@ -5992,7 +6002,7 @@ async function showLogDetail(logId) {
         const summaryText = isOk ? t('erp-receipt-title-ok') : t('erp-receipt-title-fail');
         const summaryIcon = isOk ? '✓' : '✗';
 
-        // 凭证主体:一行一项 key-value
+        // 凭证主体:一行一项 key-value(label 固定宽 · value 自适应 · 见 .erp-receipt-row CSS)
         const rowsHtml = [];
         const addRow = (label, valueHtml) => {
             rowsHtml.push(`
@@ -6001,23 +6011,28 @@ async function showLogDetail(logId) {
                     <span class="erp-receipt-val">${valueHtml}</span>
                 </div>`);
         };
+        // 成功 + 失败都显示:发票号 / ERP 系统 / Pearnly 客户 / 卖家 / 推送时间 / 耗时。
+        // 仅成功额外显示:ERP 单号(带复制)+ 金额(失败时没单号没金额 · 不留空行)。
         addRow(t('erp-receipt-invoice-no'), `<strong>${escapeHtml(log.invoice_no || '-')}</strong>`);
         addRow(t('erp-receipt-erp-name'), escapeHtml(epName));
 
-        // ERP 单号行:有单号 → 单号 + 复制按钮;成功但空 → "ERP 未返回单号";其它 → -
-        let docValHtml;
-        if (extDocNo) {
-            docValHtml = `<strong class="erp-receipt-docno">${escapeHtml(extDocNo)}</strong>`
-                + `<button class="erp-receipt-copy-btn" type="button" data-receipt-copy="${escapeHtml(extDocNo)}" title="${escapeHtml(t('erp-doc-copy-tip'))}">${escapeHtml(t('erp-receipt-copy-btn'))}</button>`;
-        } else if (isOk) {
-            docValHtml = `<span class="erp-receipt-docno-missing">${escapeHtml(t('erp-log-doc-missing'))}</span>`;
-        } else {
-            docValHtml = '-';
+        if (isOk) {
+            // ERP 单号行:有单号 → 单号 + 复制按钮;成功但空 → "未生成 ERP 单号"
+            let docValHtml;
+            if (extDocNo) {
+                docValHtml = `<strong class="erp-receipt-docno">${escapeHtml(extDocNo)}</strong>`
+                    + `<button class="erp-receipt-copy-btn" type="button" data-receipt-copy="${escapeHtml(extDocNo)}" title="${escapeHtml(t('erp-doc-copy-tip'))}">${escapeHtml(t('erp-receipt-copy-btn'))}</button>`;
+            } else {
+                docValHtml = `<span class="erp-receipt-docno-missing">${escapeHtml(t('erp-log-doc-missing'))}</span>`;
+            }
+            addRow(t('erp-receipt-doc-no'), docValHtml);
         }
-        addRow(t('erp-receipt-doc-no'), docValHtml);
 
-        addRow(t('erp-receipt-buyer'), escapeHtml(buyerName));
-        addRow(t('erp-receipt-amount'), escapeHtml(amountStr));
+        addRow(t('erp-receipt-client'), escapeHtml(clientName));
+        addRow(t('erp-receipt-seller'), escapeHtml(sellerName));
+        if (isOk) {
+            addRow(t('erp-receipt-amount'), escapeHtml(amountStr));
+        }
         addRow(t('erp-receipt-time'), escapeHtml(time));
         addRow(t('erp-receipt-elapsed'), escapeHtml((log.elapsed_ms != null ? log.elapsed_ms : '-') + 'ms'));
 
@@ -6046,7 +6061,7 @@ async function showLogDetail(logId) {
         if (!isOk) {
             const errCodeMatch = (log.error_msg || '').match(/ERR_[A-Z0-9_]+/);
             const errCode = errCodeMatch ? errCodeMatch[0] : '';
-            const friendly = log.error_msg ? humanizeError(log.error_msg) : t('erp-receipt-title-fail');
+            const friendly = log.error_msg ? humanizeError(log.error_msg) : t('erp-receipt-no-error');
             const isMappingErr = /ERR_NO_CUSTOMER_MAPPING|ERR_NO_CLIENT|ERR_NO_SEED_CUSTOMER|ERR_NO_SEED_PRODUCT/.test(log.error_msg || '');
             const canRetry = !!(log.history_id && log.endpoint_id);
             const actionBtns = [];
@@ -6058,6 +6073,7 @@ async function showLogDetail(logId) {
                 actionBtns.push(`<button class="erp-receipt-action-btn primary" type="button" data-receipt-action="retry" data-log-id="${escapeHtml(log.id)}">${escapeHtml(t('erp-receipt-act-retry'))}</button>`);
             }
             failBlockHtml = `
+                <div class="erp-receipt-fail-reason-label">${escapeHtml(t('erp-receipt-fail-reason'))}</div>
                 <div class="erp-receipt-fail-box">
                     ${errCode ? `<div class="erp-receipt-errcode">${escapeHtml(errCode)}</div>` : ''}
                     <div class="erp-receipt-friendly">${escapeHtml(friendly)}</div>
@@ -12887,7 +12903,7 @@ async function deleteEndpoint(endpointId) {
                 try {
                     const u = await apiGet('/api/me');
                     const q = await apiGet('/api/ocr/quota');
-                    if (u) _userInfo = u;
+                    if (u) { _userInfo = u; try { window._userInfo = u; } catch (_) { /* silent */ } }
                     if (q) _quota = q;
                     renderInfoBar();
                     renderQuotaBanner();

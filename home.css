@@ -2984,21 +2984,34 @@ button.btn-primary.btn-tiny:hover {
 }
 .erp-receipt-row:last-child { border-bottom: none; }
 .erp-receipt-key {
-    flex: 0 0 110px;
+    flex: 0 0 130px;
     color: var(--ink-3);
+    white-space: nowrap;      /* label 固定一行 · 不允许换成两三行 */
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .erp-receipt-val {
     flex: 1;
+    min-width: 0;             /* 允许内部 ellipsis · 不被长单号撑破整行 */
     color: var(--ink);
     display: flex;
     align-items: center;
     gap: 8px;
-    word-break: break-all;
+    word-break: break-word;
+}
+.erp-receipt-fail-reason-label {
+    font-size: 12px;
+    color: var(--ink-3, #6b7280);
+    margin-bottom: 6px;
 }
 .erp-receipt-docno {
     font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
     color: var(--brand, #4f46e5);
     font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 .erp-receipt-docno-missing {
     color: #d97706;
@@ -3012,6 +3025,8 @@ button.btn-primary.btn-tiny:hover {
     color: var(--ink-2);
     border-radius: 6px;
     cursor: pointer;
+    flex-shrink: 0;        /* 复制按钮不被压缩 · 也不撑乱整行 */
+    white-space: nowrap;
 }
 .erp-receipt-copy-btn:hover { background: #f4f4f0; }
 .erp-receipt-hint {

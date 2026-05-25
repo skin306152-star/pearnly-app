@@ -11,6 +11,7 @@ import logging
 from typing import Optional, Dict, Any, List
 
 import db
+from services.erp.external_ref import derive_external_ref
 
 logger = logging.getLogger(__name__)
 
@@ -751,7 +752,7 @@ def list_push_logs(
                        l.seller_name, l.total_amount, l.status, l.http_status,
                        l.error_msg, l.attempt, l.elapsed_ms, l.trigger,
                        l.created_at, l.retry_count, l.max_retries,
-                       l.next_retry_at,
+                       l.next_retry_at, l.response_body,
                        h.client_id AS history_client_id,
                        c.name AS client_name,
                        e.name AS endpoint_name,
@@ -767,6 +768,15 @@ def list_push_logs(
                 tuple(params) + (limit, offset),
             )
             items = [dict(r) for r in cur.fetchall()]
+            # 临时任务 (Zihao 2026-05-26) · 在日志 API 层派生通用 ERP 单号字段
+            # (external_doc_no/external_doc_id/external_url + adapter 提示码)。
+            # 不动状态机 · 不新增状态源 · 仅从已有 response_body+adapter 读出。
+            # 派生后丢掉原始 response_body · 列表 payload 保持轻量(详情接口才回完整体)。
+            for it in items:
+                ref = derive_external_ref(
+                    it.get("endpoint_adapter"), it.pop("response_body", None), it.get("status")
+                )
+                it.update(ref)
             return {"items": items, "total": total}
     except Exception as e:
         logger.error(f"list_push_logs failed: {e}")
@@ -774,23 +784,43 @@ def list_push_logs(
 
 
 def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
-    """单条推送日志完整详情(含 request_body / response_body)"""
+    """单条推送日志完整详情(含 request_body / response_body)
+
+    临时任务 (Zihao 2026-05-26) · JOIN endpoints 拿 adapter + name,JOIN clients
+    拿 Pearnly 客户/买方名,供凭证弹窗显示;并派生通用 ERP 单号字段
+    (external_doc_no/external_doc_id/external_url + adapter 提示码)。
+    response_body 在详情接口里保留(弹窗"技术详情"折叠区要看原始体)。
+    """
     try:
         with db.get_cursor() as cur:
             cur.execute(
                 """
-                SELECT id, endpoint_id, history_id, invoice_no, seller_name,
-                       total_amount, status, http_status,
-                       request_body, response_body, error_msg,
-                       attempt, elapsed_ms, trigger, created_at,
-                       retry_count, max_retries, next_retry_at
-                FROM erp_push_logs
-                WHERE id = %s AND user_id = %s
+                SELECT l.id, l.endpoint_id, l.history_id, l.invoice_no, l.seller_name,
+                       l.total_amount, l.status, l.http_status,
+                       l.request_body, l.response_body, l.error_msg,
+                       l.attempt, l.elapsed_ms, l.trigger, l.created_at,
+                       l.retry_count, l.max_retries, l.next_retry_at,
+                       h.client_id AS history_client_id,
+                       c.name AS client_name,
+                       e.name AS endpoint_name,
+                       e.adapter AS endpoint_adapter
+                FROM erp_push_logs l
+                LEFT JOIN ocr_history h ON h.id = l.history_id
+                LEFT JOIN clients c ON c.id = h.client_id
+                LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
+                WHERE l.id = %s AND l.user_id = %s
             """,
                 (log_id, user_id),
             )
             row = cur.fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+            detail = dict(row)
+            ref = derive_external_ref(
+                detail.get("endpoint_adapter"), detail.get("response_body"), detail.get("status")
+            )
+            detail.update(ref)
+            return detail
     except Exception as e:
         logger.error(f"get_push_log_detail failed: {e}")
         return None

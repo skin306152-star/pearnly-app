@@ -2587,6 +2587,33 @@ body.sidebar-collapsed .nav-lock-icon {
     color: #9ca3af;
     font-style: italic;
 }
+/* 临时任务 (Zihao 2026-05-26) · 通用「ERP 单号」列 */
+.log-doc {
+    min-width: 120px;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.log-doc-copy {
+    cursor: pointer;
+    color: var(--brand, #4f46e5);
+    border-bottom: 1px dashed currentColor;
+}
+.log-doc-copy:hover { opacity: 0.75; }
+.log-doc-open {
+    color: var(--brand, #4f46e5);
+    text-decoration: none;
+    font-weight: 600;
+    font-family: sans-serif;
+}
+.log-doc-open:hover { text-decoration: underline; }
+.log-doc-missing {
+    color: #d97706;
+    font-style: italic;
+    cursor: help;
+}
+.log-doc-empty { color: var(--ink-3); }
 .log-http { color: var(--ink-3); }
 .log-elapsed { color: var(--ink-3); min-width: 60px; text-align: right; }
 
@@ -2793,6 +2820,128 @@ button.btn-primary.btn-tiny:hover {
     word-break: break-all;
     color: var(--ink);
 }
+
+/* ============================================================
+   临时任务 (Zihao 2026-05-26) · ERP 推送凭证弹窗
+   ============================================================ */
+.erp-receipt-body {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+.erp-receipt-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+}
+.erp-receipt-row:last-child { border-bottom: none; }
+.erp-receipt-key {
+    flex: 0 0 110px;
+    color: var(--ink-3);
+}
+.erp-receipt-val {
+    flex: 1;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    word-break: break-all;
+}
+.erp-receipt-docno {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    color: var(--brand, #4f46e5);
+    font-size: 14px;
+}
+.erp-receipt-docno-missing {
+    color: #d97706;
+    font-style: italic;
+}
+.erp-receipt-copy-btn {
+    padding: 2px 10px;
+    font-size: 11px;
+    border: 1px solid var(--line);
+    background: white;
+    color: var(--ink-2);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.erp-receipt-copy-btn:hover { background: #f4f4f0; }
+.erp-receipt-hint {
+    background: #FEF9EC;
+    border: 1px solid #FBE6B5;
+    color: #8a5a00;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 14px;
+}
+.erp-receipt-primary-wrap {
+    margin-bottom: 14px;
+}
+.erp-receipt-primary-btn {
+    display: inline-block;
+    padding: 9px 18px;
+    background: var(--brand, #4f46e5);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+.erp-receipt-primary-btn:hover { opacity: 0.9; }
+.erp-receipt-fail-box {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+}
+.erp-receipt-errcode {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    color: #991B1B;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.erp-receipt-friendly {
+    font-size: 13px;
+    color: #7f1d1d;
+    line-height: 1.5;
+}
+.erp-receipt-actions-label {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-bottom: 8px;
+}
+.erp-receipt-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+.erp-receipt-action-btn {
+    padding: 7px 14px;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    background: white;
+    color: var(--ink-2);
+    border-radius: 8px;
+    cursor: pointer;
+}
+.erp-receipt-action-btn:hover { background: #f4f4f0; }
+.erp-receipt-action-btn.primary {
+    background: var(--brand, #4f46e5);
+    color: #fff;
+    border-color: var(--brand, #4f46e5);
+}
+.erp-receipt-action-btn.primary:hover { opacity: 0.9; }
 
 /* ============================================================
    v0.10 · 自动化左侧子菜单 + 右侧内容区

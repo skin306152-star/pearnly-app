@@ -508,6 +508,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动 clients 建表失败: {e}")
 
+    # B0 (2026-05-25) · workspace_clients 账套主体表(独立于买方 clients · 见 services/workspace)
+    try:
+        db.ensure_workspace_tables()
+    except Exception as e:
+        logger.warning(f"启动 workspace_clients 建表失败: {e}")
+
     # v118.18 · 推荐分类学习表初始化
     try:
         db.ensure_supplier_categories_table()

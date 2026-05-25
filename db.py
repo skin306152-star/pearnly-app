@@ -4518,3 +4518,13 @@ from services.clients.store import (
     delete_client as delete_client,
     assign_invoice_to_client as assign_invoice_to_client,
 )
+
+# B0 地基(2026-05-25)· workspace_clients 账套主体 DAL(独立于买方 clients 表)
+from services.workspace.store import (
+    ensure_workspace_tables as ensure_workspace_tables,
+    create_workspace_client as create_workspace_client,
+    get_workspace_client as get_workspace_client,
+    list_workspace_clients as list_workspace_clients,
+    bind_workspace_endpoint as bind_workspace_endpoint,
+    get_workspace_endpoint_id as get_workspace_endpoint_id,
+)

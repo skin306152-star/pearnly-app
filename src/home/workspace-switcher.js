@@ -100,10 +100,10 @@
         const msg = _t('ws-need-client', '这个功能需要先选择客户');
         const pick = _t('ws-btn-pick', '选择客户');
         const cancel = _t('ws-btn-cancel', '取消');
+        // home.js 的 showConfirm(msg, opts) 返回 Promise<bool> · 用 okText/cancelText 自定义按钮。
         if (typeof window.showConfirm === 'function') {
-            window.showConfirm(msg, pick, cancel, function () {
-                openWorkspaceChooser(onOk);
-            });
+            const ok = await window.showConfirm(msg, { okText: pick, cancelText: cancel });
+            if (ok) openWorkspaceChooser(onOk);
         } else if (window.confirm(msg + '\n\n[' + pick + ' / ' + cancel + ']')) {
             openWorkspaceChooser(onOk);
         }

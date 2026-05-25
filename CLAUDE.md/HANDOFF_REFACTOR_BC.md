@@ -8,8 +8,8 @@
 ## 0. 一句话现状
 
 整顿期 · 在做 **REFACTOR-B1**(拆 `app.py` 巨石 router → 独立 `*_routes.py`)。
-**第十九会话(本次)抽了 3 个 router**(categories / erp / admin_users)+ 把 `_record_500` 三件套搬到 route_helpers · **app.py 7275 → 5530 行(-1745)** · **3 个 commit 全绿 · ⚠️ 全留本地未 push**(`af9a2f4`/`c81f609`/`eadc121` · 领先 origin/master 3 个 · 0 behind)。
-**下窗口**:① 先 push 这 3 个 commit(需 Zihao 授权)· ② 续 §5 拆 **history 组**(唯一剩的大组 · 但纠缠最深 · 需先把 `_async_run_exception_checks` 整条链搬到共享模块)· 或拆 `assign_client` 单路由(干净但薄)。
+**第十九会话(本次)抽了 3 个 router**(categories / erp / admin_users)+ 把 `_record_500` 三件套搬到 route_helpers · **app.py 7275 → 5530 行(-1745)** · **✅ 已 push + CI 双 job 全绿 + 生产抽查零丢路由**(`af9a2f4`/`c81f609`/`eadc121`)· 另修了第十八会话遗留的 CI lint 红(`9ee3a6d` · black 7 文件 + 2 F401)· origin/master 与 HEAD 同步 0/0。
+**下窗口**:回归 §5 拆 **history 组**(唯一剩的大组 · 纠缠最深 · 需先把 `_async_run_exception_checks` 整条链搬到共享模块 · 分两步)· 或拆 `assign_client` 单路由(干净但薄)。开工前 baseline:`git status` 干净 + `origin/master...HEAD` = 0 0。
 
 ---
 
@@ -48,13 +48,12 @@
 
 ---
 
-## 3. ⚠️ 本会话 3 个 commit 未 push · 下窗口第一件事
+## 3. ✅ 本会话已 push + CI 全绿 + 生产验证(下窗口无需补 push)
 
-- `af9a2f4`/`c81f609`/`eadc121` 全在本地 master · **领先 origin/master 3 个 · 0 behind**。
-- 下窗口:`git push origin master`(**会被 auto-mode 权限分类器拦** · 需 Zihao 当场授权)。
-- push 后照例验:`/api/version` 200 + 抽搬出路由确认 401/422(非 404)= 零丢路由 · 重点抽 `/api/erp/endpoints`、`/api/admin/users`、`/api/categories`。CI 看 `gh run list --branch master`。
-- 本窗口**未跑生产/CI 验证**(没 push)· 全部是本地守门全绿(unit 612)。
-- 截至第十八会话的所有 commit(到 `e3a42bc`)**已在 origin**(线上版本 11835078)。
+- 本会话 5 个 commit 全已 push(`e3a42bc..9ee3a6d`):3 router(`af9a2f4`/`c81f609`/`eadc121`)+ docs(`8ef6779`)+ 格式修复(`9ee3a6d`)· `origin/master` 与 HEAD 同步 `0/0`。
+- **CI 双 job 全绿**(run 26390… 之后的格式 push run):✓ lint(black+ruff+prettier+eslint · 58s)✓ test(import+i18n+unit+vite+e2e · 2m49s)。
+- **生产验证**:`/api/version` 200(版本 11835078 不变 · 纯后端重构无 cache_bust)· 抽查 `/api/categories`、`/api/erp/{endpoints,logs}`、`/api/admin/{users,employees,users.csv}` 全返 401(非 404/500)= 零丢路由。
+- **CI lint 红已清**:第十八会话 recon/salesvat 修复漏跑 black → CI lint 自那时一直红 · 本会话 `9ee3a6d` black 格式化 7 文件 + ruff --fix 2 个 F401 修复(纯格式化)· 下窗口 baseline CI 应是绿的。
 
 ---
 
@@ -130,6 +129,7 @@
 - **black / ruff(F)/ check_imports / check_i18n(0/0)/ unit 612**:每个 commit 全绿 · 会话末完整 gate 全绿(unit 597→612)。
 - **offload 守门**:`test_erp_test_connection_route_dispatch.py` 33 passed(erp 路由搬家后 patch 目标改 erp_routes · async tripwire/to_thread 未破坏)。
 - **playwright / node --check**:本会话 0 改 JS / 0 改 UI(纯后端 router 搬家)· 不适用 · 未跑。
-- **生产 / CI**:本会话**未 push · 未部署** · 无生产/CI 验证(下窗口 push 后补)。
-- **git**:领先 origin/master **3** 个 commit(`af9a2f4`/`c81f609`/`eadc121`)· 0 behind · 工作区只有这 3 个 commit 的内容 + 既有未跟踪 probes/ 等(非本会话产生 · 别误提交)。
+- **生产 / CI**:✅ 已 push + 部署 · **CI 双 job 全绿**(lint 58s + test 2m49s)· `/api/version` 200 · 搬出路由抽查全 401(零丢路由)。
+- **CI lint 红已清**:`9ee3a6d` black 7 文件 + ruff --fix 2 个 F401(第十八会话 recon/salesvat 漏跑 black 的遗留)· 修后全仓 `black --check .` 干净(206 files)。
+- **git**:`origin/master` 与 HEAD 同步 `0/0` · 工作区只剩既有未跟踪 probes/ 等 + 别的窗口的 `.claude/settings.local.json`、`CLAUDE.md/CLAUDE.md`(非本会话 · 别误提交)。
 - **app.py**:7275 → 5530(-1745)· CRLF=0(每次 splice 后校验)。

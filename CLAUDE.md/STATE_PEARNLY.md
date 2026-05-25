@@ -1,9 +1,9 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十九会话 · B1 续**)· **🟢 app.py 续拆 3 个 router(categories / erp 15 路由 / admin_users 15 路由)+ `_record_500` 三件套搬 route_helpers(共享状态单一来源)· app.py 7275→5530(-1745)· 3 commit 全绿 · 全量单测 612 passed · ⚠️ 全留本地未 push(领先 origin/master 3 个)。**
-> ⚠️⚠️ **下个窗口:① 先 push 本地 3 个 commit(`af9a2f4`/`c81f609`/`eadc121` · 需 Zihao 授权)· ② 续 B1 拆 **history 组**(唯一剩的大组 · 但纠缠最深 · 需先把 `_async_run_exception_checks` 整条链迁到共享模块 · 分两步 · 详见 `HANDOFF_REFACTOR_BC.md` §5)· 或拆 `assign_client` 单路由(干净但薄)· 或 Zihao 在场开 C 前端拆 home.js。**
+> **最近更新**:2026-05-25(**第十九会话 · B1 续**)· **🟢 app.py 续拆 3 个 router(categories / erp 15 路由 / admin_users 15 路由)+ `_record_500` 三件套搬 route_helpers · app.py 7275→5530(-1745)· 全量单测 612 passed · ✅ 已 push(`af9a2f4`/`c81f609`/`eadc121`)· 顺手修了第十八会话遗留的 CI lint 红(`9ee3a6d` black+ruff)· CI 双 job 全绿 · 生产抽查搬出路由全 401(零丢路由)· origin/master 与 HEAD 同步 0/0。**
+> ⚠️⚠️ **下个窗口:回归整顿 · 续 B1 拆 **history 组**(唯一剩的大组 · 纠缠最深 · 需先把 `_async_run_exception_checks` 整条链迁到共享模块 · 分两步 · 详见 `HANDOFF_REFACTOR_BC.md` §5)· 或拆 `assign_client` 单路由(干净但薄)· 或 Zihao 在场开 C 前端拆 home.js。开工前 baseline:`git status` 干净 + `origin/master...HEAD` = 0 0。**
 >
-> **(第十九会话 · B1 续)app.py 拆 router 长跑(纯后端搬家 · 0 业务逻辑改 · 3 commit 全留本地 · ⚠️ 未 push)**:
+> **(第十九会话 · B1 续)app.py 拆 router 长跑(纯后端搬家 · 0 业务逻辑改 · ✅ 已 push + CI 全绿 + 生产验证)**:
 > 模式 = 接力自主长跑「每完成一个安全 slice 本地 commit · 不 push · 只拆边界清晰组 · 纠缠太深跳过」。本会话从 app.py 抽出 3 个 router:
 > - **categories_routes.py**(`af9a2f4`)· 1 路由 `/api/categories`(供应商分类自动补全)· 用 `_tid`(route_helpers)· 完全自包含。
 > - **erp_routes.py**(`c81f609`)· 15 路由 `/api/erp/{endpoints,test-connection,customers,products,push,logs,stats,retry,batch}` + `_check_push_access`(独占)+ 6 model + `_strip_endpoint_for_response`/`_fetch_listing_with_retry` + 3 个 TTL 缓存。**铁律 #10 async tripwire**(test-connection/customers/products/push 调 sync Playwright 的 `asyncio.to_thread` offload)随路由体完整搬走 · offload 测试 33 passed。**自动推送后台 cluster**(`_auto_push_*` · OCR hook 触发 · 非路由)留 app.py · 两段 splice 绕开。**`_record_500`/`_read_last_500`/`_last_500_event`** 三件套(app 异常处理器 + erp + admin_diagnostics 三方共享 mutable 状态)搬到 route_helpers 做单一来源。启动缓存 flush 加 `flush_test_connection_caches()` 封装。
@@ -11,6 +11,8 @@
 > - **范式**:字节级 splice(ReadAllLines + 边界 assert + `@app.`→`@router.` + UTF8-no-BOM)· 每组带 contract test · app.py LF 全程干净(CRLF=0)。
 > - **守门**:每组 imports / i18n(0/0)/ unit / black / ruff(F)全绿 · unit 597→**612**(+2 新 contract · 改 4 既有)。
 > - **当前行数**:app.py **5530**(-1745)· db.py 10661 · 已有 **24** 个 `*_routes.py`(home.js/css/html 本会话未动)。
+> - **push + 验证**:Zihao 授权后 push(`e3a42bc..8ef6779` 3 router+docs)· 生产 webhook 部署 · `/api/version` 200 · 抽查 `/api/categories`、`/api/erp/{endpoints,logs}`、`/api/admin/{users,employees,users.csv}` 全返 401(非 404/500)= 零丢路由。
+> - **顺手修 CI lint 红(`9ee3a6d`)**:验证时发现 CI lint job 自第十八会话起一直红 · 根因 = recon/salesvat 修复(`575767f`/`eb87429`)提交时漏跑 black(7 文件 py311-black 脏)+ 2 个未用 import(black 先挂 ruff 没跑到)。本窗口 black 格式化 7 文件 + ruff --fix 清 2 个 F401 · 纯格式化 0 逻辑改 · 推后 **CI 双 job 全绿**(lint 58s + test 2m49s)。
 > - **停止原因**:3 个干净 slice 后 · 唯一剩的大组 history 纠缠最深(需先做 `_async_run_exception_checks` 整条链迁移子工程)· 本窗口已大量分析 + 3 次提取(含 erp 共享状态迁移)· 按「上下文不足不硬开下一大组 · 不留半拆 app.py」收尾 · 非测试失败非阻碍。**详见 `CLAUDE.md/HANDOFF_REFACTOR_BC.md`**。
 >
 > ---

@@ -109,15 +109,46 @@ class RunBankReconTests(unittest.TestCase):
         for s in ("parse", "reconcile", "persist", "done"):
             self.assertIn(s, stages)
 
-    def test_one_side_all_fail_saves_failed_task(self):
-        # stmt 全失败 → 不抛 · 存失败诊断任务 · 返回 failed task 指针
-        self._patch(parse_bank_statement_pdf=mock.Mock(return_value={"ok": False, "error": "boom"}))
+    def test_one_side_all_fail_no_table_signals_failed(self):
+        # BUG-FIX-RECON-GLCSV · stmt 全失败且无表格结构可修(无 mapping_request)→ 不抛 ·
+        #   存诊断任务(#16)· 但返回 ("__failed__", …) 让 worker 置 failed · 绝不进 done。
+        self._patch(
+            parse_bank_statement_pdf=mock.Mock(
+                return_value={"ok": False, "error": "boom", "error_code": "ocr_failed"}
+            )
+        )
         with tempfile.TemporaryDirectory() as d:
             refs = [_stage(d, "stmt", "s.pdf"), _stage(d, "gl", "g.xlsx")]
             with mock.patch("db.create_bank_recon_v2_task", return_value=999) as save:
-                table, rid = handlers.run_bank_recon({"user_id": "u1"}, refs, None)
-        self.assertEqual((table, rid), ("bank_recon_v2_task", 999))
+                sentinel, payload = handlers.run_bank_recon({"user_id": "u1"}, refs, None)
+        self.assertEqual(sentinel, "__failed__")
+        self.assertEqual(payload["error_code"], "ocr_failed")
+        self.assertEqual(payload["result_id"], 999)  # 诊断任务指针保留(#16)
         save.assert_called_once()
+
+    def test_one_side_needs_mapping_signals_needs_mapping(self):
+        # BUG-FIX-RECON-GLCSV · GL 整侧 needs_mapping(读到表格 · 有 headers/preview · 不认识列)
+        #   → 返回 ("__needs_mapping__", …) · 前端弹『确认列对应』· 绝不进 done。
+        mreq = {"document_type": "gl", "headers": ["A", "B"], "preview_rows": [["1", "2"]]}
+        self._patch(
+            parse_gl_v2=mock.Mock(
+                return_value={
+                    "ok": False,
+                    "rows": [],
+                    "needs_mapping": True,
+                    "error_code": "needs_mapping",
+                    "mapping_request": mreq,
+                }
+            )
+        )
+        with tempfile.TemporaryDirectory() as d:
+            refs = [_stage(d, "stmt", "s.pdf"), _stage(d, "gl", "g.csv")]
+            with mock.patch("db.create_bank_recon_v2_task", return_value=888):
+                sentinel, payload = handlers.run_bank_recon({"user_id": "u1"}, refs, None)
+        self.assertEqual(sentinel, "__needs_mapping__")
+        self.assertEqual(payload["mapping"]["file"], "g.csv")
+        self.assertEqual(payload["mapping"]["document_type"], "gl")
+        self.assertEqual(payload["result_id"], 888)
 
 
 class RunGlvatTests(unittest.TestCase):

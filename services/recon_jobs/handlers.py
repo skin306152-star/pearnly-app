@@ -55,6 +55,40 @@ def _noop(_p: dict) -> None:
     pass
 
 
+def _side_fail_signal(stmt_results, stmt_data, gl_results, gl_data, failed_id):
+    """整侧解析全失败 → 给 worker 的非 done 信号(BUG-FIX-RECON-GLCSV · 失败分流)。
+
+    ① 任一失败结果带 mapping_request(读到了表格结构 · 有 headers/preview · 只是不认识列)
+       → ("__needs_mapping__", …)· worker 置 needs_mapping · 前端弹『确认列对应』让用户指认。
+    ② 否则(连表格结构都没读出:PDF/OCR 失败 / 空 / 损坏 / 无 headers)
+       → ("__failed__", …)· worker 置 failed · 前端显示明确失败原因。
+    result_id 指向已存的诊断任务(#16:历史/GET 仍能看解析诊断表)。
+    """
+    paired = list(zip(stmt_results, stmt_data)) + list(zip(gl_results, gl_data))
+    # ① 有 mapping_request 的优先(stmt 先 gl 后)· 可现场弹面板修
+    for r, (_, fn) in paired:
+        if r.get("ok"):
+            continue
+        if r.get("needs_mapping") and r.get("mapping_request"):
+            return ("__needs_mapping__", {
+                "mapping": {"file": fn, **(r.get("mapping_request") or {})},
+                "result_table": "bank_recon_v2_task",
+                "result_id": failed_id,
+                "error_code": "needs_mapping",
+            })
+    # ② 无表格结构可修 → 明确失败 · 取第一条失败结果的 error_code(前端翻译成友好文案)
+    code = "parse_failed"
+    for r, _ in paired:
+        if not r.get("ok"):
+            code = r.get("error_code") or "parse_failed"
+            break
+    return ("__failed__", {
+        "result_table": "bank_recon_v2_task",
+        "result_id": failed_id,
+        "error_code": code,
+    })
+
+
 def _parallel(fn: Callable, items: List, max_workers: int = 4) -> List:
     """并行映射 · 保持输入顺序(复刻原路由 asyncio.gather 行为)。"""
     if not items:
@@ -237,12 +271,17 @@ def run_bank_recon(
         except Exception:  # noqa: BLE001
             return None
 
-    # 部分文件失败容错(原路由 v118.35.0.53):整侧全失败才真失败
+    # 部分文件失败容错(原路由 v118.35.0.53):整侧全失败才真失败。
+    # BUG-FIX-RECON-GLCSV(2026-05-25):整侧全失败**不再**静默存 done 任务 —— 否则前端按
+    #   "完成"渲染 0 行结果(委托回归 P0-1/P0-2)。守铁律「低信心主动喊停·不静默出错」· 失败分流:
+    #     ① 读到表格结构(有 headers/preview · needs_mapping)→ 弹『确认列对应』让用户指认列;
+    #     ② 连表格都没读出(PDF/OCR 失败 / 空 / 损坏 / 无 headers)→ 明确失败(status=failed)。
+    #   两种都存诊断任务(#16:失败任务的 GET/历史仍能看解析诊断表)· 但 job 绝不进 done。
     stmt_ok_n = sum(1 for r in stmt_results if r.get("ok"))
     gl_ok_n = sum(1 for r in gl_results if r.get("ok"))
     if stmt_ok_n == 0 or gl_ok_n == 0:
         failed_id = _save_failed_task()
-        return ("bank_recon_v2_task", failed_id)
+        return _side_fail_signal(stmt_results, stmt_data, gl_results, gl_data, failed_id)
 
     progress_cb({"stage": "reconcile", "stage_done": 0, "stage_total": 1})
 
@@ -271,7 +310,12 @@ def run_bank_recon(
 
     if not stmt_rows or not gl_rows:
         failed_id = _save_failed_task(bc=bank_code, stmt_rc=len(stmt_rows), gl_rc=len(gl_rows))
-        return ("bank_recon_v2_task", failed_id)
+        # 解析 ok 但合并后 0 行(罕见)· 无 mapping_request 可弹 → 明确失败 · 绝不显示完成
+        return ("__failed__", {
+            "result_table": "bank_recon_v2_task",
+            "result_id": failed_id,
+            "error_code": "no_rows",
+        })
 
     # 4. 对账
     recon_rows, summary = bank_reconcile(

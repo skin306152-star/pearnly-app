@@ -94,7 +94,11 @@ def _cleanup_on_fail(job_id: str):
 _EXCEL_EXTS = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv"}  # S6a · CSV/TSV 也走表格预检
 
 
-_GL_EXTS = {".xlsx", ".xls", ".xlsm"}  # GL 预检只查 Excel(CSV GL 暂走原路径)
+# BUG-FIX-RECON-GLCSV(2026-05-25):GL 预检纳入 CSV/TSV(与 stmt 侧 _EXCEL_EXTS 对称)。
+# 此前 GL CSV 跳过同步预检 → 直接进异步 worker · 无 AI 学不到模板 → 必 needs_mapping →
+# worker 把整侧失败静默存成 done 0 行任务(委托回归 P0-1/P0-2)。纳入后 GL CSV 走和 xlsx
+# 一样的路径:能 AI/本地推断 → 同步学模板 + 后台解析出行;推不准 → 同步弹『确认列对应』。
+_GL_EXTS = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv"}
 
 
 def _preflight_stmt_mapping(input_ref, scope_id, api_key=""):
@@ -324,6 +328,9 @@ async def get_job(job_id: str, request: Request):
         "progress": _progress,
         # S8 · needs_review 时携带核对载荷(前端据此弹逐行核对面板)
         "review": _progress.get("review") if job.get("status") == "needs_review" else None,
+        # BUG-FIX-RECON-GLCSV · needs_mapping 时携带列映射载荷(前端据此弹『确认列对应』面板 ·
+        #   shape 与 submit 预检同源:{file, document_type, headers, preview_rows, suggested_mapping, …})
+        "mapping": _progress.get("mapping") if job.get("status") == "needs_mapping" else None,
         "result_table": job.get("result_table"),
         "result_id": job.get("result_id"),
         "error_code": job.get("error_code"),

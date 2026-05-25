@@ -82,14 +82,26 @@ def _run_one(job: Dict) -> None:
     try:
         result = handler(job.get("params") or {}, job.get("input_ref") or [], progress_cb)
         # S8 · handler 返回 ("__needs_review__", payload) → 暂停等用户核对 OCR 行
-        if (
-            isinstance(result, (tuple, list))
-            and len(result) == 2
-            and result[0] == "__needs_review__"
-        ):
+        _sentinel = result[0] if isinstance(result, (tuple, list)) and len(result) == 2 else None
+        if _sentinel == "__needs_review__":
             store.set_needs_review(job_id, result[1])
             keep_stage = True
             logger.info(f"[recon-worker] job {job_id} ({jtype}) -> needs_review(待用户核对)")
+            return
+        # BUG-FIX-RECON-GLCSV · 整侧解析失败不再静默 done:能弹列映射 → needs_mapping;否则 failed。
+        if _sentinel == "__needs_mapping__":
+            store.set_needs_mapping(job_id, result[1] or {})
+            logger.info(f"[recon-worker] job {job_id} ({jtype}) -> needs_mapping(待用户确认列对应)")
+            return
+        if _sentinel == "__failed__":
+            p = result[1] or {}
+            store.set_failed(
+                job_id,
+                p.get("error_code") or "parse_failed",
+                result_table=p.get("result_table"),
+                result_id=p.get("result_id"),
+            )
+            logger.info(f"[recon-worker] job {job_id} ({jtype}) -> failed({p.get('error_code')})")
             return
         result_table: Optional[str] = None
         result_id = None

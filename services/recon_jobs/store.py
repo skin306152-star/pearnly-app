@@ -274,6 +274,80 @@ def set_needs_review(job_id: str, payload: dict) -> bool:
         return False
 
 
+def set_needs_mapping(job_id: str, payload: dict) -> bool:
+    """BUG-FIX-RECON-GLCSV · 整侧解析读到表格但不认识列 → status=needs_mapping。
+
+    载荷(headers/preview/suggested_mapping 等)存 progress.mapping(复用 progress 列 · 零 schema 改动 ·
+    仿 set_needs_review)· 前端轮询拿到后弹『确认列对应』面板。result_table/result_id 指向诊断任务
+    (#16:历史/GET 仍能看解析诊断表)。不置 finished_at(等用户确认 · 与 needs_review 同生命周期)。
+    """
+    p = payload or {}
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE recon_jobs
+                SET status = 'needs_mapping',
+                    progress = %s::jsonb,
+                    result_table = %s,
+                    result_id = %s,
+                    error_code = %s,
+                    lease_until = NULL,
+                    updated_at = now()
+                WHERE id = %s::uuid
+                """,
+                (
+                    _json.dumps({"mapping": p.get("mapping") or {}}, ensure_ascii=False, default=str),
+                    p.get("result_table"),
+                    str(p["result_id"]) if p.get("result_id") is not None else None,
+                    p.get("error_code") or "needs_mapping",
+                    str(job_id),
+                ),
+            )
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"set_needs_mapping failed ({job_id}): {e}")
+        return False
+
+
+def set_failed(
+    job_id: str,
+    error_code: str,
+    result_table: Optional[str] = None,
+    result_id: Any = None,
+) -> bool:
+    """BUG-FIX-RECON-GLCSV · 终态失败(不重试 · 区别于 fail 的回 queued 逻辑)· 带诊断结果指针。
+
+    整侧解析失败且无表格结构可现场修(PDF/OCR 失败 / 空 / 损坏 / 0 行)→ status=failed ·
+    前端按失败展示明确原因(绝不显示完成)。result_table/result_id 指向诊断任务(#16)。
+    """
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE recon_jobs
+                SET status = 'failed',
+                    error_code = %s,
+                    result_table = %s,
+                    result_id = %s,
+                    finished_at = now(),
+                    lease_until = NULL,
+                    updated_at = now()
+                WHERE id = %s::uuid
+                """,
+                (
+                    error_code,
+                    result_table,
+                    str(result_id) if result_id is not None else None,
+                    str(job_id),
+                ),
+            )
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"set_failed failed ({job_id}): {e}")
+        return False
+
+
 def fail(job_id: str, error_code: str) -> bool:
     """任务失败 · 还有重试次数则回 queued · 否则 failed。"""
     try:

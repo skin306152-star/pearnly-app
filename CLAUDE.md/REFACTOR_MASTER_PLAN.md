@@ -318,10 +318,10 @@
 
 **当前累积成果**(从 2026-05-21 EXECUTION_PLAN 开始):
 - `app.py` 10,075 → **4,459 行**(减 5,616 · B1 拆 21 router + 服务模块 · 安全部分到顶)
-- `db.py` 10,663 → **7,136 行**(减 3,527 · **B2 第二十二会话** · 抽 9 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1})
+- `db.py` 10,663 → **5,484 行**(减 5,179 · **B2 第二十二+二十三会话** · 抽 15 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1}/archive/rd/cost/exceptions/clients/billing)
 - `home.js` 33,768 → **22,210 行**(C1:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js` · + 测试中心 493 行→`src/home/test-center.js`)
-- `services/**/*.py` 40 → **51**(B2 新增 9 个 store + recon/__init__ 等);`services/ocr/entrypoints.py`(171 行 · 第二十一会话 `1eadc16`):web/LINE/email 三处共用 OCR 入口 helper 从 app.py/email_ingest 抽出
-- 守门测试:0 → **682 unit**(origin · 第二十二会话 B2 +20 域契约:email 3/oauth 3/mappings 3/notification 2/push 4/recon-task 3/bank-recon-v1 3 · 既有 tenant 隔离/分类器/dedup 测试全绿)+ 1 E2E + CI(lint + test 双 job)全绿
+- `services/**/*.py` 40 → **63**(B2 新增 15 个 store + 各 __init__);`services/ocr/entrypoints.py`(171 行 · 第二十一会话 `1eadc16`):web/LINE/email 三处共用 OCR 入口 helper 从 app.py/email_ingest 抽出
+- 守门测试:0 → **694 unit**(origin · B2 共 +32 域契约:第二十二会话 +20 · 第二十三会话 +12〔archive 2/rd 2/cost 2/exceptions 2/clients 2/billing 2〕· 既有 tenant 隔离/分类器/dedup/buyer-resolver/salesvat 测试全绿)+ 1 E2E + CI(lint + test 双 job)全绿
 
 ---
 
@@ -542,7 +542,17 @@ python scripts/refactor_progress.py
 
 ## 🚀 下一个 task
 
-**当前(第二十二会话 · 2026-05-25)· B2 db.py→services 长跑**(Zihao 授权 push 长跑 · 达到目标行数):
+**当前(第二十三会话 · 2026-05-25)· B2 db.py→services 长跑续**(Zihao "继续 · 授权 push"):
+- db.py 7136→**5484**(本会话 -1652 · 累计自 10663 起 -5179)· 再抽 6 个 cohesive 域 DAL 到 services(全 push 2 批 + CI 绿 + 生产 401 验证零丢路由):
+  - `services/archive/store.py`(`ca4f242` · 3 函数 · 智能归档设置)
+  - `services/rd/store.py`(`9a29821` · 2 函数 · RD 校验日限)
+  - `services/cost/store.py`(`6870222` · 6 函数 · ocr_cost_log 成本记账+只读聚合 · 不涉扣费)
+  - `services/exceptions/store.py`(`9468ba6` · 13 函数 · 异常栏+白名单 · tenant 隔离矩阵)
+  - `services/clients/store.py`(`1888f23` · 16 函数 · clients CRUD+供应商分类+买家→客户映射/解析 · tenant 隔离矩阵 · 字节级提取)
+  - `services/billing/store.py`(`5531a3b` · 2 函数 · billing_balance_log calibration 兜底)
+- 守门:每域契约测试(共 +12 unit:682→**694**)· 既有 tenant 隔离/分类器/dedup/buyer-resolver/salesvat 测试全绿(`mock.patch("db.get_cursor")`/`db.log_ocr_cost`/`db.get_latest_balance`/`db.try_resolve_buyer_to_client` 经 re-export 仍生效)· black(py311)/ruff/check_imports/check_i18n(0/0)/LF 无 BOM 全绿。services 新增 6 个 store(archive/rd/cost/exceptions/clients/billing)。
+
+**(第二十二会话 · 2026-05-25)· B2 启动**:
 - db.py 10663→**7136**(-3527)· 抽 9 个 cohesive 域 DAL 到 services(全 push + CI 绿 + 生产 401 验证零丢路由):
   - `services/email_ingest/store.py`(`435ece6` · 10 函数)
   - `services/erp/oauth_store.py`(`78e9667` · 12 函数 · _b64 私有)
@@ -553,7 +563,8 @@ python scripts/refactor_progress.py
   - `services/recon/bank_recon_v1_store.py`(`e26dafd` · 17 函数 + _find_candidates 私有 · session+匹配候选)
   - 配套 `09a3e73` 把已抽 store 统一改 `import db`+运行时 `db.get_cursor()`(patch 生效 + 防循环)
 - **B2 范式(下窗口照搬)**:① 行号随每次删除下移 · **抽前必 re-grep 当前行号**(别用旧 def-list)· ② cohesive 整片搬 service 模块 · `import db`+`db.get_cursor()`(不用 `from db import get_cursor` by-value · 否则 tenant 隔离测试 patch 失效)· ③ db.py 文件尾 `from services.X import a as a`(`x as x` 形式避 F401)· ④ 私有 `_helper`/`_常量` 不外露(确认无外部 `db._x` 引用)· 校验常量只在本域用则随域搬 · ⑤ 字节级 LF splice(无 BOM)· 边界 assert · ⑥ 每域带契约测试 · 跑全量 unit(尤其覆盖该域的既有测试)· ⑦ 批量本地 commit · 攒几个再 push(减生产重启)。
-- **剩余域**(下窗口续 · 由易到难):archive_settings / rd_usage(都很小)/ vat_recon 三表组(vat_report+reconciliation_task+reconciliation_row + 内嵌 client helper)/ membership+RLS+migration(admin)/ clients+categories+buyer_to_client / tenant / 操作日志+员工 → **(高敏后置 · 建议 Zihao 在场)** credits+charge_ocr(钱)/ user+auth(登录)/ ocr_history(OCR 热路径)。**已完成**:email_ingest / erp.oauth / erp.mappings / notification / erp.push / recon 4 表(vat_recon_tasks/gl_vat/bank_recon_v2/bank_recon_v1)。
+- **剩余域**(下窗口续 · 由易到难):vat_recon 三表组(vat_report+reconciliation_task+reconciliation_row + 内嵌 client helper find_client_by_tax_id/auto_create_client/find_or_create_client_by_tax_id/get_client_by_id · 是 P0-VAT 核心 · 有 salesvat 测试 · 中险)/ membership+RLS+migration(admin · 注意 get_cursor_rls/_is_rls_enabled 是基础设施 · 别动 RLS infra)/ tenant(get_tenant/create_tenant/list_all_tenants 等)/ 操作日志(insert/list_operation_logs)+员工(list_employees/add_employee 等)→ **(高敏后置 · 建议 Zihao 在场)** credits+charge_ocr(钱)/ user+auth(登录)/ ocr_history(OCR 热路径)。**已完成(15 域)**:email_ingest / erp.oauth / erp.mappings / notification / erp.push / recon 4 表(vat_recon_tasks/gl_vat/bank_recon_v2/bank_recon_v1)/ **archive / rd / cost / exceptions / clients / billing(第二十三会话)**。
+- **B2 范式不变**(见上一会话段)· 大块用字节级 PowerShell 提取(`$body = $lines[a..b] | %{ $_ -replace 'get_cursor\(','db.get_cursor(' }` + 拼 header)避免手抄 750 行出错。
 
 ---
 

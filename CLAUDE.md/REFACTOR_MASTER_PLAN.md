@@ -181,7 +181,7 @@
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
 | B1 | `app.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(20-30 个 router) | 4-6 周 | A1, A5 | 🟡 进行中 · **已抽 14 个 router**:notification(6)+ clients(5)+ exceptions(8)+ team(7)+ erp_mappings(12)+ email_ingest(6)+ rd(4)+ settings(5)+ **bank_recon(11 `faaa536`)+ admin_migration(7 `b33dd58`)+ admin_cost(10 `13eded7`)+ tenant(6 `fac5f62`)+ admin_logs(4 `574c92d`)+ erp_xero(8 `569b534`)** · 另把 `_plan_permissions`(`870290c`)+ `_tid`(`4755af7`)搬进 route_helpers · `_ensure_fresh_xero_token` 随 erp_xero · **app.py 10075→9546→8589→7263**(第十七会话 8589→7263 · 净 -1326)· 每组带 contract test(unit 530→552→**580**)· 守门 imports/i18n/unit/black/ruff 全绿 · LF 全程干净 · **第十八/十九会话续抽** categories/erp/admin_users + exception_checks/history 组(全 push)· **第二十会话续抽** pages(12)/me(3+UserInfo)/line_binding(4)· **app.py 7263→4459** · 共 **21 router + 30 个 *_routes.py** · unit →639 · 全 push+CI 绿+生产零丢路由。**B1 安全部分已到顶**:剩 22 @app 全安全敏感(login/OAuth/email-code/JWT+账号合并)或勿碰(OCR recognize 850 行/LINE webhook)或故意留(/api/version)· **app.py < 500 无法靠安全搬家达成** · 需 auth 专窗口(铁律 #16 登录关键路径 · Zihao 在场)· 详见 `HANDOFF_REFACTOR_BC.md` |
-| B2 | `db.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(业务 SQL 迁 `services/`) | 3-4 周 | A1 | 🟡 进行中 · **第二十二会话开张**:db.py 10663→**8439**(-2224)· 抽 5 个域 DAL 到 services:`email_ingest/store.py`(10 函数 `435ece6`)· `erp/oauth_store.py`(12 `78e9667`)· `erp/mappings_store.py`(15+常量 `f62d0d9`)· `notification/store.py`(9 `9de1baa`)· `erp/push_store.py`(25+3常量 `7edb3c3`)· **范式**:cohesive 域整片搬 service 模块(`import db`+运行时 `db.get_cursor()` → patch 生效 + 防循环 import)· db.py 文件尾 `from services.X import a as a` 显式 re-export(pyflakes 不报 F401)→ 所有 `db.xxx()`/`from db import xxx` 调用点**零改动** · 私有 helper/常量不外露 · 校验常量随域搬 · 每域带契约测试(函数在 service / re-export 同一对象防漂移)· LF 全程干净 · 全 push + CI 5 连绿 + 生产路由 401 验证零丢。**剩余域**(下窗口续):bank_recon v1 / vat_recon 三表组 / gl_vat / bank_recon_v2 / vat_recon_tasks / membership+RLS+migration / clients+categories+buyer_to_client / tenant / archive / rd_usage / **(高敏后置)** credits+charge_ocr(钱)/ user+auth / ocr_history(OCR 热路径)|
+| B2 | `db.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(业务 SQL 迁 `services/`) | 3-4 周 | A1 | 🟡 进行中 · **第二十二会话**:db.py 10663→**7136**(-3527)· 抽 9 个域 DAL 到 services:`email_ingest/store.py`(10 `435ece6`)· `erp/oauth_store.py`(12 `78e9667`)· `erp/mappings_store.py`(15+常量 `f62d0d9`)· `notification/store.py`(9 `9de1baa`)· `erp/push_store.py`(25+3常量 `7edb3c3`)· `recon/{vat_recon_tasks,gl_vat,bank_recon_v2}_store.py`(7+6+6 `a012482`)· `recon/bank_recon_v1_store.py`(17 `e26dafd`)· **范式**:cohesive 域整片搬 service 模块(`import db`+运行时 `db.get_cursor()` → patch 生效 + 防循环 import)· db.py 文件尾 `from services.X import a as a` 显式 re-export(pyflakes 不报 F401)→ 所有 `db.xxx()`/`from db import xxx` 调用点**零改动** · 私有 helper/常量不外露 · 校验常量随域搬 · 每域带契约测试(函数在 service / re-export 同一对象防漂移)· LF 全程干净 · 全 push + CI 5 连绿 + 生产路由 401 验证零丢。**剩余域**(下窗口续 · 由易到难):archive_settings / rd_usage / vat_recon 三表组(vat_report+recon_task+recon_row)/ membership+RLS+migration / clients+categories+buyer_to_client / tenant / 操作日志+员工 / **(高敏后置 · Zihao 在场)** credits+charge_ocr(钱)/ user+auth / ocr_history(OCR 热路径)|
 | B3 | 所有 `ensure_*` 迁 Alembic(25 个 · schema 完全版本化) | 3-4 周 | A2 | ⚪ |
 | B4 | 健康检查端点 `/health` + `/ready`(DB / Gemini / SMTP / LINE 各 check) | 半天 | — | ⚪ |
 | B5 | API 全局限流(每 IP / 每用户 / 每 endpoint · 比现有 PLG 反薅闸更全) | 1-2 天 | — | ⚪ |
@@ -305,7 +305,7 @@
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
-| B 后端 | 🟡 1.5/10 | **B1 安全部分已到顶**(app.py 10075→4459)· **B2 进行中**:db.py 10663→**8439**(-2224 · 抽 5 域 DAL → services) | B1:21 router + exception_checks · 剩 22 @app 全安全敏感/勿碰/故意留 · 需 auth 专窗口。**B2(第二十二会话开张)**:email_ingest/erp.oauth/erp.mappings/notification/erp.push 5 个 store(`435ece6`/`78e9667`/`f62d0d9`/`9de1baa`/`7edb3c3`)· re-export 范式零改调用点 · 全 push+CI 绿+生产 401 验证 · services/*.py 40→47 · unit 656→**676** |
+| B 后端 | 🟡 1.5/10 | **B1 安全部分已到顶**(app.py 10075→4459)· **B2 进行中**:db.py 10663→**7136**(-3527 · 抽 9 域 DAL → services) | B1:21 router + exception_checks · 剩 22 @app 安全敏感/勿碰/故意留 · 需 auth 专窗口。**B2(第二十二会话 · 9 域)**:email_ingest/erp.oauth/erp.mappings/notification/erp.push + recon.{vat_recon_tasks/gl_vat/bank_recon_v2/bank_recon_v1}(`435ece6`/`78e9667`/`f62d0d9`/`9de1baa`/`7edb3c3`/`a012482`/`e26dafd`)· re-export 范式零改调用点 · 全 push+CI 绿+生产 401 验证 · services/*.py 40→51 · unit 656→**682** |
 | C 前端 | 🟡 1/8(C1 进行中) | C1 续:home.js 22703→**22210**(抽测试中心 → `src/home/test-center.js`) | 依赖 A1(✅)· 已抽 dashboard + billing(IIFE→ES module)+ i18n 字典→`static/i18n-data.js` + **测试中心 IIFE(skin only)→`src/home/test-center.js`**(第二十一会话 `0377055` · 只 bump main.js?v= 不动 home.js?v= → /api/version 不变 · push+CI 绿+生产 playwright 验证 loadTestCenterPage 渲染 0 报错)· 下一步抽更多 cohesive feature 函数群→`src/home/*` |
 | D 测试 | 🟡 1/5(部分 D1) | D1 续:补 4 个 router 守门契约测试 | 第二十一会话 `d65b692`(report/vat_excel/recon/admin_diagnostics · 8 硬门槛 #4 补缺 · +16 unit · push+CI 双 job 绿)· 依赖 A1 |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |
@@ -318,10 +318,10 @@
 
 **当前累积成果**(从 2026-05-21 EXECUTION_PLAN 开始):
 - `app.py` 10,075 → **4,459 行**(减 5,616 · B1 拆 21 router + 服务模块 · 安全部分到顶)
-- `db.py` 10,663 → **8,439 行**(减 2,224 · **B2 第二十二会话开张** · 抽 5 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push)
+- `db.py` 10,663 → **7,136 行**(减 3,527 · **B2 第二十二会话** · 抽 9 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1})
 - `home.js` 33,768 → **22,210 行**(C1:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js` · + 测试中心 493 行→`src/home/test-center.js`)
-- `services/**/*.py` 40 → **47**(B2 新增 5 个 store + 2 个 __init__);`services/ocr/entrypoints.py`(171 行 · 第二十一会话 `1eadc16`):web/LINE/email 三处共用 OCR 入口 helper 从 app.py/email_ingest 抽出
-- 守门测试:0 → **676 unit**(origin · 第二十二会话 B2 +14 域契约:email 3 / oauth 3 / mappings 3 / notification 2 / push 4 · 既有 tenant 隔离/分类器/dedup 测试全绿)+ 1 E2E + CI(lint + test 双 job)5 连绿
+- `services/**/*.py` 40 → **51**(B2 新增 9 个 store + recon/__init__ 等);`services/ocr/entrypoints.py`(171 行 · 第二十一会话 `1eadc16`):web/LINE/email 三处共用 OCR 入口 helper 从 app.py/email_ingest 抽出
+- 守门测试:0 → **682 unit**(origin · 第二十二会话 B2 +20 域契约:email 3/oauth 3/mappings 3/notification 2/push 4/recon-task 3/bank-recon-v1 3 · 既有 tenant 隔离/分类器/dedup 测试全绿)+ 1 E2E + CI(lint + test 双 job)全绿
 
 ---
 
@@ -542,16 +542,18 @@ python scripts/refactor_progress.py
 
 ## 🚀 下一个 task
 
-**当前(第二十二会话 · 2026-05-25)· B2 db.py→services 长跑开张**(Zihao 授权 push 长跑 · 达到目标行数):
-- db.py 10663→**8439**(-2224)· 抽 5 个 cohesive 域 DAL 到 services(全 push + CI 5 连绿 + 生产 401 验证零丢路由):
+**当前(第二十二会话 · 2026-05-25)· B2 db.py→services 长跑**(Zihao 授权 push 长跑 · 达到目标行数):
+- db.py 10663→**7136**(-3527)· 抽 9 个 cohesive 域 DAL 到 services(全 push + CI 绿 + 生产 401 验证零丢路由):
   - `services/email_ingest/store.py`(`435ece6` · 10 函数)
   - `services/erp/oauth_store.py`(`78e9667` · 12 函数 · _b64 私有)
   - `services/erp/mappings_store.py`(`f62d0d9` · 15 函数 + ERP_TYPES_VALID/PEARNLY_TAX_KINDS_VALID 常量随域搬)
   - `services/notification/store.py`(`9de1baa` · 9 函数)
   - `services/erp/push_store.py`(`7edb3c3` · 25 函数 + 3 公共常量 · 重试/分类器)
+  - `services/recon/{vat_recon_tasks,gl_vat,bank_recon_v2}_store.py`(`a012482` · 7+6+6 函数 · 三对账任务表 · tenant 隔离矩阵)
+  - `services/recon/bank_recon_v1_store.py`(`e26dafd` · 17 函数 + _find_candidates 私有 · session+匹配候选)
   - 配套 `09a3e73` 把已抽 store 统一改 `import db`+运行时 `db.get_cursor()`(patch 生效 + 防循环)
 - **B2 范式(下窗口照搬)**:① 行号随每次删除下移 · **抽前必 re-grep 当前行号**(别用旧 def-list)· ② cohesive 整片搬 service 模块 · `import db`+`db.get_cursor()`(不用 `from db import get_cursor` by-value · 否则 tenant 隔离测试 patch 失效)· ③ db.py 文件尾 `from services.X import a as a`(`x as x` 形式避 F401)· ④ 私有 `_helper`/`_常量` 不外露(确认无外部 `db._x` 引用)· 校验常量只在本域用则随域搬 · ⑤ 字节级 LF splice(无 BOM)· 边界 assert · ⑥ 每域带契约测试 · 跑全量 unit(尤其覆盖该域的既有测试)· ⑦ 批量本地 commit · 攒几个再 push(减生产重启)。
-- **剩余域**(下窗口续 · 由易到难):bank_recon v1 / vat_recon 三表 / gl_vat / bank_recon_v2 / vat_recon_tasks / membership+RLS+migration / clients+categories+buyer_to_client / tenant / archive / rd_usage / 操作日志+员工 → **(高敏后置 · 建议 Zihao 在场)** credits+charge_ocr(钱)/ user+auth(登录)/ ocr_history(OCR 热路径)。
+- **剩余域**(下窗口续 · 由易到难):archive_settings / rd_usage(都很小)/ vat_recon 三表组(vat_report+reconciliation_task+reconciliation_row + 内嵌 client helper)/ membership+RLS+migration(admin)/ clients+categories+buyer_to_client / tenant / 操作日志+员工 → **(高敏后置 · 建议 Zihao 在场)** credits+charge_ocr(钱)/ user+auth(登录)/ ocr_history(OCR 热路径)。**已完成**:email_ingest / erp.oauth / erp.mappings / notification / erp.push / recon 4 表(vat_recon_tasks/gl_vat/bank_recon_v2/bank_recon_v1)。
 
 ---
 

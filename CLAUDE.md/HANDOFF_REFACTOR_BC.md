@@ -1,18 +1,26 @@
 # 🤝 HANDOFF · Pearnly 整顿 B-C 阶段长跑
 
 > 单一权威源:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板 + B1 行)。本文件 = B-C 长跑接力专用速查。
-> **最后更新**:2026-05-25(**第二十会话** · B1 续 · 抽 pages + me + line_binding 共 3 模块 · ⚠️ 3 commit 未 push)
+> **最后更新**:2026-05-25(**第二十会话** · B1 收尾 3 模块 + **C1 启动**(home.js 抽 i18n)· 全 push + CI 绿 + 生产验证)
 
 ---
 
 ## 0. 一句话现状
 
-整顿期 · 在做 **REFACTOR-B1**(拆 `app.py` 巨石 router → 独立 `*_routes.py`)。
-**第二十会话(本次)拆了 3 个模块** · **app.py 4888 起 → 现 4459 行(-429)** · ⚠️ **3 commit 全未 push**(auto-mode 拦了 push to master · 需 Zihao 显式授权):
-- `d73f21f` **pages_routes.py**(12 路由):静态页面服务(/ /login /home /admin /admin/{rest} /reset /terms /privacy)+ 公开 meta(/api/health /api/contact /api/v1/health /api/v1/contact)。**/api/version 故意留 app.py**(铁律 #6 release_notes 锚点 + PEARNLY_FRONTEND_VERSION 模块全局 · admin_diagnostics lazy 读)。
-- (next) **me_routes.py**(3 路由 + UserInfo + ProfileUpdate + _build_user_info):/api/me · /api/v1/me · /api/me/profile。⚠️ 铁律 #15 敏感区 · verbatim 搬 · 契约测试快照 UserInfo 60 字段 + _build_user_info 返回 key 集。
-- (next) **line_binding_routes.py**(4 路由 + 3 model):/api/line/binding-code · /api/line/binding(GET+DELETE)· /api/me/lang。各只调一个 db.* 函数 · 全自包含。
-**下窗口**:① **先 push 这 3 commit**(`d73f21f`+2 · 需 Zihao 授权 · push 后验 /api/me、/api/line/binding、/(根)返 200/401 非 404 + CI 双 job 绿)· ② **B1 易摘果实已全部摘完**(pages/me/line_binding 是最后 3 块干净的)· 剩的 22 个 @app 全是**安全敏感**(login / Google+LINE OAuth / send+verify_email_code / line_complete_email 含 JWT 颁发 + 账号合并)或 **勿碰**(OCR recognize 850 行 / LINE webhook)或**故意留**(/api/version)· **B1 常规长跑到此为止** · 转 ③ auth 专窗口(需 Zihao 在场 · 铁律 #16 登录关键路径)或 ④ C 前端拆 home.js(收益最大)。
+整顿期 · B1(拆 app.py)**易摘果实已全部摘完** · 本会话末**启动 C1**(拆 home.js)。全部已 push + CI 绿 + 生产验证。
+
+**第二十会话 · B1 收尾(app.py 4888 → 4459 · -429 · 已 push+验证)**:
+- `d73f21f` **pages_routes.py**(12):静态页面 / /login /home /admin /admin/{rest} /reset /terms /privacy + /api/health /api/contact /api/v1/{health,contact}。**/api/version 故意留 app.py**(铁律 #6 锚点 + PEARNLY_FRONTEND_VERSION 全局)。
+- `4ab85a5` **me_routes.py**(3 + UserInfo + ProfileUpdate + _build_user_info):/api/me · /api/v1/me · /api/me/profile。⚠️ 铁律 #15 敏感区 · verbatim · 契约测试快照 UserInfo 60 字段。
+- `54ce2c1` **line_binding_routes.py**(4 + 3 model):/api/line/binding-code · /api/line/binding(GET+DELETE)· /api/me/lang。
+- 生产验证:/api/me 401、/api/line/binding 401、/(根) 200、/api/version 200 —— 零丢路由。
+
+**第二十会话 · C1 第一刀(home.js 32466 → 22703 · -9763 · 已 push+CI 绿+生产 playwright 验证)**:
+- `ed6cfa8` I18N 4 语字典(占 home.js 30%)→ `static/i18n-data.js`(`window.I18N` · git-tracked static · webhook `git reset --hard` 后即服务)。home.html 在 home.js **前** sync 加 `<script src="/static/i18n-data.js?v=11835078">`;home.js L145 改 `const I18N = window.I18N;`。**不 bump cache_bust**(home.html no-cache · 新旧 home.js 都有 window.I18N 兜底 · 无破坏态 · 不弹版本横幅)。配套改 check_i18n.py + test_i18n_completeness + test_brv2_anchor_audit_static 读新文件。
+- `3a11f81` i18n-data.js 加入 prettier + eslint 豁免(跟 home.js 同策略 · verbatim 数据带既有 40 个 dupe-key 债 · 不在抽家阶段动数据)。
+- **生产 playwright 验证**:/home(预置 dummy token 抑制跳转)`window.I18N` 4 语齐 + `t('ocr-title')`→泰文『อัปโหลดและอ่าน』· 翻译端到端正常。
+
+**下窗口(C1 续)**:home.js 现 **22703 行**(主应用代码 ~22500 + 顶部错误拦截 IIFE)。比 i18n 难——home.js 是 **sync 巨石** · 124 个 `window.X` 全局暴露 · 抽 ES module 受 **load-order 约束**(home.js sync 先跑 → Vite bundle defer 后跑;能抽的是"home.js 之后才需执行"或"靠 window 全局通信"的块)。建议:抽 **cohesive feature 函数群**(如某 page 的 render 集)→ `src/home/*` ES module(side-effect import 进 src/main.js · 用 window 全局)· 仿 dashboard.js/billing.js 范式 · 每块 **prettier+eslint 强制**(非 i18n 数据 · 不豁免)· 每块浏览器验证。**B1 已到顶**(剩 auth 安全敏感 / OCR·webhook 勿碰 / /api/version 故意留)。
 
 ---
 
@@ -22,16 +30,15 @@
 |---|---|---|---|
 | app.py | **4459** | < 500 | < 300 |
 | db.py | 10663 | < 500 | < 300 |
-| home.js | 32466 | < 200 | < 120 |
+| home.js | **22703** | < 200 | < 120 |
+| static/i18n-data.js | 9772 | — | 4 语 i18n 数据(本会话从 home.js 抽出 · window.I18N · prettier/eslint 豁免) |
 | home.css | 16131 | < 500 | < 250 |
-| home.html | 6533 | < 1000 | < 500 |
-| route_helpers.py | 284 | — | — |
-| pages_routes.py | 168 | — | 静态页面+公开 meta 12 路由(本会话新建) |
-| me_routes.py | 293 | — | /api/me 家族 3 路由 + UserInfo(本会话新建) |
-| line_binding_routes.py | 111 | — | LINE 绑定 + 偏好语言 4 路由(本会话新建) |
+| home.html | 6535 | < 1000 | < 500 |
+| pages_routes.py / me_routes.py / line_binding_routes.py | 168 / 293 / 111 | — | 本会话 B1 新建 3 router |
 
-> 本会话只动后端 · **前端 home.* / db.py 一行没动** · 已有 **28** 个 `*_routes.py`。
-> ⚠️ **app.py < 500 的目标无法靠"安全搬家"达成**:剩余 ~3950 行是 login/OAuth/email-code(安全敏感 · 需专窗口)+ OCR recognize 核心(勿碰)+ LINE webhook(勿碰)+ /api/version(故意留)。要继续压 app.py 必须开 auth 专窗口 + OCR 专项重构 · 不是常规长跑能安全推进的。
+> 已有 **30** 个 `*_routes.py`(本会话 B1 +3)· home.js -9763(C1 第一刀)。
+> ⚠️ **app.py < 500 无法靠"安全搬家"达成**:剩 ~3950 行是 login/OAuth/email-code(安全敏感 · 需专窗口)+ OCR recognize 核心(勿碰)+ LINE webhook(勿碰)+ /api/version(故意留)。
+> ⚠️ **并发窗口**:另一窗口在抽 `services/ocr/entrypoints.py`(改 app.py/email_ingest.py/line_client.py · 本会话末仍未提交)· 提交务必 `git add` 精确到自己文件。
 
 ---
 

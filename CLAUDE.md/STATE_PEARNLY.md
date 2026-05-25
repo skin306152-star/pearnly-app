@@ -1,7 +1,10 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第二十会话 · B1 续**)· **🟢 app.py 再拆 3 模块 · 4888→4459(-429)。pages_routes(静态页面+公开 meta 12 路由)/ me_routes(/api/me 家族 3 路由+UserInfo · 铁律 #15 敏感区 verbatim 搬+字段快照)/ line_binding_routes(LINE 绑定+偏好语言 4 路由)· unit 634 passed · ⚠️ 3 commit 全未 push(auto-mode 拦了 push to master · 需显式授权)。**
-> ⚠️⚠️ **下个窗口:① 先 push 这 3 commit(`d73f21f`+2 · 需 Zihao 授权 · push 后验 /api/me、/api/line/binding、/(根)返 200/401 非 404 + CI 双 job 绿)· ② B1 易摘果实已【全部】摘完(pages/me/line_binding 是最后 3 块干净的)· 剩 22 个 @app 全是【安全敏感】(login/Google+LINE OAuth/email-code/line_complete_email 含 JWT 颁发+账号合并)或【勿碰】(OCR recognize 850 行/LINE webhook)或【故意留】(/api/version)。**app.py < 500 无法靠安全搬家达成** · 要继续压必须开 auth 专窗口(需 Zihao 在场 · 铁律 #16 登录关键路径)或转 C 前端拆 home.js(收益最大)。详见 `HANDOFF_REFACTOR_BC.md` §0/§5。开工 baseline:push 后 `origin/master...HEAD` = 0 0。**
+> **最近更新**:2026-05-25(**第二十会话 · B1 收尾 + C1 启动**)· **🟢 全部已 push + CI 绿 + 生产验证。**
+> **① B1**:app.py 再拆 3 模块 4888→4459(-429)· pages_routes(12)/me_routes(3+UserInfo · 铁律#15 敏感区 verbatim+字段快照)/line_binding_routes(4)· 生产零丢路由(/api/me 401、/(根) 200)。
+> **② C1 第一刀(home.js 拆解启动)**:I18N 4 语字典(9763 行 · 占 home.js 30%)从 home.js 抽到 `static/i18n-data.js`(window.I18N · home.html 在 home.js 前 sync 加载)· **home.js 32466→22703(-9763)**。配套改 check_i18n.py + 2 个 i18n 测试读新文件 + i18n-data.js 加入 prettier/eslint 豁免(跟 home.js 同策略 · verbatim 数据带既有 dupe-key 债)。**生产 playwright 实测**:/home(token 抑制跳转)window.I18N 4 语齐 + `t('ocr-title')`→泰文『อัปโหลดและอ่าน』· 翻译端到端正常。
+> ⚠️⚠️ **下个窗口:① C1 续拆 home.js(现 22703 行 · 主应用代码 ~22500 行)· 比 i18n 难——home.js 是 sync 巨石 · 124 个 window.X 全局暴露 · 抽 ES module 要处理 load-order(只能抽"在 home.js 后跑"或"靠 window 全局通信"的块)· 建议先抽 cohesive feature(如某个 page 的 render 函数群)走 src/home/* · 每块 prettier+eslint 强制(非 i18n 数据)· 浏览器验证。② B1 已到顶(剩全是 auth 安全敏感 / OCR·webhook 勿碰 / 故意留)。详见 `HANDOFF_REFACTOR_BC.md`。开工 baseline:`origin/master...HEAD` = 0 0。**
+> ⚠️ **本仓库有并发窗口**:另一窗口在抽 `services/ocr/entrypoints.py`(改 app.py/email_ingest.py/line_client.py · 未提交)· 提交前务必 `git add` 精确到自己的文件 · 别带上别人的活。
 >
 > **(第十九会话)app.py 拆 6 模块 · 10075→4888**:categories/erp/admin_users 3 router(已 push)+ exception_checks+history 组(`b264790`/`c5af58e`/`1835bce` · 已于本会话前 push · origin 同步)。详见下方原记录。
 >

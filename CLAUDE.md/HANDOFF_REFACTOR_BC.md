@@ -1,7 +1,11 @@
 # 🤝 HANDOFF · Pearnly 整顿 B-C 阶段长跑
 
 > 单一权威源:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板 + B1 行)。本文件 = B-C 长跑接力专用速查。
-> **最后更新**:2026-05-25(**第二十会话** · B1 收尾 3 模块 + **C1 启动**(home.js 抽 i18n)· 全 push + CI 绿 + 生产验证)
+> **最后更新**:2026-05-25(**第二十一会话** · 因并发窗口占用 app.py · B-C 可执行搬家暂停 · 改做 D1 测试补缺 `d65b692`)
+
+> **⚠️ 第二十一会话插曲(D1 · 不是 B-C 搬家)**:开窗时另一窗口正在改 app.py/email_ingest.py/line_client.py(抽 `services/ocr/entrypoints.py` · 共享工作区未提交)。**关键约束**:C1 抽 home.js 可执行块必须 bump `home.js?v=` 来逐出旧缓存(否则旧 home.js + 新 bundle 双绑事件)· 而 `/api/version` = `_read_frontend_version()` 读 `home.js?v=` → bump 必弹版本横幅 → 铁律 #6 要改 app.py 里的 `release_notes` · **但 app.py 被并发窗口占着不能动**。故本窗口避开所有可执行搬家,改做纯测试补缺(`report/vat_excel/recon/admin_diagnostics` 4 个 router 契约测试 · +16 unit · 见 MASTER_PLAN D 行)。**下窗口先 `git status` 看并发窗口是否已合 app.py;合了再回 C1。**
+
+
 
 ---
 

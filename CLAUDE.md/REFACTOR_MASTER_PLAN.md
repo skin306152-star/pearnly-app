@@ -307,7 +307,7 @@
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
 | B 后端 | 🟡 1/10 | B1 **安全部分已到顶** · 已抽 21 router + exception_checks 服务模块 · app.py 10075→**4459**(-56%) | 第二十会话 +3 router(`d73f21f` pages 12 / `4ab85a5` me 3+UserInfo / `54ce2c1` line_binding 4 · 全 push+CI 绿+生产零丢路由)· 已有 **30** 个 *_routes.py · unit →639 · **剩 22 @app 全安全敏感**(login/Google+LINE OAuth/email-code/line_complete_email 含 JWT+账号合并)**或勿碰**(OCR recognize 850 行/LINE webhook)**或故意留**(/api/version)· app.py < 500 无法靠安全搬家达成 · 需 auth 专窗口 · 详见 HANDOFF |
 | C 前端 | 🟡 1/8(C1 进行中) | C1 启动:home.js 32466→**22703**(抽 i18n 9763 行) | 依赖 A1(✅)· 已抽 dashboard + billing(IIFE→ES module)+ **i18n 字典→`static/i18n-data.js`**(`ed6cfa8`+`3a11f81` · push+CI 绿+生产 playwright 验证翻译正常)· 下一步抽 cohesive feature 函数群→`src/home/*` |
-| D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
+| D 测试 | 🟡 1/5(部分 D1) | D1 续:补 4 个 router 守门契约测试 | 第二十一会话 `d65b692`(report/vat_excel/recon/admin_diagnostics · 8 硬门槛 #4 补缺 · +16 unit · push+CI 双 job 绿)· 依赖 A1 |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |
 | F 数据 | ⚪ 0/3 | — | 依赖 B1 |
 | G 文档 | ⚪ 0/7 | — | 随时做 · 不阻塞 |
@@ -319,7 +319,7 @@
 **当前累积成果**(从 2026-05-21 EXECUTION_PLAN 开始):
 - `app.py` 10,075 → **4,459 行**(减 5,616 · B1 拆 21 router + 服务模块 · 安全部分到顶)
 - `home.js` 33,768 → **22,703 行**(C1:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js`)
-- 守门测试:0 → **639 unit** + 1 E2E + CI(lint + test 双 job)全绿
+- 守门测试:0 → **655 unit**(origin · 第二十一会话 +16 router 契约测试 `d65b692`)+ 1 E2E + CI(lint + test 双 job)全绿
 
 ---
 

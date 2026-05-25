@@ -1,6 +1,10 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第二十会话 · B1 收尾 + C1 启动**)· **🟢 全部已 push + CI 绿 + 生产验证。**
+> **最近更新**:2026-05-25(**第二十一会话 · D1 补 router 守门契约测试**)· **🟢 已 push + CI 双 job 绿 + 生产存活。**
+> **第二十一会话(D1 · 测试补缺 · `d65b692`)**:并发窗口正在改 app.py/email_ingest.py/line_client.py(抽 `services/ocr/entrypoints.py` · 共享工作区未提交)→ B1/C1-可执行 暂不可动(C1 抽可执行块须 bump `home.js?v=` → 改 /api/version → 弹横幅 → 要改 app.py release_notes · 而 app.py 被并发窗口占用)。改做**纯测试补缺**(不碰任何并发文件 · 0 部署风险):补齐 8 硬门槛 #4 的 4 个缺口——`report_routes`(此前 0 覆盖)/ `vat_excel_routes` / `recon_routes` / `admin_diagnostics_routes` 的路由 path+method 契约 + prefix + include_router 挂载 + 针对性断言(vat_excel 静态/动态段声明序防吞 · recon 三族 run 入口 · diagnostics /internal/deploy webhook 锚点 + _read_last_500/_require_super_admin 单一来源)。**unit 639→655(origin · +16)** · imports/i18n(0/0)/black/ruff 全绿 · CI 双 job 绿 · /api/version 200(11835078 不变 · 无横幅)。**提交只 `git add` 我那 4 个测试文件 · 没碰并发窗口的活。**
+> ⚠️⚠️ **下个窗口**:① 并发窗口若已合 app.py → 回 **C1 续拆 home.js**(抽 cohesive feature 函数群→`src/home/*` · 须 bump home.js?v= + 4 语 release_notes + 浏览器验证 · 见 HANDOFF §0)· ② 或继续补 D 测试(E2E 核心路径 D1 仍 1/10)· ③ B1 已到顶。**开工前 `git status` 确认并发窗口是否已提交 · 别误带别人的活。**
+>
+> **(第二十会话 · B1 收尾 + C1 启动)**:
 > **① B1**:app.py 再拆 3 模块 4888→4459(-429)· pages_routes(12)/me_routes(3+UserInfo · 铁律#15 敏感区 verbatim+字段快照)/line_binding_routes(4)· 生产零丢路由(/api/me 401、/(根) 200)。
 > **② C1 第一刀(home.js 拆解启动)**:I18N 4 语字典(9763 行 · 占 home.js 30%)从 home.js 抽到 `static/i18n-data.js`(window.I18N · home.html 在 home.js 前 sync 加载)· **home.js 32466→22703(-9763)**。配套改 check_i18n.py + 2 个 i18n 测试读新文件 + i18n-data.js 加入 prettier/eslint 豁免(跟 home.js 同策略 · verbatim 数据带既有 dupe-key 债)。**生产 playwright 实测**:/home(token 抑制跳转)window.I18N 4 语齐 + `t('ocr-title')`→泰文『อัปโหลดและอ่าน』· 翻译端到端正常。
 > ⚠️⚠️ **下个窗口:① C1 续拆 home.js(现 22703 行 · 主应用代码 ~22500 行)· 比 i18n 难——home.js 是 sync 巨石 · 124 个 window.X 全局暴露 · 抽 ES module 要处理 load-order(只能抽"在 home.js 后跑"或"靠 window 全局通信"的块)· 建议先抽 cohesive feature(如某个 page 的 render 函数群)走 src/home/* · 每块 prettier+eslint 强制(非 i18n 数据)· 浏览器验证。② B1 已到顶(剩全是 auth 安全敏感 / OCR·webhook 勿碰 / 故意留)。详见 `HANDOFF_REFACTOR_BC.md`。开工 baseline:`origin/master...HEAD` = 0 0。**

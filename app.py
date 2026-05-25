@@ -30,11 +30,6 @@ from db import (
     update_last_login,
     increment_user_monthly_usage,
     insert_ocr_history,
-    list_ocr_history,
-    get_ocr_history_detail,
-    update_ocr_history_pages,
-    delete_ocr_history_with_pdf_paths,  # v114 · PDF 留底
-    get_history_pdf_info,  # v114
     find_ocr_by_hash,
 )
 import pdf_storage  # v114 · PDF 留底存储模块
@@ -66,8 +61,9 @@ from admin_users_routes import (
     router as admin_users_router,
 )  # REFACTOR-B1 · 超管用户/员工 15 路由 · 2026-05-25
 
-# REFACTOR-B1(2026-05-25)· OCR 异常检测 + 智能提醒链 · OCR/LINE 上传路由调用
-from exception_checks import _async_run_exception_checks, _parse_money
+# REFACTOR-B1(2026-05-25)· OCR 异常检测链 · OCR/LINE 上传路由调用(_parse_money 随 history 搬走)
+from exception_checks import _async_run_exception_checks
+from history_routes import router as history_router  # REFACTOR-B1 · OCR 历史 10 路由 · 2026-05-25
 from settings_routes import (
     router as settings_router,
 )  # REFACTOR-B1 · 归档/查重设置 5 路由 · 2026-05-25
@@ -1098,6 +1094,7 @@ app.include_router(settings_router)  # REFACTOR-B1 · 归档/查重设置 5 路�
 app.include_router(categories_router)  # REFACTOR-B1 · 分类 1 路由(2026-05-25)
 app.include_router(erp_router)  # REFACTOR-B1 · ERP 推送 15 路由(2026-05-25)
 app.include_router(admin_users_router)  # REFACTOR-B1 · 超管用户/员工 15 路由(2026-05-25)
+app.include_router(history_router)  # REFACTOR-B1 · OCR 历史 10 路由(2026-05-25)
 app.include_router(bank_recon_router)  # REFACTOR-B1 · 银行对账 11 路由(2026-05-25)
 app.include_router(admin_migration_router)  # REFACTOR-B1 · 超管迁移/RLS 7 路由(2026-05-25)
 app.include_router(admin_cost_router)  # REFACTOR-B1 · 超管成本/收入/监控 10 路由(2026-05-25)
@@ -3104,10 +3101,6 @@ async def v1_contact():
 # ============================================================
 
 
-class HistoryUpdateRequest(BaseModel):
-    pages: List[Any] = Field(..., description="完整 pages 数组(会计修改后的)")
-
-
 # ============================================================
 # v118.20.1 · 异常栏(Exceptions)规则检查 + 智能提醒(LINE)整条链已抽到
 # exception_checks.py(REFACTOR-B1 · 2026-05-25)· EXC_RULE_* 常量 / _parse_money /
@@ -3124,221 +3117,13 @@ class HistoryUpdateRequest(BaseModel):
 # _tid 已搬到 route_helpers.py(REFACTOR-B1 · 2026-05-25)· 顶部 from route_helpers import _tid
 
 
-def _check_history_access(user: dict):
-    """v0.8 · 所有 plan 都能看历史,保留天数不同"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_view_history"):
-        raise HTTPException(403, detail="history.upgrade_required")
-    return int(p.get("history_retention_days", 7))
-
-
-@app.get("/api/history")
-async def history_list(
-    request: Request,
-    keyword: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
-    client_id: Optional[int] = None,
-):
-    user = get_current_user_from_request(request)
-    retention = _check_history_access(user)
-    # 安全限制
-    limit = max(1, min(int(limit), 100))
-    offset = max(0, int(offset))
-    return list_ocr_history(
-        user_id=str(user["id"]),
-        retention_days=retention,
-        keyword=keyword.strip() if keyword else None,
-        limit=limit,
-        offset=offset,
-        tenant_id=_tid(user),
-        client_id=client_id,  # v118.28.0 · 顶栏客户切换器过滤
-        restrict_client_ids=db.get_visible_client_ids_for_user(user),  # v118.28.1 · 员工分配
-    )
-
-
-@app.get("/api/history/{record_id}")
-async def history_detail(record_id: str, request: Request):
-    user = get_current_user_from_request(request)
-    _check_history_access(user)
-    detail = get_ocr_history_detail(str(user["id"]), record_id, tenant_id=_tid(user))
-    if not detail:
-        raise HTTPException(404, detail="history.not_found")
-    return detail
-
-
-@app.put("/api/history/{record_id}")
-async def history_update(record_id: str, req: HistoryUpdateRequest, request: Request):
-    user = get_current_user_from_request(request)
-    _check_history_access(user)
-    if not req.pages:
-        raise HTTPException(400, detail="history.empty_pages")
-    ok = update_ocr_history_pages(str(user["id"]), record_id, req.pages, tenant_id=_tid(user))
-    if not ok:
-        raise HTTPException(404, detail="history.not_found")
-    # v118.18 · 推荐分类「学习」· 用户改了 category 就记忆「seller → category」
-    try:
-        for p in req.pages or []:
-            if p.get("is_duplicate") or p.get("is_copy"):
-                continue
-            f = p.get("fields") or {}
-            seller = (f.get("seller_name") or "").strip()
-            cat = (f.get("category") or "").strip()
-            if seller and cat:
-                db.upsert_supplier_category(
-                    seller_name=seller,
-                    category=cat,
-                    user_id=str(user["id"]),
-                    tenant_id=_tid(user),
-                )
-            break  # 只学主页 · 多页发票其他页是副本不学
-    except Exception as _ue:
-        logger.warning(f"upsert supplier_category 失败(已忽略): {_ue}")
-    # v118.21.3 · 字段改完后重跑规则 · 让异常自动消失或更新
-    rechecked = False
-    try:
-        # 取主页字段(跟 OCR 时的 hook 输入一致)
-        primary = None
-        for p in req.pages or []:
-            if p.get("is_duplicate") or p.get("is_copy"):
-                continue
-            primary = p
-            break
-        if primary:
-            f = primary.get("fields") or {}
-            seller_name = (f.get("seller_name") or "").strip() or None
-            invoice_no = (f.get("invoice_number") or f.get("invoice_no") or "").strip() or None
-            total_amount = _parse_money(f.get("total_amount"))
-            # 取 history 的当前 confidence(更新 pages 不会影响 confidence · 复用现值)
-            detail_now = get_ocr_history_detail(str(user["id"]), record_id, tenant_id=_tid(user))
-            confidence = (detail_now or {}).get("confidence")
-            # 1. 删该 history 下所有 pending 异常
-            db.delete_pending_exceptions_by_history(
-                record_id, tenant_id=_tid(user), user_id=str(user["id"])
-            )
-            # 2. 同步重跑规则(duplicate 不重检 · 因为依赖 OCR 时的指纹比对 · 此处保留为 None)
-            await _async_run_exception_checks(
-                history_id=record_id,
-                user_id=str(user["id"]),
-                tenant_id=_tid(user),
-                seller_name=seller_name,
-                invoice_no=invoice_no,
-                total_amount=total_amount,
-                confidence=confidence,
-                duplicate=None,
-                fields=f,
-            )
-            rechecked = True
-    except Exception as _re:
-        logger.warning(f"history_update rechek hook failed (id={record_id}): {_re}")
-    return {"ok": True, "rechecked": rechecked}
-
-
-@app.delete("/api/history/{record_id}")
-async def history_delete(record_id: str, request: Request):
-    user = get_current_user_from_request(request)
-    _check_history_access(user)
-    # v114 · 删除时同步清掉留底的 PDF 文件
-    deleted, pdf_paths = delete_ocr_history_with_pdf_paths(
-        str(user["id"]), [record_id], tenant_id=_tid(user)
-    )
-    if deleted == 0:
-        raise HTTPException(404, detail="history.not_found")
-    # v114 · 检查这个 PDF 是否还被其他记录引用(多发票拆分场景共享同一 PDF)· 没人引用才真正删
-    for p in pdf_paths:
-        try:
-            still_used = False
-            from db import get_cursor
-
-            with get_cursor() as cur:
-                cur.execute("SELECT 1 FROM ocr_history WHERE pdf_storage_path = %s LIMIT 1", (p,))
-                still_used = cur.fetchone() is not None
-            if not still_used:
-                pdf_storage.delete_pdf(p)
-        except Exception as e:
-            logger.warning(f"清理 PDF 文件失败(已忽略): {e}")
-    return {"ok": True}
-
-
-# v114 · PDF 留底下载接口 · 用户可下载自己识别过的原 PDF
-@app.get("/api/history/{record_id}/pdf")
-async def history_pdf_download(record_id: str, request: Request):
-    from fastapi.responses import FileResponse
-
-    user = get_current_user_from_request(request)
-    _check_history_access(user)
-    info = get_history_pdf_info(str(user["id"]), record_id, tenant_id=_tid(user))
-    if not info:
-        raise HTTPException(404, detail="history.pdf_not_found")
-    abs_path = pdf_storage.get_pdf_abs_path(info["pdf_storage_path"])
-    if not abs_path or not abs_path.exists():
-        raise HTTPException(404, detail="history.pdf_missing")
-    fn = info.get("filename") or "invoice.pdf"
-    if not fn.lower().endswith(".pdf"):
-        fn = fn + ".pdf"
-    return FileResponse(
-        path=str(abs_path),
-        media_type="application/pdf",
-        filename=fn,
-    )
-
-
-# v0.16 · 批量删除历史记录
-class HistoryBatchDeleteRequest(BaseModel):
-    ids: List[str] = Field(..., min_length=1, max_length=500)
-
-
-@app.post("/api/history/batch-delete")
-async def history_batch_delete(req: HistoryBatchDeleteRequest, request: Request):
-    user = get_current_user_from_request(request)
-    _check_history_access(user)
-    uid = str(user["id"])
-    # v114 · 一次性删除 + 拿到所有要清理的 PDF 路径
-    deleted, pdf_paths = delete_ocr_history_with_pdf_paths(uid, list(req.ids), tenant_id=_tid(user))
-    failed = max(0, len(req.ids) - deleted)
-    # v114 · 检查每个 PDF 是否还被其他记录引用 · 没人引用才物理删
-    if pdf_paths:
-        try:
-            from db import get_cursor
-
-            for p in set(pdf_paths):
-                try:
-                    with get_cursor() as cur:
-                        cur.execute(
-                            "SELECT 1 FROM ocr_history WHERE pdf_storage_path = %s LIMIT 1", (p,)
-                        )
-                        still_used = cur.fetchone() is not None
-                    if not still_used:
-                        pdf_storage.delete_pdf(p)
-                except Exception as e:
-                    logger.warning(f"[batch-delete] 清理 PDF 失败 {p}: {e}")
-        except Exception as e:
-            logger.warning(f"[batch-delete] 清理 PDF 阶段失败(已忽略): {e}")
-    return {"ok": True, "deleted": deleted, "failed": failed}
-
-
-# v1 别名
-@app.get("/api/v1/history")
-async def v1_history_list(
-    request: Request, keyword: Optional[str] = None, limit: int = 50, offset: int = 0
-):
-    return await history_list(request, keyword, limit, offset)
-
-
-@app.get("/api/v1/history/{record_id}")
-async def v1_history_detail(record_id: str, request: Request):
-    return await history_detail(record_id, request)
-
-
-@app.put("/api/v1/history/{record_id}")
-async def v1_history_update(record_id: str, req: HistoryUpdateRequest, request: Request):
-    return await history_update(record_id, req, request)
-
-
-@app.delete("/api/v1/history/{record_id}")
-async def v1_history_delete(record_id: str, request: Request):
-    return await history_delete(record_id, request)
+# ============================================================
+# OCR 历史记录 10 路由(list/detail/update/delete/pdf/batch-delete + v1 别名)
+# + HistoryUpdateRequest/HistoryBatchDeleteRequest model + _check_history_access
+# 已抽到 history_routes.py(REFACTOR-B1 · 2026-05-25 · 步骤 B)· 顶部
+# from history_routes import router as history_router · app.include_router(history_router)。
+# history PUT 编辑后重跑规则用 exception_checks._async_run_exception_checks(步骤 A 已搬)。
+# ============================================================
 
 
 # ============================================================

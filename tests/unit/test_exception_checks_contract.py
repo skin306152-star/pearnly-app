@@ -17,11 +17,19 @@ import exception_checks
 
 class ExceptionChecksContractTests(unittest.TestCase):
     def test_single_source_with_app(self):
-        """app.py 调的就是 exception_checks 的同一份对象 · 单一来源"""
+        """消费者调的就是 exception_checks 的同一份对象 · 单一来源。
+        _async_run_exception_checks:app.py OCR/LINE 上传路由仍调(app 再导出)。
+        _parse_money:history PUT 用 · REFACTOR-B1 步骤 B 后随 history_routes 搬出 ·
+        断言跟到新消费者 history_routes(app.py 已不再 import)。"""
         import app
+        import history_routes
 
         self.assertIs(app._async_run_exception_checks, exception_checks._async_run_exception_checks)
-        self.assertIs(app._parse_money, exception_checks._parse_money)
+        self.assertIs(history_routes._parse_money, exception_checks._parse_money)
+        self.assertIs(
+            history_routes._async_run_exception_checks,
+            exception_checks._async_run_exception_checks,
+        )
 
     def test_rule_code_constants(self):
         """EXC_RULE_* 规则码值不变(DB rule_code 契约 · 改了会和历史数据/前端对不上)"""

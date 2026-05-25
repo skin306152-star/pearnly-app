@@ -37,7 +37,18 @@ export default [
         languageOptions: {
             ecmaVersion: 2022,
             sourceType: 'module',
-            globals: { ...globals.browser, ...globals.node },
+            globals: {
+                ...globals.browser,
+                ...globals.node,
+                // REFACTOR-C1 · home.js(sync · 先于本 bundle 执行)暴露的跨文件全局 ·
+                // 阶段 C src/home 模块按需引用(共享 realm 全局环境 · 运行期解析得到)·
+                // home.js 完全模块化后逐步退出。t/showToast 是 window 函数 · _userInfo/currentRoute
+                // 是 home.js 顶层 let(不在 window 上 · 不能写成 window.X)· 故声明为只读全局。
+                t: 'readonly',
+                showToast: 'readonly',
+                _userInfo: 'readonly',
+                currentRoute: 'readonly',
+            },
         },
         rules: {
             // 存量未用变量较多 · 起步只 warn 不 fail(后续 stage 收紧)

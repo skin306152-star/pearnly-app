@@ -1,0 +1,71 @@
+# -*- coding: utf-8 -*-
+"""
+REFACTOR-C1 守门测试 · 测试中心(Test Center)从 home.js 抽到 src/home/test-center.js。
+
+home.js 是巨石 · 无法 jsdom 单测 · 用静态文本契约锁定抽迁(防回归 / 防重复):
+  1. src/home/test-center.js 存在 · 定义入口 window.loadTestCenterPage(+ _tcOnNewLog/_tcApplyVisibility)
+  2. src/main.js 通过 side-effect import 引入了 test-center.js(否则 bundle 不含它 → 入口丢失)
+  3. home.js 不再 *定义* 测试中心 IIFE(window.loadTestCenterPage = 已删)· 但仍保留 *调用方*
+     (路由 window.loadTestCenterPage() + 错误拦截器 window._tcOnNewLog())· 防重复定义双跑
+  4. home.html 仍在 home.js 之后加载 main.js bundle(加载序约束 · test-center 依赖 home.js 全局)
+
+8 硬门槛 #4:每拆一个模块必带守门测试。
+"""
+
+import os
+import unittest
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+
+class TestCenterExtractionStaticTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(ROOT, "home.js"), "r", encoding="utf-8") as f:
+            cls.home_js = f.read()
+        with open(os.path.join(ROOT, "src", "main.js"), "r", encoding="utf-8") as f:
+            cls.main_js = f.read()
+        with open(os.path.join(ROOT, "src", "home", "test-center.js"), "r", encoding="utf-8") as f:
+            cls.tc_js = f.read()
+        with open(os.path.join(ROOT, "home.html"), "r", encoding="utf-8") as f:
+            cls.home_html = f.read()
+
+    def test_module_defines_entry(self):
+        """新模块定义测试中心入口 + 跨文件 window 钩子"""
+        self.assertIn("window.loadTestCenterPage", self.tc_js)
+        self.assertIn("window._tcOnNewLog", self.tc_js)
+        self.assertIn("window._tcApplyVisibility", self.tc_js)
+
+    def test_main_imports_test_center(self):
+        """src/main.js side-effect import test-center.js · 否则 Vite bundle 不含它"""
+        self.assertIn("./home/test-center.js", self.main_js)
+
+    def test_home_js_no_longer_defines_test_center(self):
+        """home.js 不再 *定义* 测试中心(防与 bundle 重复定义双跑)。
+        注意:不能用裸 'window.loadTestCenterPage =' 判 · 它是 'window.loadTestCenterPage ===' 的前缀
+        (路由 L832 typeof 检查)· 必须判定义形态 '= function' / '= async'。"""
+        self.assertNotIn("window.loadTestCenterPage = function", self.home_js)
+        self.assertNotIn("window.loadTestCenterPage = async", self.home_js)
+        self.assertNotIn("window._tcApplyVisibility = ", self.home_js)
+        # 定义形态(= function)只应出现在新模块里
+        self.assertIn("window.loadTestCenterPage = function", self.tc_js)
+        # 中文标题注释也应随 IIFE 移走(只在新模块里)
+        self.assertNotIn("测试中心(Test Center · TC)", self.home_js)
+        self.assertIn("测试中心(Test Center · TC)", self.tc_js)
+
+    def test_home_js_keeps_callers(self):
+        """home.js 仍保留调用方(路由分发 + 错误拦截器钩子)· 经 window 调新模块入口"""
+        self.assertIn("window.loadTestCenterPage()", self.home_js)
+        self.assertIn("window._tcOnNewLog(", self.home_js)
+
+    def test_home_html_load_order(self):
+        """home.js(sync)必须先于 main.js bundle(defer)· test-center 依赖 home.js 全局"""
+        idx_home = self.home_html.find("/static/home.js?v=")
+        idx_bundle = self.home_html.find("/static/dist/main.js?v=")
+        self.assertGreater(idx_home, 0, "home.js script 标签缺失")
+        self.assertGreater(idx_bundle, 0, "main.js bundle script 标签缺失")
+        self.assertLess(idx_home, idx_bundle, "home.js 必须排在 main.js bundle 之前")
+
+
+if __name__ == "__main__":
+    unittest.main()

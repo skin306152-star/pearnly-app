@@ -8,7 +8,8 @@
 
 import './home/dashboard.js';
 import './home/billing.js';
+import './home/test-center.js'; // REFACTOR-C1 · 测试中心(skin only)
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
-    console.info('[pearnly] vite bundle loaded · dashboard + billing');
+    console.info('[pearnly] vite bundle loaded · dashboard + billing + test-center');
 }

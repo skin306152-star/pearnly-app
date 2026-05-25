@@ -223,7 +223,9 @@ class RunGlvatTests(unittest.TestCase):
                 )
         self.assertEqual((table, rid), ("gl_vat_task", 606))
         # PNG VAT 报告 → 走 pdf/OCR 计费分支
-        kinds = [c.args[2] if len(c.args) > 2 else c.kwargs.get("kind") for c in charge.call_args_list]
+        kinds = [
+            c.args[2] if len(c.args) > 2 else c.kwargs.get("kind") for c in charge.call_args_list
+        ]
         self.assertIn("pdf", kinds)
 
     def test_glvat_no_charge_when_exempt(self):

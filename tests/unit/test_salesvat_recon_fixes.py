@@ -151,9 +151,19 @@ class SalesvatOcrCountTests(unittest.TestCase):
             mock.patch.object(
                 VEX,
                 "extract_invoices_parallel",
-                return_value=[{"ok": True, "filename": "i1.pdf"}, {"ok": False, "filename": "i2.pdf"}],
+                return_value=[
+                    {"ok": True, "filename": "i1.pdf"},
+                    {"ok": False, "filename": "i2.pdf"},
+                ],
             ),
-            mock.patch.object(VEX, "build_excel", return_value=(b"XLSX", {"n_total": 1, "n_ok": 1, "n_diff": 0, "diff_amount_total": 0.0})),
+            mock.patch.object(
+                VEX,
+                "build_excel",
+                return_value=(
+                    b"XLSX",
+                    {"n_total": 1, "n_ok": 1, "n_diff": 0, "diff_amount_total": 0.0},
+                ),
+            ),
             mock.patch("vat_excel_routes._save_excel_file", return_value="/tmp/x.xlsx"),
             mock.patch("db.create_vat_recon_task", side_effect=_capture_create),
             mock.patch("db.get_cursor"),

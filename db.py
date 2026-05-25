@@ -1838,7 +1838,9 @@ def ensure_erp_push_logs_status_constraint():
             """)
             rows = cur.fetchall() or []
             if not rows:
-                logger.info("ℹ erp_push_logs has no status CHECK constraint (skipped_dup OK · skip)")
+                logger.info(
+                    "ℹ erp_push_logs has no status CHECK constraint (skipped_dup OK · skip)"
+                )
                 return
             current_def = " ".join((r["def"] or "").lower() for r in rows)
             if "skipped_dup" in current_def:

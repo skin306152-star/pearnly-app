@@ -17,7 +17,7 @@ import re
 import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
 from vat_report_parser import parse_vat_report  # 复用但不修改
 from field_comparator import (
@@ -879,7 +879,9 @@ def extract_invoices_batched_parallel(
         try:
             fut.result(timeout=_batch_timeout)
         except FuturesTimeout:
-            logger.error(f"[vex.batch.parallel] 批硬超时({_batch_timeout}s) · start={s} · 落 ok=False")
+            logger.error(
+                f"[vex.batch.parallel] 批硬超时({_batch_timeout}s) · start={s} · 落 ok=False"
+            )
             for j, f in enumerate(c):
                 if results[s + j] is None:
                     results[s + j] = {

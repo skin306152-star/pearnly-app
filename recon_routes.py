@@ -17,7 +17,6 @@ from auth import get_current_user_from_request
 from vat_report_parser import parse_vat_report
 from reconciliation_matcher import run_matching
 from field_comparator import compare_all_fields
-from vat_file_classifier import classify_file
 from vat_excel_exporter import export_recon_task
 from vat_ai_analyzer import analyze_diff
 
@@ -263,7 +262,6 @@ def _run_match_and_save(task_id, invoice_rows, report_rows):
 # ======================================================================
 
 
-
 class CreateTaskBody(BaseModel):
     client_id: int
     period_year: int
@@ -358,7 +356,6 @@ async def run_recon(
 # ======================================================================
 # 屏 B · 批量智能识别
 # ======================================================================
-
 
 
 @router.post("/batch_process")
@@ -970,19 +967,31 @@ async def gl_vat_run(
                 if ext in _excel_exts:
                     _excel_units += _db_chg_glv._excel_char_count_estimate(b, fn)
                 else:
-                    _pdf_units += _pdf_billing_units(_count_pages_glv(b) or 1, len(r.get("rows") or []))
+                    _pdf_units += _pdf_billing_units(
+                        _count_pages_glv(b) or 1, len(r.get("rows") or [])
+                    )
             if _pdf_units > 0:
                 asyncio.create_task(
                     asyncio.to_thread(
-                        _db_chg_glv.charge_ocr_async, str(user.get("id")), _tid_chg_glv,
-                        "pdf", _pdf_units, None, f"收入对账 PDF · {_pdf_units} 页",
+                        _db_chg_glv.charge_ocr_async,
+                        str(user.get("id")),
+                        _tid_chg_glv,
+                        "pdf",
+                        _pdf_units,
+                        None,
+                        f"收入对账 PDF · {_pdf_units} 页",
                     )
                 )
             if _excel_units > 0:
                 asyncio.create_task(
                     asyncio.to_thread(
-                        _db_chg_glv.charge_ocr_async, str(user.get("id")), _tid_chg_glv,
-                        "excel", _excel_units, None, f"收入对账 Excel · {_excel_units} 字符",
+                        _db_chg_glv.charge_ocr_async,
+                        str(user.get("id")),
+                        _tid_chg_glv,
+                        "excel",
+                        _excel_units,
+                        None,
+                        f"收入对账 Excel · {_excel_units} 字符",
                     )
                 )
         except Exception as _ce:  # noqa: BLE001

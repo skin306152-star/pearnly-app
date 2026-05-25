@@ -297,7 +297,9 @@ def set_needs_mapping(job_id: str, payload: dict) -> bool:
                 WHERE id = %s::uuid
                 """,
                 (
-                    _json.dumps({"mapping": p.get("mapping") or {}}, ensure_ascii=False, default=str),
+                    _json.dumps(
+                        {"mapping": p.get("mapping") or {}}, ensure_ascii=False, default=str
+                    ),
                     p.get("result_table"),
                     str(p["result_id"]) if p.get("result_id") is not None else None,
                     p.get("error_code") or "needs_mapping",

@@ -70,23 +70,29 @@ def _side_fail_signal(stmt_results, stmt_data, gl_results, gl_data, failed_id):
         if r.get("ok"):
             continue
         if r.get("needs_mapping") and r.get("mapping_request"):
-            return ("__needs_mapping__", {
-                "mapping": {"file": fn, **(r.get("mapping_request") or {})},
-                "result_table": "bank_recon_v2_task",
-                "result_id": failed_id,
-                "error_code": "needs_mapping",
-            })
+            return (
+                "__needs_mapping__",
+                {
+                    "mapping": {"file": fn, **(r.get("mapping_request") or {})},
+                    "result_table": "bank_recon_v2_task",
+                    "result_id": failed_id,
+                    "error_code": "needs_mapping",
+                },
+            )
     # ② 无表格结构可修 → 明确失败 · 取第一条失败结果的 error_code(前端翻译成友好文案)
     code = "parse_failed"
     for r, _ in paired:
         if not r.get("ok"):
             code = r.get("error_code") or "parse_failed"
             break
-    return ("__failed__", {
-        "result_table": "bank_recon_v2_task",
-        "result_id": failed_id,
-        "error_code": code,
-    })
+    return (
+        "__failed__",
+        {
+            "result_table": "bank_recon_v2_task",
+            "result_id": failed_id,
+            "error_code": code,
+        },
+    )
 
 
 def _parallel(fn: Callable, items: List, max_workers: int = 4) -> List:
@@ -311,11 +317,14 @@ def run_bank_recon(
     if not stmt_rows or not gl_rows:
         failed_id = _save_failed_task(bc=bank_code, stmt_rc=len(stmt_rows), gl_rc=len(gl_rows))
         # 解析 ok 但合并后 0 行(罕见)· 无 mapping_request 可弹 → 明确失败 · 绝不显示完成
-        return ("__failed__", {
-            "result_table": "bank_recon_v2_task",
-            "result_id": failed_id,
-            "error_code": "no_rows",
-        })
+        return (
+            "__failed__",
+            {
+                "result_table": "bank_recon_v2_task",
+                "result_id": failed_id,
+                "error_code": "no_rows",
+            },
+        )
 
     # 4. 对账
     recon_rows, summary = bank_reconcile(
@@ -471,7 +480,12 @@ def run_glvat(
                 )
             if _excel_units > 0:
                 db.charge_ocr_async(
-                    user_id, tenant_id, "excel", _excel_units, None, f"收入对账 Excel · {_excel_units} 字符"
+                    user_id,
+                    tenant_id,
+                    "excel",
+                    _excel_units,
+                    None,
+                    f"收入对账 Excel · {_excel_units} 字符",
                 )
         except Exception as _ce:  # noqa: BLE001
             logger.warning(f"💳 glvat async charge skip: {_ce}")

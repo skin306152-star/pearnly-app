@@ -11,6 +11,8 @@
 
 **主计划**:[`CLAUDE.md/REFACTOR_MASTER_PLAN.md`](REFACTOR_MASTER_PLAN.md)(60+ task · 9 阶段 A-I · 单一权威源)
 
+**Codex 协作分流规则**:[`CLAUDE.md/CODEX_COLLAB_RULES.md`](CODEX_COLLAB_RULES.md)(Zihao 说「继续」时先分流:测试项目 / 重整长跑文案)
+
 **接力 agent 进窗口顺序**:
 1. 读本文件(看铁律 #18-20 段)
 2. 读 `STATE_PEARNLY.md`(头部"整顿模式"段)

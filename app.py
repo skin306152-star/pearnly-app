@@ -60,6 +60,7 @@ from email_ingest_routes import (
     router as email_ingest_router,
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25
 from rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税务 4 路由 · 2026-05-25
+from categories_routes import router as categories_router  # REFACTOR-B1 · 分类 1 路由 · 2026-05-25
 from settings_routes import (
     router as settings_router,
 )  # REFACTOR-B1 · 归档/查重设置 5 路由 · 2026-05-25
@@ -1136,6 +1137,7 @@ app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2
 app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(2026-05-25)
 app.include_router(rd_router)  # REFACTOR-B1 · 泰国 RD 税务 4 路由(2026-05-25)
 app.include_router(settings_router)  # REFACTOR-B1 · 归档/查重设置 5 路由(2026-05-25)
+app.include_router(categories_router)  # REFACTOR-B1 · 分类 1 路由(2026-05-25)
 app.include_router(bank_recon_router)  # REFACTOR-B1 · 银行对账 11 路由(2026-05-25)
 app.include_router(admin_migration_router)  # REFACTOR-B1 · 超管迁移/RLS 7 路由(2026-05-25)
 app.include_router(admin_cost_router)  # REFACTOR-B1 · 超管成本/收入/监控 10 路由(2026-05-25)
@@ -7237,14 +7239,8 @@ async def admin_cascade_delete(user_id: str, req: CascadeDeleteRequest, request:
 # ============================================================
 
 
-@app.get("/api/categories")
-async def api_list_used_categories(request: Request):
-    """列出当前 tenant/user 用过的所有 category(给前端 datalist 自动补全 + 统计)"""
-    user = get_current_user_from_request(request)
-    tid = _tid(user)
-    cats = db.list_used_categories(user_id=str(user["id"]), tenant_id=tid, limit=30)
-    n_mappings = db.count_supplier_mappings(user_id=str(user["id"]), tenant_id=tid)
-    return {"categories": cats, "supplier_count": n_mappings}
+# 已抽到 categories_routes.py(REFACTOR-B1 · 2026-05-25 · /api/categories 单路由)·
+# 顶部 from categories_routes import router as categories_router · app.include_router(categories_router)
 
 
 # ============================================================

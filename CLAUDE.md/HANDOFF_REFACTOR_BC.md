@@ -1,14 +1,15 @@
 # 🤝 HANDOFF · Pearnly 整顿 B-C 阶段长跑
 
 > 单一权威源:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板 + B1 行)。本文件 = B-C 长跑接力专用速查。
-> **最后更新**:2026-05-25(第十七会话收尾)
+> **最后更新**:2026-05-25(第十八会话 · 修复插曲收尾 · 下窗口回归 B1)
 
 ---
 
 ## 0. 一句话现状
 
 整顿期 · 在做 **REFACTOR-B1**(拆 `app.py` 巨石 router → 独立 `*_routes.py`)。
-第十七会话抽了 6 个 router + 搬了 1 个 helper(`_tid`)· **app.py 8589 → 7263 行(-1326)** · **7 个 commit 全绿** · ⚠️ **全留本地未 push**(领先 origin/master 7 个)。
+第十七会话抽了 6 个 router + 搬了 1 个 helper(`_tid`)· **app.py 8589 → 7263 行(-1326)** · **7 个 commit 全绿 · ✅ 已 push**(`faaa536..569b534` + docs `aa2e6e3`,origin/master 与 HEAD 同步)。
+**第十八会话是修复插曲**(codex 报告驱动的 3 批生产回归修复 · 见 STATE 头部)· **未动 app.py 拆分进度** · 下窗口直接回 §5 续拆纠缠组。
 
 ---
 
@@ -42,12 +43,12 @@
 
 ---
 
-## 3. ⚠️ 未 push · 下窗口第一件事
+## 3. ✅ B1 已 push + 已生产验证(第十八会话修复插曲一并部署)
 
-- 7 个 commit(`faaa536..569b534`)全在本地 master · **领先 origin/master 7 个 · 0 behind**。
-- 下窗口:`git push origin master`。**会被 auto-mode 权限分类器拦** · 需 Zihao 当场授权(或加 `Bash(git push:*)` 权限规则免询问)。
-- push 后照例验:`/api/version` 200 + 抽几个搬出的路由确认 401/422(非 404)= 零丢路由。CI 看 `gh run list --branch master`。
-- 本窗口**未跑生产验证**(没 push · 没部署)· 全部是本地守门全绿。
+- 第十七会话 7 个 commit(`faaa536..569b534`)+ docs `aa2e6e3` **已 push origin/master**(随第十八会话修复部署一并上线 · `origin/master` 与 HEAD 同步 `0/0`)。
+- 其上又叠了第十八会话 3 批修复 commit(`672f748`/`0daebf6`/`eb87429`/`15241bd`/`575767f`)· 全已 push + 部署(版本 11835078)。
+- **下窗口第一件事不再是 push** · 而是回 §5 续拆 B1 纠缠组(history / erp-push / admin-users)· 开工前 baseline:`git status` 干净 + `git rev-list --left-right --count origin/master...HEAD` 应为 `0 0`。
+- B1 搬出的路由生产验证:`/api/version` 200 · 抽搬出路由确认 401/422(非 404)= 零丢路由(第十六会话已验范式 · 第十七组同范式)。
 
 ---
 

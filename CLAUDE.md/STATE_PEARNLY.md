@@ -1,9 +1,18 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十七会话**)· **🟢 整顿 REFACTOR-B1 长跑续 · app.py 拆 router · 8589→7263 行(-1326 · 6 新 router 模块 + 47 路由 + _tid 搬家)· 7 commit 全绿 · ⚠️ 全留本地未 push(领先 origin/master 7 个)。**
-> ⚠️⚠️ **下个窗口:① 先把本地 7 个 commit push master(需 Zihao 当场授权或加 `Bash(git push:*)` 权限规则)· ② 继续 B1 拆剩下的纠缠组(history / erp-endpoints-push / admin-users · 都需先搬共享 helper · 详见 HANDOFF)· 或 Zihao 在场开 C 前端拆 home.js。**
+> **最近更新**:2026-05-25(**第十八会话 · 修复插曲**)· **🟢 codex 测试报告驱动的 3 批回归修复全部上线(GL CSV / 销项税 6 项+旧流程清理 / 收入对账 M3+ERP 6 项)· 部署 11835078 · 全量单测 596 passed · 浏览器冒烟通过。B1 的 7 个 commit 早已随部署 push(origin/master 与 HEAD 同步 0/0)。**
+> ⚠️⚠️ **下个窗口:回归整顿 `CLAUDE.md/REFACTOR_MASTER_PLAN.md` · 续 REFACTOR-B1 拆剩下的纠缠组(history / erp-endpoints-push / admin-users · 都需先搬共享 helper · 详见 `HANDOFF_REFACTOR_BC.md` §5)· 或 Zihao 在场开 C 前端拆 home.js。修复主线本会话告一段落。**
 >
-> **(第十七会话)整顿 B1 · app.py 拆 router 长跑续(纯后端搬家 · 0 业务逻辑改 · 7 commit 全留本地 · ⚠️ 未 push)**:
+> **(第十八会话 · 修复插曲)codex 测试报告驱动的 3 批回归修复(打断 B1 冻结期 · 已全部上线 + 部署)**:
+> 来源 = Zihao 转的 codex 实测报告。整顿期原则上 0 新功能,但生产回归 bug 优先于重构。本批修复均"修一类不修一处 + 守门全绿 + 4 语 release_notes + 部署后留 codex 生产复测"。
+> - **GL CSV 整侧失败不再静默完成(`672f748` + 前端 `0daebf6`)**:GL/VAT 任一侧 0 收入行原被吞成"完成" → 改 needs_mapping / failed 失败分流 · cache_bust 11835074→11835075。
+> - **销项税对账 6 项回归修复 + 旧流程清理(`eb87429` + `15241bd`)**:正常匹配发票不再误判差异 · 支持 Excel/CSV/Word 发票与报告 · 跨月报告提示不静默合并 · 图片识别加超时保护 · 删旧客户期间流程 + 批量分类残留(P2)。
+> - **收入对账 M3 + ERP 推送 6 项(`575767f` · 本会话)**:① M3-1 成功后历史列表立即刷新(`_loadHistory`)· ② M3-2 失败改 `__failed__` sentinel 带 error_code → worker 透传 → 前端 4 语可读文案(复用 bank 基础设施)· ③ M3-3 计费漏洞修复(gl_vat 按量扣费 · 图片/PDF 按 OCR 页 · Excel 按字符 · 闭掉免费入口)· ④ ERP-1 list/get endpoint SELECT 补 user_id(不再误报 `ERR_NO_CUSTOMER_MAPPING`)· ⑤ ERP-2 `ensure_erp_push_logs_status_constraint` 放开 status CHECK 接受 `skipped_dup` + insert 失败显性 `log_write_failed`(防重日志落库)· ⑥ ERP-3 核实 reset-password 故意 410 · 前端无按钮调用 · intended 无需改。
+> - **守门 + 部署**:全量单测 596 passed · py 语法/导入全绿 · 浏览器冒烟(GlVatRecon 模块/三 tab/设置弹窗 零页面报错)· cache_bust→11835078 · `/api/version` 4 语 release_notes 已覆盖式更新(只留本次:收入对账历史即时刷新 + 失败具体原因)· 生产已落地 11835078。
+> - **待 codex 生产复测**:① 收入对账成功后历史即现/前缀错显原因/GL Excel+VAT PNG 扣费链 · ② ERP 自动推送 success(不再 mapping 误报)+ 重复推送 skipped_dup 落 /api/erp/logs。
+>
+> ---
+> **(第十七会话)整顿 B1 · app.py 拆 router 长跑续(纯后端搬家 · 0 业务逻辑改 · 7 commit · ✅ 已随后续部署 push · origin 同步)**:
 > 模式 = 接力自主长跑「每完成一个安全 slice 本地 commit · 不 push · 只拆边界清晰组 · 纠缠太深跳过」。本会话从 app.py 抽出 6 个 router + 搬 1 个 helper:
 > - **bank_recon_routes.py**(`faaa536`)· 11 路由 `/api/bank-recon/*`(上传/会话/匹配/候选/客户绑定/dev seed)· _TEST_USER_IDS 随组搬 · 自包含(仅 db + auth)。
 > - **admin_migration_routes.py**(`b33dd58`)· 7 路由 `/api/admin/{migration,rls}/*`(超管多租户迁移/RLS)· 仅 _require_super_admin + db。

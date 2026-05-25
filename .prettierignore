@@ -27,6 +27,10 @@ playwright-report/
 # ─────────────────────────────────────────────────────────────
 # REFACTOR-C1 · home.js 33k 行 IIFE → 拆 src/home/*.js
 home.js
+# REFACTOR-C1(2026-05-25)· 从 home.js verbatim 抽出的 4 语 i18n 数据(9772 行 · window.I18N)·
+# 跟 home.js 同策略豁免:verbatim 抽家阶段不重排格式(prettier 会改 9772 行 + 毁 git blame)·
+# 重复 key 去重 / 格式化留后续 i18n 专项;check_i18n.py 仍强制 4 语 key 完整性。
+static/i18n-data.js
 # REFACTOR-C2 · home.css → 拆 component CSS
 home.css
 # REFACTOR-C3 · home.html → 组件化

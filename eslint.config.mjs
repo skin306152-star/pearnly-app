@@ -19,6 +19,10 @@ export default [
             '_pkg_tmpstatic/**',
             'probes/**',
             'home.js', // REFACTOR-C1 拆解目标
+            // REFACTOR-C1(2026-05-25)· 从 home.js verbatim 抽出的 4 语 i18n 数据 ·
+            // 继承 home.js 既有的重复 key 债(no-dupe-keys · 后者覆盖前者 · 运行期无害)·
+            // 跟 home.js 同策略豁免 · 重复 key 去重留后续专项(verbatim 抽家阶段不动数据)
+            'static/i18n-data.js',
             'home.html',
             'login.html',
             'pearnly_nav_prototype_final.html',

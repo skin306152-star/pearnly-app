@@ -62,7 +62,7 @@ LINE_I18N = {
             "请到网站「自动化 → LINE Bot」获取绑定码 · 发给我即可。"
         ),
         "image_soon": "📷 收到图片 · 图片识别功能即将上线 · 敬请期待!",
-        "unsupported": "暂只支持文字(绑定码)和图片(即将上线)· 谢谢!",
+        "unsupported": "支持文字(绑定码)以及发票文件:PDF / 图片 / Excel / CSV / Word / TXT。",
     },
     "en": {
         "welcome": (
@@ -100,7 +100,7 @@ LINE_I18N = {
             "Go to 'Automation → LINE Bot' on the website to get a binding code."
         ),
         "image_soon": "📷 Image received · recognition feature coming soon!",
-        "unsupported": "Only text (binding codes) and images (coming soon) are supported · thanks!",
+        "unsupported": "Send text binding codes or invoice files: PDF / images / Excel / CSV / Word / TXT.",
     },
     "th": {
         "welcome": (
@@ -138,7 +138,7 @@ LINE_I18N = {
             "ไปที่ 'ระบบอัตโนมัติ → LINE Bot' บนเว็บไซต์เพื่อรับรหัสผูกบัญชี"
         ),
         "image_soon": "📷 รับรูปแล้ว · ฟีเจอร์อ่านรูปกำลังมา · โปรดรอ!",
-        "unsupported": "รองรับเฉพาะข้อความ (รหัสผูกบัญชี) และรูป (กำลังมา) · ขอบคุณ!",
+        "unsupported": "รองรับรหัสผูกบัญชีและไฟล์ใบกำกับ: PDF / รูปภาพ / Excel / CSV / Word / TXT",
     },
     "ja": {
         "welcome": (
@@ -176,7 +176,7 @@ LINE_I18N = {
             "サイトの「自動化 → LINE Bot」でコードを取得してください。"
         ),
         "image_soon": "📷 画像を受信しました · 画像認識機能は近日公開!",
-        "unsupported": "テキスト(紐付けコード)と画像(近日公開)のみ対応しています · ありがとうございます!",
+        "unsupported": "紐付けコードと請求書ファイル(PDF / 画像 / Excel / CSV / Word / TXT)に対応しています。",
     },
 }
 

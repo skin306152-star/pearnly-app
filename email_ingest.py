@@ -25,6 +25,16 @@ from email.header import decode_header
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 
+from services.ocr.entrypoints import (
+    SUPPORTED_OCR_EXTENSIONS,
+    all_pages_not_invoice,
+    billing_quote,
+    charge_successful_ocr,
+    content_hash,
+    get_cached_history,
+    run_pipeline_for_file,
+)
+
 logger = logging.getLogger(__name__)
 
 # ============================================================
@@ -121,8 +131,8 @@ IMAP_PRESETS = {
 # IMAP 抓取主函数(骨架 · 真正的抓取逻辑)
 # ============================================================
 
-# 支持的附件扩展名(OCR 能处理的)
-_SUPPORTED_EXTS = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
+# 支持的附件扩展名(与网页上传 OCR 入口保持一致)
+_SUPPORTED_EXTS = SUPPORTED_OCR_EXTENSIONS
 
 # 首次抓取时向前追溯多少天
 INITIAL_DAYS_BACK = 7
@@ -249,60 +259,44 @@ def _ingest_one_attachment(
     """
     import db
 
-    # PDF 或图片 · 图片需要先转 PDF(复用 jsPDF 方案不行 · 用 PIL + reportlab 简化:只支持 PDF)
     ext = os.path.splitext(filename.lower())[1]
-    if ext != ".pdf":
-        # v0.17 轮 2 暂只支持 PDF 附件 · 图片走下轮扩展
-        logger.info(f"[email_ingest] 跳过非 PDF 附件 · {filename}")
+    if ext not in _SUPPORTED_EXTS:
+        logger.info(f"[email_ingest] 跳过不支持附件 · {filename}")
         return None
 
-    # 用户限额/quota 检查
     user = db.find_user_by_id(user_id)
     if not user:
         logger.warning(f"[email_ingest] user_id={user_id} 不存在")
         return None
 
-    # 页数检查(复用 ocr_engine)
-    try:
-        from services.ocr.pdf_utils import count_pdf_pages
+    # 文件缓存命中:直接复用历史,不扣费(全入口统一契约)
+    file_hash = content_hash(content)
+    cached = get_cached_history(user, file_hash)
+    if cached:
+        logger.info(
+            f"[email_ingest] 命中文件缓存 · {filename} · "
+            f"hash={file_hash[:12]} hid={cached.get('id')}"
+        )
+        return str(cached.get("id"))
 
-        page_count = count_pdf_pages(content)
-        if page_count == 0:
-            logger.warning(f"[email_ingest] 无法解析 PDF · {filename}")
-            return None
-        if page_count > 50:
-            logger.warning(f"[email_ingest] PDF 页数超限 · {filename} ({page_count}页)")
-            return None
-    except Exception as e:
-        logger.error(f"[email_ingest] 读取 PDF 页数失败: {e}")
+    quote = billing_quote(user, content, filename, max_pages=50)
+    if not quote.get("allowed"):
+        logger.warning(
+            f"[email_ingest] billing/file gate blocked · {filename} · " f"{quote.get('error_code')}"
+        )
         return None
 
-    # Gemini API key · 优先用户自带 · 否则系统 key(若月付额度够)
+    # Gemini API key · 优先用户自带 · 否则系统 key
     user_key = db.get_user_gemini_key(user_id)
-    monthly_quota = user.get("monthly_quota")
-    if not user_key:
-        # 月付用户 · 检查配额
-        if monthly_quota is None:
-            logger.warning(f"[email_ingest] 用户 {user_id} 未配 API key 且非月付 · 跳过")
-            return None
-        used = db.get_user_monthly_usage(user_id)
-        if used + page_count > monthly_quota:
-            logger.warning(
-                f"[email_ingest] 用户 {user_id} 额度不足 · 跳过 · used={used} quota={monthly_quota}"
-            )
-            return None
-
-    # 调 OCR · 新 pipeline 唯一路径
     api_key = user_key or os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         logger.error("[email_ingest] 没有可用的 Gemini API key")
         return None
 
     try:
-        from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
 
-        _pipe_res = _pipeline_run(content, max_pages=50, api_key=api_key)
+        _pipe_res = run_pipeline_for_file(content, filename, api_key=api_key, max_pages=50)
         result = pipeline_result_to_legacy_dict(_pipe_res)
         _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
         logger.info(
@@ -321,13 +315,9 @@ def _ingest_one_attachment(
         return None
 
     pages = result["pages"]
-
-    # 扣配额(月付用户)
-    if not user_key and monthly_quota is not None:
-        try:
-            db.increment_user_monthly_usage(user_id, page_count)
-        except Exception as e:
-            logger.warning(f"[email_ingest] 扣配额失败: {e}")
+    if all_pages_not_invoice(pages):
+        logger.warning(f"[email_ingest] 判定非发票 · 不入库不扣费 · {filename}")
+        return None
 
     # 算置信度(简化 · 关键字段齐全=high · 否则 medium)
     confidence = "medium"
@@ -359,17 +349,25 @@ def _ingest_one_attachment(
     source_ref = f"{account_id}:{uid}"
     history_id = db.insert_ocr_history(
         user_id=user_id,
+        tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
         filename=filename,
-        page_count=page_count,
+        page_count=int(quote.get("page_count") or result.get("page_count") or len(pages)),
         pages=pages,
         confidence=confidence,
         elapsed_ms=int(result.get("elapsed_ms") or 0),
         file_size_kb=len(content) // 1024,
-        file_hash=None,  # 邮件附件不用文件 hash 缓存(防止用户重发同文件跳过)
+        file_hash=file_hash,
         archive_name=archive_name,
         category_tag=category_tag,
         source="email",
         source_ref=source_ref,
+    )
+
+    charge_successful_ocr(
+        user,
+        quote,
+        history_id,
+        f"Email OCR · {filename} · {str(history_id or '')[:8]}",
     )
 
     # email_ingest cost 埋点(pipeline 唯一路径,100% 记录)

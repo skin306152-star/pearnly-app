@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+import unittest
+from pathlib import Path
+from unittest import mock
+
+import db
+import email_ingest
+from services.ocr import entrypoints
+
+
+class OcrEntrypointContractTests(unittest.TestCase):
+    def test_all_entrypoints_share_supported_file_set(self):
+        required = {
+            ".pdf",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".webp",
+            ".tiff",
+            ".tif",
+            ".bmp",
+            ".gif",
+            ".xlsx",
+            ".xls",
+            ".xlsm",
+            ".csv",
+            ".tsv",
+            ".docx",
+            ".doc",
+            ".txt",
+        }
+        self.assertTrue(required.issubset(entrypoints.SUPPORTED_OCR_EXTENSIONS))
+        self.assertEqual(email_ingest._SUPPORTED_EXTS, entrypoints.SUPPORTED_OCR_EXTENSIONS)
+
+    def test_billing_quote_images_use_pdf_page_pricing(self):
+        user = {"id": "u1", "tenant_id": "t1"}
+        with mock.patch("db.get_billing_status_combined") as status:
+            status.return_value = {
+                "allowed": True,
+                "is_exempt": False,
+                "balance_thb": 100,
+                "pages_used_this_month": 0,
+            }
+            quote = entrypoints.billing_quote(user, b"image-bytes", "invoice.png")
+        self.assertTrue(quote["allowed"])
+        self.assertEqual(quote["kind"], "pdf")
+        self.assertEqual(quote["units"], 1)
+        self.assertEqual(quote["page_count"], 1)
+
+    def test_billing_quote_tables_use_excel_character_pricing(self):
+        user = {"id": "u1", "tenant_id": "t1"}
+        with (
+            mock.patch("db.get_billing_status_combined") as status,
+            mock.patch("db._excel_char_count_estimate", return_value=1234) as chars,
+        ):
+            status.return_value = {
+                "allowed": True,
+                "is_exempt": False,
+                "balance_thb": 100,
+                "pages_used_this_month": 0,
+            }
+            quote = entrypoints.billing_quote(user, b"a,b\n1,2\n", "invoice.csv")
+        self.assertTrue(quote["allowed"])
+        self.assertEqual(quote["kind"], "excel")
+        self.assertEqual(quote["units"], 1234)
+        chars.assert_called_once()
+
+    def test_charge_successful_ocr_skips_cache_or_exempt_only_by_quote(self):
+        user = {"id": "u1", "tenant_id": "t1"}
+        with mock.patch("db.charge_ocr_async") as charge:
+            entrypoints.charge_successful_ocr(
+                user,
+                {"is_exempt": False, "kind": "pdf", "units": 2},
+                "hid-1",
+                "OCR test",
+            )
+        charge.assert_called_once_with("u1", "t1", "pdf", 2, "hid-1", "OCR test")
+
+        with mock.patch("db.charge_ocr_async") as charge:
+            entrypoints.charge_successful_ocr(
+                user,
+                {"is_exempt": True, "kind": "pdf", "units": 2},
+                "hid-1",
+                "OCR test",
+            )
+        charge.assert_not_called()
+
+    def test_duplicate_semantics_document_cache_as_only_no_charge_path(self):
+        self.assertTrue(hasattr(db, "find_ocr_by_hash"))
+        self.assertTrue(hasattr(entrypoints, "get_cached_history"))
+
+    def test_web_upload_checks_cache_before_balance_gate(self):
+        app_py = Path(__file__).resolve().parents[2] / "app.py"
+        src = app_py.read_text(encoding="utf-8")
+        cache_pos = src.index("cached = _ocr_get_cached(user, file_hash)")
+        billing_pos = src.index('db.get_billing_status_combined(str(user.get("id")), _tid(user))')
+        self.assertLess(
+            cache_pos,
+            billing_pos,
+            "缓存命中是唯一不扣费路径,必须先于余额闸;否则 0 余额用户无法复用旧结果。",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

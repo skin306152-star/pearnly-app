@@ -30,7 +30,6 @@ from db import (
     update_last_login,
     increment_user_monthly_usage,
     insert_ocr_history,
-    find_ocr_by_hash,
 )
 import pdf_storage  # v114 · PDF 留底存储模块
 from auth import (
@@ -112,6 +111,15 @@ from route_helpers import (  # REFACTOR-B1 · 公共鉴权/日志/校验 helper(
     _plan_permissions,
     _record_500,
     _tid,
+)
+from services.ocr.entrypoints import (
+    all_pages_not_invoice as _ocr_all_pages_not_invoice,
+    billing_quote as _ocr_billing_quote,
+    charge_successful_ocr as _ocr_charge_success,
+    content_hash as _ocr_content_hash,
+    get_cached_history as _ocr_get_cached,
+    is_supported_ocr_file as _ocr_is_supported_file,
+    run_pipeline_for_file as _ocr_run_pipeline_file,
 )
 
 try:
@@ -1870,44 +1878,11 @@ async def ocr_recognize(
     used_today = None
     used_month = 0
 
-    # v118.35.0.21 · Credits 余额前置检查(v0.20 重做 · 1 次 SELECT · 修连接池超时)
-    _billing = {
-        "allowed": True,
-        "is_exempt": True,
-        "balance_thb": 0.0,
-        "pages_used_this_month": 0,
-        "error_code": None,
-    }
-    try:
-        _billing = db.get_billing_status_combined(str(user.get("id")), _tid(user))
-        if not _billing.get("allowed") and not _billing.get("is_exempt"):
-            if _ext in PDF_EXTENSIONS:
-                _est_cost = float(
-                    db.estimate_pdf_cost_thb(_billing.get("pages_used_this_month", 0), page_count)
-                )
-            else:
-                _chars = db._excel_char_count_estimate(content, file.filename or "")
-                _est_cost = float(db.estimate_excel_cost_thb(_chars))
-            raise HTTPException(
-                402,
-                detail={
-                    "code": "insufficient_balance",
-                    "balance": _billing.get("balance_thb", 0.0),
-                    "estimated_cost": _est_cost,
-                    "pages_used_this_month": _billing.get("pages_used_this_month", 0),
-                },
-            )
-    except HTTPException:
-        raise
-    except Exception as _be:
-        logger.warning(f"[credits] billing pre-check skip(error tolerated): {_be}")
-
     # 4.5. 文件指纹缓存 · v0.8 改:所有 plan 都启用(按 user_id 隔离,不跨用户)
     # v92 · 缓存窗口从 24h 扩到 30 天(默认) · 月末复核上月票也能命中 · 省 Gemini 配额
-    import hashlib
-
-    file_hash = hashlib.sha256(content).hexdigest()
-    cached = find_ocr_by_hash(str(user["id"]), file_hash, tenant_id=_tid(user))
+    # v118.47 · 缓存必须先于余额闸:缓存命中不产生新 OCR 成本,余额为 0 也应可复用旧结果。
+    file_hash = _ocr_content_hash(content)
+    cached = _ocr_get_cached(user, file_hash)
     if cached:
         logger.info(f"  🎯 命中文件缓存 (hash={file_hash[:12]}..., 省额度)")
 
@@ -2006,6 +1981,38 @@ async def ocr_recognize(
                 "monthly_quota": monthly_quota,
             },
         }
+
+    # v118.35.0.21 · Credits 余额前置检查(v0.20 重做 · 1 次 SELECT · 修连接池超时)
+    _billing = {
+        "allowed": True,
+        "is_exempt": True,
+        "balance_thb": 0.0,
+        "pages_used_this_month": 0,
+        "error_code": None,
+    }
+    try:
+        _billing = db.get_billing_status_combined(str(user.get("id")), _tid(user))
+        if not _billing.get("allowed") and not _billing.get("is_exempt"):
+            if _ext in PDF_EXTENSIONS or _ext in IMAGE_EXTENSIONS:
+                _est_cost = float(
+                    db.estimate_pdf_cost_thb(_billing.get("pages_used_this_month", 0), page_count)
+                )
+            else:
+                _chars = db._excel_char_count_estimate(content, file.filename or "")
+                _est_cost = float(db.estimate_excel_cost_thb(_chars))
+            raise HTTPException(
+                402,
+                detail={
+                    "code": "insufficient_balance",
+                    "balance": _billing.get("balance_thb", 0.0),
+                    "estimated_cost": _est_cost,
+                    "pages_used_this_month": _billing.get("pages_used_this_month", 0),
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception as _be:
+        logger.warning(f"[credits] billing pre-check skip(error tolerated): {_be}")
 
     # 5. 选引擎(v103 · 永远走降级链 · _choose_engine 保留兼容)
     engine_name = _choose_engine(plan, user)
@@ -3980,9 +3987,10 @@ async def _handle_line_event(ev: dict):
             await _handle_line_text(line_user_id, reply_token, text, ev)
             return
 
-        # 图片消息:v0.19 T1 轮 3 · OCR 闭环
-        if msg_type == "image":
+        # 图片 / 文件消息:统一走 OCR 入口(支持 PDF / 图片 / Excel / CSV / Word / TXT)
+        if msg_type in ("image", "file"):
             message_id = msg.get("id")
+            filename = msg.get("fileName") if msg_type == "file" else f"line_{message_id}.jpg"
             # 检查是否绑定
             bound_user = db.get_user_by_line_user_id(line_user_id) if line_user_id else None
             if not bound_user:
@@ -4013,6 +4021,7 @@ async def _handle_line_event(ev: dict):
                     bound_user=bound_user,
                     line_user_id=line_user_id,
                     message_id=message_id,
+                    filename=filename,
                     lang=lang,
                 )
             )
@@ -4107,64 +4116,41 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
 # ============================================================
 
 
-async def _handle_line_image_ocr(bound_user: dict, line_user_id: str, message_id: str, lang: str):
+async def _handle_line_image_ocr(
+    bound_user: dict,
+    line_user_id: str,
+    message_id: str,
+    lang: str,
+    filename: str = None,
+):
     """
-    异步处理 LINE 图片消息:
-      1. 下载图片
-      2. 包装成 PDF 喂 OCR(复用 gemini 引擎)
+    异步处理 LINE 图片/文件消息:
+      1. 下载内容
+      2. 按网页上传同一支持清单喂 OCR pipeline
       3. 插入 ocr_history(source='line_bot')
-      4. 扣配额
+      4. 非缓存成功识别后按 credits 定价扣费
       5. push 结果给用户
     """
     try:
         # 1. 下载
-        img_bytes = line_client.download_message_content(message_id)
-        if not img_bytes:
+        file_bytes = line_client.download_message_content(message_id)
+        filename = filename or f"line_{message_id}.jpg"
+        if not file_bytes:
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_download"))
             return
+        if not _ocr_is_supported_file(filename):
+            line_client.push_text(line_user_id, line_client.t_line(lang, "unsupported"))
+            return
 
-        # 2. 权限 / 配额检查(复用网页逻辑)
+        # 2. 用户 / credits 检查(复用网页入口的 credits 逻辑)
         user_fresh = db.find_user_by_id(bound_user["id"])
         if not user_fresh:
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
             return
 
-        # 所有账号都走 Gemini · 区别只在 key 归属(月付共用 / 买断自带)和配额
-        ok, err_code, quota_info = _check_user_quota(user_fresh)
-        if not ok:
-            if err_code in ("quota.exhausted", "ocr.monthly_limit_exceeded"):
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_quota"))
-            elif err_code == "quota.need_api_key":
-                # 买断账号没填 key
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_need_key"))
-            else:
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_quota"))
-            return
-
-        # 月付用户:本次 1 页 · 预先检查是否超额
-        if quota_info.get("mode") == "monthly":
-            mq = quota_info.get("monthly_quota") or 0
-            um = quota_info.get("used_this_month") or 0
-            if um + 1 > mq:
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_quota"))
-                return
-
-        # 3. 图片 → PDF
-        pdf_bytes = line_client.image_to_pdf_bytes(img_bytes)
-        if not pdf_bytes:
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
-            return
-
-        # 3.5 · 文件指纹缓存查找(v118.22.0.3 · 与网页入口对齐)
-        # LINE 同图重传 / 用户传过的票再发 → 命中则跳 Gemini · 省配额
-        import hashlib as _hashlib_l
-
-        file_hash = _hashlib_l.sha256(pdf_bytes).hexdigest()
-        cached = find_ocr_by_hash(
-            str(user_fresh["id"]),
-            file_hash,
-            tenant_id=str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None,
-        )
+        # 3. 文件指纹缓存查找:命中则跳 OCR + 跳扣费
+        file_hash = _ocr_content_hash(file_bytes)
+        cached = _ocr_get_cached(user_fresh, file_hash)
         if cached:
             logger.info(f"[line_ocr] 命中文件缓存 (hash={file_hash[:12]}...) hid={cached['id']}")
             # 跑异常 hook(同网页缓存命中分支 · 不重复扣配额)
@@ -4216,6 +4202,15 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str, message_id
             line_client.push_text(line_user_id, reply_txt)
             return
 
+        quote = _ocr_billing_quote(user_fresh, file_bytes, filename, max_pages=50)
+        if not quote.get("allowed"):
+            code = quote.get("error_code")
+            if code == "insufficient_balance":
+                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_quota"))
+            else:
+                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
+            return
+
         # 4. OCR · 新 pipeline 唯一路径
         own_key = (
             user_fresh.get("gemini_api_key") or user_fresh.get("custom_gemini_api_key") or ""
@@ -4227,10 +4222,14 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str, message_id
             return
 
         try:
-            from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
             from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
 
-            _pipe_res = _pipeline_run(pdf_bytes, max_pages=1, api_key=api_key)
+            _pipe_res = _ocr_run_pipeline_file(
+                file_bytes,
+                filename,
+                api_key=api_key,
+                max_pages=50,
+            )
             result = pipeline_result_to_legacy_dict(_pipe_res)
             _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
             logger.info(
@@ -4246,18 +4245,22 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str, message_id
         if not pages:
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
             return
+        if _ocr_all_pages_not_invoice(pages):
+            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
+            return
 
         # 5. 写 history(source='line_bot')
         # file_hash 已在 3.5 计算(v118.22.0.3)
         try:
             hid = insert_ocr_history(
                 user_id=str(user_fresh["id"]),
-                filename=f"line_{message_id}.pdf",
-                page_count=len(pages),
+                tenant_id=str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None,
+                filename=filename,
+                page_count=int(quote.get("page_count") or result.get("page_count") or len(pages)),
                 pages=pages,
                 confidence=result.get("confidence") or "unknown",
                 elapsed_ms=result.get("elapsed_ms") or 0,
-                file_size_kb=len(pdf_bytes) // 1024,
+                file_size_kb=len(file_bytes) // 1024,
                 file_hash=file_hash,
                 source="line_bot",
                 source_ref=line_user_id,
@@ -4265,6 +4268,21 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str, message_id
         except Exception as e:
             logger.warning(f"[line_ocr] 写 history 失败(不影响回复): {e}")
             hid = None
+        if hid:
+            try:
+                import asyncio as _asyncio_charge_l
+
+                _asyncio_charge_l.create_task(
+                    _asyncio_charge_l.to_thread(
+                        _ocr_charge_success,
+                        user_fresh,
+                        quote,
+                        str(hid),
+                        f"LINE OCR · {filename} · {str(hid)[:8]}",
+                    )
+                )
+            except Exception as _chg_e:
+                logger.warning(f"[line_ocr] credits charge dispatch failed: {_chg_e}")
 
         # LINE 入口 cost 埋点(pipeline 唯一路径,100% 记录)
         try:
@@ -4342,20 +4360,7 @@ async def _handle_line_image_ocr(bound_user: dict, line_user_id: str, message_id
             except Exception as _e:
                 logger.warning(f"[line_ocr] 异常检测入队失败(不影响推送): {_e}")
 
-        # 6. 扣配额(月付)· v87 多租户支持
-        qm = quota_info.get("mode")
-        if qm == "shared" and user_fresh.get("tenant_id"):
-            try:
-                db.increment_tenant_monthly_usage(str(user_fresh["tenant_id"]), n=1)
-            except Exception as e:
-                logger.warning(f"[line_ocr] 扣租户配额失败: {e}")
-        elif qm == "monthly":
-            try:
-                increment_user_monthly_usage(str(user_fresh["id"]), n=1)
-            except Exception as e:
-                logger.warning(f"[line_ocr] 扣配额失败: {e}")
-
-        # 7. 推送识别结果
+        # 6. 推送识别结果
         reply_txt = line_client.format_ocr_result_for_line(lang, pages, invoice_count=len(pages))
         line_client.push_text(line_user_id, reply_txt)
         logger.info(f"[line_ocr] 完成 · user={user_fresh['id']} · hid={hid}")

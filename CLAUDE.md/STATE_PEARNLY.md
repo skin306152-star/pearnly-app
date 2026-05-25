@@ -1,6 +1,34 @@
 # 📊 STATE · Pearnly 项目状态
 
 > ════════════════════════════════════════════════════════════
+> **【第二十五会话 · 交接 · 2026-05-26】通用 ERP 推送凭证 + B4 工作模式切换器接入 + P0 同页多票漏识别根因修复(全部已 push + 部署)**
+> ════════════════════════════════════════════════════════════
+> **进窗口先读**:本块 + 第二十四会话块 + `AGENTS.md` + `docs/agent/*` + `docs/refactor/*`。
+> **当前前端版本**:home.js/home.css/i18n-data.js/main.js `?v=11835084`。
+>
+> **① 本会话已完成并上线(master · 自动部署):**
+> - **通用 ERP 推送日志能力**(`d305a30` + 收尾 `6d77f20`):新 `services/erp/external_ref.py` 在日志 API 层派生 `external_doc_no/external_doc_id/external_url`(+ adapter 提示码)· 不动状态机 · MR.ERP 从 `response_body.mrerp_bill_no` 映射 · Xero/QuickBooks/custom 预留。前端推送日志列表加「ERP 单号」列 + 详情升级为「推送凭证弹窗」(成功:发票号/ERP 系统/ERP 单号带复制/Pearnly 客户/卖家/金额/推送时间/耗时 + MR.ERP 去哪搜提示 + 技术详情默认折叠;失败:错误原因+建议处理+去异常/补映射/重试)。contract test `tests/unit/test_erp_external_ref_contract.py`(12)。
+> - **B4 workspace 工作模式切换器接入 home.js**(`6747de4` + 遗留 `10ca7ea` + 图标线性化 `4c70901` + owner 判定修 `6d77f20`):右上角唯一入口从「买方过滤」换成「工作模式」(个人事务/客户业务)· 取代并删除旧 ClientSwitcher(348 行)· api 包装器带 `X-Workspace-Client-Id` 头 · 自包含选择/新建客户弹层 in `src/home/workspace-switcher.js`。
+> - **P0 同页多票漏识别根因修复**(`c97ba0c`):**图片型 PDF 一页印多张发票,旧 pipeline 一页只产 1 张 → 静默漏票**。根因 = Layer2 prompt「Output ONE JSON object」+ 无候选检测。修:ThaiInvoice 加 `additional_invoices`;L2/L3 prompt 支持同页多票;legacy_adapter 展开成多 page → grouper 产 N 票;`_count_invoice_no_candidates` 候选>提取 → 先触发 L3 视觉复读(加强 OCR),L3 后仍短缺才标人工核对(`needs_review` + `missed_invoice_warnings` 回前端提示)。**真账号实测闭环:SINCERE.pdf 出 3 票(IV69/00179+00189+00199,金额自洽)**。golden `tests/unit/test_multi_invoice_per_page.py`(8)。**原则(Zihao)**:少让人工兜底 · 优先加强自身 OCR · 人工只在票据本身残缺/涂抹 OCR 实在没办法时。
+> - **i18n 双源 + 弹窗布局收尾**(`6d77f20`):修「UI 显示 raw i18n key」真因——`t()` 读 `window.I18N`(`static/i18n-data.js`),之前只 bump 了 home.js?v= 没 bump i18n-data.js?v= → 旧缓存字典 → 回退显示 key。本会话四资源统一 bump 11835084。owner 判定修:home.js `/api/me` 加载只设局部 `_userInfo` 没设 `window._userInfo` → switcher 把 owner 当员工错显「请联系老板分配」· 已在各赋值点同步 `window._userInfo` + `_isOwner()` 放宽。
+>
+> **② 未完成 / 下窗口接力(重要):**
+> - **🔴 P1 · MR.ERP 推送正确性(未做 · 需 live MR.ERP 才能闭环验证)**:已静态定位根因,**未改代码**(怕动唯一付费用户核心推送路径未验证就上)。两宗:
+>   1. `INV2026030004`→`SI690301-614203`:MR.ERP 里商品行全变 `code 123 / สมุดฉีก`(疑似占位/seed 商品被静默复用,或铁律#9「PHP success ≠ 写库」导致 fallback)。查 `services/erp/mrerp_product_sync.py` `_layer4_auto_create` 保存后是否校验。
+>   2. `INV2026030005`→`SI690302-370756`:OCR 买方是个人/另一方,MR.ERP 客户却是 `บริษัท อิ๊กลู สตูดิโอ / P26050029`(客户错配)。根因:`mrerp_customer_sync.py` 匹配**纯按名字**(listing 不含 tax_id,见文件头注释)· 解析顺序 L0 cache(by name)→ **L1 db mapping(按 client_id 复用 · 无名字复核)** → L2 exact name → **L3 fuzzy@0.82**。stale/污染 mapping、fuzzy 误配、by-name cache 撞名都会静默推到错客户。
+>   - **Zihao 拍板原则**:customer_code 不能仅凭 code 复用 · **必须校验 name(+ tax 若有)匹配 · 不匹配就不能继续静默推送**。
+>   - **拟修(fail-safe)**:复用/解析出 customer_code 后,用 listing 名字复核 vs 买方;不匹配 → 抛 `ERR_CUSTOMER_NAME_MISMATCH` 响亮 FailedRow(把「静默错推」变「响亮失败让用户修」)· 商品 save 后同样校验。+ guard 单测。
+>   - **闭环前置(需 Zihao)**:① 我可先 SSH prod 只读查这两张的 `erp_push_logs` + `mappings['clients']` 实际值,确认是 stale-mapping / fuzzy-FP / code 撞;② 真闭环要重开测试 endpoint `dad6fb0f`(当前 enabled=false)真推一张验证 = prod 写操作,**需 Zihao 点头**。Zihao 在【上一条消息】已表示要先澄清再做 · 下窗口先问清「只读查 vs 直接上 fail-safe vs 暂缓」。
+> - **🟡 B2 登录后强制选择客户弹窗:未做 · 不要直接上**。Zihao 明确:**先输出交互方案过审再做**。当前只有右上角工作模式切换器 + 业务动作惰性提示 `requireWorkspace`(签名已修 `2525a74`/`10ca7ea` 思路 · 但**尚未接线到任何业务入口**)。下窗口若做:先写交互方案(何时弹、能否跳过/个人模式、owner vs 员工差异、与买方识别不混)给 Zihao。
+>
+> **③ 关键踩坑备忘(下窗口必看,省得重踩):**
+> - **i18n 是双源**:`t()` 只读 `window.I18N`(= `static/i18n-data.js`)。在 home.js 用 `t('新key')` 必须**同时把新 key 加进 i18n-data.js 并 bump `i18n-data.js?v=`**(跟 home.js?v= 一起),否则旧缓存字典 → UI 显示 raw key。`scripts/check_i18n.py --strict` 只验 i18n-data.js(0/0 才算过)。
+> - **CRLF 铁律扩面**:`home.html` / `home.js` / `static/i18n-data.js` 全是 CRLF。**用 python 改这些文件必须 read/write binary 保 CRLF**(本会话用 python text-mode 写 i18n-data.js 触发整文件 LF 污染 19868 行 diff,已用 byte 脚本修回)。优先用 Edit 工具(保 CRLF)。
+> - **git 提交**:用 PowerShell tool + `git commit -F <file>`(消息写临时文件)。**不要用 Bash tool 的 `git commit -m @'...'`**——会在 subject 前留一个 `@` 字符(本会话踩过 `10ca7ea` · 已是 origin 既成,未强推纠正:cosmetic)。
+> - **window._userInfo**:bundle 模块(`src/home/*.js`)读 `window._userInfo` 判角色;home.js 改用户态各点必须同步 `window._userInfo`。
+> - **OCR 生产路径**:`/api/ocr/recognize`(app.py)→ `services.ocr.pipeline.run_on_pdf_bytes` → `legacy_adapter.pipeline_result_to_legacy_dict` → `invoice_grouper.group_pages_to_invoices` → 每组一条 history。pipeline 文档注释「不接 app.py」已过时(实际已接)。
+>
+> ════════════════════════════════════════════════════════════
 > **【第二十四会话 · 交接 · 2026-05-26】MR.ERP 推送修复(BUG·已验收) + Workspace 工作台 B 阶段(进行中)**
 > ════════════════════════════════════════════════════════════
 > **⛔ 下窗口直接续做,不要再讨论已定决策(下方"已锁定"段),Zihao 要持续完成不重复讨论。**

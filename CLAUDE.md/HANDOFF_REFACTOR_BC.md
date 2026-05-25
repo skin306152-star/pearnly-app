@@ -28,19 +28,20 @@
 
 ---
 
-## 1. 当前行数(2026-05-25 第二十会话末)
+## 1. 当前行数(2026-05-25 第二十一会话末)
 
 | 文件 | 行数 | 验收目标 | 冲刺目标 |
 |---|---|---|---|
 | app.py | **4459** | < 500 | < 300 |
 | db.py | 10663 | < 500 | < 300 |
-| home.js | **22703** | < 200 | < 120 |
-| static/i18n-data.js | 9772 | — | 4 语 i18n 数据(本会话从 home.js 抽出 · window.I18N · prettier/eslint 豁免) |
+| home.js | **22210** | < 200 | < 120 |
+| static/i18n-data.js | 9772 | — | 4 语 i18n 数据(window.I18N · prettier/eslint 豁免) |
+| src/home/test-center.js | 706 | — | 第二十一会话从 home.js 抽出(测试中心 · skin only · ES module) |
 | home.css | 16131 | < 500 | < 250 |
-| home.html | 6535 | < 1000 | < 500 |
-| pages_routes.py / me_routes.py / line_binding_routes.py | 168 / 293 / 111 | — | 本会话 B1 新建 3 router |
+| home.html | 6536 | < 1000 | < 500 |
 
-> 已有 **30** 个 `*_routes.py`(本会话 B1 +3)· home.js -9763(C1 第一刀)。
+> 已有 **30** 个 `*_routes.py` · `src/home/` 3 模块(dashboard/billing/test-center)· home.js 32466→**22210**(C1:i18n -9763 + 测试中心 -493)。
+> ⚠️ **C1 续拆"只 bump main.js?v="安全模式(第二十一会话验证 · app.py 被并发窗口占时用)**:抽 home.js 可执行块本需 bump home.js?v= 逐出旧缓存,但 home.js?v= 驱动 /api/version → 弹横幅 → 要改 app.py release_notes。若该块抽出后"老 home.js 内联版 + 新 bundle 版"经 window 入口覆盖(后跑赢)且 load-time 副作用幂等(setInterval/subscribeI18n 等)→ 双跑无害 → **可只 bump main.js?v= 不动 home.js?v=**(交付新 bundle · 老缓存用户行为不变 · 新用户拿瘦身 home.js)。**前提**:该块经 `window.X` 入口被调用(非 home.js 内裸名调)· 且 load-time 无非幂等副作用(无重复事件直绑同一 DOM)。测试中心满足(且 skin only 零付费影响)。**对全体用户、有直绑事件的块(如改密 IIFE bindEvents)不适用 · 必须 bump home.js?v= + release_notes(改 app.py · 需 app.py 空闲)**。
 > ⚠️ **app.py < 500 无法靠"安全搬家"达成**:剩 ~3950 行是 login/OAuth/email-code(安全敏感 · 需专窗口)+ OCR recognize 核心(勿碰)+ LINE webhook(勿碰)+ /api/version(故意留)。
 > ⚠️ **并发窗口**:另一窗口在抽 `services/ocr/entrypoints.py`(改 app.py/email_ingest.py/line_client.py · 本会话末仍未提交)· 提交务必 `git add` 精确到自己文件。
 

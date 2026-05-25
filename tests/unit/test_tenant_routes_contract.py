@@ -79,12 +79,14 @@ class TenantRoutesContractTests(unittest.TestCase):
             admin_users_routes.AdminUpdateTenantStatusRequest, AdminUpdateTenantStatusRequest
         )
 
-    def test_assign_client_stays_in_app(self):
-        """中间夹的 history 路由 assign_client 仍留 app.py · 不被误搬到 tenant_routes"""
+    def test_assign_client_not_in_tenant_router(self):
+        """history 路由 assign_client 不能跑进 tenant_routes。
+        REFACTOR-B1(2026-05-25):assign_client 已并入 history_routes(属 history 组)·
+        仍经 include 挂在 app 上 · 但绝不属于 tenant 组。"""
         import app
 
         paths = {r.path for r in app.app.routes if hasattr(r, "path")}
-        self.assertIn("/api/history/{history_id}/assign_client", paths)
+        self.assertIn("/api/history/{history_id}/assign_client", paths)  # 仍挂载(经 history_router)
         tenant_paths = {r.path for r in router.routes if hasattr(r, "path")}
         self.assertNotIn("/api/history/{history_id}/assign_client", tenant_paths)
 

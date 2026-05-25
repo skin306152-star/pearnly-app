@@ -262,3 +262,66 @@ async def v1_history_update(record_id: str, req: HistoryUpdateRequest, request: 
 @router.delete("/api/v1/history/{record_id}")
 async def v1_history_delete(record_id: str, request: Request):
     return await history_delete(record_id, request)
+
+
+class AssignClientRequest(BaseModel):
+    client_id: Optional[int] = None  # None 表示移除归属
+
+
+@router.post("/api/history/{history_id}/assign_client")
+async def api_assign_client(history_id: str, req: AssignClientRequest, request: Request):
+    """把发票归属到客户 · client_id=null 表示取消归属"""
+    user = get_current_user_from_request(request)
+    # v118.28.1 · 员工:校验 client_id 在 visible_ids 内 · 否则 403(防员工把发票归到他不能看的客户)
+    if req.client_id is not None:
+        visible = db.get_visible_client_ids_for_user(user)
+        if visible is not None and int(req.client_id) not in set(visible):
+            raise HTTPException(403, detail="client.no_access")
+    ok = db.assign_invoice_to_client(
+        str(user["id"]), history_id, req.client_id, tenant_id=_tid(user)
+    )
+    if not ok:
+        raise HTTPException(400, detail="client.assign_failed")
+
+    # 批 1 改动 1 (Zihao 2026-05-19 拍板 · v118.34.33) · 用户手动 assign 时 ·
+    # 把 buyer_name + buyer_tax → client_id 的关系学进 buyer_to_client_memory ·
+    # 下次 OCR 出同 buyer 就 auto-resolve · 不用每次手动选.
+    if req.client_id is not None:
+        try:
+            h = db.get_ocr_history_detail(
+                str(user["id"]),
+                history_id,
+                tenant_id=_tid(user),
+            )
+            if h:
+                _pages = h.get("pages") or []
+                _primary = next(
+                    (
+                        p
+                        for p in _pages
+                        if isinstance(p, dict)
+                        and not p.get("is_duplicate")
+                        and not p.get("is_copy")
+                    ),
+                    _pages[0] if _pages else {},
+                )
+                _f = (_primary or {}).get("fields") or {}
+                _buyer_name = _f.get("buyer_name") or ""
+                _buyer_tax = _f.get("buyer_tax") or ""
+                if _buyer_name:
+                    db.learn_buyer_to_client(
+                        _buyer_name,
+                        _buyer_tax,
+                        int(req.client_id),
+                        str(user["id"]),
+                        tenant_id=_tid(user),
+                    )
+                    logger.info(
+                        "[assign_client] learned buyer→client: %r → %s",
+                        _buyer_name[:40],
+                        req.client_id,
+                    )
+        except Exception as e:
+            logger.warning(f"learn buyer→client failed (history={history_id[:8]}): {e}")
+
+    return {"ok": True}

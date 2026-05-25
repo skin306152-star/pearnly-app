@@ -294,6 +294,8 @@ class MRERPCustomerSyncService:
         # entry expires. Listings are small enough (we saw ~4 KB / 2
         # rows) that re-fetching is cheap.
         self._listing_cache_key = "__armas_listing__"
+        # 自动挑的默认种子客户码缓存(没配 seed 时自动建用 · 见 _resolve_default_seed)
+        self._default_seed_cache: Optional[str] = None
 
     # ----- public API ------------------------------------------
 
@@ -397,12 +399,17 @@ class MRERPCustomerSyncService:
         if existing is not None:
             return existing
 
+        # 2026-05-25 · 自动建买方"开箱即用":没配 seed 就自动挑一个现有客户当克隆模板。
+        # auto-create 走 copy-from-seed(MR.ERP 建客户表单需继承主数据引用),种子只
+        # 提供 salesman/area/branch/GL 等引用,不影响业务字段 → 不再要求用户预配。
         if not seed_customer_code:
+            seed_customer_code = self._resolve_default_seed()
+
+        if not seed_customer_code:
+            # 仅当主数据为空(无任何现有客户可当模板)才真失败 → 进异常。
             raise MRERPBusinessError(
-                f"Auto-create needs a seed customer code "
-                f"(ERR_NO_SEED_CUSTOMER) — pick one in the ERP "
-                f"connection wizard or pass seed_customer_code "
-                f"explicitly. buyer={buyer.name!r}",
+                f"Auto-create needs a seed customer to clone but the MR.ERP "
+                f"customer master is empty (ERR_NO_SEED_CUSTOMER). buyer={buyer.name!r}",
                 failed_rows=[{"buyer_name": buyer.name, "reason_code": "ERR_NO_SEED_CUSTOMER"}],
             )
 
@@ -557,6 +564,29 @@ class MRERPCustomerSyncService:
         )
 
     # ----- Layer 4 auto-create ---------------------------------
+
+    def _resolve_default_seed(self) -> Optional[str]:
+        """没配 seed_customer_code 时,自动挑一个现有客户当 copy-from-seed 的克隆模板。
+
+        种子仅用于继承 MR.ERP 建客户表单要求的主数据引用(salesman/area/branch/GL 等),
+        新买方的业务字段(名/税号/地址)都会被覆盖 → 任一活动客户都可当模板。
+        优先挑应收(ลูกหนี้การค้า)类型避免拿到非客户类型;取首页一个即可。结果缓存。
+        2026-05-25 · 让"全自动建买方"开箱即用 · 不再要求用户预配种子。
+        """
+        if self._default_seed_cache:
+            return self._default_seed_cache
+        try:
+            listing = self._fetch_listing()
+        except MRERPTechnicalError as e:
+            logger.warning("default seed resolve: listing fetch failed: %s", e)
+            return None
+        preferred = [r for r in listing if r.code and "ลูกหนี้" in (r.type_name or "")]
+        pool = preferred or [r for r in listing if r.code and r.code.strip()]
+        if not pool:
+            return None
+        self._default_seed_cache = pool[0].code
+        logger.info("auto-picked default seed customer=%s for auto-create", pool[0].code)
+        return self._default_seed_cache
 
     def _layer4_auto_create(
         self,
@@ -902,17 +932,21 @@ class MRERPCustomerSyncService:
             self._fill_field(page, f"txtaddr{i}", p[:80])
 
     def _generate_customer_code(self) -> str:
-        """Pick the next sequence value in the P{YYMM}{SEQ4} namespace.
+        """在 P{YYMM}{SEQ4} 命名空间里挑一个**全量唯一**的客户码。
 
-        Scans the current listing for codes that match the prefix and
-        returns one bigger than the max — naive O(N) on a small listing
-        is fine. Falls back to a timestamp-suffixed code if the listing
-        scan somehow returns no candidates AND we still want uniqueness
-        guarantees across processes.
+        2026-05-25 修:旧实现只扫首页 ~30 条列表算 max+1 → 首页 max 恒为已有最大
+        (如 028)→ 每次都生成同一个码(029)→ 多个买方撞同一客户码(实测坐实 ·
+        推送会指向错误客户)。改用搜索框(查全量)逐个确认候选码不存在。
         """
+        import random
+
         today = date.today()
         prefix = f"{DEFAULT_CUSTOMER_CODE_PREFIX}{today.year % 100:02d}{today.month:02d}"
-        listing = self._fetch_listing()
+        # 起点:首页列表里同前缀的 max+1(仅作起点 · 首页只读 30 条 · max 可能偏小)
+        try:
+            listing = self._fetch_listing()
+        except MRERPTechnicalError:
+            listing = []
         existing_seqs: List[int] = []
         for row in listing:
             if row.code.startswith(prefix):
@@ -920,12 +954,20 @@ class MRERPCustomerSyncService:
                 if tail.isdigit():
                     existing_seqs.append(int(tail))
         next_seq = (max(existing_seqs) + 1) if existing_seqs else 1
+
+        # 全量唯一性校验:用搜索框查候选码 · 精确命中即撞 → +1 重试(最多 60 次)。
         candidate = f"{prefix}{next_seq:04d}"
-        # Defensive: confirm it's not in listing.
-        while any(r.code == candidate for r in listing):
+        for _ in range(60):
+            try:
+                hits = self._search_listing(candidate)
+            except MRERPTechnicalError:
+                return candidate  # 搜不了 → 用当前候选回退 · 不阻断建客户
+            if not any(r.code == candidate for r in hits):
+                return candidate  # 全量无此码 → 唯一
             next_seq += 1
             candidate = f"{prefix}{next_seq:04d}"
-        return candidate
+        # 兜底:60 连撞(极不可能)→ 随机 4 位
+        return f"{prefix}{random.randint(1, 9999):04d}"
 
     def _upsert_mapping(
         self,

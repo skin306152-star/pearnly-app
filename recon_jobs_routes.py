@@ -248,6 +248,9 @@ async def gl_vat_submit(
         raise HTTPException(422, "请上传 GL 与销项税报告文件")
 
     tenant_id = user.get("tenant_id")
+    # M3-3 修(2026-05-25):收入对账与银行对账一致 · submit 前置 credits 检查(余额不足直接 402 ·
+    #   不让付费 OCR/Gemini 先跑再失败)· is_exempt 透传给 worker 决定是否扣费。
+    billing = _credits_precheck(user["id"], tenant_id, len(gl_list) + len(vat_list))
     job_id = str(uuid.uuid4())
     try:
         input_ref = await _stage_uploads(job_id, gl_list, "gl", "gl.pdf")
@@ -256,6 +259,7 @@ async def gl_vat_submit(
             "user_id": str(user["id"]),
             "tenant_id": tenant_id,
             "api_key": _user_key(user),
+            "is_exempt": bool(billing.get("is_exempt", True)),
             "revenue_prefix": revenue_prefix or "4",
             "lang": lang,
         }

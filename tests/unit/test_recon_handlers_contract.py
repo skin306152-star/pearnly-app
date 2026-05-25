@@ -180,21 +180,70 @@ class RunGlvatTests(unittest.TestCase):
                 )
         self.assertEqual((table, rid), ("gl_vat_task", 555))
 
-    def test_gl_no_rows_raises(self):
+    def test_gl_no_rows_signals_failed(self):
+        # M3-2(2026-05-25):GL 0 收入行 → 返回 __failed__ + 明确 error_code(不再 raise · 不被吞成
+        #   processing_error)· worker 据此置 job failed + error_code · 前端映射 4 语文案。
         self._patch_parse({"ok": True, "rows": []}, {"ok": True, "rows": [{"b": 2}]})
         with tempfile.TemporaryDirectory() as d:
             refs = [_stage(d, "gl", "g.xlsx"), _stage(d, "vat", "v.pdf")]
-            with self.assertRaises(ValueError):
-                handlers.run_glvat({"user_id": "u1"}, refs, None)
+            sentinel, payload = handlers.run_glvat({"user_id": "u1"}, refs, None)
+        self.assertEqual(sentinel, "__failed__")
+        self.assertEqual(payload["error_code"], "gl_no_revenue_rows")
 
-    def test_vat_no_rows_raises(self):
+    def test_vat_no_rows_signals_failed(self):
         self._patch_parse(
             {"ok": True, "rows": [{"a": 1}], "row_count": 1}, {"ok": True, "rows": []}
         )
         with tempfile.TemporaryDirectory() as d:
             refs = [_stage(d, "gl", "g.xlsx"), _stage(d, "vat", "v.pdf")]
-            with self.assertRaises(ValueError):
-                handlers.run_glvat({"user_id": "u1"}, refs, None)
+            sentinel, payload = handlers.run_glvat({"user_id": "u1"}, refs, None)
+        self.assertEqual(sentinel, "__failed__")
+        self.assertEqual(payload["error_code"], "vat_no_rows")
+
+    def test_glvat_charges_ocr_when_not_exempt(self):
+        # M3-3(2026-05-25):非豁免 + 图片 VAT 报告(PNG)→ 必须按 OCR 页扣费(此前完全不扣)。
+        self._patch_parse(
+            {"ok": True, "rows": [{"a": 1}], "row_count": 1},
+            {"ok": True, "rows": [{"b": 2}], "row_count": 1},
+        )
+        detail = [SimpleNamespace(gl_amount=10.0, diff=0.0)]
+        with (
+            mock.patch("recon_routes.reconcile_gl_vat", return_value=(detail, object())),
+            mock.patch("recon_routes.detail_to_json", return_value=[]),
+            mock.patch("recon_routes.summary_to_json", return_value={}),
+            mock.patch("recon_routes._pdf_billing_units", return_value=1),
+            mock.patch("services.ocr.pdf_utils.count_pdf_pages", return_value=1),
+            mock.patch("db.create_gl_vat_task", return_value=606),
+            mock.patch("db.charge_ocr_async") as charge,
+        ):
+            with tempfile.TemporaryDirectory() as d:
+                refs = [_stage(d, "gl", "g.xlsx"), _stage(d, "vat", "v.png")]
+                table, rid = handlers.run_glvat(
+                    {"user_id": "u1", "tenant_id": "t1", "is_exempt": False}, refs, None
+                )
+        self.assertEqual((table, rid), ("gl_vat_task", 606))
+        # PNG VAT 报告 → 走 pdf/OCR 计费分支
+        kinds = [c.args[2] if len(c.args) > 2 else c.kwargs.get("kind") for c in charge.call_args_list]
+        self.assertIn("pdf", kinds)
+
+    def test_glvat_no_charge_when_exempt(self):
+        # 豁免账号(is_exempt=True · 默认)→ 不扣费
+        self._patch_parse(
+            {"ok": True, "rows": [{"a": 1}], "row_count": 1},
+            {"ok": True, "rows": [{"b": 2}], "row_count": 1},
+        )
+        detail = [SimpleNamespace(gl_amount=10.0, diff=0.0)]
+        with (
+            mock.patch("recon_routes.reconcile_gl_vat", return_value=(detail, object())),
+            mock.patch("recon_routes.detail_to_json", return_value=[]),
+            mock.patch("recon_routes.summary_to_json", return_value={}),
+            mock.patch("db.create_gl_vat_task", return_value=607),
+            mock.patch("db.charge_ocr_async") as charge,
+        ):
+            with tempfile.TemporaryDirectory() as d:
+                refs = [_stage(d, "gl", "g.xlsx"), _stage(d, "vat", "v.png")]
+                handlers.run_glvat({"user_id": "u1", "is_exempt": True}, refs, None)
+        charge.assert_not_called()
 
 
 class RunSalesvatTests(unittest.TestCase):

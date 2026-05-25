@@ -1424,10 +1424,13 @@ def list_erp_endpoints(user_id: str, auto_push_only: bool = False) -> List[Dict[
     """列出用户的所有 ERP 端点(默认排前面)· auto_push_only=True 时只返回开启自动推且 enabled 的"""
     try:
         with get_cursor() as cur:
+            # ERP-1 修(2026-05-25):SELECT 补 user_id · 此前缺它 → 自动推送(_auto_push_history
+            #   用本函数 auto_push_only=True 取端点)拿不到 user_id → tenant_id None → mappings 空
+            #   → 误报 ERR_NO_CUSTOMER_MAPPING(手动推送走 get_erp_endpoint 含 user_id 故正常)。
             sql = """
                 SELECT id, name, adapter, config, is_default, auto_push, enabled,
                        last_used_at, last_status, success_count, failure_count,
-                       created_at, updated_at
+                       created_at, updated_at, user_id
                 FROM erp_endpoints
                 WHERE user_id = %s
             """
@@ -1468,7 +1471,7 @@ def get_default_erp_endpoint(user_id: str) -> Optional[Dict[str, Any]]:
         with get_cursor() as cur:
             cur.execute(
                 """
-                SELECT id, name, adapter, config, is_default, auto_push, enabled
+                SELECT id, name, adapter, config, is_default, auto_push, enabled, user_id
                 FROM erp_endpoints
                 WHERE user_id = %s AND enabled = true
                 ORDER BY is_default DESC, created_at ASC
@@ -1816,6 +1819,44 @@ def ensure_erp_push_logs_adapter_constraint():
             )
     except Exception:
         logger.exception("ensure_erp_push_logs_adapter_constraint failed")
+
+
+def ensure_erp_push_logs_status_constraint():
+    """ERP-2 修(2026-05-25):若 erp_push_logs.status 有 CHECK 约束且不含 'skipped_dup' ·
+    drop + rebuild 放开。此前重复推送写 status='skipped_dup' 被约束拒绝 → insert 抛异常被
+    insert_push_log 吞 → 返回 None → 防重日志没落库(log_id=null)。没有该约束则跳过(无需迁移)。"""
+    canonical = ("success", "failed", "skipped_dup", "pending", "retrying")
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute("""
+                SELECT con.conname, pg_get_constraintdef(con.oid) AS def
+                FROM pg_constraint con
+                JOIN pg_class rel ON rel.oid = con.conrelid
+                WHERE rel.relname = 'erp_push_logs'
+                  AND con.contype = 'c'
+                  AND pg_get_constraintdef(con.oid) ILIKE '%status%'
+            """)
+            rows = cur.fetchall() or []
+            if not rows:
+                logger.info("ℹ erp_push_logs has no status CHECK constraint (skipped_dup OK · skip)")
+                return
+            current_def = " ".join((r["def"] or "").lower() for r in rows)
+            if "skipped_dup" in current_def:
+                logger.info("✅ erp_push_logs status CHECK already includes skipped_dup (skip)")
+                return
+            for r in rows:
+                name = r["conname"]
+                cur.execute(f"ALTER TABLE erp_push_logs DROP CONSTRAINT IF EXISTS {name}")
+                logger.info("[migration] dropped old erp_push_logs status CHECK: %s", name)
+            in_list = ", ".join(f"'{s}'" for s in canonical)
+            cur.execute(
+                f"ALTER TABLE erp_push_logs "
+                f"ADD CONSTRAINT erp_push_logs_status_chk "
+                f"CHECK (status IN ({in_list}))"
+            )
+            logger.info("✅ erp_push_logs status CHECK rewritten · whitelist=%s", canonical)
+    except Exception:
+        logger.exception("ensure_erp_push_logs_status_constraint failed")
 
 
 def ensure_erp_retry_columns():

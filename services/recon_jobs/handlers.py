@@ -402,12 +402,14 @@ def run_glvat(
         reconcile_gl_vat,
         detail_to_json,
         summary_to_json,
+        _pdf_billing_units,
     )
 
     revenue_prefix = params.get("revenue_prefix") or "4"
     api_key = params.get("api_key")
     user_id = str(params.get("user_id"))
     tenant_id = params.get("tenant_id")
+    is_exempt = bool(params.get("is_exempt", True))
 
     gl_data = _read_inputs(input_ref, "gl")
     vat_data = _read_inputs(input_ref, "vat")
@@ -417,14 +419,16 @@ def run_glvat(
     # 1. 并行解析 GL + 合并 rows
     gl_results = _parallel(lambda bf: parse_gl(bf[0], bf[1], revenue_prefix), gl_data)
     progress_cb({"stage": "parse", "stage_done": len(gl_data), "stage_total": total})
+    # M3-2 修(2026-05-25 收入对账回归):已知业务失败返回 __failed__ sentinel 带明确 error_code ·
+    #   worker 据此置 job failed + error_code(不再被统一吞成 processing_error)· 前端映射成 4 语文案。
     gl_errors = [r.get("error") for r in gl_results if not r.get("ok") and r.get("error")]
     if gl_errors and not any(r.get("rows") for r in gl_results):
-        raise ValueError("gl_parse_failed: " + "; ".join(filter(None, gl_errors))[:200])
+        return ("__failed__", {"error_code": "gl_parse_failed"})
     merged_gl_rows: list = []
     for r in gl_results:
         merged_gl_rows.extend(r.get("rows") or [])
     if not merged_gl_rows:
-        raise ValueError("gl_no_revenue_rows")
+        return ("__failed__", {"error_code": "gl_no_revenue_rows"})
     gl_row_count = sum(r.get("row_count") or 0 for r in gl_results)
 
     # 2. 并行解析 VAT + 合并 rows
@@ -432,13 +436,45 @@ def run_glvat(
     progress_cb({"stage": "parse", "stage_done": total, "stage_total": total})
     vat_errors = [r.get("error") for r in vat_results if not r.get("ok") and r.get("error")]
     if vat_errors and not any(r.get("rows") for r in vat_results):
-        raise ValueError("vat_parse_failed: " + "; ".join(filter(None, vat_errors))[:200])
+        return ("__failed__", {"error_code": "vat_parse_failed"})
     merged_vat_rows: list = []
     for r in vat_results:
         merged_vat_rows.extend(r.get("rows") or [])
     if not merged_vat_rows:
-        raise ValueError("vat_no_rows")
+        return ("__failed__", {"error_code": "vat_no_rows"})
     vat_row_count = sum(r.get("row_count") or 0 for r in vat_results)
+
+    # M3-3 修(2026-05-25 收入对账成本回归):此前 GL-VAT 完全不扣费 → 图片/PDF VAT 报告用了
+    #   Gemini/OCR 却免费(成本泄漏)。改为与 run_bank/run_salesvat 一致的统一按量计费:
+    #   图片/PDF 按 OCR 页 · Excel/CSV 本地解析按字符估算 · 各格式各费率 · 豁免账号不扣。
+    if not is_exempt:
+        try:
+            from services.ocr.pdf_utils import count_pdf_pages as _count_pages
+
+            _excel_exts = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv", ".txt", ".docx", ".doc"}
+            _pdf_units = 0
+            _excel_units = 0
+            for r, (b, fn) in list(zip(gl_results, gl_data)) + list(zip(vat_results, vat_data)):
+                if not r.get("ok"):
+                    continue
+                row_count = len(r.get("rows") or [])
+                if row_count == 0:
+                    continue
+                ext = "." + (fn or "").lower().rsplit(".", 1)[-1] if "." in (fn or "") else ""
+                if ext in _excel_exts:
+                    _excel_units += db._excel_char_count_estimate(b, fn)
+                else:
+                    _pdf_units += _pdf_billing_units(_count_pages(b) or 1, row_count)
+            if _pdf_units > 0:
+                db.charge_ocr_async(
+                    user_id, tenant_id, "pdf", _pdf_units, None, f"收入对账 PDF · {_pdf_units} 页"
+                )
+            if _excel_units > 0:
+                db.charge_ocr_async(
+                    user_id, tenant_id, "excel", _excel_units, None, f"收入对账 Excel · {_excel_units} 字符"
+                )
+        except Exception as _ce:  # noqa: BLE001
+            logger.warning(f"💳 glvat async charge skip: {_ce}")
 
     # 3. 对账
     progress_cb({"stage": "reconcile", "stage_done": 0, "stage_total": 1})

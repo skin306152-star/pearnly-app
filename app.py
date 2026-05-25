@@ -617,6 +617,11 @@ async def lifespan(app: FastAPI):
         db.ensure_erp_push_logs_adapter_constraint()
     except Exception as e:
         logger.warning(f"启动 erp_push_logs adapter constraint migration 失败: {e}")
+    try:
+        # ERP-2(2026-05-25):放开 erp_push_logs.status CHECK 接受 skipped_dup(防重日志落库)
+        db.ensure_erp_push_logs_status_constraint()
+    except Exception as e:
+        logger.warning(f"启动 erp_push_logs status constraint migration 失败: {e}")
 
     # v118.26.2 · bank_reconcile_sessions.client_id 列(v28.1 客户分配 filter 适配)
     try:
@@ -4453,9 +4458,16 @@ async def erp_push(req: ErpPushRequest, request: Request):
             endpoint["id"][:8],
             str(existing.get("id"))[:8],
         )
+        if not log_id:
+            # ERP-2:防重日志没写进去(如 status CHECK 约束)· 不静默假装成功 · 显性告知
+            logger.warning(
+                "[push-dedup] skipped_dup log NOT persisted (insert returned None) · history=%s",
+                str(req.history_id)[:8],
+            )
         return {
             "ok": True,
             "log_id": log_id,
+            "log_write_failed": not log_id,
             "http_status": 200,
             "skipped_dup": True,
             "prior_log_id": str(existing.get("id")),
@@ -5159,10 +5171,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "销项税对账更准更稳:正常匹配的发票不再被误判为差异;支持上传 Excel / CSV / Word 格式的发票与报告;上传不同月份的报告会提示,不再悄悄合并;图片识别加了超时保护,不会再一直转圈卡住。\n\n即日生效。",
-            "th": "การกระทบยอดภาษีขายแม่นยำและเสถียรขึ้น: ใบกำกับที่ตรงกันจะไม่ถูกตัดสินว่าต่างกันอีก; รองรับการอัปโหลดใบกำกับและรายงานรูปแบบ Excel / CSV / Word; หากอัปโหลดรายงานคนละเดือนจะมีการแจ้งเตือน ไม่รวมให้เงียบ ๆ; การอ่านรูปภาพมีการกันค้าง ไม่หมุนค้างอีกต่อไป\n\nมีผลทันที",
-            "en": "Sales-VAT reconciliation is more accurate and stable: correctly matching invoices are no longer flagged as differences; you can now upload invoices and reports in Excel / CSV / Word; uploading reports from different months now warns you instead of silently merging; image reading has a timeout guard so it no longer spins forever.\n\nEffective immediately.",
-            "ja": "売上VAT照合がより正確・安定になりました:正しく一致する請求書が差異と誤判定されなくなりました;Excel / CSV / Word 形式の請求書・レポートのアップロードに対応;異なる月のレポートをアップロードすると警告し、勝手に結合しなくなりました;画像読み取りにタイムアウト保護を追加し、回り続けて止まらなくなりました。\n\n即日有効。",
+            "zh": "收入对账更顺手:对账成功后「近期对账任务」会立即出现,不用再刷新页面;失败时会说明具体原因(比如收入科目前缀填错、报告没有数据),不再只显示一句「出错了」。\n\n即日生效。",
+            "th": "การกระทบยอดรายได้ใช้งานลื่นขึ้น: หลังกระทบยอดสำเร็จ «งานกระทบยอดล่าสุด» จะปรากฏทันที ไม่ต้องรีเฟรชหน้า; เมื่อผิดพลาดจะแจ้งสาเหตุชัดเจน (เช่น คำนำหน้าบัญชีรายได้ผิด หรือรายงานไม่มีข้อมูล) ไม่ใช่แค่ «เกิดข้อผิดพลาด»\n\nมีผลทันที",
+            "en": "Income reconciliation is smoother: after a successful run, the recent-tasks list appears immediately without refreshing the page; on failure it now explains the specific reason (e.g. wrong revenue-account prefix, or the report has no rows) instead of a generic “error”.\n\nEffective immediately.",
+            "ja": "収入照合がより快適に:照合成功後、「最近の照合タスク」が更新なしで即表示されます;失敗時は具体的な理由(収益科目プレフィックスの誤り、レポートに行がない等)を表示し、単なる「エラー」ではなくなりました。\n\n即日有効。",
         },
     }
 

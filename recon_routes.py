@@ -858,6 +858,34 @@ async def gl_vat_run(
     if not gl_list or not vat_list:
         raise HTTPException(422, _glv_err("gl_parse_failed", lang, e="missing files"))
 
+    # M3-3 修(2026-05-25):收入对账旧同步路径补 credits 前置检查 + 按量扣费 · 闭掉免费入口
+    #   (与 bank /run、async /submit 一致 · 余额不足直接 402 · 不让付费 OCR 先跑)。
+    _billing_glv = {"is_exempt": True, "pages_used_this_month": 0}
+    try:
+        import db as _db_credit_glv
+
+        _tid_glv = user.get("tenant_id")
+        _billing_glv = _db_credit_glv.get_billing_status_combined(str(user.get("id")), _tid_glv)
+        if not _billing_glv.get("allowed") and not _billing_glv.get("is_exempt"):
+            _est_cost = float(
+                _db_credit_glv.estimate_pdf_cost_thb(
+                    _billing_glv.get("pages_used_this_month", 0), len(gl_list) + len(vat_list)
+                )
+            )
+            raise HTTPException(
+                402,
+                detail={
+                    "code": "insufficient_balance",
+                    "balance": _billing_glv.get("balance_thb", 0.0),
+                    "estimated_cost": _est_cost,
+                    "pages_used_this_month": _billing_glv.get("pages_used_this_month", 0),
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception as _be:
+        logger.warning(f"[gl-vat.credits] pre-check skip: {_be}")
+
     # 读所有字节
     gl_data: List[tuple] = []
     vat_data: List[tuple] = []
@@ -922,6 +950,43 @@ async def gl_vat_run(
         "rows": merged_vat_rows,
         "row_count": sum(r.get("row_count") or 0 for r in vat_results),
     }
+
+    # M3-3 · 按量扣费(图片/PDF 按 OCR 页 · Excel/CSV 按字符估算 · 各格式各费率)· 豁免账号不扣
+    if not _billing_glv.get("is_exempt"):
+        try:
+            import db as _db_chg_glv
+            from services.ocr.pdf_utils import count_pdf_pages as _count_pages_glv
+
+            _tid_chg_glv = user.get("tenant_id")
+            _excel_exts = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv", ".txt", ".docx", ".doc"}
+            _pdf_units = 0
+            _excel_units = 0
+            for r, (b, fn) in list(zip(gl_results, gl_data)) + list(zip(vat_results, vat_data)):
+                if not r.get("ok"):
+                    continue
+                if len(r.get("rows") or []) == 0:
+                    continue
+                ext = "." + (fn or "").lower().rsplit(".", 1)[-1] if "." in (fn or "") else ""
+                if ext in _excel_exts:
+                    _excel_units += _db_chg_glv._excel_char_count_estimate(b, fn)
+                else:
+                    _pdf_units += _pdf_billing_units(_count_pages_glv(b) or 1, len(r.get("rows") or []))
+            if _pdf_units > 0:
+                asyncio.create_task(
+                    asyncio.to_thread(
+                        _db_chg_glv.charge_ocr_async, str(user.get("id")), _tid_chg_glv,
+                        "pdf", _pdf_units, None, f"收入对账 PDF · {_pdf_units} 页",
+                    )
+                )
+            if _excel_units > 0:
+                asyncio.create_task(
+                    asyncio.to_thread(
+                        _db_chg_glv.charge_ocr_async, str(user.get("id")), _tid_chg_glv,
+                        "excel", _excel_units, None, f"收入对账 Excel · {_excel_units} 字符",
+                    )
+                )
+        except Exception as _ce:  # noqa: BLE001
+            logger.warning(f"💳 gl-vat sync charge skip: {_ce}")
 
     # 3. 对账
     detail, summary = reconcile_gl_vat(gl_result["rows"], vat_result["rows"])

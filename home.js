@@ -31230,6 +31230,39 @@ window.addEventListener('DOMContentLoaded', () => {
     };
     const _t = (key) => (I18N[_lang()] || I18N.th)[key] || key;
 
+    // M3-2:收入对账失败 error_code → 4 语可读原因 + 引导(取代泛化 "เกิดข้อผิดพลาด")
+    function _glvFailMsg(code) {
+        const lang = _lang();
+        const M = {
+            gl_no_revenue_rows: {
+                zh: 'GL 中未找到收入科目行。请确认「收入科目前缀」是否正确(收入科目通常以 4 开头),改对后重试。',
+                th: 'ไม่พบรายการบัญชีรายได้ใน GL · ตรวจสอบ «คำนำหน้าบัญชีรายได้» (รายได้มักขึ้นต้นด้วย 4) แล้วลองใหม่',
+                en: 'No revenue-account rows found in the GL. Check the “revenue account prefix” (revenue usually starts with 4) and retry.',
+                ja: 'GL に収益科目の行が見つかりません。「収益科目プレフィックス」(通常 4 で始まる)を確認して再試行してください。',
+            },
+            gl_parse_failed: {
+                zh: 'GL 文件解析失败。请确认文件含日期/科目/借贷列,或换清晰的 Excel/CSV 重传。',
+                th: 'อ่านไฟล์ GL ไม่สำเร็จ · ตรวจสอบว่ามีคอลัมน์ วันที่/บัญชี/เดบิต-เครดิต หรืออัปโหลด Excel/CSV ที่ชัดเจน',
+                en: 'Failed to parse the GL file. Ensure it has date/account/debit-credit columns, or re-upload a clean Excel/CSV.',
+                ja: 'GL ファイルの解析に失敗しました。日付/科目/借方貸方列を確認するか、Excel/CSV を再アップロードしてください。',
+            },
+            vat_no_rows: {
+                zh: '销项税报告里没有可对账的数据行。请确认上传了正确的销项税报告。',
+                th: 'ไม่พบแถวข้อมูลในรายงานภาษีขาย · ตรวจสอบว่าอัปโหลดรายงานที่ถูกต้อง',
+                en: 'No rows found in the sales-VAT report. Please check you uploaded the correct report.',
+                ja: '売上VATレポートに行が見つかりません。正しいレポートをアップロードしたか確認してください。',
+            },
+            vat_parse_failed: {
+                zh: '销项税报告解析失败。请换更清晰的版本,或转成 Excel/PDF 重传。',
+                th: 'อ่านรายงานภาษีขายไม่สำเร็จ · ลองเวอร์ชันที่ชัดเจนกว่า หรือแปลงเป็น Excel/PDF',
+                en: 'Failed to parse the sales-VAT report. Try a clearer version, or convert to Excel/PDF.',
+                ja: '売上VATレポートの解析に失敗しました。より鮮明な版か、Excel/PDF に変換してください。',
+            },
+        };
+        const m = M[code];
+        return m ? (m[lang] || m.th || m.en) : (_t('error') || 'Error');
+    }
+
     const _fmt = (n) => {
         if (n === null || n === undefined || isNaN(n)) return '';
         return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -31689,6 +31722,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 onProgress: (p) => { if (_glvSub) _glvSub.textContent = window._reconProgressText(p, _lang()); },
             });
             if (!job || job.status !== 'done' || !job.result_id) {
+                // M3-2 修(2026-05-25):失败时用后端 error_code 映射成可读文案 · 不再泛化 "เกิดข้อผิดพลาด"
+                if (job && job.status === 'failed' && job.error_code) {
+                    throw new Error(_glvFailMsg(job.error_code));
+                }
                 throw new Error(_t('error') || 'Error');
             }
             // 用 result_id 调现有结果接口(GET 形状与 run 一致)
@@ -31715,6 +31752,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 status.innerHTML = '<span>' + _t('done') + ' · GL ' + (data.gl_row_count || 0) +
                                    ' · VAT ' + (data.vat_row_count || 0) + '</span>';
             }
+            // M3-1 修(2026-05-25):成功后刷新「近期对账任务」· 此前只渲染结果区 · 历史表不更新
+            _loadHistory();
         } catch (e) {
             console.error('[gl-vat] run failed:', e);
             if (status) {

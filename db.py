@@ -1423,60 +1423,9 @@ def delete_ocr_history_with_pdf_paths(
 
 
 # ============================================================
-# v0.7 · 智能归档
+# v0.7 · 智能归档 DAL → services/archive/store.py (REFACTOR-B2)
+# 纯搬家 0 逻辑改 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
 # ============================================================
-def get_archive_settings(user_id: str) -> Optional[Dict[str, Any]]:
-    """读用户的归档设置。没配过就返回 None(调用方用默认)"""
-    try:
-        with get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT user_id, name_template, folder_strategy
-                FROM archive_settings WHERE user_id = %s
-            """,
-                (user_id,),
-            )
-            r = cur.fetchone()
-            return dict(r) if r else None
-    except Exception as e:
-        logger.error(f"get_archive_settings failed: {e}")
-        return None
-
-
-def get_archive_template(user_id: str) -> Optional[List[Dict[str, Any]]]:
-    """只读命名模板。给识别流程用的快捷方法"""
-    s = get_archive_settings(user_id)
-    if not s:
-        return None
-    tpl = s.get("name_template") or []
-    return tpl if isinstance(tpl, list) and tpl else None
-
-
-def upsert_archive_settings(
-    user_id: str, name_template: List[Dict[str, Any]], folder_strategy: str
-) -> bool:
-    """创建或更新归档设置"""
-    if folder_strategy not in ("none", "by_month", "by_seller", "by_month_seller"):
-        folder_strategy = "by_month_seller"
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                INSERT INTO archive_settings (user_id, name_template, folder_strategy)
-                VALUES (%s, %s::jsonb, %s)
-                ON CONFLICT (user_id) DO UPDATE
-                  SET name_template = EXCLUDED.name_template,
-                      folder_strategy = EXCLUDED.folder_strategy,
-                      updated_at = NOW()
-            """,
-                (user_id, _json.dumps(name_template or []), folder_strategy),
-            )
-            return True
-    except Exception as e:
-        logger.error(f"upsert_archive_settings failed: {e}")
-        return False
-
-
 # ============================================================
 # v0.8 · RD 校验日限(Free 5/天)
 # ============================================================
@@ -7133,4 +7082,10 @@ from services.recon.bank_recon_v1_store import (
     override_tx_match as override_tx_match,
     seed_bank_recon_test_data as seed_bank_recon_test_data,
     clear_bank_recon_test_data as clear_bank_recon_test_data,
+)
+
+from services.archive.store import (
+    get_archive_settings as get_archive_settings,
+    get_archive_template as get_archive_template,
+    upsert_archive_settings as upsert_archive_settings,
 )

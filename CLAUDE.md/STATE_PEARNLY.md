@@ -1,8 +1,15 @@
 # 📊 STATE · Pearnly 项目状态
 
-> **最近更新**:2026-05-25(**第十九会话 · B1 续**)· **🟢 app.py 续拆 3 个 router(categories / erp 15 路由 / admin_users 15 路由)+ `_record_500` 三件套搬 route_helpers · app.py 7275→5530(-1745)· 全量单测 612 passed · ✅ 已 push(`af9a2f4`/`c81f609`/`eadc121`)· 顺手修了第十八会话遗留的 CI lint 红(`9ee3a6d` black+ruff)· CI 双 job 全绿 · 生产抽查搬出路由全 401(零丢路由)· origin/master 与 HEAD 同步 0/0。**
-> ⚠️⚠️ **下个窗口:回归整顿 · 续 B1 拆 **history 组**(唯一剩的大组 · 纠缠最深 · 需先把 `_async_run_exception_checks` 整条链迁到共享模块 · 分两步 · 详见 `HANDOFF_REFACTOR_BC.md` §5)· 或拆 `assign_client` 单路由(干净但薄)· 或 Zihao 在场开 C 前端拆 home.js。开工前 baseline:`git status` 干净 + `origin/master...HEAD` = 0 0。**
+> **最近更新**:2026-05-25(**第十九会话 · B1 续**)· **🟢 app.py 拆 6 模块 · 10075→4888(-51%)。前半:categories/erp/admin_users 3 router + `_record_500`→route_helpers + 修 CI lint 红 · ✅ 已 push + CI 全绿 + 生产零丢路由。后半:history 组完成(exception_checks.py 异常链 + history_routes.py 11 路由)· unit 622 passed · ⚠️ 3 commit 未 push(`b264790`/`c5af58e`/`1835bce`)。**
+> ⚠️⚠️ **下个窗口:① 先 push 后半 3 commit(需 Zihao 授权)· ② B1 易摘果实已摘完(history 最深纠缠已拿下)· 剩 37 个 @app 全是核心耦合区(OCR recognize 850 行 / LINE webhook)或安全敏感区(auth/OAuth)· 详见 `HANDOFF_REFACTOR_BC.md` §5 · 建议转 C 前端拆 home.js(收益大)或谨慎评估 auth 组 · 不建议常规长跑碰 OCR 核心。开工 baseline:push 后 `origin/master...HEAD` = 0 0。**
 >
+> **(第十九会话后半)history 组拆分完成(两步法 · 纯后端搬家 · 0 业务逻辑改 · ⚠️ 3 commit 未 push)**:
+> - **步骤 A · exception_checks.py**(`b264790`):OCR 异常检测(5 类规则)+ LINE 智能提醒整条链(378 行:EXC_RULE 常量 / `_parse_money` / `_is_valid_thai_tax_id` / `_async_run_exception_checks` / `_notify_exception_high` / `_notify_large_invoice` / `_format_thb` / `_user_lang_safe` / `_rule_belongs_to`)从 app.py 搬出。此前在 app.py · 被 OCR/LINE 上传路由 + history PUT 共用 · 不搬出直接拆 history 会循环 import。`line_client` 防御式 import(未部署降级 None)。
+> - **步骤 B · history_routes.py**(`c5af58e` 10 路由 + `1835bce` assign_client 并入 = 11 路由):list/detail/update(编辑后重跑规则)/delete/pdf/batch-delete + 4 个 v1 别名 + assign_client · `_check_history_access` 随组走 · history PUT 从 exception_checks import `_async_run_exception_checks`/`_parse_money`(单一来源)。app.py 删 6 个随之 unused 的 import · 单一来源断言跟到新消费者(exception_checks/history_routes)· tenant contract 的 assign_client 断言语义更新。
+> - **守门**:每 commit black/ruff(F)/imports/i18n(0/0)/unit 全绿 · unit 612→**622**。app.py 5530→**4888** · CRLF=0。
+> - **停止原因**:history(文档标的"唯一剩的大组")已完成 · 剩余全核心耦合/安全敏感 · 上下文消耗可观 · 按「不在预算偏紧时硬开核心耦合区 · 不留半拆」收尾。
+>
+> ---
 > **(第十九会话 · B1 续)app.py 拆 router 长跑(纯后端搬家 · 0 业务逻辑改 · ✅ 已 push + CI 全绿 + 生产验证)**:
 > 模式 = 接力自主长跑「每完成一个安全 slice 本地 commit · 不 push · 只拆边界清晰组 · 纠缠太深跳过」。本会话从 app.py 抽出 3 个 router:
 > - **categories_routes.py**(`af9a2f4`)· 1 路由 `/api/categories`(供应商分类自动补全)· 用 `_tid`(route_helpers)· 完全自包含。

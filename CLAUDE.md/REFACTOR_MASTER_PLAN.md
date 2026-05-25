@@ -305,7 +305,7 @@
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
-| B 后端 | 🟡 1/10 | B1 已抽 17 router(130+ 路由)· app.py 10075→**5530** | 第十九会话 +3 router(categories 1 / erp 15 / admin_users 15)+ `_record_500` 三件套→route_helpers(共享状态单一来源)· app.py 7275→5530(-1745)· 已有 **24** 个 *_routes.py · unit 597→612 · ✅ **已 push + CI 双 job 全绿 + 生产零丢路由**(`af9a2f4`/`c81f609`/`eadc121` · 另 `9ee3a6d` 修第十八会话遗留 CI lint 红)· 剩 history 大组(纠缠最深 · 需先迁 `_async_run_exception_checks` 链 · 详见 HANDOFF §5)+ assign_client 单路由 |
+| B 后端 | 🟡 1/10 | B1 已抽 18 router + exception_checks 服务模块 · app.py 10075→**4888**(-51%) | 第十九会话 +6 模块:前半 categories/erp/admin_users 3 router + `_record_500`→route_helpers(✅ 已 push + CI 全绿 + 生产零丢路由 + 修 CI lint 红 `9ee3a6d`)· 后半 **history 组完成**(exception_checks.py 异常链 `b264790` → history_routes.py 11 路由 `c5af58e`+`1835bce` · ⚠️ 未 push)· 已有 **25** 个 *_routes.py · unit 597→622 · 剩 37 @app 全核心耦合区(OCR recognize 850 行/LINE webhook)或安全敏感区(auth/OAuth)· 建议转 C 前端或谨慎评估 · 详见 HANDOFF §5 |
 | C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |

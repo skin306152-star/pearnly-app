@@ -1,7 +1,49 @@
 # 📊 STATE · Pearnly 项目状态
 
+> ════════════════════════════════════════════════════════════
+> **【第二十四会话 · 交接 · 2026-05-26】MR.ERP 推送修复(BUG·已验收) + Workspace 工作台 B 阶段(进行中)**
+> ════════════════════════════════════════════════════════════
+> **⛔ 下窗口直接续做,不要再讨论已定决策(下方"已锁定"段),Zihao 要持续完成不重复讨论。**
+>
+> **进窗口先读**:`AGENTS.md`(入口规则)→ `docs/agent/{TASK_MODES,BUSINESS_GLOSSARY,ERROR_CODES_AND_STATES,ACCEPTANCE_PLAYBOOKS}.md` → `docs/agent/PEARNLY_AGENT_WORKBENCH.md`(路线图)→ `docs/refactor/{workspace-rollout-plan,b2-work-mode-redesign,b3-employee-workspace-permission,b6-legacy-workspace-backfill,batch-center-plan}.md`(B 阶段设计)。
+>
+> **① MR.ERP 推送 BUG 已修复并通过真实验收(上一窗口主诉求 · DONE)**:真因 = ⓐ 2 worker 共用 MR.ERP 账号老 PHP 单会话互踢→ERR_AUTH ⓑ 客户列表只读首页~30条→第31+个买方匹配不上→假 ERR_NO_CUSTOMER_MAPPING。已修并上线:**A1 会话跨进程串行锁**(`8e334ba` services/erp/session_lock.py pg advisory xact lock)+ **A3 核心搜索查全量**(`248b19c` mrerp_customer_sync._search_listing 用 #txtsearch)+ **A3 闭环自动建买方**(`720ca6c` 自动挑种子 _resolve_default_seed + 客户码全量唯一)。**真实验收 PASS**(Codex 独立核):log `7180de17` success · bill_no `SI690319-706687` 在 MR.ERP TEST2019 真实存在 · 同张发票 INV2026030212 修前 ERR_NO_CUSTOMER_MAPPING 修后成功。测试账号 endpoint `dad6fb0f` 已恢复 enabled=false。⚠️ **遗留未修**:商品(product)自动建侧有同款"列表只读30条"bug(fail-soft 没炸推送 · 仅记录)。
+>
+> **② Workspace 工作台 B 阶段 · 已上线生产(master + 部署 + CI 绿)**:
+> - **B0**(`7a6d9e5`)地基:新表 `workspace_clients`(账套主体·tenant/user/name/tax_id/**erp_endpoint_id** 绑定列)+ `ocr_history.workspace_client_id` 列(可空)。services/workspace/store.py DAL · db re-export · 双跑(alembic/005 + 启动 ensure)。
+> - **B1 相 1**(`857f576`)`insert_ocr_history` + `/api/ocr/recognize` 兼容写入 workspace_client_id(可选·Form 或 header `X-Workspace-Client-Id`·**带不上 NULL·不强制·不拦上传·不碰买方 client_id**)。**顺带修了 CI black 红**(B4 commit 漏给 app.py 跑 black 的 import 超长行)。
+> - **B4 后端**(`89818a9`)`workspace_routes.py`:GET/POST/PUT `/api/workspace/clients`(休眠端点·401·仅 owner 可建/绑)。
+> - **文档**:`AGENTS.md` + docs/agent/* 4 文档 + docs/refactor/* 6 设计文档全部已 push。
+>
+> **③ 本地未 push commit(1 个)**:`567b15c` = B4 前端工作模式切换器逻辑(src/home/workspace-switcher.js · eslint 干净 · **未接入 home.js**)。
+>
+> **④ 已锁定决策(别再讨论·照做)**:
+> 1. `workspace_client_id`(账套主体=在做谁的账)**≠** `history.client_id`(发票买方→MR.ERP 应收客户)· 两个独立字段 · 永不混用。
+> 2. `erp_push_logs` = 推送状态**唯一来源** · 批次态从它派生(services/erp/batch_view.py)· 不加第二套状态源。
+> 3. MR.ERP 买方:已有→搜索匹配 / 不存在→copy-from-seed 自动建 · 税号优先在 Pearnly 侧(buyer_to_client_memory)。
+> 4. **B2 = 工作模式**(个人事务/客户业务 + 业务功能惰性提示「这个功能需要先选择客户」)· **不做登录后全站硬拦截**。详见 b2-work-mode-redesign.md。
+> 5. **B4 选项 A(Zihao 拍板)**:新 workspace 切换器**取代**旧 ClientSwitcher(右上角唯一入口)。⚠️**关键**:旧"客户切换器"实为**全 app 买方过滤器**(home.js getCurrentClientId 被 history/异常/银行/dashboard 等 22 处消费)· 取代后这些列表降级"显示全部"(消费者有 typeof 守卫·不崩)。
+> 6. Pearnly **不自动创建 ERP 账套主体** · 只绑 workspace→**已有** endpoint · 只自动建交易对象(买方/供应商/商品)。
+> 7. 员工权限按 **workspace** 分(不按买方)· 新建 workspace 仅 owner · 新建买方员工可(详见 b3 文档)。
+>
+> **⑤ 下一步(直接开做·已无需讨论)= B4 home.js 切换(全员 UI · 必须浏览器实测后才部署)**:
+> | 步骤 | 精确触点 |
+> |---|---|
+> | 挂新控件 | home.js:2164 `#client-switcher` 槽 → 改调 `window.renderWorkspaceControl` |
+> | 移旧买方过滤 | home.js:17090+ 旧 ClientSwitcher IIFE(消费者 2987/4872 有 `typeof===function` 守卫·移除后降级显示全部不崩) |
+> | 发 header | home.js api 包装器 423/453/487 加 `X-Workspace-Client-Id: window.getActiveWorkspaceClientId()` |
+> | 弹层 UI | 实现 `window.openWorkspaceChooserUI`(切换器 module 已调用它) |
+> | i18n 4 语 | ws-personal/ws-current-label/ws-need-client/ws-btn-pick/ws-btn-cancel/ws-empty-owner/ws-empty-employee |
+> | bundle 入口 import switcher + cache_bust(home.js?v= + main.js?v=)+ 4 语 release_notes + **run/playwright 浏览器实测**(右上角控件渲染/切换/header 真发出/旧过滤降级不崩)→ 才 push 部署 |
+>
+> **再后续(各需确认·见对应 docs)**:B1 相 2 强校验(缺 workspace 拒绝·需先 B6 回填)· B3 员工 workspace 分配(需 workspace_assignments 表=schema)· B5 批次中心(需 erp_push_logs.batch_id=schema + batch_routes + UI)· B6 老数据未归属队列。其它创建入口(bank-recon/recon submit)接 workspace 前需各自加列。
+>
+> **守门/验证**:`python -m pytest tests/unit -q`(729 绿)· `python -m black --check <file>`(**no-flag·CI 同款 line-length=100·改 app.py/db.py 巨石必跑**)· `python -m ruff check` · `npx eslint src/home/<f>.js` · 部署后 `/api/version`=200 + 双 worker startup complete。
+> **教训**:改 app.py(哪怕一行 import)必跑 black,否则 CI `black --check .`(py3.11)红。
+> ════════════════════════════════════════════════════════════
+>
 > **最近更新**:2026-05-25(**第二十三会话 · B2 db.py→services 长跑续**)· **🟢 全部 push 4 批 + CI 绿 + 生产 401 验证。**
-> **⛔⛔ 下窗口先做 BUG 整改(Zihao 2026-05-25 换窗口前拍板:BUG > 整改)· Zihao 会在下窗口发 BUG 问题 · 修完 BUG 再回 B2 续抽剩余域(见 `REFACTOR_MASTER_PLAN.md` "下一个 task")。**
+> **✅ 上面那条「下窗口先做 BUG 整改」已在第二十四会话完成**:该 BUG = MR.ERP 推送失败,已修复+真实验收通过(见顶部第二十四会话段)。下窗口续 Workspace 工作台(B4 home.js 切换),不是回 db.py→services。
 > **第二十三会话(尾)· audit + team(`cc2c3f5`/`048a0e7`)**:抽 operation_logs 操作日志(3 函数 → `services/audit/store.py`)+ 员工管理(4 函数 → `services/team/store.py` · users role=member · add_employee 原 bare `find_user_by_username`→`db.find_user_by_username` · import bcrypt as _bcrypt 进 header)。**db.py 4745→4513** · unit 697→**702**。本会话共抽 **9 域** · db.py 7136→4513(-2623 · 累计自 10663 -6150)· 全 push 4 批 + CI 绿 + 生产 401 验证。
 > **第二十三会话(续)· vat_recon 三表组(P0-VAT 核心 · `cf712df`)**:抽 **19** 函数到 `services/recon/vat_recon_store.py`——三表 CRUD(vat_report/reconciliation_task/reconciliation_row)+ 屏 B 内嵌 client helper(find_client_by_tax_id/auto_create_client/get_client_by_id/find_or_create_client_by_tax_id)。**关键依赖处理**:find_or_create 原 bare 调 `create_client`(本会话已迁 clients/store)→ 改 `db.create_client`(re-export · 行为不变 · 且现在可被 `patch("db.create_client")` 拦截 · 新增守门测试证)· get_recon_row 的 module 级 `import json` 随域搬入新模块 header(db.py 该 import 已无别的消费者)。字节级提取(`get_cursor`→`db.get_cursor` + 精确改 create_client 调用 · 不误伤 `auto_create_client`)。**db.py 5484→4745(-744)** · unit 694→**697**(+3 契约:含 find_or_create 经 db.create_client 验证)· 既有 field_override(patch db.get_recon_row/db.get_cursor)+ salesvat + recon_handlers 全绿 · push + CI 绿 + 生产 `/api/recon/tasks` 401 验证。
 > **第二十三会话 · B2 续(Zihao "继续 · 授权 Push")**:**db.py 7136→5484** · 再抽 **6** 个 cohesive 域 DAL 到 `services/`:① `archive/store.py`(3 函数 · 智能归档 `ca4f242`)② `rd/store.py`(2 · RD 校验日限 `9a29821`)③ `cost/store.py`(6 · ocr_cost_log 成本记账+只读聚合 · 不涉扣费 `6870222`)④ `exceptions/store.py`(13 · 异常栏+白名单 · tenant 隔离矩阵 `9468ba6`)⑤ `clients/store.py`(16 · clients CRUD+供应商分类+买家→客户映射/解析 · tenant 隔离矩阵 · 字节级 PowerShell 提取 `1888f23`)⑥ `billing/store.py`(2 · billing_balance_log calibration 兜底 `5531a3b`)。**范式同上窗口**(cohesive 整片搬 · `import db`+运行时 `db.get_cursor()` · db.py 尾 `from services.X import x as x` re-export · 调用点零改动 · 私有不外露)· 大块(clients 750 行)用字节级 `$lines[a..b] -replace 'get_cursor\(','db.get_cursor('` 提取避免手抄出错。**守门**:每域契约测试(unit 682→**694** · +12)· 既有 `mock.patch("db.get_cursor"/"db.log_ocr_cost"/"db.get_latest_balance")` + buyer-resolver/salesvat 测试全绿(re-export 对象可被 patch)· black(py311)/ruff/check_imports/check_i18n(0/0)/LF 无 BOM。**两批 push master + CI 绿 + 生产逐域 401 验证**(/api/archive/settings · /api/rd/verify〔422〕· /api/admin/cost/overview · /api/exceptions/list · /api/clients · /api/categories 全返 401/422 非 500/404)。services 新增 6 个 store(archive/rd/cost/exceptions/clients/billing · 共 15 域)。⚠️ **下窗口续 B2 剩余域**(见 `REFACTOR_MASTER_PLAN.md` "下一个 task" · 由易到难:vat_recon 三表组〔P0-VAT 核心 · 中险〕/ membership+RLS〔别动 RLS infra〕/ tenant / 操作日志+员工 → 高敏后置 credits/charge_ocr/auth/ocr_history 建议 Zihao 在场)· **抽前必 re-grep 当前行号**。

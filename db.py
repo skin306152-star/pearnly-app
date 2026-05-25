@@ -1426,46 +1426,12 @@ def delete_ocr_history_with_pdf_paths(
 # v0.7 · 智能归档 DAL → services/archive/store.py (REFACTOR-B2)
 # 纯搬家 0 逻辑改 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
 # ============================================================
-# ============================================================
-# v0.8 · RD 校验日限(Free 5/天)
-# ============================================================
-def get_rd_daily_usage(user_id: str) -> int:
-    """返回今天用户已调 RD 的次数"""
-    try:
-        with get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT count FROM rd_daily_usage
-                WHERE user_id = %s AND day = CURRENT_DATE
-            """,
-                (user_id,),
-            )
-            r = cur.fetchone()
-            return int(r["count"]) if r else 0
-    except Exception as e:
-        logger.error(f"get_rd_daily_usage failed: {e}")
-        return 0
 
 
-def increment_rd_daily_usage(user_id: str, n: int = 1) -> int:
-    """RD 调用成功后 +1 · 自动按当天聚合"""
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                INSERT INTO rd_daily_usage (user_id, day, count)
-                VALUES (%s, CURRENT_DATE, %s)
-                ON CONFLICT (user_id, day) DO UPDATE
-                SET count = rd_daily_usage.count + EXCLUDED.count
-                RETURNING count
-            """,
-                (user_id, n),
-            )
-            r = cur.fetchone()
-            return int(r["count"]) if r else n
-    except Exception as e:
-        logger.error(f"increment_rd_daily_usage failed: {e}")
-        return 0
+# ============================================================
+# v0.8 · RD 校验日限 DAL → services/rd/store.py (REFACTOR-B2)
+# 纯搬家 0 逻辑改 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
+# ============================================================
 
 
 # ============================================================
@@ -7088,4 +7054,9 @@ from services.archive.store import (
     get_archive_settings as get_archive_settings,
     get_archive_template as get_archive_template,
     upsert_archive_settings as upsert_archive_settings,
+)
+
+from services.rd.store import (
+    get_rd_daily_usage as get_rd_daily_usage,
+    increment_rd_daily_usage as increment_rd_daily_usage,
 )

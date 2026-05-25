@@ -95,3 +95,12 @@ _bank_samples/
 #   只有 run_eval.py / README / ground_truth/example_synthetic.json 进 git
 tests/eval/_runs/
 tests/eval/ground_truth_local/
+
+# REFACTOR(2026-05-25 第二十一会话)· 本地 dev scratch / 诊断探针 / 临时输出(从不入库 · 历次会话遗留)
+probes/
+_deploy_nginx/
+_test_reports/
+recon-i18n-fixes-*.md
+
+# Claude Code 本地覆盖配置(每台机器各自的权限/偏好 · 按约定不入库)
+.claude/settings.local.json

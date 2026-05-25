@@ -1,9 +1,16 @@
 # 🤝 HANDOFF · Pearnly 整顿 B-C 阶段长跑
 
 > 单一权威源:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板 + B1 行)。本文件 = B-C 长跑接力专用速查。
-> **最后更新**:2026-05-25(**第二十一会话** · 因并发窗口占用 app.py · B-C 可执行搬家暂停 · 改做 D1 测试补缺 `d65b692`)
+> **最后更新**:2026-05-25(**第二十一会话** · D1 补 4 router 契约 + C1 抽测试中心 + 收尾遗留 OCR 重构上线 · 工作区已清理)
 
-> **⚠️ 第二十一会话插曲(D1 · 不是 B-C 搬家)**:开窗时另一窗口正在改 app.py/email_ingest.py/line_client.py(抽 `services/ocr/entrypoints.py` · 共享工作区未提交)。**关键约束**:C1 抽 home.js 可执行块必须 bump `home.js?v=` 来逐出旧缓存(否则旧 home.js + 新 bundle 双绑事件)· 而 `/api/version` = `_read_frontend_version()` 读 `home.js?v=` → bump 必弹版本横幅 → 铁律 #6 要改 app.py 里的 `release_notes` · **但 app.py 被并发窗口占着不能动**。故本窗口避开所有可执行搬家,改做纯测试补缺(`report/vat_excel/recon/admin_diagnostics` 4 个 router 契约测试 · +16 unit · 见 MASTER_PLAN D 行)。**下窗口先 `git status` 看并发窗口是否已合 app.py;合了再回 C1。**
+> **✅ 第二十一会话(全 push + CI 绿 + 生产验证 · 工作区干净)**:
+> - **D1**(`d65b692`):补 4 个 router 契约测试(report/vat_excel/recon/admin_diagnostics)· +16 unit。
+> - **C1**(`0377055`):测试中心 IIFE → `src/home/test-center.js`(skin only)· home.js 22703→**22210**。**安全 bump 策略**:只 bump main.js?v= 不动 home.js?v=(/api/version 不变 · 不弹横幅)· 生产 playwright 验证渲染 0 报错。
+> - **OCR 重构收尾**(`1eadc16`):上一会话遗留的 OCR 入口 helper 抽到 `services/ocr/entrypoints.py`(8 函数 · 171 行)已提交上线 · 生产 OCR 路由返 422(非 500)。⚠️ 未跑真额度 E2E · 建议真账号传发票冒烟计费。
+> - **清理**:scratch(probes/ _deploy_nginx/ _test_reports/ recon-i18n md)+ `.claude/settings.local.json` 入 .gitignore(后者 git rm --cached · 本地保留)· 工作区无尾巴。
+> - **admin-cost 抽迁尝试并回退**(load-order 纠缠:billing IIFE 装饰 + DOMContentLoaded 直绑)· 教训:多数 home.js 块有装饰器/裸名/inline onclick 纠缠 · 抽前必查引用。
+>
+> **下窗口**:app.py 已干净(OCR WIP 上线)· 全体用户 home.js 块现可正经抽(bump home.js?v= + 4 语 release_notes + 浏览器验证 · 抽前查装饰器纠缠 · 碰付费 UI 建议 Zihao 在场)· 或走无需 app.py 的 C2 home.css(不弹横幅)/ B2 db.py / D 测试(E2E 1/10)。
 
 
 
@@ -32,18 +39,19 @@
 
 | 文件 | 行数 | 验收目标 | 冲刺目标 |
 |---|---|---|---|
-| app.py | **4459** | < 500 | < 300 |
+| app.py | **4464** | < 500 | < 300 |
 | db.py | 10663 | < 500 | < 300 |
 | home.js | **22210** | < 200 | < 120 |
 | static/i18n-data.js | 9772 | — | 4 语 i18n 数据(window.I18N · prettier/eslint 豁免) |
 | src/home/test-center.js | 706 | — | 第二十一会话从 home.js 抽出(测试中心 · skin only · ES module) |
+| services/ocr/entrypoints.py | 171 | — | 第二十一会话 OCR 入口 helper(B2 风格 · web/LINE/email 共用) |
 | home.css | 16131 | < 500 | < 250 |
 | home.html | 6536 | < 1000 | < 500 |
 
-> 已有 **30** 个 `*_routes.py` · `src/home/` 3 模块(dashboard/billing/test-center)· home.js 32466→**22210**(C1:i18n -9763 + 测试中心 -493)。
-> ⚠️ **C1 续拆"只 bump main.js?v="安全模式(第二十一会话验证 · app.py 被并发窗口占时用)**:抽 home.js 可执行块本需 bump home.js?v= 逐出旧缓存,但 home.js?v= 驱动 /api/version → 弹横幅 → 要改 app.py release_notes。若该块抽出后"老 home.js 内联版 + 新 bundle 版"经 window 入口覆盖(后跑赢)且 load-time 副作用幂等(setInterval/subscribeI18n 等)→ 双跑无害 → **可只 bump main.js?v= 不动 home.js?v=**(交付新 bundle · 老缓存用户行为不变 · 新用户拿瘦身 home.js)。**前提**:该块经 `window.X` 入口被调用(非 home.js 内裸名调)· 且 load-time 无非幂等副作用(无重复事件直绑同一 DOM)。测试中心满足(且 skin only 零付费影响)。**对全体用户、有直绑事件的块(如改密 IIFE bindEvents)不适用 · 必须 bump home.js?v= + release_notes(改 app.py · 需 app.py 空闲)**。
+> 已有 **30** 个 `*_routes.py` · `src/home/` 3 模块(dashboard/billing/test-center)· `services/ocr/entrypoints.py` · home.js 32466→**22210**(C1:i18n -9763 + 测试中心 -493)。
+> ⚠️ **C1 续拆"只 bump main.js?v="安全模式(第二十一会话验证)**:抽 home.js 可执行块本需 bump home.js?v= 逐出旧缓存,但 home.js?v= 驱动 /api/version → 弹横幅 → 要改 app.py release_notes。若该块抽出后"老 home.js 内联版 + 新 bundle 版"经 window 入口覆盖(后跑赢)且 load-time 副作用幂等(setInterval/subscribeI18n 等)→ 双跑无害 → **可只 bump main.js?v= 不动 home.js?v=**(交付新 bundle · 老缓存用户行为不变 · 新用户拿瘦身 home.js)。**前提**:该块经 `window.X` 入口被调用(非 home.js 内裸名调)· 且 load-time 无非幂等副作用(无重复事件直绑同一 DOM)· 且无其他代码装饰该 window.X(admin-cost 因 billing IIFE 装饰被否)。测试中心满足(且 skin only 零付费影响)。**对全体用户、有直绑事件/被装饰的块不适用 · 必须 bump home.js?v= + release_notes(改 app.py)**。
 > ⚠️ **app.py < 500 无法靠"安全搬家"达成**:剩 ~3950 行是 login/OAuth/email-code(安全敏感 · 需专窗口)+ OCR recognize 核心(勿碰)+ LINE webhook(勿碰)+ /api/version(故意留)。
-> ⚠️ **并发窗口**:另一窗口在抽 `services/ocr/entrypoints.py`(改 app.py/email_ingest.py/line_client.py · 本会话末仍未提交)· 提交务必 `git add` 精确到自己文件。
+> ✅ **OCR helper 抽迁已完成**(`1eadc16` · `services/ocr/entrypoints.py`)· app.py/email_ingest 不再内联那批 OCR 入口逻辑 · 工作区已无遗留未提交改动。
 
 ---
 

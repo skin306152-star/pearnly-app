@@ -180,7 +180,7 @@
 
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
-| B1 | `app.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(20-30 个 router) | 4-6 周 | A1, A5 | 🟡 进行中 · **已抽 14 个 router**:notification(6)+ clients(5)+ exceptions(8)+ team(7)+ erp_mappings(12)+ email_ingest(6)+ rd(4)+ settings(5)+ **bank_recon(11 `faaa536`)+ admin_migration(7 `b33dd58`)+ admin_cost(10 `13eded7`)+ tenant(6 `fac5f62`)+ admin_logs(4 `574c92d`)+ erp_xero(8 `569b534`)** · 另把 `_plan_permissions`(`870290c`)+ `_tid`(`4755af7`)搬进 route_helpers · `_ensure_fresh_xero_token` 随 erp_xero · **app.py 10075→9546→8589→7263**(第十七会话 8589→7263 · 净 -1326)· 每组带 contract test(unit 530→552→**580**)· 守门 imports/i18n/unit/black/ruff 全绿 · LF 全程干净 · ⚠️ **第十七会话 7 commit 全留本地未 push**(领先 origin/master 7 个 · `faaa536..569b534`)· **下一组(均较纠缠 · 需先搬共享 helper)**:history(7 路由 · `_async_run_exception_checks` 170 行 + `_notify_*`/EXC_RULE 依赖 · 被 upload 路由共用)、`/api/erp/*` endpoints/push/logs(`_check_push_access` 共享 + 铁律 #10 async tripwire)、`/api/admin/users\|employees` 大组(多 helper + 孤立 users.csv) |
+| B1 | `app.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(20-30 个 router) | 4-6 周 | A1, A5 | 🟡 进行中 · **已抽 14 个 router**:notification(6)+ clients(5)+ exceptions(8)+ team(7)+ erp_mappings(12)+ email_ingest(6)+ rd(4)+ settings(5)+ **bank_recon(11 `faaa536`)+ admin_migration(7 `b33dd58`)+ admin_cost(10 `13eded7`)+ tenant(6 `fac5f62`)+ admin_logs(4 `574c92d`)+ erp_xero(8 `569b534`)** · 另把 `_plan_permissions`(`870290c`)+ `_tid`(`4755af7`)搬进 route_helpers · `_ensure_fresh_xero_token` 随 erp_xero · **app.py 10075→9546→8589→7263**(第十七会话 8589→7263 · 净 -1326)· 每组带 contract test(unit 530→552→**580**)· 守门 imports/i18n/unit/black/ruff 全绿 · LF 全程干净 · **第十八/十九会话续抽** categories/erp/admin_users + exception_checks/history 组(全 push)· **第二十会话续抽** pages(12)/me(3+UserInfo)/line_binding(4)· **app.py 7263→4459** · 共 **21 router + 30 个 *_routes.py** · unit →639 · 全 push+CI 绿+生产零丢路由。**B1 安全部分已到顶**:剩 22 @app 全安全敏感(login/OAuth/email-code/JWT+账号合并)或勿碰(OCR recognize 850 行/LINE webhook)或故意留(/api/version)· **app.py < 500 无法靠安全搬家达成** · 需 auth 专窗口(铁律 #16 登录关键路径 · Zihao 在场)· 详见 `HANDOFF_REFACTOR_BC.md` |
 | B2 | `db.py` 拆完 4k → 验收 < 500 行 / 冲刺 < 300 行(业务 SQL 迁 `services/`) | 3-4 周 | A1 | ⚪ |
 | B3 | 所有 `ensure_*` 迁 Alembic(25 个 · schema 完全版本化) | 3-4 周 | A2 | ⚪ |
 | B4 | 健康检查端点 `/health` + `/ready`(DB / Gemini / SMTP / LINE 各 check) | 半天 | — | ⚪ |
@@ -199,7 +199,7 @@
 
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
-| C1 | `home.js` 拆完 33k → 验收 < 200 行 / 冲刺 < 120 行(50-100 个 ES module · 每个 100-300 行) | 6-8 周 | A1 | 🟡 部分(已抽 dashboard + billing) |
+| C1 | `home.js` 拆完 33k → 验收 < 200 行 / 冲刺 < 120 行(50-100 个 ES module · 每个 100-300 行) | 6-8 周 | A1 | 🟡 进行中 · home.js 32466→**22703** · 已抽 dashboard+billing(IIFE→ES module)+ **i18n 字典 9763 行→`static/i18n-data.js`**(`ed6cfa8`/`3a11f81` · window.I18N · home.html sync 排 home.js 前 · 生产 playwright 验翻译正常)· check_i18n/2 测试改读新文件 · i18n-data.js 入 prettier/eslint 豁免(verbatim 数据带既有 dupe-key 债)· 下一步:抽 cohesive feature 函数群→`src/home/*`(受 load-order 约束 · 仿 dashboard 范式) |
 | C2 | `home.css` 拆完 7k → 验收 < 500 行 / 冲刺 < 250 行(20-30 个 component CSS) | 2-3 周 | A1 | ⚪ |
 | C3 | `home.html` 拆 6.5k → 验收 < 1000 行 / 冲刺 < 500 行(`<template>` 或服务端拼接) | 2 周 | C1 | ⚪ |
 | C4 | Design System / 组件库(按钮 / 输入框 / Modal / Toast / Card / Table 抽通用 component) | 3-4 周 | C1 | ⚪ |
@@ -305,8 +305,8 @@
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
-| B 后端 | 🟡 1/10 | B1 已抽 18 router + exception_checks 服务模块 · app.py 10075→**4888**(-51%) | 第十九会话 +6 模块:前半 categories/erp/admin_users 3 router + `_record_500`→route_helpers(✅ 已 push + CI 全绿 + 生产零丢路由 + 修 CI lint 红 `9ee3a6d`)· 后半 **history 组完成**(exception_checks.py 异常链 `b264790` → history_routes.py 11 路由 `c5af58e`+`1835bce` · ⚠️ 未 push)· 已有 **25** 个 *_routes.py · unit 597→622 · 剩 37 @app 全核心耦合区(OCR recognize 850 行/LINE webhook)或安全敏感区(auth/OAuth)· 建议转 C 前端或谨慎评估 · 详见 HANDOFF §5 |
-| C 前端 | 🟡 1/8(部分 C1) | — | 依赖 A1 · C1 已抽 dashboard + billing |
+| B 后端 | 🟡 1/10 | B1 **安全部分已到顶** · 已抽 21 router + exception_checks 服务模块 · app.py 10075→**4459**(-56%) | 第二十会话 +3 router(`d73f21f` pages 12 / `4ab85a5` me 3+UserInfo / `54ce2c1` line_binding 4 · 全 push+CI 绿+生产零丢路由)· 已有 **30** 个 *_routes.py · unit →639 · **剩 22 @app 全安全敏感**(login/Google+LINE OAuth/email-code/line_complete_email 含 JWT+账号合并)**或勿碰**(OCR recognize 850 行/LINE webhook)**或故意留**(/api/version)· app.py < 500 无法靠安全搬家达成 · 需 auth 专窗口 · 详见 HANDOFF |
+| C 前端 | 🟡 1/8(C1 进行中) | C1 启动:home.js 32466→**22703**(抽 i18n 9763 行) | 依赖 A1(✅)· 已抽 dashboard + billing(IIFE→ES module)+ **i18n 字典→`static/i18n-data.js`**(`ed6cfa8`+`3a11f81` · push+CI 绿+生产 playwright 验证翻译正常)· 下一步抽 cohesive feature 函数群→`src/home/*` |
 | D 测试 | 🟡 1/5(部分 D1) | — | 依赖 A1 |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |
 | F 数据 | ⚪ 0/3 | — | 依赖 B1 |
@@ -317,9 +317,9 @@
 **累计 task 数**:60 主 task · 已完成约 5 个(A0/A1/A2.1/A7/A9)+ 进行中约 3 个(C1/D1/I1)· 待启动 52 个
 
 **当前累积成果**(从 2026-05-21 EXECUTION_PLAN 开始):
-- `app.py` 10,060 → 9,211 行(减 849 · 阶段 5 后端拆 router)
-- `home.js` 33,768 → 33,251 行(减 517 · 阶段 7 抽 dashboard + billing)
-- 守门测试:0 → 293 unit + 1 E2E + 4 step CI 全绿
+- `app.py` 10,075 → **4,459 行**(减 5,616 · B1 拆 21 router + 服务模块 · 安全部分到顶)
+- `home.js` 33,768 → **22,703 行**(C1:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js`)
+- 守门测试:0 → **639 unit** + 1 E2E + CI(lint + test 双 job)全绿
 
 ---
 

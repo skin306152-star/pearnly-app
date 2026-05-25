@@ -123,6 +123,146 @@ body.sidebar-collapsed .topbar-left { width: var(--sidebar-w-collapsed); padding
     flex-shrink: 1;
     min-width: 0;
 }
+/* ============================================================
+   B4 (2026-05-26) · workspace 工作模式切换器(右上角控件 + 选择弹层)
+   ============================================================ */
+.ws-ctrl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    max-width: 240px;
+    padding: 0 12px;
+    background: transparent;
+    border: 1px solid var(--line, #e8e8e3);
+    border-radius: 7px;
+    font-size: 13px;
+    color: var(--ink-2, #4b5563);
+    cursor: pointer;
+    transition: all 120ms;
+    user-select: none;
+    font-family: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ws-ctrl-btn:hover {
+    background: var(--bg, #f4f4f0);
+    border-color: var(--ink-4, #d1d5db);
+    color: var(--ink, #111);
+}
+.ws-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 17, 17, 0.45);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.ws-modal-box {
+    background: #fff;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 420px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+.ws-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px 10px;
+}
+.ws-modal-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink, #111);
+}
+.ws-modal-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--ink-3, #6b7280);
+    padding: 0 4px;
+}
+.ws-modal-close:hover { color: var(--ink, #111); }
+.ws-modal-list {
+    padding: 4px 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.ws-modal-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--ink, #111);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+}
+.ws-modal-item:hover { background: var(--bg, #f4f4f0); }
+.ws-modal-item.active {
+    border-color: var(--brand, #4f46e5);
+    background: #f5f3ff;
+    font-weight: 600;
+}
+.ws-modal-item-ic { font-size: 16px; }
+.ws-modal-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-modal-empty {
+    padding: 8px 18px 12px;
+    font-size: 13px;
+    color: var(--ink-3, #6b7280);
+}
+.ws-modal-create {
+    padding: 8px 18px 16px;
+    border-top: 1px solid var(--line, #e8e8e3);
+    margin-top: 4px;
+}
+.ws-modal-create-toggle {
+    background: none;
+    border: none;
+    color: var(--brand, #4f46e5);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 0;
+    font-family: inherit;
+}
+.ws-modal-create-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+.ws-modal-create-input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--line, #e8e8e3);
+    border-radius: 7px;
+    font-size: 13px;
+    font-family: inherit;
+}
+.ws-modal-create-submit {
+    padding: 8px 14px;
+    background: var(--brand, #4f46e5);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
+.ws-modal-create-submit:hover { opacity: 0.9; }
 .cs-btn {
     display: inline-flex; align-items: center; gap: 6px;
     height: 32px;

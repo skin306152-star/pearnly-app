@@ -420,8 +420,20 @@ function _showSessionRevokedModal() {
 // ============================================================
 // API
 // ============================================================
+// B4 (2026-05-26) · 业务请求带上当前 workspace 账套主体(=在为哪家公司做账)。
+// 后端(B1)选读 X-Workspace-Client-Id · 带不上即 NULL · 不强制 · 不影响发票买方。
+// 个人模式 / 未选 → 不发头(返回 {})。
+function _wsHeader() {
+    try {
+        if (typeof window.getActiveWorkspaceClientId === 'function') {
+            const id = window.getActiveWorkspaceClientId();
+            if (id != null) return { 'X-Workspace-Client-Id': String(id) };
+        }
+    } catch (_) { /* 切换器未就绪 · 静默 */ }
+    return {};
+}
 async function apiGet(url) {
-    const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token, ..._wsHeader() } });
     if (resp.status === 401 || resp.status === 403) {
         // v118.11 · 修 BUG B 员工登录跳着陆页:兼容 string/object detail
         // 原代码只看 detail.code · 但后端经常用 detail="auth.xxx" 字符串 · 导致任何 401/403 都跳
@@ -453,7 +465,7 @@ async function apiGet(url) {
 async function apiPost(url, data) {
     const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ..._wsHeader() },
         body: JSON.stringify(data),
     });
     if (resp.status === 401 || resp.status === 403) {
@@ -488,7 +500,7 @@ async function apiPut(url, data) {
     try {
         const resp = await fetch(url, {
             method: 'PUT',
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ..._wsHeader() },
             body: JSON.stringify(data),
         });
         if (resp.status === 401 || resp.status === 403) {
@@ -519,6 +531,9 @@ async function apiPut(url, data) {
         return { ok: false, error: String(e) };
     }
 }
+// B4 (2026-05-26) · 暴露给 bundle 模块(workspace-switcher.js · fetch 列表 + 新建客户)。
+window.apiGet = apiGet;
+window.apiPost = apiPost;
 
 // ============================================================
 // 语言切换
@@ -17236,353 +17251,13 @@ try { window.I18N = I18N; } catch(e) {}
 })();
 
 // ============================================================
-// v118.28.0 · 顶栏客户切换器(ClientSwitcher)
-//   - localStorage 持久化 currentClientId
-//   - 选中后派发 'pearnly:client-changed' CustomEvent
-//   - history / exceptions / bank list / dashboard 各模块订阅事件 reload
-//   - 客户列表来自 window._clientsCache(已存在的全局缓存)
-//   - 删除当前选中客户后自动回退「全部客户」
-//   - subscribeI18n 注册 · 切语言不残留
+// B4 (2026-05-26) · 旧顶栏客户切换器(ClientSwitcher · 全 app 买方过滤器)已移除 ·
+//   被 workspace 工作模式切换器取代(src/home/workspace-switcher.js · 右上角唯一入口)。
+//   - window.getCurrentClientId 不再定义 · 余下消费者(history 2987 / dashboard 4872)
+//     均有 typeof===function 守卫 → 自动降级"显示全部"· 不崩。
+//   - 旧 'pearnly:client-changed' 事件的派发/监听随 IIFE 一起删除(自包含)。
+//   - 旧 cs-* DOM 标签 + CSS 成为死代码(harmless · C2 清 home.css 时一并删)。
 // ============================================================
-(function () {
-    'use strict';
-
-    const LS_KEY = 'pearnly_current_client_id';
-
-    // 状态
-    let _searchKw = '';
-    let _bound = false;
-
-    // ---------- 全局 API ----------
-    function getCurrentClientId() {
-        const v = localStorage.getItem(LS_KEY);
-        if (!v || v === 'null' || v === '0' || v === '') return null;
-        const n = parseInt(v, 10);
-        return isNaN(n) ? null : n;
-    }
-    function setCurrentClientId(id) {
-        const old = getCurrentClientId();
-        if (id == null || id === 0) {
-            localStorage.removeItem(LS_KEY);
-        } else {
-            localStorage.setItem(LS_KEY, String(id));
-        }
-        const next = getCurrentClientId();
-        if (old === next) return; // 无变化不派发
-        _emitChanged(next, old);
-    }
-    function _emitChanged(next, old) {
-        try {
-            window.dispatchEvent(new CustomEvent('pearnly:client-changed', {
-                detail: { clientId: next, previous: old }
-            }));
-        } catch (_) { /* silent · CustomEvent dispatch 极少 fail */ }
-    }
-
-    window.getCurrentClientId = getCurrentClientId;
-    window.setCurrentClientId = setCurrentClientId;
-
-    // ---------- 客户列表(从全局缓存读) ----------
-    function _allClients() {
-        const list = (window._clientsCache || []);
-        // 仅活跃客户进切换器(归档的不显示)
-        return list.filter(c => c && (c.is_active === true || c.is_active === undefined));
-    }
-
-    function _findClient(id) {
-        if (!id) return null;
-        return _allClients().find(c => Number(c.id) === Number(id)) || null;
-    }
-
-    function _initial(name) {
-        const s = String(name || '').trim();
-        if (!s) return '?';
-        return s.charAt(0).toUpperCase();
-    }
-
-    function _color(c) {
-        return (c && c.color) || '#1a365d';
-    }
-
-    function _t(key, fallback, vars) {
-        let s;
-        if (typeof t === 'function') {
-            s = t(key);
-            if (s === key) s = fallback;
-        } else {
-            s = fallback;
-        }
-        if (vars && typeof s === 'string') {
-            Object.keys(vars).forEach(k => {
-                s = s.replace('{' + k + '}', String(vars[k]));
-            });
-        }
-        return s;
-    }
-
-    // ---------- 渲染 ----------
-    function _renderButtonLabel() {
-        const root = document.getElementById('client-switcher');
-        const lbl = document.getElementById('cs-current-label');
-        if (!root || !lbl) return;
-        const cid = getCurrentClientId();
-        if (!cid) {
-            lbl.textContent = _t('cs-all', '全部客户');
-            root.classList.remove('has-selection');
-            return;
-        }
-        const c = _findClient(cid);
-        if (!c) {
-            // 当前选中客户已不存在(被删除/分配变更)→ 回退全部
-            localStorage.removeItem(LS_KEY);
-            lbl.textContent = _t('cs-all', '全部客户');
-            root.classList.remove('has-selection');
-            // 通知一次刷新(因为隐性变化)
-            _emitChanged(null, cid);
-            return;
-        }
-        lbl.textContent = c.name || ('#' + c.id);
-        root.classList.add('has-selection');
-    }
-
-    function _renderList() {
-        const wrap = document.getElementById('cs-list');
-        const empty = document.getElementById('cs-empty');
-        if (!wrap || !empty) return;
-
-        const cid = getCurrentClientId();
-        const all = _allClients();
-        const kw = String(_searchKw || '').trim().toLowerCase();
-        const filtered = kw
-            ? all.filter(c => (c.name || '').toLowerCase().includes(kw))
-            : all;
-
-        const html = [];
-
-        // 顶部固定项:全部客户(搜索时仍显示 · 除非搜索词与「all」明显不匹配 · 简化:始终显示)
-        const allActive = !cid;
-        const allText = _t('cs-all', '全部客户');
-        if (!kw || allText.toLowerCase().includes(kw)) {
-            html.push(
-                '<button type="button" class="cs-item' + (allActive ? ' active' : '') +
-                '" data-cid="" role="option" aria-selected="' + allActive + '">' +
-                    '<span class="cs-item-chip cs-chip-all">' +
-                        '<svg class="cs-item-chip-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-                            '<rect x="3" y="3" width="6" height="6" rx="1"/>' +
-                            '<rect x="11" y="3" width="6" height="6" rx="1"/>' +
-                            '<rect x="3" y="11" width="6" height="6" rx="1"/>' +
-                            '<rect x="11" y="11" width="6" height="6" rx="1"/>' +
-                        '</svg>' +
-                    '</span>' +
-                    '<span class="cs-item-text">' +
-                        '<span class="cs-item-name">' + escapeHtml(allText) + '</span>' +
-                    '</span>' +
-                    '<svg class="cs-item-check" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
-                        '<path d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z"/>' +
-                    '</svg>' +
-                '</button>'
-            );
-            if (filtered.length > 0) html.push('<div class="cs-divider"></div>');
-        }
-
-        // 客户列表
-        filtered.forEach(c => {
-            const active = (cid && Number(cid) === Number(c.id));
-            const invCnt = (typeof c.invoice_count === 'number') ? c.invoice_count : 0;
-            const meta = invCnt > 0
-                ? _t('cs-meta-invoices', '{n} 张发票', { n: invCnt })
-                : _t('cs-meta-no-invoice', '尚无发票');
-            html.push(
-                '<button type="button" class="cs-item' + (active ? ' active' : '') +
-                '" data-cid="' + Number(c.id) + '" role="option" aria-selected="' + active + '">' +
-                    '<span class="cs-item-chip" style="background:' + escapeHtml(_color(c)) + '">' +
-                        escapeHtml(_initial(c.name)) +
-                    '</span>' +
-                    '<span class="cs-item-text">' +
-                        '<span class="cs-item-name">' + escapeHtml(c.name || ('#' + c.id)) + '</span>' +
-                        '<span class="cs-item-meta">' + escapeHtml(meta) + '</span>' +
-                    '</span>' +
-                    '<svg class="cs-item-check" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
-                        '<path d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z"/>' +
-                    '</svg>' +
-                '</button>'
-            );
-        });
-
-        wrap.innerHTML = html.join('');
-
-        // 空态(搜索后无匹配,且「全部」也被搜索词过滤掉)
-        const showEmpty = (kw && filtered.length === 0 && !allText.toLowerCase().includes(kw));
-        empty.style.display = showEmpty ? '' : 'none';
-    }
-
-    function _rerenderAll() {
-        _renderButtonLabel();
-        _renderList();
-        // 同步 placeholder
-        const inp = document.getElementById('cs-search');
-        if (inp) {
-            const ph = _t('cs-search-ph', '搜索客户...');
-            inp.setAttribute('placeholder', ph);
-        }
-    }
-
-    // ---------- 交互 ----------
-    function _open() {
-        const root = document.getElementById('client-switcher');
-        if (!root) return;
-        root.classList.add('open');
-        const btn = document.getElementById('cs-toggle');
-        if (btn) btn.setAttribute('aria-expanded', 'true');
-        _searchKw = '';
-        const inp = document.getElementById('cs-search');
-        if (inp) {
-            inp.value = '';
-            setTimeout(() => { try { inp.focus(); } catch(_){ /* silent · 元素不可 focus */ } }, 50);
-        }
-        _renderList();
-    }
-    function _close() {
-        const root = document.getElementById('client-switcher');
-        if (!root) return;
-        root.classList.remove('open');
-        const btn = document.getElementById('cs-toggle');
-        if (btn) btn.setAttribute('aria-expanded', 'false');
-    }
-    function _toggle() {
-        const root = document.getElementById('client-switcher');
-        if (!root) return;
-        if (root.classList.contains('open')) _close();
-        else _open();
-    }
-
-    function _bindOnce() {
-        if (_bound) return;
-        const root = document.getElementById('client-switcher');
-        if (!root) return; // DOM 还没准备好(极早调用)· 后面再试
-        _bound = true;
-
-        // 切换按钮
-        const btn = document.getElementById('cs-toggle');
-        if (btn) {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                _toggle();
-            });
-        }
-
-        // 选项点击(事件委托)
-        const list = document.getElementById('cs-list');
-        if (list) {
-            list.addEventListener('click', (e) => {
-                const item = e.target.closest('.cs-item');
-                if (!item) return;
-                const raw = item.getAttribute('data-cid');
-                const id = (raw === '' || raw == null) ? null : parseInt(raw, 10);
-                setCurrentClientId(id);
-                _renderButtonLabel();
-                _close();
-            });
-        }
-
-        // 搜索
-        const inp = document.getElementById('cs-search');
-        if (inp) {
-            inp.addEventListener('input', (e) => {
-                _searchKw = e.target.value || '';
-                _renderList();
-            });
-            inp.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    _close();
-                    e.stopPropagation();
-                }
-            });
-        }
-
-        // 点空白关闭
-        document.addEventListener('click', (e) => {
-            const r = document.getElementById('client-switcher');
-            if (!r || !r.classList.contains('open')) return;
-            if (!r.contains(e.target)) _close();
-        });
-
-        // ESC 关闭
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const r = document.getElementById('client-switcher');
-                if (r && r.classList.contains('open')) _close();
-            }
-        });
-    }
-
-    // ---------- 数据刷新钩子 ----------
-    // 客户缓存更新后(loadClientsCache 之后)· 刷一次切换器
-    function _onClientsRefreshed() {
-        _bindOnce();
-        _rerenderAll();
-    }
-    window._refreshClientSwitcher = _onClientsRefreshed;
-
-    // ---------- 切换事件:通知各列表模块 reload ----------
-    window.addEventListener('pearnly:client-changed', () => {
-        // 1) OCR 历史:仅当用户在历史页才立刻 reload · 否则下次进页生效
-        try {
-            if (typeof currentRoute === 'string' && currentRoute === 'history' &&
-                typeof loadHistoryPage === 'function') {
-                // 切换 = 第 1 页起
-                if (typeof _historyState === 'object' && _historyState) {
-                    _historyState.page = 0;
-                }
-                loadHistoryPage();
-            }
-        } catch (_) {}
-
-        // 2) 异常栏:复用现有 client filter 同步 · 切换器优先级高于页内下拉
-        try {
-            if (window._excState) {
-                const cid = getCurrentClientId();
-                window._excState.currentClient = cid ? String(cid) : '';
-                // 同步页内 select(若存在)
-                const sel = document.getElementById('exc-client-filter');
-                if (sel) sel.value = cid ? String(cid) : '';
-                if (typeof currentRoute === 'string' && currentRoute === 'exceptions' &&
-                    typeof window.loadExceptionsPage === 'function') {
-                    window.loadExceptionsPage();
-                }
-            }
-        } catch (_) {}
-
-        // 3) 银行对账:在对账页则触发其重新加载(模块自检 currentRoute)
-        try {
-            if (typeof currentRoute === 'string' && currentRoute === 'reconcile' &&
-                typeof window.loadReconcilePage === 'function') {
-                window.loadReconcilePage();
-            }
-        } catch (_) {}
-
-        // 4) 仪表盘:进页时再 fetch · 这里不动
-    });
-
-    // ---------- i18n 订阅 ----------
-    if (typeof window.subscribeI18n === 'function') {
-        window.subscribeI18n('client-switcher', _rerenderAll);
-    }
-
-    // ---------- 启动 ----------
-    // DOM 已就绪(home.js 末尾执行)· 直接绑一次 + 渲染按钮 label
-    function _boot() {
-        _bindOnce();
-        _renderButtonLabel();
-        // 客户缓存可能还没拉好 · 先空列表 · loadClientsCache 完会回调 _refreshClientSwitcher
-        _renderList();
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _boot);
-    } else {
-        _boot();
-    }
-})();
 
 // ============================================================
 // REFACTOR-C1(2026-05-25)· 测试中心(Test Center)已抽到 src/home/test-center.js

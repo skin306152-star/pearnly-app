@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835060">
+<link rel="stylesheet" href="/static/home.css?v=11835080">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -2155,34 +2155,11 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
         <!-- v118.28.5 · 语言切换器从这里移到「设置 → 个人资料」内 · 顶栏右侧腾给客户切换器 -->
 
         <!-- v118.28.5 · 客户切换器(从 brand 旁迁移到顶栏右侧 · 跟 Linear / Notion workspace switcher 同位置) -->
+        <!-- B4 (2026-05-26) · workspace 工作模式切换器(账套主体=在为哪家公司做账)·
+             取代旧 ClientSwitcher(买方过滤)。控件由 src/home/workspace-switcher.js 渲染进
+             #workspace-switcher-root。外层保留 id=client-switcher 供 admin-mode 隐藏 + 既有定位 CSS。 -->
         <div class="client-switcher cs-right" id="client-switcher">
-            <button type="button" class="cs-btn" id="cs-toggle" aria-haspopup="listbox" aria-expanded="false">
-                <svg class="cs-btn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 17V6a1 1 0 011-1h5a1 1 0 011 1v11"/>
-                    <path d="M10 17V9a1 1 0 011-1h5a1 1 0 011 1v8"/>
-                    <line x1="3" y1="17" x2="17" y2="17"/>
-                    <line x1="6" y1="9" x2="7" y2="9"/>
-                    <line x1="6" y1="12" x2="7" y2="12"/>
-                    <line x1="13" y1="12" x2="14" y2="12"/>
-                </svg>
-                <span class="cs-btn-label" id="cs-current-label" data-i18n="cs-all">全部客户</span>
-                <svg class="cs-caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/></svg>
-            </button>
-            <div class="cs-menu" id="cs-menu" role="listbox" aria-label="Client switcher">
-                <div class="cs-search-wrap">
-                    <svg class="cs-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="9" cy="9" r="6"/>
-                        <line x1="14" y1="14" x2="17" y2="17"/>
-                    </svg>
-                    <input type="text" class="cs-search-input" id="cs-search" data-i18n-placeholder="cs-search-ph" placeholder="搜索客户...">
-                </div>
-                <div class="cs-list" id="cs-list" role="presentation">
-                    <!-- 客户列表 · JS 动态渲染 -->
-                </div>
-                <div class="cs-empty" id="cs-empty" style="display:none;">
-                    <span data-i18n="cs-empty">没找到客户</span>
-                </div>
-            </div>
+            <div id="workspace-switcher-root"></div>
         </div>
 
         <!-- NAV-IA Phase 1 · 顶栏搜索框(2026-05-15 拍板 · 点击/⌘K 弹命令面板) -->
@@ -6507,7 +6484,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 
 <!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 home.js 前 · 提供 window.I18N -->
 <script src="/static/i18n-data.js?v=11835078"></script>
-<script src="/static/home.js?v=11835078"></script>
+<script src="/static/home.js?v=11835080"></script>
 <!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE 不引 home.js · runRecon 检测 needs_mapping 时调用 -->
 <script src="/static/recon-mapping.js?v=11835072" defer></script>
 <!-- ADR-006 S8 · PDF/扫描件逐行核对纠错面板 · 独立 IIFE · runRecon 检测 needs_review 时调用 -->
@@ -6516,7 +6493,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
      ES module(type=module 自动 defer)· 必在 home.js 后执行 ·
      依赖 home.js 的全局:t / showToast / escapeHtml / subscribeI18n / _userInfo / currentRoute / loadDashboard
      REFACTOR-C1(2026-05-25)· 抽测试中心 + 重建 bundle · 只 bump 本 main.js?v=(不动 home.js?v= → /api/version 不变 → 不弹横幅) -->
-<script type="module" src="/static/dist/main.js?v=11835079"></script>
+<script type="module" src="/static/dist/main.js?v=11835080"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + 3-step wizard ·

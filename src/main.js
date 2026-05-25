@@ -9,7 +9,8 @@
 import './home/dashboard.js';
 import './home/billing.js';
 import './home/test-center.js'; // REFACTOR-C1 · 测试中心(skin only)
+import './home/workspace-switcher.js'; // B4 · workspace 工作模式切换器(取代旧 ClientSwitcher)
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
-    console.info('[pearnly] vite bundle loaded · dashboard + billing + test-center');
+    console.info('[pearnly] vite bundle loaded · dashboard + billing + test-center + workspace-switcher');
 }

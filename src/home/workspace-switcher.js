@@ -170,6 +170,175 @@
         if (btn) btn.addEventListener('click', () => openWorkspaceChooser(null));
     }
 
+    // ---------- 选择面板真实 UI(B4 · 自包含弹层 · 不进 home.js 巨石)----------
+    // openWorkspaceChooser 调 window.openWorkspaceChooserUI(opts) · opts 见下。
+    function _esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+        });
+    }
+
+    function openWorkspaceChooserUI(opts) {
+        opts = opts || {};
+        const clients = opts.clients || [];
+        const active = opts.active;
+        // 关掉已存在的弹层(防叠层)
+        const old = document.getElementById('ws-modal');
+        if (old) old.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ws-modal';
+        overlay.className = 'ws-modal';
+
+        const personalActive = getWorkMode() === 'personal' || active == null;
+        const rows = [];
+        // 个人事务
+        rows.push(
+            '<button type="button" class="ws-modal-item' +
+                (personalActive ? ' active' : '') +
+                '" data-ws-personal="1">' +
+                '<span class="ws-modal-item-ic">👤</span>' +
+                '<span class="ws-modal-item-name">' +
+                _esc(_t('ws-personal', '个人事务')) +
+                '</span>' +
+                '</button>'
+        );
+        // 客户列表
+        clients.forEach(function (c) {
+            const isActive = active != null && Number(active) === Number(c.id);
+            rows.push(
+                '<button type="button" class="ws-modal-item' +
+                    (isActive ? ' active' : '') +
+                    '" data-ws-pick="' +
+                    _esc(c.id) +
+                    '">' +
+                    '<span class="ws-modal-item-ic">🏢</span>' +
+                    '<span class="ws-modal-item-name">' +
+                    _esc(c.name || '#' + c.id) +
+                    '</span>' +
+                    '</button>'
+            );
+        });
+
+        const emptyHtml =
+            !clients.length && opts.emptyHint
+                ? '<div class="ws-modal-empty">' + _esc(opts.emptyHint) + '</div>'
+                : '';
+        const createHtml = opts.canCreate
+            ? '<div class="ws-modal-create">' +
+              '<button type="button" class="ws-modal-create-toggle" data-ws-create-toggle="1">+ ' +
+              _esc(_t('ws-create-client', '新建客户')) +
+              '</button>' +
+              '<div class="ws-modal-create-form" data-ws-create-form style="display:none;">' +
+              '<input type="text" class="ws-modal-create-input" data-ws-create-name placeholder="' +
+              _esc(_t('ws-create-ph', '客户/公司名称')) +
+              '">' +
+              '<button type="button" class="ws-modal-create-submit" data-ws-create-submit="1">' +
+              _esc(_t('ws-create-submit', '创建')) +
+              '</button>' +
+              '</div>' +
+              '</div>'
+            : '';
+
+        overlay.innerHTML =
+            '<div class="ws-modal-box" role="dialog" aria-modal="true">' +
+            '<div class="ws-modal-head">' +
+            '<span class="ws-modal-title">' +
+            _esc(_t('ws-chooser-title', '选择工作模式')) +
+            '</span>' +
+            '<button type="button" class="ws-modal-close" data-ws-close="1" aria-label="close">✕</button>' +
+            '</div>' +
+            '<div class="ws-modal-list">' +
+            rows.join('') +
+            '</div>' +
+            emptyHtml +
+            createHtml +
+            '</div>';
+
+        document.body.appendChild(overlay);
+
+        function close() {
+            overlay.remove();
+        }
+
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay || e.target.closest('[data-ws-close]')) {
+                close();
+                return;
+            }
+            const personalBtn = e.target.closest('[data-ws-personal]');
+            if (personalBtn) {
+                if (typeof opts.onPersonal === 'function') opts.onPersonal();
+                close();
+                renderWorkspaceControl();
+                return;
+            }
+            const pickBtn = e.target.closest('[data-ws-pick]');
+            if (pickBtn) {
+                const id = pickBtn.getAttribute('data-ws-pick');
+                if (typeof opts.onPick === 'function') opts.onPick(id);
+                close();
+                renderWorkspaceControl();
+                return;
+            }
+            const toggle = e.target.closest('[data-ws-create-toggle]');
+            if (toggle) {
+                const form = overlay.querySelector('[data-ws-create-form]');
+                if (form) {
+                    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+                    const inp = form.querySelector('[data-ws-create-name]');
+                    if (inp) inp.focus();
+                }
+                return;
+            }
+            const submit = e.target.closest('[data-ws-create-submit]');
+            if (submit) {
+                _doCreate(overlay, opts, close);
+                return;
+            }
+        });
+    }
+
+    async function _doCreate(overlay, opts, close) {
+        const inp = overlay.querySelector('[data-ws-create-name]');
+        const name = inp ? (inp.value || '').trim() : '';
+        if (!name) {
+            if (inp) inp.focus();
+            return;
+        }
+        let res = null;
+        try {
+            if (typeof window.apiPost === 'function') {
+                const r = await window.apiPost('/api/workspace/clients', { name: name });
+                res = r && typeof r.json === 'function' ? await r.json().catch(() => null) : r;
+            }
+        } catch {
+            res = null;
+        }
+        const newId = res && (res.id || (res.client && res.client.id));
+        if (!newId) {
+            if (typeof window.showToast === 'function') {
+                window.showToast(_t('ws-create-fail', '新建客户失败 · 请重试'), 'error');
+            }
+            return;
+        }
+        // 刷新缓存(让右上角标签能解析到新客户名)再选中它
+        window._workspaceClientsCache = await fetchWorkspaceClients();
+        setActiveWorkspaceClientId(Number(newId));
+        if (typeof opts.onPick === 'function') {
+            // onPick 已在弹层里再调一次 setActive 也幂等 · 但 _doCreate 直接走完整闭环更稳
+        }
+        close();
+        renderWorkspaceControl();
+    }
+
+    window.openWorkspaceChooserUI = openWorkspaceChooserUI;
+
+    // 任何工作模式/选定客户变化 → 右上角标签即时刷新。
+    window.addEventListener('pearnly:workspace-changed', function () {
+        renderWorkspaceControl();
+    });
+
     // ---------- 暴露 ----------
     window.getWorkMode = getWorkMode;
     window.getActiveWorkspaceClientId = getActiveWorkspaceClientId;

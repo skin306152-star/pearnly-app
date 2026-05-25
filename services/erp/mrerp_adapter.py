@@ -69,6 +69,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import mrerp_xlsx_generator  # noqa: E402
 from services.erp._browser import BrowserSession  # noqa: E402
+from services.erp.session_lock import mrerp_session_lock  # noqa: E402
 from services.erp.exceptions import (  # noqa: E402
     MRERPAuthError,
     MRERPBusinessError,
@@ -205,6 +206,7 @@ class MRERPAdapter:
         master_data_auto_create: bool = False,
         seed_customer_code: Optional[str] = None,
         seed_product_code: Optional[str] = None,
+        serialize_sessions: bool = True,
     ):
         if not login_url:
             raise ValueError("login_url required")
@@ -246,6 +248,11 @@ class MRERPAdapter:
         self._customer_sync = None  # lazy-created on first use
         self._product_sync = None  # lazy-created on first use
 
+        # 2026-05-25 · 跨进程会话串行锁(治 worker 互踢 ERR_AUTH)。
+        # 老 PHP 单账号单会话 · 2 worker 同推同账号会互踢 · 见 session_lock.py。
+        self.serialize_sessions = bool(serialize_sessions)
+        self._lock_cm = None
+
         self._session: Optional[BrowserSession] = None
         self._logged_in = False
         self._company_selected = False
@@ -280,6 +287,15 @@ class MRERPAdapter:
     # ----- context lifecycle -----------------------------------------
 
     def __enter__(self) -> "MRERPAdapter":
+        # 先拿账号级跨进程串行锁(在开浏览器之前 · 不持浏览器空等锁)·
+        # 同一 MR.ERP 账号同一刻只允许一个会话登录 · 避免老 PHP 互踢 ERR_AUTH。
+        if self.serialize_sessions:
+            self._lock_cm = mrerp_session_lock(f"{self.login_url}|{self._username}")
+            try:
+                self._lock_cm.__enter__()
+            except Exception:
+                # 锁基础设施异常不应阻断推送 · 降级放行
+                self._lock_cm = None
         secrets = [self._password]
         if len(self._username) >= 3:
             secrets.append(self._username)
@@ -297,6 +313,12 @@ class MRERPAdapter:
         self._session = None
         self._logged_in = False
         self._company_selected = False
+        # 释放会话锁(浏览器关闭后再放锁 · 确保整段操作期间独占账号)
+        if self._lock_cm is not None:
+            try:
+                self._lock_cm.__exit__(exc_type, exc, tb)
+            finally:
+                self._lock_cm = None
 
     # ----- internals --------------------------------------------------
 

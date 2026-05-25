@@ -319,7 +319,8 @@
 **当前累积成果**(从 2026-05-21 EXECUTION_PLAN 开始):
 - `app.py` 10,075 → **4,459 行**(减 5,616 · B1 拆 21 router + 服务模块 · 安全部分到顶)
 - `home.js` 33,768 → **22,210 行**(C1:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js` · + 测试中心 493 行→`src/home/test-center.js`)
-- 守门测试:0 → **660 unit**(origin · 第二十一会话 +16 router 契约 `d65b692` + 5 test-center 抽迁静态契约 `0377055`)+ 1 E2E + CI(lint + test 双 job)全绿
+- `services/ocr/entrypoints.py`(171 行 · 第二十一会话 `1eadc16`):web/LINE/email 三处共用 OCR 入口 helper 从 app.py/email_ingest 抽出(B2 风格 · SUPPORTED_OCR_EXTENSIONS 单一来源 · 生产验证 OCR 路由 422 非 500)
+- 守门测试:0 → **661 unit**(origin · 第二十一会话 +16 router 契约 `d65b692` + 5 test-center 静态契约 `0377055` + 8 OCR entrypoints 契约 `1eadc16`)+ 1 E2E + CI(lint + test 双 job)全绿
 
 ---
 

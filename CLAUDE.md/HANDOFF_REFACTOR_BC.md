@@ -1,7 +1,7 @@
 # 🤝 HANDOFF · Pearnly 整顿 B-C 阶段长跑
 
 > 单一权威源:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板 + B1 行)。本文件 = B-C 长跑接力专用速查。
-> **最后更新**:2026-05-25(**第二十三会话** · B2 db.py→services 续抽 6 域:archive/rd/cost/exceptions/clients/billing · db.py 7136→5484 · 两批 push+CI 绿+生产 401 验证)
+> **最后更新**:2026-05-25(**第二十三会话** · B2 db.py→services 续抽 7 域:archive/rd/cost/exceptions/clients/billing/vat_recon〔P0-VAT 三表组 19 函数〕· db.py 7136→4745 · 三批 push+CI 绿+生产 401 验证)
 
 > **✅ 第二十一会话(全 push + CI 绿 + 生产验证 · 工作区干净)**:
 > - **D1**(`d65b692`):补 4 个 router 契约测试(report/vat_excel/recon/admin_diagnostics)· +16 unit。
@@ -40,7 +40,7 @@
 | 文件 | 行数 | 验收目标 | 冲刺目标 |
 |---|---|---|---|
 | app.py | **4464** | < 500 | < 300 |
-| db.py | **5484** | < 500 | < 300（B2 抽 15 域 DAL→services · 10663→5484 · -5179）|
+| db.py | **4745** | < 500 | < 300（B2 抽 16 域 DAL→services · 10663→4745 · -5918）|
 | home.js | **22210** | < 200 | < 120 |
 | static/i18n-data.js | 9772 | — | 4 语 i18n 数据(window.I18N · prettier/eslint 豁免) |
 | src/home/test-center.js | 706 | — | 第二十一会话从 home.js 抽出(测试中心 · skin only · ES module) |

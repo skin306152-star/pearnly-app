@@ -3098,6 +3098,23 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                 }), 'success');
             }
 
+            // P0 修 (2026-05-26) · 同页多票防静默漏:后端检测到某页发票号候选数 >
+            // 实际识别数 → 明确警告用户"可能漏识别发票 · 请人工核对"· 不静默成功。
+            if (data.missed_invoice_warnings && data.missed_invoice_warnings.length) {
+                const _pages = data.missed_invoice_warnings
+                    .map(function (w) { return w.page; })
+                    .filter(function (p) { return p != null; });
+                showToast(
+                    t('missed-invoice-warn', {
+                        file: data.filename,
+                        pages: _pages.join(', '),
+                    }),
+                    'warn',
+                    8000,
+                );
+                console.warn('[OCR] possible missed invoice(s)', data.missed_invoice_warnings);
+            }
+
             // v0.12 · Typhoon 增援提示
             if (data.typhoon_enhanced && data.typhoon_pages && data.typhoon_pages.length) {
                 showToast(t('typhoon-enhanced-toast', {

@@ -643,6 +643,27 @@ def _process_one_page(
 
     total_ms = int((time.time() - t_total) * 1000)
 
+    # P0 修 (2026-05-26) · 同页多票 · 人工兜底(最后手段)。
+    # 顺序:① L2 文本提取(含 additional_invoices)→ ② 若候选>提取 · Rule 7 已让
+    # L3 视觉复读再补一次(加强自身 OCR)→ ③ 这里基于 L3 复读后的【最终】invoice
+    # 再数一次:仍然候选>提取,说明 OCR 已尽力(残缺/涂抹/印刷异常等票据本身问题)
+    # 才标人工核对 + 警告。绝不静默成功,但也不在 OCR 还能补救前就丢给人工。
+    if (
+        document_type in ("auto", "invoice")
+        and not invoice.is_not_invoice
+        and invoice.invoice_number
+    ):
+        extracted_n = 1 + len(invoice.additional_invoices or [])
+        candidate_n = _count_invoice_no_candidates(l1_page.full_text, invoice.invoice_number)
+        if candidate_n > extracted_n:
+            reason = (
+                f"possible_missed_invoice: page shows {candidate_n} invoice-number "
+                f"candidates matching the pattern of {invoice.invoice_number!r} but only "
+                f"{extracted_n} invoice(s) extracted after visual re-read — manual review needed"
+            )
+            validation_warnings.append(reason)
+            needs_manual_review = True
+
     # Record final invoice pattern in pattern memory (after possible L3
     # correction). Subsequent pages benefit from this learned baseline.
     if (
@@ -827,7 +848,50 @@ def _evaluate_triggers(
         if anomaly:
             triggers.append(anomaly)
 
+    # Rule 7 (P0 2026-05-26 · 同页多票):OCR 文本里的发票号候选数 > 已提取数 →
+    # 大概率漏了一张堆叠发票。把它当作 L3 视觉复读的触发条件(先加强自身 OCR ·
+    # 让 Flash 看图把漏的那张补回来)· 而不是直接丢给人工。真正的人工兜底只在
+    # L3 复读后仍然短缺时才在 pipeline 末尾触发。
+    if invoice.invoice_number:
+        extracted_n = 1 + len(invoice.additional_invoices or [])
+        candidate_n = _count_invoice_no_candidates(page.full_text, invoice.invoice_number)
+        if candidate_n > extracted_n:
+            triggers.append(
+                f"possible_missed_invoice(L2): {candidate_n} invoice-number candidates "
+                f"vs {extracted_n} extracted — escalate to visual re-read"
+            )
+
     return triggers
+
+
+def _count_invoice_no_candidates(full_text: str, sample_invoice_no: str) -> int:
+    """P0 修 (2026-05-26) · 数 OCR 文本里跟 sample 发票号"同族"的不同候选号个数。
+
+    从已成功提取的 invoice_number 推导出结构正则(字母段照搬 · 数字段→\\d+),
+    再在整页 OCR 文本里 findall · 去重计数。用于"同页多票防静默漏":候选数 >
+    实际提取数 → 大概率漏了一张堆叠发票。
+
+    例:sample='IV69/00179' → 正则 'IV\\d+/\\d+' · 页文本含 IV69/00179 + IV69/00189
+        → 返回 2。
+    保守:推不出正则 / 正则错 → 返回 0(不误报)。
+    """
+    if not full_text or not sample_invoice_no:
+        return 0
+    parts = re.split(r"(\d+)", str(sample_invoice_no).strip())
+    segs: List[str] = []
+    for seg in parts:
+        if not seg:
+            continue
+        segs.append(r"\d+" if seg.isdigit() else re.escape(seg))
+    if not segs or r"\d+" not in segs:
+        # 没有数字段的发票号(纯字母)→ 正则会过度匹配 · 不数
+        return 0
+    pattern = "".join(segs)
+    try:
+        found = re.findall(pattern, full_text)
+    except re.error:
+        return 0
+    return len({f.strip() for f in found if f.strip()})
 
 
 def _check_amount_math(invoice: ThaiInvoice) -> Optional[str]:

@@ -146,6 +146,7 @@ Output ONE JSON object matching this schema (no markdown, no explanation, just J
   "items": [{"name": "...", "qty": "...", "price": "...", "subtotal": "..."}],
   "notes": "remark text",
   "category": "3-5 char summary in items' language",
+  "additional_invoices": [],
   "source_refs": {
     "invoice_number": {"value": "...", "source_text": "as printed", "source_column": "Invoice No."} or omit,
     "total_amount":   {"value": "...", "source_text": "as printed", "source_column": "Total"     } or omit,
@@ -171,6 +172,14 @@ CRITICAL RULES (same as previous extraction; pay attention):
 7. AMOUNT ARITHMETIC: When trigger reasons mention amount mismatch, look carefully at subtotal/vat/total in the image. The correct relationship is: subtotal + vat = total_amount (within rounding tolerance).
 8. is_not_invoice: true ONLY if the text is clearly not an invoice.
 9. is_copy_or_duplicate: true if the text contains สำเนา / COPY / DUPLICATE markers.
+10. MULTIPLE INVOICES ON ONE PAGE (CRITICAL — a trigger reason may say a stacked
+    invoice was missed): a single page image often contains TWO OR MORE separate
+    tax invoices stacked vertically, each with its OWN invoice number, buyer, and
+    total. Look at the WHOLE image top-to-bottom. Put the FIRST (topmost) invoice
+    in the top-level fields and EACH remaining invoice as a COMPLETE object in the
+    "additional_invoices" array. Every distinct invoice number visible on the page
+    MUST appear exactly once (top-level or in additional_invoices) — never merge or
+    drop one. Keep nested additional_invoices as []. Only one invoice → leave it [].
 """
 
 

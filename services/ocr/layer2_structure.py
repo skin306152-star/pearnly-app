@@ -346,6 +346,7 @@ Output ONE JSON object matching this schema (no markdown fences, no explanation,
   "items": [{"name": "...", "qty": "...", "price": "...", "subtotal": "..."}],
   "notes": "remark text",
   "category": "3-5 char summary in items' language (e.g. 餐饮, ค่าขนส่ง)",
+  "additional_invoices": [],
   "source_refs": {
     "invoice_number": {"value": "...", "source_text": "as printed", "source_column": "Invoice No."} or omit,
     "total_amount":   {"value": "...", "source_text": "as printed", "source_column": "Total"     } or omit,
@@ -374,6 +375,22 @@ CRITICAL RULES:
 6. WHT (หัก ณ ที่จ่าย / ภ.ง.ด.3 / ภ.ง.ด.53): Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%"). Only extract if printed; do NOT guess.
 7. is_not_invoice: true ONLY if the text is clearly not an invoice (letter, contract, blank page, signature page).
 8. is_copy_or_duplicate: true if the text contains สำเนา / COPY / DUPLICATE markers.
+9. MULTIPLE INVOICES ON ONE PAGE (CRITICAL — do not drop any):
+   - A single page image often contains TWO OR MORE separate tax invoices stacked
+     vertically (top half = one invoice, bottom half = another), each with its OWN
+     invoice number, its own buyer, and its own total. This is common in Thai
+     invoice scans.
+   - Detect this by looking for more than one distinct invoice number / more than
+     one "ใบกำกับภาษี" header / more than one grand-total block on the page.
+   - When there are N invoices on the page: put the FIRST (topmost) invoice in the
+     top-level fields, and put EACH of the remaining invoices as a COMPLETE object
+     (same fields: invoice_number, date, buyer_name, subtotal, vat, total_amount,
+     items, ...) inside the "additional_invoices" array.
+   - Every distinct invoice number you can see on the page MUST appear exactly once,
+     either as the top-level invoice or inside additional_invoices. Never merge two
+     different invoices into one. Never silently drop the second invoice.
+   - Inside additional_invoices objects, keep their own "additional_invoices" as [].
+   - If the page truly has only ONE invoice, leave additional_invoices as [].
 """
 
 _USER_PROMPT_PREFIX = "Extract from this OCR text:\n\n"

@@ -51,8 +51,14 @@ def _invoice_to_legacy_fields(inv: ThaiInvoice) -> Dict[str, Any]:
 
     Adds the legacy `tax_ids` list (concat of seller_tax + buyer_tax,
     deduplicated) that some downstream consumers may read.
+
+    P0 修 (2026-05-26): drops the `additional_invoices` key — those are
+    flattened into separate legacy page entries by pipeline_result_to_legacy_dict,
+    so the per-invoice `fields` must NOT carry the nested list (would bloat
+    history + confuse the grouper).
     """
     fields = inv.model_dump(mode="json")
+    fields.pop("additional_invoices", None)
     tax_ids: List[str] = []
     if inv.seller_tax:
         tax_ids.append(inv.seller_tax)
@@ -62,15 +68,27 @@ def _invoice_to_legacy_fields(inv: ThaiInvoice) -> Dict[str, Any]:
     return fields
 
 
-def _page_to_legacy(p: PipelinePageResult) -> Dict[str, Any]:
+def _page_to_legacy(
+    p: PipelinePageResult,
+    invoice: ThaiInvoice = None,
+    is_additional: bool = False,
+) -> Dict[str, Any]:
+    """Build a legacy page dict. When `invoice` is given (an additional
+    invoice on the same physical page), use it instead of p.invoice and tag
+    the entry as a multi-invoice sibling (same page_number / metadata)."""
+    inv = invoice if invoice is not None else p.invoice
     out: Dict[str, Any] = {
         "page_number": p.page_number,
         "page": p.page_number,  # alternate key used by some downstream consumers
+        # P0 修: 物理页号固定 · 同页多票的 sibling 也归属同一物理页(grouper 按
+        # invoice_number 分组 · page_index 保留真实页号便于 PDF 留底定位)。
+        "page_index": p.page_number,
         "text": "",  # not surfaced by pipeline; downstream rarely uses raw text
         "lines": [],
-        "fields": _invoice_to_legacy_fields(p.invoice),
-        "is_copy": bool(p.invoice.is_copy_or_duplicate),
+        "fields": _invoice_to_legacy_fields(inv),
+        "is_copy": bool(inv.is_copy_or_duplicate),
         "is_duplicate": False,  # set later by invoice_grouper based on invoice_no dedup
+        "_multi_invoice_sibling": bool(is_additional),
         "elapsed_ms": int(p.total_ms),
         "input_tokens": int(p.layer2_input_tokens + p.layer3_input_tokens),
         "output_tokens": int(p.layer2_output_tokens + p.layer3_output_tokens),
@@ -111,8 +129,17 @@ def pipeline_result_to_legacy_dict(pr: PipelineResult) -> Dict[str, Any]:
         if band_priority.get(p.confidence_band, 0) > band_priority[worst_band]:
             worst_band = p.confidence_band
 
+    # P0 修 (2026-05-26): 同页多票 → 把每页的 additional_invoices 展开成多个 legacy
+    # page 条目(主票 + 每张附加票 · 同物理页号)。invoice_grouper 按 invoice_number
+    # 分组 → 一页 N 票产出 N 张发票,不再静默漏掉第 2 张。
+    pages_out: List[Dict[str, Any]] = []
+    for p in pr.pages:
+        pages_out.append(_page_to_legacy(p))
+        for extra in p.invoice.additional_invoices or []:
+            pages_out.append(_page_to_legacy(p, invoice=extra, is_additional=True))
+
     return {
-        "pages": [_page_to_legacy(p) for p in pr.pages],
+        "pages": pages_out,
         "page_count": int(pr.page_count),
         "elapsed_ms": int(pr.elapsed_ms),
         "engine": str(pr.engine),  # "pipeline_v1"

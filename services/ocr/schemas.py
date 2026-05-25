@@ -606,6 +606,17 @@ class ThaiInvoice(BaseModel):
     notes: str = Field(default="", description="remark text")
     category: str = Field(default="", description="3-5 char summary in items' language")
 
+    # P0 修 (2026-05-26) · 同页多票:图片型 PDF 一页可能印多张独立发票
+    # (各自 invoice_number + 合计)。Layer 2 把第 1 张放顶层字段,其余每张作为
+    # 完整对象放这里(嵌套层的 additional_invoices 必须为空 · 不递归)。
+    # legacy_adapter 会把它们拆成多个 page 条目 → invoice_grouper 产出多张发票。
+    additional_invoices: List["ThaiInvoice"] = Field(
+        default_factory=list,
+        description="extra invoices found on the SAME page beyond the primary "
+        "(multi-invoice-per-page). Each is a full ThaiInvoice; their own "
+        "additional_invoices must stay empty.",
+    )
+
     # 2026-05-21 multi-schema refactor: per-field source provenance.
     # Optional — populated by Layer 2 / Layer 3 when the model returns
     # bbox / source_text info. Used by validators to enforce "amount only
@@ -669,6 +680,15 @@ class ThaiInvoice(BaseModel):
     @classmethod
     def _coerce_source_refs(cls, v):
         return {} if v is None else v
+
+    @field_validator("additional_invoices", mode="before")
+    @classmethod
+    def _coerce_additional(cls, v):
+        return [] if v is None else v
+
+
+# Self-referencing field (additional_invoices: List[ThaiInvoice]) needs rebuild.
+ThaiInvoice.model_rebuild()
 
 
 NonInvoiceDocument = Union[

@@ -9,7 +9,7 @@ db.py 文件尾 re-export 对外函数 · 所有 `db.xxx()` 调用点不变。
 
 import logging
 
-from db import get_cursor
+import db
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ PEARNLY_TAX_KINDS_VALID = {
 def ensure_erp_mapping_tables():
     """v118.27.0 · ERP 映射底座 3 张表 · 启动时幂等建"""
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             # ── 客户映射(Pearnly client_id → ERP customer 编号 · 按 erp_type 区分)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS erp_client_mappings (
@@ -119,7 +119,7 @@ def list_erp_client_mappings(tenant_id, restrict_client_ids=None):
     if not tenant_id:
         return []
     try:
-        with get_cursor() as cur:
+        with db.get_cursor() as cur:
             sql = """
                 SELECT m.id, m.tenant_id, m.client_id, m.erp_type, m.erp_code,
                        m.notes, m.created_at, m.updated_at,
@@ -154,7 +154,7 @@ def upsert_erp_client_mapping(tenant_id, client_id, erp_type, erp_code, notes, u
         return None
     notes_clean = (notes or "").strip()[:500]
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             # 校验 client 属于 tenant
             cur.execute(
                 """
@@ -198,7 +198,7 @@ def delete_erp_client_mapping(tenant_id, mapping_id):
     if not tenant_id or not mapping_id:
         return False
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_client_mappings WHERE id = %s AND tenant_id = %s",
                 (str(mapping_id), str(tenant_id)),
@@ -214,7 +214,7 @@ def list_erp_account_mappings(tenant_id):
     if not tenant_id:
         return []
     try:
-        with get_cursor() as cur:
+        with db.get_cursor() as cur:
             cur.execute(
                 """
                 SELECT id, tenant_id, erp_type, pearnly_category, erp_code,
@@ -246,7 +246,7 @@ def upsert_erp_account_mapping(
     name_clean = (erp_name or "").strip()[:200]
     notes_clean = (notes or "").strip()[:500]
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO erp_account_mappings
@@ -281,7 +281,7 @@ def delete_erp_account_mapping(tenant_id, mapping_id):
     if not tenant_id or not mapping_id:
         return False
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_account_mappings WHERE id = %s AND tenant_id = %s",
                 (str(mapping_id), str(tenant_id)),
@@ -297,7 +297,7 @@ def list_erp_tax_mappings(tenant_id):
     if not tenant_id:
         return []
     try:
-        with get_cursor() as cur:
+        with db.get_cursor() as cur:
             cur.execute(
                 """
                 SELECT id, tenant_id, erp_type, pearnly_tax_kind, erp_code,
@@ -328,7 +328,7 @@ def upsert_erp_tax_mapping(tenant_id, erp_type, pearnly_tax_kind, erp_code, note
         return None
     notes_clean = (notes or "").strip()[:500]
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO erp_tax_mappings
@@ -361,7 +361,7 @@ def delete_erp_tax_mapping(tenant_id, mapping_id):
     if not tenant_id or not mapping_id:
         return False
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_tax_mappings WHERE id = %s AND tenant_id = %s",
                 (str(mapping_id), str(tenant_id)),
@@ -390,7 +390,7 @@ def list_erp_product_mappings(tenant_id, erp_type=None):
     if not tenant_id:
         return []
     try:
-        with get_cursor() as cur:
+        with db.get_cursor() as cur:
             if erp_type:
                 cur.execute(
                     """
@@ -436,7 +436,7 @@ def upsert_erp_product_mapping(tenant_id, erp_type, item_name, erp_code, erp_nam
     erp_name_clean = (erp_name or "").strip()[:256] if erp_name else None
     notes_clean = (notes or "").strip()[:500]
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO erp_product_mappings
@@ -473,7 +473,7 @@ def delete_erp_product_mapping(tenant_id, mapping_id):
     if not tenant_id or not mapping_id:
         return False
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_product_mappings WHERE id = %s AND tenant_id = %s",
                 (str(mapping_id), str(tenant_id)),
@@ -499,7 +499,7 @@ def find_erp_product_mappings_batch(tenant_id, erp_type, item_names):
     if not norms:
         return {}
     try:
-        with get_cursor() as cur:
+        with db.get_cursor() as cur:
             cur.execute(
                 """
                 SELECT item_name, item_name_norm, erp_code, erp_name

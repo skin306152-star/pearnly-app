@@ -9,7 +9,7 @@ db.py 文件尾 re-export 回本命名空间 · 所有 `db.xxx()` 调用点不�
 
 import logging
 
-from db import get_cursor
+import db
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ def ensure_erp_oauth_tables():
     """v118.27.4 · OAuth token 表 + state 临时表 · 启动时幂等建
     v27.8.1.3 加 auto_push 字段(端到端自动推开关 · tenant 级别)"""
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS erp_oauth_tokens (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -68,7 +68,7 @@ def set_xero_auto_push(tenant_id: str, on: bool) -> bool:
     if not tenant_id:
         return False
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
                 UPDATE erp_oauth_tokens SET auto_push = %s, updated_at = NOW()
@@ -87,7 +87,7 @@ def get_xero_auto_push(tenant_id: str) -> bool:
     if not tenant_id:
         return False
     try:
-        with get_cursor() as cur:
+        with db.get_cursor() as cur:
             cur.execute(
                 """
                 SELECT 1 FROM erp_oauth_tokens
@@ -103,7 +103,7 @@ def get_xero_auto_push(tenant_id: str) -> bool:
 def list_tenants_xero_auto_push_on() -> list:
     """v27.8.1.3 · 给 OCR hook 用 · 拉所有开了 Xero 自动推的 tenant_id 列表"""
     try:
-        with get_cursor() as cur:
+        with db.get_cursor() as cur:
             cur.execute("""
                 SELECT DISTINCT tenant_id::text AS tid
                 FROM erp_oauth_tokens
@@ -136,7 +136,7 @@ def save_oauth_state(state, tenant_id, user_id, erp_type):
     if not state or not tenant_id or not user_id:
         return False
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             # 顺手清掉 5 分钟前的 state(轻量 GC)
             cur.execute(
                 "DELETE FROM erp_oauth_states WHERE created_at < NOW() - INTERVAL '5 minutes'"
@@ -164,7 +164,7 @@ def consume_oauth_state(state):
     if not state:
         return None
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
                 DELETE FROM erp_oauth_states
@@ -210,7 +210,7 @@ def upsert_oauth_token(
     ):
         return None
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             if is_default:
                 # 同 tenant 同 erp 老的全部 unset is_default
                 cur.execute(
@@ -260,7 +260,7 @@ def get_default_oauth_token(tenant_id, erp_type):
     if not tenant_id or not erp_type:
         return None
     try:
-        with get_cursor() as cur:
+        with db.get_cursor() as cur:
             cur.execute(
                 """
                 SELECT id, organisation_id, organisation_name,
@@ -290,7 +290,7 @@ def list_oauth_tokens(tenant_id, erp_type):
     if not tenant_id or not erp_type:
         return []
     try:
-        with get_cursor() as cur:
+        with db.get_cursor() as cur:
             cur.execute(
                 """
                 SELECT id, organisation_id, organisation_name, expires_at,
@@ -312,7 +312,7 @@ def update_oauth_access_token(token_id, access_token, refresh_token, expires_at)
     if not token_id or not access_token or not refresh_token:
         return False
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
                 UPDATE erp_oauth_tokens
@@ -340,7 +340,7 @@ def delete_oauth_tokens(tenant_id, erp_type):
     if not tenant_id or not erp_type:
         return 0
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_oauth_tokens WHERE tenant_id = %s AND erp_type = %s",
                 (str(tenant_id), str(erp_type)),
@@ -356,7 +356,7 @@ def set_default_oauth_token(tenant_id, erp_type, token_id):
     if not tenant_id or not erp_type or not token_id:
         return False
     try:
-        with get_cursor(commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 "UPDATE erp_oauth_tokens SET is_default = FALSE WHERE tenant_id = %s AND erp_type = %s",
                 (str(tenant_id), str(erp_type)),

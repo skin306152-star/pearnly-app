@@ -43,9 +43,10 @@ class EmailIngestStoreContractTests(unittest.TestCase):
                 f"db.{name} 不是 store.{name} 同一对象(漂移!)",
             )
 
-    def test_service_uses_db_get_cursor(self):
-        # store 通过 db.get_cursor 取游标(经 from db import get_cursor)
-        self.assertIs(store.get_cursor, db.get_cursor)
+    def test_service_uses_db_module_for_cursor(self):
+        # store 通过 `import db` + 运行时 db.get_cursor() 取游标
+        # (而非 from db import get_cursor by-value · 保证 patch("db.get_cursor") 在测试里生效)
+        self.assertIs(store.db, db)
 
 
 if __name__ == "__main__":

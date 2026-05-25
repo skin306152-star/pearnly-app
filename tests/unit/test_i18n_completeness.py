@@ -24,9 +24,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 
-from check_i18n import diff_keysets, parse_i18n_blocks  # noqa: E402
+from check_i18n import diff_keysets, parse_i18n_blocks, _i18n_source_file  # noqa: E402
 
-HOME_JS = PROJECT_ROOT / "home.js"
+# REFACTOR-C1(2026-05-25)· I18N 字典已从 home.js 抽到 static/i18n-data.js ·
+# 跟 check_i18n 用同一个源文件解析器(优先 i18n-data.js · 回退 home.js)
+I18N_SRC = _i18n_source_file()
 
 
 class I18nDictCompletenessTests(unittest.TestCase):
@@ -34,7 +36,7 @@ class I18nDictCompletenessTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.text = HOME_JS.read_text(encoding="utf-8")
+        cls.text = I18N_SRC.read_text(encoding="utf-8")
         cls.blocks = parse_i18n_blocks(cls.text)
 
     def test_four_language_blocks_present(self):

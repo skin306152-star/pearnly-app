@@ -23,6 +23,13 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
             cls.home_js = f.read()
         with open(os.path.join(ROOT, "recon_routes.py"), "r", encoding="utf-8") as f:
             cls.recon_py = f.read()
+        # REFACTOR-C1(2026-05-25)· I18N 4 语字典已从 home.js 抽到 static/i18n-data.js ·
+        # i18n key 完整性校验改读这里(回退 home.js 兼容老结构 / 万一回滚)
+        _i18n_path = os.path.join(ROOT, "static", "i18n-data.js")
+        if not os.path.exists(_i18n_path):
+            _i18n_path = os.path.join(ROOT, "home.js")
+        with open(_i18n_path, "r", encoding="utf-8") as f:
+            cls.i18n_data = f.read()
 
     def test_brv2_render_anchor_audit_defined_and_called(self):
         """P0.3 契约 · _brv2RenderAnchorAudit 必须定义 + renderResults 必须调用"""
@@ -67,12 +74,12 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
             "brv2-anchor-audit-col-diff",
         ]
         for k in keys:
-            occurrences = self.home_js.count("'" + k + "'")
-            # 至少 4 次(每语言字典各 1 次)· P0.3 helper 引用是 'brv2-anchor-audit-title' 字符串 not key def · 也算
+            # 4 语字典定义在 static/i18n-data.js(每语言各 1 次 = 4 次)· 见 setUpClass
+            occurrences = self.i18n_data.count("'" + k + "'")
             self.assertGreaterEqual(
                 occurrences,
                 4,
-                f"i18n key '{k}' should appear ≥4 times (one per lang dict), got {occurrences}",
+                f"i18n key '{k}' should appear ≥4 times (one per lang dict in i18n-data.js), got {occurrences}",
             )
 
     def test_get_task_route_returns_full_summary_with_underscore_fields(self):

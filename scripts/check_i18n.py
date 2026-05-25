@@ -31,7 +31,15 @@ import sys
 from pathlib import Path
 from typing import Dict, Set
 
-HOME_JS = Path(__file__).resolve().parents[1] / "home.js"
+_ROOT = Path(__file__).resolve().parents[1]
+# REFACTOR-C1(2026-05-25)· I18N 字典从 home.js 抽到 static/i18n-data.js(window.I18N)·
+# 优先读 i18n-data.js · 不存在则回退 home.js(兼容老结构 / 万一回滚)
+I18N_SRC = _ROOT / "static" / "i18n-data.js"
+HOME_JS = _ROOT / "home.js"
+
+
+def _i18n_source_file() -> Path:
+    return I18N_SRC if I18N_SRC.exists() else HOME_JS
 
 
 def parse_i18n_blocks(text: str) -> Dict[str, Set[str]]:
@@ -45,14 +53,16 @@ def parse_i18n_blocks(text: str) -> Dict[str, Set[str]]:
     lines = text.splitlines()
     blocks: Dict[str, Set[str]] = {}
 
-    # 找 const I18N = { 起始行
+    # 找 I18N 起始行(兼容 `const I18N = {`(老 home.js)与 `window.I18N = {`(新 i18n-data.js))
     i18n_start = None
     for i, ln in enumerate(lines):
-        if re.match(r"^const\s+I18N\s*=\s*\{", ln):
+        if re.match(r"^(?:const\s+I18N|window\.I18N)\s*=\s*\{", ln):
             i18n_start = i
             break
     if i18n_start is None:
-        raise ValueError("没找到 `const I18N = {` · 是不是 home.js 改了结构?")
+        raise ValueError(
+            "没找到 `const I18N = {` 或 `window.I18N = {` · 是不是 i18n 源文件改了结构?"
+        )
 
     # 从 i18n_start 开始 · 找 4 个 ^    lang: { 块
     # 每个块的结束: 同缩进 ^    }, (跟开始 lang: { 的缩进相同)
@@ -117,11 +127,12 @@ def main(argv=None) -> int:
     p.add_argument("--source", default="zh", help="source of truth language (default zh)")
     args = p.parse_args(argv)
 
-    if not HOME_JS.exists():
-        print(f"[ERR] home.js 不存在: {HOME_JS}", file=sys.stderr)
+    src_file = _i18n_source_file()
+    if not src_file.exists():
+        print(f"[ERR] i18n 源文件不存在: {src_file}", file=sys.stderr)
         return 2
 
-    text = HOME_JS.read_text(encoding="utf-8")
+    text = src_file.read_text(encoding="utf-8")
     blocks = parse_i18n_blocks(text)
 
     if not args.quiet:

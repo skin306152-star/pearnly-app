@@ -329,15 +329,23 @@ class MRERPCustomerSyncService:
             self.cache.set(cache_key, l1.customer_code)
             return l1
 
-        # L2/L3 · scan the live listing.
-        # 最终冲刺 (Zihao 2026-05-19 拍板 · v118.34.27) · fail-soft listing fetch ·
-        # 镜像 product side · listing 拉不到不阻断 lookup · 让 lookup_or_create
-        # 走 L4 auto-create (创建路径不依赖 listing).
+        # L2/L3 · 用搜索框查全量主数据(替代只读首页 ~30 条的 _fetch_listing ·
+        # 2026-05-25 修:客户 > 30 个时第 31+ 个匹配不上 → 假 ERR_NO_CUSTOMER_MAPPING)。
+        # fail-soft:搜不到/技术异常不阻断 · 让 lookup_or_create 走 L4 auto-create。
         try:
-            listing = self._fetch_listing()
+            listing = self._search_listing(buyer.name)
+            if not listing:
+                # 全名搜不到 → 用最长 token 再搜一次提召回(下方 exact/fuzzy 仍会收敛)
+                token = max(
+                    (w for w in re.split(r"\s+", buyer.name) if w),
+                    key=len,
+                    default="",
+                )
+                if token and token != buyer.name.strip():
+                    listing = self._search_listing(token)
         except MRERPTechnicalError as e:
             logger.warning(
-                "customer _fetch_listing failed in lookup · skipping L2/L3 · "
+                "customer search failed in lookup · skipping L2/L3 · "
                 "fall through to None (caller goes L4 auto-create): %s",
                 e,
             )
@@ -649,9 +657,13 @@ class MRERPCustomerSyncService:
         else:
             new_dialogs = []
 
-        # 8) Verify by listing.
+        # 8) Verify by search (按码搜全量 · 不再用只读 30 条的 _fetch_listing ·
+        #    2026-05-25 修:新建客户排在 30 名后会被误判"did not appear")。
         self.invalidate()
-        listing = self._fetch_listing()
+        try:
+            listing = self._search_listing(customer_code)
+        except MRERPTechnicalError:
+            listing = self._fetch_listing()  # 搜索异常兜底回退首页扫描
         if any(r.code == customer_code for r in listing):
             logger.info(
                 "auto-created customer %s (seed=%s, buyer=%s)",
@@ -1017,6 +1029,51 @@ class MRERPCustomerSyncService:
             f"customer listing fetch failed after 3 wait+reload attempts; "
             f"screenshot={shot}; last_error={last_err}"
         )
+
+    def _search_listing(self, query: str) -> List[ListingCustomer]:
+        """用 allview.php 的 #txtsearch 按【码/类型/名】搜**全量**客户主数据。
+
+        2026-05-25 · 修 _fetch_listing 只读首页 ~30 条的上限:客户 > 30 个时
+        第 31+ 个永远匹配不上 → 假 ERR_NO_CUSTOMER_MAPPING(实测坐实)。
+        搜索框 onkeyup=searchdata(1) / #btnsearch=searchdata(2) 走 AJAX 即时重绘
+        #showdata;按名搜返回候选很少(远 < 30)· 不受分页上限影响。
+
+        注:MR.ERP 搜索只覆盖 码/类型/名 · 不含税号(税号匹配在 Pearnly 侧做)。
+        query 为空 → []。搜不到 → []。技术异常抛 MRERPTechnicalError 由上层兜。
+        """
+        q = (query or "").strip()
+        if not q:
+            return []
+        self.adapter.select_company()
+        page = self.adapter._page
+        url = self.adapter.login_url + self.LISTING_PATH
+        try:
+            if "allview.php" not in (page.url or "").lower():
+                page.goto(url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.wait_for_selector("#txtsearch", state="visible", timeout=10_000)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"customer search nav timeout: {e}") from e
+
+        try:
+            box = page.locator("#txtsearch")
+            box.click()
+            box.fill("")
+            # press_sequentially 发真键事件 → 触发 onkeyup=searchdata(1)
+            box.press_sequentially(q[:80], delay=30)
+            # #btnsearch=searchdata(2) 更稳;回退 Enter
+            try:
+                page.locator("#btnsearch").click(timeout=3_000)
+            except Exception:
+                box.press("Enter")
+            try:
+                page.wait_for_load_state("networkidle", timeout=15_000)
+            except PWTimeout:
+                pass
+            page.wait_for_timeout(1_200)  # 给 showdata.php AJAX 重绘留余量
+            html = page.content() or ""
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"customer search failed: {e}") from e
+        return parse_armas_listing(html)
 
 
 __all__ = [

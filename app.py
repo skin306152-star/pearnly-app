@@ -14,7 +14,7 @@ from typing import Optional, List, Any, Dict
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -53,6 +53,9 @@ from email_ingest_routes import (
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25
 from rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税务 4 路由 · 2026-05-25
 from categories_routes import router as categories_router  # REFACTOR-B1 · 分类 1 路由 · 2026-05-25
+from pages_routes import (
+    router as pages_router,
+)  # REFACTOR-B1 · 静态页面 + 公开 meta 12 路由 · 2026-05-25
 from erp_routes import (  # REFACTOR-B1 · ERP 推送 15 路由 · 2026-05-25
     router as erp_router,
     flush_test_connection_caches as _flush_erp_caches,
@@ -1094,6 +1097,7 @@ app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(
 app.include_router(rd_router)  # REFACTOR-B1 · 泰国 RD 税务 4 路由(2026-05-25)
 app.include_router(settings_router)  # REFACTOR-B1 · 归档/查重设置 5 路由(2026-05-25)
 app.include_router(categories_router)  # REFACTOR-B1 · 分类 1 路由(2026-05-25)
+app.include_router(pages_router)  # REFACTOR-B1 · 静态页面 + 公开 meta 12 路由(2026-05-25)
 app.include_router(erp_router)  # REFACTOR-B1 · ERP 推送 15 路由(2026-05-25)
 app.include_router(admin_users_router)  # REFACTOR-B1 · 超管用户/员工 15 路由(2026-05-25)
 app.include_router(history_router)  # REFACTOR-B1 · OCR 历史 11 路由(含 assign_client)(2026-05-25)
@@ -1812,42 +1816,7 @@ def _check_user_quota(user: dict) -> tuple:
     )
 
 
-# ============================================================
-# Health & Contact
-# ============================================================
-@app.get("/api/health")
-async def health():
-    # 新架构 · pipeline_v1 唯一路径 · 健康检查改为校验 GCP Service Account 就绪
-    _creds = (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or "").strip()
-    if _creds and os.path.isfile(_creds):
-        credentials_status = {"available": True, "path": _creds}
-    elif _creds:
-        credentials_status = {"available": False, "error": f"file not found: {_creds}"}
-    else:
-        credentials_status = {
-            "available": False,
-            "error": "GOOGLE_APPLICATION_CREDENTIALS env not set",
-        }
-    return {
-        "status": "ok",
-        "version": "0.18.5-v105",
-        "engines": {
-            "pipeline": "pipeline_v1",
-            "layers": ["text_path", "vision", "flash-lite", "flash"],
-            "credentials_status": credentials_status,
-        },
-    }
-
-
-@app.get("/api/contact")
-async def contact():
-    return {
-        "phone": os.environ.get("CONTACT_PHONE", "086-889-2228"),
-        "line_id": os.environ.get("CONTACT_LINE", "@Pearnly"),
-        "line_url": os.environ.get("CONTACT_LINE_URL", "https://line.me/R/ti/p/@059oupmg"),
-        "email": os.environ.get("CONTACT_EMAIL", "hello@pearnly.com"),
-        "address": os.environ.get("CONTACT_ADDRESS", "Bangkok, Thailand"),
-    }
+# (Health & Contact 公开 meta 路由 → pages_routes.py · REFACTOR-B1)
 
 
 # v118.35.0.6 · /api/plans + /api/v1/plans 已下线 · credits 系统接管(legacy/credits-system-5de6cc5 tag)
@@ -3088,14 +3057,7 @@ async def v1_export(req: ExportRequest, request: Request):
 # v118.35.0.6 · /api/v1/plans 已下线 · 配套 /api/plans · credits 系统接管
 
 
-@app.get("/api/v1/health")
-async def v1_health():
-    return await health()
-
-
-@app.get("/api/v1/contact")
-async def v1_contact():
-    return await contact()
+# (/api/v1/health · /api/v1/contact → pages_routes.py · REFACTOR-B1)
 
 
 # ============================================================
@@ -3402,68 +3364,7 @@ def _trigger_auto_push_all(user_id: str, tenant_id: Optional[str], history_id: s
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    # v118.44.0.3 · login.html 也加 no-cache · 防浏览器 cache 老 login.html 让超管跳转逻辑失效
-    return FileResponse(
-        "static/login.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
-
-
-@app.get("/login", response_class=HTMLResponse)
-async def login_page():
-    return FileResponse(
-        "static/login.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
-
-
-@app.get("/home", response_class=HTMLResponse)
-async def home():
-    # v118.27.5.4 · 强制 no-cache · 防 CDN/浏览器误缓存导致用户拿不到新版
-    return FileResponse(
-        "static/home.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
-
-
-# v118.44.0.1 · NAV-IA Phase 8 hotfix · 老 /admin 永久重定向到 /admin/cost
-# 解决:老浏览器 cache 里的 home.js 仍跳 /admin · 导致 Earn 进入老 PEARNLY_ADMIN_MODE 视图(home.html 红 banner)
-# 修法:无论老新代码,/admin 都被 server 端 301 引导到 /admin/cost(新 admin SPA)
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_page():
-    from fastapi.responses import RedirectResponse
-
-    return RedirectResponse(url="/admin/cost", status_code=301)
-
-
-# v118.44.0 · NAV-IA Phase 8 · Earn 超管独立 admin layout(SPA)
-# 路径 /admin/cost · /admin/users · /admin/* 全部返回独立 static/admin/admin.html
-# 鉴权由前端 admin.js 调 /api/me + is_super_admin 校验(非超管 → 跳 /)
-# 老的 /admin URL(L4209)仍返回 home.html · 作 PEARNLY_ADMIN_MODE 老逻辑兜底
-@app.get("/admin/{rest:path}", response_class=HTMLResponse)
-async def admin_layout_page(rest: str):
-    return FileResponse(
-        "static/admin/admin.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
+# (静态页面路由 / · /login · /home · /admin · /admin/{rest} → pages_routes.py · REFACTOR-B1)
 
 
 # v118.27.5.4 · 前端版本检测接口 · 前端定时轮询 · 不一致弹横幅
@@ -3488,19 +3389,7 @@ async def get_frontend_version():
     }
 
 
-@app.get("/reset", response_class=HTMLResponse)
-async def reset_page():
-    return FileResponse("static/reset.html")
-
-
-@app.get("/terms", response_class=HTMLResponse)
-async def terms_page():
-    return FileResponse("static/terms.html")
-
-
-@app.get("/privacy", response_class=HTMLResponse)
-async def privacy_page():
-    return FileResponse("static/privacy.html")
+# (/reset · /terms · /privacy → pages_routes.py · REFACTOR-B1)
 
 
 # ============================================================

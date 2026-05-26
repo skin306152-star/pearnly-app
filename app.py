@@ -3440,10 +3440,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "新增「ERP 自动处理方式」设置:可在「ERP 对接」页选择识别后如何处理发票——智能分拣、固定当前账套、或只识别不推送。ERP 连接向导的选项文案也已优化更清晰。即日生效。",
-            "th": "เพิ่มการตั้งค่า «วิธีประมวลผล ERP อัตโนมัติ»: เลือกได้ในหน้า «การเชื่อมต่อ ERP» ว่าหลังอ่านใบกำกับแล้วจะจัดการอย่างไร — จัดส่งอัจฉริยะ ใช้ชุดบัญชีปัจจุบัน หรืออ่านอย่างเดียวไม่ส่ง · ข้อความในตัวช่วยเชื่อมต่อ ERP ปรับให้ชัดเจนขึ้น · มีผลทันที",
-            "en": "Added an “ERP auto-processing” setting: on the “ERP integration” page you can choose how invoices are handled after recognition — smart routing, fixed to the current account-set, or recognize-only. The ERP connection wizard wording has also been clarified. Effective immediately.",
-            "ja": "「ERP 自動処理方式」設定を追加しました。「ERP 連携」ページで、読み取り後の請求書の扱い方(スマート振り分け・現在の帳簿に固定・読み取りのみ)を選択できます。ERP 接続ウィザードの文言も分かりやすく改善しました。即日有効。",
+            "zh": "「ERP 推送异常」处理已增强:当系统发现发票上的商品与 ERP 中的商品对不上时,现在可以在异常处直接为每个商品选择正确的 ERP 商品并一键重新推送,无需再到设置里调整。即日生效。",
+            "th": "ปรับปรุงการจัดการ «ข้อผิดพลาดการส่ง ERP»: เมื่อพบว่าสินค้าในใบกำกับไม่ตรงกับสินค้าใน ERP ตอนนี้สามารถเลือกสินค้า ERP ที่ถูกต้องให้แต่ละรายการได้ในหน้าข้อผิดพลาดและส่งใหม่ได้ในคลิกเดียว ไม่ต้องไปตั้งค่าแยก · มีผลทันที",
+            "en": "The ERP push-exception workflow has been enhanced: when an invoice line does not match a product in your ERP, you can now pick the correct ERP product for each line right in the exception view and resend in one click — no need to adjust settings separately. Effective immediately.",
+            "ja": "「ERP 送信エラー」の処理を強化しました。請求書の商品が ERP の商品と一致しない場合、エラー画面で各商品に正しい ERP 商品を選んでワンクリックで再送信できるようになりました。設定を別途変更する必要はありません。即日有効。",
         },
     }
 

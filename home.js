@@ -16174,6 +16174,8 @@ try { window.I18N = I18N; } catch(e) {}
         const it = (_erpExcState.items || []).find(x => String(x.id) === String(id));
         if (!it) return;
         const canPickCustomer = !!(it.history_client_id) && it.category === 'customer_mismatch';
+        // 商品不符 picker(对称客户 picker · Zihao 2026-05-26)· 通用 adapter · 不写死 MR.ERP。
+        const canPickProduct = it.category === 'product_mismatch' && !!it.history_id && !!it.endpoint_id;
         const reason = _erpExcFriendly(it);
         const stateCls = it.state === 'needs_action' ? 'needs' : (it.state === 'retrying' ? 'retry' : 'fail');
         const dRow = (lbl, val) => `<div class="erp-exc-m-row"><span class="erp-exc-m-k">${escapeHtml(lbl)}</span><span class="erp-exc-m-v">${escapeHtml(val || '—')}</span></div>`;
@@ -16186,6 +16188,14 @@ try { window.I18N = I18N; } catch(e) {}
                     <input type="search" class="erp-exc-m-search" id="erp-exc-m-search" placeholder="${escapeHtml(t('erp-exc-edit-pick-ph'))}">
                     <div class="erp-exc-m-custlist" id="erp-exc-m-custlist">
                         <div class="erp-exc-m-loading">${escapeHtml(t('erp-exc-edit-pick-loading'))}</div>
+                    </div>
+                </div>`;
+        } else if (canPickProduct) {
+            fixHtml = `
+                <div class="erp-exc-m-fix">
+                    <div class="erp-exc-m-fix-title">${escapeHtml(t('erp-exc-edit-prod-intro'))}</div>
+                    <div class="erp-exc-m-custlist" id="erp-exc-m-prodlist">
+                        <div class="erp-exc-m-loading">${escapeHtml(t('erp-exc-edit-prod-loading'))}</div>
                     </div>
                 </div>`;
         } else {
@@ -16216,6 +16226,7 @@ try { window.I18N = I18N; } catch(e) {}
                     <button class="erp-exc-batch-btn ghost" type="button" id="erp-exc-m-cancel">${escapeHtml(t('erp-exc-edit-close'))}</button>
                     <button class="erp-exc-batch-btn" type="button" id="erp-exc-m-retry">${escapeHtml(t('erp-exc-edit-retry'))}</button>
                     ${canPickCustomer ? `<button class="erp-exc-batch-btn" type="button" id="erp-exc-m-bind" disabled>${escapeHtml(t('erp-exc-edit-bind-retry'))}</button>` : ''}
+                    ${canPickProduct ? `<button class="erp-exc-batch-btn" type="button" id="erp-exc-m-bind-prod" disabled>${escapeHtml(t('erp-exc-edit-bind-prod-retry'))}</button>` : ''}
                 </div>
             </div>`;
         document.body.appendChild(ov);
@@ -16292,6 +16303,89 @@ try { window.I18N = I18N; } catch(e) {}
                 } catch (e) {
                     showToast(t('erp-exc-retry-fail'), 'error');
                     bindBtn.disabled = false; bindBtn.textContent = t('erp-exc-edit-bind-retry');
+                }
+            });
+        }
+
+        // ── 商品不符 picker(对称客户 picker)──
+        // 逐行列出发票商品 · 每行一个 ERP 商品下拉(原生 select · 键盘可搜)·
+        // 选中后写 /mappings/products(item_name→erp_code · 通用)· 再走同一 /retry 重解析推送。
+        if (canPickProduct) {
+            const bindBtn = document.getElementById('erp-exc-m-bind-prod');
+            const listEl = document.getElementById('erp-exc-m-prodlist');
+            const sel = {};        // item_name → {code, name}
+            let _products = [];
+
+            const optionsHtml = () => '<option value="">' + escapeHtml(t('erp-exc-edit-prod-choose')) + '</option>'
+                + _products.slice(0, 500).map(p =>
+                    `<option value="${escapeHtml(p.code || '')}" data-pname="${escapeHtml(p.name || '')}">`
+                    + escapeHtml((p.name || '') + ' · ' + (p.code || '')) + '</option>').join('');
+
+            const renderItems = (names) => {
+                if (!names.length) { listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-prod-noitems'))}</div>`; return; }
+                listEl.innerHTML = names.map(nm =>
+                    `<div class="erp-exc-m-cust" style="cursor:default">
+                        <span class="erp-exc-m-cust-name" title="${escapeHtml(nm)}">${escapeHtml(nm)}</span>
+                        <select class="erp-exc-m-prod-sel" data-item="${escapeHtml(nm)}" style="max-width:55%;flex:0 0 auto;padding:4px 6px;border:1px solid var(--border,#e5e7eb);border-radius:6px;font-size:12px">${optionsHtml()}</select>
+                    </div>`).join('');
+                listEl.querySelectorAll('.erp-exc-m-prod-sel').forEach(s => {
+                    s.addEventListener('change', () => {
+                        const nm = s.dataset.item;
+                        const opt = s.options[s.selectedIndex];
+                        if (s.value) sel[nm] = { code: s.value, name: opt ? (opt.dataset.pname || '') : '' };
+                        else delete sel[nm];
+                        if (bindBtn) bindBtn.disabled = Object.keys(sel).length === 0;
+                    });
+                });
+            };
+
+            const loadAll = async () => {
+                try {
+                    const hResp = await fetch('/api/history/' + encodeURIComponent(it.history_id), {
+                        headers: { 'Authorization': 'Bearer ' + _erpExcTok() },
+                    });
+                    const hData = await hResp.json().catch(() => ({}));
+                    const pages = (hData && hData.pages) || [];
+                    const names = []; const seen = {};
+                    (Array.isArray(pages) ? pages : []).forEach(pg => {
+                        const items = (pg && pg.fields && pg.fields.items) || [];
+                        (Array.isArray(items) ? items : []).forEach(li => {
+                            const nm = ((li && (li.name || li.description)) || '').trim();
+                            if (nm && !seen[nm]) { seen[nm] = 1; names.push(nm); }
+                        });
+                    });
+                    const pResp = await fetch('/api/erp/endpoints/' + encodeURIComponent(it.endpoint_id) + '/products', {
+                        headers: { 'Authorization': 'Bearer ' + _erpExcTok() },
+                    });
+                    const pData = await pResp.json().catch(() => ({}));
+                    if (!pResp.ok || !pData.ok) { listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-prod-fail'))}</div>`; return; }
+                    _products = pData.products || [];
+                    renderItems(names);
+                } catch (e) {
+                    listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-prod-fail'))}</div>`;
+                }
+            };
+            loadAll();
+
+            if (bindBtn) bindBtn.addEventListener('click', async () => {
+                const entries = Object.entries(sel);
+                if (!entries.length) return;
+                bindBtn.disabled = true; bindBtn.textContent = t('erp-exc-retrying');
+                try {
+                    for (const [itemName, v] of entries) {
+                        const mResp = await fetch('/api/erp/mappings/products', {
+                            method: 'POST',
+                            headers: { 'Authorization': 'Bearer ' + _erpExcTok(), 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ erp_type: it.endpoint_adapter, item_name: itemName, erp_code: v.code, erp_name: v.name }),
+                        });
+                        if (!mResp.ok) { showToast(t('erp-exc-retry-fail'), 'error'); bindBtn.disabled = false; bindBtn.textContent = t('erp-exc-edit-bind-prod-retry'); return; }
+                    }
+                    showToast(t('erp-exc-edit-prod-bound-ok'), 'success');
+                    _erpExcCloseModal();
+                    await _erpExcRetry(it.id, null);
+                } catch (e) {
+                    showToast(t('erp-exc-retry-fail'), 'error');
+                    bindBtn.disabled = false; bindBtn.textContent = t('erp-exc-edit-bind-prod-retry');
                 }
             });
         }

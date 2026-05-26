@@ -1,7 +1,30 @@
 # 📊 STATE · Pearnly 项目状态
 
-> 🏗️ **【常驻指针 · 整顿恢复后读】ERP「开箱即用」收尾已全部完成(P0-P3 · 唯 B2 种子提示后置)。** 下一步:**整顿可启动 · 改走 `/batch` 加速** —— 进窗口读 `docs/refactor/BATCH_STRATEGY.md`(从 Wave 0 安全网起跑)+ `REFACTOR_MASTER_PLAN.md`。⚠️ 整顿 Wave 2(拆 home.js)与本次 P2-C/P3 改的 home.js 同文件,re-grep 行号后再拆。
+> 🏗️ **【常驻指针 · 整顿恢复后读】ERP「开箱即用」收尾已全部完成(P0-P3)· 整顿 Wave 0 安全网已开跑(见第三十五会话)。** 下一步:**整顿继续 · 可走 `/batch` 加速** —— 进窗口读 `docs/refactor/BATCH_STRATEGY.md` + `REFACTOR_MASTER_PLAN.md`。Wave 0(安全网)已铺一大批纯逻辑守门;**Wave 1(db.py 剩余安全域)/ Wave 2(拆 home.js)未开** —— Wave 2 与 P2-C/P3 改过的 home.js 同文件,re-grep 行号后再拆。
 
+> ════════════════════════════════════════════════════════════
+> **【第三十五会话 · 交接 · 2026-05-27】整顿 REFACTOR-D2(Wave 0 安全网)+ G2(RUNBOOK)· 与 ERP 第三十四会话同仓并行 · 零冲突**
+> ════════════════════════════════════════════════════════════
+> **背景**:ERP 窗口在做 P2-C/P3 收尾期间,本窗口并行做**不碰 home.js/ERP/db.py 巨石**的安全活(纯新增 `tests/`、`docs/` + 3 个纯函数小修)。两窗口共用同一本地仓库 + master,提交线性交错、**碰的是不同文件、零冲突**。
+>
+> **① REFACTOR-D2 · Wave 0 安全网(17 个测试文件 · 单元 872→1095)** —— 给以前 0 测试的核心纯逻辑模块补行为契约,动巨石前先有网:
+> - 对账/导出链:`field_comparator`(33)/`reconciliation_matcher`(12)/`gl_vat_reconciler`(16)/`vat_report_parser`(14)/`vat_file_classifier`(9)/`excel_template_th`(16)/`excel_export`(13)/`report_engine`(12)/`usage_report`(8)/`invoice_grouper` 三策略(7)
+> - 基础设施/安全:`services/monitoring`(10)/`services/task_queue`(13)/`pdf_storage` 含路径穿越防护(7)/`pdf_searchable`(8)/`kms_helper` 加解密往返(8)/`i18n_reports` 4 语硬守门(10)/`archive` 命名(21)
+> - 全程守门绿:black/ruff/check_imports/check_i18n(0/0)· 每个 commit 含 `· REFACTOR-D2`。
+>
+> **② 测试挖出并修了 3 个真 bug(commit `85c35bb` · 纯函数小修 · 有测试兜底)**:
+> - `field_comparator.normalize_branch`:别名集合没跟输入同款归一化 → `"head office"`/泰文 `"สำนักงานใหญ่"`(NFKC 拆 ำ)永远匹配不上 → 总部被误判 `branch_mismatch`(**对账准确性 bug**)。已修:别名集合走同款 NFKC+lower+去空格。
+> - `excel_template_th._norm_date`:docstring 称转佛历但代码没转 → 导出年份错。已修:year>2400 减 543。
+> - `vat_file_classifier._filename_guess`:`\b` 遇下划线失效 → `"invoice_2026.pdf"` 落不到零成本快路径 → 白花一次 Gemini。已修:额外比「下划线转空格」串(兼容 `sales_tax` 等含下划线 hint)。
+>
+> **③ REFACTOR-G2 · 新增 `docs/RUNBOOK.md`(commit `5544d0e`)**:把散在 CLAUDE.md 的部署/回滚/CI 查看/健康检查/紧急排查(磁盘满血泪根因·铁律 #24)consolidate 成可操作手册 · docs/README §7 加索引。
+>
+> **本会话 commits(REFACTOR-D2/G2 · 与 ERP 提交交错在 master)**:`347b026` `48dd6b3` `0958613` `aeb35ff` `c5cb219` `db871c4` `65f9f20` `a837e66` `d015f78` `a532d1b` `bc3edc1` `b568844` `85c35bb`(bug 修)`5544d0e`(RUNBOOK)`5e8fdbe` `54982bf`。
+>
+> **push 状态**:本窗口未 push、未 fetch(沙箱无网)。两窗口共用 master → **谁 push 都会把整条 master 一起推**;ERP 第三十四会话若已 push,本批随之上线(全绿·测试+文档+3 小修·安全)。下窗口确认 `git log` HEAD 后正常 push 即可。
+>
+> **下窗口续整顿**:Wave 0 纯逻辑安全网已基本铺满;可继续 **Wave 1(db.py 剩余安全域)** 或 **Wave 2(拆 home.js · re-grep 行号)** —— 见 `BATCH_STRATEGY.md` §10。高敏域(登录/计费/OCR热路径/RLS)仍需 Zihao 在场。
+>
 > ════════════════════════════════════════════════════════════
 > **【第三十四会话 · 交接 · 2026-05-27】P2-C(不裸透泰文)+ P3(概念/导航)上线 · ERP 收尾完成**
 > ════════════════════════════════════════════════════════════

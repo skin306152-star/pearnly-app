@@ -307,10 +307,10 @@
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
 | B 后端 | 🟡 1.5/10 | **B1 安全部分已到顶**(app.py 10075→4459)· **B2 进行中**:db.py 10663→**7136**(-3527 · 抽 9 域 DAL → services) | B1:21 router + exception_checks · 剩 22 @app 安全敏感/勿碰/故意留 · 需 auth 专窗口。**B2(第二十二会话 · 9 域)**:email_ingest/erp.oauth/erp.mappings/notification/erp.push + recon.{vat_recon_tasks/gl_vat/bank_recon_v2/bank_recon_v1}(`435ece6`/`78e9667`/`f62d0d9`/`9de1baa`/`7edb3c3`/`a012482`/`e26dafd`)· re-export 范式零改调用点 · 全 push+CI 绿+生产 401 验证 · services/*.py 40→51 · unit 656→**682** |
 | C 前端 | 🟡 1/8(C1 进行中) | C1 续:home.js 22703→**22210**(抽测试中心 → `src/home/test-center.js`) | 依赖 A1(✅)· 已抽 dashboard + billing(IIFE→ES module)+ i18n 字典→`static/i18n-data.js` + **测试中心 IIFE(skin only)→`src/home/test-center.js`**(第二十一会话 `0377055` · 只 bump main.js?v= 不动 home.js?v= → /api/version 不变 · push+CI 绿+生产 playwright 验证 loadTestCenterPage 渲染 0 报错)· 下一步抽更多 cohesive feature 函数群→`src/home/*` |
-| D 测试 | 🟡 1/5(部分 D1) | D1 续:补 4 个 router 守门契约测试 | 第二十一会话 `d65b692`(report/vat_excel/recon/admin_diagnostics · 8 硬门槛 #4 补缺 · +16 unit · push+CI 双 job 绿)· 依赖 A1 |
+| D 测试 | 🟡 2/5(D1 部分 + **D2 Wave 0 安全网大批**) | D2 续:核心纯逻辑模块行为契约 | **第三十五会话(2026-05-27)· REFACTOR-D2 Wave 0**:给 17 个 0 测试的核心纯逻辑模块补行为契约 · unit **872→1095**(field_comparator/reconciliation_matcher/gl_vat_reconciler/vat_report_parser/vat_file_classifier/excel_template_th/excel_export/report_engine/usage_report/invoice_grouper/monitoring/task_queue/pdf_storage/pdf_searchable/kms_helper/i18n_reports/archive)· **挖出并修 3 个真 bug**(normalize_branch 总部别名 / _norm_date 佛历 / _filename_guess 下划线 · `85c35bb`)· 全守门绿 · 不碰巨石零冲突。早前 D1 第二十一会话 `d65b692` |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |
 | F 数据 | ⚪ 0/3 | — | 依赖 B1 |
-| G 文档 | ⚪ 0/7 | — | 随时做 · 不阻塞 |
+| G 文档 | 🟡 1/7(G2 ✅) | G2 RUNBOOK ✅ `5544d0e` | 第三十五会话:新增 `docs/RUNBOOK.md`(部署/回滚/CI/健康检查/紧急排查 · 磁盘满血泪根因)+ docs/README §7 索引 · 其余 G1 ADR/G3 ONBOARDING/G5-G7 待做 |
 | H 合规 | ⚪ 0/6 | — | 靠后 |
 | I 抛光 | 🟡 1.3/5(部分 I1 + 部分 I2) | — | I1 30/52 silent + I2 老订阅残留 admin/home 用户可见全清(2026-05-22) |
 
@@ -321,7 +321,7 @@
 - `db.py` 10,663 → **4,513 行**(减 6,150 · **B2 第二十二+二十三会话** · 抽 18 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1}/archive/rd/cost/exceptions/clients/billing/recon.vat_recon〔三表组〕/audit/team)
 - `home.js` 33,768 → **22,210 行**(C1:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js` · + 测试中心 493 行→`src/home/test-center.js`)
 - `services/**/*.py` 40 → **66**(B2 新增 18 个 store + 各 __init__);`services/ocr/entrypoints.py`(171 行 · 第二十一会话 `1eadc16`):web/LINE/email 三处共用 OCR 入口 helper 从 app.py/email_ingest 抽出
-- 守门测试:0 → **702 unit**(origin · B2 共 +40 域契约:第二十二会话 +20 · 第二十三会话 +20〔archive 2/rd 2/cost 2/exceptions 2/clients 2/billing 2/vat_recon 3/audit 2/team 3〕· 既有 tenant 隔离/分类器/dedup/buyer-resolver/salesvat/field_override 测试全绿)+ 1 E2E + CI(lint + test 双 job)全绿
+- 守门测试:0 → **1095 unit**(B2 +40 域契约 → 702;**第三十五会话 REFACTOR-D2 Wave 0 安全网 +~220** → 17 个核心纯逻辑模块行为契约 · 顺手挖修 3 个真 bug)+ 1 E2E + CI(lint + test 双 job)全绿
 
 ---
 

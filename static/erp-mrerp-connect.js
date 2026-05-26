@@ -887,7 +887,7 @@
         const curProd = cfg.seed_product_code || '';
         const ssel = 'width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;';
         const ov = document.createElement('div');
-        ov.className = 'mrerp-wizard-overlay';
+        ov.className = 'mrerp-wizard-overlay is-open';
         ov.setAttribute('role', 'dialog');
         ov.setAttribute('aria-modal', 'true');
         ov.innerHTML =

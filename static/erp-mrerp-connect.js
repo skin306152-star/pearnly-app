@@ -4,7 +4,7 @@
  * C-2 + C-3 + C-4 (Zihao 2026-05-18 拍板).
  *
  * Adds MR.ERP / FlowAccount cards into #erp-connect-cards (alongside
- * the existing Xero card IIFE) + the 3-step connect wizard modal +
+ * the existing Xero card IIFE) + the 2-step connect wizard modal +
  * the sidebar push-log scaffold.
  *
  * Self-contained:
@@ -162,35 +162,9 @@
             zh_TW: '連接 MR.ERP',
             ja: 'MR.ERP に接続',
         },
-        'wiz-step-1-h': {
-            zh: '这个连接用于哪些客户?',
-            en: 'Which Pearnly clients does this connection cover?',
-            th: 'การเชื่อมต่อนี้ครอบคลุมลูกค้าใดบ้าง?',
-            zh_TW: '此連線適用於哪些客戶?',
-            ja: 'この接続はどの取引先をカバーしますか?',
-        },
-        'wiz-step-1-hint': {
-            zh: '这些客户的发票将被推送到 MR.ERP',
-            en: 'Invoices for these clients will be pushed to MR.ERP',
-            th: 'ใบกำกับของลูกค้าเหล่านี้จะถูกส่งไป MR.ERP',
-            zh_TW: '這些客戶的發票將被推送到 MR.ERP',
-            ja: 'これらの取引先の請求書を MR.ERP に送信します',
-        },
-        'wiz-step-1-select-all': {
-            zh: '全选',
-            en: 'Select all',
-            th: 'เลือกทั้งหมด',
-            zh_TW: '全選',
-            ja: 'すべて選択',
-        },
-        // Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · Step 1 必选 ≥1 客户
-        'wiz-step-1-need-client': {
-            zh: '请至少选 1 个 Pearnly 客户 · 这个 ERP 连接才知道把谁的发票推过去',
-            en: 'Pick at least one Pearnly client · the ERP connection needs to know whose invoices to push',
-            th: 'เลือกลูกค้า Pearnly อย่างน้อย 1 รายการ · ERP จะได้รู้ว่าจะส่งใบกำกับของใคร',
-            zh_TW: '請至少選 1 個 Pearnly 客戶 · 這個 ERP 連線才知道把誰的發票推過去',
-            ja: '少なくとも 1 件の Pearnly 取引先を選択してください · ERP 連携が誰の請求書を送るか判断するために必要です',
-        },
+        // P0「开箱即用」(Zihao 2026-05-26) · 原 Step 1「选买方客户」picker 已退役
+        // (client_ids 废逻辑 · 卡死新用户)· wiz-step-1-h / -hint / -select-all /
+        // -need-client 四条文案随之删除。
         'wiz-step-2-h': {
             zh: '填入 MR.ERP 登录信息',
             en: 'Enter your MR.ERP login',
@@ -1314,7 +1288,7 @@
     };
 
     // =============================================================
-    // C-3 · 3-step connect wizard (Zihao 2026-05-18 拍板)
+    // C-3 · connect wizard (Zihao 2026-05-18 拍板;P0 开箱即用 2026-05-26 改 2 步)
     //
     // Loaded inline in this same file (not the originally suggested
     // static/erp-connect-wizard.html) so we don't need a separate
@@ -1326,9 +1300,10 @@
     //     - endpoint=null → new connection (Step 1 blank)
     //     - endpoint=<obj> → edit (preload from endpoint.config)
     //
-    // Step 3 includes the new "新客户模板" (seed_customer_code)
-    // dropdown that ties Customer auto-create to a known-good seed
-    // (e.g. 0006). Empty selection disables auto-create entirely.
+    // 2 步:Step 1 = 登录 + 测试连接;Step 2 = 选 ERP 年度账套 + 是否自动推送。
+    // (原 Step 1「选买方客户」已退役 · 见 _buildStep2Html 上方注释。)
+    // Step 2 的「高级设置」含 seed_customer_code / seed_product_code 模板,
+    // 把买方自动创建挂到一个 known-good seed(如 0006)· 留空则关闭自动创建。
     // =============================================================
 
     let _wizardEl = null;
@@ -1348,15 +1323,12 @@
             '<span class="mrerp-wizard-step-dot is-active" data-mw-dot="1"></span>' +
             '<span class="mrerp-wizard-step-sep"></span>' +
             '<span class="mrerp-wizard-step-dot" data-mw-dot="2"></span>' +
-            '<span class="mrerp-wizard-step-sep"></span>' +
-            '<span class="mrerp-wizard-step-dot" data-mw-dot="3"></span>' +
             '</div>' +
             '<button class="mrerp-wizard-close" data-mw-close type="button" aria-label="close">' +
             '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>' +
             '</button>' +
             '</div>' +
             '<div class="mrerp-wizard-body">' +
-            _buildStep1Html() +
             _buildStep2Html() +
             _buildStep3Html() +
             '</div>' +
@@ -1373,21 +1345,16 @@
         return wrap;
     }
 
-    function _buildStep1Html() {
-        return (
-            '<div class="mrerp-wizard-step is-active" data-mw-step="1">' +
-            '<h3 class="mrerp-wizard-step-h" data-mw-step1-h></h3>' +
-            '<p class="mrerp-wizard-hint" data-mw-step1-hint></p>' +
-            '<div class="mrerp-wizard-checkboxes" data-mw-clients>' +
-            '<div class="mrerp-card-empty">—</div>' +
-            '</div>' +
-            '</div>'
-        );
-    }
+    // P0「开箱即用」(Zihao 2026-05-26) · 删掉原 Step 1「选买方客户」picker
+    // (client_ids 已退役 · 见 erp_routes.py POST 注释)。向导从 3 步 → 2 步:
+    //   Step 1 = 填登录 + 测试连接(原 Step 2)
+    //   Step 2 = 选 ERP 年度账套 + 是否自动推送(原 Step 3)
+    // data-mw-step2-* / data-mw-step3-* 这些是内部唯一选择器名 · 保持不变 ·
+    // 只把容器 data-mw-step 序号和进度点重排成 1/2。
 
     function _buildStep2Html() {
         return (
-            '<div class="mrerp-wizard-step" data-mw-step="2">' +
+            '<div class="mrerp-wizard-step is-active" data-mw-step="1">' +
             '<h3 class="mrerp-wizard-step-h" data-mw-step2-h></h3>' +
             '<div class="mrerp-wizard-field">' +
             '<label class="mrerp-wizard-label" data-mw-user-label></label>' +
@@ -1418,7 +1385,7 @@
         // OR a text input as fallback when creating a new endpoint
         // (no id yet) or when the fetch fails.
         return (
-            '<div class="mrerp-wizard-step" data-mw-step="3">' +
+            '<div class="mrerp-wizard-step" data-mw-step="2">' +
             '<h3 class="mrerp-wizard-step-h" data-mw-step3-h></h3>' +
             '<div class="mrerp-wizard-field">' +
             '<label class="mrerp-wizard-label" data-mw-company-label></label>' +
@@ -1487,17 +1454,14 @@
     function _applyWizardI18n() {
         const w = _wizardEl;
         w.querySelector('[data-mw-title]').textContent = t('wiz-title-connect');
-        // Step 1
-        w.querySelector('[data-mw-step1-h]').textContent = t('wiz-step-1-h');
-        w.querySelector('[data-mw-step1-hint]').textContent = t('wiz-step-1-hint');
-        // Step 2
+        // Step 1 = 登录(原 Step 2 文案,保留 i18n key 名)
         w.querySelector('[data-mw-step2-h]').textContent = t('wiz-step-2-h');
         w.querySelector('[data-mw-user-label]').textContent = t('wiz-username');
         w.querySelector('[data-mw-pass-label]').textContent = t('wiz-password');
         w.querySelector('[data-mw-pwd-hint]').textContent = t('wiz-pwd-hint');
         w.querySelector('[data-mw-test]').textContent = t('wiz-test-btn');
         w.querySelector('[data-mw-test-status]').textContent = t('wiz-test-pending');
-        // Step 3
+        // Step 2 = 账套(原 Step 3 文案,保留 i18n key 名)
         w.querySelector('[data-mw-step3-h]').textContent = t('wiz-step-3-h');
         w.querySelector('[data-mw-company-label]').textContent = t('wiz-company');
         w.querySelector('[data-mw-company-hint]').textContent = t('wiz-company-hint');
@@ -1788,7 +1752,7 @@
             else if (dn === n) el.classList.add('is-active');
         });
         w.querySelector('[data-mw-prev]').style.display = n > 1 ? '' : 'none';
-        w.querySelector('[data-mw-next]').textContent = n === 3 ? t('btn-finish') : t('btn-next');
+        w.querySelector('[data-mw-next]').textContent = n === 2 ? t('btn-finish') : t('btn-next');
     }
 
     function _closeWizard() {
@@ -1803,7 +1767,6 @@
         _wizardState = {
             step: 1,
             endpoint: endpoint || null,
-            client_ids: (endpoint && endpoint.config && endpoint.config.client_ids) || [],
             companies: [],
         };
         // Reset inputs
@@ -1815,48 +1778,14 @@
         const seedSel = w.querySelector('[data-mw-seed]');
         seedSel.innerHTML = '<option value="">' + _esc(t('wiz-seed-empty')) + '</option>';
 
-        // Step 1 — load Pearnly clients
-        const clientsBox = w.querySelector('[data-mw-clients]');
-        clientsBox.innerHTML = '<div class="mrerp-card-empty">…</div>';
-        try {
-            const r = await fetch('/api/clients?limit=200', { headers: _authHeaders() });
-            if (r.ok) {
-                const data = await r.json();
-                const items = (data && (data.items || data.clients)) || [];
-                const preSelected = new Set((_wizardState.client_ids || []).map(String));
-                if (items.length === 0) {
-                    clientsBox.innerHTML = '<div class="mrerp-card-empty">—</div>';
-                } else {
-                    clientsBox.innerHTML = items
-                        .map(function (c) {
-                            const id = String(c.id || c.client_id || '');
-                            const checked = preSelected.has(id) ? ' checked' : '';
-                            return (
-                                '<label class="mrerp-wizard-checkbox-row">' +
-                                '<input type="checkbox" data-mw-client value="' +
-                                _esc(id) +
-                                '"' +
-                                checked +
-                                '>' +
-                                '<span>' +
-                                _esc(c.name || c.client_name || '#' + id) +
-                                '</span>' +
-                                '</label>'
-                            );
-                        })
-                        .join('');
-                }
-            } else {
-                clientsBox.innerHTML = '<div class="mrerp-card-empty">—</div>';
-            }
-        } catch (e) {
-            clientsBox.innerHTML = '<div class="mrerp-card-empty">—</div>';
-        }
-
+        // P0「开箱即用」· 向导第一步现在就是登录(原 Step 2)· 不再加载/选买方客户。
         _gotoStep(1);
         _wizardEl.classList.add('is-open');
-        // Focus the username on Step 2 entry; for now nothing special
-        // until user clicks Next.
+        // 进来直接聚焦用户名,少一次点击。
+        setTimeout(function () {
+            const userEl = _wizardEl && _wizardEl.querySelector('[data-mw-user]');
+            if (userEl) userEl.focus();
+        }, 30);
     }
 
     function _wizardPrev() {
@@ -1865,28 +1794,7 @@
 
     async function _wizardNext() {
         if (_wizardState.step === 1) {
-            // Collect selected clients
-            const ids = [].slice
-                .call(_wizardEl.querySelectorAll('[data-mw-client]:checked'))
-                .map(function (cb) {
-                    return cb.value;
-                });
-            // Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · 至少选 1 客户才能 Next ·
-            // 否则保存的 endpoint 没绑任何客户 · 推送时 history.client_id 找不到
-            // 关联 → ERR_NO_CLIENT 一连串失败。前端先拦住 · 配合后端 validator 双保险.
-            if (!ids.length) {
-                _toast(t('wiz-step-1-need-client'), 'warn');
-                return;
-            }
-            _wizardState.client_ids = ids;
-            _gotoStep(2);
-            setTimeout(function () {
-                _wizardEl.querySelector('[data-mw-user]').focus();
-            }, 30);
-            return;
-        }
-        if (_wizardState.step === 2) {
-            // Move to step 3; populate company + seed dropdown.
+            // Step 1 = 登录 · 点下一步 → 进 Step 2(选账套);填充公司 + seed 下拉。
             const companies = _wizardState.companies || [];
             const sel = _wizardEl.querySelector('[data-mw-company]');
             sel.innerHTML = companies.length
@@ -1905,7 +1813,7 @@
                       .join('')
                 : '<option value="6:1">' + _esc('TEST2019') + '</option>';
 
-            _gotoStep(3);
+            _gotoStep(2);
             // Seed customer dropdown (Task 1) — async populate from
             // /api/erp/endpoints/:id/customers when editing an
             // existing endpoint. Falls back to text input on new
@@ -1925,7 +1833,7 @@
             _populateSeedProductSelector(currentSeedP);
             return;
         }
-        // Step 3 → finish
+        // Step 2 → finish
         await _wizardFinish();
     }
 
@@ -2053,7 +1961,7 @@
 
         if (!username || !password) {
             _toast(t('wiz-fill-creds'), 'warn');
-            _gotoStep(2);
+            _gotoStep(1);
             return;
         }
 
@@ -2068,7 +1976,8 @@
             password_enc: password,
             comidyear: comidyear,
             seldb: seldb,
-            client_ids: _wizardState.client_ids || [],
+            // P0「开箱即用」· client_ids 已退役 · 不再下发(后端默认 [] · 编辑
+            // 时 PATCH 不传该键 → DB 旧值原样保留 · 兼容老连接)。
             seed_customer_code: seed || null,
             seed_product_code: seedProduct || null,
         };

@@ -3526,10 +3526,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已修复商品名称较长时的「ERP 对接」推送失败。此前较长的商品描述在 ERP 中被截断保存,系统据此误判为不同商品而拦截推送;现已修复,较长名称的新商品可正常自动创建并推送成功。即日生效。",
-            "th": "ระบบได้แก้ไขการส่งล้มเหลวใน «การเชื่อมต่อ ERP» เมื่อชื่อสินค้ายาว · ก่อนหน้านี้คำอธิบายสินค้าที่ยาวถูกตัดให้สั้นลงเมื่อบันทึกใน ERP ทำให้ระบบเข้าใจผิดว่าเป็นสินค้าคนละรายการและบล็อกการส่ง · ได้รับการแก้ไขแล้ว สินค้าใหม่ที่มีชื่อยาวสามารถสร้างและส่งสำเร็จได้ตามปกติ · มีผลทันที",
-            "en": "Fixed ERP integration push failures for products with long names. Previously, long product descriptions were truncated when saved in the ERP, so the system mistook them for a different product and blocked the push; this is fixed — new products with long names are now auto-created and pushed successfully. Effective immediately.",
-            "ja": "商品名が長い場合の「ERP 連携」送信失敗を修正しました。これまで長い商品説明は ERP 保存時に切り詰められ、別の商品と誤認されて送信がブロックされていました。修正により、長い名称の新規商品も正常に自動作成・送信できるようになりました。即日有効。",
+            "zh": "「ERP 对接」连接设置已简化。新建 MR.ERP 连接现在只需两步:填写登录信息并测试连接,然后选择年度账套与是否自动推送即可完成,不再需要事先选择客户名单。新用户开通后可以更快地完成对接、开始使用。即日生效。",
+            "th": "การตั้งค่าเชื่อมต่อใน «การเชื่อมต่อ ERP» ง่ายขึ้น · การสร้างการเชื่อมต่อ MR.ERP ใหม่ตอนนี้มีเพียงสองขั้นตอน: กรอกข้อมูลเข้าสู่ระบบและทดสอบการเชื่อมต่อ จากนั้นเลือกชุดบัญชีรายปีและตั้งค่าการส่งอัตโนมัติ โดยไม่ต้องเลือกรายชื่อลูกค้าล่วงหน้าอีกต่อไป · ผู้ใช้ใหม่จึงตั้งค่าและเริ่มใช้งานได้รวดเร็วขึ้น · มีผลทันที",
+            "en": "Setting up an ERP integration is now simpler. Creating a new MR.ERP connection takes just two steps: enter your login and test the connection, then choose the year account-set and whether to push automatically. You no longer need to pick a client list beforehand, so new users can finish setup and get started faster. Effective immediately.",
+            "ja": "「ERP 連携」の接続設定を簡素化しました。MR.ERP の新規接続は 2 ステップになり、ログイン情報を入力して接続をテストした後、年度の帳簿と自動送信の有無を選ぶだけで完了します。事前に取引先を選ぶ必要がなくなり、新規のお客様もより早く設定して利用を開始できます。即日有効。",
         },
     }
 

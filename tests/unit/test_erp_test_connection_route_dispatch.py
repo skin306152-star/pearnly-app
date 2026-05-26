@@ -2105,18 +2105,18 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
     and __import__("importlib").util.find_spec("fastapi") is not None,
     "needs full app + fastapi; covered server-side otherwise.",
 )
-class EndpointClientIdsRequiredTests(unittest.TestCase):
-    """Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · mrerp endpoint must be
-    bound to at least one Pearnly client. Otherwise every push lands
-    ERR_NO_CLIENT (because the history's client_id won't be resolvable
-    against the endpoint's client list).
+class EndpointClientIdsRetiredTests(unittest.TestCase):
+    """P0「开箱即用」(Zihao 2026-05-26 拍板) · client_ids 已退役。
 
-    Two layers:
-        1. wizard Step 1 enforces ≥ 1 client client-side (toast warn)
-        2. POST/PATCH /api/erp/endpoints validates server-side · 400
+    历史:v118.34.22 曾强制 mrerp endpoint 至少绑 1 个 Pearnly 买方客户
+    (POST/PATCH 校验 + wizard Step 1 picker),理由是"推送要按 client_id
+    解析客户码"。但智能分拣引擎(第二十八会话)落地后,推送按发票**卖方**
+    税号路由,两条推送路径(_auto_push_history / _auto_push_smart_routed)
+    **都不读 client_ids**。这道闸只剩一个副作用:买方客户列表为空的新用户
+    在连接向导第 1 步永远过不去 → 卡死开箱即用(A5)。
 
-    This test pins layer 2 — wizard-bypass attempts (curl / API direct)
-    still get blocked.
+    本测试**反过来锁**:空/缺 client_ids 必须被**允许**(2xx),否则就是有人
+    把废逻辑闸又加回来了 —— 撤掉他的 commit。字段本身保留兼容老数据。
     """
 
     @classmethod
@@ -2124,6 +2124,16 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
         import os
 
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        # mrerp POST/PATCH 路由会 import kms_helper 加密凭据 · 该模块在
+        # import 时强制要求 PEARNLY_KMS_KEY,否则 ImportError → 500。给个
+        # 测试用 Fernet key 让加密路径真正走通(这样我们验的是 client_ids
+        # 已放行,而不是被 KMS 缺失的 500 掩盖)。
+        try:
+            from cryptography.fernet import Fernet
+
+            os.environ.setdefault("PEARNLY_KMS_KEY", Fernet.generate_key().decode())
+        except Exception:
+            pass
         import app
 
         cls.app_module = app
@@ -2133,7 +2143,20 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
 
         return TestClient(self.app_module.app)
 
-    def test_post_mrerp_with_empty_client_ids_is_rejected(self):
+    def _mrerp_stored_endpoint(self):
+        return {
+            "id": "new-ep-id",
+            "user_id": "u",
+            "adapter": "mrerp",
+            "config": {
+                "system_url": "https://www.mrerp4sme.com",
+                "client_ids": [],
+            },
+            "enabled": True,
+            "name": "MR.ERP",
+        }
+
+    def test_post_mrerp_with_empty_client_ids_is_allowed(self):
         app = self.app_module
         with (
             patch.object(
@@ -2143,6 +2166,8 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "list_erp_endpoints", return_value=[]),
+            patch.object(app.db, "create_erp_endpoint", return_value="new-ep-id"),
+            patch.object(app.db, "get_erp_endpoint", return_value=self._mrerp_stored_endpoint()),
         ):
             with self._make_client() as client:
                 r = client.post(
@@ -2158,23 +2183,11 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
                         },
                     },
                 )
-        self.assertEqual(r.status_code, 400, r.text)
-        body = r.json()
-        # Detail can be a string or dict — accept both shapes as long as
-        # it carries the no_clients code.
-        detail = body.get("detail")
-        flat = (
-            str(detail)
-            if isinstance(detail, (str, int))
-            else json.dumps(detail) if isinstance(detail, dict) else ""
-        )
-        self.assertIn(
-            "endpoint_no_clients",
-            flat,
-            f"expected endpoint_no_clients in detail, got {detail!r}",
-        )
+        self.assertEqual(r.status_code, 200, r.text)
+        # 退役闸的反向回归:detail 里绝不能再出现 endpoint_no_clients。
+        self.assertNotIn("endpoint_no_clients", r.text)
 
-    def test_post_mrerp_with_missing_client_ids_is_rejected(self):
+    def test_post_mrerp_with_missing_client_ids_is_allowed(self):
         app = self.app_module
         with (
             patch.object(
@@ -2184,6 +2197,8 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "list_erp_endpoints", return_value=[]),
+            patch.object(app.db, "create_erp_endpoint", return_value="new-ep-id"),
+            patch.object(app.db, "get_erp_endpoint", return_value=self._mrerp_stored_endpoint()),
         ):
             with self._make_client() as client:
                 r = client.post(
@@ -2199,12 +2214,11 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
                         },
                     },
                 )
-        self.assertEqual(r.status_code, 400, r.text)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertNotIn("endpoint_no_clients", r.text)
 
-    def test_patch_mrerp_clearing_client_ids_is_rejected(self):
-        """User mistakenly trying to remove all clients via PATCH gets
-        blocked too — the regression vector is sneakier than POST
-        because the wizard might Re-render an empty checkbox state."""
+    def test_patch_mrerp_clearing_client_ids_is_allowed(self):
+        """编辑连接清空 client_ids 不再被拦 · 否则老用户编辑会被废逻辑卡住。"""
         app = self.app_module
         existing_ep = {
             "id": "ep-1",
@@ -2231,12 +2245,13 @@ class EndpointClientIdsRequiredTests(unittest.TestCase):
                         "config": {"client_ids": []},
                     },
                 )
-        self.assertEqual(r.status_code, 400, r.text)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertNotIn("endpoint_no_clients", r.text)
 
     def test_post_non_mrerp_adapter_allows_empty_client_ids(self):
-        """Webhook etc. don't need client_ids · the restriction is
-        mrerp-specific (because mrerp push needs to resolve client_id
-        to a customer code mapping)."""
+        """Webhook etc. don't need client_ids either · after P0 退役,
+        no adapter requires them. Kept as a sanity check for the
+        non-mrerp branch."""
         app = self.app_module
         with (
             patch.object(

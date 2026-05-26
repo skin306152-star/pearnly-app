@@ -130,21 +130,14 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
         if req.adapter not in _erp.ADAPTER_REGISTRY:
             raise HTTPException(400, detail="erp.unknown_adapter")
 
-        # Bug 1 (Zihao 2026-05-19 拍板 · v118.34.22) · 拒绝没绑客户的 mrerp endpoint
-        # 落库 · 否则推送时 ERR_NO_CLIENT 一连串失败. 前端 wizard Step 1 也加了
-        # 一道闸 · 这里是双保险(API 直接打过来 / 老 wizard 残留状态).
+        # P0「开箱即用」(Zihao 2026-05-26 拍板) · 退役 client_ids 必填校验。
+        # 智能分拣按发票卖方税号路由,推送两条路径(_auto_push_history /
+        # _auto_push_smart_routed)都不读 client_ids · 这道闸只会卡死买方
+        # 客户列表为空的新用户(连接向导第 1 步永远过不去)。字段保留兼容
+        # 老数据,新建默认 [] 保持 shape 一致。
         config = dict(req.config or {})
-        if req.adapter == "mrerp":
-            client_ids = config.get("client_ids") or []
-            if not isinstance(client_ids, list) or not client_ids:
-                raise HTTPException(
-                    400,
-                    detail={
-                        "code": "erp.endpoint_no_clients",
-                        "message_zh": "这个 ERP 连接还没绑任何 Pearnly 客户 · 请在向导第 1 步至少选 1 个客户",
-                        "message_en": "No Pearnly clients linked to this ERP connection · pick at least one in wizard Step 1",
-                    },
-                )
+        if req.adapter == "mrerp" and not isinstance(config.get("client_ids"), list):
+            config["client_ids"] = []
 
         # v118.34.13 · 加密 mrerp 凭据再落地 · wizard 发的是 plaintext。
         # 即使字段名叫 _enc · 不加密就 None-op 解密会炸。
@@ -250,19 +243,8 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
         new_cfg.pop("_username_enc_set", None)
         new_cfg.pop("_password_enc_set", None)
 
-        # Bug 1 (v118.34.22) · 镜像 POST 的 client_ids 验证 · PATCH 改 client_ids
-        # 为空也得拦下 · 否则用户误删可能 silent regression 全推送失败.
-        if target_adapter == "mrerp" and "client_ids" in new_cfg:
-            cids = new_cfg.get("client_ids") or []
-            if not isinstance(cids, list) or not cids:
-                raise HTTPException(
-                    400,
-                    detail={
-                        "code": "erp.endpoint_no_clients",
-                        "message_zh": "这个 ERP 连接不能没有 Pearnly 客户 · 至少留 1 个",
-                        "message_en": "ERP connection must have at least one Pearnly client",
-                    },
-                )
+        # P0「开箱即用」(Zihao 2026-05-26 拍板) · client_ids 已退役(见 POST
+        # 路由注释)· PATCH 不再拦"清空 client_ids" · 编辑连接不会再被卡。
 
         # P-3 · MR.ERP 加密镜像 POST 路由 (v118.34.13 一致)
         if target_adapter == "mrerp":

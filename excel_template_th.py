@@ -71,7 +71,11 @@ def _norm_date(raw: Any) -> Optional[datetime]:
     # 容错多种格式 · 含泰国佛历(2569 → 公历 2026)
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y/%m/%d", "%d-%m-%Y", "%d.%m.%Y"):
         try:
-            return datetime.strptime(s[:10], fmt)
+            d = datetime.strptime(s[:10], fmt)
+            # 泰国佛历转西历(2569 → 2026)· year > 2400 视为佛历
+            if d.year > 2400:
+                d = d.replace(year=d.year - 543)
+            return d
         except Exception:
             pass
     return None

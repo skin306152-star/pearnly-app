@@ -39,14 +39,12 @@ class FilenameGuessTests(unittest.TestCase):
         # 同时含 invoice 与 vat 关键词 → invoice 优先(先判 invoice hints)
         self.assertEqual(vfc._filename_guess("vat-invoice.pdf"), "invoice")
 
-    @unittest.expectedFailure
-    def test_KNOWN_GAP_underscore_breaks_word_boundary_hints(self):
-        r"""🐛 已知缺口(待 Zihao 拍板):\binvoice\b / \binv\b / \bvat\b 用 \b 词边界,
-        但 '_' 是正则单词字符 → 'invoice_2026.pdf' 在 invoice 与 _ 间无边界 → 匹配不上,
-        这种超常见文件名落不到零成本快路径 · 白白多调一次 Gemini(成本)。
-        修法:hint 改用 [\W_] 边界(把下划线也视作分隔)或先把 _ 归一成空格再匹配。
-        """
+    def test_underscore_filenames_now_hit_fast_path(self):
+        r"""已修(REFACTOR-D2):额外比一份「下划线转空格」的串 · 'invoice_2026.pdf'
+        这类常见名能命中零成本快路径 · 省 Gemini 调用。含下划线的 hint(sales_tax)仍兼容。"""
         self.assertEqual(vfc._filename_guess("invoice_2026.pdf"), "invoice")
+        self.assertEqual(vfc._filename_guess("tax_invoice_001.pdf"), "invoice")
+        self.assertEqual(vfc._filename_guess("sales_tax_2026.xlsx"), "vat_report")  # 仍兼容
 
 
 def _xlsx(rows):

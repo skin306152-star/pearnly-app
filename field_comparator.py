@@ -48,7 +48,10 @@ def normalize_branch(s) -> str:
     if not s:
         return "00000"
     n = normalize_str(s).replace(" ", "")
-    if n in {v.lower() for v in _HQ_ALIASES} or n == "":
+    # 别名集合走同款归一化(NFKC + lower + 去空格)再比 ·
+    # 否则带空格的 "head office" / 泰文 "สำนักงานใหญ่"(NFKC 拆 ำ)永远匹配不上
+    hq_norm = {normalize_str(v).replace(" ", "") for v in _HQ_ALIASES}
+    if n in hq_norm or n == "":
         return "00000"
     if n.isdigit():
         return n.zfill(5)

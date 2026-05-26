@@ -51,17 +51,12 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual(fc.normalize_branch("123"), "00123")  # 数字补零到 5 位
         self.assertEqual(fc.normalize_branch("00000"), "00000")
 
-    @unittest.expectedFailure
-    def test_KNOWN_BUG_multiword_and_thai_hq_aliases_not_matched(self):
-        """🐛 已知 bug(待 Zihao 拍板修):_HQ_ALIASES 比较时 input 做了 NFKC + 去空格,
-        但别名集合只 .lower()(未去空格 / 未 NFKC)· 导致:
-          - "head office"(带空格)→ input 去空格成 "headoffice" 匹配不上
-          - "สำนักงานใหญ่"(NFKC 把 ำ \\u0e33 拆成 \\u0e4d\\u0e32)→ 匹配不上
-        这两类总部写法会被误判成 branch_mismatch。
-        修法:别名集合也走同款归一化(NFKC + lower + 去空格)再比。
-        """
+    def test_multiword_and_thai_hq_aliases_matched(self):
+        """已修(REFACTOR-D2):别名集合走同款归一化(NFKC+lower+去空格)后,
+        带空格的 "head office" 和泰文 "สำนักงานใหญ่"(NFKC 拆 ำ)都能归一为总部。"""
         self.assertEqual(fc.normalize_branch("Head Office"), "00000")
         self.assertEqual(fc.normalize_branch("สำนักงานใหญ่"), "00000")
+        self.assertEqual(fc.normalize_branch("สำนักงานหลัก"), "00000")
 
 
 class DateParseTests(unittest.TestCase):

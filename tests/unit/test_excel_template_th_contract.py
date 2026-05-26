@@ -29,16 +29,12 @@ class NormDateTests(unittest.TestCase):
         self.assertIsNone(et._norm_date(""))
         self.assertIsNone(et._norm_date("not-a-date"))
 
-    @unittest.expectedFailure
-    def test_KNOWN_GAP_buddhist_era_not_converted(self):
-        """🐛 文档/代码不一致(待 Zihao 拍板):docstring 声称『含泰国佛历 2569→2026』,
-        但 _norm_date 只 strptime · 未做 -543 转换 · 佛历年份会原样落入 Excel。
-        若佛历日期会到这(field_comparator.parse_date 已转 · 本模块没转)→ 导出年份错。
-        修法:解析后对 year>2400 减 543(复用 field_comparator._thai_to_gregorian)。
-        """
+    def test_buddhist_era_converted(self):
+        """已修(REFACTOR-D2):_norm_date 解析后对 year>2400 减 543 · 佛历转西历。"""
         from datetime import datetime
 
         self.assertEqual(et._norm_date("2569-03-15"), datetime(2026, 3, 15))
+        self.assertEqual(et._norm_date("15/03/2569"), datetime(2026, 3, 15))
 
 
 class ToFloatStrTests(unittest.TestCase):

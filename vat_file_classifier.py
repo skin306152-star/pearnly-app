@@ -40,9 +40,18 @@ _REPORT_HINTS = [
 def _filename_guess(filename: str) -> Optional[str]:
     """根据文件名猜类型 · 返回 'invoice' / 'vat_report' / None"""
     fn = (filename or "").lower()
-    if any(re.search(p, fn, re.IGNORECASE) for p in _INVOICE_HINTS):
+    # 下划线是正则单词字符 · 会让 \binvoice\b 在 "invoice_2026" 处失效 ·
+    # 额外比一份「下划线转空格」的版本(同时保留原串 · 兼容 sales_tax 这类含下划线的 hint)
+    fn_spaced = fn.replace("_", " ")
+
+    def _hit(hints):
+        return any(
+            re.search(p, fn, re.IGNORECASE) or re.search(p, fn_spaced, re.IGNORECASE) for p in hints
+        )
+
+    if _hit(_INVOICE_HINTS):
         return "invoice"
-    if any(re.search(p, fn, re.IGNORECASE) for p in _REPORT_HINTS):
+    if _hit(_REPORT_HINTS):
         return "vat_report"
     return None
 

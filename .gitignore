@@ -25,6 +25,10 @@ _gemini_key.local/
 pearnly-vision-key*.json
 *-key.json
 _probe_*.py
+# 本地一次性诊断 / 清理脚本(历次会话遗留 · 需生产 DB 才能跑 · 从不入库)
+_diag_*.py
+_clean_*.py
+_*.mjs
 
 # Playwright(Python · 探测脚本副产物)
 playwright-report/

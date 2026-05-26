@@ -1,6 +1,31 @@
 # 📊 STATE · Pearnly 项目状态
 
 > ════════════════════════════════════════════════════════════
+> **【第三十会话 · 交接 · 2026-05-26】MR.ERP 推送闭环攻坚:列表全量+修热路径反噬+模块路径+建码撞码+归一不一致+名称截断 6 连修(真账号推绿)→ Zihao 体验仍"慢/繁琐/状态打架" → 退回来出「真正开箱即用」重构设计文档 · 下窗口照 P0-P3 做**
+> ════════════════════════════════════════════════════════════
+> **当前前端版本**:home.js/i18n-data.js `?v=11835103` · `/api/version`=**11835103** · 本地无未 push commit(scratch `_diag_*.py`/`_clean_*.py`/`scripts/probe/_debug/`(已 gitignore) 勿提交)。
+>
+> **🟢 进窗口第一件事**:读 **`docs/refactor/erp-out-of-box-redesign.md`**(本会话产出的总设计 · 含全部问题清单 + 开箱即用方案 + 老逻辑清理 + 可砍项 + 落地分期),**从 P0(client_ids 退役·解新用户连接卡死)起做**。这是 Zihao 拍板的方向:别再逐个打补丁,按这份方案重构。P1=通用商品模式(灵魂·解多商品发票 130 秒慢+商品不符)。
+>
+> **① 本会话连修 6 个真 bug(全 push+部署·11835097→11835103·真账号实测)**:沙箱 skin306152→MR.ERP TEST2019 走真推,逐层挖出叠加根因:
+> - **列表只读 30 条**:`allview.php` 的 `#showdata` 由 showdata.js 滚动驱动只首屏 30 → picker/匹配漏第 31+。新建 `services/erp/_listing_paginate.fetch_all_listing_pages`(POST `<module>/component/showdata.php` 逐页·实证机制)· 仅 picker 路由拉全量。
+> - **我引入的热路径反噬**:上条让 `_fetch_listing` 全量化 → 推送热路径每笔翻 69 页(2060 商品)卡几分钟。修:`_fetch_listing(max_pages=1 默认 · searchdataval 过滤分页)`,picker 传 400。
+> - **`_search_listing` 模块路径**:`"allview.php" not in url` 模块无关 → 客户复核后停 armas,商品复核误判已在页 → 在客户页搜商品码搜不到 → 假 ERR_PRODUCT_VERIFY_UNAVAILABLE。改按 `LISTING_PATH` 精确判断。
+> - **自动建码撞码**:`_generate_product_code/_generate_customer_code` 只看首页 30 → 多商品同码 P26050093 撞库。改按月份码前缀(searchdataval=prefix)过滤分页取真 max。建后复查改 `_search_listing(code)` 按码精确(不被首页截断)。
+> - **归一不一致(自动建商品推不成真凶)**:`_upsert_mapping` 存 item_name_norm 用 `normalize_item_name`(留空格),generator `_resolve_product_code` 查表用 `_norm_product_name`(去空格)→ 查不到 → 占位码 123 → 复核 ERR_PRODUCT_NAME_MISMATCH。修:`mrerp_xlsx_generator._build_product_lookup` 按 item_name 现算 `_norm_product_name` 双 key 入表(commit e228716)。
+> - **MR.ERP 商品名截断**:长描述商品(泰式烘焙 100+字)建档被 ERP 截断 ~40 字 → 复核"完整 vs 截断"恒 0.30<0.9。修:`verify_resolved_code`(商品)ERP 归一名是发票名前缀且≥8字符 → 判同商品放行(commit ec55c16)。
+> - 复核搜索 +1 重试;两条推送路径(`_auto_push_history` 兜底 / `_auto_push_batch_for_endpoint` 分拣)都补 pending「推送中」行 + 识别后日志即时显示 + 4s 轮询翻终态;异常批删原生 confirm→产品弹窗。
+> - **守门**:新增 `test_listing_paginate`/`test_mrerp_search_module_path`/`test_product_lookup_norm`/`test_product_verify_truncation`;E2E `test_mrerp_e2e_auto_sync` 真账号 PASS;`scripts/probe/green_push.py` 真推绿。
+>
+> **② 实测真推成功**:Zihao 真账号 INV2026030003 重试推绿(SI690301-677725)· E2E auto-create 全链绿。**推送内核已通**。
+>
+> **③ 但 Zihao 体验仍差(→ 触发重构)**:① 6 商品发票 130 秒太慢(逐行现场建商品)② 建重复商品 ③ 重试出重复日志行 ④ 推送日志说成功/异常栏说失败(状态打架)⑤ 连接向导 step1 "选买方客户"卡死新用户(client_ids 废逻辑·推送根本不用)⑥ 概念绕(工作空间=卖方/客户=买方 没讲清)。**全部收进 `erp-out-of-box-redesign.md`。**
+>
+> **④ 关键发现(写进设计文档)**:`client_ids` = 纯废逻辑(向导强制+后端校验,但智能分拣按卖方路由、推送两路径都不读)→ P0 退役。两套商品归一函数待合并。逐行自动建商品 = 慢+脏根源 → P1 改「通用商品+行描述」默认模式。重试 INSERT 新行 + 异常队列异口径 = 状态打架 → P2 改 UPDATE+单一口径。
+>
+> **⑤ 备忘**:沙箱授权本轮 = Zihao 给 SSH root@45.76.53.194(只读诊断)+ MR.ERP test01/test01 TEST2019(`.env.local` 有明文 · comidyear=6/seldb=1)。TEST2019 已被测试堆了 400+ P2605 重复商品(垃圾·让 code-gen 过滤分页偏慢)。`scripts/probe/green_push.py`=最小绿推证明脚本。
+>
+> ════════════════════════════════════════════════════════════
 > **【第二十九会话 · 交接 · 2026-05-26】卖方智能分拣 4 项收尾:多端点路由真验 + 商品不符 picker + per-endpoint 高级设置弹窗 + smart 驱动真 MR.ERP 推送实证 · 全程沙箱真账号 UI 实测**
 > ════════════════════════════════════════════════════════════
 > **当前前端版本**:home.js/i18n-data.js `?v=11835096` · erp-mrerp-connect.js `?v=11835097` · `/api/version`=**11835096** · 本地无未 push commit(仅 3 个 `_diag_*.py` scratch 未跟踪 · 勿提交)。

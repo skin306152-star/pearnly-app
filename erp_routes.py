@@ -921,18 +921,25 @@ async def erp_logs(
 
 
 @router.get("/api/erp/exceptions")
-async def erp_exceptions(request: Request, limit: int = 200):
+async def erp_exceptions(
+    request: Request,
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
     """ERP 推送异常队列(Zihao 2026-05-26)· 派生自 erp_push_logs(铁律 #12 单一源)。
 
-    每个 (history×endpoint) 最近一条仍 failed 的推送 → 一张可处理异常卡:
+    每个 (history×endpoint) 最近一条仍 failed 的推送 → 一条可处理异常行:
     带 state(needs_action/retrying/failed)+ category(customer_mismatch/product_mismatch/
     no_client/verify_unavailable/other)+ 发票号/卖方/买方/已归属客户/端点名/错误码。
-    前端据 category 出 chip、据 state 分四态。通用层 · 不写死 MR.ERP。
+    支持搜索(q)+ category 过滤 + 分页。返回 {items, total, categories}。通用层 · 不写死 MR.ERP。
     """
     user = get_current_user_from_request(request)
     _check_push_access(user)
-    items = db.list_push_exceptions(user["id"], limit=min(limit, 500))
-    return {"items": items, "total": len(items)}
+    return db.list_push_exceptions(
+        user["id"], q=q, category=category, limit=min(limit, 200), offset=max(0, offset)
+    )
 
 
 @router.get("/api/erp/logs/{log_id}")

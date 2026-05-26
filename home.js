@@ -15933,7 +15933,14 @@ try { window.I18N = I18N; } catch(e) {}
     // 闭环:修复(picker 下一块)+ [重试推送] 都在卡片内完成 · 重试走同一 /retry 端点
     //       (重新解析+反查+推送)· 成功 → 卡片消失(单一源自动同步)· 不来回跳日志页。
     // ─────────────────────────────────────────────────────────
-    let _erpExcState = { items: [], cat: '' };
+    let _erpExcState = {
+        items: [], q: '', cat: '', selected: new Set(),
+        total: 0, categories: {}, pageSize: 30, loading: false,
+        focusSearch: false, searchCaret: 0,
+    };
+    let _erpExcSearchTimer = null;
+
+    function _erpExcTok() { return localStorage.getItem('mrpilot_token') || ''; }
 
     function _erpExcFriendly(it) {
         // 优先用全局 humanizeError(凭证弹窗同款)· 没有则按 category 给友好文案
@@ -15943,63 +15950,136 @@ try { window.I18N = I18N; } catch(e) {}
         return t('erp-exc-reason-' + (it.category || 'other'));
     }
 
+    function _erpExcUpdateBatchBar() {
+        const bar = document.getElementById('erp-exc-batch');
+        if (!bar) return;
+        const n = _erpExcState.selected.size;
+        bar.hidden = n === 0;
+        const cnt = bar.querySelector('.erp-exc-batch-count');
+        if (cnt) cnt.textContent = String(n);
+    }
+
     function renderErpExceptions() {
         const block = document.getElementById('erp-exc-block');
         if (!block) return;
-        const all = _erpExcState.items || [];
-        if (all.length === 0) { block.hidden = true; block.innerHTML = ''; return; }
+        const st = _erpExcState;
+        // 真正空(无异常 + 无搜索/筛选)→ 隐藏整块;搜索/筛选 0 结果 → 显示空态(留搜索框)
+        const show = st.total > 0 || !!st.q || !!st.cat;
+        if (!show) { block.hidden = true; block.innerHTML = ''; return; }
         block.hidden = false;
 
-        // category chip 计数(全量)
-        const cats = {};
-        all.forEach(it => { const c = it.category || 'other'; cats[c] = (cats[c] || 0) + 1; });
-        const curCat = _erpExcState.cat || '';
-        let chipsHtml = `<button class="erp-exc-chip ${curCat === '' ? 'active' : ''}" data-erpexc-cat="">`
-            + `<span>${escapeHtml(t('erp-exc-cat-all'))}</span><span class="erp-exc-chip-count">${all.length}</span></button>`;
+        // category chips(计数来自后端 · 当前搜索范围内)
+        const cats = st.categories || {};
+        const allCount = Object.keys(cats).reduce((s, k) => s + cats[k], 0);
+        let chipsHtml = `<button class="erp-exc-chip ${st.cat === '' ? 'active' : ''}" data-erpexc-cat="">`
+            + `<span>${escapeHtml(t('erp-exc-cat-all'))}</span><span class="erp-exc-chip-count">${allCount}</span></button>`;
         Object.keys(cats).forEach(c => {
-            chipsHtml += `<button class="erp-exc-chip ${curCat === c ? 'active' : ''}" data-erpexc-cat="${escapeHtml(c)}">`
+            chipsHtml += `<button class="erp-exc-chip ${st.cat === c ? 'active' : ''}" data-erpexc-cat="${escapeHtml(c)}">`
                 + `<span>${escapeHtml(t('erp-exc-cat-' + c))}</span><span class="erp-exc-chip-count">${cats[c]}</span></button>`;
         });
 
-        const shown = curCat ? all.filter(it => (it.category || 'other') === curCat) : all;
-        const cardsHtml = shown.map(it => {
+        const items = st.items || [];
+        const allChecked = items.length > 0 && items.every(it => st.selected.has(it.id));
+        const rowsHtml = items.map(it => {
             const stateCls = it.state === 'needs_action' ? 'needs' : (it.state === 'retrying' ? 'retry' : 'fail');
             const stateLbl = t('erp-exc-state-' + (it.state || 'failed'));
             const reason = _erpExcFriendly(it);
-            const row = (lbl, val) => `<div class="erp-exc-row"><span class="erp-exc-k">${escapeHtml(lbl)}</span>`
-                + `<span class="erp-exc-v">${escapeHtml(val || '—')}</span></div>`;
-            return `<div class="erp-exc-card">
-                <div class="erp-exc-card-head">
-                    <span class="erp-exc-inv">${escapeHtml(it.invoice_no || '—')}</span>
-                    <span class="erp-exc-state ${stateCls}">${escapeHtml(stateLbl)}</span>
-                </div>
-                <div class="erp-exc-reason">${escapeHtml(reason)}${it.error_code ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</div>
-                ${row(t('erp-exc-f-seller'), it.seller_name)}
-                ${row(t('erp-exc-f-buyer'), it.ocr_buyer_name)}
-                ${row(t('erp-exc-f-erpcustomer'), it.client_name)}
-                ${row(t('erp-exc-f-endpoint'), it.endpoint_name)}
-                <div class="erp-exc-actions">
-                    <button class="erp-exc-retry-btn" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button>
-                </div>
+            const checked = st.selected.has(it.id) ? 'checked' : '';
+            return `<div class="erp-exc-row" data-erpexc-id="${escapeHtml(it.id)}">
+                <span class="ex-cb"><input type="checkbox" class="erp-exc-cb" data-erpexc-cb="${escapeHtml(it.id)}" ${checked}></span>
+                <span class="ex-inv" title="${escapeHtml(it.invoice_no || '')}">${escapeHtml(it.invoice_no || '—')}</span>
+                <span class="ex-seller" title="${escapeHtml(it.seller_name || '')}">${escapeHtml(it.seller_name || '—')}</span>
+                <span class="ex-buyer" title="${escapeHtml(it.ocr_buyer_name || '')}">${escapeHtml(it.ocr_buyer_name || '—')}</span>
+                <span class="ex-state"><span class="erp-exc-state ${stateCls}">${escapeHtml(stateLbl)}</span></span>
+                <span class="ex-reason" title="${escapeHtml(reason)}">${escapeHtml(reason)}${it.error_code ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</span>
+                <span class="ex-act"><button class="erp-exc-retry-btn" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button></span>
             </div>`;
         }).join('');
+
+        const emptyHtml = items.length === 0
+            ? `<div class="erp-exc-empty">${escapeHtml(t('erp-exc-empty'))}</div>` : '';
+        const moreHtml = items.length < st.total
+            ? `<button class="erp-exc-more" type="button" id="erp-exc-more">${escapeHtml(t('erp-exc-load-more'))} (${items.length}/${st.total})</button>`
+            : (st.total > 0 ? `<div class="erp-exc-count">${escapeHtml(t('erp-exc-shown', { n: items.length, total: st.total }))}</div>` : '');
 
         block.innerHTML = `
             <div class="erp-exc-head">
                 <h2 class="erp-exc-title">${escapeHtml(t('erp-exc-title'))}</h2>
                 <span class="erp-exc-sub">${escapeHtml(t('erp-exc-sub'))}</span>
+                <input type="search" class="erp-exc-search" id="erp-exc-search" placeholder="${escapeHtml(t('erp-exc-search-ph'))}" value="${escapeHtml(st.q)}">
             </div>
             <div class="erp-exc-chips">${chipsHtml}</div>
-            <div class="erp-exc-cards">${cardsHtml}</div>`;
+            <div class="erp-exc-batch" id="erp-exc-batch" ${st.selected.size ? '' : 'hidden'}>
+                <span class="erp-exc-batch-info"><span class="erp-exc-batch-count">${st.selected.size}</span> ${escapeHtml(t('erp-exc-batch-selected'))}</span>
+                <button class="erp-exc-batch-btn" type="button" data-erpexc-batch="retry">${escapeHtml(t('erp-exc-batch-retry'))}</button>
+                <button class="erp-exc-batch-btn danger" type="button" data-erpexc-batch="delete">${escapeHtml(t('erp-exc-batch-delete'))}</button>
+                <button class="erp-exc-batch-btn ghost" type="button" data-erpexc-batch="clear">${escapeHtml(t('erp-exc-batch-clear'))}</button>
+            </div>
+            <div class="erp-exc-rows">
+                <div class="erp-exc-row erp-exc-row-head">
+                    <span class="ex-cb"><input type="checkbox" class="erp-exc-cb-all" id="erp-exc-cb-all" ${allChecked ? 'checked' : ''}></span>
+                    <span class="ex-inv">${escapeHtml(t('erp-exc-f-invoice'))}</span>
+                    <span class="ex-seller">${escapeHtml(t('erp-exc-f-seller'))}</span>
+                    <span class="ex-buyer">${escapeHtml(t('erp-exc-f-buyer'))}</span>
+                    <span class="ex-state">${escapeHtml(t('erp-exc-f-state'))}</span>
+                    <span class="ex-reason">${escapeHtml(t('erp-exc-f-reason'))}</span>
+                    <span class="ex-act"></span>
+                </div>
+                ${rowsHtml}${emptyHtml}
+            </div>
+            <div class="erp-exc-foot">${moreHtml}</div>`;
 
+        // 搜索框(debounce · 保持焦点 + 光标)
+        const search = document.getElementById('erp-exc-search');
+        if (search) {
+            if (st.focusSearch) { search.focus(); try { search.setSelectionRange(st.searchCaret, st.searchCaret); } catch (_) {} }
+            search.addEventListener('input', () => {
+                st.q = search.value;
+                st.focusSearch = true;
+                st.searchCaret = search.selectionStart || search.value.length;
+                clearTimeout(_erpExcSearchTimer);
+                _erpExcSearchTimer = setTimeout(() => loadErpExceptions(false), 350);
+            });
+            search.addEventListener('blur', () => { st.focusSearch = false; });
+        }
+        // chips
         block.querySelectorAll('.erp-exc-chip').forEach(btn => {
-            btn.addEventListener('click', () => {
-                _erpExcState.cat = btn.dataset.erpexcCat || '';
-                renderErpExceptions();
+            btn.addEventListener('click', () => { st.cat = btn.dataset.erpexcCat || ''; loadErpExceptions(false); });
+        });
+        // 单条 retry
+        block.querySelectorAll('[data-erpexc-retry]').forEach(btn => {
+            btn.addEventListener('click', (e) => { e.stopPropagation(); _erpExcRetry(btn.dataset.erpexcRetry, btn); });
+        });
+        // 单选 checkbox(直接改 set + 更新批量栏 · 不整块重渲 · 防丢焦点)
+        block.querySelectorAll('.erp-exc-cb').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const id = cb.dataset.erpexcCb;
+                if (cb.checked) st.selected.add(id); else st.selected.delete(id);
+                const head = document.getElementById('erp-exc-cb-all');
+                if (head) head.checked = items.length > 0 && items.every(it => st.selected.has(it.id));
+                _erpExcUpdateBatchBar();
             });
         });
-        block.querySelectorAll('[data-erpexc-retry]').forEach(btn => {
-            btn.addEventListener('click', () => _erpExcRetry(btn.dataset.erpexcRetry, btn));
+        // 全选(当前页)
+        const cbAll = document.getElementById('erp-exc-cb-all');
+        if (cbAll) cbAll.addEventListener('change', () => {
+            items.forEach(it => { if (cbAll.checked) st.selected.add(it.id); else st.selected.delete(it.id); });
+            block.querySelectorAll('.erp-exc-cb').forEach(c => { c.checked = cbAll.checked; });
+            _erpExcUpdateBatchBar();
+        });
+        // 批量
+        block.querySelectorAll('[data-erpexc-batch]').forEach(btn => {
+            btn.addEventListener('click', () => _erpExcBatch(btn.dataset.erpexcBatch));
+        });
+        // 加载更多
+        const more = document.getElementById('erp-exc-more');
+        if (more) more.addEventListener('click', () => loadErpExceptions(true));
+        // 单击行(非 checkbox/按钮)→ 编辑弹窗(下一步)· 现暂留 hook
+        block.querySelectorAll('.erp-exc-row:not(.erp-exc-row-head)').forEach(row => {
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('input,button')) return;
+                if (typeof window._erpExcOpenEdit === 'function') window._erpExcOpenEdit(row.dataset.erpexcId);
+            });
         });
     }
 
@@ -16008,41 +16088,75 @@ try { window.I18N = I18N; } catch(e) {}
         if (btn) { btn.disabled = true; btn.textContent = t('erp-exc-retrying'); }
         try {
             const resp = await fetch('/api/erp/logs/' + encodeURIComponent(logId) + '/retry', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') },
+                method: 'POST', headers: { 'Authorization': 'Bearer ' + _erpExcTok() },
             });
             const data = await resp.json().catch(() => ({}));
-            if (resp.ok && data.ok) {
-                showToast(t('erp-exc-retry-ok'), 'success');
-            } else {
-                // 仍失败:重试重新解析后仍冲突 · 卡片会换新原因
-                showToast(t('erp-exc-retry-fail'), 'error');
-            }
-        } catch (e) {
-            showToast(t('erp-exc-retry-fail'), 'error');
-        }
-        // 单一源:重拉队列 · 成功的卡片自动消失 · 失败的换新原因(铁律 #12 · 不维护乐观态)
-        loadErpExceptions();
+            showToast(resp.ok && data.ok ? t('erp-exc-retry-ok') : t('erp-exc-retry-fail'),
+                resp.ok && data.ok ? 'success' : 'error');
+        } catch (e) { showToast(t('erp-exc-retry-fail'), 'error'); }
+        // 单一源:重拉队列 · 成功的行自动消失 · 失败的换新原因(铁律 #12 · 不维护乐观态)
+        _erpExcState.selected.delete(logId);
+        loadErpExceptions(false);
         if (typeof refreshExcBadge === 'function') { try { refreshExcBadge(); } catch (_) {} }
     }
 
-    async function loadErpExceptions() {
+    async function _erpExcBatch(action) {
+        const ids = Array.from(_erpExcState.selected);
+        if (action === 'clear') { _erpExcState.selected.clear(); renderErpExceptions(); return; }
+        if (ids.length === 0) return;
+        if (action === 'delete') {
+            if (!confirm(t('erp-exc-batch-delete-confirm', { n: ids.length }))) return;
+            try {
+                const resp = await fetch('/api/erp/logs/batch-delete', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + _erpExcTok(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ log_ids: ids.slice(0, 200) }),
+                });
+                const d = await resp.json().catch(() => ({}));
+                showToast(resp.ok ? t('erp-exc-batch-delete-ok', { n: d.deleted || 0 }) : t('erp-exc-retry-fail'),
+                    resp.ok ? 'success' : 'error');
+            } catch (e) { showToast(t('erp-exc-retry-fail'), 'error'); }
+        } else if (action === 'retry') {
+            try {
+                const resp = await fetch('/api/erp/logs/batch-retry', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + _erpExcTok(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ log_ids: ids.slice(0, 50) }),
+                });
+                const d = await resp.json().catch(() => ({}));
+                showToast(resp.ok ? t('erp-exc-batch-retry-ok', { ok: d.succeeded || 0, fail: (d.failed || 0) + (d.skipped || 0) }) : t('erp-exc-retry-fail'),
+                    resp.ok ? 'success' : 'error');
+            } catch (e) { showToast(t('erp-exc-retry-fail'), 'error'); }
+        }
+        _erpExcState.selected.clear();
+        loadErpExceptions(false);
+        if (typeof refreshExcBadge === 'function') { try { refreshExcBadge(); } catch (_) {} }
+    }
+
+    async function loadErpExceptions(append) {
         const block = document.getElementById('erp-exc-block');
-        if (!block) return;
+        if (!block || _erpExcState.loading) return;
+        _erpExcState.loading = true;
         try {
-            const resp = await fetch('/api/erp/exceptions', {
-                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') },
+            const params = new URLSearchParams();
+            if (_erpExcState.q) params.set('q', _erpExcState.q);
+            if (_erpExcState.cat) params.set('category', _erpExcState.cat);
+            params.set('limit', String(_erpExcState.pageSize));
+            params.set('offset', String(append ? _erpExcState.items.length : 0));
+            const resp = await fetch('/api/erp/exceptions?' + params.toString(), {
+                headers: { 'Authorization': 'Bearer ' + _erpExcTok() },
             });
-            if (!resp.ok) { block.hidden = true; return; }
+            if (!resp.ok) { if (!append) { block.hidden = true; } return; }
             const data = await resp.json();
-            _erpExcState.items = data.items || [];
-            // 当前选中的 category 若已无数据 · 回到全部
-            if (_erpExcState.cat && !_erpExcState.items.some(it => (it.category || 'other') === _erpExcState.cat)) {
-                _erpExcState.cat = '';
-            }
+            const newItems = data.items || [];
+            _erpExcState.items = append ? _erpExcState.items.concat(newItems) : newItems;
+            _erpExcState.total = data.total || 0;
+            _erpExcState.categories = data.categories || {};
             renderErpExceptions();
         } catch (e) {
-            block.hidden = true;
+            if (!append) block.hidden = true;
+        } finally {
+            _erpExcState.loading = false;
         }
     }
     window._rerenderErpExceptions = renderErpExceptions;

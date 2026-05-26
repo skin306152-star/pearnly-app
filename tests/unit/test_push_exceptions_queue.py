@@ -112,13 +112,21 @@ class ListPushExceptionsTests(unittest.TestCase):
             },
         ]
 
-    def test_filters_and_classifies(self):
+    def _call(self, **kw):
         cur = _Cur(self._rows())
         with mock.patch.object(push_store.db, "get_cursor", lambda *a, **k: _CM(cur)):
-            items = push_store.list_push_exceptions("u1")
+            return push_store.list_push_exceptions("u1", **kw)
+
+    def test_filters_and_classifies(self):
+        res = self._call()
+        items = res["items"]
         # 只剩 2 条(success/skipped_dup 被排除)
         ids = {it["id"] for it in items}
         self.assertEqual(ids, {"l1", "l3"})
+        self.assertEqual(res["total"], 2)
+        # category 计数
+        self.assertEqual(res["categories"].get("customer_mismatch"), 1)
+        self.assertEqual(res["categories"].get("verify_unavailable"), 1)
         by_id = {it["id"]: it for it in items}
         # l1:客户名不符 · 用户数据错 → needs_action
         self.assertEqual(by_id["l1"]["category"], "customer_mismatch")
@@ -128,6 +136,27 @@ class ListPushExceptionsTests(unittest.TestCase):
         # l3:反查不可用 + 在重试队列 → retrying(技术可重试)
         self.assertEqual(by_id["l3"]["category"], "verify_unavailable")
         self.assertEqual(by_id["l3"]["state"], "retrying")
+
+    def test_search_filters_by_invoice_seller_buyer(self):
+        # 搜 "买方X" → 只命中 l1
+        res = self._call(q="买方X")
+        self.assertEqual({it["id"] for it in res["items"]}, {"l1"})
+        self.assertEqual(res["total"], 1)
+
+    def test_category_filter(self):
+        res = self._call(category="verify_unavailable")
+        self.assertEqual({it["id"] for it in res["items"]}, {"l3"})
+        # categories 计数在 category 过滤前算 → 仍含两类
+        self.assertEqual(res["categories"].get("customer_mismatch"), 1)
+
+    def test_pagination_limit_offset(self):
+        res = self._call(limit=1, offset=0)
+        self.assertEqual(len(res["items"]), 1)
+        self.assertEqual(res["total"], 2)
+        res2 = self._call(limit=1, offset=1)
+        self.assertEqual(len(res2["items"]), 1)
+        # 两页不同
+        self.assertNotEqual(res["items"][0]["id"], res2["items"][0]["id"])
 
 
 if __name__ == "__main__":

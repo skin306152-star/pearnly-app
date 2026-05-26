@@ -865,7 +865,13 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
     return "other"
 
 
-def list_push_exceptions(user_id: str, limit: int = 200) -> List[Dict[str, Any]]:
+def list_push_exceptions(
+    user_id: str,
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> Dict[str, Any]:
     """ERP 推送异常队列(派生自 erp_push_logs · 铁律 #12 单一状态源,不另立异常表)。
 
     取每个 (history, endpoint) **最近一条** log · 仅保留 status='failed'(已被后续
@@ -875,9 +881,13 @@ def list_push_exceptions(user_id: str, limit: int = 200) -> List[Dict[str, Any]]
         verify_unavailable / other)· 前端 chip 用
       - 发票号 / 发票卖方(seller_name)/ 发票买方(ocr_buyer_name)/ 已归属 Pearnly 客户
         / ERP 端点名 / 错误码 / 原始 error_msg(前端转友好文案)
+
+    支持搜索(q:发票号/卖方/买方 模糊)+ category 过滤 + 分页(limit/offset)。
+    返回 {items: 当前页, total: 过滤后总数, categories: 各子类计数(供 chip)}。
     通用层只认统一状态 + 错误码,不写 if adapter=='mrerp'。
     """
     from services.erp import batch_view
+    import re as _re
 
     try:
         with db.get_cursor() as cur:
@@ -911,23 +921,45 @@ def list_push_exceptions(user_id: str, limit: int = 200) -> List[Dict[str, Any]]
             rows = [dict(r) for r in (cur.fetchall() or [])]
     except Exception as e:
         logger.error(f"list_push_exceptions failed: {e}")
-        return []
+        return {"items": [], "total": 0, "categories": {}}
 
-    out: List[Dict[str, Any]] = []
+    # 1) 仅留最近一条仍 failed 的(已解决的自动排除)+ 附 state/category/code
+    base: List[Dict[str, Any]] = []
     for r in rows:
         if (r.get("status") or "") != "failed":
-            continue  # 最近一条已成功/跳过 → 已解决 · 不进队列
+            continue
         r["state"] = batch_view.classify_push_log(r)
         r["category"] = classify_push_exception(r.get("error_msg"))
-        err = r.get("error_msg") or ""
-        import re as _re
-
-        m = _re.search(r"ERR_[A-Z0-9_]+", err)
+        m = _re.search(r"ERR_[A-Z0-9_]+", r.get("error_msg") or "")
         r["error_code"] = m.group(0) if m else ""
-        out.append(r)
-        if len(out) >= limit:
-            break
-    return out
+        base.append(r)
+
+    # 2) 搜索(发票号/卖方/买方 · 大小写不敏感)
+    qq = (q or "").strip().lower()
+    if qq:
+        base = [
+            r
+            for r in base
+            if qq in (r.get("invoice_no") or "").lower()
+            or qq in (r.get("seller_name") or "").lower()
+            or qq in (r.get("ocr_buyer_name") or "").lower()
+        ]
+
+    # 3) category 计数(搜索后 · 过滤前 → chip 显当前搜索范围内各子类数)
+    categories: Dict[str, int] = {}
+    for r in base:
+        c = r.get("category") or "other"
+        categories[c] = categories.get(c, 0) + 1
+
+    # 4) category 过滤 + 按时间倒序 + 分页
+    if category:
+        base = [r for r in base if (r.get("category") or "other") == category]
+    base.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    total = len(base)
+    off = max(0, int(offset or 0))
+    lim = max(1, min(int(limit or 50), 200))
+    page = base[off : off + lim]
+    return {"items": page, "total": total, "categories": categories}
 
 
 def get_push_stats_today(user_id: str) -> Dict[str, Any]:

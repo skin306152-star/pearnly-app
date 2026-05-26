@@ -3216,10 +3216,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "异常处理页新增「ERP 推送异常」:推送被系统拦截的发票会集中显示在这里,标明卖方、买方与失败原因,修复后可一键重试,处理完成会自动消失。推送日志的「工作空间/账套」列现按发票卖方自动归属;暂未识别出账套的会标「未归属·待确认卖方」。即日生效。",
-            "th": "เพิ่มส่วน «ข้อยกเว้นการส่งเข้า ERP» ในหน้าจัดการข้อยกเว้น: ใบกำกับที่ระบบระงับการส่งจะถูกรวบรวมไว้ที่นี่ พร้อมผู้ขาย ผู้ซื้อ และสาเหตุที่ล้มเหลว แก้แล้วกดลองใหม่ได้ในคลิกเดียว และจะหายไปเองเมื่อสำเร็จ · คอลัมน์พื้นที่ทำงานในบันทึกการส่งจะอ้างอิงผู้ขายในใบกำกับโดยอัตโนมัติ · มีผลทันที",
-            "en": "A new “ERP push exceptions” section has been added to the Exceptions page: invoices the system blocked from posting are collected here with their seller, buyer and failure reason, can be retried in one click, and disappear automatically once resolved. The push log's Workspace column now reflects the invoice seller automatically. Effective immediately.",
-            "ja": "例外処理ページに「ERP 連携の例外」を追加しました。システムが送信を保留した請求書がここにまとまり、売り手・買い手・失敗理由が表示され、ワンクリックで再試行でき、解決すると自動的に消えます。送信ログの「ワークスペース」列は請求書の売り手に基づいて自動的に割り当てられます。即日有効。",
+            "zh": "「ERP 推送异常」列表已升级:改为紧凑列表,支持按发票号/卖方/买方搜索、按类型筛选、勾选后批量重试或删除,数据多时分页加载。修复后一键重试,处理完成自动消失。即日生效。",
+            "th": "ปรับปรุงรายการ «ข้อยกเว้นการส่งเข้า ERP»: เป็นรายการแบบกระชับ ค้นหาด้วยเลขใบกำกับ/ผู้ขาย/ผู้ซื้อ กรองตามประเภท เลือกหลายรายการเพื่อลองใหม่หรือลบเป็นชุด และแบ่งหน้าเมื่อมีจำนวนมาก · แก้แล้วกดลองใหม่ได้ในคลิกเดียว สำเร็จแล้วจะหายไปเอง · มีผลทันที",
+            "en": "The “ERP push exceptions” list has been upgraded to a compact list with search (invoice / seller / buyer), category filters, multi-select batch retry or delete, and paging for large volumes. Fix then retry in one click — resolved items disappear automatically. Effective immediately.",
+            "ja": "「ERP 連携の例外」一覧を改善しました。コンパクトなリストになり、請求書番号・売り手・買い手での検索、種類フィルター、複数選択での一括再試行・削除、大量時のページ送りに対応。修正後はワンクリックで再試行でき、解決すると自動的に消えます。即日有効。",
         },
     }
 

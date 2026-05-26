@@ -2720,26 +2720,45 @@ body.sidebar-collapsed .nav-lock-icon {
 }
 .erp-exc-chip.active { background: #111111; color: #fff; border-color: #111111; }
 .erp-exc-chip-count { font-size: 11px; opacity: .8; }
-.erp-exc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-.erp-exc-card { border: 1px solid #e8e8e3; border-radius: 8px; padding: 12px; background: #fff; }
-.erp-exc-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.erp-exc-inv { font-weight: 700; font-size: 13px; color: #111111; }
-.erp-exc-state { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.erp-exc-search {
+    margin-left: auto; min-width: 220px; padding: 6px 10px; font-size: 12px;
+    border: 1px solid #e8e8e3; border-radius: 6px; background: #f4f4f0; color: var(--ink-1);
+}
+/* 批量栏 */
+.erp-exc-batch { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 10px; background: #f4f4f0; border-radius: 8px; }
+.erp-exc-batch-info { font-size: 12px; color: var(--ink-2); }
+.erp-exc-batch-count { font-weight: 700; color: #111111; }
+.erp-exc-batch-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; background: #111111; color: #fff; }
+.erp-exc-batch-btn.danger { background: #B91C1C; }
+.erp-exc-batch-btn.ghost { background: transparent; color: var(--ink-2); border: 1px solid #e8e8e3; }
+/* 横条行(像推送日志 · 不做卡片 · 省位置) */
+.erp-exc-rows { display: flex; flex-direction: column; }
+.erp-exc-row {
+    display: grid;
+    grid-template-columns: 32px 130px 1.2fr 1.2fr 96px 2fr 76px;
+    align-items: center; gap: 8px;
+    padding: 9px 6px; font-size: 12px; border-bottom: 1px solid #f0f0ec;
+}
+.erp-exc-row:not(.erp-exc-row-head):hover { background: #faf9f5; }
+.erp-exc-row-head { font-weight: 600; color: var(--ink-3); border-bottom: 1px solid #e8e8e3; }
+.erp-exc-row .ex-inv { font-weight: 600; color: #111111; }
+.erp-exc-row .ex-inv, .erp-exc-row .ex-seller, .erp-exc-row .ex-buyer, .erp-exc-row .ex-reason {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.erp-exc-row .ex-seller, .erp-exc-row .ex-buyer { color: var(--ink-2); }
+.erp-exc-row .ex-reason { color: var(--ink-2); }
+.erp-exc-state { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .erp-exc-state.needs { background: #FEF3C7; color: #B45309; }
 .erp-exc-state.retry { background: #DBEAFE; color: #1E40AF; }
 .erp-exc-state.fail { background: #FEE2E2; color: #B91C1C; }
-.erp-exc-reason { font-size: 12px; color: var(--ink-2); margin-bottom: 8px; line-height: 1.5; }
 .erp-exc-code { font-family: ui-monospace, monospace; font-size: 10px; color: var(--ink-3); background: #f4f4f0; padding: 1px 5px; border-radius: 4px; }
-.erp-exc-row { display: flex; gap: 8px; font-size: 12px; padding: 2px 0; }
-.erp-exc-k { color: var(--ink-3); min-width: 76px; flex-shrink: 0; }
-.erp-exc-v { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.erp-exc-actions { margin-top: 10px; display: flex; gap: 8px; }
-.erp-exc-retry-btn {
-    padding: 6px 14px; font-size: 12px; font-weight: 600;
-    background: #111111; color: #fff; border: none; border-radius: 6px; cursor: pointer;
-}
+.erp-exc-retry-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; background: #111111; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
 .erp-exc-retry-btn:hover { background: #333; }
 .erp-exc-retry-btn:disabled { opacity: .6; cursor: default; }
+.erp-exc-empty { padding: 20px; text-align: center; color: var(--ink-3); font-size: 12px; }
+.erp-exc-foot { margin-top: 10px; text-align: center; }
+.erp-exc-more { padding: 6px 16px; font-size: 12px; border: 1px solid #e8e8e3; border-radius: 6px; background: #fff; color: var(--ink-2); cursor: pointer; }
+.erp-exc-count { font-size: 11px; color: var(--ink-3); }
 .log-time { color: var(--ink-3); min-width: 80px; }
 .log-status { min-width: 16px; text-align: center; }
 .log-tag { padding: 2px 6px; font-size: 10px; border-radius: 4px; font-family: sans-serif; }
@@ -2768,10 +2787,9 @@ body.sidebar-collapsed .nav-lock-icon {
 .log-workspace-personal {
     color: #9ca3af;
 }
-/* 卖方未匹配到账套 · 暖色提示需处理(Zihao 2026-05-26)· 不是灰字"个人事务" */
+/* 卖方未匹配到账套 · 默认字体(不斜体 · 跟邻列统一)· 中性灰提示需处理(Zihao 2026-05-26) */
 .log-workspace-unresolved {
-    color: #B45309;
-    font-style: italic;
+    color: #9ca3af;
     cursor: help;
 }
 .log-client-empty {

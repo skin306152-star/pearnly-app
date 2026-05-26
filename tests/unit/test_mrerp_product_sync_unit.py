@@ -119,6 +119,16 @@ class LookupLayerTests(unittest.TestCase):
         page = MagicMock()
         page.goto.return_value = None
         page.content.return_value = SAMPLE_HTML
+
+        # 2026-05-26 · _fetch_listing 改走 showdata.php 全量分页 ·
+        # listing 行经 page.request.post 取(非 page.content)· 假实现:
+        # page 1 返 SAMPLE_HTML(< 30 行 → 一页即停)· 后续页返空。
+        def _fake_post(url, *, form):
+            resp = MagicMock()
+            resp.text.return_value = SAMPLE_HTML if form.get("showdata_pages") == "1" else ""
+            return resp
+
+        page.request.post.side_effect = _fake_post
         adapter._page = page
         svc = MRERPProductSyncService(adapter, product_threshold=0.90)
         return svc, adapter, page

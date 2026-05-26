@@ -60,6 +60,7 @@ from services.erp.exceptions import (
     MRERPBusinessError,
     MRERPTechnicalError,
 )
+from services.erp._listing_paginate import fetch_all_listing_pages
 
 logger = logging.getLogger(__name__)
 
@@ -900,11 +901,17 @@ class MRERPProductSyncService:
                     state="attached",
                     timeout=30_000,
                 )
-                html = page.content() or ""
-                rows = parse_stkmas_listing(html)
+                # 全量分页(2026-05-26):同客户列表 · #showdata 滚动驱动只 30 条 →
+                # 直接 POST showdata.php 逐页拉全量(_listing_paginate)。
+                rows = fetch_all_listing_pages(
+                    page.request.post,
+                    self.adapter.login_url,
+                    self.LISTING_PATH,
+                    parse_stkmas_listing,
+                )
                 self.cache.set(self._listing_cache_key, rows)
                 logger.info(
-                    "fetched stkmas listing: %d rows (attempt %d)",
+                    "fetched stkmas listing: %d rows (attempt %d · paginated)",
                     len(rows),
                     attempt,
                 )

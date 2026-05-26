@@ -61,6 +61,7 @@ from services.erp.exceptions import (
     MRERPBusinessError,
     MRERPTechnicalError,
 )
+from services.erp._listing_paginate import fetch_all_listing_pages
 
 logger = logging.getLogger(__name__)
 
@@ -1199,11 +1200,19 @@ class MRERPCustomerSyncService:
                     state="attached",
                     timeout=30_000,
                 )
-                html = page.content() or ""
-                rows = parse_armas_listing(html)
+                # 全量分页(2026-05-26):#showdata 由 showdata.js 滚动驱动 ·
+                # 首屏只 30 条 → 客户 > 30 个时第 31+ 个在 picker/匹配兜底里漏掉。
+                # 用已登录会话直接 POST showdata.php 逐页拉全量(详见
+                # _listing_paginate.fetch_all_listing_pages)。
+                rows = fetch_all_listing_pages(
+                    page.request.post,
+                    self.adapter.login_url,
+                    self.LISTING_PATH,
+                    parse_armas_listing,
+                )
                 self.cache.set(self._listing_cache_key, rows)
                 logger.info(
-                    "fetched armas listing: %d rows (attempt %d)",
+                    "fetched armas listing: %d rows (attempt %d · paginated)",
                     len(rows),
                     attempt,
                 )

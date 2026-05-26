@@ -84,6 +84,8 @@ scripts/probe/_debug/armas_copy_*.json
 scripts/probe/_debug/armas_copy_v2_*.json
 scripts/probe/_debug/product_listing_*.html
 scripts/probe/_debug/product_form_*.json
+# 探测产物含真实账套主数据(隐私)· 整目录不入库
+scripts/probe/_debug/
 
 # 本地真实账单样本(绝不进 git · 隐私)
 _bank_samples/

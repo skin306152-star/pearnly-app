@@ -3440,10 +3440,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "「ERP 对接」已支持在每个连接卡片上直接打开「高级设置」,调整自动创建买方/商品所用的模板,无需重走连接向导、也不必重新输入登录信息。即日生效。",
-            "th": "การเชื่อมต่อ ERP รองรับการเปิด «ตั้งค่าขั้นสูง» ได้โดยตรงบนการ์ดการเชื่อมต่อแต่ละรายการ เพื่อปรับแม่แบบที่ใช้สร้างผู้ซื้อ/สินค้าอัตโนมัติ โดยไม่ต้องทำตัวช่วยเชื่อมต่อใหม่หรือกรอกข้อมูลเข้าสู่ระบบอีกครั้ง · มีผลทันที",
-            "en": "ERP integration now lets you open “Advanced” directly on each ERP connection card to adjust the templates used when auto-creating buyers/products — without re-running the connection wizard or re-entering your login. Effective immediately.",
-            "ja": "「ERP 連携」では、各 ERP 接続カードから直接「詳細設定」を開き、買い手/商品の自動作成に使うテンプレートを調整できるようになりました。接続ウィザードをやり直したりログイン情報を再入力したりする必要はありません。即日有効。",
+            "zh": "系统已优化「ERP 对接」的客户与商品选择。此前因仅能读取前 30 个,导致客户或商品较多时第 31 个起无法选中、自动匹配也可能遗漏的问题,已修复。现可读取并选择全部客户与商品。即日生效。",
+            "th": "ระบบได้ปรับปรุงการเลือกลูกค้าและสินค้าใน «การเชื่อมต่อ ERP» · ปัญหาเดิมที่อ่านได้เพียง 30 รายการแรก ทำให้เมื่อมีลูกค้าหรือสินค้าจำนวนมากจะเลือกตั้งแต่รายการที่ 31 ไม่ได้และการจับคู่อัตโนมัติอาจตกหล่น ได้รับการแก้ไขแล้ว · ขณะนี้สามารถอ่านและเลือกลูกค้าและสินค้าได้ครบทั้งหมด · มีผลทันที",
+            "en": "Customer and product selection in ERP integration has been improved. Previously only the first 30 could be read, so with many customers or products the 31st onward could not be selected and automatic matching might miss them. This is now fixed — all customers and products can be read and selected. Effective immediately.",
+            "ja": "「ERP 連携」の取引先・商品の選択を改善しました。これまでは先頭 30 件しか読み込めず、取引先や商品が多い場合に 31 件目以降を選べず、自動照合でも漏れる可能性がありました。この問題は修正され、すべての取引先・商品を読み込んで選択できるようになりました。即日有効。",
         },
     }
 

@@ -1,6 +1,52 @@
 # 📊 STATE · Pearnly 项目状态
 
 > ════════════════════════════════════════════════════════════
+> **【第二十六会话 · 交接 · 2026-05-26】MR.ERP 重整 PRD:文案统一(P1)+ fail-safe 含税号优先(P2)+ 自动创建闭环(P3)+ 2 UI bug · 全部 push+部署+上线验证 · 等 Codex 真账号验收**
+> ════════════════════════════════════════════════════════════
+> **进窗口先读**:本块 + 第二十五会话块 + `AGENTS.md` + `docs/agent/*`。**当前前端版本**:home.js/home.css/i18n-data.js `?v=11835089` · main.js(bundle)`?v=11835088` · erp-mrerp-connect.js `?v=11835086` · `/api/version`=**11835089**。
+>
+> **🟢 进窗口第一件事:看 Codex 的真账号验收结果回来没**(Zihao 让 Codex 跑下方验收清单)。回了 → 按结果修 bug + 做 P4;没回 → 可先做"不依赖结果"的遗留(见 ④),或等。**别盲做 P4**(异常 UI 长啥样取决于真实失败怎么冒出来)。
+>
+> **① 本会话已完成并上线(master 自动部署 · 10 commit · 离线单测 774 绿)**:
+> 这是 Zihao 给的一份完整 MR.ERP 重整 PRD(配置/推送/匹配/自动创建/异常兜底/文案统一 · 5 阶段)。本会话做完 P1+P2+P3:
+> - **P1 文案/概念统一**(全前端 · 纯文案不改逻辑):
+>   - workspace 切换器最终文案=**「工作空间」**(`8648227` · 覆盖上一版"做账主体"/"客户业务"·太生硬被否)· 个人事务+说明 · 空状态 SaaS 文案 · 4 语 + `ws-personal-desc`。**修 bug**(`a9ab2fd`):创建公司后只剩 1 个工作空间时点右上角无反应 → 根因 openWorkspaceChooser「只剩 1 个自动选中 return」没区分手动/惰性 · 已改「仅惰性(带 afterSelect)才自动选 · 手动点永远弹层」。
+>   - 「客户管理」→**「买方客户」**(`8648227` · clients-title 4 语 · 跟工作空间区分)。
+>   - 配置向导(`42826bc` · static/erp-mrerp-connect.js 自带 5 语 i18n):**账套概念更正**——TEST2019/TEST2020 = 同一 ERP 公司主体下的**年度账套/数据库**,不是两家公司。「公司」→「ERP 公司/年度账套」· 「看到 N 个公司」→「发现 N 个 ERP 年度账套」· 新增 wiz-company-hint · seed 字段正名「自动创建买方/商品时使用的模板」+ 说明(名称/税号/地址来自发票)。
+>   - 推送日志(`0802af8`+`35be50b`):`卖家`→**发票卖方**、`Pearnly 客户`→**发票买方**(4 语)· **新增「工作空间」归属列**(`list_push_logs` LEFT JOIN workspace_clients · 无归属显「个人事务」)· **修 bug**(`a9ab2fd`):失败行 ↻ 重试按钮把右侧列挤歪 → 重新设计加固定宽 `.log-actions` 列(每行同宽)· 变宽重试信息从行内 chip 改挂状态图标 tooltip。
+>   - key-leak 自检:39 个 erp-receipt-*/erp-log-* key 全 4 语齐 · 无 raw key 泄漏。
+> - **P2 fail-safe 推送复核**(`46d6bc5` 名称 + `7363871` 税号 · 仅 MR.ERP 路径):
+>   - 根因(只读生产 DB 诊断坐实):推送时 customer/product code 直接从 `mappings` 取(含 DB stale 映射 + generator 的 `'123'` fallback)· **绕过 Sync.lookup** · 凭 code 复用不复核 → 静默错推。商品 16/17 stale 映射全→占位 123;客户自动建码撞码→个人买方推到 อิ๊กลู สตูดิโอ。
+>   - 修:**gate 在 `mrerp_adapter.upload_invoice_batch` 的 generate_xlsx 之前**(`_verify_resolved_master_data`)· 对每张发票"将推送的"customer_code+各 product_code 反查 MR.ERP 真名复核 · 不匹配→FailedRow。`mrerp_customer_sync.verify_resolved_code(code,name,tax_id)` + `mrerp_product_sync.verify_resolved_code(code,name)` + 商品加 `_search_listing`。
+>   - **税号优先**(P2):有买方税号→`_fetch_customer_detail` 读 ERP 客户详情 txttaxid;税号一致=放行(权威·即便名字略差)、税号冲突=ERR_CUSTOMER_NAME_MISMATCH、**读不到税号→安全降级名称复核**(防详情页 selector 假设错时硬拦所有推送)。
+>   - 错误码:`ERR_CUSTOMER_NAME_MISMATCH`/`ERR_PRODUCT_NAME_MISMATCH`(用户数据错·入 USER_DATA_ERROR_CODES·不 retry)· `ERR_CUSTOMER_VERIFY_UNAVAILABLE`/`ERR_PRODUCT_VERIFY_UNAVAILABLE`(技术错·走 retry·绝不显示成功)· 4 语友好文案在 mrerp_business_friendly.py。
+>   - **污染 mapping 已清**(Zihao 授权 · 只读列清单后):该 tenant(040f012b)erp_product_mappings 删 17 + erp_client_mappings 删 2(client 49/50)· re-count 0/0。
+> - **P3 自动创建闭环反查**(`cf4587a`):customer/product `_layer4_auto_create` 建完确认码出现后,复用 verify_resolved_code 再核一次名/税号 · 冲突抛(不推)· 反查不可用→log 降级(刚写的可信)。
+> - 守门:guard 单测 `tests/unit/test_mrerp_master_data_verify.py`(25)· 全套 pytest 774 绿 · black/ruff/check_i18n(0/0)/CRLF 每步过 · 每次部署后 `/api/version` + systemd 重启时间 + 模块 import 真验证。
+>
+> **② 🔴 等待中:Codex 真账号验收清单(Zihao 让 Codex 跑 · 下窗口看结果)**:pearnly.com 真账号 + 真 MR.ERP TEST2019。重点项:
+>   - 文案/UI:工作空间弹窗(创建后能重开切换/新建)· 4 语无 raw key · 买方客户标题 · 配置向导年度账套文案 · 日志卖方/买方/工作空间列 + 失败行 ↻ 对齐。
+>   - **fail-safe(核心)**:买方已存在→成功;不存在→自动建+反查→成功;故意客户名不符→必失败 ERR_CUSTOMER_NAME_MISMATCH;故意同名不同税号→必失败(conflict=tax_id);故意商品名不符→ERR_PRODUCT_NAME_MISMATCH;反查失败→ERR_*_VERIFY_UNAVAILABLE 不显示成功。
+>   - **回归**:真实买方(BAKELAB)仍能成功(确认没误杀)。
+>   - **盯**:服务器日志有没有大量 `detail tax read failed` 降级 → 说明 `txttaxid` selector 要按真 HTML 调(不影响正确性·只降级名称)。
+>
+> **③ 未做 / 下窗口接力**:
+> - **P4 异常兜底统一 UI**(PRD section 六):选择/创建 ERP 买方客户/商品、重试推送、跳过 的统一异常面板。**等 Codex 结果再做**(纯前端·按铁律放 src/home/*·不进 home.js)。
+> - **改推送主路径的更大改动**:本会话 P2/P3 都是"加层+安全降级"·已上线。若后续要动匹配主流程,先给 Zihao 影响面/测试/回滚(铁律)。
+>
+> **④ 不依赖测试结果的遗留(没回 Codex 时可先做)**:
+> - 推送日志「**ERP 账套(TEST2019)**」列:endpoint 只存 comidyear/seldb 码 · **未持久化数据库显示名** → 要先在 test-connection / endpoint config 持久化 label,再加列。
+> - 配置向导下拉 option label「公司全名 · TEST2019」(PRD section 十.3):需 live MR.ERP 下拉 HTML 真样本才能正确拼公司名+库名。
+> - 推送详情弹窗加「工作空间」字段(`get_push_log_detail` 是另一条 query · 要单独 join)。
+>
+> **⑤ 关键踩坑/接力备忘**:
+> - **推送码的真实来源**:`mrerp_xlsx_generator.lookup_customer_code(client_id,mappings)` + `_resolve_product_code`(找不到 fallback `'123'`)· 都从 `mappings` 取(DB 预载 + adapter `_sync_master_data` enrich)· **fail-safe 必须卡在"最终码"= adapter gate**,不能只在 Sync.lookup 里(会被 enrich 的 swallow 绕过)。
+> - **i18n 双源**:配置向导文案在 `static/erp-mrerp-connect.js` 自带 dict(5 语 zh/en/th/zh_TW/ja)· 不在 i18n-data.js;其余 UI 在 `static/i18n-data.js`(4 语 · t() 读 window.I18N · 改了必 bump i18n-data.js?v=)。`check_i18n --strict` 只验 i18n-data.js。
+> - **改 home.js → bump home.js?v= → 弹版本横幅 → 必写 4 语 release_notes**(覆盖式·官方语言)。纯 src/home(bundle)/i18n-data 改不动 home.js?v= 则不弹(沿用 C1 策略)。
+> - **push 授权**:Zihao 本会话给了"全部授权 push·不再每次问"(口头·auto-mode 分类器仍可能逐次拦·拦了就 `! git push origin master` 或 Zihao 在对话里再说一次)。
+> - **scratch 文件**(未跟踪·勿提交):本地 + 服务器 /opt/mrpilot/ 各有 `_diag_p1_pushes.py`/`_diag_p1_v2.py`/`_clean_polluted_mappings.py`(纯只读诊断/已用过的清理脚本·可删)。
+>
+> ════════════════════════════════════════════════════════════
 > **【第二十五会话 · 交接 · 2026-05-26】通用 ERP 推送凭证 + B4 工作模式切换器接入 + P0 同页多票漏识别根因修复(全部已 push + 部署)**
 > ════════════════════════════════════════════════════════════
 > **进窗口先读**:本块 + 第二十四会话块 + `AGENTS.md` + `docs/agent/*` + `docs/refactor/*`。

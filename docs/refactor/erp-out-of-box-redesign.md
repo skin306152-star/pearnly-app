@@ -203,7 +203,7 @@
   - **B3 ✅(核查已满足)** `requireWorkspace` 全项目只定义、无人调用 → 上传不强制选工作空间(读可选 `X-Workspace-Client-Id` header · 后端按卖方智能分拣)· 单工作空间业务动作本就自动选中。
   - **B5 折中**:`客户`只改名不挪导航位置(移子菜单风险高且 B5 原标"待拍板")· 改名 + 对称命名已达概念清晰目标。
   - **B2 🔲 折中后置**:种子失效提示 —— 通用商品模式已弱化 seed 角色(§7 明确降优先级)· 属推送内部逻辑 · 不在本轮自主长跑冒险 · 留后续单独处理。
-  - **UI 实测受阻(诚实记录)**:提供的测试账号 `18685123456@163.com` 登录返 **401 invalid_credentials**(2× API + 1× Playwright 真浏览器均失败 · 凭据无效)· 改用**生产静态文件验证**(curl 确认 4 语新 `nav-clients` + `ws-chooser-subtitle` + bundle 内 `title` tooltip / 「发票卖方」副标题 均已 live)· 可视化截图待有效凭据补。
+  - **✅ UI 实测通过**:真浏览器 Playwright + 真账号 `18685123459@163.com`(登录 200)· 导航显「买方客户」(B4)· 工作空间弹窗顶部「工作空间 = 你的公司(发票卖方/开票方)」副标题(B1)· 线上 `/api/erp/exceptions` 18 条中 14 条带 `error_friendly`(P2-C 顺带验:`ERR_CUSTOMER_NAME_MISMATCH`→中文+泰文)· 截图已交 Zihao。
 - **每期**:本机验 → diff 给 Zihao → 沙箱真账号(test01/TEST2019)实测 → 上 → 4 语 release_notes + 守门。
 
 ---

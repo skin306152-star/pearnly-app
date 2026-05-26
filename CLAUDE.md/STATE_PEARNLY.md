@@ -17,7 +17,7 @@
 > - 守门:全量 unit 1095 · eslint/prettier/node/check_i18n(0/0)/black/vite build 全绿。版本 `?v=` 三件(i18n-data/home.js/main.js)→ 11835109 · 4 语 release_notes 覆盖式。
 > - **🔲 B2 种子失效提示折中后置**:通用模式已弱化 seed(§7 降优先级)· 留后续。
 >
-> **⚠️ UI 实测受阻(诚实)**:给的测试账号 `18685123456@163.com` / `xiaopi19950730..` 登录返 **401 invalid_credentials**(2× API + 1× Playwright 真浏览器均失败 · 凭据无效)。改用**生产静态文件 curl 验证**新文案确已 live(4 语 nav-clients + ws-chooser-subtitle + bundle tooltip/副标题)。**可视化截图待 Zihao 给有效凭据或自行眼验**(登录 → ERP 对接 → 推送异常看友好中文 / 导航看「买方客户」/ 右上角工作空间弹窗看卖方副标题)。
+> **✅ UI 实测通过(真浏览器 Playwright + 真账号 `18685123459@163.com` · 登录 200)**:① 左侧导航显示「**买方客户**」(B4)· ② 右上角工作空间弹窗顶部副标题「**工作空间 = 你的公司(发票卖方/开票方)**」(B1)· ③ 线上 `/api/erp/exceptions` 18 条中 **14 条带 error_friendly**(P2-C · 样本 `ERR_CUSTOMER_NAME_MISMATCH` → 中文「复核发现要推送的客户码…」+ 泰文,完整 HTTP 路径验证)。截图已交 Zihao。(注:首轮邮箱尾号笔误 …456,实为 …459)
 >
 > ════════════════════════════════════════════════════════════
 > **【第三十三会话 · 交接 · 2026-05-27】P2-B 推送日志折叠上线(真账号实测过)· 只剩 P2-C(触 home.js)/ P3**

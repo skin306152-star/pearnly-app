@@ -124,10 +124,11 @@
 
 | 文件 | 主旨 |
 |---|---|
+| [`RUNBOOK.md`](RUNBOOK.md) | **运维手册**(整顿 G2)· 部署 / 回滚 / CI 查看 / 健康检查 / 紧急排查(磁盘满血泪根因)· 出事先翻这里 · 2026-05-27 |
 | [`deploy-sync-analysis.md`](deploy-sync-analysis.md) | 部署流程现状 + 防失同步建议 · webhook + git pull 链路 |
 | [`excel-export-test-checklist.md`](excel-export-test-checklist.md) | Excel 导出实测 Checklist · 银行对账 v2 |
 
-> 主部署文档在 `CLAUDE.md/CLAUDE.md` § 部署 & 打包铁律(L632+)。
+> 主部署文档在 `CLAUDE.md/CLAUDE.md` § 部署 & 打包铁律(L632+)。RUNBOOK 是其可操作版浓缩。
 
 ---
 

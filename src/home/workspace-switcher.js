@@ -109,8 +109,8 @@
             return true;
         }
         // 个人模式 / 未选 → 轻提示(不阻塞全站 · 只挡这个动作)
-        const msg = _t('ws-need-client', '这个功能需要先选择客户');
-        const pick = _t('ws-btn-pick', '选择客户');
+        const msg = _t('ws-need-client', '这个功能需要先选择做账主体(账套)');
+        const pick = _t('ws-btn-pick', '选择账套');
         const cancel = _t('ws-btn-cancel', '取消');
         // home.js 的 showConfirm(msg, opts) 返回 Promise<bool> · 用 okText/cancelText 自定义按钮。
         if (typeof window.showConfirm === 'function') {
@@ -146,16 +146,22 @@
                 emptyHint: list.length
                     ? null
                     : _isOwner()
-                      ? _t('ws-empty-owner', '还没有客户,请先新建一个客户')
-                      : _t('ws-empty-employee', '你还没有被分配客户,请联系老板分配'),
+                      ? _t(
+                            'ws-empty-owner',
+                            '还没有做账主体 · 这里登记你在「给哪家公司做账」(代理记账用)· 与左侧「客户管理(发票买方)」不是一回事 · 点下方新建'
+                        )
+                      : _t('ws-empty-employee', '你还没有被分配做账主体(账套)· 请联系老板分配'),
             });
             return;
         }
         // 兜底(UI 未挂载时):0 个不死循环,只给提示
         if (!list.length) {
             const hint = _isOwner()
-                ? _t('ws-empty-owner', '还没有客户,请先新建一个客户')
-                : _t('ws-empty-employee', '你还没有被分配客户,请联系老板分配');
+                ? _t(
+                      'ws-empty-owner',
+                      '还没有做账主体 · 这里登记你在「给哪家公司做账」(代理记账用)· 与左侧「客户管理(发票买方)」不是一回事 · 点下方新建'
+                  )
+                : _t('ws-empty-employee', '你还没有被分配做账主体(账套)· 请联系老板分配');
             if (typeof window.showToast === 'function') window.showToast(hint, 'info');
         }
     }
@@ -171,7 +177,7 @@
             const list = window._workspaceClientsCache || [];
             const c = list.find((x) => Number(x.id) === Number(id));
             icon = _icon('building');
-            text = c ? c.name : _t('ws-current-label', '当前客户');
+            text = c ? c.name : _t('ws-current-label', '当前账套');
         } else {
             icon = _icon('user');
             text = _t('ws-personal', '个人事务');
@@ -234,7 +240,9 @@
             '<button type="button" class="ws-modal-item' +
                 (personalActive ? ' active' : '') +
                 '" data-ws-personal="1">' +
-                '<span class="ws-modal-item-ic">' + _icon('user') + '</span>' +
+                '<span class="ws-modal-item-ic">' +
+                _icon('user') +
+                '</span>' +
                 '<span class="ws-modal-item-name">' +
                 _esc(_t('ws-personal', '个人事务')) +
                 '</span>' +
@@ -249,7 +257,9 @@
                     '" data-ws-pick="' +
                     _esc(c.id) +
                     '">' +
-                    '<span class="ws-modal-item-ic">' + _icon('building') + '</span>' +
+                    '<span class="ws-modal-item-ic">' +
+                    _icon('building') +
+                    '</span>' +
                     '<span class="ws-modal-item-name">' +
                     _esc(c.name || '#' + c.id) +
                     '</span>' +
@@ -264,11 +274,11 @@
         const createHtml = opts.canCreate
             ? '<div class="ws-modal-create">' +
               '<button type="button" class="ws-modal-create-toggle" data-ws-create-toggle="1">+ ' +
-              _esc(_t('ws-create-client', '新建客户')) +
+              _esc(_t('ws-create-client', '新建做账主体')) +
               '</button>' +
               '<div class="ws-modal-create-form" data-ws-create-form style="display:none;">' +
               '<input type="text" class="ws-modal-create-input" data-ws-create-name placeholder="' +
-              _esc(_t('ws-create-ph', '客户/公司名称')) +
+              _esc(_t('ws-create-ph', '做账主体公司名称')) +
               '">' +
               '<button type="button" class="ws-modal-create-submit" data-ws-create-submit="1">' +
               _esc(_t('ws-create-submit', '创建')) +
@@ -355,7 +365,7 @@
         const newId = res && (res.id || (res.client && res.client.id));
         if (!newId) {
             if (typeof window.showToast === 'function') {
-                window.showToast(_t('ws-create-fail', '新建客户失败 · 请重试'), 'error');
+                window.showToast(_t('ws-create-fail', '新建做账主体失败 · 请重试'), 'error');
             }
             return;
         }

@@ -272,7 +272,10 @@
                     '<span class="ws-modal-item-ic">' +
                     _icon('building') +
                     '</span>' +
-                    '<span class="ws-modal-item-name">' +
+                    // B1 (P3) · title 全名 tooltip 防截断看不全
+                    '<span class="ws-modal-item-name" title="' +
+                    _esc(c.name || '#' + c.id) +
+                    '">' +
                     _esc(c.name || '#' + c.id) +
                     '</span>' +
                     '</button>'
@@ -306,6 +309,15 @@
             _esc(_t('ws-chooser-title', '选择工作空间')) +
             '</span>' +
             '<button type="button" class="ws-modal-close" data-ws-close="1" aria-label="close">✕</button>' +
+            '</div>' +
+            // B1 (P3) · 副标题点明:工作空间 = 你的公司(发票卖方)· 跟"买方客户"对称
+            '<div class="ws-modal-subtitle" style="font-size:12px;color:#6b7280;padding:2px 4px 12px;line-height:1.45;white-space:normal;">' +
+            _esc(
+                _t(
+                    'ws-chooser-subtitle',
+                    '工作空间 = 你的公司(发票卖方/开票方)。选择正在为哪家公司做账。'
+                )
+            ) +
             '</div>' +
             '<div class="ws-modal-list">' +
             rows.join('') +

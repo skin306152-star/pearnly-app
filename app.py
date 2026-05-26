@@ -3531,10 +3531,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "「ERP 对接」的推送失败原因现在以您所选的界面语言显示。此前部分失败提示直接显示原始(如泰文)文字,不易看懂;现已改为本地语言的清晰说明,原始文字仍可在「技术详情」中查看。即日生效。",
-            "th": "เหตุผลที่การส่งใน «การเชื่อมต่อ ERP» ล้มเหลว จะแสดงเป็นภาษาของหน้าจอที่คุณเลือกแล้ว · ก่อนหน้านี้บางข้อความแสดงเป็นข้อความต้นฉบับทำให้อ่านเข้าใจยาก · ตอนนี้แสดงเป็นคำอธิบายที่ชัดเจนในภาษาของคุณ(ยังดูข้อความต้นฉบับได้ใน «รายละเอียดทางเทคนิค»)· มีผลทันที",
-            "en": 'Failure reasons in "ERP integration" are now shown in your selected interface language. Previously some messages appeared in their original (e.g. Thai) text and were hard to read; they now show a clear explanation in your language, with the original text still available under "Technical details". Effective immediately.',
-            "ja": "「ERP 連携」の送信失敗の理由が、選択中の表示言語で表示されるようになりました。これまで一部のメッセージは元の言語(タイ語など)のまま表示され分かりにくいことがありましたが、今後はお使いの言語で分かりやすく表示されます(元の文章は「技術詳細」で引き続き確認できます)。即日有効。",
+            "zh": "界面用词更清楚了。「客户」已改为「买方客户」(指发票上的买家);「工作空间」也补充了说明,指你自己的公司(开票方/卖方),方便区分两者。即日生效。",
+            "th": "ปรับถ้อยคำในระบบให้ชัดเจนขึ้น · «ลูกค้า» เปลี่ยนเป็น «ลูกค้า (ผู้ซื้อ)» (หมายถึงผู้ซื้อในใบกำกับ) และ «พื้นที่ทำงาน» เพิ่มคำอธิบายว่าหมายถึงบริษัทของคุณเอง (ผู้ขาย/ผู้ออกใบกำกับ) เพื่อให้แยกแยะได้ง่ายขึ้น · มีผลทันที",
+            "en": 'Clearer wording in the interface. "Clients" is now "Buyer clients" (the buyer on an invoice), and "Workspace" now explains it means your own company (the seller/invoice issuer), making the two easier to tell apart. Effective immediately.',
+            "ja": "画面の用語が分かりやすくなりました。「クライアント」を「取引先(買い手)」(請求書の買い手)に変更し、「ワークスペース」にはあなたの会社(売り手/発行者)を指すという説明を追加しました。即日有効。",
         },
     }
 

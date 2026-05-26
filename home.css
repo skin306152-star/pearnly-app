@@ -2713,6 +2713,18 @@ body.sidebar-collapsed .nav-lock-icon {
     white-space: nowrap;
     font-weight: 500;
 }
+/* P1-C 后端列 · 工作空间归属(账套)· 无归属=个人事务(灰) */
+.log-workspace {
+    min-width: 90px;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+.log-workspace-personal {
+    color: #9ca3af;
+}
 .log-client-empty {
     color: #9ca3af;
     font-style: italic;

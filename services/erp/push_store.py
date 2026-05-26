@@ -761,11 +761,13 @@ def list_push_logs(
                        h.client_id AS history_client_id,
                        c.name AS client_name,
                        e.name AS endpoint_name,
-                       e.adapter AS endpoint_adapter
+                       e.adapter AS endpoint_adapter,
+                       w.name AS workspace_name
                 FROM erp_push_logs l
                 LEFT JOIN ocr_history h ON h.id = l.history_id
                 LEFT JOIN clients c ON c.id = h.client_id
                 LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
+                LEFT JOIN workspace_clients w ON w.id = h.workspace_client_id
                 WHERE {joined_where}
                 ORDER BY l.created_at DESC
                 LIMIT %s OFFSET %s

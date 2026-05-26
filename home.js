@@ -5582,7 +5582,9 @@ async function loadErpLogs() {
             + `<span class="log-status">${escapeHtml(t('erp-log-col-status'))}</span>`
             + `<span class="log-tag-header">${escapeHtml(t('erp-log-col-trigger'))}</span>`
             + `<span class="log-invoice">${escapeHtml(t('erp-log-col-invoice'))}</span>`
-            // 批 1 改动 5 (v118.34.33) · 新增 "Pearnly 客户" 列 · 跟 "卖家" 分开
+            // P1-C 后端列 (2026-05-26) · 工作空间(账套归属)· join ocr_history.workspace_client_id
+            + `<span class="log-workspace">${escapeHtml(t('erp-log-col-workspace'))}</span>`
+            // 批 1 改动 5 (v118.34.33) · 新增 "发票买方" 列 · 跟 "发票卖方" 分开
             + `<span class="log-client">${escapeHtml(t('erp-log-col-client'))}</span>`
             + `<span class="log-seller">${escapeHtml(t('erp-log-col-seller'))}</span>`
             // 改动 8 · "ERP" 列(走哪个 endpoint)
@@ -5653,6 +5655,10 @@ async function loadErpLogs() {
             const clientCell = log.client_name
                 ? `<span class="log-client">${escapeHtml((log.client_name || '').substring(0, 18))}</span>`
                 : `<span class="log-client log-client-empty" title="${escapeHtml(t('erp-log-client-unassigned-tip'))}">${escapeHtml(t('erp-log-client-unassigned'))}</span>`;
+            // P1-C 后端列 · 工作空间归属 · 无归属(个人事务模式上传)→ 显示「个人事务」
+            const wsCell = log.workspace_name
+                ? `<span class="log-workspace">${escapeHtml((log.workspace_name || '').substring(0, 16))}</span>`
+                : `<span class="log-workspace log-workspace-personal">${escapeHtml(t('ws-personal'))}</span>`;
             // 改动 8 (v118.34.33) · ERP 列 · endpoint 名(用户起的)
             const erpCell = log.endpoint_name
                 ? `<span class="log-erp">${escapeHtml((log.endpoint_name || '').substring(0, 14))}</span>`
@@ -5682,6 +5688,7 @@ async function loadErpLogs() {
                     <span class="log-status" title="${escapeHtml(statusLabel + (retryInfo ? ' · ' + retryInfo : ''))}">${statusIcon}</span>
                     ${triggerTag}
                     <span class="log-invoice">${escapeHtml(log.invoice_no || '-')}</span>
+                    ${wsCell}
                     ${clientCell}
                     <span class="log-seller">${escapeHtml((log.seller_name || '').substring(0, 20))}</span>
                     ${erpCell}

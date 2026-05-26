@@ -1,6 +1,31 @@
 # 📊 STATE · Pearnly 项目状态
 
 > ════════════════════════════════════════════════════════════
+> **【第二十八会话 · 交接 · 2026-05-26】卖方智能分拣引擎 P1b+P1c+P1d 全实现 + UI + 沙箱真账号实测通过 + 全局 flag 上线 · 引擎段收官**
+> ════════════════════════════════════════════════════════════
+> **当前前端版本**:home.js/home.css/i18n-data.js `?v=11835094` · `/api/version`=**11835094** · 本地无未 push commit。
+>
+> **① 本会话完成并上线(master · 2 commit · pytest 820 绿)**:
+> - **P1b**(`ad61411`):`users.erp_push_mode`(smart/fixed/ocr_only · 进 `ensure_google_sub_column` · alembic 006 留档)+ `db.get/set_erp_push_mode` + `GET/PUT /api/settings/erp-push-mode` + `/api/ocr/recognize` Form `push_mode` 覆盖本批 + 两处 auto-push 的 `ocr_only` 纯跳过门。
+> - **P1c**(`ad61411`):`erp_push.py` 抽 `flatten_history_for_mrerp`/`load_mrerp_mappings`/`build_mrerp_adapter`(行为不变 · 49 守门绿)+ 新 `services/erp/push_dispatch.dispatch_endpoint_batch`(mrerp 一次 upload_invoice_batch 按 invoice_no 回映射 · 非 mrerp 循环)+ 契约测试 6。
+> - **P1d**(`ad61411`):`app.py` `_auto_push_smart_routed`(按 history.workspace_client_id→endpoint 分组 → `_auto_push_batch_for_endpoint` 一组一次 dispatch · 未匹配/未绑/停用→兜底现 auto_push 端点)+ `_persist_push_outcome`(dedup/log/stats/retry 同源)· per-invoice 隔离 · 路由单测 9。
+> - **回滚开关**:`_erp_seller_routing_enabled(user_id)` = 全局 `ERP_SELLER_ROUTING` 或灰度 `ERP_SELLER_ROUTING_USERS`(csv uid)。
+> - **UI(两个轴各管各的 · Zihao 拍板)**:账户级「ERP 自动处理方式」3 选 inline 放「自动化→ERP 对接→连接」子面板顶部(全局);ERP 连接向导 per-endpoint「推送模式」正名「**此账套是否自动推送**」(=auto_push)· seed 模板收进向导「⚙ 高级设置」折叠区(5 语)。
+> - **沙箱实测抓到并修的真 bug**(`ec9ac4a`):`get_ocr_history_detail` SELECT 没返 `workspace_client_id` → 智能分拣永远读 None 全走兜底。修 + 回归守门。
+>
+> **② 沙箱真账号实测 PASS**(测试账号 18685123459@163.com · 独立租户 · 不碰 mrerp):该账号拥有沙箱端点 `dad6fb0f`(MR.ERP TEST2019 真凭据)。设灰度 flag + 启用端点 + 建 workspace(BAKELAB tax 0125559013489 绑 dad6fb0f)+ 传 BAKELAB 发票 → 日志 `[SmartPush] 分拣 · 1 端点组 + 0 兜底` → dispatch 登录 MR.ERP → fail-safe `ERR_CUSTOMER_NAME_MISMATCH`(P2 正确拦截 · 买方 POCs Cafe 名不符 TEST2019 · 独立已验层)→ `_persist_push_outcome` 落库 + 用户数据错不入重试队列。**全链路正确**。
+>
+> **③ 上线状态**:`ERP_SELLER_ROUTING=1` 已写 prod `.env` 全局开。**对 mrerp 零影响**(实测其租户 auto_push+enabled 端点=0 · workspace=0 → auto-push 块不执行 · 手动推不走 P1d)。当前**全平台 inert**——无人配了 auto_push 端点+绑定 workspace,故只在用户配置 workspace 绑定后才生效(=渐进采纳)。沙箱端点 dad6fb0f 已恢复 enabled=false。
+>
+> **④ 下一轮接力**:
+>   - **多端点路由验证**:测试账号目前单端点,smart 路由"分对端点"在单端点下与现行为同果(已靠日志+单测证)。要真证"各推各的",给测试账号加第 2 个端点(webhook)+ 第 2 个 workspace,各绑各,传两张不同卖方发票验分流。
+>   - **seed→高级设置 完整版**:本轮做的是 wizard 内 `<details>` 折叠(低风险)。Zihao 原意是收进**端点卡片自己的「高级设置」弹窗**(per-endpoint)· 留作专门一轮(要复用 listing loader + PATCH 保存)。
+>   - **mrerp 真正用上智能分拣**:需给 mrerp 配 workspace(各账套主体 tax + 绑 endpoint)· 并把其端点设 auto_push+enabled · 才会走分拣(否则 inert)。
+>   - 商品不符 picker(对称客户 picker)· 异常队列其余。
+>
+> **⑤ 备忘**:① 沙箱测授权 = Zihao 给了 SSH root@45.76.53.194 进 prod(本轮限定)· 设 env + 重启 + 读日志都走它。② `load_dotenv()` 读 `/opt/mrpilot/.env` · 加 flag = append 该文件 + `systemctl restart mrpilot`。③ prod 不跑 alembic · schema 靠启动 ensure(006 留档)。④ 测试账号灰度行 `ERP_SELLER_ROUTING_USERS=1182f2ae...` 仍在(全局开后冗余 · 无害)。⑤ scratch `_diag_p1_*.py`/`_clean_polluted_mappings.py` 未跟踪勿提交。
+>
+> ════════════════════════════════════════════════════════════
 > **【第二十七会话 · 交接 · 2026-05-26】MR.ERP 重整大推进:买方税号闭环 + 卖方智能分拣地基 + ERP 推送异常队列闭环(横条/搜索/分页/多选批量/单条编辑弹窗)· 6 次部署全 CI 绿上线 · 引擎段(P1c/P1d)留蓝图待专门一轮**
 > ════════════════════════════════════════════════════════════
 > **进窗口先读**:本块 + 第二十六会话块 + `AGENTS.md` + `docs/agent/*` + **`docs/refactor/seller-smart-routing-plan.md`(引擎蓝图 · 下一轮照做)**。**当前前端版本**:home.js/home.css/i18n-data.js `?v=11835093` · `/api/version`=**11835093**。**本地无未 push commit(全部已部署)**。

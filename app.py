@@ -3526,10 +3526,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "「ERP 对接」连接设置已简化。新建 MR.ERP 连接现在只需两步:填写登录信息并测试连接,然后选择年度账套与是否自动推送即可完成,不再需要事先选择客户名单。新用户开通后可以更快地完成对接、开始使用。即日生效。",
-            "th": "การตั้งค่าเชื่อมต่อใน «การเชื่อมต่อ ERP» ง่ายขึ้น · การสร้างการเชื่อมต่อ MR.ERP ใหม่ตอนนี้มีเพียงสองขั้นตอน: กรอกข้อมูลเข้าสู่ระบบและทดสอบการเชื่อมต่อ จากนั้นเลือกชุดบัญชีรายปีและตั้งค่าการส่งอัตโนมัติ โดยไม่ต้องเลือกรายชื่อลูกค้าล่วงหน้าอีกต่อไป · ผู้ใช้ใหม่จึงตั้งค่าและเริ่มใช้งานได้รวดเร็วขึ้น · มีผลทันที",
-            "en": "Setting up an ERP integration is now simpler. Creating a new MR.ERP connection takes just two steps: enter your login and test the connection, then choose the year account-set and whether to push automatically. You no longer need to pick a client list beforehand, so new users can finish setup and get started faster. Effective immediately.",
-            "ja": "「ERP 連携」の接続設定を簡素化しました。MR.ERP の新規接続は 2 ステップになり、ログイン情報を入力して接続をテストした後、年度の帳簿と自動送信の有無を選ぶだけで完了します。事前に取引先を選ぶ必要がなくなり、新規のお客様もより早く設定して利用を開始できます。即日有効。",
+            "zh": "「ERP 对接」推送更快了。连接设置已简化为两步;并可在连接的「高级设置」中选择一个通用销售商品:发票里能对上的商品仍按原商品记账,对不上的明细会归到这个通用商品下,原始描述照样保留在行内。这样推送一张多行发票更快、也不会再产生重复的商品记录。即日生效。",
+            "th": "การส่งใน «การเชื่อมต่อ ERP» เร็วขึ้น · ตั้งค่าการเชื่อมต่อเหลือสองขั้นตอน และสามารถเลือกสินค้าขายทั่วไปได้ใน «ตั้งค่าขั้นสูง» ของการเชื่อมต่อ: รายการที่ตรงกับสินค้าเดิมยังลงบัญชีตามสินค้านั้น ส่วนรายการที่ไม่ตรงจะลงภายใต้สินค้าทั่วไปนี้ โดยยังเก็บคำอธิบายเดิมไว้ในบรรทัด · การส่งใบกำกับหลายบรรทัดจึงเร็วขึ้นและไม่เกิดสินค้าซ้ำ · มีผลทันที",
+            "en": "Pushing through the ERP integration is now faster. Connection setup is simplified to two steps, and you can choose a generic sales product under a connection's Advanced settings: invoice lines that match an existing product still post to that product, while lines that don't match are booked under the generic product with their original description kept on the line. Multi-line invoices push faster and no longer create duplicate product records. Effective immediately.",
+            "ja": "「ERP 連携」の送信が速くなりました。接続設定は 2 ステップに簡素化され、接続の「詳細設定」で汎用売上商品を選べます。既存商品に一致する明細は引き続きその商品に計上し、一致しない明細は元の説明を明細に残したまま汎用商品に計上します。複数明細の請求書送信が速くなり、重複した商品レコードも作成されなくなりました。即日有効。",
         },
     }
 

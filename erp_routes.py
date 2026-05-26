@@ -304,6 +304,8 @@ async def erp_endpoints_delete(endpoint_id: str, request: Request):
 class ErpSeedUpdate(BaseModel):
     seed_customer_code: Optional[str] = None
     seed_product_code: Optional[str] = None
+    # P1「开箱即用」· 通用销售商品码 · 配了 → 商品「匹配优先 + 通用兜底 · 不自动建」。
+    generic_product_code: Optional[str] = None
 
 
 @router.patch("/api/erp/endpoints/{endpoint_id}/seed")
@@ -326,6 +328,8 @@ async def erp_endpoints_update_seed(endpoint_id: str, req: ErpSeedUpdate, reques
         cfg["seed_customer_code"] = data["seed_customer_code"] or None
     if "seed_product_code" in data:
         cfg["seed_product_code"] = data["seed_product_code"] or None
+    if "generic_product_code" in data:
+        cfg["generic_product_code"] = data["generic_product_code"] or None
     ok = db.update_erp_endpoint(user["id"], endpoint_id, config=cfg)
     if not ok:
         raise HTTPException(404, detail="erp.endpoint_not_found")
@@ -333,6 +337,7 @@ async def erp_endpoints_update_seed(endpoint_id: str, req: ErpSeedUpdate, reques
         "ok": True,
         "seed_customer_code": cfg.get("seed_customer_code"),
         "seed_product_code": cfg.get("seed_product_code"),
+        "generic_product_code": cfg.get("generic_product_code"),
     }
 
 

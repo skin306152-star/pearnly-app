@@ -343,6 +343,21 @@
             zh_TW: '⚠ 無法拉取列表 · 請稍後重試',
             ja: '⚠ リストを取得できません · 後ほど再試行してください',
         },
+        // P1「开箱即用」· 通用销售商品 · 商品行对不上 ERP 已有商品时挂它(秒级 · 不建垃圾)。
+        'adv-generic-label': {
+            zh: '通用销售商品(推荐)',
+            en: 'Generic sales product (recommended)',
+            th: 'สินค้าขายทั่วไป (แนะนำ)',
+            zh_TW: '通用銷售商品(推薦)',
+            ja: '汎用売上商品(推奨)',
+        },
+        'adv-generic-hint': {
+            zh: '选一个 ERP 里的「销售收入」类商品。发票里对不上已有商品的行(如定制长描述)会挂到它上面,真实描述照样保留在行名;能对上已有商品的行仍用真实商品。选了它就不再逐行新建商品 —— 推送更快、不产生重复商品。不选 = 维持逐行自动创建。',
+            en: 'Pick a "sales revenue" product in your ERP. Invoice lines that don\'t match an existing product (e.g. custom long descriptions) are booked under it, with the real description kept as the line name; lines that match an existing product still use the real product. With this set, products are no longer created line-by-line — pushing is faster and avoids duplicate products. Leave blank to keep per-line auto-create.',
+            th: 'เลือกสินค้าประเภท "รายได้จากการขาย" ใน ERP · บรรทัดใบกำกับที่ไม่ตรงกับสินค้าเดิม (เช่น คำอธิบายยาวเฉพาะ) จะลงภายใต้สินค้านี้ โดยยังเก็บคำอธิบายจริงเป็นชื่อบรรทัด · บรรทัดที่ตรงกับสินค้าเดิมยังใช้สินค้าจริง · เมื่อตั้งค่านี้จะไม่สร้างสินค้าทีละบรรทัดอีก — ส่งเร็วขึ้นและไม่เกิดสินค้าซ้ำ · เว้นว่าง = สร้างอัตโนมัติทีละบรรทัดเหมือนเดิม',
+            zh_TW: '選一個 ERP 裡的「銷售收入」類商品。發票裡對不上既有商品的行(如客製長描述)會掛到它上面,真實描述照樣保留在行名;能對上既有商品的行仍用真實商品。選了它就不再逐行新建商品 —— 推送更快、不產生重複商品。不選 = 維持逐行自動建立。',
+            ja: 'ERP の「売上収益」系の商品を 1 つ選びます。既存商品に一致しない請求書明細(カスタムの長い説明など)はこの商品に計上され、実際の説明は明細名として保持されます。既存商品に一致する明細は引き続き実商品を使用します。設定すると明細ごとの商品作成を行わなくなり、送信が速く重複商品も発生しません。空欄 = 明細ごとの自動作成を維持。',
+        },
         'wiz-seed': {
             zh: '自动创建买方时使用的模板(可选)',
             en: 'Template for auto-creating buyer customers (optional)',
@@ -859,6 +874,7 @@
         const cfg = (ep && ep.config) || {};
         const curCust = cfg.seed_customer_code || '';
         const curProd = cfg.seed_product_code || '';
+        const curGeneric = cfg.generic_product_code || '';  // P1 通用销售商品码
         const ssel = 'width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;';
         const ov = document.createElement('div');
         ov.className = 'mrerp-wizard-overlay is-open';
@@ -871,6 +887,16 @@
             '</div><button type="button" data-adv-close aria-label="close" ' +
             'style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1">×</button></div>' +
             '<div style="padding:16px 20px">' +
+            // P1「开箱即用」· 通用销售商品(推荐 · 放最前)· 选了 = 匹配优先+通用兜底+不逐行建。
+            '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">' +
+            _esc(t('adv-generic-label')) +
+            '</label><select data-adv-generic style="' + ssel + '"><option value="">' +
+            _esc(t('adv-prod-loading')) +
+            '</option></select>' +
+            '<div style="font-size:12px;color:#6B7280;margin:6px 0 18px;line-height:1.5">' +
+            _esc(t('adv-generic-hint')) +
+            '</div>' +
+            '<div style="border-top:1px solid #eee;margin:4px 0 16px"></div>' +
             '<div style="font-size:12px;color:#6B7280;margin-bottom:16px;line-height:1.5">' +
             _esc(t('wiz-seed-hint')) +
             '</div>' +
@@ -898,6 +924,7 @@
 
         const custSel = ov.querySelector('[data-adv-cust]');
         const prodSel = ov.querySelector('[data-adv-prod]');
+        const genericSel = ov.querySelector('[data-adv-generic]');  // P1 通用销售商品
 
         const fill = function (selEl, list, cur) {
             let html = '<option value="">' + _esc(t('wiz-seed-empty')) + '</option>';
@@ -925,8 +952,17 @@
             .catch(function () { failOpt(custSel, curCust); });
         fetch('/api/erp/endpoints/' + eid + '/products', { headers: _authHeaders() })
             .then(function (r) { return r.json(); })
-            .then(function (d) { if (d && d.ok) fill(prodSel, d.products || [], curProd); else failOpt(prodSel, curProd); })
-            .catch(function () { failOpt(prodSel, curProd); });
+            .then(function (d) {
+                if (d && d.ok) {
+                    // 同一份商品列表同时填「自动创建模板」和「通用销售商品」两个下拉。
+                    fill(prodSel, d.products || [], curProd);
+                    fill(genericSel, d.products || [], curGeneric);
+                } else {
+                    failOpt(prodSel, curProd);
+                    failOpt(genericSel, curGeneric);
+                }
+            })
+            .catch(function () { failOpt(prodSel, curProd); failOpt(genericSel, curGeneric); });
 
         ov.querySelector('[data-adv-save]').addEventListener('click', async function () {
             const btn = this;
@@ -938,12 +974,14 @@
                     body: JSON.stringify({
                         seed_customer_code: custSel.value || null,
                         seed_product_code: prodSel.value || null,
+                        generic_product_code: genericSel.value || null,
                     }),
                 });
                 if (!r.ok) { _toast(t('adv-fail'), 'error'); btn.disabled = false; return; }
                 ep.config = ep.config || {};
                 ep.config.seed_customer_code = custSel.value || null;
                 ep.config.seed_product_code = prodSel.value || null;
+                ep.config.generic_product_code = genericSel.value || null;
                 _toast(t('adv-saved'), 'success');
                 close();
             } catch (e) {

@@ -239,5 +239,74 @@ class VerifyGateGenericCollapseTests(unittest.TestCase):
         self.assertIn("123", called_codes, "精确模式不中行应 fallback '123' 名复核")
 
 
+# ============================================================
+# 契约 4 · /seed 路由可保存 generic_product_code(高级设置入口)
+# ============================================================
+class SeedRouteGenericTests(unittest.TestCase):
+    def test_model_accepts_generic_product_code(self):
+        from erp_routes import ErpSeedUpdate
+
+        m = ErpSeedUpdate(generic_product_code="GEN-INCOME")
+        self.assertEqual(m.generic_product_code, "GEN-INCOME")
+        # 默认 None(不传不动)
+        self.assertIsNone(ErpSeedUpdate().generic_product_code)
+
+
+@unittest.skipUnless(
+    __import__("importlib").util.find_spec("fastapi") is not None,
+    "needs fastapi for route-level test",
+)
+class SeedRouteGenericRouteTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import os
+
+        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        import app
+
+        cls.app_module = app
+
+    def test_patch_seed_persists_generic_product_code(self):
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+        import erp_routes
+
+        app = self.app_module
+        existing = {
+            "id": "ep-1",
+            "user_id": "u",
+            "adapter": "mrerp",
+            "config": {"seed_customer_code": "0006"},
+            "enabled": True,
+            "name": "MR.ERP",
+        }
+        captured = {}
+
+        def _fake_update(uid, eid, **fields):
+            captured.update(fields)
+            return True
+
+        with (
+            patch.object(
+                erp_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "lifetime"},
+            ),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_erp_endpoint", return_value=existing),
+            patch.object(app.db, "update_erp_endpoint", side_effect=_fake_update),
+        ):
+            with TestClient(app.app) as client:
+                r = client.patch(
+                    "/api/erp/endpoints/ep-1/seed",
+                    json={"generic_product_code": "GEN-INCOME"},
+                )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json().get("generic_product_code"), "GEN-INCOME")
+        # 合并写回 config 含通用码 · 且不动已有 seed_customer_code
+        self.assertEqual(captured["config"].get("generic_product_code"), "GEN-INCOME")
+        self.assertEqual(captured["config"].get("seed_customer_code"), "0006")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

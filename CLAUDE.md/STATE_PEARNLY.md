@@ -1,6 +1,21 @@
 # 📊 STATE · Pearnly 项目状态
 
 > ════════════════════════════════════════════════════════════
+> **【第三十二会话 · 交接 · 2026-05-27】「真正开箱即用」P1 收尾:向导内「智能默认通用商品」上线(沙箱真账号实测过)· 下窗口续 P2(状态单一真相)/ P3(概念/导航)**
+> ════════════════════════════════════════════════════════════
+> **当前前端版本**:home.js/i18n-data.js/erp-mrerp-connect.js `?v=11835106` · `/api/version`=**11835106**(已部署验证)· 本地无未 push commit(scratch `_diag_*.py` 已删 · gitignore 勿提交)。
+>
+> **🟢 进窗口第一件事**:读 `docs/refactor/erp-out-of-box-redesign.md`。**P0+P1(含收尾)+P1b 全部上线**。下一步按优先级:**P2(状态单一真相 + 文案 · §3.5/§4.2)→ P3(概念/导航 · §5)**。
+>
+> **① 本会话完成并上线(1 commit · `8c7deff` · master · 已部署 11835106)· P1 收尾「向导内智能默认通用商品」(§3.4 step 3)**:目标 = 新用户连一次 MR.ERP(登录+选账套)就把通用销售商品自动配好,无需懂概念、不必进「高级设置」手挑。
+> - **后端**:① `erp_push.list_mrerp_products` 加明文/密文双形态启发式(镜像 `test_mrerp_endpoint`)→ 向导「保存前」用内存**明文**凭据也能拉商品(saved-endpoint 仍走密文 · 行为不变)。② 新纯函数 `services/erp/mrerp_product_sync.suggest_generic_product_code(products)`:按收入/销售/服务类多语种关键词(รายได้/ขาย/บริการ/income/revenue/sales/service/收入/销售/服务/売上/収益/サービス)挑建议码,名字优先于分类,挑不到返 None(不瞎填)。③ 新路由 `POST /api/erp/wizard/products`(erp_routes.py · 走 `_fetch_listing_with_retry` 已 to_thread)· 成功附 `suggested_generic_code`。
+> - **前端**(`static/erp-mrerp-connect.js` · **全 LF 文件**·HEAD 本就 0 CRLF·Edit 保留):step 2 加可见「通用销售商品(推荐)」下拉 + 5 语状态文案(复用 `adv-generic-label/hint`);进 step2 / 换账套时调探测路由拉商品 · **仅「新建连接」自动套建议码 + 绿色提示**;**编辑已存连接绝不自动套**(空=精确)→ 保护现有精确模式付费用户。finish 写 `config.generic_product_code`;拉不到降级文本框(可手填/留空)。
+> - **沙箱真账号实测(关键证据)**:`.env.local` test01/TEST2019 明文凭据写探针 → `list_mrerp_products` 明文路径拉到 **514 商品 5.4s**,`suggest_generic_product_code` 挑中 **`00-รายได้ส่วนกลาง`**(收入类 · 与第 29 会话认定的正确收入商品一致)。探针 scratch 跑完已删。
+> - **守门**:`test_erp_wizard_generic_default`(10 例 · 建议函数 7 + 路由建议码 2 + 失败不附键 1)+ async tripwire `test_wizard_products_route_offloads` + 路由契约 19→**20** · erp/mrerp 套件 **270 passed/1 skipped** · black(--check py310 干净)+ check_i18n 0/0(连 i18n-data.js 未动)+ node --check connect.js。
+>
+> **② 下一步(P2 · §3.5/§4.2/§B7/§B8)**:重试改 UPDATE 原行(不再 INSERT 新行)+ 日志/异常队列按(发票×端点)同口径折叠(消除 A3 重复行 + A4 两处状态打架)+ 错误原因走 4 语 friendly 不裸透 ERP 泰文(B7)+「发票号已存在」识别为「已推送过/skipped_dup」中性态(B8)。改 `erp_routes.py` retry/batch-retry + `list_push_exceptions`/`list_push_logs` 口径。**仍触及付费用户推送路径 · 沙箱真账号实测 + 守门。**
+>
+> ════════════════════════════════════════════════════════════
 > **【第三十一会话 · 交接 · 2026-05-27】「真正开箱即用」P0+P1+P1b 全部落地上线(沙箱真账号实测过)· 下窗口续 P1 智能默认 / P2 / P3**
 > ════════════════════════════════════════════════════════════
 > **当前前端版本**:home.js/i18n-data.js/erp-mrerp-connect.js `?v=11835105` · 本地无未 push commit(scratch `_diag_*.py`/`_clean_*.py`/`_*.mjs` 已 gitignore · 勿提交)。

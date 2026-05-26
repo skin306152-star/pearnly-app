@@ -1,6 +1,56 @@
 # 📊 STATE · Pearnly 项目状态
 
 > ════════════════════════════════════════════════════════════
+> **【第二十七会话 · 交接 · 2026-05-26】MR.ERP 重整大推进:买方税号闭环 + 卖方智能分拣地基 + ERP 推送异常队列闭环(横条/搜索/分页/多选批量/单条编辑弹窗)· 6 次部署全 CI 绿上线 · 引擎段(P1c/P1d)留蓝图待专门一轮**
+> ════════════════════════════════════════════════════════════
+> **进窗口先读**:本块 + 第二十六会话块 + `AGENTS.md` + `docs/agent/*` + **`docs/refactor/seller-smart-routing-plan.md`(引擎蓝图 · 下一轮照做)**。**当前前端版本**:home.js/home.css/i18n-data.js `?v=11835093` · `/api/version`=**11835093**。**本地无未 push commit(全部已部署)**。
+>
+> **🟢 进窗口第一件事**:Zihao 让接着做就是 **P1c+P1d 引擎**(让卖方智能分拣真正驱动批量路由推送)。**这是改付费用户推送主路径的危险段** → 按 `seller-smart-routing-plan.md` 末尾「P1b+P1c+P1d 实现蓝图」照做 · 本地验 → **diff 给 Zihao 过目** → **沙箱真账号测**(需 Zihao 授权重开 endpoint `dad6fb0f` + 给 token)→ 才上 · 加 `ERP_SELLER_ROUTING` 回滚开关。**别在长会话尾部赶。**
+>
+> **① 本会话已完成并上线(master 自动部署 · 6 次 · 全 CI 绿 · 离线单测 803 绿)**:
+> 这是 Zihao 给的「混合卖方/买方大批量智能推送 ERP」完整 PRD 的前半段 + 异常兜底。逐次:
+> - **买方税号优先·混合自动创建闭环**(`858baca`):根因=新买方匹配不到现有 client→client_id=null→推送必 ERR_NO_CLIENT。新增 `services/clients/store.resolve_or_create_buyer_client`(有合法13位税号→按税号建 client 放行;无税号/多页买方冲突 qa_4→review 不建)· app.py OCR 段改调它。client_id 设上后 `_sync_master_data` 自动建 MR.ERP 客户 + P2/P3 反查 gate 全现成。**不改推送主逻辑**。
+> - **OCR schema 容错**(`858baca`):`schemas._coerce_source_refs` 防 `{"vat":null}` 整份 400(Codex qa_3 根因)。
+> - **发票买方列**(`858baca`):`push_store` 从 `ocr_history.pages` JSONB 派生 `ocr_buyer_name` · 列显真买方(不再显 client_name=skin)。
+> - **skipped_dup 显示**(`858baca`):home.js 加分支显「已推送过」中性灰 · 不红叉不计失败。
+> - **CI 预存红修绿**(`014c57f`):prettier `src/main.js`(上会话遗留)。
+> - **卖方智能分拣地基 P1a**(`63991c7`):新表 `seller_workspace_routes`(seller_tax/name→workspace · 绑一次记住)+ `services/workspace/store.match_workspace_for_seller`(路由记忆→workspace.tax_id→name · 判 assigned/unbound/multi/none)+ `learn_seller_workspace_route` + `update_history_workspace_client_id`。**销项发票卖方=账套主体=workspace_client**。app.py OCR 后按卖方自动归属 `workspace_client_id`(切换器降为查看过滤器·不再决定归属)· 未匹配→NULL。**注:workspace_client_id 当前仅供日志/视图显示消费 · 推送路由 P1d 才接 · 故纯显示影响**。
+> - **推送日志「工作空间」列文案**(`63991c7`+`0426226`):空值「个人事务」→「未归属·待确认卖方」· 默认字体(不斜体·中性灰·跟邻列统一)。
+> - **ERP 推送异常队列闭环**(`63991c7` 后端 + `0426226` 列表升级 + `7496ac0` 编辑弹窗):
+>   - 后端 `list_push_exceptions`(`erp_push_logs` 派生 · 铁律 #12 单一源 · 不另立表)· 每个 (history×endpoint) 最近一条仍 failed → 异常 · 附 state(needs_action/retrying/failed · batch_view 派生)+ category(customer_mismatch/product_mismatch/no_client/verify_unavailable)· 支持 q 搜索/category 过滤/分页 · `GET /api/erp/exceptions` 返 {items,total,categories}。
+>   - 前端异常页顶部独立「ERP 推送异常」块(不动 OCR 识别异常)· **横条行**(非卡片)+ 搜索框 + category chip + 单选/全选 + 批量重试(`/logs/batch-retry`≤50)/批量删除(`/logs/batch-delete`≤200)+ 加载更多分页。
+>   - **单条异常编辑弹窗**(`window._erpExcOpenEdit`):详情 + 客户不符且有买方→ERP 客户 picker(拉 `/endpoints/{id}/customers` 通用 · 搜索 · 选中→写 `/mappings/clients` client_id→erp_code → `/retry` 重新解析推送)+ 其余类型友好 hint + 直接重试。**全通用 erp_type=endpoint_adapter · 不写死 MR.ERP**。
+>   - **闭环(Zihao 三问拍死)**:不用回日志点重试 · 异常与日志同源自动同步 · 重试=重新解析(用上新映射就推成)· 详见设计文档「ERP 推送异常 闭环交互逻辑」。
+> - 守门:全套 pytest 803 绿(新守门:schema null 4 + buyer 编排 12 + 卖方匹配 8 + 异常队列 5)· black/ruff/check_imports/check_i18n(0/0 · 2418→更多 keys)· home.js node --check · CRLF 保留 · 每次 cache_bust + 4 语 release_notes。
+>
+> **② 🔴 下一轮接力 = P1c+P1d 引擎(蓝图已写 · 危险段)**:
+> 见 `docs/refactor/seller-smart-routing-plan.md` 末尾。要点:
+>   - **P1b** 处理模式:`users.erp_push_mode`('smart'/'fixed'/'ocr_only')+ DAL + `/api/settings/erp-push-mode` + 上传 Form 覆盖。**安全子集**:'ocr_only' 门(跳过 auto-push)可先单独上。UI 加「ERP 自动处理方式」三选(通用文案·默认智能分拣)。
+>   - **P1c** 批量 seam:`erp_push.py` 抽 `build_mrerp_adapter`/`flatten_history_for_mrerp`/`load_mrerp_mappings`(行为不变·跑 async tripwire/contract 测试验证)+ 新 `services/erp/push_dispatch.dispatch_endpoint_batch(endpoint, histories)`:一个 endpoint 多张**一次** `upload_invoice_batch` + 按 invoice_no 回映射 ImportResult.success/failed。解 1000 张(现每张一次浏览器登录)。
+>   - **P1d** 编排(app.py auto-push 块 · **唯一真危险点**):取 mode → smart=按 seller 的 workspace→endpoint 分组批量推 + 未匹配兜底现 auto_push 端点;fixed=全推当前 workspace 端点;ocr_only=不推。per-invoice 隔离。**`ERP_SELLER_ROUTING` 回滚开关** + 沙箱真账号测(重开 `dad6fb0f`)。
+>
+> **③ 其余遗留(非引擎)**:
+>   - 商品不符的 picker(对称客户 picker · 补全异常修复)。
+>   - 沙箱真账号端到端复测(买方闭环 + 异常修复闭环 · 需 Zihao 授权重开 endpoint + token)· 或交 Codex。
+>   - 「ERP 自动处理方式」+「高级设置」配置页通用 UI(per-ERP 特殊字段如 seed customer 收进高级)。
+>
+> **④ 已锁定决策(别再讨论·照做)**:
+>   1. 销项发票**卖方 = 账套主体 = workspace_client → 绑 ERP endpoint**;买方 = ERP 客户。上传不要求选 · 按 seller 自动分拣。
+>   2. 右上角切换器 = **查看过滤器**(只过滤历史/日志视图)· 不决定上传归属(fixed 模式才用作默认账套)。
+>   3. 处理模式 3 选(智能分拣默认/固定当前账套/只识别不推送)· 账户级默认 + 每批可覆盖。
+>   4. 通用 seam = `dispatch_endpoint_batch(endpoint, histories, mode)` 批量(**不**现在抽 5 离散方法)· 上层只认 seller_route + 统一状态 + 错误码 · 不写 `if adapter=='mrerp'`。
+>   5. seller 路由记忆 = 独立表 `seller_workspace_routes`(不污染 workspace_clients.tax_id)。
+>   6. ERP 推送异常 = `erp_push_logs` 派生(铁律 #12)· 不另立异常表。异常修复+重试都在异常处(不跳日志)。
+>   7. 异常卡片可操作 = 先可见+重试(已上)· 再 picker(客户已上 · 商品待做)。通用文案「ERP 买方/客户」不写死 MR.ERP。
+>
+> **⑤ 关键踩坑/接力备忘**:
+>   - **循环导入**:测 `services.clients.store` / `services.workspace.store` 要先 `import db` 再 `from services.x import store`(否则 partial-init 循环)。
+>   - **i18n 双源 + CRLF**:home.js 用 `t('新key')` 必须同步加进 `static/i18n-data.js` 并 bump `i18n-data.js?v=`(随 home.html 三处 ?v= 一起);home.js/home.html/i18n-data.js 全 CRLF · 用 Edit 保留 · `check_i18n --strict` 0/0 才过。
+>   - **home.js 无 lint 门**:home.js 不在 eslint/prettier 范围(.prettierignore)· 改完跑 `node --check home.js` 防语法错。新前端业务**本应进 src/home/***(铁律 #23)· ERP 异常块暂塞 home.js(并入现有异常页 DOM)· commit 已透明记录 · 迁出 deadline REFACTOR-C1。
+>   - **推送内部**:`push_to_endpoint`(erp_push.py:492)mrerp 早路由 `push_mrerp_history`(244)· 每张 `with adapter: upload_invoice_batch([one], mappings)` = 每张一次浏览器登录 · ImportResult 现假设单张(success[0]/failed[0])· P1c 要改成多张回映射。
+>   - **scratch 文件**(未跟踪·勿提交):`_diag_p1_pushes.py`/`_diag_p1_v2.py`/`_clean_polluted_mappings.py`(只读诊断·可删)。
+>
+> ════════════════════════════════════════════════════════════
 > **【第二十六会话 · 交接 · 2026-05-26】MR.ERP 重整 PRD:文案统一(P1)+ fail-safe 含税号优先(P2)+ 自动创建闭环(P3)+ 2 UI bug · 全部 push+部署+上线验证 · 等 Codex 真账号验收**
 > ════════════════════════════════════════════════════════════
 > **进窗口先读**:本块 + 第二十五会话块 + `AGENTS.md` + `docs/agent/*`。**当前前端版本**:home.js/home.css/i18n-data.js `?v=11835089` · main.js(bundle)`?v=11835088` · erp-mrerp-connect.js `?v=11835086` · `/api/version`=**11835089**。

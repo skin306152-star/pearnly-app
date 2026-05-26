@@ -3526,10 +3526,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "「ERP 对接」推送更快了。连接设置已简化为两步;并可在连接的「高级设置」中选择一个通用销售商品:发票里能对上的商品仍按原商品记账,对不上的明细会归到这个通用商品下,原始描述照样保留在行内。这样推送一张多行发票更快、也不会再产生重复的商品记录。即日生效。",
-            "th": "การส่งใน «การเชื่อมต่อ ERP» เร็วขึ้น · ตั้งค่าการเชื่อมต่อเหลือสองขั้นตอน และสามารถเลือกสินค้าขายทั่วไปได้ใน «ตั้งค่าขั้นสูง» ของการเชื่อมต่อ: รายการที่ตรงกับสินค้าเดิมยังลงบัญชีตามสินค้านั้น ส่วนรายการที่ไม่ตรงจะลงภายใต้สินค้าทั่วไปนี้ โดยยังเก็บคำอธิบายเดิมไว้ในบรรทัด · การส่งใบกำกับหลายบรรทัดจึงเร็วขึ้นและไม่เกิดสินค้าซ้ำ · มีผลทันที",
-            "en": "Pushing through the ERP integration is now faster. Connection setup is simplified to two steps, and you can choose a generic sales product under a connection's Advanced settings: invoice lines that match an existing product still post to that product, while lines that don't match are booked under the generic product with their original description kept on the line. Multi-line invoices push faster and no longer create duplicate product records. Effective immediately.",
-            "ja": "「ERP 連携」の送信が速くなりました。接続設定は 2 ステップに簡素化され、接続の「詳細設定」で汎用売上商品を選べます。既存商品に一致する明細は引き続きその商品に計上し、一致しない明細は元の説明を明細に残したまま汎用商品に計上します。複数明細の請求書送信が速くなり、重複した商品レコードも作成されなくなりました。即日有効。",
+            "zh": "「ERP 对接」连接设置已进一步简化。新建连接时,系统会自动为你推荐一个「销售收入」类通用商品并预先选好,可直接使用或自行改选,无需再到「高级设置」里手动配置。发票里能对上的商品仍按原商品记账,对不上的明细归到通用商品下并保留原始描述。多行发票推送更快、也不会再产生重复的商品记录。即日生效。",
+            "th": "การตั้งค่าการเชื่อมต่อ «ERP» ง่ายขึ้นอีก · เมื่อสร้างการเชื่อมต่อใหม่ ระบบจะแนะนำและเลือกสินค้าทั่วไปประเภท «รายได้จากการขาย» ให้โดยอัตโนมัติ ใช้เลยหรือเปลี่ยนเองก็ได้ ไม่ต้องไปตั้งค่าใน «ตั้งค่าขั้นสูง» อีก · รายการที่ตรงกับสินค้าเดิมยังลงบัญชีตามสินค้านั้น ส่วนที่ไม่ตรงจะลงภายใต้สินค้าทั่วไปและเก็บคำอธิบายเดิมไว้ · การส่งใบกำกับหลายบรรทัดเร็วขึ้นและไม่เกิดสินค้าซ้ำ · มีผลทันที",
+            "en": 'Setting up an ERP connection is now even simpler. When you create a new connection, the system automatically suggests and pre-selects a generic "sales revenue" product for you — keep it or pick another, with no need to configure it in Advanced settings. Invoice lines that match an existing product still post to that product, while lines that don\'t match are booked under the generic product with their original description kept. Multi-line invoices push faster and no longer create duplicate product records. Effective immediately.',
+            "ja": "ERP 接続の設定がさらに簡単になりました。新しい接続を作成すると、「売上収益」系の汎用商品をシステムが自動で提案・事前選択します。そのまま使うことも別の商品を選ぶこともでき、「詳細設定」で手動設定する必要はありません。既存商品に一致する明細は引き続きその商品に計上し、一致しない明細は元の説明を残したまま汎用商品に計上します。複数明細の請求書送信が速くなり、重複した商品レコードも作成されません。即日有効。",
         },
     }
 

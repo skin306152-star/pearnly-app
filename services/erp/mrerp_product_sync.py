@@ -218,6 +218,56 @@ def parse_stkmas_listing(html: str) -> List[ListingProduct]:
 
 
 # ============================================================
+# 通用销售商品 · 智能默认建议(P1「开箱即用」· §3.4 step 3)
+# ============================================================
+
+# 收入/销售/服务类商品的多语种关键词 · 命中即认为是适合做「通用销售商品」
+# 兜底科目的真实商品。覆盖泰(MR.ERP 原生)/英/中/日,大小写无关。
+# 沙箱真账号里的典型种子就是 "00-รายได้ส่วนกล..."(รายได้ = 收入)。
+_GENERIC_PRODUCT_KEYWORDS = (
+    "รายได้",  # th · 收入/营收
+    "ขาย",  # th · 销售
+    "บริการ",  # th · 服务
+    "income",
+    "revenue",
+    "sales",
+    "service",
+    "收入",
+    "销售",
+    "服务",
+    "売上",  # ja · 销售
+    "収益",  # ja · 收益
+    "サービス",  # ja · 服务
+)
+
+
+def suggest_generic_product_code(products: List[Dict[str, Any]]) -> Optional[str]:
+    """从商品列表里挑一个最像「销售收入」类的商品码做向导智能默认。
+
+    products = list_mrerp_products 返回的 [{code, name, category_name, ...}].
+    策略:先按商品名命中收入类关键词,再按分类名命中;都不中返 None
+    (前端让用户自己选,不瞎填)。纯函数 · 无副作用 · 守门可测。
+    """
+    if not products:
+        return None
+    kws = _GENERIC_PRODUCT_KEYWORDS
+
+    def _hit(text: str) -> bool:
+        low = (text or "").lower()
+        return any(kw.lower() in low for kw in kws)
+
+    # 第一优先:商品名命中
+    for p in products:
+        if p.get("code") and _hit(str(p.get("name") or "")):
+            return str(p["code"])
+    # 第二优先:分类名命中(名字没写但归在收入类)
+    for p in products:
+        if p.get("code") and _hit(str(p.get("category_name") or "")):
+            return str(p["code"])
+    return None
+
+
+# ============================================================
 # The service
 # ============================================================
 

@@ -712,6 +712,50 @@ async def erp_endpoint_products(
     return result
 
 
+class ErpWizardProductsRequest(BaseModel):
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/api/erp/wizard/products")
+async def erp_wizard_products(req: ErpWizardProductsRequest, request: Request):
+    """P1「开箱即用」(§3.4 step 3) · 连接向导「保存前」用内存「明文」凭据
+    + 选定账套拉一次 MR.ERP 商品列表,顺带返回一个智能建议的「通用销售商品」
+    码(`suggested_generic_code`)让向导预选 —— 新用户连一次就把通用商品配好,
+    无需懂概念也不必到「高级设置」里手挑。
+
+    与 saved-endpoint 的 /endpoints/{id}/products 区别:那条要已存 endpoint
+    (拿存好的密文凭据),向导新建时还没 endpoint id,只能用表单里的明文。
+    `list_mrerp_products` 已支持明文/密文双形态(见 erp_push.py)。
+
+    铁律 #10/#13:`_fetch_listing_with_retry` 内部 `asyncio.to_thread` 调
+    sync Playwright,本路由不裸调 —— AsyncLoopOffloadTests 守门。
+    返回 200 + `{ok, products, suggested_generic_code, ...}`,失败也是 200 +
+    `{ok: false, ...}` 让向导降级(用户可手填 / 跳过)。
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    cfg = dict(req.config or {})
+    cfg.pop("_token_set", None)
+
+    result = await _fetch_listing_with_retry(
+        _erp.list_mrerp_products,
+        cfg,
+        listing_kind="products",
+    )
+    # 只在成功时算建议码;失败时不附,前端走降级。
+    if result.get("ok"):
+        try:
+            from services.erp.mrerp_product_sync import suggest_generic_product_code
+
+            result["suggested_generic_code"] = suggest_generic_product_code(
+                result.get("products") or []
+            )
+        except Exception:
+            logger.exception("suggest_generic_product_code raised")
+            result["suggested_generic_code"] = None
+    return result
+
+
 class ErpPushRequest(BaseModel):
     history_id: str
     endpoint_id: Optional[str] = Field(None, description="不传则用默认端点")

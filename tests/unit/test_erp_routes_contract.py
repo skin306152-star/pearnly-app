@@ -43,6 +43,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/endpoints/{endpoint_id}/test-connection"),
             ("GET", "/api/erp/endpoints/{endpoint_id}/customers"),
             ("GET", "/api/erp/endpoints/{endpoint_id}/products"),
+            ("POST", "/api/erp/wizard/products"),
             ("POST", "/api/erp/push"),
             ("GET", "/api/erp/logs/{log_id}/debug-xlsx"),
             ("GET", "/api/erp/history/{history_id}/push_status"),
@@ -55,7 +56,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/logs/batch-delete"),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 19)
+        self.assertEqual(len(router.routes), 20)
 
     def test_app_includes_erp_router(self):
         """防 include_router 漏挂 · app 必须能路由到 erp 推送"""

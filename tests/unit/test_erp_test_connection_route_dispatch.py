@@ -618,6 +618,44 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
             f"products route tripwire fired: {body!r}",
         )
 
+    async def test_wizard_products_route_offloads(self):
+        """P1「开箱即用」· /api/erp/wizard/products 用内存明文凭据拉商品做
+        智能预选,内部同样走 list_mrerp_products(sync Playwright)· 必须
+        offload 到线程,否则 Playwright sync_api 在 event loop 里炸。"""
+        app = self.app_module
+        with (
+            patch.object(
+                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+            ),
+            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(app._erp, "list_mrerp_products", side_effect=self._tripwire_sync_helper),
+        ):
+            client = await self._make_async_client()
+            async with client:
+                r = await client.post(
+                    "/api/erp/wizard/products",
+                    json={
+                        "config": {
+                            "username": "u",
+                            "password": "p",
+                            "comidyear": "6",
+                            "seldb": "1",
+                        }
+                    },
+                )
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(
+            body.get("ok"),
+            f"wizard/products route tripwire fired: {body!r}",
+        )
+        # 成功时必须附 suggested_generic_code 键(值可为 None)。
+        self.assertIn(
+            "suggested_generic_code",
+            body,
+            f"wizard/products didn't attach suggested_generic_code: {body!r}",
+        )
+
     async def test_push_route_offloads(self):
         """`push_to_endpoint` MUST also be offloaded because once the
         mrerp branch lights up it will drive MRERPAdapter the same way."""

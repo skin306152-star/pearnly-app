@@ -1052,33 +1052,62 @@ def list_mrerp_products(
 
     cfg = config or {}
     login_url = (cfg.get("system_url") or "https://www.mrerp4sme.com").strip()
-    enc_user = cfg.get("username_enc") or ""
-    enc_pass = cfg.get("password_enc") or ""
     comidyear = str(cfg.get("comidyear") or "6")
     seldb = str(cfg.get("seldb") or "1")
 
-    if not (enc_user and enc_pass):
+    # P1「开箱即用」· 向导探测路由(/api/erp/wizard/products)在「保存连接前」
+    # 用内存「明文」凭据拉商品做智能预选,而 saved-endpoint 的 /products 路由
+    # 仍传 Fernet「密文」。这里镜像 test_mrerp_endpoint 的双形态启发式:
+    # 明文优先,但形如 gAAAAA* 的值仍走解密路径(覆盖「编辑已存连接」时表单
+    # 预填的密文)。两条调用路径共用本函数,行为对已存连接不变(只多支持明文)。
+    plain_user = (cfg.get("username") or "").strip()
+    plain_pass = cfg.get("password") or ""
+    enc_user = (cfg.get("username_enc") or "").strip()
+    enc_pass = cfg.get("password_enc") or ""
+    try:
+        from kms_helper import is_encrypted as _is_enc
+
+        if plain_user and _is_enc(plain_user) and not enc_user:
+            enc_user, plain_user = plain_user, ""
+        if plain_pass and _is_enc(plain_pass) and not enc_pass:
+            enc_pass, plain_pass = plain_pass, ""
+    except ImportError:
+        pass
+
+    if not ((plain_user and plain_pass) or (enc_user and enc_pass)):
         return {
             "ok": False,
             "elapsed_ms": 0,
             "products": [],
             "error_code": "ERR_NO_CREDS",
             "error_friendly": get_friendly("ERR_NO_CREDS"),
-            "raw_error": "username_enc / password_enc missing in config",
+            "raw_error": "username/password missing (neither plain nor encrypted)",
         }
 
     t0 = _time.time()
     try:
-        adapter = MRERPAdapter.from_encrypted(
-            login_url=login_url,
-            encrypted_username=enc_user,
-            encrypted_password=enc_pass,
-            comidyear=comidyear,
-            seldb=seldb,
-            headless=True,
-            retry_attempts=1,
-            retry_delays_seconds=(0.5,),
-        )
+        if plain_user and plain_pass:
+            adapter = MRERPAdapter(
+                login_url=login_url,
+                username=plain_user,
+                password=plain_pass,
+                comidyear=comidyear,
+                seldb=seldb,
+                headless=True,
+                retry_attempts=1,
+                retry_delays_seconds=(0.5,),
+            )
+        else:
+            adapter = MRERPAdapter.from_encrypted(
+                login_url=login_url,
+                encrypted_username=enc_user,
+                encrypted_password=enc_pass,
+                comidyear=comidyear,
+                seldb=seldb,
+                headless=True,
+                retry_attempts=1,
+                retry_delays_seconds=(0.5,),
+            )
     except Exception as e:
         return {
             "ok": False,

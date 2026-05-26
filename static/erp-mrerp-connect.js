@@ -358,6 +358,42 @@
             zh_TW: '選一個 ERP 裡的「銷售收入」類商品。發票裡對不上既有商品的行(如客製長描述)會掛到它上面,真實描述照樣保留在行名;能對上既有商品的行仍用真實商品。選了它就不再逐行新建商品 —— 推送更快、不產生重複商品。不選 = 維持逐行自動建立。',
             ja: 'ERP の「売上収益」系の商品を 1 つ選びます。既存商品に一致しない請求書明細(カスタムの長い説明など)はこの商品に計上され、実際の説明は明細名として保持されます。既存商品に一致する明細は引き続き実商品を使用します。設定すると明細ごとの商品作成を行わなくなり、送信が速く重複商品も発生しません。空欄 = 明細ごとの自動作成を維持。',
         },
+        // P1「开箱即用」· 向导内通用销售商品下拉的运行态文案。
+        'wiz-generic-loading': {
+            zh: '正在读取 ERP 商品…',
+            en: 'Loading ERP products…',
+            th: 'กำลังโหลดสินค้าจาก ERP…',
+            zh_TW: '正在讀取 ERP 商品…',
+            ja: 'ERP 商品を読み込み中…',
+        },
+        'wiz-generic-empty': {
+            zh: '不设置(维持逐行自动创建)',
+            en: "Don't set (keep per-line auto-create)",
+            th: 'ไม่ตั้งค่า (สร้างทีละบรรทัดเหมือนเดิม)',
+            zh_TW: '不設定(維持逐行自動建立)',
+            ja: '設定しない(明細ごとの自動作成を維持)',
+        },
+        'wiz-generic-suggested': {
+            zh: '✓ 已为你智能推荐一个「销售收入」类商品,可直接用或改选',
+            en: '✓ A "sales revenue" product has been suggested for you — keep it or pick another',
+            th: '✓ ได้แนะนำสินค้าประเภท "รายได้จากการขาย" ให้แล้ว · ใช้เลยหรือเลือกใหม่ก็ได้',
+            zh_TW: '✓ 已為你智慧推薦一個「銷售收入」類商品,可直接用或改選',
+            ja: '✓ 「売上収益」系の商品を提案しました · そのまま使うか別の商品を選べます',
+        },
+        'wiz-generic-fallback': {
+            zh: '暂时读不到 ERP 商品列表 · 可手填一个通用商品码,或留空稍后在「高级设置」里选',
+            en: "Couldn't load the ERP product list · type a generic product code, or leave blank and pick it later in Advanced settings",
+            th: 'โหลดรายการสินค้า ERP ไม่ได้ชั่วคราว · พิมพ์รหัสสินค้าทั่วไป หรือเว้นว่างแล้วเลือกภายหลังใน "ตั้งค่าขั้นสูง"',
+            zh_TW: '暫時讀不到 ERP 商品列表 · 可手填一個通用商品碼,或留空稍後在「進階設定」裡選',
+            ja: 'ERP 商品リストを読み込めませんでした · 汎用商品コードを入力するか、空欄のまま後で「詳細設定」で選択してください',
+        },
+        'wiz-generic-input-placeholder': {
+            zh: '通用商品码(可留空)',
+            en: 'Generic product code (optional)',
+            th: 'รหัสสินค้าทั่วไป (เว้นว่างได้)',
+            zh_TW: '通用商品碼(可留空)',
+            ja: '汎用商品コード(空欄可)',
+        },
         'wiz-seed': {
             zh: '自动创建买方时使用的模板(可选)',
             en: 'Template for auto-creating buyer customers (optional)',
@@ -1443,6 +1479,17 @@
             '</label>' +
             '</div>' +
             '</div>' +
+            // P1「开箱即用」· 通用销售商品(推荐)· 可见字段 · 进 step 2 自动拉商品
+            // 并智能预选一个收入类商品 → 新用户连一次就把通用商品配好。
+            '<div class="mrerp-wizard-field">' +
+            '<label class="mrerp-wizard-label" data-mw-generic-label></label>' +
+            '<select class="mrerp-wizard-select" data-mw-generic style="display:none;">' +
+            '<option value="" data-mw-generic-empty></option>' +
+            '</select>' +
+            '<input type="text" class="mrerp-wizard-input" data-mw-generic-input style="display:none;" autocomplete="off">' +
+            '<div class="mrerp-wizard-hint" data-mw-generic-hint></div>' +
+            '<div class="mrerp-wizard-hint" data-mw-generic-suggested-hint style="display:none;color:#15803d;"></div>' +
+            '</div>' +
             // 高级设置(自动创建买方/商品的模板 seed)· 冷门 per-ERP 字段 · 默认折叠 ·
             // 用原生 <details> · 不动 seed 加载逻辑(select/input/hint 仍在 DOM 内)。
             '<details class="mrerp-wizard-advanced" style="margin-top:4px;">' +
@@ -1479,6 +1526,13 @@
         w.querySelector('[data-mw-prev]').addEventListener('click', _wizardPrev);
         w.querySelector('[data-mw-next]').addEventListener('click', _wizardNext);
         w.querySelector('[data-mw-test]').addEventListener('click', _wizardRunTest);
+        // P1「开箱即用」· 换年度账套 → 重拉该账套的商品 + 重选建议通用商品。
+        const companyEl = w.querySelector('[data-mw-company]');
+        if (companyEl) {
+            companyEl.addEventListener('change', function () {
+                _populateGenericSelector();
+            });
+        }
         w.addEventListener('click', function (e) {
             // click outside the modal body closes
             if (e.target === w) _closeWizard();
@@ -1506,6 +1560,18 @@
         w.querySelector('[data-mw-mode-label]').textContent = t('wiz-mode');
         w.querySelector('[data-mw-mode-auto]').textContent = t('wiz-mode-auto');
         w.querySelector('[data-mw-mode-manual]').textContent = t('wiz-mode-manual');
+        // P1「开箱即用」· 通用销售商品(复用高级设置弹窗的 label/hint 文案)
+        const gLabel = w.querySelector('[data-mw-generic-label]');
+        if (gLabel) gLabel.textContent = t('adv-generic-label');
+        const gHint = w.querySelector('[data-mw-generic-hint]');
+        if (gHint) gHint.textContent = t('adv-generic-hint');
+        const gSelEl = w.querySelector('[data-mw-generic]');
+        if (gSelEl) {
+            gSelEl.innerHTML =
+                '<option value="" data-mw-generic-empty>' + _esc(t('wiz-generic-empty')) + '</option>';
+        }
+        const gInput = w.querySelector('[data-mw-generic-input]');
+        if (gInput) gInput.placeholder = t('wiz-generic-input-placeholder');
         const _advEl = w.querySelector('[data-mw-advanced]');
         if (_advEl) _advEl.textContent = t('wiz-advanced');
         w.querySelector('[data-mw-seed-label]').textContent = t('wiz-seed');
@@ -1777,6 +1843,141 @@
         return '';
     }
 
+    // ── P1「开箱即用」· 向导内通用销售商品(智能默认)─────────────
+    // 用「保存前」表单里的内存凭据 + 选定账套打探测路由,拉商品列表并由后端
+    // 给出建议码。失败 → 降级文本框(可手填/留空)。不阻断保存。
+    async function _fetchWizardProducts(config) {
+        const ctrl = new AbortController();
+        const tid = setTimeout(function () {
+            ctrl.abort();
+        }, 60_000);
+        try {
+            const r = await fetch('/api/erp/wizard/products', {
+                method: 'POST',
+                headers: _authHeaders(),
+                body: JSON.stringify({ config: config }),
+                signal: ctrl.signal,
+            });
+            if (!r.ok) return null;
+            const data = await r.json();
+            if (!data || !data.ok) return null;
+            return data; // {products, suggested_generic_code}
+        } catch (e) {
+            return null;
+        } finally {
+            clearTimeout(tid);
+        }
+    }
+
+    async function _populateGenericSelector() {
+        const w = _wizardEl;
+        const selectEl = w.querySelector('[data-mw-generic]');
+        const inputEl = w.querySelector('[data-mw-generic-input]');
+        const sugHintEl = w.querySelector('[data-mw-generic-suggested-hint]');
+        if (!selectEl || !inputEl) return;
+
+        // 已存连接编辑时,优先保留已保存的通用商品码作当前值。
+        const currentCode =
+            (_wizardState.endpoint &&
+                _wizardState.endpoint.config &&
+                _wizardState.endpoint.config.generic_product_code) ||
+            '';
+
+        // 表单里的内存凭据(明文;编辑态可能是预填密文 → 后端双形态都吃)+ 选定账套
+        const username = (w.querySelector('[data-mw-user]').value || '').trim();
+        const password = w.querySelector('[data-mw-pass]').value || '';
+        const companyChoice = w.querySelector('[data-mw-company]').value || '6:1';
+        const parts = companyChoice.split(':');
+
+        sugHintEl.style.display = 'none';
+        inputEl.style.display = 'none';
+        if (!username || !password) {
+            // 没凭据没法拉 · 降级文本框
+            selectEl.style.display = 'none';
+            inputEl.style.display = '';
+            inputEl.value = currentCode || '';
+            return;
+        }
+        selectEl.innerHTML = '<option value="">' + _esc(t('wiz-generic-loading')) + '</option>';
+        selectEl.style.display = '';
+        selectEl.disabled = true;
+
+        const data = await _fetchWizardProducts({
+            system_url: 'https://www.mrerp4sme.com',
+            username: username,
+            password: password,
+            comidyear: parts[0] || '6',
+            seldb: parts[1] || '1',
+        });
+        selectEl.disabled = false;
+
+        const products = data && Array.isArray(data.products) ? data.products : null;
+        if (products === null || products.length === 0) {
+            // 降级文本框 + 提示
+            selectEl.style.display = 'none';
+            inputEl.style.display = '';
+            inputEl.value = currentCode || '';
+            inputEl.classList.add('mrerp-seed-input-saved');
+            sugHintEl.textContent = t('wiz-generic-fallback');
+            sugHintEl.style.color = '#8a5a00';
+            sugHintEl.style.display = '';
+            return;
+        }
+
+        inputEl.classList.remove('mrerp-seed-input-saved');
+        const opts = ['<option value="">' + _esc(t('wiz-generic-empty')) + '</option>'];
+        const inList = !!(
+            currentCode &&
+            products.some(function (p) {
+                return p.code === currentCode;
+            })
+        );
+        if (currentCode && !inList) {
+            opts.push(
+                '<option value="' +
+                    _esc(currentCode) +
+                    '">' +
+                    _esc(currentCode + ' · ' + t('wiz-seed-saved-not-in-list')) +
+                    '</option>'
+            );
+        }
+        products.forEach(function (p) {
+            const label = (p.name || '') + ' (' + p.code + ')';
+            opts.push('<option value="' + _esc(p.code) + '">' + _esc(label) + '</option>');
+        });
+        selectEl.innerHTML = opts.join('');
+
+        // 预选:已保存值优先;否则仅「新建连接」才用智能建议码自动预选。
+        // 编辑已存在连接时绝不自动套建议码 —— 现有精确模式付费用户没配通用码
+        // 就该维持精确模式(空=精确),不能因为重新打开向导被静默翻成通用模式。
+        const isNewConnection = !(_wizardState && _wizardState.endpoint);
+        const suggested = (data && data.suggested_generic_code) || '';
+        if (currentCode) {
+            selectEl.value = currentCode;
+        } else if (isNewConnection && suggested) {
+            selectEl.value = suggested;
+            sugHintEl.textContent = t('wiz-generic-suggested');
+            sugHintEl.style.color = '#15803d';
+            sugHintEl.style.display = '';
+        } else {
+            selectEl.value = '';
+        }
+        inputEl.style.display = 'none';
+    }
+
+    function _readGenericValue() {
+        const w = _wizardEl;
+        const selectEl = w.querySelector('[data-mw-generic]');
+        const inputEl = w.querySelector('[data-mw-generic-input]');
+        if (selectEl && selectEl.style.display !== 'none') {
+            return (selectEl.value || '').trim();
+        }
+        if (inputEl && inputEl.style.display !== 'none') {
+            return (inputEl.value || '').trim();
+        }
+        return '';
+    }
+
     function _gotoStep(n) {
         _wizardState.step = n;
         const w = _wizardEl;
@@ -1869,6 +2070,8 @@
                     _wizardState.endpoint.config.seed_product_code) ||
                 '';
             _populateSeedProductSelector(currentSeedP);
+            // P1「开箱即用」· 通用销售商品智能默认(拉商品 + 预选建议码)。
+            _populateGenericSelector();
             return;
         }
         // Step 2 → finish
@@ -1996,6 +2199,7 @@
         const mode = w.querySelector('input[name="mrerp-mode"]:checked').value;
         const seed = _readSeedValue();
         const seedProduct = _readSeedProductValue();
+        const genericProduct = _readGenericValue();
 
         if (!username || !password) {
             _toast(t('wiz-fill-creds'), 'warn');
@@ -2018,6 +2222,8 @@
             // 时 PATCH 不传该键 → DB 旧值原样保留 · 兼容老连接)。
             seed_customer_code: seed || null,
             seed_product_code: seedProduct || null,
+            // P1「开箱即用」· 通用销售商品(配了 = 匹配优先+通用兜底+不逐行建)。
+            generic_product_code: genericProduct || null,
         };
         const body = {
             name: 'MR.ERP',

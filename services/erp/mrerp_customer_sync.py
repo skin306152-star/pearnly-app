@@ -1257,7 +1257,12 @@ class MRERPCustomerSyncService:
         page = self.adapter._page
         url = self.adapter.login_url + self.LISTING_PATH
         try:
-            if "allview.php" not in (page.url or "").lower():
+            # 2026-05-26 修:必须按**本模块**列表路径判断是否已在页上 ·
+            # 旧检查 "allview.php" not in url 是模块无关的 → 客户复核后页停在
+            # armas/allview.php,商品复核时误判"已在列表页"跳过导航 → 在客户页
+            # 搜商品码 → 搜不到 → 假 ERR_*_VERIFY_UNAVAILABLE(同一批客户+商品复核时
+            # 第二个必炸·绿色推送永远拿不到)。改为按 LISTING_PATH 精确判断。
+            if self.LISTING_PATH.lower() not in (page.url or "").lower():
                 page.goto(url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
             page.wait_for_selector("#txtsearch", state="visible", timeout=10_000)
         except (PWTimeout, PWError) as e:

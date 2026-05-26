@@ -3440,10 +3440,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已优化「ERP 对接」的客户与商品选择。此前因仅能读取前 30 个,导致客户或商品较多时第 31 个起无法选中、自动匹配也可能遗漏的问题,已修复。现可读取并选择全部客户与商品。即日生效。",
-            "th": "ระบบได้ปรับปรุงการเลือกลูกค้าและสินค้าใน «การเชื่อมต่อ ERP» · ปัญหาเดิมที่อ่านได้เพียง 30 รายการแรก ทำให้เมื่อมีลูกค้าหรือสินค้าจำนวนมากจะเลือกตั้งแต่รายการที่ 31 ไม่ได้และการจับคู่อัตโนมัติอาจตกหล่น ได้รับการแก้ไขแล้ว · ขณะนี้สามารถอ่านและเลือกลูกค้าและสินค้าได้ครบทั้งหมด · มีผลทันที",
-            "en": "Customer and product selection in ERP integration has been improved. Previously only the first 30 could be read, so with many customers or products the 31st onward could not be selected and automatic matching might miss them. This is now fixed — all customers and products can be read and selected. Effective immediately.",
-            "ja": "「ERP 連携」の取引先・商品の選択を改善しました。これまでは先頭 30 件しか読み込めず、取引先や商品が多い場合に 31 件目以降を選べず、自動照合でも漏れる可能性がありました。この問題は修正され、すべての取引先・商品を読み込んで選択できるようになりました。即日有効。",
+            "zh": "系统已修复「ERP 对接」推送中,同时涉及客户与商品核对时可能出现的推送失败问题。此前部分发票因核对环节误判而未能成功推送,现已修复,推送更稳定可靠。同时,客户与商品选择已可完整读取全部条目(不再仅限前 30 个)。即日生效。",
+            "th": "ระบบได้แก้ไขปัญหาการส่งข้อมูลใน «การเชื่อมต่อ ERP» ที่อาจล้มเหลวเมื่อต้องตรวจสอบทั้งลูกค้าและสินค้าพร้อมกัน · ก่อนหน้านี้ใบกำกับบางรายการส่งไม่สำเร็จเพราะขั้นตอนตรวจสอบเข้าใจผิด ได้รับการแก้ไขแล้ว การส่งเสถียรและเชื่อถือได้มากขึ้น · อีกทั้งการเลือกลูกค้าและสินค้าสามารถอ่านได้ครบทุกรายการ (ไม่จำกัดเพียง 30 รายการแรก) · มีผลทันที",
+            "en": "Resolved an issue in ERP integration where a push could fail when both the customer and the product needed verification at the same time. Previously some invoices were not pushed due to a misjudgement in the verification step; this is fixed and pushing is now more stable and reliable. Customer and product selection now also reads all entries (no longer limited to the first 30). Effective immediately.",
+            "ja": "「ERP 連携」の送信で、取引先と商品を同時に照合する際に送信が失敗することがある問題を修正しました。これまで一部の請求書は照合工程の誤判定により送信できませんでしたが、修正され、送信がより安定し信頼できるようになりました。あわせて、取引先・商品の選択はすべての項目を読み込めるようになりました(先頭 30 件に限定されません)。即日有効。",
         },
     }
 

@@ -952,7 +952,11 @@ class MRERPProductSyncService:
         page = self.adapter._page
         url = self.adapter.login_url + self.LISTING_PATH
         try:
-            if "allview.php" not in (page.url or "").lower():
+            # 2026-05-26 修:按**本模块**(stkmas)列表路径判断是否已在页上 ·
+            # 旧检查 "allview.php" not in url 模块无关 → 客户复核后页停在
+            # armas/allview.php,商品复核误判"已在列表页"不导航 → 在客户页搜商品码
+            # → 搜不到/回退重型全量 → 假 ERR_PRODUCT_VERIFY_UNAVAILABLE。按 LISTING_PATH 精确判断。
+            if self.LISTING_PATH.lower() not in (page.url or "").lower():
                 page.goto(url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
             # 搜索框不在 → 回退首页扫描(graceful degrade · 不硬炸)。
             if page.locator("#txtsearch").count() == 0:

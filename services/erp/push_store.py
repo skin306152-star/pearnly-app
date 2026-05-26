@@ -634,9 +634,21 @@ def update_log_status_after_retry(
     response_body: Optional[str],
     error_msg: Optional[str],
     elapsed_ms: int,
+    request_body: Optional[Any] = None,
 ):
-    """重试完成后更新原 log 的 status / http_status / response · 不写新行"""
+    """更新原 log 的 status / http_status / response(不写新行)。
+    重试完成调用;也用于把识别后立刻写的「pending(推送中)」行落定成
+    success/failed(2026-05-26)。request_body 仅在传入时覆盖(retry 不传 → 保留原值)。"""
+    import json as _json
+
     try:
+        rb = None
+        if request_body is not None:
+            rb = (
+                request_body
+                if isinstance(request_body, str)
+                else _json.dumps(request_body, ensure_ascii=False)
+            )
         with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
@@ -645,7 +657,8 @@ def update_log_status_after_retry(
                     http_status = %s,
                     response_body = %s,
                     error_msg = %s,
-                    elapsed_ms = %s
+                    elapsed_ms = %s,
+                    request_body = COALESCE(%s::jsonb, request_body)
                 WHERE id = %s
             """,
                 (
@@ -654,6 +667,7 @@ def update_log_status_after_retry(
                     response_body,
                     error_msg,
                     int(elapsed_ms),
+                    rb,
                     log_id,
                 ),
             )

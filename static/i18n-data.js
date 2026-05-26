@@ -1196,6 +1196,7 @@ window.I18N = {
         'log-retry-fail': '重试失败',
         // v118.25 · ERP 自动重试状态
         'erp-status-retrying': '重试中',
+        'erp-status-pending': '推送中',
         'erp-status-success': '成功',
         'erp-status-failed': '失败',
         'erp-status-skipped': '已推送过',
@@ -3761,6 +3762,7 @@ window.I18N = {
         'log-retry-fail': 'Retry failed',
         // v118.25 · ERP auto-retry status
         'erp-status-retrying': 'Retrying',
+        'erp-status-pending': 'Pushing',
         'erp-status-success': 'Success',
         'erp-status-failed': 'Failed',
         'erp-status-skipped': 'Already pushed',
@@ -6314,6 +6316,7 @@ window.I18N = {
         'log-retry-fail': 'ล้มเหลว',
         // v118.25 · สถานะลองใหม่อัตโนมัติของ ERP
         'erp-status-retrying': 'กำลังลองใหม่',
+        'erp-status-pending': 'กำลังส่ง',
         'erp-status-success': 'สำเร็จ',
         'erp-status-failed': 'ล้มเหลว',
         'erp-status-skipped': 'ส่งไปแล้ว',
@@ -8863,6 +8866,7 @@ window.I18N = {
         'log-retry-fail': '再試行失敗',
         // v118.25 · ERP 自動再試行ステータス
         'erp-status-retrying': '再試行中',
+        'erp-status-pending': '送信中',
         'erp-status-success': '成功',
         'erp-status-failed': '失敗',
         'erp-status-skipped': '送信済み',

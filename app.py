@@ -3107,26 +3107,40 @@ def _erp_seller_routing_enabled(user_id=None) -> bool:
     return False
 
 
-def _persist_push_outcome(user_id, ep, history, result, trigger="auto"):
+def _persist_push_outcome(user_id, ep, history, result, trigger="auto", pending_log_id=None):
     """把一条 push 结果落库:push 日志 + endpoint stats + 历史状态 + 失败入重试队列。
-    与 _auto_push_history 单张写库逻辑同源(铁律#12 单一源)· 供 P1d 批量路径复用。"""
+    与 _auto_push_history 单张写库逻辑同源(铁律#12 单一源)· 供 P1d 批量路径复用。
+    pending_log_id(2026-05-26):若推送前已写「pending(推送中)」行,这里把它**更新**
+    成 success/failed(不再新插一行),让用户识别后立刻看到的「推送中」原地变成最终态。"""
     history_id = str(history["id"])
-    new_log_id = db.insert_push_log(
-        user_id=user_id,
-        endpoint_id=ep["id"],
-        history_id=history_id,
-        invoice_no=history.get("invoice_no"),
-        seller_name=history.get("seller_name"),
-        total_amount=history.get("total_amount"),
-        status="success" if result["success"] else "failed",
-        http_status=result.get("http_status"),
-        request_body=result.get("request_body"),
-        response_body=result.get("response_body"),
-        error_msg=result.get("error_msg"),
-        attempt=1,
-        elapsed_ms=result.get("elapsed_ms", 0),
-        trigger=trigger,
-    )
+    if pending_log_id:
+        db.update_log_status_after_retry(
+            pending_log_id,
+            result["success"],
+            result.get("http_status"),
+            result.get("response_body"),
+            result.get("error_msg"),
+            result.get("elapsed_ms", 0),
+            request_body=result.get("request_body"),
+        )
+        new_log_id = pending_log_id
+    else:
+        new_log_id = db.insert_push_log(
+            user_id=user_id,
+            endpoint_id=ep["id"],
+            history_id=history_id,
+            invoice_no=history.get("invoice_no"),
+            seller_name=history.get("seller_name"),
+            total_amount=history.get("total_amount"),
+            status="success" if result["success"] else "failed",
+            http_status=result.get("http_status"),
+            request_body=result.get("request_body"),
+            response_body=result.get("response_body"),
+            error_msg=result.get("error_msg"),
+            attempt=1,
+            elapsed_ms=result.get("elapsed_ms", 0),
+            trigger=trigger,
+        )
     db.update_endpoint_stats(ep["id"], result["success"])
     db.update_history_push_status(history_id, "success" if result["success"] else "failed")
 
@@ -3188,6 +3202,34 @@ async def _auto_push_batch_for_endpoint(user_id, endpoint, histories, tenant_id=
     if not to_push:
         return
 
+    # 1.5) 立刻给每张写一条 pending(推送中)日志 · 识别后用户马上能在日志看到排队,
+    #      不用干等几秒的 Playwright 往返(2026-05-26 Zihao 反馈)· 推完原地更新成 ✓/✗。
+    pending_ids = {}
+    for h in to_push:
+        try:
+            pid = db.insert_push_log(
+                user_id=user_id,
+                endpoint_id=endpoint["id"],
+                history_id=str(h["id"]),
+                invoice_no=h.get("invoice_no"),
+                seller_name=h.get("seller_name"),
+                total_amount=h.get("total_amount"),
+                status="pending",
+                http_status=None,
+                request_body={"adapter": endpoint.get("adapter"), "stage": "pushing"},
+                response_body=None,
+                error_msg=None,
+                attempt=1,
+                elapsed_ms=0,
+                trigger="auto",
+            )
+            if pid:
+                pending_ids[str(h["id"])] = pid
+        except Exception as e:
+            logger.warning(
+                "[SmartPush] pending 日志写入失败 history=%s: %s", str(h.get("id"))[:8], e
+            )
+
     # 2) 一次性批量推(off-loop)。
     loop = asyncio.get_event_loop()
     try:
@@ -3200,12 +3242,26 @@ async def _auto_push_batch_for_endpoint(user_id, endpoint, histories, tenant_id=
             endpoint.get("name"),
             e,
         )
+        # dispatch 整体炸了 → 把 pending(推送中)行落定成 failed · 不让它卡在「推送中」。
+        for h in to_push:
+            pid = pending_ids.get(str(h["id"]))
+            if not pid:
+                continue
+            try:
+                db.update_log_status_after_retry(
+                    pid, False, None, None, f"dispatch_error: {type(e).__name__}", 0
+                )
+                db.update_history_push_status(str(h["id"]), "failed")
+            except Exception:
+                pass
         return
 
-    # 3) 逐张落库(per-invoice 隔离:一张写库异常不影响其余)。
+    # 3) 逐张落库(per-invoice 隔离:一张写库异常不影响其余)· 把 pending 行更新成终态。
     for h, result in zip(to_push, results):
         try:
-            _persist_push_outcome(user_id, endpoint, h, result)
+            _persist_push_outcome(
+                user_id, endpoint, h, result, pending_log_id=pending_ids.get(str(h["id"]))
+            )
             logger.info(
                 "[SmartPush] user=%s.. history=%s.. ep=%r success=%s",
                 user_id[:8],
@@ -3440,10 +3496,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已大幅提升「ERP 对接」推送的速度与稳定性。此前商品较多的账套在推送时核对耗时过长、易超时导致推送失败,现已优化,推送更快更稳定可靠。即日生效。",
-            "th": "ระบบได้ปรับปรุงความเร็วและความเสถียรของการส่งข้อมูลใน «การเชื่อมต่อ ERP» อย่างมาก · ก่อนหน้านี้บัญชีที่มีสินค้าจำนวนมากใช้เวลาตรวจสอบนานเกินไปและมักหมดเวลาจนส่งไม่สำเร็จ ได้รับการปรับปรุงแล้ว การส่งเร็วขึ้นและเสถียรเชื่อถือได้มากขึ้น · มีผลทันที",
-            "en": "Significantly improved the speed and reliability of ERP integration pushes. Previously, accounts with many products took too long to verify and often timed out, causing pushes to fail. This is now optimized — pushing is faster and more reliable. Effective immediately.",
-            "ja": "「ERP 連携」の送信の速度と安定性を大幅に改善しました。これまで商品の多い帳簿では照合に時間がかかりすぎてタイムアウトし、送信が失敗することがありました。最適化により、送信がより速く安定するようになりました。即日有効。",
+            "zh": "识别完成后,发票会立即出现在推送日志并显示「推送中」,处理完自动变为成功或失败,无需等待或反复刷新。同时优化了相关确认弹窗的界面风格。即日生效。",
+            "th": "หลังจากอ่านข้อมูลเสร็จ ใบกำกับจะปรากฏในบันทึกการส่งทันทีพร้อมสถานะ «กำลังส่ง» และจะเปลี่ยนเป็นสำเร็จหรือไม่สำเร็จโดยอัตโนมัติเมื่อเสร็จสิ้น โดยไม่ต้องรอหรือรีเฟรช · พร้อมทั้งปรับปรุงรูปแบบหน้าต่างยืนยันที่เกี่ยวข้อง · มีผลทันที",
+            "en": "Right after recognition, invoices now appear in the push log immediately marked “Pushing”, and automatically turn to success or failed when done — no waiting or repeated refreshing. The related confirmation dialog style has also been improved. Effective immediately.",
+            "ja": "読み取り完了後、請求書はすぐに送信ログに「送信中」として表示され、完了すると自動的に成功または失敗に変わります。待ったり何度も更新したりする必要はありません。あわせて関連する確認ダイアログの見た目も改善しました。即日有効。",
         },
     }
 

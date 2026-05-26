@@ -5534,12 +5534,12 @@ let _logFilter = { key: 'all', val: '' };
 // v118.25.1 · 推送日志多选状态(批量重推)
 let _erpSelected = new Set();
 
-async function loadErpLogs() {
+async function loadErpLogs(silent) {
     const listEl = document.getElementById('erp-logs-list');
     if (!listEl) return;
 
-    // v0.10 · 立即显示 loading 态 · 让用户知道点到了
-    listEl.innerHTML = `<div class="erp-logs-empty">${escapeHtml(t('erp-logs-loading'))}</div>`;
+    // v0.10 · 立即显示 loading 态 · 让用户知道点到了(silent=自动轮询刷新·不闪 loading)
+    if (!silent) listEl.innerHTML = `<div class="erp-logs-empty">${escapeHtml(t('erp-logs-loading'))}</div>`;
 
     // 今日统计同步刷新(不等)
     loadErpTodayStats();
@@ -5559,6 +5559,12 @@ async function loadErpLogs() {
         }
         const data = await resp.json();
         const items = data.items || [];
+        // 有「推送中(pending)」行 → 4s 后静默再拉一次 · 让状态原地翻成 ✓/✗(2026-05-26)·
+        // 无 pending 或离开页面(下次 listEl 不在直接 return)即自动停。
+        if (window._erpLogPollTimer) { clearTimeout(window._erpLogPollTimer); window._erpLogPollTimer = null; }
+        if (items.some(function (l) { return l.status === 'pending'; })) {
+            window._erpLogPollTimer = setTimeout(function () { loadErpLogs(true); }, 4000);
+        }
         if (items.length === 0) {
             listEl.innerHTML = `<div class="erp-logs-empty">${escapeHtml(t('erp-logs-empty'))}</div>`;
             return;
@@ -5604,7 +5610,12 @@ async function loadErpLogs() {
                 && log.next_retry_at
                 && (new Date(log.next_retry_at).getTime() > Date.now() - 60000); // 兜底:就算稍微过了点也算重试中(worker 几秒就到)
             let statusClass, statusIcon, statusLabel;
-            if (log.status === 'success') {
+            if (log.status === 'pending') {
+                // 识别后立刻写的「推送中」· 旋转图标 · 推完会原地变 ✓/✗(2026-05-26)
+                statusClass = 'retrying';
+                statusIcon = '⟳';
+                statusLabel = t('erp-status-pending');
+            } else if (log.status === 'success') {
                 statusClass = 'ok';
                 statusIcon = '✓';
                 statusLabel = t('erp-status-success');
@@ -16105,7 +16116,9 @@ try { window.I18N = I18N; } catch(e) {}
         if (action === 'clear') { _erpExcState.selected.clear(); renderErpExceptions(); return; }
         if (ids.length === 0) return;
         if (action === 'delete') {
-            if (!confirm(t('erp-exc-batch-delete-confirm', { n: ids.length }))) return;
+            // 用产品风格确认弹窗替换浏览器原生 confirm()(2026-05-26 · 符合设计语言)
+            const ok = await showConfirm(t('erp-exc-batch-delete-confirm', { n: ids.length }), { danger: true });
+            if (!ok) return;
             try {
                 const resp = await fetch('/api/erp/logs/batch-delete', {
                     method: 'POST',

@@ -136,8 +136,21 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.logs = []
         self.retries = []
+        self.updates = []  # 2026-05-26 · pending 行落定走 update_log_status_after_retry
+        self._log_seq = 0
+
+        def _ins(**kw):
+            self.logs.append(kw)
+            self._log_seq += 1
+            return f"log-{self._log_seq}"
+
+        mock.patch.object(db, "insert_push_log", side_effect=_ins).start()
         mock.patch.object(
-            db, "insert_push_log", side_effect=lambda **kw: self.logs.append(kw) or "log-1"
+            db,
+            "update_log_status_after_retry",
+            side_effect=lambda log_id, success, *a, **kw: self.updates.append(
+                {"log_id": log_id, "success": success}
+            ),
         ).start()
         mock.patch.object(db, "update_endpoint_stats", side_effect=lambda *a: None).start()
         mock.patch.object(db, "update_history_push_status", side_effect=lambda *a: None).start()
@@ -212,8 +225,10 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
             {"id": "3", "invoice_no": "INV3"},
         ]
         await app._auto_push_batch_for_endpoint("u1", self._ep(), hists, None)
-        statuses = [lg["status"] for lg in self.logs]
-        self.assertEqual(statuses, ["success", "failed", "failed"])
+        # 推送前先写 3 条 pending(推送中)行
+        self.assertEqual([lg["status"] for lg in self.logs], ["pending", "pending", "pending"])
+        # 推完把 pending 行原地更新成 success/failed(不再新插)
+        self.assertEqual([u["success"] for u in self.updates], [True, False, False])
         # 仅技术失败(h2)入重试队列;用户数据错(h3)不入队
         self.assertEqual(len(self.retries), 1)
 
@@ -247,7 +262,7 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
         # 第一张 persist 抛 · 第二张仍应被处理
         calls = {"n": 0}
 
-        def flaky(user_id, ep, h, result, trigger="auto"):
+        def flaky(user_id, ep, h, result, trigger="auto", pending_log_id=None):
             calls["n"] += 1
             if h["id"] == "1":
                 raise RuntimeError("boom")

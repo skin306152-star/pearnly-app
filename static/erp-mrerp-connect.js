@@ -241,11 +241,11 @@
             ja: 'テスト中…',
         },
         'wiz-test-ok': {
-            zh: '✓ 已连接 · 看到 {n} 个公司',
-            en: '✓ Connected — saw {n} companies',
-            th: '✓ เชื่อมแล้ว — พบ {n} บริษัท',
-            zh_TW: '✓ 已連接 · 看到 {n} 個公司',
-            ja: '✓ 接続済み — {n} 社が見つかりました',
+            zh: '✓ 已连接 · 发现 {n} 个 ERP 年度账套/数据库',
+            en: '✓ Connected — found {n} ERP year-database(s)',
+            th: '✓ เชื่อมแล้ว — พบชุดบัญชีรายปี ERP {n} รายการ',
+            zh_TW: '✓ 已連接 · 發現 {n} 個 ERP 年度帳套/資料庫',
+            ja: '✓ 接続済み — ERP 年度データベース {n} 件',
         },
         // P-4 (Zihao 2026-05-19 拍板 · v118.34.21) · 失败时把截图路径单独显示
         'wiz-screenshot-saved': {
@@ -256,18 +256,25 @@
             ja: 'エラースクショ保存先: {path} · サポートに送ると調査が早まります',
         },
         'wiz-step-3-h': {
-            zh: '选公司 + 推送模式',
-            en: 'Pick the company and push mode',
-            th: 'เลือกบริษัทและโหมดการส่ง',
-            zh_TW: '選公司 + 推送模式',
-            ja: '会社と送信モードを選択',
+            zh: '选择 ERP 年度账套 + 推送模式',
+            en: 'Pick the ERP year-database and push mode',
+            th: 'เลือกชุดบัญชีรายปี ERP และโหมดการส่ง',
+            zh_TW: '選擇 ERP 年度帳套 + 推送模式',
+            ja: 'ERP 年度データベースと送信モードを選択',
         },
         'wiz-company': {
-            zh: '公司',
-            en: 'Company',
-            th: 'บริษัท',
-            zh_TW: '公司',
-            ja: '会社',
+            zh: 'ERP 公司 / 年度账套',
+            en: 'ERP company / year-database',
+            th: 'บริษัท ERP / ชุดบัญชีรายปี',
+            zh_TW: 'ERP 公司 / 年度帳套',
+            ja: 'ERP 会社 / 年度データベース',
+        },
+        'wiz-company-hint': {
+            zh: '请选择这批发票要写入的 MR.ERP 年度账套。通常同一家公司会按年度或数据库区分账套。',
+            en: 'Pick the MR.ERP year-database these invoices write into. The same company is usually split into account-sets by year or database.',
+            th: 'เลือกชุดบัญชีรายปี MR.ERP ที่ใบกำกับชุดนี้จะบันทึกเข้าไป โดยปกติบริษัทเดียวกันจะแยกชุดบัญชีตามปีหรือฐานข้อมูล',
+            zh_TW: '請選擇這批發票要寫入的 MR.ERP 年度帳套。通常同一家公司會按年度或資料庫區分帳套。',
+            ja: 'この請求書群を書き込む MR.ERP 年度データベースを選択してください。通常、同じ会社は年度やデータベースで帳簿が分かれます。',
         },
         'wiz-mode': {
             zh: '推送模式',
@@ -291,18 +298,18 @@
             ja: '「送信」ボタンを押したときのみ送信',
         },
         'wiz-seed': {
-            zh: '新客户模板(可选)',
-            en: 'New customer template (optional)',
-            th: 'แม่แบบลูกค้าใหม่ (ทางเลือก)',
-            zh_TW: '新客戶範本(可選)',
-            ja: '新規顧客テンプレート(任意)',
+            zh: '自动创建买方时使用的模板(可选)',
+            en: 'Template for auto-creating buyer customers (optional)',
+            th: 'แม่แบบสำหรับสร้างลูกค้าผู้ซื้ออัตโนมัติ (ทางเลือก)',
+            zh_TW: '自動建立買方時使用的範本(可選)',
+            ja: '買い手の自動作成に使うテンプレート(任意)',
         },
         'wiz-seed-hint': {
-            zh: '自动建新客户时拿这个作模板 · 不选 = 关闭自动建',
-            en: "When auto-creating a customer, clone this row's master-data refs. Leave blank to disable auto-create.",
-            th: 'ใช้ลูกค้านี้เป็นแม่แบบตอนสร้างอัตโนมัติ · เว้นว่าง = ปิดการสร้างอัตโนมัติ',
-            zh_TW: '自動建新客戶時拿這個作範本 · 不選 = 關閉自動建',
-            ja: '自動作成時にこの行のマスターデータを継承します · 空欄 = 自動作成を無効化',
+            zh: '如果发票买方在 ERP 中不存在,系统会自动创建 ERP 买方客户。模板只用于继承 ERP 默认分类、账务等设置;客户名称、税号、地址来自发票识别结果。不选 = 关闭自动创建。',
+            en: "If the invoice buyer doesn't exist in ERP, the system auto-creates an ERP buyer customer. The template only supplies ERP defaults (category, accounting, etc.); name, tax ID and address come from the invoice. Leave blank to disable auto-create.",
+            th: 'หากผู้ซื้อในใบกำกับไม่มีใน ERP ระบบจะสร้างลูกค้าผู้ซื้อ ERP อัตโนมัติ · แม่แบบใช้สืบทอดค่าเริ่มต้น (หมวดหมู่/บัญชี) เท่านั้น · ชื่อ เลขภาษี ที่อยู่ มาจากใบกำกับ · เว้นว่าง = ปิดการสร้างอัตโนมัติ',
+            zh_TW: '如果發票買方在 ERP 中不存在,系統會自動建立 ERP 買方客戶。範本只用於繼承 ERP 預設分類、帳務等設定;客戶名稱、稅號、地址來自發票辨識結果。不選 = 關閉自動建立。',
+            ja: '請求書の買い手が ERP に存在しない場合、ERP 買い手顧客を自動作成します。テンプレートは ERP の既定設定(分類・勘定など)の継承のみに使用し、名称・税番号・住所は請求書から取得します。空欄 = 自動作成を無効化。',
         },
         'wiz-seed-empty': {
             zh: '— 不自动建(默认) —',
@@ -367,18 +374,18 @@
         },
         // Seed PRODUCT (Task 2 Phase 5)
         'wiz-seedp': {
-            zh: '新商品模板(可选)',
-            en: 'New product template (optional)',
-            th: 'แม่แบบสินค้าใหม่ (ทางเลือก)',
-            zh_TW: '新商品範本(可選)',
-            ja: '新規商品テンプレート(任意)',
+            zh: '自动创建商品时使用的模板(可选)',
+            en: 'Template for auto-creating products (optional)',
+            th: 'แม่แบบสำหรับสร้างสินค้าอัตโนมัติ (ทางเลือก)',
+            zh_TW: '自動建立商品時使用的範本(可選)',
+            ja: '商品の自動作成に使うテンプレート(任意)',
         },
         'wiz-seedp-hint': {
-            zh: '自动建新商品时拿这个作模板 · 单位/账户码/价格继承 · 不选 = 关闭自动建商品',
-            en: "When auto-creating a product, clone this row's unit/account/price refs. Leave blank to disable product auto-create.",
-            th: 'ใช้สินค้านี้เป็นแม่แบบตอนสร้างอัตโนมัติ · หน่วย/บัญชี/ราคา สืบทอด · เว้นว่าง = ปิด',
-            zh_TW: '自動建新商品時拿這個作範本 · 單位/帳戶碼/價格繼承 · 不選 = 關閉自動建商品',
-            ja: '自動作成時にこの行の単位/勘定/価格を継承 · 空欄 = 自動作成を無効化',
+            zh: '如果发票商品在 ERP 中不存在,系统会自动创建 ERP 商品。模板只用于继承单位、分类、账户等默认设置;商品名称、价格、数量来自发票识别结果。不选 = 关闭自动创建。',
+            en: "If an invoice product doesn't exist in ERP, the system auto-creates an ERP product. The template only supplies defaults (unit, category, account); product name, price and quantity come from the invoice. Leave blank to disable auto-create.",
+            th: 'หากสินค้าในใบกำกับไม่มีใน ERP ระบบจะสร้างสินค้า ERP อัตโนมัติ · แม่แบบใช้สืบทอดค่าเริ่มต้น (หน่วย/หมวดหมู่/บัญชี) เท่านั้น · ชื่อ ราคา จำนวน มาจากใบกำกับ · เว้นว่าง = ปิดการสร้างอัตโนมัติ',
+            zh_TW: '如果發票商品在 ERP 中不存在,系統會自動建立 ERP 商品。範本只用於繼承單位、分類、帳戶等預設設定;商品名稱、價格、數量來自發票辨識結果。不選 = 關閉自動建立。',
+            ja: '請求書の商品が ERP に存在しない場合、ERP 商品を自動作成します。テンプレートは既定値(単位・分類・勘定)の継承のみに使用し、名称・価格・数量は請求書から取得します。空欄 = 自動作成を無効化。',
         },
         'wiz-seedp-empty': {
             zh: '— 不自动建(默认) —',
@@ -1232,6 +1239,7 @@
             '<div class="mrerp-wizard-field">' +
             '<label class="mrerp-wizard-label" data-mw-company-label></label>' +
             '<select class="mrerp-wizard-select" data-mw-company></select>' +
+            '<div class="mrerp-wizard-hint" data-mw-company-hint></div>' +
             '</div>' +
             '<div class="mrerp-wizard-field">' +
             '<label class="mrerp-wizard-label" data-mw-mode-label></label>' +
@@ -1301,6 +1309,7 @@
         // Step 3
         w.querySelector('[data-mw-step3-h]').textContent = t('wiz-step-3-h');
         w.querySelector('[data-mw-company-label]').textContent = t('wiz-company');
+        w.querySelector('[data-mw-company-hint]').textContent = t('wiz-company-hint');
         w.querySelector('[data-mw-mode-label]').textContent = t('wiz-mode');
         w.querySelector('[data-mw-mode-auto]').textContent = t('wiz-mode-auto');
         w.querySelector('[data-mw-mode-manual]').textContent = t('wiz-mode-manual');

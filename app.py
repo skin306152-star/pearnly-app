@@ -988,6 +988,10 @@ async def _run_erp_retry_tick():
                 )
 
                 # 自增 retry_count · 更新 log 状态(直接覆盖原行 · 不写新行)
+                # P2-D(B8)· 「发票号已存在」= skipped_dup 中性态(不算失败)。
+                final_status = db.classify_push_status(
+                    bool(result.get("success")), result.get("error_msg")
+                )
                 new_count = db.increment_retry_count(str(log["id"]))
                 db.update_log_status_after_retry(
                     log_id=str(log["id"]),
@@ -996,19 +1000,17 @@ async def _run_erp_retry_tick():
                     response_body=result.get("response_body"),
                     error_msg=result.get("error_msg"),
                     elapsed_ms=int(result.get("elapsed_ms", 0)),
+                    final_status=final_status,
                 )
-                # 端点 + history 状态同步
-                db.update_endpoint_stats(str(endpoint["id"]), bool(result.get("success")))
+                # 端点 + history 状态同步(skipped_dup 视为非失败)
+                db.update_endpoint_stats(str(endpoint["id"]), final_status != "failed")
                 if log.get("history_id"):
-                    db.update_history_push_status(
-                        str(log["history_id"]),
-                        "success" if result.get("success") else "failed",
-                    )
+                    db.update_history_push_status(str(log["history_id"]), final_status)
 
-                if result.get("success"):
-                    # 重试成功 · 摘出队列
+                if final_status != "failed":
+                    # 重试成功 / 已推送过 · 摘出队列
                     db.clear_retry_schedule(str(log["id"]))
-                    logger.info(f"[erp_retry] log {log['id']} 重试 #{new_count} 成功")
+                    logger.info(f"[erp_retry] log {log['id']} 重试 #{new_count} → {final_status}")
                 else:
                     # 批 1 改动 3 (v118.34.33) · 用户数据错 retry 阶段也要识别 ·
                     # 一旦从技术错变成用户数据错(或本来就是)· 立刻摘队列.
@@ -3051,6 +3053,8 @@ async def _auto_push_history(
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(None, _erp.push_to_endpoint, ep, history)
 
+            # P2-D(B8)· 「发票号已存在」= skipped_dup 中性态(不算失败)。
+            final_status = db.classify_push_status(result["success"], result.get("error_msg"))
             # 把 pending 行原地更新成终态(没拿到 pending_id 才退回新插一行)。
             if pending_id:
                 db.update_log_status_after_retry(
@@ -3061,6 +3065,7 @@ async def _auto_push_history(
                     result.get("error_msg"),
                     result.get("elapsed_ms", 0),
                     request_body=result.get("request_body"),
+                    final_status=final_status,
                 )
                 new_log_id = pending_id
             else:
@@ -3071,7 +3076,7 @@ async def _auto_push_history(
                     invoice_no=history.get("invoice_no"),
                     seller_name=history.get("seller_name"),
                     total_amount=history.get("total_amount"),
-                    status="success" if result["success"] else "failed",
+                    status=final_status,
                     http_status=result.get("http_status"),
                     request_body=result.get("request_body"),
                     response_body=result.get("response_body"),
@@ -3081,15 +3086,12 @@ async def _auto_push_history(
                     trigger="auto",  # 标记自动触发
                 )
 
-            db.update_endpoint_stats(ep["id"], result["success"])
-            db.update_history_push_status(
-                history_id,
-                "success" if result["success"] else "failed",
-            )
+            db.update_endpoint_stats(ep["id"], final_status != "failed")
+            db.update_history_push_status(history_id, final_status)
 
             # v118.25 · 自动推送失败 · 进入重试队列(60s 后第一次重试)
-            # 批 1 改动 3 (v118.34.33) · 用户数据错跳过重试队列.
-            if not result["success"] and new_log_id:
+            # 批 1 改动 3 (v118.34.33) · 用户数据错 / 已推送过跳过重试队列.
+            if final_status == "failed" and new_log_id:
                 if db.is_user_data_error(result.get("error_msg")):
                     logger.info(
                         "[AutoPush] user-data error · NOT scheduling retry · " "log=%s err=%r",
@@ -3143,6 +3145,8 @@ def _persist_push_outcome(user_id, ep, history, result, trigger="auto", pending_
     pending_log_id(2026-05-26):若推送前已写「pending(推送中)」行,这里把它**更新**
     成 success/failed(不再新插一行),让用户识别后立刻看到的「推送中」原地变成最终态。"""
     history_id = str(history["id"])
+    # P2-D(Zihao 2026-05-27 · B8)· 「发票号已存在」= skipped_dup 中性态(不算失败)。
+    final_status = db.classify_push_status(result["success"], result.get("error_msg"))
     if pending_log_id:
         db.update_log_status_after_retry(
             pending_log_id,
@@ -3152,6 +3156,7 @@ def _persist_push_outcome(user_id, ep, history, result, trigger="auto", pending_
             result.get("error_msg"),
             result.get("elapsed_ms", 0),
             request_body=result.get("request_body"),
+            final_status=final_status,
         )
         new_log_id = pending_log_id
     else:
@@ -3162,7 +3167,7 @@ def _persist_push_outcome(user_id, ep, history, result, trigger="auto", pending_
             invoice_no=history.get("invoice_no"),
             seller_name=history.get("seller_name"),
             total_amount=history.get("total_amount"),
-            status="success" if result["success"] else "failed",
+            status=final_status,
             http_status=result.get("http_status"),
             request_body=result.get("request_body"),
             response_body=result.get("response_body"),
@@ -3171,11 +3176,11 @@ def _persist_push_outcome(user_id, ep, history, result, trigger="auto", pending_
             elapsed_ms=result.get("elapsed_ms", 0),
             trigger=trigger,
         )
-    db.update_endpoint_stats(ep["id"], result["success"])
-    db.update_history_push_status(history_id, "success" if result["success"] else "failed")
+    db.update_endpoint_stats(ep["id"], final_status != "failed")
+    db.update_history_push_status(history_id, final_status)
 
-    # 失败入重试队列(用户数据错跳过 · 同 _auto_push_history)。
-    if not result["success"] and new_log_id:
+    # 失败入重试队列(用户数据错 / 已推送过都跳过 · 同 _auto_push_history)。
+    if final_status == "failed" and new_log_id:
         if db.is_user_data_error(result.get("error_msg")):
             logger.info(
                 "[SmartPush] user-data error · NOT scheduling retry · log=%s err=%r",
@@ -3526,10 +3531,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "「ERP 对接」连接设置已进一步简化。新建连接时,系统会自动为你推荐一个「销售收入」类通用商品并预先选好,可直接使用或自行改选,无需再到「高级设置」里手动配置。发票里能对上的商品仍按原商品记账,对不上的明细归到通用商品下并保留原始描述。多行发票推送更快、也不会再产生重复的商品记录。即日生效。",
-            "th": "การตั้งค่าการเชื่อมต่อ «ERP» ง่ายขึ้นอีก · เมื่อสร้างการเชื่อมต่อใหม่ ระบบจะแนะนำและเลือกสินค้าทั่วไปประเภท «รายได้จากการขาย» ให้โดยอัตโนมัติ ใช้เลยหรือเปลี่ยนเองก็ได้ ไม่ต้องไปตั้งค่าใน «ตั้งค่าขั้นสูง» อีก · รายการที่ตรงกับสินค้าเดิมยังลงบัญชีตามสินค้านั้น ส่วนที่ไม่ตรงจะลงภายใต้สินค้าทั่วไปและเก็บคำอธิบายเดิมไว้ · การส่งใบกำกับหลายบรรทัดเร็วขึ้นและไม่เกิดสินค้าซ้ำ · มีผลทันที",
-            "en": 'Setting up an ERP connection is now even simpler. When you create a new connection, the system automatically suggests and pre-selects a generic "sales revenue" product for you — keep it or pick another, with no need to configure it in Advanced settings. Invoice lines that match an existing product still post to that product, while lines that don\'t match are booked under the generic product with their original description kept. Multi-line invoices push faster and no longer create duplicate product records. Effective immediately.',
-            "ja": "ERP 接続の設定がさらに簡単になりました。新しい接続を作成すると、「売上収益」系の汎用商品をシステムが自動で提案・事前選択します。そのまま使うことも別の商品を選ぶこともでき、「詳細設定」で手動設定する必要はありません。既存商品に一致する明細は引き続きその商品に計上し、一致しない明細は元の説明を残したまま汎用商品に計上します。複数明細の請求書送信が速くなり、重複した商品レコードも作成されません。即日有効。",
+            "zh": "「ERP 对接」推送记录更清晰了。重试推送不再产生重复的日志行,同一张发票在「推送日志」和「异常」里显示的状态保持一致。另外,系统检测到某张发票之前已经推送过时,会标记为「已推送过」而不再当作失败提示。即日生效。",
+            "th": "บันทึกการส่งใน «การเชื่อมต่อ ERP» ชัดเจนขึ้น · การส่งซ้ำจะไม่สร้างบรรทัดบันทึกซ้ำอีกต่อไป และสถานะของใบกำกับเดียวกันใน «บันทึกการส่ง» กับ «รายการผิดปกติ» จะตรงกัน · นอกจากนี้ หากระบบพบว่าใบกำกับเคยส่งไปแล้ว จะระบุว่า «ส่งแล้ว» แทนการแจ้งว่าล้มเหลว · มีผลทันที",
+            "en": 'ERP integration push records are now clearer. Retrying a push no longer creates duplicate log rows, and the same invoice shows a consistent status in both the push log and the exceptions list. Also, when an invoice was already pushed before, it is now marked as "Already pushed" instead of showing as a failure. Effective immediately.',
+            "ja": "「ERP 連携」の送信記録が見やすくなりました。再送信でログ行が重複しなくなり、同じ請求書の状態が「送信ログ」と「例外」で一致するようになりました。また、すでに送信済みの請求書を検出した場合は、失敗ではなく「送信済み」と表示されます。即日有効。",
         },
     }
 

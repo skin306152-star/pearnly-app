@@ -843,7 +843,8 @@ async def erp_push(req: ErpPushRequest, request: Request):
 
     result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
 
-    # 4) 写日志
+    # 4) 写日志 · P2-D(B8)· 「发票号已存在」= skipped_dup 中性态(不算失败)。
+    final_status = db.classify_push_status(result["success"], result.get("error_msg"))
     log_id = db.insert_push_log(
         user_id=user["id"],
         endpoint_id=endpoint["id"],
@@ -851,7 +852,7 @@ async def erp_push(req: ErpPushRequest, request: Request):
         invoice_no=history.get("invoice_no"),
         seller_name=history.get("seller_name"),
         total_amount=history.get("total_amount"),
-        status="success" if result["success"] else "failed",
+        status=final_status,
         http_status=result.get("http_status"),
         request_body=result.get("request_body"),
         response_body=result.get("response_body"),
@@ -860,14 +861,14 @@ async def erp_push(req: ErpPushRequest, request: Request):
         elapsed_ms=result.get("elapsed_ms", 0),
     )
 
-    # 5) 更新 endpoint 统计 + history 推送状态
-    db.update_endpoint_stats(endpoint["id"], result["success"])
-    db.update_history_push_status(req.history_id, "success" if result["success"] else "failed")
+    # 5) 更新 endpoint 统计 + history 推送状态(skipped_dup 视为非失败)
+    db.update_endpoint_stats(endpoint["id"], final_status != "failed")
+    db.update_history_push_status(req.history_id, final_status)
 
     # v118.25 · 手动推送失败 · 也进重试队列(给用户"扔出去就不管"的体验)
     # 批 1 改动 3 (v118.34.33) · 用户数据错(ERR_NO_CLIENT 等)不入重试 ·
-    # retry 没意义 + 污染队列.
-    if not result["success"] and log_id:
+    # retry 没意义 + 污染队列. skipped_dup 也不入(已推送过)。
+    if final_status == "failed" and log_id:
         if db.is_user_data_error(result.get("error_msg")):
             logger.info(
                 "[push] user-data error · NOT scheduling retry · log=%s err=%r",
@@ -880,8 +881,10 @@ async def erp_push(req: ErpPushRequest, request: Request):
                 db.schedule_log_retry(str(log_id), first_delay)
 
     return {
-        "ok": result["success"],
+        "ok": result["success"] or final_status == "skipped_dup",
         "log_id": log_id,
+        "status": final_status,
+        "skipped_dup": final_status == "skipped_dup",
         "http_status": result.get("http_status"),
         "error_msg": result.get("error_msg"),
         "elapsed_ms": result.get("elapsed_ms"),
@@ -1052,34 +1055,33 @@ async def erp_retry_push(log_id: str, request: Request):
 
     result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
 
-    # 写新一条日志(attempt 递增)
-    new_log_id = db.insert_push_log(
-        user_id=user["id"],
-        endpoint_id=endpoint["id"],
-        history_id=log["history_id"],
-        invoice_no=history.get("invoice_no"),
-        seller_name=history.get("seller_name"),
-        total_amount=history.get("total_amount"),
-        status="success" if result["success"] else "failed",
+    # P2-A(Zihao 2026-05-27 拍板 · A3)· 重试**更新原行**(不再 INSERT 新行)·
+    # 消除「旧失败行 + 新成功行」重复日志。retry_count 自增、状态原地落定。
+    # P2-D(B8)· 「发票号已存在」= skipped_dup 中性态(不算失败)。
+    final_status = db.classify_push_status(result["success"], result.get("error_msg"))
+    db.increment_retry_count(log["id"])
+    db.update_log_status_after_retry(
+        log_id=log["id"],
+        success=result["success"],
         http_status=result.get("http_status"),
-        request_body=result.get("request_body"),
         response_body=result.get("response_body"),
         error_msg=result.get("error_msg"),
-        attempt=(log.get("attempt") or 1) + 1,
         elapsed_ms=result.get("elapsed_ms", 0),
-        trigger="retry",
+        request_body=result.get("request_body"),
+        final_status=final_status,
     )
-    db.update_endpoint_stats(endpoint["id"], result["success"])
-    db.update_history_push_status(log["history_id"], "success" if result["success"] else "failed")
+    # skipped_dup 视为非失败(已推送过)· 不计入端点失败数。
+    db.update_endpoint_stats(endpoint["id"], final_status != "failed")
+    db.update_history_push_status(log["history_id"], final_status)
 
-    # v118.25 · 手动重试结果同步到原 log 的 retry 状态
-    # 成功 → 清队列(终止自动重试)· 失败 → 也清队列(用户已经手动管了 · 不再交给 worker)
+    # 用户已亲自重试 · 把原 log 的自动重试队列摘掉(成功/失败/已存在都不再交给 worker)。
     if log.get("next_retry_at"):
         db.clear_retry_schedule(log["id"])
 
     return {
-        "ok": result["success"],
-        "log_id": new_log_id,
+        "ok": result["success"] or final_status == "skipped_dup",
+        "log_id": log["id"],
+        "status": final_status,
         "http_status": result.get("http_status"),
         "error_msg": result.get("error_msg"),
         "elapsed_ms": result.get("elapsed_ms"),
@@ -1134,33 +1136,32 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
             import asyncio as _asyncio
 
             result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
-            db.insert_push_log(
-                user_id=user["id"],
-                endpoint_id=endpoint["id"],
-                history_id=log["history_id"],
-                invoice_no=history.get("invoice_no"),
-                seller_name=history.get("seller_name"),
-                total_amount=history.get("total_amount"),
-                status="success" if result["success"] else "failed",
+            # P2-A/P2-D · 更新原行(不 INSERT 新行)+ skipped_dup 中性态。
+            final_status = db.classify_push_status(result["success"], result.get("error_msg"))
+            db.increment_retry_count(log["id"])
+            db.update_log_status_after_retry(
+                log_id=log["id"],
+                success=result["success"],
                 http_status=result.get("http_status"),
-                request_body=result.get("request_body"),
                 response_body=result.get("response_body"),
                 error_msg=result.get("error_msg"),
-                attempt=(log.get("attempt") or 1) + 1,
                 elapsed_ms=result.get("elapsed_ms", 0),
-                trigger="retry",
+                request_body=result.get("request_body"),
+                final_status=final_status,
             )
-            db.update_endpoint_stats(endpoint["id"], result["success"])
-            db.update_history_push_status(
-                log["history_id"], "success" if result["success"] else "failed"
-            )
+            db.update_endpoint_stats(endpoint["id"], final_status != "failed")
+            db.update_history_push_status(log["history_id"], final_status)
             # 跟单个手动重推一样:用户已经亲自管了 · 把原 log 的自动重试队列摘掉
             if log.get("next_retry_at"):
                 db.clear_retry_schedule(log["id"])
 
-            if result["success"]:
+            if final_status == "success":
                 succeeded += 1
                 details.append({"log_id": log_id, "result": "success"})
+            elif final_status == "skipped_dup":
+                # 已推送过 · 算中性跳过(不计失败 · 不红叉)
+                skipped += 1
+                details.append({"log_id": log_id, "result": "skipped", "reason": "already_pushed"})
             else:
                 failed += 1
                 details.append(

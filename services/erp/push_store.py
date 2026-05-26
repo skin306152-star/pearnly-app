@@ -520,6 +520,39 @@ USER_DATA_ERROR_THAI_PATTERNS = (
 )
 
 
+# P2-D(Zihao 2026-05-27 拍板 · B8)· MR.ERP 返「发票号已存在/已推过」不是失败 ·
+# 是「已推送过」中性态(skipped_dup)· 不红叉、不计失败、不入重试。
+# 两种 MR.ERP 文案 + 我方 ERR_DUPLICATE_INVOICE 码都算。
+_ALREADY_PUSHED_THAI_PATTERNS = (
+    "เลขที่ดังกล่าวมีอยู่ในระบบแล้ว",  # 该号已存在系统
+    "เลขที่เอกสารซ้ำ",  # 单据号重复
+)
+
+
+def is_already_pushed_error(error_msg: Optional[str]) -> bool:
+    """这条「失败」其实是「发票号已存在/之前已推过」吗?是 → 应记为 skipped_dup 中性态。"""
+    if not error_msg:
+        return False
+    s = str(error_msg)
+    if "ERR_DUPLICATE_INVOICE" in s:
+        return True
+    for pat in _ALREADY_PUSHED_THAI_PATTERNS:
+        if pat in s:
+            return True
+    return False
+
+
+def classify_push_status(success: bool, error_msg: Optional[str]) -> str:
+    """推送结果 → 单一权威 status(铁律 #12)。
+    success → 'success';「发票号已存在」→ 'skipped_dup'(中性·已推送过);其余 → 'failed'。
+    """
+    if success:
+        return "success"
+    if is_already_pushed_error(error_msg):
+        return "skipped_dup"
+    return "failed"
+
+
 def is_user_data_error(error_msg: Optional[str]) -> bool:
     """判断这条错误是不是"用户数据错"(不应该 retry).
     匹配 ERR_* code 前缀 OR 已知泰文 raw 模式.
@@ -635,12 +668,16 @@ def update_log_status_after_retry(
     error_msg: Optional[str],
     elapsed_ms: int,
     request_body: Optional[Any] = None,
+    final_status: Optional[str] = None,
 ):
     """更新原 log 的 status / http_status / response(不写新行)。
     重试完成调用;也用于把识别后立刻写的「pending(推送中)」行落定成
-    success/failed(2026-05-26)。request_body 仅在传入时覆盖(retry 不传 → 保留原值)。"""
+    success/failed(2026-05-26)。request_body 仅在传入时覆盖(retry 不传 → 保留原值)。
+    P2-D(2026-05-27):final_status 传入时直接用它(支持 'skipped_dup' 中性态);
+    不传则沿用 success→'success'/'failed' 老映射(向后兼容所有现有调用)。"""
     import json as _json
 
+    status = final_status if final_status else ("success" if success else "failed")
     try:
         rb = None
         if request_body is not None:
@@ -662,7 +699,7 @@ def update_log_status_after_retry(
                 WHERE id = %s
             """,
                 (
-                    "success" if success else "failed",
+                    status,
                     http_status,
                     response_body,
                     error_msg,

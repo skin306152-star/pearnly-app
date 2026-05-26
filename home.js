@@ -5664,10 +5664,12 @@ async function loadErpLogs() {
             const clientCell = buyerName
                 ? `<span class="log-client" title="${escapeHtml(buyerName)}">${escapeHtml(buyerName.substring(0, 18))}</span>`
                 : `<span class="log-client log-client-empty" title="${escapeHtml(t('erp-log-client-unassigned-tip'))}">${escapeHtml(t('erp-log-client-unassigned'))}</span>`;
-            // P1-C 后端列 · 工作空间归属 · 无归属(个人事务模式上传)→ 显示「个人事务」
+            // 工作空间/账套列 = 发票卖方自动分拣结果(Zihao 2026-05-26)。
+            // 切换器只是查看过滤器、不决定归属;seller 没匹配到 workspace → 显「未归属/待确认卖方」
+            //(不再显「个人事务」,避免误以为切换器决定归属)。
             const wsCell = log.workspace_name
                 ? `<span class="log-workspace">${escapeHtml((log.workspace_name || '').substring(0, 16))}</span>`
-                : `<span class="log-workspace log-workspace-personal">${escapeHtml(t('ws-personal'))}</span>`;
+                : `<span class="log-workspace log-workspace-unresolved" title="${escapeHtml(t('erp-log-ws-unresolved-tip'))}">${escapeHtml(t('erp-log-ws-unresolved'))}</span>`;
             // 改动 8 (v118.34.33) · ERP 列 · endpoint 名(用户起的)
             const erpCell = log.endpoint_name
                 ? `<span class="log-erp">${escapeHtml((log.endpoint_name || '').substring(0, 14))}</span>`
@@ -15915,12 +15917,135 @@ try { window.I18N = I18N; } catch(e) {}
         _excState.loading = true;
         try {
             _refreshExcClientFilter();
+            // ERP 推送异常(独立来源 · 派生自 erp_push_logs)· 先加载 · 与 OCR 异常并存
+            loadErpExceptions();
             await loadExceptionsStats();
             await loadExceptionsList();
         } finally {
             _excState.loading = false;
         }
     };
+
+    // ─────────────────────────────────────────────────────────
+    // ERP 推送异常块(Zihao 2026-05-26 · 独立来源 · 派生自 erp_push_logs · 铁律 #12)
+    // ⚠️ 暂塞 home.js(并入现有异常页 DOM · 与 _excState 同作用域共享 t/escapeHtml/showToast)·
+    //    迁出 deadline:REFACTOR-C1 拆 home.js 时一并搬到 src/home/erp-exceptions.js。
+    // 闭环:修复(picker 下一块)+ [重试推送] 都在卡片内完成 · 重试走同一 /retry 端点
+    //       (重新解析+反查+推送)· 成功 → 卡片消失(单一源自动同步)· 不来回跳日志页。
+    // ─────────────────────────────────────────────────────────
+    let _erpExcState = { items: [], cat: '' };
+
+    function _erpExcFriendly(it) {
+        // 优先用全局 humanizeError(凭证弹窗同款)· 没有则按 category 给友好文案
+        if (typeof humanizeError === 'function' && it.error_msg) {
+            try { return humanizeError(it.error_msg); } catch (_) { /* fall through */ }
+        }
+        return t('erp-exc-reason-' + (it.category || 'other'));
+    }
+
+    function renderErpExceptions() {
+        const block = document.getElementById('erp-exc-block');
+        if (!block) return;
+        const all = _erpExcState.items || [];
+        if (all.length === 0) { block.hidden = true; block.innerHTML = ''; return; }
+        block.hidden = false;
+
+        // category chip 计数(全量)
+        const cats = {};
+        all.forEach(it => { const c = it.category || 'other'; cats[c] = (cats[c] || 0) + 1; });
+        const curCat = _erpExcState.cat || '';
+        let chipsHtml = `<button class="erp-exc-chip ${curCat === '' ? 'active' : ''}" data-erpexc-cat="">`
+            + `<span>${escapeHtml(t('erp-exc-cat-all'))}</span><span class="erp-exc-chip-count">${all.length}</span></button>`;
+        Object.keys(cats).forEach(c => {
+            chipsHtml += `<button class="erp-exc-chip ${curCat === c ? 'active' : ''}" data-erpexc-cat="${escapeHtml(c)}">`
+                + `<span>${escapeHtml(t('erp-exc-cat-' + c))}</span><span class="erp-exc-chip-count">${cats[c]}</span></button>`;
+        });
+
+        const shown = curCat ? all.filter(it => (it.category || 'other') === curCat) : all;
+        const cardsHtml = shown.map(it => {
+            const stateCls = it.state === 'needs_action' ? 'needs' : (it.state === 'retrying' ? 'retry' : 'fail');
+            const stateLbl = t('erp-exc-state-' + (it.state || 'failed'));
+            const reason = _erpExcFriendly(it);
+            const row = (lbl, val) => `<div class="erp-exc-row"><span class="erp-exc-k">${escapeHtml(lbl)}</span>`
+                + `<span class="erp-exc-v">${escapeHtml(val || '—')}</span></div>`;
+            return `<div class="erp-exc-card">
+                <div class="erp-exc-card-head">
+                    <span class="erp-exc-inv">${escapeHtml(it.invoice_no || '—')}</span>
+                    <span class="erp-exc-state ${stateCls}">${escapeHtml(stateLbl)}</span>
+                </div>
+                <div class="erp-exc-reason">${escapeHtml(reason)}${it.error_code ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</div>
+                ${row(t('erp-exc-f-seller'), it.seller_name)}
+                ${row(t('erp-exc-f-buyer'), it.ocr_buyer_name)}
+                ${row(t('erp-exc-f-erpcustomer'), it.client_name)}
+                ${row(t('erp-exc-f-endpoint'), it.endpoint_name)}
+                <div class="erp-exc-actions">
+                    <button class="erp-exc-retry-btn" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button>
+                </div>
+            </div>`;
+        }).join('');
+
+        block.innerHTML = `
+            <div class="erp-exc-head">
+                <h2 class="erp-exc-title">${escapeHtml(t('erp-exc-title'))}</h2>
+                <span class="erp-exc-sub">${escapeHtml(t('erp-exc-sub'))}</span>
+            </div>
+            <div class="erp-exc-chips">${chipsHtml}</div>
+            <div class="erp-exc-cards">${cardsHtml}</div>`;
+
+        block.querySelectorAll('.erp-exc-chip').forEach(btn => {
+            btn.addEventListener('click', () => {
+                _erpExcState.cat = btn.dataset.erpexcCat || '';
+                renderErpExceptions();
+            });
+        });
+        block.querySelectorAll('[data-erpexc-retry]').forEach(btn => {
+            btn.addEventListener('click', () => _erpExcRetry(btn.dataset.erpexcRetry, btn));
+        });
+    }
+
+    async function _erpExcRetry(logId, btn) {
+        if (!logId) return;
+        if (btn) { btn.disabled = true; btn.textContent = t('erp-exc-retrying'); }
+        try {
+            const resp = await fetch('/api/erp/logs/' + encodeURIComponent(logId) + '/retry', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') },
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data.ok) {
+                showToast(t('erp-exc-retry-ok'), 'success');
+            } else {
+                // 仍失败:重试重新解析后仍冲突 · 卡片会换新原因
+                showToast(t('erp-exc-retry-fail'), 'error');
+            }
+        } catch (e) {
+            showToast(t('erp-exc-retry-fail'), 'error');
+        }
+        // 单一源:重拉队列 · 成功的卡片自动消失 · 失败的换新原因(铁律 #12 · 不维护乐观态)
+        loadErpExceptions();
+        if (typeof refreshExcBadge === 'function') { try { refreshExcBadge(); } catch (_) {} }
+    }
+
+    async function loadErpExceptions() {
+        const block = document.getElementById('erp-exc-block');
+        if (!block) return;
+        try {
+            const resp = await fetch('/api/erp/exceptions', {
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') },
+            });
+            if (!resp.ok) { block.hidden = true; return; }
+            const data = await resp.json();
+            _erpExcState.items = data.items || [];
+            // 当前选中的 category 若已无数据 · 回到全部
+            if (_erpExcState.cat && !_erpExcState.items.some(it => (it.category || 'other') === _erpExcState.cat)) {
+                _erpExcState.cat = '';
+            }
+            renderErpExceptions();
+        } catch (e) {
+            block.hidden = true;
+        }
+    }
+    window._rerenderErpExceptions = renderErpExceptions;
 
     // 暴露红点刷新 · 启动时 + 周期调用
     window.refreshExcBadge = refreshExcBadge;
@@ -15940,6 +16065,8 @@ try { window.I18N = I18N; } catch(e) {}
         if (_excState.listCache && _excState.listCache.length) {
             renderList(_excState.listCache);
         }
+        // ERP 推送异常块也跟着切语言重渲(用缓存 · 不发请求)
+        try { if (_erpExcState.items && _erpExcState.items.length) renderErpExceptions(); } catch (_) {}
         // 抽屉打开时也跟着重渲
         if (_drawer.openExcId) renderDrawer();
     };

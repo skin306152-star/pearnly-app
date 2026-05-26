@@ -517,6 +517,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动 workspace_clients 建表失败: {e}")
 
+    # P1a (2026-05-26) · seller 路由记忆表(seller_tax/name → workspace · 卖方智能分拣)
+    try:
+        db.ensure_seller_route_table()
+    except Exception as e:
+        logger.warning(f"启动 seller_workspace_routes 建表失败: {e}")
+
     # v118.18 · 推荐分类学习表初始化
     try:
         db.ensure_supplier_categories_table()
@@ -2515,6 +2521,38 @@ async def ocr_recognize(
             except Exception as _are:
                 logger.warning(f"buyer-resolve client_id failed (history={hid[:8]}): {_are}")
 
+            # 卖方智能分拣 → workspace 归属(Phase 1 · Zihao 2026-05-26)。
+            # 销项发票「卖方」= 账套主体 = workspace_client。归属**完全由 seller 决定**,
+            # 右上角切换器只是查看过滤器、不再决定上传归属。
+            #   匹配到(assigned/unbound)→ 写该 workspace_client_id(覆盖)
+            #   未匹配/多候选(none/multi)→ 置 NULL → 日志显「未归属/待确认卖方」
+            # 注:当前 workspace_client_id 仅供日志/视图显示消费(推送路由 P1d 再接);
+            #     故此处只影响"归属显示",安全。
+            try:
+                _seller_match = db.match_workspace_for_seller(
+                    seller_tax=(g_fields or {}).get("seller_tax"),
+                    seller_name=(g_fields or {}).get("seller_name"),
+                    user_id=str(user["id"]),
+                    tenant_id=_tid(user),
+                )
+                _ws_assigned = (
+                    _seller_match.get("workspace_client_id")
+                    if _seller_match.get("action") in ("assigned", "unbound")
+                    else None
+                )
+                db.update_history_workspace_client_id(
+                    hid, _ws_assigned, str(user["id"]), tenant_id=_tid(user)
+                )
+                logger.info(
+                    "[seller-route] %s history=%s seller=%r workspace_client_id=%s",
+                    _seller_match.get("action"),
+                    hid[:8],
+                    ((g_fields or {}).get("seller_name") or "")[:40],
+                    _ws_assigned,
+                )
+            except Exception as _sre:
+                logger.warning(f"seller-route failed (history={hid[:8]}): {_sre}")
+
             # v118.20.1 · 异常栏 · 异步跑零成本规则(不阻塞 OCR 主流程)
             try:
                 import asyncio as _asyncio_exc
@@ -3178,10 +3216,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已优化发票买方的自动归属与推送。新买方将按税号自动归属并完成 ERP 推送,推送日志「发票买方」列现显示发票上的真实买方名称;重复推送将显示「已推送过」而非失败,此前个别信息缺失导致整份发票无法识别的问题也已修复。即日生效。",
-            "th": "ระบบได้ปรับปรุงการผูกและส่งผู้ซื้อในใบกำกับ · ผู้ซื้อรายใหม่จะถูกผูกอัตโนมัติตามเลขประจำตัวผู้เสียภาษีและส่งเข้า ERP ให้ และคอลัมน์ «ผู้ซื้อในใบกำกับ» ในบันทึกการส่งจะแสดงชื่อผู้ซื้อจริงบนใบกำกับ · การส่งซ้ำจะแสดง «ส่งไปแล้ว» แทนข้อผิดพลาด และแก้ปัญหาที่ข้อมูลบางช่องขาดหายทำให้ทั้งใบอ่านไม่ได้แล้ว · มีผลทันที",
-            "en": "Invoice-buyer matching and posting have been improved. New buyers are now matched automatically by tax ID and posted to your ERP, and the push log's Invoice Buyer column shows the actual buyer printed on the invoice. Re-pushing an invoice now shows “Already pushed” instead of an error, and an issue where a missing field could fail an entire invoice has been fixed. Effective immediately.",
-            "ja": "請求書の買い手の自動紐づけと送信を改善しました。新しい買い手は納税者番号で自動的に紐づけられ ERP へ送信され、送信ログの「請求書の買い手」列には請求書に記載された実際の買い手名が表示されます。再送信時はエラーではなく「送信済み」と表示され、一部の項目が欠けると請求書全体が読み取れなくなる問題も修正しました。即日有効。",
+            "zh": "异常处理页新增「ERP 推送异常」:推送被系统拦截的发票会集中显示在这里,标明卖方、买方与失败原因,修复后可一键重试,处理完成会自动消失。推送日志的「工作空间/账套」列现按发票卖方自动归属;暂未识别出账套的会标「未归属·待确认卖方」。即日生效。",
+            "th": "เพิ่มส่วน «ข้อยกเว้นการส่งเข้า ERP» ในหน้าจัดการข้อยกเว้น: ใบกำกับที่ระบบระงับการส่งจะถูกรวบรวมไว้ที่นี่ พร้อมผู้ขาย ผู้ซื้อ และสาเหตุที่ล้มเหลว แก้แล้วกดลองใหม่ได้ในคลิกเดียว และจะหายไปเองเมื่อสำเร็จ · คอลัมน์พื้นที่ทำงานในบันทึกการส่งจะอ้างอิงผู้ขายในใบกำกับโดยอัตโนมัติ · มีผลทันที",
+            "en": "A new “ERP push exceptions” section has been added to the Exceptions page: invoices the system blocked from posting are collected here with their seller, buyer and failure reason, can be retried in one click, and disappear automatically once resolved. The push log's Workspace column now reflects the invoice seller automatically. Effective immediately.",
+            "ja": "例外処理ページに「ERP 連携の例外」を追加しました。システムが送信を保留した請求書がここにまとまり、売り手・買い手・失敗理由が表示され、ワンクリックで再試行でき、解決すると自動的に消えます。送信ログの「ワークスペース」列は請求書の売り手に基づいて自動的に割り当てられます。即日有効。",
         },
     }
 

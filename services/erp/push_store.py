@@ -851,6 +851,85 @@ def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def classify_push_exception(error_msg: Optional[str]) -> str:
+    """把 ERP 推送失败错误码归到异常子类(前端 chip 用 · 通用 · 不写死 MR.ERP)。"""
+    msg = error_msg or ""
+    if "ERR_CUSTOMER_NAME_MISMATCH" in msg or "ERR_NO_CUSTOMER_MAPPING" in msg:
+        return "customer_mismatch"
+    if "ERR_PRODUCT_NAME_MISMATCH" in msg:
+        return "product_mismatch"
+    if "ERR_NO_CLIENT" in msg:
+        return "no_client"
+    if "VERIFY_UNAVAILABLE" in msg:
+        return "verify_unavailable"
+    return "other"
+
+
+def list_push_exceptions(user_id: str, limit: int = 200) -> List[Dict[str, Any]]:
+    """ERP 推送异常队列(派生自 erp_push_logs · 铁律 #12 单一状态源,不另立异常表)。
+
+    取每个 (history, endpoint) **最近一条** log · 仅保留 status='failed'(已被后续
+    success/skipped_dup 解决的自动排除)。每条附:
+      - state:batch_view 派生展示态(needs_action / retrying / failed)
+      - category:错误码子类(customer_mismatch / product_mismatch / no_client /
+        verify_unavailable / other)· 前端 chip 用
+      - 发票号 / 发票卖方(seller_name)/ 发票买方(ocr_buyer_name)/ 已归属 Pearnly 客户
+        / ERP 端点名 / 错误码 / 原始 error_msg(前端转友好文案)
+    通用层只认统一状态 + 错误码,不写 if adapter=='mrerp'。
+    """
+    from services.erp import batch_view
+
+    try:
+        with db.get_cursor() as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT ON (l.history_id, l.endpoint_id)
+                    l.id, l.history_id, l.endpoint_id, l.invoice_no, l.seller_name,
+                    l.total_amount, l.status, l.error_msg, l.created_at,
+                    l.retry_count, l.max_retries, l.next_retry_at,
+                    h.client_id AS history_client_id,
+                    c.name AS client_name,
+                    COALESCE((
+                        SELECT pg->'fields'->>'buyer_name'
+                        FROM jsonb_array_elements(
+                            CASE WHEN jsonb_typeof(h.pages)='array'
+                                 THEN h.pages ELSE '[]'::jsonb END
+                        ) pg
+                        WHERE COALESCE(pg->'fields'->>'buyer_name','') <> ''
+                        LIMIT 1
+                    ), '') AS ocr_buyer_name,
+                    e.name AS endpoint_name, e.adapter AS endpoint_adapter
+                FROM erp_push_logs l
+                LEFT JOIN ocr_history h ON h.id = l.history_id
+                LEFT JOIN clients c ON c.id = h.client_id
+                LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
+                WHERE l.user_id = %s
+                ORDER BY l.history_id, l.endpoint_id, l.created_at DESC
+                """,
+                (str(user_id),),
+            )
+            rows = [dict(r) for r in (cur.fetchall() or [])]
+    except Exception as e:
+        logger.error(f"list_push_exceptions failed: {e}")
+        return []
+
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        if (r.get("status") or "") != "failed":
+            continue  # 最近一条已成功/跳过 → 已解决 · 不进队列
+        r["state"] = batch_view.classify_push_log(r)
+        r["category"] = classify_push_exception(r.get("error_msg"))
+        err = r.get("error_msg") or ""
+        import re as _re
+
+        m = _re.search(r"ERR_[A-Z0-9_]+", err)
+        r["error_code"] = m.group(0) if m else ""
+        out.append(r)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def get_push_stats_today(user_id: str) -> Dict[str, Any]:
     """今日推送统计(总数 · 成功 · 失败)"""
     try:

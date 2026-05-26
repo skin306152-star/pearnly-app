@@ -920,6 +920,21 @@ async def erp_logs(
     )
 
 
+@router.get("/api/erp/exceptions")
+async def erp_exceptions(request: Request, limit: int = 200):
+    """ERP 推送异常队列(Zihao 2026-05-26)· 派生自 erp_push_logs(铁律 #12 单一源)。
+
+    每个 (history×endpoint) 最近一条仍 failed 的推送 → 一张可处理异常卡:
+    带 state(needs_action/retrying/failed)+ category(customer_mismatch/product_mismatch/
+    no_client/verify_unavailable/other)+ 发票号/卖方/买方/已归属客户/端点名/错误码。
+    前端据 category 出 chip、据 state 分四态。通用层 · 不写死 MR.ERP。
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    items = db.list_push_exceptions(user["id"], limit=min(limit, 500))
+    return {"items": items, "total": len(items)}
+
+
 @router.get("/api/erp/logs/{log_id}")
 async def erp_log_detail(log_id: str, request: Request):
     """单条日志完整详情 · 含请求体/响应体"""

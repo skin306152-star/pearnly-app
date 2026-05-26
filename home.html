@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835090">
+<link rel="stylesheet" href="/static/home.css?v=11835091">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -4350,6 +4350,10 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             </div>
         </div>
 
+        <!-- ERP 推送异常块(独立来源 · Zihao 2026-05-26)· 派生自 erp_push_logs ·
+             0 条时隐藏 · 内容(标题/chip/卡片)全由 JS renderErpExceptions 填充 -->
+        <div class="erp-exc-block" id="erp-exc-block" hidden></div>
+
         <!-- 顶部 4 KPI -->
         <div class="exc-kpi-row" id="exc-kpi-row">
             <div class="exc-kpi">
@@ -6483,8 +6487,8 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 </div>
 
 <!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 home.js 前 · 提供 window.I18N -->
-<script src="/static/i18n-data.js?v=11835090"></script>
-<script src="/static/home.js?v=11835090"></script>
+<script src="/static/i18n-data.js?v=11835091"></script>
+<script src="/static/home.js?v=11835091"></script>
 <!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE 不引 home.js · runRecon 检测 needs_mapping 时调用 -->
 <script src="/static/recon-mapping.js?v=11835072" defer></script>
 <!-- ADR-006 S8 · PDF/扫描件逐行核对纠错面板 · 独立 IIFE · runRecon 检测 needs_review 时调用 -->

@@ -2699,6 +2699,47 @@ body.sidebar-collapsed .nav-lock-icon {
 .erp-log-row.fail .log-status { color: #EF4444; font-weight: 700; }
 /* 去重跳过(skipped_dup)· 中性灰蓝 · 不是失败红(Codex 2026-05-26) */
 .erp-log-row.skipped .log-status { color: #64748B; font-weight: 700; }
+
+/* ERP 推送异常块(异常页顶部独立来源 · Zihao 2026-05-26) */
+.erp-exc-block {
+    margin: 0 0 18px 0;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid #e8e8e3;
+    border-radius: 10px;
+}
+.erp-exc-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.erp-exc-title { font-size: 15px; font-weight: 700; color: #111111; margin: 0; }
+.erp-exc-sub { font-size: 12px; color: var(--ink-3); }
+.erp-exc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.erp-exc-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; font-size: 12px; border-radius: 999px;
+    border: 1px solid #e8e8e3; background: #f4f4f0; color: var(--ink-2);
+    cursor: pointer;
+}
+.erp-exc-chip.active { background: #111111; color: #fff; border-color: #111111; }
+.erp-exc-chip-count { font-size: 11px; opacity: .8; }
+.erp-exc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.erp-exc-card { border: 1px solid #e8e8e3; border-radius: 8px; padding: 12px; background: #fff; }
+.erp-exc-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.erp-exc-inv { font-weight: 700; font-size: 13px; color: #111111; }
+.erp-exc-state { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.erp-exc-state.needs { background: #FEF3C7; color: #B45309; }
+.erp-exc-state.retry { background: #DBEAFE; color: #1E40AF; }
+.erp-exc-state.fail { background: #FEE2E2; color: #B91C1C; }
+.erp-exc-reason { font-size: 12px; color: var(--ink-2); margin-bottom: 8px; line-height: 1.5; }
+.erp-exc-code { font-family: ui-monospace, monospace; font-size: 10px; color: var(--ink-3); background: #f4f4f0; padding: 1px 5px; border-radius: 4px; }
+.erp-exc-row { display: flex; gap: 8px; font-size: 12px; padding: 2px 0; }
+.erp-exc-k { color: var(--ink-3); min-width: 76px; flex-shrink: 0; }
+.erp-exc-v { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.erp-exc-actions { margin-top: 10px; display: flex; gap: 8px; }
+.erp-exc-retry-btn {
+    padding: 6px 14px; font-size: 12px; font-weight: 600;
+    background: #111111; color: #fff; border: none; border-radius: 6px; cursor: pointer;
+}
+.erp-exc-retry-btn:hover { background: #333; }
+.erp-exc-retry-btn:disabled { opacity: .6; cursor: default; }
 .log-time { color: var(--ink-3); min-width: 80px; }
 .log-status { min-width: 16px; text-align: center; }
 .log-tag { padding: 2px 6px; font-size: 10px; border-radius: 4px; font-family: sans-serif; }
@@ -2726,6 +2767,12 @@ body.sidebar-collapsed .nav-lock-icon {
 }
 .log-workspace-personal {
     color: #9ca3af;
+}
+/* 卖方未匹配到账套 · 暖色提示需处理(Zihao 2026-05-26)· 不是灰字"个人事务" */
+.log-workspace-unresolved {
+    color: #B45309;
+    font-style: italic;
+    cursor: help;
 }
 .log-client-empty {
     color: #9ca3af;

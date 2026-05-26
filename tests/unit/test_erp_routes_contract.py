@@ -48,12 +48,13 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("GET", "/api/erp/logs"),
             ("GET", "/api/erp/logs/{log_id}"),
             ("GET", "/api/erp/stats/today"),
+            ("GET", "/api/erp/exceptions"),
             ("POST", "/api/erp/logs/{log_id}/retry"),
             ("POST", "/api/erp/logs/batch-retry"),
             ("POST", "/api/erp/logs/batch-delete"),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 17)
+        self.assertEqual(len(router.routes), 18)
 
     def test_app_includes_erp_router(self):
         """防 include_router 漏挂 · app 必须能路由到 erp 推送"""

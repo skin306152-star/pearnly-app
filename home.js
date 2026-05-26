@@ -16159,6 +16159,144 @@ try { window.I18N = I18N; } catch(e) {}
             _erpExcState.loading = false;
         }
     }
+    // ── 单条异常编辑弹窗(Zihao 2026-05-26 · 闭环最后一环:选/绑 ERP 客户 + 重试)──
+    // 通用:ERP 客户列表走 /endpoints/{id}/customers(adapter 通用接口)· 绑定走
+    // /mappings/clients(通用 client_id→erp_code)· 重试走同一 /retry(重新解析)。
+    // 不写死 MR.ERP:erp_type=endpoint_adapter · 仅"客户不符"且有买方 client 时显 picker。
+    let _erpExcCustCache = {};  // endpoint_id → [{code,name,...}]
+
+    function _erpExcCloseModal() {
+        const ov = document.getElementById('erp-exc-modal');
+        if (ov) ov.remove();
+    }
+
+    window._erpExcOpenEdit = function(id) {
+        const it = (_erpExcState.items || []).find(x => String(x.id) === String(id));
+        if (!it) return;
+        const canPickCustomer = !!(it.history_client_id) && it.category === 'customer_mismatch';
+        const reason = _erpExcFriendly(it);
+        const stateCls = it.state === 'needs_action' ? 'needs' : (it.state === 'retrying' ? 'retry' : 'fail');
+        const dRow = (lbl, val) => `<div class="erp-exc-m-row"><span class="erp-exc-m-k">${escapeHtml(lbl)}</span><span class="erp-exc-m-v">${escapeHtml(val || '—')}</span></div>`;
+
+        let fixHtml = '';
+        if (canPickCustomer) {
+            fixHtml = `
+                <div class="erp-exc-m-fix">
+                    <div class="erp-exc-m-fix-title">${escapeHtml(t('erp-exc-edit-pick'))}</div>
+                    <input type="search" class="erp-exc-m-search" id="erp-exc-m-search" placeholder="${escapeHtml(t('erp-exc-edit-pick-ph'))}">
+                    <div class="erp-exc-m-custlist" id="erp-exc-m-custlist">
+                        <div class="erp-exc-m-loading">${escapeHtml(t('erp-exc-edit-pick-loading'))}</div>
+                    </div>
+                </div>`;
+        } else {
+            const hintKey = 'erp-exc-edit-hint-' + (it.category || 'other');
+            let hint = t(hintKey);
+            if (!hint || hint === hintKey) hint = reason;
+            fixHtml = `<div class="erp-exc-m-hint">${escapeHtml(hint)}</div>`;
+        }
+
+        const ov = document.createElement('div');
+        ov.id = 'erp-exc-modal';
+        ov.className = 'erp-exc-modal-overlay';
+        ov.innerHTML = `
+            <div class="erp-exc-modal" role="dialog" aria-modal="true">
+                <div class="erp-exc-m-head">
+                    <h3>${escapeHtml(t('erp-exc-edit-title'))}</h3>
+                    <button class="erp-exc-m-close" type="button" id="erp-exc-m-close" aria-label="close">×</button>
+                </div>
+                <div class="erp-exc-m-body">
+                    <div class="erp-exc-m-reason"><span class="erp-exc-state ${stateCls}">${escapeHtml(t('erp-exc-state-' + (it.state || 'failed')))}</span> ${escapeHtml(reason)}${it.error_code ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</div>
+                    ${dRow(t('erp-exc-f-invoice'), it.invoice_no)}
+                    ${dRow(t('erp-exc-f-seller'), it.seller_name)}
+                    ${dRow(t('erp-exc-f-buyer'), it.ocr_buyer_name)}
+                    ${dRow(t('erp-exc-edit-field-current'), it.client_name)}
+                    ${fixHtml}
+                </div>
+                <div class="erp-exc-m-foot">
+                    <button class="erp-exc-batch-btn ghost" type="button" id="erp-exc-m-cancel">${escapeHtml(t('erp-exc-edit-close'))}</button>
+                    <button class="erp-exc-batch-btn" type="button" id="erp-exc-m-retry">${escapeHtml(t('erp-exc-edit-retry'))}</button>
+                    ${canPickCustomer ? `<button class="erp-exc-batch-btn" type="button" id="erp-exc-m-bind" disabled>${escapeHtml(t('erp-exc-edit-bind-retry'))}</button>` : ''}
+                </div>
+            </div>`;
+        document.body.appendChild(ov);
+
+        ov.addEventListener('click', (e) => { if (e.target === ov) _erpExcCloseModal(); });
+        document.getElementById('erp-exc-m-close').addEventListener('click', _erpExcCloseModal);
+        document.getElementById('erp-exc-m-cancel').addEventListener('click', _erpExcCloseModal);
+        document.getElementById('erp-exc-m-retry').addEventListener('click', () => {
+            _erpExcCloseModal();
+            _erpExcRetry(it.id, null);
+        });
+
+        if (canPickCustomer) {
+            let _selectedCode = '';
+            const bindBtn = document.getElementById('erp-exc-m-bind');
+            const listEl = document.getElementById('erp-exc-m-custlist');
+            const searchEl = document.getElementById('erp-exc-m-search');
+
+            const renderCustList = (custs, filter) => {
+                const q = (filter || '').trim().toLowerCase();
+                const shown = q
+                    ? custs.filter(c => (c.code || '').toLowerCase().includes(q) || (c.name || '').toLowerCase().includes(q))
+                    : custs;
+                if (shown.length === 0) { listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-pick-empty'))}</div>`; return; }
+                listEl.innerHTML = shown.slice(0, 100).map(c =>
+                    `<div class="erp-exc-m-cust" data-cust-code="${escapeHtml(c.code || '')}">
+                        <span class="erp-exc-m-cust-name">${escapeHtml(c.name || '')}</span>
+                        <span class="erp-exc-m-cust-code">${escapeHtml(c.code || '')}</span>
+                    </div>`).join('');
+                listEl.querySelectorAll('.erp-exc-m-cust').forEach(el => {
+                    el.addEventListener('click', () => {
+                        _selectedCode = el.dataset.custCode || '';
+                        listEl.querySelectorAll('.erp-exc-m-cust').forEach(x => x.classList.remove('sel'));
+                        el.classList.add('sel');
+                        if (bindBtn) bindBtn.disabled = !_selectedCode;
+                    });
+                });
+            };
+
+            const loadCusts = async () => {
+                const epId = it.endpoint_id;
+                if (_erpExcCustCache[epId]) { renderCustList(_erpExcCustCache[epId], ''); return; }
+                try {
+                    const resp = await fetch('/api/erp/endpoints/' + encodeURIComponent(epId) + '/customers', {
+                        headers: { 'Authorization': 'Bearer ' + _erpExcTok() },
+                    });
+                    const data = await resp.json().catch(() => ({}));
+                    if (!resp.ok || !data.ok) { listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-pick-fail'))}</div>`; return; }
+                    const custs = data.customers || [];
+                    _erpExcCustCache[epId] = custs;
+                    renderCustList(custs, '');
+                } catch (e) {
+                    listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-pick-fail'))}</div>`;
+                }
+            };
+            if (searchEl) searchEl.addEventListener('input', () => renderCustList(_erpExcCustCache[it.endpoint_id] || [], searchEl.value));
+            loadCusts();
+
+            if (bindBtn) bindBtn.addEventListener('click', async () => {
+                if (!_selectedCode) return;
+                bindBtn.disabled = true; bindBtn.textContent = t('erp-exc-retrying');
+                try {
+                    // 1) 绑定买方 client → ERP 客户码(通用 client mapping)
+                    const mResp = await fetch('/api/erp/mappings/clients', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + _erpExcTok(), 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ client_id: it.history_client_id, erp_type: it.endpoint_adapter, erp_code: _selectedCode }),
+                    });
+                    if (!mResp.ok) { showToast(t('erp-exc-retry-fail'), 'error'); bindBtn.disabled = false; bindBtn.textContent = t('erp-exc-edit-bind-retry'); return; }
+                    showToast(t('erp-exc-edit-bound-ok'), 'success');
+                    _erpExcCloseModal();
+                    // 2) 重试(重新解析 → 用上新映射 → 推送)
+                    await _erpExcRetry(it.id, null);
+                } catch (e) {
+                    showToast(t('erp-exc-retry-fail'), 'error');
+                    bindBtn.disabled = false; bindBtn.textContent = t('erp-exc-edit-bind-retry');
+                }
+            });
+        }
+    };
+
     window._rerenderErpExceptions = renderErpExceptions;
 
     // 暴露红点刷新 · 启动时 + 周期调用

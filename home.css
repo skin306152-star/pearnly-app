@@ -2759,6 +2759,30 @@ body.sidebar-collapsed .nav-lock-icon {
 .erp-exc-foot { margin-top: 10px; text-align: center; }
 .erp-exc-more { padding: 6px 16px; font-size: 12px; border: 1px solid #e8e8e3; border-radius: 6px; background: #fff; color: var(--ink-2); cursor: pointer; }
 .erp-exc-count { font-size: 11px; color: var(--ink-3); }
+/* 单条异常编辑弹窗 */
+.erp-exc-modal-overlay { position: fixed; inset: 0; background: rgba(17,17,17,.45); display: flex; align-items: center; justify-content: center; z-index: 9000; }
+.erp-exc-modal { width: 480px; max-width: calc(100vw - 32px); max-height: calc(100vh - 64px); display: flex; flex-direction: column; background: #fff; border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,.2); }
+.erp-exc-m-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #e8e8e3; }
+.erp-exc-m-head h3 { margin: 0; font-size: 15px; font-weight: 700; color: #111111; }
+.erp-exc-m-close { border: none; background: transparent; font-size: 22px; line-height: 1; color: var(--ink-3); cursor: pointer; }
+.erp-exc-m-body { padding: 16px 18px; overflow-y: auto; }
+.erp-exc-m-reason { font-size: 12px; color: var(--ink-2); margin-bottom: 12px; line-height: 1.6; }
+.erp-exc-m-row { display: flex; gap: 10px; font-size: 12px; padding: 3px 0; }
+.erp-exc-m-k { color: var(--ink-3); min-width: 84px; flex-shrink: 0; }
+.erp-exc-m-v { color: var(--ink-1); }
+.erp-exc-m-fix { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f0ec; }
+.erp-exc-m-fix-title { font-size: 12px; font-weight: 600; color: #111111; margin-bottom: 8px; }
+.erp-exc-m-search { width: 100%; padding: 7px 10px; font-size: 12px; border: 1px solid #e8e8e3; border-radius: 6px; margin-bottom: 8px; box-sizing: border-box; }
+.erp-exc-m-custlist { max-height: 240px; overflow-y: auto; border: 1px solid #f0f0ec; border-radius: 6px; }
+.erp-exc-m-cust { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f5f5f1; }
+.erp-exc-m-cust:hover { background: #faf9f5; }
+.erp-exc-m-cust.sel { background: #111111; color: #fff; }
+.erp-exc-m-cust.sel .erp-exc-m-cust-code { color: #ddd; }
+.erp-exc-m-cust-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.erp-exc-m-cust-code { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-3); flex-shrink: 0; }
+.erp-exc-m-loading, .erp-exc-m-empty { padding: 16px; text-align: center; font-size: 12px; color: var(--ink-3); }
+.erp-exc-m-hint { margin-top: 14px; padding: 10px 12px; background: #DBEAFE; color: #1E40AF; border-radius: 8px; font-size: 12px; line-height: 1.6; }
+.erp-exc-m-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid #e8e8e3; }
 .log-time { color: var(--ink-3); min-width: 80px; }
 .log-status { min-width: 16px; text-align: center; }
 .log-tag { padding: 2px 6px; font-size: 10px; border-radius: 4px; font-family: sans-serif; }

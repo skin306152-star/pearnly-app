@@ -3216,10 +3216,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "「ERP 推送异常」列表已升级:改为紧凑列表,支持按发票号/卖方/买方搜索、按类型筛选、勾选后批量重试或删除,数据多时分页加载。修复后一键重试,处理完成自动消失。即日生效。",
-            "th": "ปรับปรุงรายการ «ข้อยกเว้นการส่งเข้า ERP»: เป็นรายการแบบกระชับ ค้นหาด้วยเลขใบกำกับ/ผู้ขาย/ผู้ซื้อ กรองตามประเภท เลือกหลายรายการเพื่อลองใหม่หรือลบเป็นชุด และแบ่งหน้าเมื่อมีจำนวนมาก · แก้แล้วกดลองใหม่ได้ในคลิกเดียว สำเร็จแล้วจะหายไปเอง · มีผลทันที",
-            "en": "The “ERP push exceptions” list has been upgraded to a compact list with search (invoice / seller / buyer), category filters, multi-select batch retry or delete, and paging for large volumes. Fix then retry in one click — resolved items disappear automatically. Effective immediately.",
-            "ja": "「ERP 連携の例外」一覧を改善しました。コンパクトなリストになり、請求書番号・売り手・買い手での検索、種類フィルター、複数選択での一括再試行・削除、大量時のページ送りに対応。修正後はワンクリックで再試行でき、解決すると自動的に消えます。即日有効。",
+            "zh": "「ERP 推送异常」现可一键修复:点开异常即可查看冲突详情,直接搜索并选择正确的 ERP 客户绑定后自动重试推送,全程不用离开页面。即日生效。",
+            "th": "ตอนนี้แก้ «ข้อยกเว้นการส่งเข้า ERP» ได้ในที่เดียว: เปิดรายการเพื่อดูรายละเอียดความขัดแย้ง ค้นหาและเลือกลูกค้า ERP ที่ถูกต้องเพื่อผูก แล้วระบบจะลองส่งใหม่อัตโนมัติ โดยไม่ต้องออกจากหน้า · มีผลทันที",
+            "en": "“ERP push exceptions” can now be fixed in one place: open an exception to see the conflict details, search and select the correct ERP customer to bind, and the push retries automatically — without leaving the page. Effective immediately.",
+            "ja": "「ERP 連携の例外」をその場で修正できるようになりました。例外を開いて不一致の詳細を確認し、正しい ERP 取引先を検索・選択して紐づけると、自動的に再送信されます。ページを離れる必要はありません。即日有効。",
         },
     }
 

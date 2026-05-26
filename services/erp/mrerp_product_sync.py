@@ -681,7 +681,9 @@ class MRERPProductSyncService:
         warnings.append("WARN_PRODUCT_PRICE_INHERITED_FROM_SEED")
 
         self.invalidate()
-        listing = self._fetch_listing()
+        # 2026-05-26 修:按**新码精确搜**确认是否落库 · 不能用 _fetch_listing(默认只首页 30 条)·
+        # 大目录下新建的高位码不在首页 → 误判"did not appear" → 建档当失败 → 后续 NAME_MISMATCH。
+        listing = self._search_listing(product_code)
         if any(r.code == product_code for r in listing):
             # P3 闭环反查(Zihao 2026-05-26 section 五):建完复核新码对应商品名 ==
             # 发票商品行。名不符(BusinessError)→ 抛(建出来的不是这个商品 · 不推)。
@@ -831,7 +833,10 @@ class MRERPProductSyncService:
         but uses the stkmas listing for collision avoidance."""
         today = date.today()
         prefix = f"{DEFAULT_PRODUCT_CODE_PREFIX}{today.year % 100:02d}{today.month:02d}"
-        listing = self._fetch_listing()
+        # 2026-05-26 修:按月份码前缀**过滤分页拉全**(只该月那批·量小)· 找真实 max+1 防撞码。
+        # 此前用 _fetch_listing()(默认首页 30 条)→ 大目录看不到本月已建码 → 全给同一个码
+        # (实测 5 个商品全 P26050093)→ MR.ERP 撞码 → 后续 NAME_MISMATCH。
+        listing = self._fetch_listing(max_pages=400, searchdataval=prefix)
         existing_seqs: List[int] = []
         for row in listing:
             if row.code.startswith(prefix):
@@ -874,9 +879,12 @@ class MRERPProductSyncService:
 
     # ----- listing fetch ---------------------------------------
 
-    def _fetch_listing(self, max_pages: int = 1) -> List[ListingProduct]:
+    def _fetch_listing(self, max_pages: int = 1, searchdataval: str = "") -> List[ListingProduct]:
         """A3 (Zihao 2026-05-19 拍板) · mirror of customer listing
         reliability layer: wait_for_selector + reload retry + screenshot.
+
+        searchdataval(2026-05-26):传给 showdata.php 的过滤值(月份码前缀)· 只翻少量行 ·
+        自动建码找真 max 完整且轻量 · 过滤版不进缓存。
 
         max_pages(2026-05-26 修):默认只取首页(~30 条)· 推送热路径(lookup /
         _alloc_next_code / 复核兜底 / 建后复查)只能用轻量版。大目录(实测 2060 商品)
@@ -885,7 +893,7 @@ class MRERPProductSyncService:
         """
         import time as _time
 
-        use_cache = max_pages <= 1
+        use_cache = max_pages <= 1 and not searchdataval
         if use_cache:
             cached = self.cache.get(self._listing_cache_key)
             if cached is not None:
@@ -922,6 +930,7 @@ class MRERPProductSyncService:
                     self.LISTING_PATH,
                     parse_stkmas_listing,
                     max_pages=max_pages,
+                    searchdataval=searchdataval,
                 )
                 if use_cache:
                     self.cache.set(self._listing_cache_key, rows)
@@ -929,6 +938,7 @@ class MRERPProductSyncService:
                     "fetched stkmas listing: %d rows (attempt %d · max_pages=%d)",
                     len(rows),
                     attempt,
+                    max_pages,
                 )
                 return rows
             except PWTimeout as e:

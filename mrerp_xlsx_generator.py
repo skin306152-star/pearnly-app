@@ -84,10 +84,16 @@ def _build_product_lookup(mappings: Optional[Dict[str, Any]]) -> Dict[str, str]:
         erp_code = p.get("erp_code")
         if not erp_code:
             continue
-        # 优先用 DB 算好的 norm · 退到自己算
-        norm = p.get("item_name_norm") or _norm_product_name(p.get("item_name") or "")
-        if norm:
-            out[norm] = str(erp_code).strip()
+        # 2026-05-26 修:同时按【item_name 现算的 _norm_product_name】+【存的 item_name_norm】
+        # 双 key 入表。根因:自动建档 _upsert_mapping 存的 item_name_norm 用的是
+        # normalize_item_name(带空格),而 _resolve_product_code 查表用 _norm_product_name
+        # (去空格)· 两套归一不一致 → 查不到 → 回退占位码 123 → 复核 NAME_MISMATCH ·
+        # 自动建出的商品永远推不成。现算 key 保证 resolve 必命中,存的 key 留兼容。
+        code = str(erp_code).strip()
+        item_name = p.get("item_name") or ""
+        for k in {_norm_product_name(item_name), (p.get("item_name_norm") or "")}:
+            if k:
+                out[k] = code
     return out
 
 

@@ -1113,9 +1113,11 @@ class MRERPCustomerSyncService:
 
         today = date.today()
         prefix = f"{DEFAULT_CUSTOMER_CODE_PREFIX}{today.year % 100:02d}{today.month:02d}"
-        # 起点:首页列表里同前缀的 max+1(仅作起点 · 首页只读 30 条 · max 可能偏小)
+        # 2026-05-26 修:按月份码前缀**过滤分页拉全**(只该月那批·量小)→ 真实 max+1 ·
+        # 起点准了基本一次命中。此前用 _fetch_listing(首页 30 条)起点偏小 + 搜索校验偶发
+        # 返空 → 误判候选码可用 → 撞到已有客户(实测 P26050038 撞旧买方 → NAME_MISMATCH)。
         try:
-            listing = self._fetch_listing()
+            listing = self._fetch_listing(max_pages=400, searchdataval=prefix)
         except MRERPTechnicalError:
             listing = []
         existing_seqs: List[int] = []
@@ -1163,9 +1165,12 @@ class MRERPCustomerSyncService:
 
     # ----- listing fetch ---------------------------------------
 
-    def _fetch_listing(self, max_pages: int = 1) -> List[ListingCustomer]:
+    def _fetch_listing(self, max_pages: int = 1, searchdataval: str = "") -> List[ListingCustomer]:
         """Returns the parsed customer listing, hitting the in-service
         TTLCache to avoid refetching during a single push job.
+
+        searchdataval(2026-05-26):传给 showdata.php 的过滤值 · 传月份码前缀只翻该前缀
+        少量行(自动建码找真 max 完整且轻量 · 不必翻整本)· 过滤版不进缓存。
 
         max_pages(2026-05-26 修):默认只取首页(~30 条)· **推送热路径**(lookup /
         _alloc_next_code 防撞码 / 复核兜底 / 建后复查)只能用这个轻量版,否则大目录
@@ -1178,7 +1183,7 @@ class MRERPCustomerSyncService:
         """
         # 缓存仅服务首页版(热路径反复取)· 全量版(picker)一次性 · 不读写缓存
         # 避免互相污染(全量写进去会让后续热路径误用 · 首页写进去会让 picker 漏数据)。
-        use_cache = max_pages <= 1
+        use_cache = max_pages <= 1 and not searchdataval
         if use_cache:
             cached = self.cache.get(self._listing_cache_key)
             if cached is not None:
@@ -1225,6 +1230,7 @@ class MRERPCustomerSyncService:
                     self.LISTING_PATH,
                     parse_armas_listing,
                     max_pages=max_pages,
+                    searchdataval=searchdataval,
                 )
                 if use_cache:
                     self.cache.set(self._listing_cache_key, rows)

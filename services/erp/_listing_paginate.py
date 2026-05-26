@@ -52,8 +52,9 @@ def fetch_all_listing_pages(
     parse_fn: Callable[[str], List[T]],
     *,
     max_pages: int = _MAX_PAGES,
+    searchdataval: str = "",
 ) -> List[T]:
-    """逐页 POST showdata.php 把 allview.php 列表拉全量。
+    """逐页 POST showdata.php 把 allview.php 列表(可带搜索过滤)拉全量。
 
     Args:
         request_post: Playwright `page.request.post` 可调用对象
@@ -63,6 +64,8 @@ def fetch_all_listing_pages(
         listing_path: 模块列表路径,如 "/armas/allview.php" / "/stkmas/allview.php"。
         parse_fn:    把一页 HTML 解析成行对象列表(各模块自带的 parser)。
         max_pages:   分页硬上限(防死循环)。
+        searchdataval: showdata.php 的搜索过滤值(空=全量)· 传月份码前缀(如 "P2605")
+            可只翻该前缀的少量行 → 自动建码找真实 max **完整且轻量**(不必翻整本 2060)。
 
     Returns:
         全部页累计的行对象列表(顺序 = MR.ERP 列表顺序)。
@@ -79,7 +82,7 @@ def fetch_all_listing_pages(
             form={
                 "showdata_numrows": str(SHOWDATA_NUMROWS),
                 "showdata_pages": str(pg),
-                "searchdataval": "",
+                "searchdataval": searchdataval or "",
             },
         )
         body = resp.text() or ""

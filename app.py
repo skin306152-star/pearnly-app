@@ -3029,27 +3029,57 @@ async def _auto_push_history(
                 )
                 continue
 
-            # push_to_endpoint 是同步调用(requests) · 用 run_in_executor 挪到线程
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, _erp.push_to_endpoint, ep, history)
-
-            # 写日志
-            new_log_id = db.insert_push_log(
+            # 先写 pending(推送中)· 识别后用户立刻在日志看到排队(2026-05-26 · 兜底路径补齐)。
+            pending_id = db.insert_push_log(
                 user_id=user_id,
                 endpoint_id=ep["id"],
                 history_id=history_id,
                 invoice_no=history.get("invoice_no"),
                 seller_name=history.get("seller_name"),
                 total_amount=history.get("total_amount"),
-                status="success" if result["success"] else "failed",
-                http_status=result.get("http_status"),
-                request_body=result.get("request_body"),
-                response_body=result.get("response_body"),
-                error_msg=result.get("error_msg"),
+                status="pending",
+                http_status=None,
+                request_body={"adapter": ep.get("adapter"), "stage": "pushing"},
+                response_body=None,
+                error_msg=None,
                 attempt=1,
-                elapsed_ms=result.get("elapsed_ms", 0),
-                trigger="auto",  # 标记自动触发
+                elapsed_ms=0,
+                trigger="auto",
             )
+
+            # push_to_endpoint 是同步调用(requests) · 用 run_in_executor 挪到线程
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, _erp.push_to_endpoint, ep, history)
+
+            # 把 pending 行原地更新成终态(没拿到 pending_id 才退回新插一行)。
+            if pending_id:
+                db.update_log_status_after_retry(
+                    pending_id,
+                    result["success"],
+                    result.get("http_status"),
+                    result.get("response_body"),
+                    result.get("error_msg"),
+                    result.get("elapsed_ms", 0),
+                    request_body=result.get("request_body"),
+                )
+                new_log_id = pending_id
+            else:
+                new_log_id = db.insert_push_log(
+                    user_id=user_id,
+                    endpoint_id=ep["id"],
+                    history_id=history_id,
+                    invoice_no=history.get("invoice_no"),
+                    seller_name=history.get("seller_name"),
+                    total_amount=history.get("total_amount"),
+                    status="success" if result["success"] else "failed",
+                    http_status=result.get("http_status"),
+                    request_body=result.get("request_body"),
+                    response_body=result.get("response_body"),
+                    error_msg=result.get("error_msg"),
+                    attempt=1,
+                    elapsed_ms=result.get("elapsed_ms", 0),
+                    trigger="auto",  # 标记自动触发
+                )
 
             db.update_endpoint_stats(ep["id"], result["success"])
             db.update_history_push_status(
@@ -3496,10 +3526,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "识别完成后,发票会立即出现在推送日志并显示「推送中」,处理完自动变为成功或失败,无需等待或反复刷新。同时优化了相关确认弹窗的界面风格。即日生效。",
-            "th": "หลังจากอ่านข้อมูลเสร็จ ใบกำกับจะปรากฏในบันทึกการส่งทันทีพร้อมสถานะ «กำลังส่ง» และจะเปลี่ยนเป็นสำเร็จหรือไม่สำเร็จโดยอัตโนมัติเมื่อเสร็จสิ้น โดยไม่ต้องรอหรือรีเฟรช · พร้อมทั้งปรับปรุงรูปแบบหน้าต่างยืนยันที่เกี่ยวข้อง · มีผลทันที",
-            "en": "Right after recognition, invoices now appear in the push log immediately marked “Pushing”, and automatically turn to success or failed when done — no waiting or repeated refreshing. The related confirmation dialog style has also been improved. Effective immediately.",
-            "ja": "読み取り完了後、請求書はすぐに送信ログに「送信中」として表示され、完了すると自動的に成功または失敗に変わります。待ったり何度も更新したりする必要はありません。あわせて関連する確認ダイアログの見た目も改善しました。即日有効。",
+            "zh": "系统已修复「ERP 对接」自动创建买方与商品后推送失败的问题。此前发票上的新买方/新商品在 ERP 中自动创建后,因内部识别不一致导致推送被拦截;现已修复,新买方与新商品可正常自动创建并推送成功。识别后推送日志也会立即显示「推送中」。即日生效。",
+            "th": "ระบบได้แก้ไขปัญหาการส่งล้มเหลวหลังจากสร้างผู้ซื้อและสินค้าอัตโนมัติใน «การเชื่อมต่อ ERP» · ก่อนหน้านี้ผู้ซื้อ/สินค้าใหม่บนใบกำกับที่ถูกสร้างอัตโนมัติใน ERP ถูกบล็อกการส่งเพราะการจับคู่ภายในไม่ตรงกัน · ได้รับการแก้ไขแล้ว สามารถสร้างและส่งสำเร็จได้ตามปกติ · บันทึกการส่งยังแสดง «กำลังส่ง» ทันทีหลังอ่านข้อมูล · มีผลทันที",
+            "en": "Fixed an issue in ERP integration where pushes failed after auto-creating new buyers and products. Previously, new buyers/products on an invoice were auto-created in the ERP but then blocked from pushing due to an internal matching inconsistency; this is fixed — new buyers and products are now auto-created and pushed successfully. The push log also shows “Pushing” immediately after recognition. Effective immediately.",
+            "ja": "「ERP 連携」で、新しい取引先・商品を自動作成した後に送信が失敗する問題を修正しました。これまで請求書上の新規取引先/商品は ERP に自動作成されたものの、内部照合の不整合により送信がブロックされていました。修正により、新規取引先・商品が正常に自動作成され送信できるようになりました。送信ログは読み取り後すぐ「送信中」と表示されます。即日有効。",
         },
     }
 

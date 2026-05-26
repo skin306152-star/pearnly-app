@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any, List
 
 import db
 from services.erp.external_ref import derive_external_ref
+from services.erp.mrerp_business_friendly import friendly_for_ui
 
 logger = logging.getLogger(__name__)
 
@@ -898,6 +899,9 @@ def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
                 detail.get("endpoint_adapter"), detail.get("response_body"), detail.get("status")
             )
             detail.update(ref)
+            # P2-C (B7) · 附友好原因 4 语 dict(命中 catalog 才有 · 否则 None →
+            # 前端回退 humanizeError)· 详情抽屉「失败原因」优先显本语言,不裸透泰文。
+            detail["error_friendly"] = friendly_for_ui(detail.get("error_msg"))
             return detail
     except Exception as e:
         logger.error(f"get_push_log_detail failed: {e}")
@@ -985,6 +989,9 @@ def list_push_exceptions(
         r["category"] = classify_push_exception(r.get("error_msg"))
         m = _re.search(r"ERR_[A-Z0-9_]+", r.get("error_msg") or "")
         r["error_code"] = m.group(0) if m else ""
+        # P2-C (B7) · 附友好原因 4 语 dict(命中 catalog 才有 · 否则 None)·
+        # 异常卡片优先显本语言,不裸透泰文。
+        r["error_friendly"] = friendly_for_ui(r.get("error_msg"))
         base.append(r)
 
     # 2) 搜索(发票号/卖方/买方 · 大小写不敏感)

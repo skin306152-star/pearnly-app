@@ -3531,10 +3531,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "「ERP 对接」推送记录更清晰了。重试推送不再产生重复的日志行,同一张发票在「推送日志」和「异常」里显示的状态保持一致。另外,系统检测到某张发票之前已经推送过时,会标记为「已推送过」而不再当作失败提示。即日生效。",
-            "th": "บันทึกการส่งใน «การเชื่อมต่อ ERP» ชัดเจนขึ้น · การส่งซ้ำจะไม่สร้างบรรทัดบันทึกซ้ำอีกต่อไป และสถานะของใบกำกับเดียวกันใน «บันทึกการส่ง» กับ «รายการผิดปกติ» จะตรงกัน · นอกจากนี้ หากระบบพบว่าใบกำกับเคยส่งไปแล้ว จะระบุว่า «ส่งแล้ว» แทนการแจ้งว่าล้มเหลว · มีผลทันที",
-            "en": 'ERP integration push records are now clearer. Retrying a push no longer creates duplicate log rows, and the same invoice shows a consistent status in both the push log and the exceptions list. Also, when an invoice was already pushed before, it is now marked as "Already pushed" instead of showing as a failure. Effective immediately.',
-            "ja": "「ERP 連携」の送信記録が見やすくなりました。再送信でログ行が重複しなくなり、同じ請求書の状態が「送信ログ」と「例外」で一致するようになりました。また、すでに送信済みの請求書を検出した場合は、失敗ではなく「送信済み」と表示されます。即日有効。",
+            "zh": "「ERP 对接」的推送失败原因现在以您所选的界面语言显示。此前部分失败提示直接显示原始(如泰文)文字,不易看懂;现已改为本地语言的清晰说明,原始文字仍可在「技术详情」中查看。即日生效。",
+            "th": "เหตุผลที่การส่งใน «การเชื่อมต่อ ERP» ล้มเหลว จะแสดงเป็นภาษาของหน้าจอที่คุณเลือกแล้ว · ก่อนหน้านี้บางข้อความแสดงเป็นข้อความต้นฉบับทำให้อ่านเข้าใจยาก · ตอนนี้แสดงเป็นคำอธิบายที่ชัดเจนในภาษาของคุณ(ยังดูข้อความต้นฉบับได้ใน «รายละเอียดทางเทคนิค»)· มีผลทันที",
+            "en": 'Failure reasons in "ERP integration" are now shown in your selected interface language. Previously some messages appeared in their original (e.g. Thai) text and were hard to read; they now show a clear explanation in your language, with the original text still available under "Technical details". Effective immediately.',
+            "ja": "「ERP 連携」の送信失敗の理由が、選択中の表示言語で表示されるようになりました。これまで一部のメッセージは元の言語(タイ語など)のまま表示され分かりにくいことがありましたが、今後はお使いの言語で分かりやすく表示されます(元の文章は「技術詳細」で引き続き確認できます)。即日有効。",
         },
     }
 

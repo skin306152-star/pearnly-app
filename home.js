@@ -6092,7 +6092,10 @@ async function showLogDetail(logId) {
         if (!isOk) {
             const errCodeMatch = (log.error_msg || '').match(/ERR_[A-Z0-9_]+/);
             const errCode = errCodeMatch ? errCodeMatch[0] : '';
-            const friendly = log.error_msg ? humanizeError(log.error_msg) : t('erp-receipt-no-error');
+            // P2-C (B7) · 优先后端 4 语友好原因(不裸透泰文)· 没命中再回退 humanizeError(网络错误)
+            const _efLang = (typeof currentLang === 'string' && currentLang) || window._currentLang || 'th';
+            const _ef = log.error_friendly && log.error_friendly[_efLang];
+            const friendly = _ef || (log.error_msg ? humanizeError(log.error_msg) : t('erp-receipt-no-error'));
             const isMappingErr = /ERR_NO_CUSTOMER_MAPPING|ERR_NO_CLIENT|ERR_NO_SEED_CUSTOMER|ERR_NO_SEED_PRODUCT/.test(log.error_msg || '');
             const canRetry = !!(log.history_id && log.endpoint_id);
             const actionBtns = [];
@@ -15954,7 +15957,10 @@ try { window.I18N = I18N; } catch(e) {}
     function _erpExcTok() { return localStorage.getItem('mrpilot_token') || ''; }
 
     function _erpExcFriendly(it) {
-        // 优先用全局 humanizeError(凭证弹窗同款)· 没有则按 category 给友好文案
+        // P2-C (B7) · 优先后端 4 语友好原因(不裸透泰文)→ 退 humanizeError(网络错误)→ category 文案
+        const _efLang = (typeof currentLang === 'string' && currentLang) || window._currentLang || 'th';
+        const _ef = it.error_friendly && it.error_friendly[_efLang];
+        if (_ef) return _ef;
         if (typeof humanizeError === 'function' && it.error_msg) {
             try { return humanizeError(it.error_msg); } catch (_) { /* fall through */ }
         }

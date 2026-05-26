@@ -415,3 +415,43 @@ def primary_friendly(
     if lang in translations and translations[lang]:
         return translations[lang]
     return translations.get("en") or (reason or "")
+
+
+# Pearnly 前端主 UI 的 4 语集(home.js currentLang)· 注意是 ja 不是 zh_TW。
+# catalog 历史按 th/en/zh/zh_TW 编(失败信息界面靠近台湾会计师 · 见模块头注释),
+# 这里把它映射到主 UI 的 zh/th/en/ja:ja 无目录条目 → 退英文(国际兜底)。
+APP_UI_LANGS = ("zh", "th", "en", "ja")
+
+
+def _match_catalog(reason: str) -> Optional[Dict[str, str]]:
+    """命中则返回 catalog 原始 dict(th/en/zh/zh_TW),否则 None。"""
+    if reason in _ERR_CATALOG:
+        return _ERR_CATALOG[reason]
+    low = reason.strip().lower()
+    for pattern, translations in _THAI_REASON_CATALOG:
+        if pattern.lower() in low:
+            return translations
+    return None
+
+
+def friendly_for_ui(reason: Optional[str]) -> Optional[Dict[str, str]]:
+    """P2-C (Zihao 2026-05-27) · 给前端日志/异常渲染用的友好文案 4 语 dict。
+
+    返回 {zh, th, en, ja}(主 UI 语言集),**仅当 reason 命中 catalog 时**;
+    未命中返回 None → 调用方(前端)回退自己的 humanizeError(处理网络错误)/ 原文,
+    避免把 raw 泰文/ERR 码直接展示给中日英用户(B7「不裸透泰文」)。
+
+    ja 无 catalog 条目 → 退 en(国际兜底);任何语言缺失 → 退 en → 退 raw reason。
+    """
+    if not reason:
+        return None
+    matched = _match_catalog(reason)
+    if matched is None:
+        return None
+    en = matched.get("en") or reason
+    return {
+        "zh": matched.get("zh") or en,
+        "th": matched.get("th") or en,
+        "en": en,
+        "ja": en,  # 无日语目录 → 英文兜底(文档化偏差)
+    }

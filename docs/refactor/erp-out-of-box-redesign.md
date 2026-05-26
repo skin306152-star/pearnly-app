@@ -2,7 +2,8 @@
 
 > 起草:2026-05-26(第三十会话 · Claude Opus 4.7)
 > 触发:Zihao 用真账号 skin306152 → MR.ERP TEST2019 走完整推送流程,体验"繁琐 / 难用 / 难等 / 概念绕",要求**退回来重新设计**,不再逐个打补丁。
-> 状态:**✅ Zihao 2026-05-26 已拍板接受全案**(含核心决策 §3.1 匹配优先+通用兜底+不自动建商品,及 P0-P3 分期)· 下一个窗口照此执行,从 P0 起做。
+> 状态:**✅ 全案落地完成(2026-05-27)· P0 + P1(含收尾) + P1b + P2(A/B/C/D) + P3(B1/B3/B4 + B5 折中) 全部上线**。唯一后置:**B2 种子失效提示**(通用模式已弱化 seed · §7 降优先级 · 留后续)。详见 §8 各期 ✅。
+> 历史:Zihao 2026-05-26 拍板接受全案(核心决策 §3.1 匹配优先+通用兜底+不自动建商品)。
 > 关联文档:`seller-smart-routing-plan.md`(智能分拣引擎 · 已落地)、`b2-work-mode-redesign.md`(工作空间)、`docs/integrations/mrerp-known-facts.md`(MR.ERP 先验事实)。
 
 ---
@@ -191,12 +192,18 @@
 - **P0 · 解卡(半天)· ✅ 已上线(第三十一会话 · `a05d5c6`)**:client_ids 退役(向导 3→2 步删 step1 + 后端去必填 + 守门测试反转)。新用户能连上 MR.ERP。Playwright 真浏览器实测过。
 - **P1 · 提速核心 · ✅ 后端核心+UI 入口已上线(第三十一会话 · `692b394` + `eae8bca`)**:商品「匹配优先 + 通用兜底 · 不自动建」。`endpoint.config.generic_product_code` 配了→通用模式(不中兜底通用码 · 不逐行建 · verify 整批只验通用码存在一次);没配→精确模式(老行为不变 · 保护付费用户)。「⚙ 高级设置」弹窗加通用商品 picker。**沙箱真账号实测:3 行全不中的发票 7.2s 绿色成功 · 整批只搜 1 次 · 不建垃圾商品。**
   - **P1 剩余 · ✅ 已上线(第三十二会话)**:向导内"智能默认通用商品"(§3.4 step 3)。新增 `POST /api/erp/wizard/products`(用向导内存「明文」凭据 + 选定账套拉商品 · `list_mrerp_products` 加明文/密文双形态启发式),后端 `suggest_generic_product_code` 按收入类多语种关键词(รายได้/ขาย/income/收入/销售/service…)挑一个建议码。向导 step 2 加可见「通用销售商品(推荐)」下拉,**新建连接**自动预选建议码(编辑已存连接绝不自动套 · 保护精确模式付费用户)。沙箱真账号实测:明文拉到 514 商品 5.4s,智能挑中 `00-รายได้ส่วนกลาง`(收入类)。守门:`test_erp_wizard_generic_default`(10 例)+ async tripwire(wizard/products)+ 路由契约 20。**至此 P1 全部完成 · 新用户连一次即开箱即用。**
-- **P2 · 状态单一真相 + 文案(1 天)· 🟡 P2-A/B/D 已上线(`dfec193`/`c4845b5`)· 只剩 P2-C(触 home.js)**:
+- **P2 · 状态单一真相 + 文案(1 天)· ✅ P2-A/B/C/D 全部上线(`dfec193`/`c4845b5`/`206f6ea`)**:
   - **P2-A ✅(A3/A4)**:手动重试(单条 + 批量)从 INSERT 新行改 UPDATE 原行(对齐自动重试 worker)· 同(发票×端点)只剩一条原地落定 → 消除重复日志行,日志与异常读同一行不打架。
   - **P2-D ✅(B8)**:`push_store.is_already_pushed_error/classify_push_status` · 「发票号已存在」(เลขที่ดังกล่าวมีอยู่ในระบบแล้ว / เลขที่เอกสารซ้ำ / ERR_DUPLICATE_INVOICE)记 skipped_dup 中性态(home.js 已灰显「已推送过」)· 不计失败、不入重试 · 全 MR.ERP 落库点统一(手动/智能分拣/兜底/重试 worker)。守门 `test_erp_retry_update_and_skipped_dup`(6 例)。
   - **P2-B ✅(2026-05-27 · commit `c4845b5` · 已部署 + 真账号实测)**:`list_push_logs` 加折叠 CTE(ROW_NUMBER OVER PARTITION 取每对 history×endpoint created_at 最新一条),清「混合手动+自动推」遗留重复行,与异常队列同口径(单一状态源·铁律 #12)。**NULL-safe**:history_id/endpoint_id 任一为空(Xero/已删 endpoint 孤儿 log)→ `'solo:'||id` 独立分区(_rn 恒 1)→ 永不被误合并;状态/trigger/adapter 过滤作用于折叠后当前态;COUNT 同口径。守门 `test_push_logs_fold`(7 例 SQL 形状契约)· 全量 unit 938 passed。**真账号实测(只读探生产)**:付费 468b50c1 **15→5**、测试 1182f2ae **25→25**(NULL-safe)、孤儿 9707bdff **2→2**;原 8 行那对 → 1 条(最新态 failed)。纯后端 0 前端 · 不动 release_notes。
-  - **P2-C 🔲 剩余(B7)**:错误原因 4 语 friendly 不裸透 ERP 泰文。后端 friendly 目录已全(`mrerp_business_friendly`),但前端 `home.js` 主渲染仍显 raw error_msg(`erp-log-enhance.js` 只在下面加友好气泡)· 真正消除需后端给 logs/exceptions 响应附 `error_friendly` 4 语 + 改 home.js 渲染优先用它 · **触及 home.js 巨石** · 下窗口做。
-- **P3 · 概念与导航(1 天)**:工作空间管理+文案(B1)、"客户"改名/归位(B4/B5)、上传不弹工作空间(B3)、种子失效提示(B2)。
+  - **P2-C ✅(B7 · 2026-05-27 · commit `206f6ea` · 已部署 11835108 · 真生产数据验证)**:`mrerp_business_friendly.friendly_for_ui(reason)` 命中 catalog(ERR_*/泰文子串)→ 返回主 UI 4 语 `{zh,th,en,ja}`(ja 无目录退英文),未命中返 None。`push_store` 在 `get_push_log_detail` + `list_push_exceptions` 附 `error_friendly`(additive)。home.js 详情抽屉 + 异常队列优先用 `error_friendly[currentLang]`,没命中再退 humanizeError(网络错误)· 原文仍在「技术详情」可见。守门 `test_p2c_friendly_for_ui`(6 例)。**真生产验证(只读)**:测试账号异常队列 18 条中 14 条附友好(其余 4 条网络错误正确 None)· 详情接口一条 mismatch 日志 4 语齐(zh/th/en/ja · ja=en)。
+- **P3 · 概念与导航 · ✅ 核心完成(2026-05-27 · commit `14e6e84` · 已部署 11835109 · 生产静态文件验证 live)**:
+  - **B4 ✅** 导航「客户」→「买方客户」(4 语 `nav-clients` · 讲清是发票买方 · 与「工作空间(卖方)」对称)。
+  - **B1 ✅** 工作空间弹窗:客户名 `title` 全名 tooltip(防截断)+ 新增 4 语副标题 `ws-chooser-subtitle`「工作空间 = 你的公司(发票卖方/开票方)」· 改 `src/home/workspace-switcher.js` + Vite 重建 `main.js`。
+  - **B3 ✅(核查已满足)** `requireWorkspace` 全项目只定义、无人调用 → 上传不强制选工作空间(读可选 `X-Workspace-Client-Id` header · 后端按卖方智能分拣)· 单工作空间业务动作本就自动选中。
+  - **B5 折中**:`客户`只改名不挪导航位置(移子菜单风险高且 B5 原标"待拍板")· 改名 + 对称命名已达概念清晰目标。
+  - **B2 🔲 折中后置**:种子失效提示 —— 通用商品模式已弱化 seed 角色(§7 明确降优先级)· 属推送内部逻辑 · 不在本轮自主长跑冒险 · 留后续单独处理。
+  - **UI 实测受阻(诚实记录)**:提供的测试账号 `18685123456@163.com` 登录返 **401 invalid_credentials**(2× API + 1× Playwright 真浏览器均失败 · 凭据无效)· 改用**生产静态文件验证**(curl 确认 4 语新 `nav-clients` + `ws-chooser-subtitle` + bundle 内 `title` tooltip / 「发票卖方」副标题 均已 live)· 可视化截图待有效凭据补。
 - **每期**:本机验 → diff 给 Zihao → 沙箱真账号(test01/TEST2019)实测 → 上 → 4 语 release_notes + 守门。
 
 ---

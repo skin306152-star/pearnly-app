@@ -1,7 +1,24 @@
 # 📊 STATE · Pearnly 项目状态
 
-> 🏗️ **【常驻指针 · 整顿恢复后读】当前优先级仍是 ERP 收尾(剩 P2-C/P3)**;**这两项修完后**整顿恢复、改走 `/batch` 加速 —— 那时进窗口读 `docs/refactor/BATCH_STRATEGY.md`(从 Wave 0 安全网起跑)+ `REFACTOR_MASTER_PLAN.md`。**现在别动整顿**,先把 ERP 收尾做完。
+> 🏗️ **【常驻指针 · 整顿恢复后读】ERP「开箱即用」收尾已全部完成(P0-P3 · 唯 B2 种子提示后置)。** 下一步:**整顿可启动 · 改走 `/batch` 加速** —— 进窗口读 `docs/refactor/BATCH_STRATEGY.md`(从 Wave 0 安全网起跑)+ `REFACTOR_MASTER_PLAN.md`。⚠️ 整顿 Wave 2(拆 home.js)与本次 P2-C/P3 改的 home.js 同文件,re-grep 行号后再拆。
 
+> ════════════════════════════════════════════════════════════
+> **【第三十四会话 · 交接 · 2026-05-27】P2-C(不裸透泰文)+ P3(概念/导航)上线 · ERP 收尾完成**
+> ════════════════════════════════════════════════════════════
+> **本会话完成并上线 · ERP「开箱即用」收尾(P2-C + P3)**:
+>
+> **① P2-C(B7 不裸透泰文)· commit `206f6ea` · 部署 11835108 · 真生产数据验证**:
+> - 后端 `services/erp/mrerp_business_friendly.friendly_for_ui(reason)`:命中 catalog(ERR_*/泰文子串)→ 返回主 UI 4 语 `{zh,th,en,ja}`(ja 无目录退英文),未命中返 None。`push_store` 在 `get_push_log_detail` + `list_push_exceptions` 附 `error_friendly`(additive)。
+> - 前端 `home.js`:详情抽屉(`showLogDetail`)+ 异常队列(`_erpExcFriendly`)优先用 `error_friendly[currentLang]`,没命中再退 `humanizeError`(网络错误)· 原文仍在「技术详情」可见。`erp-log-enhance.js` 不动(扫列表行,与本次 DOM 不重叠,留 C1 清)。
+> - 守门 `test_p2c_friendly_for_ui`(6 例)。**真生产验证(只读)**:测试账号异常队列 18 条中 14 条附友好(其余 4 条网络错误正确 None)· 详情一条 mismatch 4 语齐(ja=en)。
+>
+> **② P3(概念/导航)· commit `14e6e84` · 部署 11835109 · 生产静态文件验证 live**:
+> - **B4** 导航「客户」→「买方客户」(4 语 `nav-clients`)。**B1** 工作空间弹窗:客户名 `title` 全名 tooltip + 4 语副标题 `ws-chooser-subtitle`「工作空间=你的公司(发票卖方)」(改 `src/home/workspace-switcher.js` + Vite 重建 `main.js`)。**B3** 核查已满足(`requireWorkspace` 无人调用 · 上传不强制选 · 后端按卖方分拣)。**B5** 折中只改名不挪导航位。
+> - 守门:全量 unit 1095 · eslint/prettier/node/check_i18n(0/0)/black/vite build 全绿。版本 `?v=` 三件(i18n-data/home.js/main.js)→ 11835109 · 4 语 release_notes 覆盖式。
+> - **🔲 B2 种子失效提示折中后置**:通用模式已弱化 seed(§7 降优先级)· 留后续。
+>
+> **⚠️ UI 实测受阻(诚实)**:给的测试账号 `18685123456@163.com` / `xiaopi19950730..` 登录返 **401 invalid_credentials**(2× API + 1× Playwright 真浏览器均失败 · 凭据无效)。改用**生产静态文件 curl 验证**新文案确已 live(4 语 nav-clients + ws-chooser-subtitle + bundle tooltip/副标题)。**可视化截图待 Zihao 给有效凭据或自行眼验**(登录 → ERP 对接 → 推送异常看友好中文 / 导航看「买方客户」/ 右上角工作空间弹窗看卖方副标题)。
+>
 > ════════════════════════════════════════════════════════════
 > **【第三十三会话 · 交接 · 2026-05-27】P2-B 推送日志折叠上线(真账号实测过)· 只剩 P2-C(触 home.js)/ P3**
 > ════════════════════════════════════════════════════════════

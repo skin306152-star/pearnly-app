@@ -431,6 +431,76 @@ class MRERPCustomerSyncService:
             )
         return result
 
+    def verify_resolved_code(
+        self,
+        customer_code: str,
+        buyer_name: str,
+    ) -> str:
+        """Fail-safe(Zihao 2026-05-26 拍板 · P1):复核一个**已解析出**的
+        customer_code 在 MR.ERP 里的真实客户名是否跟发票买方匹配。
+
+        背景:推送时 customer_code 可能来自 stale db_mapping / by-name cache /
+        自动建码撞码 —— 这些路径凭 code 复用、不复核名字 → 静默推到错客户
+        (实测:个人买方被推到 บริษัท อิ๊กลู สตูดิโอ)。本方法把"静默错推"
+        变"响亮失败让用户修"。
+
+        Returns:
+            匹配时返回 MR.ERP 里的真实客户名(供日志/调试)。
+
+        Raises:
+            MRERPBusinessError(ERR_CUSTOMER_NAME_MISMATCH)
+                listing 反查到该码 · 但真名 vs 买方归一化相似度 < 阈值
+                → 用户数据错 · 不 retry · 用户去改映射。
+            MRERPTechnicalError(ERR_CUSTOMER_VERIFY_UNAVAILABLE)
+                无法向 MR.ERP 确认(search 技术异常/超时,或搜不到该码)
+                → 技术错 · 可 retry · 但绝不当成功(Zihao Q2:不确定就停)。
+        """
+        code = (customer_code or "").strip()
+        name = (buyer_name or "").strip()
+        if not code or not name:
+            raise MRERPTechnicalError(
+                f"ERR_CUSTOMER_VERIFY_UNAVAILABLE — cannot verify "
+                f"(code={code!r}, buyer={name!r} · one is empty)"
+            )
+
+        try:
+            listing = self._search_listing(code)
+        except MRERPTechnicalError as e:
+            raise MRERPTechnicalError(
+                f"ERR_CUSTOMER_VERIFY_UNAVAILABLE — MR.ERP listing lookup "
+                f"failed for customer_code {code!r}: {e}"
+            ) from e
+
+        row = next((r for r in listing if r.code == code), None)
+        if row is None:
+            # 搜索成功但没这个码 → 无法确认匹配 → 阻断(可 retry · 列表可能短暂抖动)。
+            raise MRERPTechnicalError(
+                f"ERR_CUSTOMER_VERIFY_UNAVAILABLE — customer_code {code!r} "
+                f"not found in MR.ERP listing (cannot confirm it matches "
+                f"buyer {name!r})"
+            )
+
+        buyer_norm = normalize_company_name(name)
+        erp_norm = row.name_norm or normalize_company_name(row.name)
+        ratio = levenshtein_ratio(buyer_norm, erp_norm) if (buyer_norm and erp_norm) else 0.0
+        if ratio >= self.customer_threshold:
+            return row.name
+
+        raise MRERPBusinessError(
+            f"ERR_CUSTOMER_NAME_MISMATCH — resolved customer_code {code!r} "
+            f"maps to MR.ERP customer {row.name!r} but the invoice buyer is "
+            f"{name!r} (name ratio={ratio:.2f} < {self.customer_threshold})",
+            failed_rows=[
+                {
+                    "reason_code": "ERR_CUSTOMER_NAME_MISMATCH",
+                    "customer_code": code,
+                    "erp_customer_name": row.name,
+                    "buyer_name": name,
+                    "name_ratio": round(ratio, 3),
+                }
+            ],
+        )
+
     def invalidate(self) -> None:
         """Drop ALL cached entries — call after an auto-create lands so
         the next lookup() picks up the new listing entry."""

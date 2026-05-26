@@ -816,6 +816,20 @@ class MRERPAdapter:
             result.elapsed_ms = int((time.time() - t0) * 1000)
             return result
 
+        # P1 fail-safe 名字复核 gate(Zihao 2026-05-26 拍板)· 在生成 xlsx 前 ·
+        # 对每张发票将要推送的 customer_code / product_code 反查 MR.ERP 真名复核 ·
+        # 不匹配/无法确认的不推 · 变 FailedRow(响亮失败)· 杜绝静默错推到错客户/占位商品。
+        valid_histories, verify_failed = self._verify_resolved_master_data(
+            valid_histories, mappings
+        )
+
+        if not valid_histories:
+            # 全被复核拦下:没有可推的发票。
+            result = ImportResult(total=len(histories))
+            result.failed = preflight_failed + verify_failed
+            result.elapsed_ms = int((time.time() - t0) * 1000)
+            return result
+
         xlsx_bytes = mrerp_xlsx_generator.generate_xlsx(
             valid_histories, mappings, sheet_kind="sales_credit"
         )
@@ -871,9 +885,11 @@ class MRERPAdapter:
                 evidence_screenshot=evidence,
             )
 
-        # Merge preflight failures into the final result.
+        # Merge preflight + fail-safe verify failures into the final result.
         if preflight_failed:
             result.failed.extend(preflight_failed)
+        if verify_failed:
+            result.failed.extend(verify_failed)
         result.total = len(histories)  # full input count, not just valid
         result.elapsed_ms = int((time.time() - t0) * 1000)
         result.xlsx_size_bytes = len(xlsx_bytes)
@@ -1617,6 +1633,123 @@ class MRERPAdapter:
                         item.name,
                         e,
                     )
+
+    def _verify_resolved_master_data(
+        self,
+        histories: List[Dict[str, Any]],
+        mappings: Dict[str, Any],
+    ) -> Tuple[List[Dict[str, Any]], List[FailedRow]]:
+        """Fail-safe 复核 gate(Zihao 2026-05-26 拍板 · P1)。
+
+        在 generate_xlsx 之前 · 对每张 history **解析出最终要推送的**
+        customer_code(同 generator 的 lookup_customer_code)和各商品行的
+        product_code(同 generator 的 _resolve_product_code · 含 fallback '123'),
+        用 MR.ERP listing 反查真名复核是否匹配买方/商品:
+
+          - 不匹配 → 该 history 不推 · 变 FailedRow(ERR_*_NAME_MISMATCH · 用户改映射)
+          - 无法确认(search 超时/搜不到)→ 不推 · FailedRow(ERR_*_VERIFY_UNAVAILABLE
+            · 技术错可 retry · 但绝不显示成功)
+
+        为什么在这里而不在 Sync 服务内部:推送时 customer/product code 直接从
+        `mappings`(已含 DB 里的 stale 映射 + generator 的 '123' fallback)取 ·
+        绕过了 Sync.lookup 的解析路径 · 所以复核必须卡在"最终码"这一关。
+
+        Returns (still_valid_histories, failed_rows)。复核需要 live MR.ERP listing,
+        故懒创建 Sync 服务(不依赖 enable_master_data_sync 开关 · 安全复核对所有
+        MR.ERP 推送都生效)。
+        """
+        import mrerp_xlsx_generator as _gen
+
+        if self._customer_sync is None:
+            from services.erp.mrerp_customer_sync import MRERPCustomerSyncService
+
+            self._customer_sync = MRERPCustomerSyncService(self)
+        if self._product_sync is None:
+            from services.erp.mrerp_product_sync import MRERPProductSyncService
+
+            self._product_sync = MRERPProductSyncService(self)
+
+        from services.erp._matching import normalize_company_name, normalize_item_name
+
+        product_lookup = _gen._build_product_lookup(mappings)
+
+        # 复核结果 memo(防同一 (code,名) 在批内反复 search)· 值=reason_code 或 None(通过)。
+        cust_memo: Dict[tuple, Optional[str]] = {}
+        prod_memo: Dict[tuple, Optional[str]] = {}
+
+        def _verify_customer(code: str, buyer_name: str) -> Optional[str]:
+            key = (code, normalize_company_name(buyer_name or ""))
+            if key in cust_memo:
+                return cust_memo[key]
+            reason: Optional[str] = None
+            try:
+                self._customer_sync.verify_resolved_code(code, buyer_name)
+            except MRERPBusinessError:
+                reason = "ERR_CUSTOMER_NAME_MISMATCH"
+            except MRERPTechnicalError:
+                reason = "ERR_CUSTOMER_VERIFY_UNAVAILABLE"
+            cust_memo[key] = reason
+            return reason
+
+        def _verify_product(code: str, item_name: str) -> Optional[str]:
+            key = (code, normalize_item_name(item_name or ""))
+            if key in prod_memo:
+                return prod_memo[key]
+            reason: Optional[str] = None
+            try:
+                self._product_sync.verify_resolved_code(code, item_name)
+            except MRERPBusinessError:
+                reason = "ERR_PRODUCT_NAME_MISMATCH"
+            except MRERPTechnicalError:
+                reason = "ERR_PRODUCT_VERIFY_UNAVAILABLE"
+            prod_memo[key] = reason
+            return reason
+
+        still_valid: List[Dict[str, Any]] = []
+        failed: List[FailedRow] = []
+        for h in histories:
+            reason: Optional[str] = None
+
+            # 1) 客户复核 — 仅当能解析出 code + 有买方名(否则无名可比 · 维持原行为)。
+            cid = int(h.get("client_id") or 0)
+            customer_code = _gen.lookup_customer_code(cid, mappings)
+            buyer = self._extract_buyer(h)
+            buyer_name = buyer.name if buyer else ""
+            if customer_code and buyer_name:
+                reason = _verify_customer(customer_code, buyer_name)
+
+            # 2) 商品复核 — 客户先过才查商品(失败已定 · 省 search)。
+            if reason is None:
+                for item in self._extract_items(h):
+                    product_code = _gen._resolve_product_code(item.name, product_lookup) or "123"
+                    r = _verify_product(product_code, item.name)
+                    if r is not None:
+                        reason = r
+                        break
+
+            if reason is None:
+                still_valid.append(h)
+                continue
+
+            inv_no = (
+                _gen.derive_mrerp_invoice_no(h)
+                if h.get("invoice_date")
+                else (h.get("invoice_number") or h.get("invoice_no") or "?")
+            )
+            logger.warning(
+                "fail-safe verify blocked push for invoice %s: %s",
+                inv_no,
+                reason,
+            )
+            failed.append(
+                FailedRow(
+                    invoice_no=inv_no,
+                    reasons=[reason],
+                    reasons_friendly=translate_reasons([reason]),
+                    original=h,
+                )
+            )
+        return still_valid, failed
 
     @staticmethod
     def _extract_items(history: Dict[str, Any]):

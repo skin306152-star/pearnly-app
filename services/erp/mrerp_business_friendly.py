@@ -76,6 +76,20 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "这个客户在 MR.ERP 里还没对应客户码 · 请打开 MR.ERP 连接向导选「种子客户」(开自动建) · 或去 ERP 设置手动加映射",
         "zh_TW": "這個客戶在 MR.ERP 裡還沒對應客戶碼 · 請打開 MR.ERP 連線精靈選「種子客戶」(開自動建立) · 或去 ERP 設定手動加對應",
     },
+    # Fail-safe name verification (Zihao 2026-05-26 拍板 · P1)
+    # 复用 code 后反查 MR.ERP 真名复核 · 不匹配/无法确认都阻断 · 不再静默错推。
+    "ERR_CUSTOMER_NAME_MISMATCH": {
+        "th": "ระบบตรวจสอบพบว่ารหัสลูกค้าที่จะส่งไป MR.ERP ตรงกับลูกค้าคนละรายกับผู้ซื้อในใบกำกับ · หยุดส่งเพื่อกันบันทึกผิดลูกค้า · กรุณาแก้ไขการแมปลูกค้าในการตั้งค่า ERP แล้วส่งใหม่",
+        "en": "Verification found the customer code about to be pushed maps to a different MR.ERP customer than this invoice's buyer · push stopped to avoid recording against the wrong customer · fix the customer mapping in ERP settings and retry",
+        "zh": "复核发现要推送的客户码在 MR.ERP 对应的是另一个客户 · 跟这张发票的买方不一致 · 为防记到错客户已停止推送 · 请到 ERP 设置更正客户映射后重推",
+        "zh_TW": "複核發現要推送的客戶碼在 MR.ERP 對應的是另一個客戶 · 跟這張發票的買方不一致 · 為防記到錯客戶已停止推送 · 請到 ERP 設定更正客戶對應後重推",
+    },
+    "ERR_CUSTOMER_VERIFY_UNAVAILABLE": {
+        "th": "ยังยืนยันกับ MR.ERP ไม่ได้ว่าลูกค้าตรงกันหรือไม่ (เครือข่าย/หมดเวลา) · ยังไม่ได้ส่งเพื่อความปลอดภัย · ระบบจะลองใหม่อัตโนมัติ",
+        "en": "Could not confirm with MR.ERP whether the customer matches (network/timeout) · not pushed for safety · will retry automatically",
+        "zh": "暂时无法向 MR.ERP 确认客户是否匹配(网络/超时)· 为安全起见尚未推送 · 系统会自动重试",
+        "zh_TW": "暫時無法向 MR.ERP 確認客戶是否相符(網路/逾時)· 為安全起見尚未推送 · 系統會自動重試",
+    },
     "ERR_NO_INVOICE_NO": {
         "th": "เลขที่ใบกำกับว่าง",
         "en": "Invoice number is empty",
@@ -217,6 +231,19 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "a seed with the right unit or drop the OCR unit hint",
         "zh": "OCR 单位与种子商品单位不符 · 换个种子或删去 OCR 单位提示",
         "zh_TW": "OCR 單位與種子商品單位不符 · 換個種子或刪去 OCR 單位提示",
+    },
+    # Fail-safe name verification (Zihao 2026-05-26 拍板 · P1)
+    "ERR_PRODUCT_NAME_MISMATCH": {
+        "th": "ระบบตรวจสอบพบว่ารหัสสินค้าที่จะส่งไป MR.ERP ตรงกับสินค้าคนละรายการกับในใบกำกับ (หรือยังเป็นสินค้าตัวอย่าง) · หยุดส่งเพื่อกันบันทึกผิดสินค้า · กรุณาแก้ไขการแมปสินค้าในการตั้งค่า ERP แล้วส่งใหม่",
+        "en": "Verification found the product code about to be pushed maps to a different MR.ERP product than this invoice line (or is still a placeholder product) · push stopped to avoid recording the wrong item · fix the product mapping in ERP settings and retry",
+        "zh": "复核发现要推送的商品码在 MR.ERP 对应的是另一个商品 · 跟发票上的商品不一致(或仍是占位商品)· 为防记错商品已停止推送 · 请到 ERP 设置更正商品映射后重推",
+        "zh_TW": "複核發現要推送的商品碼在 MR.ERP 對應的是另一個商品 · 跟發票上的商品不一致(或仍是佔位商品)· 為防記錯商品已停止推送 · 請到 ERP 設定更正商品對應後重推",
+    },
+    "ERR_PRODUCT_VERIFY_UNAVAILABLE": {
+        "th": "ยังยืนยันกับ MR.ERP ไม่ได้ว่าสินค้าตรงกันหรือไม่ (เครือข่าย/หมดเวลา) · ยังไม่ได้ส่งเพื่อความปลอดภัย · ระบบจะลองใหม่อัตโนมัติ",
+        "en": "Could not confirm with MR.ERP whether the product matches (network/timeout) · not pushed for safety · will retry automatically",
+        "zh": "暂时无法向 MR.ERP 确认商品是否匹配(网络/超时)· 为安全起见尚未推送 · 系统会自动重试",
+        "zh_TW": "暫時無法向 MR.ERP 確認商品是否相符(網路/逾時)· 為安全起見尚未推送 · 系統會自動重試",
     },
     "WARN_PRODUCT_NAME_TRUNCATED": {
         "th": "ชื่อสินค้ายาวเกิน 100 ตัวอักษร — ถูกตัดให้พอดี",

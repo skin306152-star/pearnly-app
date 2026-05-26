@@ -347,6 +347,72 @@ class MRERPProductSyncService:
             )
         return result
 
+    def verify_resolved_code(
+        self,
+        product_code: str,
+        item_name: str,
+    ) -> str:
+        """Fail-safe(Zihao 2026-05-26 拍板 · P1):复核一个**已解析出**的
+        product_code 在 MR.ERP 里的真实商品名是否跟发票商品行匹配。
+
+        背景:推送时 product_code 可能来自 stale db_mapping(实测:16 条不同
+        商品全映射到占位码 123)· 或 generator 找不到映射时 fallback '123' →
+        所有商品行静默记到占位商品上。本方法把"静默错记"变"响亮失败"。
+
+        Returns:
+            匹配时返回 MR.ERP 里的真实商品名。
+
+        Raises:
+            MRERPBusinessError(ERR_PRODUCT_NAME_MISMATCH)
+                反查到该码但真名 vs OCR 商品名相似度 < 阈值(占位 123 必中)。
+            MRERPTechnicalError(ERR_PRODUCT_VERIFY_UNAVAILABLE)
+                无法向 MR.ERP 确认(search/listing 技术异常,或搜不到该码)。
+        """
+        code = (product_code or "").strip()
+        name = (item_name or "").strip()
+        if not code or not name:
+            raise MRERPTechnicalError(
+                f"ERR_PRODUCT_VERIFY_UNAVAILABLE — cannot verify "
+                f"(code={code!r}, item={name!r} · one is empty)"
+            )
+
+        try:
+            listing = self._search_listing(code)
+        except MRERPTechnicalError as e:
+            raise MRERPTechnicalError(
+                f"ERR_PRODUCT_VERIFY_UNAVAILABLE — MR.ERP listing lookup "
+                f"failed for product_code {code!r}: {e}"
+            ) from e
+
+        row = next((r for r in listing if r.code == code), None)
+        if row is None:
+            raise MRERPTechnicalError(
+                f"ERR_PRODUCT_VERIFY_UNAVAILABLE — product_code {code!r} "
+                f"not found in MR.ERP listing (cannot confirm it matches "
+                f"item {name!r})"
+            )
+
+        item_norm = normalize_item_name(name)
+        erp_norm = row.name_norm or normalize_item_name(row.name)
+        ratio = levenshtein_ratio(item_norm, erp_norm) if (item_norm and erp_norm) else 0.0
+        if ratio >= self.product_threshold:
+            return row.name
+
+        raise MRERPBusinessError(
+            f"ERR_PRODUCT_NAME_MISMATCH — resolved product_code {code!r} "
+            f"maps to MR.ERP product {row.name!r} but the invoice line is "
+            f"{name!r} (name ratio={ratio:.2f} < {self.product_threshold})",
+            failed_rows=[
+                {
+                    "reason_code": "ERR_PRODUCT_NAME_MISMATCH",
+                    "product_code": code,
+                    "erp_product_name": row.name,
+                    "item_name": name,
+                    "name_ratio": round(ratio, 3),
+                }
+            ],
+        )
+
     def invalidate(self) -> None:
         self.cache.clear()
 
@@ -846,6 +912,53 @@ class MRERPProductSyncService:
             f"product listing fetch failed after 3 wait+reload attempts; "
             f"screenshot={shot}; last_error={last_err}"
         )
+
+    def _search_listing(self, query: str) -> List[ListingProduct]:
+        """用 stkmas/allview.php 的 #txtsearch 按【码/名】搜**全量**商品主数据。
+
+        镜像 mrerp_customer_sync._search_listing(2026-05-26 · P1 fail-safe 复核
+        需要按码反查任意商品 · _fetch_listing 只读首页有分页上限)。
+
+        稳健性:若搜索 UI(#txtsearch)不存在 / 选择器变了 → 回退到 _fetch_listing()
+        首页扫描(已在生产验证过)· 不让 fail-safe 因 selector 漂移把整批推送炸掉。
+        query 为空 → []。技术异常抛 MRERPTechnicalError 由上层(verify)兜成
+        ERR_PRODUCT_VERIFY_UNAVAILABLE。
+        """
+        q = (query or "").strip()
+        if not q:
+            return []
+        self.adapter.select_company()
+        page = self.adapter._page
+        url = self.adapter.login_url + self.LISTING_PATH
+        try:
+            if "allview.php" not in (page.url or "").lower():
+                page.goto(url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            # 搜索框不在 → 回退首页扫描(graceful degrade · 不硬炸)。
+            if page.locator("#txtsearch").count() == 0:
+                logger.info("stkmas #txtsearch not present · falling back to _fetch_listing scan")
+                return self._fetch_listing()
+            page.wait_for_selector("#txtsearch", state="visible", timeout=10_000)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"product search nav timeout: {e}") from e
+
+        try:
+            box = page.locator("#txtsearch")
+            box.click()
+            box.fill("")
+            box.press_sequentially(q[:80], delay=30)
+            try:
+                page.locator("#btnsearch").click(timeout=3_000)
+            except Exception:
+                box.press("Enter")
+            try:
+                page.wait_for_load_state("networkidle", timeout=15_000)
+            except PWTimeout:
+                pass
+            page.wait_for_timeout(1_200)
+            html = page.content() or ""
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"product search failed: {e}") from e
+        return parse_stkmas_listing(html)
 
 
 __all__ = [

@@ -503,6 +503,11 @@ USER_DATA_ERROR_CODES = {
     "ERR_NO_SEED_PRODUCT",
     # MR.ERP duplicate · 重推还是同一个 bill_no · 没意义
     "ERR_DUPLICATE_INVOICE",
+    # Fail-safe 名字复核不匹配(Zihao 2026-05-26 拍板 · P1)· 用户得先改映射 ·
+    # 重推同样不匹配 · 不入 retry。注:ERR_*_VERIFY_UNAVAILABLE(网络/超时无法确认)
+    # 故意不在此 set · 属技术错 · 走 retry 队列(但永远不显示 success)。
+    "ERR_CUSTOMER_NAME_MISMATCH",
+    "ERR_PRODUCT_NAME_MISMATCH",
 }
 
 # Thai raw error patterns that map to user-data errors (报错可能直接是 raw 泰文)

@@ -739,71 +739,73 @@ def list_push_logs(
     limit: int = 50,
     offset: int = 0,
 ) -> Dict[str, Any]:
-    """查询推送日志,支持按 history/endpoint/status/trigger/adapter 过滤
+    """查询推送日志(P2-B 折叠版),支持按 history/endpoint/status/trigger/adapter 过滤.
 
-    批 3 改动 6 (Zihao 2026-05-19 拍板 · v118.34.34) · 新增 adapter_filter.
-    按 erp_endpoints.adapter (mrerp/xero/webhook 等) 过滤. 已删除的 endpoint
-    join 不到 row (endpoint_adapter is NULL),自动不命中任何 adapter filter,
-    符合预期 (用户筛 "MR.ERP" 不会带出已删 endpoint 的孤儿 log).
+    P2-B (Zihao 2026-05-27 · ERP 收尾) · 折叠到每对 (history×endpoint) 最新一条,
+    清「混合手动+自动推」遗留重复行,与 list_push_exceptions 同口径(单一状态源·铁律 #12).
+    NULL-safe:history_id/endpoint_id 任一为空(Xero/已删 endpoint 孤儿 log)→ 按行自身
+    id 独立分区,永不被误合并. 状态/trigger/adapter 过滤作用于折叠后的当前态.
+
+    批 3 改动 6 (Zihao 2026-05-19 · v118.34.34) · adapter_filter 按 erp_endpoints.adapter
+    过滤. 已删 endpoint join 不到 row (endpoint_adapter is NULL),自动不命中 adapter filter.
     """
     try:
         with db.get_cursor() as cur:
-            where = ["user_id = %s"]
+            # 折叠 CTE:每对 (history×endpoint) 取 created_at 最新一条(id 作 tie-break).
+            # NULL-safe:任一 id 为空 → 'solo:'||id 独立分区 → _rn 恒为 1 → 全保留不合并.
+            ranked_cte = """
+                WITH ranked AS (
+                    SELECT l.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY CASE
+                                WHEN l.history_id IS NOT NULL AND l.endpoint_id IS NOT NULL
+                                THEN l.history_id::text || '|' || l.endpoint_id::text
+                                ELSE 'solo:' || l.id::text
+                            END
+                            ORDER BY l.created_at DESC, l.id DESC
+                        ) AS _rn
+                    FROM erp_push_logs l
+                    WHERE l.user_id = %s
+                )
+            """
+            # 过滤作用于「折叠后的当前态」(l._rn = 1) · 字段全 prefix 防 ambiguous.
+            outer = ["l._rn = 1"]
             params: list = [user_id]
             if history_id:
-                where.append("history_id = %s")
+                outer.append("l.history_id = %s")
                 params.append(history_id)
             if endpoint_id:
-                where.append("endpoint_id = %s")
+                outer.append("l.endpoint_id = %s")
                 params.append(endpoint_id)
             if status_filter == "success":
-                where.append("status = 'success'")
+                outer.append("l.status = 'success'")
             elif status_filter == "retrying":
                 # v118.25.1 · 重试中:failed + 仍在重试队列里(next_retry_at 未来/未清)
-                where.append("status = 'failed' AND next_retry_at IS NOT NULL")
+                outer.append("l.status = 'failed' AND l.next_retry_at IS NOT NULL")
             elif status_filter == "failed":
-                # v118.25.1 · 失败终态:failed + 不在重试队列(已耗尽 / 端点删 / 用户手动停)
-                where.append("status = 'failed' AND next_retry_at IS NULL")
+                # v118.25.1 · 失败终态:failed + 不在重试队列(已耗尽 / 端点删 / 手动停)
+                outer.append("l.status = 'failed' AND l.next_retry_at IS NULL")
             if trigger_filter in ("manual", "auto"):
-                where.append("trigger = %s")
+                outer.append("l.trigger = %s")
                 params.append(trigger_filter)
-            where_sql = " AND ".join(where)
-            # 批 1 改动 5/8 (Zihao 2026-05-19 拍板 · v118.34.33) · JOIN clients
-            # 拿 Pearnly 客户名 (改动 5) + JOIN erp_endpoints 拿 endpoint
-            # name (改动 8). where_sql 字段全部 prefix 成 l.* 防 join 后 ambig.
-            joined_where = (
-                where_sql.replace("user_id = %s", "l.user_id = %s")
-                .replace("history_id = %s", "l.history_id = %s")
-                .replace("endpoint_id = %s", "l.endpoint_id = %s")
-                .replace("status = 'success'", "l.status = 'success'")
-                .replace(
-                    "status = 'failed' AND next_retry_at IS NOT NULL",
-                    "l.status = 'failed' AND l.next_retry_at IS NOT NULL",
-                )
-                .replace(
-                    "status = 'failed' AND next_retry_at IS NULL",
-                    "l.status = 'failed' AND l.next_retry_at IS NULL",
-                )
-                .replace("trigger = %s", "l.trigger = %s")
-            )
-            # 批 3 改动 6 · adapter filter · 走 JOIN 后的 e.adapter (e 是 endpoint).
-            # NULL-safe: LOWER(e.adapter) = LOWER(%s) 自动滤掉孤儿 log.
+            # 批 3 改动 6 · adapter filter · 走 JOIN 后 e.adapter · NULL-safe LOWER 滤孤儿.
             if adapter_filter:
-                joined_where += " AND LOWER(e.adapter) = LOWER(%s)"
+                outer.append("LOWER(e.adapter) = LOWER(%s)")
                 params.append(adapter_filter)
+            outer_sql = " AND ".join(outer)
 
-            # COUNT 必须跟主查询走相同 JOIN · 因为 joined_where 可能引用 e.adapter.
+            # COUNT(折叠后) · JOIN erp_endpoints 供 adapter filter(无 filter 时无害).
             cur.execute(
-                f"""SELECT COUNT(*) AS n FROM erp_push_logs l
-                    LEFT JOIN ocr_history h ON h.id = l.history_id
-                    LEFT JOIN clients c ON c.id = h.client_id
+                ranked_cte + f"""
+                    SELECT COUNT(*) AS n FROM ranked l
                     LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
-                    WHERE {joined_where}""",
+                    WHERE {outer_sql}
+                """,
                 tuple(params),
             )
             total = cur.fetchone()["n"]
             cur.execute(
-                f"""
+                ranked_cte + f"""
                 SELECT l.id, l.endpoint_id, l.history_id, l.invoice_no,
                        l.seller_name, l.total_amount, l.status, l.http_status,
                        l.error_msg, l.attempt, l.elapsed_ms, l.trigger,
@@ -823,12 +825,12 @@ def list_push_logs(
                        e.name AS endpoint_name,
                        e.adapter AS endpoint_adapter,
                        w.name AS workspace_name
-                FROM erp_push_logs l
+                FROM ranked l
                 LEFT JOIN ocr_history h ON h.id = l.history_id
                 LEFT JOIN clients c ON c.id = h.client_id
                 LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
                 LEFT JOIN workspace_clients w ON w.id = h.workspace_client_id
-                WHERE {joined_where}
+                WHERE {outer_sql}
                 ORDER BY l.created_at DESC
                 LIMIT %s OFFSET %s
             """,

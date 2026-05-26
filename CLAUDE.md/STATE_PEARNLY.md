@@ -5,7 +5,7 @@
 > ════════════════════════════════════════════════════════════
 > **当前前端版本**:home.js/i18n-data.js `?v=11835103` · `/api/version`=**11835103** · 本地无未 push commit(scratch `_diag_*.py`/`_clean_*.py`/`scripts/probe/_debug/`(已 gitignore) 勿提交)。
 >
-> **🟢 进窗口第一件事**:读 **`docs/refactor/erp-out-of-box-redesign.md`**(本会话产出的总设计 · 含全部问题清单 + 开箱即用方案 + 老逻辑清理 + 可砍项 + 落地分期),**从 P0(client_ids 退役·解新用户连接卡死)起做**。这是 Zihao 拍板的方向:别再逐个打补丁,按这份方案重构。P1=通用商品模式(灵魂·解多商品发票 130 秒慢+商品不符)。
+> **🟢 进窗口第一件事**:读 **`docs/refactor/erp-out-of-box-redesign.md`**(本会话产出的总设计 · ✅ **Zihao 2026-05-26 已拍板接受全案**)· **从 P0(client_ids 退役·解新用户连接卡死)起,一期期干净落地**。别再逐个打补丁。核心决策已锁:**商品「匹配优先 + 通用兜底 · 不再自动建商品」**(P1·灵魂·解多商品发票 130 秒慢 + 商品不符)。P2=重试 UPDATE 原行+状态单一真相+错误文案 4 语+发票号已存在判已推送过。P3=概念/导航/工作空间管理/客户改名归位。每期沙箱真账号实测 + 守门 + 4 语 release_notes。
 >
 > **① 本会话连修 6 个真 bug(全 push+部署·11835097→11835103·真账号实测)**:沙箱 skin306152→MR.ERP TEST2019 走真推,逐层挖出叠加根因:
 > - **列表只读 30 条**:`allview.php` 的 `#showdata` 由 showdata.js 滚动驱动只首屏 30 → picker/匹配漏第 31+。新建 `services/erp/_listing_paginate.fetch_all_listing_pages`(POST `<module>/component/showdata.php` 逐页·实证机制)· 仅 picker 路由拉全量。

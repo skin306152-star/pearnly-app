@@ -544,6 +544,21 @@ python scripts/refactor_progress.py
 
 **⛔ 下窗口先做 BUG 整改(Zihao 2026-05-25 拍板:BUG > 整改)· Zihao 会在下窗口发 BUG 问题 · 修完 BUG 再回 B2 续抽。**
 
+---
+
+### 🚀🚀 整顿恢复后走 `/batch` 加速(2026-05-27 Zihao 拍板 · 见 `docs/refactor/BATCH_STRATEGY.md`)
+
+**前提**:ERP「开箱即用」收尾(P2-B 日志折叠 / P2-C 不裸透泰文 / P3 概念导航)修完后,整顿正式恢复,并改用 **`/batch` 并行 worktree agent** 加速拆巨石/补测试。
+
+**接力窗口进来(Zihao 说「继续整顿,按 BATCH_STRATEGY 走」)**:
+1. 读 `docs/refactor/BATCH_STRATEGY.md`(整套作战手册 · 5 波次 + 承包清单 + agent 黄金模板 + 操作手册)。
+2. 看该文档 §10 进度账本找当前波次,从 **Wave 0(安全网:E2E + 集成测试)** 起跑——动巨石前必须先有测试网。
+3. 核心范式:**拆分=并行(agent 只 copy-out 新文件,不删巨石)· 接线=串行(单独窗口删巨石)**。
+4. **Wave 2(home.js)必须在 ERP P2-C 之后**(P2-C 也改 home.js)。
+5. 高敏域(登录/计费/OCR热路径/auth/RLS)永不进 batch,Zihao 在场单独做。
+
+> 本段是整顿"如何加速"的指针 · 详版权威在 `BATCH_STRATEGY.md`。
+
 **当前(第二十三会话 · 2026-05-25)· B2 db.py→services 长跑续**(Zihao "继续 · 慢慢做 · 最安全方式"):
 - db.py 7136→**4513**(本会话 -2623 · 累计自 10663 起 -6150)· 再抽 9 个 cohesive 域 DAL 到 services(全 push 4 批 + CI 绿 + 生产 401 验证零丢路由):
   - `services/recon/vat_recon_store.py`(`cf712df` · 19 函数 · P0-VAT 对账三表组 + 屏 B 内嵌 client helper · find_or_create 原 bare `create_client`→`db.create_client` · get_recon_row 的 module 级 import json 随域搬)

@@ -1677,13 +1677,14 @@ class MRERPAdapter:
         cust_memo: Dict[tuple, Optional[str]] = {}
         prod_memo: Dict[tuple, Optional[str]] = {}
 
-        def _verify_customer(code: str, buyer_name: str) -> Optional[str]:
-            key = (code, normalize_company_name(buyer_name or ""))
+        def _verify_customer(code: str, buyer_name: str, buyer_tax_id: str) -> Optional[str]:
+            # P2 · memo key 含税号(同码不同税号要分别复核)。
+            key = (code, normalize_company_name(buyer_name or ""), (buyer_tax_id or "").strip())
             if key in cust_memo:
                 return cust_memo[key]
             reason: Optional[str] = None
             try:
-                self._customer_sync.verify_resolved_code(code, buyer_name)
+                self._customer_sync.verify_resolved_code(code, buyer_name, buyer_tax_id)
             except MRERPBusinessError:
                 reason = "ERR_CUSTOMER_NAME_MISMATCH"
             except MRERPTechnicalError:
@@ -1715,8 +1716,9 @@ class MRERPAdapter:
             customer_code = _gen.lookup_customer_code(cid, mappings)
             buyer = self._extract_buyer(h)
             buyer_name = buyer.name if buyer else ""
+            buyer_tax_id = (buyer.tax_id if buyer else "") or ""
             if customer_code and buyer_name:
-                reason = _verify_customer(customer_code, buyer_name)
+                reason = _verify_customer(customer_code, buyer_name, buyer_tax_id)
 
             # 2) 商品复核 — 客户先过才查商品(失败已定 · 省 search)。
             if reason is None:

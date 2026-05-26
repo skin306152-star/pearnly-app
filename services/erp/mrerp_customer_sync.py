@@ -177,6 +177,15 @@ def _strip_tags(s: str) -> str:
     return re.sub(r"<[^>]+>", "", s).strip()
 
 
+def _norm_tax(s: Any) -> str:
+    """归一化泰国税号:去掉所有非数字 · 仅当结果是 13 位才返回(否则空 = 不可比)。
+    P2 税号优先复核用 · 空/非 13 位 → 视为"无可比税号" → 降级名称复核。"""
+    if not s:
+        return ""
+    digits = re.sub(r"\D", "", str(s))
+    return digits if len(digits) == 13 else ""
+
+
 def parse_armas_listing(html: str) -> List[ListingCustomer]:
     """Extract customer rows from an armas/allview.php response.
 
@@ -435,25 +444,31 @@ class MRERPCustomerSyncService:
         self,
         customer_code: str,
         buyer_name: str,
+        buyer_tax_id: Optional[str] = None,
     ) -> str:
-        """Fail-safe(Zihao 2026-05-26 拍板 · P1):复核一个**已解析出**的
-        customer_code 在 MR.ERP 里的真实客户名是否跟发票买方匹配。
+        """Fail-safe(Zihao 2026-05-26 拍板 · P1 + P2 税号优先):复核一个
+        **已解析出**的 customer_code 在 MR.ERP 里对应的客户是否真的就是发票买方。
 
         背景:推送时 customer_code 可能来自 stale db_mapping / by-name cache /
-        自动建码撞码 —— 这些路径凭 code 复用、不复核名字 → 静默推到错客户
-        (实测:个人买方被推到 บริษัท อิ๊กลู สตูดิโอ)。本方法把"静默错推"
-        变"响亮失败让用户修"。
+        自动建码撞码 —— 凭 code 复用、不复核 → 静默推到错客户(实测:个人买方
+        被推到 บริษัท อิ๊กลู สตูดิโอ)。本方法把"静默错推"变"响亮失败让用户修"。
+
+        复核优先级(P2 · Zihao section 四「税号优先」):
+            1. 有买方税号 → 读 ERP 客户详情页税号:
+                 - 税号一致 → 放行(税号是权威标识 · 即便名字略有出入也算同一户)
+                 - 税号都有但**不一致** → ERR_CUSTOMER_NAME_MISMATCH(同名不同税号 =
+                   不同主体 · 必拦)
+                 - 读不到 ERP 税号(详情页取不到/该客户没填税号)→ **降级到名称复核**
+                   (不硬拦 · 防详情页 selector 假设出错时误杀所有推送)
+            2. 名称归一化相似度 ≥ 阈值 → 放行;否则 ERR_CUSTOMER_NAME_MISMATCH。
 
         Returns:
             匹配时返回 MR.ERP 里的真实客户名(供日志/调试)。
 
         Raises:
-            MRERPBusinessError(ERR_CUSTOMER_NAME_MISMATCH)
-                listing 反查到该码 · 但真名 vs 买方归一化相似度 < 阈值
-                → 用户数据错 · 不 retry · 用户去改映射。
-            MRERPTechnicalError(ERR_CUSTOMER_VERIFY_UNAVAILABLE)
-                无法向 MR.ERP 确认(search 技术异常/超时,或搜不到该码)
-                → 技术错 · 可 retry · 但绝不当成功(Zihao Q2:不确定就停)。
+            MRERPBusinessError(ERR_CUSTOMER_NAME_MISMATCH)  名称/税号不一致 · 不 retry。
+            MRERPTechnicalError(ERR_CUSTOMER_VERIFY_UNAVAILABLE)  无法向 ERP 确认
+                (listing search 技术异常/超时,或搜不到该码)· 可 retry · 不当成功。
         """
         code = (customer_code or "").strip()
         name = (buyer_name or "").strip()
@@ -480,6 +495,37 @@ class MRERPCustomerSyncService:
                 f"buyer {name!r})"
             )
 
+        # P2 · 税号优先:有买方税号才付出读详情页的代价(否则纯名称复核 · 不加导航)。
+        buyer_tax = _norm_tax(buyer_tax_id)
+        if buyer_tax:
+            erp_tax = ""
+            try:
+                detail = self._fetch_customer_detail(code)
+                erp_tax = _norm_tax((detail or {}).get("tax_id"))
+            except Exception as e:  # best-effort · 失败降级名称复核 · 绝不因读详情失败硬拦
+                logger.warning("customer detail tax read failed for %s: %s", code, e)
+                erp_tax = ""
+            if erp_tax:
+                if erp_tax == buyer_tax:
+                    return row.name  # 税号一致 = 权威匹配 · 放行
+                raise MRERPBusinessError(
+                    f"ERR_CUSTOMER_NAME_MISMATCH — resolved customer_code {code!r} "
+                    f"(MR.ERP customer {row.name!r}) tax_id {erp_tax!r} does NOT match "
+                    f"invoice buyer {name!r} tax_id {buyer_tax!r}",
+                    failed_rows=[
+                        {
+                            "reason_code": "ERR_CUSTOMER_NAME_MISMATCH",
+                            "customer_code": code,
+                            "erp_customer_name": row.name,
+                            "erp_tax_id": erp_tax,
+                            "buyer_name": name,
+                            "buyer_tax_id": buyer_tax,
+                            "conflict": "tax_id",
+                        }
+                    ],
+                )
+            # erp_tax 读不到 → 落到下方名称复核(降级 · 不硬拦)。
+
         buyer_norm = normalize_company_name(name)
         erp_norm = row.name_norm or normalize_company_name(row.name)
         ratio = levenshtein_ratio(buyer_norm, erp_norm) if (buyer_norm and erp_norm) else 0.0
@@ -500,6 +546,33 @@ class MRERPCustomerSyncService:
                 }
             ],
         )
+
+    def _fetch_customer_detail(self, customer_code: str) -> Optional[Dict[str, str]]:
+        """读 MR.ERP 客户详情页(armas/allform.php?id=<code>&status=view)的
+        name + tax_id(P2 税号复核用)。best-effort:取不到返 None / 缺字段留空。
+
+        view 模式表单字段 id 沿用 create 表单(txtname / txttaxid · readonly)。
+        调用方必须在 adapter 的 with 块内。
+        """
+        code = (customer_code or "").strip()
+        if not code:
+            return None
+        page = self.adapter._page
+        url = f"{self.adapter.login_url}{self.FORM_PATH}?id={code}&status=view"
+        try:
+            page.goto(url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.wait_for_selector("input#txtname", state="attached", timeout=10_000)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"customer detail nav failed for {code!r}: {e}") from e
+        try:
+            name = page.locator("input#txtname").first.input_value()
+        except Exception:
+            name = ""
+        try:
+            tax = page.locator("input#txttaxid").first.input_value()
+        except Exception:
+            tax = ""
+        return {"name": (name or "").strip(), "tax_id": (tax or "").strip()}
 
     def invalidate(self) -> None:
         """Drop ALL cached entries — call after an auto-create lands so

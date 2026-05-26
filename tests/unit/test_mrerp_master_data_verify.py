@@ -113,6 +113,76 @@ class CustomerVerifyTests(unittest.TestCase):
             svc.verify_resolved_code("P1", "")
         svc._search_listing.assert_not_called()
 
+    # ----- P2 税号优先 -----
+    def test_tax_match_passes_despite_name_diff(self):
+        # 税号一致 = 权威匹配 · 即便 listing 名字跟买方对不上也放行。
+        svc = _cust_svc()
+        svc._search_listing = MagicMock(
+            return_value=[
+                ListingCustomer(code="C1", type_name="", prefix="", name="完全不同的名字")
+            ]
+        )
+        svc._fetch_customer_detail = MagicMock(
+            return_value={"name": "完全不同的名字", "tax_id": "0105556789012"}
+        )
+        out = svc.verify_resolved_code("C1", "ACME Co., Ltd.", "0-1055-56789-01-2")
+        self.assertEqual(out, "完全不同的名字")
+
+    def test_tax_mismatch_raises_even_if_name_matches(self):
+        # 同名不同税号 = 不同主体 · 必须拦(税号冲突压过名字匹配)。
+        svc = _cust_svc()
+        svc._search_listing = MagicMock(
+            return_value=[
+                ListingCustomer(code="C1", type_name="", prefix="", name="ACME Co., Ltd.")
+            ]
+        )
+        svc._fetch_customer_detail = MagicMock(
+            return_value={"name": "ACME Co., Ltd.", "tax_id": "9999999999999"}
+        )
+        with self.assertRaises(MRERPBusinessError) as ctx:
+            svc.verify_resolved_code("C1", "ACME Co., Ltd.", "0105556789012")
+        self.assertEqual(ctx.exception.failed_rows[0]["reason_code"], "ERR_CUSTOMER_NAME_MISMATCH")
+        self.assertEqual(ctx.exception.failed_rows[0].get("conflict"), "tax_id")
+
+    def test_tax_unreadable_degrades_to_name_match(self):
+        # 详情页读不到 ERP 税号 → 不硬拦 · 降级名称复核(名字一致则放行)。
+        svc = _cust_svc()
+        svc._search_listing = MagicMock(
+            return_value=[
+                ListingCustomer(code="C1", type_name="", prefix="", name="ACME Co., Ltd.")
+            ]
+        )
+        svc._fetch_customer_detail = MagicMock(
+            return_value={"name": "ACME Co., Ltd.", "tax_id": ""}
+        )
+        out = svc.verify_resolved_code("C1", "ACME Co., Ltd.", "0105556789012")
+        self.assertEqual(out, "ACME Co., Ltd.")
+
+    def test_tax_detail_fetch_raises_degrades_to_name(self):
+        # 读详情抛异常(selector 假设错/超时)→ 降级名称复核 · 绝不因此硬拦合法推送。
+        svc = _cust_svc()
+        svc._search_listing = MagicMock(
+            return_value=[
+                ListingCustomer(code="C1", type_name="", prefix="", name="ACME Co., Ltd.")
+            ]
+        )
+        svc._fetch_customer_detail = MagicMock(side_effect=MRERPTechnicalError("detail nav fail"))
+        out = svc.verify_resolved_code("C1", "ACME Co., Ltd.", "0105556789012")
+        self.assertEqual(out, "ACME Co., Ltd.")
+
+    def test_no_buyer_tax_skips_detail_fetch(self):
+        # 买方没税号 → 不付出读详情的代价 · 纯名称复核。
+        svc = _cust_svc()
+        svc._search_listing = MagicMock(
+            return_value=[
+                ListingCustomer(code="C1", type_name="", prefix="", name="ACME Co., Ltd.")
+            ]
+        )
+        svc._fetch_customer_detail = MagicMock()
+        out = svc.verify_resolved_code("C1", "ACME Co., Ltd.")
+        self.assertEqual(out, "ACME Co., Ltd.")
+        svc._fetch_customer_detail.assert_not_called()
+
 
 # ============================================================
 # Product verify_resolved_code
@@ -162,7 +232,7 @@ class AdapterVerifyGateTests(unittest.TestCase):
         ad._customer_sync = MagicMock()
         ad._product_sync = MagicMock()
 
-        def cust_verify(code, buyer_name):
+        def cust_verify(code, buyer_name, buyer_tax_id=None):
             if code == "C-BAD":
                 raise MRERPBusinessError(
                     "mismatch",

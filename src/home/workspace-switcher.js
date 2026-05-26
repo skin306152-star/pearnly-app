@@ -109,8 +109,8 @@
             return true;
         }
         // 个人模式 / 未选 → 轻提示(不阻塞全站 · 只挡这个动作)
-        const msg = _t('ws-need-client', '这个功能需要先选择做账主体(账套)');
-        const pick = _t('ws-btn-pick', '选择账套');
+        const msg = _t('ws-need-client', '这个功能需要先选择工作空间');
+        const pick = _t('ws-btn-pick', '选择工作空间');
         const cancel = _t('ws-btn-cancel', '取消');
         // home.js 的 showConfirm(msg, opts) 返回 Promise<bool> · 用 okText/cancelText 自定义按钮。
         if (typeof window.showConfirm === 'function') {
@@ -148,9 +148,9 @@
                     : _isOwner()
                       ? _t(
                             'ws-empty-owner',
-                            '还没有做账主体 · 这里登记你在「给哪家公司做账」(代理记账用)· 与左侧「客户管理(发票买方)」不是一回事 · 点下方新建'
+                            '还没有工作空间。创建一个公司后,上传、对账和 ERP 推送都会归属到该公司。'
                         )
-                      : _t('ws-empty-employee', '你还没有被分配做账主体(账套)· 请联系老板分配'),
+                      : _t('ws-empty-employee', '你还没有可用的工作空间,请联系管理员分配。'),
             });
             return;
         }
@@ -159,9 +159,9 @@
             const hint = _isOwner()
                 ? _t(
                       'ws-empty-owner',
-                      '还没有做账主体 · 这里登记你在「给哪家公司做账」(代理记账用)· 与左侧「客户管理(发票买方)」不是一回事 · 点下方新建'
+                      '还没有工作空间。创建一个公司后,上传、对账和 ERP 推送都会归属到该公司。'
                   )
-                : _t('ws-empty-employee', '你还没有被分配做账主体(账套)· 请联系老板分配');
+                : _t('ws-empty-employee', '你还没有可用的工作空间,请联系管理员分配。');
             if (typeof window.showToast === 'function') window.showToast(hint, 'info');
         }
     }
@@ -177,7 +177,7 @@
             const list = window._workspaceClientsCache || [];
             const c = list.find((x) => Number(x.id) === Number(id));
             icon = _icon('building');
-            text = c ? c.name : _t('ws-current-label', '当前账套');
+            text = c ? c.name : _t('ws-current-label', '当前工作空间');
         } else {
             icon = _icon('user');
             text = _t('ws-personal', '个人事务');
@@ -235,7 +235,7 @@
 
         const personalActive = getWorkMode() === 'personal' || active == null;
         const rows = [];
-        // 个人事务
+        // 个人事务(带说明:用于临时识别/测试/不归属任何公司的文件)
         rows.push(
             '<button type="button" class="ws-modal-item' +
                 (personalActive ? ' active' : '') +
@@ -243,8 +243,13 @@
                 '<span class="ws-modal-item-ic">' +
                 _icon('user') +
                 '</span>' +
+                '<span class="ws-modal-item-text" style="display:flex;flex-direction:column;align-items:flex-start;min-width:0;">' +
                 '<span class="ws-modal-item-name">' +
                 _esc(_t('ws-personal', '个人事务')) +
+                '</span>' +
+                '<span class="ws-modal-item-desc" style="font-size:11px;color:#6b7280;font-weight:400;margin-top:2px;line-height:1.35;white-space:normal;">' +
+                _esc(_t('ws-personal-desc', '用于临时识别、测试或处理不归属任何公司的文件。')) +
+                '</span>' +
                 '</span>' +
                 '</button>'
         );
@@ -274,11 +279,11 @@
         const createHtml = opts.canCreate
             ? '<div class="ws-modal-create">' +
               '<button type="button" class="ws-modal-create-toggle" data-ws-create-toggle="1">+ ' +
-              _esc(_t('ws-create-client', '新建做账主体')) +
+              _esc(_t('ws-create-client', '新建工作空间')) +
               '</button>' +
               '<div class="ws-modal-create-form" data-ws-create-form style="display:none;">' +
               '<input type="text" class="ws-modal-create-input" data-ws-create-name placeholder="' +
-              _esc(_t('ws-create-ph', '做账主体公司名称')) +
+              _esc(_t('ws-create-ph', '公司名称,例如 BAKELAB')) +
               '">' +
               '<button type="button" class="ws-modal-create-submit" data-ws-create-submit="1">' +
               _esc(_t('ws-create-submit', '创建')) +
@@ -291,7 +296,7 @@
             '<div class="ws-modal-box" role="dialog" aria-modal="true">' +
             '<div class="ws-modal-head">' +
             '<span class="ws-modal-title">' +
-            _esc(_t('ws-chooser-title', '选择工作模式')) +
+            _esc(_t('ws-chooser-title', '选择工作空间')) +
             '</span>' +
             '<button type="button" class="ws-modal-close" data-ws-close="1" aria-label="close">✕</button>' +
             '</div>' +
@@ -365,7 +370,7 @@
         const newId = res && (res.id || (res.client && res.client.id));
         if (!newId) {
             if (typeof window.showToast === 'function') {
-                window.showToast(_t('ws-create-fail', '新建做账主体失败 · 请重试'), 'error');
+                window.showToast(_t('ws-create-fail', '新建工作空间失败 · 请重试'), 'error');
             }
             return;
         }

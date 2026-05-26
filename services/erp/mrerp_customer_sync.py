@@ -838,6 +838,21 @@ class MRERPCustomerSyncService:
         except MRERPTechnicalError:
             listing = self._fetch_listing()  # 搜索异常兜底回退首页扫描
         if any(r.code == customer_code for r in listing):
+            # P3 闭环反查(Zihao 2026-05-26 section 五):建完再复核新码对应的客户
+            # 名/税号确实 == 发票买方 · 防"自动建码撞到已存在的别家客户"残留风险。
+            # 名/税号冲突(BusinessError)→ 抛(建出来的不是买方 · 不推)。
+            # 反查不可用(TechnicalError)→ 降级:刚写的就是买方数据 · 可信 · 仅 log。
+            try:
+                self.verify_resolved_code(customer_code, buyer.name, buyer.tax_id)
+            except MRERPBusinessError:
+                raise
+            except MRERPTechnicalError as e:
+                logger.warning(
+                    "auto-create post-verify unavailable for %s (trusting just-written "
+                    "buyer data): %s",
+                    customer_code,
+                    e,
+                )
             logger.info(
                 "auto-created customer %s (seed=%s, buyer=%s)",
                 customer_code,

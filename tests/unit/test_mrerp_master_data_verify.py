@@ -355,5 +355,62 @@ class ClassificationAndI18nTests(unittest.TestCase):
                 self.assertTrue(msg and msg != code, f"{code}/{lang} missing friendly text")
 
 
+# ============================================================
+# P3 自动创建闭环反查:建完调 verify · 冲突抛 / 不可用降级
+# ============================================================
+class AutoCreatePostVerifyTests(unittest.TestCase):
+    def _cust_create_svc(self):
+        from services.erp.mrerp_customer_sync import ListingCustomer as LC
+
+        adapter = MagicMock()
+        adapter.login_url = "https://mock.example.com"
+        page = MagicMock()
+        page.url = "https://mock.example.com/armas/allform.php"
+        adapter._page = page
+        adapter._session = MagicMock()
+        adapter._session.dialogs = []
+        svc = MRERPCustomerSyncService(adapter)
+        svc._generate_customer_code = MagicMock(return_value="C-NEW")
+        svc._copy_from_seed = MagicMock()
+        svc._override_after_copy = MagicMock()
+        svc.invalidate = MagicMock()
+        svc._search_listing = MagicMock(
+            return_value=[LC(code="C-NEW", type_name="", prefix="", name="ACME")]
+        )
+        return svc
+
+    def test_autocreate_propagates_name_or_tax_conflict(self):
+        from services.erp.mrerp_customer_sync import BuyerInfo
+
+        svc = self._cust_create_svc()
+        svc.verify_resolved_code = MagicMock(
+            side_effect=MRERPBusinessError(
+                "conflict", failed_rows=[{"reason_code": "ERR_CUSTOMER_NAME_MISMATCH"}]
+            )
+        )
+        with self.assertRaises(MRERPBusinessError):
+            svc._layer4_auto_create(BuyerInfo(name="ACME", tax_id="0105556789012"), "0006")
+
+    def test_autocreate_swallows_verify_unavailable(self):
+        from services.erp.mrerp_customer_sync import BuyerInfo
+
+        svc = self._cust_create_svc()
+        svc.verify_resolved_code = MagicMock(
+            side_effect=MRERPTechnicalError("ERR_CUSTOMER_VERIFY_UNAVAILABLE")
+        )
+        res = svc._layer4_auto_create(BuyerInfo(name="ACME"), "0006")
+        self.assertEqual(res.customer_code, "C-NEW")
+        self.assertTrue(res.is_new)
+
+    def test_autocreate_success_runs_verify(self):
+        from services.erp.mrerp_customer_sync import BuyerInfo
+
+        svc = self._cust_create_svc()
+        svc.verify_resolved_code = MagicMock(return_value="ACME")
+        res = svc._layer4_auto_create(BuyerInfo(name="ACME", tax_id="0105556789012"), "0006")
+        self.assertEqual(res.customer_code, "C-NEW")
+        svc.verify_resolved_code.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -670,6 +670,20 @@ class MRERPProductSyncService:
         self.invalidate()
         listing = self._fetch_listing()
         if any(r.code == product_code for r in listing):
+            # P3 闭环反查(Zihao 2026-05-26 section 五):建完复核新码对应商品名 ==
+            # 发票商品行。名不符(BusinessError)→ 抛(建出来的不是这个商品 · 不推)。
+            # 反查不可用(TechnicalError)→ 降级:刚写的就是该商品名 · 可信 · 仅 log。
+            try:
+                self.verify_resolved_code(product_code, item.name)
+            except MRERPBusinessError:
+                raise
+            except MRERPTechnicalError as e:
+                logger.warning(
+                    "product auto-create post-verify unavailable for %s (trusting "
+                    "just-written name): %s",
+                    product_code,
+                    e,
+                )
             logger.info(
                 "auto-created product %s (seed=%s, name=%s)",
                 product_code,

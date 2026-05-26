@@ -237,34 +237,10 @@ def push_mrerp(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tupl
     )
 
 
-def push_mrerp_history(
-    endpoint: Dict[str, Any],
-    history_record: Dict[str, Any],
-) -> Dict[str, Any]:
-    """A1 (Zihao 2026-05-19 拍板) · The real mrerp pusher.
-
-    Unlike push_webhook / push_flowaccount which work on a "standard
-    payload" dict, mrerp's adapter wants the raw history + per-tenant
-    mappings. This function builds those, drives
-    MRERPAdapter.upload_invoice_batch, and translates the ImportResult
-    back into the dict shape push_to_endpoint promises its caller
-    (success / http_status / response_body / error_msg / elapsed_ms /
-    request_body / adapter / + optional mrerp_bill_no for success).
-
-    Returns the same shape as push_to_endpoint so the calling routes
-    (manual push / auto push / log retry / batch retry / retry worker)
-    don't need to special-case mrerp at all — they just write the
-    insert_push_log + update_history_push_status rows from this result.
-
-    Never raises — every failure path returns a dict.
-    """
-    t0 = time.time()
-    config = endpoint.get("config") or {}
-    user_id = endpoint.get("user_id")
-    endpoint_id = str(endpoint.get("id") or "")
-
-    # ── flatten OCR pages -> top-level fields so MRERPAdapter._extract_buyer
-    #    can find buyer_name (mirrors build_standard_payload's logic).
+def flatten_history_for_mrerp(history_record: Dict[str, Any]) -> Dict[str, Any]:
+    """P1c · 把 OCR pages 顶层 fields 拍平,让 MRERPAdapter._extract_buyer 能直接
+    在 history_flat['fields'] 找到 buyer_name(行为不变 · 从 push_mrerp_history 抽出)。
+    选第一个非 duplicate/copy 的 page · 没有就退第一页。不写 tenant_id(caller 加)。"""
     pages = history_record.get("pages") or []
     primary = None
     for p in pages:
@@ -278,71 +254,44 @@ def push_mrerp_history(
 
     history_flat = dict(history_record)
     history_flat["fields"] = fields
+    return history_flat
 
-    # ── tenant_id needed for mappings + product/customer sync attribution.
+
+def load_mrerp_mappings(tenant_id: Optional[str]) -> Dict[str, Any]:
+    """P1c · 取该 tenant 的 MR.ERP 主数据映射 bundle(clients/products/accounts/taxes)。
+    无 tenant → 空 bundle(行为不变 · 从 push_mrerp_history 抽出)。"""
     try:
         import db as _db
-    except Exception as e:
-        logger.exception("push_mrerp_history: db import failed")
-        return _mrerp_result_dict(
-            False,
-            0,
-            "",
-            error_msg=f"ERR_DB_IMPORT: {e}",
-            elapsed_ms=int((time.time() - t0) * 1000),
-            endpoint_id=endpoint_id,
-            history_id=str(history_record.get("id") or ""),
-        )
-
-    tenant_id = _db.get_user_tenant_id(user_id) if user_id else None
-    if tenant_id:
-        history_flat["tenant_id"] = tenant_id
-
-    mappings = (
+    except Exception:
+        return {"clients": [], "products": [], "accounts": [], "taxes": []}
+    return (
         _db.get_mrerp_mappings_bundle(tenant_id)
         if tenant_id
         else {"clients": [], "products": [], "accounts": [], "taxes": []}
     )
 
-    request_body = {
-        "history_id": str(history_record.get("id") or ""),
-        "invoice_no": history_record.get("invoice_no"),
-        "tenant_id": tenant_id,
-        "endpoint_id": endpoint_id,
-        "adapter": "mrerp",
-    }
 
-    def _resp(
-        success: bool, http_status: int, body, error_msg: Optional[str] = None, **extra
-    ) -> Dict[str, Any]:
-        body_str = (
-            body if isinstance(body, str) else json.dumps(body, default=str, ensure_ascii=False)
-        )
-        return {
-            "success": success,
-            "http_status": http_status,
-            "response_body": body_str[:4000],
-            "error_msg": error_msg,
-            "elapsed_ms": int((time.time() - t0) * 1000),
-            "request_body": request_body,
-            "adapter": "mrerp",
-            **extra,
+def build_mrerp_adapter(config: Dict[str, Any]):
+    """P1c · 从 endpoint.config 构造 MRERPAdapter(行为不变 · 从 push_mrerp_history 抽出)。
+
+    返回 (adapter, err):
+      - 成功 → (adapter, None)
+      - 失败 → (None, {"http_status", "body", "error_msg"}) · caller 直接拼成 push 结果 dict
+    单张(push_mrerp_history)和批量(push_dispatch.dispatch_endpoint_batch)共用此构造逻辑。
+    """
+    # lazy adapter import (Playwright may be missing on dev boxes).
+    try:
+        from services.erp.mrerp_adapter import MRERPAdapter
+    except ImportError as e:
+        return None, {
+            "http_status": 0,
+            "body": f"playwright_missing: {e}",
+            "error_msg": f"ERR_PLAYWRIGHT_MISSING: {e}",
         }
 
-    # ── lazy adapter import (Playwright may be missing on dev boxes).
-    try:
-        from services.erp.mrerp_adapter import (
-            MRERPAdapter,
-            MRERPAuthError,
-            MRERPTechnicalError,
-            MRERPBusinessError,
-        )
-    except ImportError as e:
-        return _resp(False, 0, f"playwright_missing: {e}", error_msg=f"ERR_PLAYWRIGHT_MISSING: {e}")
-
-    # ── credentials. Accept both shapes:
-    #    enc_user/enc_pass (Fernet ciphertext via wizard POST encryption)
-    #    plain_user/plain_pass (legacy plaintext or PATCH-not-yet-encrypted path)
+    # credentials. Accept both shapes:
+    #   enc_user/enc_pass (Fernet ciphertext via wizard POST encryption)
+    #   plain_user/plain_pass (legacy plaintext or PATCH-not-yet-encrypted path)
     enc_user = (config.get("username_enc") or "").strip()
     enc_pass = config.get("password_enc") or ""
     plain_user = (config.get("username") or "").strip()
@@ -355,7 +304,6 @@ def push_mrerp_history(
         from kms_helper import is_encrypted as _is_enc
 
         if enc_user and not _is_enc(enc_user):
-            # username_enc field holds plaintext (PATCH path didn't encrypt yet).
             plain_user, enc_user = enc_user, ""
         if enc_pass and not _is_enc(enc_pass):
             plain_pass, enc_pass = enc_pass, ""
@@ -389,22 +337,120 @@ def push_mrerp_history(
                 **common_kwargs,
             )
         else:
-            return _resp(
-                False,
-                401,
-                "no_credentials",
-                error_msg="ERR_NO_CREDS: username/password missing in endpoint.config",
-            )
+            return None, {
+                "http_status": 401,
+                "body": "no_credentials",
+                "error_msg": "ERR_NO_CREDS: username/password missing in endpoint.config",
+            }
     except ValueError as e:
-        return _resp(False, 401, f"decrypt_failed: {e}", error_msg=f"ERR_CRED_DECRYPT: {e}")
+        return None, {
+            "http_status": 401,
+            "body": f"decrypt_failed: {e}",
+            "error_msg": f"ERR_CRED_DECRYPT: {e}",
+        }
     except Exception as e:
-        logger.exception("push_mrerp_history: adapter construct failed")
-        return _resp(
+        logger.exception("build_mrerp_adapter: adapter construct failed")
+        return None, {
+            "http_status": 0,
+            "body": f"adapter_construct: {type(e).__name__}: {e}",
+            "error_msg": f"ERR_UNEXPECTED: adapter construct: {e}",
+        }
+    return adapter, None
+
+
+def push_mrerp_history(
+    endpoint: Dict[str, Any],
+    history_record: Dict[str, Any],
+) -> Dict[str, Any]:
+    """A1 (Zihao 2026-05-19 拍板) · The real mrerp pusher.
+
+    Unlike push_webhook / push_flowaccount which work on a "standard
+    payload" dict, mrerp's adapter wants the raw history + per-tenant
+    mappings. This function builds those, drives
+    MRERPAdapter.upload_invoice_batch, and translates the ImportResult
+    back into the dict shape push_to_endpoint promises its caller
+    (success / http_status / response_body / error_msg / elapsed_ms /
+    request_body / adapter / + optional mrerp_bill_no for success).
+
+    Returns the same shape as push_to_endpoint so the calling routes
+    (manual push / auto push / log retry / batch retry / retry worker)
+    don't need to special-case mrerp at all — they just write the
+    insert_push_log + update_history_push_status rows from this result.
+
+    Never raises — every failure path returns a dict.
+    """
+    t0 = time.time()
+    config = endpoint.get("config") or {}
+    user_id = endpoint.get("user_id")
+    endpoint_id = str(endpoint.get("id") or "")
+
+    # ── flatten OCR pages -> top-level fields so MRERPAdapter._extract_buyer
+    #    can find buyer_name (P1c · 抽到 flatten_history_for_mrerp · 行为不变).
+    history_flat = flatten_history_for_mrerp(history_record)
+
+    # ── tenant_id needed for mappings + product/customer sync attribution.
+    try:
+        import db as _db
+    except Exception as e:
+        logger.exception("push_mrerp_history: db import failed")
+        return _mrerp_result_dict(
             False,
             0,
-            f"adapter_construct: {type(e).__name__}: {e}",
-            error_msg=f"ERR_UNEXPECTED: adapter construct: {e}",
+            "",
+            error_msg=f"ERR_DB_IMPORT: {e}",
+            elapsed_ms=int((time.time() - t0) * 1000),
+            endpoint_id=endpoint_id,
+            history_id=str(history_record.get("id") or ""),
         )
+
+    tenant_id = _db.get_user_tenant_id(user_id) if user_id else None
+    if tenant_id:
+        history_flat["tenant_id"] = tenant_id
+
+    mappings = load_mrerp_mappings(tenant_id)
+
+    request_body = {
+        "history_id": str(history_record.get("id") or ""),
+        "invoice_no": history_record.get("invoice_no"),
+        "tenant_id": tenant_id,
+        "endpoint_id": endpoint_id,
+        "adapter": "mrerp",
+    }
+
+    def _resp(
+        success: bool, http_status: int, body, error_msg: Optional[str] = None, **extra
+    ) -> Dict[str, Any]:
+        body_str = (
+            body if isinstance(body, str) else json.dumps(body, default=str, ensure_ascii=False)
+        )
+        return {
+            "success": success,
+            "http_status": http_status,
+            "response_body": body_str[:4000],
+            "error_msg": error_msg,
+            "elapsed_ms": int((time.time() - t0) * 1000),
+            "request_body": request_body,
+            "adapter": "mrerp",
+            **extra,
+        }
+
+    # ── build adapter (P1c · 抽到 build_mrerp_adapter · 行为不变:含 playwright
+    #    import / cred enc-plain 启发式 / construct;失败回 (None, err) → 同样的 _resp).
+    adapter, build_err = build_mrerp_adapter(config)
+    if build_err:
+        return _resp(
+            False,
+            build_err["http_status"],
+            build_err["body"],
+            error_msg=build_err["error_msg"],
+        )
+
+    # adapter 已构造成功 → playwright 必可 import · 取异常类用于下方分类。
+    from services.erp.mrerp_adapter import (
+        MRERPAuthError,
+        MRERPTechnicalError,
+        MRERPBusinessError,
+    )
 
     # ── run the batch (sync · MUST be off the event loop · the caller
     #    in app.py wraps push_to_endpoint with asyncio.to_thread).

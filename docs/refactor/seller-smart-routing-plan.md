@@ -151,6 +151,19 @@ _verify_resolved_master_data(重新反查)**。所以用户在卡片里"选对 E
 - 守门:路由单测(单端点=现状 / 多端点=各推各 / 未匹配=兜底)· 沙箱真账号:重开 dad6fb0f
   推一张新卖方发票验路由到对账套 + 验不误杀现用户。
 
+## 🧩 实现落地记录(2026-05-26 · P1b+P1c+P1d 本地完成 · 灰度沙箱测中)
+
+- **P1b**:`users.erp_push_mode`(smart/fixed/ocr_only · 进 `ensure_google_sub_column` · alembic 006 留档)+ `db.get/set_erp_push_mode` + `GET/PUT /api/settings/erp-push-mode`(settings_routes)+ `/api/ocr/recognize` Form `push_mode` 覆盖本批 + 两处 auto-push 的 `ocr_only` 纯跳过门。
+- **P1c**:`erp_push.py` 抽 `flatten_history_for_mrerp` / `load_mrerp_mappings` / `build_mrerp_adapter`(行为不变 · 49 守门测试照旧绿);新 `services/erp/push_dispatch.dispatch_endpoint_batch(endpoint, histories)`(mrerp 一次 `upload_invoice_batch` 按 invoice_no 回映射 · 非 mrerp 循环 push_to_endpoint)+ 契约测试。
+- **P1d**:`app.py` `_auto_push_smart_routed`(按 history 的 workspace→endpoint 分组 → `_auto_push_batch_for_endpoint` 一组一次 dispatch · 未匹配/未绑/停用 → 兜底现 auto_push 端点)+ `_persist_push_outcome`(dedup/log/stats/retry 同源)· per-invoice 隔离 · 路由单测。
+
+**回滚开关(扩展)**:`_erp_seller_routing_enabled(user_id)` —— 全局 `ERP_SELLER_ROUTING`(1/true/yes/on)或灰度 `ERP_SELLER_ROUTING_USERS`(逗号分隔 user_id · **仅名单内**走分拣 · 其余含 mrerp 照旧)。默认全关。
+
+### UI 决策(2026-05-26 拍板 · 两个轴各管各的)
+- **轴 A(端点级 · ERP 连接向导已有)**:每个 ERP「识别后自动推 / 手动点推」= `endpoint.auto_push`。向导文案已从「推送模式」正名为「**此账套是否自动推送**」,与全局策略区分。
+- **轴 B(账户级 · 本轮新增)**:「ERP 自动处理方式」= 智能分拣 / 固定当前账套 / 只识别不推送。**放在「自动化 → ERP 对接 → 连接」子面板顶部 inline**(卡片上方 · 全局对所有端点统一生效 · 不进任何单端点配置,因智能分拣本质跨端点分流)。
+- **per-ERP 冷门字段(seed 买方/商品模板)**:收进 ERP 连接向导的「⚙ 高级设置」折叠区(默认折叠 · 原生 `<details>` · 不动加载逻辑)。
+
 ## 构建阶段(确认后)
 - **P1a 路由记忆层**:`seller_workspace_routes` 表 + DAL(match/learn)+ 整合进 match_workspace_for_seller。
 - **P1b 处理模式存储**:user/tenant 默认模式 setting + 上传 Form 覆盖参数。

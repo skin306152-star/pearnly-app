@@ -4,12 +4,14 @@ Pearnly · 用户设置路由模块(智能归档 + 重复发票检测)(REFACTOR-
 
 从 app.py 整片搬过来 · 纯搬家 · 不改业务逻辑 / URL / response shape。
 
-覆盖 5 个 API:
+覆盖 7 个 API:
   GET  /api/archive/settings        · 读归档命名设置(没配过返默认)
   PUT  /api/archive/settings        · 存归档命名设置
   POST /api/archive/rename-preview  · 归档命名实时预览
   GET  /api/settings/dup-check      · 读重复发票检测开关
   PUT  /api/settings/dup-check      · 存重复发票检测开关
+  GET  /api/settings/erp-push-mode  · 读 ERP 自动处理方式(P1b)
+  PUT  /api/settings/erp-push-mode  · 存 ERP 自动处理方式(P1b)
 
 依赖:
   - db.*(archive settings + dup-check 开关)
@@ -131,3 +133,28 @@ async def dup_check_put(payload: DupCheckSettingPayload, request: Request):
     if not ok:
         raise HTTPException(500, detail="settings.save_failed")
     return {"ok": True, "enabled": payload.enabled}
+
+
+# ─── P1b · ERP 自动处理方式(账户级默认 · 上传可临时覆盖本批)───────────
+#   smart    = 智能分拣(按发票卖方→账套→ERP 端点 · 默认推荐)
+#   fixed    = 固定当前账套(全推 auto_push 端点 · 现行为)
+#   ocr_only = 只识别不推送(完全跳过 auto-push)
+class ErpPushModePayload(BaseModel):
+    mode: str
+
+
+@router.get("/api/settings/erp-push-mode")
+async def erp_push_mode_get(request: Request):
+    user = get_current_user_from_request(request)
+    return {"mode": db.get_erp_push_mode(str(user["id"]))}
+
+
+@router.put("/api/settings/erp-push-mode")
+async def erp_push_mode_put(payload: ErpPushModePayload, request: Request):
+    user = get_current_user_from_request(request)
+    if payload.mode not in db.ERP_PUSH_MODES:
+        raise HTTPException(400, detail="settings.invalid_mode")
+    ok = db.set_erp_push_mode(str(user["id"]), payload.mode)
+    if not ok:
+        raise HTTPException(500, detail="settings.save_failed")
+    return {"ok": True, "mode": payload.mode}

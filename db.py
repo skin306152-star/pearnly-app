@@ -282,7 +282,11 @@ def link_google_sub_to_user(user_id: str, google_sub: str) -> bool:
 
 def ensure_google_sub_column():
     """v118.27.5 · 启动时自动加 google_sub 列(幂等 · IF NOT EXISTS)
-    v118.27.5.3 · 同时加 avatar_url 列(Google OAuth picture URL)"""
+    v118.27.5.3 · 同时加 avatar_url 列(Google OAuth picture URL)
+    P1b(2026-05-26)· 同时加 erp_push_mode 列(ERP 自动处理方式 · 账户级默认)·
+      复用本 users 多列 ensure(铁律 #21/#23:不新增 ensure_* · 进现有 ensure)·
+      值 smart(智能分拣) / fixed(固定当前账套) / ocr_only(只识别不推送)· 默认 smart。
+      留档迁移见 alembic/versions/006_users_erp_push_mode.py(生产不跑 alembic · 双跑范式)。"""
     try:
         with get_cursor(commit=True) as cur:
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT")
@@ -290,7 +294,10 @@ def ensure_google_sub_column():
                 "CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL"
             )
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT")
-        logger.info("[v118.27.5.3] users.google_sub + avatar_url 列就绪")
+            cur.execute(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS " "erp_push_mode TEXT DEFAULT 'smart'"
+            )
+        logger.info("[v118.27.5.3] users.google_sub + avatar_url + erp_push_mode 列就绪")
         return True
     except Exception as e:
         logger.error(f"[v118.27.5.3] 加列失败: {e}")
@@ -1062,6 +1069,42 @@ def set_user_dup_check_enabled(user_id: str, enabled: bool) -> bool:
         return True
     except Exception as e:
         logger.error(f"更新重复检测开关失败: {e}")
+        return False
+
+
+# ── P1b(2026-05-26)· ERP 自动处理方式(账户级默认 · 上传可临时覆盖本批)──
+#   smart    = 智能分拣(按发票卖方→账套→ERP 端点 · 新用户默认推荐)
+#   fixed    = 固定当前账套(全推 auto_push 端点 · 现行为)
+#   ocr_only = 只识别不推送(完全跳过 auto-push)
+# mirror dup_check 范式 · 容错读默认 smart。
+ERP_PUSH_MODES = ("smart", "fixed", "ocr_only")
+
+
+def get_erp_push_mode(user_id: str) -> str:
+    """读取用户的 ERP 自动处理方式(默认 'smart')。任何异常/缺列 → 'smart'。"""
+    try:
+        with get_cursor() as cur:
+            cur.execute("SELECT erp_push_mode FROM users WHERE id = %s", (user_id,))
+            row = cur.fetchone()
+            if not row:
+                return "smart"
+            v = (row.get("erp_push_mode") or "").strip()
+            return v if v in ERP_PUSH_MODES else "smart"
+    except Exception:
+        return "smart"
+
+
+def set_erp_push_mode(user_id: str, mode: str) -> bool:
+    """存 ERP 自动处理方式。非法值拒写(返 False)。"""
+    mode = (mode or "").strip()
+    if mode not in ERP_PUSH_MODES:
+        return False
+    try:
+        with get_cursor(commit=True) as cur:
+            cur.execute("UPDATE users SET erp_push_mode = %s WHERE id = %s", (mode, user_id))
+        return True
+    except Exception as e:
+        logger.error(f"更新 ERP 自动处理方式失败: {e}")
         return False
 
 

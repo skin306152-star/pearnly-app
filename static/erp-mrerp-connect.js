@@ -256,11 +256,11 @@
             ja: 'エラースクショ保存先: {path} · サポートに送ると調査が早まります',
         },
         'wiz-step-3-h': {
-            zh: '选择 ERP 年度账套 + 推送模式',
-            en: 'Pick the ERP year-database and push mode',
-            th: 'เลือกชุดบัญชีรายปี ERP และโหมดการส่ง',
-            zh_TW: '選擇 ERP 年度帳套 + 推送模式',
-            ja: 'ERP 年度データベースと送信モードを選択',
+            zh: '选择 ERP 年度账套 + 是否自动推送',
+            en: 'Pick the ERP year-database and auto-push',
+            th: 'เลือกชุดบัญชีรายปี ERP และการส่งอัตโนมัติ',
+            zh_TW: '選擇 ERP 年度帳套 + 是否自動推送',
+            ja: 'ERP 年度データベースと自動送信の選択',
         },
         'wiz-company': {
             zh: 'ERP 公司 / 年度账套',
@@ -277,25 +277,32 @@
             ja: 'この請求書群を書き込む MR.ERP 年度データベースを選択してください。通常、同じ会社は年度やデータベースで帳簿が分かれます。',
         },
         'wiz-mode': {
-            zh: '推送模式',
-            en: 'Push mode',
-            th: 'โหมดการส่ง',
-            zh_TW: '推送模式',
-            ja: '送信モード',
+            zh: '此账套是否自动推送',
+            en: 'Auto-push to this account-set',
+            th: 'ส่งเข้าชุดบัญชีนี้อัตโนมัติหรือไม่',
+            zh_TW: '此帳套是否自動推送',
+            ja: 'この帳簿へ自動送信するか',
         },
         'wiz-mode-auto': {
-            zh: '识别后自动推送(不需要手动)',
-            en: 'Auto-push after OCR (hands-off)',
-            th: 'ส่งอัตโนมัติหลัง OCR เสร็จ',
-            zh_TW: '辨識後自動推送(不需手動)',
-            ja: 'OCR 完了後に自動送信(手動不要)',
+            zh: '识别后自动推送到此账套',
+            en: 'Auto-push to this account-set after OCR',
+            th: 'ส่งเข้าชุดบัญชีนี้อัตโนมัติหลัง OCR',
+            zh_TW: '辨識後自動推送到此帳套',
+            ja: 'OCR 完了後この帳簿へ自動送信',
         },
         'wiz-mode-manual': {
-            zh: '我手动点「推送」才推',
-            en: "Only push when I click the 'Push' button",
-            th: 'ส่งเมื่อกดปุ่ม "Push" เท่านั้น',
-            zh_TW: '我手動點「推送」才推',
-            ja: '「送信」ボタンを押したときのみ送信',
+            zh: '不自动推 · 我手动点「推送」才推',
+            en: "Don't auto-push · only when I click 'Push'",
+            th: 'ไม่ส่งอัตโนมัติ · ส่งเมื่อกดปุ่ม "Push" เท่านั้น',
+            zh_TW: '不自動推 · 我手動點「推送」才推',
+            ja: '自動送信しない · 「送信」を押したときのみ',
+        },
+        'wiz-advanced': {
+            zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
+            en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
+            th: '⚙ ตั้งค่าขั้นสูง (แม่แบบสร้างผู้ซื้อ/สินค้าอัตโนมัติ · ไม่บังคับ)',
+            zh_TW: '⚙ 進階設定(自動建立買方/商品的範本 · 可不填)',
+            ja: '⚙ 詳細設定(買い手/商品の自動作成テンプレート · 任意)',
         },
         'wiz-seed': {
             zh: '自动创建买方时使用的模板(可选)',
@@ -1254,6 +1261,11 @@
             '</label>' +
             '</div>' +
             '</div>' +
+            // 高级设置(自动创建买方/商品的模板 seed)· 冷门 per-ERP 字段 · 默认折叠 ·
+            // 用原生 <details> · 不动 seed 加载逻辑(select/input/hint 仍在 DOM 内)。
+            '<details class="mrerp-wizard-advanced" style="margin-top:4px;">' +
+            '<summary style="cursor:pointer;font-size:13px;color:#6B7280;user-select:none;list-style:revert;" data-mw-advanced></summary>' +
+            '<div style="margin-top:12px;">' +
             '<div class="mrerp-wizard-field">' +
             '<label class="mrerp-wizard-label" data-mw-seed-label></label>' +
             '<select class="mrerp-wizard-select" data-mw-seed style="display:none;">' +
@@ -1272,6 +1284,8 @@
             '<div class="mrerp-wizard-hint" data-mw-seedp-hint></div>' +
             '<div class="mrerp-wizard-hint" data-mw-seedp-fallback-hint style="display:none;color:#8a5a00;"></div>' +
             '</div>' +
+            '</div>' +
+            '</details>' +
             '</div>'
         );
     }
@@ -1313,6 +1327,8 @@
         w.querySelector('[data-mw-mode-label]').textContent = t('wiz-mode');
         w.querySelector('[data-mw-mode-auto]').textContent = t('wiz-mode-auto');
         w.querySelector('[data-mw-mode-manual]').textContent = t('wiz-mode-manual');
+        const _advEl = w.querySelector('[data-mw-advanced]');
+        if (_advEl) _advEl.textContent = t('wiz-advanced');
         w.querySelector('[data-mw-seed-label]').textContent = t('wiz-seed');
         w.querySelector('[data-mw-seed-hint]').textContent = t('wiz-seed-hint');
         // Reset the seed select to its initial single-option state so

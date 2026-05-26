@@ -19116,6 +19116,41 @@ window.pearnlyConfirm = function (message, title) {
     async function _onEnterConnectSubtab() {
         await _loadStatus(true);
         _renderCard();
+        _loadGlobalPushMode();
+    }
+
+    // P1b · 全局「ERP 自动处理方式」· 账户级 · 对所有端点统一生效。
+    async function _loadGlobalPushMode() {
+        const sel = document.getElementById('erp-global-push-mode');
+        if (!sel) return;
+        const tk = localStorage.getItem('mrpilot_token');
+        if (!tk) return;
+        try {
+            const r = await fetch('/api/settings/erp-push-mode', {
+                headers: { 'Authorization': 'Bearer ' + tk },
+            });
+            if (r.ok) {
+                const d = await r.json();
+                if (d.mode) { sel.value = d.mode; sel.dataset.prev = d.mode; }
+            }
+        } catch (e) { /* 静默 · 保留默认 smart */ }
+    }
+
+    async function _onChangeGlobalPushMode(sel) {
+        const mode = sel.value;
+        const tk = localStorage.getItem('mrpilot_token');
+        try {
+            const r = await fetch('/api/settings/erp-push-mode', {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + tk, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode }),
+            });
+            if (r.ok) { sel.dataset.prev = mode; _toast(t('pref-erp-mode-saved'), 'success'); }
+            else { sel.value = sel.dataset.prev || 'smart'; _toast(t('pref-save-failed'), 'error'); }
+        } catch (e) {
+            sel.value = sel.dataset.prev || 'smart';
+            _toast(t('pref-save-failed'), 'error');
+        }
     }
 
     // ─── OAuth 回调 redirect 后的提示(URL hash 含 ?xero=ok|err)
@@ -19159,6 +19194,10 @@ window.pearnlyConfirm = function (message, title) {
             // v27.8.1.3 · auto-push toggle
             if (ev.target && ev.target.id === 'xero-auto-push-toggle') {
                 _onToggleAutoPush(ev.target.checked, ev.target);
+            }
+            // P1b · 全局 ERP 自动处理方式 select
+            if (ev.target && ev.target.id === 'erp-global-push-mode') {
+                _onChangeGlobalPushMode(ev.target);
             }
         });
 

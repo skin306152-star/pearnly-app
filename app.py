@@ -1837,6 +1837,9 @@ async def ocr_recognize(
     # B1 相 1 (2026-05-26) · workspace 账套归属(在为哪家公司做账)· 可选 · Form 或 header
     # X-Workspace-Client-Id · 带不上 NULL · 非强制(缺失不拦上传)· 与 client_id(买方)独立。
     workspace_client_id: Optional[str] = Form(None),
+    # P1b (2026-05-26) · ERP 自动处理方式 · 临时覆盖本批(可空 · 缺省走账户级默认)。
+    # smart=智能分拣 / fixed=固定当前账套 / ocr_only=只识别不推送。
+    push_mode: Optional[str] = Form(None),
 ):
     user = get_current_user_from_request(request)
     client_ip = get_client_ip(request)
@@ -1845,6 +1848,11 @@ async def ocr_recognize(
     # B1 相 1 · 解析 workspace 账套归属:优先 Form,回退 header;非数字/缺失 → None(写 NULL)。
     _ws_raw = workspace_client_id or request.headers.get("X-Workspace-Client-Id")
     _ws_client_id = int(_ws_raw) if (_ws_raw and str(_ws_raw).strip().isdigit()) else None
+
+    # P1b · ERP 自动处理方式:本批 Form 覆盖优先,否则读账户级默认(容错 smart)。
+    # ocr_only → 下方两处 auto-push 直接跳过(零风险纯跳过);smart/fixed 的真正分流在 P1d。
+    _pm = (push_mode or "").strip()
+    _erp_mode = _pm if _pm in db.ERP_PUSH_MODES else db.get_erp_push_mode(str(user["id"]))
 
     # 1. 基本校验 (2026-05-21 multi-format refactor: PDF + image + Excel + CSV + Word)
     from services.ocr.pipeline import (
@@ -1910,18 +1918,29 @@ async def ocr_recognize(
         logger.info(f"  🎯 命中文件缓存 (hash={file_hash[:12]}..., 省额度)")
 
         # v0.9 · 缓存命中也触发自动推送(用户的期待是"每次上传就推送")
+        # P1b · ocr_only 模式 → 完全跳过 auto-push(纯跳过 · 零风险)。
         cache_auto_pushed = False
-        if _plan_permissions(plan).get("can_auto_push_erp"):
+        if _erp_mode == "ocr_only":
+            logger.info("[Cache][P1b] ocr_only 模式 · 跳过自动推送")
+        elif _plan_permissions(plan).get("can_auto_push_erp"):
             try:
                 auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
                 if auto_eps:
                     import asyncio
 
-                    asyncio.create_task(
-                        _auto_push_history(
-                            str(user["id"]), cached["id"], auto_eps, tenant_id=_tid(user)
+                    # P1d · 缓存命中也走同一分流(开+smart→分拣 · 否则现行为)。
+                    if _erp_seller_routing_enabled(str(user["id"])) and _erp_mode == "smart":
+                        asyncio.create_task(
+                            _auto_push_smart_routed(
+                                str(user["id"]), [cached["id"]], _tid(user), auto_eps
+                            )
                         )
-                    )
+                    else:
+                        asyncio.create_task(
+                            _auto_push_history(
+                                str(user["id"]), cached["id"], auto_eps, tenant_id=_tid(user)
+                            )
+                        )
                     cache_auto_pushed = True
                     logger.info(f"🚀 [Cache] 自动推送已入队 · history={cached['id']}")
             except Exception as e:
@@ -2586,8 +2605,11 @@ async def ocr_recognize(
     # 没 client_id 的就交给「待归属」/「建议归属」UI 让用户确认 · 防止
     # auto-push 必炸 ERR_NO_CLIENT 浪费 retry 队列(对应 Zihao 截图里
     # 一直 retry 的混乱).
+    # P1b · ocr_only 模式 → 完全跳过 auto-push + Xero 触发(纯跳过 · 零风险)。
     auto_pushed = False
-    if history_ids and _plan_permissions(plan).get("can_auto_push_erp"):
+    if _erp_mode == "ocr_only":
+        logger.info("[P1b] ocr_only 模式 · 跳过 %d 张发票的自动推送", len(history_ids or []))
+    elif history_ids and _plan_permissions(plan).get("can_auto_push_erp"):
         try:
             auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
             if auto_eps:
@@ -2609,15 +2631,27 @@ async def ocr_recognize(
                 if pushable_ids:
                     import asyncio
 
-                    for hid in pushable_ids:
+                    # P1d · ERP_SELLER_ROUTING 开 + smart → 按卖方账套路由分组批量推;
+                    # 否则(关 / fixed)走现行为:每张推所有 auto_push 端点。
+                    if _erp_seller_routing_enabled(str(user["id"])) and _erp_mode == "smart":
                         asyncio.create_task(
-                            _auto_push_history(
+                            _auto_push_smart_routed(
                                 str(user["id"]),
-                                hid,
+                                pushable_ids,
+                                _tid(user),
                                 auto_eps,
-                                tenant_id=_tid(user),
                             ),
                         )
+                    else:
+                        for hid in pushable_ids:
+                            asyncio.create_task(
+                                _auto_push_history(
+                                    str(user["id"]),
+                                    hid,
+                                    auto_eps,
+                                    tenant_id=_tid(user),
+                                ),
+                            )
                     auto_pushed = True
                     logger.info(
                         "🚀 自动推送已入队 · %d/%d 张发票 × %d 端点 " "(没归属的发票跳过)",
@@ -3049,6 +3083,196 @@ async def _auto_push_history(
 
 
 # ============================================================
+# P1d (Zihao 2026-05-26) · 卖方智能分拣 → 按账套路由批量推送
+#   回滚开关 ERP_SELLER_ROUTING(默认关 · 关 = 现"全推 auto_push 端点"行为)。
+#   开 + mode=smart → 按每张 history 的卖方账套(workspace)绑定的 endpoint 分组,
+#   一组一次 dispatch_endpoint_batch(解 1000 张规模);未匹配/未绑端点 → 兼容兜底
+#   推现有 auto_push 端点(不阻断 · 回滚安全线)。per-invoice 隔离。
+#   写库逻辑(dedup / push 日志 / stats / 历史状态 / retry 队列)与逐张路径同源(铁律#12)。
+# ============================================================
+def _erp_seller_routing_enabled(user_id=None) -> bool:
+    """ERP_SELLER_ROUTING 回滚开关 · 默认关。
+
+    - 全局开:`ERP_SELLER_ROUTING` = 1/true/yes/on(忽略大小写)→ 所有用户走智能分拣。
+    - 灰度开:`ERP_SELLER_ROUTING_USERS` = 逗号分隔 user_id → **仅名单内**用户走 ·
+      其余用户(含现付费用户 mrerp)照旧。沙箱/灰度真账号测专用,隔离风险。
+    """
+    if (os.environ.get("ERP_SELLER_ROUTING") or "").strip().lower() in ("1", "true", "yes", "on"):
+        return True
+    if user_id:
+        allow = os.environ.get("ERP_SELLER_ROUTING_USERS") or ""
+        ids = {x.strip() for x in allow.split(",") if x.strip()}
+        if str(user_id) in ids:
+            return True
+    return False
+
+
+def _persist_push_outcome(user_id, ep, history, result, trigger="auto"):
+    """把一条 push 结果落库:push 日志 + endpoint stats + 历史状态 + 失败入重试队列。
+    与 _auto_push_history 单张写库逻辑同源(铁律#12 单一源)· 供 P1d 批量路径复用。"""
+    history_id = str(history["id"])
+    new_log_id = db.insert_push_log(
+        user_id=user_id,
+        endpoint_id=ep["id"],
+        history_id=history_id,
+        invoice_no=history.get("invoice_no"),
+        seller_name=history.get("seller_name"),
+        total_amount=history.get("total_amount"),
+        status="success" if result["success"] else "failed",
+        http_status=result.get("http_status"),
+        request_body=result.get("request_body"),
+        response_body=result.get("response_body"),
+        error_msg=result.get("error_msg"),
+        attempt=1,
+        elapsed_ms=result.get("elapsed_ms", 0),
+        trigger=trigger,
+    )
+    db.update_endpoint_stats(ep["id"], result["success"])
+    db.update_history_push_status(history_id, "success" if result["success"] else "failed")
+
+    # 失败入重试队列(用户数据错跳过 · 同 _auto_push_history)。
+    if not result["success"] and new_log_id:
+        if db.is_user_data_error(result.get("error_msg")):
+            logger.info(
+                "[SmartPush] user-data error · NOT scheduling retry · log=%s err=%r",
+                str(new_log_id)[:8],
+                (result.get("error_msg") or "")[:80],
+            )
+        else:
+            first_delay = db.get_erp_retry_delay_sec(0)
+            if first_delay is not None:
+                db.schedule_log_retry(str(new_log_id), first_delay)
+                logger.info(
+                    f"[SmartPush] 失败入重试队列 · log={new_log_id} · {first_delay}s 后第 1 次重试"
+                )
+
+
+async def _auto_push_batch_for_endpoint(user_id, endpoint, histories, tenant_id=None):
+    """P1d · 一个 endpoint 一批 history:dedup → 一次 dispatch_endpoint_batch → 逐张落库。
+    dispatch 是同步(Playwright)· 用 run_in_executor 挪线程 · 不阻塞事件循环。"""
+    import asyncio
+
+    from services.erp import push_dispatch
+
+    # 1) dedup:已 success 过 → 写 skipped_dup,不进 dispatch(同 _auto_push_history)。
+    to_push = []
+    for h in histories:
+        try:
+            existing = db.has_recent_successful_push(str(h["id"]), endpoint["id"], user_id)
+        except Exception:
+            existing = None
+        if existing:
+            db.insert_push_log(
+                user_id=user_id,
+                endpoint_id=endpoint["id"],
+                history_id=str(h["id"]),
+                invoice_no=h.get("invoice_no"),
+                seller_name=h.get("seller_name"),
+                total_amount=h.get("total_amount"),
+                status="skipped_dup",
+                http_status=200,
+                request_body={
+                    "adapter": endpoint.get("adapter"),
+                    "skipped_reason": "already_success",
+                    "prior_log_id": str(existing.get("id")),
+                },
+                response_body=existing.get("response_body"),
+                error_msg=None,
+                attempt=1,
+                elapsed_ms=0,
+                trigger="auto",
+            )
+            continue
+        to_push.append(h)
+
+    if not to_push:
+        return
+
+    # 2) 一次性批量推(off-loop)。
+    loop = asyncio.get_event_loop()
+    try:
+        results = await loop.run_in_executor(
+            None, push_dispatch.dispatch_endpoint_batch, endpoint, to_push
+        )
+    except Exception as e:
+        logger.exception(
+            "[SmartPush] dispatch_endpoint_batch raised · endpoint=%s · %s",
+            endpoint.get("name"),
+            e,
+        )
+        return
+
+    # 3) 逐张落库(per-invoice 隔离:一张写库异常不影响其余)。
+    for h, result in zip(to_push, results):
+        try:
+            _persist_push_outcome(user_id, endpoint, h, result)
+            logger.info(
+                "[SmartPush] user=%s.. history=%s.. ep=%r success=%s",
+                user_id[:8],
+                str(h["id"])[:8],
+                endpoint.get("name"),
+                result.get("success"),
+            )
+        except Exception as e:
+            logger.exception("[SmartPush] 落库异常 history=%s: %s", str(h.get("id"))[:8], e)
+
+
+async def _auto_push_smart_routed(user_id, history_ids, tenant_id, fallback_eps):
+    """P1d · 智能分拣编排:按每张 history 的卖方账套(workspace)绑定的 endpoint 分组批量推;
+    未匹配/未绑端点/端点停用 → 兼容兜底推现有 auto_push 端点(回滚安全线 · 不阻断)。"""
+    groups = {}  # endpoint_id -> {"endpoint": ep, "histories": [...]}
+    fallback = []  # 未匹配 → 兜底
+    ep_cache = {}
+
+    for hid in history_ids:
+        try:
+            h = db.get_ocr_history_detail(user_id, hid, tenant_id=tenant_id)
+        except Exception:
+            h = None
+        if not h:
+            continue
+        wcid = h.get("workspace_client_id")
+        target_ep = None
+        if wcid:
+            try:
+                wc = db.get_workspace_client(int(wcid), user_id, tenant_id=tenant_id)
+            except Exception:
+                wc = None
+            eid = ((wc or {}).get("erp_endpoint_id") or "").strip() or None
+            if eid:
+                if eid not in ep_cache:
+                    ep_cache[eid] = db.get_erp_endpoint(user_id, eid)
+                target_ep = ep_cache[eid]
+        if target_ep and target_ep.get("enabled", True):
+            g = groups.setdefault(str(target_ep["id"]), {"endpoint": target_ep, "histories": []})
+            g["histories"].append(h)
+        else:
+            fallback.append(h)
+
+    logger.info(
+        "[SmartPush] 分拣 · %d 端点组 + %d 张兜底",
+        len(groups),
+        len(fallback),
+    )
+
+    # 各账套端点分组批量推(组间串行 · MR.ERP 会话锁本就跨进程串行)。
+    for g in groups.values():
+        try:
+            await _auto_push_batch_for_endpoint(
+                user_id, g["endpoint"], g["histories"], tenant_id=tenant_id
+            )
+        except Exception as e:
+            logger.exception("[SmartPush] 端点组推送异常: %s", e)
+
+    # 兜底:未匹配的推现有 auto_push 端点(现行为 · 不阻断付费用户)。
+    for h in fallback:
+        try:
+            await _auto_push_history(user_id, str(h["id"]), fallback_eps, tenant_id=tenant_id)
+        except Exception as e:
+            logger.exception("[SmartPush] 兜底推送异常 history=%s: %s", str(h.get("id"))[:8], e)
+
+
+# ============================================================
 # v27.8.1.3 · Xero 后台自动推(OCR 完成 hook 调用)
 # ============================================================
 async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: str):
@@ -3216,10 +3440,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "「ERP 推送异常」现可一键修复:点开异常即可查看冲突详情,直接搜索并选择正确的 ERP 客户绑定后自动重试推送,全程不用离开页面。即日生效。",
-            "th": "ตอนนี้แก้ «ข้อยกเว้นการส่งเข้า ERP» ได้ในที่เดียว: เปิดรายการเพื่อดูรายละเอียดความขัดแย้ง ค้นหาและเลือกลูกค้า ERP ที่ถูกต้องเพื่อผูก แล้วระบบจะลองส่งใหม่อัตโนมัติ โดยไม่ต้องออกจากหน้า · มีผลทันที",
-            "en": "“ERP push exceptions” can now be fixed in one place: open an exception to see the conflict details, search and select the correct ERP customer to bind, and the push retries automatically — without leaving the page. Effective immediately.",
-            "ja": "「ERP 連携の例外」をその場で修正できるようになりました。例外を開いて不一致の詳細を確認し、正しい ERP 取引先を検索・選択して紐づけると、自動的に再送信されます。ページを離れる必要はありません。即日有効。",
+            "zh": "新增「ERP 自动处理方式」设置:可在「ERP 对接」页选择识别后如何处理发票——智能分拣、固定当前账套、或只识别不推送。ERP 连接向导的选项文案也已优化更清晰。即日生效。",
+            "th": "เพิ่มการตั้งค่า «วิธีประมวลผล ERP อัตโนมัติ»: เลือกได้ในหน้า «การเชื่อมต่อ ERP» ว่าหลังอ่านใบกำกับแล้วจะจัดการอย่างไร — จัดส่งอัจฉริยะ ใช้ชุดบัญชีปัจจุบัน หรืออ่านอย่างเดียวไม่ส่ง · ข้อความในตัวช่วยเชื่อมต่อ ERP ปรับให้ชัดเจนขึ้น · มีผลทันที",
+            "en": "Added an “ERP auto-processing” setting: on the “ERP integration” page you can choose how invoices are handled after recognition — smart routing, fixed to the current account-set, or recognize-only. The ERP connection wizard wording has also been clarified. Effective immediately.",
+            "ja": "「ERP 自動処理方式」設定を追加しました。「ERP 連携」ページで、読み取り後の請求書の扱い方(スマート振り分け・現在の帳簿に固定・読み取りのみ)を選択できます。ERP 接続ウィザードの文言も分かりやすく改善しました。即日有効。",
         },
     }
 

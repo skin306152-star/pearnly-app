@@ -3440,10 +3440,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已修复「ERP 对接」推送中,同时涉及客户与商品核对时可能出现的推送失败问题。此前部分发票因核对环节误判而未能成功推送,现已修复,推送更稳定可靠。同时,客户与商品选择已可完整读取全部条目(不再仅限前 30 个)。即日生效。",
-            "th": "ระบบได้แก้ไขปัญหาการส่งข้อมูลใน «การเชื่อมต่อ ERP» ที่อาจล้มเหลวเมื่อต้องตรวจสอบทั้งลูกค้าและสินค้าพร้อมกัน · ก่อนหน้านี้ใบกำกับบางรายการส่งไม่สำเร็จเพราะขั้นตอนตรวจสอบเข้าใจผิด ได้รับการแก้ไขแล้ว การส่งเสถียรและเชื่อถือได้มากขึ้น · อีกทั้งการเลือกลูกค้าและสินค้าสามารถอ่านได้ครบทุกรายการ (ไม่จำกัดเพียง 30 รายการแรก) · มีผลทันที",
-            "en": "Resolved an issue in ERP integration where a push could fail when both the customer and the product needed verification at the same time. Previously some invoices were not pushed due to a misjudgement in the verification step; this is fixed and pushing is now more stable and reliable. Customer and product selection now also reads all entries (no longer limited to the first 30). Effective immediately.",
-            "ja": "「ERP 連携」の送信で、取引先と商品を同時に照合する際に送信が失敗することがある問題を修正しました。これまで一部の請求書は照合工程の誤判定により送信できませんでしたが、修正され、送信がより安定し信頼できるようになりました。あわせて、取引先・商品の選択はすべての項目を読み込めるようになりました(先頭 30 件に限定されません)。即日有効。",
+            "zh": "系统已大幅提升「ERP 对接」推送的速度与稳定性。此前商品较多的账套在推送时核对耗时过长、易超时导致推送失败,现已优化,推送更快更稳定可靠。即日生效。",
+            "th": "ระบบได้ปรับปรุงความเร็วและความเสถียรของการส่งข้อมูลใน «การเชื่อมต่อ ERP» อย่างมาก · ก่อนหน้านี้บัญชีที่มีสินค้าจำนวนมากใช้เวลาตรวจสอบนานเกินไปและมักหมดเวลาจนส่งไม่สำเร็จ ได้รับการปรับปรุงแล้ว การส่งเร็วขึ้นและเสถียรเชื่อถือได้มากขึ้น · มีผลทันที",
+            "en": "Significantly improved the speed and reliability of ERP integration pushes. Previously, accounts with many products took too long to verify and often timed out, causing pushes to fail. This is now optimized — pushing is faster and more reliable. Effective immediately.",
+            "ja": "「ERP 連携」の送信の速度と安定性を大幅に改善しました。これまで商品の多い帳簿では照合に時間がかかりすぎてタイムアウトし、送信が失敗することがありました。最適化により、送信がより速く安定するようになりました。即日有効。",
         },
     }
 

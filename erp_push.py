@@ -963,7 +963,8 @@ def list_mrerp_customers(
     try:
         with adapter:
             svc = MRERPCustomerSyncService(adapter)
-            rows = svc._fetch_listing()
+            # picker 下拉:拉全量(用户主动点·可缓存·不在推送热路径)。
+            rows = svc._fetch_listing(max_pages=400)
         customers = [
             {
                 "code": r.code,
@@ -1088,7 +1089,8 @@ def list_mrerp_products(
     try:
         with adapter:
             svc = MRERPProductSyncService(adapter)
-            rows = svc._fetch_listing()
+            # picker 下拉:拉全量(用户主动点·可缓存·不在推送热路径)。
+            rows = svc._fetch_listing(max_pages=400)
         products = [
             {
                 "code": r.code,

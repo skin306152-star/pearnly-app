@@ -479,13 +479,25 @@ class MRERPCustomerSyncService:
                 f"(code={code!r}, buyer={name!r} · one is empty)"
             )
 
-        try:
-            listing = self._search_listing(code)
-        except MRERPTechnicalError as e:
+        # 2026-05-26 修:复核搜索加 1 次重试 · 大目录/服务端抖动下单次易超时 →
+        # 误判 ERR_CUSTOMER_VERIFY_UNAVAILABLE 把能推的发票挡下(生产实测)。
+        import time as _time
+
+        listing = None
+        last_err: Optional[Exception] = None
+        for attempt in (1, 2):
+            try:
+                listing = self._search_listing(code)
+                break
+            except MRERPTechnicalError as e:
+                last_err = e
+                if attempt < 2:
+                    _time.sleep(2)
+        if listing is None:
             raise MRERPTechnicalError(
                 f"ERR_CUSTOMER_VERIFY_UNAVAILABLE — MR.ERP listing lookup "
-                f"failed for customer_code {code!r}: {e}"
-            ) from e
+                f"failed for customer_code {code!r} after retry: {last_err}"
+            ) from last_err
 
         row = next((r for r in listing if r.code == code), None)
         if row is None:
@@ -1151,23 +1163,26 @@ class MRERPCustomerSyncService:
 
     # ----- listing fetch ---------------------------------------
 
-    def _fetch_listing(self) -> List[ListingCustomer]:
+    def _fetch_listing(self, max_pages: int = 1) -> List[ListingCustomer]:
         """Returns the parsed customer listing, hitting the in-service
         TTLCache to avoid refetching during a single push job.
 
-        A3 (Zihao 2026-05-19 拍板) · two-layer reliability:
-          1. wait_for_selector('#showdata p', 10s) after goto · catches
-             the slow-render race where networkidle finishes before the
-             AJAX listing rows attach to DOM.
-          2. On timeout: page.reload() + another 10 s budget.
-          3. Still nothing: save_listing_fail_screenshot() · path baked
-             into MRERPTechnicalError so /api/version's last_500 carries
-             it forward and the route layer's retry can decide whether
-             to re-try.
+        max_pages(2026-05-26 修):默认只取首页(~30 条)· **推送热路径**(lookup /
+        _alloc_next_code 防撞码 / 复核兜底 / 建后复查)只能用这个轻量版,否则大目录
+        (实测 2060 商品/账套)每笔翻 69 页 × 多次建档失效重取 = 推送卡几分钟、超时连环。
+        只有用户主动点的 picker 下拉(list_mrerp_*)才传大 max_pages 拉全量(可缓存·不阻塞推送)。
+        匹配早已改走 _search_listing(按码/名搜·完整),不依赖本方法翻全表。
+
+        可靠性(A3 · Zihao 2026-05-19):goto 后 wait_for_selector('#showdata p')
+        catches 慢渲染 race;超时则 reload 重试;3 次仍空 → 截图 + 抛 MRERPTechnicalError。
         """
-        cached = self.cache.get(self._listing_cache_key)
-        if cached is not None:
-            return cached
+        # 缓存仅服务首页版(热路径反复取)· 全量版(picker)一次性 · 不读写缓存
+        # 避免互相污染(全量写进去会让后续热路径误用 · 首页写进去会让 picker 漏数据)。
+        use_cache = max_pages <= 1
+        if use_cache:
+            cached = self.cache.get(self._listing_cache_key)
+            if cached is not None:
+                return cached
 
         # Ensure the adapter is logged in + on the right company.
         self.adapter.select_company()
@@ -1209,12 +1224,15 @@ class MRERPCustomerSyncService:
                     self.adapter.login_url,
                     self.LISTING_PATH,
                     parse_armas_listing,
+                    max_pages=max_pages,
                 )
-                self.cache.set(self._listing_cache_key, rows)
+                if use_cache:
+                    self.cache.set(self._listing_cache_key, rows)
                 logger.info(
-                    "fetched armas listing: %d rows (attempt %d · paginated)",
+                    "fetched armas listing: %d rows (attempt %d · max_pages=%d)",
                     len(rows),
                     attempt,
+                    max_pages,
                 )
                 return rows
             except PWTimeout as e:

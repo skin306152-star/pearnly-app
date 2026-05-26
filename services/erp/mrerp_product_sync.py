@@ -377,13 +377,25 @@ class MRERPProductSyncService:
                 f"(code={code!r}, item={name!r} · one is empty)"
             )
 
-        try:
-            listing = self._search_listing(code)
-        except MRERPTechnicalError as e:
+        # 2026-05-26 修:复核搜索加 1 次重试 · 大目录/服务端抖动下单次易超时 →
+        # 误判 ERR_PRODUCT_VERIFY_UNAVAILABLE 把能推的发票挡下(生产实测)。
+        import time as _time
+
+        listing = None
+        last_err: Optional[Exception] = None
+        for attempt in (1, 2):
+            try:
+                listing = self._search_listing(code)
+                break
+            except MRERPTechnicalError as e:
+                last_err = e
+                if attempt < 2:
+                    _time.sleep(2)
+        if listing is None:
             raise MRERPTechnicalError(
                 f"ERR_PRODUCT_VERIFY_UNAVAILABLE — MR.ERP listing lookup "
-                f"failed for product_code {code!r}: {e}"
-            ) from e
+                f"failed for product_code {code!r} after retry: {last_err}"
+            ) from last_err
 
         row = next((r for r in listing if r.code == code), None)
         if row is None:
@@ -862,21 +874,22 @@ class MRERPProductSyncService:
 
     # ----- listing fetch ---------------------------------------
 
-    def _fetch_listing(self) -> List[ListingProduct]:
+    def _fetch_listing(self, max_pages: int = 1) -> List[ListingProduct]:
         """A3 (Zihao 2026-05-19 拍板) · mirror of customer listing
         reliability layer: wait_for_selector + reload retry + screenshot.
 
-        问题 2 加固 (Zihao 2026-05-19 拍板 · v118.34.24):
-          - attempts 2 → 3
-          - wait_for_selector 10s → 30s (大 tenant listing 慢)
-          - 间隔 0 → 5s (退让 server 压力)
-          - cache TTL 由 caller 控制(app.py 改 600s)
+        max_pages(2026-05-26 修):默认只取首页(~30 条)· 推送热路径(lookup /
+        _alloc_next_code / 复核兜底 / 建后复查)只能用轻量版。大目录(实测 2060 商品)
+        每笔建档失效后重取整本(69 页)= 推送卡几分钟+超时连环。只有 picker 下拉
+        (list_mrerp_products)传大 max_pages 拉全量(一次性·不阻塞推送)。匹配走 _search_listing。
         """
         import time as _time
 
-        cached = self.cache.get(self._listing_cache_key)
-        if cached is not None:
-            return cached
+        use_cache = max_pages <= 1
+        if use_cache:
+            cached = self.cache.get(self._listing_cache_key)
+            if cached is not None:
+                return cached
         self.adapter.select_company()
         url = self.adapter.login_url + self.LISTING_PATH
         page = self.adapter._page
@@ -908,10 +921,12 @@ class MRERPProductSyncService:
                     self.adapter.login_url,
                     self.LISTING_PATH,
                     parse_stkmas_listing,
+                    max_pages=max_pages,
                 )
-                self.cache.set(self._listing_cache_key, rows)
+                if use_cache:
+                    self.cache.set(self._listing_cache_key, rows)
                 logger.info(
-                    "fetched stkmas listing: %d rows (attempt %d · paginated)",
+                    "fetched stkmas listing: %d rows (attempt %d · max_pages=%d)",
                     len(rows),
                     attempt,
                 )

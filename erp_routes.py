@@ -319,6 +319,41 @@ async def erp_endpoints_delete(endpoint_id: str, request: Request):
     return {"ok": True}
 
 
+class ErpSeedUpdate(BaseModel):
+    seed_customer_code: Optional[str] = None
+    seed_product_code: Optional[str] = None
+
+
+@router.patch("/api/erp/endpoints/{endpoint_id}/seed")
+async def erp_endpoints_update_seed(endpoint_id: str, req: ErpSeedUpdate, request: Request):
+    """per-endpoint「高级设置」· 只更新自动创建买方/商品的种子模板码。
+
+    关键(2026-05-26 Zihao 拍板 task 3):服务端合并现有 config · **不碰已加密凭据**。
+    前端拿不到明文凭据(被 _strip_endpoint_for_response 抹成 ***)· 故不能走整体替换
+    config 的 PATCH(会把 *** 当明文再加密 → 凭据损坏)。这里读 DB 原始 config
+    (含真实密文)· 仅覆盖 seed_* 两键 · 原样写回 · username_enc/password_enc 不变。
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    if not ep:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    cfg = dict(ep.get("config") or {})
+    data = req.dict(exclude_unset=True)
+    if "seed_customer_code" in data:
+        cfg["seed_customer_code"] = data["seed_customer_code"] or None
+    if "seed_product_code" in data:
+        cfg["seed_product_code"] = data["seed_product_code"] or None
+    ok = db.update_erp_endpoint(user["id"], endpoint_id, config=cfg)
+    if not ok:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    return {
+        "ok": True,
+        "seed_customer_code": cfg.get("seed_customer_code"),
+        "seed_product_code": cfg.get("seed_product_code"),
+    }
+
+
 @router.post("/api/erp/test-connection")
 async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
     """前端「测试连接」按钮 · 不写日志、不改任何状态

@@ -3440,10 +3440,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "「ERP 推送异常」处理已增强:当系统发现发票上的商品与 ERP 中的商品对不上时,现在可以在异常处直接为每个商品选择正确的 ERP 商品并一键重新推送,无需再到设置里调整。即日生效。",
-            "th": "ปรับปรุงการจัดการ «ข้อผิดพลาดการส่ง ERP»: เมื่อพบว่าสินค้าในใบกำกับไม่ตรงกับสินค้าใน ERP ตอนนี้สามารถเลือกสินค้า ERP ที่ถูกต้องให้แต่ละรายการได้ในหน้าข้อผิดพลาดและส่งใหม่ได้ในคลิกเดียว ไม่ต้องไปตั้งค่าแยก · มีผลทันที",
-            "en": "The ERP push-exception workflow has been enhanced: when an invoice line does not match a product in your ERP, you can now pick the correct ERP product for each line right in the exception view and resend in one click — no need to adjust settings separately. Effective immediately.",
-            "ja": "「ERP 送信エラー」の処理を強化しました。請求書の商品が ERP の商品と一致しない場合、エラー画面で各商品に正しい ERP 商品を選んでワンクリックで再送信できるようになりました。設定を別途変更する必要はありません。即日有効。",
+            "zh": "「ERP 对接」已支持在每个连接卡片上直接打开「高级设置」,调整自动创建买方/商品所用的模板,无需重走连接向导、也不必重新输入登录信息。即日生效。",
+            "th": "การเชื่อมต่อ ERP รองรับการเปิด «ตั้งค่าขั้นสูง» ได้โดยตรงบนการ์ดการเชื่อมต่อแต่ละรายการ เพื่อปรับแม่แบบที่ใช้สร้างผู้ซื้อ/สินค้าอัตโนมัติ โดยไม่ต้องทำตัวช่วยเชื่อมต่อใหม่หรือกรอกข้อมูลเข้าสู่ระบบอีกครั้ง · มีผลทันที",
+            "en": "ERP integration now lets you open “Advanced” directly on each ERP connection card to adjust the templates used when auto-creating buyers/products — without re-running the connection wizard or re-entering your login. Effective immediately.",
+            "ja": "「ERP 連携」では、各 ERP 接続カードから直接「詳細設定」を開き、買い手/商品の自動作成に使うテンプレートを調整できるようになりました。接続ウィザードをやり直したりログイン情報を再入力したりする必要はありません。即日有効。",
         },
     }
 

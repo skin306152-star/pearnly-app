@@ -304,6 +304,71 @@
             zh_TW: '⚙ 進階設定(自動建立買方/商品的範本 · 可不填)',
             ja: '⚙ 詳細設定(買い手/商品の自動作成テンプレート · 任意)',
         },
+        // task 3 (Zihao 2026-05-26) · per-endpoint 独立「高级设置」弹窗 ·
+        // 直接改种子模板 · 不必重走向导 / 重输凭据(走 /seed 服务端合并)。
+        'card-btn-advanced': {
+            zh: '⚙ 高级设置',
+            en: '⚙ Advanced',
+            th: '⚙ ขั้นสูง',
+            zh_TW: '⚙ 進階設定',
+            ja: '⚙ 詳細設定',
+        },
+        'adv-title': {
+            zh: '高级设置 · 自动创建模板',
+            en: 'Advanced · auto-create templates',
+            th: 'ตั้งค่าขั้นสูง · แม่แบบสร้างอัตโนมัติ',
+            zh_TW: '進階設定 · 自動建立範本',
+            ja: '詳細設定 · 自動作成テンプレート',
+        },
+        'adv-prod-label': {
+            zh: '自动创建商品时使用的模板(可选)',
+            en: 'Template for auto-creating products (optional)',
+            th: 'แม่แบบสำหรับสร้างสินค้าอัตโนมัติ (ทางเลือก)',
+            zh_TW: '自動建立商品時使用的範本(可選)',
+            ja: '商品の自動作成に使うテンプレート(任意)',
+        },
+        'adv-prod-loading': {
+            zh: '正在拉取商品列表…',
+            en: 'Loading product list…',
+            th: 'กำลังโหลดรายการสินค้า…',
+            zh_TW: '正在拉取商品列表…',
+            ja: '商品リストを読み込み中…',
+        },
+        'adv-save': {
+            zh: '保存',
+            en: 'Save',
+            th: 'บันทึก',
+            zh_TW: '儲存',
+            ja: '保存',
+        },
+        'adv-cancel': {
+            zh: '取消',
+            en: 'Cancel',
+            th: 'ยกเลิก',
+            zh_TW: '取消',
+            ja: 'キャンセル',
+        },
+        'adv-saved': {
+            zh: '高级设置已保存',
+            en: 'Advanced settings saved',
+            th: 'บันทึกการตั้งค่าขั้นสูงแล้ว',
+            zh_TW: '進階設定已儲存',
+            ja: '詳細設定を保存しました',
+        },
+        'adv-fail': {
+            zh: '保存失败 · 请稍后重试',
+            en: 'Save failed · try again later',
+            th: 'บันทึกไม่สำเร็จ · ลองใหม่ภายหลัง',
+            zh_TW: '儲存失敗 · 請稍後重試',
+            ja: '保存に失敗しました · 後ほど再試行してください',
+        },
+        'adv-list-fail': {
+            zh: '⚠ 无法拉取列表 · 请稍后重试',
+            en: '⚠ Could not load the list · try again later',
+            th: '⚠ ไม่สามารถโหลดรายการได้ · ลองใหม่ภายหลัง',
+            zh_TW: '⚠ 無法拉取列表 · 請稍後重試',
+            ja: '⚠ リストを取得できません · 後ほど再試行してください',
+        },
         'wiz-seed': {
             zh: '自动创建买方时使用的模板(可选)',
             en: 'Template for auto-creating buyer customers (optional)',
@@ -766,6 +831,9 @@
                 '</button>' +
                 '<button type="button" class="int-btn-configure" data-mrerp-card-action="edit">' +
                 _esc(t('card-btn-edit')) +
+                '</button>' +
+                '<button type="button" class="int-btn-configure" data-mrerp-card-action="advanced">' +
+                _esc(t('card-btn-advanced')) +
                 '</button>';
         } else {
             actionsHtml =
@@ -810,6 +878,107 @@
 
     // v118.34.35 · _renderFlowAccountCard 已删除 (空卡片占位 · 上线时再加回)
 
+    // task 3 (Zihao 2026-05-26) · per-endpoint「高级设置」轻弹窗 ·
+    // 直接改种子模板(自动创建买方/商品)· 复用向导 overlay/box CSS · 列表复用
+    // /endpoints/{id}/{customers,products} · 保存走 /seed(服务端合并 · 不碰凭据)。
+    async function _openSeedAdvanced(ep) {
+        const cfg = (ep && ep.config) || {};
+        const curCust = cfg.seed_customer_code || '';
+        const curProd = cfg.seed_product_code || '';
+        const ssel = 'width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;';
+        const ov = document.createElement('div');
+        ov.className = 'mrerp-wizard-overlay';
+        ov.setAttribute('role', 'dialog');
+        ov.setAttribute('aria-modal', 'true');
+        ov.innerHTML =
+            '<div class="mrerp-wizard" style="max-width:520px">' +
+            '<div class="mrerp-wizard-head"><div class="mrerp-wizard-title">' +
+            _esc(t('adv-title')) +
+            '</div><button type="button" data-adv-close aria-label="close" ' +
+            'style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1">×</button></div>' +
+            '<div style="padding:16px 20px">' +
+            '<div style="font-size:12px;color:#6B7280;margin-bottom:16px;line-height:1.5">' +
+            _esc(t('wiz-seed-hint')) +
+            '</div>' +
+            '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">' +
+            _esc(t('wiz-seed')) +
+            '</label><select data-adv-cust style="' + ssel + 'margin-bottom:18px"><option value="">' +
+            _esc(t('wiz-seed-loading')) +
+            '</option></select>' +
+            '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">' +
+            _esc(t('adv-prod-label')) +
+            '</label><select data-adv-prod style="' + ssel + '"><option value="">' +
+            _esc(t('adv-prod-loading')) +
+            '</option></select>' +
+            '</div>' +
+            '<div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #eee">' +
+            '<button type="button" class="int-btn-configure" data-adv-close>' +
+            _esc(t('adv-cancel')) +
+            '</button><button type="button" class="mrerp-card-toggle mrerp-card-toggle-enable" data-adv-save>' +
+            _esc(t('adv-save')) +
+            '</button></div></div>';
+        document.body.appendChild(ov);
+        const close = function () { ov.remove(); };
+        ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+        ov.querySelectorAll('[data-adv-close]').forEach(function (b) { b.addEventListener('click', close); });
+
+        const custSel = ov.querySelector('[data-adv-cust]');
+        const prodSel = ov.querySelector('[data-adv-prod]');
+
+        const fill = function (selEl, list, cur) {
+            let html = '<option value="">' + _esc(t('wiz-seed-empty')) + '</option>';
+            let inList = false;
+            (list || []).slice(0, 800).forEach(function (it) {
+                const code = it.code || '';
+                if (code === cur) inList = true;
+                html += '<option value="' + _esc(code) + '">' + _esc((it.name || '') + ' · ' + code) + '</option>';
+            });
+            if (cur && !inList) {
+                html += '<option value="' + _esc(cur) + '">' + _esc(cur + ' ' + t('wiz-seed-saved-not-in-list')) + '</option>';
+            }
+            selEl.innerHTML = html;
+            selEl.value = cur || '';
+        };
+        const failOpt = function (selEl, cur) {
+            selEl.innerHTML = '<option value="' + _esc(cur) + '">' + _esc(t('adv-list-fail')) + '</option>';
+            selEl.value = cur || '';
+        };
+
+        const eid = encodeURIComponent(ep.id);
+        fetch('/api/erp/endpoints/' + eid + '/customers', { headers: _authHeaders() })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d && d.ok) fill(custSel, d.customers || [], curCust); else failOpt(custSel, curCust); })
+            .catch(function () { failOpt(custSel, curCust); });
+        fetch('/api/erp/endpoints/' + eid + '/products', { headers: _authHeaders() })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d && d.ok) fill(prodSel, d.products || [], curProd); else failOpt(prodSel, curProd); })
+            .catch(function () { failOpt(prodSel, curProd); });
+
+        ov.querySelector('[data-adv-save]').addEventListener('click', async function () {
+            const btn = this;
+            btn.disabled = true;
+            try {
+                const r = await fetch('/api/erp/endpoints/' + eid + '/seed', {
+                    method: 'PATCH',
+                    headers: _authHeaders(),
+                    body: JSON.stringify({
+                        seed_customer_code: custSel.value || null,
+                        seed_product_code: prodSel.value || null,
+                    }),
+                });
+                if (!r.ok) { _toast(t('adv-fail'), 'error'); btn.disabled = false; return; }
+                ep.config = ep.config || {};
+                ep.config.seed_customer_code = custSel.value || null;
+                ep.config.seed_product_code = prodSel.value || null;
+                _toast(t('adv-saved'), 'success');
+                close();
+            } catch (e) {
+                _toast(t('adv-fail'), 'error');
+                btn.disabled = false;
+            }
+        });
+    }
+
     function _bindCardEvents(zone, mrerpEp) {
         // Card-level "Connect" / "Edit" → open wizard
         zone.querySelectorAll(
@@ -819,6 +988,14 @@
                 e.preventDefault();
                 e.stopPropagation();
                 window._mrerpOpenWizard(mrerpEp || null);
+            });
+        });
+        // task 3 · per-endpoint「高级设置」· 不重走向导改种子模板
+        zone.querySelectorAll('[data-mrerp-card-action="advanced"]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (mrerpEp) _openSeedAdvanced(mrerpEp);
             });
         });
         // "See push logs →" — switch ERP subtab to the new logs panel.

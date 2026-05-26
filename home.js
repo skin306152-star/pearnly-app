@@ -5591,6 +5591,8 @@ async function loadErpLogs() {
             + `<span class="log-doc">${escapeHtml(t('erp-log-col-doc'))}</span>`
             + `<span class="log-http">${escapeHtml(t('erp-log-col-http'))}</span>`
             + `<span class="log-elapsed">${escapeHtml(t('erp-log-col-elapsed'))}</span>`
+            // 固定宽操作列(重试按钮)· 每行都有 · 保证列对齐(修:失败行 ↻ 把右侧列挤歪)
+            + '<span class="log-actions"></span>'
             + '</div>';
         listEl.innerHTML = headerRow + items.map(log => {
             const time = new Date(log.created_at);
@@ -5617,8 +5619,10 @@ async function loadErpLogs() {
             if (log.trigger === 'auto') triggerTag = `<span class="log-tag auto">${escapeHtml(t('log-tag-auto'))}</span>`;
             else if (log.trigger === 'retry') triggerTag = `<span class="log-tag retry">${escapeHtml(t('log-tag-retry'))}</span>`;
             else triggerTag = `<span class="log-tag manual">${escapeHtml(t('log-tag-manual'))}</span>`;
-            // v118.25 · 重试 chip(只在重试中或已耗尽时显示)
-            let retryChip = '';
+            // v118.25 · 重试信息 · 重新设计(2026-05-26 Zihao 报对齐 bug):不再做成
+            // 行内变宽 chip(会把后面的列挤歪 · 失败行尤其明显)· 改成挂在状态图标的
+            // tooltip 里(retryInfo)· 行布局只保留固定宽的操作列 · 列永远对齐。
+            let retryInfo = '';
             const rc = log.retry_count || 0;
             const mr = log.max_retries || 3;
             if (isRetrying) {
@@ -5628,10 +5632,9 @@ async function loadErpLogs() {
                     ? t('erp-retry-next-soon')
                     : t('erp-retry-next-min', { n: nextMin });
                 const attemptLabel = t('erp-retry-attempt', { n: rc, max: mr });
-                retryChip = `<span class="log-retry-chip" title="${escapeHtml(nextLabel)}">${escapeHtml(attemptLabel)} · ${escapeHtml(nextLabel)}</span>`;
+                retryInfo = `${attemptLabel} · ${nextLabel}`;
             } else if (log.status === 'failed' && rc >= mr && !log.next_retry_at) {
-                // 重试已耗尽
-                retryChip = `<span class="log-retry-chip exhausted">${escapeHtml(t('erp-retry-exhausted', { n: rc }))}</span>`;
+                retryInfo = t('erp-retry-exhausted', { n: rc });
             }
             // v118.25 · 重试中不显示手动重推按钮(避免和 worker 撞);失败终态才显示
             const retryBtn = (log.status === 'failed' && !isRetrying)
@@ -5676,7 +5679,7 @@ async function loadErpLogs() {
                 <div class="erp-log-row ${statusClass}" data-log-detail="${escapeHtml(log.id)}">
                     ${cb}
                     <span class="log-time">${timeStr}</span>
-                    <span class="log-status" title="${escapeHtml(statusLabel)}">${statusIcon}</span>
+                    <span class="log-status" title="${escapeHtml(statusLabel + (retryInfo ? ' · ' + retryInfo : ''))}">${statusIcon}</span>
                     ${triggerTag}
                     <span class="log-invoice">${escapeHtml(log.invoice_no || '-')}</span>
                     ${clientCell}
@@ -5685,8 +5688,7 @@ async function loadErpLogs() {
                     ${docCell}
                     <span class="log-http">HTTP ${log.http_status || '-'}</span>
                     <span class="log-elapsed">${log.elapsed_ms}ms</span>
-                    ${retryChip}
-                    ${retryBtn}
+                    <span class="log-actions">${retryBtn}</span>
                 </div>
             `;
         }).join('');

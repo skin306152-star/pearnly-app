@@ -122,14 +122,21 @@
         return false;
     }
 
-    // ---------- 选择面板(work mode + 选/建客户 · 唯一入口)----------
+    // ---------- 选择面板(work mode + 选/建工作空间 · 唯一入口)----------
     // afterSelect:选定 workspace 后回调(惰性守卫复用:选完直接进原功能)。
     async function openWorkspaceChooser(afterSelect) {
         const list = await fetchWorkspaceClients();
-        // 1 个:自动选中 · 不弹(B2 点 12)
-        if (getWorkMode() !== 'personal' && list.length === 1) {
+        // 只剩 1 个时自动选中 · 不弹 —— 但**仅限业务动作惰性触发**(带 afterSelect 回调)。
+        // 修(2026-05-26 Zihao 报):用户手动点右上角(afterSelect 为空)必须永远弹窗,
+        // 否则只有 1 个工作空间时点右上角会命中这条 → 自动选中后 return → 永远打不开
+        // 弹层 → 没法切换/新建/回个人事务。
+        if (
+            typeof afterSelect === 'function' &&
+            getWorkMode() !== 'personal' &&
+            list.length === 1
+        ) {
             setActiveWorkspaceClientId(Number(list[0].id));
-            if (typeof afterSelect === 'function') afterSelect();
+            afterSelect();
             return;
         }
         if (typeof window.openWorkspaceChooserUI === 'function') {

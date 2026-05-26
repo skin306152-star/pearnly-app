@@ -3187,10 +3187,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已提升发票识别能力:同一页里印有多张发票时,现在会逐张完整识别,不再漏票;万一仍有未能识别的发票,会明确提示需要人工核对。顶部右上角已升级为「工作模式」切换,选定客户后本次上传会自动归属该客户;推送到外部 ERP 成功后也可直接查看并复制 ERP 单号。即日生效。",
-            "th": "ระบบปรับปรุงการอ่านใบกำกับ: เมื่อมีหลายใบในหน้าเดียว ระบบจะอ่านครบทุกใบ ไม่ตกหล่น หากยังมีใบที่อ่านไม่ได้จะแจ้งให้ตรวจสอบเอง อย่างชัดเจน นอกจากนี้ปุ่มมุมขวาบนเปลี่ยนเป็น «โหมดการทำงาน» เลือกลูกค้าแล้วการอัปโหลดจะถูกจัดให้ลูกค้านั้นอัตโนมัติ และหลังส่งไป ERP สำเร็จสามารถดู/คัดลอกเลขที่เอกสาร ERP ได้ มีผลทันที",
-            "en": "Invoice recognition is stronger: when one page contains several invoices, every invoice is now captured instead of dropping one; if any invoice still cannot be read, you are clearly told to review it manually. The top-right control is now a Work Mode switch — pick a client and this session's uploads are attributed to it; and after a successful push to an external ERP you can view and copy the ERP document number. Effective immediately.",
-            "ja": "請求書認識を強化:1ページに複数の請求書がある場合も、取りこぼさず全件認識します。読み取れない請求書が残る場合は手動確認が必要と明確に通知します。右上は「作業モード」切り替えになり、クライアントを選ぶと今回のアップロードが自動的にそのクライアントに帰属します。外部 ERP への送信成功後は ERP 伝票番号を表示・コピーできます。即日有効。",
+            "zh": "系统已优化「工作空间」切换与 ERP 推送日志显示。现在可随时切换或新建工作空间(用于区分为不同公司做账);推送日志中卖方与买方的列已正名并修复对齐,状态信息更清晰。即日生效。",
+            "th": "ระบบได้ปรับปรุงการสลับ «พื้นที่ทำงาน» และการแสดงบันทึกการส่งเข้า ERP · ตอนนี้สลับหรือสร้างพื้นที่ทำงานได้ตลอดเวลา (เพื่อแยกการทำบัญชีของแต่ละบริษัท) · คอลัมน์ผู้ขายและผู้ซื้อในบันทึกได้รับการปรับชื่อและแก้การจัดวางให้ชัดเจนขึ้น · มีผลทันที",
+            "en": "The Workspace switcher and ERP push-log display have been improved. You can now switch or create a workspace at any time (to keep each company's books separate), and the push log's seller/buyer columns are renamed and aligned for clearer reading. Effective immediately.",
+            "ja": "「ワークスペース」の切り替えと ERP 連携ログの表示を改善しました。いつでもワークスペースを切り替え・作成でき(会社ごとの記帳を分けられます)、ログの売り手・買い手の列名と表示崩れも修正しました。即日有効。",
         },
     }
 

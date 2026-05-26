@@ -2760,6 +2760,9 @@ body.sidebar-collapsed .nav-lock-icon {
 .log-doc-empty { color: var(--ink-3); }
 .log-http { color: var(--ink-3); }
 .log-elapsed { color: var(--ink-3); min-width: 60px; text-align: right; }
+/* 固定宽操作列(重试按钮)· 每行(含表头/成功/失败)都占同宽 · 保证右侧列对齐 ·
+   修(2026-05-26):失败行 ↻ 重试按钮原作行内变宽元素 · 把 ERP/HTTP/耗时挤歪 */
+.log-actions { flex: 0 0 28px; display: flex; align-items: center; justify-content: flex-end; }
 
 /* ============================================================
    v0.9.1 · 推送日志增强(筛选 + 今日统计 + 详情对话框)

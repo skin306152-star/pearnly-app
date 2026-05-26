@@ -1,6 +1,23 @@
 # 📊 STATE · Pearnly 项目状态
 
 > ════════════════════════════════════════════════════════════
+> **【第三十二会话(续)· 交接 · 2026-05-27】P2 状态单一真相 上半:P2-A 重试更新原行 + P2-D 发票号已存在判「已推送过」上线 · 下窗口续 P2-B(日志折叠)/ P2-C(B7 不裸透泰文)/ P3**
+> ════════════════════════════════════════════════════════════
+> **当前前端版本**:home.js/i18n-data.js `?v=11835107` · erp-mrerp-connect.js `?v=11835106` · `/api/version`=**11835107**(已部署验证)· 本地无未 push commit(scratch `_diag_*.py`/`_diag_*.py` 已删)。
+>
+> **🟢 进窗口第一件事**:读 `docs/refactor/erp-out-of-box-redesign.md` §8(P2 进度表)。**P0+P1(含收尾)+P1b + P2-A/D 已上线**。下一步:**P2-B(日志折叠·风险段)→ P2-C(B7 友好文案·触 home.js)→ P3(概念/导航)**。
+>
+> **① 本会话(续)完成并上线(commit `dfec193` · master · 已部署 11835107)· P2 状态单一真相上半**:
+> - **P2-A(A3/A4 · 重试不再重复行)**:手动重试路由(单条 `/logs/{id}/retry` + 批量 `/logs/batch-retry`)从「INSERT 新行」改「UPDATE 原行 + `increment_retry_count`」· 对齐自动重试 worker(`app.py:_run_erp_retry_tick` 本就 UPDATE 原行)。同(发票×端点)只剩一条原地落定 → 消除「旧失败行+新成功行」重复日志,推送日志与异常队列读同一行不再打架。返回 `log_id`=原行 id。
+> - **P2-D(B8 · 发票号已存在=已推送过)**:新增 `services/erp/push_store.is_already_pushed_error` + `classify_push_status`(success→success / 发票号已存在(`เลขที่ดังกล่าวมีอยู่ในระบบแล้ว`·`เลขที่เอกสารซ้ำ`·`ERR_DUPLICATE_INVOICE`)→ `skipped_dup` / 其余→`failed`)· db.py re-export。**全 MR.ERP 推送结果落库点统一用它**:手动推(`erp_routes`)、智能分拣 `_persist_push_outcome`、兜底 `_auto_push_history` 的 pending/insert、自动重试 worker。skipped_dup = 中性态(home.js 已灰显「已推送过」· session 27 既有)· 不计端点失败数、不入重试队列。`update_log_status_after_retry` 加 `final_status` 兼容形参。
+> - **守门**:`test_erp_retry_update_and_skipped_dup`(6 例 · 分类器 + 重试 UPDATE-不-INSERT + already-exists→skipped_dup)· erp/mrerp/push/retry 套件 **316 passed/1 skipped** · 现有 user_data/dedup/friendly/exceptions/batch_view 55 例不破 · black + check_i18n 0/0。
+>
+> **② P2 剩余(下窗口 · 详见设计文档 §8)**:
+>   - **P2-B(日志折叠 · 风险段)**:`push_store.list_push_logs` 折叠到(history×endpoint)最新一条 → 清「混合手动+自动推」遗留重复行,与 `list_push_exceptions`(已 DISTINCT ON)口径完全一致。**注**:A4 打架已被 P2-A 在重试路径根治,这是 cosmetic polish。重写付费主日志视图 SQL **必须 NULL-safe**(ROW_NUMBER PARTITION 用 `CASE WHEN history_id&endpoint_id 都有 THEN 拼 key ELSE id`,防 Xero/孤儿 log endpoint_id=NULL 被误合并)。+ 守门(折叠后每对一条 + 状态过滤作用于折叠后的当前态)。
+>   - **P2-C(B7 · 不裸透泰文)**:后端 friendly 目录已全(`mrerp_business_friendly.get_friendly` 含两种 duplicate + 各 ERR_*),但 `home.js` 主日志/异常渲染仍显 raw `error_msg`(`static/erp-log-enhance.js` 只在下面加友好气泡 · 且其 JS 表只 6 条不全)。真正消除:后端给 `list_push_logs`/`list_push_exceptions`/`get_push_log_detail` 响应附 `error_friendly` 4 语 dict(additive · 低风险)+ 改 home.js 渲染优先用 `error_friendly[lang]`(**触 home.js 巨石 · 需 UI 实测**)。
+>   - **P3**:概念/导航(工作空间管理+文案 B1、客户改名/归位 B4/B5、上传不弹工作空间 B3、种子失效提示 B2)。
+>
+> ════════════════════════════════════════════════════════════
 > **【第三十二会话 · 交接 · 2026-05-27】「真正开箱即用」P1 收尾:向导内「智能默认通用商品」上线(沙箱真账号实测过)· 下窗口续 P2(状态单一真相)/ P3(概念/导航)**
 > ════════════════════════════════════════════════════════════
 > **当前前端版本**:home.js/i18n-data.js/erp-mrerp-connect.js `?v=11835106` · `/api/version`=**11835106**(已部署验证)· 本地无未 push commit(scratch `_diag_*.py` 已删 · gitignore 勿提交)。

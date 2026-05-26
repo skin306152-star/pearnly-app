@@ -679,7 +679,17 @@ class ThaiInvoice(BaseModel):
     @field_validator("source_refs", mode="before")
     @classmethod
     def _coerce_source_refs(cls, v):
-        return {} if v is None else v
+        # Gemini 有两种 null 玩法都得防(否则整份发票 422/400):
+        #   1) 整个 source_refs = null            → {}
+        #   2) 个别字段 = null,如 {"vat": null}  → 丢掉该键(不是合法 FieldRef dict)
+        # 真实踩坑(2026-05-26 Codex 验收 qa_3):source_refs.vat=null →
+        #   "Input should be a valid dictionary" → 整份 PDF 400。根因是只防了 case 1。
+        if v is None:
+            return {}
+        if isinstance(v, dict):
+            # 只保留值是 dict(可构造 FieldRef)的条目;null / 标量 / list 一律丢弃。
+            return {k: val for k, val in v.items() if isinstance(val, dict)}
+        return v
 
     @field_validator("additional_invoices", mode="before")
     @classmethod

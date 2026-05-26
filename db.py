@@ -4538,6 +4538,7 @@ from services.clients.store import (
     ensure_buyer_to_client_table as ensure_buyer_to_client_table,
     learn_buyer_to_client as learn_buyer_to_client,
     try_resolve_buyer_to_client as try_resolve_buyer_to_client,
+    resolve_or_create_buyer_client as resolve_or_create_buyer_client,
     update_history_client_id as update_history_client_id,
     upsert_supplier_category as upsert_supplier_category,
     list_used_categories as list_used_categories,

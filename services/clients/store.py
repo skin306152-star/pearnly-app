@@ -381,6 +381,127 @@ def try_resolve_buyer_to_client(
         return None
 
 
+def _buyer_candidates_conflict(candidates: Optional[List[str]]) -> bool:
+    """判断同一张发票多页是否出现「互不包含」的两个买方名(真冲突)。
+
+    缩写/全称(一个是另一个的子串)视为同一实体 · 不算冲突。
+    OCR 噪声(大小写/首尾空格)归一后比对。
+    用于 qa_4 那种「同号多页 buyer 候选冲突」→ 不自动建客户 · 转人工确认。
+    """
+    norm: List[str] = []
+    for c in candidates or []:
+        s = (c or "").strip().lower()
+        if s and s not in norm:
+            norm.append(s)
+    if len(norm) <= 1:
+        return False
+    for i in range(len(norm)):
+        for j in range(i + 1, len(norm)):
+            a, b = norm[i], norm[j]
+            if a in b or b in a:
+                continue
+            return True  # 存在两个互不包含的买方 → 真冲突
+    return False
+
+
+def resolve_or_create_buyer_client(
+    buyer_name: Optional[str],
+    buyer_tax: Optional[str],
+    user_id: str,
+    tenant_id: Optional[str] = None,
+    *,
+    buyer_candidates: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """OCR 落库后把「发票买方」解析到 Pearnly client（税号优先·混合策略，
+    Zihao 2026-05-26 拍板）。返回决策 dict，**不写 ocr_history**（caller 负责把
+    client_id 写回对应 history + 处理 suggest/review 的 UI 标记）。
+
+    返回:
+      {action, client_id, client_name, confidence, match_source, reason}
+      action ∈
+        "assigned" — 命中已存在高置信客户（memory/税号/名字精确）· 已学习 · 可放行推送
+        "created"  — 有合法 13 位税号但无匹配 → 按税号建新客户（去重）· 已学习 · 可放行推送
+        "suggest"  — 名字近似但无税号 → 建议归属（不绑/不建）· 等用户一键确认
+        "review"   — 多页买方冲突 / 无税号且无匹配 → 待确认（不建垃圾客户）
+        "none"     — 没有买方名 → 无可做
+
+    设计要点:
+      - **税号 = 泰国法定唯一身份**：有合法 13 位税号且没命中已存在客户 → 直接建（按税号
+        去重），这才是「新买方自动建」闭环；只靠名字模糊匹配不建（防同名异主体错并）。
+      - 多页买方候选**冲突**（qa_4）→ 绝不自动建 · 转人工 · 杜绝静默高信心错建。
+      - 只「移除」模糊情况下的自动建，不会绑/建出错误客户 → 比旧行为严格更安全。
+    """
+    decision = {
+        "action": "none",
+        "client_id": None,
+        "client_name": None,
+        "confidence": 0.0,
+        "match_source": "",
+        "reason": "",
+    }
+    if not buyer_name or not buyer_name.strip():
+        decision["reason"] = "no_buyer_name"
+        return decision
+
+    # 多页买方冲突 → 不自动建,转人工(qa_4)
+    if _buyer_candidates_conflict(buyer_candidates):
+        decision["action"] = "review"
+        decision["reason"] = "buyer_candidates_conflict"
+        return decision
+
+    tax_clean = (buyer_tax or "").replace("-", "").replace(" ", "").strip()
+    has_valid_tax = len(tax_clean) == 13 and tax_clean.isdigit()
+
+    # 1) 已存在高置信客户(memory 1.0 / 税号精确 0.98 / 名字精确 0.95)→ 用它
+    resolved = try_resolve_buyer_to_client(buyer_name, buyer_tax, user_id, tenant_id)
+    if resolved and resolved.get("confidence", 0.0) >= 0.95 and resolved.get("client_id"):
+        cid = int(resolved["client_id"])
+        learn_buyer_to_client(buyer_name, buyer_tax, cid, user_id, tenant_id)
+        decision.update(
+            action="assigned",
+            client_id=cid,
+            client_name=resolved.get("client_name"),
+            confidence=float(resolved.get("confidence", 0.0)),
+            match_source=resolved.get("match_source", ""),
+            reason="existing_high_confidence",
+        )
+        return decision
+
+    # 2) 税号权威:有合法 13 位税号但没高置信匹配 → 按税号找或建(去重),闭环放行
+    if has_valid_tax:
+        cid = db.find_or_create_client_by_tax_id(user_id, tenant_id, tax_clean, buyer_name.strip())
+        if cid:
+            learn_buyer_to_client(buyer_name, buyer_tax, int(cid), user_id, tenant_id)
+            decision.update(
+                action="created",
+                client_id=int(cid),
+                client_name=buyer_name.strip(),
+                confidence=0.98,
+                match_source="tax_id_create",
+                reason="auto_created_by_tax_id",
+            )
+            return decision
+        # 建失败 → 别静默,转人工
+        decision.update(action="review", reason="create_by_tax_failed")
+        return decision
+
+    # 3) 名字近似但无税号 → 建议归属(不绑/不建),等用户确认
+    if resolved and resolved.get("confidence", 0.0) >= 0.80 and resolved.get("client_id"):
+        decision.update(
+            action="suggest",
+            client_id=int(resolved["client_id"]),
+            client_name=resolved.get("client_name"),
+            confidence=float(resolved.get("confidence", 0.0)),
+            match_source=resolved.get("match_source", ""),
+            reason="name_suggestion_no_tax",
+        )
+        return decision
+
+    # 4) 无税号且无匹配 → 待确认(不建垃圾客户)
+    decision.update(action="review", reason="no_tax_no_match")
+    return decision
+
+
 def update_history_client_id(
     history_id: str,
     client_id: Optional[int],

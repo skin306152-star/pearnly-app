@@ -2438,13 +2438,14 @@ async def ocr_recognize(
                     except Exception as _ce:
                         logger.warning(f"💳 async charge dispatch skip: {_ce}")
 
-            # 批 1 改动 1 (Zihao 2026-05-19 拍板 · v118.34.33) · auto-resolve
-            # client_id. 如果右上角客户切换器没选 client_id (常态) · 按
-            # buyer_name + buyer_tax 匹配 Pearnly 客户:
-            #   ≥0.95 → 自动 assign + 学习 · 让 auto-push 继续
-            #   0.80-0.95 → 不 assign · 写 suggested_client_id 到 history.pages
-            #               + 不 trigger auto-push (等用户确认)
-            #   <0.80 → 不 assign · 不 trigger auto-push
+            # 买方→Pearnly client 闭环(Zihao 2026-05-26 拍板 · 税号优先·混合)。
+            # 右上角客户切换器没选 client_id(常态)时,把发票买方解析/创建成 client:
+            #   决策逻辑全在 services/clients/store.resolve_or_create_buyer_client:
+            #   assigned/created → 写回 history.client_id · 放行 auto-push(闭环)
+            #   suggest          → 写 _suggested_client_* 到 history.pages · 等用户确认
+            #   review/none      → 不绑/不建(防同名异主体错并 & qa_4 多页买方冲突)
+            # 根因(替代旧「只匹配已存在客户」逻辑):新买方第一次出现匹配不到 →
+            #   client_id=null → 推送必 ERR_NO_CLIENT。有合法 13 位税号即按税号建客户闭环。
             _auto_resolved_client = False
             try:
                 history_existing_client = (
@@ -2453,76 +2454,66 @@ async def ocr_recognize(
                 if not history_existing_client:
                     _buyer_name = (g_fields or {}).get("buyer_name")
                     _buyer_tax = (g_fields or {}).get("buyer_tax")
-                    resolved = db.try_resolve_buyer_to_client(
+                    # 同一张发票多页的买方候选(给冲突检测 · qa_4)
+                    _buyer_candidates = [
+                        (p.get("fields") or {}).get("buyer_name") for p in (g_pages_for_save or [])
+                    ]
+                    decision = db.resolve_or_create_buyer_client(
                         buyer_name=_buyer_name,
                         buyer_tax=_buyer_tax,
                         user_id=str(user["id"]),
                         tenant_id=_tid(user),
+                        buyer_candidates=_buyer_candidates,
                     )
-                    if resolved:
-                        conf = resolved.get("confidence", 0.0)
-                        rcid = resolved.get("client_id")
-                        if conf >= 0.95 and rcid:
-                            # 自动绑 + 学习
-                            db.update_history_client_id(
-                                hid,
-                                rcid,
-                                str(user["id"]),
-                                tenant_id=_tid(user),
-                            )
-                            db.learn_buyer_to_client(
-                                _buyer_name,
-                                _buyer_tax,
-                                rcid,
-                                str(user["id"]),
-                                tenant_id=_tid(user),
-                            )
-                            _auto_resolved_client = True
-                            logger.info(
-                                "[auto-resolve] history=%s client_id=%s "
-                                "name=%r conf=%.2f source=%s",
-                                hid[:8],
-                                rcid,
-                                resolved.get("client_name"),
-                                conf,
-                                resolved.get("match_source"),
-                            )
-                        elif conf >= 0.80 and rcid:
-                            # 建议归属 · 不 auto-assign · 标 suggestion
-                            # 抽屉 UI 显示 "建议归属 X · 点确认"
-                            logger.info(
-                                "[auto-resolve] SUGGEST history=%s client_id=%s "
-                                "name=%r conf=%.2f",
-                                hid[:8],
-                                rcid,
-                                resolved.get("client_name"),
-                                conf,
-                            )
-                            # 把 suggestion stash 到 history.pages[0].fields 让前端读
-                            try:
-                                _new_pages = [dict(p) for p in (g_pages_for_save or [])]
-                                if _new_pages:
-                                    _f = dict(_new_pages[0].get("fields") or {})
-                                    _f["_suggested_client_id"] = rcid
-                                    _f["_suggested_client_name"] = resolved.get("client_name")
-                                    _f["_suggested_client_confidence"] = conf
-                                    _new_pages[0] = {**_new_pages[0], "fields": _f}
-                                    db.update_ocr_history_pages(
-                                        str(user["id"]),
-                                        hid,
-                                        _new_pages,
-                                        tenant_id=_tid(user),
-                                    )
-                            except Exception as _se:
-                                logger.warning(f"stash suggestion failed: {_se}")
+                    _act = decision.get("action")
+                    _rcid = decision.get("client_id")
+                    if _act in ("assigned", "created") and _rcid:
+                        db.update_history_client_id(
+                            hid, _rcid, str(user["id"]), tenant_id=_tid(user)
+                        )
+                        _auto_resolved_client = True
+                        logger.info(
+                            "[buyer-resolve] %s history=%s client_id=%s name=%r "
+                            "conf=%.2f source=%s",
+                            _act,
+                            hid[:8],
+                            _rcid,
+                            decision.get("client_name"),
+                            decision.get("confidence", 0.0),
+                            decision.get("match_source"),
+                        )
+                    elif _act == "suggest" and _rcid:
+                        # 建议归属 · 不 auto-assign · stash 到 history.pages[0].fields
+                        logger.info(
+                            "[buyer-resolve] SUGGEST history=%s client_id=%s name=%r conf=%.2f",
+                            hid[:8],
+                            _rcid,
+                            decision.get("client_name"),
+                            decision.get("confidence", 0.0),
+                        )
+                        try:
+                            _new_pages = [dict(p) for p in (g_pages_for_save or [])]
+                            if _new_pages:
+                                _f = dict(_new_pages[0].get("fields") or {})
+                                _f["_suggested_client_id"] = _rcid
+                                _f["_suggested_client_name"] = decision.get("client_name")
+                                _f["_suggested_client_confidence"] = decision.get("confidence")
+                                _new_pages[0] = {**_new_pages[0], "fields": _f}
+                                db.update_ocr_history_pages(
+                                    str(user["id"]), hid, _new_pages, tenant_id=_tid(user)
+                                )
+                        except Exception as _se:
+                            logger.warning(f"stash suggestion failed: {_se}")
                     else:
                         logger.info(
-                            "[auto-resolve] no match history=%s buyer=%r",
+                            "[buyer-resolve] %s history=%s buyer=%r reason=%s",
+                            _act,
                             hid[:8],
                             (_buyer_name or "")[:40],
+                            decision.get("reason"),
                         )
             except Exception as _are:
-                logger.warning(f"auto-resolve client_id failed (history={hid[:8]}): {_are}")
+                logger.warning(f"buyer-resolve client_id failed (history={hid[:8]}): {_are}")
 
             # v118.20.1 · 异常栏 · 异步跑零成本规则(不阻塞 OCR 主流程)
             try:
@@ -3187,10 +3178,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已优化「工作空间」切换与 ERP 推送日志。现在可随时切换或新建工作空间(用于区分为不同公司做账);推送日志已正名卖方/买方列、修复对齐,并新增「工作空间」归属列,便于按公司查看推送记录。即日生效。",
-            "th": "ระบบได้ปรับปรุงการสลับ «พื้นที่ทำงาน» และบันทึกการส่งเข้า ERP · ตอนนี้สลับหรือสร้างพื้นที่ทำงานได้ตลอดเวลา (เพื่อแยกการทำบัญชีของแต่ละบริษัท) · บันทึกการส่งปรับชื่อคอลัมน์ผู้ขาย/ผู้ซื้อ แก้การจัดวาง และเพิ่มคอลัมน์ «พื้นที่ทำงาน» เพื่อดูตามบริษัทได้ง่ายขึ้น · มีผลทันที",
-            "en": "The Workspace switcher and ERP push log have been improved. You can now switch or create a workspace at any time (to keep each company's books separate); the push log's seller/buyer columns are renamed and aligned, and a new Workspace column shows which company each push belongs to. Effective immediately.",
-            "ja": "「ワークスペース」の切り替えと ERP 連携ログを改善しました。いつでもワークスペースを切り替え・作成でき(会社ごとの記帳を分けられます)、ログの売り手・買い手の列名と表示崩れを修正し、各送信の所属を示す「ワークスペース」列を追加しました。即日有効。",
+            "zh": "系统已优化发票买方的自动归属与推送。新买方将按税号自动归属并完成 ERP 推送,推送日志「发票买方」列现显示发票上的真实买方名称;重复推送将显示「已推送过」而非失败,此前个别信息缺失导致整份发票无法识别的问题也已修复。即日生效。",
+            "th": "ระบบได้ปรับปรุงการผูกและส่งผู้ซื้อในใบกำกับ · ผู้ซื้อรายใหม่จะถูกผูกอัตโนมัติตามเลขประจำตัวผู้เสียภาษีและส่งเข้า ERP ให้ และคอลัมน์ «ผู้ซื้อในใบกำกับ» ในบันทึกการส่งจะแสดงชื่อผู้ซื้อจริงบนใบกำกับ · การส่งซ้ำจะแสดง «ส่งไปแล้ว» แทนข้อผิดพลาด และแก้ปัญหาที่ข้อมูลบางช่องขาดหายทำให้ทั้งใบอ่านไม่ได้แล้ว · มีผลทันที",
+            "en": "Invoice-buyer matching and posting have been improved. New buyers are now matched automatically by tax ID and posted to your ERP, and the push log's Invoice Buyer column shows the actual buyer printed on the invoice. Re-pushing an invoice now shows “Already pushed” instead of an error, and an issue where a missing field could fail an entire invoice has been fixed. Effective immediately.",
+            "ja": "請求書の買い手の自動紐づけと送信を改善しました。新しい買い手は納税者番号で自動的に紐づけられ ERP へ送信され、送信ログの「請求書の買い手」列には請求書に記載された実際の買い手名が表示されます。再送信時はエラーではなく「送信済み」と表示され、一部の項目が欠けると請求書全体が読み取れなくなる問題も修正しました。即日有効。",
         },
     }
 

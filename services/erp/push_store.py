@@ -760,6 +760,15 @@ def list_push_logs(
                        l.next_retry_at, l.response_body,
                        h.client_id AS history_client_id,
                        c.name AS client_name,
+                       COALESCE((
+                           SELECT pg->'fields'->>'buyer_name'
+                           FROM jsonb_array_elements(
+                               CASE WHEN jsonb_typeof(h.pages)='array'
+                                    THEN h.pages ELSE '[]'::jsonb END
+                           ) pg
+                           WHERE COALESCE(pg->'fields'->>'buyer_name','') <> ''
+                           LIMIT 1
+                       ), '') AS ocr_buyer_name,
                        e.name AS endpoint_name,
                        e.adapter AS endpoint_adapter,
                        w.name AS workspace_name
@@ -809,6 +818,15 @@ def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
                        l.retry_count, l.max_retries, l.next_retry_at,
                        h.client_id AS history_client_id,
                        c.name AS client_name,
+                       COALESCE((
+                           SELECT pg->'fields'->>'buyer_name'
+                           FROM jsonb_array_elements(
+                               CASE WHEN jsonb_typeof(h.pages)='array'
+                                    THEN h.pages ELSE '[]'::jsonb END
+                           ) pg
+                           WHERE COALESCE(pg->'fields'->>'buyer_name','') <> ''
+                           LIMIT 1
+                       ), '') AS ocr_buyer_name,
                        e.name AS endpoint_name,
                        e.adapter AS endpoint_adapter
                 FROM erp_push_logs l

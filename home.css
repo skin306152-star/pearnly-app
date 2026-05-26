@@ -2697,6 +2697,8 @@ body.sidebar-collapsed .nav-lock-icon {
 .erp-log-row:last-child { border-bottom: none; }
 .erp-log-row.ok .log-status { color: #10B981; font-weight: 700; }
 .erp-log-row.fail .log-status { color: #EF4444; font-weight: 700; }
+/* 去重跳过(skipped_dup)· 中性灰蓝 · 不是失败红(Codex 2026-05-26) */
+.erp-log-row.skipped .log-status { color: #64748B; font-weight: 700; }
 .log-time { color: var(--ink-3); min-width: 80px; }
 .log-status { min-width: 16px; text-align: center; }
 .log-tag { padding: 2px 6px; font-size: 10px; border-radius: 4px; font-family: sans-serif; }

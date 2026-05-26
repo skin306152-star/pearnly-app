@@ -5608,6 +5608,12 @@ async function loadErpLogs() {
                 statusClass = 'ok';
                 statusIcon = '✓';
                 statusLabel = t('erp-status-success');
+            } else if (log.status === 'skipped_dup') {
+                // 去重跳过(同发票同端点已成功推过)· 不是失败 · 中性「已存在」·
+                // 该行带原 ERP 单号(docCell 会显)· 旧逻辑掉进 else 显红叉误导用户(Codex P1)
+                statusClass = 'skipped';
+                statusIcon = '⏭';
+                statusLabel = t('erp-status-skipped');
             } else if (isRetrying) {
                 statusClass = 'retrying';
                 statusIcon = '↻';
@@ -5651,9 +5657,12 @@ async function loadErpLogs() {
             const cb = canSelect
                 ? `<input type="checkbox" class="erp-log-cb" data-log-cb="${escapeHtml(log.id)}" ${checked}>`
                 : `<span class="erp-log-cb-spacer"></span>`;
-            // 批 1 改动 5 (v118.34.33) · Pearnly 客户列 · 未归属灰色提示用户补
-            const clientCell = log.client_name
-                ? `<span class="log-client">${escapeHtml((log.client_name || '').substring(0, 18))}</span>`
+            // 发票买方列(Zihao 2026-05-26)· 显 OCR 真买方名(发票上印的买方)·
+            // 不是 Pearnly client 名(旧逻辑显 client_name → 未归属时误显 skin)。
+            // 优先 ocr_buyer_name(发票真买方)→ 退回 client_name(已归属客户)→ 未归属灰字。
+            const buyerName = (log.ocr_buyer_name || '').trim() || (log.client_name || '').trim();
+            const clientCell = buyerName
+                ? `<span class="log-client" title="${escapeHtml(buyerName)}">${escapeHtml(buyerName.substring(0, 18))}</span>`
                 : `<span class="log-client log-client-empty" title="${escapeHtml(t('erp-log-client-unassigned-tip'))}">${escapeHtml(t('erp-log-client-unassigned'))}</span>`;
             // P1-C 后端列 · 工作空间归属 · 无归属(个人事务模式上传)→ 显示「个人事务」
             const wsCell = log.workspace_name
@@ -5999,8 +6008,8 @@ async function showLogDetail(logId) {
         const extUrl = (log.external_url || '').trim();
         const extHint = (log.external_doc_hint || '').trim();
 
-        // Pearnly 客户(client_name)+ 卖家(seller_name)+ 金额格式化
-        const clientName = log.client_name || '-';
+        // 发票买方(OCR 真买方名优先 · 退回已归属 client_name)+ 卖家 + 金额格式化
+        const clientName = (log.ocr_buyer_name || '').trim() || log.client_name || '-';
         const sellerName = log.seller_name || '-';
         let amountStr = '-';
         const amtNum = Number(log.total_amount);

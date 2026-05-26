@@ -3526,10 +3526,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "系统已修复「ERP 对接」自动创建买方与商品后推送失败的问题。此前发票上的新买方/新商品在 ERP 中自动创建后,因内部识别不一致导致推送被拦截;现已修复,新买方与新商品可正常自动创建并推送成功。识别后推送日志也会立即显示「推送中」。即日生效。",
-            "th": "ระบบได้แก้ไขปัญหาการส่งล้มเหลวหลังจากสร้างผู้ซื้อและสินค้าอัตโนมัติใน «การเชื่อมต่อ ERP» · ก่อนหน้านี้ผู้ซื้อ/สินค้าใหม่บนใบกำกับที่ถูกสร้างอัตโนมัติใน ERP ถูกบล็อกการส่งเพราะการจับคู่ภายในไม่ตรงกัน · ได้รับการแก้ไขแล้ว สามารถสร้างและส่งสำเร็จได้ตามปกติ · บันทึกการส่งยังแสดง «กำลังส่ง» ทันทีหลังอ่านข้อมูล · มีผลทันที",
-            "en": "Fixed an issue in ERP integration where pushes failed after auto-creating new buyers and products. Previously, new buyers/products on an invoice were auto-created in the ERP but then blocked from pushing due to an internal matching inconsistency; this is fixed — new buyers and products are now auto-created and pushed successfully. The push log also shows “Pushing” immediately after recognition. Effective immediately.",
-            "ja": "「ERP 連携」で、新しい取引先・商品を自動作成した後に送信が失敗する問題を修正しました。これまで請求書上の新規取引先/商品は ERP に自動作成されたものの、内部照合の不整合により送信がブロックされていました。修正により、新規取引先・商品が正常に自動作成され送信できるようになりました。送信ログは読み取り後すぐ「送信中」と表示されます。即日有効。",
+            "zh": "系统已修复商品名称较长时的「ERP 对接」推送失败。此前较长的商品描述在 ERP 中被截断保存,系统据此误判为不同商品而拦截推送;现已修复,较长名称的新商品可正常自动创建并推送成功。即日生效。",
+            "th": "ระบบได้แก้ไขการส่งล้มเหลวใน «การเชื่อมต่อ ERP» เมื่อชื่อสินค้ายาว · ก่อนหน้านี้คำอธิบายสินค้าที่ยาวถูกตัดให้สั้นลงเมื่อบันทึกใน ERP ทำให้ระบบเข้าใจผิดว่าเป็นสินค้าคนละรายการและบล็อกการส่ง · ได้รับการแก้ไขแล้ว สินค้าใหม่ที่มีชื่อยาวสามารถสร้างและส่งสำเร็จได้ตามปกติ · มีผลทันที",
+            "en": "Fixed ERP integration push failures for products with long names. Previously, long product descriptions were truncated when saved in the ERP, so the system mistook them for a different product and blocked the push; this is fixed — new products with long names are now auto-created and pushed successfully. Effective immediately.",
+            "ja": "商品名が長い場合の「ERP 連携」送信失敗を修正しました。これまで長い商品説明は ERP 保存時に切り詰められ、別の商品と誤認されて送信がブロックされていました。修正により、長い名称の新規商品も正常に自動作成・送信できるようになりました。即日有効。",
         },
     }
 

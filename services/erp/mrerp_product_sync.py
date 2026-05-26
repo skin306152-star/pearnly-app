@@ -407,8 +407,13 @@ class MRERPProductSyncService:
 
         item_norm = normalize_item_name(name)
         erp_norm = row.name_norm or normalize_item_name(row.name)
+        # 2026-05-26 修:MR.ERP 商品名字段有长度上限,长描述商品(泰式烘焙长名带规格/换行,
+        # 100+ 字)建档时被**截断** → ERP 存的是发票名的前缀。复核时拿"完整发票名 vs 截断名"
+        # 算相似度恒 < 阈值(实测 0.30)→ 自动建出来的长名商品永远推不成。
+        # 截断前缀匹配:ERP 归一名是发票归一名的前缀且足够长(≥8 字符防误命中)→ 判为同一商品。
+        truncated_match = bool(erp_norm) and len(erp_norm) >= 8 and item_norm.startswith(erp_norm)
         ratio = levenshtein_ratio(item_norm, erp_norm) if (item_norm and erp_norm) else 0.0
-        if ratio >= self.product_threshold:
+        if truncated_match or ratio >= self.product_threshold:
             return row.name
 
         raise MRERPBusinessError(

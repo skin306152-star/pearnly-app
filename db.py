@@ -1310,7 +1310,7 @@ def get_ocr_history_detail(
                            pages, invoice_no, invoice_date, seller_name, total_amount,
                            archive_name, category_tag,
                            fields_edited_at, edit_count, created_at, updated_at,
-                           client_id
+                           client_id, workspace_client_id
                     FROM ocr_history
                     WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
                     LIMIT 1
@@ -1324,7 +1324,7 @@ def get_ocr_history_detail(
                            pages, invoice_no, invoice_date, seller_name, total_amount,
                            archive_name, category_tag,
                            fields_edited_at, edit_count, created_at, updated_at,
-                           client_id
+                           client_id, workspace_client_id
                     FROM ocr_history
                     WHERE id = %s AND user_id = %s
                     LIMIT 1
@@ -1353,6 +1353,10 @@ def get_ocr_history_detail(
                 "updated_at": r["updated_at"].isoformat(),
                 # v107 · 客户归属
                 "client_id": int(r["client_id"]) if r.get("client_id") else None,
+                # P1d · 卖方账套归属(智能分拣路由读它定目标 endpoint)
+                "workspace_client_id": (
+                    int(r["workspace_client_id"]) if r.get("workspace_client_id") else None
+                ),
             }
     except Exception as e:
         logger.error(f"查询历史详情失败 (id={record_id}): {e}")

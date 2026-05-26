@@ -264,5 +264,55 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls["n"], 2, "一张异常不应中断后续张")
 
 
+class HistoryDetailExposesWorkspaceTests(unittest.TestCase):
+    """回归守门(沙箱实测抓到的真 bug):get_ocr_history_detail 必须返回
+    workspace_client_id —— 否则 _auto_push_smart_routed 永远读到 None → 全兜底,
+    智能分拣形同虚设。单测 mock 了 detail 故没抓到 · 这里用假 cursor 锁死映射。"""
+
+    def test_detail_returns_workspace_client_id(self):
+        from datetime import datetime
+        import db
+
+        row = {
+            "id": "h1",
+            "filename": "f.pdf",
+            "page_count": 1,
+            "confidence": 0.9,
+            "elapsed_ms": 10,
+            "pages": [],
+            "invoice_no": "INV1",
+            "invoice_date": None,
+            "seller_name": "S",
+            "total_amount": None,
+            "archive_name": None,
+            "category_tag": None,
+            "fields_edited_at": None,
+            "edit_count": 0,
+            "created_at": datetime(2026, 5, 26),
+            "updated_at": datetime(2026, 5, 26),
+            "client_id": None,
+            "workspace_client_id": 7,
+        }
+
+        class _Cur:
+            def execute(self, *a, **k):
+                pass
+
+            def fetchone(self):
+                return row
+
+        class _CM:
+            def __enter__(self):
+                return _Cur()
+
+            def __exit__(self, *a):
+                return False
+
+        with mock.patch.object(db, "get_cursor", lambda *a, **k: _CM()):
+            out = db.get_ocr_history_detail("u1", "h1")
+        self.assertIn("workspace_client_id", out)
+        self.assertEqual(out["workspace_client_id"], 7)
+
+
 if __name__ == "__main__":
     unittest.main()

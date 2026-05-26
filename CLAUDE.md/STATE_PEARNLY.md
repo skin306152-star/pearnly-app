@@ -1,6 +1,25 @@
 # 📊 STATE · Pearnly 项目状态
 
 > ════════════════════════════════════════════════════════════
+> **【第三十一会话 · 交接 · 2026-05-27】「真正开箱即用」P0+P1+P1b 全部落地上线(沙箱真账号实测过)· 下窗口续 P1 智能默认 / P2 / P3**
+> ════════════════════════════════════════════════════════════
+> **当前前端版本**:home.js/i18n-data.js/erp-mrerp-connect.js `?v=11835105` · 本地无未 push commit(scratch `_diag_*.py`/`_clean_*.py`/`_*.mjs` 已 gitignore · 勿提交)。
+>
+> **🟢 进窗口第一件事**:读 `docs/refactor/erp-out-of-box-redesign.md`(总设计 · Zihao 已拍板)。**P0 + P1 + P1b 已上线**,下一步按优先级:**P1 收尾(向导内"智能默认通用商品" · §3.4)→ P2(状态单一真相)→ P3(概念/导航)**。
+>
+> **① 本会话完成并上线(4 次 push · master)**:
+> - **P0 解卡(`a05d5c6`)**:`client_ids` 退役。后端 `erp_routes.py` POST/PATCH 删 mrerp client_ids 必填校验(新建默认 [] · 字段留兼容);连接向导 `erp-mrerp-connect.js` 从 3 步 → **2 步**(① 登录+测连接 ② 选账套+自动推送 · 删原第 1 步买方客户 picker)。守门测试**反转**`EndpointClientIdsRetiredTests`(锁"允许空")。**实测**:真路由 TestClient 空 client_ids→200;Playwright 真浏览器走完 2 步向导(点数 2 / payload 无 client_ids / 0 错误)。
+> - **gitignore(`8f69b06`)**:补 `_diag_*.py`/`_clean_*.py`/`_*.mjs`(STATE 说 gitignore 但实际只 ignore 了 `_probe_*.py`)。
+> - **P1 后端核心(`692b394`)· 方案灵魂**:商品「匹配优先 + 通用兜底 · 不自动建」。`endpoint.config.generic_product_code` 配了 → 通用模式;没配 → 精确模式(**老行为完全不变 · 保护付费用户 mrerp@outlook**)。改 4 文件:`erp_push.build_mrerp_adapter`(读 config 传 adapter)、`mrerp_adapter`(加字段 + 注入共享 mappings + `_sync_master_data` 商品分支通用模式只 lookup 不建档 · 买方仍 auto-create + `_verify_resolved_master_data` 不中行共用通用码**整批只验存在一次**)、`mrerp_product_sync.verify_code_exists`(名字无关存在检查)、`mrerp_xlsx_generator`(不中兜底通用码 · item_name 保留为行描述)。守门 `test_erp_generic_product_mode`。
+> - **P1b 通用商品 picker 接入 UI(`eae8bca`)**:`PATCH /endpoints/{id}/seed` 支持 `generic_product_code`(服务端合并 · 不碰凭据);per-endpoint「⚙ 高级设置」弹窗新增「通用销售商品」下拉(复用 /products · 预选 · 4 语)。
+>
+> **② 沙箱真账号实测(关键证据 · `.env.local` 有 MR.ERP test01/TEST2019 明文凭据)**:照 `scripts/probe/green_push.py` 写探针,推一张【3 行全定制描述、全部对不上已有商品】的发票在通用模式下到 TEST2019 → **🟢 绿色成功落库(db_row_id) · 整批商品 search 只 1 次(不是逐行 3 次)· 7.2 秒 · 没新建任何商品 · 推完自动删除零残留**。证明"130 秒 → 秒级 + 不建垃圾商品"是真的。(探针是 `_diag_*.py` scratch · 跑完已删 · 模式同 green_push.py 可随时重写。)
+>
+> **③ P1 剩余项(下窗口做)**:连接向导内"智能默认通用商品"(§3.4 step 3)——目前新建连接(无 endpoint id)只能在保存后经「⚙ 高级设置」选通用商品(真实下拉);要真正开箱即用,需后端在 test-connection 时探测一个"销售收入"类商品做智能预选 + 向导内可选字段。**现状:现有付费用户不配通用码 = 精确模式 = 行为不变(安全)。**
+>
+> **④ 累计守门**:`test_erp_generic_product_mode`(13 例)+ `EndpointClientIdsRetiredTests`(反转)+ erp 套件 51 passed/1 skipped + mrerp 回归 106 passed + check_i18n 0/0 + release_notes 4 + black 全过 + 2 个 Playwright 真浏览器实测(向导 2 步 / 高级设置弹窗)。
+>
+> ════════════════════════════════════════════════════════════
 > **【第三十会话 · 交接 · 2026-05-26】MR.ERP 推送闭环攻坚:列表全量+修热路径反噬+模块路径+建码撞码+归一不一致+名称截断 6 连修(真账号推绿)→ Zihao 体验仍"慢/繁琐/状态打架" → 退回来出「真正开箱即用」重构设计文档 · 下窗口照 P0-P3 做**
 > ════════════════════════════════════════════════════════════
 > **当前前端版本**:home.js/i18n-data.js `?v=11835103` · `/api/version`=**11835103** · 本地无未 push commit(scratch `_diag_*.py`/`_clean_*.py`/`scripts/probe/_debug/`(已 gitignore) 勿提交)。

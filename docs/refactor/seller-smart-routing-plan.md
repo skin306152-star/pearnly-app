@@ -111,6 +111,46 @@ _verify_resolved_master_data(重新反查)**。所以用户在卡片里"选对 E
 **当前阶段(先可见+重试)**:卡片先给 [重试推送](复用 /retry)+ 可见性(为什么/哪字段/去哪修)。
 [选择/新建 ERP 客户] picker 是紧接着的下一块(通用 adapter 接口 · 写映射后重试闭环同上)。
 
+## 🔧 P1b+P1c+P1d 实现蓝图(文件级 · 下一轮照做 · 危险段必 diff 过目 + 沙箱测)
+
+> 已读透推送内部(2026-05-26):`push_to_endpoint`(erp_push.py:492)mrerp 早路由到
+> `push_mrerp_history`(244),每张 `with adapter: upload_invoice_batch([one], mappings)`
+> = **每张一次浏览器登录**。ImportResult 映射现假设单张(`result.success[0]/failed[0]`)。
+> auto-push(app.py:2560+)对每张 history 循环推**所有** auto_push 端点。
+
+### P1b 处理模式存储(安全 · 先行)
+- schema:`users.erp_push_mode TEXT DEFAULT 'smart'`(mirror `dup_check_enabled` · 在 users 现有
+  ensure 里加列 · 不新增 ensure_*)。值:`smart`(智能分拣)/ `fixed`(固定当前账套)/ `ocr_only`(只识别)。
+- DAL:`get_erp_push_mode(user_id)` / `set_erp_push_mode(user_id, mode)`(mirror dup_check)。
+- 路由:`GET/PUT /api/settings/erp-push-mode`(settings_routes.py)。
+- 上传覆盖:`/api/ocr/recognize` 加 Form `push_mode`(可空 · 覆盖本批)。
+- **门(本轮可安全先上)**:auto-push 块开头 `mode = push_mode or get_erp_push_mode(user)`;
+  `mode=='ocr_only'` → 跳过 auto-push + Xero 触发(纯跳过 · 零风险)。`smart/fixed` 暂走现状。
+- UI:ERP 配置页/设置加「ERP 自动处理方式」三选(通用文案 · 默认智能分拣)。
+
+### P1c 批量 seam(erp_push.py 重构 + 新 dispatch)
+- 抽 3 个 helper(行为不变 · push_mrerp_history 改调它们 · 跑 async tripwire/contract 测试验证):
+  `build_mrerp_adapter(config)`(cred enc/plain 启发式 + construct)· `flatten_history_for_mrerp(h)`
+  · `load_mrerp_mappings(tenant_id)`。
+- 新 `services/erp/push_dispatch.py: dispatch_endpoint_batch(endpoint, histories) -> List[result]`:
+  - mrerp:build adapter **一次** → flatten 全部 → `upload_invoice_batch(flats, mappings)` **一次** →
+    按 `invoice_no` 把 `result.success/failed` 回映射到每张 history → 每张一个 result dict(与
+    push_to_endpoint 同 shape)。
+  - 非 mrerp:循环 `push_to_endpoint`(无批量也统一接口)。
+  - 统一状态词汇 + 不写 `if adapter=='mrerp'`(分支只在 dispatch 内一处)。
+- 守门:dispatch 契约测试(mock upload_invoice_batch 返多行 ImportResult → 验回映射)。
+
+### P1d 编排重写(app.py auto-push 块 · **唯一危险点** · diff + 沙箱)
+- 取 mode(P1b)。`ocr_only` → 不推。
+- `smart`:每张 history 已带 seller 分拣的 `workspace_client_id`(P1a 已落库)→ 取其 endpoint →
+  **按 endpoint 分组** → 每组 `dispatch_endpoint_batch(endpoint, histories)` 一次 →
+  写 push 日志(每张)。未匹配/未绑端点的 history → **兼容兜底**:推现有 auto_push 端点(不阻断)。
+- `fixed`:全部 → 当前 workspace(切换器)绑定的 endpoint → 一组 dispatch。
+- per-invoice 隔离:一张 FailedRow 不影响同批其余(upload_invoice_batch 本就 per-row 报)。
+- 回滚:加 `ERP_SELLER_ROUTING` 开关(env / 配置)· 关掉即回退现"全推 auto_push 端点"。
+- 守门:路由单测(单端点=现状 / 多端点=各推各 / 未匹配=兜底)· 沙箱真账号:重开 dad6fb0f
+  推一张新卖方发票验路由到对账套 + 验不误杀现用户。
+
 ## 构建阶段(确认后)
 - **P1a 路由记忆层**:`seller_workspace_routes` 表 + DAL(match/learn)+ 整合进 match_workspace_for_seller。
 - **P1b 处理模式存储**:user/tenant 默认模式 setting + 上传 Form 覆盖参数。

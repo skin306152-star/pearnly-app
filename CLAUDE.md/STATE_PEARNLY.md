@@ -1,7 +1,19 @@
 # 📊 STATE · Pearnly 项目状态
 
-> 🏗️ **【常驻指针 · 整顿恢复后读】当前优先级仍是 ERP 收尾(P2-B/C/P3)**;**这三项修完后**整顿恢复、改走 `/batch` 加速 —— 那时进窗口读 `docs/refactor/BATCH_STRATEGY.md`(从 Wave 0 安全网起跑)+ `REFACTOR_MASTER_PLAN.md`。**现在别动整顿**,先把 ERP 收尾做完。
+> 🏗️ **【常驻指针 · 整顿恢复后读】当前优先级仍是 ERP 收尾(剩 P2-C/P3)**;**这两项修完后**整顿恢复、改走 `/batch` 加速 —— 那时进窗口读 `docs/refactor/BATCH_STRATEGY.md`(从 Wave 0 安全网起跑)+ `REFACTOR_MASTER_PLAN.md`。**现在别动整顿**,先把 ERP 收尾做完。
 
+> ════════════════════════════════════════════════════════════
+> **【第三十三会话 · 交接 · 2026-05-27】P2-B 推送日志折叠上线(真账号实测过)· 只剩 P2-C(触 home.js)/ P3**
+> ════════════════════════════════════════════════════════════
+> **本会话完成并上线(commit `c4845b5` · master · 已部署 · 真账号实测过)· P2-B 推送日志折叠**:
+> - `list_push_logs` 加折叠 CTE(`ROW_NUMBER() OVER (PARTITION BY ... ORDER BY created_at DESC, id DESC)`)→ 每对(history×endpoint)只显示最新一条,清「混合手动+自动推」遗留重复行,与 `list_push_exceptions` 同口径(单一状态源·铁律 #12)。
+> - **NULL-safe**:`CASE WHEN history_id 与 endpoint_id 都有 THEN history||'|'||endpoint ELSE 'solo:'||id`——孤儿 log(endpoint 已删 / 任一 NULL)/ Xero 各自独立分区(_rn 恒 1),**永不被误合并**。状态/trigger/adapter 过滤作用于折叠后当前态;COUNT 与主查询同口径。
+> - **两调用方安全**:`/api/erp/logs` 展示折叠;`/api/erp/check-pushed`(查发票是否已推成功)变为看折叠后**最新态**(更符合单一状态源)。统计 `get_push_stats_today` 走独立 query 不受影响。
+> - **守门**:新增 `tests/unit/test_push_logs_fold.py`(7 例 SQL 形状契约:折叠 CTE/NULL-safe 分区/最新优先/过滤作用于折叠后/user_id 永在 CTE)· 全量 unit **938 passed** · 既有 adapter/contract/exceptions/retry 套件不破 · black/ruff/imports/i18n 全绿。**纯后端 0 前端 · 不动 release_notes/版本**。
+> - **真账号实测(只读探生产 · Zihao 授权)**:生产 `erp_push_logs` 现有重复行 → 折叠后:付费 `468b50c1` **15→5**、测试 `1182f2ae` **25→25**(NULL-safe 孤儿全留)、`9707bdff` **2→2**;原 8 行那对 → **1 条**(最新态 failed)。全程只读 · 未造测试数据 · 无需清理。
+>
+> **下一步(下窗口续 ERP 收尾)**:**P2-C(B7 不裸透泰文 · 触 home.js 巨石 · 需 UI 实测)→ P3(概念/导航)**。⚠️ P2-C 改 home.js 渲染,跟整顿 Wave 2(拆 home.js)同文件 → 见 `BATCH_STRATEGY.md`:P2-C 必须先做完,整顿 Wave 2 才能开。
+>
 > ════════════════════════════════════════════════════════════
 > **【第三十二会话(续)· 交接 · 2026-05-27】P2 状态单一真相 上半:P2-A 重试更新原行 + P2-D 发票号已存在判「已推送过」上线 · 下窗口续 P2-B(日志折叠)/ P2-C(B7 不裸透泰文)/ P3**
 > ════════════════════════════════════════════════════════════

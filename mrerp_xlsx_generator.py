@@ -585,6 +585,12 @@ def build_sales_credit_detail_rows(
 
     # v27.8.1.17 · 建商品 lookup 一次（O(N)）· 内循环 O(1) 查
     product_lookup = _build_product_lookup(mappings)
+    # P1「开箱即用」· 通用商品码兜底(由 adapter 注入 mappings)· 配了才有。
+    # 商品行对不上 ERP 已有真实商品时,挂这个通用销售商品码,OCR 行描述(item_name)
+    # 原样保留为行名/备注。未配(None)= 精确模式 = 老行为(None → 下游 '123')。
+    generic_product_code = None
+    if isinstance(mappings, dict):
+        generic_product_code = (mappings.get("_generic_product_code") or "").strip() or None
 
     items = []
     for src_field in (
@@ -626,8 +632,11 @@ def build_sales_credit_detail_rows(
             if amt is None and qty is not None and price is not None:
                 amt = round(qty * price, 2)
             # v27.8.1.17 · 查商品映射 · 找不到返 None · 下游 korn_clone 兜底 '123'
+            # P1 · 通用模式下找不到 → 用通用销售商品码(精准其所当精准,通用其所该通用)。
             item_name = it.get("name") or it.get("description") or ""
             erp_code = _resolve_product_code(item_name, product_lookup)
+            if erp_code is None and generic_product_code:
+                erp_code = generic_product_code
             rows.append(
                 {
                     "invoice_no": mrerp_invoice_no,
@@ -650,7 +659,8 @@ def build_sales_credit_detail_rows(
                 "qty": 1,
                 "unit_price": unit,
                 "amount": unit,
-                "product_code": None,
+                # P1 · 无明细行也用通用码兜底(精确模式仍 None → 下游 '123')。
+                "product_code": generic_product_code,
                 "item_name": "",
             }
         )

@@ -431,6 +431,48 @@ class MRERPProductSyncService:
             ],
         )
 
+    def verify_code_exists(self, product_code: str) -> str:
+        """P1「开箱即用」· 只验一个 product_code 在 MR.ERP 里**存在**,不做名字匹配。
+
+        用于通用商品码(generic_product_code)兜底:对不上真实商品的发票行都挂这个
+        通用销售商品,行描述用 OCR 原名。通用码是用户连接时从 ERP 商品列表选的,
+        本就是已有真实商品 · 不需要逐行拿"行描述 vs 通用品名"做相似度(必然不像)。
+        只需确认它还在(防被删/配错 → A6 种子失效),整批 search 一次即可。
+
+        Returns: MR.ERP 里该码的真实商品名(确认存在)。
+        Raises:  MRERPTechnicalError — 搜不到该码 / listing 技术异常(无法确认存在)。
+        """
+        code = (product_code or "").strip()
+        if not code:
+            raise MRERPTechnicalError(
+                "ERR_PRODUCT_VERIFY_UNAVAILABLE — generic product_code is empty "
+                "(连接里没配通用销售商品码)"
+            )
+        import time as _time
+
+        listing = None
+        last_err: Optional[Exception] = None
+        for attempt in (1, 2):
+            try:
+                listing = self._search_listing(code)
+                break
+            except MRERPTechnicalError as e:
+                last_err = e
+                if attempt < 2:
+                    _time.sleep(2)
+        if listing is None:
+            raise MRERPTechnicalError(
+                f"ERR_PRODUCT_VERIFY_UNAVAILABLE — MR.ERP listing lookup failed "
+                f"for generic product_code {code!r} after retry: {last_err}"
+            ) from last_err
+        row = next((r for r in listing if r.code == code), None)
+        if row is None:
+            raise MRERPTechnicalError(
+                f"ERR_PRODUCT_VERIFY_UNAVAILABLE — generic product_code {code!r} "
+                f"not found in MR.ERP listing(可能被删或配错 · 请回连接重选通用商品)"
+            )
+        return row.name
+
     def invalidate(self) -> None:
         self.cache.clear()
 

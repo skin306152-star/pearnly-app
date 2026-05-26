@@ -321,6 +321,9 @@ def build_mrerp_adapter(config: Dict[str, Any]):
         master_data_auto_create=bool(config.get("master_data_auto_create", True)),
         seed_customer_code=(config.get("seed_customer_code") or None),
         seed_product_code=(config.get("seed_product_code") or None),
+        # P1「开箱即用」· 通用销售商品码 · 配了 → 商品「匹配优先 + 通用兜底 · 不自动建」;
+        # 未配 → 精确模式(逐行 auto-create · 老行为不变 · 保护现有付费用户)。
+        generic_product_code=(config.get("generic_product_code") or None),
     )
 
     try:

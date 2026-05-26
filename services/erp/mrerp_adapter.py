@@ -206,6 +206,7 @@ class MRERPAdapter:
         master_data_auto_create: bool = False,
         seed_customer_code: Optional[str] = None,
         seed_product_code: Optional[str] = None,
+        generic_product_code: Optional[str] = None,
         serialize_sessions: bool = True,
     ):
         if not login_url:
@@ -245,6 +246,14 @@ class MRERPAdapter:
         self.master_data_auto_create = bool(master_data_auto_create)
         self.seed_customer_code = (seed_customer_code or "").strip() or None
         self.seed_product_code = (seed_product_code or "").strip() or None
+        # P1「开箱即用」(Zihao 2026-05-26 拍板) · 通用商品码兜底模式。
+        # 配了 generic_product_code = 进入「匹配优先 + 通用兜底 · 不自动建商品」:
+        #   - 商品行能对上 ERP 已有真实商品 → 用真码(精准)。
+        #   - 对不上(定制长描述) → 挂这个通用销售商品码,OCR 行描述原样保留
+        #     在行名/备注。**不再逐行去 ERP 现场建商品**(慢+脏+撞码+截断的根)。
+        # 不配(None) = 精确模式 = 老行为完全不变(保护现有付费用户)。
+        # 注意:这只 gate 商品;买方仍按 master_data_auto_create 自动建(真实主体)。
+        self.generic_product_code = (generic_product_code or "").strip() or None
         self._customer_sync = None  # lazy-created on first use
         self._product_sync = None  # lazy-created on first use
 
@@ -759,6 +768,11 @@ class MRERPAdapter:
         """
         if not histories:
             return ImportResult(total=0)
+
+        # P1「开箱即用」· 把通用商品码注入共享 mappings,供 verify gate +
+        # xlsx generator 读取(避免穿透多层函数签名)。None = 精确模式。
+        if isinstance(mappings, dict):
+            mappings["_generic_product_code"] = self.generic_product_code
 
         self.select_company()
         t0 = time.time()
@@ -1604,7 +1618,10 @@ class MRERPAdapter:
             items = self._extract_items(h)
             for item in items:
                 try:
-                    if self.master_data_auto_create:
+                    # P1「开箱即用」· 通用模式(配了 generic_product_code)下商品
+                    # 只 lookup 命中真实商品(精准),对不上不建档 —— 兜底通用码在
+                    # generator/verify 处理。仅精确模式(未配通用码)才逐行 auto-create。
+                    if self.master_data_auto_create and not self.generic_product_code:
                         result = self._product_sync.lookup_or_create(
                             item,
                             mappings,
@@ -1673,9 +1690,14 @@ class MRERPAdapter:
 
         product_lookup = _gen._build_product_lookup(mappings)
 
+        # P1「开箱即用」· 通用商品码(配了才有)· 不中的行挂它,只验它"存在"一次。
+        generic_code = (mappings.get("_generic_product_code") or "").strip() or None
+
         # 复核结果 memo(防同一 (code,名) 在批内反复 search)· 值=reason_code 或 None(通过)。
         cust_memo: Dict[tuple, Optional[str]] = {}
         prod_memo: Dict[tuple, Optional[str]] = {}
+        # 通用码存在性 memo · 按码(不含名)· 整批最多 search 一次。
+        generic_memo: Dict[str, Optional[str]] = {}
 
         def _verify_customer(code: str, buyer_name: str, buyer_tax_id: str) -> Optional[str]:
             # P2 · memo key 含税号(同码不同税号要分别复核)。
@@ -1706,6 +1728,20 @@ class MRERPAdapter:
             prod_memo[key] = reason
             return reason
 
+        def _verify_generic_exists(code: str) -> Optional[str]:
+            # P1「开箱即用」· 通用商品码只验"在 ERP 里存在"(整批一次)· 不做名字
+            # 匹配(行描述本就和通用品名不同)。这是把 130 秒(逐行反查)降到秒级的关键。
+            if code in generic_memo:
+                return generic_memo[code]
+            reason: Optional[str] = None
+            try:
+                self._product_sync.verify_code_exists(code)
+            except MRERPTechnicalError:
+                # 通用码在 ERP 找不到(被删/配错)· 不静默 · 响亮失败让用户回连接重选。
+                reason = "ERR_PRODUCT_VERIFY_UNAVAILABLE"
+            generic_memo[code] = reason
+            return reason
+
         still_valid: List[Dict[str, Any]] = []
         failed: List[FailedRow] = []
         for h in histories:
@@ -1723,8 +1759,16 @@ class MRERPAdapter:
             # 2) 商品复核 — 客户先过才查商品(失败已定 · 省 search)。
             if reason is None:
                 for item in self._extract_items(h):
-                    product_code = _gen._resolve_product_code(item.name, product_lookup) or "123"
-                    r = _verify_product(product_code, item.name)
+                    real_code = _gen._resolve_product_code(item.name, product_lookup)
+                    if real_code:
+                        # 命中 ERP 已有真实商品 → 按码反查真名复核(含截断容忍)。
+                        r = _verify_product(real_code, item.name)
+                    elif generic_code:
+                        # P1 通用模式 · 对不上 → 挂通用码,只验通用码存在(整批一次)。
+                        r = _verify_generic_exists(generic_code)
+                    else:
+                        # 精确模式且对不上 → 老行为:fallback '123' → 名复核必失败(响亮)。
+                        r = _verify_product("123", item.name)
                     if r is not None:
                         reason = r
                         break

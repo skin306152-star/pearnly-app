@@ -23,6 +23,11 @@ import './home/erp-xero.js'; // REFACTOR-C1 · Xero 连接卡片
 import './home/report-templates.js'; // REFACTOR-C1 · 报表模板/统一导出弹窗(openReportModal)
 import './home/folder-watcher.js'; // REFACTOR-C1 · 文件夹监听(_loadFolderWatcherPanel)
 import './home/email-ingest.js'; // REFACTOR-C1 · 邮箱抓取(_loadEmailIngestPanel)
+import './home/bank-recon.js'; // REFACTOR-C1 · 银行对账模块(M10)
+import './home/clients.js'; // REFACTOR-C1 · 客户实体前端
+import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页
+import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
+import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(

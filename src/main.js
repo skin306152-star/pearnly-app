@@ -28,6 +28,9 @@ import './home/clients.js'; // REFACTOR-C1 · 客户实体前端
 import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件
+import './home/recon-subtab-settings.js'; // REFACTOR-C1 · 对账子tab+设置弹窗
+import './home/excel-formula-recon.js'; // REFACTOR-C1 · Excel公式对账内测(skin-only)
+import './home/gl-vat-recon.js'; // REFACTOR-C1 · GL vs 销项税报告对账
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(

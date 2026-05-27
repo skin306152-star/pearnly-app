@@ -24,8 +24,20 @@ class ExportLangFollowsUiTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        # REFACTOR-C1:对账/导出相关 IIFE 已陆续从 home.js verbatim 抽到 src/home/*.js
+        # (M2 VEX → excel-formula-recon.js · M3 GL-VAT → gl-vat-recon.js · 银行对账 → bank-recon.js)。
+        # 动态语言契约逻辑随代码整块搬走、行为不变 → 守门扫 home.js + 全部 src/home 模块的并集,
+        # 这样无论代码留在 home.js 还是已模块化,契约都能锁住(对后续抽取也免疫)。
+        parts = []
         with open(os.path.join(ROOT, "home.js"), "r", encoding="utf-8") as f:
-            cls.home_js = f.read()
+            parts.append(f.read())
+        src_home = os.path.join(ROOT, "src", "home")
+        if os.path.isdir(src_home):
+            for name in sorted(os.listdir(src_home)):
+                if name.endswith(".js"):
+                    with open(os.path.join(src_home, name), "r", encoding="utf-8") as f:
+                        parts.append(f.read())
+        cls.home_js = "\n".join(parts)
 
     def test_brv2_export_passes_window_current_lang(self):
         """契约 1 · _brv2Export 必须用 window._currentLang 拼 URL · 不能 hardcode"""
@@ -142,9 +154,10 @@ class ExportLangFollowsUiTests(unittest.TestCase):
             f"VEX submit lang 不能 hardcode 字面量({lang_expr})",
         )
         # _curLang 必须派生自 currentLang / _currentLang(动态跟随 UI)
-        self.assertRegex(
-            head,
-            r"_curLang\s*=.*(?:currentLang|_currentLang)",
+        # REFACTOR-C1:模块化后 prettier 可能把 `const _curLang =` 与 currentLang 折成多行 →
+        # 用 re.DOTALL 让 . 跨行(契约不变 · 仅容忍换行)。
+        self.assertTrue(
+            re.search(r"_curLang\s*=.*?(?:currentLang|_currentLang)", head, re.DOTALL),
             "VEX lang(_curLang)必须来自 currentLang/_currentLang · 不能 hardcode",
         )
 

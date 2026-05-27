@@ -43,6 +43,7 @@ import './home/sidebar-nav-group.js'; // REFACTOR-C1 · 侧栏可折叠业务流
 import './home/help-modal.js'; // REFACTOR-C1 · Help modal 关闭绑定
 import './home/integration-config.js'; // REFACTOR-C1 · 集成页「配置」按钮→抽屉
 import './home/erp-integration.js'; // REFACTOR-C1 · ERP 集成页(推送日志+端点管理 · loadErpLogs/loadErpEndpoints/...)
+import './home/admin-users.js'; // REFACTOR-C1 · 超管用户管理页(loadAdminUsersPage + __adm_* + 风控 + 员工 tab)· 抽自 v109.3 IIFE 后半
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(

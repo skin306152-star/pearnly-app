@@ -233,7 +233,7 @@
 |---|---|---|---|---|
 | 0 安全网(E2E/集成) | ✅ E2E 网成 | unit 872 / E2E 1 | unit **1132** / E2E **10** | 第三十五会话 17 个纯逻辑模块补契约(+~220 unit)。**第三十八会话(2026-05-27)质检窗口用真账号建 9 个登录态 E2E(登录/4语/客户/历史/异常/销项税/收入对账/ERP/充值)+ 登录地基 storageState · env-gated CI 跳过保绿 · 真站点 10/10 全绿 · `bcfb499`。E2E 网 1→10 达标** |
 | 1 db.py 收尾 | 🟡 | db.py 4620 行 | db.py 4620(未接线) | 第三十七会话(2026-05-27)**首次用并行 agent**:membership(9 函数)+ tenant(14 函数)两安全域 copy-out → `services/{membership,tenant}/store.py` + 37 契约测试 · 全守门绿 · CI 绿 · `c1a8c8a`。**copy-out 完成 · 串行接线(删 db.py + re-export)未做**。剩余域全高敏(credits/auth/ocr_history)→ Zihao 在场 |
-| 2 home.js | 🟡 抽取中 | home.js **22970 行** | home.js **21991 行** | 第三十八会话(2026-05-27)E2E 网绿后**开抽 §13🟢 表**:recon-center(`4fa262e`)→ assign-clients(`e2a9d43`)→ access-log(`6ff538b`)→ notifications(`cad5f1b`)· 4 块共 -979 行 · 每块独立 commit · 真站点 E2E 10/10 全绿 · CI 绿。配方:逐字切片→main.js import→删块保 CRLF→双缓存戳 +1→4 守门→单独 push→生产 E2E。**继续抽 §13🟢 余下块** |
+| 2 home.js | 🟡 抽取中 | home.js **22970 行** | home.js **20831 行** | 第三十八会话(2026-05-27)E2E 网绿后**开抽 §13🟢 表 · 8 块已抽**(每块独立 commit · 真站点 E2E 10/10 全绿 · CI 绿):**R1 串行**(逐块验配方)recon-center `4fa262e` / assign-clients `e2a9d43` / access-log `6ff538b` / notifications `cad5f1b`(-979);**R2 并行 copy-out agent**(配方确认后转批量)recon-batch `f3d4cbc` / welcome-wizard `c9fb2a0` / ai-balance `ea71f7f` / archive-settings `10cb6d6`(-1160)。共 **-2139 行**。配方见 §13。**继续抽 §13🟢 余下块** |
 | 3 css/html | ⚪ | css 16124 / html 6568 | — | — |
 | 4 i18n/文档/抛光 | ⚪ | — | — | — |
 
@@ -269,8 +269,9 @@
 
 > **关键发现**:home.js 的"大未知块"不是一个巨函数,而是 **~35 个功能孤岛**(顶层函数群 + 约 25 个 IIFE 自执行模块串在一起)。每个 IIFE 天然 = 一个 `src/home/<feature>.js`。**行号是本快照,抽前必 re-grep。**
 >
-> **⚠️ 进度更新(第三十八会话 · 2026-05-27)**:已抽 4 块(②表打 ✅)· home.js **22970 → 21991 行**。**②表里 L17526 之后的所有块行号已整体上移**(notifications/recon-center/access-log/assign-clients 删除累计 -979)· **必 re-grep**。
-> **配方(已验证可复制 · 单块流水线)**:re-grep 真实起止 → node 切片 verbatim 写 `src/home/<x>.js`(CRLF→prettier 转 LF)→ 加 `/* global ... */` 补 eslint(列出 home.js 暴露但未在 eslint.config globals 的裸全局:apiGet/apiPost/escapeHtml/showConfirm/token/loadTeamList 等)→ `src/main.js` 加 import → node 切片删 home.js 原块(**join('\n') 保 CRLF · 别整文件转 LF**)→ `home.html` 双缓存戳 `home.js?v=`+`main.js?v=` 各 +1(**两个都 bump · 内容都变 · 不动 /api/version 不弹横幅**)→ 4 守门(build/node --check/check_i18n --strict/unittest)→ 每块独立 commit → 一轮单独 push → 生产 E2E 10/10。
+> **⚠️ 进度更新(第三十八会话 · 2026-05-27)**:已抽 **8 块**(②表打 ✅)· home.js **22970 → 20831 行**(累计 **-2139**)。**②表行号已大幅漂移**(删除分布在 L7970 / 12155 / 15713 / 17526~18326 / 21710 等)· **抽前必 re-grep**。
+> **配方(已验证可复制 · R2 起用并行 copy-out agent)**:re-grep 真实起止 → node 切片 verbatim 写 `src/home/<x>.js`(CRLF→prettier 转 LF)→ 加 `/* global ... */` 补 eslint(home.js 暴露但未在 eslint.config globals 的裸全局:apiGet/apiPost/escapeHtml/showConfirm/token/loadTeamList/currentLang/_contact/switchSettingsTab 等)→ 若块内有 verbatim 防御式初始化/下架死码触发 `no-useless-assignment`/`no-unreachable` **error**(src 段未豁免 · 会拖红 CI lint),加头部 `/* eslint-disable <rule> -- verbatim ... */`(0 改逻辑)→ `src/main.js` 加 import → node 切片删 home.js 原块(**split('\n')/join('\n') 保 CRLF · 逐次校验 LF-only=0 · 别整文件转 LF/别用 sed-python**)→ `home.html` 双缓存戳 `home.js?v=`+`main.js?v=` 各 +1(**两个都 bump · 内容都变 · 不动 /api/version 不弹横幅**)→ 守门(eslint 0-error / build / node --check / check_i18n --strict / unittest)→ 每块独立 commit → 一轮单独 push → 生产 E2E 10/10。
+> **批量模式**:挑 4-6 个**互不相邻的干净单 IIFE**(避开:顶层函数群如 `export` L4392-4610 · 双 IIFE 如 `admin-misc` · 紧邻🔴的块如 `recon-collapse`(挨 session-heartbeat))→ 并行派同数 copy-out agent(只读 home.js · 只写自己那个新文件 · 回报删除锚点)→ 父窗口串行接线。
 
 **① ⚠️ 更正(2026-05-27 实查代码):不需要先抽 `_shared.js`!**
 - 实查 `src/home/{dashboard,test-center,workspace-switcher}.js` + `src/main.js`:**已落地的成熟样板是「全局暴露」不是「import」**。home.js `<script>` 同步先跑 → 顶层 `function t/showToast/showConfirm/apiGet/...` 自动成为全局(window 属性);抽出的 ES module 由 `main.js` import、`type=module defer` 后跑 → 执行时这些全局已就绪,**直接 bare 调用 `t(...)`/`showToast(...)` 即可,无需 import、无需重定义**。test-center.js 就是这么干且已上线验证。
@@ -289,19 +290,19 @@
 | ocr-run-results.js | 2964-3640 | 680 | 开始识别/引擎轮询/结果渲染/搜索 |
 | results-drawer.js | 3641-3895 | 255 | 识别抽屉/字段渲染 |
 | rd-sync.js | 3896-4391 | 495 | RD 税务校验/同步弹窗/OCR 推送/diagnose |
-| export.js | 4392-4610 | 220 | Excel 导出模板系统 |
+| ⚠️ export.js | 4392-4610 | 220 | Excel 导出模板系统 · **不是 IIFE · 是顶层函数群 + setInterval**(顶层 function 是全局 · 别处可能裸名引用 · 搬走前须查全部外部引用是否走 window)· 非简单 copy-out |
 | history.js | 4790-5462 | 670 | 历史记录页 |
 | erp-endpoints-logs.js | 5463-6760 | 1300 | ERP 端点管理/推送日志/批量重推删 |
 | email-ingest.js | 6761-7418 | 655 | 邮箱抓取 |
 | folder-watcher.js | 7421-7968 | 544 | 文件夹监听(File System Access API) |
-| archive-settings.js | 7971-8470 | 497 | 归档命名规则编辑器 |
+| ✅ archive-settings.js | 7971-8470 | 497 | 归档命名规则编辑器 · 已抽 `10cb6d6` |
 | bank-recon.js | 8474-9528 | 1052 | 银行对账模块 |
 | **(待探)** | 9597-11127 | ~1530 | ⚠️ 无标题块 · 抽前需 agent 先测绘标注 |
-| admin-misc.js | 11130-11397 | 267 | 老 admin 残留入口 + 成本追踪面板 |
+| admin-misc.js | 11130-11397 | 267 | 老 admin 残留入口 + 成本追踪面板 · **是两个 IIFE**(11129-11167 下拉 handler + 11171-11397 loadAdminCostPage)· 搬时两个一起 |
 | clients.js | 11401-12152 | 750 | 客户实体前端全套 |
-| ai-balance.js | 12156-12337 | 180 | Google AI 余额追踪 |
+| ✅ ai-balance.js | 12156-12337 | 180 | Google AI 余额追踪 · 已抽 `ea71f7f` |
 | report-templates.js | 12340-12749 | 410 | 报表模板/统一导出弹窗 |
-| welcome-wizard.js | 15714-15907 | 190 | 登录后欢迎向导 |
+| ✅ welcome-wizard.js | 15714-15907 | 190 | 登录后欢迎向导 · 已抽 `c9fb2a0` |
 | exceptions.js | 15914-17523 | 1609 | 异常栏 列表 + 抽屉(第二大块) |
 | ✅ notifications.js | 17527-17823 | 296 | 智能提醒 · 已抽 `cad5f1b` |
 | ✅ recon-center.js | 17826-18151 | 325 | 对账中心首页 · 已抽 `4fa262e` |
@@ -311,8 +312,8 @@
 | erp-xero.js | 19182-19732 | 546 | Xero 连接卡片 + 推按钮 |
 | bulk-upload.js | 19735-20204 | ~470 | 大批量上传进度 + 新用户引导 |
 | topbar-avatar.js | 21264-22376 | 1100 | 顶栏三件套 / 头像菜单(NAV-IA P1) |
-| recon-collapse.js | 22441-22690 | 250 | 销项/收入对账折叠组件 |
-| recon-batch.js | 22691-22970 | 280 | 对账历史多选批量删 |
+| recon-collapse.js | 22441-22690 | 250 | 销项/收入对账折叠组件 · ⚠️ **紧邻🔴session-heartbeat**(其上方)· 抽时小心 START 边界别越界 |
+| ✅ recon-batch.js | 22691-22970 | 280 | 对账历史多选批量删 · 已抽 `f3d4cbc` |
 
 **③ ⚠️ 高敏/勿入 batch(留 Zihao 在场 · 主控亲手做)**
 - `plans-plg-line`(L12757-15446 · **2689 行 · 最大块**):商业模式 = 套餐 + 防薅闸 + 升级弹窗 + **LINE 绑定**(碰登录/账号)。

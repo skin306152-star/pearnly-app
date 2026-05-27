@@ -231,9 +231,9 @@
 
 | Wave | 状态 | 起始数字 | 当前数字 | 已合 PR / 备注 |
 |---|---|---|---|---|
-| 0 安全网(E2E/集成) | 🟡 | unit 872 / E2E 1 | unit **1095** / E2E 1 | 第三十五会话(2026-05-27)**未用 /batch · 在单窗口直接做**:17 个核心纯逻辑模块补行为契约(对账/导出/归档/监控/加密)· +~220 unit · 挖修 3 真 bug · 全守门绿 · 零冲突。**E2E(登录后核心路径)仍 1/10 · 需账号** |
+| 0 安全网(E2E/集成) | ✅ E2E 网成 | unit 872 / E2E 1 | unit **1132** / E2E **10** | 第三十五会话 17 个纯逻辑模块补契约(+~220 unit)。**第三十八会话(2026-05-27)质检窗口用真账号建 9 个登录态 E2E(登录/4语/客户/历史/异常/销项税/收入对账/ERP/充值)+ 登录地基 storageState · env-gated CI 跳过保绿 · 真站点 10/10 全绿 · `bcfb499`。E2E 网 1→10 达标** |
 | 1 db.py 收尾 | 🟡 | db.py 4620 行 | db.py 4620(未接线) | 第三十七会话(2026-05-27)**首次用并行 agent**:membership(9 函数)+ tenant(14 函数)两安全域 copy-out → `services/{membership,tenant}/store.py` + 37 契约测试 · 全守门绿 · CI 绿 · `c1a8c8a`。**copy-out 完成 · 串行接线(删 db.py + re-export)未做**。剩余域全高敏(credits/auth/ocr_history)→ Zihao 在场 |
-| 2 home.js | 🟡 测绘完 | home.js **22970 行** | — | 第三十七会话测绘完(见 §13)· `_shared` 待抽(串行)· 大块 L6623-20204 已确认 = ~25 个 IIFE 模块(非单巨函数)· **等 Wave 0 E2E 网绿后开大批** |
+| 2 home.js | 🟡 抽取中 | home.js **22970 行** | home.js **21991 行** | 第三十八会话(2026-05-27)E2E 网绿后**开抽 §13🟢 表**:recon-center(`4fa262e`)→ assign-clients(`e2a9d43`)→ access-log(`6ff538b`)→ notifications(`cad5f1b`)· 4 块共 -979 行 · 每块独立 commit · 真站点 E2E 10/10 全绿 · CI 绿。配方:逐字切片→main.js import→删块保 CRLF→双缓存戳 +1→4 守门→单独 push→生产 E2E。**继续抽 §13🟢 余下块** |
 | 3 css/html | ⚪ | css 16124 / html 6568 | — | — |
 | 4 i18n/文档/抛光 | ⚪ | — | — | — |
 
@@ -268,6 +268,9 @@
 ## 13. home.js 测绘 manifest(2026-05-27 · 第三十七会话 · 22970 行版本)
 
 > **关键发现**:home.js 的"大未知块"不是一个巨函数,而是 **~35 个功能孤岛**(顶层函数群 + 约 25 个 IIFE 自执行模块串在一起)。每个 IIFE 天然 = 一个 `src/home/<feature>.js`。**行号是本快照,抽前必 re-grep。**
+>
+> **⚠️ 进度更新(第三十八会话 · 2026-05-27)**:已抽 4 块(②表打 ✅)· home.js **22970 → 21991 行**。**②表里 L17526 之后的所有块行号已整体上移**(notifications/recon-center/access-log/assign-clients 删除累计 -979)· **必 re-grep**。
+> **配方(已验证可复制 · 单块流水线)**:re-grep 真实起止 → node 切片 verbatim 写 `src/home/<x>.js`(CRLF→prettier 转 LF)→ 加 `/* global ... */` 补 eslint(列出 home.js 暴露但未在 eslint.config globals 的裸全局:apiGet/apiPost/escapeHtml/showConfirm/token/loadTeamList 等)→ `src/main.js` 加 import → node 切片删 home.js 原块(**join('\n') 保 CRLF · 别整文件转 LF**)→ `home.html` 双缓存戳 `home.js?v=`+`main.js?v=` 各 +1(**两个都 bump · 内容都变 · 不动 /api/version 不弹横幅**)→ 4 守门(build/node --check/check_i18n --strict/unittest)→ 每块独立 commit → 一轮单独 push → 生产 E2E 10/10。
 
 **① ⚠️ 更正(2026-05-27 实查代码):不需要先抽 `_shared.js`!**
 - 实查 `src/home/{dashboard,test-center,workspace-switcher}.js` + `src/main.js`:**已落地的成熟样板是「全局暴露」不是「import」**。home.js `<script>` 同步先跑 → 顶层 `function t/showToast/showConfirm/apiGet/...` 自动成为全局(window 属性);抽出的 ES module 由 `main.js` import、`type=module defer` 后跑 → 执行时这些全局已就绪,**直接 bare 调用 `t(...)`/`showToast(...)` 即可,无需 import、无需重定义**。test-center.js 就是这么干且已上线验证。
@@ -300,10 +303,10 @@
 | report-templates.js | 12340-12749 | 410 | 报表模板/统一导出弹窗 |
 | welcome-wizard.js | 15714-15907 | 190 | 登录后欢迎向导 |
 | exceptions.js | 15914-17523 | 1609 | 异常栏 列表 + 抽屉(第二大块) |
-| notifications.js | 17527-17823 | 296 | 智能提醒 |
-| recon-center.js | 17826-18151 | 325 | 对账中心首页 |
-| access-log.js | 18299-18488 | 189 | 客户访问日志 tab |
-| assign-clients.js | 18491-18653 | 162 | 客户分配 modal(老板分客户给员工) |
+| ✅ notifications.js | 17527-17823 | 296 | 智能提醒 · 已抽 `cad5f1b` |
+| ✅ recon-center.js | 17826-18151 | 325 | 对账中心首页 · 已抽 `4fa262e` |
+| ✅ access-log.js | 18299-18488 | 189 | 客户访问日志 tab · 已抽 `6ff538b` |
+| ✅ assign-clients.js | 18491-18653 | 162 | 客户分配 modal(老板分客户给员工)· 已抽 `e2a9d43` |
 | erp-mappings.js | 18704-19178 + 20143-20190 | ~520 | ERP 字段映射底座 + 高级 toggle |
 | erp-xero.js | 19182-19732 | 546 | Xero 连接卡片 + 推按钮 |
 | bulk-upload.js | 19735-20204 | ~470 | 大批量上传进度 + 新用户引导 |

@@ -1,0 +1,528 @@
+/* ============================================================
+   v89 · 员工管理卡片式布局
+   ============================================================ */
+.team-list {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 12px;
+}
+.team-card {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    transition: border-color .15s, box-shadow .15s;
+}
+.team-card:hover {
+    border-color: #CBD5E0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.team-card.disabled {
+    opacity: 0.65;
+    background: #FAFAFA;
+}
+.team-avatar {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #111111, #6366F1);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px;
+    flex-shrink: 0;
+    user-select: none;
+}
+.team-card.disabled .team-avatar {
+    background: #9CA3AF;
+}
+.team-card.owner .team-avatar {
+    background: linear-gradient(135deg, #F59E0B, #F97316);
+}
+.team-card-info {
+    flex: 1; min-width: 0;
+}
+.team-card-name {
+    font-weight: 600; font-size: 14px;
+    color: var(--ink);
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap;
+}
+.team-card-meta {
+    font-size: 12px; color: var(--ink-3);
+    margin-top: 3px;
+}
+.team-role-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: #FEF3C7;
+    color: #92400E;
+    font-weight: 600;
+}
+.team-status-badge {
+    font-size: 11px;
+    padding: 4px 9px;
+    border-radius: 5px;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+.team-status-badge.on { background: #D1FAE5; color: #065F46; }
+.team-status-badge.off { background: #F3F4F6; color: #6B7280; }
+.team-card-actions {
+    display: flex; gap: 6px; flex-shrink: 0;
+}
+.team-card-actions button {
+    padding: 6px 12px;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all .15s;
+}
+.team-card-actions button:hover {
+    border-color: #9CA3AF;
+    background: #F9FAFB;
+}
+.team-card-actions button.danger { color: #DC2626; }
+.team-card-actions button.danger:hover {
+    border-color: #FCA5A5;
+    background: #FEF2F2;
+}
+@media (max-width: 640px) {
+    .team-card { flex-wrap: wrap; }
+    .team-card-actions { margin-left: auto; }
+}
+
+/* ============================================================
+ * v95 · 文件夹监听 · 浏览器 File System Access API
+ * ============================================================ */
+.folder-card {
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 12px;
+    padding: 24px; margin-top: 16px;
+}
+/* CSS 兜底 · 防止 SVG 撑爆容器 */
+.folder-card svg, .folder-unsupported svg, .folder-empty svg, .folder-active svg {
+    max-width: 100%; max-height: 100%;
+}
+.folder-unsupported, .folder-empty {
+    text-align: center; padding: 48px 24px;
+}
+.folder-unsupported-icon, .folder-empty-icon {
+    width: 64px; height: 64px; margin: 0 auto 16px;
+    color: #9CA3AF;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.folder-unsupported-icon svg, .folder-empty-icon svg {
+    width: 64px; height: 64px;
+    display: block;
+}
+.folder-unsupported-title, .folder-empty-title {
+    font-size: 18px; font-weight: 600; color: #111827; margin-bottom: 8px;
+}
+.folder-unsupported-desc, .folder-empty-desc {
+    color: #6B7280; font-size: 14px; margin-bottom: 24px; max-width: 480px; margin-left: auto; margin-right: auto;
+}
+.folder-alt-section { margin-top: 24px; }
+.folder-alt-title { font-size: 13px; color: #6B7280; margin-bottom: 12px; font-weight: 500; }
+.folder-alt-btn { margin: 4px; }
+.folder-warn-row {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 16px; padding: 8px 14px;
+    background: #FEF3C7; color: #92400E;
+    border-radius: 6px; font-size: 12px;
+}
+.folder-warn-row svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* 已配置 */
+.folder-config-card { padding: 20px 24px; }
+.folder-config-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+}
+.folder-config-info { display: flex; gap: 14px; align-items: flex-start; flex: 1; min-width: 240px; }
+.folder-config-icon {
+    width: 40px; height: 40px; flex-shrink: 0;
+    background: #f4f4f0; color: #111111;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+}
+.folder-config-icon svg { width: 22px; height: 22px; }
+.folder-config-path {
+    font-size: 15px; font-weight: 600; color: #111827; margin-bottom: 4px;
+    word-break: break-all;
+}
+.folder-config-meta {
+    font-size: 13px; color: #6B7280;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+}
+.folder-status-pulse {
+    display: inline-block; width: 8px; height: 8px;
+    background: #10B981; border-radius: 50%;
+    animation: folder-pulse 1.6s ease-in-out infinite;
+    margin-right: 4px;
+}
+.folder-status-pulse.paused {
+    background: #9CA3AF;
+    animation: none;
+}
+@keyframes folder-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.5; transform: scale(0.85); }
+}
+.folder-interval-select {
+    padding: 2px 6px; font-size: 13px;
+    border: 1px solid #D1D5DB; border-radius: 4px;
+    background: #fff; color: #111827; cursor: pointer;
+}
+.folder-config-actions {
+    display: flex; gap: 6px; flex-wrap: wrap;
+}
+.folder-btn-danger { color: #DC2626; }
+.folder-btn-danger:hover { background: #FEE2E2 !important; }
+
+.folder-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-top: 20px; padding-top: 20px; border-top: 1px solid #F3F4F6;
+}
+.folder-stat { text-align: center; }
+.folder-stat-label { font-size: 11px; color: #6B7280; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.folder-stat-value { font-size: 20px; font-weight: 600; color: #111827; }
+
+.folder-recent-card { padding: 20px 24px; }
+.folder-recent-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+}
+.folder-recent-title { font-size: 14px; font-weight: 600; color: #111827; }
+.btn-tiny {
+    font-size: 11px; padding: 3px 10px;
+    background: transparent; color: #6B7280;
+    border: 1px solid #E5E7EB; border-radius: 4px; cursor: pointer;
+}
+.btn-tiny:hover { background: #F9FAFB; }
+.folder-recent-list { display: flex; flex-direction: column; gap: 6px; }
+.folder-recent-empty {
+    text-align: center; color: #9CA3AF; font-size: 13px; padding: 24px 0;
+}
+.folder-recent-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; background: #F9FAFB; border-radius: 6px;
+}
+.folder-recent-icon {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.folder-recent-icon.ok   { background: #D1FAE5; color: #065F46; }
+.folder-recent-icon.fail { background: #FEE2E2; color: #991B1B; }
+.folder-recent-icon.dup  { background: #DBEAFE; color: #111111; }
+.folder-recent-icon.skip { background: #F3F4F6; color: #6B7280; }
+.folder-recent-body { flex: 1; min-width: 0; }
+.folder-recent-name {
+    font-size: 13px; color: #111827;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-recent-err { font-size: 11px; color: #DC2626; margin-top: 2px; }
+.folder-recent-time {
+    font-size: 11px; color: #6B7280; flex-shrink: 0; font-variant-numeric: tabular-nums;
+}
+
+/* status pill 颜色 */
+.auto-status-pill.running { background: #D1FAE5; color: #065F46; }
+.auto-status-pill.paused  { background: #F3F4F6; color: #6B7280; }
+
+@media (max-width: 720px) {
+    .folder-stats { grid-template-columns: repeat(2, 1fr); }
+    .folder-config-head { flex-direction: column; }
+    .folder-config-actions { width: 100%; }
+}
+
+/* v97.1 · folder-tip-247 · 引导卡片底部"7×24 用邮件"提示 */
+.folder-tip-247 {
+    display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-top: 12px; padding: 10px 14px;
+    background: #f4f4f0; color: #111111;
+    border: 1px solid #DBEAFE;
+    border-radius: 6px; font-size: 12px;
+    max-width: 580px; margin-left: auto; margin-right: auto;
+    text-align: left;
+}
+.folder-tip-247 svg { width: 14px; height: 14px; flex-shrink: 0; }
+.btn-link-tiny {
+    background: transparent; border: none; padding: 0;
+    color: #111111; font-size: 12px; font-weight: 500;
+    cursor: pointer; text-decoration: underline;
+}
+.btn-link-tiny:hover { color: #111111; }
+
+/* v98 · 隐藏式 chip · 默认极简 · 悬停展开完整提示 */
+.folder-info-bar {
+    display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-top: 16px; justify-content: center;
+}
+.folder-info-chip {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px;
+    font-size: 11px; font-weight: 500;
+    background: transparent; color: #9CA3AF;
+    border: 1px dashed #D1D5DB; border-radius: 999px;
+    cursor: help;
+    transition: all 0.15s;
+    user-select: none;
+}
+.folder-info-chip:hover, .folder-info-chip:focus-visible {
+    background: #F9FAFB; color: #374151; border-color: #9CA3AF;
+    outline: none;
+}
+.folder-info-chip-link {
+    cursor: pointer;
+    color: #6B7280;
+    border-color: #e8e8e3;
+}
+.folder-info-chip-link:hover, .folder-info-chip-link:focus-visible {
+    background: #f4f4f0; color: #111111; border-color: #111111;
+}
+.folder-info-chip svg { width: 12px; height: 12px; flex-shrink: 0; opacity: 0.8; }
+.folder-info-tooltip {
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    width: 280px; max-width: 90vw;
+    padding: 10px 12px;
+    background: #1F2937; color: #fff;
+    border-radius: 6px; font-size: 12px; line-height: 1.5;
+    text-align: left;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 100;
+    white-space: normal;
+}
+.folder-info-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: #1F2937;
+}
+.folder-info-chip:hover .folder-info-tooltip,
+.folder-info-chip:focus-visible .folder-info-tooltip {
+    opacity: 1;
+}
+
+
+/* v113 · 「文档扫描」按钮(主扫描入口) · v113.1 · 改 outline 风格 · 与"上传图片"统一 */
+.btn-scan-doc {
+    background: #fff;
+    color: #111111;
+    border: 1.5px solid #c7d2fe;
+    padding: 11px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 2px 4px rgba(17, 17, 17, 0.06);
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s, background 0.12s;
+}
+.btn-scan-doc:hover {
+    background: #f4f4f0;
+    border-color: #818cf8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(17, 17, 17, 0.12);
+}
+.btn-scan-doc:active { transform: translateY(0); }
+.btn-scan-doc svg { width: 18px; height: 18px; }
+
+/* v113.1 · 上传图片按钮 · 跟拍摄票据完全同款 · 仅图标不同 */
+.btn-upload-pic {
+    /* 继承 .btn-scan-doc · 确保 100% 一致 */
+}
+
+/* v113.1 · 上传入口行 · gap 12px 加宽 · 防按钮挤一起 */
+.upload-alt-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+.upload-alt-row .btn-scan-doc {
+    flex: 1 1 160px;
+    min-height: 48px;     /* v113.1 · 手机点击区域更大 · 不误触 */
+}
+
+/* v113.1 · 桌面端(>768px)· 隐藏「拍摄票据」按钮 · 电脑摄像头不能拍发票 · 只留上传图片 */
+@media (min-width: 769px) {
+    .upload-alt-row #btn-scan-doc {
+        display: none;
+    }
+    .upload-alt-row #btn-upload-pic {
+        flex: 0 0 auto;
+        min-width: 200px;
+    }
+}
+
+/* ============================================================
+ * v104.5 · 预览编辑模式
+ * ============================================================ */
+.preview-overlay {
+    position: absolute;
+    inset: 0;
+    background: #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+    color: #fff;
+}
+.preview-topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.preview-btn-back,
+.preview-btn-confirm {
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 44px;
+    min-height: 36px;
+    justify-content: center;
+}
+.preview-btn-confirm {
+    background: #10b981;
+    padding: 8px 16px;
+}
+.preview-btn-back:hover { background: rgba(255, 255, 255, 0.22); }
+.preview-btn-confirm:hover { background: #059669; }
+.preview-btn-back svg,
+.preview-btn-confirm svg { width: 18px; height: 18px; }
+.preview-title {
+    flex: 1;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 0 12px;
+}
+.preview-stage {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: #1a1a1a;
+}
+.preview-canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+.preview-tools {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.85);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.tool-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    min-width: 60px;
+}
+.tool-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.tool-btn:active { background: rgba(255, 255, 255, 0.2); }
+.tool-btn svg { width: 22px; height: 22px; }
+.preview-filters {
+    flex: 0 0 auto;
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 12px 16px 16px;
+    background: rgba(0, 0, 0, 0.92);
+    scrollbar-width: thin;
+}
+@supports (padding: max(0px)) {
+    .preview-filters {
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+}
+.filter-btn {
+    flex: 0 0 auto;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+    white-space: nowrap;
+    min-width: 72px;
+}
+.filter-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+}
+.filter-btn.active {
+    background: #10b981;
+    border-color: #10b981;
+    color: #fff;
+    font-weight: 600;
+}
+.filter-name {
+    display: block;
+}
+
+/* v105.2 · 抽屉头部「推送 ERP」按钮 · 不再浮在内容上 · 永不遮挡 */
+.drawer-push-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--brand, #111111);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    margin-right: 8px;
+    white-space: nowrap;
+}
+.drawer-push-btn:hover { background: #111111; }
+.drawer-push-btn:active { transform: scale(0.97); }
+.drawer-push-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.drawer-push-btn svg { width: 14px; height: 14px; }
+@media (max-width: 600px) {
+    .drawer-push-btn span { display: none; }   /* 手机只显示图标 · 节省空间 */
+    .drawer-push-btn { padding: 8px; }
+}
+

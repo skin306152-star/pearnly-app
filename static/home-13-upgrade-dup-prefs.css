@@ -1,0 +1,261 @@
+/* ============================================================
+   v0.12 · 升级窗 2 列版(月付 vs 买断)
+   ============================================================ */
+.plan-table-2col .plan-row {
+    display: grid !important;
+    grid-template-columns: 1.3fr 1fr 1fr !important;
+}
+.plan-table-2col .plan-col.monthly,
+.plan-table-2col .plan-col.lifetime {
+    padding: 14px 16px;
+    text-align: center;
+}
+.plan-table-2col .plan-row.head .plan-col {
+    padding: 18px 12px;
+    border-bottom: 2px solid var(--line);
+}
+.plan-table-2col .plan-col.monthly {
+    background: linear-gradient(135deg, #f4f4f0 0%, #f4f4f0 100%);
+}
+.plan-table-2col .plan-col.lifetime {
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+}
+.plan-table-2col .plan-row.head .plan-col .plan-name {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.plan-table-2col .plan-row.head .plan-col .plan-price {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 6px;
+}
+.plan-table-2col .plan-row.head .plan-col.monthly .plan-price { color: #0369A1; }
+.plan-table-2col .plan-row.head .plan-col.lifetime .plan-price { color: #B45309; }
+.plan-table-2col .plan-row.head .plan-col .plan-tag {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    display: inline-block;
+}
+.plan-table-2col .plan-row.head .plan-col.monthly .plan-tag {
+    background: #0369A1;
+    color: white;
+}
+.plan-table-2col .plan-row.head .plan-col.lifetime .plan-tag {
+    background: #B45309;
+    color: white;
+}
+
+/* ============================================================
+   v0.12 · Typhoon 泰文增援徽章(抽屉副标题用)
+   ============================================================ */
+.engine-badge.typhoon {
+    background: linear-gradient(135deg, #EDE9FE, #DDD6FE);
+    color: #6D28D9;
+    border: 1px solid #C4B5FD;
+    font-weight: 600;
+    cursor: help;
+}
+
+/* ============================================================
+   v0.13 · 重复发票警告对话框
+   ============================================================ */
+.log-detail-box.dup-dialog {
+    padding: 0;
+    max-width: 580px;
+    overflow: hidden;
+}
+.dup-head {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+}
+.dup-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+.dup-close {
+    background: transparent;
+    border: none;
+    color: var(--ink-3);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+.dup-close:hover { color: var(--ink); }
+.dup-body {
+    padding: 20px;
+}
+.dup-desc {
+    font-size: 13px;
+    color: var(--ink-2);
+    margin-bottom: 14px;
+    line-height: 1.5;
+}
+.dup-source {
+    background: #f4f4f0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+}
+.dup-source-label {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-bottom: 4px;
+}
+.dup-source-name {
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 500;
+    word-break: break-all;
+}
+.dup-matched-label {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-bottom: 10px;
+}
+.dup-field-chip {
+    display: inline-block;
+    background: #FEF3C7;
+    color: #92400E;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 4px;
+}
+.dup-compare {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.dup-compare th, .dup-compare td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+}
+.dup-compare thead th {
+    background: #f4f4f0;
+    color: var(--ink-3);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.dup-compare tbody td:first-child {
+    color: var(--ink-3);
+    width: 90px;
+}
+.dup-actions {
+    display: flex;
+    gap: 8px;
+    padding: 14px 20px;
+    background: #fafaf8;
+    border-top: 1px solid var(--line);
+    justify-content: flex-end;
+}
+.btn.btn-danger {
+    background: #DC2626;
+    color: white;
+    border: 1px solid #DC2626;
+}
+.btn.btn-danger:hover {
+    background: #B91C1C;
+    border-color: #B91C1C;
+}
+
+/* ============================================================
+   v0.13 · 设置页首选项 · toggle 开关
+   ============================================================ */
+.prefs-list {
+    display: flex;
+    flex-direction: column;
+}
+.pref-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+    gap: 24px;
+}
+.pref-row:last-child {
+    border-bottom: none;
+}
+.pref-info {
+    flex: 1;
+    min-width: 0;
+}
+.pref-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 4px;
+}
+.pref-desc {
+    font-size: 12px;
+    color: var(--ink-3);
+    line-height: 1.5;
+}
+
+/* iOS 风格开关 */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #CBD5E0;
+    border-radius: 24px;
+    transition: background-color 0.2s;
+}
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #1877f2;
+}
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+/* v0.14 · 设置页 · 联系我们 */
+.about-desc {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin: 0 0 16px;
+    line-height: 1.6;
+}
+#settings-contact-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+@media (min-width: 640px) {
+    #settings-contact-grid { grid-template-columns: 1fr 1fr 1fr; }
+}
+

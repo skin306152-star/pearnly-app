@@ -1,0 +1,303 @@
+/* ============================================================
+   v0.10 · 推送日志增强:刷新旋转 + 详情人性化
+   ============================================================ */
+@keyframes mp-spin {
+    from { transform: rotate(0); }
+    to { transform: rotate(360deg); }
+}
+#btn-refresh-logs.spinning svg {
+    animation: mp-spin 0.6s linear;
+}
+
+/* 详情对话框 loading */
+.log-detail-loading {
+    padding: 60px 40px;
+    text-align: center;
+    color: var(--ink-3);
+    font-size: 14px;
+}
+
+/* 详情头部的状态大图标 */
+.log-detail-status-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 14px;
+    margin-right: 4px;
+}
+.log-detail-status-icon.ok   { background: #D1FAE5; color: #065F46; }
+.log-detail-status-icon.fail { background: #FEE2E2; color: #991B1B; }
+
+/* 摘要行:端点 + 发票号 */
+.log-detail-summary-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 14px 16px;
+    background: #f4f4f0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 14px;
+    font-size: 13px;
+}
+.log-detail-summary-row > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.log-detail-meta-key {
+    font-size: 11px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.log-detail-summary-row strong {
+    color: var(--ink);
+    font-weight: 600;
+    word-break: break-all;
+}
+
+/* 折叠的 JSON 详情 */
+.log-detail-collapsible {
+    margin-top: 8px;
+}
+.log-detail-collapsible > summary {
+    padding: 8px 12px;
+    background: #F3F4F6;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--ink-3);
+    user-select: none;
+    list-style: none;
+}
+.log-detail-collapsible > summary::-webkit-details-marker { display: none; }
+.log-detail-collapsible > summary::before {
+    content: "▶";
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform 0.15s;
+    font-size: 9px;
+}
+.log-detail-collapsible[open] > summary::before {
+    transform: rotate(90deg);
+}
+.log-detail-collapsible > summary:hover {
+    background: #E5E7EB;
+    color: var(--ink);
+}
+
+/* ============================================================
+   v0.10 · 金额补全提示 + token SVG 图标
+   ============================================================ */
+.history-missing-amount {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #FEF3C7;
+    color: #92400E;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.history-missing-amount:hover {
+    background: #FDE68A;
+    color: #78350F;
+}
+
+/* v91 · 缺金额按钮版(可点) · 覆盖 button 默认样式 · 复用上面徽章视觉 */
+button.history-missing-amount-btn {
+    border: none;
+    font-family: inherit;
+    line-height: 1.5;
+    padding: 3px 10px;
+}
+.history-missing-amount-arrow {
+    opacity: 0.7;
+    font-weight: 600;
+    margin-left: 1px;
+}
+.history-missing-amount-btn:hover .history-missing-amount-arrow {
+    opacity: 1;
+}
+
+/* 归档编辑器 SVG 图标 · 覆盖 emoji 的字体大小 */
+.archive-token .token-icon,
+.archive-palette-btn .token-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+.archive-token .token-icon svg,
+.archive-palette-btn .token-icon svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+}
+
+/* palette 按钮每个字段也带主题色 · 和 canvas token 呼应 */
+.archive-palette-btn.date    { color: #111111; }
+.archive-palette-btn.seller  { color: #3730A3; }
+.archive-palette-btn.category{ color: #92400E; }
+.archive-palette-btn.amount  { color: #065F46; }
+.archive-palette-btn.invoice { color: #9F1239; }
+.archive-palette-btn.buyer   { color: #5B21B6; }
+.archive-palette-btn.sep     { color: #6B7280; }
+.archive-palette-btn.date:hover    { background: #DBEAFE; border-color: #e8e8e3; }
+.archive-palette-btn.seller:hover  { background: #E0E7FF; border-color: #C7D2FE; }
+.archive-palette-btn.category:hover{ background: #FEF3C7; border-color: #FCD34D; }
+.archive-palette-btn.amount:hover  { background: #D1FAE5; border-color: #A7F3D0; }
+.archive-palette-btn.invoice:hover { background: #FCE7F3; border-color: #FBCFE8; }
+.archive-palette-btn.buyer:hover   { background: #EDE9FE; border-color: #DDD6FE; }
+.archive-palette-btn.sep:hover     { background: #F3F4F6; }
+
+/* 升级窗卖点 banner */
+.plan-selling-point {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #DBEAFE;
+    border: 1px solid #e8e8e3;
+    border-radius: 10px;
+    margin: 14px 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: #4338CA;
+}
+.plan-selling-point svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: #6366F1;
+}
+
+/* ============================================================
+   v0.10.1 · 抽屉诊断按钮 + 诊断对话框
+   ============================================================ */
+.drawer-diagnose {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--ink-3);
+    transition: all 0.15s;
+    margin-right: 8px;
+}
+.drawer-diagnose:hover {
+    background: #f4f4f0;
+    color: #6366F1;
+    border-color: #C7D2FE;
+}
+.drawer-diagnose svg {
+    width: 16px;
+    height: 16px;
+}
+
+.diagnose-json {
+    background: #0F172A;
+    color: #E2E8F0;
+    border: none;
+    border-radius: 8px;
+    padding: 16px 18px;
+    font-size: 11px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    max-height: 500px;
+    overflow: auto;
+    white-space: pre;
+    line-height: 1.6;
+    margin: 0;
+}
+.diagnose-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+}
+
+/* ============================================================
+   v0.11 · 搜索框增强(图标 + 清除按钮 + 匹配计数) + 多发票角标
+   ============================================================ */
+.search-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+}
+.search-wrap .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 15px;
+    height: 15px;
+    color: var(--ink-3);
+    pointer-events: none;
+    stroke-width: 1.8;
+}
+.search-wrap .search-input {
+    padding-left: 34px !important;
+    padding-right: 32px !important;
+    width: 100%;
+    box-sizing: border-box;
+}
+.search-wrap .search-input:focus + .search-clear,
+.search-wrap .search-input:not(:placeholder-shown) ~ .search-clear {
+    /* 清除按钮可见性由 JS 控制 */
+}
+.search-wrap .search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: none;
+    background: #E5E7EB;
+    color: #6B7280;
+    cursor: pointer;
+    font-size: 10px;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+.search-wrap .search-clear:hover {
+    background: #D1D5DB;
+    color: var(--ink);
+}
+.search-matches {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-left: 10px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* 多发票拆分 · 历史行小角标(紫色) */
+.history-badge.multi {
+    background: #EDE9FE;
+    color: #6D28D9;
+    font-weight: 600;
+}
+.history-badge.multi::before {
+    content: "📑";
+    display: none;  /* emoji 不显示,保持纯文字风格 */
+}
+

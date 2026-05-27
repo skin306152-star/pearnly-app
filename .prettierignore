@@ -17,6 +17,7 @@ _test_reports/
 probes/
 test-results/
 playwright-report/
+tests/e2e/.auth/
 
 # ─────────────────────────────────────────────────────────────
 # Stage C 拆解目标(REFACTOR_MASTER_PLAN.md 阶段 C)· 暂不格式化
@@ -33,6 +34,9 @@ home.js
 static/i18n-data.js
 # REFACTOR-C2 · home.css → 拆 component CSS
 home.css
+# 拆出的 css 切片:verbatim 搬迁,必须与原 home.css 字节级一致以保证级联零变化 →
+# 跟 home.css 同策略豁免 prettier(重排会破坏字节等价 → 视觉漂移风险)。
+static/home-*.css
 # REFACTOR-C3 · home.html → 组件化
 home.html
 # C 阶段相邻 · login.html 242KB · 未来模块化

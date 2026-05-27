@@ -8,6 +8,7 @@ P0.4 BUG-A-T1 v118.35.0.40 · 守门测试 · modal flex-chain 防御性 min-hei
   3. audit doc docs/audits/2026-05-23-modal-flex-chain-audit.md 存在 · 锁住接力 agent 看
 """
 
+import glob
 import os
 import re
 import unittest
@@ -19,8 +20,16 @@ class ModalFlexChainDefenseTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        # REFACTOR-C2: home.css 已拆到 static/home-*.css · 读 home.css + 所有切片的并集
+        # (按 link 顺序拼接 == 原始 home.css 字节级一致 · 见 BATCH_STRATEGY §13)·
+        # 规则搬进切片后在并集里仍找得到 · 测试不随拆分误报。
+        parts = []
         with open(os.path.join(ROOT, "home.css"), "r", encoding="utf-8") as f:
-            cls.home_css = f.read()
+            parts.append(f.read())
+        for p in sorted(glob.glob(os.path.join(ROOT, "static", "home-*.css"))):
+            with open(p, "r", encoding="utf-8") as f:
+                parts.append(f.read())
+        cls.home_css = "\n".join(parts)
 
     def test_modal_body_has_min_height_zero(self):
         """P0.4 契约 · 至少 1 个 .modal-body block 含 min-height: 0

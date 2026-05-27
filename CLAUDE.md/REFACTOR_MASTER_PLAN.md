@@ -312,7 +312,7 @@
 | F 数据 | ⚪ 0/3 | — | 依赖 B1 |
 | G 文档 | 🟡 1/7(G2 ✅) | G2 RUNBOOK ✅ `5544d0e` | 第三十五会话:新增 `docs/RUNBOOK.md`(部署/回滚/CI/健康检查/紧急排查 · 磁盘满血泪根因)+ docs/README §7 索引 · 其余 G1 ADR/G3 ONBOARDING/G5-G7 待做 |
 | H 合规 | ⚪ 0/6 | — | 靠后 |
-| I 抛光 | 🟡 1.3/5(部分 I1 + 部分 I2) | — | I1 30/52 silent + I2 老订阅残留 admin/home 用户可见全清(2026-05-22) |
+| I 抛光 | 🟡 1.6/5(I1 ✅home.js silent=0 + 部分 I2) | — | **I1:home.js 无注释 silent 0(`b7d167b`)** · I2 死码续清(usage 计数器/demo 播种 `158b55c`/`b62aeca`)+ 老订阅残留全清 |
 
 **累计 task 数**:60 主 task · 已完成约 5 个(A0/A1/A2.1/A7/A9)+ 进行中约 3 个(C1/D1/I1)· 待启动 52 个
 

@@ -5294,7 +5294,7 @@ function _humanizeBackendError(detail, fallback) {
         if (detail.message) return detail.message;
         if (detail.error)   return detail.error;
         if (detail.detail && typeof detail.detail === 'string') return detail.detail;
-        try { return JSON.stringify(detail).slice(0, 160); } catch (_) {}
+        try { return JSON.stringify(detail).slice(0, 160); } catch (_) { /* silent: detail 含循环引用时 stringify 抛错 · 下方 fallback/String(detail) 兜底 */ }
     }
     return fallback || String(detail);
 }
@@ -6160,7 +6160,7 @@ window.pearnlyConfirm = function (message, title) {
                         } else {
                             alert('Session expired');
                         }
-                    } catch (_) {}
+                    } catch (_) { /* silent: 提示展示失败(无 showToast/alert)不阻断下方登出跳转 */ }
                     setTimeout(() => { window.location.href = '/'; }, 1500);
                 }
             }

@@ -1,9 +1,21 @@
 # 📊 STATE · Pearnly 项目状态
 
 > 🏗️ **【常驻指针 · 整顿恢复后读】整顿进行中 · 已开始并行 agent 加速。** 进窗口必读 `docs/refactor/BATCH_STRATEGY.md`(**特别 §9.5 实际操作模型 + §13 home.js 测绘 manifest**)+ `REFACTOR_MASTER_PLAN.md`。
-> **当前态(第三十七会话 · 持续更新)**:① E2E 安全网已建(10 个 · 真账号 · CI 用 env-gated skip 保绿)。② **home.js 大 batch 进行中**:R1-R5 已抽 **21 块** safe IIFE 模块 → `src/home/*`,home.js **22970→12929**(全接线 + 每轮生产 E2E 10/10 + 守门全绿,见 §10/§13 账本)。③ Wave 1(db.py membership+tenant)已 copy-out 未接线。**下一步**:新窗口照 §13 manifest 继续 batch 抽剩余 safe IIFE 模块(每轮 re-grep 行号 · E2E 验 · 避🔴高敏 4 块);抽尽 safe 后,剩高敏 4 块 + 顶层函数群 + _shared 收官需 Zihao 在场 / 主控做。
+> **当前态(第三十七会话 · 持续更新)**:① E2E 安全网已建(10 个 · 真账号 · CI 用 env-gated skip 保绿)。② **home.js 大 batch 进行中**:R1-R6 已抽 **25 块** safe IIFE 模块 → `src/home/*`,home.js **22970→11898**(全接线 + 每轮生产 E2E 10/10 + 守门全绿,见 §10/§13 账本)。③ Wave 1(db.py membership+tenant)已 copy-out 未接线。**下一步**:新窗口照 §13 manifest 继续 batch 抽剩余 safe IIFE 模块(每轮 re-grep 行号 · E2E 验 · 避🔴高敏 4 块);抽尽 safe 后,剩高敏 4 块 + 顶层函数群 + _shared 收官需 Zihao 在场 / 主控做。
 > **⚠️ 工作流变化**:Zihao 非技术用户 · 内置 `/batch` 在本环境未触发 → **主控窗口自己用 Agent 工具派后台并行 agent**(copy-out)· 全部判断/守门/合并/上线由主控包办 · Zihao 只贴极少命令 + 当用户测 app。详见 §9.5。
 
+> ════════════════════════════════════════════════════════════
+> **【第四十会话 · 交接 · 2026-05-27】home.js R6:并行抽 4 块 ERP 尾区 safe IIFE(12929→11898 · -1031)· 生产 E2E 10/10 · R7 起手即停**
+> ════════════════════════════════════════════════════════════
+> **本会话(整顿 REFACTOR-C1 · home.js batch 续 · R6 一轮完整 + R7 探好即停)**:
+> - **R6(`8358366` · -1031 · 12929→11898)**:并行派 4 个 copy-out agent + 主控串行接线,抽 ERP 尾区 4 块干净单 IIFE(均 verbatim · 0 改逻辑):`erp-mappings`(字段映射底座 L11805-12280)/ `unified-push`(ERP 统一推送按钮/连接器下拉 L12285-12684)/ `erp-map-advanced`(高级 sub-tab toggle L12693-12740)/ `erp-onboard`(对接新用户引导 modal L12749-12855)→ `src/home/*.js` · main.js 配对 4 import · home.html `home.js?v=`+`main.js?v=` 11850015→**11850016**。
+> - **字节级证明**:home.js 纯删 1031 行、0 插入(自底向上 node split/join · 保 CRLF · 删后 bareLF=0 · 12930→11899)。4 块均自包含 IIFE(无 window.X 外部导出 · 仅 `window.subscribeI18n(...)` 调用)。**🔴高敏 4 块零泄漏**:删除区间 [11805,12855] 完全避开 plans(8645-11334)/password(11342-11598)/line-email(11629-11753)/session-heartbeat(11838-);`window.pearnlyConfirm`(L11761 共享工具)保留。grep 计数全不变。
+> - **eslint 坑(下窗口注意)**:`/* global */` **不许列** `t`/`showToast`/`_userInfo`/`currentRoute`(已在 `eslint.config.mjs` globals · 列了 = `no-redeclare` **error** 拖红)· 只列 `escapeHtml`/`apiGet` 等未声明的;erp-mappings 有 verbatim `let payload={}` 死赋值 → 加头部 `/* eslint-disable no-useless-assignment -- verbatim */`。
+> - **守门全绿**:node --check / vite build(30 模块)/ eslint **0-error** / prettier / check_i18n **0-0** / check_imports / **pytest 1131 passed,1 skipped**。commit `8358366` · push master · 部署 11850016(curl 验:删的 `pearnly_erp_onboard_shown` 从 static/home.js 消失=0、进 dist/main.js=1)· **生产 E2E 10/10**(真账号 · 清 .auth/state.json 后跑 · 含 08-erp-push 覆盖 unified-push/erp-mappings)。
+> - **R7 起手即停**(Zihao 喊停 · 本轮未做):已派 agent 验证好下 3 块边界(recon-job-poll 6765-6830 / bank-recon-v2 6832-8115 / admin-misc 8364-8632),建了 recon-job-poll.js + admin-misc.js 两文件 **但未接线** → 停手时**已删除**这两文件(工作树干净 · HEAD=`8358366` 与生产一致)。bank-recon-v2 agent 被 Zihao 拦下未建。
+>
+> **下窗口接续(R7)**:§13 头部「R6 后 IIFE 地图」已写好**已验证的下 3 块 + 坑**:① recon-job-poll + bank-recon-v2 一对(只经 `window._reconPollJob` 耦合 · 运行期取用 · 顺序无关 · 可一并抽)② admin-misc 两 IIFE(⚠️ 成本面板 `window.loadAdminCostPage` 被 ai-balance.js 包裹 → admin-misc import 须排 ai-balance 之前)③ **⚠️ 8120-8362 LINE Bot 绑定面板 = 账号绑定敏感 · 跳过**。抽前必 re-grep(R6 后行号又漂)。
+>
 > ════════════════════════════════════════════════════════════
 > **【第三十九会话 · 交接 · 2026-05-27】home.js R4+R5:并行抽 8 块 safe IIFE(18513→12929 · -5584)· 每轮生产 E2E 10/10**
 > ════════════════════════════════════════════════════════════

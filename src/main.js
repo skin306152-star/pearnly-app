@@ -13,9 +13,10 @@ import './home/workspace-switcher.js'; // B4 · workspace 工作模式切换器(
 import './home/recon-center.js'; // REFACTOR-C1 · 对账中心首页(loadReconcilePage)
 import './home/assign-clients.js'; // REFACTOR-C1 · 客户分配 modal(openAssignClientsModal)
 import './home/access-log.js'; // REFACTOR-C1 · 客户访问日志 tab(自绑 · owner only)
+import './home/notifications.js'; // REFACTOR-C1 · 智能提醒(_loadNotificationsPanel)
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(
-        '[pearnly] vite bundle loaded · dashboard + billing + test-center + workspace-switcher + recon-center + assign-clients + access-log'
+        '[pearnly] vite bundle loaded · dashboard + billing + test-center + workspace-switcher + recon-center + assign-clients + access-log + notifications'
     );
 }

@@ -8,6 +8,7 @@ home.js 是 1.3MB IIFE 巨石 · 没法跑 jsdom 单测 · 用静态文本契约
   3. /bank-v2/{task_id} 路由响应保持返回完整 summary(_anchor_overrides 字段不被过滤)
 """
 
+import glob
 import os
 import re
 import unittest
@@ -19,8 +20,16 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        # REFACTOR-C1(2026-05-27 R7)· bank-recon-v2 已从 home.js 抽到 src/home/bank-recon-v2.js
+        # (含 _brv2RenderAnchorAudit 定义 + 调用)· 前端静态契约改读「home.js + src/home/*.js」并集
+        # (拼接 == 原巨石全文 · 拆分后仍能找到搬走的函数)。
+        parts = []
         with open(os.path.join(ROOT, "home.js"), "r", encoding="utf-8") as f:
-            cls.home_js = f.read()
+            parts.append(f.read())
+        for p in sorted(glob.glob(os.path.join(ROOT, "src", "home", "*.js"))):
+            with open(p, "r", encoding="utf-8") as f:
+                parts.append(f.read())
+        cls.home_js = "\n".join(parts)
         with open(os.path.join(ROOT, "recon_routes.py"), "r", encoding="utf-8") as f:
             cls.recon_py = f.read()
         # REFACTOR-C1(2026-05-25)· I18N 4 语字典已从 home.js 抽到 static/i18n-data.js ·

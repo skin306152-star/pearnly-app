@@ -236,7 +236,7 @@
 |---|---|---|---|---|
 | 0 安全网(E2E/集成) | ✅ E2E 网成 | unit 872 / E2E 1 | unit **1132** / E2E **10** | 第三十五会话 17 个纯逻辑模块补契约(+~220 unit)。**第三十八会话(2026-05-27)质检窗口用真账号建 9 个登录态 E2E(登录/4语/客户/历史/异常/销项税/收入对账/ERP/充值)+ 登录地基 storageState · env-gated CI 跳过保绿 · 真站点 10/10 全绿 · `bcfb499`。E2E 网 1→10 达标** |
 | 1 db.py 收尾 | 🟡 | db.py 4620 行 | db.py 4620(未接线) | 第三十七会话(2026-05-27)**首次用并行 agent**:membership(9 函数)+ tenant(14 函数)两安全域 copy-out → `services/{membership,tenant}/store.py` + 37 契约测试 · 全守门绿 · CI 绿 · `c1a8c8a`。**copy-out 完成 · 串行接线(删 db.py + re-export)未做**。剩余域全高敏(credits/auth/ocr_history)→ Zihao 在场 |
-| 2 home.js | 🟡 抽取中 | home.js **22970 行** | home.js **18514 行** | 第三十八会话(2026-05-27)E2E 网绿后**开抽 §13🟢 表 · 13 块已抽**(每块独立 commit · 每轮真站点 E2E 10/10 全绿 · CI 绿):**R1 串行**(逐块验配方)recon-center `4fa262e` / assign-clients `e2a9d43` / access-log `6ff538b` / notifications `cad5f1b`(-979);**R2 并行 agent**(转批量)recon-batch `f3d4cbc` / welcome-wizard `c9fb2a0` / ai-balance `ea71f7f` / archive-settings `10cb6d6`(-1160);**R3 并行 agent ×5**:big-batch-progress `696136c` / erp-xero `a6d5652` / report-templates `c603834` / folder-watcher `eff5f79` / email-ingest `3bd7fbc`(-2317)。共 **-4456 行**(22970→18514)。配方见 §13。**继续抽 §13🟢 余下块** |
+| 2 home.js | 🟡 抽取中 | home.js **22970 行** | home.js **14483 行** | 第三十八会话(2026-05-27)E2E 网绿后**开抽 §13🟢 表 · 18 块已抽**(每块独立 commit · 每轮真站点 E2E 10/10 全绿 · CI 绿):**R1 串行**(逐块验配方)recon-center `4fa262e` / assign-clients `e2a9d43` / access-log `6ff538b` / notifications `cad5f1b`(-979);**R2 并行 agent**(转批量)recon-batch `f3d4cbc` / welcome-wizard `c9fb2a0` / ai-balance `ea71f7f` / archive-settings `10cb6d6`(-1160);**R3 并行 agent ×5**:big-batch-progress `696136c` / erp-xero `a6d5652` / report-templates `c603834` / folder-watcher `eff5f79` / email-ingest `3bd7fbc`(-2317)。第三十九会话 **R4 并行 5 块**:bank-recon / clients / exceptions / topbar-avatar / recon-collapse(`b9f6e1f` · -4030 · 守门全绿 · 生产 E2E 10/10)。共 **-8487 行**(22970→14483 · 18 块)。配方见 §13。**继续抽 §13🟢 余下块** |
 | 3 css/html | 🟡 css 拆解中(C2) | css **16673 行** | css **16556 行** | 第三十九会话(2026-05-27)**home.css 拆解窗口开工**(REFACTOR-C2 · 与 home.js 窗口并行碰不同文件)。安全模型 = 自顶向下 peel 区块到 `static/home-*.css` + `home.html` 按序加 `<link>`(新文件→home.css 末)+ **杀手级字节校验**(按 link 序拼接 ≡ 基线 `home.css` · 0 差异 = 级联零变化)。**R1 抽 1 块**:`home-01-base.css`(L1-117 · 设计令牌 `:root`+reset+顶栏/brand · 含 BOM)· 校验 PASS 482214 bytes byte-identical · 待 push/E2E。配方:`node` 按 LF 字节切片(保 CRLF/BOM)→ `$TEMP/css_verify.mjs` 按 home.html link 序拼接比对基线。 |
 | 4 i18n/文档/抛光 | ⚪ | — | — | — |
 
@@ -272,7 +272,7 @@
 
 > **关键发现**:home.js 的"大未知块"不是一个巨函数,而是 **~35 个功能孤岛**(顶层函数群 + 约 25 个 IIFE 自执行模块串在一起)。每个 IIFE 天然 = 一个 `src/home/<feature>.js`。**行号是本快照,抽前必 re-grep。**
 >
-> **⚠️ 进度更新(第三十八会话 · 2026-05-27)**:已抽 **13 块**(②表打 ✅)· home.js **22970 → 18514 行**(累计 **-4456**)· R3 一轮并行 5 块全绿。**②表行号已大幅漂移**(删除分布在 L7970 / 12155 / 15713 / 17526~18326 / 21710 等)· **抽前必 re-grep**。
+> **⚠️ 进度更新(第三十八/九会话 · 2026-05-27)**:已抽 **18 块**(②表打 ✅)· home.js **22970 → 14483 行**(累计 **-8487**)· R1-R3 抽 13 块,**R4(第三十九会话)并行 5 块**:bank-recon / clients / exceptions / topbar-avatar / recon-collapse(`b9f6e1f` · 守门全绿 · 生产 E2E 10/10)。**②表行号已严重漂移**(R4 后早块上移更多 · 如 bank-recon 现 ~6764 · clients ~9694 · exceptions banner ~13415 · topbar ~17087 · recon-collapse ~18264)· **抽前必 re-grep**。
 > **配方(已验证可复制 · R2 起用并行 copy-out agent)**:re-grep 真实起止 → node 切片 verbatim 写 `src/home/<x>.js`(CRLF→prettier 转 LF)→ 加 `/* global ... */` 补 eslint(home.js 暴露但未在 eslint.config globals 的裸全局:apiGet/apiPost/escapeHtml/showConfirm/token/loadTeamList/currentLang/_contact/switchSettingsTab 等)→ 若块内有 verbatim 防御式初始化/下架死码触发 `no-useless-assignment`/`no-unreachable` **error**(src 段未豁免 · 会拖红 CI lint),加头部 `/* eslint-disable <rule> -- verbatim ... */`(0 改逻辑)→ `src/main.js` 加 import → node 切片删 home.js 原块(**split('\n')/join('\n') 保 CRLF · 逐次校验 LF-only=0 · 别整文件转 LF/别用 sed-python**)→ `home.html` 双缓存戳 `home.js?v=`+`main.js?v=` 各 +1(**两个都 bump · 内容都变 · 不动 /api/version 不弹横幅**)→ 守门(eslint 0-error / build / node --check / check_i18n --strict / unittest)→ 每块独立 commit → 一轮单独 push → 生产 E2E 10/10。
 > **批量模式**:挑 4-6 个**互不相邻的干净单 IIFE**(避开:顶层函数群如 `export` L4392-4610 · 双 IIFE 如 `admin-misc` · 紧邻🔴的块如 `recon-collapse`(挨 session-heartbeat))→ 并行派同数 copy-out agent(只读 home.js · 只写自己那个新文件 · 回报删除锚点)→ 父窗口串行接线。
 
@@ -299,14 +299,14 @@
 | ✅ email-ingest.js | 6761-7418 | 655 | 邮箱抓取 · 已抽 `3bd7fbc` |
 | ✅ folder-watcher.js | 7421-7968 | 544 | 文件夹监听(File System Access API)· 已抽 `eff5f79` |
 | ✅ archive-settings.js | 7971-8470 | 497 | 归档命名规则编辑器 · 已抽 `10cb6d6` |
-| bank-recon.js | 8474-9528 | 1052 | 银行对账模块 |
+| ✅ bank-recon.js | 8474-9528 | 1052 | 银行对账模块(M10)· 已抽 `b9f6e1f` |
 | **(待探)** | 9597-11127 | ~1530 | ⚠️ 无标题块 · 抽前需 agent 先测绘标注 |
 | admin-misc.js | 11130-11397 | 267 | 老 admin 残留入口 + 成本追踪面板 · **是两个 IIFE**(11129-11167 下拉 handler + 11171-11397 loadAdminCostPage)· 搬时两个一起 |
-| clients.js | 11401-12152 | 750 | 客户实体前端全套 |
+| ✅ clients.js | 11401-12152 | 750 | 客户实体前端全套 · 已抽 `b9f6e1f` |
 | ✅ ai-balance.js | 12156-12337 | 180 | Google AI 余额追踪 · 已抽 `ea71f7f` |
 | ✅ report-templates.js | 12340-12749 | 410 | 报表模板/统一导出弹窗 · 已抽 `c603834` |
 | ✅ welcome-wizard.js | 15714-15907 | 190 | 登录后欢迎向导 · 已抽 `c9fb2a0` |
-| exceptions.js | 15914-17523 | 1609 | 异常栏 列表 + 抽屉(第二大块) |
+| ✅ exceptions.js | 15914-17523 | 1609 | 异常栏 列表 + 抽屉(第二大块)· 已抽 `b9f6e1f` |
 | ✅ notifications.js | 17527-17823 | 296 | 智能提醒 · 已抽 `cad5f1b` |
 | ✅ recon-center.js | 17826-18151 | 325 | 对账中心首页 · 已抽 `4fa262e` |
 | ✅ access-log.js | 18299-18488 | 189 | 客户访问日志 tab · 已抽 `6ff538b` |
@@ -314,8 +314,8 @@
 | erp-mappings.js | 18704-19178 + 20143-20190 | ~520 | ERP 字段映射底座 + 高级 toggle |
 | ✅ erp-xero.js | 19182-19732 | 546 | Xero 连接卡片 + 推按钮 · 已抽 `a6d5652` |
 | 🟡 bulk-upload.js | 19735-20204 | ~470 | **已拆两半**:✅ big-batch-progress(进度条 · `696136c`)已抽;剩「ERP 新用户引导」IIFE(紧随其后)待抽 |
-| topbar-avatar.js | 21264-22376 | 1100 | 顶栏三件套 / 头像菜单(NAV-IA P1) |
-| recon-collapse.js | 22441-22690 | 250 | 销项/收入对账折叠组件 · ⚠️ **紧邻🔴session-heartbeat**(其上方)· 抽时小心 START 边界别越界 |
+| ✅ topbar-avatar.js | 21264-22376 | 1100 | 顶栏三件套 / 头像菜单(NAV-IA P1)· 已抽 `b9f6e1f`(实为单 IIFE ~360 行) |
+| ✅ recon-collapse.js | 22441-22690 | 250 | 销项/收入对账折叠组件 · 已抽 `b9f6e1f`(START 从 banner 起 · 心跳零泄漏已验) |
 | ✅ recon-batch.js | 22691-22970 | 280 | 对账历史多选批量删 · 已抽 `f3d4cbc` |
 
 **③ ⚠️ 高敏/勿入 batch(留 Zihao 在场 · 主控亲手做)**

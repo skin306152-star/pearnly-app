@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""B4 守门:workspace_routes 路由契约(非破坏版)。
+"""B4 + P3 守门:workspace_routes 路由契约。
 
 锁定:
-  1. 3 个 /api/workspace/* 路由按预期 path+method 注册;
+  1. /api/workspace/* 路由按预期 path+method 注册(GET/POST/PUT-endpoint +
+     P3 新增 PATCH 编辑 / DELETE 软删归档);
   2. router 已挂到 app(include_router);
-  3. 不碰任何上传/推送/对账主路径(本测试只断言新增路由存在 · 不改旧行为)。
+  3. DELETE 仅限单账套主体软删归档 · 不得新增批量/破坏性删除路由。
 """
 
 import unittest
@@ -28,13 +29,19 @@ class WorkspaceRouteContractTests(unittest.TestCase):
         self.assertIn(("GET", "/api/workspace/clients"), rs)
         self.assertIn(("POST", "/api/workspace/clients"), rs)
         self.assertIn(("PUT", "/api/workspace/clients/{workspace_client_id}/endpoint"), rs)
+        # P3(2026-05-27 · Zihao 拍板)· 账套主体管理页:补编辑 + 归档(软删)路由
+        self.assertIn(("PATCH", "/api/workspace/clients/{workspace_client_id}"), rs)
+        self.assertIn(("DELETE", "/api/workspace/clients/{workspace_client_id}"), rs)
 
-    def test_no_unexpected_destructive_routes(self):
-        # 非破坏版:不应有 DELETE/批量等破坏性路由
+    def test_delete_is_soft_archive_only(self):
+        # P3:DELETE 仅允许出现在单个账套主体的归档路由上(软删 is_active=False)·
+        # 不得出现批量/破坏性删除路由(发票归属链、seller 路由记忆都靠软删保全)。
         rs = _route_set(workspace_router)
-        self.assertFalse(
-            any(m == "DELETE" for (m, _p) in rs),
-            "B4 非破坏版不应含 DELETE 路由",
+        delete_paths = {p for (m, p) in rs if m == "DELETE"}
+        self.assertEqual(
+            delete_paths,
+            {"/api/workspace/clients/{workspace_client_id}"},
+            "DELETE 仅限单账套主体归档(软删)· 不得新增其它破坏性删除路由",
         )
 
 

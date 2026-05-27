@@ -241,46 +241,51 @@
         overlay.className = 'ws-modal';
 
         const personalActive = getWorkMode() === 'personal' || active == null;
-        const rows = [];
-        // 个人事务(带说明:用于临时识别/测试/不归属任何公司的文件)
-        rows.push(
+        // 个人事务(固定按钮 · 不动 —— Zihao 2026-05-27)
+        const personalHtml =
             '<button type="button" class="ws-modal-item' +
-                (personalActive ? ' active' : '') +
-                '" data-ws-personal="1">' +
-                '<span class="ws-modal-item-ic">' +
-                _icon('user') +
-                '</span>' +
-                '<span class="ws-modal-item-text" style="display:flex;flex-direction:column;align-items:flex-start;min-width:0;">' +
-                '<span class="ws-modal-item-name">' +
-                _esc(_t('ws-personal', '个人事务')) +
-                '</span>' +
-                '<span class="ws-modal-item-desc" style="font-size:11px;color:#6b7280;font-weight:400;margin-top:2px;line-height:1.35;white-space:normal;">' +
-                _esc(_t('ws-personal-desc', '用于临时识别、测试或处理不归属任何公司的文件。')) +
-                '</span>' +
-                '</span>' +
-                '</button>'
-        );
-        // 客户列表
-        clients.forEach(function (c) {
-            const isActive = active != null && Number(active) === Number(c.id);
-            rows.push(
-                '<button type="button" class="ws-modal-item' +
-                    (isActive ? ' active' : '') +
-                    '" data-ws-pick="' +
-                    _esc(c.id) +
-                    '">' +
-                    '<span class="ws-modal-item-ic">' +
-                    _icon('building') +
-                    '</span>' +
-                    // B1 (P3) · title 全名 tooltip 防截断看不全
-                    '<span class="ws-modal-item-name" title="' +
-                    _esc(c.name || '#' + c.id) +
-                    '">' +
-                    _esc(c.name || '#' + c.id) +
-                    '</span>' +
-                    '</button>'
+            (personalActive ? ' active' : '') +
+            '" data-ws-personal="1">' +
+            '<span class="ws-modal-item-ic">' +
+            _icon('user') +
+            '</span>' +
+            '<span class="ws-modal-item-text" style="display:flex;flex-direction:column;align-items:flex-start;min-width:0;">' +
+            '<span class="ws-modal-item-name">' +
+            _esc(_t('ws-personal', '个人事务')) +
+            '</span>' +
+            '<span class="ws-modal-item-desc" style="font-size:11px;color:#6b7280;font-weight:400;margin-top:2px;line-height:1.35;white-space:normal;">' +
+            _esc(_t('ws-personal-desc', '用于临时识别、测试或处理不归属任何公司的文件。')) +
+            '</span>' +
+            '</span>' +
+            '</button>';
+
+        // 账套主体:下拉选择(Zihao 2026-05-27 · 列表多时更紧凑;个人事务保持按钮不动)
+        let selectHtml = '';
+        if (clients.length) {
+            const opts = ['<option value="">' + _esc(_t('ws-select-ph', '— 选择账套主体 —')) + '</option>'].concat(
+                clients.map(function (c) {
+                    const isActive = active != null && Number(active) === Number(c.id);
+                    return (
+                        '<option value="' +
+                        _esc(c.id) +
+                        '"' +
+                        (isActive ? ' selected' : '') +
+                        '>' +
+                        _esc(c.name || '#' + c.id) +
+                        '</option>'
+                    );
+                })
             );
-        });
+            selectHtml =
+                '<div class="ws-modal-select-row">' +
+                '<label class="ws-modal-select-label">' +
+                _esc(_t('ws-select-label', '账套主体')) +
+                '</label>' +
+                '<select class="ws-modal-select" data-ws-select="1">' +
+                opts.join('') +
+                '</select>' +
+                '</div>';
+        }
 
         const emptyHtml =
             !clients.length && opts.emptyHint
@@ -315,18 +320,31 @@
             _esc(
                 _t(
                     'ws-chooser-subtitle',
-                    '工作空间 = 你的公司(发票卖方/开票方)。选择正在为哪家公司做账。'
+                    '账套主体 = 你的公司(发票卖方/开票方)。选择正在为哪家公司做账。'
                 )
             ) +
             '</div>' +
             '<div class="ws-modal-list">' +
-            rows.join('') +
+            personalHtml +
+            selectHtml +
             '</div>' +
             emptyHtml +
             createHtml +
             '</div>';
 
         document.body.appendChild(overlay);
+
+        // 账套主体下拉:change 即选定(不在上面的 click 委托里)
+        const selEl = overlay.querySelector('[data-ws-select]');
+        if (selEl) {
+            selEl.addEventListener('change', function () {
+                const id = selEl.value;
+                if (!id) return;
+                if (typeof opts.onPick === 'function') opts.onPick(id);
+                close();
+                renderWorkspaceControl();
+            });
+        }
 
         function close() {
             overlay.remove();
@@ -420,10 +438,29 @@
     window.renderWorkspaceControl = renderWorkspaceControl;
     window.fetchWorkspaceClients = fetchWorkspaceClients;
 
+    // ---------- 登录软弹(B2 · Zihao 2026-05-27 上线 · 软弹不硬拦)----------
+    // 登录后若还没选账套主体且未明确进个人事务 → 自动弹一次让用户选(可关 / 可选个人事务)。
+    // 每会话仅一次(sessionStorage),不在每次刷新都打扰。
+    function _maybeLoginPrompt() {
+        try {
+            if (sessionStorage.getItem('pearnly_ws_login_prompted') === '1') return;
+            if (getActiveWorkspaceClientId() != null) return; // 已选账套 → 不打扰
+            if (localStorage.getItem(LS_MODE) === 'personal') return; // 明确选过个人事务 → 不打扰
+            sessionStorage.setItem('pearnly_ws_login_prompted', '1');
+            // 略等 /api/me 就绪(owner 判定 + 新建表单可见性靠 window._userInfo)
+            setTimeout(function () {
+                openWorkspaceChooser(null);
+            }, 800);
+        } catch (e) {
+            /* no-op */
+        }
+    }
+
     // 列表缓存(供标签显示客户名)
     fetchWorkspaceClients().then((l) => {
         window._workspaceClientsCache = l;
         renderWorkspaceControl();
+        _maybeLoginPrompt();
     });
 
     if (typeof window.subscribeI18n === 'function') {

@@ -3,7 +3,7 @@
 REFACTOR-B1 守门测试 · 客户管理路由从 app.py 抽到 clients_routes.py。
 
 锁定三件事(防搬迁回归):
-  1. router 注册的 5 个路由 path+method 契约不变(防丢路由 / 改 URL)
+  1. router 注册的路由 path+method 契约不变(防丢路由 / 改 URL · 含 P3 批量删除)
   2. app.py 通过 include_router 真挂上了(防漏挂)
   3. _serialize_client 序列化契约不变(字段名 / 默认色 / datetime → isoformat)
 """
@@ -28,6 +28,8 @@ class ClientsRoutesContractTests(unittest.TestCase):
             ("PATCH", "/api/clients/{client_id}"),
             ("DELETE", "/api/clients/{client_id}"),
             ("GET", "/api/clients/{client_id}/export"),
+            # P3(2026-05-27)· 客户管理页横条多选批量删除
+            ("POST", "/api/clients/batch-delete"),
         }
         self.assertEqual(got, expected)
 

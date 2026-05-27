@@ -156,6 +156,31 @@ async def api_delete_client(client_id: int, request: Request):
     return {"ok": True}
 
 
+class ClientBatchDeleteRequest(BaseModel):
+    ids: list[int] = Field(..., min_length=1, max_length=500)
+
+
+@router.post("/api/clients/batch-delete")
+async def api_batch_delete_clients(req: ClientBatchDeleteRequest, request: Request):
+    """批量删除买方客户(级联解绑发票 · 不删发票)。客户管理页批量操作用。"""
+    user = get_current_user_from_request(request)
+    deleted = 0
+    failed: list[int] = []
+    for cid in req.ids:
+        try:
+            ok = db.delete_client(
+                str(user["id"]), int(cid), cascade_unlink=True, tenant_id=_tid(user)
+            )
+            if ok:
+                deleted += 1
+            else:
+                failed.append(int(cid))
+        except Exception as e:
+            logger.warning(f"[client_batch_delete] id={cid} failed: {e}")
+            failed.append(int(cid))
+    return {"ok": True, "deleted": deleted, "failed": failed}
+
+
 @router.get("/api/clients/{client_id}/export")
 async def api_export_client_invoices(client_id: int, request: Request, month: Optional[str] = None):
     """按客户导出发票 Excel(VAT 报表格式)

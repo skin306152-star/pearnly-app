@@ -198,6 +198,32 @@ body.sidebar-collapsed .topbar-left { width: var(--sidebar-w-collapsed); padding
     flex-direction: column;
     gap: 2px;
 }
+/* 账套主体下拉(P3 · Zihao 2026-05-27)*/
+.ws-modal-select-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px 12px 4px;
+}
+.ws-modal-select-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-3, #6b7280);
+}
+.ws-modal-select {
+    width: 100%;
+    padding: 9px 12px;
+    font-size: 13px;
+    border: 1px solid var(--line, #e5e7eb);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink, #111);
+    cursor: pointer;
+}
+.ws-modal-select:focus {
+    outline: none;
+    border-color: var(--brand, #4f46e5);
+}
 .ws-modal-item {
     display: flex;
     align-items: center;
@@ -13715,6 +13741,104 @@ body.sidebar-collapsed .nav-collapsible.collapsed .nav-sub { max-height: 800px; 
     box-shadow: 0 1px 3px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06);
 }
 .recon-tab-btn.active svg { opacity: 1; }
+
+/* ============ P3 · 客户管理页(账套主体 / 买方客户 横条列表)============ */
+.cust-tab-bar { margin-bottom: 16px; }
+.cust-pane { display: none; }
+.cust-pane.active { display: block; }
+
+.cust-toolbar {
+    display: flex; gap: 10px; align-items: center;
+    flex-wrap: wrap; margin-bottom: 12px;
+}
+.cust-search-wrap { flex: 1; min-width: 220px; display: flex; }
+.cust-search-wrap .search-input { width: 100%; }
+.cust-hint {
+    font-size: 12px; color: var(--ink-3, #6b7280);
+    background: var(--bg, #f7f7f3); border: 1px solid var(--line, #e5e7eb);
+    border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; line-height: 1.5;
+}
+
+.cust-table-wrap {
+    border: 1px solid var(--line, #e5e7eb); border-radius: 10px; overflow: hidden;
+    background: #fff;
+}
+.cust-table-head, .cust-row {
+    display: grid; gap: 10px; align-items: center;
+    padding: 11px 14px;
+}
+.buyer-grid  { grid-template-columns: 36px 1fr 90px 140px 150px; }
+.seller-grid { grid-template-columns: 1fr 170px 90px 210px; }
+.cust-table-head {
+    background: var(--bg, #f9fafb); font-size: 12px; font-weight: 600;
+    color: var(--ink-3, #6b7280); border-bottom: 1px solid var(--line, #e5e7eb);
+}
+.cust-row {
+    font-size: 13px; border-bottom: 1px solid var(--line, #f0f0ec);
+    transition: background .12s;
+}
+.cust-row:last-child { border-bottom: none; }
+.cust-row:hover { background: var(--bg, #f9fafb); }
+.cust-row.selected { background: #eef2ff; }
+.align-right { text-align: right; }
+
+.cust-col-check, .cust-cell-check { display: flex; align-items: center; justify-content: center; }
+.cust-col-check input, .cust-cell-check input { width: 16px; height: 16px; accent-color: #111; cursor: pointer; }
+
+.cust-cell-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cust-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.cust-name-text { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cust-cell-sub { font-size: 11px; color: var(--ink-3, #6b7280); margin-top: 1px; }
+.cust-cell-amount { font-weight: 600; }
+.cust-cell-tax { color: var(--ink-3, #6b7280); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cust-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.cust-row-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1px solid var(--line, #e5e7eb); background: #fff;
+    border-radius: 6px; padding: 4px 9px; font-size: 12px;
+    color: var(--ink-2, #374151); cursor: pointer; white-space: nowrap;
+    transition: background .12s, border-color .12s, color .12s;
+}
+.cust-row-btn svg { width: 13px; height: 13px; }
+.cust-row-btn:hover { background: var(--bg, #f3f4f6); border-color: #d1d5db; }
+.cust-row-btn.danger:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+.cust-row-btn.primary { background: #111; color: #fff; border-color: #111; }
+.cust-row-btn.primary:hover { background: #333; }
+.cust-badge-current {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0;
+    border-radius: 6px; padding: 4px 9px; font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+
+.cust-batch-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 14px; margin-bottom: 12px;
+    background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px;
+}
+.cust-batch-count { font-weight: 600; font-size: 13px; }
+.cust-batch-actions { display: flex; gap: 8px; }
+.btn-sm { padding: 5px 12px !important; font-size: 12px !important; }
+
+.cust-foot {
+    display: flex; justify-content: space-between; align-items: center; margin-top: 12px;
+}
+.cust-pager-info { font-size: 12px; color: var(--ink-3, #6b7280); }
+.cust-pager-btns { display: flex; gap: 6px; }
+
+.cust-loading, .cust-empty {
+    padding: 40px 16px; text-align: center; color: var(--ink-3, #6b7280); font-size: 13px;
+}
+.wsclient-modal-note {
+    font-size: 12px; color: var(--ink-3, #6b7280); line-height: 1.5;
+    background: var(--bg, #f7f7f3); border-radius: 8px; padding: 8px 12px; margin-top: 4px;
+}
+
+@media (max-width: 720px) {
+    .buyer-grid  { grid-template-columns: 30px 1fr 56px 84px auto; }
+    .seller-grid { grid-template-columns: 1fr 90px 50px auto; }
+    .cust-row-btn span { display: none; }
+}
 
 /* 子面板切换 */
 .recon-pane { display: block; }

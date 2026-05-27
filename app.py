@@ -3531,10 +3531,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_t.time()),
         "release_notes": {
-            "zh": "界面用词更清楚了。「客户」已改为「买方客户」(指发票上的买家);「工作空间」也补充了说明,指你自己的公司(开票方/卖方),方便区分两者。即日生效。",
-            "th": "ปรับถ้อยคำในระบบให้ชัดเจนขึ้น · «ลูกค้า» เปลี่ยนเป็น «ลูกค้า (ผู้ซื้อ)» (หมายถึงผู้ซื้อในใบกำกับ) และ «พื้นที่ทำงาน» เพิ่มคำอธิบายว่าหมายถึงบริษัทของคุณเอง (ผู้ขาย/ผู้ออกใบกำกับ) เพื่อให้แยกแยะได้ง่ายขึ้น · มีผลทันที",
-            "en": 'Clearer wording in the interface. "Clients" is now "Buyer clients" (the buyer on an invoice), and "Workspace" now explains it means your own company (the seller/invoice issuer), making the two easier to tell apart. Effective immediately.',
-            "ja": "画面の用語が分かりやすくなりました。「クライアント」を「取引先(買い手)」(請求書の買い手)に変更し、「ワークスペース」にはあなたの会社(売り手/発行者)を指すという説明を追加しました。即日有効。",
+            "zh": "「客户」已升级为「客户管理」。现在可在同一页面分别管理「账套主体」(您自己的公司 / 开票方)与「买方客户」(发票上的买家);买方客户改为列表展示,支持搜索、多选与批量删除。登录后系统会引导您选择当前账套主体。即日生效。",
+            "th": "«ลูกค้า» ได้รับการปรับเป็น «จัดการลูกค้า» · ตอนนี้จัดการ «กิจการ» (บริษัทของคุณเอง / ผู้ออกใบกำกับ) และ «ลูกค้าผู้ซื้อ» (ผู้ซื้อในใบกำกับ) ได้ในหน้าเดียว · ลูกค้าผู้ซื้อแสดงเป็นรายการที่ค้นหา เลือกหลายรายการ และลบเป็นชุดได้ · หลังเข้าสู่ระบบจะแนะนำให้เลือกกิจการปัจจุบัน · มีผลทันที",
+            "en": '"Clients" has been upgraded to "Customers". You can now manage "Accounting entities" (your own company / the invoice issuer) and "Buyer customers" (the buyer on an invoice) on one page; buyer customers are shown as a searchable list with multi-select and bulk delete. After signing in, you will be guided to choose your current accounting entity. Effective immediately.',
+            "ja": "「クライアント」を「顧客管理」に改善しました。同じ画面で「対象会社」(あなたの会社 / 請求書の発行者)と「買い手顧客」(請求書の買い手)を分けて管理できます。買い手顧客は一覧表示になり、検索・複数選択・一括削除に対応しました。ログイン後に現在の対象会社を選ぶ案内が表示されます。即日有効。",
         },
     }
 

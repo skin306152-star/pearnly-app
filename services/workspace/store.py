@@ -156,6 +156,128 @@ def list_workspace_clients(
         return []
 
 
+def update_workspace_client(
+    workspace_client_id: int,
+    user_id: str,
+    tenant_id: Optional[str] = None,
+    name: Optional[str] = None,
+    tax_id: Optional[str] = None,
+) -> bool:
+    """改账套主体的名称/税号(P3-客户管理页编辑用)。tenant 隔离。
+
+    只更新传入的字段(None=不动)。name 给空串视为不改(账套主体名不能清空)。
+    """
+    sets: list = []
+    params: list = []
+    if name is not None and name.strip():
+        sets.append("name = %s")
+        params.append(name.strip()[:200])
+    if tax_id is not None:
+        sets.append("tax_id = %s")
+        params.append((tax_id or "").strip()[:30] or None)
+    if not sets:
+        return False
+    sets.append("updated_at = NOW()")
+    try:
+        with db.get_cursor(commit=True) as cur:
+            if tenant_id:
+                where = "id = %s AND tenant_id = %s"
+                params += [int(workspace_client_id), tenant_id]
+            else:
+                where = "id = %s AND user_id = %s AND tenant_id IS NULL"
+                params += [int(workspace_client_id), str(user_id)]
+            cur.execute(
+                f"UPDATE workspace_clients SET {', '.join(sets)} WHERE {where}",
+                tuple(params),
+            )
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"update_workspace_client failed: {e}")
+        return False
+
+
+def archive_workspace_client(
+    workspace_client_id: int,
+    user_id: str,
+    tenant_id: Optional[str] = None,
+    active: bool = False,
+) -> bool:
+    """归档/恢复账套主体(软删 · is_active 切换)。
+
+    软删而非硬删:历史发票的 workspace_client_id 归属、seller 路由记忆都还指向它,
+    硬删会留下悬空引用。归档后默认列表(active_only)看不到,但归属链完整。
+    """
+    try:
+        with db.get_cursor(commit=True) as cur:
+            if tenant_id:
+                cur.execute(
+                    "UPDATE workspace_clients SET is_active = %s, updated_at = NOW() "
+                    "WHERE id = %s AND tenant_id = %s",
+                    (bool(active), int(workspace_client_id), tenant_id),
+                )
+            else:
+                cur.execute(
+                    "UPDATE workspace_clients SET is_active = %s, updated_at = NOW() "
+                    "WHERE id = %s AND user_id = %s AND tenant_id IS NULL",
+                    (bool(active), int(workspace_client_id), str(user_id)),
+                )
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"archive_workspace_client failed: {e}")
+        return False
+
+
+def list_workspace_clients_enriched(
+    user_id: str,
+    tenant_id: Optional[str] = None,
+    active_only: bool = True,
+) -> List[Dict[str, Any]]:
+    """列账套主体 + 关联发票统计(发票数 / 金额合计)· 客户管理页「账套主体」tab 用。
+
+    与 list_workspace_clients 同 scope/隔离规则,额外 LEFT JOIN ocr_history 聚合。
+    归属 = ocr_history.workspace_client_id。tenant 模式下统计同租户全部成员的发票。
+    """
+    try:
+        params: list = []
+        if tenant_id:
+            where = "wc.tenant_id = %s"
+            params.append(tenant_id)
+            join_user = ""  # tenant 共享:不再按 user 限制发票
+        else:
+            where = "wc.user_id = %s AND wc.tenant_id IS NULL"
+            params.append(str(user_id))
+            join_user = ""
+        if active_only:
+            where += " AND wc.is_active = TRUE"
+        with db.get_cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT wc.*,
+                       COALESCE(agg.invoice_count, 0)  AS invoice_count,
+                       COALESCE(agg.total_amount, 0)   AS total_amount,
+                       agg.last_invoice_at             AS last_invoice_at
+                FROM workspace_clients wc
+                LEFT JOIN (
+                    SELECT workspace_client_id,
+                           COUNT(*)               AS invoice_count,
+                           SUM(total_amount)      AS total_amount,
+                           MAX(created_at)        AS last_invoice_at
+                    FROM ocr_history
+                    WHERE workspace_client_id IS NOT NULL
+                    GROUP BY workspace_client_id
+                ) agg ON agg.workspace_client_id = wc.id
+                WHERE {where} {join_user}
+                ORDER BY wc.name
+                """,
+                tuple(params),
+            )
+            return [dict(r) for r in (cur.fetchall() or [])]
+    except Exception as e:
+        logger.warning(f"list_workspace_clients_enriched failed: {e}")
+        # 兜底:退回不带统计的基础列表(不让管理页白屏)
+        return list_workspace_clients(user_id, tenant_id=tenant_id, active_only=active_only)
+
+
 def bind_workspace_endpoint(
     workspace_client_id: int,
     erp_endpoint_id: Optional[str],

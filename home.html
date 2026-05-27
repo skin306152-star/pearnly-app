@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<link rel="stylesheet" href="/static/home.css?v=11835094">
+<link rel="stylesheet" href="/static/home.css?v=11850000">
 <!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style id="v118-34-37-modal-defensive-override">
@@ -2372,7 +2372,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             <path d="M18 17v-1.5a3 3 0 00-2.3-2.9"/>
             <path d="M13 3.6a3 3 0 010 5.8"/>
         </svg>
-        <span class="nav-label" data-i18n="nav-clients">客户</span>
+        <span class="nav-label" data-i18n="nav-clients">客户管理</span>
     </div>
 
     <div class="nav-item" data-route="exceptions">
@@ -4460,21 +4460,84 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
             </div>
             <div class="page-head-text">
                 <h1 class="page-title" data-i18n="clients-title">客户管理</h1>
-                <div class="page-subtitle" data-i18n="clients-sub">为每家客户单独归档发票 · 月底一键导出 VAT 报表</div>
-            </div>
-            <div class="page-head-actions">
-                <button class="btn btn-primary" id="btn-client-new">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M8 3v10M3 8h10"/>
-                    </svg>
-                    <span data-i18n="client-new">新建客户</span>
-                </button>
+                <div class="page-subtitle" data-i18n="clients-sub">账套主体 + 买方客户 · 统一归档管理</div>
             </div>
         </div>
 
-        <!-- 客户卡片网格 -->
-        <div class="clients-grid" id="clients-grid">
-            <div class="clients-loading" data-i18n="clients-loading">加载中…</div>
+        <!-- 顶部横向 tab 条(对账中心同款)· 账套主体 / 买方客户 -->
+        <div class="recon-tab-bar cust-tab-bar">
+            <button class="recon-tab-btn active" data-cust-tab="seller" data-i18n="cust-tab-seller">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="2" y="5" width="12" height="9" rx="1"/><path d="M10 14V4a1 1 0 00-1-1H7a1 1 0 00-1 1v10"/></svg>
+                账套主体
+            </button>
+            <button class="recon-tab-btn" data-cust-tab="buyer" data-i18n="cust-tab-buyer">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M11 14v-1.2a2.4 2.4 0 00-2.4-2.4H4.4A2.4 2.4 0 002 12.8V14"/><circle cx="6.2" cy="5.2" r="2.4"/><path d="M14 14v-1.2a2.4 2.4 0 00-1.8-2.3"/></svg>
+                买方客户
+            </button>
+        </div>
+
+        <!-- ── 账套主体面板(= 工作空间 · 与右上角切换器/登录弹窗共用同一份)── -->
+        <div id="cust-pane-seller" class="cust-pane active">
+            <div class="cust-toolbar">
+                <div class="search-wrap cust-search-wrap">
+                    <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+                    <input type="text" id="seller-search" class="search-input" data-i18n-placeholder="seller-search-ph" placeholder="搜索账套主体…">
+                    <button class="search-clear" id="seller-search-clear" style="display:none;">&times;</button>
+                </div>
+                <button class="btn btn-primary" id="btn-seller-new" style="display:none;">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg>
+                    <span data-i18n="seller-new">新建账套主体</span>
+                </button>
+            </div>
+            <div class="cust-hint" data-i18n="seller-hint">账套主体 = 你的公司(发票卖方 / 开票方)。这里与右上角切换器、登录弹窗共用同一份数据,任意处新建/修改都会同步。</div>
+            <div class="cust-table-wrap">
+                <div class="cust-table-head seller-grid">
+                    <div data-i18n="seller-col-name">账套主体</div>
+                    <div data-i18n="seller-col-tax">税号</div>
+                    <div class="align-right" data-i18n="seller-col-count">发票数</div>
+                    <div class="align-right" data-i18n="seller-col-actions">操作</div>
+                </div>
+                <div id="seller-tbody"><div class="cust-loading" data-i18n="clients-loading">加载中…</div></div>
+            </div>
+        </div>
+
+        <!-- ── 买方客户面板(横条列表 · 搜索/多选/批删/翻页 · 识别记录同款)── -->
+        <div id="cust-pane-buyer" class="cust-pane">
+            <div class="cust-toolbar">
+                <div class="search-wrap cust-search-wrap">
+                    <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+                    <input type="text" id="buyer-search" class="search-input" data-i18n-placeholder="buyer-search-ph" placeholder="搜索买方客户 / 税号…">
+                    <button class="search-clear" id="buyer-search-clear" style="display:none;">&times;</button>
+                </div>
+                <button class="btn btn-primary" id="btn-buyer-new">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg>
+                    <span data-i18n="buyer-new">新建买方客户</span>
+                </button>
+            </div>
+            <div id="buyer-batch-bar" class="cust-batch-bar" style="display:none;">
+                <span class="cust-batch-count" id="buyer-batch-count"></span>
+                <div class="cust-batch-actions">
+                    <button class="btn btn-ghost btn-sm" id="buyer-batch-cancel" data-i18n="cust-batch-cancel">取消</button>
+                    <button class="btn btn-danger btn-sm" id="buyer-batch-delete" data-i18n="cust-batch-delete">批量删除</button>
+                </div>
+            </div>
+            <div class="cust-table-wrap">
+                <div class="cust-table-head buyer-grid">
+                    <div class="cust-col-check"><input type="checkbox" id="buyer-check-all"></div>
+                    <div data-i18n="buyer-col-name">客户名称</div>
+                    <div class="align-right" data-i18n="buyer-col-count">发票数</div>
+                    <div class="align-right" data-i18n="buyer-col-amount">金额合计</div>
+                    <div class="align-right" data-i18n="buyer-col-actions">操作</div>
+                </div>
+                <div id="buyer-tbody"><div class="cust-loading" data-i18n="clients-loading">加载中…</div></div>
+            </div>
+            <div class="cust-foot">
+                <span class="cust-pager-info" id="buyer-pager-info"></span>
+                <div class="cust-pager-btns">
+                    <button class="btn btn-ghost btn-sm" id="buyer-prev" data-i18n="cust-prev">上一页</button>
+                    <button class="btn btn-ghost btn-sm" id="buyer-next" data-i18n="cust-next">下一页</button>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -4546,6 +4609,37 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
                 <div class="modal-footer-right">
                     <button class="btn btn-ghost" id="client-modal-cancel" data-i18n="client-cancel">取消</button>
                     <button class="btn btn-primary" id="client-modal-save" data-i18n="client-save">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ P3 · 账套主体编辑弹窗(新建/改名/改税号 · 仅老板)============ -->
+    <div class="modal-mask" id="wsclient-modal-mask" style="display:none;">
+        <div class="modal" role="dialog" style="max-width:440px;">
+            <div class="modal-header">
+                <div class="modal-title" id="wsclient-modal-title" data-i18n="wsclient-modal-new">新建账套主体</div>
+                <button class="modal-close" id="wsclient-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <label data-i18n="wsclient-field-name">账套主体名称 *</label>
+                    <input type="text" id="wsclient-input-name" maxlength="200" data-i18n-placeholder="wsclient-field-name-ph" placeholder="公司名称,例如 BAKELAB">
+                </div>
+                <div class="form-row">
+                    <label data-i18n="wsclient-field-tax">税号</label>
+                    <input type="text" id="wsclient-input-tax" maxlength="30">
+                </div>
+                <div class="wsclient-modal-note" data-i18n="wsclient-note">账套主体 = 你的公司(发票卖方)。它和右上角切换器、登录弹窗共用,这里改了那边同步。</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="wsclient-modal-archive" style="display:none;">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M4 4v9a1 1 0 001 1h6a1 1 0 001-1V4M6 4V2.5a1 1 0 011-1h2a1 1 0 011 1V4"/></svg>
+                    <span data-i18n="wsclient-archive">归档</span>
+                </button>
+                <div class="modal-footer-right">
+                    <button class="btn btn-ghost" id="wsclient-modal-cancel" data-i18n="client-cancel">取消</button>
+                    <button class="btn btn-primary" id="wsclient-modal-save" data-i18n="client-save">保存</button>
                 </div>
             </div>
         </div>
@@ -6498,8 +6592,8 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 </div>
 
 <!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 home.js 前 · 提供 window.I18N -->
-<script src="/static/i18n-data.js?v=11835109"></script>
-<script src="/static/home.js?v=11835109"></script>
+<script src="/static/i18n-data.js?v=11850000"></script>
+<script src="/static/home.js?v=11850000"></script>
 <!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE 不引 home.js · runRecon 检测 needs_mapping 时调用 -->
 <script src="/static/recon-mapping.js?v=11835072" defer></script>
 <!-- ADR-006 S8 · PDF/扫描件逐行核对纠错面板 · 独立 IIFE · runRecon 检测 needs_review 时调用 -->
@@ -6508,7 +6602,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
      ES module(type=module 自动 defer)· 必在 home.js 后执行 ·
      依赖 home.js 的全局:t / showToast / escapeHtml / subscribeI18n / _userInfo / currentRoute / loadDashboard
      REFACTOR-C1(2026-05-25)· 抽测试中心 + 重建 bundle · 只 bump 本 main.js?v=(不动 home.js?v= → /api/version 不变 → 不弹横幅) -->
-<script type="module" src="/static/dist/main.js?v=11835109"></script>
+<script type="module" src="/static/dist/main.js?v=11850000"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·

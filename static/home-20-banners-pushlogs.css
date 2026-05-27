@@ -1,0 +1,198 @@
+/* ============================================================
+ * v118.24 · Chrome only 顶部横幅 + 文件夹监听辅助行
+ * ============================================================ */
+.chrome-only-banner {
+    position: sticky; top: 0; z-index: 1200;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px;
+    background: #fef3c7;
+    color: #92400e;
+    border-bottom: 1px solid #fcd34d;
+    font-size: 13px; line-height: 1.4;
+}
+.chrome-only-banner-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.chrome-only-banner-msg {
+    flex: 1;
+}
+.chrome-only-banner-close {
+    flex-shrink: 0;
+    background: #fff;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background .15s;
+}
+.chrome-only-banner-close:hover {
+    background: #fef3c7;
+}
+@media (max-width: 640px) {
+    .chrome-only-banner {
+        flex-wrap: wrap;
+        font-size: 12px;
+        padding: 8px 12px;
+    }
+    .chrome-only-banner-msg {
+        flex: 1 1 100%;
+        order: 2;
+    }
+    .chrome-only-banner-close {
+        order: 3;
+        margin-left: auto;
+    }
+}
+
+/* ============================================================
+ * v118.28.2 · 超管 /admin 视图红色顶部 banner
+ * v118.28.2.1 · 改 fixed 不挡 logo · admin-mode 时整体下移 36px
+ * ============================================================ */
+.admin-mode-banner {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 1300;
+    height: 36px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 16px;
+    background: #fef2f2;
+    color: #991b1b;
+    border-bottom: 1px solid #fecaca;
+    font-size: 13px; line-height: 1.4;
+    font-weight: 500;
+    box-sizing: border-box;
+}
+.admin-mode-banner-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: #dc2626;
+}
+.admin-mode-banner-msg {
+    flex: 1;
+}
+/* admin-mode 下 · 把 topbar / sidebar / main 都下推 36px · 给 banner 让位 */
+body.admin-mode .topbar { top: 36px; }
+body.admin-mode .sidebar { top: calc(var(--topbar-h) + 36px); }
+body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
+@media (max-width: 640px) {
+    .admin-mode-banner {
+        font-size: 12px;
+        padding: 0 12px;
+    }
+}
+
+/* 文件夹监听辅助提示行(子文件夹递归) · 比 keep-open warn 更柔和 */
+.folder-warn-row.folder-info-soft {
+    background: #f4f4f0;
+    color: #075985;
+    border-color: #bae6fd;
+}
+.folder-warn-row.folder-info-soft svg {
+    color: #0ea5e9;
+}
+
+/* ============================================================
+ * v118.25 · ERP 推送日志「重试中」状态 + 重试 chip
+ * ============================================================ */
+.erp-log-row.retrying {
+    /* 重试中:橙色调 · 区分于成功(绿)/ 失败(红) */
+    background: linear-gradient(to right, #fffbeb 0%, #fff 30%);
+    border-left: 3px solid #f59e0b;
+}
+.erp-log-row.retrying .log-status {
+    color: #b45309;
+    font-size: 16px;
+    display: inline-block;
+    animation: erp-retry-spin 2s linear infinite;
+}
+@keyframes erp-retry-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.log-retry-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    margin-left: 6px;
+    white-space: nowrap;
+}
+.log-retry-chip.exhausted {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fca5a5;
+}
+
+/* ============================================================
+ * v118.25.1 · 推送日志批量栏 + 行 checkbox
+ * ============================================================ */
+.erp-logs-batch-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    background: #f4f4f0;
+    border: 1px solid #e8e8e3;
+    border-radius: 6px;
+}
+/* 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 推送日志表头行
+   · 全选 checkbox + 列标签 · 区分于数据 row */
+.erp-log-row-header {
+    background: #f9fafb;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 500;
+    border-bottom: 1px solid #e5e7eb;
+    cursor: default !important;
+}
+.erp-log-row-header:hover {
+    background: #f9fafb !important;
+}
+.erp-log-cb-all {
+    cursor: pointer;
+}
+/* indeterminate 状态视觉 · 浏览器原生支持 input.indeterminate 但要确保 visible */
+.erp-log-cb-all:indeterminate {
+    opacity: 1;
+}
+/* Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除按钮 · 危险色 ghost */
+.btn-danger-ghost {
+    color: #dc2626;
+    background: transparent;
+    border: 1px solid #fecaca;
+}
+.btn-danger-ghost:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+}
+.erp-logs-batch-count {
+    flex: 1;
+    font-size: 13px;
+    color: #111111;
+    font-weight: 500;
+}
+.erp-log-row {
+    /* 给 checkbox 让位 */
+    align-items: center;
+}
+.erp-log-cb {
+    margin-right: 6px;
+    cursor: pointer;
+    width: 14px; height: 14px;
+    accent-color: #111111;
+    flex-shrink: 0;
+}
+.erp-log-cb-spacer {
+    display: inline-block;
+    width: 20px;
+    flex-shrink: 0;
+}
+

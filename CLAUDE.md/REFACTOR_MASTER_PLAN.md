@@ -199,7 +199,7 @@
 
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
-| C1 | `home.js` 拆完 33k → 验收 < 200 行 / 冲刺 < 120 行(50-100 个 ES module · 每个 100-300 行) | 6-8 周 | A1 | 🟡 进行中 · home.js 32466→**22703** · 已抽 dashboard+billing(IIFE→ES module)+ **i18n 字典 9763 行→`static/i18n-data.js`**(`ed6cfa8`/`3a11f81` · window.I18N · home.html sync 排 home.js 前 · 生产 playwright 验翻译正常)· check_i18n/2 测试改读新文件 · i18n-data.js 入 prettier/eslint 豁免(verbatim 数据带既有 dupe-key 债)· 下一步:抽 cohesive feature 函数群→`src/home/*`(受 load-order 约束 · 仿 dashboard 范式) |
+| C1 | `home.js` 拆完 33k → 验收 < 200 行 / 冲刺 < 120 行(50-100 个 ES module · 每个 100-300 行) | 6-8 周 | A1 | 🟡 进行中 · home.js 32466→**6191**(第三十八~四十二会话大批 · 详见 STATE + `BATCH_STRATEGY.md` §10/§13)· 抽 35 个 `src/home/*` 模块 + i18n 字典→`static/i18n-data.js` + 整删老 admin 布局(`fa08ecc` -4566)+ **计费迁移收尾**(全平台只剩 credits+admin · 老套餐前后端全清 · `101824d`/`1f7d8b8`/`93a67da`/`52aeeb6`)· **⛔ 剩「地板」**:routeTo 中枢 / 顶层函数群(被 routeTo 裸名调)/ 🔴高敏(改密/LINE绑定/session心跳)· 需 Zihao 在场 / 主控亲手判性质,非并行 batch |
 | C2 | `home.css` 拆完 7k → 验收 < 500 行 / 冲刺 < 250 行(20-30 个 component CSS) | 2-3 周 | A1 | ⚪ |
 | C3 | `home.html` 拆 6.5k → 验收 < 1000 行 / 冲刺 < 500 行(`<template>` 或服务端拼接) | 2 周 | C1 | ⚪ |
 | C4 | Design System / 组件库(按钮 / 输入框 / Modal / Toast / Card / Table 抽通用 component) | 3-4 周 | C1 | ⚪ |
@@ -306,7 +306,7 @@
 |---|---|---|---|
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
 | B 后端 | 🟡 1.5/10 | **B1 安全部分已到顶**(app.py 10075→4459)· **B2 进行中**:db.py 10663→**7136**(-3527 · 抽 9 域 DAL → services) | B1:21 router + exception_checks · 剩 22 @app 安全敏感/勿碰/故意留 · 需 auth 专窗口。**B2(第二十二会话 · 9 域)**:email_ingest/erp.oauth/erp.mappings/notification/erp.push + recon.{vat_recon_tasks/gl_vat/bank_recon_v2/bank_recon_v1}(`435ece6`/`78e9667`/`f62d0d9`/`9de1baa`/`7edb3c3`/`a012482`/`e26dafd`)· re-export 范式零改调用点 · 全 push+CI 绿+生产 401 验证 · services/*.py 40→51 · unit 656→**682** |
-| C 前端 | 🟡 1/8(C1 进行中) | C1 续:home.js 22703→**22210**(抽测试中心 → `src/home/test-center.js`) | 依赖 A1(✅)· 已抽 dashboard + billing(IIFE→ES module)+ i18n 字典→`static/i18n-data.js` + **测试中心 IIFE(skin only)→`src/home/test-center.js`**(第二十一会话 `0377055` · 只 bump main.js?v= 不动 home.js?v= → /api/version 不变 · push+CI 绿+生产 playwright 验证 loadTestCenterPage 渲染 0 报错)· 下一步抽更多 cohesive feature 函数群→`src/home/*` |
+| C 前端 | 🟡 C1 进行中(到地板)· C2 ✅ home.css 0 | 第四十二会话:home.js → **6191**(整删老 admin 布局 -4566 + 计费迁移收尾 · 套餐前后端全清) | C1:home.js 32466→**6191**(35 个 `src/home/*` + i18n-data.js + 老 admin 布局整删 + 计费迁移)· **剩地板**(routeTo 中枢 / 顶层函数群 / 🔴高敏)需 Zihao 在场。C2:home.css 16673→**0** ✅(36 切片)。详见 STATE 第四十二会话块 + `BATCH_STRATEGY.md` §10/§13 |
 | D 测试 | 🟡 2/5(D1 部分 + **D2 Wave 0 安全网大批**) | D2 续:核心纯逻辑模块行为契约 | **第三十五会话(2026-05-27)· REFACTOR-D2 Wave 0**:给 17 个 0 测试的核心纯逻辑模块补行为契约 · unit **872→1095**(field_comparator/reconciliation_matcher/gl_vat_reconciler/vat_report_parser/vat_file_classifier/excel_template_th/excel_export/report_engine/usage_report/invoice_grouper/monitoring/task_queue/pdf_storage/pdf_searchable/kms_helper/i18n_reports/archive)· **挖出并修 3 个真 bug**(normalize_branch 总部别名 / _norm_date 佛历 / _filename_guess 下划线 · `85c35bb`)· 全守门绿 · 不碰巨石零冲突。早前 D1 第二十一会话 `d65b692` |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |
 | F 数据 | ⚪ 0/3 | — | 依赖 B1 |

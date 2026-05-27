@@ -1,20 +1,21 @@
 # 📊 STATE · Pearnly 项目状态
 
 > 🏗️ **【常驻指针 · 整顿恢复后读】整顿进行中 · 已开始并行 agent 加速。** 进窗口必读 `docs/refactor/BATCH_STRATEGY.md`(**特别 §9.5 实际操作模型 + §13 home.js 测绘 manifest**)+ `REFACTOR_MASTER_PLAN.md`。
-> **当前态(第三十七会话 · 持续更新)**:① E2E 安全网已建(10 个 · 真账号 · CI 用 env-gated skip 保绿)。② **home.js 大 batch 进行中**:R1-R4 已抽 **18 块** safe IIFE 模块 → `src/home/*`,home.js **22970→14483**(全接线 + 生产 E2E 10/10 + 守门全绿,见 §10/§13 账本)。③ Wave 1(db.py membership+tenant)已 copy-out 未接线。**下一步**:新窗口照 §13 manifest 继续 batch 抽剩余 safe IIFE 模块(每轮 re-grep 行号 · E2E 验 · 避🔴高敏 4 块);抽尽 safe 后,剩高敏 4 块 + 顶层函数群 + _shared 收官需 Zihao 在场 / 主控做。
+> **当前态(第三十七会话 · 持续更新)**:① E2E 安全网已建(10 个 · 真账号 · CI 用 env-gated skip 保绿)。② **home.js 大 batch 进行中**:R1-R5 已抽 **21 块** safe IIFE 模块 → `src/home/*`,home.js **22970→12929**(全接线 + 每轮生产 E2E 10/10 + 守门全绿,见 §10/§13 账本)。③ Wave 1(db.py membership+tenant)已 copy-out 未接线。**下一步**:新窗口照 §13 manifest 继续 batch 抽剩余 safe IIFE 模块(每轮 re-grep 行号 · E2E 验 · 避🔴高敏 4 块);抽尽 safe 后,剩高敏 4 块 + 顶层函数群 + _shared 收官需 Zihao 在场 / 主控做。
 > **⚠️ 工作流变化**:Zihao 非技术用户 · 内置 `/batch` 在本环境未触发 → **主控窗口自己用 Agent 工具派后台并行 agent**(copy-out)· 全部判断/守门/合并/上线由主控包办 · Zihao 只贴极少命令 + 当用户测 app。详见 §9.5。
 
 > ════════════════════════════════════════════════════════════
-> **【第三十九会话 · 交接 · 2026-05-27】home.js R4:并行抽 5 块 safe IIFE(18513→14483 · -4030)· 生产 E2E 10/10**
+> **【第三十九会话 · 交接 · 2026-05-27】home.js R4+R5:并行抽 8 块 safe IIFE(18513→12929 · -5584)· 每轮生产 E2E 10/10**
 > ════════════════════════════════════════════════════════════
-> **本会话(整顿 REFACTOR-C1 · home.js 大 batch 续)**:照 §13 配方,**并行派 5 个 copy-out agent** + 主控串行接线,抽 5 块干净单 IIFE:
-> - `bank-recon`(银行对账 M10)/ `clients`(客户实体)/ `exceptions`(异常栏列表页)/ `topbar-avatar`(顶栏三件套/头像菜单)/ `recon-collapse`(对账折叠组件)→ `src/home/*.js`。
-> - **home.js 18513 → 14483(-4030)**。字节级证明:home.js = HEAD 删去恰好这 5 段、其余一字未变;CRLF 完好(bareLF=0 全程)。main.js 配对加 5 import;home.html `home.js?v=`+`main.js?v=` 11850013→**11850014**。
+> **本会话(整顿 REFACTOR-C1 · home.js 大 batch 续 · 两轮 R4+R5)**:照 §13 配方,**并行派 copy-out agent** + 主控串行接线。
+> - **R5(`962105e` · -1554 · 14483→12929)**:recon-subtab-settings(对账子tab+设置弹窗)/ excel-formula-recon(Excel公式对账·skin-only·完全独立IIFE)/ gl-vat-recon(GL vs 销项税报告对账)。字节级证明 + CRLF 完好 + 高敏零泄漏(gl-vat END 停在 session-heartbeat 之上)。**守门测试 test_brv2_export_lang_follows 跟随代码搬家更新**(非回归 · verbatim 字节级等价):setUpClass 改扫 home.js + src/home/*.js 并集(M2 VEX→excel-formula-recon · M3 GL-VAT→gl-vat-recon),_curLang 断言加 re.DOTALL 容忍 prettier 折行。生产 E2E 10/10。
+> - **R4(`b9f6e1f` · -4030 · 18513→14483)**:**并行派 5 个 copy-out agent** + 主控串行接线,抽 5 块干净单 IIFE:`bank-recon`(银行对账 M10)/ `clients`(客户实体)/ `exceptions`(异常栏列表页)/ `topbar-avatar`(顶栏三件套/头像菜单)/ `recon-collapse`(对账折叠组件)→ `src/home/*.js`。
+> - **home.js 两轮 18513 → 12929(-5584)**。字节级证明:每轮 home.js = 删块前删去恰好那些段、其余一字未变;CRLF 完好(bareLF=0 全程)。main.js 配对加 import;home.html `home.js?v=`+`main.js?v=` 11850013→**11850015**(各轮 +1)。
 > - **🔴高敏 4 块未碰**(_sessionCheck×5 / 修改密码 / LINE 绑定 / `window.I18N` 暴露行均验证保留 · recon-collapse START 从 banner 起,心跳零泄漏)。
 > - **守门全绿**:node --check / vite build(23 模块)/ eslint **0-error** / prettier / check_i18n **0-0** / check_imports / pytest **1131 passed**。commit `b9f6e1f` · push master · 部署 11850014 · **生产 E2E 10/10**(真账号 · 首轮 9 连败系陈旧 .auth/state.json 多 context session 互踢、与重构无关 · 清 state 重跑全绿)。
 > - **⚠️ 操作记录**:铁律 #6「home.js 只用 Edit」与 §13「node split/join 删块」冲突 → 自动模式拦 node 写 home.js → Zihao 放行 node split/join(+护栏:逐块删、每删校验行数+LF=0、配对 import、出错从备份恢复)。下窗口删 home.js 可继续用此法(已验证 CRLF 安全)。
 >
-> **下窗口接续**:继续 §13②表 safe 块。**剩余 safe 候选**(抽前必 re-grep · R4 后行号又漂):erp-endpoints-logs(~L5463 区 · 多 IIFE 群,需先看清边界)、待探区(R4 前 ~7892-9418 = Bank Recon v2 + 一 IIFE · 已部分测绘,可抽)、admin-misc(两 IIFE)、erp-mappings(两段)、bulk-upload 剩半、settings(两段)、early 区 chrome-quota/upload-camera/ocr-run/results-drawer/rd-sync/history(多为 banner 分隔的内联函数群 · 非干净单 IIFE · 较难)、team(含员工改密 · borderline)。**地板**:🔴高敏 4 块、顶层函数群(export L4392 一带)、sidebar-routing(含 routeTo 中枢)、_shared 收官 → 留 Zihao 在场。
+> **下窗口接续**:继续抽 safe 块 · **当前 home.js IIFE 地图 + 剩余 safe 候选见 BATCH_STRATEGY §13 头部「R5 后当前 home.js IIFE 地图」段**(R5 后行号又漂 · 抽前必 re-grep)。要点:剩 admin-misc(两IIFE)/ bulk-upload 新用户引导(完成🟡)/ erp-mappings(两段)/ erp-endpoints-logs 多IIFE群 / 待探 Bank-Recon-v2 区(含 window._reconPollJob 共享工具,留 home.js 或一并搬)/ early 区 banner 分隔函数群(非干净单 IIFE · 较难)/ team(含员工改密 borderline)。**地板**:🔴高敏 4 块、顶层函数群(export L4392 一带)、sidebar-routing(含 routeTo 中枢)、_shared 收官 → 留 Zihao 在场。
 >
 > ════════════════════════════════════════════════════════════
 > **【第三十七会话 · 交接 · 2026-05-27】整顿首次用并行 agent 加速 · Wave 1 db.py 两安全域 copy-out + 文档补齐 + home.js 测绘 + 确立操作模型**

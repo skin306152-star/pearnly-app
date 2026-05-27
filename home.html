@@ -21,7 +21,6 @@
 <link rel="stylesheet" href="/static/home-15-team-folder.css?v=11850008">
 <link rel="stylesheet" href="/static/home-16-cost-clients.css?v=11850008">
 <link rel="stylesheet" href="/static/home-17-aibalance-reports-trial.css?v=11850008">
-<link rel="stylesheet" href="/static/home-18-admin-users.css?v=11850008">
 <link rel="stylesheet" href="/static/home-19-exceptions-alerts.css?v=11850008">
 <link rel="stylesheet" href="/static/home-20-banners-pushlogs.css?v=11850008">
 <link rel="stylesheet" href="/static/home-21-recon-center.css?v=11850008">
@@ -5546,236 +5545,6 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
         </div>
     </section>
 
-    <!-- ============ v109.3 · 用户管理页(仅 super admin) ============ -->
-    <section class="page" id="page-admin-users">
-        <div class="page-head">
-            <div class="page-head-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="16" cy="8" r="3.5"/>
-                    <circle cx="8" cy="8" r="3.5"/>
-                    <path d="M2 19v-1.8a3.5 3.5 0 013.5-3.5h2.5a3.5 3.5 0 013.5 3.5V19"/>
-                    <path d="M13 16a3.5 3.5 0 013.5-3.5h2a3.5 3.5 0 013.5 3.5V19"/>
-                </svg>
-            </div>
-            <div class="page-head-text">
-                <h1 class="page-title" data-i18n="admin-users-title">用户管理</h1>
-                <div class="page-subtitle" data-i18n="admin-users-sub">注册用户 · 套餐分布 · 待审核付款 · 风控</div>
-            </div>
-        </div>
-
-        <!-- 漏斗概览 -->
-        <div class="adm-kpi-grid" id="adm-kpi-grid">
-            <!-- 动态填充 -->
-        </div>
-
-        <!-- 待审核付款 -->
-        <div class="adm-section">
-            <div class="adm-section-head">
-                <div class="adm-section-title" data-i18n="adm-pending-title">待审核付款</div>
-                <button class="btn btn-ghost btn-sm" id="adm-refresh-pending"><span data-i18n="adm-refresh">刷新</span></button>
-            </div>
-            <div class="adm-pending-list" id="adm-pending-list">
-                <!-- 动态填充 -->
-            </div>
-        </div>
-
-        <!-- Trial 即将到期 -->
-        <div class="adm-section">
-            <div class="adm-section-head">
-                <div class="adm-section-title" data-i18n="adm-expiring-title">Trial 即将到期(≤ 3 天)</div>
-            </div>
-            <div class="adm-expiring-list" id="adm-expiring-list">
-                <!-- 动态填充 -->
-            </div>
-        </div>
-
-        <!-- 用户管理 · v118.12 分两 tab:客户 / 员工 · v118.29.0 加日志 tab + 分页 + CSV -->
-        <div class="adm-section">
-            <div class="adm-section-head">
-                <div class="adm-tabs-bar">
-                    <button class="adm-tab active" data-adm-tab="customers" data-i18n="adm-tab-customers">客户</button>
-                    <button class="adm-tab" data-adm-tab="employees" data-i18n="adm-tab-employees">员工</button>
-                    <button class="adm-tab" data-adm-tab="logs" data-i18n="adm-tab-logs">操作日志</button>
-                </div>
-                <div class="adm-filters" data-adm-tab-filter="customers">
-                    <select class="adm-filter" id="adm-plan-filter">
-                        <option value="all" data-i18n="adm-filter-all">全部</option>
-                        <option value="trial" data-i18n="plan-trial">Trial</option>
-                        <option value="solo" data-i18n="adm-plan-solo">Solo</option>
-                        <option value="team" data-i18n="adm-plan-team">Team</option>
-                        <option value="firm" data-i18n="plan-firm">Firm</option>
-                    </select>
-                    <input type="text" class="adm-search" id="adm-user-search" data-i18n-placeholder="adm-search-ph">
-                    <button class="btn btn-ghost btn-sm" id="adm-users-csv-btn" type="button">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        <span data-i18n="adm-export-csv">导出 CSV</span>
-                    </button>
-                </div>
-                <div class="adm-filters" data-adm-tab-filter="employees" style="display:none;">
-                    <input type="text" class="adm-search" id="adm-employee-search" data-i18n-placeholder="adm-employee-search-ph">
-                </div>
-                <div class="adm-filters" data-adm-tab-filter="logs" style="display:none;">
-                    <input type="text" class="adm-search" id="adm-logs-search" data-i18n-placeholder="adm-logs-search-ph">
-                    <button class="btn btn-ghost btn-sm" id="adm-logs-csv-btn" type="button">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        <span data-i18n="adm-export-csv">导出 CSV</span>
-                    </button>
-                </div>
-            </div>
-            <!-- 客户表 -->
-            <div class="adm-users-table" id="adm-users-table" data-adm-tab-pane="customers">
-                <!-- 动态填充 -->
-            </div>
-            <!-- 员工表(v118.12 新) -->
-            <div class="adm-employees-table" id="adm-employees-table" data-adm-tab-pane="employees" style="display:none;">
-                <!-- 动态填充 -->
-            </div>
-            <!-- 操作日志表(v118.29.0 新) -->
-            <div class="adm-logs-table" id="adm-logs-table" data-adm-tab-pane="logs" style="display:none;">
-                <!-- 动态填充 -->
-            </div>
-            <!-- 分页器 · 客户 -->
-            <div class="adm-pager" id="adm-pager-customers" data-adm-tab-pane="customers"></div>
-            <!-- 分页器 · 日志 -->
-            <div class="adm-pager" id="adm-pager-logs" data-adm-tab-pane="logs" style="display:none;"></div>
-        </div>
-
-        <!-- 风控 -->
-        <div class="adm-section">
-            <div class="adm-section-head">
-                <div class="adm-section-title" data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</div>
-            </div>
-            <div id="adm-risk-content"></div>
-        </div>
-    </section>
-
-    <!-- ============ v106 · 成本追踪页(仅 super admin) ============ -->
-    <section class="page" id="page-admin-cost">
-        <div class="page-head">
-            <div class="page-head-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 17h18M5 17V8M9 17V5M13 17v-7M17 17V11"/>
-                </svg>
-            </div>
-            <div class="page-head-text">
-                <h1 class="page-title" data-i18n="admin-cost-title">成本追踪</h1>
-                <div class="page-subtitle" data-i18n="admin-cost-sub">实时监控 OCR 引擎使用成本 · 仅管理员可见</div>
-            </div>
-        </div>
-
-        <!-- v108 · Google AI Studio 余额卡片(顶部 · 最显眼) -->
-        <div class="billing-card" id="billing-card">
-            <div class="billing-card-head">
-                <div class="billing-card-title">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="5" width="16" height="11" rx="2"/>
-                        <path d="M2 9h16M5 13h3"/>
-                    </svg>
-                    <span data-i18n="billing-title">Google 实际余额</span>
-                </div>
-                <div class="billing-card-actions">
-                    <button class="btn btn-ghost btn-sm" id="btn-billing-update">
-                        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 2l3 3-7 7H2v-3z"/>
-                        </svg>
-                        <span data-i18n="billing-update">更新余额</span>
-                    </button>
-                    <a class="btn btn-primary btn-sm" id="btn-billing-google" target="_blank" rel="noopener">
-                        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M5 9l4-4M5 5h4v4"/>
-                        </svg>
-                        <span data-i18n="billing-google-link">在 Google 查最新</span>
-                    </a>
-                </div>
-            </div>
-            <div class="billing-card-body" id="billing-card-body">
-                <div class="billing-loading" data-i18n="billing-loading">加载中…</div>
-            </div>
-        </div>
-
-        <!-- 顶部 KPI 卡片 -->
-        <div class="cost-kpi-grid" id="cost-kpi-grid">
-            <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="cost-today">今日花费</div>
-                <div class="cost-kpi-value" id="kpi-today-cost">—</div>
-                <div class="cost-kpi-sub" id="kpi-today-sub">—</div>
-            </div>
-            <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="cost-month">本月花费</div>
-                <div class="cost-kpi-value" id="kpi-month-cost">—</div>
-                <div class="cost-kpi-sub" id="kpi-month-sub">—</div>
-            </div>
-            <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="cost-total">累计花费</div>
-                <div class="cost-kpi-value" id="kpi-total-cost">—</div>
-                <div class="cost-kpi-sub" id="kpi-total-sub">—</div>
-            </div>
-            <div class="cost-kpi-card">
-                <div class="cost-kpi-label" data-i18n="cost-engines">引擎占比(本月)</div>
-                <div class="cost-kpi-value cost-engines-mini" id="kpi-engines">—</div>
-                <div class="cost-kpi-sub" data-i18n="cost-engines-sub">主备引擎使用情况</div>
-            </div>
-        </div>
-
-        <!-- 趋势图 + 操作 -->
-        <div class="cost-section">
-            <div class="cost-section-head">
-                <h3 data-i18n="cost-trend-title">最近 30 天趋势</h3>
-                <div class="cost-actions">
-                    <button class="btn btn-ghost" id="btn-cost-refresh">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M2 8a6 6 0 0110-4.5M14 8a6 6 0 01-10 4.5M14 2v4h-4M2 14v-4h4"/>
-                        </svg>
-                        <span data-i18n="cost-refresh">刷新</span>
-                    </button>
-                    <button class="btn btn-primary" id="btn-cost-export">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M8 2v8M5 7l3 3 3-3M3 13h10"/>
-                        </svg>
-                        <span data-i18n="cost-export">导出 CSV</span>
-                    </button>
-                </div>
-            </div>
-            <div class="cost-trend-chart" id="cost-trend-chart"></div>
-        </div>
-
-        <!-- 按用户分组 -->
-        <div class="cost-section">
-            <div class="cost-section-head">
-                <h3 data-i18n="cost-by-user-title">按用户分组</h3>
-                <span class="cost-section-hint" data-i18n="cost-by-user-hint">按本月花费排序 · 找烧钱多的用户</span>
-            </div>
-            <div class="cost-table-wrap">
-                <table class="cost-table">
-                    <thead>
-                        <tr>
-                            <th data-i18n="cost-th-user">用户</th>
-                            <th data-i18n="cost-th-plan">套餐</th>
-                            <th data-i18n="cost-th-today">今日</th>
-                            <th data-i18n="cost-th-month">本月</th>
-                            <th data-i18n="cost-th-total">累计</th>
-                            <th data-i18n="cost-th-pages">总页数</th>
-                            <th data-i18n="cost-th-invoices">总张数</th>
-                            <th data-i18n="cost-th-avg">平均/张</th>
-                            <th data-i18n="cost-th-last">最后使用</th>
-                        </tr>
-                    </thead>
-                    <tbody id="cost-by-user-tbody">
-                        <tr><td colspan="9" class="cost-table-empty" data-i18n="cost-loading">加载中…</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
-
     <!-- ================= v118.28.1.0 · 测试中心 ================= -->
     <section class="page" id="page-test-center">
         <div class="page-head">
@@ -6629,7 +6398,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
 
 <!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 home.js 前 · 提供 window.I18N -->
 <script src="/static/i18n-data.js?v=11850000"></script>
-<script src="/static/home.js?v=11850020"></script>
+<script src="/static/home.js?v=11850021"></script>
 <!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE 不引 home.js · runRecon 检测 needs_mapping 时调用 -->
 <script src="/static/recon-mapping.js?v=11835072" defer></script>
 <!-- ADR-006 S8 · PDF/扫描件逐行核对纠错面板 · 独立 IIFE · runRecon 检测 needs_review 时调用 -->
@@ -6638,7 +6407,7 @@ tr.brv2-row-warn-soft:hover td { background: #fee2e2 !important; }
      ES module(type=module 自动 defer)· 必在 home.js 后执行 ·
      依赖 home.js 的全局:t / showToast / escapeHtml / subscribeI18n / _userInfo / currentRoute / loadDashboard
      REFACTOR-C1(2026-05-25)· 抽测试中心 + 重建 bundle · 只 bump 本 main.js?v=(不动 home.js?v= → /api/version 不变 → 不弹横幅) -->
-<script type="module" src="/static/dist/main.js?v=11850020"></script>
+<script type="module" src="/static/dist/main.js?v=11850021"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·

@@ -664,32 +664,8 @@ function applyLang(lang) {
             renderHistoryList();
         }
     } catch (e) {}
-    // v24 · 用户管理页(admin)· 切语言后表格内容重渲染 · 徽章/按钮/统计跟随
-    // v109.4 · 改成新的 admin-users
-    // v118.3 · 切语言时先用缓存数据立即重渲整页(零滞后) · 再后台 fetch 更新数据
-    try {
-        if (currentRoute === 'admin-users') {
-            // 立即重渲(同步 · 用缓存)· 切语言瞬间所有内容已是新文字
-            if (typeof window.__rerenderAdmPage === 'function') {
-                window.__rerenderAdmPage();
-            }
-            // 后台异步 fetch · 数据可能更新但语言已对
-            if (typeof window.loadAdminUsersPage === 'function') {
-                window.loadAdminUsersPage();
-            }
-        }
-        // v111.3 · 用户详情抽屉打开中 · 重新拉数据 + 重渲染(否则上次语言残留)
-        const adrOverlay = document.getElementById('adm-drawer-overlay');
-        if (adrOverlay && adrOverlay.dataset.uid && typeof window.__adm_open_user_drawer === 'function') {
-            window.__adm_open_user_drawer(adrOverlay.dataset.uid);
-        }
-    } catch (e) {}
-    // v106 · 成本面板切语言后重新渲染(把 innerHTML 里的 i18n key 文字刷新)
-    try {
-        if (currentRoute === 'admin-cost' && typeof window.loadAdminCostPage === 'function') {
-            window.loadAdminCostPage();
-        }
-    } catch (e) {}
+    // REFACTOR-C1 · 老 home.html admin 布局(admin-users / admin-cost)已整体下线
+    //   超管走独立 /admin SPA · home.html admin 路由对所有角色不可达 · 切语言重渲块随之删除
     // v107 · 客户管理页切语言重渲染
     try {
         if (currentRoute === 'clients' && typeof window.loadClientsPage === 'function') {
@@ -787,18 +763,10 @@ document.getElementById('sidebar-overlay')?.addEventListener('click', () => {
 });
 
 // v118.32.5.5.37 NAV-IA Phase 5: automation 页面无侧边栏入口且不可路由 · 银行上传改为对账中心原地上传
-const VALID_ROUTES = ['ocr', 'dashboard', 'history', 'integration', 'integrations', 'templates', 'api-keys', 'settings', 'admin-cost', 'admin-users', 'exceptions', 'clients', 'vouchers', 'sales-invoices', 'receivables', 'reconcile', 'cloud', 'test-center'];
+const VALID_ROUTES = ['ocr', 'dashboard', 'history', 'integration', 'integrations', 'templates', 'api-keys', 'settings', 'exceptions', 'clients', 'vouchers', 'sales-invoices', 'receivables', 'reconcile', 'cloud', 'test-center'];
 
 function routeTo(route) {
-    // v109.4 · 老 admin 路由迁移到 admin-users(数据更全 · 字段对齐多租户)
-    if (route === 'admin') route = 'admin-users';
-
-    // v109.4 · 防越权:非 super_admin 访问 admin-* 路由直接重定向回 ocr
-    if ((route === 'admin-users' || route === 'admin-cost') &&
-        _userInfo && !_userInfo.is_super_admin) {
-        route = 'ocr';
-    }
-
+    // REFACTOR-C1 · 老 admin/admin-users/admin-cost 路由已下线(超管走独立 /admin SPA)· 落到 ocr
     if (!VALID_ROUTES.includes(route)) route = 'ocr';
     currentRoute = route;
     // v118.33.5 NAV-IA Phase 5 · 进子项路由 · 自动展开所在折叠组(销项/进项)
@@ -825,8 +793,6 @@ function routeTo(route) {
     if (route === 'settings') renderSettings();
     if (route === 'history') loadHistoryPage();
     // automation 路由已移除 · 银行上传改为对账中心原地弹文件选择器
-    if (route === 'admin-cost' && typeof window.loadAdminCostPage === 'function') window.loadAdminCostPage();
-    if (route === 'admin-users' && typeof window.loadAdminUsersPage === 'function') window.loadAdminUsersPage();
     if (route === 'clients' && typeof window.loadClientsPage === 'function') window.loadClientsPage();
     // v118.20.2 · 异常栏页面加载
     if (route === 'exceptions' && typeof window.loadExceptionsPage === 'function') window.loadExceptionsPage();
@@ -1102,17 +1068,9 @@ async function loadAll() {
                 return;
             }
             window.PEARNLY_ADMIN_MODE = _isAdminPath;
-
-            // v118.28.2.1 · admin mode 启动 force 路由到「用户管理」
-            // 防止 localStorage 残留 / 浏览器 hash 把 Earn 带到客户业务页(如 settings/learned)
-            if (_isAdminPath) {
-                try { localStorage.removeItem('mrpilot_settings_tab'); } catch(_){ /* silent · localStorage 私模/配额 */ }
-                const _h = location.hash || '';
-                const _adminAllowedRoutes = ['#/admin-users', '#/admin-cost', '#/settings'];
-                if (!_adminAllowedRoutes.some(r => _h.startsWith(r))) {
-                    location.hash = '#/admin-users';
-                }
-            }
+            // REFACTOR-C1 · 老 home.html admin 布局(_isAdminPath 强制 #/admin-users)已下线 ·
+            //   home.js 永不在 /admin* 加载(server: /admin/* → admin.html SPA)· _isAdminPath 恒 false ·
+            //   仅保留上面「超管误进 /home → 弹回 /admin/cost」的活逻辑。
         } catch(_e) { window.PEARNLY_ADMIN_MODE = false; }
 
         _quota = q;
@@ -1886,11 +1844,8 @@ function applySidebarVisibility() {
     const tplBtn = document.getElementById('btn-custom-template');
     if (tplBtn) { tplBtn.style.display = ''; tplBtn.classList.remove('locked-for-plan'); }
 
-    // v22 · 超管下拉(顶栏):仅超管可见
-    const adminDropdown = document.getElementById('admin-dropdown');
-    if (adminDropdown) adminDropdown.style.display = isSuperAdmin(u) ? '' : 'none';
-
-    // v118.33.2 NAV-IA Phase 2 · sidebar 底部「成本追踪 / 用户管理 / 测试 / adm-lang-bar」整体已删 · 显隐逻辑搬到头像菜单 applyRoleVisibility · 这里只剩顶栏超管下拉
+    // v118.33.2 NAV-IA Phase 2 · sidebar 底部「成本追踪 / 用户管理 / 测试 / adm-lang-bar」整体已删 · 显隐逻辑搬到头像菜单 applyRoleVisibility
+    // REFACTOR-C1 · 顶栏超管下拉(#admin-dropdown)+ 老 home.html admin 布局已下线 · 超管走独立 /admin SPA
 
     // ============================================================
     // v118.12 · 设置页 6 个 tab 显隐(原子函数驱动)
@@ -4562,14 +4517,8 @@ try {
     routeTo(VALID_ROUTES.includes(initialRoute) ? initialRoute : 'ocr');
 } catch (e) { console.warn('[boot] routeTo failed', e); }
 
-// v83 · 修复刷新 admin 页卡「加载中」:IIFE 里的 loadAdminUsersPage 赋值晚于此处启动
-// v109.4 · 老 admin 已删 · 改成 admin-users
-// setTimeout 0 让 IIFE 先跑完 · 再补一次特殊页加载
+// v118.33.10.1 · reconcile 页初始 hash 时 loadReconcilePage(module · defer)还未注册 · setTimeout 0 补一次调用
 setTimeout(() => {
-    if (currentRoute === 'admin-users' && typeof window.loadAdminUsersPage === 'function') {
-        window.loadAdminUsersPage();
-    }
-    // v118.33.10.1 · reconcile 页初始 hash 时 loadReconcilePage 还未注册 · 补一次调用
     if (currentRoute === 'reconcile' && typeof window.loadReconcilePage === 'function') {
         window.loadReconcilePage();
     }

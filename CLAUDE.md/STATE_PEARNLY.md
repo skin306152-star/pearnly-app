@@ -1,8 +1,9 @@
 # 📊 STATE · Pearnly 项目状态
 
 > 🏗️ **【常驻指针 · 整顿恢复后读】整顿进行中 · 已开始并行 agent 加速。** 进窗口必读 `docs/refactor/BATCH_STRATEGY.md`(**特别 §9.5 实际操作模型 + §13 home.js 测绘 manifest**)+ `REFACTOR_MASTER_PLAN.md`。
-> **当前态(第三十七会话 · 持续更新)**:① E2E 安全网已建(10 个 · 真账号 · CI 用 env-gated skip 保绿)。② **home.js 大 batch 进行中**:R1-R6 已抽 **25 块** safe IIFE 模块 → `src/home/*`,home.js **22970→11898**(全接线 + 每轮生产 E2E 10/10 + 守门全绿,见 §10/§13 账本)。③ Wave 1(db.py membership+tenant)已 copy-out 未接线。**下一步**:新窗口照 §13 manifest 继续 batch 抽剩余 safe IIFE 模块(每轮 re-grep 行号 · E2E 验 · 避🔴高敏 4 块);抽尽 safe 后,剩高敏 4 块 + 顶层函数群 + _shared 收官需 Zihao 在场 / 主控做。
-> **⚠️ 工作流变化**:Zihao 非技术用户 · 内置 `/batch` 在本环境未触发 → **主控窗口自己用 Agent 工具派后台并行 agent**(copy-out)· 全部判断/守门/合并/上线由主控包办 · Zihao 只贴极少命令 + 当用户测 app。详见 §9.5。
+> **当前态(2026-05-27 · 持续更新 · 含主控换窗口)**:① E2E 安全网 10 个(env-gated skip 保 CI 绿)。② **home.js batch**:R1-R6 抽 **25 块** → home.js **22970→11898**(`src/home/*` · 全接线 · 每轮生产 E2E 10/10)。③ **home.css batch(并行)**:R1-R3 抽 **10 个组件 css** → home.css **16673→13433**(`static/home-*.css` · 每轮字节铁证「拼接==原始 home.css」+ 生产 sha256 校验)。④ db.py membership+tenant copy-out 未接线。⑤ **两个拆解窗口都停在干净轮(home.js R6 / home.css R3)· master 全绿 · home.js 窗口已铺好 R7 待抽块(见 §13/账本)**。**下一步**:新窗口照 §13 续抽 safe 块(re-grep · E2E 验 · 避🔴高敏 4 块);safe 抽尽后剩高敏 4 块 + 顶层函数群 + sidebar-routing/routeTo + _shared 收官需 Zihao 在场 / 主控做。
+> **⚠️ 工作流(§9.5 权威 · 8 条)**:Zihao 非技术用户 · 内置 `/batch` 未触发 → 拆解窗口/主控用 Agent 工具派后台并行 agent(copy-out)· 判断/守门/合并/上线由窗口包办 · Zihao 只贴极少命令 + 当用户测 app。
+> **⚠️⚠️ 血泪(§9.5 第8条 · 2026-05-27)**:拆解窗口曾**漏跑全套守门**(`npm run format:check` + 全量单测)→ CI 实红却报「绿」(prettier 卡新 css 切片 · 读 home.css 的守门测试没跟搬迁),**主控独立 `gh run list` 查 CI 才抓到**。**恢复任何拆解窗口前必给它「流程补丁」**:push 前跑全 6 道门(尤其 format:check + 全量 unittest)· 守门测试读 home.js/home.css 的改读并集 · 新 css 已自动进 `.prettierignore`。**主控每批必独立查 CI 真绿,不只信窗口报告。**
 
 > ════════════════════════════════════════════════════════════
 > **【第四十会话 · 交接 · 2026-05-27】home.js R6:并行抽 4 块 ERP 尾区 safe IIFE(12929→11898 · -1031)· 生产 E2E 10/10 · R7 起手即停**

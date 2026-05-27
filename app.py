@@ -486,11 +486,7 @@ async def lifespan(app: FastAPI):
         )
 
     # v0.15.1 · 不再自动创建 demo 账号 · 账号由 Supabase 管理
-    # 如需恢复自动创建 · 取消下方注释:
-    # try:
-    #     ensure_demo_account()
-    # except Exception as e:
-    #     logger.error(f"启动时初始化 demo 失败: {e}")
+    #   (REFACTOR-I2 2026-05-28:已删 db.ensure_demo_account 死码 + 此处下线注释)
     # v0.8.1 · 启动时清理过期历史
     try:
         cleaned = db.cleanup_expired_history(free_days=7, plus_days=90, pro_days=365)

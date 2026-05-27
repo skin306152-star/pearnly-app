@@ -318,7 +318,7 @@
 
 **当前累积成果**(从 2026-05-21 EXECUTION_PLAN 开始):
 - `app.py` 10,075 → **4,459 行**(减 5,616 · B1 拆 21 router + 服务模块 · 安全部分到顶)
-- `db.py` 10,663 → **3,371 行**(减 7,292 · 第四十一会话 `4a10b88` membership/tenant 接线 4620→3371 · 此前 **B2 第二十二+二十三会话** · 抽 18 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1}/archive/rd/cost/exceptions/clients/billing/recon.vat_recon〔三表组〕/audit/team)
+- `db.py` 10,663 → **3,260 行**(减 7,403 · 第四十三会话自主 loop `73bebb5` 抽 user_settings 域 3356→3260 · 第四十一会话 `4a10b88` membership/tenant 接线 4620→3371 · 此前 **B2 第二十二+二十三会话** · 抽 18 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1}/archive/rd/cost/exceptions/clients/billing/recon.vat_recon〔三表组〕/audit/team · **+user_settings(dup_check/erp_push_mode/gemini_key)**)
 - `home.js` 33,768 → **22,210 行**(C1:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js` · + 测试中心 493 行→`src/home/test-center.js`)
 - `services/**/*.py` 40 → **66**(B2 新增 18 个 store + 各 __init__);`services/ocr/entrypoints.py`(171 行 · 第二十一会话 `1eadc16`):web/LINE/email 三处共用 OCR 入口 helper 从 app.py/email_ingest 抽出
 - 守门测试:0 → **1516 unit**(第四十一会话 +384 services 数据层行为契约 `917f2f4` 1132→1516;此前 B2 +40 域契约 → 702;**第三十五会话 REFACTOR-D2 Wave 0 安全网 +~220** → 17 个核心纯逻辑模块行为契约 · 顺手挖修 3 个真 bug)+ 1 E2E + CI(lint + test 双 job)全绿

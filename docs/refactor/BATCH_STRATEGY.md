@@ -227,6 +227,11 @@
 7. **【巨石删大块/搬块的批准方法 · 重要】**:从 home.js / home.css 删大块,**Edit 工具不适合**(把上千行原文当 old_string 贴极易错)。**批准方法** = `node` 读文件 `split('\n')` → 按行号删 → `join('\n')` 写回(**保 `\r` · CRLF 不变**);**删后必跑字节校验**(行数对 + 无 `\r` 的行计数=0 / CRLF 完好);**删前先 `cp` 备份**;**自底向上、一块一块删 + 逐块校验**(隔离错误)。
    - 这是 CLAUDE.md「不用 sed/python 写巨石」禁令的**受控例外**:禁令针对会把 `CRLF→LF` 的**盲写**;本法**专门保 CRLF + 有字节校验 + 有备份**,守住了禁令本意。前 13 块 home.js 即此法删除、零污染、已验证。
    - ⚠️ harness 自动模式分类器可能**按字面**拦「node 写 home.js」→ Zihao 在权限询问点「允许」(或加 Bash 放行规则)。这是误拦,不是真违规。
+8. **【守门必须跑全 · 血泪 2026-05-27】**:home.css/home.js batch 期间,有窗口只跑 `node --check` + 自己改的那几个测试 + 字节校验就报「绿」,**漏跑 `npm run format:check`(prettier)和全量单测** → CI 实红半天(prettier 卡新 css 切片 · 读 home.css 的守门测试没跟搬迁),窗口却一路报绿。**每次 push 前必须跑全、全绿才 push**:
+   - ① `npm run format:check`(prettier · **最易漏!**)② `python -m unittest discover -s tests/unit`(**全量** · 不是只跑你改的)③ `python scripts/check_imports.py --quiet` ④ `python scripts/check_i18n.py --strict` ⑤ `node --check <改的.js>` ⑥(前端改)`npm run build`。
+   - **prettier 配套**:新 `static/home-*.css` 切片是 verbatim(不能重排)→ 已在 `.prettierignore` 用 `static/home-*.css` 通配豁免;新 **JS 模块**(`src/home/*.js`)反而**要** `npx prettier --write` 格式化(不豁免)。
+   - **守门测试读巨石的要改并集**:任何测试 `open("home.js"/"home.css")` 找内容,拆分后会失效 → 改读并集(`home.js + src/home/*.js` 或 `home.css + static/home-*.css`,拼接==原文)。已修 `test_brv2_export_lang_follows` / `test_modal_flex_chain_defense`。
+   - **主控每批必独立 `gh run list` 查 CI 真绿**——窗口的局部守门会漏,不能只信它报告。
 
 ## 10. 进度账本(每波收尾必更新 · 让下个窗口接得上)
 

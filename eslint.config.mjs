@@ -18,6 +18,9 @@ export default [
             '_pkg/**',
             '_pkg_tmpstatic/**',
             'probes/**',
+            // 逆向工程抓取的 MR.ERP 页面 JS + 一次性探针(非本项目源码 · 铁律 #8 不改抓取样本)
+            'scripts/probe/**',
+            '_uitest/**', // 本地真站点 UI 实测脚本(gitignore · 非交付源码)
             'home.js', // REFACTOR-C1 拆解目标
             // REFACTOR-C1(2026-05-25)· 从 home.js verbatim 抽出的 4 语 i18n 数据 ·
             // 继承 home.js 既有的重复 key 债(no-dupe-keys · 后者覆盖前者 · 运行期无害)·

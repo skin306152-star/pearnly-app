@@ -910,8 +910,9 @@
         const cfg = (ep && ep.config) || {};
         const curCust = cfg.seed_customer_code || '';
         const curProd = cfg.seed_product_code || '';
-        const curGeneric = cfg.generic_product_code || '';  // P1 通用销售商品码
-        const ssel = 'width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;';
+        const curGeneric = cfg.generic_product_code || ''; // P1 通用销售商品码
+        const ssel =
+            'width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;';
         const ov = document.createElement('div');
         ov.className = 'mrerp-wizard-overlay is-open';
         ov.setAttribute('role', 'dialog');
@@ -926,7 +927,9 @@
             // P1「开箱即用」· 通用销售商品(推荐 · 放最前)· 选了 = 匹配优先+通用兜底+不逐行建。
             '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">' +
             _esc(t('adv-generic-label')) +
-            '</label><select data-adv-generic style="' + ssel + '"><option value="">' +
+            '</label><select data-adv-generic style="' +
+            ssel +
+            '"><option value="">' +
             _esc(t('adv-prod-loading')) +
             '</option></select>' +
             '<div style="font-size:12px;color:#6B7280;margin:6px 0 18px;line-height:1.5">' +
@@ -938,12 +941,16 @@
             '</div>' +
             '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">' +
             _esc(t('wiz-seed')) +
-            '</label><select data-adv-cust style="' + ssel + 'margin-bottom:18px"><option value="">' +
+            '</label><select data-adv-cust style="' +
+            ssel +
+            'margin-bottom:18px"><option value="">' +
             _esc(t('wiz-seed-loading')) +
             '</option></select>' +
             '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">' +
             _esc(t('adv-prod-label')) +
-            '</label><select data-adv-prod style="' + ssel + '"><option value="">' +
+            '</label><select data-adv-prod style="' +
+            ssel +
+            '"><option value="">' +
             _esc(t('adv-prod-loading')) +
             '</option></select>' +
             '</div>' +
@@ -954,13 +961,19 @@
             _esc(t('adv-save')) +
             '</button></div></div>';
         document.body.appendChild(ov);
-        const close = function () { ov.remove(); };
-        ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
-        ov.querySelectorAll('[data-adv-close]').forEach(function (b) { b.addEventListener('click', close); });
+        const close = function () {
+            ov.remove();
+        };
+        ov.addEventListener('click', function (e) {
+            if (e.target === ov) close();
+        });
+        ov.querySelectorAll('[data-adv-close]').forEach(function (b) {
+            b.addEventListener('click', close);
+        });
 
         const custSel = ov.querySelector('[data-adv-cust]');
         const prodSel = ov.querySelector('[data-adv-prod]');
-        const genericSel = ov.querySelector('[data-adv-generic]');  // P1 通用销售商品
+        const genericSel = ov.querySelector('[data-adv-generic]'); // P1 通用销售商品
 
         const fill = function (selEl, list, cur) {
             let html = '<option value="">' + _esc(t('wiz-seed-empty')) + '</option>';
@@ -968,26 +981,46 @@
             (list || []).slice(0, 800).forEach(function (it) {
                 const code = it.code || '';
                 if (code === cur) inList = true;
-                html += '<option value="' + _esc(code) + '">' + _esc((it.name || '') + ' · ' + code) + '</option>';
+                html +=
+                    '<option value="' +
+                    _esc(code) +
+                    '">' +
+                    _esc((it.name || '') + ' · ' + code) +
+                    '</option>';
             });
             if (cur && !inList) {
-                html += '<option value="' + _esc(cur) + '">' + _esc(cur + ' ' + t('wiz-seed-saved-not-in-list')) + '</option>';
+                html +=
+                    '<option value="' +
+                    _esc(cur) +
+                    '">' +
+                    _esc(cur + ' ' + t('wiz-seed-saved-not-in-list')) +
+                    '</option>';
             }
             selEl.innerHTML = html;
             selEl.value = cur || '';
         };
         const failOpt = function (selEl, cur) {
-            selEl.innerHTML = '<option value="' + _esc(cur) + '">' + _esc(t('adv-list-fail')) + '</option>';
+            selEl.innerHTML =
+                '<option value="' + _esc(cur) + '">' + _esc(t('adv-list-fail')) + '</option>';
             selEl.value = cur || '';
         };
 
         const eid = encodeURIComponent(ep.id);
         fetch('/api/erp/endpoints/' + eid + '/customers', { headers: _authHeaders() })
-            .then(function (r) { return r.json(); })
-            .then(function (d) { if (d && d.ok) fill(custSel, d.customers || [], curCust); else failOpt(custSel, curCust); })
-            .catch(function () { failOpt(custSel, curCust); });
+            .then(function (r) {
+                return r.json();
+            })
+            .then(function (d) {
+                if (d && d.ok) fill(custSel, d.customers || [], curCust);
+                else failOpt(custSel, curCust);
+            })
+            .catch(function () {
+                failOpt(custSel, curCust);
+            });
         fetch('/api/erp/endpoints/' + eid + '/products', { headers: _authHeaders() })
-            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                return r.json();
+            })
             .then(function (d) {
                 if (d && d.ok) {
                     // 同一份商品列表同时填「自动创建模板」和「通用销售商品」两个下拉。
@@ -998,7 +1031,10 @@
                     failOpt(genericSel, curGeneric);
                 }
             })
-            .catch(function () { failOpt(prodSel, curProd); failOpt(genericSel, curGeneric); });
+            .catch(function () {
+                failOpt(prodSel, curProd);
+                failOpt(genericSel, curGeneric);
+            });
 
         ov.querySelector('[data-adv-save]').addEventListener('click', async function () {
             const btn = this;
@@ -1013,7 +1049,11 @@
                         generic_product_code: genericSel.value || null,
                     }),
                 });
-                if (!r.ok) { _toast(t('adv-fail'), 'error'); btn.disabled = false; return; }
+                if (!r.ok) {
+                    _toast(t('adv-fail'), 'error');
+                    btn.disabled = false;
+                    return;
+                }
                 ep.config = ep.config || {};
                 ep.config.seed_customer_code = custSel.value || null;
                 ep.config.seed_product_code = prodSel.value || null;
@@ -1568,7 +1608,9 @@
         const gSelEl = w.querySelector('[data-mw-generic]');
         if (gSelEl) {
             gSelEl.innerHTML =
-                '<option value="" data-mw-generic-empty>' + _esc(t('wiz-generic-empty')) + '</option>';
+                '<option value="" data-mw-generic-empty>' +
+                _esc(t('wiz-generic-empty')) +
+                '</option>';
         }
         const gInput = w.querySelector('[data-mw-generic-input]');
         if (gInput) gInput.placeholder = t('wiz-generic-input-placeholder');

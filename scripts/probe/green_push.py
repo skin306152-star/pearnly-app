@@ -13,6 +13,7 @@
 
 跑法:python scripts/probe/green_push.py
 """
+
 from __future__ import annotations
 
 import logging
@@ -77,7 +78,9 @@ def main():
             # 不在 push 会话里再跑重型全量 listing(减少对 test01 单会话老 PHP 的冲击)。
             cust_name = "Skin Trading Co., Ltd."
             prod_name = "Pepsi 500ml"
-            print(f"[setup] 客户 {SEED_CUSTOMER_CODE}={cust_name!r} · 商品 {SEED_PRODUCT_CODE}={prod_name!r}")
+            print(
+                f"[setup] 客户 {SEED_CUSTOMER_CODE}={cust_name!r} · 商品 {SEED_PRODUCT_CODE}={prod_name!r}"
+            )
             print(f"[setup] invoice_no={invoice_no}")
 
             history = {
@@ -91,9 +94,7 @@ def main():
                 "subtotal": "100.00",
                 "vat": "7.00",
                 "total_amount": "107.00",
-                "items": [
-                    {"name": prod_name, "qty": 1, "unit_price": 100.00, "amount": 100.00}
-                ],
+                "items": [{"name": prod_name, "qty": 1, "unit_price": 100.00, "amount": 100.00}],
             }
             mappings = {
                 "clients": [
@@ -120,7 +121,9 @@ def main():
 
             print("[push] upload_invoice_batch ...")
             result = adapter.upload_invoice_batch([history], mappings)
-            print(f"[push] total={result.total} success={len(result.success)} failed={len(result.failed)} all_success={result.all_success}")
+            print(
+                f"[push] total={result.total} success={len(result.success)} failed={len(result.failed)} all_success={result.all_success}"
+            )
             if result.failed:
                 for f in result.failed:
                     print(f"   FAILED {f.invoice_no}: {f.reasons}")
@@ -129,7 +132,9 @@ def main():
             rec = adapter.search_invoice(invoice_no)
             if rec:
                 cleanup_db_id = rec.db_row_id
-                print(f"[verify] ✅ 列表查到落库:invoice_no={rec.invoice_no} db_row_id={rec.db_row_id}")
+                print(
+                    f"[verify] ✅ 列表查到落库:invoice_no={rec.invoice_no} db_row_id={rec.db_row_id}"
+                )
             else:
                 print("[verify] ❌ 列表查不到 — 不是真成功")
 

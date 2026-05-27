@@ -6,6 +6,7 @@
 跑法:python scripts/probe/probe-listing-pagination.py
 输出:scripts/probe/_debug/listing_*.{html,png,txt}
 """
+
 from __future__ import annotations
 
 import os
@@ -78,9 +79,24 @@ def main():
 
         # ---- 找翻页线索 ----
         print("[4] 翻页线索搜索:")
-        for kw in ["showdata.php", "searchdata", "loadpage", "pagenum", "page=",
-                   "limit", "offset", "pagination", "pager", "หน้า", "next",
-                   "showmore", "loadmore", "rows", "perpage", "page_size"]:
+        for kw in [
+            "showdata.php",
+            "searchdata",
+            "loadpage",
+            "pagenum",
+            "page=",
+            "limit",
+            "offset",
+            "pagination",
+            "pager",
+            "หน้า",
+            "next",
+            "showmore",
+            "loadmore",
+            "rows",
+            "perpage",
+            "page_size",
+        ]:
             n = html.lower().count(kw.lower())
             if n:
                 print(f"    '{kw}' × {n}")
@@ -91,8 +107,10 @@ def main():
         for s in scripts:
             if re.search(r"showdata|searchdata|allview|loadpage|pagin", s, re.I):
                 js_hits.append(s.strip())
-        dump("listing_scripts.txt", "\n\n===SCRIPT===\n\n".join(js_hits) if js_hits
-             else "(no matching inline scripts)")
+        dump(
+            "listing_scripts.txt",
+            "\n\n===SCRIPT===\n\n".join(js_hits) if js_hits else "(no matching inline scripts)",
+        )
 
         # 外部 js 引用
         ext_js = re.findall(r'<script\b[^>]*src=["\']([^"\']+)["\']', html, re.I)
@@ -103,7 +121,7 @@ def main():
         if idx < 0:
             idx = html.lower().find("id='showdata'")
         if idx >= 0:
-            tail = html[idx: idx + 4000]
+            tail = html[idx : idx + 4000]
             dump("listing_showdata_region.html", tail)
 
         # ---- 验证真分页:POST /armas/component/showdata.php(showdata.js 实证)----
@@ -127,8 +145,10 @@ def main():
             sub = parse_armas_listing(body)
             has_p = "<p>" in body.lower()
             has_nodata = 'id="nodata"' in body.lower()
-            print(f"    page {pg} → HTTP {resp.status} · parsed {len(sub)} · "
-                  f"has<p>={has_p} nodata={has_nodata} · {len(body)} chars")
+            print(
+                f"    page {pg} → HTTP {resp.status} · parsed {len(sub)} · "
+                f"has<p>={has_p} nodata={has_nodata} · {len(body)} chars"
+            )
             if pg == 1:
                 dump("showdata_post_page1.html", body)
             all_codes += [r.code for r in sub]

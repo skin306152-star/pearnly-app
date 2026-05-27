@@ -1,6 +1,29 @@
 # 📊 STATE · Pearnly 项目状态
 
-> 🏗️ **【常驻指针 · 整顿恢复后读】ERP「开箱即用」收尾已全部完成(P0-P3)· 整顿 Wave 0 安全网已开跑(见第三十五会话)。** 下一步:**整顿继续 · 可走 `/batch` 加速** —— 进窗口读 `docs/refactor/BATCH_STRATEGY.md` + `REFACTOR_MASTER_PLAN.md`。Wave 0(安全网)已铺一大批纯逻辑守门;**Wave 1(db.py 剩余安全域)/ Wave 2(拆 home.js)未开** —— Wave 2 与 P2-C/P3 改过的 home.js 同文件,re-grep 行号后再拆。
+> 🏗️ **【常驻指针 · 整顿恢复后读】整顿进行中 · 已开始并行 agent 加速。** 进窗口必读 `docs/refactor/BATCH_STRATEGY.md`(**特别 §9.5 实际操作模型 + §13 home.js 测绘 manifest**)+ `REFACTOR_MASTER_PLAN.md`。
+> **当前态(第三十七会话后)**:Wave 1(db.py membership+tenant)已 copy-out(未接线)· home.js 已测绘完(§13)· **质检窗口正在建 9 个 E2E 安全网**。**下一步**:E2E 网绿 → 开 home.js 大 batch(§13 manifest · 直接搬功能模块 · 不用先抽 _shared)。
+> **⚠️ 工作流变化**:Zihao 非技术用户 · 内置 `/batch` 在本环境未触发 → **主控窗口自己用 Agent 工具派后台并行 agent**(copy-out)· 全部判断/守门/合并/上线由主控包办 · Zihao 只贴极少命令 + 当用户测 app。详见 §9.5。
+
+> ════════════════════════════════════════════════════════════
+> **【第三十七会话 · 交接 · 2026-05-27】整顿首次用并行 agent 加速 · Wave 1 db.py 两安全域 copy-out + 文档补齐 + home.js 测绘 + 确立操作模型**
+> ════════════════════════════════════════════════════════════
+> **本会话(整顿 · 非 ERP · Zihao 拍板"用 /batch 快速推进整顿")**:
+>
+> **① 首次并行 agent(内置 /batch 未触发 → 主控用 Agent 工具自派 4 个后台 agent · copy-out 只新增非重叠文件)**:
+> - **REFACTOR-B2**(`c1a8c8a`):db.py 两安全域 copy-out → `services/membership/store.py`(9 函数)+ `services/tenant/store.py`(14 函数)+ 37 契约测试。**只新增 · 未删 db.py · 未接线**。⚠️ tenant 含 `create_owner_user`(bcrypt 哈希)/`delete_owner_user_cascade`(级联删数据)—— 原样照搬,**接线时(删 db.py + re-export)需当敏感处理**。
+> - **REFACTOR-G1/G3/G5**(`ca1d4d6`):补 4 个 ADR(001 Vite/002 Alembic/007 services 抽取/008 batch)+ `ONBOARDING.md` + `.github/PULL_REQUEST_TEMPLATE.md` + 2 个 issue 模板。
+> - 全程主控统一守门:unit 1095→**1132** 全绿 / black+ruff/imports/i18n 0-0 / 纯 LF · CI 双 job 绿。
+>
+> **② home.js 测绘(`eb4ebf2` · 写入 BATCH_STRATEGY §13)**:22970 行 = **~35 个功能孤岛**(顶层函数群 + ~25 个 IIFE 模块),非单巨函数。manifest 列全:30 个可并行 copy-out 安全模块(带行范围)+ 4 块高敏勿入 batch(**plans+LINE绑定 L12757-15446 2689行 / 改密 / LINE补邮箱 / session心跳**)+ 1 块待探(L9597-11127)。
+> **关键发现**:实查 `src/home/{dashboard,test-center}.js` —— 已落地样板是「home.js 先加载+全局暴露,抽出模块 bare 调全局」**不用 import、不用先抽 _shared**。`_shared.js` 是收官步非前置。大 batch 照 test-center 样板直接搬功能模块即可。
+>
+> **③ 确立"实际操作模型"(写入 BATCH_STRATEGY §9.5)**:非技术用户 + 主控自派 agent + 质检窗口模式 + push 单独一条 + 高敏留 Zihao。新窗口照 §9.5 接。
+>
+> **④ 进行中(本会话末)**:Zihao 另开**质检窗口**建 9 个核心路径 E2E(REFACTOR-D1 · 卡在缺真账号已解)· 主控写好活儿单贴给 Zihao · 跑完报告回主控验收。
+>
+> **下窗口接续**:① 收质检窗口 E2E 报告 → 验收 → 网绿 ② 开 home.js 大 batch(§13 manifest · 12-18 agent · 2-3 轮)③ membership/tenant 串行接线(删 db.py+re-export · tenant 敏感函数注意)④ 高敏 4 块留 Zihao 在场。**本会话所有 commit 已 push master · CI 绿。**
+>
+> ════════════════════════════════════════════════════════════
 
 > ════════════════════════════════════════════════════════════
 > **【第三十六会话 · 交接 · 2026-05-27】P3 续:客户管理页(账套主体/买方客户 双 tab)+ 登录账套软弹 · 真账号实测上线 · BUG 修复完毕 · 下窗口回归整顿**

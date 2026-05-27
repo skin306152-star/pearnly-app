@@ -214,6 +214,17 @@
 
 ---
 
+## 9.5 实际操作模型(2026-05-27 第三十七会话确立 · 新窗口必读 · 比上面理想版更贴实情)
+
+> 这套是 Zihao × 主控窗口实跑出来的真实分工。新窗口照这个接,别按"理想版"假设 Zihao 会 review 代码。
+
+1. **Zihao 是非技术用户(不懂编程)**:主控窗口(Claude)**全包** —— 研究 / 规划 / 派工 / 判断作业合不合格 / 跑 5 道守门 / 复查 / 合并 / 提交上线 / 出测试清单。Zihao 只负责:① 极少数必须他敲的命令(如内置 /batch)② 像普通用户一样点 app 验收 ③ 涉及钱/登录时拍板"行/不行"。**不要让 Zihao 看代码、判断 PR、学合并。**
+2. **内置 `/batch` 在本环境未触发**(贴进来会变成普通消息发给主控)→ 主控**自己用 Agent 工具派后台并行 agent**(`run_in_background` · copy-out 只新增非重叠文件 · 各自跑自检)→ 收到完成通知后,主控**统一**跑守门 + 复查 + 一次提交。效果等同 /batch,且 Zihao 零操作。
+3. **质检窗口模式(UI 实测)**:要真账号实测时,主控写一段"活儿单"文案 → Zihao 贴到**另开的质检窗口** + 单独发测试账号 → 质检窗口用真账号跑 Playwright → 报告贴回主控验收。质检窗口铁律:凭据只走 env 不提交、需登录的 spec 必须 `test.skip(!env)` 否则拖红 CI、绝不花真钱/造垃圾数据。
+4. **高敏永不进 batch**:登录 / 计费扣费 / OCR 热路径 / RLS 基础设施 / LINE 绑定 / 改密码 → Zihao 在场,主控亲手单独做。
+5. **push 到 master**:主控有 C 档位授权(CLAUDE.md 铁律 #16),但 harness 自动模式分类器会拦「串联命令里的 push」→ **push 必须单独一条** `git push origin master`(别和 commit/pull 串一起)。
+6. **copy-out 提交是安全的**:并行 agent 只新增文件、不接线,新模块是"死代码"不影响运行,守门绿即可提交;真正改运行行为的"接线删巨石"才需谨慎串行。
+
 ## 10. 进度账本(每波收尾必更新 · 让下个窗口接得上)
 
 > 符号:⚪ 待启动 · 🟡 进行中 · ✅ 已完成
@@ -258,9 +269,10 @@
 
 > **关键发现**:home.js 的"大未知块"不是一个巨函数,而是 **~35 个功能孤岛**(顶层函数群 + 约 25 个 IIFE 自执行模块串在一起)。每个 IIFE 天然 = 一个 `src/home/<feature>.js`。**行号是本快照,抽前必 re-grep。**
 
-**① 先抽(串行 · 由主控做):公共件 `src/home/_shared.js`**
-- 散落 L190-770:`isSuperAdmin/isOwner/isEmployee/isTrial/isLifetime/shouldHideMoney`(角色)、`t`(L273)、`escapeHtml`(L278)、`svgIcon`(L285)、`showConfirm`(L309)、`apiGet/apiPost/apiPut`(L435-499)、`applyLang`(L541)、`setupDropdown`(L735)、`showToast`(L6577)、`showAlert`(L4745)、`renderPageHeadInfo`(L4804)。
-- 几乎所有 feature 模块都依赖它 → 必须第一个抽,之后各模块 import。
+**① ⚠️ 更正(2026-05-27 实查代码):不需要先抽 `_shared.js`!**
+- 实查 `src/home/{dashboard,test-center,workspace-switcher}.js` + `src/main.js`:**已落地的成熟样板是「全局暴露」不是「import」**。home.js `<script>` 同步先跑 → 顶层 `function t/showToast/showConfirm/apiGet/...` 自动成为全局(window 属性);抽出的 ES module 由 `main.js` import、`type=module defer` 后跑 → 执行时这些全局已就绪,**直接 bare 调用 `t(...)`/`showToast(...)` 即可,无需 import、无需重定义**。test-center.js 就是这么干且已上线验证。
+- 所以公共函数**留在 home.js 壳里**(它最先加载),feature 模块照搬即用。`_shared.js` 是**收官步**(等 home.js 缩到比公共函数还小时再抽),**不是前置**。
+- 公共函数清单(留在 home.js · 别动):`isSuperAdmin/isOwner/...`(角色 L209)、`t`(L273)、`escapeHtml`(L278)、`svgIcon`(L285)、`showConfirm`(L309)、`apiGet/apiPost/apiPut`(L435)、`applyLang`(L541)、`setupDropdown`(L735)、`showToast`(L6577)、`showAlert`(L4745)、`renderPageHeadInfo`(L4804)。
 
 **② 可并行 copy-out 的安全 feature 模块(大批 · 每个 1 agent)**
 
@@ -306,7 +318,8 @@
 - `session-heartbeat`(L22377-22440):Session 心跳踢设备(auth)。
 - 启动/boot 段(L4761-4789)+ routeTo 中枢:接线敏感,串行小心。
 
-**④ 节奏**:`_shared` 先串行抽 → 再放 12-18 个 agent 并行 copy-out 上表安全模块(2-3 轮)→ 串行窗口接线删 home.js → 最后 Zihao 在场处理高敏 4 块。**前置:Wave 0 E2E 网必须先绿**(否则拆完无法验证页面还能渲染)。
+**④ 节奏**:直接放 12-18 个 agent 并行 copy-out 上表安全模块(照 test-center 样板:搬进 `src/home/<x>.js` + `main.js` import + bare 调全局,**0 改逻辑**)· 分 2-3 轮 → 串行窗口接线删 home.js → 最后 Zihao 在场处理高敏 4 块 → 收官再抽 `_shared.js`。**前置:Wave 0 E2E 网必须先绿**(否则拆完无法验证页面还能渲染)。
+- **每个 agent 黄金指令**:照 §5 模板 B,但「import 公共件 _shared」改成「bare 调全局 t/showToast/showConfirm/apiGet 等(home.js 已暴露,勿重定义/勿 import)」;搬完在 `src/main.js` 加一行 import;带渲染/契约测试;5 道守门;commit 含 · REFACTOR-C1。
 
 ---
 

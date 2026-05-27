@@ -1345,80 +1345,6 @@ def _bkk_year_month() -> str:
     return _v36_dt.now(_BKK_TZ_V36).strftime("%Y-%m")
 
 
-def list_user_companies(user_id: str) -> list:
-    """Return all companies a user belongs to.
-
-    Each item: {tenant_id, name, role, balance_thb, pages_this_month, is_active}
-    Uses Asia/Bangkok timezone for year_month.
-    """
-    try:
-        year_month = _bkk_year_month()
-        with get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    ucr.tenant_id::text AS tenant_id,
-                    t.name AS name,
-                    ucr.role AS role,
-                    ucr.is_active AS is_active,
-                    COALESCE(tc.balance_thb, 0) AS balance_thb,
-                    COALESCE(mpu.pages_used, 0) AS pages_this_month
-                FROM user_company_roles ucr
-                JOIN tenants t ON t.id = ucr.tenant_id
-                LEFT JOIN tenant_credits tc ON tc.tenant_id = ucr.tenant_id
-                LEFT JOIN monthly_page_usage mpu
-                       ON mpu.tenant_id = ucr.tenant_id AND mpu.year_month = %s
-                WHERE ucr.user_id = %s::uuid AND ucr.is_active = TRUE
-                ORDER BY t.name
-            """,
-                (year_month, str(user_id)),
-            )
-            rows = cur.fetchall() or []
-        out = []
-        for r in rows:
-            out.append(
-                {
-                    "tenant_id": r["tenant_id"],
-                    "name": r["name"] or "",
-                    "role": r["role"] or "member",
-                    "balance_thb": float(r["balance_thb"] or 0),
-                    "pages_this_month": int(r["pages_this_month"] or 0),
-                    "is_active": bool(r["is_active"]),
-                }
-            )
-        return out
-    except Exception as e:
-        logger.error(f"list_user_companies failed: {e}")
-        return []
-
-
-def set_user_active_tenant(user_id: str, tenant_id: str) -> bool:
-    """Validate user belongs to tenant; if yes set active_tenant_id."""
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                SELECT 1 FROM user_company_roles
-                WHERE user_id = %s::uuid AND tenant_id = %s::uuid AND is_active = TRUE
-                LIMIT 1
-            """,
-                (str(user_id), str(tenant_id)),
-            )
-            if not cur.fetchone():
-                return False
-            cur.execute(
-                """
-                UPDATE users SET active_tenant_id = %s::uuid
-                WHERE id = %s::uuid
-            """,
-                (str(tenant_id), str(user_id)),
-            )
-        return True
-    except Exception as e:
-        logger.error(f"set_user_active_tenant failed: {e}")
-        return False
-
-
 # ============================================================================
 # v118.35.0.21 · Credits 计费业务层(v0.21 修正版 · 修 v0.20 部署后超时)
 #
@@ -2078,4 +2004,10 @@ from services.credits.store import (
     get_tenants_credits_summary as get_tenants_credits_summary,
     get_tenant_credit_summary as get_tenant_credit_summary,
     get_credits_daily_trend as get_credits_daily_trend,
+)
+
+# REFACTOR-B2 · 多公司成员/当前账套 DAL re-export(已抽到 services/tenant/store · 调用点零改动)
+from services.tenant.store import (
+    list_user_companies as list_user_companies,
+    set_user_active_tenant as set_user_active_tenant,
 )

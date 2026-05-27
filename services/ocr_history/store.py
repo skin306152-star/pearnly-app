@@ -10,6 +10,7 @@
 """
 
 import json as _json
+from datetime import datetime as _datetime
 import logging
 from typing import Optional, Dict, Any, List
 
@@ -232,7 +233,7 @@ def update_ocr_history_pages(
     """会计修改字段后保存。同步刷新冗余字段 + v0.7 重算归档名
     v118.14 · tenant_id 给了 → 同 tenant 任意成员可改 · 否则只能改自己的
     """
-    summary = db._extract_summary_fields(new_pages)
+    summary = _extract_summary_fields(new_pages)
 
     # v0.7 · 重算归档名(按用户当前模板)
     new_archive_name = None
@@ -354,3 +355,444 @@ def delete_ocr_history_with_pdf_paths(
     except Exception as e:
         logger.error(f"批量删除历史失败: {e}")
         return 0, []
+
+
+# ============================================================
+# 写入 / 去重(REFACTOR-B2 · 从 db.py 第二刀搬入 · 纯搬家 0 逻辑改)
+# ============================================================
+def _extract_summary_fields(pages: list) -> dict:
+    """从 pages 抽出列表展示用的核心字段
+    v106.2 修复:多联发票(底单/发票/收据 3 页) Gemini 可能把所有页都标 is_copy=true ·
+    导致摘要字段全 None · 列表显示「未识别到 · 金额 · 发票号 · 日期 · 卖方」误报
+    改进:先找非副本主页 · 找不到再用 is_duplicate=False 的页 · 最后兜底用第 1 页
+    """
+    pages = pages or []
+
+    def _build_from_page(p):
+        f = p.get("fields") or {}
+        raw_date = f.get("date")
+        invoice_date = None
+        if raw_date:
+            try:
+                s = str(raw_date).replace("/", "-")[:10]
+                _datetime.strptime(s, "%Y-%m-%d")
+                invoice_date = s
+            except Exception:
+                invoice_date = None
+        raw_amt = f.get("total_amount")
+        total = None
+        if raw_amt is not None:
+            try:
+                total = float(str(raw_amt).replace(",", ""))
+            except Exception:
+                total = None
+        return {
+            "invoice_no": (f.get("invoice_number") or "")[:200] or None,
+            "invoice_date": invoice_date,
+            "seller_name": (f.get("seller_name") or "")[:200] or None,
+            "total_amount": total,
+        }
+
+    # 1. 优先 · 非副本主页(是非 is_copy 也非 is_duplicate)
+    for p in pages:
+        if not p.get("is_copy") and not p.get("is_duplicate"):
+            f = p.get("fields") or {}
+            if f.get("invoice_number") or f.get("total_amount") or f.get("seller_name"):
+                return _build_from_page(p)
+
+    # 2. 兜底 · 全部 is_copy/is_duplicate 时 · 选有最多关键字段的那页
+    def _score(p):
+        f = p.get("fields") or {}
+        s = 0
+        if f.get("invoice_number"):
+            s += 1
+        if f.get("total_amount"):
+            s += 1
+        if f.get("seller_name"):
+            s += 1
+        if f.get("date"):
+            s += 1
+        return s
+
+    if pages:
+        best = max(pages, key=_score)
+        if _score(best) > 0:
+            return _build_from_page(best)
+
+    return {"invoice_no": None, "invoice_date": None, "seller_name": None, "total_amount": None}
+
+
+def insert_ocr_history(
+    user_id: str,
+    filename: str,
+    page_count: int,
+    pages: list,
+    confidence: str,
+    elapsed_ms: int,
+    file_size_kb: Optional[int] = None,
+    file_hash: Optional[str] = None,
+    archive_name: Optional[str] = None,
+    category_tag: Optional[str] = None,
+    # v0.11 · 多发票拆分字段
+    source_pdf_id: Optional[str] = None,
+    source_page_indices: Optional[list] = None,
+    source_index: Optional[int] = None,
+    source_total: Optional[int] = None,
+    # v0.17 · M6 · 来源标识
+    source: str = "manual",
+    source_ref: Optional[str] = None,
+    # v114 · PDF 留底
+    pdf_storage_path: Optional[str] = None,
+    pdf_size_bytes: Optional[int] = None,
+    # v27.8.1.13a · 上传时自动归属客户(右上角客户切换器选中 / 文件夹绑定 / 邮件别名等)
+    client_id: Optional[int] = None,
+    # 2026-05-24 · 多租户:历史归属租户(原缺失 → tenant_id 恒 NULL → 按租户查历史/对账漏)
+    tenant_id: Optional[str] = None,
+    # B1 相 1 (2026-05-26) · workspace 账套主体归属(在为哪家公司做账)· 可选 · 带不上 NULL ·
+    # 与 client_id(买方)是两个独立字段 · 非强制(缺失不报错·不拦上传)。
+    workspace_client_id: Optional[int] = None,
+) -> Optional[str]:
+    """写入一条历史记录,返回新记录的 id(失败返回 None,不影响主流程)"""
+    summary = _extract_summary_fields(pages)
+    # v27.8.1.13a · 客户归属:校验 client_id 真属于该 user 的 tenant,防越权
+    safe_client_id = None
+    if client_id is not None:
+        try:
+            cid = int(client_id)
+            with db.get_cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id FROM clients
+                    WHERE id = %s
+                      AND user_id IN (
+                          SELECT id FROM users
+                          WHERE tenant_id = (SELECT tenant_id FROM users WHERE id = %s)
+                            OR id = %s
+                      )
+                    LIMIT 1
+                """,
+                    (cid, user_id, user_id),
+                )
+                if cur.fetchone():
+                    safe_client_id = cid
+        except Exception as e:
+            logger.warning(
+                f"insert_ocr_history client_id 校验失败 (user_id={user_id}, client_id={client_id}): {e}"
+            )
+    # B1 相 1 · workspace 账套归属校验(防越权:只接受属本 tenant/自己的 workspace)·
+    # 校验不过/缺失 → NULL · 绝不报错、不拦上传、不碰 client_id(买方)。
+    safe_workspace_client_id = None
+    if workspace_client_id is not None:
+        try:
+            wid = int(workspace_client_id)
+            with db.get_cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id FROM workspace_clients
+                    WHERE id = %s
+                      AND (
+                          (tenant_id IS NOT NULL
+                           AND tenant_id = (SELECT tenant_id FROM users WHERE id = %s))
+                          OR (tenant_id IS NULL AND user_id = %s)
+                      )
+                    LIMIT 1
+                    """,
+                    (wid, user_id, user_id),
+                )
+                if cur.fetchone():
+                    safe_workspace_client_id = wid
+        except Exception as e:
+            logger.warning(
+                f"insert_ocr_history workspace_client_id 校验失败 "
+                f"(user_id={user_id}, workspace_client_id={workspace_client_id}): {e}"
+            )
+    try:
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                INSERT INTO ocr_history (
+                    user_id, tenant_id, filename, page_count, file_size_kb, file_hash,
+                    pages, confidence, elapsed_ms,
+                    invoice_no, invoice_date, seller_name, total_amount,
+                    archive_name, category_tag, archived_at,
+                    source_pdf_id, source_page_indices, source_index, source_total,
+                    source, source_ref,
+                    pdf_storage_path, pdf_size_bytes,
+                    client_id, workspace_client_id
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s,
+                    %s::jsonb, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s, CASE WHEN %s IS NOT NULL THEN NOW() ELSE NULL END,
+                    %s, %s::jsonb, %s, %s,
+                    %s, %s,
+                    %s, %s,
+                    %s, %s
+                )
+                RETURNING id
+            """,
+                (
+                    user_id,
+                    str(tenant_id) if tenant_id else None,
+                    filename,
+                    page_count,
+                    file_size_kb,
+                    file_hash,
+                    _json.dumps(pages, ensure_ascii=False),
+                    confidence,
+                    elapsed_ms,
+                    summary["invoice_no"],
+                    summary["invoice_date"],
+                    summary["seller_name"],
+                    summary["total_amount"],
+                    archive_name,
+                    category_tag,
+                    archive_name,
+                    source_pdf_id,
+                    _json.dumps(source_page_indices) if source_page_indices else None,
+                    source_index,
+                    source_total,
+                    source,
+                    source_ref,
+                    pdf_storage_path,
+                    pdf_size_bytes,
+                    safe_client_id,
+                    safe_workspace_client_id,
+                ),
+            )
+            row = cur.fetchone()
+            return str(row["id"]) if row else None
+    except Exception as e:
+        logger.error(f"写入历史记录失败 (user_id={user_id}, file={filename}): {e}")
+        return None
+
+
+def get_history_pdf_info(
+    user_id: str, record_id: str, tenant_id: Optional[str] = None
+) -> Optional[dict]:
+    """v114 · 取一条历史的 PDF 留底信息(只查路径 · 鉴权用 user_id)
+    v118.14 · tenant_id 给了 → 同 tenant 任意成员可下载 PDF
+    """
+    try:
+        with db.get_cursor() as cur:
+            if tenant_id:
+                cur.execute(
+                    """
+                    SELECT pdf_storage_path, pdf_size_bytes, filename
+                    FROM ocr_history
+                    WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
+                    LIMIT 1
+                """,
+                    (record_id, tenant_id),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT pdf_storage_path, pdf_size_bytes, filename
+                    FROM ocr_history
+                    WHERE id = %s AND user_id = %s
+                    LIMIT 1
+                """,
+                    (record_id, user_id),
+                )
+            r = cur.fetchone()
+            if not r or not r.get("pdf_storage_path"):
+                return None
+            return {
+                "pdf_storage_path": r["pdf_storage_path"],
+                "pdf_size_bytes": r.get("pdf_size_bytes"),
+                "filename": r.get("filename"),
+            }
+    except Exception as e:
+        logger.error(f"get_history_pdf_info 失败 (record_id={record_id}): {e}")
+        return None
+
+
+def find_ocr_by_hash(
+    user_id: str, file_hash: str, max_age_hours: int = 24 * 30, tenant_id: Optional[str] = None
+) -> Optional[dict]:
+    """
+    按文件哈希查最近的识别结果。
+    用于避免重复识别相同文件(省 Gemini 额度)
+
+    v92 · 窗口从 24h 扩到 30 天 · 会计真实场景下月末才会复核上月票 · 24h 太短
+    v92 · 只返回有效结果 · 识别失败(关键字段全空)的记录视为未命中 · 配合第 1 层防御
+    v118.14 · tenant_id 给了 → 同 tenant 内任意成员上传过此文件就能复用结果(省额度)
+    """
+    if not file_hash:
+        return None
+    try:
+        with db.get_cursor() as cur:
+            if tenant_id:
+                cur.execute(
+                    """
+                    SELECT id, filename, page_count, confidence, elapsed_ms, pages,
+                           archive_name, category_tag, created_at
+                    FROM ocr_history
+                    WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)
+                      AND file_hash = %s
+                      AND created_at >= NOW() - INTERVAL '%s hours'
+                      AND pages IS NOT NULL
+                      AND jsonb_array_length(pages) > 0
+                      AND (total_amount IS NOT NULL OR invoice_no IS NOT NULL OR seller_name IS NOT NULL)
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """ % ("%s", "%s", int(max_age_hours)),
+                    (tenant_id, file_hash),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT id, filename, page_count, confidence, elapsed_ms, pages,
+                           archive_name, category_tag, created_at
+                    FROM ocr_history
+                    WHERE user_id = %s
+                      AND file_hash = %s
+                      AND created_at >= NOW() - INTERVAL '%s hours'
+                      AND pages IS NOT NULL
+                      AND jsonb_array_length(pages) > 0
+                      AND (total_amount IS NOT NULL OR invoice_no IS NOT NULL OR seller_name IS NOT NULL)
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """ % ("%s", "%s", int(max_age_hours)),
+                    (user_id, file_hash),
+                )
+            r = cur.fetchone()
+            if not r:
+                return None
+            return {
+                "id": str(r["id"]),
+                "filename": r["filename"],
+                "page_count": r["page_count"],
+                "confidence": r["confidence"],
+                "elapsed_ms": r["elapsed_ms"],
+                "pages": r["pages"],
+                "archive_name": r.get("archive_name"),
+                "category_tag": r.get("category_tag"),
+                "created_at": r["created_at"].isoformat(),
+            }
+    except Exception as e:
+        logger.error(f"查缓存失败 (hash={file_hash[:12]}): {e}")
+        return None
+
+
+def check_duplicate_invoice(
+    user_id: str,
+    invoice_no: Optional[str],
+    invoice_date: Optional[str],
+    seller_name: Optional[str],
+    total_amount: Optional[float],
+    exclude_id: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    v0.13 · 重复发票检测 · 仅当前用户的历史
+    返回 None 表示无重复 · 返回 dict 表示有重复 · 含:
+      {
+        "level": "exact" | "likely",   # exact=发票号严格匹配 / likely=字段组合匹配
+        "match": { id, filename, invoice_no, invoice_date, seller_name, total_amount, created_at },
+        "matched_fields": [...]         # 匹配上的字段
+      }
+
+    第 1 层 · invoice_no 严格匹配(大小写不敏感)
+    第 2 层 · 发票号缺失时 · 用 (date+seller+amount) 三字段匹配
+    """
+    try:
+        with db.get_cursor() as cur:
+            # ─────────────────────────────────────────
+            # 第 1 层 · 发票号严格匹配
+            # ─────────────────────────────────────────
+            inv = (invoice_no or "").strip()
+            if inv:
+                where_extra = ""
+                params = [user_id, inv.lower()]
+                if exclude_id:
+                    where_extra = " AND id != %s"
+                    params.append(exclude_id)
+                cur.execute(
+                    f"""
+                    SELECT id, filename, invoice_no, invoice_date, seller_name,
+                           total_amount, created_at
+                    FROM ocr_history
+                    WHERE user_id = %s
+                      AND invoice_no IS NOT NULL
+                      AND invoice_no != ''
+                      AND LOWER(invoice_no) = %s
+                      {where_extra}
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """,
+                    params,
+                )
+                row = cur.fetchone()
+                if row:
+                    return {
+                        "level": "exact",
+                        "matched_fields": ["invoice_no"],
+                        "match": {
+                            "id": str(row["id"]),
+                            "filename": row["filename"],
+                            "invoice_no": row["invoice_no"],
+                            "invoice_date": (
+                                row["invoice_date"].isoformat() if row["invoice_date"] else None
+                            ),
+                            "seller_name": row["seller_name"],
+                            "total_amount": (
+                                float(row["total_amount"])
+                                if row["total_amount"] is not None
+                                else None
+                            ),
+                            "created_at": row["created_at"].isoformat(),
+                        },
+                    }
+
+            # ─────────────────────────────────────────
+            # 第 2 层 · 字段组合(发票号缺失时)
+            # 必须 3 个字段都有 · 才查
+            # ─────────────────────────────────────────
+            if invoice_date and total_amount is not None and (seller_name or "").strip():
+                where_extra = ""
+                params = [user_id, invoice_date, float(total_amount), (seller_name or "").strip()]
+                if exclude_id:
+                    where_extra = " AND id != %s"
+                    params.append(exclude_id)
+                cur.execute(
+                    f"""
+                    SELECT id, filename, invoice_no, invoice_date, seller_name,
+                           total_amount, created_at
+                    FROM ocr_history
+                    WHERE user_id = %s
+                      AND invoice_date = %s
+                      AND total_amount = %s
+                      AND seller_name IS NOT NULL
+                      AND LOWER(seller_name) = LOWER(%s)
+                      {where_extra}
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """,
+                    params,
+                )
+                row = cur.fetchone()
+                if row:
+                    return {
+                        "level": "likely",
+                        "matched_fields": ["invoice_date", "seller_name", "total_amount"],
+                        "match": {
+                            "id": str(row["id"]),
+                            "filename": row["filename"],
+                            "invoice_no": row["invoice_no"],
+                            "invoice_date": (
+                                row["invoice_date"].isoformat() if row["invoice_date"] else None
+                            ),
+                            "seller_name": row["seller_name"],
+                            "total_amount": (
+                                float(row["total_amount"])
+                                if row["total_amount"] is not None
+                                else None
+                            ),
+                            "created_at": row["created_at"].isoformat(),
+                        },
+                    }
+        return None
+    except Exception as e:
+        logger.warning(f"重复检测失败(不影响识别): {e}")
+        return None

@@ -52,7 +52,7 @@ def _run_insert(cur, **kwargs):
     with (
         mock.patch("db.get_cursor", _fake_get_cursor),
         mock.patch(
-            "db._extract_summary_fields",
+            "services.ocr_history.store._extract_summary_fields",  # REFACTOR-B2 · 随 insert 搬到 store
             return_value={
                 "invoice_no": "INV1",
                 "invoice_date": "2026-05-26",

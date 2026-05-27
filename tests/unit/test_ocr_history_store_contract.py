@@ -23,11 +23,25 @@ class OcrHistoryReexportContract(unittest.TestCase):
             "update_ocr_history_pages",
             "delete_ocr_history",
             "delete_ocr_history_with_pdf_paths",
+            # 写入/去重半边(REFACTOR-B2 第二刀)
+            "insert_ocr_history",
+            "get_history_pdf_info",
+            "find_ocr_by_hash",
+            "check_duplicate_invoice",
+            "_extract_summary_fields",
         ]:
             self.assertTrue(hasattr(store, n), f"service missing {n}")
             self.assertIs(
                 getattr(db, n), getattr(store, n), f"db.{n} not re-exporting service object"
             )
+
+    def test_extract_summary_fields_picks_main_page(self):
+        # 纯逻辑(无 DB):非副本主页优先
+        pages = [
+            {"is_copy": True, "fields": {"invoice_number": "COPY"}},
+            {"fields": {"invoice_number": "MAIN", "total_amount": "100", "seller_name": "S"}},
+        ]
+        self.assertEqual(store._extract_summary_fields(pages)["invoice_no"], "MAIN")
 
 
 class OcrHistoryBehaviorContract(unittest.TestCase):

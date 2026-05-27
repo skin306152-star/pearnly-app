@@ -1,0 +1,719 @@
+/* ============================================================
+   v118.26.0 · 对账中心顶级菜单骨架
+   ============================================================ */
+
+/* 3 个统计卡:网格布局 */
+.reconcile-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 20px 0 12px;
+}
+
+.reconcile-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+.reconcile-stat-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
+    border-color: #cbd5e1;
+}
+
+.reconcile-stat-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+.reconcile-stat-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+/* 三色调:待对(琥珀)/ 已完成(绿)/ 未匹配(红) */
+.reconcile-stat-card.pending .reconcile-stat-icon {
+    background: #fef3c7;
+    color: #b45309;
+}
+.reconcile-stat-card.matched .reconcile-stat-icon {
+    background: #d1fae5;
+    color: #047857;
+}
+.reconcile-stat-card.unmatched .reconcile-stat-icon {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.reconcile-stat-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.reconcile-stat-num {
+    font-size: 28px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.1;
+    letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums;
+}
+
+.reconcile-stat-card.pending .reconcile-stat-num   { color: #b45309; }
+.reconcile-stat-card.matched .reconcile-stat-num   { color: #047857; }
+.reconcile-stat-card.unmatched .reconcile-stat-num { color: #b91c1c; }
+
+/* 0 数据时数字显示「-」· 颜色调淡(防误读为「全核完了」) */
+.reconcile-stat-num.is-empty {
+    color: #cbd5e1 !important;
+    font-weight: 500;
+}
+
+.reconcile-stat-label {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* 最近对账时间 + 错误提示 行 */
+.reconcile-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 4px 4px 16px;
+    min-height: 20px;
+}
+
+.reconcile-last-activity {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.reconcile-last-activity.has-data {
+    color: #475569;
+}
+
+.reconcile-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    color: #b91c1c;
+    font-size: 13px;
+    margin: 8px 0;
+}
+
+.reconcile-error svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.reconcile-error .btn-tiny {
+    margin-left: auto;
+}
+
+/* 空态 */
+.reconcile-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 56px 24px;
+    background: #fff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 14px;
+    margin-top: 12px;
+}
+
+.reconcile-empty-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    margin-bottom: 16px;
+}
+
+.reconcile-empty-icon svg {
+    width: 44px;
+    height: 44px;
+}
+
+.reconcile-empty-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 6px;
+}
+
+.reconcile-empty-hint {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.6;
+    max-width: 420px;
+    margin-bottom: 20px;
+}
+
+.reconcile-empty .btn {
+    gap: 6px;
+}
+
+/* 移动端:3 卡堆叠 */
+@media (max-width: 640px) {
+    .reconcile-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    .reconcile-stat-card {
+        padding: 14px 16px;
+    }
+    .reconcile-stat-num {
+        font-size: 24px;
+    }
+    .page-head-clean .btn {
+        margin-top: 8px;
+    }
+    .reconcile-empty {
+        padding: 36px 16px;
+    }
+}
+
+/* v4.10.4 · 对账中心 L2 区域分隔 + 上传卡片 */
+.rc-panel-divider {
+    height: 0.5px;
+    background: #E5E7EB;
+    margin: 12px 0 20px;
+}
+
+/* v118.33.7.8 · 上传银行对账单卡 · 去浅蓝 · 暖灰底 + 边框 · 跟整体调子统一 */
+.rc-upload-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border: 1.5px dashed #cbd5e0;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+.rc-upload-card-icon {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #111111;
+}
+.rc-upload-card-icon svg { width: 28px; height: 28px; }
+.rc-upload-card-body { flex: 1; min-width: 0; }
+.rc-upload-card-title { font-size: 14px; font-weight: 600; color: #555555; margin-bottom: 2px; }
+.rc-upload-card-sub   { font-size: 12px; color: #999999; }
+.rc-upload-btn {
+    flex-shrink: 0;
+    background: #555555;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.rc-upload-btn:hover { background: #093a6a; }
+.rc-upload-btn svg { width: 14px; height: 14px; }
+
+@media (max-width: 800px) {
+    .rc-upload-card { flex-wrap: wrap; }
+    .rc-upload-btn { width: 100%; justify-content: center; }
+}
+
+
+/* ============================================================
+ * v118.26.1 · 银行对账批量上传队列 + 对账中心最近列表
+ * ============================================================ */
+
+/* ---- 上传队列 ---- */
+.bank-upload-queue {
+    margin-top: 14px;
+    border-top: 1px dashed var(--line);
+    padding-top: 12px;
+}
+.bank-upload-queue-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.bank-upload-queue-title {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 13px;
+}
+.bank-upload-queue-summary {
+    flex: 1;
+    color: var(--ink-2);
+    font-size: 12px;
+}
+.bank-upload-queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.bq-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) 60px minmax(180px, 1.4fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 13px;
+}
+.bq-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink);
+}
+.bq-size {
+    color: var(--ink-3);
+    font-size: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.bq-status {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.bq-stat {
+    font-size: 12px;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bq-stat.bq-wait { color: var(--ink-3); }
+.bq-stat.bq-run  { color: var(--accent); }
+.bq-stat.bq-ok   { color: var(--success); font-weight: 500; }
+.bq-stat.bq-fail { color: var(--danger); }
+.bq-bar {
+    height: 4px;
+    background: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+.bq-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width .15s ease;
+}
+.bq-bar-indet {
+    width: 40% !important;
+    animation: bq-indet 1.2s ease-in-out infinite;
+}
+@keyframes bq-indet {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+}
+.bq-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+.bq-act {
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink-2);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .15s;
+}
+.bq-act:hover {
+    background: var(--line-soft);
+    color: var(--ink);
+}
+.bq-act-retry {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.bq-act-retry:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+@media (max-width: 640px) {
+    .bq-row {
+        grid-template-columns: 1fr auto;
+        gap: 6px;
+    }
+    .bq-size { display: none; }
+    .bq-status { grid-column: 1 / 3; }
+    .bq-actions { grid-column: 2 / 3; grid-row: 1; }
+}
+
+/* ---- 对账中心 · 最近对账列表 ---- */
+.reconcile-recent {
+    margin-top: 24px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.reconcile-recent-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 18px 10px;
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 14px;
+    border-bottom: 1px solid var(--line-soft);
+}
+.reconcile-recent-head svg { width: 16px; height: 16px; color: var(--ink-2); }
+.reconcile-recent-list {
+    display: flex;
+    flex-direction: column;
+}
+.recon-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 18px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--line-soft);
+    transition: background .12s;
+}
+.recon-card:last-child { border-bottom: none; }
+.recon-card:hover { background: var(--bg); }
+
+.bank-chip {
+    flex-shrink: 0;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .3px;
+    line-height: 1.6;
+}
+.bank-chip-kbank  { background: #d4f4dd; color: #1a5d2a; }
+.bank-chip-scb    { background: #e9d4f4; color: #5a1a7d; }
+.bank-chip-bbl    { background: #d4e6f4; color: #1a4d7d; }
+.bank-chip-ktb    { background: #fff3c4; color: #7d5a1a; }
+.bank-chip-ttb    { background: #ffd9c4; color: #7d3a1a; }
+.bank-chip-other  { background: var(--line-soft); color: var(--ink-2); }
+
+.recon-card-main {
+    flex: 1;
+    min-width: 0;
+}
+.recon-card-title {
+    font-size: 13px;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+.recon-card-sub {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-top: 3px;
+    font-variant-numeric: tabular-nums;
+}
+.recon-card-right {
+    flex-shrink: 0;
+    font-size: 12px;
+}
+.recon-card-tx {
+    color: var(--ink-2);
+    background: var(--bg);
+    padding: 3px 9px;
+    border-radius: 12px;
+}
+.recon-card-fail {
+    color: var(--danger);
+    background: var(--danger-bg);
+    padding: 3px 9px;
+    border-radius: 12px;
+}
+.recon-card-arrow {
+    width: 14px;
+    height: 14px;
+    color: var(--ink-3);
+    flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+    .recon-card { padding: 10px 14px; gap: 10px; }
+    .recon-card-arrow { display: none; }
+}
+
+/* ============================================================
+ * v118.26.1.1 · 筛选 chip + hover 删除按钮
+ * ============================================================ */
+
+/* ---- 自动化 tab session list 筛选 chip ---- */
+.bank-section-head {
+    /* 现有结构基础上让筛选 chip 推到右边 */
+    position: relative;
+}
+.bank-sessions-filters {
+    margin-left: auto;
+    display: inline-flex;
+    gap: 6px;
+}
+.bank-sessions-chip {
+    background: var(--card);
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    padding: 4px 11px;
+    border-radius: 14px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .12s;
+    line-height: 1.4;
+}
+.bank-sessions-chip:hover {
+    background: var(--line-soft);
+    color: var(--ink);
+}
+.bank-sessions-chip.active {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+}
+
+/* ---- 自动化 tab session 行内 hover 出垃圾桶 ---- */
+.bank-session-row {
+    /* 让垃圾桶绝对定位在 arrow 左边 · 默认隐藏 */
+    position: relative;
+}
+.bank-session-trash {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--ink-3);
+    padding: 5px;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all .12s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.bank-session-trash svg { width: 14px; height: 14px; }
+.bank-session-row:hover .bank-session-trash {
+    opacity: 1;
+}
+.bank-session-trash:hover {
+    background: var(--danger-bg);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* ---- 对账中心首页 recon-card hover 出垃圾桶 ---- */
+.recon-card { position: relative; }
+.recon-card-trash {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--ink-3);
+    padding: 5px;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all .12s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.recon-card-trash svg { width: 14px; height: 14px; }
+.recon-card:hover .recon-card-trash {
+    opacity: 1;
+}
+.recon-card-trash:hover {
+    background: var(--danger-bg);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* 移动端:垃圾桶始终可见(hover 不存在) */
+@media (max-width: 640px) {
+    .bank-session-trash,
+    .recon-card-trash {
+        opacity: 1;
+    }
+    .bank-sessions-filters {
+        margin-left: 0;
+        margin-top: 8px;
+        flex-wrap: wrap;
+    }
+    .bank-section-head {
+        flex-wrap: wrap;
+    }
+}
+
+/* ============================================================
+ * v118.26.2 · 候选抽屉 top 5 卡片(替代旧 bank-cand-item 单卡)
+ * ============================================================ */
+.bank-cand-hint {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.bank-cand-hint.hint-matched {
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid #c8efd2;
+}
+.bank-cand-hint.hint-suggested {
+    background: var(--accent-soft);
+    color: var(--brand);
+    border: 1px solid #cfe2f7;
+}
+.bank-cand-hint.hint-low {
+    background: var(--warn-bg);
+    color: var(--warn);
+    border: 1px solid #fde6c2;
+}
+
+.bank-cand-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bank-cand-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    transition: all .15s;
+    position: relative;
+}
+.bank-cand-card:hover {
+    border-color: var(--ink-4);
+    box-shadow: var(--shadow-sm);
+}
+/* auto-picked 卡片左边一条蓝色高亮(系统首选标识) */
+.bank-cand-card.is-auto {
+    border-left: 3px solid var(--accent);
+    background: linear-gradient(to right, var(--accent-soft) 0%, var(--card) 30%);
+}
+/* 当前已确认匹配的卡片左边绿色 */
+.bank-cand-card.is-picked {
+    border-left: 3px solid var(--success);
+    background: linear-gradient(to right, var(--success-bg) 0%, var(--card) 30%);
+}
+
+.bank-cand-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.bank-cand-card-vendor {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.bank-cand-score {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 11px;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+.bank-cand-score.score-high { background: var(--success-bg); color: var(--success); }
+.bank-cand-score.score-mid  { background: var(--warn-bg);    color: var(--warn); }
+.bank-cand-score.score-low  { background: var(--danger-bg);  color: var(--danger); }
+
+.bank-cand-card-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-bottom: 6px;
+    font-variant-numeric: tabular-nums;
+}
+.bank-cand-flabel {
+    color: var(--ink-3);
+    margin-right: 2px;
+}
+.bank-cand-card-file {
+    font-size: 11px;
+    color: var(--ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 6px;
+    font-family: var(--font-mono);
+}
+.bank-cand-card-reason {
+    font-size: 12px;
+    color: var(--ink-2);
+    background: var(--bg);
+    padding: 6px 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+.bank-cand-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+@media (max-width: 640px) {
+    .bank-cand-card-head { flex-wrap: wrap; }
+    .bank-cand-card-fields { flex-direction: column; gap: 4px; }
+}
+
+

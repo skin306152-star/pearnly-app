@@ -1,0 +1,544 @@
+/* ============================================================
+   v118.33.2 NAV-IA Phase 2 · sidebar 底部 user-row 整套样式已删 · 替代品在右上角头像菜单(.avatar-popup)
+   v118.33.3 NAV-IA Phase 3 · sidebar 顶部 CTA「上传发票」+ 底部「集成」一级入口
+   ============================================================ */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+}
+
+/* v118.33.7.3 · .sidebar-cta 样式已删 · 对齐 prototype_final(prototype sidebar 无 CTA 按钮) */
+
+/* v118.33.7.4 · sidebar 分隔线 · 对齐 prototype */
+.nav-divider {
+    height: 1px;
+    background: var(--line);
+    margin: 8px 12px;
+}
+body.sidebar-collapsed .nav-divider { margin: 8px 6px; }
+
+/* v118.33.3 · sidebar 底部固定区(集成入口)· 推到底部 */
+.sidebar-bottom {
+    margin-top: auto;
+    flex-shrink: 0;
+    border-top: 1px solid var(--line);
+    padding: 6px 8px 10px;
+    background: var(--card);
+}
+.sidebar-bottom .nav-item {
+    /* 复用现有 .nav-item 样式 · 无需额外定义 */
+}
+
+/* v118.33.7 NAV-IA Phase 7 · 集成页 · 6 张卡片 · 参考 DESIGN_SYSTEM §20 */
+.integrations-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-soft);
+    color: var(--brand);
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+.integrations-info-bar svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+.integrations-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 12px 0 10px;
+}
+.sec-divider {
+    height: 1px;
+    background: var(--line-soft, var(--line));
+    margin: 18px 0;
+}
+.integration-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    transition: border-color 0.15s, background 0.15s;
+}
+.integration-row:hover {
+    border-color: var(--ink-4);
+    background: var(--bg);
+}
+.integration-row.connected {
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+.int-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.int-icon svg { width: 18px; height: 18px; }
+.ic-g { background: #e8f0fe; color: #1a73e8; }
+.ic-gs { background: #e6f4ea; color: #0f9d58; }
+.ic-gm { background: #fce8e6; color: #ea4335; }
+.ic-line { background: #e6f5ea; color: #06c755; }
+.ic-folder { background: #fef3c7; color: #d97706; }
+.ic-erp { background: var(--bg); color: var(--ink-3); }
+.int-info { flex: 1; min-width: 0; }
+.int-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+.int-desc {
+    font-size: 11px;
+    color: var(--ink-3);
+    line-height: 1.5;
+}
+.int-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.int-btn-configure {
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink-2);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+.int-btn-configure:hover {
+    background: var(--bg);
+    border-color: var(--ink-4);
+    color: var(--ink);
+}
+
+/* 手机端 · 卡片改纵向堆叠 */
+@media (max-width: 600px) {
+    .integration-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .int-actions {
+        justify-content: flex-end;
+    }
+}
+
+/* v118.33.5 NAV-IA Phase 5 · 业务流可折叠组(销项▼/进项▼) */
+.nav-group.nav-collapsible {
+    margin: 4px 8px;
+    padding: 0;
+}
+.nav-group-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    cursor: pointer;
+    border-radius: 6px;
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.12s, color 0.12s;
+    user-select: none;
+}
+.nav-group-toggle:hover { background: var(--bg); color: var(--ink); }
+.nav-group-toggle .nav-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: var(--ink-3);
+}
+.nav-group-toggle .nav-label { flex: 1; }
+.nav-group-toggle .nav-chevron {
+    width: 14px;
+    height: 14px;
+    margin-left: auto;
+    flex-shrink: 0;
+    color: var(--ink-3);
+    transition: transform 0.18s;
+}
+.nav-collapsible.collapsed .nav-group-toggle .nav-chevron {
+    transform: rotate(-90deg);
+}
+.nav-sub {
+    overflow: hidden;
+    max-height: 800px;
+    transition: max-height 0.22s ease;
+}
+.nav-collapsible.collapsed .nav-sub {
+    max-height: 0;
+}
+/* v118.33.7.6 · sidebar 子项缩进加深 · 14px→38px · 对齐 prototype 层级感更强 */
+.nav-sub-item {
+    padding-left: 38px !important;
+    margin-left: 0 !important;
+}
+.nav-sub-item .nav-icon {
+    width: 16px;
+    height: 16px;
+}
+/* 收起态(全 sidebar 缩窄)· chevron 隐藏 · 子项缩进取消 · 折叠组强制全展开 · 组标题字隐藏(防竖排 BUG) */
+body.sidebar-collapsed .nav-group-toggle .nav-chevron { display: none; }
+body.sidebar-collapsed .nav-group-toggle .nav-label { display: none; }
+body.sidebar-collapsed .nav-group-toggle {
+    justify-content: center;
+    padding: 10px;
+}
+/* v118.33.7.9 · 收起态 sub-item · 取消 38px padding 否则图标被挤出容器(黑方块 BUG) */
+body.sidebar-collapsed .nav-sub-item {
+    margin-left: 0 !important;
+    padding-left: 10px !important;
+    justify-content: center;
+}
+body.sidebar-collapsed .nav-collapsible.collapsed .nav-sub { max-height: 800px; }
+
+/* 帮助反馈 modal · 联系卡列表 */
+.help-modal-tip {
+    font-size: 13px;
+    color: var(--ink-2);
+    margin-bottom: 16px;
+    line-height: 1.6;
+}
+.help-contact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.help-contact-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--ink);
+    transition: all 0.15s;
+    background: var(--card);
+}
+.help-contact-card:hover {
+    border-color: var(--brand);
+    background: var(--accent-soft);
+    transform: translateY(-1px);
+}
+.help-contact-card svg {
+    width: 22px;
+    height: 22px;
+    color: var(--brand);
+    flex-shrink: 0;
+}
+.help-contact-label {
+    font-size: 11px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+.help-contact-value {
+    font-size: 14px;
+    color: var(--ink);
+    font-weight: 500;
+}
+
+
+/* ============================================================
+   v118.27.5.2 · 设置页 · 改用 settings-layout wrapper(跟 .auto-layout 同款 grid)
+   · 修复响应式表现不一致问题
+   ============================================================ */
+.settings-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+.settings-side-nav {
+    position: sticky;
+    top: calc(var(--topbar-h) + 16px);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 8px;
+    max-height: calc(100vh - var(--topbar-h) - 32px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+.settings-nav-group { padding-bottom: 6px; }
+.settings-nav-group + .settings-nav-group {
+    border-top: 1px solid var(--line);
+    padding-top: 6px;
+    margin-top: 4px;
+}
+.settings-nav-group-title {
+    padding: 6px 12px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+/* 二级导航条目 · 兼容现有 .settings-tab JS 选择器 */
+.settings-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 12px;
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    transition: all 0.12s;
+    position: relative;
+}
+.settings-nav-item:hover { background: var(--bg); color: var(--ink); }
+.settings-nav-item.active {
+    background: var(--accent-soft);
+    color: var(--brand);
+    font-weight: 600;
+}
+.settings-nav-item svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--ink-3);
+    transition: color 0.12s;
+}
+.settings-nav-item.active svg,
+.settings-nav-item:hover svg { color: var(--brand); }
+.settings-nav-item span { flex: 1; min-width: 0; }
+
+/* ============================================================
+   v118.28.5.1/2 · 移动端 settings 导航 · chip 风格 · 不再 inline-flex 叠加
+   方案:容器 flex column · 每个 nav-group 占一行 · 组内 chip 横向 wrap
+   ============================================================ */
+@media (max-width: 860px) {
+    .settings-layout {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+    .settings-side-nav {
+        position: static;
+        max-height: none;
+        overflow: visible;
+        padding: 8px 10px;
+        white-space: normal;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .settings-nav-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 0;
+        border-top: none !important;
+        margin-top: 0 !important;
+        padding-top: 4px !important;
+    }
+    .settings-nav-group + .settings-nav-group {
+        border-top: 1px solid var(--line) !important;
+        padding-top: 6px !important;
+        margin-top: 2px !important;
+        border-left: none;
+        padding-left: 0;
+    }
+    .settings-nav-group-title {
+        display: block;
+        flex: 0 0 100%;
+        padding: 2px 4px 4px;
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+    }
+    .settings-layout .settings-side-nav .settings-tab,
+    .settings-layout .settings-side-nav .settings-nav-item {
+        display: inline-flex !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px !important;
+        margin: 0 !important;
+        border: 1px solid var(--line) !important;
+        border-bottom: 1px solid var(--line) !important;
+        border-radius: 16px !important;
+        background: #fff !important;
+        color: var(--ink) !important;
+        font-size: 12.5px !important;
+        line-height: 1.3 !important;
+        height: auto !important;
+        white-space: nowrap !important;
+    }
+    .settings-layout .settings-side-nav .settings-tab.active,
+    .settings-layout .settings-side-nav .settings-nav-item.active {
+        background: var(--accent-soft) !important;
+        color: var(--brand) !important;
+        border-color: var(--brand) !important;
+    }
+    .settings-layout .settings-side-nav .settings-tab svg,
+    .settings-layout .settings-side-nav .settings-nav-item svg {
+        width: 13px !important;
+        height: 13px !important;
+        flex-shrink: 0;
+    }
+    .settings-layout .settings-side-nav .settings-tab span,
+    .settings-layout .settings-side-nav .settings-nav-item span {
+        display: inline !important;
+    }
+}
+
+.settings-layout .settings-side-nav.settings-tabs {
+    display: block;
+}
+
+/* form-row-inline · 通用设置 pane 排版 */
+.profile-form .form-row.form-row-inline {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    grid-template-areas:
+        "label input"
+        "hint  hint";
+    column-gap: 16px;
+    row-gap: 4px;
+    align-items: center;
+}
+.profile-form .form-row.form-row-inline > label {
+    grid-area: label;
+    margin: 0;
+    color: var(--text-mute, #6b7280);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+}
+.profile-form .form-row.form-row-inline > .form-input {
+    grid-area: input;
+    width: 100%;
+    max-width: 320px;
+}
+.profile-form .form-row.form-row-inline > .form-hint {
+    grid-area: hint;
+    margin: 2px 0 0 156px;
+    font-size: 12px;
+    color: #9ca3af;
+}
+@media (max-width: 600px) {
+    .profile-form .form-row.form-row-inline {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "label"
+            "input"
+            "hint";
+        row-gap: 6px;
+    }
+    .profile-form .form-row.form-row-inline > .form-input { max-width: 100%; }
+    .profile-form .form-row.form-row-inline > .form-hint { margin-left: 0; }
+}
+
+/* ============================================================
+   v118.28.5.2 · 移动端全局断版修复
+   ============================================================ */
+
+/* BUG 1+2 · page-head 移动端必须 wrap · 否则 actions 抢宽 → 标题逐字换行 */
+@media (max-width: 768px) {
+    .page-head {
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 16px 0;
+    }
+    .page-head-icon {
+        width: 36px;
+        height: 36px;
+    }
+    .page-head-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+    .page-head-text {
+        flex: 1 1 calc(100% - 52px);
+        min-width: 0;
+    }
+    .page-head-text .page-title {
+        font-size: 18px;
+        line-height: 1.3;
+        word-break: keep-all;
+        overflow-wrap: normal;
+    }
+    .page-head-text .page-subtitle {
+        font-size: 12px;
+        line-height: 1.4;
+        word-break: normal;
+        overflow-wrap: break-word;
+    }
+    /* 关键 · 让 actions 强制换到新一行(不抢标题宽) */
+    .page-head-actions {
+        flex: 1 1 100%;
+        width: 100%;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .page-head-actions > * {
+        flex: 1 1 auto;
+    }
+    .page-head-actions .history-range,
+    .page-head-actions select {
+        flex: 1 1 auto;
+        min-width: 140px;
+    }
+    .page-head-actions .btn {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+}
+
+/* BUG 3 · 客户卡片移动端按钮竖排 · 提升可读性 */
+@media (max-width: 600px) {
+    .client-card-actions {
+        flex-direction: column;
+        gap: 6px;
+    }
+    .client-card-btn {
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    .client-card-btn svg { width: 13px; height: 13px; }
+}
+
+/* BUG 4 · 历史表头/行 · 中文供应商 + 长发票号 不一字一行 */
+@media (max-width: 760px) {
+    .history-cell-filename,
+    .history-cell-subtitle {
+        word-break: normal !important;
+        overflow-wrap: anywhere !important;
+        line-height: 1.4;
+    }
+}
+

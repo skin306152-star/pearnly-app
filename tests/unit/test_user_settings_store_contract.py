@@ -25,6 +25,7 @@ class UserSettingsReexportContract(unittest.TestCase):
             "set_user_gemini_key",
             "get_user_gemini_key",
             "get_user_gemini_key_masked",
+            "update_user_preferred_lang",  # REFACTOR-B2 · 后搬入
         ]
         for n in names:
             self.assertTrue(hasattr(store, n), f"service missing {n}")
@@ -35,6 +36,11 @@ class UserSettingsReexportContract(unittest.TestCase):
     def test_erp_push_modes_constant(self):
         self.assertEqual(store.ERP_PUSH_MODES, ("smart", "fixed", "ocr_only"))
         self.assertIs(db.ERP_PUSH_MODES, store.ERP_PUSH_MODES)
+
+    def test_preferred_lang_rejects_bad_lang(self):
+        # 非法语言码 → 早返 False,不触库
+        with mock.patch("db.get_cursor", side_effect=AssertionError("must not hit DB")):
+            self.assertFalse(store.update_user_preferred_lang("u1", "xx"))
 
     def test_set_erp_push_mode_rejects_garbage(self):
         # 非法值不触库直接 False(纯逻辑 · 不需 cursor)

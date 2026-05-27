@@ -675,24 +675,6 @@ def cleanup_expired_history(free_days: int = 7, plus_days: int = 90, pro_days: i
 # ════════════════════════════════════════════════════════════════════
 
 
-def update_user_preferred_lang(user_id: str, lang: str) -> bool:
-    """更新用户偏好语言 · 供 LINE Bot 等场景读取"""
-    if lang not in ("zh", "en", "th", "ja"):
-        return False
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                UPDATE users SET preferred_lang = %s WHERE id = %s
-            """,
-                (lang, str(user_id)),
-            )
-            return cur.rowcount > 0
-    except Exception as e:
-        logger.error(f"update_user_preferred_lang failed: {e}")
-        return False
-
-
 # ============================================================
 # v22 多租户 · 租户管理函数
 # ============================================================
@@ -1990,4 +1972,9 @@ from services.billing.pricing import (
     PDF_TIER2_PRICE_V21 as PDF_TIER2_PRICE_V21,
     EXCEL_CHARS_PER_SATANG_V21 as EXCEL_CHARS_PER_SATANG_V21,
     EXCEL_SATANG_PRICE_V21 as EXCEL_SATANG_PRICE_V21,
+)
+
+# REFACTOR-B2 · 用户偏好语言 re-export(已抽到 services/user_settings/store · 调用点零改动)
+from services.user_settings.store import (
+    update_user_preferred_lang as update_user_preferred_lang,
 )

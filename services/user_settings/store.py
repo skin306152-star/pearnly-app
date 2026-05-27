@@ -122,3 +122,22 @@ def get_user_gemini_key_masked(user_id: str) -> dict:
     else:
         preview = f"{k[:4]}...{k[-4:]}"
     return {"has_key": True, "preview": preview}
+
+
+# ── 用户偏好语言(REFACTOR-B2 · 从 db.py 搬入 · 纯搬家 0 逻辑改 · LINE Bot/设置用)──
+def update_user_preferred_lang(user_id: str, lang: str) -> bool:
+    """更新用户偏好语言 · 供 LINE Bot 等场景读取"""
+    if lang not in ("zh", "en", "th", "ja"):
+        return False
+    try:
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE users SET preferred_lang = %s WHERE id = %s
+            """,
+                (lang, str(user_id)),
+            )
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"update_user_preferred_lang failed: {e}")
+        return False

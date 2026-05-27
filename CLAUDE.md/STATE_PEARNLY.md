@@ -3,6 +3,28 @@
 > 🏗️ **【常驻指针 · 整顿恢复后读】ERP「开箱即用」收尾已全部完成(P0-P3)· 整顿 Wave 0 安全网已开跑(见第三十五会话)。** 下一步:**整顿继续 · 可走 `/batch` 加速** —— 进窗口读 `docs/refactor/BATCH_STRATEGY.md` + `REFACTOR_MASTER_PLAN.md`。Wave 0(安全网)已铺一大批纯逻辑守门;**Wave 1(db.py 剩余安全域)/ Wave 2(拆 home.js)未开** —— Wave 2 与 P2-C/P3 改过的 home.js 同文件,re-grep 行号后再拆。
 
 > ════════════════════════════════════════════════════════════
+> **【第三十六会话 · 交接 · 2026-05-27】P3 续:客户管理页(账套主体/买方客户 双 tab)+ 登录账套软弹 · 真账号实测上线 · BUG 修复完毕 · 下窗口回归整顿**
+> ════════════════════════════════════════════════════════════
+> **本会话完成并上线(ERP「开箱即用」P3 续作 · Zihao 当场指派 · 非整顿任务)**:
+>
+> **① 左导航「客户」→「客户管理」· 页内对账中心同款双 tab**(`home.html`/`home.js`/`home.css`):
+> - 「账套主体」tab(= `workspace_clients`):老板可新建/编辑/归档(软删 `is_active`),与右上角切换器 + 登录弹窗**共用同一份**,任意处增改即时同步;行内「设为当前」联动右上角。
+> - 「买方客户」tab(= `clients`):卡片 → **横条列表**,搜索 + 全选/多选 + 批量删除 + 翻页(每页 12)+ 单条编辑/导出,复用原编辑弹窗(识别记录同款交互)。
+> - 右上角 + 登录弹窗(`src/home/workspace-switcher.js` + Vite 重建):账套主体改 `<select>` 下拉(**个人事务保留固定按钮**);措辞「工作空间」→「账套主体」(4 语)。登录后无选中账套且未明确个人事务 → **软弹一次**引导(sessionStorage 一次/会话 · 不硬拦)。
+>
+> **② 后端(非破坏 · 无新 schema · 无 DDL)**:`workspace_routes` 补 PATCH(改名/税号)+ DELETE(软删归档)+ GET `include_inactive` + `list_workspace_clients_enriched`(发票数/金额统计);`clients_routes` 补 `POST /api/clients/batch-delete`;`services/workspace/store` + `db.py` 同步 re-export;2 个路由契约测试更新(workspace 现允许单条软删 DELETE / clients 加 batch-delete)。
+>
+> **③ i18n 四语补齐**(各语 2499 key · 0 missing/extra)· 新增 `cust-*`/`seller-*`/`buyer-*`/`wsclient-*` + `ws-select-*` · `ws-*` 措辞改账套主体。
+>
+> **④ 守门 + 实测**:5 道守门全绿;真浏览器(Playwright+Chromium · stub)客户管理 **20/20** + 登录软弹 **3/3**;**真账号 `18685123459@163.com` 真站点 pearnly.com 实测 12/12**(登录软弹 / 双 tab / 真实 3 账套主体 / 买方新建→搜索→编辑→批量删除全链 · 测试数据已清 0 残留)。截图已交 Zihao。
+>
+> **本会话 commits**:`89e8d56`(P3 客户管理页主体 · 部署 **11850000** · 4 语 release_notes 覆盖式)`106ff44`(prettier 修 workspace-switcher 回归)`e2ffc45`(绿化 CI)。
+>
+> **⑤ 顺手绿化长期红的 CI lint**(前 3+ commit 已红 · 根因非本功能):`scripts/probe/_debug/*.js` 是逆向抓取的 MR.ERP 页面 JS(铁律 #8 不改抓取样本)→ `eslint.config.mjs` ignores 加 `scripts/probe/**` + `_uitest/**`;`scripts/probe/*.py` + `static/erp-mrerp-connect.js` 既有格式债 → black/prettier 自动修。本地 7 步 lint 全绿。
+>
+> **🔲 BUG 修复完毕 · 下窗口回归整顿**:ERP P0-P3(含本 P3 续作)收尾全完。下窗口按常驻指针续 **整顿 Wave 1(db.py 剩余安全域)/ Wave 2(拆 home.js)** —— ⚠️ 本会话又改了 `home.js`(+客户管理页逻辑约 +300 行)· Wave 2 拆解前**必须 re-grep 行号**。见 `BATCH_STRATEGY.md` + `REFACTOR_MASTER_PLAN.md`。
+>
+> ════════════════════════════════════════════════════════════
 > **【第三十五会话 · 交接 · 2026-05-27】整顿 REFACTOR-D2(Wave 0 安全网)+ G2(RUNBOOK)· 与 ERP 第三十四会话同仓并行 · 零冲突**
 > ════════════════════════════════════════════════════════════
 > **背景**:ERP 窗口在做 P2-C/P3 收尾期间,本窗口并行做**不碰 home.js/ERP/db.py 巨石**的安全活(纯新增 `tests/`、`docs/` + 3 个纯函数小修)。两窗口共用同一本地仓库 + master,提交线性交错、**碰的是不同文件、零冲突**。

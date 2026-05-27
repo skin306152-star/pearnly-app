@@ -1,0 +1,556 @@
+/* ============================================================
+   v0.9 · 推送日志区
+   ============================================================ */
+.erp-logs-section {
+    margin-top: 20px;
+    border-top: 1px solid var(--line, #e5e7eb);
+    padding-top: 16px;
+}
+.erp-logs-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 8px 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink, #111827);
+    user-select: none;
+}
+.erp-logs-head:hover { color: var(--brand); }
+.erp-logs-head svg { width: 14px; height: 14px; }
+.erp-logs-hint { margin-left: auto; font-size: 11px; color: var(--ink-3); font-weight: 400; }
+.erp-logs-list { margin-top: 8px; max-height: 400px; overflow-y: auto; }
+.erp-logs-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--ink-3);
+    font-size: 12px;
+}
+.erp-log-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line, #f3f4f6);
+    font-size: 12px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+.erp-log-row:last-child { border-bottom: none; }
+.erp-log-row.ok .log-status { color: #10B981; font-weight: 700; }
+.erp-log-row.fail .log-status { color: #EF4444; font-weight: 700; }
+/* 去重跳过(skipped_dup)· 中性灰蓝 · 不是失败红(Codex 2026-05-26) */
+.erp-log-row.skipped .log-status { color: #64748B; font-weight: 700; }
+
+/* ERP 推送异常块(异常页顶部独立来源 · Zihao 2026-05-26) */
+.erp-exc-block {
+    margin: 0 0 18px 0;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid #e8e8e3;
+    border-radius: 10px;
+}
+.erp-exc-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.erp-exc-title { font-size: 15px; font-weight: 700; color: #111111; margin: 0; }
+.erp-exc-sub { font-size: 12px; color: var(--ink-3); }
+.erp-exc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.erp-exc-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; font-size: 12px; border-radius: 999px;
+    border: 1px solid #e8e8e3; background: #f4f4f0; color: var(--ink-2);
+    cursor: pointer;
+}
+.erp-exc-chip.active { background: #111111; color: #fff; border-color: #111111; }
+.erp-exc-chip-count { font-size: 11px; opacity: .8; }
+.erp-exc-search {
+    margin-left: auto; min-width: 220px; padding: 6px 10px; font-size: 12px;
+    border: 1px solid #e8e8e3; border-radius: 6px; background: #f4f4f0; color: var(--ink-1);
+}
+/* 批量栏 */
+.erp-exc-batch { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 10px; background: #f4f4f0; border-radius: 8px; }
+.erp-exc-batch-info { font-size: 12px; color: var(--ink-2); }
+.erp-exc-batch-count { font-weight: 700; color: #111111; }
+.erp-exc-batch-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; background: #111111; color: #fff; }
+.erp-exc-batch-btn.danger { background: #B91C1C; }
+.erp-exc-batch-btn.ghost { background: transparent; color: var(--ink-2); border: 1px solid #e8e8e3; }
+/* 横条行(像推送日志 · 不做卡片 · 省位置) */
+.erp-exc-rows { display: flex; flex-direction: column; }
+.erp-exc-row {
+    display: grid;
+    grid-template-columns: 32px 130px 1.2fr 1.2fr 96px 2fr 76px;
+    align-items: center; gap: 8px;
+    padding: 9px 6px; font-size: 12px; border-bottom: 1px solid #f0f0ec;
+}
+.erp-exc-row:not(.erp-exc-row-head):hover { background: #faf9f5; }
+.erp-exc-row-head { font-weight: 600; color: var(--ink-3); border-bottom: 1px solid #e8e8e3; }
+.erp-exc-row .ex-inv { font-weight: 600; color: #111111; }
+.erp-exc-row .ex-inv, .erp-exc-row .ex-seller, .erp-exc-row .ex-buyer, .erp-exc-row .ex-reason {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.erp-exc-row .ex-seller, .erp-exc-row .ex-buyer { color: var(--ink-2); }
+.erp-exc-row .ex-reason { color: var(--ink-2); }
+.erp-exc-state { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.erp-exc-state.needs { background: #FEF3C7; color: #B45309; }
+.erp-exc-state.retry { background: #DBEAFE; color: #1E40AF; }
+.erp-exc-state.fail { background: #FEE2E2; color: #B91C1C; }
+.erp-exc-code { font-family: ui-monospace, monospace; font-size: 10px; color: var(--ink-3); background: #f4f4f0; padding: 1px 5px; border-radius: 4px; }
+.erp-exc-retry-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; background: #111111; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+.erp-exc-retry-btn:hover { background: #333; }
+.erp-exc-retry-btn:disabled { opacity: .6; cursor: default; }
+.erp-exc-empty { padding: 20px; text-align: center; color: var(--ink-3); font-size: 12px; }
+.erp-exc-foot { margin-top: 10px; text-align: center; }
+.erp-exc-more { padding: 6px 16px; font-size: 12px; border: 1px solid #e8e8e3; border-radius: 6px; background: #fff; color: var(--ink-2); cursor: pointer; }
+.erp-exc-count { font-size: 11px; color: var(--ink-3); }
+/* 单条异常编辑弹窗 */
+.erp-exc-modal-overlay { position: fixed; inset: 0; background: rgba(17,17,17,.45); display: flex; align-items: center; justify-content: center; z-index: 9000; }
+.erp-exc-modal { width: 480px; max-width: calc(100vw - 32px); max-height: calc(100vh - 64px); display: flex; flex-direction: column; background: #fff; border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,.2); }
+.erp-exc-m-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #e8e8e3; }
+.erp-exc-m-head h3 { margin: 0; font-size: 15px; font-weight: 700; color: #111111; }
+.erp-exc-m-close { border: none; background: transparent; font-size: 22px; line-height: 1; color: var(--ink-3); cursor: pointer; }
+.erp-exc-m-body { padding: 16px 18px; overflow-y: auto; }
+.erp-exc-m-reason { font-size: 12px; color: var(--ink-2); margin-bottom: 12px; line-height: 1.6; }
+.erp-exc-m-row { display: flex; gap: 10px; font-size: 12px; padding: 3px 0; }
+.erp-exc-m-k { color: var(--ink-3); min-width: 84px; flex-shrink: 0; }
+.erp-exc-m-v { color: var(--ink-1); }
+.erp-exc-m-fix { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f0ec; }
+.erp-exc-m-fix-title { font-size: 12px; font-weight: 600; color: #111111; margin-bottom: 8px; }
+.erp-exc-m-search { width: 100%; padding: 7px 10px; font-size: 12px; border: 1px solid #e8e8e3; border-radius: 6px; margin-bottom: 8px; box-sizing: border-box; }
+.erp-exc-m-custlist { max-height: 240px; overflow-y: auto; border: 1px solid #f0f0ec; border-radius: 6px; }
+.erp-exc-m-cust { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f5f5f1; }
+.erp-exc-m-cust:hover { background: #faf9f5; }
+.erp-exc-m-cust.sel { background: #111111; color: #fff; }
+.erp-exc-m-cust.sel .erp-exc-m-cust-code { color: #ddd; }
+.erp-exc-m-cust-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.erp-exc-m-cust-code { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-3); flex-shrink: 0; }
+.erp-exc-m-loading, .erp-exc-m-empty { padding: 16px; text-align: center; font-size: 12px; color: var(--ink-3); }
+.erp-exc-m-hint { margin-top: 14px; padding: 10px 12px; background: #DBEAFE; color: #1E40AF; border-radius: 8px; font-size: 12px; line-height: 1.6; }
+.erp-exc-m-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid #e8e8e3; }
+.log-time { color: var(--ink-3); min-width: 80px; }
+.log-status { min-width: 16px; text-align: center; }
+.log-tag { padding: 2px 6px; font-size: 10px; border-radius: 4px; font-family: sans-serif; }
+.log-tag.auto { background: #EDE9FE; color: #6D28D9; }
+.log-tag.manual { background: #F3F4F6; color: #6B7280; }
+.log-invoice { min-width: 100px; color: var(--ink); }
+.log-seller { flex: 1; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 批 1 改动 5 + 改动 8 (v118.34.33) · Pearnly 客户列 + ERP 列 */
+.log-client {
+    min-width: 110px;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+/* P1-C 后端列 · 工作空间归属(账套)· 无归属=个人事务(灰) */
+.log-workspace {
+    min-width: 90px;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+.log-workspace-personal {
+    color: #9ca3af;
+}
+/* 卖方未匹配到账套 · 默认字体(不斜体 · 跟邻列统一)· 中性灰提示需处理(Zihao 2026-05-26) */
+.log-workspace-unresolved {
+    color: #9ca3af;
+    cursor: help;
+}
+.log-client-empty {
+    color: #9ca3af;
+    font-style: italic;
+    font-weight: normal;
+    cursor: help;
+}
+.log-erp {
+    min-width: 90px;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+.log-erp-deleted {
+    color: #9ca3af;
+    font-style: italic;
+}
+/* 临时任务 (Zihao 2026-05-26) · 通用「ERP 单号」列 */
+.log-doc {
+    min-width: 120px;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.log-doc-copy {
+    cursor: pointer;
+    color: var(--brand, #4f46e5);
+    border-bottom: 1px dashed currentColor;
+}
+.log-doc-copy:hover { opacity: 0.75; }
+.log-doc-open {
+    color: var(--brand, #4f46e5);
+    text-decoration: none;
+    font-weight: 600;
+    font-family: sans-serif;
+}
+.log-doc-open:hover { text-decoration: underline; }
+.log-doc-missing {
+    color: #d97706;
+    font-style: italic;
+    cursor: help;
+}
+.log-doc-empty { color: var(--ink-3); }
+.log-http { color: var(--ink-3); }
+.log-elapsed { color: var(--ink-3); min-width: 60px; text-align: right; }
+/* 固定宽操作列(重试按钮)· 每行(含表头/成功/失败)都占同宽 · 保证右侧列对齐 ·
+   修(2026-05-26):失败行 ↻ 重试按钮原作行内变宽元素 · 把 ERP/HTTP/耗时挤歪 */
+.log-actions { flex: 0 0 28px; display: flex; align-items: center; justify-content: flex-end; }
+
+/* ============================================================
+   v0.9.1 · 推送日志增强(筛选 + 今日统计 + 详情对话框)
+   ============================================================ */
+.erp-logs-today-stats {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-3);
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+.erp-logs-today-stats.has-fail { color: #EF4444; }
+
+.erp-logs-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+}
+.erp-logs-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+.chip-filter {
+    padding: 4px 10px;
+    font-size: 11px;
+    border: 1px solid var(--line);
+    background: white;
+    color: var(--ink-3);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+.chip-filter:hover { background: #F9FAFB; color: var(--ink); }
+.chip-filter.active {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+}
+/* 批 3 改动 6 (v118.34.34) · ERP adapter chip 视觉区分 ·
+   分隔线 + 灰色 disabled 即将上线状态 */
+.erp-logs-filter-sep {
+    color: var(--line, #e8e8e3);
+    align-self: center;
+    margin: 0 2px;
+    user-select: none;
+    font-size: 12px;
+}
+.chip-filter.chip-filter-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: var(--bg, #f4f4f0);
+}
+.chip-filter.chip-filter-disabled:hover {
+    background: var(--bg, #f4f4f0);
+    color: var(--ink-3, #6B7280);
+}
+.chip-filter .chip-soon {
+    margin-left: 4px;
+    font-size: 9px;
+    padding: 1px 4px;
+    background: #fdebcb;
+    color: #8a5a00;
+    border-radius: 999px;
+    letter-spacing: 0.2px;
+}
+.btn-tiny {
+    padding: 4px 8px;
+    font-size: 11px;
+    background: white;
+    border: 1px solid var(--line);
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.btn-tiny svg { width: 12px; height: 12px; }
+.btn-tiny:hover { background: #F9FAFB; }
+
+/* v92 · Bug 3 · 修复 btn-primary + btn-tiny 组合被 btn-tiny 的 white 背景覆盖 · 导致白底白字看不见(例如「保留·不是重复」按钮) */
+button.btn-primary.btn-tiny {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+}
+button.btn-primary.btn-tiny:hover {
+    background: var(--brand-hover);
+}
+
+.erp-log-row {
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.erp-log-row:hover { background: #F9FAFB; }
+
+.log-tag.retry { background: #FEF3C7; color: #92400E; }
+
+.log-retry-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: white;
+    color: var(--ink-3);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    line-height: 1;
+}
+.log-retry-btn:hover {
+    background: #FEF3C7;
+    color: #92400E;
+    border-color: #FCD34D;
+}
+
+/* 日志详情对话框 */
+.log-detail-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+}
+.log-detail-box {
+    background: white;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 720px;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 20px 24px;
+}
+.log-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.log-detail-title {
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.log-detail-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--ink-3);
+    padding: 0 8px;
+}
+.log-detail-close:hover { color: var(--ink); }
+.log-detail-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--ink-3);
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 16px;
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+.log-detail-section {
+    margin-bottom: 16px;
+}
+.log-detail-section.log-detail-error pre {
+    background: #FEF2F2;
+    color: #991B1B;
+    border: 1px solid #FECACA;
+}
+.log-detail-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-3);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.log-detail-section pre {
+    background: #f4f4f0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 11px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    overflow-x: auto;
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--ink);
+}
+
+/* ============================================================
+   临时任务 (Zihao 2026-05-26) · ERP 推送凭证弹窗
+   ============================================================ */
+.erp-receipt-body {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+.erp-receipt-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+}
+.erp-receipt-row:last-child { border-bottom: none; }
+.erp-receipt-key {
+    flex: 0 0 130px;
+    color: var(--ink-3);
+    white-space: nowrap;      /* label 固定一行 · 不允许换成两三行 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.erp-receipt-val {
+    flex: 1;
+    min-width: 0;             /* 允许内部 ellipsis · 不被长单号撑破整行 */
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    word-break: break-word;
+}
+.erp-receipt-fail-reason-label {
+    font-size: 12px;
+    color: var(--ink-3, #6b7280);
+    margin-bottom: 6px;
+}
+.erp-receipt-docno {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    color: var(--brand, #4f46e5);
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.erp-receipt-docno-missing {
+    color: #d97706;
+    font-style: italic;
+}
+.erp-receipt-copy-btn {
+    padding: 2px 10px;
+    font-size: 11px;
+    border: 1px solid var(--line);
+    background: white;
+    color: var(--ink-2);
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;        /* 复制按钮不被压缩 · 也不撑乱整行 */
+    white-space: nowrap;
+}
+.erp-receipt-copy-btn:hover { background: #f4f4f0; }
+.erp-receipt-hint {
+    background: #FEF9EC;
+    border: 1px solid #FBE6B5;
+    color: #8a5a00;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.erp-receipt-hint-ic { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+.erp-receipt-primary-wrap {
+    margin-bottom: 14px;
+}
+.erp-receipt-primary-btn {
+    display: inline-block;
+    padding: 9px 18px;
+    background: var(--brand, #4f46e5);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+.erp-receipt-primary-btn:hover { opacity: 0.9; }
+.erp-receipt-fail-box {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+}
+.erp-receipt-errcode {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    color: #991B1B;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.erp-receipt-friendly {
+    font-size: 13px;
+    color: #7f1d1d;
+    line-height: 1.5;
+}
+.erp-receipt-actions-label {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-bottom: 8px;
+}
+.erp-receipt-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+.erp-receipt-action-btn {
+    padding: 7px 14px;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    background: white;
+    color: var(--ink-2);
+    border-radius: 8px;
+    cursor: pointer;
+}
+.erp-receipt-action-btn:hover { background: #f4f4f0; }
+.erp-receipt-action-btn.primary {
+    background: var(--brand, #4f46e5);
+    color: #fff;
+    border-color: var(--brand, #4f46e5);
+}
+.erp-receipt-action-btn.primary:hover { opacity: 0.9; }
+

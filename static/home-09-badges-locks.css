@@ -1,0 +1,156 @@
+/* ============================================================
+   v0.8 · Plus 角标 + 禁用开关样式
+   ============================================================ */
+.form-switch-row.disabled-plus {
+    opacity: 0.6;
+    cursor: not-allowed;
+    position: relative;
+}
+.form-switch-row.disabled-plus input[type="checkbox"] {
+    cursor: not-allowed;
+}
+.plus-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    margin-left: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);
+    color: white;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+}
+.btn-disabled-plus {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+.btn-disabled-plus:hover {
+    background: inherit !important;
+}
+
+/* ============================================================
+   v0.8.1 · 新视觉元素
+   ============================================================ */
+
+/* 历史列表 · 事项色块 */
+.history-badge.category {
+    background: #F0F4FF;
+    color: #4F46E5;
+    border: 1px solid #E0E7FF;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+/* 配额条升级链 */
+.chip-upgrade-hint {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 11px;
+    color: #7C3AED;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+}
+.chip-upgrade-hint:hover {
+    text-decoration: underline;
+}
+
+/* ERP 端点列表 · 数量上限提示 */
+.erp-limit-hint {
+    padding: 12px 16px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--ink-3, #6b7280);
+    background: #F9FAFB;
+    border-radius: 8px;
+    text-align: center;
+}
+.erp-limit-hint a {
+    color: #7C3AED;
+    font-weight: 500;
+    cursor: pointer;
+    margin-left: 4px;
+}
+.erp-limit-hint a:hover {
+    text-decoration: underline;
+}
+
+/* 归档卡复制按钮 */
+.drawer-archive-copy {
+    margin-left: auto;
+    width: 26px;
+    height: 26px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid #BFE5CD;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #0F6E56;
+    transition: all 0.15s;
+}
+.drawer-archive-copy:hover {
+    background: white;
+    transform: scale(1.05);
+}
+.drawer-archive-copy svg {
+    width: 14px;
+    height: 14px;
+}
+.drawer-archive-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ============================================================
+   v0.8.2 · 锁样式(Free 下受限功能显示但变灰 + 锁图标)
+   ============================================================ */
+.nav-item.locked-for-plan {
+    opacity: 0.55;
+    cursor: pointer;
+}
+.nav-item.locked-for-plan:hover {
+    opacity: 0.75;
+    background: var(--bg-hover, #f3f4f6);
+}
+.nav-item.locked-for-plan .nav-label {
+    color: var(--ink-3, #6b7280);
+}
+
+.nav-lock-icon {
+    width: 12px;
+    height: 12px;
+    margin-left: auto;
+    opacity: 0;
+    color: var(--ink-3, #9ca3af);
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+}
+.nav-item.locked-for-plan .nav-lock-icon {
+    opacity: 0.75;
+}
+.nav-item.locked-for-plan:hover .nav-lock-icon {
+    opacity: 1;
+}
+
+/* 识别页「自定义模板」按钮 · Free 锁样式 */
+.btn.locked-for-plan {
+    opacity: 0.55;
+    position: relative;
+}
+.btn.locked-for-plan::after {
+    content: "🔒";
+    margin-left: 6px;
+    font-size: 11px;
+}
+
+/* 侧栏收起时锁图标藏起(只留灰色状态) */
+body.sidebar-collapsed .nav-lock-icon {
+    display: none;
+}
+

@@ -38,17 +38,16 @@ router = APIRouter(tags=["signup-v109.3"])
 #   lifetime - ฿9,900 一次买断 · 无限 · 自带 Gemini key · 一次 100 文件
 #   admin    - super admin · 无限 · 一次 999 文件
 #
-# 老 plan 通过 LEGACY_PLAN_MAP 自动映射(_get_plan 出口处):
-#   free, plus → trial · pro → monthly · firm → yearly · enterprise → lifetime
-#
-# 数据库 plan 字段不强制迁移 · 上层一律看 mapped_plan
+# v118.46(2026-05-27 计费迁移收尾)· 全平台只剩 credits + admin 两档 ·
+#   老套餐 trial/monthly/yearly/lifetime/free/pro/firm/enterprise + LEGACY_PLAN_MAP 全删 ·
+#   _get_plan 非超管恒返 credits · 数据库残留老 plan 值无害(上层一律 credits)。
 # ============================================================
 
 PLAN_CONFIG = {
     # === v118.35.0.4 新注册默认 · pay-as-you-go credits ===
     # 月配额不卡(走 tenant_credits.balance_thb 真扣费) · 但保留 features 让
-    # 现有 quota/features 链路不空 · features.ocr_per_period=999999 避免
-    # check_ocr_quota 误判超额 · 真实计量由 credits 系统在 OCR 端点扣
+    # 现有 quota/features 链路不空 · features.ocr_per_period=999999 占位 ·
+    # 真实计量由 credits 系统在 OCR 端点按余额扣
     "credits": {
         "ocr_per_period": 999999,
         "max_upload_files": 500,
@@ -64,74 +63,6 @@ PLAN_CONFIG = {
         "needs_own_key": False,
         "price_thb": 0,
         "billing": "credits",
-    },
-    # === 新 5 档 ===
-    "trial": {
-        "ocr_per_period": 30,  # v118.32.5.5.14 · Korn 反薅闸 · 100→30 张/月
-        "max_upload_files": 30,
-        "max_pages_per_file": 50,
-        "max_mb_per_file": 100,
-        "clients_max": 3,
-        "seats_max": 1,
-        "automation": False,
-        "advanced_templates": False,
-        "batch_export": True,
-        "line_bot": False,
-        "duration_days": 3,  # v118.32.5.5.14 · Korn 反薅闸 · 7→3 天
-        "needs_own_key": False,
-        "price_thb": 0,
-        "billing": "trial",
-        # 兼容老字段(/api/me/plan 用)· 不再依赖 LINE 双轨制
-        "ocr_with_line": 30,  # v118.32.5.5.14 · 同步缩
-        "clients_max_with_line": 3,
-    },
-    "monthly": {
-        "ocr_per_period": 500,
-        "max_upload_files": 500,  # v118.27.8.1.15 · 30→500 · 月付 500 张 · Korn 反馈月底 300-700 张要一次跑完
-        "max_pages_per_file": 50,
-        "max_mb_per_file": 100,
-        "clients_max": 10,
-        "seats_max": 1,
-        "automation": True,
-        "advanced_templates": True,
-        "batch_export": True,
-        "line_bot": True,
-        "duration_days": 30,
-        "needs_own_key": False,
-        "price_thb": 299,
-        "billing": "monthly",
-    },
-    "yearly": {
-        "ocr_per_period": 1500,
-        "max_upload_files": 800,  # v118.27.8.1.15 · 50→800 · 年付高峰月 800 张一锅端
-        "max_pages_per_file": 50,
-        "max_mb_per_file": 100,
-        "clients_max": 30,
-        "seats_max": 3,
-        "automation": True,
-        "advanced_templates": True,
-        "batch_export": True,
-        "line_bot": True,
-        "duration_days": 365,
-        "needs_own_key": False,
-        "price_thb": 2990,
-        "billing": "yearly",
-    },
-    "lifetime": {
-        "ocr_per_period": 999999,
-        "max_upload_files": 1000,  # v118.27.8.1.15 · 100→1000 · 买断不限月 · 单次也开大
-        "max_pages_per_file": 100,
-        "max_mb_per_file": 200,
-        "clients_max": 999999,
-        "seats_max": 5,
-        "automation": True,
-        "advanced_templates": True,
-        "batch_export": True,
-        "line_bot": True,
-        "duration_days": None,  # 永久
-        "needs_own_key": True,  # 必须自己填 Gemini key
-        "price_thb": 9900,
-        "billing": "lifetime",
     },
     "admin": {
         "ocr_per_period": 999999,
@@ -149,88 +80,6 @@ PLAN_CONFIG = {
         "price_thb": 0,
         "billing": "admin",
     },
-    # === 老 plan 别名(数据库还有这些值 · 兼容直接读)===
-    # 实际不会被 _get_plan 返回(已通过 LEGACY_PLAN_MAP 映射)· 仅为保险
-    "free": {
-        # v118.32.5.5.14 · 跟 trial 同步缩(防有老用户卡在 free 别名)
-        "ocr_per_period": 30,
-        "max_upload_files": 30,
-        "max_pages_per_file": 50,
-        "max_mb_per_file": 100,
-        "clients_max": 3,
-        "seats_max": 1,
-        "automation": False,
-        "advanced_templates": False,
-        "batch_export": True,
-        "line_bot": False,
-        "duration_days": 3,
-        "needs_own_key": False,
-        "price_thb": 0,
-        "billing": "trial",
-        "ocr_with_line": 30,
-        "clients_max_with_line": 3,
-        "_legacy_alias": "trial",
-    },
-    "pro": {
-        "ocr_per_period": 500,
-        "max_upload_files": 500,
-        "max_pages_per_file": 50,
-        "max_mb_per_file": 100,
-        "clients_max": 10,
-        "seats_max": 1,
-        "automation": True,
-        "advanced_templates": True,
-        "batch_export": True,
-        "line_bot": True,
-        "duration_days": 30,
-        "needs_own_key": False,
-        "price_thb": 299,
-        "billing": "monthly",
-        "_legacy_alias": "monthly",
-    },
-    "firm": {
-        "ocr_per_period": 1500,
-        "max_upload_files": 800,
-        "max_pages_per_file": 50,
-        "max_mb_per_file": 100,
-        "clients_max": 30,
-        "seats_max": 3,
-        "automation": True,
-        "advanced_templates": True,
-        "batch_export": True,
-        "line_bot": True,
-        "duration_days": 365,
-        "needs_own_key": False,
-        "price_thb": 2990,
-        "billing": "yearly",
-        "_legacy_alias": "yearly",
-    },
-    "enterprise": {
-        "ocr_per_period": 999999,
-        "max_upload_files": 1000,
-        "max_pages_per_file": 100,
-        "max_mb_per_file": 200,
-        "clients_max": 999999,
-        "seats_max": 5,
-        "automation": True,
-        "advanced_templates": True,
-        "batch_export": True,
-        "line_bot": True,
-        "duration_days": None,
-        "needs_own_key": True,
-        "price_thb": 9900,
-        "billing": "lifetime",
-        "_legacy_alias": "lifetime",
-    },
-}
-
-# 老 plan → 新 plan 字符串映射(_get_plan 出口处用)
-LEGACY_PLAN_MAP = {
-    "free": "trial",
-    "plus": "trial",
-    "pro": "monthly",
-    "firm": "yearly",
-    "enterprise": "lifetime",
 }
 
 
@@ -727,7 +576,7 @@ def _ensure_tenant_for_new_user(
         tenant_name = tenant_name[:100]
 
         # PLAN_CONFIG 拿真实配额(防 fix_orphan 那种 monthly_quota=0 复发)
-        features = PLAN_CONFIG.get(plan) or PLAN_CONFIG.get("trial") or {}
+        features = PLAN_CONFIG.get(plan) or PLAN_CONFIG.get("credits") or {}
         monthly_quota = int(features.get("ocr_per_period") or 100)
 
         # 建 tenant(同事务)
@@ -764,9 +613,8 @@ def _ensure_tenant_for_new_user(
 
 
 def get_plan_features(plan: str) -> Dict[str, Any]:
-    """v111.1 · 取套餐配置 · 自动 map 老 plan · fallback trial"""
-    mapped = LEGACY_PLAN_MAP.get(plan, plan)
-    return PLAN_CONFIG.get(mapped, PLAN_CONFIG["trial"]).copy()
+    """v118.46 · 全平台只剩 credits + admin(老套餐已下线)· fallback credits"""
+    return PLAN_CONFIG.get(plan, PLAN_CONFIG["credits"]).copy()
 
 
 # ============================================================
@@ -1642,15 +1490,6 @@ def get_my_plan(request: Request):
                 "line_id": line_id,
                 "country": country,
             },
-            # v111.1 · 新 3 档定价(替换老 pro/firm)
-            "pricing": {
-                "monthly_thb": PLAN_CONFIG["monthly"].get("price_thb"),
-                "yearly_thb": PLAN_CONFIG["yearly"].get("price_thb"),
-                "lifetime_thb": PLAN_CONFIG["lifetime"].get("price_thb"),
-                # 兼容 v110 老前端 · 别立刻 break
-                "pro_thb": PLAN_CONFIG["monthly"].get("price_thb"),
-                "firm_thb": PLAN_CONFIG["yearly"].get("price_thb"),
-            },
             "payment_info": {
                 "bank": "Kasikorn Bank",
                 "bank_th": "ธนาคารกสิกรไทย",
@@ -1786,185 +1625,6 @@ def admin_cleanup_demo(request: Request):
     except Exception as e:
         logger.error(f"admin_cleanup_demo: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================================
-# OCR 配额拦截(其他路由调这个判断能不能 OCR)
-# ============================================================
-def check_ocr_quota(user_id: str) -> Dict[str, Any]:
-    """
-    返回:
-      {allowed: bool, used: N, limit: N, plan: str, reason: str}
-    其他模块在跑 OCR 前调这个 · allowed=False 就拒绝
-
-    v110.16 · super_admin 完全豁免(开发/运维账号无配额限制)
-    v118.27.5 · skin306152 测试账号永久放行(避免 trial 7 天到期后被升级窗口骚扰 · 跟 ERP/银行对账 dev seed 白名单一致)
-    """
-    # v118.35.0.21 · 白名单查 users.is_billing_exempt 字段(单一数据源 + 5min cache)
-    # 取代硬编码 user_id · 数据库已标记两个邮箱:skin306152 + mrerp@outlook.co.th
-    try:
-        import db as _db_wl
-
-        if _db_wl.is_user_billing_exempt(user_id):
-            return {
-                "allowed": True,
-                "plan": "exempt",
-                "reason": "billing_exempt",
-                "used": 0,
-                "limit": 999999,
-            }
-    except Exception as _wle:
-        logger.warning(f"check_ocr_quota whitelist lookup skip: {_wle}")
-
-    try:
-        import db as _db
-
-        # v111.1 · 一次拉齐所需字段
-        with _db.get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT COALESCE(is_super_admin, false) AS sa,
-                       plan, gemini_api_key, is_banned, ban_reason,
-                       trial_expires_at, plan_expires_at, created_at
-                FROM users WHERE id=%s
-            """,
-                (user_id,),
-            )
-            row = cur.fetchone()
-            if not row:
-                return {"allowed": False, "reason": "user_not_found", "plan": "unknown"}
-
-            if isinstance(row, dict):
-                sa = row.get("sa")
-                raw_plan = row.get("plan") or "trial"
-                gemini_key = (row.get("gemini_api_key") or "").strip()
-                is_banned = row.get("is_banned")
-                ban_reason = row.get("ban_reason")
-                trial_exp = row.get("trial_expires_at")
-                plan_exp = row.get("plan_expires_at")
-                created_at = row.get("created_at")
-            else:
-                sa, raw_plan, gemini_key, is_banned, ban_reason, trial_exp, plan_exp, created_at = (
-                    row
-                )
-                gemini_key = (gemini_key or "").strip()
-
-            # ---- super_admin → admin plan(无限)----
-            if sa:
-                f = PLAN_CONFIG["admin"]
-                return {
-                    "allowed": True,
-                    "used": 0,
-                    "limit": 999999,
-                    "plan": "admin",
-                    "max_upload_files": f["max_upload_files"],
-                    "max_pages_per_file": f["max_pages_per_file"],
-                    "max_mb_per_file": f["max_mb_per_file"],
-                }
-
-            # ---- 封禁 ----
-            if is_banned:
-                return {
-                    "allowed": False,
-                    "reason": "banned",
-                    "ban_reason": ban_reason,
-                    "plan": "banned",
-                }
-
-            # ---- map 到新 plan ----
-            # v118.35.0.4 · 未知 plan / 误植 admin 兜底改成 credits(新注册默认)
-            # 老 trial 用户保留(raw_plan='trial' 走原路径 → plan='trial')
-            plan = LEGACY_PLAN_MAP.get(raw_plan, raw_plan)
-            if plan not in PLAN_CONFIG or plan == "admin":
-                plan = "credits"
-            features = PLAN_CONFIG[plan]
-
-            # ---- lifetime · 必须自带 Gemini key ----
-            if plan == "lifetime":
-                if not gemini_key:
-                    return {
-                        "allowed": False,
-                        "reason": "needs_own_key",
-                        "plan": "lifetime",
-                        "used": 0,
-                        "limit": 999999,
-                        "max_upload_files": features["max_upload_files"],
-                        "max_pages_per_file": features["max_pages_per_file"],
-                        "max_mb_per_file": features["max_mb_per_file"],
-                    }
-                # 有 key · 无限
-                return {
-                    "allowed": True,
-                    "used": 0,
-                    "limit": 999999,
-                    "plan": "lifetime",
-                    "max_upload_files": features["max_upload_files"],
-                    "max_pages_per_file": features["max_pages_per_file"],
-                    "max_mb_per_file": features["max_mb_per_file"],
-                }
-
-            # ---- trial 7 天到期检查 ----
-            if plan == "trial":
-                from datetime import datetime, timezone, timedelta
-
-                now = datetime.now(timezone.utc)
-                expire_at = trial_exp
-                if not expire_at and created_at:
-                    if isinstance(created_at, str):
-                        created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                    expire_at = created_at + timedelta(days=features["duration_days"])
-                if expire_at:
-                    if isinstance(expire_at, str):
-                        expire_at = datetime.fromisoformat(expire_at.replace("Z", "+00:00"))
-                    if expire_at < now:
-                        return {
-                            "allowed": False,
-                            "reason": "trial_expired",
-                            "plan": "trial",
-                            "trial_days": features["duration_days"],
-                            "max_upload_files": features["max_upload_files"],
-                            "max_pages_per_file": features["max_pages_per_file"],
-                            "max_mb_per_file": features["max_mb_per_file"],
-                        }
-
-            # ---- 月配额检查(trial / monthly / yearly)----
-            with _db.get_cursor() as cur2:
-                cur2.execute(
-                    """
-                    SELECT COUNT(*) FROM ocr_history
-                    WHERE user_id=%s
-                      AND date_trunc('month', created_at) = date_trunc('month', NOW())
-                """,
-                    (user_id,),
-                )
-                used = _row_count(cur2.fetchone(), 0)
-
-            limit = features.get("ocr_per_period", 0)
-            if used >= limit:
-                return {
-                    "allowed": False,
-                    "reason": "quota_exceeded",
-                    "plan": plan,
-                    "used": used,
-                    "limit": limit,
-                    "max_upload_files": features["max_upload_files"],
-                    "max_pages_per_file": features["max_pages_per_file"],
-                    "max_mb_per_file": features["max_mb_per_file"],
-                }
-
-            return {
-                "allowed": True,
-                "plan": plan,
-                "used": used,
-                "limit": limit,
-                "max_upload_files": features["max_upload_files"],
-                "max_pages_per_file": features["max_pages_per_file"],
-                "max_mb_per_file": features["max_mb_per_file"],
-            }
-    except Exception as e:
-        logger.error(f"check_ocr_quota: {e}", exc_info=True)
-        # 出错不拦截 · 不影响真用户
-        return {"allowed": True, "used": 0, "limit": 0, "plan": "unknown", "error": str(e)}
 
 
 # ============================================================

@@ -262,7 +262,9 @@
         // 账套主体:下拉选择(Zihao 2026-05-27 · 列表多时更紧凑;个人事务保持按钮不动)
         let selectHtml = '';
         if (clients.length) {
-            const opts = ['<option value="">' + _esc(_t('ws-select-ph', '— 选择账套主体 —')) + '</option>'].concat(
+            const opts = [
+                '<option value="">' + _esc(_t('ws-select-ph', '— 选择账套主体 —')) + '</option>',
+            ].concat(
                 clients.map(function (c) {
                     const isActive = active != null && Number(active) === Number(c.id);
                     return (

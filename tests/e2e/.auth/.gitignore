@@ -1,0 +1,4 @@
+# REFACTOR-D1 · 登录态 storageState(含 mrpilot_token)绝不入库
+# 整个 .auth 目录只保留本 .gitignore · 其余(state.json 等)全部忽略
+*
+!.gitignore

@@ -480,43 +480,6 @@ def update_last_login(user_id: str):
         logger.error(f"更新登录时间失败: {e}")
 
 
-def get_ip_usage_today(ip: str) -> int:
-    try:
-        with get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT count FROM ip_usage
-                WHERE ip_address = %s AND usage_date = CURRENT_DATE LIMIT 1
-            """,
-                (ip,),
-            )
-            row = cur.fetchone()
-            return row["count"] if row else 0
-    except Exception as e:
-        logger.error(f"查询 IP 用量失败: {e}")
-        return 0
-
-
-def increment_ip_usage(ip: str, n: int = 1) -> int:
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                INSERT INTO ip_usage (ip_address, usage_date, count)
-                VALUES (%s, CURRENT_DATE, %s)
-                ON CONFLICT (ip_address, usage_date)
-                DO UPDATE SET count = ip_usage.count + %s
-                RETURNING count
-            """,
-                (ip, n, n),
-            )
-            row = cur.fetchone()
-            return row["count"] if row else 0
-    except Exception as e:
-        logger.error(f"更新 IP 用量失败: {e}")
-        return 0
-
-
 def increment_user_monthly_usage(user_id: str, n: int = 1) -> int:
     """
     Plus 用户识别后累加本月用量。
@@ -544,59 +507,6 @@ def increment_user_monthly_usage(user_id: str, n: int = 1) -> int:
             return row["used_this_month"] if row else 0
     except Exception as e:
         logger.error(f"更新用户月用量失败 (user_id={user_id}): {e}")
-        return 0
-
-
-def increment_typhoon_usage(user_id: str, n: int = 1) -> int:
-    """
-    v0.12 · 累加本月 Typhoon 增援次数(独立配额)
-    跨月自动重置 · 失败返回 0(不影响主流程)
-    """
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                UPDATE users SET
-                    typhoon_used_this_month = CASE
-                        WHEN typhoon_last_usage_month IS NULL
-                          OR typhoon_last_usage_month < DATE_TRUNC('month', NOW())::date
-                        THEN %s
-                        ELSE COALESCE(typhoon_used_this_month, 0) + %s
-                    END,
-                    typhoon_last_usage_month = DATE_TRUNC('month', NOW())::date
-                WHERE id = %s
-                RETURNING typhoon_used_this_month
-            """,
-                (n, n, user_id),
-            )
-            row = cur.fetchone()
-            return row["typhoon_used_this_month"] if row else 0
-    except Exception as e:
-        logger.warning(f"更新 Typhoon 用量失败 · 但不影响识别 (user_id={user_id}): {e}")
-        return 0
-
-
-def get_user_monthly_usage(user_id: str) -> int:
-    """查询某用户本月已用次数(若跨月返回 0)"""
-    try:
-        with get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    CASE
-                        WHEN last_usage_month IS NULL
-                          OR last_usage_month < DATE_TRUNC('month', NOW())::date
-                        THEN 0
-                        ELSE COALESCE(used_this_month, 0)
-                    END AS used
-                FROM users WHERE id = %s LIMIT 1
-            """,
-                (user_id,),
-            )
-            row = cur.fetchone()
-            return row["used"] if row else 0
-    except Exception as e:
-        logger.error(f"查询用户月用量失败 (user_id={user_id}): {e}")
         return 0
 
 

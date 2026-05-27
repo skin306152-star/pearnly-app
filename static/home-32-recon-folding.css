@@ -1,0 +1,136 @@
+/* ============================================================
+   v118.32.5.5.19 · 销售税核查 vs 收入对账 对称化 折叠组件
+   两边共用 · 默认收起 · 点击 head 展开
+   ============================================================ */
+.recon-collapse {
+    background: #ffffff;
+    border: 1px solid #e8e8e3;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.recon-collapse-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    user-select: none;
+    background: #ffffff;
+    transition: background .12s;
+}
+.recon-collapse-head:hover { background: #F9FAFB; }
+.recon-collapse-chevron {
+    width: 14px; height: 14px;
+    color: #999999;
+    flex-shrink: 0;
+    transition: transform .15s;
+}
+.recon-collapse:not([data-collapsed="true"]) .recon-collapse-chevron { transform: rotate(180deg); }
+.recon-collapse-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111111;
+}
+.recon-collapse-sub {
+    font-size: 11px;
+    color: #6B7280;
+    background: #E5E7EB;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+}
+.recon-collapse-body {
+    padding: 14px;
+    display: none;
+    border-top: 1px solid #f0f0eb;
+}
+.recon-collapse:not([data-collapsed="true"]) .recon-collapse-body { display: block; }
+.recon-preview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+.recon-preview-col {
+    background: #fafaf8;
+    border: 1px solid #e8e8e3;
+    border-radius: 8px;
+    overflow: hidden;
+    min-width: 0;
+}
+.recon-preview-col-head {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555555;
+    background: #f4f4f0;
+    border-bottom: 1px solid #e8e8e3;
+}
+.recon-preview-col-body {
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #555555;
+    min-height: 40px;
+}
+.recon-preview-empty {
+    color: #999999;
+    font-size: 12px;
+    padding: 6px 0;
+    text-align: center;
+}
+.recon-preview-file {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 0;
+    border-bottom: 1px dashed #f0f0eb;
+}
+.recon-preview-file:last-child { border-bottom: none; }
+.recon-preview-file-name {
+    color: #111111;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: default;
+}
+.recon-preview-file-meta {
+    color: #999999;
+    font-size: 11px;
+}
+.recon-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+}
+.recon-sum-card {
+    background: #fafaf8;
+    border: 1px solid #e8e8e3;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+.recon-sum-val {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111111;
+    line-height: 1.1;
+    margin-bottom: 4px;
+}
+.recon-sum-val.recon-sum-ok { color: #16a34a; }
+.recon-sum-val.recon-sum-warn { color: #d97706; }
+.recon-sum-val.recon-sum-err { color: #dc2626; }
+.recon-sum-lbl { font-size: 11px; color: #555555; }
+.recon-detail-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.recon-detail-table th { text-align: left; padding: 7px 10px; color: #999999; border-bottom: 1px solid #f0f0eb; font-weight: 500; font-size: 11px; }
+.recon-detail-table td { padding: 7px 10px; border-bottom: 1px solid #f0f0eb; color: #333333; vertical-align: top; }
+.recon-detail-table tr:last-child td { border-bottom: none; }
+.recon-detail-table tr:hover td { background: #fafaf8; }
+.recon-detail-table .recon-detail-cell-mono { font-family: SFMono-Regular, Consolas, monospace; color: #111111; }
+.recon-detail-empty { padding: 20px; text-align: center; color: #999999; font-size: 12px; }
+#vex-detail-collapse .recon-collapse-body { max-height: 440px; overflow-y: auto; }
+#vex-detail-collapse .recon-detail-table thead th { position: sticky; top: 0; background: #f8fafc; z-index: 1; }
+@media (max-width: 800px) {
+    .recon-preview-grid { grid-template-columns: 1fr; }
+    .recon-summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+

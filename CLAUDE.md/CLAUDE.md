@@ -594,6 +594,37 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 
 ---
 
+### 26. 无人值守自动修 bug + 自动合并(2026-05-28 Zihao 拍板 · 安全区自动 / 高敏保留闸)
+
+**背景**:Zihao 2026-05-28 拍板开启「无人值守」能力 — 没人看着的窗口 / headless / CI 也能**自动修 bug 并合并到 master**,前提是落在「安全区」。本条统一铁律 #16 红线、#25 闭环、`BATCH_STRATEGY.md` §9.5 #4 的口径,**消除冲突**:此前那些「关键路径大改先汇报」「prod 写操作要 Zihao 点一下」「Zihao 在场才动」的措辞,自本条起一律按下面**两档制**精确化。
+
+**🟢 安全区 — 无人值守可全自动(改 + 合并 + 上线 · 不需要任何人在场)**
+- **范围**:文案 / 翻译(i18n)/ 样式(CSS)/ 非核心普通业务逻辑 / 测试 / 文档 / 依赖绿 PR。
+- **放行条件(必须全部满足才自动合并)**:
+  1. CI 5 关全绿(lint+安全扫描 / import / i18n / 单测+覆盖率棘轮 / build / E2E)· 主控独立 `gh run list` 查真绿,不只信本地
+  2. 改动**不命中**下面🔴高敏文件 / 路径
+  3. 改动 < 30 文件(沿用铁律 #16)
+  4. 不删表 / 删字段 / DROP / schema migration(沿用铁律 #16)
+- 全过 → 直接 `git commit` + `git push origin master`,**无需 Zihao 在场**。
+
+**🔴 高敏区 — 永远需要 Zihao 在场(无人值守一律停 · 绝不自动合并)**
+- **范围**:登录 / 注册 / 计费扣费充值 / OCR 热路径(recognize)/ auth·JWT·session / RLS 基础设施 / LINE 绑定 / 改密码 / 账号合并。
+- **命中即高敏的文件 / 位置**:`auth.py` · `auth_signup.py` · `billing_routes.py` · `services/billing/*` · `line_binding_routes.py` · `line_client.py` · `db.py` 的 credits/charge_ocr/RLS(`get_cursor_rls` 等)· `app.py` 的 recognize 路由 · `services/ocr/*` · `home.js` 的 plans-plg-line / password-change / line-email-modal / session-heartbeat 块。
+- **无人值守碰到 → 立刻停**:开 PR / 留草稿 + 标注「待 Zihao 在场」,**绝不自动合并到 master**。
+- 要做必须:Zihao 在场点头 → 纯结构性 0 逻辑改 → **当轮真账号 E2E(含登录/充值弹窗)验** → 下一块。
+
+**唯一永不松动的硬线(两档都适用)**:测试**绝不触发真实扣钱 / 退款**(充值 E2E 是「绝不真付」设计)。
+
+**自检(无人值守每次自动合并前 · 内心 checklist)**:
+- [ ] 改动文件**全部在安全区**?(grep 是否命中上面🔴高敏文件)
+- [ ] CI 5 关是否全绿?(`gh run list` 查真绿)
+- [ ] < 30 文件 / 无 schema 改动?
+- 全过 → 自动合并;**任一不过 → 停 + 开 PR 等 Zihao**。
+
+> **怎么真正跑起来「无人值守」**:本条是**策略授权**,不是触发机制。真要让它半夜自己跑,还需要一个**调用入口**(headless `claude -p` 接 CI / 定时任务),那一步单独配 · 配的时候只读审查先行、安全区才开自动合并。派后台并行 agent 的标准操作见 `docs/refactor/BATCH_AGENT_DISPATCH_TEMPLATE.md`。
+
+---
+
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)
 
 **Pearnly 全局导航 = 跟着 `D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html` 走**

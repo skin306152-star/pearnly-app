@@ -757,17 +757,6 @@ document.addEventListener('click', () => {
 setupDropdown('lang-dropdown', (item) => applyLang(item.dataset.lang));
 // v0.15 · 删除顶部套餐下拉 · 所有用户权限一致
 
-// v118.28.5.1 · 设置 → 系统 → 通用设置 · 语言 select 切换(替代旧 set-lang-row 4 按钮卡)
-(function () {
-    const sel = document.getElementById('general-lang');
-    if (!sel) return;
-    sel.addEventListener('change', (e) => {
-        const lang = e.target.value;
-        if (lang) applyLang(lang);
-    });
-    const _curLang = (typeof currentLang === 'string' && currentLang) || localStorage.getItem('mrpilot_lang') || 'th';
-    sel.value = _curLang;
-})();
 
 // v118.33.2 NAV-IA Phase 2 · adm-lang-bar IIFE 已删 · admin/超管走「设置 → 通用设置」或 Cmd+K 切 4 语
 
@@ -877,60 +866,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
 
 // v118.33.7.3 · sidebar-cta-upload 已删 · 对齐 prototype_final(prototype sidebar 无 CTA)
 
-// v118.33.7.8 · 修 X 关闭 BUG · Phase 2 删 sidebar-user 时把 help-modal close 逻辑误删 · 这里独立绑回
-(function () {
-    function _bindHelpModal() {
-        const helpModal = document.getElementById('help-modal');
-        const helpClose = document.getElementById('help-modal-close');
-        if (!helpModal) return;
-        if (helpClose && !helpClose.dataset.bound) {
-            helpClose.addEventListener('click', function () {
-                helpModal.style.display = 'none';
-            });
-            helpClose.dataset.bound = '1';
-        }
-        if (!helpModal.dataset.maskBound) {
-            helpModal.addEventListener('click', function (e) {
-                if (e.target === helpModal) helpModal.style.display = 'none';
-            });
-            helpModal.dataset.maskBound = '1';
-        }
-        // ESC 关闭
-        if (!window._helpModalEscBound) {
-            document.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape' && helpModal.style.display === 'flex') {
-                    helpModal.style.display = 'none';
-                }
-            });
-            window._helpModalEscBound = true;
-        }
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _bindHelpModal);
-    } else {
-        _bindHelpModal();
-    }
-})();
 
-// v118.32.5.5.37 NAV-IA Phase 5 收尾 · 集成页「配置」按钮 → 右侧抽屉(不再跳 automation 路由)
-// anchor→drawer tab 映射(google-drive/sheets 走原 inline 展开 · 不拦截)
-(function () {
-    const _anchorMap = { line: 'line', folder: 'folder', gmail: 'email', erp: 'erp', alert: 'alert' };
-    document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.int-btn-configure');
-        if (!btn) return;
-        const row = btn.closest('.integration-row');
-        const anchor = row ? row.dataset.intAnchor : null;
-        if (anchor && _anchorMap[anchor]) {
-            const nameEl = row.querySelector('.int-name');
-            const title = nameEl ? (nameEl.textContent || nameEl.innerText || '').trim() : '配置';
-            if (typeof window.openIntegrationDrawer === 'function') {
-                window.openIntegrationDrawer(_anchorMap[anchor], title);
-            }
-        }
-        // google-drive / google-sheets 走原有 inline 展开逻辑 · 不拦截
-    });
-})();
 
 // A4 (v118.34.19 · Zihao 2026-05-19 拍板) · 集成主页面顶部 tab 切换
 // + "看推送日志 →" 链接(从 ERP 卡片 / 也可来自其他地方)
@@ -1109,65 +1045,6 @@ document.querySelectorAll('.nav-item').forEach(item => {
     }
 })();
 
-// v118.33.5 NAV-IA Phase 5 · sidebar 可折叠业务流分组(销项▼/进项▼ · LS 持久化)
-(function () {
-    const NAV_COLLAPSE_KEY = 'mrpilot_nav_collapsed';
-    // 路由→组 映射:点哪个子项 · 哪个组自动展开
-    const ROUTE_GROUP_MAP = {
-        'ocr': 'sales', 'history': 'sales', 'reconcile': 'sales',
-        'sales-invoices': 'sales', 'receivables': 'sales',
-        'vouchers': 'expense',
-    };
-    function _getState() {
-        try {
-            const raw = localStorage.getItem(NAV_COLLAPSE_KEY);
-            return raw ? JSON.parse(raw) : {};
-        } catch (e) { return {}; }
-    }
-    function _setState(state) {
-        try { localStorage.setItem(NAV_COLLAPSE_KEY, JSON.stringify(state)); } catch (e) {}
-    }
-    function _applyState() {
-        const state = _getState();
-        document.querySelectorAll('.nav-collapsible').forEach(function (group) {
-            const key = group.dataset.collapsible;
-            if (state[key]) group.classList.add('collapsed');
-            else group.classList.remove('collapsed');
-        });
-    }
-    function _toggle(key) {
-        const state = _getState();
-        state[key] = !state[key];
-        _setState(state);
-        _applyState();
-    }
-    // 默认:首次访问 · 销项展开(日常)· 进项折叠(Phase 6 才填全)
-    (function _ensureDefault() {
-        const state = _getState();
-        let changed = false;
-        if (state.sales === undefined) { state.sales = false; changed = true; }
-        if (state.expense === undefined) { state.expense = true; changed = true; }
-        if (changed) _setState(state);
-    })();
-    _applyState();
-    // 绑定 toggle 按钮
-    document.querySelectorAll('.nav-group-toggle').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            _toggle(btn.dataset.toggleGroup);
-        });
-    });
-    // 暴露给 routeTo:进某个子项路由时自动展开所在组
-    window.expandNavGroupForRoute = function (route) {
-        const group = ROUTE_GROUP_MAP[route];
-        if (!group) return;
-        const state = _getState();
-        if (state[group]) {
-            state[group] = false;
-            _setState(state);
-            _applyState();
-        }
-    };
-})();
 
 // v118.33.2 NAV-IA Phase 2 · _initSidebarUserMenu / renderSidebarUser 已删 · 替代品在右上角头像菜单(avatar-popup · Phase 1 上线)· 设置 / 帮助 / 退出全部从那里走
 
@@ -1875,91 +1752,6 @@ async function saveCompany() {
 })();
 
 // v118.28.5.1 · 设置 → 系统 → 通用设置(语言 + 时区 + 日期格式 + 数字格式)
-// 当前阶段:语言走 applyLang 全通路 · 其他三项前端 localStorage 占位
-// 后端 schema 留给 v118.29.x 一起加(避免本版引入空 schema)
-(function generalSettingsModule() {
-    'use strict';
-
-    const LS_TZ     = 'pearnly_general_tz';
-    const LS_DATE   = 'pearnly_general_date_format';
-    const LS_NUMBER = 'pearnly_general_number_format';
-
-    const DEFAULTS = {
-        tz: 'Asia/Bangkok',
-        date: 'YYYY-MM-DD',
-        number: 'comma_dot',
-    };
-
-    function _loadGeneral() {
-        const tz = document.getElementById('general-tz');
-        const dt = document.getElementById('general-date');
-        const nm = document.getElementById('general-number');
-        if (!tz || !dt || !nm) return;
-        try {
-            tz.value = localStorage.getItem(LS_TZ)     || DEFAULTS.tz;
-            dt.value = localStorage.getItem(LS_DATE)   || DEFAULTS.date;
-            nm.value = localStorage.getItem(LS_NUMBER) || DEFAULTS.number;
-        } catch (e) {
-            tz.value = DEFAULTS.tz;
-            dt.value = DEFAULTS.date;
-            nm.value = DEFAULTS.number;
-        }
-    }
-
-    async function _saveGeneral() {
-        const btn = document.getElementById('btn-save-general');
-        const msg = document.getElementById('general-save-msg');
-        if (!btn) return;
-        const orig = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<span>' + (t('msg-saving') || '保存中...') + '</span>';
-        if (msg) { msg.textContent = ''; msg.classList.remove('error'); }
-        try {
-            const tz = (document.getElementById('general-tz')     || {}).value || DEFAULTS.tz;
-            const dt = (document.getElementById('general-date')   || {}).value || DEFAULTS.date;
-            const nm = (document.getElementById('general-number') || {}).value || DEFAULTS.number;
-            try {
-                localStorage.setItem(LS_TZ, tz);
-                localStorage.setItem(LS_DATE, dt);
-                localStorage.setItem(LS_NUMBER, nm);
-            } catch (e) {}
-            window._pearnlyGeneral = { tz: tz, date_format: dt, number_format: nm };
-            if (msg) msg.textContent = t('msg-saved') || '已保存';
-        } catch (e) {
-            if (msg) { msg.textContent = t('msg-save-failed') || '保存失败'; msg.classList.add('error'); }
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = orig;
-            setTimeout(function () { if (msg) msg.textContent = ''; }, 3000);
-        }
-    }
-
-    function _bind() {
-        const btn = document.getElementById('btn-save-general');
-        if (!btn) { setTimeout(_bind, 200); return; }
-        if (btn._pearnlyGenBound) return;
-        btn._pearnlyGenBound = true;
-        btn.addEventListener('click', _saveGeneral);
-        _loadGeneral();
-    }
-
-    function _rerenderAll() {
-        _loadGeneral();
-        const sel = document.getElementById('general-lang');
-        if (sel) {
-            const cur = (typeof currentLang === 'string' && currentLang) || localStorage.getItem('mrpilot_lang') || 'th';
-            sel.value = cur;
-        }
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _bind);
-    } else { _bind(); }
-
-    if (typeof window.subscribeI18n === 'function') {
-        window.subscribeI18n('settings-general', _rerenderAll);
-    }
-})();
 
 // v118.8 · 顶栏 brand-workspace · 显示用户公司名 / 姓名 / fallback
 function renderBrandWorkspace() {

@@ -17,9 +17,10 @@ import './home/notifications.js'; // REFACTOR-C1 · 智能提醒(_loadNotificati
 import './home/recon-batch.js'; // REFACTOR-C1 · 对账历史多选批量删(自绑 · 事件委托)
 import './home/welcome-wizard.js'; // REFACTOR-C1 · 登录后欢迎向导(自绑 · 暂下架)
 import './home/ai-balance.js'; // REFACTOR-C1 · Google AI 余额追踪(超管成本面板)
+import './home/archive-settings.js'; // REFACTOR-C1 · 归档命名规则编辑器(设置页 tab)
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(
-        '[pearnly] vite bundle loaded · dashboard + billing + test-center + workspace-switcher + recon-center + assign-clients + access-log + notifications + recon-batch + welcome-wizard + ai-balance'
+        '[pearnly] vite bundle loaded · dashboard + billing + test-center + workspace-switcher + recon-center + assign-clients + access-log + notifications + recon-batch + welcome-wizard + ai-balance + archive-settings'
     );
 }

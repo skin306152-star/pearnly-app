@@ -11,9 +11,10 @@ import './home/billing.js';
 import './home/test-center.js'; // REFACTOR-C1 · 测试中心(skin only)
 import './home/workspace-switcher.js'; // B4 · workspace 工作模式切换器(取代旧 ClientSwitcher)
 import './home/recon-center.js'; // REFACTOR-C1 · 对账中心首页(loadReconcilePage)
+import './home/assign-clients.js'; // REFACTOR-C1 · 客户分配 modal(openAssignClientsModal)
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(
-        '[pearnly] vite bundle loaded · dashboard + billing + test-center + workspace-switcher + recon-center'
+        '[pearnly] vite bundle loaded · dashboard + billing + test-center + workspace-switcher + recon-center + assign-clients'
     );
 }

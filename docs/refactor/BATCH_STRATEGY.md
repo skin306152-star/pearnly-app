@@ -221,8 +221,8 @@
 | Wave | 状态 | 起始数字 | 当前数字 | 已合 PR / 备注 |
 |---|---|---|---|---|
 | 0 安全网(E2E/集成) | 🟡 | unit 872 / E2E 1 | unit **1095** / E2E 1 | 第三十五会话(2026-05-27)**未用 /batch · 在单窗口直接做**:17 个核心纯逻辑模块补行为契约(对账/导出/归档/监控/加密)· +~220 unit · 挖修 3 真 bug · 全守门绿 · 零冲突。**E2E(登录后核心路径)仍 1/10 · 需账号** |
-| 1 db.py 收尾 | ⚪ | db.py ~4513 行 | — | — |
-| 2 home.js | ⚪ | home.js ~22609 行 | — | `_shared` 先抽 / L6574-20163 待测绘 |
+| 1 db.py 收尾 | 🟡 | db.py 4620 行 | db.py 4620(未接线) | 第三十七会话(2026-05-27)**首次用并行 agent**:membership(9 函数)+ tenant(14 函数)两安全域 copy-out → `services/{membership,tenant}/store.py` + 37 契约测试 · 全守门绿 · CI 绿 · `c1a8c8a`。**copy-out 完成 · 串行接线(删 db.py + re-export)未做**。剩余域全高敏(credits/auth/ocr_history)→ Zihao 在场 |
+| 2 home.js | 🟡 测绘完 | home.js **22970 行** | — | 第三十七会话测绘完(见 §13)· `_shared` 待抽(串行)· 大块 L6623-20204 已确认 = ~25 个 IIFE 模块(非单巨函数)· **等 Wave 0 E2E 网绿后开大批** |
 | 3 css/html | ⚪ | css 16124 / html 6568 | — | — |
 | 4 i18n/文档/抛光 | ⚪ | — | — | — |
 
@@ -251,6 +251,62 @@
 - **能快**:测试网、复制模块这类并行活,本来几周,batch 几天啃掉大半。真提速。
 - **不可能一晚全完**:`home.js` 22k + `home.css` 16k 体量在那;每个 PR 你得过目;"删巨石接线"是真实串行尾巴;登录/计费/OCR 热路径规矩写死要你在场。
 - **真实闭环路径**:并行的 ~80% 飞快;剩 ~20% 高敏 + 串行尾巴,是你盯着的 gated 工作。
+
+---
+
+## 13. home.js 测绘 manifest(2026-05-27 · 第三十七会话 · 22970 行版本)
+
+> **关键发现**:home.js 的"大未知块"不是一个巨函数,而是 **~35 个功能孤岛**(顶层函数群 + 约 25 个 IIFE 自执行模块串在一起)。每个 IIFE 天然 = 一个 `src/home/<feature>.js`。**行号是本快照,抽前必 re-grep。**
+
+**① 先抽(串行 · 由主控做):公共件 `src/home/_shared.js`**
+- 散落 L190-770:`isSuperAdmin/isOwner/isEmployee/isTrial/isLifetime/shouldHideMoney`(角色)、`t`(L273)、`escapeHtml`(L278)、`svgIcon`(L285)、`showConfirm`(L309)、`apiGet/apiPost/apiPut`(L435-499)、`applyLang`(L541)、`setupDropdown`(L735)、`showToast`(L6577)、`showAlert`(L4745)、`renderPageHeadInfo`(L4804)。
+- 几乎所有 feature 模块都依赖它 → 必须第一个抽,之后各模块 import。
+
+**② 可并行 copy-out 的安全 feature 模块(大批 · 每个 1 agent)**
+
+| 建议文件 `src/home/*.js` | 行范围(快照) | ~行 | 功能 |
+|---|---|---|---|
+| sidebar-routing.js | 803-1176 | 370 | routeTo + 侧栏分组/折叠 |
+| team.js | 1316-1770 | 450 | 团队管理(员工增删/改密) |
+| settings.js | 1282-1962 + 20494-20650 | ~830 | 设置页 tab/表单/通用设置/设置 modal |
+| chrome-quota.js | 1965-2280 | 315 | brand workspace/配额 banner/侧栏显隐/infobar |
+| upload-camera.js | 2281-2962 | 680 | 上传入口/相机/图片转 PDF/文件列表 |
+| ocr-run-results.js | 2964-3640 | 680 | 开始识别/引擎轮询/结果渲染/搜索 |
+| results-drawer.js | 3641-3895 | 255 | 识别抽屉/字段渲染 |
+| rd-sync.js | 3896-4391 | 495 | RD 税务校验/同步弹窗/OCR 推送/diagnose |
+| export.js | 4392-4610 | 220 | Excel 导出模板系统 |
+| history.js | 4790-5462 | 670 | 历史记录页 |
+| erp-endpoints-logs.js | 5463-6760 | 1300 | ERP 端点管理/推送日志/批量重推删 |
+| email-ingest.js | 6761-7418 | 655 | 邮箱抓取 |
+| folder-watcher.js | 7421-7968 | 544 | 文件夹监听(File System Access API) |
+| archive-settings.js | 7971-8470 | 497 | 归档命名规则编辑器 |
+| bank-recon.js | 8474-9528 | 1052 | 银行对账模块 |
+| **(待探)** | 9597-11127 | ~1530 | ⚠️ 无标题块 · 抽前需 agent 先测绘标注 |
+| admin-misc.js | 11130-11397 | 267 | 老 admin 残留入口 + 成本追踪面板 |
+| clients.js | 11401-12152 | 750 | 客户实体前端全套 |
+| ai-balance.js | 12156-12337 | 180 | Google AI 余额追踪 |
+| report-templates.js | 12340-12749 | 410 | 报表模板/统一导出弹窗 |
+| welcome-wizard.js | 15714-15907 | 190 | 登录后欢迎向导 |
+| exceptions.js | 15914-17523 | 1609 | 异常栏 列表 + 抽屉(第二大块) |
+| notifications.js | 17527-17823 | 296 | 智能提醒 |
+| recon-center.js | 17826-18151 | 325 | 对账中心首页 |
+| access-log.js | 18299-18488 | 189 | 客户访问日志 tab |
+| assign-clients.js | 18491-18653 | 162 | 客户分配 modal(老板分客户给员工) |
+| erp-mappings.js | 18704-19178 + 20143-20190 | ~520 | ERP 字段映射底座 + 高级 toggle |
+| erp-xero.js | 19182-19732 | 546 | Xero 连接卡片 + 推按钮 |
+| bulk-upload.js | 19735-20204 | ~470 | 大批量上传进度 + 新用户引导 |
+| topbar-avatar.js | 21264-22376 | 1100 | 顶栏三件套 / 头像菜单(NAV-IA P1) |
+| recon-collapse.js | 22441-22690 | 250 | 销项/收入对账折叠组件 |
+| recon-batch.js | 22691-22970 | 280 | 对账历史多选批量删 |
+
+**③ ⚠️ 高敏/勿入 batch(留 Zihao 在场 · 主控亲手做)**
+- `plans-plg-line`(L12757-15446 · **2689 行 · 最大块**):商业模式 = 套餐 + 防薅闸 + 升级弹窗 + **LINE 绑定**(碰登录/账号)。
+- `password-change`(L15452-15710):修改密码模块(碰认证)。
+- `line-email-modal`(L18168-18296):LINE 补邮箱强制 modal(**账号合并**)。
+- `session-heartbeat`(L22377-22440):Session 心跳踢设备(auth)。
+- 启动/boot 段(L4761-4789)+ routeTo 中枢:接线敏感,串行小心。
+
+**④ 节奏**:`_shared` 先串行抽 → 再放 12-18 个 agent 并行 copy-out 上表安全模块(2-3 轮)→ 串行窗口接线删 home.js → 最后 Zihao 在场处理高敏 4 块。**前置:Wave 0 E2E 网必须先绿**(否则拆完无法验证页面还能渲染)。
 
 ---
 

@@ -1,7 +1,7 @@
 # 📊 STATE · Pearnly 项目状态
 
 > 🏗️ **【常驻指针 · 整顿恢复后读】整顿进行中 · 已开始并行 agent 加速。** 进窗口必读 `docs/refactor/BATCH_STRATEGY.md`(**特别 §9.5 实际操作模型 + §13 home.js 测绘 manifest**)+ `REFACTOR_MASTER_PLAN.md`。
-> **当前态(第三十七会话后)**:Wave 1(db.py membership+tenant)已 copy-out(未接线)· home.js 已测绘完(§13)· **质检窗口正在建 9 个 E2E 安全网**。**下一步**:E2E 网绿 → 开 home.js 大 batch(§13 manifest · 直接搬功能模块 · 不用先抽 _shared)。
+> **当前态(第三十七会话 · 持续更新)**:① E2E 安全网已建(10 个 · 真账号 · CI 用 env-gated skip 保绿)。② **home.js 大 batch 进行中**:R1-R3 已抽 **13 块** safe IIFE 模块 → `src/home/*`,home.js **22970→18513**(全接线 + 生产 E2E 10/10 + CI 绿,见 §10/§13 账本)。③ Wave 1(db.py membership+tenant)已 copy-out 未接线。**下一步**:新窗口照 §13 manifest 继续 batch 抽剩余 safe IIFE 模块(每轮 re-grep 行号 · E2E 验 · 避🔴高敏 4 块);抽尽 safe 后,剩高敏 4 块 + 顶层函数群 + _shared 收官需 Zihao 在场 / 主控做。
 > **⚠️ 工作流变化**:Zihao 非技术用户 · 内置 `/batch` 在本环境未触发 → **主控窗口自己用 Agent 工具派后台并行 agent**(copy-out)· 全部判断/守门/合并/上线由主控包办 · Zihao 只贴极少命令 + 当用户测 app。详见 §9.5。
 
 > ════════════════════════════════════════════════════════════

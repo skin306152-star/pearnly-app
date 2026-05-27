@@ -14,9 +14,10 @@ import './home/recon-center.js'; // REFACTOR-C1 · 对账中心首页(loadReconc
 import './home/assign-clients.js'; // REFACTOR-C1 · 客户分配 modal(openAssignClientsModal)
 import './home/access-log.js'; // REFACTOR-C1 · 客户访问日志 tab(自绑 · owner only)
 import './home/notifications.js'; // REFACTOR-C1 · 智能提醒(_loadNotificationsPanel)
+import './home/recon-batch.js'; // REFACTOR-C1 · 对账历史多选批量删(自绑 · 事件委托)
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(
-        '[pearnly] vite bundle loaded · dashboard + billing + test-center + workspace-switcher + recon-center + assign-clients + access-log + notifications'
+        '[pearnly] vite bundle loaded · dashboard + billing + test-center + workspace-switcher + recon-center + assign-clients + access-log + notifications + recon-batch'
     );
 }

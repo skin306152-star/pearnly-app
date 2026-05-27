@@ -678,70 +678,28 @@ def _require_super_admin(request: Request):
 
 
 def _get_plan(user_id: str) -> str:
-    """v111.1 · 取用户当前套餐(自动 map 老 plan + 处理过期)
-    返回值始终是新模型 plan 字符串(trial/monthly/yearly/lifetime/admin)
-    v111.2 · super_admin 直接返 admin · 不走 plan 字段
+    """v118.46 · 计费迁移收尾(2026-05-27 Zihao 拍板「全迁充值版」)·
+    全平台只剩「充值 / 按量扣费」一种(credits)· 老套餐 trial/monthly/yearly/lifetime/free 全下线。
+    非超管一律返回 'credits'、super_admin 返回 'admin'。
+    功能权限早已扁平化(route_helpers._plan_permissions 忽略 plan · 人人全开),
+    OCR 准入只看 credits 余额(app.py v118.46)· 故 plan 不再分档、不再有到期降级逻辑。
     """
     try:
         import db as _db
 
-        with _db.get_cursor(commit=True) as cur:
-            # v111.2 · super_admin 第一关 · 一律 admin plan
+        with _db.get_cursor() as cur:
             cur.execute(
-                """
-                    SELECT COALESCE(is_super_admin, false) AS sa,
-                           plan, trial_expires_at, plan_expires_at
-                    FROM users WHERE id=%s
-                """,
+                "SELECT COALESCE(is_super_admin, false) AS sa FROM users WHERE id=%s",
                 (user_id,),
             )
             row = cur.fetchone()
             if not row:
-                return "trial"
-            if isinstance(row, dict):
-                sa = row.get("sa")
-                raw_plan = row.get("plan")
-                trial_exp = row.get("trial_expires_at")
-                plan_exp = row.get("plan_expires_at")
-            else:
-                sa, raw_plan, trial_exp, plan_exp = row
-
-            # v111.2 · super_admin 一律 admin · 享受 999 限制
-            if sa:
-                return "admin"
-
-            # v111.1 · 老 plan 自动 map 到新 plan
-            mapped_plan = LEGACY_PLAN_MAP.get(raw_plan or "trial", raw_plan or "trial")
-
-            now = _now()
-
-            # trial 到期 → 保持 trial · 让 check_ocr_quota 拒绝
-            # (用户还能看历史 · 引导付款)
-            if mapped_plan == "trial" and trial_exp and trial_exp < now:
-                # 不改库 · 仅返回 trial(quota 检查会拒绝)
-                return "trial"
-
-            # monthly/yearly 到期 → 转回 trial · 让用户重新付款
-            if mapped_plan in ("monthly", "yearly") and plan_exp and plan_exp < now:
-                cur.execute(
-                    "UPDATE users SET plan='trial', plan_expires_at=NULL WHERE id=%s", (user_id,)
-                )
-                cur.execute(
-                    """
-                        INSERT INTO subscription_log(user_id, from_plan, to_plan, reason)
-                        VALUES (%s, %s, 'trial', 'plan_expired')
-                    """,
-                    (user_id, mapped_plan),
-                )
-                logger.info(f"[v111.1] User {str(user_id)[:8]} {mapped_plan} 过期 · 自动转 trial")
-                return "trial"
-
-            # lifetime 永不过期(plan_expires_at 应为 NULL)
-            # admin 永不过期
-            return mapped_plan if mapped_plan in PLAN_CONFIG else "trial"
+                return "credits"
+            sa = row.get("sa") if isinstance(row, dict) else row[0]
+            return "admin" if sa else "credits"
     except Exception as e:
         logger.error(f"_get_plan failed: {e}")
-        return "trial"
+        return "credits"
 
 
 # ============================================================

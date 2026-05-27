@@ -22,6 +22,7 @@ import './home/big-batch-progress.js'; // REFACTOR-C1 · 大批量上传进度�
 import './home/erp-xero.js'; // REFACTOR-C1 · Xero 连接卡片
 import './home/report-templates.js'; // REFACTOR-C1 · 报表模板/统一导出弹窗(openReportModal)
 import './home/folder-watcher.js'; // REFACTOR-C1 · 文件夹监听(_loadFolderWatcherPanel)
+import './home/email-ingest.js'; // REFACTOR-C1 · 邮箱抓取(_loadEmailIngestPanel)
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(

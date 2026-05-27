@@ -42,6 +42,7 @@ import './home/settings-general.js'; // REFACTOR-C1 · 设置→通用面板(语
 import './home/sidebar-nav-group.js'; // REFACTOR-C1 · 侧栏可折叠业务流分组(window.expandNavGroupForRoute)
 import './home/help-modal.js'; // REFACTOR-C1 · Help modal 关闭绑定
 import './home/integration-config.js'; // REFACTOR-C1 · 集成页「配置」按钮→抽屉
+import './home/erp-integration.js'; // REFACTOR-C1 · ERP 集成页(推送日志+端点管理 · loadErpLogs/loadErpEndpoints/...)
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(

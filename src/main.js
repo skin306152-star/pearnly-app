@@ -31,6 +31,10 @@ import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件
 import './home/recon-subtab-settings.js'; // REFACTOR-C1 · 对账子tab+设置弹窗
 import './home/excel-formula-recon.js'; // REFACTOR-C1 · Excel公式对账内测(skin-only)
 import './home/gl-vat-recon.js'; // REFACTOR-C1 · GL vs 销项税报告对账
+import './home/erp-mappings.js'; // REFACTOR-C1 · ERP 字段映射底座(客户/科目/税码 sub-tab)
+import './home/unified-push.js'; // REFACTOR-C1 · ERP 统一推送按钮/连接器下拉
+import './home/erp-map-advanced.js'; // REFACTOR-C1 · ERP 字段映射高级 sub-tab toggle
+import './home/erp-onboard.js'; // REFACTOR-C1 · ERP 对接新用户引导 modal
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(

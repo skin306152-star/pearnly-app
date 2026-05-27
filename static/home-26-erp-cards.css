@@ -1,0 +1,489 @@
+/* ============================================================
+ * v118.27.1 · MR.ERP 下载按钮(注入到历史抽屉 saveBar 内)
+ * ============================================================ */
+#btn-mrerp-download {
+    gap: 6px;
+}
+#btn-mrerp-download.disabled,
+#btn-mrerp-download:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+#btn-mrerp-download.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+#btn-mrerp-download svg {
+    flex-shrink: 0;
+}
+
+/* ============================================================
+ * v118.27.4 · Xero 连接卡片(自动化 → ERP 对接 → 连接 & 推送日志 顶部)
+ * ============================================================ */
+.erp-connect-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.erp-connect-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 16px;
+}
+.erp-cc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.erp-cc-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+}
+.erp-cc-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+.erp-cc-badge.green {
+    background: #dcfce7;
+    color: #166534;
+}
+.erp-cc-badge.gray {
+    background: #f1f5f9;
+    color: #64748b;
+}
+.erp-cc-body {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.6;
+}
+.erp-cc-empty {
+    color: #94a3b8;
+    padding: 8px 0;
+}
+.erp-cc-meta {
+    color: #64748b;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+.erp-cc-org-label {
+    font-weight: 500;
+    color: #0f172a;
+    margin: 6px 0 4px;
+    font-size: 13px;
+}
+.erp-cc-orgs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 12px;
+}
+.erp-cc-org-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.erp-cc-org-row:hover { background: #f4f4f0; }
+.erp-cc-org-row input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+}
+.erp-cc-org-name {
+    color: #0f172a;
+    font-size: 13px;
+    word-break: break-word;
+}
+.erp-cc-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 10px;
+}
+
+/* Xero 推按钮 · 跟 MR.ERP 按钮同款 disabled */
+#btn-xero-push.disabled,
+#btn-xero-push:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+#btn-xero-push.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* ============================================================
+ * v118.27.5 · 统一推送按钮(抽屉)
+ * 取代旧 3 按钮(btn-push-erp / btn-mrerp-download / btn-xero-push)
+ * 旧按钮在新按钮注入时被 hidden(向后兼容 · 不删 DOM)
+ * ============================================================ */
+.pn-push-wrap {
+    position: relative;
+    display: inline-flex;
+}
+.pn-push-split {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+}
+.pn-push-main,
+.pn-push-arrow {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 7px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--ink-2);
+    transition: background 0.15s;
+    line-height: 1.2;
+}
+.pn-push-main svg,
+.pn-push-arrow svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+.pn-push-main:hover,
+.pn-push-arrow:hover {
+    background: var(--bg);
+}
+.pn-push-main:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.pn-push-main.loading {
+    pointer-events: none;
+    opacity: 0.65;
+}
+.pn-push-arrow {
+    padding: 7px 8px;
+    border-left: 1px solid var(--line);
+}
+.pn-push-empty {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.pn-push-dropdown {
+    position: absolute;
+    /* v118.27.6.1 · 抽屉底部按钮空间不够 · 改向上弹出(dropup)· 跟保存按钮错开 */
+    bottom: calc(100% + 6px);
+    left: 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    /* 阴影方向反转 · 向上抬起 */
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.10);
+    padding: 4px 0;
+    z-index: 1000;
+    min-width: 240px;
+    animation: pn-pd-slide-up 0.18s ease-out;
+}
+@keyframes pn-pd-slide-up {
+    from { transform: translateY(6px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.pn-pd-item {
+    padding: 9px 14px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    cursor: pointer;
+    color: var(--ink);
+    transition: background 0.12s;
+}
+.pn-pd-item:hover {
+    background: var(--bg);
+}
+.pn-pd-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--ink-2);
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.pn-pd-icon svg {
+    width: 16px;
+    height: 16px;
+}
+.pn-pd-name {
+    flex: 1;
+    color: var(--ink);
+}
+.pn-pd-tag {
+    font-size: 11px;
+    color: var(--ink-3);
+}
+.pn-pd-check {
+    color: var(--success);
+    font-size: 12px;
+    margin-left: 4px;
+}
+.pn-pd-divider {
+    border-top: 1px solid var(--line-soft);
+    margin: 4px 0;
+}
+.pn-pd-all {
+    color: var(--ink-2);
+}
+
+/* ============================================================
+ * v118.27.5.3 · 导出 Excel split button(模板选择)
+ * 砍掉占位的「自定义模板」按钮 · 改成 [导出 ▼] 下拉
+ * ============================================================ */
+.export-split-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+}
+.export-split-wrap .btn.export-main {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: 0;
+}
+.export-split-wrap .btn.export-arrow {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 0 10px;
+    min-width: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.export-split-wrap .btn.export-arrow svg {
+    width: 12px;
+    height: 12px;
+}
+.export-split-wrap .btn.export-arrow:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.export-dropdown {
+    position: absolute;
+    /* v118.27.7 · 改向上弹出 · 跟抽屉推送下拉一致 */
+    bottom: calc(100% + 6px);
+    right: 0;
+    min-width: 280px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    /* 阴影方向反转 · 向上抬起 */
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.10);
+    padding: 4px 0;
+    z-index: 1000;
+    animation: export-dd-slide-up 0.18s ease-out;
+}
+@keyframes export-dd-slide-up {
+    from { transform: translateY(6px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.export-dd-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--line-soft);
+    transition: background 0.12s;
+}
+.export-dd-item:last-child {
+    border-bottom: none;
+}
+.export-dd-item:hover {
+    background: var(--bg);
+}
+.export-dd-item.active {
+    background: var(--accent-soft);
+}
+.export-dd-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.export-dd-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    flex: 1;
+}
+.export-dd-check {
+    color: var(--success);
+    font-size: 13px;
+}
+.export-dd-desc {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+/* v118.32.5.5.24 · 屎山清理:删除 v118.27.5.4 老版本横幅(.pn-version-banner)
+   已被 static/version-banner.js 顶部弹窗替代 · CSS 整段移除 */
+
+/* ============================================================
+ * v118.27.6 · 模板下拉 badge + 自定义底部入口
+ * ============================================================ */
+.export-dd-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-left: 4px;
+}
+.export-dd-badge.badge-rec {
+    background: #dbeafe;
+    color: #111111;
+}
+.export-dd-badge.badge-new {
+    background: #dcfce7;
+    color: #166534;
+}
+.export-dd-badge.badge-soon {
+    background: #f3f4f6;
+    color: var(--ink-3);
+    font-weight: 500;
+}
+.export-dd-divider {
+    height: 1px;
+    background: var(--line);
+    margin: 4px 0;
+}
+.export-dd-item.export-dd-custom {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+.export-dd-item.export-dd-custom:hover {
+    background: var(--bg);
+}
+.export-dd-item.export-dd-custom .export-dd-name {
+    color: var(--ink-3);
+    font-weight: 400;
+}
+
+/* 单据记录批量 modal · 自定义模板「即将上线」行 */
+.report-tpl-item.report-tpl-coming {
+    cursor: not-allowed;
+    opacity: 0.6;
+    border-style: dashed;
+}
+.report-tpl-item.report-tpl-coming:hover {
+    background: transparent;
+    border-color: var(--line);
+}
+.report-tpl-item.report-tpl-coming input[type="radio"] {
+    cursor: not-allowed;
+}
+.report-tpl-badge.report-tpl-badge-soon {
+    background: #f3f4f6;
+    color: var(--ink-3);
+}
+
+/* ============================================================
+ * v27.8.1.0 · MR.ERP 凭据卡片 + modal 样式
+ * 复用 .erp-connect-card 基类(铁律 48)+ .modal 基类
+ * ============================================================ */
+
+/* MR.ERP 连接卡片(自动化 → ERP 对接 → connect sub-tab) */
+.erp-connect-card.erp-connect-mrerp {
+    /* 跟 Xero 卡片同基类 · 只差 brand 标识 */
+}
+
+.erp-cc-mrerp-meta {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--ink-3);
+    line-height: 1.5;
+}
+
+.erp-cc-mrerp-meta-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 2px 0;
+}
+
+.erp-cc-mrerp-meta-label {
+    color: var(--ink-3);
+    min-width: 56px;
+}
+
+.erp-cc-mrerp-meta-value {
+    color: var(--ink-1);
+    font-weight: 500;
+}
+
+.erp-cc-mrerp-test-pass {
+    color: #15803d;
+    font-weight: 500;
+}
+
+.erp-cc-mrerp-test-fail {
+    color: #b91c1c;
+    font-weight: 500;
+}
+
+/* MR.ERP 凭据 modal · 复用 .modal-mask + .modal · 微调 */
+.mrerp-cred-modal {
+    max-width: 520px;
+}
+
+.mrerp-cred-fallback-hint {
+    margin: 0 0 16px;
+    padding: 10px 12px;
+    background: #f4f4f0;
+    border: 1px solid #e8e8e3;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #111111;
+    line-height: 1.5;
+}
+
+.mrerp-cred-test-result {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.mrerp-cred-test-result.ok {
+    background: #ECFDF5;
+    border: 1px solid #A7F3D0;
+    color: #065F46;
+}
+
+.mrerp-cred-test-result.err {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #991B1B;
+}
+
+.mrerp-cred-test-result-icon {
+    display: inline-flex;
+    margin-right: 6px;
+    vertical-align: -2px;
+}
+
+.mrerp-cred-test-result-icon svg {
+    width: 14px;
+    height: 14px;
+}
+

@@ -1,0 +1,767 @@
+/* ============================================================
+   v118.32.3 · 系统设置改 Modal 弹窗(参考 DeepSeek / ChatGPT / Linear)
+   ============================================================ */
+.settings-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 9998;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    animation: settingsModalFadeIn .18s ease-out;
+}
+@keyframes settingsModalFadeIn { from{opacity:0} to{opacity:1} }
+
+body.settings-modal-open { overflow: hidden; }
+
+.settings-modal-overlay #page-settings {
+    background: #fff;
+    border-radius: 16px;
+    width: 1000px;
+    max-width: 100%;
+    max-height: min(85vh, calc(100vh - 64px));  /* v118.34.35 · 兜底 · 防止 vh 单位在某些缩放下计算异常 */
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    position: relative;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;  /* v118.34.35 · flex 容器子项 overflow 前置条件 */
+    animation: settingsModalSlideUp .22s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes settingsModalSlideUp {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+}
+
+/* 顶部标题区(modal 内) */
+.settings-modal-overlay #page-settings .page-head-clean {
+    padding: 20px 28px 16px;
+    border-bottom: 1px solid var(--line, #e5e7eb);
+    margin: 0;
+    flex-shrink: 0;
+}
+.settings-modal-overlay #page-settings .page-head-icon { display: none; }
+.settings-modal-overlay #page-settings .page-head-title { font-size: 18px; }
+.settings-modal-overlay #page-settings .page-head-sub { display: none; }
+
+/* layout · 左导航 + 右内容,撑满剩余高度,内部各自滚动 */
+.settings-modal-overlay #page-settings .settings-layout {
+    flex: 1;
+    min-height: 0;  /* v118.34.35 · 修响应式 bug · flex item 默认 min-height: auto 会撑爆父容器、阻断 overflow */
+    overflow: hidden;
+    display: flex;
+    align-items: stretch;  /* v118.34.35 · 修响应式 bug · 覆盖外层 grid 的 align-items: start · 让 side-nav 撑满全高才能触发自身 overflow-y 滚动 */
+    margin: 0;
+    gap: 0;  /* v118.34.35 · 覆盖外层 grid 的 gap: 20px */
+}
+.settings-modal-overlay #page-settings .settings-side-nav {
+    width: 220px;
+    min-height: 0;
+    /* v118.34.36 · 真正修复响应式 bug · 根因: 基础规则 .settings-side-nav (home.css:9758)
+       含 max-height: calc(100vh - var(--topbar-h) - 32px) + position: sticky,
+       这两条在 modal 内不该应用 · modal 内 side-nav 应该让 flex 容器决定高度 · 不该
+       自己设 max-height (会比 modal 可用高度大很多 · 超出部分被父 overflow:hidden clip 掉 ·
+       自身 overflow-y:auto 永远不触发) */
+    max-height: none !important;
+    position: static !important;
+    top: auto !important;
+    border: none;
+    border-right: 1px solid var(--line, #e5e7eb);
+    border-radius: 0;
+    padding: 16px 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    flex-shrink: 0;
+    background: #fafaf8;
+}
+.settings-modal-overlay #page-settings #settings-content,
+.settings-modal-overlay #page-settings .settings-content-wrap,
+.settings-modal-overlay #page-settings .settings-content {
+    /* v118.35.0.35 (2026-05-22) · 真正修响应式 bug · 跟 side-nav (L14253) 同款修法
+       根因: 之前靠 flex:1 + min-height:0 推 overflow · 在浏览器 zoom 67-100% 范围内 flex chain
+       高度解析失败 · overflow-y:auto 不触发 · 用户看不到 LINE ID / 国家 / 公司信息 tab 字段。
+       v118.34.39 已用同款 calc 卡死 max-height 修过左栏 · 这次轮到右栏。
+       Inline override (home.html L52-63) 是 defensive layer · 这里是 base rule 同步. */
+    max-height: calc(min(85vh, 100vh - 64px) - 80px);
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 24px 28px;
+}
+
+/* ✕ 关闭按钮(右上角) */
+.settings-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--ink-3, #6b7280);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: background .15s, color .15s;
+}
+.settings-modal-close:hover { background: #f3f4f6; color: var(--ink, #111827); }
+.settings-modal-close svg { width: 18px; height: 18px; }
+
+/* 手机端 · 全屏 */
+@media (max-width: 768px) {
+    .settings-modal-overlay { padding: 0; }
+    .settings-modal-overlay #page-settings {
+        width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    .settings-modal-overlay #page-settings .settings-layout {
+        flex-direction: column;
+    }
+    /* 手机端:左导航变成顶部横向滚动 tab 条(参考 ChatGPT mobile) */
+    .settings-modal-overlay #page-settings .settings-side-nav {
+        width: 100%;
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid var(--line, #e5e7eb);
+        padding: 8px 12px;
+        display: flex;
+        flex-direction: row;
+        gap: 4px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+    }
+    .settings-modal-overlay #page-settings .settings-nav-group {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: row;
+        gap: 4px;
+        margin: 0;
+        padding: 0 4px;
+        border-right: 1px solid var(--line, #e5e7eb);
+    }
+    .settings-modal-overlay #page-settings .settings-nav-group:last-child { border-right: none; }
+    .settings-modal-overlay #page-settings .settings-nav-group-title { display: none; }
+    .settings-modal-overlay #page-settings .settings-tab {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    .settings-modal-overlay #page-settings .settings-tab span { font-size: 13px; }
+    .settings-modal-overlay #page-settings #settings-content,
+    .settings-modal-overlay #page-settings .settings-content-wrap {
+        padding: 16px 20px;
+        -webkit-overflow-scrolling: touch;
+    }
+    .settings-modal-overlay #page-settings .page-head-clean {
+        padding: 16px 20px 12px;
+    }
+}
+
+
+/* v118.32.3.8 · DeepSeek 风格右侧内容:填满 + 行间横线分隔 · 去除嵌套卡片边框感 */
+.settings-modal-overlay #page-settings #settings-content,
+.settings-modal-overlay #page-settings .settings-content-wrap {
+    padding: 0;
+}
+
+/* settings-pane(每个 tab 内容)填满 · 不再固定宽度 */
+.settings-modal-overlay #page-settings .settings-pane {
+    width: 100%;
+    max-width: none;
+    padding: 8px 28px 28px;
+}
+.settings-modal-overlay #page-settings .settings-pane > .card,
+.settings-modal-overlay #page-settings .settings-pane > .panel {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 0 8px !important;
+    border-radius: 0 !important;
+}
+
+/* section-head: DeepSeek 风格大标题 + 副标题 + 行底横线 */
+.settings-modal-overlay #page-settings .section-head {
+    padding: 20px 0 16px;
+    border-bottom: 1px solid var(--line, #e5e7eb);
+    margin-bottom: 4px;
+}
+.settings-modal-overlay #page-settings .section-head:first-child { padding-top: 8px; }
+.settings-modal-overlay #page-settings .section-title {
+    font-size: 16px; font-weight: 600;
+    color: var(--ink, #111827);
+    margin: 0;
+}
+.settings-modal-overlay #page-settings .section-sub {
+    font-size: 13px; color: var(--ink-3, #6b7280);
+    margin-top: 4px; line-height: 1.5;
+}
+
+/* 表单字段 · 行间横线 + 标题左侧 / 控件右侧的"两栏行"模式 */
+.settings-modal-overlay #page-settings .form-group,
+.settings-modal-overlay #page-settings .form-field,
+.settings-modal-overlay #page-settings .settings-row {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line, #e5e7eb);
+    margin: 0;
+}
+.settings-modal-overlay #page-settings .form-group:last-child,
+.settings-modal-overlay #page-settings .form-field:last-child,
+.settings-modal-overlay #page-settings .settings-row:last-child {
+    border-bottom: none;
+}
+
+/* 团队管理 · 顶部"添加员工"按钮提到右上角(DeepSeek 模式) */
+.settings-modal-overlay #page-settings [data-pane="team"] .section-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 12px;
+}
+.settings-modal-overlay #page-settings [data-pane="team"] .section-head > .btn,
+.settings-modal-overlay #page-settings [data-pane="team"] .section-head + .btn,
+.settings-modal-overlay #page-settings [data-pane="team"] #team-add-btn {
+    flex-shrink: 0;
+}
+
+/* 团队列表 / 访问日志列表 · 卡片之间用横线分隔 · 不要每张都自带边框 */
+.settings-modal-overlay #page-settings .team-card,
+.settings-modal-overlay #page-settings .access-log-row {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid var(--line, #e5e7eb) !important;
+    border-radius: 0 !important;
+    padding: 16px 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+.settings-modal-overlay #page-settings .team-card:last-child,
+.settings-modal-overlay #page-settings .access-log-row:last-child {
+    border-bottom: none !important;
+}
+
+/* "加载中" / 空态居中显示 · 不要顶死左上角 */
+.settings-modal-overlay #page-settings .admin-loading,
+.settings-modal-overlay #page-settings #team-loading,
+.settings-modal-overlay #page-settings .team-empty,
+.settings-modal-overlay #page-settings .access-log-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--ink-3, #6b7280);
+    font-size: 13px;
+}
+
+/* 访问日志工具栏 · 搜索栏跟"导出 CSV"按钮一行 · 间距合理 */
+.settings-modal-overlay #page-settings .access-log-toolbar {
+    display: flex; gap: 8px; align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line, #e5e7eb);
+}
+.settings-modal-overlay #page-settings .access-log-toolbar .form-input {
+    flex: 1;
+}
+
+
+/* v118.32.3.9 · 单据记录"金额/置信/⋮"真正贴近屏幕右边
+   根因:外层 .card 自带 20px padding · 加 .main 28px · 让表格永远离右边 65px
+   修法:覆盖 #history-main 的 .card padding · 让表格 row 自己跑到 main 边界
+*/
+#history-main.card {
+    padding: 0 !important;
+    overflow: visible;
+}
+#history-main .results-head,
+#history-main .history-toolbar {
+    padding: 16px 20px 12px;
+}
+#history-main .history-table-wrap {
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+    margin: 0;
+}
+#history-main .history-table-head,
+#history-main .history-row {
+    /* 内部右 padding 收到 16px · 加 main 的 28px · ⋮ 距屏幕边 = 44px(还能再紧) */
+    padding-left: 20px;
+    padding-right: 16px;
+    /* 紧凑列宽:菜单 32px · 置信 80px · 金额 100px */
+    grid-template-columns: 28px 96px 1fr 100px 80px 32px !important;
+    gap: 8px;
+}
+#history-main .history-cell-menu {
+    justify-self: end;
+    margin-right: 0;
+    text-align: right;
+}
+#history-main .history-foot {
+    padding: 12px 20px 16px;
+}
+
+
+/* v118.32.3.9 · ✕ 关闭按钮真正显示在弹窗右上角(不再跑到浏览器右上角) */
+.settings-modal-overlay #page-settings { position: relative !important; }
+.settings-modal-overlay .settings-modal-close {
+    position: absolute !important;
+    top: 14px !important;
+    right: 14px !important;
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    background: transparent !important;
+    color: var(--ink-3, #6b7280) !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 100 !important;
+    transition: background .15s, color .15s !important;
+}
+.settings-modal-overlay .settings-modal-close:hover {
+    background: #f3f4f6 !important;
+    color: var(--ink, #111827) !important;
+}
+.settings-modal-overlay .settings-modal-close svg { width: 18px !important; height: 18px !important; }
+
+
+/* v118.32.3.9 · 批量识别错误条(取代隐式失败) */
+.bv-error-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.bv-error-banner svg { width: 18px; height: 18px; flex-shrink: 0; }
+.bv-error-banner > span { flex: 1; word-break: break-word; }
+.bv-error-close {
+    background: none; border: none; cursor: pointer;
+    color: #b91c1c; padding: 4px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+}
+.bv-error-close:hover { background: rgba(185, 28, 28, 0.1); }
+.bv-error-close svg { width: 14px; height: 14px; }
+
+
+/* ════════════════════════════════════════════════════════════════
+   v118.32.4.9.5 · Excel 公式对账内测 · UI(skin306152 only)
+   桌面优先 + @media 800px 降级(铁律 · 适配手机网页端)
+   ════════════════════════════════════════════════════════════════ */
+
+/* 顶部 segmented toggle */
+.vex-toggle-bar {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; margin: 16px 0 24px;
+}
+.vex-toggle-segmented {
+    display: inline-flex; padding: 4px;
+    background: #F3F4F6; border-radius: 10px;
+    gap: 2px;
+}
+.vex-tg-opt {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 18px; border: none; background: transparent;
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: #6B7280; cursor: pointer; font-family: inherit;
+    transition: all .2s;
+}
+.vex-tg-opt:hover { color: #111827; }
+.vex-tg-opt.active {
+    background: #fff; color: #111827;
+    box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.04);
+}
+.vex-beta-chip {
+    display: inline-flex; align-items: center;
+    padding: 2px 7px; border-radius: 99px;
+    background: #FED7AA; color: #9A3412;
+    font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+}
+.vex-toggle-hint {
+    font-size: 11.5px; color: #9A3412;
+    background: #FFF7ED; border: 1px solid #FED7AA;
+    padding: 4px 12px; border-radius: 99px;
+}
+
+/* 左右双拖拽区 · 防呆 · 中间间距 */
+.vex-drops {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    gap: 0;
+    align-items: stretch;
+    margin-bottom: 20px;
+}
+.vex-drop {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 32px 20px;
+    background: #f8f8f6;
+    border: 1.5px dashed #c8d0d8;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all .2s;
+    min-height: 180px;
+}
+.vex-drop:hover { border-color: #111111; background: #f0f0ec; }
+.vex-drop.drag-over { border-color: #111111; background: #f0f0ec; border-style: solid; }
+.vex-drop-icon-wrap {
+    width: 56px; height: 56px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+}
+.vex-drop-icon-wrap svg { width: 32px; height: 32px; }
+.vex-drop-invoice,
+.vex-drop-report  { background: #f8f8f6; border: 1.5px dashed #c8d0d8; }
+.vex-drop-invoice .vex-drop-icon-wrap { background: #e8e8e3; color: #111111; }
+.vex-drop-report  .vex-drop-icon-wrap { background: #e8e8e3; color: #111111; }
+.vex-drop-title { font-size: 15px; font-weight: 600; color: #555555; }
+.vex-drop-sub   { font-size: 12px; color: #999999; text-align: center; }
+
+.vex-drop-divider {
+    display: flex; align-items: center; justify-content: center;
+    color: #9CA3AF; font-size: 22px; font-weight: 300;
+    user-select: none;
+}
+
+/* 文件列表 · 左右两列 */
+.vex-files-row {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px; margin-bottom: 18px;
+}
+.vex-files-col {
+    background: #fafaf8; border: 1px solid #e8e8e3;
+    border-radius: 10px; padding: 12px;
+}
+.vex-files-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px; font-size: 12.5px; font-weight: 600; color: #374151;
+}
+.vex-files-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 22px; padding: 1px 8px; border-radius: 99px;
+    background: #111111; color: #fff; font-size: 11px; font-weight: 600;
+}
+.vex-files-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.vex-fi-empty { padding: 14px; color: #9CA3AF; font-size: 12px; text-align: center; }
+.vex-fi {
+    display: grid; grid-template-columns: 16px 1fr auto 24px;
+    align-items: center; gap: 8px;
+    padding: 7px 10px; background: #fff;
+    border: 1px solid transparent; border-radius: 6px;
+    font-size: 12.5px;
+}
+.vex-fi:hover { border-color: #E5E7EB; }
+.vex-fi-ic { width: 16px; height: 16px; color: #6B7280; }
+.vex-fi-n {
+    color: #111827; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; min-width: 0;
+}
+.vex-fi-s { font-size: 10.5px; color: #9CA3AF; }
+.vex-fi-x {
+    width: 22px; height: 22px; border: none; background: transparent;
+    color: #9CA3AF; cursor: pointer; border-radius: 4px;
+    font-size: 16px; line-height: 1; padding: 0;
+}
+.vex-fi-x:hover { background: #FEE2E2; color: #B91C1C; }
+
+/* 操作栏 */
+.vex-action-bar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 0; border-top: 1px solid #e8e8e3;
+}
+.vex-action-info { flex: 1; font-size: 12.5px; }
+.vex-action-info.muted { color: #9CA3AF; }
+.vex-action-info.ok    { color: var(--success, #16a34a); }
+
+/* v4.10.11 · 查看清单切换按钮 */
+.vex-toggle-preview-btn {
+    background: transparent; border: 0; padding: 4px 8px;
+    font-size: 12px; color: #111111; cursor: pointer;
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+.vex-toggle-preview-btn svg { width: 14px; height: 14px; transition: transform 0.2s; flex-shrink: 0; }
+.vex-toggle-preview-btn.open svg { transform: rotate(180deg); }
+
+/* v4.10.11 · 上传清单预览面板 */
+.vex-preview-panel {
+    border: 1px solid var(--line, #e8e8e3); border-radius: 12px;
+    background: var(--bg, #f4f4f0); padding: 14px 18px; margin-top: 8px;
+}
+/* v118.32.5.5.24 · 列宽 1:1 + gap 60px · 跟上传区 .vex-drops (1fr 60px 1fr) 视觉对齐 */
+.vex-pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+.vex-pp-col-title {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+}
+.vex-pp-col-name { font-size: 13px; font-weight: 500; color: #111827; }
+.vex-pp-col-count { font-size: 13px; color: #9CA3AF; font-weight: 400; }
+.vex-pp-search-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.vex-pp-search {
+    flex: 1; height: 30px; font-size: 12px; padding: 0 10px;
+    border: 0.5px solid var(--line, #e8e8e3); border-radius: 6px;
+    outline: none; color: #111827; background: var(--card, #fff);
+}
+.vex-pp-search:focus { border-color: #111111; }
+.vex-pp-clear-btn {
+    height: 30px; padding: 0 10px; font-size: 12px;
+    background: transparent; border: 0.5px solid var(--line, #e8e8e3);
+    border-radius: 6px; color: #6B7280; cursor: pointer; flex-shrink: 0;
+}
+.vex-pp-clear-btn:hover { color: #DC2626; border-color: #FCA5A5; }
+.vex-pp-file-list {
+    border: 0.5px solid var(--line, #e8e8e3); border-radius: 8px;
+    max-height: 220px; overflow-y: auto; background: var(--card, #fff);
+}
+.vex-pp-file-row {
+    display: flex; align-items: center;
+    padding: 8px 12px; border-bottom: 0.5px solid var(--line, #e8e8e3); font-size: 12px;
+}
+.vex-pp-file-row:last-child { border-bottom: 0; }
+.vex-pp-fi-icon { flex-shrink: 0; margin-right: 8px; display: block; }
+.vex-pp-fi-name {
+    flex: 1; color: #111827;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px;
+    min-width: 0;
+}
+.vex-pp-fi-size {
+    color: #9CA3AF; margin-right: 10px;
+    font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: 11px;
+}
+.vex-pp-fi-del {
+    color: #9CA3AF; cursor: pointer; flex-shrink: 0;
+    background: none; border: none; padding: 2px 3px;
+    display: flex; align-items: center; line-height: 1;
+}
+.vex-pp-fi-del:hover { color: #DC2626; }
+.vex-pp-pagination { text-align: center; padding: 6px 8px; font-size: 11px; color: #9CA3AF; }
+.vex-pp-guide {
+    margin-top: 14px; padding: 10px 12px; background: var(--line-soft, #f0f0eb);
+    border-radius: 8px; display: flex; align-items: center;
+    gap: 8px; font-size: 12px; color: #111111;
+}
+.vex-pp-guide svg { flex-shrink: 0; }
+@media (max-width: 800px) { .vex-pp-grid { grid-template-columns: 1fr; gap: 20px; } }
+
+/* 进度 / 结果区 */
+.vex-progress {
+    margin-top: 16px; padding: 18px 20px;
+    background: #f4f4f0; border: 1px solid #E2E8F0; border-radius: 12px;
+    display: flex; align-items: center; gap: 14px;
+}
+.vex-progress-title { font-size: 14px; font-weight: 600; color: #111827; }
+.vex-progress-sub   { font-size: 12px; color: #6B7280; margin-top: 4px; }
+
+
+/* ─ 手机端降级(铁律 · @media max-width:800px) ─ */
+@media (max-width: 800px) {
+    .vex-toggle-segmented { width: 100%; }
+    .vex-tg-opt { flex: 1; justify-content: center; padding: 10px 12px; }
+    .vex-drops {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .vex-drop-divider {
+        height: 24px;
+        font-size: 18px;
+    }
+    .vex-drop { padding: 22px 16px; min-height: 140px; }
+    .vex-files-row { grid-template-columns: 1fr; }
+    .vex-action-bar { flex-wrap: wrap; gap: 10px; }
+    .vex-action-info { flex: 1 1 100%; order: -1; text-align: center; }
+
+}
+
+/* ── v118.32.4.10.7 · VEX KPI 3 卡统一视觉 ── */
+.vex-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+.vex-kpi-card {
+    border-radius: var(--border-radius-lg, 12px);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    background: #ffffff;
+    border: 1px solid #e8e8e3;
+}
+.vex-kpi-icon-wrap {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+.vex-kpi-icon-warn  { background: #FEF3C7; color: #854F0B; }
+.vex-kpi-icon-ok    { background: #DCFCE7; color: #166534; }
+.vex-kpi-icon-err   { background: #FEE2E2; color: #991B1B; }
+.vex-kpi-val   { font-size: 18px; font-weight: 500; line-height: 1.1; color: #111827; }
+.vex-kpi-lbl   { font-size: 11px; color: #6B7280; }
+
+.vex-task-section {
+    margin-bottom: 0;
+    background: #ffffff;
+    border: 1px solid #e8e8e3;
+    border-radius: 12px;
+    padding: 16px 20px;
+}
+.vex-new-recon-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 24px 0 16px;
+}
+.vex-new-recon-divider::before,
+.vex-new-recon-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #E5E7EB;
+}
+.vex-new-recon-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6B7280;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+.vex-task-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border-tertiary, #E5E7EB);
+}
+.vex-task-table-wrap { overflow-x: auto; border-radius: var(--border-radius-lg, 12px); border: 0.5px solid var(--color-border-tertiary, #E5E7EB); }
+.vex-task-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.vex-task-table th {
+    background: #F9FAFB;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 500;
+    color: #6B7280;
+    border-bottom: 1px solid #E5E7EB;
+    white-space: nowrap;
+}
+.vex-task-table td {
+    padding: 9px 12px;
+    color: #111827;
+    border-bottom: 0.5px solid #F3F4F6;
+    white-space: nowrap;
+}
+.vex-task-row:hover td { background: #F9FAFB; }
+.vex-task-row:last-child td { border-bottom: none; }
+/* v118.32.5.5.22.1 · 列定位改 :nth-last-child · 不受前置 master checkbox 列影响 */
+.vex-task-table th:nth-last-child(3),
+.vex-task-table td:nth-last-child(3) { text-align: center; }   /* 状态列(倒数第 3)*/
+.vex-task-table th:last-child,
+.vex-task-table td:last-child { width: 80px; text-align: right; padding-right: 12px; }   /* 操作列(最右)*/
+.vex-task-empty { text-align: center; color: #9CA3AF; padding: 28px; }
+.vex-task-dl { color: #111111; text-decoration: none; font-weight: 600; }
+.vex-task-dl:hover { color: #111111; }
+
+/* v4.10.6 · 主操作上移包裹容器 */
+.vex-main-action {
+    border: 1px solid #e8e8e3;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 18px;
+    background: #ffffff;
+    position: relative;
+}
+.vex-main-action-tag {
+    position: absolute;
+    top: -9px; left: 14px;
+    background: #555555; color: #fff;
+    font-size: 10px; font-weight: 500;
+    padding: 2px 10px; border-radius: 20px;
+    white-space: nowrap;
+}
+
+/* 任务列表标题行 */
+.vex-task-header-wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border-tertiary, #E5E7EB);
+}
+.vex-task-header-wrap .vex-task-header { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.vex-task-meta { font-size: 11px; color: #9CA3AF; white-space: nowrap; }
+
+/* 历史表内联搜索框(VAT + GL 共用) */
+.hist-search-input {
+    flex: 0 0 auto;
+    width: 260px;
+    padding: 4px 10px;
+    font-size: 12px;
+    border: 1px solid var(--color-border-tertiary, #E5E7EB);
+    border-radius: 6px;
+    background: #ffffff;
+    color: var(--ink, #111827);
+    outline: none;
+    transition: border-color .15s;
+    margin-left: auto;
+}
+.hist-search-input:focus { border-color: var(--ink, #111827); }
+.hist-search-input::placeholder { color: #9CA3AF; }
+
+/* hover 操作按钮 */
+.vex-task-actions {
+    /* v118.32.5.3 · 改为长显示 · 同 GL 对账风格 · 避免用户找不到按钮 */
+    display: flex; gap: 6px; justify-content: flex-end;
+}
+.vex-task-dl-btn, .vex-task-del-btn {
+    background: transparent; border: none; cursor: pointer;
+    color: #6B7280; padding: 3px 5px; border-radius: 4px; line-height: 1;
+    display: flex; align-items: center;
+}
+.vex-task-dl-btn svg, .vex-task-del-btn svg { width: 14px; height: 14px; }
+.vex-task-dl-btn:hover { color: #111111; }
+.vex-task-del-btn:hover { color: #DC2626; }
+
+/* 展开按钮 */
+.vex-expand-btn {
+    margin-top: 12px; width: 100%; padding: 9px;
+    background: transparent; border: 0.5px dashed #CBD5E1;
+    color: #6B7280; font-size: 12px; border-radius: 8px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.vex-expand-btn:hover { background: #F9FAFB; color: #111827; }
+.vex-expand-btn svg { width: 14px; height: 14px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 500; }
+.badge-gray  { background: #F3F4F6; color: #6B7280; }
+.badge-blue  { background: #DBEAFE; color: #111111; }
+.badge-green { background: #DCFCE7; color: #15803D; }
+.badge-red   { background: #FEE2E2; color: #DC2626; }
+
+@media (max-width: 800px) {
+    .vex-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+    .vex-task-table th, .vex-task-table td { padding: 7px 8px; font-size: 12px; }
+}
+

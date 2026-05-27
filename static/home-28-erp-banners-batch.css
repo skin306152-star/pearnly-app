@@ -1,0 +1,687 @@
+/* ============================================================
+ * v27.8.1.14b.2 · A · 上传识别页:识别结果会自动保存 banner
+ * ============================================================ */
+.results-saved-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0 12px;
+    padding: 8px 12px;
+    background: #ECFDF5;
+    border: 1px solid #A7F3D0;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #065F46;
+    line-height: 1.5;
+}
+
+.results-saved-banner svg {
+    width: 16px;
+    height: 16px;
+    color: #059669;
+    flex-shrink: 0;
+}
+
+/* ============================================================
+ * v27.8.1.14b.2 · B · 单据记录页:客户过滤 banner
+ * ============================================================ */
+.history-client-filter-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0 12px;
+    padding: 10px 14px;
+    background: #f4f4f0;
+    border: 1px solid #e8e8e3;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #111111;
+}
+
+.history-client-filter-banner svg {
+    width: 18px;
+    height: 18px;
+    color: #111111;
+    flex-shrink: 0;
+}
+
+.history-client-filter-text {
+    flex: 1;
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.history-client-filter-name {
+    font-weight: 600;
+    color: #111111;
+    margin: 0 4px;
+}
+
+.history-client-filter-count {
+    color: #111111;
+    opacity: 0.7;
+    margin-left: 4px;
+    font-size: 12px;
+}
+
+.history-client-filter-clear {
+    flex-shrink: 0;
+    height: 28px;
+    padding: 0 12px;
+    font-size: 12px;
+    background: #fff;
+    border-color: #e8e8e3;
+    color: #111111;
+}
+
+.history-client-filter-clear:hover {
+    background: #DBEAFE;
+}
+
+/* ============================================================
+ * v27.8.1.14b.2 · mini modal 顶部 OCR 买方名行
+ * ============================================================ */
+.mrerp-pick-cus-buyer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 12px;
+    padding: 8px 12px;
+    background: #F9FAFB;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--ink-2);
+    line-height: 1.5;
+}
+
+.mrerp-pick-cus-buyer svg {
+    width: 14px;
+    height: 14px;
+    color: var(--ink-3);
+    flex-shrink: 0;
+}
+
+.mrerp-pick-cus-buyer-label {
+    color: var(--ink-3);
+    flex-shrink: 0;
+}
+
+.mrerp-pick-cus-buyer-name {
+    color: var(--ink);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+/* ============================================================
+   v118.27.8.1.15 · 大批量进度条 + ERP 新用户引导 modal
+   ============================================================ */
+
+/* 大批量进度条:插在 #file-list 上方 · 跟 .card 同色卡片质感 */
+.big-batch-progress {
+    margin: 12px 0 8px;
+    padding: 12px 14px;
+    background: var(--accent-soft);
+    border: 1px solid #c3dcf5;
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    animation: bbp-fade-in 220ms ease-out;
+}
+@keyframes bbp-fade-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0);    }
+}
+.big-batch-progress .bbp-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 500;
+}
+.big-batch-progress .bbp-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--accent);
+}
+.big-batch-progress .bbp-text {
+    flex: 1;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.big-batch-progress .bbp-track {
+    height: 6px;
+    background: #d9e8f7;
+    border-radius: 3px;
+    overflow: hidden;
+}
+.big-batch-progress .bbp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--brand));
+    border-radius: 3px;
+    transition: width 280ms ease-out;
+}
+
+/* ERP 新用户引导 modal */
+.erp-onboard-mask {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: erp-onboard-mask-in 180ms ease-out;
+}
+@keyframes erp-onboard-mask-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.erp-onboard-modal {
+    background: var(--card);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    max-width: 460px;
+    width: 100%;
+    padding: 28px 28px 22px;
+    text-align: center;
+    animation: erp-onboard-pop 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes erp-onboard-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+.erp-onboard-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.erp-onboard-icon svg {
+    width: 36px;
+    height: 36px;
+}
+.erp-onboard-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+.erp-onboard-body {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.6;
+    margin-bottom: 22px;
+}
+.erp-onboard-btns {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.erp-onboard-btns .btn {
+    min-width: 120px;
+}
+
+/* 移动端:进度条文字可换行 + modal padding 小一点 */
+@media (max-width: 640px) {
+    .big-batch-progress .bbp-text {
+        white-space: normal;
+        line-height: 1.4;
+    }
+    .erp-onboard-modal {
+        padding: 22px 18px 18px;
+    }
+    .erp-onboard-btns .btn {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+/* ============================================================
+   v118.27.8.1.16 · MR.ERP 客户匹配 score badge + undo toast
+   ============================================================ */
+
+/* 客户列表行的「推荐 / 可能」徽章 */
+.mrerp-pick-cus-row-match {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 7px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 9px;
+    line-height: 1;
+    margin-right: 4px;
+    flex-shrink: 0;
+    letter-spacing: 0.2px;
+}
+.mrerp-pick-cus-row-match.match-recommend {
+    color: #b45309;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+}
+.mrerp-pick-cus-row-match.match-maybe {
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+}
+
+/* 右下角 undo toast(类似 Gmail 撤销发送 · 3 秒倒计时) */
+.mrerp-undo-toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 9500;
+    min-width: 320px;
+    max-width: 420px;
+    padding: 14px 16px 12px;
+    background: var(--ink);
+    color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 200ms ease-out, transform 200ms ease-out;
+    font-size: 13px;
+}
+.mrerp-undo-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+.mrerp-undo-toast .mut-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.mrerp-undo-toast .mut-icon {
+    width: 16px;
+    height: 16px;
+    color: #4ade80;
+    flex-shrink: 0;
+}
+.mrerp-undo-toast .mut-text {
+    flex: 1;
+    line-height: 1.5;
+    word-break: break-word;
+}
+.mrerp-undo-toast .mut-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.mrerp-undo-toast .mut-progress {
+    flex: 1;
+    height: 3px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 1.5px;
+    overflow: hidden;
+}
+.mrerp-undo-toast .mut-progress-fill {
+    width: 100%;
+    height: 100%;
+    background: #4ade80;
+}
+.mrerp-undo-toast .mut-btn {
+    height: 28px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 120ms;
+    white-space: nowrap;
+}
+.mrerp-undo-toast .mut-btn-change {
+    color: #fef3c7;
+    background: transparent;
+    border-color: rgba(255,255,255,0.3);
+}
+.mrerp-undo-toast .mut-btn-change:hover {
+    background: rgba(255,255,255,0.08);
+}
+.mrerp-undo-toast .mut-btn-ok {
+    color: var(--ink);
+    background: #fff;
+    border-color: #fff;
+}
+.mrerp-undo-toast .mut-btn-ok:hover {
+    background: #e2e8f0;
+}
+
+@media (max-width: 640px) {
+    .mrerp-undo-toast {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        min-width: 0;
+        max-width: none;
+    }
+}
+
+/* ============================================================
+   v118.27.8.1.17 · MR.ERP 商品 picker mini modal
+   ============================================================ */
+.mrerp-pick-prod-mask {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.mrerp-pick-prod-modal {
+    background: var(--card);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 560px;
+    max-height: calc(100vh - 40px);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 12px;
+    animation: pearnly-pop 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes pearnly-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+.mrerp-pick-prod-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.mrerp-pick-prod-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    flex: 1;
+}
+.mrerp-pick-prod-close {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 120ms;
+}
+.mrerp-pick-prod-close:hover { background: var(--bg); color: var(--ink); }
+.mrerp-pick-prod-close svg { width: 14px; height: 14px; }
+
+.mrerp-pick-prod-progress {
+    font-size: 12px;
+    color: var(--ink-2);
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-weight: 500;
+    align-self: flex-start;
+}
+.mrerp-pick-prod-progress:empty { display: none; }
+
+.mrerp-pick-prod-ocrname {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+}
+.mrerp-pick-prod-ocrlabel {
+    color: var(--ink-2);
+    flex-shrink: 0;
+    font-weight: 500;
+}
+.mrerp-pick-prod-ocrval {
+    color: var(--ink);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.mrerp-pick-prod-search-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.mrerp-pick-prod-search-input {
+    flex: 1;
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0 12px;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--card);
+    outline: none;
+    transition: border-color 120ms;
+}
+.mrerp-pick-prod-search-input:focus { border-color: var(--accent); }
+.mrerp-pick-prod-refresh-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-2);
+    transition: all 120ms;
+}
+.mrerp-pick-prod-refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mrerp-pick-prod-refresh-btn svg { width: 14px; height: 14px; }
+.mrerp-pick-prod-refresh-btn.loading svg { animation: pearnly-spin 0.9s linear infinite; }
+@keyframes pearnly-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.mrerp-pick-prod-list {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    min-height: 180px;
+    max-height: 320px;
+    background: var(--bg);
+}
+.mrerp-pick-prod-loading,
+.mrerp-pick-prod-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--ink-2);
+    font-size: 13px;
+}
+.mrerp-pick-prod-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: background 100ms;
+}
+.mrerp-pick-prod-row:last-child { border-bottom: none; }
+.mrerp-pick-prod-row:hover { background: var(--accent-soft); }
+.mrerp-pick-prod-row.is-active {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding-left: 9px;
+}
+.mrerp-pick-prod-row-code {
+    font-family: var(--font-mono);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 60px;
+}
+.mrerp-pick-prod-row-name {
+    flex: 1;
+    color: var(--ink);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.mrerp-pick-prod-row-match {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 7px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 9px;
+    line-height: 1;
+    flex-shrink: 0;
+    letter-spacing: 0.2px;
+}
+.mrerp-pick-prod-row-match.match-recommend {
+    color: #b45309;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+}
+.mrerp-pick-prod-row-match.match-maybe {
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+}
+.mrerp-pick-prod-row-status {
+    font-size: 11px;
+    color: var(--ink-3);
+    padding: 2px 6px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.mrerp-pick-prod-manual { font-size: 13px; }
+.mrerp-pick-prod-manual summary {
+    cursor: pointer;
+    color: var(--ink-2);
+    padding: 6px 0;
+    list-style: none;
+}
+.mrerp-pick-prod-manual summary::before {
+    content: '▸ ';
+    display: inline-block;
+    transition: transform 120ms;
+}
+.mrerp-pick-prod-manual[open] summary::before {
+    transform: rotate(90deg);
+}
+.mrerp-pick-prod-manual-row {
+    display: flex;
+    gap: 8px;
+    padding-top: 8px;
+}
+.mrerp-pick-prod-manual-input {
+    flex: 1;
+    height: 32px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0 10px;
+    font-size: 13px;
+}
+.mrerp-pick-prod-manual-input:focus { border-color: var(--accent); outline: none; }
+
+.mrerp-pick-prod-selected {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    background: var(--success-bg);
+    border: 1px solid #c6f6d5;
+    border-radius: 8px;
+    font-size: 13px;
+}
+.mrerp-pick-prod-selected-label { color: var(--success); font-weight: 600; flex-shrink: 0; }
+.mrerp-pick-prod-selected-code {
+    font-family: var(--font-mono);
+    color: var(--success);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.mrerp-pick-prod-selected-name {
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.mrerp-pick-prod-btns {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.mrerp-pick-prod-btns-right {
+    display: flex;
+    gap: 8px;
+}
+.mrerp-pick-prod-btns .btn-ghost {
+    color: var(--ink-3);
+    text-decoration: underline;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+.mrerp-pick-prod-btns .btn-ghost:hover { color: var(--ink-2); }
+
+@media (max-width: 640px) {
+    .mrerp-pick-prod-modal {
+        padding: 16px;
+        max-height: calc(100vh - 24px);
+    }
+    .mrerp-pick-prod-list {
+        min-height: 140px;
+        max-height: 240px;
+    }
+    .mrerp-pick-prod-btns {
+        flex-wrap: wrap;
+    }
+    .mrerp-pick-prod-btns-right {
+        flex: 1;
+        justify-content: flex-end;
+    }
+}
+

@@ -1363,15 +1363,8 @@ def _bkk_year_month() -> str:
 #   Excel/Word/CSV: 50 字符 = 1 satang(฿0.01)· 向上取整
 # 白名单: users.is_billing_exempt = TRUE 自动跳过
 # ============================================================================
-from decimal import Decimal as _DecV21, ROUND_HALF_UP as _RH_V21
-import math as _math_v21
+from decimal import Decimal as _DecV21
 import time as _time_v21
-
-PDF_TIER1_LIMIT_V21 = 200
-PDF_TIER1_PRICE_V21 = _DecV21("1.50")
-PDF_TIER2_PRICE_V21 = _DecV21("0.75")
-EXCEL_CHARS_PER_SATANG_V21 = 50
-EXCEL_SATANG_PRICE_V21 = _DecV21("0.01")
 
 # 白名单 LRU cache(进程内 · 5 分钟 TTL · 减少 DB 压力)
 _EXEMPT_CACHE_V21: dict = {}
@@ -1473,30 +1466,6 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
             "pages_used_this_month": 0,
             "error_code": "lookup_error",
         }
-
-
-def estimate_pdf_cost_thb(pages_used_this_month: int, page_count: int) -> _DecV21:
-    """估算 PDF N 页的总成本 · 跨界自动拆段
-    v0.21 改: 调用端传 pages_used_this_month · 不再查 DB · 与前置 combined 查询复用
-    """
-    n = max(0, int(page_count or 0))
-    if n == 0:
-        return _DecV21("0.00")
-    used = max(0, int(pages_used_this_month or 0))
-    tier1_remaining = max(0, PDF_TIER1_LIMIT_V21 - used)
-    tier1_pages = min(n, tier1_remaining)
-    tier2_pages = n - tier1_pages
-    cost = (PDF_TIER1_PRICE_V21 * tier1_pages) + (PDF_TIER2_PRICE_V21 * tier2_pages)
-    return cost.quantize(_DecV21("0.01"), rounding=_RH_V21)
-
-
-def estimate_excel_cost_thb(char_count: int) -> _DecV21:
-    """Excel/Word/CSV 按字符计费 · 50 字符 = 1 satang · 向上取整"""
-    n = max(0, int(char_count or 0))
-    if n == 0:
-        return _DecV21("0.00")
-    satang = _math_v21.ceil(n / EXCEL_CHARS_PER_SATANG_V21)
-    return (EXCEL_SATANG_PRICE_V21 * satang).quantize(_DecV21("0.01"), rounding=_RH_V21)
 
 
 def charge_ocr(
@@ -2010,4 +1979,15 @@ from services.credits.store import (
 from services.tenant.store import (
     list_user_companies as list_user_companies,
     set_user_active_tenant as set_user_active_tenant,
+)
+
+# REFACTOR-B2 · 定价/成本估算 re-export(已抽到 services/billing/pricing · charge_ocr 裸名 + 外部 db.* 零改动)
+from services.billing.pricing import (
+    estimate_pdf_cost_thb as estimate_pdf_cost_thb,
+    estimate_excel_cost_thb as estimate_excel_cost_thb,
+    PDF_TIER1_LIMIT_V21 as PDF_TIER1_LIMIT_V21,
+    PDF_TIER1_PRICE_V21 as PDF_TIER1_PRICE_V21,
+    PDF_TIER2_PRICE_V21 as PDF_TIER2_PRICE_V21,
+    EXCEL_CHARS_PER_SATANG_V21 as EXCEL_CHARS_PER_SATANG_V21,
+    EXCEL_SATANG_PRICE_V21 as EXCEL_SATANG_PRICE_V21,
 )

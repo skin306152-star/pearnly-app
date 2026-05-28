@@ -148,6 +148,13 @@
 >   - app.py **3622→3484(-138 含 4 删孤儿)**。本会话累计 app.py **4523→3484 = -1039 / -23%** · 10 routes 出 · 5 模块新增。
 >   - 真账号 E2E:spec 01 单跑 PASS 5.0s · login 搬迁零回归(首跑 session 互踢 flake)。
 >   - **B1 还剩**:OCR 5 主路由(L1502-2614 · 大块 · _ocr_* helpers 缠)/ v1 ocr aliases(薄)/ version(微)/ _handle_line_image_ocr(LINE OCR 后台)。app.py 离 < 500 还需 -2984。
+> - **【第 32 轮 · loop 续 · 2026-05-28】**dynamic 微块 + v1 aliases:
+>   - **`4857070` meta_aliases_routes**:抽 /api/version + v1 OCR aliases(quota + recognize)→ `meta_aliases_routes.py`(71 行)。v1_export 跳过(ExportRequest model 紧耦合 · FastAPI signature 需注册时拿)留 app.py。
+>   - Lazy import 解循环:`from app import PEARNLY_FRONTEND_VERSION / get_quota / ocr_recognize` 在 handler 内 · app.py 顶部 include_router 顺序保 app 加载完。
+>   - 顺手修 `test_release_notes_no_history` import 路径(`app.get_frontend_version` → `meta_aliases_routes.get_frontend_version` · 防漂移)。
+>   - app.py **3484→3460(-24)**。本会话累计 app.py **4523→3460 = -1063 / -23.5%** · 12 routes 出 · 7 模块新增。
+>   - 真账号 E2E:smoke spec PASS 3.9s · 部署后 /api/version 200 验过(初跑 502 是部署中瞬态)。
+>   - **B1 接下来真正剩**:OCR 4 主路由(quota/recognize/export/export-by-history-ids · 1100+ 行 · _ocr_* helpers 缠绕严)+ v1_export(ExportRequest model)+ _handle_line_image_ocr(LINE OCR 后台 · 含 _ocr_* helpers)。app.py 真实剩可单刀的路由量很小 · 大量行数在 _ocr_* helpers + 内部 middleware/error handler。**< 500 目标在 OCR 5 主路由 + helpers 整搬到 services/ocr/ 才能达到** · 是大工程。
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

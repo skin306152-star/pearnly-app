@@ -71,93 +71,9 @@ def get_cursor(commit: bool = False):
         get_pool().putconn(conn)
 
 
-def ensure_google_sub_column():
-    """v118.27.5 · 启动时自动加 google_sub 列(幂等 · IF NOT EXISTS)
-    v118.27.5.3 · 同时加 avatar_url 列(Google OAuth picture URL)
-    P1b(2026-05-26)· 同时加 erp_push_mode 列(ERP 自动处理方式 · 账户级默认)·
-      复用本 users 多列 ensure(铁律 #21/#23:不新增 ensure_* · 进现有 ensure)·
-      值 smart(智能分拣) / fixed(固定当前账套) / ocr_only(只识别不推送)· 默认 smart。
-      留档迁移见 alembic/versions/006_users_erp_push_mode.py(生产不跑 alembic · 双跑范式)。"""
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT")
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL"
-            )
-            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT")
-            cur.execute(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS " "erp_push_mode TEXT DEFAULT 'smart'"
-            )
-        logger.info("[v118.27.5.3] users.google_sub + avatar_url + erp_push_mode 列就绪")
-        return True
-    except Exception as e:
-        logger.error(f"[v118.27.5.3] 加列失败: {e}")
-        return False
-
-
-# ============================================================
-# v118.28.9 · 改密后旧 JWT 失效
-# users 表加 password_changed_at TIMESTAMPTZ DEFAULT NOW()
-# auth.get_current_user_from_request 比对 token.iat 和该列 · 旧 token 自动作废
-# ============================================================
-def ensure_password_changed_at_column():
-    """v118.28.9 · 启动时自动加 password_changed_at 列(幂等 · IF NOT EXISTS)"""
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
-                "password_changed_at TIMESTAMPTZ DEFAULT NOW()"
-            )
-        logger.info("[v118.28.9] users.password_changed_at 列就绪")
-        return True
-    except Exception as e:
-        logger.error(f"[v118.28.9] 加 password_changed_at 列失败: {e}")
-        return False
-
-
-def ensure_line_uid_column():
-    """v118.28.4 · 启动时自动加 line_uid 列(幂等 · IF NOT EXISTS)"""
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS line_uid TEXT")
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_users_line_uid ON users(line_uid) WHERE line_uid IS NOT NULL"
-            )
-        logger.info("[v118.28.4] users.line_uid 列就绪")
-        return True
-    except Exception as e:
-        logger.error(f"[v118.28.4] line_uid 加列失败: {e}")
-        return False
-
-
-def ensure_email_codes_table():
-    """v118.27.6 · 邮箱验证码表(注册前验证 · 6 位数字 · 10 分钟有效)"""
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS email_codes (
-                    id BIGSERIAL PRIMARY KEY,
-                    email TEXT NOT NULL,
-                    code TEXT NOT NULL,
-                    purpose TEXT NOT NULL DEFAULT 'signup',
-                    expires_at TIMESTAMPTZ NOT NULL,
-                    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    used BOOLEAN NOT NULL DEFAULT FALSE,
-                    used_at TIMESTAMPTZ,
-                    sender_ip TEXT
-                )
-            """)
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes(email, purpose, used)"
-            )
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_email_codes_expires ON email_codes(expires_at)"
-            )
-        logger.info("[v118.27.6] email_codes 表就绪")
-        return True
-    except Exception as e:
-        logger.error(f"[v118.27.6] email_codes 建表失败: {e}")
-        return False
+# ensure_google_sub_column / ensure_password_changed_at_column / ensure_line_uid_column 已抽到
+# services/users/columns.py(REFACTOR-B2 · 见文件尾 re-export)
+# ensure_email_codes_table 已抽到 services/auth/email_codes_schema.py(同 · 文件尾 re-export)
 
 
 # ============================================================
@@ -1002,4 +918,16 @@ from services.billing.credits_schema import (
 # REFACTOR-B2 · Membership schema re-export(已抽到 services/membership/schema · 启动期 db.ensure_membership_tables 调用点零改)
 from services.membership.schema import (
     ensure_membership_tables as ensure_membership_tables,
+)
+
+# REFACTOR-B2 · users 表启动期列 ensure_* re-export(已抽到 services/users/columns)
+from services.users.columns import (
+    ensure_google_sub_column as ensure_google_sub_column,
+    ensure_password_changed_at_column as ensure_password_changed_at_column,
+    ensure_line_uid_column as ensure_line_uid_column,
+)
+
+# REFACTOR-B2 · email_codes 表启动期 schema re-export(已抽到 services/auth/email_codes_schema)
+from services.auth.email_codes_schema import (
+    ensure_email_codes_table as ensure_email_codes_table,
 )

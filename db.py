@@ -160,42 +160,6 @@ def ensure_email_codes_table():
         return False
 
 
-def update_last_login(user_id: str):
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute("UPDATE users SET last_login_at = NOW() WHERE id = %s", (user_id,))
-    except Exception as e:
-        logger.error(f"更新登录时间失败: {e}")
-
-
-def increment_user_monthly_usage(user_id: str, n: int = 1) -> int:
-    """
-    Plus 用户识别后累加本月用量。
-    如果已经跨月(last_usage_month != 本月),会重置为 n 而不是累加。
-    返回最新的 used_this_month 值。
-    """
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                UPDATE users SET
-                    used_this_month = CASE
-                        WHEN last_usage_month IS NULL
-                          OR last_usage_month < DATE_TRUNC('month', NOW())::date
-                        THEN %s
-                        ELSE COALESCE(used_this_month, 0) + %s
-                    END,
-                    last_usage_month = DATE_TRUNC('month', NOW())::date
-                WHERE id = %s
-                RETURNING used_this_month
-            """,
-                (n, n, user_id),
-            )
-            row = cur.fetchone()
-            return row["used_this_month"] if row else 0
-    except Exception as e:
-        logger.error(f"更新用户月用量失败 (user_id={user_id}): {e}")
-        return 0
 
 
 # ============================================================
@@ -217,48 +181,6 @@ def increment_user_monthly_usage(user_id: str, n: int = 1) -> int:
 # ============================================================
 
 
-# ============================================================
-# v0.8.1 · 过期历史清理
-# ============================================================
-def cleanup_expired_history(free_days: int = 7, plus_days: int = 90, pro_days: int = 365) -> int:
-    """按 plan 删除过期历史 · 返回删除条数"""
-    total = 0
-    try:
-        with get_cursor(commit=True) as cur:
-            # Free
-            cur.execute(
-                """
-                DELETE FROM ocr_history
-                WHERE user_id IN (SELECT id FROM users WHERE plan = 'free')
-                  AND created_at < NOW() - (%s || ' days')::interval
-            """,
-                (str(free_days),),
-            )
-            total += cur.rowcount
-            # Plus
-            cur.execute(
-                """
-                DELETE FROM ocr_history
-                WHERE user_id IN (SELECT id FROM users WHERE plan = 'plus')
-                  AND created_at < NOW() - (%s || ' days')::interval
-            """,
-                (str(plus_days),),
-            )
-            total += cur.rowcount
-            # Pro
-            cur.execute(
-                """
-                DELETE FROM ocr_history
-                WHERE user_id IN (SELECT id FROM users WHERE plan = 'pro')
-                  AND created_at < NOW() - (%s || ' days')::interval
-            """,
-                (str(pro_days),),
-            )
-            total += cur.rowcount
-        return total
-    except Exception as e:
-        logger.error(f"cleanup_expired_history failed: {e}")
-        return 0
 
 
 # ============================================================
@@ -1567,4 +1489,11 @@ from services.auth.account_merge import (
     is_line_placeholder_username as is_line_placeholder_username,
     update_user_email_and_username as update_user_email_and_username,
     merge_line_account_into_existing as merge_line_account_into_existing,
+)
+
+# REFACTOR-B2 · 用户活动/用量/历史清理 re-export(已抽到 services/usage/store · 调用点零改动)
+from services.usage.store import (
+    update_last_login as update_last_login,
+    increment_user_monthly_usage as increment_user_monthly_usage,
+    cleanup_expired_history as cleanup_expired_history,
 )

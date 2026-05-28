@@ -160,8 +160,6 @@ def ensure_email_codes_table():
         return False
 
 
-
-
 # ============================================================
 # v0.6.0 · ERP 端点 + 推送日志 DAL → services/erp/push_store.py (REFACTOR-B2)
 # 纯搬家 0 逻辑改 · 重试常量/错误分类器随域搬走 · db.py 文件尾 re-export
@@ -179,8 +177,6 @@ def ensure_email_codes_table():
 # v0.8 · RD 校验日限 DAL → services/rd/store.py (REFACTOR-B2)
 # 纯搬家 0 逻辑改 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
 # ============================================================
-
-
 
 
 # ============================================================
@@ -800,142 +796,7 @@ def ensure_tenant_credits(tenant_id) -> None:
         logger.warning(f"ensure_tenant_credits skip tenant={tenant_id}: {e}")
 
 
-# ============================================================
-# v118.35.0.6 · credits 系统 multi-company 支持
-# 从 legacy/credits-system-5de6cc5 cherry-pick · 只接 routes 用到的两个 ·
-# 其他 check/deduct/owner/state 等下个版本 v36 拉前端 + OCR 扣费时一起接
-# ============================================================
-from datetime import datetime as _v36_dt, timedelta as _v36_td, timezone as _v36_tz
-
-_BKK_TZ_V36 = _v36_tz(_v36_td(hours=7))
-
-
-def _bkk_year_month() -> str:
-    """Asia/Bangkok timezone · YYYY-MM · 月度统计锚定 UTC+7."""
-    return _v36_dt.now(_BKK_TZ_V36).strftime("%Y-%m")
-
-
-# ============================================================================
-# v118.35.0.21 · Credits 计费业务层(v0.21 修正版 · 修 v0.20 部署后超时)
-#
-# v0.20 教训:
-#   - 每个 OCR 加 3 次独立 DB 查询(is_exempt + balance + pages_used)
-#   - maxconn=5 连接池被并发 OCR 撑爆 → 全站超时 → 回滚
-#
-# v0.21 修正:
-#   1. maxconn 5→30(见上面 get_pool · 真凶)
-#   2. get_billing_status_combined: 一次 SELECT 拿 3 个字段(取代 v0.20 三次查询)
-#   3. is_user_billing_exempt: 加 5 分钟 LRU cache(白名单极少变)
-#   4. charge_ocr: 由调用端 asyncio.create_task 异步触发(不阻塞 OCR 返回)
-#
-# 价格规则(Korn 拍板 2026-05-21):
-#   PDF: 当月 ≤ 200 张 → ฿1.50/张 · > 200 张 → ฿0.75/张(跨界自动拆段)
-#   Excel/Word/CSV: 50 字符 = 1 satang(฿0.01)· 向上取整
-# 白名单: users.is_billing_exempt = TRUE 自动跳过
-# ============================================================================
 from decimal import Decimal as _DecV21
-import time as _time_v21
-
-# 白名单 LRU cache(进程内 · 5 分钟 TTL · 减少 DB 压力)
-_EXEMPT_CACHE_V21: dict = {}
-_EXEMPT_CACHE_TTL_V21 = 300
-
-
-def is_user_billing_exempt(user_id) -> bool:
-    """v0.21 · 5 分钟 cache · 白名单极少变 · 减少 DB roundtrip"""
-    if not user_id:
-        return False
-    key = str(user_id)
-    now = _time_v21.time()
-    hit = _EXEMPT_CACHE_V21.get(key)
-    if hit and hit[1] > now:
-        return hit[0]
-    try:
-        with get_cursor() as cur:
-            cur.execute(
-                "SELECT COALESCE(is_billing_exempt, FALSE) AS x "
-                "FROM users WHERE id = %s::uuid LIMIT 1",
-                (str(user_id),),
-            )
-            row = cur.fetchone()
-            result = bool(row["x"]) if row else False
-            _EXEMPT_CACHE_V21[key] = (result, now + _EXEMPT_CACHE_TTL_V21)
-            if len(_EXEMPT_CACHE_V21) > 5000:
-                # 限制 cache 体积 · 简单清理
-                _EXEMPT_CACHE_V21.clear()
-            return result
-    except Exception as e:
-        logger.warning(f"is_user_billing_exempt error user={user_id}: {e}")
-        return False
-
-
-def get_billing_status_combined(user_id, tenant_id) -> dict:
-    """v0.21 · 一次 SELECT 拿 is_exempt + balance + pages_used_this_month
-    取代 v0.20 的 3 次独立查询 · DB roundtrip 从 3 → 1。
-    返: {allowed, is_exempt, balance_thb, pages_used_this_month, error_code}
-    """
-    # 白名单走 cache(不查 DB · 0 RTT)
-    if is_user_billing_exempt(user_id):
-        return {
-            "allowed": True,
-            "is_exempt": True,
-            "balance_thb": 0.0,
-            "pages_used_this_month": 0,
-            "error_code": None,
-        }
-    if not tenant_id:
-        return {
-            "allowed": False,
-            "is_exempt": False,
-            "balance_thb": 0.0,
-            "pages_used_this_month": 0,
-            "error_code": "no_tenant",
-        }
-    try:
-        ym = _bkk_year_month()
-        with get_cursor() as cur:
-            # 一次 SELECT 合并两个 LEFT JOIN · 一次 DB roundtrip
-            cur.execute(
-                """
-                SELECT
-                    COALESCE(tc.balance_thb, 0) AS balance_thb,
-                    COALESCE(mpu.pages_used, 0) AS pages_used
-                FROM (SELECT 1) AS dummy
-                LEFT JOIN tenant_credits tc ON tc.tenant_id = %s::uuid
-                LEFT JOIN monthly_page_usage mpu
-                       ON mpu.tenant_id = %s::uuid AND mpu.year_month = %s
-                LIMIT 1
-            """,
-                (str(tenant_id), str(tenant_id), ym),
-            )
-            row = cur.fetchone()
-            bal = float(row["balance_thb"] if row else 0)
-            used = int(row["pages_used"] if row else 0)
-        if bal <= 0:
-            return {
-                "allowed": False,
-                "is_exempt": False,
-                "balance_thb": bal,
-                "pages_used_this_month": used,
-                "error_code": "insufficient_balance",
-            }
-        return {
-            "allowed": True,
-            "is_exempt": False,
-            "balance_thb": bal,
-            "pages_used_this_month": used,
-            "error_code": None,
-        }
-    except Exception as e:
-        logger.warning(f"get_billing_status_combined error tenant={tenant_id}: {e}")
-        # 失败时不阻塞 OCR(降级到允许 · 但 log 警报)
-        return {
-            "allowed": True,
-            "is_exempt": False,
-            "balance_thb": 0.0,
-            "pages_used_this_month": 0,
-            "error_code": "lookup_error",
-        }
 
 
 def charge_ocr(
@@ -1497,3 +1358,16 @@ from services.usage.store import (
     increment_user_monthly_usage as increment_user_monthly_usage,
     cleanup_expired_history as cleanup_expired_history,
 )
+
+# REFACTOR-B2 · 计费豁免 / 状态聚合 / BKK 月锚 re-export(已抽到 services/billing/account_status)
+# 注:_bkk_year_month 是私有 helper,但 charge_ocr / charge_ocr_async 内部 bare 调,必须留
+#     在 db 模块命名空间(re-export 保 bare-name 解析不破)。
+from services.billing.account_status import (
+    is_user_billing_exempt as is_user_billing_exempt,
+    get_billing_status_combined as get_billing_status_combined,
+    _bkk_year_month as _bkk_year_month,
+)
+
+# 兼容别名:老测试 / 老代码用 _EXEMPT_CACHE_V21(老名)直接清 cache
+# 新名 _EXEMPT_CACHE 在 services/billing/account_status · 这里桥回 db 命名空间保不破
+from services.billing.account_status import _EXEMPT_CACHE as _EXEMPT_CACHE_V21  # noqa: E402,F401

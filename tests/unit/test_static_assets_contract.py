@@ -34,12 +34,16 @@ class StaticAssetsContractTests(unittest.TestCase):
     def test_app_single_source_and_global(self):
         import app
 
+        # app.py 模块级仍用 read_frontend_version / purge_stale_static_gz(算 PEARNLY_FRONTEND_VERSION + 清 gz)
         self.assertIs(app.read_frontend_version, static_assets.read_frontend_version)
         self.assertIs(app.purge_stale_static_gz, static_assets.purge_stale_static_gz)
-        self.assertIs(app.ensure_user_profile_columns, columns.ensure_user_profile_columns)
         # 模块全局保留(外部 meta_aliases / admin_diagnostics 依赖)
         self.assertTrue(hasattr(app, "PEARNLY_FRONTEND_VERSION"))
         self.assertIsInstance(app.PEARNLY_FRONTEND_VERSION, str)
+        # REFACTOR-WA-B1 R5:ensure_user_profile_columns 现由 services/startup.py 消费(lifespan 抽出)
+        from services import startup
+
+        self.assertIs(startup.ensure_user_profile_columns, columns.ensure_user_profile_columns)
 
     def test_ensure_user_profile_columns_homed_in_columns(self):
         self.assertTrue(callable(columns.ensure_user_profile_columns))

@@ -35,11 +35,12 @@ class BackgroundLoopsContractTests(unittest.TestCase):
         self.assertTrue(inspect.iscoroutinefunction(bl.run_erp_retry_tick))
         self.assertTrue(inspect.iscoroutinefunction(bl.run_email_ingest_tick))
 
-    def test_app_uses_single_source_loops(self):
-        import app
+    def test_startup_uses_single_source_loops(self):
+        # REFACTOR-WA-B1 R5:lifespan(起这两条 loop)已抽到 services/startup.py
+        from services import startup
 
-        self.assertIs(app.erp_retry_loop, bl.erp_retry_loop)
-        self.assertIs(app.email_ingest_loop, bl.email_ingest_loop)
+        self.assertIs(startup.erp_retry_loop, bl.erp_retry_loop)
+        self.assertIs(startup.email_ingest_loop, bl.email_ingest_loop)
 
     def test_module_reuses_top_level_erp_push_and_db(self):
         import db

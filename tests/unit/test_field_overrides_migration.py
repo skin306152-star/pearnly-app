@@ -31,6 +31,10 @@ class FieldOverridesMigrationContractTests(unittest.TestCase):
             cls.service_src = f.read()
         with open(os.path.join(ROOT, "app.py"), "r", encoding="utf-8") as f:
             cls.app_src = f.read()
+        # REFACTOR-WA-B1 R5(2026-05-29):lifespan 启动序列已抽到 services/startup.py ·
+        # field_overrides 启动钩子随之迁入 · 契约 5 改查 startup.py。
+        with open(os.path.join(ROOT, "services", "startup.py"), "r", encoding="utf-8") as f:
+            cls.startup_src = f.read()
 
     # 4 模块表 · 必须全覆盖
     EXPECTED_TABLES = ("ocr_history", "reconciliation_row", "gl_vat_tasks", "bank_recon_v2_tasks")
@@ -118,24 +122,25 @@ class FieldOverridesMigrationContractTests(unittest.TestCase):
         )
 
     def test_app_py_startup_hook_calls_ensure(self):
-        """P1.1 契约 5 · app.py 启动钩子已 import + 调 ensure_field_overrides_columns
+        """P1.1 契约 5 · 启动钩子(services/startup.py · REFACTOR-WA-B1 从 app.py lifespan 抽出)
+        已 import + 调 ensure_field_overrides_columns
         防 prod deploy 后漏跑 ensure · 老 task 表没 field_overrides 列 · 后续 P1.2+ 写时挂
         """
         self.assertIn(
             "from services.db_migrations.field_overrides import ensure_field_overrides_columns",
-            self.app_src,
-            "app.py startup must import ensure_field_overrides_columns",
+            self.startup_src,
+            "services/startup.py startup must import ensure_field_overrides_columns",
         )
         # 找 import 之后必须有调用
-        idx = self.app_src.find(
+        idx = self.startup_src.find(
             "from services.db_migrations.field_overrides import ensure_field_overrides_columns"
         )
         self.assertGreater(idx, 0)
-        nearby = self.app_src[idx : idx + 200]
+        nearby = self.startup_src[idx : idx + 200]
         self.assertIn(
             "ensure_field_overrides_columns()",
             nearby,
-            "app.py must call ensure_field_overrides_columns() after import in startup",
+            "services/startup.py must call ensure_field_overrides_columns() after import in startup",
         )
 
 

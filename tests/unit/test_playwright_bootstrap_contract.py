@@ -45,10 +45,11 @@ class PlaywrightBootstrapContractTests(unittest.TestCase):
         self.assertIsInstance(out["playwright_installed"], bool)
         self.assertIsInstance(out["chromium_installed"], bool)
 
-    def test_app_uses_single_source_ensure(self):
-        import app
+    def test_startup_uses_single_source_ensure(self):
+        # REFACTOR-WA-B1 R5:lifespan 启动序列已抽到 services/startup.py · 它是消费方
+        from services import startup
 
-        self.assertIs(app.ensure_playwright_installed, pb.ensure_playwright_installed)
+        self.assertIs(startup.ensure_playwright_installed, pb.ensure_playwright_installed)
 
     def test_admin_diagnostics_uses_single_source_read_status(self):
         import admin_diagnostics_routes as adr

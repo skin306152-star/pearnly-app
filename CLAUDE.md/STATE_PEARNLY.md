@@ -8,7 +8,8 @@
 ## 🎯 状态卡(2026-05-29 快照 · 进窗口先读这段 + 跑脚本)
 
 - **模式**:整顿封锁期 · 0 新功能 · 打法 = 3 窗口并行 loop(A 后端 / B 前端 / C 文档测试 · 见 `docs/refactor/PARALLEL_LOOP_DISPATCH.md`)。
-- **当前 task**:治漂移 + 文档整理(本窗口 · AGENTS.md 一页入口 / 数字脚本化 / 状态卡)→ 完成后 launch 3 窗口跑 Loop 1 拆巨石。
+- **当前 task**:3 窗口 loop 拆巨石(Loop 1)· 各已落 1 commit(WA-B1 后端 / WB-C1 前端 / WC-DOC 文档 · 零串台)· app.py→2966 home.js→6060。
+- **⚠️ 2026-05-29 两处基础设施变更**:① **repo 已转 public**(整顿完转回 private · 为免费无限 Actions · 已扫历史无密钥泄露)② **CI 之前因 GitHub 账单/免费分钟耗尽假性红**(4秒挂 · 非代码问题)· 公开后恢复 ③ 已加 `Bash(git push origin master)` 授权规则(A 档无人值守)。**loop 的"CI 红即 revert"只针对真测试红 · 别被账单红误导。**
 - **代码规模快照**(实时跑 `scripts/refactor_progress.py`):home.js **6190**→<200 · app.py **3286**→<500 · db.py **819**→<500 · home.css **0** ✅ · home.html **4410**→<1000 · 综合 **~77%**。
 - **模块/测试**:src/home **35** · *_routes **36** · services **101** · unit **1629** · integration **42** · E2E **17** · home.js silent **0**。
 - **最后 commit**:跑 `git log --oneline -5`(别信手写 hash)· **未 push commit**:跑 `git status` / `git log origin/master..HEAD`。

@@ -48,7 +48,9 @@ test.describe('Session 互踢(铁律 #3)', () => {
         // ────── 1) 设备 A 登录 → tokenA · /api/me 应 200
         const ctxA = await browser.newContext();
         const pageA = await ctxA.newPage();
-        const guardA = attachConsoleGuard(pageA);
+        // 注:不在 A 上挂 console-guard 断言 —— B 登录后 A 的心跳/订阅会真实触发
+        // 401 session_revoked + token 失效 toast / 跳登录页等 console.error,这正是
+        // 铁律 #3 的预期行为,不算回归。只在 B(新主)上守 console error。
         await doUiLogin(pageA);
         const tokenA = await pageA.evaluate(() => localStorage.getItem('mrpilot_token'));
         expect((tokenA || '').length, 'tokenA 应在 localStorage').toBeGreaterThan(0);
@@ -85,8 +87,7 @@ test.describe('Session 互踢(铁律 #3)', () => {
         fs.mkdirSync(path.dirname(STORAGE_STATE), { recursive: true });
         await ctxB.storageState({ path: STORAGE_STATE });
 
-        // ────── 5) 全程无应用 console.error / pageerror(noise 已在 console-guard 过滤)
-        assertNoConsoleErrors(expect, guardA);
+        // ────── 5) 设备 B(新主)全程无 console.error / pageerror;A 因 session_revoked 必报错(预期)
         assertNoConsoleErrors(expect, guardB);
 
         await ctxA.close();

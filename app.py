@@ -43,6 +43,9 @@ from auth_signup import router as signup_router  # v109.3
 from auth_email_code_routes import (
     router as auth_email_code_router,
 )  # REFACTOR-B1 · 2026-05-28
+from line_account_merge_routes import (
+    router as line_account_merge_router,
+)  # REFACTOR-B1 · 2026-05-28
 from recon_routes import router as recon_router  # v118.32.0
 from recon_jobs_routes import router as recon_jobs_router  # ADR-005 #15 · 对账异步 submit/状态
 from import_routes import router as import_router  # ADR-006 · 通用模板学习层 列映射接口
@@ -1148,6 +1151,7 @@ app.include_router(
 app.include_router(recon_jobs_router)  # ADR-005 #15 · 对账异步 submit + 统一状态查询
 app.include_router(import_router)  # ADR-006 · 通用模板学习层 列映射接口
 app.include_router(auth_email_code_router)  # REFACTOR-B1 · 邮箱验证码 2 路由(2026-05-28)
+app.include_router(line_account_merge_router)  # REFACTOR-B1 · LINE 补邮箱+合并 2 路由(2026-05-28)
 # v118.35.0.28 P0-04 CORS 收紧 (体检 2026-05-21):
 # 旧 allow_origins=["*"] + allow_credentials=True 浏览器会自动拒绝凭据请求,
 # 但无凭据跨域 fetch 仍放行 · 收紧到生产白名单 + env 覆盖 + dev 自动放 localhost
@@ -3545,79 +3549,7 @@ window.location.replace("{_redirect_path}");
 </body></html>""")
 
 
-# ============================================================
-# v118.28.4.1 · LINE 用户补邮箱 API
-# 进 /home 时前端先查 needs_email · true 则弹强制 modal
-# 提交 email 时:已存在老账号 → 合并 line_uid + 删临时账号 + 颁老账号 token
-#               不存在 → 把临时账号的 username/email 改成真邮箱
-# ============================================================
-@app.get("/api/me/needs_email")
-async def me_needs_email(request: Request):
-    user = get_current_user_from_request(request)
-    uname = user.get("username") or ""
-    needs = db.is_line_placeholder_username(uname)
-    return {"needs_email": bool(needs)}
-
-
-class _LinePostEmail(BaseModel):
-    email: str
-
-
-@app.post("/api/me/line_complete_email")
-async def me_line_complete_email(payload: _LinePostEmail, request: Request):
-    user = get_current_user_from_request(request)
-    cur_username = user.get("username") or ""
-    if not db.is_line_placeholder_username(cur_username):
-        raise HTTPException(status_code=400, detail="not_a_line_temp_account")
-
-    email_raw = (payload.email or "").strip().lower()
-    if not email_raw or "@" not in email_raw or "." not in email_raw.split("@", 1)[1]:
-        raise HTTPException(status_code=400, detail="email_invalid")
-
-    cur_user_id = str(user["id"])
-    line_uid = user.get("line_uid")
-
-    # 检查该 email 是否已被其他账号占用
-    existing = db.find_user_by_username(email_raw)
-    if existing and str(existing["id"]) != cur_user_id:
-        # 合并到老账号
-        if not line_uid:
-            raise HTTPException(status_code=500, detail="missing_line_uid")
-        ok = db.merge_line_account_into_existing(cur_user_id, str(existing["id"]), line_uid)
-        if not ok:
-            raise HTTPException(status_code=500, detail="merge_failed")
-        # 颁老账号 token
-        merged_user = db.find_user_by_id(str(existing["id"]))
-        if not merged_user:
-            raise HTTPException(status_code=500, detail="target_user_lost")
-        db.update_last_login(str(merged_user["id"]))
-        new_token = create_access_token(
-            user_id=str(merged_user["id"]),
-            username=merged_user["username"],
-            plan=merged_user.get("plan") or "free",
-            tenant_id=str(merged_user["tenant_id"]) if merged_user.get("tenant_id") else None,
-            role=merged_user.get("role") or "owner",
-            is_super_admin=bool(merged_user.get("is_super_admin")),
-            remember_me=True,
-        )
-        return {"ok": True, "merged": True, "token": new_token}
-    else:
-        # 直接更新临时账号
-        ok = db.update_user_email_and_username(cur_user_id, email_raw)
-        if not ok:
-            raise HTTPException(status_code=500, detail="update_failed")
-        # token 里的 username 变了 · 重发一次
-        refreshed = db.find_user_by_id(cur_user_id)
-        new_token = create_access_token(
-            user_id=cur_user_id,
-            username=refreshed["username"],
-            plan=refreshed.get("plan") or "free",
-            tenant_id=str(refreshed["tenant_id"]) if refreshed.get("tenant_id") else None,
-            role=refreshed.get("role") or "owner",
-            is_super_admin=bool(refreshed.get("is_super_admin")),
-            remember_me=True,
-        )
-        return {"ok": True, "merged": False, "token": new_token}
+# /api/me/needs_email + /api/me/line_complete_email → line_account_merge_routes.py(REFACTOR-B1)
 
 
 # ============================================================

@@ -75,6 +75,44 @@ jobs:
       - name: npm audit (REFACTOR-A6 · 前端依赖 CVE · high 拦门)
         run: npm audit --audit-level=high
 
+  # REFACTOR-WC-P1 · 防屎山闸(铁律 #27 · 窗口 C · 2026-05-28)
+  #   #1 check_file_size.py : 任何监控代码文件 > 500 行 → fail(历史巨石短期豁免在脚本里)
+  #   #2 check_line_ratchet.py: 任何监控文件净增长 > 0 → fail(透明豁免:commit 加 RATCHET-EXEMPT)
+  # 当前模式 = warning(continue-on-error: true · 红但不挡 push) ·
+  # 等 Loop 1 把 app.py / home.js 等巨石拆到目标 < 500 / < 200 ·
+  # Zihao 拍板"切硬门" → 删 continue-on-error 进 fail 模式 · 整顿期就不会再糊回去。
+  lint-size:
+    name: lint-size (REFACTOR-WC-P1 · anti-bigfile · WARNING mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # ⚠️ warning 模式 · 红但不挡 push · Loop 1 拆完巨石后改 false(fail 模式)
+    continue-on-error: true
+
+    steps:
+      - name: Checkout (full history · 棘轮需要 HEAD~1)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 全历史 · 否则 HEAD~1 在 shallow clone 里不存在
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 两个脚本只用标准库 · 不装任何依赖(故意 · 零依赖 · 任何环境跑得动)
+
+      - name: 防屎山闸 #1 · 文件行数 ≤ 500(铁律 #27.1)
+        run: python scripts/check_file_size.py
+
+      - name: 防屎山闸 #2 · 棘轮 · 监控文件只许减不许增(铁律 #27.2)
+        # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python scripts/check_line_ratchet.py --base origin/${{ github.base_ref }} --head HEAD
+          else
+            python scripts/check_line_ratchet.py
+          fi
+
   test:
     name: import + i18n + unit + vite-build + e2e
     runs-on: ubuntu-latest

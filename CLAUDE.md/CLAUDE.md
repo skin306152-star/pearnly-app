@@ -632,6 +632,90 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 
 ---
 
+### 27. 防屎山 4 条机械闸(2026-05-28 Zihao 拍板 · 窗口 C 拍 · 单一权威)
+
+**背景**:Pearnly 巨石史(home.js 33k → 6k · app.py 10k → 4.5k · db.py 9k → 1k · home.html 6.5k → 4.4k)证明:**靠人自律不靠谱**,必须把"不许再涨"做成 CI 机械闸,否则下一波 vibe-code 又会糊回去。本条 4 件套是窗口 C 给整顿期落地的硬门槛 · 跟铁律 #17 / #21 / #23 配套(那 3 条是"不许塞" · 本条是"塞了就 CI 红")。
+
+**4 条机械闸**(脚本在 `scripts/check_file_size.py` + `scripts/check_line_ratchet.py` · CI `lint-size` job 跑):
+
+1. **任何代码文件超 500 行 = push 失败 · 必须先拆**
+   - 监控清单(可在 `scripts/check_file_size.py` 顶部改):`app.py` / `db.py` / `home.js` / `home.html` / `home.css` / `auth_signup.py` 等历史巨石 · 加上**所有** `*_routes.py` / `services/**/*.py` / `src/home/**/*.{js,css}`(新建的也算)
+   - 例外白名单(可显式豁免 · 必须写注释为啥):暂时不拆 home.html 1000 / home.js 200 等目标值 · 走"per-file ceiling"
+   - 触发:`python scripts/check_file_size.py` exit 1 → CI red
+2. **任何 commit 让被监控文件行数比上一 commit 多 = push 失败**(棘轮 · 只许减不许增)
+   - 实现:`scripts/check_line_ratchet.py` 跑 `git diff HEAD~1 HEAD --numstat` · 监控文件 +N > 0 即 fail
+   - 例外:必须在 commit message 显式写 `RATCHET-EXEMPT: <file> +<N> · <理由>` · 脚本 grep 跳过(同铁律 #21 透明记录范式)
+3. **新功能必须新建独立文件 + 带 1 个测试 · 否则 push 失败**
+   - 落地依赖 PR 模板自检 + reviewer 拍门 + CI 端只能做"测试目录新增"软提示(无法真验"是不是新功能" · 主要靠人 + 铁律 #28 4 问)
+   - 强化措辞:新增 `xxx_routes.py` 必带 `tests/unit/test_xxx_routes_contract.py`(已有 30+ 例 · pattern 是 `*_routes_contract.py` / `*_store_contract.py`)
+4. **替换旧功能 · 旧代码必须同一 PR 删掉 · 不许两套并存**
+   - 例:抽 `services/billing/charge.py` 出 db.py · 同一 commit 必删 db.py 老 `charge_ocr` 函数(本会话 B2 拆搬删模式)
+   - 反例:新建 `services/X/store.py` 但 db.py 老函数留着 + 加 re-export shim 假装"零调用点改"——shim 必须打 `# 兼容 re-export · 删除 deadline = vXXX` 注释,deadline 过了下个窗口必须删 shim 才能开新事
+
+**CI 模式**(窗口 C 阶段):
+- **当前(2026-05-28 起)**:`continue-on-error: true` warning 模式 · CI 红但不挡 push · 等窗口 A/B(Loop 1)拆完巨石(app.py / home.js 等都到目标 < 500/< 200)再切 fail 模式
+- **切换条件**:`python scripts/refactor_progress.py` 显示代码规模平均 ≥ 80% + Zihao 拍板"切硬门" · 把 `.github/workflows/ci.yml` `lint-size` job 的 `continue-on-error` 删掉
+- **切完之后**:整顿期任何新 commit 涨监控文件 = CI 红挡 push · 这条铁律就活了
+
+**与铁律 #17 / #21 / #23 的关系**:
+- #17 / #21:不许新东西塞巨石(预防 · 全靠人自律 + reviewer)
+- #23:8 条硬门槛(预防 + 度量 · 部分有 script 兜底)
+- **#27(本条)**:塞了就 CI 红(机械闸 · 不靠人 · 是 #17 / #21 / #23 的"自动化兜底")
+
+**完整设计决策见**:`docs/refactor/adr-010-anti-bigfile-mechanism.md`
+
+---
+
+### 28. 新功能 4 问流程(2026-05-28 Zihao 拍板 · 窗口 C 拍 · AI 写代码前必答)
+
+**背景**:窗口 C 复盘 Pearnly 屎山史 · 共识:AI vibe-code 写"先实现再说"是巨石主要源头(home.js 单函数 12,694 行就是这么来的)。本条是**写代码前 30 秒强制问答** · 卡在 AI 拿起键盘那一刻 · 4 个问题答不出来不许开写。
+
+**触发**:写**任何新功能**(新路由 / 新前端模块 / 新 db helper / 新 service)前 · AI(包括 Claude / Codex / Copilot 抓人)必须在思考链里**显式回答 4 问**(不一定要写到 commit · 但要写到 PR 描述或思考里 · 可被 grep / reviewer 检阅)。
+
+**4 问**:
+
+1. **【领域】这是什么领域?**(billing / auth / OCR / recon / erp / line / archive / settings / 其他)
+   - 答不出来 = 跨领域设计没想清楚 · 不许开写
+   - 答出来后:本功能要进对应 `services/<领域>/` 或 `<领域>_routes.py`
+
+2. **【新建什么文件】不许塞巨石 · 必须独立**(对应铁律 #17 4 不许)
+   - 后端 API:`<新名>_routes.py` 或并入已有 `<领域>_routes.py`(原则:能独立尽量独立)
+   - 后端业务:`services/<领域>/<feature>.py` · 不进 db.py
+   - 前端:`src/home/<feature>/*.js` · 不进 home.js
+   - 写出**确切路径**(不准说"就放 utils 吧")
+
+3. **【测试在哪】每个新文件必带 ≥ 1 测试**(对应铁律 #23 / 硬门槛 #4)
+   - 后端契约测试:`tests/unit/test_<名>_contract.py`(pattern 见 30+ 现存例)
+   - 后端集成:`tests/integration/test_<feature>.py`(API + 真 DB + Mock 外部)
+   - 前端关键路径:`tests/e2e/<NN>-<name>.spec.js` 或 `tests/visual/<name>.spec.js`
+   - 写出**确切测试路径** + **至少 1 个测试用例名**(不准说"等会儿加")
+
+4. **【删什么旧文件】替换旧实现的必须同一 PR 删**(对应铁律 #27.4)
+   - 如果是全新功能(无旧件)· 写 `N/A · 全新功能`
+   - 如果是替换(老 `_extract_summary_fields` 抽到 services 等):**列出要 `git rm` 的旧文件 / 老函数行号** · 同一 PR 内删干净
+   - **禁止**留两套并存"先观察一阵子再删" — 那一阵子永远不到
+
+**自检**(AI 开写前内心 checklist):
+```
+[ ] 1. 这功能属哪个领域?      → ____
+[ ] 2. 新建什么文件?(确切路径) → ____
+[ ] 3. 测试在哪?(确切路径 + 用例名) → ____
+[ ] 4. 删什么旧文件?(N/A 或 git rm 列表) → ____
+4 问全填 → 开写
+任意 1 问填不出来 → 停 · 跟 Zihao 讨论或先做拆解
+```
+
+**违反场景**:
+- AI 直接在 `app.py` 加 `@app.post("/api/new-thing")` → 没答问 2 → 违反 → revert
+- AI 抽 `services/X/foo.py` 但 db.py 老 `foo` 函数没删 → 没答问 4 → 违反 → 同一 PR 删干净
+- AI 加新功能但没建 test 文件 → 没答问 3 → 违反 → 补测试再 push
+
+**与 PR 模板的关系**:`.github/PULL_REQUEST_TEMPLATE.md` 已有"是否塞巨石自检" · 本条 4 问可作 PR 模板下个版本的扩展段(窗口 C 暂不强加 · 等铁律 #27 切硬门时一并加)。
+
+**完整设计决策见**:`docs/refactor/adr-010-anti-bigfile-mechanism.md`
+
+---
+
 ## 🧭 导航 IA 铁律(2026-05-15 拍板 · 最高优先级 · 覆盖所有 UI 重排)
 
 **Pearnly 全局导航 = 跟着 `D:\Users\Skin\Desktop\pearnly_project\pearnly_nav_prototype_final.html` 走**

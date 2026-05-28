@@ -302,17 +302,20 @@
 
 > 状态符号:⚪ 待启动 · 🟡 进行中 · ✅ 已完成 · ⏸️ 已跳过 · ❌ 取消
 
+> **🟢 窗口 C 跑文档/测试**(2026-05-28 · REFACTOR-WC · 0 业务代码)· 15/15 任务全 ✅ · 4 commit (`016aa79` `18e2747` `d37f091` + 本) · **铁律 #27 防屎山闸 + #28 新功能 4 问写入项目宪法 · scripts/check_file_size.py + scripts/check_line_ratchet.py + CI lint-size(warning 模式)+ 19 守门测试 + 21 集成测试(8 域)+ 10 视觉 baseline + G3-G7 文档 5 项 + ADR-010/011** · 详见 [`docs/refactor/WINDOW_C_COMPLETE.md`](../docs/refactor/WINDOW_C_COMPLETE.md) · **⚠️ 等 Loop 1 完成跟 Zihao 说切 CI 行数硬门 fail 模式**。
+
 | 阶段 | 完成度 | 当前 task | 备注 |
 |---|---|---|---|
 | **A 工具链** | 🟡 8/10 | A0 ✅ · A1 ✅ · A2.1 ✅ `4d5c8ba` · A5 ✅ `5ae7bd0` · A6 ✅ `ed8b5af` · A7 ✅ `296c074` · A8 ✅ `c818578` · A9 ✅ `e57993a` · A2.2 并入 B3 · **A3/A4 进行中 `df727f6`** | 2026-05-24 Zihao 拍板 **A3=本地 Docker · A4=Doppler** · A3 配置就绪(待 Zihao 装 Docker Desktop build 验证)· A4 生产 39 密钥已收拢进 Doppler `prd`(待验证+清理旧密钥)· 详见 ADR-003/004 |
 | B 后端 | 🟡 1.5/10 | **B1 安全部分已到顶**(app.py 10075→4459)· **B2 进行中**:db.py 10663→**7136**(-3527 · 抽 9 域 DAL → services) | B1:21 router + exception_checks · 剩 22 @app 安全敏感/勿碰/故意留 · 需 auth 专窗口。**B2(第二十二会话 · 9 域)**:email_ingest/erp.oauth/erp.mappings/notification/erp.push + recon.{vat_recon_tasks/gl_vat/bank_recon_v2/bank_recon_v1}(`435ece6`/`78e9667`/`f62d0d9`/`9de1baa`/`7edb3c3`/`a012482`/`e26dafd`)· re-export 范式零改调用点 · 全 push+CI 绿+生产 401 验证 · services/*.py 40→51 · unit 656→**682** |
 | C 前端 | 🟡 C1 到地板 · C2 ✅ home.css 0 · C3 🟡 开篇 | 第四十三会话:home.html 6428→**4411**(抽 head 内联 `<style>` 巨块 → home-37 切片) | C1:home.js 32466→**6191**(35 个 `src/home/*` + i18n-data.js + 老 admin 布局整删 + 计费迁移)· **剩地板**(routeTo 中枢 / 顶层函数群 / 🔴高敏)需 Zihao 在场。C2:home.css 16673→**0** ✅(36 切片)。**C3:home.html 6428→4411(`e938ae3` · 抽内联 style 2016 行 → home-37-html-inline.css · 字节无损 · CI success · 生产 E2E 10/10)· 剩 body HTML 组件化(串行)**。详见 STATE 第四十三会话块 + `BATCH_STRATEGY.md` §10/§13 |
-| D 测试 | 🟡 2/5(D1 部分 + **D2 Wave 0 安全网大批**) | D2 续:核心纯逻辑模块行为契约 | **第三十五会话(2026-05-27)· REFACTOR-D2 Wave 0**:给 17 个 0 测试的核心纯逻辑模块补行为契约 · unit **872→1095**(field_comparator/reconciliation_matcher/gl_vat_reconciler/vat_report_parser/vat_file_classifier/excel_template_th/excel_export/report_engine/usage_report/invoice_grouper/monitoring/task_queue/pdf_storage/pdf_searchable/kms_helper/i18n_reports/archive)· **挖出并修 3 个真 bug**(normalize_branch 总部别名 / _norm_date 佛历 / _filename_guess 下划线 · `85c35bb`)· 全守门绿 · 不碰巨石零冲突。早前 D1 第二十一会话 `d65b692` |
+| D 测试 | 🟡 **4/5**(D1 部分 + D2 Wave 0 + **D2 集成 21 个 + D5 视觉 10 页** · WC `d37f091`)| D2/D5 收尾 → D3/D4 待做 | **窗口 C(2026-05-28)REFACTOR-WC-P3**:D2 +21 集成测试(8 域 · billing/recon/erp/ocr/auth/clients/team/archive · env-gated · CI 默认 skip)+ D5 10 页视觉回归 baseline(独立 playwright.visual.config.js · 暂不上 CI · 见 `tests/visual/README.md`)。**第三十五会话(2026-05-27)REFACTOR-D2 Wave 0**:17 个核心纯逻辑模块行为契约 unit 872→1095 + 修 3 真 bug(`85c35bb`)。早前 D1 第二十一会话 `d65b692` |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |
 | F 数据 | ⚪ 0/3 | — | 依赖 B1 |
-| G 文档 | 🟡 2/7(G1 部分 + G2 ✅) | G1 ADR 9 个(+ADR-009)· G2 RUNBOOK ✅ | G1:ADR 001/002/003/004/005/006/007/008/**009 无人值守自主重构 loop+安全替身+实跑边界**(`7dfb1d5`)· G2:RUNBOOK ✅(第三十五会话 `5544d0e`)· G3 ONBOARDING/G5-G7 待做 |
+| G 文档 | 🟡 **7/7**(G1 + G2 + **G3/G4/G5/G6/G7 · WC `18e2747`**) | ✅ G 阶段全收齐 | G1:ADR 11 个(+ADR-010 防屎山机制 + ADR-011 3 窗口并行 · WC)· G2:RUNBOOK ✅(`5544d0e`)。**窗口 C 收齐 G3/G4/G5/G6/G7**(REFACTOR-WC-P2 `18e2747`):G3 `docs/ONBOARDING.md` + G4 `docs/openapi.md`(36 router 索引)+ G5 question 模板补齐 + G6 `docs/CHANGELOG.md`(git-cliff 配置存档 · 暂不上 CI)+ G7 `.github/CODEOWNERS`(高敏路径自动 @ Zihao) |
 | H 合规 | ⚪ 0/6 | — | 靠后 |
 | I 抛光 | 🟡 1.6/5(I1 ✅home.js silent=0 + 部分 I2) | — | **I1:home.js 无注释 silent 0(`b7d167b`)** · I2 死码续清(usage 计数器/demo 播种 `158b55c`/`b62aeca`)+ 老订阅残留全清 |
+| **WC 防屎山(新)** | ✅ **完成** `016aa79` | 铁律 #27 #28 + 2 脚本 + CI warning + 19 守门测试 | **窗口 C(2026-05-28)REFACTOR-WC-P1**:防屎山 4 件套(铁律 #27 4 条 / 铁律 #28 新功能 4 问 / `scripts/check_file_size.py` 220 行 / `scripts/check_line_ratchet.py` 250 行 + `RATCHET-EXEMPT:` 透明豁免 / CI `lint-size` job warning 模式 `continue-on-error: true` / `tests/unit/test_anti_bigfile.py` 19/19 PASS)· 首跑抓 39 违规 + 5 历史豁免 · **等 Loop 1 完成切硬门 fail 模式** |
 
 **累计 task 数**:60 主 task · 已完成约 5 个(A0/A1/A2.1/A7/A9)+ 进行中约 3 个(C1/D1/I1)· 待启动 52 个
 

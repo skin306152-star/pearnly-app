@@ -1,5 +1,19 @@
 # 📊 STATE · Pearnly 项目状态
 
+> ## 🟢 窗口 C 收官(2026-05-28 · REFACTOR-WC · 防屎山闸 + 文档 + 测试 · 0 业务代码)
+> **15/15 任务全 ✅ · 4 commit (`016aa79` P1 → `18e2747` P2 → `d37f091` P3 → P4+P5)**
+> 详细收尾文档 → [`docs/refactor/WINDOW_C_COMPLETE.md`](../docs/refactor/WINDOW_C_COMPLETE.md)
+>
+> **产出**:① 铁律 **#27 防屎山 4 条** + **#28 新功能 4 问** 写入项目宪法 ② `scripts/check_file_size.py` + `scripts/check_line_ratchet.py`(零依赖 · 470 行)③ CI **`lint-size` job** (warning 模式 · `continue-on-error: true`)④ `tests/unit/test_anti_bigfile.py` 19 守门测试 19/19 PASS ⑤ G3-G7 文档 5 项(ONBOARDING / openapi / question / git-cliff / CODEOWNERS)⑥ 21 集成测试(8 域 · env-gated)⑦ 10 页视觉回归 baseline(独立 playwright.visual.config.js)⑧ ADR-010 防屎山机制 + ADR-011 3 窗口并行策略。
+>
+> **⚠️ 等 Loop 1(窗口 A)完成后切硬门**:跟 Zihao 说"切 CI 行数硬门 fail 模式" · 删 `.github/workflows/ci.yml` `lint-size` job 的 `continue-on-error: true` 一行 · 触发条件 = `refactor_progress.py` 综合 ≥ 80% + Zihao 拍板。切完整顿期就不会再糊回去 = 工程化质变。
+>
+> **首跑数据**:`check_file_size.py` 抓到 39 个违规(超 500 行 · 主要是 recon_routes 2000 / erp_routes 1206 / src/home/exceptions.js 1904 等 · 全等 A/B 拆)+ 5 个根目录历史巨石豁免(EXEMPT_CURRENT_BIG_FILES)· `check_line_ratchet.py` 本 push 0 违规(C 窗口不碰业务代码 ✅)。
+>
+> **下个窗口入口**:① 读 [`docs/refactor/WINDOW_C_COMPLETE.md`](../docs/refactor/WINDOW_C_COMPLETE.md) §8(下一步建议)② 决定身份(A 主线 / B 前端 / C 监控)③ 接对应 task。
+>
+> ════════════════════════════════════════════════════════════
+>
 > ## 🔥 下个窗口立即接手(2026-05-28 · 自主 loop 一夜批 收官 · 读这段即可开工)
 > **身份**:整顿**主控/指挥官**(权威 `docs/refactor/BATCH_STRATEGY.md` §9.5 + 铁律 #26 自主 loop)。Zihao 非技术、零代码操作 → 你**全包**:研究 / 派工 / 接线 / 跑守门 / **真账号 E2E 自测** / 查 CI / 上线 / 更新文档。Zihao 只做:① 点 harness 权限框 ② 像普通用户验收 ③ 涉**钱/登录**拍板「行不行」。**别让 Zihao 看代码 / 判 PR / 自己跑测试。**
 > **当前数字(master 全绿·HEAD `7dfb1d5`·工作树干净·Google 级综合 87%)**:home.js **6190**(I1 silent=0) · app.py **4523** · auth_signup.py **2380** · db.py **1731**(2026-05-28 一夜自主 loop:7 域抽到 services + preferred_lang + 删死码×2 · **3356→1731 · -48%**)· home.css 0 · home.html **4410**(C3 抽 head 内联 style -2017)· src/home 模块 **35** · services 域 **+user_settings/+ocr_history/+line_binding/+credits/+billing.pricing**(并入 tenant 多公司·账套切换)· static/home-*.css 切片 **36** · 单测 **1545** · E2E **10**。`gh.exe` 路径 `C:\Program Files\GitHub CLI\gh.exe` · repo `skin306152-star/pearnly-app`。

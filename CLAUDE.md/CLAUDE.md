@@ -1,7 +1,7 @@
 # CLAUDE.md · Pearnly 项目大脑
 > 每次启动 Claude Code 必须完整读完本文件再开始任何任务
 > 本文件 = 项目宪法 · 优先级高于一切临时指令
-> 最后更新:2026-05-23(整改模式 ON · 加铁律 #21 · 整改期不污染未来整顿)
+> 最后更新:2026-05-29(模型升 Opus 4.8 1M · commit 署名 4.7→4.8 · 守门统一 6 道 · 铁律计数统一 28 · 整顿恢复 + 3 窗口并行 loop)
 
 ---
 
@@ -17,7 +17,7 @@
 1. 读本文件(看铁律 #18-20 段)
 2. 读 `STATE_PEARNLY.md`(头部"整顿模式"段)
 3. 读 `REFACTOR_MASTER_PLAN.md`(找当前 task)
-4. 干活 → 5 道守门 → push → 更新 STATE + 主计划进度看板
+4. 干活 → 6 道守门 → push → 更新 STATE + 主计划进度看板
 
 **禁止**:任何 `MODULE_ROADMAP.md` 新功能 · 任何 P0-VAT 主线 · 任何 Phase 6 进项管理 MVP
 
@@ -395,7 +395,7 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 **背景**:9 阶段 100+ task 不在一个窗口能干完 · 跨窗口接力时如果文档不读全 · 必然跑偏(找不到下个 task / 重复做 / 跳过依赖)。
 
 **铁律**:整顿期每个接力 agent 进窗口**必读**这 4 文档(顺序):
-1. **`CLAUDE.md/CLAUDE.md`**(本文件 · 20 条铁律 · 看完铁律 18-20 这段)
+1. **`CLAUDE.md/CLAUDE.md`**(本文件 · 28 条铁律 · 看完铁律 18-20 这段)
 2. **`CLAUDE.md/STATE_PEARNLY.md`** 头部("整顿模式 ON" 段 · 当前阶段 · 上窗口完成的 commit)
 3. **`CLAUDE.md/REFACTOR_MASTER_PLAN.md`**(整顿主计划 · 单一权威源 · 看"当前进度看板" + "下一个 task")
 4. 当前 task 的"完成判定"段(在主计划对应 task 行)
@@ -410,7 +410,7 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 **触发"不读文档"违规**:
 - commit message 没 REFACTOR-XX task ID → 没读主计划
 - 改了 `MODULE_ROADMAP.md` 里的新功能 → 没读铁律 #18
-- 没跑 5 道守门就 push → 没读铁律 #19 接力 protocol
+- 没跑 6 道守门就 push → 没读铁律 #19 接力 protocol
 
 ---
 
@@ -426,9 +426,9 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 
 <body 说改了什么 · 为啥 · 怎么验证>
 
-守门 5 道全绿:imports / i18n / unit / playwright / node
+守门 6 道全绿:format / unit / imports / i18n / node / build
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 ```
 
 **例子**(整顿期标准 commit):

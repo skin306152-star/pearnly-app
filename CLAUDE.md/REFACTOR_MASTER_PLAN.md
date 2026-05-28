@@ -16,7 +16,7 @@
 
 > **起源**:2026-05-22 Zihao 拍板"封锁整顿 5-8 个月 · 路径 B 上 Vite · 不开发任何新功能 · 把项目工程标准化到 Google / Anthropic Claude code 级"
 >
-> **状态**:整顿模式暂停(2026-05-22 起 · 等整改完续)· 整改期间 0 新整顿
+> **状态**:整顿模式**恢复**(2026-05-23 改善收尾后续整顿 · 见本文档顶部"改善计划收尾"段)· 2026-05-29 起 3 窗口并行 loop 加速(ADR-011)
 >
 > **目标**:6-8 个月后 Pearnly 跟主流 SaaS 看齐 · "Google 级标准 90%+"(每个文件 100-500 行 · 50-100 个模块文件 · 测试覆盖 70%+ · 性能 p95 < 1s · 真到位)
 >
@@ -30,17 +30,19 @@
 
 1. **0 新功能开发**(铁律 #18)· 你 grep `MODULE_ROADMAP.md` 想做新功能 → 立即停 · 跟 Zihao 确认
 2. **必读 4 文档**(铁律 #19)· 顺序:
-   - `CLAUDE.md/CLAUDE.md`(项目宪法 · 20 条铁律)
+   - `CLAUDE.md/CLAUDE.md`(项目宪法 · 28 条铁律)
    - `CLAUDE.md/STATE_PEARNLY.md`(当前状态 · 看头部"整顿模式 ON" 段)
    - **本文档**(整顿主计划 · 看"当前进度看板" + "下一个 task")
    - 当前 task 的"完成判定"段
 3. **commit message 必含 task ID**(铁律 #20)· 格式 `<type>(<scope>): <subject> · REFACTOR-<task-id>` · 比如 `refactor(frontend): 抽 settings.js · REFACTOR-C12`
-4. **5 道守门必跑全绿才能 push**(原有铁律 · 整顿期强化):
+4. **6 道守门必跑全绿才能 push**(原有铁律 · 整顿期强化 · 2026-05-29 统一为 6 道):
+   - `npm run format:check`(prettier · 最易漏)
+   - `python -m unittest discover -s tests/unit` → 全量 all OK
    - `python scripts/check_imports.py --quiet` → EXIT 0
    - `python scripts/check_i18n.py --strict` → 0 missing 0 extra
-   - `python -m unittest discover -s tests/unit` → all OK
-   - `npx playwright test` → all passed
    - `node --check <changed.js>` → 各改动 JS 都过
+   - `npm run build`(Vite · 改前端必跑)
+   - (E2E `npx playwright test` 按需单独跑 · 非每 commit 强制)
 5. **窗口收尾必更新**(原有铁律 · 整顿期强化):
    - `STATE_PEARNLY.md` 写本窗口完成的 task + commit hash
    - 本文档"进度看板" 段更新 task 状态(待 → 做中 → 已完成)
@@ -88,7 +90,7 @@
 
 **为啥**:
 - 有 1 真实付费用户(mrerp@outlook.co.th)· L1/L2 业务停 2-3 月不可接受
-- 17 条铁律 + 守门测试 + 文档已立 · 推倒等于重做
+- 28 条铁律 + 守门测试 + 文档已立 · 推倒等于重做
 - L3 + Vite 能到 Google 级 90% · 时间 4-6 月可控
 
 ---
@@ -321,8 +323,8 @@
 
 **当前累积成果**(从 2026-05-21 EXECUTION_PLAN 开始):
 - `app.py` 10,075 → **4,459 行**(减 5,616 · B1 拆 21 router + 服务模块 · 安全部分到顶)
-- `db.py` 10,663 → **1,731 行**(减 8,932 · **2026-05-28 一夜自主 loop 11 commits:7 域 + preferred_lang + 删死码×2(4 用量计数器+demo 播种)+ I1 home.js silent=0 + ADR-009**:`73bebb5`/`c769104`/`16eaf14`/`122ff3c`/`11b3f56`/`547f116`/`14370ed`/`885cfbc`/`158b55c`/`b62aeca`/`b7d167b`/`7dfb1d5` 3356→1731)· 第四十一会话 `4a10b88` membership/tenant 接线 4620→3371 · 此前 **B2 第二十二+二十三会话** · 抽 18 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1}/archive/rd/cost/exceptions/clients/billing/recon.vat_recon〔三表组〕/audit/team · **+user_settings(dup_check/erp_push_mode/gemini_key)**)
-- `home.js` 33,768 → **22,210 行**(C1:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js` · + 测试中心 493 行→`src/home/test-center.js`)
+- `db.py` 10,663 → **819 行**(减 9,844 · 续抽至 819 见进度看板 C 行 · **2026-05-28 一夜自主 loop 11 commits:7 域 + preferred_lang + 删死码×2(4 用量计数器+demo 播种)+ I1 home.js silent=0 + ADR-009**:`73bebb5`/`c769104`/`16eaf14`/`122ff3c`/`11b3f56`/`547f116`/`14370ed`/`885cfbc`/`158b55c`/`b62aeca`/`b7d167b`/`7dfb1d5` 3356→1731)· 第四十一会话 `4a10b88` membership/tenant 接线 4620→3371 · 此前 **B2 第二十二+二十三会话** · 抽 18 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1}/archive/rd/cost/exceptions/clients/billing/recon.vat_recon〔三表组〕/audit/team · **+user_settings(dup_check/erp_push_mode/gemini_key)**)
+- `home.js` 33,768 → **6,190 行**(C1 持续抽至 6,190 见进度看板 C 行 + STATE · 早期:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js` · + 测试中心 493 行→`src/home/test-center.js`)
 - `services/**/*.py` 40 → **66**(B2 新增 18 个 store + 各 __init__);`services/ocr/entrypoints.py`(171 行 · 第二十一会话 `1eadc16`):web/LINE/email 三处共用 OCR 入口 helper 从 app.py/email_ingest 抽出
 - 守门测试:0 → **1516 unit**(第四十一会话 +384 services 数据层行为契约 `917f2f4` 1132→1516;此前 B2 +40 域契约 → 702;**第三十五会话 REFACTOR-D2 Wave 0 安全网 +~220** → 17 个核心纯逻辑模块行为契约 · 顺手挖修 3 个真 bug)+ 1 E2E + CI(lint + test 双 job)全绿
 
@@ -333,7 +335,7 @@
 ### 开窗口(60 秒)
 
 ```
-1. 读 CLAUDE.md/CLAUDE.md(项目宪法)— 重点看顶部 20 条铁律
+1. 读 CLAUDE.md/CLAUDE.md(项目宪法)— 重点看顶部 28 条铁律
 2. 读 CLAUDE.md/STATE_PEARNLY.md 头部 — 确认"整顿模式 ON"
 3. 读本文档"当前进度看板" — 找下一个 task
 4. 读对应 task 的"完成判定"段
@@ -352,21 +354,23 @@
 ### 收尾(每个 commit 前)
 
 ```
-1. 跑 5 道守门:
+1. 跑 6 道守门:
+   npm run format:check
+   python -m unittest discover -s tests/unit
    python scripts/check_imports.py --quiet
    python scripts/check_i18n.py --strict
-   python -m unittest discover -s tests/unit
-   npx playwright test
    node --check <changed.js>  # 若改了 JS
+   npm run build             # 改前端必跑
+   # E2E npx playwright test 按需单独跑(非每 commit 强制)
 2. 全绿才 commit
 3. commit message:
    <type>(<scope>): <subject> · REFACTOR-<task-id>
    
    <body>
    
-   守门 5 道全绿:imports/i18n/unit/playwright/node
+   守门 6 道全绿:format/unit/imports/i18n/node/build
    
-   Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+   Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 4. git push origin master(C 档位 · 不问)
 ```
 
@@ -439,7 +443,7 @@ python scripts/refactor_progress.py
 | 每窗口必跑 `scripts/refactor_progress.py` | 输出固定格式 | 数字没动 = Zihao 一眼看穿 |
 | 每窗口必更新进度看板 | 本文档 + STATE | 没更新 = 下窗口接不上 |
 | commit message 必含 REFACTOR-XX | 铁律 #20 | grep 不到 = 偷做新功能 |
-| CI 5 道守门 | 已落 | 跑红 = push 不上 |
+| CI 6 道守门 | 已落 | 跑红 = push 不上 |
 | 每月末必出月报 | 模板 + cron 提醒(可选) | 没月报 = Zihao 主动问 |
 
 ---
@@ -498,7 +502,7 @@ python scripts/refactor_progress.py
 ```
 项目根/
 ├── CLAUDE.md/
-│   ├── CLAUDE.md              ← 项目宪法 · 20 条铁律(18-20 整顿期)
+│   ├── CLAUDE.md              ← 项目宪法 · 28 条铁律(18-20 整顿期)
 │   ├── STATE_PEARNLY.md       ← 当前状态 · 整顿模式 ON 标识
 │   ├── REFACTOR_MASTER_PLAN.md ← 本文档 · 整顿单一权威源
 │   ├── EXECUTION_PLAN.md      ← 历史 8 阶段 · 已合并入本文档

@@ -80,13 +80,15 @@ class ErpRoutesContractTests(unittest.TestCase):
         self.assertIsNone(_check_push_access({"id": "u1", "plan": "free"}))
 
     def test_record_500_single_source(self):
-        """_record_500 单一来源在 route_helpers · erp_routes(写)与 app 全局异常处理器
+        """_record_500 单一来源在 route_helpers · erp_routes(写)与全局异常处理器
         共享同一对象 → 共享同一 _last_500_event 状态。admin_diagnostics 直接从
-        route_helpers import _read_last_500(不再经 app 再导出)。"""
-        import app
+        route_helpers import _read_last_500(不再经 app 再导出)。
+        REFACTOR-WA-B1 R6:全局异常 handler body 已抽到 services/error_handlers.py ·
+        _record_500 消费方随之从 app → error_handlers(app 留瘦 @app.exception_handler 壳委托)。"""
+        import services.error_handlers as error_handlers
 
         self.assertIs(erp_routes._record_500, route_helpers._record_500)
-        self.assertIs(app._record_500, route_helpers._record_500)
+        self.assertIs(error_handlers._record_500, route_helpers._record_500)
         # _read_last_500 不再挂在 app 上(单一来源在 route_helpers · admin_diagnostics 直 import)
         import admin_diagnostics_routes
 

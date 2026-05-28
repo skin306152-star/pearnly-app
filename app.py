@@ -119,7 +119,6 @@ from admin_diagnostics_routes import (
 )  # 阶段 5 Task 5.2 · 抽 5 个 admin diagnostics + internal/deploy* 路由(2026-05-22)
 from route_helpers import (  # REFACTOR-B1 · 公共鉴权/日志/校验 helper(2026-05-24)
     _plan_permissions,
-    _record_500,
     _tid,
 )
 from services.ocr.entrypoints import (
@@ -139,6 +138,7 @@ from services.erp.auto_push import (  # REFACTOR-WA-B1 · ERP 自动推送编排
     _erp_seller_routing_enabled,
 )
 from services.startup import run_startup, run_shutdown  # REFACTOR-WA-B1
+from services.error_handlers import handle_unhandled_exception  # REFACTOR-WA-B1
 
 try:
     from dotenv import load_dotenv
@@ -240,30 +240,8 @@ app.add_middleware(CORSMiddleware, **_cors_kwargs)
 # 500 must also call _record_500 manually — see erp_endpoints_create.
 @app.exception_handler(Exception)
 async def _capture_unhandled_500(request: Request, exc: Exception):
-    """v118.35.0.28 安全脱敏 (P0-03 体检 2026-05-21)
-    服务端仍记录完整 traceback (_record_500 + logger.exception) ·
-    但客户端只收到稳定错误码 · 不再回传异常类型/text/diag_url ·
-    内部诊断由超管接口 /api/admin/diagnostics/runtime 提供"""
-    from fastapi.responses import JSONResponse
-
-    try:
-        _record_500(
-            path=str(request.url.path),
-            method=request.method,
-            detail=f"unhandled {type(exc).__name__}: {str(exc)[:200]}",
-        )
-    except Exception:
-        pass
-    logger.exception(
-        "[capture-500] %s %s · %s",
-        request.method,
-        request.url.path,
-        type(exc).__name__,
-    )
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "server.internal_error"},
-    )
+    # 处理体已抽到 services/error_handlers.py(REFACTOR-WA-B1 · 2026-05-29)
+    return await handle_unhandled_exception(request, exc)
 
 
 # ============================================================

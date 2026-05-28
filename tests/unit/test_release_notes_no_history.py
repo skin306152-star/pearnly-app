@@ -25,9 +25,10 @@ class ReleaseNotesContractTests(unittest.TestCase):
 
         if ROOT not in sys.path:
             sys.path.insert(0, ROOT)
-        import app
+        # REFACTOR-B1(2026-05-28)· get_frontend_version 已迁到 meta_aliases_routes
+        import meta_aliases_routes
 
-        result = asyncio.run(app.get_frontend_version())
+        result = asyncio.run(meta_aliases_routes.get_frontend_version())
         cls.release_notes = result.get("release_notes") or {}
 
     def test_4_lang_all_present_with_reasonable_length(self):

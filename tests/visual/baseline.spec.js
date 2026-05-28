@@ -3,6 +3,11 @@
 // 10 页 screenshot baseline:登录 / 着陆 / 识别 / 历史 / 客户 / 对账 / 异常 / 设置 / 充值 / 超管
 // 跑法见 tests/visual/README.md
 // 凭据走 env(同 tests/e2e/01-login.spec.js 凭据 env 桥接策略)
+//
+// 窗口 C 硬约束:不动 eslint.config.mjs(不在允许清单)·
+// 用 inline globals / disable 自洽:tests/visual 还没在 eslint flat config 里登记 ·
+// 等下一窗口允许动 eslint.config.mjs 时把 tests/visual/**/*.js 也加进 e2e 的 entry 即可。
+/* eslint-disable no-undef, no-unused-vars */
 
 const { test, expect } = require('@playwright/test');
 

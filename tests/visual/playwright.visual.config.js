@@ -8,6 +8,9 @@
 // 出基线:加 --update-snapshots
 //
 // CI 不跑(2026-05-28 窗口 C 决策 · 见 tests/visual/README.md §3)。
+//
+// 窗口 C 硬约束:不动 eslint.config.mjs(不在允许清单)· 自洽 disable(同 baseline.spec.js)。
+/* eslint-disable no-undef */
 
 const { defineConfig, devices } = require('@playwright/test');
 const path = require('path');

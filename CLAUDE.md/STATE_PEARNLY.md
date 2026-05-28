@@ -80,6 +80,16 @@
 >   - **本会话最终数字**:app.py **4029** · db.py **1499** · home.js **5690** · home.html **4153** · src/home 35 · services/{auth/{user_lookup,password,account_merge},usage} **新增 4 模块** · home-*.css 切片 36 · unit **1580** · E2E **17** ✅。
 >   - **env 提醒**:`PEARNLY_E2E_USER/PASS/ADMIN_USER/ADMIN_PASS` 在 HKCU 已 setx · 当前 claude-code 子进程不继承 → 每次跑 playwright 必 PS 桥接 `$env:X = [Environment]::GetEnvironmentVariable('X','User')` 然后跑。spec 11/12 需要全 4 个 env;其他只需前 2 个。
 >   - **真实安全洞**:spec 12 实测 RLS T1/T3/T5 在生产**穿透成功**(DB role BYPASSRLS)· 归 REFACTOR-B8 · **Zihao 在场处理**(改 DB role 或 FORCE RLS / SET LOCAL ROLE)· 硬线 #1 禁止自主 loop 动 RLS 代码。spec 12 已 annotate 出来 · 下一轮看 STATE 即懂。
+> - **【第 23 轮 · loop 续 · 2026-05-28】**Zihao 重发 `/loop` 同 prompt · dynamic mode 自调度续跑:
+>   - **实拍行数校正**(`wc -l` vs 旧 STATE):app.py 实际 **4523**(旧记 4029)/ home.js **6190**(旧 5690)/ home.html **4410**(旧 4153)· 之前 PowerShell `Get-Content` 计数偏小,本会话起以 `wc -l` 为准。
+>   - **`ceac3f0` billing/account_status**(候选 #1):3 函数 + LRU cache + BKK tz 常量 → `services/billing/account_status.py`(13 契约)。is_user_billing_exempt / get_billing_status_combined / _bkk_year_month(后者私有 · charge_ocr bare 调 · re-export 必须含)· 兼容别名 `_EXEMPT_CACHE_V21=_EXEMPT_CACHE` 让老 test_billing_contract 不破。db.py 1499→**1376(-123)**。
+>   - **CI 状态**:之前 aeef902 / 20e3dd7 被 cancelled(concurrency cancel-in-progress · 多 push 快连只留最新一个)· 0ceb4b4(STATE)/ ceac3f0 在跑。
+>   - **下一刀候选(loop 续跑)**:
+>     2. **billing/credits 框架**(~150 行 · `ensure_credits_tables` L655 + `ensure_tenant_credits` L788)
+>     3. **billing/charge_ocr 家族**(~400 行 · charge_ocr + charge_ocr_async + _excel_char_count_estimate · 最大 chunk · spec 11+16 兜底)
+>     4. **email_codes/ensure**(~30 行 · 启动期 schema · spec 17 兜底)
+>     5. **membership/ensure**(~90 行 · ⚠️ 必须留 RLS 基础设施 in place 不动)
+>   - **当前数字**:db.py **1376** · app.py 4523 · home.js 6190 · home.html 4410 · services/billing 新增 account_status · unit **1592** · E2E 17。
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

@@ -104,6 +104,12 @@
 >     - **email_codes/ensure**(~30 行 · `ensure_email_codes_table` L133 · spec 17 兜底)
 >     - **db.py 中剩 password_changed_at/google_sub/line_uid 列 ensure_* 小函数**(~50 行)
 >     - 之后 db.py 应可接近 500 · 剩下都是 cursor/pool 框架(必须留)+ RLS 基础设施(硬线 #1)+ OCR_PRICING 常量。
+> - **【第 27 轮 · loop 续 · 2026-05-28】**dynamic 双刀 + 死注释清理:
+>   - **`fa3d02f` 4 个启动期 ensure_***:3 users 列 ensure_* → `services/users/columns.py` + email_codes 表 ensure → `services/auth/email_codes_schema.py`(11 契约 · spec 01/13/14/17 兜底)。db.py 1005→933(-72)。
+>   - **`58add58` 138 行死注释清**:L73-209 全是「已迁到 services/X」占位空 header(代码本身早走 · 注释残留)→ 合并单段 + 保留 RLS infra header。db.py 933→**819**(-114)。
+>   - **本会话累计:db.py 1731 → 819(-912 · -53%)** · unit 1622 · 17/17 E2E 网保 · 守门 6 道连绿。
+>   - **⚠️ db.py < 500 数学边界**:819 = framework 72 + RLS infra 250 + 注释 17 + re-export 480。RLS 受硬线 #1 保护不许动(250)· re-export 范式要降需改全 callers `from services.X import Y`(~50+ 文件,非「结构性挪代码」)。**db.py < 500 不可达 in 硬线 #1**;接受 ~820 为 floor · 移到其他 BC 目标。
+>   - **下一刀 pivot**:B1 app.py 4523 → < 500 / C1 home.js 6190 → < 200 / C3 home.html 4410 → < 1000。**B1 第一步**:auth_routes(login/OAuth/JWT/email-code/account-merge)集中在 app.py · spec 01/13/15/17 兜底 · 可抽。下一轮 wakeup 起 B1。
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

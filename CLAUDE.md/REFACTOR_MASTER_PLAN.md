@@ -102,6 +102,8 @@
 ### 代码规模(7 项)
 
 > **行数目标分两层**:先达成"验收目标",能自然继续拆且职责更清晰时再冲"冲刺目标"。不允许为了凑行数制造过度抽象、空壳文件或跳转地狱。
+>
+> ⚠️ **"行数"指源码,不是成品(2026-05-29 钉死)**:目标是把巨石**拆成多个小源文件**(每个 < 500 行 · 好维护),**不是**把某个文件的内容压短。大厂(Chrome 36 行外壳 / Claude 一行 bundle)你看到的小行数是 **Vite build + minify 后的成品**,真源码是几千个小文件。成品体积归 E7(minify)管,源码行数归拆分管 —— **两件事别混。** "home.js < 200 行" = 入口/bootstrap 源文件,业务全在 `src/home/*`。
 
 | 文件 | 当前(2026-05-22) | 目标 | 备注 |
 |---|---|---|---|
@@ -209,6 +211,7 @@
 | C6 | i18n 拆 .json(home.js 4 个翻译块各 2324 keys → `i18n/<lang>.json` + 按模块再拆) | 1-2 周 | C1 | ⚪ |
 | C7 | 可访问性 a11y(WCAG 2.1 AA · 屏幕阅读器 / 键盘导航 / 对比度) | 2-3 周 | C4 | ⚪ |
 | C8 | 移动端真适配(iPhone / Pixel 真测 · 触控目标 / 字号 / 横滚动) | 1-2 周 | C2 | ⚪ |
+| C9 | 前端状态管理(`src/home/*` 模块化后引入轻量集中 store · 替代 bare global 耦合 · 单一数据源 + 订阅式刷新) | 1-2 周 | C1 | ⚪ **🔴 强撞 Loop 1 · 必须等 home.js 拆到地板(`src/home/*` 稳定)再做**(2026-05-29 Zihao 补入) |
 
 **C 阶段完成判定**:`home.js` / `home.css` / `home.html` 先达到验收目标；若继续拆能让职责更清晰,再冲刺更小目标 / Design System 至少 8 个通用 component / TS 化 80%+ / i18n 拆到 .json / a11y AA / 移动端 4 浏览器全测过
 
@@ -219,10 +222,10 @@
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
 | D1 | 10 个核心 E2E(登录 / 注册 / 上传 OCR / 销项税核查 / 收入对账 / ERP 推送 / 充值 / 客户 CRUD / 异常处理 / 4 语切换) | 4-6 周 | A1 | 🟡 1/10(已有着陆页) |
-| D2 | Integration tests(API + 真 DB + Mock 外部服务 Gemini / LINE / Gmail) | 2-3 周 | A1 | ⚪ |
+| D2 | Integration tests(API + 真 DB + Mock 外部服务 Gemini / LINE / Gmail) | 2-3 周 | A1 | ✅ 21 个集成测试(8 域:billing/recon/erp/ocr/auth/clients/team/archive · env-gated · CI 默认 skip)· 窗口 C `d37f091` |
 | D3 | 死灰复燃守门(Zihao 给清单 · 每条加 1 个守门测试 · 复活即 CI 红) | 1 周 + Zihao 清单 | — | ⚪ 等清单 |
 | D4 | 测试覆盖率达 70%(pytest-cov 报告) | 持续 | D1, D2 | ⚪ |
-| D5 | Visual regression(Playwright screenshot diff · 防 UI 改一处炸另一处) | 1-2 周 | D1 | ⚪ |
+| D5 | Visual regression(Playwright screenshot diff · 防 UI 改一处炸另一处) | 1-2 周 | D1 | ✅ 10 页视觉回归 baseline(独立 `playwright.visual.config.js` · 暂不上 CI · 见 `tests/visual/README.md`)· `d37f091` |
 
 **D 阶段完成判定**:10 E2E 跑通 / 20+ integration test / 死灰复燃清单全堵 / 覆盖率 ≥ 70% / Visual regression 跑
 
@@ -238,6 +241,7 @@
 | E4 | 修最慢 3 个前端模块(切换 < 1s) | 2-3 周 | E2 | ⚪ |
 | E5 | 静态资源 CDN(Cloudflare DNS only → 打开 proxy · static/*.js/css 走 CDN) | 半天 | — | ⚪ |
 | E6 | 图片 / PDF 预处理(OCR 上传压缩 · 减带宽 + 加快 Gemini) | 1 周 | — | ⚪ |
+| E7 | 资源 minify(确认 Vite prod build 的 JS/CSS minify 生效 + 补 HTML minify · 减体积加快首屏) | 半天 | A1 | ⚪ **🔴 碰 `vite.config` · 影响 Loop 1 的 build 守门 · 必须等 Loop 1 完成再改**(2026-05-29 Zihao 补入 · 注:JS/CSS minify Vite prod build 多半已默认开 · 本任务主要是确认 + 补 HTML minify) |
 
 **E 阶段完成判定**:API p95 < 1s / 前端 LCP < 2.5s / 切换交互 < 1s / CDN 启用 / 大文件预处理
 
@@ -259,13 +263,13 @@
 
 | ID | 任务 | 估时 | 依赖 | 状态 |
 |---|---|---|---|---|
-| G1 | ADR(10+ 重要决策留文 · 给未来 AI 看) | 1 周 | — | ⚪ |
-| G2 | RUNBOOK(部署 / 回滚 / 紧急排查 / 数据恢复 / 服务挂了怎么办) | 1 周 | — | ⚪ |
-| G3 | ONBOARDING.md(给真人协作者) | 半天 | — | ⚪ |
-| G4 | OpenAPI / Swagger(完善 schema · 公开 `/docs`) | 半天 | B1 | ⚪ |
-| G5 | PR / Issue 模板(`.github/PULL_REQUEST_TEMPLATE.md`) | 1h | — | ⚪ |
-| G6 | CHANGELOG 自动生成(git-cliff 类 · 从 commit message 出) | 半天 | — | ⚪ |
-| G7 | CODEOWNERS(GitHub 标记 · 防误改) | 1h | — | ⚪ |
+| G1 | ADR(10+ 重要决策留文 · 给未来 AI 看) | 1 周 | — | ✅ 11 个(ADR-001~011 · 含 ADR-010 防屎山 + ADR-011 3 窗口并行 · `3e7647c`)|
+| G2 | RUNBOOK(部署 / 回滚 / 紧急排查 / 数据恢复 / 服务挂了怎么办) | 1 周 | — | ✅ `docs/RUNBOOK.md` · `5544d0e` |
+| G3 | ONBOARDING.md(给真人协作者) | 半天 | — | ✅ `docs/ONBOARDING.md` · 窗口 C `18e2747` |
+| G4 | OpenAPI / Swagger(完善 schema · 公开 `/docs`) | 半天 | B1 | ✅ `docs/openapi.md`(36 router 索引)· `18e2747` |
+| G5 | PR / Issue 模板(`.github/PULL_REQUEST_TEMPLATE.md`) | 1h | — | ✅ PR 模板 + `ISSUE_TEMPLATE/question.md` · `18e2747` |
+| G6 | CHANGELOG 自动生成(git-cliff 类 · 从 commit message 出) | 半天 | — | ✅ `docs/CHANGELOG.md` + git-cliff 配置(暂不上 CI)· `18e2747` |
+| G7 | CODEOWNERS(GitHub 标记 · 防误改) | 1h | — | ✅ `.github/CODEOWNERS`(高敏路径自动 @ Zihao)· `18e2747` |
 
 **G 阶段完成判定**:10+ ADR / RUNBOOK 完整 / ONBOARDING / Swagger 公开 / 模板齐 / CHANGELOG 自动
 

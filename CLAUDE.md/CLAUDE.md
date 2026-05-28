@@ -13,11 +13,12 @@
 
 **Codex 协作分流规则**:[`CLAUDE.md/CODEX_COLLAB_RULES.md`](CODEX_COLLAB_RULES.md)(Zihao 说「继续」时先分流:测试项目 / 重整长跑文案)
 
-**接力 agent 进窗口顺序**:
-1. 读本文件(看铁律 #18-20 段)
-2. 读 `STATE_PEARNLY.md`(头部"整顿模式"段)
-3. 读 `REFACTOR_MASTER_PLAN.md`(找当前 task)
-4. 干活 → 6 道守门 → push → 更新 STATE + 主计划进度看板
+**接力 agent 进窗口顺序**(治漂移版 2026-05-29 · 别一上来啃 7000 行):
+1. 读 **`AGENTS.md`**(项目根 · 唯一一页入口 · 含文档地图 + 今天敲定的认知)
+2. 跑 `python scripts/refactor_progress.py`(看**实时**数字 · 永不信文档手写行数)
+3. 读 `STATE_PEARNLY.md` 顶部**「状态卡」**(分割线以上 ≤30 行 · 当前 task/最后 commit)
+4. 找当前 task → `REFACTOR_MASTER_PLAN.md`「进度看板」· 本文件(铁律细节)按需查
+5. 干活 → 6 道守门 → push → **重写** STATE 状态卡 + 主计划进度看板
 
 **禁止**:任何 `MODULE_ROADMAP.md` 新功能 · 任何 P0-VAT 主线 · 任何 Phase 6 进项管理 MVP
 
@@ -394,11 +395,12 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 
 **背景**:9 阶段 100+ task 不在一个窗口能干完 · 跨窗口接力时如果文档不读全 · 必然跑偏(找不到下个 task / 重复做 / 跳过依赖)。
 
-**铁律**:整顿期每个接力 agent 进窗口**必读**这 4 文档(顺序):
-1. **`CLAUDE.md/CLAUDE.md`**(本文件 · 28 条铁律 · 看完铁律 18-20 这段)
-2. **`CLAUDE.md/STATE_PEARNLY.md`** 头部("整顿模式 ON" 段 · 当前阶段 · 上窗口完成的 commit)
-3. **`CLAUDE.md/REFACTOR_MASTER_PLAN.md`**(整顿主计划 · 单一权威源 · 看"当前进度看板" + "下一个 task")
-4. 当前 task 的"完成判定"段(在主计划对应 task 行)
+**铁律**(治漂移版 2026-05-29 · 必读顺序 · 由小到大别贪多):
+1. **`AGENTS.md`**(项目根 · 唯一一页入口 · 文档地图 + 今天敲定的认知 · **先读这个**)
+2. 跑 `python scripts/refactor_progress.py`(实时数字 · 不信任何文档手写行数)
+3. **`CLAUDE.md/STATE_PEARNLY.md`** 顶部「状态卡」(分割线以上 ≤30 行)
+4. **`CLAUDE.md/REFACTOR_MASTER_PLAN.md`**「当前进度看板」找下一个 task + 该 task"完成判定"段
+5. **`CLAUDE.md/CLAUDE.md`**(本文件 · 28 条铁律 · 细节按需查 · 重点铁律 18-20 整顿段)(在主计划对应 task 行)
 
 **进窗口前检查**(60 秒):
 ```

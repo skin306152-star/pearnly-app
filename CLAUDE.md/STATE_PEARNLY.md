@@ -1,5 +1,22 @@
 # 📊 STATE · Pearnly 项目状态
 
+<!-- ╔═══════════════════════════════════════════════════════════════╗
+     ║  状态卡 · 每窗口收尾【重写】这一段(别追加)· 保持 ≤30 行     ║
+     ║  数字只信 `python scripts/refactor_progress.py`,本卡是快照   ║
+     ╚═══════════════════════════════════════════════════════════════╝ -->
+
+## 🎯 状态卡(2026-05-29 快照 · 进窗口先读这段 + 跑脚本)
+
+- **模式**:整顿封锁期 · 0 新功能 · 打法 = 3 窗口并行 loop(A 后端 / B 前端 / C 文档测试 · 见 `docs/refactor/PARALLEL_LOOP_DISPATCH.md`)。
+- **当前 task**:治漂移 + 文档整理(本窗口 · AGENTS.md 一页入口 / 数字脚本化 / 状态卡)→ 完成后 launch 3 窗口跑 Loop 1 拆巨石。
+- **代码规模快照**(实时跑 `scripts/refactor_progress.py`):home.js **6190**→<200 · app.py **3286**→<500 · db.py **819**→<500 · home.css **0** ✅ · home.html **4410**→<1000 · 综合 **~77%**。
+- **模块/测试**:src/home **35** · *_routes **36** · services **101** · unit **1629** · integration **42** · E2E **17** · home.js silent **0**。
+- **最后 commit**:跑 `git log --oneline -5`(别信手写 hash)· **未 push commit**:跑 `git status` / `git log origin/master..HEAD`。
+- **等 Loop 1 完成才做**:CI lint-size 切 fail 模式(铁律 #27)· E7 minify · C9 状态管理 · C5 TS化。
+- **高敏边界**:钱/登录/auth/RLS/OCR 热路径 = 纯结构性改 + 真账号 E2E 闸 + 失败自动 revert(铁律 #26)。RLS 基础设施(`get_cursor_rls` 等)永不动。
+
+<!-- ═══════════════ 以下为历史明细(按需查 · 不必每窗口通读)═══════════════ -->
+
 > ## 🟢 窗口 C 收官(2026-05-28 · REFACTOR-WC · 防屎山闸 + 文档 + 测试 · 0 业务代码)
 > **15/15 任务全 ✅ · 4 commit (`016aa79` P1 → `18e2747` P2 → `d37f091` P3 → P4+P5)**
 > 详细收尾文档 → [`docs/refactor/WINDOW_C_COMPLETE.md`](../docs/refactor/WINDOW_C_COMPLETE.md)

@@ -96,6 +96,14 @@
 >   - 删 db.py L799 孤儿 `from decimal import Decimal as _DecV21` + L802-970 共 ~170 行。db.py **1373→1208**(-165 · 单刀最大)。本会话累计 db.py 1731→1208 = **-523 / -30%**。
 >   - 真账号 E2E 闸:spec 11(充值审核闭环)+ spec 16(OCR 真识别扣费)2/2 PASS in 24.1s · 钱写入路径零回归。
 >   - **下一刀 candidates**:credits 框架(ensure_credits_tables + ensure_tenant_credits ~150 行)/ membership(ensure_membership_tables ~90 行)/ email_codes(~30 行)。剩 ~700 行还需抽,到 < 500 目标。app.py / home.js / home.html 全未动。
+> - **【第 25-26 轮 · 2026-05-28】**dynamic 续跑双刀:
+>   - **`210ebf8` billing/credits_schema**:ensure_credits_tables(advisory_xact_lock 906024 + 5 表 + 2 ALTER + 3 seed)+ ensure_tenant_credits(注册新公司初始 0 余额)→ `services/billing/credits_schema.py`(6 契约)。db.py **1208→1067(-141)**。`import db` 在 def 之后(同 charge.py 解循环)。
+>   - **`0c06b25` membership/schema**:ensure_membership_tables(3 表 roles/memberships/client_assignments + 3 系统角色 seed + tenants.tenant_type_v2 ALTER)→ `services/membership/schema.py`(3 契约)。db.py **1067→1005**。⚠️ 不动 RLS infra(硬线 #1 · _is_rls_enabled/get_cursor_rls 等仍 db.py)。
+>   - **当前数字**:db.py **1005**(本会话 1731→1005 = **-726 / -42%**) · unit **1614**。app.py 4523 · home.js 6190 · home.html 4410 全未动。
+>   - **下一刀 candidates**(剩 ~505 行需抽到 <500):
+>     - **email_codes/ensure**(~30 行 · `ensure_email_codes_table` L133 · spec 17 兜底)
+>     - **db.py 中剩 password_changed_at/google_sub/line_uid 列 ensure_* 小函数**(~50 行)
+>     - 之后 db.py 应可接近 500 · 剩下都是 cursor/pool 框架(必须留)+ RLS 基础设施(硬线 #1)+ OCR_PRICING 常量。
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

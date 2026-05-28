@@ -16,11 +16,11 @@ const hasAdminCreds = !!(ADMIN_USER && ADMIN_PASS);
 
 // 通用 mask · 替换动态内容防 baseline 抖动
 const dynamicSelectors = [
-    '[data-dynamic]',           // 任何标注为动态的元素(若 home.js 有标注)
-    '.timestamp',                // 时间戳
-    '.balance-amount',           // 余额(每次跑可能不同)
-    '.notification-badge',       // 通知数量
-    '[data-test-mask]',          // 显式 mask hooks
+    '[data-dynamic]', // 任何标注为动态的元素(若 home.js 有标注)
+    '.timestamp', // 时间戳
+    '.balance-amount', // 余额(每次跑可能不同)
+    '.notification-badge', // 通知数量
+    '[data-test-mask]', // 显式 mask hooks
 ];
 
 async function maskDynamicContent(page) {
@@ -43,7 +43,9 @@ async function loginAs(page, user, pass) {
     await page.fill('input[type="email"], input[name="username"]', user);
     await page.fill('input[type="password"], input[name="password"]', pass);
     await Promise.all([
-        page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15_000 }).catch(() => null),
+        page
+            .waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15_000 })
+            .catch(() => null),
         page.click('button[type="submit"]'),
     ]);
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => null);
@@ -86,7 +88,11 @@ test.describe('认证后页面', () => {
         // 切到上传 tab(若有 hash 路由)
         await page.evaluate(() => {
             if (typeof window.routeTo === 'function') {
-                try { window.routeTo('upload'); } catch (_) { /* silent */ }
+                try {
+                    window.routeTo('upload');
+                } catch (_) {
+                    /* silent */
+                }
             } else {
                 window.location.hash = '#upload';
             }

@@ -12,7 +12,10 @@
 const { defineConfig, devices } = require('@playwright/test');
 const path = require('path');
 
-const BASE_URL = process.env.PEARNLY_VISUAL_BASE_URL || process.env.PEARNLY_E2E_BASE_URL || 'https://pearnly.com';
+const BASE_URL =
+    process.env.PEARNLY_VISUAL_BASE_URL ||
+    process.env.PEARNLY_E2E_BASE_URL ||
+    'https://pearnly.com';
 const IS_CI = !!process.env.CI;
 
 module.exports = defineConfig({
@@ -31,7 +34,7 @@ module.exports = defineConfig({
             caret: 'hide',
         },
     },
-    fullyParallel: false,  // 视觉测试 serial 跑 · 避免 login 互相干扰
+    fullyParallel: false, // 视觉测试 serial 跑 · 避免 login 互相干扰
     workers: 1,
     retries: IS_CI ? 1 : 0,
     forbidOnly: IS_CI,
@@ -41,7 +44,7 @@ module.exports = defineConfig({
     use: {
         baseURL: BASE_URL,
         headless: true,
-        viewport: { width: 1280, height: 800 },  // 桌面端 baseline · 不抖
+        viewport: { width: 1280, height: 800 }, // 桌面端 baseline · 不抖
         ignoreHTTPSErrors: true,
         trace: 'on-first-retry',
         video: 'off',

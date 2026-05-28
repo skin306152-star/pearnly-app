@@ -141,6 +141,13 @@
 >     - **`/api/login`**(L1376 · ~120 行 + 大量 helper · spec 01 兜底 · 复杂 auth flow · 留专门轮)
 >     - **`/api/version`**(L3220 · 22 行公开 meta · 可塞 pages_routes)
 >     - **`_handle_line_image_ocr` + 所有 `_ocr_*` helpers**(还在 app.py · ~1500+ 行 · 整搬到 services/ocr/ 是大工程 · 跨多 module 重构)
+> - **【第 31 轮 · loop 续 · 2026-05-28】**dynamic 主登录:
+>   - **`738dbee` login_routes**:抽 POST /api/login + LoginRequest/Response 模型 + _record_login_failure → `login_routes.py`(164 行 · 0 业务逻辑改 · spec 01 兜底)。
+>   - 复杂依赖修正:`find_user_by_username` 是 db.* 不是 auth.* → 改用 `db.find_user_by_username`(login_routes 里只 `from auth import verify_password, create_access_token`)。
+>   - 删 app.py 4 个孤儿 import(F401):JSONResponse / find_user_by_username / update_last_login / verify_password / create_access_token。
+>   - app.py **3622→3484(-138 含 4 删孤儿)**。本会话累计 app.py **4523→3484 = -1039 / -23%** · 10 routes 出 · 5 模块新增。
+>   - 真账号 E2E:spec 01 单跑 PASS 5.0s · login 搬迁零回归(首跑 session 互踢 flake)。
+>   - **B1 还剩**:OCR 5 主路由(L1502-2614 · 大块 · _ocr_* helpers 缠)/ v1 ocr aliases(薄)/ version(微)/ _handle_line_image_ocr(LINE OCR 后台)。app.py 离 < 500 还需 -2984。
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

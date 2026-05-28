@@ -72,5 +72,30 @@ def ensure_line_uid_column():
         return False
 
 
+# v110.7 · 启动时确保 users 表有欢迎向导所需的 profile 字段(幂等)
+# REFACTOR-WA-B1(2026-05-29)· 从 app.py 抽入(同类 ensure_* 列归位 · 铁律 #21/#23 进现有 ensure 模块)
+def ensure_user_profile_columns():
+    """
+    确保 users 表有 5 个 profile 字段 · 用于欢迎向导和资料完善。
+    用 ADD COLUMN IF NOT EXISTS · 已有字段无影响 · 全新部署也能自动补齐。
+    """
+    columns = [
+        ("role", "VARCHAR(32)"),
+        ("monthly_volume", "VARCHAR(16)"),
+        ("country", "VARCHAR(8)"),
+        ("line_id", "VARCHAR(64)"),
+        ("phone", "VARCHAR(32)"),
+        ("active_jti", "TEXT"),  # v118.32.5.5.10 · 1 账号 1 设备 session 控制
+    ]
+    # v118.32.5.5.11 · 必须 commit=True · 否则 DDL 在 with 退出时回滚 · 列不会持久化
+    with db.get_cursor(commit=True) as cur:
+        for col, typ in columns:
+            try:
+                cur.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {typ}")
+            except Exception as e:
+                logger.warning(f"ALTER users add {col} 跳过: {e}")
+    logger.info("✅ v110.7 users profile 字段就绪")
+
+
 # ⚠️ `import db` 必须在 def 之后(解循环 import · 见 services/billing/charge.py 注释)
 import db  # noqa: E402

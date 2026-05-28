@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""P1d 路由单测 · app._auto_push_smart_routed / _auto_push_batch_for_endpoint
+"""P1d 路由单测 · auto_push._auto_push_smart_routed / _auto_push_batch_for_endpoint
    + ERP_SELLER_ROUTING 回滚开关。
 
 锁定(Zihao 2026-05-26 蓝图):
@@ -16,34 +16,34 @@ import os
 import unittest
 from unittest import mock
 
-import app
 import db
+from services.erp import auto_push
 
 
 class FlagTests(unittest.TestCase):
     def test_default_off(self):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("ERP_SELLER_ROUTING", None)
-            self.assertFalse(app._erp_seller_routing_enabled())
+            self.assertFalse(auto_push._erp_seller_routing_enabled())
 
     def test_truthy_values(self):
         for v in ("1", "true", "TRUE", "yes", "on"):
             with mock.patch.dict(os.environ, {"ERP_SELLER_ROUTING": v}):
-                self.assertTrue(app._erp_seller_routing_enabled(), v)
+                self.assertTrue(auto_push._erp_seller_routing_enabled(), v)
 
     def test_falsy_values(self):
         for v in ("0", "false", "off", "", "nope"):
             with mock.patch.dict(os.environ, {"ERP_SELLER_ROUTING": v}):
-                self.assertFalse(app._erp_seller_routing_enabled(), v)
+                self.assertFalse(auto_push._erp_seller_routing_enabled(), v)
 
     def test_per_user_allowlist(self):
         # 全局关 · 但名单内 user 灰度开;名单外(含 mrerp)仍关。
         env = {"ERP_SELLER_ROUTING": "0", "ERP_SELLER_ROUTING_USERS": "uTest, uOther"}
         with mock.patch.dict(os.environ, env):
-            self.assertTrue(app._erp_seller_routing_enabled("uTest"))
-            self.assertTrue(app._erp_seller_routing_enabled("uOther"))
-            self.assertFalse(app._erp_seller_routing_enabled("uMrerp"))
-            self.assertFalse(app._erp_seller_routing_enabled(None))
+            self.assertTrue(auto_push._erp_seller_routing_enabled("uTest"))
+            self.assertTrue(auto_push._erp_seller_routing_enabled("uOther"))
+            self.assertFalse(auto_push._erp_seller_routing_enabled("uMrerp"))
+            self.assertFalse(auto_push._erp_seller_routing_enabled(None))
 
 
 def _hist(hid, wcid=None):
@@ -70,8 +70,8 @@ class SmartRoutingGroupingTests(unittest.IsolatedAsyncioTestCase):
         async def fake_fallback(user_id, hid, eps, tenant_id=None):
             self.fallback_calls.append(str(hid))
 
-        self._p1 = mock.patch.object(app, "_auto_push_batch_for_endpoint", fake_batch)
-        self._p2 = mock.patch.object(app, "_auto_push_history", fake_fallback)
+        self._p1 = mock.patch.object(auto_push, "_auto_push_batch_for_endpoint", fake_batch)
+        self._p2 = mock.patch.object(auto_push, "_auto_push_history", fake_fallback)
         self._p1.start()
         self._p2.start()
         self.addCleanup(self._p1.stop)
@@ -107,7 +107,7 @@ class SmartRoutingGroupingTests(unittest.IsolatedAsyncioTestCase):
     async def test_single_endpoint_one_group(self):
         hists = [_hist("1", 10), _hist("2", 10)]
         self._patch_db(hists)
-        await app._auto_push_smart_routed("u1", ["1", "2"], None, [{"id": "fb"}])
+        await auto_push._auto_push_smart_routed("u1", ["1", "2"], None, [{"id": "fb"}])
         self.assertEqual(len(self.batch_calls), 1)
         self.assertEqual(self.batch_calls[0][0], "epA")
         self.assertEqual(sorted(self.batch_calls[0][1]), ["1", "2"])
@@ -116,7 +116,7 @@ class SmartRoutingGroupingTests(unittest.IsolatedAsyncioTestCase):
     async def test_multi_endpoint_each_routes(self):
         hists = [_hist("1", 10), _hist("2", 20), _hist("3", 10)]
         self._patch_db(hists)
-        await app._auto_push_smart_routed("u1", ["1", "2", "3"], None, [{"id": "fb"}])
+        await auto_push._auto_push_smart_routed("u1", ["1", "2", "3"], None, [{"id": "fb"}])
         groups = {eid: ids for eid, ids in self.batch_calls}
         self.assertEqual(sorted(groups["epA"]), ["1", "3"])
         self.assertEqual(groups["epB"], ["2"])
@@ -126,7 +126,7 @@ class SmartRoutingGroupingTests(unittest.IsolatedAsyncioTestCase):
         # 5=无 workspace · 6=workspace 未绑端点(wcid30) · 7=端点停用(wcid40)
         hists = [_hist("5", None), _hist("6", 30), _hist("7", 40), _hist("8", 10)]
         self._patch_db(hists)
-        await app._auto_push_smart_routed("u1", ["5", "6", "7", "8"], None, [{"id": "fb"}])
+        await auto_push._auto_push_smart_routed("u1", ["5", "6", "7", "8"], None, [{"id": "fb"}])
         self.assertEqual(self.batch_calls[0][0], "epA")
         self.assertEqual(self.batch_calls[0][1], ["8"])
         self.assertEqual(sorted(self.fallback_calls), ["5", "6", "7"])
@@ -177,7 +177,7 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
         disp = mock.patch.object(push_dispatch, "dispatch_endpoint_batch")
         m = disp.start()
         self.addCleanup(disp.stop)
-        await app._auto_push_batch_for_endpoint(
+        await auto_push._auto_push_batch_for_endpoint(
             "u1", self._ep(), [{"id": "1", "invoice_no": "INV1"}], None
         )
         m.assert_not_called()
@@ -224,7 +224,7 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
             {"id": "2", "invoice_no": "INV2"},
             {"id": "3", "invoice_no": "INV3"},
         ]
-        await app._auto_push_batch_for_endpoint("u1", self._ep(), hists, None)
+        await auto_push._auto_push_batch_for_endpoint("u1", self._ep(), hists, None)
         # 推送前先写 3 条 pending(推送中)行
         self.assertEqual([lg["status"] for lg in self.logs], ["pending", "pending", "pending"])
         # 推完把 pending 行原地更新成 success/failed(不再新插)
@@ -267,10 +267,10 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
             if h["id"] == "1":
                 raise RuntimeError("boom")
 
-        p = mock.patch.object(app, "_persist_push_outcome", side_effect=flaky)
+        p = mock.patch.object(auto_push, "_persist_push_outcome", side_effect=flaky)
         p.start()
         self.addCleanup(p.stop)
-        await app._auto_push_batch_for_endpoint(
+        await auto_push._auto_push_batch_for_endpoint(
             "u1",
             self._ep(),
             [{"id": "1", "invoice_no": "INV1"}, {"id": "2", "invoice_no": "INV2"}],

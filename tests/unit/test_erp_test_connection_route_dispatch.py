@@ -349,8 +349,8 @@ class RouteDispatchTests(unittest.TestCase):
                 return_value={"id": "u-test", "plan": "pro"},
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
-            patch.object(app._erp, "test_mrerp_endpoint", mrerp_mock),
-            patch.object(app._erp, "test_endpoint_connection", legacy_mock),
+            patch.object(_erp, "test_mrerp_endpoint", mrerp_mock),
+            patch.object(_erp, "test_endpoint_connection", legacy_mock),
         ):
             with self._make_client() as client:
                 r = client.post(
@@ -394,8 +394,8 @@ class RouteDispatchTests(unittest.TestCase):
                 return_value={"id": "u-test", "plan": "pro"},
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
-            patch.object(app._erp, "test_mrerp_endpoint", mrerp_mock),
-            patch.object(app._erp, "test_endpoint_connection", legacy_mock),
+            patch.object(_erp, "test_mrerp_endpoint", mrerp_mock),
+            patch.object(_erp, "test_endpoint_connection", legacy_mock),
         ):
             with self._make_client() as client:
                 r = client.post(
@@ -522,7 +522,7 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
                 erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
-            patch.object(app._erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
+            patch.object(_erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
         ):
             client = await self._make_async_client()
             async with client:
@@ -555,7 +555,7 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
-            patch.object(app._erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
+            patch.object(_erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
         ):
             client = await self._make_async_client()
             async with client:
@@ -578,7 +578,7 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
-            patch.object(app._erp, "list_mrerp_customers", side_effect=self._tripwire_sync_helper),
+            patch.object(_erp, "list_mrerp_customers", side_effect=self._tripwire_sync_helper),
         ):
             client = await self._make_async_client()
             async with client:
@@ -604,7 +604,7 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
-            patch.object(app._erp, "list_mrerp_products", side_effect=self._tripwire_sync_helper),
+            patch.object(_erp, "list_mrerp_products", side_effect=self._tripwire_sync_helper),
         ):
             client = await self._make_async_client()
             async with client:
@@ -628,7 +628,7 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
                 erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
-            patch.object(app._erp, "list_mrerp_products", side_effect=self._tripwire_sync_helper),
+            patch.object(_erp, "list_mrerp_products", side_effect=self._tripwire_sync_helper),
         ):
             client = await self._make_async_client()
             async with client:
@@ -682,7 +682,7 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
             patch.object(app.db, "insert_push_log", return_value="log-1"),
             patch.object(app.db, "update_endpoint_stats", return_value=None),
             patch.object(app.db, "update_history_push_status", return_value=None),
-            patch.object(app._erp, "push_to_endpoint", side_effect=self._tripwire_sync_helper),
+            patch.object(_erp, "push_to_endpoint", side_effect=self._tripwire_sync_helper),
         ):
             client = await self._make_async_client()
             async with client:
@@ -1663,7 +1663,7 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
             ) as history_status_mock,
             patch.object(app.db, "get_erp_retry_delay_sec", return_value=60),
             patch.object(app.db, "schedule_log_retry", return_value=None),
-            patch.object(app._erp, "push_to_endpoint", return_value=failed_result),
+            patch.object(_erp, "push_to_endpoint", return_value=failed_result),
         ):
             with self._make_client() as client:
                 r = client.post(
@@ -1766,7 +1766,7 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
             patch.object(
                 app.db, "update_history_push_status", return_value=None
             ) as history_status_mock,
-            patch.object(app._erp, "push_to_endpoint", return_value=success_result),
+            patch.object(_erp, "push_to_endpoint", return_value=success_result),
         ):
             with self._make_client() as client:
                 r = client.post(
@@ -1875,7 +1875,7 @@ class ListingRetryContractTests(unittest.TestCase):
 
         with (
             self._patch_common(),
-            patch.object(app._erp, "list_mrerp_customers", fetch_mock),
+            patch.object(_erp, "list_mrerp_customers", fetch_mock),
             patch("asyncio.sleep", side_effect=lambda s: None),
         ):
             with self._make_client() as client:
@@ -1913,7 +1913,7 @@ class ListingRetryContractTests(unittest.TestCase):
 
         with (
             self._patch_common(),
-            patch.object(app._erp, "list_mrerp_customers", fetch_mock),
+            patch.object(_erp, "list_mrerp_customers", fetch_mock),
             patch("asyncio.sleep", side_effect=lambda s: None),
         ):
             with self._make_client() as client:
@@ -1957,7 +1957,7 @@ class ListingRetryContractTests(unittest.TestCase):
 
         with (
             self._patch_common(),
-            patch.object(app._erp, "list_mrerp_customers", fetch_mock),
+            patch.object(_erp, "list_mrerp_customers", fetch_mock),
             patch("asyncio.sleep", side_effect=lambda s: None),
         ):
             with self._make_client() as client:

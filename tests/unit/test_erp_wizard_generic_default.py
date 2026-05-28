@@ -24,6 +24,7 @@ from unittest.mock import patch, MagicMock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
+import erp_push as _erp  # noqa: E402
 
 from services.erp.mrerp_product_sync import suggest_generic_product_code  # noqa: E402
 
@@ -132,7 +133,7 @@ class WizardProductsRouteTests(unittest.TestCase):
                 return_value={"id": "u", "plan": "pro"},
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
-            patch.object(app._erp, "list_mrerp_products", fake_listing),
+            patch.object(_erp, "list_mrerp_products", fake_listing),
         ):
             with self._client() as client:
                 r = client.post(
@@ -165,7 +166,7 @@ class WizardProductsRouteTests(unittest.TestCase):
                 return_value={"id": "u", "plan": "pro"},
             ),
             patch.object(erp_routes, "_check_push_access", return_value=None),
-            patch.object(app._erp, "list_mrerp_products", fail_listing),
+            patch.object(_erp, "list_mrerp_products", fail_listing),
         ):
             with self._client() as client:
                 r = client.post(

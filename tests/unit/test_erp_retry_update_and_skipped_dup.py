@@ -20,6 +20,7 @@ from unittest.mock import patch, MagicMock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
+import erp_push as _erp  # noqa: E402
 
 import db  # noqa: E402,F401  · 先 import db 再 import push_store(避免 partial-init 循环)
 from services.erp.push_store import (  # noqa: E402
@@ -112,7 +113,7 @@ class RetryUpdatesOriginalRowTests(unittest.TestCase):
             patch.object(app.db, "update_log_status_after_retry", update_mock),
             patch.object(app.db, "update_endpoint_stats", MagicMock()),
             patch.object(app.db, "update_history_push_status", MagicMock()),
-            patch.object(app._erp, "push_to_endpoint", MagicMock(return_value=push_result)),
+            patch.object(_erp, "push_to_endpoint", MagicMock(return_value=push_result)),
         ):
             with self._client() as client:
                 r = client.post("/api/erp/logs/log-orig-1/retry")

@@ -64,10 +64,16 @@ class ErpXeroRoutesContractTests(unittest.TestCase):
         )
 
     def test_ensure_fresh_token_single_source(self):
-        """_ensure_fresh_xero_token 单一来源 · app.py 自动推送复用的就是本模块的同一对象"""
-        import app
+        """_ensure_fresh_xero_token 单一来源 = erp_xero_routes · ERP 自动推送编排
+        (services/erp/auto_push.py · REFACTOR-WA-B1 抽出)在函数内 lazy import 复用本模块同一对象,
+        不在模块级另起一份(否则这里会抓到重复定义)。"""
+        from services.erp import auto_push
 
-        self.assertIs(app._ensure_fresh_xero_token, erp_xero_routes._ensure_fresh_xero_token)
+        self.assertTrue(callable(erp_xero_routes._ensure_fresh_xero_token))
+        self.assertFalse(
+            hasattr(auto_push, "_ensure_fresh_xero_token"),
+            "auto_push 不应在模块级重定义 _ensure_fresh_xero_token · 应 lazy import erp_xero_routes 同一对象",
+        )
 
 
 if __name__ == "__main__":

@@ -2,6 +2,8 @@
 # 构建产物 / 第三方 / 锁文件 / 运行期产物 —— 不格式化
 node_modules/
 static/dist/
+# agent / IDE 配置目录 —— 非 app 代码 · 不受项目 prettier 管(否则权限/hook 配置改一下就红 lint)
+.claude/
 package-lock.json
 *.min.js
 *.min.css

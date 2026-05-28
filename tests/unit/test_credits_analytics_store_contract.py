@@ -29,10 +29,11 @@ class CreditsAnalyticsReexportContract(unittest.TestCase):
                 getattr(db, n), getattr(store, n), f"db.{n} not re-exporting service object"
             )
 
-    def test_charge_ocr_stays_in_db(self):
-        # 钱路径未搬(只搬只读分析)
-        self.assertEqual(db.charge_ocr.__module__, "db")
-        self.assertEqual(db.charge_ocr_async.__module__, "db")
+    def test_charge_ocr_now_in_services_billing_charge(self):
+        # 旧守门曾断言「钱路径不出 db」· REFACTOR-B2 第 24 轮已迁 services/billing/charge
+        # (spec 11+16 E2E 兜底)· db.charge_ocr 仍可调(re-export 同对象 · 调用点零改动)
+        self.assertEqual(db.charge_ocr.__module__, "services.billing.charge")
+        self.assertEqual(db.charge_ocr_async.__module__, "services.billing.charge")
 
 
 class CreditsAnalyticsBehaviorContract(unittest.TestCase):

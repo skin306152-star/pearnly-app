@@ -796,180 +796,6 @@ def ensure_tenant_credits(tenant_id) -> None:
         logger.warning(f"ensure_tenant_credits skip tenant={tenant_id}: {e}")
 
 
-from decimal import Decimal as _DecV21
-
-
-def charge_ocr(
-    user_id, tenant_id, kind: str, units: int, history_id: str = None, description: str = ""
-) -> dict:
-    """OCR 完成后扣费 · v0.21 由调用端用 asyncio.create_task 异步触发
-    单原子事务(SELECT FOR UPDATE 防并发)· 内部仍持有连接 · 但已脱离 OCR 关键路径
-    kind: 'pdf' (units=page_count) | 'excel' (units=char_count)
-    豁免账号自动跳过返 ok=True charged=0
-    """
-    if not tenant_id:
-        return {"ok": False, "error": "no_tenant"}
-    if is_user_billing_exempt(user_id):
-        return {
-            "ok": True,
-            "charged_thb": 0.0,
-            "balance_after": None,
-            "kind": kind,
-            "units": units,
-            "transaction_id": None,
-            "exempt": True,
-        }
-
-    if kind == "pdf":
-        used = 0
-        try:
-            with get_cursor() as _c:
-                _c.execute(
-                    "SELECT COALESCE(pages_used, 0) AS u FROM monthly_page_usage "
-                    "WHERE tenant_id = %s::uuid AND year_month = %s",
-                    (str(tenant_id), _bkk_year_month()),
-                )
-                _r = _c.fetchone()
-                used = int(_r["u"]) if _r else 0
-        except Exception:
-            used = 0
-        cost = estimate_pdf_cost_thb(used, units)
-        pages_inc = int(units)
-    elif kind == "excel":
-        cost = estimate_excel_cost_thb(units)
-        pages_inc = 0
-    else:
-        return {"ok": False, "error": f"unknown_kind:{kind}"}
-
-    if cost <= _DecV21("0"):
-        return {
-            "ok": True,
-            "charged_thb": 0.0,
-            "balance_after": None,
-            "kind": kind,
-            "units": units,
-            "transaction_id": None,
-        }
-
-    ym = _bkk_year_month()
-    try:
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                "SELECT balance_thb FROM tenant_credits " "WHERE tenant_id = %s::uuid FOR UPDATE",
-                (str(tenant_id),),
-            )
-            row = cur.fetchone()
-            if not row:
-                cur.execute(
-                    "INSERT INTO tenant_credits (tenant_id, balance_thb) "
-                    "VALUES (%s::uuid, 0) RETURNING balance_thb",
-                    (str(tenant_id),),
-                )
-                row = cur.fetchone()
-            current_bal = _DecV21(str(row["balance_thb"]))
-            new_bal = current_bal - cost  # 可扣到负数(OCR 已完成 · 后续充值补)
-
-            cur.execute(
-                "UPDATE tenant_credits SET balance_thb = %s, updated_at = NOW() "
-                "WHERE tenant_id = %s::uuid",
-                (str(new_bal), str(tenant_id)),
-            )
-            cur.execute(
-                "INSERT INTO credit_transactions "
-                "(tenant_id, user_id, type, amount_thb, pages, balance_after, description) "
-                "VALUES (%s::uuid, %s::uuid, 'usage', %s, %s, %s, %s) RETURNING id",
-                (
-                    str(tenant_id),
-                    str(user_id) if user_id else None,
-                    str(-cost),
-                    pages_inc,
-                    str(new_bal),
-                    description or f"OCR {kind} units={units} hid={history_id or ''}",
-                ),
-            )
-            tx_id = cur.fetchone()["id"]
-
-            if kind == "pdf" and pages_inc > 0:
-                cur.execute(
-                    "INSERT INTO monthly_page_usage (tenant_id, year_month, pages_used, updated_at) "
-                    "VALUES (%s::uuid, %s, %s, NOW()) "
-                    "ON CONFLICT (tenant_id, year_month) DO UPDATE "
-                    "SET pages_used = monthly_page_usage.pages_used + EXCLUDED.pages_used, "
-                    "    updated_at = NOW()",
-                    (str(tenant_id), ym, pages_inc),
-                )
-        logger.info(
-            f"[charge_ocr] OK tenant={str(tenant_id)[:8]} kind={kind} "
-            f"units={units} cost=฿{cost} bal_after=฿{new_bal}"
-        )
-        return {
-            "ok": True,
-            "charged_thb": float(cost),
-            "balance_after": float(new_bal),
-            "kind": kind,
-            "units": units,
-            "transaction_id": tx_id,
-        }
-    except Exception as e:
-        logger.error(f"[charge_ocr] FAIL tenant={tenant_id} kind={kind} units={units}: {e}")
-        return {"ok": False, "error": str(e)[:200]}
-
-
-def _excel_char_count_estimate(file_bytes: bytes, filename: str) -> int:
-    """估算 Excel/CSV/Word 文件的总字符数 · 用于扣费"""
-    if not file_bytes:
-        return 0
-    fn = (filename or "").lower()
-    try:
-        if fn.endswith(".xlsx") or fn.endswith(".xlsm") or fn.endswith(".xls"):
-            try:
-                import openpyxl
-                import io
-
-                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
-                total = 0
-                for ws in wb.worksheets:
-                    for row in ws.iter_rows(values_only=True):
-                        for c in row:
-                            if c is not None:
-                                total += len(str(c))
-                return total
-            except Exception:
-                return max(0, len(file_bytes) // 4)  # 粗估降级
-        elif fn.endswith(".csv") or fn.endswith(".tsv") or fn.endswith(".txt"):
-            try:
-                return len(file_bytes.decode("utf-8", errors="ignore"))
-            except Exception:
-                return 0
-        elif fn.endswith(".docx") or fn.endswith(".doc"):
-            try:
-                import docx
-                import io
-
-                doc = docx.Document(io.BytesIO(file_bytes))
-                return sum(len(p.text) for p in doc.paragraphs)
-            except Exception:
-                return max(0, len(file_bytes) // 2)
-    except Exception as e:
-        logger.warning(f"_excel_char_count_estimate error fn={fn}: {e}")
-    return 0
-
-
-def charge_ocr_async(
-    user_id, tenant_id, kind: str, units: int, history_id: str = None, description: str = ""
-) -> None:
-    """v0.21 · 异步扣费包装 · 调用方:
-    asyncio.create_task(asyncio.to_thread(db.charge_ocr_async, ...))
-    fire-and-forget · 不阻塞 OCR 关键路径 · 失败仅 log 不影响用户
-    """
-    try:
-        result = charge_ocr(user_id, tenant_id, kind, units, history_id, description)
-        if not result.get("ok"):
-            logger.warning(f"[charge_ocr_async] failed silently: {result.get('error')}")
-    except Exception as e:
-        logger.error(f"[charge_ocr_async] exception(swallowed): {e}")
-
-
 # ============================================================
 # REFACTOR-B2 · services/<domain> DAL re-export
 # 业务 SQL 已抽到 services/*/store.py · 在此 re-export 回 db 命名空间 ·
@@ -1371,3 +1197,12 @@ from services.billing.account_status import (
 # 兼容别名:老测试 / 老代码用 _EXEMPT_CACHE_V21(老名)直接清 cache
 # 新名 _EXEMPT_CACHE 在 services/billing/account_status · 这里桥回 db 命名空间保不破
 from services.billing.account_status import _EXEMPT_CACHE as _EXEMPT_CACHE_V21  # noqa: E402,F401
+
+# REFACTOR-B2 · OCR 扣费 re-export(已抽到 services/billing/charge · 调用点 db.charge_ocr*/
+# db._excel_char_count_estimate 零改动 · 内部 charge_ocr 调 db.is_user_billing_exempt 等也走
+# db 命名空间)
+from services.billing.charge import (
+    charge_ocr as charge_ocr,
+    _excel_char_count_estimate as _excel_char_count_estimate,
+    charge_ocr_async as charge_ocr_async,
+)

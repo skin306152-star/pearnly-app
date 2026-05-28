@@ -267,74 +267,7 @@ def ensure_email_codes_table():
 # ============================================================
 
 
-def ensure_membership_tables():
-    """启动时建 3 张表 + 灌系统角色 + ALTER 老表加列 · 幂等"""
-    try:
-        with get_cursor(commit=True) as cur:
-            # ── 1. roles 表(RBAC 预留 · 现在不接逻辑只建表)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS roles (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    name TEXT NOT NULL UNIQUE,
-                    permissions JSONB NOT NULL DEFAULT '{}'::jsonb,
-                    is_system BOOLEAN NOT NULL DEFAULT FALSE,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                );
-            """)
-            # 灌 3 个系统角色(幂等)
-            cur.execute("""
-                INSERT INTO roles (name, permissions, is_system) VALUES
-                    ('owner',   '{"all": true}'::jsonb,                                              TRUE),
-                    ('manager', '{"manage_team": true, "view_all_clients": true}'::jsonb,           TRUE),
-                    ('staff',   '{"view_assigned_clients": true}'::jsonb,                           TRUE)
-                ON CONFLICT (name) DO NOTHING;
-            """)
-
-            # ── 2. memberships 表(用户挂事务所 + 角色 + 状态)
-            # Q1 砍 M:N · UNIQUE(user_id) · 1 人 1 事务所
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS memberships (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-                    role_id UUID NOT NULL REFERENCES roles(id),
-                    status TEXT NOT NULL DEFAULT 'active',
-                    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    UNIQUE(user_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_memberships_tenant ON memberships(tenant_id);
-                CREATE INDEX IF NOT EXISTS idx_memberships_status ON memberships(status) WHERE status = 'active';
-            """)
-
-            # ── 3. client_assignments 表(谁能看哪个客户 · 所长授权)
-            # 注意:clients.id 是 BIGSERIAL(BIGINT)· 不是 UUID
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS client_assignments (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    client_id BIGINT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-                    assigned_by UUID REFERENCES users(id),
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    UNIQUE(user_id, client_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_client_assign_user ON client_assignments(user_id);
-                CREATE INDEX IF NOT EXISTS idx_client_assign_client ON client_assignments(client_id);
-            """)
-
-            # ── 4. tenants 加 tenant_type 列(区分事务所/SME/freelancer)
-            cur.execute("""
-                ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tenant_type_v2 TEXT DEFAULT 'firm';
-            """)
-            # 注意:tenants 表已经有老的 tenant_type(shared_api/byo_api/admin · 计费类型)
-            # 不能覆盖 · 用新列 tenant_type_v2 区分(firm/sme/freelancer · 业务类型)
-
-            # ── 5. clients 表 · tenant_id 列已存在(v107 ensure_clients_table 已建)· 不重复 ALTER
-
-            logger.info(
-                "✅ v118.27.7 · memberships / client_assignments / roles 表已就绪 · 3 系统角色已灌入"
-            )
-    except Exception as e:
-        logger.error(f"ensure_membership_tables failed: {e}")
+# ensure_membership_tables 已抽到 services/membership/schema.py(REFACTOR-B2 · 见文件尾 re-export)
 
 
 # ============================================================
@@ -1064,4 +997,9 @@ from services.billing.charge import (
 from services.billing.credits_schema import (
     ensure_credits_tables as ensure_credits_tables,
     ensure_tenant_credits as ensure_tenant_credits,
+)
+
+# REFACTOR-B2 · Membership schema re-export(已抽到 services/membership/schema · 启动期 db.ensure_membership_tables 调用点零改)
+from services.membership.schema import (
+    ensure_membership_tables as ensure_membership_tables,
 )

@@ -42,7 +42,7 @@
 | 环节 | 谁干 | 自动吗 |
 |---|---|---|
 | 读文档、找下一波、出承包清单 + batch 指令 | Claude 窗口 | ✅ 自动(你说"继续整顿"触发) |
-| 写代码、跑 5 道守门、开 PR | batch agent | ✅ 自动(触发后) |
+| 写代码、跑 6 道守门、开 PR | batch agent | ✅ 自动(触发后) |
 | **敲 `/batch <指令>`** | **Zihao** | ❌ 你来(内置命令只能你敲) |
 | **review PR、决定合不合** | **Zihao** | ❌ 你来(这步没人能替) |
 | 串行接线删巨石(拷出后那步) | Claude 窗口 | ✅ 自动,但一步步停下汇报 |
@@ -129,14 +129,16 @@
 铁律:
 - 只新建文件(tests/e2e/<name>.spec.js 或 src/home/<feature>.js),
   绝不改 home.js / db.py / app.py / home.css。
-- 跑全 5 道守门,全绿才提交:
+- 跑全 6 道守门,全绿才提交:
+    npm run format:check
+    python -m unittest discover -s tests/unit
     python scripts/check_imports.py --quiet
     python scripts/check_i18n.py --strict
-    python -m unittest discover -s tests/unit
-    npx playwright test
     node --check <改的.js>
-- commit message 必含 · REFACTOR-<task-id>,带 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>。
-- 完成后开 PR,描述写清:产出文件、跑过哪 5 道门、覆盖哪条核心路径。
+    npm run build
+    npx playwright test            # (按需 E2E)改了前端/核心路径才跑
+- commit message 必含 · REFACTOR-<task-id>,带 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>。
+- 完成后开 PR,描述写清:产出文件、跑过哪 6 道门、覆盖哪条核心路径。
 - 任何不确定 / 要碰巨石 / 触发高敏(登录·计费·OCR热路径)→ 立刻停,PR 里标注,不硬来。
 ```
 
@@ -150,7 +152,7 @@
 - 共享全局(t / subscribeI18n / showToast / showConfirm 等)一律 import,不重复定义。
 - 字节级 LF 处理,无 BOM。
 - 带一个渲染/契约测试:该 module 入口函数能渲染、0 报错。
-- 5 道守门全绿才提交;commit 含 · REFACTOR-C1(后端则 REFACTOR-B2);
+- 6 道守门全绿才提交;commit 含 · REFACTOR-C1(后端则 REFACTOR-B2);
   开 PR 写清:抽了哪个功能、新文件、依赖哪些公共件、跑过的门。
 - 触发登录/计费/OCR热路径/RLS基础设施 → 停,标注,不动。
 ```
@@ -174,7 +176,7 @@
 
 - [ ] 开 batch 前 `git tag` 备份当前 master。
 - [ ] 第一次只在 **Wave 0** 试水,看 agent 守不守门、PR 质量。
-- [ ] 每个 agent 指令**内嵌 5 道守门 + 契约测试 + REFACTOR-id**——否则批量产出违反 8 硬门槛 = 偷渡新债。
+- [ ] 每个 agent 指令**内嵌 6 道守门 + 契约测试 + REFACTOR-id**——否则批量产出违反 8 硬门槛 = 偷渡新债。
 - [ ] 高敏域(登录/计费/OCR热路径/auth/RLS)**永远不进 batch**,Zihao 在场单独做。
 - [ ] 动巨石的波次**必须等 ME.ERP 合并**。
 - [ ] 删除巨石旧代码这步**串行**,不并行。
@@ -218,7 +220,7 @@
 
 > 这套是 Zihao × 主控窗口实跑出来的真实分工。新窗口照这个接,别按"理想版"假设 Zihao 会 review 代码。
 
-1. **Zihao 是非技术用户(不懂编程)**:主控窗口(Claude)**全包** —— 研究 / 规划 / 派工 / 判断作业合不合格 / 跑 5 道守门 / 复查 / 合并 / 提交上线 / 出测试清单。Zihao 只负责:① 极少数必须他敲的命令(如内置 /batch)② 像普通用户一样点 app 验收 ③ 涉及钱/登录时拍板"行/不行"。**不要让 Zihao 看代码、判断 PR、学合并。**
+1. **Zihao 是非技术用户(不懂编程)**:主控窗口(Claude)**全包** —— 研究 / 规划 / 派工 / 判断作业合不合格 / 跑 6 道守门 / 复查 / 合并 / 提交上线 / 出测试清单。Zihao 只负责:① 极少数必须他敲的命令(如内置 /batch)② 像普通用户一样点 app 验收 ③ 涉及钱/登录时拍板"行/不行"。**不要让 Zihao 看代码、判断 PR、学合并。**
 2. **内置 `/batch` 在本环境未触发**(贴进来会变成普通消息发给主控)→ 主控**自己用 Agent 工具派后台并行 agent**(`run_in_background` · copy-out 只新增非重叠文件 · 各自跑自检)→ 收到完成通知后,主控**统一**跑守门 + 复查 + 一次提交。效果等同 /batch,且 Zihao 零操作。
 3. **质检窗口模式(UI 实测)**:要真账号实测时,主控写一段"活儿单"文案 → Zihao 贴到**另开的质检窗口** + 单独发测试账号 → 质检窗口用真账号跑 Playwright → 报告贴回主控验收。质检窗口铁律:凭据只走 env 不提交、需登录的 spec 必须 `test.skip(!env)` 否则拖红 CI、绝不花真钱/造垃圾数据。
 4. **高敏不进「无人看管的并行 batch」· 但 Zihao 在场时可做**:登录 / 计费扣费 / OCR 热路径 / RLS 基础设施 / LINE 绑定 / 改密码。
@@ -340,7 +342,7 @@
 - 启动/boot 段(L4761-4789)+ routeTo 中枢:接线敏感,串行小心。
 
 **④ 节奏**:直接放 12-18 个 agent 并行 copy-out 上表安全模块(照 test-center 样板:搬进 `src/home/<x>.js` + `main.js` import + bare 调全局,**0 改逻辑**)· 分 2-3 轮 → 串行窗口接线删 home.js → 最后 Zihao 在场处理高敏 4 块 → 收官再抽 `_shared.js`。**前置:Wave 0 E2E 网必须先绿**(否则拆完无法验证页面还能渲染)。
-- **每个 agent 黄金指令**:照 §5 模板 B,但「import 公共件 _shared」改成「bare 调全局 t/showToast/showConfirm/apiGet 等(home.js 已暴露,勿重定义/勿 import)」;搬完在 `src/main.js` 加一行 import;带渲染/契约测试;5 道守门;commit 含 · REFACTOR-C1。
+- **每个 agent 黄金指令**:照 §5 模板 B,但「import 公共件 _shared」改成「bare 调全局 t/showToast/showConfirm/apiGet 等(home.js 已暴露,勿重定义/勿 import)」;搬完在 `src/main.js` 加一行 import;带渲染/契约测试;6 道守门;commit 含 · REFACTOR-C1。
 
 ---
 

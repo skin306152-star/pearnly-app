@@ -13,13 +13,15 @@
 
 ---
 
-## 5 道守门(本机全绿才提交 · CI 也跑)
+## 6 道守门(本机全绿才提交 · CI 也跑)
 
+- [ ] `npm run format:check` → 全绿(prettier 格式)
+- [ ] `python -m unittest discover -s tests/unit -p "test_*.py"` → all OK(全量单测)
 - [ ] `python scripts/check_imports.py --quiet` → EXIT 0
 - [ ] `python scripts/check_i18n.py --strict` → 0 missing 0 extra(4 语完整)
-- [ ] `python -m unittest discover -s tests/unit -p "test_*.py"` → all OK
-- [ ] `npx playwright test` → all passed(改了 login.html / 顶栏 / 4 语切换时必跑)
 - [ ] `node --check <changed.js>` → 各改动 JS 都过(改了 JS 时)
+- [ ] `npm run build` → 构建通过(改了前端时)
+- [ ] (按需 E2E)`npx playwright test` → 改了 login.html / 顶栏 / 4 语切换 / 核心路径时必跑
 
 ---
 

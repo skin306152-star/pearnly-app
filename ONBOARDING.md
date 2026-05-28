@@ -161,16 +161,18 @@ git push origin master  →  GitHub webhook  →  服务器 git pull + cp static
 
 ---
 
-## 8. 提交前必跑的 5 道守门
+## 8. 提交前必跑的 6 道守门
 
 push 前本机全绿才提交(CI 也跑同样的检查,不绿合不进):
 
 ```bash
-python scripts/check_imports.py --quiet            # 1) 静态 import 检查 → EXIT 0
-python scripts/check_i18n.py --strict              # 2) i18n 4 语完整性 → 0 missing 0 extra
-python -m unittest discover -s tests/unit -p "test_*.py"   # 3) 单元 / contract 测试 → all OK
-npx playwright test                                # 4) E2E smoke(改了 login.html / 顶栏 / 4 语切换时必跑)
+npm run format:check                               # 1) prettier 格式 → 全绿
+python -m unittest discover -s tests/unit -p "test_*.py"   # 2) 全量单元 / contract 测试 → all OK
+python scripts/check_imports.py --quiet            # 3) 静态 import 检查 → EXIT 0
+python scripts/check_i18n.py --strict              # 4) i18n 4 语完整性 → 0 missing 0 extra
 node --check <changed.js>                          # 5) 改了 JS 时 · 各改动文件都过
+npm run build                                      # 6) Vite 构建通过(改了前端时)
+npx playwright test                                # (按需 E2E)改了 login.html / 顶栏 / 4 语切换 / 核心路径时必跑
 ```
 
 commit message 格式(整顿期):
@@ -180,7 +182,7 @@ commit message 格式(整顿期):
 
 <body 说改了什么 · 为啥 · 怎么验证>
 
-守门 5 道全绿:imports / i18n / unit / playwright / node
+守门 6 道全绿:format / unit / imports / i18n / node / build
 ```
 
 ---
@@ -189,11 +191,11 @@ commit message 格式(整顿期):
 
 1. **读三份核心文档**:`CLAUDE.md/CLAUDE.md`(宪法)→ `CLAUDE.md/STATE_PEARNLY.md`(当前状态)→ `CLAUDE.md/REFACTOR_MASTER_PLAN.md`(整顿主计划 · 看"当前进度看板")。
 2. **把项目在本地跑起来**(§3),打开 `http://localhost:7860` 确认能看到登录 / 主页面。
-3. **跑一遍 5 道守门**(§8),确认本机环境干净、测试全绿 —— 这是你后续每次提交的基线。
+3. **跑一遍 6 道守门**(§8),确认本机环境干净、测试全绿 —— 这是你后续每次提交的基线。
 4. **跑一次整顿进度脚本**熟悉度量口径:`python scripts/refactor_progress.py`(输出各巨石行数 / 测试数 / 模块数 / 达标进度 %)。
 5. **翻一遍 `docs/README.md`**(40+ 文档索引)+ `CONTRIBUTING.md`,知道遇到具体问题去哪查。
 6. **找一个 `REFACTOR_MASTER_PLAN.md` 进度看板里"进行中"或下一个待启动的小任务**(中等粒度,如抽一个 router / 补一个模块测试)上手 —— **不要**第一天就动登录 / 计费 / OCR 热路径等高敏区(那些要在 Zihao 在场时单独做)。
-7. **提交前对照 §8 五道守门 + §7 铁律摘要**,commit message 带上 `REFACTOR-<task-id>`。
+7. **提交前对照 §8 六道守门 + §7 铁律摘要**,commit message 带上 `REFACTOR-<task-id>`。
 
 ---
 

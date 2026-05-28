@@ -64,12 +64,14 @@
 铁律：
 - 只新建文件（如 tests/e2e/<name>.spec.js 或 docs/<name>.md），
   绝不改 home.js / db.py / app.py / home.css / home.html。
-- 完成后跑全 5 道守门，全绿才算完：
+- 完成后跑全 6 道守门，全绿才算完：
+    npm run format:check                        # prettier 格式
+    python -m unittest discover -s tests/unit   # 全量单测
     python scripts/check_imports.py --quiet
     python scripts/check_i18n.py --strict
-    python -m unittest discover -s tests/unit
-    npx playwright test            # 改了前端/E2E 才跑
-    node --check <你改的.js>        # 改了 JS 才跑
+    node --check <你改的.js>                     # 改了 JS 才跑
+    npm run build                               # 改了前端才跑
+    npx playwright test                         # (按需 E2E)改了前端/E2E 才跑
 - 字节级 LF 处理，无 BOM。
 - 完成后回报：产出了哪些文件、跑过哪几道门、覆盖哪条路径。
 - 不确定 / 要碰巨石 / 触发高敏（登录·计费·OCR热路径·改密·LINE绑定·auth·RLS）
@@ -93,7 +95,7 @@
   等 error 时加 /* eslint-disable <rule> -- verbatim */（0 改逻辑）。
 - 字节级 LF 处理，无 BOM。
 - 带一个渲染/契约测试：该 module 入口函数能渲染、0 报错。
-- 跑全 5 道守门，全绿才算完。
+- 跑全 6 道守门(format/unit/imports/i18n/node/build · E2E 按需)，全绿才算完。
 - 回报：抽了哪个功能、新文件路径、删除锚点行号（给主控接线用）、跑过的门。
 - 触发高敏（登录·计费·OCR热路径·改密·LINE绑定·auth·RLS基础设施）
   → 停，回报里标注，不动。
@@ -140,7 +142,7 @@
 
 - [ ] 派工前 `git tag` 备份当前 master。
 - [ ] 承包清单零重叠（没有两 agent 碰同一段）。
-- [ ] 每个 agent 指令内嵌 5 道守门 + 契约测试 + REFACTOR-id（否则违反 8 硬门槛）。
+- [ ] 每个 agent 指令内嵌 6 道守门 + 契约测试 + REFACTOR-id（否则违反 8 硬门槛）。
 - [ ] 高敏域永不进无人看管的并行 batch（铁律 #26 · §9.5 #4）。
 - [ ] 删巨石旧代码这步**串行**，不并行（一块一守门一 commit）。
 - [ ] 每波结束跑 `python scripts/refactor_progress.py` 看数字真掉了。

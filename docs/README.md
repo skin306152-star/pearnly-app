@@ -6,7 +6,7 @@
 > 每条 1-2 句说明 + 创建/更新日期 + 现在还能不能信(✅ 当前 / 📚 历史 / ⚠️ 已过时但保留)。
 >
 > **项目级文档不在这里** · 见项目根:
-> - `CLAUDE.md/CLAUDE.md`(项目宪法 · 17 条铁律)
+> - `CLAUDE.md/CLAUDE.md`(项目宪法 · 28 条铁律)
 > - `CLAUDE.md/STATE_PEARNLY.md`(当前状态 · 每会话末更新)
 > - `CLAUDE.md/EXECUTION_PLAN.md`(8 阶段执行清单 · 阶段 7 收尾中)
 > - `CLAUDE.md/TECH_DEBT.md`(技术债清单 · 长期持续)

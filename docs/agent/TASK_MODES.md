@@ -39,7 +39,7 @@
 1. 选**边界清晰**的一片(一个 router / 一个 cohesive 域 / 一个 IIFE)。纠缠太深(load-order 装饰器/裸名调)就跳过。
 2. 整片搬到独立文件(`*_routes.py` / `src/home/*` / `services/<domain>/*.py`)· 用 re-export 让调用点零改动。
 3. **每片带契约测试**(函数在新位置 + re-export 同一对象防漂移)。
-4. 5 道守门全绿(black/ruff/imports/i18n/unit)→ 本地 commit(message 含 `REFACTOR-<id>`)。
+4. 6 道守门全绿(format[black/ruff]/unit/imports/i18n/node --check/build · E2E 按需)→ 本地 commit(message 含 `REFACTOR-<id>`)。
 5. **抽前必 re-grep 当前行号**(每次删除后行号下移)。
 
 禁忌:不留半拆;不在预算偏紧时硬开核心耦合区;不碰 auth/OCR 热路径/计费除非 Zihao 在场。

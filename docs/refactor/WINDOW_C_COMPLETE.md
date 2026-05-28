@@ -177,7 +177,7 @@ chore(ci): 防屎山闸切 fail 模式 · 整顿期硬门激活 · REFACTOR-WC-G
 此后任何 commit 涨监控文件 = CI 红挡 push · 整顿期不会再糊回去。
 警告期反馈:见 ADR-010 §7 (How we'll know it works)。
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 EOF
 )"
 ```

@@ -43,12 +43,14 @@ SSH 免密已配(`id_ed25519`)。只读诊断 Claude 自己跑;**生产写操作
 # 1. 确认在 master(铁律 #14 · 每窗口开工必查)
 git -C "D:\Users\Skin\Desktop\pearnly_project" branch --show-current   # 必须 master
 
-# 2. 5 道守门全绿才推
+# 2. 6 道守门全绿才推
+npm run format:check                             # prettier 格式
+python -m unittest discover -s tests/unit        # 全量单测 all OK
 python scripts/check_imports.py --quiet          # EXIT 0
 python scripts/check_i18n.py --strict            # 0 missing 0 extra
-python -m unittest discover -s tests/unit        # all OK
-npx playwright test                              # all passed(改了前端时)
-node --check <changed.js>                        # 改了 JS 时
+node --check <changed.js>                         # 改了 JS 时
+npm run build                                     # 构建通过(改了前端时)
+npx playwright test                              # (按需 E2E)改了前端/核心路径时
 
 # 3. 提交 + 推(显式写 master · 不是当前分支)
 git add -A

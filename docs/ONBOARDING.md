@@ -134,7 +134,7 @@ node --check <changed.js>
 
 <body 说改了什么 · 为啥 · 怎么验证>
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 ```
 
 **type 取值**:`feat` / `fix` / `refactor` / `test` / `chore` / `docs` / `hotfix`(整顿期允许的紧急 BUG 修复 · 不带 REFACTOR-id)

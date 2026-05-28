@@ -52,7 +52,7 @@ git commit -m "chore(visual): 更新视觉基线 · REFACTOR-<task-id>
 
 <理由 · 改了什么 UI · 验过 4 语 / 移动端>
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 "
 ```
 

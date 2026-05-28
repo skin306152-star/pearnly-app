@@ -7,7 +7,7 @@
 // 加载顺序:home.js(sync)先跑暴露全局 → 本 module(Vite · defer)后跑。
 // verbatim 搬迁 · 0 逻辑改。
 // ============================================================
-/* global t, showToast, _showSessionRevokedModal */
+/* global _showSessionRevokedModal */
 (function () {
     'use strict';
     let _hbTimer = null;

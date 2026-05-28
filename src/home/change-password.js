@@ -6,7 +6,6 @@
 // 加载顺序:home.js(sync)先跑暴露全局 → 本 module(Vite · defer)后跑,DOM/全局已就绪。
 // verbatim 搬迁 · 0 逻辑改。
 // ============================================================
-/* global t, showToast */
 (function () {
     'use strict';
 

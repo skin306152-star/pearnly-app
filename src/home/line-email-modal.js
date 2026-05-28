@@ -8,7 +8,6 @@
 //   subscribeI18n)→ 本 module(Vite bundle · defer)后跑,执行时全局已就绪。
 // verbatim 搬迁 · 0 逻辑改。
 // ============================================================
-/* global t, showToast */
 (function () {
     'use strict';
 

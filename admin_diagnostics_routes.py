@@ -34,6 +34,9 @@ from route_helpers import (  # REFACTOR-B1 · 公共守门(2026-05-24)· _read_l
     _read_last_500,
     _require_super_admin,
 )
+from services.playwright_bootstrap import (  # REFACTOR-WA-B1 · 2026-05-29 · 单一来源
+    read_playwright_status,
+)
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter()
@@ -65,13 +68,14 @@ async def admin_diagnostics_runtime(request: Request):
 
     # Lazy import 解循环 import:app.py 也 import 本模块 · 顶层不能 import app
     # 此时(handler 执行时)app module 已经完成 init · 全局变量都已就绪
+    # (playwright 状态走 services.playwright_bootstrap 顶层 import · 无循环)
     import app as _app
 
     return {
         "ok": True,
         "ts": int(_t.time()),
         "version": _app.PEARNLY_FRONTEND_VERSION,
-        "playwright": _app._read_playwright_status(),
+        "playwright": read_playwright_status(),
         "last_500": _read_last_500(),  # REFACTOR-B1 · 单一来源 route_helpers(2026-05-25)
     }
 

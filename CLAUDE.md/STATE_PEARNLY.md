@@ -110,6 +110,17 @@
 >   - **本会话累计:db.py 1731 → 819(-912 · -53%)** · unit 1622 · 17/17 E2E 网保 · 守门 6 道连绿。
 >   - **⚠️ db.py < 500 数学边界**:819 = framework 72 + RLS infra 250 + 注释 17 + re-export 480。RLS 受硬线 #1 保护不许动(250)· re-export 范式要降需改全 callers `from services.X import Y`(~50+ 文件,非「结构性挪代码」)。**db.py < 500 不可达 in 硬线 #1**;接受 ~820 为 floor · 移到其他 BC 目标。
 >   - **下一刀 pivot**:B1 app.py 4523 → < 500 / C1 home.js 6190 → < 200 / C3 home.html 4410 → < 1000。**B1 第一步**:auth_routes(login/OAuth/JWT/email-code/account-merge)集中在 app.py · spec 01/13/15/17 兜底 · 可抽。下一轮 wakeup 起 B1。
+> - **【第 28 轮 · loop 续 · 2026-05-28】**dynamic 自调度 · B1 第一刀 email_code routes:
+>   - **`ff6fa48` auth_email_code_routes**:抽 app.py L3620-3920(SMTP 块 + 4 语品牌邮件 HTML 模板 + email 正则 + 2 Pydantic 模型 + send_email_code / verify_email_code 2 路由)→ `auth_email_code_routes.py`(329 行 · 含 4 语 inline HTML)。app.py 顶部加 import + L1146 后 include_router · 删原 ~292 行。
+>   - app.py **4523→4231(-292)**。剩 16 @app 路由(原 18 - 2)· 离 < 500 还需 ~3700 行抽。
+>   - 真账号 E2E:spec 17 部署后 PASS 4.5s · 4 端点 smoke 全绿(forgot_password ok×2 / send_email_code 409+400)。
+>   - **B1 下一刀 candidates**(spec 兜底已就位):
+>     - **`/api/me/needs_email` + `/api/me/line_complete_email`**(L3550-3760 · ~210 行 · LINE 账号补邮箱 + 合并 · spec 14 间接覆盖)
+>     - **`/api/auth/google/start` + `/api/auth/google/callback`**(L3263-3402 · ~140 行 · spec 01 登录间接相关)
+>     - **`/api/auth/line/start` + `/api/auth/line/callback`**(L3404-3548 · ~145 行 · spec 14 间接)
+>     - **`/api/line/webhook`**(L3932+ · 大块 · LINE Bot 事件分发 · spec 14 间接 · 留后)
+>     - **`/api/ocr/*` 系列**(L1498-2610 · 5 路由 · spec 16 兜底)+ **`/api/v1/ocr/*` 3 aliases**
+>     - **`/api/login`**(L1372 · 巨型 · spec 01 兜底 · 留最后或专门一轮)
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

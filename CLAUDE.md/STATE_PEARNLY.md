@@ -155,6 +155,13 @@
 >   - app.py **3484→3460(-24)**。本会话累计 app.py **4523→3460 = -1063 / -23.5%** · 12 routes 出 · 7 模块新增。
 >   - 真账号 E2E:smoke spec PASS 3.9s · 部署后 /api/version 200 验过(初跑 502 是部署中瞬态)。
 >   - **B1 接下来真正剩**:OCR 4 主路由(quota/recognize/export/export-by-history-ids · 1100+ 行 · _ocr_* helpers 缠绕严)+ v1_export(ExportRequest model)+ _handle_line_image_ocr(LINE OCR 后台 · 含 _ocr_* helpers)。app.py 真实剩可单刀的路由量很小 · 大量行数在 _ocr_* helpers + 内部 middleware/error handler。**< 500 目标在 OCR 5 主路由 + helpers 整搬到 services/ocr/ 才能达到** · 是大工程。
+> - **【第 33 轮 · loop 续 · 2026-05-28】**dynamic OCR export 4 路由:
+>   - **关键发现**:`_ocr_*` helpers **早已抽到 `services/ocr/entrypoints.py`**(L127-134 from services.ocr.entrypoints import)· app.py 本身**没**任何 _ocr_* def · 仅消费 services 的 API。这意味着 OCR 路由抽取不受 helper 缠绕阻挡(之前 STATE 误判)。
+>   - **`7efa129` ocr_export_routes**:抽 GET /api/ocr/quota + POST /api/ocr/export + POST /api/ocr/export-by-history-ids + POST /api/v1/ocr/export 共 4 路由 + 3 Pydantic 模型(QuotaResponse / ExportRequest / ExportByHistoryIdsRequest)+ _merge_pages_to_fields helper → `ocr_export_routes.py`(218 行)。
+>   - 顺手删 app.py 3 个孤儿 import(F401):Response / BaseModel / Field。
+>   - app.py **3460→3286(-174 含孤儿)**。本会话累计 app.py **4523→3286 = -1237 / -27.4%** · 16 routes 出 · 8 模块新增。
+>   - 真账号验证:`/api/login` curl 200 · `/api/ocr/quota` curl 200 · `/api/me/credits` curl 200(部署后路由全活)。spec 09/16 chromium 本地 browser 超时(非路由问题 · login API 直 curl 通)· 17/17 网在 master 依然完整。
+>   - **B1 真正剩**:`ocr_recognize`(L1398 · 928 行 · 主大块 · 多 helper 缠绕)+ `_handle_line_image_ocr`(LINE OCR 后台 · ~260 行)。这两块抽完 app.py 还会减 ~1200 行。 剩余 middleware / exception_handler / startup hooks 等 ~2000 行属 FastAPI 基础设施 · 难抽。
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

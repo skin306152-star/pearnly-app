@@ -8,10 +8,10 @@
 ## 🎯 状态卡(2026-05-29 快照 · 进窗口先读这段 + 跑脚本)
 
 - **模式**:整顿封锁期 · 0 新功能 · 打法 = 3 窗口并行 loop(A 后端 / B 前端 / C 文档测试 · 见 `docs/refactor/PARALLEL_LOOP_DISPATCH.md`)。
-- **当前 task**:3 窗口 loop(Loop 1 拆巨石 + 文档/测试)· **WA 后端(2 commit:playwright_bootstrap 抽启动自举 + background_loops 抽 ERP重试/邮箱抓取 · app.py 3286→2777)** / **WB-C1 前端(3 commit:抽 line-email-modal + change-password + session-heartbeat 3 个自包含 IIFE→src/home · home.js 6190→5737 · 高敏 4 块已抽 3 · 仅剩 plans-plg-line + routeTo 中枢/顶层函数群)** / **WC 文档扫荡✅→已转 D3 测试**(WC-DOC 二级文档守门5→6道+署名4.7→4.8+铁律17→28 · WC-D3 注册 signup 4xx 校验契约集成测试)· 零串台 · app.py→2777 home.js→5737。
+- **当前 task**:3 窗口 loop(Loop 1 拆巨石 + 文档/测试)· **WA 后端(2 commit:playwright_bootstrap 抽启动自举 + background_loops 抽 ERP重试/邮箱抓取 · app.py 3286→2777)** / **WB-C1 前端(3 commit:抽 line-email-modal + change-password + session-heartbeat 3 个自包含 IIFE→src/home · home.js 6190→5737 · 高敏 4 块已抽 3 · 仅剩 plans-plg-line + routeTo 中枢/顶层函数群)** / **WC 文档扫荡✅→已转 D3 测试**(WC-DOC 二级文档守门5→6道+署名4.7→4.8+铁律17→28 · WC-D3 注册 signup + 销项税 VAT excel 4xx 校验契约集成测试 ×2)· 零串台 · app.py→2777 home.js→5737。
 - **⚠️ 2026-05-29 两处基础设施变更**:① **repo 已转 public**(整顿完转回 private · 为免费无限 Actions · 已扫历史无密钥泄露)② **CI 之前因 GitHub 账单/免费分钟耗尽假性红**(4秒挂 · 非代码问题)· 公开后恢复 ③ 已加 `Bash(git push origin master)` 授权规则(A 档无人值守)。**loop 的"CI 红即 revert"只针对真测试红 · 别被账单红误导。**
 - **代码规模快照**(实时跑 `scripts/refactor_progress.py`):home.js **5737**→<200 · app.py **2777**→<500 · db.py **819**→<500 · home.css **0** ✅ · home.html **4410**→<1000 · 综合 **~78%**。
-- **模块/测试**:src/home **38**(+line-email-modal/change-password/session-heartbeat WB) · *_routes **36** · services **103**(+playwright_bootstrap +background_loops WA)· unit **1650** · integration **43**(+signup 注册契约 WC-D3)· E2E **17** · home.js silent **0**。
+- **模块/测试**:src/home **38**(+line-email-modal/change-password/session-heartbeat WB) · *_routes **36** · services **103**(+playwright_bootstrap +background_loops WA)· unit **1650** · integration **44**(+signup 注册 +VAT excel 销项税契约 WC-D3)· E2E **17** · home.js silent **0**。
 - **最后 commit**:跑 `git log --oneline -5`(别信手写 hash)· **未 push commit**:跑 `git status` / `git log origin/master..HEAD`。
 - **等 Loop 1 完成才做**:CI lint-size 切 fail 模式(铁律 #27)· E7 minify · C9 状态管理 · C5 TS化。
 - **高敏边界**:钱/登录/auth/RLS/OCR 热路径 = 纯结构性改 + 真账号 E2E 闸 + 失败自动 revert(铁律 #26)。RLS 基础设施(`get_cursor_rls` 等)永不动。

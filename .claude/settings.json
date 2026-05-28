@@ -1,4 +1,10 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git push origin master)",
+      "Bash(git push origin master:*)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {

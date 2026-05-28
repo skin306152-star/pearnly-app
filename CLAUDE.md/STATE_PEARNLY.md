@@ -90,6 +90,12 @@
 >     4. **email_codes/ensure**(~30 行 · 启动期 schema · spec 17 兜底)
 >     5. **membership/ensure**(~90 行 · ⚠️ 必须留 RLS 基础设施 in place 不动)
 >   - **当前数字**:db.py **1376** · app.py 4523 · home.js 6190 · home.html 4410 · services/billing 新增 account_status · unit **1592** · E2E 17。
+> - **【第 24 轮 · loop 续 · 2026-05-28】**dynamic 自调度 · 抽 candidate #3(最大单刀):
+>   - **`3c3af5e` billing/charge**:charge_ocr(钱写入 · SELECT FOR UPDATE)+ _excel_char_count_estimate(扣费 units 估算)+ charge_ocr_async(fire-and-forget 包装)→ `services/billing/charge.py`(13 契约 · spec 11+16 兜底)。
+>   - **关键 import 修复**:charge.py 顶部 `import db` 会触发 charge ↔ db 循环 ImportError(charge.py 被单独跑时)→ 把 `import db` 移到 charge.py 末尾(所有 def 之后)· runtime db.X 调用不变。同时改老守门测试 `test_charge_ocr_stays_in_db` → `test_charge_ocr_now_in_services_billing_charge`(__module__ 期望改 services.billing.charge · 显式许可记录这块迁出)。
+>   - 删 db.py L799 孤儿 `from decimal import Decimal as _DecV21` + L802-970 共 ~170 行。db.py **1373→1208**(-165 · 单刀最大)。本会话累计 db.py 1731→1208 = **-523 / -30%**。
+>   - 真账号 E2E 闸:spec 11(充值审核闭环)+ spec 16(OCR 真识别扣费)2/2 PASS in 24.1s · 钱写入路径零回归。
+>   - **下一刀 candidates**:credits 框架(ensure_credits_tables + ensure_tenant_credits ~150 行)/ membership(ensure_membership_tables ~90 行)/ email_codes(~30 行)。剩 ~700 行还需抽,到 < 500 目标。app.py / home.js / home.html 全未动。
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

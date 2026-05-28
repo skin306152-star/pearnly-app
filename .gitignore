@@ -110,3 +110,10 @@ recon-i18n-fixes-*.md
 
 # Claude Code 本地覆盖配置(每台机器各自的权限/偏好 · 按约定不入库)
 .claude/settings.local.json
+
+# 个人杂物 / 系统文件 / 会话转录(不进 git · 2026-05-29)
+desktop.ini
+*.lnk
+code快捷键.html
+BC完成后.md
+Power of attorney template.pdf

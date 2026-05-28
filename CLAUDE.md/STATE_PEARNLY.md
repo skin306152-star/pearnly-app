@@ -121,6 +121,15 @@
 >     - **`/api/line/webhook`**(L3932+ · 大块 · LINE Bot 事件分发 · spec 14 间接 · 留后)
 >     - **`/api/ocr/*` 系列**(L1498-2610 · 5 路由 · spec 16 兜底)+ **`/api/v1/ocr/*` 3 aliases**
 >     - **`/api/login`**(L1372 · 巨型 · spec 01 兜底 · 留最后或专门一轮)
+> - **【第 29 轮 · loop 续 · 2026-05-28】**dynamic 双刀:
+>   - **`b943a7f` line_account_merge_routes**(LINE 临时账号补邮箱 + 合并 2 路由 · 94 行 · spec 14 间接)。app.py 4231→4163(-68)。
+>   - **`de71486` oauth_routes**(Google+LINE OAuth start/callback 4 路由 + 共用 _oauth_state_cache + helpers + env 配置 + 长 HTML 中间页 · 346 行)。删 app.py L3237-3549 共 ~310 行 + 顺手删孤儿 `HTMLResponse` import(ruff F401)。app.py 4163→**3854(-309)**。
+>   - **本会话累计 app.py 4523→3854 = -669 / -14.8%**(B1 4 commits · 8 routes 迁出 · 距 < 500 还需 -3354)。
+>   - 真账号 E2E:spec 01 单跑 PASS 4.9s · spec 14 PASS · OAuth 路径无回归。
+>   - **下一刀 candidates 排序**:
+>     - **`/api/line/webhook`**(L3640+ · LINE Bot follow/message 事件分发 + 签名校验 · ~700+ 行 · 内含 OCR 上传 LINE 入口 · 大块)
+>     - **`/api/ocr/*`** 5 路由 · L1502-2614 · spec 16 兜底
+>     - **`/api/login`** 主登录 · L1376+ · 巨型(~150 行?)· spec 01 兜底 · 留专门一轮
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

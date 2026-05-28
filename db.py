@@ -349,38 +349,6 @@ def cleanup_expired_history(free_days: int = 7, plus_days: int = 90, pro_days: i
 # ============================================================
 # v23 · 用户(老板)管理 + 员工 + 操作日志
 # ============================================================
-import bcrypt as _bcrypt
-
-
-def verify_user_password(user_id: str, password: str) -> bool:
-    """二次验证用 · 返回密码是否匹配"""
-    try:
-        with get_cursor() as cur:
-            cur.execute("SELECT password_hash FROM users WHERE id = %s LIMIT 1", (str(user_id),))
-            row = cur.fetchone()
-            if not row:
-                return False
-            return _bcrypt.checkpw(password.encode("utf-8"), row["password_hash"].encode("utf-8"))
-    except Exception as e:
-        logger.error(f"verify_user_password failed: {e}")
-        return False
-
-
-def reset_user_password(user_id: str, new_password: str) -> bool:
-    """超管用 · 给指定用户重置密码"""
-    try:
-        pw_hash = _bcrypt.hashpw(new_password.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
-        with get_cursor(commit=True) as cur:
-            cur.execute(
-                "UPDATE users SET password_hash = %s, password_changed_at = NOW() WHERE id = %s",
-                (pw_hash, str(user_id)),
-            )
-            return cur.rowcount > 0
-    except Exception as e:
-        logger.error(f"reset_user_password failed: {e}")
-        return False
-
-
 # ============================================================
 # 操作/审计日志 operation_logs DAL → services/audit/store.py (REFACTOR-B2)
 # 纯搬家 0 逻辑改 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
@@ -1649,4 +1617,10 @@ from services.auth.user_lookup import (
     update_user_avatar as update_user_avatar,
     find_user_by_line_uid as find_user_by_line_uid,
     link_line_uid_to_user as link_line_uid_to_user,
+)
+
+# REFACTOR-B2 · 密码 verify/reset re-export(已抽到 services/auth/password · 调用点零改动)
+from services.auth.password import (
+    verify_user_password as verify_user_password,
+    reset_user_password as reset_user_password,
 )

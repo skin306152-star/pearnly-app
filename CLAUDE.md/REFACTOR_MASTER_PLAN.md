@@ -310,7 +310,7 @@
 | D 测试 | 🟡 2/5(D1 部分 + **D2 Wave 0 安全网大批**) | D2 续:核心纯逻辑模块行为契约 | **第三十五会话(2026-05-27)· REFACTOR-D2 Wave 0**:给 17 个 0 测试的核心纯逻辑模块补行为契约 · unit **872→1095**(field_comparator/reconciliation_matcher/gl_vat_reconciler/vat_report_parser/vat_file_classifier/excel_template_th/excel_export/report_engine/usage_report/invoice_grouper/monitoring/task_queue/pdf_storage/pdf_searchable/kms_helper/i18n_reports/archive)· **挖出并修 3 个真 bug**(normalize_branch 总部别名 / _norm_date 佛历 / _filename_guess 下划线 · `85c35bb`)· 全守门绿 · 不碰巨石零冲突。早前 D1 第二十一会话 `d65b692` |
 | E 性能 | ⚪ 0/6 | — | 依赖 B6 + D1 |
 | F 数据 | ⚪ 0/3 | — | 依赖 B1 |
-| G 文档 | 🟡 1/7(G2 ✅) | G2 RUNBOOK ✅ `5544d0e` | 第三十五会话:新增 `docs/RUNBOOK.md`(部署/回滚/CI/健康检查/紧急排查 · 磁盘满血泪根因)+ docs/README §7 索引 · 其余 G1 ADR/G3 ONBOARDING/G5-G7 待做 |
+| G 文档 | 🟡 2/7(G1 部分 + G2 ✅) | G1 ADR 9 个(+ADR-009)· G2 RUNBOOK ✅ | G1:ADR 001/002/003/004/005/006/007/008/**009 无人值守自主重构 loop+安全替身+实跑边界**(`7dfb1d5`)· G2:RUNBOOK ✅(第三十五会话 `5544d0e`)· G3 ONBOARDING/G5-G7 待做 |
 | H 合规 | ⚪ 0/6 | — | 靠后 |
 | I 抛光 | 🟡 1.6/5(I1 ✅home.js silent=0 + 部分 I2) | — | **I1:home.js 无注释 silent 0(`b7d167b`)** · I2 死码续清(usage 计数器/demo 播种 `158b55c`/`b62aeca`)+ 老订阅残留全清 |
 
@@ -318,7 +318,7 @@
 
 **当前累积成果**(从 2026-05-21 EXECUTION_PLAN 开始):
 - `app.py` 10,075 → **4,459 行**(减 5,616 · B1 拆 21 router + 服务模块 · 安全部分到顶)
-- `db.py` 10,663 → **1,732 行**(减 8,931 · 第四十三会话自主 loop:7 域 + preferred_lang + 删死码×2(用量计数器+demo播种)`73bebb5`…`b62aeca` 3356→1732 · 第四十一会话 `4a10b88` membership/tenant 接线 4620→3371 · 此前 **B2 第二十二+二十三会话** · 抽 18 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1}/archive/rd/cost/exceptions/clients/billing/recon.vat_recon〔三表组〕/audit/team · **+user_settings(dup_check/erp_push_mode/gemini_key)**)
+- `db.py` 10,663 → **1,731 行**(减 8,932 · **2026-05-28 一夜自主 loop 11 commits:7 域 + preferred_lang + 删死码×2(4 用量计数器+demo 播种)+ I1 home.js silent=0 + ADR-009**:`73bebb5`/`c769104`/`16eaf14`/`122ff3c`/`11b3f56`/`547f116`/`14370ed`/`885cfbc`/`158b55c`/`b62aeca`/`b7d167b`/`7dfb1d5` 3356→1731)· 第四十一会话 `4a10b88` membership/tenant 接线 4620→3371 · 此前 **B2 第二十二+二十三会话** · 抽 18 域 DAL → services:email_ingest/erp.oauth/erp.mappings/notification/erp.push/recon.{vat_recon_tasks,gl_vat,bank_recon_v2,bank_recon_v1}/archive/rd/cost/exceptions/clients/billing/recon.vat_recon〔三表组〕/audit/team · **+user_settings(dup_check/erp_push_mode/gemini_key)**)
 - `home.js` 33,768 → **22,210 行**(C1:抽 dashboard + billing IIFE→ES module · + i18n 字典 9,763 行→`static/i18n-data.js` · + 测试中心 493 行→`src/home/test-center.js`)
 - `services/**/*.py` 40 → **66**(B2 新增 18 个 store + 各 __init__);`services/ocr/entrypoints.py`(171 行 · 第二十一会话 `1eadc16`):web/LINE/email 三处共用 OCR 入口 helper 从 app.py/email_ingest 抽出
 - 守门测试:0 → **1516 unit**(第四十一会话 +384 services 数据层行为契约 `917f2f4` 1132→1516;此前 B2 +40 域契约 → 702;**第三十五会话 REFACTOR-D2 Wave 0 安全网 +~220** → 17 个核心纯逻辑模块行为契约 · 顺手挖修 3 个真 bug)+ 1 E2E + CI(lint + test 双 job)全绿

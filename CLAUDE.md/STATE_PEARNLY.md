@@ -1,10 +1,28 @@
 # 📊 STATE · Pearnly 项目状态
 
-> ## 🔥 下个窗口立即接手(2026-05-27 · 第四十一会话主控交接 · 读这段即可开工)
-> **身份**:整顿**主控/指挥官**(权威 `docs/refactor/BATCH_STRATEGY.md` §9.5)。Zihao 非技术、零代码操作 → 你**全包**:研究 / 派工 / 接线 / 跑守门 / **真账号 E2E 自测** / 查 CI / 上线 / 更新文档。Zihao 只做:① 点 harness 权限框(push、用 node/python 写 home.js·db.py 时会弹)② 像普通用户验收 ③ 涉**钱/登录**拍板「行不行」。**别让 Zihao 看代码 / 判 PR / 自己跑测试。**
-> **每轮闭环(本会话实测有效)**:① re-grep 重测绘 home.js 选**干净**目标(行号会漂)② 派后台 `Agent`(run_in_background)copy-out → 只新增 `src/home/<x>.js`、**不删巨石**、查「自带状态 / 不碰 `_results`/`_drawerIdx` OCR 内存 / 不写 home.js 闭包变量 / 不裸调未挂 window 的闭包函数」③ 主控接线:node/python **多段精确删 home.js(保 CRLF·先备份·字节校验)** + `src/main.js` 加 import + `home.html` 双缓存戳 `home.js?v=`/`main.js?v=` 各 +1 ④ **6 道门全绿**:`npx eslint src/home/<新>.js`(0 error·warn 不卡)·`npm run format:check`·`npm run build`·`node --check`·`python -m unittest discover -s tests/unit`·`check_imports`+`check_i18n --strict` ⑤ commit(`· REFACTOR-C1`)→ **单独一条** `git push origin master`(classifier 拦·Zihao 点允许)⑥ 等部署(后端重启短暂 502 → 轮询 `/api/version` 到 200)→ **真账号 `npx playwright test`**(全 10 绿)→ **独立 `gh run watch <id> --exit-status` 查 CI 真绿**(别只信窗口报告)⑦ 更新本文件 + `BATCH_STRATEGY.md §10`。
-> **真账号 E2E**:**账号要向 Zihao 当面要**(普通非超管邮箱+密码)· 只设进环境变量 `PEARNLY_E2E_USER`/`PEARNLY_E2E_PASS` · **绝不提交/打印/写文件** · 跑完 `rm tests/e2e/.auth/state.json`(含 token)。**硬线:测试绝不触发真实扣钱/退款**(09-recharge 已是「绝不真付」设计)。
-> **当前数字(master 全绿·工作树干净)**:home.js **6191** · app.py **4528** · auth_signup.py **2380** · db.py **1732**(自主 loop:7 域 + preferred_lang + 删死码×2(4 用量计数器+demo播种)· 3356→1732)· home.css 0 · home.html **4411**(C3 开篇 · 抽 head 内联 style -2017)· src/home 模块 **35** · services 模块 **+user_settings/+ocr_history** · static/home-*.css 切片 **36** · 单测 **1527** · E2E **10**。`gh.exe` 路径 `C:\Program Files\GitHub CLI\gh.exe` · repo `skin306152-star/pearnly-app`。
+> ## 🔥 下个窗口立即接手(2026-05-28 · 自主 loop 一夜批 收官 · 读这段即可开工)
+> **身份**:整顿**主控/指挥官**(权威 `docs/refactor/BATCH_STRATEGY.md` §9.5 + 铁律 #26 自主 loop)。Zihao 非技术、零代码操作 → 你**全包**:研究 / 派工 / 接线 / 跑守门 / **真账号 E2E 自测** / 查 CI / 上线 / 更新文档。Zihao 只做:① 点 harness 权限框 ② 像普通用户验收 ③ 涉**钱/登录**拍板「行不行」。**别让 Zihao 看代码 / 判 PR / 自己跑测试。**
+> **当前数字(master 全绿·HEAD `7dfb1d5`·工作树干净·Google 级综合 87%)**:home.js **6190**(I1 silent=0) · app.py **4523** · auth_signup.py **2380** · db.py **1731**(2026-05-28 一夜自主 loop:7 域抽到 services + preferred_lang + 删死码×2 · **3356→1731 · -48%**)· home.css 0 · home.html **4410**(C3 抽 head 内联 style -2017)· src/home 模块 **35** · services 域 **+user_settings/+ocr_history/+line_binding/+credits/+billing.pricing**(并入 tenant 多公司·账套切换)· static/home-*.css 切片 **36** · 单测 **1545** · E2E **10**。`gh.exe` 路径 `C:\Program Files\GitHub CLI\gh.exe` · repo `skin306152-star/pearnly-app`。
+> **真账号 E2E**:账号向 Zihao 要(普通非超管邮箱+密码)· 只设进环境变量 `PEARNLY_E2E_USER`/`PEARNLY_E2E_PASS` · **绝不提交/打印/写文件** · 跑完 `rm tests/e2e/.auth/state.json`(含 token)。**硬线:绝不触发真实扣钱/退款**(09-recharge 是「绝不真付」设计)。
+> **每轮闭环(本夜实跑 11 块验证有效)**:① re-grep 真实行号 ② 程序化提取(node 切片+正则 · 非手抄)copy-out → services/`<域>`/store.py · `import db` + `db.get_cursor()`(保 patch 生效)③ 删 db.py 函数定义(node split/join 保 LF·边界 assert)+ 文件尾 `from services.X import a as a` re-export → 调用点零改 ④ **6 道门全绿**:black/ruff · check_imports · check_i18n 0/0 · 全量 unittest · prettier · build ⑤ commit(`· REFACTOR-id`)→ **单独一条** `git push origin master` ⑥ `gh run watch <id> --exit-status` 独立查 CI 真绿(别只信窗口报告)⑦ 部署后 `/api/version` 200 即活 → 真账号 E2E(高敏块跑受影响 spec)⑧ 红 → `git revert` + push,**绝不留红** ⑨ 更新 STATE/主计划/BATCH §10/§13。
+>
+> ## ⛔⛔ 下窗口直接读这条 · 自主 loop 「干净安全 surface」已 100% 耗尽
+> 2026-05-28 一夜跑了 **12 实拆轮 + 11 待命轮 · 26 commits · CI 全绿 · 0 回滚**。db.py 从 3356 抽到 1731(-48%)· home.html 抽内联 style(-2017)· home.css 早已 0 · home.js I1 静默吞错 17→0 · 新增 ADR-009(自主 loop 机制+实跑边界)。**严格 re-grep 反复确认:剩下的全部不适合无人值守**。
+>
+> **剩余 4 类块 · 各自需要什么**:
+>
+> | 块 | 为什么不能无人值守做 | 怎么做 |
+> |---|---|---|
+> | **db.py charge_ocr 钱写入 + auth(verify/reset_password)+ user lookup(find_user_by_*)** | 真扣费/登录 E2E 套件没现成 · 巨大爆炸半径 | **Zihao 在场陪做** · 每块当轮真账号 E2E(含登录/充值申请→审核→扣费全流程)验,Zihao 看着 |
+> | **app.py 剩 22 路由** | 全 auth/OCR recognize/LINE webhook 高敏 | 同上 · Zihao 在场 |
+> | **home.js 顶层函数群**(loadHistoryPage 等)+ routeTo 中枢 | `loadHistoryPage` 9+ 处 routeTo 裸调 + i18n 重渲 dispatcher 引用 module-local `currentRoute` · 04-history E2E 盖不全 | 主控**单独开谨慎一轮**:整组 `window.` 桥接 + 改 routeTo 调用点 · 每组一 E2E |
+> | **home.html body 拆分** | 需要先造「运行期模板注入」机制(新代码 · 非搬) | 先设计一轮 mechanism + ADR · 再分块抽 |
+>
+> **绝对不要**:让自主 loop 继续硬碰这 4 类。**铁律 #26 的安全替身 B(真账号 E2E 闸)只和 E2E 覆盖一样强** · 上面这些块的 E2E 我没现成,「绿」不代表真没坏 · 残余风险会直接上线给付费用户(mrerp)。
+>
+> **RLS 基础设施永远勿动**(`_is_rls_enabled`/`get_cursor_rls`/`get_clients_rls_status`/`run_rls_isolation_tests` · 是 cursor 框架的并列件)。
+>
+> **下窗口第一步**:① 读本段 + 读 `docs/refactor/adr-009-autonomous-refactor-loop.md`(自主 loop 机制+实跑边界) ② 问 Zihao「想做哪类?」 — 如果 Zihao 在,就陪他做计费/auth(每块一 E2E);如果 Zihao 不在/让你单独做,**就只做** home.js 顶层函数群整组桥接(从 history 组开始,E2E 04-history 兜底,单独谨慎一轮);**绝不**在 Zihao 不在时碰计费/auth/RLS。
 >
 > ════════════════════════════════════════════════════════════
 > **【自主整顿 Loop 启动 · 2026-05-28】铁律 #26 自主 BC 拆搬删 loop(含高敏 · 安全替身:纯结构性0逻辑改 + 真账号E2E闸 + 失败自动回滚 + 永不真付)· 见 `docs/refactor/AUTONOMOUS_LOOP.md`**

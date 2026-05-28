@@ -176,6 +176,14 @@
 >   - app.py **3460→3286(-174 含孤儿)**。本会话累计 app.py **4523→3286 = -1237 / -27.4%** · 16 routes 出 · 8 模块新增。
 >   - 真账号验证:`/api/login` curl 200 · `/api/ocr/quota` curl 200 · `/api/me/credits` curl 200(部署后路由全活)。spec 09/16 chromium 本地 browser 超时(非路由问题 · login API 直 curl 通)· 17/17 网在 master 依然完整。
 >   - **B1 真正剩**:`ocr_recognize`(L1398 · 928 行 · 主大块 · 多 helper 缠绕)+ `_handle_line_image_ocr`(LINE OCR 后台 · ~260 行)。这两块抽完 app.py 还会减 ~1200 行。 剩余 middleware / exception_handler / startup hooks 等 ~2000 行属 FastAPI 基础设施 · 难抽。
+> - **【第 34 轮 · loop 续 · 2026-05-28】**Zihao 中途 push 了铁律 #27/#28(防屎山闸 + 4 问)+ Window C 大批 commit(D2/D3/G3-7/ADR-010-011)· 本轮 pull 读毕。
+>   - **铁律 #27.1 的影响**:任何 routes 文件 >500 行 = CI 红(当前 warning 模式)。**剩 `ocr_recognize` 是 928 行单 async def · 无法直接抽到 < 500 行的单文件**。正确做法是先把内部 8 段(校验/配额/缓存/扣费/Gemini/异常hook/auto-push/return)拆为 services/ocr/ helpers · 然后才能抽主路由 · 是大手术 · 不适合无人值守。
+>   - **`_handle_line_image_ocr`** 同样 ~260 行 · 复用 ocr_recognize 的 helpers · 必须配合 OCR helpers 整搬一起做。
+>   - **B1 单刀可走 surface 已耗尽**:本会话 16 routes 出 · app.py 4523→3286(-27.4%) · 剩余路由都是 OCR 热路径手术,**留 Zihao 在场 / 主控在 OCR 内部重构后再抽**。
+>   - **下一窗口可选**:
+>     - **路径 A · OCR 内部重构**:把 cache-hit / billing-quote / persist-history / auto-push-dispatch / exception-hook-dispatch 5 块抽到 services/ocr/ 各 ~80-150 行模块 · spec 11+16 兜底 · 但是属于真正的逻辑重构(非纯结构 copy-out)· 建议 Zihao 在场或 spec 16 真账号端到端验。
+>     - **路径 B · pivot C 阶段**:home.js 6190 / home.html 4410 · 部分块已被 W-C 处理(看主计划 W-C 进度)· spec 13/14/15 覆盖改密 / LINE绑定 / session 心跳 · 评估剩余 safe surface。
+>   - **本轮无新代码 commits** · 只更新 STATE 记 boundary 发现 · 给下一窗口决策。E2E 17/17 仍绿 · CI 守门连绿(包括 W-C 新加的 lint-size warning)。
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

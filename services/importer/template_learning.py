@@ -24,7 +24,6 @@ import csv
 import hashlib
 import io
 import re
-from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -181,80 +180,15 @@ GL_ACCOUNT_H = {
 }
 
 
-def _norm(value: Any) -> str:
-    return re.sub(r"\s+", " ", str(value or "").strip().lower())
-
-
-def hit(header: Any, hints) -> bool:
-    """短 ASCII 词(in/out/cr/dr)整词匹配防误命中;长词/泰中日越用子串。"""
-    h = _norm(header)
-    if not h:
-        return False
-    tokens = None
-    for hint in hints:
-        hl = hint.lower()
-        if hl.isascii() and len(hl) <= 3:
-            if tokens is None:
-                tokens = set(re.split(r"[\s/().,_\-]+", h))
-            if hl in tokens:
-                return True
-        elif hl in h:
-            return True
-    return False
-
-
-def to_float(value: Any) -> float:
-    if value is None:
-        return 0.0
-    if isinstance(value, (int, float)):
-        return float(value)
-    s = str(value).strip().replace(",", "").replace(" ", "").replace(" ", "")
-    if not s or s in {"-", "–", "—"}:
-        return 0.0
-    neg = False
-    if s.startswith("(") and s.endswith(")"):
-        neg, s = True, s[1:-1]
-    if s.startswith("-"):
-        neg, s = True, s[1:]
-    if s.count(".") > 1:  # 1.234.56 千分点
-        first, *rest = s.split(".")
-        s = first + "".join(rest[:-1]) + "." + rest[-1]
-    try:
-        out = float(s)
-        return -out if neg else out
-    except Exception:
-        return 0.0
-
-
-def parse_date(value: Any) -> Optional[date]:
-    """支持常见格式 + 泰历(年>2400 → −543)。"""
-    if value is None or value == "":
-        return None
-    if isinstance(value, datetime):
-        d = value.date()
-        return date(d.year - 543, d.month, d.day) if d.year > 2400 else d
-    if isinstance(value, date):
-        return date(value.year - 543, value.month, value.day) if value.year > 2400 else value
-    text = re.sub(r"\s+00:00:00$", "", str(value).strip())
-    if not text:
-        return None
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y", "%m/%d/%Y", "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y"):
-        try:
-            d = datetime.strptime(text[:10], fmt).date()
-            return date(d.year - 543, d.month, d.day) if d.year > 2400 else d
-        except Exception:
-            pass
-    return None
-
-
-def is_date_like(v: Any) -> bool:
-    return parse_date(v) is not None
-
-
-def is_amount_like(v: Any) -> bool:
-    if v is None or str(v).strip() == "":
-        return False
-    return to_float(v) != 0.0 or str(v).strip() in {"0", "0.0", "0.00"}
+# 值coercion 原语已抽到 services/importer/coerce.py(REFACTOR-WA-B1 · 2026-05-29)· 叶子模块防循环
+from services.importer.coerce import (
+    _norm,
+    hit,
+    to_float,
+    parse_date,
+    is_date_like,
+    is_amount_like,
+)  # noqa: F401
 
 
 # ── 读文件 ──────────────────────────────────────────────────────────

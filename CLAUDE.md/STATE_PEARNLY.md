@@ -59,6 +59,27 @@
 >     - **billing/credits_framework**(~150 行):ensure_credits_tables + ensure_tenant_credits + _bkk_year_month(spec 11 兜底)
 >     - **billing/charge_ocr 家族**(~400 行):charge_ocr + charge_ocr_async + _excel_char_count_estimate(spec 11/16 兜底 · **最大块**)
 >   - **接力 / 上下文压缩接手提示**:E2E 17/17 网已就位 · 下一轮 wakeup 或新窗口接手直接看本块。RLS infra T1/T3/T5 已知 fail(归 B8 · Zihao 在场)· 不要修。db.py 还需 -1126 才能 < 500 — 即上面 6 块全抽 + 启动期 ensure_* schema 可能 Alembic 化才能到目标。app.py / home.js / home.html 离目标更远 · 是后续多窗口的事 · 17 E2E 网已经能兜每一刀。
+> - **【第 21-22 轮 · 同会话连刀】Zihao「做完一条立刻下一条 · 17/17 全绿再去拆 BC」**:E2E 17/17 跑通后**立刻进 B2 高敏拆搬删**(铁律 #26 安全替身 B 真账号 E2E 闸已就位):
+>   - `30c8167` **user_lookup**(7 函数:find_user_by_*/link_*/update_user_avatar → `services/auth/user_lookup.py` · 11 契约 · spec 01 兜底)。db.py 1731→1652。
+>   - `72a4ddb` **password**(2 函数:verify_user_password/reset_user_password + bcrypt 私有 → `services/auth/password.py` · 8 契约 · spec 13 兜底)。db.py 1652→1626。
+>   - `20e3dd7` **account_merge**(3 函数:is_line_placeholder_username/update_user_email_and_username/merge_line_account_into_existing → `services/auth/account_merge.py` · 9 契约 · spec 14 兜底)。db.py 1626→1570。
+>   - `aeef902` **usage**(3 函数:update_last_login/increment_user_monthly_usage/cleanup_expired_history → `services/usage/store.py` · 8 契约 · spec 16/11/01 兜底)。db.py 1570→**1499 · 首次破 1500** 🎉。
+>   - **本会话 B2 累计**:db.py **1731→1499 · -232 (-13.4%)** · unit **1545→1580 (+35 契约)** · 14 commits push 完 · CI 跟在后面跑。所有删除走 Edit 工具(LF 完好 · HEAD 本就 LF)+ 每域带行为契约(假游标 mock 验真 SQL/参数/异常吞)。
+> - **⛔⛔ 本会话到此停 · BC 还远没完 · 下一窗口必读本段然后续跑**:
+>   - **完成判定离目标**:db.py **1499 → < 500(还 -999)** · app.py **4029 → < 500(还 -3529)** · home.js **5690 → < 200(还 -5490)** · home.html **4153 → < 1000(还 -3153)** —— 还需 **30+ 轮拆搬删** 才能闭环。本会话只啃下 db.py 的 13%。
+>   - **下一窗口 db.py 续抽顺序**(候选 · 由易到难 · 都有 spec 兜底):
+>     1. **billing/exempt + status**(~100 行 · `is_user_billing_exempt` + `get_billing_status_combined` · spec 16 兜底)
+>     2. **billing/credits_framework**(~150 行 · `ensure_credits_tables` + `ensure_tenant_credits` + `_bkk_year_month` · spec 11 兜底)
+>     3. **billing/charge_ocr 家族**(~400 行 · `charge_ocr` + `charge_ocr_async` + `_excel_char_count_estimate` · spec 11+16 兜底 · **最大单 chunk**)
+>     4. **email_codes/ensure**(~30 行 · `ensure_email_codes_table` · spec 17 兜底 · 启动期)
+>     5. **membership/ensure**(~90 行 · `ensure_membership_tables` · 启动期 · 注意保留 RLS 基础设施 in place)
+>   - 抽完上面 ~770 行 → db.py ~730 → 还需把启动期 ensure_* 走 Alembic 才能 < 500(归 B3)。
+>   - **B1 app.py 续**:剩 22 路由全 auth/login/OAuth/email-code/JWT/OCR recognize/LINE webhook · spec 01/11/13/14/15/16/17 全已覆盖 → 可无人值守拆 · 但每路由都是 ~100-200 行 · 拆完需 20+ commits。
+>   - **C1 home.js 续**:5690 → < 200 需 -5490。剩 routeTo 中枢 + 顶层函数群(loadHistoryPage 等 9+ 处 routeTo 裸调 · 桥接 = 中枢改动)+ 🔴高敏 4 块(plans-plg-line/password/line-email-modal/session-heartbeat)+ team + LINE 绑定面板。spec 13/14/15/16 兜底 · 可做但更需细心(一组 window. 桥接策略一次一组 E2E 验)。
+>   - **C3 home.html 续**:4153 → < 1000 需 -3153 + 需先设计「运行期模板注入机制」(非搬 · 是设计活)。
+>   - **本会话最终数字**:app.py **4029** · db.py **1499** · home.js **5690** · home.html **4153** · src/home 35 · services/{auth/{user_lookup,password,account_merge},usage} **新增 4 模块** · home-*.css 切片 36 · unit **1580** · E2E **17** ✅。
+>   - **env 提醒**:`PEARNLY_E2E_USER/PASS/ADMIN_USER/ADMIN_PASS` 在 HKCU 已 setx · 当前 claude-code 子进程不继承 → 每次跑 playwright 必 PS 桥接 `$env:X = [Environment]::GetEnvironmentVariable('X','User')` 然后跑。spec 11/12 需要全 4 个 env;其他只需前 2 个。
+>   - **真实安全洞**:spec 12 实测 RLS T1/T3/T5 在生产**穿透成功**(DB role BYPASSRLS)· 归 REFACTOR-B8 · **Zihao 在场处理**(改 DB role 或 FORCE RLS / SET LOCAL ROLE)· 硬线 #1 禁止自主 loop 动 RLS 代码。spec 12 已 annotate 出来 · 下一轮看 STATE 即懂。
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

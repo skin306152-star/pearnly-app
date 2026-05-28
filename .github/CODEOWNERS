@@ -1,0 +1,122 @@
+# Pearnly · CODEOWNERS · REFACTOR-WC-G7(2026-05-28 窗口 C)
+#
+# 用途:GitHub 自动为命中下面 glob 的 PR 加 reviewer。
+# 整顿期(2026-05-22 起)只有 Zihao(@skin306152-star)是核心 reviewer ·
+# 这里把"高敏路径"(铁律 #26)标出来 · 确保 PR 必须 Zihao 在场 review。
+#
+# 语法:<glob 模式> <@owner1> <@owner2> ...
+#   - 最后匹配的规则胜出(后面行覆盖前面)
+#   - PR 改动命中规则 → GitHub 自动 @ 对应 owner
+#   - 默认(*) 兜底 @skin306152-star
+
+# ── 默认 · 兜底 ──
+* @skin306152-star
+
+# ── 文档 / docs(低敏 · 任何接力 agent 可改 · 但还是知会 Zihao)──
+*.md @skin306152-star
+docs/ @skin306152-star
+CLAUDE.md/ @skin306152-star
+
+# ── 配置 / 构建(中敏 · 改动需要更谨慎)──
+pyproject.toml @skin306152-star
+package.json @skin306152-star
+package-lock.json @skin306152-star
+vite.config.mjs @skin306152-star
+vite.config.js @skin306152-star
+playwright.config.js @skin306152-star
+.github/ @skin306152-star
+.github/workflows/ @skin306152-star
+.github/CODEOWNERS @skin306152-star
+
+# ── 锁文件 · 依赖管理(改 = 升级风险 · 必须 review)──
+requirements.lock.txt @skin306152-star
+requirements*.txt @skin306152-star
+alembic.ini @skin306152-star
+alembic/ @skin306152-star
+
+# ── 🔴 高敏区(铁律 #26)· 必须 Zihao 在场 review · 无人值守严禁动 ──
+
+# Auth / 登录 / 注册 / OAuth(高敏 · 巨大爆炸半径)
+auth.py @skin306152-star
+auth_signup.py @skin306152-star
+auth_email_code_routes.py @skin306152-star
+login_routes.py @skin306152-star
+oauth_routes.py @skin306152-star
+line_account_merge_routes.py @skin306152-star
+services/auth/ @skin306152-star
+services/auth/user_lookup.py @skin306152-star
+services/auth/password.py @skin306152-star
+services/auth/account_merge.py @skin306152-star
+
+# Billing / 充值 / 扣费(高敏 · 涉及钱)
+billing_routes.py @skin306152-star
+admin_users_routes.py @skin306152-star
+admin_cost_routes.py @skin306152-star
+services/billing/ @skin306152-star
+services/billing/charge.py @skin306152-star
+services/billing/credits_schema.py @skin306152-star
+services/billing/account_status.py @skin306152-star
+services/billing/pricing.py @skin306152-star
+services/credits/ @skin306152-star
+
+# OCR 热路径(高敏 · 用户付费的核心功能)
+services/ocr/ @skin306152-star
+services/ocr_history/ @skin306152-star
+ocr_export_routes.py @skin306152-star
+history_routes.py @skin306152-star
+
+# LINE 集成(高敏 · 第三方账号绑定)
+line_binding_routes.py @skin306152-star
+line_webhook_routes.py @skin306152-star
+line_client.py @skin306152-star
+services/line_binding/ @skin306152-star
+
+# DB 基础设施 / RLS / Schema(永远勿动 · 改 = 数据丢)
+db.py @skin306152-star
+services/tenant/ @skin306152-star
+services/workspace/ @skin306152-star
+services/membership/ @skin306152-star
+
+# ── 前端高敏块(home.js 内部段)──
+# CODEOWNERS 不支持文件内行级 · 只能整文件标
+# 高敏块:plans-plg-line / password-change / line-email-modal / session-heartbeat
+# 改 home.js 任意行都得 @skin306152-star
+home.js @skin306152-star
+home.html @skin306152-star
+home.css @skin306152-star
+login.html @skin306152-star
+
+# ── ERP 集成 / 推送(中-高敏 · 第三方系统交互)──
+erp_routes.py @skin306152-star
+erp_mappings_routes.py @skin306152-star
+erp_xero_routes.py @skin306152-star
+services/erp/ @skin306152-star
+
+# ── 对账 / Recon(中敏 · 业务核心)──
+recon_routes.py @skin306152-star
+recon_jobs_routes.py @skin306152-star
+bank_recon_routes.py @skin306152-star
+vat_excel_routes.py @skin306152-star
+services/recon/ @skin306152-star
+services/recon_jobs/ @skin306152-star
+services/importer/ @skin306152-star
+
+# ── Tests / 测试(任何人可加测试 · 但删测试要 review)──
+tests/ @skin306152-star
+tests/unit/ @skin306152-star
+tests/integration/ @skin306152-star
+tests/e2e/ @skin306152-star
+tests/visual/ @skin306152-star
+
+# ── Scripts / 工具脚本(低敏 · 但防屎山闸脚本是 CI 命脉)──
+scripts/check_file_size.py @skin306152-star
+scripts/check_line_ratchet.py @skin306152-star
+scripts/check_imports.py @skin306152-star
+scripts/check_i18n.py @skin306152-star
+scripts/refactor_progress.py @skin306152-star
+
+# ── git-deploy 钩子 / 部署脚本(变 = 上线变 · 永远 review)──
+git-deploy.sh @skin306152-star
+deploy*.sh @skin306152-star
+Dockerfile @skin306152-star
+docker-compose.yml @skin306152-star

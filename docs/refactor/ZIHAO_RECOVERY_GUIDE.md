@@ -3,19 +3,40 @@
 > **写给**:Zihao(产品经理 · 不写代码)
 > **场景**:窗口崩了 / 不知道下一步 / 想新开窗口接力 / 想催进度
 > **原则**:大白话 · 全是"该做什么"不是"为什么"
-> **最后更新**:2026-05-28 · 当前 3 个 loop 并行整顿期
+> **最后更新**:2026-05-29 · 3 窗口并行(A 后端/B 前端/C 文档测试)· 已上 SessionStart 自动入口 hook + 一页入口 AGENTS.md
 
 ---
 
-## 🟢 此刻在跑什么(2026-05-28)
+## 🟢 此刻在跑什么(2026-05-29 · 3 窗口并行)
 
-| 窗口 | 在做啥 | 怎么看进度 |
-|------|--------|-----------|
-| **窗口 A · Loop 1** | 拆 BC 巨石(app.py / db.py / home.js / home.html 拆到验收行数) | 看 STATE_PEARNLY.md 头部 + `git log --oneline \| grep REFACTOR-B` |
-| **窗口 C** | 防屎山闸 4 件套 + 文档 + 集成测试 + ADR | 看 `git log --oneline \| grep REFACTOR-WC` |
-| **当前这个窗口**(对话窗口) | Zihao 跟 Claude 商讨策略 · 不写代码 · 不在 loop 里 | 这里崩了不影响 A 和 C |
+打法 = 3 个独立 Claude Code 窗口按【文件分工】并行 · 互不撞车(权威:`docs/refactor/PARALLEL_LOOP_DISPATCH.md`):
 
-**关键**:窗口 A 和窗口 C 在**独立的 Claude Code 进程**里跑 · 这个对话窗口崩了 100% 不影响它们继续干活。
+| 窗口 | 只碰 | 在做啥 | 怎么看进度 |
+|------|------|--------|-----------|
+| **窗口 A · 后端** | app.py / db.py / services | 拆后端巨石到验收行数(B2/B1) | `git log --oneline \| grep REFACTOR-WA` |
+| **窗口 B · 前端** | home.js / home.html / home.css / src/home | 拆前端巨石到地板(C1/C3) | `git log --oneline \| grep REFACTOR-WB` |
+| **窗口 C · 文档测试** | docs / 测试 / 脚本 / .github | 文档扫荡 + D3/D4 测试 + 覆盖率 | `git log --oneline \| grep REFACTOR-WC` |
+| **对话窗口**(可有可无) | — | 跟 Claude 商讨策略 · 不在 loop 里 | 崩了不影响 A/B/C |
+
+**关键**:A/B/C 在独立进程里跑 · 对话窗口崩了 100% 不影响它们。「Loop 1」= A+B 一起把巨石拆到地板这个阶段。
+**新机制(2026-05-29)**:每个新窗口启动会被 SessionStart hook 自动塞「入口 + 真数字 + 当前 task」· 不用你贴长说明。
+
+---
+
+## 📌 日常怎么开窗口操作(2026-05-29 · 治漂移后最常用 · 先看这段)
+
+> **定心丸**:项目「大脑」已搬进 git 仓库(`AGENTS.md` / STATE 状态卡 / `PARALLEL_LOOP_DISPATCH.md` / `ENGINEERING_STANDARD.md`)· **不在任何聊天窗口里**。窗口随便关 · 新窗口开了照样接上。**不再需要专门留一个"指挥窗口"。**
+
+每次开窗口 · 就三种情况:
+
+| 你想干啥 | 你怎么操作(就一两步) |
+|---|---|
+| **① 跑整顿拆巨石(无人值守长跑)** | 开窗 → 说一句「读 docs/refactor/PARALLEL_LOOP_DISPATCH.md · 按窗口 A 跑 loop」(B/C 同理)→ Shift+Tab 切 auto-accept → 它自己跑。**长指令已存那文件 · 不用 Claude 重新生成 · 也不用你贴一大段。** |
+| **② 做件具体的事(修 bug / 加功能 / 问问题)** | 开窗 → 一句话说要干啥(「修 X bug」「客户页加搜索」)→ hook 已自动塞现状 · 它直接照大厂标准(`ENGINEERING_STANDARD.md`)干。**不用贴长说明 · 不用先解释项目。** |
+| **③ 看进度 / 聊策略(像跟我现在这样)** | 开窗 → 「现在整顿到哪了?下一步?」→ 它有真数字 + 状态卡 · 直接答。 |
+
+- **关了窗口怎么办**:毫无影响 · 大脑在仓库不在窗口 · 新窗口 hook 自动接上。
+- **还需要长指令吗**:不用了 · 降级成「一句话」。长 loop 指令存在 `PARALLEL_LOOP_DISPATCH.md` · 要用就让窗口去读那文件,或复制粘贴。
 
 ---
 

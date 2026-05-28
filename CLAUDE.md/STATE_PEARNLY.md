@@ -130,6 +130,17 @@
 >     - **`/api/line/webhook`**(L3640+ · LINE Bot follow/message 事件分发 + 签名校验 · ~700+ 行 · 内含 OCR 上传 LINE 入口 · 大块)
 >     - **`/api/ocr/*`** 5 路由 · L1502-2614 · spec 16 兜底
 >     - **`/api/login`** 主登录 · L1376+ · 巨型(~150 行?)· spec 01 兜底 · 留专门一轮
+> - **【第 30 轮 · loop 续 · 2026-05-28】**dynamic LINE webhook:
+>   - **`d8b3772` line_webhook_routes**:抽 LINE Bot webhook 主路由 + _normalize_line_lang/_ev_lang/_follow_lang/_handle_line_event/_handle_line_text 共 ~240 行(277 行总 · 含 docs)→ `line_webhook_routes.py`。`_handle_line_image_ocr` 留 app.py(依赖 ~10 个 _ocr_* helpers 盘根错节 · 留专门一轮)· `_handle_line_event` 内 lazy `from app import _handle_line_image_ocr` 解循环。
+>   - 顺手删 app.py L11 孤儿 `import json`(OAuth + LINE webhook 两次迁出后无用户 · ruff F401)。
+>   - app.py **3854→3622(-232)**。本会话累计 **4523→3622 = -901 / -19.9%**(B1 9 routes 迁出 · 5 模块新增)。
+>   - 真账号 E2E:spec 14 单跑 PASS 8.9s · LINE webhook 抽取零回归。
+>   - **下一刀剩**:
+>     - **`/api/ocr/*` 5 路由**(L1502-2614 · 主区 ~1100 行 · spec 16 兜底 · 需先抽 _ocr_* helpers 或大块整搬)
+>     - **`/api/v1/ocr/*` 3 aliases**(~17 行 · 薄 alias · 用 lazy import 解 v0 调用)
+>     - **`/api/login`**(L1376 · ~120 行 + 大量 helper · spec 01 兜底 · 复杂 auth flow · 留专门轮)
+>     - **`/api/version`**(L3220 · 22 行公开 meta · 可塞 pages_routes)
+>     - **`_handle_line_image_ocr` + 所有 `_ocr_*` helpers**(还在 app.py · ~1500+ 行 · 整搬到 services/ocr/ 是大工程 · 跨多 module 重构)
 >
 > ════════════════════════════════════════════════════════════
 > **【第四十三会话 · 2026-05-27/28】REFACTOR-C3 开篇 · home.html 6428→4411(-2017)· 抽 head 内联 `<style>` 巨块 → static/home-37-html-inline.css**

@@ -71,136 +71,22 @@ def get_cursor(commit: bool = False):
         get_pool().putconn(conn)
 
 
-# ensure_google_sub_column / ensure_password_changed_at_column / ensure_line_uid_column 已抽到
-# services/users/columns.py(REFACTOR-B2 · 见文件尾 re-export)
-# ensure_email_codes_table 已抽到 services/auth/email_codes_schema.py(同 · 文件尾 re-export)
-
-
 # ============================================================
-# v0.6.0 · ERP 端点 + 推送日志 DAL → services/erp/push_store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · 重试常量/错误分类器随域搬走 · db.py 文件尾 re-export
-# 对外函数 + 公共常量(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ============================================================
-# v0.7 · 智能归档 DAL → services/archive/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
+# REFACTOR-B2 抽取归档:
+#   各业务域 DAL 已搬到 services/<域>/store.py(详见文件尾 `from services.X import Y as Y`
+#   re-export 列表)。所有 `db.xxx()` 调用点零改动 · `__module__` 验过对象身份。
+#   迁出域(本会话清单 · 按抽取顺序):
+#     email_ingest / erp.{oauth,mappings,push} / notification / recon.{vat_recon_tasks,
+#     gl_vat,bank_recon_v2,bank_recon_v1,vat_recon} / archive / rd / cost / exceptions /
+#     clients / billing.{pricing,store,charge,account_status,credits_schema} /
+#     user_settings / ocr_history / line_binding / credits / tenant / audit / team /
+#     membership.{store,schema} / auth.{user_lookup,password,account_merge,email_codes_schema} /
+#     usage / users.columns。
 # ============================================================
 
 
 # ============================================================
-# v0.8 · RD 校验日限 DAL → services/rd/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ============================================================
-# v0.17 · M6 · 邮箱抓取 DAL → services/email_ingest/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · db.py 文件尾 re-export 回本命名空间(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ════════════════════════════════════════════════════════════════════
-# v0.18 · M10 · 银行对账 v1 DAL → services/recon/bank_recon_v1_store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
-# ════════════════════════════════════════════════════════════════════
-
-
-# ============================================================
-# v22 多租户 · 租户管理函数
-# ============================================================
-# 设计原则:
-# - 所有业务函数保持按 user_id 查(不破坏现有代码)
-# - 下面这批新函数供超级管理员后台使用
-# - 租户数据隔离通过"每个用户只属于一个租户"来保证
-# ============================================================
-
-
-# ============================================================
-# v23 · 用户(老板)管理 + 员工 + 操作日志
-# ============================================================
-# ============================================================
-# 操作/审计日志 operation_logs DAL → services/audit/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ============================================================
-# 员工管理(老板自助 · users role=member)DAL → services/team/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · tenant 隔离 · add_employee 复用 db.find_user_by_username
-# db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ============================================================
-# v106 · 成本追踪 ocr_cost_log DAL → services/cost/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · 只读聚合(成本面板)+ 成本记账 · 不涉扣费逻辑
-# db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ============================================================
-# v107 · 客户(clients)+ 供应商分类(supplier_categories)+ 买家→客户(buyer_to_client_memory)
-#        DAL → services/clients/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · tenant 隔离矩阵 · db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ============================================================
-# v108 · Google AI Studio 余额追踪 billing_balance_log DAL → services/billing/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · 保留 ensure_billing_balance_table/get_latest_balance(calibration 兜底)
-# add_balance_log/get_balance_summary 已于 2026-05-25 Earn 后台改造删除
-# db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ============================================================
-# v118.20.1 · 异常栏(exceptions + exception_whitelist)DAL → services/exceptions/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · tenant 隔离矩阵(同 tenant 共享异常池/白名单)
-# db.py 文件尾 re-export(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ============================================================
-# v118.22.1 · 智能提醒 DAL → services/notification/store.py (REFACTOR-B2)
-# 纯搬家 0 逻辑改 · db.py 文件尾 re-export 回本命名空间(所有 db.xxx() 调用点不变)
-# ============================================================
-
-
-# ============================================================
-# v118.27.7 · 多租户改造 P0 · 数据层重构
-# ============================================================
-# 目标:
-#   - 建 memberships / client_assignments / roles 三表(底层骨架)
-#   - 提供 get_user_tenant_id() 兼容层(优先 memberships · 回退 users.tenant_id)
-#   - 提供 migrate_to_membership_model(dry_run) 迁移函数(超管手动触发)
-# 约束:
-#   - 不动 users.tenant_id 字段(双写过渡期 · 至少 2 版)
-#   - 老代码继续 work · ensure_membership_tables() 仅建表 · 不自动迁移
-#   - Q1 决定:1 人 1 事务所 · UNIQUE(user_id) · 未来放宽改成 (user_id, tenant_id)
-#   - Q2 决定:client 不需要登录 · client_assignments 仅约束员工可见客户
-# ============================================================
-
-
-# ensure_membership_tables 已抽到 services/membership/schema.py(REFACTOR-B2 · 见文件尾 re-export)
-
-
-# ============================================================
-# v118.28.1 · 客户分配(老板分客户给员工)· 业务工具
-# ============================================================
-
-
-# ============================================================
-# v118.27.7.1 · 孤立用户(tenant_id IS NULL)盘点 + 修复
-#   - 给每个孤立用户建一个独立 tenant + 写 membership
-#   - 完整继承 user.plan / monthly_quota / expires(防付费用户掉级)
-#   - 单用户独立事务 · 一个失败不影响其他
-# ============================================================
-
-
-# ============================================================
-# v118.27.8.0 · RLS 行级安全基础设施(P1 试点)
+# v118.27.8.0 · RLS 行级安全基础设施(P1 试点)· 留在 db.py(铁律 #26 硬线 #1 不许动)
 #   - ENABLE_RLS 环境变量:0 关 / 1 开(默认 0)
 #   - get_cursor_rls(tenant_id, bypass) · 自动 SET LOCAL app.current_tenant_id
 #   - run_rls_isolation_tests · 临时启用 clients 表 RLS 跑 5 条穿透测试 · 测完关

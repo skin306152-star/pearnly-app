@@ -24,6 +24,7 @@ import './home/folder-watcher.js'; // REFACTOR-C1 · 文件夹监听(_loadFolder
 import './home/email-ingest.js'; // REFACTOR-C1 · 邮箱抓取(_loadEmailIngestPanel)
 import './home/bank-recon.js'; // REFACTOR-C1 · 银行对账模块(M10)
 import './home/clients.js'; // REFACTOR-C1 · 客户实体前端
+import './home/page-exceptions.js'; // REFACTOR-WB-C3 · 异常栏页骨架运行期注入(home.html section 抽出 · 须在 exceptions.js 前)
 import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件

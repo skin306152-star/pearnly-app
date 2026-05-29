@@ -15,106 +15,17 @@ from typing import Optional, Dict, Any, List
 
 import db
 
+# facade re-export(REFACTOR-WA-B1 · 实现已抽到同包子模块 · db.X/store.X 单一对象不变)
+from services.recon.vat_recon_schema import ensure_vat_recon_tables  # noqa: F401,E402
+from services.recon.recon_resolve import (  # noqa: F401,E402
+    list_invoices_for_recon,
+    find_client_by_tax_id,
+    auto_create_client,
+    get_client_by_id,
+    find_or_create_client_by_tax_id,
+)
+
 logger = logging.getLogger(__name__)
-
-
-def ensure_vat_recon_tables():
-    """v118.32.0 · 销项税对账 3 张表 · 启动时幂等建"""
-    try:
-        with db.get_cursor(commit=True) as cur:
-
-            # ── 1. vat_report(先建 · 被 reconciliation_task 外键引用)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS vat_report (
-                    id              BIGSERIAL PRIMARY KEY,
-                    tenant_id       UUID,
-                    client_id       BIGINT REFERENCES clients(id) ON DELETE SET NULL,
-                    period_year     INTEGER NOT NULL,
-                    period_month    INTEGER NOT NULL CHECK (period_month BETWEEN 1 AND 12),
-                    issuer_tax_id   TEXT,
-                    issuer_name     TEXT,
-                    issuer_branch   TEXT DEFAULT '00000',
-                    source_file_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
-                    parsed_rows     JSONB NOT NULL DEFAULT '[]'::jsonb,
-                    total_amount_pre_vat NUMERIC(18, 2),
-                    total_vat       NUMERIC(18, 2),
-                    total_amount    NUMERIC(18, 2),
-                    parser_version  TEXT,
-                    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                );
-                CREATE INDEX IF NOT EXISTS idx_vat_report_tenant
-                    ON vat_report(tenant_id) WHERE tenant_id IS NOT NULL;
-                CREATE INDEX IF NOT EXISTS idx_vat_report_client_period
-                    ON vat_report(client_id, period_year, period_month);
-                CREATE INDEX IF NOT EXISTS idx_vat_report_tax_id
-                    ON vat_report(issuer_tax_id) WHERE issuer_tax_id IS NOT NULL;
-            """)
-
-            # ── 2. reconciliation_task
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS reconciliation_task (
-                    id                       BIGSERIAL PRIMARY KEY,
-                    tenant_id                UUID,
-                    user_id                  UUID NOT NULL,
-                    client_id                BIGINT REFERENCES clients(id) ON DELETE SET NULL,
-                    period_year              INTEGER NOT NULL,
-                    period_month             INTEGER NOT NULL CHECK (period_month BETWEEN 1 AND 12),
-                    vat_report_id            BIGINT REFERENCES vat_report(id) ON DELETE SET NULL,
-                    invoice_count_archived   INTEGER NOT NULL DEFAULT 0,
-                    invoice_count_supplement INTEGER NOT NULL DEFAULT 0,
-                    report_row_count         INTEGER NOT NULL DEFAULT 0,
-                    status                   TEXT NOT NULL DEFAULT 'created',
-                    matched_count            INTEGER NOT NULL DEFAULT 0,
-                    mismatched_count         INTEGER NOT NULL DEFAULT 0,
-                    invoice_orphan_count     INTEGER NOT NULL DEFAULT 0,
-                    report_orphan_count      INTEGER NOT NULL DEFAULT 0,
-                    confidence_score         REAL,
-                    created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    completed_at             TIMESTAMPTZ
-                );
-                CREATE INDEX IF NOT EXISTS idx_recon_task_tenant
-                    ON reconciliation_task(tenant_id) WHERE tenant_id IS NOT NULL;
-                CREATE INDEX IF NOT EXISTS idx_recon_task_user
-                    ON reconciliation_task(user_id);
-                CREATE INDEX IF NOT EXISTS idx_recon_task_client_period
-                    ON reconciliation_task(client_id, period_year, period_month);
-                CREATE INDEX IF NOT EXISTS idx_recon_task_status
-                    ON reconciliation_task(status);
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_recon_task_unique_period
-                    ON reconciliation_task(client_id, period_year, period_month)
-                    WHERE status <> 'failed';
-            """)
-
-            # ── 3. reconciliation_row
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS reconciliation_row (
-                    id                BIGSERIAL PRIMARY KEY,
-                    task_id           BIGINT NOT NULL
-                                        REFERENCES reconciliation_task(id) ON DELETE CASCADE,
-                    invoice_id        UUID REFERENCES ocr_history(id) ON DELETE SET NULL,
-                    report_row_no     INTEGER,
-                    pair_confidence   REAL,
-                    status            TEXT NOT NULL DEFAULT 'pending',
-                    diff_fields       JSONB NOT NULL DEFAULT '{}'::jsonb,
-                    diff_categories   TEXT,
-                    ai_analysis       TEXT,
-                    accountant_action TEXT NOT NULL DEFAULT 'pending',
-                    notes             TEXT,
-                    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                );
-                CREATE INDEX IF NOT EXISTS idx_recon_row_task
-                    ON reconciliation_row(task_id);
-                CREATE INDEX IF NOT EXISTS idx_recon_row_task_status
-                    ON reconciliation_row(task_id, status);
-                CREATE INDEX IF NOT EXISTS idx_recon_row_invoice
-                    ON reconciliation_row(invoice_id) WHERE invoice_id IS NOT NULL;
-            """)
-
-            logger.info(
-                "✅ vat_report + reconciliation_task + reconciliation_row 已就绪 (v118.32.0)"
-            )
-    except Exception as e:
-        logger.error(f"ensure_vat_recon_tables failed: {e}")
 
 
 # ── CRUD · vat_report ──────────────────────────────────────
@@ -363,153 +274,9 @@ def list_recon_rows(task_id: int) -> List[Dict[str, Any]]:
 # ── 发票查询(供对账引擎使用)────────────────────────────────
 
 
-def list_invoices_for_recon(
-    tenant_id=None,
-    client_id: int = None,
-    period_year: int = None,
-    period_month: int = None,
-    source_ref: str = None,
-) -> List[Dict[str, Any]]:
-    """
-    拉取指定客户 × 纳税期间内已归档发票
-    从 ocr_history 顶层字段 + pages[0].fields 提取买方信息
-    v118.32.4.3 · source_ref(=task_id 字符串) 传了就只取本次 task 关联的发票
-    用于屏 B 流程隔离 · 不传时是屏 A 老逻辑(按客户+期间扫全部历史)
-    """
-    try:
-        with db.get_cursor() as cur:
-            # 按 invoice_date 的年月过滤
-            # v118.32.2.4 · 期间过滤宽容化 · invoice_date NULL 的发票也进对账
-            # (OCR 没识别出日期不该把发票排除 · 让匹配引擎用发票号/金额/税号补救)
-            base_where = ""
-            params: list = []
-            if source_ref:
-                base_where += " AND h.source_ref = %s"
-                params.append(str(source_ref))
-            if tenant_id:
-                base_where += " AND h.user_id IN (SELECT id FROM users WHERE tenant_id = %s::uuid)"
-                params.append(str(tenant_id))
-            if client_id:
-                base_where += " AND h.client_id = %s"
-                params.append(client_id)
-            if period_year and period_month:
-                # 日期不为空时按期间过滤 · 为空时一律通过(让匹配引擎处理)
-                base_where += """ AND (
-                    h.invoice_date IS NULL
-                    OR (EXTRACT(YEAR  FROM h.invoice_date::date) = %s
-                    AND EXTRACT(MONTH FROM h.invoice_date::date) = %s)
-                )"""
-                params.extend([period_year, period_month])
-            elif period_year:
-                base_where += (
-                    " AND (h.invoice_date IS NULL OR EXTRACT(YEAR FROM h.invoice_date::date) = %s)"
-                )
-                params.append(period_year)
-            elif period_month:
-                base_where += (
-                    " AND (h.invoice_date IS NULL OR EXTRACT(MONTH FROM h.invoice_date::date) = %s)"
-                )
-                params.append(period_month)
-
-            cur.execute(
-                f"""
-                SELECT
-                    h.id::text                                    AS id,
-                    h.invoice_no,
-                    h.invoice_date,
-                    h.seller_name,
-                    h.total_amount,
-                    -- 买方信息从 pages[0].fields 提取(OCR 输出字段)
-                    h.pages->0->'fields'->>'buyer_name'           AS buyer_name,
-                    h.pages->0->'fields'->>'buyer_tax'            AS buyer_tax_id,
-                    h.pages->0->'fields'->>'buyer_branch'         AS buyer_branch,
-                    h.pages->0->'fields'->>'subtotal'             AS amount_pre_vat,
-                    h.pages->0->'fields'->>'vat'                  AS vat_amount,
-                    h.filename,
-                    h.client_id
-                FROM ocr_history h
-                WHERE h.invoice_no IS NOT NULL
-                  AND h.invoice_no != ''
-                  {base_where}
-                ORDER BY h.invoice_date, h.invoice_no
-                LIMIT 2000
-            """,
-                params,
-            )
-
-            rows = cur.fetchall() or []
-            result = []
-            for r in rows:
-                d = dict(r)
-                # 数值字段做类型转换
-                for field in ("total_amount", "amount_pre_vat", "vat_amount"):
-                    try:
-                        d[field] = float(str(d[field] or 0).replace(",", "")) if d[field] else None
-                    except Exception:
-                        d[field] = None
-                result.append(d)
-            return result
-    except Exception as e:
-        logger.error(f"list_invoices_for_recon failed: {e}")
-        return []
-
-
 # ============================================================
 # v118.32.x · 销项税对账模块扩展 CRUD
 # ============================================================
-
-
-def find_client_by_tax_id(tenant_id, tax_id: str) -> Optional[Dict[str, Any]]:
-    """按税号找客户 · 跨 tenant 隔离"""
-    if not tax_id:
-        return None
-    try:
-        with db.get_cursor() as cur:
-            if tenant_id:
-                cur.execute(
-                    """
-                    SELECT * FROM clients
-                    WHERE tax_id = %s AND tenant_id = %s::uuid
-                    LIMIT 1
-                """,
-                    (tax_id, str(tenant_id)),
-                )
-            else:
-                cur.execute("SELECT * FROM clients WHERE tax_id = %s LIMIT 1", (tax_id,))
-            row = cur.fetchone()
-            return dict(row) if row else None
-    except Exception as e:
-        logger.error(f"find_client_by_tax_id failed: {e}")
-        return None
-
-
-def auto_create_client(
-    user_id: str, tenant_id, tax_id: str, name: str, color: str = "#3b82f6"
-) -> Optional[int]:
-    """v118.32.x · 屏 B 遇到陌生税号自动建客户 · 名字从发票/报告 OCR 出来"""
-    try:
-        with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                INSERT INTO clients (
-                    user_id, tenant_id, name, tax_id, color, is_active, notes
-                ) VALUES (%s::uuid, %s, %s, %s, %s, TRUE,
-                          'v118.32.x · 自动创建 · 请确认信息')
-                RETURNING id
-            """,
-                (
-                    user_id,
-                    str(tenant_id) if tenant_id else None,
-                    (name or f"客户 {tax_id[:5]}")[:200],
-                    tax_id,
-                    color,
-                ),
-            )
-            row = cur.fetchone()
-            return int(row["id"]) if row else None
-    except Exception as e:
-        logger.error(f"auto_create_client failed: {e}")
-        return None
 
 
 def get_recon_row(row_id: int) -> Optional[Dict[str, Any]]:
@@ -686,70 +453,6 @@ def list_recon_rows_detailed(task_id: int) -> List[Dict[str, Any]]:
         return []
 
 
-def get_client_by_id(client_id: int) -> Optional[Dict[str, Any]]:
-    try:
-        with db.get_cursor() as cur:
-            cur.execute("SELECT * FROM clients WHERE id = %s", (client_id,))
-            row = cur.fetchone()
-            return dict(row) if row else None
-    except Exception as e:
-        logger.error(f"get_client_by_id failed: {e}")
-        return None
-
-
 # ============================================================
 # v118.32.2 · VAT 对账增强(只保留新增 · 已有的不复制)
 # ============================================================
-
-
-def find_or_create_client_by_tax_id(
-    user_id: str, tenant_id: Optional[str], tax_id: str, name: str = ""
-) -> Optional[int]:
-    """v118.32.2 · 屏 B 自动建客户:按税号找 · 找不到就建 · 复用 create_client"""
-    if not tax_id or len(tax_id) != 13:
-        return None
-    try:
-        with db.get_cursor() as cur:
-            if tenant_id:
-                cur.execute(
-                    "SELECT id FROM clients WHERE tenant_id = %s AND tax_id = %s "
-                    "AND is_active = TRUE LIMIT 1",
-                    (str(tenant_id), tax_id),
-                )
-            else:
-                cur.execute(
-                    "SELECT id FROM clients WHERE user_id = %s AND tax_id = %s "
-                    "AND is_active = TRUE LIMIT 1",
-                    (str(user_id), tax_id),
-                )
-            row = cur.fetchone()
-            if row:
-                return int(row["id"])
-    except Exception as e:
-        logger.error(f"find_or_create_client_by_tax_id lookup failed: {e}")
-        return None
-
-    # 没找到 · 建一个 · 复用现有 create_client
-    palette = [
-        "#3b82f6",
-        "#10b981",
-        "#f59e0b",
-        "#ef4444",
-        "#8b5cf6",
-        "#ec4899",
-        "#14b8a6",
-        "#f97316",
-        "#06b6d4",
-        "#a855f7",
-    ]
-    color = palette[hash(tax_id) % len(palette)]
-    new_id = db.create_client(
-        user_id=str(user_id),
-        tenant_id=str(tenant_id) if tenant_id else None,
-        name=(name or f"客户 {tax_id[-4:]}"),
-        tax_id=tax_id,
-        color=color,
-    )
-    if new_id:
-        logger.info(f"[v118.32.2] auto-created client id={new_id} tax_id={tax_id} name={name}")
-    return new_id

@@ -3840,9 +3840,6 @@ function _getCurrentExportTpl() {
 function _setCurrentExportTpl(id) {
     try { localStorage.setItem('pn_export_tpl', id || 'input_vat'); } catch (e) {}
 }
-function _getTplDef(id) {
-    return _EXPORT_TEMPLATES.find(x => x.id === id) || _EXPORT_TEMPLATES[0];
-}
 
 async function _runExport(templateId) {
     if (_results.length === 0) return;
@@ -4113,18 +4110,6 @@ function _renderCreditsSettings(u, el) {
 
 // v118.35.0.16 · BYO Gemini Key 全套(loadGeminiKeyInfo/saveGeminiKey/testGeminiKey/clearGeminiKey + setApiKeyMsg) 物理删除
 
-
-async function refreshUserInfo() {
-    try {
-        const resp = await fetch('/api/me', {
-            headers: { 'Authorization': 'Bearer ' + token },
-        });
-        if (resp.ok) {
-            _userInfo = await resp.json();
-            try { window._userInfo = _userInfo; } catch (_) { /* silent · workspace-switcher 读它判 owner */ }
-        }
-    } catch (e) {}
-}
 
 // 事件绑定(页面加载时只绑一次)
 document.addEventListener('DOMContentLoaded', () => {

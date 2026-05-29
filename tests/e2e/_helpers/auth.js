@@ -19,9 +19,22 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const AUTH_DIR = path.join(__dirname, '..', '.auth');
-const STORAGE_STATE = path.join(AUTH_DIR, 'state.json');
+
+// storageState 按账号隔离(解 3 窗口并行「session 互踢」文件层根因)
+//   - 每个窗口在自己 shell 里设 PEARNLY_E2E_USER → 落到 state-<email短哈希>.json
+//   - 不同账号 = 不同文件 · 互不覆盖 token · 各窗口 E2E 可靠并行
+//   - 无凭据(CI)→ 'default' 占位(调用方会 test.skip · 文件不会真生成)
+function stateFileFor(user) {
+    if (!user) return path.join(AUTH_DIR, 'state-default.json');
+    const slug = crypto.createHash('sha1').update(user).digest('hex').slice(0, 10);
+    return path.join(AUTH_DIR, `state-${slug}.json`);
+}
+
+// 模块加载时按当前环境的测试账号定 state 文件(各窗口环境不同 → 文件不同)
+const STORAGE_STATE = stateFileFor(process.env.PEARNLY_E2E_USER);
 
 // storageState 新鲜度 · 超时即重登(token 后端给 30 天有效 · 这里只为防极端陈旧 / 跨天残留)
 const STATE_TTL_MS = 30 * 60 * 1000;

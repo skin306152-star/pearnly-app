@@ -12,13 +12,15 @@ from unittest import mock
 
 import db  # noqa: F401 — 先完成 db 初始化,避免 services.clients.store 循环导入
 from services.clients import store
+from services.clients import buyer_resolve as br  # REFACTOR-WA-B1 R12 · 买家解析下沉 · patch 锚点
 
 
 class ResolveOrCreateBuyerClientTests(unittest.TestCase):
     def setUp(self):
         # 默认:无现有匹配、建客户返回新 id、学习成功
-        self.p_resolve = mock.patch.object(store, "try_resolve_buyer_to_client", return_value=None)
-        self.p_learn = mock.patch.object(store, "learn_buyer_to_client", return_value=True)
+        # R12:resolve_or_create_buyer_client 与这两个被调函数同迁 buyer_resolve · 内部互调在该模块 resolve
+        self.p_resolve = mock.patch.object(br, "try_resolve_buyer_to_client", return_value=None)
+        self.p_learn = mock.patch.object(br, "learn_buyer_to_client", return_value=True)
         self.p_create = mock.patch.object(
             store.db, "find_or_create_client_by_tax_id", return_value=999
         )

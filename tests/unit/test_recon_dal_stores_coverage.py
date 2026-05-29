@@ -22,6 +22,7 @@ from services.recon import (
     bank_recon_v2_store as brv2,
     bank_recon_v1_store as brv1,
     vat_recon_store as vrs,
+    bank_recon_match as brm,  # REFACTOR-WA-B1 R11 · 匹配实现下沉 · patch 锚点
 )
 
 
@@ -506,8 +507,10 @@ class BankReconV1StoreTests(unittest.TestCase):
         with (
             patch_cursor(None),
             mock.patch.object(brv1.db, "get_cursor", side_effect=RuntimeError("no column")),
+            # REFACTOR-WA-B1 R11:find_invoice_candidates_for_tx 与 _find_candidates_from_pages_jsonb
+            # 同迁 bank_recon_match · 内部互调在该模块 resolve · patch 锚点改 brm
             mock.patch.object(
-                brv1, "_find_candidates_from_pages_jsonb", return_value=[{"id": "fallback"}]
+                brm, "_find_candidates_from_pages_jsonb", return_value=[{"id": "fallback"}]
             ) as m,
         ):
             out = brv1.find_invoice_candidates_for_tx(USER, 100.0, "2026-05-01")

@@ -1,0 +1,214 @@
+/* ============================================================
+ * REFACTOR-WB-C · 全站统一按钮系统(品牌色)· Zihao 2026-05-29 拍板
+ * 主 = 蓝 #2563EB(hover #1D4ED8 / active #1E40AF)
+ * 强调 = 琥珀橙 #F59E0B(全站仅最关键 1 个转化按钮:充值/升级 · 勿滥用)
+ * 规格:高 38(小 32)· 圆角 9 · 扁平无渐变 · 字号 13.5 / 600
+ * 四层级:btn-primary(实心蓝)/ btn-secondary(白底描边)/ btn-ghost(幽灵)/ btn-danger(白底红描边)
+ * 加载于所有 home-*.css 之后 → cascade 覆盖旧黑按钮系统(home-04 等)。
+ * ⚠ 覆盖 NAV-IA 旧视觉铁律「主按钮纯黑 #111111」(2026-05-29 Zihao 改蓝 · 已同步改铁律)。
+ * ============================================================ */
+
+.btn {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 38px;
+    height: 38px;
+    padding: 0 16px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+    background: none;
+    color: inherit;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        box-shadow 0.15s,
+        color 0.15s,
+        transform 0.05s;
+}
+.btn svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+/* 小号 38→32 */
+.btn.btn-sm,
+.btn.btn-small,
+.btn.btn-tiny {
+    min-height: 32px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 12.5px;
+}
+
+/* ── 主操作 · 实心蓝(每页通常仅 1 个)── */
+.btn-primary {
+    background: #2563eb;
+    color: #fff;
+    border-color: #2563eb;
+}
+.btn-primary:hover:not(:disabled):not(.is-disabled) {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+}
+.btn-primary:active:not(:disabled):not(.is-disabled) {
+    background: #1e40af;
+    border-color: #1e40af;
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+/* ── 次操作 · 白底 + 描边 ── */
+.btn-secondary {
+    background: #fff;
+    color: #1f2937;
+    border-color: #d7d8d1;
+}
+.btn-secondary:hover:not(:disabled):not(.is-disabled) {
+    background: #f7f7f4;
+    border-color: #b8bab2;
+    box-shadow: 0 2px 8px rgba(17, 17, 17, 0.06);
+}
+.btn-secondary:active:not(:disabled):not(.is-disabled) {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+/* ── 幽灵 · 透明 · 灰字 · hover 浅底 ── */
+.btn-ghost {
+    background: transparent;
+    color: #6b7280;
+    border-color: transparent;
+}
+.btn-ghost:hover:not(:disabled):not(.is-disabled) {
+    background: #f0f1ee;
+    color: #374151;
+}
+.btn-ghost:active:not(:disabled):not(.is-disabled) {
+    transform: translateY(1px);
+}
+
+/* ── 删除类 · 白底 + 红描边 ── */
+.btn-danger {
+    background: #fff;
+    color: #dc2626;
+    border-color: #dc2626;
+}
+.btn-danger:hover:not(:disabled):not(.is-disabled) {
+    background: #fef2f2;
+    border-color: #b91c1c;
+    color: #b91c1c;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+}
+.btn-danger:active:not(:disabled):not(.is-disabled) {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+/* ── 强调 · 琥珀橙(全站仅充值/升级 1 个转化按钮)── */
+.btn-accent {
+    background: #f59e0b;
+    color: #fff;
+    border-color: #f59e0b;
+}
+.btn-accent:hover:not(:disabled):not(.is-disabled) {
+    background: #d97706;
+    border-color: #d97706;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+.btn-accent:active:not(:disabled):not(.is-disabled) {
+    background: #b45309;
+    border-color: #b45309;
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+/* ── 禁用态(:disabled 原生 + .is-disabled 类)· 置灰 + 🚫 · hover 无反馈 ── */
+.btn:disabled,
+.btn.is-disabled {
+    background: #ecedf0 !important;
+    color: #aeb3bc !important;
+    border-color: #ecedf0 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+/* ── 图标按钮 · 34x34 · 描边 · hover 浅底 ── */
+.btn-icon {
+    box-sizing: border-box;
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    border: 1px solid #d7d8d1;
+    border-radius: 9px;
+    background: #fff;
+    color: #6b7280;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+.btn-icon:hover:not(:disabled):not(.is-disabled) {
+    background: #f0f1ee;
+    border-color: #b8bab2;
+}
+.btn-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ── 开关 toggle · 深色轨 · 开启 = 主色蓝 · 白圆点滑动 ──
+ * 标准类 .btn-toggle(input[type=checkbox] + label 或 button[role=switch])·
+ * 存量 toggle 在 Step 二 收编对齐到此。 */
+.btn-toggle {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: #cbd0d8;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+.btn-toggle::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.btn-toggle:checked,
+.btn-toggle[aria-checked="true"] {
+    background: #2563eb;
+}
+.btn-toggle:checked::after,
+.btn-toggle[aria-checked="true"]::after {
+    transform: translateX(18px);
+}
+.btn-toggle:disabled,
+.btn-toggle.is-disabled {
+    background: #ecedf0;
+    cursor: not-allowed;
+}

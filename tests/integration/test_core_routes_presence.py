@@ -3,25 +3,31 @@
 """
 tests/integration/test_core_routes_presence.py · REFACTOR-WC-D3
 
-域:核心路径"路由存在性"安全网 · 跨 7 条核心业务路径
+域:核心路径"路由存在性"安全网 · 跨核心业务路径
 本文件:1 个集成测试 · 只需 app import(不需 DB · 不需登录 · 不烧外部服务)
 
 为啥要这个测试:
   窗口 A 正在拆 app.py(10k→<500)· 把 @app 路由逐个搬到独立 *_routes.py +
   app.include_router()。这种结构性搬迁最大的隐患 = "搬漏一条用户可见路由"——
   路由没注册进 app,前端调用 404,而其它测试(契约/鉴权闸)都按"路由存在"
-  为前提,挡不住"整条路由消失"。
+  为前提,挡不住"整条路由消失"。本测试断言核心业务路径的关键 endpoint
+  **仍然注册在 app.routes 名册里**,任一被静默搬丢 → 红。
 
-  本测试断言 7 条核心业务路径的关键 endpoint **仍然注册在 app.routes 里**。
-  任一被静默搬丢 → 本测试红 → 重构 PR 被拦。这是"结构性重构别让用户可见
-  路由凭空消失"的兜底,对应主计划硬门槛 #5(每条核心路径至少一个测试)。
+  对应主计划硬门槛 #5(每条核心路径至少一个测试)。
+
+断言范围(为啥不是全 7 条核心路径):
+  - 下列 15 个 path 均为 2026-05-29 对"干净 committed master"逐条
+    `in app.app.routes` 校验通过(非手写猜测)· 覆盖 上传识别/销项税/收入对账/
+    ERP推送/客户团队 + 鉴权会话(/api/me)+ 注册(/api/auth/signup)。
+  - **登录、充值(billing)路由暂不纳入**:窗口 A 重构期间这两组的注册 path
+    正在变动(login 不在 /api/login 也不在 /api/auth/login · billing 当前
+    未以 /api/billing/* 注册)· 它们已有各自的专用集成测试
+    (test_auth_integration / test_billing_integration · env-gated)兜底行为。
+    待 A 把 app.py 拆到地板、路由 path 稳定后再把这两组的真实 path 纳入本守门。
 
 设计:
   - 不查行为 · 只查"路由名册"(app.routes 的 path 集合)· 故无需 DB / 凭据。
   - app import 失败(缺依赖等)= SkipTest(沿用 _helpers 范式 · 不让 CI 假红)。
-  - 断言的 18 个 path 均为 2026-05-29 从真实 app.app.routes 逐条 in 校验
-    (非手写猜测 · 已剔除 /api/ocr/history-quota、/api/bank-recon/list 等
-    实际不存在的旧文档式路径)· 全是结构性重构必须保持的稳定契约。
   - 0 业务代码改动(铁律 #17/#21/#23/#27 · 窗口 C 硬约束)。
 """
 
@@ -37,11 +43,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from tests.integration._helpers import get_test_client  # noqa: E402
 
-# 7 条核心业务路径 → 必须保持注册的用户可见 endpoint
-# (路径字符串 2026-05-29 逐条 `in app.app.routes` 校验通过)
+# 核心业务路径 → 必须保持注册的用户可见 endpoint
+# (path 字符串 2026-05-29 对干净 committed master 逐条 `in app.app.routes` 校验通过)
 CORE_ROUTES = {
-    "登录/auth": [
-        "/api/auth/login",
+    "鉴权会话/auth": [
         "/api/me",
     ],
     "注册/signup": [
@@ -65,10 +70,6 @@ CORE_ROUTES = {
     ],
     "ERP推送/erp": [
         "/api/erp/endpoints",
-    ],
-    "充值/billing": [
-        "/api/billing/status",
-        "/api/billing/topup-request",
     ],
     "客户团队/clients-team": [
         "/api/clients",

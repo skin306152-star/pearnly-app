@@ -70,7 +70,10 @@ class RetryUpdatesOriginalRowTests(unittest.TestCase):
 
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app  # noqa: F401
-        import erp_routes  # noqa: F401
+
+        # R18(2026-05-29):retry 路由从 erp_routes 拆到 erp_push_log_routes ·
+        # patch 目标随 handler 落点走(get_current_user/_check_push_access/_tid 都在该模块)。
+        import erp_push_log_routes as erp_routes  # noqa: F401
 
         cls.app_module = app
         cls.erp_routes = erp_routes

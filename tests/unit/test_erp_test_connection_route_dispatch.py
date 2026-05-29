@@ -45,6 +45,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 import erp_push as _erp  # noqa: E402
 import erp_routes  # noqa: E402  # REFACTOR-B1: erp 路由搬到此模块
+import erp_endpoints_routes  # noqa: E402  # R18: 端点 CRUD 拆出
+import erp_push_log_routes  # noqa: E402  # R18: 推送/日志/重试拆出
 
 
 class StubContractTests(unittest.TestCase):
@@ -674,9 +676,11 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         }
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_push_log_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_push_log_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app.db, "insert_push_log", return_value="log-1"),
@@ -1455,9 +1459,11 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
 
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_push_log_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_push_log_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app.db, "get_user_tenant_id", return_value="tenant-1"),
@@ -1651,9 +1657,11 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
 
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_push_log_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_push_log_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app.db, "insert_push_log", return_value="log-1") as insert_log_mock,
@@ -1756,9 +1764,11 @@ class PushStatusSourceOfTruthTests(unittest.TestCase):
 
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_push_log_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_push_log_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_ocr_history_detail", return_value=fake_history),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(app.db, "insert_push_log", return_value="log-1") as insert_log_mock,
@@ -2042,9 +2052,11 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
 
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_endpoints_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_endpoints_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep),
             patch.object(app.db, "update_erp_endpoint", return_value=True) as update_mock,
         ):
@@ -2107,9 +2119,11 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
 
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_endpoints_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_endpoints_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep),
             patch.object(app.db, "update_erp_endpoint", return_value=True) as update_mock,
         ):
@@ -2198,11 +2212,11 @@ class EndpointClientIdsRetiredTests(unittest.TestCase):
         app = self.app_module
         with (
             patch.object(
-                erp_routes,
+                erp_endpoints_routes,
                 "get_current_user_from_request",
                 return_value={"id": "u", "plan": "lifetime"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_endpoints_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "list_erp_endpoints", return_value=[]),
             patch.object(app.db, "create_erp_endpoint", return_value="new-ep-id"),
             patch.object(app.db, "get_erp_endpoint", return_value=self._mrerp_stored_endpoint()),
@@ -2229,11 +2243,11 @@ class EndpointClientIdsRetiredTests(unittest.TestCase):
         app = self.app_module
         with (
             patch.object(
-                erp_routes,
+                erp_endpoints_routes,
                 "get_current_user_from_request",
                 return_value={"id": "u", "plan": "lifetime"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_endpoints_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "list_erp_endpoints", return_value=[]),
             patch.object(app.db, "create_erp_endpoint", return_value="new-ep-id"),
             patch.object(app.db, "get_erp_endpoint", return_value=self._mrerp_stored_endpoint()),
@@ -2268,11 +2282,11 @@ class EndpointClientIdsRetiredTests(unittest.TestCase):
         }
         with (
             patch.object(
-                erp_routes,
+                erp_endpoints_routes,
                 "get_current_user_from_request",
                 return_value={"id": "u", "plan": "lifetime"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_endpoints_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=existing_ep),
             patch.object(app.db, "update_erp_endpoint", return_value=True),
         ):
@@ -2293,11 +2307,11 @@ class EndpointClientIdsRetiredTests(unittest.TestCase):
         app = self.app_module
         with (
             patch.object(
-                erp_routes,
+                erp_endpoints_routes,
                 "get_current_user_from_request",
                 return_value={"id": "u", "plan": "lifetime"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_endpoints_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "list_erp_endpoints", return_value=[]),
             patch.object(app.db, "create_erp_endpoint", return_value="new-ep-id"),
             patch.object(

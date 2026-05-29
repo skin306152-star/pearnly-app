@@ -269,7 +269,9 @@ class SeedRouteGenericRouteTests(unittest.TestCase):
     def test_patch_seed_persists_generic_product_code(self):
         from unittest.mock import patch
         from fastapi.testclient import TestClient
-        import erp_routes
+
+        # R18(2026-05-29):seed 路由从 erp_routes 拆到 erp_endpoints_routes · patch 随 handler 落点走。
+        import erp_endpoints_routes as erp_routes
 
         app = self.app_module
         existing = {

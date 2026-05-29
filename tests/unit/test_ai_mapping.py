@@ -19,6 +19,7 @@ from unittest import mock
 
 import bank_recon_v2 as brv2
 from services.importer import template_learning as tl
+from services.importer import ai_mapping  # REFACTOR-WA-B1 R8 · AI 映射抽出 · 缓存目录常量在此
 
 
 def _xlsx(rows):
@@ -100,11 +101,12 @@ class HookUnitTests(unittest.TestCase):
     def setUp(self):
         # 每个用例独立临时缓存目录 · 避免相互命中 + 不污染工程
         self._cache_dir = tempfile.mkdtemp(prefix="ai_map_test_")
-        self._orig_dir = tl._AI_MAPPING_CACHE_DIR
-        tl._AI_MAPPING_CACHE_DIR = self._cache_dir
+        # REFACTOR-WA-B1 R8:缓存常量随 AI 映射迁到 services/importer/ai_mapping.py · 在那里改
+        self._orig_dir = ai_mapping._AI_MAPPING_CACHE_DIR
+        ai_mapping._AI_MAPPING_CACHE_DIR = self._cache_dir
 
     def tearDown(self):
-        tl._AI_MAPPING_CACHE_DIR = self._orig_dir
+        ai_mapping._AI_MAPPING_CACHE_DIR = self._orig_dir
         shutil.rmtree(self._cache_dir, ignore_errors=True)
 
     def test_no_api_key_returns_none_no_call(self):

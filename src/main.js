@@ -7,6 +7,7 @@
 // 后续阶段 C 持续从 home.js 抽模块 → 都进 src/home/ → 在这里 import
 
 import './home/page-reconcile.js'; // REFACTOR-WB-C3 · 对账中心骨架运行期注入(home.html section 抽出 · 须最前 · 6 模块在其后绑定)
+import './home/page-integrations.js'; // REFACTOR-WB-C3 · 集成页骨架运行期注入(home.html section 抽出 · 早于 erp-integration 等模块)
 import './home/dashboard.js';
 import './home/billing.js';
 import './home/test-center.js'; // REFACTOR-C1 · 测试中心(skin only)

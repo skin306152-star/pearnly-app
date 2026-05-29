@@ -113,6 +113,8 @@
 
 - **测试账号凭据**:窗口 A 跑真账号 E2E 用环境变量 `PEARNLY_E2E_USER/_PASS`(HKCU setx)· **绝不进 git**。开窗口前确认已配。
 - **三窗口同时 push**:CI `concurrency` 会取消旧 run(feature 不是 bug)· 每个窗口 push 前 `git pull --rebase`、push 后独立 `gh run watch` 查自己那条真绿。
+- **🔴 共享 git index 铁律 · commit 必带 pathspec**(2026-05-29 窗口 C 踩坑):三窗口共用同一工作目录 = 共用同一个 `.git/index`。`git add <我的文件>` 后 `git commit`(不带路径)会把**另一个窗口在这两步之间 `git add` 的文件一起卷进我的 commit**(窗口 C 的 `docs(state)` commit 曾误卷入窗口 B 的 home.js/chrome-render.js · 已在 master 无法回退)。**铁律:每次 commit 必须显式带 pathspec** —— `git commit -- <精确文件列表>`(`--` 后只提交这些路径 · 无视 index 里别人 stage 的东西)· 或 `git commit <files>`。**绝不 `git commit` 裸提交 / `git commit -a`。** 提交后用 `git diff-tree --no-commit-id --name-only -r HEAD` 核实只含自己的文件;若已卷入别人的且已 push → **不 force-push 不 revert**(会毁对方工作)· 只在 STATE 记录 + 口头知会对方窗口。
+- **gh CLI 路径**(2026-05-29 更新):`%LOCALAPPDATA%\Microsoft\WinGet\Packages\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\bin\gh.exe`(旧 `C:\Program Files\GitHub CLI\gh.exe` 已失效)。
 - **STATE 头部**会出现"窗口 A/B/C 当前 task"三行,一眼看到三条线。
 - **本地跑**(非云端):窗口留着才跑,持续耗 Opus 额度。
 

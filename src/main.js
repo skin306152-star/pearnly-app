@@ -23,6 +23,7 @@ import './home/report-templates.js'; // REFACTOR-C1 · 报表模板/统一导出
 import './home/folder-watcher.js'; // REFACTOR-C1 · 文件夹监听(_loadFolderWatcherPanel)
 import './home/email-ingest.js'; // REFACTOR-C1 · 邮箱抓取(_loadEmailIngestPanel)
 import './home/bank-recon.js'; // REFACTOR-C1 · 银行对账模块(M10)
+import './home/page-clients.js'; // REFACTOR-WB-C3 · 客户页骨架运行期注入(home.html section 抽出 · 须在 clients.js 前)
 import './home/clients.js'; // REFACTOR-C1 · 客户实体前端
 import './home/page-exceptions.js'; // REFACTOR-WB-C3 · 异常栏页骨架运行期注入(home.html section 抽出 · 须在 exceptions.js 前)
 import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页

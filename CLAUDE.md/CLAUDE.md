@@ -768,7 +768,7 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 - 不需要问 Zihao "PRD 跟 prototype 哪个对" · 默认 prototype 对
 
 **视觉对齐铁律(2026-05-15 v118.33.7.x 累积)**:
-- 主色:纯黑 `#111111`(不用深蓝)· active / 主按钮 / focus 都黑
+- ~~主色:纯黑 `#111111`(不用深蓝)· active / 主按钮 / focus 都黑~~ **【2026-05-29 Zihao 改判·覆盖】全站统一按钮系统:主按钮 = 品牌蓝 `#2563EB`(hover `#1D4ED8`/active `#1E40AF`)· 强调=琥珀橙 `#F59E0B`(仅充值/升级 1 转化按钮)· 标准见中央 `static/home-38-buttons.css`(REFACTOR-WB-C)。active/focus 仍可保黑系或随蓝(侧栏 active 视觉另议)· 但 `.btn-primary` 一律蓝。**
 - 背景:暖灰 `#f4f4f0`(应用主背景)
 - 卡片:白 `#fff` + 淡边框 `#e8e8e3`(浮在暖灰背景)
 - 浅蓝 info 提示色保留 `#DBEAFE` + `#1E40AF`(prototype 也这样)· 其他蓝色一律去

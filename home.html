@@ -4381,7 +4381,7 @@
 
 <!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 home.js 前 · 提供 window.I18N -->
 <script src="/static/i18n-data.js?v=11850000"></script>
-<script src="/static/home.js?v=11850023"></script>
+<script src="/static/home.js?v=11850024"></script>
 <!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE 不引 home.js · runRecon 检测 needs_mapping 时调用 -->
 <script src="/static/recon-mapping.js?v=11835072" defer></script>
 <!-- ADR-006 S8 · PDF/扫描件逐行核对纠错面板 · 独立 IIFE · runRecon 检测 needs_review 时调用 -->
@@ -4390,7 +4390,7 @@
      ES module(type=module 自动 defer)· 必在 home.js 后执行 ·
      依赖 home.js 的全局:t / showToast / escapeHtml / subscribeI18n / _userInfo / currentRoute / loadDashboard
      REFACTOR-C1(2026-05-25)· 抽测试中心 + 重建 bundle · 只 bump 本 main.js?v=(不动 home.js?v= → /api/version 不变 → 不弹横幅) -->
-<script type="module" src="/static/dist/main.js?v=11850021"></script>
+<script type="module" src="/static/dist/main.js?v=11850022"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·

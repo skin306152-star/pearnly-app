@@ -44,6 +44,7 @@ import './home/erp-integration.js'; // REFACTOR-C1 · ERP 集成页(推送日志
 import './home/line-email-modal.js'; // REFACTOR-WB-C1 · LINE 用户补邮箱强制 modal(自包含 IIFE · 自启动)
 import './home/change-password.js'; // REFACTOR-WB-C1 · 修改密码模块(设置→账户 · 自包含 IIFE)
 import './home/session-heartbeat.js'; // REFACTOR-WB-C1 · Session 心跳 15s 踢设备(自包含 IIFE · window._sessionCheck)
+import './home/team.js'; // REFACTOR-WB-C1 · 团队管理(老板侧:员工增删/启停/重置密码 · window.loadTeamList)
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(

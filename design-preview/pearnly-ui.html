@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<!--
+  Pearnly · UI 风格效果图 v2(design-preview · 仅供预览 · 不接入生产)
+  ────────────────────────────────────────────────────────────
+  本版改动:① 删除左下套餐卡 ② 对账中心=3 子功能 ③ 客户管理=2 子功能
+           ④ 左侧导航改为可折叠/展开 ⑤ logo 不变 ⑥ 顶部加浅色/深色切换
+  风格:干净浅色 / 深色(参考 Stripe Dashboard / Linear)
+  设计令牌见 :root 与 [data-theme=dark]
+-->
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pearnly · UI 预览</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#F6F7F9; --surface:#FFFFFF; --surface-2:#FBFBFD;
+    --border:#E7E9EE; --border-strong:#D8DBE3;
+    --text:#0F172A; --muted:#64748B; --faint:#94A3B8;
+    --primary:#4F46E5; --primary-hover:#4338CA; --primary-soft:#EEF0FF;
+    --green:#16A34A; --green-soft:#ECFDF3;
+    --amber:#D97706; --amber-soft:#FEF6E7;
+    --red:#DC2626; --red-soft:#FEECEC;
+    --blue:#2563EB; --blue-soft:#EAF1FE;
+    --radius-card:14px; --radius-btn:9px; --radius-pill:999px;
+    --shadow-sm:0 1px 2px rgba(16,24,40,.05);
+    --shadow-md:0 4px 16px rgba(16,24,40,.08);
+    --font:'Inter','Noto Sans Thai',-apple-system,'Segoe UI',sans-serif;
+  }
+  body[data-theme="dark"]{
+    --bg:#0B0F17; --surface:#141A24; --surface-2:#1B2230;
+    --border:#262E3D; --border-strong:#333C4D;
+    --text:#E7EAF0; --muted:#9BA6B5; --faint:#697282;
+    --primary:#6366F1; --primary-hover:#7C84FF; --primary-soft:rgba(99,102,241,.16);
+    --green:#34D399; --green-soft:rgba(52,211,153,.14);
+    --amber:#FBBF24; --amber-soft:rgba(251,191,36,.14);
+    --red:#F87171; --red-soft:rgba(248,113,113,.14);
+    --blue:#60A5FA; --blue-soft:rgba(96,165,250,.14);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --shadow-md:0 8px 24px rgba(0,0,0,.5);
+  }
+  html,body{height:100%}
+  body{
+    font-family:var(--font); background:var(--bg); color:var(--text);
+    -webkit-font-smoothing:antialiased; font-size:14px; line-height:1.5; transition:background .2s,color .2s;
+  }
+  .app{display:grid; grid-template-columns:248px 1fr; grid-template-rows:60px 1fr; height:100vh}
+
+  /* ── Top bar ── */
+  .topbar{grid-column:1 / -1; display:flex; align-items:center; gap:20px; padding:0 24px;
+    background:var(--surface); border-bottom:1px solid var(--border); z-index:10}
+  .brand{display:flex; align-items:center; gap:10px; width:200px}
+  .brand-mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#6366F1,#4F46E5);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;
+    box-shadow:0 2px 6px rgba(79,70,229,.35)}
+  .brand-name{font-weight:700;font-size:17px;letter-spacing:-.2px}
+  .brand-beta{font-size:10px;font-weight:600;color:var(--primary);background:var(--primary-soft);
+    padding:2px 7px;border-radius:var(--radius-pill);letter-spacing:.5px}
+  .search{flex:1;max-width:420px;position:relative}
+  .search input{width:100%;height:38px;border:1px solid var(--border);border-radius:var(--radius-btn);
+    background:var(--surface-2);padding:0 12px 0 38px;font-family:inherit;font-size:13.5px;color:var(--text);transition:.15s}
+  .search input::placeholder{color:var(--faint)}
+  .search input:focus{outline:none;border-color:var(--primary);background:var(--surface);box-shadow:0 0 0 3px var(--primary-soft)}
+  .search svg{position:absolute;left:12px;top:9px;color:var(--faint)}
+  .topbar-right{display:flex;align-items:center;gap:12px;margin-left:auto}
+  .credits{display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;background:var(--surface-2);
+    border:1px solid var(--border);border-radius:var(--radius-pill);font-size:13px;font-weight:500;cursor:pointer;transition:.15s}
+  .credits:hover{border-color:var(--border-strong);background:var(--surface)}
+  .credits b{color:var(--text);font-weight:700}
+  .credits .topup{color:var(--primary);font-weight:600}
+  .theme-btn,.lang{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;cursor:pointer;padding:8px;border-radius:8px;border:0;background:transparent;font-family:inherit}
+  .theme-btn:hover,.lang:hover{background:var(--surface-2);color:var(--text)}
+  .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#10B981,#059669);
+    color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;cursor:pointer}
+
+  /* ── Sidebar ── */
+  .sidebar{background:var(--surface);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;overflow-y:auto}
+  .nav-group-label{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;padding:14px 12px 6px}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:var(--muted);
+    font-weight:500;font-size:14px;cursor:pointer;transition:.13s;margin-bottom:2px;user-select:none}
+  .nav-item svg.lead{color:var(--faint);transition:.13s;flex-shrink:0}
+  .nav-item:hover{background:var(--surface-2);color:var(--text)}
+  .nav-item:hover svg.lead{color:var(--muted)}
+  .nav-item.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
+  .nav-item.active svg.lead{color:var(--primary)}
+  .nav-badge{margin-left:auto;font-size:11px;font-weight:700;background:var(--red);color:#fff;min-width:18px;height:18px;
+    padding:0 5px;border-radius:var(--radius-pill);display:flex;align-items:center;justify-content:center}
+  .chev{margin-left:auto;color:var(--faint);transition:transform .2s}
+  .nav-group.open .chev{transform:rotate(90deg)}
+  .nav-children{max-height:0;overflow:hidden;transition:max-height .25s ease;margin-left:7px;
+    border-left:1.5px solid var(--border);padding-left:6px}
+  .nav-group.open .nav-children{max-height:240px}
+  .nav-sub{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;color:var(--muted);
+    font-size:13.5px;font-weight:500;cursor:pointer;transition:.13s;margin:2px 0;user-select:none}
+  .nav-sub .dot{width:5px;height:5px;border-radius:50%;background:var(--faint);flex-shrink:0;transition:.13s}
+  .nav-sub:hover{background:var(--surface-2);color:var(--text)}
+  .nav-sub.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
+  .nav-sub.active .dot{background:var(--primary)}
+  .nav-sub .nav-badge{height:17px;min-width:17px;font-size:10px}
+
+  /* ── Main ── */
+  .main{overflow-y:auto;padding:28px 32px 60px}
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px}
+  .page-title{font-size:22px;font-weight:700;letter-spacing:-.4px}
+  .page-sub{color:var(--muted);font-size:13.5px;margin-top:4px}
+  .head-actions{display:flex;gap:10px}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 16px;border-radius:var(--radius-btn);
+    font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:.15s}
+  .btn svg{width:16px;height:16px}
+  .btn-primary{background:var(--primary);color:#fff;box-shadow:var(--shadow-sm)}
+  .btn-primary:hover{background:var(--primary-hover)}
+  .btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+  .btn-secondary:hover{background:var(--surface-2)}
+  .btn-ghost{background:transparent;color:var(--muted)}
+  .btn-ghost:hover{background:var(--surface-2);color:var(--text)}
+  .btn-sm{height:32px;padding:0 12px;font-size:13px}
+
+  /* stat cards */
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-card);padding:18px 20px;box-shadow:var(--shadow-sm)}
+  .stat-top{display:flex;align-items:center;justify-content:space-between}
+  .stat-label{font-size:12.5px;color:var(--muted);font-weight:500}
+  .stat-ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+  .stat-val{font-size:27px;font-weight:700;letter-spacing:-.5px;margin-top:10px}
+  .stat-delta{font-size:12.5px;margin-top:6px;display:flex;align-items:center;gap:5px;color:var(--muted)}
+  .delta-up{color:var(--green);font-weight:600}
+  .delta-down{color:var(--red);font-weight:600}
+
+  /* card */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-card);box-shadow:var(--shadow-sm);overflow:hidden}
+  .card-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+  .card-title{font-size:15px;font-weight:600}
+  .card-pad{padding:20px}
+
+  /* table */
+  table{width:100%;border-collapse:collapse}
+  th{font-size:12px;font-weight:600;color:var(--muted);text-align:left;padding:11px 20px;background:var(--surface-2);border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:13px 20px;border-bottom:1px solid var(--border);font-size:13.5px;color:var(--text)}
+  tr:last-child td{border-bottom:0}
+  tbody tr{transition:.1s}
+  tbody tr:hover{background:var(--surface-2)}
+  .num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  .cell-strong{font-weight:600}
+  .cell-mute{color:var(--muted)}
+  .cell-2{display:flex;flex-direction:column;gap:2px}
+  .cell-2 small{color:var(--faint);font-size:12px}
+
+  /* badge */
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:var(--radius-pill);line-height:1.4}
+  .badge::before{content:"";width:6px;height:6px;border-radius:50%}
+  .b-green{background:var(--green-soft);color:var(--green)} .b-green::before{background:var(--green)}
+  .b-amber{background:var(--amber-soft);color:var(--amber)} .b-amber::before{background:var(--amber)}
+  .b-red{background:var(--red-soft);color:var(--red)} .b-red::before{background:var(--red)}
+  .b-blue{background:var(--blue-soft);color:var(--blue)} .b-blue::before{background:var(--blue)}
+  .b-gray{background:var(--surface-2);color:var(--muted)} .b-gray::before{background:var(--faint)}
+
+  /* misc */
+  .panel{display:none;animation:fade .25s ease}
+  .panel.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .row-actions{display:flex;gap:6px}
+  .icon-btn{width:30px;height:30px;border:1px solid var(--border);background:var(--surface);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;transition:.13s}
+  .icon-btn:hover{border-color:var(--border-strong);color:var(--text);background:var(--surface-2)}
+  .grid-2{display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start}
+  .grid-2b{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+
+  .dropzone{border:2px dashed var(--border-strong);border-radius:14px;background:var(--surface-2);padding:48px;text-align:center;transition:.15s;cursor:pointer}
+  .dropzone:hover{border-color:var(--primary);background:var(--primary-soft)}
+  .dz-ic{width:56px;height:56px;border-radius:14px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:var(--primary);box-shadow:var(--shadow-sm)}
+  .dz-title{font-size:16px;font-weight:600;margin-bottom:6px}
+  .dz-sub{color:var(--muted);font-size:13px}
+  .source-chips{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--surface);font-size:13px;font-weight:500;color:var(--muted);cursor:pointer}
+  .chip:hover{border-color:var(--primary);color:var(--primary)}
+
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:7px}
+  .field input,.field select{width:100%;height:40px;border:1px solid var(--border-strong);border-radius:9px;padding:0 12px;font-family:inherit;font-size:14px;color:var(--text);background:var(--surface);transition:.15s}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+  .field .hint{font-size:12px;color:var(--faint);margin-top:6px}
+
+  .list-row{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .list-row:last-child{border-bottom:0}
+  .list-row:hover{background:var(--surface-2)}
+  .av-sm{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:#fff;flex-shrink:0}
+  .toggle{width:40px;height:23px;border-radius:var(--radius-pill);background:var(--border-strong);position:relative;cursor:pointer;transition:.15s;flex-shrink:0}
+  .toggle.on{background:var(--primary)}
+  .toggle::after{content:"";position:absolute;width:19px;height:19px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.15s;box-shadow:var(--shadow-sm)}
+  .toggle.on::after{left:19px}
+
+  .bar{height:8px;border-radius:var(--radius-pill);background:var(--surface-2);overflow:hidden}
+  .bar > span{display:block;height:100%;border-radius:var(--radius-pill)}
+
+  .modal-demo{margin-top:24px}
+  .modal{max-width:440px;border:1px solid var(--border);border-radius:16px;background:var(--surface);box-shadow:var(--shadow-md)}
+  .modal-head{padding:18px 20px;border-bottom:1px solid var(--border);font-weight:600;font-size:15px}
+  .modal-body{padding:20px}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+
+  .section-title{font-size:13px;font-weight:600;color:var(--muted);margin:28px 0 12px;text-transform:uppercase;letter-spacing:.4px}
+</style>
+</head>
+<body data-theme="light">
+<div class="app">
+
+  <!-- ===== Top bar ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">P</div>
+      <span class="brand-name">Pearnly</span>
+      <span class="brand-beta">BETA</span>
+    </div>
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="搜索发票号、客户、金额…  Search invoices, clients…">
+    </div>
+    <div class="topbar-right">
+      <div class="credits"><span>余额</span><b>2,480</b><span>·</span><span class="topup">充值</span></div>
+      <button class="theme-btn" id="themeBtn" title="切换浅色/深色">
+        <svg id="themeIc" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <div class="lang">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>中文
+      </div>
+      <div class="avatar">ZH</div>
+    </div>
+  </header>
+
+  <!-- ===== Sidebar(可折叠/展开) ===== -->
+  <aside class="sidebar">
+    <div class="nav-group-label">工作区</div>
+
+    <div class="nav-item active" data-panel="dashboard">
+      <svg class="lead" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      工作台
+    </div>
+
+    <div class="nav-item" data-panel="upload">
+      <svg class="lead" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/></svg>
+      上传识别
+    </div>
+
+    <div class="nav-item" data-panel="history">
+      <svg class="lead" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>
+      历史记录
+    </div>
+
+    <!-- 对账中心(3 子功能) -->
+    <div class="nav-group open" id="grp-recon">
+      <div class="nav-item nav-parent">
+        <svg class="lead" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3l-7.5 7.5"/><path d="M3 21l7.5-7.5"/></svg>
+        对账中心
+        <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+      <div class="nav-children">
+        <div class="nav-sub" data-panel="recon-income"><span class="dot"></span>收入对账</div>
+        <div class="nav-sub" data-panel="recon-vat"><span class="dot"></span>销项税 ภ.พ.30</div>
+        <div class="nav-sub" data-panel="recon-input"><span class="dot"></span>进项税对账</div>
+      </div>
+    </div>
+
+    <!-- 客户管理(2 子功能) -->
+    <div class="nav-group open" id="grp-clients">
+      <div class="nav-item nav-parent">
+        <svg class="lead" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        客户管理
+        <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+      <div class="nav-children">
+        <div class="nav-sub" data-panel="clients-list"><span class="dot"></span>客户列表(买方)</div>
+        <div class="nav-sub" data-panel="clients-suppliers"><span class="dot"></span>供应商(卖方)</div>
+      </div>
+    </div>
+
+    <div class="nav-item" data-panel="exceptions">
+      <svg class="lead" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      异常处理
+      <span class="nav-badge">5</span>
+    </div>
+
+    <div class="nav-group-label">连接与协作</div>
+
+    <div class="nav-item" data-panel="erp">
+      <svg class="lead" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>
+      ERP 推送
+    </div>
+
+    <div class="nav-item" data-panel="team">
+      <svg class="lead" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+      团队成员
+    </div>
+
+    <div class="nav-item" data-panel="settings">
+      <svg class="lead" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      设置
+    </div>
+  </aside>
+
+  <!-- ===== Main ===== -->
+  <main class="main">
+
+    <!-- Dashboard -->
+    <section class="panel active" id="dashboard">
+      <div class="page-head">
+        <div><div class="page-title">工作台</div><div class="page-sub">早上好,Zihao 👋 这是本月的整体情况</div></div>
+        <div class="head-actions">
+          <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>导出月报</button>
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>上传发票</button>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-top"><span class="stat-label">本月识别发票</span><span class="stat-ic" style="background:var(--blue-soft);color:var(--blue)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span></div><div class="stat-val">1,520</div><div class="stat-delta"><span class="delta-up">▲ 12.5%</span> 较上月</div></div>
+        <div class="stat-card"><div class="stat-top"><span class="stat-label">待对账</span><span class="stat-ic" style="background:var(--amber-soft);color:var(--amber)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 3h5v5"/><path d="M21 3l-7.5 7.5M3 21l7.5-7.5"/><path d="M8 21H3v-5"/></svg></span></div><div class="stat-val">38</div><div class="stat-delta"><span class="delta-down">▲ 6</span> 需处理</div></div>
+        <div class="stat-card"><div class="stat-top"><span class="stat-label">已推送 ERP</span><span class="stat-ic" style="background:var(--green-soft);color:var(--green)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg></span></div><div class="stat-val">1,294</div><div class="stat-delta"><span class="delta-up">98.6%</span> 成功率</div></div>
+        <div class="stat-card"><div class="stat-top"><span class="stat-label">本月节省工时</span><span class="stat-ic" style="background:var(--primary-soft);color:var(--primary)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div><div class="stat-val">42 <span style="font-size:15px;color:var(--muted);font-weight:600">小时</span></div><div class="stat-delta"><span class="delta-up">≈ ฿8,400</span> 人力成本</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><span class="card-title">最近识别</span><button class="btn btn-ghost btn-sm">查看全部 →</button></div>
+          <table><thead><tr><th>发票号</th><th>客户</th><th>日期</th><th class="num">金额 (THB)</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td class="cell-strong">IV69/00179</td><td>Sincere Trading Co.</td><td class="cell-mute">2026-05-28</td><td class="num">2,889.00</td><td><span class="badge b-green">已推送</span></td></tr>
+              <tr><td class="cell-strong">IV69/00178</td><td>บริษัท ไทยพานิช จำกัด</td><td class="cell-mute">2026-05-28</td><td class="num">14,250.00</td><td><span class="badge b-blue">待推送</span></td></tr>
+              <tr><td class="cell-strong">IV69/00177</td><td>Global Logistics Ltd.</td><td class="cell-mute">2026-05-27</td><td class="num">7,120.50</td><td><span class="badge b-amber">待对账</span></td></tr>
+              <tr><td class="cell-strong">IV69/00176</td><td>Nakorn Supply</td><td class="cell-mute">2026-05-27</td><td class="num">980.00</td><td><span class="badge b-green">已推送</span></td></tr>
+              <tr><td class="cell-strong">IV69/00175</td><td>สหพัฒน์ อินเตอร์</td><td class="cell-mute">2026-05-26</td><td class="num">33,400.00</td><td><span class="badge b-red">识别异常</span></td></tr>
+            </tbody></table>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">本月处理进度</span></div>
+          <div class="card-pad">
+            <div style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px"><span class="cell-mute">已识别</span><span class="cell-strong">1,520 / 1,558</span></div><div class="bar"><span style="width:97%;background:var(--green)"></span></div></div>
+            <div style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px"><span class="cell-mute">已对账</span><span class="cell-strong">1,482 / 1,520</span></div><div class="bar"><span style="width:88%;background:var(--blue)"></span></div></div>
+            <div style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px"><span class="cell-mute">已推送 ERP</span><span class="cell-strong">1,294 / 1,482</span></div><div class="bar"><span style="width:78%;background:var(--primary)"></span></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px"><span class="cell-mute">异常待处理</span><span class="cell-strong" style="color:var(--red)">5</span></div><div class="bar"><span style="width:4%;background:var(--red)"></span></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upload -->
+    <section class="panel" id="upload">
+      <div class="page-head"><div><div class="page-title">上传识别</div><div class="page-sub">支持 PDF、图片、批量上传 · OCR 自动识别发票字段</div></div></div>
+      <div class="card card-pad">
+        <div class="dropzone">
+          <div class="dz-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/></svg></div>
+          <div class="dz-title">拖拽发票到这里,或点击选择文件</div>
+          <div class="dz-sub">单次最多 1,000 张 · PDF / JPG / PNG · 单文件 ≤ 20MB</div>
+          <div class="source-chips">
+            <span class="chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>LINE 接收</span>
+            <span class="chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>邮箱导入</span>
+            <span class="chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>云盘同步</span>
+            <span class="chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>扫描拍照</span>
+          </div>
+        </div>
+        <div class="section-title">正在处理 (3)</div>
+        <div class="card" style="box-shadow:none">
+          <div class="list-row"><div class="av-sm" style="background:var(--blue-soft);color:var(--blue)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><div style="flex:1"><div class="cell-strong">SINCERE_invoice_batch.pdf</div><div class="bar" style="margin-top:8px"><span style="width:64%;background:var(--primary)"></span></div></div><span class="cell-mute" style="font-size:13px">识别中 64%</span></div>
+          <div class="list-row"><div class="av-sm" style="background:var(--green-soft);color:var(--green)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><div style="flex:1"><div class="cell-strong">thaipanich_05.jpg</div><div class="cell-mute" style="font-size:12px;margin-top:2px">识别完成 · 14 个字段</div></div><span class="badge b-green">完成</span></div>
+          <div class="list-row"><div class="av-sm" style="background:var(--red-soft);color:var(--red)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></div><div style="flex:1"><div class="cell-strong">blurry_scan_03.png</div><div class="cell-mute" style="font-size:12px;margin-top:2px">图像模糊,建议重新拍摄</div></div><button class="btn btn-secondary btn-sm">重试</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section class="panel" id="history">
+      <div class="page-head"><div><div class="page-title">历史记录</div><div class="page-sub">共 1,520 张已识别发票 · 可筛选、导出、批量推送</div></div>
+        <div class="head-actions">
+          <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"/></svg>筛选</button>
+          <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>导出 Excel</button>
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>批量推送</button>
+        </div>
+      </div>
+      <div class="card">
+        <table><thead><tr><th style="width:36px"><input type="checkbox"></th><th>发票号</th><th>客户 / 卖方</th><th>日期</th><th class="num">未税</th><th class="num">VAT 7%</th><th class="num">合计 (THB)</th><th>状态</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><input type="checkbox"></td><td class="cell-strong">IV69/00179</td><td><div class="cell-2">Sincere Trading Co.<small>เลขภาษี 0105557xxxxxx</small></div></td><td class="cell-mute">2026-05-28</td><td class="num">2,700.00</td><td class="num">189.00</td><td class="num">2,889.00</td><td><span class="badge b-green">已推送</span></td><td><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></td></tr>
+            <tr><td><input type="checkbox"></td><td class="cell-strong">IV69/00178</td><td><div class="cell-2">บริษัท ไทยพานิช จำกัด<small>เลขภาษี 0107536xxxxxx</small></div></td><td class="cell-mute">2026-05-28</td><td class="num">13,317.76</td><td class="num">932.24</td><td class="num">14,250.00</td><td><span class="badge b-blue">待推送</span></td><td><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></td></tr>
+            <tr><td><input type="checkbox"></td><td class="cell-strong">IV69/00177</td><td><div class="cell-2">Global Logistics Ltd.<small>เลขภาษี 0105560xxxxxx</small></div></td><td class="cell-mute">2026-05-27</td><td class="num">6,654.21</td><td class="num">466.29</td><td class="num">7,120.50</td><td><span class="badge b-amber">待对账</span></td><td><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></td></tr>
+            <tr><td><input type="checkbox"></td><td class="cell-strong">IV69/00175</td><td><div class="cell-2">สหพัฒน์ อินเตอร์โฮลดิ้ง<small>เลขภาษี 0107537xxxxxx</small></div></td><td class="cell-mute">2026-05-26</td><td class="num">31,214.95</td><td class="num">2,185.05</td><td class="num">33,400.00</td><td><span class="badge b-red">识别异常</span></td><td><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></td></tr>
+            <tr><td><input type="checkbox"></td><td class="cell-strong">IV69/00174</td><td><div class="cell-2">CP All Public Co.<small>เลขภาษี 0107542xxxxxx</small></div></td><td class="cell-mute">2026-05-26</td><td class="num">4,672.90</td><td class="num">327.10</td><td class="num">5,000.00</td><td><span class="badge b-green">已推送</span></td><td><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></td></tr>
+          </tbody></table>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-top:1px solid var(--border)"><span class="cell-mute" style="font-size:13px">显示 1–8,共 1,520 条</span><div class="row-actions"><button class="btn btn-secondary btn-sm">上一页</button><button class="btn btn-secondary btn-sm">下一页</button></div></div>
+      </div>
+    </section>
+
+    <!-- 对账中心 · 收入对账 -->
+    <section class="panel" id="recon-income">
+      <div class="page-head"><div><div class="page-title">收入对账</div><div class="page-sub">银行流水 ↔ 销项发票 · 智能匹配,按置信度排序</div></div>
+        <div class="head-actions"><button class="btn btn-secondary">导入银行流水</button><button class="btn btn-primary">一键匹配</button></div>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card"><div class="stat-label">已匹配</div><div class="stat-val" style="color:var(--green)">1,482</div><div class="stat-delta">流水 ↔ 发票</div></div>
+        <div class="stat-card"><div class="stat-label">未匹配</div><div class="stat-val" style="color:var(--amber)">38</div><div class="stat-delta">需人工确认</div></div>
+        <div class="stat-card"><div class="stat-label">本月收入合计</div><div class="stat-val">฿ 1.52M</div><div class="stat-delta">已确认到账</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">待匹配项</span></div>
+        <table><thead><tr><th>银行流水</th><th>日期</th><th class="num">金额</th><th>建议匹配发票</th><th>置信度</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="cell-strong">SCB 转入 · ref 8841</td><td class="cell-mute">2026-05-28</td><td class="num">14,250.00</td><td>IV69/00178 · ไทยพานิช</td><td><span class="badge b-green">98% 高</span></td><td><button class="btn btn-primary btn-sm">确认</button></td></tr>
+            <tr><td class="cell-strong">KBANK 转入 · ref 2290</td><td class="cell-mute">2026-05-27</td><td class="num">7,120.50</td><td>IV69/00177 · Global Logistics</td><td><span class="badge b-green">95% 高</span></td><td><button class="btn btn-primary btn-sm">确认</button></td></tr>
+            <tr><td class="cell-strong">BBL 转入 · ref 5567</td><td class="cell-mute">2026-05-26</td><td class="num">5,020.00</td><td>IV69/00174 · CP All(差 ฿20)</td><td><span class="badge b-amber">72% 中</span></td><td><button class="btn btn-secondary btn-sm">查看</button></td></tr>
+            <tr><td class="cell-strong">SCB 转入 · ref 9913</td><td class="cell-mute">2026-05-25</td><td class="num">33,400.00</td><td>—— 无匹配 ——</td><td><span class="badge b-red">无匹配</span></td><td><button class="btn btn-secondary btn-sm">手动选</button></td></tr>
+          </tbody></table>
+      </div>
+    </section>
+
+    <!-- 对账中心 · 销项税 ภ.พ.30 -->
+    <section class="panel" id="recon-vat">
+      <div class="page-head"><div><div class="page-title">销项税 ภ.พ.30</div><div class="page-sub">本月销项发票汇总,一键生成 ภ.พ.30 申报表</div></div>
+        <div class="head-actions"><button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>导出 ภ.พ.30 Excel</button></div>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card"><div class="stat-label">销项发票数</div><div class="stat-val">1,520</div><div class="stat-delta">2026 年 5 月</div></div>
+        <div class="stat-card"><div class="stat-label">未税销售额</div><div class="stat-val">฿ 1.42M</div><div class="stat-delta">应税基数</div></div>
+        <div class="stat-card"><div class="stat-label">销项税额 (7%)</div><div class="stat-val" style="color:var(--primary)">฿ 106,420</div><div class="stat-delta">本月应缴</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">按客户汇总</span></div>
+        <table><thead><tr><th>客户</th><th>税号</th><th class="num">发票数</th><th class="num">未税额</th><th class="num">销项税 (THB)</th></tr></thead>
+          <tbody>
+            <tr><td class="cell-strong">CP All Public Co.</td><td class="cell-mute">0107542xxxxxx</td><td class="num">211</td><td class="num">2,294,392.52</td><td class="num">160,607.48</td></tr>
+            <tr><td class="cell-strong">บริษัท ไทยพานิช จำกัด</td><td class="cell-mute">0107536xxxxxx</td><td class="num">143</td><td class="num">1,125,700.93</td><td class="num">78,799.07</td></tr>
+            <tr><td class="cell-strong">Sincere Trading Co.</td><td class="cell-mute">0105557xxxxxx</td><td class="num">182</td><td class="num">490,542.06</td><td class="num">34,337.94</td></tr>
+            <tr><td class="cell-strong">Global Logistics Ltd.</td><td class="cell-mute">0105560xxxxxx</td><td class="num">97</td><td class="num">363,663.55</td><td class="num">25,456.45</td></tr>
+          </tbody></table>
+      </div>
+    </section>
+
+    <!-- 对账中心 · 进项税对账 -->
+    <section class="panel" id="recon-input">
+      <div class="page-head"><div><div class="page-title">进项税对账</div><div class="page-sub">采购/费用发票汇总,核对可抵扣进项税</div></div>
+        <div class="head-actions"><button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>上传进项发票</button></div>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card"><div class="stat-label">进项发票数</div><div class="stat-val">438</div><div class="stat-delta">2026 年 5 月</div></div>
+        <div class="stat-card"><div class="stat-label">可抵扣进项税</div><div class="stat-val" style="color:var(--green)">฿ 42,180</div><div class="stat-delta">已核验</div></div>
+        <div class="stat-card"><div class="stat-label">应纳税额(销-进)</div><div class="stat-val">฿ 64,240</div><div class="stat-delta">本月净额</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">进项发票明细</span></div>
+        <table><thead><tr><th>供应商</th><th>发票号</th><th>日期</th><th class="num">未税</th><th class="num">进项税</th><th>抵扣状态</th></tr></thead>
+          <tbody>
+            <tr><td class="cell-strong">PTT Oil & Retail</td><td class="cell-mute">PV-2291</td><td class="cell-mute">2026-05-20</td><td class="num">18,691.59</td><td class="num">1,308.41</td><td><span class="badge b-green">可抵扣</span></td></tr>
+            <tr><td class="cell-strong">Office Mate</td><td class="cell-mute">PV-2278</td><td class="cell-mute">2026-05-18</td><td class="num">4,205.61</td><td class="num">294.39</td><td><span class="badge b-green">可抵扣</span></td></tr>
+            <tr><td class="cell-strong">True Corporation</td><td class="cell-mute">PV-2265</td><td class="cell-mute">2026-05-15</td><td class="num">2,803.74</td><td class="num">196.26</td><td><span class="badge b-amber">待核验</span></td></tr>
+            <tr><td class="cell-strong">未知供应商</td><td class="cell-mute">PV-2240</td><td class="cell-mute">2026-05-10</td><td class="num">1,401.87</td><td class="num">98.13</td><td><span class="badge b-red">税号缺失</span></td></tr>
+          </tbody></table>
+      </div>
+    </section>
+
+    <!-- 客户管理 · 客户列表 -->
+    <section class="panel" id="clients-list">
+      <div class="page-head"><div><div class="page-title">客户列表(买方)</div><div class="page-sub">共 64 个客户 · 自动从发票归集 · 可绑定 ERP 账套</div></div>
+        <div class="head-actions"><button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新增客户</button></div>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>客户名称</th><th>税号</th><th class="num">发票数</th><th class="num">累计金额 (THB)</th><th>ERP 账套</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td><div style="display:flex;align-items:center;gap:11px"><div class="av-sm" style="background:linear-gradient(135deg,#60A5FA,#2563EB)">S</div><div class="cell-2">Sincere Trading Co.<small>3 个联系人</small></div></div></td><td class="cell-mute">0105557xxxxxx</td><td class="num">182</td><td class="num">524,880.00</td><td><span class="badge b-blue">MR.ERP · 主账套</span></td><td><span class="badge b-green">活跃</span></td></tr>
+            <tr><td><div style="display:flex;align-items:center;gap:11px"><div class="av-sm" style="background:linear-gradient(135deg,#34D399,#059669)">ไ</div><div class="cell-2">บริษัท ไทยพานิช จำกัด<small>1 个联系人</small></div></div></td><td class="cell-mute">0107536xxxxxx</td><td class="num">143</td><td class="num">1,204,500.00</td><td><span class="badge b-blue">MR.ERP · 主账套</span></td><td><span class="badge b-green">活跃</span></td></tr>
+            <tr><td><div style="display:flex;align-items:center;gap:11px"><div class="av-sm" style="background:linear-gradient(135deg,#FBBF24,#D97706)">G</div><div class="cell-2">Global Logistics Ltd.<small>2 个联系人</small></div></div></td><td class="cell-mute">0105560xxxxxx</td><td class="num">97</td><td class="num">389,120.50</td><td><span class="badge b-gray">未绑定</span></td><td><span class="badge b-green">活跃</span></td></tr>
+            <tr><td><div style="display:flex;align-items:center;gap:11px"><div class="av-sm" style="background:linear-gradient(135deg,#F472B6,#DB2777)">C</div><div class="cell-2">CP All Public Co.<small>5 个联系人</small></div></div></td><td class="cell-mute">0107542xxxxxx</td><td class="num">211</td><td class="num">2,455,000.00</td><td><span class="badge b-blue">MR.ERP · 主账套</span></td><td><span class="badge b-green">活跃</span></td></tr>
+          </tbody></table>
+      </div>
+    </section>
+
+    <!-- 客户管理 · 供应商 -->
+    <section class="panel" id="clients-suppliers">
+      <div class="page-head"><div><div class="page-title">供应商(卖方)</div><div class="page-sub">进项发票上的卖方 · 用于进项税抵扣与账套映射</div></div>
+        <div class="head-actions"><button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新增供应商</button></div>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>供应商名称</th><th>税号</th><th class="num">采购笔数</th><th class="num">累计进项税 (THB)</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td><div style="display:flex;align-items:center;gap:11px"><div class="av-sm" style="background:linear-gradient(135deg,#22D3EE,#0891B2)">P</div><div class="cell-2">PTT Oil & Retail<small>燃油 / 差旅</small></div></div></td><td class="cell-mute">0107544xxxxxx</td><td class="num">62</td><td class="num">28,140.00</td><td><span class="badge b-green">已核验</span></td></tr>
+            <tr><td><div style="display:flex;align-items:center;gap:11px"><div class="av-sm" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">O</div><div class="cell-2">Office Mate<small>办公用品</small></div></div></td><td class="cell-mute">0105550xxxxxx</td><td class="num">28</td><td class="num">6,820.00</td><td><span class="badge b-green">已核验</span></td></tr>
+            <tr><td><div style="display:flex;align-items:center;gap:11px"><div class="av-sm" style="background:linear-gradient(135deg,#FB7185,#E11D48)">T</div><div class="cell-2">True Corporation<small>通讯 / 网络</small></div></div></td><td class="cell-mute">0107546xxxxxx</td><td class="num">12</td><td class="num">2,355.12</td><td><span class="badge b-amber">待核验</span></td></tr>
+          </tbody></table>
+      </div>
+    </section>
+
+    <!-- Exceptions -->
+    <section class="panel" id="exceptions">
+      <div class="page-head"><div><div class="page-title">异常处理</div><div class="page-sub">系统自动标红需人工复核的项目 · 处理后即可入账推送</div></div>
+        <div class="head-actions"><button class="btn btn-secondary">全部标记已读</button></div>
+      </div>
+      <div class="card">
+        <div class="list-row"><div class="av-sm" style="background:var(--red-soft);color:var(--red)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg></div><div style="flex:1"><div class="cell-strong">IV69/00175 · 税额不一致</div><div class="cell-mute" style="font-size:12.5px;margin-top:2px">识别税额与按未税 7% 计算的结果对不上,差 ฿0.05</div></div><span class="badge b-red">高</span><button class="btn btn-primary btn-sm">去修正</button></div>
+        <div class="list-row"><div class="av-sm" style="background:var(--amber-soft);color:var(--amber)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></div><div style="flex:1"><div class="cell-strong">IV69/00168 · 疑似重复发票</div><div class="cell-mute" style="font-size:12.5px;margin-top:2px">与 IV69/00159 发票号、金额、客户高度相似</div></div><span class="badge b-amber">中</span><button class="btn btn-secondary btn-sm">对比</button></div>
+        <div class="list-row"><div class="av-sm" style="background:var(--amber-soft);color:var(--amber)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></div><div style="flex:1"><div class="cell-strong">blurry_scan_03.png · 识别失败</div><div class="cell-mute" style="font-size:12.5px;margin-top:2px">图像过于模糊,关键字段无法读取</div></div><span class="badge b-amber">中</span><button class="btn btn-secondary btn-sm">重新上传</button></div>
+        <div class="list-row"><div class="av-sm" style="background:var(--blue-soft);color:var(--blue)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 16v-4M12 8h.01"/></svg></div><div style="flex:1"><div class="cell-strong">Global Logistics · 客户未绑定 ERP 账套</div><div class="cell-mute" style="font-size:12.5px;margin-top:2px">该客户 97 张发票无法自动推送</div></div><span class="badge b-blue">提示</span><button class="btn btn-secondary btn-sm">去绑定</button></div>
+      </div>
+    </section>
+
+    <!-- ERP -->
+    <section class="panel" id="erp">
+      <div class="page-head"><div><div class="page-title">ERP 推送</div><div class="page-sub">已连接的会计系统 · 发票识别后自动推送 / 手动推送</div></div>
+        <div class="head-actions"><button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>连接新系统</button></div>
+      </div>
+      <div class="grid-2b">
+        <div class="card card-pad">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px"><div class="av-sm" style="width:46px;height:46px;background:linear-gradient(135deg,#3B82F6,#1D4ED8);font-size:15px">MR</div><div style="flex:1"><div style="font-weight:600;font-size:15px">MR.ERP</div><div class="cell-mute" style="font-size:12.5px">www.mrerp4sme.com · 主账套</div></div><span class="badge b-green">已连接</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)"><span class="cell-mute" style="font-size:13px">自动推送</span><div class="toggle on"></div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)"><span class="cell-mute" style="font-size:13px">本月已推送</span><span class="cell-strong">1,148 张</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)"><span class="cell-mute" style="font-size:13px">成功率</span><span class="cell-strong" style="color:var(--green)">99.1%</span></div>
+        </div>
+        <div class="card card-pad">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px"><div class="av-sm" style="width:46px;height:46px;background:linear-gradient(135deg,#13B5EA,#0E7490);font-size:15px">X</div><div style="flex:1"><div style="font-weight:600;font-size:15px">Xero</div><div class="cell-mute" style="font-size:12.5px">api.xero.com · 分账套</div></div><span class="badge b-green">已连接</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)"><span class="cell-mute" style="font-size:13px">自动推送</span><div class="toggle"></div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)"><span class="cell-mute" style="font-size:13px">本月已推送</span><span class="cell-strong">146 张</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)"><span class="cell-mute" style="font-size:13px">成功率</span><span class="cell-strong" style="color:var(--green)">97.3%</span></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <div class="card-head"><span class="card-title">最近推送日志</span></div>
+        <table><thead><tr><th>时间</th><th>发票号</th><th>目标系统</th><th>单据号</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td class="cell-mute">14:32:08</td><td class="cell-strong">IV69/00179</td><td>MR.ERP</td><td class="cell-mute">BILL-2026-3391</td><td><span class="badge b-green">成功</span></td></tr>
+            <tr><td class="cell-mute">14:31:55</td><td class="cell-strong">IV69/00176</td><td>MR.ERP</td><td class="cell-mute">BILL-2026-3390</td><td><span class="badge b-green">成功</span></td></tr>
+            <tr><td class="cell-mute">14:30:12</td><td class="cell-strong">IV69/00170</td><td>Xero</td><td class="cell-mute">INV-0042</td><td><span class="badge b-green">成功</span></td></tr>
+            <tr><td class="cell-mute">14:28:40</td><td class="cell-strong">IV69/00169</td><td>MR.ERP</td><td class="cell-mute">——</td><td><span class="badge b-red">失败 · 客户不存在</span></td></tr>
+          </tbody></table>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section class="panel" id="team">
+      <div class="page-head"><div><div class="page-title">团队成员</div><div class="page-sub">5 名成员 · 老板可分配客户、查看员工触发的操作</div></div>
+        <div class="head-actions"><button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>邀请成员</button></div>
+      </div>
+      <div class="card">
+        <div class="list-row"><div class="av-sm" style="background:linear-gradient(135deg,#10B981,#059669)">ZH</div><div style="flex:1"><div class="cell-strong">Zihao(你)</div><div class="cell-mute" style="font-size:12.5px">zihao@pearnly.com</div></div><span class="badge b-blue">老板</span><span class="cell-mute" style="font-size:13px;width:90px">全部权限</span><div class="toggle on"></div></div>
+        <div class="list-row"><div class="av-sm" style="background:linear-gradient(135deg,#60A5FA,#2563EB)">PT</div><div style="flex:1"><div class="cell-strong">Pittaya T.</div><div class="cell-mute" style="font-size:12.5px">pittaya@pearnly.com</div></div><span class="badge b-gray">会计</span><span class="cell-mute" style="font-size:13px;width:90px">32 个客户</span><div class="toggle on"></div></div>
+        <div class="list-row"><div class="av-sm" style="background:linear-gradient(135deg,#FBBF24,#D97706)">SK</div><div style="flex:1"><div class="cell-strong">Somchai K.</div><div class="cell-mute" style="font-size:12.5px">somchai@pearnly.com</div></div><span class="badge b-gray">会计</span><span class="cell-mute" style="font-size:13px;width:90px">18 个客户</span><div class="toggle on"></div></div>
+        <div class="list-row"><div class="av-sm" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">MN</div><div style="flex:1"><div class="cell-strong">Malee N.</div><div class="cell-mute" style="font-size:12.5px">malee@pearnly.com · 待接受邀请</div></div><span class="badge b-gray">助理</span><span class="cell-mute" style="font-size:13px;width:90px">只读</span><div class="toggle"></div></div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="panel" id="settings">
+      <div class="page-head"><div><div class="page-title">设置</div><div class="page-sub">公司资料、账号安全、通知偏好</div></div></div>
+      <div class="grid-2b">
+        <div class="card card-pad">
+          <div style="font-weight:600;font-size:15px;margin-bottom:18px">公司资料</div>
+          <div class="field"><label>公司名称</label><input value="Pearnly 会计事务所"></div>
+          <div class="field"><label>税号 (เลขประจำตัวผู้เสียภาษี)</label><input value="0105557123456"></div>
+          <div class="field"><label>默认货币</label><select><option>THB · 泰铢</option><option>USD · 美元</option></select></div>
+          <div class="field"><label>界面语言</label><select><option>中文</option><option>ไทย</option><option>English</option><option>日本語</option></select></div>
+          <button class="btn btn-primary">保存修改</button>
+        </div>
+        <div>
+          <div class="card card-pad" style="margin-bottom:20px">
+            <div style="font-weight:600;font-size:15px;margin-bottom:6px">账号安全</div>
+            <div class="cell-mute" style="font-size:13px;margin-bottom:16px">上次修改密码:30 天前</div>
+            <button class="btn btn-secondary" style="width:100%;justify-content:center">修改密码</button>
+          </div>
+          <div class="card card-pad">
+            <div style="font-weight:600;font-size:15px;margin-bottom:16px">通知偏好</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0"><span style="font-size:13.5px">识别异常时通知我</span><div class="toggle on"></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border)"><span style="font-size:13.5px">推送失败时通知我</span><div class="toggle on"></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border)"><span style="font-size:13.5px">每月对账报告</span><div class="toggle"></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border)"><span style="font-size:13.5px">LINE 通知老板</span><div class="toggle on"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-demo">
+        <div class="section-title">弹窗示意(新增客户)</div>
+        <div class="modal">
+          <div class="modal-head">新增客户</div>
+          <div class="modal-body">
+            <div class="field"><label>客户名称</label><input placeholder="例如 Sincere Trading Co."></div>
+            <div class="field"><label>税号</label><input placeholder="13 位数字"><div class="hint">用于自动匹配发票上的买方信息</div></div>
+            <div class="field" style="margin-bottom:0"><label>绑定 ERP 账套</label><select><option>MR.ERP · 主账套</option><option>Xero · 分账套</option><option>暂不绑定</option></select></div>
+          </div>
+          <div class="modal-foot"><button class="btn btn-secondary">取消</button><button class="btn btn-primary">创建客户</button></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // 叶子导航(含子项)切换面板
+  const leaves = document.querySelectorAll('[data-panel]');
+  const panels = document.querySelectorAll('.panel');
+  leaves.forEach(el => el.addEventListener('click', () => {
+    leaves.forEach(x => x.classList.remove('active'));
+    el.classList.add('active');
+    const id = el.getAttribute('data-panel');
+    panels.forEach(p => p.classList.toggle('active', p.id === id));
+    document.querySelector('.main').scrollTo({top:0,behavior:'smooth'});
+  }));
+  // 父级折叠/展开
+  document.querySelectorAll('.nav-parent').forEach(p => p.addEventListener('click', () => {
+    p.closest('.nav-group').classList.toggle('open');
+  }));
+  // 开关 toggle 演示
+  document.querySelectorAll('.toggle').forEach(t => t.addEventListener('click', () => t.classList.toggle('on')));
+  // 浅色 / 深色切换
+  const sun = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  const moon = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  const body = document.body, ic = document.getElementById('themeIc');
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    const dark = body.getAttribute('data-theme') === 'dark';
+    body.setAttribute('data-theme', dark ? 'light' : 'dark');
+    ic.innerHTML = dark ? sun : moon;
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<!--
+  Pearnly · 按钮系统 v5(品牌色版 · design-preview)
+  关键:主色用产品自有品牌色 蓝 #2563EB(logo+着陆页本就在用),琥珀橙 #F59E0B 作强调。
+  保留:尺寸统一 / 深色 toggle / hover 颜色反馈+回弹 / 禁用=禁止光标🚫
+-->
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pearnly · 按钮系统(品牌色)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --primary:#2563EB; --primary-hover:#1D4ED8; --primary-active:#1E40AF;   /* 品牌蓝 */
+    --accent:#F59E0B; --accent-hover:#D97706;                                /* 品牌琥珀橙 */
+    --bg:#F4F4F1; --surface:#FFFFFF; --border:#E7E7E2; --border-strong:#D7D8D1;
+    --text:#1A1F2B; --muted:#6B7280; --faint:#9AA0AB; --red:#DC2626;
+    --disabled-bg:#ECEDF0; --disabled-fg:#AEB3BC;
+    --radius:9px; --shadow:0 1px 2px rgba(16,24,40,.06);
+    --font:'Inter','Noto Sans Thai',-apple-system,'Segoe UI',sans-serif;
+  }
+  body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5;padding:32px}
+  h1{font-size:22px;font-weight:700;letter-spacing:-.4px;max-width:980px;margin:0 auto 6px}
+  .sub{max-width:980px;margin:0 auto 22px;color:var(--muted);font-size:13.5px}
+  .card{max-width:980px;margin:0 auto 18px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:var(--shadow)}
+  .card h2{font-size:14px;font-weight:700;margin-bottom:4px}
+  .card .hint{font-size:12.5px;color:var(--muted);margin-bottom:16px}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .cap{font-size:12px;color:var(--faint);width:100%;margin-top:6px}
+
+  /* 品牌色条 */
+  .brandbar{max-width:980px;margin:0 auto 18px;display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 20px;box-shadow:var(--shadow)}
+  .brandmark{width:40px;height:40px;border-radius:9px;background:linear-gradient(135deg,#fff,#dbeafe);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)}
+  .brandmark svg{width:26px;height:26px}
+  .sw{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+  .sw .c{width:20px;height:20px;border-radius:5px;border:1px solid rgba(0,0,0,.08)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;padding:0 16px;border-radius:var(--radius);
+    font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid transparent;white-space:nowrap;
+    transition:background .15s,border-color .15s,box-shadow .15s,color .15s,transform .04s}
+  .btn svg{width:16px;height:16px}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--primary);color:#fff;box-shadow:0 1px 2px rgba(37,99,235,.25)}
+  .btn-primary:hover{background:var(--primary-hover);box-shadow:0 5px 14px rgba(37,99,235,.28)}
+  .btn-primary:active{background:var(--primary-active);box-shadow:0 1px 2px rgba(37,99,235,.25)}
+  .btn-accent{background:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(245,158,11,.28)}
+  .btn-accent:hover{background:var(--accent-hover);box-shadow:0 5px 14px rgba(245,158,11,.3)}
+  .btn-accent:active{background:#B45309}
+  .btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+  .btn-secondary:hover{background:#F2F2EE;border-color:#C5C7BF}
+  .btn-secondary:active{background:#EAEAE4}
+  .btn-ghost{background:transparent;color:var(--muted)}
+  .btn-ghost:hover{background:#EFEFEA;color:var(--text)}
+  .btn-danger{background:var(--surface);color:var(--red);border-color:#EFC9C9}
+  .btn-danger:hover{background:#FEF2F2;border-color:#E6B0B0}
+  .btn-sm{height:32px;padding:0 12px;font-size:13px}
+  .split{display:inline-flex}
+  .split .btn-primary{border-top-right-radius:0;border-bottom-right-radius:0}
+  .split .caret{height:38px;width:34px;display:inline-flex;align-items:center;justify-content:center;background:var(--primary);color:#fff;border-top-right-radius:var(--radius);border-bottom-right-radius:var(--radius);border-left:1px solid rgba(255,255,255,.22);cursor:pointer;transition:background .15s}
+  .split .caret:hover{background:var(--primary-hover)}
+  .icon-btn{width:34px;height:34px;border:1px solid var(--border-strong);background:var(--surface);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;transition:.13s}
+  .icon-btn:hover{color:var(--text);background:#F2F2EE;border-color:#C5C7BF}
+  .btn.is-disabled{background:var(--disabled-bg);color:var(--disabled-fg);border-color:transparent;box-shadow:none;cursor:not-allowed}
+  .btn.is-disabled:hover{background:var(--disabled-bg);color:var(--disabled-fg);box-shadow:none;transform:none}
+  .btn.is-disabled svg{opacity:.65}
+  .toggle{width:42px;height:24px;border-radius:999px;background:#CBCDC6;position:relative;cursor:pointer;transition:.15s;display:inline-block;flex-shrink:0}
+  .toggle.on{background:var(--primary)}
+  .toggle::after{content:"";position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .toggle.on::after{left:20px}
+  .tg-line{display:flex;align-items:center;gap:9px;font-size:13.5px}
+</style>
+</head>
+<body>
+  <h1>用你自己的品牌色 · 蓝 + 琥珀橙</h1>
+  <div class="sub">这两个颜色是你 logo 和着陆页里本来就在用的,所以一定"搭"。把鼠标放上去看 hover;放到置灰的按钮上看 🚫。</div>
+
+  <!-- 品牌色条 -->
+  <div class="brandbar">
+    <div class="brandmark">
+      <svg viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="7" fill="url(#g)"/><path fill-rule="evenodd" clip-rule="evenodd" d="M9 9H16.5C19.5376 9 22 11.4624 22 14.5C22 17.5376 19.5376 20 16.5 20H13V25H9V9ZM13 13V16H16.5C17.3284 16 18 15.3284 18 14.5C18 13.6716 17.3284 13 16.5 13H13Z" fill="#0a0e27"/><path d="M21 13L24.5 9.5M24.5 9.5H21M24.5 9.5V13" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset="1" stop-color="#dbeafe"/></linearGradient></defs></svg>
+    </div>
+    <span style="font-size:13px;color:var(--muted)">取自你的 logo →</span>
+    <span class="sw"><span class="c" style="background:#2563EB"></span>品牌蓝 #2563EB <span style="color:var(--faint);font-weight:400">主按钮</span></span>
+    <span class="sw"><span class="c" style="background:#F59E0B"></span>琥珀橙 #F59E0B <span style="color:var(--faint);font-weight:400">最重要的那一个按钮</span></span>
+  </div>
+
+  <!-- 四种层级 -->
+  <div class="card">
+    <h2>层级(一页通常只有 1 个主按钮)</h2>
+    <div class="hint">主=品牌蓝实心 · 次=白底描边 · 轻=幽灵 · 删除=红描边</div>
+    <div class="row">
+      <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>开始识别</button>
+      <button class="btn btn-secondary">清空</button>
+      <button class="btn btn-ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>编辑</button>
+      <button class="btn btn-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>批量删除</button>
+    </div>
+  </div>
+
+  <!-- 琥珀橙强调 -->
+  <div class="card">
+    <h2>琥珀橙 · 留给"最想让用户点的那一个"</h2>
+    <div class="hint">蓝是日常主操作;橙只用在最关键的转化按钮(如充值/升级),全站偶尔出现一次,才有"重点"。不要滥用。</div>
+    <div class="row">
+      <button class="btn btn-accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>立即充值</button>
+      <button class="btn btn-primary">开始识别</button>
+      <button class="btn btn-secondary">取消</button>
+      <span class="cap">↑ 一眼就知道"充值"是最想让你点的那个;蓝是常规主操作。这就是品牌蓝+橙的配合。</span>
+    </div>
+  </div>
+
+  <!-- 真实场景 + 禁用 + 开关 -->
+  <div class="card">
+    <h2>真实场景 · 上传识别页</h2>
+    <div class="hint">含"未上传=置灰🚫"、开关、图标按钮。</div>
+    <div class="row" style="margin-bottom:16px">
+      <button class="btn is-disabled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>开始识别</button>
+      <span style="color:var(--faint);font-size:13px">← 未上传(放上去看 🚫)</span>
+      <span style="width:14px"></span>
+      <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>清空</button>
+      <div class="split">
+        <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>导出 Excel</button>
+        <span class="caret"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></span>
+      </div>
+      <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>自定义模板</button>
+    </div>
+    <div class="row">
+      <span class="tg-line"><span class="toggle on"></span>自动推送 <b>开</b></span>
+      <span class="tg-line"><span class="toggle"></span>每月报告 关</span>
+      <span style="width:10px"></span>
+      <span class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+      <span class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></span>
+    </div>
+  </div>
+
+<script>
+  document.querySelectorAll('.toggle').forEach(t=>t.addEventListener('click',()=>t.classList.toggle('on')));
+</script>
+</body>
+</html>

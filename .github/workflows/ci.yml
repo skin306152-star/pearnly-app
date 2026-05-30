@@ -148,9 +148,12 @@ jobs:
       - name: Run unit tests (under coverage · REFACTOR-A8)
         run: coverage run -m unittest discover -s tests/unit -p "test_*.py"
 
-      - name: Coverage report + ratchet (REFACTOR-A8 · fail_under 只升不降)
+      - name: Coverage report + ratchet (REFACTOR-A8 · fail_under 只升不降 · WC 显式 CLI 闸)
         run: |
-          coverage report
+          # REFACTOR-WC · 显式 --fail-under 防 pyproject 配置被删/改后覆盖率闸悄悄失效
+          # (审计发现:纸面规矩要机械执行 · CLI 标志即便 [tool.coverage.report] 被动也照样拦门)
+          # 棘轮 21 → 40(本地实测 46.6% · 留 6.6pt 余量 · 只升不降)
+          coverage report --fail-under=40
           coverage xml
 
       - name: Setup Node 20

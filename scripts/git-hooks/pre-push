@@ -1,0 +1,107 @@
+#!/bin/sh
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  pre-push 机械闸 · 推送前本地守门 · 防"坏码上 master → 自动部署 → 502" ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+#
+# 为什么需要它(2026-05-30 血泪):
+#   webhook 是 push 一上 master 就【立刻】自动部署 · 而 CI 是 push 之【后】才跑。
+#   顺序 = 推坏码 → 秒速上线 → 生产崩(502)→ CI 几分钟后才变红(太晚)。
+#   CI 只是"事后报警器" · 不是"事前闸门"。无人值守 loop 又因本机显示故障
+#   读不到 gate 红 → 没读到就推 → 连崩 3 次(1 次手动 SSH 救回)。
+#
+# 本钩子把安全从「AI 记得看结果」改成「机器自己拦」:
+#   任一守门红 → exit 1 → push 中止 → 坏码【永不】到 master → 永不部署。
+#   不依赖任何人/AI 读输出 · 只认退出码 · 显示糊了也拦得住。
+#
+# 覆盖那 3 次翻车的【全部】根因:
+#   ① AST off-by-one → SyntaxError    → `import app` 冒烟 + 全量 unittest 拦
+#   ② 漏 import logging(F821/F822)   → ruff 拦
+#   ③ 全量 unittest errors=N          → 全量 unittest 拦
+#
+# 安装:git config core.hooksPath scripts/git-hooks
+#   四个窗口共用同一个 .git → 装一次 = 每个窗口每次 push 全覆盖。
+#
+# 只检查【本次 push 范围内改动的文件】· 不被无关的本地旧问题误伤。
+# 紧急绕过(仅人工·明知故犯):git push --no-verify
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT" || exit 1
+
+echo "──────────────────────────────────────────────────────────"
+echo "🔒 pre-push 机械闸 · 推送前本地守门(防坏码上线)"
+echo "──────────────────────────────────────────────────────────"
+
+# 本次要推的提交范围:origin/master..HEAD(没有 origin/master 则退化为 HEAD~1..HEAD)
+if git rev-parse --verify --quiet origin/master >/dev/null 2>&1; then
+  RANGE="origin/master..HEAD"
+else
+  RANGE="HEAD~1..HEAD"
+fi
+CHANGED="$(git diff --name-only "$RANGE" 2>/dev/null)"
+if [ -z "$CHANGED" ]; then
+  echo "ℹ️  本次 push 无新增改动文件 · 跳过守门 · 放行"
+  exit 0
+fi
+
+PY_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.py$' || true)"
+FE_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.(js|mjs|css|html|json)$' || true)"
+
+fail() {
+  echo ""
+  echo "❌ 守门红:$1"
+  echo "   坏码已被拦下 · push 中止 · 修好再推(绝不会到 master / 绝不会上线)。"
+  echo "   —— 这正是机械闸的作用:不靠任何人读结果。"
+  exit 1
+}
+
+# ── Python 闸(改了任何 .py 才跑)──────────────────────────────
+if [ -n "$PY_CHANGED" ]; then
+  echo "▶ 改动含 .py · 跑 Python 守门"
+
+  # 只对本次改动的 .py 跑 ruff/black(不被无关旧问题误伤)· 过滤掉已删除的文件
+  PY_EXIST=""
+  for f in $PY_CHANGED; do
+    [ -f "$f" ] && PY_EXIST="$PY_EXIST $f"
+  done
+
+  if [ -n "$PY_EXIST" ]; then
+    echo "  · ruff(未定义名 F821 / 漏 import F822 = 502 元凶)"
+    # shellcheck disable=SC2086
+    ruff check $PY_EXIST || fail "ruff(本次改动的 .py 有 lint 错)"
+
+    echo "  · black --check(格式)"
+    # shellcheck disable=SC2086
+    black --check $PY_EXIST || fail "black 格式(本次改动的 .py)"
+  fi
+
+  echo "  · import app 冒烟(catch SyntaxError / 漏 import → boot 崩 → 502)"
+  python -c "import app" >/dev/null 2>&1 || fail "import app 失败(语法错 / 漏 import → 启动即崩)"
+
+  echo "  · check_imports"
+  python scripts/check_imports.py --quiet || fail "check_imports"
+
+  echo "  · check_i18n(home.js 4 语完整)"
+  python scripts/check_i18n.py --strict --quiet || fail "check_i18n(4 语缺翻译)"
+
+  echo "  · 全量 unittest(catch errors=N · 改一处崩别处)"
+  python -m unittest discover -s tests/unit -p "test_*.py" || fail "全量 unittest 红"
+fi
+
+# ── 前端闸(改了 js/css/html/json 才跑)────────────────────────
+if [ -n "$FE_CHANGED" ]; then
+  echo "▶ 改动含前端 · 跑前端守门"
+
+  echo "  · prettier --check(格式 · 巨石经 .prettierignore 豁免)"
+  npm run format:check || fail "prettier 格式"
+
+  echo "  · eslint(前端真 bug · 0 error 放行)"
+  npm run lint || fail "eslint"
+
+  echo "  · vite build(catch 配置/模块坏)"
+  npm run build >/dev/null 2>&1 || fail "vite build 失败"
+fi
+
+echo ""
+echo "✅ 全部守门绿 · 放行推送"
+echo "──────────────────────────────────────────────────────────"
+exit 0

@@ -90,8 +90,8 @@ body.sidebar-collapsed .nav-divider { margin: 8px 6px; }
 .ic-g { background: #e8f0fe; color: #1a73e8; }
 .ic-gs { background: #e6f4ea; color: #0f9d58; }
 .ic-gm { background: #fce8e6; color: #ea4335; }
-.ic-line { background: #e6f5ea; color: #06c755; }
-.ic-folder { background: #fef3c7; color: #d97706; }
+.ic-line { background: #e6f5ea; color: var(--line-color); }
+.ic-folder { background: var(--warn-bg); color: var(--warn); }
 .ic-erp { background: var(--bg); color: var(--ink-3); }
 .int-info { flex: 1; min-width: 0; }
 .int-name {

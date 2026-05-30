@@ -656,10 +656,10 @@
     padding: 3px 10px;
     border-radius: 999px;
     font-size: 11px; font-weight: 500;
-    background: #eef4ff; color: #111111;
+    background: #eef4ff; color: var(--ink);
     white-space: nowrap;
 }
-.notif-rule-tmpl-badge.large { background: #fef3c7; color: #92400e; }
+.notif-rule-tmpl-badge.large { background: var(--warn-bg); color: #92400e; }
 
 .notif-rule-main { flex: 1; min-width: 0; }
 .notif-rule-name {
@@ -770,7 +770,7 @@
 }
 .notif-template-opt:hover .notif-template-card { border-color: #9ca3af; }
 .notif-template-opt input[type="radio"]:checked ~ .notif-template-card {
-    border-color: #111111; background: #f4f4f0;
+    border-color: var(--ink); background: var(--bg);
 }
 .notif-template-name {
     font-size: 14px; font-weight: 500; color: var(--ink);
@@ -793,7 +793,7 @@
     border: 1px solid #a7f3d0;
 }
 .notif-line-check.unbound {
-    background: #fef3c7; color: #92400e;
+    background: var(--warn-bg); color: #92400e;
     border: 1px solid #fcd34d;
 }
 .notif-line-check svg {

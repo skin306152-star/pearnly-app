@@ -5,7 +5,7 @@
     position: sticky; top: 0; z-index: 1200;
     display: flex; align-items: center; gap: 10px;
     padding: 10px 16px;
-    background: #fef3c7;
+    background: var(--warn-bg);
     color: #92400e;
     border-bottom: 1px solid #fcd34d;
     font-size: 13px; line-height: 1.4;
@@ -30,7 +30,7 @@
     transition: background .15s;
 }
 .chrome-only-banner-close:hover {
-    background: #fef3c7;
+    background: var(--warn-bg);
 }
 @media (max-width: 640px) {
     .chrome-only-banner {
@@ -68,7 +68,7 @@
 .admin-mode-banner-icon {
     display: inline-flex; align-items: center; justify-content: center;
     flex-shrink: 0;
-    color: #dc2626;
+    color: var(--danger);
 }
 .admin-mode-banner-msg {
     flex: 1;
@@ -86,7 +86,7 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
 
 /* 文件夹监听辅助提示行(子文件夹递归) · 比 keep-open warn 更柔和 */
 .folder-warn-row.folder-info-soft {
-    background: #f4f4f0;
+    background: var(--bg);
     color: #075985;
     border-color: #bae6fd;
 }
@@ -118,14 +118,14 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 11px;
-    background: #fef3c7;
+    background: var(--warn-bg);
     color: #92400e;
     border: 1px solid #fcd34d;
     margin-left: 6px;
     white-space: nowrap;
 }
 .log-retry-chip.exhausted {
-    background: #fee2e2;
+    background: var(--danger-bg);
     color: #991b1b;
     border-color: #fca5a5;
 }
@@ -139,8 +139,8 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
     gap: 10px;
     padding: 8px 12px;
     margin: 8px 0;
-    background: #f4f4f0;
-    border: 1px solid #e8e8e3;
+    background: var(--bg);
+    border: 1px solid var(--line);
     border-radius: 6px;
 }
 /* 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 推送日志表头行
@@ -165,7 +165,7 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
 }
 /* Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除按钮 · 危险色 ghost */
 .btn-danger-ghost {
-    color: #dc2626;
+    color: var(--danger);
     background: transparent;
     border: 1px solid #fecaca;
 }
@@ -176,7 +176,7 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
 .erp-logs-batch-count {
     flex: 1;
     font-size: 13px;
-    color: #111111;
+    color: var(--ink);
     font-weight: 500;
 }
 .erp-log-row {
@@ -187,7 +187,7 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
     margin-right: 6px;
     cursor: pointer;
     width: 14px; height: 14px;
-    accent-color: #111111;
+    accent-color: var(--ink);
     flex-shrink: 0;
 }
 .erp-log-cb-spacer {

@@ -30,7 +30,7 @@
     margin-right: 4px;
 }
 .log-detail-status-icon.ok   { background: #D1FAE5; color: #065F46; }
-.log-detail-status-icon.fail { background: #FEE2E2; color: #991B1B; }
+.log-detail-status-icon.fail { background: var(--danger-bg); color: #991B1B; }
 
 /* 摘要行:端点 + 发票号 */
 .log-detail-summary-row {
@@ -38,7 +38,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 16px;
     padding: 14px 16px;
-    background: #f4f4f0;
+    background: var(--bg);
     border: 1px solid var(--line);
     border-radius: 8px;
     margin-bottom: 14px;
@@ -97,7 +97,7 @@
 .history-missing-amount {
     display: inline-block;
     padding: 2px 8px;
-    background: #FEF3C7;
+    background: var(--warn-bg);
     color: #92400E;
     border-radius: 10px;
     font-size: 11px;
@@ -144,16 +144,16 @@ button.history-missing-amount-btn {
 }
 
 /* palette 按钮每个字段也带主题色 · 和 canvas token 呼应 */
-.archive-palette-btn.date    { color: #111111; }
+.archive-palette-btn.date    { color: var(--ink); }
 .archive-palette-btn.seller  { color: #3730A3; }
 .archive-palette-btn.category{ color: #92400E; }
 .archive-palette-btn.amount  { color: #065F46; }
 .archive-palette-btn.invoice { color: #9F1239; }
 .archive-palette-btn.buyer   { color: #5B21B6; }
 .archive-palette-btn.sep     { color: #6B7280; }
-.archive-palette-btn.date:hover    { background: #DBEAFE; border-color: #e8e8e3; }
+.archive-palette-btn.date:hover    { background: #DBEAFE; border-color: var(--line); }
 .archive-palette-btn.seller:hover  { background: #E0E7FF; border-color: #C7D2FE; }
-.archive-palette-btn.category:hover{ background: #FEF3C7; border-color: #FCD34D; }
+.archive-palette-btn.category:hover{ background: var(--warn-bg); border-color: #FCD34D; }
 .archive-palette-btn.amount:hover  { background: #D1FAE5; border-color: #A7F3D0; }
 .archive-palette-btn.invoice:hover { background: #FCE7F3; border-color: #FBCFE8; }
 .archive-palette-btn.buyer:hover   { background: #EDE9FE; border-color: #DDD6FE; }
@@ -166,7 +166,7 @@ button.history-missing-amount-btn {
     gap: 10px;
     padding: 12px 16px;
     background: #DBEAFE;
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line);
     border-radius: 10px;
     margin: 14px 0;
     font-size: 13px;
@@ -198,7 +198,7 @@ button.history-missing-amount-btn {
     margin-right: 8px;
 }
 .drawer-diagnose:hover {
-    background: #f4f4f0;
+    background: var(--bg);
     color: #6366F1;
     border-color: #C7D2FE;
 }

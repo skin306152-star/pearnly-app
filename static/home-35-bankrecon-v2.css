@@ -88,7 +88,7 @@
 }
 .brv2-progress-label { font-size: 12px; color: var(--ink-3); }
 .brv2-error {
-  font-size: 12px; color: #dc2626; background: #fef2f2;
+  font-size: 12px; color: var(--danger); background: #fef2f2;
   border: 1px solid #fecaca; border-radius: 6px; padding: 6px 10px;
   flex: 1;
 }
@@ -108,16 +108,16 @@
 .brv2-card-num { font-size: 22px; font-weight: 700; line-height: 1.1; }
 .brv2-card-lbl { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
 .brv2-card-match { border-color: #86efac; background: #f0fdf4; }
-.brv2-card-match .brv2-card-num { color: #16a34a; }
+.brv2-card-match .brv2-card-num { color: var(--success); }
 .brv2-card-gl { border-color: #c4b5fd; background: #f5f3ff; }
 .brv2-card-gl .brv2-card-num { color: #7c3aed; }
 .brv2-card-stmt { border-color: #93c5fd; background: #eff6ff; }
 .brv2-card-stmt .brv2-card-num { color: #1d4ed8; }
 .brv2-card-diff { border-color: var(--line); background: var(--bg); }
 .brv2-card-diff.has-diff { border-color: #fca5a5; background: #fef2f2; }
-.brv2-card-diff.has-diff .brv2-card-num { color: #dc2626; }
+.brv2-card-diff.has-diff .brv2-card-num { color: var(--danger); }
 .brv2-card-diff.no-diff { border-color: #86efac; background: #f0fdf4; }
-.brv2-card-diff.no-diff .brv2-card-num { color: #16a34a; }
+.brv2-card-diff.no-diff .brv2-card-num { color: var(--success); }
 
 /* Formula box */
 .brv2-formula-box {
@@ -136,8 +136,8 @@
 .brv2-bold { font-weight: 600; color: var(--ink); }
 .brv2-formula-sep td { border-top: 1.5px solid var(--line); padding-top: 7px; }
 .brv2-formula-diff-row td { border-top: 1px solid var(--line); font-weight: 600; }
-.brv2-formula-diff-row.ok td { color: #16a34a; }
-.brv2-formula-diff-row.has-diff td { color: #dc2626; }
+.brv2-formula-diff-row.ok td { color: var(--success); }
+.brv2-formula-diff-row.has-diff td { color: var(--danger); }
 
 /* Action bar */
 .brv2-action-bar {
@@ -188,7 +188,7 @@
   white-space: nowrap;
 }
 .brv2-badge-matched { background: #d1fae5; color: #065f46; }
-.brv2-badge-matched-l2 { background: #fef3c7; color: #92400e; }
+.brv2-badge-matched-l2 { background: var(--warn-bg); color: #92400e; }
 .brv2-badge-matched-l3 { background: #ffedd5; color: #9a3412; }
 .brv2-badge-gl-only { background: #ede9fe; color: #5b21b6; }
 .brv2-badge-stmt-only { background: #dbeafe; color: #1e40af; }
@@ -220,13 +220,13 @@
 .brv2-hist-files { font-size: 12px; color: var(--ink); font-weight: 500; }
 .brv2-hist-meta { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
 .brv2-hist-stats { font-size: 11px; color: var(--ink-2); white-space: nowrap; }
-.brv2-hist-diff-ok { color: #16a34a; font-weight: 600; }
-.brv2-hist-diff-bad { color: #dc2626; font-weight: 600; }
+.brv2-hist-diff-ok { color: var(--success); font-weight: 600; }
+.brv2-hist-diff-bad { color: var(--danger); font-weight: 600; }
 .brv2-hist-del {
   background: none; border: none; cursor: pointer; padding: 4px;
   color: var(--ink-3); border-radius: 4px;
 }
-.brv2-hist-del:hover { color: #dc2626; background: #fef2f2; }
+.brv2-hist-del:hover { color: var(--danger); background: #fef2f2; }
 
 /* ── Bank Recon v2 · chips row（文件列表区，位于 vex-drops 下方） ── */
 .brv2-chips-row {

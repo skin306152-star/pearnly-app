@@ -9,13 +9,13 @@
 }
 .dash-kpi {
     background: #ffffff;
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line);
     border-radius: 10px;
     padding: 14px 16px;
 }
 .dash-kpi-label {
     font-size: 11px;
-    color: #999999;
+    color: var(--ink-3);
     margin-bottom: 6px;
     display: flex;
     align-items: center;
@@ -25,15 +25,15 @@
 .dash-kpi-val {
     font-size: 22px;
     font-weight: 700;
-    color: #111111;
+    color: var(--ink);
     line-height: 1.1;
 }
-.dash-kpi-val.dash-amber { color: #d97706; }
-.dash-kpi-val.dash-red { color: #dc2626; }
-.dash-kpi-val.dash-green { color: #16a34a; }
+.dash-kpi-val.dash-amber { color: var(--warn); }
+.dash-kpi-val.dash-red { color: var(--danger); }
+.dash-kpi-val.dash-green { color: var(--success); }
 .dash-kpi-sub {
     font-size: 11px;
-    color: #999999;
+    color: var(--ink-3);
     margin-top: 3px;
 }
 .dash-grid2 {
@@ -51,10 +51,10 @@
     position: relative;
 }
 .dash-quick-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
-.dash-quick-btn-warn { color: #dc2626; }
+.dash-quick-btn-warn { color: var(--danger); }
 .dash-quick-badge {
     margin-left: auto;
-    background: #dc2626;
+    background: var(--danger);
     color: #fff;
     font-size: 10px;
     font-weight: 700;
@@ -65,23 +65,23 @@
 }
 .dash-recent-list {
     font-size: 12px;
-    color: #999999;
+    color: var(--ink-3);
     line-height: 1.9;
 }
 .dash-recent-row {
     display: flex;
     gap: 8px;
     padding: 4px 0;
-    border-bottom: 1px solid #f0f0eb;
+    border-bottom: 1px solid var(--line-soft);
 }
 .dash-recent-row:last-child { border-bottom: 0; }
-.dash-recent-row .dash-recent-key { color: #111111; font-weight: 500; min-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dash-recent-row .dash-recent-mid { flex: 1; color: #555555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dash-recent-row .dash-recent-time { color: #999999; font-size: 11px; flex-shrink: 0; }
+.dash-recent-row .dash-recent-key { color: var(--ink); font-weight: 500; min-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-recent-row .dash-recent-mid { flex: 1; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-recent-row .dash-recent-time { color: var(--ink-3); font-size: 11px; flex-shrink: 0; }
 .dash-recent-empty {
     padding: 24px 16px;
     text-align: center;
-    color: #999999;
+    color: var(--ink-3);
     font-size: 12px;
 }
 @media (max-width: 800px) {

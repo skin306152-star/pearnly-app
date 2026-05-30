@@ -29,6 +29,6 @@
 /* auto-panel 在抽屉内全显 */
 .int-drawer-body .auto-panel { display: block !important; padding: 20px; }
 /* 图标色: 智能提醒(琥珀) */
-.ic-alert { background: #fef3c7; color: #92400e; }
+.ic-alert { background: var(--warn-bg); color: #92400e; }
 @media (max-width: 600px) { .int-drawer { width: 100vw; right: -100vw; } }
 

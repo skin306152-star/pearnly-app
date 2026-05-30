@@ -60,7 +60,7 @@
     margin-bottom: 6px;
 }
 .api-key-msg.success { color: #059669; }
-.api-key-msg.error   { color: #DC2626; }
+.api-key-msg.error   { color: var(--danger); }
 .api-key-msg.info    { color: #4B5563; }
 .api-key-help {
     font-size: 12px;
@@ -82,7 +82,7 @@
     font-weight: 700;
 }
 .info-chip.chip-warn {
-    background: #FEF3C7;
+    background: var(--warn-bg);
     color: #92400E;
     border-color: #FCD34D;
 }
@@ -212,12 +212,12 @@
     font-weight: 600;
     white-space: nowrap;
 }
-#page-admin .tenant-type-admin   { background: #FEF3C7; color: #92400E; }
-#page-admin .tenant-type-shared  { background: #DBEAFE; color: #111111; }
+#page-admin .tenant-type-admin   { background: var(--warn-bg); color: #92400E; }
+#page-admin .tenant-type-shared  { background: #DBEAFE; color: var(--ink); }
 #page-admin .tenant-type-byo     { background: #D1FAE5; color: #065F46; }
 #page-admin .tenant-status-active     { background: #D1FAE5; color: #065F46; }
-#page-admin .tenant-status-warning    { background: #FEF3C7; color: #92400E; }
-#page-admin .tenant-status-suspended  { background: #FEE2E2; color: #991B1B; }
+#page-admin .tenant-status-warning    { background: var(--warn-bg); color: #92400E; }
+#page-admin .tenant-status-suspended  { background: var(--danger-bg); color: #991B1B; }
 #page-admin .tenant-status-frozen     { background: #F3F4F6; color: #4B5563; }
 #page-admin .tenant-quota-bar {
     display: inline-block;
@@ -231,7 +231,7 @@
 }
 #page-admin .tenant-quota-fill {
     height: 100%;
-    background: #111111;
+    background: var(--ink);
     transition: width .3s;
 }
 #page-admin .tenant-quota-fill.warn { background: #F59E0B; }
@@ -261,8 +261,8 @@
     border-color: #D1D5DB;
 }
 #page-admin .tenant-actions button.danger {
-    color: #DC2626;
-    border-color: #FEE2E2;
+    color: var(--danger);
+    border-color: var(--danger-bg);
 }
 #page-admin .tenant-actions button.danger:hover {
     background: #FEF2F2;
@@ -318,7 +318,7 @@
 .admin-modal .form-row select:focus,
 .admin-modal .form-row textarea:focus {
     outline: none;
-    border-color: #111111;
+    border-color: var(--ink);
     box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1);
 }
 .admin-modal .form-hint {
@@ -440,13 +440,13 @@
 }
 .admin-tab:hover { color: #111827; }
 .admin-tab.active {
-    color: #111111;
-    border-bottom-color: #111111;
+    color: var(--ink);
+    border-bottom-color: var(--ink);
 }
 
 /* 用户名可点击 */
 .admin-table .clickable-username {
-    color: #111111;
+    color: var(--ink);
     cursor: pointer;
     font-weight: 600;
     text-decoration: none;
@@ -477,7 +477,7 @@
 }
 .admin-logs-list .log-main .log-actor {
     font-weight: 600;
-    color: #111111;
+    color: var(--ink);
 }
 .admin-logs-list .log-main .log-action {
     color: #6B7280;
@@ -488,7 +488,7 @@
 }
 .admin-logs-list .log-super-badge {
     display: inline-block;
-    background: #FEF3C7;
+    background: var(--warn-bg);
     color: #92400E;
     padding: 1px 6px;
     border-radius: 4px;
@@ -566,8 +566,8 @@
 }
 .admin-detail-tabs .admin-tab:hover { color: #111827; }
 .admin-detail-tabs .admin-tab.active {
-    color: #111111;
-    border-bottom-color: #111111;
+    color: var(--ink);
+    border-bottom-color: var(--ink);
 }
 /* 日志条 */
 .admin-logs-list {
@@ -599,7 +599,7 @@
 .admin-log-body .admin-log-action {
     padding: 1px 6px;
     background: #DBEAFE;
-    color: #111111;
+    color: var(--ink);
     border-radius: 3px;
     font-size: 11px;
     margin: 0 4px;
@@ -625,9 +625,9 @@
     margin-bottom: 16px;
 }
 .btn.btn-danger {
-    background: #DC2626;
+    background: var(--danger);
     color: #fff;
-    border: 1px solid #DC2626;
+    border: 1px solid var(--danger);
 }
 .btn.btn-danger:hover {
     background: #B91C1C;
@@ -653,7 +653,7 @@
     margin-right: 8px;
 }
 #admin-dropdown .dd-btn-icon {
-    color: #111111;
+    color: var(--ink);
 }
 /* 侧栏顶部汉堡(新加的位置)*/
 .sidebar-toggle.sidebar-toggle-in {
@@ -724,7 +724,7 @@
     align-items: center;
     justify-content: center;
     padding: 12px 0 4px;
-    color: #111111;
+    color: var(--ink);
 }
 .sidebar .brand-mini svg {
     width: 28px;
@@ -743,7 +743,7 @@
     animation: login-shake .4s ease;
 }
 .login-form-error input {
-    border-color: #DC2626 !important;
+    border-color: var(--danger) !important;
     background: #FEF2F2;
 }
 .login-locked-banner {

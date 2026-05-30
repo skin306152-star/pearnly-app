@@ -39,7 +39,7 @@
     font-family: var(--font-mono);
 }
 .engine-badge.flash { background: #fef5e7; color: var(--warn); }
-.engine-badge.cached { background: #f4f4f0; color: #111111; }
+.engine-badge.cached { background: var(--bg); color: var(--ink); }
 .tax-badge {
     display: inline-block; padding: 1px 6px;
     font-size: 10px; font-weight: 500;

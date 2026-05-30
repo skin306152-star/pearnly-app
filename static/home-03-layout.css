@@ -257,7 +257,7 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     align-items: center; justify-content: center; gap: 8px;
 }
-.offline-banner.is-offline { background: #DC2626; animation: banner-pulse 2s ease-in-out infinite; }
+.offline-banner.is-offline { background: var(--danger); animation: banner-pulse 2s ease-in-out infinite; }
 .offline-banner.is-online { background: #059669; }
 @keyframes banner-pulse {
     0%, 100% { opacity: 1; }

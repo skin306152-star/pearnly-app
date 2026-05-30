@@ -17,7 +17,7 @@
     border-bottom: 1px solid #f1f5f9;
 }
 .adm-logs-table .adm-log-head {
-    background: #f4f4f0;
+    background: var(--bg);
     font-weight: 600;
     color: #475569;
 }
@@ -28,8 +28,8 @@
     display: inline-block;
     padding: 2px 8px;
     border-radius: 4px;
-    background: #f4f4f0;
-    color: #111111;
+    background: var(--bg);
+    color: var(--ink);
     font-size: 12px;
     font-weight: 500;
 }
@@ -61,7 +61,7 @@
     transition: all 0.15s;
 }
 .adm-pager-btn:hover:not(:disabled) {
-    background: #f4f4f0;
+    background: var(--bg);
     border-color: #cbd5e1;
 }
 .adm-pager-btn:disabled {
@@ -125,7 +125,7 @@
     border-bottom: 1px solid #f1f5f9;
 }
 .access-log-head {
-    background: #f4f4f0;
+    background: var(--bg);
     font-weight: 600;
     color: #475569;
     font-size: 12px;
@@ -147,7 +147,7 @@
     display: inline-block;
     padding: 2px 8px;
     border-radius: 4px;
-    background: #fef3c7;
+    background: var(--warn-bg);
     color: #92400e;
     font-size: 12px;
     font-weight: 500;
@@ -180,7 +180,7 @@
     transition: all 0.15s;
 }
 .access-log-pager-btn:hover:not(:disabled) {
-    background: #f4f4f0;
+    background: var(--bg);
     border-color: #cbd5e1;
 }
 .access-log-pager-btn:disabled {

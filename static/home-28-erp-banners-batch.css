@@ -31,17 +31,17 @@
     gap: 10px;
     margin: 6px 0 12px;
     padding: 10px 14px;
-    background: #f4f4f0;
-    border: 1px solid #e8e8e3;
+    background: var(--bg);
+    border: 1px solid var(--line);
     border-radius: 8px;
     font-size: 13px;
-    color: #111111;
+    color: var(--ink);
 }
 
 .history-client-filter-banner svg {
     width: 18px;
     height: 18px;
-    color: #111111;
+    color: var(--ink);
     flex-shrink: 0;
 }
 
@@ -55,12 +55,12 @@
 
 .history-client-filter-name {
     font-weight: 600;
-    color: #111111;
+    color: var(--ink);
     margin: 0 4px;
 }
 
 .history-client-filter-count {
-    color: #111111;
+    color: var(--ink);
     opacity: 0.7;
     margin-left: 4px;
     font-size: 12px;
@@ -72,8 +72,8 @@
     padding: 0 12px;
     font-size: 12px;
     background: #fff;
-    border-color: #e8e8e3;
-    color: #111111;
+    border-color: var(--line);
+    color: var(--ink);
 }
 
 .history-client-filter-clear:hover {
@@ -275,13 +275,13 @@
 }
 .mrerp-pick-cus-row-match.match-recommend {
     color: #b45309;
-    background: #fef3c7;
+    background: var(--warn-bg);
     border: 1px solid #fde68a;
 }
 .mrerp-pick-cus-row-match.match-maybe {
     color: #92400e;
     background: #fffbeb;
-    border: 1px solid #fef3c7;
+    border: 1px solid var(--warn-bg);
 }
 
 /* 右下角 undo toast(类似 Gmail 撤销发送 · 3 秒倒计时) */
@@ -352,7 +352,7 @@
     white-space: nowrap;
 }
 .mrerp-undo-toast .mut-btn-change {
-    color: #fef3c7;
+    color: var(--warn-bg);
     background: transparent;
     border-color: rgba(255,255,255,0.3);
 }
@@ -573,13 +573,13 @@
 }
 .mrerp-pick-prod-row-match.match-recommend {
     color: #b45309;
-    background: #fef3c7;
+    background: var(--warn-bg);
     border: 1px solid #fde68a;
 }
 .mrerp-pick-prod-row-match.match-maybe {
     color: #92400e;
     background: #fffbeb;
-    border: 1px solid #fef3c7;
+    border: 1px solid var(--warn-bg);
 }
 .mrerp-pick-prod-row-status {
     font-size: 11px;

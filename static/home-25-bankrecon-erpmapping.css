@@ -88,8 +88,8 @@
 /* 选中流水高亮 · 让用户清楚正在看哪笔 */
 .bank-tx-table tbody tr.is-selected,
 .bank-tx-table tbody tr.is-selected:hover {
-    background: #f4f4f0;
-    outline: 2px solid #111111;
+    background: var(--bg);
+    outline: 2px solid var(--ink);
     outline-offset: -2px;
 }
 
@@ -115,11 +115,11 @@
     width: 3px;
     background: #D1D5DB;
 }
-.bank-cand-pane-body .bank-cand-card.is-auto::before { background: #16A34A; }
-.bank-cand-pane-body .bank-cand-card.is-picked::before { background: #111111; width: 4px; }
+.bank-cand-pane-body .bank-cand-card.is-auto::before { background: var(--success); }
+.bank-cand-pane-body .bank-cand-card.is-picked::before { background: var(--ink); width: 4px; }
 .bank-cand-pane-body .bank-cand-card.is-picked {
-    border-color: #111111;
-    background: #f4f4f0;
+    border-color: var(--ink);
+    background: var(--bg);
 }
 .bank-cand-pane-body .bank-cand-card-head {
     display: flex;
@@ -181,8 +181,8 @@
     line-height: 1.6;
     flex-shrink: 0;
 }
-.bank-cand-score.score-high { background: #DCFCE7; color: #15803D; }
-.bank-cand-score.score-mid  { background: #FEF3C7; color: #92400E; }
+.bank-cand-score.score-high { background: var(--success-bg); color: #15803D; }
+.bank-cand-score.score-mid  { background: var(--warn-bg); color: #92400E; }
 .bank-cand-score.score-low  { background: #F3F4F6; color: #6B7280; }
 
 /* 头部小提示三档(承接 hint-matched / suggested / low)*/
@@ -193,9 +193,9 @@
     margin-bottom: 10px;
     line-height: 1.5;
 }
-.bank-cand-pane-body .bank-cand-hint.hint-matched   { background: #DCFCE7; color: #15803D; }
-.bank-cand-pane-body .bank-cand-hint.hint-suggested { background: #DBEAFE; color: #111111; }
-.bank-cand-pane-body .bank-cand-hint.hint-low       { background: #FEF3C7; color: #92400E; }
+.bank-cand-pane-body .bank-cand-hint.hint-matched   { background: var(--success-bg); color: #15803D; }
+.bank-cand-pane-body .bank-cand-hint.hint-suggested { background: #DBEAFE; color: var(--ink); }
+.bank-cand-pane-body .bank-cand-hint.hint-low       { background: var(--warn-bg); color: #92400E; }
 
 /* 客户徽章(bank-detail-head 内 · 老板可点 · 员工 disabled) */
 .bank-client-badge {
@@ -281,8 +281,8 @@
 }
 .bank-client-picker-row:hover { background: #F9FAFB; }
 .bank-client-picker-row.is-selected {
-    background: #f4f4f0;
-    border-color: #111111;
+    background: var(--bg);
+    border-color: var(--ink);
 }
 .bank-client-picker-row .bank-cp-dot {
     width: 10px;
@@ -396,7 +396,7 @@
 .erp-map-row.row-accounts  { grid-template-columns: 1fr 1.2fr 1fr 1.2fr 1fr 60px; }
 .erp-map-row.row-taxes     { grid-template-columns: 1fr 1.4fr 1fr 1.2fr 60px; }
 .erp-map-head {
-    background: #f4f4f0;
+    background: var(--bg);
     font-weight: 600;
     color: #475569;
     font-size: 12px;
@@ -431,7 +431,7 @@
     display: inline-block;
     padding: 2px 8px;
     border-radius: 4px;
-    background: #fef3c7;
+    background: var(--warn-bg);
     color: #92400e;
     font-size: 12px;
     font-weight: 500;
@@ -444,7 +444,7 @@
 .erp-map-del-btn {
     background: transparent;
     border: 1px solid #fecaca;
-    color: #dc2626;
+    color: var(--danger);
     border-radius: 6px;
     width: 32px;
     height: 32px;
@@ -454,7 +454,7 @@
     justify-content: center;
     transition: all 0.15s;
 }
-.erp-map-del-btn:hover { background: #fee2e2; }
+.erp-map-del-btn:hover { background: var(--danger-bg); }
 .erp-map-del-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
@@ -491,7 +491,7 @@
     color: #64748b;
 }
 .erp-map-row-add {
-    background: #f4f4f0;
+    background: var(--bg);
 }
 .erp-map-row-add .erp-map-cell-name {
     color: #94a3b8;
@@ -532,7 +532,7 @@
     display: flex;
     gap: 4px;
     margin: 0 0 16px;
-    border-bottom: 1px solid #e8e8e3;
+    border-bottom: 1px solid var(--line);
     background: #fff;
     padding: 0 4px;
     border-radius: 8px 8px 0 0;

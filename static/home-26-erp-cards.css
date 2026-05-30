@@ -52,7 +52,7 @@
     font-weight: 500;
 }
 .erp-cc-badge.green {
-    background: #dcfce7;
+    background: var(--success-bg);
     color: #166534;
 }
 .erp-cc-badge.gray {
@@ -94,7 +94,7 @@
     cursor: pointer;
     transition: background 0.15s;
 }
-.erp-cc-org-row:hover { background: #f4f4f0; }
+.erp-cc-org-row:hover { background: var(--bg); }
 .erp-cc-org-row input[type="radio"] {
     margin: 0;
     cursor: pointer;
@@ -350,10 +350,10 @@
 }
 .export-dd-badge.badge-rec {
     background: #dbeafe;
-    color: #111111;
+    color: var(--ink);
 }
 .export-dd-badge.badge-new {
-    background: #dcfce7;
+    background: var(--success-bg);
     color: #166534;
 }
 .export-dd-badge.badge-soon {
@@ -448,11 +448,11 @@
 .mrerp-cred-fallback-hint {
     margin: 0 0 16px;
     padding: 10px 12px;
-    background: #f4f4f0;
-    border: 1px solid #e8e8e3;
+    background: var(--bg);
+    border: 1px solid var(--line);
     border-radius: 8px;
     font-size: 12px;
-    color: #111111;
+    color: var(--ink);
     line-height: 1.5;
 }
 

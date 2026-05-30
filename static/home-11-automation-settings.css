@@ -55,12 +55,12 @@
     color: var(--brand);
 }
 #page-reconcile .auto-nav-item.active {
-    background: #f4f4f0;
-    color: #111111;
+    background: var(--bg);
+    color: var(--ink);
     font-weight: 500;
 }
 #page-reconcile .auto-nav-item.active .auto-nav-icon {
-    color: #111111;
+    color: var(--ink);
 }
 .auto-nav-icon {
     display: flex;
@@ -143,7 +143,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f4f4f0;
+    background: var(--bg);
     border-radius: 20px;
     color: var(--brand);
 }
@@ -188,7 +188,7 @@
 .coming-eta {
     display: inline-block;
     padding: 6px 14px;
-    background: #FEF3C7;
+    background: var(--warn-bg);
     color: #92400E;
     border-radius: 16px;
     font-size: 12px;
@@ -294,8 +294,8 @@
 }
 .settings-tab:hover { color: var(--text, #111827); background: rgba(0,0,0,0.03); border-radius: 6px 6px 0 0; }
 .settings-tab.active {
-    color: var(--primary, #111111);
-    border-bottom-color: var(--primary, #111111);
+    color: var(--primary, var(--ink));
+    border-bottom-color: var(--primary, var(--ink));
     font-weight: 600;
 }
 .settings-content { padding: 4px; }
@@ -321,7 +321,7 @@
     color: var(--text, #111827);
     transition: border-color 0.15s;
 }
-.profile-form .form-input:focus { outline: none; border-color: var(--primary, #111111); }
+.profile-form .form-input:focus { outline: none; border-color: var(--primary, var(--ink)); }
 .profile-form .form-input:disabled { background: #f9fafb; color: #9ca3af; cursor: not-allowed; }
 .profile-form .form-hint { font-size: 12px; color: #9ca3af; }
 .profile-form .form-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
@@ -420,12 +420,12 @@
     margin-bottom: 10px;
     transition: border-color 0.15s;
 }
-.team-card:hover { border-color: var(--primary, #111111); }
+.team-card:hover { border-color: var(--primary, var(--ink)); }
 .team-card-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
 .team-avatar {
     width: 40px; height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #111111, #111111);
+    background: linear-gradient(135deg, var(--ink), var(--ink));
     color: #fff;
     font-weight: 600;
     display: flex; align-items: center; justify-content: center;
@@ -505,7 +505,7 @@
     transition: border-color 0.15s;
     box-sizing: border-box;
 }
-.add-emp-input:focus { outline: none; border-color: #111111; box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1); }
+.add-emp-input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1); }
 .add-emp-hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
 .add-emp-msg { font-size: 13px; min-height: 20px; color: #10b981; }
 .add-emp-msg.error { color: #ef4444; }
@@ -539,14 +539,14 @@
     align-items: center;
     gap: 10px;
     padding: 12px 14px;
-    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+    background: linear-gradient(135deg, var(--warn-bg), #FDE68A);
     border: 1px solid #FCD34D;
     border-radius: 10px;
     margin-bottom: 20px;
     font-size: 13px;
     color: #92400E;
 }
-.archive-upgrade-banner svg { width: 18px; height: 18px; color: #D97706; flex-shrink: 0; }
+.archive-upgrade-banner svg { width: 18px; height: 18px; color: var(--warn); flex-shrink: 0; }
 .archive-upgrade-banner span { flex: 1; }
 
 .archive-section { margin-bottom: 24px; }
@@ -562,7 +562,7 @@
 .archive-rule-canvas {
     min-height: 60px;
     padding: 16px;
-    background: #f4f4f0;
+    background: var(--bg);
     border: 1px dashed var(--line);
     border-radius: 10px;
     display: flex;
@@ -601,9 +601,9 @@
     background: var(--accent-soft);
 }
 .archive-token.sep { background: #F3F4F6; color: var(--ink-3); }
-.archive-token.date    { background: #DBEAFE; color: #111111; border-color: #e8e8e3; }
+.archive-token.date    { background: #DBEAFE; color: var(--ink); border-color: var(--line); }
 .archive-token.seller  { background: #E0E7FF; color: #3730A3; border-color: #C7D2FE; }
-.archive-token.category{ background: #FEF3C7; color: #92400E; border-color: #FCD34D; }
+.archive-token.category{ background: var(--warn-bg); color: #92400E; border-color: #FCD34D; }
 .archive-token.amount  { background: #D1FAE5; color: #065F46; border-color: #A7F3D0; }
 .archive-token.invoice { background: #FCE7F3; color: #9F1239; border-color: #FBCFE8; }
 .archive-token.buyer   { background: #EDE9FE; color: #5B21B6; border-color: #DDD6FE; }
@@ -636,7 +636,7 @@
 
 .archive-preview-box {
     padding: 16px 20px;
-    background: linear-gradient(135deg, #f4f4f0, #f4f4f0);
+    background: linear-gradient(135deg, var(--bg), var(--bg));
     border: 1px solid #BAE6FD;
     border-radius: 10px;
 }

@@ -81,7 +81,7 @@
     outline: none;
 }
 .history-range:hover { border-color: #d1d5db; }
-.history-range:focus { border-color: var(--primary, #111111); }
+.history-range:focus { border-color: var(--primary, var(--ink)); }
 
 .history-table-wrap {
     border: 1px solid var(--line);
@@ -171,8 +171,8 @@
     padding: 2px 6px; font-size: 10px; font-weight: 500;
     border-radius: 3px;
 }
-.history-badge.source-email  { background: #DBEAFE; color: #111111; }
-.history-badge.source-folder { background: #FEF3C7; color: #92400E; }
+.history-badge.source-email  { background: #DBEAFE; color: var(--ink); }
+.history-badge.source-folder { background: var(--warn-bg); color: #92400E; }
 .history-badge.source-api    { background: #E0E7FF; color: #3730A3; }
 .history-badge.conf-high { background: var(--success-bg); color: var(--success); border: 1px solid #9ae6b4; }
 .history-badge.conf-mid  { background: #fefcbf; color: #975a16; border: 1px solid #f6e05e; }
@@ -236,7 +236,7 @@
     color: var(--ink);
 }
 .history-popover button:hover { background: #f3f4f6; }
-.history-popover button.danger { color: #dc2626; }
+.history-popover button.danger { color: var(--danger); }
 .history-popover button.danger:hover { background: #fef2f2; }
 
 /* 抽屉内的「保存修改」按钮条 · v105.1 · 修遮挡问题 */
@@ -329,7 +329,7 @@
     width: 20px;
     height: 20px;
 }
-.auto-pillar-icon.erp    { background: #f4f4f0; color: #555555; }
+.auto-pillar-icon.erp    { background: var(--bg); color: var(--ink-2); }
 .auto-pillar-icon.email  { background: #FAEEDA; color: #854F0B; }
 .auto-pillar-icon.folder { background: #E1F5EE; color: #0F6E56; }
 .auto-pillar-icon.alert  { background: #FBEAF0; color: #72243E; }
@@ -363,7 +363,7 @@
     white-space: nowrap;
 }
 .auto-status-pill.none   { background: #f3f4f6; color: #9ca3af; }
-.auto-status-pill.ready  { background: #f4f4f0; color: #555555; }
+.auto-status-pill.ready  { background: var(--bg); color: var(--ink-2); }
 .auto-status-pill.active { background: #E1F5EE; color: #0F6E56; }
 .auto-status-pill.coming { background: #f3f4f6; color: #9ca3af; }
 
@@ -437,7 +437,7 @@
     font-weight: 500;
     white-space: nowrap;
 }
-.ep-badge.default  { background: #f4f4f0; color: #555555; }
+.ep-badge.default  { background: var(--bg); color: var(--ink-2); }
 .ep-badge.auto     { background: #E1F5EE; color: #0F6E56; }
 .ep-badge.disabled { background: #f3f4f6; color: #9ca3af; }
 
@@ -452,7 +452,7 @@
     min-height: 0;
 }
 .btn.btn-danger {
-    color: #dc2626;
+    color: var(--danger);
 }
 .btn.btn-danger:hover:not(:disabled) {
     background: #fef2f2;
@@ -551,7 +551,7 @@
     font-family: inherit;
 }
 .form-input:hover { border-color: #d1d5db; }
-.form-input:focus { border-color: var(--primary, #111111); box-shadow: 0 0 0 3px rgba(17,17,17,0.1); }
+.form-input:focus { border-color: var(--primary, var(--ink)); box-shadow: 0 0 0 3px rgba(17,17,17,0.1); }
 .form-hint {
     margin-top: 4px;
     font-size: 11px;
@@ -601,8 +601,8 @@
 .adapter-card:hover:not(.disabled) { border-color: #d1d5db; background: #fafaf8; }
 .adapter-card input[type="radio"] { margin: 2px 0 0; }
 .adapter-card:has(input:checked) {
-    border-color: var(--primary, #111111);
-    background: #f4f4f0;
+    border-color: var(--primary, var(--ink));
+    background: var(--bg);
 }
 .adapter-card.disabled { opacity: 0.5; cursor: not-allowed; }
 

@@ -45,7 +45,7 @@
 
 /* 三色调:待对(琥珀)/ 已完成(绿)/ 未匹配(红) */
 .reconcile-stat-card.pending .reconcile-stat-icon {
-    background: #fef3c7;
+    background: var(--warn-bg);
     color: #b45309;
 }
 .reconcile-stat-card.matched .reconcile-stat-icon {
@@ -53,7 +53,7 @@
     color: #047857;
 }
 .reconcile-stat-card.unmatched .reconcile-stat-icon {
-    background: #fee2e2;
+    background: var(--danger-bg);
     color: #b91c1c;
 }
 
@@ -214,7 +214,7 @@
     gap: 16px;
     background: var(--bg);
     border: 1px solid var(--line);
-    border: 1.5px dashed #cbd5e0;
+    border: 1.5px dashed var(--ink-4);
     border-radius: 12px;
     padding: 14px 18px;
     margin-bottom: 20px;
@@ -226,15 +226,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #111111;
+    color: var(--ink);
 }
 .rc-upload-card-icon svg { width: 28px; height: 28px; }
 .rc-upload-card-body { flex: 1; min-width: 0; }
-.rc-upload-card-title { font-size: 14px; font-weight: 600; color: #555555; margin-bottom: 2px; }
-.rc-upload-card-sub   { font-size: 12px; color: #999999; }
+.rc-upload-card-title { font-size: 14px; font-weight: 600; color: var(--ink-2); margin-bottom: 2px; }
+.rc-upload-card-sub   { font-size: 12px; color: var(--ink-3); }
 .rc-upload-btn {
     flex-shrink: 0;
-    background: #555555;
+    background: var(--ink-2);
     color: #fff;
     border: none;
     border-radius: 8px;

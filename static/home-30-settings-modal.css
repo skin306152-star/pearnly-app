@@ -418,8 +418,8 @@ body.settings-modal-open { overflow: hidden; }
     transition: all .2s;
     min-height: 180px;
 }
-.vex-drop:hover { border-color: #111111; background: #f0f0ec; }
-.vex-drop.drag-over { border-color: #111111; background: #f0f0ec; border-style: solid; }
+.vex-drop:hover { border-color: var(--ink); background: #f0f0ec; }
+.vex-drop.drag-over { border-color: var(--ink); background: #f0f0ec; border-style: solid; }
 .vex-drop-icon-wrap {
     width: 56px; height: 56px; border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
@@ -427,10 +427,10 @@ body.settings-modal-open { overflow: hidden; }
 .vex-drop-icon-wrap svg { width: 32px; height: 32px; }
 .vex-drop-invoice,
 .vex-drop-report  { background: #f8f8f6; border: 1.5px dashed #c8d0d8; }
-.vex-drop-invoice .vex-drop-icon-wrap { background: #e8e8e3; color: #111111; }
-.vex-drop-report  .vex-drop-icon-wrap { background: #e8e8e3; color: #111111; }
-.vex-drop-title { font-size: 15px; font-weight: 600; color: #555555; }
-.vex-drop-sub   { font-size: 12px; color: #999999; text-align: center; }
+.vex-drop-invoice .vex-drop-icon-wrap { background: var(--line); color: var(--ink); }
+.vex-drop-report  .vex-drop-icon-wrap { background: var(--line); color: var(--ink); }
+.vex-drop-title { font-size: 15px; font-weight: 600; color: var(--ink-2); }
+.vex-drop-sub   { font-size: 12px; color: var(--ink-3); text-align: center; }
 
 .vex-drop-divider {
     display: flex; align-items: center; justify-content: center;
@@ -444,7 +444,7 @@ body.settings-modal-open { overflow: hidden; }
     gap: 16px; margin-bottom: 18px;
 }
 .vex-files-col {
-    background: #fafaf8; border: 1px solid #e8e8e3;
+    background: #fafaf8; border: 1px solid var(--line);
     border-radius: 10px; padding: 12px;
 }
 .vex-files-head {
@@ -454,7 +454,7 @@ body.settings-modal-open { overflow: hidden; }
 .vex-files-count {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 22px; padding: 1px 8px; border-radius: 99px;
-    background: #111111; color: #fff; font-size: 11px; font-weight: 600;
+    background: var(--ink); color: #fff; font-size: 11px; font-weight: 600;
 }
 .vex-files-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .vex-fi-empty { padding: 14px; color: #9CA3AF; font-size: 12px; text-align: center; }
@@ -477,12 +477,12 @@ body.settings-modal-open { overflow: hidden; }
     color: #9CA3AF; cursor: pointer; border-radius: 4px;
     font-size: 16px; line-height: 1; padding: 0;
 }
-.vex-fi-x:hover { background: #FEE2E2; color: #B91C1C; }
+.vex-fi-x:hover { background: var(--danger-bg); color: #B91C1C; }
 
 /* 操作栏 */
 .vex-action-bar {
     display: flex; align-items: center; gap: 14px;
-    padding: 14px 0; border-top: 1px solid #e8e8e3;
+    padding: 14px 0; border-top: 1px solid var(--line);
 }
 .vex-action-info { flex: 1; font-size: 12.5px; }
 .vex-action-info.muted { color: #9CA3AF; }
@@ -491,7 +491,7 @@ body.settings-modal-open { overflow: hidden; }
 /* v4.10.11 · 查看清单切换按钮 */
 .vex-toggle-preview-btn {
     background: transparent; border: 0; padding: 4px 8px;
-    font-size: 12px; color: #111111; cursor: pointer;
+    font-size: 12px; color: var(--ink); cursor: pointer;
     display: flex; align-items: center; gap: 4px; flex-shrink: 0;
 }
 .vex-toggle-preview-btn svg { width: 14px; height: 14px; transition: transform 0.2s; flex-shrink: 0; }
@@ -516,13 +516,13 @@ body.settings-modal-open { overflow: hidden; }
     border: 0.5px solid var(--line); border-radius: 6px;
     outline: none; color: #111827; background: var(--card, #fff);
 }
-.vex-pp-search:focus { border-color: #111111; }
+.vex-pp-search:focus { border-color: var(--ink); }
 .vex-pp-clear-btn {
     height: 30px; padding: 0 10px; font-size: 12px;
     background: transparent; border: 0.5px solid var(--line);
     border-radius: 6px; color: #6B7280; cursor: pointer; flex-shrink: 0;
 }
-.vex-pp-clear-btn:hover { color: #DC2626; border-color: #FCA5A5; }
+.vex-pp-clear-btn:hover { color: var(--danger); border-color: #FCA5A5; }
 .vex-pp-file-list {
     border: 0.5px solid var(--line); border-radius: 8px;
     max-height: 220px; overflow-y: auto; background: var(--card, #fff);
@@ -547,12 +547,12 @@ body.settings-modal-open { overflow: hidden; }
     background: none; border: none; padding: 2px 3px;
     display: flex; align-items: center; line-height: 1;
 }
-.vex-pp-fi-del:hover { color: #DC2626; }
+.vex-pp-fi-del:hover { color: var(--danger); }
 .vex-pp-pagination { text-align: center; padding: 6px 8px; font-size: 11px; color: #9CA3AF; }
 .vex-pp-guide {
     margin-top: 14px; padding: 10px 12px; background: var(--line-soft);
     border-radius: 8px; display: flex; align-items: center;
-    gap: 8px; font-size: 12px; color: #111111;
+    gap: 8px; font-size: 12px; color: var(--ink);
 }
 .vex-pp-guide svg { flex-shrink: 0; }
 @media (max-width: 800px) { .vex-pp-grid { grid-template-columns: 1fr; gap: 20px; } }
@@ -560,7 +560,7 @@ body.settings-modal-open { overflow: hidden; }
 /* 进度 / 结果区 */
 .vex-progress {
     margin-top: 16px; padding: 18px 20px;
-    background: #f4f4f0; border: 1px solid #E2E8F0; border-radius: 12px;
+    background: var(--bg); border: 1px solid #E2E8F0; border-radius: 12px;
     display: flex; align-items: center; gap: 14px;
 }
 .vex-progress-title { font-size: 14px; font-weight: 600; color: #111827; }
@@ -602,7 +602,7 @@ body.settings-modal-open { overflow: hidden; }
     align-items: center;
     gap: 10px;
     background: #ffffff;
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line);
 }
 .vex-kpi-icon-wrap {
     flex-shrink: 0;
@@ -614,16 +614,16 @@ body.settings-modal-open { overflow: hidden; }
     justify-content: center;
     font-size: 14px;
 }
-.vex-kpi-icon-warn  { background: #FEF3C7; color: #854F0B; }
-.vex-kpi-icon-ok    { background: #DCFCE7; color: #166534; }
-.vex-kpi-icon-err   { background: #FEE2E2; color: #991B1B; }
+.vex-kpi-icon-warn  { background: var(--warn-bg); color: #854F0B; }
+.vex-kpi-icon-ok    { background: var(--success-bg); color: #166534; }
+.vex-kpi-icon-err   { background: var(--danger-bg); color: #991B1B; }
 .vex-kpi-val   { font-size: 18px; font-weight: 500; line-height: 1.1; color: #111827; }
 .vex-kpi-lbl   { font-size: 11px; color: #6B7280; }
 
 .vex-task-section {
     margin-bottom: 0;
     background: #ffffff;
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 16px 20px;
 }
@@ -684,12 +684,12 @@ body.settings-modal-open { overflow: hidden; }
 .vex-task-table th:last-child,
 .vex-task-table td:last-child { width: 80px; text-align: right; padding-right: 12px; }   /* 操作列(最右)*/
 .vex-task-empty { text-align: center; color: #9CA3AF; padding: 28px; }
-.vex-task-dl { color: #111111; text-decoration: none; font-weight: 600; }
-.vex-task-dl:hover { color: #111111; }
+.vex-task-dl { color: var(--ink); text-decoration: none; font-weight: 600; }
+.vex-task-dl:hover { color: var(--ink); }
 
 /* v4.10.6 · 主操作上移包裹容器 */
 .vex-main-action {
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 16px;
     margin-bottom: 18px;
@@ -699,7 +699,7 @@ body.settings-modal-open { overflow: hidden; }
 .vex-main-action-tag {
     position: absolute;
     top: -9px; left: 14px;
-    background: #555555; color: #fff;
+    background: var(--ink-2); color: #fff;
     font-size: 10px; font-weight: 500;
     padding: 2px 10px; border-radius: 20px;
     white-space: nowrap;
@@ -742,8 +742,8 @@ body.settings-modal-open { overflow: hidden; }
     display: flex; align-items: center;
 }
 .vex-task-dl-btn svg, .vex-task-del-btn svg { width: 14px; height: 14px; }
-.vex-task-dl-btn:hover { color: #111111; }
-.vex-task-del-btn:hover { color: #DC2626; }
+.vex-task-dl-btn:hover { color: var(--ink); }
+.vex-task-del-btn:hover { color: var(--danger); }
 
 /* 展开按钮 */
 .vex-expand-btn {
@@ -756,9 +756,9 @@ body.settings-modal-open { overflow: hidden; }
 .vex-expand-btn svg { width: 14px; height: 14px; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 500; }
 .badge-gray  { background: #F3F4F6; color: #6B7280; }
-.badge-blue  { background: #DBEAFE; color: #111111; }
-.badge-green { background: #DCFCE7; color: #15803D; }
-.badge-red   { background: #FEE2E2; color: #DC2626; }
+.badge-blue  { background: #DBEAFE; color: var(--ink); }
+.badge-green { background: var(--success-bg); color: #15803D; }
+.badge-red   { background: var(--danger-bg); color: var(--danger); }
 
 @media (max-width: 800px) {
     .vex-kpi-strip { grid-template-columns: repeat(2, 1fr); }

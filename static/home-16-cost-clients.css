@@ -2,7 +2,7 @@
    v106 · 成本追踪面板(仅 super admin)
    =========================================== */
 .nav-badge.admin-badge {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
+    background: linear-gradient(135deg, #f59e0b, var(--warn));
     color: #fff;
     font-size: 10px;
     padding: 2px 6px;
@@ -188,8 +188,8 @@
     border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
-    background: #f4f4f0;
-    color: #111111;
+    background: var(--bg);
+    color: var(--ink);
 }
 
 @media (max-width: 768px) {
@@ -232,12 +232,12 @@
     position: absolute;
     top: 0; left: 0;
     width: 4px; height: 100%;
-    background: var(--client-color, #111111);
+    background: var(--client-color, var(--ink));
 }
 .client-card:hover {
     box-shadow: 0 8px 20px -10px rgba(0,0,0,0.15);
     transform: translateY(-2px);
-    border-color: var(--client-color, #111111);
+    border-color: var(--client-color, var(--ink));
 }
 .client-card-head {
     display: flex;
@@ -301,8 +301,8 @@
 }
 .client-card-btn:hover {
     background: #f3f4f6;
-    border-color: var(--client-color, #111111);
-    color: var(--client-color, #111111);
+    border-color: var(--client-color, var(--ink));
+    color: var(--client-color, var(--ink));
 }
 .client-card-btn svg { width: 12px; height: 12px; }
 .client-card-empty {
@@ -504,7 +504,7 @@
     width: 44px;
     height: 44px;
     border-radius: 10px;
-    background: #f4f4f0;
+    background: var(--bg);
     color: var(--brand);
     display: flex;
     align-items: center;
@@ -554,11 +554,11 @@
 /* 危险按钮 */
 .btn-danger {
     background: #fef2f2;
-    color: #dc2626;
+    color: var(--danger);
     border: 1px solid #fecaca;
 }
 .btn-danger:hover {
-    background: #fee2e2;
+    background: var(--danger-bg);
     border-color: #fca5a5;
 }
 

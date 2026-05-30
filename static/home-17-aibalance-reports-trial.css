@@ -2,7 +2,7 @@
    v108 · Google AI Studio 余额追踪
    ============================================================ */
 .billing-card {
-    background: linear-gradient(135deg, #111111, #333333);
+    background: linear-gradient(135deg, var(--ink), var(--brand-hover));
     border-radius: 14px;
     padding: 22px 26px;
     margin: 24px 0 20px;
@@ -43,7 +43,7 @@
 }
 .billing-card-actions .btn-primary.btn-sm {
     background: #fff;
-    color: #111111;
+    color: var(--ink);
 }
 .billing-card-actions .btn-primary.btn-sm:hover {
     background: #f3f4f6;
@@ -126,12 +126,12 @@
 }
 
 .billing-modal-help {
-    background: #f4f4f0;
-    border: 1px solid #e8e8e3;
+    background: var(--bg);
+    border: 1px solid var(--line);
     border-radius: 6px;
     padding: 10px 12px;
     font-size: 12px;
-    color: #111111;
+    color: var(--ink);
     margin-bottom: 14px;
 }
 .billing-modal-link {
@@ -234,20 +234,20 @@
 }
 .report-tpl-item:hover {
     border-color: #cbd5e1;
-    background: #f4f4f0;
+    background: var(--bg);
 }
 .report-tpl-item input[type="radio"] {
     margin-top: 3px;
-    accent-color: #111111;
+    accent-color: var(--ink);
     flex-shrink: 0;
 }
 .report-tpl-item:has(input:checked) {
-    border-color: #111111;
-    background: #f4f4f0;
+    border-color: var(--ink);
+    background: var(--bg);
     box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
 }
 .report-tpl-item.is-recommended:has(input:checked) {
-    border-color: #111111;
+    border-color: var(--ink);
 }
 .report-tpl-content { flex: 1; min-width: 0; }
 .report-tpl-name {
@@ -258,7 +258,7 @@
 .report-tpl-badge {
     display: inline-flex; align-items: center;
     padding: 2px 8px;
-    background: #fef3c7;
+    background: var(--warn-bg);
     color: #92400e;
     font-size: 11px; font-weight: 600;
     border-radius: 10px;
@@ -280,15 +280,15 @@
     font-size: 13px; color: #334155;
     transition: all 0.15s;
 }
-.report-period-item:hover { border-color: #cbd5e1; background: #f4f4f0; }
+.report-period-item:hover { border-color: #cbd5e1; background: var(--bg); }
 .report-period-item input[type="radio"] {
-    accent-color: #111111;
+    accent-color: var(--ink);
     margin: 0;
     display: none;
 }
 .report-period-item:has(input:checked) {
-    border-color: #111111;
-    background: #111111;
+    border-color: var(--ink);
+    background: var(--ink);
     color: #fff;
 }
 .report-lang-hint {
@@ -308,12 +308,12 @@
 }
 .report-modal-foot .btn { min-width: 96px; }
 .report-modal-foot .btn-primary {
-    background: #111111;
+    background: var(--ink);
     color: #fff;
     border: none;
 }
 .report-modal-foot .btn-primary:hover:not(:disabled) {
-    background: #111111;
+    background: var(--ink);
 }
 .report-modal-foot .btn-primary:disabled {
     opacity: 0.6; cursor: not-allowed;
@@ -354,10 +354,10 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 @media (max-width: 768px) {
     .plan-banner { left: 0; }
 }
-.plan-banner-info { background: #f4f4f0; color: #111111; }
+.plan-banner-info { background: var(--bg); color: var(--ink); }
 .plan-banner-success { background: #ecfdf5; color: #065f46; }
-.plan-banner-warn { background: #fef3c7; color: #92400e; }
-.plan-banner-danger { background: #fee2e2; color: #991b1b; }
+.plan-banner-warn { background: var(--warn-bg); color: #92400e; }
+.plan-banner-danger { background: var(--danger-bg); color: #991b1b; }
 .plan-banner-btn {
     padding: 4px 12px;
     border-radius: 999px;
@@ -455,14 +455,14 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     text-align: center;
     padding: 14px;
     margin-bottom: 16px;
-    background: #f4f4f0;
+    background: var(--bg);
     border-radius: 10px;
 }
 .pay-plan-name {
     font-size: 13px; color: #64748b; margin-bottom: 4px;
 }
 .pay-plan-summary .pay-amount-big {
-    font-size: 32px; font-weight: 800; color: #111111;
+    font-size: 32px; font-weight: 800; color: var(--ink);
 }
 .pay-bank-card {
     background: #fff;
@@ -483,7 +483,7 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 .pay-copyable {
     cursor: pointer;
     padding: 4px 8px;
-    background: #f4f4f0;
+    background: var(--bg);
     border-radius: 6px;
     transition: all .15s;
 }
@@ -497,7 +497,7 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 .pay-line-id {
     display: inline-block;
     padding: 2px 10px;
-    background: #06c755;
+    background: var(--line-color);
     color: #fff;
     border-radius: 999px;
     font-weight: 600;
@@ -576,18 +576,18 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     background: #fff;
 }
 .upg-card:hover {
-    border-color: #111111;
+    border-color: var(--ink);
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(17,17,17,.12);
 }
 .upg-card.is-recommended {
-    border-color: #111111;
-    background: linear-gradient(180deg, #f4f4f0 0%, #fff 60%);
+    border-color: var(--ink);
+    background: linear-gradient(180deg, var(--bg) 0%, #fff 60%);
 }
 .upg-card-rec {
     position: absolute; top: -10px; left: 18px;
     padding: 2px 10px;
-    background: #111111; color: #fff;
+    background: var(--ink); color: #fff;
     font-size: 11px; font-weight: 700;
     border-radius: 999px;
     letter-spacing: .3px;
@@ -599,7 +599,7 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     font-size: 12px; color: #64748b; margin: 4px 0 14px;
 }
 .upg-card-price {
-    font-size: 30px; font-weight: 800; color: #111111;
+    font-size: 30px; font-weight: 800; color: var(--ink);
     display: flex; align-items: baseline;
     margin-bottom: 14px;
 }
@@ -634,9 +634,9 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 .pay-amount-big {
     text-align: center;
     font-size: 32px; font-weight: 800;
-    color: #111111;
+    color: var(--ink);
     padding: 16px 0;
-    background: #f4f4f0;
+    background: var(--bg);
     border-radius: 10px;
     margin-bottom: 18px;
 }
@@ -663,10 +663,10 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     margin-bottom: 10px;
     display: flex; align-items: center; justify-content: center; gap: 8px;
     border: 1.5px dashed #cbd5e1;
-    background: #f4f4f0;
+    background: var(--bg);
     color: #475569;
 }
-.pay-pick-btn:hover { border-color: #111111; color: #111111; background: #f4f4f0; }
+.pay-pick-btn:hover { border-color: var(--ink); color: var(--ink); background: var(--bg); }
 .pay-pick-btn svg { width: 16px; height: 16px; }
 .pay-input {
     width: 100%;
@@ -677,7 +677,7 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     margin-bottom: 8px;
     font-family: inherit;
 }
-.pay-input:focus { outline: none; border-color: #111111; }
+.pay-input:focus { outline: none; border-color: var(--ink); }
 .pay-submit-btn { width: 100%; padding: 12px; font-size: 15px; }
 .pay-line-contact {
     text-align: center;

@@ -118,7 +118,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
     font-weight: 500;
     flex-shrink: 0;
 }
-.avatar-pill-admin { background: #fef3c7; color: #92400e; }
+.avatar-pill-admin { background: var(--warn-bg); color: #92400e; }
 .avatar-popup-sep { height: 1px; background: var(--line-soft); margin: 4px 0; }
 
 @media (max-width: 600px) {
@@ -208,7 +208,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
     font-size: 10px;
     padding: 1px 7px;
     border-radius: 4px;
-    background: #fef3c7;
+    background: var(--warn-bg);
     color: #92400e;
     font-weight: 500;
     flex-shrink: 0;
@@ -275,7 +275,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
     font-family: Consolas, "SF Mono", monospace;
     background: #fff;
 }
-.glv-acct-prefix-input:focus { border-color: #111111; outline: none; }
+.glv-acct-prefix-input:focus { border-color: var(--ink); outline: none; }
 
 /* 结果区头部 */
 .glv-result-head {
@@ -289,7 +289,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
 
 /* 明细表 */
 .glv-table-wrap {
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line);
     border-radius: var(--border-radius-lg, 12px);
     overflow: auto;
     max-height: 520px;
@@ -311,7 +311,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
 .glv-table thead th.glv-num { text-align: right; }
 .glv-table tbody td {
     padding: 8px 12px;
-    border-bottom: 1px solid #e8e8e3;
+    border-bottom: 1px solid var(--line);
     color: #1F2937;
     vertical-align: middle;
 }
@@ -333,12 +333,12 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line);
     border-radius: var(--border-radius-lg, 12px);
     overflow: hidden;
     background: #fff;
 }
-.glv-summary-table tr { border-bottom: 1px solid #e8e8e3; }
+.glv-summary-table tr { border-bottom: 1px solid var(--line); }
 .glv-summary-table tr:last-child { border-bottom: 0; }
 .glv-summary-table td {
     padding: 11px 14px;
@@ -391,7 +391,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
 
 /* ── 可折叠分区（差异明细 / 对账汇总） ───────────────────── */
 .glv-section {
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line);
     border-radius: var(--border-radius-lg, 12px);
     overflow: hidden;
     background: #fff;
@@ -402,7 +402,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
     gap: 10px;
     padding: 12px 16px;
     background: #ffffff;
-    border-bottom: 1px solid #e8e8e3;
+    border-bottom: 1px solid var(--line);
     cursor: pointer;
     user-select: none;
     transition: background .15s;
@@ -454,7 +454,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
 .glv-history {
     margin-top: 24px;
     background: #ffffff;
-    border: 1px solid #e8e8e3;
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 16px 20px;
 }
@@ -522,5 +522,5 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
     margin: 0 1px;
     transition: background .15s, color .15s;
 }
-.glv-history-actions button:hover { background: #f4f4f0; color: #111111; }
+.glv-history-actions button:hover { background: var(--bg); color: var(--ink); }
 

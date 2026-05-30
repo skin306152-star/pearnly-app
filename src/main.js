@@ -48,7 +48,8 @@ import './home/settings-general.js'; // REFACTOR-C1 · 设置→通用面板(语
 import './home/sidebar-nav-group.js'; // REFACTOR-C1 · 侧栏可折叠业务流分组(window.expandNavGroupForRoute)
 import './home/help-modal.js'; // REFACTOR-C1 · Help modal 关闭绑定
 import './home/integration-config.js'; // REFACTOR-C1 · 集成页「配置」按钮→抽屉
-import './home/erp-integration.js'; // REFACTOR-C1 · ERP 集成页(推送日志+端点管理 · loadErpLogs/loadErpEndpoints/...)
+import './home/erp-endpoints.js'; // REFACTOR-WB-C1 · ERP 端点管理(从 erp-integration 抽出 · window 桥接 · 须在 erp-integration 前)
+import './home/erp-integration.js'; // REFACTOR-C1 · ERP 集成页(推送日志 · loadErpLogs/showLogDetail/retryPushLog · 端点管理已抽出 erp-endpoints.js)
 import './home/line-email-modal.js'; // REFACTOR-WB-C1 · LINE 用户补邮箱强制 modal(自包含 IIFE · 自启动)
 import './home/change-password.js'; // REFACTOR-WB-C1 · 修改密码模块(设置→账户 · 自包含 IIFE)
 import './home/session-heartbeat.js'; // REFACTOR-WB-C1 · Session 心跳 15s 踢设备(自包含 IIFE · window._sessionCheck)

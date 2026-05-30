@@ -91,8 +91,21 @@ fi
 if [ -n "$FE_CHANGED" ]; then
   echo "▶ 改动含前端 · 跑前端守门"
 
-  echo "  · prettier --check(格式 · 巨石经 .prettierignore 豁免)"
-  npm run format:check || fail "prettier 格式"
+  # prettier 只对【本次 push 范围内改动的前端文件】跑 · 且按【将要推送的提交内容】
+  # (git show HEAD:file)校验,而非工作区文件。
+  # 原因(2026-05-30 修):仓库级 `npm run format:check` 在 Windows 上会误伤——
+  #   core.autocrlf=true 把 LF 检出成 CRLF · prettier endOfLine:lf 对未改动文件全报红 ·
+  #   卡死所有含前端的 push(连别窗口干净的 .py/.yml commit 也被同分支挡住)。
+  #   按提交内容校验 = 看真正要上 master 的字节(LF)· 不受本机 CRLF 检出影响。
+  # 与 Python 闸同范式(只查本次改动)· 仓库级 format:check 仍由 CI 事后兜底。
+  echo "  · prettier --check(本次改动前端文件 · 按提交内容 · 巨石经 .prettierignore 豁免)"
+  FE_FMT_FAIL=0
+  for f in $FE_CHANGED; do
+    git cat-file -e "HEAD:$f" 2>/dev/null || continue  # 已删文件跳过
+    git show "HEAD:$f" | npx prettier --check --stdin-filepath="$f" >/dev/null 2>&1 \
+      || { echo "    ✗ $f"; FE_FMT_FAIL=1; }
+  done
+  [ "$FE_FMT_FAIL" = "1" ] && fail "prettier 格式(本次改动前端文件)"
 
   echo "  · eslint(前端真 bug · 0 error 放行)"
   npm run lint || fail "eslint"

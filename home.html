@@ -1696,35 +1696,7 @@
 <div class="modal-overlay" id="help-modal" style="display:none;"></div>
 
 <!-- v118.28.1 · 分配客户给员工 modal(老板用) -->
-<div class="modal-overlay" id="assign-clients-modal" style="display:none;">
-    <div class="modal" style="max-width:480px">
-        <div class="modal-head">
-            <div class="modal-title">
-                <span data-i18n="assign-modal-title">分配客户</span>
-                <span class="modal-title-sub" id="assign-modal-target"></span>
-            </div>
-            <button type="button" class="modal-close" id="assign-modal-close" aria-label="Close">
-                <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l8 8M14 6l-8 8" stroke-linecap="round"/></svg>
-            </button>
-        </div>
-        <div class="modal-body">
-            <div class="assign-modal-toolbar">
-                <label class="assign-toolbar-checkbox">
-                    <input type="checkbox" id="assign-select-all">
-                    <span data-i18n="assign-select-all">全选</span>
-                </label>
-                <span class="assign-toolbar-count" id="assign-selected-count"></span>
-            </div>
-            <div class="assign-clients-list" id="assign-clients-list">
-                <div class="assign-empty" data-i18n="assign-loading">加载中...</div>
-            </div>
-        </div>
-        <div class="modal-foot">
-            <button type="button" class="btn btn-ghost" id="assign-modal-cancel" data-i18n="assign-cancel">取消</button>
-            <button type="button" class="btn btn-primary" id="assign-modal-save" data-i18n="assign-save">保存</button>
-        </div>
-    </div>
-</div>
+<div class="modal-overlay" id="assign-clients-modal" style="display:none;"></div>
 
 <!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 home.js 前 · 提供 window.I18N -->
 <script src="/static/i18n-data.js?v=11850000"></script>

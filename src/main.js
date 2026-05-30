@@ -17,6 +17,7 @@ import './home/billing.js';
 import './home/test-center.js'; // REFACTOR-C1 · 测试中心(skin only)
 import './home/workspace-switcher.js'; // B4 · workspace 工作模式切换器(取代旧 ClientSwitcher)
 import './home/recon-center.js'; // REFACTOR-C1 · 对账中心首页(loadReconcilePage)
+import './home/modal-assign-clients.js'; // REFACTOR-WB-C3 · 客户分配弹窗 inner 注入(assign-clients.js _bindOnce 用户开时绑 · 置其前)
 import './home/assign-clients.js'; // REFACTOR-C1 · 客户分配 modal(openAssignClientsModal)
 import './home/access-log.js'; // REFACTOR-C1 · 客户访问日志 tab(自绑 · owner only)
 import './home/modal-notif-new.js'; // REFACTOR-WB-C3 · 智能提醒新建规则弹窗 inner 注入(home.html 空壳 · 须在 notifications.js 前 · _bindOnce eval 期绑)

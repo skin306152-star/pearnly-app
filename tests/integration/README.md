@@ -7,16 +7,33 @@
 ### 1. 纯函数安全网(无条件跑 · CI 真跑不 skip)
 
 直接调用纯计算函数,不连 DB、不打网络、不烧 Gemini。CI 每次都跑,是真正能拦回归的硬闸。
-重点锁「扣费正确性」——窗口 A 拆高敏 OCR/billing/VAT 热路径时,任一金额不变量被改坏就立刻红。
+给窗口 A 拆高敏 OCR/billing/VAT/ERP 热路径当保险:任一不变量被改坏就立刻红。
+命名 `test_*_safety_net.py` · 当前 10 文件 / 152 测。
+
+**扣费 + 对账链**(文件 → units → cost → charge → 配对 → 退款 → 充值,全程纯函数闸):
 
 | 文件 | 测数 | 锁什么 |
 |---|---|---|
 | `test_billing_correctness_safety_net.py` | 23 | PDF 阶梯价跨界 200 / Excel 字符向上取整 / 估价幂等 / usage↔退款冲销 / `_ocr_validate_invoice` 7% VAT 公式 |
 | `test_excel_charge_units_safety_net.py` | 14 | `_excel_char_count_estimate` 计费 units:文本按 utf-8 字符数(非字节,防多字节多收 3 倍)+ 文件→units→cost 闭合 |
-| `test_recon_matching_safety_net.py` | 12 | `_build_recon_pairs` 一对一配对:partition 不变量(不重复计入 / 不静默丢)+ 不误配 + 散客/OCR 漏税号分类 |
 | `test_topup_contract_safety_net.py` | 10 | 充值金额边界契约:`amount_thb` gt=0/le=500000 + 超管审批 `actual_amount_thb` gt=0 |
+| `test_recon_matching_safety_net.py` | 12 | `_build_recon_pairs` 一对一配对:partition 不变量(不重复计入 / 不静默丢)+ 不误配 + 散客/OCR 漏税号分类 |
+| `test_recon_primitives_safety_net.py` | 17 | 配对原语:总额求和 / `_eq_amount` 容差 / `normalize_invoice_no`+`normalize_tax_id` / `tax_id_fuzzy_distance` |
+| `test_recon_field_override_safety_net.py` | 8 | `ALLOWED_FIELDS` 用户可校正 7 字段白名单(含金额 · 不含派生 total)+ `parse_overrides` JSONB→dict 副本归一 |
 
-扣费链覆盖:文件 bytes → units → cost → charge → recon 配对 → 退款 → 充值,全程纯函数闸。
+**ERP 客户/商品同步**(归一写坏 → 匹配错买方/错商品码 = 红线 · 现有 mrerp 测要真 sandbox + 浏览器,CI skip):
+
+| 文件 | 测数 | 锁什么 |
+|---|---|---|
+| `test_erp_matching_safety_net.py` | 20 | `_matching` 地基:`normalize_company_name`(去法人后缀)vs `normalize_item_name`(保后缀)/ `levenshtein`+`ratio` / `fuzzy_match` 阈值/平局/跳 None |
+| `test_mrerp_customer_parse_safety_net.py` | 15 | `parse_armas_listing`(行/表头/限域/缺码)+ `_norm_tax`(仅 13 位可比)+ `_strip_tags` + `to_dict` 契约 |
+| `test_mrerp_product_parse_safety_net.py` | 17 | `parse_stkmas_listing` + `suggest_generic_product_code`(多语种命中 · 名字优先分类)+ `to_dict` 契约 |
+
+**OCR 非图像路径**:
+
+| 文件 | 测数 | 锁什么 |
+|---|---|---|
+| `test_table_path_safety_net.py` | 16 | `table_path`:CSV→`Layer1Result` 契约(engine / `table_rows` 按表头键 dict / 空与不支持扩展名抛 `ValueError`)+ `_decode_bytes` 多编码(泰文 cp874)|
 
 ### 2. env-gated 真集成(默认 skip · 配齐 env 才跑)
 

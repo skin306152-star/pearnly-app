@@ -113,6 +113,31 @@ jobs:
             python scripts/check_line_ratchet.py
           fi
 
+  # REFACTOR-WC · UI 一致性闸(审计发现 #2:check_ui_consistency 没接 CI · 1787 违规无人棘轮)
+  #   棘轮:违规总数 > BASELINE_TOTAL(脚本内 · 现 1787)→ 非零退出。
+  #   当前 warning 模式(continue-on-error: true · 红但不挡 push)· 等窗口 B 把 B1/B2 降下来 ·
+  #   手动把 BASELINE_TOTAL 棘轮调小 → 谁让 UI 不一致反弹超基线,CI 当场报红。
+  lint-ui:
+    name: lint-ui (REFACTOR-WC · UI 一致性棘轮 · WARNING mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # ⚠️ warning 模式 · 红但不挡 push · 窗口 B 降违规 + 棘轮收紧后改 false(fail 模式)
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 零依赖(只用标准库)
+
+      - name: UI 一致性棘轮 · 违规不许反弹超基线(审计 #2)
+        run: python scripts/check_ui_consistency.py
+
   # REFACTOR-WC · 新债 diff 闸(封死铁律 #5/#17 · 审计发现「纸面规矩没机械执行」)
   #   #5  db.py/services/** 不许新增 def ensure_*  (运行期建表反模式 · schema 只走 alembic)
   #   #17 app.py 不许新增 @app.<verb> 路由         (路由必落 *_routes.py · 防巨石回潮)

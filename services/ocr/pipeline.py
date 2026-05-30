@@ -45,11 +45,10 @@ from __future__ import annotations
 import logging
 import os
 import re
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Union
 
 from .confidence import (
     check_field_in_l1_text,
@@ -89,6 +88,12 @@ from .validators import (
 )
 
 logger = logging.getLogger(__name__)
+
+from .pattern_memory import (  # noqa: F401 · P-C 纯搬家 re-export(调用方 0 改动)
+    MIN_INSTANCES_BEFORE_FLAGGING,
+    InvoicePatternMemory,
+)
+
 
 from .cost import (  # noqa: F401 · P-A 纯搬家 re-export(调用方 0 改动)
     COST_FLASHLITE_INPUT_PER_M_USD,
@@ -151,7 +156,6 @@ def downscale_image_bytes(image_bytes: bytes, max_long_edge: int) -> bytes:
 # Template (invoice_number prefix) familiarity check — minimum seen instances
 # before flagging a new pattern as anomalous, to avoid flagging the first
 # invoice ever for a given seller.
-MIN_INSTANCES_BEFORE_FLAGGING = int(os.environ.get("OCR_PIPELINE_PATTERN_MIN_INSTANCES", "2"))
 
 # Critical fields whose word-level confidence we check (B1 fix: replaces the
 # page-avg confidence trigger which was too coarse).
@@ -187,87 +191,6 @@ CONFIDENCE_REVIEW_THRESHOLD = float(os.environ.get("OCR_CONF_REVIEW", "0.90"))
 # ============================================================
 # Invoice number pattern memory (B1 fix part: template familiarity)
 # ============================================================
-class InvoicePatternMemory:
-    """Tracks invoice_number prefix patterns per seller_tax to catch anomalies.
-
-    Pattern extraction: leading letters + up to 4 leading digits before any
-    non-alphanumeric separator. Examples:
-        IV69/00271  -> 'IV69'   (letters + 2 digits, stops at `/`)
-        IV69100179  -> 'IV6910' (no separator; 4 digits captured)
-        IV60/00304  -> 'IV60'   (different from IV69!)
-        INV2026030204 -> 'INV2026'
-        INV2026030002 -> 'INV2026'
-
-    Anomaly logic: only flag if the seller_tax has been seen with >=
-    MIN_INSTANCES_BEFORE_FLAGGING different invoices already (baseline
-    built). Brand-new sellers don't get flagged.
-
-    Current scope: in-memory only, per-Pipeline-process. For production
-    integration with app.py, this can be initialized from
-    db.get_seller_recent_invoices(seller_tax) or similar.
-    """
-
-    _PREFIX_RE = re.compile(r"^([A-Za-z]+)(\d{0,4})")
-
-    def __init__(self):
-        self._patterns: Dict[str, Set[str]] = {}
-        self._instance_counts: Dict[str, int] = {}
-        self._lock = threading.Lock()
-
-    @classmethod
-    def _extract_pattern(cls, invoice_number: str) -> Optional[str]:
-        """Returns canonical pattern or None if no clean prefix."""
-        if not invoice_number:
-            return None
-        m = cls._PREFIX_RE.match(invoice_number)
-        if not m or not m.group(1):
-            return None
-        return (m.group(1) + m.group(2)).upper()
-
-    def record(self, seller_tax: Optional[str], invoice_number: Optional[str]) -> None:
-        """Record that this seller_tax issued an invoice with this pattern.
-
-        Called after every page is processed. We deliberately record AFTER
-        the (possibly-L3-corrected) final invoice, so the memory learns
-        the corrected values.
-        """
-        if not seller_tax or not invoice_number:
-            return
-        pattern = self._extract_pattern(invoice_number)
-        if not pattern:
-            return
-        with self._lock:
-            self._patterns.setdefault(seller_tax, set()).add(pattern)
-            self._instance_counts[seller_tax] = self._instance_counts.get(seller_tax, 0) + 1
-
-    def check_anomaly(
-        self,
-        seller_tax: Optional[str],
-        invoice_number: Optional[str],
-    ) -> Optional[str]:
-        """Return a trigger-reason string if pattern doesn't match any
-        previously seen pattern for this seller_tax. None = OK or no baseline.
-
-        Skips check if (a) inputs empty, (b) less than
-        MIN_INSTANCES_BEFORE_FLAGGING invoices seen for this seller_tax.
-        """
-        if not seller_tax or not invoice_number:
-            return None
-        new_pattern = self._extract_pattern(invoice_number)
-        if not new_pattern:
-            return None
-        with self._lock:
-            known = self._patterns.get(seller_tax)
-            instance_count = self._instance_counts.get(seller_tax, 0)
-            if not known or instance_count < MIN_INSTANCES_BEFORE_FLAGGING:
-                return None
-            if new_pattern in known:
-                return None
-            return (
-                f"invoice_number {invoice_number!r} pattern={new_pattern!r} "
-                f"differs from known patterns {sorted(known)} for seller_tax "
-                f"{seller_tax} ({instance_count} prior invoices)"
-            )
 
 
 # ============================================================

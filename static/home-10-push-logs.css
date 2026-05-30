@@ -305,22 +305,13 @@ button.btn-primary.btn-tiny:hover {
 
 .log-tag.retry { background: var(--warn-bg); color: var(--amber-800); }
 
-.log-retry-btn {
+/* log-retry-btn 收口中央 .btn-icon(home-38)·钩子 data-log-retry 不变·仅保留 22×22 紧凑密度(plan §3①·不破坏行内布局)·边框/底/色/hover 由 btn-icon 统一接管 · REFACTOR-WB-BTN */
+.log-retry-btn.btn-icon {
     width: 22px;
     height: 22px;
-    border-radius: 4px;
-    border: 1px solid var(--line);
-    background: white;
-    color: var(--ink-3);
-    cursor: pointer;
+    min-height: 22px;
+    border-radius: 6px;
     font-size: 13px;
-    padding: 0;
-    line-height: 1;
-}
-.log-retry-btn:hover {
-    background: var(--warn-bg);
-    color: var(--amber-800);
-    border-color: var(--amber-300);
 }
 
 /* 日志详情对话框 */

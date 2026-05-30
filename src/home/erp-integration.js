@@ -182,7 +182,7 @@ async function loadErpLogs(silent) {
                     // v118.25 · 重试中不显示手动重推按钮(避免和 worker 撞);失败终态才显示
                     const retryBtn =
                         log.status === 'failed' && !isRetrying
-                            ? `<button class="log-retry-btn" data-log-retry="${escapeHtml(log.id)}" title="${escapeHtml(t('log-retry-title'))}">↻</button>`
+                            ? `<button class="log-retry-btn btn btn-icon" data-log-retry="${escapeHtml(log.id)}" title="${escapeHtml(t('log-retry-title'))}">↻</button>`
                             : '';
                     // 问题 D (Zihao 2026-05-19 拍板 · v118.34.25) · 全选要含 success.
                     // 原:只 failed 终态可选(重试中防抢 · success 没意义)

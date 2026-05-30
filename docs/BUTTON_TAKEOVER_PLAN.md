@@ -40,5 +40,18 @@
 - 客户管理(设为当前/编辑/归档)· 团队管理(分配客户/发送改密链接/禁用/移除)· 设置各按钮 · Pearnly 访问日志导出CSV → 收编。
 - 全站逐条核每个批量栏是否 hidden-when-empty。
 
+## 2.5 §3 视觉项决策(2026-05-30 主控拍板 · Zihao「需拍板的视觉按最好的做」)
+B 上轮列出 3 个留 Zihao 审的视觉项,主控按工程最优定如下,B 下轮自取执行(纯结构性 + 截图自核,无需再等人):
+- ① **图标行系统(log-retry-btn 等 22×22 图标按钮)折叠进 `.btn-icon`** → **做**。统一图标按钮体系最干净。⚠️前提:`.btn-icon` 不能破坏紧凑布局(保留原 22×22 尺寸 + 行内间距);若套用 `.btn-icon` 后行高/间距变化,加 `.btn-sm` 或局部覆盖保持原视觉密度。改完截图自核 icon 行未变形。
+- ② **tab-active 全统一品牌蓝** → **不做(保持现状 --line)**。理由:tab/分段控件做实心蓝 = 反最佳实践,会与"主操作蓝"撞色、破坏层级——正是本文 §2「tab/chip/nav 绝不做成实心蓝(会破坏)」的红线。最佳做法就是 tab 维持 `--line`/分段样式不变。**此项标记 closed-won't-do,别再反复查。**
+- ③ **像素级蓝复核** → **做**(纯核对无风险):按 [[btn-verify-prod-bytes-not-headless-probe]] 用 prod CSS 字节核主操作按钮确是 #2563eb 实心蓝、无后续 .btn 覆盖;肉眼一瞥归 Zihao。
+
+做完 ①③ + 标 ② closed → §1/§2/§3 全清 → 进 §3 验收。
+
 ## 3. 验收(Zihao 一次性审)
 全部改完 → 主控/窗口跑 Playwright 截关键页(异常栏/集成/客户/设置/发票记录)自核 → 让 Zihao 看一遍关键页确认"蓝/变体对/选中才显示/忘记密码能点/上传图片没了" → OUTCOMES #1/#2/#3 划掉。
+
+**已核实落地(主控 2026-05-30 按 prod/origin 字节核·非自述):**
+- Bug A 忘记密码:`d68f2ae` · origin change-password.js 事件委托 closest('#cpw-forgot-link')×4 · E2E MODAL=true ✅
+- Bug B 桌面隐藏上传图片:`5322a01` · origin home-15-team-folder.css `@media(min-width:769px){#btn-upload-pic{display:none}}` · 桌面隐藏手机保留·钩子未动 ✅
+- §2 全站扫描完成:origin HEAD 730727d · 5 收编 commit 全 git 核存在 ✅

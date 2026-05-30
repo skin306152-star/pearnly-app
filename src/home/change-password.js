@@ -32,154 +32,156 @@
         return typeof t === 'function' ? t(key) : key;
     }
 
-    function bindEvents() {
-        // v109.4 · 防 Chrome/Edge autofill 关键技巧:页面加载时字段是 readonly · 用户点击/聚焦时才移除 readonly
-        // 这样浏览器不会触发 autofill(autofill 只对非 readonly 字段生效)
-        const cpwInputs = ['cpw-old', 'cpw-new', 'cpw-confirm'];
-        cpwInputs.forEach((id) => {
+    // Bug A 修复(2026-05-30)· 改密表单元素由 page-settings.js 运行期注入 + recon-subtab DOM-move →
+    // DOMContentLoaded 直绑必 race(忘记密码/提交/眼睛全曾失效)· 改 document 事件委托(对注入/move 免疫)。
+    // 钩子 id/class 全保留 · 0 逻辑改(仅绑定机制)。
+    let _cpwDelegated = false;
+
+    function armCpwInputs() {
+        ['cpw-old', 'cpw-new', 'cpw-confirm'].forEach((id) => {
             const inp = document.getElementById(id);
-            if (!inp) return;
-            // 页面加载强制清空 + 设 readonly 避免 autofill
-            inp.value = '';
-            inp.setAttribute('readonly', 'readonly');
-            // focus 时移除 readonly · 让用户能输入
-            inp.addEventListener('focus', function () {
-                this.removeAttribute('readonly');
-            });
-            // blur 时清空(防键盘 manager 残留)— 不做这个 · 用户可能想编辑后再回来确认 newpw
+            if (inp) {
+                inp.value = '';
+                inp.setAttribute('readonly', 'readonly');
+            }
         });
-
-        // 设置页打开时再次清空(用户可能已经填了之后切走又回来)
-        // 通过监听 settings tab 切换实现
-        document
-            .querySelectorAll('.settings-nav-item[data-settings-tab="account"]')
-            .forEach((tab) => {
-                tab.addEventListener('click', () => {
-                    setTimeout(() => {
-                        cpwInputs.forEach((id) => {
-                            const inp = document.getElementById(id);
-                            if (inp) {
-                                inp.value = '';
-                                inp.setAttribute('readonly', 'readonly');
-                            }
-                        });
-                        const bar = document.getElementById('cpw-strength-bar');
-                        if (bar) {
-                            bar.style.width = '0%';
-                            bar.className = 'cpw-strength-bar';
-                        }
-                        showMsg('', '');
-                    }, 100);
-                });
-            });
-
-        // 眼睛图标 · 切换密码可见
-        document.querySelectorAll('.cpw-eye').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const target = btn.dataset.target;
-                const inp = document.getElementById(target);
-                if (!inp) return;
-                inp.type = inp.type === 'password' ? 'text' : 'password';
-            });
-        });
-
-        // 新密码强度条
-        const newInp = document.getElementById('cpw-new');
         const bar = document.getElementById('cpw-strength-bar');
-        if (newInp && bar) {
-            newInp.addEventListener('input', () => {
-                const s = strength(newInp.value);
+        if (bar) {
+            bar.style.width = '0%';
+            bar.className = 'cpw-strength-bar';
+        }
+        showMsg('', '');
+    }
+
+    async function submitChangePw() {
+        const btn = document.getElementById('btn-change-pw');
+        const oldEl = document.getElementById('cpw-old');
+        const newEl = document.getElementById('cpw-new');
+        const cfmEl = document.getElementById('cpw-confirm');
+        const bar = document.getElementById('cpw-strength-bar');
+        if (!btn || !oldEl || !newEl || !cfmEl) return;
+
+        const oldPw = oldEl.value;
+        const newPw = newEl.value;
+        const cfm = cfmEl.value;
+
+        // 前端校验
+        if (!oldPw || !newPw || !cfm) {
+            showMsg(tt('settings-change-pw-empty'), 'error');
+            return;
+        }
+        if (newPw.length < 8) {
+            showMsg(tt('settings-change-pw-too-short'), 'error');
+            return;
+        }
+        if (!(/[a-zA-Z]/.test(newPw) && /\d/.test(newPw))) {
+            showMsg(tt('settings-change-pw-too-weak'), 'error');
+            return;
+        }
+        if (newPw !== cfm) {
+            showMsg(tt('settings-change-pw-mismatch'), 'error');
+            return;
+        }
+
+        // 提交
+        btn.disabled = true;
+        const oldText = btn.textContent;
+        btn.textContent = tt('settings-change-pw-submitting');
+        showMsg('', '');
+
+        try {
+            const tok = localStorage.getItem('mrpilot_token');
+            const r = await fetch('/api/me/change_password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + tok,
+                },
+                body: JSON.stringify({ old_password: oldPw, new_password: newPw }),
+            });
+            const data = await r.json().catch(() => ({}));
+            if (r.ok && data.ok) {
+                showMsg(tt('settings-change-pw-success'), 'success');
+                if (typeof showToast === 'function')
+                    showToast(tt('settings-change-pw-success'), 'success');
+                oldEl.value = '';
+                newEl.value = '';
+                cfmEl.value = '';
+                if (bar) {
+                    bar.style.width = '0%';
+                    bar.className = 'cpw-strength-bar';
+                }
+            } else {
+                const detail = data.detail || '';
+                let msg = tt('settings-change-pw-success'); // 占位
+                if (detail === 'wrong_old_password') msg = tt('settings-change-pw-wrong-old');
+                else if (detail === 'password_too_short') msg = tt('settings-change-pw-too-short');
+                else if (detail === 'password_too_weak') msg = tt('settings-change-pw-too-weak');
+                else msg = detail || 'Error';
+                showMsg(msg, 'error');
+            }
+        } catch (e) {
+            console.error('change_password', e);
+            showMsg('Network error', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = oldText;
+        }
+    }
+
+    function bindEvents() {
+        if (_cpwDelegated) return;
+        _cpwDelegated = true;
+
+        // 点击委托:眼睛切换 / 忘记密码 / 提交 / 切账户安全 tab 清空
+        document.addEventListener('click', (e) => {
+            if (!e.target || !e.target.closest) return;
+            const eye = e.target.closest('.cpw-eye');
+            if (eye) {
+                const inp = document.getElementById(eye.dataset.target);
+                if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+                return;
+            }
+            if (e.target.closest('#cpw-forgot-link')) {
+                e.preventDefault();
+                openForgotCurrentPwModal();
+                return;
+            }
+            if (e.target.closest('#btn-change-pw')) {
+                submitChangePw();
+                return;
+            }
+            if (
+                e.target.closest(
+                    '.settings-nav-item[data-settings-tab="account"], .settings-nav-item[data-tab="account"], .settings-nav-item[data-tab="security"]'
+                )
+            ) {
+                setTimeout(armCpwInputs, 100);
+            }
+        });
+
+        // 输入委托:新密码强度条
+        document.addEventListener('input', (e) => {
+            if (e.target && e.target.id === 'cpw-new') {
+                const bar = document.getElementById('cpw-strength-bar');
+                if (!bar) return;
+                const s = strength(e.target.value);
                 const widths = ['0%', '33%', '66%', '100%'];
                 const cls = ['', 'weak', 'medium', 'strong'];
                 bar.style.width = widths[s];
                 bar.className = 'cpw-strength-bar ' + cls[s];
-            });
-        }
-
-        // v109.4 · 「忘记当前密码?」链接 → 弹窗确认发送重置邮件
-        const forgotLink = document.getElementById('cpw-forgot-link');
-        if (forgotLink) {
-            forgotLink.addEventListener('click', () => openForgotCurrentPwModal());
-        }
-
-        // 提交
-        const btn = document.getElementById('btn-change-pw');
-        if (!btn) return;
-        btn.addEventListener('click', async () => {
-            const oldEl = document.getElementById('cpw-old');
-            const newEl = document.getElementById('cpw-new');
-            const cfmEl = document.getElementById('cpw-confirm');
-            if (!oldEl || !newEl || !cfmEl) return;
-
-            const oldPw = oldEl.value;
-            const newPw = newEl.value;
-            const cfm = cfmEl.value;
-
-            // 前端校验
-            if (!oldPw || !newPw || !cfm) {
-                showMsg(tt('settings-change-pw-empty'), 'error');
-                return;
-            }
-            if (newPw.length < 8) {
-                showMsg(tt('settings-change-pw-too-short'), 'error');
-                return;
-            }
-            if (!(/[a-zA-Z]/.test(newPw) && /\d/.test(newPw))) {
-                showMsg(tt('settings-change-pw-too-weak'), 'error');
-                return;
-            }
-            if (newPw !== cfm) {
-                showMsg(tt('settings-change-pw-mismatch'), 'error');
-                return;
-            }
-
-            // 提交
-            btn.disabled = true;
-            const oldText = btn.textContent;
-            btn.textContent = tt('settings-change-pw-submitting');
-            showMsg('', '');
-
-            try {
-                const tok = localStorage.getItem('mrpilot_token');
-                const r = await fetch('/api/me/change_password', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: 'Bearer ' + tok,
-                    },
-                    body: JSON.stringify({ old_password: oldPw, new_password: newPw }),
-                });
-                const data = await r.json().catch(() => ({}));
-                if (r.ok && data.ok) {
-                    showMsg(tt('settings-change-pw-success'), 'success');
-                    if (typeof showToast === 'function')
-                        showToast(tt('settings-change-pw-success'), 'success');
-                    oldEl.value = '';
-                    newEl.value = '';
-                    cfmEl.value = '';
-                    if (bar) {
-                        bar.style.width = '0%';
-                        bar.className = 'cpw-strength-bar';
-                    }
-                } else {
-                    const detail = data.detail || '';
-                    let msg = tt('settings-change-pw-success'); // 占位
-                    if (detail === 'wrong_old_password') msg = tt('settings-change-pw-wrong-old');
-                    else if (detail === 'password_too_short')
-                        msg = tt('settings-change-pw-too-short');
-                    else if (detail === 'password_too_weak')
-                        msg = tt('settings-change-pw-too-weak');
-                    else msg = detail || 'Error';
-                    showMsg(msg, 'error');
-                }
-            } catch (e) {
-                console.error('change_password', e);
-                showMsg('Network error', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = oldText;
             }
         });
+
+        // 焦点委托:防 autofill · 聚焦改密字段时移除 readonly
+        document.addEventListener('focusin', (e) => {
+            if (e.target && ['cpw-old', 'cpw-new', 'cpw-confirm'].includes(e.target.id)) {
+                e.target.removeAttribute('readonly');
+            }
+        });
+
+        // 若改密表单此刻已在场 · 立即武装一次(清空 + readonly 防 autofill)
+        if (document.getElementById('cpw-old')) armCpwInputs();
     }
 
     // v109.4 · 「忘记当前密码?」弹窗

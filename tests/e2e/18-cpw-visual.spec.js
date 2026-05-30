@@ -42,7 +42,10 @@ test.describe('改密 UI 视觉验收(A2/A3 · .cpw-* CSS restore)', () => {
 
         // ────── 3) #cpw-forgot-link 真的可见(A2 核心:漏迁前不可见)
         const forgotLink = page.locator('#cpw-forgot-link');
-        await expect(forgotLink, '忘记密码链接应可见(.cpw-forgot-link CSS 已 restore)').toBeVisible();
+        await expect(
+            forgotLink,
+            '忘记密码链接应可见(.cpw-forgot-link CSS 已 restore)'
+        ).toBeVisible();
 
         // 是文字链接样式:有下划线
         const deco = await forgotLink.evaluate((el) => getComputedStyle(el).textDecorationLine);

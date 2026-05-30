@@ -290,6 +290,7 @@ _REEXPORTS = {
         "delete_ocr_history",
         "delete_ocr_history_with_pdf_paths",
         "insert_ocr_history",
+        "update_ocr_history_pdf_storage",
         "get_history_pdf_info",
         "find_ocr_by_hash",
         "check_duplicate_invoice",

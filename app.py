@@ -26,7 +26,6 @@ from db import (
     increment_user_monthly_usage,
     insert_ocr_history,
 )
-import pdf_storage  # v114 · PDF 留底存储模块
 from auth import (
     get_current_user_from_request,
     get_client_ip,
@@ -735,28 +734,9 @@ async def ocr_recognize(
     except Exception as e:
         logger.warning(f"[dup_check] 读取用户设置失败 · 用默认值: {e}")
 
-    # v114 · PDF 留底 · 所有发票共享同一份原 PDF · 失败不阻塞主流程
-    # v115 · 升级 · 先生成 searchable PDF(把 OCR 文字塞进不可见层)· 失败 fallback 原 PDF
-    _pdf_rel_path, _pdf_size_bytes = None, None
-    try:
-        # v115 · 收集每页搜索文本 · 用 Gemini 已识别的字段拼出
-        _pdf_to_save = content
-        try:
-            import pdf_searchable
-
-            _pages_texts = pdf_searchable.extract_searchable_text_from_pages(
-                result.get("pages") or []
-            )
-            if any(t.strip() for t in _pages_texts):
-                _searchable = pdf_searchable.make_searchable_pdf(content, _pages_texts)
-                if _searchable:
-                    _pdf_to_save = _searchable
-        except Exception as _se:
-            logger.warning(f"v115 · searchable PDF 生成失败 · 用原始 PDF: {_se}")
-
-        _pdf_rel_path, _pdf_size_bytes = pdf_storage.save_pdf(str(user["id"]), _pdf_to_save)
-    except Exception as _pdf_err:
-        logger.warning(f"⚠️ PDF 留底失败(已忽略): {_pdf_err}")
+    # v114/v115 · PDF 留底(searchable PDF 生成 + save_pdf)·
+    # REFACTOR-WA-OCRPERF Step1:挪出响应主路径 → 响应返回后后台生成 + 回填 pdf_storage_path
+    #   (字段/响应不变 · 砍墙钟开销大头)。下方 insert 先存 None · 见函数尾部后台任务。
 
     for idx, group in enumerate(invoice_groups, start=1):
         g_pages = group["source_pages"]
@@ -885,9 +865,9 @@ async def ocr_recognize(
             source_page_indices=group["page_indices"] if invoice_count > 1 else None,
             source_index=idx if invoice_count > 1 else None,
             source_total=invoice_count if invoice_count > 1 else None,
-            # v114 · PDF 留底 · 所有发票共享同一份原 PDF
-            pdf_storage_path=_pdf_rel_path,
-            pdf_size_bytes=_pdf_size_bytes,
+            # v114 · PDF 留底 · REFACTOR-WA-OCRPERF Step1:先存 None · 响应返回后后台生成+回填
+            pdf_storage_path=None,
+            pdf_size_bytes=None,
             # v27.8.1.13a · 右上角客户切换器选中时自动归属(多发票同一 PDF 共享同一 client_id)
             client_id=(
                 int(client_id) if (client_id and str(client_id).strip().isdigit()) else None
@@ -1156,6 +1136,40 @@ async def ocr_recognize(
         )
     except Exception as _cost_err:
         logger.warning(f"成本记录写入失败(不影响识别): {_cost_err}")
+
+    # REFACTOR-WA-OCRPERF Step1 · PDF 留底后台化:响应返回后才生成 searchable PDF + save_pdf
+    #   + 回填 pdf_storage_path(前端 has_pdf 届时显示下载)。字段/响应字段一字不变;
+    #   留底失败只是没下载(同原 try/except 降级)。sync CPU/disk 走 to_thread 不堵 event loop。
+    if history_ids:
+        try:
+            _pdf_pages = result.get("pages") or []
+            _pdf_uid = str(user["id"])
+            _pdf_tid = _tid(user)
+            _pdf_hids = list(history_ids)
+            _pdf_content = content
+
+            async def _bg_pdf_backfill():
+                try:
+                    from services.ocr.pdf_backfill import generate_and_save_pdf
+
+                    rel, size = await asyncio.to_thread(
+                        generate_and_save_pdf, _pdf_content, _pdf_pages, _pdf_uid
+                    )
+                    if rel:
+                        await asyncio.to_thread(
+                            db.update_ocr_history_pdf_storage,
+                            _pdf_hids,
+                            rel,
+                            size,
+                            _pdf_uid,
+                            _pdf_tid,
+                        )
+                except Exception as _bge:
+                    logger.warning(f"[ocrperf] PDF 后台留底/回填失败(已忽略): {_bge}")
+
+            asyncio.create_task(_bg_pdf_backfill())
+        except Exception as _sched_err:
+            logger.warning(f"[ocrperf] PDF 后台任务调度失败(已忽略): {_sched_err}")
 
     # P0 修 (2026-05-26) · 同页多票防静默漏:收集 pipeline 标出的"可能漏识别发票"页
     # (_validation_warnings 里以 possible_missed_invoice 开头),回前端明确提示 +

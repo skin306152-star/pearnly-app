@@ -210,6 +210,43 @@ def delete_ocr_history_with_pdf_paths(
         return 0, []
 
 
+def update_ocr_history_pdf_storage(
+    record_ids: list,
+    pdf_storage_path: str,
+    pdf_size_bytes: Optional[int],
+    user_id: str,
+    tenant_id: Optional[str] = None,
+) -> int:
+    """REFACTOR-WA-OCRPERF Step1 · 后台回填 PDF 留底路径。
+
+    searchable PDF 生成挪出响应主路径后,响应返回再后台生成 + 调本函数补写 pdf_storage_path/
+    pdf_size_bytes(前端 has_pdf 届时显示下载)。**tenant/user 锁**(同
+    delete_ocr_history_with_pdf_paths 口径)防越权回填别 tenant/user 的记录。
+    Returns: 回填行数(无 record_ids / 无 path / 异常 → 0 · 绝不抛 · 留底失败不影响识别)。
+    """
+    if not record_ids or not pdf_storage_path:
+        return 0
+    try:
+        with db.get_cursor(commit=True) as cur:
+            if tenant_id:
+                cur.execute(
+                    "UPDATE ocr_history SET pdf_storage_path = %s, pdf_size_bytes = %s "
+                    "WHERE id = ANY(%s::uuid[]) "
+                    "AND user_id IN (SELECT id FROM users WHERE tenant_id = %s::uuid)",
+                    (pdf_storage_path, pdf_size_bytes, record_ids, tenant_id),
+                )
+            else:
+                cur.execute(
+                    "UPDATE ocr_history SET pdf_storage_path = %s, pdf_size_bytes = %s "
+                    "WHERE id = ANY(%s::uuid[]) AND user_id = %s::uuid",
+                    (pdf_storage_path, pdf_size_bytes, record_ids, user_id),
+                )
+            return cur.rowcount
+    except Exception as e:
+        logger.error(f"update_ocr_history_pdf_storage failed: {e}")
+        return 0
+
+
 def insert_ocr_history(
     user_id: str,
     filename: str,

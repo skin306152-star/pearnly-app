@@ -24,6 +24,7 @@ import './home/notifications.js'; // REFACTOR-C1 · 智能提醒(_loadNotificati
 import './home/recon-batch.js'; // REFACTOR-C1 · 对账历史多选批量删(自绑 · 事件委托)
 import './home/welcome-wizard.js'; // REFACTOR-C1 · 登录后欢迎向导(自绑 · 暂下架)
 import './home/modal-archive-rule.js'; // REFACTOR-WB-C3 · 归档命名规则弹窗 inner 注入(home.html 空壳 · archive-settings.js 文档委托 · 置其前稳妥)
+import './home/modal-archive-token.js'; // REFACTOR-WB-C3 · 归档字段编辑弹窗 inner 注入(archive-settings.js 文档委托 · 置其前稳妥)
 import './home/archive-settings.js'; // REFACTOR-C1 · 归档命名规则编辑器(设置页 tab)
 import './home/big-batch-progress.js'; // REFACTOR-C1 · 大批量上传进度条(_bigBatchStart/_bigBatchStop)
 import './home/erp-xero.js'; // REFACTOR-C1 · Xero 连接卡片

@@ -90,13 +90,21 @@ from .validators import (
 
 logger = logging.getLogger(__name__)
 
+from .cost import (  # noqa: F401 · P-A 纯搬家 re-export(调用方 0 改动)
+    COST_FLASHLITE_INPUT_PER_M_USD,
+    COST_FLASHLITE_OUTPUT_PER_M_USD,
+    COST_FLASH_INPUT_PER_M_USD,
+    COST_FLASH_OUTPUT_PER_M_USD,
+    COST_VISION_PER_PAGE_USD,
+    THB_PER_USD,
+    _compute_total_cost,
+)
 
 # ============================================================
 # Constants / env-tunable thresholds
 # ============================================================
 CONFIDENCE_THRESHOLD = float(os.environ.get("OCR_PIPELINE_CONF_THRESHOLD", "0.85"))
 AMOUNT_TOLERANCE_THB = float(os.environ.get("OCR_PIPELINE_AMOUNT_TOL", "0.5"))
-THB_PER_USD = float(os.environ.get("OCR_PIPELINE_THB_PER_USD", "35"))
 # Step2(REFACTOR-WA-OCRPERF)· 多页 PDF 页面并行度 · 仅 pattern_memory is None(生产 web 路径)
 # 时并发;并发 4 远低于 Vision 1800/min 配额 · 设 1 即退回串行。
 OCR_PDF_PAGE_WORKERS = int(os.environ.get("OCR_PDF_PAGE_WORKERS", "4"))
@@ -152,11 +160,6 @@ CRITICAL_FIELDS = ("invoice_number", "total_amount", "seller_tax")
 
 # Gemini pricing (USD per 1M tokens unless noted). Update if Google changes pricing.
 # Source: architecture.md §三 cost table back-calculated to per-token rates.
-COST_VISION_PER_PAGE_USD = 0.00150
-COST_FLASHLITE_INPUT_PER_M_USD = 0.10
-COST_FLASHLITE_OUTPUT_PER_M_USD = 0.40
-COST_FLASH_INPUT_PER_M_USD = 0.30
-COST_FLASH_OUTPUT_PER_M_USD = 2.50
 
 DEFAULT_DPI = 200
 DEFAULT_MAX_PAGES = 50
@@ -1017,28 +1020,3 @@ def _check_amount_math(invoice: ThaiInvoice) -> Optional[str]:
 # ============================================================
 # Internal: cost
 # ============================================================
-def _compute_total_cost(page_results: List[PipelinePageResult]) -> float:
-    """Sum estimated cost across pages, return THB.
-
-    Notes:
-        - Vision $0.00150/page applies only when Layer 1 Vision actually
-          ran (layer_chain starts with "L1"). When text_path (Layer 0)
-          hit and Vision was skipped, layer_chain starts with "text" and
-          no Vision cost is added.
-        - Flash-Lite cost = (input * 0.10 + output * 0.40) / 1M tokens, USD
-        - Flash cost = (input * 0.30 + output * 2.50) / 1M tokens, USD
-        - Then * THB_PER_USD (default 35)
-    """
-    total_usd = 0.0
-    for pr in page_results:
-        # Vision per-page — only when L1 actually ran (skipped for text_path)
-        if "L1" in pr.layer_chain:
-            total_usd += COST_VISION_PER_PAGE_USD
-        # Flash-Lite (always runs)
-        total_usd += (pr.layer2_input_tokens / 1_000_000.0) * COST_FLASHLITE_INPUT_PER_M_USD
-        total_usd += (pr.layer2_output_tokens / 1_000_000.0) * COST_FLASHLITE_OUTPUT_PER_M_USD
-        # Flash (only if L3 ran successfully — tokens > 0 means it ran)
-        if pr.layer3_input_tokens or pr.layer3_output_tokens:
-            total_usd += (pr.layer3_input_tokens / 1_000_000.0) * COST_FLASH_INPUT_PER_M_USD
-            total_usd += (pr.layer3_output_tokens / 1_000_000.0) * COST_FLASH_OUTPUT_PER_M_USD
-    return total_usd * THB_PER_USD

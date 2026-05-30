@@ -325,7 +325,7 @@
             <div class="exc-error">
                 ${errSvg}
                 <div class="exc-error-msg">${escapeHtml(title)}${desc ? ' · ' + escapeHtml(desc) : ''}</div>
-                <button class="exc-retry-btn" id="exc-retry-btn" type="button">${escapeHtml(t('exc-retry-btn'))}</button>
+                <button class="btn btn-sm btn-secondary" id="exc-retry-btn" type="button">${escapeHtml(t('exc-retry-btn'))}</button>
             </div>`;
         const btn = document.getElementById('exc-retry-btn');
         if (btn)

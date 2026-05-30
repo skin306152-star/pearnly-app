@@ -349,16 +349,6 @@
     font-size: 13px;
     color: var(--ink-2);
 }
-.exc-retry-btn {
-    padding: 6px 14px;
-    font-size: 13px;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    color: var(--ink);
-    cursor: pointer;
-}
-.exc-retry-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 @media (max-width: 768px) {
     .exc-batch-bar {

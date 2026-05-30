@@ -19,11 +19,10 @@ tests/integration/test_core_routes_presence.py · REFACTOR-WC-D3
   - 下列 15 个 path 均为 2026-05-29 对"干净 committed master"逐条
     `in app.app.routes` 校验通过(非手写猜测)· 覆盖 上传识别/销项税/收入对账/
     ERP推送/客户团队 + 鉴权会话(/api/me)+ 注册(/api/auth/signup)。
-  - **登录、充值(billing)路由暂不纳入**:窗口 A 重构期间这两组的注册 path
-    正在变动(login 不在 /api/login 也不在 /api/auth/login · billing 当前
-    未以 /api/billing/* 注册)· 它们已有各自的专用集成测试
-    (test_auth_integration / test_billing_integration · env-gated)兜底行为。
-    待 A 把 app.py 拆到地板、路由 path 稳定后再把这两组的真实 path 纳入本守门。
+  - 2026-05-30 扩:A 已把 app.py 拆出 *_routes.py(billing_topup / credits /
+    auth_email_code / line 等)· 登录/充值/邮箱验证码/LINE 绑定/改密 这批高敏
+    用户可见 path 现已稳定注册 · 逐条对 committed master `in app.app.routes`
+    校验通过后纳入本守门(对应铁律 #16 高敏主路径:登录/计费/推送)。
 
 设计:
   - 不查行为 · 只查"路由名册"(app.routes 的 path 集合)· 故无需 DB / 凭据。
@@ -74,6 +73,35 @@ CORE_ROUTES = {
     "客户团队/clients-team": [
         "/api/clients",
         "/api/team/employees",
+    ],
+    # 2026-05-30 扩 · A 拆 app.py 后稳定的高敏用户可见 path(铁律 #16)
+    "登录/login": [
+        "/api/login",
+    ],
+    "充值/topup": [
+        "/api/credits/topup/request",
+        "/api/credits/topup/history",
+        "/api/credits/topup/upload-slip/{request_id}",
+        "/api/me/credits",
+        "/api/admin/credits/topup/requests",
+    ],
+    "用量/usage": [
+        "/api/credits/usage-history",
+        "/api/credits/usage-report",
+    ],
+    "邮箱验证码/email-code": [
+        "/api/auth/send_email_code",
+        "/api/auth/verify_email_code",
+        "/api/auth/forgot_password",
+        "/api/auth/reset_password",
+    ],
+    "LINE绑定/line": [
+        "/api/line/binding",
+        "/api/line/binding-code",
+        "/api/line/webhook",
+    ],
+    "改密/password": [
+        "/api/me/change_password",
     ],
 }
 

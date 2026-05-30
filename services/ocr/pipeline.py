@@ -100,6 +100,45 @@ THB_PER_USD = float(os.environ.get("OCR_PIPELINE_THB_PER_USD", "35"))
 # Step2(REFACTOR-WA-OCRPERF)· 多页 PDF 页面并行度 · 仅 pattern_memory is None(生产 web 路径)
 # 时并发;并发 4 远低于 Vision 1800/min 配额 · 设 1 即退回串行。
 OCR_PDF_PAGE_WORKERS = int(os.environ.get("OCR_PDF_PAGE_WORKERS", "4"))
+# Step3(REFACTOR-WA-OCRPERF)· 图片上传送 Layer1 Vision 前的最长边上限(只缩不放)·
+# 0 = 关闭压缩。A/B 已验 2400px 对真泰票 7 关键字段 0 变化 + L3 不升 + 更快。
+# 仅作用于【图片上传】的 Layer1 输入;PDF 渲染图 + L3 兜底用全分辨率原图(不经此)。
+OCR_IMG_MAX_LONG_EDGE = int(os.environ.get("OCR_IMG_MAX_LONG_EDGE", "2400"))
+
+
+def downscale_image_bytes(image_bytes: bytes, max_long_edge: int) -> bytes:
+    """图片上传送 Layer1 Vision 前按最长边 cap 压缩 · 只缩不放 · 小图原样。
+
+    Step3(REFACTOR-WA-OCRPERF)· 仅用于【图片上传】路径的 Layer1 输入(run_on_image_bytes)·
+    PDF 渲染图 / L3 视觉兜底用全分辨率原图(不调本函数)。
+    任何异常 / 不需要 / 压完反而更大 → 返回原 bytes(绝不破坏识别)。
+    保留格式(PNG→PNG · JPEG→JPEG q90);A/B 验证用 PNG resize·此处同口径。
+    """
+    if not image_bytes or not max_long_edge or max_long_edge <= 0:
+        return image_bytes
+    try:
+        import io as _io
+        from PIL import Image
+
+        im = Image.open(_io.BytesIO(image_bytes))
+        w, h = im.size
+        longest = max(w, h)
+        if longest <= max_long_edge:
+            return image_bytes  # 小图原样 · 不放大
+        sc = max_long_edge / longest
+        fmt = (im.format or "PNG").upper()
+        im2 = im.resize((max(1, round(w * sc)), max(1, round(h * sc))), Image.LANCZOS)
+        buf = _io.BytesIO()
+        if fmt in ("JPEG", "JPG"):
+            im2.convert("RGB").save(buf, format="JPEG", quality=90)
+        else:
+            im2.save(buf, format="PNG")
+        out = buf.getvalue()
+        return out if 0 < len(out) < len(image_bytes) else image_bytes
+    except Exception as e:  # 压缩绝不破坏识别 · 失败回退原图
+        logger.warning("downscale_image_bytes failed (use original): %s", e)
+        return image_bytes
+
 
 # Template (invoice_number prefix) familiarity check — minimum seen instances
 # before flagging a new pattern as anomalous, to avoid flagging the first
@@ -483,6 +522,9 @@ def run_on_image_bytes(
         raise ValueError("pipeline: empty image bytes")
 
     t0 = time.time()
+    # Step3(REFACTOR-WA-OCRPERF)· 仅图片上传:Layer1 Vision 用压缩版(最长边 cap)·
+    # image_bytes 传原图全分辨率 → L3 兜底用原图。PDF 路径(run_on_pdf_bytes)不经此。
+    _l1_img = downscale_image_bytes(image_bytes, OCR_IMG_MAX_LONG_EDGE)
     pr = _process_one_page(
         image_bytes,
         page_number=1,
@@ -491,6 +533,7 @@ def run_on_image_bytes(
         fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
         pattern_memory=pattern_memory,
         document_type=document_type,
+        layer1_image_bytes_override=_l1_img,
     )
     elapsed_ms = int((time.time() - t0) * 1000)
     cost_thb = _compute_total_cost([pr])
@@ -565,19 +608,26 @@ def _process_one_page(
     pattern_memory: Optional[InvoicePatternMemory] = None,
     layer1_page_override: Optional[Page] = None,
     document_type: BusinessDocumentType = "auto",
+    layer1_image_bytes_override: Optional[bytes] = None,
 ) -> PipelinePageResult:
     """L1 -> L2 -> (maybe L3) for ONE page. Captures cost / latency / errors.
 
     If layer1_page_override is given (typically from text_path layer 0),
     Layer 1 Vision API is skipped — the supplied Page is used directly.
     image_bytes is still kept for potential Layer 3 visual fallback.
+
+    Step3(REFACTOR-WA-OCRPERF)· layer1_image_bytes_override:给定时 Layer1 Vision 用它
+    (图片上传压缩版)· image_bytes 仍是原图全分辨率 → L3 视觉兜底用原图(疑难票全清晰度)。
     """
     t_total = time.time()
 
     # --- Layer 1 (skipped if layer1_page_override provided) ---
     if layer1_page_override is None:
         t_l1 = time.time()
-        l1_result = _l1_extract_image(image_bytes, page_number=page_number)
+        _l1_input = (
+            layer1_image_bytes_override if layer1_image_bytes_override is not None else image_bytes
+        )
+        l1_result = _l1_extract_image(_l1_input, page_number=page_number)
         l1_ms = int((time.time() - t_l1) * 1000)
         l1_page = l1_result.pages[0]
         l1_layer_name = "L1"

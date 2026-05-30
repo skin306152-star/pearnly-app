@@ -1,6 +1,12 @@
 # OCR-core 拆分草案(WA)· REFACTOR-WA-OCRSPLIT
 
-> **进度**:✅ **L2-A 已落地+真账号 E2E 验过**(commit `5ba582c`·layer2_structure 981→850·新 layer2_gemini.py 169·AST 精切 verbatim·re-export 身份不变·契约 4 测+COV4 14 测经 facade 绿·部署后 INV2026030007 字段全对 2160+151.20=2311.20 VAT7%·L3 不变·prod 200)。下一刀:P-A cost.py(最小最纯)→ P-C/P-B → L2-B(prompt-coupled·真重构·单独轮)。
+> **进度(纯搬家批·自跑自验·真账号 E2E 兜底)**:
+> - ✅ **L2-A**(`5ba582c`)layer2_structure 981→850·新 layer2_gemini.py·E2E INV2026030007 字段全对 VAT7% L3不变。
+> - ✅ **P-A**(`60b6f74`)pipeline→cost.py·1044→1025·E2E INV2026030008 字段全对 VAT7%。
+> - ✅ **P-C**(`b1ffd9b`)pipeline→pattern_memory.py·1025→947·E2E INV2026030010 字段全对 VAT7%(该票自然触发 L3·触发逻辑未动)。
+> - ⏭️ **下一刀 P-B**(触发/置信纯逻辑→triggers.py·~200 行·最大纯搬家刀·是 L3 触发决策→E2E 须验 L3 触发不变·单独 focused 轮做)。
+> - 真重构刀 **L2-B / P-D** 仍待:单独轮·拆细+密 E2E·别混进搬家 commit。
+> 累计:layer2_structure 981→850 · pipeline 1044→947(均仍 >500·warning-mode 闸不阻·P-B + 真重构刀后趋 <500)。
 
 > 目标:`services/ocr/pipeline.py`(1044)+ `services/ocr/layer2_structure.py`(981)→ 各 <500(铁律#27)。
 > 方法:**纯结构搬家(copy-out + 文件尾 re-export 回原命名空间 → 调用方 0 改动 + 契约 assertIs 锁同一对象)** 为主;

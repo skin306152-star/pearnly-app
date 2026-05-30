@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 """
 services/erp/mrerp_customer_sync.py
 
@@ -42,10 +41,11 @@ Public API:
 
 from __future__ import annotations
 
-from __future__ import annotations
-
 import logging
-from typing import Any, Dict, List, Optional
+import re
+from dataclasses import dataclass
+from datetime import date
+from typing import Any, Dict, List, Literal, Optional
 
 from playwright.sync_api import (
     Error as PWError,
@@ -55,48 +55,240 @@ from playwright.sync_api import (
 from services.erp._master_data_cache import TTLCache
 from services.erp._matching import (
     levenshtein_ratio,
+    normalize_company_name,
 )
 from services.erp.exceptions import (
+    MRERPBusinessError,
     MRERPTechnicalError,
 )
 from services.erp._listing_paginate import fetch_all_listing_pages
 
-from services.erp.mrerp_customer_base import (  # noqa: F401
-    BuyerInfo,
-    ListingCustomer,
-    CustomerSyncResult,
-    parse_armas_listing,
-    _strip_tags,
-    _norm_tax,
-    _extract_top_level_spans,
-    CUSTOMER_LEVENSHTEIN_THRESHOLD_DEFAULT,
-    DEFAULT_CUSTOMER_CODE_PREFIX,
-    DEFAULT_CUSTOMER_TYPE_CODE,
-    DEFAULT_CUSTOMER_TYPE_LABEL,
-    DEFAULT_BRANCH_CODE,
-    DEFAULT_BRANCH_LABEL,
-    DEFAULT_COUNTRY,
-    DEFAULT_NUMERIC_TEXT,
-    DEFAULT_PLACEHOLDER,
-    TENANT_VALID_ACCOUNT_CODE,
-    DEFAULT_CREDIT_TERM,
-    DEFAULT_EXCHANGE_RATE,
-    DEFAULT_CUSTOMER_RANK,
-    CUSTOMER_NAME_MAX,
-)
-
-from services.erp.mrerp_customer_lookup import _CustomerLookupMixin
-from services.erp.mrerp_customer_create import _CustomerCreateMixin
-
 logger = logging.getLogger(__name__)
 
 
-class MRERPCustomerSyncService(_CustomerLookupMixin, _CustomerCreateMixin):
+CUSTOMER_LEVENSHTEIN_THRESHOLD_DEFAULT = 0.82  # Zihao 2026-05-18 拍板
+
+# Per [mrerp-master-data-sync-design.md §3.4](../../docs/integrations/mrerp-master-data-sync-design.md):
+# Default customer code template is P{YYMM}{SEQ4} = 9 chars (well under
+# the 20-char ceiling). 'P' = Pearnly-created so admins can spot
+# auto-created rows in MR.ERP.
+DEFAULT_CUSTOMER_CODE_PREFIX = "P"
+
+# Default values for required MR.ERP fields the OCR doesn't provide.
+# Tunable per-tenant in a future settings table (see design §8). The
+# values here mirror what Zihao manually set when creating customer 0006.
+DEFAULT_CUSTOMER_TYPE_CODE = "1-11"  # ลูกหนี้การค้า
+DEFAULT_CUSTOMER_TYPE_LABEL = "ลูกหนี้การค้า"
+DEFAULT_BRANCH_CODE = "00000"  # สำนักงานใหญ่
+DEFAULT_BRANCH_LABEL = "สำนักงานใหญ่"
+DEFAULT_COUNTRY = "ไทย"
+
+# checknull() on armas/allform.php demands every "required" cell be
+# non-empty. The list below mirrors the JS alert text discovered during
+# Phase 3 integration testing (2026-05-18) — Zihao's manual 0006 setup
+# only filled 4 fields because the master-data picker prefilled the
+# other defaults. Our auto-create skips the picker, so we have to plant
+# placeholders for every cell checknull() inspects.
+DEFAULT_NUMERIC_TEXT = "0.00"
+DEFAULT_PLACEHOLDER = "0000"
+# Discovered via bshlistboxdata.php: the txtacfile picker's first valid
+# account code on TEST2019 is "1111-01" / เงินสด. Different tenants
+# will likely need to override this via tenant_settings — see open
+# questions in mrerp-master-data-sync-design.md §9.
+TENANT_VALID_ACCOUNT_CODE = "1111-01"
+DEFAULT_CREDIT_TERM = "0"
+DEFAULT_EXCHANGE_RATE = "1.00"
+DEFAULT_CUSTOMER_RANK = "-"
+
+CUSTOMER_NAME_MAX = 100  # MR.ERP UI accepts up to ~100; conservative
+
+
+@dataclass
+class BuyerInfo:
+    """Input for customer sync — pulled from OCR + Pearnly client context."""
+
+    name: str
+    tenant_id: str = ""
+    client_id: int = 0
+    tax_id: Optional[str] = None
+    address: Optional[str] = None
+    branch: Optional[str] = None
+
+
+@dataclass
+class ListingCustomer:
+    """One row scraped from armas/allview.php."""
+
+    code: str
+    type_name: str
+    prefix: str
+    name: str
+    name_norm: str = ""
+
+
+@dataclass
+class CustomerSyncResult:
+    """What lookup / lookup_or_create returns to the adapter."""
+
+    customer_code: str
+    source: Literal[
+        "cache_hit",
+        "db_mapping",
+        "erp_name_match",
+        "erp_fuzzy_match",
+        "erp_auto_created",
+    ]
+    confidence: float
+    matched_name: Optional[str] = None
+    is_new: bool = False
+    erp_code_persisted: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "customer_code": self.customer_code,
+            "source": self.source,
+            "confidence": self.confidence,
+            "matched_name": self.matched_name,
+            "is_new": self.is_new,
+            "erp_code_persisted": self.erp_code_persisted,
+        }
+
+
+# ============================================================
+# Listing parsing
+# ============================================================
+
+# Per the armas/allview.php structure documented above. The header <p>
+# (first one) has literal Thai labels; data rows have actual values.
+_ROW_PATTERN = re.compile(
+    r"<p\b[^>]*>(?P<body>(?:(?!<p\b)(?!</p>).)*?)</p>",
+    re.DOTALL,
+)
+# Top-level spans only — exclude the nested URA review spans by
+# stripping anything after the first 5 top-level <span>s. We capture by
+# matching balanced spans iteratively.
+_TOP_SPAN_PATTERN = re.compile(
+    r"<span\b(?P<attrs>[^>]*)>(?P<inner>.*?)</span>",
+    re.DOTALL,
+)
+_HEADER_LABELS = {"รหัสลูกค้า", "ชื่อประเภทลูกค้า", "คำนำหน้า", "ชื่อลูกค้า", "URA"}
+
+
+def _strip_tags(s: str) -> str:
+    return re.sub(r"<[^>]+>", "", s).strip()
+
+
+def _norm_tax(s: Any) -> str:
+    """归一化泰国税号:去掉所有非数字 · 仅当结果是 13 位才返回(否则空 = 不可比)。
+    P2 税号优先复核用 · 空/非 13 位 → 视为"无可比税号" → 降级名称复核。"""
+    if not s:
+        return ""
+    digits = re.sub(r"\D", "", str(s))
+    return digits if len(digits) == 13 else ""
+
+
+def parse_armas_listing(html: str) -> List[ListingCustomer]:
+    """Extract customer rows from an armas/allview.php response.
+
+    Scope: only `<p>` elements inside `<div id="showdata">…</div>`. That
+    avoids picking up the footer's status row (which has the same span-
+    inside-p shape but contains "Username : / Status : / Company : /
+    Database Name :" cells).
+
+    Also skips:
+      - the header row (first cell == `รหัสลูกค้า`)
+      - rows with fewer than 4 top-level spans
+      - rows missing customer_code or customer_name
+    """
+    scope_match = re.search(
+        r'<div\b[^>]*\bid=["\']?showdata["\']?[^>]*>(?P<inner>.*?)</div>',
+        html,
+        re.DOTALL,
+    )
+    scope = scope_match.group("inner") if scope_match else html
+
+    customers: List[ListingCustomer] = []
+    for m in _ROW_PATTERN.finditer(scope):
+        body = m.group("body")
+        spans = _extract_top_level_spans(body, limit=5)
+        if len(spans) < 4:
+            continue
+        code = _strip_tags(spans[0]).strip()
+        type_name = _strip_tags(spans[1]).strip()
+        prefix = _strip_tags(spans[2]).strip()
+        name = _strip_tags(spans[3]).strip()
+        # Skip header row.
+        if code == "รหัสลูกค้า" or type_name == "ชื่อประเภทลูกค้า":
+            continue
+        if not code or not name:
+            continue
+        customers.append(
+            ListingCustomer(
+                code=code,
+                type_name=type_name,
+                prefix=prefix,
+                name=name,
+                name_norm=normalize_company_name(name),
+            )
+        )
+    return customers
+
+
+def _extract_top_level_spans(body: str, *, limit: int = 5) -> List[str]:
+    """Yield the contents of the FIRST `limit` top-level <span> elements in
+    `body`. Properly handles nested <span>s (URA column has a deep tree)."""
+    out: List[str] = []
+    i = 0
+    n = len(body)
+    while i < n and len(out) < limit:
+        start = body.find("<span", i)
+        if start < 0:
+            break
+        # Find end of opening tag
+        gt = body.find(">", start)
+        if gt < 0:
+            break
+        depth = 1
+        j = gt + 1
+        while j < n and depth > 0:
+            next_open = body.find("<span", j)
+            next_close = body.find("</span>", j)
+            if next_close < 0:
+                break
+            if next_open >= 0 and next_open < next_close:
+                # Nested open — skip past its tag
+                tag_end = body.find(">", next_open)
+                if tag_end < 0:
+                    break
+                depth += 1
+                j = tag_end + 1
+            else:
+                depth -= 1
+                if depth == 0:
+                    out.append(body[gt + 1 : next_close])
+                    j = next_close + len("</span>")
+                else:
+                    j = next_close + len("</span>")
+        i = j
+    return out
+
+
+# ============================================================
+# Service
+# ============================================================
+
+
+class MRERPCustomerSyncService:
     """Lookup helper for customer master data.
 
     Construct with an active MRERPAdapter (the service uses its
     BrowserSession / page; it does NOT create its own browser).
     """
+
+    LISTING_PATH = "/armas/allview.php"
+    FORM_PATH = "/armas/allform.php"
+    DEFAULT_PAGE_TIMEOUT_MS = 15_000
+    SAVE_TIMEOUT_MS = 30_000
 
     def __init__(
         self,
@@ -114,6 +306,349 @@ class MRERPCustomerSyncService(_CustomerLookupMixin, _CustomerCreateMixin):
         self._listing_cache_key = "__armas_listing__"
         # 自动挑的默认种子客户码缓存(没配 seed 时自动建用 · 见 _resolve_default_seed)
         self._default_seed_cache: Optional[str] = None
+
+    # ----- public API ------------------------------------------
+
+    def lookup(
+        self,
+        buyer: BuyerInfo,
+        mappings: Dict[str, Any],
+    ) -> Optional[CustomerSyncResult]:
+        """Try Layers 0-3. Returns None if no match passes the threshold.
+
+        Side effect: hits L0 caches as it goes. Does NOT mutate `mappings`
+        (Phase 3's lookup_or_create will).
+        """
+        if not buyer or not buyer.name:
+            return None
+
+        # L0 · cache by (tenant_id, normalized name).
+        name_norm = normalize_company_name(buyer.name)
+        cache_key = ("by_name", buyer.tenant_id, name_norm)
+        cached_code = self.cache.get(cache_key) if name_norm else None
+        if cached_code:
+            logger.debug("customer cache hit: %s -> %s", name_norm, cached_code)
+            return CustomerSyncResult(
+                customer_code=cached_code,
+                source="cache_hit",
+                confidence=1.0,
+                matched_name=buyer.name,
+            )
+
+        # L1 · existing mapping for this client_id.
+        l1 = self._layer1_db_mapping(buyer, mappings)
+        if l1 is not None:
+            self.cache.set(cache_key, l1.customer_code)
+            return l1
+
+        # L2/L3 · 用搜索框查全量主数据(替代只读首页 ~30 条的 _fetch_listing ·
+        # 2026-05-25 修:客户 > 30 个时第 31+ 个匹配不上 → 假 ERR_NO_CUSTOMER_MAPPING)。
+        # fail-soft:搜不到/技术异常不阻断 · 让 lookup_or_create 走 L4 auto-create。
+        try:
+            listing = self._search_listing(buyer.name)
+            if not listing:
+                # 全名搜不到 → 用最长 token 再搜一次提召回(下方 exact/fuzzy 仍会收敛)
+                token = max(
+                    (w for w in re.split(r"\s+", buyer.name) if w),
+                    key=len,
+                    default="",
+                )
+                if token and token != buyer.name.strip():
+                    listing = self._search_listing(token)
+        except MRERPTechnicalError as e:
+            logger.warning(
+                "customer search failed in lookup · skipping L2/L3 · "
+                "fall through to None (caller goes L4 auto-create): %s",
+                e,
+            )
+            return None
+
+        l2 = self._layer2_exact_name(name_norm, listing)
+        if l2 is not None:
+            self.cache.set(cache_key, l2.customer_code)
+            return l2
+
+        l3 = self._layer3_fuzzy_name(name_norm, listing)
+        if l3 is not None:
+            self.cache.set(cache_key, l3.customer_code)
+            return l3
+
+        return None
+
+    def lookup_or_create(
+        self,
+        buyer: BuyerInfo,
+        mappings: Dict[str, Any],
+        *,
+        seed_customer_code: Optional[str] = None,
+    ) -> CustomerSyncResult:
+        """Run Layers 0-3 (via `lookup`) then fall through to Layer 4
+        copy-from-seed auto-create when nothing matches.
+
+        ``seed_customer_code`` (Zihao 2026-05-18 拍板 · copy path):
+            existing MR.ERP customer code (e.g. "0006") whose master-
+            data references (salesman / area / shipping / branch / GL
+            account codes) the new row should inherit. When omitted
+            and a lookup miss occurs, raises
+            ``MRERPBusinessError(ERR_NO_SEED_CUSTOMER)`` instead of
+            silently failing — auto-create REQUIRES a seed because the
+            "fill placeholders" path is rejected by the server.
+
+        Side effects on auto-create:
+          - inserts a new customer row in MR.ERP via armas/allform.php
+          - mutates `mappings['clients']` so the same buyer in the same
+            push job hits Layer 1 on subsequent calls
+
+        Raises:
+          - MRERPBusinessError when MR.ERP rejects the create (missing
+            seed, server validation, etc.) — caller surfaces this as
+            a FailedRow
+          - MRERPTechnicalError on Playwright timeouts / lost selectors
+        """
+        existing = self.lookup(buyer, mappings)
+        if existing is not None:
+            return existing
+
+        # 2026-05-25 · 自动建买方"开箱即用":没配 seed 就自动挑一个现有客户当克隆模板。
+        # auto-create 走 copy-from-seed(MR.ERP 建客户表单需继承主数据引用),种子只
+        # 提供 salesman/area/branch/GL 等引用,不影响业务字段 → 不再要求用户预配。
+        if not seed_customer_code:
+            seed_customer_code = self._resolve_default_seed()
+
+        if not seed_customer_code:
+            # 仅当主数据为空(无任何现有客户可当模板)才真失败 → 进异常。
+            raise MRERPBusinessError(
+                f"Auto-create needs a seed customer to clone but the MR.ERP "
+                f"customer master is empty (ERR_NO_SEED_CUSTOMER). buyer={buyer.name!r}",
+                failed_rows=[{"buyer_name": buyer.name, "reason_code": "ERR_NO_SEED_CUSTOMER"}],
+            )
+
+        # Layer 4: copy-from-seed.
+        result = self._layer4_auto_create(buyer, seed_customer_code)
+
+        # Persist into the mappings dict so downstream calls within the
+        # same push job hit Layer 1.
+        if buyer.client_id:
+            self._upsert_mapping(mappings, buyer.client_id, result.customer_code)
+            result.erp_code_persisted = True
+
+        # Cache the new customer for subsequent lookups in this session.
+        name_norm = normalize_company_name(buyer.name)
+        if name_norm:
+            self.cache.set(
+                ("by_name", buyer.tenant_id, name_norm),
+                result.customer_code,
+            )
+        return result
+
+    def verify_resolved_code(
+        self,
+        customer_code: str,
+        buyer_name: str,
+        buyer_tax_id: Optional[str] = None,
+    ) -> str:
+        """Fail-safe(Zihao 2026-05-26 拍板 · P1 + P2 税号优先):复核一个
+        **已解析出**的 customer_code 在 MR.ERP 里对应的客户是否真的就是发票买方。
+
+        背景:推送时 customer_code 可能来自 stale db_mapping / by-name cache /
+        自动建码撞码 —— 凭 code 复用、不复核 → 静默推到错客户(实测:个人买方
+        被推到 บริษัท อิ๊กลู สตูดิโอ)。本方法把"静默错推"变"响亮失败让用户修"。
+
+        复核优先级(P2 · Zihao section 四「税号优先」):
+            1. 有买方税号 → 读 ERP 客户详情页税号:
+                 - 税号一致 → 放行(税号是权威标识 · 即便名字略有出入也算同一户)
+                 - 税号都有但**不一致** → ERR_CUSTOMER_NAME_MISMATCH(同名不同税号 =
+                   不同主体 · 必拦)
+                 - 读不到 ERP 税号(详情页取不到/该客户没填税号)→ **降级到名称复核**
+                   (不硬拦 · 防详情页 selector 假设出错时误杀所有推送)
+            2. 名称归一化相似度 ≥ 阈值 → 放行;否则 ERR_CUSTOMER_NAME_MISMATCH。
+
+        Returns:
+            匹配时返回 MR.ERP 里的真实客户名(供日志/调试)。
+
+        Raises:
+            MRERPBusinessError(ERR_CUSTOMER_NAME_MISMATCH)  名称/税号不一致 · 不 retry。
+            MRERPTechnicalError(ERR_CUSTOMER_VERIFY_UNAVAILABLE)  无法向 ERP 确认
+                (listing search 技术异常/超时,或搜不到该码)· 可 retry · 不当成功。
+        """
+        code = (customer_code or "").strip()
+        name = (buyer_name or "").strip()
+        if not code or not name:
+            raise MRERPTechnicalError(
+                f"ERR_CUSTOMER_VERIFY_UNAVAILABLE — cannot verify "
+                f"(code={code!r}, buyer={name!r} · one is empty)"
+            )
+
+        # 2026-05-26 修:复核搜索加 1 次重试 · 大目录/服务端抖动下单次易超时 →
+        # 误判 ERR_CUSTOMER_VERIFY_UNAVAILABLE 把能推的发票挡下(生产实测)。
+        import time as _time
+
+        listing = None
+        last_err: Optional[Exception] = None
+        for attempt in (1, 2):
+            try:
+                listing = self._search_listing(code)
+                break
+            except MRERPTechnicalError as e:
+                last_err = e
+                if attempt < 2:
+                    _time.sleep(2)
+        if listing is None:
+            raise MRERPTechnicalError(
+                f"ERR_CUSTOMER_VERIFY_UNAVAILABLE — MR.ERP listing lookup "
+                f"failed for customer_code {code!r} after retry: {last_err}"
+            ) from last_err
+
+        row = next((r for r in listing if r.code == code), None)
+        if row is None:
+            # 搜索成功但没这个码 → 无法确认匹配 → 阻断(可 retry · 列表可能短暂抖动)。
+            raise MRERPTechnicalError(
+                f"ERR_CUSTOMER_VERIFY_UNAVAILABLE — customer_code {code!r} "
+                f"not found in MR.ERP listing (cannot confirm it matches "
+                f"buyer {name!r})"
+            )
+
+        # P2 · 税号优先:有买方税号才付出读详情页的代价(否则纯名称复核 · 不加导航)。
+        buyer_tax = _norm_tax(buyer_tax_id)
+        if buyer_tax:
+            erp_tax = ""
+            try:
+                detail = self._fetch_customer_detail(code)
+                erp_tax = _norm_tax((detail or {}).get("tax_id"))
+            except Exception as e:  # best-effort · 失败降级名称复核 · 绝不因读详情失败硬拦
+                logger.warning("customer detail tax read failed for %s: %s", code, e)
+                erp_tax = ""
+            if erp_tax:
+                if erp_tax == buyer_tax:
+                    return row.name  # 税号一致 = 权威匹配 · 放行
+                raise MRERPBusinessError(
+                    f"ERR_CUSTOMER_NAME_MISMATCH — resolved customer_code {code!r} "
+                    f"(MR.ERP customer {row.name!r}) tax_id {erp_tax!r} does NOT match "
+                    f"invoice buyer {name!r} tax_id {buyer_tax!r}",
+                    failed_rows=[
+                        {
+                            "reason_code": "ERR_CUSTOMER_NAME_MISMATCH",
+                            "customer_code": code,
+                            "erp_customer_name": row.name,
+                            "erp_tax_id": erp_tax,
+                            "buyer_name": name,
+                            "buyer_tax_id": buyer_tax,
+                            "conflict": "tax_id",
+                        }
+                    ],
+                )
+            # erp_tax 读不到 → 落到下方名称复核(降级 · 不硬拦)。
+
+        buyer_norm = normalize_company_name(name)
+        erp_norm = row.name_norm or normalize_company_name(row.name)
+        ratio = levenshtein_ratio(buyer_norm, erp_norm) if (buyer_norm and erp_norm) else 0.0
+        if ratio >= self.customer_threshold:
+            return row.name
+
+        raise MRERPBusinessError(
+            f"ERR_CUSTOMER_NAME_MISMATCH — resolved customer_code {code!r} "
+            f"maps to MR.ERP customer {row.name!r} but the invoice buyer is "
+            f"{name!r} (name ratio={ratio:.2f} < {self.customer_threshold})",
+            failed_rows=[
+                {
+                    "reason_code": "ERR_CUSTOMER_NAME_MISMATCH",
+                    "customer_code": code,
+                    "erp_customer_name": row.name,
+                    "buyer_name": name,
+                    "name_ratio": round(ratio, 3),
+                }
+            ],
+        )
+
+    def _fetch_customer_detail(self, customer_code: str) -> Optional[Dict[str, str]]:
+        """读 MR.ERP 客户详情页(armas/allform.php?id=<code>&status=view)的
+        name + tax_id(P2 税号复核用)。best-effort:取不到返 None / 缺字段留空。
+
+        view 模式表单字段 id 沿用 create 表单(txtname / txttaxid · readonly)。
+        调用方必须在 adapter 的 with 块内。
+        """
+        code = (customer_code or "").strip()
+        if not code:
+            return None
+        page = self.adapter._page
+        url = f"{self.adapter.login_url}{self.FORM_PATH}?id={code}&status=view"
+        try:
+            page.goto(url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.wait_for_selector("input#txtname", state="attached", timeout=10_000)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"customer detail nav failed for {code!r}: {e}") from e
+        try:
+            name = page.locator("input#txtname").first.input_value()
+        except Exception:
+            name = ""
+        try:
+            tax = page.locator("input#txttaxid").first.input_value()
+        except Exception:
+            tax = ""
+        return {"name": (name or "").strip(), "tax_id": (tax or "").strip()}
+
+    def invalidate(self) -> None:
+        """Drop ALL cached entries — call after an auto-create lands so
+        the next lookup() picks up the new listing entry."""
+        self.cache.clear()
+
+    def delete_customer(self, customer_code: str) -> bool:
+        """Best-effort delete of one customer. Used by integration tests
+        to clean up auto-created rows.
+
+        Returns True if the customer is gone from the listing afterwards.
+
+        Implementation per probe:
+            The btndel→confirmdel() JS is just
+                `location = "alldel.php?id=" + id`
+            so we GET that URL directly (still browser-driven; §7 compliant).
+            This avoids the Playwright "click that triggers an async
+            navigation" timing trap that the older btndel-click path
+            stumbled into.
+
+        Caller MUST be inside the adapter's `with` block.
+        """
+        if not customer_code:
+            return False
+        page = self.adapter._page
+        del_url = f"{self.adapter.login_url}/armas/alldel.php?id={customer_code}"
+        try:
+            page.goto(del_url, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+        except (PWTimeout, PWError) as e:
+            logger.warning("delete_customer nav failed: %s", e)
+            return False
+
+        # alldel.php redirects to allview.php via JS after processing.
+        # Give the redirect + listing's showdata.php AJAX time to settle.
+        page.wait_for_timeout(2_500)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10_000)
+        except PWTimeout:
+            pass
+
+        # Force a fresh listing render: the cached listing in our local
+        # TTLCache + MR.ERP's own showdata.php sometimes lag the delete.
+        try:
+            page.goto(
+                self.adapter.login_url + self.LISTING_PATH,
+                wait_until="networkidle",
+                timeout=self.DEFAULT_PAGE_TIMEOUT_MS,
+            )
+            page.wait_for_timeout(1_500)
+        except (PWTimeout, PWError):
+            pass
+
+        self.invalidate()
+        listing = self._fetch_listing()
+        gone = not any(r.code == customer_code for r in listing)
+        if not gone:
+            logger.warning(
+                "delete_customer: %s still in listing after delete",
+                customer_code,
+            )
+        return gone
+
+    # ----- layers ----------------------------------------------
 
     def _layer1_db_mapping(
         self,
@@ -184,6 +719,8 @@ class MRERPCustomerSyncService(_CustomerLookupMixin, _CustomerCreateMixin):
             matched_name=best_row.name,
         )
 
+    # ----- Layer 4 auto-create ---------------------------------
+
     def _resolve_default_seed(self) -> Optional[str]:
         """没配 seed_customer_code 时,自动挑一个现有客户当 copy-from-seed 的克隆模板。
 
@@ -206,6 +743,427 @@ class MRERPCustomerSyncService(_CustomerLookupMixin, _CustomerCreateMixin):
         self._default_seed_cache = pool[0].code
         logger.info("auto-picked default seed customer=%s for auto-create", pool[0].code)
         return self._default_seed_cache
+
+    def _layer4_auto_create(
+        self,
+        buyer: BuyerInfo,
+        seed_customer_code: str,
+    ) -> CustomerSyncResult:
+        """Create a new customer row by cloning a seed customer and
+        overriding the four fields that are unique to the new row.
+
+        Flow (per [mrerp-customer-copy-flow.md](../../docs/integrations/mrerp-customer-copy-flow.md)):
+          1. nav armas/allform.php (blank form)
+          2. click #inpdupdata ("สำเนา") → opens bshlistbox popup
+          3. wait ~3s for AJAX-populated candidate list
+          4. click the seed row in #bshlistboxdetail
+          5. ~all 45 fields populate from the seed (incl. all hidden
+             master-data IDs and code/detail triplets)
+          6. override txtarcode (generated) + txtname (buyer.name)
+             + txttaxid (OCR or random) + txtaddr1..4 (OCR address)
+          7. click #btnsave → checknull() passes → allsave.php
+          8. verify by listing fetch
+
+        The earlier "fill placeholders" path is gone — it was rejected
+        by the server with `alert("Data is use in the system")` because
+        the placeholder codes weren't real master-data rows. The copy
+        flow inherits valid refs by construction.
+        """
+        if not seed_customer_code:
+            raise MRERPBusinessError(
+                "ERR_NO_SEED_CUSTOMER — seed_customer_code is required",
+                failed_rows=[{"buyer_name": buyer.name, "reason_code": "ERR_NO_SEED_CUSTOMER"}],
+            )
+
+        page = self.adapter._page
+
+        # 1) Pick a unique customer code.
+        customer_code = self._generate_customer_code()
+
+        target = self.adapter.login_url + self.FORM_PATH
+        try:
+            page.goto(target, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"customer-create form nav timeout: {e}") from e
+
+        # Bug 8 fix (Zihao 2026-05-19 拍板 · v118.34.23) · session bounce 检测 ·
+        # 跟 mrerp_product_sync 镜像 · armas/allform.php 也可能在长 batch 后被
+        # MR.ERP 服务端无声 invalidate session.
+        landed_url = page.url or ""
+        if "/login/login.php" in landed_url:
+            logger.warning("[customer-create] nav bounced to login.php · re-login + retry")
+            try:
+                self.adapter._logged_in = False
+                self.adapter._company_selected = False
+                self.adapter.login()
+                self.adapter.select_company()
+                page.goto(target, wait_until="networkidle", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            except Exception as e:
+                raise MRERPTechnicalError(
+                    f"customer-create session re-login failed: {type(e).__name__}: {e}"
+                ) from e
+            landed_url = page.url or ""
+
+        # Sanity: confirm we're on the create form.
+        if "allform.php" not in landed_url:
+            raise MRERPTechnicalError(
+                f"customer-create nav landed on {landed_url}, not allform.php "
+                f"(session refresh did not recover)"
+            )
+
+        # 2-5) Copy-from-seed.
+        try:
+            self._copy_from_seed(page, seed_customer_code)
+        except MRERPBusinessError:
+            raise
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"copy-from-seed flow timeout: {e}") from e
+
+        # 6) Override the fields that must be unique to the new row.
+        try:
+            self._override_after_copy(page, customer_code, buyer)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"override-after-copy timeout: {e}") from e
+
+        # 7) Click save.
+        dialogs_before = len(self.adapter._session.dialogs) if self.adapter._session else 0
+        try:
+            page.click('button[id="btnsave"]', timeout=5_000)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"customer-create save click timeout: {e}") from e
+
+        try:
+            page.wait_for_load_state("networkidle", timeout=self.SAVE_TIMEOUT_MS)
+        except PWTimeout:
+            pass
+        page.wait_for_timeout(1_500)
+
+        if self.adapter._session:
+            new_dialogs = self.adapter._session.dialogs[dialogs_before:]
+        else:
+            new_dialogs = []
+
+        # 8) Verify by search (按码搜全量 · 不再用只读 30 条的 _fetch_listing ·
+        #    2026-05-25 修:新建客户排在 30 名后会被误判"did not appear")。
+        self.invalidate()
+        try:
+            listing = self._search_listing(customer_code)
+        except MRERPTechnicalError:
+            listing = self._fetch_listing()  # 搜索异常兜底回退首页扫描
+        if any(r.code == customer_code for r in listing):
+            # P3 闭环反查(Zihao 2026-05-26 section 五):建完再复核新码对应的客户
+            # 名/税号确实 == 发票买方 · 防"自动建码撞到已存在的别家客户"残留风险。
+            # 名/税号冲突(BusinessError)→ 抛(建出来的不是买方 · 不推)。
+            # 反查不可用(TechnicalError)→ 降级:刚写的就是买方数据 · 可信 · 仅 log。
+            try:
+                self.verify_resolved_code(customer_code, buyer.name, buyer.tax_id)
+            except MRERPBusinessError:
+                raise
+            except MRERPTechnicalError as e:
+                logger.warning(
+                    "auto-create post-verify unavailable for %s (trusting just-written "
+                    "buyer data): %s",
+                    customer_code,
+                    e,
+                )
+            logger.info(
+                "auto-created customer %s (seed=%s, buyer=%s)",
+                customer_code,
+                seed_customer_code,
+                buyer.name,
+            )
+            return CustomerSyncResult(
+                customer_code=customer_code,
+                source="erp_auto_created",
+                confidence=1.0,
+                matched_name=buyer.name,
+                is_new=True,
+                erp_code_persisted=False,
+            )
+
+        dialog_text = " / ".join(d for d in new_dialogs)[:300]
+        raise MRERPBusinessError(
+            f"customer auto-create did not appear in listing "
+            f"(code={customer_code}, seed={seed_customer_code}, "
+            f"dialogs={dialog_text!r})",
+            failed_rows=[
+                {
+                    "buyer_name": buyer.name,
+                    "customer_code_attempted": customer_code,
+                    "seed_customer_code": seed_customer_code,
+                    "dialogs": new_dialogs,
+                }
+            ],
+        )
+
+    def _copy_from_seed(self, page, seed_customer_code: str) -> None:
+        """Drive the inpdupdata picker to clone `seed_customer_code`
+        into the current form.
+
+        🛠 Patch 1 (Zihao 2026-05-18 拍板): the armas popup uses the
+        same virtual-scroll pattern as stkmas — at TEST2019 scale (2
+        customers) all rows are in the DOM, but on accounting-firm
+        tenants with 50+ customers only ~10 fit at a time. We now use
+        the popup's built-in `#bshlistboxinpsearch` input to filter
+        down to just the seed before clicking, mirroring the
+        `mrerp_product_sync._copy_from_seed` implementation.
+        """
+        loc = page.locator("input#inpdupdata")
+        if loc.count() == 0:
+            raise MRERPTechnicalError(
+                "inpdupdata (copy) button missing — MR.ERP UI may have " "changed"
+            )
+        loc.first.click(timeout=5_000)
+
+        # Wait for the popup search input (faster signal than
+        # detailshow's first <p>; the search input renders before AJAX
+        # populates the rows).
+        try:
+            page.wait_for_selector(
+                "#bshlistboxinpsearch",
+                state="visible",
+                timeout=10_000,
+            )
+        except PWTimeout as e:
+            raise MRERPTechnicalError(f"copy picker popup did not render: {e}") from e
+        page.wait_for_timeout(500)
+
+        # Type the seed code into the popup's search input. The onkeyup
+        # handler `bshdatalistbox()` re-renders the visible rows in
+        # real time — only matching ones survive.
+        search = page.locator("input#bshlistboxinpsearch")
+        try:
+            search.fill(seed_customer_code)
+            # bshdatalistbox is wired to onkeyup — fire one to trigger
+            # the filter, then settle.
+            search.press("End")
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"copy picker search input failed: {e}") from e
+        page.wait_for_timeout(800)
+
+        # Stricter selector first (exact text-is on the code span), then
+        # a fallback substring match in case the code contains
+        # characters that confuse text-is().
+        row = page.locator(
+            "#bshlistboxdetailshow p" f":has(span:text-is({seed_customer_code!r}))"
+        ).first
+        if row.count() == 0:
+            row = page.locator("#bshlistboxdetailshow p" f":has-text({seed_customer_code!r})").first
+        if row.count() == 0:
+            raise MRERPBusinessError(
+                f"seed customer {seed_customer_code!r} not visible in "
+                f"the copy picker — confirm the code exists in this "
+                f"tenant's customer master (searched via "
+                f"bshlistboxinpsearch)",
+                failed_rows=[
+                    {
+                        "reason_code": "ERR_SEED_NOT_FOUND",
+                        "seed_customer_code": seed_customer_code,
+                    }
+                ],
+            )
+
+        try:
+            row.click(timeout=3_000)
+        except (PWTimeout, PWError) as e:
+            raise MRERPTechnicalError(f"seed row click failed: {e}") from e
+
+        # bshlistboxafterselectdata fires an AJAX fetch to populate the
+        # form with the seed's full field set. ~1-2s.
+        page.wait_for_timeout(2_500)
+
+        try:
+            populated_name = page.locator("input#txtname").first.input_value()
+        except Exception:
+            populated_name = ""
+        if not populated_name:
+            raise MRERPTechnicalError(
+                "copy picker click did not populate the form " "(txtname still empty)"
+            )
+
+    def _override_after_copy(
+        self,
+        page,
+        customer_code: str,
+        buyer: BuyerInfo,
+    ) -> None:
+        """Replace the seed's identity fields with the new customer's.
+
+        Per [mrerp-customer-copy-flow.md §5](../../docs/integrations/mrerp-customer-copy-flow.md):
+        leave master-data refs alone; override only the 4 unique fields.
+        """
+        # Customer code is editable text — direct fill is fine.
+        self._fill_field(page, "txtarcode", customer_code)
+        # Customer name — truncate to MR.ERP's ceiling.
+        self._fill_field(
+            page,
+            "txtname",
+            (buyer.name or "")[:CUSTOMER_NAME_MAX],
+        )
+
+        # Tax ID — use OCR if available + 13 digits, else random.
+        tax_id = (buyer.tax_id or "").strip()
+        if len(tax_id) == 13 and tax_id.isdigit():
+            self._fill_field(page, "txttaxid", tax_id)
+        else:
+            import secrets
+
+            rand_tin = str(secrets.randbelow(10**12) + 10**12)[:13]
+            self._fill_field(page, "txttaxid", rand_tin)
+
+        # Address override — only when buyer has one (otherwise inherit
+        # seed's placeholder address; harmless).
+        if buyer.address:
+            self._fill_addresses(page, buyer.address)
+
+    def _fill_field(self, page, field_id: str, value: str) -> None:
+        loc = page.locator(f'input[id="{field_id}"]')
+        if loc.count() == 0:
+            return
+        loc.first.fill(value)
+
+    def _fill_code_detail_pair(
+        self,
+        page,
+        code_field_id: str,
+        code_value: str,
+        *,
+        fallback_detail: str = "",
+    ) -> None:
+        """For inputs that live in a "code + hidden val + detail label"
+        triplet (e.g. txtrectype/rectypeval/txtrectypedetail), inject the
+        values directly via JS.
+
+        Why JS, not Playwright fill():
+          The visible 'code' inputs (txtrectype / txtacfile / txtemp /
+          etc.) are marked `readonly` because the real UX is "click the
+          input → bshlistbox opens a popup-picker → click an option →
+          JS writes back". Playwright's `fill()` rejects readonly
+          elements. We bypass the popup by setting the visible value,
+          the hidden 'val' that the server actually consumes, and the
+          'detail' label so the saved row looks right in MR.ERP's
+          listing/edit pages.
+
+        Hidden + detail id naming convention (from probe):
+          txt<base>   →  visible 'code' input (readonly)
+          <base>val   →  hidden id consumed server-side
+          txt<base>detail  →  visible label that auto-fills on pick
+        """
+        if not code_field_id.startswith("txt"):
+            return
+        base = code_field_id[3:]
+        hidden_id = f"{base}val"
+        detail_id = f"{code_field_id}detail"
+
+        import json as _json
+
+        js = """(function(code, fallback, codeId, hiddenId, detailId) {
+            var f = document.getElementById(codeId);
+            if (f) {
+                try { f.removeAttribute('readonly'); } catch(e) {}
+                f.value = code;
+                try { f.dispatchEvent(new Event('change', {bubbles: true})); } catch(e) {}
+            }
+            var h = document.getElementById(hiddenId);
+            if (h) h.value = code;
+            var d = document.getElementById(detailId);
+            if (d) d.value = fallback;
+            return {
+                visible: f ? f.value : null,
+                hidden: h ? h.value : null,
+                detail: d ? d.value : null
+            };
+        })""" + (
+            f"({_json.dumps(code_value)}, {_json.dumps(fallback_detail)}, "
+            f"{_json.dumps(code_field_id)}, {_json.dumps(hidden_id)}, "
+            f"{_json.dumps(detail_id)})"
+        )
+        try:
+            result = page.evaluate(js)
+            logger.debug(
+                "code-detail fill %s -> %s",
+                code_field_id,
+                result,
+            )
+        except Exception as e:
+            logger.warning(
+                "JS fill for %s failed: %s",
+                code_field_id,
+                e,
+            )
+
+    def _fill_addresses(self, page, address: str) -> None:
+        # MR.ERP accepts up to 4 address lines, each TBD-len. Split by
+        # newline if present; otherwise just put the whole string in
+        # addr1.
+        parts = [p.strip() for p in (address or "").split("\n") if p.strip()]
+        if not parts:
+            return
+        for i, p in enumerate(parts[:4], start=1):
+            self._fill_field(page, f"txtaddr{i}", p[:80])
+
+    def _generate_customer_code(self) -> str:
+        """在 P{YYMM}{SEQ4} 命名空间里挑一个**全量唯一**的客户码。
+
+        2026-05-25 修:旧实现只扫首页 ~30 条列表算 max+1 → 首页 max 恒为已有最大
+        (如 028)→ 每次都生成同一个码(029)→ 多个买方撞同一客户码(实测坐实 ·
+        推送会指向错误客户)。改用搜索框(查全量)逐个确认候选码不存在。
+        """
+        import random
+
+        today = date.today()
+        prefix = f"{DEFAULT_CUSTOMER_CODE_PREFIX}{today.year % 100:02d}{today.month:02d}"
+        # 2026-05-26 修:按月份码前缀**过滤分页拉全**(只该月那批·量小)→ 真实 max+1 ·
+        # 起点准了基本一次命中。此前用 _fetch_listing(首页 30 条)起点偏小 + 搜索校验偶发
+        # 返空 → 误判候选码可用 → 撞到已有客户(实测 P26050038 撞旧买方 → NAME_MISMATCH)。
+        try:
+            listing = self._fetch_listing(max_pages=400, searchdataval=prefix)
+        except MRERPTechnicalError:
+            listing = []
+        existing_seqs: List[int] = []
+        for row in listing:
+            if row.code.startswith(prefix):
+                tail = row.code[len(prefix) :]
+                if tail.isdigit():
+                    existing_seqs.append(int(tail))
+        next_seq = (max(existing_seqs) + 1) if existing_seqs else 1
+
+        # 全量唯一性校验:用搜索框查候选码 · 精确命中即撞 → +1 重试(最多 60 次)。
+        candidate = f"{prefix}{next_seq:04d}"
+        for _ in range(60):
+            try:
+                hits = self._search_listing(candidate)
+            except MRERPTechnicalError:
+                return candidate  # 搜不了 → 用当前候选回退 · 不阻断建客户
+            if not any(r.code == candidate for r in hits):
+                return candidate  # 全量无此码 → 唯一
+            next_seq += 1
+            candidate = f"{prefix}{next_seq:04d}"
+        # 兜底:60 连撞(极不可能)→ 随机 4 位
+        return f"{prefix}{random.randint(1, 9999):04d}"
+
+    def _upsert_mapping(
+        self,
+        mappings: Dict[str, Any],
+        client_id: int,
+        customer_code: str,
+    ) -> None:
+        clients = (mappings or {}).get("clients") or []
+        for m in clients:
+            if m.get("erp_type") == "mrerp" and int(m.get("client_id") or 0) == int(client_id):
+                m["erp_code"] = customer_code
+                return
+        clients.append(
+            {
+                "erp_type": "mrerp",
+                "client_id": int(client_id),
+                "erp_code": customer_code,
+            }
+        )
+        if isinstance(mappings, dict):
+            mappings["clients"] = clients
+
+    # ----- listing fetch ---------------------------------------
 
     def _fetch_listing(self, max_pages: int = 1, searchdataval: str = "") -> List[ListingCustomer]:
         """Returns the parsed customer listing, hitting the in-service
@@ -354,3 +1312,13 @@ class MRERPCustomerSyncService(_CustomerLookupMixin, _CustomerCreateMixin):
         except (PWTimeout, PWError) as e:
             raise MRERPTechnicalError(f"customer search failed: {e}") from e
         return parse_armas_listing(html)
+
+
+__all__ = [
+    "BuyerInfo",
+    "CustomerSyncResult",
+    "ListingCustomer",
+    "MRERPCustomerSyncService",
+    "parse_armas_listing",
+    "CUSTOMER_LEVENSHTEIN_THRESHOLD_DEFAULT",
+]

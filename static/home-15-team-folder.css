@@ -352,14 +352,15 @@
     min-height: 48px;     /* v113.1 · 手机点击区域更大 · 不误触 */
 }
 
-/* v113.1 · 桌面端(>768px)· 隐藏「拍摄票据」按钮 · 电脑摄像头不能拍发票 · 只留上传图片 */
+/* v113.1 · 桌面端(>768px)· 隐藏「拍摄票据」按钮 · 电脑摄像头不能拍发票 */
+/* REFACTOR-WB-BTN(2026-05-30 主控拍板 audit B)· 桌面端也隐藏「上传图片」按钮 ·
+   桌面用主 drop-zone 上传 · 手机端保留拍照+相册入口(按钮+JS钩子+id 均不动 · 仅 CSS 桌面隐藏) */
 @media (min-width: 769px) {
     .upload-alt-row #btn-scan-doc {
         display: none;
     }
     .upload-alt-row #btn-upload-pic {
-        flex: 0 0 auto;
-        min-width: 200px;
+        display: none;
     }
 }
 

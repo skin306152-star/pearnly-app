@@ -16,7 +16,7 @@
 
 | # | 结果(Zihao 要的) | 设计 | 执行 | 窗口【自检方式】(自己确认·不烦 Zihao) | 窗口 | 状态 |
 |---|---|---|---|---|---|---|
-| 1 | **全站黑按钮 → 统一变体**(design-preview/ui-consistency-audit.md A 段:收编 30+ 杂牌类到 btn-primary/secondary/ghost/danger/toggle) | ✅ | ⬜ | Playwright 导航到该页 → 截该按钮区 → **窗口读截图肉眼核**:蓝/对应变体/非黑、可点、无 console error。自检过才下一刀。 | B | 待跑 |
+| 1 | **全站黑按钮 → 统一变体**(design-preview/ui-consistency-audit.md A 段:收编 30+ 杂牌类到 btn-primary/secondary/ghost/danger/toggle) | ✅ | ⬜ | Playwright 导航到该页 → 截该按钮区 → **窗口读截图肉眼核**:蓝/对应变体/非黑、可点、无 console error。自检过才下一刀。 | B | 🔵进行中·已收编+自检 bank-filter-btn`1288ecd`/异常栏批量栏`3e17cf8`(computed实测:retry bg#2563EB蓝/delete红#DC2626描边/clear ghost·radius9·h32)·续 erp-exc-retry+ERP推送弹窗 |
 | 2 | **删桌面「上传图片」按钮**(手机端保留拍照入口)(审计 B 段·home.html L466-481) | ✅ | ⬜ | 截图核:桌面视口无该按钮、手机视口(@media)仍有。 | B | 待跑 |
 | 3 | **异常栏批量栏「选中才显示」**(照发票记录 history-batch-bar)(审计 C 段) | ✅ | ⬜ | E2E:未勾选=批量栏隐藏、勾选=出现。窗口自跑自验。 | B | 待跑 |
 | 4 | **OCR 提速**(留底后台 + 多页并行 + 图片压缩[A/B] + L3 关思考[Phase2]) | ✅ | 🔵 | 每步:同批真发票(U盘 D:\测试PDF\D:\测试图片)跑【改前 vs 改后字段逐项 diff 必须一致】+ 延迟下降 + 测试账号 E2E。字段不一致=自己查根因修,不上线。 | A | 🔵Step0 观测✅(8ecb33b·per-page layer 计时结构化日志·纯观测0逻辑改·boot 200)→ 下 Step1 PDF 留底后台化 |

@@ -135,8 +135,9 @@ for i in $(seq 1 $MAX_WAIT); do
     fi
 done
 
-# 7. 服务未恢复 → 回滚到上一个 GitHub 版本（绝不回滚到 GitHub 之前的本地旧 commit）
-echo "health check FAILED after ${MAX_WAIT}s — rolling back to $PREV_HEAD" >> "$LOG"
+# 7. 服务未恢复 → ① 回滚运行版本到上一个 GitHub 好版本(保命 · 绝不回滚到更老本地 commit)
+#    ② 写 marker 记录坏 commit → loop 每轮读它 → revert bad commit + 重做直到真绿(闭环"直到搞好")
+echo "health check FAILED after ${MAX_WAIT}s — rolling back to $PREV_HEAD (bad=$NEW_HEAD)" >> "$LOG"
 if [ -n "$PREV_HEAD" ]; then
     git reset --hard "$PREV_HEAD" >> "$LOG" 2>&1
     cp -f home.html home.js home.css login.html static/ 2>> "$LOG" || true
@@ -145,6 +146,10 @@ if [ -n "$PREV_HEAD" ]; then
     sleep 5
     HTTP2=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" 2>/dev/null || echo "000")
     echo "post-rollback health: $HTTP2" >> "$LOG"
+    # marker:谁回滚了什么(loop / 主控读它即知上次部署被回滚 → 去 revert+重做)
+    printf '%s rolled_back bad=%s good=%s post_rollback_health=%s\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S')" "$NEW_HEAD" "$PREV_HEAD" "$HTTP2" \
+        > /opt/mrpilot/.deploy_rollback 2>/dev/null || true
 fi
 exit 1
 """

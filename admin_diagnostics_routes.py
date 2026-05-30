@@ -112,17 +112,22 @@ async def github_deploy_webhook(request: Request):
 
     logger.info("[git-deploy] webhook received · launching detached deploy in 3 s")
 
-    # ── 关键：用 start_new_session=True 开新会话 ──────────────────────
-    # 父进程（mrpilot）被 systemctl restart 杀掉后，子进程仍然存活，
-    # 能完成 git pull + cp + systemctl restart 整个流程。
+    # ── 关键修复(2026-05-30):systemd-run 起独立 cgroup · 部署脚本不被 restart 杀 ──
+    # 旧版 start_new_session 只换会话 · 子进程仍在 mrpilot 的 systemd cgroup 里 →
+    # git-deploy.sh 跑到 `systemctl restart mrpilot` 时被 cgroup 整组杀 → 自杀 →
+    # 第 6/7 步健康检查+回滚【永远跑不到】→ 坏码崩了无人自愈 → 502 等人救(血泪)。
+    # systemd-run 把脚本放进独立 transient unit(自己的 cgroup)· restart 杀不到它 →
+    # 回滚安全网才真生效。systemd-run 不可用则退回旧法(至少能部署)。
     _subprocess.Popen(
         [
             "bash",
             "-c",
-            "sleep 3 && bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1",
+            "sleep 3 && ( systemd-run --quiet --collect -- "
+            "bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1 "
+            "|| bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1 )",
         ],
         close_fds=True,
-        start_new_session=True,  # 脱离父进程组，父死子不死
+        start_new_session=True,
     )
     return {"ok": True, "status": "deploy scheduled in 3 s"}
 
@@ -138,11 +143,14 @@ async def manual_deploy_trigger(token: str = ""):
     import subprocess as _subprocess
 
     logger.info("[git-deploy] manual trigger")
+    # systemd-run 独立 cgroup 启动(同 webhook · 见上方注释)· 不被 restart 杀 · 回滚生效
     _subprocess.Popen(
         [
             "bash",
             "-c",
-            "sleep 1 && bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1",
+            "sleep 1 && ( systemd-run --quiet --collect -- "
+            "bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1 "
+            "|| bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1 )",
         ],
         close_fds=True,
         start_new_session=True,

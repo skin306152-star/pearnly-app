@@ -1,0 +1,5 @@
+# pre-push 机械闸钩子必须 LF 行尾(2026-05-30)
+# Windows 下 core.autocrlf=true 会把它转成 CRLF · 行尾的 \r 会让 sh 报
+# "bad interpreter" 跑不起来 · 闸就哑了 → 这里强制 LF 锁死。
+# 仅作用于钩子目录 · 不动项目里其它(home.html/home.css 故意保留 CRLF)。
+scripts/git-hooks/* text eol=lf

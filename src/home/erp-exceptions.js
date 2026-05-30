@@ -105,7 +105,7 @@
                 <span class="ex-buyer" title="${escapeHtml(it.ocr_buyer_name || '')}">${escapeHtml(it.ocr_buyer_name || '—')}</span>
                 <span class="ex-state"><span class="erp-exc-state ${stateCls}">${escapeHtml(stateLbl)}</span></span>
                 <span class="ex-reason" title="${escapeHtml(reason)}">${escapeHtml(reason)}${it.error_code ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</span>
-                <span class="ex-act"><button class="erp-exc-retry-btn" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button></span>
+                <span class="ex-act"><button class="btn btn-sm btn-secondary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button></span>
             </div>`;
             })
             .join('');
@@ -417,10 +417,10 @@
                     ${fixHtml}
                 </div>
                 <div class="erp-exc-m-foot">
-                    <button class="erp-exc-batch-btn ghost" type="button" id="erp-exc-m-cancel">${escapeHtml(t('erp-exc-edit-close'))}</button>
-                    <button class="erp-exc-batch-btn" type="button" id="erp-exc-m-retry">${escapeHtml(t('erp-exc-edit-retry'))}</button>
-                    ${canPickCustomer ? `<button class="erp-exc-batch-btn" type="button" id="erp-exc-m-bind" disabled>${escapeHtml(t('erp-exc-edit-bind-retry'))}</button>` : ''}
-                    ${canPickProduct ? `<button class="erp-exc-batch-btn" type="button" id="erp-exc-m-bind-prod" disabled>${escapeHtml(t('erp-exc-edit-bind-prod-retry'))}</button>` : ''}
+                    <button class="btn btn-sm btn-ghost" type="button" id="erp-exc-m-cancel">${escapeHtml(t('erp-exc-edit-close'))}</button>
+                    <button class="btn btn-sm btn-primary" type="button" id="erp-exc-m-retry">${escapeHtml(t('erp-exc-edit-retry'))}</button>
+                    ${canPickCustomer ? `<button class="btn btn-sm btn-primary" type="button" id="erp-exc-m-bind" disabled>${escapeHtml(t('erp-exc-edit-bind-retry'))}</button>` : ''}
+                    ${canPickProduct ? `<button class="btn btn-sm btn-primary" type="button" id="erp-exc-m-bind-prod" disabled>${escapeHtml(t('erp-exc-edit-bind-prod-retry'))}</button>` : ''}
                 </div>
             </div>`;
         document.body.appendChild(ov);

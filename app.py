@@ -550,6 +550,13 @@ async def ocr_recognize(
             f"🆕 pipeline_v1 · file={file.filename} · ext={_ext} · pages={_pipe_res.page_count} "
             f"· cost=฿{_pipeline_cost_thb:.4f} · elapsed={_pipe_res.elapsed_ms}ms"
         )
+        # Step0 观测(REFACTOR-WA-OCRPERF)· 结构化 per-page layer 计时 · 纯观测不改逻辑
+        try:
+            from services.ocr.observability import log_pipeline_timing
+
+            log_pipeline_timing(_pipe_res, source="recognize", filename=file.filename or "")
+        except Exception:
+            pass
 
         # v118.46 · 算扣费参数(实际扣费挪到 history 落库后:才有 history_id + 已确认非发票通过)
         #   图片(PNG/JPG/扫描)与 PDF 统一按页/张扣;CSV/XLSX/DOCX/TXT 按字符。

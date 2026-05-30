@@ -8,7 +8,7 @@
 
 直接调用纯计算函数,不连 DB、不打网络、不烧 Gemini。CI 每次都跑,是真正能拦回归的硬闸。
 给窗口 A 拆高敏 OCR/billing/VAT/ERP 热路径当保险:任一不变量被改坏就立刻红。
-命名 `test_*_safety_net.py` · 当前 10 文件 / 152 测。
+命名 `test_*_safety_net.py` · 当前 11 文件 / 157 测。
 
 **扣费 + 对账链**(文件 → units → cost → charge → 配对 → 退款 → 充值,全程纯函数闸):
 
@@ -34,6 +34,14 @@
 | 文件 | 测数 | 锁什么 |
 |---|---|---|
 | `test_table_path_safety_net.py` | 16 | `table_path`:CSV→`Layer1Result` 契约(engine / `table_rows` 按表头键 dict / 空与不支持扩展名抛 `ValueError`)+ `_decode_bytes` 多编码(泰文 cp874)|
+
+**跨域 facade / 路由**(防 A 拆 db.py/app.py 时静默丢桥/丢路由):
+
+| 文件 | 测数 | 锁什么 |
+|---|---|---|
+| `test_dal_facade_completeness_safety_net.py` | 5 | 数据驱动遍历 `dal_reexports._REEXPORTS`(~286 名 / 36 域):每个 re-export 都桥到 `db` 上 + 对象身份一致 + 钱路径名锚定 |
+
+> 另有 `test_core_routes_presence.py`(app 名册守门 · 31 条用户可见 path · 非 `_safety_net` 命名但同属拆分守门)。
 
 ### 2. env-gated 真集成(默认 skip · 配齐 env 才跑)
 

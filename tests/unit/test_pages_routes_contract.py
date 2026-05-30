@@ -3,8 +3,9 @@
 REFACTOR-B1 守门测试 · 静态页面 + 公开 meta 路由从 app.py 抽到 pages_routes.py。
 
 锁定(防搬迁回归):
-  1. router 注册的 12 条路由 path+method 契约不变(防丢路由 / 改 URL)
-  2. app.py 通过 include_router 真挂上了全部 12 条(防漏挂)
+  1. router 注册的 13 条路由 path+method 契约不变(防丢路由 / 改 URL)
+     · REFACTOR-WA-B4 新增 /api/ready 真探活端点(铁律 #23.7)
+  2. app.py 通过 include_router 真挂上了全部 13 条(防漏挂)
   3. /api/version **不在** pages_routes(故意留 app.py · 铁律 #6 部署 release_notes 锚点
      + 读 PEARNLY_FRONTEND_VERSION 模块全局)· 但仍挂在 app 上
   4. v1_health / v1_contact 仍委托给本模块的 health / contact(单一来源)
@@ -16,6 +17,7 @@ from pages_routes import router
 
 EXPECTED = {
     ("GET", "/api/health"),
+    ("GET", "/api/ready"),
     ("GET", "/api/contact"),
     ("GET", "/api/v1/health"),
     ("GET", "/api/v1/contact"),
@@ -32,7 +34,7 @@ EXPECTED = {
 
 class PagesRoutesContractTests(unittest.TestCase):
     def test_router_registers_expected_routes(self):
-        """12 条路由 path+method 契约 · 防搬迁丢路由 / 改 URL"""
+        """13 条路由 path+method 契约 · 防搬迁丢路由 / 改 URL"""
         got = set()
         for r in router.routes:
             for m in getattr(r, "methods", set()) or set():

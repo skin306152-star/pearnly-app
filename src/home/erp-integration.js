@@ -33,6 +33,7 @@
 let _logFilter = { key: 'all', val: '' };
 // v118.25.1 · 推送日志多选状态(批量重推)
 let _erpSelected = new Set();
+window._erpSelected = _erpSelected;
 
 async function loadErpLogs(silent) {
     const listEl = document.getElementById('erp-logs-list');
@@ -252,184 +253,12 @@ async function loadErpLogs(silent) {
         for (const id of Array.from(_erpSelected)) {
             if (!visibleIds.has(id)) _erpSelected.delete(id);
         }
-        _refreshErpBatchBar();
+        window._refreshErpBatchBar();
     } catch (e) {
         console.error('load erp logs failed', e);
         listEl.innerHTML = `<div class="erp-logs-empty">${escapeHtml(t('erp-logs-error'))}</div>`;
     }
 }
-
-// v118.25.1 · 批量栏可见性 + 计数刷新
-function _refreshErpBatchBar() {
-    const bar = document.getElementById('erp-logs-batch-bar');
-    const countEl = document.getElementById('erp-logs-batch-count');
-    // 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 同步表头全选 checkbox 状态.
-    // none → unchecked · all → checked · partial → indeterminate.
-    const headerCb = document.querySelector('[data-log-select-all]');
-    if (headerCb) {
-        const visibleCbs = document.querySelectorAll('[data-log-cb]');
-        const total = visibleCbs.length;
-        const sel = _erpSelected.size;
-        if (sel === 0) {
-            headerCb.checked = false;
-            headerCb.indeterminate = false;
-        } else if (sel >= total) {
-            headerCb.checked = true;
-            headerCb.indeterminate = false;
-        } else {
-            headerCb.checked = false;
-            headerCb.indeterminate = true;
-        }
-    }
-    if (!bar || !countEl) return;
-    const n = _erpSelected.size;
-    if (n === 0) {
-        bar.style.display = 'none';
-        return;
-    }
-    bar.style.display = '';
-    countEl.textContent = t('erp-batch-selected', { n });
-}
-
-// v118.25.1 · 批量重推执行 · 调 /api/erp/logs/batch-retry · 提示成功/失败/跳过计数
-async function _runErpBatchRetry() {
-    console.info('[ErpBatch] retry triggered · selected=', _erpSelected.size);
-    const ids = Array.from(_erpSelected);
-    if (ids.length === 0) {
-        showToast(t('erp-batch-empty-warn'), 'warn');
-        return;
-    }
-    const ok = await showConfirm(t('erp-batch-confirm', { n: ids.length }));
-    if (!ok) return;
-    try {
-        const resp = await fetch('/api/erp/logs/batch-retry', {
-            method: 'POST',
-            headers: {
-                Authorization: 'Bearer ' + token,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ log_ids: ids }),
-        });
-        if (!resp.ok) {
-            showToast(t('erp-logs-error'), 'error');
-            return;
-        }
-        const r = await resp.json();
-        const msg = t('erp-batch-result', {
-            ok: r.succeeded || 0,
-            fail: r.failed || 0,
-            skip: r.skipped || 0,
-        });
-        const kind = r.failed && r.failed > 0 ? 'warn' : 'success';
-        showToast(msg, kind);
-        _erpSelected.clear();
-        loadErpLogs();
-    } catch (e) {
-        console.error('batch retry failed', e);
-        showToast(t('erp-logs-error'), 'error');
-    }
-}
-
-// Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除执行
-async function _runErpBatchDelete() {
-    console.info('[ErpBatch] delete triggered · selected=', _erpSelected.size);
-    const ids = Array.from(_erpSelected);
-    if (ids.length === 0) {
-        showToast(t('erp-batch-empty-warn'), 'warn');
-        return;
-    }
-    const ok = await showConfirm(t('erp-batch-delete-confirm', { n: ids.length }), {
-        danger: true,
-    });
-    if (!ok) return;
-    try {
-        const resp = await fetch('/api/erp/logs/batch-delete', {
-            method: 'POST',
-            headers: {
-                Authorization: 'Bearer ' + token,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ log_ids: ids }),
-        });
-        if (!resp.ok) {
-            showToast(t('erp-logs-error'), 'error');
-            return;
-        }
-        const r = await resp.json();
-        // 问题 C (Zihao 2026-05-19 拍板 · v118.34.25) · 立即从 DOM 移除被删 row ·
-        // 不等 reload · 用户视觉立刻反馈"消失了". 然后再 reload 拉新数据填充
-        // (DB 还有别的 log · 自动接着显示 · 不是"日志又弹出来"的 bug · 是正常分页).
-        ids.forEach(function (id) {
-            var row = document.querySelector('[data-log-detail="' + id + '"]');
-            if (row) row.remove();
-        });
-        // 立即 hide batch bar(_erpSelected.clear 后 _refreshErpBatchBar 也会做 ·
-        // 但提前 hide 防止短暂残留视觉).
-        var bar = document.getElementById('erp-logs-batch-bar');
-        if (bar) bar.style.display = 'none';
-        showToast(
-            t('erp-batch-delete-result', {
-                n: r.deleted || 0,
-                skip: r.skipped || 0,
-            }),
-            r.deleted > 0 ? 'success' : 'warn'
-        );
-        _erpSelected.clear();
-        // 延迟 500ms reload · 让用户先看到 "消失了" 效果 + toast · 再拉新数据
-        setTimeout(loadErpLogs, 500);
-    } catch (e) {
-        console.error('batch delete failed', e);
-        showToast(t('erp-logs-error'), 'error');
-    }
-}
-
-// Bug 5 fix (v118.34.23) · defensive: 直接绑定到按钮 + 也保留事件委托
-// 防 IIFE document-level handler 某些情况下没接管. 用 capture phase 保证 fire.
-(function _bindErpBatchButtonsDirect() {
-    function _bind() {
-        var btnRetry = document.getElementById('btn-erp-batch-retry');
-        var btnDelete = document.getElementById('btn-erp-batch-delete');
-        var btnClear = document.getElementById('btn-erp-batch-clear');
-        if (btnRetry && !btnRetry.dataset.boundDirect) {
-            btnRetry.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                _runErpBatchRetry();
-            });
-            btnRetry.dataset.boundDirect = '1';
-        }
-        if (btnDelete && !btnDelete.dataset.boundDirect) {
-            btnDelete.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                _runErpBatchDelete();
-            });
-            btnDelete.dataset.boundDirect = '1';
-        }
-        if (btnClear && !btnClear.dataset.boundDirect) {
-            btnClear.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                _erpSelected.clear();
-                document.querySelectorAll('.erp-log-cb').forEach(function (x) {
-                    x.checked = false;
-                });
-                _refreshErpBatchBar();
-            });
-            btnClear.dataset.boundDirect = '1';
-        }
-    }
-    // Bind at DOM ready + also on every tab switch / log load via mutation observer.
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _bind);
-    } else {
-        _bind();
-    }
-    // 兜底: 隔 2s 重试 binding(防早期 DOM 还没渲染)
-    setTimeout(_bind, 2000);
-    setTimeout(_bind, 5000);
-    window._bindErpBatchButtons = _bind;
-})();
 
 async function retryPushLog(logId) {
     try {
@@ -503,7 +332,7 @@ async function retryPushLog(logId) {
             const id = cb.dataset.logCb;
             if (cb.checked) _erpSelected.add(id);
             else _erpSelected.delete(id);
-            _refreshErpBatchBar();
+            window._refreshErpBatchBar();
             return;
         }
         // 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 表头全选 checkbox
@@ -518,13 +347,13 @@ async function retryPushLog(logId) {
                 if (checkAll) _erpSelected.add(id);
                 else _erpSelected.delete(id);
             });
-            _refreshErpBatchBar();
+            window._refreshErpBatchBar();
             return;
         }
         // v118.25.1 · 批量重推按钮
         if (e.target.closest('#btn-erp-batch-retry')) {
             e.stopPropagation();
-            _runErpBatchRetry();
+            window._runErpBatchRetry();
             return;
         }
         // v118.25.1 · 取消选择
@@ -534,7 +363,7 @@ async function retryPushLog(logId) {
             document.querySelectorAll('.erp-log-cb').forEach((x) => {
                 x.checked = false;
             });
-            _refreshErpBatchBar();
+            window._refreshErpBatchBar();
             return;
         }
         const logRow = e.target.closest('[data-log-detail]');

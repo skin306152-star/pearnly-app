@@ -315,10 +315,10 @@ export const AUTO_HTML_1 = `
 
                             <!-- 流水筛选 -->
                             <div class="bank-filter-bar">
-                                <button class="bank-filter-btn active" data-bank-filter="all" data-i18n="bank-filter-all">全部</button>
-                                <button class="bank-filter-btn" data-bank-filter="matched" data-i18n="bank-filter-matched">已匹配</button>
-                                <button class="bank-filter-btn" data-bank-filter="suggested" data-i18n="bank-filter-suggested">疑似</button>
-                                <button class="bank-filter-btn" data-bank-filter="unmatched" data-i18n="bank-filter-unmatched">未匹配</button>
+                                <button class="btn btn-sm btn-secondary bank-filter-btn active" data-bank-filter="all" data-i18n="bank-filter-all">全部</button>
+                                <button class="btn btn-sm btn-secondary bank-filter-btn" data-bank-filter="matched" data-i18n="bank-filter-matched">已匹配</button>
+                                <button class="btn btn-sm btn-secondary bank-filter-btn" data-bank-filter="suggested" data-i18n="bank-filter-suggested">疑似</button>
+                                <button class="btn btn-sm btn-secondary bank-filter-btn" data-bank-filter="unmatched" data-i18n="bank-filter-unmatched">未匹配</button>
                             </div>
 
                             <!-- v118.26.2 · 右半屏对账面板 · 流水表 + 候选发票并排 -->

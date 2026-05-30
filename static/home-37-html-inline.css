@@ -1145,9 +1145,9 @@
     background: var(--gray-100);
 }
 .bank-filter-btn.active {
-    background: var(--gray-800);
+    background: #2563eb;
     color: #fff;
-    border-color: var(--gray-800);
+    border-color: #2563eb;
 }
 
 /* 流水表格 */

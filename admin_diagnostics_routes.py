@@ -176,6 +176,28 @@ async def deploy_log(token: str = "", lines: int = 50):
         return {"ok": False, "error": str(e)}
 
 
+@router.get("/internal/deploy/status")
+async def deploy_status():
+    """上次部署是否被自动回滚(无鉴权 · 只读 marker · 信息极简非敏感:只含公开 commit SHA)。
+
+    闭环'直到搞好'的钩子:无人值守 loop 每轮【先】查这个 —— 若 rolled_back=True,
+    说明上次部署健康检查没过、已自动回滚到上个好版本(prod 仍活),detail 里的 bad=<sha>
+    就是那个坏 commit。loop 应:git revert 该 bad commit + 把活重做对 + 重新 push,
+    直到部署健康(git-deploy.sh 部署成功会自动删掉 marker → 这里恢复 rolled_back=False)。
+    """
+    import os as _os
+
+    marker = "/opt/mrpilot/.deploy_rollback"
+    try:
+        if _os.path.isfile(marker):
+            with open(marker, "r", encoding="utf-8", errors="replace") as f:
+                detail = f.read().strip()
+            return {"ok": True, "rolled_back": True, "detail": detail}
+        return {"ok": True, "rolled_back": False}
+    except Exception as e:
+        return {"ok": False, "rolled_back": False, "error": str(e)}
+
+
 # ── Playwright admin installer (v118.34.3 · 2026-05-19) ─────────────────────
 # Background: git-deploy.sh on the server runs `git pull + systemctl restart`
 # but does NOT run `pip install -r requirements.txt`. The MR.ERP integration

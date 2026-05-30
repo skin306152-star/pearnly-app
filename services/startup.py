@@ -131,6 +131,7 @@ for i in $(seq 1 $MAX_WAIT); do
     HTTP=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" 2>/dev/null || echo "000")
     if [ "$HTTP" = "200" ]; then
         echo "health check OK after ${i}s (new HEAD: $NEW_HEAD)" >> "$LOG"
+        rm -f /opt/mrpilot/.deploy_rollback 2>/dev/null || true  # 部署成功 · 清旧回滚 marker
         exit 0
     fi
 done

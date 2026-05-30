@@ -36,7 +36,7 @@
 |---|---|
 | 抽出 | `_call_gemini_with_retry`(729-845·117)+ `_SYSTEM_PROMPT`(319-)/`_USER_PROMPT_PREFIX`(391)/`_RETRY_TRIM_HINT`(90-) |
 | 落点 | 并入 `services/ocr/layer2_gemini.py`(L2-A 建·现 Gemini 传输层)→ 成「layer2 Gemini 调用 + 默认发票 prompt」模块 |
-| 机制 | 函数本身 verbatim 挪;但**它烤死了默认 invoice prompt** → prompt 常量必须一并搬。`_DOC_PROMPTS`(GL/BANK/VAT/TABLE)由 `extract_from_*` 用 → **留 layer2_structure**(否则 L2-C 抽取段反向依赖 layer2_gemini)。需确认 `_call_gemini_with_retry` 是否被非默认(GL/bank/vat)路径复用 → 若复用则 `_DOC_PROMPTS` 也得跟着走 = 跨域更大。**先读清调用图再定边界**。 |
+| 机制 | 函数 verbatim 挪 + **仅带默认 invoice prompt 三常量**(`_SYSTEM_PROMPT`/`_USER_PROMPT_PREFIX`/`_RETRY_TRIM_HINT`)。**调用图已实测厘清边界(2026-05-31)**:<br>• 函数签名有 `system_prompt_override: Optional[str]=None` — 默认走 module-global `_SYSTEM_PROMPT`,GL/bank/vat 由调用方传 `_DOC_PROMPTS[...]` 作 override。<br>• **AST 实测函数体只引用那 3 个默认常量,不引用 `_DOC_PROMPTS`** → `_DOC_PROMPTS` + 5 个 doc-type prompt **留 layer2_structure**(它们由调用方 `_extract_doc_internal`655/`_extract_internal`713 持有并以参数传入,不随函数走·无反向依赖)。<br>• `layer3_fallback.py:375` 有**自己独立的同名** `_call_gemini_with_retry`(非 layer2 这个)→ 不受影响。<br>⇒ 边界干净:只搬 1 函数 + 3 常量,比草案初判风险低。 |
 | 为何「真重构」 | 跨 extraction-domain(传输 helper 与「默认发票判定语料」纠缠)·非自洽 |
 | 收益 | layer2_structure 850 → **~620**(仍 >500 → 需 L2-C) |
 | E2E | 同两票 + 一张数字 PDF 多票/GL 或 bank 文档(确认非发票路径 prompt 未受影响) |

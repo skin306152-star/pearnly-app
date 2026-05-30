@@ -47,6 +47,7 @@ import os
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Union
 
@@ -96,6 +97,9 @@ logger = logging.getLogger(__name__)
 CONFIDENCE_THRESHOLD = float(os.environ.get("OCR_PIPELINE_CONF_THRESHOLD", "0.85"))
 AMOUNT_TOLERANCE_THB = float(os.environ.get("OCR_PIPELINE_AMOUNT_TOL", "0.5"))
 THB_PER_USD = float(os.environ.get("OCR_PIPELINE_THB_PER_USD", "35"))
+# Step2(REFACTOR-WA-OCRPERF)· 多页 PDF 页面并行度 · 仅 pattern_memory is None(生产 web 路径)
+# 时并发;并发 4 远低于 Vision 1800/min 配额 · 设 1 即退回串行。
+OCR_PDF_PAGE_WORKERS = int(os.environ.get("OCR_PDF_PAGE_WORKERS", "4"))
 
 # Template (invoice_number prefix) familiarity check — minimum seen instances
 # before flagging a new pattern as anomalous, to avoid flagging the first
@@ -307,6 +311,53 @@ def run_on_path(
     )
 
 
+def _process_pages(
+    page_image_bytes_list: List[bytes],
+    layer1_pages_override: Optional[list],
+    *,
+    api_key: Optional[str],
+    enable_layer3: bool,
+    fallback_to_layer2_on_layer3_error: bool,
+    pattern_memory: Optional["InvoicePatternMemory"],
+    document_type: "BusinessDocumentType",
+) -> List[PipelinePageResult]:
+    """Step2(REFACTOR-WA-OCRPERF)· 多页页面调度 · 【只改调度 · 单页 _process_one_page 调用一字不改】。
+
+    pattern_memory is None(生产 web 路径)且多页 → ThreadPoolExecutor 并发(各页独立 ·
+    无跨页 record 学习);pattern_memory 不为 None(跨页 pattern 学习有顺序依赖)或单页 →
+    串行。并发分支结果按 page_number 排序还原页序(与串行输出逐项一致)。
+    _process_one_page 内部自己 try/except 返回带 error 的 result(不抛)· 并发与串行错误语义一致。
+    """
+
+    def _run_page(i: int, image_bytes: bytes) -> PipelinePageResult:
+        l1_override = layer1_pages_override[i - 1] if layer1_pages_override is not None else None
+        return _process_one_page(
+            image_bytes,
+            page_number=i,
+            api_key=api_key,
+            enable_layer3=enable_layer3,
+            fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
+            pattern_memory=pattern_memory,
+            layer1_page_override=l1_override,
+            document_type=document_type,
+        )
+
+    n_pages = len(page_image_bytes_list)
+    if pattern_memory is None and n_pages > 1 and OCR_PDF_PAGE_WORKERS > 1:
+        workers = min(OCR_PDF_PAGE_WORKERS, n_pages)
+        by_page: Dict[int, PipelinePageResult] = {}
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = {
+                ex.submit(_run_page, i, ib): i
+                for i, ib in enumerate(page_image_bytes_list, start=1)
+            }
+            for fut in as_completed(futs):
+                by_page[futs[fut]] = fut.result()
+        return [by_page[i] for i in range(1, n_pages + 1)]
+    # 串行(单页 / pattern_memory 学习路径)
+    return [_run_page(i, ib) for i, ib in enumerate(page_image_bytes_list, start=1)]
+
+
 def run_on_pdf_bytes(
     pdf_bytes: bytes,
     max_pages: int = DEFAULT_MAX_PAGES,
@@ -399,20 +450,15 @@ def run_on_pdf_bytes(
         )
         layer1_pages_override = None
 
-    page_results: List[PipelinePageResult] = []
-    for i, image_bytes in enumerate(page_image_bytes_list, start=1):
-        l1_override = layer1_pages_override[i - 1] if layer1_pages_override is not None else None
-        pr = _process_one_page(
-            image_bytes,
-            page_number=i,
-            api_key=api_key,
-            enable_layer3=enable_layer3,
-            fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
-            pattern_memory=pattern_memory,
-            layer1_page_override=l1_override,
-            document_type=document_type,
-        )
-        page_results.append(pr)
+    page_results: List[PipelinePageResult] = _process_pages(
+        page_image_bytes_list,
+        layer1_pages_override,
+        api_key=api_key,
+        enable_layer3=enable_layer3,
+        fallback_to_layer2_on_layer3_error=fallback_to_layer2_on_layer3_error,
+        pattern_memory=pattern_memory,
+        document_type=document_type,
+    )
 
     elapsed_ms = int((time.time() - t0) * 1000)
     cost_thb = _compute_total_cost(page_results)

@@ -4,9 +4,10 @@
 > - ✅ **L2-A**(`5ba582c`)layer2_structure 981→850·新 layer2_gemini.py·E2E INV2026030007 字段全对 VAT7% L3不变。
 > - ✅ **P-A**(`60b6f74`)pipeline→cost.py·1044→1025·E2E INV2026030008 字段全对 VAT7%。
 > - ✅ **P-C**(`b1ffd9b`)pipeline→pattern_memory.py·1025→947·E2E INV2026030010 字段全对 VAT7%(该票自然触发 L3·触发逻辑未动)。
-> - ⏭️ **下一刀 P-B**(触发/置信纯逻辑→triggers.py·~200 行·最大纯搬家刀·是 L3 触发决策→E2E 须验 L3 触发不变·单独 focused 轮做)。
-> - 真重构刀 **L2-B / P-D** 仍待:单独轮·拆细+密 E2E·别混进搬家 commit。
-> 累计:layer2_structure 981→850 · pipeline 1044→947(均仍 >500·warning-mode 闸不阻·P-B + 真重构刀后趋 <500)。
+> - ✅ **P-B**(`5b1f41f`)触发/置信纯逻辑(5常量+5函数)→triggers.py(235)·pipeline 947→751·契约 assertIs 锁 10 名同一对象+功能锁(test_ocr_triggers_contract 7绿)·全量 2123 绿。**双票 field-diff E2E 验过**:INV2026030010(4页)page2 因 `total_amount missing` 触发 L3=['text','L2','L3']→**L3_triggered=True**(触发口径一字未改);INV2026030004(2页)全 ['text','L2']→**L3_triggered=False**·字段 3750+262.50=4012.50 VAT7% 全对。
+> - **纯搬家批(P-A/P-C/L2-A/P-B)全部完成**·均真账号 E2E 验过·0 逻辑改。
+> - 真重构刀 **L2-B / P-D / L2-C** 仍待:单独轮·拆细+密 E2E·别混进搬家 commit。
+> 累计:layer2_structure 981→850 · pipeline 1044→**751**(均仍 >500·warning-mode 闸不阻·达 <500 需 P-D/L2-B/L2-C 真重构刀·单独草案交叉验证)。
 
 > 目标:`services/ocr/pipeline.py`(1044)+ `services/ocr/layer2_structure.py`(981)→ 各 <500(铁律#27)。
 > 方法:**纯结构搬家(copy-out + 文件尾 re-export 回原命名空间 → 调用方 0 改动 + 契约 assertIs 锁同一对象)** 为主;

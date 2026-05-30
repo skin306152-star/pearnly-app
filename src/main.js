@@ -49,6 +49,7 @@ import './home/recon-job-poll.js'; // REFACTOR-C1 · 对账异步任务前端轮
 import './home/bank-recon-v2.js'; // REFACTOR-C1 · 银行对账 v2(Statement vs GL)· 用 window._reconPollJob
 import './home/settings-general.js'; // REFACTOR-C1 · 设置→通用面板(语言 select + tz/date/number)
 import './home/sidebar-nav-group.js'; // REFACTOR-C1 · 侧栏可折叠业务流分组(window.expandNavGroupForRoute)
+import './home/modal-help.js';
 import './home/help-modal.js'; // REFACTOR-C1 · Help modal 关闭绑定
 import './home/integration-config.js'; // REFACTOR-C1 · 集成页「配置」按钮→抽屉
 import './home/erp-endpoints.js'; // REFACTOR-WB-C1 · ERP 端点管理(从 erp-integration 抽出 · window 桥接 · 须在 erp-integration 前)

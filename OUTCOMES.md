@@ -22,6 +22,18 @@
 | 3 | **异常栏批量栏「选中才显示」**(照发票记录 history-batch-bar)(审计 C 段) | ✅ | ⬜ | E2E:未勾选=批量栏隐藏、勾选=出现。窗口自跑自验。 | B | 待跑 |
 | 4 | **OCR 提速**(留底后台 + 多页并行 + 图片压缩[A/B] + L3 关思考[Phase2]) | ✅ | 🔵 | 每步:同批真发票(U盘 D:\测试PDF\D:\测试图片)跑【改前 vs 改后字段逐项 diff 必须一致】+ 延迟下降 + 测试账号 E2E。字段不一致=自己查根因修,不上线。 | A | 🔵Step0 观测✅(8ecb33b)· **Step1 PDF 留底后台化✅**(b3c6446+asyncio修5453e23·留底挪出响应主路径→后台 to_thread 生成+回填·新 DAL update_ocr_history_pdf_storage tenant/user锁)· **真账号 E2E 验过**:INV2026030003 字段全对(5070+354.90=5424.90·VAT7%)+ has_pdf 2s 内回填 True ✅ → **Step2 多页 PDF 并行✅**(23cad11·_process_pages·pattern_memory is None+多页 ThreadPoolExecutor(4)·as_completed 按 page_number 还原页序·串行守卫·单页逻辑不改)·单测证 parallel==serial+真并发·真账号 E2E:INV2026030004/05 字段全对 VAT7%·页序[1,2]·2页 5.5-6.2s(vs 串行3页13s)✅ → **Step3 图片压缩 A/B✅通过**(Zihao 给 hires 4678px 真泰票 hires_INV2026030002/03):原图4678px vs 本地 LANCZOS resize 2400px·两票【7 关键字段逐项一致 + items 数一致 + L3 触发 False→False 不升】+ 更快(030002 6005→4268ms)→ 2400px 压缩对 Thai 票安全。**Step3 图片压缩✅已上线**(c0feaf2·downscale_image_bytes 只缩不放+_process_one_page layer1_image_bytes_override:L1 用压缩/L3 兜底仍原图全分辨率·仅 run_on_image_bytes 接·PDF 渲染图不动·env OCR_IMG_MAX_LONG_EDGE 默认2400·0关·单测8证 L1压缩/L3原图)·**部署后真账号 E2E**:上传 4678px hires→服务器内部压 2400px→字段与原图逐项一致(INV2026030002 1100+77=1177·VAT7%)+L3 不升+更快(6005→4302ms)✅。**🎉 OCRPERF Phase1 全 3 步(留底后台+多页并行+图片压缩)上线真账号验过完成**。Step4 L3 关思考=Phase2(google-genai SDK 迁移·高风险·待 Zihao 点头·非本 Phase)。 |
 
+## 🔴 主控浏览器实测打回(2026-05-30 · Zihao 验收 + 主控真实浏览器复现 · 推翻上方自述"完成")
+
+> **铁律升级**:以下三项窗口曾报"完成/E2E 已确认",但 Zihao 肉眼 + 主控真实浏览器(playwright 登录 pearnly_e2e_1 实点)证明**未做好**。**根因:窗口靠 grep 类名 / 自跑脚本断言 MODAL=true 宣布完成,从不看真实渲染**。**新验收标准(必须满足才算完成,grep/MODAL=true 一律不认)**:用真实浏览器抓 `isVisible()` + `getComputedStyle()` 像素证据,且 Zihao 肉眼复核。
+
+| # | 结果 | 真实浏览器实测证据(主控 2026-05-30) | 真因 | 验收 |
+|---|---|---|---|---|
+| A2 | **忘记密码必须真能点出弹窗** | 实点 `#cpw-forgot-link`:`linkCount=1` 但 `linkVisible=false` → `clickResult=not-attempted`(不可见点不到)→ `overlayAfter=0`(弹窗从不出现)·console 无报错。上方"MODAL=true 已确认"是**假的**。 | `.cpw-forgot-link` 类**全项目无任何 CSS 定义**(grep 空)→ 渲染成无样式裸 button,不可见/点不到。**委托 JS 没错·错在 CSS 整块丢失**(疑 C3/home.css 拆分时 .cpw-* 样式漏迁)。 | 真浏览器:点链接→overlay 出现且 visible;Zihao 肉眼点一次能弹 |
+| A3 | **改密输入框符合设计语言** | `#cpw-old` 计算样式 `borderRadius:0px · border:2px inset rgb(118,118,118) · padding:0px` = 浏览器**原生默认裸框**,与全站圆角 pill 输入框(.form-input-pill)完全不一致。 | 同上:`.cpw-input` 类**全项目无 CSS 定义** → 裸 input。 | 真浏览器:三框 borderRadius/border/padding 与全站输入框一致 |
+| 1b | **按钮真统一(像素级·非 grep)** | Zihao 截图 + 主控见:**至少 5 页仍黑底动作按钮**——客户管理「设为当前」/异常栏「批量重试·批量删除」/集成推送日志「批量重推·批量删除·取消选择」+ 行内「重试推送·重试」。上方"§2 全站扫描完成·零裸黑动作按钮"是**假结论**(grep 类名 ≠ 渲染成蓝)。 | 这些按钮 DOM 有 class 但计算颜色仍是黑/深底,未真套上 btn-primary 蓝变体,或被后续 CSS 覆盖。 | 真浏览器:每页主操作按钮 `backgroundColor` 实测 = #2563eb 系蓝;Zihao 肉眼每页确认 |
+
+**修法提示(给执行窗口·别再 grep 自欺)**:A2/A3 = 找回/补 `.cpw-input` `.cpw-forgot-link` `.cpw-eye` `.cpw-strength-bar` `.cpw-forgot-*` 的 CSS(查 git 历史 home.css 拆分前的 .cpw-* 段,迁进某 home-*.css 模块);1b = 逐页用真实浏览器抓 computed backgroundColor,黑的改套 btn-primary。**每改一处:playwright 登录实测 isVisible+computedStyle 截图自证 → 再 commit。**
+
 ## ⚪ 待排(Zihao 说暂不在本次)
 
 | # | 结果 | 备注 |

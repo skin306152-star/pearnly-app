@@ -1,4 +1,6 @@
-# OCR-core 拆分草案(WA · 待主控交叉验证)· REFACTOR-WA-OCRSPLIT
+# OCR-core 拆分草案(WA)· REFACTOR-WA-OCRSPLIT
+
+> **进度**:✅ **L2-A 已落地+真账号 E2E 验过**(commit `5ba582c`·layer2_structure 981→850·新 layer2_gemini.py 169·AST 精切 verbatim·re-export 身份不变·契约 4 测+COV4 14 测经 facade 绿·部署后 INV2026030007 字段全对 2160+151.20=2311.20 VAT7%·L3 不变·prod 200)。下一刀:P-A cost.py(最小最纯)→ P-C/P-B → L2-B(prompt-coupled·真重构·单独轮)。
 
 > 目标:`services/ocr/pipeline.py`(1044)+ `services/ocr/layer2_structure.py`(981)→ 各 <500(铁律#27)。
 > 方法:**纯结构搬家(copy-out + 文件尾 re-export 回原命名空间 → 调用方 0 改动 + 契约 assertIs 锁同一对象)** 为主;

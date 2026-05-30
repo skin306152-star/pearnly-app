@@ -85,6 +85,9 @@ if [ -n "$PY_CHANGED" ]; then
 
   echo "  · 全量 unittest(catch errors=N · 改一处崩别处)"
   python -m unittest discover -s tests/unit -p "test_*.py" || fail "全量 unittest 红"
+
+  echo "  · 新债 diff 闸(禁新增 ensure_*/巨石路由 · 铁律 #5/#17)"
+  python scripts/check_new_debt.py || fail "新债 diff 闸(新增 ensure_* 或 app.py 巨石路由)"
 fi
 
 # ── 前端闸(改了 js/css/html/json 才跑)────────────────────────

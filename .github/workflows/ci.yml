@@ -113,6 +113,38 @@ jobs:
             python scripts/check_line_ratchet.py
           fi
 
+  # REFACTOR-WC · 新债 diff 闸(封死铁律 #5/#17 · 审计发现「纸面规矩没机械执行」)
+  #   #5  db.py/services/** 不许新增 def ensure_*  (运行期建表反模式 · schema 只走 alembic)
+  #   #17 app.py 不许新增 @app.<verb> 路由         (路由必落 *_routes.py · 防巨石回潮)
+  # 只看本次 diff 的【新增行】· 命中即 fail · commit 加 NEW-DEBT-EXEMPT 透明豁免。
+  # 与 lint-size 不同:此闸 fail 模式(当前 HEAD 干净 · 不会误红存量)· 需全历史拿 HEAD~1。
+  lint-debt:
+    name: lint-debt (REFACTOR-WC · new-debt diff gate · FAIL mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout (full history · diff 需要 HEAD~1)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 全历史 · 否则 HEAD~1 / origin/master 在 shallow clone 里不存在
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 零依赖(只用标准库)· 任何环境跑得动
+
+      - name: 新债 diff 闸 · 禁新增 ensure_*/巨石路由(铁律 #5/#17)
+        # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python scripts/check_new_debt.py --base origin/${{ github.base_ref }} --head HEAD
+          else
+            python scripts/check_new_debt.py
+          fi
+
   test:
     name: import + i18n + unit + vite-build + e2e
     runs-on: ubuntu-latest

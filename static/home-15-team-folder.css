@@ -505,7 +505,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: var(--brand, #111111);
+    background: var(--brand);
     color: #fff;
     border: none;
     padding: 8px 14px;

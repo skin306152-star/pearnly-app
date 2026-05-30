@@ -3,7 +3,7 @@
    ============================================================ */
 .page-head-card {
     background: #fff;
-    border: 1px solid var(--line, #e5e7eb);
+    border: 1px solid var(--line);
     border-radius: 10px;
     padding: 14px 18px;
     margin-bottom: 16px;
@@ -40,12 +40,12 @@
 .page-head-title {
     font-size: 16px;
     font-weight: 500;
-    color: var(--ink, #111827);
+    color: var(--ink);
     line-height: 1.3;
 }
 .page-head-sub {
     font-size: 12px;
-    color: var(--ink-3, #6b7280);
+    color: var(--ink-3);
     margin-top: 2px;
 }
 .page-head-right {
@@ -73,7 +73,7 @@
     .page-head-sub { font-size: 11px; }
     .page-head-right {
         width: 100%;
-        border-top: 1px solid var(--line, #e5e7eb);
+        border-top: 1px solid var(--line);
         padding-top: 10px;
     }
 }
@@ -87,7 +87,7 @@
     gap: 14px;
     padding: 4px 2px 18px;
     margin-bottom: 14px;
-    border-bottom: 1px solid var(--line, #e5e7eb);
+    border-bottom: 1px solid var(--line);
 }
 /* v118.33.7.11 · 页头图标方块 · prototype 风格(暖灰底 + 灰描边 + 深字)· 之前被这层覆盖一直显浅蓝 */
 .page-head-clean .page-head-icon {
@@ -107,13 +107,13 @@
 .page-head-clean .page-head-title {
     font-size: 17px;
     font-weight: 600;
-    color: var(--ink, #111827);
+    color: var(--ink);
     line-height: 1.3;
     letter-spacing: -0.01em;
 }
 .page-head-clean .page-head-sub {
     font-size: 12px;
-    color: var(--ink-3, #6b7280);
+    color: var(--ink-3);
     margin-top: 2px;
 }
 @media (max-width: 640px) {
@@ -144,7 +144,7 @@
     padding: 10px 16px;
     font-size: 13px;
     background: #fff;
-    color: var(--ink, #111827);
+    color: var(--ink);
     border: 1px solid #D0E5D5;
     border-left: 3px solid #15803D;
     border-radius: 8px;
@@ -262,12 +262,12 @@
     font-family: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
     font-size: 13px;
     font-weight: 600;
-    color: var(--ink, #111827);
+    color: var(--ink);
     word-break: break-all;
     line-height: 1.5;
 }
 .drawer-archive-ext {
-    color: var(--ink-3, #6b7280);
+    color: var(--ink-3);
     font-weight: 400;
 }
 .drawer-archive-hint {

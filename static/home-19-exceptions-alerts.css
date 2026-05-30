@@ -70,7 +70,7 @@
     padding: 0 6px;
     font-size: 11px;
     font-weight: 500;
-    background: var(--line-soft, #F3F4F6);
+    background: var(--line-soft);
     color: var(--ink-3);
     border-radius: 9px;
 }
@@ -632,7 +632,7 @@
     margin-bottom: 14px; gap: 10px;
 }
 .auto-card-title {
-    font-size: 14px; font-weight: 600; color: var(--ink, #111827);
+    font-size: 14px; font-weight: 600; color: var(--ink);
 }
 
 /* 规则列表 */
@@ -663,12 +663,12 @@
 
 .notif-rule-main { flex: 1; min-width: 0; }
 .notif-rule-name {
-    font-size: 14px; font-weight: 500; color: var(--ink, #111827);
+    font-size: 14px; font-weight: 500; color: var(--ink);
     margin-bottom: 3px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .notif-rule-meta {
-    font-size: 12px; color: var(--ink-3, #6b7280);
+    font-size: 12px; color: var(--ink-3);
     display: flex; align-items: center; gap: 10px;
 }
 .notif-rule-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: #d1d5db; }
@@ -704,7 +704,7 @@
     border-radius: 6px;
     padding: 5px 10px;
     font-size: 12px;
-    color: var(--ink-2, #374151);
+    color: var(--ink-2);
     cursor: pointer;
     transition: border-color .15s, background .15s, color .15s;
     white-space: nowrap;
@@ -720,7 +720,7 @@
 }
 .notif-logs-empty {
     text-align: center; padding: 36px 16px;
-    color: var(--ink-4, #9ca3af); font-size: 13px;
+    color: var(--ink-4); font-size: 13px;
 }
 .notif-log-row {
     display: flex; align-items: center; gap: 12px;
@@ -738,14 +738,14 @@
 .notif-log-status.failed { background: #ef4444; }
 .notif-log-main { flex: 1; min-width: 0; }
 .notif-log-event {
-    color: var(--ink, #111827); font-weight: 500;
+    color: var(--ink); font-weight: 500;
     margin-bottom: 2px;
 }
 .notif-log-meta {
-    color: var(--ink-4, #9ca3af); font-size: 11px;
+    color: var(--ink-4); font-size: 11px;
 }
 .notif-log-time {
-    flex-shrink: 0; color: var(--ink-4, #9ca3af);
+    flex-shrink: 0; color: var(--ink-4);
     font-size: 11px;
 }
 
@@ -773,11 +773,11 @@
     border-color: #111111; background: #f4f4f0;
 }
 .notif-template-name {
-    font-size: 14px; font-weight: 500; color: var(--ink, #111827);
+    font-size: 14px; font-weight: 500; color: var(--ink);
     margin-bottom: 4px;
 }
 .notif-template-desc {
-    font-size: 12px; color: var(--ink-3, #6b7280);
+    font-size: 12px; color: var(--ink-3);
     line-height: 1.5;
 }
 
@@ -803,6 +803,6 @@
 /* form-hint */
 .form-hint {
     margin-top: 6px;
-    font-size: 11px; color: var(--ink-4, #9ca3af);
+    font-size: 11px; color: var(--ink-4);
 }
 

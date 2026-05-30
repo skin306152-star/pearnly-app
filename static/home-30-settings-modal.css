@@ -40,7 +40,7 @@ body.settings-modal-open { overflow: hidden; }
 /* 顶部标题区(modal 内) */
 .settings-modal-overlay #page-settings .page-head-clean {
     padding: 20px 28px 16px;
-    border-bottom: 1px solid var(--line, #e5e7eb);
+    border-bottom: 1px solid var(--line);
     margin: 0;
     flex-shrink: 0;
 }
@@ -70,7 +70,7 @@ body.settings-modal-open { overflow: hidden; }
     position: static !important;
     top: auto !important;
     border: none;
-    border-right: 1px solid var(--line, #e5e7eb);
+    border-right: 1px solid var(--line);
     border-radius: 0;
     padding: 16px 8px;
     overflow-y: auto;
@@ -105,7 +105,7 @@ body.settings-modal-open { overflow: hidden; }
     border-radius: 8px;
     border: none;
     background: transparent;
-    color: var(--ink-3, #6b7280);
+    color: var(--ink-3);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -113,7 +113,7 @@ body.settings-modal-open { overflow: hidden; }
     z-index: 10;
     transition: background .15s, color .15s;
 }
-.settings-modal-close:hover { background: #f3f4f6; color: var(--ink, #111827); }
+.settings-modal-close:hover { background: #f3f4f6; color: var(--ink); }
 .settings-modal-close svg { width: 18px; height: 18px; }
 
 /* 手机端 · 全屏 */
@@ -133,7 +133,7 @@ body.settings-modal-open { overflow: hidden; }
         width: 100%;
         max-height: none;
         border-right: none;
-        border-bottom: 1px solid var(--line, #e5e7eb);
+        border-bottom: 1px solid var(--line);
         padding: 8px 12px;
         display: flex;
         flex-direction: row;
@@ -149,7 +149,7 @@ body.settings-modal-open { overflow: hidden; }
         gap: 4px;
         margin: 0;
         padding: 0 4px;
-        border-right: 1px solid var(--line, #e5e7eb);
+        border-right: 1px solid var(--line);
     }
     .settings-modal-overlay #page-settings .settings-nav-group:last-child { border-right: none; }
     .settings-modal-overlay #page-settings .settings-nav-group-title { display: none; }
@@ -196,17 +196,17 @@ body.settings-modal-open { overflow: hidden; }
 /* section-head: DeepSeek 风格大标题 + 副标题 + 行底横线 */
 .settings-modal-overlay #page-settings .section-head {
     padding: 20px 0 16px;
-    border-bottom: 1px solid var(--line, #e5e7eb);
+    border-bottom: 1px solid var(--line);
     margin-bottom: 4px;
 }
 .settings-modal-overlay #page-settings .section-head:first-child { padding-top: 8px; }
 .settings-modal-overlay #page-settings .section-title {
     font-size: 16px; font-weight: 600;
-    color: var(--ink, #111827);
+    color: var(--ink);
     margin: 0;
 }
 .settings-modal-overlay #page-settings .section-sub {
-    font-size: 13px; color: var(--ink-3, #6b7280);
+    font-size: 13px; color: var(--ink-3);
     margin-top: 4px; line-height: 1.5;
 }
 
@@ -215,7 +215,7 @@ body.settings-modal-open { overflow: hidden; }
 .settings-modal-overlay #page-settings .form-field,
 .settings-modal-overlay #page-settings .settings-row {
     padding: 16px 0;
-    border-bottom: 1px solid var(--line, #e5e7eb);
+    border-bottom: 1px solid var(--line);
     margin: 0;
 }
 .settings-modal-overlay #page-settings .form-group:last-child,
@@ -240,7 +240,7 @@ body.settings-modal-open { overflow: hidden; }
 .settings-modal-overlay #page-settings .access-log-row {
     background: transparent !important;
     border: none !important;
-    border-bottom: 1px solid var(--line, #e5e7eb) !important;
+    border-bottom: 1px solid var(--line) !important;
     border-radius: 0 !important;
     padding: 16px 0 !important;
     margin: 0 !important;
@@ -258,7 +258,7 @@ body.settings-modal-open { overflow: hidden; }
 .settings-modal-overlay #page-settings .access-log-empty {
     text-align: center;
     padding: 32px 16px;
-    color: var(--ink-3, #6b7280);
+    color: var(--ink-3);
     font-size: 13px;
 }
 
@@ -266,7 +266,7 @@ body.settings-modal-open { overflow: hidden; }
 .settings-modal-overlay #page-settings .access-log-toolbar {
     display: flex; gap: 8px; align-items: center;
     padding: 16px 0;
-    border-bottom: 1px solid var(--line, #e5e7eb);
+    border-bottom: 1px solid var(--line);
 }
 .settings-modal-overlay #page-settings .access-log-toolbar .form-input {
     flex: 1;
@@ -321,7 +321,7 @@ body.settings-modal-open { overflow: hidden; }
     border-radius: 8px !important;
     border: none !important;
     background: transparent !important;
-    color: var(--ink-3, #6b7280) !important;
+    color: var(--ink-3) !important;
     cursor: pointer !important;
     display: flex !important;
     align-items: center !important;
@@ -331,7 +331,7 @@ body.settings-modal-open { overflow: hidden; }
 }
 .settings-modal-overlay .settings-modal-close:hover {
     background: #f3f4f6 !important;
-    color: var(--ink, #111827) !important;
+    color: var(--ink) !important;
 }
 .settings-modal-overlay .settings-modal-close svg { width: 18px !important; height: 18px !important; }
 
@@ -486,7 +486,7 @@ body.settings-modal-open { overflow: hidden; }
 }
 .vex-action-info { flex: 1; font-size: 12.5px; }
 .vex-action-info.muted { color: #9CA3AF; }
-.vex-action-info.ok    { color: var(--success, #16a34a); }
+.vex-action-info.ok    { color: var(--success); }
 
 /* v4.10.11 · 查看清单切换按钮 */
 .vex-toggle-preview-btn {
@@ -499,8 +499,8 @@ body.settings-modal-open { overflow: hidden; }
 
 /* v4.10.11 · 上传清单预览面板 */
 .vex-preview-panel {
-    border: 1px solid var(--line, #e8e8e3); border-radius: 12px;
-    background: var(--bg, #f4f4f0); padding: 14px 18px; margin-top: 8px;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--bg); padding: 14px 18px; margin-top: 8px;
 }
 /* v118.32.5.5.24 · 列宽 1:1 + gap 60px · 跟上传区 .vex-drops (1fr 60px 1fr) 视觉对齐 */
 .vex-pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
@@ -513,23 +513,23 @@ body.settings-modal-open { overflow: hidden; }
 .vex-pp-search-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .vex-pp-search {
     flex: 1; height: 30px; font-size: 12px; padding: 0 10px;
-    border: 0.5px solid var(--line, #e8e8e3); border-radius: 6px;
+    border: 0.5px solid var(--line); border-radius: 6px;
     outline: none; color: #111827; background: var(--card, #fff);
 }
 .vex-pp-search:focus { border-color: #111111; }
 .vex-pp-clear-btn {
     height: 30px; padding: 0 10px; font-size: 12px;
-    background: transparent; border: 0.5px solid var(--line, #e8e8e3);
+    background: transparent; border: 0.5px solid var(--line);
     border-radius: 6px; color: #6B7280; cursor: pointer; flex-shrink: 0;
 }
 .vex-pp-clear-btn:hover { color: #DC2626; border-color: #FCA5A5; }
 .vex-pp-file-list {
-    border: 0.5px solid var(--line, #e8e8e3); border-radius: 8px;
+    border: 0.5px solid var(--line); border-radius: 8px;
     max-height: 220px; overflow-y: auto; background: var(--card, #fff);
 }
 .vex-pp-file-row {
     display: flex; align-items: center;
-    padding: 8px 12px; border-bottom: 0.5px solid var(--line, #e8e8e3); font-size: 12px;
+    padding: 8px 12px; border-bottom: 0.5px solid var(--line); font-size: 12px;
 }
 .vex-pp-file-row:last-child { border-bottom: 0; }
 .vex-pp-fi-icon { flex-shrink: 0; margin-right: 8px; display: block; }
@@ -550,7 +550,7 @@ body.settings-modal-open { overflow: hidden; }
 .vex-pp-fi-del:hover { color: #DC2626; }
 .vex-pp-pagination { text-align: center; padding: 6px 8px; font-size: 11px; color: #9CA3AF; }
 .vex-pp-guide {
-    margin-top: 14px; padding: 10px 12px; background: var(--line-soft, #f0f0eb);
+    margin-top: 14px; padding: 10px 12px; background: var(--line-soft);
     border-radius: 8px; display: flex; align-items: center;
     gap: 8px; font-size: 12px; color: #111111;
 }
@@ -723,12 +723,12 @@ body.settings-modal-open { overflow: hidden; }
     border: 1px solid var(--color-border-tertiary, #E5E7EB);
     border-radius: 6px;
     background: #ffffff;
-    color: var(--ink, #111827);
+    color: var(--ink);
     outline: none;
     transition: border-color .15s;
     margin-left: auto;
 }
-.hist-search-input:focus { border-color: var(--ink, #111827); }
+.hist-search-input:focus { border-color: var(--ink); }
 .hist-search-input::placeholder { color: #9CA3AF; }
 
 /* hover 操作按钮 */

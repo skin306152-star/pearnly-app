@@ -182,13 +182,13 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
     align-items: center;
     padding: 8px 4px;
     font-size: 12px;
-    color: var(--ink-3, #6b7280);
+    color: var(--ink-3);
 }
-.file-list-head .count strong { color: var(--ink, #111827); font-weight: 500; }
+.file-list-head .count strong { color: var(--ink); font-weight: 500; }
 .file-list-head .toggle {
     background: transparent;
     border: none;
-    color: var(--accent, #111111);
+    color: var(--accent);
     font-size: 12px;
     cursor: pointer;
     padding: 4px 8px;
@@ -198,7 +198,7 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
 .file-list-body {
     max-height: 240px;       /* 约 5 行高度 */
     overflow-y: auto;
-    border: 1px solid var(--line, #e5e7eb);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 6px;
     background: #fafafa;
@@ -224,19 +224,19 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
 .file-status { font-size: 11px; flex-shrink: 0; }
 .file-status.waiting { color: var(--ink-3); }
 .file-status.processing { color: var(--accent); }
-.file-status.retrying { color: var(--warn, #d97706); }
+.file-status.retrying { color: var(--warn); }
 .file-status.success { color: var(--success); }
 .file-status.error { color: var(--danger); }
 /* v92 · Bug 7 · 失败文件重试按钮 */
 .file-retry-btn {
     display: inline-flex; align-items: center; gap: 4px;
     font-size: 11px; padding: 3px 10px;
-    background: var(--accent, #111111); color: #fff;
+    background: var(--accent); color: #fff;
     border: none; border-radius: 4px;
     cursor: pointer; flex-shrink: 0;
     transition: background 0.15s;
 }
-.file-retry-btn:hover { background: var(--brand-hover, #111111); }
+.file-retry-btn:hover { background: var(--brand-hover); }
 .file-retry-btn:active { transform: scale(0.97); }
 /* v92 · Bug 8 · 缓存命中标签 */
 .file-cache-badge {

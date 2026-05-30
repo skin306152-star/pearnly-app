@@ -12,14 +12,14 @@
 @media (max-width: 700px) { .brv2-upload-row { grid-template-columns: 1fr; } }
 
 .brv2-upload-zone {
-  border: 1.5px dashed var(--line, #e4e4de);
+  border: 1.5px dashed var(--line);
   border-radius: 10px; padding: 14px 16px;
   display: flex; flex-direction: column; gap: 8px;
-  background: var(--bg, #f8f8f4); cursor: default;
+  background: var(--bg); cursor: default;
   transition: border-color .15s, background .15s;
 }
 .brv2-upload-zone.drag-over {
-  border-color: var(--accent, #3b82f6); background: #eff6ff;
+  border-color: var(--accent); background: #eff6ff;
 }
 .brv2-zone-icon {
   width: 36px; height: 36px; border-radius: 8px;
@@ -37,7 +37,7 @@
   color: var(--ink-2, #555); font-weight: 500;
   transition: background .1s, color .1s;
 }
-.brv2-zone-btn:hover { background: var(--accent, #3b82f6); color: #fff; border-color: transparent; }
+.brv2-zone-btn:hover { background: var(--accent); color: #fff; border-color: transparent; }
 
 .brv2-file-list { display: flex; flex-direction: column; gap: 4px; }
 .brv2-file-chip {
@@ -67,7 +67,7 @@
 .brv2-run-btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
-  background: var(--accent, #3b82f6); color: #fff; border: none; cursor: pointer;
+  background: var(--accent); color: #fff; border: none; cursor: pointer;
   transition: opacity .15s;
 }
 .brv2-run-btn:disabled { opacity: .45; cursor: not-allowed; }
@@ -79,7 +79,7 @@
   overflow: hidden; max-width: 200px;
 }
 .brv2-progress-fill {
-  height: 100%; background: var(--accent, #3b82f6);
+  height: 100%; background: var(--accent);
   animation: brv2-pulse 1.4s ease-in-out infinite;
 }
 @keyframes brv2-pulse {
@@ -126,7 +126,7 @@
 }
 .brv2-formula-title {
   padding: 8px 14px; font-size: 12px; font-weight: 600;
-  background: var(--line-soft, #f0efe9); color: var(--ink-2);
+  background: var(--line-soft); color: var(--ink-2);
   border-bottom: 1px solid var(--line);
 }
 .brv2-formula-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -168,11 +168,11 @@
   text-align: right; font-variant-numeric: tabular-nums;
 }
 .brv2-table td {
-  padding: 6px 10px; border-bottom: 1px solid var(--line-soft, #f0efe9);
+  padding: 6px 10px; border-bottom: 1px solid var(--line-soft);
   vertical-align: middle;
 }
 .brv2-table tr:last-child td { border-bottom: none; }
-.brv2-table tr:hover td { background: var(--bg, #f8f8f4); }
+.brv2-table tr:hover td { background: var(--bg); }
 
 /* Row status colors */
 .brv2-table tr.matched td { }
@@ -210,7 +210,7 @@
   border: 1px solid var(--line); background: var(--bg);
   cursor: pointer; transition: background .1s;
 }
-.brv2-hist-item:hover { background: var(--line-soft, #f0efe9); }
+.brv2-hist-item:hover { background: var(--line-soft); }
 .brv2-hist-bank {
   font-size: 11px; font-weight: 700; color: #fff;
   background: #334155; border-radius: 4px; padding: 2px 6px;

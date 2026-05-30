@@ -3,7 +3,7 @@
    ============================================================ */
 .erp-logs-section {
     margin-top: 20px;
-    border-top: 1px solid var(--line, #e5e7eb);
+    border-top: 1px solid var(--line);
     padding-top: 16px;
 }
 .erp-logs-head {
@@ -14,7 +14,7 @@
     padding: 8px 0;
     font-size: 13px;
     font-weight: 500;
-    color: var(--ink, #111827);
+    color: var(--ink);
     user-select: none;
 }
 .erp-logs-head:hover { color: var(--brand); }
@@ -32,7 +32,7 @@
     align-items: center;
     gap: 12px;
     padding: 8px 12px;
-    border-bottom: 1px solid var(--line, #f3f4f6);
+    border-bottom: 1px solid var(--line);
     font-size: 12px;
     font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
 }
@@ -186,12 +186,12 @@
 }
 .log-doc-copy {
     cursor: pointer;
-    color: var(--brand, #4f46e5);
+    color: var(--brand);
     border-bottom: 1px dashed currentColor;
 }
 .log-doc-copy:hover { opacity: 0.75; }
 .log-doc-open {
-    color: var(--brand, #4f46e5);
+    color: var(--brand);
     text-decoration: none;
     font-weight: 600;
     font-family: sans-serif;
@@ -255,7 +255,7 @@
 /* 批 3 改动 6 (v118.34.34) · ERP adapter chip 视觉区分 ·
    分隔线 + 灰色 disabled 即将上线状态 */
 .erp-logs-filter-sep {
-    color: var(--line, #e8e8e3);
+    color: var(--line);
     align-self: center;
     margin: 0 2px;
     user-select: none;
@@ -264,11 +264,11 @@
 .chip-filter.chip-filter-disabled {
     opacity: 0.55;
     cursor: not-allowed;
-    background: var(--bg, #f4f4f0);
+    background: var(--bg);
 }
 .chip-filter.chip-filter-disabled:hover {
-    background: var(--bg, #f4f4f0);
-    color: var(--ink-3, #6B7280);
+    background: var(--bg);
+    color: var(--ink-3);
 }
 .chip-filter .chip-soon {
     margin-left: 4px;
@@ -449,12 +449,12 @@ button.btn-primary.btn-tiny:hover {
 }
 .erp-receipt-fail-reason-label {
     font-size: 12px;
-    color: var(--ink-3, #6b7280);
+    color: var(--ink-3);
     margin-bottom: 6px;
 }
 .erp-receipt-docno {
     font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-    color: var(--brand, #4f46e5);
+    color: var(--brand);
     font-size: 14px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -497,7 +497,7 @@ button.btn-primary.btn-tiny:hover {
 .erp-receipt-primary-btn {
     display: inline-block;
     padding: 9px 18px;
-    background: var(--brand, #4f46e5);
+    background: var(--brand);
     color: #fff;
     border: none;
     border-radius: 8px;
@@ -548,9 +548,9 @@ button.btn-primary.btn-tiny:hover {
 }
 .erp-receipt-action-btn:hover { background: #f4f4f0; }
 .erp-receipt-action-btn.primary {
-    background: var(--brand, #4f46e5);
+    background: var(--brand);
     color: #fff;
-    border-color: var(--brand, #4f46e5);
+    border-color: var(--brand);
 }
 .erp-receipt-action-btn.primary:hover { opacity: 0.9; }
 

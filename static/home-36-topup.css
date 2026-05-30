@@ -28,10 +28,10 @@
     display: flex; align-items: center; justify-content: space-between;
     padding: 20px 22px 0; flex-shrink: 0;
 }
-.topup-v2-title { font-size: 17px; font-weight: 600; color: var(--ink, #111827); }
+.topup-v2-title { font-size: 17px; font-weight: 600; color: var(--ink); }
 .topup-v2-close {
     border: none; background: none; cursor: pointer; padding: 6px;
-    color: var(--ink-3, #9ca3af); border-radius: 6px; line-height: 0;
+    color: var(--ink-3); border-radius: 6px; line-height: 0;
     transition: background .15s;
 }
 .topup-v2-close:hover { background: #f3f4f6; }
@@ -43,40 +43,40 @@
 }
 .topup-v2-dot {
     width: 26px; height: 26px; border-radius: 50%;
-    background: var(--line, #e5e7eb); color: #9ca3af;
+    background: var(--line); color: #9ca3af;
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 600; transition: all .2s;
 }
 .topup-v2-step.active .topup-v2-dot { background: var(--brand, #111); color: #fff; }
 .topup-v2-slabel { font-size: 11px; color: #9ca3af; white-space: nowrap; }
 .topup-v2-step.active .topup-v2-slabel { color: var(--brand, #111); }
-.topup-v2-line { flex: 1; height: 1px; background: var(--line, #e5e7eb); margin: 0 6px 18px; }
+.topup-v2-line { flex: 1; height: 1px; background: var(--line); margin: 0 6px 18px; }
 .topup-v2-body { padding: 16px 22px; flex: 1; overflow-y: auto; }
 .topup-v2-label {
-    display: block; font-size: 12px; color: var(--ink-3, #6b7280);
+    display: block; font-size: 12px; color: var(--ink-3);
     margin: 12px 0 6px;
 }
 .topup-v2-label:first-child { margin-top: 0; }
 .topup-v2-input {
     width: 100%; box-sizing: border-box;
-    padding: 9px 11px; border: 1px solid var(--line, #e5e7eb);
+    padding: 9px 11px; border: 1px solid var(--line);
     border-radius: 8px; font-size: 14px; font-family: inherit;
-    background: #fff; color: var(--ink, #111827); transition: border-color .15s;
+    background: #fff; color: var(--ink); transition: border-color .15s;
 }
 .topup-v2-input:focus { outline: none; border-color: var(--brand, #111); }
 .topup-v2-qamts {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px;
 }
 .topup-v2-qamt {
-    padding: 8px 4px; border: 1px solid var(--line, #e5e7eb);
+    padding: 8px 4px; border: 1px solid var(--line);
     border-radius: 8px; background: #fff; cursor: pointer;
-    font-size: 13px; font-weight: 500; color: var(--ink, #111827);
+    font-size: 13px; font-weight: 500; color: var(--ink);
     transition: all .15s;
 }
 .topup-v2-qamt:hover { border-color: var(--brand, #111); }
 .topup-v2-qamt.active {
     border-color: var(--brand, #111);
-    background: var(--accent-soft, #f5f5f4);
+    background: var(--accent-soft);
     color: var(--brand, #111); font-weight: 600;
 }
 .topup-v2-err {
@@ -84,19 +84,19 @@
     color: #7f1d1d; background: #fef2f2;
     border: 1px solid #fecaca; border-radius: 6px;
 }
-.topup-v2-bank-label { font-size: 12px; color: var(--ink-3, #6b7280); margin: 0 0 10px; }
+.topup-v2-bank-label { font-size: 12px; color: var(--ink-3); margin: 0 0 10px; }
 .topup-v2-bank-card {
-    background: #f8fafc; border: 1px solid var(--line, #e5e7eb);
+    background: #f8fafc; border: 1px solid var(--line);
     border-radius: 12px; padding: 16px; margin-bottom: 12px;
 }
 .topup-v2-bank-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-.topup-v2-bank-branch { font-size: 12px; color: var(--ink-3, #6b7280); margin-bottom: 10px; }
+.topup-v2-bank-branch { font-size: 12px; color: var(--ink-3); margin-bottom: 10px; }
 .topup-v2-bank-acct { font-size: 22px; font-weight: 700; letter-spacing: .05em; margin-bottom: 2px; }
-.topup-v2-bank-holder { font-size: 12px; color: var(--ink-3, #6b7280); margin-bottom: 12px; }
+.topup-v2-bank-holder { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
 .topup-v2-copy {
-    border: 1px solid var(--line, #e5e7eb); background: #fff;
+    border: 1px solid var(--line); background: #fff;
     border-radius: 7px; padding: 6px 14px; font-size: 12px;
-    cursor: pointer; transition: all .15s; color: var(--ink, #111827);
+    cursor: pointer; transition: all .15s; color: var(--ink);
 }
 .topup-v2-copy:hover { background: #f3f4f6; }
 .topup-v2-warn {
@@ -104,9 +104,9 @@
     padding: 10px 13px; font-size: 12px; color: #92400e; line-height: 1.5;
 }
 .topup-v2-drop {
-    border: 2px dashed var(--line, #e5e7eb); border-radius: 10px;
+    border: 2px dashed var(--line); border-radius: 10px;
     padding: 28px 16px; text-align: center; cursor: pointer;
-    transition: all .15s; color: var(--ink-3, #9ca3af);
+    transition: all .15s; color: var(--ink-3);
     margin-bottom: 6px; display: flex; flex-direction: column;
     align-items: center; gap: 8px;
 }
@@ -118,5 +118,5 @@
 .topup-v2-foot {
     display: flex; gap: 8px; justify-content: flex-end;
     padding: 14px 22px 20px;
-    border-top: 1px solid var(--line, #e5e7eb); flex-shrink: 0;
+    border-top: 1px solid var(--line); flex-shrink: 0;
 }

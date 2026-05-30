@@ -139,7 +139,7 @@
     text-align: center;
 }
 .billing-modal-link a {
-    color: var(--brand, #111111);
+    color: var(--brand);
     font-size: 13px;
     text-decoration: none;
     font-weight: 500;

@@ -8,8 +8,8 @@
     gap: 3px;
     padding: 4px;
     background: #ebebе6;
-    background: var(--bg, #f0efe9);
-    border: 1px solid var(--line, #e4e4de);
+    background: var(--bg);
+    border: 1px solid var(--line);
     border-radius: 10px;
     margin-bottom: 20px;
     overflow-x: auto;
@@ -54,13 +54,13 @@
 .cust-search-wrap { flex: 1; min-width: 220px; display: flex; }
 .cust-search-wrap .search-input { width: 100%; }
 .cust-hint {
-    font-size: 12px; color: var(--ink-3, #6b7280);
-    background: var(--bg, #f7f7f3); border: 1px solid var(--line, #e5e7eb);
+    font-size: 12px; color: var(--ink-3);
+    background: var(--bg); border: 1px solid var(--line);
     border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; line-height: 1.5;
 }
 
 .cust-table-wrap {
-    border: 1px solid var(--line, #e5e7eb); border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
     background: #fff;
 }
 .cust-table-head, .cust-row {
@@ -70,15 +70,15 @@
 .buyer-grid  { grid-template-columns: 36px 1fr 90px 140px 150px; }
 .seller-grid { grid-template-columns: 1fr 170px 90px 210px; }
 .cust-table-head {
-    background: var(--bg, #f9fafb); font-size: 12px; font-weight: 600;
-    color: var(--ink-3, #6b7280); border-bottom: 1px solid var(--line, #e5e7eb);
+    background: var(--bg); font-size: 12px; font-weight: 600;
+    color: var(--ink-3); border-bottom: 1px solid var(--line);
 }
 .cust-row {
-    font-size: 13px; border-bottom: 1px solid var(--line, #f0f0ec);
+    font-size: 13px; border-bottom: 1px solid var(--line);
     transition: background .12s;
 }
 .cust-row:last-child { border-bottom: none; }
-.cust-row:hover { background: var(--bg, #f9fafb); }
+.cust-row:hover { background: var(--bg); }
 .cust-row.selected { background: #eef2ff; }
 .align-right { text-align: right; }
 
@@ -88,20 +88,20 @@
 .cust-cell-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .cust-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .cust-name-text { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cust-cell-sub { font-size: 11px; color: var(--ink-3, #6b7280); margin-top: 1px; }
+.cust-cell-sub { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
 .cust-cell-amount { font-weight: 600; }
-.cust-cell-tax { color: var(--ink-3, #6b7280); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cust-cell-tax { color: var(--ink-3); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .cust-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .cust-row-btn {
     display: inline-flex; align-items: center; gap: 4px;
-    border: 1px solid var(--line, #e5e7eb); background: #fff;
+    border: 1px solid var(--line); background: #fff;
     border-radius: 6px; padding: 4px 9px; font-size: 12px;
-    color: var(--ink-2, #374151); cursor: pointer; white-space: nowrap;
+    color: var(--ink-2); cursor: pointer; white-space: nowrap;
     transition: background .12s, border-color .12s, color .12s;
 }
 .cust-row-btn svg { width: 13px; height: 13px; }
-.cust-row-btn:hover { background: var(--bg, #f3f4f6); border-color: #d1d5db; }
+.cust-row-btn:hover { background: var(--bg); border-color: #d1d5db; }
 .cust-row-btn.danger:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
 .cust-row-btn.primary { background: #111; color: #fff; border-color: #111; }
 .cust-row-btn.primary:hover { background: #333; }
@@ -123,15 +123,15 @@
 .cust-foot {
     display: flex; justify-content: space-between; align-items: center; margin-top: 12px;
 }
-.cust-pager-info { font-size: 12px; color: var(--ink-3, #6b7280); }
+.cust-pager-info { font-size: 12px; color: var(--ink-3); }
 .cust-pager-btns { display: flex; gap: 6px; }
 
 .cust-loading, .cust-empty {
-    padding: 40px 16px; text-align: center; color: var(--ink-3, #6b7280); font-size: 13px;
+    padding: 40px 16px; text-align: center; color: var(--ink-3); font-size: 13px;
 }
 .wsclient-modal-note {
-    font-size: 12px; color: var(--ink-3, #6b7280); line-height: 1.5;
-    background: var(--bg, #f7f7f3); border-radius: 8px; padding: 8px 12px; margin-top: 4px;
+    font-size: 12px; color: var(--ink-3); line-height: 1.5;
+    background: var(--bg); border-radius: 8px; padding: 8px 12px; margin-top: 4px;
 }
 
 @media (max-width: 720px) {
@@ -157,7 +157,7 @@
 .sv-step-label {
     font-size: 12px;
     font-weight: 600;
-    color: var(--brand, #111111);
+    color: var(--brand);
     text-transform: uppercase;
     letter-spacing: .04em;
     margin-bottom: 14px;
@@ -229,7 +229,7 @@
 }
 .sv-dropzone:hover,
 .sv-dropzone.drag-over {
-    border-color: var(--brand, #111111);
+    border-color: var(--brand);
     background: #f4f4f0;
     color: var(--brand);
 }
@@ -330,7 +330,7 @@
 }
 .bv-dropzone:hover,
 .bv-dropzone.drag-over {
-    border-color: var(--brand, #111111);
+    border-color: var(--brand);
     background: #f4f4f0;
     color: var(--brand);
 }
@@ -757,9 +757,9 @@
 }
 .sv-chip:hover { background: #F9FAFB; }
 .sv-chip.active {
-    background: var(--brand, #111111);
+    background: var(--brand);
     color: #fff;
-    border-color: var(--brand, #111111);
+    border-color: var(--brand);
 }
 
 /* 行列表 */
@@ -968,7 +968,7 @@
 .sv-batch-count {
     font-size: 13px; color: var(--text-1, #1f2937); margin-right: auto;
 }
-.sv-batch-count strong { color: var(--brand, #111111); margin: 0 4px; font-weight: 600; }
+.sv-batch-count strong { color: var(--brand); margin: 0 4px; font-weight: 600; }
 .sv-batch-icon-btn {
     background: none; border: none; cursor: pointer; padding: 8px;
     border-radius: 4px; color: var(--text-2, #6b7280);
@@ -977,7 +977,7 @@
 }
 .sv-batch-icon-btn:hover { background: var(--bg-1, #f3f4f6); color: var(--text-1, #1f2937); }
 .sv-batch-icon-btn svg { width: 18px; height: 18px; }
-#sv-batch-delete:hover { background: var(--bg-danger-soft, #fef2f2); color: var(--danger, #dc2626); }
+#sv-batch-delete:hover { background: var(--bg-danger-soft, #fef2f2); color: var(--danger); }
 
 /* 任务卡 · checkbox + ⋮ 菜单 */
 .sv-task-cell-check {
@@ -1006,7 +1006,7 @@
     padding: 8px 12px; font-size: 13px; border-radius: 4px;
 }
 .sv-task-menu-item:hover { background: var(--bg-1, #f3f4f6); }
-.sv-task-menu-item.danger { color: var(--danger, #ef4444); }
+.sv-task-menu-item.danger { color: var(--danger); }
 .sv-task-menu-item.danger:hover { background: var(--bg-danger-soft, #fef2f2); }
 
 
@@ -1016,16 +1016,16 @@
 }
 .hist-batch-icon-btn {
     background: none; border: none; cursor: pointer; padding: 8px;
-    border-radius: 6px; color: var(--ink-3, #6b7280);
+    border-radius: 6px; color: var(--ink-3);
     width: 34px; height: 34px;
     display: inline-flex; align-items: center; justify-content: center;
     transition: background .15s, color .15s;
 }
-.hist-batch-icon-btn:hover { background: var(--bg-1, #f3f4f6); color: var(--ink, #111827); }
+.hist-batch-icon-btn:hover { background: var(--bg-1, #f3f4f6); color: var(--ink); }
 .hist-batch-icon-btn svg { width: 18px; height: 18px; }
 .hist-batch-icon-btn.hist-batch-icon-danger:hover {
     background: var(--bg-danger-soft, #fef2f2);
-    color: var(--danger, #dc2626);
+    color: var(--danger);
 }
 
 /* 列头跟数据列右对齐(Excel / QuickBooks / Xero 主流做法) */

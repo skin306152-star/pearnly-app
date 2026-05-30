@@ -1142,6 +1142,11 @@ async def ocr_recognize(
     #   留底失败只是没下载(同原 try/except 降级)。sync CPU/disk 走 to_thread 不堵 event loop。
     if history_ids:
         try:
+            # asyncio 在本函数是局部名(上方 384/1075 条件分支里有 import asyncio · 编译期即
+            # 把 asyncio 标记为函数局部)· 那些分支没走时 asyncio 未绑定 → 这里显式 import 绑定,
+            # 防 UnboundLocalError(实测:无 auto-push 端点的账号触发过 · prod E2E 抓到)。
+            import asyncio
+
             _pdf_pages = result.get("pages") or []
             _pdf_uid = str(user["id"])
             _pdf_tid = _tid(user)

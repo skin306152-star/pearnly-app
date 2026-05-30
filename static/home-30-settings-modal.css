@@ -76,7 +76,7 @@ body.settings-modal-open { overflow: hidden; }
     overflow-y: auto;
     overscroll-behavior: contain;
     flex-shrink: 0;
-    background: #fafaf8;
+    background: var(--c-fafaf8);
 }
 .settings-modal-overlay #page-settings #settings-content,
 .settings-modal-overlay #page-settings .settings-content-wrap,
@@ -411,22 +411,22 @@ body.settings-modal-open { overflow: hidden; }
 .vex-drop {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 10px; padding: 32px 20px;
-    background: #f8f8f6;
-    border: 1.5px dashed #c8d0d8;
+    background: var(--c-f8f8f6);
+    border: 1.5px dashed var(--c-c8d0d8);
     border-radius: 14px;
     cursor: pointer;
     transition: all .2s;
     min-height: 180px;
 }
-.vex-drop:hover { border-color: var(--ink); background: #f0f0ec; }
-.vex-drop.drag-over { border-color: var(--ink); background: #f0f0ec; border-style: solid; }
+.vex-drop:hover { border-color: var(--ink); background: var(--c-f0f0ec); }
+.vex-drop.drag-over { border-color: var(--ink); background: var(--c-f0f0ec); border-style: solid; }
 .vex-drop-icon-wrap {
     width: 56px; height: 56px; border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
 }
 .vex-drop-icon-wrap svg { width: 32px; height: 32px; }
 .vex-drop-invoice,
-.vex-drop-report  { background: #f8f8f6; border: 1.5px dashed #c8d0d8; }
+.vex-drop-report  { background: var(--c-f8f8f6); border: 1.5px dashed var(--c-c8d0d8); }
 .vex-drop-invoice .vex-drop-icon-wrap { background: var(--line); color: var(--ink); }
 .vex-drop-report  .vex-drop-icon-wrap { background: var(--line); color: var(--ink); }
 .vex-drop-title { font-size: 15px; font-weight: 600; color: var(--ink-2); }
@@ -444,7 +444,7 @@ body.settings-modal-open { overflow: hidden; }
     gap: 16px; margin-bottom: 18px;
 }
 .vex-files-col {
-    background: #fafaf8; border: 1px solid var(--line);
+    background: var(--c-fafaf8); border: 1px solid var(--line);
     border-radius: 10px; padding: 12px;
 }
 .vex-files-head {
@@ -614,7 +614,7 @@ body.settings-modal-open { overflow: hidden; }
     justify-content: center;
     font-size: 14px;
 }
-.vex-kpi-icon-warn  { background: var(--warn-bg); color: #854F0B; }
+.vex-kpi-icon-warn  { background: var(--warn-bg); color: var(--c-854f0b); }
 .vex-kpi-icon-ok    { background: var(--success-bg); color: var(--green-800); }
 .vex-kpi-icon-err   { background: var(--danger-bg); color: var(--red-800); }
 .vex-kpi-val   { font-size: 18px; font-weight: 500; line-height: 1.1; color: var(--gray-900); }

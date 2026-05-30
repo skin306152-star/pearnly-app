@@ -642,7 +642,7 @@
 .notif-rule-row {
     display: flex; align-items: center; gap: 14px;
     padding: 14px 16px;
-    background: #fafaf8;
+    background: var(--c-fafaf8);
     border: 1px solid var(--border, var(--gray-200));
     border-radius: 10px;
     transition: border-color .15s, background .15s;
@@ -656,7 +656,7 @@
     padding: 3px 10px;
     border-radius: 999px;
     font-size: 11px; font-weight: 500;
-    background: #eef4ff; color: var(--ink);
+    background: var(--c-eef4ff); color: var(--ink);
     white-space: nowrap;
 }
 .notif-rule-tmpl-badge.large { background: var(--warn-bg); color: var(--amber-800); }
@@ -725,7 +725,7 @@
 .notif-log-row {
     display: flex; align-items: center; gap: 12px;
     padding: 10px 14px;
-    background: #fafaf8;
+    background: var(--c-fafaf8);
     border: 1px solid var(--gray-100);
     border-radius: 8px;
     font-size: 12px;

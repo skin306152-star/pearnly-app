@@ -128,7 +128,7 @@
     margin: 12px 0 8px;
     padding: 12px 14px;
     background: var(--accent-soft);
-    border: 1px solid #c3dcf5;
+    border: 1px solid var(--c-c3dcf5);
     border-radius: 10px;
     box-shadow: var(--shadow-sm);
     animation: bbp-fade-in 220ms ease-out;
@@ -161,7 +161,7 @@
 }
 .big-batch-progress .bbp-track {
     height: 6px;
-    background: #d9e8f7;
+    background: var(--c-d9e8f7);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -626,7 +626,7 @@
     gap: 6px;
     padding: 10px 12px;
     background: var(--success-bg);
-    border: 1px solid #c6f6d5;
+    border: 1px solid var(--c-c6f6d5);
     border-radius: 8px;
     font-size: 13px;
 }

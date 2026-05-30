@@ -247,7 +247,7 @@
     cursor: pointer;
     white-space: nowrap;
 }
-.rc-upload-btn:hover { background: #093a6a; }
+.rc-upload-btn:hover { background: var(--c-093a6a); }
 .rc-upload-btn svg { width: 14px; height: 14px; }
 
 @media (max-width: 800px) {
@@ -431,11 +431,11 @@
     letter-spacing: .3px;
     line-height: 1.6;
 }
-.bank-chip-kbank  { background: #d4f4dd; color: #1a5d2a; }
-.bank-chip-scb    { background: #e9d4f4; color: #5a1a7d; }
-.bank-chip-bbl    { background: #d4e6f4; color: #1a4d7d; }
-.bank-chip-ktb    { background: #fff3c4; color: #7d5a1a; }
-.bank-chip-ttb    { background: #ffd9c4; color: #7d3a1a; }
+.bank-chip-kbank  { background: var(--c-d4f4dd); color: var(--c-1a5d2a); }
+.bank-chip-scb    { background: var(--c-e9d4f4); color: var(--c-5a1a7d); }
+.bank-chip-bbl    { background: var(--c-d4e6f4); color: var(--c-1a4d7d); }
+.bank-chip-ktb    { background: var(--c-fff3c4); color: var(--c-7d5a1a); }
+.bank-chip-ttb    { background: var(--c-ffd9c4); color: var(--c-7d3a1a); }
 .bank-chip-other  { background: var(--line-soft); color: var(--ink-2); }
 
 .recon-card-main {
@@ -602,17 +602,17 @@
 .bank-cand-hint.hint-matched {
     background: var(--success-bg);
     color: var(--success);
-    border: 1px solid #c8efd2;
+    border: 1px solid var(--c-c8efd2);
 }
 .bank-cand-hint.hint-suggested {
     background: var(--accent-soft);
     color: var(--brand);
-    border: 1px solid #cfe2f7;
+    border: 1px solid var(--c-cfe2f7);
 }
 .bank-cand-hint.hint-low {
     background: var(--warn-bg);
     color: var(--warn);
-    border: 1px solid #fde6c2;
+    border: 1px solid var(--c-fde6c2);
 }
 
 .bank-cand-list {

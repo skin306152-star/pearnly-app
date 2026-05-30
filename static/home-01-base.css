@@ -150,6 +150,86 @@
     --pink-100: #fce7f3;
     --pink-200: #fbcfe8;
     --pink-800: #9d174d;
+
+    /* ============================================================
+    自定义颜色精确值令牌(REFACTOR-WB-C1 · R-UI4)· 收编剩余裸 hex + 未定义回退
+    令牌值逐字节 == 原 hex/回退值 · 0 视觉变化(集中到单一来源)
+    ============================================================ */
+    --bg-1: #f7f9fc;
+    --bg-hover: #eef2f7;
+    --c-009900: #009900;
+    --c-00b900: #00b900;
+    --c-093a6a: #093a6a;
+    --c-0b5138: #0b5138;
+    --c-0f6e56: #0f6e56;
+    --c-0f9d58: #0f9d58;
+    --c-1a1a1a: #1a1a1a;
+    --c-1a4d7d: #1a4d7d;
+    --c-1a5d2a: #1a5d2a;
+    --c-1a73e8: #1a73e8;
+    --c-1e3a5f: #1e3a5f;
+    --c-2f855a: #2f855a;
+    --c-4d7060: #4d7060;
+    --c-5a1a7d: #5a1a7d;
+    --c-718096: #718096;
+    --c-72243e: #72243e;
+    --c-791f1f: #791f1f;
+    --c-7d3a1a: #7d3a1a;
+    --c-7d5a1a: #7d5a1a;
+    --c-854d0e: #854d0e;
+    --c-854f0b: #854f0b;
+    --c-8a5a00: #8a5a00;
+    --c-975a16: #975a16;
+    --c-9ae6b4: #9ae6b4;
+    --c-9f1239: #9f1239;
+    --c-9fe1cb: #9fe1cb;
+    --c-a32d2d: #a32d2d;
+    --c-bfe5cd: #bfe5cd;
+    --c-c3dcf5: #c3dcf5;
+    --c-c6f6d5: #c6f6d5;
+    --c-c8d0d8: #c8d0d8;
+    --c-c8efd2: #c8efd2;
+    --c-c9ebd5: #c9ebd5;
+    --c-cfe2f7: #cfe2f7;
+    --c-d0e5d5: #d0e5d5;
+    --c-d4e6f4: #d4e6f4;
+    --c-d4f4dd: #d4f4dd;
+    --c-d9e8f7: #d9e8f7;
+    --c-e1f5ee: #e1f5ee;
+    --c-e6f4ea: #e6f4ea;
+    --c-e6f5ea: #e6f5ea;
+    --c-e8f0fe: #e8f0fe;
+    --c-e8f5ee: #e8f5ee;
+    --c-e9d4f4: #e9d4f4;
+    --c-ea4335: #ea4335;
+    --c-eef4ff: #eef4ff;
+    --c-f0f0ec: #f0f0ec;
+    --c-f0f4ff: #f0f4ff;
+    --c-f0f7ff: #f0f7ff;
+    --c-f0faf4: #f0faf4;
+    --c-f5f5f1: #f5f5f1;
+    --c-f6e05e: #f6e05e;
+    --c-f7c1c1: #f7c1c1;
+    --c-f8f8f6: #f8f8f6;
+    --c-faeeda: #faeeda;
+    --c-faf9f5: #faf9f5;
+    --c-fafaf8: #fafaf8;
+    --c-fafafa: #fafafa;
+    --c-fafbfc: #fafbfc;
+    --c-fbd38d: #fbd38d;
+    --c-fbe6b5: #fbe6b5;
+    --c-fbeaf0: #fbeaf0;
+    --c-fcd8a1: #fcd8a1;
+    --c-fce8e6: #fce8e6;
+    --c-fcebeb: #fcebeb;
+    --c-fde6c2: #fde6c2;
+    --c-fdebcb: #fdebcb;
+    --c-feb2b2: #feb2b2;
+    --c-fef5e7: #fef5e7;
+    --c-fef9ec: #fef9ec;
+    --c-fefcbf: #fefcbf;
+    --c-ffd9c4: #ffd9c4;
+    --c-fff3c4: #fff3c4;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }

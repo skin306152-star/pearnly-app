@@ -79,9 +79,9 @@
     display: grid;
     grid-template-columns: 32px 130px 1.2fr 1.2fr 96px 2fr 76px;
     align-items: center; gap: 8px;
-    padding: 9px 6px; font-size: 12px; border-bottom: 1px solid #f0f0ec;
+    padding: 9px 6px; font-size: 12px; border-bottom: 1px solid var(--c-f0f0ec);
 }
-.erp-exc-row:not(.erp-exc-row-head):hover { background: #faf9f5; }
+.erp-exc-row:not(.erp-exc-row-head):hover { background: var(--c-faf9f5); }
 .erp-exc-row-head { font-weight: 600; color: var(--ink-3); border-bottom: 1px solid var(--line); }
 .erp-exc-row .ex-inv { font-weight: 600; color: var(--ink); }
 .erp-exc-row .ex-inv, .erp-exc-row .ex-seller, .erp-exc-row .ex-buyer, .erp-exc-row .ex-reason {
@@ -112,12 +112,12 @@
 .erp-exc-m-row { display: flex; gap: 10px; font-size: 12px; padding: 3px 0; }
 .erp-exc-m-k { color: var(--ink-3); min-width: 84px; flex-shrink: 0; }
 .erp-exc-m-v { color: var(--ink-1); }
-.erp-exc-m-fix { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f0ec; }
+.erp-exc-m-fix { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--c-f0f0ec); }
 .erp-exc-m-fix-title { font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
 .erp-exc-m-search { width: 100%; padding: 7px 10px; font-size: 12px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; box-sizing: border-box; }
-.erp-exc-m-custlist { max-height: 240px; overflow-y: auto; border: 1px solid #f0f0ec; border-radius: 6px; }
-.erp-exc-m-cust { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f5f5f1; }
-.erp-exc-m-cust:hover { background: #faf9f5; }
+.erp-exc-m-custlist { max-height: 240px; overflow-y: auto; border: 1px solid var(--c-f0f0ec); border-radius: 6px; }
+.erp-exc-m-cust { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid var(--c-f5f5f1); }
+.erp-exc-m-cust:hover { background: var(--c-faf9f5); }
 .erp-exc-m-cust.sel { background: var(--ink); color: #fff; }
 .erp-exc-m-cust.sel .erp-exc-m-cust-code { color: #ddd; }
 .erp-exc-m-cust-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -274,8 +274,8 @@
     margin-left: 4px;
     font-size: 9px;
     padding: 1px 4px;
-    background: #fdebcb;
-    color: #8a5a00;
+    background: var(--c-fdebcb);
+    color: var(--c-8a5a00);
     border-radius: 999px;
     letter-spacing: 0.2px;
 }
@@ -478,9 +478,9 @@ button.btn-primary.btn-tiny:hover {
 }
 .erp-receipt-copy-btn:hover { background: var(--bg); }
 .erp-receipt-hint {
-    background: #FEF9EC;
-    border: 1px solid #FBE6B5;
-    color: #8a5a00;
+    background: var(--c-fef9ec);
+    border: 1px solid var(--c-fbe6b5);
+    color: var(--c-8a5a00);
     padding: 10px 12px;
     border-radius: 8px;
     font-size: 12px;

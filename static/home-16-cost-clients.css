@@ -168,7 +168,7 @@
     color: var(--ink-1, var(--gray-900));
     white-space: nowrap;
 }
-.cost-table tbody tr:hover { background: #fafaf8; }
+.cost-table tbody tr:hover { background: var(--c-fafaf8); }
 .cost-table-empty {
     text-align: center;
     color: var(--ink-3);

@@ -145,7 +145,7 @@
     font-size: 13px;
     background: #fff;
     color: var(--ink);
-    border: 1px solid #D0E5D5;
+    border: 1px solid var(--c-d0e5d5);
     border-left: 3px solid var(--green-700);
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.08);
@@ -160,7 +160,7 @@
 .mp-toast.success svg { color: var(--green-700); }
 .mp-toast.fail,
 .mp-toast.error {
-    border-color: #F7C1C1;
+    border-color: var(--c-f7c1c1);
     border-left-color: var(--danger);
     background: var(--red-50);
     color: var(--red-800);
@@ -168,7 +168,7 @@
 .mp-toast.fail svg,
 .mp-toast.error svg { color: var(--danger); }
 .mp-toast.warn {
-    border-color: #FCD8A1;
+    border-color: var(--c-fcd8a1);
     border-left-color: var(--warn);
     background: var(--amber-50);
     color: var(--amber-800);
@@ -227,8 +227,8 @@
 .drawer-archive-card {
     margin-bottom: 16px;
     padding: 12px 14px;
-    background: linear-gradient(135deg, #E8F5EE 0%, #F0FAF4 100%);
-    border: 1px solid #BFE5CD;
+    background: linear-gradient(135deg, var(--c-e8f5ee) 0%, var(--c-f0faf4) 100%);
+    border: 1px solid var(--c-bfe5cd);
     border-radius: 10px;
 }
 .drawer-archive-head {
@@ -237,7 +237,7 @@
     gap: 6px;
     font-size: 11px;
     font-weight: 500;
-    color: #0F6E56;
+    color: var(--c-0f6e56);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     margin-bottom: 6px;
@@ -251,8 +251,8 @@
     margin-left: auto;
     padding: 2px 8px;
     font-size: 10px;
-    background: #C9EBD5;
-    color: #0B5138;
+    background: var(--c-c9ebd5);
+    color: var(--c-0b5138);
     border-radius: 4px;
     text-transform: none;
     letter-spacing: 0;
@@ -273,6 +273,6 @@
 .drawer-archive-hint {
     margin-top: 6px;
     font-size: 11px;
-    color: #4D7060;
+    color: var(--c-4d7060);
 }
 

@@ -51,7 +51,7 @@
     gap: 14px;
 }
 .recon-preview-col {
-    background: #fafaf8;
+    background: var(--c-fafaf8);
     border: 1px solid var(--line);
     border-radius: 8px;
     overflow: hidden;
@@ -103,7 +103,7 @@
     gap: 10px;
 }
 .recon-sum-card {
-    background: #fafaf8;
+    background: var(--c-fafaf8);
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 12px;
@@ -124,7 +124,7 @@
 .recon-detail-table th { text-align: left; padding: 7px 10px; color: var(--ink-3); border-bottom: 1px solid var(--line-soft); font-weight: 500; font-size: 11px; }
 .recon-detail-table td { padding: 7px 10px; border-bottom: 1px solid var(--line-soft); color: var(--brand-hover); vertical-align: top; }
 .recon-detail-table tr:last-child td { border-bottom: none; }
-.recon-detail-table tr:hover td { background: #fafaf8; }
+.recon-detail-table tr:hover td { background: var(--c-fafaf8); }
 .recon-detail-table .recon-detail-cell-mono { font-family: SFMono-Regular, Consolas, monospace; color: var(--ink); }
 .recon-detail-empty { padding: 20px; text-align: center; color: var(--ink-3); font-size: 12px; }
 #vex-detail-collapse .recon-collapse-body { max-height: 440px; overflow-y: auto; }

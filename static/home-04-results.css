@@ -20,7 +20,7 @@
 .btn-secondary:hover:not(:disabled) { background: var(--bg); border-color: var(--ink-4); }
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-success { background: var(--success); color: #fff; }
-.btn-success:hover:not(:disabled) { background: #2f855a; }
+.btn-success:hover:not(:disabled) { background: var(--c-2f855a); }
 .btn-success:disabled { background: var(--ink-3); cursor: not-allowed; }
 .btn-locked {
     background: #fff; color: var(--ink-3);
@@ -149,9 +149,9 @@ table.results-table { width: 100%; border-collapse: collapse; font-size: 13px; t
     font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
     text-transform: uppercase;
 }
-.conf-badge.high { background: var(--success-bg); color: var(--success); border: 1px solid #9ae6b4; }
-.conf-badge.medium { background: #fefcbf; color: #975a16; border: 1px solid #f6e05e; }
-.conf-badge.low { background: var(--warn-bg); color: var(--warn); border: 1px solid #fbd38d; }
+.conf-badge.high { background: var(--success-bg); color: var(--success); border: 1px solid var(--c-9ae6b4); }
+.conf-badge.medium { background: var(--c-fefcbf); color: var(--c-975a16); border: 1px solid var(--c-f6e05e); }
+.conf-badge.low { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--c-fbd38d); }
 
 [data-tip] { position: relative; }
 [data-tip]:hover::after {

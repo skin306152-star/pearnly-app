@@ -304,7 +304,7 @@
     gap: 10px;
     padding: 16px 22px;
     border-top: 1px solid var(--gray-200);
-    background: #fafafa;
+    background: var(--c-fafafa);
 }
 .report-modal-foot .btn { min-width: 96px; }
 .report-modal-foot .btn-primary {
@@ -370,9 +370,9 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 }
 .plan-banner-btn:hover { background: rgba(255,255,255,1); }
 .plan-banner-btn.line-btn {
-    background: #00B900; color: #fff; border-color: #00B900;
+    background: var(--c-00b900); color: #fff; border-color: var(--c-00b900);
 }
-.plan-banner-btn.line-btn:hover { background: #009900; }
+.plan-banner-btn.line-btn:hover { background: var(--c-009900); }
 
 /* ===== 升级弹窗 ===== */
 .upg-overlay {
@@ -699,12 +699,12 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     content: '';
     position: absolute; left: 0; top: 12px;
     width: 16px; height: 16px;
-    background: #00B900;
+    background: var(--c-00b900);
     mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 8l4 4 6-8' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
     -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 8l4 4 6-8' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
 }
 .btn-line {
-    background: #00B900; color: #fff;
+    background: var(--c-00b900); color: #fff;
     width: 100%; padding: 13px;
     border: none; border-radius: 10px;
     font-size: 15px; font-weight: 600;
@@ -712,6 +712,6 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     display: flex; align-items: center; justify-content: center; gap: 10px;
     transition: background .15s;
 }
-.btn-line:hover:not(:disabled) { background: #009900; }
+.btn-line:hover:not(:disabled) { background: var(--c-009900); }
 .btn-line:disabled { opacity: .65; cursor: not-allowed; }
 

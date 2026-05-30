@@ -326,7 +326,7 @@
     align-items: center;
     gap: 14px;
     color: var(--ink-3);
-    background: #fafaf8;
+    background: var(--c-fafaf8);
 }
 .bv-dropzone:hover,
 .bv-dropzone.drag-over {
@@ -516,7 +516,7 @@
 .bv-files-toggle.open .bv-files-count { background: var(--ink); color: #fff; }
 .bv-files-list {
     margin-top: 10px; padding: 6px;
-    background: #fafaf8; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--c-fafaf8); border: 1px solid var(--line); border-radius: 10px;
     max-height: 320px; overflow-y: auto;
 }
 .bv-fi {
@@ -822,7 +822,7 @@
 .sv-row-body {
     display: none;
     padding: 16px;
-    background: #fafaf8;
+    background: var(--c-fafaf8);
     border-top: 1px solid var(--border);
 }
 .sv-row.open .sv-row-body { display: block; }
@@ -941,7 +941,7 @@
 
 /* v118.32.2.4 · 已完成任务卡可点 */
 .sv-task-card.clickable { cursor: pointer; transition: background .15s; }
-.sv-task-card.clickable:hover { background: var(--bg-1, #f7f9fc); }
+.sv-task-card.clickable:hover { background: var(--bg-1); }
 
 
 

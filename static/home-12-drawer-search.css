@@ -148,7 +148,7 @@ button.history-missing-amount-btn {
 .archive-palette-btn.seller  { color: var(--indigo-800); }
 .archive-palette-btn.category{ color: var(--amber-800); }
 .archive-palette-btn.amount  { color: var(--emerald-800); }
-.archive-palette-btn.invoice { color: #9F1239; }
+.archive-palette-btn.invoice { color: var(--c-9f1239); }
 .archive-palette-btn.buyer   { color: var(--violet-800); }
 .archive-palette-btn.sep     { color: var(--gray-500); }
 .archive-palette-btn.date:hover    { background: var(--blue-100); border-color: var(--line); }

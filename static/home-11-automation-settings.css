@@ -513,7 +513,7 @@
     display: flex; justify-content: flex-end; gap: 8px;
     padding: 14px 20px;
     border-top: 1px solid var(--slate-100);
-    background: #fafafa;
+    background: var(--c-fafafa);
 }
 .settings-prefs-inline {
     margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border, var(--gray-200));
@@ -605,7 +605,7 @@
 .archive-token.seller  { background: var(--indigo-100); color: var(--indigo-800); border-color: var(--indigo-200); }
 .archive-token.category{ background: var(--warn-bg); color: var(--amber-800); border-color: var(--amber-300); }
 .archive-token.amount  { background: var(--emerald-100); color: var(--emerald-800); border-color: var(--emerald-200); }
-.archive-token.invoice { background: var(--pink-100); color: #9F1239; border-color: var(--pink-200); }
+.archive-token.invoice { background: var(--pink-100); color: var(--c-9f1239); border-color: var(--pink-200); }
 .archive-token.buyer   { background: var(--violet-100); color: var(--violet-800); border-color: var(--violet-200); }
 .token-icon { font-size: 14px; line-height: 1; }
 

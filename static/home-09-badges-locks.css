@@ -34,7 +34,7 @@
 
 /* 历史列表 · 事项色块 */
 .history-badge.category {
-    background: #F0F4FF;
+    background: var(--c-f0f4ff);
     color: var(--indigo-600);
     border: 1px solid var(--indigo-100);
     font-size: 10px;
@@ -84,13 +84,13 @@
     width: 26px;
     height: 26px;
     background: rgba(255,255,255,0.7);
-    border: 1px solid #BFE5CD;
+    border: 1px solid var(--c-bfe5cd);
     border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: #0F6E56;
+    color: var(--c-0f6e56);
     transition: all 0.15s;
 }
 .drawer-archive-copy:hover {

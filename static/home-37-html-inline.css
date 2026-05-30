@@ -1697,7 +1697,7 @@
     padding: 14px 24px 20px;
     display: flex; justify-content: flex-end; gap: 10px;
     border-top: 1px solid rgba(15, 23, 42, 0.04);
-    background: #fafbfc;
+    background: var(--c-fafbfc);
 }
 
 .force-pw-body {
@@ -1804,7 +1804,7 @@
 .adm-emp-readonly-tip {
     background: var(--yellow-100);
     border: 1px solid var(--amber-200);
-    color: #854d0e;
+    color: var(--c-854d0e);
     padding: 10px 14px;
     font-size: 12.5px;
     line-height: 1.5;
@@ -1827,7 +1827,7 @@
     align-items: stretch;
     gap: 6px;
     padding: 16px 14px;
-    background: #fafafa;
+    background: var(--c-fafafa);
     border-radius: 6px;
 }
 .brv2-fcell {
@@ -1899,7 +1899,7 @@ tr.brv2-row-warn-soft:hover td { background: var(--danger-bg) !important; }
 /* BUG-B v118.35.0.36 (2026-05-22) · OCR 抽不准时手动录入 3 个 anchor 余额兜底
    位置:brv2 上传卡和 action-bar 之间 · 跟 Pearnly 设计语言一致(暖灰底 / 黑 focus / 13px / tabular-nums) */
 .brv2-anchor-row {
-    background: #fafaf8;
+    background: var(--c-fafaf8);
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 12px 14px;

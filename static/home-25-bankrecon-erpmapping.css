@@ -574,7 +574,7 @@
     white-space: nowrap;
 }
 .int-btn-view-logs:hover {
-    background: #f0f7ff;
+    background: var(--c-f0f7ff);
     border-color: var(--blue-300);
 }
 
@@ -589,7 +589,7 @@
     margin: 8px 0 12px !important;
 }
 .int-drawer-body .erp-connect-logs-link .int-btn-view-logs {
-    background: #f0f7ff;
+    background: var(--c-f0f7ff);
     border: 1px solid var(--blue-300);
     color: var(--blue-700);
     font-weight: 500;

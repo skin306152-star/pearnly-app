@@ -87,10 +87,10 @@ body.sidebar-collapsed .nav-divider { margin: 8px 6px; }
     flex-shrink: 0;
 }
 .int-icon svg { width: 18px; height: 18px; }
-.ic-g { background: #e8f0fe; color: #1a73e8; }
-.ic-gs { background: #e6f4ea; color: #0f9d58; }
-.ic-gm { background: #fce8e6; color: #ea4335; }
-.ic-line { background: #e6f5ea; color: var(--line-color); }
+.ic-g { background: var(--c-e8f0fe); color: var(--c-1a73e8); }
+.ic-gs { background: var(--c-e6f4ea); color: var(--c-0f9d58); }
+.ic-gm { background: var(--c-fce8e6); color: var(--c-ea4335); }
+.ic-line { background: var(--c-e6f5ea); color: var(--line-color); }
 .ic-folder { background: var(--warn-bg); color: var(--warn); }
 .ic-erp { background: var(--bg); color: var(--ink-3); }
 .int-info { flex: 1; min-width: 0; }

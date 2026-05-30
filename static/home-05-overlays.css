@@ -38,7 +38,7 @@
     background: var(--accent-soft); color: var(--brand);
     font-family: var(--font-mono);
 }
-.engine-badge.flash { background: #fef5e7; color: var(--warn); }
+.engine-badge.flash { background: var(--c-fef5e7); color: var(--warn); }
 .engine-badge.cached { background: var(--bg); color: var(--ink); }
 .tax-badge {
     display: inline-block; padding: 1px 6px;
@@ -263,13 +263,13 @@ details.raw-text pre {
     text-decoration: none; color: inherit;
     transition: background 0.15s ease;
 }
-a.contact-item:hover { background: var(--bg-hover, #eef2f7); }
+a.contact-item:hover { background: var(--bg-hover); }
 .contact-icon {
     width: 28px; height: 28px; border-radius: 5px;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; color: #fff;
 }
-.contact-icon.phone { background: #718096; }
+.contact-icon.phone { background: var(--c-718096); }
 .contact-icon.line { background: var(--line-color); }
 .contact-icon.email { background: var(--amber-500); }
 .contact-icon.address { background: var(--slate-400); }
@@ -305,7 +305,7 @@ a.contact-item:hover { background: var(--bg-hover, #eef2f7); }
     margin-bottom: 14px;
 }
 .coming-soon .cs-tag.plus { background: var(--accent-soft); color: var(--brand); }
-.coming-soon .cs-tag.pro { background: #fef5e7; color: var(--warn); }
+.coming-soon .cs-tag.pro { background: var(--c-fef5e7); color: var(--warn); }
 
 /* ============ Toast ============ */
 .toast {

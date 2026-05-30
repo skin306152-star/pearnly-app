@@ -268,11 +268,11 @@
 .tc-log-item.t-api_error .tc-log-type,
 .tc-log-item.t-api_fail .tc-log-type,
 .tc-log-item.t-console_error .tc-log-type {
-    background: var(--danger-bg); color: var(--danger); border-color: #feb2b2;
+    background: var(--danger-bg); color: var(--danger); border-color: var(--c-feb2b2);
 }
 .tc-log-item.t-api_slow .tc-log-type,
 .tc-log-item.t-console_warn .tc-log-type {
-    background: var(--warn-bg); color: var(--warn); border-color: #fbd38d;
+    background: var(--warn-bg); color: var(--warn); border-color: var(--c-fbd38d);
 }
 .tc-log-summary {
     flex: 1;

@@ -160,10 +160,10 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
     border: 2px dashed var(--line); border-radius: 8px;
     padding: 28px 20px; text-align: center;
     cursor: pointer; transition: border-color 150ms;
-    background: #fafaf8;
+    background: var(--c-fafaf8);
 }
 .drop-zone:hover, .drop-zone.drag-over {
-    border-color: var(--ink); background: #fafaf8;
+    border-color: var(--ink); background: var(--c-fafaf8);
 }
 .drop-zone .icon {
     width: 36px; height: 36px; color: var(--ink-3);
@@ -201,7 +201,7 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 6px;
-    background: #fafafa;
+    background: var(--c-fafafa);
     transition: max-height 0.2s ease;
 }
 .file-list-body.expanded {

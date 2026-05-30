@@ -41,6 +41,18 @@ pre-push 闸(Layer 1)挡住"代码本身坏"。但高敏(扣费/OCR)还有一种
 
 ---
 
-## §C · 三段 dispatch 指令(粘进对应窗口)
+## §C · Layer 2 已上线(2026-05-30 · 已验证)+ 闭环回滚跟进协议
 
-见下方 chat。三段同源保存于此文件 §C-A / §C-B / §C-C。
+**已落地(commit `7f81792`/`f41da7e`/`6e10b72`)**:
+- ✅ **systemd-run 起独立 cgroup** 启动 git-deploy.sh → 重启服务杀不到它 → 第 6/7 步健康检查+回滚**真生效**(根治"自愈死锁 502")。实测日志出现 `health check OK after 26s`(旧版到 `restarting` 就自杀)。
+- ✅ 健康检查失败 → 自动回滚到上个好版本 + 写 `/opt/mrpilot/.deploy_rollback` marker(记坏 commit)。
+- ✅ 部署成功 → 自动删 marker。
+- ✅ `GET /internal/deploy/status`(无鉴权)→ `{rolled_back, detail}`,实测 `{"ok":true,"rolled_back":false}`。
+
+**🔁 闭环跟进协议(三段 dispatch 每轮 step 0 · 兑现"崩了去解决直到搞好")**:
+> 每轮**开头先**:`curl -s https://pearnly.com/internal/deploy/status`
+> - `rolled_back:false` → 正常干活。
+> - `rolled_back:true` 且 `detail` 里 `bad=<sha>` 是**本窗口 owns 的文件改的 commit** → **先停下修它**:`git fetch` → 若 master 顶端仍是该坏 commit 则 `git revert --no-edit <sha>` + push;把那次的活**重做对**(找出运行期为何崩:`curl /internal/deploy/log` 看 health 失败原因 / ssh 看 journalctl)→ 重新 push(pre-push 闸把关)→ 部署成功后 marker 自动清(status 回 false)= 修好了。**没清干净=还没修好,继续**。再做新活。
+> - 坏 commit 不是本窗口的 → 在 STATE 记一行知会,不抢修。
+
+三段 dispatch 全文见 chat（2026-05-30）· 各窗口 step 1 之前补上面这条 step 0。

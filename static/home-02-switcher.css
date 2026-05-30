@@ -125,7 +125,7 @@
 .ws-modal-item:hover { background: var(--bg); }
 .ws-modal-item.active {
     border-color: var(--brand);
-    background: #f5f3ff;
+    background: var(--violet-50);
     font-weight: 600;
 }
 .ws-modal-item-ic { display: inline-flex; color: var(--ink-3); }

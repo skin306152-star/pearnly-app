@@ -146,7 +146,7 @@
     background: #fff;
     color: var(--ink);
     border: 1px solid #D0E5D5;
-    border-left: 3px solid #15803D;
+    border-left: 3px solid var(--green-700);
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.08);
     opacity: 0;
@@ -156,22 +156,22 @@
     max-width: 320px;
 }
 .mp-toast.show { opacity: 1; transform: translateX(0); }
-.mp-toast svg { flex-shrink: 0; width: 14px; height: 14px; color: #15803D; }
-.mp-toast.success svg { color: #15803D; }
+.mp-toast svg { flex-shrink: 0; width: 14px; height: 14px; color: var(--green-700); }
+.mp-toast.success svg { color: var(--green-700); }
 .mp-toast.fail,
 .mp-toast.error {
     border-color: #F7C1C1;
     border-left-color: var(--danger);
-    background: #FEF2F2;
-    color: #991B1B;
+    background: var(--red-50);
+    color: var(--red-800);
 }
 .mp-toast.fail svg,
 .mp-toast.error svg { color: var(--danger); }
 .mp-toast.warn {
     border-color: #FCD8A1;
     border-left-color: var(--warn);
-    background: #FFFBEB;
-    color: #92400E;
+    background: var(--amber-50);
+    color: var(--amber-800);
 }
 .mp-toast.warn svg { color: var(--warn); }
 .mp-toast.info {
@@ -184,7 +184,7 @@
 
 /* v115 · loading toast(下载中 · 转圈)*/
 .mp-toast.loading {
-    border-color: #DBEAFE;
+    border-color: var(--blue-100);
     border-left-color: var(--ink);
     background: var(--bg);
     color: var(--ink);
@@ -214,9 +214,9 @@
     margin: 12px 20px 0;
     padding: 9px 12px;
     font-size: 12px;
-    color: #7F1D1D;
-    background: #FEF2F2;
-    border: 1px solid #FECACA;
+    color: var(--red-900);
+    background: var(--red-50);
+    border: 1px solid var(--red-200);
     border-radius: 6px;
     line-height: 1.4;
 }

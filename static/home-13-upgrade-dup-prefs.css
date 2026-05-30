@@ -18,7 +18,7 @@
     background: linear-gradient(135deg, var(--bg) 0%, var(--bg) 100%);
 }
 .plan-table-2col .plan-col.lifetime {
-    background: linear-gradient(135deg, var(--warn-bg) 0%, #FDE68A 100%);
+    background: linear-gradient(135deg, var(--warn-bg) 0%, var(--amber-200) 100%);
 }
 .plan-table-2col .plan-row.head .plan-col .plan-name {
     font-size: 17px;
@@ -31,8 +31,8 @@
     color: var(--ink);
     margin-bottom: 6px;
 }
-.plan-table-2col .plan-row.head .plan-col.monthly .plan-price { color: #0369A1; }
-.plan-table-2col .plan-row.head .plan-col.lifetime .plan-price { color: #B45309; }
+.plan-table-2col .plan-row.head .plan-col.monthly .plan-price { color: var(--sky-700); }
+.plan-table-2col .plan-row.head .plan-col.lifetime .plan-price { color: var(--amber-700); }
 .plan-table-2col .plan-row.head .plan-col .plan-tag {
     font-size: 11px;
     padding: 3px 10px;
@@ -40,11 +40,11 @@
     display: inline-block;
 }
 .plan-table-2col .plan-row.head .plan-col.monthly .plan-tag {
-    background: #0369A1;
+    background: var(--sky-700);
     color: white;
 }
 .plan-table-2col .plan-row.head .plan-col.lifetime .plan-tag {
-    background: #B45309;
+    background: var(--amber-700);
     color: white;
 }
 
@@ -52,9 +52,9 @@
    v0.12 · Typhoon 泰文增援徽章(抽屉副标题用)
    ============================================================ */
 .engine-badge.typhoon {
-    background: linear-gradient(135deg, #EDE9FE, #DDD6FE);
-    color: #6D28D9;
-    border: 1px solid #C4B5FD;
+    background: linear-gradient(135deg, var(--violet-100), var(--violet-200));
+    color: var(--violet-700);
+    border: 1px solid var(--violet-300);
     font-weight: 600;
     cursor: help;
 }
@@ -122,7 +122,7 @@
 .dup-field-chip {
     display: inline-block;
     background: var(--warn-bg);
-    color: #92400E;
+    color: var(--amber-800);
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 11px;
@@ -165,8 +165,8 @@
     border: 1px solid var(--danger);
 }
 .btn.btn-danger:hover {
-    background: #B91C1C;
-    border-color: #B91C1C;
+    background: var(--red-700);
+    border-color: var(--red-700);
 }
 
 /* ============================================================

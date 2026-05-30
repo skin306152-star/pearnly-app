@@ -3,7 +3,7 @@
    两边共用 · 默认收起 · 点击 head 展开
    ============================================================ */
 .recon-collapse {
-    background: #ffffff;
+    background: var(--card);
     border: 1px solid var(--line);
     border-radius: 10px;
     overflow: hidden;
@@ -15,10 +15,10 @@
     padding: 12px 14px;
     cursor: pointer;
     user-select: none;
-    background: #ffffff;
+    background: var(--card);
     transition: background .12s;
 }
-.recon-collapse-head:hover { background: #F9FAFB; }
+.recon-collapse-head:hover { background: var(--gray-50); }
 .recon-collapse-chevron {
     width: 14px; height: 14px;
     color: var(--ink-3);
@@ -33,8 +33,8 @@
 }
 .recon-collapse-sub {
     font-size: 11px;
-    color: #6B7280;
-    background: #E5E7EB;
+    color: var(--gray-500);
+    background: var(--gray-200);
     padding: 2px 8px;
     border-radius: 10px;
     font-variant-numeric: tabular-nums;
@@ -128,7 +128,7 @@
 .recon-detail-table .recon-detail-cell-mono { font-family: SFMono-Regular, Consolas, monospace; color: var(--ink); }
 .recon-detail-empty { padding: 20px; text-align: center; color: var(--ink-3); font-size: 12px; }
 #vex-detail-collapse .recon-collapse-body { max-height: 440px; overflow-y: auto; }
-#vex-detail-collapse .recon-detail-table thead th { position: sticky; top: 0; background: #f8fafc; z-index: 1; }
+#vex-detail-collapse .recon-detail-table thead th { position: sticky; top: 0; background: var(--slate-50); z-index: 1; }
 @media (max-width: 800px) {
     .recon-preview-grid { grid-template-columns: 1fr; }
     .recon-summary-grid { grid-template-columns: repeat(2, 1fr); }

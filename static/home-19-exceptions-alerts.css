@@ -107,7 +107,7 @@
     align-items: center;
     gap: 6px;
 }
-.exc-chip:hover { background: #F9FAFB; color: var(--ink); }
+.exc-chip:hover { background: var(--gray-50); color: var(--ink); }
 .exc-chip.active {
     background: var(--brand);
     color: white;
@@ -643,11 +643,11 @@
     display: flex; align-items: center; gap: 14px;
     padding: 14px 16px;
     background: #fafaf8;
-    border: 1px solid var(--border, #e5e7eb);
+    border: 1px solid var(--border, var(--gray-200));
     border-radius: 10px;
     transition: border-color .15s, background .15s;
 }
-.notif-rule-row:hover { border-color: #d1d5db; background: #fff; }
+.notif-rule-row:hover { border-color: var(--gray-300); background: #fff; }
 .notif-rule-row.disabled { opacity: 0.55; }
 
 .notif-rule-tmpl-badge {
@@ -659,7 +659,7 @@
     background: #eef4ff; color: var(--ink);
     white-space: nowrap;
 }
-.notif-rule-tmpl-badge.large { background: var(--warn-bg); color: #92400e; }
+.notif-rule-tmpl-badge.large { background: var(--warn-bg); color: var(--amber-800); }
 
 .notif-rule-main { flex: 1; min-width: 0; }
 .notif-rule-name {
@@ -671,7 +671,7 @@
     font-size: 12px; color: var(--ink-3);
     display: flex; align-items: center; gap: 10px;
 }
-.notif-rule-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: #d1d5db; }
+.notif-rule-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--gray-300); }
 
 .notif-rule-actions {
     flex-shrink: 0;
@@ -681,7 +681,7 @@
     appearance: none;
     width: 36px; height: 20px;
     border-radius: 999px;
-    background: #d1d5db;
+    background: var(--gray-300);
     position: relative; cursor: pointer;
     transition: background .2s;
     border: none;
@@ -695,11 +695,11 @@
     transition: left .2s;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
-.notif-rule-toggle.on { background: #10b981; }
+.notif-rule-toggle.on { background: var(--emerald-500); }
 .notif-rule-toggle.on::after { left: 18px; }
 
 .notif-rule-btn {
-    border: 1px solid var(--border, #e5e7eb);
+    border: 1px solid var(--border, var(--gray-200));
     background: #fff;
     border-radius: 6px;
     padding: 5px 10px;
@@ -709,9 +709,9 @@
     transition: border-color .15s, background .15s, color .15s;
     white-space: nowrap;
 }
-.notif-rule-btn:hover { border-color: #9ca3af; background: #f9fafb; }
-.notif-rule-btn.danger { color: #b91c1c; }
-.notif-rule-btn.danger:hover { background: #fef2f2; border-color: #fca5a5; }
+.notif-rule-btn:hover { border-color: var(--gray-400); background: var(--gray-50); }
+.notif-rule-btn.danger { color: var(--red-700); }
+.notif-rule-btn.danger:hover { background: var(--red-50); border-color: var(--red-300); }
 
 /* 最近推送列表 */
 .notif-logs-list {
@@ -726,16 +726,16 @@
     display: flex; align-items: center; gap: 12px;
     padding: 10px 14px;
     background: #fafaf8;
-    border: 1px solid #f3f4f6;
+    border: 1px solid var(--gray-100);
     border-radius: 8px;
     font-size: 12px;
 }
 .notif-log-status {
     flex-shrink: 0;
     width: 8px; height: 8px; border-radius: 50%;
-    background: #10b981;
+    background: var(--emerald-500);
 }
-.notif-log-status.failed { background: #ef4444; }
+.notif-log-status.failed { background: var(--red-500); }
 .notif-log-main { flex: 1; min-width: 0; }
 .notif-log-event {
     color: var(--ink); font-weight: 500;
@@ -764,11 +764,11 @@
 .notif-template-card {
     flex: 1;
     padding: 12px 14px;
-    border: 1px solid var(--border, #e5e7eb);
+    border: 1px solid var(--border, var(--gray-200));
     border-radius: 8px;
     transition: border-color .15s, background .15s;
 }
-.notif-template-opt:hover .notif-template-card { border-color: #9ca3af; }
+.notif-template-opt:hover .notif-template-card { border-color: var(--gray-400); }
 .notif-template-opt input[type="radio"]:checked ~ .notif-template-card {
     border-color: var(--ink); background: var(--bg);
 }
@@ -789,12 +789,12 @@
     display: flex; align-items: center; gap: 8px;
 }
 .notif-line-check.bound {
-    background: #ecfdf5; color: #065f46;
-    border: 1px solid #a7f3d0;
+    background: var(--emerald-50); color: var(--emerald-800);
+    border: 1px solid var(--emerald-200);
 }
 .notif-line-check.unbound {
-    background: var(--warn-bg); color: #92400e;
-    border: 1px solid #fcd34d;
+    background: var(--warn-bg); color: var(--amber-800);
+    border: 1px solid var(--amber-300);
 }
 .notif-line-check svg {
     width: 14px; height: 14px; flex-shrink: 0;

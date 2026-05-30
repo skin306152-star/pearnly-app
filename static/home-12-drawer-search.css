@@ -29,8 +29,8 @@
     font-size: 14px;
     margin-right: 4px;
 }
-.log-detail-status-icon.ok   { background: #D1FAE5; color: #065F46; }
-.log-detail-status-icon.fail { background: var(--danger-bg); color: #991B1B; }
+.log-detail-status-icon.ok   { background: var(--emerald-100); color: var(--emerald-800); }
+.log-detail-status-icon.fail { background: var(--danger-bg); color: var(--red-800); }
 
 /* 摘要行:端点 + 发票号 */
 .log-detail-summary-row {
@@ -67,7 +67,7 @@
 }
 .log-detail-collapsible > summary {
     padding: 8px 12px;
-    background: #F3F4F6;
+    background: var(--gray-100);
     border-radius: 6px;
     cursor: pointer;
     font-size: 12px;
@@ -87,7 +87,7 @@
     transform: rotate(90deg);
 }
 .log-detail-collapsible > summary:hover {
-    background: #E5E7EB;
+    background: var(--gray-200);
     color: var(--ink);
 }
 
@@ -98,7 +98,7 @@
     display: inline-block;
     padding: 2px 8px;
     background: var(--warn-bg);
-    color: #92400E;
+    color: var(--amber-800);
     border-radius: 10px;
     font-size: 11px;
     font-weight: 500;
@@ -106,8 +106,8 @@
     transition: all 0.15s;
 }
 .history-missing-amount:hover {
-    background: #FDE68A;
-    color: #78350F;
+    background: var(--amber-200);
+    color: var(--amber-900);
 }
 
 /* v91 · 缺金额按钮版(可点) · 覆盖 button 默认样式 · 复用上面徽章视觉 */
@@ -145,19 +145,19 @@ button.history-missing-amount-btn {
 
 /* palette 按钮每个字段也带主题色 · 和 canvas token 呼应 */
 .archive-palette-btn.date    { color: var(--ink); }
-.archive-palette-btn.seller  { color: #3730A3; }
-.archive-palette-btn.category{ color: #92400E; }
-.archive-palette-btn.amount  { color: #065F46; }
+.archive-palette-btn.seller  { color: var(--indigo-800); }
+.archive-palette-btn.category{ color: var(--amber-800); }
+.archive-palette-btn.amount  { color: var(--emerald-800); }
 .archive-palette-btn.invoice { color: #9F1239; }
-.archive-palette-btn.buyer   { color: #5B21B6; }
-.archive-palette-btn.sep     { color: #6B7280; }
-.archive-palette-btn.date:hover    { background: #DBEAFE; border-color: var(--line); }
-.archive-palette-btn.seller:hover  { background: #E0E7FF; border-color: #C7D2FE; }
-.archive-palette-btn.category:hover{ background: var(--warn-bg); border-color: #FCD34D; }
-.archive-palette-btn.amount:hover  { background: #D1FAE5; border-color: #A7F3D0; }
-.archive-palette-btn.invoice:hover { background: #FCE7F3; border-color: #FBCFE8; }
-.archive-palette-btn.buyer:hover   { background: #EDE9FE; border-color: #DDD6FE; }
-.archive-palette-btn.sep:hover     { background: #F3F4F6; }
+.archive-palette-btn.buyer   { color: var(--violet-800); }
+.archive-palette-btn.sep     { color: var(--gray-500); }
+.archive-palette-btn.date:hover    { background: var(--blue-100); border-color: var(--line); }
+.archive-palette-btn.seller:hover  { background: var(--indigo-100); border-color: var(--indigo-200); }
+.archive-palette-btn.category:hover{ background: var(--warn-bg); border-color: var(--amber-300); }
+.archive-palette-btn.amount:hover  { background: var(--emerald-100); border-color: var(--emerald-200); }
+.archive-palette-btn.invoice:hover { background: var(--pink-100); border-color: var(--pink-200); }
+.archive-palette-btn.buyer:hover   { background: var(--violet-100); border-color: var(--violet-200); }
+.archive-palette-btn.sep:hover     { background: var(--gray-100); }
 
 /* 升级窗卖点 banner */
 .plan-selling-point {
@@ -165,19 +165,19 @@ button.history-missing-amount-btn {
     align-items: center;
     gap: 10px;
     padding: 12px 16px;
-    background: #DBEAFE;
+    background: var(--blue-100);
     border: 1px solid var(--line);
     border-radius: 10px;
     margin: 14px 0;
     font-size: 13px;
     font-weight: 500;
-    color: #4338CA;
+    color: var(--indigo-700);
 }
 .plan-selling-point svg {
     width: 18px;
     height: 18px;
     flex-shrink: 0;
-    color: #6366F1;
+    color: var(--indigo-500);
 }
 
 /* ============================================================
@@ -199,8 +199,8 @@ button.history-missing-amount-btn {
 }
 .drawer-diagnose:hover {
     background: var(--bg);
-    color: #6366F1;
-    border-color: #C7D2FE;
+    color: var(--indigo-500);
+    border-color: var(--indigo-200);
 }
 .drawer-diagnose svg {
     width: 16px;
@@ -208,8 +208,8 @@ button.history-missing-amount-btn {
 }
 
 .diagnose-json {
-    background: #0F172A;
-    color: #E2E8F0;
+    background: var(--slate-900);
+    color: var(--slate-200);
     border: none;
     border-radius: 8px;
     padding: 16px 18px;
@@ -267,8 +267,8 @@ button.history-missing-amount-btn {
     height: 20px;
     border-radius: 50%;
     border: none;
-    background: #E5E7EB;
-    color: #6B7280;
+    background: var(--gray-200);
+    color: var(--gray-500);
     cursor: pointer;
     font-size: 10px;
     line-height: 1;
@@ -279,7 +279,7 @@ button.history-missing-amount-btn {
     transition: background 0.15s;
 }
 .search-wrap .search-clear:hover {
-    background: #D1D5DB;
+    background: var(--gray-300);
     color: var(--ink);
 }
 .search-matches {
@@ -292,8 +292,8 @@ button.history-missing-amount-btn {
 
 /* 多发票拆分 · 历史行小角标(紫色) */
 .history-badge.multi {
-    background: #EDE9FE;
-    color: #6D28D9;
+    background: var(--violet-100);
+    color: var(--violet-700);
     font-weight: 600;
 }
 .history-badge.multi::before {

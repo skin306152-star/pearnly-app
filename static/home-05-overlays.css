@@ -271,8 +271,8 @@ a.contact-item:hover { background: var(--bg-hover, #eef2f7); }
 }
 .contact-icon.phone { background: #718096; }
 .contact-icon.line { background: var(--line-color); }
-.contact-icon.email { background: #f59e0b; }
-.contact-icon.address { background: #94a3b8; }
+.contact-icon.email { background: var(--amber-500); }
+.contact-icon.address { background: var(--slate-400); }
 .contact-icon svg { width: 14px; height: 14px; }
 .contact-text { min-width: 0; }
 .contact-label { font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; }

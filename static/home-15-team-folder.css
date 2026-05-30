@@ -24,7 +24,7 @@
 .team-avatar {
     width: 40px; height: 40px;
     border-radius: 10px;
-    background: linear-gradient(135deg, var(--ink), #6366F1);
+    background: linear-gradient(135deg, var(--ink), var(--indigo-500));
     color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-weight: 700; font-size: 16px;
@@ -32,10 +32,10 @@
     user-select: none;
 }
 .team-card.disabled .team-avatar {
-    background: #9CA3AF;
+    background: var(--gray-400);
 }
 .team-card.owner .team-avatar {
-    background: linear-gradient(135deg, #F59E0B, #F97316);
+    background: linear-gradient(135deg, var(--amber-500), var(--orange-500));
 }
 .team-card-info {
     flex: 1; min-width: 0;
@@ -55,7 +55,7 @@
     padding: 2px 7px;
     border-radius: 4px;
     background: var(--warn-bg);
-    color: #92400E;
+    color: var(--amber-800);
     font-weight: 600;
 }
 .team-status-badge {
@@ -65,8 +65,8 @@
     font-weight: 500;
     flex-shrink: 0;
 }
-.team-status-badge.on { background: #D1FAE5; color: #065F46; }
-.team-status-badge.off { background: #F3F4F6; color: #6B7280; }
+.team-status-badge.on { background: var(--emerald-100); color: var(--emerald-800); }
+.team-status-badge.off { background: var(--gray-100); color: var(--gray-500); }
 .team-card-actions {
     display: flex; gap: 6px; flex-shrink: 0;
 }
@@ -81,13 +81,13 @@
     transition: all .15s;
 }
 .team-card-actions button:hover {
-    border-color: #9CA3AF;
-    background: #F9FAFB;
+    border-color: var(--gray-400);
+    background: var(--gray-50);
 }
 .team-card-actions button.danger { color: var(--danger); }
 .team-card-actions button.danger:hover {
-    border-color: #FCA5A5;
-    background: #FEF2F2;
+    border-color: var(--red-300);
+    background: var(--red-50);
 }
 @media (max-width: 640px) {
     .team-card { flex-wrap: wrap; }
@@ -98,7 +98,7 @@
  * v95 · 文件夹监听 · 浏览器 File System Access API
  * ============================================================ */
 .folder-card {
-    background: #fff; border: 1px solid #E5E7EB; border-radius: 12px;
+    background: #fff; border: 1px solid var(--gray-200); border-radius: 12px;
     padding: 24px; margin-top: 16px;
 }
 /* CSS 兜底 · 防止 SVG 撑爆容器 */
@@ -110,7 +110,7 @@
 }
 .folder-unsupported-icon, .folder-empty-icon {
     width: 64px; height: 64px; margin: 0 auto 16px;
-    color: #9CA3AF;
+    color: var(--gray-400);
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
 }
@@ -119,18 +119,18 @@
     display: block;
 }
 .folder-unsupported-title, .folder-empty-title {
-    font-size: 18px; font-weight: 600; color: #111827; margin-bottom: 8px;
+    font-size: 18px; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;
 }
 .folder-unsupported-desc, .folder-empty-desc {
-    color: #6B7280; font-size: 14px; margin-bottom: 24px; max-width: 480px; margin-left: auto; margin-right: auto;
+    color: var(--gray-500); font-size: 14px; margin-bottom: 24px; max-width: 480px; margin-left: auto; margin-right: auto;
 }
 .folder-alt-section { margin-top: 24px; }
-.folder-alt-title { font-size: 13px; color: #6B7280; margin-bottom: 12px; font-weight: 500; }
+.folder-alt-title { font-size: 13px; color: var(--gray-500); margin-bottom: 12px; font-weight: 500; }
 .folder-alt-btn { margin: 4px; }
 .folder-warn-row {
     display: inline-flex; align-items: center; gap: 6px;
     margin-top: 16px; padding: 8px 14px;
-    background: var(--warn-bg); color: #92400E;
+    background: var(--warn-bg); color: var(--amber-800);
     border-radius: 6px; font-size: 12px;
 }
 .folder-warn-row svg { width: 14px; height: 14px; flex-shrink: 0; }
@@ -150,21 +150,21 @@
 }
 .folder-config-icon svg { width: 22px; height: 22px; }
 .folder-config-path {
-    font-size: 15px; font-weight: 600; color: #111827; margin-bottom: 4px;
+    font-size: 15px; font-weight: 600; color: var(--gray-900); margin-bottom: 4px;
     word-break: break-all;
 }
 .folder-config-meta {
-    font-size: 13px; color: #6B7280;
+    font-size: 13px; color: var(--gray-500);
     display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
 }
 .folder-status-pulse {
     display: inline-block; width: 8px; height: 8px;
-    background: #10B981; border-radius: 50%;
+    background: var(--emerald-500); border-radius: 50%;
     animation: folder-pulse 1.6s ease-in-out infinite;
     margin-right: 4px;
 }
 .folder-status-pulse.paused {
-    background: #9CA3AF;
+    background: var(--gray-400);
     animation: none;
 }
 @keyframes folder-pulse {
@@ -173,8 +173,8 @@
 }
 .folder-interval-select {
     padding: 2px 6px; font-size: 13px;
-    border: 1px solid #D1D5DB; border-radius: 4px;
-    background: #fff; color: #111827; cursor: pointer;
+    border: 1px solid var(--gray-300); border-radius: 4px;
+    background: #fff; color: var(--gray-900); cursor: pointer;
 }
 .folder-config-actions {
     display: flex; gap: 6px; flex-wrap: wrap;
@@ -184,53 +184,53 @@
 
 .folder-stats {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
-    margin-top: 20px; padding-top: 20px; border-top: 1px solid #F3F4F6;
+    margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--gray-100);
 }
 .folder-stat { text-align: center; }
-.folder-stat-label { font-size: 11px; color: #6B7280; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-.folder-stat-value { font-size: 20px; font-weight: 600; color: #111827; }
+.folder-stat-label { font-size: 11px; color: var(--gray-500); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.folder-stat-value { font-size: 20px; font-weight: 600; color: var(--gray-900); }
 
 .folder-recent-card { padding: 20px 24px; }
 .folder-recent-head {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 12px;
 }
-.folder-recent-title { font-size: 14px; font-weight: 600; color: #111827; }
+.folder-recent-title { font-size: 14px; font-weight: 600; color: var(--gray-900); }
 .btn-tiny {
     font-size: 11px; padding: 3px 10px;
-    background: transparent; color: #6B7280;
-    border: 1px solid #E5E7EB; border-radius: 4px; cursor: pointer;
+    background: transparent; color: var(--gray-500);
+    border: 1px solid var(--gray-200); border-radius: 4px; cursor: pointer;
 }
-.btn-tiny:hover { background: #F9FAFB; }
+.btn-tiny:hover { background: var(--gray-50); }
 .folder-recent-list { display: flex; flex-direction: column; gap: 6px; }
 .folder-recent-empty {
-    text-align: center; color: #9CA3AF; font-size: 13px; padding: 24px 0;
+    text-align: center; color: var(--gray-400); font-size: 13px; padding: 24px 0;
 }
 .folder-recent-item {
     display: flex; align-items: center; gap: 12px;
-    padding: 10px 12px; background: #F9FAFB; border-radius: 6px;
+    padding: 10px 12px; background: var(--gray-50); border-radius: 6px;
 }
 .folder-recent-icon {
     width: 22px; height: 22px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.folder-recent-icon.ok   { background: #D1FAE5; color: #065F46; }
-.folder-recent-icon.fail { background: var(--danger-bg); color: #991B1B; }
-.folder-recent-icon.dup  { background: #DBEAFE; color: var(--ink); }
-.folder-recent-icon.skip { background: #F3F4F6; color: #6B7280; }
+.folder-recent-icon.ok   { background: var(--emerald-100); color: var(--emerald-800); }
+.folder-recent-icon.fail { background: var(--danger-bg); color: var(--red-800); }
+.folder-recent-icon.dup  { background: var(--blue-100); color: var(--ink); }
+.folder-recent-icon.skip { background: var(--gray-100); color: var(--gray-500); }
 .folder-recent-body { flex: 1; min-width: 0; }
 .folder-recent-name {
-    font-size: 13px; color: #111827;
+    font-size: 13px; color: var(--gray-900);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .folder-recent-err { font-size: 11px; color: var(--danger); margin-top: 2px; }
 .folder-recent-time {
-    font-size: 11px; color: #6B7280; flex-shrink: 0; font-variant-numeric: tabular-nums;
+    font-size: 11px; color: var(--gray-500); flex-shrink: 0; font-variant-numeric: tabular-nums;
 }
 
 /* status pill 颜色 */
-.auto-status-pill.running { background: #D1FAE5; color: #065F46; }
-.auto-status-pill.paused  { background: #F3F4F6; color: #6B7280; }
+.auto-status-pill.running { background: var(--emerald-100); color: var(--emerald-800); }
+.auto-status-pill.paused  { background: var(--gray-100); color: var(--gray-500); }
 
 @media (max-width: 720px) {
     .folder-stats { grid-template-columns: repeat(2, 1fr); }
@@ -243,7 +243,7 @@
     display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
     margin-top: 12px; padding: 10px 14px;
     background: var(--bg); color: var(--ink);
-    border: 1px solid #DBEAFE;
+    border: 1px solid var(--blue-100);
     border-radius: 6px; font-size: 12px;
     max-width: 580px; margin-left: auto; margin-right: auto;
     text-align: left;
@@ -266,19 +266,19 @@
     display: inline-flex; align-items: center; gap: 5px;
     padding: 5px 10px;
     font-size: 11px; font-weight: 500;
-    background: transparent; color: #9CA3AF;
-    border: 1px dashed #D1D5DB; border-radius: 999px;
+    background: transparent; color: var(--gray-400);
+    border: 1px dashed var(--gray-300); border-radius: 999px;
     cursor: help;
     transition: all 0.15s;
     user-select: none;
 }
 .folder-info-chip:hover, .folder-info-chip:focus-visible {
-    background: #F9FAFB; color: #374151; border-color: #9CA3AF;
+    background: var(--gray-50); color: var(--gray-700); border-color: var(--gray-400);
     outline: none;
 }
 .folder-info-chip-link {
     cursor: pointer;
-    color: #6B7280;
+    color: var(--gray-500);
     border-color: var(--line);
 }
 .folder-info-chip-link:hover, .folder-info-chip-link:focus-visible {
@@ -289,7 +289,7 @@
     position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
     width: 280px; max-width: 90vw;
     padding: 10px 12px;
-    background: #1F2937; color: #fff;
+    background: var(--gray-800); color: #fff;
     border-radius: 6px; font-size: 12px; line-height: 1.5;
     text-align: left;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -301,7 +301,7 @@
 .folder-info-tooltip::after {
     content: ''; position: absolute; top: 100%; left: 50%;
     transform: translateX(-50%);
-    border: 5px solid transparent; border-top-color: #1F2937;
+    border: 5px solid transparent; border-top-color: var(--gray-800);
 }
 .folder-info-chip:hover .folder-info-tooltip,
 .folder-info-chip:focus-visible .folder-info-tooltip {
@@ -313,7 +313,7 @@
 .btn-scan-doc {
     background: #fff;
     color: var(--ink);
-    border: 1.5px solid #c7d2fe;
+    border: 1.5px solid var(--indigo-200);
     padding: 11px 18px;
     border-radius: 10px;
     font-size: 14px;
@@ -328,7 +328,7 @@
 }
 .btn-scan-doc:hover {
     background: var(--bg);
-    border-color: #818cf8;
+    border-color: var(--indigo-400);
     transform: translateY(-1px);
     box-shadow: 0 4px 10px rgba(17, 17, 17, 0.12);
 }
@@ -401,11 +401,11 @@
     justify-content: center;
 }
 .preview-btn-confirm {
-    background: #10b981;
+    background: var(--emerald-500);
     padding: 8px 16px;
 }
 .preview-btn-back:hover { background: rgba(255, 255, 255, 0.22); }
-.preview-btn-confirm:hover { background: #059669; }
+.preview-btn-confirm:hover { background: var(--emerald-600); }
 .preview-btn-back svg,
 .preview-btn-confirm svg { width: 18px; height: 18px; }
 .preview-title {
@@ -491,8 +491,8 @@
     color: #fff;
 }
 .filter-btn.active {
-    background: #10b981;
-    border-color: #10b981;
+    background: var(--emerald-500);
+    border-color: var(--emerald-500);
     color: #fff;
     font-weight: 600;
 }

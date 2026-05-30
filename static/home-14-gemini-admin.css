@@ -12,17 +12,17 @@
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
-    background: #ECFDF5;
-    border: 1px solid #A7F3D0;
+    background: var(--emerald-50);
+    border: 1px solid var(--emerald-200);
     border-radius: 6px;
     font-size: 12px;
-    color: #065F46;
+    color: var(--emerald-800);
     margin-bottom: 12px;
 }
 .api-key-current svg {
     width: 14px;
     height: 14px;
-    color: #10B981;
+    color: var(--emerald-500);
     flex-shrink: 0;
 }
 .api-key-current code {
@@ -51,7 +51,7 @@
     color: var(--ink);
 }
 .api-key-input:focus {
-    border-color: #6366F1;
+    border-color: var(--indigo-500);
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 .api-key-msg {
@@ -59,14 +59,14 @@
     min-height: 18px;
     margin-bottom: 6px;
 }
-.api-key-msg.success { color: #059669; }
+.api-key-msg.success { color: var(--emerald-600); }
 .api-key-msg.error   { color: var(--danger); }
-.api-key-msg.info    { color: #4B5563; }
+.api-key-msg.info    { color: var(--gray-600); }
 .api-key-help {
     font-size: 12px;
 }
 .api-key-help a {
-    color: #4F46E5;
+    color: var(--indigo-600);
     text-decoration: none;
 }
 .api-key-help a:hover {
@@ -75,7 +75,7 @@
 
 /* 顶部信息条 · 自带 key 标识 */
 .info-chip .chip-value-lifetime {
-    background: linear-gradient(135deg, #FDE68A, #F59E0B);
+    background: linear-gradient(135deg, var(--amber-200), var(--amber-500));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -83,8 +83,8 @@
 }
 .info-chip.chip-warn {
     background: var(--warn-bg);
-    color: #92400E;
-    border-color: #FCD34D;
+    color: var(--amber-800);
+    border-color: var(--amber-300);
 }
 
 /* ============================================================
@@ -94,9 +94,9 @@
     display: inline-block;
     margin-top: 12px;
     padding: 5px 14px;
-    background: #F3F4F6;
-    color: #6B7280;
-    border: 1px solid #E5E7EB;
+    background: var(--gray-100);
+    color: var(--gray-500);
+    border: 1px solid var(--gray-200);
     border-radius: 14px;
     font-size: 12px;
     font-weight: 600;
@@ -104,8 +104,8 @@
 
 /* v0.15 · 覆盖:旧 Plus/Pro tag 相关(如果还在用) · 统一为中性灰 */
 .cs-tag.plus, .cs-tag.pro, .cs-tag.free {
-    background: #F3F4F6 !important;
-    color: #6B7280 !important;
+    background: var(--gray-100) !important;
+    color: var(--gray-500) !important;
 }
 .plus-badge, .pro-badge {
     display: none !important;   /* 彻底隐藏旧 Plus/Pro 徽章 */
@@ -147,23 +147,23 @@
 }
 #page-admin .admin-stats {
     margin-left: auto;
-    color: #6B7280;
+    color: var(--gray-500);
     font-size: 13px;
 }
 #page-admin .admin-loading {
     padding: 60px 20px;
     text-align: center;
-    color: #9CA3AF;
+    color: var(--gray-400);
     font-size: 14px;
 }
 #page-admin .admin-empty {
     padding: 60px 20px;
     text-align: center;
-    color: #9CA3AF;
+    color: var(--gray-400);
 }
 #page-admin .admin-table-wrap {
     overflow-x: auto;
-    border: 1px solid #E5E7EB;
+    border: 1px solid var(--gray-200);
     border-radius: 8px;
     background: #fff;
 }
@@ -173,33 +173,33 @@
     font-size: 13px;
 }
 #page-admin .admin-table thead th {
-    background: #F9FAFB;
-    color: #6B7280;
+    background: var(--gray-50);
+    color: var(--gray-500);
     font-weight: 600;
     text-align: left;
     padding: 12px 14px;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid var(--gray-200);
     white-space: nowrap;
 }
 #page-admin .admin-table tbody td {
     padding: 14px;
-    border-bottom: 1px solid #F3F4F6;
-    color: #111827;
+    border-bottom: 1px solid var(--gray-100);
+    color: var(--gray-900);
     vertical-align: middle;
 }
 #page-admin .admin-table tbody tr:last-child td {
     border-bottom: none;
 }
 #page-admin .admin-table tbody tr:hover {
-    background: #F9FAFB;
+    background: var(--gray-50);
 }
 #page-admin .tenant-name {
     font-weight: 600;
-    color: #111827;
+    color: var(--gray-900);
 }
 #page-admin .tenant-notes {
     display: block;
-    color: #9CA3AF;
+    color: var(--gray-400);
     font-size: 11px;
     margin-top: 2px;
 }
@@ -212,18 +212,18 @@
     font-weight: 600;
     white-space: nowrap;
 }
-#page-admin .tenant-type-admin   { background: var(--warn-bg); color: #92400E; }
-#page-admin .tenant-type-shared  { background: #DBEAFE; color: var(--ink); }
-#page-admin .tenant-type-byo     { background: #D1FAE5; color: #065F46; }
-#page-admin .tenant-status-active     { background: #D1FAE5; color: #065F46; }
-#page-admin .tenant-status-warning    { background: var(--warn-bg); color: #92400E; }
-#page-admin .tenant-status-suspended  { background: var(--danger-bg); color: #991B1B; }
-#page-admin .tenant-status-frozen     { background: #F3F4F6; color: #4B5563; }
+#page-admin .tenant-type-admin   { background: var(--warn-bg); color: var(--amber-800); }
+#page-admin .tenant-type-shared  { background: var(--blue-100); color: var(--ink); }
+#page-admin .tenant-type-byo     { background: var(--emerald-100); color: var(--emerald-800); }
+#page-admin .tenant-status-active     { background: var(--emerald-100); color: var(--emerald-800); }
+#page-admin .tenant-status-warning    { background: var(--warn-bg); color: var(--amber-800); }
+#page-admin .tenant-status-suspended  { background: var(--danger-bg); color: var(--red-800); }
+#page-admin .tenant-status-frozen     { background: var(--gray-100); color: var(--gray-600); }
 #page-admin .tenant-quota-bar {
     display: inline-block;
     width: 80px;
     height: 6px;
-    background: #F3F4F6;
+    background: var(--gray-100);
     border-radius: 3px;
     overflow: hidden;
     vertical-align: middle;
@@ -234,11 +234,11 @@
     background: var(--ink);
     transition: width .3s;
 }
-#page-admin .tenant-quota-fill.warn { background: #F59E0B; }
-#page-admin .tenant-quota-fill.over { background: #EF4444; }
+#page-admin .tenant-quota-fill.warn { background: var(--amber-500); }
+#page-admin .tenant-quota-fill.over { background: var(--red-500); }
 #page-admin .tenant-quota-text {
     font-size: 12px;
-    color: #6B7280;
+    color: var(--gray-500);
     vertical-align: middle;
 }
 #page-admin .tenant-actions {
@@ -249,24 +249,24 @@
 #page-admin .tenant-actions button {
     padding: 4px 10px;
     font-size: 12px;
-    border: 1px solid #E5E7EB;
+    border: 1px solid var(--gray-200);
     background: #fff;
-    color: #374151;
+    color: var(--gray-700);
     border-radius: 6px;
     cursor: pointer;
     transition: all .15s;
 }
 #page-admin .tenant-actions button:hover {
-    background: #F3F4F6;
-    border-color: #D1D5DB;
+    background: var(--gray-100);
+    border-color: var(--gray-300);
 }
 #page-admin .tenant-actions button.danger {
     color: var(--danger);
     border-color: var(--danger-bg);
 }
 #page-admin .tenant-actions button.danger:hover {
-    background: #FEF2F2;
-    border-color: #FECACA;
+    background: var(--red-50);
+    border-color: var(--red-200);
 }
 /* 租户创建/编辑弹窗 */
 .admin-modal-backdrop {
@@ -292,7 +292,7 @@
 .admin-modal h3 {
     margin: 0 0 16px;
     font-size: 18px;
-    color: #111827;
+    color: var(--gray-900);
 }
 .admin-modal .form-row {
     margin-bottom: 16px;
@@ -301,7 +301,7 @@
     display: block;
     margin-bottom: 6px;
     font-size: 13px;
-    color: #4B5563;
+    color: var(--gray-600);
     font-weight: 500;
 }
 .admin-modal .form-row input,
@@ -309,7 +309,7 @@
 .admin-modal .form-row textarea {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid #D1D5DB;
+    border: 1px solid var(--gray-300);
     border-radius: 6px;
     font-size: 14px;
     font-family: inherit;
@@ -323,7 +323,7 @@
 }
 .admin-modal .form-hint {
     font-size: 12px;
-    color: #9CA3AF;
+    color: var(--gray-400);
     margin-top: 4px;
 }
 .admin-modal .form-actions {
@@ -346,11 +346,11 @@
     padding: 8px;
     margin: 2px auto 2px;   /* v100 · 压缩上下 · 让菜单多出空间 */
     border-radius: 8px;
-    color: #6B7280;
+    color: var(--gray-500);
     cursor: pointer;
     transition: background .15s;
 }
-.sidebar-toggle-in:hover { background: #F3F4F6; }
+.sidebar-toggle-in:hover { background: var(--gray-100); }
 .sidebar-toggle-in svg { width: 20px; height: 20px; display: block; margin: 0 auto; }
 
 /* 默认显示侧栏内的汉堡 · 顶栏的那个已经删了 */
@@ -364,15 +364,15 @@
     align-items: center;
     padding: 8px 12px;
     min-width: 160px;
-    color: #374151;
+    color: var(--gray-700);
 }
 .admin-dd-menu .dd-item svg {
     width: 16px;
     height: 16px;
     flex-shrink: 0;
-    color: #6B7280;
+    color: var(--gray-500);
 }
-.admin-dd-menu .dd-item:disabled { color: #9CA3AF; }
+.admin-dd-menu .dd-item:disabled { color: var(--gray-400); }
 
 /* 返回按钮 + 详情头 */
 .admin-detail-head {
@@ -381,7 +381,7 @@
     gap: 12px;
     margin-bottom: 16px;
     padding-bottom: 12px;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid var(--gray-200);
 }
 .admin-detail-head .btn-back {
     display: inline-flex;
@@ -392,14 +392,14 @@
 .admin-detail-title {
     font-size: 18px;
     font-weight: 600;
-    color: #111827;
+    color: var(--gray-900);
 }
 
 .admin-detail-info {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px;
-    background: #F9FAFB;
+    background: var(--gray-50);
     padding: 14px 16px;
     border-radius: 8px;
     margin-bottom: 20px;
@@ -410,14 +410,14 @@
 }
 .admin-detail-info .info-label {
     font-size: 11px;
-    color: #9CA3AF;
+    color: var(--gray-400);
     text-transform: uppercase;
     letter-spacing: 0.03em;
     margin-bottom: 4px;
 }
 .admin-detail-info .info-value {
     font-size: 14px;
-    color: #111827;
+    color: var(--gray-900);
     font-weight: 500;
 }
 
@@ -425,7 +425,7 @@
 .admin-detail-tabs {
     display: flex;
     gap: 4px;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid var(--gray-200);
     margin-bottom: 16px;
 }
 .admin-tab {
@@ -433,12 +433,12 @@
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    color: #6B7280;
+    color: var(--gray-500);
     font-size: 14px;
     cursor: pointer;
     transition: all .15s;
 }
-.admin-tab:hover { color: #111827; }
+.admin-tab:hover { color: var(--gray-900); }
 .admin-tab.active {
     color: var(--ink);
     border-bottom-color: var(--ink);
@@ -456,40 +456,40 @@
 /* 操作日志列表 */
 .admin-logs-list {
     background: #fff;
-    border: 1px solid #E5E7EB;
+    border: 1px solid var(--gray-200);
     border-radius: 8px;
     max-height: 500px;
     overflow-y: auto;
 }
 .admin-logs-list .log-item {
     padding: 12px 16px;
-    border-bottom: 1px solid #F3F4F6;
+    border-bottom: 1px solid var(--gray-100);
     font-size: 13px;
 }
 .admin-logs-list .log-item:last-child { border-bottom: none; }
 .admin-logs-list .log-time {
     font-size: 11px;
-    color: #9CA3AF;
+    color: var(--gray-400);
     margin-bottom: 2px;
 }
 .admin-logs-list .log-main {
-    color: #111827;
+    color: var(--gray-900);
 }
 .admin-logs-list .log-main .log-actor {
     font-weight: 600;
     color: var(--ink);
 }
 .admin-logs-list .log-main .log-action {
-    color: #6B7280;
+    color: var(--gray-500);
     margin: 0 4px;
 }
 .admin-logs-list .log-main .log-target {
-    color: #111827;
+    color: var(--gray-900);
 }
 .admin-logs-list .log-super-badge {
     display: inline-block;
     background: var(--warn-bg);
-    color: #92400E;
+    color: var(--amber-800);
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 10px;
@@ -499,7 +499,7 @@
 .admin-logs-list .log-empty {
     padding: 60px 20px;
     text-align: center;
-    color: #9CA3AF;
+    color: var(--gray-400);
 }
 
 /* ============================================================
@@ -511,7 +511,7 @@
     gap: 16px;
     margin-bottom: 20px;
     padding-bottom: 16px;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid var(--gray-200);
 }
 .admin-detail-head .btn-back {
     padding: 6px 12px;
@@ -523,14 +523,14 @@
 .admin-detail-title {
     font-size: 18px;
     font-weight: 600;
-    color: #111827;
+    color: var(--gray-900);
 }
 .admin-detail-info {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px 20px;
     padding: 16px;
-    background: #F9FAFB;
+    background: var(--gray-50);
     border-radius: 8px;
     margin-bottom: 20px;
 }
@@ -541,17 +541,17 @@
 }
 .admin-detail-info .info-label {
     font-size: 12px;
-    color: #6B7280;
+    color: var(--gray-500);
 }
 .admin-detail-info .info-item span:last-child {
     font-size: 14px;
-    color: #111827;
+    color: var(--gray-900);
     font-weight: 500;
 }
 .admin-detail-tabs {
     display: flex;
     gap: 4px;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid var(--gray-200);
     margin-bottom: 16px;
 }
 .admin-detail-tabs .admin-tab {
@@ -559,12 +559,12 @@
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    color: #6B7280;
+    color: var(--gray-500);
     font-size: 14px;
     cursor: pointer;
     transition: all .15s;
 }
-.admin-detail-tabs .admin-tab:hover { color: #111827; }
+.admin-detail-tabs .admin-tab:hover { color: var(--gray-900); }
 .admin-detail-tabs .admin-tab.active {
     color: var(--ink);
     border-bottom-color: var(--ink);
@@ -579,13 +579,13 @@
     display: flex;
     gap: 12px;
     padding: 10px 14px;
-    background: #F9FAFB;
+    background: var(--gray-50);
     border-radius: 6px;
     font-size: 13px;
     align-items: flex-start;
 }
 .admin-log-time {
-    color: #9CA3AF;
+    color: var(--gray-400);
     font-size: 12px;
     white-space: nowrap;
     padding-top: 1px;
@@ -593,33 +593,33 @@
 }
 .admin-log-body {
     flex: 1;
-    color: #374151;
+    color: var(--gray-700);
     line-height: 1.5;
 }
 .admin-log-body .admin-log-action {
     padding: 1px 6px;
-    background: #DBEAFE;
+    background: var(--blue-100);
     color: var(--ink);
     border-radius: 3px;
     font-size: 11px;
     margin: 0 4px;
 }
 .admin-log-body .admin-log-target {
-    color: #111827;
+    color: var(--gray-900);
     font-weight: 500;
 }
 .admin-log-body .admin-log-meta {
     margin-left: 8px;
-    color: #9CA3AF;
+    color: var(--gray-400);
     font-size: 11px;
 }
 /* 删除危险警告 */
 .admin-danger-warn {
     padding: 12px 14px;
-    background: #FEF2F2;
-    border: 1px solid #FECACA;
+    background: var(--red-50);
+    border: 1px solid var(--red-200);
     border-radius: 8px;
-    color: #991B1B;
+    color: var(--red-800);
     font-size: 13px;
     line-height: 1.5;
     margin-bottom: 16px;
@@ -630,8 +630,8 @@
     border: 1px solid var(--danger);
 }
 .btn.btn-danger:hover {
-    background: #B91C1C;
-    border-color: #B91C1C;
+    background: var(--red-700);
+    border-color: var(--red-700);
 }
 .btn.btn-danger:disabled {
     opacity: .5;
@@ -666,12 +666,12 @@
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    color: #6B7280;
+    color: var(--gray-500);
     transition: all .15s;
 }
 .sidebar-toggle.sidebar-toggle-in:hover {
-    background: #F3F4F6;
-    color: #111827;
+    background: var(--gray-100);
+    color: var(--gray-900);
 }
 .sidebar-toggle.sidebar-toggle-in svg {
     width: 20px;
@@ -679,8 +679,8 @@
 }
 /* 员工表的 owner badge 颜色修正(避免用超管的金色)*/
 #team-tbody .tenant-type-admin {
-    background: #E0E7FF;
-    color: #3730A3;
+    background: var(--indigo-100);
+    color: var(--indigo-800);
 }
 
 /* v22 · 密码输入框 + 眼睛切换 */
@@ -702,7 +702,7 @@
     border: none;
     padding: 4px;
     cursor: pointer;
-    color: #9CA3AF;
+    color: var(--gray-400);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -710,8 +710,8 @@
     transition: color .15s, background .15s;
 }
 .pw-eye:hover {
-    color: #6B7280;
-    background: #F3F4F6;
+    color: var(--gray-500);
+    background: var(--gray-100);
 }
 .pw-eye svg {
     width: 18px;
@@ -744,24 +744,24 @@
 }
 .login-form-error input {
     border-color: var(--danger) !important;
-    background: #FEF2F2;
+    background: var(--red-50);
 }
 .login-locked-banner {
     padding: 10px 14px;
-    background: #FEF2F2;
-    border: 1px solid #FECACA;
+    background: var(--red-50);
+    border: 1px solid var(--red-200);
     border-radius: 8px;
-    color: #991B1B;
+    color: var(--red-800);
     font-size: 13px;
     text-align: center;
     margin-bottom: 12px;
 }
 .login-forgot-hint {
     padding: 10px 14px;
-    background: #FFFBEB;
-    border: 1px solid #FDE68A;
+    background: var(--amber-50);
+    border: 1px solid var(--amber-200);
     border-radius: 8px;
-    color: #92400E;
+    color: var(--amber-800);
     font-size: 13px;
     text-align: center;
     margin-bottom: 12px;
@@ -769,27 +769,27 @@
 
 /* v23 · 超管账号在用户列表中变灰 · 不可操作 */
 .admin-self-row-tr {
-    background: #F9FAFB;
+    background: var(--gray-50);
 }
 .admin-self-row-tr td {
-    color: #9CA3AF;
+    color: var(--gray-400);
 }
 .admin-self-name {
-    color: #6B7280 !important;
+    color: var(--gray-500) !important;
     cursor: not-allowed;
 }
 .tenant-actions button.disabled-btn,
 .tenant-actions button[disabled] {
     opacity: 0.4;
     cursor: not-allowed !important;
-    background: #F3F4F6;
-    color: #9CA3AF;
-    border-color: #E5E7EB;
+    background: var(--gray-100);
+    color: var(--gray-400);
+    border-color: var(--gray-200);
 }
 .tenant-actions button.disabled-btn:hover,
 .tenant-actions button[disabled]:hover {
-    background: #F3F4F6;
-    color: #9CA3AF;
+    background: var(--gray-100);
+    color: var(--gray-400);
 }
 .admin-self-row:hover {
     cursor: not-allowed;
@@ -799,11 +799,11 @@
 .admin-detail-section-head {
     margin: 16px 0 12px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid var(--gray-200);
 }
 .admin-detail-section-title {
     font-size: 15px;
     font-weight: 600;
-    color: #374151;
+    color: var(--gray-700);
 }
 

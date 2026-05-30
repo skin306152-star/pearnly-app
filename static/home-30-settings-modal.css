@@ -113,7 +113,7 @@ body.settings-modal-open { overflow: hidden; }
     z-index: 10;
     transition: background .15s, color .15s;
 }
-.settings-modal-close:hover { background: #f3f4f6; color: var(--ink); }
+.settings-modal-close:hover { background: var(--gray-100); color: var(--ink); }
 .settings-modal-close svg { width: 18px; height: 18px; }
 
 /* 手机端 · 全屏 */
@@ -330,7 +330,7 @@ body.settings-modal-open { overflow: hidden; }
     transition: background .15s, color .15s !important;
 }
 .settings-modal-overlay .settings-modal-close:hover {
-    background: #f3f4f6 !important;
+    background: var(--gray-100) !important;
     color: var(--ink) !important;
 }
 .settings-modal-overlay .settings-modal-close svg { width: 18px !important; height: 18px !important; }
@@ -341,9 +341,9 @@ body.settings-modal-open { overflow: hidden; }
     display: none;
     align-items: center;
     gap: 10px;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #b91c1c;
+    background: var(--red-50);
+    border: 1px solid var(--red-200);
+    color: var(--red-700);
     padding: 12px 16px;
     border-radius: 8px;
     margin-top: 12px;
@@ -354,7 +354,7 @@ body.settings-modal-open { overflow: hidden; }
 .bv-error-banner > span { flex: 1; word-break: break-word; }
 .bv-error-close {
     background: none; border: none; cursor: pointer;
-    color: #b91c1c; padding: 4px; border-radius: 4px;
+    color: var(--red-700); padding: 4px; border-radius: 4px;
     display: flex; align-items: center; justify-content: center;
 }
 .bv-error-close:hover { background: rgba(185, 28, 28, 0.1); }
@@ -373,30 +373,30 @@ body.settings-modal-open { overflow: hidden; }
 }
 .vex-toggle-segmented {
     display: inline-flex; padding: 4px;
-    background: #F3F4F6; border-radius: 10px;
+    background: var(--gray-100); border-radius: 10px;
     gap: 2px;
 }
 .vex-tg-opt {
     display: inline-flex; align-items: center; gap: 8px;
     padding: 8px 18px; border: none; background: transparent;
     border-radius: 8px; font-size: 13px; font-weight: 500;
-    color: #6B7280; cursor: pointer; font-family: inherit;
+    color: var(--gray-500); cursor: pointer; font-family: inherit;
     transition: all .2s;
 }
-.vex-tg-opt:hover { color: #111827; }
+.vex-tg-opt:hover { color: var(--gray-900); }
 .vex-tg-opt.active {
-    background: #fff; color: #111827;
+    background: #fff; color: var(--gray-900);
     box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.04);
 }
 .vex-beta-chip {
     display: inline-flex; align-items: center;
     padding: 2px 7px; border-radius: 99px;
-    background: #FED7AA; color: #9A3412;
+    background: var(--orange-200); color: var(--orange-800);
     font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
 }
 .vex-toggle-hint {
-    font-size: 11.5px; color: #9A3412;
-    background: #FFF7ED; border: 1px solid #FED7AA;
+    font-size: 11.5px; color: var(--orange-800);
+    background: var(--orange-50); border: 1px solid var(--orange-200);
     padding: 4px 12px; border-radius: 99px;
 }
 
@@ -434,7 +434,7 @@ body.settings-modal-open { overflow: hidden; }
 
 .vex-drop-divider {
     display: flex; align-items: center; justify-content: center;
-    color: #9CA3AF; font-size: 22px; font-weight: 300;
+    color: var(--gray-400); font-size: 22px; font-weight: 300;
     user-select: none;
 }
 
@@ -449,7 +449,7 @@ body.settings-modal-open { overflow: hidden; }
 }
 .vex-files-head {
     display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 8px; font-size: 12.5px; font-weight: 600; color: #374151;
+    margin-bottom: 8px; font-size: 12.5px; font-weight: 600; color: var(--gray-700);
 }
 .vex-files-count {
     display: inline-flex; align-items: center; justify-content: center;
@@ -457,7 +457,7 @@ body.settings-modal-open { overflow: hidden; }
     background: var(--ink); color: #fff; font-size: 11px; font-weight: 600;
 }
 .vex-files-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-.vex-fi-empty { padding: 14px; color: #9CA3AF; font-size: 12px; text-align: center; }
+.vex-fi-empty { padding: 14px; color: var(--gray-400); font-size: 12px; text-align: center; }
 .vex-fi {
     display: grid; grid-template-columns: 16px 1fr auto 24px;
     align-items: center; gap: 8px;
@@ -465,19 +465,19 @@ body.settings-modal-open { overflow: hidden; }
     border: 1px solid transparent; border-radius: 6px;
     font-size: 12.5px;
 }
-.vex-fi:hover { border-color: #E5E7EB; }
-.vex-fi-ic { width: 16px; height: 16px; color: #6B7280; }
+.vex-fi:hover { border-color: var(--gray-200); }
+.vex-fi-ic { width: 16px; height: 16px; color: var(--gray-500); }
 .vex-fi-n {
-    color: #111827; overflow: hidden; text-overflow: ellipsis;
+    color: var(--gray-900); overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; min-width: 0;
 }
-.vex-fi-s { font-size: 10.5px; color: #9CA3AF; }
+.vex-fi-s { font-size: 10.5px; color: var(--gray-400); }
 .vex-fi-x {
     width: 22px; height: 22px; border: none; background: transparent;
-    color: #9CA3AF; cursor: pointer; border-radius: 4px;
+    color: var(--gray-400); cursor: pointer; border-radius: 4px;
     font-size: 16px; line-height: 1; padding: 0;
 }
-.vex-fi-x:hover { background: var(--danger-bg); color: #B91C1C; }
+.vex-fi-x:hover { background: var(--danger-bg); color: var(--red-700); }
 
 /* 操作栏 */
 .vex-action-bar {
@@ -485,7 +485,7 @@ body.settings-modal-open { overflow: hidden; }
     padding: 14px 0; border-top: 1px solid var(--line);
 }
 .vex-action-info { flex: 1; font-size: 12.5px; }
-.vex-action-info.muted { color: #9CA3AF; }
+.vex-action-info.muted { color: var(--gray-400); }
 .vex-action-info.ok    { color: var(--success); }
 
 /* v4.10.11 · 查看清单切换按钮 */
@@ -508,21 +508,21 @@ body.settings-modal-open { overflow: hidden; }
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 8px;
 }
-.vex-pp-col-name { font-size: 13px; font-weight: 500; color: #111827; }
-.vex-pp-col-count { font-size: 13px; color: #9CA3AF; font-weight: 400; }
+.vex-pp-col-name { font-size: 13px; font-weight: 500; color: var(--gray-900); }
+.vex-pp-col-count { font-size: 13px; color: var(--gray-400); font-weight: 400; }
 .vex-pp-search-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .vex-pp-search {
     flex: 1; height: 30px; font-size: 12px; padding: 0 10px;
     border: 0.5px solid var(--line); border-radius: 6px;
-    outline: none; color: #111827; background: var(--card, #fff);
+    outline: none; color: var(--gray-900); background: var(--card, #fff);
 }
 .vex-pp-search:focus { border-color: var(--ink); }
 .vex-pp-clear-btn {
     height: 30px; padding: 0 10px; font-size: 12px;
     background: transparent; border: 0.5px solid var(--line);
-    border-radius: 6px; color: #6B7280; cursor: pointer; flex-shrink: 0;
+    border-radius: 6px; color: var(--gray-500); cursor: pointer; flex-shrink: 0;
 }
-.vex-pp-clear-btn:hover { color: var(--danger); border-color: #FCA5A5; }
+.vex-pp-clear-btn:hover { color: var(--danger); border-color: var(--red-300); }
 .vex-pp-file-list {
     border: 0.5px solid var(--line); border-radius: 8px;
     max-height: 220px; overflow-y: auto; background: var(--card, #fff);
@@ -534,21 +534,21 @@ body.settings-modal-open { overflow: hidden; }
 .vex-pp-file-row:last-child { border-bottom: 0; }
 .vex-pp-fi-icon { flex-shrink: 0; margin-right: 8px; display: block; }
 .vex-pp-fi-name {
-    flex: 1; color: #111827;
+    flex: 1; color: var(--gray-900);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px;
     min-width: 0;
 }
 .vex-pp-fi-size {
-    color: #9CA3AF; margin-right: 10px;
+    color: var(--gray-400); margin-right: 10px;
     font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: 11px;
 }
 .vex-pp-fi-del {
-    color: #9CA3AF; cursor: pointer; flex-shrink: 0;
+    color: var(--gray-400); cursor: pointer; flex-shrink: 0;
     background: none; border: none; padding: 2px 3px;
     display: flex; align-items: center; line-height: 1;
 }
 .vex-pp-fi-del:hover { color: var(--danger); }
-.vex-pp-pagination { text-align: center; padding: 6px 8px; font-size: 11px; color: #9CA3AF; }
+.vex-pp-pagination { text-align: center; padding: 6px 8px; font-size: 11px; color: var(--gray-400); }
 .vex-pp-guide {
     margin-top: 14px; padding: 10px 12px; background: var(--line-soft);
     border-radius: 8px; display: flex; align-items: center;
@@ -560,11 +560,11 @@ body.settings-modal-open { overflow: hidden; }
 /* 进度 / 结果区 */
 .vex-progress {
     margin-top: 16px; padding: 18px 20px;
-    background: var(--bg); border: 1px solid #E2E8F0; border-radius: 12px;
+    background: var(--bg); border: 1px solid var(--slate-200); border-radius: 12px;
     display: flex; align-items: center; gap: 14px;
 }
-.vex-progress-title { font-size: 14px; font-weight: 600; color: #111827; }
-.vex-progress-sub   { font-size: 12px; color: #6B7280; margin-top: 4px; }
+.vex-progress-title { font-size: 14px; font-weight: 600; color: var(--gray-900); }
+.vex-progress-sub   { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
 
 
 /* ─ 手机端降级(铁律 · @media max-width:800px) ─ */
@@ -601,7 +601,7 @@ body.settings-modal-open { overflow: hidden; }
     flex-direction: row;
     align-items: center;
     gap: 10px;
-    background: #ffffff;
+    background: var(--card);
     border: 1px solid var(--line);
 }
 .vex-kpi-icon-wrap {
@@ -615,14 +615,14 @@ body.settings-modal-open { overflow: hidden; }
     font-size: 14px;
 }
 .vex-kpi-icon-warn  { background: var(--warn-bg); color: #854F0B; }
-.vex-kpi-icon-ok    { background: var(--success-bg); color: #166534; }
-.vex-kpi-icon-err   { background: var(--danger-bg); color: #991B1B; }
-.vex-kpi-val   { font-size: 18px; font-weight: 500; line-height: 1.1; color: #111827; }
-.vex-kpi-lbl   { font-size: 11px; color: #6B7280; }
+.vex-kpi-icon-ok    { background: var(--success-bg); color: var(--green-800); }
+.vex-kpi-icon-err   { background: var(--danger-bg); color: var(--red-800); }
+.vex-kpi-val   { font-size: 18px; font-weight: 500; line-height: 1.1; color: var(--gray-900); }
+.vex-kpi-lbl   { font-size: 11px; color: var(--gray-500); }
 
 .vex-task-section {
     margin-bottom: 0;
-    background: #ffffff;
+    background: var(--card);
     border: 1px solid var(--line);
     border-radius: 12px;
     padding: 16px 20px;
@@ -638,52 +638,52 @@ body.settings-modal-open { overflow: hidden; }
     content: '';
     flex: 1;
     height: 1px;
-    background: #E5E7EB;
+    background: var(--gray-200);
 }
 .vex-new-recon-label {
     font-size: 12px;
     font-weight: 600;
-    color: #6B7280;
+    color: var(--gray-500);
     letter-spacing: 0.05em;
     white-space: nowrap;
 }
 .vex-task-header {
     font-size: 13px;
     font-weight: 600;
-    color: #374151;
+    color: var(--gray-700);
     margin-bottom: 10px;
     padding-bottom: 6px;
-    border-bottom: 1px solid var(--color-border-tertiary, #E5E7EB);
+    border-bottom: 1px solid var(--color-border-tertiary, var(--gray-200));
 }
-.vex-task-table-wrap { overflow-x: auto; border-radius: var(--border-radius-lg, 12px); border: 0.5px solid var(--color-border-tertiary, #E5E7EB); }
+.vex-task-table-wrap { overflow-x: auto; border-radius: var(--border-radius-lg, 12px); border: 0.5px solid var(--color-border-tertiary, var(--gray-200)); }
 .vex-task-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
 }
 .vex-task-table th {
-    background: #F9FAFB;
+    background: var(--gray-50);
     padding: 8px 12px;
     text-align: left;
     font-weight: 500;
-    color: #6B7280;
-    border-bottom: 1px solid #E5E7EB;
+    color: var(--gray-500);
+    border-bottom: 1px solid var(--gray-200);
     white-space: nowrap;
 }
 .vex-task-table td {
     padding: 9px 12px;
-    color: #111827;
-    border-bottom: 0.5px solid #F3F4F6;
+    color: var(--gray-900);
+    border-bottom: 0.5px solid var(--gray-100);
     white-space: nowrap;
 }
-.vex-task-row:hover td { background: #F9FAFB; }
+.vex-task-row:hover td { background: var(--gray-50); }
 .vex-task-row:last-child td { border-bottom: none; }
 /* v118.32.5.5.22.1 · 列定位改 :nth-last-child · 不受前置 master checkbox 列影响 */
 .vex-task-table th:nth-last-child(3),
 .vex-task-table td:nth-last-child(3) { text-align: center; }   /* 状态列(倒数第 3)*/
 .vex-task-table th:last-child,
 .vex-task-table td:last-child { width: 80px; text-align: right; padding-right: 12px; }   /* 操作列(最右)*/
-.vex-task-empty { text-align: center; color: #9CA3AF; padding: 28px; }
+.vex-task-empty { text-align: center; color: var(--gray-400); padding: 28px; }
 .vex-task-dl { color: var(--ink); text-decoration: none; font-weight: 600; }
 .vex-task-dl:hover { color: var(--ink); }
 
@@ -693,7 +693,7 @@ body.settings-modal-open { overflow: hidden; }
     border-radius: 12px;
     padding: 16px;
     margin-bottom: 18px;
-    background: #ffffff;
+    background: var(--card);
     position: relative;
 }
 .vex-main-action-tag {
@@ -709,10 +709,10 @@ body.settings-modal-open { overflow: hidden; }
 .vex-task-header-wrap {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 10px; padding-bottom: 6px;
-    border-bottom: 1px solid var(--color-border-tertiary, #E5E7EB);
+    border-bottom: 1px solid var(--color-border-tertiary, var(--gray-200));
 }
 .vex-task-header-wrap .vex-task-header { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-.vex-task-meta { font-size: 11px; color: #9CA3AF; white-space: nowrap; }
+.vex-task-meta { font-size: 11px; color: var(--gray-400); white-space: nowrap; }
 
 /* 历史表内联搜索框(VAT + GL 共用) */
 .hist-search-input {
@@ -720,16 +720,16 @@ body.settings-modal-open { overflow: hidden; }
     width: 260px;
     padding: 4px 10px;
     font-size: 12px;
-    border: 1px solid var(--color-border-tertiary, #E5E7EB);
+    border: 1px solid var(--color-border-tertiary, var(--gray-200));
     border-radius: 6px;
-    background: #ffffff;
+    background: var(--card);
     color: var(--ink);
     outline: none;
     transition: border-color .15s;
     margin-left: auto;
 }
 .hist-search-input:focus { border-color: var(--ink); }
-.hist-search-input::placeholder { color: #9CA3AF; }
+.hist-search-input::placeholder { color: var(--gray-400); }
 
 /* hover 操作按钮 */
 .vex-task-actions {
@@ -738,7 +738,7 @@ body.settings-modal-open { overflow: hidden; }
 }
 .vex-task-dl-btn, .vex-task-del-btn {
     background: transparent; border: none; cursor: pointer;
-    color: #6B7280; padding: 3px 5px; border-radius: 4px; line-height: 1;
+    color: var(--gray-500); padding: 3px 5px; border-radius: 4px; line-height: 1;
     display: flex; align-items: center;
 }
 .vex-task-dl-btn svg, .vex-task-del-btn svg { width: 14px; height: 14px; }
@@ -748,16 +748,16 @@ body.settings-modal-open { overflow: hidden; }
 /* 展开按钮 */
 .vex-expand-btn {
     margin-top: 12px; width: 100%; padding: 9px;
-    background: transparent; border: 0.5px dashed #CBD5E1;
-    color: #6B7280; font-size: 12px; border-radius: 8px;
+    background: transparent; border: 0.5px dashed var(--slate-300);
+    color: var(--gray-500); font-size: 12px; border-radius: 8px;
     cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-.vex-expand-btn:hover { background: #F9FAFB; color: #111827; }
+.vex-expand-btn:hover { background: var(--gray-50); color: var(--gray-900); }
 .vex-expand-btn svg { width: 14px; height: 14px; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 500; }
-.badge-gray  { background: #F3F4F6; color: #6B7280; }
-.badge-blue  { background: #DBEAFE; color: var(--ink); }
-.badge-green { background: var(--success-bg); color: #15803D; }
+.badge-gray  { background: var(--gray-100); color: var(--gray-500); }
+.badge-blue  { background: var(--blue-100); color: var(--ink); }
+.badge-green { background: var(--success-bg); color: var(--green-700); }
 .badge-red   { background: var(--danger-bg); color: var(--danger); }
 
 @media (max-width: 800px) {

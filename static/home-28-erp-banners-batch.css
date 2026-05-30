@@ -7,18 +7,18 @@
     gap: 8px;
     margin: 6px 0 12px;
     padding: 8px 12px;
-    background: #ECFDF5;
-    border: 1px solid #A7F3D0;
+    background: var(--emerald-50);
+    border: 1px solid var(--emerald-200);
     border-radius: 8px;
     font-size: 12px;
-    color: #065F46;
+    color: var(--emerald-800);
     line-height: 1.5;
 }
 
 .results-saved-banner svg {
     width: 16px;
     height: 16px;
-    color: #059669;
+    color: var(--emerald-600);
     flex-shrink: 0;
 }
 
@@ -77,7 +77,7 @@
 }
 
 .history-client-filter-clear:hover {
-    background: #DBEAFE;
+    background: var(--blue-100);
 }
 
 /* ============================================================
@@ -89,7 +89,7 @@
     gap: 6px;
     margin: 0 0 12px;
     padding: 8px 12px;
-    background: #F9FAFB;
+    background: var(--gray-50);
     border: 1px solid var(--line);
     border-radius: 8px;
     font-size: 12px;
@@ -274,13 +274,13 @@
     letter-spacing: 0.2px;
 }
 .mrerp-pick-cus-row-match.match-recommend {
-    color: #b45309;
+    color: var(--amber-700);
     background: var(--warn-bg);
-    border: 1px solid #fde68a;
+    border: 1px solid var(--amber-200);
 }
 .mrerp-pick-cus-row-match.match-maybe {
-    color: #92400e;
-    background: #fffbeb;
+    color: var(--amber-800);
+    background: var(--amber-50);
     border: 1px solid var(--warn-bg);
 }
 
@@ -315,7 +315,7 @@
 .mrerp-undo-toast .mut-icon {
     width: 16px;
     height: 16px;
-    color: #4ade80;
+    color: var(--green-400);
     flex-shrink: 0;
 }
 .mrerp-undo-toast .mut-text {
@@ -338,7 +338,7 @@
 .mrerp-undo-toast .mut-progress-fill {
     width: 100%;
     height: 100%;
-    background: #4ade80;
+    background: var(--green-400);
 }
 .mrerp-undo-toast .mut-btn {
     height: 28px;
@@ -365,7 +365,7 @@
     border-color: #fff;
 }
 .mrerp-undo-toast .mut-btn-ok:hover {
-    background: #e2e8f0;
+    background: var(--slate-200);
 }
 
 @media (max-width: 640px) {
@@ -572,13 +572,13 @@
     letter-spacing: 0.2px;
 }
 .mrerp-pick-prod-row-match.match-recommend {
-    color: #b45309;
+    color: var(--amber-700);
     background: var(--warn-bg);
-    border: 1px solid #fde68a;
+    border: 1px solid var(--amber-200);
 }
 .mrerp-pick-prod-row-match.match-maybe {
-    color: #92400e;
-    background: #fffbeb;
+    color: var(--amber-800);
+    background: var(--amber-50);
     border: 1px solid var(--warn-bg);
 }
 .mrerp-pick-prod-row-status {

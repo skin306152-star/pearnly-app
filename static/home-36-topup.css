@@ -34,7 +34,7 @@
     color: var(--ink-3); border-radius: 6px; line-height: 0;
     transition: background .15s;
 }
-.topup-v2-close:hover { background: #f3f4f6; }
+.topup-v2-close:hover { background: var(--gray-100); }
 .topup-v2-steps {
     display: flex; align-items: center; padding: 16px 22px 0; flex-shrink: 0;
 }
@@ -43,12 +43,12 @@
 }
 .topup-v2-dot {
     width: 26px; height: 26px; border-radius: 50%;
-    background: var(--line); color: #9ca3af;
+    background: var(--line); color: var(--gray-400);
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 600; transition: all .2s;
 }
 .topup-v2-step.active .topup-v2-dot { background: var(--brand, #111); color: #fff; }
-.topup-v2-slabel { font-size: 11px; color: #9ca3af; white-space: nowrap; }
+.topup-v2-slabel { font-size: 11px; color: var(--gray-400); white-space: nowrap; }
 .topup-v2-step.active .topup-v2-slabel { color: var(--brand, #111); }
 .topup-v2-line { flex: 1; height: 1px; background: var(--line); margin: 0 6px 18px; }
 .topup-v2-body { padding: 16px 22px; flex: 1; overflow-y: auto; }
@@ -81,12 +81,12 @@
 }
 .topup-v2-err {
     margin-top: 6px; padding: 7px 10px; font-size: 12px;
-    color: #7f1d1d; background: #fef2f2;
-    border: 1px solid #fecaca; border-radius: 6px;
+    color: var(--red-900); background: var(--red-50);
+    border: 1px solid var(--red-200); border-radius: 6px;
 }
 .topup-v2-bank-label { font-size: 12px; color: var(--ink-3); margin: 0 0 10px; }
 .topup-v2-bank-card {
-    background: #f8fafc; border: 1px solid var(--line);
+    background: var(--slate-50); border: 1px solid var(--line);
     border-radius: 12px; padding: 16px; margin-bottom: 12px;
 }
 .topup-v2-bank-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
@@ -98,10 +98,10 @@
     border-radius: 7px; padding: 6px 14px; font-size: 12px;
     cursor: pointer; transition: all .15s; color: var(--ink);
 }
-.topup-v2-copy:hover { background: #f3f4f6; }
+.topup-v2-copy:hover { background: var(--gray-100); }
 .topup-v2-warn {
-    background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
-    padding: 10px 13px; font-size: 12px; color: #92400e; line-height: 1.5;
+    background: var(--amber-50); border: 1px solid var(--amber-200); border-radius: 8px;
+    padding: 10px 13px; font-size: 12px; color: var(--amber-800); line-height: 1.5;
 }
 .topup-v2-drop {
     border: 2px dashed var(--line); border-radius: 10px;
@@ -111,9 +111,9 @@
     align-items: center; gap: 8px;
 }
 .topup-v2-drop:hover, .topup-v2-drop.drag-over {
-    border-color: var(--brand, #111); background: #f9fafb;
+    border-color: var(--brand, #111); background: var(--gray-50);
 }
-.topup-v2-drop.has-file { border-color: #10b981; background: #f0fdf4; color: #065f46; }
+.topup-v2-drop.has-file { border-color: var(--emerald-500); background: var(--green-50); color: var(--emerald-800); }
 .topup-v2-drop-text { font-size: 13px; }
 .topup-v2-foot {
     display: flex; gap: 8px; justify-content: flex-end;

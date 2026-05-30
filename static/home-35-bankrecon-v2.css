@@ -19,14 +19,14 @@
   transition: border-color .15s, background .15s;
 }
 .brv2-upload-zone.drag-over {
-  border-color: var(--accent); background: #eff6ff;
+  border-color: var(--accent); background: var(--blue-50);
 }
 .brv2-zone-icon {
   width: 36px; height: 36px; border-radius: 8px;
-  background: #d1fae5; color: #065f46;
+  background: var(--emerald-100); color: var(--emerald-800);
   display: flex; align-items: center; justify-content: center;
 }
-.brv2-zone-icon-gl { background: #dbeafe; color: #1e40af; }
+.brv2-zone-icon-gl { background: var(--blue-100); color: var(--blue-800); }
 .brv2-zone-body { flex: 1; }
 .brv2-zone-title { font-size: 13px; font-weight: 600; color: var(--ink, #111); }
 .brv2-zone-hint { font-size: 11px; color: var(--ink-3, #999); margin-top: 2px; }
@@ -49,7 +49,7 @@
   margin-left: auto; background: none; border: none; cursor: pointer;
   color: var(--ink-3); padding: 0 2px; font-size: 13px; line-height: 1;
 }
-.brv2-file-chip-remove:hover { color: #ef4444; }
+.brv2-file-chip-remove:hover { color: var(--red-500); }
 
 /* Account row */
 .brv2-acct-row {
@@ -88,8 +88,8 @@
 }
 .brv2-progress-label { font-size: 12px; color: var(--ink-3); }
 .brv2-error {
-  font-size: 12px; color: var(--danger); background: #fef2f2;
-  border: 1px solid #fecaca; border-radius: 6px; padding: 6px 10px;
+  font-size: 12px; color: var(--danger); background: var(--red-50);
+  border: 1px solid var(--red-200); border-radius: 6px; padding: 6px 10px;
   flex: 1;
 }
 
@@ -107,16 +107,16 @@
 }
 .brv2-card-num { font-size: 22px; font-weight: 700; line-height: 1.1; }
 .brv2-card-lbl { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
-.brv2-card-match { border-color: #86efac; background: #f0fdf4; }
+.brv2-card-match { border-color: var(--green-300); background: var(--green-50); }
 .brv2-card-match .brv2-card-num { color: var(--success); }
-.brv2-card-gl { border-color: #c4b5fd; background: #f5f3ff; }
-.brv2-card-gl .brv2-card-num { color: #7c3aed; }
-.brv2-card-stmt { border-color: #93c5fd; background: #eff6ff; }
-.brv2-card-stmt .brv2-card-num { color: #1d4ed8; }
+.brv2-card-gl { border-color: var(--violet-300); background: var(--violet-50); }
+.brv2-card-gl .brv2-card-num { color: var(--violet-600); }
+.brv2-card-stmt { border-color: var(--blue-300); background: var(--blue-50); }
+.brv2-card-stmt .brv2-card-num { color: var(--blue-700); }
 .brv2-card-diff { border-color: var(--line); background: var(--bg); }
-.brv2-card-diff.has-diff { border-color: #fca5a5; background: #fef2f2; }
+.brv2-card-diff.has-diff { border-color: var(--red-300); background: var(--red-50); }
 .brv2-card-diff.has-diff .brv2-card-num { color: var(--danger); }
-.brv2-card-diff.no-diff { border-color: #86efac; background: #f0fdf4; }
+.brv2-card-diff.no-diff { border-color: var(--green-300); background: var(--green-50); }
 .brv2-card-diff.no-diff .brv2-card-num { color: var(--success); }
 
 /* Formula box */
@@ -176,10 +176,10 @@
 
 /* Row status colors */
 .brv2-table tr.matched td { }
-.brv2-table tr.matched-l2 td { background: #fffbeb; }
-.brv2-table tr.matched-l3 td { background: #fff7ed; }
-.brv2-table tr.gl-only td { background: #f5f3ff; }
-.brv2-table tr.stmt-only td { background: #eff6ff; }
+.brv2-table tr.matched-l2 td { background: var(--amber-50); }
+.brv2-table tr.matched-l3 td { background: var(--orange-50); }
+.brv2-table tr.gl-only td { background: var(--violet-50); }
+.brv2-table tr.stmt-only td { background: var(--blue-50); }
 
 /* Status badge */
 .brv2-status-badge {
@@ -187,11 +187,11 @@
   padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600;
   white-space: nowrap;
 }
-.brv2-badge-matched { background: #d1fae5; color: #065f46; }
-.brv2-badge-matched-l2 { background: var(--warn-bg); color: #92400e; }
-.brv2-badge-matched-l3 { background: #ffedd5; color: #9a3412; }
-.brv2-badge-gl-only { background: #ede9fe; color: #5b21b6; }
-.brv2-badge-stmt-only { background: #dbeafe; color: #1e40af; }
+.brv2-badge-matched { background: var(--emerald-100); color: var(--emerald-800); }
+.brv2-badge-matched-l2 { background: var(--warn-bg); color: var(--amber-800); }
+.brv2-badge-matched-l3 { background: var(--orange-100); color: var(--orange-800); }
+.brv2-badge-gl-only { background: var(--violet-100); color: var(--violet-800); }
+.brv2-badge-stmt-only { background: var(--blue-100); color: var(--blue-800); }
 
 /* History section */
 .brv2-history {
@@ -213,7 +213,7 @@
 .brv2-hist-item:hover { background: var(--line-soft); }
 .brv2-hist-bank {
   font-size: 11px; font-weight: 700; color: #fff;
-  background: #334155; border-radius: 4px; padding: 2px 6px;
+  background: var(--slate-700); border-radius: 4px; padding: 2px 6px;
   text-transform: uppercase; min-width: 36px; text-align: center;
 }
 .brv2-hist-info { flex: 1; }
@@ -226,7 +226,7 @@
   background: none; border: none; cursor: pointer; padding: 4px;
   color: var(--ink-3); border-radius: 4px;
 }
-.brv2-hist-del:hover { color: var(--danger); background: #fef2f2; }
+.brv2-hist-del:hover { color: var(--danger); background: var(--red-50); }
 
 /* ── Bank Recon v2 · chips row（文件列表区，位于 vex-drops 下方） ── */
 .brv2-chips-row {

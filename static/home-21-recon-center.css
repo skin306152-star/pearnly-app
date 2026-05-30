@@ -16,7 +16,7 @@
     gap: 14px;
     padding: 18px 20px;
     background: #fff;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gray-200);
     border-radius: 12px;
     cursor: pointer;
     transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
@@ -25,7 +25,7 @@
 .reconcile-stat-card:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
-    border-color: #cbd5e1;
+    border-color: var(--slate-300);
 }
 
 .reconcile-stat-icon {
@@ -46,15 +46,15 @@
 /* 三色调:待对(琥珀)/ 已完成(绿)/ 未匹配(红) */
 .reconcile-stat-card.pending .reconcile-stat-icon {
     background: var(--warn-bg);
-    color: #b45309;
+    color: var(--amber-700);
 }
 .reconcile-stat-card.matched .reconcile-stat-icon {
-    background: #d1fae5;
-    color: #047857;
+    background: var(--emerald-100);
+    color: var(--emerald-700);
 }
 .reconcile-stat-card.unmatched .reconcile-stat-icon {
     background: var(--danger-bg);
-    color: #b91c1c;
+    color: var(--red-700);
 }
 
 .reconcile-stat-body {
@@ -67,25 +67,25 @@
 .reconcile-stat-num {
     font-size: 28px;
     font-weight: 700;
-    color: #0f172a;
+    color: var(--slate-900);
     line-height: 1.1;
     letter-spacing: -.01em;
     font-variant-numeric: tabular-nums;
 }
 
-.reconcile-stat-card.pending .reconcile-stat-num   { color: #b45309; }
-.reconcile-stat-card.matched .reconcile-stat-num   { color: #047857; }
-.reconcile-stat-card.unmatched .reconcile-stat-num { color: #b91c1c; }
+.reconcile-stat-card.pending .reconcile-stat-num   { color: var(--amber-700); }
+.reconcile-stat-card.matched .reconcile-stat-num   { color: var(--emerald-700); }
+.reconcile-stat-card.unmatched .reconcile-stat-num { color: var(--red-700); }
 
 /* 0 数据时数字显示「-」· 颜色调淡(防误读为「全核完了」) */
 .reconcile-stat-num.is-empty {
-    color: #cbd5e1 !important;
+    color: var(--slate-300) !important;
     font-weight: 500;
 }
 
 .reconcile-stat-label {
     font-size: 13px;
-    color: #64748b;
+    color: var(--slate-500);
     font-weight: 500;
 }
 
@@ -101,11 +101,11 @@
 
 .reconcile-last-activity {
     font-size: 12px;
-    color: #94a3b8;
+    color: var(--slate-400);
 }
 
 .reconcile-last-activity.has-data {
-    color: #475569;
+    color: var(--slate-600);
 }
 
 .reconcile-error {
@@ -113,10 +113,10 @@
     align-items: center;
     gap: 10px;
     padding: 12px 14px;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
+    background: var(--red-50);
+    border: 1px solid var(--red-200);
     border-radius: 10px;
-    color: #b91c1c;
+    color: var(--red-700);
     font-size: 13px;
     margin: 8px 0;
 }
@@ -139,7 +139,7 @@
     text-align: center;
     padding: 56px 24px;
     background: #fff;
-    border: 1px dashed #cbd5e1;
+    border: 1px dashed var(--slate-300);
     border-radius: 14px;
     margin-top: 12px;
 }
@@ -148,11 +148,11 @@
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    background: #f1f5f9;
+    background: var(--slate-100);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #94a3b8;
+    color: var(--slate-400);
     margin-bottom: 16px;
 }
 
@@ -164,13 +164,13 @@
 .reconcile-empty-title {
     font-size: 16px;
     font-weight: 600;
-    color: #0f172a;
+    color: var(--slate-900);
     margin-bottom: 6px;
 }
 
 .reconcile-empty-hint {
     font-size: 13px;
-    color: #64748b;
+    color: var(--slate-500);
     line-height: 1.6;
     max-width: 420px;
     margin-bottom: 20px;
@@ -203,7 +203,7 @@
 /* v4.10.4 · 对账中心 L2 区域分隔 + 上传卡片 */
 .rc-panel-divider {
     height: 0.5px;
-    background: #E5E7EB;
+    background: var(--gray-200);
     margin: 12px 0 20px;
 }
 

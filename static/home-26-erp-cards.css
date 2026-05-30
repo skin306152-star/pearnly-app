@@ -28,7 +28,7 @@
 }
 .erp-connect-card {
     background: #fff;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gray-200);
     border-radius: 10px;
     padding: 16px;
 }
@@ -42,7 +42,7 @@
 .erp-cc-title {
     font-size: 16px;
     font-weight: 600;
-    color: #0f172a;
+    color: var(--slate-900);
 }
 .erp-cc-badge {
     display: inline-block;
@@ -53,29 +53,29 @@
 }
 .erp-cc-badge.green {
     background: var(--success-bg);
-    color: #166534;
+    color: var(--green-800);
 }
 .erp-cc-badge.gray {
-    background: #f1f5f9;
-    color: #64748b;
+    background: var(--slate-100);
+    color: var(--slate-500);
 }
 .erp-cc-body {
     font-size: 13px;
-    color: #475569;
+    color: var(--slate-600);
     line-height: 1.6;
 }
 .erp-cc-empty {
-    color: #94a3b8;
+    color: var(--slate-400);
     padding: 8px 0;
 }
 .erp-cc-meta {
-    color: #64748b;
+    color: var(--slate-500);
     font-size: 12px;
     margin-bottom: 8px;
 }
 .erp-cc-org-label {
     font-weight: 500;
-    color: #0f172a;
+    color: var(--slate-900);
     margin: 6px 0 4px;
     font-size: 13px;
 }
@@ -100,7 +100,7 @@
     cursor: pointer;
 }
 .erp-cc-org-name {
-    color: #0f172a;
+    color: var(--slate-900);
     font-size: 13px;
     word-break: break-word;
 }
@@ -108,7 +108,7 @@
     display: flex;
     gap: 8px;
     margin-top: 8px;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid var(--slate-100);
     padding-top: 10px;
 }
 
@@ -349,15 +349,15 @@
     margin-left: 4px;
 }
 .export-dd-badge.badge-rec {
-    background: #dbeafe;
+    background: var(--blue-100);
     color: var(--ink);
 }
 .export-dd-badge.badge-new {
     background: var(--success-bg);
-    color: #166534;
+    color: var(--green-800);
 }
 .export-dd-badge.badge-soon {
-    background: #f3f4f6;
+    background: var(--gray-100);
     color: var(--ink-3);
     font-weight: 500;
 }
@@ -392,7 +392,7 @@
     cursor: not-allowed;
 }
 .report-tpl-badge.report-tpl-badge-soon {
-    background: #f3f4f6;
+    background: var(--gray-100);
     color: var(--ink-3);
 }
 
@@ -431,12 +431,12 @@
 }
 
 .erp-cc-mrerp-test-pass {
-    color: #15803d;
+    color: var(--green-700);
     font-weight: 500;
 }
 
 .erp-cc-mrerp-test-fail {
-    color: #b91c1c;
+    color: var(--red-700);
     font-weight: 500;
 }
 
@@ -465,15 +465,15 @@
 }
 
 .mrerp-cred-test-result.ok {
-    background: #ECFDF5;
-    border: 1px solid #A7F3D0;
-    color: #065F46;
+    background: var(--emerald-50);
+    border: 1px solid var(--emerald-200);
+    color: var(--emerald-800);
 }
 
 .mrerp-cred-test-result.err {
-    background: #FEF2F2;
-    border: 1px solid #FECACA;
-    color: #991B1B;
+    background: var(--red-50);
+    border: 1px solid var(--red-200);
+    color: var(--red-800);
 }
 
 .mrerp-cred-test-result-icon {

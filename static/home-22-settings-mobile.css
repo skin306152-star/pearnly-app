@@ -74,8 +74,8 @@ body.sidebar-collapsed .nav-divider { margin: 8px 6px; }
     background: var(--bg);
 }
 .integration-row.connected {
-    border-color: #86efac;
-    background: #f0fdf4;
+    border-color: var(--green-300);
+    background: var(--green-50);
 }
 .int-icon {
     width: 36px;
@@ -433,7 +433,7 @@ body.sidebar-collapsed .nav-collapsible.collapsed .nav-sub { max-height: 800px; 
 .profile-form .form-row.form-row-inline > label {
     grid-area: label;
     margin: 0;
-    color: var(--text-mute, #6b7280);
+    color: var(--text-mute, var(--gray-500));
     font-size: 13px;
     font-weight: 500;
     text-align: left;
@@ -447,7 +447,7 @@ body.sidebar-collapsed .nav-collapsible.collapsed .nav-sub { max-height: 800px; 
     grid-area: hint;
     margin: 2px 0 0 156px;
     font-size: 12px;
-    color: #9ca3af;
+    color: var(--gray-400);
 }
 @media (max-width: 600px) {
     .profile-form .form-row.form-row-inline {

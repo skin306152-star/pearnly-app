@@ -6,8 +6,8 @@
     display: flex; align-items: center; gap: 10px;
     padding: 10px 16px;
     background: var(--warn-bg);
-    color: #92400e;
-    border-bottom: 1px solid #fcd34d;
+    color: var(--amber-800);
+    border-bottom: 1px solid var(--amber-300);
     font-size: 13px; line-height: 1.4;
 }
 .chrome-only-banner-icon {
@@ -20,8 +20,8 @@
 .chrome-only-banner-close {
     flex-shrink: 0;
     background: #fff;
-    border: 1px solid #fcd34d;
-    color: #92400e;
+    border: 1px solid var(--amber-300);
+    color: var(--amber-800);
     padding: 5px 12px;
     border-radius: 6px;
     cursor: pointer;
@@ -58,9 +58,9 @@
     height: 36px;
     display: flex; align-items: center; gap: 10px;
     padding: 0 16px;
-    background: #fef2f2;
-    color: #991b1b;
-    border-bottom: 1px solid #fecaca;
+    background: var(--red-50);
+    color: var(--red-800);
+    border-bottom: 1px solid var(--red-200);
     font-size: 13px; line-height: 1.4;
     font-weight: 500;
     box-sizing: border-box;
@@ -87,11 +87,11 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
 /* 文件夹监听辅助提示行(子文件夹递归) · 比 keep-open warn 更柔和 */
 .folder-warn-row.folder-info-soft {
     background: var(--bg);
-    color: #075985;
-    border-color: #bae6fd;
+    color: var(--sky-800);
+    border-color: var(--sky-200);
 }
 .folder-warn-row.folder-info-soft svg {
-    color: #0ea5e9;
+    color: var(--sky-500);
 }
 
 /* ============================================================
@@ -99,11 +99,11 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
  * ============================================================ */
 .erp-log-row.retrying {
     /* 重试中:橙色调 · 区分于成功(绿)/ 失败(红) */
-    background: linear-gradient(to right, #fffbeb 0%, #fff 30%);
-    border-left: 3px solid #f59e0b;
+    background: linear-gradient(to right, var(--amber-50) 0%, #fff 30%);
+    border-left: 3px solid var(--amber-500);
 }
 .erp-log-row.retrying .log-status {
-    color: #b45309;
+    color: var(--amber-700);
     font-size: 16px;
     display: inline-block;
     animation: erp-retry-spin 2s linear infinite;
@@ -119,15 +119,15 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
     border-radius: 4px;
     font-size: 11px;
     background: var(--warn-bg);
-    color: #92400e;
-    border: 1px solid #fcd34d;
+    color: var(--amber-800);
+    border: 1px solid var(--amber-300);
     margin-left: 6px;
     white-space: nowrap;
 }
 .log-retry-chip.exhausted {
     background: var(--danger-bg);
-    color: #991b1b;
-    border-color: #fca5a5;
+    color: var(--red-800);
+    border-color: var(--red-300);
 }
 
 /* ============================================================
@@ -146,15 +146,15 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
 /* 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 推送日志表头行
    · 全选 checkbox + 列标签 · 区分于数据 row */
 .erp-log-row-header {
-    background: #f9fafb;
-    color: #6b7280;
+    background: var(--gray-50);
+    color: var(--gray-500);
     font-size: 12px;
     font-weight: 500;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--gray-200);
     cursor: default !important;
 }
 .erp-log-row-header:hover {
-    background: #f9fafb !important;
+    background: var(--gray-50) !important;
 }
 .erp-log-cb-all {
     cursor: pointer;
@@ -167,11 +167,11 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
 .btn-danger-ghost {
     color: var(--danger);
     background: transparent;
-    border: 1px solid #fecaca;
+    border: 1px solid var(--red-200);
 }
 .btn-danger-ghost:hover {
-    background: #fef2f2;
-    border-color: #fca5a5;
+    background: var(--red-50);
+    border-color: var(--red-300);
 }
 .erp-logs-batch-count {
     flex: 1;

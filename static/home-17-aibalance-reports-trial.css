@@ -46,7 +46,7 @@
     color: var(--ink);
 }
 .billing-card-actions .btn-primary.btn-sm:hover {
-    background: #f3f4f6;
+    background: var(--gray-100);
 }
 .billing-card-actions .btn-sm svg { width: 12px; height: 12px; }
 
@@ -114,15 +114,15 @@
 }
 .billing-accuracy-badge.good {
     background: rgba(16, 185, 129, 0.25);
-    color: #6ee7b7;
+    color: var(--emerald-300);
 }
 .billing-accuracy-badge.fair {
     background: rgba(251, 191, 36, 0.25);
-    color: #fcd34d;
+    color: var(--amber-300);
 }
 .billing-accuracy-badge.poor {
     background: rgba(239, 68, 68, 0.25);
-    color: #fca5a5;
+    color: var(--red-300);
 }
 
 .billing-modal-help {
@@ -188,20 +188,20 @@
 .report-modal-head {
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 22px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--gray-200);
 }
 .report-modal-title {
-    font-size: 17px; font-weight: 600; color: #0f172a;
+    font-size: 17px; font-weight: 600; color: var(--slate-900);
 }
 .report-modal-close-x {
     width: 32px; height: 32px;
     display: flex; align-items: center; justify-content: center;
     border: none; background: transparent;
-    color: #64748b; cursor: pointer;
+    color: var(--slate-500); cursor: pointer;
     border-radius: 8px;
     transition: background 0.15s;
 }
-.report-modal-close-x:hover { background: #f1f5f9; color: #0f172a; }
+.report-modal-close-x:hover { background: var(--slate-100); color: var(--slate-900); }
 .report-modal-close-x svg { width: 18px; height: 18px; }
 .report-modal-body {
     padding: 18px 22px;
@@ -212,7 +212,7 @@
     margin-bottom: 18px;
 }
 .report-section-title {
-    font-size: 13px; font-weight: 600; color: #475569;
+    font-size: 13px; font-weight: 600; color: var(--slate-600);
     margin-bottom: 10px;
     text-transform: none;
 }
@@ -220,20 +220,20 @@
     display: flex; flex-direction: column; gap: 8px;
 }
 .report-tpl-loading {
-    color: #94a3b8; font-size: 13px;
+    color: var(--slate-400); font-size: 13px;
     padding: 24px; text-align: center;
 }
 .report-tpl-item {
     display: flex; align-items: flex-start; gap: 12px;
     padding: 12px 14px;
-    border: 1.5px solid #e5e7eb;
+    border: 1.5px solid var(--gray-200);
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.15s;
     background: #fff;
 }
 .report-tpl-item:hover {
-    border-color: #cbd5e1;
+    border-color: var(--slate-300);
     background: var(--bg);
 }
 .report-tpl-item input[type="radio"] {
@@ -251,7 +251,7 @@
 }
 .report-tpl-content { flex: 1; min-width: 0; }
 .report-tpl-name {
-    font-size: 14px; font-weight: 600; color: #0f172a;
+    font-size: 14px; font-weight: 600; color: var(--slate-900);
     display: flex; align-items: center; gap: 8px;
     flex-wrap: wrap;
 }
@@ -259,13 +259,13 @@
     display: inline-flex; align-items: center;
     padding: 2px 8px;
     background: var(--warn-bg);
-    color: #92400e;
+    color: var(--amber-800);
     font-size: 11px; font-weight: 600;
     border-radius: 10px;
 }
 .report-tpl-desc {
     margin-top: 4px;
-    font-size: 12px; color: #64748b;
+    font-size: 12px; color: var(--slate-500);
     line-height: 1.5;
 }
 .report-period-list {
@@ -274,13 +274,13 @@
 .report-period-item {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 7px 14px;
-    border: 1.5px solid #e5e7eb;
+    border: 1.5px solid var(--gray-200);
     border-radius: 999px;
     cursor: pointer;
-    font-size: 13px; color: #334155;
+    font-size: 13px; color: var(--slate-700);
     transition: all 0.15s;
 }
-.report-period-item:hover { border-color: #cbd5e1; background: var(--bg); }
+.report-period-item:hover { border-color: var(--slate-300); background: var(--bg); }
 .report-period-item input[type="radio"] {
     accent-color: var(--ink);
     margin: 0;
@@ -294,16 +294,16 @@
 .report-lang-hint {
     display: flex; align-items: center; gap: 8px;
     padding: 10px 12px;
-    background: #f1f5f9;
+    background: var(--slate-100);
     border-radius: 8px;
-    font-size: 12px; color: #475569;
+    font-size: 12px; color: var(--slate-600);
 }
 .report-lang-hint svg { width: 16px; height: 16px; flex-shrink: 0; }
 .report-modal-foot {
     display: flex; align-items: center; justify-content: flex-end;
     gap: 10px;
     padding: 16px 22px;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--gray-200);
     background: #fafafa;
 }
 .report-modal-foot .btn { min-width: 96px; }
@@ -355,9 +355,9 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     .plan-banner { left: 0; }
 }
 .plan-banner-info { background: var(--bg); color: var(--ink); }
-.plan-banner-success { background: #ecfdf5; color: #065f46; }
-.plan-banner-warn { background: var(--warn-bg); color: #92400e; }
-.plan-banner-danger { background: var(--danger-bg); color: #991b1b; }
+.plan-banner-success { background: var(--emerald-50); color: var(--emerald-800); }
+.plan-banner-warn { background: var(--warn-bg); color: var(--amber-800); }
+.plan-banner-danger { background: var(--danger-bg); color: var(--red-800); }
 .plan-banner-btn {
     padding: 4px 12px;
     border-radius: 999px;
@@ -402,18 +402,18 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 .upg-head {
     display: flex; align-items: flex-start; justify-content: space-between;
     padding: 20px 24px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--gray-200);
 }
-.upg-title { font-size: 18px; font-weight: 700; color: #0f172a; }
-.upg-sub { font-size: 13px; color: #64748b; margin-top: 4px; }
+.upg-title { font-size: 18px; font-weight: 700; color: var(--slate-900); }
+.upg-sub { font-size: 13px; color: var(--slate-500); margin-top: 4px; }
 .upg-close {
     width: 32px; height: 32px;
     border: none; background: transparent;
-    color: #64748b; cursor: pointer;
+    color: var(--slate-500); cursor: pointer;
     border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
 }
-.upg-close:hover { background: #f1f5f9; color: #0f172a; }
+.upg-close:hover { background: var(--slate-100); color: var(--slate-900); }
 .upg-close svg { width: 18px; height: 18px; }
 .upg-body { padding: 22px 24px; overflow-y: auto; flex: 1; }
 
@@ -435,19 +435,19 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 }
 /* v111.2 · 终身买断卡片(紫色突出) */
 .upg-card-lifetime {
-    border-color: #8b5cf6 !important;
-    background: linear-gradient(180deg, #faf5ff 0%, #fff 60%);
+    border-color: var(--violet-500) !important;
+    background: linear-gradient(180deg, var(--purple-50) 0%, #fff 60%);
 }
 .upg-card-lifetime:hover {
-    border-color: #7c3aed !important;
+    border-color: var(--violet-600) !important;
     box-shadow: 0 8px 20px rgba(139,92,246,.18) !important;
 }
-.upg-card-lifetime .upg-card-price { color: #7c3aed; }
+.upg-card-lifetime .upg-card-price { color: var(--violet-600); }
 .upg-card-rec-life {
-    background: #8b5cf6 !important;
+    background: var(--violet-500) !important;
 }
 .upg-card-equiv {
-    font-size: 12px; color: #94a3b8;
+    font-size: 12px; color: var(--slate-400);
     margin: -8px 0 12px;
 }
 /* v111.2 · 付款页面卡片化收款信息 */
@@ -459,27 +459,27 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     border-radius: 10px;
 }
 .pay-plan-name {
-    font-size: 13px; color: #64748b; margin-bottom: 4px;
+    font-size: 13px; color: var(--slate-500); margin-bottom: 4px;
 }
 .pay-plan-summary .pay-amount-big {
     font-size: 32px; font-weight: 800; color: var(--ink);
 }
 .pay-bank-card {
     background: #fff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--slate-200);
     border-radius: 10px;
     padding: 14px;
     display: flex; flex-direction: column; gap: 10px;
 }
 .pay-bank-name {
-    font-size: 14px; font-weight: 600; color: #0f172a;
+    font-size: 14px; font-weight: 600; color: var(--slate-900);
     display: flex; align-items: center; gap: 8px;
 }
 .pay-bank-name svg { width: 18px; height: 18px; }
 .pay-bank-row { display: flex; align-items: center; gap: 8px; }
-.pay-bank-row svg { width: 16px; height: 16px; color: #64748b; flex-shrink: 0; }
-.pay-bank-label { font-size: 12px; color: #64748b; min-width: 70px; }
-.pay-bank-value { font-size: 15px; font-weight: 600; color: #0f172a; flex: 1; }
+.pay-bank-row svg { width: 16px; height: 16px; color: var(--slate-500); flex-shrink: 0; }
+.pay-bank-label { font-size: 12px; color: var(--slate-500); min-width: 70px; }
+.pay-bank-value { font-size: 15px; font-weight: 600; color: var(--slate-900); flex: 1; }
 .pay-copyable {
     cursor: pointer;
     padding: 4px 8px;
@@ -487,11 +487,11 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     border-radius: 6px;
     transition: all .15s;
 }
-.pay-copyable:hover { background: #dbeafe; }
+.pay-copyable:hover { background: var(--blue-100); }
 .pay-copyable::after {
     content: '⎘';
     margin-left: 6px;
-    color: #94a3b8;
+    color: var(--slate-400);
     font-size: 13px;
 }
 .pay-line-id {
@@ -504,16 +504,16 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     margin-left: 6px;
 }
 .pay-lifetime-key {
-    background: #faf5ff;
+    background: var(--purple-50);
     border-radius: 10px;
     padding: 14px;
-    border-left: 3px solid #8b5cf6;
+    border-left: 3px solid var(--violet-500);
 }
 .pay-key-hint {
-    font-size: 12px; color: #6b7280;
+    font-size: 12px; color: var(--gray-500);
     margin-bottom: 8px;
 }
-.pay-key-hint a { color: #7c3aed; text-decoration: underline; }
+.pay-key-hint a { color: var(--violet-600); text-decoration: underline; }
 
 /* v111.3 · 付款截图 lightbox */
 .slip-overlay {
@@ -553,7 +553,7 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 
 /* v111.3 · 用户详情抽屉快速操作区 */
 .adm-drawer-actions-section {
-    border-top: 2px solid #f1f5f9;
+    border-top: 2px solid var(--slate-100);
     margin-top: 8px;
     padding-top: 18px;
 }
@@ -569,7 +569,7 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 .upg-card {
     position: relative;
     padding: 22px 18px;
-    border: 2px solid #e5e7eb;
+    border: 2px solid var(--gray-200);
     border-radius: 12px;
     cursor: pointer;
     transition: all .18s;
@@ -593,10 +593,10 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     letter-spacing: .3px;
 }
 .upg-card-name {
-    font-size: 22px; font-weight: 700; color: #0f172a;
+    font-size: 22px; font-weight: 700; color: var(--slate-900);
 }
 .upg-card-tag {
-    font-size: 12px; color: #64748b; margin: 4px 0 14px;
+    font-size: 12px; color: var(--slate-500); margin: 4px 0 14px;
 }
 .upg-card-price {
     font-size: 30px; font-weight: 800; color: var(--ink);
@@ -604,7 +604,7 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
     margin-bottom: 14px;
 }
 .upg-card-price-unit {
-    font-size: 13px; font-weight: 500; color: #64748b; margin-left: 6px;
+    font-size: 13px; font-weight: 500; color: var(--slate-500); margin-left: 6px;
 }
 .upg-card-feats {
     list-style: none; padding: 0; margin: 0 0 18px;
@@ -612,12 +612,12 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 .upg-card-feats li {
     padding: 6px 0 6px 22px;
     position: relative;
-    font-size: 13px; color: #334155;
+    font-size: 13px; color: var(--slate-700);
 }
 .upg-card-feats li::before {
     content: '✓';
     position: absolute; left: 0; top: 6px;
-    color: #10b981;
+    color: var(--emerald-500);
     font-weight: 700;
 }
 .upg-pick-btn { width: 100%; padding: 11px; }
@@ -625,12 +625,12 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 /* ===== 付款表单 ===== */
 .upg-back-btn {
     background: none; border: none;
-    color: #64748b; cursor: pointer;
+    color: var(--slate-500); cursor: pointer;
     font-size: 13px;
     padding: 0; margin-bottom: 12px;
     font-family: inherit;
 }
-.upg-back-btn:hover { color: #0f172a; }
+.upg-back-btn:hover { color: var(--slate-900); }
 .pay-amount-big {
     text-align: center;
     font-size: 32px; font-weight: 800;
@@ -643,35 +643,35 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 .pay-section {
     margin-bottom: 18px;
     padding: 14px 16px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gray-200);
     border-radius: 10px;
 }
 .pay-section-title {
-    font-size: 13px; font-weight: 600; color: #475569;
+    font-size: 13px; font-weight: 600; color: var(--slate-600);
     margin-bottom: 10px;
 }
 .pay-bank-row {
     display: flex; align-items: center; gap: 10px;
     padding: 8px 0;
-    font-size: 14px; color: #0f172a;
+    font-size: 14px; color: var(--slate-900);
     font-family: 'Courier New', monospace;
     font-weight: 600;
 }
-.pay-bank-row svg { width: 18px; height: 18px; color: #64748b; flex-shrink: 0; }
+.pay-bank-row svg { width: 18px; height: 18px; color: var(--slate-500); flex-shrink: 0; }
 .pay-pick-btn {
     width: 100%; padding: 11px;
     margin-bottom: 10px;
     display: flex; align-items: center; justify-content: center; gap: 8px;
-    border: 1.5px dashed #cbd5e1;
+    border: 1.5px dashed var(--slate-300);
     background: var(--bg);
-    color: #475569;
+    color: var(--slate-600);
 }
 .pay-pick-btn:hover { border-color: var(--ink); color: var(--ink); background: var(--bg); }
 .pay-pick-btn svg { width: 16px; height: 16px; }
 .pay-input {
     width: 100%;
     padding: 10px 12px;
-    border: 1.5px solid #e5e7eb;
+    border: 1.5px solid var(--gray-200);
     border-radius: 8px;
     font-size: 13px;
     margin-bottom: 8px;
@@ -681,7 +681,7 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 .pay-submit-btn { width: 100%; padding: 12px; font-size: 15px; }
 .pay-line-contact {
     text-align: center;
-    font-size: 12px; color: #64748b;
+    font-size: 12px; color: var(--slate-500);
     margin-top: 14px;
 }
 
@@ -692,7 +692,7 @@ body.sidebar-collapsed .plan-banner { left: var(--sidebar-w-collapsed); }
 .line-benefits li {
     padding: 8px 0 8px 26px;
     position: relative;
-    font-size: 14px; color: #334155;
+    font-size: 14px; color: var(--slate-700);
     line-height: 1.5;
 }
 .line-benefits li::before {

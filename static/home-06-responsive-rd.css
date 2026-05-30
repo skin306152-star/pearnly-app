@@ -50,27 +50,27 @@
     padding: 3px 8px;
     font-size: 12px;
     font-weight: 500;
-    color: #4b5563;
-    background: #f3f4f6;
-    border: 1px solid #e5e7eb;
+    color: var(--gray-600);
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s;
     line-height: 1;
 }
 .rd-btn:hover {
-    background: #e5e7eb;
-    color: #1f2937;
-    border-color: #d1d5db;
+    background: var(--gray-200);
+    color: var(--gray-800);
+    border-color: var(--gray-300);
 }
 .rd-btn svg {
     width: 12px;
     height: 12px;
 }
 .rd-btn-verify:hover {
-    background: #ecfdf5;
-    color: #047857;
-    border-color: #a7f3d0;
+    background: var(--emerald-50);
+    color: var(--emerald-700);
+    border-color: var(--emerald-200);
 }
 .rd-btn-sync:hover {
     background: var(--bg);
@@ -83,17 +83,17 @@
     display: inline-flex;
     align-items: center;
     padding: 3px 6px;
-    color: #9ca3af;
+    color: var(--gray-400);
     background: transparent;
-    border: 1px dashed #d1d5db;
+    border: 1px dashed var(--gray-300);
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s;
 }
 .rd-btn-locked:hover {
-    color: #f59e0b;
-    border-color: #fbbf24;
-    background: #fffbeb;
+    color: var(--amber-500);
+    border-color: var(--amber-400);
+    background: var(--amber-50);
 }
 .rd-btn-locked svg {
     width: 12px;
@@ -110,8 +110,8 @@
     padding: 0 4px;
     min-height: 16px;
 }
-.rd-status.loading { color: #6b7280; }
-.rd-status.valid   { color: #059669; }
+.rd-status.loading { color: var(--gray-500); }
+.rd-status.valid   { color: var(--emerald-600); }
 .rd-status.invalid { color: var(--danger); }
 .rd-status.error   { color: var(--warn); }
 .rd-status svg {
@@ -155,19 +155,19 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--gray-200);
 }
 .rd-modal-head h3 {
     margin: 0;
     font-size: 15px;
     font-weight: 600;
-    color: #111827;
+    color: var(--gray-900);
 }
 .rd-modal-close {
     background: none;
     border: none;
     font-size: 22px;
-    color: #6b7280;
+    color: var(--gray-500);
     cursor: pointer;
     padding: 0;
     width: 28px;
@@ -176,8 +176,8 @@
     line-height: 1;
 }
 .rd-modal-close:hover {
-    background: #f3f4f6;
-    color: #111827;
+    background: var(--gray-100);
+    color: var(--gray-900);
 }
 .rd-modal-body {
     padding: 16px 20px;
@@ -190,21 +190,21 @@
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 20px;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--gray-200);
 }
 .rd-modal-btn {
     padding: 8px 16px;
     font-size: 13px;
     font-weight: 500;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--gray-300);
     background: #fff;
-    color: #374151;
+    color: var(--gray-700);
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s;
 }
 .rd-modal-btn:hover {
-    background: #f9fafb;
+    background: var(--gray-50);
 }
 .rd-modal-btn.primary {
     background: var(--ink);
@@ -222,47 +222,47 @@
     gap: 10px;
     align-items: center;
     padding: 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gray-200);
     border-radius: 8px;
     margin-bottom: 8px;
     cursor: pointer;
     transition: background 0.15s;
 }
 .rd-diff-row:hover {
-    background: #f9fafb;
+    background: var(--gray-50);
 }
 .rd-diff-row input[type="checkbox"] {
     cursor: pointer;
 }
 .rd-diff-label {
     font-size: 12px;
-    color: #6b7280;
+    color: var(--gray-500);
     font-weight: 500;
 }
 .rd-diff-col-label {
     font-size: 10px;
-    color: #9ca3af;
+    color: var(--gray-400);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-bottom: 2px;
 }
 .rd-diff-val {
     font-size: 13px;
-    color: #374151;
+    color: var(--gray-700);
     line-height: 1.4;
     word-break: break-word;
 }
 .rd-diff-current .rd-diff-val {
-    color: #6b7280;
+    color: var(--gray-500);
     text-decoration: line-through;
-    text-decoration-color: #fca5a5;
+    text-decoration-color: var(--red-300);
 }
 .rd-diff-official .rd-diff-val {
-    color: #059669;
+    color: var(--emerald-600);
     font-weight: 500;
 }
 .rd-diff-arrow {
-    color: #9ca3af;
+    color: var(--gray-400);
     font-size: 14px;
     text-align: center;
 }
@@ -272,8 +272,8 @@
     align-items: center;
     gap: 10px;
     padding: 18px;
-    background: #ecfdf5;
-    color: #065f46;
+    background: var(--emerald-50);
+    color: var(--emerald-800);
     border-radius: 8px;
     font-size: 13px;
 }
@@ -285,10 +285,10 @@
 .rd-modal-extra {
     margin-top: 10px;
     padding: 10px 12px;
-    background: #f9fafb;
+    background: var(--gray-50);
     border-radius: 6px;
     font-size: 12px;
-    color: #6b7280;
+    color: var(--gray-500);
 }
 
 /* 窄屏:堆叠显示 */

@@ -28,8 +28,8 @@
 
 | # | 结果 | 真实浏览器实测证据(主控 2026-05-30) | 真因 | 验收 |
 |---|---|---|---|---|
-| A2 | **忘记密码必须真能点出弹窗** | 实点 `#cpw-forgot-link`:`linkCount=1` 但 `linkVisible=false` → `clickResult=not-attempted`(不可见点不到)→ `overlayAfter=0`(弹窗从不出现)·console 无报错。上方"MODAL=true 已确认"是**假的**。 | `.cpw-forgot-link` 类**全项目无任何 CSS 定义**(grep 空)→ 渲染成无样式裸 button,不可见/点不到。**委托 JS 没错·错在 CSS 整块丢失**(疑 C3/home.css 拆分时 .cpw-* 样式漏迁)。 | 真浏览器:点链接→overlay 出现且 visible;Zihao 肉眼点一次能弹 |
-| A3 | **改密输入框符合设计语言** | `#cpw-old` 计算样式 `borderRadius:0px · border:2px inset rgb(118,118,118) · padding:0px` = 浏览器**原生默认裸框**,与全站圆角 pill 输入框(.form-input-pill)完全不一致。 | 同上:`.cpw-input` 类**全项目无 CSS 定义** → 裸 input。 | 真浏览器:三框 borderRadius/border/padding 与全站输入框一致 |
+| A2 | ✅**主控真浏览器复验通过(2026-05-31 00:xx)** | ~~原:link 不可见点不到~~ → B `95b7b4e` restore `.cpw-*` CSS 后,**主控亲验**(pearnly_e2e_1·openSettingsModal 开设置→切 security tab→实点):`#cpw-forgot-link` visible=true·textDecoration=underline·click=true·`#cpw-forgot-overlay` 真弹出(重置密码弹窗+邮箱框+蓝色发邮件按钮·**人眼截图确认**)。 | `.cpw-forgot-link` CSS C2 拆 home.css 时整块漏迁→已从 `98f184c~1` restore 到 home-30-settings-modal.css。 | ✅主控 isVisible+点击出弹窗已过(非grep) |
+| A3 | ✅**主控真浏览器复验通过(2026-05-31 00:xx)** | ~~原:0px/inset/118 裸框~~ → 主控亲验 `#cpw-old` getComputedStyle:`borderRadius=9px·solid·rgb(226,232,240)·真渲染420×40`。pill 圆角+设计系统浅灰边,符合设计语言。 | 同 A2:`.cpw-input` 随 .cpw-* 块 restore。 | ✅主控 getComputedStyle 已过(9px/solid/浅灰·非grep) |
 | 1b | **按钮真统一(像素级·非 grep)** | Zihao 截图 + 主控见:**至少 5 页仍黑底动作按钮**——客户管理「设为当前」/异常栏「批量重试·批量删除」/集成推送日志「批量重推·批量删除·取消选择」+ 行内「重试推送·重试」。上方"§2 全站扫描完成·零裸黑动作按钮"是**假结论**(grep 类名 ≠ 渲染成蓝)。 | 这些按钮 DOM 有 class 但计算颜色仍是黑/深底,未真套上 btn-primary 蓝变体,或被后续 CSS 覆盖。 | 真浏览器:每页主操作按钮 `backgroundColor` 实测 = #2563eb 系蓝;Zihao 肉眼每页确认 |
 
 **修法提示(给执行窗口·别再 grep 自欺)**:A2/A3 = 找回/补 `.cpw-input` `.cpw-forgot-link` `.cpw-eye` `.cpw-strength-bar` `.cpw-forgot-*` 的 CSS(查 git 历史 home.css 拆分前的 .cpw-* 段,迁进某 home-*.css 模块);1b = 逐页用真实浏览器抓 computed backgroundColor,黑的改套 btn-primary。**每改一处:playwright 登录实测 isVisible+computedStyle 截图自证 → 再 commit。**

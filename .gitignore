@@ -121,3 +121,6 @@ Power of attorney template.pdf
 # 本地草稿 / 工具目录(从不入库 · 2026-05-30)· Codex 工作目录 + UI 预览草稿
 .codex/
 design-preview/check_ui_consistency.py
+
+# 主控 UI 验真探针产出(本地·勿提交)
+scripts/_mc_verify/

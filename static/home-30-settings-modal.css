@@ -116,6 +116,171 @@ body.settings-modal-open { overflow: hidden; }
 .settings-modal-close:hover { background: var(--gray-100); color: var(--ink); }
 .settings-modal-close svg { width: 18px; height: 18px; }
 
+/* ============================================================ */
+/* v109.4 · 修改密码卡片 + cpw-* · C2 拆 home.css 时整块漏迁     */
+/* 窗口B 从 98f184c~1:home.css 原值 RESTORE · REFACTOR-WB-BTN    */
+/* JS 钩子(改 class 名前先查 src/home/change-password.js):     */
+/*   #cpw-old/#cpw-new/#cpw-confirm/.cpw-eye/#cpw-forgot-link/    */
+/*   .cpw-forgot-* / .cpw-strength-bar / #btn-change-pw          */
+/* ============================================================ */
+.change-pw-form { display: flex; flex-direction: column; gap: 16px; max-width: 420px; }
+.cpw-field { display: flex; flex-direction: column; gap: 6px; }
+.cpw-field label { font-size: 13px; color: #4a5568; font-weight: 500; }
+.cpw-input-wrap { position: relative; }
+.cpw-input {
+    width: 100%;
+    height: 40px;
+    padding: 0 40px 0 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    font-size: 14px;
+    background: #fff;
+    transition: border-color .15s, box-shadow .15s;
+    box-sizing: border-box;
+}
+.cpw-input:focus {
+    outline: none;
+    border-color: #111111;
+    box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12);
+}
+.cpw-eye {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+}
+.cpw-eye:hover { color: #475569; background: #f1f5f9; }
+.cpw-eye svg { width: 16px; height: 16px; }
+.cpw-strength {
+    height: 4px;
+    background: #f1f5f9;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+.cpw-strength-bar {
+    height: 100%;
+    width: 0;
+    background: #e2e8f0;
+    transition: width .2s, background-color .2s;
+}
+.cpw-strength-bar.weak   { background: #ef4444; }
+.cpw-strength-bar.medium { background: #f59e0b; }
+.cpw-strength-bar.strong { background: #10b981; }
+.cpw-hint { font-size: 12px; color: #94a3b8; }
+.cpw-msg {
+    font-size: 13px;
+    min-height: 18px;
+    line-height: 18px;
+}
+.cpw-msg.error { color: #dc2626; }
+.cpw-msg.success { color: #059669; }
+#btn-change-pw {
+    align-self: flex-start;
+    min-width: 140px;
+}
+.cpw-forgot-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+.cpw-forgot-link {
+    background: transparent;
+    border: none;
+    color: #111111;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.cpw-forgot-link:hover { color: #111111; }
+/* 忘记密码 modal · z-index 10000 高于 settings-modal-overlay(9998) */
+.cpw-forgot-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 150ms ease;
+}
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+.cpw-forgot-modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    overflow: hidden;
+    animation: slideUp 200ms ease;
+}
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+.cpw-forgot-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 24px 0;
+}
+.cpw-forgot-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: #0f172a;
+}
+.cpw-forgot-close {
+    width: 28px; height: 28px;
+    border: none; background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #64748b;
+    display: flex; align-items: center; justify-content: center;
+}
+.cpw-forgot-close:hover { background: #f1f5f9; color: #0f172a; }
+.cpw-forgot-close svg { width: 14px; height: 14px; }
+.cpw-forgot-body { padding: 16px 24px 8px; }
+.cpw-forgot-desc {
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.55;
+    margin: 0 0 12px;
+}
+.cpw-forgot-email {
+    background: #f1f5f9;
+    border-radius: 9px;
+    padding: 10px 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: #0f172a;
+    margin-bottom: 12px;
+}
+.cpw-forgot-tip {
+    color: #94a3b8;
+    font-size: 12px;
+    margin: 0;
+    line-height: 1.5;
+}
+.cpw-forgot-msg {
+    margin-top: 12px;
+    font-size: 13px;
+    min-height: 20px;
+}
+.cpw-forgot-msg.success { color: #059669; }
+.cpw-forgot-msg.error { color: #dc2626; }
+.cpw-forgot-foot {
+    padding: 12px 24px 20px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+.cpw-forgot-foot .btn { min-width: 90px; }
+
 /* 手机端 · 全屏 */
 @media (max-width: 768px) {
     .settings-modal-overlay { padding: 0; }

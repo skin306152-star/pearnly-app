@@ -8,6 +8,13 @@
 
 import './home/core.js'; // REFACTOR-C1-home-batch9f · 真核心叶子层(t/escapeHtml/svgIcon/鉴权API🔴/_showSessionRevokedModal🔴/getMax*)· 【必第 1 个】保证 sibling 模块 eval 期 window.t/apiGet 等已就绪
 import './home/core-boot.js'; // REFACTOR-C1-home-batch9f · 真核心编排+引导(applyLang/setupDropdown/routeTo/loadAll/render助手/installNetworkBanner + bootstrap)· 【必第 2 个】紧随 core.js · bootstrap 尾部自执行 · 先于其余 sibling
+import './home/sidebar-nav.js'; // REFACTOR-C1-home-batch9g1 · 侧栏折叠/汉堡/遮罩 + hashchange + nav-item 点击(从 home.js 抽出)
+import './home/integration-drawer.js'; // REFACTOR-C1-home-batch9g1 · 集成顶tab + 集成配置抽屉(window.openIntegrationDrawer 等 · integration-config/page-automation 用)
+import './home/settings-bind.js'; // REFACTOR-C1-home-batch9g1 · 设置页 tab/保存按钮绑定(从 home.js 抽出)
+import './home/engine-poll.js'; // REFACTOR-C1-home-batch9g1 · OCR 引擎就绪轮询(window.startEnginePolling/stopEnginePolling · ocr-recognize 用)
+import './home/drawer-events.js'; // REFACTOR-C1-home-batch9g1 · 识别抽屉事件委托/关闭/ESC(从 home.js 抽出)
+import './home/misc-bindings.js'; // REFACTOR-C1-home-batch9g1 · 杂项绑定(data-upgrade/自定义模板/断网横幅装载)
+import './home/pearnly-confirm.js'; // REFACTOR-C1-home-batch9g1 · 全局确认弹窗 window.pearnlyConfirm(从 home.js 抽出)
 import './home/page-reconcile.js'; // REFACTOR-WB-C3 · 对账中心骨架运行期注入(home.html section 抽出 · 须最前 · 6 模块在其后绑定)
 import './home/page-integrations.js'; // REFACTOR-WB-C3 · 集成页骨架运行期注入(home.html section 抽出 · 早于 erp-integration 等模块)
 import './home/page-settings.js'; // REFACTOR-WB-C3 · 设置页骨架运行期注入(home.html section 抽出 · 须早于 recon-subtab-settings DOM-move 及所有 settings 模块)

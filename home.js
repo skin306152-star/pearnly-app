@@ -1352,41 +1352,6 @@ document.querySelectorAll('.nav-item[data-locked]').forEach(item => {
 // ============================================================
 
 
-function mergeFields(pages) {
-    const result = {
-        invoice_number: null, date: null, total_amount: null, tax_ids: [],
-        seller_name: '', seller_tax: '', seller_addr: '',
-        buyer_name: '', buyer_tax: '', buyer_addr: '',
-        subtotal: '', vat: '', notes: '', items: [],
-    };
-    // 只取主页(非副本/重复页)
-    const primaryPages = pages.filter(p => !p.is_duplicate && !p.is_copy);
-    const sourcePages = primaryPages.length > 0 ? primaryPages : pages;
-    for (const p of sourcePages) {
-        const f = p.fields || {};
-        // 标量字段:取第一个非空值
-        if (!result.invoice_number && f.invoice_number) result.invoice_number = f.invoice_number;
-        if (!result.date && f.date) result.date = f.date;
-        if (!result.total_amount && f.total_amount) result.total_amount = f.total_amount;
-        if (!result.subtotal && f.subtotal) result.subtotal = f.subtotal;
-        if (!result.vat && f.vat) result.vat = f.vat;
-        if (!result.seller_name && f.seller_name) result.seller_name = f.seller_name;
-        if (!result.seller_tax && f.seller_tax) result.seller_tax = f.seller_tax;
-        if (!result.seller_addr && f.seller_addr) result.seller_addr = f.seller_addr;
-        if (!result.buyer_name && f.buyer_name) result.buyer_name = f.buyer_name;
-        if (!result.buyer_tax && f.buyer_tax) result.buyer_tax = f.buyer_tax;
-        if (!result.buyer_addr && f.buyer_addr) result.buyer_addr = f.buyer_addr;
-        if (!result.notes && f.notes) result.notes = f.notes;
-        // 数组字段:合并所有页
-        if (Array.isArray(f.items) && f.items.length) result.items.push(...f.items);
-        if (Array.isArray(f.tax_ids)) result.tax_ids.push(...f.tax_ids);
-    }
-    // 兜底:若 seller_tax / buyer_tax 仍空,从 tax_ids 取
-    result.tax_ids = [...new Set(result.tax_ids)];
-    if (!result.seller_tax && result.tax_ids[0]) result.seller_tax = result.tax_ids[0];
-    if (!result.buyer_tax && result.tax_ids[1]) result.buyer_tax = result.tax_ids[1];
-    return result;
-}
 
 function startEnginePolling() {
     stopEnginePolling();
@@ -1404,28 +1369,6 @@ function stopEnginePolling() {
 
 
 
-function onFieldEdit(e) {
-    const key = e.target.dataset.field;
-    const val = e.target.value;
-    const r = _results[_drawerIdx];
-    const original = r.merged_fields[key];
-    if (val === (original ?? '')) delete r.edits[key];
-    else {
-        r.edits[key] = val;
-        r.merged_fields[key] = val;
-    }
-    const wrap = document.querySelector(`[data-field-wrap="${key}"]`);
-    if (wrap) wrap.classList.toggle('edited', r.edits[key] !== undefined);
-    updateDrawerEditCount();
-    renderResults();
-}
-
-function updateDrawerEditCount() {
-    const r = _results[_drawerIdx];
-    const n = r ? Object.keys(r.edits).length : 0;
-    const el = document.getElementById('drawer-edit-count-sub');
-    if (el) el.textContent = n > 0 ? t('drawer-edit-count', { n }) : '';
-}
 
 
 // 事件代理:抽屉内 RD 按钮点击(校验 / 同步 / 锁图标升级提示)

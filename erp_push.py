@@ -237,7 +237,9 @@ def push_mrerp(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tupl
     )
 
 
-def push_mrerp_dms(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tuple[bool, int, str]:
+def push_mrerp_dms(
+    endpoint_config: Dict[str, Any], payload: Dict[str, Any]
+) -> Tuple[bool, int, str]:
     """MR.ERP DMS (car-sales) push entry · stub kept for ADAPTER_REGISTRY
     membership only.
 
@@ -707,9 +709,7 @@ def _id_card_payload_from_dict(id_card: Dict[str, Any]):
     )
 
 
-def push_mrerp_dms_id_card(
-    endpoint: Dict[str, Any], id_card: Dict[str, Any]
-) -> Dict[str, Any]:
+def push_mrerp_dms_id_card(endpoint: Dict[str, Any], id_card: Dict[str, Any]) -> Dict[str, Any]:
     """Push one Thai ID card into DMS as customer + booking draft.
 
     Called by dms_routes (NOT push_to_endpoint). Returns a dict shaped for an

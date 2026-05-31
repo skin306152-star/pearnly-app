@@ -140,7 +140,9 @@ def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
         missing.append("birthday")
 
     # Blocking rule: citizen id (13) + first + last are required to push.
-    needs_review = bool(missing and any(f in missing for f in ("people_id", "first_name", "last_name")))
+    needs_review = bool(
+        missing and any(f in missing for f in ("people_id", "first_name", "last_name"))
+    )
 
     score = 4 - len(missing)
     confidence = "high" if score >= 4 else ("medium" if score >= 2 else "low")

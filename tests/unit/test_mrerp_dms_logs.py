@@ -67,7 +67,10 @@ _ID_CARD = {
 class PushMrerpDmsLogShapeTests(unittest.TestCase):
     def test_success_shape_carries_booking_ids(self):
         ok = DMSPushResult(
-            ok=True, customer_id="65", booking_id="16", booking_no="PN0010100531",
+            ok=True,
+            customer_id="65",
+            booking_id="16",
+            booking_no="PN0010100531",
             response_code="sc::1",
         )
         with patch.object(_erp, "_build_mrerp_dms_adapter", return_value=(_FakeAdapter(ok), None)):

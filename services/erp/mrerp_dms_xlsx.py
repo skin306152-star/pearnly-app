@@ -34,7 +34,6 @@ from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 import xml.etree.ElementTree as ET
 
-
 SHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 NS = {"m": SHEET_NS}
 ET.register_namespace("", SHEET_NS)

@@ -31,8 +31,7 @@ _WITHOUT_DMS = "('webhook', 'xero', 'flowaccount', 'mrerp')"
 def _rebuild(table: str, in_list: str) -> None:
     op.execute(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {table}_adapter_chk")
     op.execute(
-        f"ALTER TABLE {table} ADD CONSTRAINT {table}_adapter_chk "
-        f"CHECK (adapter IN {in_list})"
+        f"ALTER TABLE {table} ADD CONSTRAINT {table}_adapter_chk " f"CHECK (adapter IN {in_list})"
     )
 
 

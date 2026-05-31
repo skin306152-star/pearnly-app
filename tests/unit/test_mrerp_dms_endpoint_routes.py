@@ -75,12 +75,14 @@ class MrerpDmsEndpointCreateTests(unittest.TestCase):
         app = self.app_module
         with (
             patch.object(
-                self.routes, "get_current_user_from_request",
+                self.routes,
+                "get_current_user_from_request",
                 return_value={"id": "u-1", "plan": "pro"},
             ),
             patch.object(self.routes, "_check_push_access", return_value=None),
             patch.object(
-                self.routes, "_plan_permissions",
+                self.routes,
+                "_plan_permissions",
                 return_value={"endpoints_limit": -1, "can_auto_push_erp": auto_push_allowed},
             ),
             patch.object(app.db, "list_erp_endpoints", return_value=[]),

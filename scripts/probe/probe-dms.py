@@ -47,7 +47,9 @@ class CredStrip(logging.Filter):
         return True
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"
+)
 log = logging.getLogger("probe-dms")
 log.addFilter(CredStrip())
 
@@ -97,10 +99,15 @@ def main():
         browser = pw.chromium.launch(
             headless=True, args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
         )
-        ctx = browser.new_context(locale="th-TH", viewport={"width": 1440, "height": 900}, accept_downloads=True)
+        ctx = browser.new_context(
+            locale="th-TH", viewport={"width": 1440, "height": 900}, accept_downloads=True
+        )
         ctx.add_init_script(SDPT_INIT_SCRIPT)  # make sdpt(_blank) navigations same-tab + observable
         page = ctx.new_page()
-        page.on("dialog", lambda d: (log.info("dialog[%s]: %s", d.type, (d.message or "")[:200]), d.accept()))
+        page.on(
+            "dialog",
+            lambda d: (log.info("dialog[%s]: %s", d.type, (d.message or "")[:200]), d.accept()),
+        )
 
         # 1. login page
         page.goto(RAW_URL, wait_until="domcontentloaded", timeout=30000)
@@ -122,7 +129,11 @@ def main():
                     break
             except Exception:
                 pass
-        for sel in ['input[name="txtpasswords"]', 'input[name="password"]', 'input[type="password"]']:
+        for sel in [
+            'input[name="txtpasswords"]',
+            'input[name="password"]',
+            'input[type="password"]',
+        ]:
             try:
                 if page.query_selector(sel):
                     page.fill(sel, PASSWORD)
@@ -136,7 +147,7 @@ def main():
         # submit: the login button is <input type="button" id="btnlogin"> whose
         # JS handler does formAjax(login/checklogin.php) then sdpt(...) to navigate.
         submitted = False
-        for sel in ['#btnlogin', 'input[name="btnlogin"]', 'button']:
+        for sel in ["#btnlogin", 'input[name="btnlogin"]', "button"]:
             try:
                 el = page.query_selector(sel)
                 if el:
@@ -194,8 +205,17 @@ def main():
 
         # 5. master data lists (authenticated ctx.request shares cookies)
         masters = {}
-        for elem in ("txtusers", "txtcar", "txtcarpaint", "txtplacebook", "txttermsale",
-                     "txtbranch_book", "txtteam_book", "txtregisbehalf", "selprefix"):
+        for elem in (
+            "txtusers",
+            "txtcar",
+            "txtcarpaint",
+            "txtplacebook",
+            "txttermsale",
+            "txtbranch_book",
+            "txtteam_book",
+            "txtregisbehalf",
+            "selprefix",
+        ):
             try:
                 r = ctx.request.post(
                     BASE + "drfcbc/component/bshsd.php",
@@ -211,7 +231,9 @@ def main():
         ctx.close()
         browser.close()
 
-    (OUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    (OUT / "report.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     log.info("wrote %s", OUT / "report.json")
     return 0
 

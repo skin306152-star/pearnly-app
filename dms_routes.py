@@ -78,7 +78,9 @@ def _resolve_dms_endpoint(user_id: str, endpoint_id: Optional[str]) -> Optional[
         return None
     eps = db.list_erp_endpoints(user_id) or []
     for ep in eps:
-        if (ep.get("adapter") or "").strip().lower() == "mrerp_dms" and ep.get("enabled") is not False:
+        if (ep.get("adapter") or "").strip().lower() == "mrerp_dms" and ep.get(
+            "enabled"
+        ) is not False:
             return ep
     return None
 
@@ -173,7 +175,10 @@ async def dms_id_card_booking(
             elapsed_ocr,
             "id_card",
         )
-        base_resp["dms_push"] = {"status": "needs_review", "error_code": "ERR_ID_CARD_REQUIRED_FIELDS"}
+        base_resp["dms_push"] = {
+            "status": "needs_review",
+            "error_code": "ERR_ID_CARD_REQUIRED_FIELDS",
+        }
         return base_resp
 
     # ── 仅识别(push=false):不推 DMS · 直接返回识别结果 ──

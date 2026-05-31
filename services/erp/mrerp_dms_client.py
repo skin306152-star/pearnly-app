@@ -182,7 +182,9 @@ class DMSClient:
             return booking_id
         if code.startswith("ep::"):
             # ep::1 means DMS produced an error report — never treat as success.
-            raise DMSClientError("booking import produced DMS error report", "ERR_DMS_IMPORT_REPORT")
+            raise DMSClientError(
+                "booking import produced DMS error report", "ERR_DMS_IMPORT_REPORT"
+            )
         raise DMSClientError(f"booking import returned unexpected body: {code!r}", "ERR_DMS_IMPORT")
 
     def patch_booking_identity(

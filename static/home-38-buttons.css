@@ -99,15 +99,15 @@
 
 /* ── 删除类 · 白底 + 红描边 ── */
 .btn-danger {
-    background: #fff;
-    color: #dc2626;
+    background: #dc2626;
+    color: #fff;
     border-color: #dc2626;
 }
 .btn-danger:hover:not(:disabled):not(.is-disabled) {
-    background: #fef2f2;
+    background: #b91c1c;
     border-color: #b91c1c;
-    color: #b91c1c;
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.28);
 }
 .btn-danger:active:not(:disabled):not(.is-disabled) {
     transform: translateY(1px);

@@ -13,6 +13,7 @@ import './home/page-automation.js'; // REFACTOR-WB-C3 · 自动化页骨架运�
 import './home/page-placeholders.js'; // REFACTOR-WB-C3 · 7 个静态占位页(coming-soon)骨架运行期注入(integration/templates/api-keys/vouchers/sales-invoices/receivables/cloud)
 import './home/page-dashboard.js'; // REFACTOR-WB-C3 · 首页 section 骨架运行期注入(home.html 空壳 · 须在 dashboard.js 前)
 import './home/toast.js'; // REFACTOR-C1-home-batch6 · Toast/提示条/错误人话化(从 home.js 抽出 · window 桥 showToast/showAlert/hideAlerts/humanizeError/_humanizeBackendError · 被 ~38 模块裸调)
+import './home/confirm-modal.js'; // REFACTOR-C1-home-batch9e · 自定义确认对话框(从 home.js 抽出 · window 桥 showConfirm · 被 ~18 模块裸调 · 早 import 防 eval 期未就绪)
 import './home/settings-core.js'; // REFACTOR-C1-home-batch7 · 设置页/个人资料/公司信息(从 home.js 抽出 · window 桥 switchSettingsTab/fillSettingsForms/saveProfile/saveCompany/renderSettings · home.js IIFE+引导期裸调)
 import './home/permissions.js'; // REFACTOR-C1-home-batch8 · 用户角色原子判断(从 home.js 抽出 · window 桥 isSuperAdmin/isOwner/isEmployee/isTrial/isLifetime/shouldHideMoney/canManageTeam/canManageApiKey · 全局唯一来源 · 被多模块裸调)
 import './home/layout.js'; // REFACTOR-C1-home-batch8 · 顶栏配额chip/配额预警banner/sidebar权限显隐(从 home.js 抽出 · window 桥 renderQuotaBanner/applySidebarVisibility/renderInfoBar · 依赖 permissions.js)

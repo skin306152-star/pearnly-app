@@ -103,8 +103,8 @@
 .cust-row-btn svg { width: 13px; height: 13px; }
 .cust-row-btn:hover { background: var(--bg); border-color: var(--gray-300); }
 .cust-row-btn.danger:hover { background: var(--red-50); border-color: var(--red-200); color: var(--danger); }
-.cust-row-btn.primary { background: #111; color: #fff; border-color: #111; }
-.cust-row-btn.primary:hover { background: #333; }
+.cust-row-btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+.cust-row-btn.primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
 .cust-badge-current {
     display: inline-flex; align-items: center; gap: 4px;
     background: var(--emerald-50); color: var(--emerald-600); border: 1px solid var(--emerald-200);

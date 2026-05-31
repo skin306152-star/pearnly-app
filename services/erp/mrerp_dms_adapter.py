@@ -213,31 +213,100 @@ class MrerpDmsAdapter:
 
     def login(self) -> None:
         """Idempotent. Fills credentials, clicks the JS login button, asserts
-        we navigate away from index.php into the authenticated area."""
+        we navigate away from index.php into the authenticated area.
+
+        ⚠️ Timing-critical (2026-05-31 prod bug fix): index.js binds the
+        #btnlogin click handler inside `window.addEventListener("load", ...)`,
+        NOT on DOMContentLoaded. If we click before the `load` event fires the
+        click is a silent no-op (formAjax never runs) → page stays on index.php
+        → looks like an auth failure with NO rejection dialog. So we:
+          1. goto with wait_until="load" (guarantees the handler is bound),
+          2. retry the click a few times to absorb any residual bind race,
+          3. distinguish a real DMS rejection (an alert dialog fires) from a
+             timing miss (no dialog) — only the former is non-retryable.
+        """
         if self._logged_in:
             return
         page = self._page
+
+        # Capture the checklogin.php verdict directly — DMS reports login
+        # rejection via an in-page custom modal (bshdlal), NOT a native alert,
+        # so reading the server response is the only reliable signal. Body:
+        #   lct::<status>::<grant>  → status 1/2 user, 4 owner; grant 2 = not approved
+        #   al::<msg> / err::<msg>  → rejected (bad creds / blocked)
+        captured = {"body": None}
+
+        def _on_resp(resp):
+            try:
+                if "checklogin.php" in resp.url:
+                    captured["body"] = (resp.text() or "").strip()
+            except Exception:
+                pass
+
+        page.on("response", _on_resp)
         try:
-            page.goto(
-                self.login_url, wait_until="domcontentloaded", timeout=self.DEFAULT_PAGE_TIMEOUT_MS
+            page.goto(self.login_url, wait_until="load", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
+            page.wait_for_selector(
+                "#btnlogin", state="visible", timeout=self.DEFAULT_PAGE_TIMEOUT_MS
             )
-            page.wait_for_selector("#txtusers", timeout=self.DEFAULT_PAGE_TIMEOUT_MS)
             page.fill("#txtusers", self._username)
             page.fill("#txtpasswords", self._password)
-            page.click("#btnlogin")
-        except Exception as e:
-            raise MrerpDmsTechnicalError(f"DMS login page interaction failed: {e}") from e
 
-        try:
-            page.wait_for_url(lambda u: "index.php" not in u, timeout=self.LOGIN_TIMEOUT_MS)
-        except Exception:
-            # Stayed on index.php → login failed. DMS shows a JS alert with the
-            # reason (captured by BrowserSession); use it to classify.
-            dlg = (self._session.last_dialog if self._session else "") or ""
-            raise MrerpDmsAuthError(
-                f"DMS login did not authenticate (still on login page). dialog={dlg[:200]}"
-            )
-        self._logged_in = True
+            attempts = 3
+            per_attempt_ms = max(5000, self.LOGIN_TIMEOUT_MS // attempts)
+            for _attempt in range(attempts):
+                captured["body"] = None
+                try:
+                    # Short click timeout: if the handler isn't bound yet the
+                    # button is still clickable (no overlay) and returns fast;
+                    # we never want to hang the default 30s here.
+                    page.click("#btnlogin", timeout=5000)
+                except Exception:
+                    page.wait_for_timeout(600)
+                    continue
+
+                waited = 0
+                while waited < per_attempt_ms:
+                    if "index.php" not in page.url:
+                        self._logged_in = True
+                        return
+                    body = captured["body"]
+                    if body:
+                        self._classify_login_body(body)  # raises on rejection
+                        # success verdict (lct ok) → sdpt nav is in flight; keep
+                        # polling the URL until it lands.
+                    page.wait_for_timeout(300)
+                    waited += 300
+                # No checklogin response at all this attempt = click was a
+                # no-op (handler bound late). Brief buffer, then re-click.
+                if not captured["body"]:
+                    page.wait_for_timeout(600)
+        finally:
+            try:
+                page.remove_listener("response", _on_resp)
+            except Exception:
+                pass
+
+        raise MrerpDmsAuthError(
+            "DMS login did not complete (no successful checklogin response / no "
+            "navigation after retries · possible slow page load or block)."
+        )
+
+    def _classify_login_body(self, body: str) -> None:
+        """Raise MrerpDmsAuthError if the checklogin.php body is a rejection.
+        Returns normally for a success verdict (caller then waits for nav)."""
+        parts = body.split("::")
+        head = parts[0].strip().lower()
+        if head == "lct":
+            grant = parts[2].strip() if len(parts) > 2 else ""
+            status = parts[1].strip() if len(parts) > 1 else ""
+            if grant == "2":
+                raise MrerpDmsAuthError("DMS account not approved for system access")
+            if status == "3":
+                raise MrerpDmsAuthError("DMS account is marked resigned")
+            return  # status 1/2/4 = ok
+        # al:: / err:: / anything else = rejected
+        raise MrerpDmsAuthError(f"DMS rejected login: {body[:160]}")
 
     # ----- public business -------------------------------------------
 

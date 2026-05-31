@@ -16,6 +16,7 @@ import './home/toast.js'; // REFACTOR-C1-home-batch6 · Toast/提示条/错误�
 import './home/settings-core.js'; // REFACTOR-C1-home-batch7 · 设置页/个人资料/公司信息(从 home.js 抽出 · window 桥 switchSettingsTab/fillSettingsForms/saveProfile/saveCompany/renderSettings · home.js IIFE+引导期裸调)
 import './home/permissions.js'; // REFACTOR-C1-home-batch8 · 用户角色原子判断(从 home.js 抽出 · window 桥 isSuperAdmin/isOwner/isEmployee/isTrial/isLifetime/shouldHideMoney/canManageTeam/canManageApiKey · 全局唯一来源 · 被多模块裸调)
 import './home/layout.js'; // REFACTOR-C1-home-batch8 · 顶栏配额chip/配额预警banner/sidebar权限显隐(从 home.js 抽出 · window 桥 renderQuotaBanner/applySidebarVisibility/renderInfoBar · 依赖 permissions.js)
+import './home/recon-drawer.js'; // REFACTOR-C1-home-batch9a · 泰国RD税务API核验/同步(从 home.js 抽出 · window 桥 callRdVerify/callRdSync · drawer-body 事件代理裸调)
 import './home/ocr-results.js'; // REFACTOR-C1-home-batch1 · OCR 结果表+抽屉渲染(从 home.js 抽出 · window 桥 renderResults/openDrawer/closeDrawer)
 import './home/ocr-push.js'; // REFACTOR-C1-home-batch2 · OCR 抽屉推 ERP 三件套(从 home.js 抽出 · window 桥 injectOcrPushButton · ocr-results.js openDrawer 调它)
 import './home/export.js'; // REFACTOR-C1-home-batch3 · 识别页 Excel 导出(从 home.js 抽出 · 自包含 · 绑 #btn-export 等)

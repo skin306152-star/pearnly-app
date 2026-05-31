@@ -41,19 +41,54 @@
     grid-template-columns: 1fr 1fr;
     gap: 12px;
 }
+/* v2(主控 2026-05-31 重设计)· 4 入口 2×2 图标卡片网格 · 填满卡片不留大片空白 */
 .dash-quick-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-content: stretch;
+    height: 100%;
+    min-height: 180px;
 }
 .dash-quick-btn {
-    justify-content: flex-start !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 8px !important;
+    height: auto !important;
+    min-height: 88px;
+    padding: 16px 12px !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 12px !important;
+    background: var(--card) !important;
+    color: var(--ink) !important;
+    font-weight: 500;
     position: relative;
+    transition: border-color .15s, background .15s, transform .1s, box-shadow .15s;
 }
-.dash-quick-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
-.dash-quick-btn-warn { color: var(--danger); }
+.dash-quick-btn:hover {
+    border-color: #2563eb !important;
+    background: #f5f8ff !important;
+    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.12);
+    transform: translateY(-1px);
+}
+.dash-quick-btn:active { transform: translateY(0); }
+.dash-quick-btn svg {
+    width: 26px; height: 26px; flex-shrink: 0;
+    color: #2563eb;
+}
+.dash-quick-btn span { font-size: 13px; }
+/* 处理异常入口:图标用警示色 */
+.dash-quick-btn-warn svg { color: var(--danger); }
+.dash-quick-btn-warn:hover {
+    border-color: var(--danger) !important;
+    background: #fff5f5 !important;
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.12);
+}
 .dash-quick-badge {
-    margin-left: auto;
+    position: absolute;
+    top: 8px; right: 8px;
+    margin-left: 0;
     background: var(--danger);
     color: #fff;
     font-size: 10px;

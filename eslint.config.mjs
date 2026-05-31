@@ -59,6 +59,9 @@ export default [
             // 存量未用变量较多 · 起步只 warn 不 fail(后续 stage 收紧)
             'no-unused-vars': 'warn',
             'no-empty': ['warn', { allowEmptyCatch: true }],
+            // 防御式初始化(let x=0,y=0; 各分支再赋值)· verbatim 自 home.js 巨石 · 非 bug ·
+            // 跟 static/**/*.js 块同口径降为提示(否则 batch8 layout.js verbatim 块红)
+            'no-useless-assignment': 'warn',
         },
     },
 

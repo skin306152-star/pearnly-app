@@ -175,6 +175,31 @@ async function handleCameraImages(imageFiles, source) {
     hideAlerts();
     if (!imageFiles || imageFiles.length === 0) return;
 
+    // MR.ERP DMS · 身份证订车模式:后端按图片 OCR · 单张身份证【不转 PDF】直发原图
+    // (转 photo_*.pdf 会让 id_card OCR 读不到图 → Layer1Error · DMS-UI-003 2026-06-01)。
+    var _docMode =
+        typeof window.getOcrDocumentMode === 'function' ? window.getOcrDocumentMode() : 'invoice';
+    if (_docMode === 'thai_id_card') {
+        for (const f of imageFiles) {
+            _selectedFiles.push({
+                file: f,
+                name: f.name,
+                size: f.size,
+                status: 'waiting',
+                errorKey: null,
+                errorParams: null,
+            });
+        }
+        const _maxF = getMaxFiles();
+        if (_selectedFiles.length > _maxF) {
+            showAlert('warn', t('alert-file-count', { n: _maxF }));
+            _selectedFiles = _selectedFiles.slice(0, _maxF);
+        }
+        renderFileList();
+        updateStartButton();
+        return;
+    }
+
     // 等 jsPDF 加载
     if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
         showToast(t('camera-loading'), 'info');

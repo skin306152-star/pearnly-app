@@ -100,6 +100,13 @@ async def erp_connectors_status(request: Request):
             if not ep.get("enabled", True):
                 continue
             adapter = ep.get("adapter") or "webhook"
+            # DMS guard (DMS-UI-005 · 2026-06-01) · mrerp_dms is the car-sales
+            # ID-card→booking adapter, NEVER an invoice push target. Keep it out
+            # of the unified push connector list so the history-drawer split
+            # button can't offer "push invoice to DMS" (mirrors ocr-push.js's
+            # filter + push_to_endpoint's ERR_DMS_NOT_INVOICE_ENDPOINT reject).
+            if adapter == "mrerp_dms":
+                continue
             connectors.append(
                 {
                     "id": f"endpoint_{ep['id']}",

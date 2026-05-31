@@ -332,7 +332,7 @@
         try {
             var r = await fetch(
                 '/api/erp/endpoints/' + encodeURIComponent(_ep.id) + '/test-connection?refresh=1',
-                { headers: { Authorization: 'Bearer ' + tk } }
+                { method: 'POST', headers: { Authorization: 'Bearer ' + tk } }
             );
             var d = await r.json().catch(function () {
                 return {};

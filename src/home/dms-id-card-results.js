@@ -116,9 +116,14 @@
         // failure reason line (friendly)
         var reasonLine = '';
         if (st === 'failed' && push.error_code) {
+            // t() 缺键时回传 key 本身(truthy)· 不能用 `|| code` 兜底 · 否则露 raw key。
+            // 显式判等:无对应文案 → 退回通用友好提示(ocr.*/dms.* 等也覆盖)。
+            var _ecKey = 'dms-err-' + String(push.error_code).toLowerCase();
+            var _ecMsg = t(_ecKey);
+            if (!_ecMsg || _ecMsg === _ecKey) _ecMsg = t('dms-err-err_dms_unexpected');
             reasonLine =
                 '<div style="margin-top:8px;color:#b3261e;font-size:12px;">' +
-                _esc(t('dms-err-' + String(push.error_code).toLowerCase()) || push.error_code) +
+                _esc(_ecMsg) +
                 '</div>';
         }
 

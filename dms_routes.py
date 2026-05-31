@@ -85,6 +85,32 @@ def _resolve_dms_endpoint(user_id: str, endpoint_id: Optional[str]) -> Optional[
     return None
 
 
+def _ensure_image_bytes(content: bytes, content_type: str = "") -> bytes:
+    """身份证 OCR(extract_thai_id_card)只吃图片。共享上传流水线会把图片
+    包成单页 PDF(相机/相册图片在到达本接口前经 imagesToPdf 转 photo_*.pdf),
+    后端按图读 PDF → Layer1Error。这里把 PDF 首页栅格化成 PNG 兜底
+    (DMS-UI-003 · 2026-06-01)· 非 PDF 字节原样返回。"""
+    is_pdf = content[:5] == b"%PDF-" or (content_type or "").strip().lower() == "application/pdf"
+    if not is_pdf:
+        return content
+    try:
+        import fitz  # PyMuPDF · OCR 流水线已在用(layer1_vision/pipeline)
+
+        doc = fitz.open(stream=content, filetype="pdf")
+        if doc.page_count < 1:
+            doc.close()
+            return content
+        page = doc.load_page(0)
+        # 300 DPI · 与发票 OCR 渲染同量级 · 身份证小字够清晰
+        pix = page.get_pixmap(matrix=fitz.Matrix(300 / 72.0, 300 / 72.0), alpha=False)
+        png = pix.tobytes("png")
+        doc.close()
+        return png or content
+    except Exception as e:
+        logger.warning(f"[dms] PDF→图栅格化失败 · 退回原字节: {e}")
+        return content
+
+
 @router.post("/api/dms/id-card-booking")
 async def dms_id_card_booking(
     request: Request,
@@ -109,11 +135,13 @@ async def dms_id_card_booking(
     own_key = (
         user.get("gemini_api_key") or user.get("custom_gemini_api_key") or ""
     ).strip() or None
+    # PDF(上传流水线把图片包成的 photo_*.pdf)→ 栅格化成图片喂 OCR(DMS-UI-003)。
+    image_bytes = await asyncio.to_thread(_ensure_image_bytes, content, file.content_type or "")
     t0 = time.time()
     try:
         from services.ocr.id_card_extract import extract_thai_id_card
 
-        ocr = await asyncio.to_thread(extract_thai_id_card, content, own_key)
+        ocr = await asyncio.to_thread(extract_thai_id_card, image_bytes, own_key)
     except Exception as e:
         # IdCardExtractError 或任何 OCR 失败 → 不计费、不推送。
         is_unreadable = type(e).__name__ == "IdCardExtractError"

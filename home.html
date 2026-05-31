@@ -1701,7 +1701,7 @@
 <div class="modal-overlay" id="assign-clients-modal" style="display:none;"></div>
 
 <!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 bundle 前 · 提供 window.I18N(state.js/core.js 裸读 I18N 命中) -->
-<script src="/static/i18n-data.js?v=11850000"></script>
+<script src="/static/i18n-data.js?v=11850050"></script>
 <!-- REFACTOR-C1-home-batch9g2 · home.js 巨石已彻底删除 · 引导/状态/错误拦截全进 src/home/state.js(bundle 第1个import)· 鉴权闸已内联 <head> -->
 <!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE · runRecon 检测 needs_mapping 时调用 -->
 <script src="/static/recon-mapping.js?v=11835072" defer></script>
@@ -1710,7 +1710,7 @@
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing + test-center 由 Vite bundle 成 static/dist/main.js ·
      ES module(type=module 自动 defer)· state.js 第1个 import 装错误拦截+i18n总线+window.*状态 ·
      /api/version 现读本 main.js?v=(REFACTOR-C1-home-batch9g2 · home.js 已删 · read_frontend_version 改锚 main.js) -->
-<script type="module" src="/static/dist/main.js?v=11850043"></script>
+<script type="module" src="/static/dist/main.js?v=11850050"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·

@@ -41,23 +41,21 @@
     grid-template-columns: 1fr 1fr;
     gap: 12px;
 }
-/* v2(主控 2026-05-31 重设计)· 4 入口 2×2 图标卡片网格 · 填满卡片不留大片空白 */
+/* v3(主控 2026-05-31)· 4 入口 2×2 图标卡片 · 自适应高度·不撑破父 .card */
 .dash-quick-list {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    align-content: stretch;
-    height: 100%;
-    min-height: 180px;
+    margin-top: 12px;
 }
 .dash-quick-btn {
     flex-direction: column !important;
     justify-content: center !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 7px !important;
     height: auto !important;
-    min-height: 88px;
-    padding: 16px 12px !important;
+    min-height: 72px;
+    padding: 14px 12px !important;
     border: 1px solid var(--line) !important;
     border-radius: 12px !important;
     background: var(--card) !important;

@@ -9,8 +9,9 @@
 //   · defer)后跑 · bare 调全局不 import。
 // 桥回 home.js:window.renderResults / openDrawer / closeDrawer
 //   (home.js bootstrap 的 applyLang 守卫调 + 多处 runtime 调)。
+// ERP 推送三件套(injectOcrPushButton...)已迁 ocr-push.js(批2)· openDrawer 经 window.injectOcrPushButton 调。
 // 仍在 home.js(后续批):RD 税务 API 簇(rdFetch/callRdVerify/callRdSync/openRdSyncModal)
-//   + ERP 推送三件套(injectOcrPushButton...)+ drawer-body 事件委托 + onFieldEdit/updateDrawerEditCount。
+//   + drawer-body 事件委托 + onFieldEdit/updateDrawerEditCount。
 // ============================================================
 /* global escapeHtml, _results, _selectedFiles, _searchKeyword:writable, _sortKey:writable, _sortDir:writable, _drawerIdx:writable, onFieldEdit, updateDrawerEditCount, injectOcrPushButton */
 

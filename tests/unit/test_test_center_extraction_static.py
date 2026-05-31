@@ -25,6 +25,9 @@ class TestCenterExtractionStaticTests(unittest.TestCase):
             cls.home_js = f.read()
         with open(os.path.join(ROOT, "src", "main.js"), "r", encoding="utf-8") as f:
             cls.main_js = f.read()
+        # REFACTOR-C1-home-batch9f · 真核心簇(含 routeTo 路由分发)已 cutover 到 core-boot.js
+        with open(os.path.join(ROOT, "src", "home", "core-boot.js"), "r", encoding="utf-8") as f:
+            cls.core_boot_js = f.read()
         with open(os.path.join(ROOT, "src", "home", "test-center.js"), "r", encoding="utf-8") as f:
             cls.tc_js = f.read()
         with open(os.path.join(ROOT, "home.html"), "r", encoding="utf-8") as f:
@@ -54,8 +57,10 @@ class TestCenterExtractionStaticTests(unittest.TestCase):
         self.assertIn("测试中心(Test Center · TC)", self.tc_js)
 
     def test_home_js_keeps_callers(self):
-        """home.js 仍保留调用方(路由分发 + 错误拦截器钩子)· 经 window 调新模块入口"""
-        self.assertIn("window.loadTestCenterPage()", self.home_js)
+        """调用方(路由分发 + 错误拦截器钩子)仍存在 · 经 window 调新模块入口。
+        REFACTOR-C1-home-batch9f:routeTo(路由分发)已从 home.js cutover 到 core-boot.js ·
+        故 window.loadTestCenterPage() 现位于 core-boot.js;错误拦截器 IIFE 仍留 home.js。"""
+        self.assertIn("window.loadTestCenterPage()", self.core_boot_js)
         self.assertIn("window._tcOnNewLog(", self.home_js)
 
     def test_home_html_load_order(self):

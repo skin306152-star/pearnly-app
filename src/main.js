@@ -6,6 +6,8 @@
 //
 // 后续阶段 C 持续从 home.js 抽模块 → 都进 src/home/ → 在这里 import
 
+import './home/core.js'; // REFACTOR-C1-home-batch9f · 真核心叶子层(t/escapeHtml/svgIcon/鉴权API🔴/_showSessionRevokedModal🔴/getMax*)· 【必第 1 个】保证 sibling 模块 eval 期 window.t/apiGet 等已就绪
+import './home/core-boot.js'; // REFACTOR-C1-home-batch9f · 真核心编排+引导(applyLang/setupDropdown/routeTo/loadAll/render助手/installNetworkBanner + bootstrap)· 【必第 2 个】紧随 core.js · bootstrap 尾部自执行 · 先于其余 sibling
 import './home/page-reconcile.js'; // REFACTOR-WB-C3 · 对账中心骨架运行期注入(home.html section 抽出 · 须最前 · 6 模块在其后绑定)
 import './home/page-integrations.js'; // REFACTOR-WB-C3 · 集成页骨架运行期注入(home.html section 抽出 · 早于 erp-integration 等模块)
 import './home/page-settings.js'; // REFACTOR-WB-C3 · 设置页骨架运行期注入(home.html section 抽出 · 须早于 recon-subtab-settings DOM-move 及所有 settings 模块)

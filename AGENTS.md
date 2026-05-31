@@ -1,7 +1,7 @@
 # AGENTS.md · Pearnly 唯一入口(所有 AI 窗口先读这一页)
 
 > **这是唯一的"必读"。** 故意保持一页。完整宪法在 `CLAUDE.md/CLAUDE.md`(铁律细节),业务概念在 `docs/agent/`,但**进窗口先把这页 + STATE 状态卡读完 + 跑一次进度脚本**就能开工,别一上来啃 7000 行。
-> 最后更新:2026-05-29(Opus 4.8 1M · 守门 6 道 · 3 窗口并行 loop · 治漂移版)
+> 最后更新:2026-06-01(MR.ERP DMS 集成已上线 · 等 Codex UI 实测 · 整顿主线暂停)
 
 ---
 
@@ -21,7 +21,8 @@
 
 ## 1. 当前在干啥(整顿期 · 2026-05 起)
 
-- **模式**:整顿封锁期(铁律 #18)· **0 新功能** · 只做 `REFACTOR_MASTER_PLAN.md` 的 9 阶段 task。
+- **⏳ 当前实况(2026-06-01)**:**整顿主线暂停**。在做 **Zihao 例外任务:MR.ERP DMS 汽车销售 身份证→订车单集成**(adapter=`mrerp_dms`·已上线 prod 版本 `11850043`·后端 live 真建订车单验过)。**状态=等 Codex 浏览器 UI 实测报告** → 逐条核对 + 修 FAIL。计划 `docs/integrations/mrerp-dms-ui-test-plan.md`(本地未 commit)· 全貌见 STATE 状态卡 + 记忆 [[mrerp-dms-integration]] + `docs/integrations/mrerp-dms-integration-handoff.md`。例外任务 commit 走 `MRERP-DMS-INTEGRATION` tag(非 REFACTOR-)。
+- **模式**:整顿封锁期(铁律 #18)· **0 新功能** · 只做 `REFACTOR_MASTER_PLAN.md` 的 9 阶段 task(**当前因例外任务暂停·待 Zihao 拍板恢复**)。
 - **当前打法**:**3 窗口并行 loop**(ADR-011 + `docs/refactor/PARALLEL_LOOP_DISPATCH.md`)· A 后端 / B 前端 / C 文档测试 · 按文件 ownership 切不撞车。
 - **找下一个 task**:`REFACTOR_MASTER_PLAN.md` 顶部「当前进度看板」。
 - **你的身份**:整顿主控/指挥官 · Zihao 非技术零代码 → 你全包(研究/派工/守门/E2E自测/查CI/上线/更文档)· Zihao 只:① 点权限框 ② 像用户验收 ③ 涉钱/登录拍板。

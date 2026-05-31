@@ -6,20 +6,17 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡(2026-05-31 批9g-2 收尾重写 · 🎉 home.js 巨石彻底消除)
+## 🎯 状态卡(2026-06-01 · MR.ERP DMS 集成已上线 · ⏳等 Codex UI 实测)
 
-- **模式**:整顿封锁期 · 0 新功能 · **home.js 拆迁批1-9g2 全部收官**(33768→**0**·删除·100%·已上线 prod 验)。**下一主线候选**:app.py 1727→500 / home.html 1730→1000 / src/home/*.css(目标 20-30·现 0)·待 Zihao 拍板。
-- **批1-9f 全闭环**(批1-9e 已上线 prod 逐一验过;**批9f `2c2ea78` 已 commit·待 Zihao 拍板 push**):批6-9e=toast/settings-core/permissions+layout/recon-drawer/ocr-fields/force-pw🔴/line-panel🔴/confirm-modal。**批9f 真核心 cutover**:t/escapeHtml/svgIcon/_showSessionRevokedModal🔴/api簇🔴(铁律#26)→`src/home/core.js`(254行);applyLang/setupDropdown/routeTo/loadAll/render助手/installNetworkBanner+VALID_ROUTES+bootstrap→`core-boot.js`(471行);main.js 第1/2 import。每批 6 道守门全绿 + 真账号 E2E(9f:登录→8路由→4语→apiGet→render·0 pageerror·bootstrap loadAll 真后端 resolve)。
-- **批9g-1(`276145e`·874→381)**:删 4 死码 + 抽 7 独立 IIFE/绑定→bundle(sidebar-nav/integration-drawer/settings-bind/engine-poll/drawer-events/misc-bindings/pearnly-confirm)。
-- **🎉 批9g-2(`6963853`·381→0·彻底删 home.js·已上线 prod 验)**:大厂级做法——① 鉴权闸 1 行内联 home.html `<head>`(最早跑·无 token 弹登录);② 错误拦截器 IIFE + i18n 总线 + 全局状态 init→`src/home/state.js`(main.js **第1个** import·minified);③ 状态 `let`→`window.X`(currentLang/_userInfo/_results/token 等·**~40 模块零改动**·裸读写经全局对象解析到 window.X·真浏览器验 bareState 通);④ 删 home.js·home.html 去 `<script home.js>`·`read_frontend_version` 锚改 dist/main.js?v=。view-source 只见 minified bundle = **真·大厂级**。守门 6 道+本地+prod 真账号 E2E(hasHomeJs=false·0 pageerror·无白屏)。
-- **⚠️ 部署铁律(9f/9g 踩坑补)**:改 home.js/main.js 内容必 bump home.html 的 `home.js?v=`+`main.js?v=` 到同新值(静态文件 `immutable` 30天·不 bump=回头客旧缓存+部分驱逐 mismatch 白屏)·bump 会改 /api/version(读 static/home.html 的 home.js?v=)→弹横幅→按铁律#6 写中性4语 release_notes。**禁 sed home.html(整文件 CRLF→LF 翻·实测中招)·只用 Edit 工具行内替换或 node split/join**。
-- **大块拆法(批4/5 验证·批7-9 照用)**:单块 >500 拆 N 个 <500 子模块;共享态(_historyState/_selectedFiles/mergeFields)留 home.js 顶层当桥(两边 bare 读写·属性 mutation 不触发 no-global-assign·重新赋值标 :writable);子模块循环依赖经 window 桥 OK(调用都在 handler 内·延迟解析);bootstrap 期(applyLang/用户初始化)裸调移出函数加 `typeof window.fn==='function'` 守卫+模块按 currentRoute 自举。
-- **拆迁范式(批2-9 照用)**:home.js 是经典脚本(非IIFE)→ 顶层 `let`(_results/_drawerIdx 等)模块裸读写自动桥;移出函数 home.js/别的模块仍调需 `window.X=X` 挂出;`/* global */` 写全局·要**写**的标 `:writable`;移文件用 node split/join 保 home.js CRLF(对边界行先断言防误删·两块不连续要分别删)。
-- **真浏览器验法(本窗复用成功)**:本地 node 反代(`_uitest/proxy.cjs`:拦 /static/home.js+dist/main.js(.map)返本地·其余透传 prod·改写 Origin/Referer→prod·删 CSP·Location 改回 localhost)+ tests/e2e 临时 spec(内联轻量登录·**别用 auth.js 的 waitForURL until:load·经反代长连接会拖住 load 假超时**·改等 token+window.showToast 就绪)· 用完即删不 commit。
-- **测试账号**:e2e_1/2/3 余额满999999·密码在 `C:\Users\skin3\Desktop\pearnly_test_accounts.txt`(**格式:密码后接3空格+说明·只取首段非空白串·grep 须锚 `^username:` 否则命中 $env 行取错·tr -d '\r'**·env注入不打印)。真数据账号= 邮箱 `18685123459@163.com` / `xiaopi19950730..`。
-- **剩余瓶颈(home.js 已 0)**:app.py 1727→500(🔴 拆登录/OCR/计费需 Zihao 在场)· home.html 1730→1000· src/home/*.css 模块化(现 0·目标 20-30)。
-- **下一主线待 Zihao 拍板**:① app.py 1727→500(高敏·plan-first·拆 *_routes/services);② home.html 1730→1000(继续 C3 section/modal 抽运行期注入);③ home.css 已 0 但 src/home/*.css 模块化未起步。home.js 拆迁范式全部沉淀在记忆 [[home-js-batch-split-bridge]](含 9f cutover/9g state→window/部署 cache-bust/禁 sed CRLF)。
-- **最后 commit**:658c5b0(批9e)· `git log --oneline -5` 查最新。
+- **模式**:整顿封锁期 · **整顿主线暂停**。当前是 **Zihao 例外任务:MR.ERP DMS 汽车销售 身份证→订车单 集成**(adapter=`mrerp_dms`·非整顿·commit tag `MRERP-DMS-INTEGRATION`)。整顿主线候选(待 Zihao 拍板恢复):app.py 1727→500 / home.html 1730→1000 / src/home/*.css(现 0·目标 20-30)。**home.js 拆迁批1-9g2 已全收官 33768→0·已上线验**。
+- **⏳ 当前状态:等 Codex 浏览器 UI 实测结果**。测试计划 `docs/integrations/mrerp-dms-ui-test-plan.md`(本地·未 commit)。Codex 跑完出报告 → 本窗口逐条核对 + 修 FAIL(高危优先:发票推送列表混入 DMS / 明文凭据 / DMS 查不到单 / 需复核闸失效 / 泰语 raw key)。
+- **DMS 集成已完成上线**(主体 `2b63ecd`+`a355451`+`80bdc23` / 登录修复 `4c35dce`·prod 版本 `11850043`·deploy ok 无回滚)。后端 live 端到端真验:DMS 测试站真建订车单(customer 65 / booking_id 16 / PN0010100531 / sc::1)。架构=Playwright 真登录 + 鉴权上下文驱动官方表单契约(铁律#7)。落点:`services/erp/mrerp_dms_{models,xlsx,client,adapter}.py` / `dms_routes.py`(app.py 仅 include_router) / `services/ocr/id_card_extract.py`(独立 prompt 不碰发票) / 前端 `src/home/{erp-mrerp-dms-connect,ocr-document-mode,dms-id-card-results}.js`。详见记忆 [[mrerp-dms-integration]] + 交接文档 `docs/integrations/mrerp-dms-integration-handoff.md`。
+- **已修 DMS-UI-001(Blocker)`4c35dce`**:DMS 登录 `#btnlogin` 处理器绑在 window `load`(非 DOMContentLoaded)·原 login() 等 domcontentloaded 就点击=空操作→间歇 `ERR_DMS_AUTH`。修=`wait_until="load"` + 监听 `checklogin.php` 响应判成败(`lct::*::*`=成功 / `al::`/`err::`=拒绝·DMS 拒绝走自定义 modal 非原生 alert)+ 点击重试3次。验:好凭据 5/5、坏凭据 1.4s 秒判 AUTH。
+- **防误推三重保险(高危·别动)**:mrerp_dms `auto_push` 强制 false · 不进发票抽屉推送列表(ocr-push.js 过滤)· push_to_endpoint 硬拒(`ERR_DMS_NOT_INVOICE_ENDPOINT`)· 身份证自动推送另用 `config.id_card_auto_push`。schema:Alembic 007 + push_schema ensure 双跑(canonical 加 mrerp_dms·skip 改全量校验防 CheckViolation)。计费按普通图片 OCR(kind=pdf units=1·不污染发票额度)。
+- **测试账号**:Pearnly `18685123459@163.com` / `xiaopi19950730..`(真数据账号·谨慎);DMS 测试站 `https://www.mrerp4sme.com/dms/index.php` `dmstest`/`dmstest`(只本地 env 注入·绝不入库/日志/commit)。e2e_1/2/3 见 `C:\Users\skin3\Desktop\pearnly_test_accounts.txt`。
+- **部署铁律**:改 src/*.js 必 `npm run build` + `git add static/dist` + bump home.html `dist/main.js?v=`(纯后端 .py 改动免 build/免 bump);home.html/css/i18n-data.js 是 CRLF+prettierignored·禁 sed/prettier·只 Edit 或 node split/join;pre-push 机械闸跑 ruff/black/eslint(0 error·会扫本地 scratch 文件勿留)/build·先 format 再 push。
+- **home.js 拆迁全收官**(33768→0)·拆迁范式沉淀记忆 [[home-js-batch-split-bridge]]。
+- **最后 commit**:`4c35dce`(DMS 登录修复)· `git log --oneline -6` 查最新。
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->
 <!-- 新窗口:读上面状态卡 + 跑 scripts/refactor_progress.py 就能开工 -->

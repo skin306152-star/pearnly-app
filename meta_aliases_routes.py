@@ -36,10 +36,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_time.time()),
         "release_notes": {
-            "zh": "「客户」已升级为「客户管理」。现在可在同一页面分别管理「账套主体」(您自己的公司 / 开票方)与「买方客户」(发票上的买家);买方客户改为列表展示,支持搜索、多选与批量删除。登录后系统会引导您选择当前账套主体。即日生效。",
-            "th": "«ลูกค้า» ได้รับการปรับเป็น «จัดการลูกค้า» · ตอนนี้จัดการ «กิจการ» (บริษัทของคุณเอง / ผู้ออกใบกำกับ) และ «ลูกค้าผู้ซื้อ» (ผู้ซื้อในใบกำกับ) ได้ในหน้าเดียว · ลูกค้าผู้ซื้อแสดงเป็นรายการที่ค้นหา เลือกหลายรายการ และลบเป็นชุดได้ · หลังเข้าสู่ระบบจะแนะนำให้เลือกกิจการปัจจุบัน · มีผลทันที",
-            "en": '"Clients" has been upgraded to "Customers". You can now manage "Accounting entities" (your own company / the invoice issuer) and "Buyer customers" (the buyer on an invoice) on one page; buyer customers are shown as a searchable list with multi-select and bulk delete. After signing in, you will be guided to choose your current accounting entity. Effective immediately.',
-            "ja": "「クライアント」を「顧客管理」に改善しました。同じ画面で「対象会社」(あなたの会社 / 請求書の発行者)と「買い手顧客」(請求書の買い手)を分けて管理できます。買い手顧客は一覧表示になり、検索・複数選択・一括削除に対応しました。ログイン後に現在の対象会社を選ぶ案内が表示されます。即日有効。",
+            "zh": "系统已完成一次后台优化,页面加载与运行更稳定流畅。本次为内部性能优化,所有功能与操作方式保持不变。即日生效。",
+            "th": "ระบบได้ดำเนินการปรับปรุงประสิทธิภาพภายในเรียบร้อยแล้ว การโหลดและการทำงานของหน้าเว็บมีความเสถียรและลื่นไหลยิ่งขึ้น การปรับปรุงครั้งนี้เป็นการปรับภายในเท่านั้น ความสามารถและวิธีการใช้งานทั้งหมดยังคงเหมือนเดิม มีผลทันที",
+            "en": "The system has completed an internal optimization. Page loading and overall responsiveness are now smoother and more stable. This update is an internal improvement only; all capabilities and the way you use them remain the same. Effective immediately.",
+            "ja": "システムの内部最適化を実施しました。ページの読み込みと全体の動作がより安定し、スムーズになりました。今回は内部的な改善のみで、すべての機能と操作方法はこれまでと同じです。即日有効。",
         },
     }
 

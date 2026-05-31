@@ -17,6 +17,10 @@ import './home/ocr-push.js'; // REFACTOR-C1-home-batch2 · OCR 抽屉推 ERP 三
 import './home/export.js'; // REFACTOR-C1-home-batch3 · 识别页 Excel 导出(从 home.js 抽出 · 自包含 · 绑 #btn-export 等)
 import './home/history-list.js'; // REFACTOR-C1-home-batch4 · 发票记录页列表侧(从 home.js 抽出 · 桥 loadHistoryPage 等 · _historyState 共享态留 home.js)
 import './home/history-drawer.js'; // REFACTOR-C1-home-batch4 · 发票记录页抽屉+菜单+事件绑定(从 home.js 抽出 · 桥 openHistoryDrawer · 与 history-list.js 互调)
+import './home/upload-files.js'; // REFACTOR-C1-home-batch5 · 上传拖拽区/文件列表/开始按钮(从 home.js 抽出 · 桥 renderFileList/updateStartButton · 与 upload-camera 互调)
+import './home/upload-camera.js'; // REFACTOR-C1-home-batch5 · 相机/相册→PDF(从 home.js 抽出 · 桥 handleCameraImages)
+import './home/ocr-recognize.js'; // REFACTOR-C1-home-batch5 · OCR 识别主流程 btn-start(从 home.js 抽出 · OCR热路径 · 调 renderResults/mergeFields/showDuplicateDialog)
+import './home/ocr-duplicate-dialog.js'; // REFACTOR-C1-home-batch5 · OCR 重复发票警告弹窗(从 home.js 抽出 · 桥 showDuplicateDialog)
 import './home/dashboard.js';
 import './home/billing.js';
 import './home/test-center.js'; // REFACTOR-C1 · 测试中心(skin only)

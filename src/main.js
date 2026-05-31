@@ -14,6 +14,7 @@ import './home/page-placeholders.js'; // REFACTOR-WB-C3 · 7 个静态占位页(
 import './home/page-dashboard.js'; // REFACTOR-WB-C3 · 首页 section 骨架运行期注入(home.html 空壳 · 须在 dashboard.js 前)
 import './home/ocr-results.js'; // REFACTOR-C1-home-batch1 · OCR 结果表+抽屉渲染(从 home.js 抽出 · window 桥 renderResults/openDrawer/closeDrawer)
 import './home/ocr-push.js'; // REFACTOR-C1-home-batch2 · OCR 抽屉推 ERP 三件套(从 home.js 抽出 · window 桥 injectOcrPushButton · ocr-results.js openDrawer 调它)
+import './home/export.js'; // REFACTOR-C1-home-batch3 · 识别页 Excel 导出(从 home.js 抽出 · 自包含 · 绑 #btn-export 等)
 import './home/dashboard.js';
 import './home/billing.js';
 import './home/test-center.js'; // REFACTOR-C1 · 测试中心(skin only)

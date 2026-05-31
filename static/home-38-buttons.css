@@ -212,3 +212,32 @@
     background: #ecedf0;
     cursor: not-allowed;
 }
+
+/* ============================================================
+   全局收口(主控 2026-05-31)· 治「改一处漏一处」根因
+   各页历史 CSS 用 button.btn-primary.btn-tiny / .xxx .btn-primary 等
+   高特异性规则把主操作按钮染成 var(--ink)/var(--brand)=#111 黑,压过本文件的蓝。
+   这里用最高优先级一律收回品牌蓝。仅作用于【动作按钮 .btn-primary】,
+   不碰 chip/nav/tab/进度条(它们不是 .btn-primary,保持黑=当前位置指示)。
+   ============================================================ */
+.btn-primary,
+button.btn-primary,
+button.btn-primary.btn-tiny,
+button.btn-primary.btn-sm,
+.btn.btn-primary {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+    color: #fff !important;
+}
+.btn-primary:hover:not(:disabled):not(.is-disabled),
+button.btn-primary.btn-tiny:hover:not(:disabled),
+button.btn-primary.btn-sm:hover:not(:disabled) {
+    background: #1d4ed8 !important;
+    border-color: #1d4ed8 !important;
+}
+.btn-primary:disabled,
+.btn-primary.is-disabled {
+    background: #93b4f5 !important;
+    border-color: #93b4f5 !important;
+    cursor: not-allowed;
+}

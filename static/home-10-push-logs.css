@@ -60,14 +60,17 @@
     border: 1px solid var(--line); background: var(--bg); color: var(--ink-2);
     cursor: pointer;
 }
-.erp-exc-chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+.erp-exc-chip.active { background: #2563eb; color: #fff; border-color: #2563eb; }
 .erp-exc-chip-count { font-size: 11px; opacity: .8; }
+/* 行/全选 复选框勾选态 → 品牌蓝(局部·不动全局 --accent) */
+.erp-exc-cb, .erp-exc-cb-all { accent-color: #2563eb; width: 16px; height: 16px; cursor: pointer; }
 .erp-exc-search {
     margin-left: auto; min-width: 220px; padding: 6px 10px; font-size: 12px;
     border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink-1);
 }
-/* 批量栏 */
+/* 批量栏 · 选中才显示([hidden] 属性时隐藏 · 修 display:flex 无条件覆盖 hidden 的 bug) */
 .erp-exc-batch { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 10px; background: var(--bg); border-radius: 8px; }
+.erp-exc-batch[hidden] { display: none; }
 .erp-exc-batch-info { font-size: 12px; color: var(--ink-2); }
 .erp-exc-batch-count { font-weight: 700; color: var(--ink); }
 /* 横条行(像推送日志 · 不做卡片 · 省位置) */

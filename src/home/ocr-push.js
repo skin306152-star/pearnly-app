@@ -30,8 +30,10 @@ function injectOcrPushButton() {
     if (!header || document.getElementById('drawer-ocr-push-btn')) return;
 
     // v118.34.34 · 只展示 enabled 的 endpoint · _erpEndpoints 是全局缓存.
+    // DMS(2026-05-31):mrerp_dms 是身份证→订车单适配器 · 绝不出现在发票抽屉的
+    // 「推送到 ERP」列表里(发票推 DMS = 数据错投)· 过滤掉。
     const enabledEps = (window._erpEndpoints || _erpEndpoints || []).filter(function (ep) {
-        return ep && ep.enabled !== false;
+        return ep && ep.enabled !== false && (ep.adapter || '').toLowerCase() !== 'mrerp_dms';
     });
 
     // 0 enabled → 不渲染按钮. 用户去 ERP 对接 tab 先连一个再说.

@@ -92,6 +92,28 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
                 "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
             }
 
+    # mrerp_dms: DMS login + master-data scrape (own never-raise helper).
+    # 铁律 #10:Playwright sync API 必须 asyncio.to_thread 离开事件循环。
+    if req.adapter == "mrerp_dms":
+        try:
+            return await _asyncio.to_thread(_erp.test_mrerp_dms_endpoint, cfg)
+        except Exception as e:
+            logger.exception("erp_test_connection mrerp_dms helper raised")
+            return {
+                "ok": False,
+                "elapsed_ms": 0,
+                "masters": {},
+                "adapter": "mrerp_dms",
+                "error_code": "ERR_UNEXPECTED",
+                "error_friendly": {
+                    "zh": f"服务器内部错误:{type(e).__name__}",
+                    "en": f"Internal server error: {type(e).__name__}",
+                    "th": f"ข้อผิดพลาดของเซิร์ฟเวอร์: {type(e).__name__}",
+                    "zh_TW": f"伺服器內部錯誤:{type(e).__name__}",
+                },
+                "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
+            }
+
     # Other adapters: legacy ping. Keep the historical shape so
     # webhook / flowaccount UIs aren't broken. push_webhook uses
     # `requests.post` which is also sync I/O — to_thread either way.
@@ -168,6 +190,8 @@ async def erp_endpoint_test_connection(
     try:
         if adapter == "mrerp":
             result = await _asyncio.to_thread(_erp.test_mrerp_endpoint, config)
+        elif adapter == "mrerp_dms":
+            result = await _asyncio.to_thread(_erp.test_mrerp_dms_endpoint, config)
         else:
             # webhook / flowaccount / etc — defer to the existing ping test.
             legacy = await _asyncio.to_thread(_erp.test_endpoint_connection, adapter, config)

@@ -106,6 +106,26 @@ def _derive_mrerp(body: Dict[str, Any], status: str) -> Dict[str, str]:
     )
 
 
+def _derive_mrerp_dms(body: Dict[str, Any], status: str) -> Dict[str, str]:
+    """MR.ERP DMS · 从 response_body.booking_no 映射 external_doc_no(订车单号)。
+
+    - external_doc_no = booking_no(订车单号 · 给用户看 + 复制)
+    - external_doc_id = booking_id(DMS 内部订车单 ID)
+    - external_url    = "" (DMS 没有可直达深链)
+    - external_doc_hint = "mrerp_dms_search" (前端提示去 DMS 订车单/ใบจอง 搜该单号)
+    """
+    booking_no = str(body.get("booking_no") or "").strip()
+    booking_id = str(body.get("booking_id") or "").strip()
+    if not booking_no and not booking_id:
+        return _EMPTY.copy()
+    return _result(
+        doc_no=booking_no,
+        doc_id=booking_id or booking_no,
+        url="",
+        hint="mrerp_dms_search",
+    )
+
+
 def _derive_default(body: Dict[str, Any], status: str) -> Dict[str, str]:
     """通用派生器 · 认 response_body 里常见的单号/链接键。
 
@@ -128,6 +148,7 @@ def _derive_default(body: Dict[str, Any], status: str) -> Dict[str, str]:
 # 接入新 ERP 时在这里加一行,日志 API 和前端都无需改动。
 _DERIVERS = {
     "mrerp": _derive_mrerp,
+    "mrerp_dms": _derive_mrerp_dms,
     # "xero": _derive_xero,
     # "quickbooks": _derive_quickbooks,
     # "custom": _derive_custom,

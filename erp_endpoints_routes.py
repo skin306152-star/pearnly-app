@@ -108,9 +108,11 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
         if req.adapter == "mrerp" and not isinstance(config.get("client_ids"), list):
             config["client_ids"] = []
 
-        # v118.34.13 · 加密 mrerp 凭据再落地 · wizard 发的是 plaintext。
+        # v118.34.13 · 加密凭据再落地 · wizard 发的是 plaintext。
         # 即使字段名叫 _enc · 不加密就 None-op 解密会炸。
-        if req.adapter == "mrerp":
+        # 2026-05-31 · 从 == "mrerp" 改为 in ENCRYPTED_CRED_ADAPTERS · 让 mrerp_dms
+        # 等所有带 Fernet 凭据的 adapter 共用这条加密路径(单一来源 · 防漂移)。
+        if req.adapter in _erp.ENCRYPTED_CRED_ADAPTERS:
             try:
                 from kms_helper import encrypt_str, is_encrypted
 
@@ -141,13 +143,19 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
                     detail=f"erp.encrypt_failed: {type(e).__name__}",
                 )
 
+        # DMS 防误推铁律(2026-05-31):mrerp_dms endpoint 的 auto_push 必须 false。
+        # 发票自动推送按 db.list_erp_endpoints(auto_push_only=True) 选 endpoint,
+        # 若 DMS endpoint auto_push=true 会被卷进发票自动推送 → 把 invoice history
+        # 误推进 DMS(高危数据错投)。身份证自动推送另用 config.id_card_auto_push。
+        effective_auto_push = False if req.adapter == "mrerp_dms" else req.auto_push
+
         new_id = db.create_erp_endpoint(
             user["id"],
             req.name,
             req.adapter,
             config,
             is_default=req.is_default,
-            auto_push=req.auto_push,
+            auto_push=effective_auto_push,
         )
         if not new_id:
             # db.create_erp_endpoint swallowed the underlying DB error
@@ -215,8 +223,9 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
         # P0「开箱即用」(Zihao 2026-05-26 拍板) · client_ids 已退役(见 POST
         # 路由注释)· PATCH 不再拦"清空 client_ids" · 编辑连接不会再被卡。
 
-        # P-3 · MR.ERP 加密镜像 POST 路由 (v118.34.13 一致)
-        if target_adapter == "mrerp":
+        # P-3 · 加密镜像 POST 路由 (v118.34.13 一致)
+        # 2026-05-31 · == "mrerp" → in ENCRYPTED_CRED_ADAPTERS(含 mrerp_dms)。
+        if target_adapter in _erp.ENCRYPTED_CRED_ADAPTERS:
             try:
                 from kms_helper import encrypt_str, is_encrypted
 
@@ -252,6 +261,11 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
         p = _plan_permissions(user.get("plan", "free"))
         if not p.get("can_auto_push_erp"):
             raise HTTPException(403, detail="erp.auto_push_plus_required")
+
+    # DMS 防误推铁律(2026-05-31):mrerp_dms 的 auto_push 后端兜底强制 false
+    # (见 POST 路由同名注释)· 防发票自动推送误投进 DMS。
+    if target_adapter == "mrerp_dms" and "auto_push" in fields:
+        fields["auto_push"] = False
 
     ok = db.update_erp_endpoint(user["id"], endpoint_id, **fields)
     if not ok:

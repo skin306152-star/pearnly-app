@@ -125,3 +125,6 @@ design-preview/check_ui_consistency.py
 # 主控 UI 验真探针产出(本地·勿提交)
 scripts/_mc_verify/
 CLAUDE.md/STATE_PEARNLY.md.bak
+
+# DMS probe scratch (live-probe screenshots/html · never commit)
+_dms_probe/

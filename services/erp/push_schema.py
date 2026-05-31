@@ -25,7 +25,7 @@ def ensure_erp_endpoints_adapter_constraint():
     白名单跟 erp_push.py ADAPTER_REGISTRY 对齐 · 增 adapter 时这里和
     那里一起改。
     """
-    canonical = ("webhook", "xero", "flowaccount", "mrerp")
+    canonical = ("webhook", "xero", "flowaccount", "mrerp", "mrerp_dms")
     try:
         with db.get_cursor(commit=True) as cur:
             # 1. 找 adapter 上现存的 CHECK constraint(可能没有 · 也可能多个)
@@ -39,9 +39,12 @@ def ensure_erp_endpoints_adapter_constraint():
             """)
             rows = cur.fetchall() or []
             current_def = " ".join((r["def"] or "").lower() for r in rows)
-            # 2. 已经包含 'mrerp' 就不动 — 幂等
-            if "'mrerp'" in current_def:
-                logger.info("✅ erp_endpoints adapter CHECK already includes mrerp (skip)")
+            # 2. 幂等:必须 canonical 全量都在约束里才跳过。
+            #    ⚠️ 不能只查 "'mrerp'" —— 它是 'mrerp_dms' 加进来前的旧约束里
+            #    就已存在的子串,只查它会让线上已有 mrerp 约束误判"已迁移"而跳过,
+            #    导致 mrerp_dms 永远进不了白名单 → 创建 DMS endpoint 触发 CheckViolation。
+            if all(f"'{a}'" in current_def for a in canonical):
+                logger.info("✅ erp_endpoints adapter CHECK already includes all canonical (skip)")
                 return
             # 3. drop 所有现存 adapter-related CHECK,然后建新的
             for r in rows:
@@ -69,7 +72,7 @@ def ensure_erp_push_logs_adapter_constraint():
     """同 erp_endpoints 但针对 erp_push_logs · 若它也有 adapter CHECK
     约束就同步加 mrerp。push log 表不一定带这个约束(取决于建表 DDL),
     所以查 pg_catalog 找到了再 drop+rebuild,没找到就跳过。"""
-    canonical = ("webhook", "xero", "flowaccount", "mrerp")
+    canonical = ("webhook", "xero", "flowaccount", "mrerp", "mrerp_dms")
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute("""
@@ -85,8 +88,9 @@ def ensure_erp_push_logs_adapter_constraint():
                 logger.info("ℹ erp_push_logs has no adapter CHECK constraint (nothing to migrate)")
                 return
             current_def = " ".join((r["def"] or "").lower() for r in rows)
-            if "'mrerp'" in current_def:
-                logger.info("✅ erp_push_logs adapter CHECK already includes mrerp (skip)")
+            # 幂等:canonical 全量都在才跳过(见 erp_endpoints 同名函数注释 · 不能只查 'mrerp')。
+            if all(f"'{a}'" in current_def for a in canonical):
+                logger.info("✅ erp_push_logs adapter CHECK already includes all canonical (skip)")
                 return
             for r in rows:
                 name = r["conname"]

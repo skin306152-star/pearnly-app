@@ -485,7 +485,7 @@ button.btn-primary.btn-tiny:hover {
 .erp-receipt-primary-btn {
     display: inline-block;
     padding: 9px 18px;
-    background: var(--brand);
+    background: #2563eb;
     color: #fff;
     border: none;
     border-radius: 8px;
@@ -536,9 +536,9 @@ button.btn-primary.btn-tiny:hover {
 }
 .erp-receipt-action-btn:hover { background: var(--bg); }
 .erp-receipt-action-btn.primary {
-    background: var(--brand);
+    background: #2563eb;
     color: #fff;
-    border-color: var(--brand);
+    border-color: #2563eb;
 }
 .erp-receipt-action-btn.primary:hover { opacity: 0.9; }
 

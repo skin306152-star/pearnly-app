@@ -109,7 +109,7 @@ async def dms_id_card_booking(
     ).strip() or None
     t0 = time.time()
     try:
-        from services.ocr.id_card_extract import IdCardExtractError, extract_thai_id_card
+        from services.ocr.id_card_extract import extract_thai_id_card
 
         ocr = await asyncio.to_thread(extract_thai_id_card, content, own_key)
     except Exception as e:

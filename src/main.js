@@ -13,6 +13,7 @@ import './home/page-automation.js'; // REFACTOR-WB-C3 · 自动化页骨架运�
 import './home/page-placeholders.js'; // REFACTOR-WB-C3 · 7 个静态占位页(coming-soon)骨架运行期注入(integration/templates/api-keys/vouchers/sales-invoices/receivables/cloud)
 import './home/page-dashboard.js'; // REFACTOR-WB-C3 · 首页 section 骨架运行期注入(home.html 空壳 · 须在 dashboard.js 前)
 import './home/toast.js'; // REFACTOR-C1-home-batch6 · Toast/提示条/错误人话化(从 home.js 抽出 · window 桥 showToast/showAlert/hideAlerts/humanizeError/_humanizeBackendError · 被 ~38 模块裸调)
+import './home/settings-core.js'; // REFACTOR-C1-home-batch7 · 设置页/个人资料/公司信息(从 home.js 抽出 · window 桥 switchSettingsTab/fillSettingsForms/saveProfile/saveCompany/renderSettings · home.js IIFE+引导期裸调)
 import './home/ocr-results.js'; // REFACTOR-C1-home-batch1 · OCR 结果表+抽屉渲染(从 home.js 抽出 · window 桥 renderResults/openDrawer/closeDrawer)
 import './home/ocr-push.js'; // REFACTOR-C1-home-batch2 · OCR 抽屉推 ERP 三件套(从 home.js 抽出 · window 桥 injectOcrPushButton · ocr-results.js openDrawer 调它)
 import './home/export.js'; // REFACTOR-C1-home-batch3 · 识别页 Excel 导出(从 home.js 抽出 · 自包含 · 绑 #btn-export 等)

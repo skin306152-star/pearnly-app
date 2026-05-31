@@ -8,7 +8,8 @@
 
 ## 🎯 状态卡(2026-05-31 批3 收尾重写)
 
-- **模式**:整顿封锁期 · 0 新功能 · 当前主线 = **home.js 拆迁 9 批**(批1+2+3✅,批4-9 待续·下一批4=发票记录页 loadHistoryPage/openHistoryDrawer 等→src/home/history.js)。
+- **模式**:整顿封锁期 · 0 新功能 · 当前主线 = **home.js 拆迁 9 批**(批1+2+3✅,批4-9 待续)。
+- **⚠️批4 已勘测(下一步)**:发票记录页 = home.js **3418-4088 ≈670行(含一 IIFE 到4088)>500** → **必须拆 2 个子模块**(如 history-list.js=_historyState/loadHistoryPage/renderHistoryList/updateHistoryBatchBar/分页监听;history-drawer.js=openHistoryDrawer/openHistoryDrawerAndFocusAmount/injectHistorySaveButton/openHistoryMenu)。难点:**`_historyState` 跨两子模块共享**(拆开后不能各自 module-local·要么留 home.js 顶层 let 当桥·要么挂 window)。块外调用方需 window 桥:loadHistoryPage(routeTo 795)、openHistoryDrawer(2850 guarded)、renderHistoryList(applyLang 664 guarded)、openHistoryDrawerAndFocusAmount。比前 3 批大且高风险·要带完整上下文预算开干。
 - **批1-3 闭环**(57def27/f7244e7/262f86b 已上线·prod 逐一验过):批1 OCR结果表+抽屉→`ocr-results.js`(474行);批2 OCR推ERP三件套→`ocr-push.js`(191行);批3 Excel导出→`export.js`(262行·自包含零桥)· home.js **5344→4563**(净减781)· 每批 6 道守门全绿 + 真浏览器验过。
 - **拆迁范式(批2-9 照用)**:home.js 是经典脚本(非IIFE)→ 顶层 `let`(_results/_drawerIdx 等)模块裸读写自动桥;移出的函数若 home.js 仍调,需 `window.X=X` 挂出;`/* global */` 写全局,要**写**的标 `:writable`(否则 no-global-assign 红);移文件用 node split/join 保 home.js CRLF。
 - **批1 踩坑**:① 引导期(applyLang/顶层 addEventListener)裸调移出函数会 ReferenceError(defer模块未就绪)→ 加 `window.fn &&` 守卫 或包箭头 `()=>fn()` 延迟解析 ② verbatim 代码进新模块要过 eslint/prettier(home.js 本豁免)。

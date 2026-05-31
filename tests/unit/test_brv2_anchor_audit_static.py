@@ -24,8 +24,11 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
         # (含 _brv2RenderAnchorAudit 定义 + 调用)· 前端静态契约改读「home.js + src/home/*.js」并集
         # (拼接 == 原巨石全文 · 拆分后仍能找到搬走的函数)。
         parts = []
-        with open(os.path.join(ROOT, "home.js"), "r", encoding="utf-8") as f:
-            parts.append(f.read())
+        # REFACTOR-C1-home-batch9g2 · home.js 巨石已删 · 内容全在 src/home/*.js · 读取改可选
+        _home = os.path.join(ROOT, "home.js")
+        if os.path.exists(_home):
+            with open(_home, "r", encoding="utf-8") as f:
+                parts.append(f.read())
         for p in sorted(glob.glob(os.path.join(ROOT, "src", "home", "*.js"))):
             with open(p, "r", encoding="utf-8") as f:
                 parts.append(f.read())

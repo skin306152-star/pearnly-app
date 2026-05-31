@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
+<!-- REFACTOR-C1-home-batch9g2 · 鉴权闸(大厂 head 内联 critical bootstrap · 最早跑 · 无 token 立即弹回登录 · 不渲染主应用) -->
+<script>if(!localStorage.getItem('mrpilot_token'))location.replace('/');</script>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=2">
 <link rel="stylesheet" href="/static/home-01-base.css?v=11850008">
 <link rel="stylesheet" href="/static/home-02-switcher.css?v=11850008">
@@ -1698,18 +1700,17 @@
 <!-- v118.28.1 · 分配客户给员工 modal(老板用) -->
 <div class="modal-overlay" id="assign-clients-modal" style="display:none;"></div>
 
-<!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 home.js 前 · 提供 window.I18N -->
+<!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 bundle 前 · 提供 window.I18N(state.js/core.js 裸读 I18N 命中) -->
 <script src="/static/i18n-data.js?v=11850000"></script>
-<script src="/static/home.js?v=11850041"></script>
-<!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE 不引 home.js · runRecon 检测 needs_mapping 时调用 -->
+<!-- REFACTOR-C1-home-batch9g2 · home.js 巨石已彻底删除 · 引导/状态/错误拦截全进 src/home/state.js(bundle 第1个import)· 鉴权闸已内联 <head> -->
+<!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE · runRecon 检测 needs_mapping 时调用 -->
 <script src="/static/recon-mapping.js?v=11835072" defer></script>
 <!-- ADR-006 S8 · PDF/扫描件逐行核对纠错面板 · 独立 IIFE · runRecon 检测 needs_review 时调用 -->
 <script src="/static/recon-review.js?v=11835074" defer></script>
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing + test-center 由 Vite bundle 成 static/dist/main.js ·
-     ES module(type=module 自动 defer)· 必在 home.js 后执行 ·
-     依赖 home.js 的全局:t / showToast / escapeHtml / subscribeI18n / _userInfo / currentRoute / loadDashboard
-     REFACTOR-C1(2026-05-25)· 抽测试中心 + 重建 bundle · 只 bump 本 main.js?v=(不动 home.js?v= → /api/version 不变 → 不弹横幅) -->
-<script type="module" src="/static/dist/main.js?v=11850041"></script>
+     ES module(type=module 自动 defer)· state.js 第1个 import 装错误拦截+i18n总线+window.*状态 ·
+     /api/version 现读本 main.js?v=(REFACTOR-C1-home-batch9g2 · home.js 已删 · read_frontend_version 改锚 main.js) -->
+<script type="module" src="/static/dist/main.js?v=11850042"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·

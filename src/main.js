@@ -6,6 +6,7 @@
 //
 // 后续阶段 C 持续从 home.js 抽模块 → 都进 src/home/ → 在这里 import
 
+import './home/state.js'; // REFACTOR-C1-home-batch9g2 · 应用引导/全局状态(错误拦截IIFE + i18n总线 + window.* 状态 init)· 【必第 1 个】早于所有 sibling · 取代已删的 home.js
 import './home/core.js'; // REFACTOR-C1-home-batch9f · 真核心叶子层(t/escapeHtml/svgIcon/鉴权API🔴/_showSessionRevokedModal🔴/getMax*)· 【必第 1 个】保证 sibling 模块 eval 期 window.t/apiGet 等已就绪
 import './home/core-boot.js'; // REFACTOR-C1-home-batch9f · 真核心编排+引导(applyLang/setupDropdown/routeTo/loadAll/render助手/installNetworkBanner + bootstrap)· 【必第 2 个】紧随 core.js · bootstrap 尾部自执行 · 先于其余 sibling
 import './home/sidebar-nav.js'; // REFACTOR-C1-home-batch9g1 · 侧栏折叠/汉堡/遮罩 + hashchange + nav-item 点击(从 home.js 抽出)

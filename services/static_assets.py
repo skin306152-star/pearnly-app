@@ -18,6 +18,11 @@ def read_frontend_version() -> str:
     try:
         with open("static/home.html", "r", encoding="utf-8") as _f:
             _content = _f.read()
+        # REFACTOR-C1-home-batch9g2 · home.js 巨石已删 · 前端版本锚改 dist/main.js?v=(bundle · 每次 FE 部署 bump)
+        m = re.search(r"dist/main\.js\?v=(\d+)", _content)
+        if m:
+            return m.group(1)
+        # 兼容回退:老结构 home.js?v= / home.css?v=
         m = re.search(r"home\.js\?v=(\d+)", _content)
         if m:
             return m.group(1)

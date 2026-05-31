@@ -21,13 +21,17 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 class TestCenterExtractionStaticTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        with open(os.path.join(ROOT, "home.js"), "r", encoding="utf-8") as f:
-            cls.home_js = f.read()
+        # REFACTOR-C1-home-batch9g2 · home.js 巨石已彻底删除 · 读取改可选(残留断言对空串恒真)
+        _home = os.path.join(ROOT, "home.js")
+        cls.home_js = open(_home, "r", encoding="utf-8").read() if os.path.exists(_home) else ""
         with open(os.path.join(ROOT, "src", "main.js"), "r", encoding="utf-8") as f:
             cls.main_js = f.read()
         # REFACTOR-C1-home-batch9f · 真核心簇(含 routeTo 路由分发)已 cutover 到 core-boot.js
         with open(os.path.join(ROOT, "src", "home", "core-boot.js"), "r", encoding="utf-8") as f:
             cls.core_boot_js = f.read()
+        # REFACTOR-C1-home-batch9g2 · 错误拦截器(含 _tcOnNewLog 钩子)已搬到 src/home/state.js
+        with open(os.path.join(ROOT, "src", "home", "state.js"), "r", encoding="utf-8") as f:
+            cls.state_js = f.read()
         with open(os.path.join(ROOT, "src", "home", "test-center.js"), "r", encoding="utf-8") as f:
             cls.tc_js = f.read()
         with open(os.path.join(ROOT, "home.html"), "r", encoding="utf-8") as f:
@@ -58,18 +62,23 @@ class TestCenterExtractionStaticTests(unittest.TestCase):
 
     def test_home_js_keeps_callers(self):
         """调用方(路由分发 + 错误拦截器钩子)仍存在 · 经 window 调新模块入口。
-        REFACTOR-C1-home-batch9f:routeTo(路由分发)已从 home.js cutover 到 core-boot.js ·
-        故 window.loadTestCenterPage() 现位于 core-boot.js;错误拦截器 IIFE 仍留 home.js。"""
+        REFACTOR-C1-home-batch9f:routeTo 路由分发 → core-boot.js(window.loadTestCenterPage())。
+        REFACTOR-C1-home-batch9g2:错误拦截器 IIFE(含 _tcOnNewLog 钩子)→ state.js · home.js 已删。"""
         self.assertIn("window.loadTestCenterPage()", self.core_boot_js)
-        self.assertIn("window._tcOnNewLog(", self.home_js)
+        self.assertIn("window._tcOnNewLog(", self.state_js)
 
     def test_home_html_load_order(self):
-        """home.js(sync)必须先于 main.js bundle(defer)· test-center 依赖 home.js 全局"""
-        idx_home = self.home_html.find("/static/home.js?v=")
+        """REFACTOR-C1-home-batch9g2 · home.js 已删 · 新加载序约束:
+        i18n-data.js(sync · 提供 window.I18N)必须先于 main.js bundle(state.js 第1个 import 裸读 I18N)。
+        且 home.html 不再引用 home.js。"""
+        self.assertNotIn(
+            "/static/home.js?v=", self.home_html, "home.js 巨石应已删除 · 不再被 home.html 引用"
+        )
+        idx_i18n = self.home_html.find("/static/i18n-data.js?v=")
         idx_bundle = self.home_html.find("/static/dist/main.js?v=")
-        self.assertGreater(idx_home, 0, "home.js script 标签缺失")
+        self.assertGreater(idx_i18n, 0, "i18n-data.js script 标签缺失")
         self.assertGreater(idx_bundle, 0, "main.js bundle script 标签缺失")
-        self.assertLess(idx_home, idx_bundle, "home.js 必须排在 main.js bundle 之前")
+        self.assertLess(idx_i18n, idx_bundle, "i18n-data.js 必须排在 main.js bundle 之前")
 
 
 if __name__ == "__main__":

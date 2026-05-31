@@ -29,8 +29,11 @@ class ExportLangFollowsUiTests(unittest.TestCase):
         # 动态语言契约逻辑随代码整块搬走、行为不变 → 守门扫 home.js + 全部 src/home 模块的并集,
         # 这样无论代码留在 home.js 还是已模块化,契约都能锁住(对后续抽取也免疫)。
         parts = []
-        with open(os.path.join(ROOT, "home.js"), "r", encoding="utf-8") as f:
-            parts.append(f.read())
+        # REFACTOR-C1-home-batch9g2 · home.js 巨石已删 · 内容全在 src/home/*.js · 读取改可选
+        _home = os.path.join(ROOT, "home.js")
+        if os.path.exists(_home):
+            with open(_home, "r", encoding="utf-8") as f:
+                parts.append(f.read())
         src_home = os.path.join(ROOT, "src", "home")
         if os.path.isdir(src_home):
             for name in sorted(os.listdir(src_home)):

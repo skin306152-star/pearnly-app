@@ -19,7 +19,10 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # 扫描范围:面向用户的前端
 HTML_FILES = [ROOT / "home.html"]
-JS_FILES = sorted((ROOT / "src" / "home").glob("*.js")) + [ROOT / "home.js"]
+# REFACTOR-C1-home-batch9g2 · home.js 巨石已删 · 全在 src/home/*.js · home.js 仅在仍存在时纳入
+JS_FILES = sorted((ROOT / "src" / "home").glob("*.js")) + (
+    [ROOT / "home.js"] if (ROOT / "home.js").exists() else []
+)
 CSS_FILES = sorted((ROOT / "static").glob("home-*.css"))
 
 # 旧杂牌按钮类(应被收编/删除)

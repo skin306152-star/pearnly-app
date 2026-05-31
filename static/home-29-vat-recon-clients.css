@@ -83,7 +83,7 @@
 .align-right { text-align: right; }
 
 .cust-col-check, .cust-cell-check { display: flex; align-items: center; justify-content: center; }
-.cust-col-check input, .cust-cell-check input { width: 16px; height: 16px; accent-color: #111; cursor: pointer; }
+.cust-col-check input, .cust-cell-check input { width: 16px; height: 16px; accent-color: #2563eb; cursor: pointer; }
 
 .cust-cell-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .cust-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }

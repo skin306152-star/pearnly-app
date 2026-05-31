@@ -252,7 +252,7 @@
     transition: all 0.15s;
     flex-shrink: 0;
 }
-.exc-row-check:hover { border-color: var(--accent); }
+.exc-row-check:hover { border-color: #2563eb; }
 .exc-row-check svg {
     width: 12px; height: 12px;
     color: #fff;
@@ -260,8 +260,8 @@
     transition: opacity 0.12s;
 }
 .exc-row-check.checked {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: #2563eb;
+    border-color: #2563eb;
 }
 .exc-row-check.checked svg { opacity: 1; }
 .exc-row.selected {

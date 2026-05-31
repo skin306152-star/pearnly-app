@@ -23,7 +23,7 @@
     width: 16px;
     height: 16px;
     cursor: pointer;
-    accent-color: var(--ink);
+    accent-color: #2563eb;
     margin: 0;
 }
 
@@ -607,7 +607,7 @@
 .camera-tips-skip-row input {
     width: 15px;
     height: 15px;
-    accent-color: var(--ink);
+    accent-color: #2563eb;
     cursor: pointer;
 }
 

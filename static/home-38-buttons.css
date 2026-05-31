@@ -241,3 +241,12 @@ button.btn-primary.btn-sm:hover:not(:disabled) {
     border-color: #93b4f5 !important;
     cursor: not-allowed;
 }
+
+/* ============================================================
+   全局收口(主控 2026-05-31)· 复选框勾选态统一品牌蓝
+   各页 input[type=checkbox] 的 accent-color 散用 var(--ink)/#111 黑(home-20/29/37 等),
+   逐页改必漏。此处全局兜底:所有复选框勾选=蓝。radio(单选指示)不在此列,保持原样。
+   ============================================================ */
+input[type="checkbox"] {
+    accent-color: #2563eb;
+}

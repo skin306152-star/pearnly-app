@@ -1,0 +1,413 @@
+// ============================================================
+// REFACTOR-C1-home-batch4 (2026-05-31) · 发票记录页【抽屉+菜单+事件绑定】从 home.js 抽出为独立 ES module
+//
+// 来源:home.js verbatim 0 改逻辑 · openHistoryDrawer / openHistoryDrawerAndFocusAmount /
+//   injectHistorySaveButton / _checkDrawerPushStatus / pushHistoryToErp / saveHistoryEdits /
+//   openHistoryMenu + initHistoryPage IIFE(行/菜单/复选/搜索/分页监听)。
+// 复用 ocr-results.js 的抽屉(openDrawer/closeDrawer 经 window)· 列表侧函数(loadHistoryPage 等)
+//   经 window 桥(history-list.js 提供)· 共享态 _historyState/_historySelected 在 home.js bare 读。
+// 桥回:window.openHistoryDrawer(home.js L2850 guarded 调)。
+// 加载顺序:与 history-list.js 互调均在事件回调/异步内(延迟解析)· 顺序无关。
+// ============================================================
+/* global escapeHtml, token, mergeFields, showAlert, hideAlerts, showConfirm, _results, _drawerIdx:writable, _historyState, _historySelected, loadHistoryPage, updateHistoryBatchBar, clearHistorySelection, openDrawer, closeDrawer */
+
+// 点击行 → 打开抽屉查看/编辑
+async function openHistoryDrawer(historyId) {
+    try {
+        const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}`, {
+            headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!resp.ok) return;
+        const detail = await resp.json();
+
+        // 构造与识别页一致的 result 对象,复用同一个抽屉
+        const merged = mergeFields(detail.pages || []);
+        const fakeResult = {
+            filename: detail.filename,
+            pages: detail.pages,
+            page_count: detail.page_count,
+            elapsed_ms: detail.elapsed_ms,
+            engine: 'history',
+            merged_fields: merged,
+            edits: {},
+            confidence: detail.confidence,
+            archive_name: detail.archive_name || null,
+            category_tag: detail.category_tag || null,
+            _historyId: detail.id,
+            _historyMode: true,
+            client_id: detail.client_id || null, // v107 · 客户归属
+        };
+        // 推入 _results 末尾,打开抽屉后记下索引便于保存
+        _results.push(fakeResult);
+        _drawerIdx = _results.length - 1;
+        openDrawer(_drawerIdx);
+
+        // 额外加一个「保存修改」按钮(覆盖到抽屉底部)
+        injectHistorySaveButton();
+
+        // v107 · 绑定客户下拉(从 detail 拿当前 client_id)
+        if (typeof window.bindDrawerClient === 'function') {
+            window.bindDrawerClient(detail.id, detail.client_id || null);
+        }
+
+        // P0-2: 异步检查是否已推送过(不阻塞抽屉渲染)
+        _checkDrawerPushStatus(detail.id);
+    } catch (e) {
+        console.error('open history detail failed', e);
+    }
+}
+
+// v91 · 从「缺金额 · 补金额」按钮进入 · 自动聚焦金额输入框 · 会计直接敲数字保存
+async function openHistoryDrawerAndFocusAmount(historyId) {
+    await openHistoryDrawer(historyId);
+    // 下一帧 focus · 确保 drawer DOM 已渲染 + transition 已起步
+    requestAnimationFrame(() => {
+        const inp = document.querySelector('[data-field="total_amount"]');
+        if (!inp) return;
+        try {
+            inp.focus();
+        } catch (e) {}
+        try {
+            inp.select();
+        } catch (e) {}
+        try {
+            inp.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } catch (e) {}
+    });
+}
+
+function injectHistorySaveButton() {
+    const body = document.getElementById('drawer-body');
+    if (!body || document.getElementById('drawer-history-save')) return;
+    const saveBar = document.createElement('div');
+    saveBar.id = 'drawer-history-save';
+    saveBar.className = 'drawer-history-save-bar';
+    saveBar.innerHTML = `
+        <button class="btn btn-ghost" id="btn-push-erp" title="${escapeHtml(t('btn-push-erp'))}" style="display:none;">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 8h9M8 5l3 3-3 3"/>
+                <rect x="11" y="3" width="3" height="10" rx="1"/>
+            </svg>
+            <span>${escapeHtml(t('btn-push-erp'))}</span>
+        </button>
+        <span id="drawer-erp-pushed-badge" style="display:none;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#059669;background:#D1FAE5;padding:3px 8px;border-radius:20px;white-space:nowrap;">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;flex-shrink:0;"><path d="M2 6l3 3 5-5"/></svg>
+            ${escapeHtml(t('erp-pushed-badge'))}
+        </span>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" id="btn-save-history">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l3 3 7-7"/></svg>
+            <span>${escapeHtml(t('history-save'))}</span>
+        </button>
+    `;
+    body.appendChild(saveBar);
+    document.getElementById('btn-save-history').addEventListener('click', saveHistoryEdits);
+    document.getElementById('btn-push-erp').addEventListener('click', pushHistoryToErp);
+}
+
+// P0-2: 检查该发票是否已成功推送过 ERP
+async function _checkDrawerPushStatus(historyId) {
+    /* stub */
+}
+
+async function pushHistoryToErp() {
+    showToast(t('erp-push-coming-soon') || 'ERP 推送即将开放，敬请期待', 'info');
+}
+
+async function saveHistoryEdits() {
+    const r = _results[_drawerIdx];
+    if (!r || !r._historyId) return;
+    // 把 edits 回填到 pages 的第一页 fields(简化:只改第一页主字段,展示层)
+    const newPages = JSON.parse(JSON.stringify(r.pages || []));
+    if (newPages.length > 0) {
+        const firstMainIdx = newPages.findIndex((p) => !p.is_duplicate && !p.is_copy);
+        const idx = firstMainIdx >= 0 ? firstMainIdx : 0;
+        const f = newPages[idx].fields || (newPages[idx].fields = {});
+        // v0.17 · M2 · category_tag 是前端字段名 · 后端 db 用 fields.category · 兼容映射
+        const editsForFields = { ...r.edits };
+        if (editsForFields.category_tag !== undefined) {
+            editsForFields.category = editsForFields.category_tag;
+            delete editsForFields.category_tag;
+        }
+        Object.assign(f, editsForFields);
+    }
+
+    const btn = document.getElementById('btn-save-history');
+    if (btn) btn.disabled = true;
+    try {
+        const resp = await fetch(`/api/history/${encodeURIComponent(r._historyId)}`, {
+            method: 'PUT',
+            headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pages: newPages }),
+        });
+        if (!resp.ok) throw new Error('save failed');
+        showAlert('info', t('history-save-ok'));
+        setTimeout(hideAlerts, 1500);
+        closeDrawer();
+        // 从 _results 移除临时追加的那条
+        if (r._historyMode) _results.pop();
+        // 刷列表
+        loadHistoryPage();
+    } catch (e) {
+        showAlert('error', t('history-save-fail'));
+        if (btn) btn.disabled = false;
+    }
+}
+
+// 「...」菜单(简单版:直接 confirm 对话框流程)
+function openHistoryMenu(historyId, anchor) {
+    // 先关掉已有的 menu
+    document.querySelectorAll('.history-popover').forEach((n) => n.remove());
+    const rect = anchor.getBoundingClientRect();
+    // v0.16 · 从行数据里取发票号 · 决定"复制发票号"是否可用
+    const rec = (_historyState.items || []).find((r) => r.id === historyId);
+    const invNo = rec && rec.invoice_no ? String(rec.invoice_no) : '';
+    // v114 · 是否有 PDF 留底 · 决定「下载 PDF」是否启用
+    const hasPdf = rec && rec.has_pdf === true;
+
+    const menu = document.createElement('div');
+    menu.className = 'history-popover';
+    menu.innerHTML = `
+        <button data-act="copy-invno" ${invNo ? '' : 'disabled'}>${escapeHtml(t('history-menu-copy-invno'))}</button>
+        <button data-act="download-pdf" ${hasPdf ? '' : 'disabled'}>${escapeHtml(t('history-menu-download-pdf'))}</button>
+        <button data-act="delete" class="danger">${escapeHtml(t('history-menu-delete'))}</button>
+    `;
+    menu.style.top = rect.bottom + 4 + 'px';
+    menu.style.left = rect.right - 160 + 'px';
+    document.body.appendChild(menu);
+
+    const closeMenu = () => {
+        menu.remove();
+        document.removeEventListener('click', onDocClick, true);
+    };
+    const onDocClick = (e) => {
+        if (!menu.contains(e.target) && e.target !== anchor) closeMenu();
+    };
+    setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
+
+    menu.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-act]');
+        if (!btn || btn.disabled) return;
+        const act = btn.dataset.act;
+        closeMenu();
+        if (act === 'copy-invno') {
+            if (!invNo) return;
+            try {
+                await navigator.clipboard.writeText(invNo);
+                showToast(t('history-copy-invno-ok', { no: invNo }), 'success');
+            } catch (err) {
+                // clipboard API 被禁或 http 环境 · 降级 · textarea + execCommand
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = invNo;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    showToast(t('history-copy-invno-ok', { no: invNo }), 'success');
+                } catch (e2) {
+                    showToast(t('history-copy-invno-fail'), 'error');
+                }
+            }
+        } else if (act === 'download-pdf') {
+            // v114 · 下载 PDF 留底
+            // v115 · 加 loading toast(因为大文件可能要 30s+ · 用户需要立即反馈)
+            const dismissLoading = showToast(t('history-download-pdf-loading'), 'loading', 0);
+            try {
+                const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}/pdf`, {
+                    headers: { Authorization: 'Bearer ' + token },
+                });
+                if (!resp.ok) throw new Error('download failed');
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download =
+                    rec && rec.filename
+                        ? rec.filename.endsWith('.pdf')
+                            ? rec.filename
+                            : rec.filename + '.pdf'
+                        : 'invoice.pdf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                dismissLoading();
+                showToast(t('history-download-pdf-ok'), 'success');
+            } catch (err) {
+                dismissLoading();
+                showToast(t('history-download-pdf-fail'), 'error');
+            }
+        } else if (act === 'delete') {
+            const ok = await showConfirm(t('history-confirm-delete'), { danger: true });
+            if (!ok) return;
+            try {
+                const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: 'Bearer ' + token },
+                });
+                if (!resp.ok) throw new Error();
+                showAlert('info', t('history-delete-ok'));
+                setTimeout(hideAlerts, 1500);
+                loadHistoryPage();
+            } catch {
+                showAlert('error', t('history-delete-fail'));
+            }
+        }
+    });
+}
+
+// 事件绑定
+(function initHistoryPage() {
+    document.addEventListener('click', (e) => {
+        const row = e.target.closest('.history-row');
+        const menuBtn = e.target.closest('[data-hmenu]');
+        if (menuBtn) {
+            e.stopPropagation();
+            openHistoryMenu(menuBtn.dataset.hmenu, menuBtn);
+            return;
+        }
+        // v102 · 点统一「需复核」⚠ 直接打开抽屉(原 fill-amount 改名为 review)
+        const reviewBtn = e.target.closest('[data-review]');
+        if (reviewBtn) {
+            e.stopPropagation();
+            openHistoryDrawer(reviewBtn.dataset.review);
+            return;
+        }
+        // v91 · 旧「补金额」入口 · v102 已统一到 review · 兼容旧标签保留
+        const fillBtn = e.target.closest('[data-fill-amount]');
+        if (fillBtn) {
+            e.stopPropagation();
+            openHistoryDrawerAndFocusAmount(fillBtn.dataset.fillAmount);
+            return;
+        }
+        // v0.16 · 点 checkbox 不触发抽屉
+        if (e.target.closest('.history-row-check') || e.target.closest('.history-cell-check')) {
+            return;
+        }
+        if (row && !e.target.closest('[data-hmenu]')) {
+            openHistoryDrawer(row.dataset.hid);
+        }
+    });
+
+    // v0.16 · 单行 checkbox 勾选(用 change 更稳 · 委托到 tbody)
+    const tbody = document.getElementById('history-tbody');
+    if (tbody) {
+        tbody.addEventListener('change', (e) => {
+            const cb = e.target.closest('.history-row-check');
+            if (!cb) return;
+            const hid = cb.dataset.hid;
+            if (cb.checked) _historySelected.add(hid);
+            else _historySelected.delete(hid);
+            updateHistoryBatchBar();
+        });
+    }
+
+    // v0.16 · "全选"checkbox · 只作用于当前页
+    const checkAll = document.getElementById('history-check-all');
+    if (checkAll) {
+        checkAll.addEventListener('change', (e) => {
+            const on = e.target.checked;
+            for (const r of _historyState.items) {
+                if (on) _historySelected.add(r.id);
+                else _historySelected.delete(r.id);
+            }
+            // 同步 DOM 里所有复选框
+            document.querySelectorAll('.history-row-check').forEach((el) => {
+                el.checked = on;
+            });
+            updateHistoryBatchBar();
+        });
+    }
+
+    // v0.16 · 取消选择
+    const cancelBtn = document.getElementById('history-batch-cancel');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            clearHistorySelection();
+            document.querySelectorAll('.history-row-check').forEach((el) => {
+                el.checked = false;
+            });
+        });
+    }
+
+    // v0.16 · 批量删除
+    const batchDelBtn = document.getElementById('history-batch-delete');
+    if (batchDelBtn) {
+        batchDelBtn.addEventListener('click', async () => {
+            const n = _historySelected.size;
+            if (n === 0) return;
+            const ok = await showConfirm(t('history-batch-confirm', { n }), { danger: true });
+            if (!ok) return;
+            const ids = Array.from(_historySelected);
+            try {
+                const resp = await fetch('/api/history/batch-delete', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Bearer ' + token,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ ids }),
+                });
+                if (!resp.ok) throw new Error('batch delete failed');
+                const data = await resp.json();
+                showToast(t('history-batch-done', { n: data.deleted || 0 }), 'success');
+                clearHistorySelection();
+                loadHistoryPage();
+            } catch (e) {
+                console.error('batch delete', e);
+                showToast(t('history-batch-fail'), 'error');
+            }
+        });
+    }
+
+    let searchTimer = null;
+    document.getElementById('history-search').addEventListener('input', (e) => {
+        const val = e.target.value;
+        document.getElementById('history-search-clear').style.display = val ? '' : 'none';
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            _historyState.keyword = val.trim();
+            _historyState.page = 0;
+            clearHistorySelection();
+            loadHistoryPage();
+        }, 300);
+    });
+    document.getElementById('history-search-clear').addEventListener('click', () => {
+        const input = document.getElementById('history-search');
+        input.value = '';
+        _historyState.keyword = '';
+        _historyState.page = 0;
+        clearHistorySelection();
+        document.getElementById('history-search-clear').style.display = 'none';
+        loadHistoryPage();
+        input.focus();
+    });
+
+    document.getElementById('history-range').addEventListener('change', (e) => {
+        _historyState.range = parseInt(e.target.value, 10);
+        _historyState.page = 0;
+        clearHistorySelection();
+        loadHistoryPage();
+    });
+
+    document.getElementById('history-prev').addEventListener('click', () => {
+        if (_historyState.page > 0) {
+            _historyState.page--;
+            clearHistorySelection();
+            loadHistoryPage();
+        }
+    });
+    document.getElementById('history-next').addEventListener('click', () => {
+        if ((_historyState.page + 1) * _historyState.pageSize < _historyState.total) {
+            _historyState.page++;
+            clearHistorySelection();
+            loadHistoryPage();
+        }
+    });
+})();
+
+// 桥回 home.js(L2850 guarded 调)
+window.openHistoryDrawer = openHistoryDrawer;

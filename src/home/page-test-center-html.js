@@ -1,11 +1,11 @@
-//============================================================
-//REFACTOR-WB-C3 (2026-06-01) · 测试中心页(#page-test-center · skin-only 内部测试工具)inner 从 home.html 抽出 · 运行期注入
+// ============================================================
+// REFACTOR-WB-C3 (2026-06-01) · 测试中心页(#page-test-center · skin-only 内部测试工具)inner 从 home.html 抽出 · 运行期注入
 //
-//home.html 留空壳 <section class="page" id="page-test-center"></section>· 本模块 eval 时注入 inner。
-//test-center.js(main.js 内 import 在本模块之后·line 51)绑 tc-* 元素·全带 `if(x)` 守卫(漏接只降级不崩)·
-//且功能 skin-gated(_isAllowed)· import 置 test-center.js 前 → 注入元素在场。skin-only 内部工具·
-//e2e_1 非 skin 不可交互验·靠注入检查(wbInjected)+boot E2E 保不崩。i18n:注入后子树补译·verbatim·0 改结构。
-//============================================================
+// home.html 留空壳 <section class="page" id="page-test-center"></section>· 本模块 eval 时注入 inner。
+// test-center.js(main.js 内 import 在本模块之后·line 51)绑 tc-* 元素·全带 `if(x)` 守卫(漏接只降级不崩)·
+// 且功能 skin-gated(_isAllowed)· import 置 test-center.js 前 → 注入元素在场。skin-only 内部工具·
+// e2e_1 非 skin 不可交互验·靠注入检查(wbInjected)+boot E2E 保不崩。i18n:注入后子树补译·verbatim·0 改结构。
+// ============================================================
 import { wbInject } from './wb-inject.js';
 
 const HTML = `

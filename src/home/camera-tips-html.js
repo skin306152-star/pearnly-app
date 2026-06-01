@@ -1,11 +1,11 @@
-//============================================================
-//REFACTOR-WB-C3 (2026-06-01) · 拍照贴士弹窗 inner 从 home.html 抽出 · 运行期注入
+// ============================================================
+// REFACTOR-WB-C3 (2026-06-01) · 拍照贴士弹窗 inner 从 home.html 抽出 · 运行期注入
 //
-//home.html 留空壳 <div id="camera-tips-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
-//upload-camera.js(main.js 内 import 在本模块之后)showCameraTips() 用户点拍照时才读 camera-tips-ok/cancel/skip
-//(且带 if(!overlay||!btnOk) 守卫)· eval 注入恒早于首次触发 · import 置 upload-camera.js 前(确定性)。
-//i18n:注入后子树补译 · verbatim inner · 0 改结构。
-//============================================================
+// home.html 留空壳 <div id="camera-tips-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
+// upload-camera.js(main.js 内 import 在本模块之后)showCameraTips() 用户点拍照时才读 camera-tips-ok/cancel/skip
+// (且带 if(!overlay||!btnOk) 守卫)· eval 注入恒早于首次触发 · import 置 upload-camera.js 前(确定性)。
+// i18n:注入后子树补译 · verbatim inner · 0 改结构。
+// ============================================================
 import { wbInject } from './wb-inject.js';
 
 const HTML = `

@@ -1,13 +1,13 @@
-//============================================================
-//REFACTOR-WB-C3 (2026-06-01) · 客户编辑 / 账套主体编辑弹窗 inner 从 home.html 抽出 · 运行期注入
+// ============================================================
+// REFACTOR-WB-C3 (2026-06-01) · 客户编辑 / 账套主体编辑弹窗 inner 从 home.html 抽出 · 运行期注入
 //
-//home.html 留两个空壳 <div id="client-modal-mask"> / <div id="wsclient-modal-mask">(modal-mask · display:none)·
-//本模块 eval 时注入 inner。clients.js(main.js 内 import 在本模块之后)在 DOMContentLoaded handler 里
-//带 null 守卫绑 client-modal-* / wsclient-modal-* close/cancel/save/delete/archive/mask · openClientModal
+// home.html 留两个空壳 <div id="client-modal-mask"> / <div id="wsclient-modal-mask">(modal-mask · display:none)·
+// 本模块 eval 时注入 inner。clients.js(main.js 内 import 在本模块之后)在 DOMContentLoaded handler 里
+// 带 null 守卫绑 client-modal-* / wsclient-modal-* close/cancel/save/delete/archive/mask · openClientModal
 /// openWsClientModal 用户开弹窗时才读 inner。模块 eval(defer)早于 DOMContentLoaded → 元素届时恒在场。
-//import 置 clients.js 前(确定性·非竞态)· 镜像 modal-assign-clients.js 范式。verbatim inner · 0 改结构。
-//i18n:注入后子树补译(镜像 applyLang)· 切语言由 applyLang 全文扫描覆盖。
-//============================================================
+// import 置 clients.js 前(确定性·非竞态)· 镜像 modal-assign-clients.js 范式。verbatim inner · 0 改结构。
+// i18n:注入后子树补译(镜像 applyLang)· 切语言由 applyLang 全文扫描覆盖。
+// ============================================================
 import { wbInject } from './wb-inject.js';
 
 const CLIENT_HTML = `

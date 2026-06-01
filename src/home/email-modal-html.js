@@ -1,13 +1,13 @@
-//============================================================
-//REFACTOR-WB-C3 (2026-06-01) · 邮箱抓取绑定弹窗(#email-modal · automation 邮箱抓取)inner 从 home.html 抽出 · 运行期注入
+// ============================================================
+// REFACTOR-WB-C3 (2026-06-01) · 邮箱抓取绑定弹窗(#email-modal · automation 邮箱抓取)inner 从 home.html 抽出 · 运行期注入
 //
-//home.html 留空壳 <div id="email-modal">(modal-overlay·display:none)· 本模块 eval 时注入 inner。
-//注意:本 #email-modal 是【邮箱抓取(email-ingest)】绑定弹窗(automation·非高敏)· 与 line-email-modal.js
-//动态创建的 #line-email-modal(LINE 补邮箱高敏)是两回事——后者自建元素不碰 home.html。
-//email-ingest.js(main.js 内 import 在本模块之后·line 69)wire()(eval 期 IIFE)绑 email-modal-close/
-//btn-email-modal-cancel/test/save 等·全带 `if(x)` 守卫(漏接只降级不崩)· import 置 email-ingest.js 前
-//→ 注入元素届时在场·绑定正常。i18n:注入后子树补译 · verbatim inner · 0 改结构。
-//============================================================
+// home.html 留空壳 <div id="email-modal">(modal-overlay·display:none)· 本模块 eval 时注入 inner。
+// 注意:本 #email-modal 是【邮箱抓取(email-ingest)】绑定弹窗(automation·非高敏)· 与 line-email-modal.js
+// 动态创建的 #line-email-modal(LINE 补邮箱高敏)是两回事——后者自建元素不碰 home.html。
+// email-ingest.js(main.js 内 import 在本模块之后·line 69)wire()(eval 期 IIFE)绑 email-modal-close/
+// btn-email-modal-cancel/test/save 等·全带 `if(x)` 守卫(漏接只降级不崩)· import 置 email-ingest.js 前
+// → 注入元素届时在场·绑定正常。i18n:注入后子树补译 · verbatim inner · 0 改结构。
+// ============================================================
 import { wbInject } from './wb-inject.js';
 
 const HTML = `

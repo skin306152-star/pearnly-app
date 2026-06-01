@@ -1,12 +1,12 @@
-//============================================================
-//REFACTOR-WB-C3 (2026-06-01) · 银行对账「候选匹配抽屉」inner 从 home.html 抽出 · 运行期注入
+// ============================================================
+// REFACTOR-WB-C3 (2026-06-01) · 银行对账「候选匹配抽屉」inner 从 home.html 抽出 · 运行期注入
 //
-//home.html 留空壳 <div id="bank-cand-drawer">(fixed drawer · display:none)· 本模块 eval 时注入 inner。
-//bank-recon.js(main.js 内 import 在本模块之后)load()→bindEvents() 按需(automation bank tab 点击)才绑
-//[data-bank-cand-close]/btn-bank-cand-ignore · eval 期注入恒早于首次 load · 故确定性在场(非竞态)。
-//home.js 已 0 行(全拆完)· 0 处 parse/init 引用 bank-cand-* 元素(已核)。
-//i18n:注入后子树补译(镜像 applyLang)· 切语言由 applyLang 全文扫描覆盖。verbatim inner · 0 改结构。
-//============================================================
+// home.html 留空壳 <div id="bank-cand-drawer">(fixed drawer · display:none)· 本模块 eval 时注入 inner。
+// bank-recon.js(main.js 内 import 在本模块之后)load()→bindEvents() 按需(automation bank tab 点击)才绑
+// [data-bank-cand-close]/btn-bank-cand-ignore · eval 期注入恒早于首次 load · 故确定性在场(非竞态)。
+// home.js 已 0 行(全拆完)· 0 处 parse/init 引用 bank-cand-* 元素(已核)。
+// i18n:注入后子树补译(镜像 applyLang)· 切语言由 applyLang 全文扫描覆盖。verbatim inner · 0 改结构。
+// ============================================================
 import { wbInject } from './wb-inject.js';
 
 const HTML = `

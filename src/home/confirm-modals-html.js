@@ -1,12 +1,12 @@
-//============================================================
-//REFACTOR-WB-C3 (2026-06-01) · 两个全局确认弹窗 inner 从 home.html 抽出 · 运行期注入
+// ============================================================
+// REFACTOR-WB-C3 (2026-06-01) · 两个全局确认弹窗 inner 从 home.html 抽出 · 运行期注入
 //
-//home.html 留两空壳 <div id="pearnly-confirm-modal"> / <div id="confirm-modal">(modal-overlay·display:none)·
-//本模块 eval 时注入 inner。pearnly-confirm.js(window.pearnlyConfirm)/ confirm-modal.js(window.showConfirm·
-//~18 模块裸调)均在【调用时】(用户动作 handler · await)才读 inner 元素 · 且带 DOM 缺失守卫(退原生
-//confirm / resolve(false))· 纯 on-demand 无 eval 绑定 · import 置二者(main.js line 18/26)前确定性更稳。
-//i18n:注入后子树补译 · verbatim inner · 0 改结构。
-//============================================================
+// home.html 留两空壳 <div id="pearnly-confirm-modal"> / <div id="confirm-modal">(modal-overlay·display:none)·
+// 本模块 eval 时注入 inner。pearnly-confirm.js(window.pearnlyConfirm)/ confirm-modal.js(window.showConfirm·
+// ~18 模块裸调)均在【调用时】(用户动作 handler · await)才读 inner 元素 · 且带 DOM 缺失守卫(退原生
+// confirm / resolve(false))· 纯 on-demand 无 eval 绑定 · import 置二者(main.js line 18/26)前确定性更稳。
+// i18n:注入后子树补译 · verbatim inner · 0 改结构。
+// ============================================================
 import { wbInject } from './wb-inject.js';
 
 const PEARNLY_CONFIRM_HTML = `

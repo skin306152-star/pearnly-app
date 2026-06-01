@@ -1,14 +1,14 @@
-//============================================================
-//REFACTOR-WB-C3 (2026-06-01) · 上传识别主页(#page-ocr · 登录后默认 active 页)inner 从 home.html 抽出 · 运行期注入
+// ============================================================
+// REFACTOR-WB-C3 (2026-06-01) · 上传识别主页(#page-ocr · 登录后默认 active 页)inner 从 home.html 抽出 · 运行期注入
 //
-//home.html 留空壳 <section class="page active" id="page-ocr"></section>(保 active·默认页路由依赖)·
-//本模块 eval 时注入 inner。 高扇出:upload-files.js / ocr-recognize.js / ocr-results.js / export.js
-//等在【模块 eval 顶层·无守卫】绑 drop-zone / btn-start / file-input / search-input / btn-export /
-//results-tbody 等(它是默认主页·boot 即需)· 故本模块 import 必须置【所有】OCR 消费模块前
-//(main.js 内紧随 state.js·早于 line 32 ocr-fields)→ 注入元素届时恒在场;漏接会 bundle eval 抛错
-//→ 全员 boot 崩(登录 E2E 落本页·立即抓到)。纯结构搬迁·0 逻辑改。
-//i18n:注入后子树补译 · verbatim inner · 0 改结构。
-//============================================================
+// home.html 留空壳 <section class="page active" id="page-ocr"></section>(保 active·默认页路由依赖)·
+// 本模块 eval 时注入 inner。 高扇出:upload-files.js / ocr-recognize.js / ocr-results.js / export.js
+// 等在【模块 eval 顶层·无守卫】绑 drop-zone / btn-start / file-input / search-input / btn-export /
+// results-tbody 等(它是默认主页·boot 即需)· 故本模块 import 必须置【所有】OCR 消费模块前
+// (main.js 内紧随 state.js·早于 line 32 ocr-fields)→ 注入元素届时恒在场;漏接会 bundle eval 抛错
+// → 全员 boot 崩(登录 E2E 落本页·立即抓到)。纯结构搬迁·0 逻辑改。
+// i18n:注入后子树补译 · verbatim inner · 0 改结构。
+// ============================================================
 import { wbInject } from './wb-inject.js';
 
 const HTML = `

@@ -1,11 +1,11 @@
-//============================================================
-//REFACTOR-WB-C3 (2026-06-01) · 银行对账 session 客户绑定弹窗 inner 从 home.html 抽出 · 运行期注入
+// ============================================================
+// REFACTOR-WB-C3 (2026-06-01) · 银行对账 session 客户绑定弹窗 inner 从 home.html 抽出 · 运行期注入
 //
-//home.html 留空壳 <div id="bank-client-picker-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
-//bank-recon.js(main.js 内 import 在本模块之后)bindEvents()(load() 按需·automation bank tab 点击触发)才绑
-//[data-bank-client-picker-close]/btn-bank-client-picker-save · eval 注入恒早于首次 load · import 置 bank-recon.js 前。
-//i18n:注入后子树补译 · verbatim inner · 0 改结构。
-//============================================================
+// home.html 留空壳 <div id="bank-client-picker-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
+// bank-recon.js(main.js 内 import 在本模块之后)bindEvents()(load() 按需·automation bank tab 点击触发)才绑
+// [data-bank-client-picker-close]/btn-bank-client-picker-save · eval 注入恒早于首次 load · import 置 bank-recon.js 前。
+// i18n:注入后子树补译 · verbatim inner · 0 改结构。
+// ============================================================
 import { wbInject } from './wb-inject.js';
 
 const HTML = `

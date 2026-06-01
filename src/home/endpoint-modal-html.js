@@ -1,14 +1,14 @@
-//============================================================
-//REFACTOR-WB-C3 (2026-06-01) · ERP 端点配置弹窗 inner 从 home.html 抽出 · 运行期注入
+// ============================================================
+// REFACTOR-WB-C3 (2026-06-01) · ERP 端点配置弹窗 inner 从 home.html 抽出 · 运行期注入
 //
-//home.html 留空壳 <div id="endpoint-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
-//erp-integration.js(main.js 内 import 在本模块之后·line 95)顶层 IIFE initAutomationPage()
-//**无守卫**直接绑 endpoint-modal-close / btn-ep-cancel / btn-ep-test / btn-ep-save / ep-url(eval 期)·
-//故本模块 import 必须置 erp-integration.js 前(确定性·非竞态)· 错序则 IIFE getElementById 命中 null
-//→ addEventListener 抛错 → boot 崩(会被 E2E console 守门响亮抓到)。btn-add-endpoint 是打开按钮·
-//在页面上(page-automation 注入·line 22 早于此)· 不在本 modal 内。
-//i18n:注入后子树补译 · verbatim inner · 0 改结构。
-//============================================================
+// home.html 留空壳 <div id="endpoint-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
+// erp-integration.js(main.js 内 import 在本模块之后·line 95)顶层 IIFE initAutomationPage()
+// **无守卫**直接绑 endpoint-modal-close / btn-ep-cancel / btn-ep-test / btn-ep-save / ep-url(eval 期)·
+// 故本模块 import 必须置 erp-integration.js 前(确定性·非竞态)· 错序则 IIFE getElementById 命中 null
+// → addEventListener 抛错 → boot 崩(会被 E2E console 守门响亮抓到)。btn-add-endpoint 是打开按钮·
+// 在页面上(page-automation 注入·line 22 早于此)· 不在本 modal 内。
+// i18n:注入后子树补译 · verbatim inner · 0 改结构。
+// ============================================================
 import { wbInject } from './wb-inject.js';
 
 const HTML = `

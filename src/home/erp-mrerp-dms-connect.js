@@ -151,7 +151,7 @@
     function _openWizard() {
         _closeWizard();
         var ep = _ep;
-        var url = (ep && ep.config && ep.config.system_url) || DEFAULT_URL;
+        // 2026-06-01 · DMS 地址写死隐藏(只此一个 DMS 实例)· 向导只露 账号/密码/订车单号前缀。
         var prefix =
             (ep &&
                 ep.config &&
@@ -194,7 +194,6 @@
             '<div style="font-size:13px;color:var(--muted,#6b6b66);margin-bottom:18px;">' +
             _esc(t('dms-card-desc')) +
             '</div>' +
-            field('dms-wizard-url', 'dms-w-url', 'text', url, DEFAULT_URL) +
             field('dms-wizard-username', 'dms-w-user', 'text', '', '') +
             field('dms-wizard-password', 'dms-w-pass', 'password', '', '') +
             field('dms-wizard-prefix', 'dms-w-prefix', 'text', prefix, 'PN') +
@@ -226,7 +225,8 @@
     }
 
     async function _saveWizard() {
-        var url = (document.getElementById('dms-w-url') || {}).value || '';
+        // DMS 地址写死(界面已隐藏)· 编辑态沿用已存 system_url,新建用 DEFAULT_URL。
+        var url = (_ep && _ep.config && _ep.config.system_url) || DEFAULT_URL;
         var user = (document.getElementById('dms-w-user') || {}).value || '';
         var pass = (document.getElementById('dms-w-pass') || {}).value || '';
         var prefix = (document.getElementById('dms-w-prefix') || {}).value || 'PN';

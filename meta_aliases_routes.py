@@ -36,10 +36,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_time.time()),
         "release_notes": {
-            "zh": "系统已完成一次后台优化,页面加载与运行更稳定流畅。本次为内部性能优化,所有功能与操作方式保持不变。即日生效。",
-            "th": "ระบบได้ดำเนินการปรับปรุงประสิทธิภาพภายในเรียบร้อยแล้ว การโหลดและการทำงานของหน้าเว็บมีความเสถียรและลื่นไหลยิ่งขึ้น การปรับปรุงครั้งนี้เป็นการปรับภายในเท่านั้น ความสามารถและวิธีการใช้งานทั้งหมดยังคงเหมือนเดิม มีผลทันที",
-            "en": "The system has completed an internal optimization. Page loading and overall responsiveness are now smoother and more stable. This update is an internal improvement only; all capabilities and the way you use them remain the same. Effective immediately.",
-            "ja": "システムの内部最適化を実施しました。ページの読み込みと全体の動作がより安定し、スムーズになりました。今回は内部的な改善のみで、すべての機能と操作方法はこれまでと同じです。即日有効。",
+            "zh": "本次更新优化了菜单名称与推送记录的查看体验。「上传发票」「发票记录」已更名为「上传识别」「识别记录」,以涵盖更多单据类型;推送记录现可按对接系统分类筛选查看,信息更清晰。即日生效。",
+            "th": "การอัปเดตนี้ปรับชื่อเมนูและปรับปรุงการดูบันทึกการส่งข้อมูล โดยเปลี่ยน「อัปโหลดใบกำกับ」และ「บันทึกใบกำกับ」เป็น「อัปโหลดและสแกน」และ「บันทึกการสแกน」เพื่อรองรับเอกสารหลากหลายประเภทมากขึ้น และสามารถกรองบันทึกการส่งตามระบบที่เชื่อมต่อได้ ทำให้ข้อมูลชัดเจนยิ่งขึ้น มีผลทันที",
+            "en": 'This update refines several menu names and improves how push records are viewed. "Upload Invoice" and "Invoice Records" are now "Upload & Scan" and "Scan Records" to cover more document types, and push records can be filtered by connected system for a clearer view. Effective immediately.',
+            "ja": "今回の更新では、一部メニュー名を整理し、送信記録の表示を改善しました。「請求書アップロード」「請求書記録」を「アップロード・読取」「読取記録」に変更し、より多くの書類に対応します。送信記録は連携システムごとに絞り込めるようになりました。即日有効。",
         },
     }
 

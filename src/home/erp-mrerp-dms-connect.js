@@ -97,12 +97,14 @@
                 '</button>';
         } else {
             var toggleLabel = connected ? t('dms-card-disable') : t('dms-card-enable');
+            // 2026-06-01 · R7 视觉一致:按钮顺序对齐 MR.ERP 财务卡(修改在前 → 启用/停用在最后)。
+            // 原顺序 测试→修改→停用 与财务卡的 修改→…→停用 不一致(Codex R2 复测 FAIL)。
             actions =
-                '<button type="button" class="int-btn-configure" id="btn-dms-test">' +
-                _esc(t('dms-card-test')) +
-                '</button>' +
                 '<button type="button" class="int-btn-configure" id="btn-dms-edit">' +
                 _esc(t('dms-card-edit')) +
+                '</button>' +
+                '<button type="button" class="int-btn-configure" id="btn-dms-test">' +
+                _esc(t('dms-card-test')) +
                 '</button>' +
                 '<button type="button" class="int-btn-configure" id="btn-dms-toggle">' +
                 _esc(toggleLabel) +

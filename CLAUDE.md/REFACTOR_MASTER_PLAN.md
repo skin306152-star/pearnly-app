@@ -174,10 +174,10 @@
 - 前端深化:C4 组件库 / C5 TypeScript / C9 状态管理。
 
 **🌊 Wave 3 — 需 Zihao 动手(不花钱·按正常依赖位置·到那步我一步步教你装)**
-- **A3** 装 Docker Desktop(验本地 staging build·配置已就绪)。
+- **A3 staging 服务器(2026-06-02 Zihao 拍板新方案)**:用**闲置笔记本 IdeaPad**(i5-1155G7 / 8GB / 477GB · 在泰国)做专用 staging —— 装 **Ubuntu Server + Cloudflare Tunnel(免费·无需公网IP/开端口)**,挂 `staging.pearnly.com`,跑全套 Linux 栈(systemd + git-deploy.sh 跟 prod 一模一样)。**先 staging 试水 2-4 周验家里在线率,稳了再升正式、关 Vultr(省钱 + 白得 8GB/4核/477GB 强机 + 477GB 治磁盘满宕机)**;不稳就继续用 Vultr,staging 也不白费。**部署流程对 Zihao 完全不变(还是 git push→自动上线)**。换机器易(DB 在 Supabase 云 + Tunnel 只改指向 + 全脚本化·Code 全程做)。原 Docker Desktop 验证可并入或省去。
 - **A4** 装 Doppler CLI(密钥管理·碰 prod 红线·你在场点确认)。
 - 各阶段**验收**(像用户点一遍)+ 权限框确认。
-- ⏳ 这些**不卡 Wave 1**——不装也能继续拆文件;到了再叫你。
+- ⏳ 这些**不卡 Wave 1**——不装也能继续拆文件;到了再叫你。整顿告一段落再起 staging,别和大重构叠一起。
 
 **🌊 Wave 4 — 最后(抛光 + 可能花钱的可选项)**
 - **I 抛光**:I6 去 AI 味全量审计 + **I7 代码目录重组**(86 root .py → 包·文件全 <500 冻结后一次性搬·铁律#30)。

@@ -599,23 +599,7 @@
 
     <!-- v0.10 · 归档 token 编辑 popover -->
     <!-- v118.27.0.1 · 全局确认弹窗(替代原生 confirm · 跟 Pearnly 整体 UI 一致) -->
-    <div class="modal-overlay" id="pearnly-confirm-modal" style="display:none;">
-        <div class="modal" style="max-width:420px;">
-            <div class="modal-head">
-                <div class="modal-title" id="pearnly-confirm-title" data-i18n="confirm-default-title">请确认</div>
-                <button class="modal-close" id="pearnly-confirm-close" aria-label="close">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div id="pearnly-confirm-msg" class="pearnly-confirm-msg"></div>
-            </div>
-            <div class="modal-foot">
-                <button class="btn btn-ghost" id="pearnly-confirm-cancel" data-i18n="confirm-cancel">取消</button>
-                <button class="btn btn-primary" id="pearnly-confirm-ok" data-i18n="confirm-ok">确定</button>
-            </div>
-        </div>
-    </div>
+    <div class="modal-overlay" id="pearnly-confirm-modal" style="display:none;"></div>
 
     <div class="modal-overlay" id="archive-token-modal" style="display:none;"></div>
 
@@ -1022,21 +1006,7 @@
 </aside>
 
 <!-- ================= Confirm Modal (v0.15.6 · 替换浏览器原生 confirm) ================= -->
-<div class="modal-overlay" id="confirm-modal" style="display:none;">
-    <div class="modal" style="max-width:420px;">
-        <div class="modal-head">
-            <div class="modal-title" id="confirm-modal-title" data-i18n="confirm-default-title">请确认</div>
-            <button class="modal-close" id="confirm-modal-close" aria-label="close">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>
-            </button>
-        </div>
-        <div class="modal-body" id="confirm-modal-body" style="white-space:pre-wrap;line-height:1.55;"></div>
-        <div class="modal-foot">
-            <button class="btn btn-ghost" id="confirm-modal-cancel" data-i18n="confirm-cancel">取消</button>
-            <button class="btn btn-primary" id="confirm-modal-ok" data-i18n="confirm-ok">确定</button>
-        </div>
-    </div>
-</div>
+<div class="modal-overlay" id="confirm-modal" style="display:none;"></div>
 
 <!-- ================= 拍照贴士弹窗 · v0.17 ================= -->
 <div class="modal-overlay" id="camera-tips-modal" style="display:none;"></div>
@@ -1181,7 +1151,7 @@
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing + test-center 由 Vite bundle 成 static/dist/main.js ·
      ES module(type=module 自动 defer)· state.js 第1个 import 装错误拦截+i18n总线+window.*状态 ·
      /api/version 现读本 main.js?v=(REFACTOR-C1-home-batch9g2 · home.js 已删 · read_frontend_version 改锚 main.js) -->
-<script type="module" src="/static/dist/main.js?v=11850057"></script>
+<script type="module" src="/static/dist/main.js?v=11850058"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·

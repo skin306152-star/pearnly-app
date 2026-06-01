@@ -12,8 +12,8 @@ line_webhook_routes.py · LINE Bot Messaging API webhook(REFACTOR-B1)
     - _handle_line_text     绑定码消费 + 已绑提示
     - line_webhook 入口路由(签名校验 → 事件分发)
 
-LINE 图片/文件 → OCR 路径(`_handle_line_image_ocr`)留 app.py(依赖 _ocr_* helpers
-盘根错节 · 留专门一轮抽)。`_handle_line_event` 内 lazy import 解循环。
+LINE 图片/文件 → OCR 路径(`_handle_line_image_ocr`)已抽到 services/ocr/line_image_ocr.py
+(REFACTOR-WB-app · 2026-06-01)。`_handle_line_event` 内 import 调到 · 无循环 import。
 
 E2E 闸:spec 14(LINE binding)间接覆盖签名校验前的拒绝路径。
 """
@@ -142,9 +142,9 @@ async def _handle_line_event(ev: dict):
                 )
 
             # 启后台任务跑 OCR + push 结果
-            # ⚠️ lazy import 解循环:_handle_line_image_ocr 留 app.py(依赖 _ocr_* helpers
-            #   盘根错节)· 抽 webhook 块时不能把它一起搬走 · app 加载完后此 import 总能拿到。
-            from app import _handle_line_image_ocr  # noqa: E402
+            # _handle_line_image_ocr 已抽到 services/ocr/line_image_ocr.py
+            # (REFACTOR-WB-app · 2026-06-01)· 不再经 app.py · 无循环 import。
+            from services.ocr.line_image_ocr import _handle_line_image_ocr
 
             asyncio.create_task(
                 _handle_line_image_ocr(

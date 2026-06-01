@@ -215,6 +215,115 @@ class DmsClientFlowTests(unittest.TestCase):
         self.assertEqual(ctx.exception.error_code, "ERR_DMS_IMPORT_REPORT")
 
 
+_PROVINCE_FORM = (
+    "<form>"
+    '<select name="selprovinces">'
+    '<option value="">--</option>'
+    '<option value="65" selected>กระบี่</option>'
+    '<option value="1">กรุงเทพมหานคร</option>'
+    "</select></form>"
+)
+
+
+class GeoFakeTransport(FakeTransport):
+    """FakeTransport that scripts the province form + the geo cascade so the
+    resolver can map address TEXT → master ids. Records the cus/new.php body."""
+
+    def __init__(self, *, districts, subdistricts, zipcodes):
+        super().__init__(preview_body="")
+        self._districts = districts
+        self._subdistricts = subdistricts
+        self._zipcodes = zipcodes
+        self.new_data = None
+
+    @staticmethod
+    def _opts(rows):
+        return "".join(f'<option value="{v}">{label}</option>' for v, label in rows)
+
+    def post(self, url, data=None, files=None, timeout_ms=None):
+        if "cus/form.php" in url:
+            self.calls.append(("POST", url))
+            return _Resp(200, _PROVINCE_FORM)
+        if "cus/component/listdistricts.php" in url:
+            self.calls.append(("POST", url))
+            return _Resp(200, self._opts(self._districts))
+        if "cus/component/listsubdistricts.php" in url:
+            self.calls.append(("POST", url))
+            return _Resp(200, self._opts(self._subdistricts))
+        if "cus/component/listzipcodes.php" in url:
+            self.calls.append(("POST", url))
+            return _Resp(200, self._opts(self._zipcodes))
+        if "cus/new.php" in url:
+            self.new_data = dict(data or {})
+            self.calls.append(("POST", url))
+            return _Resp(200, "")
+        return super().post(url, data=data, files=files, timeout_ms=timeout_ms)
+
+
+def _geo_card(province="กรุงเทพมหานคร", district="บางนา", subdistrict="บางนา", zipcode="10260"):
+    return ThaiIdCardPayload(
+        people_id="9900000001010",
+        first_name="ทดสอบ",
+        last_name="เพียร์ลี่",
+        birthday_be="01/01/2530",
+        address=ThaiAddress(
+            house_no="123/45",
+            province_name=province,
+            district_name=district,
+            subdistrict_name=subdistrict,
+            zipcode=zipcode,
+        ),
+        prefix_id="17",
+    )
+
+
+class GeoResolveTests(unittest.TestCase):
+    def test_address_text_resolves_to_master_ids(self):
+        t = GeoFakeTransport(
+            districts=[("47", "บางนา"), ("18", "คลองสาน")],
+            subdistricts=[("149", "บางนา")],
+            zipcodes=[("106", "10260")],
+        )
+        client = DMSClient(t, "https://www.mrerp4sme.com/dms/")
+        client.ensure_customer(_geo_card())
+        for suffix in ("", "_ct", "_sd"):
+            self.assertEqual(t.new_data[f"selprovinces{suffix}"], "1")
+            self.assertEqual(t.new_data[f"seldistricts{suffix}"], "47")
+            self.assertEqual(t.new_data[f"selsubdistricts{suffix}"], "149")
+            self.assertEqual(t.new_data[f"selzipcodes{suffix}"], "106")
+
+    def test_prefixed_names_still_match(self):
+        t = GeoFakeTransport(
+            districts=[("47", "บางนา")],
+            subdistricts=[("149", "บางนา")],
+            zipcodes=[("106", "10260")],
+        )
+        client = DMSClient(t, "https://www.mrerp4sme.com/dms/")
+        # OCR sometimes keeps the administrative prefix word on the label.
+        client.ensure_customer(
+            _geo_card(province="จังหวัดกรุงเทพมหานคร", district="เขตบางนา", subdistrict="แขวงบางนา")
+        )
+        self.assertEqual(t.new_data["selprovinces"], "1")
+        self.assertEqual(t.new_data["seldistricts"], "47")
+        self.assertEqual(t.new_data["selsubdistricts"], "149")
+
+    def test_unmatched_name_falls_back_to_valid_chain(self):
+        # An unknown province must NOT leave the geo selects empty (cus/new.php
+        # rejects empty geo); it falls back to the form's default province and
+        # the first option at each level so creation still succeeds.
+        t = GeoFakeTransport(
+            districts=[("800", "เมือง")],
+            subdistricts=[("9000", "ในเมือง")],
+            zipcodes=[("106", "81000")],
+        )
+        client = DMSClient(t, "https://www.mrerp4sme.com/dms/")
+        client.ensure_customer(_geo_card(province="ไม่มีจริง", district="ไม่มี"))
+        self.assertEqual(t.new_data["selprovinces"], "65")  # form default
+        self.assertEqual(t.new_data["seldistricts"], "800")  # first option
+        self.assertEqual(t.new_data["selsubdistricts"], "9000")
+        self.assertEqual(t.new_data["selzipcodes"], "106")
+
+
 class XlsxBuilderTests(unittest.TestCase):
     def test_row2_shared_strings_edited_in_place(self):
         out = DMSBookingImportXlsxBuilder().build(

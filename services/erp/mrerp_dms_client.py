@@ -31,6 +31,7 @@ from __future__ import annotations
 import html
 import json
 import re
+from dataclasses import replace
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
@@ -104,7 +105,8 @@ class DMSClient:
         )
         if prefix_name:
             data["txtprefix"] = prefix_name
-        self._apply_address_to_customer_form(data, card.address)
+        resolved_address = self._resolve_address_geo(card.address, form_html)
+        self._apply_address_to_customer_form(data, resolved_address)
         resp = self.transport.post(self._url("cus/new.php"), data=data, timeout_ms=60000)
         if resp.status_code != 200 or resp.text.strip().startswith("err::"):
             raise DMSClientError(
@@ -465,6 +467,89 @@ class DMSClient:
             data[f"seldistricts{suffix}"] = address.district_id
             data[f"selsubdistricts{suffix}"] = address.subdistrict_id
             data[f"selzipcodes{suffix}"] = address.zipcode_id
+
+    # Thai administrative prefixes OCR occasionally leaves on a label even
+    # though the id-card prompt asks for bare names; strip them so the
+    # master-list lookup still lands on the right row.
+    _GEO_PREFIXES = ("จังหวัด", "อำเภอ", "ตำบล", "แขวง", "เขต", "จ.", "อ.", "ต.")
+
+    def _norm_geo(self, name: str) -> str:
+        s = html.unescape(str(name or "")).strip()
+        for prefix in self._GEO_PREFIXES:
+            if s.startswith(prefix):
+                return s[len(prefix) :].strip()
+        return s
+
+    def _parse_options(self, options_html: str) -> List[List[str]]:
+        """[[value, label], ...] for a block of <option> tags, dropping the
+        empty-value placeholder row."""
+        out: List[List[str]] = []
+        for attrs, label in re.findall(r"<option([^>]*)>(.*?)</option>", options_html, re.S | re.I):
+            value = self._attr(attrs, "value")
+            if not value:
+                continue
+            out.append([value, html.unescape(re.sub(r"<.*?>", "", label).strip())])
+        return out
+
+    def _match_geo(self, options: List[List[str]], name: str) -> str:
+        target = self._norm_geo(name)
+        if not target:
+            return ""
+        for value, label in options:
+            if self._norm_geo(label) == target:
+                return value
+        return ""
+
+    def _resolve_address_geo(self, address, form_html: str):
+        """Resolve province/district/subdistrict/zipcode TEXT → DMS master ids
+        via the customer form's cascade endpoints (listdistricts → … → zipcodes).
+
+        cus/new.php rejects an empty geo select with a misleading "already used"
+        error, so every level falls back to the list's first option (and the
+        form's pre-selected province) when the OCR'd name finds no match — the
+        customer is always created with a valid chain while the address TEXT
+        fields still carry the real registered address."""
+        prov = re.search(
+            r'<select[^>]+name="selprovinces"[^>]*>(.*?)</select>', form_html, re.S | re.I
+        )
+        if not prov:
+            return address
+        provinces = self._parse_options(prov.group(1))
+        default_province = self._selected_value(prov.group(1)) or (
+            provinces[0][0] if provinces else ""
+        )
+        province_id = self._match_geo(provinces, address.province_name) or default_province
+        if not province_id:
+            return address
+
+        districts = self._fetch_options(
+            "cus/component/listdistricts.php", {"selprovinces": province_id}
+        )
+        district_id = self._match_geo(districts, address.district_name) or (
+            districts[0][0] if districts else ""
+        )
+        subdistricts = self._fetch_options(
+            "cus/component/listsubdistricts.php", {"seldistricts": district_id}
+        )
+        subdistrict_id = self._match_geo(subdistricts, address.subdistrict_name) or (
+            subdistricts[0][0] if subdistricts else ""
+        )
+        zipcodes = self._fetch_options(
+            "cus/component/listzipcodes.php", {"selsubdistricts": subdistrict_id}
+        )
+        zipcode_id = self._match_geo(zipcodes, address.zipcode) or (
+            zipcodes[0][0] if zipcodes else ""
+        )
+        return replace(
+            address,
+            province_id=province_id,
+            district_id=district_id,
+            subdistrict_id=subdistrict_id,
+            zipcode_id=zipcode_id,
+        )
+
+    def _fetch_options(self, path: str, body: Dict[str, str]) -> List[List[str]]:
+        return self._parse_options(self._post_text(path, body))
 
     def _apply_address_to_booking_form(self, data: Dict[str, str], address) -> None:
         data.update(

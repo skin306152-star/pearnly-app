@@ -798,52 +798,6 @@
     <!-- ============ P3 · 账套主体编辑弹窗(新建/改名/改税号 · 仅老板)============ -->
     <div class="modal-mask" id="wsclient-modal-mask" style="display:none;"></div>
 
-    <!-- ============ v118.27.0 · 余额更新弹窗 ============ -->
-
-    <!-- ============ v108 · 余额更新弹窗 ============ -->
-    <div class="modal-mask" id="billing-modal-mask" style="display:none;">
-        <div class="modal" role="dialog" style="max-width:440px;">
-            <div class="modal-header">
-                <div class="modal-title" data-i18n="billing-modal-title">更新真实余额</div>
-                <button class="modal-close" id="billing-modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="billing-modal-help" data-i18n="billing-modal-help">
-                    打开 Google AI Studio Billing 页面 · 抄当前余额数字到这里
-                </div>
-                <div class="form-row">
-                    <label data-i18n="billing-field-balance">当前余额(THB)*</label>
-                    <input type="number" id="billing-input-balance" step="0.01" min="0" 
-                           data-i18n-placeholder="billing-field-balance-ph" />
-                </div>
-                <div class="form-row">
-                    <label data-i18n="billing-field-notes">备注(选填)</label>
-                    <input type="text" id="billing-input-notes" maxlength="500"
-                           data-i18n-placeholder="billing-field-notes-ph" />
-                </div>
-                <!-- v4.10.21 · calib 热改 -->
-                <div class="form-row">
-                    <label data-i18n="adm-billing-calib-label">校准系数(选填)</label>
-                    <input type="number" id="billing-input-calib" step="0.001" min="0.5" max="2.0"
-                           data-i18n-placeholder="adm-billing-calib-ph" />
-                    <div class="form-hint" data-i18n="adm-billing-calib-hint">0.5 ~ 2.0 · 留空 = 自动(推荐)</div>
-                </div>
-                <div class="billing-modal-link">
-                    <a id="billing-modal-google-link" target="_blank" rel="noopener" data-i18n="billing-google-open">
-                        💳 打开 Google AI Studio Billing →
-                    </a>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <div></div>
-                <div class="modal-footer-right">
-                    <button class="btn btn-ghost" id="billing-modal-cancel" data-i18n="client-cancel">取消</button>
-                    <button class="btn btn-primary" id="billing-modal-save" data-i18n="client-save">保存</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- ============ 页面: 凭证中心(v104 上线)============ -->
     <section class="page" id="page-vouchers">
         <!-- REFACTOR-WB-C3 · page-vouchers 占位骨架→src/home/page-placeholders.js 运行期注入 -->

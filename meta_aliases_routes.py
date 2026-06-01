@@ -36,10 +36,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_time.time()),
         "release_notes": {
-            "zh": "本次更新优化了菜单名称与推送记录的查看体验。「上传发票」「发票记录」已更名为「上传识别」「识别记录」,以涵盖更多单据类型;推送记录与异常记录现均可按对接系统分类筛选查看,不同业务的记录展示更清晰。即日生效。",
-            "th": "การอัปเดตนี้ปรับชื่อเมนูและปรับปรุงการดูบันทึกการส่งข้อมูล โดยเปลี่ยน「อัปโหลดใบกำกับ」และ「บันทึกใบกำกับ」เป็น「อัปโหลดและสแกน」และ「บันทึกการสแกน」เพื่อรองรับเอกสารหลากหลายประเภทมากขึ้น ทั้งบันทึกการส่งและรายการผิดพลาดสามารถกรองตามระบบที่เชื่อมต่อได้ ทำให้ข้อมูลของแต่ละงานชัดเจนยิ่งขึ้น มีผลทันที",
-            "en": 'This update refines several menu names and improves how push records are viewed. "Upload Invoice" and "Invoice Records" are now "Upload & Scan" and "Scan Records" to cover more document types, and both push and exception records can now be filtered by connected system so each kind of record is clearer. Effective immediately.',
-            "ja": "今回の更新では、一部メニュー名を整理し、送信記録の表示を改善しました。「請求書アップロード」「請求書記録」を「アップロード・読取」「読取記録」に変更し、より多くの書類に対応します。送信記録と例外記録は連携システムごとに絞り込めるようになり、業務ごとの記録がより分かりやすくなりました。即日有効。",
+            "zh": "本次为稳定性与性能优化更新,改进了部分页面的加载与运行表现,日常使用更顺畅。功能与操作方式保持不变,即日生效。",
+            "th": "การอัปเดตนี้เน้นความเสถียรและประสิทธิภาพ ปรับปรุงการโหลดและการทำงานของบางหน้าให้ลื่นไหลยิ่งขึ้น โดยฟังก์ชันและวิธีใช้งานยังคงเดิม มีผลทันที",
+            "en": "This update focuses on stability and performance, improving how some pages load and run for a smoother day-to-day experience. Features and workflows are unchanged. Effective immediately.",
+            "ja": "今回は安定性とパフォーマンスの向上を目的とした更新で、一部ページの読み込みと動作を改善し、日々の操作をより快適にしました。機能や操作方法に変更はありません。即日有効。",
         },
     }
 

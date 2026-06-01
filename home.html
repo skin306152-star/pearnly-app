@@ -1291,29 +1291,7 @@
 </div>
 
 <!-- ================= 银行对账 · 候选匹配抽屉 (v0.18 · M10) ================= -->
-<div class="bank-cand-drawer" id="bank-cand-drawer" style="display:none">
-    <div class="bank-cand-backdrop" data-bank-cand-close></div>
-    <div class="bank-cand-panel">
-        <div class="bank-cand-head">
-            <div>
-                <div class="bank-cand-title" data-i18n="bank-cand-title">匹配候选</div>
-                <div class="bank-cand-sub" id="bank-cand-tx-info"></div>
-            </div>
-            <button class="modal-close" data-bank-cand-close aria-label="close">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l10 10M13 3L3 13"/></svg>
-            </button>
-        </div>
-        <div class="bank-cand-body" id="bank-cand-body">
-            <div class="bank-empty" data-i18n="bank-cand-loading">加载中…</div>
-        </div>
-        <div class="bank-cand-foot">
-            <button class="btn btn-ghost btn-small" id="btn-bank-cand-ignore">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10"/></svg>
-                <span data-i18n="bank-cand-ignore">忽略此条流水</span>
-            </button>
-        </div>
-    </div>
-</div>
+<div class="bank-cand-drawer" id="bank-cand-drawer" style="display:none"></div>
 
 <!-- v118.26.2 · 银行对账 session 客户绑定 modal -->
 <div class="modal-overlay" id="bank-client-picker-modal" style="display:none;">
@@ -1475,7 +1453,7 @@
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing + test-center 由 Vite bundle 成 static/dist/main.js ·
      ES module(type=module 自动 defer)· state.js 第1个 import 装错误拦截+i18n总线+window.*状态 ·
      /api/version 现读本 main.js?v=(REFACTOR-C1-home-batch9g2 · home.js 已删 · read_frontend_version 改锚 main.js) -->
-<script type="module" src="/static/dist/main.js?v=11850053"></script>
+<script type="module" src="/static/dist/main.js?v=11850054"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·

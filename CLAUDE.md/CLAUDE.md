@@ -1,7 +1,7 @@
 # CLAUDE.md · Pearnly 项目大脑
 > 每次启动 Claude Code 必须完整读完本文件再开始任何任务
 > 本文件 = 项目宪法 · 优先级高于一切临时指令
-> 最后更新:2026-05-29(模型升 Opus 4.8 1M · commit 署名 4.7→4.8 · 守门统一 6 道 · 铁律计数统一 28 · 整顿恢复 + 3 窗口并行 loop)
+> 最后更新:2026-05-29(模型升 Opus 4.8 1M · commit 署名 4.7→4.8 · 守门统一 6 道 · 铁律计数 30(2026-06-02 加 #29 大厂质量+收尾simplify / #30 目录重组最后做) · 整顿恢复 + 3 窗口并行 loop)
 
 ---
 
@@ -400,7 +400,7 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
 2. 跑 `python scripts/refactor_progress.py`(实时数字 · 不信任何文档手写行数)
 3. **`CLAUDE.md/STATE_PEARNLY.md`** 顶部「状态卡」(分割线以上 ≤30 行)
 4. **`CLAUDE.md/REFACTOR_MASTER_PLAN.md`**「当前进度看板」找下一个 task + 该 task"完成判定"段
-5. **`CLAUDE.md/CLAUDE.md`**(本文件 · 28 条铁律 · 细节按需查 · 重点铁律 18-20 整顿段)(在主计划对应 task 行)
+5. **`CLAUDE.md/CLAUDE.md`**(本文件 · 30 条铁律 · 细节按需查 · 重点铁律 18-20 整顿段)(在主计划对应 task 行)
 
 **进窗口前检查**(60 秒):
 ```
@@ -715,6 +715,31 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 **与 PR 模板的关系**:`.github/PULL_REQUEST_TEMPLATE.md` 已有"是否塞巨石自检" · 本条 4 问可作 PR 模板下个版本的扩展段(窗口 C 暂不强加 · 等铁律 #27 切硬门时一并加)。
 
 **完整设计决策见**:`docs/refactor/adr-010-anti-bigfile-mechanism.md`
+
+---
+
+### 29. 大厂质量常驻 + 收尾跑 simplify(2026-06-02 Zihao 拍板 · 任何窗口任何任务都执行 · 非一次性)
+
+**两条常驻铁律**,不是某次任务的要求,是**每个窗口、不管做什么活都默认带着干**:
+
+1. **所有源码去 AI 味 · 注释按大厂走 · 所有"路数"(做法/工程实践)按大厂走。**
+   - 去 AI 味(新旧码都要):无废话注释 / 无"我注意到·顺便·让我们" / 无 emoji 注释 / 无防御冗余 / 无泛化命名(`data`/`temp`/`result2`)/ 无调试残留(console.log/print)。
+   - 大厂注释:**解释 why 不解释 what** · 简洁 · 必要才写 · 别逐行翻译代码。
+   - 大厂路数:命名 / 结构 / 错误处理 / 测试 / 提交都按 Google/Anthropic 级习惯 · 别 vibe-code 凑合。**写新代码当下就做到**,不是事后补。
+   - 机械兜底:pre-push 第 7 道 `check_ai_smell.py` 只拦注释 emoji + console.log(本次改动文件)· **能机械的归机械,其余靠人主动做全**。全套 Definition of Done = `docs/ENGINEERING_STANDARD.md`。
+
+2. **每次 Zihao 说"收尾"(今天到这 / 换窗口 / 下班 / 睡觉 / 总结一下 等收尾词)→ 主动先跑 `/simplify`**(扫本窗口改动做 reuse/简化/效率/altitude 收口)**再出收尾报告**。别等 Zihao 点。
+
+**Why**:Pearnly 是 AI vibe-code 项目,屎山史就是 AI 味 + 凑合路数堆出来的;整顿期要把质量拉到大厂级,这两条是常驻质量闸。同步写进全局 `~/.claude/CLAUDE.md` + `AGENTS.md`(§2.6/§7)+ 记忆 [[standing-rules-bigtech-quality-simplify]],三处每窗口必读。
+
+---
+
+### 30. 代码目录重组 = 最后做(2026-06-02 Zihao 拍板)
+
+根目录现 86 个 .py 平铺(35+ `*_routes.py` + 业务模块)· 大厂用包结构(`app/{api/routes,services,core,models}`)· **方向对但现在不动**:
+- 目录重组是**全项目最大 blast radius** 的操作(碰每个 `import`/`app.include_router`/测试/动态 import)· 纯搬动不减行数不修逻辑。
+- **必须最后做**:等所有文件拆到 <500、**文件集冻结后**一次性搬 + 全局改 import(只改一遍)。现在做 = 边拆边搬、import 改两遍 + 多窗口冲突。
+- 计划归属:`REFACTOR_MASTER_PLAN.md` 阶段 I 抛光新增一条任务。**现在只在计划占位,别动手。**
 
 ---
 

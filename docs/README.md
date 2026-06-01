@@ -1,9 +1,12 @@
 # Pearnly · `docs/` 索引
 
-> **更新**:2026-05-22 · EXECUTION_PLAN 阶段 8 Task 8.1 落地
+> **更新**:2026-06-02 · 文档整理(删 .bak / 标记陈旧交接 / 入口 AGENTS 刷新)
 >
 > 这是 `docs/` 下所有 markdown 的导航 · 给新接力 agent 和 Zihao 用。
 > 每条 1-2 句说明 + 创建/更新日期 + 现在还能不能信(✅ 当前 / 📚 历史 / ⚠️ 已过时但保留)。
+>
+> **⚠️ 单一权威源(活文档·只信这些)**:`AGENTS.md`(唯一入口)· `CLAUDE.md/STATE_PEARNLY.md`(状态卡)· `CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板)· `CLAUDE.md/CLAUDE.md`(铁律)· `OUTCOMES.md`(Zihao 结果跟踪)。
+> **已标记陈旧(勿当现状)**:`HANDOVER_TO_NEXT_WINDOW.md` · `CLAUDE.md/HANDOFF_REFACTOR_BC.md` · `docs/STATE_2026_05_19.md`(均一次性交接·已被 STATE 取代)。`docs/ONBOARDING.md` 与根 `ONBOARDING.md` 重复(待合并)。
 >
 > **项目级文档不在这里** · 见项目根:
 > - `CLAUDE.md/CLAUDE.md`(项目宪法 · 28 条铁律)

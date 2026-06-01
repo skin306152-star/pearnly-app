@@ -1,5 +1,7 @@
 # 🤝 HANDOFF · Pearnly 整顿 B-C 阶段长跑
 
+> ⚠️ **已归档 / 陈旧(2026-06-02 标记)**:本文档停在 2026-05-25 第二十三会话(db.py 7136→4513 期),数字全过期(db.py 现 344 / app.py 现 491)。**活文档 = `CLAUDE.md/STATE_PEARNLY.md` 状态卡 + `REFACTOR_MASTER_PLAN.md` 进度看板**。仅留历史范式参考。
+
 > 单一权威源:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板 + B1 行)。本文件 = B-C 长跑接力专用速查。
 > **最后更新**:2026-05-25(**第二十三会话** · B2 db.py→services 续抽 9 域:archive/rd/cost/exceptions/clients/billing/vat_recon〔P0-VAT 三表组〕/audit〔操作日志〕/team〔员工管理〕· db.py 7136→4513 · 4 批 push+CI 绿+生产 401 验证)
 > **⛔ 下窗口先做 BUG 整改(Zihao 拍板 BUG > 整改 · 会发 BUG 问题)· 修完再回 B2 续抽。**

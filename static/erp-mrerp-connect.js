@@ -542,11 +542,11 @@
         },
         // v118.34.4 · new strings for the integration-row card style.
         'mrerp-card-desc': {
-            zh: '把识别完的发票自动推到 MR.ERP · 客户/商品/销售员自动建',
-            en: 'Auto-push OCRed invoices to MR.ERP — customers / products / salesmen auto-created',
-            th: 'ส่งใบกำกับที่ OCR แล้วเข้า MR.ERP อัตโนมัติ — ลูกค้า / สินค้า / พนักงานขาย สร้างให้',
-            zh_TW: '把辨識完的發票自動推到 MR.ERP · 客戶/商品/銷售員自動建',
-            ja: 'OCR 済みの請求書を MR.ERP に自動送信 — 取引先/商品/営業担当を自動作成',
+            zh: '发票识别后自动推送 · 客户/商品/销售员自动建',
+            en: 'Auto-push invoices after OCR · customers / products / salesmen auto-created',
+            th: 'ส่งใบกำกับอัตโนมัติหลัง OCR · สร้างลูกค้า / สินค้า / พนักงานขายให้',
+            zh_TW: '發票辨識後自動推送 · 客戶/商品/銷售員自動建',
+            ja: 'OCR 後に請求書を自動送信 · 取引先/商品/営業担当を自動作成',
         },
         'flow-card-desc': {
             zh: '泰国本地 SaaS 会计 · 即将上线',
@@ -837,14 +837,17 @@
         let actionsHtml;
         if (configured) {
             // v118.34.35 · 删 "看推送日志" 按钮 · 统一放在面板底部
+            // 2026-06-01 · 按钮顺序+样式对齐下方 DMS 汽车销售卡:修改→高级设置→启用/停用,
+            // 启用/停用统一用 int-btn-configure(ghost 风格 · 不再深色 CTA · 与 DMS 一致)。
             const toggleLabel = enabled ? t('card-btn-disable') : t('card-btn-enable');
-            const toggleClass = enabled
-                ? 'mrerp-card-toggle mrerp-card-toggle-disable'
-                : 'mrerp-card-toggle mrerp-card-toggle-enable';
             actionsHtml =
-                '<button type="button" class="' +
-                toggleClass +
-                '" ' +
+                '<button type="button" class="int-btn-configure" data-mrerp-card-action="edit">' +
+                _esc(t('card-btn-edit')) +
+                '</button>' +
+                '<button type="button" class="int-btn-configure" data-mrerp-card-action="advanced">' +
+                _esc(t('card-btn-advanced')) +
+                '</button>' +
+                '<button type="button" class="int-btn-configure" ' +
                 'data-mrerp-card-action="toggle-enabled" ' +
                 'data-mrerp-enabled="' +
                 (enabled ? '1' : '0') +
@@ -853,12 +856,6 @@
                 _esc(t('card-disabled-tip')) +
                 '">' +
                 _esc(toggleLabel) +
-                '</button>' +
-                '<button type="button" class="int-btn-configure" data-mrerp-card-action="edit">' +
-                _esc(t('card-btn-edit')) +
-                '</button>' +
-                '<button type="button" class="int-btn-configure" data-mrerp-card-action="advanced">' +
-                _esc(t('card-btn-advanced')) +
                 '</button>';
         } else {
             actionsHtml =

@@ -62,7 +62,9 @@ async def v1_recognize(
     file: UploadFile = File(...),
     client_id: Optional[str] = Form(None),
 ):
-    from app import ocr_recognize  # noqa: E402 · lazy 解循环 import
+    from ocr_recognize_routes import (  # noqa: E402 · v1 别名转发 v0 实现(REFACTOR-WB-app)
+        ocr_recognize,
+    )
 
     return await ocr_recognize(request, file, client_id)
 

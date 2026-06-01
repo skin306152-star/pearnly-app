@@ -40,7 +40,6 @@ budget is exhausted (per user spec: "Gemini 返回非法 JSON → 重试 1 次 �
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
@@ -61,13 +60,14 @@ from .schemas import (
     VatReportDocument,
 )
 
-from .layer2_gemini import (  # noqa: F401 · L2-A 纯搬家 re-export(调用方/COV4 测 0 改动)
+from .layer2_gemini import (  # noqa: F401 · L2-A/L2-B 纯搬家 re-export(调用方/id_card/COV4 测 0 改动)
     DEFAULT_MAX_OUTPUT_TOKENS,
     DEFAULT_TEMPERATURE,
     Layer2AuthError,
     Layer2Error,
     Layer2QuotaError,
     Layer2TransientError,
+    _call_gemini_with_retry,
     _classify_gemini_exception,
     _get_model,
     _parse_json,
@@ -453,127 +453,3 @@ def _extract_internal(
         raise ValueError(f"layer2: Gemini JSON parsed but failed ThaiInvoice schema: {e}") from e
 
     return invoice, meta
-
-
-def _call_gemini_with_retry(
-    text: str,
-    api_key: str,
-    model_name: str,
-    max_retries: int,
-    timeout: int,
-    system_prompt_override: Optional[str] = None,
-) -> Tuple[dict, dict]:
-    """Make Gemini API call with JSON-parse retry budget.
-
-    Retries ONLY on JSON parse failure / empty response. Network / auth /
-    quota errors propagate immediately (no point retrying them at this layer
-    — pipeline.py decides whether to retry transient errors).
-
-    When system_prompt_override is provided, that prompt is used instead of
-    the default invoice prompt (multi-schema refactor).
-
-    Returns (data: dict, metadata: dict)
-    metadata keys: input_tokens, output_tokens, retries
-    """
-    model = _get_model(api_key=api_key, model_name=model_name)
-    sys_prompt = system_prompt_override if system_prompt_override else _SYSTEM_PROMPT
-    base_prompt = sys_prompt + "\n\n" + _USER_PROMPT_PREFIX + text
-
-    last_parse_error: Optional[str] = None
-    last_raw_preview: str = ""
-
-    for attempt in range(max_retries + 1):
-        # v118.35.0.5 · 重试时追加"精简输出"指令 · 救 token 上限截断场景
-        prompt = base_prompt + (_RETRY_TRIM_HINT if attempt > 0 else "")
-        # v118.35.0.25 · 埋点 · 记 Gemini 调用统计(给 Earn 监控面板 + LINE 告警用)
-        import time as _t_v25
-
-        _t_start = _t_v25.time()
-        try:
-            response = model.generate_content(
-                prompt,
-                request_options={"timeout": timeout},
-            )
-            try:
-                from services.monitoring import record_gemini_call as _rec
-
-                _rec(
-                    success=True, http_status=200, latency_ms=int((_t_v25.time() - _t_start) * 1000)
-                )
-            except Exception:
-                pass
-        except Exception as e:
-            try:
-                from services.monitoring import record_gemini_call as _rec
-
-                _http = 429 if ("ResourceExhausted" in type(e).__name__ or "429" in str(e)) else 500
-                _rec(
-                    success=False,
-                    http_status=_http,
-                    latency_ms=int((_t_v25.time() - _t_start) * 1000),
-                )
-            except Exception:
-                pass
-            # Network / auth / quota / unknown — classify and propagate
-            raise _classify_gemini_exception(e) from e
-
-        raw = (response.text or "").strip() if hasattr(response, "text") else ""
-
-        # Capture token usage (best effort)
-        input_tokens = 0
-        output_tokens = 0
-        try:
-            usage = getattr(response, "usage_metadata", None)
-            if usage is not None:
-                input_tokens = int(getattr(usage, "prompt_token_count", 0) or 0)
-                output_tokens = int(getattr(usage, "candidates_token_count", 0) or 0)
-        except Exception:  # pragma: no cover  (defensive only)
-            pass
-
-        if not raw:
-            last_parse_error = "empty response"
-            last_raw_preview = ""
-            logger.warning(
-                "layer2: empty response (attempt %d/%d)",
-                attempt + 1,
-                max_retries + 1,
-            )
-            if attempt < max_retries:
-                continue
-            raise ValueError(
-                f"layer2: Gemini returned empty response after " f"{max_retries + 1} attempts"
-            )
-
-        try:
-            data = _parse_json(raw)
-        except json.JSONDecodeError as e:
-            last_parse_error = str(e)
-            last_raw_preview = raw[:300]
-            logger.warning(
-                "layer2: JSON parse failed (attempt %d/%d): %s; raw[:200]=%r",
-                attempt + 1,
-                max_retries + 1,
-                e,
-                raw[:200],
-            )
-            if attempt < max_retries:
-                continue
-            raise ValueError(
-                f"layer2: Gemini returned invalid JSON after "
-                f"{max_retries + 1} attempts: {last_parse_error}; "
-                f"raw[:300]={last_raw_preview!r}"
-            ) from e
-
-        return data, {
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "retries": attempt,
-        }
-
-    # Defensive fallback (loop should always either return or raise above)
-    raise ValueError(f"layer2: unreachable; last parse error: {last_parse_error}")
-
-
-# ============================================================
-# Model lazy singleton (keyed by api_key + model_name)
-# ============================================================

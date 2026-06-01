@@ -620,84 +620,7 @@
     <div class="modal-overlay" id="archive-token-modal" style="display:none;"></div>
 
     <!-- ERP 端点配置对话框 -->
-    <div class="modal-overlay" id="endpoint-modal" style="display:none;">
-        <div class="modal">
-            <div class="modal-head">
-                <div class="modal-title" id="endpoint-modal-title" data-i18n="ep-modal-title-new">新增 ERP 端点</div>
-                <button class="modal-close" id="endpoint-modal-close" aria-label="close">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l10 10M3 13L13 3"/></svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <!-- 适配器选择 -->
-                <div class="form-group">
-                    <label class="form-label" data-i18n="ep-adapter">适配器类型</label>
-                    <div class="adapter-picker" id="ep-adapter-picker">
-                        <label class="adapter-card" data-adapter="webhook">
-                            <input type="radio" name="ep-adapter" value="webhook" checked>
-                            <div class="adapter-card-body">
-                                <div class="adapter-name" data-i18n="ep-adapter-webhook">自定义 Webhook</div>
-                                <div class="adapter-desc" data-i18n="ep-adapter-webhook-desc">HTTP POST 到任意 URL · 最通用</div>
-                            </div>
-                        </label>
-                        <label class="adapter-card disabled" data-adapter="flowaccount" title="即将上线">
-                            <input type="radio" name="ep-adapter" value="flowaccount" disabled>
-                            <div class="adapter-card-body">
-                                <div class="adapter-name">FlowAccount <span class="tag-soon" data-i18n="tag-soon">即将上线</span></div>
-                                <div class="adapter-desc" data-i18n="ep-adapter-flow-desc">泰国本地会计 SaaS</div>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- 通用字段 -->
-                <div class="form-group">
-                    <label class="form-label" for="ep-name" data-i18n="ep-name">端点名称</label>
-                    <input type="text" id="ep-name" class="form-input" data-i18n-placeholder="ep-name-ph">
-                </div>
-
-                <!-- Webhook 字段 -->
-                <div id="ep-fields-webhook">
-                    <div class="form-group">
-                        <label class="form-label" for="ep-url" data-i18n="ep-url">Webhook URL</label>
-                        <input type="text" id="ep-url" class="form-input" placeholder="https://your-erp.com/api/invoice/import">
-                        <div class="form-hint" data-i18n="ep-url-hint">识别完成后 Pearnly 会 POST 一个 JSON 到这个地址</div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="ep-token" data-i18n="ep-token">Secret Token(选填)</label>
-                        <input type="password" id="ep-token" class="form-input" data-i18n-placeholder="ep-token-ph">
-                        <div class="form-hint" data-i18n="ep-token-hint">会以 X-Mrpilot-Token 请求头发送 · 让接收端验证来源</div>
-                    </div>
-                </div>
-
-                <!-- 开关 -->
-                <div class="form-group">
-                    <label class="form-switch-row">
-                        <input type="checkbox" id="ep-is-default">
-                        <span class="form-switch-label" data-i18n="ep-is-default">设为默认端点</span>
-                    </label>
-                    <label class="form-switch-row">
-                        <input type="checkbox" id="ep-auto-push">
-                        <span class="form-switch-label" data-i18n="ep-auto-push">识别成功后自动推送</span>
-                    </label>
-                </div>
-
-                <!-- 测试连接结果 -->
-                <div class="form-test-result" id="ep-test-result" style="display:none;"></div>
-            </div>
-            <div class="modal-foot">
-                <button class="btn btn-ghost" id="btn-ep-test">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 8l3 3 7-7"/>
-                    </svg>
-                    <span data-i18n="ep-test-btn">测试连接</span>
-                </button>
-                <div style="flex:1"></div>
-                <button class="btn btn-ghost" id="btn-ep-cancel" data-i18n="btn-cancel">取消</button>
-                <button class="btn btn-primary" id="btn-ep-save" data-i18n="btn-save">保存</button>
-            </div>
-        </div>
-    </div>
+    <div class="modal-overlay" id="endpoint-modal" style="display:none;"></div>
 
     <!-- v0.17 · M6 · 邮箱绑定对话框 -->
     <div class="modal-overlay" id="email-modal" style="display:none;">
@@ -1304,7 +1227,7 @@
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing + test-center 由 Vite bundle 成 static/dist/main.js ·
      ES module(type=module 自动 defer)· state.js 第1个 import 装错误拦截+i18n总线+window.*状态 ·
      /api/version 现读本 main.js?v=(REFACTOR-C1-home-batch9g2 · home.js 已删 · read_frontend_version 改锚 main.js) -->
-<script type="module" src="/static/dist/main.js?v=11850056"></script>
+<script type="module" src="/static/dist/main.js?v=11850057"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·

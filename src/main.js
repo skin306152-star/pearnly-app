@@ -92,6 +92,7 @@ import './home/help-modal.js'; // REFACTOR-C1 · Help modal 关闭绑定
 import './home/integration-config.js'; // REFACTOR-C1 · 集成页「配置」按钮→抽屉
 import './home/erp-endpoints.js'; // REFACTOR-WB-C1 · ERP 端点管理(从 erp-integration 抽出 · window 桥接 · 须在 erp-integration 前)
 import './home/erp-log-detail.js'; // REFACTOR-WB-C1 · ERP 推送日志详情弹窗+复制单号(从 erp-integration 抽出 · window 桥接)
+import './home/endpoint-modal-html.js'; // REFACTOR-WB-C3 · ERP 端点配置弹窗 inner 注入(home.html 空壳 · ⚠️须在 erp-integration.js 前 · 其 initAutomationPage IIFE eval 期无守卫绑 endpoint-modal-close/btn-ep-*/ep-url)
 import './home/erp-integration.js'; // REFACTOR-C1 · ERP 推送日志列表(loadErpLogs/initAutomationPage · 持有 window._erpSelected · 端点/详情/批量已抽出)
 import './home/erp-batch.js'; // REFACTOR-WB-C1 · ERP 推送日志批量栏/重推/删除(从 erp-integration 抽出 · 共享 window._erpSelected · 须在 erp-integration 后)
 import './home/line-email-modal.js'; // REFACTOR-WB-C1 · LINE 用户补邮箱强制 modal(自包含 IIFE · 自启动)

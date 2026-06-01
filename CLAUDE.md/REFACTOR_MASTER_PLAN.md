@@ -338,6 +338,23 @@
 
 ---
 
+## 🚧 >500 文件总账(开 CI fail 模式的前置 · 必须全清零)
+
+> **实时清单只信脚本**:`python scripts/check_file_size.py`(2026-06-02 扩 `*.py` glob 后已纳入全部根业务 .py · 不再有盲区)。下面是分类 + 归属阶段,数字会 stale,**别手抄,跑脚本**。
+> **状态(2026-06-02)**:闸看见 **34 个 FAIL + login.html 豁免**(仍 warning 模式不挡 push)。全清零 + 删 `continue-on-error` = 开 fail 模式(铁律 #27 · 别提前切 · 见 [[ratchet-flip-not-low-risk]])。
+
+| 类别 | 大致文件(跑脚本看实时) | 归属 |
+|---|---|---|
+| **后端 recon(最大头)** | `bank_recon_v2`(6745)`recon_routes`(2000)`gl_vat_reconciler`(1423)`vat_report_parser`(969)`services/recon_jobs/handlers`(693) | B1 续 |
+| **后端报表/导出** | `vat_excel_export`(1960)`report_engine`(1026)`vat_excel_exporter`(626)`usage_report`(574) | B1 续 |
+| **后端 ERP 周边** | `mrerp_xlsx_generator`(1336)`services/erp/mrerp_customer_sync`(1324)`mrerp_product_sync`(1118)`mrerp_dms_client`(606) | B1 续 |
+| **后端其它** | `email_ingest`(676)`line_client`(561)`services/ocr/layer1_vision`(514)`erp_routes`(504)`auth_admin_routes`(501) | B1 续 |
+| **前端 src/home(16 个)** | `bank-recon-v2`(1592)`bank-recon`(1252)`exceptions`(1250)`gl-vat-recon`/`clients`/`excel-formula-recon`/`erp-*`/`email-ingest`/`test-center`/`folder-watcher`/`core-boot`/`ocr-recognize`/`archive-settings`/`upload-camera` | C1 续 |
+| **着陆页(豁免中)** | `login.html`(4998) | C 阶段 |
+| **闸暂不监控(判断后再定)** | `static/admin.js`(2903)`static/erp-mrerp-connect.js`(2299)旧 IIFE;`static/home-NN.css` ~20 个(C2 有意分块·是否算违规待 Zihao 定);原型/模板 HTML(非生产·建议豁免) | C / 豁免 |
+
+---
+
 ## 🔄 接力 protocol(每窗口必走)
 
 ### 开窗口(60 秒)

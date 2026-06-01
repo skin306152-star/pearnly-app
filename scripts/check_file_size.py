@@ -59,7 +59,11 @@ MONITORED_ROOT_FILES = [
 ]
 
 # 全部纳入监控的 glob(整顿期新文件 · 一律 ≤ 500 行)
+# 2026-06-02 补 `*.py`:根目录所有业务 .py(此前只监控 *_routes.py · bank_recon_v2/
+# vat_excel_export/gl_vat_reconciler 等根业务大文件全在盲区 · 开 fail 模式前必须纳入·
+# 否则"开闸"= 假安全)。根目录无基础设施 .py(全业务)· 无误伤。
 MONITORED_GLOBS = [
+    "*.py",
     "*_routes.py",
     "services/**/*.py",
     "src/home/**/*.js",
@@ -72,15 +76,11 @@ MONITORED_GLOBS = [
 # 等行数被拆到 ≤ 500 · 从本字典里删条目即可。
 # 数字以 2026-05-28 STATE_PEARNLY.md 头部为准。
 EXEMPT_CURRENT_BIG_FILES = {
-    # 数字以 2026-05-28 实测为准 · 棘轮(check_line_ratchet.py)强制只准减不准增
-    # 修拆完一个台阶 · 这里同步往下调(整顿期天然的"进度回归保护")
-    "app.py": 3300,
-    "db.py": 850,
-    "auth_signup.py": 2400,
-    "home.js": 6200,
-    "home.html": 4500,
-    "home.css": 100,  # 已 0 · 留一点点防小回潮
-    "login.html": 5000,
+    # 2026-06-02 清理:5 大巨石全部 <500(app.py 491/db.py 344/auth_signup 428/
+    # home.html 397/home.css 0/home.js 已全迁 src/home 文件不存在)→ 全从豁免删除 ·
+    # 改由默认 500 硬上限正常约束(只升不降棘轮另管 check_line_ratchet.py)。
+    # 只留仍 >500 的存量:
+    "login.html": 5000,  # 着陆页巨石 · 待拆(C 阶段)
 }
 
 # 路径模式豁免(纯数据 / 自动生成 · 不算业务代码)

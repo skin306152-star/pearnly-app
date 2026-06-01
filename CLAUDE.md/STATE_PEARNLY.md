@@ -6,7 +6,9 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡(2026-06-01 · **整顿暂停**·✅ **DMS 推送 UX 闭环 + 导航文案统一 已上线**(prod 11850051)· DMS 集成第3轮已闭环 · C3 封存 home.html 1495)
+## 🎯 状态卡(2026-06-01 · **整顿暂停**·✅ **DMS 推送 UX 闭环(2轮)+ 导航文案统一 已上线**(prod 11850052)· DMS 集成第3轮已闭环 · C3 封存 home.html 1495)
+
+- **DMS 推送 UX 第2轮(Zihao 反馈修正 · `6f78541` · prod 11850052)**:① **异常栏同理**——上轮我误把 DMS 从异常栏删了,改回(撤 list_push_exceptions 排除·保留+push_type)+ 照日志加 ERP 下拉(`#erp-exc-erp-select`·adapter 参数)+ DMS 行按 订车单号/客户 渲染+类型标 ② **详情 modal**(erp-log-detail.js)DMS 推送 发票号→订车单号/发票卖方→客户/跳过买方行 ③ **ERP 下拉圆角**(home-10-push-logs.css `.erp-logs-erp-select` 14px+自绘箭头) ④ bump main.js+home-10 ?v=→11850052 + release_notes 补异常筛选。测全量 2153 + prod E2E 01/05/08 绿。⚠️ DMS 行真实视觉仍需 Zihao 在 skin306152 眼验。
 
 - **模式**:整顿封锁期 · **整顿主线【暂停】**(Zihao 2026-06-01 再拍板:先做 DMS 推送日志/异常栏的 UX 闭环问题,整顿记录后暂停)。**C3 进度封存**:home.html 1730→**1495**(R13 page-history `4d3b9e0` + R14 onboarding `99c5da4`·均 prod E2E 验过)·目标 <1000 还差 495·下个候选 bank-cand-drawer/on-demand modal/page-ocr(最后)。app.py 1731→500 仍卡 auth 专窗口。
 - **✅ DMS 推送可视化 UX 闭环 已上线**(`cca1e77` 后端 + `c6ad3ec` 前端 + `5efff89` 文案/cache-bust · prod 11850051 · commit tag `MRERP-DMS-INTEGRATION`):① **推送日志 ERP 筛选改下拉**(`#erp-logs-erp-select`·loadErpLogs 从 /api/erp/endpoints 真实端点按 adapter 去重填充·选一个看一个)② **身份证订车行按 DMS 字段展示**(push_type=id_card·行标「身份证订车」·选中 mrerp_dms 表头切 订车单号/客户·买方/工作空间列置 —·失败用 4 语友好) ③ **异常栏排除 DMS**(list_push_exceptions skip trigger=id_card/mrerp_dms → 身份证失败不再混进发票推送异常) ④ **DMS 错误码 4 语友好文案**(_DMS_PUSH_FRIENDLY + friendly_any·不裸露 ERR_*)。测:test_dms_push_friendly 6 例 + 全量 2153 + prod E2E 01/02/08 绿。**发票行零改动**(isId=false 全走原分支)。⚠️ DMS 行/异常排除的**真账号视觉**需 Zihao 在 skin306152(有 DMS 数据)眼验·e2e 账号无 DMS 数据只验了页面无回归。

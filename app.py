@@ -129,12 +129,13 @@ from services.ocr.entrypoints import (
 )
 from services.ocr.recognize.cache import serve_cache_hit  # REFACTOR-WB-app · 2026-06-01
 from services.ocr.recognize.persist import persist_invoices  # REFACTOR-WB-app · 2026-06-01
+from services.ocr.recognize.autopush import dispatch_auto_push  # REFACTOR-WB-app · 2026-06-01
 from services.static_assets import read_frontend_version, purge_stale_static_gz  # REFACTOR-WA-B1
-from services.erp.auto_push import (  # REFACTOR-WA-B1 · ERP 自动推送编排
-    _auto_push_history,
-    _auto_push_smart_routed,
-    _trigger_auto_push_all,
-    _erp_seller_routing_enabled,
+from services.erp.auto_push import (  # ERP 自动推送编排;app 再导出锁单一来源(契约 test_auto_push_module_contract)
+    _auto_push_history,  # noqa: F401
+    _auto_push_smart_routed,  # noqa: F401
+    _trigger_auto_push_all,  # noqa: F401
+    _erp_seller_routing_enabled,  # noqa: F401
 )
 from services.startup import run_startup, run_shutdown  # REFACTOR-WA-B1
 from services.error_handlers import handle_unhandled_exception  # REFACTOR-WA-B1
@@ -615,73 +616,12 @@ async def ocr_recognize(
     primary_archive_name = _persist["primary_archive_name"]
     primary_category_tag = _persist["primary_category_tag"]
 
-    # v0.9 · 自动推送 ERP(异步 · 不阻塞返回)· 每张发票都推
-    # 批 1 改动 1 (v118.34.33) · 只对有 client_id 的 history 触发 auto-push.
-    # 没 client_id 的就交给「待归属」/「建议归属」UI 让用户确认 · 防止
-    # auto-push 必炸 ERR_NO_CLIENT 浪费 retry 队列(对应 Zihao 截图里
-    # 一直 retry 的混乱).
-    # P1b · ocr_only 模式 → 完全跳过 auto-push + Xero 触发(纯跳过 · 零风险)。
-    auto_pushed = False
-    if _erp_mode == "ocr_only":
-        logger.info("[P1b] ocr_only 模式 · 跳过 %d 张发票的自动推送", len(history_ids or []))
-    elif history_ids and _plan_permissions(plan).get("can_auto_push_erp"):
-        try:
-            auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
-            if auto_eps:
-                # 重新查 history 拿真实 client_id (auto-resolve 已经 update 过)
-                pushable_ids = []
-                for hid in history_ids:
-                    h = db.get_ocr_history_detail(
-                        str(user["id"]),
-                        hid,
-                        tenant_id=_tid(user),
-                    )
-                    if h and h.get("client_id"):
-                        pushable_ids.append(hid)
-                    else:
-                        logger.info(
-                            "[auto-push] skip history=%s · no client_id assigned",
-                            hid[:8],
-                        )
-                if pushable_ids:
-                    import asyncio
-
-                    # P1d · ERP_SELLER_ROUTING 开 + smart → 按卖方账套路由分组批量推;
-                    # 否则(关 / fixed)走现行为:每张推所有 auto_push 端点。
-                    if _erp_seller_routing_enabled(str(user["id"])) and _erp_mode == "smart":
-                        asyncio.create_task(
-                            _auto_push_smart_routed(
-                                str(user["id"]),
-                                pushable_ids,
-                                _tid(user),
-                                auto_eps,
-                            ),
-                        )
-                    else:
-                        for hid in pushable_ids:
-                            asyncio.create_task(
-                                _auto_push_history(
-                                    str(user["id"]),
-                                    hid,
-                                    auto_eps,
-                                    tenant_id=_tid(user),
-                                ),
-                            )
-                    auto_pushed = True
-                    logger.info(
-                        "🚀 自动推送已入队 · %d/%d 张发票 × %d 端点 " "(没归属的发票跳过)",
-                        len(pushable_ids),
-                        len(history_ids),
-                        len(auto_eps),
-                    )
-        except Exception as e:
-            logger.warning(f"自动推送入队失败(不影响识别): {e}")
-        # v27.8.1.3 · 同时触发 Xero 自动推(独立通道 · 跟 webhook 并存)
-        try:
-            for hid in history_ids:
-                _trigger_auto_push_all(str(user["id"]), _tid(user), hid)
-        except Exception as e:
-            logger.warning(f"xero 自动推入队失败: {e}")
+    auto_pushed = dispatch_auto_push(
+        _erp_mode=_erp_mode,
+        history_ids=history_ids,
+        plan=plan,
+        user=user,
+    )
 
     # 写入成本日志 · pipeline-v1 自带完整成本(Vision per-page + Flash-Lite + Flash · 100% 埋点)
     try:

@@ -48,6 +48,7 @@ import './home/ocr-recognize.js'; // REFACTOR-C1-home-batch5 · OCR 识别主流
 import './home/ocr-duplicate-dialog.js'; // REFACTOR-C1-home-batch5 · OCR 重复发票警告弹窗(从 home.js 抽出 · 桥 showDuplicateDialog)
 import './home/dashboard.js';
 import './home/billing.js';
+import './home/page-test-center-html.js'; // REFACTOR-WB-C3 · 测试中心页 inner 注入(home.html 空壳 · skin-only · 须在 test-center.js 前 · 其绑定带守卫+skin-gated)
 import './home/test-center.js'; // REFACTOR-C1 · 测试中心(skin only)
 import './home/workspace-switcher.js'; // B4 · workspace 工作模式切换器(取代旧 ClientSwitcher)
 import './home/recon-center.js'; // REFACTOR-C1 · 对账中心首页(loadReconcilePage)

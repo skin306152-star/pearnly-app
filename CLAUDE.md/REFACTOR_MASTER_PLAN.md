@@ -157,6 +157,35 @@
 
 ---
 
+## 🎯 执行排序(2026-06-02 Zihao 拍板:**花钱的全排后面 · 需 Zihao 动手的放正常位置·到那步教他装**)
+
+> 9 阶段是"分类",这节是"先后"。窗口按这个波次推,不必死守字母序。
+> **好消息**:计划基本全用免费/自建(本地 Docker / Doppler 免费版 / 自建监控不上 Sentry),**真正花钱的极少**,都在 Wave 4 可选段。
+
+**🌊 Wave 1 — 现在做(我自主 · 无需 Zihao · 不花钱)· 当前主线**
+- **B1 续** 后端拆 <500:recon(`bank_recon_v2` 6745 等)→ 报表(`vat_excel_export` 等)→ ERP 周边(`mrerp_xlsx_generator`/`customer_sync`/`product_sync`)。判文件先分类:函数堆→facade 切 / 巨类→mixin 真重构([[megaclass-mixin-split-playbook]])。
+- **C1 续** 前端 `src/home/*` 16 个拆 <500。
+- **B8 多租户 RLS**(安全·提前·**和拆分并行**·不碰拆分文件·Supabase 自带功能不花钱)。
+- **D 测试覆盖**(跟拆分并行加契约/集成测试·22.5%→爬向 70%)。
+
+**🌊 Wave 2 — 接着做(我自主 · 不花钱)**
+- 后端工程化:B3 Alembic / B4 `/ready` / B5 限流 / B6 结构化日志 / B7 错误聚合(自建) / B9 索引 / B10 连接池。
+- **开闸**(铁律#27 切 CI fail 模式·**全文件 <500 后**)→ **E7 minify**(确认 Vite prod build + 补 HTML minify·卡 Loop1 完成)。
+- 前端深化:C4 组件库 / C5 TypeScript / C9 状态管理。
+
+**🌊 Wave 3 — 需 Zihao 动手(不花钱·按正常依赖位置·到那步我一步步教你装)**
+- **A3** 装 Docker Desktop(验本地 staging build·配置已就绪)。
+- **A4** 装 Doppler CLI(密钥管理·碰 prod 红线·你在场点确认)。
+- 各阶段**验收**(像用户点一遍)+ 权限框确认。
+- ⏳ 这些**不卡 Wave 1**——不装也能继续拆文件;到了再叫你。
+
+**🌊 Wave 4 — 最后(抛光 + 可能花钱的可选项)**
+- **I 抛光**:I6 去 AI 味全量审计 + **I7 代码目录重组**(86 root .py → 包·文件全 <500 冻结后一次性搬·铁律#30)。
+- **H 安全 review**(合规)。
+- 💰 **花钱才做的(默认不做·想升级再说)**:真 APM/监控(Sentry/Datadog)· staging 第二台服务器(现用本地 Docker 替代)· Codecov Pro · CDN · 托管服务升级。**计划现在全用免费方案绕开了这些·要不要花钱升级你最后定。**
+
+---
+
 ## 🗺️ 9 阶段路线图(A-I · 任务 ID 唯一)
 
 > 每个 task 命名:`REFACTOR-<阶段字母><数字>` · 比如 `REFACTOR-A1`、`REFACTOR-C12`

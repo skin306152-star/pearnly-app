@@ -16,6 +16,101 @@ from services.erp.mrerp_business_friendly import friendly_for_ui  # noqa: F401
 logger = logging.getLogger(__name__)
 
 
+# 身份证→订车单(adapter=mrerp_dms)推送/识别错误码的 4 语友好文案(zh/th/en/ja)。
+# 与 mrerp_business_friendly 的「发票推送」catalog 分开:这些码只在身份证订车流程产生,
+# friendly_for_ui 不覆盖 → 不补就在日志/详情里裸露 ERR_*(Zihao 2026-06-01 指出问题)。
+_DMS_PUSH_FRIENDLY: Dict[str, Dict[str, str]] = {
+    "ERR_ID_CARD_REQUIRED_FIELDS": {
+        "zh": "身份证关键字段未识别完整(身份证号或姓名)· 已暂停建单 · 请用清晰的正面照重新识别",
+        "en": "Key ID-card fields (ID number or name) were not fully recognized; booking was paused. Please rescan a clear front image.",
+        "th": "อ่านข้อมูลบัตรประชาชนหลัก (เลขบัตร/ชื่อ) ไม่ครบ จึงหยุดสร้างใบจอง กรุณาสแกนภาพด้านหน้าที่ชัดเจนอีกครั้ง",
+        "ja": "身分証の主要項目(番号・氏名)を完全に読み取れず、予約作成を停止しました。鮮明な表面の画像で再読み取りしてください。",
+    },
+    "ERR_DMS_CUSTOMER_CREATE": {
+        "zh": "在 DMS 建客户失败 · 请检查身份证上的地址信息后重试",
+        "en": "Failed to create the customer in DMS. Please check the address on the ID card and retry.",
+        "th": "สร้างลูกค้าใน DMS ไม่สำเร็จ กรุณาตรวจสอบที่อยู่บนบัตรประชาชนแล้วลองใหม่",
+        "ja": "DMS での顧客作成に失敗しました。身分証の住所をご確認のうえ再試行してください。",
+    },
+    "ERR_DMS_IMPORT_REPORT": {
+        "zh": "订车单导入 DMS 时被退回(数据校验未过)· 请核对身份证信息后重试",
+        "en": "DMS rejected the booking import (data validation failed). Please verify the ID-card data and retry.",
+        "th": "DMS ปฏิเสธการนำเข้าใบจอง (ตรวจสอบข้อมูลไม่ผ่าน) กรุณาตรวจสอบข้อมูลบัตรแล้วลองใหม่",
+        "ja": "DMS が予約の取り込みを拒否しました(データ検証エラー)。身分証データをご確認のうえ再試行してください。",
+    },
+    "ERR_DMS_IMPORT": {
+        "zh": "订车单导入 DMS 失败 · 请稍后重试",
+        "en": "Failed to import the booking into DMS. Please retry shortly.",
+        "th": "นำเข้าใบจองรถไปยัง DMS ไม่สำเร็จ กรุณาลองใหม่ภายหลัง",
+        "ja": "予約データの DMS への取り込みに失敗しました。しばらくしてから再試行してください。",
+    },
+    "ERR_DMS_BOOKING_PATCH": {
+        "zh": "订车单已建但补充资料失败 · 请到 DMS 后台核对该单",
+        "en": "The booking was created but updating its details failed. Please verify it in the DMS console.",
+        "th": "สร้างใบจองแล้วแต่บันทึกรายละเอียดเพิ่มเติมไม่สำเร็จ กรุณาตรวจสอบใบจองในระบบ DMS",
+        "ja": "予約は作成されましたが詳細の更新に失敗しました。DMS 管理画面でご確認ください。",
+    },
+    "ERR_DMS_TEMPLATE": {
+        "zh": "获取 DMS 订车单模板失败 · 请稍后重试",
+        "en": "Failed to fetch the DMS booking template. Please retry shortly.",
+        "th": "ดึงแม่แบบใบจองของ DMS ไม่สำเร็จ กรุณาลองใหม่ภายหลัง",
+        "ja": "DMS の予約テンプレート取得に失敗しました。しばらくしてから再試行してください。",
+    },
+    "ERR_DMS_AUTH": {
+        "zh": "DMS 登录失败 · 请到连接向导检查账号和密码",
+        "en": "DMS login failed. Please check the username and password in the connection wizard.",
+        "th": "เข้าสู่ระบบ DMS ไม่สำเร็จ กรุณาตรวจสอบชื่อผู้ใช้และรหัสผ่านในตัวช่วยเชื่อมต่อ",
+        "ja": "DMS へのログインに失敗しました。連携ウィザードでユーザー名とパスワードをご確認ください。",
+    },
+    "ERR_DMS_NOT_INVOICE_ENDPOINT": {
+        "zh": "该连接是身份证订车专用 · 不能用于推送发票",
+        "en": "This connection is for ID-card vehicle booking only and cannot push invoices.",
+        "th": "การเชื่อมต่อนี้ใช้สำหรับการจองรถด้วยบัตรประชาชนเท่านั้น ไม่สามารถส่งใบกำกับได้",
+        "ja": "この連携は身分証による車両予約専用で、請求書の送信には使用できません。",
+    },
+    "ERR_DMS_TECHNICAL": {
+        "zh": "连接 DMS 超时或网络异常 · 请稍后重试",
+        "en": "DMS connection timed out or a network error occurred. Please retry shortly.",
+        "th": "การเชื่อมต่อ DMS หมดเวลาหรือเครือข่ายขัดข้อง กรุณาลองใหม่ภายหลัง",
+        "ja": "DMS への接続がタイムアウトまたはネットワーク異常です。しばらくしてから再試行してください。",
+    },
+    "ERR_DMS_UNEXPECTED": {
+        "zh": "推送 DMS 时发生未知错误 · 请稍后重试或联系客服",
+        "en": "An unexpected error occurred while pushing to DMS. Please retry or contact support.",
+        "th": "เกิดข้อผิดพลาดที่ไม่คาดคิดขณะส่งไป DMS กรุณาลองใหม่หรือติดต่อฝ่ายสนับสนุน",
+        "ja": "DMS への送信中に予期しないエラーが発生しました。再試行するかサポートにお問い合わせください。",
+    },
+}
+
+
+def dms_push_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
+    """命中身份证订车错误码 → 返回 {zh,th,en,ja} dict;否则 None。
+    长码在前(ERR_DMS_IMPORT_REPORT 先于 ERR_DMS_IMPORT)防子串误命中。"""
+    if not error_msg:
+        return None
+    for code in (
+        "ERR_ID_CARD_REQUIRED_FIELDS",
+        "ERR_DMS_CUSTOMER_CREATE",
+        "ERR_DMS_IMPORT_REPORT",
+        "ERR_DMS_IMPORT",
+        "ERR_DMS_BOOKING_PATCH",
+        "ERR_DMS_TEMPLATE",
+        "ERR_DMS_AUTH",
+        "ERR_DMS_NOT_INVOICE_ENDPOINT",
+        "ERR_DMS_TECHNICAL",
+        "ERR_DMS_UNEXPECTED",
+    ):
+        if code in error_msg:
+            return _DMS_PUSH_FRIENDLY[code]
+    return None
+
+
+def friendly_any(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
+    """发票推送 catalog 优先(friendly_for_ui)· 未命中再退身份证订车映射。
+    给 push 日志/详情/异常统一用 · 任一命中即不裸露 ERR_*。"""
+    return friendly_for_ui(error_msg) or dms_push_friendly(error_msg)
+
+
 def delete_push_logs(user_id: str, log_ids: List[str]) -> int:
     """Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除推送日志.
     严格 user_id scope · 不许跨账号删除 · 返回真删除的行数."""
@@ -150,6 +245,14 @@ def list_push_logs(
                     it.get("endpoint_adapter"), it.pop("response_body", None), it.get("status")
                 )
                 it.update(ref)
+                # DMS 推送可视化闭环(Zihao 2026-06-01)· 身份证→订车单 ≠ 发票推送:
+                # 标 push_type 让前端按 DMS 字段(订车单号/客户/身份证)渲染该行,
+                # 不再用发票字段框;并附 4 语友好错误(身份证订车码 friendly_for_ui 不覆盖)。
+                is_id_card = (it.get("trigger") or "") == "id_card" or (
+                    it.get("endpoint_adapter") or ""
+                ).lower() == "mrerp_dms"
+                it["push_type"] = "id_card" if is_id_card else "invoice"
+                it["error_friendly"] = friendly_any(it.get("error_msg"))
             return {"items": items, "total": total}
     except Exception as e:
         logger.error(f"list_push_logs failed: {e}")
@@ -204,7 +307,13 @@ def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
             detail.update(ref)
             # P2-C (B7) · 附友好原因 4 语 dict(命中 catalog 才有 · 否则 None →
             # 前端回退 humanizeError)· 详情抽屉「失败原因」优先显本语言,不裸透泰文。
-            detail["error_friendly"] = friendly_for_ui(detail.get("error_msg"))
+            detail["error_friendly"] = friendly_any(detail.get("error_msg"))
+            detail["push_type"] = (
+                "id_card"
+                if (detail.get("trigger") or "") == "id_card"
+                or (detail.get("endpoint_adapter") or "").lower() == "mrerp_dms"
+                else "invoice"
+            )
             return detail
     except Exception as e:
         logger.error(f"get_push_log_detail failed: {e}")
@@ -255,7 +364,7 @@ def list_push_exceptions(
                 """
                 SELECT DISTINCT ON (l.history_id, l.endpoint_id)
                     l.id, l.history_id, l.endpoint_id, l.invoice_no, l.seller_name,
-                    l.total_amount, l.status, l.error_msg, l.created_at,
+                    l.total_amount, l.status, l.error_msg, l.trigger, l.created_at,
                     l.retry_count, l.max_retries, l.next_retry_at,
                     h.client_id AS history_client_id,
                     c.name AS client_name,
@@ -288,13 +397,20 @@ def list_push_exceptions(
     for r in rows:
         if (r.get("status") or "") != "failed":
             continue
+        # DMS 推送可视化闭环(Zihao 2026-06-01)· 身份证→订车单失败【不进】发票推送异常栏:
+        # 它不是发票推送 · 用发票字段(发票号/买方/卖方)框它+裸露 ERR_ID_CARD_* 是错的。
+        # DMS 失败改在「集成→推送日志」里(下拉筛 DMS · 按 DMS 字段展示+原地重试)处理。
+        if (r.get("trigger") or "") == "id_card" or (
+            r.get("endpoint_adapter") or ""
+        ).lower() == "mrerp_dms":
+            continue
         r["state"] = batch_view.classify_push_log(r)
         r["category"] = classify_push_exception(r.get("error_msg"))
         m = _re.search(r"ERR_[A-Z0-9_]+", r.get("error_msg") or "")
         r["error_code"] = m.group(0) if m else ""
         # P2-C (B7) · 附友好原因 4 语 dict(命中 catalog 才有 · 否则 None)·
         # 异常卡片优先显本语言,不裸透泰文。
-        r["error_friendly"] = friendly_for_ui(r.get("error_msg"))
+        r["error_friendly"] = friendly_any(r.get("error_msg"))
         base.append(r)
 
     # 2) 搜索(发票号/卖方/买方 · 大小写不敏感)

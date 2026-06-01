@@ -6,8 +6,12 @@
 > - ✅ **P-C**(`b1ffd9b`)pipeline→pattern_memory.py·1025→947·E2E INV2026030010 字段全对 VAT7%(该票自然触发 L3·触发逻辑未动)。
 > - ✅ **P-B**(`5b1f41f`)触发/置信纯逻辑(5常量+5函数)→triggers.py(235)·pipeline 947→751·契约 assertIs 锁 10 名同一对象+功能锁(test_ocr_triggers_contract 7绿)·全量 2123 绿。**双票 field-diff E2E 验过**:INV2026030010(4页)page2 因 `total_amount missing` 触发 L3=['text','L2','L3']→**L3_triggered=True**(触发口径一字未改);INV2026030004(2页)全 ['text','L2']→**L3_triggered=False**·字段 3750+262.50=4012.50 VAT7% 全对。
 > - **纯搬家批(P-A/P-C/L2-A/P-B)全部完成**·均真账号 E2E 验过·0 逻辑改。
-> - 真重构刀 **L2-B / P-D / L2-C** 仍待:单独轮·拆细+密 E2E·别混进搬家 commit。
-> 累计:layer2_structure 981→850 · pipeline 1044→**751**(均仍 >500·warning-mode 闸不阻·达 <500 需 P-D/L2-B/L2-C 真重构刀·单独草案交叉验证)。
+> - ✅ **L2-P**(`4e21891`)7 个 prompt 字符串常量 verbatim → 新 leaf `layer2_prompts.py`(AST literal 7/7 byte-identical)· layer2_structure 850→580 · 新 test_layer2_prompts_contract。
+> - ✅ **L2-B**(`efd6fc4`)`_call_gemini_with_retry`(AST identical)→ 并入 `layer2_gemini.py`(prompt 改引 layer2_prompts 叶子)· layer2_structure 580→**455 <500 达标** · 翻 test_layer2_gemini_contract 锁“函数现在 gemini + re-export 同一对象”。
+> - ✅ **P-D**(`7efbfea`)`_process_one_page`+`_process_pages`+`OCR_PDF_PAGE_WORKERS`(两函数 AST identical)→ 新 leaf `page_runner.py` · pipeline 751→**464 <500 达标** · 删 14 个仅被搬走函数用的 import(逐一核验非 re-export 契约)· Step2 单测 patch 目标改 page_runner(Step3 run_on_image 仍经 pipeline 命名空间·不改)· 新 test_pdsplit_contract。
+> - **真重构三刀(L2-P/L2-B/P-D)收官**:全 verbatim(AST/字节比对 identical·非纯文本搬家但 0 逻辑)· 全量 2164 unittest 绿 · **真账号 field-diff E2E 双票全绿**(030004=3750+262.50=4012.50 VAT7% chains=[text,L2]×2 无L3;030010=4页 page2=[text,L2,L3] 触发L3·均 from_cache=false 真 Gemini·与 P-B 轮 L3 口径一字不差)。
+> - 仅剩 **L2-C**(layer2 抽取算法本体·已 <500 故非必须·留作进一步解耦再议)。
+> 累计:layer2_structure 981→**455** · pipeline 1044→**464**(**两文件双双 <500 达标**)。
 
 > 目标:`services/ocr/pipeline.py`(1044)+ `services/ocr/layer2_structure.py`(981)→ 各 <500(铁律#27)。
 > 方法:**纯结构搬家(copy-out + 文件尾 re-export 回原命名空间 → 调用方 0 改动 + 契约 assertIs 锁同一对象)** 为主;

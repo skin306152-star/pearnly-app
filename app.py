@@ -306,14 +306,7 @@ purge_stale_static_gz()
 # ============================================================
 
 
-# ============================================================
-# v118.20.1 · 异常栏(Exceptions)规则检查 + 智能提醒(LINE)整条链已抽到
-# exception_checks.py(REFACTOR-B1 · 2026-05-25)· EXC_RULE_* 常量 / _parse_money /
-# _is_valid_thai_tax_id / _async_run_exception_checks / _notify_exception_high /
-# _notify_large_invoice / _format_thb / _user_lang_safe / _rule_belongs_to 全搬过去。
-# 顶部 from exception_checks import _async_run_exception_checks, _parse_money ·
-# OCR/LINE 上传路由 + history PUT 共用 → 单一来源(拆 history 组前置 · 解循环 import)。
-# ============================================================
+# v118.20.1 · 异常栏规则检查 + 智能提醒整条链 → exception_checks.py(REFACTOR-B1 · 单一来源 re-export 见顶部 import)。
 
 
 # ─── API 端点 ───────────────────────────────────────────
@@ -358,13 +351,7 @@ purge_stale_static_gz()
 # ============================================================
 
 
-# ============================================================
-# v0.15 · 用户自带 Gemini API Key
-# 设计:
-#   GET  · 读遮罩信息(安全)
-#   PUT  · 保存 key
-#   POST /test · 用 key 做一次最小调用验证有效
-# v118.35.0.16 · /api/settings/gemini-key GET/PUT/POST routes 永久下线 · credits 系统不需要用户自带 key
+# v118.35.0.16 · /api/settings/gemini-key(GET/PUT/POST)永久下线 · credits 系统不需用户自带 key
 
 
 # ============================================================

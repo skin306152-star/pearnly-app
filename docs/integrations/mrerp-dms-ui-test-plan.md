@@ -1,7 +1,7 @@
 # MR.ERP DMS 汽车销售（身份证 → 订车单）· 浏览器 UI 实测计划
 
 > 交付对象：执行浏览器 UI 实测的自动化代理（Codex）
-> 版本：v1（2026-05-31）· 对应上线 commit `80bdc23` · 前端版本 `main.js?v=11850043`
+> 版本：v1（2026-05-31）· 对应上线 commit `733b3a9` · 前端版本 `main.js?v=11850050`
 > 目标：在真实浏览器里端到端验证「身份证识别 → DMS 建客户 + 建订车单」全流程，并确认**不污染**现有发票 OCR / MR.ERP 财务推送。
 
 ---
@@ -16,7 +16,7 @@
 | DMS 测试站（连接向导里填这个） | `https://www.mrerp4sme.com/dms/index.php` |
 | DMS 测试账号 | `dmstest` |
 | DMS 测试密码 | `dmstest` |
-| 预期前端版本 | `/api/version` 返回 `version: "11850043"` |
+| 预期前端版本 | `/api/version` 返回 `version: "11850050"` |
 
 **浏览器要求**：桌面 Chrome 最新版，窗口 ≥ 1440×900。全程开 DevTools（Network + Console）。
 
@@ -40,7 +40,7 @@
 | TS3 | 身份证 → 订车单 主流程（Happy Path） | 识别 → 推送 → 结果块 → DMS 复核 → 推送日志 |
 | TS4 | 字段校验与需复核 | 模糊图/缺字段/非身份证 → 不推送 + 提示 + 重试 |
 | TS5 | 隔离与防误推（**最高优先级**） | DMS 不进发票推送列表、auto_push 恒 false、发票额度不被污染 |
-| TS6 | 国际化（4 语） | zh / en / th / zh_TW 文案完整、无 raw key |
+| TS6 | 国际化（4 语） | zh / en / th / ja 文案完整、无 raw key |
 | TS7 | 错误处理 | DMS 密码错、网络异常、重试 |
 | TS8 | 回归 | 发票 OCR、MR.ERP 财务推送、Xero 卡片 不受影响 |
 
@@ -234,7 +234,7 @@
 
 ## TS6 · 国际化（4 语）
 
-对以下界面分别切到 **中文 / English / ไทย / 繁體中文**（设置 → 语言,或顶栏语言切换）,逐一确认**无 raw key**（不出现 `dms-card-title` 这种原始键名）、文案通顺、无明显错译、无 AI 腔：
+对以下界面分别切到 **中文 / English / ไทย / 日本語**（设置 → 语言,或顶栏语言切换）,逐一确认**无 raw key**（不出现 `dms-card-title` 这种原始键名）、文案通顺、无明显错译、无 AI 腔：
 - TC6.1 DMS 连接卡片（标题/描述/pill/按钮）
 - TC6.2 连接向导（标题/4 字段标签/2 按钮/校验提示/连接中…）
 - TC6.3 OCR 模式切换（发票 / 身份证订车）
@@ -259,7 +259,7 @@
 - TC8.2 发票推送到 MR.ERP 财务（若该账号配了 mrerp 财务端点）：手动推一张发票到 MR.ERP → 成功,推送日志正常,**与 DMS 互不干扰**。
 - TC8.3 其它 ERP 卡片（MR.ERP / Xero / FlowAccount）渲染与交互不受影响。
 - TC8.4 切回发票模式后,上传卡、拖拽、相机/相册入口、开始/停止识别 均正常。
-- TC8.5 全程 Console 无新增报错;页面无白屏;`/api/version` = `11850043`。
+- TC8.5 全程 Console 无新增报错;页面无白屏;`/api/version` = `11850050`。
 
 ---
 
@@ -278,7 +278,7 @@
 | 需复核 | `needs_review=true`,status=`needs_review`,日志 error=`ERR_ID_CARD_REQUIRED_FIELDS` |
 | 发票抽屉推送列表 | 不含 mrerp_dms |
 | 外部单号 | 推送日志 external_doc_no = booking_no |
-| 前端版本 | 11850043 |
+| 前端版本 | 11850050 |
 
 ---
 

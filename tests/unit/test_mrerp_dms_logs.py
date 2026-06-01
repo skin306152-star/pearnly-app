@@ -26,6 +26,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import erp_push as _erp  # noqa: E402
+import erp_dms_push  # noqa: E402  · E3:push_mrerp_dms_id_card 已搬此处,内部解析 _build_mrerp_dms_adapter
 from services.erp.mrerp_dms_models import DMSPushResult  # noqa: E402
 
 
@@ -73,7 +74,9 @@ class PushMrerpDmsLogShapeTests(unittest.TestCase):
             booking_no="PN0010100531",
             response_code="sc::1",
         )
-        with patch.object(_erp, "_build_mrerp_dms_adapter", return_value=(_FakeAdapter(ok), None)):
+        with patch.object(
+            erp_dms_push, "_build_mrerp_dms_adapter", return_value=(_FakeAdapter(ok), None)
+        ):
             res = _erp.push_mrerp_dms_id_card(_ENDPOINT, _ID_CARD)
         self.assertTrue(res["success"])
         self.assertEqual(res["adapter"], "mrerp_dms")
@@ -88,7 +91,9 @@ class PushMrerpDmsLogShapeTests(unittest.TestCase):
 
     def test_failure_shape_carries_error_code(self):
         bad = DMSPushResult(ok=False, error_code="ERR_DMS_IMPORT", error="boom")
-        with patch.object(_erp, "_build_mrerp_dms_adapter", return_value=(_FakeAdapter(bad), None)):
+        with patch.object(
+            erp_dms_push, "_build_mrerp_dms_adapter", return_value=(_FakeAdapter(bad), None)
+        ):
             res = _erp.push_mrerp_dms_id_card(_ENDPOINT, _ID_CARD)
         self.assertFalse(res["success"])
         self.assertEqual(res["error_code"], "ERR_DMS_IMPORT")
@@ -100,7 +105,7 @@ class PushMrerpDmsLogShapeTests(unittest.TestCase):
     def test_build_failure_returns_friendly_not_raise(self):
         # adapter construction failed (e.g. no creds) → never raises.
         with patch.object(
-            _erp,
+            erp_dms_push,
             "_build_mrerp_dms_adapter",
             return_value=(None, {"error_code": "ERR_NO_CREDS", "raw": "missing"}),
         ):
@@ -116,7 +121,7 @@ class PushMrerpDmsLogShapeTests(unittest.TestCase):
             def __exit__(self, *a):
                 return False
 
-        with patch.object(_erp, "_build_mrerp_dms_adapter", return_value=(_Boom(), None)):
+        with patch.object(erp_dms_push, "_build_mrerp_dms_adapter", return_value=(_Boom(), None)):
             res = _erp.push_mrerp_dms_id_card(_ENDPOINT, _ID_CARD)
         self.assertFalse(res["success"])
         self.assertEqual(res["error_code"], "ERR_DMS_UNEXPECTED")

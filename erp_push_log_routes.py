@@ -264,6 +264,7 @@ async def erp_exceptions(
     request: Request,
     q: Optional[str] = None,
     category: Optional[str] = None,
+    adapter: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
 ):
@@ -277,7 +278,12 @@ async def erp_exceptions(
     user = get_current_user_from_request(request)
     _check_push_access(user)
     return db.list_push_exceptions(
-        user["id"], q=q, category=category, limit=min(limit, 200), offset=max(0, offset)
+        user["id"],
+        q=q,
+        category=category,
+        adapter=adapter,
+        limit=min(limit, 200),
+        offset=max(0, offset),
     )
 
 

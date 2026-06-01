@@ -21,6 +21,7 @@
         items: [],
         q: '',
         cat: '',
+        adapter: '', // DMS 闭环修正(Zihao 2026-06-01)· 异常栏与推送日志同理:ERP 系统下拉筛选
         selected: new Set(),
         total: 0,
         categories: {},
@@ -98,11 +99,25 @@
                 const stateLbl = t('erp-exc-state-' + (it.state || 'failed'));
                 const reason = _erpExcFriendly(it);
                 const checked = st.selected.has(it.id) ? 'checked' : '';
+                // DMS 闭环修正 · 身份证订车异常按 DMS 字段:单据=订车单号、对方=客户、无买方;加类型标。
+                const isId = it.push_type === 'id_card';
+                const idBadge = isId
+                    ? `<span class="erp-exc-type-idcard">${escapeHtml(t('erp-log-type-idcard'))}</span> `
+                    : '';
+                const invCell = isId
+                    ? `<span class="ex-inv" title="${escapeHtml(t('erp-log-col-booking'))}">${idBadge}${escapeHtml(it.invoice_no || '—')}</span>`
+                    : `<span class="ex-inv" title="${escapeHtml(it.invoice_no || '')}">${escapeHtml(it.invoice_no || '—')}</span>`;
+                const sellerCell = isId
+                    ? `<span class="ex-seller" title="${escapeHtml(t('erp-log-col-customer'))}">${escapeHtml(it.seller_name || '—')}</span>`
+                    : `<span class="ex-seller" title="${escapeHtml(it.seller_name || '')}">${escapeHtml(it.seller_name || '—')}</span>`;
+                const buyerCell = isId
+                    ? `<span class="ex-buyer">—</span>`
+                    : `<span class="ex-buyer" title="${escapeHtml(it.ocr_buyer_name || '')}">${escapeHtml(it.ocr_buyer_name || '—')}</span>`;
                 return `<div class="erp-exc-row" data-erpexc-id="${escapeHtml(it.id)}">
                 <span class="ex-cb"><input type="checkbox" class="erp-exc-cb" data-erpexc-cb="${escapeHtml(it.id)}" ${checked}></span>
-                <span class="ex-inv" title="${escapeHtml(it.invoice_no || '')}">${escapeHtml(it.invoice_no || '—')}</span>
-                <span class="ex-seller" title="${escapeHtml(it.seller_name || '')}">${escapeHtml(it.seller_name || '—')}</span>
-                <span class="ex-buyer" title="${escapeHtml(it.ocr_buyer_name || '')}">${escapeHtml(it.ocr_buyer_name || '—')}</span>
+                ${invCell}
+                ${sellerCell}
+                ${buyerCell}
                 <span class="ex-state"><span class="erp-exc-state ${stateCls}">${escapeHtml(stateLbl)}</span></span>
                 <span class="ex-reason" title="${escapeHtml(reason)}">${escapeHtml(reason)}${it.error_code ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</span>
                 <span class="ex-act"><button class="btn btn-sm btn-secondary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button></span>
@@ -121,10 +136,24 @@
                   ? `<div class="erp-exc-count">${escapeHtml(t('erp-exc-shown', { n: items.length, total: st.total }))}</div>`
                   : '';
 
+        // DMS 闭环修正 · ERP 系统下拉(真实配置端点 · 按 adapter 去重)+ 选中 DMS 时表头切 订车单号/客户
+        const isDmsView = st.adapter === 'mrerp_dms';
+        const _eps = Array.isArray(window._erpEndpoints) ? window._erpEndpoints : [];
+        const _seenAd = new Set();
+        let _erpOpts = `<option value="">${escapeHtml(t('erp-logs-erp-all'))}</option>`;
+        _eps.forEach((e) => {
+            const ad = ((e && e.adapter) || '').toLowerCase();
+            if (!ad || _seenAd.has(ad)) return;
+            _seenAd.add(ad);
+            _erpOpts += `<option value="${escapeHtml(ad)}"${ad === st.adapter ? ' selected' : ''}>${escapeHtml((e && e.name) || ad)}</option>`;
+        });
+        const colExcInv = isDmsView ? t('erp-log-col-booking') : t('erp-exc-f-invoice');
+        const colExcSeller = isDmsView ? t('erp-log-col-customer') : t('erp-exc-f-seller');
         block.innerHTML = `
             <div class="erp-exc-head">
                 <h2 class="erp-exc-title">${escapeHtml(t('erp-exc-title'))}</h2>
                 <span class="erp-exc-sub">${escapeHtml(t('erp-exc-sub'))}</span>
+                <select class="erp-logs-erp-select" id="erp-exc-erp-select" aria-label="ERP">${_erpOpts}</select>
                 <input type="search" class="erp-exc-search" id="erp-exc-search" placeholder="${escapeHtml(t('erp-exc-search-ph'))}" value="${escapeHtml(st.q)}">
             </div>
             <div class="erp-exc-chips">${chipsHtml}</div>
@@ -137,8 +166,8 @@
             <div class="erp-exc-rows">
                 <div class="erp-exc-row erp-exc-row-head">
                     <span class="ex-cb"><input type="checkbox" class="erp-exc-cb-all" id="erp-exc-cb-all" ${allChecked ? 'checked' : ''}></span>
-                    <span class="ex-inv">${escapeHtml(t('erp-exc-f-invoice'))}</span>
-                    <span class="ex-seller">${escapeHtml(t('erp-exc-f-seller'))}</span>
+                    <span class="ex-inv">${escapeHtml(colExcInv)}</span>
+                    <span class="ex-seller">${escapeHtml(colExcSeller)}</span>
                     <span class="ex-buyer">${escapeHtml(t('erp-exc-f-buyer'))}</span>
                     <span class="ex-state">${escapeHtml(t('erp-exc-f-state'))}</span>
                     <span class="ex-reason">${escapeHtml(t('erp-exc-f-reason'))}</span>
@@ -175,6 +204,14 @@
                 loadErpExceptions(false);
             });
         });
+        // ERP 系统下拉(DMS 闭环修正 · 异常栏与推送日志同理 · 选一个看一个)
+        const erpSel = document.getElementById('erp-exc-erp-select');
+        if (erpSel) {
+            erpSel.addEventListener('change', () => {
+                st.adapter = erpSel.value || '';
+                loadErpExceptions(false);
+            });
+        }
         // 单条 retry
         block.querySelectorAll('[data-erpexc-retry]').forEach((btn) => {
             btn.addEventListener('click', (e) => {
@@ -324,9 +361,24 @@
         if (!block || _erpExcState.loading) return;
         _erpExcState.loading = true;
         try {
+            // ERP 系统下拉的选项来自真实配置端点 · 异常页可能先于集成页打开 → 懒缓存一次
+            if (!Array.isArray(window._erpEndpoints) || !window._erpEndpoints.length) {
+                try {
+                    const er = await fetch('/api/erp/endpoints', {
+                        headers: { Authorization: 'Bearer ' + _erpExcTok() },
+                    });
+                    if (er.ok) {
+                        const ed = await er.json();
+                        window._erpEndpoints = (ed && (ed.items || ed)) || [];
+                    }
+                } catch (_) {
+                    /* 下拉退化为仅「全部 ERP」· 不致命 */
+                }
+            }
             const params = new URLSearchParams();
             if (_erpExcState.q) params.set('q', _erpExcState.q);
             if (_erpExcState.cat) params.set('category', _erpExcState.cat);
+            if (_erpExcState.adapter) params.set('adapter', _erpExcState.adapter);
             params.set('limit', String(_erpExcState.pageSize));
             params.set('offset', String(append ? _erpExcState.items.length : 0));
             const resp = await fetch('/api/erp/exceptions?' + params.toString(), {

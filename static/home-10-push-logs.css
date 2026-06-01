@@ -542,3 +542,22 @@ button.btn-primary.btn-tiny:hover {
 }
 .erp-receipt-action-btn.primary:hover { opacity: 0.9; }
 
+
+/* DMS 闭环(Zihao 2026-06-01)· ERP 系统下拉筛选(推送日志+异常栏复用)· 圆角对齐 .chip-filter(原生 select 直角 → 圆角) */
+.erp-logs-erp-select {
+    padding: 4px 26px 4px 10px;
+    font-size: 11px;
+    border: 1px solid var(--line);
+    background-color: #fff;
+    color: var(--ink);
+    border-radius: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23999' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+}
+.erp-logs-erp-select:hover { border-color: var(--brand); }
+.erp-logs-erp-select:focus { outline: none; border-color: var(--brand); }

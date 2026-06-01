@@ -338,6 +338,7 @@ def list_push_exceptions(
     user_id: str,
     q: Optional[str] = None,
     category: Optional[str] = None,
+    adapter: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
 ) -> Dict[str, Any]:
@@ -397,13 +398,16 @@ def list_push_exceptions(
     for r in rows:
         if (r.get("status") or "") != "failed":
             continue
-        # DMS 推送可视化闭环(Zihao 2026-06-01)· 身份证→订车单失败【不进】发票推送异常栏:
-        # 它不是发票推送 · 用发票字段(发票号/买方/卖方)框它+裸露 ERR_ID_CARD_* 是错的。
-        # DMS 失败改在「集成→推送日志」里(下拉筛 DMS · 按 DMS 字段展示+原地重试)处理。
-        if (r.get("trigger") or "") == "id_card" or (
-            r.get("endpoint_adapter") or ""
-        ).lower() == "mrerp_dms":
-            continue
+        # DMS 推送可视化闭环(Zihao 2026-06-01 · 修正:异常栏与推送日志【同理】· 保留身份证订车失败行,
+        # 标 push_type 供前端按 DMS 字段(订车单号/客户)渲染 + ERP 下拉筛选 · 不再用发票字段框、不再误删)。
+        r["push_type"] = (
+            "id_card"
+            if (
+                (r.get("trigger") or "") == "id_card"
+                or (r.get("endpoint_adapter") or "").lower() == "mrerp_dms"
+            )
+            else "invoice"
+        )
         r["state"] = batch_view.classify_push_log(r)
         r["category"] = classify_push_exception(r.get("error_msg"))
         m = _re.search(r"ERR_[A-Z0-9_]+", r.get("error_msg") or "")
@@ -423,6 +427,12 @@ def list_push_exceptions(
             or qq in (r.get("seller_name") or "").lower()
             or qq in (r.get("ocr_buyer_name") or "").lower()
         ]
+
+    # 2.5) ERP 系统筛选(下拉 · 与推送日志同维度 · Zihao 2026-06-01 异常栏同理)·
+    #      在 category 计数前应用 → chip 数反映所选 ERP 范围。
+    ad = (adapter or "").strip().lower()
+    if ad:
+        base = [r for r in base if (r.get("endpoint_adapter") or "").lower() == ad]
 
     # 3) category 计数(搜索后 · 过滤前 → chip 显当前搜索范围内各子类数)
     categories: Dict[str, int] = {}

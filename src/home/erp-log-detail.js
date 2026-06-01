@@ -126,6 +126,9 @@ async function showLogDetail(logId) {
         // 发票买方(OCR 真买方名优先 · 退回已归属 client_name)+ 卖家 + 金额格式化
         const clientName = (log.ocr_buyer_name || '').trim() || log.client_name || '-';
         const sellerName = log.seller_name || '-';
+        // DMS 闭环修正(Zihao 2026-06-01)· 身份证订车推送详情按 DMS 字段:发票号→订车单号、
+        // 发票卖方→客户;无"发票买方"概念 → 跳过该行。不再用发票标签框身份证订车。
+        const isIdCard = log.push_type === 'id_card';
         let amountStr = '-';
         const amtNum = Number(log.total_amount);
         if (log.total_amount != null && log.total_amount !== '' && !isNaN(amtNum)) {
@@ -150,7 +153,7 @@ async function showLogDetail(logId) {
         // 成功 + 失败都显示:发票号 / ERP 系统 / Pearnly 客户 / 卖家 / 推送时间 / 耗时。
         // 仅成功额外显示:ERP 单号(带复制)+ 金额(失败时没单号没金额 · 不留空行)。
         addRow(
-            t('erp-receipt-invoice-no'),
+            isIdCard ? t('erp-log-col-booking') : t('erp-receipt-invoice-no'),
             `<strong>${escapeHtml(log.invoice_no || '-')}</strong>`
         );
         addRow(t('erp-receipt-erp-name'), escapeHtml(epName));
@@ -168,8 +171,12 @@ async function showLogDetail(logId) {
             addRow(t('erp-receipt-doc-no'), docValHtml);
         }
 
-        addRow(t('erp-receipt-client'), escapeHtml(clientName));
-        addRow(t('erp-receipt-seller'), escapeHtml(sellerName));
+        // 身份证订车无"发票买方"概念 → 跳过买方行;卖方行改标「客户」(seller_name 即客户名)
+        if (!isIdCard) addRow(t('erp-receipt-client'), escapeHtml(clientName));
+        addRow(
+            isIdCard ? t('erp-log-col-customer') : t('erp-receipt-seller'),
+            escapeHtml(sellerName)
+        );
         if (isOk) {
             addRow(t('erp-receipt-amount'), escapeHtml(amountStr));
         }

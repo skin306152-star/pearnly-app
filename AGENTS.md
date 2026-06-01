@@ -1,7 +1,7 @@
 # AGENTS.md · Pearnly 唯一入口(所有 AI 窗口先读这一页)
 
 > **这是唯一的"必读"。** 故意保持一页。完整宪法在 `CLAUDE.md/CLAUDE.md`(铁律细节),业务概念在 `docs/agent/`,但**进窗口先把这页 + STATE 状态卡读完 + 跑一次进度脚本**就能开工,别一上来啃 7000 行。
-> 最后更新:2026-06-01(MR.ERP DMS UI 实测回归:5 缺陷已修已上线 · DMS-UI-004 完整地理解析 256df28·prod 健康 · 等 Codex 复测 · 整顿主线暂停)
+> 最后更新:2026-06-01(MR.ERP DMS 6 缺陷全修上线·等 Codex 第2轮复测(R1=DMS-UI-004 硬门槛)→ 过则闭环切整顿 · 另修超管页 b078e39/7c80ee7+MR.ERP卡 ea422f9 · 整顿主线暂停)
 
 ---
 
@@ -21,7 +21,7 @@
 
 ## 1. 当前在干啥(整顿期 · 2026-05 起)
 
-- **⏳ 当前实况(2026-06-01)**:**整顿主线暂停**。在做 **Zihao 例外任务:MR.ERP DMS 汽车销售 身份证→订车单集成**(adapter=`mrerp_dms`·已上线 prod 版本 `11850050`(commit 733b3a9)。**UI 实测首轮已修 4 缺陷上线**:003 身份证不转PDF+后端栅格化 / 005 DMS不入发票推送列表 / TC1.4 测试按钮POST / 006 i18n兜底+4语补键;**DMS-UI-004 新建客户失败 ERR_DMS_CUSTOMER_CREATE 已修上线 `256df28`**(live probe 确证根因=建客户 geo select 发空串被拒·修=`_resolve_address_geo` 完整级联解析地址文字→主档 ID·live 真建成 customer 90)。**状态=等 Codex 复测**。计划 `docs/integrations/mrerp-dms-ui-test-plan.md`(本地未 commit)· 全貌见 STATE 状态卡 + 记忆 [[mrerp-dms-integration]] + `docs/integrations/mrerp-dms-integration-handoff.md`。例外任务 commit 走 `MRERP-DMS-INTEGRATION` tag(非 REFACTOR-)。
+- **⏳ 当前实况(2026-06-01)**:**整顿主线暂停**。在做 **Zihao 例外任务:MR.ERP DMS 汽车销售 身份证→订车单集成**(adapter=`mrerp_dms`·已上线 prod 版本 `11850050`(commit 733b3a9)。**UI 实测首轮已修 4 缺陷上线**:003 身份证不转PDF+后端栅格化 / 005 DMS不入发票推送列表 / TC1.4 测试按钮POST / 006 i18n兜底+4语补键;**DMS-UI-004 新建客户失败 ERR_DMS_CUSTOMER_CREATE 已修上线 `256df28`**(live probe 确证根因=建客户 geo select 发空串被拒·修=`_resolve_address_geo` 完整级联解析地址文字→主档 ID·live 真建成 customer 90)。**状态=代码侧 6 缺陷全修上线,尚未闭环——等 Codex 第2轮复测**(计划 `docs/integrations/mrerp-dms-ui-test-plan.md` v2 顶部「⭐ 第2轮复测重点」R1-R7,R1=DMS-UI-004 新建客户=签收硬门槛)。**下个窗口先看 Codex 复测报告**:过则闭环→切回整顿主线;有 FAIL 逐条修。另:2026-06-01 修了超管 `/admin/*` 设计语言崩坏(`b078e39`+`7c80ee7`·见 [[admin-spa-independent-css]])+ MR.ERP 财务卡对齐 DMS 卡(`ea422f9`)·均真浏览器验过。全貌见 STATE 状态卡 + 记忆 [[mrerp-dms-integration]]。例外任务 commit 走 `MRERP-DMS-INTEGRATION` tag(非 REFACTOR-)。
 - **模式**:整顿封锁期(铁律 #18)· **0 新功能** · 只做 `REFACTOR_MASTER_PLAN.md` 的 9 阶段 task(**当前因例外任务暂停·待 Zihao 拍板恢复**)。
 - **当前打法**:**3 窗口并行 loop**(ADR-011 + `docs/refactor/PARALLEL_LOOP_DISPATCH.md`)· A 后端 / B 前端 / C 文档测试 · 按文件 ownership 切不撞车。
 - **找下一个 task**:`REFACTOR_MASTER_PLAN.md` 顶部「当前进度看板」。

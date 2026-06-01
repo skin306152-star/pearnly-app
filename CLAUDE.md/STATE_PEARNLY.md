@@ -6,7 +6,9 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡(2026-06-01 · **整顿暂停**·✅ **DMS 推送 UX 闭环(2轮)+ 导航文案统一 已上线**(prod 11850052)· DMS 集成第3轮已闭环 · C3 封存 home.html 1495)
+## 🎯 状态卡(2026-06-01 · **整顿暂停**·✅ **DMS 推送 UX 闭环(3轮)+ 导航文案统一 已上线**(prod 11850053)· DMS 集成第3轮已闭环 · C3 封存 home.html 1495)
+
+- **DMS 推送 UX 第3轮(`a118b3e` · prod 11850053)**:DMS 视图(选中 mrerp_dms)买方列 表头「发票买方」→「身份证」+ 显掩码末4(后端从 request_body 取 people_id_tail · `_id_card_tail` · list_push_logs/exceptions SELECT 加 request_body 取后 pop);异常处理弹窗 `_erpExcOpenEdit` 改 订车单号/客户/身份证 + 去"当前ERP客户"行 + 隐藏裸 ERR_*;新 i18n `erp-log-col-idcard` 4 语。测全量 2153 + prod E2E 01/05/08 绿。
 
 - **DMS 推送 UX 第2轮(Zihao 反馈修正 · `6f78541` · prod 11850052)**:① **异常栏同理**——上轮我误把 DMS 从异常栏删了,改回(撤 list_push_exceptions 排除·保留+push_type)+ 照日志加 ERP 下拉(`#erp-exc-erp-select`·adapter 参数)+ DMS 行按 订车单号/客户 渲染+类型标 ② **详情 modal**(erp-log-detail.js)DMS 推送 发票号→订车单号/发票卖方→客户/跳过买方行 ③ **ERP 下拉圆角**(home-10-push-logs.css `.erp-logs-erp-select` 14px+自绘箭头) ④ bump main.js+home-10 ?v=→11850052 + release_notes 补异常筛选。测全量 2153 + prod E2E 01/05/08 绿。⚠️ DMS 行真实视觉仍需 Zihao 在 skin306152 眼验。
 

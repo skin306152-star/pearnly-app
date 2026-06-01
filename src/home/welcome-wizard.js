@@ -1,3 +1,4 @@
+import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 · onboarding 4 步骨架 HTML(home.html #onboarding-modal 抽出 · showOnboarding 懒注入)
 // ============================================================
 // REFACTOR-C1 (2026-05-27) · 登录后欢迎向导 welcome-wizard 从 home.js 抽出为 ES module
 //
@@ -48,6 +49,27 @@
     function showOnboarding() {
         const modal = document.getElementById('onboarding-modal');
         if (!modal) return;
+        // REFACTOR-WB-C3 · 骨架抽到 welcome-wizard-html.js · 首次显示时懒注入(空壳 → 完整向导)+ 子树初译
+        if (modal.dataset.wbInjected !== '1') {
+            modal.innerHTML = ONBOARDING_HTML;
+            modal.dataset.wbInjected = '1';
+            try {
+                const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
+                const I = window.I18N;
+                if (I && I[lang]) {
+                    modal.querySelectorAll('[data-i18n]').forEach((el) => {
+                        const k = el.getAttribute('data-i18n');
+                        if (I[lang][k]) el.textContent = I[lang][k];
+                    });
+                    modal.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+                        const k = el.getAttribute('data-i18n-placeholder');
+                        if (I[lang][k]) el.placeholder = I[lang][k];
+                    });
+                }
+            } catch (e) {
+                /* silent · 初译失败不致命 · 切语言会补 */
+            }
+        }
         _obStep = 1;
         _obData = { role: '', monthly_volume: '', country: '', line_id: '' };
         // 预填用户已有的字段(如果有)

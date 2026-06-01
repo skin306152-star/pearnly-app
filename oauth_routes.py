@@ -144,7 +144,7 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
         else:
             # 3) v118.27.5.1 · 全新用户 · Google 一键注册(主流 SaaS 标准做法)
             try:
-                from auth_signup import create_user_via_google_oauth
+                from services.auth.oauth_create import create_user_via_google_oauth
 
                 _name = (uinfo.get("name") or "").strip() or None
                 user = create_user_via_google_oauth(
@@ -298,7 +298,7 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
         if not user:
             # 3) 全新用户 · LINE 一键注册
             try:
-                from auth_signup import create_user_via_line_oauth
+                from services.auth.oauth_create import create_user_via_line_oauth
 
                 user = create_user_via_line_oauth(
                     line_uid=line_uid,

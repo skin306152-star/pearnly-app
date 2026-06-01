@@ -113,6 +113,12 @@ if [ -n "$FE_CHANGED" ]; then
   echo "  · eslint(前端真 bug · 0 error 放行)"
   npm run lint || fail "eslint"
 
+  # 去 AI 味闸(守门第 7 道 · 只查本次改动的 src JS)· 2026-06-01 加:
+  # 前 6 道全机械但无一查 AI 味 → 自动 loop 漏过(注释塞 emoji 照样绿)。本闸把它也机械化。
+  echo "  · check_ai_smell(注释 emoji / console.log 调试残留 · 去 AI 味)"
+  # shellcheck disable=SC2086
+  python scripts/check_ai_smell.py $FE_CHANGED || fail "check_ai_smell(源码有 AI 味:注释 emoji / console.log)"
+
   echo "  · vite build(catch 配置/模块坏)"
   npm run build >/dev/null 2>&1 || fail "vite build 失败"
 fi

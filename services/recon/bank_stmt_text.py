@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""bank_stmt_text.py · Pearnly · raw text-line bank statement parsers (split from bank_recon_v2)."""
+"""bank_stmt_text.py · Pearnly · raw text-line bank statement parsers.
+
+Split verbatim from bank_recon_v2.py. Line-oriented fallback used when neither
+pdfplumber tables nor word coordinates yield a usable statement.
+"""
 
 import logging
 import re

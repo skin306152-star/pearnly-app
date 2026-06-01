@@ -164,6 +164,7 @@
 
 **🌊 Wave 1 — 现在做(我自主 · 无需 Zihao · 不花钱)· 当前主线**
 - **B1 续** 后端拆 <500:recon(`bank_recon_v2` 6745 等)→ 报表(`vat_excel_export` 等)→ ERP 周边(`mrerp_xlsx_generator`/`customer_sync`/`product_sync`)。判文件先分类:函数堆→facade 切 / 巨类→mixin 真重构([[megaclass-mixin-split-playbook]])。
+  - **`bank_recon_v2` 进行中**(2026-06-02·facade 切·纯函数堆):**6745→3745**·5 刀 verbatim 上线(`ac742c9..cbc0075`)→ `services/recon/bank_recon_{types,excel,utils}` + `bank_stmt_{balance,text,extract,gemini}`。**剩余**(下窗口):GL 解析 ~1700(先抽共享助手 `_pdf_extract_text_safe`/`_is_summary_row`/`_norm_thai` 才能移 orchestrator+GL)→ legacy ~730 → 序列化/merge → **🔴高敏 reconcile+scoring(铁律#26·连 `DATE_TOL_DAYS` 一刀·做前单独报 Zihao+真账号 E2E)**。**地雷**:`DATE_TOL_DAYS` 全局名冲突·L2 容差运行时实际 7≠注释 3(死代码被 scoring 覆盖)·重构保 verbatim=7([[date-tol-days-shadowing]])。
 - **C1 续** 前端 `src/home/*` 16 个拆 <500。
 - **B8 多租户 RLS**(安全·提前·**和拆分并行**·不碰拆分文件·Supabase 自带功能不花钱)。
 - **D 测试覆盖**(跟拆分并行加契约/集成测试·22.5%→爬向 70%)。
@@ -180,7 +181,7 @@
 - ⏳ 这些**不卡 Wave 1**——不装也能继续拆文件;到了再叫你。整顿告一段落再起 staging,别和大重构叠一起。
 
 **🌊 Wave 4 — 最后(抛光 + 可能花钱的可选项)**
-- **I 抛光**:I6 去 AI 味全量审计 + **I7 代码目录重组**(86 root .py → 包·文件全 <500 冻结后一次性搬·铁律#30)。
+- **I 抛光**:I6 去 AI 味全量审计 + **I7 代码目录重组**(86 root .py → 包·文件全 <500 冻结后一次性搬·铁律#30)。**并入 I7 的改名**(Zihao 2026-06-02 拍·选 A):`bank_recon_v2.py` 去 "v2"(→ `bank_recon_engine` 或进 `services/recon/`·"v2" 配 `bank_recon_v2_store`/区别 v1 遗留·有真实含义但非大厂命名)·import 只改一遍·别在拆分期单独改。
 - **H 安全 review**(合规)。
 - 💰 **花钱才做的(默认不做·想升级再说)**:真 APM/监控(Sentry/Datadog)· staging 第二台服务器(现用本地 Docker 替代)· Codecov Pro · CDN · 托管服务升级。**计划现在全用免费方案绕开了这些·要不要花钱升级你最后定。**
 

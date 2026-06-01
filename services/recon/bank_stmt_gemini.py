@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""bank_stmt_gemini.py · Pearnly · Gemini OCR fallback for bank statements, cached (split from bank_recon_v2)."""
+"""bank_stmt_gemini.py · Pearnly · Gemini OCR fallback for bank statements.
+
+Split verbatim from bank_recon_v2.py. Last-resort parser when the deterministic
+extractors fail; results cached (in-memory LRU + disk) by file-bytes hash.
+"""
 
 import hashlib
 import json

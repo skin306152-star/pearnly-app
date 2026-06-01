@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""bank_stmt_extract.py · Pearnly · pdfplumber table + word-coordinate bank statement extractors (split from bank_recon_v2)."""
+"""bank_stmt_extract.py · Pearnly · pdfplumber table + word-coordinate extractors.
+
+Split verbatim from bank_recon_v2.py. Two orthogonal strategies the orchestrator
+tries before falling back to text/Gemini: bank-specific table parsers and a
+coordinate-clustering parser for dense multi-page text PDFs.
+"""
 
 import logging
 import re

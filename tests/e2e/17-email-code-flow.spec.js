@@ -87,17 +87,25 @@ test.describe('邮箱验证码 / 找回密码 端点 smoke(铁律 v118.27.6 + fo
         expect(f2.snippet).toMatch(/"ok"\s*:\s*true/);
 
         // ────── 3) send_email_code · 已注册邮箱 → 409 email_already_registered
-        // 证明端点真在查 DB · 不是黑盒
-        const s1 = await post(page, '/api/auth/send_email_code', {
-            email: testEmail,
-            purpose: 'signup',
-            lang: 'zh',
-        });
-        expect(
-            s1.status,
-            `send_email_code 已注册邮箱应 409 (got ${s1.status} body=${s1.snippet})`
-        ).toBe(409);
-        expect(s1.snippet).toMatch(/email_already_registered/i);
+        // 证明端点真在查 DB · 不是黑盒。仅当账号标识是 email 格式才有意义
+        //（用户名登录账号如 pearnly_e2e_1 没有 @ · 会先被邮箱格式正则拒成 400）。
+        if (testEmail.includes('@')) {
+            const s1 = await post(page, '/api/auth/send_email_code', {
+                email: testEmail,
+                purpose: 'signup',
+                lang: 'zh',
+            });
+            expect(
+                s1.status,
+                `send_email_code 已注册邮箱应 409 (got ${s1.status} body=${s1.snippet})`
+            ).toBe(409);
+            expect(s1.snippet).toMatch(/email_already_registered/i);
+        } else {
+            test.info().annotations.push({
+                type: 'note',
+                description: `PEARNLY_E2E_USER='${testEmail}' 是用户名非邮箱 · 跳过 send_email_code 已注册→409 断言（需 email 登录账号）`,
+            });
+        }
 
         // ────── 4) send_email_code · 邮件格式非法 → 400 email_invalid
         const s2 = await post(page, '/api/auth/send_email_code', {

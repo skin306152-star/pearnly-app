@@ -31,9 +31,53 @@
 /* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal */
 
 let _logFilter = { key: 'all', val: '' };
+// DMS 推送可视化闭环(Zihao 2026-06-01)· ERP 系统筛选 = 下拉(adapter)· 独立于 status/trigger chip ·
+// 选中 mrerp_dms(身份证订车)时表头/行切到 DMS 字段(订车单号/客户)· 不再用发票字段框。
+let _erpAdapter = '';
+let _erpSelectReady = false;
 // v118.25.1 · 推送日志多选状态(批量重推)
 let _erpSelected = new Set();
 window._erpSelected = _erpSelected;
+
+// DMS 推送可视化闭环(Zihao 2026-06-01)· 推送日志 ERP 筛选 = 下拉「真实配置的 ERP 端点」·
+// 不再硬编码 [MR.ERP/Xero/FlowAccount]。按 adapter 去重(后端按 adapter 过滤)· 标签用端点名。
+// 懒填一次(loadErpLogs 首次调)· 失败回滚允许重试。
+async function _ensureErpSelectOptions() {
+    const sel = document.getElementById('erp-logs-erp-select');
+    if (!sel || _erpSelectReady) return;
+    _erpSelectReady = true;
+    try {
+        let eps = window._erpEndpoints;
+        if (!Array.isArray(eps) || eps.length === 0) {
+            const r = await fetch('/api/erp/endpoints', {
+                headers: { Authorization: 'Bearer ' + token },
+            });
+            if (r.ok) {
+                const d = await r.json();
+                eps = (d && (d.items || d)) || [];
+            }
+        }
+        if (!Array.isArray(eps)) eps = [];
+        const seen = new Set();
+        const opts = [];
+        eps.forEach((e) => {
+            const ad = ((e && e.adapter) || '').toLowerCase();
+            if (!ad || seen.has(ad)) return;
+            seen.add(ad);
+            opts.push({ val: ad, label: (e && e.name) || ad });
+        });
+        sel.innerHTML =
+            `<option value="">${escapeHtml(t('erp-logs-erp-all'))}</option>` +
+            opts
+                .map(
+                    (o) =>
+                        `<option value="${escapeHtml(o.val)}"${o.val === _erpAdapter ? ' selected' : ''}>${escapeHtml(o.label)}</option>`
+                )
+                .join('');
+    } catch (e) {
+        _erpSelectReady = false; // 允许下次重试
+    }
+}
 
 async function loadErpLogs(silent) {
     const listEl = document.getElementById('erp-logs-list');
@@ -45,13 +89,15 @@ async function loadErpLogs(silent) {
 
     // 今日统计同步刷新(不等)
     window.loadErpTodayStats();
+    // ERP 系统下拉(真实配置端点)· 懒填一次
+    _ensureErpSelectOptions();
 
     try {
         const params = new URLSearchParams({ limit: '30' });
         if (_logFilter.key === 'status') params.set('status', _logFilter.val);
         if (_logFilter.key === 'trigger') params.set('trigger', _logFilter.val);
-        // 批 3 改动 6 (v118.34.34) · adapter filter chip (mrerp / xero / flowaccount).
-        if (_logFilter.key === 'adapter') params.set('adapter', _logFilter.val);
+        // DMS 推送可视化闭环 · ERP 系统筛选改下拉(_erpAdapter)· 与 status/trigger chip 独立组合
+        if (_erpAdapter) params.set('adapter', _erpAdapter);
         const resp = await fetch(`/api/erp/logs?${params}`, {
             headers: { Authorization: 'Bearer ' + token },
         });
@@ -95,6 +141,11 @@ async function loadErpLogs(silent) {
             .map(function (l) {
                 return l.id;
             });
+        // DMS 推送可视化闭环 · 选中身份证订车(mrerp_dms)时,单据列切到 DMS 语义:
+        //   发票号→订车单号、发票卖方→客户(seller_name 即客户名)· 发票买方/工作空间列 DMS 不适用置 —。
+        const isDmsView = _erpAdapter === 'mrerp_dms';
+        const colInvoice = isDmsView ? t('erp-log-col-booking') : t('erp-log-col-invoice');
+        const colSeller = isDmsView ? t('erp-log-col-customer') : t('erp-log-col-seller');
         const headerRow =
             '<div class="erp-log-row erp-log-row-header" data-log-header>' +
             (selectableIds.length > 0
@@ -103,12 +154,12 @@ async function loadErpLogs(silent) {
             `<span class="log-time">${escapeHtml(t('erp-log-col-time'))}</span>` +
             `<span class="log-status">${escapeHtml(t('erp-log-col-status'))}</span>` +
             `<span class="log-tag-header">${escapeHtml(t('erp-log-col-trigger'))}</span>` +
-            `<span class="log-invoice">${escapeHtml(t('erp-log-col-invoice'))}</span>` +
+            `<span class="log-invoice">${escapeHtml(colInvoice)}</span>` +
             // P1-C 后端列 (2026-05-26) · 工作空间(账套归属)· join ocr_history.workspace_client_id
             `<span class="log-workspace">${escapeHtml(t('erp-log-col-workspace'))}</span>` +
             // 批 1 改动 5 (v118.34.33) · 新增 "发票买方" 列 · 跟 "发票卖方" 分开
             `<span class="log-client">${escapeHtml(t('erp-log-col-client'))}</span>` +
-            `<span class="log-seller">${escapeHtml(t('erp-log-col-seller'))}</span>` +
+            `<span class="log-seller">${escapeHtml(colSeller)}</span>` +
             // 改动 8 · "ERP" 列(走哪个 endpoint)
             `<span class="log-erp">${escapeHtml(t('erp-log-col-erp'))}</span>` +
             // 临时任务 (Zihao 2026-05-26) · 通用「ERP 单号」列(external_doc_no · 不写死 MR.ERP)
@@ -161,6 +212,15 @@ async function loadErpLogs(silent) {
                         triggerTag = `<span class="log-tag retry">${escapeHtml(t('log-tag-retry'))}</span>`;
                     else
                         triggerTag = `<span class="log-tag manual">${escapeHtml(t('log-tag-manual'))}</span>`;
+                    // DMS 推送可视化闭环 · 身份证订车行标类型 + 友好失败原因(不裸露 ERR_*)。
+                    const isId = log.push_type === 'id_card';
+                    const typeBadge = isId
+                        ? `<span class="log-tag log-type-idcard">${escapeHtml(t('erp-log-type-idcard'))}</span>`
+                        : '';
+                    const friendlyReason =
+                        (log.error_friendly &&
+                            (log.error_friendly[currentLang] || log.error_friendly.en)) ||
+                        '';
                     // v118.25 · 重试信息 · 重新设计(2026-05-26 Zihao 报对齐 bug):不再做成
                     // 行内变宽 chip(会把后面的列挤歪 · 失败行尤其明显)· 改成挂在状态图标的
                     // tooltip 里(retryInfo)· 行布局只保留固定宽的操作列 · 列永远对齐。
@@ -198,15 +258,19 @@ async function loadErpLogs(silent) {
                     // 优先 ocr_buyer_name(发票真买方)→ 退回 client_name(已归属客户)→ 未归属灰字。
                     const buyerName =
                         (log.ocr_buyer_name || '').trim() || (log.client_name || '').trim();
-                    const clientCell = buyerName
-                        ? `<span class="log-client" title="${escapeHtml(buyerName)}">${escapeHtml(buyerName.substring(0, 18))}</span>`
-                        : `<span class="log-client log-client-empty" title="${escapeHtml(t('erp-log-client-unassigned-tip'))}">${escapeHtml(t('erp-log-client-unassigned'))}</span>`;
+                    const clientCell = isId
+                        ? `<span class="log-client log-client-empty">—</span>` // 身份证订车无"发票买方"概念
+                        : buyerName
+                          ? `<span class="log-client" title="${escapeHtml(buyerName)}">${escapeHtml(buyerName.substring(0, 18))}</span>`
+                          : `<span class="log-client log-client-empty" title="${escapeHtml(t('erp-log-client-unassigned-tip'))}">${escapeHtml(t('erp-log-client-unassigned'))}</span>`;
                     // 工作空间/账套列 = 发票卖方自动分拣结果(Zihao 2026-05-26)。
                     // 切换器只是查看过滤器、不决定归属;seller 没匹配到 workspace → 显「未归属/待确认卖方」
                     //(不再显「个人事务」,避免误以为切换器决定归属)。
-                    const wsCell = log.workspace_name
-                        ? `<span class="log-workspace">${escapeHtml((log.workspace_name || '').substring(0, 16))}</span>`
-                        : `<span class="log-workspace log-workspace-unresolved" title="${escapeHtml(t('erp-log-ws-unresolved-tip'))}">${escapeHtml(t('erp-log-ws-unresolved'))}</span>`;
+                    const wsCell = isId
+                        ? `<span class="log-workspace log-workspace-unresolved">—</span>` // 身份证订车无账套归属
+                        : log.workspace_name
+                          ? `<span class="log-workspace">${escapeHtml((log.workspace_name || '').substring(0, 16))}</span>`
+                          : `<span class="log-workspace log-workspace-unresolved" title="${escapeHtml(t('erp-log-ws-unresolved-tip'))}">${escapeHtml(t('erp-log-ws-unresolved'))}</span>`;
                     // 改动 8 (v118.34.33) · ERP 列 · endpoint 名(用户起的)
                     const erpCell = log.endpoint_name
                         ? `<span class="log-erp">${escapeHtml((log.endpoint_name || '').substring(0, 14))}</span>`
@@ -233,12 +297,12 @@ async function loadErpLogs(silent) {
                 <div class="erp-log-row ${statusClass}" data-log-detail="${escapeHtml(log.id)}">
                     ${cb}
                     <span class="log-time">${timeStr}</span>
-                    <span class="log-status" title="${escapeHtml(statusLabel + (retryInfo ? ' · ' + retryInfo : ''))}">${statusIcon}</span>
-                    ${triggerTag}
-                    <span class="log-invoice">${escapeHtml(log.invoice_no || '-')}</span>
+                    <span class="log-status" title="${escapeHtml(statusLabel + (retryInfo ? ' · ' + retryInfo : '') + (friendlyReason ? ' · ' + friendlyReason : ''))}">${statusIcon}</span>
+                    ${triggerTag}${typeBadge}
+                    <span class="log-invoice"${isId ? ` title="${escapeHtml(t('erp-log-col-booking'))}"` : ''}>${escapeHtml(log.invoice_no || '-')}</span>
                     ${wsCell}
                     ${clientCell}
-                    <span class="log-seller">${escapeHtml((log.seller_name || '').substring(0, 20))}</span>
+                    <span class="log-seller"${isId ? ` title="${escapeHtml(t('erp-log-col-customer'))}"` : ''}>${escapeHtml((log.seller_name || '').substring(0, 20))}</span>
                     ${erpCell}
                     ${docCell}
                     <span class="log-http">HTTP ${log.http_status || '-'}</span>
@@ -405,6 +469,14 @@ async function retryPushLog(logId) {
         if (autoNav && autoNav.dataset.autoTab) {
             switchAutomationTab(autoNav.dataset.autoTab);
             return;
+        }
+    });
+
+    // DMS 推送可视化闭环 · ERP 系统下拉切换 → 重新拉对应 ERP 的日志(不混)
+    document.addEventListener('change', (e) => {
+        if (e.target && e.target.id === 'erp-logs-erp-select') {
+            _erpAdapter = e.target.value || '';
+            loadErpLogs();
         }
     });
 })();

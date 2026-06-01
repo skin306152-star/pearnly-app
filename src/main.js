@@ -67,6 +67,7 @@ import './home/email-ingest.js'; // REFACTOR-C1 · 邮箱抓取(_loadEmailIngest
 import './home/bank-cand-drawer-html.js'; // REFACTOR-WB-C3 · 银行对账候选匹配抽屉 inner 注入(home.html 空壳 · 须在 bank-recon.js 前 · load() 按需绑定 [data-bank-cand-close]/btn-bank-cand-ignore)
 import './home/bank-recon.js'; // REFACTOR-C1 · 银行对账模块(M10)
 import './home/page-clients.js'; // REFACTOR-WB-C3 · 客户页骨架运行期注入(home.html section 抽出 · 须在 clients.js 前)
+import './home/modal-client-edit.js'; // REFACTOR-WB-C3 · 客户/账套主体编辑弹窗 inner 注入(home.html 两空壳 · 须在 clients.js 前 · clients.js DOMContentLoaded 守卫绑定 client-modal-*/wsclient-modal-*)
 import './home/clients.js'; // REFACTOR-C1 · 客户实体前端
 import './home/page-exceptions.js'; // REFACTOR-WB-C3 · 异常栏页骨架运行期注入(home.html section 抽出 · 须在 exceptions.js 前)
 import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页

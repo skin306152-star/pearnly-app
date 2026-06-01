@@ -111,7 +111,7 @@
                     ? `<span class="ex-seller" title="${escapeHtml(t('erp-log-col-customer'))}">${escapeHtml(it.seller_name || '—')}</span>`
                     : `<span class="ex-seller" title="${escapeHtml(it.seller_name || '')}">${escapeHtml(it.seller_name || '—')}</span>`;
                 const buyerCell = isId
-                    ? `<span class="ex-buyer">—</span>`
+                    ? `<span class="ex-buyer" title="${escapeHtml(t('erp-log-col-idcard'))}">${it.id_card_tail ? '••••' + escapeHtml(it.id_card_tail) : '—'}</span>`
                     : `<span class="ex-buyer" title="${escapeHtml(it.ocr_buyer_name || '')}">${escapeHtml(it.ocr_buyer_name || '—')}</span>`;
                 return `<div class="erp-exc-row" data-erpexc-id="${escapeHtml(it.id)}">
                 <span class="ex-cb"><input type="checkbox" class="erp-exc-cb" data-erpexc-cb="${escapeHtml(it.id)}" ${checked}></span>
@@ -149,6 +149,7 @@
         });
         const colExcInv = isDmsView ? t('erp-log-col-booking') : t('erp-exc-f-invoice');
         const colExcSeller = isDmsView ? t('erp-log-col-customer') : t('erp-exc-f-seller');
+        const colExcBuyer = isDmsView ? t('erp-log-col-idcard') : t('erp-exc-f-buyer');
         block.innerHTML = `
             <div class="erp-exc-head">
                 <h2 class="erp-exc-title">${escapeHtml(t('erp-exc-title'))}</h2>
@@ -168,7 +169,7 @@
                     <span class="ex-cb"><input type="checkbox" class="erp-exc-cb-all" id="erp-exc-cb-all" ${allChecked ? 'checked' : ''}></span>
                     <span class="ex-inv">${escapeHtml(colExcInv)}</span>
                     <span class="ex-seller">${escapeHtml(colExcSeller)}</span>
-                    <span class="ex-buyer">${escapeHtml(t('erp-exc-f-buyer'))}</span>
+                    <span class="ex-buyer">${escapeHtml(colExcBuyer)}</span>
                     <span class="ex-state">${escapeHtml(t('erp-exc-f-state'))}</span>
                     <span class="ex-reason">${escapeHtml(t('erp-exc-f-reason'))}</span>
                     <span class="ex-act"></span>
@@ -416,6 +417,9 @@
     window._erpExcOpenEdit = function (id) {
         const it = (_erpExcState.items || []).find((x) => String(x.id) === String(id));
         if (!it) return;
+        // DMS 闭环修正(Zihao 2026-06-01)· 身份证订车弹窗按 DMS 标签(订车单号/客户·无买方/无ERP客户)·
+        // 不裸露 ERR_* 码(友好原因已在上方显示)。
+        const isId = it.push_type === 'id_card';
         const canPickCustomer = !!it.history_client_id && it.category === 'customer_mismatch';
         // 商品不符 picker(对称客户 picker · Zihao 2026-05-26)· 通用 adapter · 不写死 MR.ERP。
         const canPickProduct =
@@ -461,11 +465,18 @@
                     <button class="erp-exc-m-close" type="button" id="erp-exc-m-close" aria-label="close">×</button>
                 </div>
                 <div class="erp-exc-m-body">
-                    <div class="erp-exc-m-reason"><span class="erp-exc-state ${stateCls}">${escapeHtml(t('erp-exc-state-' + (it.state || 'failed')))}</span> ${escapeHtml(reason)}${it.error_code ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</div>
-                    ${dRow(t('erp-exc-f-invoice'), it.invoice_no)}
-                    ${dRow(t('erp-exc-f-seller'), it.seller_name)}
-                    ${dRow(t('erp-exc-f-buyer'), it.ocr_buyer_name)}
-                    ${dRow(t('erp-exc-edit-field-current'), it.client_name)}
+                    <div class="erp-exc-m-reason"><span class="erp-exc-state ${stateCls}">${escapeHtml(t('erp-exc-state-' + (it.state || 'failed')))}</span> ${escapeHtml(reason)}${it.error_code && !isId ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</div>
+                    ${dRow(isId ? t('erp-log-col-booking') : t('erp-exc-f-invoice'), it.invoice_no)}
+                    ${dRow(isId ? t('erp-log-col-customer') : t('erp-exc-f-seller'), it.seller_name)}
+                    ${
+                        isId
+                            ? dRow(
+                                  t('erp-log-col-idcard'),
+                                  it.id_card_tail ? '••••' + it.id_card_tail : '—'
+                              )
+                            : dRow(t('erp-exc-f-buyer'), it.ocr_buyer_name) +
+                              dRow(t('erp-exc-edit-field-current'), it.client_name)
+                    }
                     ${fixHtml}
                 </div>
                 <div class="erp-exc-m-foot">

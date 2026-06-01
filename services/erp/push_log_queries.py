@@ -7,6 +7,7 @@ push_store 顶部 re-import 当 facade · db.X/store.X/本模块.X 单一对象�
 """
 
 import re  # noqa: F401
+import json
 import logging
 from typing import Optional, Dict, Any, List  # noqa: F401
 
@@ -111,6 +112,21 @@ def friendly_any(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
     return friendly_for_ui(error_msg) or dms_push_friendly(error_msg)
 
 
+def _id_card_tail(request_body) -> Optional[str]:
+    """从 erp_push_logs.request_body 取身份证末 4(仅身份证订车 push 写了 people_id_tail)·
+    容错 dict / json 字符串 · 给前端 DMS 视图「身份证」列显 ••••XXXX。"""
+    rb = request_body
+    if isinstance(rb, str):
+        try:
+            rb = json.loads(rb)
+        except Exception:
+            return None
+    if isinstance(rb, dict):
+        tail = rb.get("people_id_tail")
+        return str(tail) if tail else None
+    return None
+
+
 def delete_push_logs(user_id: str, log_ids: List[str]) -> int:
     """Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除推送日志.
     严格 user_id scope · 不许跨账号删除 · 返回真删除的行数."""
@@ -209,7 +225,7 @@ def list_push_logs(
                        l.seller_name, l.total_amount, l.status, l.http_status,
                        l.error_msg, l.attempt, l.elapsed_ms, l.trigger,
                        l.created_at, l.retry_count, l.max_retries,
-                       l.next_retry_at, l.response_body,
+                       l.next_retry_at, l.response_body, l.request_body,
                        h.client_id AS history_client_id,
                        c.name AS client_name,
                        COALESCE((
@@ -253,6 +269,7 @@ def list_push_logs(
                 ).lower() == "mrerp_dms"
                 it["push_type"] = "id_card" if is_id_card else "invoice"
                 it["error_friendly"] = friendly_any(it.get("error_msg"))
+                it["id_card_tail"] = _id_card_tail(it.pop("request_body", None))
             return {"items": items, "total": total}
     except Exception as e:
         logger.error(f"list_push_logs failed: {e}")
@@ -366,7 +383,7 @@ def list_push_exceptions(
                 SELECT DISTINCT ON (l.history_id, l.endpoint_id)
                     l.id, l.history_id, l.endpoint_id, l.invoice_no, l.seller_name,
                     l.total_amount, l.status, l.error_msg, l.trigger, l.created_at,
-                    l.retry_count, l.max_retries, l.next_retry_at,
+                    l.retry_count, l.max_retries, l.next_retry_at, l.request_body,
                     h.client_id AS history_client_id,
                     c.name AS client_name,
                     COALESCE((
@@ -408,6 +425,7 @@ def list_push_exceptions(
             )
             else "invoice"
         )
+        r["id_card_tail"] = _id_card_tail(r.pop("request_body", None))
         r["state"] = batch_view.classify_push_log(r)
         r["category"] = classify_push_exception(r.get("error_msg"))
         m = _re.search(r"ERR_[A-Z0-9_]+", r.get("error_msg") or "")

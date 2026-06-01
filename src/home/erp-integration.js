@@ -142,10 +142,11 @@ async function loadErpLogs(silent) {
                 return l.id;
             });
         // DMS 推送可视化闭环 · 选中身份证订车(mrerp_dms)时,单据列切到 DMS 语义:
-        //   发票号→订车单号、发票卖方→客户(seller_name 即客户名)· 发票买方/工作空间列 DMS 不适用置 —。
+        //   发票号→订车单号、发票买方→身份证(末4)、发票卖方→客户(seller_name 即客户名)· 工作空间列不适用置 —。
         const isDmsView = _erpAdapter === 'mrerp_dms';
         const colInvoice = isDmsView ? t('erp-log-col-booking') : t('erp-log-col-invoice');
         const colSeller = isDmsView ? t('erp-log-col-customer') : t('erp-log-col-seller');
+        const colClient = isDmsView ? t('erp-log-col-idcard') : t('erp-log-col-client');
         const headerRow =
             '<div class="erp-log-row erp-log-row-header" data-log-header>' +
             (selectableIds.length > 0
@@ -158,7 +159,7 @@ async function loadErpLogs(silent) {
             // P1-C 后端列 (2026-05-26) · 工作空间(账套归属)· join ocr_history.workspace_client_id
             `<span class="log-workspace">${escapeHtml(t('erp-log-col-workspace'))}</span>` +
             // 批 1 改动 5 (v118.34.33) · 新增 "发票买方" 列 · 跟 "发票卖方" 分开
-            `<span class="log-client">${escapeHtml(t('erp-log-col-client'))}</span>` +
+            `<span class="log-client">${escapeHtml(colClient)}</span>` +
             `<span class="log-seller">${escapeHtml(colSeller)}</span>` +
             // 改动 8 · "ERP" 列(走哪个 endpoint)
             `<span class="log-erp">${escapeHtml(t('erp-log-col-erp'))}</span>` +
@@ -259,7 +260,7 @@ async function loadErpLogs(silent) {
                     const buyerName =
                         (log.ocr_buyer_name || '').trim() || (log.client_name || '').trim();
                     const clientCell = isId
-                        ? `<span class="log-client log-client-empty">—</span>` // 身份证订车无"发票买方"概念
+                        ? `<span class="log-client" title="${escapeHtml(t('erp-log-col-idcard'))}">${log.id_card_tail ? '••••' + escapeHtml(log.id_card_tail) : '—'}</span>` // DMS:身份证(末4)
                         : buyerName
                           ? `<span class="log-client" title="${escapeHtml(buyerName)}">${escapeHtml(buyerName.substring(0, 18))}</span>`
                           : `<span class="log-client log-client-empty" title="${escapeHtml(t('erp-log-client-unassigned-tip'))}">${escapeHtml(t('erp-log-client-unassigned'))}</span>`;

@@ -1,16 +1,14 @@
-// ============================================================
-// REFACTOR-WB-C3 (2026-06-01) · 银行对账 session 客户绑定弹窗 inner 从 home.html 抽出 · 运行期注入
+//============================================================
+//REFACTOR-WB-C3 (2026-06-01) · 银行对账 session 客户绑定弹窗 inner 从 home.html 抽出 · 运行期注入
 //
-// home.html 留空壳 <div id="bank-client-picker-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
-// bank-recon.js(main.js 内 import 在本模块之后)bindEvents()(load() 按需·automation bank tab 点击触发)才绑
-// [data-bank-client-picker-close]/btn-bank-client-picker-save · eval 注入恒早于首次 load · import 置 bank-recon.js 前。
-// i18n:注入后子树补译 · verbatim inner · 0 改结构。
-// ============================================================
-(function () {
-    'use strict';
-    const m = document.getElementById('bank-client-picker-modal');
-    if (!m || m.dataset.wbInjected === '1') return;
-    m.innerHTML = `
+//home.html 留空壳 <div id="bank-client-picker-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
+//bank-recon.js(main.js 内 import 在本模块之后)bindEvents()(load() 按需·automation bank tab 点击触发)才绑
+//[data-bank-client-picker-close]/btn-bank-client-picker-save · eval 注入恒早于首次 load · import 置 bank-recon.js 前。
+//i18n:注入后子树补译 · verbatim inner · 0 改结构。
+//============================================================
+import { wbInject } from './wb-inject.js';
+
+const HTML = `
     <div class="modal" style="max-width: 420px;">
         <div class="modal-head">
             <div class="modal-title" data-i18n="bank-client-picker-title">绑定客户</div>
@@ -34,21 +32,4 @@
         </div>
     </div>
 `;
-    m.dataset.wbInjected = '1';
-    try {
-        const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
-        const I = window.I18N;
-        if (I && I[lang]) {
-            m.querySelectorAll('[data-i18n]').forEach((el) => {
-                const k = el.getAttribute('data-i18n');
-                if (I[lang][k]) el.textContent = I[lang][k];
-            });
-            m.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-                const k = el.getAttribute('data-i18n-placeholder');
-                if (I[lang][k]) el.placeholder = I[lang][k];
-            });
-        }
-    } catch (e) {
-        /* silent · 初译失败不致命 · 切语言会补 */
-    }
-})();
+wbInject('bank-client-picker-modal', HTML);

@@ -1,16 +1,14 @@
-// ============================================================
-// REFACTOR-WB-C3 (2026-06-01) · 测试中心页(#page-test-center · skin-only 内部测试工具)inner 从 home.html 抽出 · 运行期注入
+//============================================================
+//REFACTOR-WB-C3 (2026-06-01) · 测试中心页(#page-test-center · skin-only 内部测试工具)inner 从 home.html 抽出 · 运行期注入
 //
-// home.html 留空壳 <section class="page" id="page-test-center"></section>· 本模块 eval 时注入 inner。
-// test-center.js(main.js 内 import 在本模块之后·line 51)绑 tc-* 元素·全带 `if(x)` 守卫(漏接只降级不崩)·
-// 且功能 skin-gated(_isAllowed)· import 置 test-center.js 前 → 注入元素在场。skin-only 内部工具·
-// e2e_1 非 skin 不可交互验·靠注入检查(wbInjected)+boot E2E 保不崩。i18n:注入后子树补译·verbatim·0 改结构。
-// ============================================================
-(function () {
-    'use strict';
-    const m = document.getElementById('page-test-center');
-    if (!m || m.dataset.wbInjected === '1') return;
-    m.innerHTML = `
+//home.html 留空壳 <section class="page" id="page-test-center"></section>· 本模块 eval 时注入 inner。
+//test-center.js(main.js 内 import 在本模块之后·line 51)绑 tc-* 元素·全带 `if(x)` 守卫(漏接只降级不崩)·
+//且功能 skin-gated(_isAllowed)· import 置 test-center.js 前 → 注入元素在场。skin-only 内部工具·
+//e2e_1 非 skin 不可交互验·靠注入检查(wbInjected)+boot E2E 保不崩。i18n:注入后子树补译·verbatim·0 改结构。
+//============================================================
+import { wbInject } from './wb-inject.js';
+
+const HTML = `
         <div class="page-head">
             <div class="page-head-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -131,21 +129,4 @@
         </div>
 
     `;
-    m.dataset.wbInjected = '1';
-    try {
-        const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
-        const I = window.I18N;
-        if (I && I[lang]) {
-            m.querySelectorAll('[data-i18n]').forEach((el) => {
-                const k = el.getAttribute('data-i18n');
-                if (I[lang][k]) el.textContent = I[lang][k];
-            });
-            m.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-                const k = el.getAttribute('data-i18n-placeholder');
-                if (I[lang][k]) el.placeholder = I[lang][k];
-            });
-        }
-    } catch (e) {
-        /* silent · 初译失败不致命 · 切语言会补 */
-    }
-})();
+wbInject('page-test-center', HTML);

@@ -1,18 +1,16 @@
-// ============================================================
-// REFACTOR-WB-C3 (2026-06-01) · 邮箱抓取绑定弹窗(#email-modal · automation 邮箱抓取)inner 从 home.html 抽出 · 运行期注入
+//============================================================
+//REFACTOR-WB-C3 (2026-06-01) · 邮箱抓取绑定弹窗(#email-modal · automation 邮箱抓取)inner 从 home.html 抽出 · 运行期注入
 //
-// home.html 留空壳 <div id="email-modal">(modal-overlay·display:none)· 本模块 eval 时注入 inner。
-// ⚠️注意:本 #email-modal 是【邮箱抓取(email-ingest)】绑定弹窗(automation·非高敏)· 与 line-email-modal.js
-// 动态创建的 #line-email-modal(🔴LINE 补邮箱高敏)是两回事——后者自建元素不碰 home.html。
-// email-ingest.js(main.js 内 import 在本模块之后·line 69)wire()(eval 期 IIFE)绑 email-modal-close/
-// btn-email-modal-cancel/test/save 等·全带 `if(x)` 守卫(漏接只降级不崩)· import 置 email-ingest.js 前
-// → 注入元素届时在场·绑定正常。i18n:注入后子树补译 · verbatim inner · 0 改结构。
-// ============================================================
-(function () {
-    'use strict';
-    const m = document.getElementById('email-modal');
-    if (!m || m.dataset.wbInjected === '1') return;
-    m.innerHTML = `
+//home.html 留空壳 <div id="email-modal">(modal-overlay·display:none)· 本模块 eval 时注入 inner。
+//注意:本 #email-modal 是【邮箱抓取(email-ingest)】绑定弹窗(automation·非高敏)· 与 line-email-modal.js
+//动态创建的 #line-email-modal(LINE 补邮箱高敏)是两回事——后者自建元素不碰 home.html。
+//email-ingest.js(main.js 内 import 在本模块之后·line 69)wire()(eval 期 IIFE)绑 email-modal-close/
+//btn-email-modal-cancel/test/save 等·全带 `if(x)` 守卫(漏接只降级不崩)· import 置 email-ingest.js 前
+//→ 注入元素届时在场·绑定正常。i18n:注入后子树补译 · verbatim inner · 0 改结构。
+//============================================================
+import { wbInject } from './wb-inject.js';
+
+const HTML = `
         <div class="modal">
             <div class="modal-head">
                 <div class="modal-title" id="email-modal-title" data-i18n="email-modal-title-new">绑定邮箱</div>
@@ -147,21 +145,4 @@
             </div>
         </div>
     `;
-    m.dataset.wbInjected = '1';
-    try {
-        const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
-        const I = window.I18N;
-        if (I && I[lang]) {
-            m.querySelectorAll('[data-i18n]').forEach((el) => {
-                const k = el.getAttribute('data-i18n');
-                if (I[lang][k]) el.textContent = I[lang][k];
-            });
-            m.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-                const k = el.getAttribute('data-i18n-placeholder');
-                if (I[lang][k]) el.placeholder = I[lang][k];
-            });
-        }
-    } catch (e) {
-        /* silent · 初译失败不致命 · 切语言会补 */
-    }
-})();
+wbInject('email-modal', HTML);

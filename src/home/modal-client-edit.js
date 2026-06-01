@@ -1,16 +1,16 @@
-// ============================================================
-// REFACTOR-WB-C3 (2026-06-01) · 客户编辑 / 账套主体编辑弹窗 inner 从 home.html 抽出 · 运行期注入
+//============================================================
+//REFACTOR-WB-C3 (2026-06-01) · 客户编辑 / 账套主体编辑弹窗 inner 从 home.html 抽出 · 运行期注入
 //
-// home.html 留两个空壳 <div id="client-modal-mask"> / <div id="wsclient-modal-mask">(modal-mask · display:none)·
-// 本模块 eval 时注入 inner。clients.js(main.js 内 import 在本模块之后)在 DOMContentLoaded handler 里
-// 带 null 守卫绑 client-modal-* / wsclient-modal-* close/cancel/save/delete/archive/mask · openClientModal
-// / openWsClientModal 用户开弹窗时才读 inner。模块 eval(defer)早于 DOMContentLoaded → 元素届时恒在场。
-// import 置 clients.js 前(确定性·非竞态)· 镜像 modal-assign-clients.js 范式。verbatim inner · 0 改结构。
-// i18n:注入后子树补译(镜像 applyLang)· 切语言由 applyLang 全文扫描覆盖。
-// ============================================================
-(function () {
-    'use strict';
-    const CLIENT_HTML = `
+//home.html 留两个空壳 <div id="client-modal-mask"> / <div id="wsclient-modal-mask">(modal-mask · display:none)·
+//本模块 eval 时注入 inner。clients.js(main.js 内 import 在本模块之后)在 DOMContentLoaded handler 里
+//带 null 守卫绑 client-modal-* / wsclient-modal-* close/cancel/save/delete/archive/mask · openClientModal
+/// openWsClientModal 用户开弹窗时才读 inner。模块 eval(defer)早于 DOMContentLoaded → 元素届时恒在场。
+//import 置 clients.js 前(确定性·非竞态)· 镜像 modal-assign-clients.js 范式。verbatim inner · 0 改结构。
+//i18n:注入后子树补译(镜像 applyLang)· 切语言由 applyLang 全文扫描覆盖。
+//============================================================
+import { wbInject } from './wb-inject.js';
+
+const CLIENT_HTML = `
         <div class="modal client-modal" role="dialog">
             <div class="modal-header">
                 <div class="modal-title" id="client-modal-title" data-i18n="client-modal-new">新建客户</div>
@@ -81,7 +81,7 @@
             </div>
         </div>
     `;
-    const WSCLIENT_HTML = `
+const WSCLIENT_HTML = `
         <div class="modal" role="dialog" style="max-width:440px;">
             <div class="modal-header">
                 <div class="modal-title" id="wsclient-modal-title" data-i18n="wsclient-modal-new">新建账套主体</div>
@@ -110,28 +110,5 @@
             </div>
         </div>
     `;
-    function inject(id, html) {
-        const m = document.getElementById(id);
-        if (!m || m.dataset.wbInjected === '1') return;
-        m.innerHTML = html;
-        m.dataset.wbInjected = '1';
-        try {
-            const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
-            const I = window.I18N;
-            if (I && I[lang]) {
-                m.querySelectorAll('[data-i18n]').forEach((el) => {
-                    const k = el.getAttribute('data-i18n');
-                    if (I[lang][k]) el.textContent = I[lang][k];
-                });
-                m.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-                    const k = el.getAttribute('data-i18n-placeholder');
-                    if (I[lang][k]) el.placeholder = I[lang][k];
-                });
-            }
-        } catch (e) {
-            /* silent · 初译失败不致命 · 切语言会补 */
-        }
-    }
-    inject('client-modal-mask', CLIENT_HTML);
-    inject('wsclient-modal-mask', WSCLIENT_HTML);
-})();
+wbInject('client-modal-mask', CLIENT_HTML);
+wbInject('wsclient-modal-mask', WSCLIENT_HTML);

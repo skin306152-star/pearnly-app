@@ -1,16 +1,14 @@
-// ============================================================
-// REFACTOR-WB-C3 (2026-06-01) · 拍照贴士弹窗 inner 从 home.html 抽出 · 运行期注入
+//============================================================
+//REFACTOR-WB-C3 (2026-06-01) · 拍照贴士弹窗 inner 从 home.html 抽出 · 运行期注入
 //
-// home.html 留空壳 <div id="camera-tips-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
-// upload-camera.js(main.js 内 import 在本模块之后)showCameraTips() 用户点拍照时才读 camera-tips-ok/cancel/skip
-// (且带 if(!overlay||!btnOk) 守卫)· eval 注入恒早于首次触发 · import 置 upload-camera.js 前(确定性)。
-// i18n:注入后子树补译 · verbatim inner · 0 改结构。
-// ============================================================
-(function () {
-    'use strict';
-    const m = document.getElementById('camera-tips-modal');
-    if (!m || m.dataset.wbInjected === '1') return;
-    m.innerHTML = `
+//home.html 留空壳 <div id="camera-tips-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
+//upload-camera.js(main.js 内 import 在本模块之后)showCameraTips() 用户点拍照时才读 camera-tips-ok/cancel/skip
+//(且带 if(!overlay||!btnOk) 守卫)· eval 注入恒早于首次触发 · import 置 upload-camera.js 前(确定性)。
+//i18n:注入后子树补译 · verbatim inner · 0 改结构。
+//============================================================
+import { wbInject } from './wb-inject.js';
+
+const HTML = `
     <div class="modal" style="max-width:420px;">
         <div class="modal-head">
             <div class="modal-title camera-tips-title-row">
@@ -39,21 +37,4 @@
         </div>
     </div>
 `;
-    m.dataset.wbInjected = '1';
-    try {
-        const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
-        const I = window.I18N;
-        if (I && I[lang]) {
-            m.querySelectorAll('[data-i18n]').forEach((el) => {
-                const k = el.getAttribute('data-i18n');
-                if (I[lang][k]) el.textContent = I[lang][k];
-            });
-            m.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-                const k = el.getAttribute('data-i18n-placeholder');
-                if (I[lang][k]) el.placeholder = I[lang][k];
-            });
-        }
-    } catch (e) {
-        /* silent · 初译失败不致命 · 切语言会补 */
-    }
-})();
+wbInject('camera-tips-modal', HTML);

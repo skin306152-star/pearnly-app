@@ -1,17 +1,15 @@
-// ============================================================
-// REFACTOR-WB-C3 (2026-06-01) · 命令面板(Cmd+K · #cmdk-mask)inner 从 home.html 抽出 · 运行期注入
+//============================================================
+//REFACTOR-WB-C3 (2026-06-01) · 命令面板(Cmd+K · #cmdk-mask)inner 从 home.html 抽出 · 运行期注入
 //
-// home.html 留空壳 <div id="cmdk-mask">(role=dialog · CSS 控制显隐)· 本模块 eval 时注入 inner。
-// topbar-avatar.js(main.js 内 import 在本模块之后·line 79)_initCmdk()(DOMContentLoaded 调)绑
-// cmdk-input/cmdk-body/cmdk-esc-btn 等 · 且带守卫 `if(!mask||!input||!body)return`(漏接只降级不崩);
-// openCmdk/closeCmdk/_cmdkFilter 用户 Cmd+K 时才用。模块 eval(defer)早于 DOMContentLoaded → 元素恒在场。
-// import 置 topbar-avatar.js 前(确定性·非竞态)。i18n:注入后子树补译 · verbatim inner · 0 改结构。
-// ============================================================
-(function () {
-    'use strict';
-    const m = document.getElementById('cmdk-mask');
-    if (!m || m.dataset.wbInjected === '1') return;
-    m.innerHTML = `
+//home.html 留空壳 <div id="cmdk-mask">(role=dialog · CSS 控制显隐)· 本模块 eval 时注入 inner。
+//topbar-avatar.js(main.js 内 import 在本模块之后·line 79)_initCmdk()(DOMContentLoaded 调)绑
+//cmdk-input/cmdk-body/cmdk-esc-btn 等 · 且带守卫 `if(!mask||!input||!body)return`(漏接只降级不崩);
+//openCmdk/closeCmdk/_cmdkFilter 用户 Cmd+K 时才用。模块 eval(defer)早于 DOMContentLoaded → 元素恒在场。
+//import 置 topbar-avatar.js 前(确定性·非竞态)。i18n:注入后子树补译 · verbatim inner · 0 改结构。
+//============================================================
+import { wbInject } from './wb-inject.js';
+
+const HTML = `
     <div class="cmdk">
         <div class="cmdk-input-wrap">
             <svg class="cmdk-input-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -120,21 +118,4 @@
         </div>
     </div>
 `;
-    m.dataset.wbInjected = '1';
-    try {
-        const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
-        const I = window.I18N;
-        if (I && I[lang]) {
-            m.querySelectorAll('[data-i18n]').forEach((el) => {
-                const k = el.getAttribute('data-i18n');
-                if (I[lang][k]) el.textContent = I[lang][k];
-            });
-            m.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-                const k = el.getAttribute('data-i18n-placeholder');
-                if (I[lang][k]) el.placeholder = I[lang][k];
-            });
-        }
-    } catch (e) {
-        /* silent · 初译失败不致命 · 切语言会补 */
-    }
-})();
+wbInject('cmdk-mask', HTML);

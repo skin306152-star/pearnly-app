@@ -1,19 +1,17 @@
-// ============================================================
-// REFACTOR-WB-C3 (2026-06-01) · ERP 端点配置弹窗 inner 从 home.html 抽出 · 运行期注入
+//============================================================
+//REFACTOR-WB-C3 (2026-06-01) · ERP 端点配置弹窗 inner 从 home.html 抽出 · 运行期注入
 //
-// home.html 留空壳 <div id="endpoint-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
-// ⚠️ erp-integration.js(main.js 内 import 在本模块之后·line 95)顶层 IIFE initAutomationPage()
-// **无守卫**直接绑 endpoint-modal-close / btn-ep-cancel / btn-ep-test / btn-ep-save / ep-url(eval 期)·
-// 故本模块 import 必须置 erp-integration.js 前(确定性·非竞态)· 错序则 IIFE getElementById 命中 null
-// → addEventListener 抛错 → boot 崩(会被 E2E console 守门响亮抓到)。btn-add-endpoint 是打开按钮·
-// 在页面上(page-automation 注入·line 22 早于此)· 不在本 modal 内。
-// i18n:注入后子树补译 · verbatim inner · 0 改结构。
-// ============================================================
-(function () {
-    'use strict';
-    const m = document.getElementById('endpoint-modal');
-    if (!m || m.dataset.wbInjected === '1') return;
-    m.innerHTML = `
+//home.html 留空壳 <div id="endpoint-modal">(modal-overlay · display:none)· 本模块 eval 时注入 inner。
+//erp-integration.js(main.js 内 import 在本模块之后·line 95)顶层 IIFE initAutomationPage()
+//**无守卫**直接绑 endpoint-modal-close / btn-ep-cancel / btn-ep-test / btn-ep-save / ep-url(eval 期)·
+//故本模块 import 必须置 erp-integration.js 前(确定性·非竞态)· 错序则 IIFE getElementById 命中 null
+//→ addEventListener 抛错 → boot 崩(会被 E2E console 守门响亮抓到)。btn-add-endpoint 是打开按钮·
+//在页面上(page-automation 注入·line 22 早于此)· 不在本 modal 内。
+//i18n:注入后子树补译 · verbatim inner · 0 改结构。
+//============================================================
+import { wbInject } from './wb-inject.js';
+
+const HTML = `
         <div class="modal">
             <div class="modal-head">
                 <div class="modal-title" id="endpoint-modal-title" data-i18n="ep-modal-title-new">新增 ERP 端点</div>
@@ -91,21 +89,4 @@
             </div>
         </div>
     `;
-    m.dataset.wbInjected = '1';
-    try {
-        const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
-        const I = window.I18N;
-        if (I && I[lang]) {
-            m.querySelectorAll('[data-i18n]').forEach((el) => {
-                const k = el.getAttribute('data-i18n');
-                if (I[lang][k]) el.textContent = I[lang][k];
-            });
-            m.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-                const k = el.getAttribute('data-i18n-placeholder');
-                if (I[lang][k]) el.placeholder = I[lang][k];
-            });
-        }
-    } catch (e) {
-        /* silent · 初译失败不致命 · 切语言会补 */
-    }
-})();
+wbInject('endpoint-modal', HTML);

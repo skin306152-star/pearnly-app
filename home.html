@@ -1162,64 +1162,13 @@
 </div>
 
 <!-- ================= 拍照贴士弹窗 · v0.17 ================= -->
-<div class="modal-overlay" id="camera-tips-modal" style="display:none;">
-    <div class="modal" style="max-width:420px;">
-        <div class="modal-head">
-            <div class="modal-title camera-tips-title-row">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 7h4l2-2h6l2 2h4a1 1 0 011 1v11a1 1 0 01-1 1H3a1 1 0 01-1-1V8a1 1 0 011-1z"/>
-                    <circle cx="12" cy="13" r="4"/>
-                </svg>
-                <span data-i18n="camera-tips-title">拍摄小贴士</span>
-            </div>
-        </div>
-        <div class="modal-body">
-            <ul class="camera-tips-list">
-                <li><span class="tip-check"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l3.5 3.5L13 5"/></svg></span><span data-i18n="camera-tip-bg">放在深色桌面上 · 与白纸对比明显</span></li>
-                <li><span class="tip-check"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l3.5 3.5L13 5"/></svg></span><span data-i18n="camera-tip-corners">四角完整露出 · 不要手指遮挡</span></li>
-                <li><span class="tip-check"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l3.5 3.5L13 5"/></svg></span><span data-i18n="camera-tip-light">避开反光和阴影 · 光线均匀</span></li>
-                <li><span class="tip-check"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l3.5 3.5L13 5"/></svg></span><span data-i18n="camera-tip-flat">尽量正对票据 · 压平褶皱</span></li>
-            </ul>
-            <label class="camera-tips-skip-row">
-                <input type="checkbox" id="camera-tips-skip">
-                <span data-i18n="camera-tips-skip">不再提示</span>
-            </label>
-        </div>
-        <div class="modal-foot">
-            <button class="btn btn-ghost" id="camera-tips-cancel" data-i18n="confirm-cancel">取消</button>
-            <button class="btn btn-primary" id="camera-tips-ok" data-i18n="camera-tips-ok">开始拍照</button>
-        </div>
-    </div>
-</div>
+<div class="modal-overlay" id="camera-tips-modal" style="display:none;"></div>
 
 <!-- ================= 银行对账 · 候选匹配抽屉 (v0.18 · M10) ================= -->
 <div class="bank-cand-drawer" id="bank-cand-drawer" style="display:none"></div>
 
 <!-- v118.26.2 · 银行对账 session 客户绑定 modal -->
-<div class="modal-overlay" id="bank-client-picker-modal" style="display:none;">
-    <div class="modal" style="max-width: 420px;">
-        <div class="modal-head">
-            <div class="modal-title" data-i18n="bank-client-picker-title">绑定客户</div>
-            <button class="modal-close" data-bank-client-picker-close aria-label="close">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l10 10M13 3L3 13"/></svg>
-            </button>
-        </div>
-        <div class="modal-body">
-            <div class="bank-client-picker-hint" data-i18n="bank-client-picker-hint">把这份对账绑定到客户后 · 只有分到该客户的员工能看见 / 操作</div>
-            <div class="bank-client-picker-list" id="bank-client-picker-list">
-                <div class="bank-empty" data-i18n="assign-loading">加载中…</div>
-            </div>
-        </div>
-        <div class="modal-foot">
-            <button class="btn btn-ghost btn-small" data-bank-client-picker-close>
-                <span data-i18n="assign-cancel">取消</span>
-            </button>
-            <button class="btn btn-primary btn-small" id="btn-bank-client-picker-save">
-                <span data-i18n="assign-save">保存</span>
-            </button>
-        </div>
-    </div>
-</div>
+<div class="modal-overlay" id="bank-client-picker-modal" style="display:none;"></div>
 
 <!-- v110.7 · 登录后欢迎向导(B 方案 · 4 步渐进收集 · 进系统首次自动弹) -->
 <div class="modal-overlay onboarding-overlay" id="onboarding-modal" style="display:none;"></div>
@@ -1355,7 +1304,7 @@
 <!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing + test-center 由 Vite bundle 成 static/dist/main.js ·
      ES module(type=module 自动 defer)· state.js 第1个 import 装错误拦截+i18n总线+window.*状态 ·
      /api/version 现读本 main.js?v=(REFACTOR-C1-home-batch9g2 · home.js 已删 · read_frontend_version 改锚 main.js) -->
-<script type="module" src="/static/dist/main.js?v=11850055"></script>
+<script type="module" src="/static/dist/main.js?v=11850056"></script>
 <!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
 <script src="/static/version-banner.js?v=11841113" defer></script>
 <!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·

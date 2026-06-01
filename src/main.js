@@ -66,6 +66,7 @@ import './home/erp-xero.js'; // REFACTOR-C1 · Xero 连接卡片
 import './home/erp-mrerp-dms-connect.js'; // DMS集成 · MR.ERP DMS 汽车销售连接卡+向导(渲染 #erp-connect-cards · adapter=mrerp_dms)
 import './home/report-templates.js'; // REFACTOR-C1 · 报表模板/统一导出弹窗(openReportModal)
 import './home/folder-watcher.js'; // REFACTOR-C1 · 文件夹监听(_loadFolderWatcherPanel)
+import './home/email-modal-html.js'; // REFACTOR-WB-C3 · 邮箱抓取绑定弹窗 inner 注入(home.html 空壳 · 须在 email-ingest.js 前 · wire() eval 期带守卫绑 email-modal-*·非高敏·≠line-email-modal)
 import './home/email-ingest.js'; // REFACTOR-C1 · 邮箱抓取(_loadEmailIngestPanel)
 import './home/bank-cand-drawer-html.js'; // REFACTOR-WB-C3 · 银行对账候选匹配抽屉 inner 注入(home.html 空壳 · 须在 bank-recon.js 前 · load() 按需绑定 [data-bank-cand-close]/btn-bank-cand-ignore)
 import './home/bank-client-picker-html.js'; // REFACTOR-WB-C3 · 银行对账 session 客户绑定弹窗 inner 注入(home.html 空壳 · 须在 bank-recon.js 前 · bindEvents 按需绑 [data-bank-client-picker-close]/btn-bank-client-picker-save)

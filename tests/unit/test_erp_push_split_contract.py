@@ -30,10 +30,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import erp_push as _erp  # noqa: E402
 import erp_mrerp_listing as _listing  # noqa: E402
+import erp_mrerp_crud as _crud  # noqa: E402
 import erp_payload as _payload  # noqa: E402
 import erp_dms_push as _dms  # noqa: E402
 
-_E1 = ("test_mrerp_endpoint", "list_mrerp_customers", "list_mrerp_products")
+_E1 = ("test_mrerp_endpoint",)  # 连接测试留 erp_mrerp_listing
+_E1B = ("list_mrerp_customers", "list_mrerp_products")  # 列表拉取 → erp_mrerp_crud
 _E2 = (
     "PUSH_TIMEOUT_SEC",
     "build_standard_payload",
@@ -62,6 +64,8 @@ class ErpPushSplitContractTest(unittest.TestCase):
     def test_e1_reexport_single_source(self) -> None:
         for n in _E1:
             self.assertIs(getattr(_erp, n), getattr(_listing, n), f"E1 {n} re-export 漂移")
+        for n in _E1B:
+            self.assertIs(getattr(_erp, n), getattr(_crud, n), f"E1b {n} re-export 漂移")
 
     def test_e2_reexport_single_source(self) -> None:
         for n in _E2:

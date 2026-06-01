@@ -22,11 +22,13 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
-# E1 verbatim 搬家 re-export(MR.ERP 连接测试 + 客户/产品拉取 · 调用方/dispatch 测 0 改动)
-from erp_mrerp_listing import (  # noqa: E402,F401
+# E1 verbatim 搬家 re-export(MR.ERP 连接测试 · 调用方/dispatch 测 0 改动)
+from erp_mrerp_listing import test_mrerp_endpoint  # noqa: E402,F401
+
+# E1b verbatim 搬家 re-export(MR.ERP 客户/产品列表拉取 · erp_mrerp_listing<500)
+from erp_mrerp_crud import (  # noqa: E402,F401
     list_mrerp_customers,
     list_mrerp_products,
-    test_mrerp_endpoint,
 )
 
 # E2 verbatim 搬家 re-export(payload 构造 + 通用 webhook + PUSH_TIMEOUT_SEC · ADAPTER_REGISTRY/调用方 0 改动)

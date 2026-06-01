@@ -442,56 +442,9 @@ body.admin-layout-body .lang-switching-overlay {
   outline-offset: 1px;
 }
 
-/* ============ 自包含基础变量 + page-head(admin SPA 独立)============
- * 这些原由 home.css 提供,整顿期 home.css 拆成 home-01..home-38 后被清空,
- * 而 admin.html 不引那批拆分文件 → 变量与 page-head 尺寸丢失(图标 svg 无
- * width/height 退回默认 300×150 爆大)。这里自包含,不再依赖 home.css。
- * 变量值取自 home-01-base.css · page-head 取自 home-16-cost-clients.css。 */
-:root {
-  --bg: #f4f4f0;
-  --card: #ffffff;
-  --line: #e8e8e3;
-  --line-soft: #f0f0eb;
-  --ink: #111111;
-  --ink-2: #555555;
-  --ink-3: #999999;
-  --danger: #dc2626;
-  --danger-bg: #fee2e2;
-}
-.admin-layout-main .page-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin: 24px 0;
-}
+/* ============ page-head-icon 复用(home.css 已定义 · 此处只是确保不被覆盖)============ */
 .admin-layout-main .page-head-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.admin-layout-main .page-head-icon svg {
-  width: 22px;
-  height: 22px;
-}
-.admin-layout-main .page-head-text {
-  flex: 1;
-  min-width: 0;
-}
-.admin-layout-main .page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--ink);
-  margin: 0 0 4px;
-}
-.admin-layout-main .page-subtitle {
-  font-size: 13px;
-  color: var(--ink-3);
+  /* 沿用 home.css 11 轮视觉对齐的暖灰背景 · 不重复定义 */
 }
 
 /* ============================================================

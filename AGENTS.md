@@ -1,7 +1,7 @@
 # AGENTS.md · Pearnly 唯一入口(所有 AI 窗口先读这一页)
 
 > **这是唯一的"必读"。** 故意保持一页。完整宪法在 `CLAUDE.md/CLAUDE.md`(铁律细节),业务概念在 `docs/agent/`,但**进窗口先把这页 + STATE 状态卡读完 + 跑一次进度脚本**就能开工,别一上来啃 7000 行。
-> 最后更新:2026-06-01(✅ MR.ERP DMS 全链路闭环上线 prod 11850053〔集成+Codex 3 轮复测全 PASS+推送可视化 UX+导航文案统一+/simplify 清理〕· **整顿主线恢复·下个窗口做 C3 拆 home.html 1495→<1000**)
+> 最后更新:2026-06-01(✅ **C3 拆 home.html 全部收官 1495→398**〔R25 app shell 顶栏+侧栏抽进 JS·view-source 只见外壳·prod 11850064 双验绿〕· 5 大巨石 4/5·**下个 task = app.py 1731→500(高敏 auth·需 Zihao 在场·铁律 #26)**)
 
 ---
 
@@ -21,8 +21,8 @@
 
 ## 1. 当前在干啥(整顿期 · 2026-05 起)
 
-- **⏳ 当前实况(2026-06-01)**:**整顿主线恢复 · 下个窗口做 C3 拆 home.html(1495→<1000)**。Zihao 例外任务 **MR.ERP DMS(adapter=`mrerp_dms`·身份证→订车单)全链路闭环上线**(prod `11850053`):集成 + Codex 3 轮 UI 复测全 PASS + 推送可视化 UX(推送日志/异常栏 ERP 下拉 + DMS 字段展示 + 4 语友好错误)+ 导航文案统一(上传识别/识别记录)+ /simplify 后端清理(`63af109`)。详见 STATE 状态卡 + 记忆 [[mrerp-dms-integration]] + 交接 `docs/integrations/mrerp-dms-integration-handoff.md`。DMS commit 走 `MRERP-DMS-INTEGRATION` tag。**⚠️ 部署 cache-bust 铁律**:改 dist/i18n-data/home-NN.css 必 bump home.html `?v=`(否则缓存用户拿不到·E2E 无缓存测不出)·见记忆 [[fe-cache-bust-vparam-required]]。
-- **模式**:整顿封锁期(铁律 #18)· **0 新功能** · 只做 `REFACTOR_MASTER_PLAN.md` 的 9 阶段 task。**下个窗口 task = C3 拆 home.html**(候选由易到难:bank-cand-drawer / on-demand modal / page-ocr 留最后 · app shell 顶栏侧栏 boot 关键勿动 · 范式 [[wb-src-home-c3-split-playbook]])。
+- **⏳ 当前实况(2026-06-01)**:**✅ C3 拆 home.html 全部收官 1495→398**(refactor_progress 100%)。本窗口 **R25 把 app shell(顶栏 `.topbar` + 侧栏 `#sidebar`)抽进 JS** → `src/home/app-shell-html.js` 运行期注入(`d720185`·home.html 661→398),view-source 连导航框架都只见外壳(Claude 级)。本地反代真浏览器 + prod 双验透(逐页路由/汉堡/cmdk/头像/官方 E2E 全绿·CLS<0.05·FOUC=12ms 单帧白条不塌不变色·Zihao 拍板上线·prod 11850064)。**5 大巨石 4/5 完成,下个 task = app.py 1731→500(高敏 auth·需 Zihao 在场·铁律 #26)**。Zihao 例外任务 **MR.ERP DMS** 早前已全链路闭环(详见 STATE + 记忆 [[mrerp-dms-integration]] + 交接 `docs/integrations/mrerp-dms-integration-handoff.md`)。**⚠️ 部署 cache-bust 铁律**:改 dist/i18n-data/home-NN.css 必 bump home.html `?v=`(见记忆 [[fe-cache-bust-vparam-required]])。
+- **模式**:整顿封锁期(铁律 #18)· **0 新功能** · 只做 `REFACTOR_MASTER_PLAN.md` 的 9 阶段 task。**C3 拆 home.html 已全部收官(1495→398·含 app shell)** · **下个 task = app.py 1731→500**(🔴 高敏 auth 巨石·需 Zihao 在场·铁律 #26·范式见 [[wa-backend-loop-file-boundary]])。
 - **当前打法**:**3 窗口并行 loop**(ADR-011 + `docs/refactor/PARALLEL_LOOP_DISPATCH.md`)· A 后端 / B 前端 / C 文档测试 · 按文件 ownership 切不撞车。
 - **找下一个 task**:`REFACTOR_MASTER_PLAN.md` 顶部「当前进度看板」。
 - **你的身份**:整顿主控/指挥官 · Zihao 非技术零代码 → 你全包(研究/派工/守门/E2E自测/查CI/上线/更文档)· Zihao 只:① 点权限框 ② 像用户验收 ③ 涉钱/登录拍板。

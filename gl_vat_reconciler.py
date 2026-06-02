@@ -10,9 +10,6 @@ GL(总账) vs 销项税报告 对账核心引擎
 - 末列附加 GL 的 รหัสบัญชี（收入科目代码）
 """
 
-from typing import List, Dict, Any
-from dataclasses import asdict
-
 # DATA CLASSES · moved to services/recon/gl_vat_types.py
 from services.recon.gl_vat_types import (  # noqa: F401,E402  re-export (recon_routes/tests) + facade-internal
     GlRow,
@@ -66,32 +63,10 @@ from services.recon.gl_vat_reconcile import (  # noqa: F401  re-export (recon_ro
 )
 
 
-# ─────────────────────────────────────────────────────────────────────
-# 序列化（用于 DB 存储 & 前端响应）
-# ─────────────────────────────────────────────────────────────────────
-def detail_to_json(detail: List[ReconRow]) -> List[Dict[str, Any]]:
-    return [asdict(r) for r in detail]
-
-
-def summary_to_json(summary: GlVatSummary) -> Dict[str, float]:
-    return asdict(summary)
-
-
-def detail_from_json(data: List[Dict[str, Any]]) -> List[ReconRow]:
-    return [ReconRow(**r) for r in (data or [])]
-
-
-def summary_from_json(data: Dict[str, Any]) -> GlVatSummary:
-    return GlVatSummary(
-        **(
-            data
-            or {
-                "gl_total": 0,
-                "gl_only_credit": 0,
-                "gl_only_debit": 0,
-                "vat_only_positive": 0,
-                "vat_only_negative": 0,
-                "vat_total": 0,
-            }
-        )
-    )
+# SERIALIZE · moved to services/recon/gl_vat_serialize.py
+from services.recon.gl_vat_serialize import (  # noqa: F401  re-export (recon_routes/tests)
+    detail_to_json,
+    summary_to_json,
+    detail_from_json,
+    summary_from_json,
+)

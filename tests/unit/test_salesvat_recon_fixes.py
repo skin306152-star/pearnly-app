@@ -80,7 +80,8 @@ class MergeMixedPeriodTests(unittest.TestCase):
     """P1-2 · merge_vat_reports 跨文件混月份拦截(parse_vat_report 走 mock · 不碰 Gemini)。"""
 
     def _patch_parse(self, side_effect):
-        p = mock.patch.object(VEX, "parse_vat_report", side_effect=side_effect)
+        # merge_vat_reports 拆到 vat_report_merge · parse_vat_report 在该模块命名空间解析
+        p = mock.patch("vat_report_merge.parse_vat_report", side_effect=side_effect)
         p.start()
         self.addCleanup(p.stop)
 

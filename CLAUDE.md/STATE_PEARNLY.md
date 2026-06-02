@@ -6,16 +6,17 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡(2026-06-02 · **✅ bank_recon_excel 1397→facade 380 收官 · export_bank_recon_excel 816 单函数分解 · prod 上线**)
+## 🎯 状态卡(2026-06-02 · **✅ mrerp_xlsx_generator 1336→facade 381 收官 · 拆 5 leaf · prod 上线**)
 
-- **本窗口 task ✅ 收官**:`bank_recon_excel.py` 唯一巨函数 `export_bank_recon_excel`(816 行 · 18 嵌套闭包)分解。facade 841→**380**(<500)。push `5834f5a..27780e5` 上线、prod /api/version 200 健康。3 模块全 <500:
-  - `bank_recon_excel_styles`(44 · 共享调色板 COLOR_* + `_hdr_style`/`_border_range`/`_fmt_date` leaf · Sheet2/5/6 共用)
-  - `bank_recon_excel_summary`(465 · `_build_summary_sheet` · Sheet1 全块**含 18 内层闭包原样搬运**)
-  - 主 `bank_recon_excel`(380 · facade · Sheet2/5/6 builder + 编排器)
-- **巨函数分解(闭包重型版)范式**:捕获 `ws1`+行游标 `r`(nonlocal)的内层闭包**不提模块级**·整块连闭包字节级搬进 `_build_sheetN`(仍作 closure 存活·0 逻辑改);只有吃 `ws` 参数、无捕获的通用样式 helper 才提 leaf。**逐 cell 金标准等价验证**:旧 `_OLD` vs 新 · 4 语 × 5 输入形态(plain/taskinfo/overrides/zeromatch/empty)20 组 · value/number_format/font/fill/alignment/comment/行高/列宽/合并/冻结全 identical。
-- **去 AI 味**:删死代码 `_label_style`/`_num_style`(全 repo 0 调用点·删除不影响输出);summary import 去未用 Border/Side。openpyxl 改模块顶层 import(硬依赖·对齐 vat 范式)。⚠️**契约**:`export_bank_recon_excel` 名字/签名不变(含未用的 `anchor_ocr` 参数保留)→ `bank_recon_v2` re-export + 路由 + 3 个 brv2 export 测试 0 改;`_t`/`_layer_label`/`_status_label`/`_USAGE_BLOCKS` re-export 保留。
-- **✅ `recon_routes` 2000→460 收官**(路由组拆 8 子模块全 <500 · gl_vat 1423→72 · 详见 STATE_ARCHIVE)。**✅ `vat_excel_export` 1960→55 收官**(build_excel 624 单函数分解·cell-等价·详见 ARCHIVE)。
-- **最后 commit**:`27780e5`。**下个 task = `mrerp_xlsx_generator` 1336(纯 xlsx 生成·低风险)→ `report_engine` 1026 → `services/erp/mrerp_customer_sync` 1324 → ERP 周边 → 报表 `vat_report_parser`**。剩 ~13 个 .py >500(check_file_size 仍 warning 模式)。
+- **本窗口 task ✅ 收官**:`mrerp_xlsx_generator.py`(MR.ERP xlsx 生成 · 函数堆)facade 切。1336→**381**(<500)。push `8b5e0aa..5440efb` 上线、prod /api/version 200 健康。6 模块全 <500:
+  - `mrerp_xlsx_fmt`(102 · fmt_* + 校验上限常量)/ `mrerp_xlsx_lookups`(118 · 商品归一化/映射 + 客户/科目/税种查表 + derive_tax_kind)
+  - `mrerp_xlsx_schemas`(292 · 9 sheet schema + 错误码 + sheet 收集/命名)/ `mrerp_xlsx_sharedstrings`(187 · openpyxl→PhpSpreadsheet 兼容后处理)
+  - `mrerp_xlsx_sales_credit`(367 · sales_credit row/detail/tail 装配 + Korn 真样本克隆 · 经 `_gen.derive_mrerp_invoice_no` 解析)
+  - 主 `mrerp_xlsx_generator`(381 · facade · derive_/validate/generate_xlsx 编排/make_filename + 全 re-export)。
+- **⚠️ monkeypatch 双目标陷阱(facade 切 ERP/计费类必查)**:测试/适配器不止 patch `gen.derive_mrerp_invoice_no`(8 处)· 还 patch **`gen.MRERP_INVOICE_NO_MAX` 常量**(1 处 · test_bill_no_too_long 隔离 bill 检查)。grep `(_gen|gen|模块名)\.[A-Za-z_]+ *=` 抓全部 patch 目标(含常量·别只抓函数)。**读 patch 目标的函数(此处 validate)留 facade**(同模块 late binding · 两 patch 自然流入 · 字节 verbatim);**只调 derive_ 不读常量的函数**(build_*/korn)下沉 leaf · 经 `_gen.derive_` 解析(同 mrerp_adapter_masterdata 既有 `_gen.` 范式)。循环 import(facade↔leaf)用 `import 模块 as _gen`(非 from-import)· leaf 只在 facade 之后 import。
+- **验证**:OLD vs 新逐 cell/字节 · generate_xlsx[sales_credit] korn 克隆**原始字节 identical** · 其余 sheet_kind openpyxl 路径逐 cell identical · validate/derive/build_*/fmt/lookups 全输出一致 · monkeypatch(derive + MRERP_INVOICE_NO_MAX)流入 validate 实测通过。
+- **✅ 前序收官**:`bank_recon_excel` 1397→facade 380(export_bank_recon_excel 816 闭包重函数·cell-等价)· `recon_routes` 2000→460 · `vat_excel_export` 1960→55(详见 ARCHIVE)。
+- **最后 commit**:`5440efb`。**下个 task = `services/erp/mrerp_customer_sync` 1324 → `report_engine` 1026 → `email_ingest` 676 → `services/erp/mrerp_dms_client` 606 → `line_client` 561(高敏·Zihao 在场)→ 报表 `vat_report_parser`**。剩 ~12 个 .py >500(check_file_size warning 模式·FAIL 30→剩余)。
 
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->

@@ -6,16 +6,17 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡(2026-06-02 · **✅ gl_vat_reconciler 1423→72 收官 · facade 纯 re-export 壳 · recon 引擎全部 <500 · prod 上线**)
+## 🎯 状态卡(2026-06-02 · **✅ recon_routes 2000→460 收官 · 路由组拆 8 子模块全 <500 · gl_vat 1423→72 收官 · prod 上线**)
 
-- **本窗口 task ✅ 收官**:续拆 `gl_vat_reconciler.py`(929→**72**·纯 re-export 壳)。本窗口 5 刀全 verbatim(AST identical·0 逻辑改·全量 2177 unittest 绿·push `da33542..9eb97e2` 上线)。加前窗口 types+excel 2 刀,gl_vat 共 7 刀 1423→72。子模块全在 `services/recon/`、全 <500:
-  - **C3** `gl_vat_parse_common`(137·共享叶子 helper+列名常量)/ **C4** `gl_vat_parse_pdf`(335·`_parse_gl_text_lines`+`parse_gl_pdf`+正则·F821 兜底抓出漏迁 `GlRow`)/ **C5** `gl_vat_parse_excel`(275·`parse_gl_excel`+`parse_gl` dispatch+pipeline·`PARSER_VERSION` 随唯一消费者迁入)
-  - **🔴C6 高敏** `gl_vat_reconcile`(177·`reconcile_gl_vat` VAT 判定核心·铁律#26·单独验 160 recon 单测)/ **C7** `gl_vat_serialize`(35·detail/summary to/from json)
-  - 前窗口已落:`gl_vat_types`(60·dataclasses)+`gl_vat_excel`(467·i18n+导出)+`gl_vat_store`(195·DAL)
-- **拆法范式**(同 bank_recon):AST 顶层节点 (lineno,end_lineno) verbatim 切→AST dump 比对证 0 逻辑改→ruff F401+**F821 兜底抓漏 import**(本轮抓出 `GlRow`)→删「未用」前查 re-export 契约→black 保 CRLF。**⚠️本轮教训:`black --check` 经管道 `tail` 吞 exit code 误判通过·pre-push 机械闸兜住(连续 import 块多空行)·验 gate 必看 exit code 别只看 stdout**。
-- **facade `gl_vat_reconciler.py` 72 行** = 纯 re-export 全子模块(契约:`parse_gl`/`reconcile_gl_vat`/`detail_*`/`summary_*`/`GlRow`/`ReconRow`/`GlVatSummary`/`export_gl_vat_excel`/`_to_float` 等 helper·routes+tests 取用)。**本文件收官**。
-- **命名**:`gl_vat_reconciler` 改名并进最后目录重组波(铁律#30)·现在只记录。
-- **最后 commit**:`9eb97e2`(black 收口)。**下个 task = `recon_routes` 2000(路由组拆·含计费高敏)/ `vat_excel_export` 1960 → ERP 周边 → 报表**。剩 ~14 个 .py >500。
+- **本窗口 task ✅ 收官**:拆 `recon_routes.py`(2000→**460**·FastAPI 路由组拆·**含计费主路径·Zihao 拍板 3-way 全拆**)。verbatim(handler body AST identical·仅换装饰器对象名)·全量 2177 unittest 绿·push `bd450d9..2a9d449` 上线。8 子模块全 <500:
+  - `recon_routes_shared`(20·_user_key+_pdf_billing_units 跨组共享 leaf)/ `recon_routes_progress`(45·进度子系统 leaf·_progress_store 单实例)
+  - `recon_routes_glvat`(404·/gl-vat/* 6 路由·🔴计费 gl_vat_run)/ `recon_routes_v1_batch`(349·batch_process 屏B + 删除 trio)
+  - **🔴bank-v2 三模块**:`_helpers`(280·bank_recon_v2 接入+i18n+完整度/锚点·except 加 None 绑定保降级)/ `_run`(410·计费 bank_v2_run)/ `_bankv2`(219·CRUD + include run 子路由)
+  - 主 `recon_routes` 460 = v1 核心(run_recon/_run_match_and_save 等)+ 全 re-export + 3 include。
+- **路由拆范式**:子模块各建 `APIRouter()` 无 prefix → 主 `include_router` → **路由表 24 条 sorted diff 拆前后逐字一致**(拆路由必验此)。⚠️ **AST lineno 指 def 不含装饰器**·块首 handler 的 `@router` 在区间外会丢→没注册(已被 6→4 路由数抓到·起点取 `min(decorator_list.lineno)`)。
+- **契约**:`recon_jobs/handlers.py` 运行时 `from recon_routes import ...` 拉 bank/gl 函数 + handler·全 re-export(否则 worker import 崩 + monkeypatch 失效)·静态审计测试改读子模块并集·monkeypatch 命名空间改指实现模块([[wa-ocr-core-split-entangled]])。F811 抓 hashlib/asyncio 嵌套 import 撞模块头。
+- **⚠️ CRLF 坑**:footer 拼接时块尾已自带回车、再补换行=双回车(乱码)·按换行符 split 切行后须收尾把双回车折叠回单换行(replace 双 CR→单 CR)。**black --check 经管道 tail 会吞掉退出码误判通过**·pre-push 机械闸兜住·验 gate 必看退出码不只看 stdout。
+- **最后 commit**:`2a9d449`。**下个 task = `vat_excel_export` 1960(纯导出·无计费·低风险)→ `bank_recon_excel` 1397 / `mrerp_xlsx_generator` 1336 → ERP 周边(customer/product_sync)→ 报表**。剩 16 个 .py >500。
 
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->

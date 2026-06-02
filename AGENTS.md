@@ -4,7 +4,7 @@
 > 最后更新:2026-06-02(🎉 **5 大巨石全收官** + **OCR 抽取核心 + ERP 双双 <500**〔pipeline 464 / layer2_structure 455〕〔erp_push 480 · mrerp_adapter 1735 行巨类→mixin 真重构 416〕· 全 verbatim 0 逻辑改 · 已上线 prod 健康)
 >
 > **🔴 两条常驻铁律(2026-06-02 Zihao 拍板 · 任何窗口任何任务都执行)**:① 所有源码去 AI 味 + 注释/路数按大厂走(见 §2.6)② **每次 Zihao 说"收尾"(今天到这/换窗口/下班/总结)→ 主动先跑 `/simplify` 再出收尾报告**。
-> **下个 task = 模块化深化继续拆 >500**(✅`bank_recon_v2` 6745→422 + ✅`gl_vat_reconciler` 1423→72 + ✅`recon_routes` 2000→460(含计费 3-way) + ✅`vat_excel_export` 1960→55(含 build_excel 624 单函数分解·cell-等价验证)收官 + ✅`bank_recon_excel` 1397→380 + ✅`mrerp_xlsx_generator` 1336→381 + ✅`mrerp_customer_sync` 1324→111(巨类 mixin)+ ✅`report_engine` 1026→104 + ✅`email_ingest` 676→46 + ✅`mrerp_dms_client` 606→47(DMSClient 巨类 mixin)收官 / `erp_routes`504(路由组拆)→ ERP 周边 → 报表 → 前端 `src/home/*`)。**完整清单见 STATE 状态卡**。**目录重组(86 root .py→包)= 最后做**(文件全 <500 后)。
+> **下个 task = 模块化深化继续拆 >500**(✅`bank_recon_v2` 6745→422 + ✅`gl_vat_reconciler` 1423→72 + ✅`recon_routes` 2000→460(含计费 3-way) + ✅`vat_excel_export` 1960→55(含 build_excel 624 单函数分解·cell-等价验证)收官 + ✅`bank_recon_excel` 1397→380 + ✅`mrerp_xlsx_generator` 1336→381 + ✅`mrerp_customer_sync` 1324→111(巨类 mixin)+ ✅`report_engine` 1026→104 + ✅`email_ingest` 676→46 + ✅`mrerp_dms_client` 606→47(DMSClient 巨类 mixin)+ ✅`erp_routes` 504→61(连接/列表路由组拆)收官 / `auth_admin_routes`501 → ERP 周边 → 报表 → 前端 `src/home/*`)。**完整清单见 STATE 状态卡**。**目录重组(86 root .py→包)= 最后做**(文件全 <500 后)。
 
 ---
 

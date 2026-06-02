@@ -12,9 +12,6 @@ from dataclasses import asdict
 
 from services.recon.bank_recon_types import BankReconRow, BankReconSummary
 
-# EXCEL EXPORT · moved to services/recon/bank_recon_excel.py
-from services.recon.bank_recon_excel import export_bank_recon_excel  # noqa: F401 re-export
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JSON SERIALIZATION

@@ -61,8 +61,13 @@ def add_cache_bust(html: str, version: str) -> str:
 
 
 def count_lines(path: Path) -> int:
-    with path.open("rb") as f:
-        return f.read().count(b"\n") + 1
+    """行数(同 check_file_size.py · CRLF 不重复计数 · 无尾换行 +1)。"""
+    data = path.read_bytes()
+    if not data:
+        return 0
+    crlf = data.count(b"\r\n")
+    lf = data.count(b"\n") - crlf
+    return crlf + lf + (0 if data.endswith(b"\n") else 1)
 
 
 def main() -> int:
@@ -91,10 +96,10 @@ def main() -> int:
     over = []
     for p in code_files:
         n = count_lines(p)
-        flag = "  <<< 超 500" if n > LINE_LIMIT else ""
-        if n > LINE_LIMIT:
+        over_limit = n > LINE_LIMIT
+        if over_limit:
             over.append((p.name, n))
-        print(f"  {p.relative_to(assets_src)!s:32} {n:4} 行{flag}")
+        print(f"  {p.relative_to(assets_src)!s:32} {n:4} 行{'  <<< 超 500' if over_limit else ''}")
     if over:
         print(
             f"\n[注意] {len(over)} 个代码文件 >500(导入后建议微拆):"

@@ -143,10 +143,6 @@ a:hover {
   font-weight: 600;
 }
 
-.legal-table td {
-  color: var(--ink);
-}
-
 /* 页脚联系 */
 .legal-contact {
   margin-top: 40px;

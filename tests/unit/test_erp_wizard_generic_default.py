@@ -100,10 +100,12 @@ class WizardProductsRouteTests(unittest.TestCase):
 
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app  # noqa: F401
-        import erp_routes  # noqa: F401
+        import erp_listing_routes  # noqa: F401  # wizard/连接/列表路由已拆到此模块
 
         cls.app_module = app
-        cls.erp_routes = erp_routes
+        # wizard 路由的 get_current_user_from_request / _check_push_access 在 erp_listing_routes
+        # 命名空间解析 · patch 目标随实现模块走
+        cls.erp_routes = erp_listing_routes
 
     def _client(self):
         from fastapi.testclient import TestClient

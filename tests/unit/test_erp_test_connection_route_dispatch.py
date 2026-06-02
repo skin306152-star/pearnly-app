@@ -45,6 +45,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 import erp_push as _erp  # noqa: E402
 import erp_routes  # noqa: E402  # REFACTOR-B1: erp 路由搬到此模块
+import erp_listing_routes  # noqa: E402  # WB: 连接/列表路由拆到此模块
 import erp_endpoints_routes  # noqa: E402  # R18: 端点 CRUD 拆出
 import erp_push_log_routes  # noqa: E402  # R18: 推送/日志/重试拆出
 
@@ -346,11 +347,11 @@ class RouteDispatchTests(unittest.TestCase):
 
         with (
             patch.object(
-                erp_routes,
+                erp_listing_routes,
                 "get_current_user_from_request",
                 return_value={"id": "u-test", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_listing_routes, "_check_push_access", return_value=None),
             patch.object(_erp, "test_mrerp_endpoint", mrerp_mock),
             patch.object(_erp, "test_endpoint_connection", legacy_mock),
         ):
@@ -391,11 +392,11 @@ class RouteDispatchTests(unittest.TestCase):
 
         with (
             patch.object(
-                erp_routes,
+                erp_listing_routes,
                 "get_current_user_from_request",
                 return_value={"id": "u-test", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_listing_routes, "_check_push_access", return_value=None),
             patch.object(_erp, "test_mrerp_endpoint", mrerp_mock),
             patch.object(_erp, "test_endpoint_connection", legacy_mock),
         ):
@@ -521,9 +522,11 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         app = self.app_module
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_listing_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_listing_routes, "_check_push_access", return_value=None),
             patch.object(_erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
         ):
             client = await self._make_async_client()
@@ -553,9 +556,11 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         }
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_listing_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_listing_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(_erp, "test_mrerp_endpoint", side_effect=self._tripwire_sync_helper),
         ):
@@ -576,9 +581,11 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         fake_ep = {"id": "ep-1", "adapter": "mrerp", "config": {}, "enabled": True}
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_listing_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_listing_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(_erp, "list_mrerp_customers", side_effect=self._tripwire_sync_helper),
         ):
@@ -602,9 +609,11 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         fake_ep = {"id": "ep-1", "adapter": "mrerp", "config": {}, "enabled": True}
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_listing_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_listing_routes, "_check_push_access", return_value=None),
             patch.object(app.db, "get_erp_endpoint", return_value=fake_ep),
             patch.object(_erp, "list_mrerp_products", side_effect=self._tripwire_sync_helper),
         ):
@@ -627,9 +636,11 @@ class AsyncLoopOffloadTests(unittest.IsolatedAsyncioTestCase):
         app = self.app_module
         with (
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_listing_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             ),
-            patch.object(erp_routes, "_check_push_access", return_value=None),
+            patch.object(erp_listing_routes, "_check_push_access", return_value=None),
             patch.object(_erp, "list_mrerp_products", side_effect=self._tripwire_sync_helper),
         ):
             client = await self._make_async_client()
@@ -1851,10 +1862,14 @@ class ListingRetryContractTests(unittest.TestCase):
         stack = contextlib.ExitStack()
         stack.enter_context(
             patch.object(
-                erp_routes, "get_current_user_from_request", return_value={"id": "u", "plan": "pro"}
+                erp_listing_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u", "plan": "pro"},
             )
         )
-        stack.enter_context(patch.object(erp_routes, "_check_push_access", return_value=None))
+        stack.enter_context(
+            patch.object(erp_listing_routes, "_check_push_access", return_value=None)
+        )
         stack.enter_context(patch.object(app.db, "get_erp_endpoint", return_value=fake_ep))
         return stack
 

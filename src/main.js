@@ -82,6 +82,7 @@ import './home/clients.js'; // REFACTOR-C1 · 客户实体前端
 import './home/page-exceptions.js'; // REFACTOR-WB-C3 · 异常栏页骨架运行期注入(home.html section 抽出 · 须在 exceptions.js 前)
 import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页
 import './home/erp-exceptions.js'; // REFACTOR-WB-C1 · ERP 推送异常块(从 exceptions.js 抽出 · window 桥接 loadErpExceptions/_erpExcState)
+import './home/erp-exceptions-edit.js'; // REFACTOR-WB-modularize · ERP 异常单条编辑弹窗(从 erp-exceptions 拆出 · window._erpExcOpenEdit)
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件

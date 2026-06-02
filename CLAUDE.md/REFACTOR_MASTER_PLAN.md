@@ -164,7 +164,8 @@
 
 **🌊 Wave 1 — 现在做(我自主 · 无需 Zihao · 不花钱)· 当前主线**
 - **B1 续** 后端拆 <500:recon(`bank_recon_v2` 6745 等)→ 报表(`vat_excel_export` 等)→ ERP 周边(`mrerp_xlsx_generator`/`customer_sync`/`product_sync`)。判文件先分类:函数堆→facade 切 / 巨类→mixin 真重构([[megaclass-mixin-split-playbook]])。
-  - **`bank_recon_v2` 进行中**(2026-06-02·facade 切·纯函数堆):**6745→3745**·5 刀 verbatim 上线(`ac742c9..cbc0075`)→ `services/recon/bank_recon_{types,excel,utils}` + `bank_stmt_{balance,text,extract,gemini}`。**剩余**(下窗口):GL 解析 ~1700(先抽共享助手 `_pdf_extract_text_safe`/`_is_summary_row`/`_norm_thai` 才能移 orchestrator+GL)→ legacy ~730 → 序列化/merge → **🔴高敏 reconcile+scoring(铁律#26·连 `DATE_TOL_DAYS` 一刀·做前单独报 Zihao+真账号 E2E)**。**地雷**:`DATE_TOL_DAYS` 全局名冲突·L2 容差运行时实际 7≠注释 3(死代码被 scoring 覆盖)·重构保 verbatim=7([[date-tol-days-shadowing]])。
+  - **✅ `bank_recon_v2` 收官**(2026-06-02·facade 切·纯函数堆):**6745→422**·18 刀全 verbatim 上线(`ac742c9..0dede0f`)→ `services/recon/` 18 子模块(types/excel/utils/bank_stmt_{balance,text,extract,gemini,xlsx,legacy×3}/bank_table_io/bank_gl_{common,excel,pdf,pdf_mrerp}/bank_recon_{serialize,merge,pipeline,reconcile,scoring})·全 <500。facade 仅剩 imports + `parse_bank_statement_pdf`/`parse_gl` 两 orchestrator。**🔴高敏 reconcile+scoring 已抽**(Zihao 批方案·AST identical + `test_reconcile_golden` + `test_run_matching_contract` 验)。**地雷已拆除**:`DATE_TOL_DAYS` 收口到 `bank_recon_utils=7` 单一来源([[date-tol-days-shadowing]])。**⚠️撞名教训**:新建模块前必 `git cat-file -e`/`ls` 验路径空闲·裸 `open('w')` 曾静默覆盖已存在的 `bank_recon_match.py`(v1 DAL)致 import 全崩·已恢复改名 reconcile。
+  - **`gl_vat_reconciler` 进行中**(同 facade 范式·有独立 `_ACCT_RE`[4-9]/parsers·勿混 bank_recon):**1423→929**·2 刀上线(`1955ac4`)→ `services/recon/gl_vat_{types,excel}`。**剩余**:GL parsers ~660(再拆 1-2)→ **🔴高敏 `reconcile_gl_vat` ~280**(VAT 判定·铁律#26·配 golden 验)→ 序列化。
 - **C1 续** 前端 `src/home/*` 16 个拆 <500。
 - **B8 多租户 RLS**(安全·提前·**和拆分并行**·不碰拆分文件·Supabase 自带功能不花钱)。
 - **D 测试覆盖**(跟拆分并行加契约/集成测试·22.5%→爬向 70%)。

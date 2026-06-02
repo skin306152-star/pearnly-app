@@ -20,7 +20,8 @@
 - **🔴 `DATE_TOL_DAYS` 地雷已拆除([[date-tol-days-shadowing]])**:原 facade 定义两次(=3 死代码被 scoring 段 =7 加载时覆盖→运行时 7)·S1 已收口到 `bank_recon_utils.DATE_TOL_DAYS=7` 单一来源·reconcile/scoring 两模块都 import 它·运行时恒 7 不变·不再可能分叉。
 - **facade `bank_recon_v2.py` 422 行现存** = imports(全 re-export 子模块)+ orchestrator `parse_bank_statement_pdf`(~220·蓄意留·走 pipeline+pdfplumber+gemini)+ `parse_gl` 调度(~52·留)。已 <500·**本文件收官**。
 - **命名**:`bank_recon_v2` "v2" 改名并进最后目录重组波(铁律#30)·现在只记录。
-- **最后 commit**:`0dede0f`(高敏 S3)。本窗口 recon 18 刀全 push 上线·全项目最大文件从 6745 拆到 422。**下个 task = `recon_routes` 2000 / `gl_vat_reconciler` 1423 / `vat_excel_export` 1960 / `bank_recon_excel` 1397(纯呈现)→ ERP 周边 → 报表**。剩 ~16 个 .py >500。
+- **接着拆 `gl_vat_reconciler.py`(1423→929·干净函数堆·同 bank_recon 范式·有独立 `_ACCT_RE`[4-9]/parsers·勿混)**:已切 2 刀上线(`1955ac4`)→ `gl_vat_types`(60·dataclasses leaf)+ `gl_vat_excel`(468·`_I18N`+`_t`+`export_gl_vat_excel`·纯呈现)。剩:① GL parsers ~660(再拆 1-2 模块)② 🔴高敏 `reconcile_gl_vat` ~280(VAT 判定·铁律#26·单独验)③ JSON 序列化。
+- **最后 commit**:`1955ac4`(gl_vat types+excel)。本窗口 recon 共 20 刀全 push 上线(bank_recon_v2 6745→422 收官 + gl_vat 起拆)。**下个 task = 续拆 gl_vat(parsers→高敏 reconcile_gl_vat 单独验→序列化)→ `recon_routes` 2000(路由组拆·含计费高敏)/ `vat_excel_export` 1960 → ERP 周边 → 报表**。剩 ~15 个 .py >500。
 
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->

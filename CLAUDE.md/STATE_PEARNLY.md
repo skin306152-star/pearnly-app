@@ -6,17 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡(2026-06-02 · **✅ mrerp_xlsx_generator 1336→facade 381 收官 · 拆 5 leaf · prod 上线**)
+## 🎯 状态卡(2026-06-02 · **✅ mrerp_customer_sync 1324→111 · 巨类 mixin 真重构 · prod 上线**)
 
-- **本窗口 task ✅ 收官**:`mrerp_xlsx_generator.py`(MR.ERP xlsx 生成 · 函数堆)facade 切。1336→**381**(<500)。push `8b5e0aa..5440efb` 上线、prod /api/version 200 健康。6 模块全 <500:
-  - `mrerp_xlsx_fmt`(102 · fmt_* + 校验上限常量)/ `mrerp_xlsx_lookups`(118 · 商品归一化/映射 + 客户/科目/税种查表 + derive_tax_kind)
-  - `mrerp_xlsx_schemas`(292 · 9 sheet schema + 错误码 + sheet 收集/命名)/ `mrerp_xlsx_sharedstrings`(187 · openpyxl→PhpSpreadsheet 兼容后处理)
-  - `mrerp_xlsx_sales_credit`(367 · sales_credit row/detail/tail 装配 + Korn 真样本克隆 · 经 `_gen.derive_mrerp_invoice_no` 解析)
-  - 主 `mrerp_xlsx_generator`(381 · facade · derive_/validate/generate_xlsx 编排/make_filename + 全 re-export)。
-- **⚠️ monkeypatch 双目标陷阱(facade 切 ERP/计费类必查)**:测试/适配器不止 patch `gen.derive_mrerp_invoice_no`(8 处)· 还 patch **`gen.MRERP_INVOICE_NO_MAX` 常量**(1 处 · test_bill_no_too_long 隔离 bill 检查)。grep `(_gen|gen|模块名)\.[A-Za-z_]+ *=` 抓全部 patch 目标(含常量·别只抓函数)。**读 patch 目标的函数(此处 validate)留 facade**(同模块 late binding · 两 patch 自然流入 · 字节 verbatim);**只调 derive_ 不读常量的函数**(build_*/korn)下沉 leaf · 经 `_gen.derive_` 解析(同 mrerp_adapter_masterdata 既有 `_gen.` 范式)。循环 import(facade↔leaf)用 `import 模块 as _gen`(非 from-import)· leaf 只在 facade 之后 import。
-- **验证**:OLD vs 新逐 cell/字节 · generate_xlsx[sales_credit] korn 克隆**原始字节 identical** · 其余 sheet_kind openpyxl 路径逐 cell identical · validate/derive/build_*/fmt/lookups 全输出一致 · monkeypatch(derive + MRERP_INVOICE_NO_MAX)流入 validate 实测通过。
-- **✅ 前序收官**:`bank_recon_excel` 1397→facade 380(export_bank_recon_excel 816 闭包重函数·cell-等价)· `recon_routes` 2000→460 · `vat_excel_export` 1960→55(详见 ARCHIVE)。
-- **最后 commit**:`5440efb`。**下个 task = `services/erp/mrerp_customer_sync` 1324 → `report_engine` 1026 → `email_ingest` 676 → `services/erp/mrerp_dms_client` 606 → `line_client` 561(高敏·Zihao 在场)→ 报表 `vat_report_parser`**。剩 ~12 个 .py >500(check_file_size warning 模式·FAIL 30→剩余)。
+- **本窗口 task ✅ 收官**:`services/erp/mrerp_customer_sync.py` 巨类 `MRERPCustomerSyncService`(22 方法 · ~1044 行)mixin 拆分。facade 1324→**111**(<500)。push `f70df4c..391d489` 上线、prod 200。7 模块全 <500(沿用 mrerp_adapter mixin 范式 [[megaclass-mixin-split-playbook]]):
+  - `_customer_sync_models`(56 · dataclass leaf)/ `_customer_sync_const`(38 · 常量 leaf)/ `_customer_sync_parse`(120 · listing HTML 解析 leaf)
+  - `_customer_sync_resolve`(275 · CustomerResolveMixin · L1/L2/L3/seed/upsert)/ `_customer_sync_create`(431 · CustomerCreateMixin · L4 自动建档 Playwright 表单)/ `_customer_sync_fetch`(383 · CustomerFetchMixin · listing/detail 抓取 + verify + delete)
+  - 主(111 · `class MRERPCustomerSyncService(三 Mixin)` · __init__/类常量/invalidate + 全 re-export + __all__)。
+- **巨类 mixin 范式(实证 2 例:mrerp_adapter 1909→416 + 本次)**:dataclass/常量/纯函数 → leaf 破环;方法按职责分 `class XMixin`(**AST 切片方法体 verbatim**);self.* + 跨 mixin 方法调用经 MRO 回主类;实例属性 + 类常量全留主类。**超集 import → ruff F401 --fix 裁剪(本次 64 项)+ F821=0 兜底漏 import**;**ast.dump 每方法 old vs 新全 identical** + MRO 锁 + __all__ importable。本次测试在 adapter/page 边界 mock(无内部方法 monkeypatch)→ 无命名空间陷阱(比 mrerp_xlsx 简单)。
+- **✅ 前序收官**:`mrerp_xlsx_generator` 1336→381(拆 5 leaf · monkeypatch 双目标陷阱 [[facade-split-monkeypatch-constant-trap]])· `bank_recon_excel` 1397→380 · `recon_routes` 2000→460 · `vat_excel_export` 1960→55(详见 ARCHIVE)。
+- **最后 commit**:`391d489`。**下个 task = `report_engine` 1026 → `email_ingest` 676 → `services/erp/mrerp_dms_client` 606 → `auth_admin_routes` 501/`erp_routes` 504 → `line_client` 561(高敏·Zihao 在场)→ 报表 `vat_report_parser`**。剩 ~11 个 .py >500(check_file_size warning 模式)。
 
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->

@@ -43,8 +43,9 @@ class BankGetEnrichTests(unittest.TestCase):
 
     def test_stats_parse_info_warnings_restored(self):
         with (
-            mock.patch.object(
-                rr, "get_current_user_from_request", return_value={"id": "u1", "tenant_id": "t1"}
+            mock.patch(
+                "recon_routes_bankv2.get_current_user_from_request",
+                return_value={"id": "u1", "tenant_id": "t1"},
             ),
             mock.patch.object(rr.db, "get_bank_recon_v2_task", return_value=self._task()),
         ):
@@ -62,8 +63,9 @@ class BankGetEnrichTests(unittest.TestCase):
         task = self._task()
         task["summary_json"] = None
         with (
-            mock.patch.object(
-                rr, "get_current_user_from_request", return_value={"id": "u1", "tenant_id": "t1"}
+            mock.patch(
+                "recon_routes_bankv2.get_current_user_from_request",
+                return_value={"id": "u1", "tenant_id": "t1"},
             ),
             mock.patch.object(rr.db, "get_bank_recon_v2_task", return_value=task),
         ):

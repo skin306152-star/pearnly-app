@@ -3,7 +3,7 @@
 
 
 def _user_key(user):
-    return (user.get("gemini_api_key") or user.get("custom_gemini_api_key") or "").strip() or None
+    return (user.get("gemini_api_key") or user.get("custom_gemini_api_key") or "").strip() or None
 
 
 _ROWS_PER_PAGE_BILLING = 40  # v0.58 · 居中计费:一页约 40 笔 · 防密集账单按页低估
@@ -17,4 +17,4 @@ def _pdf_billing_units(page_count: int, row_count: int) -> int:
 
     pages = max(1, int(page_count or 0))
     rows = max(0, int(row_count or 0))
-    return max(pages, _m.ceil(rows / _ROWS_PER_PAGE_BILLING))
+    return max(pages, _m.ceil(rows / _ROWS_PER_PAGE_BILLING))

@@ -33,8 +33,15 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
             with open(p, "r", encoding="utf-8") as f:
                 parts.append(f.read())
         cls.home_js = "\n".join(parts)
-        with open(os.path.join(ROOT, "recon_routes.py"), "r", encoding="utf-8") as f:
-            cls.recon_py = f.read()
+        # REFACTOR-WB-modularize · recon_routes.py 2000 行已拆 · bank-v2 handler 搬到
+        # recon_routes_bankv2*.py · 静态契约改读这些文件的并集(拼接 == 原全文 · 仍能找到搬走的 handler)
+        _recon_parts = []
+        for _rp in ("recon_routes.py", "recon_routes_bankv2.py", "recon_routes_bankv2_run.py"):
+            _rpath = os.path.join(ROOT, _rp)
+            if os.path.exists(_rpath):
+                with open(_rpath, "r", encoding="utf-8") as f:
+                    _recon_parts.append(f.read())
+        cls.recon_py = "\n".join(_recon_parts)
         # REFACTOR-C1(2026-05-25)· I18N 4 语字典已从 home.js 抽到 static/i18n-data.js ·
         # i18n key 完整性校验改读这里(回退 home.js 兼容老结构 / 万一回滚)
         _i18n_path = os.path.join(ROOT, "static", "i18n-data.js")
@@ -100,7 +107,7 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
         """
         # 找 bank_v2_get_task 函数体
         m = re.search(
-            r"async def bank_v2_get_task\(.*?\n(?=\s*@router|\Z)",
+            r"async def bank_v2_get_task\(.*?\n(?=\s*@(?:router|bankv2_router|bankv2_run_router)|\Z)",
             self.recon_py,
             re.DOTALL,
         )
@@ -124,7 +131,7 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
     def test_get_export_route_forwards_anchor_overrides(self):
         """P0.3+P0.2 契约 · /export 必须从 summary_raw 拿 _anchor_overrides 传给 export_bank_recon_excel"""
         m = re.search(
-            r"async def bank_v2_export\(.*?\n(?=\s*@router|\Z)",
+            r"async def bank_v2_export\(.*?\n(?=\s*@(?:router|bankv2_router|bankv2_run_router)|\Z)",
             self.recon_py,
             re.DOTALL,
         )

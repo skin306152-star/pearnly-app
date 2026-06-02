@@ -295,59 +295,6 @@ function routeTo(route) {
     }
 }
 
-// v118.8 · 顶栏 brand-workspace · 显示用户公司名 / 姓名 / fallback
-function renderBrandWorkspace() {
-    const el = document.getElementById('brand-workspace');
-    if (!el || !_userInfo) return;
-    const u = _userInfo;
-    // v118.8.2 · 智能 cleanup · 防 username/name 字段被设成完整 email 字符串
-    function clean(s) {
-        if (!s || typeof s !== 'string') return null;
-        s = s.trim();
-        if (!s) return null;
-        // 看起来是 email · 取前缀
-        if (s.includes('@') && s.indexOf('@') > 0 && s.indexOf('.') > s.indexOf('@')) {
-            return s.split('@')[0];
-        }
-        return s;
-    }
-    // v118.8.1 · 多字段 fallback 链 · 防后端字段名不一致 / 注册时未填
-    const tryFields = [
-        u.company_name,
-        u.company,
-        u.tenant_name,
-        u.organization,
-        u.org_name,
-        u.name,
-        u.full_name,
-        u.display_name,
-        // 这些可能是 email · 用 clean() 截前缀
-        u.username,
-        u.email,
-    ];
-    let name = null;
-    for (const f of tryFields) {
-        const c = clean(f);
-        if (c) {
-            name = c;
-            break;
-        }
-    }
-    if (!name) name = t('brand-workspace-fallback') || '我的工作台';
-    el.textContent = name;
-    el.title = name;
-    el.removeAttribute('data-i18n');
-    // v118.8.1 · 调试用 · 出问题时在 console 看 _userInfo 实际字段
-    if (!u.company_name && !u.company) {
-        console.debug(
-            '[Pearnly] brand-workspace fallback to:',
-            name,
-            '· _userInfo fields:',
-            Object.keys(u)
-        );
-    }
-}
-
 function updateUploadHint() {
     if (!_quota) return;
     document.getElementById('upload-hint').textContent = t('upload-hint', {
@@ -435,7 +382,7 @@ async function loadAll() {
         // v118.33.2 NAV-IA Phase 2 · renderSidebarUser 已删 · 头像菜单 renderAvatarMenu 接管(下面 Phase 1 块)
         // v0.15 · 顶部套餐下拉已删 · 不再设置 plan-current-label
         // v118.8 · 顶栏归属感 · 显示用户公司名(归属感 · 不再是 Pearnly 大字)
-        renderBrandWorkspace();
+        window.renderBrandWorkspace();
         if (typeof window.renderInfoBar === 'function') window.renderInfoBar();
         if (typeof window.renderQuotaBanner === 'function') window.renderQuotaBanner(); // v102 · 配额低/耗尽顶部预警
         // v118.35.0.8 · renderTrialBanner 已废 · credits 系统接管
@@ -487,54 +434,11 @@ async function loadAll() {
     }
 }
 
-// v92 · Bug 7 · 断网横幅初始化
-function installNetworkBanner() {
-    let banner = document.getElementById('offline-banner');
-    if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'offline-banner';
-        banner.className = 'offline-banner';
-        banner.style.display = 'none';
-        document.body.insertBefore(banner, document.body.firstChild);
-    }
-    function updateBanner() {
-        if (navigator.onLine === false) {
-            banner.innerHTML =
-                svgIcon('wifiOff', 14) + '<span>' + escapeHtml(t('offline-banner')) + '</span>';
-            banner.classList.remove('is-online');
-            banner.classList.add('is-offline');
-            banner.style.display = 'flex';
-        } else {
-            // 先展示"已恢复" 2 秒 · 再隐藏
-            if (banner.classList.contains('is-offline')) {
-                banner.innerHTML =
-                    svgIcon('wifiOn', 14) +
-                    '<span>' +
-                    escapeHtml(t('online-reconnected')) +
-                    '</span>';
-                banner.classList.remove('is-offline');
-                banner.classList.add('is-online');
-                setTimeout(() => {
-                    banner.style.display = 'none';
-                    banner.classList.remove('is-online');
-                }, 2000);
-            } else {
-                banner.style.display = 'none';
-            }
-        }
-    }
-    window.addEventListener('online', updateBanner);
-    window.addEventListener('offline', updateBanner);
-    updateBanner(); // 页面加载时立即检查
-}
-
 // REFACTOR-C1-home-batch9f · window 挂出
 window.applyLang = applyLang;
 window.routeTo = routeTo;
 window.loadAll = loadAll;
-window.renderBrandWorkspace = renderBrandWorkspace;
 window.updateUploadHint = updateUploadHint;
-window.installNetworkBanner = installNetworkBanner;
 
 // ============================================================
 // 启动

@@ -67,7 +67,9 @@ def count_lines(path: Path) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="新着陆页导入仓库(只读桌面·只写仓库)")
-    ap.add_argument("--src", type=Path, default=DEFAULT_SRC, help="桌面源目录(含 rebuild.html + assets/)")
+    ap.add_argument(
+        "--src", type=Path, default=DEFAULT_SRC, help="桌面源目录(含 rebuild.html + assets/)"
+    )
     ap.add_argument("--version", default="1", help="login.html 内 CSS/JS 链接的 ?v= 值")
     ap.add_argument("--dry-run", action="store_true", help="只报告 · 不写任何文件")
     args = ap.parse_args()
@@ -94,7 +96,10 @@ def main() -> int:
             over.append((p.name, n))
         print(f"  {p.relative_to(assets_src)!s:32} {n:4} 行{flag}")
     if over:
-        print(f"\n[注意] {len(over)} 个代码文件 >500(导入后建议微拆):" + ", ".join(f"{n}({c})" for n, c in over))
+        print(
+            f"\n[注意] {len(over)} 个代码文件 >500(导入后建议微拆):"
+            + ", ".join(f"{n}({c})" for n, c in over)
+        )
 
     # 外壳改写预览
     shell_out = add_cache_bust(rewrite_paths(shell_src.read_text(encoding="utf-8")), args.version)

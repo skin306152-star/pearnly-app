@@ -14,6 +14,10 @@ from typing import Any, Dict, List, Optional
 
 AMOUNT_TOL = 0.02  # baht tolerance for amount matching
 MIN_PLUMBER_ROWS = 3  # fallback to Gemini if pdfplumber yields < this
+# Layer-2 date tolerance for reconcile + invoice-candidate matching. Single
+# source of truth: the legacy module defined it twice (a dead =3 shadowed by a
+# load-time =7); the runtime value has always been 7.
+DATE_TOL_DAYS = 7
 
 # v118.33.13.1 · in-memory cache for Gemini OCR results, keyed by SHA-256 of file bytes.
 # Same PDF re-uploaded -> instant. Capped at 256 entries (~80 MB worst case), LRU eviction.

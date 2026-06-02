@@ -17,11 +17,6 @@ from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CONSTANTS
-# ─────────────────────────────────────────────────────────────────────────────
-DATE_TOL_DAYS = 3  # days tolerance for layer-2 matching
-
 
 # DATA CLASSES · moved to services/recon/bank_recon_types.py
 from services.recon.bank_recon_types import (
@@ -35,6 +30,7 @@ from services.recon.bank_recon_types import (
 from services.recon.bank_recon_utils import (  # noqa: F401  re-export + facade-internal
     AMOUNT_TOL,
     MIN_PLUMBER_ROWS,
+    DATE_TOL_DAYS,
     _GEMINI_STMT_CACHE,
     _GEMINI_GL_CACHE,
     _cache_get,
@@ -697,7 +693,7 @@ THRESH_SUGGEST = 60  # 可显示为疑似
 AMOUNT_TOL_EQUAL = 0.01  # 小于这个差值 = 金额精确一致
 AMOUNT_TOL_SMALL = 1.00  # 1 泰铢内
 AMOUNT_TOL_MEDIUM = 10.00  # 10 泰铢内(手续费差 / 汇率小差)
-DATE_TOL_DAYS = 7  # 超过 7 天不计候选
+# DATE_TOL_DAYS · imported from bank_recon_utils (single source of truth = 7)
 
 
 def score_amount(bank_amount: float, invoice_amount: float) -> float:

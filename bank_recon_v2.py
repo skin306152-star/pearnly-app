@@ -73,6 +73,12 @@ from services.recon.bank_stmt_xlsx import (  # noqa: F401  re-export (recon_jobs
     _STMT_DEPOSIT_H,
 )
 
+# GL COLUMN RECOGNITION · header dicts / acct regex / col map · moved to bank_gl_common.py
+from services.recon.bank_gl_common import (  # noqa: F401  facade-internal (parse_gl_excel/pdf still here)
+    _map_gl_cols,
+    _extract_acct_code,
+)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # BANK STATEMENT PARSERS · extractors/text/gemini split to services/recon/bank_stmt_{extract,text,gemini}.py
 from services.recon.bank_stmt_extract import (
@@ -340,50 +346,6 @@ def parse_bank_statement_pdf(
         "low_conf_count": low_conf_count,
         "completeness": completeness,  # v118.35.0.63
     }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# GL PARSERS
-# ─────────────────────────────────────────────────────────────────────────────
-_GL_DATE_H = {"วันที่", "date", "วัน", "日期"}
-_GL_DOC_H = {"ใบสำคัญ", "เลขที่เอกสาร", "doc", "voucher", "reference", "เอกสาร", "凭证", "ref"}
-_GL_DESC_H = {"คำอธิบาย", "รายการ", "description", "detail", "รายละเอียด", "摘要"}
-_GL_DEBIT_H = {"เดบิต", "เดบิท", "debit", "dr", "借方", "ถอน", "จ่าย"}
-_GL_CRED_H = {"เครดิต", "credit", "cr", "贷方", "ฝาก", "รับ"}
-_GL_ACCT_H = {"รหัสบัญชี", "account", "gl account", "เลขที่บัญชี", "รหัส", "账号", "科目"}
-# BUG-FIX-T2 v118.35.0.43 · balance/余额 列识别 · 给 opening 检测读期初余额用
-# (老逻辑只看 debit/credit · Row 2 期初 ยอดยกมา 余额列填 39749.85 没读到 → opening=0 → closing 全错)
-_GL_BAL_H = {"คงเหลือ", "ยอดคงเหลือ", "balance", "running balance", "余额", "残高"}
-
-_ACCT_RE = re.compile(r"(?<![\d.])([1-9]\d{3,6}(?:[-–]\d{2,3})?)(?![\d.])")
-
-
-def _map_gl_cols(header_row: List) -> Dict[str, int]:
-    col_map: Dict[str, int] = {}
-    for i, cell in enumerate(header_row):
-        h = str(cell or "").strip().lower()
-        if not h:
-            continue
-        if "date" not in col_map and _hit(h, _GL_DATE_H):
-            col_map["date"] = i
-        elif "doc_no" not in col_map and _hit(h, _GL_DOC_H):
-            col_map["doc_no"] = i
-        elif "description" not in col_map and _hit(h, _GL_DESC_H):
-            col_map["description"] = i
-        elif "debit" not in col_map and _hit(h, _GL_DEBIT_H):
-            col_map["debit"] = i
-        elif "credit" not in col_map and _hit(h, _GL_CRED_H):
-            col_map["credit"] = i
-        elif "account" not in col_map and _hit(h, _GL_ACCT_H):
-            col_map["account"] = i
-        elif "balance" not in col_map and _hit(h, _GL_BAL_H):
-            col_map["balance"] = i  # BUG-FIX-T2 v118.35.0.43 · 给 opening 检测读期初余额
-    return col_map
-
-
-def _extract_acct_code(text: str) -> str:
-    m = _ACCT_RE.search(str(text or ""))
-    return m.group(1) if m else ""
 
 
 def parse_gl_excel(

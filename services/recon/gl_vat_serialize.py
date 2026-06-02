@@ -32,4 +32,4 @@ def summary_from_json(data: Dict[str, Any]) -> GlVatSummary:
                 "vat_total": 0,
             }
         )
-    )
+    )

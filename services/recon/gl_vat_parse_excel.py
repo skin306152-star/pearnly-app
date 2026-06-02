@@ -272,4 +272,4 @@ def _gl_rows_from_pipeline_legacy(legacy_dict: Dict[str, Any], revenue_prefix: s
                     credit=credit,
                 )
             )
-    return out
+    return out

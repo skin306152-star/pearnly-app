@@ -6,7 +6,6 @@ from typing import List, Dict, Optional
 
 from field_comparator import normalize_invoice_no
 
-
 # ── 列名关键词（中英泰混合，匹配宽容） ─────────────────────────────
 _GL_DATE_H = {"วันที่", "date", "วัน", "日期"}
 _GL_DOC_H = {"ใบสำคัญ", "เลขที่เอกสาร", "doc no", "voucher", "reference", "เอกสาร", "凭证", "单据"}
@@ -35,7 +34,7 @@ _SKIP_ROWS = {
     "รวมประจำเดือน",
     "รวมแต่ละหน้า",
     "รวมทั้งสิ้น",
-}
+}
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -95,7 +94,7 @@ def _is_skip_row(cells: List) -> bool:
 
 def normalize_doc_no(s: str) -> str:
     """单据号归一化（复用现有 invoice_no 归一化器）"""
-    return normalize_invoice_no(s)
+    return normalize_invoice_no(s)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -134,4 +133,4 @@ def _row_has_amount(cells: List, col_map: Dict[str, int]) -> bool:
         if "credit" in col_map and col_map["credit"] < len(cells)
         else 0.0
     )
-    return d != 0.0 or c != 0.0
+    return d != 0.0 or c != 0.0

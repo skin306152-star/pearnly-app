@@ -174,4 +174,4 @@ def reconcile_gl_vat(
         vat_only_positive_items=vat_only_positive_items,
         vat_only_negative_items=vat_only_negative_items,
     )
-    return detail, summary
+    return detail, summary

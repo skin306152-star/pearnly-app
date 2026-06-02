@@ -28,25 +28,7 @@ DIFF_FILL = PatternFill("solid", start_color="FEF2F2")  # 差异行底色
 OVERRIDE_FILL = PatternFill("solid", start_color="FFE082")
 OVERRIDE_FONT = Font(name="Arial", size=10, bold=True, color="92400E")  # 暖棕字
 
-# P1.2-M2 · 发票侧可校正字段 → Excel 列号 / 列标签 key(报告侧不许改)
-_OVERRIDE_FIELD_COL = {
-    "invoice_date": 2,
-    "invoice_no": 3,
-    "buyer_name": 4,
-    "buyer_tax_id": 5,
-    "buyer_branch": 6,
-    "amount_pre_vat": 7,
-    "vat_amount": 8,
-}
-_OVERRIDE_FIELD_LABEL = {
-    "invoice_date": "c_date",
-    "invoice_no": "c_inv_no",
-    "buyer_name": "c_buyer_name",
-    "buyer_tax_id": "c_buyer_tid",
-    "buyer_branch": "c_buyer_branch",
-    "amount_pre_vat": "c_pre_vat",
-    "vat_amount": "c_vat",
-}
+from vat_excel_labels import _LABELS, _OVERRIDE_FIELD_COL, _OVERRIDE_FIELD_LABEL
 
 THIN = Side(style="thin", color="B0BEC5")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
@@ -54,168 +36,6 @@ BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
 LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
 RIGHT = Alignment(horizontal="right", vertical="center", wrap_text=True)
-
-
-# v118.32.3 · F2 · Excel 表头 4 语 i18n
-# 数据本身(客户名/发票号等)保持 OCR 原文 · 只翻译标签
-_LABELS = {
-    "th": {  # 泰文(默认 · 给税局看)
-        "biz_name": "ชื่อผู้ประกอบการ",
-        "biz_address": "ที่อยู่สถานประกอบการ",
-        "tax_id": "เลขประจำตัวผู้เสียภาษี",
-        "branch": "สาขา",
-        "period": "เดือน ปี งวดภาษี",
-        "report_title": "รายงานภาษีขาย",
-        "main_office": "สำนักงานใหญ่",
-        "invoice_side": "ฝั่งใบกำกับภาษี (Invoice Side)",
-        "check_marks": "✓ ช่องตรวจสอบ (Check Marks)",
-        "report_side": "ฝั่งรายงาน (Report Side)",
-        "note": "หมายเหตุ",
-        "c_seq": "ลำดับ",
-        "c_date": "วันที่",
-        "c_inv_no": "เลขที่ใบกำกับ",
-        "c_buyer_name": "ชื่อผู้ซื้อ",
-        "c_buyer_tid": "เลขประจำตัวผู้เสียภาษี",
-        "c_buyer_branch": "สาขาผู้ซื้อ",
-        "c_pre_vat": "ยอดก่อน VAT",
-        "c_vat": "ภาษี 7%",
-        "c_total": "ยอดรวม",
-        "c_category": "หมวดหมู่",
-        "c_source": "แหล่งที่มา",
-        "rc_date": "วันที่",
-        "rc_no": "เลขที่",
-        "rc_name": "ชื่อ",
-        "rc_tid": "เลขภาษี",
-        "rc_branch": "สาขา",
-        "rc_pre": "ก่อน VAT",
-        "rc_vat": "ภาษี 7%",
-        "grand_total": "รวมยอดทั้งสิ้น",
-        "sig_prepared": "ผู้จัดทำ",
-        "sig_reviewer": "ผู้ตรวจสอบ",
-        "sig_approver": "ผู้อนุมัติ",
-        "sec_manual_entry": "ร่องรอยการแก้ไขเอง (ฝั่งใบกำกับ)",
-        "mc_field": "ช่อง",
-        "col_manual_ocr": "ค่า OCR (เดิม)",
-        "col_manual_user": "ค่าที่คุณแก้ (ใช้จริง)",
-    },
-    "zh": {
-        "biz_name": "经营者名",
-        "biz_address": "经营场所地址",
-        "tax_id": "税号",
-        "branch": "分支",
-        "period": "纳税期间",
-        "report_title": "销项税报告",
-        "main_office": "总部",
-        "invoice_side": "发票侧 (Invoice Side)",
-        "check_marks": "✓ 核对标记 (Check Marks)",
-        "report_side": "报告侧 (Report Side)",
-        "note": "备注",
-        "c_seq": "序号",
-        "c_date": "日期",
-        "c_inv_no": "发票号",
-        "c_buyer_name": "客户名",
-        "c_buyer_tid": "客户税号",
-        "c_buyer_branch": "客户分支",
-        "c_pre_vat": "前税金额",
-        "c_vat": "VAT 7%",
-        "c_total": "含税总额",
-        "c_category": "分类",
-        "c_source": "来源",
-        "rc_date": "日期",
-        "rc_no": "号码",
-        "rc_name": "名称",
-        "rc_tid": "税号",
-        "rc_branch": "分支",
-        "rc_pre": "前税",
-        "rc_vat": "VAT 7%",
-        "grand_total": "合计",
-        "sig_prepared": "制作人",
-        "sig_reviewer": "审核人",
-        "sig_approver": "批准人",
-        "sec_manual_entry": "手动修改痕迹（发票侧）",
-        "mc_field": "字段",
-        "col_manual_ocr": "OCR 原值",
-        "col_manual_user": "你改的（实际用）",
-    },
-    "en": {
-        "biz_name": "Business Name",
-        "biz_address": "Business Address",
-        "tax_id": "Tax ID",
-        "branch": "Branch",
-        "period": "Tax Period",
-        "report_title": "Output VAT Report",
-        "main_office": "Head Office",
-        "invoice_side": "Invoice Side",
-        "check_marks": "✓ Check Marks",
-        "report_side": "Report Side",
-        "note": "Note",
-        "c_seq": "#",
-        "c_date": "Date",
-        "c_inv_no": "Invoice No",
-        "c_buyer_name": "Buyer",
-        "c_buyer_tid": "Buyer Tax ID",
-        "c_buyer_branch": "Buyer Branch",
-        "c_pre_vat": "Pre-VAT",
-        "c_vat": "VAT 7%",
-        "c_total": "Total",
-        "c_category": "Category",
-        "c_source": "Source",
-        "rc_date": "Date",
-        "rc_no": "No",
-        "rc_name": "Name",
-        "rc_tid": "Tax ID",
-        "rc_branch": "Branch",
-        "rc_pre": "Pre-VAT",
-        "rc_vat": "VAT 7%",
-        "grand_total": "Grand Total",
-        "sig_prepared": "Prepared by",
-        "sig_reviewer": "Reviewed by",
-        "sig_approver": "Approved by",
-        "sec_manual_entry": "Manual Edit Trail (Invoice Side)",
-        "mc_field": "Field",
-        "col_manual_ocr": "OCR Value (original)",
-        "col_manual_user": "Your Value (used)",
-    },
-    "ja": {
-        "biz_name": "事業者名",
-        "biz_address": "事業所住所",
-        "tax_id": "税番号",
-        "branch": "支店",
-        "period": "課税期間",
-        "report_title": "売上 VAT レポート",
-        "main_office": "本社",
-        "invoice_side": "請求書側 (Invoice Side)",
-        "check_marks": "✓ チェック欄 (Check Marks)",
-        "report_side": "レポート側 (Report Side)",
-        "note": "備考",
-        "c_seq": "番号",
-        "c_date": "日付",
-        "c_inv_no": "請求書番号",
-        "c_buyer_name": "顧客名",
-        "c_buyer_tid": "顧客税番号",
-        "c_buyer_branch": "顧客支店",
-        "c_pre_vat": "税抜金額",
-        "c_vat": "VAT 7%（消費税相当）",
-        "c_total": "税込合計",
-        "c_category": "分類",
-        "c_source": "出所",
-        "rc_date": "日付",
-        "rc_no": "番号",
-        "rc_name": "名称",
-        "rc_tid": "税番号",
-        "rc_branch": "支店",
-        "rc_pre": "税抜",
-        "rc_vat": "VAT 7%（消費税相当）",
-        "grand_total": "総合計",
-        "sig_prepared": "作成者",
-        "sig_reviewer": "確認者",
-        "sig_approver": "承認者",
-        "sec_manual_entry": "手入力修正履歴（請求書側）",
-        "mc_field": "項目",
-        "col_manual_ocr": "OCR 値(元)",
-        "col_manual_user": "修正値(実使用)",
-    },
-}
 
 
 def _t(lang: str, key: str) -> str:
@@ -404,10 +224,8 @@ def export_recon_task(
 
         # 决定要写几行(铁律 PRD §7.2:每差异一行)
         if len(diff_cats) <= 1:
-            row_count = 1
             cats_per_row = [diff_cats[0] if diff_cats else ""]
         else:
-            row_count = len(diff_cats)
             cats_per_row = diff_cats
 
         for ri, cat in enumerate(cats_per_row):

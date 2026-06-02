@@ -1,0 +1,177 @@
+/* Pearnly 法律页(条款 / 隐私)共享样式 · 克制 · 标准 · 易读 */
+:root {
+  --ink: #1f2937;
+  --ink-strong: #111827;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --accent: #6d28d9;
+  --bg: #ffffff;
+  --bg-soft: #f9fafb;
+  --maxw: 720px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans Thai', sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* 顶栏:只一个回站点 + 文档标识 · 不堆元素 */
+.legal-top {
+  border-bottom: 1px solid var(--line);
+}
+
+.legal-top-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.legal-brand {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--ink-strong);
+}
+
+.legal-back {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* 正文容器 */
+.legal-doc {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+
+.legal-doc h1 {
+  font-size: 32px;
+  line-height: 1.25;
+  margin: 0 0 8px;
+  color: var(--ink-strong);
+  letter-spacing: -0.02em;
+}
+
+.legal-meta {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 32px;
+}
+
+.legal-doc h2 {
+  font-size: 20px;
+  margin: 36px 0 12px;
+  color: var(--ink-strong);
+}
+
+.legal-doc p {
+  margin: 0 0 14px;
+}
+
+.legal-doc ul {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+
+.legal-doc li {
+  margin-bottom: 8px;
+}
+
+/* 模板声明:低调左边框 · 不喧宾夺主 */
+.legal-note {
+  border-left: 3px solid var(--line);
+  background: var(--bg-soft);
+  padding: 14px 18px;
+  margin: 0 0 32px;
+  font-size: 14px;
+  color: var(--muted);
+  border-radius: 0 8px 8px 0;
+}
+
+.legal-note strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+
+/* 表格(隐私页数据类目) */
+.legal-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+
+.legal-table th,
+.legal-table td {
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal-table th {
+  background: var(--bg-soft);
+  color: var(--ink-strong);
+  font-weight: 600;
+}
+
+.legal-table td {
+  color: var(--ink);
+}
+
+/* 页脚联系 */
+.legal-contact {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.legal-contact strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-strong);
+}
+
+@media (max-width: 600px) {
+  .legal-doc {
+    padding: 32px 20px 64px;
+  }
+
+  .legal-doc h1 {
+    font-size: 26px;
+  }
+
+  .legal-doc h2 {
+    font-size: 18px;
+  }
+}

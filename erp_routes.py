@@ -18,9 +18,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 # 契约保留:erp_routes._record_500 is route_helpers._record_500 ·
-# get_current_user_from_request / _check_push_access 是 dispatch 测试的 patch 目标(保属性可达)
+# erp_routes._check_push_access is erp_routes_access._check_push_access(split-contract 测试断言)
 from route_helpers import _record_500  # noqa: F401
-from auth import get_current_user_from_request  # noqa: F401
 from erp_routes_access import _check_push_access  # noqa: F401
 
 # 连接测试 / 列表组 · model + 缓存 + flush + 路由函数全 re-export(契约/测试零改)

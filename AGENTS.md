@@ -1,10 +1,10 @@
 # AGENTS.md · Pearnly 唯一入口(所有 AI 窗口先读这一页)
 
 > **这是唯一的"必读"。** 故意保持一页。完整宪法在 `CLAUDE.md/CLAUDE.md`(铁律细节),业务概念在 `docs/agent/`,但**进窗口先把这页 + STATE 状态卡读完 + 跑一次进度脚本**就能开工,别一上来啃 7000 行。
-> 最后更新:2026-06-02(🏆 **后端 .py 全部 ≤500 达成** · 本窗口八连拆 + /simplify〔vat_report_parser/vat_excel_exporter/usage_report/recon_jobs.handlers/auth_admin_routes/mrerp_product_sync 833行巨类/line_client/layer1_vision〕· 全 verbatim AST 逐符号等价 0 逻辑改 · 8 次 pre-push 2176 测试全绿 · 已上线 prod 健康)
+> 最后更新:2026-06-02(✅ **前端 C9 五个最大文件 store 中心化收官**:bank-recon-v2/bank-recon/exceptions/gl-vat-recon/clients 1592/1252/1250/896/878 → 405/181/176/66/329 · 全 push 上线 + prod 真浏览器实测(loadTask 真数据逐字段 == 后端 JSON · 零 console error)· 后端 .py 此前已全 ≤500)
 >
 > **🔴 两条常驻铁律(2026-06-02 Zihao 拍板 · 任何窗口任何任务都执行)**:① 所有源码去 AI 味 + 注释/路数按大厂走(见 §2.6)② **每次 Zihao 说"收尾"(今天到这/换窗口/下班/总结)→ 主动先跑 `/simplify` 再出收尾报告**。
-> **下个 task = 前端 `src/home/*.js`(16 个 >500)**。✅ **所有后端 .py 已全部 ≤500**(本窗口八连拆收官:vat_report_parser/vat_excel_exporter/usage_report/recon_jobs.handlers/auth_admin_routes/mrerp_product_sync 833行巨类/line_client/layer1_vision · 完整清单 + 历史巨石见 STATE 状态卡)。前端拆需 `npm run build` + `git add static/dist` 一起提交(铁律)+ 真浏览器验 getComputedStyle/截图(view-source 只见 minified bundle)· 建议单独窗口。**目录重组(86 root .py→包)= 最后做**(文件全 <500 后)。
+> **当前 task = 前端 `src/home/*.js`(剩 11 个 >500 · 5 个最大已收官)**。**C9 范式见记忆 [[c9-store-centralization-bankrecon]]**:stateful IIFE 私有 let → 共享 store 对象(从不重赋值的对象直接 `export const` · 可重赋值原始值包对象 · 单簇独用的随簇移为模块私有);子模块真 ESM import/export(cyclic 全 runtime 安全);生成器按行 verbatim 切片 + 覆盖率(每 CODE 行恰好归一处)+ 逐行等价双校验;本地反代 harness 真浏览器验。剩 11 个见 STATE 状态卡(erp-mappings/email-ingest C9 · erp-xero/folder-watcher/core-boot/archive-settings/upload-camera/erp-exceptions 非 C9 · ocr-recognize OCR路径 · excel-formula-recon/test-center skin-only e2e_2 无法 E2E)。前端拆需 `npm run build` + `git add static/dist` 一起提交 + 真浏览器验 · **目录重组(86 root .py→包)= 最后做**。simplify 跨切面 follow-up 见 [[c9-split-followups]]。
 
 ---
 
@@ -24,7 +24,7 @@
 
 ## 1. 当前在干啥(整顿期 · 2026-05 起)
 
-- **⏳ 当前实况(2026-06-02)**:🏆 **后端 .py 全部 ≤500 达成**。本窗口八连拆 + /simplify(全 verbatim·AST 逐符号等价·0 逻辑改·8 次 pre-push 2176 测试全绿·已上线):vat_report_parser/vat_excel_exporter/usage_report/recon_jobs.handlers/auth_admin_routes/**mrerp_product_sync 833 行巨类→3 Mixin**/line_client/layer1_vision。范式见记忆 [[megaclass-mixin-split-playbook]] / [[facade-split-monkeypatch-constant-trap]]。**下个 task = 前端 `src/home/*.js`(16 个 >500)**(见 §1 下方 + STATE)。
+- **⏳ 当前实况(2026-06-02)**:✅ 后端 .py 全 ≤500 · ✅ **前端 C9 五个最大文件 store 中心化收官**(bank-recon-v2/bank-recon/exceptions/gl-vat-recon/clients → 405/181/176/66/329 · 各 +4~6 子模块 · 全 push 上线 + prod 真浏览器实测 · 零 console error)。**C9 范式 [[c9-store-centralization-bankrecon]]** + simplify follow-up [[c9-split-followups]]。**当前 task = 前端 `src/home/*.js` 剩 11 个 >500**(见 §1 + STATE 状态卡 · 照 C9 范式续拆)。
 - **模式**:整顿封锁期(铁律 #18)· **0 新功能** · 只做 `REFACTOR_MASTER_PLAN.md` 的 9 阶段 task。**判文件先分类**:一堆独立函数→facade 切(re-export);单个巨类→mixin 真重构。**下个 task 顺序**:✅`bank_recon_v2`6745→422 + ✅`gl_vat_reconciler`1423→72 + ✅`recon_routes`2000→460 + ✅`vat_excel_export`1960→55 收官 / 🔄`bank_recon_excel`1397→841(剩 export_bank_recon_excel 816 闭包函数)/ `mrerp_xlsx_generator`1336 → ERP 周边 `customer_sync`/`product_sync` → 报表 → 前端 `src/home/*`(~14 个 >500)。**巨函数分解范式(build_excel 已实证)**:样式无运行时依赖→提模块级·sheet body 保缩进搬进 `_build_sheetN`(字节级 verbatim)·只产出数据的 sheet 加 return·**旧 vs 新逐 cell 等价验证**;⚠️若函数内多嵌套闭包(export_bank_recon_excel 18 个)先规划「闭包→参数」映射再动。**路由组拆范式**:子模块各 `APIRouter()` 无 prefix→主 include_router→路由表 sorted diff 逐字一致;⚠️AST lineno 不含装饰器(块首 handler 的 `@router` 会丢·起点取 min decorator lineno);handlers.py 运行时 import 的函数全 re-export。**facade 切范式**:AST 取节点(lineno,end_lineno)·gap 注释归属后随→AST dump 比对证 0 逻辑改→ruff F401--fix + **F821 兜底抓漏 import**→**新建模块前必验路径空闲(裸 open('w') 会静默覆盖已存在文件)**→noqa 放 `from(` 开括号行→black 保 CRLF→全量 unittest + 契约 assertIs。**机械闸盲区**:根目录非 *_routes.py 的业务 .py(bank_recon_v2 等)当前 check_file_size 没监控·开 fail 模式前需先扩 glob。
 - **当前打法**:**3 窗口并行 loop**(ADR-011 + `docs/refactor/PARALLEL_LOOP_DISPATCH.md`)· A 后端 / B 前端 / C 文档测试 · 按文件 ownership 切不撞车。
 - **找下一个 task**:`REFACTOR_MASTER_PLAN.md` 顶部「当前进度看板」。

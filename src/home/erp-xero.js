@@ -10,63 +10,10 @@
 // 推按钮:历史抽屉 saveBar 内 · 跟 ERP 按钮并排
 // ============================================================
 /* global escapeHtml, _results, _drawerIdx */
+import { S, _esc, _toast, _isOwner, _loadStatus } from './erp-xero-base.js'; // REFACTOR-WB-modularize · 共享核心
+import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './erp-xero-push.js'; // REFACTOR-WB-modularize · 推按钮/全局方式
 (function () {
     'use strict';
-
-    let _status = null;
-    let _statusLoaded = false;
-    let _bound = false;
-
-    function _esc(s) {
-        return typeof escapeHtml === 'function'
-            ? escapeHtml(s == null ? '' : String(s))
-            : String(s == null ? '' : s);
-    }
-    function _toast(msg, kind) {
-        try {
-            if (typeof showToast === 'function') showToast(msg, kind || 'info');
-        } catch (e) {}
-    }
-
-    function _isOwner() {
-        const u = typeof _userInfo !== 'undefined' ? _userInfo : null;
-        return !!(u && (u.role === 'owner' || u.is_super_admin));
-    }
-
-    function _getCurrentHistory() {
-        try {
-            const r = (typeof _results !== 'undefined' ? _results : [])[
-                typeof _drawerIdx !== 'undefined' ? _drawerIdx : -1
-            ];
-            return r || null;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function _isHistoryExceptional(h) {
-        if (!h) return false;
-        const st = String(h.status || '').toLowerCase();
-        return st === 'exception' || st === 'exception_pending' || st === 'rejected';
-    }
-
-    async function _loadStatus(force) {
-        if (_statusLoaded && !force) return _status;
-        const tk = localStorage.getItem('mrpilot_token');
-        if (!tk) return null;
-        try {
-            const r = await fetch('/api/erp/xero/status', {
-                headers: { Authorization: 'Bearer ' + tk },
-            });
-            if (!r.ok) throw new Error('http_' + r.status);
-            _status = await r.json();
-            _statusLoaded = true;
-        } catch (e) {
-            _status = { configured: false, connected: false, organisations: [] };
-            _statusLoaded = false;
-        }
-        return _status;
-    }
 
     // ─── 连接卡片渲染 ──────────────────────────────────
     // v118.34.5 (Zihao 2026-05-19 拍板) · 用户截图反馈 Xero 卡片跟
@@ -78,7 +25,7 @@
     function _renderCard() {
         const host = document.getElementById('erp-connect-cards');
         if (!host) return;
-        const s = _status;
+        const s = S.status;
 
         // Status pill — same class system as MR.ERP card.
         let pill,
@@ -378,7 +325,7 @@
             }
             _toast(on ? t('erp-auto-push-toggled-on') : t('erp-auto-push-toggled-off'), 'success');
             // 刷状态 + 重渲(更新 tooltip)
-            _statusLoaded = false;
+            S.statusLoaded = false;
             await _loadStatus(true);
             _renderCard();
         } catch (e) {
@@ -393,145 +340,11 @@
         }
     }
 
-    // ─── 历史抽屉「推到 Xero」按钮注入 ──────────────────
-    async function _injectPushBtn() {
-        const saveBar = document.getElementById('drawer-history-save');
-        if (!saveBar) return;
-        if (saveBar.querySelector('#btn-xero-push')) return;
-        // v118.27.5 · 统一推送按钮存在时 · 老 Xero 按钮不再注入
-        if (saveBar.querySelector('#pn-push-wrap')) return;
-
-        await _loadStatus(false);
-        // v118.27.5.2 · race fix · await 期间统一按钮可能已被注入 · 重新 check
-        if (saveBar.querySelector('#pn-push-wrap')) return;
-        if (saveBar.querySelector('#btn-xero-push')) return;
-        const r = _getCurrentHistory();
-        const hid = r && (r._historyId || r.history_id);
-        if (!hid) return;
-
-        let disabled = false;
-        let titleKey = 'xero-push-tip';
-        if (!_status || !_status.configured) {
-            disabled = true;
-            titleKey = 'xero-err-not_configured';
-        } else if (!_status.connected) {
-            disabled = true;
-            titleKey = 'xero-push-disabled-no-conn';
-        } else if (_isHistoryExceptional(r)) {
-            disabled = true;
-            titleKey = 'xero-push-disabled-exc';
-        }
-
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.id = 'btn-xero-push';
-        btn.className = 'btn btn-ghost' + (disabled ? ' disabled' : '');
-        btn.disabled = disabled;
-        btn.title = t(titleKey) || '';
-        btn.innerHTML =
-            '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-            '<circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/></svg>' +
-            '<span style="margin-left:4px;">' +
-            _esc(t('xero-push-btn')) +
-            '</span>';
-        btn.addEventListener('click', _onPush);
-
-        const pushErpBtn = document.getElementById('btn-push-erp');
-        if (pushErpBtn && pushErpBtn.parentNode) {
-            pushErpBtn.parentNode.insertBefore(btn, pushErpBtn.nextSibling);
-        } else {
-            saveBar.insertBefore(btn, saveBar.firstChild);
-        }
-    }
-
-    async function _onPush() {
-        const r = _getCurrentHistory();
-        const hid = r && (r._historyId || r.history_id);
-        if (!hid) return;
-        const btn = document.getElementById('btn-xero-push');
-        if (btn) {
-            btn.disabled = true;
-            btn.classList.add('loading');
-        }
-        const tk = localStorage.getItem('mrpilot_token');
-        try {
-            const resp = await fetch('/api/erp/xero/push/' + encodeURIComponent(hid), {
-                method: 'POST',
-                headers: { Authorization: 'Bearer ' + tk },
-            });
-            if (!resp.ok) {
-                let detail = 'unknown';
-                try {
-                    detail = (await resp.json()).detail || 'unknown';
-                } catch (e) {}
-                const errKey = String(detail)
-                    .replace(/^xero\./, '')
-                    .toLowerCase();
-                const friendly = t('xero-' + errKey);
-                const showText = friendly && friendly !== 'xero-' + errKey ? friendly : detail;
-                _toast(t('xero-push-fail').replace('{err}', showText), 'error');
-                return;
-            }
-            _toast(t('xero-push-ok'), 'success');
-        } catch (e) {
-            _toast(t('xero-push-fail').replace('{err}', e.message || 'network'), 'error');
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.classList.remove('loading');
-            }
-        }
-    }
-
     // ─── 进入「连接 & 推送日志」sub-tab 时拉数据 ─────────
     async function _onEnterConnectSubtab() {
         await _loadStatus(true);
         _renderCard();
         _loadGlobalPushMode();
-    }
-
-    // P1b · 全局「ERP 自动处理方式」· 账户级 · 对所有端点统一生效。
-    async function _loadGlobalPushMode() {
-        const sel = document.getElementById('erp-global-push-mode');
-        if (!sel) return;
-        const tk = localStorage.getItem('mrpilot_token');
-        if (!tk) return;
-        try {
-            const r = await fetch('/api/settings/erp-push-mode', {
-                headers: { Authorization: 'Bearer ' + tk },
-            });
-            if (r.ok) {
-                const d = await r.json();
-                if (d.mode) {
-                    sel.value = d.mode;
-                    sel.dataset.prev = d.mode;
-                }
-            }
-        } catch (e) {
-            /* 静默 · 保留默认 smart */
-        }
-    }
-
-    async function _onChangeGlobalPushMode(sel) {
-        const mode = sel.value;
-        const tk = localStorage.getItem('mrpilot_token');
-        try {
-            const r = await fetch('/api/settings/erp-push-mode', {
-                method: 'PUT',
-                headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode }),
-            });
-            if (r.ok) {
-                sel.dataset.prev = mode;
-                _toast(t('pref-erp-mode-saved'), 'success');
-            } else {
-                sel.value = sel.dataset.prev || 'smart';
-                _toast(t('pref-save-failed'), 'error');
-            }
-        } catch (e) {
-            sel.value = sel.dataset.prev || 'smart';
-            _toast(t('pref-save-failed'), 'error');
-        }
     }
 
     // ─── OAuth 回调 redirect 后的提示(URL hash 含 ?xero=ok|err)
@@ -553,8 +366,8 @@
     }
 
     function _bind() {
-        if (_bound) return;
-        _bound = true;
+        if (S.bound) return;
+        S.bound = true;
 
         document.addEventListener('click', function (ev) {
             // 进入 ERP 对接 → connect sub-tab
@@ -629,7 +442,7 @@
     }
 
     function _rerenderAll() {
-        if (_status) _renderCard();
+        if (S.status) _renderCard();
         const btn = document.getElementById('btn-xero-push');
         if (btn) {
             const span = btn.querySelector('span');

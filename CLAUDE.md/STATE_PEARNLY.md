@@ -6,13 +6,13 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡(2026-06-02 · **✅ 前端 C9 五个最大文件 store 中心化拆分 · 全 push 上线 + prod 实测**)
+## 🎯 状态卡(2026-06-03 · **✅ 前端模块化收官 · 所有源文件(后端+前端)≤500 达成 · check_file_size FAIL 0**)
 
-- **本窗口连收 5 个前端 C9 + simplify ✅**:bank-recon-v2 1592→**405** / bank-recon(M10) 1252→**181** / exceptions 1250→**176** / gl-vat-recon 896→**66** / clients 878→**329**。各 +4~6 子模块(store/helpers/...)。commit `b944e03/1d08fbd/e1a9f7f`(批1)+ `1a800de/4924909`(批2)· prod `/api/version` 11850064→**11850069** · 3 批 prod spec 全绿。
-- **C9 范式([[c9-store-centralization-bankrecon]])**:stateful IIFE 私有 `let` 状态 → 共享 store 对象(**从不重赋值的对象直接 `export const`** · 可重赋值原始值包对象 · **只单簇用的随簇移为模块私有**免 store)。子模块间**真 ESM import/export**(调用点 verbatim · cyclic import 全 runtime 调用 + 提升函数 → 安全)。生成器**按行 verbatim 切片 + de-indent + 词边界状态替换** · **覆盖率**(每 CODE 行恰好归一处·零丢失无重叠)+ **逐行 CODE 等价**双校验。CRLF/LF 匹配源文件(brv2/bank-recon CRLF · exceptions/glv/clients LF)。
-- **真浏览器验**:本地反代 harness(拦本地 `main.js` · 其余透传 prod)+ e2e_2 · **loadTask 真数据**(brv2 U盘 11.68 配套对 · 169 行 · matched=25 · 渲染逐字段 == 后端 JSON)+ 各页 window 桥 `function` + 零 console error。fixture:`D:银行对账需求`(11.68 配套对出真实行 · 无关对出 0 行)。
-- **simplify 收口**:4 agent 审定拆分**干净**(无效率回归 · cyclic import 全 runtime 安全 · bundle +1.4KB · 无死 import/export · altitude 对路)。3 个跨切面 follow-up([[c9-split-followups]]:建 `recon-utils.js` 统一微工具 / exceptions 命名标准化 / 跨 feature `window._clientsCache` 桥)**故意未在收尾改**(会动已 push 钱路 + 破 verbatim) · 留专窗口。
-- **最后 commit**:`4924909`。**剩 11 个 `src/home/*.js` >500**:erp-mappings 739 / email-ingest 726(C9)· erp-exceptions 742 / folder-watcher 668 / erp-xero 663 / core-boot 565 / archive-settings 530 / upload-camera 506(非 C9 · verbatim 提取)· ocr-recognize 550(OCR 路径 · 改前报方案)· excel-formula-recon 877 / test-center 706(skin-only · e2e_2 无法 E2E)。下窗口照 C9 范式续拆。
+- **本窗口连收 11 个 `src/home/*.js`(11→0 FAIL · 全 push 上线 + prod 真浏览器验)**:archive-settings 530→434 / upload-camera 506→401 / folder-watcher 668→462 / core-boot 565→469 / erp-mappings 739→316 / email-ingest 726→452 / ocr-recognize 550→460 / erp-xero 663→475 / erp-exceptions 742→411 / excel-formula-recon 877→298 / test-center 706→404。commit `215bcb9..372381f` · prod `/api/version` 11850069→**11850080** · prod E2E:21 个 window 桥全 `function` + 零 console error。
+- **三类范式([[c9-store-centralization-bankrecon]])**:① module-scope 抽内聚簇(纯工具走 ESM import·不污染 window) ② stateful IIFE → **store 中心化**(`S={}` · `_x→S.x` 词边界 subst) ③ 去 IIFE 变 ESM module(export 共享物给子模块)。verbatim:字节切片+dedent+subst · 逐行/字符多重集等价校验全 ==。顺手删 4 处死代码。
+- **法律页**:`/terms` `/privacy` 此前是 prod 孤儿(未进 git)· 本窗口捞回 `static/{terms,privacy}.html` + 共享 `static/legal.css` · 重做标准界面(正文 verbatim · 邮箱还原 hello@pearnly.com)· prod 真浏览器验绿。
+- **着陆页换新(进行中·另窗口在设计)**:新设计 = 纯登录一屏(桌面 `pearnly_landing_layered_*` · 营销内容以后加屏)· 接入脚手架 `scripts/sync_landing.py` 就位(只读桌面·只写仓库·--dry-run 验过)· **旧 login.html(豁免 5000)待新设计定稿 → 原子 swap 替换**(删旧+上新同 commit·零空窗·先本地反代验登录再 push)。
+- **最后 commit `9523012`**。下一步候选:① login 换新(新设计好→跑 sync 脚本+本地反代验+原子 swap) ② **代码目录重组**(123 root .py → app/{routes,services,core}·铁律#3·前置「全 <500」刚满足) ③ 闲置笔记本 staging(Wave3)。
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->
 <!-- 新窗口:读上面状态卡 + 跑 scripts/refactor_progress.py 就能开工 -->

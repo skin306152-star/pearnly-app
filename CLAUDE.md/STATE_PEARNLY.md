@@ -16,7 +16,8 @@
 - **路由拆范式**:子模块各建 `APIRouter()` 无 prefix → 主 `include_router` → **路由表 24 条 sorted diff 拆前后逐字一致**(拆路由必验此)。⚠️ **AST lineno 指 def 不含装饰器**·块首 handler 的 `@router` 在区间外会丢→没注册(已被 6→4 路由数抓到·起点取 `min(decorator_list.lineno)`)。
 - **契约**:`recon_jobs/handlers.py` 运行时 `from recon_routes import ...` 拉 bank/gl 函数 + handler·全 re-export(否则 worker import 崩 + monkeypatch 失效)·静态审计测试改读子模块并集·monkeypatch 命名空间改指实现模块([[wa-ocr-core-split-entangled]])。F811 抓 hashlib/asyncio 嵌套 import 撞模块头。
 - **⚠️ CRLF 坑**:footer 拼接时块尾已自带回车、再补换行=双回车(乱码)·按换行符 split 切行后须收尾把双回车折叠回单换行(replace 双 CR→单 CR)。**black --check 经管道 tail 会吞掉退出码误判通过**·pre-push 机械闸兜住·验 gate 必看退出码不只看 stdout。
-- **最后 commit**:`2a9d449`。**下个 task = `vat_excel_export` 1960(纯导出·无计费·低风险)→ `bank_recon_excel` 1397 / `mrerp_xlsx_generator` 1336 → ERP 周边(customer/product_sync)→ 报表**。剩 16 个 .py >500。
+- **`vat_excel_export` 1960→692 进行中**(5 刀 verbatim 上线 `1be4296..fc6c963`):`vat_excel_i18n`(324·_I18N)/`vat_recon_core`(330·配对/差异/归一化 leaf)/`vat_ocr_extract`(320·单张 OCR)/`vat_ocr_batch`(248·批量 OCR)/`vat_report_merge`(125·报告拼接)。⚠️**剩 `build_excel` 624 单函数**=facade 还 692>500·**它是唯一需「内部分解成 per-sheet 子函数」(真重构非 verbatim)**·输出给税局 Excel·留专注新窗口做(别在长上下文尾硬啃)。命名空间坑:merge 的 parse_vat_report monkeypatch 改指 vat_report_merge;field_comparator 归一化 helper 保 re-export(safety-net 测试)。
+- **最后 commit**:`fc6c963`。**下个 task = `vat_excel_export` 收尾(build_excel 分解 → facade <500)→ `bank_recon_excel` 1397 / `mrerp_xlsx_generator` 1336 → ERP 周边 → 报表**。剩 ~16 个 .py >500。
 
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->

@@ -5,6 +5,7 @@ Captured before the high-sensitivity reconcile/scoring module split (铁律 #26)
 the synthetic fixture exercises L1 exact, L2 ±tolerance, and stmt-only / gl-only
 rows. Any byte change in the matched rows or summary fields fails this test.
 """
+
 import json
 import os
 import datetime

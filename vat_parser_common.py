@@ -4,6 +4,8 @@
 import re
 from typing import List, Dict, Any, Optional
 
+from field_comparator import normalize_tax_id, normalize_branch, parse_date
+
 PARSER_VERSION = "1.1.0"
 
 # ── 列名关键词(中英泰混合) ────────────────────────────
@@ -86,3 +88,59 @@ def _filter_garbage_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             continue
         out.append(r)
     return out
+
+
+def _map_columns(headers) -> Dict[str, int]:
+    col_map: Dict[str, int] = {}
+    for i, h in enumerate(headers):
+        h = (str(h) or "").strip()
+        if not h:
+            continue
+        if _hit(h, _DATE_H) and "date" not in col_map:
+            col_map["date"] = i
+        # v118.32.5 · 参考单据号优先检测（关键词更specific，避免被 _NO_H 抢走）
+        elif _hit(h, _REF_H) and "ref_no" not in col_map:
+            col_map["ref_no"] = i
+        elif _hit(h, _NO_H) and "invoice_no" not in col_map:
+            col_map["invoice_no"] = i
+        elif _hit(h, _NAME_H) and "buyer_name" not in col_map:
+            col_map["buyer_name"] = i
+        elif _hit(h, _TAX_H) and "buyer_tax_id" not in col_map:
+            col_map["buyer_tax_id"] = i
+        elif _hit(h, _BRANCH_H) and "buyer_branch" not in col_map:
+            col_map["buyer_branch"] = i
+        elif _hit(h, _NET_H) and "amount_pre_vat" not in col_map:
+            col_map["amount_pre_vat"] = i
+        elif _hit(h, _VAT_H) and "vat_amount" not in col_map:
+            col_map["vat_amount"] = i
+        elif _hit(h, _TOTAL_H) and "total_amount" not in col_map:
+            col_map["total_amount"] = i
+    return col_map
+
+
+def _build_row(row_no: int, cells: list, col_map: Dict[str, int]) -> Dict[str, Any]:
+    parsed: Dict[str, Any] = {"row_no": row_no}
+    for field, ci in col_map.items():
+        raw = cells[ci] if ci < len(cells) else None
+        val = str(raw).strip() if raw is not None else ""
+        if field == "date":
+            d = parse_date(val)
+            parsed["report_date"] = d.isoformat() if d else val
+        elif field == "invoice_no":
+            parsed["report_invoice_no"] = val
+        elif field == "ref_no":
+            parsed["report_ref_no"] = val  # v118.32.5 · GL对账匹配键
+        elif field == "buyer_name":
+            parsed["report_buyer_name"] = val
+        elif field == "buyer_tax_id":
+            parsed["report_buyer_tax_id"] = normalize_tax_id(val)
+        elif field == "buyer_branch":
+            parsed["report_buyer_branch"] = normalize_branch(val)
+        elif field == "amount_pre_vat":
+            parsed["report_amount_pre_vat"] = _to_float(val)
+        elif field == "vat_amount":
+            parsed["report_vat_amount"] = _to_float(val)
+        elif field == "total_amount":
+            parsed["report_amount"] = _to_float(val)
+    parsed["is_individual"] = not bool(parsed.get("report_buyer_tax_id"))
+    return parsed

@@ -26,8 +26,7 @@ from vat_parser_gemini import (
 )
 
 # re-export · 行为契约(tests/unit/test_vat_report_parser_contract.py 直接调 vp.<name>)
-from vat_parser_common import _hit  # noqa: F401
-from vat_parser_excel import _map_columns, _build_row  # noqa: F401
+from vat_parser_common import _hit, _map_columns, _build_row  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

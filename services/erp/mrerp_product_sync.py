@@ -21,8 +21,6 @@ from services.erp._master_data_cache import TTLCache
 
 from services.erp.mrerp_product_base import (  # noqa: F401 · re-export(__all__ + 外部 import 契约)
     PRODUCT_LEVENSHTEIN_THRESHOLD_DEFAULT,
-    PRODUCT_NAME_MAX,
-    DEFAULT_PRODUCT_CODE_PREFIX,
     ItemInfo,
     ListingProduct,
     ProductSyncResult,

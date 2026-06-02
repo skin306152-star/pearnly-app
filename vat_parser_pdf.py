@@ -8,8 +8,7 @@ from typing import List, Dict, Any, Optional
 
 from field_comparator import normalize_tax_id, normalize_branch, parse_date
 
-from vat_parser_common import _to_float, _SKIP_H, PARSER_VERSION
-from vat_parser_excel import _map_columns, _build_row
+from vat_parser_common import _to_float, _SKIP_H, PARSER_VERSION, _map_columns, _build_row
 
 logger = logging.getLogger(__name__)
 

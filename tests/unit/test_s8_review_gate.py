@@ -13,6 +13,7 @@ from unittest.mock import patch
 import db
 import recon_routes as RR
 import services.recon_jobs.handlers as H
+import services.recon_jobs.bank_handler as BH
 from bank_recon_v2 import StatementRow
 
 
@@ -48,7 +49,7 @@ def _read_inputs_fake(stmt_name="scan.pdf"):
 class S8ReviewGateTests(unittest.TestCase):
     def test_low_conf_pdf_triggers_needs_review(self):
         with (
-            patch.object(H, "_read_inputs", side_effect=_read_inputs_fake("scan.pdf")),
+            patch.object(BH, "_read_inputs", side_effect=_read_inputs_fake("scan.pdf")),
             patch.object(RR, "parse_bank_statement_pdf", return_value=_low_conf_pdf_result()),
             patch.object(RR, "parse_gl_v2", return_value={"ok": True, "rows": []}),
         ):
@@ -67,7 +68,7 @@ class S8ReviewGateTests(unittest.TestCase):
     def test_excel_stmt_does_not_trigger_review_gate(self):
         # Excel 账单即使低信心也不归 S8 核对(走 S1–S7 列映射)→ 闸不触发 → 不返回哨兵
         with (
-            patch.object(H, "_read_inputs", side_effect=_read_inputs_fake("book.xlsx")),
+            patch.object(BH, "_read_inputs", side_effect=_read_inputs_fake("book.xlsx")),
             patch.object(RR, "parse_bank_statement_pdf", return_value=_low_conf_pdf_result()),
             patch.object(RR, "parse_gl_v2", return_value={"ok": True, "rows": []}),
             patch.object(RR, "merge_statements", return_value=([], 0.0, 0.0, "generic")),
@@ -96,7 +97,7 @@ class S8ReviewGateTests(unittest.TestCase):
             }
         ]
         with (
-            patch.object(H, "_read_inputs", side_effect=_read_inputs_fake("scan.pdf")),
+            patch.object(BH, "_read_inputs", side_effect=_read_inputs_fake("scan.pdf")),
             patch.object(RR, "parse_gl_v2", return_value={"ok": True, "rows": []}),
             patch.object(RR, "merge_statements", return_value=([], 0.0, 0.0, "generic")),
             patch.object(RR, "merge_gl_files", return_value=([], [], 0.0, 0.0)),

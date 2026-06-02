@@ -23,6 +23,13 @@ from vat_ai_analyzer import analyze_diff
 # P1.2-M2 · 发票侧字段级用户校正(铁律 #21 独立 service)
 from services.recon.field_override import record_field_override, ALLOWED_FIELDS as _OVERRIDE_FIELDS
 
+# 跨组共享 helper · moved to recon_routes_shared.py
+from recon_routes_shared import (  # noqa: F401  re-export + facade-internal
+    _user_key,
+    _pdf_billing_units,
+    _ROWS_PER_PAGE_BILLING,
+)
+
 # v118.32.5 · GL vs 销项税报告 对账
 from gl_vat_reconciler import (
     parse_gl,
@@ -153,9 +160,6 @@ async def get_progress(pid: str, request: Request):
         "error": p.get("error", ""),
     }
 
-
-def _user_key(user):
-    return (user.get("gemini_api_key") or user.get("custom_gemini_api_key") or "").strip() or None
 
 
 def _missing_fields(row: Dict, is_report: bool) -> List[str]:
@@ -1268,18 +1272,6 @@ _BRV2_WARN = {
 }
 
 
-_ROWS_PER_PAGE_BILLING = 40  # v0.58 · 居中计费:一页约 40 笔 · 防密集账单按页低估
-
-
-def _pdf_billing_units(page_count: int, row_count: int) -> int:
-    """v118.35.0.58 · 银行对账 PDF/图片计费『页数』· 居中口径 max(实际页数, ⌈行数/N⌉)。
-    对齐 ฿1.5/页规则 · 修复此前误按交易行数计费(超收 10-34 倍)的 bug。
-    既不让多页大账单超收 · 也不让一页塞很多笔的密集账单被低估 · 图片=1 页。"""
-    import math as _m
-
-    pages = max(1, int(page_count or 0))
-    rows = max(0, int(row_count or 0))
-    return max(pages, _m.ceil(rows / _ROWS_PER_PAGE_BILLING))
 
 
 def _brv2_warn(key: str, lang: str = "th", **fmt) -> str:

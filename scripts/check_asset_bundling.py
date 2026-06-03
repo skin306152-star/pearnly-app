@@ -94,10 +94,10 @@ def main():
     print("=" * 70)
     if fails:
         for f in fails:
-            print(f"  🔴 {f}")
-        print(f"\n结果:🔴 FAIL · {len(fails)} 处违规")
+            print(f"  [X] {f}")
+        print(f"\n结果: FAIL - {len(fails)} 处违规")
         return 1
-    print("结果:✅ PASS · 源页只引 bundle · 资产全在打包清单")
+    print("结果: PASS - 源页只引 bundle, 资产全在打包清单")
     return 0
 
 

@@ -15,6 +15,10 @@
                 success: 'success.wav',
                 bell: 'bell.wav',
                 pop: 'pop.wav',
+                watering: 'watering.mp3',
+                pour: 'pour.mp3',
+                meow: 'meow.mp3',
+                pearnly: 'pearnly.m4a',
             };
         }
 
@@ -50,6 +54,11 @@
             if (!window.AudioContext && !window.webkitAudioContext) return;
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             const ctx = new AudioContext();
+            // meow.wav 缺失时的合成兜底:升降调 + 带通共振 ≈ 卡通猫叫(放真 meow.wav 即用文件)
+            if (name === 'meow') {
+                this.meow(ctx);
+                return;
+            }
             const gain = ctx.createGain();
             const osc = ctx.createOscillator();
             const notes = {
@@ -70,6 +79,29 @@
             osc.start();
             osc.stop(ctx.currentTime + dur);
         }
+
+        meow(ctx) {
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const filter = ctx.createBiquadFilter();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            // 音高包络:"喵"先升后降
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.linearRampToValueAtTime(940, now + 0.12);
+            osc.frequency.linearRampToValueAtTime(480, now + 0.5);
+            filter.type = 'bandpass';
+            filter.frequency.value = 1100;
+            filter.Q.value = 6;
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(this.volume * 0.6, now + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.6);
+        }
     }
 
     class MascotInteractionLayer {
@@ -81,9 +113,21 @@
             // 背景图是整图 · 猫各部位用透明热区叠在对应位置(点击=音效+火花+浮字)
             this.hotspots = [
                 {
+                    id: 'logo',
+                    label: 'Pearnly',
+                    sound: 'meow',
+                    marks: ['heart', 'star', 'heart'],
+                },
+                {
+                    id: 'welcome',
+                    label: 'Pearnly',
+                    sound: 'pearnly',
+                    marks: ['star', 'heart'],
+                },
+                {
                     id: 'face',
                     label: 'Pearl the cat',
-                    sound: 'pop',
+                    sound: 'meow',
                     marks: ['heart', 'heart'],
                     sayKey: 'sayFace',
                 },
@@ -110,17 +154,9 @@
                     effect: 'glow',
                 },
                 {
-                    id: 'mugl',
-                    label: 'Coffee',
-                    sound: 'drink',
-                    marks: ['drop', 'star'],
-                    sayKey: 'sayMug',
-                    effect: 'steam',
-                },
-                {
                     id: 'mugr',
                     label: 'Coffee',
-                    sound: 'drink',
+                    sound: 'pour',
                     marks: ['drop', 'star'],
                     sayKey: 'sayMug',
                     effect: 'steam',
@@ -135,8 +171,8 @@
                 {
                     id: 'plant',
                     label: 'Plant',
-                    sound: 'pop',
-                    marks: ['star'],
+                    sound: 'watering',
+                    marks: ['drop', 'star'],
                     sayKey: 'sayPlant',
                     effect: 'water',
                 },
@@ -196,13 +232,20 @@
             if (!this.reduceMotion) this.burst(rect, [hotspot.marks[0]]);
         }
 
+        // 舞台用 transform 缩放 · getBoundingClientRect 是缩放后屏幕 px ·
+        // 特效层在缩放容器内(本地 px)· 故 delta 需除以缩放比 · 否则放大缩小时位置漂移
+        stageScale(base) {
+            return base.width / this.panel.offsetWidth || 1;
+        }
+
         say(rect, text) {
             const base = this.panel.getBoundingClientRect();
+            const scale = this.stageScale(base);
             const label = document.createElement('span');
             label.className = 'mascot-say';
             label.textContent = text;
-            label.style.left = `${rect.left - base.left + rect.width / 2}px`;
-            label.style.top = `${rect.top - base.top - 6}px`;
+            label.style.left = `${(rect.left - base.left + rect.width / 2) / scale}px`;
+            label.style.top = `${(rect.top - base.top) / scale - 6}px`;
             this.effectLayer.appendChild(label);
             window.setTimeout(() => label.remove(), 1100);
         }
@@ -210,8 +253,9 @@
         // 主题特效: water=花盆浇水落下 · steam=水杯热气上升 · glow=电脑屏幕亮起
         themedEffect(rect, type) {
             const base = this.panel.getBoundingClientRect();
-            const cx = rect.left - base.left + rect.width / 2;
-            const cy = rect.top - base.top + rect.height / 2;
+            const scale = this.stageScale(base);
+            const cx = (rect.left - base.left + rect.width / 2) / scale;
+            const cy = (rect.top - base.top + rect.height / 2) / scale;
             if (type === 'glow') {
                 const el = document.createElement('span');
                 el.className = 'mascot-glow-fx';
@@ -255,8 +299,9 @@
 
         burst(rect, marks) {
             const base = this.panel.getBoundingClientRect();
-            const cx = rect.left - base.left + rect.width / 2;
-            const cy = rect.top - base.top + rect.height / 2;
+            const scale = this.stageScale(base);
+            const cx = (rect.left - base.left + rect.width / 2) / scale;
+            const cy = (rect.top - base.top + rect.height / 2) / scale;
             marks.forEach((kind, index) => {
                 const mark = document.createElement('span');
                 mark.className = `mascot-effect ${kind}`;

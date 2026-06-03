@@ -337,65 +337,74 @@ body {
   border-radius: 22px;
 }
 
+/* 左上角悬浮 logo 标牌热区 · 点击=猫叫(贴合玻璃徽章范围) */
+.logo-hotspot {
+  left: 26px;
+  top: 22px;
+  width: 352px;
+  height: 134px;
+}
+
+/* 问候语区(您好!…)热区 · 点击=Pearnly 英文语音 */
+.welcome-hotspot {
+  left: 56px;
+  top: 198px;
+  width: 260px;
+  height: 96px;
+}
+
 .face-hotspot {
-  left: 288px;
-  top: 298px;
-  width: 140px;
-  height: 122px;
+  left: 275px;
+  top: 398px;
+  width: 165px;
+  height: 135px;
 }
 
 .paw-hotspot {
-  left: 414px;
-  top: 212px;
-  width: 82px;
-  height: 98px;
+  left: 438px;
+  top: 352px;
+  width: 90px;
+  height: 100px;
 }
 
 .bell-hotspot {
-  left: 300px;
-  top: 430px;
-  width: 62px;
-  height: 60px;
+  left: 320px;
+  top: 500px;
+  width: 78px;
+  height: 78px;
 }
 
 .laptop-hotspot {
-  left: 356px;
-  top: 540px;
-  width: 182px;
-  height: 116px;
-}
-
-.mugl-hotspot {
-  left: 28px;
-  top: 524px;
-  width: 88px;
-  height: 86px;
+  left: 335px;
+  top: 598px;
+  width: 238px;
+  height: 142px;
 }
 
 .mugr-hotspot {
-  left: 596px;
-  top: 524px;
-  width: 98px;
-  height: 86px;
+  left: 604px;
+  top: 646px;
+  width: 116px;
+  height: 138px;
 }
 
 .bubble-hotspot {
-  left: 385px;
-  top: 258px;
-  width: 222px;
-  height: 96px;
+  left: 430px;
+  top: 248px;
+  width: 214px;
+  height: 92px;
 }
 
 .plant-hotspot {
   left: 16px;
-  top: 470px;
-  width: 82px;
-  height: 84px;
+  top: 584px;
+  width: 134px;
+  height: 156px;
 }
 
 .checklist-hotspot {
-  left: 574px;
-  top: 424px;
-  width: 162px;
-  height: 144px;
+  left: 564px;
+  top: 414px;
+  width: 178px;
+  height: 162px;
 }

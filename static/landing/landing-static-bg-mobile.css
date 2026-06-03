@@ -99,9 +99,12 @@
     right: 22px;
     width: min(360px, calc(100% - 44px));
     height: auto;
+    /* 覆盖桌面 min-height:914(覆盖背景第二层用)· 否则手机端卡片被撑到 914px 溢出舞台 */
+    min-height: 0;
     max-height: calc(var(--stage-h) - 200px);
     margin: 0;
-    padding: 72px 24px 22px;
+    /* 顶部留够空间给堆叠的语言切换(top18)+ 登录/注册 tab(top58·底~98)· 标题不再压到 tab 上 */
+    padding: 108px 24px 22px;
     overflow-y: auto;
     border-radius: 24px;
     border: 1px solid rgba(255, 255, 255, 0.85);

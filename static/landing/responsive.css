@@ -1,0 +1,345 @@
+.auth-card.signup-mode {
+  padding-top: 72px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.auth-card.signup-mode .auth-heading {
+  margin-bottom: 18px;
+}
+
+.auth-card.signup-mode .auth-heading h2 {
+  font-size: 33px;
+}
+
+.auth-card.signup-mode .auth-heading p {
+  font-size: 15px;
+}
+
+.auth-card.signup-mode .form-stack {
+  gap: 11px;
+}
+
+.auth-card.signup-mode .form-row label {
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.auth-card.signup-mode .field input,
+.auth-card.signup-mode .send-code-btn {
+  height: 46px;
+}
+
+.auth-card.signup-mode .primary-btn {
+  height: 50px;
+}
+
+.auth-card.signup-mode .register-options {
+  gap: 7px;
+}
+
+.auth-card.signup-mode .checkline {
+  font-size: 13px;
+}
+
+.auth-card.signup-mode .auth-message {
+  min-height: 16px;
+  margin-top: 7px;
+}
+
+.auth-card.signup-mode .support-card {
+  margin-top: 16px;
+  padding: 16px 18px 15px;
+}
+
+.auth-card.signup-mode .support-head {
+  grid-template-columns: 38px 1fr;
+  gap: 11px;
+  margin-bottom: 12px;
+}
+
+.auth-card.signup-mode .support-head img {
+  width: 38px;
+  height: 38px;
+}
+
+.auth-card.signup-mode .support-head strong {
+  font-size: 14px;
+}
+
+.auth-card.signup-mode .support-head span {
+  font-size: 12px;
+}
+
+.auth-card.signup-mode .contact-dot {
+  width: 36px;
+  height: 36px;
+}
+
+.auth-card.signup-mode .contact-item {
+  gap: 5px;
+  font-size: 11px;
+}
+
+.language-switcher {
+  position: absolute;
+  top: 24px;
+  left: 65px;
+  z-index: 3;
+  display: inline-grid;
+  grid-template-columns: repeat(4, 38px);
+  gap: 3px;
+  height: 36px;
+  padding: 3px;
+  border: 1px solid rgba(124, 87, 246, 0.14);
+  border-radius: 999px;
+  background: rgba(246, 244, 255, 0.86);
+}
+
+.language-switcher button {
+  border: 0;
+  border-radius: 999px;
+  color: #70688a;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.language-switcher button.active {
+  color: #fff;
+  background: linear-gradient(135deg, #7655f6, #ef55bd);
+}
+
+@media (max-width: 760px) {
+  #pearnly-auth-root {
+    padding: 18px 16px 86px;
+  }
+
+  .auth-shell {
+    width: calc(100vw - 32px);
+    min-width: 0;
+  }
+
+  .brand-panel {
+    right: 52%;
+  }
+
+  .auth-card {
+    right: 18px;
+    width: calc(52% - 36px);
+    padding-right: 42px;
+    padding-left: 42px;
+  }
+
+  .brand-logo {
+    left: 36px;
+  }
+
+  .welcome-copy {
+    left: 44px;
+  }
+
+  .quote-card {
+    left: 52px;
+    width: min(560px, calc(100% - 78px));
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  #pearnly-auth-root {
+    padding: 14px 12px 36px;
+    display: block;
+    height: auto !important;
+  }
+
+  .auth-stage {
+    width: 100%;
+    min-height: 0;
+    transform: none !important;
+  }
+
+  .auth-shell {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    border-radius: 22px;
+  }
+
+  .auth-shell::after {
+    display: none;
+  }
+
+  .brand-panel {
+    position: relative;
+    inset: auto;
+    height: 700px;
+  }
+
+  .auth-card {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: calc(100% - 28px);
+    height: auto;
+    min-height: 0;
+    margin: 0 auto 16px;
+    padding: 76px 22px 24px;
+    overflow: visible;
+  }
+
+  .auth-card.signup-mode {
+    overflow: visible;
+    padding: 76px 22px 24px;
+  }
+
+  .language-switcher {
+    left: 22px;
+    grid-template-columns: repeat(4, 34px);
+  }
+
+  .auth-mode {
+    right: 22px;
+    width: 184px;
+  }
+
+  .auth-heading h2 {
+    font-size: 32px;
+  }
+
+  .support-card {
+    margin-top: 20px;
+  }
+
+  .security-footer {
+    grid-template-columns: 1fr;
+    width: min(460px, calc(100vw - 48px));
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .copyright {
+    width: calc(100vw - 48px);
+    margin: 18px auto 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .auth-card,
+  .auth-card.signup-mode {
+    padding-top: 118px;
+  }
+
+  .language-switcher {
+    top: 22px;
+    left: 22px;
+  }
+
+  .auth-mode {
+    top: 64px;
+    left: 22px;
+    right: auto;
+    width: calc(100% - 44px);
+  }
+}
+
+@media (max-width: 620px) {
+  .brand-panel {
+    height: 700px;
+  }
+
+  .brand-logo {
+    top: 22px;
+    left: 22px;
+    width: 270px;
+    height: auto;
+  }
+
+  .welcome-copy {
+    top: 145px;
+    left: 28px;
+  }
+
+  .welcome-copy h1 {
+    font-size: 28px;
+  }
+
+  .welcome-copy p {
+    font-size: 15px;
+  }
+
+  .cat-wrap {
+    left: 16px;
+    top: 260px;
+    width: calc(100% - 32px);
+    height: 305px;
+  }
+
+  .cat-art {
+    width: 100%;
+    height: 305px;
+    object-fit: contain;
+    object-position: center bottom;
+  }
+
+  .work-bubble {
+    top: 218px;
+    left: auto;
+    right: 18px;
+    width: 158px;
+    padding: 14px 16px;
+  }
+
+  .check-card {
+    top: 386px;
+    left: auto;
+    right: 12px;
+    width: 132px;
+    padding: 13px 12px;
+  }
+
+  .check-row {
+    gap: 6px;
+    margin-bottom: 7px;
+    font-size: 11px;
+  }
+
+  .tick {
+    width: 17px;
+    height: 17px;
+    font-size: 12px;
+  }
+
+  .quote-card {
+    left: 18px;
+    right: 18px;
+    bottom: 20px;
+    width: auto;
+    padding: 20px 22px;
+    border-radius: 24px;
+  }
+
+  .quote-card blockquote {
+    font-size: 16px;
+  }
+
+  .spark-a {
+    left: 46px;
+    top: 338px;
+  }
+
+  .spark-b {
+    left: auto;
+    right: 26px;
+    top: 314px;
+  }
+
+  .contact-grid {
+    gap: 6px;
+  }
+}

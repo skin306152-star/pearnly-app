@@ -44,7 +44,7 @@ function hasCreds() {
 }
 
 // 在给定 page 上走一遍真实 UI 登录(不负责存 state)
-// 着陆页登录按钮 [data-open-auth="login"] 打开弹窗 → #form-login 内填邮箱/密码 → #btn-login 提交
+// 新分层着陆页:登录表单 #form-login 默认即在页面上(登录 tab 默认 active · 无弹窗)
 async function doUiLogin(page) {
     const user = process.env.PEARNLY_E2E_USER;
     const pass = process.env.PEARNLY_E2E_PASS;
@@ -53,10 +53,8 @@ async function doUiLogin(page) {
     }
 
     await page.goto('/');
-    // 打开登录弹窗(着陆页顶栏「登录」)
-    await page.locator('[data-open-auth="login"]').first().click();
 
-    // 登录表单(login.html #form-login):邮箱 #li-username · 密码 #li-password · 提交 #btn-login
+    // 登录表单(#form-login):用户名 #li-username · 密码 #li-password · 提交 #btn-login
     const form = page.locator('#form-login');
     await form.locator('#li-username').fill(user);
     await form.locator('#li-password').fill(pass);

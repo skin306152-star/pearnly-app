@@ -1,0 +1,253 @@
+/* 猫猫主题特效(浇水 / 热气 / 屏幕亮起 + 激活态)· 从 mascot.css 拆出(铁律 ≤500)·
+   在 mascot.css 之后加载 */
+/* 主题特效: 花盆浇水 / 水杯热气 / 电脑屏幕亮起 */
+.mascot-water,
+.mascot-steam,
+.mascot-glow-fx {
+  position: absolute;
+  pointer-events: none;
+}
+
+.mascot-water {
+  z-index: 9;
+  width: 10px;
+  height: 15px;
+  margin: -7px 0 0 -5px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: linear-gradient(180deg, #7fd0f6, #2b95e0);
+  box-shadow: 0 0 4px rgba(43, 149, 224, 0.5);
+  animation: mascot-drop 820ms ease-in forwards;
+}
+
+@keyframes mascot-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(46px) scale(1.05);
+  }
+}
+
+.mascot-steam {
+  z-index: 9;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(214, 224, 248, 0.95), rgba(206, 218, 245, 0) 68%);
+  filter: blur(0.5px);
+  animation: mascot-steam-rise 1250ms ease-out forwards;
+}
+
+@keyframes mascot-steam-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(2px) scale(0.5);
+  }
+  28% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-46px) scale(1.9);
+  }
+}
+
+.mascot-glow-fx {
+  z-index: 7;
+  width: 150px;
+  height: 100px;
+  margin: -50px 0 0 -75px;
+  border-radius: 16px;
+  background: radial-gradient(ellipse, rgba(150, 200, 255, 0.85), rgba(120, 175, 255, 0) 70%);
+  animation: mascot-screen-glow 820ms ease-out forwards;
+}
+
+@keyframes mascot-screen-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+  32% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-water,
+  .mascot-steam,
+  .mascot-glow-fx {
+    display: none;
+  }
+}
+
+.cat-wrap.mascot-cup-active {
+  animation: mascot-pop 520ms ease-out;
+}
+
+.cat-wrap.mascot-laptop-active .cat-art {
+  animation: mascot-glow-image 620ms ease-out;
+}
+
+.check-card.mascot-check-active {
+  animation: mascot-bounce 620ms ease-out;
+}
+
+.check-card.mascot-check-active .tick {
+  animation: mascot-tick 520ms ease-out;
+}
+
+.check-card.mascot-check-active .check-row:nth-child(2) .tick {
+  animation-delay: 80ms;
+}
+
+.check-card.mascot-check-active .check-row:nth-child(3) .tick {
+  animation-delay: 160ms;
+}
+
+.check-card.mascot-check-active .check-row:nth-child(4) .tick {
+  animation-delay: 240ms;
+}
+
+.quote-card.mascot-quote-active {
+  animation: mascot-float 680ms ease-out;
+}
+
+.quote-card.mascot-quote-active blockquote::after {
+  animation: mascot-pulse 620ms ease-out;
+}
+
+.work-bubble.mascot-bubble-active {
+  animation: mascot-wiggle 560ms ease-out;
+}
+
+@keyframes mascot-pop {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  45% {
+    transform: scale(1.018) rotate(-0.6deg);
+  }
+}
+
+@keyframes mascot-bounce {
+  0%,
+  100% {
+    transform: rotate(5deg) translateY(0);
+  }
+  45% {
+    transform: rotate(5deg) translateY(-7px);
+  }
+}
+
+@keyframes mascot-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  42% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes mascot-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  34% {
+    transform: rotate(-2deg);
+  }
+  68% {
+    transform: rotate(1.6deg);
+  }
+}
+
+@keyframes mascot-tick {
+  0%,
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+  45% {
+    filter: brightness(1.25);
+    transform: scale(1.15);
+  }
+}
+
+@keyframes mascot-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes mascot-glow-image {
+  0%,
+  100% {
+    filter: saturate(1.03) contrast(1.01);
+  }
+  45% {
+    filter: saturate(1.08) contrast(1.02) drop-shadow(0 0 16px rgba(124, 87, 246, 0.22));
+  }
+}
+
+@keyframes mascot-sparkle {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.65);
+  }
+  28% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--dx, 0), var(--dy, -30px), 0) scale(1.12);
+  }
+}
+
+@keyframes mascot-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-effect {
+    display: none;
+  }
+
+  .cat-wrap.mascot-cup-active,
+  .cat-wrap.mascot-laptop-active .cat-art,
+  .check-card.mascot-check-active,
+  .check-card.mascot-check-active .tick,
+  .quote-card.mascot-quote-active,
+  .quote-card.mascot-quote-active blockquote::after,
+  .work-bubble.mascot-bubble-active {
+    animation: none;
+  }
+}

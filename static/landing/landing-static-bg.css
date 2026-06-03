@@ -1,0 +1,401 @@
+:root {
+  --stage-w: 1402px;
+  --stage-h: 1122px;
+}
+
+body {
+  background:
+    radial-gradient(circle at 4% 100%, rgba(80, 202, 229, 0.45), transparent 30%),
+    radial-gradient(circle at 94% 8%, rgba(255, 218, 169, 0.65), transparent 32%),
+    linear-gradient(135deg, #bcb7ff 0%, #eadbff 42%, #ffe7f1 68%, #fff2db 100%);
+}
+
+#pearnly-auth-root {
+  padding: 0;
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+.auth-stage {
+  width: var(--stage-w);
+  min-height: var(--stage-h);
+}
+
+.auth-shell {
+  width: var(--stage-w);
+  height: var(--stage-h);
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: url('./auth-bg-desktop.png') center / 100% 100% no-repeat;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.auth-shell::before,
+.auth-shell::after {
+  display: none;
+}
+
+.brand-panel {
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* 背景水印有一道难去的玻璃圆角边(panel 左上角约 stage 26,30 · r≈28)·
+   顺着那条线做一枚独立的玻璃质感悬浮 logo 标 · 让残留边变成标牌自己的边 */
+.brand-panel::before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 22px;
+  left: 26px;
+  width: 352px;
+  height: 134px;
+  z-index: 1;
+  border-radius: 26px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.02) 45%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 22px 50px rgba(91, 73, 151, 0.22),
+    0 6px 16px rgba(91, 73, 151, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 6px rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(5px) saturate(1.25);
+  -webkit-backdrop-filter: blur(5px) saturate(1.25);
+  animation: badge-float 4.5s ease-in-out infinite;
+}
+
+/* 悬浮玻璃反光 · 一道高光循环斜划过标牌(同登录按钮扫光语言)·
+   叠在最上层(玻璃底 z1 < logo z2 < 扫光 z3)· 圆角自动裁切高光 */
+.brand-panel::after {
+  content: '';
+  position: absolute;
+  top: 22px;
+  left: 26px;
+  width: 352px;
+  height: 134px;
+  z-index: 3;
+  border-radius: 26px;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 62%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: -40% 0;
+  animation:
+    badge-sheen 5.5s ease-in-out infinite,
+    badge-float 4.5s ease-in-out infinite;
+}
+
+@keyframes badge-sheen {
+  0% {
+    background-position: -40% 0;
+  }
+  22% {
+    background-position: 140% 0;
+  }
+  100% {
+    background-position: 140% 0;
+  }
+}
+
+/* 悬浮 · 整枚标牌(玻璃底 + logo + 扫光)同步缓慢上下浮动 */
+@keyframes badge-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-panel::before,
+  .brand-panel::after,
+  .brand-logo {
+    animation: none;
+  }
+}
+
+.brand-logo {
+  top: 44px;
+  left: 60px;
+  z-index: 2;
+  width: 294px;
+  height: 82px;
+  animation: badge-float 4.5s ease-in-out infinite;
+}
+
+.welcome-copy {
+  top: 205px;
+  left: 64px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.welcome-copy h1 {
+  font-size: 33px;
+  color: #3a2bb8;
+}
+
+.welcome-copy p {
+  color: #38314f;
+  font-size: 16px;
+}
+
+/* 背景图已画好的装饰(猫/火花)隐藏真元素 · 改用透明热区交互 */
+.cat-wrap,
+.spark,
+.mini-bars {
+  display: none;
+}
+
+/* 清单: 真 check-card 不透明盖住背景图里那张"空线"清单(实测 x575-735·y425-565) · 文字由 i18n 填 */
+.check-card {
+  top: 414px;
+  left: 564px;
+  z-index: 4;
+  width: 178px;
+  min-height: 162px;
+  padding: 17px 18px;
+  transform: none;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(91, 73, 151, 0.2);
+  pointer-events: none;
+}
+
+.check-row {
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+/* 桃心徽章 · 居中盖住背景图里那颗(实测中心 717/576·r11)·放大到 34 全覆盖 */
+.check-heart {
+  top: 559px;
+  left: 700px;
+  z-index: 5;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+}
+
+/* work-bubble: 自绘真气泡盖住背景图里那个画死的白气泡(painted body x436-638·y254-331·tail尖~463,351)·
+   宽度随内容自适应(切语言不挤出)·内容居中·柔色渐变(不刺白) */
+.work-bubble {
+  top: 250px;
+  left: 430px;
+  z-index: 4;
+  justify-content: center;
+  align-items: center;
+  width: max-content;
+  min-width: 212px;
+  max-width: 250px;
+  height: auto;
+  min-height: 84px;
+  padding: 12px 20px;
+  overflow: visible;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(251, 249, 255, 0.94) 0%, rgba(235, 229, 252, 0.92) 100%);
+  box-shadow:
+    0 16px 36px rgba(88, 74, 152, 0.18),
+    0 3px 10px rgba(88, 74, 152, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+/* 气泡小尾巴 · 指向左下方的猫 · 盖住背景画的尾巴 */
+.work-bubble::after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 17px;
+  bottom: -21px;
+  border-top: 23px solid rgba(236, 230, 252, 0.93);
+  border-right: 42px solid transparent;
+  filter: drop-shadow(0 5px 4px rgba(88, 74, 152, 0.07));
+}
+
+.work-bubble p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.34;
+  text-align: center;
+  color: #4a4366;
+}
+
+/* 底部安全条: 背景图里画的图标已抹掉 · 改用真紫色线性图标(图标+文字同列对齐·均匀间距) */
+.security-footer {
+  position: absolute;
+  left: 161px;
+  bottom: 58px;
+  z-index: 4;
+  width: 1080px;
+  margin: 0;
+  pointer-events: auto;
+}
+
+/* 引言: 文字填进背景图里那个空白面板(x95-650·y745-895) · 面板本身是图 · 这里只放文字 */
+.quote-card {
+  left: 96px;
+  top: 754px;
+  bottom: auto;
+  z-index: 4;
+  width: 548px;
+  padding: 18px 40px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: auto;
+}
+
+.quote-card header {
+  margin-bottom: 12px;
+}
+
+.quote-card blockquote {
+  font-size: 17px;
+}
+
+.quote-card footer {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+/* Option B · 真磨砂卡片整体盖住背景图里画的登录面板(消除控件重影) */
+.auth-card {
+  top: 44px;
+  right: 42px;
+  z-index: 4;
+  width: 616px;
+  min-height: 914px;
+  padding: 60px 76px 30px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 26px 70px rgba(72, 58, 128, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.language-switcher {
+  top: 20px;
+  left: 64px;
+}
+
+.auth-mode {
+  top: 20px;
+  right: 64px;
+}
+
+.auth-heading {
+  margin: 8px 0 22px;
+}
+
+.auth-heading h2 {
+  font-size: 30px;
+}
+
+.auth-heading p {
+  font-size: 14px;
+}
+
+.primary-btn {
+  height: 58px;
+}
+
+.support-card {
+  margin-top: 18px;
+}
+
+.copyright {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  z-index: 4;
+  width: auto;
+  margin: 0;
+}
+
+/* 猫猫交互热区 · 像素贴合背景图各部位(brand-panel=整 stage 1402×1122) */
+.mascot-hotspot {
+  border-radius: 22px;
+}
+
+.face-hotspot {
+  left: 288px;
+  top: 298px;
+  width: 140px;
+  height: 122px;
+}
+
+.paw-hotspot {
+  left: 414px;
+  top: 212px;
+  width: 82px;
+  height: 98px;
+}
+
+.bell-hotspot {
+  left: 300px;
+  top: 430px;
+  width: 62px;
+  height: 60px;
+}
+
+.laptop-hotspot {
+  left: 356px;
+  top: 540px;
+  width: 182px;
+  height: 116px;
+}
+
+.mugl-hotspot {
+  left: 28px;
+  top: 524px;
+  width: 88px;
+  height: 86px;
+}
+
+.mugr-hotspot {
+  left: 596px;
+  top: 524px;
+  width: 98px;
+  height: 86px;
+}
+
+.bubble-hotspot {
+  left: 385px;
+  top: 258px;
+  width: 222px;
+  height: 96px;
+}
+
+.plant-hotspot {
+  left: 16px;
+  top: 470px;
+  width: 82px;
+  height: 84px;
+}
+
+.checklist-hotspot {
+  left: 574px;
+  top: 424px;
+  width: 162px;
+  height: 144px;
+}

@@ -79,8 +79,8 @@ EXEMPT_CURRENT_BIG_FILES = {
     # 2026-06-02 清理:5 大巨石全部 <500(app.py 491/db.py 344/auth_signup 428/
     # home.html 397/home.css 0/home.js 已全迁 src/home 文件不存在)→ 全从豁免删除 ·
     # 改由默认 500 硬上限正常约束(只升不降棘轮另管 check_line_ratchet.py)。
-    # 只留仍 >500 的存量:
-    "login.html": 5000,  # 着陆页巨石 · 待拆(C 阶段)
+    # 2026-06-03:login.html 着陆页换新(分层设计 · 壳 26 行 · 资产入 static/landing/)·
+    # 巨石退场 → 删豁免 · 改由默认 500 正常约束。存量豁免已清空。
 }
 
 # 路径模式豁免(纯数据 / 自动生成 · 不算业务代码)

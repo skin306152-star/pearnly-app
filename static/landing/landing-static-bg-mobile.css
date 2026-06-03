@@ -1,0 +1,141 @@
+/* 移动端响应式 · 从 landing-static-bg.css 拆出(铁律 ≤500)·
+   必在 landing-static-bg.css 之后加载(覆盖桌面基础规则) */
+@media (max-width: 760px) {
+  :root {
+    --stage-w: min(100vw, 430px);
+    --stage-h: calc(var(--stage-w) * 1.7778);
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  #pearnly-auth-root {
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    height: auto !important;
+  }
+
+  .auth-stage {
+    width: var(--stage-w);
+    min-height: var(--stage-h);
+    transform: none !important;
+  }
+
+  .auth-shell {
+    width: var(--stage-w);
+    height: var(--stage-h);
+    min-height: var(--stage-h);
+    background-image: url('./auth-bg-mobile.png');
+    background-size: 100% 100%;
+  }
+
+  .brand-panel {
+    position: absolute;
+    inset: 0;
+    height: auto;
+  }
+
+  .brand-panel::before {
+    top: 18px;
+    left: 18px;
+    width: 230px;
+    height: 82px;
+    border-radius: 18px;
+  }
+
+  .brand-logo {
+    top: 24px;
+    left: 24px;
+    width: 220px;
+    height: 68px;
+  }
+
+  .welcome-copy {
+    top: 110px;
+    left: 28px;
+  }
+
+  .welcome-copy h1 {
+    font-size: 24px;
+  }
+
+  .welcome-copy p {
+    font-size: 13px;
+  }
+
+  .work-bubble,
+  .check-card {
+    display: none;
+  }
+
+  .quote-card {
+    left: 34px;
+    top: auto;
+    bottom: 208px;
+    width: calc(100% - 84px);
+    padding: 14px 16px;
+  }
+
+  .quote-card header {
+    margin-bottom: 5px;
+    font-size: 11px;
+  }
+
+  .quote-card blockquote {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .quote-card footer {
+    font-size: 10px;
+  }
+
+  .auth-card,
+  .auth-card.signup-mode {
+    position: absolute;
+    top: 172px;
+    right: 22px;
+    width: min(360px, calc(100% - 44px));
+    height: auto;
+    max-height: calc(var(--stage-h) - 200px);
+    margin: 0;
+    padding: 72px 24px 22px;
+    overflow-y: auto;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 20px 50px rgba(72, 58, 128, 0.2);
+    backdrop-filter: blur(10px);
+  }
+
+  .language-switcher {
+    top: 18px;
+    left: 22px;
+  }
+
+  .auth-mode {
+    top: 58px;
+    left: 22px;
+    right: auto;
+    width: calc(100% - 44px);
+  }
+
+  .auth-heading h2 {
+    font-size: 28px;
+  }
+
+  .field {
+    height: 50px;
+  }
+
+  .primary-btn {
+    height: 52px;
+  }
+
+  .security-footer,
+  .copyright {
+    display: none;
+  }
+}

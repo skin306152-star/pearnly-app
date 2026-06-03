@@ -1,0 +1,40 @@
+.sso-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.sso-row .outline-btn {
+  gap: 10px;
+  padding: 0 18px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.google-mark {
+  font-size: 27px;
+  font-weight: 850;
+  line-height: 1;
+  background: conic-gradient(from -45deg, #4285f4, #34a853, #fbbc05, #ea4335, #4285f4);
+  background-clip: text;
+  color: transparent;
+}
+
+.line-logo {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 23px;
+  border-radius: 7px;
+  color: #fff;
+  background: #06c755;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+}
+
+@media (max-width: 520px) {
+  .sso-row {
+    grid-template-columns: 1fr;
+  }
+}

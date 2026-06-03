@@ -1,0 +1,52 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  place-items: center;
+  background: rgba(43, 35, 83, 0.32);
+  backdrop-filter: blur(10px);
+}
+
+.modal-overlay.show {
+  display: grid;
+}
+
+.forgot-modal {
+  width: 430px;
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 26px 80px rgba(45, 34, 93, 0.26);
+}
+
+.forgot-modal h3 {
+  margin: 0 0 8px;
+  color: #3729b9;
+  font-size: 24px;
+}
+
+.forgot-modal p {
+  margin: 0 0 20px;
+  color: #766e88;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.secondary-btn {
+  height: 48px;
+  border: 1px solid rgba(75, 67, 107, 0.16);
+  border-radius: 12px;
+  background: #fff;
+  color: #4c455e;
+  cursor: pointer;
+  font-weight: 800;
+}

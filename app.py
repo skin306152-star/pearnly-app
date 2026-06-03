@@ -233,7 +233,13 @@ if (os.environ.get("PEARNLY_ENV") or "").strip().lower() == "development":
     _cors_kwargs["allow_origin_regex"] = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
 app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
-# REFACTOR-WA-B6 · request_id 全链路上下文 · CORS 之后添加 → 处于最外层 → 最先绑定
+# REFACTOR-WA-B5 · 全局限流(保守 · 豁免基建 · fail-open)· 先于 RequestContext 添加 →
+# RequestContext 处于更外层 → 429 响应也带 request_id
+from services.ratelimit.middleware import RateLimitMiddleware
+
+app.add_middleware(RateLimitMiddleware)
+
+# REFACTOR-WA-B6 · request_id 全链路上下文 · 最后添加 → 处于最外层 → 最先绑定
 from services.observability.request_context import RequestContextMiddleware
 
 app.add_middleware(RequestContextMiddleware)

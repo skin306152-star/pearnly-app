@@ -146,10 +146,10 @@ try:
 except ImportError:
     pass  # dotenv 可选 · 未装则用系统环境变量
 
-logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO"),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+# REFACTOR-WA-B6 · 结构化日志(JSON + request_id 全链路)· 替代裸 basicConfig
+from services.observability.logging_config import configure_logging
+
+configure_logging()
 logger = logging.getLogger("mr-pilot")
 
 
@@ -232,6 +232,11 @@ _cors_kwargs = {
 if (os.environ.get("PEARNLY_ENV") or "").strip().lower() == "development":
     _cors_kwargs["allow_origin_regex"] = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
 app.add_middleware(CORSMiddleware, **_cors_kwargs)
+
+# REFACTOR-WA-B6 · request_id 全链路上下文 · CORS 之后添加 → 处于最外层 → 最先绑定
+from services.observability.request_context import RequestContextMiddleware
+
+app.add_middleware(RequestContextMiddleware)
 
 
 # v118.34.13 (Zihao 2026-05-19 拍板) · catch-all exception handler so

@@ -19,8 +19,8 @@ import os
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-# 前缀豁免:基建 / 部署回调 / 版本探测 / 静态资源
-_EXEMPT_PREFIXES = (
+# 前缀豁免默认值:基建 / 部署回调 / 版本探测 / 静态资源 · 可经 RATE_LIMIT_EXEMPT_PREFIXES 覆盖
+_DEFAULT_EXEMPT_PREFIXES = (
     "/api/health",
     "/api/ready",
     "/api/v1/health",
@@ -31,37 +31,17 @@ _EXEMPT_PREFIXES = (
 )
 
 
-def _enabled() -> bool:
-    return (os.environ.get("RATE_LIMIT_ENABLED") or "true").strip().lower() != "false"
-
-
-def _limit_per_min() -> int:
-    try:
-        return int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
-    except ValueError:
-        return 600
-
-
-def _client_ip(scope: Scope) -> str:
-    headers = dict(scope.get("headers") or [])
-    xff = headers.get(b"x-forwarded-for", b"").decode("latin-1").strip()
-    if xff:
-        return xff.split(",")[0].strip()
-    client = scope.get("client")
-    return client[0] if client else "unknown"
-
-
-def _subject_key(scope: Scope) -> str:
-    headers = dict(scope.get("headers") or [])
+def _subject_key(headers: dict, scope: Scope) -> str:
+    """限流分桶 key:已登录按 token 指纹 · 否则按客户端 IP(headers 已物化 · 不重复解析)。"""
     auth = headers.get(b"authorization", b"").decode("latin-1").strip()
     if auth:
         # token 指纹分桶 · 不验签不解码 · 仅用于区分会话来源
         return "tok:" + str(hash(auth) & 0xFFFFFFFF)
-    return "ip:" + _client_ip(scope)
-
-
-def _is_exempt(path: str) -> bool:
-    return any(path.startswith(p) for p in _EXEMPT_PREFIXES)
+    xff = headers.get(b"x-forwarded-for", b"").decode("latin-1").strip()
+    if xff:
+        return "ip:" + xff.split(",")[0].strip()
+    client = scope.get("client")
+    return "ip:" + (client[0] if client else "unknown")
 
 
 async def _reject(send: Send, retry_after: int) -> None:
@@ -82,24 +62,35 @@ async def _reject(send: Send, retry_after: int) -> None:
 class RateLimitMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
+        # 配置在启动读一次(env 改动随重启生效)· 避免每请求 os.environ 查询+解析
+        self.enabled = (os.environ.get("RATE_LIMIT_ENABLED") or "true").strip().lower() != "false"
+        try:
+            self.limit = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
+        except ValueError:
+            self.limit = 600
+        override = (os.environ.get("RATE_LIMIT_EXEMPT_PREFIXES") or "").strip()
+        self.exempt = (
+            tuple(p.strip() for p in override.split(",") if p.strip()) or _DEFAULT_EXEMPT_PREFIXES
+        )
         # 进程内单例 limiter · 延迟 import 避免循环
         from services.ratelimit.limiter import FixedWindowLimiter
 
         self.limiter = FixedWindowLimiter()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not _enabled():
+        if scope["type"] != "http" or not self.enabled:
             await self.app(scope, receive, send)
             return
 
-        path = scope.get("path", "")
-        if _is_exempt(path):
+        # str.startswith 接受前缀元组 · 一次判断所有豁免前缀
+        if scope.get("path", "").startswith(self.exempt):
             await self.app(scope, receive, send)
             return
 
+        headers = dict(scope.get("headers") or [])  # 物化一次 · 供分桶 key 复用
         try:
             allowed, retry_after = self.limiter.check(
-                _subject_key(scope), _limit_per_min(), window=60
+                _subject_key(headers, scope), self.limit, window=60
             )
         except Exception:  # fail-open:限流器挂了绝不锁站
             allowed, retry_after = True, 0

@@ -2,6 +2,9 @@
     class MascotSoundController {
         constructor(options) {
             this.basePath = options.basePath;
+            // 音频缓存版本 · 音频文件被 immutable 30d 缓存(浏览器 + Cloudflare)·
+            // 换音频后 bump 这个数,URL 变 = 强制取新文件
+            this.audioVersion = '2';
             this.storageKey = 'pearnly_mascot_muted';
             this.mobileNoSound = window.matchMedia('(max-width: 720px)').matches;
             this.muted = localStorage.getItem(this.storageKey) === '1';
@@ -44,7 +47,7 @@
             const file = this.files[name];
             if (!file) return null;
             if (!this.players.has(name)) {
-                const audio = new Audio(`${this.basePath}${file}`);
+                const audio = new Audio(`${this.basePath}${file}?v=${this.audioVersion}`);
                 audio.preload = 'none';
                 this.players.set(name, audio);
             }

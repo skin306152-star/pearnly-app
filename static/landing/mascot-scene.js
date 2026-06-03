@@ -19,6 +19,7 @@
                 pour: 'pour.mp3',
                 meow: 'meow.mp3',
                 pearnly: 'pearnly.m4a',
+                computer: 'computer.mp3',
             };
         }
 
@@ -148,7 +149,7 @@
                 {
                     id: 'laptop',
                     label: 'Laptop',
-                    sound: 'typing',
+                    sound: 'computer',
                     marks: ['star', 'star'],
                     sayKey: 'sayLaptop',
                     effect: 'glow',

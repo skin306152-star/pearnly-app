@@ -177,8 +177,6 @@
                     sayKey: 'sayCheck',
                 },
             ];
-            // 引言现在是透明文字浮在背景面板上 · 不绑卡片悬浮动画(否则悬停露出残缺阴影)
-            this.cards = [];
         }
 
         mount() {
@@ -188,7 +186,6 @@
             this.effectLayer.className = 'mascot-effect-layer';
             this.panel.append(this.layer, this.effectLayer);
             this.hotspots.forEach((hotspot) => this.addHotspot(hotspot));
-            this.cards.forEach((card) => this.bindCard(card));
         }
 
         addHotspot(hotspot) {
@@ -199,14 +196,6 @@
             button.addEventListener('click', () => this.activate(hotspot, button, true));
             button.addEventListener('mouseenter', () => this.activate(hotspot, button, false));
             this.layer.appendChild(button);
-        }
-
-        bindCard(card) {
-            const el = this.panel.querySelector(card.sel);
-            if (!el) return;
-            el.style.cursor = 'pointer';
-            el.addEventListener('click', () => this.activateCard(card, el, true));
-            el.addEventListener('mouseenter', () => this.activateCard(card, el, false));
         }
 
         activate(hotspot, button, click) {
@@ -225,19 +214,25 @@
             if (!this.reduceMotion) this.burst(rect, [hotspot.marks[0]]);
         }
 
-        // 舞台用 transform 缩放 · getBoundingClientRect 是缩放后屏幕 px ·
-        // 特效层在缩放容器内(本地 px)· 故 delta 需除以缩放比 · 否则放大缩小时位置漂移
-        stageScale(base) {
-            return base.width / this.panel.offsetWidth || 1;
+        // 舞台用 transform 缩放 · getBoundingClientRect 返回缩放后屏幕 px ·
+        // 特效层在缩放容器内(本地 px)· delta 除以缩放比换算回本地坐标(否则缩放时位置漂移)
+        localCenter(rect) {
+            const base = this.panel.getBoundingClientRect();
+            const scale = base.width / this.panel.offsetWidth || 1;
+            return {
+                base,
+                scale,
+                cx: (rect.left - base.left + rect.width / 2) / scale,
+                cy: (rect.top - base.top + rect.height / 2) / scale,
+            };
         }
 
         say(rect, text) {
-            const base = this.panel.getBoundingClientRect();
-            const scale = this.stageScale(base);
+            const { base, scale, cx } = this.localCenter(rect);
             const label = document.createElement('span');
             label.className = 'mascot-say';
             label.textContent = text;
-            label.style.left = `${(rect.left - base.left + rect.width / 2) / scale}px`;
+            label.style.left = `${cx}px`;
             label.style.top = `${(rect.top - base.top) / scale - 6}px`;
             this.effectLayer.appendChild(label);
             window.setTimeout(() => label.remove(), 1100);
@@ -245,10 +240,7 @@
 
         // 主题特效: water=花盆浇水落下 · steam=水杯热气上升 · glow=电脑屏幕亮起
         themedEffect(rect, type) {
-            const base = this.panel.getBoundingClientRect();
-            const scale = this.stageScale(base);
-            const cx = (rect.left - base.left + rect.width / 2) / scale;
-            const cy = (rect.top - base.top + rect.height / 2) / scale;
+            const { cx, cy } = this.localCenter(rect);
             if (type === 'glow') {
                 const el = document.createElement('span');
                 el.className = 'mascot-glow-fx';
@@ -271,30 +263,8 @@
             }
         }
 
-        activateCard(card, el, click) {
-            if (click) {
-                this.sound.play(card.sound);
-                this.restartClass(el, card.active);
-                if (!this.reduceMotion) this.burst(el.getBoundingClientRect(), card.marks);
-                return;
-            }
-            this.restartClass(el, 'card-hover', 340);
-            if (!this.reduceMotion) this.burst(el.getBoundingClientRect(), [card.marks[0]]);
-        }
-
-        restartClass(target, className, duration) {
-            target.classList.remove(className);
-            window.requestAnimationFrame(() => {
-                target.classList.add(className);
-                window.setTimeout(() => target.classList.remove(className), duration || 760);
-            });
-        }
-
         burst(rect, marks) {
-            const base = this.panel.getBoundingClientRect();
-            const scale = this.stageScale(base);
-            const cx = (rect.left - base.left + rect.width / 2) / scale;
-            const cy = (rect.top - base.top + rect.height / 2) / scale;
+            const { cx, cy } = this.localCenter(rect);
             marks.forEach((kind, index) => {
                 const mark = document.createElement('span');
                 mark.className = `mascot-effect ${kind}`;
@@ -312,7 +282,6 @@
         symbolFor(kind) {
             if (kind === 'drop') return '•';
             if (kind === 'heart') return '♡';
-            if (kind === 'glow') return '';
             return '✦';
         }
     }

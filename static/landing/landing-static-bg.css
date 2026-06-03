@@ -42,6 +42,12 @@ body {
   inset: 0;
   z-index: 3;
   pointer-events: none;
+  /* 悬浮 logo 玻璃标牌的盒子 · 玻璃底/扫光/点击热区共用(改一处即同步) */
+  --badge-x: 26px;
+  --badge-y: 22px;
+  --badge-w: 352px;
+  --badge-h: 134px;
+  --badge-r: 26px;
 }
 
 /* 背景水印有一道难去的玻璃圆角边(panel 左上角约 stage 26,30 · r≈28)·
@@ -50,12 +56,12 @@ body {
   content: '';
   display: block;
   position: absolute;
-  top: 22px;
-  left: 26px;
-  width: 352px;
-  height: 134px;
+  top: var(--badge-y);
+  left: var(--badge-x);
+  width: var(--badge-w);
+  height: var(--badge-h);
   z-index: 1;
-  border-radius: 26px;
+  border-radius: var(--badge-r);
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.1) 0%,
@@ -78,12 +84,12 @@ body {
 .brand-panel::after {
   content: '';
   position: absolute;
-  top: 22px;
-  left: 26px;
-  width: 352px;
-  height: 134px;
+  top: var(--badge-y);
+  left: var(--badge-x);
+  width: var(--badge-w);
+  height: var(--badge-h);
   z-index: 3;
-  border-radius: 26px;
+  border-radius: var(--badge-r);
   pointer-events: none;
   background: linear-gradient(
     100deg,
@@ -339,10 +345,10 @@ body {
 
 /* 左上角悬浮 logo 标牌热区 · 点击=猫叫(贴合玻璃徽章范围) */
 .logo-hotspot {
-  left: 26px;
-  top: 22px;
-  width: 352px;
-  height: 134px;
+  left: var(--badge-x);
+  top: var(--badge-y);
+  width: var(--badge-w);
+  height: var(--badge-h);
 }
 
 .face-hotspot {

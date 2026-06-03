@@ -6,13 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡(2026-06-03 · **✅ 前端模块化收官 · 所有源文件(后端+前端)≤500 达成 · check_file_size FAIL 0**)
+## 🎯 状态卡(2026-06-03 · **✅ 代码目录重组收官上线 · 铁律#30 = 整顿最后一步完成 · 整顿核心全收官**)
 
-- **本窗口连收 11 个 `src/home/*.js`(11→0 FAIL · 全 push 上线 + prod 真浏览器验)**:archive-settings 530→434 / upload-camera 506→401 / folder-watcher 668→462 / core-boot 565→469 / erp-mappings 739→316 / email-ingest 726→452 / ocr-recognize 550→460 / erp-xero 663→475 / erp-exceptions 742→411 / excel-formula-recon 877→298 / test-center 706→404。commit `215bcb9..372381f` · prod `/api/version` 11850069→**11850080** · prod E2E:21 个 window 桥全 `function` + 零 console error。
-- **三类范式([[c9-store-centralization-bankrecon]])**:① module-scope 抽内聚簇(纯工具走 ESM import·不污染 window) ② stateful IIFE → **store 中心化**(`S={}` · `_x→S.x` 词边界 subst) ③ 去 IIFE 变 ESM module(export 共享物给子模块)。verbatim:字节切片+dedent+subst · 逐行/字符多重集等价校验全 ==。顺手删 4 处死代码。
-- **法律页**:`/terms` `/privacy` 此前是 prod 孤儿(未进 git)· 本窗口捞回 `static/{terms,privacy}.html` + 共享 `static/legal.css` · 重做标准界面(正文 verbatim · 邮箱还原 hello@pearnly.com)· prod 真浏览器验绿。
-- **✅ 着陆页换新全部收工·上线**(REFACTOR-WB-landing · `e87f192..0e37f3f`):旧 `login.html` 4998 行巨石 → 28 行壳 · 资产入 `static/landing/`(全 ≤500)· 玻璃 logo 悬浮标 + 自绘自适应气泡 + 登录卡盖背景第二层 · **全站品牌 favicon + 侧栏 logo**(`static/brand/` 11 资产)· **猫猫互动音效**(猫头/logo=喵·盆栽=浇水·水杯=倒水·电脑=电脑音·音量随系统·音频 `?v=2` 破 immutable 缓存)· 热区全体对齐 + 缩放漂移修复 + **手机端布局修复**(min-height:0 解 914 撑爆)· /simplify 收口(提 `localCenter` 去重 + 删死代码 + `--badge-*` 变量)。资产 `?v=7`。**桌面源已退役 · repo `static/landing/` 为唯一源**(sync_landing.py 功成身退)。prod 桌面+手机真浏览器验绿 · 0 console err。
-- **最后 commit `0e37f3f`**(全 push 上线 · prod 验绿)。**下一步(铁律#30 · 整顿最后一步)= 代码目录重组**:123 root .py → `app/{routes,services,core}` 包 · 前置「全文件 <500」已满足 · 全项目最大 blast radius · 文件集已冻结 → 一次性搬 + import 只改一遍。其后:闲置笔记本 staging(Wave3)。
+- **本窗口:代码目录重组(铁律#30 · 全项目最大 blast radius)完整收官上线** `commit d05cf6d`(`a10e2cb..d05cf6d`)· prod `/api/version` 11850080→**11850081** · **零 500/502**:登录(`/api/login` 422)/OCR(`/api/ocr/quota` 401)/计费/推送/对账(`/api/bank-recon/sessions` 401)主路径全验路由活+认证正常。
+- **方案B(Zihao 拍板 · 非 `app/` 外壳)**:122 个 root 平铺 .py → 顶层 `routes/`(58)+`core/`(4·db/auth/route_helpers/kms_helper)+ 复用**已存在**的 `services/<域>/`(60·新建 vat/report/excel)· app.py 留根(`uvicorn app:app` 入口不变)· 现有 212 文件 services/ 的 import 纹丝不动(blast radius 减半)。
+- **854 处机械改写 verbatim**:`import M`→`from PKG import M`(保 `M.attr`)· `from M`→`from PKG.M`· patch 字符串路径(**收窄到 `patch(`/`setattr(`/`import_module(` 调用内**·杜绝误伤 i18n key `"auth.x"`/文件名 `"db.py"`)· `sys.modules["M"]` key · 前缀重叠按模块名长度降序。
+- **五大踩坑([[directory-reorg-playbook]])**:① **transform `read_text()`+`write_text(newline="")` 把 10 个原 CRLF 文件翻 LF** → 整文件 diff 噪声 + check_new_debt 误报 → 修法 `git -c core.autocrlf=false add --renormalize` ② sys.modules 注入的 `.get/.pop` key 漏改 → fake 模块毒化全局 ③ f-string `patch(f"recon_routes.{k}")` 字面规则抓不到 ④ 静态审计 `open(ROOT/"x_routes.py")` 硬编码路径 ⑤ ratchet 不解析 rename path(已修)。
+- **守门同步**:check_file_size+check_line_ratchet 加 `routes/** core/**` glob · ratchet 修 rename 路径解析 + 5 个 RATCHET-EXEMPT(import 加前缀致 black 拆行净增·纯结构) · refactor_progress `db.py`→`core/db.py` · 铁律#30 文字更新为「已执行」。
+- **验证**:全量 2176 单测全绿 · ruff 全规则零错 · import app 275 路由全注册 · 守门全绿 · prod 零 500。mrerp live integration(连真实 MR.ERP·缺凭证 skip)与重组无关(HEAD worktree baseline 同样失败·已铁证)。
+- **下一步**:✅ 整顿核心收官(所有源文件 <500 + 包结构达成)→ 闲置笔记本 staging(Wave3·[[spare-laptop-staging-then-prod]])· 或品牌资产全站接线(home/admin/terms/privacy 仍引 favicon.svg)。
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->
 <!-- 新窗口:读上面状态卡 + 跑 scripts/refactor_progress.py 就能开工 -->

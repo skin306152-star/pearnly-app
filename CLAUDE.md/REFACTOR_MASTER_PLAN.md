@@ -220,13 +220,13 @@
 | B1 | `app.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(20-30 个 router) | 4-6 周 | A1, A5 | 🟡 进行中 · **已抽 14 个 router**:notification(6)+ clients(5)+ exceptions(8)+ team(7)+ erp_mappings(12)+ email_ingest(6)+ rd(4)+ settings(5)+ **bank_recon(11 `faaa536`)+ admin_migration(7 `b33dd58`)+ admin_cost(10 `13eded7`)+ tenant(6 `fac5f62`)+ admin_logs(4 `574c92d`)+ erp_xero(8 `569b534`)** · 另把 `_plan_permissions`(`870290c`)+ `_tid`(`4755af7`)搬进 route_helpers · `_ensure_fresh_xero_token` 随 erp_xero · **app.py 10075→9546→8589→7263**(第十七会话 8589→7263 · 净 -1326)· 每组带 contract test(unit 530→552→**580**)· 守门 imports/i18n/unit/black/ruff 全绿 · LF 全程干净 · **第十八/十九会话续抽** categories/erp/admin_users + exception_checks/history 组(全 push)· **第二十会话续抽** pages(12)/me(3+UserInfo)/line_binding(4)· **app.py 7263→4459** · 共 **21 router + 30 个 *_routes.py** · unit →639 · 全 push+CI 绿+生产零丢路由。**B1 安全部分已到顶**:剩 22 @app 全安全敏感(login/OAuth/email-code/JWT+账号合并)或勿碰(OCR recognize 850 行/LINE webhook)或故意留(/api/version)· **app.py < 500 无法靠安全搬家达成** · 需 auth 专窗口(铁律 #16 登录关键路径 · Zihao 在场)· 详见 `HANDOFF_REFACTOR_BC.md` |
 | B2 | `db.py` 拆完 9k → 验收 < 500 行 / 冲刺 < 300 行(业务 SQL 迁 `services/`) | 3-4 周 | A1 | 🟡 进行中 · **第二十二会话**:db.py 10663→**7136**(-3527)· 抽 9 个域 DAL 到 services:`email_ingest/store.py`(10 `435ece6`)· `erp/oauth_store.py`(12 `78e9667`)· `erp/mappings_store.py`(15+常量 `f62d0d9`)· `notification/store.py`(9 `9de1baa`)· `erp/push_store.py`(25+3常量 `7edb3c3`)· `recon/{vat_recon_tasks,gl_vat,bank_recon_v2}_store.py`(7+6+6 `a012482`)· `recon/bank_recon_v1_store.py`(17 `e26dafd`)· **范式**:cohesive 域整片搬 service 模块(`import db`+运行时 `db.get_cursor()` → patch 生效 + 防循环 import)· db.py 文件尾 `from services.X import a as a` 显式 re-export(pyflakes 不报 F401)→ 所有 `db.xxx()`/`from db import xxx` 调用点**零改动** · 私有 helper/常量不外露 · 校验常量随域搬 · 每域带契约测试(函数在 service / re-export 同一对象防漂移)· LF 全程干净 · 全 push + CI 5 连绿 + 生产路由 401 验证零丢。**剩余域**(下窗口续 · 由易到难):archive_settings / rd_usage / vat_recon 三表组(vat_report+recon_task+recon_row)/ membership+RLS+migration / clients+categories+buyer_to_client / tenant / 操作日志+员工 / **(高敏后置 · Zihao 在场)** credits+charge_ocr(钱)/ user+auth / ocr_history(OCR 热路径)|
 | B3 | 所有 `ensure_*` 迁 Alembic(25 个 · schema 完全版本化) | 3-4 周 | A2 | ⚪ |
-| B4 | 健康检查端点 `/health` + `/ready`(DB / Gemini / SMTP / LINE 各 check) | 半天 | — | ⚪ |
-| B5 | API 全局限流(每 IP / 每用户 / 每 endpoint · 比现有 PLG 反薅闸更全) | 1-2 天 | — | ⚪ |
-| B6 | 结构化日志(logger 改 JSON · 加 request_id / user_id / tenant_id 全链路 trace) | 2-3 天 | — | ⚪ |
+| B4 | 健康检查端点 `/health` + `/ready`(DB / Gemini / SMTP / LINE 各 check) | 半天 | — | ✅ `services/readiness/probes.py` · /ready 真探活 DB SELECT 1 挂返 503(REFACTOR-WA-B4)· prod 实测 200 全绿 |
+| B5 | API 全局限流(每 IP / 每用户 / 每 endpoint · 比现有 PLG 反薅闸更全) | 1-2 天 | — | ⚪ 仅有注册反薅闸 · 无全局限流器 |
+| B6 | 结构化日志(logger 改 JSON · 加 request_id / user_id / tenant_id 全链路 trace) | 2-3 天 | — | 🟡 **part1 上线 `90d359d`**:`services/observability/`(JSON logging + request_id 纯 ASGI 中间件)· prod 响应头带 X-Request-ID · **part2**:user_id/tenant_id 绑定 core/auth.py(🔴高敏 · 待 Zihao) |
 | B7 | 错误日志聚合(自建简单版 · 写 `errors` 表 + admin 后台时间线 · 不上 Sentry) | 2-3 天 | B6 | ⚪ |
 | B8 | 多租户 RLS 双保险(Supabase Row Level Security · DB 层强制) | 1-2 周 | B3 | ⚪ |
 | B9 | DB 索引审计(EXPLAIN 慢查询 · 加缺索引 · 删没用的) | 2-3 天 | — | ⚪ |
-| B10 | DB 连接池调优(psycopg2 pool size + lifecycle) | 半天 | — | ⚪ |
+| B10 | DB 连接池调优(psycopg2 pool size + lifecycle) | 半天 | — | ✅ 已调 SimpleConnectionPool minconn=2/maxconn=30(v0.21 修超时)· core/db.py |
 
 **B 阶段完成判定**:`app.py` / `db.py` 达到验收 < 500 行；若继续拆能让职责更清晰,冲刺 < 300 行 / 25 个 ensure_* 全迁 Alembic / 4 个新端点端 + RLS / 9 个新机制全上线
 

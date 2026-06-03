@@ -199,6 +199,15 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
     except Exception as _e:
         logger.warning(f"[active_tenant] override skip: {_e}")
 
+    # REFACTOR-WA-B6 part2 · 鉴权成功后绑定日志上下文(本请求后续日志带 user/tenant)·
+    # 纯加观测 0 逻辑改 · try 兜底确保绝不影响鉴权结果(日志失败不能踢用户)
+    try:
+        from services.observability import log_context
+
+        log_context.bind(user_id=user.get("id"), tenant_id=user.get("tenant_id"))
+    except Exception:  # noqa: BLE001 · 观测绝不阻断鉴权
+        pass
+
     return user
 
 

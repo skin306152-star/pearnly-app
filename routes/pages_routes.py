@@ -99,7 +99,7 @@ async def v1_contact():
 async def root():
     # v118.44.0.3 · login.html 也加 no-cache · 防浏览器 cache 老 login.html 让超管跳转逻辑失效
     return FileResponse(
-        "static/login.html",
+        "static/dist/login.html",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
@@ -111,7 +111,7 @@ async def root():
 @router.get("/login", response_class=HTMLResponse)
 async def login_page():
     return FileResponse(
-        "static/login.html",
+        "static/dist/login.html",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
@@ -124,7 +124,7 @@ async def login_page():
 async def home():
     # v118.27.5.4 · 强制 no-cache · 防 CDN/浏览器误缓存导致用户拿不到新版
     return FileResponse(
-        "static/home.html",
+        "static/dist/home.html",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",

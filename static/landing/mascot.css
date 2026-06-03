@@ -15,9 +15,10 @@
   pointer-events: auto;
 }
 
+/* 装饰性猫猫热区(纯音效彩蛋)· 不显示焦点框 · 避免点击/按键时冒出蓝紫描边 */
+.mascot-hotspot:focus,
 .mascot-hotspot:focus-visible {
-  outline: 2px solid rgba(124, 87, 246, 0.64);
-  outline-offset: 3px;
+  outline: none;
 }
 
 .brand-panel[data-mascot-debug='true'] .mascot-hotspot {

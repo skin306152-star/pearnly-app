@@ -5,7 +5,8 @@
             this.storageKey = 'pearnly_mascot_muted';
             this.mobileNoSound = window.matchMedia('(max-width: 720px)').matches;
             this.muted = localStorage.getItem(this.storageKey) === '1';
-            this.volume = 0.18;
+            // 自然音量 · 完全交给用户的系统音量控制(像普通媒体一样随音量变大变小)
+            this.volume = 1.0;
             this.players = new Map();
             this.files = {
                 tap: 'tap.wav',

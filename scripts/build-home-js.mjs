@@ -21,6 +21,16 @@ const BUNDLES = [
         out: 'static/dist/post.js',
         files: ['version-banner.js', 'erp-mrerp-connect.js', 'erp-log-enhance.js'],
     },
+    {
+        // 着陆页:顺序 landing→scale→i18n→mascot(defer · 保原 DOM 时序)
+        out: 'static/dist/landing.js',
+        files: [
+            'landing/landing.js',
+            'landing/landing-scale.js',
+            'landing/landing-i18n.js',
+            'landing/mascot-scene.js',
+        ],
+    },
 ];
 
 for (const b of BUNDLES) {

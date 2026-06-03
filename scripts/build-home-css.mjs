@@ -98,16 +98,36 @@ const ADMIN_CSS = [
     'admin/admin.css',
 ];
 
+const LANDING_CSS = [
+    'landing/landing.css',
+    'landing/landing-auth.css',
+    'landing/auth-sso.css',
+    'landing/auth-modal.css',
+    'landing/mascot.css',
+    'landing/mascot-effects.css',
+    'landing/responsive.css',
+    'landing/landing-static-bg.css',
+    'landing/landing-static-bg-mobile.css',
+    'landing/landing-interactions.css',
+];
+
 const BUNDLES = [
     { list: HOME_CSS, out: 'static/dist/home.css' },
     { list: ADMIN_CSS, out: 'static/dist/admin.css' },
+    { list: LANDING_CSS, out: 'static/dist/landing.css' },
 ];
 
 async function buildOne(list, out, check) {
     const chunks = list.map((f) => {
         const fp = path.join(ROOT, 'static', f);
         if (!fs.existsSync(fp)) throw new Error(`CSS 源缺失: ${f}`);
-        return fs.readFileSync(fp, 'utf8');
+        let css = fs.readFileSync(fp, 'utf8');
+        // 相对 url('./x') 跟着源文件目录走;移进 dist/ 后须改成绝对路径,否则资源 404
+        const dir = path.dirname(f); // 'landing' 或 '.'
+        if (dir !== '.') {
+            css = css.replace(/url\((['"]?)\.\//g, `url($1/static/${dir}/`);
+        }
+        return css;
     });
     const merged = chunks.join('\n');
     const { code } = await transform(merged, { loader: 'css', minify: true });

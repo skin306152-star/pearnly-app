@@ -121,6 +121,12 @@ if [ -n "$FE_CHANGED" ]; then
 
   echo "  · vite build(catch 配置/模块坏)"
   npm run build >/dev/null 2>&1 || fail "vite build 失败"
+
+  echo "  · 打包一致性(dist 必须 == 源的最新 build)"
+  git diff --quiet static/dist/ || fail "改了前端源但 dist 没重新打包 · 跑 npm run build 后 git add static/dist 一起提交(否则 prod 跑旧 bundle · 改动不生效)"
+
+  echo "  · check_asset_bundling(源页只引 bundle · 新资产须进打包清单)"
+  python scripts/check_asset_bundling.py || fail "前端打包闸(见上方:源页明文引用=view-source 退化 / 资产漏进打包清单=样式丢)"
 fi
 
 # ── 防屎山闸(任何改动都跑 · 铁律 #27 · 整顿收官后切硬门)──────

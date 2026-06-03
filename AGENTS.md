@@ -1,7 +1,7 @@
 # AGENTS.md · Pearnly 唯一入口(所有 AI 窗口先读这一页)
 
 > **这是唯一的"必读"。** 故意保持一页。完整宪法在 `CLAUDE.md/CLAUDE.md`(铁律细节),业务概念在 `docs/agent/`,但**进窗口先把这页 + STATE 状态卡读完 + 跑一次进度脚本**就能开工,别一上来啃 7000 行。
-> 最后更新:2026-06-03(✅ **代码目录重组收官上线 · 铁律#30 = 整顿最后一步完成**:122 个 root 平铺 .py → 顶层 `routes/`+`core/` + 复用现有 `services/<域>/`(方案B·非 `app/` 外壳)· app.py 留根 · 854 处机械改写 verbatim · 全量 2176 单测全绿 + import app 275 路由全注册 + 守门全绿 + push 上线 + prod 零 500 · 范式与五大坑见 [[directory-reorg-playbook]])
+> 最后更新:2026-06-03(✅ **目录重组(铁律#30)+ view-source 成品化(E7)双双收官**。① 重组:122 个 root .py → 顶层 `routes/`+`core/`+复用现有 `services/<域>/`(方案B·非 `app/` 外壳)·app.py 留根·854 处机械改写 verbatim·全量 2176 单测全绿·prod 零 500·见 [[directory-reorg-playbook]]。② E7:所有明文 CSS/JS 打包 minified bundle + HTML 压成一行(home view-source 228行→1行·对标 Claude.ai)·含 BOM 合并坑 + /simplify 收口·见 [[frontend-asset-bundling-playbook]])
 >
 > **🔴 两条常驻铁律(2026-06-02 Zihao 拍板 · 任何窗口任何任务都执行)**:① 所有源码去 AI 味 + 注释/路数按大厂走(见 §2.6)② **每次 Zihao 说"收尾"(今天到这/换窗口/下班/总结)→ 主动先跑 `/simplify` 再出收尾报告**。
 > **📐 通用工程标准(大厂级约束基线)**:`C:\Users\skin3\Desktop\工程标准_大厂级开发约束(任意项目通用).md`(全局 CLAUDE.md 已挂·所有项目通用)。本项目铁律 = 它的超集 + Pearnly 特例;冲突以本项目为准。

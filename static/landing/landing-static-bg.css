@@ -345,14 +345,6 @@ body {
   height: 134px;
 }
 
-/* 问候语区(您好!…)热区 · 点击=Pearnly 英文语音 */
-.welcome-hotspot {
-  left: 56px;
-  top: 198px;
-  width: 260px;
-  height: 96px;
-}
-
 .face-hotspot {
   left: 275px;
   top: 398px;

@@ -13,15 +13,12 @@
             this.players = new Map();
             this.files = {
                 tap: 'tap.wav',
-                drink: 'drink.wav',
-                typing: 'typing.wav',
                 success: 'success.wav',
                 bell: 'bell.wav',
                 pop: 'pop.wav',
                 watering: 'watering.mp3',
                 pour: 'pour.mp3',
                 meow: 'meow.mp3',
-                pearnly: 'pearnly.m4a',
                 computer: 'computer.mp3',
             };
         }
@@ -67,8 +64,6 @@
             const osc = ctx.createOscillator();
             const notes = {
                 tap: [520, 0.07],
-                drink: [420, 0.1],
-                typing: [720, 0.055],
                 success: [660, 0.13],
                 bell: [840, 0.12],
                 pop: [580, 0.08],
@@ -121,12 +116,6 @@
                     label: 'Pearnly',
                     sound: 'meow',
                     marks: ['heart', 'star', 'heart'],
-                },
-                {
-                    id: 'welcome',
-                    label: 'Pearnly',
-                    sound: 'pearnly',
-                    marks: ['star', 'heart'],
                 },
                 {
                     id: 'face',

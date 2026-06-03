@@ -158,11 +158,12 @@ def main():
     print("-" * 70)
     # REFACTOR-A5 修正:Vite/A1 后新前端模块在 src/home/*(不再是 static/home/*)
     home_modules = count_files_glob("src/home/**/*.js", PROJECT_ROOT)
-    routers = count_files_glob("*_routes.py", PROJECT_ROOT)
+    # 目录重组(铁律#30)后 *_routes.py 从 root 搬入 routes/ 包
+    routers = count_files_glob("routes/**/*.py", PROJECT_ROOT)
     services = count_files_glob("services/**/*.py", PROJECT_ROOT)
     component_css = count_files_glob("src/home/**/*.css", PROJECT_ROOT)
     print(f"  src/home/**/*.js    : {home_modules:3d}  (目标 50-100)")
-    print(f"  *_routes.py         : {routers:3d}  (目标 20-30)")
+    print(f"  routes/**/*.py      : {routers:3d}  (目标 20-30)")
     print(f"  services/**/*.py    : {services:3d}  (目标 10+)")
     print(f"  src/home/**/*.css   : {component_css:3d}  (目标 20-30)")
     # REFACTOR-A5:每类按目标封顶 1.0 · 防某类超额(如 services 31/10)掩盖未动的类

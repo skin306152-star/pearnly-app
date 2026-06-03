@@ -333,7 +333,7 @@
 | I4 | 文档完整 review(docs/ 全索引 + 现状标签) | 1 周 | G | ⚪ |
 | I5 | 最后一次大体检(让别的 AI 跑 · 跟 2026-05-21 那次对比) | 1 周 | A-H 完成 | ⚪ |
 | I6 | **去 AI 味全量审计**(新旧源码都过 · 消除 `docs/ENGINEERING_STANDARD.md` §1.1 列的 13 种 AI 痕迹:过度注释/emoji/防御冗余/泛化命名/调试残留/AI自述/重复/魔法值等)· 让代码像资深工程师写的 | 2-3 周 | C1, B1 | ⚪ (2026-05-29 Zihao 拍板新增 · 拆模块时顺手清 + 本 task 收尾审计) |
-| I7 | **目录架构重组(大厂包结构)**:根目录现 86 个 .py 平铺 → 迁入 `app/{api/routes,services,core,models}` 包结构 · 一次性全局改 import / `app.include_router` / 测试 / 动态 import | 1 周 | **所有文件 <500 后(文件集冻结)** | ⚪ (2026-06-02 Zihao 拍板新增 · 🔴 **全项目最大 blast radius · 必须最后做** · 见铁律 #30 · 现在做=边拆边搬 import 改两遍 + 多窗口冲突) |
+| I7 | **目录架构重组(大厂包结构)**:根目录 122 个 .py 平铺 → 迁入包结构 · 一次性全局改 import / `app.include_router` / 测试 / 动态 import | 1 周 | **所有文件 <500 后(文件集冻结)** | ✅ 2026-06-03 · commit `d05cf6d`(**方案B**:顶层 `routes/`(58)+`core/`(4)+ 复用现有 `services/<域>/`(60)· **非 `app/` 外壳**·app.py 留根入口不变 · 854 处机械改写 verbatim · 全量 2176 单测全绿 + 275 路由全注册 + prod 零 500 · 范式与五大坑见 [[directory-reorg-playbook]]) |
 
 **I 阶段完成判定**:0 silent block / 0 死代码 / **0 AI 味(过 ENGINEERING_STANDARD §1.1)** / **大厂包结构(根目录 ≤ 几个入口文件)** / 体检报告显示"Google 级 90%+"达标
 

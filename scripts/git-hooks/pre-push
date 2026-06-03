@@ -123,6 +123,22 @@ if [ -n "$FE_CHANGED" ]; then
   npm run build >/dev/null 2>&1 || fail "vite build 失败"
 fi
 
+# ── 防屎山闸(任何改动都跑 · 铁律 #27 · 整顿收官后切硬门)──────
+# 整顿前这两道在 CI 是 warning 模式(怕误红拆分中的 split commit);整顿收官后
+# 全文件 <500 · 在此切成本地硬拦:文件超 500 / 监控文件行数净增 → push 中止。
+echo "▶ 防屎山闸(文件 ≤500 行 + 行数棘轮只降不升)"
+echo "  · check_file_size(任何监控文件 >500 行 = 拦 · 先拆)"
+python scripts/check_file_size.py --quiet || fail "check_file_size(有文件超 500 行 · 先拆到 <500)"
+
+echo "  · check_line_ratchet(监控文件净增长 = 拦 · 合理增长在 commit 写 RATCHET-EXEMPT)"
+if git rev-parse --verify --quiet origin/master >/dev/null 2>&1; then
+  python scripts/check_line_ratchet.py --base origin/master --head HEAD --quiet \
+    || fail "check_line_ratchet(监控文件行数净增 · 拆/移到独立文件 · 或 commit 加 RATCHET-EXEMPT: <file> +<N> · <理由>)"
+else
+  python scripts/check_line_ratchet.py --quiet \
+    || fail "check_line_ratchet(监控文件行数净增 · 见上)"
+fi
+
 echo ""
 echo "✅ 全部守门绿 · 放行推送"
 echo "──────────────────────────────────────────────────────────"

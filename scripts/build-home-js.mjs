@@ -35,7 +35,7 @@ const BUNDLES = [
 
 for (const b of BUNDLES) {
     const parts = b.files.map((f) => {
-        const src = fs.readFileSync(path.join(ROOT, 'static', f), 'utf8');
+        const src = fs.readFileSync(path.join(ROOT, 'static', f), 'utf8').replace(/^\uFEFF/, '');
         return transformSync(src, { loader: 'js', minify: true }).code;
     });
     // `;` 兜底 ASI · 每段已是独立 minified 脚本,合并后顶层全局与原多 <script> 等价

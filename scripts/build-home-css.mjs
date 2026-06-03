@@ -121,7 +121,9 @@ async function buildOne(list, out, check) {
     const chunks = list.map((f) => {
         const fp = path.join(ROOT, 'static', f);
         if (!fs.existsSync(fp)) throw new Error(`CSS 源缺失: ${f}`);
-        let css = fs.readFileSync(fp, 'utf8');
+        // strip BOM:文件开头的 BOM 独立 link 时浏览器忽略,但合并到 bundle 中间
+        // 就是非法字符,会破坏紧跟的那条 CSS 规则(landing-auth.css 的 .auth-card 中招过)
+        let css = fs.readFileSync(fp, 'utf8').replace(/^\uFEFF/, '');
         // 相对 url('./x') 跟着源文件目录走;移进 dist/ 后须改成绝对路径,否则资源 404
         const dir = path.dirname(f); // 'landing' 或 '.'
         if (dir !== '.') {

@@ -1,5 +1,5 @@
 ﻿<!doctype html>
-<!-- v118.44.0 · NAV-IA Phase 8 · Earn 超管独立 SPA · 与 home.html 完全隔离(NAV_IA_PRD §3.4 铁律) -->
+
 <html lang="zh">
   <head>
     <meta charset="UTF-8" />
@@ -8,50 +8,9 @@
     <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1" />
-    <!-- 共享基础样式:与 home.html 同一套拆分 CSS(home.css 整顿期已拆空 → 必须引
-         home-01..home-38,否则 admin 丢失变量/卡片/表格/page-head 全套设计语言)。
-         admin.css 永远最后加载 = admin 专属样式覆盖共享基底。 -->
-    <link rel="stylesheet" href="/static/home-01-base.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-02-switcher.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-03-layout.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-04-results.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-05-overlays.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-06-responsive-rd.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-07-history-automation.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-08-pagehead-toast.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-09-badges-locks.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-10-push-logs.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-11-automation-settings.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-12-drawer-search.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-13-upgrade-dup-prefs.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-14-gemini-admin.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-15-team-folder.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-16-cost-clients.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-17-aibalance-reports-trial.css?v=11850008" />
-    <!-- home-18 = 后台用户管理样式(adm-table/drawer/kpi/cell/risk 等)· home.html 不引(其
-         admin 布局已删)· 仅 admin SPA 用 · 曾被 fa08ecc 误当死码删除致用户页塌掉,已恢复 -->
-    <link rel="stylesheet" href="/static/home-18-admin-users.css?v=11850052" />
-    <link rel="stylesheet" href="/static/home-19-exceptions-alerts.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-20-banners-pushlogs.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-21-recon-center.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-22-settings-mobile.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-23-test-center.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-24-logs-access-assign.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-25-bankrecon-erpmapping.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-26-erp-cards.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-27-erp-credentials.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-28-erp-banners-batch.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-29-vat-recon-clients.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-30-settings-modal.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-31-navia-topbar.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-32-recon-folding.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-33-dashboard.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-34-navia-config-drawer.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-35-bankrecon-v2.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-36-topup.css?v=11850008" />
-    <link rel="stylesheet" href="/static/home-37-html-inline.css?v=11850023" />
-    <link rel="stylesheet" href="/static/home-38-buttons.css?v=11850031" />
-    <link rel="stylesheet" href="/static/admin/admin.css?v=11850052" />
+
+    <link rel="stylesheet" href="/static/dist/admin.css?v=11850090" />
+
     <script>
       // admin layout 标志 · home.js loadAll() 检测此 flag 走精简路径(不跑 home 渲染)
       window.PEARNLY_ADMIN_MODE = true;
@@ -59,7 +18,6 @@
     </script>
   </head>
   <body class="admin-layout-body">
-    <!-- ========= 顶部 admin banner ========= -->
     <div class="admin-layout-banner" role="banner">
       <div class="admin-layout-banner-left">
         <svg
@@ -82,7 +40,6 @@
       <span class="admin-layout-banner-right" id="admin-uptime" aria-live="polite"></span>
     </div>
 
-    <!-- ========= 顶栏 ========= -->
     <div class="admin-layout-topbar">
       <div class="admin-layout-topbar-left">
         <span class="admin-layout-logo">
@@ -164,7 +121,6 @@
       </div>
     </div>
 
-    <!-- ========= 主区:sidebar + content ========= -->
     <div class="admin-layout-shell">
       <aside class="admin-layout-sidebar" aria-label="Admin Navigation">
         <div class="admin-layout-sidebar-section" data-i18n="adm-sidebar-section">超管功能</div>
@@ -237,11 +193,9 @@
           </svg>
           <span data-i18n="adm-sidebar-monitor">系统监控</span>
         </a>
-        <!-- v118.44.0.4 · 删除「返回普通视图」按钮(Earn 是超管 · 不该回普通用户视图 · 且老逻辑会死循环跳回 /admin/cost) -->
       </aside>
 
       <main class="admin-layout-main">
-        <!-- ============ v118.44.0 NAV-IA Phase 8 · 嵌入 page-admin-cost(原 home.html L5071-5187 · 业务逻辑由 home.js loadAdminCostPage 接管)============ -->
         <section class="page" id="page-admin-cost">
           <div class="page-head">
             <div class="page-head-icon">
@@ -264,7 +218,6 @@
             </div>
           </div>
 
-          <!-- 引擎计费入口 · 卡片化(与下方花费卡同款视觉)· 余额去 Google 官方查 -->
           <div class="cost-engine-entries" id="billing-card">
             <a
               class="cost-engine-entry"
@@ -353,7 +306,6 @@
             余额与官方账单可能有延迟，以 Google 控制台为准。
           </div>
 
-          <!-- 顶部 KPI 卡片 -->
           <div class="cost-kpi-grid" id="cost-kpi-grid">
             <div class="cost-kpi-card">
               <div class="cost-kpi-label" data-i18n="cost-today">今日花费</div>
@@ -372,7 +324,6 @@
             </div>
           </div>
 
-          <!-- 本月引擎成本构成 · 排行列表(2026-05-25) -->
           <div class="cost-section">
             <div class="cost-section-head">
               <h3 data-i18n="cost-engines">本月引擎成本构成</h3>
@@ -383,7 +334,6 @@
             </div>
           </div>
 
-          <!-- 趋势图 + 操作 -->
           <div class="cost-section">
             <div class="cost-section-head cost-trend-head">
               <div class="cost-trend-titles">
@@ -435,7 +385,6 @@
             <div class="cost-trend-chart" id="cost-trend-chart"></div>
           </div>
 
-          <!-- 按用户分组 -->
           <div class="cost-section">
             <div class="cost-section-head">
               <h3 data-i18n="cost-by-user-title">按用户分组</h3>
@@ -469,7 +418,6 @@
             </div>
           </div>
 
-          <!-- v118.35.0.22 · Credits 收入端 KPI(用户扣费 · 跟成本互补) -->
           <div class="cost-section" style="margin-top: 24px">
             <div class="cost-section-head">
               <h3 data-i18n="rev-kpi-title">用户扣费 KPI</h3>
@@ -513,7 +461,6 @@
             </div>
           </div>
 
-          <!-- v118.35.0.22 · 全公司余额清单 -->
           <div class="cost-section">
             <div class="cost-section-head">
               <h3 data-i18n="tn-list-title">公司余额清单</h3>
@@ -547,7 +494,6 @@
           </div>
         </section>
 
-        <!-- ============ v118.44.0 NAV-IA Phase 8 · 嵌入 page-admin-users(原 home.html L4960-5068 · 业务逻辑由 home.js loadAdminUsersPage 接管)============ -->
         <section class="page" id="page-admin-users">
           <div class="page-head">
             <div class="page-head-icon">
@@ -575,10 +521,6 @@
 
           <div class="adm-kpi-grid" id="adm-kpi-grid"></div>
 
-          <!-- CLEANUP-PLAN-02 (2026-05-22) · 待审核付款 + Trial 即将到期段整删
-                 - 待审核付款:走 billing_routes.py admin_topup_list(credits 模式 · 不在用户管理页)
-                 - Trial 即将到期:credits 模式没 Trial 概念 -->
-
           <div class="adm-section">
             <div class="adm-section-head">
               <div class="adm-tabs-bar">
@@ -597,7 +539,6 @@
                 </button>
               </div>
               <div class="adm-filters" data-adm-tab-filter="customers">
-                <!-- CLEANUP-PLAN-02 · adm-plan-filter 套餐筛选删 · credits 模式没"套餐" -->
                 <input
                   type="text"
                   class="adm-search"
@@ -681,7 +622,6 @@
           </div>
         </section>
 
-        <!-- ============ 充值审核(billing_routes credits 模式 · 接 /api/admin/credits/topup/*)============ -->
         <section class="page" id="page-admin-topup">
           <div class="page-head">
             <div class="page-head-icon">
@@ -728,7 +668,7 @@
             <div id="adm-topup-list"></div>
           </div>
         </section>
-        <!-- 系统监控 + 风控(2026-05-25 · 从成本页/用户页搬出 · 独立模块)-->
+
         <section class="page" id="page-admin-monitor">
           <div class="page-head">
             <div class="page-head-icon">
@@ -750,7 +690,7 @@
               </div>
             </div>
           </div>
-          <!-- v118.35.0.25 · 系统监控 + LINE 告警 -->
+
           <div class="cost-section" style="margin-top: 24px">
             <div class="cost-section-head">
               <h3 data-i18n="mon-title">系统监控</h3>
@@ -778,7 +718,7 @@
                 <div class="cost-kpi-sub" data-i18n="mon-db-sub">高于 25/30 触发告警</div>
               </div>
             </div>
-            <!-- v118.35.0.26 · OS 指标(CPU/内存/进程) -->
+
             <div class="cost-kpi-grid" style="margin-top: 12px">
               <div class="cost-kpi-card">
                 <div class="cost-kpi-label" data-i18n="mon-mem">内存使用</div>
@@ -803,7 +743,7 @@
                 <div class="cost-kpi-sub" data-i18n="mon-procs-sub">uvicorn master + worker</div>
               </div>
             </div>
-            <!-- v118.35.0.27 · 任务队列(最小版 · 接口契约 · 未接 OCR) -->
+
             <div class="cost-kpi-grid" style="margin-top: 12px">
               <div class="cost-kpi-card">
                 <div class="cost-kpi-label" data-i18n="mon-q-pending">队列待处理</div>
@@ -830,7 +770,6 @@
             </div>
           </div>
 
-          <!-- 风控·可疑活动(从用户管理页搬来)-->
           <div class="cost-section">
             <div class="cost-section-head">
               <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
@@ -841,13 +780,10 @@
       </main>
     </div>
 
-    <!-- toast 容器(home.js showToast 用) -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- v118.44.0.7 救援版 · admin SPA 完全独立 · 不引 home.js(避开 30k 行屎山的 248 处 null bug)-->
-    <!-- 轻量 i18n 字典(zh + th)· 暴露 window.ADMIN_I18N -->
     <script src="/static/admin/admin-i18n.js?v=11841102"></script>
-    <!-- admin 主逻辑 · 鉴权 + 路由 + UI + 业务 fetch · 自包含 -->
+
     <script src="/static/admin/admin.js?v=11841102" defer></script>
   </body>
 </html>

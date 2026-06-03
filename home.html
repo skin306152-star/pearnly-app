@@ -4,122 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pearnly</title>
-<!-- REFACTOR-C1-home-batch9g2 · 鉴权闸(大厂 head 内联 critical bootstrap · 最早跑 · 无 token 立即弹回登录 · 不渲染主应用) -->
+
 <script>if(!localStorage.getItem('mrpilot_token'))location.replace('/');</script>
 <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1">
 <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1">
-<link rel="stylesheet" href="/static/home-01-base.css?v=11850008">
-<link rel="stylesheet" href="/static/home-02-switcher.css?v=11850008">
-<link rel="stylesheet" href="/static/home-03-layout.css?v=11850008">
-<link rel="stylesheet" href="/static/home-04-results.css?v=11850008">
-<link rel="stylesheet" href="/static/home-05-overlays.css?v=11850008">
-<link rel="stylesheet" href="/static/home-06-responsive-rd.css?v=11850008">
-<link rel="stylesheet" href="/static/home-07-history-automation.css?v=11850008">
-<link rel="stylesheet" href="/static/home-08-pagehead-toast.css?v=11850008">
-<link rel="stylesheet" href="/static/home-09-badges-locks.css?v=11850008">
-<link rel="stylesheet" href="/static/home-10-push-logs.css?v=11850052">
-<link rel="stylesheet" href="/static/home-11-automation-settings.css?v=11850008">
-<link rel="stylesheet" href="/static/home-12-drawer-search.css?v=11850008">
-<link rel="stylesheet" href="/static/home-13-upgrade-dup-prefs.css?v=11850008">
-<link rel="stylesheet" href="/static/home-14-gemini-admin.css?v=11850008">
-<link rel="stylesheet" href="/static/home-15-team-folder.css?v=11850008">
-<link rel="stylesheet" href="/static/home-16-cost-clients.css?v=11850008">
-<link rel="stylesheet" href="/static/home-17-aibalance-reports-trial.css?v=11850008">
-<link rel="stylesheet" href="/static/home-19-exceptions-alerts.css?v=11850008">
-<link rel="stylesheet" href="/static/home-20-banners-pushlogs.css?v=11850008">
-<link rel="stylesheet" href="/static/home-21-recon-center.css?v=11850008">
-<link rel="stylesheet" href="/static/home-22-settings-mobile.css?v=11850008">
-<link rel="stylesheet" href="/static/home-23-test-center.css?v=11850008">
-<link rel="stylesheet" href="/static/home-24-logs-access-assign.css?v=11850008">
-<link rel="stylesheet" href="/static/home-25-bankrecon-erpmapping.css?v=11850008">
-<link rel="stylesheet" href="/static/home-26-erp-cards.css?v=11850008">
-<link rel="stylesheet" href="/static/home-27-erp-credentials.css?v=11850008">
-<link rel="stylesheet" href="/static/home-28-erp-banners-batch.css?v=11850008">
-<link rel="stylesheet" href="/static/home-29-vat-recon-clients.css?v=11850008">
-<link rel="stylesheet" href="/static/home-30-settings-modal.css?v=11850008">
-<link rel="stylesheet" href="/static/home-31-navia-topbar.css?v=11850008">
-<link rel="stylesheet" href="/static/home-32-recon-folding.css?v=11850008">
-<link rel="stylesheet" href="/static/home-33-dashboard.css?v=11850008">
-<link rel="stylesheet" href="/static/home-34-navia-config-drawer.css?v=11850008">
-<link rel="stylesheet" href="/static/home-35-bankrecon-v2.css?v=11850008">
-<link rel="stylesheet" href="/static/home-36-topup.css?v=11850008">
-<link rel="stylesheet" href="/static/home.css?v=11850008">
-<!-- v0.17 · M1 · 拍照转 PDF 所需 · jsPDF(约 350KB · 只在拍照时用到) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-<style id="v118-34-37-modal-defensive-override">
-/* ==================================================
-   v118.34.37 · 防御性内联覆盖 · 即使 home.css.gz 陈旧也保证设置弹窗能滚
-   根因 (2026-05-20): nginx gzip_static 服务陈旧 .gz · 见 app.py _purge_stale_static_gz()
-   这里 inline · 比 home.css 后到 · 防 home.css 改动没生效时设置弹窗仍能用
-   ================================================== */
-.settings-modal-overlay #page-settings .settings-layout {
-    display: flex !important;
-    align-items: stretch !important;
-    min-height: 0 !important;
-    gap: 0 !important;
-    flex: 1 !important;
-    overflow: hidden !important;
-}
-.settings-modal-overlay #page-settings .settings-side-nav {
-    /* v118.34.39 · 直接用 calc 卡死 max-height · 不再依赖 flex chain (align-items: stretch + min-height: 0)
-       根因 (2026-05-20 用户 DevTools 诊断抓出): 用户 viewport 659px / zoom 142% 时,
-       modal max-height 正确卡到 560px · 但 layout (flex:1) + side-nav 被 align-items:stretch 撑到
-       内容高度 611px · 超出 modal 90px · 被 modal overflow:hidden 切掉 · 永远看不到底部 '联系我们'.
-       现在直接给 side-nav 自己设 max-height: modal高度 - title bar (~80px) · bypass flex quirks. */
-    max-height: calc(min(85vh, 100vh - 64px) - 80px) !important;
-    position: static !important;
-    top: auto !important;
-    min-height: 0 !important;
-    overflow-y: scroll !important;
-    flex-shrink: 0 !important;
-    scrollbar-width: thin !important;
-    scrollbar-gutter: stable !important;
-}
-.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar {
-    width: 8px !important;
-}
-.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar-track {
-    background: transparent;
-}
-.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.18) !important;
-    border-radius: 4px;
-}
-.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.32) !important;
-}
-.settings-modal-overlay #page-settings #settings-content,
-.settings-modal-overlay #page-settings .settings-content,
-.settings-modal-overlay #page-settings .settings-content-wrap {
-    /* v118.35.0.35 (2026-05-22) · 跟 side-nav 同款修法 · 直接 max-height 卡死 · bypass flex chain
-       根因(用户截图 67% / 75% / 80% / 90% / 100% 5 个 zoom 全报):右栏只设 flex:1 + min-height:0 +
-       overflow-y:auto · 在浏览器 zoom 改 px rounding 时 flex chain 高度解析失败 · overflow-y:auto
-       不触发滚动条 · 用户看不到下方 LINE ID / 国家 / 公司信息 tab 字段。
-       v118.34.39 修过左栏(side-nav)同款 · 这次右栏照搬:直接 calc 卡死 max-height · 自己 overflow · 不依赖父. */
-    max-height: calc(min(85vh, 100vh - 64px) - 80px) !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    overflow-y: auto !important;
-    overscroll-behavior: contain !important;
-    flex: 1 !important;
-}
-.settings-modal-overlay #page-settings {
-    max-height: min(85vh, calc(100vh - 64px)) !important;
-}
+<link rel="stylesheet" href="/static/dist/home.css?v=11850090">
 
-/* v118.34.37 · Xero/MR.ERP/未来 ERP 卡片大小统一 · 用户拍板 (2026-05-20) */
-.erp-connect-cards .integration-row {
-    min-height: 72px;
-    align-items: center;
-}
-</style>
-<link rel="stylesheet" href="/static/home-37-html-inline.css?v=11850023">
-<!-- REFACTOR-WB-C · 全站统一按钮系统(品牌色 · 蓝主色)· 须最后加载 → cascade 覆盖旧黑按钮 -->
-<link rel="stylesheet" href="/static/home-38-buttons.css?v=11850031">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+
 </head>
 <body>
-    <!-- v118.24 · Chrome only 顶部横幅 · 非 Chromium 内核浏览器一次性提示 -->
+    
     <div id="chrome-only-banner" class="chrome-only-banner" style="display:none;">
         <span class="chrome-only-banner-icon" aria-hidden="true">
             <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -133,7 +29,6 @@
         </button>
     </div>
 
-    <!-- v118.2 · 切语言全局 overlay · 覆盖所有动态 render 滞后 -->
     <div class="lang-switching-overlay" id="lang-switching-overlay">
         <div class="lang-switching-overlay-inner">
             <div class="lang-switching-overlay-spinner"></div>
@@ -141,7 +36,6 @@
         </div>
     </div>
 
-    <!-- v118.28.2 · 超管 /admin 视图红色顶部 banner(默认隐藏 · home.js 检测 PEARNLY_ADMIN_MODE 后显示) -->
     <div id="admin-mode-banner" class="admin-mode-banner" style="display:none;">
         <span class="admin-mode-banner-icon" aria-hidden="true">
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -153,134 +47,96 @@
         <span class="admin-mode-banner-msg" data-i18n="admin-banner-msg">超管视图 · 你正在以 Pearnly 平台管理员身份操作 · 所有动作有审计日志</span>
     </div>
 
-<!-- ================= 顶栏 ================= -->
 <div class="topbar" id="topbar"></div>
 
-<!-- ================= 侧栏 v100 · 按用户意图重组为 4 分组 ================= -->
 <nav class="sidebar" id="sidebar"></nav>
 
-<!-- v86 · 手机端打开侧栏时的遮罩 · 点击关闭侧栏 -->
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-<!-- ================= 主区 ================= -->
 <main class="main">
 
-    <!-- v102 · 顶部配额预警 banner · 由 JS 渲染填充 -->
     <div id="trial-banner" class="trial-banner" style="display:none;"></div>
     <div id="quota-banner" class="quota-banner" style="display:none;"></div>
 
-    <!-- ============ 页面: 识别中心 (默认) ============ -->
     <section class="page active" id="page-ocr"></section>
 
-    <!-- ============ 页面: 首页 dashboard ============ -->
-    <!-- v118.32.5.5.16 · 对照 prototype_final 补内容 · 4 KPI + 快速操作 + 最近动态 -->
     <section class="page" id="page-dashboard"></section>
 
-    <!-- ============ 页面: 历史 ============ -->
     <section class="page" id="page-history"></section>
 
-    <!-- ============ 页面: 自动化 · Phase 5 收尾: 永久隐藏 · 无侧边栏入口 · 无路由 ============ -->
     <section class="page" id="page-automation" style="display:none!important">
-        <!-- REFACTOR-WB-C3 (2026-05-29) · 骨架抽到 src/home/page-automation.js · 运行期注入(import 置前 · panel 早于 DOM-move 在场)· 智能提醒等 modal 在下方 section 外 -->
+        
     </section>
 
-    <!-- v118.22.2 · 智能提醒 · 新建规则弹窗 -->
     <div class="modal-overlay" id="notif-new-modal" style="display:none;"></div>
 
-    <!-- v0.10 · 归档 token 编辑 popover -->
-    <!-- v118.27.0.1 · 全局确认弹窗(替代原生 confirm · 跟 Pearnly 整体 UI 一致) -->
     <div class="modal-overlay" id="pearnly-confirm-modal" style="display:none;"></div>
 
     <div class="modal-overlay" id="archive-token-modal" style="display:none;"></div>
 
-    <!-- ERP 端点配置对话框 -->
     <div class="modal-overlay" id="endpoint-modal" style="display:none;"></div>
 
-    <!-- v0.17 · M6 · 邮箱绑定对话框 -->
     <div class="modal-overlay" id="email-modal" style="display:none;"></div>
 
-    <!-- ============ 页面: 集成 ============ -->
     <section class="page" id="page-integration">
-        <!-- REFACTOR-WB-C3 · page-integration 占位骨架→src/home/page-placeholders.js 运行期注入 -->
+        
     </section>
 
-    <!-- ============ 页面: 模板 ============ -->
     <section class="page" id="page-templates">
-        <!-- REFACTOR-WB-C3 · page-templates 占位骨架→src/home/page-placeholders.js 运行期注入 -->
+        
     </section>
 
-    <!-- ============ 页面: API Key(自动化对接) ============ -->
     <section class="page" id="page-api-keys">
-        <!-- REFACTOR-WB-C3 · page-api-keys 占位骨架→src/home/page-placeholders.js 运行期注入 -->
+        
     </section>
 
-    <!-- ============ 页面: 设置 ============ -->
     <section class="page" id="page-settings">
-        <!-- REFACTOR-WB-C3 (2026-05-29) · 骨架抽到 src/home/page-settings.js · 运行期注入(import 置前 · 早于 recon-subtab-settings DOM-move)· 归档/设置 modal 在下方 section 外 -->
+        
     </section>
 
-    <!-- v117 · 归档命名 modal · 入口在「识别中心」顶部 -->
     <div class="modal-overlay" id="archive-rule-modal" style="display:none;"></div>
 
-    <!-- ============ 页面: 异常栏(v118.20.2 阶段 2 · 真页面骨架)============ -->
     <section class="page" id="page-exceptions">
-        <!-- REFACTOR-WB-C3 (2026-05-29) · 骨架抽到 src/home/page-exceptions.js · 运行期注入(模块 defer) -->
+        
     </section>
 
-    <!-- ============ 页面: 客户工作台(v107 上线)============ -->
     <section class="page" id="page-clients">
-        <!-- REFACTOR-WB-C3 (2026-05-29) · 骨架抽到 src/home/page-clients.js · 运行期注入(模块 defer)· modal 仍在下方 -->
+        
     </section>
 
-    <!-- ============ v107 · 客户编辑弹窗 ============ -->
     <div class="modal-mask" id="client-modal-mask" style="display:none;"></div>
 
-    <!-- ============ P3 · 账套主体编辑弹窗(新建/改名/改税号 · 仅老板)============ -->
     <div class="modal-mask" id="wsclient-modal-mask" style="display:none;"></div>
 
-    <!-- ============ 页面: 凭证中心(v104 上线)============ -->
     <section class="page" id="page-vouchers">
-        <!-- REFACTOR-WB-C3 · page-vouchers 占位骨架→src/home/page-placeholders.js 运行期注入 -->
+        
     </section>
 
-    <!-- ============ 页面: 销售发票(v110.1 上线)· 进项+销项闭环 ============ -->
     <section class="page" id="page-sales-invoices">
-        <!-- REFACTOR-WB-C3 · page-sales-invoices 占位骨架→src/home/page-placeholders.js 运行期注入 -->
+        
     </section>
 
-    <!-- ============ 页面: 应收追踪(v107 上线)============ -->
     <section class="page" id="page-receivables">
-        <!-- REFACTOR-WB-C3 · page-receivables 占位骨架→src/home/page-placeholders.js 运行期注入 -->
+        
     </section>
 
-    <!-- ============ 页面: 对账中心(v105 上线 · v118.32.4.9.2 改左右分栏)============ -->
-    <!-- 银行对账单上传 · 隐藏 input · JS 直接触发 -->
     <input type="file" id="reconcile-bank-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc" style="display:none">
     <section class="page" id="page-reconcile">
-        <!-- REFACTOR-WB-C3 (2026-05-29) · 骨架抽到 src/home/page-reconcile.js · 运行期注入(import 置 main.js 最前) -->
+        
     </section>
 
-
-    <!-- ============ 页面: 云盘同步(v108 上线)============ -->
     <section class="page" id="page-cloud">
-        <!-- REFACTOR-WB-C3 · page-cloud 占位骨架→src/home/page-placeholders.js 运行期注入 -->
+        
     </section>
 
-    <!-- ================= v118.28.1.0 · 测试中心 ================= -->
     <section class="page" id="page-test-center"></section>
 
-    <!-- ============ 页面: 集成(NAV-IA Phase 7 · 视觉框架 · 6 张 integration-row 卡片 · 完整连接/断开逻辑暂走自动化页) ============ -->
-    <!-- v118.34.19 (Zihao 2026-05-19 拍板 · A4) · 顶部 2 tab 切换:
-         - tab1 集成卡片 (cards): 现有 integration-row 列表 · 不变
-         - tab2 推送日志 (logs): 从 auto-panel="erp" 抽屉里搬来 · 全宽全屏
-         自动化页 erp-subpanel="logs" 同步删除 · 避免双重 DOM. -->
     <section class="page" id="page-integrations">
-        <!-- REFACTOR-WB-C3 (2026-05-29) · 骨架抽到 src/home/page-integrations.js · 运行期注入(int-drawer 抽屉在下方 section 外) -->
+        
     </section>
 
 </main>
 
-<!-- ================= 抽屉 ================= -->
 <div class="drawer-mask" id="drawer-mask"></div>
 <aside class="drawer" id="drawer" role="dialog">
     <div class="drawer-header">
@@ -295,7 +151,6 @@
     <div class="drawer-body" id="drawer-body"></div>
 </aside>
 
-<!-- ================= v118.32.5.5.37 · 集成配置抽屉(从集成页各配置按钮触发) ================= -->
 <div id="int-drawer-overlay" style="display:none;"></div>
 <aside id="int-drawer" class="int-drawer" role="dialog">
     <div class="int-drawer-header">
@@ -309,7 +164,6 @@
     <div id="int-drawer-body" class="int-drawer-body"></div>
 </aside>
 
-<!-- ================= v118.20.3 · 异常栏专用抽屉 ================= -->
 <div class="drawer-mask" id="exc-drawer-mask"></div>
 <aside class="drawer exc-drawer" id="exc-drawer" role="dialog" aria-labelledby="exc-drawer-title">
     <div class="drawer-header">
@@ -322,7 +176,7 @@
         </button>
     </div>
     <div class="drawer-body exc-drawer-body" id="exc-drawer-body">
-        <!-- JS 渲染 · 含「为什么被拦」+「识别字段」两段 -->
+        
     </div>
     <div class="exc-drawer-foot" id="exc-drawer-foot">
         <button class="btn btn-ghost" id="exc-btn-ignore" type="button" disabled>
@@ -341,59 +195,37 @@
     </div>
 </aside>
 
-<!-- ================= Confirm Modal (v0.15.6 · 替换浏览器原生 confirm) ================= -->
 <div class="modal-overlay" id="confirm-modal" style="display:none;"></div>
 
-<!-- ================= 拍照贴士弹窗 · v0.17 ================= -->
 <div class="modal-overlay" id="camera-tips-modal" style="display:none;"></div>
 
-<!-- ================= 银行对账 · 候选匹配抽屉 (v0.18 · M10) ================= -->
 <div class="bank-cand-drawer" id="bank-cand-drawer" style="display:none"></div>
 
-<!-- v118.26.2 · 银行对账 session 客户绑定 modal -->
 <div class="modal-overlay" id="bank-client-picker-modal" style="display:none;"></div>
 
-<!-- v110.7 · 登录后欢迎向导(B 方案 · 4 步渐进收集 · 进系统首次自动弹) -->
 <div class="modal-overlay onboarding-overlay" id="onboarding-modal" style="display:none;"></div>
 
-<!-- ================= Toast ================= -->
 <div class="toast" id="toast"></div>
 
-<!-- NAV-IA Phase 1 · Cmd+K 命令面板(2026-05-15 拍板 · 点搜索框/⌘K 触发) -->
 <div class="cmdk-mask" id="cmdk-mask" role="dialog" aria-modal="true" aria-label="Command Palette"></div>
 
-
-<!-- v118.27.3 · 帮助反馈 modal · 必须在 home.js script 之前 · 防 IIFE 找不到元素 -->
 <div class="modal-overlay" id="help-modal" style="display:none;"></div>
 
-<!-- v118.28.1 · 分配客户给员工 modal(老板用) -->
 <div class="modal-overlay" id="assign-clients-modal" style="display:none;"></div>
 
-<!-- REFACTOR-C1(2026-05-25)· i18n 字典 · 必须 sync 排在 bundle 前 · 提供 window.I18N(state.js/core.js 裸读 I18N 命中) -->
 <script src="/static/i18n-data.js?v=11850053"></script>
-<!-- REFACTOR-C1-home-batch9g2 · home.js 巨石已彻底删除 · 引导/状态/错误拦截全进 src/home/state.js(bundle 第1个import)· 鉴权闸已内联 <head> -->
-<!-- ADR-006 · 新模板列映射确认面板 · 独立 IIFE · runRecon 检测 needs_mapping 时调用 -->
+
 <script src="/static/recon-mapping.js?v=11835072" defer></script>
-<!-- ADR-006 S8 · PDF/扫描件逐行核对纠错面板 · 独立 IIFE · runRecon 检测 needs_review 时调用 -->
+
 <script src="/static/recon-review.js?v=11835074" defer></script>
-<!-- REFACTOR-A1.3 (2026-05-22) · dashboard + billing + test-center 由 Vite bundle 成 static/dist/main.js ·
-     ES module(type=module 自动 defer)· state.js 第1个 import 装错误拦截+i18n总线+window.*状态 ·
-     /api/version 现读本 main.js?v=(REFACTOR-C1-home-batch9g2 · home.js 已删 · read_frontend_version 改锚 main.js) -->
-<script type="module" src="/static/dist/main.js?v=11850081"></script>
-<!-- v118.32.5.5.17 · 新版本检测弹窗 · 独立 IIFE 不引 home.js · 30s 轮询 -->
+
+<script type="module" src="/static/dist/main.js?v=11850090"></script>
+
 <script src="/static/version-banner.js?v=11841113" defer></script>
-<!-- C-2/C-3 (2026-05-18) · MR.ERP connect cards + connect wizard(P0 2026-05-26 改 2 步)·
-     独立 IIFE 不引 home.js · 见 docs/ui/erp-integration-ui-redesign.md -->
-<link rel="stylesheet" href="/static/erp-mrerp-connect.css?v=11835002">
+
 <script src="/static/erp-mrerp-connect.js?v=11850051" defer></script>
-<!-- C-4 · push-log friendly-message overlay · MutationObserver-based · 不动现有 IIFE -->
+
 <script src="/static/erp-log-enhance.js?v=11835002" defer></script>
 
 </body>
 </html>
-
-
-
-
-
-

@@ -1,0 +1,65 @@
+/* ==================================================
+   v118.34.37 · 防御性内联覆盖 · 即使 home.css.gz 陈旧也保证设置弹窗能滚
+   根因 (2026-05-20): nginx gzip_static 服务陈旧 .gz · 见 app.py _purge_stale_static_gz()
+   这里 inline · 比 home.css 后到 · 防 home.css 改动没生效时设置弹窗仍能用
+   ================================================== */
+.settings-modal-overlay #page-settings .settings-layout {
+    display: flex !important;
+    align-items: stretch !important;
+    min-height: 0 !important;
+    gap: 0 !important;
+    flex: 1 !important;
+    overflow: hidden !important;
+}
+.settings-modal-overlay #page-settings .settings-side-nav {
+    /* v118.34.39 · 直接用 calc 卡死 max-height · 不再依赖 flex chain (align-items: stretch + min-height: 0)
+       根因 (2026-05-20 用户 DevTools 诊断抓出): 用户 viewport 659px / zoom 142% 时,
+       modal max-height 正确卡到 560px · 但 layout (flex:1) + side-nav 被 align-items:stretch 撑到
+       内容高度 611px · 超出 modal 90px · 被 modal overflow:hidden 切掉 · 永远看不到底部 '联系我们'.
+       现在直接给 side-nav 自己设 max-height: modal高度 - title bar (~80px) · bypass flex quirks. */
+    max-height: calc(min(85vh, 100vh - 64px) - 80px) !important;
+    position: static !important;
+    top: auto !important;
+    min-height: 0 !important;
+    overflow-y: scroll !important;
+    flex-shrink: 0 !important;
+    scrollbar-width: thin !important;
+    scrollbar-gutter: stable !important;
+}
+.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar {
+    width: 8px !important;
+}
+.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18) !important;
+    border-radius: 4px;
+}
+.settings-modal-overlay #page-settings .settings-side-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.32) !important;
+}
+.settings-modal-overlay #page-settings #settings-content,
+.settings-modal-overlay #page-settings .settings-content,
+.settings-modal-overlay #page-settings .settings-content-wrap {
+    /* v118.35.0.35 (2026-05-22) · 跟 side-nav 同款修法 · 直接 max-height 卡死 · bypass flex chain
+       根因(用户截图 67% / 75% / 80% / 90% / 100% 5 个 zoom 全报):右栏只设 flex:1 + min-height:0 +
+       overflow-y:auto · 在浏览器 zoom 改 px rounding 时 flex chain 高度解析失败 · overflow-y:auto
+       不触发滚动条 · 用户看不到下方 LINE ID / 国家 / 公司信息 tab 字段。
+       v118.34.39 修过左栏(side-nav)同款 · 这次右栏照搬:直接 calc 卡死 max-height · 自己 overflow · 不依赖父. */
+    max-height: calc(min(85vh, 100vh - 64px) - 80px) !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    flex: 1 !important;
+}
+.settings-modal-overlay #page-settings {
+    max-height: min(85vh, calc(100vh - 64px)) !important;
+}
+
+/* v118.34.37 · Xero/MR.ERP/未来 ERP 卡片大小统一 · 用户拍板 (2026-05-20) */
+.erp-connect-cards .integration-row {
+    min-height: 72px;
+    align-items: center;
+}

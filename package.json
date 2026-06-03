@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "description": "Pearnly · Vite build + Playwright E2E smoke. Not a runtime package.",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node scripts/build-home-css.mjs",
     "build:watch": "vite build --watch",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",

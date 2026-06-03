@@ -34,6 +34,23 @@ async def handle_unhandled_exception(request, exc):
         )
     except Exception:
         pass
+    # REFACTOR-WA-B7 · 持久化错误事件供超管时间线(fail-open · record_error 自己吞异常)
+    try:
+        import traceback as _tb
+
+        from services.observability.error_store import record_error
+
+        record_error(
+            message=f"{type(exc).__name__}: {str(exc)[:200]}",
+            source_logger="capture-500",
+            path=str(request.url.path),
+            method=request.method,
+            status_code=500,
+            exc_type=type(exc).__name__,
+            traceback="".join(_tb.format_exception(type(exc), exc, exc.__traceback__)),
+        )
+    except Exception:
+        pass
     logger.exception(
         "[capture-500] %s %s · %s",
         request.method,

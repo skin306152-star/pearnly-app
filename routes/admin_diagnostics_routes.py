@@ -80,6 +80,15 @@ async def admin_diagnostics_runtime(request: Request):
     }
 
 
+# REFACTOR-WA-B7 · 错误事件时间线(超管)· 未捕获 500 持久化在 error_events 表
+@router.get("/api/admin/diagnostics/errors")
+async def admin_diagnostics_errors(request: Request, limit: int = 100):
+    _require_super_admin(request)
+    from services.observability.error_store import list_recent_errors
+
+    return {"ok": True, "errors": list_recent_errors(limit=limit)}
+
+
 # ── GitHub Webhook 自动部署 (v118.41.133 · 2026-05-17) ──────────────────────
 # Claude 每次 git push → GitHub → 触发这个接口 → 服务器自动 pull + restart
 # 无需 SSH · 彻底绕开 fail2ban 问题

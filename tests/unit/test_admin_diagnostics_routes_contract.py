@@ -17,6 +17,7 @@ from routes.admin_diagnostics_routes import router
 
 EXPECTED = {
     ("GET", "/api/admin/diagnostics/runtime"),
+    ("GET", "/api/admin/diagnostics/errors"),  # REFACTOR-WA-B7 · 错误事件时间线(超管)
     ("POST", "/internal/deploy"),
     ("GET", "/internal/deploy/manual"),
     ("GET", "/internal/deploy/log"),

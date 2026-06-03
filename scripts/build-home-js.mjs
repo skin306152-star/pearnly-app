@@ -5,15 +5,12 @@
 // erp-log-enhance 依赖 erp-mrerp-connect 的 window._mrerpConnectShared)。
 // 每个文件独立 minify 后用 `;` 拼接 = 等价于原来各自一个 <script>(同享全局作用域)。
 // i18n-data.js 是 715KB 纯数据(window.I18N),保留独立 <script>,不并入。
+// landing.js = 着陆页(landing -> scale -> i18n -> mascot,保 DOM 时序)。
 //
 // 用法: node scripts/build-home-js.mjs
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { transformSync } from 'esbuild';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+import { readSource, writeDist } from './build-lib.mjs';
 
 const BUNDLES = [
     { out: 'static/dist/pre.js', files: ['recon-mapping.js', 'recon-review.js'] },
@@ -22,7 +19,6 @@ const BUNDLES = [
         files: ['version-banner.js', 'erp-mrerp-connect.js', 'erp-log-enhance.js'],
     },
     {
-        // 着陆页:顺序 landing→scale→i18n→mascot(defer · 保原 DOM 时序)
         out: 'static/dist/landing.js',
         files: [
             'landing/landing.js',
@@ -34,13 +30,8 @@ const BUNDLES = [
 ];
 
 for (const b of BUNDLES) {
-    const parts = b.files.map((f) => {
-        const src = fs.readFileSync(path.join(ROOT, 'static', f), 'utf8').replace(/^\uFEFF/, '');
-        return transformSync(src, { loader: 'js', minify: true }).code;
-    });
-    // `;` 兜底 ASI · 每段已是独立 minified 脚本,合并后顶层全局与原多 <script> 等价
-    const code = parts.join(';\n');
-    fs.mkdirSync(path.join(ROOT, path.dirname(b.out)), { recursive: true });
-    fs.writeFileSync(path.join(ROOT, b.out), code);
-    console.log(`✅ ${b.out} · ${b.files.length} 文件 → ${code.length} 字节`);
+    const code = b.files
+        .map((f) => transformSync(readSource(`static/${f}`), { loader: 'js', minify: true }).code)
+        .join(';\n');
+    writeDist(b.out, code);
 }

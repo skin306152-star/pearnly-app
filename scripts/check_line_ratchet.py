@@ -136,7 +136,7 @@ def parse_numstat(output: str) -> list[tuple[int, int, str]]:
         # (否则 is_monitored / RATCHET-EXEMPT 无法匹配含 " => " 的复合串)
         if "=>" in path:
             if "{" in path:
-                path = re.sub(r"\{[^}]*=> ([^}]*)\}", r"\1", path).replace("//", "/")
+                path = re.sub(r"/{2,}", "/", re.sub(r"\{[^}]*=> ([^}]*)\}", r"\1", path))
             else:
                 path = path.split("=>", 1)[1].strip()
         rows.append((a, d, path))

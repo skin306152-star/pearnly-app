@@ -5,14 +5,11 @@
 // CSS 层叠 / !important 收口依赖顺序,改动这两个数组前务必核对 DOM 顺序。
 // home.css 是历史死链(C2 拆空)已剔除;内联 modal override 已抽成 home-modal-override.css。
 //
-// 用法: node scripts/build-home-css.mjs [--check]
+// 用法: node scripts/build-home-css.mjs
 
-import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { transform } from 'esbuild';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+import { readSource, writeDist } from './build-lib.mjs';
 
 const HOME_CSS = [
     'home-01-base.css',
@@ -117,13 +114,9 @@ const BUNDLES = [
     { list: LANDING_CSS, out: 'static/dist/landing.css' },
 ];
 
-async function buildOne(list, out, check) {
+async function buildOne(list, out) {
     const chunks = list.map((f) => {
-        const fp = path.join(ROOT, 'static', f);
-        if (!fs.existsSync(fp)) throw new Error(`CSS 源缺失: ${f}`);
-        // strip BOM:文件开头的 BOM 独立 link 时浏览器忽略,但合并到 bundle 中间
-        // 就是非法字符,会破坏紧跟的那条 CSS 规则(landing-auth.css 的 .auth-card 中招过)
-        let css = fs.readFileSync(fp, 'utf8').replace(/^\uFEFF/, '');
+        let css = readSource(`static/${f}`);
         // 相对 url('./x') 跟着源文件目录走;移进 dist/ 后须改成绝对路径,否则资源 404
         const dir = path.dirname(f); // 'landing' 或 '.'
         if (dir !== '.') {
@@ -131,20 +124,12 @@ async function buildOne(list, out, check) {
         }
         return css;
     });
-    const merged = chunks.join('\n');
-    const { code } = await transform(merged, { loader: 'css', minify: true });
-    if (check) {
-        console.log(`[${out}] ${list.length} 片段 · ${merged.length}→${code.length} 字节`);
-        return;
-    }
-    fs.mkdirSync(path.join(ROOT, path.dirname(out)), { recursive: true });
-    fs.writeFileSync(path.join(ROOT, out), code);
-    console.log(`✅ ${out} · ${list.length} 片段 → ${code.length} 字节`);
+    const { code } = await transform(chunks.join('\n'), { loader: 'css', minify: true });
+    writeDist(out, code);
 }
 
 async function main() {
-    const check = process.argv.includes('--check');
-    for (const b of BUNDLES) await buildOne(b.list, b.out, check);
+    for (const b of BUNDLES) await buildOne(b.list, b.out);
 }
 
 main().catch((e) => {

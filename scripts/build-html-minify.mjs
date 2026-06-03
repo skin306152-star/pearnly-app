@@ -3,12 +3,8 @@
 //
 // 用法: node scripts/build-html-minify.mjs
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { minify } from 'html-minifier-terser';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+import { readSource, writeDist } from './build-lib.mjs';
 
 // 保守但有效:折叠标签间空白 + 压内联 JS(鉴权 bootstrap),保留 data-i18n / 属性引号 / 自闭合斜杠
 const OPTS = {
@@ -29,11 +25,5 @@ const TARGETS = [
 ];
 
 for (const t of TARGETS) {
-    const srcPath = path.join(ROOT, t.src);
-    const html = fs.readFileSync(srcPath, 'utf8');
-    const min = await minify(html, OPTS);
-    const outPath = path.join(ROOT, t.out);
-    fs.mkdirSync(path.dirname(outPath), { recursive: true });
-    fs.writeFileSync(outPath, min);
-    console.log(`✅ ${t.out} · ${html.length}→${min.length} 字节`);
+    writeDist(t.out, await minify(readSource(t.src), OPTS));
 }

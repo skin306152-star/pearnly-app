@@ -90,9 +90,9 @@ def count_pattern_in_file(path: Path, pattern: str) -> int:
     return len(re.findall(pattern, text))
 
 
-def count_unit_tests() -> int:
-    """统计 tests/unit/ 下 def test_* 总数"""
-    test_dir = PROJECT_ROOT / "tests" / "unit"
+def _count_pytests(subdir: str) -> int:
+    """统计 tests/<subdir>/ 下 def test_* 总数 · 目录不存在返 0(诚实)"""
+    test_dir = PROJECT_ROOT / "tests" / subdir
     if not test_dir.exists():
         return 0
     total = 0
@@ -100,18 +100,14 @@ def count_unit_tests() -> int:
         with py_file.open("r", encoding="utf-8", errors="replace") as f:
             total += len(re.findall(r"^\s*def\s+test_\w+", f.read(), re.MULTILINE))
     return total
+
+
+def count_unit_tests() -> int:
+    return _count_pytests("unit")
 
 
 def count_integration_tests() -> int:
-    """统计 tests/integration/ 下 def test_* 总数 · 目录不存在返 0(诚实)"""
-    test_dir = PROJECT_ROOT / "tests" / "integration"
-    if not test_dir.exists():
-        return 0
-    total = 0
-    for py_file in test_dir.rglob("*.py"):
-        with py_file.open("r", encoding="utf-8", errors="replace") as f:
-            total += len(re.findall(r"^\s*def\s+test_\w+", f.read(), re.MULTILINE))
-    return total
+    return _count_pytests("integration")
 
 
 def count_e2e_tests() -> int:

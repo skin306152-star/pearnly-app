@@ -56,7 +56,7 @@ def mrerp_session_lock(account_key: str, timeout_sec: float = 180.0, poll_sec: f
     保持事务打开会让 PgBouncer 把后端 pin 到本连接,xact 锁在两种 pooling 下都真正互斥;
     退出时 rollback 结束事务 → 自动释放锁 + 解 pin(崩溃断连也自动释放)。
     """
-    import db
+    from core import db
 
     key = _account_lock_key(account_key)
     conn = None

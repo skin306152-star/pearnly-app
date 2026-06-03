@@ -62,7 +62,7 @@ def record_field_override(row_id: int, field: str, user_value: Optional[str]) ->
     OCR 原值锁定逻辑(铁律 #15):该字段已有 override 时复用其 ocr · 否则取当前 OCR 值。
     返回 {"ok": bool, "field_overrides": <最新全量 dict>, "error": <可选>}
     """
-    import db  # 延迟 import 避免循环依赖
+    from core import db  # 延迟 import 避免循环依赖
 
     if field not in ALLOWED_FIELDS:
         return {"ok": False, "error": "field_not_allowed"}
@@ -94,7 +94,7 @@ def record_field_override(row_id: int, field: str, user_value: Optional[str]) ->
 
 
 def _write_overrides(row_id: int, overrides: Dict[str, Any]) -> bool:
-    import db
+    from core import db
 
     try:
         with db.get_cursor(commit=True) as cur:

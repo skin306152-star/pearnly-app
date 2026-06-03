@@ -11,7 +11,7 @@
 import unittest
 from decimal import Decimal
 
-import db
+from core import db
 from services.billing import pricing
 
 

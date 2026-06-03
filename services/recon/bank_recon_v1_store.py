@@ -10,7 +10,7 @@ db.py 文件尾 re-export 对外函数 · 所有 `db.xxx()` 调用点不变。
 import logging
 from typing import Optional, Dict, Any, List
 
-import db
+from core import db
 
 # facade re-export(REFACTOR-WA-B1 · 匹配实现下沉 bank_recon_match · db.X/store.X 单一对象不变)
 from services.recon.bank_recon_match import (  # noqa: F401,E402

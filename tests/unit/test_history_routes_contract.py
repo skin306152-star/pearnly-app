@@ -12,10 +12,10 @@ REFACTOR-B1 守门测试 · OCR 历史 10 路由从 app.py 抽到 history_routes
 
 import unittest
 
-import exception_checks
-import route_helpers
-import history_routes
-from history_routes import (
+from services.exceptions import exception_checks
+from core import route_helpers
+from routes import history_routes
+from routes.history_routes import (
     HistoryBatchDeleteRequest,
     HistoryUpdateRequest,
     _check_history_access,

@@ -15,104 +15,117 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-import db  # noqa: F401 · app.db 命名空间(大量测试 monkeypatch app.db.xxx · 路由经 app.db 调 · 必须保留)
+# app.db 命名空间(大量测试 monkeypatch app.db.xxx · 路由经 app.db 调 · 必须保留)
+from core import db  # noqa: F401
 
 try:
-    import line_client  # T1 · LINE Bot(v0.19.0)
+    from services.line_binding import line_client  # T1 · LINE Bot(v0.19.0)
 except ImportError:
     line_client = None  # line_client.py 不在 pearnly 仓库 · 文件需单独部署到服务器
-from report_routes import router as reports_router  # v109.0
-from ocr_recognize_routes import router as ocr_recognize_router  # REFACTOR-WB-app · 2026-06-01
-from auth_signup import router as signup_router  # v109.3
-from auth_email_code_routes import (
+from routes.report_routes import router as reports_router  # v109.0
+from routes.ocr_recognize_routes import (
+    router as ocr_recognize_router,
+)  # REFACTOR-WB-app · 2026-06-01
+from services.auth.auth_signup import router as signup_router  # v109.3
+from routes.auth_email_code_routes import (
     router as auth_email_code_router,
 )  # REFACTOR-B1 · 2026-05-28
-from line_account_merge_routes import (
+from routes.line_account_merge_routes import (
     router as line_account_merge_router,
 )  # REFACTOR-B1 · 2026-05-28
-from oauth_routes import router as oauth_router  # REFACTOR-B1 · Google+LINE OAuth · 2026-05-28
-from line_webhook_routes import (
+from routes.oauth_routes import (
+    router as oauth_router,
+)  # REFACTOR-B1 · Google+LINE OAuth · 2026-05-28
+from routes.line_webhook_routes import (
     router as line_webhook_router,
 )  # REFACTOR-B1 · LINE Bot webhook · 2026-05-28
-from login_routes import router as login_router  # REFACTOR-B1 · 主登录 · 2026-05-28
-from meta_aliases_routes import (
+from routes.login_routes import router as login_router  # REFACTOR-B1 · 主登录 · 2026-05-28
+from routes.meta_aliases_routes import (
     router as meta_aliases_router,
 )  # REFACTOR-B1 · /api/version + v1 OCR 别名 · 2026-05-28
-from ocr_export_routes import (
+from routes.ocr_export_routes import (
     router as ocr_export_router,
 )  # REFACTOR-B1 · OCR 配额+导出 4 路由 · 2026-05-28
-from recon_routes import router as recon_router  # v118.32.0
-from recon_jobs_routes import router as recon_jobs_router  # ADR-005 #15 · 对账异步 submit/状态
-from import_routes import router as import_router  # ADR-006 · 通用模板学习层 列映射接口
-from vat_excel_routes import router as vat_excel_router  # v118.32.4.9.5 · Excel 公式对账内测
-from notification_routes import router as notification_router  # REFACTOR-B1 · 2026-05-24
-from clients_routes import router as clients_router  # REFACTOR-B1 · 客户管理 5 路由 · 2026-05-24
-from team_routes import router as team_router  # REFACTOR-B1 · 员工管理 7 路由 · 2026-05-25
-from email_ingest_routes import (
+from routes.recon_routes import router as recon_router  # v118.32.0
+from routes.recon_jobs_routes import (
+    router as recon_jobs_router,
+)  # ADR-005 #15 · 对账异步 submit/状态
+from routes.import_routes import router as import_router  # ADR-006 · 通用模板学习层 列映射接口
+from routes.vat_excel_routes import router as vat_excel_router  # v118.32.4.9.5 · Excel 公式对账内测
+from routes.notification_routes import router as notification_router  # REFACTOR-B1 · 2026-05-24
+from routes.clients_routes import (
+    router as clients_router,
+)  # REFACTOR-B1 · 客户管理 5 路由 · 2026-05-24
+from routes.team_routes import router as team_router  # REFACTOR-B1 · 员工管理 7 路由 · 2026-05-25
+from routes.email_ingest_routes import (
     router as email_ingest_router,
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25
-from rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税务 4 路由 · 2026-05-25
-from workspace_routes import (
+from routes.rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税务 4 路由 · 2026-05-25
+from routes.workspace_routes import (
     router as workspace_router,
 )  # B4 · workspace 账套主体(非破坏) · 2026-05-25
-from categories_routes import router as categories_router  # REFACTOR-B1 · 分类 1 路由 · 2026-05-25
-from pages_routes import (
+from routes.categories_routes import (
+    router as categories_router,
+)  # REFACTOR-B1 · 分类 1 路由 · 2026-05-25
+from routes.pages_routes import (
     router as pages_router,
 )  # REFACTOR-B1 · 静态页面 + 公开 meta 12 路由 · 2026-05-25
-from me_routes import (
+from routes.me_routes import (
     router as me_router,
 )  # REFACTOR-B1 · /api/me 家族 3 路由 + UserInfo · 2026-05-25
-from line_binding_routes import (
+from routes.line_binding_routes import (
     router as line_binding_router,
 )  # REFACTOR-B1 · LINE 绑定 + 偏好语言 4 路由 · 2026-05-25
-from erp_routes import (  # REFACTOR-B1 · ERP 推送 15 路由 · 2026-05-25
+from routes.erp_routes import (  # REFACTOR-B1 · ERP 推送 15 路由 · 2026-05-25
     router as erp_router,
 )
-from dms_routes import (  # MR.ERP DMS 汽车销售 · 身份证→订车单 1 路由 · 2026-05-31
+from routes.dms_routes import (  # MR.ERP DMS 汽车销售 · 身份证→订车单 1 路由 · 2026-05-31
     router as dms_router,
 )
-from admin_users_routes import (
+from routes.admin_users_routes import (
     router as admin_users_router,
 )  # REFACTOR-B1 · 超管用户/员工 15 路由 · 2026-05-25
 
 # REFACTOR-B1 · OCR 异常检测链单一来源 re-export(契约 test_exception_checks_contract;
 # 实际消费者已搬到 services/ocr/recognize/* 与 line_image_ocr · app 自身不再直接调)。
-from exception_checks import _async_run_exception_checks  # noqa: F401
-from history_routes import (
+from services.exceptions.exception_checks import _async_run_exception_checks  # noqa: F401
+from routes.history_routes import (
     router as history_router,
 )  # REFACTOR-B1 · OCR 历史 11 路由(含 assign_client) · 2026-05-25
-from settings_routes import (
+from routes.settings_routes import (
     router as settings_router,
 )  # REFACTOR-B1 · 归档/查重设置 5 路由 · 2026-05-25
-from erp_mappings_routes import (
+from routes.erp_mappings_routes import (
     router as erp_mappings_router,
 )  # REFACTOR-B1 · ERP 映射 12 路由 · 2026-05-25
-from bank_recon_routes import (
+from routes.bank_recon_routes import (
     router as bank_recon_router,
 )  # REFACTOR-B1 · 银行对账 11 路由 · 2026-05-25
-from admin_migration_routes import (
+from routes.admin_migration_routes import (
     router as admin_migration_router,
 )  # REFACTOR-B1 · 超管迁移/RLS 7 路由 · 2026-05-25
-from admin_cost_routes import (
+from routes.admin_cost_routes import (
     router as admin_cost_router,
 )  # REFACTOR-B1 · 超管成本/收入/监控 10 路由 · 2026-05-25
-from tenant_routes import router as tenant_router  # REFACTOR-B1 · 租户管理 6 路由 · 2026-05-25
-from admin_logs_routes import (
+from routes.tenant_routes import (
+    router as tenant_router,
+)  # REFACTOR-B1 · 租户管理 6 路由 · 2026-05-25
+from routes.admin_logs_routes import (
     router as admin_logs_router,
 )  # REFACTOR-B1 · 操作/审计日志 4 路由 · 2026-05-25
-from erp_xero_routes import (
+from routes.erp_xero_routes import (
     router as erp_xero_router,
 )  # REFACTOR-B1 · ERP 连接器聚合 + Xero 8 路由 · 2026-05-25
-from exceptions_routes import (
+from routes.exceptions_routes import (
     router as exceptions_router,
 )  # REFACTOR-B1 · 异常处理 8 路由 · 2026-05-24
-from billing_routes import (
+from routes.billing_routes import (
     router as billing_router,
 )  # 阶段 5 Task 5.1 · 抽 11 个 billing 路由(2026-05-22)
-from admin_diagnostics_routes import (
+from routes.admin_diagnostics_routes import (
     router as admin_diagnostics_router,
 )  # 阶段 5 Task 5.2 · 抽 5 个 admin diagnostics + internal/deploy* 路由(2026-05-22)
-from route_helpers import (  # 公共鉴权 helper;app 再导出锁单一来源(契约 test_route_helpers_contract/test_tid_helper_single_source)
+from core.route_helpers import (  # 公共鉴权 helper;app 再导出锁单一来源(契约 test_route_helpers_contract/test_tid_helper_single_source)
     _plan_permissions,  # noqa: F401
     _tid,  # noqa: F401
 )

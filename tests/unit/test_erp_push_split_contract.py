@@ -28,11 +28,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import erp_push as _erp  # noqa: E402
-import erp_mrerp_listing as _listing  # noqa: E402
-import erp_mrerp_crud as _crud  # noqa: E402
-import erp_payload as _payload  # noqa: E402
-import erp_dms_push as _dms  # noqa: E402
+from services.erp import erp_push as _erp  # noqa: E402
+from services.erp import erp_mrerp_listing as _listing  # noqa: E402
+from services.erp import erp_mrerp_crud as _crud  # noqa: E402
+from services.erp import erp_payload as _payload  # noqa: E402
+from services.erp import erp_dms_push as _dms  # noqa: E402
 
 _E1 = ("test_mrerp_endpoint",)  # 连接测试留 erp_mrerp_listing
 _E1B = ("list_mrerp_customers", "list_mrerp_products")  # 列表拉取 → erp_mrerp_crud

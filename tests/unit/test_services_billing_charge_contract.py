@@ -46,7 +46,7 @@ def _ctxmgr(cur):
 
 class ChargeReExportTests(unittest.TestCase):
     def test_db_reexports(self):
-        import db
+        from core import db
         from services.billing import charge
 
         for name in ("charge_ocr", "_excel_char_count_estimate", "charge_ocr_async"):

@@ -11,7 +11,7 @@ get/unbind 的 SQL 形状 + 返回 + 冲突拒绝 + 异常吞咽兜底。
 import unittest
 from unittest import mock
 
-import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
+from core import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
 from services.line_binding import store as lb
 
 

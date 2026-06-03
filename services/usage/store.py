@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

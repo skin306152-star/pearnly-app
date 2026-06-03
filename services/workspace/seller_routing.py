@@ -259,4 +259,4 @@ def update_history_workspace_client_id(
         return False
 
 
-import db  # noqa: E402
+from core import db  # noqa: E402

@@ -14,7 +14,7 @@ import unittest
 
 import openpyxl
 
-import vat_file_classifier as vfc
+from services.vat import vat_file_classifier as vfc
 
 
 class FilenameGuessTests(unittest.TestCase):

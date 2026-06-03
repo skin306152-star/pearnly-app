@@ -47,4 +47,4 @@ def ensure_email_codes_table():
 
 
 # ⚠️ `import db` 必须在 def 之后(解循环 import)
-import db  # noqa: E402
+from core import db  # noqa: E402

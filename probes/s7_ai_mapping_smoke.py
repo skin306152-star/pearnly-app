@@ -21,7 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import bank_recon_v2 as brv2  # noqa: E402
+from services.recon import bank_recon_v2 as brv2  # noqa: E402
 from services.importer import template_learning as tl  # noqa: E402
 
 

@@ -10,7 +10,7 @@ REFACTOR-D1 守门测试 · report_routes.py(v109 报告 / 模板导出 router)�
 
 import unittest
 
-from report_routes import router
+from routes.report_routes import router
 
 EXPECTED = {
     ("GET", "/api/reports/templates"),

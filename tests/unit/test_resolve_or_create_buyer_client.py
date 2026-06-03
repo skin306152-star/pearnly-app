@@ -10,7 +10,7 @@
 import unittest
 from unittest import mock
 
-import db  # noqa: F401 — 先完成 db 初始化,避免 services.clients.store 循环导入
+from core import db  # noqa: F401 — 先完成 db 初始化,避免 services.clients.store 循环导入
 from services.clients import store
 from services.clients import buyer_resolve as br  # REFACTOR-WA-B1 R12 · 买家解析下沉 · patch 锚点
 

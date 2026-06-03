@@ -12,7 +12,7 @@ finish / set_needs_review / set_needs_mapping / set_failed / fail / reclaim_stal
 import unittest
 from unittest import mock
 
-import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
+from core import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
 from services.recon_jobs import store as rj
 
 

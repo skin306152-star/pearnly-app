@@ -72,4 +72,4 @@ def ensure_exceptions_tables():
         logger.error(f"ensure_exceptions_tables failed: {e}")
 
 
-import db  # noqa: E402
+from core import db  # noqa: E402

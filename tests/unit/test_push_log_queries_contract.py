@@ -9,7 +9,7 @@ REFACTOR-WA-B1 守门测试 · services/erp/push_log_queries.py
 
 import unittest
 
-import db
+from core import db
 from services.erp import push_store as store, push_log_queries as q
 
 _NAMES = [

@@ -62,7 +62,7 @@ class _FakeCursor:
 
 def _patch_cursor(cur):
     """patch db.get_cursor 让每次调用都返回同一 fake cursor(忽略 commit kwarg)。"""
-    return mock.patch("db.get_cursor", return_value=cur)
+    return mock.patch("core.db.get_cursor", return_value=cur)
 
 
 class MembershipStoreContractTests(unittest.TestCase):

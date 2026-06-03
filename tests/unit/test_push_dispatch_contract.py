@@ -15,7 +15,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-import erp_push
+from services.erp import erp_push
 from services.erp import push_dispatch
 
 

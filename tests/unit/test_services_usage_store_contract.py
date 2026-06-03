@@ -38,7 +38,7 @@ def _ctxmgr(cur):
 
 class UsageStoreReExportTests(unittest.TestCase):
     def test_db_reexports_same_object(self):
-        import db
+        from core import db
         from services.usage import store
 
         for name in (

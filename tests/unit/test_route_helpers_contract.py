@@ -16,7 +16,7 @@ from unittest import mock
 
 from fastapi import HTTPException
 
-import route_helpers
+from core import route_helpers
 
 
 class RouteHelpersImportContractTests(unittest.TestCase):
@@ -34,12 +34,12 @@ class RouteHelpersImportContractTests(unittest.TestCase):
 
     def test_single_source_of_truth(self):
         """app.py 与已抽出的 routes 必须复用 route_helpers 同一份对象 · 不许各自拷贝"""
-        import admin_diagnostics_routes
-        import admin_users_routes
+        from routes import admin_diagnostics_routes
+        from routes import admin_users_routes
         import app
-        import billing_routes
-        import erp_xero_routes
-        import team_routes
+        from routes import billing_routes
+        from routes import erp_xero_routes
+        from routes import team_routes
 
         # REFACTOR-B1(2026-05-25):_require_super_admin / _log_op 在 app.py 的最后消费者
         # (超管用户/员工路由)已随 admin_users_routes 搬出 · app.py 不再 import(ruff F401)·

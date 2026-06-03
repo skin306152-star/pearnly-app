@@ -10,7 +10,7 @@ P0.1 BUG-B-T1 v118.35.0.37 · 守门测试 · recon_routes._apply_anchor_overrid
 
 import unittest
 
-from recon_routes import _apply_anchor_overrides
+from routes.recon_routes import _apply_anchor_overrides
 
 
 class ApplyAnchorOverridesContractTests(unittest.TestCase):

@@ -17,8 +17,8 @@ from unittest import mock
 
 from fastapi import HTTPException
 
-import import_routes as ir
-import recon_jobs_routes as rjr
+from routes import import_routes as ir
+from routes import recon_jobs_routes as rjr
 
 
 def _xlsx(rows):

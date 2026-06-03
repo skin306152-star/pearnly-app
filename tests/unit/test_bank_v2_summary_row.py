@@ -9,7 +9,7 @@ v118.35.0.60 · 守门测试 · 汇总/合计行识别(_is_summary_row)
 """
 
 import unittest
-from bank_recon_v2 import _is_summary_row
+from services.recon.bank_recon_v2 import _is_summary_row
 
 
 class SummaryRowTests(unittest.TestCase):

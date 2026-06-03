@@ -14,8 +14,8 @@ v118.35.0.54 · 守门测试 · 银行对账输入不匹配警告(_detect_recon_
 import unittest
 from datetime import date
 
-from bank_recon_v2 import StatementRow, GlRow
-from recon_routes import _detect_recon_mismatch
+from services.recon.bank_recon_v2 import StatementRow, GlRow
+from routes.recon_routes import _detect_recon_mismatch
 
 
 def _s(d):

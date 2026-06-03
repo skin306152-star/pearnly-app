@@ -43,8 +43,8 @@ class BackgroundLoopsContractTests(unittest.TestCase):
         self.assertIs(startup.email_ingest_loop, bl.email_ingest_loop)
 
     def test_module_reuses_top_level_erp_push_and_db(self):
-        import db
-        import erp_push
+        from core import db
+        from services.erp import erp_push
 
         self.assertIs(bl.erp_push, erp_push)
         self.assertIs(bl.db, db)

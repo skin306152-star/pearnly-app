@@ -12,7 +12,7 @@ REFACTOR-WA-B1 守门测试 · services/clients/buyer_resolve.py
 
 import unittest
 
-import db
+from core import db
 from services.clients import store, buyer_resolve as br
 
 _PUBLIC = [

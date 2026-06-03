@@ -35,7 +35,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 def _load():
     try:
-        import db
+        from core import db
         import services.dal_reexports as dal
     except Exception as e:  # pragma: no cover - import 环境问题才触发
         raise unittest.SkipTest(f"db / services.dal_reexports 不可 import:{e}")

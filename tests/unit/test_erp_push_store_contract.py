@@ -7,7 +7,7 @@
 
 import unittest
 
-import db
+from core import db
 from services.erp import push_store as store
 
 _MOVED = [

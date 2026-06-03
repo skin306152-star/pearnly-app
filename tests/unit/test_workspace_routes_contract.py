@@ -10,7 +10,7 @@
 
 import unittest
 
-from workspace_routes import router as workspace_router
+from routes.workspace_routes import router as workspace_router
 
 
 def _route_set(router):

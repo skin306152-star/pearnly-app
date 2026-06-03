@@ -17,7 +17,7 @@ import unittest
 from services.ocr.schemas import ThaiInvoice, PipelinePageResult, PipelineResult
 from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
 from services.ocr.pipeline import _count_invoice_no_candidates
-import invoice_grouper
+from services.ocr import invoice_grouper
 
 
 def _inv(no, total, buyer="", sub="", vat=""):

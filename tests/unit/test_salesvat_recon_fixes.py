@@ -11,7 +11,7 @@
 import unittest
 from unittest import mock
 
-import vat_excel_export as VEX
+from services.vat import vat_excel_export as VEX
 
 
 class BranchNormalizationTests(unittest.TestCase):
@@ -81,7 +81,7 @@ class MergeMixedPeriodTests(unittest.TestCase):
 
     def _patch_parse(self, side_effect):
         # merge_vat_reports 拆到 vat_report_merge · parse_vat_report 在该模块命名空间解析
-        p = mock.patch("vat_report_merge.parse_vat_report", side_effect=side_effect)
+        p = mock.patch("services.vat.vat_report_merge.parse_vat_report", side_effect=side_effect)
         p.start()
         self.addCleanup(p.stop)
 
@@ -165,11 +165,11 @@ class SalesvatOcrCountTests(unittest.TestCase):
                     {"n_total": 1, "n_ok": 1, "n_diff": 0, "diff_amount_total": 0.0},
                 ),
             ),
-            mock.patch("vat_excel_routes._save_excel_file", return_value="/tmp/x.xlsx"),
-            mock.patch("db.create_vat_recon_task", side_effect=_capture_create),
-            mock.patch("db.get_cursor"),
-            mock.patch("db.get_latest_balance", return_value={"calibration_factor": 1.1}),
-            mock.patch("db.log_ocr_cost"),
+            mock.patch("routes.vat_excel_routes._save_excel_file", return_value="/tmp/x.xlsx"),
+            mock.patch("core.db.create_vat_recon_task", side_effect=_capture_create),
+            mock.patch("core.db.get_cursor"),
+            mock.patch("core.db.get_latest_balance", return_value={"calibration_factor": 1.1}),
+            mock.patch("core.db.log_ocr_cost"),
         ):
             import tempfile
             import os

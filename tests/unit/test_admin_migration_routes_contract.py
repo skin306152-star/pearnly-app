@@ -10,9 +10,9 @@ REFACTOR-B1 守门测试 · 超管迁移/RLS 7 路由从 app.py 抽到 admin_mig
 
 import unittest
 
-import admin_migration_routes
-import route_helpers
-from admin_migration_routes import router
+from routes import admin_migration_routes
+from core import route_helpers
+from routes.admin_migration_routes import router
 
 
 class AdminMigrationRoutesContractTests(unittest.TestCase):

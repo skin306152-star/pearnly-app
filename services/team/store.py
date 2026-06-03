@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any, List
 
 import bcrypt as _bcrypt
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

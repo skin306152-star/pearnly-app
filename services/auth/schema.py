@@ -14,7 +14,7 @@ logger = logging.getLogger("mrpilot.signup")
 def _ensure_schema():
     """v109.3.2 数据库迁移 · 每条独立事务 · 失败不影响后续"""
     try:
-        import db as _db
+        from core import db as _db
 
         sqls = [
             # users 表新增字段(原有)

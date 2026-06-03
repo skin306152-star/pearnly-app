@@ -11,7 +11,7 @@ get_user_tenant_id(memberships 优先回退 users.tenant_id)。
 import logging
 from typing import Optional
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

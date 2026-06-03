@@ -25,8 +25,10 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import erp_push as _erp  # noqa: E402
-import erp_dms_push  # noqa: E402  · E3:push_mrerp_dms_id_card 已搬此处,内部解析 _build_mrerp_dms_adapter
+from services.erp import erp_push as _erp  # noqa: E402
+from services.erp import (
+    erp_dms_push,
+)  # noqa: E402  · E3:push_mrerp_dms_id_card 已搬此处,内部解析 _build_mrerp_dms_adapter
 from services.erp.mrerp_dms_models import DMSPushResult  # noqa: E402
 
 

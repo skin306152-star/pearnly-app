@@ -306,4 +306,4 @@ def override_tx_match(tx_id: str, user_id: str, history_id: Optional[str], statu
         return False
 
 
-import db  # noqa: E402 · 循环 import 解法
+from core import db  # noqa: E402 · 循环 import 解法

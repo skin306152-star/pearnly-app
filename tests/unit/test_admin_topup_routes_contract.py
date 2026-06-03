@@ -14,7 +14,7 @@ import unittest
 
 class AdminTopupRouteContractTests(unittest.TestCase):
     def test_billing_router_has_admin_topup_routes(self):
-        import billing_routes as br
+        from routes import billing_routes as br
 
         got = {
             (m, r.path)

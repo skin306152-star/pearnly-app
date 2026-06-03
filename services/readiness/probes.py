@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 
-import db
+from core import db
 
 
 def probe_db() -> dict:

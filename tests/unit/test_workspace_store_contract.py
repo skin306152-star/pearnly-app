@@ -12,7 +12,7 @@ import unittest
 from contextlib import contextmanager
 from unittest import mock
 
-import db
+from core import db
 from services.workspace import store
 
 
@@ -53,7 +53,7 @@ class InputGuardTests(unittest.TestCase):
 
 class CrudSqlTests(unittest.TestCase):
     def test_create_returns_new_id(self):
-        with mock.patch("db.get_cursor", return_value=_fake_cursor(fetchone={"id": 42})):
+        with mock.patch("core.db.get_cursor", return_value=_fake_cursor(fetchone={"id": 42})):
             wid = store.create_workspace_client("u1", "t1", "BAKELAB", tax_id="0105560000000")
             self.assertEqual(wid, 42)
 
@@ -72,13 +72,13 @@ class CrudSqlTests(unittest.TestCase):
             cur.execute.side_effect = _exec
             yield cur
 
-        with mock.patch("db.get_cursor", _cap):
+        with mock.patch("core.db.get_cursor", _cap):
             row = store.get_workspace_client(1, "u1", tenant_id="t1")
         self.assertEqual(row["name"], "BAKELAB")
         self.assertIn("tenant_id = %s", captured["sql"])
 
     def test_bind_endpoint_rowcount_true(self):
-        with mock.patch("db.get_cursor", return_value=_fake_cursor(rowcount=1)):
+        with mock.patch("core.db.get_cursor", return_value=_fake_cursor(rowcount=1)):
             self.assertTrue(store.bind_workspace_endpoint(1, "ep-9", "u1", tenant_id="t1"))
 
     def test_get_endpoint_id_reads_binding(self):

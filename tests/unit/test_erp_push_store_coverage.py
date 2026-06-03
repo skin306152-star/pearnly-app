@@ -20,7 +20,7 @@ from unittest import mock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import db  # noqa: E402,F401  · 先 import db 避免 partial-init 循环
+from core import db  # noqa: E402,F401  · 先 import db 避免 partial-init 循环
 from services.erp import push_store as store  # noqa: E402
 
 

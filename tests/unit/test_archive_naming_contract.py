@@ -10,7 +10,7 @@ archive.py(按模板 + 一条 OCR 历史生成合法归档文件名)此前 0 专
 
 import unittest
 
-import archive
+from services.archive import archive
 
 
 class SanitizeTests(unittest.TestCase):

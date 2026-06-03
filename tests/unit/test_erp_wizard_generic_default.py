@@ -24,7 +24,7 @@ from unittest.mock import patch, MagicMock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
-import erp_push as _erp  # noqa: E402
+from services.erp import erp_push as _erp  # noqa: E402
 
 from services.erp.mrerp_product_sync import suggest_generic_product_code  # noqa: E402
 
@@ -100,7 +100,7 @@ class WizardProductsRouteTests(unittest.TestCase):
 
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app  # noqa: F401
-        import erp_listing_routes  # noqa: F401  # wizard/连接/列表路由已拆到此模块
+        from routes import erp_listing_routes  # noqa: F401  # wizard/连接/列表路由已拆到此模块
 
         cls.app_module = app
         # wizard 路由的 get_current_user_from_request / _check_push_access 在 erp_listing_routes

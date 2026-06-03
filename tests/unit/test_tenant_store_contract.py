@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """REFACTOR-B2 守门 · 账套/租户管理 DAL 抽到 services/tenant/store.py
 
-验证 14 个函数都在 service 模块 · 用 mock.patch("db.get_cursor") 造假游标 ·
+验证 14 个函数都在 service 模块 · 用 mock.patch("core.db.get_cursor") 造假游标 ·
 对关键函数断言「执行的 SQL 含哪些表/字段、参数顺序对、返回结构对」·
 读类验证 SQL 形状 · 写类验证 INSERT/UPDATE/DELETE 形状 + 提交行为(commit=True)。
 create_owner_user 内部走 db.find_user_by_username(留 db.py)· 经 db.* 调用 · 可被 patch。
@@ -70,7 +70,7 @@ def _patch_cursor(cur):
     cm = mock.MagicMock()
     cm.__enter__ = mock.Mock(return_value=cur)
     cm.__exit__ = mock.Mock(return_value=False)
-    return mock.patch("db.get_cursor", return_value=cm)
+    return mock.patch("core.db.get_cursor", return_value=cm)
 
 
 class TenantStoreContractTests(unittest.TestCase):
@@ -239,7 +239,7 @@ class TenantStoreContractTests(unittest.TestCase):
         cur = FakeCursor()
         with (
             _patch_cursor(cur),
-            mock.patch("db.find_user_by_username", return_value={"id": "x"}) as m,
+            mock.patch("core.db.find_user_by_username", return_value={"id": "x"}) as m,
         ):
             out = store.create_owner_user("dup", "pw", "Acme")
         self.assertTrue(m.called, "create_owner_user 未经 db.find_user_by_username")
@@ -249,7 +249,10 @@ class TenantStoreContractTests(unittest.TestCase):
     def test_create_owner_user_creates_tenant_and_owner(self):
         # 顺序:INSERT tenants → INSERT users → UPDATE tenants 回填 owner
         cur = FakeCursor(fetchone_script=[{"id": "tid"}, {"id": "uid"}])
-        with _patch_cursor(cur) as p, mock.patch("db.find_user_by_username", return_value=None):
+        with (
+            _patch_cursor(cur) as p,
+            mock.patch("core.db.find_user_by_username", return_value=None),
+        ):
             out = store.create_owner_user("boss", "secret", "Acme", monthly_quota=300)
         self.assertEqual(out, {"ok": True, "user_id": "uid", "tenant_id": "tid"})
         self.assertEqual(p.call_args.kwargs.get("commit"), True)

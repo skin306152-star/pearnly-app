@@ -247,4 +247,4 @@ def update_log_status_after_retry(
         logger.error(f"update_log_status_after_retry failed: {e}")
 
 
-import db  # noqa: E402
+from core import db  # noqa: E402

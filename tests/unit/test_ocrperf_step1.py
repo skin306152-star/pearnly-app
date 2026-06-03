@@ -28,7 +28,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # 先 import db 完整初始化 dal_reexports 链(否则 standalone 跑本文件会触发
 # services.ocr_history.mutations partial-init 循环 · 见 STATE dal_reexports 偏序坑;
 # 全量 discover 下 db 被更早导入故无此问题)。
-import db  # noqa: E402,F401
+from core import db  # noqa: E402,F401
 from services.ocr import pdf_backfill  # noqa: E402
 from services.ocr_history import mutations  # noqa: E402
 
@@ -39,9 +39,11 @@ _PAGES = [{"fields": {"invoice_number": "INV1"}}]
 class GenerateAndSavePdfTest(unittest.TestCase):
     def _patches(self, texts, searchable, save_ret=("rel/p.pdf", 123)):
         return (
-            patch("pdf_searchable.extract_searchable_text_from_pages", return_value=texts),
-            patch("pdf_searchable.make_searchable_pdf", return_value=searchable),
-            patch("pdf_storage.save_pdf", return_value=save_ret),
+            patch(
+                "services.ocr.pdf_searchable.extract_searchable_text_from_pages", return_value=texts
+            ),
+            patch("services.ocr.pdf_searchable.make_searchable_pdf", return_value=searchable),
+            patch("services.ocr.pdf_storage.save_pdf", return_value=save_ret),
         )
 
     def test_text_present_uses_searchable(self) -> None:
@@ -60,9 +62,13 @@ class GenerateAndSavePdfTest(unittest.TestCase):
         self.assertEqual(save.call_args.args[1], _CONTENT)
 
     def test_searchable_raises_falls_back_to_original(self) -> None:
-        p1 = patch("pdf_searchable.extract_searchable_text_from_pages", return_value=["t"])
-        p2 = patch("pdf_searchable.make_searchable_pdf", side_effect=RuntimeError("boom"))
-        p3 = patch("pdf_storage.save_pdf", return_value=("r", 1))
+        p1 = patch(
+            "services.ocr.pdf_searchable.extract_searchable_text_from_pages", return_value=["t"]
+        )
+        p2 = patch(
+            "services.ocr.pdf_searchable.make_searchable_pdf", side_effect=RuntimeError("boom")
+        )
+        p3 = patch("services.ocr.pdf_storage.save_pdf", return_value=("r", 1))
         with p1, p2, p3 as save:
             rel, _ = pdf_backfill.generate_and_save_pdf(_CONTENT, _PAGES, "u1")
         self.assertEqual(rel, "r")
@@ -76,9 +82,11 @@ class GenerateAndSavePdfTest(unittest.TestCase):
         self.assertEqual(save.call_args.args[1], _CONTENT)
 
     def test_save_raises_returns_none_none(self) -> None:
-        p1 = patch("pdf_searchable.extract_searchable_text_from_pages", return_value=[""])
-        p2 = patch("pdf_searchable.make_searchable_pdf", return_value=None)
-        p3 = patch("pdf_storage.save_pdf", side_effect=OSError("disk full"))
+        p1 = patch(
+            "services.ocr.pdf_searchable.extract_searchable_text_from_pages", return_value=[""]
+        )
+        p2 = patch("services.ocr.pdf_searchable.make_searchable_pdf", return_value=None)
+        p3 = patch("services.ocr.pdf_storage.save_pdf", side_effect=OSError("disk full"))
         with p1, p2, p3:
             self.assertEqual(
                 pdf_backfill.generate_and_save_pdf(_CONTENT, _PAGES, "u1"), (None, None)

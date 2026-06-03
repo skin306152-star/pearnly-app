@@ -11,7 +11,7 @@ REFACTOR-B1 守门测试 · ERP 映射 12 路由从 app.py 抽到 erp_mappings_r
 
 import unittest
 
-from erp_mappings_routes import ErpProductMappingReq, _require_owner_or_super, router
+from routes.erp_mappings_routes import ErpProductMappingReq, _require_owner_or_super, router
 
 
 class ErpMappingsRoutesContractTests(unittest.TestCase):
@@ -48,7 +48,7 @@ class ErpMappingsRoutesContractTests(unittest.TestCase):
 
     def test_require_owner_or_super_single_source(self):
         """复用 route_helpers 同一份对象 · 不许各自拷贝漂移"""
-        import route_helpers
+        from core import route_helpers
 
         self.assertIs(_require_owner_or_super, route_helpers._require_owner_or_super)
 

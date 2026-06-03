@@ -34,7 +34,7 @@ class UserLookupReExportTests(unittest.TestCase):
             self.assertTrue(callable(getattr(user_lookup, name)), f"{name} should be callable")
 
     def test_db_reexports_same_object(self):
-        import db
+        from core import db
         from services.auth import user_lookup
 
         for name in self.NAMES:

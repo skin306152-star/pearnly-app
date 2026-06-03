@@ -39,7 +39,7 @@ NO_BATCH_KEY = "__no_batch__"
 def _default_is_user_data_error(error_msg: Optional[str]) -> bool:
     """默认用 db.is_user_data_error(单一权威源)· 懒 import 便于无 DB 单测注入替身。"""
     try:
-        import db
+        from core import db
 
         return bool(db.is_user_data_error(error_msg))
     except Exception:

@@ -7,7 +7,7 @@ add_employee 复用 db.find_user_by_username(留在 db.py)· 经 db.* 调用 · 
 
 import unittest
 
-import db
+from core import db
 from services.team import store
 
 _MOVED = [
@@ -34,7 +34,7 @@ class TeamStoreContractTests(unittest.TestCase):
         # 命中已存在用户 → 返回 None(不建重复用户名)
         from unittest import mock
 
-        with mock.patch("db.find_user_by_username", return_value={"id": "existing"}) as m:
+        with mock.patch("core.db.find_user_by_username", return_value={"id": "existing"}) as m:
             rid = db.add_employee("tenant-1", "dupuser", "pw123456")
         self.assertTrue(m.called, "add_employee 未经 db.find_user_by_username(re-export 失效?)")
         self.assertIsNone(rid)

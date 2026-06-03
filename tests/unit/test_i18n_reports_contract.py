@@ -10,7 +10,7 @@ i18n_reports.py(后端独立报表 i18n · 模板名/列头/标题/合计)此前
 
 import unittest
 
-import i18n_reports as ir
+from services.report import i18n_reports as ir
 
 _LANGS = ("zh", "th", "en", "ja")
 

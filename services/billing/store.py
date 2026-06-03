@@ -14,7 +14,7 @@ db.py 文件尾 re-export 回本命名空间 · 所有 ``db.xxx()`` 调用点不
 import logging
 from typing import Optional, Dict, Any
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

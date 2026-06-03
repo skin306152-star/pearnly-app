@@ -11,7 +11,7 @@ REFACTOR-B1 守门测试 · 邮箱抓取 6 路由从 app.py 抽到 email_ingest_
 
 import unittest
 
-from email_ingest_routes import (
+from routes.email_ingest_routes import (
     EmailAccountBindRequest,
     EmailTestConnRequest,
     _email_presets,

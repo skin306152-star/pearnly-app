@@ -170,4 +170,4 @@ def ensure_erp_retry_columns():
         logger.warning(f"ensure_erp_retry_columns failed: {e}")
 
 
-import db  # noqa: E402
+from core import db  # noqa: E402

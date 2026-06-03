@@ -195,7 +195,7 @@ class MRERPMasterDataMixin:
         故懒创建 Sync 服务(不依赖 enable_master_data_sync 开关 · 安全复核对所有
         MR.ERP 推送都生效)。
         """
-        import mrerp_xlsx_generator as _gen
+        from services.erp import mrerp_xlsx_generator as _gen
 
         if self._customer_sync is None:
             from services.erp.mrerp_customer_sync import MRERPCustomerSyncService

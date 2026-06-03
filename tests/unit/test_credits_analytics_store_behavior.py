@@ -11,7 +11,7 @@ revenue_overview(3 查:KPI/池余额/透支数)+ tenants_summary + tenant_summar
 import unittest
 from unittest import mock
 
-import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
+from core import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
 from services.credits import store as cr
 
 

@@ -28,9 +28,9 @@ from unittest.mock import MagicMock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import db  # noqa: E402,F401  (先 import 让 push_store 完整初始化 · 防循环 import)
+from core import db  # noqa: E402,F401  (先 import 让 push_store 完整初始化 · 防循环 import)
 
-import mrerp_xlsx_generator as _gen  # noqa: E402
+from services.erp import mrerp_xlsx_generator as _gen  # noqa: E402
 from services.erp.exceptions import MRERPTechnicalError  # noqa: E402
 from services.erp.mrerp_product_sync import (  # noqa: E402
     ListingProduct,
@@ -116,7 +116,7 @@ class AdapterGenericModeWiringTests(unittest.TestCase):
         return cfg
 
     def test_generic_code_set_enters_generic_mode(self):
-        import erp_push
+        from services.erp import erp_push
 
         adapter, err = erp_push.build_mrerp_adapter(
             self._base_cfg(generic_product_code="GEN-INCOME")
@@ -125,7 +125,7 @@ class AdapterGenericModeWiringTests(unittest.TestCase):
         self.assertEqual(adapter.generic_product_code, "GEN-INCOME")
 
     def test_no_generic_code_is_precise_mode(self):
-        import erp_push
+        from services.erp import erp_push
 
         adapter, err = erp_push.build_mrerp_adapter(self._base_cfg())
         self.assertIsNone(err, f"构建失败:{err!r}")
@@ -244,7 +244,7 @@ class VerifyGateGenericCollapseTests(unittest.TestCase):
 # ============================================================
 class SeedRouteGenericTests(unittest.TestCase):
     def test_model_accepts_generic_product_code(self):
-        from erp_routes import ErpSeedUpdate
+        from routes.erp_routes import ErpSeedUpdate
 
         m = ErpSeedUpdate(generic_product_code="GEN-INCOME")
         self.assertEqual(m.generic_product_code, "GEN-INCOME")
@@ -271,7 +271,7 @@ class SeedRouteGenericRouteTests(unittest.TestCase):
         from fastapi.testclient import TestClient
 
         # R18(2026-05-29):seed 路由从 erp_routes 拆到 erp_endpoints_routes · patch 随 handler 落点走。
-        import erp_endpoints_routes as erp_routes
+        from routes import erp_endpoints_routes as erp_routes
 
         app = self.app_module
         existing = {

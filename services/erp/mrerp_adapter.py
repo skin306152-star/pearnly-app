@@ -210,7 +210,7 @@ class MRERPAdapter(MRERPLoginMixin, MRERPUploadMixin, MRERPReportMixin, MRERPMas
         Decryption uses services-wide kms_helper (`PEARNLY_KMS_KEY` env).
         The plaintext only lives in this adapter's memory; nothing logs it.
         """
-        from kms_helper import decrypt_str  # import here so unit tests
+        from core.kms_helper import decrypt_str  # import here so unit tests
 
         # that don't need encryption
         # don't require PEARNLY_KMS_KEY

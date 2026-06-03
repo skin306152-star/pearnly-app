@@ -17,7 +17,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-import bank_recon_v2 as brv2
+from services.recon import bank_recon_v2 as brv2
 from services.importer import template_learning as tl
 from services.importer import ai_mapping  # REFACTOR-WA-B1 R8 · AI 映射抽出 · 缓存目录常量在此
 

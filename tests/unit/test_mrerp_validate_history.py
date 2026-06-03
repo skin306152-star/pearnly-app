@@ -28,7 +28,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import mrerp_xlsx_generator as gen  # noqa: E402
+from services.erp import mrerp_xlsx_generator as gen  # noqa: E402
 
 
 def _today_iso() -> str:

@@ -11,7 +11,7 @@ ensure_table / log_ocr_cost / get_cost_overview / get_cost_by_user / daily_trend
 import unittest
 from unittest import mock
 
-import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
+from core import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
 from services.cost import store as cost
 
 

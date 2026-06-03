@@ -9,7 +9,7 @@ REFACTOR-WA-B2 守门测试 · services/erp/push_retry.py + push_schema.py
 
 import unittest
 
-import db
+from core import db
 from services.erp import push_store as store, push_retry, push_schema
 
 _RETRY_NAMES = [

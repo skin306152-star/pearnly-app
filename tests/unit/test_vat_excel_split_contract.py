@@ -12,9 +12,9 @@ _tenant_user 下沉 vat_excel_helpers · vat_excel_routes include_router 聚合(
 
 import unittest
 
-import vat_excel_routes
-import vat_excel_tasks_routes
-import vat_excel_helpers
+from routes import vat_excel_routes
+from routes import vat_excel_tasks_routes
+from services.vat import vat_excel_helpers
 
 
 def _paths(r):

@@ -24,8 +24,8 @@ def run_glvat(
     params: dict, input_ref: List[dict], progress_cb: Optional[ProgressCb] = None
 ) -> Tuple[str, Any]:
     progress_cb = progress_cb or _noop
-    import db
-    from recon_routes import (
+    from core import db
+    from routes.recon_routes import (
         parse_gl,
         parse_vat_report,
         reconcile_gl_vat,
@@ -146,14 +146,14 @@ def run_salesvat(
 ) -> Tuple[str, Any]:
     progress_cb = progress_cb or _noop
     import time
-    import db
-    from vat_excel_export import (
+    from core import db
+    from services.vat.vat_excel_export import (
         extract_invoices_parallel,
         extract_invoices_batched_parallel,
         merge_vat_reports,
         build_excel,
     )
-    from vat_excel_routes import _save_excel_file
+    from routes.vat_excel_routes import _save_excel_file
 
     lang = params.get("lang") or "th"
     api_key = params.get("api_key")

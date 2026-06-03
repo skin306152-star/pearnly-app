@@ -183,7 +183,7 @@ def run_matching_for_session(session_id: str, user_id: str) -> Dict[str, Any]:
     返回统计:{tx_total, matched, suggested, unmatched, elapsed_ms}
     """
     import time
-    import db
+    from core import db
 
     t0 = time.time()
     txs = db.list_bank_recon_transactions(session_id, user_id, limit=2000)

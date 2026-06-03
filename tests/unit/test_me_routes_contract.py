@@ -16,8 +16,8 @@ REFACTOR-B1 守门测试 · /api/me 家族从 app.py 抽到 me_routes.py。
 
 import unittest
 
-import route_helpers
-from me_routes import UserInfo, _build_user_info, router
+from core import route_helpers
+from routes.me_routes import UserInfo, _build_user_info, router
 
 # 60 字段快照(2026-05-25 抽取时 · verbatim 搬家后必须完全一致)
 EXPECTED_USERINFO_FIELDS = {

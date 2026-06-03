@@ -31,7 +31,7 @@ def _load_topup_models():
     try:
         from pydantic import ValidationError
 
-        import billing_topup_routes as routes
+        from routes import billing_topup_routes as routes
     except Exception as e:  # pragma: no cover - import 环境问题才触发
         raise unittest.SkipTest(f"billing_topup_routes 不可 import:{e}")
     return routes, ValidationError

@@ -32,7 +32,7 @@ class AccountLockKeyTests(unittest.TestCase):
 class GracefulDegradeTests(unittest.TestCase):
     def test_no_db_yields_false_not_raise(self):
         """get_pool 抛(没 DATABASE_URL)→ 锁降级放行 · 不阻断业务。"""
-        with mock.patch("db.get_pool", side_effect=RuntimeError("no DATABASE_URL")):
+        with mock.patch("core.db.get_pool", side_effect=RuntimeError("no DATABASE_URL")):
             with mrerp_session_lock("acct|x", timeout_sec=1) as got:
                 self.assertFalse(got)  # 没拿到真锁 · 但放行
 
@@ -41,7 +41,7 @@ class GracefulDegradeTests(unittest.TestCase):
         fake_conn.cursor.side_effect = RuntimeError("conn broke")
         fake_pool = mock.MagicMock()
         fake_pool.getconn.return_value = fake_conn
-        with mock.patch("db.get_pool", return_value=fake_pool):
+        with mock.patch("core.db.get_pool", return_value=fake_pool):
             with mrerp_session_lock("acct|x", timeout_sec=1) as got:
                 self.assertFalse(got)
         # 连接必须被归还

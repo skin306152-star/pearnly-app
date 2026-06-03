@@ -14,7 +14,7 @@ handle_unhandled_exception:服务端记录完整 traceback(_record_500 + logger.
 
 import logging
 
-from route_helpers import _record_500
+from core.route_helpers import _record_500
 
 logger = logging.getLogger("mr-pilot")
 

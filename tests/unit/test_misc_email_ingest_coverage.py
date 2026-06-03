@@ -11,7 +11,7 @@
 - insert_email_ingest_log / list_email_ingest_logs
 - is_email_uid_seen / mark_email_uid_seen: 截断 subject[:500]/sender[:200]
 
-风格:patch("db.get_cursor") 给假游标 · 验返回结构 / SQL / 边界 / 异常吞。
+风格:patch("core.db.get_cursor") 给假游标 · 验返回结构 / SQL / 边界 / 异常吞。
 """
 
 import sys
@@ -58,7 +58,7 @@ if "psycopg2" not in sys.modules:
     sys.modules["psycopg2.pool"] = _pg.pool
     sys.modules["psycopg2.sql"] = _pg.sql
 
-import db  # noqa: E402
+from core import db  # noqa: E402
 from services.email_ingest import store  # noqa: E402
 
 

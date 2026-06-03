@@ -4,7 +4,7 @@
 import re
 from typing import List, Dict, Optional
 
-from field_comparator import normalize_invoice_no
+from services.recon.field_comparator import normalize_invoice_no
 
 # ── 列名关键词（中英泰混合，匹配宽容） ─────────────────────────────
 _GL_DATE_H = {"วันที่", "date", "วัน", "日期"}

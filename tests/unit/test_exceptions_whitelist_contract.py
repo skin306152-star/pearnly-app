@@ -9,7 +9,7 @@ REFACTOR-WA-B1 守门测试 · services/exceptions/exceptions_schema.py + except
 
 import unittest
 
-import db
+from core import db
 from services.exceptions import store, exceptions_schema as sch, exceptions_whitelist as wl
 
 _WL = [

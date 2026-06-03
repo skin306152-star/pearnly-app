@@ -13,7 +13,7 @@ import unittest
 
 from openpyxl import load_workbook
 
-import excel_template_th as et
+from services.excel import excel_template_th as et
 
 
 class NormDateTests(unittest.TestCase):

@@ -39,7 +39,7 @@ class FieldOverrideServiceTests(unittest.TestCase):
         self.assertEqual(r["error"], "field_not_allowed")
 
     def test_row_not_found(self):
-        with mock.patch("db.get_recon_row", return_value=None):
+        with mock.patch("core.db.get_recon_row", return_value=None):
             r = fo.record_field_override(99, "buyer_name", "x")
         self.assertFalse(r["ok"])
         self.assertEqual(r["error"], "row_not_found")
@@ -47,8 +47,8 @@ class FieldOverrideServiceTests(unittest.TestCase):
     def test_record_sets_ocr_and_user(self):
         row = {"buyer_name": "ABC Co", "field_overrides": {}}
         with (
-            mock.patch("db.get_recon_row", return_value=row),
-            mock.patch("db.get_cursor", _fake_get_cursor),
+            mock.patch("core.db.get_recon_row", return_value=row),
+            mock.patch("core.db.get_cursor", _fake_get_cursor),
         ):
             r = fo.record_field_override(1, "buyer_name", "ABC Company Ltd")
         self.assertTrue(r["ok"])
@@ -63,8 +63,8 @@ class FieldOverrideServiceTests(unittest.TestCase):
             "field_overrides": {"buyer_name": {"ocr": "ABC Co", "user": "X", "ts": "t"}},
         }
         with (
-            mock.patch("db.get_recon_row", return_value=row),
-            mock.patch("db.get_cursor", _fake_get_cursor),
+            mock.patch("core.db.get_recon_row", return_value=row),
+            mock.patch("core.db.get_cursor", _fake_get_cursor),
         ):
             r = fo.record_field_override(1, "buyer_name", "ABC Co")
         self.assertTrue(r["ok"])
@@ -76,8 +76,8 @@ class FieldOverrideServiceTests(unittest.TestCase):
             "field_overrides": {"buyer_name": {"ocr": "ABC Co", "user": "X", "ts": "t"}},
         }
         with (
-            mock.patch("db.get_recon_row", return_value=row),
-            mock.patch("db.get_cursor", _fake_get_cursor),
+            mock.patch("core.db.get_recon_row", return_value=row),
+            mock.patch("core.db.get_cursor", _fake_get_cursor),
         ):
             r = fo.record_field_override(1, "buyer_name", "")
         self.assertTrue(r["ok"])
@@ -90,8 +90,8 @@ class FieldOverrideServiceTests(unittest.TestCase):
             "field_overrides": {"buyer_name": {"ocr": "ABC Co", "user": "First Edit", "ts": "t"}},
         }
         with (
-            mock.patch("db.get_recon_row", return_value=row),
-            mock.patch("db.get_cursor", _fake_get_cursor),
+            mock.patch("core.db.get_recon_row", return_value=row),
+            mock.patch("core.db.get_cursor", _fake_get_cursor),
         ):
             r = fo.record_field_override(1, "buyer_name", "Second Edit")
         ov = r["field_overrides"]["buyer_name"]

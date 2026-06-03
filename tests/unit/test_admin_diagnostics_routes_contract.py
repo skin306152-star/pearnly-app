@@ -13,7 +13,7 @@ REFACTOR-D1 守门测试 · admin_diagnostics_routes.py(超管诊断 + 部署 we
 
 import unittest
 
-from admin_diagnostics_routes import router
+from routes.admin_diagnostics_routes import router
 
 EXPECTED = {
     ("GET", "/api/admin/diagnostics/runtime"),
@@ -60,8 +60,8 @@ class AdminDiagnosticsRoutesContractTests(unittest.TestCase):
 
     def test_shared_helpers_single_source(self):
         """_read_last_500 / _require_super_admin 必须复用 route_helpers · 单一来源防漂移"""
-        import route_helpers
-        import admin_diagnostics_routes as mod
+        from core import route_helpers
+        from routes import admin_diagnostics_routes as mod
 
         self.assertIs(mod._read_last_500, route_helpers._read_last_500)
         self.assertIs(mod._require_super_admin, route_helpers._require_super_admin)

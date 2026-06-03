@@ -734,12 +734,17 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 
 ---
 
-### 30. 代码目录重组 = 最后做(2026-06-02 Zihao 拍板)
+### 30. 代码目录重组 = 最后做(2026-06-02 拍板 · 2026-06-03 ✅ 执行上线)
 
-根目录现 86 个 .py 平铺(35+ `*_routes.py` + 业务模块)· 大厂用包结构(`app/{api/routes,services,core,models}`)· **方向对但现在不动**:
-- 目录重组是**全项目最大 blast radius** 的操作(碰每个 `import`/`app.include_router`/测试/动态 import)· 纯搬动不减行数不修逻辑。
-- **必须最后做**:等所有文件拆到 <500、**文件集冻结后**一次性搬 + 全局改 import(只改一遍)。现在做 = 边拆边搬、import 改两遍 + 多窗口冲突。
-- 计划归属:`REFACTOR_MASTER_PLAN.md` 阶段 I 抛光新增一条任务。**现在只在计划占位,别动手。**
+**✅ 已完成(方案B · Zihao 2026-06-03 拍板)**:根目录 122 个平铺 .py 搬入包结构 · app.py 留根(入口 `uvicorn app:app` 不变):
+- `routes/`(58):全部 `*_routes.py` + `recon_routes_*` 分拆 + `erp_routes_access`
+- `core/`(4):`db` `auth` `route_helpers` `kms_helper`(横切基础设施)
+- `services/<域>/`(60):复用**已存在的**顶层 `services/` 包(212 文件按域分)· root 业务模块归进对应域 + 新建 `vat`/`report`/`excel` 子域
+- **方案B 而非 `app/` 外壳**:顶层已有成熟 `services/`(db 业务下沉产物)· 建 `app/` 需连搬 212 文件 import(blast radius 翻倍)· 故顶层新建 `routes/`+`core/`、业务复用现有 `services/`(只动 root 122 · 现有 212 文件 import 纹丝不动)。
+- **变换范式**(854 处机械改写 · verbatim):`import M`→`from PKG import M`(保 `M.attr` 用法)· `from M import`→`from PKG.M import`· patch/setattr/import_module 参数位的 module path 字符串(收窄到调用内 · 杜绝误伤 i18n key `"auth.x"`/文件名 `"db.py"`)· `sys.modules["M"]` key 同步。前缀重叠按模块名长度降序处理。
+- **三类测试修复**:① sys.modules 注入未恢复(`.get/.pop` 漏改 key → fake 模块毒化全局)② f-string 动态 patch `patch(f"recon_routes.{k}")`③ 静态审计 `open(ROOT/"x_routes.py")` 硬编码路径 → 加 `routes/`。
+- **守门脚本同步**(否则盲区假绿):`check_file_size`/`check_line_ratchet` 加 `routes/**` `core/**` glob · `refactor_progress` `db.py`→`core/db.py`。
+- **验证**:全量 2176 单测全绿 · `ruff F821` 零漏改 · `import app` 275 路由全注册 · 守门 4 道绿。mrerp live integration 测试(连真实 MR.ERP·缺凭证则 skip)与重组无关。
 
 ---
 

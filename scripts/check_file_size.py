@@ -48,10 +48,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CEILING = 500
 
 # 显式监控的根目录文件(每个文件都要检查 · 即使在豁免清单也报)
+# db.py→core/、auth_signup.py→services/auth/(目录重组·铁律#30)· 改由 core/ services/ glob 覆盖
 MONITORED_ROOT_FILES = [
     "app.py",
-    "db.py",
-    "auth_signup.py",
     "home.js",
     "home.html",
     "home.css",
@@ -65,6 +64,8 @@ MONITORED_ROOT_FILES = [
 MONITORED_GLOBS = [
     "*.py",
     "*_routes.py",
+    "routes/**/*.py",
+    "core/**/*.py",
     "services/**/*.py",
     "src/home/**/*.js",
     "src/home/**/*.css",

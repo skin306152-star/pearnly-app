@@ -11,7 +11,7 @@ REFACTOR-B1 守门测试 · 客户管理路由从 app.py 抽到 clients_routes.p
 import datetime
 import unittest
 
-from clients_routes import _serialize_client, router
+from routes.clients_routes import _serialize_client, router
 
 
 class ClientsRoutesContractTests(unittest.TestCase):

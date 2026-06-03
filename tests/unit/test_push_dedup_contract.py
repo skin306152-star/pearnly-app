@@ -71,7 +71,7 @@ if "psycopg2" not in sys.modules:
     sys.modules["psycopg2.sql"] = fake_pg.sql
 
 
-import db  # noqa: E402
+from core import db  # noqa: E402
 
 
 class _MockCursor:

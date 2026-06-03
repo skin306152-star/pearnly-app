@@ -20,7 +20,7 @@ from unittest import mock
 
 from fastapi import HTTPException
 
-import recon_jobs_routes as rjr
+from routes import recon_jobs_routes as rjr
 from services.recon_jobs import store, worker
 
 

@@ -19,7 +19,7 @@ v118.35.0.48 · 守门测试 · M4 银行对账余额验证 续页/缺期初 不
 import unittest
 from datetime import date
 
-from bank_recon_v2 import StatementRow, _verify_row_balances, merge_statements
+from services.recon.bank_recon_v2 import StatementRow, _verify_row_balances, merge_statements
 
 # BBL 2697 Page 9/9 续页真实数据(PDF 顶到底顺序 · 余额链自洽)
 _BBL2697 = [

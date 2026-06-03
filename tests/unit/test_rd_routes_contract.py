@@ -12,8 +12,8 @@ REFACTOR-B1 守门测试 · 泰国 RD 税务 4 路由从 app.py 抽到 rd_routes
 
 import unittest
 
-import route_helpers
-from rd_routes import RdQueryRequest, _check_rd_access, router
+from core import route_helpers
+from routes.rd_routes import RdQueryRequest, _check_rd_access, router
 
 
 class RdRoutesContractTests(unittest.TestCase):

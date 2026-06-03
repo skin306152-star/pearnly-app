@@ -11,7 +11,7 @@
 import logging
 from typing import Dict, Any, List
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

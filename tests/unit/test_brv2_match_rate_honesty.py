@@ -17,7 +17,7 @@ import unittest
 
 import openpyxl
 
-from bank_recon_v2 import BankReconSummary, BankReconRow, export_bank_recon_excel
+from services.recon.bank_recon_v2 import BankReconSummary, BankReconRow, export_bank_recon_excel
 
 DIFF_OK_BG = "D1FAE5"  # mint green (对平)
 DIFF_BAD_BG = "FEE2E2"  # soft red (未对平/可疑)

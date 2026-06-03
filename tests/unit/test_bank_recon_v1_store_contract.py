@@ -7,7 +7,7 @@
 
 import unittest
 
-import db
+from core import db
 from services.recon import bank_recon_v1_store as store
 
 _MOVED = [

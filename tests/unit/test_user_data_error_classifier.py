@@ -65,7 +65,7 @@ if "psycopg2" not in sys.modules:
     sys.modules["psycopg2.sql"] = fake_pg.sql
 
 
-import db as DB  # noqa: E402
+from core import db as DB  # noqa: E402
 
 
 class UserDataErrorCodeCoverageTests(unittest.TestCase):

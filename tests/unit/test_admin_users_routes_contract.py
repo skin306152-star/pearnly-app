@@ -13,11 +13,11 @@ REFACTOR-B1 守门测试 · 超管用户/员工管理 15 路由从 app.py 抽到
 
 import unittest
 
-import route_helpers
-import tenant_routes
-import team_routes
-import admin_users_routes
-from admin_users_routes import (
+from core import route_helpers
+from routes import tenant_routes
+from routes import team_routes
+from routes import admin_users_routes
+from routes.admin_users_routes import (
     AdminCreateUserRequest,
     CascadeDeleteRequest,
     router,

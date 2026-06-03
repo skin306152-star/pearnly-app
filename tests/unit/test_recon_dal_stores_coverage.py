@@ -15,7 +15,7 @@ import unittest
 from contextlib import contextmanager
 from unittest import mock
 
-import db
+from core import db
 from services.recon import (
     vat_recon_tasks_store as vrt,
     gl_vat_store as glv,
@@ -66,7 +66,7 @@ def patch_cursor(cur):
     def _cm(*a, **k):
         yield cur
 
-    return mock.patch("db.get_cursor", _cm)
+    return mock.patch("core.db.get_cursor", _cm)
 
 
 def boom_cursor():
@@ -77,7 +77,7 @@ def boom_cursor():
         raise RuntimeError("db down")
         yield  # pragma: no cover
 
-    return mock.patch("db.get_cursor", _cm)
+    return mock.patch("core.db.get_cursor", _cm)
 
 
 TENANT = "11111111-1111-1111-1111-111111111111"

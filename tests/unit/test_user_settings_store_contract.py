@@ -5,13 +5,13 @@
   1. 7 个函数 + ERP_PUSH_MODES 常量都从 services.user_settings.store 提供,
      且 db.py 经 re-export 暴露同一对象(调用点 db.xxx 零改动)。
   2. 纯结构性搬家 0 逻辑改:验关键行为(默认值/非法值拒写/遮罩)经
-     mock.patch("db.get_cursor") 仍生效。
+     mock.patch("core.db.get_cursor") 仍生效。
 """
 
 import unittest
 from unittest import mock
 
-import db
+from core import db
 from services.user_settings import store
 
 
@@ -39,7 +39,7 @@ class UserSettingsReexportContract(unittest.TestCase):
 
     def test_preferred_lang_rejects_bad_lang(self):
         # 非法语言码 → 早返 False,不触库
-        with mock.patch("db.get_cursor", side_effect=AssertionError("must not hit DB")):
+        with mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")):
             self.assertFalse(store.update_user_preferred_lang("u1", "xx"))
 
     def test_set_erp_push_mode_rejects_garbage(self):
@@ -59,12 +59,12 @@ class UserSettingsBehaviorContract(unittest.TestCase):
 
     def test_dup_check_defaults_true_when_no_row(self):
         ctx, _ = self._fake_cursor(None)
-        with mock.patch("db.get_cursor", return_value=ctx):
+        with mock.patch("core.db.get_cursor", return_value=ctx):
             self.assertTrue(store.get_user_dup_check_enabled("u1"))
 
     def test_erp_push_mode_defaults_smart_on_bad_value(self):
         ctx, _ = self._fake_cursor({"erp_push_mode": "weird"})
-        with mock.patch("db.get_cursor", return_value=ctx):
+        with mock.patch("core.db.get_cursor", return_value=ctx):
             self.assertEqual(store.get_erp_push_mode("u1"), "smart")
 
     def test_gemini_key_masked_preview(self):

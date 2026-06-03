@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import pdf_storage
+from services.ocr import pdf_storage
 
 
 class PdfStorageTests(unittest.TestCase):

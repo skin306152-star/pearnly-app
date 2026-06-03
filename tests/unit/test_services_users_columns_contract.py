@@ -33,7 +33,7 @@ def _ctxmgr(cur):
 
 class UsersColumnsReExportTests(unittest.TestCase):
     def test_users_columns_reexport(self):
-        import db
+        from core import db
         from services.users import columns
 
         for name in (
@@ -45,7 +45,7 @@ class UsersColumnsReExportTests(unittest.TestCase):
             self.assertIs(getattr(db, name), getattr(columns, name))
 
     def test_email_codes_schema_reexport(self):
-        import db
+        from core import db
         from services.auth import email_codes_schema
 
         self.assertTrue(hasattr(email_codes_schema, "ensure_email_codes_table"))

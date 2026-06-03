@@ -153,4 +153,4 @@ def count_whitelist_rules(user_id: str, tenant_id: Optional[str] = None) -> int:
         return 0
 
 
-import db  # noqa: E402
+from core import db  # noqa: E402

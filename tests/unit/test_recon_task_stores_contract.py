@@ -8,7 +8,7 @@ db re-export 同一对象(防漂移)· 既有 tenant 隔离契约测试同时守
 
 import unittest
 
-import db
+from core import db
 from services.recon import vat_recon_tasks_store, gl_vat_store, bank_recon_v2_store
 
 _MAP = {

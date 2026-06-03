@@ -18,8 +18,8 @@ import os
 import tempfile
 import unittest
 
-import recon_jobs_routes as RR
-from bank_recon_v2 import parse_gl, parse_gl_excel
+from routes import recon_jobs_routes as RR
+from services.recon.bank_recon_v2 import parse_gl, parse_gl_excel
 
 # 委托素材的最小内嵌复刻(同形状 · 不依赖桌面外部文件)
 GL_MISSING_DATE = (  # A,B,C,D:无日期、无科目列 · 只有凭证/摘要/借/贷

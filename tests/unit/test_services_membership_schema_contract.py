@@ -33,7 +33,7 @@ def _ctxmgr(cur):
 
 class MembershipSchemaReExportTests(unittest.TestCase):
     def test_db_reexports(self):
-        import db
+        from core import db
         from services.membership import schema
 
         self.assertTrue(hasattr(schema, "ensure_membership_tables"))

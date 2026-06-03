@@ -19,8 +19,8 @@ def run_bank_recon(
     params: dict, input_ref: List[dict], progress_cb: Optional[ProgressCb] = None
 ) -> Tuple[str, Any]:
     progress_cb = progress_cb or _noop
-    import db
-    from recon_routes import (
+    from core import db
+    from routes.recon_routes import (
         parse_bank_statement_pdf,
         parse_gl_v2,
         merge_statements,

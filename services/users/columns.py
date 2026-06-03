@@ -98,4 +98,4 @@ def ensure_user_profile_columns():
 
 
 # ⚠️ `import db` 必须在 def 之后(解循环 import · 见 services/billing/charge.py 注释)
-import db  # noqa: E402
+from core import db  # noqa: E402

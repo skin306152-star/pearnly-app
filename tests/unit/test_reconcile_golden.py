@@ -10,7 +10,7 @@ import json
 import os
 import datetime
 
-import bank_recon_v2 as br
+from services.recon import bank_recon_v2 as br
 from services.recon.bank_recon_types import StatementRow, GlRow
 
 _GOLDEN = os.path.join(os.path.dirname(__file__), "_golden_reconcile.json")

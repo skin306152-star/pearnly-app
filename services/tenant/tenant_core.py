@@ -12,7 +12,7 @@ services.tenant.store 命名空间(db.xxx() 调用点不变)。
 import logging
 from typing import Optional, Dict, Any, List
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

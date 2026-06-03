@@ -10,7 +10,7 @@ group_pages_to_invoices 此前仅 test_multi_invoice_per_page 覆盖「拆页 ha
 
 import unittest
 
-import invoice_grouper as ig
+from services.ocr import invoice_grouper as ig
 
 
 def _p(idx=None, **fields):

@@ -8,7 +8,7 @@ P0-VAT 核心 · find_or_create_client_by_tax_id 复用 db.create_client(已迁 
 
 import unittest
 
-import db
+from core import db
 from services.recon import vat_recon_store as store
 
 _MOVED = [
@@ -68,8 +68,8 @@ class VatReconStoreContractTests(unittest.TestCase):
             return _C()
 
         with (
-            mock.patch("db.get_cursor", _fake_cursor),
-            mock.patch("db.create_client", return_value=4242) as m,
+            mock.patch("core.db.get_cursor", _fake_cursor),
+            mock.patch("core.db.create_client", return_value=4242) as m,
         ):
             rid = db.find_or_create_client_by_tax_id("u1", None, "1234567890123", "ACME")
             captured["rid"] = rid

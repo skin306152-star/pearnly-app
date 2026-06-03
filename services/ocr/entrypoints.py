@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any, Dict, Optional
 
-import db
+from core import db
 from services.ocr.pipeline import (
     IMAGE_EXTENSIONS,
     PDF_EXTENSIONS,

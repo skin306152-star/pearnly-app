@@ -10,8 +10,8 @@ REFACTOR-B1 守门测试 · /api/categories 单路由从 app.py 抽到 categorie
 
 import unittest
 
-import route_helpers
-from categories_routes import api_list_used_categories, router
+from core import route_helpers
+from routes.categories_routes import api_list_used_categories, router
 
 
 class CategoriesRoutesContractTests(unittest.TestCase):

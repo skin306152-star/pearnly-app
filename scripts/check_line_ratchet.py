@@ -50,10 +50,9 @@ else:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # 与 check_file_size.py 保持一致(人维护 · 若分歧以 check_file_size 为准)
+# db.py→core/、auth_signup.py→services/auth/(目录重组·铁律#30)· 改由前缀覆盖
 MONITORED_ROOT_FILES = {
     "app.py",
-    "db.py",
-    "auth_signup.py",
     "home.js",
     "home.html",
     "home.css",
@@ -62,6 +61,8 @@ MONITORED_ROOT_FILES = {
 
 # Glob 匹配规则(改 / 加新文件也要进监控)
 MONITORED_PATH_PREFIXES = (
+    "routes/",
+    "core/",
     "services/",
     "src/home/",
 )
@@ -131,6 +132,13 @@ def parse_numstat(output: str) -> list[tuple[int, int, str]]:
             a, d = int(a_s), int(d_s)
         except ValueError:
             continue
+        # rename:numstat 用 "old => new" 或 "pre{old => new}post" · 取新路径
+        # (否则 is_monitored / RATCHET-EXEMPT 无法匹配含 " => " 的复合串)
+        if "=>" in path:
+            if "{" in path:
+                path = re.sub(r"\{[^}]*=> ([^}]*)\}", r"\1", path).replace("//", "/")
+            else:
+                path = path.split("=>", 1)[1].strip()
         rows.append((a, d, path))
     return rows
 

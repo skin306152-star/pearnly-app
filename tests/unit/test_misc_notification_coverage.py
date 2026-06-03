@@ -50,7 +50,7 @@ if "psycopg2" not in sys.modules:
     sys.modules["psycopg2.pool"] = _pg.pool
     sys.modules["psycopg2.sql"] = _pg.sql
 
-import db  # noqa: E402
+from core import db  # noqa: E402
 from services.notification import store  # noqa: E402
 
 

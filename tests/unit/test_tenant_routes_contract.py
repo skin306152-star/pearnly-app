@@ -12,9 +12,9 @@ REFACTOR-B1 守门测试 · 租户管理 6 路由 + 3 model 从 app.py 抽到 te
 
 import unittest
 
-import route_helpers
-import tenant_routes
-from tenant_routes import (
+from core import route_helpers
+from routes import tenant_routes
+from routes.tenant_routes import (
     AdminCreateTenantRequest,
     AdminUpdateTenantQuotaRequest,
     AdminUpdateTenantStatusRequest,
@@ -70,7 +70,7 @@ class TenantRoutesContractTests(unittest.TestCase):
     def test_shared_models_single_source(self):
         """admin user quota/status 路由复用的 2 model 是 tenant_routes 的(单一来源)。
         REFACTOR-B1(2026-05-25):该 2 路由随 admin 组搬到 admin_users_routes · 断言跟到新消费者。"""
-        import admin_users_routes
+        from routes import admin_users_routes
 
         self.assertIs(
             admin_users_routes.AdminUpdateTenantQuotaRequest, AdminUpdateTenantQuotaRequest

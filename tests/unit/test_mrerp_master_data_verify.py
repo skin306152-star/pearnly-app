@@ -27,7 +27,9 @@ from unittest.mock import MagicMock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import db  # noqa: E402,F401  (import first so db's re-export fully inits push_store · 避免 push_store 作入口的循环 import)
+from core import (
+    db,
+)  # noqa: E402,F401  (import first so db's re-export fully inits push_store · 避免 push_store 作入口的循环 import)
 
 from services.erp.exceptions import (  # noqa: E402
     MRERPBusinessError,

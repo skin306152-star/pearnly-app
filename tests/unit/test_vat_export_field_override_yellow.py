@@ -14,7 +14,7 @@ import unittest
 
 import openpyxl
 
-from vat_excel_exporter import export_recon_task
+from services.vat.vat_excel_exporter import export_recon_task
 
 
 def _task():

@@ -32,7 +32,7 @@ def ensure_field_overrides_columns() -> None:
     Alembic 跑过 002 后再跑这函数 · ADD COLUMN IF NOT EXISTS 是 no-op
     """
     # 延迟 import 避免循环依赖(db.py 启动时不一定全加载)
-    import db as _db
+    from core import db as _db
 
     for table in TARGET_TABLES:
         try:

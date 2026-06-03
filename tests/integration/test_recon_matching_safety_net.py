@@ -30,7 +30,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 def _load_recon():
     try:
-        from vat_excel_export import _build_recon_pairs
+        from services.vat.vat_excel_export import _build_recon_pairs
     except Exception as e:  # pragma: no cover - import 环境问题才触发
         raise unittest.SkipTest(f"vat_excel_export._build_recon_pairs 不可 import:{e}")
     return _build_recon_pairs

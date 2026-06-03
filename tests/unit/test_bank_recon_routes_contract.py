@@ -11,8 +11,8 @@ REFACTOR-B1 守门测试 · 银行对账 11 路由从 app.py 抽到 bank_recon_r
 
 import unittest
 
-import bank_recon_routes
-from bank_recon_routes import _TEST_USER_IDS, router
+from routes import bank_recon_routes
+from routes.bank_recon_routes import _TEST_USER_IDS, router
 
 
 class BankReconRoutesContractTests(unittest.TestCase):
@@ -53,7 +53,7 @@ class BankReconRoutesContractTests(unittest.TestCase):
 
     def test_routes_use_auth_dependency(self):
         """路由模块用 auth.get_current_user_from_request 单一来源(防鉴权失踪)"""
-        import auth
+        from core import auth
 
         self.assertIs(
             bank_recon_routes.get_current_user_from_request,

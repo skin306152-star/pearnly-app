@@ -463,4 +463,4 @@ def get_push_stats_today(user_id: str) -> Dict[str, Any]:
         return {"total": 0, "success": 0, "failed": 0, "auto_cnt": 0}
 
 
-import db  # noqa: E402
+from core import db  # noqa: E402

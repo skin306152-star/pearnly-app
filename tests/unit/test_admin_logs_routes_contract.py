@@ -12,9 +12,9 @@ REFACTOR-B1 守门测试 · 操作/审计日志 4 路由从 app.py 抽到 admin_
 
 import unittest
 
-import admin_logs_routes
-import route_helpers
-from admin_logs_routes import router
+from routes import admin_logs_routes
+from core import route_helpers
+from routes.admin_logs_routes import router
 
 
 class AdminLogsRoutesContractTests(unittest.TestCase):
@@ -52,7 +52,7 @@ class AdminLogsRoutesContractTests(unittest.TestCase):
 
     def test_auth_dependency_single_source(self):
         """/api/me/access_log* 用 auth.get_current_user_from_request 单一来源"""
-        import auth
+        from core import auth
 
         self.assertIs(
             admin_logs_routes.get_current_user_from_request,

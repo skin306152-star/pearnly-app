@@ -17,8 +17,8 @@ email_ingest(运行时 import · 未配 EMAIL_ENCRYPTION_KEY 时 is_available() 
 import os
 import logging
 
-import db
-import erp_push
+from core import db
+from services.erp import erp_push
 
 logger = logging.getLogger("mr-pilot")
 
@@ -166,7 +166,7 @@ async def run_email_ingest_tick():
     from datetime import datetime, timezone, timedelta
 
     try:
-        import email_ingest
+        from services.email_ingest import email_ingest
 
         if not email_ingest.is_available():
             return  # 未配 EMAIL_ENCRYPTION_KEY

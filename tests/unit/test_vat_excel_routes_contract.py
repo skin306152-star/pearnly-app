@@ -11,7 +11,7 @@ REFACTOR-D1 守门测试 · vat_excel_routes.py(Excel 公式对账 router)。
 
 import unittest
 
-from vat_excel_routes import router
+from routes.vat_excel_routes import router
 
 EXPECTED = {
     ("GET", "/api/vat_excel/check"),

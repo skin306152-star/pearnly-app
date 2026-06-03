@@ -10,8 +10,8 @@ here by a behavioural contract: with db.* mocked, the session matcher must still
 
 from unittest import mock
 
-import db
-import bank_recon_v2 as br
+from core import db
+from services.recon import bank_recon_v2 as br
 from services.recon.bank_recon_utils import DATE_TOL_DAYS
 
 

@@ -10,7 +10,7 @@ REFACTOR-B1 守门测试 · 异常处理路由从 app.py 抽到 exceptions_route
 
 import unittest
 
-from exceptions_routes import router
+from routes.exceptions_routes import router
 
 
 class ExceptionsRoutesContractTests(unittest.TestCase):
@@ -45,7 +45,7 @@ class ExceptionsRoutesContractTests(unittest.TestCase):
     def test_dead_payload_not_resurrected(self):
         """ExceptionResolvePayload 是死代码 · 搬迁时已删 · 两处都不该有"""
         import app
-        import exceptions_routes
+        from routes import exceptions_routes
 
         self.assertFalse(hasattr(exceptions_routes, "ExceptionResolvePayload"))
         self.assertFalse(hasattr(app, "ExceptionResolvePayload"))

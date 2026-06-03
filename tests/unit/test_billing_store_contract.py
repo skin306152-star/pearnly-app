@@ -2,12 +2,12 @@
 """REFACTOR-B2 守门 · 余额追踪 DAL 抽到 services/billing/store.py
 
 验证 2 个函数都在 service 模块 + db 命名空间 re-export 同一对象(防漂移)。
-既有 mock.patch("db.get_latest_balance") 的 recon_handlers/salesvat 测试仍生效。
+既有 mock.patch("core.db.get_latest_balance") 的 recon_handlers/salesvat 测试仍生效。
 """
 
 import unittest
 
-import db
+from core import db
 from services.billing import store
 
 _MOVED = [

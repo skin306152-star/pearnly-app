@@ -170,7 +170,7 @@ def build_bank_review_payload(
 
 def review_rows_to_statement_rows(review_rows: List[Dict[str, Any]], source_file: str = ""):
     """review-row dict → StatementRow 对象列表(懒 import 防循环)· 给重对账喂数据。"""
-    from bank_recon_v2 import StatementRow  # noqa: PLC0415
+    from services.recon.bank_recon_v2 import StatementRow  # noqa: PLC0415
 
     out = []
     for r in review_rows or []:

@@ -18,7 +18,7 @@ import random
 import unittest
 from datetime import date, timedelta
 
-from bank_recon_v2 import (
+from services.recon.bank_recon_v2 import (
     StatementRow,
     GlRow,
     _correct_direction_from_balance,

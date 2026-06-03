@@ -9,7 +9,7 @@
 
 import unittest
 
-import db
+from core import db
 from services.email_ingest import store
 
 # 抽出的 10 个邮箱抓取 DAL 函数
@@ -45,7 +45,7 @@ class EmailIngestStoreContractTests(unittest.TestCase):
 
     def test_service_uses_db_module_for_cursor(self):
         # store 通过 `import db` + 运行时 db.get_cursor() 取游标
-        # (而非 from db import get_cursor by-value · 保证 patch("db.get_cursor") 在测试里生效)
+        # (而非 from db import get_cursor by-value · 保证 patch("core.db.get_cursor") 在测试里生效)
         self.assertIs(store.db, db)
 
 

@@ -43,11 +43,11 @@ from unittest.mock import patch, MagicMock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import erp_push as _erp  # noqa: E402
-import erp_routes  # noqa: E402  # REFACTOR-B1: erp 路由搬到此模块
-import erp_listing_routes  # noqa: E402  # WB: 连接/列表路由拆到此模块
-import erp_endpoints_routes  # noqa: E402  # R18: 端点 CRUD 拆出
-import erp_push_log_routes  # noqa: E402  # R18: 推送/日志/重试拆出
+from services.erp import erp_push as _erp  # noqa: E402
+from routes import erp_routes  # noqa: E402  # REFACTOR-B1: erp 路由搬到此模块
+from routes import erp_listing_routes  # noqa: E402  # WB: 连接/列表路由拆到此模块
+from routes import erp_endpoints_routes  # noqa: E402  # R18: 端点 CRUD 拆出
+from routes import erp_push_log_routes  # noqa: E402  # R18: 推送/日志/重试拆出
 
 
 class StubContractTests(unittest.TestCase):
@@ -855,7 +855,7 @@ class MrerpAdapterConstraintTests(unittest.TestCase):
         # Late import so the test file can still be collected on hosts
         # without psycopg2 / postgres reachability.
         try:
-            import db as _db
+            from core import db as _db
 
             self._db = _db
         except Exception as e:
@@ -1108,7 +1108,7 @@ class PushMRERPRouteContractTests(unittest.TestCase):
         3. The fake adapter's upload_invoice_batch was called exactly
            once with the single-history list shape.
         """
-        import erp_push as _erp_mod
+        from services.erp import erp_push as _erp_mod
         from services.erp import mrerp_adapter as _mrerp_mod
 
         endpoint = {
@@ -1163,8 +1163,8 @@ class PushMRERPRouteContractTests(unittest.TestCase):
         fake_db = MagicMock()
         fake_db.get_user_tenant_id = MagicMock(return_value="tenant-test-1")
         fake_db.get_mrerp_mappings_bundle = MagicMock(return_value=mappings)
-        original_db = sys.modules.get("db")
-        sys.modules["db"] = fake_db
+        original_db = sys.modules.get("core.db")
+        sys.modules["core.db"] = fake_db
         try:
             with (
                 patch.object(_mrerp_mod, "MRERPAdapter", _FakeMRERPAdapterForPushTests),
@@ -1173,9 +1173,9 @@ class PushMRERPRouteContractTests(unittest.TestCase):
                 result = _erp_mod.push_to_endpoint(endpoint, history)
         finally:
             if original_db is None:
-                sys.modules.pop("db", None)
+                sys.modules.pop("core.db", None)
             else:
-                sys.modules["db"] = original_db
+                sys.modules["core.db"] = original_db
 
         # ── Shape: must be the full push_to_endpoint dict.
         self.assertIsInstance(result, dict)
@@ -1239,7 +1239,7 @@ class PushMRERPRouteContractTests(unittest.TestCase):
         """Sanity: non-mrerp adapters still go through ADAPTER_REGISTRY
         (push_webhook etc.). The early-return for mrerp must NOT
         accidentally break webhook routing."""
-        import erp_push as _erp_mod
+        from services.erp import erp_push as _erp_mod
 
         endpoint = {
             "id": "ep-test-wh",
@@ -2125,7 +2125,7 @@ class PatchEndpointEncryptionContractTests(unittest.TestCase):
         # Generate a real-looking Fernet ciphertext for the test (using
         # the same kms_helper the route uses).
         try:
-            from kms_helper import encrypt_str
+            from core.kms_helper import encrypt_str
 
             already_ct_user = encrypt_str("test01")
             already_ct_pass = encrypt_str("test01pass")

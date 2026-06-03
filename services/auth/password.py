@@ -18,7 +18,7 @@ import logging
 
 import bcrypt as _bcrypt
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

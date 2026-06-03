@@ -10,11 +10,11 @@ import datetime as dt
 import unittest
 from unittest.mock import patch
 
-import db
-import recon_routes as RR
+from core import db
+from routes import recon_routes as RR
 import services.recon_jobs.handlers as H
 import services.recon_jobs.bank_handler as BH
-from bank_recon_v2 import StatementRow
+from services.recon.bank_recon_v2 import StatementRow
 
 
 def _low_conf_pdf_result():

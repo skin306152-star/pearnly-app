@@ -42,7 +42,7 @@ def _ctxmgr(cursor):
 
 class PasswordReExportTests(unittest.TestCase):
     def test_module_and_reexport_same_object(self):
-        import db
+        from core import db
         from services.auth import password
 
         for name in ("verify_user_password", "reset_user_password"):

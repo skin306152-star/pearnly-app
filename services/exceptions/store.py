@@ -13,7 +13,7 @@ import json as _json
 import logging
 from typing import Optional, Dict, Any, List
 
-import db
+from core import db
 
 # facade re-export(REFACTOR-WA-B1 · schema/whitelist 实现下沉 · db.X/store.X 单一对象不变)
 from services.exceptions.exceptions_schema import ensure_exceptions_tables  # noqa: F401,E402

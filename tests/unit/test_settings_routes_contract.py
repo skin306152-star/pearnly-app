@@ -11,8 +11,8 @@ REFACTOR-B1 守门测试 · 智能归档 + 重复发票检测设置 5 路由从 
 
 import unittest
 
-import route_helpers
-from settings_routes import (
+from core import route_helpers
+from routes.settings_routes import (
     ArchivePreviewRequest,
     ArchiveSettingsPayload,
     DupCheckSettingPayload,
@@ -74,7 +74,7 @@ class SettingsRoutesContractTests(unittest.TestCase):
 
     def test_erp_push_mode_dal_validates(self):
         """P1b · get/set_erp_push_mode 默认 smart + 拒非法值(纯逻辑 · 不打 DB)"""
-        import db
+        from core import db
 
         self.assertEqual(db.ERP_PUSH_MODES, ("smart", "fixed", "ocr_only"))
         # 非法 mode → set 拒写(返 False)· 不触 DB

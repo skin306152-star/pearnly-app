@@ -9,7 +9,7 @@ REFACTOR-WA-B1 守门测试 · services/workspace/seller_routing.py
 
 import unittest
 
-import db
+from core import db
 from services.workspace import store, seller_routing as sr
 
 _PUBLIC = [

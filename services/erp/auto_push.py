@@ -429,8 +429,8 @@ def _trigger_auto_push_all(user_id: str, tenant_id: Optional[str], history_id: s
 
 
 # ⚠️ `import db` / `import erp_push` 放 def 之后(解循环 import · 见 services/billing/charge.py 注释)
-import db  # noqa: E402
-import erp_push  # noqa: E402
+from core import db  # noqa: E402
+from services.erp import erp_push  # noqa: E402
 
 # R19 · Xero 自动推路径下沉 auto_push_xero · 此处 re-import:_trigger_auto_push_all 调 + 契约 re-export
 from services.erp.auto_push_xero import _auto_push_xero_for_history  # noqa: E402,F401

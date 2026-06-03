@@ -12,7 +12,7 @@ REFACTOR-WA-B1 守门测试 · services/recon/bank_recon_match.py
 
 import unittest
 
-import db
+from core import db
 from services.recon import bank_recon_v1_store as store, bank_recon_match as m
 
 _PUBLIC = [

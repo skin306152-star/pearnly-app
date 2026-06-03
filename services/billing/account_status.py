@@ -22,7 +22,7 @@ import logging
 import time as _time
 from datetime import datetime as _dt, timedelta as _td, timezone as _tz
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

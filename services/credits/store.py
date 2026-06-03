@@ -10,7 +10,7 @@ Earn 超管面板用:收入端 KPI(今日/本月/总计)· 各租户额度汇总
 import logging
 from typing import Dict, Any
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

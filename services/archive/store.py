@@ -10,7 +10,7 @@ import json as _json
 import logging
 from typing import Optional, Dict, Any, List
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

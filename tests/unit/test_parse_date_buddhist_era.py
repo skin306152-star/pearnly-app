@@ -19,7 +19,7 @@ from datetime import date, datetime
 
 import openpyxl
 
-import bank_recon_v2 as brv2
+from services.recon import bank_recon_v2 as brv2
 
 
 class ParseDateBuddhistEraTests(unittest.TestCase):
@@ -182,7 +182,7 @@ class M3GlVatBuddhistEraTests(unittest.TestCase):
 
     def test_m3_parse_gl_excel_datetime_be_year_converts(self):
         """M3 parse_gl_excel 接收 BE datetime cell → 输出 CE ISO date 字符串"""
-        import gl_vat_reconciler as glvr
+        from services.recon import gl_vat_reconciler as glvr
 
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -206,7 +206,7 @@ class M3GlVatBuddhistEraTests(unittest.TestCase):
 
     def test_m3_parse_gl_excel_string_date_passes_through(self):
         """M3 字符串 date 原样通过(不破坏老格式 GL · 用 M3 真实 header 关键词)"""
-        import gl_vat_reconciler as glvr
+        from services.recon import gl_vat_reconciler as glvr
 
         wb = openpyxl.Workbook()
         ws = wb.active

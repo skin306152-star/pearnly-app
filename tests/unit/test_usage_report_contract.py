@@ -11,7 +11,7 @@ import unittest
 
 from openpyxl import load_workbook
 
-import usage_report as ur
+from services.usage import usage_report as ur
 
 
 class I18nTests(unittest.TestCase):

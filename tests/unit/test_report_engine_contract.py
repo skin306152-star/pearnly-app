@@ -14,7 +14,7 @@ import unittest
 
 from openpyxl import load_workbook
 
-import report_engine as re_eng
+from services.report import report_engine as re_eng
 
 
 class NormalizeRowTests(unittest.TestCase):

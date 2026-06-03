@@ -10,11 +10,11 @@ erp_routes_access(_check_push_access 共享准入闸)· erp_routes 顶部 includ
 
 import unittest
 
-import erp_routes
-import erp_endpoints_routes
-import erp_push_log_routes
-import erp_routes_access
-import route_helpers
+from routes import erp_routes
+from routes import erp_endpoints_routes
+from routes import erp_push_log_routes
+from routes import erp_routes_access
+from core import route_helpers
 
 
 def _paths(r):

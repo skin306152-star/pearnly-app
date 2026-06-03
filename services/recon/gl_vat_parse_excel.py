@@ -6,7 +6,7 @@ import logging
 from datetime import date, datetime
 from typing import List, Dict, Any
 
-from field_comparator import normalize_invoice_no
+from services.recon.field_comparator import normalize_invoice_no
 from services.ocr.error_format import short_error as _short_err
 from services.recon.gl_vat_types import GlRow
 from services.recon.gl_vat_parse_pdf import parse_gl_pdf

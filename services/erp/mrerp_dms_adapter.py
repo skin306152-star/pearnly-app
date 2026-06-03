@@ -168,7 +168,7 @@ class MrerpDmsAdapter:
     ) -> "MrerpDmsAdapter":
         """Build from Fernet-encrypted credentials (PEARNLY_KMS_KEY env).
         Plaintext only lives in this adapter's memory; nothing logs it."""
-        from kms_helper import decrypt_str
+        from core.kms_helper import decrypt_str
 
         return cls(
             system_url=system_url,

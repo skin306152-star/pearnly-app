@@ -9,9 +9,9 @@ line_webhook_routes._handle_line_event 里 lazy import 调到;依赖的 _ocr_* h
 import os
 import logging
 
-import db
-from db import insert_ocr_history
-from exception_checks import _async_run_exception_checks
+from core import db
+from core.db import insert_ocr_history
+from services.exceptions.exception_checks import _async_run_exception_checks
 from services.ocr.entrypoints import (
     all_pages_not_invoice as _ocr_all_pages_not_invoice,
     billing_quote as _ocr_billing_quote,
@@ -23,7 +23,7 @@ from services.ocr.entrypoints import (
 )
 
 try:
-    import line_client
+    from services.line_binding import line_client
 except ImportError:
     line_client = None  # line_client.py 不在仓库 · 单独部署到服务器
 

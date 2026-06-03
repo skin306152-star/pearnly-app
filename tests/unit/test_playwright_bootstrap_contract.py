@@ -52,7 +52,7 @@ class PlaywrightBootstrapContractTests(unittest.TestCase):
         self.assertIs(startup.ensure_playwright_installed, pb.ensure_playwright_installed)
 
     def test_admin_diagnostics_uses_single_source_read_status(self):
-        import admin_diagnostics_routes as adr
+        from routes import admin_diagnostics_routes as adr
 
         self.assertIs(adr.read_playwright_status, pb.read_playwright_status)
 

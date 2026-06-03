@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import db
-import email_ingest
+from core import db
+from services.email_ingest import email_ingest
 from services.ocr import entrypoints
 
 
@@ -34,7 +34,7 @@ class OcrEntrypointContractTests(unittest.TestCase):
 
     def test_billing_quote_images_use_pdf_page_pricing(self):
         user = {"id": "u1", "tenant_id": "t1"}
-        with mock.patch("db.get_billing_status_combined") as status:
+        with mock.patch("core.db.get_billing_status_combined") as status:
             status.return_value = {
                 "allowed": True,
                 "is_exempt": False,
@@ -50,8 +50,8 @@ class OcrEntrypointContractTests(unittest.TestCase):
     def test_billing_quote_tables_use_excel_character_pricing(self):
         user = {"id": "u1", "tenant_id": "t1"}
         with (
-            mock.patch("db.get_billing_status_combined") as status,
-            mock.patch("db._excel_char_count_estimate", return_value=1234) as chars,
+            mock.patch("core.db.get_billing_status_combined") as status,
+            mock.patch("core.db._excel_char_count_estimate", return_value=1234) as chars,
         ):
             status.return_value = {
                 "allowed": True,
@@ -67,7 +67,7 @@ class OcrEntrypointContractTests(unittest.TestCase):
 
     def test_charge_successful_ocr_skips_cache_or_exempt_only_by_quote(self):
         user = {"id": "u1", "tenant_id": "t1"}
-        with mock.patch("db.charge_ocr_async") as charge:
+        with mock.patch("core.db.charge_ocr_async") as charge:
             entrypoints.charge_successful_ocr(
                 user,
                 {"is_exempt": False, "kind": "pdf", "units": 2},
@@ -76,7 +76,7 @@ class OcrEntrypointContractTests(unittest.TestCase):
             )
         charge.assert_called_once_with("u1", "t1", "pdf", 2, "hid-1", "OCR test")
 
-        with mock.patch("db.charge_ocr_async") as charge:
+        with mock.patch("core.db.charge_ocr_async") as charge:
             entrypoints.charge_successful_ocr(
                 user,
                 {"is_exempt": True, "kind": "pdf", "units": 2},
@@ -92,7 +92,7 @@ class OcrEntrypointContractTests(unittest.TestCase):
     def test_web_upload_checks_cache_before_balance_gate(self):
         # ocr_recognize 主路由 2026-06-01 抽到 ocr_recognize_routes.py(REFACTOR-WB-app);
         # 缓存先于余额闸的顺序契约随之跟到新文件。
-        route_py = Path(__file__).resolve().parents[2] / "ocr_recognize_routes.py"
+        route_py = Path(__file__).resolve().parents[2] / "routes" / "ocr_recognize_routes.py"
         src = route_py.read_text(encoding="utf-8")
         cache_pos = src.index("cached = _ocr_get_cached(user, file_hash)")
         billing_pos = src.index('db.get_billing_status_combined(str(user.get("id")), _tid(user))')

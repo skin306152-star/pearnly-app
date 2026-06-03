@@ -36,7 +36,7 @@ def _ctxmgr(cursor):
 
 class AccountMergeReExportTests(unittest.TestCase):
     def test_reexport_same_object(self):
-        import db
+        from core import db
         from services.auth import account_merge
 
         for name in (

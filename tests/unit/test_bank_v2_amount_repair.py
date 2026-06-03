@@ -16,7 +16,7 @@ v118.35.0.62 · 守门测试 · 余额链自动修复读错的金额(_repair_amo
 
 import unittest
 
-from bank_recon_v2 import (
+from services.recon.bank_recon_v2 import (
     StatementRow,
     _verify_row_balances,
     _repair_amount_from_balance,

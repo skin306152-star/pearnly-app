@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 
 load_dotenv(PROJECT_ROOT / ".env.local")
 
-import mrerp_xlsx_generator
+from services.erp import mrerp_xlsx_generator
 
 from services.erp.mrerp_adapter import MRERPAdapter
 

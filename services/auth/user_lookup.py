@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from typing import Optional, Dict, Any
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

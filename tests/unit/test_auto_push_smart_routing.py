@@ -16,7 +16,7 @@ import os
 import unittest
 from unittest import mock
 
-import db
+from core import db
 from services.erp import auto_push
 
 
@@ -286,7 +286,7 @@ class HistoryDetailExposesWorkspaceTests(unittest.TestCase):
 
     def test_detail_returns_workspace_client_id(self):
         from datetime import datetime
-        import db
+        from core import db
 
         row = {
             "id": "h1",

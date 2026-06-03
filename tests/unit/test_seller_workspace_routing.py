@@ -11,7 +11,7 @@
 import unittest
 from unittest import mock
 
-import db  # noqa: F401 — 先初始化 db 防 services.workspace.store 循环导入
+from core import db  # noqa: F401 — 先初始化 db 防 services.workspace.store 循环导入
 from services.workspace import store
 
 

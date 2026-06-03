@@ -12,7 +12,7 @@ import unittest
 from contextlib import contextmanager
 from unittest import mock
 
-import db
+from core import db
 
 
 class _FakeCursor:
@@ -50,7 +50,7 @@ def _run_insert(cur, **kwargs):
         yield cur
 
     with (
-        mock.patch("db.get_cursor", _fake_get_cursor),
+        mock.patch("core.db.get_cursor", _fake_get_cursor),
         mock.patch(
             "services.ocr_history.store._extract_summary_fields",  # REFACTOR-B2 · 随 insert 搬到 store
             return_value={

@@ -3,14 +3,14 @@
 
 从 db.py 抽出(REFACTOR-B2 · 纯搬家 · 0 逻辑改)。
 覆盖:重复检测开关 dup_check · ERP 自动处理方式 erp_push_mode · 用户自带 Gemini API Key。
-所有游标访问走 db.get_cursor(...) · 确保测试可 mock.patch("db.get_cursor")。
+所有游标访问走 db.get_cursor(...) · 确保测试可 mock.patch("core.db.get_cursor")。
 db.py 文件尾 re-export 回本命名空间 · 所有 `db.xxx()` 调用点不变。
 """
 
 import logging
 from typing import Optional
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

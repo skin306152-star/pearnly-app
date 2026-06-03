@@ -7,7 +7,7 @@
 
 import unittest
 
-import db
+from core import db
 from services.exceptions import store
 
 _MOVED = [

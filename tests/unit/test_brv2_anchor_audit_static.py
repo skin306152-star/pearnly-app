@@ -37,7 +37,7 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
         # recon_routes_bankv2*.py · 静态契约改读这些文件的并集(拼接 == 原全文 · 仍能找到搬走的 handler)
         _recon_parts = []
         for _rp in ("recon_routes.py", "recon_routes_bankv2.py", "recon_routes_bankv2_run.py"):
-            _rpath = os.path.join(ROOT, _rp)
+            _rpath = os.path.join(ROOT, "routes", _rp)
             if os.path.exists(_rpath):
                 with open(_rpath, "r", encoding="utf-8") as f:
                     _recon_parts.append(f.read())

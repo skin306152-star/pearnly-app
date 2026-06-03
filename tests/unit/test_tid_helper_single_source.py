@@ -10,8 +10,8 @@ REFACTOR-B1 守门测试 · _tid 从 app.py 搬到 route_helpers.py。
 import unittest
 
 import app
-import route_helpers
-from route_helpers import _tid
+from core import route_helpers
+from core.route_helpers import _tid
 
 
 class TidHelperSingleSourceTests(unittest.TestCase):

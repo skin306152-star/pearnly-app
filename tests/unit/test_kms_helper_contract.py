@@ -17,7 +17,7 @@ from cryptography.fernet import Fernet
 # import 前确保有 key(本地缺则生成 · CI/真实环境已设则保留)
 os.environ.setdefault("PEARNLY_KMS_KEY", Fernet.generate_key().decode())
 
-import kms_helper as kms  # noqa: E402 - 必须在 setdefault 之后导入
+from core import kms_helper as kms  # noqa: E402 - 必须在 setdefault 之后导入
 
 
 class RoundTripTests(unittest.TestCase):

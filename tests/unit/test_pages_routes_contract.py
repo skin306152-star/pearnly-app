@@ -13,7 +13,7 @@ REFACTOR-B1 守门测试 · 静态页面 + 公开 meta 路由从 app.py 抽到 p
 
 import unittest
 
-from pages_routes import router
+from routes.pages_routes import router
 
 EXPECTED = {
     ("GET", "/api/health"),
@@ -62,7 +62,7 @@ class PagesRoutesContractTests(unittest.TestCase):
 
     def test_v1_aliases_delegate_to_base(self):
         """v1_health / v1_contact 委托给本模块 health / contact · 单一来源"""
-        import pages_routes
+        from routes import pages_routes
 
         self.assertIs(pages_routes.v1_health.__globals__["health"], pages_routes.health)
         self.assertIs(pages_routes.v1_contact.__globals__["contact"], pages_routes.contact)

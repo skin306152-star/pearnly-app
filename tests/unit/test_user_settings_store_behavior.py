@@ -11,7 +11,7 @@ dup_check 开关 / erp_push_mode(枚举校验)/ gemini_key(set/get/遮罩)/ pref
 import unittest
 from unittest import mock
 
-import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
+from core import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
 from services.user_settings import store as us
 
 

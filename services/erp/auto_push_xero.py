@@ -59,10 +59,10 @@ async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: 
             return
         # 拿 token + push
         try:
-            from erp_xero_routes import _ensure_fresh_xero_token
+            from routes.erp_xero_routes import _ensure_fresh_xero_token
 
             access_token, xero_org_id = _ensure_fresh_xero_token(tenant_id)
-            from xero_pusher import (
+            from services.erp.xero_pusher import (
                 find_contact_by_name,
                 build_invoice_payload,
                 push_invoice,
@@ -117,4 +117,4 @@ async def _auto_push_xero_for_history(user_id: str, tenant_id: str, history_id: 
         logger.exception(f"[AutoPushXero] outer exception: {e}")
 
 
-import db  # noqa: E402
+from core import db  # noqa: E402

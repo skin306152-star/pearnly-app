@@ -1,0 +1,284 @@
+# -*- coding: utf-8 -*-
+"""
+Pearnly · 路由公共 helper 模块(REFACTOR-B1 · 2026-05-24 抽出)
+
+把散在 app.py 里、被多个路由组共用的鉴权 / 日志 / 校验 helper 集中到这里 ·
+让后续抽 team / history / admin 等 router 时直接 import · 不再各自复制一份。
+
+纯搬家 · 不改业务逻辑 / 返回值 / 异常 code。app.py 与已抽出的
+billing_routes / admin_diagnostics_routes 改成从这里 import(去掉各自的拷贝)。
+
+依赖:
+  - db.*(insert_operation_log / create_tenant / get_cursor)
+  - auth.get_current_user_from_request
+  不 import app.py · 防循环 import。
+
+覆盖:
+  _tid                       · 取 user 的 tenant_id 字符串(多租户共享过滤)
+  _require_super_admin       · 超管守门(非超管 403)
+  _require_owner_or_super    · 老板或超管(含懒建 tenant 兜底)
+  _log_op                    · 写操作日志便捷函数
+  _get_client_ip             · 从 X-Forwarded-For / client.host 取真实 IP
+  _check_password_strength   · 密码强度校验(返 None 通过 / code 拒绝)
+  _WEAK_PASSWORDS            · 常见弱密码黑名单
+  _tid                       · 取 user tenant_id(2026-05-25 第十七会话搬入)
+  _plan_permissions          · plan 权限(扁平化全开 · 2026-05-25 搬入)
+  _record_500 / _read_last_500 / _last_500_event · 最近 500 现场摘要(共享状态 · 2026-05-25 搬入)
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, Optional
+
+from fastapi import HTTPException, Request, status
+
+from core import db
+from core.auth import get_current_user_from_request
+
+logger = logging.getLogger("mr-pilot")
+
+
+def _require_super_admin(request: Request) -> Dict[str, Any]:
+    """超级管理员守门员 · 非超管 403"""
+    user = get_current_user_from_request(request)
+    if not user.get("is_super_admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="admin.not_super_admin",
+        )
+    return user
+
+
+def _tid(user: dict) -> Optional[str]:
+    """v118.14 · 多租户共享:返回用户的 tenant_id 字符串(用于 db 函数过滤同 tenant 数据)
+    给 list_ocr_history / get_ocr_history_detail / find_ocr_by_hash 等的 tenant_id 参数使用
+    传了 → 同 tenant 所有成员共享数据(老板看员工的发票)
+    没传 / NULL → fallback 单 user 老逻辑(向前兼容)
+
+    REFACTOR-B1(2026-05-25):从 app.py 搬到 route_helpers ·
+    让 categories / connectors-status / erp-xero 等 router 抽出时可直接 import · 不再绑 app.py。
+    """
+    if not user:
+        return None
+    tid = user.get("tenant_id")
+    return str(tid) if tid else None
+
+
+def _get_client_ip(request):
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
+def _log_op(
+    request: Request, user, action, target_type=None, target_id=None, target_name=None, details=None
+):
+    """记操作日志的便捷函数"""
+    try:
+        db.insert_operation_log(
+            tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None,
+            actor_user_id=str(user["id"]),
+            actor_username=user.get("username"),
+            actor_is_super=bool(user.get("is_super_admin")),
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            target_name=target_name,
+            details=details,
+            ip=_get_client_ip(request),
+            ua=request.headers.get("User-Agent", "")[:300],
+        )
+    except Exception as e:
+        logger.warning(f"_log_op failed: {e}")
+
+
+_WEAK_PASSWORDS = {
+    "111111",
+    "112233",
+    "121212",
+    "123123",
+    "123321",
+    "123456",
+    "1234567",
+    "12345678",
+    "123456789",
+    "1234567890",
+    "131313",
+    "147258",
+    "159753",
+    "654321",
+    "666666",
+    "888888",
+    "987654",
+    "abc123",
+    "abcd1234",
+    "admin",
+    "admin123",
+    "iloveyou",
+    "letmein",
+    "monkey",
+    "password",
+    "password1",
+    "password123",
+    "qazwsx",
+    "qwerty",
+    "qwerty123",
+    "qwertyuiop",
+    "welcome",
+    "zxcvbnm",
+}
+
+
+def _plan_permissions(plan: str = None) -> dict:
+    """
+    v0.15 · 彻底扁平化 · 不再有套餐概念
+    所有用户功能完全一样 · 配额由 user.monthly_quota 单独控制
+    plan 参数保留仅为兼容 · 忽略其值 · 永远返回全开权限
+
+    REFACTOR-B1(2026-05-25):从 app.py 搬到 route_helpers ·
+    让 rd / archive / history 等 router 抽出时可直接 import · 不再绑 app.py。
+    """
+    return {
+        # 这里的 monthly_quota 是 "权限层默认值" · 实际配额以 user.monthly_quota 为准
+        # 下游代码应读 user.monthly_quota · 而不是 perms["monthly_quota"]
+        "monthly_quota": None,  # 权限层不限 · 实际配额看 user
+        "max_pages_per_upload": 50,
+        "max_file_size_mb": 100,
+        "can_edit_fields": True,
+        "can_verify_tax": True,
+        "rd_daily_limit": None,
+        "can_extract_items": True,
+        "can_view_history": True,
+        "history_retention_days": 365,
+        "can_push_erp": True,
+        "can_auto_push_erp": True,
+        "endpoints_limit": -1,
+        "can_archive": True,
+        "can_customize_archive": True,
+        "zip_batch_limit": -1,
+        "can_use_email_ingest": True,
+        "can_use_folder_watch": True,
+        "can_use_smart_alert": True,
+        "can_use_custom_template": True,
+        "custom_template_limit": -1,
+        "typhoon_quota_monthly": 500,
+        "can_manage_api_keys": True,
+        "can_auto_classify": True,
+        "can_duplicate_detect": True,
+        "can_ai_query": True,
+        "can_voucher_draft": True,
+    }
+
+
+def _check_password_strength(password: str) -> Optional[str]:
+    """
+    返回 None 表示通过 · 返回错误 code 表示拒绝
+    code: pwd.too_short / pwd.too_weak_numeric / pwd.too_weak_common / pwd.too_weak
+    """
+    if not password or len(password) < 8:
+        return "pwd.too_short"
+    if password.lower() in _WEAK_PASSWORDS:
+        return "pwd.too_weak_common"
+    if password.isdigit():
+        return "pwd.too_weak_numeric"
+    has_letter = any(c.isalpha() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    if not (has_letter and has_digit):
+        return "pwd.too_weak"
+    return None
+
+
+def _require_owner_or_super(request: Request) -> Dict[str, Any]:
+    """老板或超管
+    v118.26.2.4 · BUG 4 修补:新注册老板 tenant_id=NULL · 加员工时被拒
+    懒建模式:首次需要 tenant 时自动建一个 + 回填 user.tenant_id · 不影响新签名 API
+    """
+    user = get_current_user_from_request(request)
+    if user.get("is_super_admin"):
+        return user
+    if user.get("role") != "owner":
+        raise HTTPException(403, detail="team.only_owner_or_super")
+    if not user.get("tenant_id"):
+        # v118.26.2.4 · 懒建 tenant · 只在首次需要时
+        try:
+            tenant_name = (
+                user.get("company_name")
+                or user.get("full_name")
+                or user.get("username")
+                or f"user_{str(user['id'])[:8]}"
+            )[:100]
+            new_tid = db.create_tenant(
+                name=tenant_name,
+                owner_user_id=str(user["id"]),
+                tenant_type="shared_api",
+                monthly_quota=100,
+                notes="auto-created on first owner action",
+            )
+            if new_tid:
+                with db.get_cursor(commit=True) as _cur:
+                    _cur.execute(
+                        "UPDATE users SET tenant_id = %s WHERE id = %s AND tenant_id IS NULL",
+                        (new_tid, str(user["id"])),
+                    )
+                user["tenant_id"] = new_tid
+                logger.info(
+                    f"[v118.26.2.4 lazy-tenant] +tenant {new_tid[:8]}.. for user {user.get('username')!r}"
+                )
+        except Exception as _e:
+            logger.error(f"_require_owner_or_super lazy-tenant fail: {_e}")
+            raise HTTPException(500, detail="team.tenant_create_failed")
+        if not user.get("tenant_id"):
+            raise HTTPException(400, detail="team.no_tenant")
+    return user
+
+
+# v118.34.13 (Zihao 2026-05-19 拍板) · 最近 500 错误的现场摘要 ·
+# 通过 /api/version 直接读 · 用户不用 SSH 看 journalctl 也能拿到根因。
+# 内容控制在 1500 字符内,堆栈尾巴优先(异常点附近)。
+# REFACTOR-B1(2026-05-25):从 app.py 搬来 · app.py(全局异常处理器)、erp_routes
+# (endpoints 创建/更新 500 兜底)、admin_diagnostics_routes(读 last_500)共享同一
+# _last_500_event 状态 → 必须单一来源,不能各持副本。
+_last_500_event: Dict[str, Any] = {}
+
+
+def _record_500(*, path: str = "", method: str = "", detail: str = ""):
+    """Capture the current traceback (if any) + request context into the
+    module-level snapshot that /api/version surfaces. Safe to call from
+    anywhere — uses sys.exc_info() to grab the active traceback, falls
+    back to a synthetic message when no exception is in flight."""
+    import sys as _sys
+    import time as _t
+    import traceback as _tb
+
+    tb_str = ""
+    exc_type = ""
+    try:
+        et, ev, etb = _sys.exc_info()
+        if et is not None and ev is not None:
+            exc_type = et.__name__
+            tb_str = "".join(_tb.format_exception(et, ev, etb))
+    except Exception:
+        pass
+    if not tb_str and detail:
+        tb_str = f"(no traceback) {detail}"
+    # Trim to last 1500 chars — the tail is where the actual error is.
+    _last_500_event.clear()
+    _last_500_event.update(
+        {
+            "ts": int(_t.time()),
+            "path": str(path or "")[:200],
+            "method": str(method or "")[:10],
+            "detail": str(detail or "")[:200],
+            "exc_type": exc_type,
+            "traceback": (tb_str or "")[-1500:],
+        }
+    )
+
+
+def _read_last_500() -> Dict[str, Any]:
+    """Snapshot copy of the last captured 500 event."""
+    if not _last_500_event:
+        return {}
+    return dict(_last_500_event)

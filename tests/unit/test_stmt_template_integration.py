@@ -13,7 +13,7 @@ import io
 import unittest
 from unittest import mock
 
-import bank_recon_v2 as brv2
+from services.recon import bank_recon_v2 as brv2
 
 
 def _xlsx(rows):

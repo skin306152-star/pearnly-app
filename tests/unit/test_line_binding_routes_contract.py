@@ -10,7 +10,7 @@ REFACTOR-B1 守门测试 · LINE 绑定 + 偏好语言路由从 app.py 抽到 li
 
 import unittest
 
-from line_binding_routes import router
+from routes.line_binding_routes import router
 
 EXPECTED = {
     ("POST", "/api/line/binding-code"),

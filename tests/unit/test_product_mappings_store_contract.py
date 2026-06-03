@@ -9,7 +9,7 @@ REFACTOR-WA-B1 守门测试 · services/erp/product_mappings_store.py
 
 import unittest
 
-import db
+from core import db
 from services.erp import mappings_store as store, product_mappings_store as pm
 
 _PUBLIC = [

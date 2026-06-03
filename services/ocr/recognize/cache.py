@@ -8,9 +8,9 @@ services/ocr/recognize/cache.py · OCR 识别·文件指纹缓存命中分支
 
 import logging
 
-import db
-from route_helpers import _plan_permissions, _tid
-from exception_checks import _async_run_exception_checks
+from core import db
+from core.route_helpers import _plan_permissions, _tid
+from services.exceptions.exception_checks import _async_run_exception_checks
 from services.erp.auto_push import (
     _auto_push_history,
     _auto_push_smart_routed,

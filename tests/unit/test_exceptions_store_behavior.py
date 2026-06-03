@@ -11,7 +11,7 @@ tenant vs 无-tenant 隔离两路径 + ON CONFLICT no-op + 异常吞咽兜底 + 
 import unittest
 from unittest import mock
 
-import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
+from core import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
 from services.exceptions import store as exc
 
 

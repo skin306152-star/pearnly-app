@@ -3,7 +3,7 @@
 
 从 db.py 抽出(REFACTOR-B2 · 纯搬家 · 0 逻辑改)。
 覆盖:生成/消费绑定码 · 绑定/换绑(冲突拒绝)· 查绑定 · LINE→user 反查(更新活跃时间)· 解绑。
-游标走 db.get_cursor(...)·确保测试 mock.patch("db.get_cursor") 仍生效。
+游标走 db.get_cursor(...)·确保测试 mock.patch("core.db.get_cursor") 仍生效。
 db.py 文件尾 re-export 回本命名空间(所有 db.xxx() 调用点不变 · app/line_binding_routes/
 notification_routes/exception_checks 均走 db.*)。
 """
@@ -13,7 +13,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

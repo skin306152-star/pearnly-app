@@ -9,7 +9,7 @@ no_client/verify_unavailable/other)。已成功/已跳过(最近一条非 failed
 import unittest
 from unittest import mock
 
-import db  # noqa: F401
+from core import db  # noqa: F401
 from services.erp import push_store
 
 

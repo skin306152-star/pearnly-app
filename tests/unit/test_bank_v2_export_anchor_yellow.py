@@ -14,7 +14,7 @@ import unittest
 import openpyxl
 from openpyxl.comments import Comment
 
-from bank_recon_v2 import (
+from services.recon.bank_recon_v2 import (
     BankReconSummary,
     BankReconRow,
     export_bank_recon_excel,

@@ -13,7 +13,7 @@ REFACTOR-WA-B1 守门测试 · services/recon/vat_recon_schema.py + recon_resolv
 
 import unittest
 
-import db
+from core import db
 from services.recon import vat_recon_store as store, vat_recon_schema, recon_resolve
 
 

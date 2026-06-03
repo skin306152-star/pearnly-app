@@ -59,7 +59,7 @@ class ErrorHandlersContractTests(unittest.TestCase):
         self.assertIs(app.handle_unhandled_exception, error_handlers.handle_unhandled_exception)
 
     def test_reuses_route_helpers_record_500(self):
-        import route_helpers
+        from core import route_helpers
 
         self.assertIs(error_handlers._record_500, route_helpers._record_500)
 

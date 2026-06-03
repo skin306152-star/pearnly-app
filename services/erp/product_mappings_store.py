@@ -164,4 +164,4 @@ def find_erp_product_mappings_batch(tenant_id, erp_type, item_names):
         return {}
 
 
-import db  # noqa: E402
+from core import db  # noqa: E402

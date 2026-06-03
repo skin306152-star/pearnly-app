@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def update_user_email_and_username(user_id: str, new_email: str) -> bool:
     if not user_id or not new_email:
         return False
     try:
-        from auth_signup import normalize_email as _norm_email
+        from services.auth.auth_signup import normalize_email as _norm_email
     except Exception:
         _norm_email = lambda x: (x or "").strip().lower()
     new_email_clean = (new_email or "").strip().lower()

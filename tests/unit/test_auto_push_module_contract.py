@@ -45,8 +45,8 @@ class AutoPushModuleContractTests(unittest.TestCase):
         self.assertIs(app._erp_seller_routing_enabled, auto_push._erp_seller_routing_enabled)
 
     def test_module_reuses_top_level_erp_push_and_db(self):
-        import db
-        import erp_push
+        from core import db
+        from services.erp import erp_push
 
         self.assertIs(auto_push.erp_push, erp_push)
         self.assertIs(auto_push.db, db)

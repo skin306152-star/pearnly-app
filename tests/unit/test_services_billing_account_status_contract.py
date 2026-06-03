@@ -43,7 +43,7 @@ def _clear_exempt_cache():
 
 class AccountStatusReExportTests(unittest.TestCase):
     def test_db_reexports(self):
-        import db
+        from core import db
         from services.billing import account_status
 
         # 注意 _bkk_year_month 是私有 helper · 但 charge_ocr bare 调 · 必须 re-export

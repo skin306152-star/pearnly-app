@@ -9,7 +9,7 @@
 
 import unittest
 
-import db
+from core import db
 from services.erp import mappings_store as store
 
 _MOVED = [

@@ -27,7 +27,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 _HAS_FASTAPI = importlib.util.find_spec("fastapi") is not None
 try:
-    import kms_helper  # noqa: F401
+    from core import kms_helper  # noqa: F401
 
     _HAS_KMS = True
 except Exception:
@@ -42,7 +42,7 @@ class MrerpDmsEndpointCreateTests(unittest.TestCase):
 
         os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
         import app  # noqa
-        import erp_endpoints_routes  # noqa
+        from routes import erp_endpoints_routes  # noqa
 
         cls.app_module = app
         cls.routes = erp_endpoints_routes
@@ -88,8 +88,8 @@ class MrerpDmsEndpointCreateTests(unittest.TestCase):
             patch.object(app.db, "list_erp_endpoints", return_value=[]),
             patch.object(app.db, "create_erp_endpoint", side_effect=_fake_create),
             patch.object(app.db, "get_erp_endpoint", side_effect=_fake_get),
-            patch("kms_helper.encrypt_str", side_effect=lambda v: "ENC:" + v),
-            patch("kms_helper.is_encrypted", side_effect=lambda v: str(v).startswith("ENC:")),
+            patch("core.kms_helper.encrypt_str", side_effect=lambda v: "ENC:" + v),
+            patch("core.kms_helper.is_encrypted", side_effect=lambda v: str(v).startswith("ENC:")),
         ):
             with self._client() as client:
                 r = client.post("/api/erp/endpoints", json=body)

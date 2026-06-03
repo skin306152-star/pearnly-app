@@ -30,7 +30,7 @@ class AutoPushXeroContractTests(unittest.TestCase):
         self.assertIn("_auto_push_xero_for_history", auto_push._trigger_auto_push_all.__globals__)
 
     def test_leaf_reuses_top_level_db(self):
-        import db
+        from core import db
 
         self.assertIs(auto_push_xero.db, db)
 

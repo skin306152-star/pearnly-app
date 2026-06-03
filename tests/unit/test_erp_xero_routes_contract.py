@@ -12,9 +12,9 @@ REFACTOR-B1 守门测试 · ERP 连接器聚合 + Xero 8 路由从 app.py 抽到
 
 import unittest
 
-import erp_xero_routes
-import route_helpers
-from erp_xero_routes import router
+from routes import erp_xero_routes
+from core import route_helpers
+from routes.erp_xero_routes import router
 
 
 class ErpXeroRoutesContractTests(unittest.TestCase):
@@ -55,7 +55,7 @@ class ErpXeroRoutesContractTests(unittest.TestCase):
 
     def test_tid_and_auth_single_source(self):
         """_tid / get_current_user_from_request 单一来源(防鉴权失踪)"""
-        import auth
+        from core import auth
 
         self.assertIs(erp_xero_routes._tid, route_helpers._tid)
         self.assertIs(

@@ -8,7 +8,7 @@
 
 import unittest
 
-import db
+from core import db
 from services.clients import store
 
 _MOVED = [

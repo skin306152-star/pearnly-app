@@ -16,7 +16,7 @@ v118.35.0.63 · 守门测试 · 完整性交叉校验(_audit_completeness)· 主
 
 import unittest
 
-from bank_recon_v2 import StatementRow, _audit_completeness
+from services.recon.bank_recon_v2 import StatementRow, _audit_completeness
 
 
 def _r(dep=0.0, wd=0.0, bal=0.0):

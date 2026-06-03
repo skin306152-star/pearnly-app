@@ -208,7 +208,7 @@ def check_signup_abuse(email_norm: str, ip: str, fingerprint: str = None) -> Opt
     4. 同归一化邮箱已存在 → 拒绝(覆盖 + alias 攻击)
     """
     try:
-        import db as _db
+        from core import db as _db
 
         with _db.get_cursor(commit=True) as cur:
             # 1. 归一化邮箱重复
@@ -301,7 +301,7 @@ def _hash_password(password: str) -> str:
     全失败时 fallback 到 bcrypt(passlib) · 都不行才用 sha256
     """
     try:
-        import auth as _a
+        from core import auth as _a
 
         for fn_name in (
             "hash_password",
@@ -332,7 +332,7 @@ def _hash_password(password: str) -> str:
 
 def _get_user_safe(request: Request):
     try:
-        from auth import get_current_user_from_request
+        from core.auth import get_current_user_from_request
 
         u = get_current_user_from_request(request)
         return u
@@ -387,7 +387,7 @@ def _get_plan(user_id: str) -> str:
     OCR 准入只看 credits 余额(app.py v118.46)· 故 plan 不再分档、不再有到期降级逻辑。
     """
     try:
-        import db as _db
+        from core import db as _db
 
         with _db.get_cursor() as cur:
             cur.execute(

@@ -32,7 +32,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 TARGETS = {
     "home.js": {"target": 200, "label": "home.js"},
     "app.py": {"target": 500, "label": "app.py"},
-    "db.py": {"target": 500, "label": "db.py"},
+    "core/db.py": {"target": 500, "label": "db.py"},
     "home.css": {"target": 500, "label": "home.css"},
     "home.html": {"target": 1000, "label": "home.html"},
 }
@@ -41,7 +41,7 @@ TARGETS = {
 START_BASELINE = {
     "home.js": 33768,  # 本会话拆 dashboard + billing 前
     "app.py": 10060,  # 阶段 5 完成后
-    "db.py": 9255,  # 真实测量
+    "core/db.py": 9255,  # 真实测量
     "home.css": 16124,  # 真实测量(比估计大 2 倍)
     "home.html": 6568,  # 真实测量
 }

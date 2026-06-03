@@ -89,11 +89,11 @@ class RunBankReconTests(unittest.TestCase):
             _detect_recon_mismatch=mock.Mock(return_value=[]),
         )
         defaults.update(over)
-        ps = [mock.patch(f"recon_routes.{k}", v) for k, v in defaults.items()]
+        ps = [mock.patch(f"routes.recon_routes.{k}", v) for k, v in defaults.items()]
         for p in ps:
             p.start()
             self.addCleanup(p.stop)
-        dbm = mock.patch("db.create_bank_recon_v2_task", return_value=777)
+        dbm = mock.patch("core.db.create_bank_recon_v2_task", return_value=777)
         dbm.start()
         self.addCleanup(dbm.stop)
         return defaults
@@ -119,7 +119,7 @@ class RunBankReconTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as d:
             refs = [_stage(d, "stmt", "s.pdf"), _stage(d, "gl", "g.xlsx")]
-            with mock.patch("db.create_bank_recon_v2_task", return_value=999) as save:
+            with mock.patch("core.db.create_bank_recon_v2_task", return_value=999) as save:
                 sentinel, payload = handlers.run_bank_recon({"user_id": "u1"}, refs, None)
         self.assertEqual(sentinel, "__failed__")
         self.assertEqual(payload["error_code"], "ocr_failed")
@@ -143,7 +143,7 @@ class RunBankReconTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as d:
             refs = [_stage(d, "stmt", "s.pdf"), _stage(d, "gl", "g.csv")]
-            with mock.patch("db.create_bank_recon_v2_task", return_value=888):
+            with mock.patch("core.db.create_bank_recon_v2_task", return_value=888):
                 sentinel, payload = handlers.run_bank_recon({"user_id": "u1"}, refs, None)
         self.assertEqual(sentinel, "__needs_mapping__")
         self.assertEqual(payload["mapping"]["file"], "g.csv")
@@ -154,7 +154,7 @@ class RunBankReconTests(unittest.TestCase):
 class RunGlvatTests(unittest.TestCase):
     def _patch_parse(self, gl_ret, vat_ret):
         for name, ret in (("parse_gl", gl_ret), ("parse_vat_report", vat_ret)):
-            p = mock.patch(f"recon_routes.{name}", return_value=ret)
+            p = mock.patch(f"routes.recon_routes.{name}", return_value=ret)
             p.start()
             self.addCleanup(p.stop)
 
@@ -168,10 +168,10 @@ class RunGlvatTests(unittest.TestCase):
             SimpleNamespace(gl_amount=None, diff=0),
         ]
         with (
-            mock.patch("recon_routes.reconcile_gl_vat", return_value=(detail, object())),
-            mock.patch("recon_routes.detail_to_json", return_value=[]),
-            mock.patch("recon_routes.summary_to_json", return_value={}),
-            mock.patch("db.create_gl_vat_task", return_value=555),
+            mock.patch("routes.recon_routes.reconcile_gl_vat", return_value=(detail, object())),
+            mock.patch("routes.recon_routes.detail_to_json", return_value=[]),
+            mock.patch("routes.recon_routes.summary_to_json", return_value={}),
+            mock.patch("core.db.create_gl_vat_task", return_value=555),
         ):
             with tempfile.TemporaryDirectory() as d:
                 refs = [_stage(d, "gl", "g.xlsx"), _stage(d, "vat", "v.pdf")]
@@ -208,13 +208,13 @@ class RunGlvatTests(unittest.TestCase):
         )
         detail = [SimpleNamespace(gl_amount=10.0, diff=0.0)]
         with (
-            mock.patch("recon_routes.reconcile_gl_vat", return_value=(detail, object())),
-            mock.patch("recon_routes.detail_to_json", return_value=[]),
-            mock.patch("recon_routes.summary_to_json", return_value={}),
-            mock.patch("recon_routes._pdf_billing_units", return_value=1),
+            mock.patch("routes.recon_routes.reconcile_gl_vat", return_value=(detail, object())),
+            mock.patch("routes.recon_routes.detail_to_json", return_value=[]),
+            mock.patch("routes.recon_routes.summary_to_json", return_value={}),
+            mock.patch("routes.recon_routes._pdf_billing_units", return_value=1),
             mock.patch("services.ocr.pdf_utils.count_pdf_pages", return_value=1),
-            mock.patch("db.create_gl_vat_task", return_value=606),
-            mock.patch("db.charge_ocr_async") as charge,
+            mock.patch("core.db.create_gl_vat_task", return_value=606),
+            mock.patch("core.db.charge_ocr_async") as charge,
         ):
             with tempfile.TemporaryDirectory() as d:
                 refs = [_stage(d, "gl", "g.xlsx"), _stage(d, "vat", "v.png")]
@@ -236,11 +236,11 @@ class RunGlvatTests(unittest.TestCase):
         )
         detail = [SimpleNamespace(gl_amount=10.0, diff=0.0)]
         with (
-            mock.patch("recon_routes.reconcile_gl_vat", return_value=(detail, object())),
-            mock.patch("recon_routes.detail_to_json", return_value=[]),
-            mock.patch("recon_routes.summary_to_json", return_value={}),
-            mock.patch("db.create_gl_vat_task", return_value=607),
-            mock.patch("db.charge_ocr_async") as charge,
+            mock.patch("routes.recon_routes.reconcile_gl_vat", return_value=(detail, object())),
+            mock.patch("routes.recon_routes.detail_to_json", return_value=[]),
+            mock.patch("routes.recon_routes.summary_to_json", return_value={}),
+            mock.patch("core.db.create_gl_vat_task", return_value=607),
+            mock.patch("core.db.charge_ocr_async") as charge,
         ):
             with tempfile.TemporaryDirectory() as d:
                 refs = [_stage(d, "gl", "g.xlsx"), _stage(d, "vat", "v.png")]
@@ -261,14 +261,19 @@ class RunSalesvatTests(unittest.TestCase):
         }
         summary = {"n_total": 1, "n_ok": 1, "n_diff": 0, "diff_amount_total": 0.0}
         with (
-            mock.patch("vat_excel_export.merge_vat_reports", return_value=rep),
-            mock.patch("vat_excel_export.extract_invoices_parallel", return_value=[{"ok": True}]),
-            mock.patch("vat_excel_export.build_excel", return_value=(b"XLSX", summary)),
-            mock.patch("vat_excel_routes._save_excel_file", return_value="/tmp/x.xlsx"),
-            mock.patch("db.create_vat_recon_task", return_value="abc-uuid"),
-            mock.patch("db.get_cursor"),
-            mock.patch("db.log_ocr_cost"),
-            mock.patch("db.get_latest_balance", return_value={"calibration_factor": 1.1}),
+            mock.patch("services.vat.vat_excel_export.merge_vat_reports", return_value=rep),
+            mock.patch(
+                "services.vat.vat_excel_export.extract_invoices_parallel",
+                return_value=[{"ok": True}],
+            ),
+            mock.patch(
+                "services.vat.vat_excel_export.build_excel", return_value=(b"XLSX", summary)
+            ),
+            mock.patch("routes.vat_excel_routes._save_excel_file", return_value="/tmp/x.xlsx"),
+            mock.patch("core.db.create_vat_recon_task", return_value="abc-uuid"),
+            mock.patch("core.db.get_cursor"),
+            mock.patch("core.db.log_ocr_cost"),
+            mock.patch("core.db.get_latest_balance", return_value={"calibration_factor": 1.1}),
         ):
             with tempfile.TemporaryDirectory() as d:
                 refs = [_stage(d, "invoice", "i.pdf"), _stage(d, "report", "r.pdf")]

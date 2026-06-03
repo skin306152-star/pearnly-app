@@ -13,7 +13,7 @@ import json
 import logging
 from typing import Optional, Dict, Any, List
 
-import db
+from core import db
 
 # facade re-export(REFACTOR-WA-B1 · 实现已抽到同包子模块 · db.X/store.X 单一对象不变)
 from services.recon.vat_recon_schema import ensure_vat_recon_tables  # noqa: F401,E402

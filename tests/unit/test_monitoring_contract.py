@@ -141,7 +141,7 @@ class RecordGeminiCallSwallowsErrorTests(unittest.TestCase):
 
 class DBPoolStatsTests(unittest.TestCase):
     def test_no_pool_returns_unavailable(self):
-        with mock.patch("db._pool", None):
+        with mock.patch("core.db._pool", None):
             self.assertEqual(monitoring.DBPoolStats.get_stats(), {"available": False})
 
 

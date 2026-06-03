@@ -13,7 +13,7 @@ from datetime import datetime as _datetime
 import logging
 from typing import Optional
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ def update_ocr_history_pages(
     new_archive_name = None
     new_category_tag = None
     try:
-        import archive as _archive
+        from services.archive import archive as _archive
 
         merged = {}
         for p in new_pages or []:

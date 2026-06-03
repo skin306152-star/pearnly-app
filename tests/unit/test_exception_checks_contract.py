@@ -12,7 +12,7 @@ REFACTOR-B1 守门测试 · OCR 异常检测 + 智能提醒链从 app.py 抽到 
 
 import unittest
 
-import exception_checks
+from services.exceptions import exception_checks
 
 
 class ExceptionChecksContractTests(unittest.TestCase):
@@ -22,7 +22,7 @@ class ExceptionChecksContractTests(unittest.TestCase):
         _parse_money:history PUT 用 · REFACTOR-B1 步骤 B 后随 history_routes 搬出 ·
         断言跟到新消费者 history_routes(app.py 已不再 import)。"""
         import app
-        import history_routes
+        from routes import history_routes
 
         self.assertIs(app._async_run_exception_checks, exception_checks._async_run_exception_checks)
         self.assertIs(history_routes._parse_money, exception_checks._parse_money)

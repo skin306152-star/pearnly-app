@@ -9,7 +9,7 @@ db.py 文件尾 re-export 对外函数 · 所有 `db.xxx()` 调用点不变。
 
 import logging
 
-import db
+from core import db
 
 # facade re-export(REFACTOR-WA-B1 · 产品映射实现下沉 product_mappings_store · db.X/store.X 单一对象不变)
 from services.erp.product_mappings_store import (  # noqa: F401,E402

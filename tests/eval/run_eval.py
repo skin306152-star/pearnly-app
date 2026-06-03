@@ -35,7 +35,7 @@ except Exception:
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from bank_recon_v2 import parse_bank_statement_pdf  # noqa: E402
+from services.recon.bank_recon_v2 import parse_bank_statement_pdf  # noqa: E402
 
 _HERE = os.path.dirname(__file__)
 _GT_DIRS = [

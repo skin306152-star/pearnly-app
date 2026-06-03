@@ -17,7 +17,7 @@ logger = logging.getLogger("mrpilot.signup")
 
 def _signup_helpers():
     """lazy 取 auth_signup 共享 helper(破循环 import)。"""
-    from auth_signup import (
+    from services.auth.auth_signup import (
         is_signup_globally_disabled,
         normalize_email,
         _hash_password,
@@ -41,7 +41,7 @@ def _signup_helpers():
 def create_user_via_google_oauth(
     email: str, full_name: str, google_sub: str, ip: str = None, ua: str = None
 ) -> Optional[Dict[str, Any]]:
-    import db as _db
+    from core import db as _db
 
     (
         is_signup_globally_disabled,
@@ -193,7 +193,7 @@ def create_user_via_line_oauth(
     ip: str = None,
     ua: str = None,
 ) -> Optional[Dict[str, Any]]:
-    import db as _db
+    from core import db as _db
 
     (
         is_signup_globally_disabled,

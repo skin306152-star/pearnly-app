@@ -12,7 +12,7 @@ import unittest
 
 from fastapi import HTTPException
 
-from notification_routes import (
+from routes.notification_routes import (
     NOTIF_TEMPLATE_EXCEPTION_HIGH,
     NOTIF_TEMPLATE_LARGE_INVOICE,
     _validate_template_params,

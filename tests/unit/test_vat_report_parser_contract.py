@@ -14,7 +14,7 @@ import unittest
 
 import openpyxl
 
-import vat_report_parser as vp
+from services.vat import vat_report_parser as vp
 
 
 class HelperTests(unittest.TestCase):

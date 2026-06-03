@@ -40,7 +40,7 @@ def _load_pricing():
 
 def _load_vat_validator():
     try:
-        from vat_excel_export import _ocr_validate_invoice
+        from services.vat.vat_excel_export import _ocr_validate_invoice
     except Exception as e:  # pragma: no cover
         raise unittest.SkipTest(f"vat_excel_export._ocr_validate_invoice 不可 import:{e}")
     return _ocr_validate_invoice

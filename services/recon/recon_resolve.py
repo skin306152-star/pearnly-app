@@ -220,4 +220,4 @@ def find_or_create_client_by_tax_id(
     return new_id
 
 
-import db  # noqa: E402 · 循环 import 解法
+from core import db  # noqa: E402 · 循环 import 解法

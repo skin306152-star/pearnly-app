@@ -5,13 +5,13 @@
   1. 5 个函数从 services.ocr_history.store 提供,db.py 经 re-export 暴露同一对象
      (调用点 db.xxx / from db import 零改动)。
   2. 纯结构性 0 逻辑改:跨域调用改 db.*(find_user_by_id 等)后,关键行为经
-     mock.patch("db.get_cursor") 仍生效:retention_days==0 早返空 · 空 record_ids 早返。
+     mock.patch("core.db.get_cursor") 仍生效:retention_days==0 早返空 · 空 record_ids 早返。
 """
 
 import unittest
 from unittest import mock
 
-import db
+from core import db
 from services.ocr_history import store
 
 
@@ -47,12 +47,12 @@ class OcrHistoryReexportContract(unittest.TestCase):
 class OcrHistoryBehaviorContract(unittest.TestCase):
     def test_list_retention_zero_returns_empty_without_db(self):
         # retention_days==0 → 早返空,不应触库
-        with mock.patch("db.get_cursor", side_effect=AssertionError("must not hit DB")):
+        with mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")):
             out = store.list_ocr_history("u1", retention_days=0)
         self.assertEqual(out, {"items": [], "total": 0})
 
     def test_delete_with_pdf_paths_empty_ids_early_return(self):
-        with mock.patch("db.get_cursor", side_effect=AssertionError("must not hit DB")):
+        with mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")):
             self.assertEqual(store.delete_ocr_history_with_pdf_paths("u1", []), (0, []))
 
     def test_list_builds_items_via_mocked_cursor(self):
@@ -88,7 +88,7 @@ class OcrHistoryBehaviorContract(unittest.TestCase):
         ctx = mock.MagicMock()
         ctx.__enter__.return_value = cur
         ctx.__exit__.return_value = False
-        with mock.patch("db.get_cursor", return_value=ctx):
+        with mock.patch("core.db.get_cursor", return_value=ctx):
             out = store.list_ocr_history("u1", retention_days=90)
         self.assertEqual(out["total"], 1)
         self.assertEqual(len(out["items"]), 1)

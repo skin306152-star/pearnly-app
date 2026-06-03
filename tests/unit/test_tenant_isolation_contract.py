@@ -91,7 +91,7 @@ def _ensure_stub_bcrypt():
 _ensure_stub_psycopg2()
 _ensure_stub_bcrypt()
 
-import db  # noqa: E402
+from core import db  # noqa: E402
 
 
 # ────────────────────────────────────────────────────────────────────

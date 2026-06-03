@@ -19,7 +19,7 @@ import unittest
 
 import openpyxl
 
-from bank_recon_v2 import parse_bank_stmt_xlsx_direct
+from services.recon.bank_recon_v2 import parse_bank_stmt_xlsx_direct
 
 
 def _build_multi():

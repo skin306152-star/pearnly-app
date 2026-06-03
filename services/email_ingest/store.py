@@ -9,7 +9,7 @@ db.py 在文件尾用 `from services.email_ingest.store import ...` re-export �
 import logging
 from typing import Optional, Dict, Any, List
 
-import db
+from core import db
 
 logger = logging.getLogger(__name__)
 

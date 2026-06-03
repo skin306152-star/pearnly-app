@@ -20,9 +20,9 @@ from unittest.mock import patch, MagicMock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
-import erp_push as _erp  # noqa: E402
+from services.erp import erp_push as _erp  # noqa: E402
 
-import db  # noqa: E402,F401  · 先 import db 再 import push_store(避免 partial-init 循环)
+from core import db  # noqa: E402,F401  · 先 import db 再 import push_store(避免 partial-init 循环)
 from services.erp.push_store import (  # noqa: E402
     is_already_pushed_error,
     classify_push_status,
@@ -73,7 +73,7 @@ class RetryUpdatesOriginalRowTests(unittest.TestCase):
 
         # R18(2026-05-29):retry 路由从 erp_routes 拆到 erp_push_log_routes ·
         # patch 目标随 handler 落点走(get_current_user/_check_push_access/_tid 都在该模块)。
-        import erp_push_log_routes as erp_routes  # noqa: F401
+        from routes import erp_push_log_routes as erp_routes  # noqa: F401
 
         cls.app_module = app
         cls.erp_routes = erp_routes

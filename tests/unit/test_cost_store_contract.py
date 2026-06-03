@@ -6,7 +6,7 @@
 
 import unittest
 
-import db
+from core import db
 from services.cost import store
 
 _MOVED = [

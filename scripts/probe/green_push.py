@@ -28,7 +28,7 @@ except Exception:
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import mrerp_xlsx_generator  # noqa: E402
+from services.erp import mrerp_xlsx_generator  # noqa: E402
 from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
 from services.erp.mrerp_customer_sync import MRERPCustomerSyncService  # noqa: E402
 from services.erp.mrerp_product_sync import MRERPProductSyncService  # noqa: E402

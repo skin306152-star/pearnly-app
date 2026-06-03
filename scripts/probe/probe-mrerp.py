@@ -371,7 +371,7 @@ def step_05_inspect_form(page: Page):
 # ============================================================
 def build_test_xlsx() -> Tuple[bytes, str]:
     log.info("→ 构造测试 xlsx(monkey-patch invoice_no=PEARNLY-TEST-001)")
-    import mrerp_xlsx_generator as gen
+    from services.erp import mrerp_xlsx_generator as gen
 
     original_derive = gen.derive_mrerp_invoice_no
     gen.derive_mrerp_invoice_no = lambda h: TEST_INVOICE_NO  # type: ignore

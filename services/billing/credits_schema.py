@@ -171,4 +171,4 @@ def ensure_tenant_credits(tenant_id) -> None:
 
 
 # ⚠️ 见 services/billing/charge.py 顶部循环 import 解释 · `import db` 在所有 def 之后。
-import db  # noqa: E402
+from core import db  # noqa: E402

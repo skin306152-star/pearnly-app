@@ -33,7 +33,7 @@ def _ctxmgr(cur):
 
 class CreditsSchemaReExportTests(unittest.TestCase):
     def test_db_reexports(self):
-        import db
+        from core import db
         from services.billing import credits_schema
 
         for name in ("ensure_credits_tables", "ensure_tenant_credits"):

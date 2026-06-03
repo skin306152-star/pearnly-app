@@ -23,7 +23,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import erp_push  # noqa: E402
+from services.erp import erp_push  # noqa: E402
 
 APP_UI_LANGS = ("zh", "en", "th", "ja")
 

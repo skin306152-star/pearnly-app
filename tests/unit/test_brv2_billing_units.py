@@ -14,7 +14,7 @@ BUG 修复:此前 PDF/图片按『交易行数』当页数计费 · 超收 10-34
 
 import unittest
 
-from recon_routes import _pdf_billing_units, _ROWS_PER_PAGE_BILLING
+from routes.recon_routes import _pdf_billing_units, _ROWS_PER_PAGE_BILLING
 
 
 class PdfBillingUnitsTests(unittest.TestCase):

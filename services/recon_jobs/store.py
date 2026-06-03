@@ -14,7 +14,7 @@ import json as _json
 import logging
 from typing import Any, Dict, List, Optional
 
-from db import get_cursor
+from core.db import get_cursor
 
 logger = logging.getLogger("recon_jobs")
 

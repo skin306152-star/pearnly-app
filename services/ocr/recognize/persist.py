@@ -9,10 +9,10 @@ services/ocr/recognize/persist.py · OCR 识别·多发票入库持久化
 
 import logging
 
-import db
-from db import insert_ocr_history
-from route_helpers import _tid
-from exception_checks import _async_run_exception_checks
+from core import db
+from core.db import insert_ocr_history
+from core.route_helpers import _tid
+from services.exceptions.exception_checks import _async_run_exception_checks
 
 logger = logging.getLogger("mr-pilot")
 
@@ -35,8 +35,8 @@ def persist_invoices(
     history_id = None
     # v0.11 · 多发票智能分组:把 PDF 拆成 N 张独立发票,每张一条历史
     import uuid as _uuid
-    import invoice_grouper
-    import archive as _archive
+    from services.ocr import invoice_grouper
+    from services.archive import archive as _archive
 
     try:
         invoice_groups = invoice_grouper.group_pages_to_invoices(result["pages"])

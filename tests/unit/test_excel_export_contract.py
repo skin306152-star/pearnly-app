@@ -13,7 +13,7 @@ import unittest
 
 from openpyxl import load_workbook
 
-import excel_export as ee
+from services.excel import excel_export as ee
 
 
 class ColumnLabelTests(unittest.TestCase):

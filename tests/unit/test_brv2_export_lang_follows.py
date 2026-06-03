@@ -79,7 +79,7 @@ class ExportLangFollowsUiTests(unittest.TestCase):
 
     def test_export_bank_recon_excel_lang_4_languages_complete(self):
         """契约 2 · export_bank_recon_excel 4 语 _RECON_TITLE 全到 · 调用时跟 lang 走"""
-        from bank_recon_v2 import (
+        from services.recon.bank_recon_v2 import (
             BankReconSummary,
             BankReconRow,
             export_bank_recon_excel,

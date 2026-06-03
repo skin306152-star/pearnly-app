@@ -95,4 +95,4 @@ def ensure_membership_tables():
 
 
 # ⚠️ `import db` 必须在 def 之后(解 charge ↔ db 循环 import · 见 services/billing/charge.py 注释)
-import db  # noqa: E402
+from core import db  # noqa: E402

@@ -353,7 +353,7 @@ async def run_startup() -> dict:
     # someone clicks 重新测试 right after a deploy.
     try:
         # REFACTOR-B1(2026-05-25):3 个缓存随 erp 路由搬到 erp_routes.py · 调封装函数清
-        from erp_routes import flush_test_connection_caches
+        from routes.erp_routes import flush_test_connection_caches
 
         flush_test_connection_caches()
         logger.info("[startup] flushed ERP test-connection caches")
@@ -485,4 +485,4 @@ async def run_shutdown(tasks: dict):
 
 
 # ⚠️ `import db` 放 def 之后(解循环 import · 见 services/billing/charge.py 注释)
-import db  # noqa: E402
+from core import db  # noqa: E402

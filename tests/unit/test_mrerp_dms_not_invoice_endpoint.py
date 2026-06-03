@@ -22,7 +22,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import erp_push as _erp  # noqa: E402
+from services.erp import erp_push as _erp  # noqa: E402
 
 
 class PushToEndpointRejectsDmsTests(unittest.TestCase):

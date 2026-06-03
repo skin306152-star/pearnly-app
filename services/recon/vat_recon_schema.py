@@ -109,4 +109,4 @@ def ensure_vat_recon_tables():
         logger.error(f"ensure_vat_recon_tables failed: {e}")
 
 
-import db  # noqa: E402 · 循环 import 解法(被 db 间接引)
+from core import db  # noqa: E402 · 循环 import 解法(被 db 间接引)

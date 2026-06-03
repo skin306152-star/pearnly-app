@@ -9,7 +9,7 @@
 
 import unittest
 
-import db
+from core import db
 from services.erp import oauth_store as store
 
 # 对外(被 erp_xero_routes / app.py 通过 db.xxx 调用)的 12 个函数

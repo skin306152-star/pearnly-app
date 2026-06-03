@@ -94,7 +94,7 @@ class DBPoolStats:
     @staticmethod
     def get_stats() -> Dict[str, Any]:
         try:
-            import db as _db
+            from core import db as _db
 
             pool = _db._pool
             if pool is None:

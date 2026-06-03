@@ -29,8 +29,8 @@ def generate_and_save_pdf(
     任何异常吞掉(留底失败绝不影响识别 · 同原 try/except 行为)。
     """
     try:
-        import pdf_storage
-        import pdf_searchable
+        from services.ocr import pdf_storage
+        from services.ocr import pdf_searchable
 
         _pdf_to_save = content
         try:

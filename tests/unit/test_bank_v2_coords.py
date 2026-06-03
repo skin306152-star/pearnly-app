@@ -18,7 +18,7 @@ import unittest
 
 import fitz  # PyMuPDF
 
-from bank_recon_v2 import _parse_stmt_text_coords
+from services.recon.bank_recon_v2 import _parse_stmt_text_coords
 
 
 def _make_pdf(header, rows, width=400):

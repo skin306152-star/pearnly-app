@@ -212,4 +212,4 @@ def charge_ocr_async(
 
 
 # ⚠️ 见文件顶部注释 · `import db` 必须在所有 def 之后,解 charge ↔ db 循环 import。
-import db  # noqa: E402
+from core import db  # noqa: E402

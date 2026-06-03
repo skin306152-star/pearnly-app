@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 def _mrerp_history_invoice_no(history_flat: Dict[str, Any]) -> str:
     """与 mrerp_adapter 内部一致的 invoice_no 派生 · 用于把批量结果回映射到每张 history。"""
     try:
-        import mrerp_xlsx_generator
+        from services.erp import mrerp_xlsx_generator
 
         return mrerp_xlsx_generator.derive_mrerp_invoice_no(history_flat) or "?"
     except Exception:
@@ -41,7 +41,7 @@ def _dispatch_mrerp_batch(
     endpoint: Dict[str, Any], histories: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
     """MR.ERP 批量:一次 build adapter + 一次 upload_invoice_batch,按 invoice_no 回映射。"""
-    import erp_push
+    from services.erp import erp_push
 
     t0 = time.time()
     config = endpoint.get("config") or {}
@@ -51,7 +51,7 @@ def _dispatch_mrerp_batch(
     # tenant_id(批内同 endpoint → 同 user → 同 tenant)· 给 mappings + 主数据归属。
     tenant_id = None
     try:
-        import db as _db
+        from core import db as _db
 
         tenant_id = _db.get_user_tenant_id(user_id) if user_id else None
     except Exception as e:
@@ -271,6 +271,6 @@ def dispatch_endpoint_batch(
         return _dispatch_mrerp_batch(endpoint, histories)
 
     # 非 mrerp:暂无批量能力 → 循环单张(统一接口 · 行为不变)。
-    import erp_push
+    from services.erp import erp_push
 
     return [erp_push.push_to_endpoint(endpoint, h) for h in histories]

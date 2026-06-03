@@ -20,8 +20,8 @@ import unittest
 
 import openpyxl
 
-from bank_recon_v2 import _hit, _map_bank_stmt_cols, parse_bank_stmt_xlsx_direct
-from bank_recon_v2 import _STMT_DEPOSIT_H
+from services.recon.bank_recon_v2 import _hit, _map_bank_stmt_cols, parse_bank_stmt_xlsx_direct
+from services.recon.bank_recon_v2 import _STMT_DEPOSIT_H
 
 
 class HitWholeWordTests(unittest.TestCase):

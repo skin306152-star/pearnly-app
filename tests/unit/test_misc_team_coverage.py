@@ -56,7 +56,7 @@ if "psycopg2" not in sys.modules:
     sys.modules["psycopg2.pool"] = _pg.pool
     sys.modules["psycopg2.sql"] = _pg.sql
 
-import db  # noqa: E402  (先 import db 触发 re-export · 解循环)
+from core import db  # noqa: E402  (先 import db 触发 re-export · 解循环)
 from services.team import store  # noqa: E402
 
 

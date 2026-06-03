@@ -254,12 +254,18 @@ jobs:
       - name: Install Node deps (npm ci · 严格按 lockfile)
         run: npm ci
 
-      - name: Vite build (REFACTOR-A1.2 · 防本地 build 产物没提交)
+      - name: Vite build + 打包一致性闸① (REFACTOR-A1.2/E7 · 防本地 build 产物没提交)
         run: |
           npm run build
           # static/dist/main.js 是 A1.1 起的 Vite 产物 · 本地 build 后必须 commit
           # CI 这步重 build 一次 · 跑通 = 配置无脏 · 失败 = vite.config.mjs / src/main.js 有问题
           test -f static/dist/main.js || { echo "::error::vite build did not produce static/dist/main.js"; exit 1; }
+          # 闸①打包一致性: CI 重 build 后 dist 必须 == 提交的 · 改前端源忘打包 = 这里红(防 prod 跑旧 bundle)
+          git diff --exit-code static/dist/ \
+            || { echo "::error::dist 与源的 build 不一致 · 改了前端源但没 git add static/dist · 跑 npm run build 后提交"; exit 1; }
+
+      - name: 前端打包闸②③ (源页只引 bundle · 资产全在打包清单 · 防 view-source 退化)
+        run: python scripts/check_asset_bundling.py
 
       - name: Cache Playwright browsers
         id: playwright-cache

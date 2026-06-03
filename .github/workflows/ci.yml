@@ -80,15 +80,13 @@ jobs:
   # REFACTOR-WC-P1 · 防屎山闸(铁律 #27 · 窗口 C · 2026-05-28)
   #   #1 check_file_size.py : 任何监控代码文件 > 500 行 → fail(历史巨石短期豁免在脚本里)
   #   #2 check_line_ratchet.py: 任何监控文件净增长 > 0 → fail(透明豁免:commit 加 RATCHET-EXEMPT)
-  # 当前模式 = warning(continue-on-error: true · 红但不挡 push) ·
-  # 等 Loop 1 把 app.py / home.js 等巨石拆到目标 < 500 / < 200 ·
-  # Zihao 拍板"切硬门" → 删 continue-on-error 进 fail 模式 · 整顿期就不会再糊回去。
+  # 模式 = FAIL(2026-06-03 整顿收官 · 全文件 <500 · Zihao 拍板切硬门)·
+  # 任何监控文件 >500 行 或 行数净增长 → CI 红 → 挡合并 · 屎山不再复辟。
+  # 合理增长在 commit 写 RATCHET-EXEMPT: <file> +<N> · <理由> 透明豁免。
   lint-size:
-    name: lint-size (REFACTOR-WC-P1 · anti-bigfile · WARNING mode)
+    name: lint-size (REFACTOR-WC-P1 · anti-bigfile · FAIL mode)
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # ⚠️ warning 模式 · 红但不挡 push · Loop 1 拆完巨石后改 false(fail 模式)
-    continue-on-error: true
 
     steps:
       - name: Checkout (full history · 棘轮需要 HEAD~1)

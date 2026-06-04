@@ -17,9 +17,16 @@ math_mismatch / tax_id_format_invalid)+ high 异常 / 大额发票的 LINE 智�
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from core import db
+
+# When set, the knowledge dead-rules engine produces the invoice findings
+# (duplicate / amount_missing / math_mismatch / tax_id) in place of the inline
+# rules below — one rule source instead of two. Default off: the legacy path is
+# the rollback path. confidence_low and the LINE reminders stay either way.
+KNOWLEDGE_RULES_ENABLED = os.environ.get("KNOWLEDGE_RULES") == "1"
 
 try:
     from services.line_binding import line_client  # T1 · LINE Bot(v0.19.0)· 文件需单独部署到服务器
@@ -110,102 +117,34 @@ async def _async_run_exception_checks(
                 )
                 if _ex_id_1 and _sev_1 == "high":
                     _high_inserted.append(EXC_RULE_CONFIDENCE_LOW)
-        # ── Rule 2 · duplicate(已检测过 · 直接复用)
-        if duplicate:
-            if not db.is_exception_whitelisted(user_id, tenant_id, seller_name, EXC_RULE_DUPLICATE):
-                _sev_2 = "high" if duplicate.get("level") == "exact" else "medium"
-                _ex_id_2 = db.insert_exception(
+        # ── Rules 2-5 · 发票自洽/查重/税号 · flag 开走统一引擎 · 关走旧内联逻辑(回滚路径)
+        if KNOWLEDGE_RULES_ENABLED:
+            from services.exceptions import knowledge_bridge
+
+            _high_inserted.extend(
+                knowledge_bridge.run_and_record(
+                    history_id=history_id,
                     user_id=user_id,
                     tenant_id=tenant_id,
-                    history_id=history_id,
-                    rule_code=EXC_RULE_DUPLICATE,
-                    severity=_sev_2,
                     seller_name=seller_name,
                     invoice_no=invoice_no,
                     total_amount=total_amount,
-                    detail={
-                        "level": duplicate.get("level"),
-                        "matched_fields": duplicate.get("matched_fields"),
-                        "match_id": (duplicate.get("match") or {}).get("id"),
-                        "match_filename": (duplicate.get("match") or {}).get("filename"),
-                        "match_invoice_no": (duplicate.get("match") or {}).get("invoice_no"),
-                    },
+                    fields=fields,
                 )
-                if _ex_id_2 and _sev_2 == "high":
-                    _high_inserted.append(EXC_RULE_DUPLICATE)
-        # ── Rule 3 · amount_missing(总金额 + 发票号 都为空 → 严重异常)
-        _no_amount = total_amount is None
-        _no_invno = not invoice_no or not str(invoice_no).strip()
-        if _no_amount and _no_invno:
-            if not db.is_exception_whitelisted(
-                user_id, tenant_id, seller_name, EXC_RULE_AMOUNT_MISSING
-            ):
-                _ex_id_3 = db.insert_exception(
+            )
+        else:
+            _high_inserted.extend(
+                _run_legacy_invoice_rules(
+                    history_id=history_id,
                     user_id=user_id,
                     tenant_id=tenant_id,
-                    history_id=history_id,
-                    rule_code=EXC_RULE_AMOUNT_MISSING,
-                    severity="high",
-                    seller_name=seller_name,
-                    invoice_no=None,
-                    total_amount=None,
-                    detail={"missing": ["total_amount", "invoice_no"]},
-                )
-                if _ex_id_3:
-                    _high_inserted.append(EXC_RULE_AMOUNT_MISSING)
-        # ── Rule 4 · math_mismatch(自洽性 · 未税 + 税额 ≠ 总额 → 假数据嫌疑)
-        _sub = _parse_money(fields.get("subtotal"))
-        _vat = _parse_money(fields.get("vat"))
-        if _sub is not None and _vat is not None and total_amount is not None:
-            _expected = round(_sub + _vat, 2)
-            _diff = abs(_expected - total_amount)
-            if _diff > 1.0:  # ±1฿ 舍入容差
-                if not db.is_exception_whitelisted(
-                    user_id, tenant_id, seller_name, EXC_RULE_MATH_MISMATCH
-                ):
-                    _ex_id_4 = db.insert_exception(
-                        user_id=user_id,
-                        tenant_id=tenant_id,
-                        history_id=history_id,
-                        rule_code=EXC_RULE_MATH_MISMATCH,
-                        severity="high",  # 数学不自洽 = OCR 数据可能编的 · 高危
-                        seller_name=seller_name,
-                        invoice_no=invoice_no,
-                        total_amount=total_amount,
-                        detail={
-                            "subtotal": _sub,
-                            "vat": _vat,
-                            "total_actual": total_amount,
-                            "total_expected": _expected,
-                            "diff": round(_diff, 2),
-                        },
-                    )
-                    if _ex_id_4:
-                        _high_inserted.append(EXC_RULE_MATH_MISMATCH)
-        # ── Rule 5 · tax_id_format_invalid(卖方税号不是 13 位 → OCR 读错 / 假票)
-        _stax = fields.get("seller_tax")
-        if _stax and not _is_valid_thai_tax_id(_stax):
-            if not db.is_exception_whitelisted(
-                user_id, tenant_id, seller_name, EXC_RULE_TAX_ID_FORMAT
-            ):
-                _clean = str(_stax).strip().replace("-", "").replace(" ", "")
-                db.insert_exception(
-                    user_id=user_id,
-                    tenant_id=tenant_id,
-                    history_id=history_id,
-                    rule_code=EXC_RULE_TAX_ID_FORMAT,
-                    severity="medium",
                     seller_name=seller_name,
                     invoice_no=invoice_no,
                     total_amount=total_amount,
-                    detail={
-                        "tax_id_raw": _stax,
-                        "tax_id_normalized": _clean,
-                        "expected": "13 digits",
-                        "actual_length": len(_clean),
-                    },
+                    duplicate=duplicate,
+                    fields=fields,
                 )
-                # severity 是 medium · 不进 _high_inserted
+            )
         # v118.22.1.1 · 智能提醒触发(异步 fire-and-forget · 失败吞)
         try:
             import asyncio as _asyncio_notif
@@ -238,6 +177,120 @@ async def _async_run_exception_checks(
             logger.warning(f"notify trigger enqueue failed (hid={history_id}): {_ne}")
     except Exception as e:
         logger.warning(f"_async_run_exception_checks failed (hid={history_id}): {e}")
+
+
+def _run_legacy_invoice_rules(
+    *,
+    history_id: str,
+    user_id: str,
+    tenant_id: Optional[str],
+    seller_name: Optional[str],
+    invoice_no: Optional[str],
+    total_amount: Optional[float],
+    duplicate: Optional[Dict[str, Any]],
+    fields: Dict[str, Any],
+) -> List[str]:
+    """旧内联规则(duplicate / amount_missing / math_mismatch / tax_id)· 回滚路径。
+
+    返回本次写入的 high severity 规则码,供调用方触发 LINE 提醒。confidence_low
+    不在此处(它不是发票规则,留在主 hook 内永远跑)。
+    """
+    high_inserted: List[str] = []
+    # ── Rule 2 · duplicate(已检测过 · 直接复用)
+    if duplicate:
+        if not db.is_exception_whitelisted(user_id, tenant_id, seller_name, EXC_RULE_DUPLICATE):
+            _sev_2 = "high" if duplicate.get("level") == "exact" else "medium"
+            _ex_id_2 = db.insert_exception(
+                user_id=user_id,
+                tenant_id=tenant_id,
+                history_id=history_id,
+                rule_code=EXC_RULE_DUPLICATE,
+                severity=_sev_2,
+                seller_name=seller_name,
+                invoice_no=invoice_no,
+                total_amount=total_amount,
+                detail={
+                    "level": duplicate.get("level"),
+                    "matched_fields": duplicate.get("matched_fields"),
+                    "match_id": (duplicate.get("match") or {}).get("id"),
+                    "match_filename": (duplicate.get("match") or {}).get("filename"),
+                    "match_invoice_no": (duplicate.get("match") or {}).get("invoice_no"),
+                },
+            )
+            if _ex_id_2 and _sev_2 == "high":
+                high_inserted.append(EXC_RULE_DUPLICATE)
+    # ── Rule 3 · amount_missing(总金额 + 发票号 都为空 → 严重异常)
+    _no_amount = total_amount is None
+    _no_invno = not invoice_no or not str(invoice_no).strip()
+    if _no_amount and _no_invno:
+        if not db.is_exception_whitelisted(
+            user_id, tenant_id, seller_name, EXC_RULE_AMOUNT_MISSING
+        ):
+            _ex_id_3 = db.insert_exception(
+                user_id=user_id,
+                tenant_id=tenant_id,
+                history_id=history_id,
+                rule_code=EXC_RULE_AMOUNT_MISSING,
+                severity="high",
+                seller_name=seller_name,
+                invoice_no=None,
+                total_amount=None,
+                detail={"missing": ["total_amount", "invoice_no"]},
+            )
+            if _ex_id_3:
+                high_inserted.append(EXC_RULE_AMOUNT_MISSING)
+    # ── Rule 4 · math_mismatch(自洽性 · 未税 + 税额 ≠ 总额 → 假数据嫌疑)
+    _sub = _parse_money(fields.get("subtotal"))
+    _vat = _parse_money(fields.get("vat"))
+    if _sub is not None and _vat is not None and total_amount is not None:
+        _expected = round(_sub + _vat, 2)
+        _diff = abs(_expected - total_amount)
+        if _diff > 1.0:  # ±1฿ 舍入容差
+            if not db.is_exception_whitelisted(
+                user_id, tenant_id, seller_name, EXC_RULE_MATH_MISMATCH
+            ):
+                _ex_id_4 = db.insert_exception(
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    history_id=history_id,
+                    rule_code=EXC_RULE_MATH_MISMATCH,
+                    severity="high",  # 数学不自洽 = OCR 数据可能编的 · 高危
+                    seller_name=seller_name,
+                    invoice_no=invoice_no,
+                    total_amount=total_amount,
+                    detail={
+                        "subtotal": _sub,
+                        "vat": _vat,
+                        "total_actual": total_amount,
+                        "total_expected": _expected,
+                        "diff": round(_diff, 2),
+                    },
+                )
+                if _ex_id_4:
+                    high_inserted.append(EXC_RULE_MATH_MISMATCH)
+    # ── Rule 5 · tax_id_format_invalid(卖方税号不是 13 位 → OCR 读错 / 假票)
+    _stax = fields.get("seller_tax")
+    if _stax and not _is_valid_thai_tax_id(_stax):
+        if not db.is_exception_whitelisted(user_id, tenant_id, seller_name, EXC_RULE_TAX_ID_FORMAT):
+            _clean = str(_stax).strip().replace("-", "").replace(" ", "")
+            db.insert_exception(
+                user_id=user_id,
+                tenant_id=tenant_id,
+                history_id=history_id,
+                rule_code=EXC_RULE_TAX_ID_FORMAT,
+                severity="medium",
+                seller_name=seller_name,
+                invoice_no=invoice_no,
+                total_amount=total_amount,
+                detail={
+                    "tax_id_raw": _stax,
+                    "tax_id_normalized": _clean,
+                    "expected": "13 digits",
+                    "actual_length": len(_clean),
+                },
+            )
+            # severity 是 medium · 不进 high_inserted
+    return high_inserted
 
 
 # v118.22.1.1 · 智能提醒触发 helper · 异步 fire-and-forget

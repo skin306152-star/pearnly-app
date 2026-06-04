@@ -3,18 +3,18 @@
 // verbatim 0 改逻辑。
 // ============================================================
 
-const $ = (id) => document.getElementById(id);
-function fmtNum(v) {
+const $ = (id: string) => document.getElementById(id);
+function fmtNum(v: unknown) {
     if (v === null || v === undefined) return '—';
     const n = Number(v);
     if (isNaN(n)) return '—';
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-function fmtDate(s) {
+function fmtDate(s: unknown) {
     if (!s) return '—';
     return String(s).slice(0, 10).split('-').reverse().join('/');
 }
-function esc2(s) {
+function esc2(s: unknown) {
     return String(s || '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -22,9 +22,9 @@ function esc2(s) {
 }
 
 // BUG-FIX-RECON-GLCSV · 后台整侧解析明确失败(无表格可现场修)→ 按 error_code 给 4 语友好原因 + 引导
-function _brv2FailMsg(code, lang) {
+function _brv2FailMsg(code: string, lang?: string) {
     lang = window._currentLang || lang || 'th';
-    const M = {
+    const M: Record<string, Record<string, string>> = {
         stmt_headers_not_found: {
             zh: '认不出银行账单表头 · 请确认文件含日期/金额/余额列,或转成清晰的 Excel/CSV 重传',
             th: 'หาหัวตารางบัญชีธนาคารไม่เจอ · ตรวจสอบว่ามีคอลัมน์ วันที่/จำนวนเงิน/ยอดคงเหลือ หรือแปลงเป็น Excel/CSV แล้วอัปโหลดใหม่',
@@ -78,17 +78,17 @@ function _brv2FailMsg(code, lang) {
     return m[lang] || m.th || m.en;
 }
 
-function _brv2FmtSize(bytes) {
+function _brv2FmtSize(bytes: number) {
     if (!bytes) return '';
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-function _brv2T(key, fallback) {
+function _brv2T(key: string, fallback?: string) {
     return (window.t && window.t(key)) || fallback;
 }
-function _brv2EscHtml(s) {
+function _brv2EscHtml(s: unknown) {
     return String(s == null ? '' : s)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -96,9 +96,10 @@ function _brv2EscHtml(s) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
-function _brv2FmtNum(v) {
-    if (!Number.isFinite(+v)) return '—';
-    return (+v).toLocaleString(undefined, {
+function _brv2FmtNum(v: unknown) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });

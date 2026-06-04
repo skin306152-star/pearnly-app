@@ -5,8 +5,8 @@
 // btn-start(ocr-recognize.js)thai_id_card 模式经 ESM import 调 _runDmsIdCardFlow。
 // ============================================================
 /* global _selectedFiles, token, renderFileList, updateStartButton */
-async function _runDmsIdCardFlow(forceFile) {
-    let f;
+async function _runDmsIdCardFlow(forceFile?: File) {
+    let f: SelectedFile;
     if (forceFile) {
         f = _selectedFiles.find((x) => x.file === forceFile) || {
             file: forceFile,

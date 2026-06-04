@@ -3,7 +3,7 @@
 // verbatim 0 改逻辑。
 // ============================================================
 
-function _scoreBadge(score) {
+function _scoreBadge(score: unknown) {
     const n = Number(score || 0);
     let cls = 'score-low';
     if (n >= 85) cls = 'score-high';
@@ -20,12 +20,12 @@ function _scoreBadge(score) {
 }
 
 // ---------- 工具 ----------
-function showBankProgress(show) {
+function showBankProgress(show: boolean) {
     const el = document.getElementById('bank-upload-progress');
     if (el) el.style.display = show ? '' : 'none';
 }
 
-function showBankError(msg) {
+function showBankError(msg: string) {
     const el = document.getElementById('bank-upload-error');
     if (el) {
         el.textContent = msg;
@@ -38,8 +38,8 @@ function hideBankError() {
     if (el) el.style.display = 'none';
 }
 
-function formatUploadError(detail) {
-    const map = {
+function formatUploadError(detail: string) {
+    const map: Record<string, string> = {
         'bank_recon.only_pdf': t('bank-err-only-pdf'),
         'bank_recon.empty_file': t('bank-err-empty'),
         'bank_recon.file_too_large': t('bank-err-too-large'),
@@ -52,25 +52,25 @@ function formatUploadError(detail) {
     return map[detail] || t('bank-err-unknown') + ' (' + detail + ')';
 }
 
-function fmtAmt(v) {
+function fmtAmt(v: unknown) {
     if (v === null || v === undefined) return '-';
     const n = Number(v);
     if (isNaN(n)) return '-';
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatDate(s) {
+function formatDate(s: unknown) {
     if (!s) return '-';
     const str = String(s);
     return str.length >= 10 ? str.slice(0, 10) : str;
 }
 
-function formatPeriod(a, b) {
+function formatPeriod(a: unknown, b: unknown) {
     if (!a && !b) return '';
     return (formatDate(a) || '?') + ' ~ ' + (formatDate(b) || '?');
 }
 
-function esc(s) {
+function esc(s: unknown) {
     if (s === null || s === undefined) return '';
     return String(s)
         .replace(/&/g, '&amp;')

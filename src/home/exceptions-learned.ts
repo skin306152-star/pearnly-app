@@ -30,7 +30,7 @@ async function loadLearnedRules() {
                     id: unknown;
                     rule_code: string;
                     seller_name: unknown;
-                    created_at: unknown;
+                    created_at?: string | null;
                 }) => {
                     const ruleLabel = t('exc-rule-' + it.rule_code) || it.rule_code;
                     return `

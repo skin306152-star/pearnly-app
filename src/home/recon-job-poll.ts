@@ -16,7 +16,7 @@
  * ============================================================ */
 (function () {
     'use strict';
-    const _STAGE_LBL = {
+    const _STAGE_LBL: Record<string, Record<string, string>> = {
         parse: { zh: '解析文件中', th: 'กำลังอ่านไฟล์', en: 'Parsing files', ja: 'ファイル解析中' },
         report: {
             zh: '读取报告中',
@@ -41,15 +41,19 @@
         const label = lbl[lang] || lbl.th || lbl.en;
         const total = progress.stage_total,
             done = progress.stage_done;
-        if (stage === 'parse' && Number.isFinite(total) && total > 0) {
-            const cntL =
-                {
-                    zh: '共 {d}/{t} 个文件',
-                    th: '{d}/{t} ไฟล์',
-                    en: '{d}/{t} files',
-                    ja: '{d}/{t} ファイル',
-                }[lang] || '{d}/{t} files';
-            return label + ' · ' + cntL.replace('{d}', done || 0).replace('{t}', total);
+        if (stage === 'parse' && typeof total === 'number' && total > 0) {
+            const cntL: string =
+                (
+                    {
+                        zh: '共 {d}/{t} 个文件',
+                        th: '{d}/{t} ไฟล์',
+                        en: '{d}/{t} files',
+                        ja: '{d}/{t} ファイル',
+                    } as Record<string, string>
+                )[lang] || '{d}/{t} files';
+            return (
+                label + ' · ' + cntL.replace('{d}', String(done || 0)).replace('{t}', String(total))
+            );
         }
         return label;
     };

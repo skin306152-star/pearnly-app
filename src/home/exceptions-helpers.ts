@@ -4,7 +4,7 @@
 /* global escapeHtml, showConfirm, currentLang, humanizeError */
 
 // v118.20.5 · 简易 i18n 占位替换({n} 等)
-function _tn(key, vars) {
+function _tn(key: string, vars?: Record<string, unknown>) {
     let s = t(key) || key;
     if (vars)
         for (const k in vars) s = s.replace(new RegExp('\\{' + k + '\\}', 'g'), String(vars[k]));
@@ -12,7 +12,7 @@ function _tn(key, vars) {
 }
 
 // SVG 小图标(规则严重度)
-function _sevSvg(sev) {
+function _sevSvg(sev: string) {
     if (sev === 'high') {
         return `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M7 1.5L1 12.5h12L7 1.5z"/>
@@ -40,28 +40,28 @@ function _emptySvg() {
     </svg>`;
 }
 
-function _fmtMoney(n) {
+function _fmtMoney(n: unknown) {
     if (n === null || n === undefined) return '—';
-    const v = parseFloat(n);
+    const v = parseFloat(String(n));
     if (isNaN(v)) return '—';
     return (
         '฿ ' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     );
 }
 
-function _shortDate(iso) {
+function _shortDate(iso?: string | null) {
     if (!iso) return '—';
     return iso.slice(0, 10);
 }
 
-function _v(s) {
+function _v(s: unknown) {
     if (s === null || s === undefined || String(s).trim() === '') {
         return `<span class="empty">${escapeHtml(t('exc-empty-val'))}</span>`;
     }
     return escapeHtml(String(s));
 }
 
-function _money(n) {
+function _money(n: unknown) {
     if (n === null || n === undefined) return '—';
     const v = typeof n === 'number' ? n : parseFloat(String(n).replace(/,/g, ''));
     if (isNaN(v)) return escapeHtml(String(n));
@@ -73,11 +73,11 @@ function _money(n) {
 // ============================================================
 // v118.21.2 · 设置页 · 学习规则面板(列出 / 撤销已学的白名单)
 // ============================================================
-function _shortDateTime(iso) {
+function _shortDateTime(iso?: string | null) {
     if (!iso) return '—';
     try {
         const d = new Date(iso);
-        const pad = (n) => String(n).padStart(2, '0');
+        const pad = (n: number) => String(n).padStart(2, '0');
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     } catch (_) {
         return iso.slice(0, 16).replace('T', ' ');

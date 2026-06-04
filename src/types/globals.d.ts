@@ -42,10 +42,46 @@ declare function saveCompany(): void;
 declare function installNetworkBanner(): void;
 declare function callRdVerify(side?: string): Promise<void>;
 declare function callRdSync(side?: string): Promise<void>;
+/** One OCR result row in the results drawer. Dynamic field bags are kept as
+ *  Record; the index signature covers the many per-stage extras. */
+interface OcrResult {
+    merged_fields: Record<string, unknown>;
+    edits: Record<string, unknown>;
+    [key: string]: unknown;
+}
 // eslint-disable-next-line no-var
-declare var _results: unknown[];
+declare var _results: OcrResult[];
 // eslint-disable-next-line no-var
 declare var _drawerIdx: number;
+declare function svgIcon(name: string, size?: number): string;
+declare function renderResults(data?: unknown): void;
+declare function renderFileList(zone?: unknown): void;
+declare function updateStartButton(): void;
+declare function _showSessionRevokedModal(): void;
+/** Bearer token held globally by home.js core. */
+// eslint-disable-next-line no-var
+declare var token: string;
+/** One entry in the OCR upload queue. Known fields are typed; the index
+ *  signature covers per-flow extras (errorKey, canRetry, progress, …). */
+interface SelectedFile {
+    file: File;
+    name: string;
+    status: string;
+    [key: string]: unknown;
+}
+
+/** Currently selected OCR files / active contact (home.js lexical state). */
+// eslint-disable-next-line no-var
+declare var _selectedFiles: SelectedFile[];
+// eslint-disable-next-line no-var
+declare var _contact: {
+    phone?: string;
+    line_id?: string;
+    line_url?: string;
+    email?: string;
+    address?: string;
+    [key: string]: unknown;
+} | null;
 
 // Window bridges exposed by migrated src/home modules. Extended per C5 batch as
 // modules move to TypeScript; consumers still on .js read these off window.
@@ -76,6 +112,30 @@ interface Window {
     _stopEmailLogAutoRefresh: () => void;
     _helpModalEscBound: boolean;
     _refreshChromeBanner: () => void;
+    // DMS id-card OCR bridges
+    _dmsLastFile?: File;
+    _dmsRetryIdCard: () => void;
+    renderDmsIdCardResult?: (data: unknown) => void;
+    // recon job polling + session + nav-group + settings panels
+    _reconProgressText: (
+        progress?: { stage?: string; stage_total?: number; stage_done?: number },
+        lang?: string
+    ) => string;
+    _reconPollJob: (
+        jobId: string,
+        token: string,
+        opts?: {
+            intervalMs?: number;
+            maxMs?: number;
+            onProgress?: (progress: unknown, job: unknown) => void;
+        }
+    ) => Promise<unknown>;
+    _sessionCheck: () => void;
+    expandNavGroupForRoute: (route: string) => void;
+    loadAboutPanel: () => void;
+    loadPrefsSettings: () => void;
+    // jsPDF UMD global (vendored, no bundled types)
+    jspdf: { jsPDF: new (...args: any[]) => any };
 }
 
 // navigator.userAgentData (UA-CH) is not yet in the DOM lib; chrome-banner reads it.

@@ -6,7 +6,7 @@
 // ============================================================
 // v0.17 · 图片质量快速检查:返回 {warnings:[], width, height, brightness}
 // 采样:缩到 64×64 算平均亮度(太小误差大 / 太大耗时),用 canvas
-async function analyzeImageQuality(imgFile) {
+async function analyzeImageQuality(imgFile: File) {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onerror = () => resolve({ warnings: [], width: 0, height: 0, brightness: 128 });
@@ -22,7 +22,7 @@ async function analyzeImageQuality(imgFile) {
                     const cv = document.createElement('canvas');
                     cv.width = 64;
                     cv.height = 64;
-                    const ctx = cv.getContext('2d');
+                    const ctx = cv.getContext('2d')!;
                     ctx.drawImage(img, 0, 0, 64, 64);
                     const data = ctx.getImageData(0, 0, 64, 64).data;
                     let sum = 0,
@@ -40,7 +40,7 @@ async function analyzeImageQuality(imgFile) {
                     resolve({ warnings, width: w, height: h, brightness: 128 });
                 }
             };
-            img.src = reader.result;
+            img.src = reader.result as string;
         };
         reader.readAsDataURL(imgFile);
     });
@@ -49,7 +49,7 @@ async function analyzeImageQuality(imgFile) {
 // v0.17 · 单张图片 → PDF(自动按图片比例设置页面)
 // v0.17 · M3 · 多张图片合并成一个 PDF(每张图独占一页)
 // 单张也走这个函数 · 保持向后兼容
-async function imagesToPdf(imgFiles) {
+async function imagesToPdf(imgFiles: File[]) {
     if (!imgFiles || imgFiles.length === 0) return null;
     const { jsPDF } = window.jspdf;
     // A4 尺寸(mm)
@@ -86,22 +86,24 @@ async function imagesToPdf(imgFiles) {
     return new File([blob], `photo_${ts}${suffix}.pdf`, { type: 'application/pdf' });
 }
 
-function _readImage(imgFile) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = reject;
-        reader.onload = () => {
-            const img = new Image();
-            img.onerror = reject;
-            img.onload = () =>
-                resolve({
-                    dataUrl: reader.result,
-                    naturalW: img.naturalWidth,
-                    naturalH: img.naturalHeight,
-                });
-            img.src = reader.result;
-        };
-        reader.readAsDataURL(imgFile);
-    });
+function _readImage(imgFile: File) {
+    return new Promise<{ dataUrl: string; naturalW: number; naturalH: number }>(
+        (resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = reject;
+            reader.onload = () => {
+                const img = new Image();
+                img.onerror = reject;
+                img.onload = () =>
+                    resolve({
+                        dataUrl: reader.result as string,
+                        naturalW: img.naturalWidth,
+                        naturalH: img.naturalHeight,
+                    });
+                img.src = reader.result as string;
+            };
+            reader.readAsDataURL(imgFile);
+        }
+    );
 }
 export { analyzeImageQuality, imagesToPdf };

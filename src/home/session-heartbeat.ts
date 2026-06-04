@@ -10,7 +10,7 @@
 /* global _showSessionRevokedModal */
 (function () {
     'use strict';
-    let _hbTimer = null;
+    let _hbTimer: ReturnType<typeof setInterval> | null = null;
     let _hbRunning = false;
     async function _sessionCheck() {
         if (_hbRunning) return;

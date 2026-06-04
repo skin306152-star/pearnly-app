@@ -11,8 +11,25 @@
  */
 /* global _results, _drawerIdx, renderResults */
 
-function mergeFields(pages) {
-    const result = {
+function mergeFields(
+    pages: Array<{ fields?: Record<string, unknown>; is_duplicate?: boolean; is_copy?: boolean }>
+) {
+    const result: {
+        invoice_number: unknown;
+        date: unknown;
+        total_amount: unknown;
+        tax_ids: unknown[];
+        seller_name: unknown;
+        seller_tax: unknown;
+        seller_addr: unknown;
+        buyer_name: unknown;
+        buyer_tax: unknown;
+        buyer_addr: unknown;
+        subtotal: unknown;
+        vat: unknown;
+        notes: unknown;
+        items: unknown[];
+    } = {
         invoice_number: null,
         date: null,
         total_amount: null,
@@ -57,9 +74,10 @@ function mergeFields(pages) {
     return result;
 }
 
-function onFieldEdit(e) {
-    const key = e.target.dataset.field;
-    const val = e.target.value;
+function onFieldEdit(e: Event) {
+    const target = e.target as HTMLInputElement;
+    const key = target.dataset.field!;
+    const val = target.value;
     const r = _results[_drawerIdx];
     const original = r.merged_fields[key];
     if (val === (original ?? '')) delete r.edits[key];

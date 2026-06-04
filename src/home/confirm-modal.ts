@@ -11,7 +11,18 @@
 
 // 自定义确认对话框 · v0.15.6 · 替换浏览器原生 confirm()
 // 用法: const ok = await showConfirm('确定删除吗?', { danger: true }); if (!ok) return;
-function showConfirm(msg, opts) {
+function showConfirm(
+    msg?: string,
+    opts?: {
+        title?: string;
+        promptInput?: boolean;
+        placeholder?: string;
+        danger?: boolean;
+        okText?: string;
+        cancelText?: string;
+        hideCancel?: boolean;
+    }
+) {
     opts = opts || {};
     return new Promise((resolve) => {
         const overlay = document.getElementById('confirm-modal');
@@ -25,7 +36,7 @@ function showConfirm(msg, opts) {
             resolve(false);
             return;
         }
-        title.textContent = opts.title || t('confirm-default-title');
+        title!.textContent = opts.title || t('confirm-default-title');
         // v118.14 · 支持 promptInput 模式(在 body 里插一个 input · OK 时返回输入值)
         const inputId = opts.promptInput ? 'cm_in_' + Date.now() : null;
         if (opts.promptInput) {
@@ -54,11 +65,11 @@ function showConfirm(msg, opts) {
         btnCancel.style.display = opts.hideCancel ? 'none' : '';
         overlay.style.display = 'flex';
 
-        const cleanup = (result) => {
+        const cleanup = (result: unknown) => {
             overlay.style.display = 'none';
             btnOk.onclick = null;
             btnCancel.onclick = null;
-            btnClose.onclick = null;
+            btnClose!.onclick = null;
             overlay.onclick = null;
             document.removeEventListener('keydown', onKey);
             // 还原 body 给下次用(promptInput 改了 innerHTML)
@@ -67,16 +78,18 @@ function showConfirm(msg, opts) {
             resolve(result);
         };
         const getInputVal = () => {
-            const i = inputId ? document.getElementById(inputId) : null;
+            const i = inputId
+                ? (document.getElementById(inputId) as HTMLInputElement | null)
+                : null;
             return i ? i.value : '';
         };
-        const onKey = (e) => {
+        const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') cleanup(opts.promptInput ? null : false);
             else if (e.key === 'Enter') cleanup(opts.promptInput ? getInputVal() : true);
         };
         btnOk.onclick = () => cleanup(opts.promptInput ? getInputVal() : true);
         btnCancel.onclick = () => cleanup(opts.promptInput ? null : false);
-        btnClose.onclick = () => cleanup(opts.promptInput ? null : false);
+        btnClose!.onclick = () => cleanup(opts.promptInput ? null : false);
         overlay.onclick = (e) => {
             if (e.target === overlay) cleanup(opts.promptInput ? null : false);
         };
@@ -84,7 +97,7 @@ function showConfirm(msg, opts) {
         // 聚焦
         setTimeout(() => {
             if (opts.promptInput) {
-                const i = document.getElementById(inputId);
+                const i = document.getElementById(inputId!);
                 if (i) i.focus();
             } else {
                 btnOk.focus();

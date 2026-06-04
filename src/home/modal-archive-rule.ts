@@ -64,11 +64,11 @@
         if (I && I[lang]) {
             m.querySelectorAll('[data-i18n]').forEach((el) => {
                 const k = el.getAttribute('data-i18n');
-                if (I[lang][k]) el.textContent = I[lang][k];
+                if (k && I[lang][k]) el.textContent = I[lang][k];
             });
             m.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
                 const k = el.getAttribute('data-i18n-placeholder');
-                if (I[lang][k]) el.placeholder = I[lang][k];
+                if (k && I[lang][k]) (el as HTMLInputElement).placeholder = I[lang][k];
             });
         }
     } catch (e) {

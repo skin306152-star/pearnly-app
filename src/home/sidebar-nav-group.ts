@@ -9,7 +9,7 @@
 (function () {
     const NAV_COLLAPSE_KEY = 'mrpilot_nav_collapsed';
     // 路由→组 映射:点哪个子项 · 哪个组自动展开
-    const ROUTE_GROUP_MAP = {
+    const ROUTE_GROUP_MAP: Record<string, string> = {
         ocr: 'sales',
         history: 'sales',
         reconcile: 'sales',
@@ -17,7 +17,7 @@
         receivables: 'sales',
         vouchers: 'expense',
     };
-    function _getState() {
+    function _getState(): Record<string, boolean> {
         try {
             const raw = localStorage.getItem(NAV_COLLAPSE_KEY);
             return raw ? JSON.parse(raw) : {};
@@ -25,20 +25,20 @@
             return {};
         }
     }
-    function _setState(state) {
+    function _setState(state: Record<string, boolean>) {
         try {
             localStorage.setItem(NAV_COLLAPSE_KEY, JSON.stringify(state));
         } catch (e) {}
     }
     function _applyState() {
         const state = _getState();
-        document.querySelectorAll('.nav-collapsible').forEach(function (group) {
-            const key = group.dataset.collapsible;
+        document.querySelectorAll<HTMLElement>('.nav-collapsible').forEach(function (group) {
+            const key = group.dataset.collapsible!;
             if (state[key]) group.classList.add('collapsed');
             else group.classList.remove('collapsed');
         });
     }
-    function _toggle(key) {
+    function _toggle(key: string) {
         const state = _getState();
         state[key] = !state[key];
         _setState(state);
@@ -60,9 +60,9 @@
     })();
     _applyState();
     // 绑定 toggle 按钮
-    document.querySelectorAll('.nav-group-toggle').forEach(function (btn) {
+    document.querySelectorAll<HTMLElement>('.nav-group-toggle').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            _toggle(btn.dataset.toggleGroup);
+            _toggle(btn.dataset.toggleGroup!);
         });
     });
     // 暴露给 routeTo:进某个子项路由时自动展开所在组

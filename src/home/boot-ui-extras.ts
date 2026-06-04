@@ -11,15 +11,15 @@ function renderBrandWorkspace() {
     if (!el || !_userInfo) return;
     const u = _userInfo;
     // v118.8.2 · 智能 cleanup · 防 username/name 字段被设成完整 email 字符串
-    function clean(s) {
+    function clean(s: unknown): string | null {
         if (!s || typeof s !== 'string') return null;
-        s = s.trim();
-        if (!s) return null;
+        const str = s.trim();
+        if (!str) return null;
         // 看起来是 email · 取前缀
-        if (s.includes('@') && s.indexOf('@') > 0 && s.indexOf('.') > s.indexOf('@')) {
-            return s.split('@')[0];
+        if (str.includes('@') && str.indexOf('@') > 0 && str.indexOf('.') > str.indexOf('@')) {
+            return str.split('@')[0];
         }
-        return s;
+        return str;
     }
     // v118.8.1 · 多字段 fallback 链 · 防后端字段名不一致 / 注册时未填
     const tryFields = [
@@ -60,9 +60,9 @@ function renderBrandWorkspace() {
 
 // v92 · Bug 7 · 断网横幅初始化
 function installNetworkBanner() {
-    let banner = document.getElementById('offline-banner');
-    if (!banner) {
-        banner = document.createElement('div');
+    const existing = document.getElementById('offline-banner');
+    const banner = existing ?? document.createElement('div');
+    if (!existing) {
         banner.id = 'offline-banner';
         banner.className = 'offline-banner';
         banner.style.display = 'none';

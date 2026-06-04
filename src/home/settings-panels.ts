@@ -66,7 +66,7 @@
             });
             if (!resp.ok) return;
             const data = await resp.json();
-            const cb = document.getElementById('pref-dup-check');
+            const cb = document.getElementById('pref-dup-check') as HTMLInputElement | null;
             if (cb) cb.checked = !!data.enabled;
         } catch (e) {
             console.warn('load prefs failed', e);
@@ -78,7 +78,7 @@
     if (_prefDupCheckEl && !_prefDupCheckEl.dataset.bound) {
         _prefDupCheckEl.dataset.bound = '1';
         _prefDupCheckEl.addEventListener('change', async (e) => {
-            const enabled = e.target.checked;
+            const enabled = (e.target as HTMLInputElement).checked;
             try {
                 const resp = await fetch('/api/settings/dup-check', {
                     method: 'PUT',
@@ -94,11 +94,11 @@
                         'success'
                     );
                 } else {
-                    e.target.checked = !enabled; // 回滚 UI
+                    (e.target as HTMLInputElement).checked = !enabled; // 回滚 UI
                     showToast(t('pref-save-failed'), 'error');
                 }
             } catch (err) {
-                e.target.checked = !enabled;
+                (e.target as HTMLInputElement).checked = !enabled;
                 showToast(t('pref-save-failed'), 'error');
             }
         });

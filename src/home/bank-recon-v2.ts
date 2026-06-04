@@ -28,16 +28,25 @@ import {
     _initBrv2TogglePreview,
 } from './bank-recon-v2-upload.js';
 
+type ReconProgress = { stage?: string; stage_total?: number; stage_done?: number };
+type ReconJob = {
+    status?: string;
+    mapping?: unknown;
+    review?: unknown;
+    error_code?: string;
+    result_id?: string;
+};
+
 // ── Progress helpers ──────────────────────────────────────────────
-function showProgress(show) {
+function showProgress(show: boolean) {
     const p = $('brv2-progress'),
-        btn = $('brv2-run-btn'),
+        btn = $('brv2-run-btn') as HTMLButtonElement | null,
         err = $('brv2-error');
     if (p) p.style.display = show ? '' : 'none';
     if (btn) btn.disabled = show;
     if (err) err.style.display = 'none';
 }
-function showError(msg) {
+function showError(msg: string) {
     const err = $('brv2-error');
     if (err) {
         err.textContent = msg;
@@ -54,7 +63,7 @@ async function runRecon() {
     if (S.stmtFiles.length === 0 || S.glFiles.length === 0) return;
     const token = localStorage.getItem('mrpilot_token') || '';
     const lang = window._currentLang || 'zh';
-    const acct = ($('brv2-acct-select') || {}).value || '';
+    const acct = (($('brv2-acct-select') || {}) as HTMLInputElement).value || '';
 
     showResultSections(false);
     showProgress(true);
@@ -68,14 +77,24 @@ async function runRecon() {
 
         // BUG-B v118.35.0.36 · 3 个 anchor 余额手动录入 · 优先于 OCR 抽到的值
         // BUG-FIX-T3 v118.35.0.44 · 加第 4 个 anchor stmt_closing(Statement 期末)
-        const aGlClose = parseFloat(($('brv2-anchor-gl-closing') || {}).value);
-        const aStmtClose = parseFloat(($('brv2-anchor-stmt-closing') || {}).value);
-        const aStmtOpen = parseFloat(($('brv2-anchor-stmt-opening') || {}).value);
-        const aGlOpen = parseFloat(($('brv2-anchor-gl-opening') || {}).value);
-        if (Number.isFinite(aGlClose)) fd.append('gl_closing_override', aGlClose);
-        if (Number.isFinite(aStmtClose)) fd.append('stmt_closing_override', aStmtClose);
-        if (Number.isFinite(aStmtOpen)) fd.append('stmt_opening_override', aStmtOpen);
-        if (Number.isFinite(aGlOpen)) fd.append('gl_opening_override', aGlOpen);
+        const aGlClose = parseFloat(
+            (($('brv2-anchor-gl-closing') || {}) as HTMLInputElement).value
+        );
+        const aStmtClose = parseFloat(
+            (($('brv2-anchor-stmt-closing') || {}) as HTMLInputElement).value
+        );
+        const aStmtOpen = parseFloat(
+            (($('brv2-anchor-stmt-opening') || {}) as HTMLInputElement).value
+        );
+        const aGlOpen = parseFloat((($('brv2-anchor-gl-opening') || {}) as HTMLInputElement).value);
+        if (Number.isFinite(aGlClose))
+            fd.append('gl_closing_override', aGlClose as unknown as string);
+        if (Number.isFinite(aStmtClose))
+            fd.append('stmt_closing_override', aStmtClose as unknown as string);
+        if (Number.isFinite(aStmtOpen))
+            fd.append('stmt_opening_override', aStmtOpen as unknown as string);
+        if (Number.isFinite(aGlOpen))
+            fd.append('gl_opening_override', aGlOpen as unknown as string);
 
         // BUG-FIX-RECON-ASYNC #16 · 改异步:submit 秒回 job_id → 轮询 → 用 result_id 取结果
         const submitRes = await fetch('/api/recon/bank-v2/submit', {
@@ -111,7 +130,10 @@ async function runRecon() {
             showProgress(false);
             if (sub && (sub.detail || sub.error)) {
                 showError(
-                    _humanizeBackendError(sub.detail || sub.error, 'Error ' + submitRes.status)
+                    _humanizeBackendError(
+                        (sub.detail || sub.error) as string,
+                        'Error ' + submitRes.status
+                    )!
                 );
             } else {
                 showError(t('brv2-err-server') || '服务器繁忙,请稍后重试');
@@ -121,11 +143,12 @@ async function runRecon() {
 
         // 轮询后台任务 · 转圈旁实时显示「共 X/Y 个文件」
         const _subEl = $('brv2-progress-sub');
-        const job = await window._reconPollJob(sub.job_id, token, {
-            onProgress: (p) => {
-                if (_subEl) _subEl.textContent = window._reconProgressText(p, lang);
+        const job = (await window._reconPollJob(sub.job_id, token, {
+            onProgress: (p: unknown) => {
+                if (_subEl)
+                    _subEl.textContent = window._reconProgressText(p as ReconProgress, lang);
             },
-        });
+        })) as ReconJob;
         // BUG-FIX-RECON-GLCSV · 后台解析读到表格但不认识列(整侧 needs_mapping)→ 弹『确认列对应』。
         //   正常 CSV/Excel 在 submit 同步预检就弹了 · 这里是防御纵深(预检漏网/PDF GL 等)·
         //   守铁律「整侧失败绝不进 done 完成态」。确认保存模板后 onConfirmed 重跑(预检命中模板即过)。
@@ -153,13 +176,17 @@ async function runRecon() {
                     token: token,
                     lang: lang,
                     jobId: sub.job_id,
-                    onConfirmed: async function (newJobId) {
+                    onConfirmed: async function (newJobId: string) {
                         showProgress(true);
-                        const j2 = await window._reconPollJob(newJobId, token, {
-                            onProgress: (p) => {
-                                if (_subEl) _subEl.textContent = window._reconProgressText(p, lang);
+                        const j2 = (await window._reconPollJob(newJobId, token, {
+                            onProgress: (p: unknown) => {
+                                if (_subEl)
+                                    _subEl.textContent = window._reconProgressText(
+                                        p as ReconProgress,
+                                        lang
+                                    );
                             },
-                        });
+                        })) as ReconJob;
                         await _processBankJob(j2);
                     },
                 });
@@ -172,13 +199,13 @@ async function runRecon() {
         //   不再静默"完成"。按 error_code 给 4 语友好原因 + 引导(换清晰文件 / 转 Excel·CSV / 重传)。
         if (job && job.status === 'failed') {
             showProgress(false);
-            showError(_brv2FailMsg(job.error_code, lang));
+            showError(_brv2FailMsg(job.error_code as string, lang));
             return;
         }
         await _processBankJob(job);
 
         // 轮询完成后:取结果 + 渲染(初次 + S8 确认重对账共用)
-        async function _processBankJob(job) {
+        async function _processBankJob(job: ReconJob) {
             try {
                 if (!job || job.status !== 'done' || !job.result_id) {
                     showProgress(false);
@@ -211,7 +238,9 @@ async function runRecon() {
                 S.currentFilter = 'all';
                 document
                     .querySelectorAll('.brv2-filter-btn')
-                    .forEach((b) => b.classList.toggle('active', b.dataset.filter === 'all'));
+                    .forEach((b) =>
+                        b.classList.toggle('active', (b as HTMLElement).dataset.filter === 'all')
+                    );
 
                 // P0.1 BUG-B-T1 v118.35.0.37 · 后端总是落 summary._anchor_ocr · 存到 localStorage
                 //   下次进对账 tab 自动预填 3 个 input · 不让用户从零填
@@ -224,15 +253,15 @@ async function runRecon() {
                 if (sc) sc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } catch (e) {
                 showProgress(false);
-                showError(e.message || 'Network error');
+                showError((e as Error).message || 'Network error');
             }
         }
     } catch (e) {
-        showError(e.message || 'Network error');
+        showError((e as Error).message || 'Network error');
     }
 }
 
-function populateAcctSelect(accounts) {
+function populateAcctSelect(accounts: unknown[]) {
     const sel = $('brv2-acct-select');
     if (!sel) return;
     const _al = window._currentLang || 'zh';
@@ -241,7 +270,7 @@ function populateAcctSelect(accounts) {
         '全部账户';
     sel.innerHTML =
         `<option value="">${_allAcctLbl}</option>` +
-        accounts.map((a) => `<option value="${esc2(a)}">${esc2(a)}</option>`).join('');
+        accounts.map((a: unknown) => `<option value="${esc2(a)}">${esc2(a)}</option>`).join('');
     sel.style.display = '';
 }
 
@@ -265,8 +294,10 @@ function init() {
         'brv2-anchor-gl-opening',
     ];
     function _brv2UpdateAnchorEq() {
-        const stmtOpen = parseFloat(($('brv2-anchor-stmt-opening') || {}).value);
-        const glOpen = parseFloat(($('brv2-anchor-gl-opening') || {}).value);
+        const stmtOpen = parseFloat(
+            (($('brv2-anchor-stmt-opening') || {}) as HTMLInputElement).value
+        );
+        const glOpen = parseFloat((($('brv2-anchor-gl-opening') || {}) as HTMLInputElement).value);
         const eq = $('brv2-anchor-eq');
         const eqVal = $('brv2-anchor-eq-val');
         if (!eq || !eqVal) return;
@@ -320,7 +351,7 @@ function init() {
             anchorIds.forEach((id) => {
                 const el = $(id);
                 if (el) {
-                    el.value = '';
+                    (el as HTMLInputElement).value = '';
                     const cell = el.closest && el.closest('.brv2-anchor-cell');
                     if (cell) cell.classList.remove('is-prefilled');
                 }
@@ -350,9 +381,9 @@ function init() {
     if (filterTabs) {
         filterTabs.addEventListener('click', (e) => {
             e.stopPropagation(); // 防止触发 recon-collapse-head 折叠
-            const btn = e.target.closest('.brv2-filter-btn');
+            const btn = (e.target as HTMLElement).closest('.brv2-filter-btn');
             if (!btn) return;
-            S.currentFilter = btn.dataset.filter;
+            S.currentFilter = (btn as HTMLElement).dataset.filter!;
             filterTabs
                 .querySelectorAll('.brv2-filter-btn')
                 .forEach((b) => b.classList.toggle('active', b === btn));
@@ -371,7 +402,7 @@ function init() {
 
     // Subscribe to global language changes so dynamic content re-renders
     if (!Array.isArray(window.__i18nSubs)) window.__i18nSubs = [];
-    window.__i18nSubs = window.__i18nSubs.filter((s) => s.name !== 'brv2');
+    window.__i18nSubs = (window.__i18nSubs as { name?: string }[]).filter((s) => s.name !== 'brv2');
     window.__i18nSubs.push({
         name: 'brv2',
         fn: function () {

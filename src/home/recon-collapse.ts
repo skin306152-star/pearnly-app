@@ -12,13 +12,15 @@
 // ============================================================
 (function _reconCollapseIIFE() {
     'use strict';
-    function _esc(s) {
-        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    function _esc(s: unknown) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c: string) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[
+                c as '&' | '<' | '>' | '"' | "'"
+            ];
         });
     }
-    function _fmtSize(b) {
-        if (!b || isNaN(b)) return '';
+    function _fmtSize(b: unknown) {
+        if (!b || isNaN(b as number)) return '';
         var n = Number(b);
         if (n < 1024) return n + ' B';
         if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
@@ -26,10 +28,13 @@
     }
     // 全局事件代理 · 点击 .recon-collapse-head 切换(销售税核查 vex-summary/vex-detail 用)
     document.addEventListener('click', function (e) {
-        var head = e.target.closest && e.target.closest('.recon-collapse-head');
+        var head =
+            (e.target as HTMLElement).closest &&
+            (e.target as HTMLElement).closest('.recon-collapse-head');
         if (!head) return;
         // 头部内的按钮/链接(如导出)不触发折叠
-        if (e.target.closest('button') || e.target.closest('a')) return;
+        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a'))
+            return;
         var box = head.closest('.recon-collapse');
         if (!box) return;
         var nowCollapsed = box.getAttribute('data-collapsed') === 'true';
@@ -42,10 +47,12 @@
     // 键盘 Enter / Space
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter' && e.key !== ' ') return;
-        var head = e.target.closest && e.target.closest('.recon-collapse-head');
+        var head =
+            (e.target as HTMLElement).closest &&
+            (e.target as HTMLElement).closest('.recon-collapse-head');
         if (!head) return;
         e.preventDefault();
-        head.click();
+        (head as HTMLElement).click();
     });
 
     // v118.32.5.5.25 · 收入对账"查看清单" 1:1 复刻销售税核查 vex-preview-panel
@@ -69,20 +76,22 @@
         _renderGlvColumn('gl');
     }
 
-    function _glvStateFiles(kind) {
+    function _glvStateFiles(kind: string): File[] {
         // v118.35.0.3 · 多文件 · 直接从 GlVatRecon STATE 拿 · input.files 已被
         // bindUpload 主动清空(允许重复选同名文件)· 所以以 STATE 为单一真相
         try {
             // 同 IIFE 内不可直接拿 STATE,这里通过 DOM/全局桥(_glvPreviewFiles)读
             if (typeof window._glvPreviewFiles === 'function') {
-                return window._glvPreviewFiles(kind) || [];
+                return (window._glvPreviewFiles(kind) || []) as File[];
             }
         } catch (_) {}
-        var inp = document.getElementById(kind === 'vat' ? 'glv-vat-input' : 'glv-gl-input');
+        var inp = document.getElementById(
+            kind === 'vat' ? 'glv-vat-input' : 'glv-gl-input'
+        ) as HTMLInputElement;
         return inp && inp.files ? Array.from(inp.files) : [];
     }
 
-    function _renderGlvColumn(kind) {
+    function _renderGlvColumn(kind: 'vat' | 'gl') {
         var colEl = document.getElementById(kind === 'vat' ? 'glv-pp-vat-col' : 'glv-pp-gl-col');
         if (!colEl) return;
         var files = _glvStateFiles(kind);
@@ -127,7 +136,7 @@
         var si = document.getElementById('glv-pp-search-' + kind);
         if (si)
             si.addEventListener('input', function (e) {
-                _glvSearch[kind] = e.target.value;
+                _glvSearch[kind] = (e.target as HTMLInputElement).value;
                 _renderGlvFileListOnly(kind);
             });
         // 全清按钮
@@ -140,7 +149,7 @@
         _renderGlvFileListOnly(kind);
     }
 
-    function _renderGlvFileListOnly(kind) {
+    function _renderGlvFileListOnly(kind: 'vat' | 'gl') {
         var listEl = document.getElementById('glv-pp-' + kind + '-list');
         var pgEl = document.getElementById('glv-pp-' + kind + '-pg');
         if (!listEl) return;
@@ -185,8 +194,8 @@
         // X 删除按钮
         listEl.querySelectorAll('.vex-pp-fi-del').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var k = btn.dataset.kind;
-                var i = parseInt(btn.dataset.idx, 10);
+                var k = (btn as HTMLElement).dataset.kind;
+                var i = parseInt((btn as HTMLElement).dataset.idx as string, 10);
                 if (window._glvRemoveFile) window._glvRemoveFile(k, isNaN(i) ? null : i);
             });
         });
@@ -194,13 +203,15 @@
         // 分页提示
         if (pgEl) {
             var tpl = (window.t && window.t('vex-preview-count')) || '显示前 {n} / 共 {m}';
-            pgEl.textContent = tpl.replace('{n}', filtered.length).replace('{m}', filtered.length);
+            pgEl.textContent = tpl
+                .replace('{n}', filtered.length as unknown as string)
+                .replace('{m}', filtered.length as unknown as string);
         }
     }
 
     // 销售税核查"对账汇总"填数据 · 从最新 vex-task 行拿
     function _fillVexSummary() {
-        var setVal = function (id, v) {
+        var setVal = function (id: string, v: unknown) {
             var el = document.getElementById(id);
             if (el) el.textContent = v == null ? '—' : String(v);
         };
@@ -210,12 +221,13 @@
         setVal('vex-sum-diff', last.diff);
         setVal('vex-sum-incomplete', last.incomplete);
         setVal('vex-sum-cash', last.cash);
+        // @ts-expect-error TS6133 verbatim 占位
         var subEl = document.getElementById('vex-summary-sub');
     }
 
     // 销售税核查"差异明细"填数据 · 从最新任务的 diff_rows 拿
     function _fillVexDetail() {
-        var rows = (window._vexLastTask && window._vexLastTask.diff_rows) || [];
+        var rows = ((window._vexLastTask && window._vexLastTask.diff_rows) || []) as any[];
         var tb = document.getElementById('vex-detail-tbody');
         var tbl = document.getElementById('vex-detail-table');
         var emp = document.getElementById('vex-detail-empty');
@@ -257,7 +269,9 @@
 
     // v5.5.23 · 收入对账 toggle 按钮 + 文件变化监听 · 复刻销售税核查
     function _initGlvTogglePreview() {
-        var btn = document.getElementById('glv-toggle-preview');
+        var btn = document.getElementById('glv-toggle-preview') as
+            | (HTMLElement & { _reconBound?: boolean })
+            | null;
         if (btn && !btn._reconBound) {
             btn._reconBound = true;
             btn.addEventListener('click', function () {
@@ -265,7 +279,7 @@
                 var label = document.getElementById('glv-toggle-preview-label');
                 var isOpen = panel && panel.style.display !== 'none';
                 if (panel) panel.style.display = isOpen ? 'none' : '';
-                btn.classList.toggle('open', !isOpen);
+                btn!.classList.toggle('open', !isOpen);
                 if (label)
                     label.textContent = isOpen
                         ? (window.t && window.t('vex-toggle-preview-open')) || '查看清单'
@@ -275,7 +289,9 @@
         }
         // 文件变化时 · 若 panel 已展开则实时刷新
         ['glv-vat-input', 'glv-gl-input'].forEach(function (id) {
-            var inp = document.getElementById(id);
+            var inp = document.getElementById(id) as
+                | (HTMLElement & { _reconWatched?: boolean })
+                | null;
             if (!inp || inp._reconWatched) return;
             inp._reconWatched = true;
             inp.addEventListener('change', function () {

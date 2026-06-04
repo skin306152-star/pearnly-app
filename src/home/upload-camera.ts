@@ -36,9 +36,9 @@ import { analyzeImageQuality, imagesToPdf } from './camera-image-utils.js'; // R
             camInput.click();
         });
         // 拍照 input change · 每次返回 1 张 · 进 buffer
-        camInput.addEventListener('change', async (e) => {
-            const files = Array.from(e.target.files || []);
-            e.target.value = '';
+        camInput.addEventListener('change', async (e: Event) => {
+            const files = Array.from((e.target as HTMLInputElement).files || []);
+            (e.target as HTMLInputElement).value = '';
             if (files.length === 0) return;
             for (const f of files) {
                 await handleCameraImages([f], 'camera');
@@ -52,12 +52,14 @@ import { analyzeImageQuality, imagesToPdf } from './camera-image-utils.js'; // R
         btnUploadPic.addEventListener('click', () => galInput.click());
     }
 
-    const onPick = (source) => async (e) => {
-        const files = Array.from(e.target.files || []);
-        e.target.value = '';
+    const onPick = (source: string) => async (e: Event) => {
+        const files = Array.from((e.target as HTMLInputElement).files || []);
+        (e.target as HTMLInputElement).value = '';
         if (files.length === 0) return;
         // v113 · 选图可能混 PDF · 拆开走两条路
-        const pdfs = files.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+        const pdfs = files.filter(
+            (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name)
+        );
         const imgs = files.filter((f) => !pdfs.includes(f));
         if (pdfs.length > 0) await handleDirectPdfFiles(pdfs);
         if (imgs.length > 0) await handleCameraImages(imgs, source);
@@ -66,7 +68,7 @@ import { analyzeImageQuality, imagesToPdf } from './camera-image-utils.js'; // R
 })();
 
 // v113 · 用户从相册选了 PDF · 直接进 _selectedFiles · 不需要转换
-async function handleDirectPdfFiles(pdfFiles) {
+async function handleDirectPdfFiles(pdfFiles: File[]) {
     for (const f of pdfFiles) {
         _selectedFiles.push({
             file: f,
@@ -98,11 +100,11 @@ function showCameraTips() {
             return;
         }
         // 默认不勾选"不再提示"
-        if (chkSkip) chkSkip.checked = false;
+        if (chkSkip) (chkSkip as HTMLInputElement).checked = false;
         overlay.style.display = 'flex';
-        const cleanup = (go) => {
+        const cleanup = (go: boolean) => {
             overlay.style.display = 'none';
-            if (chkSkip && chkSkip.checked) {
+            if (chkSkip && (chkSkip as HTMLInputElement).checked) {
                 localStorage.setItem('mrpilot_camera_tips_skip', '1');
             }
             btnOk.onclick = null;
@@ -111,7 +113,7 @@ function showCameraTips() {
             document.removeEventListener('keydown', onKey);
             resolve(go);
         };
-        const onKey = (e) => {
+        const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') cleanup(false);
         };
         btnOk.onclick = () => cleanup(true);
@@ -127,10 +129,10 @@ function showCameraTips() {
 // v0.17 · 把拍的图转成 PDF 后塞进现有 _selectedFiles 流程
 // v0.17 · M3 · 连拍缓冲区(多张合并成 1 个 PDF)
 // v118.27.8.1.14e · 缓冲区现在也接相册多选 · 让用户在浮条上自己选合并 vs 分别
-let _cameraBuffer = []; // { file, quality: {warnings, ...} }
-let _cameraBufferSource = null; // 'camera' | 'gallery' · 决定浮条「继续」按钮触发哪个 input
+let _cameraBuffer: { file: File; quality: { warnings?: string[] } }[] = []; // { file, quality: {warnings, ...} }
+let _cameraBufferSource: string | null = null; // 'camera' | 'gallery' · 决定浮条「继续」按钮触发哪个 input
 
-async function handleCameraImages(imageFiles, source) {
+async function handleCameraImages(imageFiles: File[], source: string) {
     hideAlerts();
     if (!imageFiles || imageFiles.length === 0) return;
 
@@ -175,9 +177,9 @@ async function handleCameraImages(imageFiles, source) {
     // 拍照单张(source='camera' 且 1 张)→ 进缓冲区 · 显示浮条
     if (source === 'camera' && imageFiles.length === 1) {
         const f = imageFiles[0];
-        let q = {};
+        let q: { warnings?: string[] } = {};
         try {
-            q = await analyzeImageQuality(f);
+            q = (await analyzeImageQuality(f)) as { warnings?: string[] };
         } catch (e) {}
         _cameraBuffer.push({ file: f, quality: q });
         _cameraBufferSource = 'camera';
@@ -190,9 +192,9 @@ async function handleCameraImages(imageFiles, source) {
     // 痛点修复:之前强制合并 · 80%+ 场景用户是想批量传不同发票 · 默认合并是错的
     if (source === 'gallery' && (imageFiles.length >= 2 || _cameraBuffer.length > 0)) {
         for (const f of imageFiles) {
-            let q = {};
+            let q: { warnings?: string[] } = {};
             try {
-                q = await analyzeImageQuality(f);
+                q = (await analyzeImageQuality(f)) as { warnings?: string[] };
             } catch (e) {}
             _cameraBuffer.push({ file: f, quality: q });
         }
@@ -206,12 +208,12 @@ async function handleCameraImages(imageFiles, source) {
 }
 
 // 把一组图合并成 1 个 PDF · 加入 _selectedFiles
-async function flushImagesAsOnePdf(imageFiles) {
+async function flushImagesAsOnePdf(imageFiles: File[]) {
     const warningSet = new Set();
     for (const f of imageFiles) {
         try {
-            const q = await analyzeImageQuality(f);
-            (q.warnings || []).forEach((w) => warningSet.add(w));
+            const q = (await analyzeImageQuality(f)) as { warnings?: string[] };
+            (q.warnings || []).forEach((w: string) => warningSet.add(w));
         } catch (e) {}
     }
     try {
@@ -310,18 +312,18 @@ function renderCameraBufferBar() {
         </div>
     `;
 
-    bar.querySelector('[data-cbb-action="discard"]').onclick = () => {
+    (bar!.querySelector('[data-cbb-action="discard"]') as HTMLElement).onclick = () => {
         _cameraBuffer = [];
         _cameraBufferSource = null;
         renderCameraBufferBar();
     };
-    bar.querySelector('[data-cbb-action="more"]').onclick = () => {
+    (bar!.querySelector('[data-cbb-action="more"]') as HTMLElement).onclick = () => {
         // 按来源触发对应 input · 桌面端 camera-input 退化成文件选择器一样能用
         const inputId = isGallery ? 'gallery-input' : 'camera-input';
         const input = document.getElementById(inputId);
         if (input) input.click();
     };
-    const mergeBtn = bar.querySelector('[data-cbb-action="merge"]');
+    const mergeBtn = bar!.querySelector('[data-cbb-action="merge"]') as HTMLElement | null;
     if (mergeBtn) {
         mergeBtn.onclick = async () => {
             const files = _cameraBuffer.map((x) => x.file);
@@ -331,7 +333,7 @@ function renderCameraBufferBar() {
             await flushImagesAsOnePdf(files);
         };
     }
-    const sepBtn = bar.querySelector('[data-cbb-action="separate"]');
+    const sepBtn = bar!.querySelector('[data-cbb-action="separate"]') as HTMLElement | null;
     if (sepBtn) {
         sepBtn.onclick = async () => {
             const files = _cameraBuffer.map((x) => x.file);
@@ -351,13 +353,13 @@ if (typeof window.subscribeI18n === 'function') {
 }
 
 // v113 · 把每张图分别转成独立 PDF · 加进 _selectedFiles
-async function flushImagesAsSeparatePdfs(imageFiles) {
+async function flushImagesAsSeparatePdfs(imageFiles: File[]) {
     const warningSet = new Set();
     let okCount = 0;
     for (const f of imageFiles) {
         try {
-            const q = await analyzeImageQuality(f);
-            (q.warnings || []).forEach((w) => warningSet.add(w));
+            const q = (await analyzeImageQuality(f)) as { warnings?: string[] };
+            (q.warnings || []).forEach((w: string) => warningSet.add(w));
             const pdfFile = await imagesToPdf([f]);
             if (pdfFile) {
                 _selectedFiles.push({

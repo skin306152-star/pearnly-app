@@ -107,7 +107,13 @@ const CHECKLIST = [
     },
 ];
 
-export const S = {
+export const S: {
+    results: Record<string, string>;
+    logFilter: string;
+    bound: boolean;
+    renderScheduled: boolean;
+    checkN: number;
+} = {
     results: {}, // { 'A1': 'pass'|'fail'|'skip', ... }
     logFilter: 'all',
     bound: false,
@@ -115,7 +121,7 @@ export const S = {
     checkN: 0,
 };
 
-function _t(key, fallback, vars) {
+function _t(key: string, fallback: string, vars?: Record<string, unknown>) {
     let s = typeof t === 'function' ? t(key) : null;
     if (!s || s === key) s = fallback;
     if (vars)
@@ -142,15 +148,15 @@ function _saveResults() {
     }
 }
 
-function _fmtTime(ts) {
-    const d = new Date(ts);
-    const pad = function (n) {
+function _fmtTime(ts: unknown) {
+    const d = new Date(ts as number);
+    const pad = function (n: number) {
         return n < 10 ? '0' + n : '' + n;
     };
     return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
 }
 
-function _esc(s) {
+function _esc(s: unknown) {
     return String(s == null ? '' : s)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -159,7 +165,7 @@ function _esc(s) {
         .replace(/'/g, '&#39;');
 }
 
-function _toast(msg, type) {
+function _toast(msg: string, type?: string) {
     try {
         if (typeof showToast === 'function') showToast(msg, type || 'info');
         else alert(msg);
@@ -168,7 +174,7 @@ function _toast(msg, type) {
     }
 }
 
-function _copyToClipboard(text) {
+function _copyToClipboard(text: string) {
     try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard
@@ -186,7 +192,7 @@ function _copyToClipboard(text) {
         _fallbackCopy(text);
     }
 }
-function _fallbackCopy(text) {
+function _fallbackCopy(text: string) {
     try {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -206,6 +212,8 @@ function _fallbackCopy(text) {
 }
 
 // ---------- 复制 markdown ----------
+type TcLog = { ts: unknown; type: string; summary: string; detail?: unknown };
+
 function _buildResultsMarkdown() {
     const lines = [];
     const now = new Date();
@@ -258,7 +266,7 @@ function _buildResultsMarkdown() {
         });
     }
     // 异常日志最近 30 条
-    const logs = (window._pearnlyTcLogs || []).slice(-30).reverse();
+    const logs = ((window._pearnlyTcLogs || []) as TcLog[]).slice(-30).reverse();
     if (logs.length > 0) {
         lines.push('');
         lines.push('## 🔴 异常日志(最近 ' + logs.length + ' 条)');
@@ -277,8 +285,8 @@ function _buildResultsMarkdown() {
     }
     return lines.join('\n');
 }
-function _buildLogsMarkdown(limit) {
-    const logs = (window._pearnlyTcLogs || []).slice(-limit).reverse();
+function _buildLogsMarkdown(limit: number) {
+    const logs = ((window._pearnlyTcLogs || []) as TcLog[]).slice(-limit).reverse();
     if (logs.length === 0) return '(暂无异常日志)';
     const lines = ['# Pearnly 异常日志(最近 ' + logs.length + ' 条)'];
     const acct = (_userInfo && (_userInfo.email || _userInfo.username)) || '—';

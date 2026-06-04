@@ -5,12 +5,27 @@
 import { S, _buyerState, _buyerSelected } from './clients-store.js';
 import { apiClient, getActiveColor } from './clients-helpers.js';
 
+type Client = {
+    id: string;
+    name?: string;
+    short_name?: string;
+    tax_id?: string;
+    color?: string;
+    invoice_count?: number;
+    total_amount?: number;
+    address?: string;
+    contact_person?: string;
+    contact_phone?: string;
+    contact_email?: string;
+    notes?: string;
+};
+
 // ---------- 加载客户列表 ----------
 async function loadClientsCache() {
     try {
         const data = await apiClient('/api/clients');
         S.clients = data.clients || [];
-        window._clientsCache = S.clients;
+        window._clientsCache = S.clients as { [key: string]: unknown; id?: unknown }[];
     } catch (e) {
         console.error('loadClientsCache fail', e);
         S.clients = [];
@@ -48,7 +63,7 @@ function renderClientsGrid() {
             </div>`;
         return;
     }
-    wrap.innerHTML = S.clients
+    wrap.innerHTML = (S.clients as Client[])
         .map(
             (c) => `
         <div class="client-card" data-cid="${c.id}" style="--client-color:${escapeHtml(c.color)}">
@@ -93,8 +108,8 @@ function renderClientsGrid() {
 // ==========================================================
 function _buyerFiltered() {
     const kw = _buyerState.keyword.trim().toLowerCase();
-    if (!kw) return S.clients;
-    return S.clients.filter(
+    if (!kw) return S.clients as Client[];
+    return (S.clients as Client[]).filter(
         (c) =>
             (c.name || '').toLowerCase().includes(kw) ||
             (c.short_name || '').toLowerCase().includes(kw) ||
@@ -140,9 +155,9 @@ function renderBuyerList() {
     const info = document.getElementById('buyer-pager-info');
     if (info)
         info.textContent = total ? `${start + 1}–${Math.min(start + ps, total)} / ${total}` : '0';
-    const prev = document.getElementById('buyer-prev');
+    const prev = document.getElementById('buyer-prev') as HTMLButtonElement | null;
     if (prev) prev.disabled = _buyerState.page <= 0;
-    const next = document.getElementById('buyer-next');
+    const next = document.getElementById('buyer-next') as HTMLButtonElement | null;
     if (next) next.disabled = _buyerState.page >= maxPage;
     _updateBuyerBatchBar();
 }
@@ -152,8 +167,8 @@ function _updateBuyerBatchBar() {
     const bar = document.getElementById('buyer-batch-bar');
     if (bar) bar.style.display = n ? 'flex' : 'none';
     const cnt = document.getElementById('buyer-batch-count');
-    if (cnt) cnt.textContent = t('cust-selected-n').replace('{n}', n);
-    const all = document.getElementById('buyer-check-all');
+    if (cnt) cnt.textContent = t('cust-selected-n').replace('{n}', n as unknown as string);
+    const all = document.getElementById('buyer-check-all') as HTMLInputElement | null;
     if (all) {
         const { items } = _buyerPageItems();
         const pageIds = items.map((c) => c.id);
@@ -171,9 +186,12 @@ function clearBuyerSelection() {
 async function buyerBatchDelete() {
     const ids = Array.from(_buyerSelected);
     if (!ids.length) return;
-    const ok = await showConfirm(t('cust-batch-del-confirm').replace('{n}', ids.length), {
-        danger: true,
-    });
+    const ok = await showConfirm(
+        t('cust-batch-del-confirm').replace('{n}', ids.length as unknown as string),
+        {
+            danger: true,
+        }
+    );
     if (!ok) return;
     try {
         await apiClient('/api/clients/batch-delete', {
@@ -192,51 +210,72 @@ async function buyerBatchDelete() {
 }
 
 // ---------- 弹窗 ----------
-function openClientModal(client) {
+function openClientModal(client: Client | null) {
     S.editingClientId = client ? client.id : null;
     const isEdit = !!client;
-    document.getElementById('client-modal-title').textContent = t(
+    document.getElementById('client-modal-title')!.textContent = t(
         isEdit ? 'client-modal-edit' : 'client-modal-new'
     );
-    document.getElementById('client-input-name').value = (client && client.name) || '';
-    document.getElementById('client-input-short').value = (client && client.short_name) || '';
-    document.getElementById('client-input-tax').value = (client && client.tax_id) || '';
-    document.getElementById('client-input-address').value = (client && client.address) || '';
-    document.getElementById('client-input-contact').value = (client && client.contact_person) || '';
-    document.getElementById('client-input-phone').value = (client && client.contact_phone) || '';
-    document.getElementById('client-input-email').value = (client && client.contact_email) || '';
-    document.getElementById('client-input-notes').value = (client && client.notes) || '';
+    (document.getElementById('client-input-name') as HTMLInputElement).value =
+        (client && client.name) || '';
+    (document.getElementById('client-input-short') as HTMLInputElement).value =
+        (client && client.short_name) || '';
+    (document.getElementById('client-input-tax') as HTMLInputElement).value =
+        (client && client.tax_id) || '';
+    (document.getElementById('client-input-address') as HTMLInputElement).value =
+        (client && client.address) || '';
+    (document.getElementById('client-input-contact') as HTMLInputElement).value =
+        (client && client.contact_person) || '';
+    (document.getElementById('client-input-phone') as HTMLInputElement).value =
+        (client && client.contact_phone) || '';
+    (document.getElementById('client-input-email') as HTMLInputElement).value =
+        (client && client.contact_email) || '';
+    (document.getElementById('client-input-notes') as HTMLInputElement).value =
+        (client && client.notes) || '';
     // 颜色
     const targetColor = (client && client.color) || '#111111';
     document.querySelectorAll('#client-color-picker .color-swatch').forEach((s) => {
-        s.classList.toggle('active', s.dataset.color === targetColor);
+        s.classList.toggle('active', (s as HTMLElement).dataset.color === targetColor);
     });
     // 删除按钮(仅编辑时显示)
-    document.getElementById('client-modal-delete').style.display = isEdit ? '' : 'none';
-    document.getElementById('client-modal-mask').style.display = 'flex';
-    setTimeout(() => document.getElementById('client-input-name').focus(), 50);
+    document.getElementById('client-modal-delete')!.style.display = isEdit ? '' : 'none';
+    document.getElementById('client-modal-mask')!.style.display = 'flex';
+    setTimeout(() => document.getElementById('client-input-name')!.focus(), 50);
 }
 
 function closeClientModal() {
-    document.getElementById('client-modal-mask').style.display = 'none';
+    document.getElementById('client-modal-mask')!.style.display = 'none';
     S.editingClientId = null;
 }
 
 async function saveClient() {
-    const name = document.getElementById('client-input-name').value.trim();
+    const name = (document.getElementById('client-input-name') as HTMLInputElement).value.trim();
     if (!name) {
         showToast(t('client-msg-name-required'), 'fail');
         return;
     }
     const payload = {
         name,
-        short_name: document.getElementById('client-input-short').value.trim() || null,
-        tax_id: document.getElementById('client-input-tax').value.trim() || null,
-        address: document.getElementById('client-input-address').value.trim() || null,
-        contact_person: document.getElementById('client-input-contact').value.trim() || null,
-        contact_phone: document.getElementById('client-input-phone').value.trim() || null,
-        contact_email: document.getElementById('client-input-email').value.trim() || null,
-        notes: document.getElementById('client-input-notes').value.trim() || null,
+        short_name:
+            (document.getElementById('client-input-short') as HTMLInputElement).value.trim() ||
+            null,
+        tax_id:
+            (document.getElementById('client-input-tax') as HTMLInputElement).value.trim() || null,
+        address:
+            (document.getElementById('client-input-address') as HTMLInputElement).value.trim() ||
+            null,
+        contact_person:
+            (document.getElementById('client-input-contact') as HTMLInputElement).value.trim() ||
+            null,
+        contact_phone:
+            (document.getElementById('client-input-phone') as HTMLInputElement).value.trim() ||
+            null,
+        contact_email:
+            (document.getElementById('client-input-email') as HTMLInputElement).value.trim() ||
+            null,
+        notes:
+            (document.getElementById('client-input-notes') as HTMLInputElement).value.trim() ||
+            null,
         color: getActiveColor(),
     };
     try {
@@ -260,16 +299,16 @@ async function saveClient() {
     } catch (e) {
         console.error('saveClient fail', e);
         // v107.1 · 显示后端 detail · 而不是模糊的"保存失败"
-        const errMsg = e && e.message ? e.message : t('client-msg-save-fail');
+        const errMsg = e && (e as Error).message ? (e as Error).message : t('client-msg-save-fail');
         showToast(t('client-msg-save-fail') + ' · ' + errMsg, 'fail');
     }
 }
 
 async function deleteClient() {
     if (!S.editingClientId) return;
-    const c = S.clients.find((x) => x.id === S.editingClientId);
+    const c = (S.clients as Client[]).find((x) => x.id === S.editingClientId);
     if (!c) return;
-    const msg = t('client-delete-confirm').replace('{name}', c.name);
+    const msg = t('client-delete-confirm').replace('{name}', c.name as string);
     const ok = await showConfirm(msg, { danger: true });
     if (!ok) return;
     try {
@@ -287,8 +326,8 @@ async function deleteClient() {
 }
 
 // 导出某客户(v109.1 · 改用统一弹窗)
-async function exportClient(clientId) {
-    const c = S.clients.find((x) => x.id === clientId);
+async function exportClient(clientId: string) {
+    const c = (S.clients as Client[]).find((x) => x.id === clientId);
     if (typeof window.openClientExportModal === 'function') {
         window.openClientExportModal(clientId, c ? c.name : '');
         return;
@@ -324,29 +363,33 @@ async function exportClient(clientId) {
         URL.revokeObjectURL(url);
     } catch (e) {
         console.error('exportClient fail', e);
-        showToast(t('client-msg-save-fail') + ' · ' + (e.message || ''), 'fail');
+        showToast(t('client-msg-save-fail') + ' · ' + ((e as Error).message || ''), 'fail');
     }
 }
 
 // ---------- 抽屉里下拉 ----------
 function refreshDrawerClientSelect() {
-    const sel = document.getElementById('drawer-client-select');
+    const sel = document.getElementById('drawer-client-select') as HTMLSelectElement | null;
     if (!sel) return;
     const cur = sel.value;
     sel.innerHTML =
         `<option value="">${escapeHtml(t('drawer-client-none'))}</option>` +
-        S.clients.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        (S.clients as Client[])
+            .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+            .join('');
     sel.value = cur || '';
 }
 
 // ---------- 历史页筛选 ----------
 function refreshHistoryClientFilter() {
-    const sel = document.getElementById('history-client-filter');
+    const sel = document.getElementById('history-client-filter') as HTMLSelectElement | null;
     if (!sel) return;
     const cur = sel.value;
     sel.innerHTML =
         `<option value="">${escapeHtml(t('history-client-all'))}</option>` +
-        S.clients.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        (S.clients as Client[])
+            .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+            .join('');
     sel.value = cur || '';
 }
 

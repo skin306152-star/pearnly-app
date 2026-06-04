@@ -14,16 +14,25 @@
 // ============================================================
 (function _reconBatchDeleteIIFE() {
     'use strict';
-    function _t(k, fb) {
+    type Cfg = { tbody: string; api: string; reload: () => void; kind: string };
+    type TheadEx = HTMLTableSectionElement & { _reconReady?: boolean };
+    type TbodyEx = HTMLElement & { _reconBatchWatched?: boolean };
+    function _t(k: string, fb: string) {
         try {
             return (window.t && window.t(k)) || fb;
         } catch (_) {
             return fb;
         }
     }
-    function _esc(s) {
-        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    // @ts-expect-error TS6133 verbatim 占位
+    function _esc(s: unknown) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c: string) {
+            return (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<
+                    string,
+                    string
+                >
+            )[c];
         });
     }
     function _authH() {
@@ -94,7 +103,7 @@
         document.head.appendChild(s);
     }
 
-    function _getRowTaskId(tr) {
+    function _getRowTaskId(tr: HTMLElement | null) {
         if (!tr) return '';
         if (tr.dataset && tr.dataset.taskId) return tr.dataset.taskId;
         // vex-task 行另一个属性名
@@ -103,12 +112,12 @@
     }
 
     // 给 thead 默认 tr 加 master checkbox 列 + 给"时间"列加 .recon-time-col(防压缩)
-    function _injectThead(cfg) {
+    function _injectThead(cfg: Cfg) {
         var tbodyEl = document.getElementById(cfg.tbody);
         if (!tbodyEl) return null;
         var table = tbodyEl.closest('table');
         if (!table) return null;
-        var thead = table.querySelector('thead');
+        var thead = table.querySelector('thead') as TheadEx | null;
         if (!thead) return null;
         if (thead._reconReady) return thead;
         var defaultTr = thead.querySelector('tr');
@@ -162,10 +171,10 @@
         batchTr.appendChild(batchSelTh);
         batchTr.appendChild(actTh);
         thead.appendChild(batchTr);
-        actTh.querySelector('[data-recon-del]').addEventListener('click', function () {
+        actTh.querySelector('[data-recon-del]')!.addEventListener('click', function () {
             _doBatchDelete(cfg);
         });
-        actTh.querySelector('[data-recon-clear]').addEventListener('click', function () {
+        actTh.querySelector('[data-recon-clear]')!.addEventListener('click', function () {
             _clearSelection(cfg);
         });
         thead._reconReady = true;
@@ -174,7 +183,7 @@
     }
 
     // 给 tbody 每行加 row checkbox(最左)+ 给"时间"列(第 2 列)加 nowrap class
-    function _injectTbodyCheckboxes(cfg) {
+    function _injectTbodyCheckboxes(cfg: Cfg) {
         var tbodyEl = document.getElementById(cfg.tbody);
         if (!tbodyEl) return;
         var rows = tbodyEl.querySelectorAll('tr');
@@ -208,13 +217,13 @@
         _refreshAfterChange(cfg);
     }
 
-    function _getCheckboxes(cfg) {
+    function _getCheckboxes(cfg: Cfg) {
         var tbodyEl = document.getElementById(cfg.tbody);
         if (!tbodyEl) return [];
         return Array.prototype.slice.call(tbodyEl.querySelectorAll('.recon-sel-cb'));
     }
 
-    function _getSelectedIds(cfg) {
+    function _getSelectedIds(cfg: Cfg) {
         return _getCheckboxes(cfg)
             .filter(function (cb) {
                 return cb.checked;
@@ -224,14 +233,14 @@
             });
     }
 
-    function _onMasterChange(cfg, checked) {
-        _getCheckboxes(cfg).forEach(function (cb) {
+    function _onMasterChange(cfg: Cfg, checked: boolean) {
+        _getCheckboxes(cfg).forEach(function (cb: HTMLInputElement) {
             cb.checked = !!checked;
         });
         _refreshAfterChange(cfg);
     }
 
-    function _refreshAfterChange(cfg) {
+    function _refreshAfterChange(cfg: Cfg) {
         var ids = _getSelectedIds(cfg);
         var all = _getCheckboxes(cfg);
         var tbodyEl = document.getElementById(cfg.tbody);
@@ -245,33 +254,35 @@
             thead.classList.remove('recon-batch-mode');
         }
         // 同步 master checkbox 状态(全选 / 部分 / 未选)
-        thead.querySelectorAll('.recon-master-cb').forEach(function (mcb) {
-            if (all.length === 0) {
-                mcb.checked = false;
-                mcb.indeterminate = false;
-                return;
+        (thead.querySelectorAll('.recon-master-cb') as NodeListOf<HTMLInputElement>).forEach(
+            function (mcb: HTMLInputElement) {
+                if (all.length === 0) {
+                    mcb.checked = false;
+                    mcb.indeterminate = false;
+                    return;
+                }
+                if (ids.length === all.length) {
+                    mcb.checked = true;
+                    mcb.indeterminate = false;
+                } else if (ids.length === 0) {
+                    mcb.checked = false;
+                    mcb.indeterminate = false;
+                } else {
+                    mcb.checked = false;
+                    mcb.indeterminate = true;
+                }
             }
-            if (ids.length === all.length) {
-                mcb.checked = true;
-                mcb.indeterminate = false;
-            } else if (ids.length === 0) {
-                mcb.checked = false;
-                mcb.indeterminate = false;
-            } else {
-                mcb.checked = false;
-                mcb.indeterminate = true;
-            }
-        });
+        );
         // 更新计数文案
         var cntEl = thead.querySelector('[data-recon-count]');
         if (cntEl)
             cntEl.textContent = _t('recon-batch-selected-n', '已选 {n} 条').replace(
                 '{n}',
-                ids.length
+                ids.length as unknown as string
             );
     }
 
-    function _refreshTheadLang(cfg) {
+    function _refreshTheadLang(cfg: Cfg) {
         var tbodyEl = document.getElementById(cfg.tbody);
         if (!tbodyEl) return;
         var table = tbodyEl.closest('table');
@@ -284,20 +295,20 @@
         _refreshAfterChange(cfg);
     }
 
-    function _clearSelection(cfg) {
-        _getCheckboxes(cfg).forEach(function (cb) {
+    function _clearSelection(cfg: Cfg) {
+        _getCheckboxes(cfg).forEach(function (cb: HTMLInputElement) {
             cb.checked = false;
         });
         _refreshAfterChange(cfg);
     }
 
-    async function _doBatchDelete(cfg) {
+    async function _doBatchDelete(cfg: Cfg) {
         var ids = _getSelectedIds(cfg);
         if (!ids.length) return;
         var msg = _t(
             'recon-batch-delete-confirm',
             '确定删除选中的 {n} 条对账任务?此操作不可恢复'
-        ).replace('{n}', ids.length);
+        ).replace('{n}', ids.length as unknown as string);
         var ok = false;
         try {
             if (typeof window.pearnlyConfirm === 'function') {
@@ -310,7 +321,10 @@
         }
         if (!ok) return;
         try {
-            var headers = Object.assign({ 'Content-Type': 'application/json' }, _authH());
+            var headers = Object.assign({ 'Content-Type': 'application/json' }, _authH()) as Record<
+                string,
+                string
+            >;
             var payloadIds =
                 cfg.kind === 'glv'
                     ? ids.map(function (v) {
@@ -341,10 +355,10 @@
         }
     }
 
-    function _setupOne(cfg) {
+    function _setupOne(cfg: Cfg) {
         _injectThead(cfg);
         _injectTbodyCheckboxes(cfg);
-        var tbodyEl = document.getElementById(cfg.tbody);
+        var tbodyEl = document.getElementById(cfg.tbody) as TbodyEx | null;
         if (!tbodyEl || tbodyEl._reconBatchWatched) return;
         tbodyEl._reconBatchWatched = true;
         var mo = new MutationObserver(function () {

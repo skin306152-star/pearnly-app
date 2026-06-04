@@ -38,7 +38,7 @@ async function loadTeamList() {
         }
         listEl.style.display = '';
         listEl.innerHTML = employees
-            .map((e) => {
+            .map((e: any) => {
                 const lastLogin = e.last_login_at
                     ? new Date(e.last_login_at).toLocaleDateString()
                     : t('team-never-login') || '从未登录';
@@ -140,62 +140,65 @@ async function showAddEmployeeModal() {
         overlay.classList.remove('show');
         setTimeout(() => overlay.remove(), 220);
     }
-    overlay.querySelector('.add-emp-close').addEventListener('click', close);
-    overlay.querySelector('#add-emp-cancel').addEventListener('click', close);
+    overlay.querySelector('.add-emp-close')!.addEventListener('click', close);
+    overlay.querySelector('#add-emp-cancel')!.addEventListener('click', close);
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) close();
     });
 
-    overlay.querySelector('#add-emp-submit').addEventListener('click', async () => {
-        const usernameEl = document.getElementById('add-emp-username');
-        const emailEl = document.getElementById('add-emp-email');
-        const passwordEl = document.getElementById('add-emp-password');
+    overlay.querySelector('#add-emp-submit')!.addEventListener('click', async () => {
+        const usernameEl = document.getElementById('add-emp-username') as HTMLInputElement | null;
+        const emailEl = document.getElementById('add-emp-email') as HTMLInputElement | null;
+        const passwordEl = document.getElementById('add-emp-password') as HTMLInputElement | null;
         const msgEl = document.getElementById('add-emp-msg');
-        const submitBtn = document.getElementById('add-emp-submit');
-        const username = (usernameEl.value || '').trim();
-        const email = (emailEl.value || '').trim();
-        const password = passwordEl.value || '';
-        msgEl.textContent = '';
-        msgEl.classList.remove('error');
+        const submitBtn = document.getElementById('add-emp-submit') as HTMLButtonElement | null;
+        const username = (usernameEl!.value || '').trim();
+        const email = (emailEl!.value || '').trim();
+        const password = passwordEl!.value || '';
+        msgEl!.textContent = '';
+        msgEl!.classList.remove('error');
 
         if (!username || username.length < 3) {
-            msgEl.textContent = t('team-modal-err-username') || '用户名至少 3 位';
-            msgEl.classList.add('error');
+            msgEl!.textContent = t('team-modal-err-username') || '用户名至少 3 位';
+            msgEl!.classList.add('error');
             return;
         }
         if (!/^[a-zA-Z0-9_.\-]+$/.test(username)) {
-            msgEl.textContent =
+            msgEl!.textContent =
                 t('team-modal-err-username-fmt') || '只能用字母 / 数字 / 下划线 / 点 / 横线';
-            msgEl.classList.add('error');
+            msgEl!.classList.add('error');
             return;
         }
         // v118.11 · 邮箱选填 · 但填了就要格式正确
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            msgEl.textContent = t('msg-email-invalid') || '邮箱格式不对';
-            msgEl.classList.add('error');
+            msgEl!.textContent = t('msg-email-invalid') || '邮箱格式不对';
+            msgEl!.classList.add('error');
             return;
         }
         // v118.11 · 密码强度本地预检(后端再校验一次,这里给即时反馈)
         if (password.length < 8) {
-            msgEl.textContent = t('pwd-too-short') || '密码至少 8 位';
-            msgEl.classList.add('error');
+            msgEl!.textContent = t('pwd-too-short') || '密码至少 8 位';
+            msgEl!.classList.add('error');
             return;
         }
         if (/^\d+$/.test(password)) {
-            msgEl.textContent = t('pwd-too-weak-numeric') || '不能是纯数字 · 请加入字母';
-            msgEl.classList.add('error');
+            msgEl!.textContent = t('pwd-too-weak-numeric') || '不能是纯数字 · 请加入字母';
+            msgEl!.classList.add('error');
             return;
         }
         if (!(/[a-zA-Z]/.test(password) && /\d/.test(password))) {
-            msgEl.textContent = t('pwd-too-weak') || '密码至少 8 位 · 字母 + 数字';
-            msgEl.classList.add('error');
+            msgEl!.textContent = t('pwd-too-weak') || '密码至少 8 位 · 字母 + 数字';
+            msgEl!.classList.add('error');
             return;
         }
 
-        submitBtn.disabled = true;
-        submitBtn.textContent = t('msg-saving') || '保存中...';
+        submitBtn!.disabled = true;
+        submitBtn!.textContent = t('msg-saving') || '保存中...';
         try {
-            const payload = { username, password };
+            const payload: { username: string; password: string; email?: string } = {
+                username,
+                password,
+            };
             if (email) payload.email = email;
             const resp = await apiPost('/api/team/employees', payload);
             const body = resp ? await resp.json().catch(() => ({})) : {};
@@ -217,20 +220,21 @@ async function showAddEmployeeModal() {
                 'pwd.too_weak_common': t('pwd-too-weak-common') || '这个密码太常见 · 请换一个',
                 'pwd.too_weak': t('pwd-too-weak') || '密码至少 8 位 · 字母 + 数字',
             };
-            msgEl.textContent =
-                msgMap[code] || (t('team-create-failed') || '创建失败') + ' (' + code + ')';
-            msgEl.classList.add('error');
+            msgEl!.textContent =
+                msgMap[code as keyof typeof msgMap] ||
+                (t('team-create-failed') || '创建失败') + ' (' + code + ')';
+            msgEl!.classList.add('error');
         } catch (e) {
-            msgEl.textContent = t('team-create-failed') || '创建失败';
-            msgEl.classList.add('error');
+            msgEl!.textContent = t('team-create-failed') || '创建失败';
+            msgEl!.classList.add('error');
         } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = t('team-add') || '添加员工';
+            submitBtn!.disabled = false;
+            submitBtn!.textContent = t('team-add') || '添加员工';
         }
     });
 
     // ESC 关闭
-    function onKey(e) {
+    function onKey(e: KeyboardEvent) {
         if (e.key === 'Escape') {
             close();
             document.removeEventListener('keydown', onKey);
@@ -240,7 +244,7 @@ async function showAddEmployeeModal() {
 }
 
 // v118.10.2 · 团队管理 · 启用/禁用 + 移除
-async function toggleEmployeeActive(employeeId, makeActive) {
+async function toggleEmployeeActive(employeeId: string, makeActive: boolean) {
     try {
         const resp = await fetch(`/api/team/employees/${encodeURIComponent(employeeId)}/active`, {
             method: 'PATCH',
@@ -256,7 +260,7 @@ async function toggleEmployeeActive(employeeId, makeActive) {
         showToast(t('team-toggle-failed') || '操作失败', 'error');
     }
 }
-async function removeEmployee(employeeId, username) {
+async function removeEmployee(employeeId: string, username: string) {
     // v118.11 · 用系统 modal 替代浏览器原生 confirm() · 兼容 {name}/{n} 占位符
     const tpl =
         t('team-confirm-remove') ||
@@ -281,7 +285,7 @@ async function removeEmployee(employeeId, username) {
 }
 
 // v118.11 · 重置员工密码 · 系统生成 12 位强随机密码 · 一次性弹窗给老板
-async function resetEmployeePassword(employeeId, username) {
+async function resetEmployeePassword(employeeId: string, username: string) {
     const confirmTpl =
         t('team-reset-pwd-confirm') ||
         '给员工「{name}」发送改密链接?系统将通过员工的邮箱或 LINE 发送一个 15 分钟内有效的链接 · 员工自己点链接改密码 · 您看不到密码';
@@ -324,32 +328,32 @@ async function resetEmployeePassword(employeeId, username) {
 
 // v118.10.2 · 团队管理 · 事件代理(点击 add / toggle / remove 按钮)
 document.addEventListener('click', (e) => {
-    if (e.target.closest('#btn-add-employee')) {
+    if ((e.target as HTMLElement).closest('#btn-add-employee')) {
         e.preventDefault();
         showAddEmployeeModal();
         return;
     }
-    const tg = e.target.closest('[data-toggle-employee]');
+    const tg = (e.target as HTMLElement).closest('[data-toggle-employee]') as HTMLElement | null;
     if (tg) {
         e.preventDefault();
-        toggleEmployeeActive(tg.dataset.toggleEmployee, tg.dataset.active === 'false');
+        toggleEmployeeActive(tg.dataset.toggleEmployee!, tg.dataset.active === 'false');
         return;
     }
-    const rm = e.target.closest('[data-remove-employee]');
+    const rm = (e.target as HTMLElement).closest('[data-remove-employee]') as HTMLElement | null;
     if (rm) {
         e.preventDefault();
-        removeEmployee(rm.dataset.removeEmployee, rm.dataset.name || '');
+        removeEmployee(rm.dataset.removeEmployee!, rm.dataset.name || '');
         return;
     }
     // v118.11 · 重置密码按钮
-    const rs = e.target.closest('[data-reset-pwd-employee]');
+    const rs = (e.target as HTMLElement).closest('[data-reset-pwd-employee]') as HTMLElement | null;
     if (rs) {
         e.preventDefault();
-        resetEmployeePassword(rs.dataset.resetPwdEmployee, rs.dataset.name || '');
+        resetEmployeePassword(rs.dataset.resetPwdEmployee!, rs.dataset.name || '');
         return;
     }
     // v118.28.1 · 分配客户按钮
-    const ac = e.target.closest('[data-assign-clients]');
+    const ac = (e.target as HTMLElement).closest('[data-assign-clients]') as HTMLElement | null;
     if (ac) {
         e.preventDefault();
         if (typeof window.openAssignClientsModal === 'function')

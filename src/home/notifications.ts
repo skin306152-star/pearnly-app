@@ -17,9 +17,9 @@
 (function () {
     'use strict';
 
-    const $ = (id) => document.getElementById(id);
+    const $ = (id: string) => document.getElementById(id);
 
-    async function _apiPatch(url, data) {
+    async function _apiPatch(url: string, data: unknown) {
         const resp = await fetch(url, {
             method: 'PATCH',
             headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -27,7 +27,7 @@
         });
         return resp;
     }
-    async function _apiDelete(url) {
+    async function _apiDelete(url: string) {
         const resp = await fetch(url, {
             method: 'DELETE',
             headers: { Authorization: 'Bearer ' + token },
@@ -35,7 +35,7 @@
         return resp;
     }
 
-    let _lineBoundCache = null; // {bound: bool}
+    let _lineBoundCache: { bound?: boolean } | null = null; // {bound: bool}
 
     async function _checkLineBound() {
         try {
@@ -46,7 +46,7 @@
         return _lineBoundCache;
     }
 
-    function _renderLineCheckBox(target, bound) {
+    function _renderLineCheckBox(target: HTMLElement | null, bound: boolean) {
         if (!target) return;
         target.style.display = '';
         target.className = 'notif-line-check ' + (bound ? 'bound' : 'unbound');
@@ -60,7 +60,7 @@
             '</span>';
     }
 
-    function _fmtTHB(amount) {
+    function _fmtTHB(amount: unknown) {
         if (amount == null) return '-';
         const n = Number(amount);
         if (isNaN(n)) return String(amount);
@@ -69,7 +69,7 @@
         );
     }
 
-    function _fmtTime(iso) {
+    function _fmtTime(iso: string) {
         if (!iso) return '-';
         try {
             const d = new Date(iso);
@@ -83,13 +83,13 @@
         }
     }
 
-    function _renderRules(rules) {
+    function _renderRules(rules: any[]) {
         const listEl = $('notif-rules-list');
         const emptyEl = $('notif-rules-empty');
         const countEl = $('notif-rules-count');
         if (!listEl || !emptyEl) return;
-        countEl.textContent = String(rules.length);
-        countEl.className = 'auto-status-pill ' + (rules.length > 0 ? 'active' : 'none');
+        countEl!.textContent = String(rules.length);
+        countEl!.className = 'auto-status-pill ' + (rules.length > 0 ? 'active' : 'none');
         if (!rules.length) {
             emptyEl.style.display = '';
             listEl.style.display = 'none';
@@ -99,7 +99,7 @@
         emptyEl.style.display = 'none';
         listEl.style.display = '';
         listEl.innerHTML = rules
-            .map((r) => {
+            .map((r: any) => {
                 const isLarge = r.template_code === 'large_invoice';
                 const tagKey = isLarge ? 'notif-rule-large-tag' : 'notif-rule-exception-tag';
                 const tagClass = isLarge ? 'large' : '';
@@ -134,7 +134,7 @@
             .join('');
     }
 
-    function _renderLogs(logs) {
+    function _renderLogs(logs: any[]) {
         const listEl = $('notif-logs-list');
         if (!listEl) return;
         if (!logs.length) {
@@ -143,7 +143,7 @@
             return;
         }
         listEl.innerHTML = logs
-            .map((lg) => {
+            .map((lg: any) => {
                 const ok = lg.status === 'sent';
                 const evtKey =
                     lg.event_type === 'exception_high'
@@ -169,22 +169,22 @@
         try {
             const r = await apiGet('/api/notifications/rules');
             _lastRules = (r && r.items) || [];
-            _renderRules(_lastRules);
+            _renderRules(_lastRules!);
         } catch (e) {
             console.warn('load rules fail', e);
         }
         try {
             const r = await apiGet('/api/notifications/logs?limit=20');
             _lastLogs = (r && r.items) || [];
-            _renderLogs(_lastLogs);
+            _renderLogs(_lastLogs!);
         } catch (e) {
             console.warn('load logs fail', e);
         }
     }
 
     // v118.22.2.1 · 切语言时用缓存重渲染 · 不重发 API
-    let _lastRules = null;
-    let _lastLogs = null;
+    let _lastRules: any[] | null = null;
+    let _lastLogs: any[] | null = null;
     function _rerenderAll() {
         if (_lastRules) _renderRules(_lastRules);
         if (_lastLogs) _renderLogs(_lastLogs);
@@ -203,12 +203,12 @@
         const modal = $('notif-new-modal');
         if (!modal) return;
         modal.style.display = '';
-        $('notif-new-name').value = '';
-        $('notif-new-threshold').value = '';
-        $('notif-new-threshold-row').style.display = 'none';
+        ($('notif-new-name') as HTMLInputElement).value = '';
+        ($('notif-new-threshold') as HTMLInputElement).value = '';
+        ($('notif-new-threshold-row') as HTMLElement).style.display = 'none';
         document
             .querySelectorAll('input[name="notif-template"]')
-            .forEach((r) => (r.checked = false));
+            .forEach((r) => ((r as HTMLInputElement).checked = false));
         // 同步 LINE 绑定状态显示
         _checkLineBound().then((b) => _renderLineCheckBox($('notif-line-check'), !!(b && b.bound)));
     }
@@ -217,15 +217,17 @@
         if (modal) modal.style.display = 'none';
     }
     function _onTemplateChange() {
-        const sel = document.querySelector('input[name="notif-template"]:checked');
+        const sel = document.querySelector(
+            'input[name="notif-template"]:checked'
+        ) as HTMLInputElement | null;
         const thRow = $('notif-new-threshold-row');
         if (!sel) {
-            thRow.style.display = 'none';
+            thRow!.style.display = 'none';
             return;
         }
-        thRow.style.display = sel.value === 'large_invoice' ? '' : 'none';
+        thRow!.style.display = sel.value === 'large_invoice' ? '' : 'none';
         // 自动填名称建议
-        const nameInput = $('notif-new-name');
+        const nameInput = $('notif-new-name') as HTMLInputElement | null;
         if (nameInput && !nameInput.value.trim()) {
             nameInput.value =
                 sel.value === 'large_invoice'
@@ -234,19 +236,26 @@
         }
     }
     async function _onSaveNew() {
-        const sel = document.querySelector('input[name="notif-template"]:checked');
+        const sel = document.querySelector(
+            'input[name="notif-template"]:checked'
+        ) as HTMLInputElement | null;
         if (!sel) {
             showToast(t('notif-new-template'), 'error');
             return;
         }
-        const name = ($('notif-new-name').value || '').trim();
+        const name = (($('notif-new-name') as HTMLInputElement).value || '').trim();
         if (!name) {
             showToast(t('notif-name-required'), 'error');
             return;
         }
-        const payload = { name, template_code: sel.value, params: {}, enabled: true };
+        const payload = {
+            name,
+            template_code: sel.value,
+            params: {} as { threshold?: number },
+            enabled: true,
+        };
         if (sel.value === 'large_invoice') {
-            const thr = parseFloat($('notif-new-threshold').value || '0');
+            const thr = parseFloat(($('notif-new-threshold') as HTMLInputElement).value || '0');
             if (!thr || thr <= 0) {
                 showToast(t('notif-threshold-required'), 'error');
                 return;
@@ -269,7 +278,7 @@
     }
 
     // ── 行内动作 ────────────────────────────────
-    async function _onRuleAction(action, ruleId, btn) {
+    async function _onRuleAction(action: string | null, ruleId: string | null, btn: HTMLElement) {
         if (action === 'toggle') {
             const isOn = btn.classList.contains('on');
             const resp = await _apiPatch('/api/notifications/rules/' + ruleId, { enabled: !isOn });
@@ -339,7 +348,9 @@
         const list = $('notif-rules-list');
         if (list) {
             list.addEventListener('click', (e) => {
-                const btn = e.target.closest('button[data-action]');
+                const btn = (e.target as HTMLElement).closest(
+                    'button[data-action]'
+                ) as HTMLElement | null;
                 if (!btn) return;
                 const row = btn.closest('[data-rule-id]');
                 if (!row) return;

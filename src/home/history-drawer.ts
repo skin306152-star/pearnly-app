@@ -11,8 +11,16 @@
 // ============================================================
 /* global escapeHtml, token, mergeFields, showAlert, hideAlerts, showConfirm, _results, _drawerIdx:writable, _historyState, _historySelected, loadHistoryPage, updateHistoryBatchBar, clearHistorySelection, openDrawer, closeDrawer */
 
+type HistDrawerRow = {
+    id: string;
+    invoice_no?: unknown;
+    has_pdf?: boolean;
+    filename?: string;
+    [key: string]: unknown;
+};
+
 // 点击行 → 打开抽屉查看/编辑
-async function openHistoryDrawer(historyId) {
+async function openHistoryDrawer(historyId: string) {
     try {
         const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}`, {
             headers: { Authorization: 'Bearer ' + token },
@@ -58,11 +66,13 @@ async function openHistoryDrawer(historyId) {
 }
 
 // v91 · 从「缺金额 · 补金额」按钮进入 · 自动聚焦金额输入框 · 会计直接敲数字保存
-async function openHistoryDrawerAndFocusAmount(historyId) {
+async function openHistoryDrawerAndFocusAmount(historyId: string) {
     await openHistoryDrawer(historyId);
     // 下一帧 focus · 确保 drawer DOM 已渲染 + transition 已起步
     requestAnimationFrame(() => {
-        const inp = document.querySelector('[data-field="total_amount"]');
+        const inp = document.querySelector(
+            '[data-field="total_amount"]'
+        ) as HTMLInputElement | null;
         if (!inp) return;
         try {
             inp.focus();
@@ -101,12 +111,12 @@ function injectHistorySaveButton() {
         </button>
     `;
     body.appendChild(saveBar);
-    document.getElementById('btn-save-history').addEventListener('click', saveHistoryEdits);
-    document.getElementById('btn-push-erp').addEventListener('click', pushHistoryToErp);
+    document.getElementById('btn-save-history')!.addEventListener('click', saveHistoryEdits);
+    document.getElementById('btn-push-erp')!.addEventListener('click', pushHistoryToErp);
 }
 
 // P0-2: 检查该发票是否已成功推送过 ERP
-async function _checkDrawerPushStatus(historyId) {
+async function _checkDrawerPushStatus(_historyId: string) {
     /* stub */
 }
 
@@ -120,7 +130,7 @@ async function saveHistoryEdits() {
     // 把 edits 回填到 pages 的第一页 fields(简化:只改第一页主字段,展示层)
     const newPages = JSON.parse(JSON.stringify(r.pages || []));
     if (newPages.length > 0) {
-        const firstMainIdx = newPages.findIndex((p) => !p.is_duplicate && !p.is_copy);
+        const firstMainIdx = newPages.findIndex((p: any) => !p.is_duplicate && !p.is_copy);
         const idx = firstMainIdx >= 0 ? firstMainIdx : 0;
         const f = newPages[idx].fields || (newPages[idx].fields = {});
         // v0.17 · M2 · category_tag 是前端字段名 · 后端 db 用 fields.category · 兼容映射
@@ -132,10 +142,10 @@ async function saveHistoryEdits() {
         Object.assign(f, editsForFields);
     }
 
-    const btn = document.getElementById('btn-save-history');
+    const btn = document.getElementById('btn-save-history') as HTMLButtonElement | null;
     if (btn) btn.disabled = true;
     try {
-        const resp = await fetch(`/api/history/${encodeURIComponent(r._historyId)}`, {
+        const resp = await fetch(`/api/history/${encodeURIComponent(r._historyId as string)}`, {
             method: 'PUT',
             headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
             body: JSON.stringify({ pages: newPages }),
@@ -155,12 +165,12 @@ async function saveHistoryEdits() {
 }
 
 // 「...」菜单(简单版:直接 confirm 对话框流程)
-function openHistoryMenu(historyId, anchor) {
+function openHistoryMenu(historyId: string, anchor: HTMLElement) {
     // 先关掉已有的 menu
     document.querySelectorAll('.history-popover').forEach((n) => n.remove());
     const rect = anchor.getBoundingClientRect();
     // v0.16 · 从行数据里取发票号 · 决定"复制发票号"是否可用
-    const rec = (_historyState.items || []).find((r) => r.id === historyId);
+    const rec = ((_historyState.items as HistDrawerRow[]) || []).find((r) => r.id === historyId);
     const invNo = rec && rec.invoice_no ? String(rec.invoice_no) : '';
     // v114 · 是否有 PDF 留底 · 决定「下载 PDF」是否启用
     const hasPdf = rec && rec.has_pdf === true;
@@ -180,13 +190,13 @@ function openHistoryMenu(historyId, anchor) {
         menu.remove();
         document.removeEventListener('click', onDocClick, true);
     };
-    const onDocClick = (e) => {
-        if (!menu.contains(e.target) && e.target !== anchor) closeMenu();
+    const onDocClick = (e: MouseEvent) => {
+        if (!menu.contains(e.target as Node) && e.target !== anchor) closeMenu();
     };
     setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
 
     menu.addEventListener('click', async (e) => {
-        const btn = e.target.closest('[data-act]');
+        const btn = (e.target as HTMLElement).closest('[data-act]') as HTMLButtonElement | null;
         if (!btn || btn.disabled) return;
         const act = btn.dataset.act;
         closeMenu();
@@ -262,32 +272,37 @@ function openHistoryMenu(historyId, anchor) {
 // 事件绑定
 (function initHistoryPage() {
     document.addEventListener('click', (e) => {
-        const row = e.target.closest('.history-row');
-        const menuBtn = e.target.closest('[data-hmenu]');
+        const row = (e.target as HTMLElement).closest('.history-row') as HTMLElement | null;
+        const menuBtn = (e.target as HTMLElement).closest('[data-hmenu]') as HTMLElement | null;
         if (menuBtn) {
             e.stopPropagation();
-            openHistoryMenu(menuBtn.dataset.hmenu, menuBtn);
+            openHistoryMenu(menuBtn.dataset.hmenu!, menuBtn);
             return;
         }
         // v102 · 点统一「需复核」⚠ 直接打开抽屉(原 fill-amount 改名为 review)
-        const reviewBtn = e.target.closest('[data-review]');
+        const reviewBtn = (e.target as HTMLElement).closest('[data-review]') as HTMLElement | null;
         if (reviewBtn) {
             e.stopPropagation();
             openHistoryDrawer(reviewBtn.dataset.review);
             return;
         }
         // v91 · 旧「补金额」入口 · v102 已统一到 review · 兼容旧标签保留
-        const fillBtn = e.target.closest('[data-fill-amount]');
+        const fillBtn = (e.target as HTMLElement).closest(
+            '[data-fill-amount]'
+        ) as HTMLElement | null;
         if (fillBtn) {
             e.stopPropagation();
-            openHistoryDrawerAndFocusAmount(fillBtn.dataset.fillAmount);
+            openHistoryDrawerAndFocusAmount(fillBtn.dataset.fillAmount!);
             return;
         }
         // v0.16 · 点 checkbox 不触发抽屉
-        if (e.target.closest('.history-row-check') || e.target.closest('.history-cell-check')) {
+        if (
+            (e.target as HTMLElement).closest('.history-row-check') ||
+            (e.target as HTMLElement).closest('.history-cell-check')
+        ) {
             return;
         }
-        if (row && !e.target.closest('[data-hmenu]')) {
+        if (row && !(e.target as HTMLElement).closest('[data-hmenu]')) {
             openHistoryDrawer(row.dataset.hid);
         }
     });
@@ -296,7 +311,9 @@ function openHistoryMenu(historyId, anchor) {
     const tbody = document.getElementById('history-tbody');
     if (tbody) {
         tbody.addEventListener('change', (e) => {
-            const cb = e.target.closest('.history-row-check');
+            const cb = (e.target as HTMLElement).closest(
+                '.history-row-check'
+            ) as HTMLInputElement | null;
             if (!cb) return;
             const hid = cb.dataset.hid;
             if (cb.checked) _historySelected.add(hid);
@@ -309,14 +326,14 @@ function openHistoryMenu(historyId, anchor) {
     const checkAll = document.getElementById('history-check-all');
     if (checkAll) {
         checkAll.addEventListener('change', (e) => {
-            const on = e.target.checked;
-            for (const r of _historyState.items) {
+            const on = (e.target as HTMLInputElement).checked;
+            for (const r of _historyState.items as HistDrawerRow[]) {
                 if (on) _historySelected.add(r.id);
                 else _historySelected.delete(r.id);
             }
             // 同步 DOM 里所有复选框
             document.querySelectorAll('.history-row-check').forEach((el) => {
-                el.checked = on;
+                (el as HTMLInputElement).checked = on;
             });
             updateHistoryBatchBar();
         });
@@ -328,7 +345,7 @@ function openHistoryMenu(historyId, anchor) {
         cancelBtn.addEventListener('click', () => {
             clearHistorySelection();
             document.querySelectorAll('.history-row-check').forEach((el) => {
-                el.checked = false;
+                (el as HTMLInputElement).checked = false;
             });
         });
     }
@@ -363,11 +380,11 @@ function openHistoryMenu(historyId, anchor) {
         });
     }
 
-    let searchTimer = null;
-    document.getElementById('history-search').addEventListener('input', (e) => {
-        const val = e.target.value;
-        document.getElementById('history-search-clear').style.display = val ? '' : 'none';
-        clearTimeout(searchTimer);
+    let searchTimer: ReturnType<typeof setTimeout> | null = null;
+    document.getElementById('history-search')!.addEventListener('input', (e) => {
+        const val = (e.target as HTMLInputElement).value;
+        document.getElementById('history-search-clear')!.style.display = val ? '' : 'none';
+        clearTimeout(searchTimer!);
         searchTimer = setTimeout(() => {
             _historyState.keyword = val.trim();
             _historyState.page = 0;
@@ -375,32 +392,32 @@ function openHistoryMenu(historyId, anchor) {
             loadHistoryPage();
         }, 300);
     });
-    document.getElementById('history-search-clear').addEventListener('click', () => {
-        const input = document.getElementById('history-search');
-        input.value = '';
+    document.getElementById('history-search-clear')!.addEventListener('click', () => {
+        const input = document.getElementById('history-search') as HTMLInputElement | null;
+        input!.value = '';
         _historyState.keyword = '';
         _historyState.page = 0;
         clearHistorySelection();
-        document.getElementById('history-search-clear').style.display = 'none';
+        document.getElementById('history-search-clear')!.style.display = 'none';
         loadHistoryPage();
-        input.focus();
+        input!.focus();
     });
 
-    document.getElementById('history-range').addEventListener('change', (e) => {
-        _historyState.range = parseInt(e.target.value, 10);
+    document.getElementById('history-range')!.addEventListener('change', (e) => {
+        _historyState.range = parseInt((e.target as HTMLSelectElement).value, 10);
         _historyState.page = 0;
         clearHistorySelection();
         loadHistoryPage();
     });
 
-    document.getElementById('history-prev').addEventListener('click', () => {
+    document.getElementById('history-prev')!.addEventListener('click', () => {
         if (_historyState.page > 0) {
             _historyState.page--;
             clearHistorySelection();
             loadHistoryPage();
         }
     });
-    document.getElementById('history-next').addEventListener('click', () => {
+    document.getElementById('history-next')!.addEventListener('click', () => {
         if ((_historyState.page + 1) * _historyState.pageSize < _historyState.total) {
             _historyState.page++;
             clearHistorySelection();

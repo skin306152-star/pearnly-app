@@ -9,8 +9,8 @@ function getMaxFiles() {
     // v111.2 · 优先用后端 /api/me/plan 返回的 limits.max_upload_files
     try {
         const ps = window._planState;
-        if (ps && ps.limits && ps.limits.max_upload_files) {
-            return ps.limits.max_upload_files;
+        if (ps && ps.limits && (ps.limits as any).max_upload_files) {
+            return (ps.limits as any).max_upload_files;
         }
         // 后端 plan 字符串兜底(/api/me/plan 还没回 · 用 _userInfo.plan)
         const plan = (_userInfo && _userInfo.plan) || 'trial';
@@ -30,7 +30,7 @@ function getMaxFiles() {
             plus: 30,
             free: 30,
         };
-        return mapping[plan] || 30;
+        return mapping[plan as keyof typeof mapping] || 30;
     } catch (_) {
         return 30;
     }
@@ -39,7 +39,8 @@ function getMaxFiles() {
 function getMaxPagesPerFile() {
     try {
         const ps = window._planState;
-        if (ps && ps.limits && ps.limits.max_pages_per_file) return ps.limits.max_pages_per_file;
+        if (ps && ps.limits && (ps.limits as any).max_pages_per_file)
+            return (ps.limits as any).max_pages_per_file;
         if (_userInfo && _userInfo.is_super_admin) return 999;
         const plan = (_userInfo && _userInfo.plan) || 'trial';
         return plan === 'lifetime' || plan === 'enterprise' ? 100 : 50;
@@ -51,7 +52,8 @@ function getMaxPagesPerFile() {
 function getMaxMbPerFile() {
     try {
         const ps = window._planState;
-        if (ps && ps.limits && ps.limits.max_mb_per_file) return ps.limits.max_mb_per_file;
+        if (ps && ps.limits && (ps.limits as any).max_mb_per_file)
+            return (ps.limits as any).max_mb_per_file;
         if (_userInfo && _userInfo.is_super_admin) return 500;
         const plan = (_userInfo && _userInfo.plan) || 'trial';
         if (plan === 'lifetime' || plan === 'enterprise') return 200;
@@ -64,27 +66,27 @@ function getMaxMbPerFile() {
 // ============================================================
 // 工具
 // ============================================================
-function t(key, params) {
+function t(key: string, params?: Record<string, string>) {
     let s = (I18N[currentLang] && I18N[currentLang][key]) || key;
     if (params) for (const k in params) s = s.replace('{' + k + '}', params[k]);
     return s;
 }
-function escapeHtml(s) {
+function escapeHtml(s: unknown) {
     return String(s ?? '').replace(
         /[&<>"']/g,
-        (ch) =>
+        (ch: string) =>
             ({
                 '&': '&amp;',
                 '<': '&lt;',
                 '>': '&gt;',
                 '"': '&quot;',
                 "'": '&#39;',
-            })[ch]
+            })[ch] as string
     );
 }
 
 // v93 · SVG 线性图标 helper · lucide 风格 · 替代 emoji 保持专业感
-function svgIcon(name, size) {
+function svgIcon(name: string, size?: number) {
     size = size || 14;
     const paths = {
         refresh:
@@ -103,7 +105,7 @@ function svgIcon(name, size) {
         sparkle:
             '<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>',
     };
-    const inner = paths[name] || '';
+    const inner = paths[name as keyof typeof paths] || '';
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; flex-shrink: 0;">${inner}</svg>`;
 }
 
@@ -134,7 +136,7 @@ function _showSessionRevokedModal() {
         th: 'ตกลง เข้าสู่ระบบ',
         ja: 'OK、ログイン',
     };
-    var lang = titles[l] ? l : 'th';
+    var lang = titles[l as keyof typeof titles] ? l : 'th';
     var overlay = document.createElement('div');
     overlay.id = 'pn-session-revoked-modal';
     overlay.style.cssText =
@@ -145,17 +147,17 @@ function _showSessionRevokedModal() {
         '<svg width="26" height="26" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="#DC2626"/></svg>' +
         '</div>' +
         '<div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:10px;line-height:1.4;">' +
-        titles[lang] +
+        titles[lang as keyof typeof titles] +
         '</div>' +
         '<div style="font-size:13px;color:#6B7280;line-height:1.7;margin-bottom:24px;white-space:pre-line;">' +
-        bodies[lang] +
+        bodies[lang as keyof typeof bodies] +
         '</div>' +
         '<button id="pn-srm-ok" style="width:100%;padding:11px 0;background:#111111;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">' +
-        okLabels[lang] +
+        okLabels[lang as keyof typeof okLabels] +
         '</button>' +
         '</div>';
     document.body.appendChild(overlay);
-    document.getElementById('pn-srm-ok').addEventListener('click', function () {
+    document.getElementById('pn-srm-ok')!.addEventListener('click', function () {
         window.location.href = '/';
     });
 }
@@ -177,9 +179,9 @@ function _wsHeader() {
     }
     return {};
 }
-async function apiGet(url) {
+async function apiGet(url: string) {
     const resp = await fetch(url, {
-        headers: { Authorization: 'Bearer ' + token, ..._wsHeader() },
+        headers: { Authorization: 'Bearer ' + token, ..._wsHeader() } as HeadersInit,
     });
     if (resp.status === 401 || resp.status === 403) {
         // v118.11 · 修 BUG B 员工登录跳着陆页:兼容 string/object detail
@@ -210,21 +212,21 @@ async function apiGet(url) {
             return null;
         }
         // 业务类 403(如 quota.need_api_key)交由调用方处理
-        const err = new Error('biz_403');
+        const err = new Error('biz_403') as Error & { detail?: unknown };
         err.detail = detail;
         throw err;
     }
     if (!resp.ok) throw new Error('fetch failed');
     return await resp.json();
 }
-async function apiPost(url, data) {
+async function apiPost(url: string, data: unknown) {
     const resp = await fetch(url, {
         method: 'POST',
         headers: {
             Authorization: 'Bearer ' + token,
             'Content-Type': 'application/json',
             ..._wsHeader(),
-        },
+        } as HeadersInit,
         body: JSON.stringify(data),
     });
     if (resp.status === 401 || resp.status === 403) {
@@ -261,7 +263,7 @@ async function apiPost(url, data) {
 }
 
 // v118.10 · PUT helper(/api/me/profile 等)· 返回 {ok: true/false, ...} 而不是 Response
-async function apiPut(url, data) {
+async function apiPut(url: string, data: unknown) {
     try {
         const resp = await fetch(url, {
             method: 'PUT',
@@ -269,7 +271,7 @@ async function apiPut(url, data) {
                 Authorization: 'Bearer ' + token,
                 'Content-Type': 'application/json',
                 ..._wsHeader(),
-            },
+            } as HeadersInit,
             body: JSON.stringify(data),
         });
         if (resp.status === 401 || resp.status === 403) {

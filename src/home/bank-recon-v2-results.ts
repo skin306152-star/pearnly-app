@@ -7,7 +7,7 @@ import { $, fmtNum, fmtDate, esc2 } from './bank-recon-v2-helpers.js';
 import { _brv2RenderAnchorAudit } from './bank-recon-v2-anchor.js';
 
 // ── 显示/隐藏结果折叠区 ──────────────────────────────────────────
-function showResultSections(show) {
+function showResultSections(show: boolean) {
     const sc = $('brv2-summary-collapse');
     const dc = $('brv2-detail-collapse');
     const eb = $('brv2-export-btn');
@@ -27,7 +27,7 @@ function showResultSections(show) {
 }
 
 // ── 文件解析诊断表 ────────────────────────────────────────────────
-function renderParseInfo(data) {
+function renderParseInfo(data: any) {
     const wrap = $('brv2-parse-info-wrap');
     const body = $('brv2-parse-info-body');
     if (!wrap || !body) return;
@@ -56,15 +56,18 @@ function renderParseInfo(data) {
         warn: { zh: '⚠ 0行', th: '⚠ 0 แถว', en: '⚠ 0 rows', ja: '⚠ 0行' },
         fail: { zh: '✗ 失败', th: '✗ ล้มเหลว', en: '✗ Failed', ja: '✗ 失敗' },
     };
-    const t = (k) => (L[k] || {})[lang] || (L[k] || {}).zh || k;
+    const t = (k: keyof typeof L) =>
+        ((L[k] as Record<string, string>) || {})[lang] ||
+        ((L[k] as Record<string, string>) || {}).zh ||
+        k;
 
     const rows = [
-        ...(pi.stmt_files || []).map((f) => ({
+        ...(pi.stmt_files || []).map((f: any) => ({
             ...f,
             _type: 'stmt',
             _extra: f.bank_code || '',
         })),
-        ...(pi.gl_files || []).map((f) => ({
+        ...(pi.gl_files || []).map((f: any) => ({
             ...f,
             _type: 'gl',
             _extra: (f.accounts || []).join(', '),
@@ -111,7 +114,7 @@ function renderParseInfo(data) {
         },
     };
     // raw error → error_code 正则映射(后端老路径未带 code 时兜底)
-    const _rawToCode = (raw) => {
+    const _rawToCode = (raw: any) => {
         const r = String(raw || '');
         if (/Cannot detect bank statement column headers/i.test(r)) return 'stmt_headers_not_found';
         if (/Cannot detect GL column headers/i.test(r)) return 'gl_headers_not_found';
@@ -126,17 +129,17 @@ function renderParseInfo(data) {
             return 'ocr_failed';
         return null;
     };
-    const _humanizeReconError = (row) => {
-        const code = row.error_code || _rawToCode(row.error);
+    const _humanizeReconError = (row: any) => {
+        const code: keyof typeof _ERR_MAP = row.error_code || _rawToCode(row.error);
         if (code && _ERR_MAP[code]) {
             const lng = window._currentLang || 'zh';
-            return _ERR_MAP[code][lng] || _ERR_MAP[code].zh;
+            return _ERR_MAP[code][lng as 'zh'] || _ERR_MAP[code].zh;
         }
         // 无法翻译 → 用通用 + 截断 raw(供技术支持参考)
         return String(row.error || '').slice(0, 80);
     };
 
-    const statusCell = (row) => {
+    const statusCell = (row: any) => {
         if (!row.ok && row.error)
             return `<span style="color:#dc2626">${t('fail')} — ${esc2(_humanizeReconError(row))}</span>`;
         if (!row.rows) return `<span style="color:#d97706">${t('warn')}</span>`;
@@ -173,7 +176,7 @@ function renderParseInfo(data) {
 }
 
 // ── Export helper (fetch+blob so Auth header is sent) ─────────────
-async function _brv2Export(taskId) {
+async function _brv2Export(taskId: any) {
     const token = localStorage.getItem('mrpilot_token') || '';
     const l = window._currentLang || 'zh';
     try {
@@ -198,13 +201,13 @@ async function _brv2Export(taskId) {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     } catch (e) {
-        if (window.showToast) window.showToast('Export error: ' + e.message, 'error');
+        if (window.showToast) window.showToast('Export error: ' + (e as Error).message, 'error');
     }
 }
 
 // ── Render results ────────────────────────────────────────────────
 // v118.35.0.54 · 输入不匹配 / 跳过文件 警告条(期间/规模对不上 · 不让用户看不懂差额)
-function _brv2RenderWarnings(warnings, skipped) {
+function _brv2RenderWarnings(warnings: any, skipped: any) {
     const host = $('brv2-summary-collapse');
     let box = $('brv2-warnings');
     const _l = window._currentLang || 'zh';
@@ -215,9 +218,9 @@ function _brv2RenderWarnings(warnings, skipped) {
             en: '⏭ Skipped unreadable file:',
             ja: '⏭ 読み取れないファイルをスキップ:',
         }[_l] || '⏭ ';
-    const msgs = [];
-    (skipped || []).forEach((fn) => msgs.push(skipLbl + ' ' + fn));
-    (warnings || []).forEach((w) => msgs.push(w));
+    const msgs: string[] = [];
+    (skipped || []).forEach((fn: any) => msgs.push(skipLbl + ' ' + fn));
+    (warnings || []).forEach((w: any) => msgs.push(w));
     if (!msgs.length) {
         if (box) box.style.display = 'none';
         return;
@@ -234,7 +237,7 @@ function _brv2RenderWarnings(warnings, skipped) {
     box.innerHTML = msgs.map((m) => '<div>' + esc2(m) + '</div>').join('');
 }
 
-function renderResults(data) {
+function renderResults(data: any) {
     // Always render parse diagnostics (shown on both success and failure)
     renderParseInfo(data);
     // v118.35.0.54 · 输入不匹配 / 跳过文件 警告条
@@ -255,9 +258,9 @@ function renderResults(data) {
     const diffOk = Math.abs(fdiff) < 0.05;
 
     // KPI strip (3 cards)
-    if ($('brv2-kpi-matched')) $('brv2-kpi-matched').textContent = matched;
-    if ($('brv2-kpi-diff')) $('brv2-kpi-diff').textContent = fmtNum(fdiff);
-    if ($('brv2-kpi-unmatched')) $('brv2-kpi-unmatched').textContent = glOnly + stmtOnly;
+    if ($('brv2-kpi-matched')) $('brv2-kpi-matched')!.textContent = matched;
+    if ($('brv2-kpi-diff')) $('brv2-kpi-diff')!.textContent = fmtNum(fdiff);
+    if ($('brv2-kpi-unmatched')) $('brv2-kpi-unmatched')!.textContent = glOnly + stmtOnly;
     // 差额图标颜色
     const diffIcon = $('brv2-kpi-diff-icon');
     if (diffIcon) {
@@ -281,11 +284,11 @@ function renderResults(data) {
         const _rowLbl =
             { zh: '共 {n} 行', th: 'ทั้งหมด {n} แถว', en: '{n} rows', ja: '計 {n} 行' }[_dl] ||
             '共 {n} 行';
-        detailSub.textContent = _rowLbl.replace('{n}', S.allRows.length);
+        detailSub.textContent = _rowLbl.replace('{n}', S.allRows.length as unknown as string);
     }
 
     // 公式表
-    function setFrm(id, val, neg) {
+    function setFrm(id: any, val: any, neg?: any) {
         const el = $(id);
         if (!el) return;
         el.textContent =
@@ -300,7 +303,7 @@ function renderResults(data) {
     setFrm('brf-calc-close', summary.formula_stmt_closing || 0);
     setFrm('brf-stmt-close', summary.stmt_closing || 0);
     if ($('brf-diff')) {
-        $('brf-diff').textContent = fmtNum(fdiff);
+        $('brf-diff')!.textContent = fmtNum(fdiff);
     }
 
     // 差额卡片颜色 (v118.33.12.0 · 横向公式卡片)
@@ -314,7 +317,7 @@ function renderResults(data) {
     if (exportBtn) {
         exportBtn.onclick = () => {
             if (!S.currentTask) return;
-            _brv2Export(S.currentTask.task_id);
+            _brv2Export((S.currentTask as any).task_id);
         };
     }
 
@@ -329,7 +332,7 @@ function renderTable() {
     const tbody = $('brv2-tbody');
     if (!tbody) return;
 
-    const rows = S.allRows.filter((r) => {
+    const rows = (S.allRows as any[]).filter((r) => {
         if (S.currentFilter === 'all') return true;
         if (S.currentFilter === 'matched') return r.match_status === 'matched';
         if (S.currentFilter === 'gl_only') return r.match_status.startsWith('gl_');

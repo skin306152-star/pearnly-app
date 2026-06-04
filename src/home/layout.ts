@@ -34,16 +34,16 @@ function renderQuotaBanner() {
     let used = 0,
         total = 0;
     if (_userInfo.plan === 'free' && _quota && _quota.ip_daily_limit) {
-        used = _quota.ip_used_today || 0;
-        total = _quota.ip_daily_limit;
-    } else if (_userInfo.tenant_quota != null && _userInfo.tenant_quota > 0) {
+        used = (_quota.ip_used_today || 0) as number;
+        total = _quota.ip_daily_limit as number;
+    } else if (_userInfo.tenant_quota != null && (_userInfo.tenant_quota as number) > 0) {
         // v109.4 · 优先 tenant 字段
-        used = _userInfo.tenant_used || 0;
-        total = _userInfo.tenant_quota;
-    } else if (_userInfo.monthly_quota && _userInfo.monthly_quota > 0) {
+        used = (_userInfo.tenant_used || 0) as number;
+        total = _userInfo.tenant_quota as number;
+    } else if (_userInfo.monthly_quota && (_userInfo.monthly_quota as number) > 0) {
         // v109.4 · 兜底用 user 表字段
-        used = _userInfo.used_this_month || 0;
-        total = _userInfo.monthly_quota;
+        used = (_userInfo.used_this_month || 0) as number;
+        total = _userInfo.monthly_quota as number;
     } else {
         // 没配额信息 · 不显示 banner
         el.style.display = 'none';
@@ -135,21 +135,25 @@ function applySidebarVisibility() {
     // v118.12 · 设置页 6 个 tab 显隐(原子函数驱动)
     // ============================================================
     // 团队管理:仅 owner / 超管
-    const teamTab = document.querySelector('.settings-tab[data-tab="team"]');
+    const teamTab = document.querySelector('.settings-tab[data-tab="team"]') as HTMLElement | null;
     if (teamTab) teamTab.style.display = _canTeam ? '' : 'none';
-    const teamPanel = document.querySelector('.settings-panel[data-settings-panel="team"]');
+    const teamPanel = document.querySelector(
+        '.settings-panel[data-settings-panel="team"]'
+    ) as HTMLElement | null;
     if (teamPanel) teamPanel.dataset.permHidden = _canTeam ? '0' : '1';
 
     // API & 密钥:仅买断 owner / 超管
-    const apiTab = document.querySelector('.settings-tab[data-tab="api"]');
+    const apiTab = document.querySelector('.settings-tab[data-tab="api"]') as HTMLElement | null;
     if (apiTab) apiTab.style.display = _canApiKey || isSuperAdmin(u) ? '' : 'none';
 
     // 套餐 & 用量:员工隐藏
-    const planTab = document.querySelector('.settings-tab[data-tab="plan"]');
+    const planTab = document.querySelector('.settings-tab[data-tab="plan"]') as HTMLElement | null;
     if (planTab) planTab.style.display = _hideMoney ? 'none' : '';
 
     // v118.12 · 公司信息 tab:员工隐藏(公司是事务所属性 · 跟员工无关)
-    const companyTab = document.querySelector('.settings-tab[data-tab="company"]');
+    const companyTab = document.querySelector(
+        '.settings-tab[data-tab="company"]'
+    ) as HTMLElement | null;
     if (companyTab) companyTab.style.display = _hideMoney ? 'none' : '';
 
     // ============================================================
@@ -172,7 +176,7 @@ function applySidebarVisibility() {
 
     // v118.35.0.9 · 升级按钮全局 click 绑定永久下线 · 直接隐藏所有 .btn-upgrade / .topbar-upgrade / [data-upgrade-cta]
     document.querySelectorAll('[data-upgrade-cta], .btn-upgrade, .topbar-upgrade').forEach((el) => {
-        el.style.display = 'none';
+        (el as HTMLElement).style.display = 'none';
     });
 
     // body class · 让 CSS 可以基于角色做额外样式收尾(比如员工进设置默认 active 不在公司信息)
@@ -183,7 +187,7 @@ function applySidebarVisibility() {
     // v118.12.3 · 关键修复:如果当前 active tab 是被隐藏的(localStorage 恢复了员工无权访问的 tab)
     // 强制切回 profile · 否则员工会看到 team panel 内容 + 调 API 被 403
     try {
-        const activeTab = document.querySelector('.settings-tab.active');
+        const activeTab = document.querySelector('.settings-tab.active') as HTMLElement | null;
         if (activeTab && activeTab.style.display === 'none') {
             if (typeof window.switchSettingsTab === 'function') {
                 window.switchSettingsTab('profile');
@@ -207,12 +211,12 @@ function applySidebarVisibility() {
 
         document.querySelectorAll('.nav-item').forEach((item) => {
             if (!item.classList.contains('nav-admin-only')) {
-                item.style.display = 'none';
+                (item as HTMLElement).style.display = 'none';
             }
         });
         document.querySelectorAll('.nav-group').forEach((group) => {
             if (!group.classList.contains('nav-group-admin-only')) {
-                group.style.display = 'none';
+                (group as HTMLElement).style.display = 'none';
             }
         });
         const cs = document.getElementById('client-switcher');
@@ -224,22 +228,24 @@ function applySidebarVisibility() {
         // 保留:个人资料 / 账户安全 / 通知偏好 / 联系我们
         const _adminSettingsAllowed = ['profile', 'security', 'notifications', 'about'];
         document.querySelectorAll('.settings-tab').forEach((tab) => {
-            const name = tab.dataset.tab;
+            const name = (tab as HTMLElement).dataset.tab;
             if (name && !_adminSettingsAllowed.includes(name)) {
-                tab.style.display = 'none';
+                (tab as HTMLElement).style.display = 'none';
             }
         });
         document.querySelectorAll('.settings-pane').forEach((pane) => {
-            const name = pane.dataset.pane;
+            const name = (pane as HTMLElement).dataset.pane;
             if (name && !_adminSettingsAllowed.includes(name)) {
-                pane.style.display = 'none';
+                (pane as HTMLElement).style.display = 'none';
             }
         });
         // 隐藏所有 tab 都被砍掉的分组标题(防止"公司"标题下空荡荡)
         document.querySelectorAll('.settings-nav-group').forEach((group) => {
             const visibleTabs = group.querySelectorAll('.settings-tab');
-            const anyVisible = Array.from(visibleTabs).some((t) => t.style.display !== 'none');
-            if (!anyVisible) group.style.display = 'none';
+            const anyVisible = Array.from(visibleTabs).some(
+                (t) => (t as HTMLElement).style.display !== 'none'
+            );
+            if (!anyVisible) (group as HTMLElement).style.display = 'none';
         });
     }
 }
@@ -284,11 +290,14 @@ function renderInfoBar() {
     } else {
         // shared_api · 月付共用 key(默认分支 · trial 也走这条)
         // v109.4 · 优先 tenant 字段 · 缺失回退 user 字段
-        const used = user.tenant_used != null ? user.tenant_used : user.used_this_month || 0;
-        const total =
-            user.tenant_quota != null && user.tenant_quota > 0
+        const used = (
+            user.tenant_used != null ? user.tenant_used : user.used_this_month || 0
+        ) as number;
+        const total = (
+            user.tenant_quota != null && (user.tenant_quota as number) > 0
                 ? user.tenant_quota
-                : user.monthly_quota || 0;
+                : user.monthly_quota || 0
+        ) as number;
         const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
         let cls = '';
         if (pct >= 95) cls = 'danger';

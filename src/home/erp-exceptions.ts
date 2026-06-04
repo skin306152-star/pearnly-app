@@ -15,7 +15,32 @@
 // 闭环:修复(picker 下一块)+ [重试推送] 都在卡片内完成 · 重试走同一 /retry 端点
 //       (重新解析+反查+推送)· 成功 → 卡片消失(单一源自动同步)· 不来回跳日志页。
 // ─────────────────────────────────────────────────────────
-let _erpExcState = {
+type ErpExcItem = {
+    id: string;
+    state?: string;
+    push_type?: string;
+    invoice_no?: string;
+    seller_name?: string;
+    id_card_tail?: string;
+    ocr_buyer_name?: string;
+    error_code?: string;
+    error_msg?: string;
+    category?: string;
+    error_friendly?: Record<string, string>;
+};
+let _erpExcState: {
+    items: ErpExcItem[];
+    q: string;
+    cat: string;
+    adapter: string;
+    selected: Set<string>;
+    total: number;
+    categories: Record<string, number>;
+    pageSize: number;
+    loading: boolean;
+    focusSearch: boolean;
+    searchCaret: number;
+} = {
     items: [],
     q: '',
     cat: '',
@@ -28,13 +53,13 @@ let _erpExcState = {
     focusSearch: false,
     searchCaret: 0,
 };
-let _erpExcSearchTimer = null;
+let _erpExcSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 function _erpExcTok() {
     return localStorage.getItem('mrpilot_token') || '';
 }
 
-function _erpExcFriendly(it) {
+function _erpExcFriendly(it: ErpExcItem) {
     // P2-C (B7) · 优先后端 4 语友好原因(不裸透泰文)→ 退 humanizeError(网络错误)→ category 文案
     const _efLang = (typeof currentLang === 'string' && currentLang) || window._currentLang || 'th';
     const _ef = it.error_friendly && it.error_friendly[_efLang];
@@ -135,7 +160,7 @@ function renderErpExceptions() {
     const _seenAd = new Set();
     let _erpOpts = `<option value="">${escapeHtml(t('erp-logs-erp-all'))}</option>`;
     _eps.forEach((e) => {
-        const ad = ((e && e.adapter) || '').toLowerCase();
+        const ad = (((e && e.adapter) || '') as string).toLowerCase();
         if (!ad || _seenAd.has(ad)) return;
         _seenAd.add(ad);
         _erpOpts += `<option value="${escapeHtml(ad)}"${ad === st.adapter ? ' selected' : ''}>${escapeHtml((e && e.name) || ad)}</option>`;
@@ -172,7 +197,7 @@ function renderErpExceptions() {
         <div class="erp-exc-foot">${moreHtml}</div>`;
 
     // 搜索框(debounce · 保持焦点 + 光标)
-    const search = document.getElementById('erp-exc-search');
+    const search = document.getElementById('erp-exc-search') as HTMLInputElement | null;
     if (search) {
         if (st.focusSearch) {
             search.focus();
@@ -184,7 +209,7 @@ function renderErpExceptions() {
             st.q = search.value;
             st.focusSearch = true;
             st.searchCaret = search.selectionStart || search.value.length;
-            clearTimeout(_erpExcSearchTimer);
+            clearTimeout(_erpExcSearchTimer!);
             _erpExcSearchTimer = setTimeout(() => loadErpExceptions(false), 350);
         });
         search.addEventListener('blur', () => {
@@ -194,12 +219,12 @@ function renderErpExceptions() {
     // chips
     block.querySelectorAll('.erp-exc-chip').forEach((btn) => {
         btn.addEventListener('click', () => {
-            st.cat = btn.dataset.erpexcCat || '';
+            st.cat = (btn as HTMLElement).dataset.erpexcCat || '';
             loadErpExceptions(false);
         });
     });
     // ERP 系统下拉(DMS 闭环修正 · 异常栏与推送日志同理 · 选一个看一个)
-    const erpSel = document.getElementById('erp-exc-erp-select');
+    const erpSel = document.getElementById('erp-exc-erp-select') as HTMLSelectElement | null;
     if (erpSel) {
         erpSel.addEventListener('change', () => {
             st.adapter = erpSel.value || '';
@@ -210,23 +235,23 @@ function renderErpExceptions() {
     block.querySelectorAll('[data-erpexc-retry]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            _erpExcRetry(btn.dataset.erpexcRetry, btn);
+            _erpExcRetry((btn as HTMLElement).dataset.erpexcRetry, btn as HTMLButtonElement);
         });
     });
     // 单选 checkbox(直接改 set + 更新批量栏 · 不整块重渲 · 防丢焦点)
     block.querySelectorAll('.erp-exc-cb').forEach((cb) => {
         cb.addEventListener('change', () => {
-            const id = cb.dataset.erpexcCb;
-            if (cb.checked) st.selected.add(id);
+            const id = (cb as HTMLInputElement).dataset.erpexcCb as string;
+            if ((cb as HTMLInputElement).checked) st.selected.add(id);
             else st.selected.delete(id);
-            const head = document.getElementById('erp-exc-cb-all');
+            const head = document.getElementById('erp-exc-cb-all') as HTMLInputElement | null;
             if (head)
                 head.checked = items.length > 0 && items.every((it) => st.selected.has(it.id));
             _erpExcUpdateBatchBar();
         });
     });
     // 全选(当前页)
-    const cbAll = document.getElementById('erp-exc-cb-all');
+    const cbAll = document.getElementById('erp-exc-cb-all') as HTMLInputElement | null;
     if (cbAll)
         cbAll.addEventListener('change', () => {
             items.forEach((it) => {
@@ -234,13 +259,13 @@ function renderErpExceptions() {
                 else st.selected.delete(it.id);
             });
             block.querySelectorAll('.erp-exc-cb').forEach((c) => {
-                c.checked = cbAll.checked;
+                (c as HTMLInputElement).checked = cbAll.checked;
             });
             _erpExcUpdateBatchBar();
         });
     // 批量
     block.querySelectorAll('[data-erpexc-batch]').forEach((btn) => {
-        btn.addEventListener('click', () => _erpExcBatch(btn.dataset.erpexcBatch));
+        btn.addEventListener('click', () => _erpExcBatch((btn as HTMLElement).dataset.erpexcBatch));
     });
     // 加载更多
     const more = document.getElementById('erp-exc-more');
@@ -248,14 +273,14 @@ function renderErpExceptions() {
     // 单击行(非 checkbox/按钮)→ 编辑弹窗(下一步)· 现暂留 hook
     block.querySelectorAll('.erp-exc-row:not(.erp-exc-row-head)').forEach((row) => {
         row.addEventListener('click', (e) => {
-            if (e.target.closest('input,button')) return;
+            if ((e.target as HTMLElement).closest('input,button')) return;
             if (typeof window._erpExcOpenEdit === 'function')
-                window._erpExcOpenEdit(row.dataset.erpexcId);
+                window._erpExcOpenEdit((row as HTMLElement).dataset.erpexcId);
         });
     });
 }
 
-async function _erpExcRetry(logId, btn) {
+async function _erpExcRetry(logId: string | undefined, btn: HTMLButtonElement | null) {
     if (!logId) return;
     if (btn) {
         btn.disabled = true;
@@ -284,7 +309,7 @@ async function _erpExcRetry(logId, btn) {
     }
 }
 
-async function _erpExcBatch(action) {
+async function _erpExcBatch(action: string | undefined) {
     const ids = Array.from(_erpExcState.selected);
     if (action === 'clear') {
         _erpExcState.selected.clear();
@@ -350,7 +375,7 @@ async function _erpExcBatch(action) {
     }
 }
 
-async function loadErpExceptions(append) {
+async function loadErpExceptions(append?: boolean) {
     const block = document.getElementById('erp-exc-block');
     if (!block || _erpExcState.loading) return;
     _erpExcState.loading = true;

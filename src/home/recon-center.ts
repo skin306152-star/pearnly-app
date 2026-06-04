@@ -17,14 +17,14 @@
 (function () {
     'use strict';
 
-    const elNum = (key) => document.querySelector('[data-num-target="' + key + '"]');
+    const elNum = (key: string) => document.querySelector('[data-num-target="' + key + '"]');
 
-    function _formatLastActivity(isoStr) {
+    function _formatLastActivity(isoStr: string | null | undefined) {
         if (!isoStr) return t('reconcile-last-activity-none');
         try {
             const then = new Date(isoStr);
             const now = new Date();
-            const diffMs = now - then;
+            const diffMs = (now as unknown as number) - (then as unknown as number);
             const diffMin = diffMs / 60000;
             if (diffMin < 5) return t('reconcile-last-activity-just-now');
             // 同一日历日(BKK · 浏览器本地)算「今天」
@@ -32,35 +32,38 @@
                 return t('reconcile-last-activity-today');
             }
             const diffDays = Math.max(1, Math.floor(diffMs / (24 * 3600 * 1000)));
-            return t('reconcile-last-activity-days-ago').replace('{n}', diffDays);
+            return t('reconcile-last-activity-days-ago').replace(
+                '{n}',
+                diffDays as unknown as string
+            );
         } catch (e) {
             return t('reconcile-last-activity-none');
         }
     }
 
-    function _setNum(key, val, isEmpty) {
+    function _setNum(key: string, val: unknown, isEmpty: unknown) {
         const el = elNum(key);
         if (!el) return;
         el.textContent = isEmpty ? '-' : String(val);
         el.classList.toggle('is-empty', !!isEmpty);
     }
 
-    function _showError(show) {
+    function _showError(show: unknown) {
         const e = document.getElementById('reconcile-error');
         if (e) e.style.display = show ? 'flex' : 'none';
     }
-    function _showEmpty(show) {
+    function _showEmpty(show: unknown) {
         const e = document.getElementById('reconcile-empty');
         if (e) e.style.display = show ? 'flex' : 'none';
     }
-    function _setLastActivityText(text, hasData) {
+    function _setLastActivityText(text: string, hasData: unknown) {
         const el = document.getElementById('reconcile-last-activity');
         if (!el) return;
         el.textContent = text;
         el.classList.toggle('has-data', !!hasData);
     }
 
-    function _renderStats(stats) {
+    function _renderStats(stats: any) {
         const isEmpty = !stats || (stats.total_sessions || 0) === 0;
         _setNum('pending', stats.pending || 0, isEmpty);
         _setNum('matched', stats.matched || 0, isEmpty);
@@ -73,7 +76,7 @@
     }
 
     // v118.26.1 · 最近对账列表渲染(有数据时显示 · 替代空态)
-    function _bankChipClass(code) {
+    function _bankChipClass(code: string | null | undefined) {
         const c = (code || '').toUpperCase();
         if (c === 'KBANK') return 'bank-chip-kbank';
         if (c === 'SCB') return 'bank-chip-scb';
@@ -83,13 +86,13 @@
         return 'bank-chip-other';
     }
 
-    function _fmtPeriodShort(start, end) {
-        const fmt = (s) => (s ? String(s).slice(0, 10) : '?');
+    function _fmtPeriodShort(start: unknown, end: unknown) {
+        const fmt = (s: unknown) => (s ? String(s).slice(0, 10) : '?');
         if (!start && !end) return '';
         return fmt(start) + ' ~ ' + fmt(end);
     }
 
-    function _esc(s) {
+    function _esc(s: unknown) {
         if (s === null || s === undefined) return '';
         return String(s)
             .replace(/&/g, '&amp;')
@@ -99,7 +102,7 @@
             .replace(/'/g, '&#39;');
     }
 
-    function _renderRecent(sessions) {
+    function _renderRecent(sessions: any[]) {
         const wrap = document.getElementById('reconcile-recent');
         const list = document.getElementById('reconcile-recent-list');
         if (!wrap || !list) return;
@@ -113,7 +116,7 @@
         _showEmpty(false);
 
         list.innerHTML = items
-            .map((s) => {
+            .map((s: any) => {
                 const failed = s.parse_status === 'parse_failed';
                 const bankCode = s.bank_code || 'OTHER';
                 const acct = s.account_last4 ? ' ···' + _esc(s.account_last4) : '';
@@ -125,7 +128,7 @@
                       t('reconcile-card-parse-failed') +
                       '</span>'
                     : '<span class="recon-card-tx">' +
-                      t('reconcile-card-tx').replace('{n}', txN) +
+                      t('reconcile-card-tx').replace('{n}', txN as unknown as string) +
                       '</span>';
                 // v118.26.1.1 · hover 出垃圾桶 · 直接删该会话(共用 _deleteBankSession)
                 return (
@@ -168,17 +171,17 @@
 
         list.querySelectorAll('.recon-card').forEach((c) => {
             c.addEventListener('click', (e) => {
-                if (e.target.closest('.recon-card-trash')) return; // 点的是垃圾桶
-                const sid = c.dataset.sessionId;
+                if ((e.target as HTMLElement).closest('.recon-card-trash')) return; // 点的是垃圾桶
+                const sid = (c as HTMLElement).dataset.sessionId;
                 _gotoBankSession(sid);
             });
         });
         list.querySelectorAll('.recon-card-trash').forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const sid = btn.dataset.trash;
+                const sid = (btn as HTMLElement).dataset.trash;
                 const card = btn.closest('.recon-card');
-                const fname = card ? card.dataset.sessionName || '' : '';
+                const fname = card ? (card as HTMLElement).dataset.sessionName || '' : '';
                 if (typeof window._deleteBankSession === 'function') {
                     window._deleteBankSession(sid, fname);
                 }
@@ -186,11 +189,11 @@
         });
     }
 
-    function _gotoBankSession(sessionId) {
+    function _gotoBankSession(_sessionId: unknown) {
         // v118.33.6 · redirect to reconcile center bank tab
         if (typeof window.routeTo === 'function') window.routeTo('reconcile');
         setTimeout(function () {
-            const bankTab = document.querySelector('[data-recon-tab="bank"]');
+            const bankTab = document.querySelector('[data-recon-tab="bank"]') as HTMLElement | null;
             if (bankTab) bankTab.click();
         }, 150);
     }
@@ -204,7 +207,7 @@
         // 导航到对账中心 → 银行对账 tab（不自动弹文件框，用户自己点区域）
         if (typeof window.routeTo === 'function') window.routeTo('reconcile');
         setTimeout(function () {
-            const bankTab = document.querySelector('[data-recon-tab="bank"]');
+            const bankTab = document.querySelector('[data-recon-tab="bank"]') as HTMLElement | null;
             if (bankTab) bankTab.click();
         }, 150);
     }
@@ -240,12 +243,12 @@
     }
 
     // 对账中心原地上传：选文件 → POST /api/bank-recon/upload → 刷新对账中心
-    function _handleBankFileSelect(files) {
+    function _handleBankFileSelect(files: FileList | null | undefined) {
         if (!files || !files.length) return;
         const auth = 'Bearer ' + (localStorage.getItem('mrpilot_token') || '');
         let done = 0;
         const total = files.length;
-        Array.from(files).forEach(function (file) {
+        Array.from(files).forEach(function (file: File) {
             const fd = new FormData();
             fd.append('file', file, file.name);
             const xhr = new XMLHttpRequest();
@@ -289,25 +292,25 @@
         // 银行对账单文件选择器
         const bankFileInput = document.getElementById('reconcile-bank-file-input');
         if (bankFileInput) {
-            bankFileInput.addEventListener('change', function () {
+            bankFileInput.addEventListener('change', function (this: HTMLInputElement) {
                 _handleBankFileSelect(this.files);
                 this.value = ''; // 重置 · 允许重复选同一文件
             });
         }
         document.addEventListener('click', (e) => {
             if (
-                e.target.closest('#btn-reconcile-upload-top') ||
-                e.target.closest('#btn-reconcile-upload-empty')
+                (e.target as HTMLElement).closest('#btn-reconcile-upload-top') ||
+                (e.target as HTMLElement).closest('#btn-reconcile-upload-empty')
             ) {
                 _gotoBankUpload();
                 return;
             }
-            if (e.target.closest('#btn-reconcile-retry')) {
+            if ((e.target as HTMLElement).closest('#btn-reconcile-retry')) {
                 load();
                 return;
             }
             // v118.26.2 · 测试中心专用 · 插 mock 数据 · 仅 skin 白名单
-            if (e.target.closest('#btn-reconcile-dev-seed')) {
+            if ((e.target as HTMLElement).closest('#btn-reconcile-dev-seed')) {
                 _devSeedMock();
                 return;
             }
@@ -342,7 +345,7 @@
                 location.hash = '#/automation';
             }
             setTimeout(() => {
-                const tab = document.querySelector('[data-auto-tab="bank"]');
+                const tab = document.querySelector('[data-auto-tab="bank"]') as HTMLElement | null;
                 if (tab) tab.click();
                 if (data.session_id && typeof window._openBankSession === 'function') {
                     window._openBankSession(data.session_id);

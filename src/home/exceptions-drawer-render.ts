@@ -7,8 +7,43 @@ import { _drawer } from './exceptions-store.js';
 import { _v, _money } from './exceptions-helpers.js';
 import { _loadDrawerPdf, _extractFields, actionSaveFields } from './exceptions-drawer.js';
 
+type WhyDetail = {
+    subtotal?: unknown;
+    vat?: unknown;
+    total_expected?: unknown;
+    total_actual?: unknown;
+    diff?: unknown;
+    tax_id_normalized?: string;
+    tax_id_raw?: string;
+    actual_length?: unknown;
+    level?: string;
+    match_filename?: string;
+    match_invoice_no?: string;
+    confidence?: string;
+};
+
+type ExcRow = {
+    seller_name?: string;
+    filename?: string;
+    status?: string;
+    invoice_date?: string;
+    created_at?: string;
+    invoice_no?: string;
+    severity?: string;
+    rule_code?: string;
+    detail?: WhyDetail;
+    history_id?: string;
+};
+
+type DrawerHistory = {
+    pages?: Array<{ is_duplicate?: boolean; is_copy?: boolean; fields?: unknown }>;
+    _err?: unknown;
+};
+
+type ExtractedFields = Record<string, unknown>;
+
 // 「为什么被拦」详情段 · 根据 rule_code 把 detail_json 渲成人话
-function renderWhyDetail(rule, detail) {
+function renderWhyDetail(rule: string, detail: WhyDetail) {
     detail = detail || {};
     if (rule === 'math_mismatch') {
         return `
@@ -50,19 +85,19 @@ function renderWhyDetail(rule, detail) {
 }
 
 function renderDrawer() {
-    const row = _drawer.excRow;
+    const row = _drawer.excRow as ExcRow;
     if (!row) return;
 
     // Header
     const seller = row.seller_name && row.seller_name.trim() ? row.seller_name : t('exc-no-seller');
     const filename = row.filename || '—';
-    document.getElementById('exc-drawer-title').textContent = filename;
+    document.getElementById('exc-drawer-title')!.textContent = filename;
 
     const statusKey = 'exc-status-' + (row.status || 'pending');
     const statusLabel = t(statusKey) || row.status;
     const statusCls = 's-' + (row.status || 'pending');
     const date = (row.invoice_date || row.created_at || '').slice(0, 10);
-    document.getElementById('exc-drawer-sub').innerHTML = `
+    document.getElementById('exc-drawer-sub')!.innerHTML = `
         <span>${escapeHtml(seller)}</span>
         ${row.invoice_no ? `<span>· ${escapeHtml(row.invoice_no)}</span>` : ''}
         ${date ? `<span>· ${escapeHtml(date)}</span>` : ''}
@@ -72,11 +107,11 @@ function renderDrawer() {
     // Body · 两段
     const sev = row.severity || 'medium';
     const ruleLabel = t('exc-rule-' + row.rule_code) || row.rule_code;
-    const whyDetail = renderWhyDetail(row.rule_code, row.detail || {});
+    const whyDetail = renderWhyDetail(row.rule_code!, row.detail || {});
 
-    const f = _extractFields(_drawer.history);
+    const f = _extractFields(_drawer.history as DrawerHistory) as ExtractedFields;
     const fieldsLoading = _drawer.history === null;
-    const fieldsErr = _drawer.history && _drawer.history._err;
+    const fieldsErr = _drawer.history && (_drawer.history as DrawerHistory)._err;
 
     // 标记哪些字段触发了规则(高亮红)
     const flagSet = new Set();
@@ -92,8 +127,8 @@ function renderDrawer() {
     }
 
     const editing = !!_drawer.editing;
-    const editF = _drawer.editFields || {};
-    const fld = (key, labelKey, isMoney) => {
+    const editF = (_drawer.editFields || {}) as Record<string, unknown>;
+    const fld = (key: string, labelKey: string, isMoney: boolean) => {
         if (fieldsLoading) {
             return `<div class="exc-field-row"><label>${escapeHtml(t(labelKey))}</label><span class="val empty">…</span></div>`;
         }
@@ -216,7 +251,7 @@ function renderDrawer() {
         `;
     })();
 
-    document.getElementById('exc-drawer-body').innerHTML = `
+    document.getElementById('exc-drawer-body')!.innerHTML = `
         <div class="exc-pdf-pane">${pdfPaneHtml}</div>
         <div class="exc-fields-pane">
             <div class="exc-section">
@@ -273,7 +308,7 @@ function renderDrawer() {
     if (editBtn)
         editBtn.addEventListener('click', () => {
             _drawer.editing = true;
-            _drawer.editFields = { ..._extractFields(_drawer.history) };
+            _drawer.editFields = { ..._extractFields(_drawer.history as DrawerHistory) };
             renderDrawer();
         });
     const cancelBtn = document.getElementById('exc-fld-cancel');
@@ -290,7 +325,9 @@ function renderDrawer() {
     inputs.forEach((inp) => {
         inp.addEventListener('input', () => {
             if (!_drawer.editFields) _drawer.editFields = {};
-            _drawer.editFields[inp.dataset.editKey] = inp.value;
+            (_drawer.editFields as Record<string, unknown>)[
+                (inp as HTMLInputElement).dataset.editKey!
+            ] = (inp as HTMLInputElement).value;
         });
     });
 
@@ -298,19 +335,20 @@ function renderDrawer() {
     const pdfRetry = document.getElementById('exc-pdf-retry');
     if (pdfRetry && _drawer.openExcId) {
         pdfRetry.addEventListener('click', () => {
-            if (_drawer.excRow) _loadDrawerPdf(_drawer.excRow.history_id, _drawer.openExcId);
+            if (_drawer.excRow)
+                _loadDrawerPdf((_drawer.excRow as ExcRow).history_id!, _drawer.openExcId);
         });
     }
 
     // 底部按钮 · 仅 pending 可操作
     const isPending = row.status === 'pending';
     const hasSeller = !!(row.seller_name && row.seller_name.trim());
-    const btnResolve = document.getElementById('exc-btn-resolve');
-    const btnIgnore = document.getElementById('exc-btn-ignore');
-    btnResolve.disabled = !isPending;
-    btnIgnore.disabled = !isPending || !hasSeller;
+    const btnResolve = document.getElementById('exc-btn-resolve') as HTMLButtonElement | null;
+    const btnIgnore = document.getElementById('exc-btn-ignore') as HTMLButtonElement | null;
+    btnResolve!.disabled = !isPending;
+    btnIgnore!.disabled = !isPending || !hasSeller;
     // 「忽略此类」副提示(在按钮上方 · 用 title attr)
-    btnIgnore.title = hasSeller ? t('exc-ignore-hint') : t('exc-ignore-no-seller');
+    btnIgnore!.title = hasSeller ? t('exc-ignore-hint') : t('exc-ignore-no-seller');
 }
 
 export { renderDrawer };

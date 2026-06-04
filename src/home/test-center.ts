@@ -34,17 +34,21 @@ import {
     _buildResultsMarkdown,
     _buildLogsMarkdown,
 } from './test-center-base.js'; // REFACTOR-WB-modularize · 数据/状态/工具/markdown
+type TcLog = { type: string; ts: number; summary: string; detail: unknown };
+type TcT = (key: string, fallback: string, vars?: Record<string, unknown>) => string;
 (function () {
     'use strict';
     // ---------- 渲染:状态条 ----------
     function _renderStatusBar() {
         const acc = document.getElementById('tc-account-chip');
         const prog = document.getElementById('tc-progress-chip');
-        if (acc) acc.textContent = (_userInfo && (_userInfo.email || _userInfo.username)) || '—';
+        if (acc)
+            acc.textContent =
+                ((_userInfo && (_userInfo.email || _userInfo.username)) as string) || '—';
         if (prog) {
             const total = CHECKLIST.length;
             const done = CHECKLIST.filter(function (it) {
-                return S.results[it.id];
+                return (S.results as Record<string, string>)[it.id];
             }).length;
             prog.textContent = done + ' / ' + total;
         }
@@ -54,17 +58,17 @@ import {
     function _renderChecklist() {
         const wrap = document.getElementById('tc-checklist-body');
         if (!wrap) return;
-        const groups = {};
+        const groups: Record<string, (typeof CHECKLIST)[number][]> = {};
         CHECKLIST.forEach(function (it) {
             if (!groups[it.group]) groups[it.group] = [];
             groups[it.group].push(it);
         });
-        const html = [];
+        const html: string[] = [];
         Object.keys(groups).forEach(function (g) {
             html.push('<div class="tc-checklist-group">');
             html.push('<div class="tc-checklist-group-title">' + _esc(g) + '</div>');
             groups[g].forEach(function (it) {
-                const st = S.results[it.id] || '';
+                const st = (S.results as Record<string, string>)[it.id] || '';
                 const cls = st ? 'is-' + st : '';
                 html.push(
                     '<div class="tc-check-item ' +
@@ -90,7 +94,7 @@ import {
         });
         wrap.innerHTML = html.join('');
     }
-    function _statusBtn(id, kind, current) {
+    function _statusBtn(id: string, kind: 'pass' | 'fail' | 'skip', current: string) {
         const isActive = current === kind;
         const icons = {
             pass: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,11 8,15 16,5"/></svg>',
@@ -98,9 +102,9 @@ import {
             skip: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="10" x2="15" y2="10"/></svg>',
         };
         const titles = {
-            pass: _t('tc-status-pass', '通过'),
-            fail: _t('tc-status-fail', '失败'),
-            skip: _t('tc-status-skip', '跳过'),
+            pass: (_t as TcT)('tc-status-pass', '通过'),
+            fail: (_t as TcT)('tc-status-fail', '失败'),
+            skip: (_t as TcT)('tc-status-skip', '跳过'),
         };
         return (
             '<button type="button" class="tc-status-btn ' +
@@ -118,7 +122,7 @@ import {
     }
 
     // ---------- 渲染:异常日志 ----------
-    function _matchFilter(entry) {
+    function _matchFilter(entry: TcLog) {
         if (S.logFilter === 'all') return true;
         if (S.logFilter === 'js_error')
             return entry.type === 'js_error' || entry.type === 'promise_error';
@@ -132,13 +136,15 @@ import {
         const wrap = document.getElementById('tc-logs-body');
         const cnt = document.getElementById('tc-logs-count');
         if (!wrap) return;
-        const all = (window._pearnlyTcLogs || []).slice().reverse(); // 最新在前
+        const all = ((window._pearnlyTcLogs as TcLog[]) || []).slice().reverse(); // 最新在前
         const filtered = all.filter(_matchFilter);
         if (cnt) cnt.textContent = String(all.length);
 
         if (filtered.length === 0) {
             wrap.innerHTML =
-                '<div class="tc-logs-empty">' + _esc(_t('tc-logs-empty', '暂无异常')) + '</div>';
+                '<div class="tc-logs-empty">' +
+                _esc((_t as TcT)('tc-logs-empty', '暂无异常')) +
+                '</div>';
             return;
         }
         const html = filtered
@@ -187,7 +193,7 @@ import {
             const onPage =
                 currentRoute === 'test-center' &&
                 document.getElementById('page-test-center') &&
-                document.getElementById('page-test-center').classList.contains('active');
+                document.getElementById('page-test-center')!.classList.contains('active');
             if (onPage) _renderLogs();
             _renderNavBadge();
         }, 200);
@@ -197,7 +203,7 @@ import {
     function _renderNavBadge() {
         const badge = document.getElementById('nav-test-badge');
         if (!badge) return;
-        const errCount = (window._pearnlyTcLogs || []).filter(function (e) {
+        const errCount = ((window._pearnlyTcLogs as TcLog[]) || []).filter(function (e) {
             return (
                 e.type === 'js_error' ||
                 e.type === 'promise_error' ||
@@ -231,12 +237,12 @@ import {
                     _toast(_t('tc-toast-health-ok', '后端健康 ✓ {ms}ms', { ms: ms }), 'success');
                 else
                     _toast(
-                        _t('tc-toast-health-fail', '后端无响应') + ' (' + r.status + ')',
+                        (_t as TcT)('tc-toast-health-fail', '后端无响应') + ' (' + r.status + ')',
                         'error'
                     );
             })
             .catch(function () {
-                _toast(_t('tc-toast-health-fail', '后端无响应'), 'error');
+                _toast((_t as TcT)('tc-toast-health-fail', '后端无响应'), 'error');
             });
     }
     function _toolClearSession() {
@@ -251,7 +257,7 @@ import {
             }
         } catch (_) {}
         _rerenderAll();
-        _toast(_t('tc-toast-cleared', 'session 状态已清空'), 'success');
+        _toast((_t as TcT)('tc-toast-cleared', 'session 状态已清空'), 'success');
     }
     function _toolReloadClients() {
         try {
@@ -292,14 +298,15 @@ import {
         const cl = document.getElementById('tc-checklist-body');
         if (cl) {
             cl.addEventListener('click', function (e) {
-                const btn = e.target.closest('.tc-status-btn');
+                const btn = (e.target as HTMLElement).closest('.tc-status-btn');
                 if (!btn) return;
                 const id = btn.getAttribute('data-id');
                 const kind = btn.getAttribute('data-kind');
                 if (!id || !kind) return;
                 // 同状态再点 = 取消
-                if (S.results[id] === kind) delete S.results[id];
-                else S.results[id] = kind;
+                if ((S.results as Record<string, string>)[id] === kind)
+                    delete (S.results as Record<string, string>)[id];
+                else (S.results as Record<string, string>)[id] = kind;
                 _saveResults();
                 _renderChecklist();
                 _renderStatusBar();
@@ -343,7 +350,7 @@ import {
         const flt = document.getElementById('tc-logs-filter');
         if (flt)
             flt.addEventListener('click', function (e) {
-                const c = e.target.closest('.tc-filter-chip');
+                const c = (e.target as HTMLElement).closest('.tc-filter-chip');
                 if (!c) return;
                 S.logFilter = c.getAttribute('data-filter') || 'all';
                 _renderLogs();
@@ -353,7 +360,7 @@ import {
         const lb = document.getElementById('tc-logs-body');
         if (lb)
             lb.addEventListener('click', function (e) {
-                const it = e.target.closest('.tc-log-item');
+                const it = (e.target as HTMLElement).closest('.tc-log-item');
                 if (!it) return;
                 it.classList.toggle('expanded');
             });
@@ -398,7 +405,7 @@ import {
             const onPage =
                 currentRoute === 'test-center' &&
                 document.getElementById('page-test-center') &&
-                document.getElementById('page-test-center').classList.contains('active');
+                document.getElementById('page-test-center')!.classList.contains('active');
             if (onPage) _rerenderAll();
         });
     }

@@ -6,11 +6,30 @@
 /* global escapeHtml */
 /* eslint-disable no-useless-assignment -- verbatim exceptions.js · 非 bug */
 import { _erpExcState, _erpExcFriendly, _erpExcRetry, _erpExcTok } from './erp-exceptions.js';
+
+type ExcItem = {
+    id: string | number;
+    push_type?: string;
+    history_client_id?: string | number;
+    category?: string;
+    history_id?: string | number;
+    endpoint_id?: string | number;
+    endpoint_adapter?: string;
+    state?: string;
+    error_code?: string;
+    invoice_no?: string;
+    seller_name?: string;
+    id_card_tail?: string;
+    ocr_buyer_name?: string;
+    client_name?: string;
+};
+type ExcCust = { code?: string; name?: string };
+type ExcProduct = { code?: string; name?: string };
 // ── 单条异常编辑弹窗(Zihao 2026-05-26 · 闭环最后一环:选/绑 ERP 客户 + 重试)──
 // 通用:ERP 客户列表走 /endpoints/{id}/customers(adapter 通用接口)· 绑定走
 // /mappings/clients(通用 client_id→erp_code)· 重试走同一 /retry(重新解析)。
 // 不写死 MR.ERP:erp_type=endpoint_adapter · 仅"客户不符"且有买方 client 时显 picker。
-let _erpExcCustCache = {}; // endpoint_id → [{code,name,...}]
+let _erpExcCustCache: Record<string, ExcCust[]> = {}; // endpoint_id → [{code,name,...}]
 
 function _erpExcCloseModal() {
     const ov = document.getElementById('erp-exc-modal');
@@ -18,7 +37,9 @@ function _erpExcCloseModal() {
 }
 
 window._erpExcOpenEdit = function (id) {
-    const it = (_erpExcState.items || []).find((x) => String(x.id) === String(id));
+    const it = ((_erpExcState.items as ExcItem[] | undefined) || []).find(
+        (x: ExcItem) => String(x.id) === String(id)
+    ) as ExcItem | undefined;
     if (!it) return;
     // DMS 闭环修正(Zihao 2026-06-01)· 身份证订车弹窗按 DMS 标签(订车单号/客户·无买方/无ERP客户)·
     // 不裸露 ERR_* 码(友好原因已在上方显示)。
@@ -27,10 +48,10 @@ window._erpExcOpenEdit = function (id) {
     // 商品不符 picker(对称客户 picker · Zihao 2026-05-26)· 通用 adapter · 不写死 MR.ERP。
     const canPickProduct =
         it.category === 'product_mismatch' && !!it.history_id && !!it.endpoint_id;
-    const reason = _erpExcFriendly(it);
+    const reason = _erpExcFriendly(it as any);
     const stateCls =
         it.state === 'needs_action' ? 'needs' : it.state === 'retrying' ? 'retry' : 'fail';
-    const dRow = (lbl, val) =>
+    const dRow = (lbl: string, val?: string) =>
         `<div class="erp-exc-m-row"><span class="erp-exc-m-k">${escapeHtml(lbl)}</span><span class="erp-exc-m-v">${escapeHtml(val || '—')}</span></div>`;
 
     let fixHtml = '';
@@ -94,11 +115,11 @@ window._erpExcOpenEdit = function (id) {
     ov.addEventListener('click', (e) => {
         if (e.target === ov) _erpExcCloseModal();
     });
-    document.getElementById('erp-exc-m-close').addEventListener('click', _erpExcCloseModal);
-    document.getElementById('erp-exc-m-cancel').addEventListener('click', _erpExcCloseModal);
-    document.getElementById('erp-exc-m-retry').addEventListener('click', () => {
+    document.getElementById('erp-exc-m-close')!.addEventListener('click', _erpExcCloseModal);
+    document.getElementById('erp-exc-m-cancel')!.addEventListener('click', _erpExcCloseModal);
+    document.getElementById('erp-exc-m-retry')!.addEventListener('click', () => {
         _erpExcCloseModal();
-        _erpExcRetry(it.id, null);
+        _erpExcRetry(it.id as string, null);
     });
 
     if (canPickCustomer) {
@@ -107,43 +128,43 @@ window._erpExcOpenEdit = function (id) {
         const listEl = document.getElementById('erp-exc-m-custlist');
         const searchEl = document.getElementById('erp-exc-m-search');
 
-        const renderCustList = (custs, filter) => {
+        const renderCustList = (custs: ExcCust[], filter?: string) => {
             const q = (filter || '').trim().toLowerCase();
             const shown = q
                 ? custs.filter(
-                      (c) =>
+                      (c: ExcCust) =>
                           (c.code || '').toLowerCase().includes(q) ||
                           (c.name || '').toLowerCase().includes(q)
                   )
                 : custs;
             if (shown.length === 0) {
-                listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-pick-empty'))}</div>`;
+                listEl!.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-pick-empty'))}</div>`;
                 return;
             }
-            listEl.innerHTML = shown
+            listEl!.innerHTML = shown
                 .slice(0, 100)
                 .map(
-                    (c) =>
+                    (c: ExcCust) =>
                         `<div class="erp-exc-m-cust" data-cust-code="${escapeHtml(c.code || '')}">
                     <span class="erp-exc-m-cust-name">${escapeHtml(c.name || '')}</span>
                     <span class="erp-exc-m-cust-code">${escapeHtml(c.code || '')}</span>
                 </div>`
                 )
                 .join('');
-            listEl.querySelectorAll('.erp-exc-m-cust').forEach((el) => {
+            listEl!.querySelectorAll('.erp-exc-m-cust').forEach((el) => {
                 el.addEventListener('click', () => {
-                    _selectedCode = el.dataset.custCode || '';
-                    listEl
+                    _selectedCode = (el as HTMLElement).dataset.custCode || '';
+                    listEl!
                         .querySelectorAll('.erp-exc-m-cust')
                         .forEach((x) => x.classList.remove('sel'));
                     el.classList.add('sel');
-                    if (bindBtn) bindBtn.disabled = !_selectedCode;
+                    if (bindBtn) (bindBtn as HTMLButtonElement).disabled = !_selectedCode;
                 });
             });
         };
 
         const loadCusts = async () => {
-            const epId = it.endpoint_id;
+            const epId = it.endpoint_id as string;
             if (_erpExcCustCache[epId]) {
                 renderCustList(_erpExcCustCache[epId], '');
                 return;
@@ -157,26 +178,29 @@ window._erpExcOpenEdit = function (id) {
                 );
                 const data = await resp.json().catch(() => ({}));
                 if (!resp.ok || !data.ok) {
-                    listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-pick-fail'))}</div>`;
+                    listEl!.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-pick-fail'))}</div>`;
                     return;
                 }
                 const custs = data.customers || [];
                 _erpExcCustCache[epId] = custs;
                 renderCustList(custs, '');
             } catch (e) {
-                listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-pick-fail'))}</div>`;
+                listEl!.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-pick-fail'))}</div>`;
             }
         };
         if (searchEl)
             searchEl.addEventListener('input', () =>
-                renderCustList(_erpExcCustCache[it.endpoint_id] || [], searchEl.value)
+                renderCustList(
+                    _erpExcCustCache[it.endpoint_id as string] || [],
+                    (searchEl as HTMLInputElement).value
+                )
             );
         loadCusts();
 
         if (bindBtn)
             bindBtn.addEventListener('click', async () => {
                 if (!_selectedCode) return;
-                bindBtn.disabled = true;
+                (bindBtn as HTMLButtonElement).disabled = true;
                 bindBtn.textContent = t('erp-exc-retrying');
                 try {
                     // 1) 绑定买方 client → ERP 客户码(通用 client mapping)
@@ -194,17 +218,17 @@ window._erpExcOpenEdit = function (id) {
                     });
                     if (!mResp.ok) {
                         showToast(t('erp-exc-retry-fail'), 'error');
-                        bindBtn.disabled = false;
+                        (bindBtn as HTMLButtonElement).disabled = false;
                         bindBtn.textContent = t('erp-exc-edit-bind-retry');
                         return;
                     }
                     showToast(t('erp-exc-edit-bound-ok'), 'success');
                     _erpExcCloseModal();
                     // 2) 重试(重新解析 → 用上新映射 → 推送)
-                    await _erpExcRetry(it.id, null);
+                    await _erpExcRetry(it.id as string, null);
                 } catch (e) {
                     showToast(t('erp-exc-retry-fail'), 'error');
-                    bindBtn.disabled = false;
+                    (bindBtn as HTMLButtonElement).disabled = false;
                     bindBtn.textContent = t('erp-exc-edit-bind-retry');
                 }
             });
@@ -216,8 +240,8 @@ window._erpExcOpenEdit = function (id) {
     if (canPickProduct) {
         const bindBtn = document.getElementById('erp-exc-m-bind-prod');
         const listEl = document.getElementById('erp-exc-m-prodlist');
-        const sel = {}; // item_name → {code, name}
-        let _products = [];
+        const sel: Record<string, { code: string; name: string }> = {}; // item_name → {code, name}
+        let _products: ExcProduct[] = [];
 
         const optionsHtml = () =>
             '<option value="">' +
@@ -226,48 +250,54 @@ window._erpExcOpenEdit = function (id) {
             _products
                 .slice(0, 500)
                 .map(
-                    (p) =>
+                    (p: ExcProduct) =>
                         `<option value="${escapeHtml(p.code || '')}" data-pname="${escapeHtml(p.name || '')}">` +
                         escapeHtml((p.name || '') + ' · ' + (p.code || '')) +
                         '</option>'
                 )
                 .join('');
 
-        const renderItems = (names) => {
+        const renderItems = (names: string[]) => {
             if (!names.length) {
-                listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-prod-noitems'))}</div>`;
+                listEl!.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-prod-noitems'))}</div>`;
                 return;
             }
-            listEl.innerHTML = names
+            listEl!.innerHTML = names
                 .map(
-                    (nm) =>
+                    (nm: string) =>
                         `<div class="erp-exc-m-cust" style="cursor:default">
                     <span class="erp-exc-m-cust-name" title="${escapeHtml(nm)}">${escapeHtml(nm)}</span>
                     <select class="erp-exc-m-prod-sel" data-item="${escapeHtml(nm)}" style="max-width:55%;flex:0 0 auto;padding:4px 6px;border:1px solid var(--border,#e5e7eb);border-radius:6px;font-size:12px">${optionsHtml()}</select>
                 </div>`
                 )
                 .join('');
-            listEl.querySelectorAll('.erp-exc-m-prod-sel').forEach((s) => {
+            listEl!.querySelectorAll('.erp-exc-m-prod-sel').forEach((s) => {
                 s.addEventListener('change', () => {
-                    const nm = s.dataset.item;
-                    const opt = s.options[s.selectedIndex];
-                    if (s.value)
-                        sel[nm] = { code: s.value, name: opt ? opt.dataset.pname || '' : '' };
+                    const nm = (s as HTMLSelectElement).dataset.item as string;
+                    const opt = (s as HTMLSelectElement).options[
+                        (s as HTMLSelectElement).selectedIndex
+                    ];
+                    if ((s as HTMLSelectElement).value)
+                        sel[nm] = {
+                            code: (s as HTMLSelectElement).value,
+                            name: opt ? opt.dataset.pname || '' : '',
+                        };
                     else delete sel[nm];
-                    if (bindBtn) bindBtn.disabled = Object.keys(sel).length === 0;
+                    if (bindBtn)
+                        (bindBtn as HTMLButtonElement).disabled = Object.keys(sel).length === 0;
                 });
             });
         };
 
         const loadAll = async () => {
             try {
-                const hResp = await fetch('/api/history/' + encodeURIComponent(it.history_id), {
+                const hResp = await fetch('/api/history/' + encodeURIComponent(it.history_id!), {
                     headers: { Authorization: 'Bearer ' + _erpExcTok() },
                 });
                 const hData = await hResp.json().catch(() => ({}));
                 const pages = (hData && hData.pages) || [];
-                const names = [];
-                const seen = {};
+                const names: string[] = [];
+                const seen: Record<string, number> = {};
                 (Array.isArray(pages) ? pages : []).forEach((pg) => {
                     const items = (pg && pg.fields && pg.fields.items) || [];
                     (Array.isArray(items) ? items : []).forEach((li) => {
@@ -279,20 +309,20 @@ window._erpExcOpenEdit = function (id) {
                     });
                 });
                 const pResp = await fetch(
-                    '/api/erp/endpoints/' + encodeURIComponent(it.endpoint_id) + '/products',
+                    '/api/erp/endpoints/' + encodeURIComponent(it.endpoint_id!) + '/products',
                     {
                         headers: { Authorization: 'Bearer ' + _erpExcTok() },
                     }
                 );
                 const pData = await pResp.json().catch(() => ({}));
                 if (!pResp.ok || !pData.ok) {
-                    listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-prod-fail'))}</div>`;
+                    listEl!.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-prod-fail'))}</div>`;
                     return;
                 }
                 _products = pData.products || [];
                 renderItems(names);
             } catch (e) {
-                listEl.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-prod-fail'))}</div>`;
+                listEl!.innerHTML = `<div class="erp-exc-m-empty">${escapeHtml(t('erp-exc-edit-prod-fail'))}</div>`;
             }
         };
         loadAll();
@@ -301,7 +331,7 @@ window._erpExcOpenEdit = function (id) {
             bindBtn.addEventListener('click', async () => {
                 const entries = Object.entries(sel);
                 if (!entries.length) return;
-                bindBtn.disabled = true;
+                (bindBtn as HTMLButtonElement).disabled = true;
                 bindBtn.textContent = t('erp-exc-retrying');
                 try {
                     for (const [itemName, v] of entries) {
@@ -320,17 +350,17 @@ window._erpExcOpenEdit = function (id) {
                         });
                         if (!mResp.ok) {
                             showToast(t('erp-exc-retry-fail'), 'error');
-                            bindBtn.disabled = false;
+                            (bindBtn as HTMLButtonElement).disabled = false;
                             bindBtn.textContent = t('erp-exc-edit-bind-prod-retry');
                             return;
                         }
                     }
                     showToast(t('erp-exc-edit-prod-bound-ok'), 'success');
                     _erpExcCloseModal();
-                    await _erpExcRetry(it.id, null);
+                    await _erpExcRetry(it.id as string, null);
                 } catch (e) {
                     showToast(t('erp-exc-retry-fail'), 'error');
-                    bindBtn.disabled = false;
+                    (bindBtn as HTMLButtonElement).disabled = false;
                     bindBtn.textContent = t('erp-exc-edit-bind-prod-retry');
                 }
             });

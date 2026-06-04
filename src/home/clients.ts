@@ -50,7 +50,7 @@ window.bindDrawerClient = function (history_id, current_client_id) {
     const sel = document.getElementById('drawer-client-select');
     if (!sel) return;
     refreshDrawerClientSelect();
-    sel.value = current_client_id ? String(current_client_id) : '';
+    (sel as HTMLSelectElement).value = current_client_id ? String(current_client_id) : '';
     if (!history_id) {
         // 没 history_id · 只填充选项 · 不绑 onchange · 用户选了也没用(史无 PK)
         sel.onchange = null;
@@ -59,7 +59,9 @@ window.bindDrawerClient = function (history_id, current_client_id) {
         return;
     }
     sel.onchange = async () => {
-        const newCid = sel.value ? parseInt(sel.value, 10) : null;
+        const newCid = (sel as HTMLSelectElement).value
+            ? parseInt((sel as HTMLSelectElement).value, 10)
+            : null;
         try {
             await apiClient(`/api/history/${history_id}/assign_client`, {
                 method: 'POST',
@@ -74,7 +76,7 @@ window.bindDrawerClient = function (history_id, current_client_id) {
             console.error(e);
             showToast(t('client-msg-save-fail'), 'fail');
             // 回滚
-            sel.value = current_client_id ? String(current_client_id) : '';
+            (sel as HTMLSelectElement).value = current_client_id ? String(current_client_id) : '';
         }
     };
     // 「+」快捷新建
@@ -122,8 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabBar = document.querySelector('.cust-tab-bar');
     if (tabBar) {
         tabBar.addEventListener('click', (e) => {
-            const b = e.target.closest('[data-cust-tab]');
-            if (b) switchCustTab(b.dataset.custTab);
+            const b = (e.target as HTMLElement).closest('[data-cust-tab]') as HTMLElement | null;
+            if (b) switchCustTab(b.dataset.custTab!);
         });
     }
 
@@ -134,32 +136,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const buyerTbody = document.getElementById('buyer-tbody');
     if (buyerTbody) {
         buyerTbody.addEventListener('click', (e) => {
-            const cb = e.target.closest('.buyer-row-check');
+            const cb = (e.target as HTMLElement).closest(
+                '.buyer-row-check'
+            ) as HTMLInputElement | null;
             if (cb) {
-                const cid = parseInt(cb.dataset.cid, 10);
-                if (cb.checked) _buyerSelected.add(cid);
-                else _buyerSelected.delete(cid);
+                const cid = parseInt(cb.dataset.cid as string, 10);
+                if (cb.checked) _buyerSelected.add(cid as unknown as string);
+                else _buyerSelected.delete(cid as unknown as string);
                 const row = cb.closest('.cust-row');
                 if (row) row.classList.toggle('selected', cb.checked);
                 _updateBuyerBatchBar();
                 return;
             }
-            const btn = e.target.closest('.cust-row-btn');
+            const btn = (e.target as HTMLElement).closest('.cust-row-btn') as HTMLElement | null;
             if (btn) {
                 e.stopPropagation();
-                const cid = parseInt(btn.dataset.cid, 10);
+                const cid = parseInt(btn.dataset.cid as string, 10);
                 if (btn.dataset.action === 'edit') {
-                    const c = S.clients.find((x) => x.id === cid);
-                    if (c) openClientModal(c);
+                    const c = S.clients.find((x: any) => x.id === cid);
+                    if (c) openClientModal(c as any);
                 } else if (btn.dataset.action === 'export') {
-                    exportClient(cid);
+                    exportClient(cid as unknown as string);
                 }
                 return;
             }
-            const row = e.target.closest('.cust-row');
-            if (row && !e.target.closest('.cust-cell-check')) {
-                const c = S.clients.find((x) => x.id === parseInt(row.dataset.cid, 10));
-                if (c) openClientModal(c);
+            const row = (e.target as HTMLElement).closest('.cust-row') as HTMLElement | null;
+            if (row && !(e.target as HTMLElement).closest('.cust-cell-check')) {
+                const c = S.clients.find(
+                    (x: any) => x.id === parseInt(row.dataset.cid as string, 10)
+                );
+                if (c) openClientModal(c as any);
             }
         });
     }
@@ -167,8 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (buyerCheckAll) {
         buyerCheckAll.addEventListener('change', () => {
             const { items } = _buyerPageItems();
-            items.forEach((c) => {
-                if (buyerCheckAll.checked) _buyerSelected.add(c.id);
+            items.forEach((c: any) => {
+                if ((buyerCheckAll as HTMLInputElement).checked) _buyerSelected.add(c.id);
                 else _buyerSelected.delete(c.id);
             });
             renderBuyerList();
@@ -194,14 +200,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     const buyerSearch = document.getElementById('buyer-search');
     if (buyerSearch) {
-        let dq;
+        let dq: ReturnType<typeof setTimeout>;
         buyerSearch.addEventListener('input', () => {
             clearTimeout(dq);
             dq = setTimeout(() => {
-                _buyerState.keyword = buyerSearch.value;
+                _buyerState.keyword = (buyerSearch as HTMLInputElement).value;
                 _buyerState.page = 0;
                 const cl = document.getElementById('buyer-search-clear');
-                if (cl) cl.style.display = buyerSearch.value ? '' : 'none';
+                if (cl) cl.style.display = (buyerSearch as HTMLInputElement).value ? '' : 'none';
                 renderBuyerList();
             }, 200);
         });
@@ -210,10 +216,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (buyerSearchClear)
         buyerSearchClear.addEventListener('click', () => {
             const s = document.getElementById('buyer-search');
-            if (s) s.value = '';
+            if (s) (s as HTMLInputElement).value = '';
             _buyerState.keyword = '';
             _buyerState.page = 0;
-            buyerSearchClear.style.display = 'none';
+            (buyerSearchClear as HTMLElement).style.display = 'none';
             renderBuyerList();
         });
 
@@ -223,12 +229,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const sellerTbody = document.getElementById('seller-tbody');
     if (sellerTbody) {
         sellerTbody.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-saction]');
+            const btn = (e.target as HTMLElement).closest('[data-saction]') as HTMLElement | null;
             if (!btn) return;
             e.stopPropagation();
-            const wid = parseInt(btn.dataset.wid, 10);
+            const wid = parseInt(btn.dataset.wid as string, 10);
             const act = btn.dataset.saction;
-            const ws = S.sellerClients.find((x) => Number(x.id) === wid);
+            const ws = S.sellerClients.find((x: any) => Number(x.id) === wid) as any;
             if (act === 'activate') {
                 if (typeof window.setActiveWorkspaceClientId === 'function')
                     window.setActiveWorkspaceClientId(wid);
@@ -239,20 +245,20 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (act === 'edit') {
                 if (ws) openWsClientModal(ws);
             } else if (act === 'archive') {
-                S.editingWsClientId = wid;
+                S.editingWsClientId = wid as unknown as string;
                 archiveWsClient();
             }
         });
     }
     const sellerSearch = document.getElementById('seller-search');
     if (sellerSearch) {
-        let dq2;
+        let dq2: ReturnType<typeof setTimeout>;
         sellerSearch.addEventListener('input', () => {
             clearTimeout(dq2);
             dq2 = setTimeout(() => {
-                _sellerState.keyword = sellerSearch.value;
+                _sellerState.keyword = (sellerSearch as HTMLInputElement).value;
                 const cl = document.getElementById('seller-search-clear');
-                if (cl) cl.style.display = sellerSearch.value ? '' : 'none';
+                if (cl) cl.style.display = (sellerSearch as HTMLInputElement).value ? '' : 'none';
                 renderSellerList();
             }, 200);
         });
@@ -261,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sellerSearchClear)
         sellerSearchClear.addEventListener('click', () => {
             const s = document.getElementById('seller-search');
-            if (s) s.value = '';
+            if (s) (s as HTMLInputElement).value = '';
             _sellerState.keyword = '';
             sellerSearchClear.style.display = 'none';
             renderSellerList();
@@ -301,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const picker = document.getElementById('client-color-picker');
     if (picker) {
         picker.addEventListener('click', (e) => {
-            const sw = e.target.closest('.color-swatch');
+            const sw = (e.target as HTMLElement).closest('.color-swatch');
             if (!sw) return;
             picker.querySelectorAll('.color-swatch').forEach((s) => s.classList.remove('active'));
             sw.classList.add('active');
@@ -312,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const histFilter = document.getElementById('history-client-filter');
     if (histFilter) {
         histFilter.addEventListener('change', () => {
-            S.historyClientFilter = histFilter.value;
+            S.historyClientFilter = (histFilter as HTMLSelectElement).value;
             if (typeof renderHistoryList === 'function') renderHistoryList();
         });
     }

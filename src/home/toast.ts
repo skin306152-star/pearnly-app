@@ -62,7 +62,7 @@ function _humanizeBackendError(detail: unknown, fallback?: string) {
         if ((detail as BackendErr).message) return (detail as BackendErr).message;
         if ((detail as BackendErr).error) return (detail as BackendErr).error;
         if ((detail as BackendErr).detail && typeof (detail as BackendErr).detail === 'string')
-            return (detail as BackendErr).detail;
+            return (detail as BackendErr).detail as string;
         try {
             return JSON.stringify(detail).slice(0, 160);
         } catch (_) {

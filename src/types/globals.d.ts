@@ -71,13 +71,20 @@ interface HistoryState {
 declare var _historyState: HistoryState;
 // eslint-disable-next-line no-var
 declare var _historySelected: Set<unknown>;
+/** Plan/quota payload + i18n table reachable as bare names (mirror window props). */
+// eslint-disable-next-line no-var
+declare var _quota: Record<string, unknown> | null;
+// eslint-disable-next-line no-var
+declare var I18N: Record<string, Record<string, string>>;
+/** Open the OCR results drawer at a queue index (ocr-results module). */
+declare function openDrawer(idx: number): void;
 /** ERP page loaders (home.js / erp modules), reachable as bare names. */
 declare function loadErpLogs(silent?: boolean): Promise<void>;
 declare function loadErpTodayStats(): Promise<void>;
 declare function loadErpEndpoints(): Promise<void>;
 declare function loadTeamList(): Promise<void>;
 /** OCR upload helpers (home.js core). */
-declare function handleCameraImages(imageFiles: File[], source?: string): Promise<void>;
+declare function handleCameraImages(imageFiles: File[], source: string): Promise<void>;
 declare function getMaxFiles(): number;
 /** ERP endpoints cache as a bare lexical global (mirrors window._erpEndpoints). */
 // eslint-disable-next-line no-var
@@ -245,6 +252,28 @@ interface Window {
     _historyState?: HistoryState;
     _historySelected?: Set<unknown>;
     _drawerAlreadyPushed?: boolean;
+    // ── C5 批11 桥(clients/recon/test-center/erp-exc/notifications/layout 遗留边界)──
+    _refreshClientSwitcher?: () => void;
+    ReconMapping?: { show: (...args: any[]) => void; [key: string]: unknown };
+    ReconReview?: { show: (...args: any[]) => void; [key: string]: unknown };
+    bindDrawerClient?: (...args: any[]) => any;
+    _planState?: Record<string, unknown> | null;
+    _erpExcOpenEdit?: (...args: any[]) => any;
+    _brv2LoadHistory?: () => void;
+    setActiveWorkspaceClientId?: (...args: any[]) => any;
+    openClientExportModal?: (...args: any[]) => any;
+    loadRecentTasks?: () => void;
+    _rerenderReconcile?: () => void;
+    __reconcileBound?: boolean;
+    setCurrentClientId?: (...args: any[]) => any;
+    loadTestCenterPage?: () => void;
+    loadClientsPage?: () => void;
+    getHistoryClientFilter?: () => unknown;
+    fillCategoryDatalist?: () => void;
+    _tcApplyVisibility?: () => void;
+    _rerenderNotifications?: () => void;
+    _loadBankReconV2Panel?: (...args: any[]) => any;
+    PEARNLY_ADMIN_MODE?: boolean;
 }
 
 // navigator.userAgentData (UA-CH) is not yet in the DOM lib; chrome-banner reads it.

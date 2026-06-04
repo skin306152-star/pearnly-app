@@ -78,6 +78,18 @@ declare var _quota: Record<string, unknown> | null;
 declare var I18N: Record<string, Record<string, string>>;
 /** Open the OCR results drawer at a queue index (ocr-results module). */
 declare function openDrawer(idx: number): void;
+/** Sort/search lexical globals (home.js state.js), reachable bare or via window. */
+// eslint-disable-next-line no-var
+declare var _sortKey: string | null;
+// eslint-disable-next-line no-var
+declare var _sortDir: string;
+// eslint-disable-next-line no-var
+declare var _searchKeyword: string;
+/** Bare-callable legacy bridges (also exposed on window by their modules). */
+declare function openSettingsModal(): void;
+declare function openReportModal(...args: any[]): any;
+declare function renderAvatarMenu(...args: any[]): any;
+declare function applyRoleVisibility(...args: any[]): any;
 /** ERP page loaders (home.js / erp modules), reachable as bare names. */
 declare function loadErpLogs(silent?: boolean): Promise<void>;
 declare function loadErpTodayStats(): Promise<void>;
@@ -86,9 +98,6 @@ declare function loadTeamList(): Promise<void>;
 /** OCR upload helpers (home.js core). */
 declare function handleCameraImages(imageFiles: File[], source: string): Promise<void>;
 declare function getMaxFiles(): number;
-/** ERP endpoints cache as a bare lexical global (mirrors window._erpEndpoints). */
-// eslint-disable-next-line no-var
-declare var _erpEndpoints: Array<{ id?: unknown; [key: string]: unknown }>;
 /** One OCR result row in the results drawer. Dynamic field bags are kept as
  *  Record; the index signature covers the many per-stage extras. */
 interface OcrResult {
@@ -186,7 +195,6 @@ interface Window {
     // settings + reconcile subtab bridges
     _pearnlyGeneral?: { tz: string; date_format: string; number_format: string };
     _bankReconV2Init?: () => void;
-    openSettingsModal?: () => void;
     closeSettingsModal?: () => void;
     // big-batch progress hooks
     _bigBatchStart?: (files?: unknown) => void;
@@ -243,9 +251,6 @@ interface Window {
     _fillVexDetail?: (...args: any[]) => any;
     retryPushLog?: (...args: any[]) => any;
     _vexLastTask?: Record<string, unknown> | null;
-    _sortKey?: string | null;
-    _sortDir?: string;
-    _searchKeyword?: string;
     _quota?: Record<string, unknown> | null;
     _pearnlyTcPush?: (...args: any[]) => any;
     _pearnlyTcLogs?: unknown[];
@@ -274,6 +279,31 @@ interface Window {
     _rerenderNotifications?: () => void;
     _loadBankReconV2Panel?: (...args: any[]) => any;
     PEARNLY_ADMIN_MODE?: boolean;
+    // ── C5 批12 桥(ocr/folder/erp/billing/avatar/workspace/archive/email 遗留边界)──
+    _ocrCtrls?: Set<AbortController>;
+    _ocrAborted?: boolean;
+    _pearnlyFolderUnloadAttached?: boolean;
+    _erpLogPollTimer?: ReturnType<typeof setTimeout> | null;
+    __langSyncTimer?: ReturnType<typeof setTimeout> | null;
+    __langSyncCtrl?: AbortController | null;
+    showDirectoryPicker?: (opts?: { mode?: string; startIn?: string }) => Promise<any>;
+    closeCmdk?: () => void;
+    openCmdk?: (...args: any[]) => any;
+    _closeAvatarPopup?: () => void;
+    openWorkspaceChooserUI?: (...args: any[]) => any;
+    openWorkspaceChooser?: (...args: any[]) => any;
+    requireWorkspace?: (...args: any[]) => any;
+    fetchWorkspaceClients?: (...args: any[]) => any;
+    getWorkMode?: () => unknown;
+    _rerenderEmailIngest?: () => void;
+    _rerenderArchiveAll?: () => void;
+    loadArchiveSettings?: () => void;
+    _refreshBalanceAlerts?: (...args: any[]) => any;
+    _startCreditsPoll?: () => void;
+    _stopCreditsPoll?: () => void;
+    _openTopupModal?: (...args: any[]) => any;
+    _userInfoForAdmin?: AppUser | null;
+    PEARNLY_ADMIN_LAYOUT?: boolean;
 }
 
 // navigator.userAgentData (UA-CH) is not yet in the DOM lib; chrome-banner reads it.

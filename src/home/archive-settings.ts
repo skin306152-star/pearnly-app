@@ -10,7 +10,14 @@
 // v0.10 · 设置页 tab + 归档命名规则编辑器
 // ============================================================
 (function () {
-    let _archiveTemplate = [];
+    type ArchiveTokenAS = {
+        type: string;
+        format?: string;
+        short?: boolean;
+        with_currency?: boolean;
+        val?: string;
+    };
+    let _archiveTemplate: ArchiveTokenAS[] = [];
     let _archiveFolderStrategy = 'by_month_seller';
     let _archiveEditingIdx = -1;
     let _archiveReadOnly = false;
@@ -40,7 +47,7 @@
     // 预览用的示例数据(category 按语言切换)· v0.10
     function getSampleCategory() {
         const map = { zh: '运费', en: 'Shipping', th: 'ค่าขนส่ง', ja: '送料' };
-        return map[currentLang] || 'Shipping';
+        return map[currentLang as keyof typeof map] || 'Shipping';
     }
     function getSampleSellerName() {
         return 'DHL Express (Thailand) Co., Ltd.';
@@ -104,8 +111,8 @@
         }
         canvas.innerHTML = _archiveTemplate
             .map((tok, idx) => {
-                const meta = FIELD_META[tok.type] || { label: tok.type };
-                const icon = ICONS[tok.type] || '';
+                const meta = FIELD_META[tok.type as keyof typeof FIELD_META] || { label: tok.type };
+                const icon = ICONS[tok.type as keyof typeof ICONS] || '';
                 const label =
                     tok.type === 'sep'
                         ? `"${escapeHtml(tok.val || '_')}"`
@@ -129,8 +136,8 @@
         const fields = ['date', 'seller', 'category', 'amount', 'invoice', 'buyer', 'sep'];
         p.innerHTML = fields
             .map((type) => {
-                const meta = FIELD_META[type];
-                const icon = ICONS[type] || '';
+                const meta = FIELD_META[type as keyof typeof FIELD_META];
+                const icon = ICONS[type as keyof typeof ICONS] || '';
                 return `
                 <button class="archive-palette-btn ${type}" data-add-field="${type}" ${_archiveReadOnly ? 'disabled' : ''}>
                     <span class="token-icon">${icon}</span>
@@ -144,8 +151,9 @@
     // ====== 文件夹策略 radio ======
     function renderArchiveFolderStrategy() {
         document.querySelectorAll('input[name="folder-strategy"]').forEach((r) => {
-            r.checked = r.value === _archiveFolderStrategy;
-            r.disabled = _archiveReadOnly;
+            (r as HTMLInputElement).checked =
+                (r as HTMLInputElement).value === _archiveFolderStrategy;
+            (r as HTMLInputElement).disabled = _archiveReadOnly;
         });
     }
 
@@ -187,23 +195,23 @@
     // ====== 拖拽排序 ======
     let _dragFromIdx = -1;
     document.addEventListener('dragstart', (e) => {
-        const tok = e.target.closest('.archive-token');
+        const tok = (e.target as HTMLElement).closest('.archive-token') as HTMLElement | null;
         if (!tok || _archiveReadOnly) return;
-        _dragFromIdx = parseInt(tok.dataset.tokenIdx, 10);
+        _dragFromIdx = parseInt(tok.dataset.tokenIdx!, 10);
         tok.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer!.effectAllowed = 'move';
     });
-    document.addEventListener('dragend', (e) => {
+    document.addEventListener('dragend', (_e) => {
         document
             .querySelectorAll('.archive-token')
             .forEach((t) => t.classList.remove('dragging', 'drop-target'));
         _dragFromIdx = -1;
     });
     document.addEventListener('dragover', (e) => {
-        const tok = e.target.closest('.archive-token');
+        const tok = (e.target as HTMLElement).closest('.archive-token');
         if (tok) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
+            e.dataTransfer!.dropEffect = 'move';
             document
                 .querySelectorAll('.archive-token')
                 .forEach((t) => t.classList.remove('drop-target'));
@@ -211,10 +219,10 @@
         }
     });
     document.addEventListener('drop', (e) => {
-        const tok = e.target.closest('.archive-token');
+        const tok = (e.target as HTMLElement).closest('.archive-token') as HTMLElement | null;
         if (!tok || _dragFromIdx < 0 || _archiveReadOnly) return;
         e.preventDefault();
-        const toIdx = parseInt(tok.dataset.tokenIdx, 10);
+        const toIdx = parseInt(tok.dataset.tokenIdx!, 10);
         if (toIdx === _dragFromIdx) return;
         const moved = _archiveTemplate.splice(_dragFromIdx, 1)[0];
         _archiveTemplate.splice(toIdx, 0, moved);
@@ -228,8 +236,8 @@
         // v117 · 归档 modal 打开 / 关闭
         // v118.19.1 · 触发源:旧识别中心顶部按钮 #btn-open-archive-rule(已移除 · 兼容)+ 新设置页按钮 #btn-open-archive-rule-from-settings
         if (
-            e.target.closest('#btn-open-archive-rule') ||
-            e.target.closest('#btn-open-archive-rule-from-settings')
+            (e.target as HTMLElement).closest('#btn-open-archive-rule') ||
+            (e.target as HTMLElement).closest('#btn-open-archive-rule-from-settings')
         ) {
             const modal = document.getElementById('archive-rule-modal');
             if (modal) {
@@ -239,14 +247,17 @@
             }
             return;
         }
-        if (e.target.closest('#archive-rule-modal-close') || e.target.id === 'archive-rule-modal') {
+        if (
+            (e.target as HTMLElement).closest('#archive-rule-modal-close') ||
+            (e.target as HTMLElement).id === 'archive-rule-modal'
+        ) {
             const modal = document.getElementById('archive-rule-modal');
             if (modal) modal.style.display = 'none';
             return;
         }
 
         // v117 · settings 页已经无 sidebar tab · 这段保留为兼容(querySelector 返回 null 时无害)
-        const sNav = e.target.closest('.settings-nav-item');
+        const sNav = (e.target as HTMLElement).closest('.settings-nav-item') as HTMLElement | null;
         if (sNav) {
             switchSettingsTab(sNav.dataset.settingsTab);
             return;
@@ -255,7 +266,7 @@
         if (_archiveReadOnly) {
             // v0.15 · 只读模式提示(扁平权限下此分支不会触发 · 保留作安全兜底)
             if (
-                e.target.closest(
+                (e.target as HTMLElement).closest(
                     '.archive-token, [data-add-field], #btn-archive-save, #btn-archive-reset'
                 )
             ) {
@@ -265,45 +276,48 @@
         }
 
         // 添加字段
-        const addBtn = e.target.closest('[data-add-field]');
+        const addBtn = (e.target as HTMLElement).closest('[data-add-field]') as HTMLElement | null;
         if (addBtn) {
             const type = addBtn.dataset.addField;
-            const meta = FIELD_META[type];
+            const meta = FIELD_META[type as keyof typeof FIELD_META];
             const cfg = { type, ...meta.defaultCfg };
-            _archiveTemplate.push(cfg);
+            _archiveTemplate.push(cfg as ArchiveTokenAS);
             renderArchiveCanvas();
             updateArchivePreview();
             return;
         }
 
         // 点 token 编辑
-        const tok = e.target.closest('.archive-token');
+        const tok = (e.target as HTMLElement).closest('.archive-token') as HTMLElement | null;
         if (tok && !_archiveReadOnly) {
-            openArchiveTokenModal(parseInt(tok.dataset.tokenIdx, 10));
+            openArchiveTokenModal(parseInt(tok.dataset.tokenIdx!, 10));
             return;
         }
 
         // 保存 / 重置
-        if (e.target.closest('#btn-archive-save')) return saveArchiveSettings();
-        if (e.target.closest('#btn-archive-reset')) return resetArchiveSettings();
+        if ((e.target as HTMLElement).closest('#btn-archive-save')) return saveArchiveSettings();
+        if ((e.target as HTMLElement).closest('#btn-archive-reset')) return resetArchiveSettings();
 
         // Token modal
-        if (e.target.closest('#archive-token-close') || e.target.id === 'archive-token-modal') {
-            document.getElementById('archive-token-modal').style.display = 'none';
+        if (
+            (e.target as HTMLElement).closest('#archive-token-close') ||
+            (e.target as HTMLElement).id === 'archive-token-modal'
+        ) {
+            document.getElementById('archive-token-modal')!.style.display = 'none';
         }
-        if (e.target.closest('#btn-archive-token-ok')) saveArchiveTokenEdit();
-        if (e.target.closest('#btn-archive-token-delete')) deleteArchiveToken();
+        if ((e.target as HTMLElement).closest('#btn-archive-token-ok')) saveArchiveTokenEdit();
+        if ((e.target as HTMLElement).closest('#btn-archive-token-delete')) deleteArchiveToken();
     });
 
     // 文件夹 radio
     document.addEventListener('change', (e) => {
-        if (e.target.name === 'folder-strategy') {
-            _archiveFolderStrategy = e.target.value;
+        if ((e.target as HTMLInputElement).name === 'folder-strategy') {
+            _archiveFolderStrategy = (e.target as HTMLInputElement).value;
         }
     });
 
     // ====== Token 编辑对话框 ======
-    function openArchiveTokenModal(idx) {
+    function openArchiveTokenModal(idx: number) {
         _archiveEditingIdx = idx;
         const tok = _archiveTemplate[idx];
         if (!tok) return;
@@ -340,22 +354,22 @@
                         <button type="button" class="sep-chip ${tok.val === '_' ? 'active' : ''}" data-sep="_">_ (下划线)</button>
                         <button type="button" class="sep-chip ${tok.val === '-' ? 'active' : ''}" data-sep="-">- (短横)</button>
                         <button type="button" class="sep-chip ${tok.val === ' ' ? 'active' : ''}" data-sep=" ">(空格)</button>
-                        <input type="text" id="token-sep-custom" class="form-input sep-custom" maxlength="3" placeholder="${escapeHtml(t('archive-sep-custom'))}" value="${['_', '-', ' '].includes(tok.val) ? '' : escapeHtml(tok.val || '')}">
+                        <input type="text" id="token-sep-custom" class="form-input sep-custom" maxlength="3" placeholder="${escapeHtml(t('archive-sep-custom'))}" value="${['_', '-', ' '].includes(tok.val as string) ? '' : escapeHtml(tok.val || '')}">
                     </div>
                 </div>`;
         } else {
             html = `<div class="form-hint">${escapeHtml(t('archive-token-no-option'))}</div>`;
         }
-        body.innerHTML = html;
-        document.getElementById('archive-token-modal').style.display = '';
+        body!.innerHTML = html;
+        document.getElementById('archive-token-modal')!.style.display = '';
 
         // 分隔符 chip 交互
-        body.querySelectorAll('.sep-chip').forEach((chip) => {
+        body!.querySelectorAll('.sep-chip').forEach((chip) => {
             chip.addEventListener('click', () => {
-                body.querySelectorAll('.sep-chip').forEach((c) => c.classList.remove('active'));
+                body!.querySelectorAll('.sep-chip').forEach((c) => c.classList.remove('active'));
                 chip.classList.add('active');
                 const custom = document.getElementById('token-sep-custom');
-                if (custom) custom.value = '';
+                if (custom) (custom as HTMLInputElement).value = '';
             });
         });
     }
@@ -364,17 +378,21 @@
         const tok = _archiveTemplate[_archiveEditingIdx];
         if (!tok) return;
         if (tok.type === 'date') {
-            tok.format = document.getElementById('token-date-format').value;
+            tok.format = (document.getElementById('token-date-format') as HTMLInputElement).value;
         } else if (tok.type === 'seller') {
-            tok.short = document.getElementById('token-seller-short').checked;
+            tok.short = (document.getElementById('token-seller-short') as HTMLInputElement).checked;
         } else if (tok.type === 'amount') {
-            tok.with_currency = document.getElementById('token-amount-currency').checked;
+            tok.with_currency = (
+                document.getElementById('token-amount-currency') as HTMLInputElement
+            ).checked;
         } else if (tok.type === 'sep') {
-            const activeChip = document.querySelector('#archive-token-body .sep-chip.active');
-            const custom = document.getElementById('token-sep-custom').value;
+            const activeChip = document.querySelector(
+                '#archive-token-body .sep-chip.active'
+            ) as HTMLElement | null;
+            const custom = (document.getElementById('token-sep-custom') as HTMLInputElement).value;
             tok.val = custom || (activeChip ? activeChip.dataset.sep : '_');
         }
-        document.getElementById('archive-token-modal').style.display = 'none';
+        document.getElementById('archive-token-modal')!.style.display = 'none';
         renderArchiveCanvas();
         updateArchivePreview();
     }
@@ -382,7 +400,7 @@
     function deleteArchiveToken() {
         if (_archiveEditingIdx < 0) return;
         _archiveTemplate.splice(_archiveEditingIdx, 1);
-        document.getElementById('archive-token-modal').style.display = 'none';
+        document.getElementById('archive-token-modal')!.style.display = 'none';
         renderArchiveCanvas();
         updateArchivePreview();
     }

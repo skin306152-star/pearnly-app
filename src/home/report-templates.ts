@@ -70,13 +70,15 @@
         </div>`;
         const wrap = document.createElement('div');
         wrap.innerHTML = html;
-        document.body.appendChild(wrap.firstElementChild);
+        document.body.appendChild(wrap.firstElementChild as Node);
 
         // 事件:关闭
-        document.getElementById('report-modal-close-x').addEventListener('click', closeReportModal);
-        document.getElementById('report-modal-cancel').addEventListener('click', closeReportModal);
-        document.getElementById('report-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'report-modal') closeReportModal();
+        document
+            .getElementById('report-modal-close-x')!
+            .addEventListener('click', closeReportModal);
+        document.getElementById('report-modal-cancel')!.addEventListener('click', closeReportModal);
+        document.getElementById('report-modal')!.addEventListener('click', (e) => {
+            if ((e.target as HTMLElement).id === 'report-modal') closeReportModal();
         });
     }
 
@@ -88,12 +90,13 @@
     }
 
     // 模态状态
-    let _modalCtx = null;
+    let _modalCtx: any = null;
 
     // 加载模板列表(带缓存)· v118.27.7 · 第 2 个参数 ctxMode 决定是否加 sales_detail_th
-    async function fetchTemplates(lang, ctxMode) {
+    async function fetchTemplates(lang: string, ctxMode?: string) {
         const cacheKey = lang + ':' + (ctxMode || '');
-        if (_tplCache[cacheKey]) return _tplCache[cacheKey];
+        if ((_tplCache as Record<string, any>)[cacheKey])
+            return (_tplCache as Record<string, any>)[cacheKey];
         let result;
         try {
             const tok = localStorage.getItem('mrpilot_token');
@@ -128,12 +131,12 @@
             ];
         }
         // v118.27.6 · 砍 ERP 录入格式(被 ERP 适配器取代 · 向后兼容老服务器仍返回 erp)
-        result = result.filter((tpl) => tpl.code !== 'erp');
+        result = result.filter((tpl: any) => tpl.code !== 'erp');
         // v118.27.7 · sales_detail_th 在「单据记录批量」入口也支持(走 /api/ocr/export-by-history-ids)
         // 客户卡片导出暂不支持 · 只在 history-batch 模式加
         if (ctxMode === 'history-batch') {
             // 插在 standard 之后(跟识别中心下拉顺序一致)
-            const stdIdx = result.findIndex((x) => x.code === 'standard');
+            const stdIdx = result.findIndex((x: any) => x.code === 'standard');
             const insertAt = stdIdx >= 0 ? stdIdx + 1 : result.length;
             result.splice(insertAt, 0, {
                 code: 'sales_detail_th',
@@ -143,16 +146,16 @@
                 is_new: true,
             });
         }
-        _tplCache[cacheKey] = result;
+        (_tplCache as Record<string, any>)[cacheKey] = result;
         return result;
     }
 
     // 渲染模板列表
-    function renderTemplates(templates) {
+    function renderTemplates(templates: any[]) {
         const wrap = document.getElementById('report-tpl-list');
         const itemsHtml = templates
             .map(
-                (tpl, idx) => `
+                (tpl: any, idx: number) => `
             <label class="report-tpl-item${tpl.recommended ? ' is-recommended' : ''}">
                 <input type="radio" name="report-tpl" value="${tpl.code}" ${tpl.recommended ? 'checked' : idx === 0 ? 'checked' : ''}>
                 <div class="report-tpl-content">
@@ -179,19 +182,28 @@
                 </div>
             </label>
         `;
-        wrap.innerHTML = itemsHtml + customHtml;
+        wrap!.innerHTML = itemsHtml + customHtml;
     }
 
-    function escapeHtmlSafe(s) {
+    function escapeHtmlSafe(s: unknown) {
         if (s === null || s === undefined) return '';
         return String(s).replace(
             /[&<>"']/g,
-            (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]
+            (ch) =>
+                (
+                    ({
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#39;',
+                    }) as Record<string, string>
+                )[ch]
         );
     }
 
     // 计算时间范围 → YYYY-MM 或 all
-    function periodToMonth(period) {
+    function periodToMonth(period: string) {
         const now = new Date();
         const y = now.getFullYear();
         const m = now.getMonth() + 1;
@@ -204,6 +216,7 @@
         if (period === 'this-year') return `${y}`; // 后端按前缀匹配 · 暂用 all 兜底
         if (period === 'this-quarter') {
             // 本季度起始月
+            // @ts-expect-error TS6133 verbatim 占位
             const qs = Math.floor((m - 1) / 3) * 3 + 1;
             return `${y}-Q${Math.floor((m - 1) / 3) + 1}`; // 后端不支持 · 实际 fallback all
         }
@@ -231,8 +244,8 @@
         else {
             document.querySelectorAll('#report-modal [data-i18n]').forEach((el) => {
                 const k = el.getAttribute('data-i18n');
-                if (I18N[currentLang] && I18N[currentLang][k])
-                    el.textContent = I18N[currentLang][k];
+                if (I18N[currentLang] && I18N[currentLang][k as string])
+                    el.textContent = I18N[currentLang][k as string];
             });
         }
 
@@ -242,10 +255,10 @@
 
         // 初始 placeholder
         const listWrap = document.getElementById('report-tpl-list');
-        listWrap.innerHTML = `<div class="report-tpl-loading">${escapeHtmlSafe(t('report-modal-loading'))}</div>`;
+        listWrap!.innerHTML = `<div class="report-tpl-loading">${escapeHtmlSafe(t('report-modal-loading'))}</div>`;
 
         // 显示
-        document.getElementById('report-modal').style.display = '';
+        document.getElementById('report-modal')!.style.display = '';
 
         // 异步拉模板列表 · v118.27.7 · 传 ctx.mode 决定是否加 sales_detail_th(只 history-batch 支持)
         const templates = await fetchTemplates(currentLang, opts && opts.mode);
@@ -256,27 +269,27 @@
         // 绑定下载按钮(每次都重新绑 · 因为 ctx 变了)
         const dlBtn = document.getElementById('report-modal-download');
         // 移除旧监听 · 用 cloneNode 替换
-        const newBtn = dlBtn.cloneNode(true);
-        dlBtn.parentNode.replaceChild(newBtn, dlBtn);
+        const newBtn = dlBtn!.cloneNode(true);
+        dlBtn!.parentNode!.replaceChild(newBtn, dlBtn as Node);
         newBtn.addEventListener('click', () => doDownload(_modalCtx));
     };
 
     // ============================================================
     // 下载
     // ============================================================
-    async function doDownload(ctx) {
+    async function doDownload(ctx: any) {
         if (!ctx) return;
         const tplInput = document.querySelector('input[name="report-tpl"]:checked');
         if (!tplInput) {
             showToast(t('report-toast-no-selection'), 'info');
             return;
         }
-        const template = tplInput.value;
+        const template = (tplInput as HTMLInputElement).value;
         const periodInput = document.querySelector('input[name="report-period"]:checked');
-        const period = periodInput ? periodInput.value : 'all';
+        const period = periodInput ? (periodInput as HTMLInputElement).value : 'all';
         const month = periodToMonth(period);
 
-        const dlBtn = document.getElementById('report-modal-download');
+        const dlBtn = document.getElementById('report-modal-download') as HTMLButtonElement;
         const origHTML = dlBtn.innerHTML;
         dlBtn.disabled = true;
         dlBtn.innerHTML = `<span>${escapeHtmlSafe(t('report-modal-loading'))}</span>`;
@@ -385,7 +398,7 @@
             closeReportModal();
         } catch (e) {
             console.error('doDownload fail', e);
-            showToast(t('report-toast-fail') + ' · ' + (e.message || ''), 'error');
+            showToast(t('report-toast-fail') + ' · ' + ((e as Error).message || ''), 'error');
         } finally {
             dlBtn.disabled = false;
             dlBtn.innerHTML = origHTML;
@@ -400,7 +413,7 @@
         if (ocrExportBtn) {
             // 用克隆移除老监听
             const newBtn = ocrExportBtn.cloneNode(true);
-            ocrExportBtn.parentNode.replaceChild(newBtn, ocrExportBtn);
+            ocrExportBtn.parentNode!.replaceChild(newBtn, ocrExportBtn);
             newBtn.addEventListener('click', () => {
                 if (typeof _results === 'undefined' || !_results || _results.length === 0) {
                     showToast(t('report-toast-no-selection'), 'info');

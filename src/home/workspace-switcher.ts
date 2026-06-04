@@ -22,7 +22,7 @@
     const LS_ID = 'pearnly_active_workspace_client_id';
     const LS_MODE = 'pearnly_work_mode'; // 'personal' | 'client'
 
-    function _t(key, fallback) {
+    function _t(key: string, fallback: string) {
         if (typeof window.t === 'function') {
             const s = window.t(key);
             if (s && s !== key) return s;
@@ -59,7 +59,7 @@
         return isNaN(n) ? null : n;
     }
 
-    function _emit(id) {
+    function _emit(id: number | null) {
         try {
             window.dispatchEvent(
                 new CustomEvent('pearnly:workspace-changed', {
@@ -71,7 +71,7 @@
         }
     }
 
-    function setActiveWorkspaceClientId(id) {
+    function setActiveWorkspaceClientId(id: number | null) {
         const old = getActiveWorkspaceClientId();
         if (id == null || id === 0) {
             localStorage.removeItem(LS_ID);
@@ -103,7 +103,7 @@
 
     // ---------- 惰性守卫(B2 核心)----------
     // 业务功能入口调用:有 workspace → onOk();否则轻提示「这个功能需要先选择客户」。
-    async function requireWorkspace(onOk) {
+    async function requireWorkspace(onOk: (() => void) | null) {
         if (getWorkMode() === 'client' && getActiveWorkspaceClientId() != null) {
             if (typeof onOk === 'function') onOk();
             return true;
@@ -124,7 +124,7 @@
 
     // ---------- 选择面板(work mode + 选/建工作空间 · 唯一入口)----------
     // afterSelect:选定 workspace 后回调(惰性守卫复用:选完直接进原功能)。
-    async function openWorkspaceChooser(afterSelect) {
+    async function openWorkspaceChooser(afterSelect: (() => void) | null) {
         const list = await fetchWorkspaceClients();
         // 只剩 1 个时自动选中 · 不弹 —— 但**仅限业务动作惰性触发**(带 afterSelect 回调)。
         // 修(2026-05-26 Zihao 报):用户手动点右上角(afterSelect 为空)必须永远弹窗,
@@ -146,7 +146,7 @@
                 canCreate: _isOwner(),
                 active: getActiveWorkspaceClientId(),
                 onPersonal: enterPersonalMode,
-                onPick: function (id) {
+                onPick: function (id: number | string) {
                     setActiveWorkspaceClientId(Number(id));
                     if (typeof afterSelect === 'function') afterSelect();
                 },
@@ -174,7 +174,7 @@
     }
 
     // ---------- 右上角两态标签(home.js 挂载点调用)----------
-    function renderWorkspaceControl(el) {
+    function renderWorkspaceControl(el?: HTMLElement | null) {
         const root = el || document.getElementById('workspace-switcher-root');
         if (!root) return;
         const mode = getWorkMode();
@@ -182,7 +182,9 @@
         let icon, text;
         if (mode === 'client' && id != null) {
             const list = window._workspaceClientsCache || [];
-            const c = list.find((x) => Number(x.id) === Number(id));
+            const c = (list as Array<{ id: number; name: string }>).find(
+                (x) => Number(x.id) === Number(id)
+            );
             icon = _icon('building');
             text = c ? c.name : _t('ws-current-label', '当前工作空间');
         } else {
@@ -201,14 +203,16 @@
 
     // ---------- 选择面板真实 UI(B4 · 自包含弹层 · 不进 home.js 巨石)----------
     // openWorkspaceChooser 调 window.openWorkspaceChooserUI(opts) · opts 见下。
-    function _esc(s) {
-        return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    function _esc(s: unknown) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (m: string) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[
+                m as '&' | '<' | '>' | '"' | "'"
+            ];
         });
     }
 
     // 铁律(UI):只用 SVG line 图标(feather/lucide)· 禁止 emoji 当图标。
-    function _icon(name) {
+    function _icon(name: string) {
         const open =
             '<svg class="ws-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
@@ -228,7 +232,14 @@
         );
     }
 
-    function openWorkspaceChooserUI(opts) {
+    function openWorkspaceChooserUI(opts: {
+        clients?: Array<{ id: number; name?: string }>;
+        active?: number | null;
+        canCreate?: boolean;
+        emptyHint?: string | null;
+        onPersonal?: () => void;
+        onPick?: (id: number | string) => void;
+    }) {
         opts = opts || {};
         const clients = opts.clients || [];
         const active = opts.active;
@@ -265,7 +276,7 @@
             const opts = [
                 '<option value="">' + _esc(_t('ws-select-ph', '— 选择账套主体 —')) + '</option>',
             ].concat(
-                clients.map(function (c) {
+                clients.map(function (c: { id: number; name?: string }) {
                     const isActive = active != null && Number(active) === Number(c.id);
                     return (
                         '<option value="' +
@@ -337,7 +348,7 @@
         document.body.appendChild(overlay);
 
         // 账套主体下拉:change 即选定(不在上面的 click 委托里)
-        const selEl = overlay.querySelector('[data-ws-select]');
+        const selEl = overlay.querySelector('[data-ws-select]') as HTMLSelectElement | null;
         if (selEl) {
             selEl.addEventListener('change', function () {
                 const id = selEl.value;
@@ -353,36 +364,36 @@
         }
 
         overlay.addEventListener('click', function (e) {
-            if (e.target === overlay || e.target.closest('[data-ws-close]')) {
+            if (e.target === overlay || (e.target as HTMLElement).closest('[data-ws-close]')) {
                 close();
                 return;
             }
-            const personalBtn = e.target.closest('[data-ws-personal]');
+            const personalBtn = (e.target as HTMLElement).closest('[data-ws-personal]');
             if (personalBtn) {
                 if (typeof opts.onPersonal === 'function') opts.onPersonal();
                 close();
                 renderWorkspaceControl();
                 return;
             }
-            const pickBtn = e.target.closest('[data-ws-pick]');
+            const pickBtn = (e.target as HTMLElement).closest('[data-ws-pick]');
             if (pickBtn) {
                 const id = pickBtn.getAttribute('data-ws-pick');
-                if (typeof opts.onPick === 'function') opts.onPick(id);
+                if (typeof opts.onPick === 'function') opts.onPick(id as string);
                 close();
                 renderWorkspaceControl();
                 return;
             }
-            const toggle = e.target.closest('[data-ws-create-toggle]');
+            const toggle = (e.target as HTMLElement).closest('[data-ws-create-toggle]');
             if (toggle) {
-                const form = overlay.querySelector('[data-ws-create-form]');
+                const form = overlay.querySelector('[data-ws-create-form]') as HTMLElement | null;
                 if (form) {
                     form.style.display = form.style.display === 'none' ? 'flex' : 'none';
-                    const inp = form.querySelector('[data-ws-create-name]');
+                    const inp = form.querySelector('[data-ws-create-name]') as HTMLElement | null;
                     if (inp) inp.focus();
                 }
                 return;
             }
-            const submit = e.target.closest('[data-ws-create-submit]');
+            const submit = (e.target as HTMLElement).closest('[data-ws-create-submit]');
             if (submit) {
                 _doCreate(overlay, opts, close);
                 return;
@@ -390,8 +401,12 @@
         });
     }
 
-    async function _doCreate(overlay, opts, close) {
-        const inp = overlay.querySelector('[data-ws-create-name]');
+    async function _doCreate(
+        overlay: HTMLElement,
+        opts: { onPick?: (id: number | string) => void },
+        close: () => void
+    ) {
+        const inp = overlay.querySelector('[data-ws-create-name]') as HTMLInputElement | null;
         const name = inp ? (inp.value || '').trim() : '';
         if (!name) {
             if (inp) inp.focus();

@@ -36,11 +36,11 @@ async function refreshExcBadge() {
     }
 }
 
-function renderKpis(stats) {
-    document.getElementById('exc-kpi-pending').textContent = stats.pending || 0;
-    document.getElementById('exc-kpi-high').textContent = stats.high_severity || 0;
-    document.getElementById('exc-kpi-resolved').textContent = stats.resolved || 0;
-    document.getElementById('exc-kpi-learned').textContent = stats.learned_rules || 0;
+function renderKpis(stats?: any) {
+    document.getElementById('exc-kpi-pending')!.textContent = stats.pending || 0;
+    document.getElementById('exc-kpi-high')!.textContent = stats.high_severity || 0;
+    document.getElementById('exc-kpi-resolved')!.textContent = stats.resolved || 0;
+    document.getElementById('exc-kpi-learned')!.textContent = stats.learned_rules || 0;
     // v118.21.1 · status tab 计数同步
     const cp = document.getElementById('exc-status-tab-count-pending');
     const cr = document.getElementById('exc-status-tab-count-resolved');
@@ -51,11 +51,14 @@ function renderKpis(stats) {
     // active 态
     const tabs = document.querySelectorAll('#exc-status-tabs .exc-status-tab');
     tabs.forEach((t) => {
-        t.classList.toggle('active', t.dataset.status === (_excState.currentStatus || 'pending'));
+        t.classList.toggle(
+            'active',
+            (t as HTMLElement).dataset.status === (_excState.currentStatus || 'pending')
+        );
     });
 }
 
-function renderChips(stats) {
+function renderChips(stats?: any) {
     const wrap = document.getElementById('exc-chips');
     if (!wrap) return;
     const byRule = stats.by_rule || {};
@@ -84,14 +87,14 @@ function renderChips(stats) {
     wrap.innerHTML = html;
     wrap.querySelectorAll('.exc-chip').forEach((btn) => {
         btn.addEventListener('click', () => {
-            const rc = btn.dataset.rule || null;
+            const rc = (btn as HTMLElement).dataset.rule || null;
             _excState.currentRule = rc;
             loadExceptionsList();
         });
     });
 }
 
-function renderList(items) {
+function renderList(items?: any) {
     const wrap = document.getElementById('exc-list');
     if (!wrap) return;
     if (!items || items.length === 0) {
@@ -106,7 +109,7 @@ function renderList(items) {
     const checkSvg = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l3 3 5-5"/></svg>`;
     const showCheckbox = (_excState.currentStatus || 'pending') === 'pending';
     wrap.innerHTML = items
-        .map((it) => {
+        .map((it: any) => {
             const sev = it.severity || 'medium';
             const ruleLabel = t('exc-rule-' + it.rule_code) || it.rule_code;
             const seller =
@@ -136,8 +139,8 @@ function renderList(items) {
     // 行点击 → 抽屉(checkbox 区域阻断)
     wrap.querySelectorAll('.exc-row').forEach((row) => {
         row.addEventListener('click', (e) => {
-            if (e.target.closest('.exc-row-check')) return; // checkbox 自己处理
-            const id = row.dataset.excId;
+            if ((e.target as HTMLElement).closest('.exc-row-check')) return; // checkbox 自己处理
+            const id = (row as HTMLElement).dataset.excId;
             if (id) openExcDrawer(parseInt(id, 10));
         });
     });
@@ -145,16 +148,16 @@ function renderList(items) {
     wrap.querySelectorAll('.exc-row-check').forEach((box) => {
         box.addEventListener('click', (e) => {
             e.stopPropagation();
-            const id = parseInt(box.dataset.checkId, 10);
+            const id = parseInt((box as HTMLElement).dataset.checkId!, 10);
             if (!id) return;
             if (_excState.selectedIds.has(id)) {
                 _excState.selectedIds.delete(id);
                 box.classList.remove('checked');
-                box.closest('.exc-row').classList.remove('selected');
+                box.closest('.exc-row')!.classList.remove('selected');
             } else {
                 _excState.selectedIds.add(id);
                 box.classList.add('checked');
-                box.closest('.exc-row').classList.add('selected');
+                box.closest('.exc-row')!.classList.add('selected');
             }
             renderBatchBar();
         });
@@ -191,7 +194,7 @@ function renderListFoot() {
     foot.style.display = '';
     // 当前筛选下的 pending 总数(从 stats 取 · 跟 chip 数同步)
     let total = shown;
-    const stats = _excState.statsCache;
+    const stats = _excState.statsCache as any;
     if (stats) {
         if (_excState.currentRule) {
             total = (stats.by_rule || {})[_excState.currentRule] || shown;
@@ -233,7 +236,7 @@ async function loadExceptionsStats() {
     }
 }
 
-function _renderListError(isOffline) {
+function _renderListError(isOffline?: any) {
     const wrap = document.getElementById('exc-list');
     if (!wrap) return;
     const errSvg = `<svg class="exc-error-icon" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -257,7 +260,7 @@ function _renderListError(isOffline) {
         );
 }
 
-async function loadExceptionsList(opts) {
+async function loadExceptionsList(opts?: any) {
     opts = opts || {};
     const append = !!opts.append;
     const wrap = document.getElementById('exc-list');
@@ -295,7 +298,8 @@ async function loadExceptionsList(opts) {
     } catch (e) {
         console.warn('loadExceptionsList fail', e);
         _excState.loadFailed = true;
-        const isOffline = navigator.onLine === false || String(e.message || '').includes('offline');
+        const isOffline =
+            navigator.onLine === false || String((e as any).message || '').includes('offline');
         // append 失败:仅 toast · 不替换列表(用户已加载的不丢)
         if (append) {
             showToast(t('exc-toast-load-fail'), 'error');
@@ -329,7 +333,7 @@ function _refreshExcClientFilter() {
     sel.innerHTML =
         `<option value="">${escapeHtml(allLabel)}</option>` +
         list.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-    sel.value = cur;
+    (sel as HTMLSelectElement).value = cur;
 }
 
 async function actionBatchResolve() {

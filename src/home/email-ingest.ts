@@ -22,6 +22,7 @@ import {
     async function load() {
         const emptyEl = document.getElementById('email-empty');
         const cardEl = document.getElementById('email-account-card');
+        // @ts-expect-error TS6133 verbatim 占位
         const logsEl = document.getElementById('email-logs-section');
         if (!emptyEl || !cardEl) return;
         try {
@@ -64,15 +65,15 @@ import {
         const logsEl = document.getElementById('email-logs-section');
 
         if (!S.account) {
-            emptyEl.style.display = '';
-            cardEl.style.display = 'none';
+            emptyEl!.style.display = '';
+            cardEl!.style.display = 'none';
             if (logsEl) logsEl.style.display = 'none';
             setStatus('none');
             return;
         }
 
-        emptyEl.style.display = 'none';
-        cardEl.style.display = '';
+        emptyEl!.style.display = 'none';
+        cardEl!.style.display = '';
         if (logsEl) logsEl.style.display = '';
 
         const addrEl = document.getElementById('email-account-addr');
@@ -81,7 +82,7 @@ import {
         const errEl = document.getElementById('email-last-error');
         const tgl = document.getElementById('email-enabled-toggle');
 
-        if (addrEl) addrEl.textContent = S.account.email_address || '-';
+        if (addrEl) addrEl.textContent = (S.account.email_address as string) || '-';
         if (hostEl)
             hostEl.textContent = `${S.account.imap_host || '-'}:${S.account.imap_port || 993}`;
 
@@ -90,7 +91,7 @@ import {
             if (!last) {
                 lastEl.textContent = t('email-last-never');
             } else {
-                const timeStr = formatTime(last);
+                const timeStr = formatTime(last as string);
                 const ok = !S.account.last_error;
                 lastEl.textContent = ok
                     ? t('email-last-ok', { time: timeStr })
@@ -107,7 +108,7 @@ import {
             }
         }
 
-        if (tgl) tgl.checked = !!S.account.enabled;
+        if (tgl) (tgl as HTMLInputElement).checked = !!S.account.enabled;
 
         // 状态 pill
         if (!S.account.enabled) setStatus('off');
@@ -115,7 +116,7 @@ import {
         else setStatus('on');
     }
 
-    function setStatus(kind) {
+    function setStatus(kind: string) {
         const pill = document.getElementById('email-status-summary');
         if (!pill) return;
         pill.classList.remove('none', 'ready', 'active', 'coming');
@@ -137,15 +138,15 @@ import {
         pill.textContent = t(key);
     }
 
-    function formatTime(iso) {
+    function formatTime(iso: string | number | null | undefined) {
         if (!iso) return '';
         const d = new Date(iso);
         if (isNaN(d.getTime())) return '';
-        const pad = (n) => String(n).padStart(2, '0');
+        const pad = (n: number) => String(n).padStart(2, '0');
         return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 
-    function humanizeEmailError(raw) {
+    function humanizeEmailError(raw: unknown) {
         if (!raw) return '';
         const r = String(raw);
         if (/auth|AUTHENTICATIONFAILED|invalid credentials/i.test(r))
@@ -171,9 +172,9 @@ import {
         }
 
         const btn = document.getElementById('btn-email-modal-save');
-        if (btn) btn.disabled = true;
+        if (btn) (btn as HTMLButtonElement).disabled = true;
 
-        const body = { ...form };
+        const body: any = { ...form };
         // edit 模式 · 空密码表示保留原密码
         if (S.modalMode === 'edit' && !body.password) delete body.password;
 
@@ -201,7 +202,7 @@ import {
         } catch (e) {
             showTestResult('fail', t('email-save-fail'));
         } finally {
-            if (btn) btn.disabled = false;
+            if (btn) (btn as HTMLButtonElement).disabled = false;
         }
     }
 
@@ -241,7 +242,7 @@ import {
         const btn = document.getElementById('btn-email-trigger');
         const origLabel = btn ? btn.innerHTML : '';
         if (btn) {
-            btn.disabled = true;
+            (btn as HTMLButtonElement).disabled = true;
             btn.innerHTML = `<span>${escapeHtml(t('email-trigger-running'))}</span>`;
         }
         try {
@@ -273,7 +274,7 @@ import {
         } finally {
             S.triggering = false;
             if (btn) {
-                btn.disabled = false;
+                (btn as HTMLButtonElement).disabled = false;
                 btn.innerHTML = origLabel;
             }
         }
@@ -282,7 +283,7 @@ import {
     async function toggleEnabled() {
         if (!S.account) return;
         const tgl = document.getElementById('email-enabled-toggle');
-        const newVal = !!(tgl && tgl.checked);
+        const newVal = !!(tgl && (tgl as HTMLInputElement).checked);
         const prev = S.account.enabled;
         try {
             const resp = await fetch('/api/email-ingest/account', {
@@ -308,11 +309,11 @@ import {
                 S.account = data.account;
                 render();
             } else {
-                if (tgl) tgl.checked = prev;
+                if (tgl) (tgl as HTMLInputElement).checked = prev as boolean;
                 showToast(t('email-toggle-fail'), 'error');
             }
         } catch (e) {
-            if (tgl) tgl.checked = prev;
+            if (tgl) (tgl as HTMLInputElement).checked = prev as boolean;
             showToast(t('email-toggle-fail'), 'error');
         }
     }
@@ -341,7 +342,7 @@ import {
         }
     }
 
-    function renderLogRow(log) {
+    function renderLogRow(log: any) {
         const time = formatTime(log.created_at);
         const status = log.status || 'failed';
         const cls = status === 'success' ? 'ok' : status === 'partial' ? 'partial' : 'fail';
@@ -397,17 +398,20 @@ import {
         if (saveBtn) saveBtn.addEventListener('click', save);
 
         const presetSel = document.getElementById('email-preset');
-        if (presetSel) presetSel.addEventListener('change', (e) => applyPreset(e.target.value));
+        if (presetSel)
+            presetSel.addEventListener('change', (e) =>
+                applyPreset((e.target as HTMLInputElement).value)
+            );
 
         // v95 · 邮箱输入框自动检测域名 · 触发 preset
         const addrEl = document.getElementById('email-address');
         if (addrEl && !addrEl.dataset.autoBound) {
             addrEl.dataset.autoBound = '1';
             addrEl.addEventListener('blur', (e) =>
-                autoDetectPresetByAddress((e.target.value || '').trim())
+                autoDetectPresetByAddress(((e.target as HTMLInputElement).value || '').trim())
             );
             addrEl.addEventListener('input', (e) => {
-                const v = (e.target.value || '').trim();
+                const v = ((e.target as HTMLInputElement).value || '').trim();
                 // 输入到域名后(包含 . 至少 2 段)立刻触发
                 if (v.includes('@') && v.split('@')[1].includes('.')) {
                     autoDetectPresetByAddress(v);
@@ -433,7 +437,7 @@ import {
         if (!S.loaded) return;
         render();
         const logsSection = document.getElementById('email-logs-section');
-        if (S.account && logsSection && logsSection.open) loadLogs();
+        if (S.account && logsSection && (logsSection as HTMLDetailsElement).open) loadLogs();
     };
 
     // v95 · 30s 自动刷新日志(用户在邮箱 tab 时才跑)

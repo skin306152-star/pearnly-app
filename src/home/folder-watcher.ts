@@ -22,20 +22,20 @@ import {
 (function folderWatcher() {
     const SUPPORTED = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 
-    let _dirHandle = null;
-    let _intervalId = null;
+    let _dirHandle: any = null;
+    let _intervalId: ReturnType<typeof setInterval> | null = null;
     let _intervalSec = 60;
     let _paused = false;
     let _scanning = false; // 防重入
     let _processedCount = 0;
     let _failedCount = 0;
     let _queueCount = 0;
-    let _recent = []; // [{name, status, time, error?, history_id?}]
-    let _lastScanAt = null;
+    let _recent: any[] = []; // [{name, status, time, error?, history_id?}]
+    let _lastScanAt: Date | null = null;
     let _loaded = false;
 
     // ---------- UI ----------
-    function setStatus(textKey, cls) {
+    function setStatus(textKey: string, cls?: string) {
         const el = document.getElementById('folder-status-summary');
         if (!el) return;
         el.setAttribute('data-i18n', textKey);
@@ -43,14 +43,14 @@ import {
         el.className = 'auto-status-pill' + (cls ? ' ' + cls : '');
     }
 
-    function showOnly(panelId) {
+    function showOnly(panelId: string) {
         ['folder-unsupported', 'folder-empty', 'folder-active'].forEach((id) => {
             const el = document.getElementById(id);
             if (el) el.style.display = id === panelId ? '' : 'none';
         });
     }
 
-    function fmtTime(d) {
+    function fmtTime(d: Date | string | number | null) {
         if (!d) return '-';
         const dt = d instanceof Date ? d : new Date(d);
         const hh = String(dt.getHours()).padStart(2, '0');
@@ -64,14 +64,14 @@ import {
         const pathEl = document.getElementById('folder-config-path');
         if (pathEl && _dirHandle) pathEl.textContent = _dirHandle.name || '-';
         const intervalSel = document.getElementById('folder-interval-select');
-        if (intervalSel) intervalSel.value = String(_intervalSec);
+        if (intervalSel) (intervalSel as HTMLInputElement).value = String(_intervalSec);
 
-        document.getElementById('folder-stat-last').textContent = _lastScanAt
+        document.getElementById('folder-stat-last')!.textContent = _lastScanAt
             ? fmtTime(_lastScanAt)
             : '-';
-        document.getElementById('folder-stat-processed').textContent = String(_processedCount);
-        document.getElementById('folder-stat-failed').textContent = String(_failedCount);
-        document.getElementById('folder-stat-queue').textContent = String(_queueCount);
+        document.getElementById('folder-stat-processed')!.textContent = String(_processedCount);
+        document.getElementById('folder-stat-failed')!.textContent = String(_failedCount);
+        document.getElementById('folder-stat-queue')!.textContent = String(_queueCount);
 
         const pauseBtn = document.getElementById('btn-folder-pause');
         const resumeBtn = document.getElementById('btn-folder-resume');
@@ -145,7 +145,7 @@ import {
             .join('');
     }
 
-    function pushRecent(item) {
+    function pushRecent(item: any) {
         _recent.unshift(item);
         if (_recent.length > 50) _recent.length = 50;
         // v101 · Bug 3 修复 · 持久化到 IndexedDB · 切页/刷新不丢
@@ -167,7 +167,7 @@ import {
             }
 
             _lastScanAt = new Date();
-            const candidates = [];
+            const candidates: any[] = [];
             // v118.24 · 递归扫描子文件夹
             await walkDir(_dirHandle, '', candidates, 0);
             _queueCount = candidates.length;
@@ -235,7 +235,7 @@ import {
                         name: c.relPath || c.file.name,
                         status: 'fail',
                         time: new Date(),
-                        error: String(err.message || err),
+                        error: String((err as any).message || err),
                     });
                     // 不写 seen · 下次重试
                     await idbPut('config', 'failed_count', _failedCount);
@@ -263,7 +263,7 @@ import {
     }
 
     // v118.24 · 浏览器关闭警告 · 监听运行时阻止意外关闭
-    function _unloadHandler(e) {
+    function _unloadHandler(e: BeforeUnloadEvent) {
         if (!_dirHandle || _paused) return;
         const msg =
             typeof t === 'function'
@@ -313,7 +313,10 @@ import {
 
     async function pickFolder() {
         try {
-            const handle = await window.showDirectoryPicker({ mode: 'read', startIn: 'documents' });
+            const handle = await window.showDirectoryPicker!({
+                mode: 'read',
+                startIn: 'documents',
+            });
             const ok = await ensurePermission(handle);
             if (!ok) {
                 showToast('warn', t('folder-permission-denied'));
@@ -331,7 +334,7 @@ import {
             start();
         } catch (e) {
             // 用户取消选择 · 静默
-            if (e && e.name !== 'AbortError') console.warn('[folder] pick failed:', e);
+            if (e && (e as any).name !== 'AbortError') console.warn('[folder] pick failed:', e);
         }
     }
 
@@ -397,10 +400,10 @@ import {
         }
         _dirHandle = savedHandle;
         try {
-            _processedCount = (await idbGet('config', 'processed_count')) || 0;
+            _processedCount = ((await idbGet('config', 'processed_count')) as number) || 0;
         } catch {}
         try {
-            _failedCount = (await idbGet('config', 'failed_count')) || 0;
+            _failedCount = ((await idbGet('config', 'failed_count')) as number) || 0;
         } catch {}
         // v101 · Bug 3 修复 · 恢复最近处理列表 · 切页/刷新不丢
         try {
@@ -436,7 +439,7 @@ import {
         if (clearBtn) clearBtn.addEventListener('click', clearRecent);
         if (intervalSel)
             intervalSel.addEventListener('change', (e) => {
-                _intervalSec = parseInt(e.target.value, 10) || 60;
+                _intervalSec = parseInt((e.target as HTMLInputElement).value, 10) || 60;
                 if (!_paused) startTimer();
             });
         // v98 · folder-empty 卡片 + folder-unsupported 卡片里所有 [data-tab-jump]
@@ -445,17 +448,17 @@ import {
 
     function wireTabJump() {
         document.querySelectorAll('[data-auto-panel="folder"] [data-tab-jump]').forEach((btn) => {
-            if (btn.dataset.tabJumpBound) return;
-            btn.dataset.tabJumpBound = '1';
+            if ((btn as HTMLElement).dataset.tabJumpBound) return;
+            (btn as HTMLElement).dataset.tabJumpBound = '1';
             btn.addEventListener('click', (e) => {
-                const target = e.currentTarget.dataset.tabJump;
+                const target = (e.currentTarget as HTMLElement).dataset.tabJump;
                 if (target === 'email') {
                     if (typeof switchAutomationTab === 'function') switchAutomationTab('email');
                 } else if (target === 'upload') {
                     const navUpload =
                         document.querySelector('[data-page="recognize"]') ||
                         document.querySelector('[data-page="upload"]');
-                    if (navUpload) navUpload.click();
+                    if (navUpload) (navUpload as HTMLElement).click();
                 }
             });
         });

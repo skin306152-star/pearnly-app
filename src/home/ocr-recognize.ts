@@ -14,9 +14,9 @@ import { _runDmsIdCardFlow } from './ocr-dms-idcard.js'; // REFACTOR-WB-modulari
 // ============================================================
 // 开始识别
 // ============================================================
-document.getElementById('btn-start').addEventListener('click', async () => {
+document.getElementById('btn-start')!.addEventListener('click', async () => {
     hideAlerts();
-    document.getElementById('btn-start').disabled = true;
+    (document.getElementById('btn-start') as HTMLButtonElement).disabled = true;
 
     // MR.ERP DMS · 身份证订车模式分流(REFACTOR-DMS 2026-05-31)。
     // 仅当 ocr-document-mode 报告当前是 thai_id_card 时走 DMS 接口;
@@ -27,7 +27,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
         try {
             await _runDmsIdCardFlow();
         } finally {
-            const _b = document.getElementById('btn-start');
+            const _b = document.getElementById('btn-start') as HTMLButtonElement | null;
             if (_b) _b.disabled = false;
         }
         return;
@@ -48,7 +48,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
     const pendingFiles = _selectedFiles.filter((f) => f.status === 'waiting');
     const PARALLEL_LIMIT = 6;
 
-    async function processOneFile(f, isAutoRetry) {
+    async function processOneFile(f: SelectedFile, isAutoRetry?: boolean) {
         // v118.20.6 · 用户已点停止 · 把待跑文件标 cancelled 跳过
         if (window._ocrAborted) {
             f.status = 'cancelled';
@@ -122,7 +122,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                     f.errorParams = null;
                 } else if (detail && detail.code) {
                     f.errorKey = 'err.' + detail.code;
-                    f.errorParams = { ...detail, mb: _quota.max_file_size_mb };
+                    f.errorParams = { ...detail, mb: _quota!.max_file_size_mb };
                 } else {
                     f.errorKey = 'err.unknown';
                     f.errorParams = null;
@@ -138,7 +138,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                 // v92 · Bug 7 · 服务端错误可以重试(除了格式/大小等用户侧问题)
                 f.canRetry =
                     !/not_pdf|invalid_pdf|file_too_large|too_many_pages|monthly_limit_exceeded|ip_limit_exceeded|plan_not_supported|need_api_key|not_invoice/.test(
-                        f.errorKey || ''
+                        (f.errorKey as string) || ''
                     );
                 renderFileList();
                 return {};
@@ -189,10 +189,10 @@ document.getElementById('btn-start').addEventListener('click', async () => {
             // 实际识别数 → 明确警告用户"可能漏识别发票 · 请人工核对"· 不静默成功。
             if (data.missed_invoice_warnings && data.missed_invoice_warnings.length) {
                 const _pages = data.missed_invoice_warnings
-                    .map(function (w) {
+                    .map(function (w: { page?: unknown }) {
                         return w.page;
                     })
-                    .filter(function (p) {
+                    .filter(function (p: unknown) {
                         return p != null;
                     });
                 showToast(
@@ -271,9 +271,12 @@ document.getElementById('btn-start').addEventListener('click', async () => {
             }
             // v0.10.1 · 区分错误类型 · v92 · Bug 7 · 加超时
             console.error('[Upload] failed for', f.file.name, e);
-            const isAbort = e && (e.name === 'AbortError' || e === 'timeout');
+            const isAbort = e && ((e as Error).name === 'AbortError' || e === 'timeout');
             const isTimeout = isAbort && (ctrl.signal.reason === 'timeout' || e === 'timeout');
-            const isNetwork = e && e.message && /NetworkError|Failed to fetch/i.test(e.message);
+            const isNetwork =
+                e &&
+                (e as Error).message &&
+                /NetworkError|Failed to fetch/i.test((e as Error).message);
             // v118.20.6 · 用户主动停止 · 不算错误 · 不重试 · 不入失败汇总
             const isCancelled =
                 isAbort && (ctrl.signal.reason === 'user_stop' || window._ocrAborted);
@@ -293,7 +296,9 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                 f.errorKey = 'err.network';
             } else {
                 f.errorKey = 'err.unknown';
-                f.errorParams = { msg: e && e.message ? e.message : String(e) };
+                f.errorParams = {
+                    msg: e && (e as Error).message ? (e as Error).message : String(e),
+                };
             }
             f.status = 'error';
             // v92 · Bug 7 · 网络/超时错误可自动重试 1 次(用户停止后不重试)
@@ -307,7 +312,11 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                 renderFileList();
                 // 静默等 2 秒 · 自动重试 1 次
                 await new Promise((r) => setTimeout(r, 2000));
-                if (f.status === 'error' && navigator.onLine !== false && !window._ocrAborted) {
+                if (
+                    f.status === 'error' &&
+                    (navigator.onLine as boolean) !== false &&
+                    !window._ocrAborted
+                ) {
                     return processOneFile(f, true);
                 }
             }
@@ -369,7 +378,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
 
     updateStartButton();
     stopEnginePolling();
-    if (document.getElementById('alert-info').classList.contains('show')) {
+    if (document.getElementById('alert-info')!.classList.contains('show')) {
         showAlert('info', t('alert-engine-ready'));
         setTimeout(hideAlerts, 2000);
     }
@@ -393,7 +402,8 @@ document.getElementById('btn-start').addEventListener('click', async () => {
                 const k = f.errorKey || '';
                 if (k === 'err.network') sum.network++;
                 else if (k === 'err.timeout' || k === 'err.aborted') sum.timeout++;
-                else if (k.indexOf('quota') >= 0 || k === 'err.monthly_limit_exceeded') sum.quota++;
+                else if ((k as string).indexOf('quota') >= 0 || k === 'err.monthly_limit_exceeded')
+                    sum.quota++;
                 else if (k === 'err.gemini_overloaded' || k === 'err.server') sum.overloaded++;
                 else if (k === 'err.rate_limit') sum.rate++;
                 else sum.other++;
@@ -419,27 +429,34 @@ document.getElementById('btn-start').addEventListener('click', async () => {
 });
 
 // v118.20.6 · 汇总 toast 文案(中断态 / 失败态)
-function _summaryAbortedToast(sum, total) {
+type OcrSummary = Record<string, number>;
+function _summaryAbortedToast(sum: OcrSummary, total: number) {
     return t('ocr-summary-aborted')
-        .replace('{success}', sum.success)
-        .replace('{cancelled}', sum.cancelled)
-        .replace('{total}', total);
+        .replace('{success}', sum.success as unknown as string)
+        .replace('{cancelled}', sum.cancelled as unknown as string)
+        .replace('{total}', total as unknown as string);
 }
-function _summaryFailToast(sum) {
+function _summaryFailToast(sum: OcrSummary) {
     const parts = [];
-    if (sum.success) parts.push(t('ocr-summary-success').replace('{n}', sum.success));
-    if (sum.network) parts.push(t('ocr-summary-network').replace('{n}', sum.network));
-    if (sum.timeout) parts.push(t('ocr-summary-timeout').replace('{n}', sum.timeout));
-    if (sum.quota) parts.push(t('ocr-summary-quota').replace('{n}', sum.quota));
-    if (sum.overloaded) parts.push(t('ocr-summary-overloaded').replace('{n}', sum.overloaded));
-    if (sum.rate) parts.push(t('ocr-summary-rate').replace('{n}', sum.rate));
-    if (sum.other) parts.push(t('ocr-summary-other').replace('{n}', sum.other));
+    if (sum.success)
+        parts.push(t('ocr-summary-success').replace('{n}', sum.success as unknown as string));
+    if (sum.network)
+        parts.push(t('ocr-summary-network').replace('{n}', sum.network as unknown as string));
+    if (sum.timeout)
+        parts.push(t('ocr-summary-timeout').replace('{n}', sum.timeout as unknown as string));
+    if (sum.quota)
+        parts.push(t('ocr-summary-quota').replace('{n}', sum.quota as unknown as string));
+    if (sum.overloaded)
+        parts.push(t('ocr-summary-overloaded').replace('{n}', sum.overloaded as unknown as string));
+    if (sum.rate) parts.push(t('ocr-summary-rate').replace('{n}', sum.rate as unknown as string));
+    if (sum.other)
+        parts.push(t('ocr-summary-other').replace('{n}', sum.other as unknown as string));
     return parts.join(' · ');
 }
 
 // v118.20.6 · 「停止识别」按钮事件 · 中断 in-flight + 标 abort
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('#btn-stop')) return;
+    if (!(e.target as HTMLElement).closest('#btn-stop')) return;
     if (window._ocrAborted) return; // 防双击
     window._ocrAborted = true;
     if (window._ocrCtrls && window._ocrCtrls.size) {
@@ -451,7 +468,7 @@ document.addEventListener('click', (e) => {
             }
         });
     }
-    const btnStopEl = document.getElementById('btn-stop');
+    const btnStopEl = document.getElementById('btn-stop') as HTMLButtonElement | null;
     if (btnStopEl) btnStopEl.disabled = true;
     if (typeof showToast === 'function') showToast(t('ocr-stop-toast'), 'warn', 2000);
     setTimeout(() => {

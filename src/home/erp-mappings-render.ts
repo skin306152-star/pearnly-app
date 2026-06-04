@@ -46,18 +46,18 @@ function _isSkin() {
     return !!(u && u.id === TEST_USER_ID);
 }
 
-function _esc(s) {
+function _esc(s: unknown) {
     return typeof escapeHtml === 'function'
         ? escapeHtml(s == null ? '' : String(s))
         : String(s == null ? '' : s);
 }
-function _toast(msg, kind) {
+function _toast(msg: string, kind?: string) {
     try {
         if (typeof showToast === 'function') showToast(msg, kind || 'info');
     } catch (e) {}
 }
 
-function _renderHead(sub) {
+function _renderHead(sub: string) {
     if (sub === 'clients') {
         return (
             '<div class="erp-map-row erp-map-head row-clients">' +
@@ -146,21 +146,28 @@ function _renderHead(sub) {
     );
 }
 
-function _erpSelect(currentValue, fieldKey) {
+function _erpSelect(currentValue: string, fieldKey: string) {
     let s = '<select class="form-input" data-erp-field="' + fieldKey + '">';
     s += '<option value="">' + _esc(t('erp-map-pick-erp')) + '</option>';
     ERP_OPTIONS.forEach(function (k) {
         const sel = k === currentValue ? ' selected' : '';
-        s += '<option value="' + k + '"' + sel + '>' + _esc(ERP_LABELS[k]) + '</option>';
+        s +=
+            '<option value="' +
+            k +
+            '"' +
+            sel +
+            '>' +
+            _esc(ERP_LABELS[k as keyof typeof ERP_LABELS]) +
+            '</option>';
     });
     s += '</select>';
     return s;
 }
 
-function _clientSelect(currentClientId) {
+function _clientSelect(currentClientId: string) {
     let s = '<select class="form-input" data-erp-field="client_id">';
     s += '<option value="">' + _esc(t('erp-map-pick-client')) + '</option>';
-    (_state.clientList || []).forEach(function (c) {
+    (_state.clientList || []).forEach(function (c: any) {
         const sel = String(c.id) === String(currentClientId) ? ' selected' : '';
         s += '<option value="' + c.id + '"' + sel + '>' + _esc(c.name || '#' + c.id) + '</option>';
     });
@@ -168,7 +175,7 @@ function _clientSelect(currentClientId) {
     return s;
 }
 
-function _categorySelect(currentValue) {
+function _categorySelect(currentValue: string) {
     let s = '<select class="form-input" data-erp-field="pearnly_category">';
     s += '<option value="">' + _esc(t('erp-map-pick-cat')) + '</option>';
     CATEGORY_OPTIONS.forEach(function (k) {
@@ -179,7 +186,7 @@ function _categorySelect(currentValue) {
     return s;
 }
 
-function _taxKindSelect(currentValue) {
+function _taxKindSelect(currentValue: string) {
     let s = '<select class="form-input" data-erp-field="pearnly_tax_kind">';
     s += '<option value="">' + _esc(t('erp-map-pick-tax')) + '</option>';
     TAX_KIND_OPTIONS.forEach(function (k) {
@@ -190,7 +197,7 @@ function _taxKindSelect(currentValue) {
     return s;
 }
 
-function _renderAddRow(sub) {
+function _renderAddRow(sub: string) {
     const saveBtn =
         '<button class="btn btn-primary" type="button" data-erp-save="new" style="padding:6px 12px;height:32px;">' +
         _esc(t('erp-map-save')) +
@@ -288,7 +295,7 @@ function _renderAddRow(sub) {
     );
 }
 
-function _renderItemRow(sub, it, readonly) {
+function _renderItemRow(sub: string, it: any, readonly: boolean) {
     const delBtn = readonly
         ? ''
         : '<button class="erp-map-del-btn" type="button" data-erp-del="' +
@@ -300,7 +307,7 @@ function _renderItemRow(sub, it, readonly) {
           '</button>';
     const erpBadge =
         '<span class="erp-map-erp-badge">' +
-        _esc(ERP_LABELS[it.erp_type] || it.erp_type) +
+        _esc(ERP_LABELS[it.erp_type as keyof typeof ERP_LABELS] || it.erp_type) +
         '</span>';
     if (sub === 'clients') {
         return (

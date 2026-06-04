@@ -88,7 +88,7 @@ async function showLogDetail(logId: any) {
 
         // 临时任务 (Zihao 2026-05-26) · 把"成功/失败提示"升级成"ERP 推送凭证弹窗"。
         // 端点名优先用后端 join 出来的 endpoint_name(详情 API 已带),兜底查本地 cache。
-        const ep = window._erpEndpoints.find((x) => x.id === log.endpoint_id);
+        const ep = window._erpEndpoints!.find((x) => x.id === log.endpoint_id);
         const epName =
             log.endpoint_name ||
             (ep ? ep.name : log.endpoint_id ? t('erp-log-endpoint-deleted') : '-');

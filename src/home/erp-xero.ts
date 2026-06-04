@@ -29,6 +29,7 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
 
         // Status pill — same class system as MR.ERP card.
         let pill,
+            // @ts-expect-error TS6133 verbatim 占位
             configured = !!s,
             connected = false;
         if (!s) {
@@ -139,7 +140,7 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
         // selector + auto-push toggle + disconnect). Renders only when
         // _isOwner() AND we toggled it open via #btn-xero-edit-toggle.
         if (s && s.configured && s.connected && _isOwner()) {
-            const orgs = s.organisations || [];
+            const orgs = (s.organisations || []) as any[];
             let detailsBody = '';
             if (orgs.length > 0) {
                 detailsBody +=
@@ -149,7 +150,7 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
                 detailsBody +=
                     '<div class="erp-cc-org-label">' + _esc(t('xero-default-org')) + ':</div>';
                 detailsBody += '<div class="erp-cc-orgs">';
-                orgs.forEach(function (o) {
+                orgs.forEach(function (o: any) {
                     detailsBody +=
                         '<label class="erp-cc-org-row">' +
                         '<input type="radio" name="xero-default-org" value="' +
@@ -214,7 +215,9 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
         }
 
         // v118.34.35 · 启用/停用 toggle (= auto_push) · 对齐 MR.ERP 模式
-        const toggleBtn = document.getElementById('btn-xero-toggle-enabled');
+        const toggleBtn = document.getElementById(
+            'btn-xero-toggle-enabled'
+        ) as HTMLButtonElement | null;
         if (toggleBtn) {
             toggleBtn.addEventListener('click', async function (e) {
                 e.preventDefault();
@@ -263,7 +266,10 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
                 window.location.href = data.redirect_url;
             }
         } catch (e) {
-            _toast(t('xero-push-fail').replace('{err}', e.message || 'network'), 'error');
+            _toast(
+                t('xero-push-fail').replace('{err}', (e as Error).message || 'network'),
+                'error'
+            );
         }
     }
 
@@ -280,11 +286,11 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
             await _loadStatus(true);
             _renderCard();
         } catch (e) {
-            _toast(t('xero-push-fail').replace('{err}', e.message), 'error');
+            _toast(t('xero-push-fail').replace('{err}', (e as Error).message), 'error');
         }
     }
 
-    async function _onSelectOrg(tokenId) {
+    async function _onSelectOrg(tokenId: any) {
         const tk = localStorage.getItem('mrpilot_token');
         try {
             const r = await fetch('/api/erp/xero/select_org', {
@@ -299,12 +305,12 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
             await _loadStatus(true);
             _renderCard();
         } catch (e) {
-            _toast(t('xero-push-fail').replace('{err}', e.message), 'error');
+            _toast(t('xero-push-fail').replace('{err}', (e as Error).message), 'error');
         }
     }
 
     // v27.8.1.3 · 切自动推送开关
-    async function _onToggleAutoPush(on, checkboxEl) {
+    async function _onToggleAutoPush(on: any, checkboxEl: any) {
         const tk = localStorage.getItem('mrpilot_token');
         if (checkboxEl) checkboxEl.disabled = true;
         try {
@@ -332,7 +338,7 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
             // 回滚 checkbox 状态
             if (checkboxEl) checkboxEl.checked = !on;
             _toast(
-                t('erp-auto-push-toggle-fail').replace('{err}', e.message || 'network'),
+                t('erp-auto-push-toggle-fail').replace('{err}', (e as Error).message || 'network'),
                 'error'
             );
         } finally {
@@ -371,24 +377,28 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
 
         document.addEventListener('click', function (ev) {
             // 进入 ERP 对接 → connect sub-tab
-            const subBtn = ev.target.closest('.erp-subtab[data-erp-subtab="connect"]');
+            const subBtn = (ev.target as HTMLElement).closest(
+                '.erp-subtab[data-erp-subtab="connect"]'
+            );
             if (subBtn) {
                 setTimeout(_onEnterConnectSubtab, 50);
                 return;
             }
             // 进入 ERP 对接 panel(自动化 nav)
-            const erpAutoTab = ev.target.closest('.auto-nav-item[data-auto-tab="erp"]');
+            const erpAutoTab = (ev.target as HTMLElement).closest(
+                '.auto-nav-item[data-auto-tab="erp"]'
+            );
             if (erpAutoTab) {
                 setTimeout(_onEnterConnectSubtab, 80);
                 return;
             }
             // 卡片按钮
-            if (ev.target.closest('#btn-xero-connect')) {
+            if ((ev.target as HTMLElement).closest('#btn-xero-connect')) {
                 ev.preventDefault();
                 _onConnect();
                 return;
             }
-            if (ev.target.closest('#btn-xero-disconnect')) {
+            if ((ev.target as HTMLElement).closest('#btn-xero-disconnect')) {
                 ev.preventDefault();
                 _onDisconnect();
                 return;
@@ -396,16 +406,19 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
         });
 
         document.addEventListener('change', function (ev) {
-            if (ev.target && ev.target.matches('input[name="xero-default-org"]')) {
-                _onSelectOrg(ev.target.value);
+            if (
+                ev.target &&
+                (ev.target as HTMLInputElement).matches('input[name="xero-default-org"]')
+            ) {
+                _onSelectOrg((ev.target as HTMLInputElement).value);
             }
             // v27.8.1.3 · auto-push toggle
-            if (ev.target && ev.target.id === 'xero-auto-push-toggle') {
-                _onToggleAutoPush(ev.target.checked, ev.target);
+            if (ev.target && (ev.target as HTMLInputElement).id === 'xero-auto-push-toggle') {
+                _onToggleAutoPush((ev.target as HTMLInputElement).checked, ev.target);
             }
             // P1b · 全局 ERP 自动处理方式 select
-            if (ev.target && ev.target.id === 'erp-global-push-mode') {
-                _onChangeGlobalPushMode(ev.target);
+            if (ev.target && (ev.target as HTMLSelectElement).id === 'erp-global-push-mode') {
+                _onChangeGlobalPushMode(ev.target as HTMLSelectElement);
             }
         });
 
@@ -456,7 +469,7 @@ import { _injectPushBtn, _loadGlobalPushMode, _onChangeGlobalPushMode } from './
     }
     // v27.8.1.2 · 修「老板按钮 30 秒空白」bug · 之前 setTimeout 600ms 太短
     // 改 polling _userInfo 就绪 + 进 sub-tab 时主动渲(connect tab 默认 active)
-    async function _waitForUserInfo(maxMs) {
+    async function _waitForUserInfo(maxMs?: any) {
         const start = Date.now();
         while (Date.now() - start < (maxMs || 5000)) {
             // _userInfo 是文件作用域 let · IIFE 走作用域链可访问

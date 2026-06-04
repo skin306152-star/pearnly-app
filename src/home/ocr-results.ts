@@ -18,30 +18,33 @@
 // ============================================================
 // 结果渲染
 // ============================================================
+type ResultRow = OcrResult & { _idx: number };
+
 function renderResults() {
     const card = document.getElementById('results-card');
     if (_results.length === 0) {
-        card.classList.remove('show');
+        card!.classList.remove('show');
         return;
     }
-    card.classList.add('show');
+    card!.classList.add('show');
 
     // 顶部统计条:发票数 · 识别成功率 · 合计金额(一行)
     // v118.20.1.6 · 改用「识别成功率」语义(以前的「高置信」会误导用户跳过复核)
     let totalSum = 0;
     _results.forEach((r) => {
-        const v = parseFloat(r.merged_fields.total_amount);
+        const v = parseFloat(r.merged_fields.total_amount as string);
         if (!isNaN(v)) totalSum += v;
     });
     const totalFiles = (_selectedFiles && _selectedFiles.length) || _results.length;
     const successCount = _results.length;
+    // @ts-expect-error TS6133 verbatim 占位
     const successRate = totalFiles > 0 ? Math.round((successCount / totalFiles) * 100) : 0;
     const totalFmt = totalSum.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
 
-    document.getElementById('results-head-stats').innerHTML = `
+    document.getElementById('results-head-stats')!.innerHTML = `
         <div class="rh-stat">
             <span class="rh-stat-value">${successCount}</span>
             <span class="rh-stat-label">${t('stats-invoices')}</span>
@@ -53,18 +56,18 @@ function renderResults() {
     `;
 
     // 过滤 + 排序
-    let rows = _results.map((r, idx) => ({ ...r, _idx: idx }));
+    let rows: ResultRow[] = _results.map((r, idx) => ({ ...r, _idx: idx }) as ResultRow);
     if (_searchKeyword) {
         const kw = _searchKeyword.toLowerCase();
         rows = rows.filter(
             (r) =>
-                (r.filename || '').toLowerCase().includes(kw) ||
-                (r.merged_fields.invoice_number || '').toLowerCase().includes(kw)
+                ((r.filename as string) || '').toLowerCase().includes(kw) ||
+                ((r.merged_fields.invoice_number as string) || '').toLowerCase().includes(kw)
         );
     }
     if (_sortKey) {
         rows.sort((a, b) => {
-            let va, vb;
+            let va: unknown, vb: unknown;
             if (_sortKey === 'filename') {
                 va = a.filename;
                 vb = b.filename;
@@ -75,8 +78,8 @@ function renderResults() {
                 va = a.merged_fields.date;
                 vb = b.merged_fields.date;
             } else if (_sortKey === 'total') {
-                va = parseFloat(a.merged_fields.total_amount) || 0;
-                vb = parseFloat(b.merged_fields.total_amount) || 0;
+                va = parseFloat(a.merged_fields.total_amount as string) || 0;
+                vb = parseFloat(b.merged_fields.total_amount as string) || 0;
             } else if (_sortKey === 'confidence') {
                 va = a.confidence;
                 vb = b.confidence;
@@ -84,19 +87,19 @@ function renderResults() {
                 va = '';
                 vb = '';
             }
-            if (va < vb) return _sortDir === 'asc' ? -1 : 1;
-            if (va > vb) return _sortDir === 'asc' ? 1 : -1;
+            if ((va as number) < (vb as number)) return _sortDir === 'asc' ? -1 : 1;
+            if ((va as number) > (vb as number)) return _sortDir === 'asc' ? 1 : -1;
             return 0;
         });
     }
 
     const tbody = document.getElementById('results-tbody');
-    tbody.innerHTML = rows
+    tbody!.innerHTML = rows
         .map((r, visibleIdx) => {
             const f = r.merged_fields;
             const emptyCell = `<span class="empty-cell">${t('empty-val')}</span>`;
-            const confTipKey = 'conf-tip-' + (r.confidence || 'low');
-            const confLabelKey = 'conf-' + (r.confidence || 'low');
+            const confTipKey = 'conf-tip-' + ((r.confidence as string) || 'low');
+            const confLabelKey = 'conf-' + ((r.confidence as string) || 'low');
             const confTip = t(confTipKey);
             const confLabel = t(confLabelKey);
             return `
@@ -106,7 +109,7 @@ function renderResults() {
                 <td class="inv">${f.invoice_number ? escapeHtml(f.invoice_number) : emptyCell}</td>
                 <td class="date">${f.date ? escapeHtml(f.date) : emptyCell}</td>
                 <td class="amount">${f.total_amount ? Number(f.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : emptyCell}</td>
-                <td><span class="conf-badge ${r.confidence}" data-tip="${escapeHtml(confTip)}">${confLabel}</span></td>
+                <td><span class="conf-badge ${r.confidence as string}" data-tip="${escapeHtml(confTip)}">${confLabel}</span></td>
             </tr>
         `;
         })
@@ -114,12 +117,12 @@ function renderResults() {
 
     document.querySelectorAll('#results-table th').forEach((th) => {
         th.classList.remove('sort-asc', 'sort-desc');
-        if (th.dataset.sort === _sortKey) th.classList.add('sort-' + _sortDir);
+        if ((th as HTMLElement).dataset.sort === _sortKey) th.classList.add('sort-' + _sortDir);
     });
 
-    tbody.querySelectorAll('tr').forEach((tr) => {
+    tbody!.querySelectorAll('tr').forEach((tr) => {
         tr.addEventListener('click', () => {
-            const idx = parseInt(tr.dataset.idx, 10);
+            const idx = parseInt(tr.dataset.idx!, 10);
             openDrawer(idx);
         });
     });
@@ -129,7 +132,7 @@ function renderResults() {
 document.querySelectorAll('#results-table th').forEach((th) => {
     if (th.classList.contains('no-sort')) return;
     th.addEventListener('click', () => {
-        const key = th.dataset.sort;
+        const key = (th as HTMLElement).dataset.sort as string;
         if (_sortKey === key) _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
         else {
             _sortKey = key;
@@ -140,22 +143,22 @@ document.querySelectorAll('#results-table th').forEach((th) => {
 });
 
 // v0.11 · 识别页搜索:防抖 + 清除按钮 + 匹配计数
-let _resultsSearchTimer = null;
-document.getElementById('search-input').addEventListener('input', (e) => {
-    const val = e.target.value;
-    document.getElementById('search-clear').style.display = val ? '' : 'none';
-    clearTimeout(_resultsSearchTimer);
+let _resultsSearchTimer: ReturnType<typeof setTimeout> | null = null;
+document.getElementById('search-input')!.addEventListener('input', (e) => {
+    const val = (e.target as HTMLInputElement).value;
+    document.getElementById('search-clear')!.style.display = val ? '' : 'none';
+    clearTimeout(_resultsSearchTimer!);
     _resultsSearchTimer = setTimeout(() => {
         _searchKeyword = val.trim();
         renderResults();
         updateResultsMatchCount();
     }, 200);
 });
-document.getElementById('search-clear').addEventListener('click', () => {
-    const input = document.getElementById('search-input');
+document.getElementById('search-clear')!.addEventListener('click', () => {
+    const input = document.getElementById('search-input') as HTMLInputElement;
     input.value = '';
     _searchKeyword = '';
-    document.getElementById('search-clear').style.display = 'none';
+    document.getElementById('search-clear')!.style.display = 'none';
     renderResults();
     updateResultsMatchCount();
     input.focus();
@@ -188,17 +191,19 @@ function updateResultsMatchCount() {
 // ============================================================
 // 抽屉
 // ============================================================
-function openDrawer(idx) {
+function openDrawer(idx: number) {
     _drawerIdx = idx;
     const r = _results[idx];
     if (!r) return;
 
-    document.getElementById('drawer-title').textContent = r.filename;
+    document.getElementById('drawer-title')!.textContent = r.filename as string;
 
     // 副标题:页数 + 耗时 + 缓存标记(隐藏引擎档位 · v0.15.6)
     const isCached = r.engine === 'cache' || r.from_cache;
-    const timeText = isCached ? t('badge-cached-hint') : `${(r.elapsed_ms / 1000).toFixed(1)}s`;
-    document.getElementById('drawer-sub').innerHTML = `
+    const timeText = isCached
+        ? t('badge-cached-hint')
+        : `${((r.elapsed_ms as number) / 1000).toFixed(1)}s`;
+    document.getElementById('drawer-sub')!.innerHTML = `
         <span>${r.page_count} ${t('pages-unit')} · ${escapeHtml(timeText)}</span>
         ${isCached ? `<span class="engine-badge cached">${escapeHtml(t('badge-cached'))}</span>` : ''}
         <span class="drawer-edit-count" id="drawer-edit-count-sub"></span>
@@ -209,7 +214,7 @@ function openDrawer(idx) {
     const canVerifyTax = _userInfo && _userInfo.can_verify_tax;
 
     const f = r.merged_fields;
-    const body = document.getElementById('drawer-body');
+    const body = document.getElementById('drawer-body') as HTMLElement;
 
     const readonlyBanner = canEdit
         ? ''
@@ -330,7 +335,7 @@ function openDrawer(idx) {
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l7-4 7 4v7l-7 4-7-4z"/><path d="M3 7l7 4 7-4M10 11v8"/></svg>
                 ${t('drawer-sec-items')}
             </div>
-            ${f.items && f.items.length > 0 ? renderItems(f.items) : `<div class="drawer-items-empty">${t('drawer-items-empty')}</div>`}
+            ${f.items && (f.items as unknown[]).length > 0 ? renderItems(f.items as Array<Record<string, unknown>>) : `<div class="drawer-items-empty">${t('drawer-items-empty')}</div>`}
         </div>
 
         <div class="drawer-section">
@@ -339,7 +344,7 @@ function openDrawer(idx) {
 
         <details class="raw-text">
             <summary>${t('raw-text')}</summary>
-            <pre>${escapeHtml(r.pages.map((p) => `--- Page ${p.page || p.page_number || '?'} ---\n${p.raw_text || p.text || ''}`).join('\n\n'))}</pre>
+            <pre>${escapeHtml((r.pages as Array<Record<string, unknown>>).map((p) => `--- Page ${p.page || p.page_number || '?'} ---\n${p.raw_text || p.text || ''}`).join('\n\n'))}</pre>
         </details>
     `;
 
@@ -354,8 +359,8 @@ function openDrawer(idx) {
         });
     }
 
-    document.getElementById('drawer-mask').classList.add('show');
-    document.getElementById('drawer').classList.add('show');
+    document.getElementById('drawer-mask')!.classList.add('show');
+    document.getElementById('drawer')!.classList.add('show');
 
     // 识别页抽屉底部推 ERP 按钮(历史模式由另一个函数 injectHistorySaveButton 处理)
     injectOcrPushButton();
@@ -374,19 +379,27 @@ function openDrawer(idx) {
     // v118.19 · 键盘流 · 如果记账科目为空 · 自动 focus 让会计直接键盘录入
     // 之所以 focus 科目而不是客户:学过的供应商客户通常自动绑定 · 科目才是会计每天主动填的字段
     setTimeout(() => {
-        const catInput = document.getElementById('drawer-cat-input');
+        const catInput = document.getElementById('drawer-cat-input') as HTMLInputElement | null;
         if (catInput && !catInput.value && !catInput.readOnly) {
             catInput.focus();
         }
     }, 80);
 }
 
-function renderWhtBadge(rate) {
+function renderWhtBadge(rate: unknown) {
     if (!rate) return '';
     return `<span class="wht-badge">${escapeHtml(rate)}%</span>`;
 }
 
-function renderField(key, labelKey, value, type, canEdit, badgeHtml, actionsHtml) {
+function renderField(
+    key: string,
+    labelKey: string,
+    value: unknown,
+    type: string,
+    canEdit: unknown,
+    badgeHtml?: string,
+    actionsHtml?: string
+) {
     const r = _results[_drawerIdx];
     const editedValue = r && r.edits[key] !== undefined ? r.edits[key] : value;
     const edited = r && r.edits[key] !== undefined && r.edits[key] !== value;
@@ -410,7 +423,7 @@ function renderField(key, labelKey, value, type, canEdit, badgeHtml, actionsHtml
 }
 
 // 渲染税号字段右上角的 RD 按钮(校验 + 同步)
-function renderRdActions(side) {
+function renderRdActions(side: string) {
     // side: 'seller' 或 'buyer'
     const canVerify = _userInfo && _userInfo.can_verify_tax;
     if (!canVerify) {
@@ -432,7 +445,7 @@ function renderRdActions(side) {
     `;
 }
 
-function renderItems(items) {
+function renderItems(items: Array<Record<string, unknown>>) {
     return `
         <div class="drawer-items-header">
             <div>${t('drawer-item-name')}</div>
@@ -456,8 +469,8 @@ function renderItems(items) {
 }
 
 function closeDrawer() {
-    document.getElementById('drawer-mask').classList.remove('show');
-    document.getElementById('drawer').classList.remove('show');
+    document.getElementById('drawer-mask')!.classList.remove('show');
+    document.getElementById('drawer')!.classList.remove('show');
     // 清理抽屉底部的按钮栏(下次打开会重新注入)
     const existingHistoryBar = document.getElementById('drawer-history-save');
     if (existingHistoryBar) existingHistoryBar.remove();

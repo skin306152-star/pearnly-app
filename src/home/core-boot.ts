@@ -7,7 +7,7 @@
 // ============================================================
 // 语言切换
 // ============================================================
-function applyLang(lang) {
+function applyLang(lang?: any) {
     // v117 · 防止切语言时看到"左侧先变 / 右侧后变"的分帧顺序
     // 加 class → 同步替换 DOM → 双 rAF 后移除 class · 让所有 i18n 文字一起淡入
     document.body.classList.add('lang-switching');
@@ -56,23 +56,23 @@ function applyLang(lang) {
     } catch (e) {}
 
     document.querySelectorAll('[data-i18n]').forEach((el) => {
-        const key = el.getAttribute('data-i18n');
+        const key = el.getAttribute('data-i18n') as string;
         if (I18N[lang] && I18N[lang][key]) el.textContent = I18N[lang][key];
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-        const key = el.getAttribute('data-i18n-placeholder');
-        if (I18N[lang] && I18N[lang][key]) el.placeholder = I18N[lang][key];
+        const key = el.getAttribute('data-i18n-placeholder') as string;
+        if (I18N[lang] && I18N[lang][key]) (el as HTMLInputElement).placeholder = I18N[lang][key];
     });
 
     // v118.28.5 · 顶栏 lang-current / lang-dropdown 已删除 · 改为兜防御 + 同步设置页
     const _langCurrent = document.getElementById('lang-current');
     if (_langCurrent) _langCurrent.textContent = I18N[lang]['lang-name'];
     document.querySelectorAll('#lang-dropdown .dd-item').forEach((item) => {
-        item.classList.toggle('active', item.dataset.lang === lang);
+        item.classList.toggle('active', (item as HTMLElement).dataset.lang === lang);
     });
     // v118.28.5.1 · 设置 → 系统 → 通用设置:同步语言 select 当前选中项
     const _genLangSel = document.getElementById('general-lang');
-    if (_genLangSel) _genLangSel.value = lang;
+    if (_genLangSel) (_genLangSel as HTMLSelectElement).value = lang;
 
     // 置信度列 tooltip
     const th = document.getElementById('col-conf-th');
@@ -164,7 +164,7 @@ function applyLang(lang) {
     // v118.26.1.2 · 统一通知所有用 subscribeI18n 注册的模块
     // (新模块走这条路径 · 不再加散落的 try 块)
     if (Array.isArray(window.__i18nSubs)) {
-        for (const sub of window.__i18nSubs) {
+        for (const sub of window.__i18nSubs as any[]) {
             try {
                 sub.fn();
             } catch (e) {
@@ -191,11 +191,11 @@ function applyLang(lang) {
 // ============================================================
 // 下拉菜单通用
 // ============================================================
-function setupDropdown(id, onSelect) {
+function setupDropdown(id?: any, onSelect?: any) {
     const dd = document.getElementById(id);
     if (!dd) return;
     const toggle = dd.querySelector('.dd-btn');
-    toggle.addEventListener('click', (e) => {
+    toggle!.addEventListener('click', (e) => {
         e.stopPropagation();
         document.querySelectorAll('.dropdown.open').forEach((el) => {
             if (el !== dd) el.classList.remove('open');
@@ -213,7 +213,7 @@ function setupDropdown(id, onSelect) {
 document.addEventListener('click', () => {
     document.querySelectorAll('.dropdown.open').forEach((el) => el.classList.remove('open'));
 });
-setupDropdown('lang-dropdown', (item) => applyLang(item.dataset.lang));
+setupDropdown('lang-dropdown', (item: any) => applyLang(item.dataset.lang));
 
 // v118.32.5.5.37 NAV-IA Phase 5: automation 页面无侧边栏入口且不可路由 · 银行上传改为对账中心原地上传
 const VALID_ROUTES = [
@@ -235,7 +235,7 @@ const VALID_ROUTES = [
     'test-center',
 ];
 
-function routeTo(route) {
+function routeTo(route?: any) {
     // REFACTOR-C1 · 老 admin/admin-users/admin-cost 路由已下线(超管走独立 /admin SPA)· 落到 ocr
     if (!VALID_ROUTES.includes(route)) route = 'ocr';
     currentRoute = route;
@@ -250,7 +250,7 @@ function routeTo(route) {
     if (pageEl) pageEl.classList.add('active');
     // 侧栏激活
     document.querySelectorAll('.nav-item').forEach((item) => {
-        item.classList.toggle('active', item.dataset.route === route);
+        item.classList.toggle('active', (item as HTMLElement).dataset.route === route);
     });
     // URL hash
     if (location.hash !== '#/' + route) {
@@ -297,7 +297,7 @@ function routeTo(route) {
 
 function updateUploadHint() {
     if (!_quota) return;
-    document.getElementById('upload-hint').textContent = t('upload-hint', {
+    document.getElementById('upload-hint')!.textContent = t('upload-hint', {
         pages: getMaxPagesPerFile(), // v111.2 · 用 plan limits
         mb: getMaxMbPerFile(), // v111.2 · 用 plan limits
         files: getMaxFiles(),

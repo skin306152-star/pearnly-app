@@ -18,7 +18,7 @@
     'use strict';
 
     // ---- 测试白名单判定(复刻 test-center _isAllowed 同款 3 条件) ----
-    function _isInTestWhitelist(u) {
+    function _isInTestWhitelist(u: any) {
         try {
             if (location.search.indexOf('test_center=1') >= 0) return true;
             if (localStorage.getItem('pearnly_test_mode') === '1') return true;
@@ -50,20 +50,30 @@
             isTest = _isInTestWhitelist(u);
         }
 
-        document.querySelectorAll('[data-show-if-team]').forEach(function (el) {
+        document.querySelectorAll<HTMLElement>('[data-show-if-team]').forEach(function (
+            el: HTMLElement
+        ) {
             el.style.display = canTeam ? '' : 'none';
         });
-        document.querySelectorAll('[data-show-if-money]').forEach(function (el) {
+        document.querySelectorAll<HTMLElement>('[data-show-if-money]').forEach(function (
+            el: HTMLElement
+        ) {
             el.style.display = hideMoney ? 'none' : '';
         });
-        document.querySelectorAll('[data-show-if-admin]').forEach(function (el) {
+        document.querySelectorAll<HTMLElement>('[data-show-if-admin]').forEach(function (
+            el: HTMLElement
+        ) {
             el.style.display = isSuper ? '' : 'none';
         });
-        document.querySelectorAll('[data-show-if-test]').forEach(function (el) {
+        document.querySelectorAll<HTMLElement>('[data-show-if-test]').forEach(function (
+            el: HTMLElement
+        ) {
             el.style.display = isTest ? '' : 'none';
         });
         var anySpecial = isSuper || isTest;
-        document.querySelectorAll('[data-show-if-special]').forEach(function (el) {
+        document.querySelectorAll<HTMLElement>('[data-show-if-special]').forEach(function (
+            el: HTMLElement
+        ) {
             el.style.display = anySpecial ? '' : 'none';
         });
     };
@@ -106,30 +116,32 @@
         if (!wrap || !btn || !popup) return;
 
         function closePopup() {
-            popup.classList.remove('show');
-            btn.setAttribute('aria-expanded', 'false');
+            popup!.classList.remove('show');
+            btn!.setAttribute('aria-expanded', 'false');
         }
         function openPopup() {
-            popup.classList.add('show');
-            btn.setAttribute('aria-expanded', 'true');
+            popup!.classList.add('show');
+            btn!.setAttribute('aria-expanded', 'true');
         }
 
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
-            if (popup.classList.contains('show')) closePopup();
+            if (popup!.classList.contains('show')) closePopup();
             else openPopup();
         });
 
         // 外部点击关闭(仅当 popup 开着 + 点击点不在 wrap 内)
         document.addEventListener('click', function (e) {
-            if (popup.classList.contains('show') && !wrap.contains(e.target)) {
+            if (popup!.classList.contains('show') && !wrap!.contains(e.target as Node | null)) {
                 closePopup();
             }
         });
 
         // 9 项 data-action 事件委托
         popup.addEventListener('click', function (e) {
-            var item = e.target.closest('.avatar-popup-item');
+            var item = (e.target as HTMLElement).closest(
+                '.avatar-popup-item'
+            ) as HTMLElement | null;
             if (!item) return;
             var action = item.dataset.action;
             closePopup();
@@ -192,11 +204,13 @@
 
     // ---- Cmd+K 命令面板 ----
     function _cmdkVisibleItems() {
-        return [].slice.call(document.querySelectorAll('.cmdk-item')).filter(function (el) {
-            return el.style.display !== 'none';
-        });
+        return ([].slice.call(document.querySelectorAll('.cmdk-item')) as HTMLElement[]).filter(
+            function (el) {
+                return el.style.display !== 'none';
+            }
+        );
     }
-    function _cmdkSetFocus(idx) {
+    function _cmdkSetFocus(idx: number) {
         var items = _cmdkVisibleItems();
         items.forEach(function (i) {
             i.classList.remove('focus');
@@ -206,7 +220,7 @@
             items[idx].scrollIntoView({ block: 'nearest' });
         }
     }
-    function _cmdkMoveFocus(delta) {
+    function _cmdkMoveFocus(delta: number) {
         var items = _cmdkVisibleItems();
         if (!items.length) return;
         var cur = items.findIndex(function (i) {
@@ -216,7 +230,7 @@
         var next = (cur + delta + items.length) % items.length;
         _cmdkSetFocus(next);
     }
-    function _cmdkFilter(q) {
+    function _cmdkFilter(q: string) {
         q = (q || '').toLowerCase().trim();
         var visibleCount = 0;
         var u = window._userInfo;
@@ -224,7 +238,7 @@
             typeof isSuperAdmin === 'function' ? isSuperAdmin(u) : !!(u && u.is_super_admin);
         var isTest = _isInTestWhitelist(u);
 
-        document.querySelectorAll('.cmdk-item').forEach(function (item) {
+        document.querySelectorAll<HTMLElement>('.cmdk-item').forEach(function (item: HTMLElement) {
             // 权限项硬过滤(不显在 cmdk 里 · 不参与计数)
             if (item.dataset.showIfAdmin === '1' && !isSuper) {
                 item.style.display = 'none';
@@ -243,14 +257,16 @@
         });
 
         // section 标题:该区无可见项时隐
-        document.querySelectorAll('[data-cmdk-section]').forEach(function (s) {
+        document.querySelectorAll<HTMLElement>('[data-cmdk-section]').forEach(function (
+            s: HTMLElement
+        ) {
             var n = s.nextElementSibling,
                 any = false;
             while (n && !n.hasAttribute('data-cmdk-section')) {
                 if (
                     n.classList &&
                     n.classList.contains('cmdk-item') &&
-                    n.style.display !== 'none'
+                    (n as HTMLElement).style.display !== 'none'
                 ) {
                     any = true;
                     break;
@@ -276,7 +292,7 @@
         setTimeout(function () {
             var input = document.getElementById('cmdk-input');
             if (!input) return;
-            input.value = '';
+            (input as HTMLInputElement).value = '';
             _cmdkFilter('');
             input.focus();
             _cmdkSetFocus(0);
@@ -287,7 +303,7 @@
         if (mask) mask.classList.remove('show');
     };
 
-    function _cmdkActivate(item) {
+    function _cmdkActivate(item: HTMLElement | null) {
         if (!item) return;
         // 「即将」项:不执行 · toast 提示
         if (item.classList.contains('cmdk-item-locked')) {
@@ -299,7 +315,7 @@
         }
         var route = item.dataset.cmdkRoute;
         var action = item.dataset.cmdkAction;
-        window.closeCmdk();
+        window.closeCmdk!();
 
         if (route) {
             if (typeof routeTo === 'function') routeTo(route);
@@ -325,17 +341,17 @@
 
         // 点 mask 自身关闭(不冒泡到内部)
         mask.addEventListener('click', function (e) {
-            if (e.target === mask) window.closeCmdk();
+            if (e.target === mask) window.closeCmdk!();
         });
         var escBtn = document.getElementById('cmdk-esc-btn');
         if (escBtn)
             escBtn.addEventListener('click', function () {
-                window.closeCmdk();
+                window.closeCmdk!();
             });
 
         // 输入过滤
         input.addEventListener('input', function (e) {
-            _cmdkFilter(e.target.value);
+            _cmdkFilter((e.target as HTMLInputElement).value);
         });
         input.addEventListener('keydown', function (e) {
             if (e.key === 'ArrowDown') {
@@ -346,21 +362,21 @@
                 _cmdkMoveFocus(-1);
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                _cmdkActivate(mask.querySelector('.cmdk-item.focus'));
+                _cmdkActivate(mask!.querySelector('.cmdk-item.focus') as HTMLElement | null);
             } else if (e.key === 'Escape') {
                 e.preventDefault();
-                window.closeCmdk();
+                window.closeCmdk!();
             }
         });
 
         // 列表点击委托
         body.addEventListener('click', function (e) {
-            var item = e.target.closest('.cmdk-item');
+            var item = (e.target as HTMLElement).closest('.cmdk-item') as HTMLElement | null;
             if (item) _cmdkActivate(item);
         });
         // 鼠标 hover 切焦点
         body.addEventListener('mousemove', function (e) {
-            var item = e.target.closest('.cmdk-item');
+            var item = (e.target as HTMLElement).closest('.cmdk-item') as HTMLElement | null;
             if (
                 !item ||
                 item.style.display === 'none' ||
@@ -377,12 +393,12 @@
         var tbs = document.getElementById('topbar-search');
         if (tbs) {
             tbs.addEventListener('click', function () {
-                window.openCmdk();
+                window.openCmdk!();
             });
             tbs.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    window.openCmdk();
+                    window.openCmdk!();
                 }
             });
         }
@@ -393,7 +409,7 @@
         // ⌘K / Ctrl+K
         if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
             e.preventDefault();
-            window.openCmdk();
+            window.openCmdk!();
             return;
         }
         // ESC 链:cmdk → avatar-popup(只关一层)
@@ -401,7 +417,7 @@
             var mask = document.getElementById('cmdk-mask');
             if (mask && mask.classList.contains('show')) {
                 // input 内的 ESC 已由 _initCmdk 处理 · 这里兜底
-                window.closeCmdk();
+                window.closeCmdk!();
                 return;
             }
             var popup = document.getElementById('avatar-popup');

@@ -18,15 +18,15 @@
     'use strict';
 
     var DEFAULT_URL = 'https://www.mrerp4sme.com/dms/index.php';
-    var _ep = null; // the saved mrerp_dms endpoint (or null)
+    var _ep: any = null; // the saved mrerp_dms endpoint (or null)
     var _loaded = false;
 
-    function _esc(s) {
+    function _esc(s: any) {
         return typeof escapeHtml === 'function'
             ? escapeHtml(s == null ? '' : String(s))
             : String(s == null ? '' : s);
     }
-    function _toast(msg, kind) {
+    function _toast(msg: any, kind?: any) {
         try {
             if (typeof showToast === 'function') showToast(msg, kind || 'info');
         } catch (e) {}
@@ -35,7 +35,7 @@
         return localStorage.getItem('mrpilot_token');
     }
 
-    async function _loadEndpoint(force) {
+    async function _loadEndpoint(force?: any) {
         if (_loaded && !force) return _ep;
         var tk = _tk();
         if (!tk) return null;
@@ -47,7 +47,7 @@
             var data = await r.json();
             var items = (data && data.items) || [];
             _ep =
-                items.find(function (e) {
+                items.find(function (e: any) {
                     return e && (e.adapter || '').toLowerCase() === 'mrerp_dms';
                 }) || null;
             _loaded = true;
@@ -144,7 +144,7 @@
         if (ov) ov.remove();
         document.removeEventListener('keydown', _onEsc);
     }
-    function _onEsc(e) {
+    function _onEsc(e: KeyboardEvent) {
         if (e.key === 'Escape') _closeWizard();
     }
 
@@ -159,7 +159,7 @@
                 ep.config.booking_defaults.booking_prefix) ||
             'PN';
 
-        var field = function (labelKey, id, type, value, ph) {
+        var field = function (labelKey: any, id: any, type: any, value: any, ph?: any) {
             return (
                 '<label style="display:block;margin-bottom:12px;">' +
                 '<span style="display:block;font-size:13px;color:var(--muted,#6b6b66);margin-bottom:5px;">' +
@@ -216,7 +216,7 @@
         if (userEl) userEl.focus();
     }
 
-    function _wizErr(msg) {
+    function _wizErr(msg: any) {
         var el = document.getElementById('dms-w-err');
         if (el) {
             el.textContent = msg;
@@ -227,16 +227,17 @@
     async function _saveWizard() {
         // DMS 地址写死(界面已隐藏)· 编辑态沿用已存 system_url,新建用 DEFAULT_URL。
         var url = (_ep && _ep.config && _ep.config.system_url) || DEFAULT_URL;
-        var user = (document.getElementById('dms-w-user') || {}).value || '';
-        var pass = (document.getElementById('dms-w-pass') || {}).value || '';
-        var prefix = (document.getElementById('dms-w-prefix') || {}).value || 'PN';
+        var user = ((document.getElementById('dms-w-user') || {}) as HTMLInputElement).value || '';
+        var pass = ((document.getElementById('dms-w-pass') || {}) as HTMLInputElement).value || '';
+        var prefix =
+            ((document.getElementById('dms-w-prefix') || {}) as HTMLInputElement).value || 'PN';
         url = url.trim();
         user = user.trim();
         if (!url || !user || !pass) {
             _wizErr(t('dms-wizard-required'));
             return;
         }
-        var saveBtn = document.getElementById('dms-w-save');
+        var saveBtn = document.getElementById('dms-w-save') as HTMLButtonElement | null;
         if (saveBtn) {
             saveBtn.disabled = true;
             saveBtn.textContent = t('dms-wizard-saving');
@@ -380,35 +381,38 @@
     }
 
     document.addEventListener('click', function (ev) {
-        if (ev.target.closest('.erp-subtab[data-erp-subtab="connect"]')) {
+        if ((ev.target as HTMLElement).closest('.erp-subtab[data-erp-subtab="connect"]')) {
             setTimeout(_onEnterConnectSubtab, 60);
             return;
         }
-        if (ev.target.closest('.auto-nav-item[data-auto-tab="erp"]')) {
+        if ((ev.target as HTMLElement).closest('.auto-nav-item[data-auto-tab="erp"]')) {
             setTimeout(_onEnterConnectSubtab, 90);
             return;
         }
-        if (ev.target.closest('#btn-dms-connect') || ev.target.closest('#btn-dms-edit')) {
+        if (
+            (ev.target as HTMLElement).closest('#btn-dms-connect') ||
+            (ev.target as HTMLElement).closest('#btn-dms-edit')
+        ) {
             ev.preventDefault();
             _openWizard();
             return;
         }
-        if (ev.target.closest('#dms-w-cancel')) {
+        if ((ev.target as HTMLElement).closest('#dms-w-cancel')) {
             ev.preventDefault();
             _closeWizard();
             return;
         }
-        if (ev.target.closest('#dms-w-save')) {
+        if ((ev.target as HTMLElement).closest('#dms-w-save')) {
             ev.preventDefault();
             _saveWizard();
             return;
         }
-        if (ev.target.closest('#btn-dms-test')) {
+        if ((ev.target as HTMLElement).closest('#btn-dms-test')) {
             ev.preventDefault();
             _testSaved();
             return;
         }
-        if (ev.target.closest('#btn-dms-toggle')) {
+        if ((ev.target as HTMLElement).closest('#btn-dms-toggle')) {
             ev.preventDefault();
             _toggleEnabled();
             return;

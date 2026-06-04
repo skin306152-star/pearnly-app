@@ -59,9 +59,9 @@ async function _ensureErpSelectOptions() {
         }
         if (!Array.isArray(eps)) eps = [];
         const seen = new Set();
-        const opts = [];
-        eps.forEach((e) => {
-            const ad = ((e && e.adapter) || '').toLowerCase();
+        const opts: { val: string; label: string }[] = [];
+        (eps as any[]).forEach((e) => {
+            const ad = (((e && e.adapter) || '') as string).toLowerCase();
             if (!ad || seen.has(ad)) return;
             seen.add(ad);
             opts.push({ val: ad, label: (e && e.name) || ad });
@@ -79,7 +79,7 @@ async function _ensureErpSelectOptions() {
     }
 }
 
-async function loadErpLogs(silent) {
+async function loadErpLogs(silent?: boolean) {
     const listEl = document.getElementById('erp-logs-list');
     if (!listEl) return;
 
@@ -114,7 +114,7 @@ async function loadErpLogs(silent) {
             window._erpLogPollTimer = null;
         }
         if (
-            items.some(function (l) {
+            items.some(function (l: any) {
                 return l.status === 'pending';
             })
         ) {
@@ -131,14 +131,14 @@ async function loadErpLogs(silent) {
         // 仅 retrying 中的行不可选(防跟 worker 撞). 批量重试 server-side
         // 自动 skip success · 不会重复推.
         const selectableIds = items
-            .filter(function (l) {
+            .filter(function (l: any) {
                 var isR =
                     l.status === 'failed' &&
                     l.next_retry_at &&
                     new Date(l.next_retry_at).getTime() > Date.now() - 60000;
                 return !isR;
             })
-            .map(function (l) {
+            .map(function (l: any) {
                 return l.id;
             });
         // DMS 推送可视化闭环 · 选中身份证订车(mrerp_dms)时,单据列切到 DMS 语义:
@@ -173,7 +173,7 @@ async function loadErpLogs(silent) {
         listEl.innerHTML =
             headerRow +
             items
-                .map((log) => {
+                .map((log: any) => {
                     const time = new Date(log.created_at);
                     const timeStr = `${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')} ${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
                     // v118.25 · 三态:success / retrying(failed + 有 next_retry_at)/ failed(终态)
@@ -314,7 +314,7 @@ async function loadErpLogs(silent) {
                 })
                 .join('');
         // v118.25.1 · 重新渲染后 · 修剪掉已经不在列表里的选中项 + 刷新批量栏
-        const visibleIds = new Set(items.map((x) => x.id));
+        const visibleIds = new Set(items.map((x: any) => x.id));
         for (const id of Array.from(_erpSelected)) {
             if (!visibleIds.has(id)) _erpSelected.delete(id);
         }
@@ -325,7 +325,7 @@ async function loadErpLogs(silent) {
     }
 }
 
-async function retryPushLog(logId) {
+async function retryPushLog(logId: any) {
     try {
         const resp = await fetch(`/api/erp/logs/${encodeURIComponent(logId)}/retry`, {
             method: 'POST',
@@ -351,47 +351,49 @@ async function retryPushLog(logId) {
 (function initAutomationPage() {
     // 点新增按钮
     document
-        .getElementById('btn-add-endpoint')
+        .getElementById('btn-add-endpoint')!
         .addEventListener('click', () => window.openEndpointModal(null));
 
     // 对话框关闭
     document
-        .getElementById('endpoint-modal-close')
+        .getElementById('endpoint-modal-close')!
         .addEventListener('click', window.closeEndpointModal);
-    document.getElementById('btn-ep-cancel').addEventListener('click', window.closeEndpointModal);
+    document.getElementById('btn-ep-cancel')!.addEventListener('click', window.closeEndpointModal);
 
     // 点遮罩不关闭(避免误触丢失填写的内容 · 只能通过关闭按钮/取消按钮关闭)
 
     // 测试连接
-    document.getElementById('btn-ep-test').addEventListener('click', window.testEndpointConnection);
+    document
+        .getElementById('btn-ep-test')!
+        .addEventListener('click', window.testEndpointConnection);
 
     // 保存
-    document.getElementById('btn-ep-save').addEventListener('click', window.saveEndpoint);
+    document.getElementById('btn-ep-save')!.addEventListener('click', window.saveEndpoint);
 
     // v0.9.1 · URL 输入框失焦自动清理"Copy to clipboard"等粘贴糟粕
-    document.getElementById('ep-url').addEventListener('blur', (e) => {
-        const cleaned = window._sanitizeUrl(e.target.value);
-        if (cleaned !== e.target.value.trim()) {
-            e.target.value = cleaned;
+    document.getElementById('ep-url')!.addEventListener('blur', (e) => {
+        const cleaned = window._sanitizeUrl((e.target as HTMLInputElement).value);
+        if (cleaned !== (e.target as HTMLInputElement).value.trim()) {
+            (e.target as HTMLInputElement).value = cleaned;
         }
     });
 
     // 列表里的编辑/删除按钮(事件委托)
     document.addEventListener('click', (e) => {
-        const editBtn = e.target.closest('[data-ep-edit]');
-        const delBtn = e.target.closest('[data-ep-del]');
+        const editBtn = (e.target as HTMLElement).closest('[data-ep-edit]') as HTMLElement | null;
+        const delBtn = (e.target as HTMLElement).closest('[data-ep-del]') as HTMLElement | null;
         if (editBtn) window.openEndpointModal(editBtn.dataset.epEdit);
         if (delBtn) window.deleteEndpoint(delBtn.dataset.epDel);
 
         // v0.9.1 · 推送日志交互
-        const retryBtn = e.target.closest('[data-log-retry]');
+        const retryBtn = (e.target as HTMLElement).closest('[data-log-retry]') as HTMLElement;
         if (retryBtn) {
             e.stopPropagation();
             retryPushLog(retryBtn.dataset.logRetry);
             return;
         }
         // v118.25.1 · 批量勾选
-        const cb = e.target.closest('[data-log-cb]');
+        const cb = (e.target as HTMLElement).closest('[data-log-cb]') as HTMLInputElement | null;
         if (cb) {
             e.stopPropagation();
             const id = cb.dataset.logCb;
@@ -401,12 +403,14 @@ async function retryPushLog(logId) {
             return;
         }
         // 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 表头全选 checkbox
-        const selectAllCb = e.target.closest('[data-log-select-all]');
+        const selectAllCb = (e.target as HTMLElement).closest(
+            '[data-log-select-all]'
+        ) as HTMLInputElement | null;
         if (selectAllCb) {
             e.stopPropagation();
             const checkAll = selectAllCb.checked;
             const allCbs = document.querySelectorAll('[data-log-cb]');
-            allCbs.forEach(function (rowCb) {
+            allCbs.forEach(function (rowCb: any) {
                 rowCb.checked = checkAll;
                 const id = rowCb.dataset.logCb;
                 if (checkAll) _erpSelected.add(id);
@@ -416,49 +420,54 @@ async function retryPushLog(logId) {
             return;
         }
         // v118.25.1 · 批量重推按钮
-        if (e.target.closest('#btn-erp-batch-retry')) {
+        if ((e.target as HTMLElement).closest('#btn-erp-batch-retry')) {
             e.stopPropagation();
             window._runErpBatchRetry();
             return;
         }
         // v118.25.1 · 取消选择
-        if (e.target.closest('#btn-erp-batch-clear')) {
+        if ((e.target as HTMLElement).closest('#btn-erp-batch-clear')) {
             e.stopPropagation();
             _erpSelected.clear();
-            document.querySelectorAll('.erp-log-cb').forEach((x) => {
+            document.querySelectorAll('.erp-log-cb').forEach((x: any) => {
                 x.checked = false;
             });
             window._refreshErpBatchBar();
             return;
         }
-        const logRow = e.target.closest('[data-log-detail]');
+        const logRow = (e.target as HTMLElement).closest('[data-log-detail]') as HTMLElement | null;
         if (logRow) {
             // 点 checkbox 不算点 row
-            if (e.target.closest('[data-log-cb]')) return;
+            if ((e.target as HTMLElement).closest('[data-log-cb]')) return;
             // 临时任务 (Zihao 2026-05-26) · 点 ERP 单号 → 复制 · 不打开详情
-            const copyDocEl = e.target.closest('[data-copy-doc]');
+            const copyDocEl = (e.target as HTMLElement).closest(
+                '[data-copy-doc]'
+            ) as HTMLElement | null;
             if (copyDocEl) {
                 e.stopPropagation();
                 window.copyErpDocNo(copyDocEl.dataset.copyDoc);
                 return;
             }
             // 点「打开」链接 → 让 <a> 默认在新标签打开 · 不打开详情
-            if (e.target.closest('.log-doc-open')) return;
+            if ((e.target as HTMLElement).closest('.log-doc-open')) return;
             window.showLogDetail(logRow.dataset.logDetail);
             return;
         }
-        const filterChip = e.target.closest('.chip-filter');
+        const filterChip = (e.target as HTMLElement).closest('.chip-filter') as HTMLElement | null;
         if (filterChip) {
             document
                 .querySelectorAll('#erp-logs-filters .chip-filter')
-                .forEach((c) => c.classList.remove('active'));
+                .forEach((c: Element) => c.classList.remove('active'));
             filterChip.classList.add('active');
-            _logFilter = { key: filterChip.dataset.filterKey, val: filterChip.dataset.filterVal };
+            _logFilter = {
+                key: filterChip.dataset.filterKey as string,
+                val: filterChip.dataset.filterVal as string,
+            };
             loadErpLogs();
             return;
         }
-        if (e.target.closest('#btn-refresh-logs')) {
-            const btn = e.target.closest('#btn-refresh-logs');
+        if ((e.target as HTMLElement).closest('#btn-refresh-logs')) {
+            const btn = (e.target as HTMLElement).closest('#btn-refresh-logs')!;
             btn.classList.add('spinning');
             setTimeout(() => btn.classList.remove('spinning'), 600);
             loadErpLogs();
@@ -466,7 +475,7 @@ async function retryPushLog(logId) {
         }
 
         // v0.10 · 自动化子菜单切换(guard: 只处理有 data-auto-tab 的按钮，防止对账中心等共用 .auto-nav-item 类名的按钮触发 switchAutomationTab(undefined))
-        const autoNav = e.target.closest('.auto-nav-item');
+        const autoNav = (e.target as HTMLElement).closest('.auto-nav-item') as HTMLElement | null;
         if (autoNav && autoNav.dataset.autoTab) {
             switchAutomationTab(autoNav.dataset.autoTab);
             return;
@@ -475,8 +484,8 @@ async function retryPushLog(logId) {
 
     // DMS 推送可视化闭环 · ERP 系统下拉切换 → 重新拉对应 ERP 的日志(不混)
     document.addEventListener('change', (e) => {
-        if (e.target && e.target.id === 'erp-logs-erp-select') {
-            _erpAdapter = e.target.value || '';
+        if (e.target && (e.target as HTMLElement).id === 'erp-logs-erp-select') {
+            _erpAdapter = (e.target as HTMLInputElement).value || '';
             loadErpLogs();
         }
     });

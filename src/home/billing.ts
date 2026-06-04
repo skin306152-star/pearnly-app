@@ -13,19 +13,19 @@
 //          <script type=module src=/static/dist/main.js> defer 自动后跑
 // ============================================================
 
-function _t(k) {
+function _bt(k: string): string {
     return (typeof window.t === 'function' ? window.t(k) : null) || k;
 }
 function _tok() {
     return localStorage.getItem('mrpilot_token') || '';
 }
-function _g(id) {
+function _g(id: string): HTMLElement | null {
     return document.getElementById(id);
 }
 
 // ── 余额实时轮询 ──
-var _lastBal = null;
-var _pollTimer = null;
+var _lastBal: number | null = null;
+var _pollTimer: ReturnType<typeof setInterval> | null = null;
 
 function _startPoll() {
     if (_pollTimer) return;
@@ -42,7 +42,7 @@ function _startPoll() {
                 if (!d) return;
                 var bal = d.balance_thb != null ? Number(d.balance_thb) : 0;
                 if (_lastBal !== null && bal > _lastBal) {
-                    if (window.showToast) window.showToast(_t('credits-updated'), 'success');
+                    if (window.showToast) window.showToast(_bt('credits-updated'), 'success');
                     if (typeof window.loadDashboard === 'function') window.loadDashboard();
                     if (typeof window._refreshBalanceAlerts === 'function')
                         window._refreshBalanceAlerts();
@@ -66,7 +66,7 @@ window._stopCreditsPoll = _stopPoll;
 _startPoll(); // 登录后页面已有 token,直接启动
 
 // ── modal state ──
-var _reqId = null;
+var _reqId: string | null = null;
 var _amount = 0;
 
 // ── 构建 DOM(懒创建,只建一次)──
@@ -143,23 +143,23 @@ function _render() {
 }
 
 function _applyText() {
-    var setText = function (id, v) {
+    var setText = function (id: string, v: string) {
         var e = _g(id);
         if (e) e.textContent = v;
     };
-    setText('tv2-title', _t('topup-title'));
-    setText('tv2-sl1', _t('topup-step1'));
-    setText('tv2-sl2', _t('topup-step2'));
-    setText('tv2-sl3', _t('topup-step3'));
-    setText('tv2-al', _t('topup-amount-label'));
-    setText('tv2-bl', _t('topup-bank-label'));
-    setText('tv2-copy', _t('topup-copy-account'));
-    setText('tv2-dt', _t('topup-slip-drop'));
-    setText('tv2-pl', _t('topup-payer-label'));
-    setText('tv2-nl', _t('topup-note-label'));
+    setText('tv2-title', _bt('topup-title'));
+    setText('tv2-sl1', _bt('topup-step1'));
+    setText('tv2-sl2', _bt('topup-step2'));
+    setText('tv2-sl3', _bt('topup-step3'));
+    setText('tv2-al', _bt('topup-amount-label'));
+    setText('tv2-bl', _bt('topup-bank-label'));
+    setText('tv2-copy', _bt('topup-copy-account'));
+    setText('tv2-dt', _bt('topup-slip-drop'));
+    setText('tv2-pl', _bt('topup-payer-label'));
+    setText('tv2-nl', _bt('topup-note-label'));
 }
 
-function _setStep(n) {
+function _setStep(n: number) {
     [1, 2, 3].forEach(function (i) {
         var s = _g('tv2-s' + i);
         if (s) s.style.display = i === n ? '' : 'none';
@@ -171,19 +171,19 @@ function _setStep(n) {
     if (n === 1) {
         if (back) {
             back.style.display = '';
-            back.textContent = _t('topup-btn-cancel');
+            back.textContent = _bt('topup-btn-cancel');
         }
     } else {
         if (back) {
             back.style.display = '';
-            back.textContent = _t('topup-btn-back');
+            back.textContent = _bt('topup-btn-back');
         }
     }
-    if (next) next.textContent = n === 3 ? _t('topup-btn-submit') : _t('topup-btn-next');
+    if (next) next.textContent = n === 3 ? _bt('topup-btn-submit') : _bt('topup-btn-next');
     if (n === 2) {
         var bn = _g('tv2-bn');
         if (bn)
-            bn.innerHTML = _t('topup-bank-note').replace(
+            bn.innerHTML = _bt('topup-bank-note').replace(
                 '{amount}',
                 '<strong>฿' + Number(_amount).toLocaleString() + '</strong>'
             );
@@ -198,14 +198,14 @@ function _curStep() {
     return 1;
 }
 
-function _clrErr(id) {
+function _clrErr(id: string) {
     var e = _g(id);
     if (e) {
         e.textContent = '';
         e.style.display = 'none';
     }
 }
-function _showErr(id, msg) {
+function _showErr(id: string, msg: string) {
     var e = _g(id);
     if (e) {
         e.textContent = msg;
@@ -213,7 +213,7 @@ function _showErr(id, msg) {
     }
 }
 
-function _setFile(f) {
+function _setFile(f: File) {
     var dt = _g('tv2-dt');
     if (dt) dt.textContent = f.name;
     var drop = _g('tv2-drop');
@@ -222,8 +222,8 @@ function _setFile(f) {
 }
 
 function _bindEvents() {
-    var ov = _g('topup-v2-ov');
-    _g('tv2-close').addEventListener('click', _close);
+    var ov = _g('topup-v2-ov')!;
+    _g('tv2-close')!.addEventListener('click', _close);
     ov.addEventListener('click', function (e) {
         if (e.target === ov) _close();
     });
@@ -232,15 +232,15 @@ function _bindEvents() {
     });
     // quick amount buttons
     ov.addEventListener('click', function (e) {
-        var btn = e.target.closest('.topup-v2-qamt');
+        var btn = (e.target as HTMLElement).closest('.topup-v2-qamt');
         if (!btn) return;
         ov.querySelectorAll('.topup-v2-qamt').forEach(function (b) {
             b.classList.remove('active');
         });
         btn.classList.add('active');
-        var inp = _g('tv2-amt');
+        var inp = _g('tv2-amt') as HTMLInputElement | null;
         if (inp) {
-            inp.value = btn.dataset.val;
+            inp.value = (btn as HTMLElement).dataset.val as string;
             _clrErr('tv2-ae');
         }
     });
@@ -258,40 +258,40 @@ function _bindEvents() {
         copyBtn.addEventListener('click', function () {
             if (!navigator.clipboard) return;
             navigator.clipboard.writeText('2300913684').then(function () {
-                var orig = copyBtn.textContent;
-                copyBtn.textContent = _t('topup-copied');
+                var orig = copyBtn!.textContent;
+                copyBtn!.textContent = _bt('topup-copied');
                 setTimeout(function () {
-                    copyBtn.textContent = orig;
+                    copyBtn!.textContent = orig;
                 }, 1500);
             });
         });
     // drop zone
     var drop = _g('tv2-drop'),
-        fi = _g('tv2-file');
+        fi = _g('tv2-file') as HTMLInputElement | null;
     if (drop) {
         drop.addEventListener('click', function () {
             if (fi) fi.click();
         });
         drop.addEventListener('dragover', function (e) {
             e.preventDefault();
-            drop.classList.add('drag-over');
+            drop!.classList.add('drag-over');
         });
         drop.addEventListener('dragleave', function () {
-            drop.classList.remove('drag-over');
+            drop!.classList.remove('drag-over');
         });
         drop.addEventListener('drop', function (e) {
             e.preventDefault();
-            drop.classList.remove('drag-over');
+            drop!.classList.remove('drag-over');
             var f = e.dataTransfer && e.dataTransfer.files[0];
             if (f) _setFile(f);
         });
     }
     if (fi)
         fi.addEventListener('change', function () {
-            if (fi.files[0]) _setFile(fi.files[0]);
+            if (fi!.files![0]) _setFile(fi!.files![0]);
         });
     // back / next
-    _g('tv2-back').addEventListener('click', function () {
+    _g('tv2-back')!.addEventListener('click', function () {
         var n = _curStep();
         if (n <= 1) {
             _close();
@@ -299,7 +299,7 @@ function _bindEvents() {
         }
         _setStep(n - 1);
     });
-    _g('tv2-next').addEventListener('click', function () {
+    _g('tv2-next')!.addEventListener('click', function () {
         var n = _curStep();
         if (n === 1) _step1Next();
         else if (n === 2) _setStep(3);
@@ -308,19 +308,19 @@ function _bindEvents() {
 }
 
 async function _step1Next() {
-    var inp = _g('tv2-amt'),
+    var inp = _g('tv2-amt') as HTMLInputElement | null,
         amt = inp ? parseFloat(inp.value) : 0;
     if (!amt || amt < 10) {
-        _showErr('tv2-ae', _t('topup-amount-invalid'));
+        _showErr('tv2-ae', _bt('topup-amount-invalid'));
         return;
     }
     // v118.35.0.21 · 前端兜底:超过单次上限 ฿500,000 立即提示
     if (amt > 500000) {
-        _showErr('tv2-ae', _t('topup-amount-too-large'));
+        _showErr('tv2-ae', _bt('topup-amount-too-large'));
         return;
     }
     _amount = amt;
-    var next = _g('tv2-next');
+    var next = _g('tv2-next') as HTMLButtonElement | null;
     if (next) {
         next.disabled = true;
         next.textContent = '…';
@@ -334,15 +334,15 @@ async function _step1Next() {
         if (!res.ok) {
             // v118.35.0.21 · 422 raw pydantic ValidationError → 友好翻译
             var raw = await res.text();
-            var msg = _t('topup-submit-fail');
+            var msg = _bt('topup-submit-fail');
             try {
                 var body = JSON.parse(raw);
                 var d = body.detail;
                 if (Array.isArray(d) && d.length) {
                     var typ = (d[0] && d[0].type) || '';
-                    if (typ.indexOf('less_than') >= 0) msg = _t('topup-amount-too-large');
-                    else if (typ.indexOf('greater_than') >= 0) msg = _t('topup-amount-invalid');
-                    else if (typ.indexOf('parsing') >= 0) msg = _t('topup-amount-invalid');
+                    if (typ.indexOf('less_than') >= 0) msg = _bt('topup-amount-too-large');
+                    else if (typ.indexOf('greater_than') >= 0) msg = _bt('topup-amount-invalid');
+                    else if (typ.indexOf('parsing') >= 0) msg = _bt('topup-amount-invalid');
                 } else if (typeof d === 'string') {
                     msg = d;
                 }
@@ -353,31 +353,31 @@ async function _step1Next() {
         _reqId = data.request_id;
         _setStep(2);
     } catch (e) {
-        _showErr('tv2-ae', e.message || _t('topup-submit-fail'));
+        _showErr('tv2-ae', (e as Error).message || _bt('topup-submit-fail'));
     } finally {
         if (next) {
             next.disabled = false;
-            next.textContent = _t('topup-btn-next');
+            next.textContent = _bt('topup-btn-next');
         }
     }
 }
 
 async function _step3Submit() {
-    var fi = _g('tv2-file');
+    var fi = _g('tv2-file') as HTMLInputElement | null;
     if (!fi || !fi.files || !fi.files[0]) {
-        _showErr('tv2-se', _t('topup-slip-required'));
+        _showErr('tv2-se', _bt('topup-slip-required'));
         return;
     }
-    var btn = _g('tv2-next');
+    var btn = _g('tv2-next') as HTMLButtonElement | null;
     if (btn) {
         btn.disabled = true;
         btn.textContent = '…';
     }
     try {
         var fd = new FormData();
-        fd.append('file', fi.files[0]);
-        var payer = _g('tv2-payer'),
-            note = _g('tv2-note');
+        fd.append('file', fi.files![0]);
+        var payer = _g('tv2-payer') as HTMLInputElement | null,
+            note = _g('tv2-note') as HTMLInputElement | null;
         if (payer && payer.value.trim()) fd.append('payer_name', payer.value.trim());
         if (note && note.value.trim()) fd.append('note', note.value.trim());
         var res = await fetch('/api/credits/topup/upload-slip/' + _reqId, {
@@ -388,17 +388,17 @@ async function _step3Submit() {
         if (!res.ok) throw new Error(await res.text());
         var data = await res.json();
         if (data.auto_approved) {
-            if (window.showToast) window.showToast(_t('topup-auto-approved'), 'success');
+            if (window.showToast) window.showToast(_bt('topup-auto-approved'), 'success');
             if (typeof window.loadDashboard === 'function') window.loadDashboard();
         } else {
-            if (window.showToast) window.showToast(_t('topup-pending'), 'info');
+            if (window.showToast) window.showToast(_bt('topup-pending'), 'info');
         }
         _close();
     } catch (e) {
-        _showErr('tv2-ue', _t('topup-upload-fail') + ' · ' + e.message);
+        _showErr('tv2-ue', _bt('topup-upload-fail') + ' · ' + (e as Error).message);
         if (btn) {
             btn.disabled = false;
-            btn.textContent = _t('topup-btn-submit');
+            btn.textContent = _bt('topup-btn-submit');
         }
     }
 }
@@ -414,14 +414,14 @@ window._openTopupModal = function () {
     _reqId = null;
     _amount = 0;
     ['tv2-amt', 'tv2-payer', 'tv2-note'].forEach(function (id) {
-        var e = _g(id);
+        var e = _g(id) as HTMLInputElement | null;
         if (e) e.value = '';
     });
-    var fi = _g('tv2-file');
+    var fi = _g('tv2-file') as HTMLInputElement | null;
     if (fi) fi.value = '';
     var drop = _g('tv2-drop');
     if (drop) drop.classList.remove('has-file', 'drag-over');
-    _g('topup-v2-ov')
+    _g('topup-v2-ov')!
         .querySelectorAll('.topup-v2-qamt')
         .forEach(function (b) {
             b.classList.remove('active');
@@ -431,7 +431,7 @@ window._openTopupModal = function () {
     });
     _applyText();
     _setStep(1);
-    _g('topup-v2-ov').style.display = 'flex';
+    _g('topup-v2-ov')!.style.display = 'flex';
 };
 
 // 切语言时若 modal 开着,重新应用文字

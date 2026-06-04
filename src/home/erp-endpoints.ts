@@ -12,9 +12,9 @@
 // ============================================================
 /* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal */
 
-let _erpEndpoints = [];
+let _erpEndpoints: Array<{ id?: unknown; [key: string]: unknown }> = [];
 window._erpEndpoints = _erpEndpoints;
-let _epEditingId = null; // 当前编辑中的 endpoint id,null = 新增模式
+let _epEditingId: unknown = null; // 当前编辑中的 endpoint id,null = 新增模式
 
 async function loadErpEndpoints() {
     try {
@@ -103,13 +103,13 @@ function renderErpEndpointsList() {
 
     // v0.8 · 按 endpoints_limit 灰化新增按钮
     if (addBtn && _userInfo) {
-        const limit = _userInfo.endpoints_limit;
+        const limit = _userInfo.endpoints_limit as number;
         if (limit !== -1 && _erpEndpoints.length >= limit) {
-            addBtn.disabled = true;
+            (addBtn as HTMLButtonElement).disabled = true;
             addBtn.title = t('ep-limit-reached', { limit });
             addBtn.classList.add('btn-disabled-plus');
         } else {
-            addBtn.disabled = false;
+            (addBtn as HTMLButtonElement).disabled = false;
             addBtn.title = '';
             addBtn.classList.remove('btn-disabled-plus');
         }
@@ -137,8 +137,9 @@ function renderErpEndpointsList() {
 
     list.innerHTML = _erpEndpoints
         .map((ep) => {
-            const cfg = ep.config || {};
-            const url = escapeHtml(cfg.url || '');
+            const cfg = (ep.config || {}) as Record<string, unknown>;
+            const url = escapeHtml((cfg.url as string) || '');
+            // @ts-expect-error TS6133 verbatim 占位
             const hasToken = !!cfg._token_set;
             const enabled = ep.enabled !== false;
 
@@ -155,11 +156,11 @@ function renderErpEndpointsList() {
                 );
 
             const stats = [];
-            if (ep.success_count > 0)
+            if ((ep.success_count as number) > 0)
                 stats.push(
                     `<span class="ep-stat ok">${escapeHtml(t('ep-success', { n: ep.success_count }))}</span>`
                 );
-            if (ep.failure_count > 0)
+            if ((ep.failure_count as number) > 0)
                 stats.push(
                     `<span class="ep-stat fail">${escapeHtml(t('ep-failure', { n: ep.failure_count }))}</span>`
                 );
@@ -204,21 +205,21 @@ function renderErpEndpointsList() {
 }
 
 // 打开新增对话框
-function openEndpointModal(editingId) {
+function openEndpointModal(editingId: unknown) {
     _epEditingId = editingId || null;
     const modal = document.getElementById('endpoint-modal');
     const titleEl = document.getElementById('endpoint-modal-title');
-    titleEl.textContent = editingId ? t('ep-modal-title-edit') : t('ep-modal-title-new');
+    titleEl!.textContent = editingId ? t('ep-modal-title-edit') : t('ep-modal-title-new');
 
-    const nameEl = document.getElementById('ep-name');
-    const urlEl = document.getElementById('ep-url');
-    const tokenEl = document.getElementById('ep-token');
-    const isDefEl = document.getElementById('ep-is-default');
-    const autoPushEl = document.getElementById('ep-auto-push');
+    const nameEl = document.getElementById('ep-name') as HTMLInputElement;
+    const urlEl = document.getElementById('ep-url') as HTMLInputElement;
+    const tokenEl = document.getElementById('ep-token') as HTMLInputElement;
+    const isDefEl = document.getElementById('ep-is-default') as HTMLInputElement;
+    const autoPushEl = document.getElementById('ep-auto-push') as HTMLInputElement;
     const resultEl = document.getElementById('ep-test-result');
 
-    resultEl.style.display = 'none';
-    resultEl.textContent = '';
+    resultEl!.style.display = 'none';
+    resultEl!.textContent = '';
 
     // 清掉上次遗留的错误提示
     const errBox = document.getElementById('ep-save-error');
@@ -227,10 +228,12 @@ function openEndpointModal(editingId) {
     if (editingId) {
         const ep = _erpEndpoints.find((e) => e.id === editingId);
         if (!ep) return;
-        nameEl.value = ep.name || '';
-        urlEl.value = (ep.config || {}).url || '';
-        tokenEl.value = (ep.config || {})._token_set ? ep.config.token || '' : '';
-        tokenEl.placeholder = (ep.config || {})._token_set
+        nameEl.value = (ep.name as string) || '';
+        urlEl.value = (((ep.config || {}) as Record<string, unknown>).url as string) || '';
+        tokenEl.value = ((ep.config || {}) as Record<string, unknown>)._token_set
+            ? ((ep.config as Record<string, unknown>).token as string) || ''
+            : '';
+        tokenEl.placeholder = ((ep.config || {}) as Record<string, unknown>)._token_set
             ? '（已保存 · 留空保持不变）'
             : t('ep-token-ph');
         isDefEl.checked = !!ep.is_default;
@@ -246,7 +249,7 @@ function openEndpointModal(editingId) {
     }
 
     // v0.15 · 扁平权限 · 所有人都能自动推送
-    const autoPushRow = autoPushEl.closest('.form-switch-row');
+    const autoPushRow = autoPushEl.closest('.form-switch-row') as HTMLElement | null;
     autoPushEl.disabled = false;
     if (autoPushRow) {
         autoPushRow.classList.remove('disabled-plus');
@@ -257,19 +260,19 @@ function openEndpointModal(editingId) {
         if (b) b.remove();
     }
 
-    modal.style.display = '';
+    modal!.style.display = '';
     setTimeout(() => nameEl.focus(), 50);
 }
 
 function closeEndpointModal() {
-    document.getElementById('endpoint-modal').style.display = 'none';
+    document.getElementById('endpoint-modal')!.style.display = 'none';
     _epEditingId = null;
     // 关闭时清错误提示,避免下次打开残留
     const errBox = document.getElementById('ep-save-error');
     if (errBox) errBox.remove();
 }
 
-function _sanitizeUrl(raw) {
+function _sanitizeUrl(raw: string) {
     // v0.9.1 · 清理常见"复制糟粕"(Copy to clipboard / 空格后跟可疑词)
     if (!raw) return '';
     let u = raw.trim();
@@ -280,13 +283,13 @@ function _sanitizeUrl(raw) {
 }
 
 function readEndpointForm() {
-    const name = document.getElementById('ep-name').value.trim();
-    const url = _sanitizeUrl(document.getElementById('ep-url').value);
-    const tokenVal = document.getElementById('ep-token').value;
-    const isDefault = document.getElementById('ep-is-default').checked;
-    const autoPush = document.getElementById('ep-auto-push').checked;
+    const name = (document.getElementById('ep-name') as HTMLInputElement).value.trim();
+    const url = _sanitizeUrl((document.getElementById('ep-url') as HTMLInputElement).value);
+    const tokenVal = (document.getElementById('ep-token') as HTMLInputElement).value;
+    const isDefault = (document.getElementById('ep-is-default') as HTMLInputElement).checked;
+    const autoPush = (document.getElementById('ep-auto-push') as HTMLInputElement).checked;
 
-    const config = { url };
+    const config: { url: string; token?: string } = { url };
     // token:编辑模式下如果留空,发 "***" 占位(后端会保留旧值);否则发新值
     if (_epEditingId) {
         if (tokenVal) config.token = tokenVal;
@@ -298,17 +301,18 @@ function readEndpointForm() {
 }
 
 async function testEndpointConnection() {
+    // @ts-expect-error TS6133 verbatim 占位
     const { name, url, config } = readEndpointForm();
     const resultEl = document.getElementById('ep-test-result');
     if (!url) {
-        resultEl.style.display = '';
-        resultEl.className = 'form-test-result fail';
-        resultEl.textContent = t('ep-required');
+        resultEl!.style.display = '';
+        resultEl!.className = 'form-test-result fail';
+        resultEl!.textContent = t('ep-required');
         return;
     }
-    resultEl.style.display = '';
-    resultEl.className = 'form-test-result running';
-    resultEl.textContent = t('ep-test-running');
+    resultEl!.style.display = '';
+    resultEl!.className = 'form-test-result running';
+    resultEl!.textContent = t('ep-test-running');
 
     try {
         const resp = await fetch('/api/erp/test-connection', {
@@ -318,18 +322,18 @@ async function testEndpointConnection() {
         });
         const data = await resp.json();
         if (data.success) {
-            resultEl.className = 'form-test-result ok';
-            resultEl.textContent = t('ep-test-ok', {
+            resultEl!.className = 'form-test-result ok';
+            resultEl!.textContent = t('ep-test-ok', {
                 status: data.http_status,
                 ms: data.elapsed_ms,
             });
         } else {
-            resultEl.className = 'form-test-result fail';
-            resultEl.textContent = t('ep-test-fail', { err: data.error_msg || 'unknown' });
+            resultEl!.className = 'form-test-result fail';
+            resultEl!.textContent = t('ep-test-fail', { err: data.error_msg || 'unknown' });
         }
     } catch (e) {
-        resultEl.className = 'form-test-result fail';
-        resultEl.textContent = t('ep-test-fail', { err: e.message });
+        resultEl!.className = 'form-test-result fail';
+        resultEl!.textContent = t('ep-test-fail', { err: (e as Error).message });
     }
 }
 
@@ -350,7 +354,7 @@ async function saveEndpoint() {
         auto_push: form.autoPush,
     };
 
-    const btn = document.getElementById('btn-ep-save');
+    const btn = document.getElementById('btn-ep-save') as HTMLButtonElement;
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.classList.add('loading');
@@ -358,7 +362,7 @@ async function saveEndpoint() {
     try {
         let resp;
         if (_epEditingId) {
-            resp = await fetch(`/api/erp/endpoints/${encodeURIComponent(_epEditingId)}`, {
+            resp = await fetch(`/api/erp/endpoints/${encodeURIComponent(_epEditingId as string)}`, {
                 method: 'PATCH',
                 headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -380,7 +384,7 @@ async function saveEndpoint() {
         showToast(t('ep-save-ok'));
         loadErpEndpoints();
     } catch (e) {
-        showEpSaveError(`${t('ep-save-fail')} · ${e.message || 'unknown'}`);
+        showEpSaveError(`${t('ep-save-fail')} · ${(e as Error).message || 'unknown'}`);
     } finally {
         btn.disabled = false;
         btn.classList.remove('loading');
@@ -388,7 +392,7 @@ async function saveEndpoint() {
     }
 }
 
-function showEpSaveError(msg) {
+function showEpSaveError(msg: string) {
     let box = document.getElementById('ep-save-error');
     if (!box) {
         const foot = document.querySelector('#endpoint-modal .modal-foot');
@@ -396,19 +400,19 @@ function showEpSaveError(msg) {
         box = document.createElement('div');
         box.id = 'ep-save-error';
         box.className = 'ep-inline-error';
-        foot.parentNode.insertBefore(box, foot);
+        foot.parentNode!.insertBefore(box, foot);
     }
     box.textContent = msg;
     box.style.display = '';
 }
 
-async function deleteEndpoint(endpointId) {
+async function deleteEndpoint(endpointId: unknown) {
     const ep = _erpEndpoints.find((e) => e.id === endpointId);
     if (!ep) return;
     const ok = await showConfirm(t('ep-delete-confirm', { name: ep.name }), { danger: true });
     if (!ok) return;
     try {
-        const resp = await fetch(`/api/erp/endpoints/${encodeURIComponent(endpointId)}`, {
+        const resp = await fetch(`/api/erp/endpoints/${encodeURIComponent(endpointId as string)}`, {
             method: 'DELETE',
             headers: { Authorization: 'Bearer ' + token },
         });

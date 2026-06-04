@@ -9,22 +9,23 @@
 (function () {
     'use strict';
 
-    let _connectors = null;
+    let _connectors: any[] | null = null;
     let _connectorsLoadAt = 0;
     let _docBound = false;
 
-    function _esc(s) {
+    function _esc(s: unknown) {
         return typeof escapeHtml === 'function'
             ? escapeHtml(s == null ? '' : String(s))
             : String(s == null ? '' : s);
     }
-    function _toast(msg, kind) {
+    function _toast(msg: string, kind?: string) {
         try {
             if (typeof showToast === 'function') showToast(msg, kind || 'info');
         } catch (e) {}
     }
     // P1-7: toast + 可点击链接(showToast 不支持 HTML，用 DOM 手建)
-    function _toastWithLink(msg, href, linkText) {
+    // @ts-expect-error TS6133 verbatim 占位
+    function _toastWithLink(msg: string, href: string, linkText: string) {
         try {
             let wrap = document.getElementById('mp-toast-wrap');
             if (!wrap) {
@@ -60,7 +61,7 @@
         } catch (e) {}
     }
 
-    async function _loadConnectors(force) {
+    async function _loadConnectors(force?: boolean) {
         const now = Date.now();
         if (!force && _connectors && now - _connectorsLoadAt < 30000) return _connectors;
         const tk = localStorage.getItem('mrpilot_token');
@@ -86,26 +87,26 @@
             return '';
         }
     }
-    function _setDefaultConnectorId(id) {
+    function _setDefaultConnectorId(id: string) {
         try {
             localStorage.setItem('pn_push_default_connector', id || '');
         } catch (e) {}
     }
 
-    function _resolveDefault(connectors) {
+    function _resolveDefault(connectors: any[]) {
         if (!connectors || !connectors.length) return null;
         const def = _getDefaultConnectorId();
         if (def) {
-            const found = connectors.find((c) => c.id === def);
+            const found = connectors.find((c: any) => c.id === def);
             if (found) return found;
         }
         // 用户没设过 · 优先 endpoints 表里 is_default · 兜底第一个
-        const epDef = connectors.find((c) => c.is_default);
+        const epDef = connectors.find((c: any) => c.is_default);
         if (epDef) return epDef;
         return connectors[0];
     }
 
-    function _isHistoryExceptional(historyObj) {
+    function _isHistoryExceptional(historyObj: any) {
         if (!historyObj) return false;
         const st = String(historyObj.status || '').toLowerCase();
         return st === 'exception' || st === 'exception_pending' || st === 'rejected';
@@ -121,7 +122,7 @@
         }
     }
 
-    function _connectorIcon(c) {
+    function _connectorIcon(c: any) {
         const tp = c && (c.type || c.id);
         if (tp === 'xero') {
             return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M5.5 8l2 2 3-3.5"/></svg>';
@@ -133,9 +134,9 @@
         return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h9M8 5l3 3-3 3"/><rect x="11" y="3" width="3" height="10" rx="1"/></svg>';
     }
 
-    async function _pushOne(connector, historyId) {
+    async function _pushOne(connector: any, historyId: any) {
         if (!connector || !historyId) return false;
-        const btn = document.getElementById('btn-push-default');
+        const btn = document.getElementById('btn-push-default') as HTMLButtonElement | null;
         if (btn) {
             btn.disabled = true;
             btn.classList.add('loading');
@@ -143,7 +144,7 @@
         const tk = localStorage.getItem('mrpilot_token');
         try {
             let url,
-                opts = { method: 'POST', headers: { Authorization: 'Bearer ' + tk } };
+                opts: any = { method: 'POST', headers: { Authorization: 'Bearer ' + tk } };
             if (connector.type === 'xero') {
                 url = '/api/erp/xero/push/' + encodeURIComponent(historyId);
             } else {
@@ -166,7 +167,7 @@
             // business failures (e.g. MR.ERP report.php หมายเหตุ
             // rejection · adapter rejected the row). Parse body
             // upfront so both branches can see body.ok and body.error_msg.
-            let body = {};
+            let body: any = {};
             try {
                 body = await resp.json();
             } catch (e) {}
@@ -205,7 +206,7 @@
             _toast(
                 t('unified-push-fail')
                     .replace('{name}', connector.name)
-                    .replace('{err}', e.message || 'network'),
+                    .replace('{err}', (e as Error).message || 'network'),
                 'error'
             );
             return false;
@@ -217,19 +218,19 @@
         }
     }
 
-    async function _pushAll(connectors, historyId) {
+    async function _pushAll(connectors: any[], historyId: any) {
         // 串行 · 失败不阻塞
         for (const c of connectors) {
             await _pushOne(c, historyId);
         }
     }
 
-    function _renderDropdown(connectors, def) {
+    function _renderDropdown(connectors: any[], def: any) {
         const dd = document.createElement('div');
         dd.className = 'pn-push-dropdown';
         dd.id = 'pn-push-dropdown';
         const items = (connectors || [])
-            .map((c) => {
+            .map((c: any) => {
                 const isDef = !!(def && c.id === def.id);
                 const tag =
                     c.method === 'download'
@@ -260,7 +261,9 @@
                   '<div class="pn-pd-item pn-pd-all" data-cid="__all__">' +
                   '<span class="pn-pd-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h10M3 10h10M3 13.5h6"/></svg></span>' +
                   '<span class="pn-pd-name">' +
-                  _esc(t('unified-push-all').replace('{n}', connectors.length)) +
+                  _esc(
+                      t('unified-push-all').replace('{n}', connectors.length as unknown as string)
+                  ) +
                   '</span>' +
                   '</div>'
                 : '';
@@ -299,7 +302,7 @@
         await _pushOne(def, hid);
     }
 
-    async function _onDropdownItemClick(cid) {
+    async function _onDropdownItemClick(cid: string) {
         _closeDropdown();
         const connectors = (await _loadConnectors(false)) || [];
         const r = _getCurrentHistory();
@@ -313,7 +316,7 @@
             await _pushAll(connectors, hid);
             return;
         }
-        const c = connectors.find((x) => x.id === cid);
+        const c = connectors.find((x: any) => x.id === cid);
         if (!c) return;
         _setDefaultConnectorId(cid); // 用户选了哪个就 sticky 成默认
         await _pushOne(c, hid);
@@ -337,7 +340,7 @@
         // 1. hide 老 3 按钮(向后兼容 · DOM 留着)· querySelectorAll 防 race 残留多个同 ID
         ['btn-push-erp', 'btn-xero-push'].forEach((id) => {
             saveBar.querySelectorAll('#' + id).forEach((old) => {
-                old.style.display = 'none';
+                (old as HTMLElement).style.display = 'none';
             });
         });
 
@@ -397,13 +400,13 @@
         if (!_docBound) {
             _docBound = true;
             document.addEventListener('click', function (e) {
-                const item = e.target.closest('.pn-pd-item');
+                const item = (e.target as HTMLElement).closest('.pn-pd-item');
                 if (item) {
                     const cid = item.getAttribute('data-cid');
-                    _onDropdownItemClick(cid);
+                    _onDropdownItemClick(cid as string);
                     return;
                 }
-                if (e.target.closest('#btn-push-arrow')) return;
+                if ((e.target as HTMLElement).closest('#btn-push-arrow')) return;
                 _closeDropdown();
             });
             if (typeof window.subscribeI18n === 'function') {
@@ -430,8 +433,8 @@
         // 1. hide 所有旧按钮(querySelectorAll · race 导致 DOM 出现多个相同 ID 时全部 hide)
         ['btn-push-erp', 'btn-xero-push'].forEach((id) => {
             saveBar.querySelectorAll('#' + id).forEach((old) => {
-                if (old.style.display !== 'none') {
-                    old.style.display = 'none';
+                if ((old as HTMLElement).style.display !== 'none') {
+                    (old as HTMLElement).style.display = 'none';
                 }
             });
         });

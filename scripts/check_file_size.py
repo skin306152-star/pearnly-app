@@ -68,6 +68,7 @@ MONITORED_GLOBS = [
     "core/**/*.py",
     "services/**/*.py",
     "src/home/**/*.js",
+    "src/home/**/*.ts",  # C5 TypeScript 迁移产物(.js→.ts)· 同 ≤500 约束 · 防脱离监控
     "src/home/**/*.css",
 ]
 

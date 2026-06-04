@@ -44,7 +44,8 @@ if [ -z "$CHANGED" ]; then
 fi
 
 PY_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.py$' || true)"
-FE_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.(js|mjs|css|html|json)$' || true)"
+FE_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.(js|mjs|ts|css|html|json)$' || true)"
+TS_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.ts$' || true)"
 
 fail() {
   echo ""
@@ -118,6 +119,12 @@ if [ -n "$FE_CHANGED" ]; then
   echo "  · check_ai_smell(注释 emoji / console.log 调试残留 · 去 AI 味)"
   # shellcheck disable=SC2086
   python scripts/check_ai_smell.py $FE_CHANGED || fail "check_ai_smell(源码有 AI 味:注释 emoji / console.log)"
+
+  # TS 类型检查(C5 · .ts 的等价 node --check)· 只在改了 .ts 时跑
+  if [ -n "$TS_CHANGED" ]; then
+    echo "  · tsc --noEmit(TypeScript 类型检查)"
+    npm run typecheck >/dev/null 2>&1 || fail "tsc 类型检查(.ts 有类型错)"
+  fi
 
   echo "  · vite build(catch 配置/模块坏)"
   npm run build >/dev/null 2>&1 || fail "vite build 失败"

@@ -6,7 +6,7 @@ import { S } from './bank-recon-v2-store.js';
 import { $, esc2, _brv2FmtSize } from './bank-recon-v2-helpers.js';
 
 // ── File rendering（vex-drop-filename + preview panel） ──────────
-function renderFileList(zone) {
+function renderFileList(zone: 'stmt' | 'gl') {
     const files = zone === 'stmt' ? S.stmtFiles : S.glFiles;
     // 更新拖拽区内摘要文字
     const nameEl = $(`brv2-${zone}-name`);
@@ -16,7 +16,7 @@ function renderFileList(zone) {
         } else {
             const lang = window._currentLang || 'zh';
             const labels = { zh: '个文件', th: ' ไฟล์', en: ' file(s)', ja: ' ファイル' };
-            nameEl.textContent = files.length + (labels[lang] || ' 个文件');
+            nameEl.textContent = files.length + (labels[lang as keyof typeof labels] || ' 个文件');
         }
     }
     // 若 preview panel 已展开则刷新对应列
@@ -43,7 +43,7 @@ function _renderBrv2PreviewPanel() {
     _renderBrv2Column('gl');
 }
 
-function _renderBrv2Column(zone) {
+function _renderBrv2Column(zone: 'stmt' | 'gl') {
     const colEl = $(zone === 'stmt' ? 'brv2-pp-stmt-col' : 'brv2-pp-gl-col');
     if (!colEl) return;
     const files = zone === 'stmt' ? S.stmtFiles : S.glFiles;
@@ -52,7 +52,8 @@ function _renderBrv2Column(zone) {
         stmt: { zh: '① 银行账单', th: '① บัญชีธนาคาร', en: '① Bank Stmt', ja: '① 銀行明細' },
         gl: { zh: '② 总账 GL', th: '② GL รายงาน', en: '② GL Report', ja: '② GL帳簿' },
     };
-    const title = (titleMap[zone] || {})[lang] || titleMap[zone].zh;
+    const title =
+        (titleMap[zone] || {})[lang as keyof (typeof titleMap)['stmt']] || titleMap[zone].zh;
     const ph = esc2((window.t && window.t('vex-preview-search')) || '搜索文件名...');
     const clearLbl = esc2((window.t && window.t('vex-preview-clear-all')) || '全清');
     const searchVal = S.brv2Search[zone] || '';
@@ -89,7 +90,7 @@ function _renderBrv2Column(zone) {
     const si = $('brv2-pp-search-' + zone);
     if (si)
         si.addEventListener('input', function (e) {
-            S.brv2Search[zone] = e.target.value;
+            S.brv2Search[zone] = (e.target as HTMLInputElement).value;
             _renderBrv2FileList(zone);
         });
     const ca = $('brv2-pp-clearall-' + zone);
@@ -103,7 +104,7 @@ function _renderBrv2Column(zone) {
     _renderBrv2FileList(zone);
 }
 
-function _renderBrv2FileList(zone) {
+function _renderBrv2FileList(zone: 'stmt' | 'gl') {
     const listEl = $('brv2-pp-' + zone + '-list');
     const pgEl = $('brv2-pp-' + zone + '-pg');
     if (!listEl) return;
@@ -116,7 +117,7 @@ function _renderBrv2FileList(zone) {
         '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" width="11" height="11"><path d="M2 4h10M5 4V2h4v2M5.5 7v4M8.5 7v4M3 4l1 8h6l1-8"/></svg>';
     listEl.innerHTML = filtered
         .map(
-            (f, i) =>
+            (f, _i) =>
                 '<div class="vex-pp-file-row">' +
                 fileIco +
                 '<span class="vex-pp-fi-name" title="' +
@@ -139,21 +140,23 @@ function _renderBrv2FileList(zone) {
         .join('');
     listEl.querySelectorAll('.vex-pp-fi-del').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            const idx = parseInt(btn.dataset.idx, 10);
-            if (btn.dataset.zone === 'stmt') S.stmtFiles.splice(idx, 1);
+            const idx = parseInt((btn as HTMLElement).dataset.idx!, 10);
+            if ((btn as HTMLElement).dataset.zone === 'stmt') S.stmtFiles.splice(idx, 1);
             else S.glFiles.splice(idx, 1);
-            renderFileList(btn.dataset.zone);
+            renderFileList((btn as HTMLElement).dataset.zone as 'stmt' | 'gl');
             updateRunBtn();
         });
     });
     if (pgEl) {
         const tpl = (window.t && window.t('vex-preview-count')) || '显示 {n} / 共 {m}';
-        pgEl.textContent = tpl.replace('{n}', filtered.length).replace('{m}', files.length);
+        pgEl.textContent = tpl
+            .replace('{n}', filtered.length as unknown as string)
+            .replace('{m}', files.length as unknown as string);
     }
 }
 
 function _initBrv2TogglePreview() {
-    const btn = $('brv2-toggle-preview');
+    const btn = $('brv2-toggle-preview') as (HTMLElement & { _reconBound?: boolean }) | null;
     if (btn && !btn._reconBound) {
         btn._reconBound = true;
         btn.addEventListener('click', function () {
@@ -176,7 +179,7 @@ function updateRunBtn() {
     const status = $('brv2-status');
     const hasStmt = S.stmtFiles.length > 0;
     const hasGl = S.glFiles.length > 0;
-    if (btn) btn.disabled = !(hasStmt && hasGl);
+    if (btn) (btn as HTMLButtonElement).disabled = !(hasStmt && hasGl);
     if (status) {
         const lang = window._currentLang || 'zh';
         if (!hasStmt && !hasGl) {
@@ -186,7 +189,7 @@ function updateRunBtn() {
                 en: 'Upload bank statement and GL files',
                 ja: '銀行明細と GL を両方アップロードしてください',
             };
-            status.textContent = m[lang] || m.zh;
+            status.textContent = m[lang as keyof typeof m] || m.zh;
         } else if (!hasStmt) {
             const m = {
                 zh: '还缺银行账单 PDF',
@@ -194,7 +197,7 @@ function updateRunBtn() {
                 en: 'Missing bank statement PDF',
                 ja: '銀行明細 PDF が未アップロード',
             };
-            status.textContent = m[lang] || m.zh;
+            status.textContent = m[lang as keyof typeof m] || m.zh;
         } else if (!hasGl) {
             const m = {
                 zh: '还缺 GL 文件',
@@ -202,7 +205,7 @@ function updateRunBtn() {
                 en: 'Missing GL file',
                 ja: 'GL ファイルが未アップロード',
             };
-            status.textContent = m[lang] || m.zh;
+            status.textContent = m[lang as keyof typeof m] || m.zh;
         } else {
             const m = {
                 zh: '两份文件已就绪',
@@ -210,15 +213,15 @@ function updateRunBtn() {
                 en: 'Ready to reconcile',
                 ja: '照合を開始できます',
             };
-            status.textContent = m[lang] || m.zh;
+            status.textContent = m[lang as keyof typeof m] || m.zh;
         }
     }
 }
 
 // ── Drag-and-drop（整区点击 · 无独立按钮） ────────────────────────
-function setupDrop(zoneId, inputId, zone) {
+function setupDrop(zoneId: string, inputId: string, zone: 'stmt' | 'gl') {
     const zoneEl = $(zoneId);
-    const inputEl = $(inputId);
+    const inputEl = $(inputId) as HTMLInputElement | null;
     if (!zoneEl || !inputEl) return;
 
     // 整区点击 → 弹文件对话框
@@ -238,7 +241,7 @@ function setupDrop(zoneId, inputId, zone) {
     zoneEl.addEventListener('drop', (e) => {
         e.preventDefault();
         zoneEl.classList.remove('drag-over');
-        const dropped = Array.from(e.dataTransfer.files || []);
+        const dropped = Array.from(e.dataTransfer!.files || []) as File[];
         if (zone === 'stmt') S.stmtFiles.push(...dropped);
         else S.glFiles.push(...dropped);
         renderFileList(zone);
@@ -246,7 +249,7 @@ function setupDrop(zoneId, inputId, zone) {
     });
 
     inputEl.addEventListener('change', () => {
-        const chosen = Array.from(inputEl.files || []);
+        const chosen = Array.from(inputEl.files || []) as File[];
         if (zone === 'stmt') S.stmtFiles.push(...chosen);
         else S.glFiles.push(...chosen);
         inputEl.value = '';

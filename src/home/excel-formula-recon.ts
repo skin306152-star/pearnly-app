@@ -31,8 +31,8 @@ import {
         if (S.running) return;
         if (!S.invoiceFiles.length || !S.reportFiles.length) return;
         S.running = true;
-        $('vex-build').disabled = true;
-        $('vex-progress').style.display = 'flex';
+        ($('vex-build') as HTMLButtonElement).disabled = true;
+        $('vex-progress')!.style.display = 'flex';
         var _dlBtnHide = document.getElementById('vex-download');
         if (_dlBtnHide) _dlBtnHide.style.display = 'none';
         ['vex-summary-collapse', 'vex-detail-collapse'].forEach(function (id) {
@@ -40,21 +40,21 @@ import {
             if (el) el.style.display = 'none';
         });
         const startAt = Date.now();
-        $('vex-progress-title').textContent = t('vex-progress-running') || 'AI 抽取中';
-        $('vex-progress-sub').textContent = (
+        $('vex-progress-title')!.textContent = t('vex-progress-running') || 'AI 抽取中';
+        $('vex-progress-sub')!.textContent = (
             t('vex-progress-sub') || '{a} 张发票 + {b} 份报告 · 并行处理'
         )
-            .replace('{a}', S.invoiceFiles.length)
-            .replace('{b}', S.reportFiles.length);
+            .replace('{a}', S.invoiceFiles.length as unknown as string)
+            .replace('{b}', S.reportFiles.length as unknown as string);
 
         const _tick = setInterval(() => {
             const s = Math.floor((Date.now() - startAt) / 1000);
-            $('vex-progress-sub').textContent = (
+            $('vex-progress-sub')!.textContent = (
                 t('vex-progress-elapsed') || '已 {s} 秒 · {a} 张发票 + {b} 份报告'
             )
-                .replace('{s}', s)
-                .replace('{a}', S.invoiceFiles.length)
-                .replace('{b}', S.reportFiles.length);
+                .replace('{s}', s as unknown as string)
+                .replace('{a}', S.invoiceFiles.length as unknown as string)
+                .replace('{b}', S.reportFiles.length as unknown as string);
         }, 1000);
 
         try {
@@ -88,15 +88,23 @@ import {
             // 轮询 · 转圈旁实时显示「共 X/Y 个文件」
             const _vexSub = $('vex-progress-sub');
             const job = await window._reconPollJob(sub.job_id, _vexTok, {
-                onProgress: (p) => {
-                    if (_vexSub) _vexSub.textContent = window._reconProgressText(p, _curLang);
+                onProgress: (p: unknown) => {
+                    if (_vexSub)
+                        _vexSub.textContent = window._reconProgressText(
+                            p as { stage?: string; stage_total?: number; stage_done?: number },
+                            _curLang
+                        );
                 },
             });
             clearInterval(_tick);
-            if (!job || job.status !== 'done' || !job.result_id) {
+            if (
+                !job ||
+                (job as { status?: string }).status !== 'done' ||
+                !(job as { result_id?: string }).result_id
+            ) {
                 throw new Error(t('vex-toast-fail') || '生成失败');
             }
-            const taskId = job.result_id;
+            const taskId = (job as { result_id: string }).result_id;
 
             // P1-4 修(2026-05-25):OCR 失败数改用后端解析层字段 invoice_ocr_failed_count ·
             //   此前用 n_total-n_ok(对账差异行数)当 OCR 失败数 → 正常匹配/普通差异都被误报"OCR 失败"。
@@ -115,7 +123,7 @@ import {
 
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
-            const dl = $('vex-download');
+            const dl = $('vex-download') as HTMLAnchorElement;
             dl.href = url;
             dl.download = fname;
 
@@ -129,7 +137,7 @@ import {
                 setTimeout(() => _a.remove(), 100);
             } catch (e) {}
 
-            $('vex-progress').style.display = 'none';
+            $('vex-progress')!.style.display = 'none';
             var _dlBtn = document.getElementById('vex-download');
             if (_dlBtn) _dlBtn.style.display = '';
             // P1-3 修:先 await 填好「当前任务」详情(设 window._vexLastTask + 返回 OCR 失败数)·
@@ -139,7 +147,10 @@ import {
 
             if (fail > 0) {
                 showToast(
-                    (t('vex-toast-some-fail') || '有 {n} 张发票 OCR 失败').replace('{n}', fail),
+                    (t('vex-toast-some-fail') || '有 {n} 张发票 OCR 失败').replace(
+                        '{n}',
+                        fail as unknown as string
+                    ),
                     'warn'
                 );
             } else {
@@ -150,12 +161,12 @@ import {
             setTimeout(_loadVexTaskList, 800);
         } catch (e) {
             clearInterval(_tick);
-            $('vex-progress').style.display = 'none';
-            const msg = (t('vex-toast-fail') || '生成失败') + ': ' + (e.message || e);
+            $('vex-progress')!.style.display = 'none';
+            const msg = (t('vex-toast-fail') || '生成失败') + ': ' + ((e as Error).message || e);
             showToast(msg, 'error');
         } finally {
             S.running = false;
-            $('vex-build').disabled = false;
+            ($('vex-build') as HTMLButtonElement).disabled = false;
         }
     }
 
@@ -167,7 +178,7 @@ import {
         _renderFiles();
     }
 
-    function _fmtAmt(v) {
+    function _fmtAmt(v: any) {
         if (v == null) return '—';
         var n = parseFloat(v);
         return isNaN(n)
@@ -175,13 +186,13 @@ import {
             : n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    async function _fetchAndFillVexPreview(taskId) {
+    async function _fetchAndFillVexPreview(taskId: string) {
         // P1-4:返回发票 OCR 失败数(解析层真值 invoice_ocr_failed_count)· 调用方据此弹 toast。异常返回 0。
         try {
             var r = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(taskId), {
                 headers: _authHeader(),
             });
-            if (!r.ok) throw new Error(r.status);
+            if (!r.ok) throw new Error(r.status as unknown as string);
             var data = await r.json();
             var raw = data.raw_data_json;
             if (typeof raw === 'string') {
@@ -193,8 +204,8 @@ import {
             }
             raw = raw || {};
             var backendRows = raw.rows || [];
-            var diffRows = [];
-            backendRows.forEach(function (row) {
+            var diffRows: any[] = [];
+            backendRows.forEach(function (row: any) {
                 if (row.kind === 'invoice_orphan') {
                     diffRows.push({
                         invoice_no: row.invoice_no || '',
@@ -225,7 +236,7 @@ import {
                     });
                 }
             });
-            var cashCount = backendRows.filter(function (row) {
+            var cashCount = backendRows.filter(function (row: any) {
                 return row.kind === 'matched_cash';
             }).length;
             var failCount = Math.max(0, parseInt(raw.invoice_ocr_failed_count || 0, 10));
@@ -251,7 +262,7 @@ import {
         const pane = document.getElementById('vex-pane');
         if (pane)
             pane.querySelectorAll('[data-i18n]').forEach((el) => {
-                const v = t(el.dataset.i18n);
+                const v = t((el as HTMLElement).dataset.i18n as string);
                 if (v) el.textContent = v;
             });
         _renderFiles();

@@ -17,7 +17,7 @@
 /* global escapeHtml, apiGet, apiPut, shouldHideMoney, loadTeamList, renderBrandWorkspace, tt */
 
 // v118.10 · 设置页 · 二级 tab 切换
-function switchSettingsTab(tabName) {
+function switchSettingsTab(tabName: any) {
     if (!tabName) return;
     // v118.12.3 · 员工守卫:阻止切到隐藏的 tab(team/api/plan/company)
     // 防止 localStorage 恢复 + 老板用过 team 后员工登录被带到 team panel
@@ -34,10 +34,10 @@ function switchSettingsTab(tabName) {
         /* noop */
     }
     document.querySelectorAll('.settings-tab').forEach((t) => {
-        t.classList.toggle('active', t.dataset.tab === tabName);
+        t.classList.toggle('active', (t as HTMLElement).dataset.tab === tabName);
     });
     document.querySelectorAll('.settings-pane').forEach((p) => {
-        p.classList.toggle('active', p.dataset.pane === tabName);
+        p.classList.toggle('active', (p as HTMLElement).dataset.pane === tabName);
     });
     try {
         localStorage.setItem('mrpilot_settings_tab', tabName);
@@ -62,11 +62,11 @@ function switchSettingsTab(tabName) {
 }
 
 // v118.10 · 设置页 · 预填充个人资料 + 公司信息表单
-function fillSettingsForms(u) {
+function fillSettingsForms(u: any) {
     if (!u) return;
-    const set = (id, val) => {
+    const set = (id: string, val: any) => {
         const el = document.getElementById(id);
-        if (el) el.value = val || '';
+        if (el) (el as HTMLInputElement).value = val || '';
     };
     set('profile-username', u.username || '');
     set('profile-email', u.username || ''); // 当前后端 email == username
@@ -81,7 +81,7 @@ function fillSettingsForms(u) {
 
 // v118.10 · 保存个人资料
 async function saveProfile() {
-    const btn = document.getElementById('btn-save-profile');
+    const btn = document.getElementById('btn-save-profile') as HTMLButtonElement;
     const msg = document.getElementById('profile-save-msg');
     if (!btn) return;
     const orig = btn.innerHTML;
@@ -93,10 +93,16 @@ async function saveProfile() {
     }
     try {
         const payload = {
-            full_name: (document.getElementById('profile-fullname') || {}).value || '',
-            phone: (document.getElementById('profile-phone') || {}).value || '',
-            country: (document.getElementById('profile-country') || {}).value || 'TH',
-            line_id: (document.getElementById('profile-line') || {}).value || '',
+            full_name:
+                ((document.getElementById('profile-fullname') || {}) as HTMLInputElement).value ||
+                '',
+            phone:
+                ((document.getElementById('profile-phone') || {}) as HTMLInputElement).value || '',
+            country:
+                ((document.getElementById('profile-country') || {}) as HTMLInputElement).value ||
+                'TH',
+            line_id:
+                ((document.getElementById('profile-line') || {}) as HTMLInputElement).value || '',
         };
         const r = await apiPut('/api/me/profile', payload);
         if (r && r.ok) {
@@ -131,7 +137,7 @@ async function saveProfile() {
 
 // v118.10 · 保存公司信息
 async function saveCompany() {
-    const btn = document.getElementById('btn-save-company');
+    const btn = document.getElementById('btn-save-company') as HTMLButtonElement;
     const msg = document.getElementById('company-save-msg');
     if (!btn) return;
     const orig = btn.innerHTML;
@@ -143,9 +149,11 @@ async function saveCompany() {
     }
     try {
         const payload = {
-            company_name: (document.getElementById('company-name') || {}).value || '',
-            monthly_volume: (document.getElementById('company-volume') || {}).value || '',
-            role: (document.getElementById('company-role') || {}).value || '',
+            company_name:
+                ((document.getElementById('company-name') || {}) as HTMLInputElement).value || '',
+            monthly_volume:
+                ((document.getElementById('company-volume') || {}) as HTMLInputElement).value || '',
+            role: ((document.getElementById('company-role') || {}) as HTMLInputElement).value || '',
         };
         const r = await apiPut('/api/me/profile', payload);
         if (r && r.ok) {
@@ -216,7 +224,8 @@ function renderSettings() {
     // v118.10.2 · 超管(Earn)也能看(测试 + 管理需要)
     const apiKeyCard = document.getElementById('api-key-card');
     if (apiKeyCard) {
-        const showCard = tt === 'byo_api' || (_userInfo && _userInfo.is_super_admin);
+        const showCard =
+            (tt as unknown as string) === 'byo_api' || (_userInfo && _userInfo.is_super_admin);
         apiKeyCard.style.display = showCard ? '' : 'none';
     }
 }
@@ -226,7 +235,7 @@ function renderSettings() {
 // 只显示:用户名 + 计费方式 + 价格说明小字
 // 余额卡 / 充值按钮搬到首页 KPI 卡 · 这里不再重复
 // ============================================================
-function _renderCreditsSettings(u, el) {
+function _renderCreditsSettings(u: any, el: HTMLElement) {
     // v118.35.0.13 · 3 行: 用户名 + 计费方式 + 价格说明 · keys 跟用户规范命名对齐
     const username = escapeHtml(u.username || u.email || '');
     el.innerHTML = `

@@ -13,7 +13,7 @@
 /* global token, _showSessionRevokedModal, escapeHtml, _results, _drawerIdx, updateDrawerEditCount, renderResults */
 
 // 独立 fetch(不走 apiPost · 避免 403 被误踢)
-async function rdFetch(url, payload) {
+async function rdFetch(url: string, payload: unknown) {
     try {
         const resp = await fetch(url, {
             method: 'POST',
@@ -38,7 +38,7 @@ async function rdFetch(url, payload) {
     }
 }
 
-function _rdErrKey(code) {
+function _rdErrKey(code: string) {
     const map = {
         invalid_format: 'rd-err-format',
         not_found: 'rd-err-not-found',
@@ -46,22 +46,22 @@ function _rdErrKey(code) {
         parse_error: 'rd-err-unknown',
         network: 'rd-err-unreachable',
     };
-    return map[code] || 'rd-err-unknown';
+    return map[code as keyof typeof map] || 'rd-err-unknown';
 }
 
-function _getFieldValue(key) {
-    const el = document.querySelector(`[data-field="${key}"]`);
+function _getFieldValue(key: string) {
+    const el = document.querySelector(`[data-field="${key}"]`) as HTMLInputElement | null;
     return el ? (el.value || '').trim() : '';
 }
 
-function _setRdStatus(side, html, cls) {
+function _setRdStatus(side: string, html: string, cls?: string) {
     const el = document.querySelector(`[data-rd-status="${side}"]`);
     if (!el) return;
     el.innerHTML = html;
     el.className = 'rd-status' + (cls ? ' ' + cls : '');
 }
 
-async function callRdVerify(side) {
+async function callRdVerify(side: string) {
     const taxField = side === 'seller' ? 'seller_tax' : 'buyer_tax';
     const taxId = _getFieldValue(taxField);
     _setRdStatus(side, t('rd-verifying'), 'loading');
@@ -83,7 +83,7 @@ async function callRdVerify(side) {
     }
 }
 
-async function callRdSync(side) {
+async function callRdSync(side: string) {
     const taxField = side === 'seller' ? 'seller_tax' : 'buyer_tax';
     const taxId = _getFieldValue(taxField);
     _setRdStatus(side, t('rd-syncing'), 'loading');
@@ -104,7 +104,7 @@ async function callRdSync(side) {
 // ============================================================
 // RD 同步对比弹窗
 // ============================================================
-function openRdSyncModal(side, official) {
+function openRdSyncModal(side: string, official: any) {
     const nameKey = side === 'seller' ? 'seller_name' : 'buyer_name';
     const addrKey = side === 'seller' ? 'seller_addr' : 'buyer_addr';
     const curName = _getFieldValue(nameKey);
@@ -169,7 +169,7 @@ function openRdSyncModal(side, official) {
     } else {
         const rowsHtml = rows
             .map(
-                (row, i) => `
+                (row, _i) => `
             <label class="rd-diff-row">
                 <input type="checkbox" data-rd-apply data-field="${row.field}" data-value="${escapeHtml(row.official)}" checked>
                 <div class="rd-diff-label">${escapeHtml(row.label)}</div>
@@ -207,7 +207,7 @@ function openRdSyncModal(side, official) {
     modal.classList.add('show');
 
     const closeModal = () => modal.classList.remove('show');
-    modal.querySelector('.rd-modal-close').addEventListener('click', closeModal);
+    modal.querySelector('.rd-modal-close')!.addEventListener('click', closeModal);
     modal
         .querySelectorAll('[data-rd-modal-close]')
         .forEach((b) => b.addEventListener('click', closeModal));
@@ -224,11 +224,13 @@ function openRdSyncModal(side, official) {
                 return;
             }
             modal.querySelectorAll('[data-rd-apply]:checked').forEach((cb) => {
-                const field = cb.dataset.field;
-                const value = cb.dataset.value;
+                const field = (cb as HTMLElement).dataset.field!;
+                const value = (cb as HTMLElement).dataset.value!;
                 r.edits[field] = value;
                 r.merged_fields[field] = value;
-                const input = document.querySelector(`[data-field="${field}"]`);
+                const input = document.querySelector(
+                    `[data-field="${field}"]`
+                ) as HTMLInputElement | null;
                 if (input) input.value = value;
                 const wrap = document.querySelector(`[data-field-wrap="${field}"]`);
                 if (wrap) wrap.classList.add('edited');

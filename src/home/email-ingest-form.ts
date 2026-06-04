@@ -6,13 +6,13 @@
 /* global token */
 import { S } from './email-ingest-store.js';
 // ---------- modal ----------
-function openModal(mode) {
-    S.modalMode = mode;
+function openModal(mode: string) {
+    S.modalMode = mode as 'new' | 'edit';
     const overlay = document.getElementById('email-modal');
     if (!overlay) return;
 
     // 填 preset select
-    const sel = document.getElementById('email-preset');
+    const sel = document.getElementById('email-preset') as HTMLSelectElement;
     sel.innerHTML = '';
     const presets = S.presets || {};
     const order = ['gmail', 'outlook', 'yahoo', 'icloud', 'qq', '163', 'custom'];
@@ -28,21 +28,22 @@ function openModal(mode) {
         if (!presets[k]) return;
         const opt = document.createElement('option');
         opt.value = k;
-        opt.textContent = k === 'custom' ? t('email-preset-custom') : labels[k] || k;
+        opt.textContent =
+            k === 'custom' ? t('email-preset-custom') : labels[k as keyof typeof labels] || k;
         sel.appendChild(opt);
     });
 
-    const titleEl = document.getElementById('email-modal-title');
-    const addrEl = document.getElementById('email-address');
-    const pwdEl = document.getElementById('email-password');
-    const hostEl = document.getElementById('email-imap-host');
-    const portEl = document.getElementById('email-imap-port');
-    const sslEl = document.getElementById('email-imap-ssl');
-    const folderEl = document.getElementById('email-folder');
-    const markEl = document.getElementById('email-mark-read');
-    const enaEl = document.getElementById('email-bind-enabled');
+    const titleEl = document.getElementById('email-modal-title') as HTMLElement;
+    const addrEl = document.getElementById('email-address') as HTMLInputElement;
+    const pwdEl = document.getElementById('email-password') as HTMLInputElement;
+    const hostEl = document.getElementById('email-imap-host') as HTMLInputElement;
+    const portEl = document.getElementById('email-imap-port') as HTMLInputElement;
+    const sslEl = document.getElementById('email-imap-ssl') as HTMLInputElement;
+    const folderEl = document.getElementById('email-folder') as HTMLInputElement;
+    const markEl = document.getElementById('email-mark-read') as HTMLInputElement;
+    const enaEl = document.getElementById('email-bind-enabled') as HTMLInputElement;
     const testResult = document.getElementById('email-test-result');
-    const advDetails = document.getElementById('email-adv-details');
+    const advDetails = document.getElementById('email-adv-details') as HTMLDetailsElement;
 
     if (testResult) {
         testResult.style.display = 'none';
@@ -52,25 +53,25 @@ function openModal(mode) {
     if (mode === 'edit' && S.account) {
         titleEl.setAttribute('data-i18n', 'email-modal-title-edit');
         titleEl.textContent = t('email-modal-title-edit');
-        addrEl.value = S.account.email_address || '';
+        addrEl.value = (S.account.email_address as string) || '';
         pwdEl.value = '';
         pwdEl.setAttribute('data-i18n-placeholder', 'email-field-password-edit-ph');
         pwdEl.placeholder = t('email-field-password-edit-ph');
-        hostEl.value = S.account.imap_host || '';
-        portEl.value = S.account.imap_port || 993;
+        hostEl.value = (S.account.imap_host as string) || '';
+        portEl.value = (S.account.imap_port || 993) as unknown as string;
         sslEl.checked = S.account.imap_use_ssl !== false;
-        folderEl.value = S.account.folder || 'INBOX';
+        folderEl.value = (S.account.folder as string) || 'INBOX';
         markEl.checked = S.account.mark_as_read !== false;
         enaEl.checked = S.account.enabled !== false;
         // v95 · 编辑时回填过滤器
-        const fSenderEl = document.getElementById('email-filter-sender');
-        const fSubjectEl = document.getElementById('email-filter-subject');
-        if (fSenderEl) fSenderEl.value = S.account.filter_sender || '';
-        if (fSubjectEl) fSubjectEl.value = S.account.filter_subject || '';
+        const fSenderEl = document.getElementById('email-filter-sender') as HTMLInputElement;
+        const fSubjectEl = document.getElementById('email-filter-subject') as HTMLInputElement;
+        if (fSenderEl) fSenderEl.value = (S.account.filter_sender as string) || '';
+        if (fSubjectEl) fSubjectEl.value = (S.account.filter_subject as string) || '';
         // v0.17.9 · 高亮当前 interval
-        setIntervalUI(S.account.interval_min || 15);
+        setIntervalUI((S.account.interval_min as number) || 15);
         // 尝试按 host 匹配 preset
-        sel.value = matchPreset(S.account.imap_host) || 'custom';
+        sel.value = matchPreset(S.account.imap_host as string) || 'custom';
         if (advDetails) advDetails.open = true;
     } else {
         titleEl.setAttribute('data-i18n', 'email-modal-title-new');
@@ -85,8 +86,8 @@ function openModal(mode) {
         markEl.checked = true;
         enaEl.checked = true;
         // v95 · 新增时清空过滤器
-        const fSenderEl = document.getElementById('email-filter-sender');
-        const fSubjectEl = document.getElementById('email-filter-subject');
+        const fSenderEl = document.getElementById('email-filter-sender') as HTMLInputElement;
+        const fSubjectEl = document.getElementById('email-filter-subject') as HTMLInputElement;
         if (fSenderEl) fSenderEl.value = '';
         if (fSubjectEl) fSubjectEl.value = '';
         // v0.17.9 · 默认标准档(15 分钟)
@@ -106,14 +107,14 @@ function closeModal() {
     if (overlay) overlay.style.display = 'none';
 }
 
-function applyPreset(key) {
-    const preset = (S.presets || {})[key];
+function applyPreset(key: string) {
+    const preset = (S.presets || {})[key] as { host?: string; port?: number; ssl?: boolean };
     if (!preset || key === 'custom') return;
-    const hostEl = document.getElementById('email-imap-host');
-    const portEl = document.getElementById('email-imap-port');
-    const sslEl = document.getElementById('email-imap-ssl');
+    const hostEl = document.getElementById('email-imap-host') as HTMLInputElement;
+    const portEl = document.getElementById('email-imap-port') as HTMLInputElement;
+    const sslEl = document.getElementById('email-imap-ssl') as HTMLInputElement;
     if (hostEl) hostEl.value = preset.host || '';
-    if (portEl) portEl.value = preset.port || 993;
+    if (portEl) portEl.value = (preset.port || 993) as unknown as string;
     if (sslEl) sslEl.checked = preset.ssl !== false;
 }
 
@@ -139,12 +140,12 @@ const _DOMAIN_TO_PRESET = {
 };
 
 // v95 · 输入邮箱时自动检测后缀 · 选 preset · 应用 IMAP
-function autoDetectPresetByAddress(addr) {
+function autoDetectPresetByAddress(addr: string) {
     if (!addr || !addr.includes('@')) return;
     const domain = addr.split('@')[1].toLowerCase().trim();
-    const key = _DOMAIN_TO_PRESET[domain];
+    const key = _DOMAIN_TO_PRESET[domain as keyof typeof _DOMAIN_TO_PRESET];
     if (!key) return;
-    const sel = document.getElementById('email-preset');
+    const sel = document.getElementById('email-preset') as HTMLSelectElement;
     if (!sel) return;
     // 只有用户没手动改过 preset 时才自动覆盖
     const currentPreset = sel.value;
@@ -156,12 +157,12 @@ function autoDetectPresetByAddress(addr) {
     applyPreset(key);
 }
 
-function matchPreset(host) {
+function matchPreset(host: string) {
     if (!host) return null;
     const presets = S.presets || {};
     for (const k in presets) {
         if (k === 'custom') continue;
-        if (presets[k] && presets[k].host === host) return k;
+        if (presets[k] && (presets[k] as { host?: string }).host === host) return k;
     }
     return null;
 }
@@ -171,31 +172,51 @@ function readModalForm() {
     const activeIntervalBtn = document.querySelector(
         '#email-interval-options .email-interval-btn.active'
     );
-    const intervalMin = activeIntervalBtn ? parseInt(activeIntervalBtn.dataset.interval, 10) : 15;
+    const intervalMin = activeIntervalBtn
+        ? parseInt((activeIntervalBtn as HTMLElement).dataset.interval!, 10)
+        : 15;
     return {
-        email_address: (document.getElementById('email-address').value || '').trim(),
-        password: document.getElementById('email-password').value || '',
-        imap_host: (document.getElementById('email-imap-host').value || '').trim(),
-        imap_port: parseInt(document.getElementById('email-imap-port').value || '993', 10) || 993,
-        imap_use_ssl: document.getElementById('email-imap-ssl').checked,
-        folder: (document.getElementById('email-folder').value || 'INBOX').trim() || 'INBOX',
-        mark_as_read: document.getElementById('email-mark-read').checked,
-        enabled: document.getElementById('email-bind-enabled').checked,
+        email_address: (
+            (document.getElementById('email-address') as HTMLInputElement).value || ''
+        ).trim(),
+        password: (document.getElementById('email-password') as HTMLInputElement).value || '',
+        imap_host: (
+            (document.getElementById('email-imap-host') as HTMLInputElement).value || ''
+        ).trim(),
+        imap_port:
+            parseInt(
+                (document.getElementById('email-imap-port') as HTMLInputElement).value || '993',
+                10
+            ) || 993,
+        imap_use_ssl: (document.getElementById('email-imap-ssl') as HTMLInputElement).checked,
+        folder:
+            (
+                (document.getElementById('email-folder') as HTMLInputElement).value || 'INBOX'
+            ).trim() || 'INBOX',
+        mark_as_read: (document.getElementById('email-mark-read') as HTMLInputElement).checked,
+        enabled: (document.getElementById('email-bind-enabled') as HTMLInputElement).checked,
         interval_min: [5, 15, 60].includes(intervalMin) ? intervalMin : 15,
         // v95 · 过滤器
-        filter_sender: (document.getElementById('email-filter-sender').value || '').trim() || null,
+        filter_sender:
+            (
+                (document.getElementById('email-filter-sender') as HTMLInputElement).value || ''
+            ).trim() || null,
         filter_subject:
-            (document.getElementById('email-filter-subject').value || '').trim() || null,
+            (
+                (document.getElementById('email-filter-subject') as HTMLInputElement).value || ''
+            ).trim() || null,
     };
 }
 
 // v0.17.9 · 间隔按钮组点击切换 · 委托到容器
 function bindIntervalOptions() {
-    const opts = document.getElementById('email-interval-options');
+    const opts = document.getElementById('email-interval-options') as HTMLElement & {
+        _bound?: boolean;
+    };
     if (!opts || opts._bound) return;
     opts._bound = true;
     opts.addEventListener('click', (e) => {
-        const btn = e.target.closest('.email-interval-btn');
+        const btn = (e.target as HTMLElement).closest('.email-interval-btn');
         if (!btn) return;
         opts.querySelectorAll('.email-interval-btn').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
@@ -203,16 +224,16 @@ function bindIntervalOptions() {
 }
 
 // v0.17.9 · 把 modal 当前的 interval 高亮(open modal 时调)
-function setIntervalUI(intervalMin) {
+function setIntervalUI(intervalMin: number) {
     const v = [5, 15, 60].includes(intervalMin) ? intervalMin : 15;
     const opts = document.getElementById('email-interval-options');
     if (!opts) return;
     opts.querySelectorAll('.email-interval-btn').forEach((b) => {
-        b.classList.toggle('active', parseInt(b.dataset.interval, 10) === v);
+        b.classList.toggle('active', parseInt((b as HTMLElement).dataset.interval!, 10) === v);
     });
 }
 
-function showTestResult(kind, text) {
+function showTestResult(kind: string, text: string) {
     const el = document.getElementById('email-test-result');
     if (!el) return;
     el.style.display = '';
@@ -236,7 +257,7 @@ async function testFromModal() {
         return;
     }
 
-    const btn = document.getElementById('btn-email-modal-test');
+    const btn = document.getElementById('btn-email-modal-test') as HTMLButtonElement;
     if (btn) btn.disabled = true;
     showTestResult('running', t('email-test-running'));
     try {

@@ -53,6 +53,24 @@ declare function openHistoryDrawer(historyId: unknown): Promise<void>;
 /** Core fetch helpers (home.js). JSON payloads are untyped legacy → any. */
 declare function apiGet(url: string): Promise<any>;
 declare function apiPost(url: string, data?: unknown): Promise<any>;
+declare function apiPut(url: string, data?: unknown): Promise<any>;
+/** i18n alias used as a bare name by some legacy modules (home.js core). */
+declare function tt(key: string): string;
+/** History page state (home.js state.js). Known fields typed; index keeps extras. */
+interface HistoryState {
+    page: number;
+    pageSize: number;
+    total: number;
+    keyword: string;
+    range: number;
+    items: unknown[];
+    loading: boolean;
+    [key: string]: unknown;
+}
+// eslint-disable-next-line no-var
+declare var _historyState: HistoryState;
+// eslint-disable-next-line no-var
+declare var _historySelected: Set<unknown>;
 /** ERP page loaders (home.js / erp modules), reachable as bare names. */
 declare function loadErpLogs(silent?: boolean): Promise<void>;
 declare function loadErpTodayStats(): Promise<void>;
@@ -209,6 +227,24 @@ interface Window {
     _workspaceClientsCache?: unknown[];
     loadErpLogs?: (silent?: boolean) => Promise<void>;
     loadErpExceptions?: (append?: boolean) => Promise<void>;
+    // ── C5 批10 桥(state / history / test-center / vex / erp-log 遗留边界)──
+    __i18nSubs?: unknown[];
+    getCurrentClientId?: () => unknown;
+    _tcOnNewLog?: (entry: unknown) => void;
+    _onVexResultShown?: (...args: any[]) => any;
+    _fillVexSummary?: (...args: any[]) => any;
+    _fillVexDetail?: (...args: any[]) => any;
+    retryPushLog?: (...args: any[]) => any;
+    _vexLastTask?: Record<string, unknown> | null;
+    _sortKey?: string | null;
+    _sortDir?: string;
+    _searchKeyword?: string;
+    _quota?: Record<string, unknown> | null;
+    _pearnlyTcPush?: (...args: any[]) => any;
+    _pearnlyTcLogs?: unknown[];
+    _historyState?: HistoryState;
+    _historySelected?: Set<unknown>;
+    _drawerAlreadyPushed?: boolean;
 }
 
 // navigator.userAgentData (UA-CH) is not yet in the DOM lib; chrome-banner reads it.

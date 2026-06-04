@@ -7,6 +7,21 @@ import { S } from './bank-recon-v2-store.js';
 import { $, fmtNum } from './bank-recon-v2-helpers.js';
 import { renderResults, _brv2Export } from './bank-recon-v2-results.js';
 
+type VexTask = {
+    id: string;
+    created_at?: string;
+    formula_diff?: number;
+    stmt_files?: string;
+    gl_files?: string;
+    stmt_row_count?: number;
+    gl_row_count?: number;
+    matched_count?: number;
+    unmatched_gl?: number;
+    unmatched_stmt?: number;
+    status?: string;
+    [key: string]: unknown;
+};
+
 // ── History ───────────────────────────────────────────────────────
 async function loadHistory() {
     const token = localStorage.getItem('mrpilot_token') || '';
@@ -47,15 +62,15 @@ function _brv2RenderPager() {
     pager.style.display = '';
     const totalPages = Math.ceil(S.cachedHistoryTasks.length / BRV2_PAGE_SIZE);
     if (info) info.textContent = S.brv2Page + ' / ' + totalPages;
-    if (prev) prev.disabled = S.brv2Page <= 1;
-    if (next) next.disabled = S.brv2Page >= totalPages;
+    if (prev) (prev as HTMLButtonElement).disabled = S.brv2Page <= 1;
+    if (next) (next as HTMLButtonElement).disabled = S.brv2Page >= totalPages;
 }
 
 function _brv2InitPager() {
     const prev = $('brv2-history-prev');
     const next = $('brv2-history-next');
-    if (prev && !prev._brv2Bound) {
-        prev._brv2Bound = true;
+    if (prev && !(prev as HTMLElement & { _brv2Bound?: boolean })._brv2Bound) {
+        (prev as HTMLElement & { _brv2Bound?: boolean })._brv2Bound = true;
         prev.addEventListener('click', () => {
             if (S.brv2Page > 1) {
                 S.brv2Page--;
@@ -63,8 +78,8 @@ function _brv2InitPager() {
             }
         });
     }
-    if (next && !next._brv2Bound) {
-        next._brv2Bound = true;
+    if (next && !(next as HTMLElement & { _brv2Bound?: boolean })._brv2Bound) {
+        (next as HTMLElement & { _brv2Bound?: boolean })._brv2Bound = true;
         next.addEventListener('click', () => {
             const totalPages = Math.ceil(S.cachedHistoryTasks.length / BRV2_PAGE_SIZE);
             if (S.brv2Page < totalPages) {
@@ -75,7 +90,7 @@ function _brv2InitPager() {
     }
 }
 
-function renderHistory(tasks) {
+function renderHistory(tasks?: any[]) {
     if (tasks !== undefined) {
         S.cachedHistoryTasks = tasks || [];
         S.brv2Page = 1;
@@ -116,17 +131,17 @@ function renderHistory(tasks) {
         '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 4 13 4"/><path d="M6 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4"/><path d="M5 4l1 9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-9"/></svg>';
 
     tbody.innerHTML = '';
-    tasks_page.forEach((t) => {
+    (tasks_page as VexTask[]).forEach((t: VexTask) => {
         const diff = Number(t.formula_diff || 0);
         const diffOk = Math.abs(diff) < 0.05;
         const stmtF = (t.stmt_files || '')
             .split(';')
-            .map((s) => s.trim().split(/[/\\]/).pop())
+            .map((s: string) => s.trim().split(/[/\\]/).pop())
             .filter(Boolean)
             .join(', ');
         const glF = (t.gl_files || '')
             .split(';')
-            .map((s) => s.trim().split(/[/\\]/).pop())
+            .map((s: string) => s.trim().split(/[/\\]/).pop())
             .filter(Boolean)
             .join(', ');
         const dt = t.created_at ? String(t.created_at).slice(0, 16).replace('T', ' ') : '';
@@ -148,15 +163,15 @@ function renderHistory(tasks) {
 
         const tdMatched = document.createElement('td');
         tdMatched.className = 'glv-num';
-        tdMatched.textContent = t.matched_count || 0;
+        tdMatched.textContent = (t.matched_count || 0) as unknown as string;
 
         const tdGlOnly = document.createElement('td');
         tdGlOnly.className = 'glv-num';
-        tdGlOnly.textContent = t.unmatched_gl || 0;
+        tdGlOnly.textContent = (t.unmatched_gl || 0) as unknown as string;
 
         const tdStmtOnly = document.createElement('td');
         tdStmtOnly.className = 'glv-num';
-        tdStmtOnly.textContent = t.unmatched_stmt || 0;
+        tdStmtOnly.textContent = (t.unmatched_stmt || 0) as unknown as string;
 
         const tdDiff = document.createElement('td');
         tdDiff.className = 'glv-num';
@@ -165,7 +180,7 @@ function renderHistory(tasks) {
 
         const tdAct = document.createElement('td');
         tdAct.className = 'glv-history-actions';
-        const mkBtn = (svg, title, cls, onClick) => {
+        const mkBtn = (svg: string, title: string, cls: string, onClick: () => void) => {
             const b = document.createElement('button');
             b.type = 'button';
             b.title = title;
@@ -207,7 +222,11 @@ function renderHistory(tasks) {
         );
         tr.style.cursor = 'pointer';
         tr.addEventListener('click', async (e) => {
-            if (e.target.closest('.glv-del') || e.target.closest('button')) return;
+            if (
+                (e.target as HTMLElement).closest('.glv-del') ||
+                (e.target as HTMLElement).closest('button')
+            )
+                return;
             await loadTask(t.id, token);
         });
         tbody.appendChild(tr);
@@ -217,7 +236,9 @@ function renderHistory(tasks) {
 }
 
 function _applyBrv2Search() {
-    const q = (($('brv2-hist-search') || {}).value || '').trim().toLowerCase();
+    const q = ((($('brv2-hist-search') || {}) as HTMLInputElement).value || '')
+        .trim()
+        .toLowerCase();
     const tbody = $('brv2-history-tbody');
     if (!tbody) return;
     tbody.querySelectorAll('tr').forEach((tr) => {
@@ -226,7 +247,7 @@ function _applyBrv2Search() {
     });
 }
 
-async function loadTask(taskId, token) {
+async function loadTask(taskId: string, token: string) {
     try {
         const res = await fetch('/api/recon/bank-v2/' + taskId, {
             headers: { Authorization: 'Bearer ' + token },
@@ -239,7 +260,9 @@ async function loadTask(taskId, token) {
         // 重置 filter tab 到 "all"
         document
             .querySelectorAll('.brv2-filter-btn')
-            .forEach((b) => b.classList.toggle('active', b.dataset.filter === 'all'));
+            .forEach((b) =>
+                b.classList.toggle('active', (b as HTMLElement).dataset.filter === 'all')
+            );
         renderResults(S.currentTask);
     } catch (e) {
         /* silent */

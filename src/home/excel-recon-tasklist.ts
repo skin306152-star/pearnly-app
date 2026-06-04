@@ -40,7 +40,14 @@ async function _loadVexTaskList() {
 const VEX_PAGE_SIZE = 10;
 
 function _applyVexSearch() {
-    var q = ((document.getElementById('vex-task-search') || {}).value || '').trim().toLowerCase();
+    var q = (
+        (
+            (document.getElementById('vex-task-search') as HTMLInputElement | null) ||
+            ({} as HTMLInputElement)
+        ).value || ''
+    )
+        .trim()
+        .toLowerCase();
     S.vexPage = 1;
     _renderVexTaskList(S.vexAllRows);
     if (!q) return;
@@ -52,8 +59,8 @@ function _applyVexSearch() {
     });
 }
 
-function _renderVexTaskList(rows) {
-    S.vexAllRows = rows || S.vexAllRows;
+function _renderVexTaskList(rows?: any[]) {
+    S.vexAllRows = (rows || S.vexAllRows) as never[];
     const tbody = document.getElementById('vex-task-tbody');
     if (!tbody) return;
     if (!S.vexAllRows.length) {
@@ -71,7 +78,7 @@ function _renderVexTaskList(rows) {
     _vexRenderPager(S.vexAllRows.length);
 }
 
-function _vexRenderPager(total) {
+function _vexRenderPager(total: number) {
     const pager = document.getElementById('vex-task-pager');
     const info = document.getElementById('vex-task-pager-info');
     const prev = document.getElementById('vex-task-prev');
@@ -84,11 +91,11 @@ function _vexRenderPager(total) {
     pager.style.display = '';
     const totalPages = Math.ceil(total / VEX_PAGE_SIZE);
     if (info) info.textContent = S.vexPage + ' / ' + totalPages;
-    if (prev) prev.disabled = S.vexPage <= 1;
-    if (next) next.disabled = S.vexPage >= totalPages;
+    if (prev) (prev as HTMLButtonElement).disabled = S.vexPage <= 1;
+    if (next) (next as HTMLButtonElement).disabled = S.vexPage >= totalPages;
 }
 
-function _doRenderVexRows(rows) {
+function _doRenderVexRows(rows: any[]) {
     const tbody = document.getElementById('vex-task-tbody');
     if (!tbody) return;
     const statusLabel = {
@@ -106,7 +113,7 @@ function _doRenderVexRows(rows) {
     const dlSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>`;
     const delSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h10M6 4V3h4v1M5 4v8a1 1 0 001 1h4a1 1 0 001-1V4"/></svg>`;
     tbody.innerHTML = rows
-        .map((row) => {
+        .map((row: any) => {
             const dt = row.created_at
                 ? new Date(row.created_at).toLocaleString([], {
                       year: 'numeric',
@@ -139,7 +146,7 @@ function _doRenderVexRows(rows) {
             <td>${(row.invoice_count || 0) + ' / ' + (row.report_count || 0)}</td>
             <td>${kpiStr}</td>
             <td>${diff}</td>
-            <td><span class="badge ${statusClass[st] || 'badge-gray'}">${statusLabel[st] || st}</span></td>
+            <td><span class="badge ${statusClass[st as keyof typeof statusClass] || 'badge-gray'}">${statusLabel[st as keyof typeof statusLabel] || st}</span></td>
             <td>${elapsed}</td>
             <td><div class="vex-task-actions">
                 <button class="vex-task-dl-btn" data-task-id="${_esc(row.id)}" title="${t('hist_export') || '导出'}">${dlSvg}</button>
@@ -152,10 +159,10 @@ function _doRenderVexRows(rows) {
     tbody.querySelectorAll('.vex-task-dl-btn').forEach((btn) => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            const taskId = btn.dataset.taskId;
+            const taskId = (btn as HTMLElement).dataset.taskId;
             try {
                 const resp = await fetch(
-                    '/api/vat_excel/tasks/' + encodeURIComponent(taskId) + '/download',
+                    '/api/vat_excel/tasks/' + encodeURIComponent(taskId!) + '/download',
                     { credentials: 'include', headers: _authHeader() }
                 );
                 if (resp.status === 410) {
@@ -185,7 +192,7 @@ function _doRenderVexRows(rows) {
     tbody.querySelectorAll('.vex-task-del-btn').forEach((btn) => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            _confirmDeleteVatTask(btn.dataset.taskId);
+            _confirmDeleteVatTask((btn as HTMLElement).dataset.taskId);
         });
     });
     _applyVexSearch();
@@ -194,8 +201,8 @@ function _doRenderVexRows(rows) {
 function _vexInitPager() {
     var prev = document.getElementById('vex-task-prev');
     var next = document.getElementById('vex-task-next');
-    if (prev && !prev._vexBound) {
-        prev._vexBound = true;
+    if (prev && !(prev as HTMLElement & { _vexBound?: boolean })._vexBound) {
+        (prev as HTMLElement & { _vexBound?: boolean })._vexBound = true;
         prev.addEventListener('click', function () {
             if (S.vexPage > 1) {
                 S.vexPage--;
@@ -203,8 +210,8 @@ function _vexInitPager() {
             }
         });
     }
-    if (next && !next._vexBound) {
-        next._vexBound = true;
+    if (next && !(next as HTMLElement & { _vexBound?: boolean })._vexBound) {
+        (next as HTMLElement & { _vexBound?: boolean })._vexBound = true;
         next.addEventListener('click', function () {
             var totalPages = Math.ceil(S.vexAllRows.length / VEX_PAGE_SIZE);
             if (S.vexPage < totalPages) {
@@ -215,7 +222,7 @@ function _vexInitPager() {
     }
 }
 
-async function _confirmDeleteVatTask(taskId) {
+async function _confirmDeleteVatTask(taskId: any) {
     const title = t('vex-task-delete-confirm-title') || '删除对账任务?';
     const body = t('vex-task-delete-confirm-body') || '同时清掉对应的发票识别缓存 · 不可恢复';
     const ok = await showConfirm(body, {
@@ -230,7 +237,7 @@ async function _confirmDeleteVatTask(taskId) {
             credentials: 'include',
             headers: _authHeader(),
         });
-        if (!resp.ok) throw new Error(resp.status);
+        if (!resp.ok) throw new Error(resp.status as unknown as string);
         showToast(t('vex-task-delete-ok') || '已删除', 'success');
         _loadVexTaskList();
         _loadVexKpi();

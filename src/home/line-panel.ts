@@ -13,12 +13,13 @@
 /* global showConfirm */
 
 (function () {
-    let _codeTimer = null; // 过期倒计时
-    let _pollTimer = null; // 绑定状态轮询
-    let _currentCode = null;
-    let _currentExpiresAt = null;
+    let _codeTimer: ReturnType<typeof setInterval> | null = null; // 过期倒计时
+    let _pollTimer: ReturnType<typeof setInterval> | null = null; // 绑定状态轮询
+    // @ts-expect-error TS6133 verbatim write-only 占位 · 0 改逻辑保留
+    let _currentCode: string | null = null;
+    let _currentExpiresAt: number | null = null;
 
-    function $(id) {
+    function $(id: string) {
         return document.getElementById(id);
     }
 
@@ -49,10 +50,10 @@
         }
     }
 
-    function renderBound(data) {
+    function renderBound(data: any) {
         stopPolling();
-        $('linebot-unbound').style.display = 'none';
-        $('linebot-bound').style.display = 'block';
+        $('linebot-unbound')!.style.display = 'none';
+        $('linebot-bound')!.style.display = 'block';
 
         const pill = $('linebot-status-summary');
         if (pill) {
@@ -67,7 +68,7 @@
         const avatarEl = $('linebot-avatar');
         if (avatarEl) {
             if (data.line_picture_url) {
-                avatarEl.src = data.line_picture_url;
+                (avatarEl as HTMLImageElement).src = data.line_picture_url;
                 avatarEl.style.display = '';
             } else {
                 avatarEl.style.display = 'none';
@@ -81,8 +82,8 @@
     }
 
     async function renderUnbound() {
-        $('linebot-bound').style.display = 'none';
-        $('linebot-unbound').style.display = 'block';
+        $('linebot-bound')!.style.display = 'none';
+        $('linebot-unbound')!.style.display = 'block';
 
         const pill = $('linebot-status-summary');
         if (pill) {
@@ -115,7 +116,7 @@
         }
     }
 
-    function renderCode(data) {
+    function renderCode(data: any) {
         const codeEl = $('linebot-code');
         if (codeEl) codeEl.textContent = data.code;
 
@@ -158,7 +159,7 @@
                 }
                 const codeEl = $('linebot-code');
                 if (codeEl) codeEl.style.opacity = '0.4';
-                clearInterval(_codeTimer);
+                clearInterval(_codeTimer!);
                 _codeTimer = null;
                 return;
             }
@@ -167,7 +168,7 @@
             const s = total % 60;
             if (expEl) {
                 expEl.textContent = t('linebot-code-expires-in')
-                    .replace('{m}', m)
+                    .replace('{m}', m as unknown as string)
                     .replace('{s}', String(s).padStart(2, '0'));
                 if (ms < 60000) expEl.classList.add('expiring');
                 else expEl.classList.remove('expiring');
@@ -212,7 +213,7 @@
         stopPolling();
     }
 
-    function showError(msg) {
+    function showError(msg: string) {
         const box = $('linebot-error');
         if (box) {
             box.textContent = msg;
@@ -246,14 +247,14 @@
 
     // 事件绑定
     document.addEventListener('click', (e) => {
-        const refreshBtn = e.target.closest('#linebot-code-refresh');
+        const refreshBtn = (e.target as HTMLElement).closest('#linebot-code-refresh');
         if (refreshBtn) {
             e.preventDefault();
             hideError();
             fetchNewCode();
             return;
         }
-        const unbindBtn = e.target.closest('#linebot-unbind');
+        const unbindBtn = (e.target as HTMLElement).closest('#linebot-unbind');
         if (unbindBtn) {
             e.preventDefault();
             unbind();

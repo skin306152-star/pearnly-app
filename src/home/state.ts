@@ -16,8 +16,8 @@
 (function () {
     'use strict';
     const BUF_MAX = 200;
-    const buf = [];
-    function _push(entry) {
+    const buf: any[] = [];
+    function _push(entry: any) {
         try {
             buf.push(Object.assign({ ts: Date.now() }, entry));
             if (buf.length > BUF_MAX) buf.shift();
@@ -39,7 +39,12 @@
         'error',
         function (e) {
             // 资源加载错误 e.target 是元素 · 跳过(信噪比低)
-            if (e.target && e.target !== window && (e.target.src || e.target.href)) return;
+            if (
+                e.target &&
+                e.target !== window &&
+                ((e.target as any).src || (e.target as any).href)
+            )
+                return;
             _push({
                 type: 'js_error',
                 summary: String(e.message || 'JS Error').slice(0, 200),
@@ -77,7 +82,7 @@
             const method = (args[1] && args[1].method) || 'GET';
             const urlClean = String(url).split('?')[0];
             return _origFetch
-                .apply(this, args)
+                .apply(this, args as any)
                 .then(function (resp) {
                     const elapsed = Date.now() - t0;
                     if (!resp.ok) {
@@ -183,9 +188,9 @@
 
     // 4) console.error / console.warn 拦截(信噪比中 · 仅取摘要)
     ['error', 'warn'].forEach(function (level) {
-        const orig = console[level];
+        const orig = console[level as keyof Console] as any;
         if (typeof orig !== 'function') return;
-        console[level] = function () {
+        console[level as keyof Console] = function () {
             try {
                 const parts = [];
                 for (let i = 0; i < arguments.length; i++) {
@@ -223,12 +228,12 @@ window.subscribeI18n = function (name, fn) {
         return;
     }
     // 同名只注册一次(防 IIFE 重复执行 · 重复挂钩)
-    const exist = window.__i18nSubs.find((s) => s.name === name);
+    const exist = (window.__i18nSubs as any[]).find((s: any) => s.name === name);
     if (exist) {
         exist.fn = fn;
         return;
     }
-    window.__i18nSubs.push({ name: String(name || '?'), fn: fn });
+    (window.__i18nSubs as any[]).push({ name: String(name || '?'), fn: fn });
 };
 
 // ============================================================
@@ -260,4 +265,4 @@ window._historySelected = new Set();
 window._erpEndpoints = [];
 
 // token 读取(无 token 的硬拦截由 home.html <head> 内联鉴权闸更早处理 · 这里只暴露给模块用)
-window.token = localStorage.getItem('mrpilot_token');
+window.token = localStorage.getItem('mrpilot_token') as string;

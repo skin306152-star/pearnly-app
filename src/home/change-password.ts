@@ -10,7 +10,7 @@
     'use strict';
 
     // 密码强度评估(0-3)
-    function strength(pw) {
+    function strength(pw: string) {
         let s = 0;
         if (pw.length >= 8) s++;
         if (pw.length >= 12) s++;
@@ -20,7 +20,7 @@
     }
 
     // 显示消息(成功 / 失败)
-    function showMsg(text, type) {
+    function showMsg(text: string, type: string) {
         const el = document.getElementById('cpw-msg');
         if (!el) return;
         el.textContent = text;
@@ -28,7 +28,7 @@
     }
 
     // 翻译 · 走全局 t()
-    function tt(key) {
+    function tt(key: string) {
         return typeof t === 'function' ? t(key) : key;
     }
 
@@ -39,7 +39,7 @@
 
     function armCpwInputs() {
         ['cpw-old', 'cpw-new', 'cpw-confirm'].forEach((id) => {
-            const inp = document.getElementById(id);
+            const inp = document.getElementById(id) as HTMLInputElement | null;
             if (inp) {
                 inp.value = '';
                 inp.setAttribute('readonly', 'readonly');
@@ -54,11 +54,11 @@
     }
 
     async function submitChangePw() {
-        const btn = document.getElementById('btn-change-pw');
-        const oldEl = document.getElementById('cpw-old');
-        const newEl = document.getElementById('cpw-new');
-        const cfmEl = document.getElementById('cpw-confirm');
-        const bar = document.getElementById('cpw-strength-bar');
+        const btn = document.getElementById('btn-change-pw') as HTMLButtonElement | null;
+        const oldEl = document.getElementById('cpw-old') as HTMLInputElement | null;
+        const newEl = document.getElementById('cpw-new') as HTMLInputElement | null;
+        const cfmEl = document.getElementById('cpw-confirm') as HTMLInputElement | null;
+        const bar = document.getElementById('cpw-strength-bar') as HTMLElement | null;
         if (!btn || !oldEl || !newEl || !cfmEl) return;
 
         const oldPw = oldEl.value;
@@ -135,24 +135,24 @@
 
         // 点击委托:眼睛切换 / 忘记密码 / 提交 / 切账户安全 tab 清空
         document.addEventListener('click', (e) => {
-            if (!e.target || !e.target.closest) return;
-            const eye = e.target.closest('.cpw-eye');
+            if (!e.target || !(e.target as HTMLElement).closest) return;
+            const eye = (e.target as HTMLElement).closest('.cpw-eye') as HTMLElement | null;
             if (eye) {
-                const inp = document.getElementById(eye.dataset.target);
+                const inp = document.getElementById(eye.dataset.target!) as HTMLInputElement | null;
                 if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
                 return;
             }
-            if (e.target.closest('#cpw-forgot-link')) {
+            if ((e.target as HTMLElement).closest('#cpw-forgot-link')) {
                 e.preventDefault();
                 openForgotCurrentPwModal();
                 return;
             }
-            if (e.target.closest('#btn-change-pw')) {
+            if ((e.target as HTMLElement).closest('#btn-change-pw')) {
                 submitChangePw();
                 return;
             }
             if (
-                e.target.closest(
+                (e.target as HTMLElement).closest(
                     '.settings-nav-item[data-settings-tab="account"], .settings-nav-item[data-tab="account"], .settings-nav-item[data-tab="security"]'
                 )
             ) {
@@ -162,10 +162,10 @@
 
         // 输入委托:新密码强度条
         document.addEventListener('input', (e) => {
-            if (e.target && e.target.id === 'cpw-new') {
+            if (e.target && (e.target as HTMLElement).id === 'cpw-new') {
                 const bar = document.getElementById('cpw-strength-bar');
                 if (!bar) return;
-                const s = strength(e.target.value);
+                const s = strength((e.target as HTMLInputElement).value);
                 const widths = ['0%', '33%', '66%', '100%'];
                 const cls = ['', 'weak', 'medium', 'strong'];
                 bar.style.width = widths[s];
@@ -175,8 +175,11 @@
 
         // 焦点委托:防 autofill · 聚焦改密字段时移除 readonly
         document.addEventListener('focusin', (e) => {
-            if (e.target && ['cpw-old', 'cpw-new', 'cpw-confirm'].includes(e.target.id)) {
-                e.target.removeAttribute('readonly');
+            if (
+                e.target &&
+                ['cpw-old', 'cpw-new', 'cpw-confirm'].includes((e.target as HTMLElement).id)
+            ) {
+                (e.target as HTMLElement).removeAttribute('readonly');
             }
         });
 
@@ -188,7 +191,7 @@
     function openForgotCurrentPwModal() {
         const u = window._userInfo || (typeof _userInfo !== 'undefined' ? _userInfo : null);
         const email = u && u.username ? u.username : '';
-        const maskedEmail = maskEmail(email);
+        const maskedEmail = maskEmail(email as string);
 
         // 创建 overlay
         let overlay = document.getElementById('cpw-forgot-overlay');
@@ -220,19 +223,19 @@
 
         // 关闭
         const close = () => overlay.remove();
-        overlay.querySelector('#cpw-forgot-close').addEventListener('click', close);
-        overlay.querySelector('#cpw-forgot-cancel').addEventListener('click', close);
+        overlay.querySelector('#cpw-forgot-close')!.addEventListener('click', close);
+        overlay.querySelector('#cpw-forgot-cancel')!.addEventListener('click', close);
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) close();
         });
 
         // 发送
-        overlay.querySelector('#cpw-forgot-send').addEventListener('click', async () => {
-            const sendBtn = overlay.querySelector('#cpw-forgot-send');
-            const msgEl = overlay.querySelector('#cpw-forgot-msg');
-            sendBtn.disabled = true;
-            const oldText = sendBtn.textContent;
-            sendBtn.textContent = tt('cpw-forgot-sending');
+        overlay.querySelector('#cpw-forgot-send')!.addEventListener('click', async () => {
+            const sendBtn = overlay.querySelector('#cpw-forgot-send') as HTMLButtonElement | null;
+            const msgEl = overlay.querySelector('#cpw-forgot-msg') as HTMLElement | null;
+            sendBtn!.disabled = true;
+            const oldText = sendBtn!.textContent;
+            sendBtn!.textContent = tt('cpw-forgot-sending');
             try {
                 const r = await fetch('/api/auth/forgot_password', {
                     method: 'POST',
@@ -241,28 +244,28 @@
                 });
                 const data = await r.json().catch(() => ({}));
                 if (r.ok) {
-                    msgEl.textContent = tt('cpw-forgot-success');
-                    msgEl.className = 'cpw-forgot-msg success';
-                    sendBtn.style.display = 'none';
-                    overlay.querySelector('#cpw-forgot-cancel').textContent =
+                    msgEl!.textContent = tt('cpw-forgot-success');
+                    msgEl!.className = 'cpw-forgot-msg success';
+                    sendBtn!.style.display = 'none';
+                    overlay.querySelector('#cpw-forgot-cancel')!.textContent =
                         tt('cpw-forgot-close-btn');
                 } else {
-                    msgEl.textContent = data.detail || tt('cpw-forgot-fail');
-                    msgEl.className = 'cpw-forgot-msg error';
-                    sendBtn.disabled = false;
-                    sendBtn.textContent = oldText;
+                    msgEl!.textContent = data.detail || tt('cpw-forgot-fail');
+                    msgEl!.className = 'cpw-forgot-msg error';
+                    sendBtn!.disabled = false;
+                    sendBtn!.textContent = oldText;
                 }
             } catch (e) {
-                msgEl.textContent = tt('cpw-forgot-fail');
-                msgEl.className = 'cpw-forgot-msg error';
-                sendBtn.disabled = false;
-                sendBtn.textContent = oldText;
+                msgEl!.textContent = tt('cpw-forgot-fail');
+                msgEl!.className = 'cpw-forgot-msg error';
+                sendBtn!.disabled = false;
+                sendBtn!.textContent = oldText;
             }
         });
     }
 
     // 邮箱半遮罩 · ab****@gmail.com
-    function maskEmail(email) {
+    function maskEmail(email: string) {
         if (!email || !email.includes('@')) return email || '';
         const [local, domain] = email.split('@');
         if (local.length <= 2) return local + '****@' + domain;
@@ -270,11 +273,14 @@
     }
 
     // 安全转义
-    function esc(s) {
+    function esc(s: unknown) {
         if (s == null) return '';
         return String(s).replace(
             /[&<>"']/g,
-            (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+            (c: string) =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[
+                    c
+                ] as string
         );
     }
 

@@ -7,6 +7,18 @@ import { S } from './bank-recon-store.js';
 import { showBankProgress, hideBankError, formatUploadError, esc } from './bank-recon-helpers.js';
 import { refreshSessions } from './bank-recon-sessions.js';
 
+type QItem = {
+    id: string;
+    file: File;
+    name: string;
+    size: number;
+    status: string;
+    progress: number;
+    error_code: string | null;
+    tx_count: number;
+    session_id: string | null;
+};
+
 const QUEUE_CONCURRENCY = 3;
 
 function _qid() {
@@ -14,14 +26,14 @@ function _qid() {
     return 'q' + S.qSeq + '_' + Date.now();
 }
 
-async function handleFilePick(e) {
-    const files = Array.from(e.target.files || []);
-    e.target.value = '';
+async function handleFilePick(e: Event) {
+    const files = Array.from((e.target as HTMLInputElement).files || []);
+    (e.target as HTMLInputElement).value = '';
     if (files.length === 0) return;
 
     // 校验 + 入队
     for (const f of files) {
-        const item = {
+        const item: QItem = {
             id: _qid(),
             file: f,
             name: f.name,
@@ -73,7 +85,7 @@ function renderQueue() {
         nFail = 0,
         nRun = 0,
         nWait = 0;
-    for (const it of S.queue) {
+    for (const it of S.queue as QItem[]) {
         if (it.status === 'ok') nDone++;
         else if (it.status === 'failed') nFail++;
         else if (it.status === 'uploading' || it.status === 'parsing') nRun++;
@@ -81,25 +93,25 @@ function renderQueue() {
     }
     if (summary) {
         summary.textContent = t('bank-queue-summary')
-            .replace('{ok}', nDone)
-            .replace('{run}', nRun)
-            .replace('{wait}', nWait)
-            .replace('{fail}', nFail);
+            .replace('{ok}', nDone as unknown as string)
+            .replace('{run}', nRun as unknown as string)
+            .replace('{wait}', nWait as unknown as string)
+            .replace('{fail}', nFail as unknown as string);
     }
 
-    list.innerHTML = S.queue.map(_rowHtml).join('');
+    list.innerHTML = (S.queue as QItem[]).map(_rowHtml).join('');
     // 绑定重试 / 移除按钮
     list.querySelectorAll('[data-q-act]').forEach((btn) => {
-        const act = btn.dataset.qAct;
-        const id = btn.dataset.qId;
+        const act = (btn as HTMLElement).dataset.qAct;
+        const id = (btn as HTMLElement).dataset.qId;
         btn.addEventListener('click', () => {
-            if (act === 'retry') _retryItem(id);
-            if (act === 'remove') _removeItem(id);
+            if (act === 'retry') _retryItem(id!);
+            if (act === 'remove') _removeItem(id!);
         });
     });
 }
 
-function _rowHtml(it) {
+function _rowHtml(it: QItem) {
     const sizeKb = (it.size / 1024).toFixed(0) + ' KB';
     let statusHtml = '';
     let actHtml = '';
@@ -124,7 +136,7 @@ function _rowHtml(it) {
     } else if (it.status === 'ok') {
         statusHtml =
             '<span class="bq-stat bq-ok">' +
-            t('bank-queue-status-ok').replace('{n}', it.tx_count || 0) +
+            t('bank-queue-status-ok').replace('{n}', (it.tx_count || 0) as unknown as string) +
             '</span>';
         actHtml =
             '<button data-q-act="remove" data-q-id="' + esc(it.id) + '" class="bq-act">×</button>';
@@ -164,8 +176,8 @@ function _rowHtml(it) {
     );
 }
 
-function _retryItem(id) {
-    const it = S.queue.find((x) => x.id === id);
+function _retryItem(id: string) {
+    const it = (S.queue as QItem[]).find((x) => x.id === id);
     if (!it) return;
     it.status = 'pending';
     it.error_code = null;
@@ -174,10 +186,10 @@ function _retryItem(id) {
     _drainQueue();
 }
 
-function _removeItem(id) {
-    const idx = S.queue.findIndex((x) => x.id === id);
+function _removeItem(id: string) {
+    const idx = (S.queue as QItem[]).findIndex((x) => x.id === id);
     if (idx < 0) return;
-    const it = S.queue[idx];
+    const it = (S.queue as QItem[])[idx];
     // 跑着的不能直接移除(防中断)· 只能完成态/排队态
     if (it.status === 'uploading' || it.status === 'parsing') return;
     S.queue.splice(idx, 1);
@@ -185,20 +197,20 @@ function _removeItem(id) {
 }
 
 function _clearDone() {
-    S.queue = S.queue.filter((x) => x.status !== 'ok');
+    S.queue = (S.queue as QItem[]).filter((x) => x.status !== 'ok');
     renderQueue();
 }
 
 async function _drainQueue() {
     while (true) {
-        const running = S.queue.filter(
+        const running = (S.queue as QItem[]).filter(
             (x) => x.status === 'uploading' || x.status === 'parsing'
         ).length;
         if (running >= QUEUE_CONCURRENCY) return;
-        const next = S.queue.find((x) => x.status === 'pending');
+        const next = (S.queue as QItem[]).find((x) => x.status === 'pending');
         if (!next) {
             // 全部跑完一轮 · 刷一次 sessions 列表
-            if (S.queue.every((x) => x.status === 'ok' || x.status === 'failed')) {
+            if ((S.queue as QItem[]).every((x) => x.status === 'ok' || x.status === 'failed')) {
                 await refreshSessions();
                 if (typeof window.loadReconcilePage === 'function') {
                     window.loadReconcilePage();
@@ -212,7 +224,7 @@ async function _drainQueue() {
     }
 }
 
-async function _runOne(it) {
+async function _runOne(it: QItem) {
     it.status = 'uploading';
     it.progress = 0;
     renderQueue();
@@ -221,7 +233,7 @@ async function _runOne(it) {
         // 用 XHR 拿上传进度;后端处理是同步的(解析阻塞返回) · 上传完后切 'parsing' 等响应
         const fd = new FormData();
         fd.append('file', it.file, it.name);
-        const respText = await new Promise((resolve, reject) => {
+        const respText = await new Promise<{ status: number; text: string }>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/bank-recon/upload');
             xhr.setRequestHeader('Authorization', 'Bearer ' + token);
@@ -244,7 +256,7 @@ async function _runOne(it) {
             xhr.send(fd);
         });
 
-        let body = {};
+        let body: Record<string, any> = {};
         try {
             body = JSON.parse(respText.text || '{}');
         } catch (_) {

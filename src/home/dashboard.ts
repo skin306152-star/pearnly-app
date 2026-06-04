@@ -14,14 +14,14 @@
 //          在本 module 执行时一定已就绪
 // ============================================================
 
-function _t(k, fb) {
+function _t(k: string, fb?: string) {
     try {
         return typeof window.t === 'function' ? window.t(k) : fb;
     } catch (_) {
         return fb;
     }
 }
-function _fmtNum(n) {
+function _fmtNum(n: number) {
     if (n == null || isNaN(n)) return '—';
     try {
         return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -29,16 +29,16 @@ function _fmtNum(n) {
         return String(n);
     }
 }
-function _ago(iso) {
+function _ago(iso: string) {
     if (!iso) return '';
     try {
         const t = new Date(iso).getTime();
         if (!t) return '';
         const s = Math.floor((Date.now() - t) / 1000);
         if (s < 60) return _t('time-just-now', '刚刚');
-        if (s < 3600) return Math.floor(s / 60) + _t('time-min-ago-suffix', ' 分钟前');
-        if (s < 86400) return Math.floor(s / 3600) + _t('time-hour-ago-suffix', ' 小时前');
-        return Math.floor(s / 86400) + _t('time-day-ago-suffix', ' 天前');
+        if (s < 3600) return Math.floor(s / 60) + _t('time-min-ago-suffix', ' 分钟前')!;
+        if (s < 86400) return Math.floor(s / 3600) + _t('time-hour-ago-suffix', ' 小时前')!;
+        return Math.floor(s / 86400) + _t('time-day-ago-suffix', ' 天前')!;
     } catch (_) {
         return '';
     }
@@ -99,7 +99,7 @@ async function loadDashboard() {
             if (elPlanSub) {
                 elPlanSub.textContent = quota
                     ? used + ' / ' + _fmtNum(quota) + ' 张'
-                    : _t('dash-kpi-plan-sub', '本月用量');
+                    : _t('dash-kpi-plan-sub', '本月用量')!;
             }
         }
         // 最近 5 条
@@ -122,7 +122,7 @@ async function loadDashboard() {
                             ''
                         ).toString();
                         const t = _ago(r.created_at || r.upload_time || r.date);
-                        const esc = (s) =>
+                        const esc = (s: string) =>
                             String(s).replace(
                                 /[&<>"']/g,
                                 (c) =>
@@ -132,7 +132,7 @@ async function loadDashboard() {
                                         '>': '&gt;',
                                         '"': '&quot;',
                                         "'": '&#39;',
-                                    })[c]
+                                    })[c as '&' | '<' | '>' | '"' | "'"]
                             );
                         return (
                             '<div class="dash-recent-row"><span class="dash-recent-key" title="' +
@@ -144,7 +144,7 @@ async function loadDashboard() {
                             '">' +
                             esc(mid) +
                             '</span><span class="dash-recent-time">' +
-                            esc(t) +
+                            esc(t!) +
                             '</span></div>'
                         );
                     })
@@ -226,7 +226,7 @@ async function loadCreditsCard() {
                             : 'Top up →';
                     const linkColor = bal < 50 ? '#dc2626' : '#6b7280';
                     // ES module 不再依赖 IIFE 外的 escapeHtml 词法引用 · 显式走 window.escapeHtml
-                    const esc = (s) =>
+                    const esc = (s: string) =>
                         typeof window.escapeHtml === 'function'
                             ? window.escapeHtml(s)
                             : String(s).replace(
@@ -238,7 +238,7 @@ async function loadCreditsCard() {
                                           '>': '&gt;',
                                           '"': '&quot;',
                                           "'": '&#39;',
-                                      })[c]
+                                      })[c as '&' | '<' | '>' | '"' | "'"]
                               );
                     balSub.innerHTML =
                         '<a href="#" id="kpi-balance-topup-link" style="color:' +

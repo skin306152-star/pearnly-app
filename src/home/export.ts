@@ -39,17 +39,17 @@ function _getCurrentExportTpl() {
         return 'input_vat';
     }
 }
-function _setCurrentExportTpl(id) {
+function _setCurrentExportTpl(id: any) {
     try {
         localStorage.setItem('pn_export_tpl', id || 'input_vat');
     } catch (e) {}
 }
 
-async function _runExport(templateId) {
+async function _runExport(templateId?: any) {
     if (_results.length === 0) return;
     templateId = templateId || 'input_vat';
 
-    const btn = document.getElementById('btn-export');
+    const btn = document.getElementById('btn-export') as HTMLButtonElement | null;
     if (btn) {
         btn.disabled = true;
         btn.classList.add('loading');
@@ -64,7 +64,8 @@ async function _runExport(templateId) {
             // v118.27.5.1 · 多发票拆分修复 · 一个文件含多张发票时 · 拆 N 行 · 不再合并丢字段
             const flatRecords = [];
             for (const r of _results) {
-                const invs = r.invoices && r.invoices.length > 0 ? r.invoices : null;
+                const invs: any =
+                    r.invoices && (r.invoices as any[]).length > 0 ? r.invoices : null;
                 if (invs && invs.length > 1) {
                     for (let i = 0; i < invs.length; i++) {
                         const inv = invs[i] || {};
@@ -171,7 +172,7 @@ async function _runExport(templateId) {
     }
 }
 
-document.getElementById('btn-export').addEventListener('click', () => {
+document.getElementById('btn-export')!.addEventListener('click', () => {
     _runExport(_getCurrentExportTpl());
 });
 
@@ -225,7 +226,7 @@ function _closeExportDropdown() {
     const dd = document.getElementById('export-dropdown');
     if (dd) dd.remove();
 }
-const _btnExpArrow = document.getElementById('btn-export-arrow');
+const _btnExpArrow = document.getElementById('btn-export-arrow') as HTMLButtonElement | null;
 if (_btnExpArrow) {
     _btnExpArrow.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -234,7 +235,7 @@ if (_btnExpArrow) {
     });
 }
 document.addEventListener('click', (e) => {
-    const item = e.target.closest('.export-dd-item');
+    const item = (e.target as HTMLElement).closest('.export-dd-item');
     if (item) {
         const tplId = item.getAttribute('data-tpl');
         // v118.27.6 · 自定义模板入口 · 暂未开放 · toast 「即将上线」 · 不切模板不导出
@@ -248,14 +249,14 @@ document.addEventListener('click', (e) => {
         _runExport(tplId);
         return;
     }
-    if (e.target.closest('#btn-export-arrow')) return;
+    if ((e.target as HTMLElement).closest('#btn-export-arrow')) return;
     _closeExportDropdown();
 });
 
 // 当 _results 变化时(开始识别 / 清空)同步 disable arrow
 function _syncExportArrow() {
-    const arrow = document.getElementById('btn-export-arrow');
-    const main = document.getElementById('btn-export');
+    const arrow = document.getElementById('btn-export-arrow') as HTMLButtonElement | null;
+    const main = document.getElementById('btn-export') as HTMLButtonElement | null;
     if (arrow && main) arrow.disabled = main.disabled;
 }
 // 监听 export 主按钮的 disabled 变化(简单 polling · 兼容老逻辑)

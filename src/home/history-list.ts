@@ -12,6 +12,24 @@
 // ============================================================
 /* global escapeHtml, svgIcon, token, _historyState, _historySelected, _showSessionRevokedModal */
 
+type HistoryRow = {
+    id: string;
+    confidence?: string;
+    created_at: string;
+    filename?: string;
+    invoice_no?: string;
+    seller_name?: string;
+    category_tag?: string;
+    source_total?: number;
+    source_index?: number;
+    total_amount?: number | null;
+    invoice_date?: string;
+    edited?: boolean;
+    edit_count?: number;
+    smart_assigned_flag?: boolean;
+    source?: string;
+};
+
 function updateHistoryBatchBar() {
     const bar = document.getElementById('history-batch-bar');
     const countEl = document.getElementById('history-batch-count');
@@ -28,14 +46,17 @@ function updateHistoryBatchBar() {
 
     // "全选" checkbox 三态:全选/部分/全不选
     if (checkAll) {
-        const items = _historyState.items || [];
+        const items = (_historyState.items || []) as HistoryRow[];
         if (items.length === 0) {
-            checkAll.checked = false;
-            checkAll.indeterminate = false;
+            (checkAll as HTMLInputElement).checked = false;
+            (checkAll as HTMLInputElement).indeterminate = false;
         } else {
-            const selectedInPage = items.filter((r) => _historySelected.has(r.id)).length;
-            checkAll.checked = selectedInPage === items.length;
-            checkAll.indeterminate = selectedInPage > 0 && selectedInPage < items.length;
+            const selectedInPage = items.filter((r: HistoryRow) =>
+                _historySelected.has(r.id)
+            ).length;
+            (checkAll as HTMLInputElement).checked = selectedInPage === items.length;
+            (checkAll as HTMLInputElement).indeterminate =
+                selectedInPage > 0 && selectedInPage < items.length;
         }
     }
 }
@@ -72,7 +93,7 @@ async function loadHistoryPage() {
         const params = new URLSearchParams({
             limit: _historyState.pageSize,
             offset: offset,
-        });
+        } as unknown as Record<string, string>);
         if (_historyState.keyword) params.set('keyword', _historyState.keyword);
         // v118.28.0 · 顶栏客户切换器过滤(唯一来源 · 14b.3 后删除了重复 UI)
         const cid =
@@ -97,9 +118,11 @@ async function loadHistoryPage() {
         _historyState.items = data.items || [];
         _historyState.total = data.total || 0;
         // 拉到新一页后 · 只保留当前页里仍然存在的那些选中项
-        const currentIds = new Set(_historyState.items.map((r) => r.id));
+        const currentIds = new Set(
+            (_historyState.items as HistoryRow[]).map((r: HistoryRow) => r.id)
+        );
         for (const id of Array.from(_historySelected)) {
-            if (!currentIds.has(id)) _historySelected.delete(id);
+            if (!currentIds.has(id as string)) _historySelected.delete(id);
         }
         renderHistoryList();
     } catch (e) {
@@ -112,7 +135,7 @@ async function loadHistoryPage() {
 function renderHistoryList() {
     const main = document.getElementById('history-main');
     const empty = document.getElementById('history-empty');
-    const items = _historyState.items;
+    const items = _historyState.items as HistoryRow[];
 
     // v0.11 · 更新匹配计数
     const matchesEl = document.getElementById('history-search-matches');
@@ -123,21 +146,21 @@ function renderHistoryList() {
     }
 
     if (items.length === 0 && _historyState.total === 0 && !_historyState.keyword) {
-        main.style.display = 'none';
-        empty.style.display = '';
+        main!.style.display = 'none';
+        empty!.style.display = '';
         return;
     }
-    main.style.display = '';
-    empty.style.display = 'none';
+    main!.style.display = '';
+    empty!.style.display = 'none';
 
     // 头部统计
     let highCount = 0;
-    items.forEach((r) => {
+    items.forEach((r: HistoryRow) => {
         if (r.confidence === 'high') highCount++;
     });
     const avgConfPct = items.length > 0 ? Math.round((highCount / items.length) * 100) : 0;
 
-    document.getElementById('history-stats').innerHTML = `
+    document.getElementById('history-stats')!.innerHTML = `
         <div class="rh-stat">
             <span class="rh-stat-label">${escapeHtml(t('history-total', { n: _historyState.total }))}</span>
         </div>
@@ -150,10 +173,10 @@ function renderHistoryList() {
     // 列表
     const tbody = document.getElementById('history-tbody');
     if (items.length === 0) {
-        tbody.innerHTML = `<div class="history-row-empty">${escapeHtml(t('history-empty-title'))}</div>`;
+        tbody!.innerHTML = `<div class="history-row-empty">${escapeHtml(t('history-empty-title'))}</div>`;
     } else {
-        tbody.innerHTML = items
-            .map((r) => {
+        tbody!.innerHTML = items
+            .map((r: HistoryRow) => {
                 const dt = new Date(r.created_at);
                 const mm = String(dt.getMonth() + 1).padStart(2, '0');
                 const dd = String(dt.getDate()).padStart(2, '0');
@@ -197,11 +220,13 @@ function renderHistoryList() {
                 if (!r.invoice_no) missingFields.push(t('field-invoice-no'));
                 if (!r.invoice_date) missingFields.push(t('field-invoice-date'));
                 if (!r.seller_name) missingFields.push(t('field-seller-name'));
+                // @ts-expect-error TS6133 verbatim 未使用占位 · 0 改逻辑保留
                 const reviewBadge =
                     missingFields.length > 0
                         ? `<span class="history-needs-review" data-review="${escapeHtml(r.id)}" title="${escapeHtml(t('history-needs-review-tip') + ' · ' + missingFields.join(' · '))}" role="button" aria-label="${escapeHtml(t('history-needs-review-tip'))}">${svgIcon('alert', 14)}</span>`
                         : '';
 
+                // @ts-expect-error TS6133 verbatim 未使用占位 · 0 改逻辑保留
                 const editedBadge = r.edited
                     ? `<span class="history-badge edited">${escapeHtml(t('history-edited', { n: r.edit_count || 1 }))}</span>`
                     : '';
@@ -260,15 +285,16 @@ function renderHistoryList() {
     // 分页信息
     const from = items.length > 0 ? _historyState.page * _historyState.pageSize + 1 : 0;
     const to = _historyState.page * _historyState.pageSize + items.length;
-    document.getElementById('history-pager-info').textContent = t('history-pager', {
+    document.getElementById('history-pager-info')!.textContent = t('history-pager', {
         from,
         to,
         total: _historyState.total,
     });
 
     // 分页按钮
-    document.getElementById('history-prev').disabled = _historyState.page === 0;
-    document.getElementById('history-next').disabled =
+    (document.getElementById('history-prev') as HTMLButtonElement).disabled =
+        _historyState.page === 0;
+    (document.getElementById('history-next') as HTMLButtonElement).disabled =
         (_historyState.page + 1) * _historyState.pageSize >= _historyState.total;
 }
 

@@ -9,7 +9,7 @@
 
 // 临时任务 (Zihao 2026-05-26) · 复制 ERP 单号(列表 / 凭证弹窗共用)·
 // 带 clipboard API 失败时的 textarea+execCommand 降级(http 环境 / 权限禁用)。
-async function copyErpDocNo(docNo) {
+async function copyErpDocNo(docNo: any) {
     docNo = (docNo || '').trim();
     if (!docNo) return;
     try {
@@ -32,7 +32,7 @@ async function copyErpDocNo(docNo) {
     }
 }
 
-async function showLogDetail(logId) {
+async function showLogDetail(logId: any) {
     // v0.10 · 立即弹窗显示 loading · 再请求
     const modal = document.createElement('div');
     modal.className = 'log-detail-modal';
@@ -43,22 +43,29 @@ async function showLogDetail(logId) {
     `;
     document.body.appendChild(modal);
     modal.addEventListener('click', async (e) => {
-        if (e.target === modal || e.target.classList.contains('log-detail-close')) {
+        if (
+            e.target === modal ||
+            (e.target as HTMLElement).classList.contains('log-detail-close')
+        ) {
             modal.remove();
             return;
         }
         // 临时任务 (Zihao 2026-05-26) · 凭证弹窗里的复制 ERP 单号
-        const copyEl = e.target.closest('[data-receipt-copy]');
+        const copyEl = (e.target as HTMLElement).closest(
+            '[data-receipt-copy]'
+        ) as HTMLElement | null;
         if (copyEl) {
             copyErpDocNo(copyEl.dataset.receiptCopy);
             return;
         }
         // 失败态建议动作 · 跳转后关弹窗
-        const actEl = e.target.closest('[data-receipt-action]');
+        const actEl = (e.target as HTMLElement).closest(
+            '[data-receipt-action]'
+        ) as HTMLElement | null;
         if (actEl) {
             const act = actEl.dataset.receiptAction;
             if (act === 'retry') {
-                window.retryPushLog(actEl.dataset.logId);
+                window.retryPushLog!(actEl.dataset.logId);
             } else if (act === 'exceptions') {
                 if (typeof routeTo === 'function') routeTo('exceptions');
             } else if (act === 'mappings') {
@@ -85,6 +92,7 @@ async function showLogDetail(logId) {
         const epName =
             log.endpoint_name ||
             (ep ? ep.name : log.endpoint_id ? t('erp-log-endpoint-deleted') : '-');
+        // @ts-expect-error TS6133 verbatim 保留 · 0 改逻辑(派生但当前模板未引用)
         const adapter = (log.endpoint_adapter || (ep && ep.adapter) || '').toLowerCase();
 
         const time = new Date(log.created_at).toLocaleString();
@@ -142,8 +150,8 @@ async function showLogDetail(logId) {
         const summaryIcon = isOk ? '✓' : '✗';
 
         // 凭证主体:一行一项 key-value(label 固定宽 · value 自适应 · 见 .erp-receipt-row CSS)
-        const rowsHtml = [];
-        const addRow = (label, valueHtml) => {
+        const rowsHtml: string[] = [];
+        const addRow = (label: any, valueHtml: any) => {
             rowsHtml.push(`
                 <div class="erp-receipt-row">
                     <span class="erp-receipt-key">${escapeHtml(label)}</span>
@@ -246,7 +254,7 @@ async function showLogDetail(logId) {
                 <div class="erp-receipt-actions">${actionBtns.join('')}</div>`;
         }
 
-        modal.querySelector('.log-detail-box').innerHTML = `
+        modal.querySelector('.log-detail-box')!.innerHTML = `
             <div class="log-detail-head">
                 <div class="log-detail-title">
                     <span class="log-detail-status-icon ${isOk ? 'ok' : 'fail'}">${summaryIcon}</span>

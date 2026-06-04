@@ -21,16 +21,18 @@ import {
     _renderAddRow,
     _renderItemRow,
 } from './erp-mappings-render.js'; // REFACTOR-WB-modularize · 视图层拆出
+type ErpSub = keyof typeof _state.loaded;
 (function () {
     'use strict';
 
     // ─── 显隐 owner-only nav 入口(借用现有 .set-tab-owner-only)
+    // @ts-expect-error TS6133 verbatim 占位空函数(同名 class 已控显隐)· 0 改逻辑保留
     function _applyVisibility() {
         // 已由 access-log 的 _applyVisibility 同名 class 控制 · 这里不重复
     }
 
     // ─── 拉数据 ────────────────────────────────────
-    async function _fetchSub(sub, force) {
+    async function _fetchSub(sub: ErpSub, force?: boolean) {
         const tk = localStorage.getItem('mrpilot_token');
         if (!tk) return;
         if (_state.loaded[sub] && !force) return;
@@ -48,7 +50,7 @@ import {
         }
     }
 
-    async function _fetchClients(force) {
+    async function _fetchClients(force?: boolean) {
         if (_state.clientLoaded && !force) return;
         const tk = localStorage.getItem('mrpilot_token');
         if (!tk) return;
@@ -59,7 +61,7 @@ import {
             if (!r.ok) throw new Error('http_' + r.status);
             const data = await r.json();
             _state.clientList = (data.clients || data.items || []).filter(
-                (c) => c.is_active !== false
+                (c: { is_active?: boolean }) => c.is_active !== false
             );
             _state.clientLoaded = true;
         } catch (e) {
@@ -101,7 +103,7 @@ import {
     function _renderTable() {
         const host = document.getElementById('erp-map-table-host');
         if (!host) return;
-        const sub = _state.sub;
+        const sub = _state.sub as ErpSub;
         const items = _state.items[sub] || [];
         const adding = _state.addingNew[sub];
         const readonly = !_isOwner();
@@ -126,18 +128,20 @@ import {
             html += _renderAddRow(sub);
         }
         // 数据行
-        items.forEach(function (it) {
+        (items as unknown[]).forEach(function (it: unknown) {
             html += _renderItemRow(sub, it, readonly);
         });
         host.innerHTML = html;
     }
 
     // ─── 操作 ──────────────────────────────────────
-    async function _save(rowEl) {
-        const sub = _state.sub;
-        const fields = {};
-        rowEl.querySelectorAll('[data-erp-field]').forEach(function (el) {
-            fields[el.dataset.erpField] = (el.value || '').trim();
+    async function _save(rowEl: HTMLElement) {
+        const sub = _state.sub as ErpSub;
+        const fields: Record<string, string> = {};
+        rowEl.querySelectorAll('[data-erp-field]').forEach(function (el: Element) {
+            fields[(el as HTMLElement).dataset.erpField as string] = (
+                (el as HTMLInputElement).value || ''
+            ).trim();
         });
         const tk = localStorage.getItem('mrpilot_token');
         if (!tk) return;
@@ -195,7 +199,7 @@ import {
         }
     }
 
-    async function _delete(id) {
+    async function _delete(id: string) {
         const ok = await window.pearnlyConfirm(t('erp-map-confirm-delete'));
         if (!ok) return;
         const sub = _state.sub;
@@ -206,7 +210,7 @@ import {
                 headers: { Authorization: 'Bearer ' + tk },
             });
             if (!r.ok) throw new Error('http_' + r.status);
-            await _fetchSub(sub, true);
+            await _fetchSub(sub as ErpSub, true);
             _renderTable();
             _toast(t('erp-map-deleted-toast'), 'success');
         } catch (e) {
@@ -217,21 +221,21 @@ import {
     // ─── 进入 tab + 切 sub-tab ─────────────────────
     async function _enterTab() {
         await _fetchClients(false);
-        await _fetchSub(_state.sub, false);
+        await _fetchSub(_state.sub as ErpSub, false);
         _renderRoot();
     }
 
-    function _switchSub(sub) {
+    function _switchSub(sub: ErpSub) {
         if (sub === _state.sub) return;
         _state.sub = sub;
         _state.addingNew[sub] = false;
         // 切 sub 时清旧 sub 的 add 状态
         ['clients', 'accounts', 'taxes', 'products'].forEach(function (s) {
-            if (s !== sub) _state.addingNew[s] = false;
+            if (s !== sub) _state.addingNew[s as ErpSub] = false;
         });
         // 更新 sub-tab 高亮
-        document.querySelectorAll('.erp-map-subtab').forEach(function (b) {
-            b.classList.toggle('active', b.dataset.erpSubtab === sub);
+        document.querySelectorAll('.erp-map-subtab').forEach(function (b: Element) {
+            b.classList.toggle('active', (b as HTMLElement).dataset.erpSubtab === sub);
         });
         _fetchSub(sub, false).then(function () {
             _renderRoot();
@@ -245,15 +249,15 @@ import {
 
         // 进入 ERP 对接 panel 内的「字段映射」子面板时拉数据
         document.addEventListener('click', function (ev) {
-            const erpSubBtn = ev.target.closest('.erp-subtab[data-erp-subtab]');
+            const erpSubBtn = (ev.target as HTMLElement).closest('.erp-subtab[data-erp-subtab]');
             if (erpSubBtn) {
                 ev.preventDefault();
-                const target = erpSubBtn.dataset.erpSubtab; // "connect" | "mappings"
-                document.querySelectorAll('.erp-subtab').forEach(function (b) {
-                    b.classList.toggle('active', b.dataset.erpSubtab === target);
+                const target = (erpSubBtn as HTMLElement).dataset.erpSubtab; // "connect" | "mappings"
+                document.querySelectorAll('.erp-subtab').forEach(function (b: Element) {
+                    b.classList.toggle('active', (b as HTMLElement).dataset.erpSubtab === target);
                 });
-                document.querySelectorAll('.erp-subpanel').forEach(function (p) {
-                    p.classList.toggle('active', p.dataset.erpSubpanel === target);
+                document.querySelectorAll('.erp-subpanel').forEach(function (p: Element) {
+                    p.classList.toggle('active', (p as HTMLElement).dataset.erpSubpanel === target);
                 });
                 if (target === 'mappings') {
                     setTimeout(_enterTab, 50);
@@ -261,34 +265,34 @@ import {
                 return;
             }
             // 映射内部 sub-tab 切换(客户 / 科目 / 税码)
-            const subBtn = ev.target.closest('.erp-map-subtab[data-erp-subtab]');
+            const subBtn = (ev.target as HTMLElement).closest('.erp-map-subtab[data-erp-subtab]');
             if (subBtn) {
                 ev.preventDefault();
-                _switchSub(subBtn.dataset.erpSubtab);
+                _switchSub((subBtn as HTMLElement).dataset.erpSubtab as ErpSub);
                 return;
             }
             // 加新行
-            const addBtn = ev.target.closest('#erp-map-add-btn');
+            const addBtn = (ev.target as HTMLElement).closest('#erp-map-add-btn');
             if (addBtn) {
                 ev.preventDefault();
                 if (!_isOwner()) return;
-                _state.addingNew[_state.sub] = true;
+                _state.addingNew[_state.sub as ErpSub] = true;
                 _renderTable();
                 return;
             }
             // 保存
-            const saveBtn = ev.target.closest('[data-erp-save="new"]');
+            const saveBtn = (ev.target as HTMLElement).closest('[data-erp-save="new"]');
             if (saveBtn) {
                 ev.preventDefault();
                 const row = saveBtn.closest('[data-erp-row="new"]');
-                if (row) _save(row);
+                if (row) _save(row as HTMLElement);
                 return;
             }
             // 删除
-            const delBtn = ev.target.closest('[data-erp-del]');
+            const delBtn = (ev.target as HTMLElement).closest('[data-erp-del]');
             if (delBtn) {
                 ev.preventDefault();
-                _delete(delBtn.dataset.erpDel);
+                _delete((delBtn as HTMLElement).dataset.erpDel as string);
                 return;
             }
         });
@@ -301,8 +305,8 @@ import {
             _renderRoot();
         }
         // sub-tab label 也需要更新
-        document.querySelectorAll('.erp-map-subtab').forEach(function (b) {
-            const k = 'erp-map-subtab-' + b.dataset.erpSubtab;
+        document.querySelectorAll('.erp-map-subtab').forEach(function (b: Element) {
+            const k = 'erp-map-subtab-' + (b as HTMLElement).dataset.erpSubtab;
             const lbl = t(k);
             if (lbl && lbl !== k) b.textContent = lbl;
         });

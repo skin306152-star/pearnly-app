@@ -3,7 +3,7 @@
 // ============================================================
 import { S, $, _esc, _fmtSize, ALLOWED_EXT, MAX_INV, MAX_REP } from './excel-recon-store.js';
 // P1-1:不支持格式的明确提示(4 语)· 取代此前静默丢弃
-function _vexToastRejected(n) {
+function _vexToastRejected(n: number) {
     const lang = window._currentLang || 'th';
     const M = {
         zh: `已忽略 ${n} 个不支持的文件 · 仅支持 PDF / 图片 / Excel / CSV / Word`,
@@ -11,12 +11,12 @@ function _vexToastRejected(n) {
         en: `Ignored ${n} unsupported file(s) · only PDF / image / Excel / CSV / Word are supported`,
         ja: `非対応ファイル ${n} 件をスキップ · 対応形式は PDF / 画像 / Excel / CSV / Word のみ`,
     };
-    showToast(M[lang] || M.th, 'warn');
+    showToast(M[lang as keyof typeof M] || M.th, 'warn');
 }
 
 // ── 文件入队(去重 + 上限) ──
-function _addInvoices(files) {
-    const seen = new Set(S.invoiceFiles.map((f) => f.name + '|' + f.size));
+function _addInvoices(files: File[]) {
+    const seen = new Set((S.invoiceFiles as File[]).map((f) => f.name + '|' + f.size));
     let _rejected = 0; // P1-1:不支持格式不再静默丢弃 · 计数后给明确 toast
     for (const f of files) {
         if (!ALLOWED_EXT.test(f.name)) {
@@ -26,7 +26,7 @@ function _addInvoices(files) {
         const k = f.name + '|' + f.size;
         if (seen.has(k)) continue;
         seen.add(k);
-        S.invoiceFiles.push(f);
+        (S.invoiceFiles as File[]).push(f);
         if (S.invoiceFiles.length >= MAX_INV) break;
     }
     if (_rejected > 0) _vexToastRejected(_rejected);
@@ -37,8 +37,8 @@ function _addInvoices(files) {
     _renderFiles();
 }
 
-function _addReports(files) {
-    const seen = new Set(S.reportFiles.map((f) => f.name + '|' + f.size));
+function _addReports(files: File[]) {
+    const seen = new Set((S.reportFiles as File[]).map((f) => f.name + '|' + f.size));
     let _rejected = 0; // P1-1:不支持格式不再静默丢弃
     for (const f of files) {
         if (!ALLOWED_EXT.test(f.name)) {
@@ -48,7 +48,7 @@ function _addReports(files) {
         const k = f.name + '|' + f.size;
         if (seen.has(k)) continue;
         seen.add(k);
-        S.reportFiles.push(f);
+        (S.reportFiles as File[]).push(f);
         if (S.reportFiles.length >= MAX_REP) break;
     }
     if (_rejected > 0) _vexToastRejected(_rejected);
@@ -59,11 +59,11 @@ function _addReports(files) {
     _renderFiles();
 }
 
-function _removeInvoice(idx) {
+function _removeInvoice(idx: number) {
     S.invoiceFiles.splice(idx, 1);
     _renderFiles();
 }
-function _removeReport(idx) {
+function _removeReport(idx: number) {
     S.reportFiles.splice(idx, 1);
     _renderFiles();
 }
@@ -73,10 +73,10 @@ function _renderFiles() {
     const rl = $('vex-list-report');
     const _cntInv = $('vex-count-invoice'),
         _cntRep = $('vex-count-report');
-    if (_cntInv) _cntInv.textContent = S.invoiceFiles.length;
-    if (_cntRep) _cntRep.textContent = S.reportFiles.length;
+    if (_cntInv) _cntInv.textContent = S.invoiceFiles.length as unknown as string;
+    if (_cntRep) _cntRep.textContent = S.reportFiles.length as unknown as string;
 
-    const _row = (f, idx, kind) => `<div class="vex-fi">
+    const _row = (f: File, idx: number, kind: string) => `<div class="vex-fi">
         <svg class="vex-fi-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h6l4 4v8a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v4h4"/></svg>
         <span class="vex-fi-n" title="${_esc(f.name)}">${_esc(f.name)}</span>
         <span class="vex-fi-s">${_fmtSize(f.size)}</span>
@@ -84,18 +84,18 @@ function _renderFiles() {
     </div>`;
     if (il)
         il.innerHTML =
-            S.invoiceFiles.map((f, i) => _row(f, i, 'inv')).join('') ||
+            (S.invoiceFiles as File[]).map((f, i) => _row(f, i, 'inv')).join('') ||
             `<div class="vex-fi-empty" data-i18n="vex-no-files">还没文件</div>`;
     if (rl)
         rl.innerHTML =
-            S.reportFiles.map((f, i) => _row(f, i, 'rep')).join('') ||
+            (S.reportFiles as File[]).map((f, i) => _row(f, i, 'rep')).join('') ||
             `<div class="vex-fi-empty" data-i18n="vex-no-files">还没文件</div>`;
 
     // 删除按钮事件
     document.querySelectorAll('.vex-fi-x').forEach((b) => {
-        b.addEventListener('click', (e) => {
-            const k = b.dataset.vexKind;
-            const i = parseInt(b.dataset.vexIdx, 10);
+        b.addEventListener('click', (_e) => {
+            const k = (b as HTMLElement).dataset.vexKind;
+            const i = parseInt((b as HTMLElement).dataset.vexIdx!, 10);
             if (k === 'inv') _removeInvoice(i);
             else _removeReport(i);
         });
@@ -103,7 +103,7 @@ function _renderFiles() {
 
     // 启用 / 禁用「生成 Excel」按钮
     const ok = S.invoiceFiles.length > 0 && S.reportFiles.length > 0;
-    $('vex-build').disabled = !ok || S.running;
+    ($('vex-build') as HTMLButtonElement).disabled = !ok || S.running;
     const info = $('vex-action-info');
     if (info) {
         if (!S.invoiceFiles.length || !S.reportFiles.length) {
@@ -111,8 +111,8 @@ function _renderFiles() {
             info.className = 'vex-action-info muted';
         } else {
             info.textContent = (t('vex-ready') || '已就绪 · {a} 张发票 · {b} 份报告')
-                .replace('{a}', S.invoiceFiles.length)
-                .replace('{b}', S.reportFiles.length);
+                .replace('{a}', S.invoiceFiles.length as unknown as string)
+                .replace('{b}', S.reportFiles.length as unknown as string);
             info.className = 'vex-action-info ok';
         }
     }
@@ -133,7 +133,7 @@ function _renderPreviewPanel() {
     if (guide) guide.style.display = S.invoiceFiles.length > 100 ? 'flex' : 'none';
 }
 
-function _renderPreviewColFull(kind) {
+function _renderPreviewColFull(kind: string) {
     const colEl = $(kind === 'inv' ? 'vex-pp-invoice-col' : 'vex-pp-report-col');
     if (!colEl) return;
     const files = kind === 'inv' ? S.invoiceFiles : S.reportFiles;
@@ -160,10 +160,10 @@ function _renderPreviewColFull(kind) {
     if (si)
         si.addEventListener('input', (e) => {
             if (kind === 'inv') {
-                S.previewSearchInv = e.target.value;
+                S.previewSearchInv = (e.target as HTMLInputElement).value;
                 S.previewLimitInv = 50;
             } else {
-                S.previewSearchRep = e.target.value;
+                S.previewSearchRep = (e.target as HTMLInputElement).value;
                 S.previewLimitRep = 50;
             }
             _renderFileListOnly(kind);
@@ -187,11 +187,11 @@ function _renderPreviewColFull(kind) {
     _renderFileListOnly(kind);
 }
 
-function _renderFileListOnly(kind) {
+function _renderFileListOnly(kind: string) {
     const listEl = $('vex-pp-' + kind + '-list');
     const pgEl = $('vex-pp-' + kind + '-pg');
     if (!listEl) return;
-    const files = kind === 'inv' ? S.invoiceFiles : S.reportFiles;
+    const files = (kind === 'inv' ? S.invoiceFiles : S.reportFiles) as File[];
     const searchVal = kind === 'inv' ? S.previewSearchInv : S.previewSearchRep;
     const limit = kind === 'inv' ? S.previewLimitInv : S.previewLimitRep;
     const icon = kind === 'inv' ? _ppInvIcon : _ppRepIcon;
@@ -217,20 +217,22 @@ function _renderFileListOnly(kind) {
 
     listEl.querySelectorAll('.vex-pp-fi-del').forEach((btn) => {
         btn.addEventListener('click', () => {
-            const idx = parseInt(btn.dataset.ridx, 10);
-            if (btn.dataset.kind === 'inv') _removeInvoice(idx);
+            const idx = parseInt((btn as HTMLElement).dataset.ridx!, 10);
+            if ((btn as HTMLElement).dataset.kind === 'inv') _removeInvoice(idx);
             else _removeReport(idx);
         });
     });
 
     if (pgEl) {
         const tpl = t('vex-preview-count') || '显示前 {n} / 共 {m}';
-        pgEl.textContent = tpl.replace('{n}', shown.length).replace('{m}', filtered.length);
+        pgEl.textContent = tpl
+            .replace('{n}', shown.length as unknown as string)
+            .replace('{m}', filtered.length as unknown as string);
     }
     _bindPreviewObserver(kind, filtered.length);
 }
 
-function _bindPreviewObserver(kind, totalFiltered) {
+function _bindPreviewObserver(kind: string, totalFiltered: number) {
     const limit = kind === 'inv' ? S.previewLimitInv : S.previewLimitRep;
     if (limit >= totalFiltered) return;
     const sentinel = $('vex-pp-sentinel-' + kind);
@@ -250,7 +252,12 @@ function _bindPreviewObserver(kind, totalFiltered) {
 }
 
 // ── 拖拽事件 ──
-function _bindDropzone(zoneId, inputId, onFiles, wrongKindHint) {
+function _bindDropzone(
+    zoneId: string,
+    inputId: string,
+    onFiles: (files: File[]) => void,
+    _wrongKindHint?: unknown
+) {
     const zone = $(zoneId);
     const input = $(inputId);
     if (!zone || !input) return;
@@ -269,7 +276,7 @@ function _bindDropzone(zoneId, inputId, onFiles, wrongKindHint) {
     zone.addEventListener('drop', (e) => {
         e.preventDefault();
         zone.classList.remove('drag-over');
-        const arr = Array.from(e.dataTransfer.files);
+        const arr = Array.from((e as DragEvent).dataTransfer!.files);
         const ok = arr.filter((f) => ALLOWED_EXT.test(f.name));
         if (!ok.length) {
             showToast(t('vex-toast-bad-ext'), 'error');
@@ -278,9 +285,9 @@ function _bindDropzone(zoneId, inputId, onFiles, wrongKindHint) {
         onFiles(ok);
     });
     input.addEventListener('change', () => {
-        const arr = Array.from(input.files);
+        const arr = Array.from((input as HTMLInputElement).files!);
         onFiles(arr);
-        input.value = '';
+        (input as HTMLInputElement).value = '';
     });
 }
 

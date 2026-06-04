@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """Bridge: run the knowledge dead-rules engine from the OCR exception hook.
 
-Behind the KNOWLEDGE_RULES flag this replaces exception_checks' inline invoice
-rules (duplicate / amount_missing / math_mismatch / tax_id) with the single
+This is the single rule source: it replaces exception_checks' former inline
+invoice rules (duplicate / amount_missing / math_mismatch / tax_id) with the
 rules engine in services.knowledge, so there is one rule source instead of two.
 
 It maps the OCR field dict to an Invoice, builds a RuleContext (the tenant's
@@ -16,6 +16,7 @@ reports back which were high-severity so the caller fires the same reminders.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -198,10 +199,11 @@ def make_dedup_lookups(
 
 
 def _load_ruleset(tenant_id: Optional[str], workspace_client_id: Optional[int]) -> ClientRuleSet:
-    # Customer rules need a tenant and the client_rules table. Without them
-    # (personal mode, or before the table exists) the global rules still run
-    # against an empty ruleset rather than failing the whole hook.
-    if not tenant_id:
+    # Customer rules need a tenant and the client_rules table, which the
+    # knowledge feature owns. Until KNOWLEDGE_ENABLED is set (and the table
+    # provisioned) we skip the query entirely and run only the global rules, so
+    # the engine works on day one without touching an unprovisioned table.
+    if not tenant_id or os.environ.get("KNOWLEDGE_ENABLED") != "1":
         return ClientRuleSet()
     try:
         with db.get_cursor() as cur:

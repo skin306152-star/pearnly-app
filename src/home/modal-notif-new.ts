@@ -27,25 +27,12 @@
                                 <div class="notif-template-desc" data-i18n="notif-tmpl-exception-desc">数学不自洽 / 重复发票 / 缺总额 等高严重度异常 · 自动推送</div>
                             </div>
                         </label>
-                        <label class="notif-template-opt" data-tmpl="large_invoice">
-                            <input type="radio" name="notif-template" value="large_invoice">
-                            <div class="notif-template-card">
-                                <div class="notif-template-name" data-i18n="notif-tmpl-large-name">单张发票超阈值</div>
-                                <div class="notif-template-desc" data-i18n="notif-tmpl-large-desc">总金额 ≥ 你设的金额 · 立刻推 LINE</div>
-                            </div>
-                        </label>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="notif-new-name" data-i18n="notif-new-name-label">规则名称</label>
                     <input type="text" id="notif-new-name" class="form-input" maxlength="100" data-i18n-placeholder="notif-new-name-ph" placeholder="例:大额发票推老板">
-                </div>
-
-                <div class="form-group" id="notif-new-threshold-row" style="display:none;">
-                    <label class="form-label" for="notif-new-threshold" data-i18n="notif-new-threshold-label">金额阈值(฿)</label>
-                    <input type="number" id="notif-new-threshold" class="form-input" min="1" step="1" data-i18n-placeholder="notif-new-threshold-ph" placeholder="500000">
-                    <div class="form-hint" data-i18n="notif-new-threshold-hint">总额 ≥ 此值 · 才推送</div>
                 </div>
 
                 <div id="notif-line-check" class="notif-line-check" style="display:none;"></div>

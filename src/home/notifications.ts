@@ -60,15 +60,6 @@
             '</span>';
     }
 
-    function _fmtTHB(amount: unknown) {
-        if (amount == null) return '-';
-        const n = Number(amount);
-        if (isNaN(n)) return String(amount);
-        return (
-            '฿ ' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        );
-    }
-
     function _fmtTime(iso: string) {
         if (!iso) return '-';
         try {
@@ -100,14 +91,9 @@
         listEl.style.display = '';
         listEl.innerHTML = rules
             .map((r: any) => {
-                const isLarge = r.template_code === 'large_invoice';
-                const tagKey = isLarge ? 'notif-rule-large-tag' : 'notif-rule-exception-tag';
-                const tagClass = isLarge ? 'large' : '';
+                const tagKey = 'notif-rule-exception-tag';
+                const tagClass = '';
                 let metaParts = [];
-                if (isLarge) {
-                    const thr = r.params && r.params.threshold ? _fmtTHB(r.params.threshold) : '-';
-                    metaParts.push(escapeHtml(t('notif-rule-threshold-prefix')) + ' ' + thr);
-                }
                 if (!r.enabled)
                     metaParts.push(
                         '<span style="color:#9ca3af;">' +
@@ -148,9 +134,7 @@
                 const evtKey =
                     lg.event_type === 'exception_high'
                         ? 'notif-event-exception-high'
-                        : lg.event_type === 'large_invoice'
-                          ? 'notif-event-large-invoice'
-                          : 'notif-event-test-send';
+                        : 'notif-event-test-send';
                 const errMeta = ok ? '' : ' · ' + escapeHtml(lg.error || 'failed');
                 return `
                 <div class="notif-log-row">
@@ -204,8 +188,6 @@
         if (!modal) return;
         modal.style.display = '';
         ($('notif-new-name') as HTMLInputElement).value = '';
-        ($('notif-new-threshold') as HTMLInputElement).value = '';
-        ($('notif-new-threshold-row') as HTMLElement).style.display = 'none';
         document
             .querySelectorAll('input[name="notif-template"]')
             .forEach((r) => ((r as HTMLInputElement).checked = false));
@@ -220,19 +202,11 @@
         const sel = document.querySelector(
             'input[name="notif-template"]:checked'
         ) as HTMLInputElement | null;
-        const thRow = $('notif-new-threshold-row');
-        if (!sel) {
-            thRow!.style.display = 'none';
-            return;
-        }
-        thRow!.style.display = sel.value === 'large_invoice' ? '' : 'none';
+        if (!sel) return;
         // 自动填名称建议
         const nameInput = $('notif-new-name') as HTMLInputElement | null;
         if (nameInput && !nameInput.value.trim()) {
-            nameInput.value =
-                sel.value === 'large_invoice'
-                    ? t('notif-tmpl-large-name')
-                    : t('notif-tmpl-exception-name');
+            nameInput.value = t('notif-tmpl-exception-name');
         }
     }
     async function _onSaveNew() {
@@ -251,17 +225,9 @@
         const payload = {
             name,
             template_code: sel.value,
-            params: {} as { threshold?: number },
+            params: {},
             enabled: true,
         };
-        if (sel.value === 'large_invoice') {
-            const thr = parseFloat(($('notif-new-threshold') as HTMLInputElement).value || '0');
-            if (!thr || thr <= 0) {
-                showToast(t('notif-threshold-required'), 'error');
-                return;
-            }
-            payload.params.threshold = thr;
-        }
         try {
             const resp = await apiPost('/api/notifications/rules', payload);
             if (resp && resp.ok) {

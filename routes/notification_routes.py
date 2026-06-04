@@ -44,8 +44,7 @@ router = APIRouter()
 # 内置模板常量(app.py 也有同名 · 复制一份防循环 import)
 # ============================================================
 NOTIF_TEMPLATE_EXCEPTION_HIGH = "exception_high"
-NOTIF_TEMPLATE_LARGE_INVOICE = "large_invoice"
-NOTIF_TEMPLATE_WHITELIST = {NOTIF_TEMPLATE_EXCEPTION_HIGH, NOTIF_TEMPLATE_LARGE_INVOICE}
+NOTIF_TEMPLATE_WHITELIST = {NOTIF_TEMPLATE_EXCEPTION_HIGH}
 
 
 def _tid(user: dict) -> Optional[str]:
@@ -73,18 +72,8 @@ def _validate_template_params(
     template_code: str, params: Optional[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """模板特定参数校验 · 失败 raise HTTPException 400"""
-    p = dict(params or {})
-    if template_code == NOTIF_TEMPLATE_LARGE_INVOICE:
-        thr = p.get("threshold")
-        try:
-            thr_f = float(thr) if thr is not None else 0.0
-        except Exception:
-            raise HTTPException(400, detail="notification.threshold_invalid")
-        if thr_f <= 0:
-            raise HTTPException(400, detail="notification.threshold_required")
-        p["threshold"] = thr_f
-    # exception_high 暂无必填参数
-    return p
+    # exception_high 暂无必填参数(金额阈值已并入「金额上限」客户规矩)
+    return dict(params or {})
 
 
 @router.get("/api/notifications/rules")

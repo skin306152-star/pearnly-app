@@ -29,9 +29,11 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
         if os.path.exists(_home):
             with open(_home, "r", encoding="utf-8") as f:
                 parts.append(f.read())
-        for p in sorted(glob.glob(os.path.join(ROOT, "src", "home", "*.js"))):
-            with open(p, "r", encoding="utf-8") as f:
-                parts.append(f.read())
+        # C5 迁 TS 后 src/home 是 .ts(Vite 解析 .js→.ts)· 静态契约扫 .js + .ts 并集
+        for ext in ("*.js", "*.ts"):
+            for p in sorted(glob.glob(os.path.join(ROOT, "src", "home", ext))):
+                with open(p, "r", encoding="utf-8") as f:
+                    parts.append(f.read())
         cls.home_js = "\n".join(parts)
         # REFACTOR-WB-modularize · recon_routes.py 2000 行已拆 · bank-v2 handler 搬到
         # recon_routes_bankv2*.py · 静态契约改读这些文件的并集(拼接 == 原全文 · 仍能找到搬走的 handler)
@@ -58,14 +60,13 @@ class Brv2AnchorAuditStaticContractTests(unittest.TestCase):
             self.home_js,
             "_brv2RenderAnchorAudit function missing in home.js",
         )
-        # _brv2RenderAnchorAudit(summary) 至少出现 2 次:
-        #   1 次是 'function _brv2RenderAnchorAudit(summary) {' 定义
-        #   1 次(或更多)是 renderResults 内调用
+        # 调用 `_brv2RenderAnchorAudit(summary)` 至少 1 次(定义已在上方单独断言;
+        # C5 迁 TS 后定义签名带类型注解 `(summary: T)` 不再匹配 `(summary)`,故这里只数调用)。
         occurrences = self.home_js.count("_brv2RenderAnchorAudit(summary)")
         self.assertGreaterEqual(
             occurrences,
-            2,
-            f"_brv2RenderAnchorAudit(summary) should appear ≥2 times (1 def + ≥1 call), got {occurrences}",
+            1,
+            f"_brv2RenderAnchorAudit(summary) call should appear ≥1 time, got {occurrences}",
         )
         # 找非 function-def 的调用 · 邻近必须有 showResultSections(确认在 renderResults 内)
         for m in re.finditer(r"_brv2RenderAnchorAudit\(summary\)", self.home_js):

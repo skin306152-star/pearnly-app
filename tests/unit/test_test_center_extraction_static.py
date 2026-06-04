@@ -27,12 +27,13 @@ class TestCenterExtractionStaticTests(unittest.TestCase):
         with open(os.path.join(ROOT, "src", "main.js"), "r", encoding="utf-8") as f:
             cls.main_js = f.read()
         # REFACTOR-C1-home-batch9f · 真核心簇(含 routeTo 路由分发)已 cutover 到 core-boot.js
-        with open(os.path.join(ROOT, "src", "home", "core-boot.js"), "r", encoding="utf-8") as f:
+        # C5 迁 TS:src/home 模块现为 .ts(import 路径仍写 .js · Vite 解析 .js→.ts)
+        with open(os.path.join(ROOT, "src", "home", "core-boot.ts"), "r", encoding="utf-8") as f:
             cls.core_boot_js = f.read()
-        # REFACTOR-C1-home-batch9g2 · 错误拦截器(含 _tcOnNewLog 钩子)已搬到 src/home/state.js
-        with open(os.path.join(ROOT, "src", "home", "state.js"), "r", encoding="utf-8") as f:
+        # REFACTOR-C1-home-batch9g2 · 错误拦截器(含 _tcOnNewLog 钩子)已搬到 src/home/state.ts
+        with open(os.path.join(ROOT, "src", "home", "state.ts"), "r", encoding="utf-8") as f:
             cls.state_js = f.read()
-        with open(os.path.join(ROOT, "src", "home", "test-center.js"), "r", encoding="utf-8") as f:
+        with open(os.path.join(ROOT, "src", "home", "test-center.ts"), "r", encoding="utf-8") as f:
             cls.tc_js = f.read()
         with open(os.path.join(ROOT, "home.html"), "r", encoding="utf-8") as f:
             cls.home_html = f.read()

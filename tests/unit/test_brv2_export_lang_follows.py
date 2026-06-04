@@ -37,7 +37,7 @@ class ExportLangFollowsUiTests(unittest.TestCase):
         src_home = os.path.join(ROOT, "src", "home")
         if os.path.isdir(src_home):
             for name in sorted(os.listdir(src_home)):
-                if name.endswith(".js"):
+                if name.endswith((".js", ".ts")):  # C5 迁 TS · 扫 .js + .ts 并集
                     with open(os.path.join(src_home, name), "r", encoding="utf-8") as f:
                         parts.append(f.read())
         cls.home_js = "\n".join(parts)

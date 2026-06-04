@@ -18,3 +18,10 @@ declare var _userInfo: Record<string, unknown> | null;
 /** Active route id, reassigned by core-boot's routeTo. */
 // eslint-disable-next-line no-var
 declare var currentRoute: string;
+
+// Window bridges exposed by migrated src/home modules. Extended per C5 batch as
+// modules move to TypeScript; consumers still on .js read these off window.
+interface Window {
+    startEnginePolling: () => void;
+    stopEnginePolling: () => void;
+}

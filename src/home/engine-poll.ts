@@ -1,7 +1,8 @@
 // REFACTOR-C1-home-batch9g1 · 从 home.js verbatim 抽出(0 逻辑改)
 // OCR 引擎就绪轮询(ocr-recognize 经 window 调)
+// REFACTOR-C5 · 迁 TypeScript · 标注计时器句柄类型(行为 verbatim)。
 
-let _engineCheckTimer = null;
+let _engineCheckTimer: ReturnType<typeof setInterval> | null = null;
 
 function startEnginePolling() {
     stopEnginePolling();

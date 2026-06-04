@@ -43,7 +43,7 @@ window.refreshExcBadge = refreshExcBadge;
 // v118.21.0 · 客户列表加载完毕后给异常栏刷下拉
 window._refreshExcClientFilter = _refreshExcClientFilter;
 // v118.28.0 · 暴露状态给顶栏客户切换器联动
-window._excState = _excState;
+window._excState = _excState as unknown as Record<string, unknown>;
 
 // 切语言时用缓存重渲(不发请求 · 即时无闪烁)
 window._rerenderExceptions = function () {
@@ -65,7 +65,7 @@ window._rerenderExceptions = function () {
         if (
             window._erpExcState &&
             window._erpExcState.items &&
-            window._erpExcState.items.length &&
+            (window._erpExcState.items as unknown[]).length &&
             typeof window._rerenderErpExceptions === 'function'
         )
             window._rerenderErpExceptions();
@@ -76,15 +76,15 @@ window._rerenderExceptions = function () {
 
 // 抽屉事件接线(deferred · 等 DOM 就绪)
 document.addEventListener('click', (e) => {
-    if (e.target.closest('#exc-drawer-close')) closeExcDrawer();
-    if (e.target.closest('#exc-drawer-mask')) closeExcDrawer();
-    if (e.target.closest('#exc-btn-resolve')) actionResolve();
-    if (e.target.closest('#exc-btn-ignore')) actionIgnore();
+    if ((e.target as HTMLElement).closest('#exc-drawer-close')) closeExcDrawer();
+    if ((e.target as HTMLElement).closest('#exc-drawer-mask')) closeExcDrawer();
+    if ((e.target as HTMLElement).closest('#exc-btn-resolve')) actionResolve();
+    if ((e.target as HTMLElement).closest('#exc-btn-ignore')) actionIgnore();
     // v118.20.5 · 批量栏 + 加载更多
-    if (e.target.closest('#exc-batch-resolve')) actionBatchResolve();
-    if (e.target.closest('#exc-batch-ignore')) actionBatchIgnore();
-    if (e.target.closest('#exc-batch-clear')) clearBatchSelection();
-    if (e.target.closest('#exc-loadmore')) loadMore();
+    if ((e.target as HTMLElement).closest('#exc-batch-resolve')) actionBatchResolve();
+    if ((e.target as HTMLElement).closest('#exc-batch-ignore')) actionBatchIgnore();
+    if ((e.target as HTMLElement).closest('#exc-batch-clear')) clearBatchSelection();
+    if ((e.target as HTMLElement).closest('#exc-loadmore')) loadMore();
 });
 // ESC 关抽屉
 document.addEventListener('keydown', (e) => {
@@ -93,7 +93,7 @@ document.addEventListener('keydown', (e) => {
 
 // 「刷新」按钮(页内)
 document.addEventListener('click', (e) => {
-    const btn = e.target.closest('#btn-exc-refresh');
+    const btn = (e.target as HTMLElement).closest('#btn-exc-refresh');
     if (!btn) return;
     if (typeof window.loadExceptionsPage === 'function') window.loadExceptionsPage();
     refreshExcBadge();
@@ -101,8 +101,8 @@ document.addEventListener('click', (e) => {
 
 // v118.21.0 · 客户筛选切换 · 重置 chip / 选中 · 重拉数据
 document.addEventListener('change', (e) => {
-    if (!e.target.closest('#exc-client-filter')) return;
-    const sel = e.target;
+    if (!(e.target as HTMLElement).closest('#exc-client-filter')) return;
+    const sel = e.target as HTMLSelectElement;
     _excState.currentClient = sel.value || '';
     _excState.currentRule = null; // 切客户后还原全部规则 chip
     _excState.selectedIds.clear(); // 清空多选(列表会变)
@@ -113,7 +113,9 @@ document.addEventListener('change', (e) => {
 
 // v118.21.1 · status tab 切换(待复核 / 已处理 / 已忽略)
 document.addEventListener('click', (e) => {
-    const tab = e.target.closest('#exc-status-tabs .exc-status-tab');
+    const tab = (e.target as HTMLElement).closest(
+        '#exc-status-tabs .exc-status-tab'
+    ) as HTMLElement;
     if (!tab) return;
     const newStatus = tab.dataset.status || 'pending';
     if (newStatus === _excState.currentStatus) return;
@@ -142,13 +144,13 @@ window.loadLearnedRules = loadLearnedRules;
 
 // 删除按钮事件(委托)
 document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-del-wl]');
+    const btn = (e.target as HTMLElement).closest('[data-del-wl]') as HTMLElement;
     if (!btn) return;
-    const wlId = parseInt(btn.dataset.delWl, 10);
+    const wlId = parseInt(btn.dataset.delWl!, 10);
     if (!wlId) return;
     const row = btn.closest('.learned-row');
     const sellerEl = row && row.querySelector('.learned-seller');
-    const sellerName = sellerEl ? sellerEl.textContent.trim() : '';
+    const sellerName = sellerEl ? sellerEl.textContent!.trim() : '';
     const msg = t('set-learned-del-confirm').replace('{seller}', sellerName);
     const ok = await showConfirm(msg, { danger: true });
     if (!ok) return;

@@ -16,7 +16,13 @@
 // ============================================================
 (function () {
     'use strict';
-    let _state = {
+    let _state: {
+        employeeId: any;
+        employeeName: string;
+        clients: Record<string, any>[];
+        selected: Set<string>;
+        opened: boolean;
+    } = {
         employeeId: null,
         employeeName: '',
         clients: [],
@@ -79,10 +85,10 @@
         if (lab) {
             const fmt = t('assign-selected-count') || '已选 {n} / {total}';
             lab.textContent = fmt
-                .replace('{n}', _state.selected.size)
-                .replace('{total}', _state.clients.length);
+                .replace('{n}', _state.selected.size as unknown as string)
+                .replace('{total}', _state.clients.length as unknown as string);
         }
-        const sa = _selAll();
+        const sa = _selAll() as HTMLInputElement | null;
         if (sa)
             sa.checked =
                 _state.clients.length > 0 && _state.selected.size === _state.clients.length;
@@ -93,7 +99,7 @@
         if (el) el.textContent = _state.employeeName ? ' · ' + _state.employeeName : '';
     }
 
-    async function open(employeeId, employeeName) {
+    async function open(employeeId: any, employeeName: any) {
         _state.employeeId = employeeId;
         _state.employeeName = employeeName || '';
         _state.opened = true;
@@ -140,7 +146,7 @@
         const ids = Array.from(_state.selected)
             .map((s) => parseInt(s, 10))
             .filter((n) => !isNaN(n));
-        const btn = document.getElementById('assign-modal-save');
+        const btn = document.getElementById('assign-modal-save') as HTMLButtonElement | null;
         if (btn) btn.disabled = true;
         try {
             const r = await apiPost(
@@ -149,7 +155,10 @@
             );
             if (r && r.ok !== false) {
                 showToast(
-                    (t('assign-saved') || '已保存 {n} 个客户分配').replace('{n}', ids.length),
+                    (t('assign-saved') || '已保存 {n} 个客户分配').replace(
+                        '{n}',
+                        ids.length as unknown as string
+                    ),
                     'success'
                 );
                 close();
@@ -183,7 +192,7 @@
         });
 
         // 全选
-        const sa = _selAll();
+        const sa = _selAll() as HTMLInputElement | null;
         if (sa)
             sa.addEventListener('change', function () {
                 if (sa.checked) {
@@ -198,9 +207,11 @@
         const list = _list();
         if (list)
             list.addEventListener('change', function (ev) {
-                const cb = ev.target.closest('input[type="checkbox"][data-cid]');
+                const cb = (ev.target as HTMLElement).closest(
+                    'input[type="checkbox"][data-cid]'
+                ) as HTMLInputElement | null;
                 if (!cb) return;
-                const cid = cb.dataset.cid;
+                const cid = cb.dataset.cid!;
                 if (cb.checked) _state.selected.add(cid);
                 else _state.selected.delete(cid);
                 _refreshCount();

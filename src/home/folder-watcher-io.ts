@@ -8,28 +8,28 @@
 const VALID_EXTS = /\.(pdf|jpe?g|png|webp)$/i;
 const DB_NAME = 'mrpilot_folder_watcher';
 const DB_VERSION = 1;
-let _dbPromise = null;
+let _dbPromise: Promise<IDBDatabase> | null = null;
 
 // ---------- IndexedDB ----------
 function openDB() {
     if (_dbPromise) return _dbPromise;
     _dbPromise = new Promise((resolve, reject) => {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
-        req.onupgradeneeded = (e) => {
-            const db = e.target.result;
+        req.onupgradeneeded = (e: Event) => {
+            const db = (e.target as IDBOpenDBRequest).result;
             if (!db.objectStoreNames.contains('handles')) db.createObjectStore('handles');
             if (!db.objectStoreNames.contains('seen')) db.createObjectStore('seen');
             if (!db.objectStoreNames.contains('config')) db.createObjectStore('config');
         };
-        req.onsuccess = (e) => resolve(e.target.result);
-        req.onerror = (e) => reject(e.target.error);
+        req.onsuccess = (e: Event) => resolve((e.target as IDBOpenDBRequest).result);
+        req.onerror = (e: Event) => reject((e.target as IDBOpenDBRequest).error);
     });
     return _dbPromise;
 }
 
-function idbGet(store, key) {
+function idbGet(store: string, key: IDBValidKey) {
     return openDB().then(
-        (db) =>
+        (db: IDBDatabase) =>
             new Promise((resolve, reject) => {
                 const tx = db.transaction(store, 'readonly');
                 const req = tx.objectStore(store).get(key);
@@ -38,10 +38,10 @@ function idbGet(store, key) {
             })
     );
 }
-function idbPut(store, key, value) {
+function idbPut(store: string, key: IDBValidKey, value: unknown) {
     return openDB().then(
-        (db) =>
-            new Promise((resolve, reject) => {
+        (db: IDBDatabase) =>
+            new Promise<void>((resolve, reject) => {
                 const tx = db.transaction(store, 'readwrite');
                 tx.objectStore(store).put(value, key);
                 tx.oncomplete = () => resolve();
@@ -49,10 +49,10 @@ function idbPut(store, key, value) {
             })
     );
 }
-function idbDel(store, key) {
+function idbDel(store: string, key: IDBValidKey) {
     return openDB().then(
-        (db) =>
-            new Promise((resolve, reject) => {
+        (db: IDBDatabase) =>
+            new Promise<void>((resolve, reject) => {
                 const tx = db.transaction(store, 'readwrite');
                 tx.objectStore(store).delete(key);
                 tx.oncomplete = () => resolve();
@@ -60,10 +60,10 @@ function idbDel(store, key) {
             })
     );
 }
-function idbClear(store) {
+function idbClear(store: string) {
     return openDB().then(
-        (db) =>
-            new Promise((resolve, reject) => {
+        (db: IDBDatabase) =>
+            new Promise<void>((resolve, reject) => {
                 const tx = db.transaction(store, 'readwrite');
                 tx.objectStore(store).clear();
                 tx.oncomplete = () => resolve();
@@ -73,7 +73,7 @@ function idbClear(store) {
 }
 
 // ---------- 权限 ----------
-async function ensurePermission(handle) {
+async function ensurePermission(handle: any) {
     if (!handle) return false;
     try {
         const opts = { mode: 'read' };
@@ -88,7 +88,7 @@ async function ensurePermission(handle) {
 }
 
 // ---------- 上传单个文件 ----------
-async function uploadOne(file) {
+async function uploadOne(file: File) {
     const fd = new FormData();
     fd.append('file', file, file.name);
     fd.append('source', 'folder');
@@ -118,7 +118,7 @@ async function uploadOne(file) {
 }
 
 // ---------- 等文件写完(检测 size 不变 3s)----------
-async function isFileStable(handle) {
+async function isFileStable(handle: any) {
     try {
         const f1 = await handle.getFile();
         const s1 = f1.size;
@@ -131,7 +131,7 @@ async function isFileStable(handle) {
 }
 
 // v118.24 · 递归遍历目录 · 子文件夹也扫
-async function walkDir(handle, prefix, candidates, depth) {
+async function walkDir(handle: any, prefix: string, candidates: any[], depth: number) {
     if (depth > 10) return; // 防深度爆栈
     let perm;
     try {

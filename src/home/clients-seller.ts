@@ -8,11 +8,13 @@ import { apiClient } from './clients-helpers.js';
 // ==========================================================
 // P3 · 客户管理页 · tab 切换
 // ==========================================================
-function switchCustTab(tab) {
+function switchCustTab(tab: string) {
     S.custTab = tab === 'buyer' ? 'buyer' : 'seller';
     document
         .querySelectorAll('[data-cust-tab]')
-        .forEach((b) => b.classList.toggle('active', b.dataset.custTab === S.custTab));
+        .forEach((b) =>
+            b.classList.toggle('active', (b as HTMLElement).dataset.custTab === S.custTab)
+        );
     const ps = document.getElementById('cust-pane-seller');
     const pb = document.getElementById('cust-pane-buyer');
     if (ps) ps.classList.toggle('active', S.custTab === 'seller');
@@ -58,7 +60,7 @@ function _sellerFiltered() {
     const kw = _sellerState.keyword.trim().toLowerCase();
     if (!kw) return S.sellerClients;
     return S.sellerClients.filter(
-        (c) =>
+        (c: any) =>
             (c.name || '').toLowerCase().includes(kw) || (c.tax_id || '').toLowerCase().includes(kw)
     );
 }
@@ -79,7 +81,7 @@ function renderSellerList() {
         return;
     }
     tb.innerHTML = items
-        .map((c) => {
+        .map((c: any) => {
             const isActive = activeId != null && Number(activeId) === Number(c.id);
             const current = isActive
                 ? `<span class="cust-badge-current"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5l3.2 3.2L12 4"/></svg>${escapeHtml(t('seller-current'))}</span>`
@@ -100,26 +102,28 @@ function renderSellerList() {
 }
 
 // 账套主体编辑弹窗
-function openWsClientModal(ws) {
+function openWsClientModal(ws: any) {
     S.editingWsClientId = ws ? ws.id : null;
-    document.getElementById('wsclient-modal-title').textContent = t(
+    document.getElementById('wsclient-modal-title')!.textContent = t(
         ws ? 'wsclient-modal-edit' : 'wsclient-modal-new'
     );
-    document.getElementById('wsclient-input-name').value = (ws && ws.name) || '';
-    document.getElementById('wsclient-input-tax').value = (ws && ws.tax_id) || '';
-    document.getElementById('wsclient-modal-archive').style.display = ws ? '' : 'none';
-    document.getElementById('wsclient-modal-mask').style.display = 'flex';
-    setTimeout(() => document.getElementById('wsclient-input-name').focus(), 50);
+    (document.getElementById('wsclient-input-name') as HTMLInputElement).value =
+        (ws && ws.name) || '';
+    (document.getElementById('wsclient-input-tax') as HTMLInputElement).value =
+        (ws && ws.tax_id) || '';
+    document.getElementById('wsclient-modal-archive')!.style.display = ws ? '' : 'none';
+    document.getElementById('wsclient-modal-mask')!.style.display = 'flex';
+    setTimeout(() => document.getElementById('wsclient-input-name')!.focus(), 50);
 }
 
 function closeWsClientModal() {
-    document.getElementById('wsclient-modal-mask').style.display = 'none';
+    document.getElementById('wsclient-modal-mask')!.style.display = 'none';
     S.editingWsClientId = null;
 }
 
 async function saveWsClient() {
-    const name = document.getElementById('wsclient-input-name').value.trim();
-    const tax = document.getElementById('wsclient-input-tax').value.trim();
+    const name = (document.getElementById('wsclient-input-name') as HTMLInputElement).value.trim();
+    const tax = (document.getElementById('wsclient-input-tax') as HTMLInputElement).value.trim();
     if (!name) {
         showToast(t('client-msg-name-required'), 'fail');
         return;
@@ -143,16 +147,16 @@ async function saveWsClient() {
         renderSellerList();
         _syncWorkspaceSwitcher();
     } catch (e) {
-        const m = e && e.message ? e.message : t('client-msg-save-fail');
+        const m = e && (e as Error).message ? (e as Error).message : t('client-msg-save-fail');
         showToast(t('client-msg-save-fail') + ' · ' + m, 'fail');
     }
 }
 
 async function archiveWsClient() {
     if (!S.editingWsClientId) return;
-    const ws = S.sellerClients.find((x) => Number(x.id) === Number(S.editingWsClientId));
+    const ws = S.sellerClients.find((x: any) => Number(x.id) === Number(S.editingWsClientId));
     const ok = await showConfirm(
-        t('wsclient-archive-confirm').replace('{name}', ws ? ws.name : ''),
+        t('wsclient-archive-confirm').replace('{name}', ws ? (ws as any).name : ''),
         { danger: true }
     );
     if (!ok) return;

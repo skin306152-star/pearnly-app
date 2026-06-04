@@ -5,7 +5,7 @@ import { STATE } from './glv-store.js';
 import { $, _t, _fmt, _renderKpi, _authH, _token } from './glv-helpers.js';
 
 // ── 渲染 ────────────────────────────────────────────────────────
-function _renderTable(detail) {
+function _renderTable(detail: any[]) {
     const tbody = $('glv-tbody');
     if (!tbody) return;
     _setDetailCount(detail.length);
@@ -13,10 +13,10 @@ function _renderTable(detail) {
     const nf = _t('not_found');
     const frag = document.createDocumentFragment();
 
-    detail.forEach((r) => {
+    detail.forEach((r: any) => {
         const tr = document.createElement('tr');
 
-        const td = (txt, cls) => {
+        const td = (txt: string, cls: string) => {
             const c = document.createElement('td');
             if (cls) c.className = cls;
             c.textContent = txt;
@@ -45,8 +45,8 @@ function _renderTable(detail) {
     tbody.appendChild(frag);
 }
 
-function _renderSummary(summary) {
-    const tbody = $('glv-summary-table') && $('glv-summary-table').querySelector('tbody');
+function _renderSummary(summary: any) {
+    const tbody = $('glv-summary-table') && $('glv-summary-table')!.querySelector('tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
     const rows = [
@@ -103,7 +103,7 @@ function _renderSummary(summary) {
         tr.appendChild(td1);
         tr.appendChild(td2);
         tbody.appendChild(tr);
-        (items || []).forEach((it) => {
+        (items || []).forEach((it: any) => {
             const itr = document.createElement('tr');
             itr.className = 'glv-summary-item';
             const itd1 = document.createElement('td');
@@ -119,7 +119,7 @@ function _renderSummary(summary) {
     });
 }
 
-async function _loadTask(taskId) {
+async function _loadTask(taskId: any) {
     try {
         const res = await fetch('/api/recon/gl-vat/' + taskId, { headers: _authH() });
         const data = await res.json();
@@ -134,7 +134,7 @@ async function _loadTask(taskId) {
         if (rs) rs.style.display = '';
         _expandResults();
         window.scrollTo({ top: rs ? rs.offsetTop - 80 : 0, behavior: 'smooth' });
-    } catch (e) {
+    } catch (e: any) {
         console.error('[gl-vat] load task failed:', e);
         alert(_t('error') + ': ' + (e.message || e));
     }
@@ -153,14 +153,14 @@ function _expandResults() {
 function _bindSectionToggle() {
     document.querySelectorAll('.glv-section-head[data-toggle]').forEach((head) => {
         const targetId = head.getAttribute('data-toggle');
-        const target = document.getElementById(targetId);
+        const target = document.getElementById(targetId as string);
         if (!target) return;
-        const toggle = (e) => {
+        const toggle = (e: Event) => {
             // 不要让头部里的按钮（导出）触发折叠
             if (
                 e.target &&
-                e.target.closest('button') !== null &&
-                !e.target.classList.contains('glv-section-head')
+                (e.target as HTMLElement).closest('button') !== null &&
+                !(e.target as HTMLElement).classList.contains('glv-section-head')
             ) {
                 return;
             }
@@ -168,7 +168,7 @@ function _bindSectionToggle() {
             target.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
         };
         head.addEventListener('click', toggle);
-        head.addEventListener('keydown', (e) => {
+        (head as HTMLElement).addEventListener('keydown', (e: KeyboardEvent) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 toggle(e);
@@ -177,7 +177,7 @@ function _bindSectionToggle() {
     });
 }
 
-function _setDetailCount(n) {
+function _setDetailCount(n: any) {
     const el = $('glv-detail-count');
     if (el) el.textContent = n != null ? String(n) : '';
 }

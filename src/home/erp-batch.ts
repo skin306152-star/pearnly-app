@@ -18,20 +18,20 @@ function _refreshErpBatchBar() {
     if (headerCb) {
         const visibleCbs = document.querySelectorAll('[data-log-cb]');
         const total = visibleCbs.length;
-        const sel = window._erpSelected.size;
+        const sel = window._erpSelected!.size;
         if (sel === 0) {
-            headerCb.checked = false;
-            headerCb.indeterminate = false;
-        } else if (sel >= total) {
-            headerCb.checked = true;
-            headerCb.indeterminate = false;
+            (headerCb as HTMLInputElement).checked = false;
+            (headerCb as HTMLInputElement).indeterminate = false;
+        } else if ((sel as number) >= total) {
+            (headerCb as HTMLInputElement).checked = true;
+            (headerCb as HTMLInputElement).indeterminate = false;
         } else {
-            headerCb.checked = false;
-            headerCb.indeterminate = true;
+            (headerCb as HTMLInputElement).checked = false;
+            (headerCb as HTMLInputElement).indeterminate = true;
         }
     }
     if (!bar || !countEl) return;
-    const n = window._erpSelected.size;
+    const n = window._erpSelected!.size;
     if (n === 0) {
         bar.style.display = 'none';
         return;
@@ -42,8 +42,8 @@ function _refreshErpBatchBar() {
 
 // v118.25.1 · 批量重推执行 · 调 /api/erp/logs/batch-retry · 提示成功/失败/跳过计数
 async function _runErpBatchRetry() {
-    console.info('[ErpBatch] retry triggered · selected=', window._erpSelected.size);
-    const ids = Array.from(window._erpSelected);
+    console.info('[ErpBatch] retry triggered · selected=', window._erpSelected!.size);
+    const ids = Array.from(window._erpSelected as Set<unknown>);
     if (ids.length === 0) {
         showToast(t('erp-batch-empty-warn'), 'warn');
         return;
@@ -71,7 +71,7 @@ async function _runErpBatchRetry() {
         });
         const kind = r.failed && r.failed > 0 ? 'warn' : 'success';
         showToast(msg, kind);
-        window._erpSelected.clear();
+        (window._erpSelected as Set<unknown>).clear();
         window.loadErpLogs();
     } catch (e) {
         console.error('batch retry failed', e);
@@ -81,8 +81,8 @@ async function _runErpBatchRetry() {
 
 // Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除执行
 async function _runErpBatchDelete() {
-    console.info('[ErpBatch] delete triggered · selected=', window._erpSelected.size);
-    const ids = Array.from(window._erpSelected);
+    console.info('[ErpBatch] delete triggered · selected=', window._erpSelected!.size);
+    const ids = Array.from(window._erpSelected as Set<unknown>);
     if (ids.length === 0) {
         showToast(t('erp-batch-empty-warn'), 'warn');
         return;
@@ -123,7 +123,7 @@ async function _runErpBatchDelete() {
             }),
             r.deleted > 0 ? 'success' : 'warn'
         );
-        window._erpSelected.clear();
+        (window._erpSelected as Set<unknown>).clear();
         // 延迟 500ms reload · 让用户先看到 "消失了" 效果 + toast · 再拉新数据
         setTimeout(window.loadErpLogs, 500);
     } catch (e) {
@@ -159,9 +159,9 @@ async function _runErpBatchDelete() {
             btnClear.addEventListener('click', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
-                window._erpSelected.clear();
+                (window._erpSelected as Set<unknown>).clear();
                 document.querySelectorAll('.erp-log-cb').forEach(function (x) {
-                    x.checked = false;
+                    (x as HTMLInputElement).checked = false;
                 });
                 _refreshErpBatchBar();
             });

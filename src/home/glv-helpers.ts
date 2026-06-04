@@ -2,7 +2,7 @@
 // REFACTOR-WB (2026-06-02) · GL-VAT 对账 · 纯工具:DOM/i18n/格式化/KPI · 从 gl-vat-recon.js 抽出 · verbatim 0 改逻辑。
 // ============================================================
 
-const $ = (id) => document.getElementById(id);
+const $ = (id: string) => document.getElementById(id);
 const _token = () => localStorage.getItem('mrpilot_token') || '';
 // v118.32.5.1 · 优先读 window.currentLang（实时切换不依赖 localStorage 刷新）
 const _lang = () => {
@@ -94,10 +94,11 @@ const I18N = {
         s_vat_total: '売上税報告合計',
     },
 };
-const _t = (key) => (I18N[_lang()] || I18N.th)[key] || key;
+const _t = (key: string) =>
+    (I18N[_lang() as keyof typeof I18N] || I18N.th)[key as keyof (typeof I18N)['th']] || key;
 
 // M3-2:收入对账失败 error_code → 4 语可读原因 + 引导(取代泛化 "เกิดข้อผิดพลาด")
-function _glvFailMsg(code) {
+function _glvFailMsg(code: string) {
     const lang = _lang();
     const M = {
         gl_no_revenue_rows: {
@@ -125,11 +126,11 @@ function _glvFailMsg(code) {
             ja: '売上VATレポートの解析に失敗しました。より鮮明な版か、Excel/PDF に変換してください。',
         },
     };
-    const m = M[code];
-    return m ? m[lang] || m.th || m.en : _t('error') || 'Error';
+    const m = M[code as keyof typeof M];
+    return m ? m[lang as keyof typeof m] || m.th || m.en : _t('error') || 'Error';
 }
 
-const _fmt = (n) => {
+const _fmt = (n: any) => {
     if (n === null || n === undefined || isNaN(n)) return '';
     return Number(n).toLocaleString('en-US', {
         minimumFractionDigits: 2,
@@ -137,23 +138,23 @@ const _fmt = (n) => {
     });
 };
 
-function _renderKpi(stats) {
+function _renderKpi(stats: any) {
     if ($('glv-kpi-matched'))
-        $('glv-kpi-matched').textContent = stats && stats.matched != null ? stats.matched : '—';
+        $('glv-kpi-matched')!.textContent = stats && stats.matched != null ? stats.matched : '—';
     if ($('glv-kpi-diff'))
-        $('glv-kpi-diff').textContent = stats && stats.diff != null ? stats.diff : '—';
+        $('glv-kpi-diff')!.textContent = stats && stats.diff != null ? stats.diff : '—';
     if ($('glv-kpi-unmatched'))
-        $('glv-kpi-unmatched').textContent =
+        $('glv-kpi-unmatched')!.textContent =
             stats && stats.unmatched != null ? stats.unmatched : '—';
 }
 
 // ── 历史任务列表 ─────────────────────────────────────────────────
-function _fmtTime(s) {
+function _fmtTime(s: any) {
     if (!s) return '';
     try {
         const d = new Date(s);
         if (isNaN(d.getTime())) return s;
-        const pad = (n) => String(n).padStart(2, '0');
+        const pad = (n: number) => String(n).padStart(2, '0');
         return (
             d.getFullYear() +
             '-' +

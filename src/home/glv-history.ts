@@ -5,13 +5,13 @@ import { $, _t, _fmt, _fmtTime, _authH, _token, _lang } from './glv-helpers.js';
 import { _loadTask } from './glv-results.js';
 
 const GLV_PAGE_SIZE = 10;
-var _glvAllTasks = [];
+var _glvAllTasks: any[] = [];
 var _glvPage = 1;
 
 function _applyGlvSearch() {
     _glvPage = 1;
     _renderGlvPage();
-    var q = (($('glv-hist-search') || {}).value || '').trim().toLowerCase();
+    var q = ((($('glv-hist-search') || {}) as HTMLInputElement).value || '').trim().toLowerCase();
     if (!q) return;
     var tbody = $('glv-history-tbody');
     if (!tbody) return;
@@ -46,8 +46,8 @@ function _renderGlvPage() {
     if (pager) {
         pager.style.display = _glvAllTasks.length > GLV_PAGE_SIZE ? '' : 'none';
         if (info) info.textContent = _glvPage + ' / ' + totalPages;
-        if (prev) prev.disabled = _glvPage <= 1;
-        if (next) next.disabled = _glvPage >= totalPages;
+        if (prev) (prev as HTMLButtonElement).disabled = _glvPage <= 1;
+        if (next) (next as HTMLButtonElement).disabled = _glvPage >= totalPages;
     }
     const tasks = pageTasks;
     tasks.forEach((t) => {
@@ -74,7 +74,7 @@ function _renderGlvPage() {
         const cellAct = document.createElement('td');
         cellAct.className = 'glv-history-actions';
         // 三个图标按钮（hover 显示 tooltip · 同销项税对账风格）
-        const mkBtn = (svg, title, cls, onClick) => {
+        const mkBtn = (svg: string, title: string, cls: string, onClick: () => void) => {
             const b = document.createElement('button');
             b.type = 'button';
             if (cls) b.className = cls;
@@ -101,8 +101,8 @@ function _renderGlvPage() {
 }
 
 function _glvInitPager() {
-    var prev = $('glv-history-prev');
-    var next = $('glv-history-next');
+    var prev = $('glv-history-prev') as any;
+    var next = $('glv-history-next') as any;
     if (prev && !prev._glvBound) {
         prev._glvBound = true;
         prev.addEventListener('click', function () {
@@ -137,7 +137,7 @@ async function _loadHistory() {
     }
 }
 
-async function _exportTask(taskId) {
+async function _exportTask(taskId: any) {
     try {
         const url = '/api/recon/gl-vat/' + taskId + '/export?lang=' + encodeURIComponent(_lang());
         const res = await fetch(url, { headers: _authH() });
@@ -155,11 +155,11 @@ async function _exportTask(taskId) {
     } catch (e) {
         console.error('[gl-vat] exportTask failed:', e);
         if (typeof showToast === 'function')
-            showToast(_t('error') + ': ' + (e.message || e), 'error');
+            showToast(_t('error') + ': ' + ((e as Error).message || e), 'error');
     }
 }
 
-async function _deleteTask(taskId) {
+async function _deleteTask(taskId: any) {
     // v118.32.5.4 · 用产品自带 showConfirm 替换原生 confirm()
     let ok;
     if (typeof window.showConfirm === 'function') {
@@ -178,7 +178,7 @@ async function _deleteTask(taskId) {
     } catch (e) {
         console.error('[gl-vat] delete failed:', e);
         if (typeof showToast === 'function')
-            showToast(_t('error') + ': ' + (e.message || e), 'error');
+            showToast(_t('error') + ': ' + ((e as Error).message || e), 'error');
     }
 }
 

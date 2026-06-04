@@ -7,7 +7,7 @@ import { _brv2T, _brv2EscHtml, _brv2FmtNum } from './bank-recon-v2-helpers.js';
 // P0.1 BUG-B-T1 v118.35.0.37 · 3 anchor 预填 cache 跨会话 · localStorage 单 key 兜底
 //   不分 bank · 1 个事务所 1-2 个银行 · 简化(后续 Phase 1 P1.4 加 confidence 时再 per-bank scope)
 var _BRV2_ANCHOR_KEY = 'pearnly.brv2.lastAnchorOcr';
-function _brv2SaveLastAnchorOcr(summary) {
+function _brv2SaveLastAnchorOcr(summary: any) {
     try {
         var ocr = summary && summary._anchor_ocr;
         if (!ocr || typeof ocr !== 'object') return;
@@ -48,10 +48,10 @@ function _brv2RestoreAnchorPrefill() {
         var el = document.getElementById(id);
         if (!el) return;
         // 用户已经手填了任何值 → 不覆盖
-        if (el.value !== '') return;
-        var v = map[id];
+        if ((el as HTMLInputElement).value !== '') return;
+        var v = map[id as keyof typeof map];
         if (!Number.isFinite(v)) return;
-        el.value = v.toFixed(2);
+        (el as HTMLInputElement).value = v.toFixed(2);
         var cell = el.closest && el.closest('.brv2-anchor-cell');
         if (cell) cell.classList.add('is-prefilled');
         prefilledCount += 1;
@@ -102,7 +102,7 @@ var _BRV2_ANCHOR_LABEL_KEYS = [
     ['stmt_closing', 'brv2-anchor-stmt-closing'], // BUG-FIX-T3 v118.35.0.44 · 加 4th anchor
 ];
 
-function _brv2RenderAnchorAudit(summary) {
+function _brv2RenderAnchorAudit(summary: any) {
     var host = document.getElementById('brv2-summary-collapse');
     if (!host || !host.parentNode) return;
     var panel = document.getElementById('brv2-anchor-audit');

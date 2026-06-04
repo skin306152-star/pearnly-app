@@ -59,11 +59,12 @@ import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 ·
                 if (I && I[lang]) {
                     modal.querySelectorAll('[data-i18n]').forEach((el) => {
                         const k = el.getAttribute('data-i18n');
-                        if (I[lang][k]) el.textContent = I[lang][k];
+                        if (I[lang][k as string]) el.textContent = I[lang][k as string];
                     });
                     modal.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
                         const k = el.getAttribute('data-i18n-placeholder');
-                        if (I[lang][k]) el.placeholder = I[lang][k];
+                        if (I[lang][k as string])
+                            (el as HTMLInputElement).placeholder = I[lang][k as string];
                     });
                 }
             } catch (e) {
@@ -74,16 +75,16 @@ import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 ·
         _obData = { role: '', monthly_volume: '', country: '', line_id: '' };
         // 预填用户已有的字段(如果有)
         if (window._userInfo) {
-            _obData.role = window._userInfo.role || '';
-            _obData.monthly_volume = window._userInfo.monthly_volume || '';
-            _obData.country = window._userInfo.country || '';
-            _obData.line_id = window._userInfo.line_id || '';
+            _obData.role = (window._userInfo.role || '') as string;
+            _obData.monthly_volume = (window._userInfo.monthly_volume || '') as string;
+            _obData.country = (window._userInfo.country || '') as string;
+            _obData.line_id = (window._userInfo.line_id || '') as string;
         }
         gotoStep(1);
         modal.style.display = 'flex';
     }
 
-    function gotoStep(n) {
+    function gotoStep(n: number) {
         _obStep = n;
         for (let i = 1; i <= OB_TOTAL; i++) {
             const el = document.getElementById('ob-step-' + i);
@@ -91,7 +92,7 @@ import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 ·
         }
         // 进度圆点
         document.querySelectorAll('.ob-dot').forEach((dot) => {
-            const s = parseInt(dot.dataset.step, 10);
+            const s = parseInt((dot as HTMLElement).dataset.step!, 10);
             dot.classList.toggle('active', s === n);
             dot.classList.toggle('done', s < n);
         });
@@ -105,11 +106,11 @@ import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 ·
         // 第 4 步预填 LINE input
         if (n === 4) {
             const inp = document.getElementById('ob-line-input');
-            if (inp) inp.value = _obData.line_id || '';
+            if (inp) (inp as HTMLInputElement).value = _obData.line_id || '';
         }
     }
 
-    function showFeedback(msg) {
+    function showFeedback(msg: string) {
         const modal = document.querySelector('.onboarding-modal');
         if (!modal) return;
         let fb = modal.querySelector('.ob-feedback');
@@ -125,14 +126,14 @@ import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 ·
 
     // 选项点击(所有 .ob-option 共用)
     document.addEventListener('click', (e) => {
-        const opt = e.target.closest('.ob-option');
+        const opt = (e.target as HTMLElement).closest('.ob-option');
         if (!opt) return;
         const wrap = opt.parentElement;
         if (!wrap || !wrap.classList.contains('ob-options')) return;
         // 选中视觉 + 记录
-        wrap.querySelectorAll('.ob-option').forEach((o) => o.classList.remove('selected'));
+        wrap.querySelectorAll('.ob-option').forEach((o: Element) => o.classList.remove('selected'));
         opt.classList.add('selected');
-        const value = opt.dataset.value;
+        const value = (opt as HTMLElement).dataset.value as string;
         if (wrap.id === 'ob-role-options') _obData.role = value;
         else if (wrap.id === 'ob-volume-options') _obData.monthly_volume = value;
         else if (wrap.id === 'ob-country-options') _obData.country = value;
@@ -140,25 +141,27 @@ import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 ·
 
     // 跳过当前步
     document.addEventListener('click', (e) => {
-        if (e.target.id !== 'ob-skip') return;
+        if ((e.target as HTMLElement).id !== 'ob-skip') return;
         // 当前步骤的字段不填 · 直接进下一步
         nextStepOrFinish();
     });
 
     // 下一步 / 完成
     document.addEventListener('click', (e) => {
-        if (e.target.id !== 'ob-next') return;
+        if ((e.target as HTMLElement).id !== 'ob-next') return;
         // 第 4 步收集 LINE input
         if (_obStep === 4) {
             const inp = document.getElementById('ob-line-input');
-            _obData.line_id = ((inp && inp.value) || '').trim().replace(/^@+/, '');
+            _obData.line_id = ((inp && (inp as HTMLInputElement).value) || '')
+                .trim()
+                .replace(/^@+/, '');
         }
         nextStepOrFinish();
     });
 
     // 关闭按钮(右上 X)· 24h 不再弹
     document.addEventListener('click', (e) => {
-        if (e.target.closest('#ob-close')) {
+        if ((e.target as HTMLElement).closest('#ob-close')) {
             localStorage.setItem(OB_DISMISS_KEY, String(Date.now()));
             const m = document.getElementById('onboarding-modal');
             if (m) m.style.display = 'none';
@@ -175,7 +178,7 @@ import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 ·
         if (_obStep < OB_TOTAL) {
             setTimeout(
                 () => gotoStep(_obStep + 1),
-                _obData[Object.keys(_obData)[_obStep - 1]] ? 350 : 0
+                _obData[Object.keys(_obData)[_obStep - 1] as keyof typeof _obData] ? 350 : 0
             );
         } else {
             finishOnboarding();
@@ -190,7 +193,7 @@ import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 ·
         localStorage.removeItem(OB_DISMISS_KEY);
 
         // 提交到后端
-        const payload = {};
+        const payload: Record<string, string> = {};
         if (_obData.role) payload.role = _obData.role;
         if (_obData.monthly_volume) payload.monthly_volume = _obData.monthly_volume;
         if (_obData.country) payload.country = _obData.country;

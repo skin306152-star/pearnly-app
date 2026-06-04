@@ -8,6 +8,8 @@ import { formatDate, formatPeriod, esc } from './bank-recon-helpers.js';
 import { loadSessionDetail, renderDetailMeta, renderTxTable } from './bank-recon-detail.js';
 import { _renderClientBadge } from './bank-recon-picker.js';
 
+type Session = Record<string, any>;
+
 // ---------- API 调用 ----------
 async function refreshSessions() {
     try {
@@ -35,11 +37,13 @@ function refreshSummary() {
     }
     // 统计未完全匹配的
     let pending = 0;
-    for (const s of S.sessions) {
+    for (const s of S.sessions as Session[]) {
         if (s.parse_status === 'parsed' && (s.unmatched_count || 0) > 0) pending++;
     }
     pill.textContent =
-        pending > 0 ? t('bank-pill-pending').replace('{n}', pending) : t('bank-pill-ok');
+        pending > 0
+            ? t('bank-pill-pending').replace('{n}', pending as unknown as string)
+            : t('bank-pill-ok');
 }
 
 function renderSessionList() {
@@ -48,9 +52,9 @@ function renderSessionList() {
     // 筛选
     let visible = S.sessions || [];
     if (S.sessionFilter === 'parsed') {
-        visible = visible.filter((s) => s.parse_status === 'parsed');
+        visible = (visible as Session[]).filter((s: Session) => s.parse_status === 'parsed');
     } else if (S.sessionFilter === 'failed') {
-        visible = visible.filter((s) => s.parse_status === 'parse_failed');
+        visible = (visible as Session[]).filter((s: Session) => s.parse_status === 'parse_failed');
     }
     if (!S.sessions || S.sessions.length === 0) {
         list.innerHTML =
@@ -63,27 +67,27 @@ function renderSessionList() {
         list.innerHTML = '<div class="bank-empty">' + t('bank-sess-filter-empty') + '</div>';
         return;
     }
-    list.innerHTML = visible.map((s) => renderSessionRow(s)).join('');
+    list.innerHTML = (visible as Session[]).map((s: Session) => renderSessionRow(s)).join('');
     // 行点击 → 进会话详情 · 但点垃圾桶不能触发
     list.querySelectorAll('.bank-session-row').forEach((row) => {
         row.addEventListener('click', (e) => {
-            if (e.target.closest('.bank-session-trash')) return; // 点的是垃圾桶 · 跳过
-            loadSessionDetail(row.dataset.sessionId);
+            if ((e.target as HTMLElement).closest('.bank-session-trash')) return; // 点的是垃圾桶 · 跳过
+            loadSessionDetail((row as HTMLElement).dataset.sessionId!);
         });
     });
     // 垃圾桶绑定
     list.querySelectorAll('.bank-session-trash').forEach((btn) => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const sid = btn.dataset.sessionId;
-            const fname = btn.dataset.sessionName || '';
+            const sid = (btn as HTMLElement).dataset.sessionId;
+            const fname = (btn as HTMLElement).dataset.sessionName || '';
             handleDeleteSessionFromList(sid, fname);
         });
     });
 }
 
 // v118.26.1.1 · 共用删除函数 · 自动化 tab 列表 + 对账中心列表都用
-async function handleDeleteSessionFromList(sessionId, fname) {
+async function handleDeleteSessionFromList(sessionId: any, fname: any) {
     if (!sessionId) return;
     const msg = (t('bank-session-delete-confirm') || '确定删除这条对账记录吗?').replace(
         '{name}',
@@ -99,7 +103,7 @@ async function handleDeleteSessionFromList(sessionId, fname) {
         if (!resp.ok) throw new Error('delete:' + resp.status);
         showToast(t('bank-deleted'), 'success');
         // 如果当前正打开这个会话 · 退回列表
-        if (S.currentSession && S.currentSession.id === sessionId) {
+        if (S.currentSession && (S.currentSession as Session).id === sessionId) {
             S.currentSession = null;
             S.currentTxs = [];
             showListMode();
@@ -115,7 +119,7 @@ async function handleDeleteSessionFromList(sessionId, fname) {
     }
 }
 
-function renderSessionRow(s) {
+function renderSessionRow(s: Session) {
     const bank = (s.bank_code || 'OTHER').toUpperCase();
     const period = formatPeriod(s.period_start, s.period_end);
     const acct = s.account_last4 ? '···' + s.account_last4 : '';
@@ -141,7 +145,7 @@ function renderSessionRow(s) {
     `;
 }
 
-function renderSessionCounts(s) {
+function renderSessionCounts(s: Session) {
     if (s.parse_status === 'parse_failed') {
         return `<span class="bank-session-count cnt-failed">${t('bank-count-parse-failed')}</span>`;
     }
@@ -164,8 +168,8 @@ function renderSessionCounts(s) {
 }
 
 function showDetailMode() {
-    document.getElementById('bank-detail').style.display = '';
-    document.querySelector('.bank-sessions-section').style.display = 'none';
+    document.getElementById('bank-detail')!.style.display = '';
+    (document.querySelector('.bank-sessions-section') as HTMLElement).style.display = 'none';
     renderDetailMeta();
     renderTxTable();
     // v118.26.2 · 渲染客户徽章
@@ -173,8 +177,8 @@ function showDetailMode() {
 }
 
 function showListMode() {
-    document.getElementById('bank-detail').style.display = 'none';
-    document.querySelector('.bank-sessions-section').style.display = '';
+    document.getElementById('bank-detail')!.style.display = 'none';
+    (document.querySelector('.bank-sessions-section') as HTMLElement).style.display = '';
     // v118.26.2 · 退出 detail 顺手关 pane(切回列表不残留)
     const detailBody = document.getElementById('bank-detail-body');
     if (detailBody) detailBody.classList.remove('has-pane');

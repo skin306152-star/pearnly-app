@@ -9,11 +9,13 @@
 // ============================================================
 /* global _selectedFiles:writable, _results:writable, getMaxFiles, hideAlerts, showAlert, escapeHtml, renderResults, handleCameraImages, svgIcon */
 
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('file-input');
+const dropZone = document.getElementById('drop-zone') as HTMLElement;
+const fileInput = document.getElementById('file-input') as HTMLInputElement;
 
 dropZone.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+fileInput.addEventListener('change', (e: Event) =>
+    handleFiles((e.target as HTMLInputElement).files)
+);
 ['dragover', 'dragenter'].forEach((evt) => {
     dropZone.addEventListener(evt, (e) => {
         e.preventDefault();
@@ -26,30 +28,30 @@ fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
         dropZone.classList.remove('drag-over');
     });
 });
-dropZone.addEventListener('drop', (e) => {
+dropZone.addEventListener('drop', (e: DragEvent) => {
     e.preventDefault();
-    handleFiles(e.dataTransfer.files);
+    handleFiles(e.dataTransfer!.files);
 });
 
 // v118.35.0.3 · 主上传区接收 PDF / 图片 / Excel / CSV / Word — 跟 #file-input
 // accept 属性 + drop-hint 文案对齐 · 之前只接 PDF 是个老遗留过滤(底层 OCR
 // pipeline 已经多 schema 支持所有格式 / 后端 /api/ocr/recognize 也接全格式)
 const _SUPPORTED_UPLOAD_EXT = /\.(pdf|png|jpe?g|webp|tiff?|bmp|gif|xlsx?|xlsm|csv|tsv|docx?|txt)$/i;
-function _isImageFile(f) {
+function _isImageFile(f: File) {
     return (
         (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|tiff?|bmp|gif)$/i.test(f.name)
     );
 }
-function _isPdfFile(f) {
+function _isPdfFile(f: File) {
     return f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 }
-function _isSupportedUpload(f) {
+function _isSupportedUpload(f: File) {
     return _isPdfFile(f) || _isImageFile(f) || _SUPPORTED_UPLOAD_EXT.test(f.name);
 }
 
-function handleFiles(fileList) {
+function handleFiles(fileList: FileList | null) {
     hideAlerts();
-    const all = Array.from(fileList);
+    const all = Array.from(fileList!);
     const supported = all.filter(_isSupportedUpload);
     if (supported.length !== all.length) {
         showAlert('warn', t('alert-unsupported-format'));
@@ -140,7 +142,7 @@ function renderFileList() {
             let statusText = t('status-' + f.status);
             if (f.status === 'retrying') statusText = t('status-retrying');
             if (f.status === 'error' && f.errorKey) {
-                statusText = t(f.errorKey, f.errorParams || {});
+                statusText = t(f.errorKey as string, f.errorParams || {});
             }
             const spinner =
                 f.status === 'processing' || f.status === 'retrying'
@@ -191,7 +193,7 @@ function renderFileList() {
     if (body && !body.dataset.retryBound) {
         body.dataset.retryBound = '1';
         body.addEventListener('click', async (e) => {
-            const btn = e.target.closest('.file-retry-btn');
+            const btn = (e.target as HTMLElement).closest('.file-retry-btn') as HTMLElement;
             if (!btn) return;
             const idx = parseInt(btn.dataset.retryIdx || '-1', 10);
             if (idx < 0 || idx >= _selectedFiles.length) return;
@@ -206,9 +208,9 @@ function renderFileList() {
 }
 
 function updateStartButton() {
-    const btnStart = document.getElementById('btn-start');
-    const btnClear = document.getElementById('btn-clear');
-    const btnExport = document.getElementById('btn-export');
+    const btnStart = document.getElementById('btn-start') as HTMLButtonElement;
+    const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
+    const btnExport = document.getElementById('btn-export') as HTMLButtonElement;
     const hasWaiting = _selectedFiles.some((f) => f.status === 'waiting');
     btnStart.disabled = _selectedFiles.length === 0 || !hasWaiting;
     btnClear.disabled = _selectedFiles.length === 0 && _results.length === 0;
@@ -216,7 +218,7 @@ function updateStartButton() {
 }
 
 // 清空
-document.getElementById('btn-clear').addEventListener('click', () => {
+document.getElementById('btn-clear')!.addEventListener('click', () => {
     _selectedFiles = [];
     _results = [];
     renderFileList();

@@ -8,7 +8,7 @@ import { _scoreBadge, fmtAmt, formatDate, esc } from './bank-recon-helpers.js';
 import { loadSessionDetail, handlePickCandidate } from './bank-recon-detail.js';
 
 // ---------- v118.26.2 · 右半屏候选 pane(取代旧 fixed drawer)----------
-async function openCandDrawer(tx) {
+async function openCandDrawer(tx: any) {
     S.currentTxForDrawer = tx;
     // 切到 grid 双栏(桌面) · 移动端样式自动改成底部 drawer
     const detailBody = document.getElementById('bank-detail-body');
@@ -49,7 +49,7 @@ async function openCandDrawer(tx) {
     }
 }
 
-function _candCard(tx, c, isCurrentMatched) {
+function _candCard(tx: any, c: any, isCurrentMatched: any) {
     const hid = c.history_id;
     const inv = c.invoice_no || '-';
     const vendor = c.vendor || '-';
@@ -121,7 +121,7 @@ function _candCard(tx, c, isCurrentMatched) {
     );
 }
 
-function renderCandBody(tx, candidates) {
+function renderCandBody(tx: any, candidates: any) {
     // v118.26.2 · 渲染目标改成新 inline pane body
     const body = document.getElementById('bank-cand-pane-body');
     if (!body) return;
@@ -151,13 +151,13 @@ function renderCandBody(tx, candidates) {
     }
 
     const isMatched = tx.match_status === 'matched';
-    const cards = list.map((c) => _candCard(tx, c, isMatched)).join('');
+    const cards = list.map((c: any) => _candCard(tx, c, isMatched)).join('');
     body.innerHTML = headHint + '<div class="bank-cand-list">' + cards + '</div>';
 
     // 绑事件
     body.querySelectorAll('[data-act="pick"]').forEach((btn) => {
         btn.addEventListener('click', () => {
-            handlePickCandidate(btn.dataset.hid);
+            handlePickCandidate((btn as HTMLElement).dataset.hid!);
         });
     });
     body.querySelectorAll('[data-act="unmatch"]').forEach((btn) => {
@@ -172,7 +172,7 @@ function renderCandBody(tx, candidates) {
                     body: JSON.stringify({ status: 'unmatched' }),
                 });
                 closeCandDrawer();
-                await loadSessionDetail(S.currentSession.id);
+                await loadSessionDetail((S.currentSession as any).id);
             } catch (e) {
                 showToast(t('bank-action-failed'), 'error');
             }

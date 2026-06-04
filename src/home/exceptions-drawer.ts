@@ -18,7 +18,7 @@ function _revokeDrawerPdf() {
     _drawer.pdfStatus = 'idle';
 }
 
-async function _loadDrawerPdf(hid, expectId) {
+async function _loadDrawerPdf(hid: string, expectId: unknown) {
     _drawer.pdfStatus = 'loading';
     renderDrawer();
     try {
@@ -49,8 +49,10 @@ async function _loadDrawerPdf(hid, expectId) {
     }
 }
 
-function openExcDrawer(excId) {
-    const row = (_excState.listCache || []).find((r) => r.id === excId);
+function openExcDrawer(excId: unknown) {
+    const row = ((_excState.listCache as Array<{ id: unknown }>) || []).find(
+        (r: { id: unknown }) => r.id === excId
+    );
     if (!row) {
         showToast(t('exc-drawer-error'), 'error');
         return;
@@ -62,14 +64,14 @@ function openExcDrawer(excId) {
     // v118.21.3 · 切条目时退出编辑态
     _drawer.editing = false;
     _drawer.editFields = null;
-    _drawer.openExcId = excId;
+    _drawer.openExcId = excId as number | null;
     _drawer.excRow = row;
     _drawer.history = null;
-    document.getElementById('exc-drawer-mask').classList.add('show');
-    document.getElementById('exc-drawer').classList.add('show');
+    document.getElementById('exc-drawer-mask')!.classList.add('show');
+    document.getElementById('exc-drawer')!.classList.add('show');
     renderDrawer(); // 先渲染骨架(showing loading on history section)
-    loadHistoryDetail(row.history_id);
-    _loadDrawerPdf(row.history_id, excId);
+    loadHistoryDetail((row as unknown as { history_id: string }).history_id);
+    _loadDrawerPdf((row as unknown as { history_id: string }).history_id, excId);
 }
 
 function closeExcDrawer() {
@@ -80,14 +82,14 @@ function closeExcDrawer() {
     _drawer.openExcId = null;
     _drawer.excRow = null;
     _drawer.history = null;
-    document.getElementById('exc-drawer-mask').classList.remove('show');
-    document.getElementById('exc-drawer').classList.remove('show');
+    document.getElementById('exc-drawer-mask')!.classList.remove('show');
+    document.getElementById('exc-drawer')!.classList.remove('show');
     // v118.20.5 · 还原 scroll(下一帧 · 等抽屉收起)
     const y = _excState.listScrollY || 0;
     if (y > 0) requestAnimationFrame(() => window.scrollTo(0, y));
 }
 
-async function loadHistoryDetail(hid) {
+async function loadHistoryDetail(hid: string) {
     try {
         const resp = await fetch('/api/history/' + encodeURIComponent(hid), {
             headers: {
@@ -105,7 +107,9 @@ async function loadHistoryDetail(hid) {
 }
 
 // 从 history.pages 抽出主页字段(后端 mergeFields 等价 · 简化版)
-function _extractFields(history) {
+function _extractFields(history: {
+    pages?: Array<{ is_duplicate?: boolean; is_copy?: boolean; fields?: unknown }>;
+}) {
     if (!history || !history.pages) return {};
     const pages = history.pages;
     const primary = pages.find((p) => !p.is_duplicate && !p.is_copy) || pages[0];
@@ -114,14 +118,19 @@ function _extractFields(history) {
 
 // v118.21.3 · 保存字段编辑 · 调 PUT /api/history/{id} · 后端会自动重跑规则
 async function actionSaveFields() {
-    if (!_drawer.openExcId || !_drawer.history || !_drawer.history.pages) return;
+    if (!_drawer.openExcId || !_drawer.history || !(_drawer.history as { pages?: unknown }).pages)
+        return;
     if (_drawer.loading) return;
     _drawer.loading = true;
     const dismiss = showToast(t('exc-fld-saving'), 'loading', 0);
     try {
         // 把 editFields 写入 primary page 的 fields(数字字段转 number · 空字符串转 null)
-        const pages = JSON.parse(JSON.stringify(_drawer.history.pages || []));
-        let primaryIdx = pages.findIndex((p) => !p.is_duplicate && !p.is_copy);
+        const pages = JSON.parse(
+            JSON.stringify((_drawer.history as { pages?: unknown }).pages || [])
+        );
+        let primaryIdx = pages.findIndex(
+            (p: { is_duplicate?: boolean; is_copy?: boolean }) => !p.is_duplicate && !p.is_copy
+        );
         if (primaryIdx < 0) primaryIdx = 0;
         if (!pages[primaryIdx]) pages[primaryIdx] = { fields: {} };
         const oldFields = pages[primaryIdx].fields || {};
@@ -129,7 +138,7 @@ async function actionSaveFields() {
         const moneyKeys = new Set(['subtotal', 'vat', 'total_amount']);
         const newFields = { ...oldFields };
         for (const k in ef) {
-            let v = ef[k];
+            let v = (ef as Record<string, any>)[k];
             if (v === '' || v === undefined) v = null;
             if (moneyKeys.has(k) && v !== null) {
                 const n = parseFloat(v);
@@ -138,14 +147,17 @@ async function actionSaveFields() {
             newFields[k] = v;
         }
         pages[primaryIdx].fields = newFields;
-        const resp = await fetch('/api/history/' + encodeURIComponent(_drawer.history.id), {
-            method: 'PUT',
-            headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ pages }),
-        });
+        const resp = await fetch(
+            '/api/history/' + encodeURIComponent((_drawer.history as { id: string }).id),
+            {
+                method: 'PUT',
+                headers: {
+                    Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ pages }),
+            }
+        );
         if (!resp.ok) throw new Error('http ' + resp.status);
         dismiss();
         showToast(t('exc-fld-save-ok'), 'success');

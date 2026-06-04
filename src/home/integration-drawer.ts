@@ -5,15 +5,15 @@
 // A4 (v118.34.19 · Zihao 2026-05-19 拍板) · 集成主页面顶部 tab 切换
 // + "看推送日志 →" 链接(从 ERP 卡片 / 也可来自其他地方)
 (function () {
-    function _activateIntTopTab(targetKey) {
+    function _activateIntTopTab(targetKey: string) {
         const tabs = document.querySelectorAll('#page-integrations .int-top-tab');
         const panels = document.querySelectorAll('#page-integrations .int-top-panel');
         tabs.forEach((t) => {
-            const k = t.dataset.intTopTab;
+            const k = (t as HTMLElement).dataset.intTopTab;
             t.classList.toggle('active', k === targetKey);
         });
         panels.forEach((p) => {
-            const k = p.dataset.intTopPanel;
+            const k = (p as HTMLElement).dataset.intTopPanel;
             p.classList.toggle('active', k === targetKey);
         });
         // 切到 logs · 触发一次 fetch 让用户立刻看到数据
@@ -61,18 +61,20 @@
 
     document.addEventListener('click', function (e) {
         // tab 切换
-        const tab = e.target.closest('#page-integrations .int-top-tab');
+        const tab = (e.target as HTMLElement).closest('#page-integrations .int-top-tab');
         if (tab) {
-            const k = tab.dataset.intTopTab;
+            const k = (tab as HTMLElement).dataset.intTopTab;
             if (k) _activateIntTopTab(k);
             return;
         }
         // 「看推送日志 →」按钮(集成页 ERP 卡片 OR ERP 抽屉内 ERP 连接卡片)
-        const logsBtn = e.target.closest('[data-int-action="view-logs"], .int-btn-view-logs');
+        const logsBtn = (e.target as HTMLElement).closest(
+            '[data-int-action="view-logs"], .int-btn-view-logs'
+        );
         if (logsBtn) {
             e.preventDefault();
             e.stopPropagation();
-            window.activateIntegrationsLogsTab();
+            window.activateIntegrationsLogsTab!();
         }
     });
 
@@ -101,8 +103,8 @@
         if (!body) return;
         const autoContent = document.querySelector('.auto-content');
         if (!autoContent) return;
-        Array.from(body.querySelectorAll('.auto-panel')).forEach(function (el) {
-            el.style.display = '';
+        Array.from(body.querySelectorAll('.auto-panel')).forEach(function (el: Element) {
+            (el as HTMLElement).style.display = '';
             autoContent.appendChild(el);
         });
     }
@@ -130,12 +132,12 @@
             erp: 'erp',
             bank: 'bank',
         };
-        var panelId = _panelIds[tab] || tab;
+        var panelId = _panelIds[tab as keyof typeof _panelIds] || tab;
 
         // 把对应的 auto-panel 移入抽屉(DOM move · 保留事件监听)
         const panel = document.querySelector('.auto-panel[data-auto-panel="' + panelId + '"]');
         if (panel) {
-            panel.style.display = 'block';
+            (panel as HTMLElement).style.display = 'block';
             body.appendChild(panel);
         } else {
             body.innerHTML =
@@ -155,9 +157,9 @@
             alert: window._loadNotificationsPanel,
             bank: window._loadBankReconPanel,
         };
-        if (loaders[tab]) {
+        if (loaders[tab as keyof typeof loaders]) {
             try {
-                loaders[tab]();
+                loaders[tab as keyof typeof loaders]!();
             } catch (e) {
                 console.warn('[int-drawer] loader error', e);
             }
@@ -187,10 +189,12 @@
     function _initDrawerEvents() {
         var closeBtn = document.getElementById('int-drawer-close');
         var overlay = document.getElementById('int-drawer-overlay');
-        if (closeBtn) closeBtn.addEventListener('click', window.closeIntegrationDrawer);
-        if (overlay) overlay.addEventListener('click', window.closeIntegrationDrawer);
+        if (closeBtn)
+            closeBtn.addEventListener('click', window.closeIntegrationDrawer as EventListener);
+        if (overlay)
+            overlay.addEventListener('click', window.closeIntegrationDrawer as EventListener);
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') window.closeIntegrationDrawer();
+            if (e.key === 'Escape') window.closeIntegrationDrawer!();
         });
     }
 

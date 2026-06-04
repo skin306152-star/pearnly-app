@@ -18,7 +18,7 @@
 
     const _state = { page: 1, per_page: 50, q: '', total: 0, rows: [], loaded: false };
 
-    function _fmtTime(iso) {
+    function _fmtTime(iso: string) {
         if (!iso) return '';
         try {
             return new Date(iso).toLocaleString();
@@ -27,7 +27,7 @@
         }
     }
 
-    function _renderEmpty(msg) {
+    function _renderEmpty(msg: string) {
         const tbl = document.getElementById('access-log-table');
         if (tbl) tbl.innerHTML = '<div class="access-log-empty">' + escapeHtml(msg) + '</div>';
         const pg = document.getElementById('access-log-pager');
@@ -51,7 +51,7 @@
                 <div>${escapeHtml(t('set-access-log-col-ip'))}</div>
             </div>`;
         const body = rows
-            .map(function (l) {
+            .map(function (l: any) {
                 return `
                 <div class="access-log-row">
                     <div class="access-log-time" data-label="${escapeHtml(t('set-access-log-col-time'))}">${escapeHtml(_fmtTime(l.created_at))}</div>
@@ -76,10 +76,13 @@
         const page = _state.page || 1;
         const per = _state.per_page || 50;
         const totalPages = Math.max(1, Math.ceil(total / per));
-        const info = (t('set-access-log-pager-total') || 'Total {n}').replace('{n}', total);
+        const info = (t('set-access-log-pager-total') || 'Total {n}').replace(
+            '{n}',
+            total as unknown as string
+        );
         const pageStr = (t('set-access-log-pager-page') || 'Page {p} / {t}')
-            .replace('{p}', page)
-            .replace('{t}', totalPages);
+            .replace('{p}', page as unknown as string)
+            .replace('{t}', totalPages as unknown as string);
         wrap.innerHTML = `
             <div class="access-log-pager-info">${escapeHtml(info)}</div>
             <div class="access-log-pager-ctrl">
@@ -89,7 +92,7 @@
             </div>`;
     }
 
-    async function _load(page) {
+    async function _load(page: number) {
         const tk = localStorage.getItem('mrpilot_token');
         if (!tk) return;
         _state.page = page || 1;
@@ -150,14 +153,14 @@
     function _applyVisibility() {
         const items = document.querySelectorAll('.set-tab-owner-only');
         const isOwner = !!(_userInfo && (_userInfo.role === 'owner' || _userInfo.is_super_admin));
-        items.forEach(function (el) {
-            el.style.display = isOwner ? '' : 'none';
+        items.forEach(function (el: Element) {
+            (el as HTMLElement).style.display = isOwner ? '' : 'none';
         });
     }
 
     // tab 切换钩子 · 监听 settings tab 切换
     document.addEventListener('click', function (ev) {
-        const tabBtn = ev.target.closest('.settings-tab[data-tab="access-log"]');
+        const tabBtn = (ev.target as HTMLElement).closest('.settings-tab[data-tab="access-log"]');
         if (tabBtn) {
             // 进入 access-log tab · 加载首页
             setTimeout(function () {
@@ -167,25 +170,27 @@
             }, 50);
             return;
         }
-        const csvBtn = ev.target.closest('#access-log-csv-btn');
+        const csvBtn = (ev.target as HTMLElement).closest('#access-log-csv-btn');
         if (csvBtn) {
             ev.preventDefault();
             _csvExport();
             return;
         }
-        const pgBtn = ev.target.closest('.access-log-pager-btn[data-access-log-page]');
+        const pgBtn = (ev.target as HTMLElement).closest(
+            '.access-log-pager-btn[data-access-log-page]'
+        ) as HTMLButtonElement | null;
         if (pgBtn && !pgBtn.disabled) {
-            const tp = parseInt(pgBtn.dataset.accessLogPage, 10);
+            const tp = parseInt(pgBtn.dataset.accessLogPage!, 10);
             _load(tp);
         }
     });
 
     // 搜索 · debounce
     document.addEventListener('input', function (ev) {
-        if (ev.target && ev.target.id === 'access-log-search') {
+        if (ev.target && (ev.target as HTMLElement).id === 'access-log-search') {
             clearTimeout(window.__accessLogSearchTimer);
             window.__accessLogSearchTimer = setTimeout(function () {
-                _state.q = (ev.target.value || '').trim();
+                _state.q = ((ev.target as HTMLInputElement).value || '').trim();
                 _load(1);
             }, 350);
         }

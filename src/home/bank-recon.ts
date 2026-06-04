@@ -42,20 +42,20 @@ async function load() {
 function bindEvents() {
     // 上传(v118.26.1 · 批量)
     const input = document.getElementById('bank-file-input');
-    if (input && !input._bound) {
-        input._bound = true;
+    if (input && !(input as HTMLElement & { _bound?: boolean })._bound) {
+        (input as HTMLElement & { _bound?: boolean })._bound = true;
         input.addEventListener('change', handleFilePick);
     }
     // 清除已完成队列
     const btnClear = document.getElementById('btn-bank-queue-clear-done');
-    if (btnClear && !btnClear._bound) {
-        btnClear._bound = true;
+    if (btnClear && !(btnClear as HTMLElement & { _bound?: boolean })._bound) {
+        (btnClear as HTMLElement & { _bound?: boolean })._bound = true;
         btnClear.addEventListener('click', _clearDone);
     }
     // 返回列表
     const btnBack = document.getElementById('btn-bank-back');
-    if (btnBack && !btnBack._bound) {
-        btnBack._bound = true;
+    if (btnBack && !(btnBack as HTMLElement & { _bound?: boolean })._bound) {
+        (btnBack as HTMLElement & { _bound?: boolean })._bound = true;
         btnBack.addEventListener('click', () => {
             S.currentSession = null;
             S.currentTxs = [];
@@ -64,22 +64,22 @@ function bindEvents() {
     }
     // 删除会话
     const btnDel = document.getElementById('btn-bank-delete');
-    if (btnDel && !btnDel._bound) {
-        btnDel._bound = true;
+    if (btnDel && !(btnDel as HTMLElement & { _bound?: boolean })._bound) {
+        (btnDel as HTMLElement & { _bound?: boolean })._bound = true;
         btnDel.addEventListener('click', handleDeleteSession);
     }
     // 触发匹配
     const btnMatch = document.getElementById('btn-bank-run-match');
-    if (btnMatch && !btnMatch._bound) {
-        btnMatch._bound = true;
+    if (btnMatch && !(btnMatch as HTMLElement & { _bound?: boolean })._bound) {
+        (btnMatch as HTMLElement & { _bound?: boolean })._bound = true;
         btnMatch.addEventListener('click', handleRunMatch);
     }
     // 过滤按钮组(委托到容器)
     document.querySelectorAll('.bank-filter-btn').forEach((b) => {
-        if (b._bound) return;
-        b._bound = true;
+        if ((b as HTMLElement & { _bound?: boolean })._bound) return;
+        (b as HTMLElement & { _bound?: boolean })._bound = true;
         b.addEventListener('click', () => {
-            S.currentFilter = b.dataset.bankFilter || 'all';
+            S.currentFilter = (b as HTMLElement).dataset.bankFilter || 'all';
             document.querySelectorAll('.bank-filter-btn').forEach((x) => {
                 x.classList.toggle('active', x === b);
             });
@@ -88,51 +88,51 @@ function bindEvents() {
     });
     // 抽屉关闭(旧 fixed drawer · 保留兼容)
     document.querySelectorAll('[data-bank-cand-close]').forEach((e) => {
-        if (e._bound) return;
-        e._bound = true;
+        if ((e as HTMLElement & { _bound?: boolean })._bound) return;
+        (e as HTMLElement & { _bound?: boolean })._bound = true;
         e.addEventListener('click', closeCandDrawer);
     });
     // v118.26.2 · 新右半屏 pane 的 close 按钮(移动端 drawer 模式才显示)
     const btnPaneClose = document.getElementById('btn-bank-cand-pane-close');
-    if (btnPaneClose && !btnPaneClose._bound) {
-        btnPaneClose._bound = true;
+    if (btnPaneClose && !(btnPaneClose as HTMLElement & { _bound?: boolean })._bound) {
+        (btnPaneClose as HTMLElement & { _bound?: boolean })._bound = true;
         btnPaneClose.addEventListener('click', closeCandDrawer);
     }
     // 抽屉的忽略按钮(旧 + 新 pane)
     const btnIgn = document.getElementById('btn-bank-cand-ignore');
-    if (btnIgn && !btnIgn._bound) {
-        btnIgn._bound = true;
+    if (btnIgn && !(btnIgn as HTMLElement & { _bound?: boolean })._bound) {
+        (btnIgn as HTMLElement & { _bound?: boolean })._bound = true;
         btnIgn.addEventListener('click', handleIgnoreTx);
     }
     const btnIgnPane = document.getElementById('btn-bank-cand-ignore-pane');
-    if (btnIgnPane && !btnIgnPane._bound) {
-        btnIgnPane._bound = true;
+    if (btnIgnPane && !(btnIgnPane as HTMLElement & { _bound?: boolean })._bound) {
+        (btnIgnPane as HTMLElement & { _bound?: boolean })._bound = true;
         btnIgnPane.addEventListener('click', handleIgnoreTx);
     }
     // v118.26.2 · 客户徽章点击 · 老板可改 / 员工只读
     const badge = document.getElementById('bank-client-badge');
-    if (badge && !badge._bound) {
-        badge._bound = true;
+    if (badge && !(badge as HTMLElement & { _bound?: boolean })._bound) {
+        (badge as HTMLElement & { _bound?: boolean })._bound = true;
         badge.addEventListener('click', _openClientPicker);
     }
     // v118.26.2 · 客户绑定 modal · close 按钮
     document.querySelectorAll('[data-bank-client-picker-close]').forEach((e) => {
-        if (e._bound) return;
-        e._bound = true;
+        if ((e as HTMLElement & { _bound?: boolean })._bound) return;
+        (e as HTMLElement & { _bound?: boolean })._bound = true;
         e.addEventListener('click', _closeClientPicker);
     });
     // v118.26.2 · 客户绑定 modal · 保存按钮
     const btnSave = document.getElementById('btn-bank-client-picker-save');
-    if (btnSave && !btnSave._bound) {
-        btnSave._bound = true;
+    if (btnSave && !(btnSave as HTMLElement & { _bound?: boolean })._bound) {
+        (btnSave as HTMLElement & { _bound?: boolean })._bound = true;
         btnSave.addEventListener('click', _saveClientPicker);
     }
     // v118.26.1.1 · session list 顶部筛选 chip
     document.querySelectorAll('.bank-sessions-chip').forEach((b) => {
-        if (b._bound) return;
-        b._bound = true;
+        if ((b as HTMLElement & { _bound?: boolean })._bound) return;
+        (b as HTMLElement & { _bound?: boolean })._bound = true;
         b.addEventListener('click', () => {
-            S.sessionFilter = b.dataset.sessFilter || 'all';
+            S.sessionFilter = (b as HTMLElement).dataset.sessFilter || 'all';
             document.querySelectorAll('.bank-sessions-chip').forEach((x) => {
                 x.classList.toggle('active', x === b);
             });

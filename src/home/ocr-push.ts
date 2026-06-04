@@ -32,7 +32,7 @@ function injectOcrPushButton() {
     // v118.34.34 · 只展示 enabled 的 endpoint · _erpEndpoints 是全局缓存.
     // DMS(2026-05-31):mrerp_dms 是身份证→订车单适配器 · 绝不出现在发票抽屉的
     // 「推送到 ERP」列表里(发票推 DMS = 数据错投)· 过滤掉。
-    const enabledEps = (window._erpEndpoints || _erpEndpoints || []).filter(function (ep) {
+    const enabledEps = (window._erpEndpoints || _erpEndpoints || []).filter(function (ep: any) {
         return ep && ep.enabled !== false && (ep.adapter || '').toLowerCase() !== 'mrerp_dms';
     });
 
@@ -86,7 +86,7 @@ function injectOcrPushButton() {
 }
 
 // v118.34.34 · 多 endpoint picker · 简单 popover · 复用 history-popover CSS.
-function openOcrPushPicker(anchor, historyId, enabledEps) {
+function openOcrPushPicker(anchor: HTMLElement, historyId: any, enabledEps: any[]) {
     // 先关掉已有 popover
     document.querySelectorAll('.drawer-push-picker').forEach((n) => n.remove());
 
@@ -100,7 +100,7 @@ function openOcrPushPicker(anchor, historyId, enabledEps) {
     pop.style.zIndex = '12000';
 
     const rows = enabledEps
-        .map(function (ep) {
+        .map(function (ep: any) {
             const name = escapeHtml(ep.name || ep.adapter || 'ERP');
             const adapter = escapeHtml((ep.adapter || '').toLowerCase());
             const isDef = ep.is_default;
@@ -131,14 +131,18 @@ function openOcrPushPicker(anchor, historyId, enabledEps) {
         pop.remove();
         document.removeEventListener('click', onDoc, true);
     };
-    const onDoc = (e) => {
-        if (!pop.contains(e.target) && e.target !== anchor && !anchor.contains(e.target))
+    const onDoc = (e: Event) => {
+        if (
+            !pop.contains(e.target as Node) &&
+            e.target !== anchor &&
+            !anchor.contains(e.target as Node)
+        )
             closePop();
     };
     setTimeout(() => document.addEventListener('click', onDoc, true), 0);
 
     pop.addEventListener('click', (e) => {
-        const b = e.target.closest('[data-ep-id]');
+        const b = (e.target as HTMLElement).closest('[data-ep-id]');
         if (!b) return;
         const epId = b.getAttribute('data-ep-id');
         closePop();
@@ -146,11 +150,11 @@ function openOcrPushPicker(anchor, historyId, enabledEps) {
     });
 }
 
-async function pushOcrToErp(historyId, endpointId) {
-    const btn = document.getElementById('drawer-ocr-push-btn');
+async function pushOcrToErp(historyId: any, endpointId: any) {
+    const btn = document.getElementById('drawer-ocr-push-btn') as HTMLButtonElement;
     if (btn) btn.disabled = true;
     try {
-        const body = { history_id: historyId };
+        const body: { history_id: any; endpoint_id?: any } = { history_id: historyId };
         if (endpointId) body.endpoint_id = endpointId;
         const resp = await fetch('/api/erp/push', {
             method: 'POST',
@@ -183,7 +187,7 @@ async function pushOcrToErp(historyId, endpointId) {
             showToast(t('erp-push-fail', { err: data.error_msg || 'unknown' }), 'fail');
         }
     } catch (e) {
-        showToast(t('erp-push-fail', { err: e.message }), 'fail');
+        showToast(t('erp-push-fail', { err: (e as Error).message }), 'fail');
     } finally {
         if (btn) btn.disabled = false;
     }

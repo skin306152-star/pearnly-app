@@ -17,7 +17,7 @@
     var _hasDms = false;
     var _dmsLoaded = false;
 
-    function _esc(s) {
+    function _esc(s: unknown) {
         return typeof escapeHtml === 'function'
             ? escapeHtml(s == null ? '' : String(s))
             : String(s == null ? '' : s);
@@ -53,7 +53,7 @@
         el.id = 'ocr-doc-mode';
         el.className = 'ocr-doc-mode';
         el.setAttribute('role', 'tablist');
-        el.style.cssText =
+        (el as HTMLElement).style.cssText =
             'display:none;gap:6px;margin:0 0 14px;padding:4px;border-radius:10px;' +
             'background:var(--bg,#f5f5f3);border:1px solid var(--line,#e5e5e0);width:fit-content;';
         if (head && head.parentNode) {
@@ -64,7 +64,7 @@
         return el;
     }
 
-    function _segBtn(mode, labelKey, active) {
+    function _segBtn(mode: string, labelKey: string, active: boolean) {
         return (
             '<button type="button" class="ocr-doc-seg' +
             (active ? ' active' : '') +
@@ -91,17 +91,17 @@
         if (!el) return;
         // No DMS endpoint → keep the control hidden, mode stays invoice.
         if (!_hasDms) {
-            el.style.display = 'none';
+            (el as HTMLElement).style.display = 'none';
             return;
         }
         var mode = _savedMode();
-        el.style.display = 'flex';
+        (el as HTMLElement).style.display = 'flex';
         el.innerHTML =
             _segBtn('invoice', 'ocr-mode-invoice', mode === 'invoice') +
             _segBtn('thai_id_card', 'ocr-mode-id-card', mode === 'thai_id_card');
     }
 
-    function _setMode(mode) {
+    function _setMode(mode: string) {
         try {
             localStorage.setItem(LS_KEY, mode === 'thai_id_card' ? 'thai_id_card' : 'invoice');
         } catch (e) {}
@@ -110,13 +110,13 @@
         try {
             document.dispatchEvent(
                 new CustomEvent('ocr-doc-mode-change', {
-                    detail: { mode: window.getOcrDocumentMode() },
+                    detail: { mode: window.getOcrDocumentMode!() },
                 })
             );
         } catch (e) {}
     }
 
-    async function _loadDmsEndpoints(force) {
+    async function _loadDmsEndpoints(force: boolean) {
         if (_dmsLoaded && !force) return;
         var tk = localStorage.getItem('mrpilot_token');
         if (!tk) return;
@@ -127,7 +127,7 @@
             if (!r.ok) return;
             var data = await r.json();
             var items = (data && data.items) || [];
-            _hasDms = items.some(function (ep) {
+            _hasDms = items.some(function (ep: { adapter?: string; enabled?: boolean }) {
                 return (
                     ep && (ep.adapter || '').toLowerCase() === 'mrerp_dms' && ep.enabled !== false
                 );
@@ -147,10 +147,10 @@
     };
 
     document.addEventListener('click', function (ev) {
-        var seg = ev.target.closest('.ocr-doc-seg');
+        var seg = (ev.target as HTMLElement).closest('.ocr-doc-seg');
         if (seg && seg.getAttribute('data-doc-mode')) {
             ev.preventDefault();
-            _setMode(seg.getAttribute('data-doc-mode'));
+            _setMode(seg.getAttribute('data-doc-mode')!);
         }
     });
 

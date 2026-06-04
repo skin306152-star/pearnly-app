@@ -50,6 +50,20 @@ declare function applyLang(lang: string): void;
 declare function renderSettings(): void;
 /** Open the history drawer for a given record id (history-drawer module). */
 declare function openHistoryDrawer(historyId: unknown): Promise<void>;
+/** Core fetch helpers (home.js). JSON payloads are untyped legacy → any. */
+declare function apiGet(url: string): Promise<any>;
+declare function apiPost(url: string, data?: unknown): Promise<any>;
+/** ERP page loaders (home.js / erp modules), reachable as bare names. */
+declare function loadErpLogs(silent?: boolean): Promise<void>;
+declare function loadErpTodayStats(): Promise<void>;
+declare function loadErpEndpoints(): Promise<void>;
+declare function loadTeamList(): Promise<void>;
+/** OCR upload helpers (home.js core). */
+declare function handleCameraImages(imageFiles: File[], source?: string): Promise<void>;
+declare function getMaxFiles(): number;
+/** ERP endpoints cache as a bare lexical global (mirrors window._erpEndpoints). */
+// eslint-disable-next-line no-var
+declare var _erpEndpoints: Array<{ id?: unknown; [key: string]: unknown }>;
 /** One OCR result row in the results drawer. Dynamic field bags are kept as
  *  Record; the index signature covers the many per-stage extras. */
 interface OcrResult {
@@ -161,6 +175,40 @@ interface Window {
     _glvClearPreviewSearch?: () => void;
     // DMS id-card result clear bridge
     clearDmsIdCardResult?: () => void;
+    // ── C5 批9 桥(exceptions / erp / recon / workspace / ocr-doc-mode 等遗留边界)──
+    // 零参/取值桥用精确类型;带参或多态的遗留桥用 (...args: any[]) => any 避免逆变失配。
+    loadExceptionsPage?: () => void;
+    refreshExcBadge?: () => void;
+    _refreshExcClientFilter?: () => void;
+    _excState?: Record<string, unknown>;
+    _rerenderExceptions?: () => void;
+    loadLearnedRules?: () => void;
+    getOcrDocumentMode?: () => string;
+    _refreshOcrDocMode?: () => void;
+    _dmsHasEndpoint?: boolean;
+    activateIntegrationsLogsTab?: () => void;
+    closeIntegrationDrawer?: () => void;
+    maybeShowOnboarding?: (...args: any[]) => any;
+    openAssignClientsModal?: (...args: any[]) => any;
+    __accessLogSearchTimer?: ReturnType<typeof setTimeout>;
+    _deleteBankSession?: (...args: any[]) => any;
+    _rerenderBankRecon?: () => void;
+    _openBankSession?: (...args: any[]) => any;
+    _bindErpBatchButtons?: () => void;
+    // 仅被本批文件调用(定义在别处)的遗留桥
+    _erpSelected?: Set<unknown>;
+    getActiveWorkspaceClientId?: () => unknown;
+    _erpExcState?: Record<string, unknown>;
+    renderWorkspaceControl?: () => void;
+    navigateTo?: (route: string) => void;
+    loadReconcilePage?: () => void;
+    enterPersonalMode?: () => void;
+    _rerenderErpExceptions?: () => void;
+    _reprocessFile?: (...args: any[]) => any;
+    _refreshErpEndpointsCache?: () => void;
+    _workspaceClientsCache?: unknown[];
+    loadErpLogs?: (silent?: boolean) => Promise<void>;
+    loadErpExceptions?: (append?: boolean) => Promise<void>;
 }
 
 // navigator.userAgentData (UA-CH) is not yet in the DOM lib; chrome-banner reads it.

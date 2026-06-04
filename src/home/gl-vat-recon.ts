@@ -1,6 +1,7 @@
 // ============================================================
 // REFACTOR-C1 (2026-05-27) · GL vs 销项税报告对账 gl-vat-recon 从 home.js 抽出为 ES module
 // REFACTOR-WB (2026-06-02) · STATE 入 store + 拆 6 子模块(store/helpers/upload/results/history/run)。
+// REFACTOR-C5 · 迁 TypeScript · _glvPreviewFiles 参数标注 + window 桥进 globals.d.ts(行为 verbatim)。
 // ============================================================
 import { STATE } from './glv-store.js';
 import { $, _renderKpi } from './glv-helpers.js';
@@ -56,6 +57,6 @@ window._glvRemoveFile = _removeFile;
 
 window.GlVatRecon = { ensureInit };
 // v118.35.0.3 · 让 preview panel(在另一个 IIFE)能拿到多文件 STATE
-window._glvPreviewFiles = function (kind) {
+window._glvPreviewFiles = function (kind: string) {
     return _glvFiles(kind === 'vat' ? 'vatFile' : 'glFile');
 };

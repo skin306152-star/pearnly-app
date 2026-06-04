@@ -24,4 +24,11 @@ declare var currentRoute: string;
 interface Window {
     startEnginePolling: () => void;
     stopEnginePolling: () => void;
+    // i18n switch bus (home.js core); optional — callers guard with typeof check.
+    subscribeI18n?: (key: string, rerender: () => void) => void;
+    // gl-vat-recon bridges
+    GlVatRecon: { ensureInit: () => void };
+    _loadGlvHistory: () => void;
+    _glvRemoveFile: (...args: unknown[]) => void;
+    _glvPreviewFiles: (kind: string) => unknown;
 }

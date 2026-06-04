@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>预览 · 死规则检查并入异常界面</title>
+    <style>
+      /* 真实 token,取自 home-01-base.css + home-19-exceptions-alerts.css */
+      :root {
+        --ink: #111111;
+        --ink-2: #555555;
+        --ink-3: #999999;
+        --ink-4: #cbd5e0;
+        --bg: #f4f4f0;
+        --card: #ffffff;
+        --line: #e8e8e3;
+        --line-soft: #f0f0eb;
+        --danger: #dc2626;
+        --danger-bg: #fee2e2;
+        --warn: #d97706;
+        --warn-bg: #fef3c7;
+        --success: #16a34a;
+        --success-bg: #dcfce7;
+        --blue: #2563eb;
+        --blue-hover: #1d4ed8;
+        --shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+        --shadow-lg: 0 10px 32px rgba(0, 0, 0, 0.08);
+        --mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", Roboto,
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .note {
+        background: #111;
+        color: #fff;
+        padding: 10px 18px;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .note b {
+        color: #ffd966;
+      }
+      .wrap {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 24px 20px 60px;
+      }
+      .page-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .page-head h1 {
+        font-size: 18px;
+        font-weight: 650;
+        margin: 0;
+      }
+      .page-head .sub {
+        font-size: 13px;
+        color: var(--ink-3);
+      }
+      .tag-new {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--blue);
+        background: #eaf1fe;
+        border: 1px solid #cfe0fc;
+        padding: 2px 7px;
+        border-radius: 6px;
+      }
+
+      /* KPI 行 */
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .kpi {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+      .kpi .v {
+        font: 700 26px var(--mono);
+        color: var(--ink);
+      }
+      .kpi .v.danger {
+        color: var(--danger);
+      }
+      .kpi .l {
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+
+      /* 状态 tab */
+      .tabs {
+        display: flex;
+        gap: 4px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 12px;
+      }
+      .tab {
+        padding: 9px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink-3);
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        margin-bottom: -1px;
+      }
+      .tab.on {
+        color: var(--ink);
+        border-bottom-color: var(--ink);
+      }
+      .tab .c {
+        font: inherit;
+        font-size: 11px;
+        background: var(--line-soft);
+        color: var(--ink-2);
+        border-radius: 9px;
+        padding: 1px 7px;
+        margin-left: 4px;
+      }
+
+      /* 筛选 chips */
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 14px;
+      }
+      .chip {
+        font-size: 12px;
+        padding: 5px 12px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink-2);
+        cursor: pointer;
+      }
+      .chip.on {
+        background: var(--ink);
+        color: #fff;
+        border-color: var(--ink);
+      }
+      .chip .c {
+        font-size: 11px;
+        opacity: 0.7;
+        margin-left: 3px;
+      }
+
+      /* 异常行 */
+      .row {
+        display: grid;
+        grid-template-columns: 18px 24px 1fr auto auto;
+        gap: 12px;
+        align-items: center;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-left-width: 3px;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: 0.15s;
+      }
+      .row:hover {
+        border-color: var(--ink);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow);
+      }
+      .row.high {
+        border-left-color: var(--danger);
+      }
+      .row.mid {
+        border-left-color: var(--warn);
+      }
+      .row.low {
+        border-left-color: var(--ink-3);
+      }
+      .cb {
+        width: 18px;
+        height: 18px;
+        border: 1.5px solid var(--ink-4);
+        border-radius: 4px;
+      }
+      .sevico {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 13px;
+      }
+      .row.high .sevico {
+        background: var(--danger-bg);
+      }
+      .row.mid .sevico {
+        background: var(--warn-bg);
+      }
+      .row.low .sevico {
+        background: var(--bg);
+      }
+      .rmain {
+        min-width: 0;
+      }
+      .rtitle {
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .rmeta {
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .rmeta b {
+        color: var(--ink-2);
+        font-family: var(--mono);
+        font-weight: 600;
+      }
+      .rule-badge {
+        font-size: 11px;
+        font-weight: 500;
+        padding: 3px 8px;
+        border-radius: 10px;
+      }
+      .rule-badge.high {
+        background: var(--danger-bg);
+        color: var(--danger);
+      }
+      .rule-badge.mid {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .rule-badge.low {
+        background: var(--bg);
+        color: var(--ink-3);
+      }
+      .amt {
+        font: 13px var(--mono);
+        color: var(--ink);
+        text-align: right;
+        white-space: nowrap;
+      }
+      .src-tag {
+        font-size: 10px;
+        color: var(--blue);
+        margin-left: 6px;
+      }
+
+      .hint {
+        font-size: 12px;
+        color: var(--ink-3);
+        margin: 14px 2px;
+      }
+      .openbtn {
+        font: inherit;
+        font-size: 13px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink-2);
+        cursor: pointer;
+      }
+
+      /* 抽屉 */
+      .scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.28);
+        display: none;
+      }
+      .scrim.open {
+        display: block;
+      }
+      .drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 760px;
+        max-width: 94vw;
+        background: var(--card);
+        box-shadow: var(--shadow-lg);
+        transform: translateX(100%);
+        transition: transform 0.22s ease;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
+      .drawer.open {
+        transform: none;
+      }
+      .dhead {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .dhead .t {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .dhead .s {
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-top: 3px;
+      }
+      .status-pill {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .dbody {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        overflow: hidden;
+      }
+      .pdfpane {
+        border-right: 1px solid var(--line);
+        background: var(--bg);
+        display: grid;
+        place-items: center;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+      .fieldpane {
+        padding: 18px 20px;
+        overflow-y: auto;
+      }
+      .sec-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        letter-spacing: 0.04em;
+        margin: 0 0 8px;
+      }
+      .why {
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--warn);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 22px;
+      }
+      .why .rname {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .drow {
+        display: flex;
+        justify-content: space-between;
+        font: 12px var(--mono);
+        padding: 4px 0;
+      }
+      .drow .k {
+        color: var(--ink-3);
+      }
+      .drow .bad {
+        color: var(--danger);
+        font-weight: 600;
+      }
+      .drow .good {
+        color: var(--success);
+      }
+      .frow2 {
+        display: grid;
+        grid-template-columns: 96px 1fr;
+        gap: 8px;
+        padding: 7px 0;
+        font-size: 13px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+      .frow2 .k {
+        color: var(--ink-3);
+      }
+      .frow2 .v {
+        font-family: var(--mono);
+      }
+      .dfoot {
+        padding: 12px 18px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+      .btn {
+        height: 38px;
+        padding: 0 16px;
+        border-radius: 9px;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid transparent;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: #6b7280;
+      }
+      .btn-ghost:hover {
+        background: #f0f1ee;
+      }
+      .btn-primary {
+        background: var(--blue);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: var(--blue-hover);
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+      }
+      @media (max-width: 640px) {
+        .kpis {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .dbody {
+          grid-template-columns: 1fr;
+        }
+        .pdfpane {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      <b>设计预览</b>(非真功能)。这是把新的<b>死规则检查</b>并入你<b>现有异常界面</b>的样子——
+      同一套列表/筛选/抽屉/放行-忽略,颜色沿用异常模块(选中黑、放行按钮蓝
+      <b>#2563eb</b>)。蓝色「新」标记只是这次给你看的标注,真实里不区分来源。
+      点任意一行 → 打开详情抽屉。
+    </div>
+
+    <div class="wrap">
+      <div class="page-head">
+        <h1>🧾 异常 / 待复核</h1>
+        <span class="sub">账套:ABC 贸易有限公司 · 同事共享</span>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="v">12</div><div class="l">待复核</div></div>
+        <div class="kpi"><div class="v danger">3</div><div class="l">高风险</div></div>
+        <div class="kpi"><div class="v">48</div><div class="l">已处理</div></div>
+        <div class="kpi"><div class="v">7</div><div class="l">已学习规则</div></div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab on">待复核<span class="c">12</span></div>
+        <div class="tab">已处理<span class="c">48</span></div>
+        <div class="tab">已忽略<span class="c">5</span></div>
+      </div>
+
+      <div class="chips">
+        <div class="chip on">全部<span class="c">12</span></div>
+        <div class="chip">低置信<span class="c">3</span></div>
+        <div class="chip">重复票<span class="c">2</span></div>
+        <div class="chip">VAT算术<span class="c">2</span></div>
+        <div class="chip">税号格式<span class="c">1</span></div>
+        <div class="chip">供应商名单<span class="c">1</span></div>
+        <div class="chip">合同上限<span class="c">1</span></div>
+      </div>
+
+      <!-- 列表:新死规则(蓝「新」)与现有 OCR 异常混在一起 -->
+      <div class="row high" onclick="openDrawer()">
+        <div class="cb"></div>
+        <div class="sevico">🔺</div>
+        <div class="rmain">
+          <div class="rtitle">ABC 贸易有限公司 · 发票A.pdf<span class="src-tag">● 新·死规则</span></div>
+          <div class="rmeta"><b>INV-2024-0891</b> · 2024-03-15</div>
+        </div>
+        <div class="rule-badge high">供应商需复核</div>
+        <div class="amt">฿ 35,080.00</div>
+      </div>
+
+      <div class="row mid" onclick="openDrawer()">
+        <div class="cb"></div>
+        <div class="sevico">●</div>
+        <div class="rmain">
+          <div class="rtitle">XYZ 商行 · 发票B.pdf<span class="src-tag">● 新·死规则</span></div>
+          <div class="rmeta"><b>INV-2024-0877</b> · 2024-03-12</div>
+        </div>
+        <div class="rule-badge mid">VAT算术</div>
+        <div class="amt">฿ 12,840.00</div>
+      </div>
+
+      <div class="row mid" onclick="openDrawer()">
+        <div class="cb"></div>
+        <div class="sevico">●</div>
+        <div class="rmain">
+          <div class="rtitle">某物流有限公司 · 发票C.pdf<span class="src-tag">● 新·死规则</span></div>
+          <div class="rmeta"><b>INV-2024-0863</b> · 2024-03-11</div>
+        </div>
+        <div class="rule-badge mid">税号格式</div>
+        <div class="amt">฿ 8,200.00</div>
+      </div>
+
+      <div class="row low" onclick="openDrawer()">
+        <div class="cb"></div>
+        <div class="sevico">ℹ</div>
+        <div class="rmain">
+          <div class="rtitle">利丰贸易 · 扫描件D.pdf</div>
+          <div class="rmeta"><b>—</b> · 2024-03-10</div>
+        </div>
+        <div class="rule-badge low">低置信</div>
+        <div class="amt">฿ 4,500.00</div>
+      </div>
+
+      <div class="row low" onclick="openDrawer()">
+        <div class="cb"></div>
+        <div class="sevico">ℹ</div>
+        <div class="rmain">
+          <div class="rtitle">ABC 贸易有限公司 · 发票E.pdf</div>
+          <div class="rmeta"><b>INV-2024-0855</b> · 2024-03-09</div>
+        </div>
+        <div class="rule-badge low">重复票</div>
+        <div class="amt">฿ 6,300.00</div>
+      </div>
+
+      <div class="hint">
+        ↑ 蓝「新·死规则」是这次新增的检查(VAT/税号/供应商/合同上限);其余(低置信、重复)是你
+        现有的 OCR 异常。它们在同一个列表里,同样可放行/忽略。 &nbsp;
+        <button class="openbtn" onclick="openDrawer()">打开一条详情抽屉看看 →</button>
+      </div>
+    </div>
+
+    <!-- 抽屉:点行打开,展示"为什么被拦"+ 放行/忽略 -->
+    <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+    <div class="drawer" id="drawer">
+      <div class="dhead">
+        <div>
+          <div class="t">发票B.pdf</div>
+          <div class="s">XYZ 商行 · INV-2024-0877 · 2024-03-12</div>
+        </div>
+        <span class="status-pill">待复核</span>
+      </div>
+      <div class="dbody">
+        <div class="pdfpane">📄 发票原件预览</div>
+        <div class="fieldpane">
+          <p class="sec-title">为什么被拦</p>
+          <div class="why">
+            <div class="rname">VAT 算术对不上</div>
+            <div class="drow"><span class="k">小计</span><span>12,000.00</span></div>
+            <div class="drow"><span class="k">VAT 7% 应为</span><span class="good">840.00 ✓</span></div>
+            <div class="drow"><span class="k">票面 VAT</span><span class="bad">80.00 ✗</span></div>
+            <div class="drow"><span class="k">命中规则</span><span>R-VAT-01</span></div>
+          </div>
+          <p class="sec-title">识别字段</p>
+          <div class="frow2"><span class="k">卖方</span><span class="v">XYZ 商行</span></div>
+          <div class="frow2"><span class="k">税号</span><span class="v">0107561009876</span></div>
+          <div class="frow2"><span class="k">发票号</span><span class="v">INV-2024-0877</span></div>
+          <div class="frow2"><span class="k">小计</span><span class="v">12,000.00</span></div>
+          <div class="frow2"><span class="k">VAT</span><span class="v" style="color: var(--danger)">80.00</span></div>
+          <div class="frow2"><span class="k">合计</span><span class="v">12,840.00</span></div>
+        </div>
+      </div>
+      <div class="dfoot">
+        <button class="btn btn-ghost">⊘ 永远忽略此类</button>
+        <button class="btn btn-primary">✓ 确认放行</button>
+      </div>
+    </div>
+
+    <script>
+      function openDrawer() {
+        document.getElementById("scrim").classList.add("open");
+        document.getElementById("drawer").classList.add("open");
+      }
+      function closeDrawer() {
+        document.getElementById("scrim").classList.remove("open");
+        document.getElementById("drawer").classList.remove("open");
+      }
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeDrawer();
+      });
+    </script>
+  </body>
+</html>

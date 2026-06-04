@@ -77,6 +77,7 @@ class MainHostProvider(HostProvider):
         _safe_path(key).unlink(missing_ok=True)
 
     def charge_credits(self, tenant_id: Optional[str], kind: str, amount: int, meta: dict) -> None:
-        # Knowledge/RAG usage is metered but not billed yet (product decision
-        # 2026-06-04); record usage for later pricing without deducting credits.
+        # Metered, not billed (product decision 2026-06-04). Log-only placeholder:
+        # a durable usage sink (e.g. a usage_events row) is a follow-up before GA —
+        # rotated logs alone cannot reconstruct billing.
         logger.info("knowledge usage tenant=%s kind=%s amount=%s", tenant_id, kind, amount)

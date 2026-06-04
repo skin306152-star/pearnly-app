@@ -5,7 +5,7 @@
 // v118.27.0.1 · 全局确认弹窗(替代原生 confirm · 跟 Pearnly 整体 UI 一致)
 // 用法:pearnlyConfirm(消息, 标题?).then(ok => { if (ok) { ... } })
 // ============================================================
-window.pearnlyConfirm = function (message, title) {
+window.pearnlyConfirm = function (message: string, title?: string) {
     return new Promise(function (resolve) {
         const overlay = document.getElementById('pearnly-confirm-modal');
         const titleEl = document.getElementById('pearnly-confirm-title');
@@ -24,12 +24,12 @@ window.pearnlyConfirm = function (message, title) {
         }
         msgEl.textContent = message || '';
         overlay.style.display = 'flex';
-        function cleanup(result) {
-            overlay.style.display = 'none';
-            okBtn.removeEventListener('click', onOk);
-            cancelBtn.removeEventListener('click', onCancel);
+        function cleanup(result: boolean) {
+            overlay!.style.display = 'none';
+            okBtn!.removeEventListener('click', onOk);
+            cancelBtn!.removeEventListener('click', onCancel);
             if (closeBtn) closeBtn.removeEventListener('click', onCancel);
-            overlay.removeEventListener('click', onBgClick);
+            overlay!.removeEventListener('click', onBgClick);
             document.removeEventListener('keydown', onKey);
             resolve(result);
         }
@@ -39,10 +39,10 @@ window.pearnlyConfirm = function (message, title) {
         function onCancel() {
             cleanup(false);
         }
-        function onBgClick(ev) {
+        function onBgClick(ev: Event) {
             if (ev.target === overlay) cleanup(false);
         }
-        function onKey(ev) {
+        function onKey(ev: KeyboardEvent) {
             if (ev.key === 'Escape') cleanup(false);
             else if (ev.key === 'Enter') cleanup(true);
         }

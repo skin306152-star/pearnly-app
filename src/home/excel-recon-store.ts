@@ -8,17 +8,21 @@ const MAX_REP = 30;
 //   后端发票侧/报告侧都已能解析这些格式(报告 parse_vat_report 全格式 · 发票走 pipeline)。
 const ALLOWED_EXT = /\.(pdf|jpe?g|png|webp|tiff?|xlsx?|xlsm|csv|tsv|docx?)$/i;
 
-const $ = (id) => document.getElementById(id);
+const $ = (id: string) => document.getElementById(id);
 function _authHeader() {
     return { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
 }
-function _esc(s) {
-    return String(s == null ? '' : s).replace(
-        /[&<>"']/g,
-        (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
-    );
+function _esc(s: unknown) {
+    const map: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+    };
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => map[c]);
 }
-function _fmtSize(b) {
+function _fmtSize(b: number) {
     if (b < 1024) return b + ' B';
     if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
     return (b / 1024 / 1024).toFixed(1) + ' MB';

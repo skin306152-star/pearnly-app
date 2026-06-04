@@ -10,34 +10,34 @@
  * 全部纯函数 · 调用点都在函数 / handler 内 · 无引导期裸调风险。
  */
 
-function isSuperAdmin(u) {
+function isSuperAdmin(u?: AppUser | null) {
     u = u || _userInfo;
     return !!(u && u.is_super_admin);
 }
-function isOwner(u) {
+function isOwner(u?: AppUser | null) {
     u = u || _userInfo;
     return !!u && (u.role === 'owner' || isSuperAdmin(u));
 }
-function isEmployee(u) {
+function isEmployee(u?: AppUser | null) {
     u = u || _userInfo;
     return !!u && u.role === 'member' && !isSuperAdmin(u);
 }
-function isTrial(u) {
+function isTrial(u?: AppUser | null) {
     u = u || _userInfo;
     return !!u && (u.effective_plan === 'trial' || u.plan === 'trial') && !isSuperAdmin(u);
 }
-function isLifetime(u) {
+function isLifetime(u?: AppUser | null) {
     u = u || _userInfo;
     return !!u && u.tenant_type === 'byo_api';
 }
 // 钱相关 UI 是否应该隐藏(员工就该看不到)· 这是核心铁律 · v118.12 主菜
-function shouldHideMoney(u) {
+function shouldHideMoney(u?: AppUser | null) {
     return isEmployee(u);
 }
-function canManageTeam(u) {
+function canManageTeam(u?: AppUser | null) {
     return isOwner(u);
 }
-function canManageApiKey(u) {
+function canManageApiKey(u?: AppUser | null) {
     return isOwner(u) && isLifetime(u);
 }
 

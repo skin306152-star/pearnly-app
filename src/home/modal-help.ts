@@ -50,10 +50,10 @@ function _injectHelpModal() {
     if (!host || host.children.length) return;
     host.innerHTML = HELP_MODAL_HTML;
     const lang = window._currentLang || 'th';
-    const dict = (window.I18N && window.I18N[lang]) || {};
+    const dict: Record<string, string> = (window.I18N && window.I18N[lang]) || {};
     host.querySelectorAll('[data-i18n]').forEach((el) => {
         const k = el.getAttribute('data-i18n');
-        if (dict[k]) el.textContent = dict[k];
+        if (k && dict[k]) el.textContent = dict[k];
     });
 }
 

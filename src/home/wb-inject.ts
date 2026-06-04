@@ -4,7 +4,7 @@
 // 本助手统一「注入 innerHTML + 子树初译」逻辑(原先各模块各抄一份)。
 // 注入幂等(dataset.wbInjected 哨兵);子树初译镜像 applyLang,读 window.I18N/_currentLang,
 // boot applyLang 已跑过,切语言由 applyLang 全文扫描覆盖,故初译失败不致命。
-export function wbInject(id, html) {
+export function wbInject(id: string, html: string) {
     const m = document.getElementById(id);
     if (!m || m.dataset.wbInjected === '1') return;
     m.innerHTML = html;
@@ -15,13 +15,13 @@ export function wbInject(id, html) {
         if (!I || !I[lang]) return;
         m.querySelectorAll('[data-i18n]').forEach((el) => {
             const k = el.getAttribute('data-i18n');
-            if (I[lang][k]) el.textContent = I[lang][k];
+            if (k && I[lang][k]) el.textContent = I[lang][k];
         });
         m.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
             const k = el.getAttribute('data-i18n-placeholder');
-            if (I[lang][k]) el.placeholder = I[lang][k];
+            if (k && I[lang][k]) (el as HTMLInputElement).placeholder = I[lang][k];
         });
-    } catch (e) {
+    } catch {
         // 初译失败不致命,切语言会补
     }
 }

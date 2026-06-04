@@ -10,11 +10,11 @@
 // 同 PR 删 home.js 死码 loadAutomationPage(automation route 不在 VALID_ROUTES · 全仓 0 外部调用点)。
 // ============================================================
 
-function switchAutomationTab(tabKey) {
-    document.querySelectorAll('.auto-nav-item').forEach((item) => {
+function switchAutomationTab(tabKey: string) {
+    document.querySelectorAll<HTMLElement>('.auto-nav-item').forEach((item) => {
         item.classList.toggle('active', item.dataset.autoTab === tabKey);
     });
-    document.querySelectorAll('.auto-panel').forEach((panel) => {
+    document.querySelectorAll<HTMLElement>('.auto-panel').forEach((panel) => {
         panel.classList.toggle('active', panel.dataset.autoPanel === tabKey);
     });
     // v0.17 · M6 · 邮箱抓取 tab 首次进入时拉数据

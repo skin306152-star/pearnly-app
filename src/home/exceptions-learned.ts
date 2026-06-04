@@ -25,9 +25,15 @@ async function loadLearnedRules() {
             <path d="M3 4h8M5.5 4V2.5h3V4M4 4l0.6 8.5h4.8L10 4"/>
         </svg>`;
         wrap.innerHTML = items
-            .map((it) => {
-                const ruleLabel = t('exc-rule-' + it.rule_code) || it.rule_code;
-                return `
+            .map(
+                (it: {
+                    id: unknown;
+                    rule_code: string;
+                    seller_name: unknown;
+                    created_at: unknown;
+                }) => {
+                    const ruleLabel = t('exc-rule-' + it.rule_code) || it.rule_code;
+                    return `
                 <div class="learned-row" data-wl-id="${escapeHtml(String(it.id))}">
                     <div class="learned-seller" title="${escapeHtml(it.seller_name)}">${escapeHtml(it.seller_name)}</div>
                     <div class="learned-rule">${escapeHtml(ruleLabel)}</div>
@@ -35,7 +41,8 @@ async function loadLearnedRules() {
                     <button class="learned-del-btn" data-del-wl="${escapeHtml(String(it.id))}" title="${escapeHtml(t('set-learned-del'))}" type="button">${trashSvg}</button>
                 </div>
             `;
-            })
+                }
+            )
             .join('');
     } catch (e) {
         console.warn('loadLearnedRules fail', e);

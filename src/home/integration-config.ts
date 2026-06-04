@@ -9,7 +9,7 @@
 // v118.32.5.5.37 NAV-IA Phase 5 收尾 · 集成页「配置」按钮 → 右侧抽屉(不再跳 automation 路由)
 // anchor→drawer tab 映射(google-drive/sheets 走原 inline 展开 · 不拦截)
 (function () {
-    const _anchorMap = {
+    const _anchorMap: Record<string, string> = {
         line: 'line',
         folder: 'folder',
         gmail: 'email',
@@ -17,12 +17,12 @@
         alert: 'alert',
     };
     document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.int-btn-configure');
+        const btn = (e.target as HTMLElement).closest('.int-btn-configure');
         if (!btn) return;
-        const row = btn.closest('.integration-row');
+        const row = btn.closest<HTMLElement>('.integration-row');
         const anchor = row ? row.dataset.intAnchor : null;
         if (anchor && _anchorMap[anchor]) {
-            const nameEl = row.querySelector('.int-name');
+            const nameEl = row!.querySelector<HTMLElement>('.int-name');
             const title = nameEl ? (nameEl.textContent || nameEl.innerText || '').trim() : '配置';
             if (typeof window.openIntegrationDrawer === 'function') {
                 window.openIntegrationDrawer(_anchorMap[anchor], title);

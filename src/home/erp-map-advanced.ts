@@ -28,7 +28,7 @@
     }
 
     document.addEventListener('click', function (ev) {
-        const btn = ev.target.closest('#erp-map-show-advanced-btn');
+        const btn = (ev.target as HTMLElement).closest('#erp-map-show-advanced-btn');
         if (!btn) return;
         ev.preventDefault();
         const subtabs = document.getElementById('erp-map-subtabs');
@@ -41,7 +41,7 @@
                 '.erp-map-subtab.active.erp-map-subtab-advanced'
             );
             if (activeBtn) {
-                const clientBtn = subtabs.querySelector(
+                const clientBtn = subtabs.querySelector<HTMLElement>(
                     '.erp-map-subtab[data-erp-subtab="clients"]'
                 );
                 if (clientBtn) clientBtn.click();

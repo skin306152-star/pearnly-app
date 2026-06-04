@@ -5,13 +5,13 @@
 // v118.10 · 设置页 · tab 点击绑定 + 持久化恢复
 (function initSettingsTabs() {
     function bind() {
-        const tabs = document.querySelectorAll('.settings-tab');
+        const tabs = document.querySelectorAll<HTMLElement>('.settings-tab');
         if (!tabs.length) {
             setTimeout(bind, 200);
             return;
         }
         tabs.forEach((t) => {
-            t.addEventListener('click', () => switchSettingsTab(t.dataset.tab));
+            t.addEventListener('click', () => switchSettingsTab(t.dataset.tab!));
         });
         // 恢复上次 tab(若 tab 因权限隐藏 · 退回 profile)
         let saved = null;
@@ -19,7 +19,9 @@
             saved = localStorage.getItem('mrpilot_settings_tab');
         } catch (e) {}
         if (saved) {
-            const target = document.querySelector(`.settings-tab[data-tab="${saved}"]`);
+            const target = document.querySelector<HTMLElement>(
+                `.settings-tab[data-tab="${saved}"]`
+            );
             if (target && target.style.display !== 'none') {
                 switchSettingsTab(saved);
                 return;

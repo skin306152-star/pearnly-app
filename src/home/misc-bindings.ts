@@ -4,7 +4,7 @@
 
 // 全局 data-upgrade 按钮 · v0.15 不再触发升级窗 · 静默忽略
 document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-upgrade]');
+    const el = (e.target as HTMLElement).closest('[data-upgrade]');
     if (el) {
         e.preventDefault();
         // no-op · 以前会弹升级窗

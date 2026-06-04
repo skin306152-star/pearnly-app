@@ -24,11 +24,11 @@ import { AUTO_HTML_2 } from './page-automation-panes-2.js'; // REFACTOR-WB-C1 ·
         if (I && I[lang]) {
             sec.querySelectorAll('[data-i18n]').forEach((el) => {
                 const k = el.getAttribute('data-i18n');
-                if (I[lang][k]) el.textContent = I[lang][k];
+                if (k && I[lang][k]) el.textContent = I[lang][k];
             });
             sec.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
                 const k = el.getAttribute('data-i18n-placeholder');
-                if (I[lang][k]) el.placeholder = I[lang][k];
+                if (k && I[lang][k]) (el as HTMLInputElement).placeholder = I[lang][k];
             });
         }
     } catch (e) {

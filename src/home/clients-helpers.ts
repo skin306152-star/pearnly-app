@@ -6,7 +6,7 @@
 function authH() {
     return { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
 }
-async function apiClient(path, opts = {}) {
+async function apiClient(path: string, opts: RequestInit = {}) {
     const r = await fetch(path, {
         ...opts,
         headers: { 'Content-Type': 'application/json', ...authH(), ...(opts.headers || {}) },
@@ -19,16 +19,19 @@ async function apiClient(path, opts = {}) {
 }
 
 function getActiveColor() {
-    const sel = document.querySelector('#client-color-picker .color-swatch.active');
+    const sel = document.querySelector<HTMLElement>('#client-color-picker .color-swatch.active');
     return sel ? sel.dataset.color : '#111111';
 }
 
-function _updateLearnedBadge(n) {
+function _updateLearnedBadge(n: number) {
     const tag = document.getElementById('drawer-cat-learned-tag');
     if (!tag) return;
     // 如果有学过的供应商映射 · badge 显示「已学 N」 · 否则保持「自动建议」默认
     if (n > 0) {
-        tag.textContent = (t('drawer-suggest-learned-with-count') || '已学 {n}').replace('{n}', n);
+        tag.textContent = (t('drawer-suggest-learned-with-count') || '已学 {n}').replace(
+            '{n}',
+            String(n)
+        );
     }
 }
 

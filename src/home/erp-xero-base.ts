@@ -6,17 +6,22 @@
 // ============================================================
 /* global escapeHtml, _results, _drawerIdx */
 
-export const S = {
+interface XeroBaseState {
+    status: Record<string, unknown> | null;
+    statusLoaded: boolean;
+    bound: boolean;
+}
+export const S: XeroBaseState = {
     status: null,
     statusLoaded: false,
     bound: false,
 };
-function _esc(s) {
+function _esc(s: unknown) {
     return typeof escapeHtml === 'function'
         ? escapeHtml(s == null ? '' : String(s))
         : String(s == null ? '' : s);
 }
-function _toast(msg, kind) {
+function _toast(msg: string, kind?: string) {
     try {
         if (typeof showToast === 'function') showToast(msg, kind || 'info');
     } catch (e) {}
@@ -38,13 +43,13 @@ function _getCurrentHistory() {
     }
 }
 
-function _isHistoryExceptional(h) {
+function _isHistoryExceptional(h: Record<string, unknown> | null) {
     if (!h) return false;
     const st = String(h.status || '').toLowerCase();
     return st === 'exception' || st === 'exception_pending' || st === 'rejected';
 }
 
-async function _loadStatus(force) {
+async function _loadStatus(force?: boolean) {
     if (S.statusLoaded && !force) return S.status;
     const tk = localStorage.getItem('mrpilot_token');
     if (!tk) return null;

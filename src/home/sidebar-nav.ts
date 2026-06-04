@@ -9,7 +9,7 @@ const SIDEBAR_COLLAPSED_KEY = 'mrpilot_sidebar_collapsed';
 if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1') {
     document.body.classList.add('sidebar-collapsed');
 }
-document.getElementById('sidebar-toggle').addEventListener('click', () => {
+document.getElementById('sidebar-toggle')!.addEventListener('click', () => {
     if (window.innerWidth <= 768) {
         document.body.classList.toggle('sidebar-open');
     } else {
@@ -35,14 +35,14 @@ window.addEventListener('hashchange', () => {
     routeTo(r);
 });
 
-document.querySelectorAll('.nav-item').forEach((item) => {
+document.querySelectorAll<HTMLElement>('.nav-item').forEach((item) => {
     item.addEventListener('click', () => {
         // v0.15 · 「即将」菜单项(data-locked="1")给 toast · 不切路由
         if (item.dataset.locked === '1') {
             showToast(t('feature-coming-soon'), 'info');
             return;
         }
-        routeTo(item.dataset.route);
+        routeTo(item.dataset.route!);
     });
 });
 

@@ -214,6 +214,24 @@ app.include_router(line_webhook_router)  # REFACTOR-B1 · LINE Bot webhook · 20
 app.include_router(login_router)  # REFACTOR-B1 · 主登录 · 2026-05-28
 app.include_router(meta_aliases_router)  # REFACTOR-B1 · /api/version + v1 OCR 别名 · 2026-05-28
 app.include_router(ocr_export_router)  # REFACTOR-B1 · OCR 配额+导出 4 路由 · 2026-05-28
+
+# 知识库(RAG + 死规则检查)· 从 pearnly-knowledge 沙盒迁入。
+# KNOWLEDGE_ENABLED 默认未设 → 路由不挂载(线上隐身 · 现有用户零影响);
+# 仅挂载时注册真实 host provider,让契约层有真实后端接线。
+if os.environ.get("KNOWLEDGE_ENABLED") == "1":
+    from services.knowledge import contract as _kb_contract
+    from services.knowledge.host_provider import MainHostProvider
+    from routes.knowledge_routes import router as knowledge_router
+    from routes.knowledge_rules_routes import router as knowledge_rules_router
+    from routes.knowledge_ask_routes import router as knowledge_ask_router
+    from routes.knowledge_risk_routes import router as knowledge_risk_router
+
+    _kb_contract.use_provider(MainHostProvider())
+    app.include_router(knowledge_router)
+    app.include_router(knowledge_rules_router)
+    app.include_router(knowledge_ask_router)
+    app.include_router(knowledge_risk_router)
+    logger.info("knowledge base routes mounted (KNOWLEDGE_ENABLED=1)")
 # v118.35.0.28 P0-04 CORS 收紧 (体检 2026-05-21):
 # 旧 allow_origins=["*"] + allow_credentials=True 浏览器会自动拒绝凭据请求,
 # 但无凭据跨域 fetch 仍放行 · 收紧到生产白名单 + env 覆盖 + dev 自动放 localhost

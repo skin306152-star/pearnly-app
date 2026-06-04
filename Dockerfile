@@ -8,21 +8,13 @@
 # Python 版本与 CI 对齐(.github/workflows/ci.yml · 3.11)· lock 文件由
 # pip-compile 在 3.10 生成 · CI 用 3.11 装且全绿 · 这里沿用 3.11。
 #
-# ⚠️ 体积提示:依赖含 torch / torchvision / easyocr / opencv / scipy 等 ML 栈 ·
-#    首次 build 要下载数 GB · 镜像约 5-7 GB · 属预期。减体积方案见
-#    docs/refactor/adr-003-docker-env.md(可选 CPU-only torch)。
+# 体积:2026-06-04 删 easyocr 死栈(全仓库零 import · 经它拽进 torch/torchvision/
+#    opencv/scipy/numpy 整棵 ML 栈)→ 镜像 5-7 GB 降到数百 MB。OCR 走 Gemini 云端。
+# 现存依赖全是 manylinux 预编译 wheel(lxml/pillow/cryptography/psycopg2-binary 等
+#    自带运行时库)· 无需任何系统 apt 包 · 也无需编译工具链。
 # ============================================================
 
 FROM python:3.11-slim
-
-# ── 系统运行时依赖 ──────────────────────────────────────────
-# libglib2.0-0 : opencv-python-headless 运行时需要
-# libgomp1     : torch / scipy 的 OpenMP runtime
-# 不装编译工具链:lock 里的包都是 manylinux 预编译 wheel · 无需 gcc。
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libglib2.0-0 \
-        libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

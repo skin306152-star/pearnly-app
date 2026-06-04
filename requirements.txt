@@ -96,7 +96,9 @@ Pillow==12.2.0
 # ============================================================
 # === OCR / AI ===
 # ============================================================
-easyocr==1.7.2
+# 注:OCR 走 Gemini 云端(google-generativeai)· 不用本地 easyocr。
+# 2026-06-04 删 easyocr==1.7.2:全仓库零 import · 仅拖累镜像(拽 torch/torchvision/
+# opencv/scipy/numpy 整棵 ML 栈 · 镜像 5-7GB → 数百 MB)。见 STATE / adr-003。
 openai==2.32.0
 google-generativeai
 

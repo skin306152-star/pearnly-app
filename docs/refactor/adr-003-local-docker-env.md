@@ -95,12 +95,12 @@ docker compose down -v         # 连数据卷一起删(重置本地 DB)
 
 ## ⚠️ 已知坑 / 约束
 
-1. **镜像大(~5-7 GB)**:依赖含 `torch / torchvision / easyocr / opencv / scipy` ML 栈 ·
-   首次 build 要下载数 GB · 慢属正常。这是 OCR 引擎的代价 · 与 prod 一致。
-2. **CPU torch 减体积(可选进阶)**:lock 钉死 `torch==2.12.0`(PyPI manylinux 含 CUDA)。
-   若要瘦身可改用 PyTorch CPU index(`https://download.pytorch.org/whl/cpu`)·
-   但 CPU wheel 版本号带 `+cpu` 后缀 · 与 lock pin 不完全匹配 · 需单独处理 ·
-   暂不做(CI 已验证 CUDA 版能跑 CPU 推理)。
+1. ~~**镜像大(~5-7 GB)**:依赖含 torch/torchvision/easyocr/opencv/scipy ML 栈~~
+   **✅ 2026-06-04 已解决**:删 `easyocr==1.7.2`(requirements.txt 唯一直接声明 · 全仓库
+   零 import · OCR 早已全走 Gemini 云端)→ 经它拽进的整棵 torch/torchvision/opencv/scipy/
+   numpy/scikit-image 子树(lock 299→229 行 · 删 23 包)随之消失 → 镜像 5-7 GB 降到数百 MB。
+   Dockerfile 同步去掉 `libglib2.0-0`(opencv 用)+ `libgomp1`(torch/scipy OpenMP)。
+   ~~2. CPU torch 减体积(可选进阶)~~:torch 已整棵删除 · 此项作废,无需再考虑 CPU wheel。
 3. **playwright chromium 默认不装**:MR.ERP 集成需要 · 与 prod 一致(prod 走
    `/internal/install-playwright` 单独装)。本地要测 ERP 推送:
    `docker compose exec app python -m playwright install --with-deps chromium`。

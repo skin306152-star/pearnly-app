@@ -14,7 +14,7 @@
   - **工具链**:`tsconfig`(strict+bundler+allowJs/checkJs:false+noEmit)· `npm run typecheck` · 共享类型集中 `src/types/globals.d.ts`(ambient 全局 + Window 桥一大批 + AppUser/SelectedFile/OcrResult/HistoryState 等)。守门:check_file_size/ratchet 纳 `src/home/**/*.ts` + pre-push typecheck 闸。
   - **打法 + 五大坑全文**:见记忆 [[c5-typescript-migration-playbook]](收官打法/脚本全局碰撞/逆变/跨文件签名/esbuild改名重排+size硬闸)。
 - **未提交残留**:无(全 push + 9 道闸绿 + prod 200)。
-- **遗留(留专窗口 · 非阻塞)**:① globals.d.ts 遗留桥的 `(...args:any[])=>any`/动态 JSON 显式 `:any`(未迁 home.js 边界的合理松类型)· ② 12 处 `@ts-expect-error TS6133`(真死只写占位 · 删会改 emit)· ③ i18n 子树补译块跨 6+ 文件重复 → 抽 `applyI18nPlaceholders` 共享 helper(超 verbatim · 留 C-dedup)· ④ CI ci.yml 未加 typecheck step(缺 workflow OAuth scope · 靠 pre-push 兜底)。
+- **遗留(留专窗口 · 非阻塞)**:① globals.d.ts 遗留桥的 `(...args:any[])=>any`/动态 JSON 显式 `:any`(未迁 home.js 边界的合理松类型)· ② 14 处 `@ts-expect-error TS6133`(真死只写占位 · 删会改 emit)· ③ i18n 子树补译块跨 6+ 文件重复 → 抽 `applyI18nPlaceholders` 共享 helper(超 verbatim · 留 C-dedup)· ④ CI ci.yml 未加 typecheck step(缺 workflow OAuth scope · 靠 pre-push 兜底)。
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->
 <!-- 新窗口:读上面状态卡 + 跑 scripts/refactor_progress.py 就能开工 -->

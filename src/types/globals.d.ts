@@ -5,6 +5,11 @@
 // loosely on purpose: the legacy surface is untyped and gets tightened per batch
 // as modules migrate to TypeScript.
 
+/** Multi-arg/polymorphic legacy bridge whose exact signature isn't worth pinning
+ *  (home.js still owns the implementation). Bivariant on purpose to dodge
+ *  strictFunctionTypes contravariance when migrated modules assign concrete fns. */
+type LegacyBridge = (...args: any[]) => any;
+
 /** i18n lookup; returns the translated string for the active language. */
 declare function t(key: string, ...args: unknown[]): string;
 
@@ -209,7 +214,7 @@ interface Window {
     // DMS id-card result clear bridge
     clearDmsIdCardResult?: () => void;
     // ── C5 批9 桥(exceptions / erp / recon / workspace / ocr-doc-mode 等遗留边界)──
-    // 零参/取值桥用精确类型;带参或多态的遗留桥用 (...args: any[]) => any 避免逆变失配。
+    // 零参/取值桥用精确类型;带参或多态的遗留桥用 LegacyBridge 避免逆变失配。
     loadExceptionsPage?: () => void;
     refreshExcBadge?: () => void;
     _refreshExcClientFilter?: () => void;
@@ -221,12 +226,12 @@ interface Window {
     _dmsHasEndpoint?: boolean;
     activateIntegrationsLogsTab?: () => void;
     closeIntegrationDrawer?: () => void;
-    maybeShowOnboarding?: (...args: any[]) => any;
-    openAssignClientsModal?: (...args: any[]) => any;
+    maybeShowOnboarding?: LegacyBridge;
+    openAssignClientsModal?: LegacyBridge;
     __accessLogSearchTimer?: ReturnType<typeof setTimeout>;
-    _deleteBankSession?: (...args: any[]) => any;
+    _deleteBankSession?: LegacyBridge;
     _rerenderBankRecon?: () => void;
-    _openBankSession?: (...args: any[]) => any;
+    _openBankSession?: LegacyBridge;
     _bindErpBatchButtons?: () => void;
     // 仅被本批文件调用(定义在别处)的遗留桥
     _erpSelected?: Set<unknown>;
@@ -237,7 +242,7 @@ interface Window {
     loadReconcilePage?: () => void;
     enterPersonalMode?: () => void;
     _rerenderErpExceptions?: () => void;
-    _reprocessFile?: (...args: any[]) => any;
+    _reprocessFile?: LegacyBridge;
     _refreshErpEndpointsCache?: () => void;
     _workspaceClientsCache?: unknown[];
     loadErpLogs?: (silent?: boolean) => Promise<void>;
@@ -246,13 +251,13 @@ interface Window {
     __i18nSubs?: unknown[];
     getCurrentClientId?: () => unknown;
     _tcOnNewLog?: (entry: unknown) => void;
-    _onVexResultShown?: (...args: any[]) => any;
-    _fillVexSummary?: (...args: any[]) => any;
-    _fillVexDetail?: (...args: any[]) => any;
-    retryPushLog?: (...args: any[]) => any;
+    _onVexResultShown?: LegacyBridge;
+    _fillVexSummary?: LegacyBridge;
+    _fillVexDetail?: LegacyBridge;
+    retryPushLog?: LegacyBridge;
     _vexLastTask?: Record<string, unknown> | null;
     _quota?: Record<string, unknown> | null;
-    _pearnlyTcPush?: (...args: any[]) => any;
+    _pearnlyTcPush?: LegacyBridge;
     _pearnlyTcLogs?: unknown[];
     _historyState?: HistoryState;
     _historySelected?: Set<unknown>;
@@ -261,23 +266,23 @@ interface Window {
     _refreshClientSwitcher?: () => void;
     ReconMapping?: { show: (...args: any[]) => void; [key: string]: unknown };
     ReconReview?: { show: (...args: any[]) => void; [key: string]: unknown };
-    bindDrawerClient?: (...args: any[]) => any;
+    bindDrawerClient?: LegacyBridge;
     _planState?: Record<string, unknown> | null;
-    _erpExcOpenEdit?: (...args: any[]) => any;
+    _erpExcOpenEdit?: LegacyBridge;
     _brv2LoadHistory?: () => void;
-    setActiveWorkspaceClientId?: (...args: any[]) => any;
-    openClientExportModal?: (...args: any[]) => any;
+    setActiveWorkspaceClientId?: LegacyBridge;
+    openClientExportModal?: LegacyBridge;
     loadRecentTasks?: () => void;
     _rerenderReconcile?: () => void;
     __reconcileBound?: boolean;
-    setCurrentClientId?: (...args: any[]) => any;
+    setCurrentClientId?: LegacyBridge;
     loadTestCenterPage?: () => void;
     loadClientsPage?: () => void;
     getHistoryClientFilter?: () => unknown;
     fillCategoryDatalist?: () => void;
     _tcApplyVisibility?: () => void;
     _rerenderNotifications?: () => void;
-    _loadBankReconV2Panel?: (...args: any[]) => any;
+    _loadBankReconV2Panel?: LegacyBridge;
     PEARNLY_ADMIN_MODE?: boolean;
     // ── C5 批12 桥(ocr/folder/erp/billing/avatar/workspace/archive/email 遗留边界)──
     _ocrCtrls?: Set<AbortController>;
@@ -288,20 +293,20 @@ interface Window {
     __langSyncCtrl?: AbortController | null;
     showDirectoryPicker?: (opts?: { mode?: string; startIn?: string }) => Promise<any>;
     closeCmdk?: () => void;
-    openCmdk?: (...args: any[]) => any;
+    openCmdk?: LegacyBridge;
     _closeAvatarPopup?: () => void;
-    openWorkspaceChooserUI?: (...args: any[]) => any;
-    openWorkspaceChooser?: (...args: any[]) => any;
-    requireWorkspace?: (...args: any[]) => any;
-    fetchWorkspaceClients?: (...args: any[]) => any;
+    openWorkspaceChooserUI?: LegacyBridge;
+    openWorkspaceChooser?: LegacyBridge;
+    requireWorkspace?: LegacyBridge;
+    fetchWorkspaceClients?: LegacyBridge;
     getWorkMode?: () => unknown;
     _rerenderEmailIngest?: () => void;
     _rerenderArchiveAll?: () => void;
     loadArchiveSettings?: () => void;
-    _refreshBalanceAlerts?: (...args: any[]) => any;
+    _refreshBalanceAlerts?: LegacyBridge;
     _startCreditsPoll?: () => void;
     _stopCreditsPoll?: () => void;
-    _openTopupModal?: (...args: any[]) => any;
+    _openTopupModal?: LegacyBridge;
     _userInfoForAdmin?: AppUser | null;
     PEARNLY_ADMIN_LAYOUT?: boolean;
 }

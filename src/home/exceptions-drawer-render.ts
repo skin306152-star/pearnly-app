@@ -40,8 +40,6 @@ type DrawerHistory = {
     _err?: unknown;
 };
 
-type ExtractedFields = Record<string, unknown>;
-
 // 「为什么被拦」详情段 · 根据 rule_code 把 detail_json 渲成人话
 function renderWhyDetail(rule: string, detail: WhyDetail) {
     detail = detail || {};
@@ -109,7 +107,7 @@ function renderDrawer() {
     const ruleLabel = t('exc-rule-' + row.rule_code) || row.rule_code;
     const whyDetail = renderWhyDetail(row.rule_code!, row.detail || {});
 
-    const f = _extractFields(_drawer.history as DrawerHistory) as ExtractedFields;
+    const f = _extractFields(_drawer.history as DrawerHistory) as Record<string, unknown>;
     const fieldsLoading = _drawer.history === null;
     const fieldsErr = _drawer.history && (_drawer.history as DrawerHistory)._err;
 

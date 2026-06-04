@@ -9,7 +9,16 @@
 // v0.13 · 重复发票警告对话框(逐张处理 · 用户操作完一条 → 显示下一条)
 function showDuplicateDialog() {
     if (!window._dupQueue || !window._dupQueue.length) return;
-    const w = window._dupQueue.shift();
+    const w = window._dupQueue!.shift()! as {
+        level?: unknown;
+        invoice_total: number;
+        invoice_index?: unknown;
+        matched_fields?: string[];
+        filename?: unknown;
+        current: Record<string, unknown>;
+        match: Record<string, unknown>;
+        new_history_id?: unknown;
+    };
 
     const isExact = w.level === 'exact';
     const titleKey = isExact ? 'dup-title-exact' : 'dup-title-likely';
@@ -17,17 +26,17 @@ function showDuplicateDialog() {
     const titleColor = isExact ? '#DC2626' : '#D97706';
     const titleBg = isExact ? '#FEE2E2' : '#FEF3C7';
 
-    const fmtAmt = (v) =>
+    const fmtAmt = (v: unknown) =>
         v != null
             ? Number(v).toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
               })
             : '—';
-    const fmtDate = (v) => v || '—';
-    const fmtCreated = (v) => {
+    const fmtDate = (v: unknown) => v || '—';
+    const fmtCreated = (v: unknown) => {
         try {
-            const d = new Date(v);
+            const d = new Date(v as string);
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         } catch {
             return v;
@@ -99,9 +108,9 @@ function showDuplicateDialog() {
             setTimeout(showDuplicateDialog, 200);
         }
     };
-    modal.querySelector('.dup-close').addEventListener('click', close);
+    modal.querySelector('.dup-close')!.addEventListener('click', close);
 
-    modal.querySelector('[data-action="view"]').addEventListener('click', () => {
+    modal.querySelector('[data-action="view"]')!.addEventListener('click', () => {
         // 跳到历史页 · 打开原记录抽屉
         const matchId = w.match.id;
         window.location.hash = '#/history';
@@ -111,7 +120,7 @@ function showDuplicateDialog() {
         close();
     });
 
-    modal.querySelector('[data-action="delete"]').addEventListener('click', async () => {
+    modal.querySelector('[data-action="delete"]')!.addEventListener('click', async () => {
         // 删除"刚刚新建的这条"(因为是重复 · 用户决定不要)
         const newId = w.new_history_id;
         if (!newId) {
@@ -119,7 +128,7 @@ function showDuplicateDialog() {
             return;
         }
         try {
-            const resp = await fetch(`/api/history/${encodeURIComponent(newId)}`, {
+            const resp = await fetch(`/api/history/${encodeURIComponent(newId as string)}`, {
                 method: 'DELETE',
                 headers: { Authorization: 'Bearer ' + token },
             });
@@ -134,7 +143,7 @@ function showDuplicateDialog() {
         close();
     });
 
-    modal.querySelector('[data-action="keep"]').addEventListener('click', close);
+    modal.querySelector('[data-action="keep"]')!.addEventListener('click', close);
 }
 
 // 桥回:ocr-recognize.js 调

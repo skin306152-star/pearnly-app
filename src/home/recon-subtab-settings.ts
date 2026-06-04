@@ -16,7 +16,7 @@
     'use strict';
 
     // ── 对账中心子 tab 切换(bank / sale-vat / gl-vat)──
-    function _setMainHeader(pane) {
+    function _setMainHeader(_pane: string) {
         // L2 pane 各自有标题 · L1 永远保持 rc-page-title/rc-page-sub · 不随 tab 变
         return;
     }
@@ -27,14 +27,14 @@
             btn.addEventListener('click', () => {
                 tabs.forEach((b) => b.classList.remove('active'));
                 btn.classList.add('active');
-                const pane = btn.dataset.reconTab;
+                const pane = (btn as HTMLElement).dataset.reconTab;
                 const paneBank = document.getElementById('recon-pane-bank');
                 const paneSv = document.getElementById('recon-pane-sale-vat');
                 const paneGlVat = document.getElementById('recon-pane-gl-vat');
                 if (paneBank) paneBank.style.display = pane === 'bank' ? '' : 'none';
                 if (paneSv) paneSv.style.display = pane === 'sale-vat' ? '' : 'none';
                 if (paneGlVat) paneGlVat.style.display = pane === 'gl-vat' ? '' : 'none';
-                _setMainHeader(pane);
+                _setMainHeader(pane as string);
                 // 销项税(sale-vat)数据加载由新 VEX 模块自绑(_loadVexKpi/_loadVexTaskList)
                 if (pane === 'gl-vat' && window.GlVatRecon) window.GlVatRecon.ensureInit();
                 if (pane === 'bank' && typeof window._bankReconV2Init === 'function') {
@@ -43,7 +43,7 @@
             });
         });
         const activeTab = document.querySelector('[data-recon-tab].active');
-        if (activeTab) _setMainHeader(activeTab.dataset.reconTab);
+        if (activeTab) _setMainHeader((activeTab as HTMLElement).dataset.reconTab as string);
     }
 
     // ── 全站设置弹窗(历史上挂在本模块 · 与销项税流程无关 · 保留原样)──
@@ -60,7 +60,7 @@
         overlay.style.display = 'none';
 
         // 把 page-settings 移进 overlay
-        page.parentElement.insertBefore(overlay, page);
+        page.parentElement!.insertBefore(overlay, page);
         overlay.appendChild(page);
 
         // ✕ 关闭按钮 · v118.32.3.9 修:放进 page-settings 内部(position:absolute 相对 page-settings 定位)
@@ -101,7 +101,7 @@
                 document.querySelector('.settings-tab[data-tab="profile"]');
             if (activeTab) {
                 // 用 dispatchEvent 模拟点击 · 触发所有 click 绑定的 hook
-                activeTab.click();
+                (activeTab as HTMLElement).click();
             }
         }, 50);
     }

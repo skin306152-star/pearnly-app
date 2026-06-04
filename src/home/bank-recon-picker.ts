@@ -11,7 +11,7 @@ import { refreshSessions } from './bank-recon-sessions.js';
 function _renderClientBadge() {
     const badge = document.getElementById('bank-client-badge');
     if (!badge || !S.currentSession) return;
-    const cid = S.currentSession.client_id;
+    const cid = (S.currentSession as { client_id?: unknown }).client_id;
     const dot = document.getElementById('bank-client-badge-dot');
     const name = document.getElementById('bank-client-badge-name');
     const caret = document.getElementById('bank-client-badge-caret');
@@ -20,10 +20,12 @@ function _renderClientBadge() {
     const isOwnerLike = !(u && u.role === 'member');
 
     if (cid != null) {
-        const c = (window._clientsCache || []).find((x) => Number(x.id) === Number(cid));
+        const c = (window._clientsCache || []).find((x) => Number(x.id) === Number(cid)) as
+            | { color?: unknown; short_name?: unknown; name?: unknown }
+            | undefined;
         badge.classList.remove('is-empty');
-        if (dot) dot.style.background = (c && c.color) || '#111111';
-        if (name) name.textContent = (c && (c.short_name || c.name)) || '#' + cid;
+        if (dot) dot.style.background = ((c && c.color) || '#111111') as string;
+        if (name) name.textContent = ((c && (c.short_name || c.name)) || '#' + cid) as string;
     } else {
         badge.classList.add('is-empty');
         if (dot) dot.style.background = '';
@@ -33,11 +35,11 @@ function _renderClientBadge() {
     // 员工只读 · 老板可点
     if (isOwnerLike) {
         badge.classList.remove('is-readonly');
-        badge.disabled = false;
+        (badge as HTMLButtonElement).disabled = false;
         if (caret) caret.style.display = '';
     } else {
         badge.classList.add('is-readonly');
-        badge.disabled = true;
+        (badge as HTMLButtonElement).disabled = true;
         if (caret) caret.style.display = 'none';
     }
     badge.style.display = '';
@@ -48,8 +50,9 @@ function _openClientPicker() {
     const u = typeof _userInfo !== 'undefined' ? _userInfo : null;
     const isOwnerLike = !(u && u.role === 'member');
     if (!isOwnerLike) return; // 员工没权限 · 直接 noop
-    S.pickerSelected =
-        S.currentSession.client_id != null ? Number(S.currentSession.client_id) : null;
+    S.pickerSelected = ((S.currentSession as { client_id?: unknown }).client_id != null
+        ? Number((S.currentSession as { client_id?: unknown }).client_id)
+        : null) as unknown as string | null;
     _renderClientPickerList();
     const m = document.getElementById('bank-client-picker-modal');
     if (m) m.style.display = '';
@@ -99,8 +102,8 @@ function _renderClientPickerList() {
     list.innerHTML = rows.join('');
     list.querySelectorAll('.bank-client-picker-row').forEach((row) => {
         row.addEventListener('click', () => {
-            const cid = row.dataset.cid;
-            S.pickerSelected = cid ? Number(cid) : null;
+            const cid = (row as HTMLElement).dataset.cid;
+            S.pickerSelected = (cid ? Number(cid) : null) as unknown as string | null;
             _renderClientPickerList();
         });
     });
@@ -110,7 +113,9 @@ async function _saveClientPicker() {
     if (!S.currentSession) return;
     try {
         const resp = await fetch(
-            '/api/bank-recon/sessions/' + encodeURIComponent(S.currentSession.id) + '/client',
+            '/api/bank-recon/sessions/' +
+                encodeURIComponent((S.currentSession as { id?: unknown }).id as string) +
+                '/client',
             {
                 method: 'PATCH',
                 headers: {
@@ -121,7 +126,7 @@ async function _saveClientPicker() {
             }
         );
         if (!resp.ok) throw new Error('client:' + resp.status);
-        S.currentSession.client_id = S.pickerSelected;
+        (S.currentSession as { client_id?: unknown }).client_id = S.pickerSelected;
         _renderClientBadge();
         showToast(t('bank-client-changed'), 'success');
         _closeClientPicker();

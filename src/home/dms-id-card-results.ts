@@ -11,7 +11,7 @@
 (function () {
     'use strict';
 
-    function _esc(s) {
+    function _esc(s: unknown) {
         return typeof escapeHtml === 'function'
             ? escapeHtml(s == null ? '' : String(s))
             : String(s == null ? '' : s);
@@ -33,7 +33,7 @@
         return el;
     }
 
-    function _row(labelKey, value) {
+    function _row(labelKey: string, value: unknown) {
         return (
             '<div style="display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--line,#eee);">' +
             '<span style="color:var(--muted,#6b6b66);font-size:13px;">' +
@@ -46,7 +46,7 @@
         );
     }
 
-    function _addr(a) {
+    function _addr(a: Record<string, unknown> | null | undefined) {
         if (!a) return '';
         var parts = [a.house_no, a.road, a.subdistrict, a.district, a.province, a.zipcode].filter(
             function (x) {
@@ -57,7 +57,7 @@
     }
 
     // status pill + headline message
-    function _statusBlock(push) {
+    function _statusBlock(push: { status?: unknown } | null | undefined) {
         var st = (push && push.status) || 'failed';
         var color, bg, key;
         if (st === 'success') {
@@ -94,10 +94,10 @@
         var el = _host();
         if (!el) return;
         data = data || {};
-        var card = data.id_card || {};
-        var addr = card.address || {};
-        var push = data.dms_push || {};
-        var st = push.status || (data.ok ? 'success' : 'failed');
+        var card = ((data as { id_card?: unknown }).id_card || {}) as Record<string, unknown>;
+        var addr = (card.address || {}) as Record<string, unknown>;
+        var push = ((data as { dms_push?: unknown }).dms_push || {}) as Record<string, unknown>;
+        var st = push.status || ((data as { ok?: unknown }).ok ? 'success' : 'failed');
 
         var bookingRows = '';
         if (st === 'success') {
@@ -155,7 +155,7 @@
     };
 
     document.addEventListener('click', function (ev) {
-        if (ev.target.closest('#dms-id-card-retry')) {
+        if ((ev.target as HTMLElement).closest('#dms-id-card-retry')) {
             ev.preventDefault();
             if (typeof window._dmsRetryIdCard === 'function') window._dmsRetryIdCard();
         }

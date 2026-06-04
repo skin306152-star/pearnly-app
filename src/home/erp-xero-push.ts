@@ -69,12 +69,12 @@ async function _onPush() {
     if (!hid) return;
     const btn = document.getElementById('btn-xero-push');
     if (btn) {
-        btn.disabled = true;
+        (btn as HTMLButtonElement).disabled = true;
         btn.classList.add('loading');
     }
     const tk = localStorage.getItem('mrpilot_token');
     try {
-        const resp = await fetch('/api/erp/xero/push/' + encodeURIComponent(hid), {
+        const resp = await fetch('/api/erp/xero/push/' + encodeURIComponent(hid as string), {
             method: 'POST',
             headers: { Authorization: 'Bearer ' + tk },
         });
@@ -93,10 +93,10 @@ async function _onPush() {
         }
         _toast(t('xero-push-ok'), 'success');
     } catch (e) {
-        _toast(t('xero-push-fail').replace('{err}', e.message || 'network'), 'error');
+        _toast(t('xero-push-fail').replace('{err}', (e as Error).message || 'network'), 'error');
     } finally {
         if (btn) {
-            btn.disabled = false;
+            (btn as HTMLButtonElement).disabled = false;
             btn.classList.remove('loading');
         }
     }
@@ -115,7 +115,7 @@ async function _loadGlobalPushMode() {
         if (r.ok) {
             const d = await r.json();
             if (d.mode) {
-                sel.value = d.mode;
+                (sel as HTMLSelectElement).value = d.mode;
                 sel.dataset.prev = d.mode;
             }
         }
@@ -124,7 +124,7 @@ async function _loadGlobalPushMode() {
     }
 }
 
-async function _onChangeGlobalPushMode(sel) {
+async function _onChangeGlobalPushMode(sel: HTMLSelectElement) {
     const mode = sel.value;
     const tk = localStorage.getItem('mrpilot_token');
     try {

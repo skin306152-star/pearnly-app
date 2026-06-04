@@ -11,7 +11,7 @@
 (function () {
     'use strict';
 
-    let _modalEl = null;
+    let _modalEl: HTMLElement | null = null;
     let _shown = false;
 
     function _buildModal() {
@@ -38,19 +38,19 @@
         document.body.appendChild(el);
         _modalEl = el;
 
-        const inp = el.querySelector('#line-email-input');
-        const btn = el.querySelector('#line-email-submit-btn');
+        const inp = el.querySelector('#line-email-input') as HTMLInputElement | null;
+        const btn = el.querySelector('#line-email-submit-btn') as HTMLButtonElement | null;
         const err = el.querySelector('#line-email-err');
 
         async function _submit() {
-            err.textContent = '';
-            const v = (inp.value || '').trim().toLowerCase();
+            err!.textContent = '';
+            const v = (inp!.value || '').trim().toLowerCase();
             if (!v || v.indexOf('@') < 0 || v.split('@')[1].indexOf('.') < 0) {
-                err.textContent = t('line-email-err-invalid');
+                err!.textContent = t('line-email-err-invalid');
                 return;
             }
-            btn.disabled = true;
-            btn.style.opacity = '0.6';
+            btn!.disabled = true;
+            btn!.style.opacity = '0.6';
             try {
                 const resp = await fetch('/api/me/line_complete_email', {
                     method: 'POST',
@@ -76,13 +76,13 @@
                     window.location.reload();
                 }, 600);
             } catch (e) {
-                err.textContent = t('line-email-err-failed');
-                btn.disabled = false;
-                btn.style.opacity = '1';
+                err!.textContent = t('line-email-err-failed');
+                btn!.disabled = false;
+                btn!.style.opacity = '1';
             }
         }
-        btn.addEventListener('click', _submit);
-        inp.addEventListener('keydown', function (e) {
+        btn!.addEventListener('click', _submit);
+        inp!.addEventListener('keydown', function (e: KeyboardEvent) {
             if (e.key === 'Enter') _submit();
         });
         return el;
@@ -92,7 +92,7 @@
         if (!_modalEl) return;
         const titleEl = _modalEl.querySelector('#line-email-title-h');
         const subEl = _modalEl.querySelector('#line-email-sub-p');
-        const inpEl = _modalEl.querySelector('#line-email-input');
+        const inpEl = _modalEl.querySelector('#line-email-input') as HTMLInputElement | null;
         const btnEl = _modalEl.querySelector('#line-email-submit-btn');
         if (titleEl) titleEl.textContent = t('line-email-title');
         if (subEl) subEl.textContent = t('line-email-sub');
@@ -103,9 +103,9 @@
     function _show() {
         _buildModal();
         _renderTexts();
-        _modalEl.style.display = 'flex';
+        _modalEl!.style.display = 'flex';
         _shown = true;
-        const inp = _modalEl.querySelector('#line-email-input');
+        const inp = _modalEl!.querySelector('#line-email-input') as HTMLInputElement | null;
         if (inp)
             setTimeout(function () {
                 inp.focus();

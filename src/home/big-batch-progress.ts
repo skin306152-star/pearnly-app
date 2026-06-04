@@ -18,13 +18,13 @@
     const PER_FILE_SEC = 6; // 预估每张 6 秒(并行 6 路 · 单张实际 ~3-4s)
     const TIP_STORAGE_KEY = 'pearnly_big_batch_tip_shown';
 
-    let _intervalId = null;
-    let _pendingRef = null;
+    let _intervalId: ReturnType<typeof setInterval> | null = null;
+    let _pendingRef: { status: string }[] | null = null;
     let _totalAtStart = 0;
     let _startTs = 0;
     let _unloadAttached = false;
 
-    function _unloadHandler(e) {
+    function _unloadHandler(e: BeforeUnloadEvent) {
         const msg =
             typeof t === 'function'
                 ? t('big-batch-unload-warn')
@@ -96,24 +96,29 @@
         if (fill) fill.style.width = pct + '%';
         if (txt) {
             if (done >= total) {
-                txt.textContent = t('big-batch-progress-done').replace('{total}', total);
+                txt.textContent = t('big-batch-progress-done').replace(
+                    '{total}',
+                    total as unknown as string
+                );
             } else {
                 txt.textContent = t('big-batch-progress-running')
-                    .replace('{done}', done)
-                    .replace('{total}', total)
-                    .replace('{min}', remainMin);
+                    .replace('{done}', done as unknown as string)
+                    .replace('{total}', total as unknown as string)
+                    .replace('{min}', remainMin as unknown as string);
             }
         }
     }
 
-    function _maybeShowFirstTip(total) {
+    function _maybeShowFirstTip(total: number) {
         try {
             if (localStorage.getItem(TIP_STORAGE_KEY) === '1') return;
         } catch (_) {
             /* silent · localStorage 私模 / 兜底默认 */
         }
         const estMin = Math.max(1, Math.ceil((total * PER_FILE_SEC) / 6 / 60));
-        const msg = t('big-batch-first-tip').replace('{n}', total).replace('{min}', estMin);
+        const msg = t('big-batch-first-tip')
+            .replace('{n}', total as unknown as string)
+            .replace('{min}', estMin as unknown as string);
         if (typeof showToast === 'function') showToast(msg, 'info', 8000);
         try {
             localStorage.setItem(TIP_STORAGE_KEY, '1');
@@ -122,7 +127,7 @@
         }
     }
 
-    function _start(pendingFiles) {
+    function _start(pendingFiles: { status: string }[]) {
         if (!pendingFiles || pendingFiles.length < BIG_THRESHOLD) return;
         _pendingRef = pendingFiles;
         _totalAtStart = pendingFiles.length;
@@ -151,7 +156,7 @@
         _totalAtStart = 0;
     }
 
-    window._bigBatchStart = _start;
+    window._bigBatchStart = _start as (files?: unknown) => void;
     window._bigBatchStop = _stop;
 
     // i18n 切语言 · 重渲进度文本

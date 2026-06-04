@@ -53,7 +53,7 @@ function ensureInit() {
     }
 }
 
-window._glvRemoveFile = _removeFile;
+window._glvRemoveFile = _removeFile as (...args: unknown[]) => void;
 
 window.GlVatRecon = { ensureInit };
 // v118.35.0.3 · 让 preview panel(在另一个 IIFE)能拿到多文件 STATE

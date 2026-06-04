@@ -2,20 +2,23 @@
 // REFACTOR-WB (2026-06-02) · GL-VAT 对账 · 上传卡 + 文件态 · 从 gl-vat-recon.js 抽出 · verbatim 0 改逻辑。
 // ============================================================
 import { STATE } from './glv-store.js';
+import type { GlvState } from './glv-store.js';
 import { $, _t } from './glv-helpers.js';
 
 // ── 文件选择 + 拖拽 ─────────────────────────────────────────────
 // v118.35.0.3 · 销项税报告核查改多文件 · STATE.vatFile / STATE.glFile 现在是 File[]
-function _bindUpload(cardId, inputId, nameId, target) {
+function _bindUpload(cardId: string, inputId: string, nameId: string, target: keyof GlvState) {
     const card = $(cardId);
-    const input = $(inputId);
+    const input = $(inputId) as HTMLInputElement;
     const name = $(nameId);
     if (!card || !input || !name) return;
 
-    const addFiles = (files) => {
+    const addFiles = (files: File[]) => {
         if (!files || !files.length) return;
-        const arr = Array.isArray(STATE[target]) ? STATE[target].slice() : [];
-        const seen = new Set(arr.map((f) => f.name + '|' + f.size));
+        const arr = (
+            Array.isArray(STATE[target]) ? (STATE[target] as File[]).slice() : []
+        ) as File[];
+        const seen = new Set(arr.map((f: File) => f.name + '|' + f.size));
         for (const f of files) {
             if (!f) continue;
             const k = f.name + '|' + f.size;
@@ -24,7 +27,7 @@ function _bindUpload(cardId, inputId, nameId, target) {
                 seen.add(k);
             }
         }
-        STATE[target] = arr;
+        (STATE as Record<keyof GlvState, unknown>)[target] = arr;
         _renderCardSummary(name, arr);
         _updateRunButton();
         _updateStatus();
@@ -42,7 +45,7 @@ function _bindUpload(cardId, inputId, nameId, target) {
         }
     });
     input.addEventListener('change', () => {
-        addFiles(Array.from(input.files || []));
+        addFiles(Array.from(input.files || []) as File[]);
         // 清空原生 input,允许重复选同名文件 · 同时避免 panel 仍从 input.files 取
         input.value = '';
     });
@@ -62,28 +65,29 @@ function _bindUpload(cardId, inputId, nameId, target) {
     });
 }
 
-function _renderCardSummary(nameEl, arr) {
+function _renderCardSummary(nameEl: HTMLElement | null, arr: File[]) {
     if (!nameEl) return;
     if (!arr || arr.length === 0) {
         nameEl.textContent = '';
         return;
     }
-    const totalKB = arr.reduce((s, f) => s + Math.round(f.size / 1024), 0);
+    const totalKB = arr.reduce((s: number, f: File) => s + Math.round(f.size / 1024), 0);
     if (arr.length === 1) {
         nameEl.textContent = arr[0].name + '  (' + totalKB + ' KB)';
     } else {
         const tpl = (window.t && window.t('glv-files-count')) || '{n} 个文件';
-        nameEl.textContent = tpl.replace('{n}', arr.length) + '  (' + totalKB + ' KB)';
+        nameEl.textContent =
+            tpl.replace('{n}', arr.length as unknown as string) + '  (' + totalKB + ' KB)';
     }
 }
 
-function _glvFiles(target) {
+function _glvFiles(target: keyof GlvState) {
     const v = STATE[target];
     return Array.isArray(v) ? v : v ? [v] : [];
 }
 
 function _updateRunButton() {
-    const btn = $('btn-glv-run');
+    const btn = $('btn-glv-run') as HTMLButtonElement;
     if (!btn) return;
     const has = _glvFiles('glFile').length > 0 && _glvFiles('vatFile').length > 0;
     btn.disabled = !has || STATE.running;
@@ -109,7 +113,7 @@ function _updateStatus() {
 
 // v118.32.5.5.25 · 删文件(X 按钮 / 全清按钮)· 真清 STATE + UI + 刷 panel
 // v118.35.0.3 · 支持多文件 · idx=null 时整列清空 · idx=N 时只删第 N 个
-function _removeFile(kind, idx) {
+function _removeFile(kind: string, idx: number | null) {
     const target = kind === 'vat' ? 'vatFile' : 'glFile';
     const inputId = kind === 'vat' ? 'glv-vat-input' : 'glv-gl-input';
     const nameId = kind === 'vat' ? 'glv-vat-name' : 'glv-gl-name';
@@ -117,9 +121,9 @@ function _removeFile(kind, idx) {
     if (idx == null) {
         STATE[target] = [];
     } else {
-        STATE[target] = arr.filter((_, i) => i !== idx);
+        STATE[target] = arr.filter((_: File, i: number) => i !== idx);
     }
-    const inp = $(inputId);
+    const inp = $(inputId) as HTMLInputElement;
     if (inp) inp.value = '';
     _renderCardSummary($(nameId), _glvFiles(target));
     _updateRunButton();
@@ -135,9 +139,9 @@ function _reset() {
     STATE.currentTaskId = null;
     STATE.lastDetail = [];
     STATE.lastSummary = null;
-    const vi = $('glv-vat-input');
+    const vi = $('glv-vat-input') as HTMLInputElement;
     if (vi) vi.value = '';
-    const gi = $('glv-gl-input');
+    const gi = $('glv-gl-input') as HTMLInputElement;
     if (gi) gi.value = '';
     const vn = $('glv-vat-name');
     if (vn) vn.textContent = '';

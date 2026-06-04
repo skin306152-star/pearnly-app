@@ -12,15 +12,15 @@
 // ============================================================
 // 提示
 // ============================================================
-function showAlert(type, msg) {
+function showAlert(type: string, msg: string) {
     const box = document.getElementById('alert-' + type);
     if (!box) return;
-    document.getElementById('alert-' + type + '-text').textContent = msg;
+    document.getElementById('alert-' + type + '-text')!.textContent = msg;
     box.classList.add('show');
 }
 function hideAlerts() {
     ['info', 'warn', 'error'].forEach((t) => {
-        document.getElementById('alert-' + t).classList.remove('show');
+        document.getElementById('alert-' + t)!.classList.remove('show');
     });
 }
 
@@ -30,30 +30,39 @@ function hideAlerts() {
 
 // v118.35.0.23 · 把后端 HTTPException detail 转成人话(防 [object Object])
 // detail 可能是: string / {code, ...其它字段} / pydantic errors[] / 其它对象
-function _humanizeBackendError(detail, fallback) {
+type BackendErr = {
+    msg?: string;
+    code?: string;
+    message?: string;
+    error?: string;
+    detail?: unknown;
+};
+
+function _humanizeBackendError(detail: unknown, fallback?: string) {
     if (detail == null) return fallback || '操作失败';
     if (typeof detail === 'string') return detail;
     if (Array.isArray(detail)) {
         // pydantic ValidationError
-        const first = detail[0] || {};
+        const first = (detail[0] as BackendErr) || {};
         if (first.msg) return first.msg;
         return fallback || '请求格式错误';
     }
     if (typeof detail === 'object') {
         // 优先按 code 走 i18n: 'err.<code>'
-        if (detail.code) {
-            const k = 'err.' + detail.code;
+        if ((detail as BackendErr).code) {
+            const k = 'err.' + (detail as BackendErr).code;
             try {
                 const tr = t(k, detail);
                 if (tr && tr !== k) return tr;
             } catch (e) {
                 console.warn('[i18n] t() failed for key:', k, e);
             }
-            return detail.code;
+            return (detail as BackendErr).code;
         }
-        if (detail.message) return detail.message;
-        if (detail.error) return detail.error;
-        if (detail.detail && typeof detail.detail === 'string') return detail.detail;
+        if ((detail as BackendErr).message) return (detail as BackendErr).message;
+        if ((detail as BackendErr).error) return (detail as BackendErr).error;
+        if ((detail as BackendErr).detail && typeof (detail as BackendErr).detail === 'string')
+            return (detail as BackendErr).detail;
         try {
             return JSON.stringify(detail).slice(0, 160);
         } catch (_) {
@@ -63,7 +72,7 @@ function _humanizeBackendError(detail, fallback) {
     return fallback || String(detail);
 }
 
-function humanizeError(raw) {
+function humanizeError(raw: unknown) {
     if (!raw) return '';
     const r = String(raw);
     if (/ECONNREFUSED|Connection refused/i.test(r))
@@ -84,7 +93,7 @@ function humanizeError(raw) {
 }
 
 // 简易 toast(右下角冒泡 · 2.5 秒自动消失 · 不阻塞交互)
-function showToast(msg, kind, duration) {
+function showToast(msg: string, kind?: string, duration?: number) {
     let wrap = document.getElementById('mp-toast-wrap');
     if (!wrap) {
         wrap = document.createElement('div');
@@ -109,7 +118,7 @@ function showToast(msg, kind, duration) {
     toast.className = 'mp-toast ' + kind;
     toast.innerHTML = `
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            ${ICONS[kind] || ICONS.success}
+            ${ICONS[kind as keyof typeof ICONS] || ICONS.success}
         </svg>
         <span>${escapeHtml(msg)}</span>
     `;
@@ -118,7 +127,7 @@ function showToast(msg, kind, duration) {
 
     // v115 · duration 默认 2500ms · 传 0 表示不自动关 · 调用方需手动关
     const dur = typeof duration === 'number' ? duration : 2500;
-    let timer = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const dismiss = () => {
         if (timer) {
             clearTimeout(timer);

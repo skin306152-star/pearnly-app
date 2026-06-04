@@ -27,7 +27,9 @@ async function _run() {
     if (progress) progress.style.display = '';
     if (progressSub)
         progressSub.textContent =
-            (STATE.vatFile.name || 'VAT') + ' + ' + (STATE.glFile.name || 'GL');
+            ((STATE.vatFile as unknown as File).name || 'VAT') +
+            ' + ' +
+            ((STATE.glFile as unknown as File).name || 'GL');
 
     const fd = new FormData();
     // v118.35.0.3 · multi-file · 同 key 多次 append → 后端 List[UploadFile]
@@ -35,7 +37,8 @@ async function _run() {
     const _gls = _glvFiles('glFile');
     for (const f of _vats) fd.append('vat_files', f, f.name);
     for (const f of _gls) fd.append('gl_files', f, f.name);
-    const prefix = (($('glv-prefix') && $('glv-prefix').value) || '4').trim() || '4';
+    const prefix =
+        (($('glv-prefix') && ($('glv-prefix') as HTMLInputElement).value) || '4').trim() || '4';
     fd.append('revenue_prefix', prefix);
     fd.append('lang', _lang()); // v118.32.5 · 后端按 lang 返回错误消息
 
@@ -60,11 +63,15 @@ async function _run() {
         }
         // 轮询 · 转圈旁实时显示「共 X/Y 个文件」
         const _glvSub = $('glv-progress-sub');
-        const job = await window._reconPollJob(sub.job_id, _token(), {
-            onProgress: (p) => {
-                if (_glvSub) _glvSub.textContent = window._reconProgressText(p, _lang());
+        const job = (await window._reconPollJob(sub.job_id, _token(), {
+            onProgress: (p: unknown) => {
+                if (_glvSub)
+                    _glvSub.textContent = window._reconProgressText(
+                        p as { stage?: string; stage_total?: number; stage_done?: number },
+                        _lang()
+                    );
             },
-        });
+        })) as { status?: string; result_id?: string; error_code?: string } | null;
         if (!job || job.status !== 'done' || !job.result_id) {
             // M3-2 修(2026-05-25):失败时用后端 error_code 映射成可读文案 · 不再泛化 "เกิดข้อผิดพลาด"
             if (job && job.status === 'failed' && job.error_code) {
@@ -113,7 +120,8 @@ async function _run() {
         if (status) {
             status.className = 'vex-action-info';
             status.style.color = '#ef4444';
-            status.innerHTML = '<span>' + _t('error') + ': ' + (e.message || e) + '</span>';
+            status.innerHTML =
+                '<span>' + _t('error') + ': ' + ((e as Error).message || e) + '</span>';
         }
     } finally {
         STATE.running = false;
@@ -146,7 +154,7 @@ async function _export() {
     } catch (e) {
         console.error('[gl-vat] export failed:', e);
         if (typeof showToast === 'function')
-            showToast(_t('error') + ': ' + (e.message || e), 'error');
+            showToast(_t('error') + ': ' + ((e as Error).message || e), 'error');
     }
 }
 

@@ -42,6 +42,14 @@ declare function saveCompany(): void;
 declare function installNetworkBanner(): void;
 declare function callRdVerify(side?: string): Promise<void>;
 declare function callRdSync(side?: string): Promise<void>;
+/** Active language code (home.js core) and language switcher. */
+// eslint-disable-next-line no-var
+declare var currentLang: string;
+declare function applyLang(lang: string): void;
+/** Reconcile settings re-render (home.js core). */
+declare function renderSettings(): void;
+/** Open the history drawer for a given record id (history-drawer module). */
+declare function openHistoryDrawer(historyId: unknown): Promise<void>;
 /** One OCR result row in the results drawer. Dynamic field bags are kept as
  *  Record; the index signature covers the many per-stage extras. */
 interface OcrResult {
@@ -136,6 +144,23 @@ interface Window {
     loadPrefsSettings: () => void;
     // jsPDF UMD global (vendored, no bundled types)
     jspdf: { jsPDF: new (...args: any[]) => any };
+    // settings + reconcile subtab bridges
+    _pearnlyGeneral?: { tz: string; date_format: string; number_format: string };
+    _bankReconV2Init?: () => void;
+    openSettingsModal?: () => void;
+    closeSettingsModal?: () => void;
+    // big-batch progress hooks
+    _bigBatchStart?: (files?: unknown) => void;
+    _bigBatchStop?: () => void;
+    // shared caches written by migrated modules, read elsewhere as bare window props
+    _clientsCache?: Array<{ id?: unknown; [key: string]: unknown }>;
+    _erpEndpoints?: Array<{ id?: unknown; [key: string]: unknown }>;
+    _dupQueue?: Array<Record<string, unknown>>;
+    // gl-vat-recon collapse panel + preview-search clear bridge
+    _reconCollapse?: { renderGlvPreview?: () => void; [key: string]: unknown };
+    _glvClearPreviewSearch?: () => void;
+    // DMS id-card result clear bridge
+    clearDmsIdCardResult?: () => void;
 }
 
 // navigator.userAgentData (UA-CH) is not yet in the DOM lib; chrome-banner reads it.

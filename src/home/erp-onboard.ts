@@ -64,7 +64,7 @@
             mask.style.display = 'none';
         }
 
-        document.getElementById('erp-onboard-ok').addEventListener('click', function () {
+        document.getElementById('erp-onboard-ok')!.addEventListener('click', function () {
             try {
                 localStorage.setItem(STORAGE_KEY, '1');
             } catch (_) {}
@@ -77,7 +77,7 @@
                 if (btnAddEp) btnAddEp.scrollIntoView({ behavior: 'smooth', block: 'center' });
             } catch (_) {}
         });
-        document.getElementById('erp-onboard-later').addEventListener('click', function () {
+        document.getElementById('erp-onboard-later')!.addEventListener('click', function () {
             try {
                 localStorage.setItem(STORAGE_KEY, '1');
             } catch (_) {}
@@ -118,8 +118,8 @@
 
     // 点击进入 ERP 对接子面板时触发
     document.addEventListener('click', function (ev) {
-        const erpTab = ev.target.closest('.auto-nav-item[data-auto-tab="erp"]');
-        const erpSub = ev.target.closest('.erp-subtab[data-erp-subtab="connect"]');
+        const erpTab = (ev.target as HTMLElement).closest('.auto-nav-item[data-auto-tab="erp"]');
+        const erpSub = (ev.target as HTMLElement).closest('.erp-subtab[data-erp-subtab="connect"]');
         if (erpTab || erpSub) {
             // 等 _erpEndpoints 拉好 · 大概 300-600ms
             setTimeout(_maybeShow, 700);

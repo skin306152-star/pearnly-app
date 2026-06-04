@@ -131,12 +131,12 @@
         const I = window.I18N;
         if (I && I[lang]) {
             sec.querySelectorAll('[data-i18n]').forEach((el) => {
-                const k = el.getAttribute('data-i18n');
+                const k = el.getAttribute('data-i18n') as string;
                 if (I[lang][k]) el.textContent = I[lang][k];
             });
             sec.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-                const k = el.getAttribute('data-i18n-placeholder');
-                if (I[lang][k]) el.placeholder = I[lang][k];
+                const k = el.getAttribute('data-i18n-placeholder') as string;
+                if (I[lang][k]) (el as HTMLInputElement).placeholder = I[lang][k];
             });
         }
     } catch (e) {

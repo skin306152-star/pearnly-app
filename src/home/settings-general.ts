@@ -9,10 +9,10 @@
 
 // v118.28.5.1 · 设置 → 系统 → 通用设置 · 语言 select 切换(替代旧 set-lang-row 4 按钮卡)
 (function () {
-    const sel = document.getElementById('general-lang');
+    const sel = document.getElementById('general-lang') as HTMLSelectElement | null;
     if (!sel) return;
     sel.addEventListener('change', (e) => {
-        const lang = e.target.value;
+        const lang = (e.target as HTMLSelectElement).value;
         if (lang) applyLang(lang);
     });
     const _curLang =
@@ -38,9 +38,9 @@
     };
 
     function _loadGeneral() {
-        const tz = document.getElementById('general-tz');
-        const dt = document.getElementById('general-date');
-        const nm = document.getElementById('general-number');
+        const tz = document.getElementById('general-tz') as HTMLSelectElement | null;
+        const dt = document.getElementById('general-date') as HTMLSelectElement | null;
+        const nm = document.getElementById('general-number') as HTMLSelectElement | null;
         if (!tz || !dt || !nm) return;
         try {
             tz.value = localStorage.getItem(LS_TZ) || DEFAULTS.tz;
@@ -54,7 +54,7 @@
     }
 
     async function _saveGeneral() {
-        const btn = document.getElementById('btn-save-general');
+        const btn = document.getElementById('btn-save-general') as HTMLButtonElement | null;
         const msg = document.getElementById('general-save-msg');
         if (!btn) return;
         const orig = btn.innerHTML;
@@ -65,9 +65,15 @@
             msg.classList.remove('error');
         }
         try {
-            const tz = (document.getElementById('general-tz') || {}).value || DEFAULTS.tz;
-            const dt = (document.getElementById('general-date') || {}).value || DEFAULTS.date;
-            const nm = (document.getElementById('general-number') || {}).value || DEFAULTS.number;
+            const tz =
+                ((document.getElementById('general-tz') || {}) as { value?: string }).value ||
+                DEFAULTS.tz;
+            const dt =
+                ((document.getElementById('general-date') || {}) as { value?: string }).value ||
+                DEFAULTS.date;
+            const nm =
+                ((document.getElementById('general-number') || {}) as { value?: string }).value ||
+                DEFAULTS.number;
             try {
                 localStorage.setItem(LS_TZ, tz);
                 localStorage.setItem(LS_DATE, dt);
@@ -90,7 +96,9 @@
     }
 
     function _bind() {
-        const btn = document.getElementById('btn-save-general');
+        const btn = document.getElementById('btn-save-general') as
+            | (HTMLButtonElement & { _pearnlyGenBound?: boolean })
+            | null;
         if (!btn) {
             setTimeout(_bind, 200);
             return;
@@ -103,7 +111,7 @@
 
     function _rerenderAll() {
         _loadGeneral();
-        const sel = document.getElementById('general-lang');
+        const sel = document.getElementById('general-lang') as HTMLSelectElement | null;
         if (sel) {
             const cur =
                 (typeof currentLang === 'string' && currentLang) ||

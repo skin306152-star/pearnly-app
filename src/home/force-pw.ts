@@ -53,12 +53,12 @@ function showForceChangePasswordModal() {
         if (inp) inp.focus();
     }, 200);
 
-    const submitBtn = overlay.querySelector('#force-pw-submit');
+    const submitBtn = overlay.querySelector('#force-pw-submit') as HTMLButtonElement;
     submitBtn.addEventListener('click', async () => {
-        const oldPw = document.getElementById('force-pw-old').value;
-        const newPw = document.getElementById('force-pw-new').value;
-        const newPw2 = document.getElementById('force-pw-new2').value;
-        const msgEl = document.getElementById('force-pw-msg');
+        const oldPw = (document.getElementById('force-pw-old') as HTMLInputElement).value;
+        const newPw = (document.getElementById('force-pw-new') as HTMLInputElement).value;
+        const newPw2 = (document.getElementById('force-pw-new2') as HTMLInputElement).value;
+        const msgEl = document.getElementById('force-pw-msg') as HTMLElement;
         msgEl.textContent = '';
         msgEl.classList.remove('error');
 
@@ -109,7 +109,8 @@ function showForceChangePasswordModal() {
                     password_too_short: t('pwd-too-short') || '密码至少 8 位',
                     password_too_weak: t('pwd-too-weak') || '密码至少 8 位 · 字母 + 数字',
                 };
-                msgEl.textContent = map[code] || t('force-pw-fail') || '修改失败';
+                msgEl.textContent =
+                    map[code as keyof typeof map] || t('force-pw-fail') || '修改失败';
                 msgEl.classList.add('error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = t('force-pw-submit') || '修改并继续';

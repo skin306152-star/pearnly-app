@@ -68,11 +68,8 @@ class NotificationRuleUpdate(BaseModel):
     enabled: Optional[bool] = None
 
 
-def _validate_template_params(
-    template_code: str, params: Optional[Dict[str, Any]]
-) -> Dict[str, Any]:
-    """模板特定参数校验 · 失败 raise HTTPException 400"""
-    # exception_high 暂无必填参数(金额阈值已并入「金额上限」客户规矩)
+def _validate_template_params(params: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """通知模板参数校验 · exception_high 无必填参数(金额阈值已并入「金额上限」客户规矩)"""
     return dict(params or {})
 
 
@@ -95,7 +92,7 @@ async def api_notif_create_rule(req: NotificationRuleCreate, request: Request):
         raise HTTPException(400, detail="notification.name_too_long")
     if req.template_code not in NOTIF_TEMPLATE_WHITELIST:
         raise HTTPException(400, detail="notification.template_invalid")
-    params = _validate_template_params(req.template_code, req.params)
+    params = _validate_template_params(req.params)
     rule_id = db.create_notification_rule(
         user_id=str(user["id"]),
         tenant_id=_tid(user),
@@ -125,7 +122,7 @@ async def api_notif_update_rule(rule_id: int, req: NotificationRuleUpdate, reque
             raise HTTPException(400, detail="notification.name_too_long")
     params_new = None
     if req.params is not None:
-        params_new = _validate_template_params(rule["template_code"], req.params)
+        params_new = _validate_template_params(req.params)
     ok = db.update_notification_rule(
         rule_id=rule_id,
         user_id=str(user["id"]),

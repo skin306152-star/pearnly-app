@@ -48,6 +48,15 @@ function rsSevOptions(sel: string | null): string {
     );
 }
 
+// subject_key 输入(编辑态锁定 · API 只 patch body/severity/active,不改 subject)
+function rsKeyField(label: string, rule?: ClientRuleRow): string {
+    const key = rule && rule.subject_key ? escapeHtml(rule.subject_key) : '';
+    return (
+        `<div class="rs-mlbl">${label}</div>` +
+        `<input class="rs-field" id="rs-f-key" value="${key}"${rule ? ' disabled' : ''}>`
+    );
+}
+
 // ---- 一条规矩 → 人话描述 ----
 function rsRuleText(r: ClientRuleRow): string {
     const L = rsL();
@@ -169,20 +178,10 @@ function rsAddFields(rule?: ClientRuleRow): string {
         );
     }
     if (rsAddType === 'supplier_force_review') {
-        const key = rule && rule.subject_key ? escapeHtml(rule.subject_key) : '';
-        return (
-            `<div class="rs-mlbl">${L.fSupplierTax}</div>` +
-            `<input class="rs-field" id="rs-f-key" value="${key}"${rule ? ' disabled' : ''}>` +
-            sevSel
-        );
+        return rsKeyField(L.fSupplierTax, rule) + sevSel;
     }
     if (rsAddType === 'no_auto_push_category') {
-        const key = rule && rule.subject_key ? escapeHtml(rule.subject_key) : '';
-        return (
-            `<div class="rs-mlbl">${L.fCategory}</div>` +
-            `<input class="rs-field" id="rs-f-key" value="${key}"${rule ? ' disabled' : ''}>` +
-            sevSel
-        );
+        return rsKeyField(L.fCategory, rule) + sevSel;
     }
     // accounting_period
     const mode = rule ? rule.rule_body.mode : 'current_month';

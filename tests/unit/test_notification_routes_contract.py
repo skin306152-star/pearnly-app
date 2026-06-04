@@ -10,11 +10,7 @@ REFACTOR-B1 守门测试 · 通知规则路由从 app.py 抽到 notification_rou
 
 import unittest
 
-from routes.notification_routes import (
-    NOTIF_TEMPLATE_EXCEPTION_HIGH,
-    _validate_template_params,
-    router,
-)
+from routes.notification_routes import _validate_template_params, router
 
 
 class NotificationRoutesContractTests(unittest.TestCase):
@@ -43,10 +39,10 @@ class NotificationRoutesContractTests(unittest.TestCase):
         self.assertIn("/api/notifications/rules", paths)
         self.assertIn("/api/notifications/logs", paths)
 
-    def test_validate_exception_high_no_required_params(self):
-        """exception_high 无必填参数 · 空 params 直接通过"""
-        p = _validate_template_params(NOTIF_TEMPLATE_EXCEPTION_HIGH, {})
-        self.assertEqual(p, {})
+    def test_validate_params_no_required(self):
+        """通知模板无必填参数 · 空 params 直接通过(金额阈值已并入金额上限客户规矩)"""
+        self.assertEqual(_validate_template_params({}), {})
+        self.assertEqual(_validate_template_params(None), {})
 
 
 if __name__ == "__main__":

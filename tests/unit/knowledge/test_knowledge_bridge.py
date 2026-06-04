@@ -15,6 +15,16 @@ from unittest.mock import patch
 from services.exceptions import knowledge_bridge as kb
 from services.knowledge.rules.context import ClientRuleSet
 from services.knowledge.rules.validity import valid_thai_tax_id
+from services.knowledge.schema import (
+    RULE_AMOUNT_LIMIT,
+    RULE_NO_AUTO_PUSH_CATEGORY,
+    RULE_SUPPLIER_FORCE_REVIEW,
+    SUBJECT_CATEGORY,
+    SUBJECT_SUPPLIER,
+    ClientRule,
+)
+
+_VALID_SELLER = "1234567890121"  # valid Thai tax-id checksum (shared with engine tests)
 
 
 def _valid_tax_id(prefix="010553600002"):
@@ -23,6 +33,25 @@ def _valid_tax_id(prefix="010553600002"):
         if valid_thai_tax_id(candidate):
             return candidate
     raise AssertionError("no valid check digit found")
+
+
+def _ruleset(rule_type, subject_type, subject_key, body, severity=None):
+    rule = ClientRule(
+        id=1,
+        tenant_id="t1",
+        workspace_client_id=None,
+        rule_type=rule_type,
+        subject_type=subject_type,
+        subject_key=subject_key,
+        rule_body=body,
+        severity=severity,
+        is_active=True,
+        effective_from=None,
+        effective_to=None,
+        origin="manual",
+        created_at=None,
+    )
+    return ClientRuleSet.from_rules([rule])
 
 
 class _Recorder:
@@ -46,14 +75,15 @@ class _Recorder:
 
 
 @contextmanager
-def _wired(recorder, *, exact=None, suspected=()):
-    """Isolate run_and_record from the database, injecting dedup results."""
+def _wired(recorder, *, exact=None, suspected=(), ruleset=None):
+    """Isolate run_and_record from the database, injecting dedup + client rules."""
+    loaded = ruleset if ruleset is not None else ClientRuleSet()
 
     def fake_lookups(**kwargs):
         return (lambda s, n: exact), (lambda s, t, d: list(suspected))
 
     with (
-        patch.object(kb, "_load_ruleset", lambda *a, **k: ClientRuleSet()),
+        patch.object(kb, "_load_ruleset", lambda *a, **k: loaded),
         patch.object(kb, "_resolve_workspace_client_id", lambda *a, **k: None),
         patch.object(kb, "make_dedup_lookups", fake_lookups),
         patch.object(kb.db, "insert_exception", recorder.insert_exception),
@@ -71,9 +101,10 @@ def _run(
     recorder=None,
     exact=None,
     suspected=(),
+    ruleset=None,
 ):
     rec = recorder or _Recorder()
-    with _wired(rec, exact=exact, suspected=suspected):
+    with _wired(rec, exact=exact, suspected=suspected, ruleset=ruleset):
         high = kb.run_and_record(
             history_id="11111111-1111-1111-1111-111111111111",
             user_id="u1",
@@ -195,6 +226,81 @@ def test_dedup_lookup_is_tenant_scoped_and_excludes_self():
     assert "id <> %s::uuid" in captured["sql"]
     assert "self-id" in captured["params"]
     assert "t1" in captured["params"]
+
+
+def test_future_invoice_date_writes_finding():
+    rec, _ = _run({"seller_tax": _VALID_SELLER, "invoice_date": "2999-01-01"})
+    assert "R-DATE-01" in rec.rule_codes()
+
+
+def test_unparseable_invoice_date_writes_finding():
+    rec, _ = _run({"seller_tax": _VALID_SELLER, "invoice_date": "not a date"})
+    assert "R-DATE-01" in rec.rule_codes()
+
+
+def test_plausible_invoice_date_does_not_fire():
+    rec, _ = _run({"seller_tax": _VALID_SELLER, "invoice_date": "2026-06-01"})
+    assert "R-DATE-01" not in rec.rule_codes()
+
+
+def test_force_review_supplier_writes_finding():
+    ruleset = _ruleset(
+        RULE_SUPPLIER_FORCE_REVIEW, SUBJECT_SUPPLIER, _VALID_SELLER, {"reason": "watch"}, "high"
+    )
+    rec, high = _run({"seller_tax": _VALID_SELLER}, ruleset=ruleset)
+    assert "R-SUP-02" in rec.rule_codes()
+    assert "R-SUP-02" in high
+
+
+def test_force_review_does_not_fire_for_other_supplier():
+    ruleset = _ruleset(
+        RULE_SUPPLIER_FORCE_REVIEW, SUBJECT_SUPPLIER, "9999999999999", {"reason": "watch"}, "high"
+    )
+    rec, _ = _run({"seller_tax": _VALID_SELLER}, ruleset=ruleset)
+    assert "R-SUP-02" not in rec.rule_codes()
+
+
+def test_amount_over_limit_writes_finding():
+    ruleset = _ruleset(
+        RULE_AMOUNT_LIMIT,
+        SUBJECT_SUPPLIER,
+        _VALID_SELLER,
+        {"limit": 1000, "basis": "total", "period": "per_invoice"},
+        "high",
+    )
+    rec, _ = _run({"seller_tax": _VALID_SELLER}, total_amount=2000.0, ruleset=ruleset)
+    assert "R-LIMIT-01" in rec.rule_codes()
+
+
+def test_amount_within_limit_does_not_fire():
+    ruleset = _ruleset(
+        RULE_AMOUNT_LIMIT,
+        SUBJECT_SUPPLIER,
+        _VALID_SELLER,
+        {"limit": 1000, "basis": "total", "period": "per_invoice"},
+        "high",
+    )
+    rec, _ = _run({"seller_tax": _VALID_SELLER}, total_amount=500.0, ruleset=ruleset)
+    assert "R-LIMIT-01" not in rec.rule_codes()
+
+
+def test_no_auto_push_category_writes_finding():
+    ruleset = _ruleset(RULE_NO_AUTO_PUSH_CATEGORY, SUBJECT_CATEGORY, "entertainment", {})
+    rec, _ = _run({"seller_tax": _VALID_SELLER, "category": "entertainment"}, ruleset=ruleset)
+    assert "R-CAT-01" in rec.rule_codes()
+
+
+def test_other_category_does_not_fire_no_auto_push():
+    ruleset = _ruleset(RULE_NO_AUTO_PUSH_CATEGORY, SUBJECT_CATEGORY, "entertainment", {})
+    rec, _ = _run({"seller_tax": _VALID_SELLER, "category": "rent"}, ruleset=ruleset)
+    assert "R-CAT-01" not in rec.rule_codes()
+
+
+def test_held_back_rules_are_not_enabled():
+    # Inputs the OCR field dict does not carry yet — keep them off so they cannot
+    # silently over-report once the engine runs live.
+    for rule_id in ("R-WHT-01", "R-WS-01", "R-BRANCH-01", "R-FIELD-02"):
+        assert kb._is_enabled(rule_id) is False
 
 
 from tests.unit.knowledge._pytest_adapter import build_case  # noqa: E402

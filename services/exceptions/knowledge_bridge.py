@@ -30,8 +30,15 @@ logger = logging.getLogger("mr-pilot")
 # Rule groups live in the unified path one group at a time, each turned on only
 # once its simulate-trigger tests pass (plan P2). A finding whose rule_id is not
 # enabled is still computed but not written, so enabling a group is one edit.
-# Starts with the groups that directly replace the legacy inline rules
-# (math_mismatch -> arithmetic, tax_id -> R-TAXID, duplicate -> R-DUP).
+#   - R-VAT/R-SUM/R-LINE/R-MULTIPAGE/R-TAXID/R-DUP: replace the legacy inline
+#     rules (math_mismatch -> arithmetic, tax_id -> R-TAXID, duplicate -> R-DUP).
+#   - R-DATE: invoice-date legality (unparseable / future) + accounting period.
+#   - R-SUP/R-LIMIT/R-CAT: customer rules — inert until a client_rule configures
+#     them, so safe to enable now; this is the engine's net-new value.
+# Held back until their inputs exist: R-WHT and R-WS (OCR carries no declared WHT
+# rate or workspace tax id), R-BRANCH (no seller_branch field), and R-FIELD
+# completeness (needs doc_type / address the OCR field dict does not provide;
+# enabling as-is would over-report on every invoice).
 ENABLED_RULE_PREFIXES = (
     "R-VAT",
     "R-SUM",
@@ -39,6 +46,10 @@ ENABLED_RULE_PREFIXES = (
     "R-MULTIPAGE",
     "R-TAXID",
     "R-DUP",
+    "R-DATE",
+    "R-SUP",
+    "R-LIMIT",
+    "R-CAT",
 )
 
 

@@ -216,6 +216,7 @@ interface Window {
     // ── C5 批9 桥(exceptions / erp / recon / workspace / ocr-doc-mode 等遗留边界)──
     // 零参/取值桥用精确类型;带参或多态的遗留桥用 LegacyBridge 避免逆变失配。
     loadExceptionsPage?: () => void;
+    openRulesSettings?: () => void;
     refreshExcBadge?: () => void;
     _refreshExcClientFilter?: () => void;
     _excState?: Record<string, unknown>;

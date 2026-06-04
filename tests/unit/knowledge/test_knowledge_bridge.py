@@ -296,6 +296,32 @@ def test_other_category_does_not_fire_no_auto_push():
     assert "R-CAT-01" not in rec.rule_codes()
 
 
+def test_amount_limit_notify_line_pushes_without_high_severity():
+    ruleset = _ruleset(
+        RULE_AMOUNT_LIMIT,
+        SUBJECT_SUPPLIER,
+        _VALID_SELLER,
+        {"limit": 1000, "basis": "total", "period": "per_invoice", "notify_line": True},
+        "medium",  # not high, but opted into the LINE push
+    )
+    rec, line = _run({"seller_tax": _VALID_SELLER}, total_amount=2000.0, ruleset=ruleset)
+    assert "R-LIMIT-01" in rec.rule_codes()  # written to the exception store
+    assert "R-LIMIT-01" in line  # and pushed to LINE despite being medium
+
+
+def test_amount_limit_without_notify_line_does_not_push_when_medium():
+    ruleset = _ruleset(
+        RULE_AMOUNT_LIMIT,
+        SUBJECT_SUPPLIER,
+        _VALID_SELLER,
+        {"limit": 1000, "basis": "total", "period": "per_invoice"},
+        "medium",
+    )
+    rec, line = _run({"seller_tax": _VALID_SELLER}, total_amount=2000.0, ruleset=ruleset)
+    assert "R-LIMIT-01" in rec.rule_codes()  # still a finding
+    assert "R-LIMIT-01" not in line  # but no LINE push (medium, no opt-in)
+
+
 def test_held_back_rules_are_not_enabled():
     # Inputs the OCR field dict does not carry yet — keep them off so they cannot
     # silently over-report once the engine runs live.

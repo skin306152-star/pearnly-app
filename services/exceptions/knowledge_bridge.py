@@ -23,7 +23,7 @@ from core import db
 from services.knowledge.rules.context import ClientRuleSet, Invoice, RuleContext
 from services.knowledge.rules_dal import load_client_rules
 from services.knowledge.rules_engine import run_rules
-from services.knowledge.schema import SEVERITY_HIGH
+from services.knowledge.schema import SEVERITY_HIGH, ClientRule
 
 logger = logging.getLogger("mr-pilot")
 
@@ -261,6 +261,36 @@ def _is_enabled(rule_id: str) -> bool:
     return any(rule_id.startswith(prefix) for prefix in ENABLED_RULE_PREFIXES)
 
 
+def _rules_by_id(ruleset: ClientRuleSet) -> dict[int, ClientRule]:
+    """Index the loaded client rules by id, for per-finding rule_body lookups.
+
+    Only rule kinds that attach a client_rule_id to their findings are indexed
+    (force-review, amount-limit, no-auto-push, wht, accounting-period); the
+    allowlist/toggle kinds produce id-less findings, so they need no lookup.
+    """
+    rules: list[ClientRule] = []
+    rules.extend(ruleset.force_review_suppliers.values())
+    rules.extend(ruleset.amount_limits.values())
+    rules.extend(ruleset.no_push_categories.values())
+    rules.extend(ruleset.wht_rates.values())
+    if ruleset.accounting_period is not None:
+        rules.append(ruleset.accounting_period)
+    return {rule.id: rule for rule in rules}
+
+
+def _wants_line_push(finding, rules_by_id: dict[int, ClientRule]) -> bool:
+    """A customer rule may opt into a LINE push regardless of severity.
+
+    rule_body.notify_line is the "🔔 也推 LINE" option — it lets, e.g., an
+    amount-limit rule ping the boss without being high-severity, replacing the
+    retired large_invoice notification.
+    """
+    if not finding.client_rule_id:
+        return False
+    rule = rules_by_id.get(finding.client_rule_id)
+    return bool(rule and rule.rule_body.get("notify_line"))
+
+
 def run_and_record(
     *,
     history_id: str,
@@ -273,8 +303,9 @@ def run_and_record(
 ) -> List[str]:
     """Run the engine over one OCR result and write its enabled findings.
 
-    Returns the rule_ids of high-severity findings that were written, so the
-    caller fires the same LINE reminders the legacy path did.
+    Returns the rule_ids that should fire a LINE reminder: every high-severity
+    finding, plus any finding whose customer rule opted into notify_line. The
+    caller pushes the same LINE reminders the legacy path did.
     """
     history_id = str(history_id)
     workspace_client_id = _resolve_workspace_client_id(user_id, tenant_id, history_id)
@@ -289,8 +320,9 @@ def run_and_record(
         seller_name=seller_name,
     )
     result = run_rules(invoice, ctx)
+    rules_by_id = _rules_by_id(ctx.rules)
 
-    high_written: List[str] = []
+    line_push: List[str] = []
     for finding in result.findings:
         if not _is_enabled(finding.rule_id):
             continue
@@ -311,6 +343,8 @@ def run_and_record(
                 "client_rule_id": finding.client_rule_id,
             },
         )
-        if ex_id and finding.severity == SEVERITY_HIGH:
-            high_written.append(finding.rule_id)
-    return high_written
+        if not ex_id:
+            continue
+        if finding.severity == SEVERITY_HIGH or _wants_line_push(finding, rules_by_id):
+            line_push.append(finding.rule_id)
+    return line_push

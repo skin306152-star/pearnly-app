@@ -262,6 +262,22 @@ def test_amount_over_limit():
     assert "R-LIMIT-01" in _fired(_clean(), _ctx(rules=ruleset))
 
 
+def test_global_amount_over_limit_any_supplier():
+    ruleset = ClientRuleSet.from_rules(
+        [
+            _rule(
+                RULE_AMOUNT_LIMIT,
+                SUBJECT_GLOBAL,
+                None,
+                {"limit": 500.0, "basis": "total", "period": "per_invoice"},
+            )
+        ]
+    )
+    inv = _clean()
+    inv.seller_tax_id = "9999999999999"  # no supplier-specific limit exists for this seller
+    assert "R-LIMIT-01" in _fired(inv, _ctx(rules=ruleset))
+
+
 def test_category_no_auto_push():
     ruleset = ClientRuleSet.from_rules(
         [_rule(RULE_NO_AUTO_PUSH_CATEGORY, SUBJECT_CATEGORY, "entertainment", {})]

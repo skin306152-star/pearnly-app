@@ -20,6 +20,7 @@ from services.knowledge.schema import (
     RULE_NO_AUTO_PUSH_CATEGORY,
     RULE_SUPPLIER_FORCE_REVIEW,
     SUBJECT_CATEGORY,
+    SUBJECT_GLOBAL,
     SUBJECT_SUPPLIER,
     ClientRule,
 )
@@ -294,6 +295,30 @@ def test_other_category_does_not_fire_no_auto_push():
     ruleset = _ruleset(RULE_NO_AUTO_PUSH_CATEGORY, SUBJECT_CATEGORY, "entertainment", {})
     rec, _ = _run({"seller_tax": _VALID_SELLER, "category": "rent"}, ruleset=ruleset)
     assert "R-CAT-01" not in rec.rule_codes()
+
+
+def test_global_amount_limit_fires_for_any_supplier():
+    ruleset = _ruleset(
+        RULE_AMOUNT_LIMIT,
+        SUBJECT_GLOBAL,
+        None,  # global: applies to every invoice, replacing the old large_invoice
+        {"limit": 50000, "basis": "total", "period": "per_invoice"},
+        "high",
+    )
+    rec, _ = _run({"seller_tax": _VALID_SELLER}, total_amount=60000.0, ruleset=ruleset)
+    assert "R-LIMIT-01" in rec.rule_codes()
+
+
+def test_global_amount_limit_silent_under_limit():
+    ruleset = _ruleset(
+        RULE_AMOUNT_LIMIT,
+        SUBJECT_GLOBAL,
+        None,
+        {"limit": 50000, "basis": "total", "period": "per_invoice"},
+        "high",
+    )
+    rec, _ = _run({"seller_tax": _VALID_SELLER}, total_amount=40000.0, ruleset=ruleset)
+    assert "R-LIMIT-01" not in rec.rule_codes()
 
 
 def test_amount_limit_notify_line_pushes_without_high_severity():

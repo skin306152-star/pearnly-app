@@ -19,6 +19,7 @@ from services.knowledge.rules.context import (
 from services.knowledge.schema import (
     RULE_SUPPLIER_ALLOWLIST,
     SUBJECT_CATEGORY,
+    SUBJECT_GLOBAL,
     SUBJECT_SUPPLIER,
 )
 
@@ -80,7 +81,9 @@ def r_ws_01_ownership(invoice: Invoice, ctx: RuleContext) -> list[Finding]:
 
 
 def r_limit_01_amount(invoice: Invoice, ctx: RuleContext) -> list[Finding]:
-    candidates = []
+    # A global limit applies to every invoice; supplier/category limits narrow to
+    # this invoice's seller or category. Each configured match is its own finding.
+    candidates = [(SUBJECT_GLOBAL, "")]
     if invoice.seller_tax_id:
         candidates.append((SUBJECT_SUPPLIER, invoice.seller_tax_id))
     if invoice.category:

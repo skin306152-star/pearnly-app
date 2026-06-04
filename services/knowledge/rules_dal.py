@@ -86,10 +86,15 @@ def validate_rule(rule_type: str, subject_type: str, subject_key, body: dict) ->
         _require(bool(subject_key), f"{rule_type} needs a subject_key (seller_tax_id)")
     elif rule_type == RULE_AMOUNT_LIMIT:
         _require(
-            subject_type in (SUBJECT_SUPPLIER, SUBJECT_CATEGORY, SUBJECT_CONTRACT),
-            "amount_limit subject must be supplier|category|contract",
+            subject_type in (SUBJECT_SUPPLIER, SUBJECT_CATEGORY, SUBJECT_CONTRACT, SUBJECT_GLOBAL),
+            "amount_limit subject must be supplier|category|contract|global",
         )
-        _require(bool(subject_key), "amount_limit needs a subject_key")
+        # A global limit applies to every invoice (replaces the old large_invoice
+        # alert); only the scoped subjects need a subject_key.
+        _require(
+            subject_type == SUBJECT_GLOBAL or bool(subject_key),
+            "amount_limit needs a subject_key unless global",
+        )
         _require(_is_number(body.get("limit")), "amount_limit body needs limit:number")
         _require(body.get("basis", "total") in ("total", "net"), "basis must be total|net")
         _require(

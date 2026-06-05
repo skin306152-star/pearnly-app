@@ -3,26 +3,16 @@
 """
 tests/integration/test_version_endpoint_contract.py · REFACTOR-WC
 
-域:/api/version 部署金丝雀 + release_notes 4 语完整性契约
+域:/api/version 部署金丝雀契约
 本文件:1 个集成测试 · 只需 app import(不需 DB · 不需登录 · 不烧外部服务)
 
 为啥要这个测试:
   /api/version 是**每次部署后的验证金丝雀**(`curl https://pearnly.com/api/version`
-  看返回翻新 = 部署成功 · 见 CLAUDE.md 部署铁律)。它若被结构性重构搬丢字段 /
-  改坏返回,整条"部署是否生效"的验证链就瞎了。同时铁律 #6 要求 release_notes
-  必须 4 语齐全(zh/th/en/ja · 缺一不部署)。
+  看 version 翻新 = 部署成功 · 见 CLAUDE.md 部署铁律)。它若被结构性重构搬丢字段 /
+  改坏返回,整条"部署是否生效"的验证链就瞎了。
 
-  本测试锁定两条契约:
-    1. GET /api/version → 200,且含 version(str)+ ts(部署时间戳 · 翻新判据)
-    2. release_notes 是 dict 且 zh/th/en/ja 4 语 key 齐全(铁律 #6)
-  任一被搬坏 → 本测试红。
-
-设计:
-  - 断言字段(version / ts / release_notes 4 语)均 2026-05-29 对真实 /api/version
-    返回逐项校验通过(KEYS=release_notes,ts,version · 非手写猜测 · 不臆造 cache_bust 等)。
-  - 只查返回名册 · 不查 release_notes 文案内容(那随每次部署变 · 测内容会脆)。
-  - 无需 DB / 凭据 / 外部服务 · app import 失败则 SkipTest(沿用 _helpers 范式)。
-  - 0 业务代码改动(铁律 #17/#21/#23/#27 · 窗口 C 硬约束)。
+  本测试锁定契约:GET /api/version → 200,且含 version(str)+ ts(部署时间戳)。
+  更新通知横幅 version-banner 已下线,接口不再返回 release_notes。
 """
 
 from __future__ import annotations
@@ -37,16 +27,14 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from tests.integration._helpers import get_test_client  # noqa: E402
 
-REQUIRED_LANGS = {"zh", "th", "en", "ja"}
-
 
 class VersionEndpointContractIntegrationTest(unittest.TestCase):
-    """部署金丝雀 + release_notes 4 语契约守门。"""
+    """部署金丝雀契约守门。"""
 
     def setUp(self) -> None:
         self.client = get_test_client()
 
-    def test_version_returns_deploy_fields_and_4lang_release_notes(self) -> None:
+    def test_version_returns_deploy_fields(self) -> None:
         resp = self.client.get("/api/version")
         self.assertEqual(
             resp.status_code,
@@ -55,26 +43,17 @@ class VersionEndpointContractIntegrationTest(unittest.TestCase):
         )
         data = resp.json()
 
-        # 1. 部署验证字段 · version(str)标识版本 · ts(部署时间戳)翻新判部署生效
+        # 部署验证字段 · version(str)标识版本 · ts(部署时间戳)翻新判部署生效
         for field in ("version", "ts"):
             self.assertIn(
                 field,
                 data,
                 msg=f"/api/version 必须含 {field}(部署验证依赖)· keys={sorted(data.keys())}",
             )
-
-        # 2. release_notes 4 语完整(铁律 #6 · 缺一不部署)
-        release_notes = data.get("release_notes")
-        self.assertIsInstance(
-            release_notes,
-            dict,
-            msg=f"release_notes 应是 4 语 dict · 实际 {type(release_notes).__name__}",
-        )
-        missing = REQUIRED_LANGS - set(release_notes.keys())
-        self.assertEqual(
-            missing,
-            set(),
-            msg=f"release_notes 缺语言(铁律 #6 4 语必齐)· 缺 {missing} · 现有 {sorted(release_notes.keys())}",
+        self.assertNotIn(
+            "release_notes",
+            data,
+            msg="version-banner 已下线 · /api/version 不应再返回 release_notes",
         )
 
 

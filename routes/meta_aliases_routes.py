@@ -26,21 +26,14 @@ router = APIRouter()
 
 @router.get("/api/version")
 async def get_frontend_version():
-    """v118.27.5.4 · 前端版本检测接口 · 前端定时轮询 · 不一致弹横幅
-    v118.32.5.5.17 · release_notes 4 语字段 · version-banner.js 拿来显示更新内容
-    v118.35.0.28 · 公开接口只返回 version/ts/release_notes 三个公开字段"""
+    """前端版本锚点:返回当前部署的 bundle 版本(read_frontend_version 解析 home.html)。
+    用于运维/部署校验与 E2E。更新通知横幅(version-banner)已下线,故不再返回 release_notes。"""
     # lazy import:PEARNLY_FRONTEND_VERSION 在 app.py 模块级 · app 加载完后可拿
     from app import PEARNLY_FRONTEND_VERSION
 
     return {
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_time.time()),
-        "release_notes": {
-            "zh": "本次更新统一了系统内操作按钮与开关的颜色风格:原先部分按钮显示为深色,现已统一为品牌蓝色,整体界面看起来更一致、更清晰。即日生效。",
-            "th": "การอัปเดตนี้ได้ปรับสีของปุ่มและสวิตช์ต่าง ๆ ในระบบให้เป็นรูปแบบเดียวกัน จากเดิมที่บางปุ่มแสดงเป็นสีเข้ม ตอนนี้ปรับเป็นสีน้ำเงินของแบรนด์ทั้งหมด ทำให้หน้าจอดูสอดคล้องและชัดเจนยิ่งขึ้น มีผลทันที",
-            "en": "This update unifies the color of action buttons and toggles across the system. Some buttons that previously appeared dark are now shown in the brand blue, giving the whole interface a more consistent and clearer look. Effective immediately.",
-            "ja": "今回の更新では、システム内の操作ボタンとスイッチの配色を統一しました。これまで一部のボタンが濃い色で表示されていましたが、すべてブランドのブルーに統一し、画面全体がより一貫して見やすくなりました。即日有効。",
-        },
     }
 
 

@@ -6,8 +6,8 @@ REFACTOR-B1 守门测试 · 静态页面 + 公开 meta 路由从 app.py 抽到 p
   1. router 注册的 13 条路由 path+method 契约不变(防丢路由 / 改 URL)
      · REFACTOR-WA-B4 新增 /api/ready 真探活端点(铁律 #23.7)
   2. app.py 通过 include_router 真挂上了全部 13 条(防漏挂)
-  3. /api/version **不在** pages_routes(故意留 app.py · 铁律 #6 部署 release_notes 锚点
-     + 读 PEARNLY_FRONTEND_VERSION 模块全局)· 但仍挂在 app 上
+  3. /api/version **不在** pages_routes(在 meta_aliases · 读 PEARNLY_FRONTEND_VERSION
+     模块全局 · 部署金丝雀)· 但仍挂在 app 上
   4. v1_health / v1_contact 仍委托给本模块的 health / contact(单一来源)
 """
 
@@ -51,7 +51,7 @@ class PagesRoutesContractTests(unittest.TestCase):
             self.assertIn(p, paths, f"page route missing from app: {p}")
 
     def test_version_route_stays_in_app_not_pages(self):
-        """/api/version 故意留 app.py(铁律 #6 release_notes 锚点)· 不在 pages_routes"""
+        """/api/version 在 meta_aliases(部署金丝雀 · 读 PEARNLY_FRONTEND_VERSION)· 不在 pages_routes"""
         pages_paths = {r.path for r in router.routes if hasattr(r, "path")}
         self.assertNotIn("/api/version", pages_paths)
 

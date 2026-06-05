@@ -434,10 +434,6 @@ window.I18N = {
         'export-tpl-sales-detail': '泰国销售明细',
         'export-tpl-sales-detail-desc': '每商品 1 行 · 含 Excel 公式 · 跟泰本会计习惯一致',
         'export-tpl-pick': '选导出模板',
-        // v118.27.5.4 · 新版本检测横幅
-        'version-new-msg': 'Pearnly 有新版本',
-        'version-reload': '刷新更新',
-        'version-dismiss': '稍后',
         // v118.20.6 · 停止识别 + 错误分类 + 汇总
         'ocr-stop-toast': '已停止 · 等待当前请求结束',
         'ocr-summary-aborted': '已停止 · 成功 {success} · 已取消 {cancelled} · 共 {total}',
@@ -3132,10 +3128,6 @@ window.I18N = {
         'export-tpl-sales-detail': 'Thai sales detail',
         'export-tpl-sales-detail-desc': 'One row per item · Excel formulas · matches Thai accounting habit',
         'export-tpl-pick': 'Pick template',
-        // v118.27.5.4 · new version banner
-        'version-new-msg': 'A new version of Pearnly is available',
-        'version-reload': 'Reload',
-        'version-dismiss': 'Later',
         // v118.20.6 · stop + error categorization + summary
         'ocr-stop-toast': 'Stopped · waiting for current request to finish',
         'ocr-summary-aborted': 'Stopped · {success} ok · {cancelled} cancelled · {total} total',
@@ -5813,10 +5805,6 @@ window.I18N = {
         'export-tpl-sales-detail': 'รายละเอียดขายไทย',
         'export-tpl-sales-detail-desc': '1 แถวต่อสินค้า · มีสูตร Excel · ตามรูปแบบบัญชีไทย',
         'export-tpl-pick': 'เลือกเทมเพลต',
-        // v118.27.5.4 · แบนเนอร์เวอร์ชันใหม่
-        'version-new-msg': 'มีเวอร์ชันใหม่ของ Pearnly',
-        'version-reload': 'รีเฟรช',
-        'version-dismiss': 'ภายหลัง',
         // v118.20.6 · หยุด + จัดประเภทข้อผิดพลาด + สรุป
         'ocr-stop-toast': 'หยุดแล้ว · กำลังรอคำขอปัจจุบันเสร็จ',
         'ocr-summary-aborted': 'หยุด · สำเร็จ {success} · ยกเลิก {cancelled} · ทั้งหมด {total}',
@@ -8489,10 +8477,6 @@ window.I18N = {
         'export-tpl-sales-detail': 'タイ販売明細',
         'export-tpl-sales-detail-desc': '商品ごと 1 行 · Excel 数式付き · タイ会計慣行に対応',
         'export-tpl-pick': 'テンプレートを選ぶ',
-        // v118.27.5.4 · 新バージョン通知バナー
-        'version-new-msg': 'Pearnly の新バージョンがあります',
-        'version-reload': '更新',
-        'version-dismiss': '後で',
         // v118.20.6 · 停止 + エラー分類 + サマリー
         'ocr-stop-toast': '停止しました · 現在のリクエスト完了を待機中',
         'ocr-summary-aborted': '停止 · 成功 {success} · キャンセル {cancelled} · 合計 {total}',

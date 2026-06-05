@@ -1,6 +1,6 @@
 // 把 home.html 里零散的浏览器全局脚本合并压缩成两个 bundle,按原加载位置分组:
 //   pre.js  = main.js 之前(defer): recon-mapping + recon-review
-//   post.js = main.js 之后(defer): version-banner + erp-mrerp-connect + erp-log-enhance
+//   post.js = main.js 之后(defer): erp-mrerp-connect + erp-log-enhance
 // 分组 = 原 DOM 顺序,保住相对 main.js 的执行时序(脚本依赖 main.js 设的全局 +
 // erp-log-enhance 依赖 erp-mrerp-connect 的 window._mrerpConnectShared)。
 // 每个文件独立 minify 后用 `;` 拼接 = 等价于原来各自一个 <script>(同享全局作用域)。
@@ -16,7 +16,7 @@ const BUNDLES = [
     { out: 'static/dist/pre.js', files: ['recon-mapping.js', 'recon-review.js'] },
     {
         out: 'static/dist/post.js',
-        files: ['version-banner.js', 'erp-mrerp-connect.js', 'erp-log-enhance.js'],
+        files: ['erp-mrerp-connect.js', 'erp-log-enhance.js'],
     },
     {
         out: 'static/dist/landing.js',

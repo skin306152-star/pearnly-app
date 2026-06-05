@@ -330,11 +330,18 @@ async function rsSave(): Promise<void> {
 async function rsToggle(id: number): Promise<void> {
     const rule = rsRules.find((r) => r.id === id);
     if (!rule) return;
+    const next = !rule.is_active;
+    // 乐观更新:立刻翻当前开关(CSS .15s 滑动播)+ 本地 state,后台 PATCH;不整列表重渲(那会换掉 DOM 让动画失效=卡顿)
+    rule.is_active = next;
+    const sw = document.querySelector<HTMLElement>(`#rules-settings-modal [data-toggle="${id}"]`);
+    if (sw) sw.classList.toggle('off', !next);
     try {
-        const resp = await rsApi('PATCH', '/' + id, { is_active: !rule.is_active });
+        const resp = await rsApi('PATCH', '/' + id, { is_active: next });
         if (!resp.ok) throw new Error('http ' + resp.status);
-        await rsLoad();
+        showToast(next ? rsL().enabled : rsL().disabled, 'success');
     } catch (_e) {
+        rule.is_active = !next; // 回滚
+        if (sw) sw.classList.toggle('off', next);
         showToast(rsL().saveFail, 'error');
     }
 }

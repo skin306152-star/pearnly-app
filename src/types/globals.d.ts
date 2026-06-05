@@ -282,6 +282,9 @@ interface Window {
     loadKnowledgePage?: () => void;
     _knowledgeProbed?: boolean;
     _kbRenderDocs?: () => void;
+    _kbRenderAsk?: () => void;
+    _kbOpenSource?: (citation: { chunk_id?: number; document_id?: number; filename?: string; score?: number }) => void;
+    _kbWireAsk?: (threadEl: HTMLElement, inputEl: HTMLInputElement, sendBtn: HTMLElement) => void;
     getHistoryClientFilter?: () => unknown;
     fillCategoryDatalist?: () => void;
     _tcApplyVisibility?: () => void;

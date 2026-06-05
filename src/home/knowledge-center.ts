@@ -49,6 +49,7 @@ function switchTab(tab: string): void {
         p.classList.toggle('active', p.id === 'kb-pane-' + tab);
     });
     if (tab === 'docs' && typeof window._kbRenderDocs === 'function') window._kbRenderDocs();
+    if (tab === 'qa' && typeof window._kbRenderAsk === 'function') window._kbRenderAsk();
 }
 
 function bindTabs(): void {

@@ -243,14 +243,12 @@ def update_client_rule(
     return _as_rule(row) if row is not None else None
 
 
-def deactivate_client_rule(
-    cur, *, tenant_id: str, rule_id: int, accessible_ids: AccessibleIds
-) -> bool:
-    """Soft-delete: mark inactive so it stops loading but stays auditable."""
+def delete_client_rule(cur, *, tenant_id: str, rule_id: int, accessible_ids: AccessibleIds) -> bool:
+    """Hard-delete a rule (the trash action). Disabling without removing is the
+    toggle path (update_client_rule is_active=false); delete means gone."""
     where, params = workspace_filter(accessible_ids)
     cur.execute(
-        "UPDATE client_rules SET is_active = false, updated_at = now() "
-        "WHERE tenant_id = %s AND id = %s AND is_active" + where,
+        "DELETE FROM client_rules WHERE tenant_id = %s AND id = %s" + where,
         [tenant_id, rule_id, *params],
     )
     return cur.rowcount > 0

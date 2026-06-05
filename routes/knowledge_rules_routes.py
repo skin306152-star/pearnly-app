@@ -127,9 +127,9 @@ def update_rule(request: Request, rule_id: int, body: RulePatch) -> dict[str, An
 def delete_rule(request: Request, rule_id: int) -> dict[str, Any]:
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id, commit=True) as cur:
-        deactivated = rules_dal.deactivate_client_rule(
+        deleted = rules_dal.delete_client_rule(
             cur, tenant_id=identity.tenant_id, rule_id=rule_id, accessible_ids=accessible
         )
-    if not deactivated:
+    if not deleted:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "rule not found")
-    return {"status": "deactivated", "rule_id": rule_id}
+    return {"status": "deleted", "rule_id": rule_id}

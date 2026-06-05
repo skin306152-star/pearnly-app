@@ -281,6 +281,7 @@ interface Window {
     loadClientsPage?: () => void;
     loadKnowledgePage?: () => void;
     _knowledgeProbed?: boolean;
+    _kbRenderDocs?: () => void;
     getHistoryClientFilter?: () => unknown;
     fillCategoryDatalist?: () => void;
     _tcApplyVisibility?: () => void;

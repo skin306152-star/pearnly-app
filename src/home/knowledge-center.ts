@@ -48,6 +48,7 @@ function switchTab(tab: string): void {
     document.querySelectorAll<HTMLElement>('.kb-pane').forEach((p) => {
         p.classList.toggle('active', p.id === 'kb-pane-' + tab);
     });
+    if (tab === 'docs' && typeof window._kbRenderDocs === 'function') window._kbRenderDocs();
 }
 
 function bindTabs(): void {
@@ -70,6 +71,11 @@ function bindTabs(): void {
 window.loadKnowledgePage = function loadKnowledgePage(): void {
     bindTabs();
     renderWorkspaceBar();
+    // 文档库是默认 tab · 进页即拉取(切到其它 tab 再回来由 switchTab 兜底刷新)
+    const docsActive = document
+        .querySelector('.kb-tab-bar .recon-tab-btn[data-kb-tab="docs"]')
+        ?.classList.contains('active');
+    if (docsActive && typeof window._kbRenderDocs === 'function') window._kbRenderDocs();
 };
 
 // 探针门控:仅当后端知识库开启(flag)才显示侧栏入口。关闭态用户全程零入口。

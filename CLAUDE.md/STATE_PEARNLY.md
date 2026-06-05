@@ -6,17 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-05 · **✅ 知识库「文档库+问答+悬浮猫+费用+全格式OCR入库+真实计费」整条上线**）
+## 🎯 状态卡（2026-06-05 · **✅ 知识库 /simplify 收口 + Codex 报告 4 修复 + 图标线性化 · 集中上线 `11850607`**）
 
-- **客户知识中心整条上线**(master `f73c42e` · 版本 `11850606` · prod 活 · `KNOWLEDGE_ENABLED=1` · 全量对所有用户可见含 mrerp · Zihao 拍板全开)。5 前端阶段 `src/home/knowledge-*.ts`(api/center/documents/ask/sources/fab/info + page-knowledge):
-  - **文档库**(拖拽上传/状态轮询/删除/四态)、**问答**(带 `[n]` 出处卡 · 点开来源弹窗 `.modal` · 无来源回「资料不足」)、**悬浮猫 FAB**(长按拖拽吸边+卖萌·问答 tab 开关控显隐·素材 `static/brand/kb-cat.png`)、**功能介绍+费用弹窗**。侧栏「客户知识」探针门控(`GET /bases` 200 才显)。i18n 全 4 语。
-- **全格式入库**(`services/knowledge/ocr_ingest.py`):文本走纯核心(ingest.py 不动·按字符);**图片/扫描件 PDF 走 OCR Layer1 Vision** 整页 full_text → 切片建索引(按页)。上传走 `asyncio.to_thread`。
-- **真实计费接通**(钱路径·Zihao 拍板):`charge.deduct_thb` 通用扣 `tenant_credits.balance_thb`·`host_provider.charge_credits` 取代 log-only(amount=satang)。**上传**图片/扫描件按页(`estimate_pdf` ฿1.50/页起)·文本按字符(`estimate_excel`);**问答**答出扣 ฿0.50(`_RAG_ANSWER_SATANG=50`·no_answer 不扣·余额前置检查 402)。跟 OCR 同池。
-- **验证**:前端本地反代真账号 5 阶段全 PASS;**计费 prod 真账号自验通过**(文本฿0.02/图片OCR ready ฿1.50/问答฿0.50/503 不扣)。单测 `test_knowledge_billing` 8 例 + 守门 9 道绿。
-- **prod 实测 3 修复**(Zihao 验·已上线 `11850606`):① **猫图裂** = Cloudflare 缓存了部署前的 404(本地反代验证时请求过裸 URL)→ `KB_CAT` 加 `?v=2` 破缓存(文件本身在服务器好好的)② 聊天气泡 🐱 emoji → 全统一真猫图(共享常量 `KB_CAT` in knowledge-api.ts)③ 侧栏「客户知识」入口挪到「客户管理」正下方(原在「异常」后)。**坑记**:pearnly.com 走 Cloudflare·新静态资源若部署前被请求过会缓存 404·**新增 static 资源引用带 `?v=`**。
-- **未提交残留**:无(全 push)。**未闭环**:① 问答出处暂只显文档名+相关度,**原文片段高亮**需加后端「按 chunk_id 取文」接口(留后续)② 问答偶发 **Gemini 503**(瞬时·前端优雅降级显「出错重试」不扣费)。
-- **/simplify 发现(故意留下个窗口·跟 Codex 修复一起做=一次部署·别为纯DRY单独重部署稳定线)**:① 5 个 knowledge-*.ts 各自定义 i18n helper(`aT/dT/sT/iT/fT`)→ 抽 `knowledge-api.ts` 导出 `kbT` ② 4× `esc`(escapeHtml 包装)→ 抽 `kbEsc`(且 fab 里 citation JSON 没转义=小隐患)③ `deduct_thb` 与 `charge_ocr` 逐字复制 11 行余额 SQL → 抽私有 `_execute_balance_transaction` ④ satang 转换两处硬编码 → `charge.py` 加 `thb_to_satang`/`SATANG_PER_THB` ⑤ `knowledge-sources`/`knowledge-info` 两套 modal mask → 抽工厂。
-- **下一步(下个窗口)**:**等 Codex 真 prod UI 实测报告**(文案已给 Zihao)→ 看报告再决定做什么 · 顺手把上面 /simplify 5 条收口 + 原文高亮后端接口一起做。全貌见 [[kb-rag-sandbox-project]] / [[knowledge-frontend-ocr-billing-shipped]]。
+- **本批集中一次 push**(master `517fba9` · 版本 `11850607` · prod 活)：上窗口留的 /simplify 5 条 + Codex prod 实测报告 4 个问题 + 图标线性化一起上。守门全绿(format/i18n/imports/ruff/ai_smell/vite build)· 全量单测 **2290 OK**(+6)。home.html `?v=` 11850606→11850607(字节级改保 CRLF)。
+- **/simplify 5 条**(`368c411`)：① 6 份 i18n helper→`kbT` ② 5 份 esc→`kbEsc` ③ `charge_ocr`/`deduct_thb` 余额 SQL→私有 `_debit_balance` ④ satang 硬编码→`SATANG_PER_THB`/`thb_to_satang`/`satang_to_thb` ⑤ sources/info 两套 modal mask→`kbModalShell` 工厂。(原"citation 没转义"核查后**不存在**·escapeHtml 已转单引号·citeChip 已包)
+- **报告 4 修复**(`517fba9`)：**P0** 查不到资料仍扣费 → `ask.py` 哨兵 `NO_ANSWER` 或答案无 `[n]` 出处即 `no_answer=true` 不扣(+2 测)；**P1a** 坏文件 500 → `ocr_ingest` 包文本路径异常 + 路由兜底落 `failed` + 新码 `processing_failed`(4 语·+4 测)；**P1b** 402 → 显「余额不足,请先充值」(4 语)；**P2a** 上传行不即时 → 统一 `renderList` 乐观行。
+- **图标线性化**：知识库 emoji 图标(📄📑💬✅✓✕🎯ℹ️🔒 等)→ `kbIcon` lucide 线性 SVG;🎯/ℹ️/🔒 删冗余。**悬浮猫(fab)整体保留**(爆花/猫爪/动画·Zihao 指定)。**图标 Zihao 自验·不进 Codex 清单**。
+- **未提交残留**:无(全 push·分支已删)。**未闭环**:原文片段高亮(后端「按 chunk_id 取文」接口)留后续;问答偶发 Gemini 503(瞬时·已降级不扣)。
+- **在等 Codex**:用桌面 `knowledge_fix_verify_2026-06-05\`(`验证清单_2026-06-05.md` + `files/kb_bad_broken.pdf` 坏PDF + `files/kb_seed_policy.txt` 种子文档)做 **prod UI 实测**(图标除外),重点验三条"不该扣费"(P0-1 off-topic / P1a 坏文件 / P1b 低余额)→ 出 `知识库修复验证报告_2026-06-05.md`。
+- **下一步(下个窗口)**:**等 Codex 报告再决定**(Zihao 拍板)——有问题修、没问题收;顺带可做原文片段高亮接口。⚠️ P0/P1a 碰计费/OCR 热路径·已上线但建议真账号 prod 复验(方向更保守·不会多扣)。全貌见 [[kb-rag-sandbox-project]] / [[knowledge-frontend-ocr-billing-shipped]]。
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->
 <!-- 新窗口:读上面状态卡 + 跑 scripts/refactor_progress.py 就能开工 -->

@@ -57,11 +57,19 @@ def _rule_out(rule: ClientRule) -> dict[str, Any]:
 
 
 @router.get("")
-def list_rules(request: Request, rule_type: Optional[str] = None) -> dict[str, Any]:
+def list_rules(
+    request: Request, rule_type: Optional[str] = None, include_inactive: bool = False
+) -> dict[str, Any]:
+    # include_inactive: the settings UI lists disabled rules too (greyed, re-enableable);
+    # the engine's ruleset loader stays active-only and is unaffected.
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id) as cur:
         rules = rules_dal.list_client_rules(
-            cur, tenant_id=identity.tenant_id, accessible_ids=accessible, rule_type=rule_type
+            cur,
+            tenant_id=identity.tenant_id,
+            accessible_ids=accessible,
+            rule_type=rule_type,
+            include_inactive=include_inactive,
         )
     return {"rules": [_rule_out(r) for r in rules]}
 

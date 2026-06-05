@@ -139,7 +139,8 @@ function rsRender(): void {
 
 async function rsLoad(): Promise<void> {
     try {
-        const resp = await rsApi('GET', '');
+        // 设置弹窗要列出停用的规矩(变灰可重新启用)· 引擎加载只取启用的,互不影响
+        const resp = await rsApi('GET', '?include_inactive=1');
         if (!resp.ok) throw new Error('http ' + resp.status);
         const data = await resp.json();
         rsRules = (data.rules || []) as ClientRuleRow[];
@@ -403,6 +404,12 @@ function rsBuild(): void {
         const pick = el.closest('[data-type-pick]') as HTMLElement | null;
         if (pick) {
             rsAddType = pick.dataset.typePick!;
+            // 高亮跟随选中:重渲表单不含类型卡片,需手动迁移 on
+            document
+                .querySelectorAll('#rs-add-modal .rs-type')
+                .forEach((c) =>
+                    c.classList.toggle('on', (c as HTMLElement).dataset.typePick === rsAddType)
+                );
             const fields = document.getElementById('rs-add-fields');
             if (fields) fields.innerHTML = rsAddFields();
         }

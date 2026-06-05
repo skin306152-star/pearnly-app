@@ -50,7 +50,7 @@
     border: 1px solid var(--line);
     border-radius: 10px;
 }
-.erp-exc-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.erp-exc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 10px; }
 .erp-exc-title { font-size: 15px; font-weight: 700; color: var(--ink); margin: 0; }
 .erp-exc-sub { font-size: 12px; color: var(--ink-3); }
 .erp-exc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
@@ -74,7 +74,7 @@
 .erp-exc-batch-info { font-size: 12px; color: var(--ink-2); }
 .erp-exc-batch-count { font-weight: 700; color: var(--ink); }
 /* 横条行(像推送日志 · 不做卡片 · 省位置) */
-.erp-exc-rows { display: flex; flex-direction: column; }
+.erp-exc-rows { display: flex; flex-direction: column; overflow-x: auto; }
 .erp-exc-row {
     display: grid;
     grid-template-columns: 32px 130px 1.2fr 1.2fr 96px 2fr 76px;
@@ -85,7 +85,12 @@
 .erp-exc-row-head { font-weight: 600; color: var(--ink-3); border-bottom: 1px solid var(--line); }
 .erp-exc-row .ex-inv { font-weight: 600; color: var(--ink); }
 .erp-exc-row .ex-inv, .erp-exc-row .ex-seller, .erp-exc-row .ex-buyer, .erp-exc-row .ex-reason {
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+/* 窄屏:整块内横向滚动 · 不撑破页面(本块后续将迁至集成页) */
+@media (max-width: 800px) {
+    .erp-exc-row { min-width: 660px; }
+    .erp-exc-search { width: 100%; min-width: 0; margin-left: 0; }
 }
 .erp-exc-row .ex-seller, .erp-exc-row .ex-buyer { color: var(--ink-2); }
 .erp-exc-row .ex-reason { color: var(--ink-2); }

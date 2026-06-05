@@ -59,14 +59,20 @@ function _erpExcTok() {
     return localStorage.getItem('mrpilot_token') || '';
 }
 
+// 原始报错串(HTML 错误页 / 栈 / ERR_ 码 / 超长串)不该露给用户 → 退回类别文案
+function _erpExcLooksRaw(s: string) {
+    return /<!?\s*doctype|<html|<\/?[a-z]+>|\bTraceback\b|^\s*ERR_[A-Z]/i.test(s) || s.length > 200;
+}
+
 function _erpExcFriendly(it: ErpExcItem) {
     // P2-C (B7) · 优先后端 4 语友好原因(不裸透泰文)→ 退 humanizeError(网络错误)→ category 文案
     const _efLang = (typeof currentLang === 'string' && currentLang) || window._currentLang || 'th';
     const _ef = it.error_friendly && it.error_friendly[_efLang];
     if (_ef) return _ef;
-    if (typeof humanizeError === 'function' && it.error_msg) {
+    if (typeof humanizeError === 'function' && it.error_msg && !_erpExcLooksRaw(it.error_msg)) {
         try {
-            return humanizeError(it.error_msg);
+            const h = humanizeError(it.error_msg);
+            if (h && !_erpExcLooksRaw(h)) return h;
         } catch (_) {
             /* fall through */
         }
@@ -137,7 +143,7 @@ function renderErpExceptions() {
             ${sellerCell}
             ${buyerCell}
             <span class="ex-state"><span class="erp-exc-state ${stateCls}">${escapeHtml(stateLbl)}</span></span>
-            <span class="ex-reason" title="${escapeHtml(reason)}">${escapeHtml(reason)}${it.error_code ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</span>
+            <span class="ex-reason" title="${escapeHtml(reason)}${it.error_code ? ' (' + escapeHtml(it.error_code) + ')' : ''}">${escapeHtml(reason)}</span>
             <span class="ex-act"><button class="btn btn-sm btn-secondary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button></span>
         </div>`;
         })

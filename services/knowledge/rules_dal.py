@@ -181,9 +181,13 @@ def list_client_rules(
     tenant_id: str,
     accessible_ids: AccessibleIds,
     rule_type: Optional[str] = None,
+    include_inactive: bool = False,
 ) -> list[ClientRule]:
+    # The engine loads active rules only; the settings UI passes include_inactive
+    # so disabled rules stay listed (greyed) and can be re-enabled.
+    active_clause = "" if include_inactive else " AND is_active"
     where, params = workspace_filter(accessible_ids)
-    sql = f"SELECT {_CR_COLS} FROM client_rules WHERE tenant_id = %s AND is_active" + where
+    sql = f"SELECT {_CR_COLS} FROM client_rules WHERE tenant_id = %s{active_clause}" + where
     args: list = [tenant_id, *params]
     if rule_type is not None:
         sql += " AND rule_type = %s"

@@ -887,7 +887,7 @@ Pearnly = 泰国会计事务所 + SME 老板的 AP 自动化 SaaS
 | 服务器 | root@45.76.53.194 · Vultr Tokyo · Ubuntu 24.04 · /opt/mrpilot/ |
 | 数据库 | Supabase PostgreSQL · AWS ap-southeast-1 |
 | 邮件 | Gmail SMTP · hello@pearnly.com |
-| LINE Bot | @059oupmg · Channel ID 2010022630 |
+| LINE Bot | @pearnly · Channel ID 2010309291 |
 | SSH | 免密已配置（id_ed25519）· 不再需要密码 |
 
 ---

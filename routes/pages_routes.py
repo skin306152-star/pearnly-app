@@ -75,8 +75,8 @@ async def ready():
 async def contact():
     return {
         "phone": os.environ.get("CONTACT_PHONE", "086-889-2228"),
-        "line_id": os.environ.get("CONTACT_LINE", "@Pearnly"),
-        "line_url": os.environ.get("CONTACT_LINE_URL", "https://line.me/R/ti/p/@059oupmg"),
+        "line_id": os.environ.get("CONTACT_LINE", "@pearnly"),
+        "line_url": os.environ.get("CONTACT_LINE_URL", "https://line.me/R/ti/p/@pearnly"),
         "email": os.environ.get("CONTACT_EMAIL", "hello@pearnly.com"),
         "address": os.environ.get("CONTACT_ADDRESS", "Bangkok, Thailand"),
     }

@@ -263,7 +263,7 @@ A: 先看是不是环境问题(Python 3.10 vs 3.11 · npm ci · pip install -r r
 | 服务器 | root@45.76.53.194(Vultr Tokyo · 免密 SSH) |
 | 数据库 | Supabase PostgreSQL · AWS ap-southeast-1 |
 | 邮件 | hello@pearnly.com(Gmail SMTP) |
-| LINE Bot | @059oupmg(Channel ID 2010022630) |
+| LINE Bot | @pearnly(Channel ID 2010309291) |
 | 部署 | git push origin master → webhook 自动部署 · ~15s 后 `/api/version` 可验 |
 | 1 真实付费用户 | mrerp@outlook.co.th(MR.ERP · 维护时绝不动其余额) |
 

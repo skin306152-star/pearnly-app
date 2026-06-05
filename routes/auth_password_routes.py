@@ -80,7 +80,7 @@ def _send_password_reset_via_email(email: str, reset_url: str, user_name: str = 
                 <p style="font-size:12px;color:#94a3b8;line-height:1.6;">If the button doesn't work, copy this link:<br><span style="word-break:break-all;color:#475569;">{reset_url}</span></p>
                 <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
                 <p style="font-size:11px;color:#94a3b8;line-height:1.6;">If you didn't request this, please ignore this email. 如非本人操作 · 请忽略此邮件。</p>
-                <p style="font-size:11px;color:#94a3b8;">Need help? Email hello@pearnly.com or LINE @Pearnly</p>
+                <p style="font-size:11px;color:#94a3b8;">Need help? Email hello@pearnly.com or LINE @pearnly</p>
             </div>
         </div>
         """

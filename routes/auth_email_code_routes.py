@@ -146,7 +146,7 @@ def _build_verification_email_html(code: str, lang: str) -> tuple:
       <div style="font-size:12px;color:#475569;margin-bottom:6px;font-weight:600;">{tt["brand_full"]}</div>
       <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
         Bangkok, Thailand · <a href="https://pearnly.com" style="color:#94a3b8;text-decoration:none;">pearnly.com</a><br>
-        hello@pearnly.com · LINE @059oupmg · +66 86-889-2228
+        hello@pearnly.com · LINE @pearnly · +66 86-889-2228
       </div>
       <div style="margin-top:12px;font-size:11px;">
         <a href="https://pearnly.com/terms" style="color:#94a3b8;text-decoration:none;margin:0 8px;">{tt["tos"]}</a>

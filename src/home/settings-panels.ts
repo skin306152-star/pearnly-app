@@ -14,8 +14,8 @@
         const el = document.getElementById('settings-contact-grid');
         if (!el) return;
         const phone = _contact?.phone || '086-889-2228';
-        const lineId = _contact?.line_id || '@Pearnly';
-        const lineUrl = _contact?.line_url || 'https://line.me/R/ti/p/@059oupmg';
+        const lineId = _contact?.line_id || '@pearnly';
+        const lineUrl = _contact?.line_url || 'https://line.me/R/ti/p/@pearnly';
         const email = _contact?.email || 'hello@pearnly.com';
         const address = _contact?.address || 'Bangkok, Thailand';
         el.innerHTML = `

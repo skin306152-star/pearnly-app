@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pearnly · FastAPI 主入口 (v3.5)
+Pearnly · FastAPI 主入口 (v3.5)
 第 3.5 批:
   - 返回完整权限字段
   - /api/v1/ 路由前缀预留(与旧路径并存)
@@ -172,7 +172,7 @@ async def lifespan(app: FastAPI):
     await run_shutdown(tasks)
 
 
-app = FastAPI(title="Mr.Pearnly API", version="0.3.5-mvp", lifespan=lifespan)
+app = FastAPI(title="Pearnly API", version="0.3.5-mvp", lifespan=lifespan)
 app.include_router(reports_router)  # v109.0
 app.include_router(ocr_recognize_router)  # REFACTOR-WB-app · OCR 识别主路由(2026-06-01)
 app.include_router(signup_router)  # v109.3

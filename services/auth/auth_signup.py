@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pearnly · v109.3 商业模式核心
+Pearnly · v109.3 商业模式核心
 ==============================
 - 自由注册(7 天 trial · 50 张 / 3 客户)
 - 套餐拦截(trial / free / pro / firm)

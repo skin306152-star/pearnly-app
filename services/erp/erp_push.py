@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pilot · ERP 推送模块 (v0.6.0 · 支柱 3)
+Pearnly · ERP 推送模块 (v0.6.0 · 支柱 3)
 
 设计:
 - 适配器(adapter)模式:不同的 ERP 走不同的 push 函数,但对外接口统一
@@ -446,12 +446,12 @@ def test_endpoint_connection(adapter: str, config: Dict[str, Any]) -> Dict[str, 
         "invoice_no": "TEST-PING",
         "date": datetime.utcnow().strftime("%Y-%m-%d"),
         "total": "0.00",
-        "seller": {"name": "Mr.Pilot Test"},
-        "buyer": {"name": "Mr.Pilot Test"},
+        "seller": {"name": "Pearnly Test"},
+        "buyer": {"name": "Pearnly Test"},
         "items": [],
         "metadata": {
             "filename": "test-ping.pdf",
-            "test_purpose": "connection check from Mr.Pilot",
+            "test_purpose": "connection check from Pearnly",
         },
     }
     push_fn = ADAPTER_REGISTRY.get(adapter)

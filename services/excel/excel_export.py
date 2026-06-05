@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pilot · Excel 导出模块
+Pearnly · Excel 导出模块
 "普通模板":17 列标准发票结构,系统默认,所有套餐可用
 """
 

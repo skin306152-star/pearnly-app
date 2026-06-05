@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pearnly · 数据库模块(v3)
+Pearnly · 数据库模块(v3)
 第 3.5 批:支持新权限字段 + ensure_demo 更新字段
 """
 

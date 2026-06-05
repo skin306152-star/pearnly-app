@@ -6,20 +6,20 @@ from typing import Optional
 LINE_I18N = {
     "zh": {
         "welcome": (
-            "👋 欢迎使用 Mr.Pilot!\n\n"
+            "👋 欢迎使用 Pearnly!\n\n"
             "请先到网站绑定账号:\n"
-            "1. 登录 https://mr-cloud-mr-cloud.hf.space\n"
+            "1. 登录 https://pearnly.com\n"
             "2. 打开「自动化 → LINE Bot」\n"
             "3. 把那里显示的 6 位数字发给我\n\n"
             "绑定完成后 · 把发票照片发给我 · 我帮你自动识别 ✨"
         ),
         "bind_invalid": "❌ 绑定码无效或已过期。\n请回网站重新获取。",
         "bind_conflict": (
-            "❌ 绑定失败 · 此 LINE 账号可能已绑到其他 Mr.Pilot 用户。\n" "请先在原账号解绑再试。"
+            "❌ 绑定失败 · 此 LINE 账号可能已绑到其他 Pearnly 用户。\n" "请先在原账号解绑再试。"
         ),
         "bind_success": (
             "✅ 绑定成功!\n\n"
-            "Mr.Pilot 账号:{username}\n"
+            "Pearnly 账号:{username}\n"
             "LINE:{display_name}\n\n"
             "接下来把发票照片发给我 · 自动识别入账 📸\n"
             "(图片识别功能即将上线)"
@@ -29,12 +29,12 @@ LINE_I18N = {
         ),
         "need_bind": (
             "👋 请先绑定账号:\n"
-            "1. 登录 Mr.Pilot 网站\n"
+            "1. 登录 Pearnly 网站\n"
             "2. 打开「自动化 → LINE Bot」\n"
             "3. 把 6 位数字绑定码发给我"
         ),
         "image_not_bound": (
-            "⚠️ 您还没绑定 Mr.Pilot 账号。\n"
+            "⚠️ 您还没绑定 Pearnly 账号。\n"
             "请到网站「自动化 → LINE Bot」获取绑定码 · 发给我即可。"
         ),
         "image_soon": "📷 收到图片 · 图片识别功能即将上线 · 敬请期待!",
@@ -42,21 +42,21 @@ LINE_I18N = {
     },
     "en": {
         "welcome": (
-            "👋 Welcome to Mr.Pilot!\n\n"
+            "👋 Welcome to Pearnly!\n\n"
             "Please bind your account first:\n"
-            "1. Log in at https://mr-cloud-mr-cloud.hf.space\n"
+            "1. Log in at https://pearnly.com\n"
             "2. Open 'Automation → LINE Bot'\n"
             "3. Send me the 6-digit code shown there\n\n"
             "Once bound, send invoice photos to me and I'll recognize them automatically ✨"
         ),
         "bind_invalid": "❌ Invalid or expired code.\nPlease get a new one from the website.",
         "bind_conflict": (
-            "❌ Binding failed · this LINE account may already be bound to another Mr.Pilot user.\n"
+            "❌ Binding failed · this LINE account may already be bound to another Pearnly user.\n"
             "Please unbind from the original account first."
         ),
         "bind_success": (
             "✅ Bound successfully!\n\n"
-            "Mr.Pilot account: {username}\n"
+            "Pearnly account: {username}\n"
             "LINE: {display_name}\n\n"
             "Now send me invoice photos · I'll auto-recognize and file them 📸\n"
             "(Image recognition coming soon)"
@@ -67,12 +67,12 @@ LINE_I18N = {
         ),
         "need_bind": (
             "👋 Please bind first:\n"
-            "1. Log in to Mr.Pilot website\n"
+            "1. Log in to Pearnly website\n"
             "2. Open 'Automation → LINE Bot'\n"
             "3. Send me the 6-digit binding code"
         ),
         "image_not_bound": (
-            "⚠️ You haven't bound a Mr.Pilot account yet.\n"
+            "⚠️ You haven't bound a Pearnly account yet.\n"
             "Go to 'Automation → LINE Bot' on the website to get a binding code."
         ),
         "image_soon": "📷 Image received · recognition feature coming soon!",
@@ -80,21 +80,21 @@ LINE_I18N = {
     },
     "th": {
         "welcome": (
-            "👋 ยินดีต้อนรับสู่ Mr.Pilot!\n\n"
+            "👋 ยินดีต้อนรับสู่ Pearnly!\n\n"
             "กรุณาผูกบัญชีก่อน:\n"
-            "1. เข้าสู่ระบบที่ https://mr-cloud-mr-cloud.hf.space\n"
+            "1. เข้าสู่ระบบที่ https://pearnly.com\n"
             "2. เปิด 'ระบบอัตโนมัติ → LINE Bot'\n"
             "3. ส่งรหัส 6 หลักที่แสดงไว้มาให้เรา\n\n"
             "หลังผูกบัญชี · ส่งรูปใบกำกับมา · จะอ่านให้อัตโนมัติ ✨"
         ),
         "bind_invalid": "❌ รหัสไม่ถูกต้องหรือหมดอายุ\nกรุณารับรหัสใหม่จากเว็บไซต์",
         "bind_conflict": (
-            "❌ ผูกบัญชีไม่สำเร็จ · LINE นี้อาจถูกผูกกับ Mr.Pilot บัญชีอื่นแล้ว\n"
+            "❌ ผูกบัญชีไม่สำเร็จ · LINE นี้อาจถูกผูกกับ Pearnly บัญชีอื่นแล้ว\n"
             "กรุณายกเลิกที่บัญชีเดิมก่อน"
         ),
         "bind_success": (
             "✅ ผูกบัญชีสำเร็จ!\n\n"
-            "บัญชี Mr.Pilot: {username}\n"
+            "บัญชี Pearnly: {username}\n"
             "LINE: {display_name}\n\n"
             "ส่งรูปใบกำกับมาได้เลย · จะอ่านและบันทึกอัตโนมัติ 📸\n"
             "(ฟีเจอร์อ่านรูปกำลังมา)"
@@ -105,12 +105,12 @@ LINE_I18N = {
         ),
         "need_bind": (
             "👋 กรุณาผูกบัญชีก่อน:\n"
-            "1. เข้าสู่เว็บ Mr.Pilot\n"
+            "1. เข้าสู่เว็บ Pearnly\n"
             "2. เปิด 'ระบบอัตโนมัติ → LINE Bot'\n"
             "3. ส่งรหัส 6 หลักมาให้เรา"
         ),
         "image_not_bound": (
-            "⚠️ ยังไม่ได้ผูกบัญชี Mr.Pilot\n"
+            "⚠️ ยังไม่ได้ผูกบัญชี Pearnly\n"
             "ไปที่ 'ระบบอัตโนมัติ → LINE Bot' บนเว็บไซต์เพื่อรับรหัสผูกบัญชี"
         ),
         "image_soon": "📷 รับรูปแล้ว · ฟีเจอร์อ่านรูปกำลังมา · โปรดรอ!",
@@ -118,21 +118,21 @@ LINE_I18N = {
     },
     "ja": {
         "welcome": (
-            "👋 Mr.Pilot へようこそ!\n\n"
+            "👋 Pearnly へようこそ!\n\n"
             "まずアカウントを紐付けてください:\n"
-            "1. https://mr-cloud-mr-cloud.hf.space にログイン\n"
+            "1. https://pearnly.com にログイン\n"
             "2. 「自動化 → LINE Bot」を開く\n"
             "3. そこに表示される 6 桁の数字を送信\n\n"
             "紐付け完了後 · 請求書の写真を送ると自動認識します ✨"
         ),
         "bind_invalid": "❌ コードが無効または期限切れです。\nウェブサイトから新しいコードを取得してください。",
         "bind_conflict": (
-            "❌ 紐付け失敗 · この LINE は別の Mr.Pilot アカウントに紐付け済みの可能性があります。\n"
+            "❌ 紐付け失敗 · この LINE は別の Pearnly アカウントに紐付け済みの可能性があります。\n"
             "元のアカウントで先に解除してください。"
         ),
         "bind_success": (
             "✅ 紐付け成功!\n\n"
-            "Mr.Pilot アカウント: {username}\n"
+            "Pearnly アカウント: {username}\n"
             "LINE: {display_name}\n\n"
             "請求書の写真を送ってください · 自動で認識して記録します 📸\n"
             "(画像認識は近日公開)"
@@ -143,12 +143,12 @@ LINE_I18N = {
         ),
         "need_bind": (
             "👋 まず紐付けしてください:\n"
-            "1. Mr.Pilot サイトにログイン\n"
+            "1. Pearnly サイトにログイン\n"
             "2. 「自動化 → LINE Bot」を開く\n"
             "3. 6 桁のコードを送信"
         ),
         "image_not_bound": (
-            "⚠️ Mr.Pilot アカウントがまだ紐付けされていません。\n"
+            "⚠️ Pearnly アカウントがまだ紐付けされていません。\n"
             "サイトの「自動化 → LINE Bot」でコードを取得してください。"
         ),
         "image_soon": "📷 画像を受信しました · 画像認識機能は近日公開!",
@@ -190,7 +190,7 @@ OCR_RESULT_I18N = {
         "err_quota": "⚠️ 本月识别额度已用完 · 请等下月重置或联系管理员",
         "err_need_key": "⚠️ 请先到网站「设置 → API Key」填入您的 Gemini API Key",
         "err_plan": "⚠️ 账号暂不可用 · 请联系管理员",
-        "view_on_web": "网页历史记录查看详情 👉 https://mr-cloud-mr-cloud.hf.space",
+        "view_on_web": "网页历史记录查看详情 👉 https://pearnly.com",
     },
     "en": {
         "processing": "📸 Image received · recognizing...",
@@ -206,7 +206,7 @@ OCR_RESULT_I18N = {
         "err_quota": "⚠️ Monthly quota exhausted · please wait for reset or contact admin",
         "err_need_key": "⚠️ Please set your Gemini API Key at 'Settings → API Key' on the website",
         "err_plan": "⚠️ Account unavailable · please contact admin",
-        "view_on_web": "View details in web history 👉 https://mr-cloud-mr-cloud.hf.space",
+        "view_on_web": "View details in web history 👉 https://pearnly.com",
     },
     "th": {
         "processing": "📸 รับรูปแล้ว · กำลังอ่าน...",
@@ -222,7 +222,7 @@ OCR_RESULT_I18N = {
         "err_quota": "⚠️ โควต้าเดือนนี้หมดแล้ว · กรุณารอเดือนหน้าหรือติดต่อผู้ดูแล",
         "err_need_key": "⚠️ กรุณาตั้งค่า Gemini API Key ที่ 'การตั้งค่า → API Key' บนเว็บก่อน",
         "err_plan": "⚠️ บัญชีไม่พร้อมใช้งาน · กรุณาติดต่อผู้ดูแล",
-        "view_on_web": "ดูรายละเอียดบนเว็บ 👉 https://mr-cloud-mr-cloud.hf.space",
+        "view_on_web": "ดูรายละเอียดบนเว็บ 👉 https://pearnly.com",
     },
     "ja": {
         "processing": "📸 画像を受信 · 認識中...",
@@ -238,7 +238,7 @@ OCR_RESULT_I18N = {
         "err_quota": "⚠️ 月間枠を使い切りました · リセットまたは管理者にお問い合わせください",
         "err_need_key": "⚠️ Web の「設定 → API Key」で Gemini API Key を設定してください",
         "err_plan": "⚠️ アカウント利用不可 · 管理者にお問い合わせください",
-        "view_on_web": "Web で履歴を確認 👉 https://mr-cloud-mr-cloud.hf.space",
+        "view_on_web": "Web で履歴を確認 👉 https://pearnly.com",
     },
 }
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pilot · 统一报表引擎 v109.0
+Pearnly · 统一报表引擎 v109.0
 ==============================
 职责:
   - 4 个内置模板(input_vat / standard / erp / print)

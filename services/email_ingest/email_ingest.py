@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pilot · v0.17 · M6 邮箱附件抓取
+Pearnly · v0.17 · M6 邮箱附件抓取
 职责:
   - 从用户邮箱(IMAP)拉取未读邮件 · 提取 PDF/图片附件
   - 喂给 Gemini OCR → 写 ocr_history · 触发自动 ERP 推送

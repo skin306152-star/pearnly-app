@@ -200,7 +200,7 @@ REPORT_TEMPLATES = {
         "ascii_only": True,  # 列名严格 ASCII
         "iso_date": True,  # 日期 ISO 格式
         "no_thousand_sep": True,  # 金额不带千位分隔
-        "first_row_marker": "<!-- ERP_IMPORT_FORMAT_v1 · Mr.Pilot -->",
+        "first_row_marker": "<!-- ERP_IMPORT_FORMAT_v1 · Pearnly -->",
         "columns": [
             {
                 "key": "invoice_date",

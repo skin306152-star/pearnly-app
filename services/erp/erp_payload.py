@@ -152,7 +152,7 @@ def push_webhook(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tu
 
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "MrPilot/0.96 (+https://pearnly.com)",
+        "User-Agent": "Pearnly/0.96 (+https://pearnly.com)",
     }
     if token:
         headers["X-Mrpilot-Token"] = token

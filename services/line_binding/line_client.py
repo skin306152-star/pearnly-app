@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pilot · LINE Messaging API 客户端
+Pearnly · LINE Messaging API 客户端
 T1 轮 2 · v0.19.0 · 2026-04-23
 
 不依赖 line-bot-sdk · 只用 stdlib(hmac / base64 / urllib)
@@ -45,7 +45,7 @@ def pick_lang_from_line_event(ev: dict) -> str:
         src = ev.get("source") or {}
         lang = (src.get("language") or "").lower()
     if not lang:
-        return "zh"
+        return "th"  # 事件不带 language(图片/普通消息)· 主市场泰国兜底
     # 归一化
     if lang.startswith("th"):
         return "th"
@@ -55,7 +55,7 @@ def pick_lang_from_line_event(ev: dict) -> str:
         return "zh"
     if lang.startswith("en"):
         return "en"
-    return "zh"
+    return "th"
 
 
 def _get_channel_secret() -> str:

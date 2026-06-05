@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pearnly · 认证模块
+Pearnly · 认证模块
 - bcrypt 密码验证
 - JWT 令牌生成和验证
 - v118.28.9 · 改密后旧 JWT 失效(token.iat < user.password_changed_at → 401)

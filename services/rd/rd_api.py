@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mr.Pilot · 泰国 RD 税务局 SOAP API 客户端 (v0.5.1)
+Pearnly · 泰国 RD 税务局 SOAP API 客户端 (v0.5.1)
 
 提供两个能力:
   1. verify_tin(tax_id)         → 校验 13 位税号(TIN Service)

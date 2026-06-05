@@ -158,7 +158,7 @@ exit 1
 
 async def run_startup() -> dict:
     """app 启动序列 · 返回 {email_task, erp_retry_task} 供 run_shutdown cancel。"""
-    logger.info("🚀 Mr.Pearnly 启动中...")
+    logger.info("🚀 Pearnly 启动中...")
 
     # v118.35.0.28 P0 安全 self-check (体检 2026-05-21)
     # /internal/deploy 现在 fail-closed · secret 缺失会拒服务 ·
@@ -452,7 +452,7 @@ async def run_startup() -> dict:
         except Exception as e:
             logger.warning(f"[recon-worker] embedded 启动失败(不影响主服务): {e}")
 
-    logger.info("✅ Mr.Pearnly 已就绪 v0.21.0-v108 (Google 余额追踪 · 半自动校准)")
+    logger.info("✅ Pearnly 已就绪 v0.21.0-v108 (Google 余额追踪 · 半自动校准)")
     return {"email_task": email_task, "erp_retry_task": erp_retry_task}
 
 
@@ -481,7 +481,7 @@ async def run_shutdown(tasks: dict):
             await erp_retry_task
         except asyncio.CancelledError:
             pass  # 任务取消 · 正常退出
-    logger.info("👋 Mr.Pearnly 关闭")
+    logger.info("👋 Pearnly 关闭")
 
 
 # ⚠️ `import db` 放 def 之后(解循环 import · 见 services/billing/charge.py 注释)

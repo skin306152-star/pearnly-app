@@ -145,6 +145,21 @@ class ListExceptionsTests(unittest.TestCase):
         self.assertIn("h.client_id = ANY(%s::bigint[])", cur2.last_sql)
         self.assertIn([5, 6], cur2.last_params)
 
+    def test_single_rule_code_uses_equality(self):
+        cur = FakeCursor(fetchall=[])
+        with patch_cursor(cur):
+            exc.list_exceptions("u1", tenant_id="t1", rule_code="R-VAT-01")
+        self.assertIn("e.rule_code = %s", cur.last_sql)
+        self.assertNotIn("e.rule_code = ANY(%s)", cur.last_sql)
+        self.assertIn("R-VAT-01", cur.last_params)
+
+    def test_comma_rule_codes_use_any_group_filter(self):
+        cur = FakeCursor(fetchall=[])
+        with patch_cursor(cur):
+            exc.list_exceptions("u1", tenant_id="t1", rule_code="R-VAT-01,R-VAT-02,math_mismatch")
+        self.assertIn("e.rule_code = ANY(%s)", cur.last_sql)
+        self.assertIn(["R-VAT-01", "R-VAT-02", "math_mismatch"], cur.last_params)
+
     def test_row_mapping_and_limit_offset(self):
         row = {
             "id": 7,

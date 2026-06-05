@@ -4,10 +4,14 @@
 /* eslint-disable no-useless-assignment -- verbatim · 非 bug */
 /* global escapeHtml, showConfirm, currentLang, humanizeError */
 import { _drawer } from './exceptions-store.js';
-import { _v, _money } from './exceptions-helpers.js';
+import { _v, _money, excRuleLabel } from './exceptions-helpers.js';
 import { _loadDrawerPdf, _extractFields, actionSaveFields } from './exceptions-drawer.js';
 
 type WhyDetail = {
+    // 新引擎 finding 形状
+    message_key?: string;
+    evidence?: Record<string, unknown>;
+    // 旧库存行(部署前)形状
     subtotal?: unknown;
     vat?: unknown;
     total_expected?: unknown;
@@ -40,9 +44,101 @@ type DrawerHistory = {
     _err?: unknown;
 };
 
-// 「为什么被拦」详情段 · 根据 rule_code 把 detail_json 渲成人话
+function _whyRow(labelKey: string, val: string, cls?: string) {
+    return `<div class="exc-why-detail-row"><b>${escapeHtml(t(labelKey))}</b><span class="${cls || ''}">${escapeHtml(val)}</span></div>`;
+}
+
+// 新引擎 finding 的 detail = {message_key, evidence}。按 message_key 把证据渲成人话:
+// 标红实测值(v-bad)、标绿应有值(v-good),与旧路径同一套视觉。
+function renderRiskDetail(messageKey: string, ev: Record<string, unknown>) {
+    const m = (k: string) => _money(ev[k]);
+    const s = (k: string) => (ev[k] === null || ev[k] === undefined ? '—' : String(ev[k]));
+    switch (messageKey) {
+        case 'risk.vat_mismatch':
+            return (
+                _whyRow('exc-fld-subtotal', m('net_amount')) +
+                _whyRow('exc-fld-vat', m('vat_amount'), 'v-bad') +
+                _whyRow('exc-detail-expected', m('expected_vat'), 'v-good')
+            );
+        case 'risk.total_mismatch': {
+            const net = Number(ev.net_amount) || 0;
+            const vat = Number(ev.vat_amount) || 0;
+            return (
+                _whyRow('exc-fld-subtotal', m('net_amount')) +
+                _whyRow('exc-fld-vat', m('vat_amount')) +
+                _whyRow('exc-fld-total', m('total_amount'), 'v-bad') +
+                _whyRow('exc-detail-expected', _money(net + vat), 'v-good')
+            );
+        }
+        case 'risk.line_sum_mismatch':
+            return (
+                _whyRow('exc-ev-lines-sum', m('lines_sum'), 'v-bad') +
+                _whyRow('exc-fld-subtotal', m('net_amount'), 'v-good')
+            );
+        case 'risk.line_amount_mismatch': {
+            const qty = Number(ev.qty) || 0;
+            const unit = Number(ev.unit_price) || 0;
+            return (
+                _whyRow('exc-ev-amount', m('amount'), 'v-bad') +
+                _whyRow('exc-detail-expected', _money(qty * unit), 'v-good')
+            );
+        }
+        case 'risk.multipage_mismatch':
+            return _whyRow('exc-ev-pages', s('pages'));
+        case 'risk.seller_tax_id_invalid':
+            return _whyRow('exc-fld-seller-tax', s('seller_tax_id'), 'v-bad');
+        case 'risk.buyer_tax_id_invalid':
+            return _whyRow('exc-fld-buyer-tax', s('buyer_tax_id'), 'v-bad');
+        case 'risk.tax_id_placeholder':
+            return _whyRow('exc-ev-value', s('value'), 'v-bad');
+        case 'risk.invoice_date_unparseable':
+        case 'risk.invoice_date_future':
+            return _whyRow('exc-fld-date', s('invoice_date'), 'v-bad');
+        case 'risk.invoice_date_out_of_period':
+            return (
+                _whyRow('exc-fld-date', s('invoice_date'), 'v-bad') +
+                _whyRow('exc-ev-period-start', s('period_start')) +
+                _whyRow('exc-ev-period-end', s('period_end'))
+            );
+        case 'risk.duplicate_exact':
+            return (
+                (ev.invoice_no ? _whyRow('exc-fld-invoice-no', s('invoice_no')) : '') +
+                _whyRow('exc-fld-seller-tax', s('seller_tax_id'))
+            );
+        case 'risk.duplicate_suspected': {
+            const ids = Array.isArray(ev.candidate_history_ids)
+                ? ev.candidate_history_ids.length
+                : 0;
+            return _whyRow('exc-ev-dup-count', String(ids));
+        }
+        case 'risk.supplier_not_allowlisted':
+            return (
+                _whyRow('exc-fld-seller', s('seller_name')) +
+                _whyRow('exc-fld-seller-tax', s('seller_tax_id'))
+            );
+        case 'risk.supplier_force_review':
+            return (
+                _whyRow('exc-ev-reason', s('reason'), 'v-bad') +
+                _whyRow('exc-fld-seller-tax', s('seller_tax_id'))
+            );
+        case 'risk.amount_over_limit':
+            return (
+                _whyRow('exc-ev-amount', m('value'), 'v-bad') +
+                _whyRow('exc-ev-limit', m('limit'), 'v-good')
+            );
+        case 'risk.category_no_auto_push':
+            return _whyRow('exc-ev-category', s('category'));
+        default:
+            return `<div class="exc-why-detail-row"><span style="font-size:11px;">${escapeHtml(JSON.stringify(ev))}</span></div>`;
+    }
+}
+
+// 「为什么被拦」详情段 · 新引擎走 message_key/evidence;旧库存行与 confidence_low 走旧形状
 function renderWhyDetail(rule: string, detail: WhyDetail) {
     detail = detail || {};
+    if (detail.message_key) {
+        return renderRiskDetail(detail.message_key, detail.evidence || {});
+    }
     if (rule === 'math_mismatch') {
         return `
             <div class="exc-why-detail-row"><b>${escapeHtml(t('exc-fld-subtotal'))}</b><span>${escapeHtml(_money(detail.subtotal))}</span></div>
@@ -104,22 +200,37 @@ function renderDrawer() {
 
     // Body · 两段
     const sev = row.severity || 'medium';
-    const ruleLabel = t('exc-rule-' + row.rule_code) || row.rule_code;
+    const ruleLabel = excRuleLabel(row);
     const whyDetail = renderWhyDetail(row.rule_code!, row.detail || {});
 
     const f = _extractFields(_drawer.history as DrawerHistory) as Record<string, unknown>;
     const fieldsLoading = _drawer.history === null;
     const fieldsErr = _drawer.history && (_drawer.history as DrawerHistory)._err;
 
-    // 标记哪些字段触发了规则(高亮红)
+    // 标记哪些字段触发了规则(高亮红)· 新码与对应旧码归同一组字段
     const flagSet = new Set();
-    if (row.rule_code === 'math_mismatch') {
+    const fc = row.rule_code || '';
+    if (['math_mismatch', 'R-VAT-01', 'R-VAT-02', 'R-SUM-01', 'R-LINE-01'].includes(fc)) {
         flagSet.add('subtotal');
         flagSet.add('vat');
         flagSet.add('total_amount');
-    } else if (row.rule_code === 'tax_id_format_invalid') {
+    } else if (fc === 'R-MULTIPAGE-01' || fc === 'R-LIMIT-01') {
+        flagSet.add('total_amount');
+    } else if (fc === 'tax_id_format_invalid' || fc === 'R-TAXID-01') {
         flagSet.add('seller_tax');
-    } else if (row.rule_code === 'amount_missing') {
+    } else if (fc === 'R-TAXID-02') {
+        flagSet.add('buyer_tax');
+    } else if (fc === 'R-TAXID-03') {
+        flagSet.add('seller_tax');
+        flagSet.add('buyer_tax');
+    } else if (fc === 'R-DATE-01' || fc === 'R-DATE-02') {
+        flagSet.add('date');
+    } else if (fc === 'R-DUP-01' || fc === 'R-DUP-02') {
+        flagSet.add('invoice_number');
+    } else if (fc === 'R-SUP-01' || fc === 'R-SUP-02') {
+        flagSet.add('seller_name');
+        flagSet.add('seller_tax');
+    } else if (fc === 'amount_missing') {
         flagSet.add('total_amount');
         flagSet.add('invoice_number');
     }

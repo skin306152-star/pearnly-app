@@ -2,7 +2,7 @@
 // REFACTOR-WB (2026-06-02) · 异常栏 · 学习规则列表 loadLearnedRules · 从 exceptions.js 抽出 · verbatim 0 改逻辑。
 // ============================================================
 /* global escapeHtml, showConfirm, currentLang, humanizeError */
-import { _shortDateTime } from './exceptions-helpers.js';
+import { _shortDateTime, excRuleLabel } from './exceptions-helpers.js';
 
 interface LearnedRule {
     id: unknown;
@@ -33,7 +33,7 @@ async function loadLearnedRules() {
         </svg>`;
         wrap.innerHTML = items
             .map((it: LearnedRule) => {
-                const ruleLabel = t('exc-rule-' + it.rule_code) || it.rule_code;
+                const ruleLabel = excRuleLabel(it);
                 return `
                 <div class="learned-row" data-wl-id="${escapeHtml(String(it.id))}">
                     <div class="learned-seller" title="${escapeHtml(it.seller_name)}">${escapeHtml(it.seller_name)}</div>

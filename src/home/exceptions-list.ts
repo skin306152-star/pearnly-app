@@ -3,7 +3,15 @@
 // ============================================================
 /* global escapeHtml, showConfirm, currentLang, humanizeError */
 import { _excState, _flags } from './exceptions-store.js';
-import { _tn, _sevSvg, _emptySvg, _fmtMoney, _shortDate } from './exceptions-helpers.js';
+import {
+    _tn,
+    _sevSvg,
+    _emptySvg,
+    _fmtMoney,
+    _shortDate,
+    excRuleLabel,
+    EXC_RULE_GROUPS,
+} from './exceptions-helpers.js';
 import { openExcDrawer } from './exceptions-drawer.js';
 
 // 红点徽章 · 全局可用 · 路由切换 + 周期刷新都调它
@@ -58,29 +66,28 @@ function renderKpis(stats?: any) {
     });
 }
 
+// 按规则组求和(currentRule 可能是逗号分隔的一组 rule_code)
+function _sumByRule(byRule: Record<string, number>, ruleParam: string) {
+    return ruleParam.split(',').reduce((s, c) => s + (byRule[c] || 0), 0);
+}
+
 function renderChips(stats?: any) {
     const wrap = document.getElementById('exc-chips');
     if (!wrap) return;
     const byRule = stats.by_rule || {};
-    const rules = [
-        'confidence_low',
-        'duplicate',
-        'amount_missing',
-        'math_mismatch',
-        'tax_id_format_invalid',
-    ];
 
     const allActive = !_excState.currentRule;
     let html = `<button class="exc-chip ${allActive ? 'active' : ''}" data-rule="">
         <span>${escapeHtml(t('exc-chip-all'))}</span>
         <span class="exc-chip-count">${stats.pending || 0}</span>
     </button>`;
-    for (const rc of rules) {
-        const n = byRule[rc] || 0;
-        if (n === 0 && _excState.currentRule !== rc) continue; // 0 数 + 非当前激活 → 隐藏 chip 减杂讯
-        const active = _excState.currentRule === rc;
-        html += `<button class="exc-chip ${active ? 'active' : ''}" data-rule="${escapeHtml(rc)}">
-            <span>${escapeHtml(t('exc-chip-' + rc))}</span>
+    for (const grp of EXC_RULE_GROUPS) {
+        const ruleParam = grp.codes.join(',');
+        const n = _sumByRule(byRule, ruleParam);
+        const active = _excState.currentRule === ruleParam;
+        if (n === 0 && !active) continue; // 0 数 + 非当前激活 → 隐藏 chip 减杂讯
+        html += `<button class="exc-chip ${active ? 'active' : ''}" data-rule="${escapeHtml(ruleParam)}">
+            <span>${escapeHtml(t(grp.labelKey))}</span>
             <span class="exc-chip-count">${n}</span>
         </button>`;
     }
@@ -111,7 +118,7 @@ function renderList(items?: any) {
     wrap.innerHTML = items
         .map((it: any) => {
             const sev = it.severity || 'medium';
-            const ruleLabel = t('exc-rule-' + it.rule_code) || it.rule_code;
+            const ruleLabel = excRuleLabel(it);
             const seller =
                 it.seller_name && it.seller_name.trim() ? it.seller_name : t('exc-no-seller');
             const filename = it.filename || '—';
@@ -197,7 +204,7 @@ function renderListFoot() {
     const stats = _excState.statsCache as any;
     if (stats) {
         if (_excState.currentRule) {
-            total = (stats.by_rule || {})[_excState.currentRule] || shown;
+            total = _sumByRule(stats.by_rule || {}, _excState.currentRule) || shown;
         } else {
             total = stats.pending || shown;
         }

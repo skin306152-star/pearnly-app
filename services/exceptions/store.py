@@ -105,8 +105,14 @@ def list_exceptions(
                 where.append("e.status = %s")
                 params.append(status)
             if rule_code:
-                where.append("e.rule_code = %s")
-                params.append(rule_code)
+                # 一个筛选 chip 可代表一组规则码(逗号分隔),按组过滤;单码保持原样
+                codes = [c for c in rule_code.split(",") if c]
+                if len(codes) == 1:
+                    where.append("e.rule_code = %s")
+                    params.append(codes[0])
+                elif codes:
+                    where.append("e.rule_code = ANY(%s)")
+                    params.append(codes)
             # v118.21.0 · 客户筛选 · client_id 来自 ocr_history(JOIN 后字段)
             if client_id:
                 where.append("h.client_id = %s")

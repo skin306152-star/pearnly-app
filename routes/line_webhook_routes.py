@@ -34,6 +34,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# 转人工关键词(多语言 · 子串匹配)· 命中则机器人回执 · 真人在 LINE Chat 后台接手。
+# 走机器人不走 LINE 原生关键词规则:不受「Manual chat 仅营业时段外」限制 · 4 语统一。
+_AGENT_KEYWORDS = (
+    "เจ้าหน้าที่",
+    "ติดต่อเจ้าหน้าที่",
+    "คุยกับเจ้าหน้าที่",
+    "แอดมิน",
+    "พนักงาน",
+    "人工",
+    "转人工",
+    "客服",
+    "agent",
+    "human",
+    "support",
+    "operator",
+    "オペレーター",
+    "担当者",
+)
+
+
+def _is_agent_request(text: str) -> bool:
+    """文字是否在请求人工客服(多语言关键词子串匹配)。"""
+    t = (text or "").strip().lower()
+    return bool(t) and any(kw.lower() in t for kw in _AGENT_KEYWORDS)
+
+
 # v118.25.4 · LINE 用户语言规范化(把 LINE 给的多种语言代码映射到我们支持的 4 语)
 def _normalize_line_lang(raw_lang: str) -> str:
     """
@@ -176,6 +202,13 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
 
     # v118.25.4 · 在最开头算出 ev_lang 备用 · 所有未确定身份的 fallback 都用它
     ev_lang = _ev_lang(ev)
+
+    # 转人工:命中关键词 → 回执 · 真人在 Chat 后台接手(已绑用户优先用其偏好语言)
+    if _is_agent_request(text):
+        bound_user = db.get_user_by_line_user_id(line_user_id)
+        lang = (bound_user.get("preferred_lang") if bound_user else None) or ev_lang
+        line_client.reply_text(reply_token, line_client.t_line(lang, "agent_ack"))
+        return
 
     # 6 位数字 → 尝试当作绑定码
     if len(text) == 6 and text.isdigit():

@@ -6,153 +6,210 @@ from typing import Optional
 LINE_I18N = {
     "zh": {
         "welcome": (
-            "👋 欢迎使用 Pearnly!\n\n"
-            "请先到网站绑定账号:\n"
+            "👋 欢迎使用 Pearnly\n"
+            "智能记账助手 · 为泰国会计事务所与中小企业打造\n\n"
+            "开始前先绑定账号:\n"
             "1. 登录 https://pearnly.com\n"
             "2. 打开「自动化 → LINE Bot」\n"
-            "3. 把那里显示的 6 位数字发给我\n\n"
-            "绑定完成后 · 把发票照片发给我 · 我帮你自动识别 ✨"
+            "3. 把 6 位绑定码发给我\n\n"
+            "绑定后,把发票/收据拍照发来,几秒自动识别入账 📸"
         ),
-        "bind_invalid": "❌ 绑定码无效或已过期。\n请回网站重新获取。",
+        "bind_invalid": "❌ 绑定码无效或已过期\n请回 pearnly.com 重新获取",
         "bind_conflict": (
-            "❌ 绑定失败 · 此 LINE 账号可能已绑到其他 Pearnly 用户。\n" "请先在原账号解绑再试。"
+            "❌ 绑定失败 · 此 LINE 账号可能已绑到其他 Pearnly 用户\n请先在原账号解绑再试"
         ),
         "bind_success": (
-            "✅ 绑定成功!\n\n"
+            "✅ 绑定成功\n\n"
             "Pearnly 账号:{username}\n"
             "LINE:{display_name}\n\n"
-            "接下来把发票照片发给我 · 自动识别入账 📸\n"
-            "(图片识别功能即将上线)"
+            "现在可以:\n"
+            "📸 发发票/收据照片或 PDF → 自动识别入账\n"
+            "🧾 发一句「ค่าน้ำ 50」→ 自动记一笔并分类\n"
+            "💬 需要人工 → 回复「人工」"
         ),
         "already_bound_hint": (
-            "Hi {username} · 已绑定。\n" "把发票照片发给我 · 即可自动识别(功能即将上线)。"
+            "Hi {username} 👋 我能帮你:\n"
+            "📸 发发票/收据照片或 PDF → 自动识别、查重、入账\n"
+            "🧾 发一句「ค่าน้ำ 50」→ 自动记一笔并归类到凭证中心\n"
+            "💬 需要人工 → 回复「人工」\n"
+            "🔗 完整功能在 pearnly.com"
         ),
         "need_bind": (
-            "👋 请先绑定账号:\n"
-            "1. 登录 Pearnly 网站\n"
-            "2. 打开「自动化 → LINE Bot」\n"
-            "3. 把 6 位数字绑定码发给我"
+            "👋 我是 Pearnly 智能记账助手 · 先绑定账号即可开始:\n"
+            "1. 登录 https://pearnly.com\n"
+            "2.「自动化 → LINE Bot」拿 6 位码\n"
+            "3. 发给我\n\n"
+            "绑定后能做:\n"
+            "📸 发发票照片/PDF 自动识别入账\n"
+            "🧾 发一句「ค่าน้ำ 50」自动记账分类"
         ),
         "image_not_bound": (
-            "⚠️ 您还没绑定 Pearnly 账号。\n"
-            "请到网站「自动化 → LINE Bot」获取绑定码 · 发给我即可。"
+            "⚠️ 你还没绑定 Pearnly 账号\n"
+            "到 pearnly.com「自动化 → LINE Bot」拿 6 位绑定码发给我,即可开始自动识别入账 📸"
         ),
-        "image_soon": "📷 收到图片 · 图片识别功能即将上线 · 敬请期待!",
-        "unsupported": "支持文字(绑定码)以及发票文件:PDF / 图片 / Excel / CSV / Word / TXT。",
+        "image_soon": "📷 收到图片 · 处理中...",
+        "unsupported": (
+            "我能识别发票/收据:图片 / PDF / Excel / CSV / Word / TXT\n"
+            "也可发一句文字记账,如「ค่าน้ำ 50」\n"
+            "需要人工 → 回复「人工」"
+        ),
+        "agent_ack": "🙋 正在为你转接人工 · 我们的团队会尽快回复(周一–周五 9:00–18:00)",
     },
     "en": {
         "welcome": (
-            "👋 Welcome to Pearnly!\n\n"
-            "Please bind your account first:\n"
+            "👋 Welcome to Pearnly\n"
+            "The smart bookkeeping assistant for accounting firms & SMEs in Thailand\n\n"
+            "Let's get you set up:\n"
             "1. Log in at https://pearnly.com\n"
             "2. Open 'Automation → LINE Bot'\n"
-            "3. Send me the 6-digit code shown there\n\n"
-            "Once bound, send invoice photos to me and I'll recognize them automatically ✨"
+            "3. Send me the 6-digit code\n\n"
+            "Once linked, just snap a photo of any invoice/receipt — I'll read and record it in seconds 📸"
         ),
-        "bind_invalid": "❌ Invalid or expired code.\nPlease get a new one from the website.",
+        "bind_invalid": "❌ Invalid or expired code\nGet a new one at pearnly.com",
         "bind_conflict": (
-            "❌ Binding failed · this LINE account may already be bound to another Pearnly user.\n"
-            "Please unbind from the original account first."
+            "❌ Binding failed · this LINE account may already be bound to another Pearnly user\n"
+            "Please unbind from the original account first"
         ),
         "bind_success": (
-            "✅ Bound successfully!\n\n"
+            "✅ Linked successfully\n\n"
             "Pearnly account: {username}\n"
             "LINE: {display_name}\n\n"
-            "Now send me invoice photos · I'll auto-recognize and file them 📸\n"
-            "(Image recognition coming soon)"
+            "You can now:\n"
+            "📸 Send a photo/PDF of an invoice or receipt → auto-read & recorded\n"
+            "🧾 Type 'Water 50' → auto-logged and categorized\n"
+            "💬 Need a human → type 'agent'"
         ),
         "already_bound_hint": (
-            "Hi {username} · already bound.\n"
-            "Send me invoice photos for auto-recognition (coming soon)."
+            "Hi {username} 👋 Here's what I can do:\n"
+            "📸 Send a photo/PDF of an invoice or receipt → read, de-duplicate, record\n"
+            "🧾 Type 'Water 50' → auto-logged to your voucher center, categorized\n"
+            "💬 Need a human → type 'agent'\n"
+            "🔗 Full features at pearnly.com"
         ),
         "need_bind": (
-            "👋 Please bind first:\n"
-            "1. Log in to Pearnly website\n"
-            "2. Open 'Automation → LINE Bot'\n"
-            "3. Send me the 6-digit binding code"
+            "👋 I'm Pearnly, your smart bookkeeping assistant · link your account to start:\n"
+            "1. Log in at https://pearnly.com\n"
+            "2. Open 'Automation → LINE Bot' for your 6-digit code\n"
+            "3. Send it to me\n\n"
+            "Once linked:\n"
+            "📸 Send invoice photos/PDF → auto-read & recorded\n"
+            "🧾 Type 'Water 50' → auto-logged and categorized"
         ),
         "image_not_bound": (
-            "⚠️ You haven't bound a Pearnly account yet.\n"
-            "Go to 'Automation → LINE Bot' on the website to get a binding code."
+            "⚠️ Your Pearnly account isn't linked yet\n"
+            "Get a 6-digit code at pearnly.com 'Automation → LINE Bot' and send it to me to start auto-recording 📸"
         ),
-        "image_soon": "📷 Image received · recognition feature coming soon!",
-        "unsupported": "Send text binding codes or invoice files: PDF / images / Excel / CSV / Word / TXT.",
+        "image_soon": "📷 Image received · processing...",
+        "unsupported": (
+            "I can read invoices/receipts: photos / PDF / Excel / CSV / Word / TXT\n"
+            "Or type an expense like 'Water 50'\n"
+            "Need a human → type 'agent'"
+        ),
+        "agent_ack": "🙋 Connecting you to our team · we'll reply shortly (Mon–Fri 9:00–18:00)",
     },
     "th": {
         "welcome": (
-            "👋 ยินดีต้อนรับสู่ Pearnly!\n\n"
-            "กรุณาผูกบัญชีก่อน:\n"
+            "👋 ยินดีต้อนรับสู่ Pearnly\n"
+            "ผู้ช่วยบัญชีอัจฉริยะ สำหรับสำนักงานบัญชีและ SME ในไทย\n\n"
+            "เริ่มต้นด้วยการผูกบัญชี:\n"
             "1. เข้าสู่ระบบที่ https://pearnly.com\n"
             "2. เปิด 'ระบบอัตโนมัติ → LINE Bot'\n"
-            "3. ส่งรหัส 6 หลักที่แสดงไว้มาให้เรา\n\n"
-            "หลังผูกบัญชี · ส่งรูปใบกำกับมา · จะอ่านให้อัตโนมัติ ✨"
+            "3. ส่งรหัส 6 หลักมาให้เรา\n\n"
+            "หลังผูกบัญชี ถ่ายรูปใบกำกับ/ใบเสร็จส่งมาได้เลย ระบบจะอ่านและบันทึกให้อัตโนมัติภายในไม่กี่วินาที 📸"
         ),
-        "bind_invalid": "❌ รหัสไม่ถูกต้องหรือหมดอายุ\nกรุณารับรหัสใหม่จากเว็บไซต์",
+        "bind_invalid": "❌ รหัสไม่ถูกต้องหรือหมดอายุ\nกรุณารับรหัสใหม่ที่ pearnly.com",
         "bind_conflict": (
             "❌ ผูกบัญชีไม่สำเร็จ · LINE นี้อาจถูกผูกกับ Pearnly บัญชีอื่นแล้ว\n"
             "กรุณายกเลิกที่บัญชีเดิมก่อน"
         ),
         "bind_success": (
-            "✅ ผูกบัญชีสำเร็จ!\n\n"
+            "✅ ผูกบัญชีสำเร็จ\n\n"
             "บัญชี Pearnly: {username}\n"
             "LINE: {display_name}\n\n"
-            "ส่งรูปใบกำกับมาได้เลย · จะอ่านและบันทึกอัตโนมัติ 📸\n"
-            "(ฟีเจอร์อ่านรูปกำลังมา)"
+            "ตอนนี้ทำได้เลย:\n"
+            "📸 ส่งรูป/PDF ใบกำกับหรือใบเสร็จ → อ่านและบันทึกอัตโนมัติ\n"
+            "🧾 พิมพ์ 'ค่าน้ำ 50' → บันทึกและจัดหมวดให้อัตโนมัติ\n"
+            "💬 ต้องการเจ้าหน้าที่ → พิมพ์ 'เจ้าหน้าที่'"
         ),
         "already_bound_hint": (
-            "สวัสดี {username} · ผูกบัญชีเรียบร้อย\n"
-            "ส่งรูปใบกำกับมา · จะอ่านให้อัตโนมัติ (กำลังมา)"
+            "สวัสดี {username} 👋 Pearnly ช่วยคุณได้:\n"
+            "📸 ส่งรูป/PDF ใบกำกับหรือใบเสร็จ → อ่าน ตรวจซ้ำ และบันทึกอัตโนมัติ\n"
+            "🧾 พิมพ์ 'ค่าน้ำ 50' → บันทึกและจัดหมวดเข้าศูนย์ใบสำคัญ\n"
+            "💬 ต้องการเจ้าหน้าที่ → พิมพ์ 'เจ้าหน้าที่'\n"
+            "🔗 ฟีเจอร์ทั้งหมดที่ pearnly.com"
         ),
         "need_bind": (
-            "👋 กรุณาผูกบัญชีก่อน:\n"
-            "1. เข้าสู่เว็บ Pearnly\n"
-            "2. เปิด 'ระบบอัตโนมัติ → LINE Bot'\n"
-            "3. ส่งรหัส 6 หลักมาให้เรา"
+            "👋 Pearnly ผู้ช่วยบัญชีอัจฉริยะ · ผูกบัญชีก่อนเริ่มใช้งาน:\n"
+            "1. เข้าสู่ระบบที่ https://pearnly.com\n"
+            "2. เปิด 'ระบบอัตโนมัติ → LINE Bot' รับรหัส 6 หลัก\n"
+            "3. ส่งรหัสมาให้เรา\n\n"
+            "หลังผูกบัญชี:\n"
+            "📸 ส่งรูป/PDF ใบกำกับ → อ่านและบันทึกอัตโนมัติ\n"
+            "🧾 พิมพ์ 'ค่าน้ำ 50' → บันทึกและจัดหมวดอัตโนมัติ"
         ),
         "image_not_bound": (
             "⚠️ ยังไม่ได้ผูกบัญชี Pearnly\n"
-            "ไปที่ 'ระบบอัตโนมัติ → LINE Bot' บนเว็บไซต์เพื่อรับรหัสผูกบัญชี"
+            "ไปที่ pearnly.com 'ระบบอัตโนมัติ → LINE Bot' รับรหัส 6 หลักแล้วส่งมา เพื่อเริ่มอ่านและบันทึกอัตโนมัติ 📸"
         ),
-        "image_soon": "📷 รับรูปแล้ว · ฟีเจอร์อ่านรูปกำลังมา · โปรดรอ!",
-        "unsupported": "รองรับรหัสผูกบัญชีและไฟล์ใบกำกับ: PDF / รูปภาพ / Excel / CSV / Word / TXT",
+        "image_soon": "📷 รับรูปแล้ว · กำลังประมวลผล...",
+        "unsupported": (
+            "รองรับใบกำกับ/ใบเสร็จ: รูป / PDF / Excel / CSV / Word / TXT\n"
+            "หรือพิมพ์บันทึกค่าใช้จ่าย เช่น 'ค่าน้ำ 50'\n"
+            "ต้องการเจ้าหน้าที่ → พิมพ์ 'เจ้าหน้าที่'"
+        ),
+        "agent_ack": "🙋 กำลังโอนสายให้เจ้าหน้าที่ · ทีมงานจะตอบกลับโดยเร็ว (จันทร์–ศุกร์ 9:00–18:00)",
     },
     "ja": {
         "welcome": (
-            "👋 Pearnly へようこそ!\n\n"
-            "まずアカウントを紐付けてください:\n"
+            "👋 Pearnly へようこそ\n"
+            "会計事務所・SME 向けのスマート経理アシスタントです\n\n"
+            "まずはアカウント連携を:\n"
             "1. https://pearnly.com にログイン\n"
             "2. 「自動化 → LINE Bot」を開く\n"
-            "3. そこに表示される 6 桁の数字を送信\n\n"
-            "紐付け完了後 · 請求書の写真を送ると自動認識します ✨"
+            "3. 6 桁のコードを送信\n\n"
+            "連携後は、請求書・領収書を撮って送るだけ。数秒で読み取り・記帳します 📸"
         ),
-        "bind_invalid": "❌ コードが無効または期限切れです。\nウェブサイトから新しいコードを取得してください。",
+        "bind_invalid": "❌ コードが無効または期限切れです\npearnly.com で新しいコードを取得してください",
         "bind_conflict": (
-            "❌ 紐付け失敗 · この LINE は別の Pearnly アカウントに紐付け済みの可能性があります。\n"
-            "元のアカウントで先に解除してください。"
+            "❌ 紐付け失敗 · この LINE は別の Pearnly アカウントに紐付け済みの可能性があります\n"
+            "元のアカウントで先に解除してください"
         ),
         "bind_success": (
-            "✅ 紐付け成功!\n\n"
+            "✅ 連携完了\n\n"
             "Pearnly アカウント: {username}\n"
             "LINE: {display_name}\n\n"
-            "請求書の写真を送ってください · 自動で認識して記録します 📸\n"
-            "(画像認識は近日公開)"
+            "これで使えます:\n"
+            "📸 請求書・領収書の写真/PDF → 自動で読み取り・記帳\n"
+            "🧾 「水道 50」と入力 → 自動で記録・仕分け\n"
+            "💬 オペレーター希望 → 「オペレーター」と入力"
         ),
         "already_bound_hint": (
-            "こんにちは {username} · 紐付け済みです。\n"
-            "請求書の写真を送ると自動認識します(近日公開)。"
+            "こんにちは {username} 👋 Pearnly でできること:\n"
+            "📸 請求書・領収書の写真/PDF → 読み取り・重複チェック・記帳\n"
+            "🧾 「水道 50」と入力 → 証憑センターへ自動記録・仕分け\n"
+            "💬 オペレーター希望 → 「オペレーター」と入力\n"
+            "🔗 全機能は pearnly.com"
         ),
         "need_bind": (
-            "👋 まず紐付けしてください:\n"
-            "1. Pearnly サイトにログイン\n"
-            "2. 「自動化 → LINE Bot」を開く\n"
-            "3. 6 桁のコードを送信"
+            "👋 スマート経理アシスタント Pearnly です · まずアカウント連携を:\n"
+            "1. https://pearnly.com にログイン\n"
+            "2. 「自動化 → LINE Bot」で 6 桁コードを取得\n"
+            "3. コードを送信\n\n"
+            "連携後:\n"
+            "📸 請求書の写真/PDF → 自動で読み取り・記帳\n"
+            "🧾 「水道 50」と入力 → 自動で記録・仕分け"
         ),
         "image_not_bound": (
-            "⚠️ Pearnly アカウントがまだ紐付けされていません。\n"
-            "サイトの「自動化 → LINE Bot」でコードを取得してください。"
+            "⚠️ Pearnly アカウントが未連携です\n"
+            "pearnly.com「自動化 → LINE Bot」で 6 桁コードを取得して送信すると、自動記帳を開始できます 📸"
         ),
-        "image_soon": "📷 画像を受信しました · 画像認識機能は近日公開!",
-        "unsupported": "紐付けコードと請求書ファイル(PDF / 画像 / Excel / CSV / Word / TXT)に対応しています。",
+        "image_soon": "📷 画像を受信 · 処理中...",
+        "unsupported": (
+            "対応: 請求書・領収書の 写真 / PDF / Excel / CSV / Word / TXT\n"
+            "または「水道 50」のように入力して記帳\n"
+            "オペレーター希望 → 「オペレーター」と入力"
+        ),
+        "agent_ack": "🙋 オペレーターにおつなぎします · 担当者より順次ご返信します(月–金 9:00–18:00)",
     },
 }
 
@@ -160,13 +217,13 @@ LINE_I18N = {
 def t_line(lang: Optional[str], key: str, **kwargs) -> str:
     """
     取 LINE 场景文案。
-    lang:zh/en/th/ja · 其他/None 默认用 zh
+    lang:zh/en/th/ja · 其他/None 默认用 th(主市场泰国)
     key:文案 key
     kwargs:格式化变量(如 username / display_name)
     """
     if lang not in LINE_I18N:
-        lang = "zh"
-    tmpl = LINE_I18N[lang].get(key) or LINE_I18N["zh"].get(key) or key
+        lang = "th"
+    tmpl = LINE_I18N[lang].get(key) or LINE_I18N["th"].get(key) or key
     if kwargs:
         try:
             return tmpl.format(**kwargs)
@@ -246,8 +303,8 @@ OCR_RESULT_I18N = {
 def t_ocr(lang: Optional[str], key: str, **kwargs) -> str:
     """OCR 场景文案"""
     if lang not in OCR_RESULT_I18N:
-        lang = "zh"
-    tmpl = OCR_RESULT_I18N[lang].get(key) or OCR_RESULT_I18N["zh"].get(key) or key
+        lang = "th"
+    tmpl = OCR_RESULT_I18N[lang].get(key) or OCR_RESULT_I18N["th"].get(key) or key
     if kwargs:
         try:
             return tmpl.format(**kwargs)

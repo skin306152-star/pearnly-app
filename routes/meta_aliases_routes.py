@@ -36,10 +36,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_time.time()),
         "release_notes": {
-            "zh": "本次为稳定性与性能优化更新,改进了部分页面的加载与运行表现,日常使用更顺畅。功能与操作方式保持不变,即日生效。",
-            "th": "การอัปเดตนี้เน้นความเสถียรและประสิทธิภาพ ปรับปรุงการโหลดและการทำงานของบางหน้าให้ลื่นไหลยิ่งขึ้น โดยฟังก์ชันและวิธีใช้งานยังคงเดิม มีผลทันที",
-            "en": "This update focuses on stability and performance, improving how some pages load and run for a smoother day-to-day experience. Features and workflows are unchanged. Effective immediately.",
-            "ja": "今回は安定性とパフォーマンスの向上を目的とした更新で、一部ページの読み込みと動作を改善し、日々の操作をより快適にしました。機能や操作方法に変更はありません。即日有効。",
+            "zh": "本次更新优化了发票异常检查:对税额计算、税号、重复发票、发票日期等的核对更细致准确,异常列表与原因说明也更清晰。事务所还可在异常页自定义供应商名单、单据金额上限等核查规矩。即日生效。",
+            "th": "การอัปเดตนี้ปรับปรุงการตรวจสอบความผิดปกติของใบกำกับ: ตรวจการคำนวณภาษี เลขผู้เสียภาษี ใบกำกับซ้ำ และวันที่ได้ละเอียดขึ้น พร้อมคำอธิบายในรายการที่ชัดเจนขึ้น สำนักงานบัญชียังตั้งกฎตรวจสอบของตนเองได้ เช่น รายชื่อผู้ขายและวงเงินต่อใบ ที่หน้ารายการผิดปกติ มีผลทันที",
+            "en": "This update improves invoice exception checks: VAT arithmetic, tax IDs, duplicate invoices and invoice dates are now checked more thoroughly, with clearer explanations in the exception list. Firms can also set their own checks — such as supplier lists and per-invoice amount limits — on the exceptions page. Effective immediately.",
+            "ja": "今回の更新で請求書の異常チェックを強化しました。税額計算・納税者番号・重複請求書・請求日などの照合がより精密になり、異常一覧と理由の説明も分かりやすくなりました。会計事務所は仕入先リストや1件あたりの金額上限などの独自チェックを異常ページで設定できます。即日有効。",
         },
     }
 

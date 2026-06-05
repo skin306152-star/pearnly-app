@@ -233,6 +233,7 @@ const VALID_ROUTES = [
     'reconcile',
     'cloud',
     'test-center',
+    'knowledge',
 ];
 
 function routeTo(route?: any) {
@@ -268,6 +269,9 @@ function routeTo(route?: any) {
     // automation 路由已移除 · 银行上传改为对账中心原地弹文件选择器
     if (route === 'clients' && typeof window.loadClientsPage === 'function')
         window.loadClientsPage();
+    // KNOWLEDGE · 客户知识中心
+    if (route === 'knowledge' && typeof window.loadKnowledgePage === 'function')
+        window.loadKnowledgePage();
     // v118.20.2 · 异常栏页面加载
     if (route === 'exceptions' && typeof window.loadExceptionsPage === 'function')
         window.loadExceptionsPage();

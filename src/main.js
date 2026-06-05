@@ -84,6 +84,8 @@ import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页
 import './home/erp-exceptions.js'; // REFACTOR-WB-C1 · ERP 推送异常块(从 exceptions.js 抽出 · window 桥接 loadErpExceptions/_erpExcState)
 import './home/erp-exceptions-edit.js'; // REFACTOR-WB-modularize · ERP 异常单条编辑弹窗(从 erp-exceptions 拆出 · window._erpExcOpenEdit)
 import './home/rules-settings.js'; // KNOWLEDGE · 客户风险规矩设置弹窗(window.openRulesSettings · 异常页「规矩设置」按钮调 · flag-gated 后端)
+import './home/page-knowledge.js'; // KNOWLEDGE · 客户知识中心页骨架注入(home.html #page-knowledge 空壳 · 须在 knowledge-center 前)
+import './home/knowledge-center.js'; // KNOWLEDGE · 知识中心页逻辑(tab 切换 + 账套上下文 + 探针门控侧栏入口 · window.loadKnowledgePage)
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件

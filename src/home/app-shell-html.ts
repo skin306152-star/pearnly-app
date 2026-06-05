@@ -258,6 +258,16 @@ const SIDEBAR_HTML = `
         <span class="nav-badge danger" id="nav-exc-badge" style="display:none;">0</span>
     </div>
 
+    <!-- KNOWLEDGE · 客户知识中心入口 · 探针门控(知识库 flag 开才显示 · knowledge-center.ts) -->
+    <div class="nav-item" data-route="knowledge" id="nav-knowledge" style="display:none;">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="10" cy="10" r="7.5"/>
+            <path d="M7.8 7.6a2.2 2.2 0 114.4 0c0 1.3-2.2 1.7-2.2 3"/>
+            <line x1="10" y1="14" x2="10" y2="14.01"/>
+        </svg>
+        <span class="nav-label" data-i18n="nav-knowledge">客户知识</span>
+    </div>
+
     <!-- v118.32.5.5.37 NAV-IA Phase 5 收尾 · 自动化入口已移至集成页右侧抽屉 -->
     <!-- v118.33.3 NAV-IA Phase 3 · sidebar 底部「集成」一级入口 · 空壳路由 · Phase 7 才填内容(Google/LINE/Gmail/文件夹/ERP 第三方授权聚合) -->
     <div class="sidebar-bottom">

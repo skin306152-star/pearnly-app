@@ -279,6 +279,8 @@ interface Window {
     setCurrentClientId?: LegacyBridge;
     loadTestCenterPage?: () => void;
     loadClientsPage?: () => void;
+    loadKnowledgePage?: () => void;
+    _knowledgeProbed?: boolean;
     getHistoryClientFilter?: () => unknown;
     fillCategoryDatalist?: () => void;
     _tcApplyVisibility?: () => void;

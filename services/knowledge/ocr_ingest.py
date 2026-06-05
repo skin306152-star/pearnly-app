@@ -17,12 +17,7 @@ from services.knowledge.ingest import (
     normalize_text,
 )
 from services.knowledge.processing import ProcessOutcome, process_uploaded
-from services.knowledge.schema import (
-    DOC_FAILED,
-    DOC_READY,
-    ERROR_PROCESSING,
-    ERROR_UNSUPPORTED,
-)
+from services.knowledge.schema import DOC_FAILED, DOC_READY, ERROR_PROCESSING
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
 
@@ -73,6 +68,8 @@ def process_uploaded_any(
 
     text = normalize_text(text)
     if not text.strip():
-        return ProcessOutcome(status=DOC_FAILED, error_code=ERROR_UNSUPPORTED)
+        # 支持的类型但 OCR 抽不到任何文字(损坏 / 加密 / 空白扫描)→ 处理失败,
+        # 不是"不支持的类型"(那类在 process_uploaded 已按 UnsupportedDocument 落)。
+        return ProcessOutcome(status=DOC_FAILED, error_code=ERROR_PROCESSING)
     chunks = chunk_text(text, max_chars=max_chars, overlap=overlap)
     return ProcessOutcome(status=DOC_READY, chunks=chunks, ocr_pages=max(1, pages))

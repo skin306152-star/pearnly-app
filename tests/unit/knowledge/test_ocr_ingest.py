@@ -27,6 +27,18 @@ def test_corrupt_non_pdf_text_path_raises_is_failed():
     assert outcome.error_code == ERROR_PROCESSING
 
 
+def test_ocr_returns_empty_is_processing_failed_not_unsupported():
+    # Prod path for a corrupt/blank PDF: text layer fails, OCR runs but extracts
+    # no text. Must be processing_failed ("无法解析"), NOT unsupported_document.
+    with (
+        mock.patch.object(ocr_ingest, "process_uploaded", side_effect=RuntimeError("boom")),
+        mock.patch.object(ocr_ingest, "_ocr_text_and_pages", return_value=("   \n  ", 1)),
+    ):
+        outcome = ocr_ingest.process_uploaded_any("kb_bad_broken.pdf", b"%PDF")
+    assert outcome.status == DOC_FAILED
+    assert outcome.error_code == ERROR_PROCESSING
+
+
 def test_corrupt_pdf_recovered_by_ocr_is_ready():
     # A PDF the text layer can't read but OCR can still salvage stays READY.
     with (

@@ -126,3 +126,16 @@ def get_answer(request: Request, answer_id: int) -> dict[str, Any]:
     if answer is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "answer not found")
     return _answer_out(answer)
+
+
+@router.get("/chunks/{chunk_id}")
+def get_chunk(request: Request, chunk_id: int) -> dict[str, Any]:
+    """出处原文:取被引用的 chunk + 相邻段落,供来源弹窗高亮命中片段。"""
+    identity, accessible = resolve_caller(request)
+    with db.get_cursor_rls(identity.tenant_id) as cur:
+        ctx = search.get_chunk_context(
+            cur, tenant_id=identity.tenant_id, accessible_ids=accessible, chunk_id=chunk_id
+        )
+    if ctx is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "chunk not found")
+    return ctx

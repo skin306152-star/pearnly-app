@@ -103,3 +103,59 @@ def search_chunks(
         )
         for r in cur.fetchall()
     ]
+
+
+def get_chunk_context(
+    cur,
+    *,
+    tenant_id: str,
+    accessible_ids: AccessibleIds,
+    chunk_id: int,
+    radius: int = 1,
+) -> Optional[dict]:
+    """Fetch one cited chunk plus its neighbours, for the source-preview modal.
+
+    Returns the matched chunk's text and up to `radius` chunks on each side (same
+    document, by ordinal) so the UI can show it in context with the hit highlighted.
+    Tenant + workspace scoped and deleted-document aware — same visibility as search;
+    returns None when the chunk isn't visible to the caller.
+    """
+    where, params = workspace_filter(accessible_ids, alias="c")
+    cur.execute(
+        "SELECT c.id, c.document_id, c.chunk_index, c.text, d.filename "
+        "FROM knowledge_chunks c JOIN knowledge_documents d ON d.id = c.document_id "
+        "WHERE c.id = %s AND c.tenant_id = %s AND d.status <> %s" + where,
+        [chunk_id, tenant_id, DOC_DELETED, *params],
+    )
+    target = cur.fetchone()
+    if not target:
+        return None
+    # Neighbours share the document (already visibility-checked above) — scope by
+    # tenant + document + ordinal window.
+    cur.execute(
+        "SELECT chunk_index, text FROM knowledge_chunks "
+        "WHERE tenant_id = %s AND document_id = %s AND chunk_index BETWEEN %s AND %s "
+        "ORDER BY chunk_index",
+        [
+            tenant_id,
+            target["document_id"],
+            target["chunk_index"] - radius,
+            target["chunk_index"] + radius,
+        ],
+    )
+    hit_index = target["chunk_index"]
+    segments = [
+        {
+            "chunk_index": r["chunk_index"],
+            "text": r["text"],
+            "matched": r["chunk_index"] == hit_index,
+        }
+        for r in cur.fetchall()
+    ]
+    return {
+        "chunk_id": target["id"],
+        "document_id": target["document_id"],
+        "filename": target["filename"],
+        "chunk_index": hit_index,
+        "segments": segments,
+    }

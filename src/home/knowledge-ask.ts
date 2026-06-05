@@ -6,7 +6,7 @@
 // citation 点开经 knowledge-sources(.modal)。每条答出后端扣 1 credit(no_answer 不扣)。
 // ============================================================
 /* global escapeHtml, showToast */
-import { kbRequest } from './knowledge-api.js';
+import { KB_CAT, kbRequest } from './knowledge-api.js';
 import type { KbCitation } from './knowledge-sources.js';
 
 interface AskResult {
@@ -43,11 +43,11 @@ function citeChip(c: KbCitation): string {
 function aiBubble(data: AskResult): string {
     if (data.no_answer) {
         const msg = aT(data.message_key || 'ask.no_source', '资料不足，无法判断。');
-        return `<div class="kb-msg ai"><div class="kb-ava">🐱</div>
+        return `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div>
             <div class="kb-bub no-src">${esc(msg)}</div></div>`;
     }
     const cites = (data.citations || []).map((c) => citeChip(c)).join('');
-    return `<div class="kb-msg ai"><div class="kb-ava">🐱</div>
+    return `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div>
         <div class="kb-bub">${esc(data.answer)}${cites ? `<div class="kb-cites">${cites}</div>` : ''}</div></div>`;
 }
 
@@ -79,13 +79,13 @@ function wireAsk(threadEl: HTMLElement, inputEl: HTMLInputElement, sendBtn: HTML
         inputEl.value = '';
         append(userBubble(q));
         const thinking = append(
-            `<div class="kb-msg ai"><div class="kb-ava">🐱</div><div class="kb-bub kb-thinking">${esc(aT('kb-ask-thinking', '思考中…'))}</div></div>`
+            `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div><div class="kb-bub kb-thinking">${esc(aT('kb-ask-thinking', '思考中…'))}</div></div>`
         );
         const data = await runAsk(q);
         thinking.remove();
         if (!data) {
             append(
-                `<div class="kb-msg ai"><div class="kb-ava">🐱</div><div class="kb-bub no-src">${esc(aT('kb-ask-error', '出错了，请稍后重试。'))}</div></div>`
+                `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div><div class="kb-bub no-src">${esc(aT('kb-ask-error', '出错了，请稍后重试。'))}</div></div>`
             );
             if (typeof showToast === 'function')
                 showToast(aT('kb-ask-error', '出错了，请稍后重试。'), 'error');
@@ -174,7 +174,7 @@ function renderAsk(): void {
     const fabOn = typeof window._kbFabEnabled === 'function' && window._kbFabEnabled();
     pane.innerHTML = `
         <div class="kb-ft">
-            <span class="ft-cat"><img src="/static/brand/kb-cat.png" alt=""></span>
+            <span class="ft-cat"><img src="${KB_CAT}" alt=""></span>
             <div class="ft-txt">
                 <b>${esc(aT('kb-fab-toggle', '桌面悬浮问答助手'))}</b>
                 <div class="sub">${esc(aT('kb-fab-toggle-sub', '打开后任意页面右下角常驻一只猫，随手就能问，可长按拖到屏幕任意一边。'))}</div>
@@ -183,7 +183,7 @@ function renderAsk(): void {
         </div>
         <div class="kb-qa">
             <div class="kb-qa-thread" id="kb-qa-thread">
-                <div class="kb-msg ai"><div class="kb-ava">🐱</div>
+                <div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div>
                 <div class="kb-bub">${esc(aT('kb-ask-empty', '问点关于这家客户的事，答案都带合同原文出处；查不到时如实说「资料不足」。'))}</div></div>
             </div>
             <div class="kb-qa-foot">

@@ -9,6 +9,9 @@
 
 const KB_BASE = '/api/knowledge';
 
+// 品牌猫素材 · 带版本号破 Cloudflare 缓存(换猫时 bump);全知识库模块共用,保猫一致。
+export const KB_CAT = '/static/brand/kb-cat.png?v=2';
+
 function kbToken(): string {
     return localStorage.getItem('mrpilot_token') || '';
 }

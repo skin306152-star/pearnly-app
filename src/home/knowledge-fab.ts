@@ -5,10 +5,10 @@
 // 点开 = 磨砂玻璃问答卡,复用 _kbWireAsk(与问答 tab 同一套答案/出处逻辑)。
 // 显隐由问答 tab 的开关控制(localStorage 持久),仅知识库 flag 开 + 用户开启才出现。
 // ============================================================
-import { kbProbe, kbWorkspaceName } from './knowledge-api.js';
+import { KB_CAT, kbProbe, kbWorkspaceName } from './knowledge-api.js';
 
 const LS_KEY = 'pearnly_kb_fab';
-const CAT = '/static/brand/kb-cat.png';
+const CAT = KB_CAT;
 const M = 14; // 离边距离
 let built = false;
 let wired = false;

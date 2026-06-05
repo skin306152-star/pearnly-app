@@ -5,6 +5,7 @@
 // 费用金额为示意占位(标「待定」),最终定价由 Zihao 拍板后填真数。用 .modal 体系。
 // ============================================================
 /* global escapeHtml */
+import { KB_CAT } from './knowledge-api.js';
 
 function iT(key: string, fb: string): string {
     if (typeof window.t === 'function') {
@@ -93,7 +94,7 @@ function render(): void {
     if (!modal) return;
     modal.innerHTML = `
         <div class="kb-info-head">
-            <span class="ic"><img src="/static/brand/kb-cat.png" alt=""></span>
+            <span class="ic"><img src="${KB_CAT}" alt=""></span>
             <div>
                 <h2>${esc(iT('kb-info-title', '客户知识助手是什么'))}</h2>
                 <div class="lead">${esc(iT('kb-info-lead', '把每家客户的合同与规矩，变成系统记得住、能自动执行、还能随时问的「活资料」。'))}</div>

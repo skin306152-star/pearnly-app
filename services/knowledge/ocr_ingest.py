@@ -52,12 +52,11 @@ def process_uploaded_any(
         try:
             outcome = process_uploaded(filename, data, max_chars=max_chars, overlap=overlap)
         except Exception:
-            if suffix != ".pdf":
-                return ProcessOutcome(status=DOC_FAILED, error_code=ERROR_PROCESSING)
             outcome = ProcessOutcome(status=DOC_FAILED, error_code=ERROR_PROCESSING)
         if outcome.status == DOC_READY:
             return outcome  # 文字层抽到 → 按字符
-        # 文字型 PDF 抽不到文本(扫描件)→ 落 OCR;其它 unsupported 仍失败。
+        # 非 PDF 到此即失败(损坏/加密 → ERROR_PROCESSING;不支持类型 → process_uploaded 的码)。
+        # PDF 抽不到文本(扫描件)→ 落下方 OCR 再试一次。
         if suffix != ".pdf":
             return outcome
 

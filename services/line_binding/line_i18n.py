@@ -3,6 +3,8 @@
 
 from typing import Optional
 
+DEFAULT_LANG = "th"  # 主市场泰国 · 未知语言兜底(单一来源 · 改市场只动这里)
+
 LINE_I18N = {
     "zh": {
         "bind_invalid": "❌ 绑定码无效或已过期\n请回 pearnly.com 重新获取",
@@ -39,7 +41,6 @@ LINE_I18N = {
             "⚠️ 你还没绑定 Pearnly 账号\n"
             "到 pearnly.com「集成 → LINE Bot」拿 6 位绑定码发给我,即可开始自动识别入账 📸"
         ),
-        "image_soon": "📷 收到图片 · 处理中...",
         "unsupported": (
             "我能识别发票/收据:图片 / PDF / Excel / CSV / Word / TXT\n"
             "也可发一句文字记账,如「ค่าน้ำ 50」\n"
@@ -83,7 +84,6 @@ LINE_I18N = {
             "⚠️ Your Pearnly account isn't linked yet\n"
             "Get a 6-digit code at pearnly.com 'Integrations → LINE Bot' and send it to me to start auto-recording 📸"
         ),
-        "image_soon": "📷 Image received · processing...",
         "unsupported": (
             "I can read invoices/receipts: photos / PDF / Excel / CSV / Word / TXT\n"
             "Or type an expense like 'Water 50'\n"
@@ -127,7 +127,6 @@ LINE_I18N = {
             "⚠️ ยังไม่ได้ผูกบัญชี Pearnly\n"
             "ไปที่ pearnly.com 'การเชื่อมต่อ → LINE Bot' รับรหัส 6 หลักแล้วส่งมา เพื่อเริ่มอ่านและบันทึกอัตโนมัติ 📸"
         ),
-        "image_soon": "📷 รับรูปแล้ว · กำลังประมวลผล...",
         "unsupported": (
             "รองรับใบกำกับ/ใบเสร็จ: รูป / PDF / Excel / CSV / Word / TXT\n"
             "หรือพิมพ์บันทึกค่าใช้จ่าย เช่น 'ค่าน้ำ 50'\n"
@@ -171,7 +170,6 @@ LINE_I18N = {
             "⚠️ Pearnly アカウントが未連携です\n"
             "pearnly.com「連携 → LINE Bot」で 6 桁コードを取得して送信すると、自動記帳を開始できます 📸"
         ),
-        "image_soon": "📷 画像を受信 · 処理中...",
         "unsupported": (
             "対応: 請求書・領収書の 写真 / PDF / Excel / CSV / Word / TXT\n"
             "または「水道 50」のように入力して記帳\n"
@@ -190,8 +188,8 @@ def t_line(lang: Optional[str], key: str, **kwargs) -> str:
     kwargs:格式化变量(如 username / display_name)
     """
     if lang not in LINE_I18N:
-        lang = "th"
-    tmpl = LINE_I18N[lang].get(key) or LINE_I18N["th"].get(key) or key
+        lang = DEFAULT_LANG
+    tmpl = LINE_I18N[lang].get(key) or LINE_I18N[DEFAULT_LANG].get(key) or key
     if kwargs:
         try:
             return tmpl.format(**kwargs)
@@ -271,8 +269,8 @@ OCR_RESULT_I18N = {
 def t_ocr(lang: Optional[str], key: str, **kwargs) -> str:
     """OCR 场景文案"""
     if lang not in OCR_RESULT_I18N:
-        lang = "th"
-    tmpl = OCR_RESULT_I18N[lang].get(key) or OCR_RESULT_I18N["th"].get(key) or key
+        lang = DEFAULT_LANG
+    tmpl = OCR_RESULT_I18N[lang].get(key) or OCR_RESULT_I18N[DEFAULT_LANG].get(key) or key
     if kwargs:
         try:
             return tmpl.format(**kwargs)

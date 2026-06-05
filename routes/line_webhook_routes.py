@@ -55,9 +55,9 @@ _AGENT_KEYWORDS = (
 
 
 def _is_agent_request(text: str) -> bool:
-    """文字是否在请求人工客服(多语言关键词子串匹配)。"""
+    """文字是否在请求人工客服(多语言关键词子串匹配 · _AGENT_KEYWORDS 均小写)。"""
     t = (text or "").strip().lower()
-    return bool(t) and any(kw.lower() in t for kw in _AGENT_KEYWORDS)
+    return bool(t) and any(kw in t for kw in _AGENT_KEYWORDS)
 
 
 # v118.25.4 · LINE 用户语言规范化(把 LINE 给的多种语言代码映射到我们支持的 4 语)

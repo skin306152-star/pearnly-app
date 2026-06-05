@@ -118,11 +118,12 @@ jobs:
   #   当前 warning 模式(continue-on-error: true · 红但不挡 push)· 等窗口 B 把 B1/B2 降下来 ·
   #   手动把 BASELINE_TOTAL 棘轮调小 → 谁让 UI 不一致反弹超基线,CI 当场报红。
   lint-ui:
-    name: lint-ui (REFACTOR-WC · UI 一致性棘轮 · WARNING mode)
+    name: lint-ui (UI 一致性 + 弹窗/按钮硬规 · FAIL mode)
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # ⚠️ warning 模式 · 红但不挡 push · 窗口 B 降违规 + 棘轮收紧后改 false(fail 模式)
-    continue-on-error: true
+    # FAIL 模式(2026-06-05 Zihao 拍板切硬门)· check_ui_consistency 非零 → CI 红挡合并:
+    #   D1 禁新增抽屉(.drawer · 新 UI 用 .modal)· D2 按钮/切换黑底=0(只导航栏可黑)· 存量违规棘轮基线 480。
+    #   与 pre-push 同闸 · 双层兜底(防 --no-verify 绕过)。
 
     steps:
       - name: Checkout

@@ -77,7 +77,26 @@ class MainHostProvider(HostProvider):
         _safe_path(key).unlink(missing_ok=True)
 
     def charge_credits(self, tenant_id: Optional[str], kind: str, amount: int, meta: dict) -> None:
-        # Metered, not billed (product decision 2026-06-04). Log-only placeholder:
-        # a durable usage sink (e.g. a usage_events row) is a follow-up before GA —
-        # rotated logs alone cannot reconstruct billing.
-        logger.info("knowledge usage tenant=%s kind=%s amount=%s", tenant_id, kind, amount)
+        # 真扣费(2026-06-05 Zihao 定价拍板,取代 06-04 的 log-only)。amount = satang(分),
+        # 扣 tenant_credits.balance_thb,复用 OCR 钱路径(charge.deduct_thb)。失败仅 log 不抛。
+        if not tenant_id or not amount or amount <= 0:
+            logger.info(
+                "knowledge usage tenant=%s kind=%s amount=%s (no charge)", tenant_id, kind, amount
+            )
+            return
+        from decimal import Decimal
+
+        from services.billing.charge import deduct_thb
+
+        cost_thb = Decimal(int(amount)) / Decimal(100)
+        user_id = (meta or {}).get("user_id")
+        res = deduct_thb(
+            user_id, tenant_id, cost_thb, kind, description=f"knowledge {kind} {meta or {}}"
+        )
+        logger.info(
+            "knowledge charged tenant=%s kind=%s thb=%s ok=%s",
+            tenant_id,
+            kind,
+            cost_thb,
+            res.get("ok"),
+        )

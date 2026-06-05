@@ -28,10 +28,16 @@ class ProcessOutcome:
     status: str  # DOC_READY | DOC_FAILED
     chunks: list[Chunk] = field(default_factory=list)
     error_code: str | None = None
+    # >0 表示走了 OCR(图片 / 扫描件)· 按页计费;=0 表示文本抽取 · 按字符计费。
+    ocr_pages: int = 0
 
     @property
     def chunk_count(self) -> int:
         return len(self.chunks)
+
+    @property
+    def char_count(self) -> int:
+        return sum(c.char_count for c in self.chunks)
 
 
 def process_uploaded(

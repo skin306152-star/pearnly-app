@@ -15,6 +15,7 @@ already model that (queued job -> terminal job).
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from pathlib import Path
 from typing import Any, Optional
@@ -26,7 +27,7 @@ from core import db
 from services.knowledge import contract
 from routes.knowledge_common import authorize_write, resolve_caller
 from services.knowledge import dal, embedding, search
-from services.knowledge.processing import process_uploaded
+from services.knowledge.ocr_ingest import process_uploaded_any
 from services.knowledge.schema import (
     DOC_FAILED,
     DOC_READY,
@@ -109,7 +110,8 @@ async def upload_document(
     storage_key = f"{identity.tenant_id}/{checksum}{suffix}"
     storage_path = contract.storage_put(storage_key, data)
 
-    outcome = process_uploaded(filename, data)
+    # OCR(图片/扫描件)联网较慢 · 放线程池避免阻塞 async 事件循环。
+    outcome = await asyncio.to_thread(process_uploaded_any, filename, data)
     tenant_id = identity.tenant_id
 
     # Embed parsed chunks before opening the transaction — the network call stays
@@ -188,6 +190,30 @@ async def upload_document(
             progress=PROGRESS_COMPLETE if ready else 0,
             error_code=error_code,
         )
+
+    # 入库计费(成功才扣):图片/扫描件按页(estimate_pdf),文本按字符(estimate_excel)。
+    # 扣 tenant_credits.balance_thb · 统一走 contract.charge_credits(amount=satang)。
+    if ready:
+        try:
+            if outcome.ocr_pages > 0:
+                cost_thb = db.estimate_pdf_cost_thb(0, outcome.ocr_pages)
+            else:
+                cost_thb = db.estimate_excel_cost_thb(outcome.char_count)
+            satang = int(round(float(cost_thb) * 100))
+            if satang > 0:
+                contract.charge_credits(
+                    tenant_id,
+                    "kb_ingest",
+                    satang,
+                    {
+                        "document_id": doc.id,
+                        "user_id": identity.user_id,
+                        "ocr_pages": outcome.ocr_pages,
+                        "chars": outcome.char_count,
+                    },
+                )
+        except Exception:
+            pass  # 计费失败不阻断已完成的入库
 
     return {
         "document": _doc_out(doc),

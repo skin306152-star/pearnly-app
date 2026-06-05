@@ -211,5 +211,59 @@ def charge_ocr_async(
         logger.error(f"[charge_ocr_async] exception(swallowed): {e}")
 
 
+def deduct_thb(user_id, tenant_id, cost_thb, kind: str, description: str = "") -> dict:
+    """通用泰铢扣费(知识库等非 OCR 用量)· 复用 OCR 钱路径范式(铁律 #26)。
+
+    单原子事务:`tenant_credits.balance_thb` SELECT FOR UPDATE → UPDATE → `credit_transactions`
+    INSERT(type='usage')。豁免账号不扣。余额可扣到负(用量已发生 · 后续充值补 · 同 charge_ocr)。
+    cost_thb ≤ 0 直接放行。失败仅 log 不抛(不阻断已完成的用量)。
+    """
+    cost = _Dec(str(cost_thb))
+    if cost <= 0:
+        return {"ok": True, "charged_thb": 0.0, "balance_after": None}
+    try:
+        if db.is_user_billing_exempt(user_id):
+            return {"ok": True, "charged_thb": 0.0, "balance_after": None, "exempt": True}
+    except Exception:
+        pass
+    try:
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s::uuid FOR UPDATE",
+                (str(tenant_id),),
+            )
+            row = cur.fetchone()
+            if not row:
+                cur.execute(
+                    "INSERT INTO tenant_credits (tenant_id, balance_thb) "
+                    "VALUES (%s::uuid, 0) RETURNING balance_thb",
+                    (str(tenant_id),),
+                )
+                row = cur.fetchone()
+            new_bal = _Dec(str(row["balance_thb"])) - cost
+            cur.execute(
+                "UPDATE tenant_credits SET balance_thb = %s, updated_at = NOW() "
+                "WHERE tenant_id = %s::uuid",
+                (str(new_bal), str(tenant_id)),
+            )
+            cur.execute(
+                "INSERT INTO credit_transactions "
+                "(tenant_id, user_id, type, amount_thb, pages, balance_after, description) "
+                "VALUES (%s::uuid, %s::uuid, 'usage', %s, %s, %s, %s)",
+                (
+                    str(tenant_id),
+                    str(user_id) if user_id else None,
+                    str(-cost),
+                    0,
+                    str(new_bal),
+                    description or f"knowledge {kind}",
+                ),
+            )
+        return {"ok": True, "charged_thb": float(cost), "balance_after": float(new_bal)}
+    except Exception as e:
+        logger.warning(f"[deduct_thb] knowledge charge failed(tolerated): {e}")
+        return {"ok": False, "charged_thb": 0.0, "balance_after": None}
+
+
 # ⚠️ 见文件顶部注释 · `import db` 必须在所有 def 之后,解 charge ↔ db 循环 import。
 from core import db  # noqa: E402

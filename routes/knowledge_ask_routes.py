@@ -22,6 +22,8 @@ from services.knowledge.schema import KnowledgeAnswer
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge-ask"])
 
 _CREDIT_KIND = "rag_answer"
+# 每答出一次扣 ฿0.50(50 satang · Zihao 2026-06-05 拍板 · 真实成本~฿0.07·≈OCR 毛利)。
+_RAG_ANSWER_SATANG = 50
 
 
 class AskRequest(BaseModel):
@@ -50,6 +52,25 @@ def ask_question(request: Request, body: AskRequest) -> dict[str, Any]:
     question = body.question.strip()
     if not question:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "empty question")
+
+    # 余额前置检查:不足则在花 Gemini 钱之前拦下(豁免账号放行)。
+    try:
+        _bill = db.get_billing_status_combined(identity.user_id, identity.tenant_id)
+        if not _bill.get("is_exempt") and float(_bill.get("balance_thb", 0)) < (
+            _RAG_ANSWER_SATANG / 100
+        ):
+            raise HTTPException(
+                status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "code": "insufficient_balance",
+                    "balance": _bill.get("balance_thb", 0.0),
+                    "estimated_cost": _RAG_ANSWER_SATANG / 100,
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # 计费查询异常容忍 · 不阻断问答
 
     scope = accessible
     if body.workspace_client_id is not None:
@@ -85,7 +106,12 @@ def ask_question(request: Request, body: AskRequest) -> dict[str, Any]:
         )
 
     if not result.no_answer:
-        contract.charge_credits(identity.tenant_id, _CREDIT_KIND, 1, {"answer_id": answer.id})
+        contract.charge_credits(
+            identity.tenant_id,
+            _CREDIT_KIND,
+            _RAG_ANSWER_SATANG,
+            {"answer_id": answer.id, "user_id": identity.user_id},
+        )
     return _answer_out(answer)
 
 

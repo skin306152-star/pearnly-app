@@ -7,10 +7,10 @@ LINE_I18N = {
     "zh": {
         "welcome": (
             "👋 欢迎使用 Pearnly\n"
-            "智能记账助手 · 为泰国会计事务所与中小企业打造\n\n"
+            "财务自动化助手 · 为泰国会计事务所与中小企业打造\n\n"
             "开始前先绑定账号:\n"
             "1. 登录 https://pearnly.com\n"
-            "2. 打开「自动化 → LINE Bot」\n"
+            "2. 打开「集成 → LINE Bot」\n"
             "3. 把 6 位绑定码发给我\n\n"
             "绑定后,把发票/收据拍照发来,几秒自动识别入账 📸"
         ),
@@ -35,9 +35,9 @@ LINE_I18N = {
             "🔗 完整功能在 pearnly.com"
         ),
         "need_bind": (
-            "👋 我是 Pearnly 智能记账助手 · 先绑定账号即可开始:\n"
+            "👋 我是 Pearnly 财务自动化助手 · 先绑定账号即可开始:\n"
             "1. 登录 https://pearnly.com\n"
-            "2.「自动化 → LINE Bot」拿 6 位码\n"
+            "2.「集成 → LINE Bot」拿 6 位码\n"
             "3. 发给我\n\n"
             "绑定后能做:\n"
             "📸 发发票照片/PDF 自动识别入账\n"
@@ -45,7 +45,7 @@ LINE_I18N = {
         ),
         "image_not_bound": (
             "⚠️ 你还没绑定 Pearnly 账号\n"
-            "到 pearnly.com「自动化 → LINE Bot」拿 6 位绑定码发给我,即可开始自动识别入账 📸"
+            "到 pearnly.com「集成 → LINE Bot」拿 6 位绑定码发给我,即可开始自动识别入账 📸"
         ),
         "image_soon": "📷 收到图片 · 处理中...",
         "unsupported": (
@@ -58,10 +58,10 @@ LINE_I18N = {
     "en": {
         "welcome": (
             "👋 Welcome to Pearnly\n"
-            "The smart bookkeeping assistant for accounting firms & SMEs in Thailand\n\n"
+            "The accounting automation assistant for accounting firms & SMEs in Thailand\n\n"
             "Let's get you set up:\n"
             "1. Log in at https://pearnly.com\n"
-            "2. Open 'Automation → LINE Bot'\n"
+            "2. Open 'Integrations → LINE Bot'\n"
             "3. Send me the 6-digit code\n\n"
             "Once linked, just snap a photo of any invoice/receipt — I'll read and record it in seconds 📸"
         ),
@@ -87,9 +87,9 @@ LINE_I18N = {
             "🔗 Full features at pearnly.com"
         ),
         "need_bind": (
-            "👋 I'm Pearnly, your smart bookkeeping assistant · link your account to start:\n"
+            "👋 I'm Pearnly, your accounting automation assistant · link your account to start:\n"
             "1. Log in at https://pearnly.com\n"
-            "2. Open 'Automation → LINE Bot' for your 6-digit code\n"
+            "2. Open 'Integrations → LINE Bot' for your 6-digit code\n"
             "3. Send it to me\n\n"
             "Once linked:\n"
             "📸 Send invoice photos/PDF → auto-read & recorded\n"
@@ -97,7 +97,7 @@ LINE_I18N = {
         ),
         "image_not_bound": (
             "⚠️ Your Pearnly account isn't linked yet\n"
-            "Get a 6-digit code at pearnly.com 'Automation → LINE Bot' and send it to me to start auto-recording 📸"
+            "Get a 6-digit code at pearnly.com 'Integrations → LINE Bot' and send it to me to start auto-recording 📸"
         ),
         "image_soon": "📷 Image received · processing...",
         "unsupported": (
@@ -110,10 +110,10 @@ LINE_I18N = {
     "th": {
         "welcome": (
             "👋 ยินดีต้อนรับสู่ Pearnly\n"
-            "ผู้ช่วยบัญชีอัจฉริยะ สำหรับสำนักงานบัญชีและ SME ในไทย\n\n"
+            "ผู้ช่วยงานบัญชีอัตโนมัติ สำหรับสำนักงานบัญชีและ SME ในไทย\n\n"
             "เริ่มต้นด้วยการผูกบัญชี:\n"
             "1. เข้าสู่ระบบที่ https://pearnly.com\n"
-            "2. เปิด 'ระบบอัตโนมัติ → LINE Bot'\n"
+            "2. เปิด 'การเชื่อมต่อ → LINE Bot'\n"
             "3. ส่งรหัส 6 หลักมาให้เรา\n\n"
             "หลังผูกบัญชี ถ่ายรูปใบกำกับ/ใบเสร็จส่งมาได้เลย ระบบจะอ่านและบันทึกให้อัตโนมัติภายในไม่กี่วินาที 📸"
         ),
@@ -139,9 +139,9 @@ LINE_I18N = {
             "🔗 ฟีเจอร์ทั้งหมดที่ pearnly.com"
         ),
         "need_bind": (
-            "👋 Pearnly ผู้ช่วยบัญชีอัจฉริยะ · ผูกบัญชีก่อนเริ่มใช้งาน:\n"
+            "👋 Pearnly ผู้ช่วยงานบัญชีอัตโนมัติ · ผูกบัญชีก่อนเริ่มใช้งาน:\n"
             "1. เข้าสู่ระบบที่ https://pearnly.com\n"
-            "2. เปิด 'ระบบอัตโนมัติ → LINE Bot' รับรหัส 6 หลัก\n"
+            "2. เปิด 'การเชื่อมต่อ → LINE Bot' รับรหัส 6 หลัก\n"
             "3. ส่งรหัสมาให้เรา\n\n"
             "หลังผูกบัญชี:\n"
             "📸 ส่งรูป/PDF ใบกำกับ → อ่านและบันทึกอัตโนมัติ\n"
@@ -149,7 +149,7 @@ LINE_I18N = {
         ),
         "image_not_bound": (
             "⚠️ ยังไม่ได้ผูกบัญชี Pearnly\n"
-            "ไปที่ pearnly.com 'ระบบอัตโนมัติ → LINE Bot' รับรหัส 6 หลักแล้วส่งมา เพื่อเริ่มอ่านและบันทึกอัตโนมัติ 📸"
+            "ไปที่ pearnly.com 'การเชื่อมต่อ → LINE Bot' รับรหัส 6 หลักแล้วส่งมา เพื่อเริ่มอ่านและบันทึกอัตโนมัติ 📸"
         ),
         "image_soon": "📷 รับรูปแล้ว · กำลังประมวลผล...",
         "unsupported": (
@@ -162,10 +162,10 @@ LINE_I18N = {
     "ja": {
         "welcome": (
             "👋 Pearnly へようこそ\n"
-            "会計事務所・SME 向けのスマート経理アシスタントです\n\n"
+            "会計事務所・SME 向けの経理自動化アシスタントです\n\n"
             "まずはアカウント連携を:\n"
             "1. https://pearnly.com にログイン\n"
-            "2. 「自動化 → LINE Bot」を開く\n"
+            "2. 「連携 → LINE Bot」を開く\n"
             "3. 6 桁のコードを送信\n\n"
             "連携後は、請求書・領収書を撮って送るだけ。数秒で読み取り・記帳します 📸"
         ),
@@ -191,9 +191,9 @@ LINE_I18N = {
             "🔗 全機能は pearnly.com"
         ),
         "need_bind": (
-            "👋 スマート経理アシスタント Pearnly です · まずアカウント連携を:\n"
+            "👋 経理自動化アシスタント Pearnly です · まずアカウント連携を:\n"
             "1. https://pearnly.com にログイン\n"
-            "2. 「自動化 → LINE Bot」で 6 桁コードを取得\n"
+            "2. 「連携 → LINE Bot」で 6 桁コードを取得\n"
             "3. コードを送信\n\n"
             "連携後:\n"
             "📸 請求書の写真/PDF → 自動で読み取り・記帳\n"
@@ -201,7 +201,7 @@ LINE_I18N = {
         ),
         "image_not_bound": (
             "⚠️ Pearnly アカウントが未連携です\n"
-            "pearnly.com「自動化 → LINE Bot」で 6 桁コードを取得して送信すると、自動記帳を開始できます 📸"
+            "pearnly.com「連携 → LINE Bot」で 6 桁コードを取得して送信すると、自動記帳を開始できます 📸"
         ),
         "image_soon": "📷 画像を受信 · 処理中...",
         "unsupported": (

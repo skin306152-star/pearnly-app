@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 from pathlib import Path
 from typing import Any, Optional
 
@@ -29,10 +30,12 @@ from services.knowledge import contract
 from routes.knowledge_common import authorize_write, resolve_caller
 from services.knowledge import dal, embedding, search
 from services.knowledge.ocr_ingest import process_uploaded_any
+from services.knowledge.processing import ProcessOutcome
 from services.knowledge.schema import (
     DOC_FAILED,
     DOC_READY,
     ERROR_EMBEDDING,
+    ERROR_PROCESSING,
     JOB_FAILED,
     JOB_SUCCESS,
     PROGRESS_COMPLETE,
@@ -43,6 +46,7 @@ from services.knowledge.schema import (
 )
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
+logger = logging.getLogger(__name__)
 
 
 def _base_out(base: KnowledgeBase) -> dict[str, Any]:
@@ -112,7 +116,12 @@ async def upload_document(
     storage_path = contract.storage_put(storage_key, data)
 
     # OCR(图片/扫描件)联网较慢 · 放线程池避免阻塞 async 事件循环。
-    outcome = await asyncio.to_thread(process_uploaded_any, filename, data)
+    # 入库失败必须落 failed 行 + 错误码,绝不让异常逃逸成 500(报告 P1a)。
+    try:
+        outcome = await asyncio.to_thread(process_uploaded_any, filename, data)
+    except Exception:
+        logger.exception("knowledge ingest failed: %s", filename)
+        outcome = ProcessOutcome(status=DOC_FAILED, error_code=ERROR_PROCESSING)
     tenant_id = identity.tenant_id
 
     # Embed parsed chunks before opening the transaction — the network call stays

@@ -10,21 +10,31 @@ the assembly is testable without the network.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from services.knowledge import generation
 from services.knowledge.schema import SearchHit
 
+# Token the model must emit when the sources don't answer the question. Kept
+# distinctive so it can't collide with a legitimate cited answer.
+NO_ANSWER_SENTINEL = "NO_ANSWER"
+
 SYSTEM_PROMPT = (
     "You are a financial knowledge assistant for an accounting firm. "
     "Answer ONLY from the numbered sources provided. Cite the sources you use "
-    "as [1], [2], etc. If the sources do not contain the answer, say you do not "
-    "have enough information. Reply in the language of the question."
+    f"as [1], [2], etc. If the sources do not contain the answer, reply with "
+    f"exactly {NO_ANSWER_SENTINEL} and nothing else. Reply in the language of "
+    "the question."
 )
 
 # Returned as the answer text when there is nothing to ground an answer on.
 NO_SOURCE_MESSAGE_KEY = "ask.no_source"
+
+# A grounded answer must reference at least one source as [n]; its absence (or
+# the refusal sentinel) means the model did not answer from the sources.
+_CITATION_MARK = re.compile(r"\[\d+\]")
 
 
 @dataclass
@@ -61,7 +71,12 @@ def answer_question(
 ) -> AnswerResult:
     if not hits:
         return AnswerResult(answer="", no_answer=True, citations=[])
-    text = generate(build_prompt(question, hits), system=SYSTEM_PROMPT)
+    text = generate(build_prompt(question, hits), system=SYSTEM_PROMPT).strip()
+    # Refusal: the model emitted the sentinel, or produced no [n] citation — in
+    # either case it did not ground an answer, so refuse and do not bill.
+    refused = text.upper().startswith(NO_ANSWER_SENTINEL) or not _CITATION_MARK.search(text)
+    if refused:
+        return AnswerResult(answer="", no_answer=True, citations=[])
     return AnswerResult(
         answer=text,
         no_answer=False,

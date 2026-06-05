@@ -17,7 +17,12 @@ from services.knowledge.ingest import (
     normalize_text,
 )
 from services.knowledge.processing import ProcessOutcome, process_uploaded
-from services.knowledge.schema import DOC_FAILED, DOC_READY, ERROR_UNSUPPORTED
+from services.knowledge.schema import (
+    DOC_FAILED,
+    DOC_READY,
+    ERROR_PROCESSING,
+    ERROR_UNSUPPORTED,
+)
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
 
@@ -47,7 +52,14 @@ def process_uploaded_any(
     is_image = suffix in IMAGE_SUFFIXES
 
     if not is_image:
-        outcome = process_uploaded(filename, data, max_chars=max_chars, overlap=overlap)
+        # 损坏/加密文件会让文本抽取抛异常(非 UnsupportedDocument)· 不能逃逸成 500:
+        # PDF 仍给 OCR 一次机会,其余直接落 failed。
+        try:
+            outcome = process_uploaded(filename, data, max_chars=max_chars, overlap=overlap)
+        except Exception:
+            if suffix != ".pdf":
+                return ProcessOutcome(status=DOC_FAILED, error_code=ERROR_PROCESSING)
+            outcome = ProcessOutcome(status=DOC_FAILED, error_code=ERROR_PROCESSING)
         if outcome.status == DOC_READY:
             return outcome  # 文字层抽到 → 按字符
         # 文字型 PDF 抽不到文本(扫描件)→ 落 OCR;其它 unsupported 仍失败。
@@ -57,7 +69,7 @@ def process_uploaded_any(
     try:
         text, pages = _ocr_text_and_pages(filename, data)
     except Exception:
-        return ProcessOutcome(status=DOC_FAILED, error_code=ERROR_UNSUPPORTED)
+        return ProcessOutcome(status=DOC_FAILED, error_code=ERROR_PROCESSING)
 
     text = normalize_text(text)
     if not text.strip():

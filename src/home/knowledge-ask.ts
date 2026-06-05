@@ -6,7 +6,7 @@
 // citation 点开经 knowledge-sources(.modal)。每条答出后端扣 1 credit(no_answer 不扣)。
 // ============================================================
 /* global showToast */
-import { KB_CAT, kbEsc, kbRequest, kbT } from './knowledge-api.js';
+import { KB_CAT, kbEsc, kbRequest, kbT, type KbResult } from './knowledge-api.js';
 import type { KbCitation } from './knowledge-sources.js';
 
 interface AskResult {
@@ -39,10 +39,12 @@ function aiBubble(data: AskResult): string {
         <div class="kb-bub">${kbEsc(data.answer)}${cites ? `<div class="kb-cites">${cites}</div>` : ''}</div></div>`;
 }
 
-async function runAsk(question: string): Promise<AskResult | null> {
-    const r = await kbRequest<AskResult>('POST', '/ask', { question });
-    if (!r.ok || !r.data) return null;
-    return r.data;
+function runAsk(question: string): Promise<KbResult<AskResult>> {
+    return kbRequest<AskResult>('POST', '/ask', { question });
+}
+
+function aiErrorBubble(msg: string): string {
+    return `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div><div class="kb-bub no-src">${kbEsc(msg)}</div></div>`;
 }
 
 // 一套问答接线:给定 thread/input/send 三件 → 自带会话状态 · 供 tab 与悬浮件复用
@@ -69,16 +71,18 @@ function wireAsk(threadEl: HTMLElement, inputEl: HTMLInputElement, sendBtn: HTML
         const thinking = append(
             `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div><div class="kb-bub kb-thinking">${kbEsc(kbT('kb-ask-thinking', '思考中…'))}</div></div>`
         );
-        const data = await runAsk(q);
+        const res = await runAsk(q);
         thinking.remove();
-        if (!data) {
-            append(
-                `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div><div class="kb-bub no-src">${kbEsc(kbT('kb-ask-error', '出错了，请稍后重试。'))}</div></div>`
-            );
-            if (typeof showToast === 'function')
-                showToast(kbT('kb-ask-error', '出错了，请稍后重试。'), 'error');
+        if (res.status === 402) {
+            const msg = kbT('kb-ask-low-balance', '余额不足，请先充值后再提问。');
+            append(aiErrorBubble(msg));
+            if (typeof showToast === 'function') showToast(msg, 'error');
+        } else if (!res.ok || !res.data) {
+            const msg = kbT('kb-ask-error', '出错了，请稍后重试。');
+            append(aiErrorBubble(msg));
+            if (typeof showToast === 'function') showToast(msg, 'error');
         } else {
-            append(aiBubble(data));
+            append(aiBubble(res.data));
         }
         busy = false;
     }
@@ -186,7 +190,7 @@ function renderAsk(): void {
                 </div>
             </div>
         </div>
-        <p class="kb-qa-hint">🔒 ${kbEsc(kbT('kb-ask-disclaimer', 'AI 的每个结论都带可点开的出处；查不到依据时固定回答「资料不足」，绝不编。'))}</p>
+        <p class="kb-qa-hint">${kbEsc(kbT('kb-ask-disclaimer', 'AI 的每个结论都带可点开的出处；查不到依据时固定回答「资料不足」，绝不编。'))}</p>
     `;
     pane.dataset.kbBuilt = '1';
 

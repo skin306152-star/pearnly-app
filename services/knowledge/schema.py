@@ -106,6 +106,9 @@ PROGRESS_COMPLETE = 100
 # Stable error codes recorded on a failed document (knowledge_documents.error_code).
 ERROR_UNSUPPORTED = "unsupported_document"
 ERROR_EMBEDDING = "embedding_failed"
+# A readable file whose bytes could not be parsed/OCR'd (corrupt, truncated,
+# password-protected) — distinct from an unsupported type so the UI can say so.
+ERROR_PROCESSING = "processing_failed"
 
 
 @dataclass(frozen=True)

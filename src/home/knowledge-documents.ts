@@ -7,7 +7,7 @@
 // 由 knowledge-center 在进页 / 切到文档库 tab 时调 window._kbRenderDocs。
 // ============================================================
 /* global showToast, showConfirm */
-import { kbEsc, kbRequest, kbT, kbUpload } from './knowledge-api.js';
+import { kbEsc, kbIcon, kbRequest, kbT, kbUpload } from './knowledge-api.js';
 
 interface KbDoc {
     id: number;
@@ -28,13 +28,19 @@ function statusBadge(d: KbDoc): string {
     if (d.status === 'failed') {
         return `<span class="kb-badge failed"><span class="kb-bdot"></span>${kbEsc(kbT('kb-doc-failed', '失败'))}</span>`;
     }
-    return `<span class="kb-badge parsing"><span class="kb-bdot"></span>${kbEsc(kbT('kb-doc-parsing', '解析中'))}</span>`;
+    const label =
+        d.status === 'uploading'
+            ? kbT('kb-doc-uploading', '上传中…')
+            : kbT('kb-doc-parsing', '解析中');
+    return `<span class="kb-badge parsing"><span class="kb-bdot"></span>${kbEsc(label)}</span>`;
 }
 
 function errText(code: string | null): string {
     if (code === 'unsupported_document')
         return kbT('kb-err-unsupported_document', '不支持的文件类型');
     if (code === 'embedding_failed') return kbT('kb-err-embedding_failed', '向量化失败，可重试');
+    if (code === 'processing_failed')
+        return kbT('kb-err-processing_failed', '文件无法解析，可能已损坏或加密');
     return code ? kbT('kb-doc-failed', '失败') : '';
 }
 
@@ -43,11 +49,19 @@ function fmtDate(iso: string): string {
 }
 
 function rowHtml(d: KbDoc): string {
-    const sub =
-        d.status === 'failed' && d.error_code
-            ? `<div class="kb-doc-sub err">${kbEsc(errText(d.error_code))}</div>`
-            : `<div class="kb-doc-sub">${kbEsc((d.source_type || '').toUpperCase())} · ${kbEsc(fmtDate(d.created_at))}</div>`;
-    const del = `<button class="btn btn-sm btn-ghost kb-doc-del" data-id="${d.id}">${kbEsc(kbT('kb-doc-delete', '删除'))}</button>`;
+    let sub: string;
+    if (d.status === 'failed' && d.error_code) {
+        sub = `<div class="kb-doc-sub err">${kbEsc(errText(d.error_code))}</div>`;
+    } else if (d.status === 'uploading') {
+        sub = `<div class="kb-doc-sub">${kbEsc(kbT('kb-doc-uploading', '上传中…'))}</div>`;
+    } else {
+        sub = `<div class="kb-doc-sub">${kbEsc((d.source_type || '').toUpperCase())} · ${kbEsc(fmtDate(d.created_at))}</div>`;
+    }
+    // 上传中的临时行(负 id)不给删除入口,避免删到一笔还没落库的占位。
+    const del =
+        d.status === 'uploading'
+            ? ''
+            : `<button class="btn btn-sm btn-ghost kb-doc-del" data-id="${d.id}">${kbEsc(kbT('kb-doc-delete', '删除'))}</button>`;
     return `<div class="kb-doc-row" data-id="${d.id}">
         <div class="kb-doc-ic">${docIcon(d.source_type)}</div>
         <div class="kb-doc-meta"><div class="kb-doc-name">${kbEsc(d.filename)}</div>${sub}</div>
@@ -57,11 +71,10 @@ function rowHtml(d: KbDoc): string {
 
 function docIcon(t: string): string {
     const e = (t || '').toLowerCase();
-    if (e === 'pdf') return '📄';
-    if (e === 'doc' || e === 'docx') return '📘';
-    if (e === 'xls' || e === 'xlsx' || e === 'csv') return '📊';
-    if (['png', 'jpg', 'jpeg', 'webp'].includes(e)) return '🖼️';
-    return '📄';
+    if (e === 'doc' || e === 'docx') return kbIcon('file-text');
+    if (e === 'xls' || e === 'xlsx' || e === 'csv') return kbIcon('sheet');
+    if (['png', 'jpg', 'jpeg', 'webp'].includes(e)) return kbIcon('image');
+    return kbIcon('file');
 }
 
 function listEl(): HTMLElement | null {
@@ -116,7 +129,7 @@ async function uploadFiles(files: FileList | File[]): Promise<void> {
             error_code: null,
             created_at: new Date().toISOString(),
         } as KbDoc);
-        renderUploading(tempId);
+        renderList(); // 乐观行立即入列表(任何前态:空/骨架/列表都走同一渲染路径)
         const r = await kbUpload<{ document: KbDoc }>(file);
         const idx = _docs.findIndex((d) => d.id === tempId);
         if (idx < 0) continue;
@@ -131,22 +144,6 @@ async function uploadFiles(files: FileList | File[]): Promise<void> {
         }
         renderList();
     }
-}
-
-function renderUploading(tempId: number): void {
-    const el = listEl();
-    if (!el) return;
-    const d = _docs.find((x) => x.id === tempId);
-    if (!d) return;
-    if (_docs.length === 1) el.innerHTML = '';
-    const div = document.createElement('div');
-    div.innerHTML = `<div class="kb-doc-row" data-id="${tempId}">
-        <div class="kb-doc-ic">${docIcon(d.source_type)}</div>
-        <div class="kb-doc-meta"><div class="kb-doc-name">${kbEsc(d.filename)}</div>
-        <div class="kb-doc-sub">${kbEsc(kbT('kb-doc-uploading', '上传中…'))}</div></div>
-        <span class="kb-badge parsing"><span class="kb-bdot"></span>${kbEsc(kbT('kb-doc-uploading', '上传中…'))}</span>
-    </div>`;
-    el.insertBefore(div.firstElementChild as Node, el.firstChild);
 }
 
 async function deleteDoc(id: number): Promise<void> {
@@ -183,7 +180,8 @@ function ensureShell(): void {
 .kb-doc-list{background:var(--card,#fff);border:1px solid var(--border,#e8e8e3);border-radius:12px;overflow:hidden;min-height:80px}
 .kb-doc-row{display:flex;align-items:center;gap:13px;padding:13px 16px;border-bottom:1px solid var(--border,#e8e8e3)}
 .kb-doc-row:last-child{border-bottom:none}
-.kb-doc-ic{width:34px;height:34px;border-radius:8px;background:var(--bg,#f4f4f0);display:grid;place-items:center;flex-shrink:0;font-size:15px}
+.kb-doc-ic{width:34px;height:34px;border-radius:8px;background:var(--bg,#f4f4f0);display:grid;place-items:center;flex-shrink:0;color:var(--ink-2,#555)}
+.kb-doc-ic svg{width:17px;height:17px}
 .kb-doc-meta{flex:1;min-width:0}
 .kb-doc-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kb-doc-sub{font-size:11px;color:var(--ink-3,#999);margin-top:1px}

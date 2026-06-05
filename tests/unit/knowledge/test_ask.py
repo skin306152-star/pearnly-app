@@ -46,6 +46,28 @@ def test_answer_assembles_citations():
     assert captured["system"] == ask.SYSTEM_PROMPT
 
 
+def test_sentinel_refusal_with_hits_is_no_answer():
+    hits = [_hit(1, 10, "vat.txt", "Thailand VAT is 7 percent.", 0.4)]
+    result = ask.answer_question(
+        "Mars office pet policy?", hits, generate=lambda *a, **k: ask.NO_ANSWER_SENTINEL
+    )
+    assert result.no_answer is True
+    assert result.answer == ""
+    assert result.citations == []
+
+
+def test_uncited_answer_with_hits_is_no_answer():
+    # Model replied in prose but grounded nothing (no [n]); must refuse, not bill.
+    hits = [_hit(1, 10, "vat.txt", "Thailand VAT is 7 percent.", 0.3)]
+    result = ask.answer_question(
+        "Pluto paint color?",
+        hits,
+        generate=lambda *a, **k: "I do not have enough information.",
+    )
+    assert result.no_answer is True
+    assert result.citations == []
+
+
 from tests.unit.knowledge._pytest_adapter import build_case  # noqa: E402
 
 TestAsk = build_case(globals(), "TestAsk")

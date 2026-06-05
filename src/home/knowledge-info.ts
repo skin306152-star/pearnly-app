@@ -4,7 +4,7 @@
 // 页头「功能介绍 · 费用」按钮触发。讲清真实用处 + 费用构成。
 // 费用金额为示意占位(标「待定」),最终定价由 Zihao 拍板后填真数。用 .modal 体系。
 // ============================================================
-import { KB_CAT, kbEsc, kbModalShell, kbT, type KbModal } from './knowledge-api.js';
+import { KB_CAT, kbEsc, kbIcon, kbModalShell, kbT, type KbModal } from './knowledge-api.js';
 
 let _shell: KbModal | null = null;
 
@@ -22,18 +22,21 @@ function ensureDom(): void {
 .kb-info-head .ic img{width:48px;height:48px;object-fit:cover;object-position:center 14%}
 .kb-info-head h2{font-size:18px;font-weight:800;margin:0}
 .kb-info-head .lead{color:var(--ink-2,#555);font-size:12.5px;margin-top:3px;line-height:1.55}
-.kb-info-head .x{margin-left:auto;color:var(--ink-3,#999);font-size:18px;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;cursor:pointer;border:none;background:none;flex-shrink:0}
+.kb-info-head .x{margin-left:auto;color:var(--ink-3,#999);width:30px;height:30px;border-radius:8px;display:grid;place-items:center;cursor:pointer;border:none;background:none;flex-shrink:0}
+.kb-info-head .x svg{width:16px;height:16px}
 .kb-info-head .x:hover{background:var(--bg,#f4f4f0);color:var(--ink,#111)}
 .kb-info-body{padding:18px 24px 24px}
 .kb-info-h{font-size:13px;font-weight:800;margin:18px 0 9px;display:flex;align-items:center;gap:8px}
 .kb-info-h .l{width:4px;height:14px;border-radius:3px;background:var(--btn-blue,#2563eb)}
 .kb-info-use{list-style:none;display:flex;flex-direction:column;gap:9px;padding:0;margin:0}
 .kb-info-use li{display:flex;gap:10px;font-size:12.5px;color:var(--ink-2,#555);line-height:1.55}
-.kb-info-use li .ck{width:20px;height:20px;border-radius:6px;background:var(--info-bg,#dbeafe);color:var(--info-ink,#1e40af);display:grid;place-items:center;flex-shrink:0;font-weight:800;font-size:12px}
+.kb-info-use li .ck{width:20px;height:20px;border-radius:6px;background:var(--info-bg,#dbeafe);color:var(--info-ink,#1e40af);display:grid;place-items:center;flex-shrink:0}
+.kb-info-use li .ck svg{width:13px;height:13px;stroke-width:2.4}
 .kb-info-price{border:1px solid var(--border,#e8e8e3);border-radius:12px;overflow:hidden}
 .kb-info-price .row{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--border,#e8e8e3)}
 .kb-info-price .row:last-child{border-bottom:none}
-.kb-info-price .pi{width:34px;height:34px;border-radius:9px;background:var(--bg,#f4f4f0);display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.kb-info-price .pi{width:34px;height:34px;border-radius:9px;background:var(--bg,#f4f4f0);display:grid;place-items:center;color:var(--ink-2,#555);flex-shrink:0}
+.kb-info-price .pi svg{width:17px;height:17px}
 .kb-info-price .pm{flex:1}
 .kb-info-price .pm b{font-weight:700;font-size:13px}
 .kb-info-price .pm .d{font-size:11px;color:var(--ink-3,#999);margin-top:1px;line-height:1.4}
@@ -47,7 +50,7 @@ function ensureDom(): void {
 }
 
 function useItem(key: string, fb: string): string {
-    return `<li><span class="ck">✓</span><span>${kbEsc(kbT(key, fb))}</span></li>`;
+    return `<li><span class="ck">${kbIcon('check')}</span><span>${kbEsc(kbT(key, fb))}</span></li>`;
 }
 
 function priceRow(
@@ -74,7 +77,7 @@ function render(): void {
                 <h2>${kbEsc(kbT('kb-info-title', '客户知识助手是什么'))}</h2>
                 <div class="lead">${kbEsc(kbT('kb-info-lead', '把每家客户的合同与规矩，变成系统记得住、能自动执行、还能随时问的「活资料」。'))}</div>
             </div>
-            <button class="x" data-kb-info-close aria-label="close">✕</button>
+            <button class="x" data-kb-info-close aria-label="close">${kbIcon('x')}</button>
         </div>
         <div class="kb-info-body">
             <div class="kb-info-h"><span class="l"></span>${kbEsc(kbT('kb-info-use-h', '它真正帮你省什么'))}</div>
@@ -87,11 +90,11 @@ function render(): void {
             <div class="kb-info-h"><span class="l"></span>${kbEsc(kbT('kb-info-cost-h', '费用怎么算'))}</div>
             <p style="font-size:12.5px;color:var(--ink-2,#555);margin:0 0 11px;line-height:1.55">${kbEsc(kbT('kb-info-cost-lead', '从你的泰铢余额按用量扣，不用不花，跟 OCR 共用一个余额池：'))}</p>
             <div class="kb-info-price">
-                ${priceRow('📑', 'kb-info-c1-n', '上传建库', 'kb-info-c1-d', 'PDF / 图片按页、文档按字符 —— 跟现在 OCR 同价', 'kb-info-c1-amt', '฿1.50/页起')}
-                ${priceRow('💬', 'kb-info-c2-n', 'AI 问答', 'kb-info-c2-d', '每次带合同原文出处的回答', 'kb-info-c2-amt', '฿0.50/次')}
-                ${priceRow('✅', 'kb-info-c3-n', '自动发票检查', 'kb-info-c3-d', '死规则:算术 / 税号 / 查重 / 客户规矩', 'kb-info-c3-amt', '免费')}
+                ${priceRow(kbIcon('upload'), 'kb-info-c1-n', '上传建库', 'kb-info-c1-d', 'PDF / 图片按页、文档按字符 —— 跟现在 OCR 同价', 'kb-info-c1-amt', '฿1.50/页起')}
+                ${priceRow(kbIcon('message'), 'kb-info-c2-n', 'AI 问答', 'kb-info-c2-d', '每次带合同原文出处的回答', 'kb-info-c2-amt', '฿0.50/次')}
+                ${priceRow(kbIcon('shield-check'), 'kb-info-c3-n', '自动发票检查', 'kb-info-c3-d', '死规则:算术 / 税号 / 查重 / 客户规矩', 'kb-info-c3-amt', '免费')}
             </div>
-            <div class="kb-info-tbd"><span>ℹ️</span><span>${kbEsc(kbT('kb-info-note', '充值与扣费跟现有 OCR 共用同一个泰铢余额；问答按真实成本加合理毛利定价（与 OCR 同档）。'))}</span></div>
+            <div class="kb-info-tbd"><span>${kbEsc(kbT('kb-info-note', '充值与扣费跟现有 OCR 共用同一个泰铢余额；问答按真实成本加合理毛利定价（与 OCR 同档）。'))}</span></div>
         </div>
         <div class="kb-info-foot"><button class="btn btn-primary" data-kb-info-close>${kbEsc(kbT('kb-info-close', '知道了'))}</button></div>
     `;

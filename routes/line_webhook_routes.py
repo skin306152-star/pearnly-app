@@ -7,9 +7,9 @@ line_webhook_routes.py · LINE Bot Messaging API webhook(REFACTOR-B1)
 包含:
     - _normalize_line_lang  LINE 语言代码 → 4 语 (zh/en/th/ja)
     - _ev_lang(ev)          从 event 安全拿语言并规范化
-    - _follow_lang(uid)     follow event 调 Profile API 拿语言
-    - _handle_line_event    单事件路由(follow / unfollow / message)
-    - _handle_line_text     绑定码消费 + 已绑提示
+    - _is_agent_request     转人工关键词识别(多语言)
+    - _handle_line_event    单事件路由(follow 不回 · 欢迎语走 OA Greeting / unfollow / message)
+    - _handle_line_text     转人工 / 绑定码消费 / 引导提示
     - line_webhook 入口路由(签名校验 → 事件分发)
 
 LINE 图片/文件 → OCR 路径(`_handle_line_image_ocr`)已抽到 services/ocr/line_image_ocr.py
@@ -90,21 +90,6 @@ def _ev_lang(ev: dict) -> str:
     return _normalize_line_lang(raw)
 
 
-def _follow_lang(line_user_id: str) -> str:
-    """
-    follow event 平台不传 language · 主动调 Profile API 拿 · 规范化后返回
-    适用于:加好友 / 解绑后重新加(此时 line_user_id 还没绑定记录)
-    """
-    if not line_user_id:
-        return "th"
-    try:
-        profile = line_client.get_user_profile(line_user_id) or {}
-        return _normalize_line_lang(profile.get("language") or "")
-    except Exception as e:
-        logger.warning(f"[line] _follow_lang profile 调用失败 · fallback th: {e}")
-        return "th"
-
-
 async def _handle_line_event(ev: dict):
     """单个 LINE 事件处理"""
     ev_type = ev.get("type")
@@ -112,16 +97,8 @@ async def _handle_line_event(ev: dict):
     line_user_id = src.get("userId")
     reply_token = ev.get("replyToken")
 
-    # follow:用户加 Bot 好友
+    # follow:用户加 Bot 好友 · 欢迎语由 LINE OA Greeting 卡片负责(避免与机器人重复)· 机器人不回
     if ev_type == "follow":
-        if reply_token:
-            # v118.25.4 · LINE follow event 不传 language · 必须调 Profile API
-            # 这覆盖了「解绑后重新加」场景 · 因为此时还没 line_bindings 记录
-            lang = _follow_lang(line_user_id)
-            line_client.reply_text(
-                reply_token,
-                line_client.t_line(lang, "welcome"),
-            )
         return
 
     # unfollow:用户删 Bot

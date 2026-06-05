@@ -5,15 +5,6 @@ from typing import Optional
 
 LINE_I18N = {
     "zh": {
-        "welcome": (
-            "👋 欢迎使用 Pearnly\n"
-            "财务自动化助手 · 为泰国会计事务所与中小企业打造\n\n"
-            "开始前先绑定账号:\n"
-            "1. 登录 https://pearnly.com\n"
-            "2. 打开「集成 → LINE Bot」\n"
-            "3. 把 6 位绑定码发给我\n\n"
-            "绑定后,把发票/收据拍照发来,几秒自动识别入账 📸"
-        ),
         "bind_invalid": "❌ 绑定码无效或已过期\n请回 pearnly.com 重新获取",
         "bind_conflict": (
             "❌ 绑定失败 · 此 LINE 账号可能已绑到其他 Pearnly 用户\n请先在原账号解绑再试"
@@ -30,6 +21,7 @@ LINE_I18N = {
         "already_bound_hint": (
             "Hi {username} 👋 我能帮你:\n"
             "📸 发发票/收据照片或 PDF → 自动识别、查重、入账\n"
+            "💡 拍全张、光线清晰,识别最准\n"
             "🧾 发一句「ค่าน้ำ 50」→ 自动记一笔并归类到凭证中心\n"
             "💬 需要人工 → 回复「人工」\n"
             "🔗 完整功能在 pearnly.com"
@@ -56,15 +48,6 @@ LINE_I18N = {
         "agent_ack": "🙋 正在为你转接人工 · 我们的团队会尽快回复(周一–周五 9:00–18:00)",
     },
     "en": {
-        "welcome": (
-            "👋 Welcome to Pearnly\n"
-            "The accounting automation assistant for accounting firms & SMEs in Thailand\n\n"
-            "Let's get you set up:\n"
-            "1. Log in at https://pearnly.com\n"
-            "2. Open 'Integrations → LINE Bot'\n"
-            "3. Send me the 6-digit code\n\n"
-            "Once linked, just snap a photo of any invoice/receipt — I'll read and record it in seconds 📸"
-        ),
         "bind_invalid": "❌ Invalid or expired code\nGet a new one at pearnly.com",
         "bind_conflict": (
             "❌ Binding failed · this LINE account may already be bound to another Pearnly user\n"
@@ -82,6 +65,7 @@ LINE_I18N = {
         "already_bound_hint": (
             "Hi {username} 👋 Here's what I can do:\n"
             "📸 Send a photo/PDF of an invoice or receipt → read, de-duplicate, record\n"
+            "💡 Tip: capture the full document in good light for best accuracy\n"
             "🧾 Type 'Water 50' → auto-logged to your voucher center, categorized\n"
             "💬 Need a human → type 'agent'\n"
             "🔗 Full features at pearnly.com"
@@ -108,15 +92,6 @@ LINE_I18N = {
         "agent_ack": "🙋 Connecting you to our team · we'll reply shortly (Mon–Fri 9:00–18:00)",
     },
     "th": {
-        "welcome": (
-            "👋 ยินดีต้อนรับสู่ Pearnly\n"
-            "ผู้ช่วยงานบัญชีอัตโนมัติ สำหรับสำนักงานบัญชีและ SME ในไทย\n\n"
-            "เริ่มต้นด้วยการผูกบัญชี:\n"
-            "1. เข้าสู่ระบบที่ https://pearnly.com\n"
-            "2. เปิด 'การเชื่อมต่อ → LINE Bot'\n"
-            "3. ส่งรหัส 6 หลักมาให้เรา\n\n"
-            "หลังผูกบัญชี ถ่ายรูปใบกำกับ/ใบเสร็จส่งมาได้เลย ระบบจะอ่านและบันทึกให้อัตโนมัติภายในไม่กี่วินาที 📸"
-        ),
         "bind_invalid": "❌ รหัสไม่ถูกต้องหรือหมดอายุ\nกรุณารับรหัสใหม่ที่ pearnly.com",
         "bind_conflict": (
             "❌ ผูกบัญชีไม่สำเร็จ · LINE นี้อาจถูกผูกกับ Pearnly บัญชีอื่นแล้ว\n"
@@ -134,6 +109,7 @@ LINE_I18N = {
         "already_bound_hint": (
             "สวัสดี {username} 👋 Pearnly ช่วยคุณได้:\n"
             "📸 ส่งรูป/PDF ใบกำกับหรือใบเสร็จ → อ่าน ตรวจซ้ำ และบันทึกอัตโนมัติ\n"
+            "💡 เคล็ดลับ: ถ่ายให้เห็นเต็มใบ แสงชัดเจน เพื่อความแม่นยำสูงสุด\n"
             "🧾 พิมพ์ 'ค่าน้ำ 50' → บันทึกและจัดหมวดเข้าศูนย์ใบสำคัญ\n"
             "💬 ต้องการเจ้าหน้าที่ → พิมพ์ 'เจ้าหน้าที่'\n"
             "🔗 ฟีเจอร์ทั้งหมดที่ pearnly.com"
@@ -160,15 +136,6 @@ LINE_I18N = {
         "agent_ack": "🙋 กำลังโอนสายให้เจ้าหน้าที่ · ทีมงานจะตอบกลับโดยเร็ว (จันทร์–ศุกร์ 9:00–18:00)",
     },
     "ja": {
-        "welcome": (
-            "👋 Pearnly へようこそ\n"
-            "会計事務所・SME 向けの経理自動化アシスタントです\n\n"
-            "まずはアカウント連携を:\n"
-            "1. https://pearnly.com にログイン\n"
-            "2. 「連携 → LINE Bot」を開く\n"
-            "3. 6 桁のコードを送信\n\n"
-            "連携後は、請求書・領収書を撮って送るだけ。数秒で読み取り・記帳します 📸"
-        ),
         "bind_invalid": "❌ コードが無効または期限切れです\npearnly.com で新しいコードを取得してください",
         "bind_conflict": (
             "❌ 紐付け失敗 · この LINE は別の Pearnly アカウントに紐付け済みの可能性があります\n"
@@ -186,6 +153,7 @@ LINE_I18N = {
         "already_bound_hint": (
             "こんにちは {username} 👋 Pearnly でできること:\n"
             "📸 請求書・領収書の写真/PDF → 読み取り・重複チェック・記帳\n"
+            "💡 コツ: 書類全体を明るく撮ると精度が上がります\n"
             "🧾 「水道 50」と入力 → 証憑センターへ自動記録・仕分け\n"
             "💬 オペレーター希望 → 「オペレーター」と入力\n"
             "🔗 全機能は pearnly.com"

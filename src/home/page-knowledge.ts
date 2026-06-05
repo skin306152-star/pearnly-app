@@ -25,6 +25,9 @@
 .kb-soon h3{color:var(--ink-2,#555);font-size:15px;margin:0 0 6px}
 .kb-rules-intro{background:var(--card,#fff);border:1px solid var(--border,#e8e8e3);border-radius:12px;padding:20px}
 .kb-rules-intro p{color:var(--ink-2,#555);font-size:13px;margin:0 0 14px;line-height:1.6}
+.kb-info-btn{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--btn-blue,#2563eb);background:var(--info-bg,#dbeafe);border:none;border-radius:18px;padding:6px 13px;cursor:pointer}
+.kb-info-btn:hover{background:#cfe0fd}
+.kb-info-btn svg{width:14px;height:14px}
 `;
         document.head.appendChild(st);
     }
@@ -42,6 +45,10 @@
                 <h1 class="page-title" data-i18n="kb-title">客户知识</h1>
                 <div class="page-subtitle" data-i18n="kb-sub">合同 / 政策 / 规矩按账套主体隔离 · AI 检查发票与问答均带出处</div>
             </div>
+            <button class="kb-info-btn" id="kb-info-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                <span data-i18n="kb-info-btn">功能介绍 · 费用</span>
+            </button>
         </div>
 
         <div class="kb-ws-bar" id="kb-ws-bar">

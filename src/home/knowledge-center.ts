@@ -66,6 +66,12 @@ function bindTabs(): void {
             if (typeof window.openRulesSettings === 'function') window.openRulesSettings();
         });
     }
+    const infoBtn = document.getElementById('kb-info-btn');
+    if (infoBtn) {
+        infoBtn.addEventListener('click', () => {
+            if (typeof window._kbOpenInfo === 'function') window._kbOpenInfo();
+        });
+    }
     _tabsBound = true;
 }
 

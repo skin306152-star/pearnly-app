@@ -287,6 +287,7 @@ interface Window {
     _kbWireAsk?: (threadEl: HTMLElement, inputEl: HTMLInputElement, sendBtn: HTMLElement) => void;
     _kbFabSetEnabled?: (on: boolean) => void;
     _kbFabEnabled?: () => boolean;
+    _kbOpenInfo?: () => void;
     getHistoryClientFilter?: () => unknown;
     fillCategoryDatalist?: () => void;
     _tcApplyVisibility?: () => void;

@@ -90,6 +90,7 @@ import './home/knowledge-documents.js'; // KNOWLEDGE · 文档库 tab(上传/列
 import './home/knowledge-sources.js'; // KNOWLEDGE · 来源出处弹窗(.modal · window._kbOpenSource · 须在 knowledge-ask 前)
 import './home/knowledge-ask.js'; // KNOWLEDGE · 问答 tab + 可复用问答接线(window._kbRenderAsk/_kbWireAsk · 接 /api/knowledge/ask)
 import './home/knowledge-fab.js'; // KNOWLEDGE · 悬浮猫问答助手(拖拽吸边+卖萌·复用 _kbWireAsk·问答 tab 开关控显隐·须在 knowledge-ask 后)
+import './home/knowledge-info.js'; // KNOWLEDGE · 功能介绍+费用弹窗(.modal · window._kbOpenInfo · 页头按钮触发)
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件

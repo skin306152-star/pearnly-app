@@ -1,0 +1,130 @@
+// ============================================================
+// 客户知识 · 功能介绍 + 费用弹窗(KNOWLEDGE feature · 阶段5)
+//
+// 页头「功能介绍 · 费用」按钮触发。讲清真实用处 + 费用构成。
+// 费用金额为示意占位(标「待定」),最终定价由 Zihao 拍板后填真数。用 .modal 体系。
+// ============================================================
+/* global escapeHtml */
+
+function iT(key: string, fb: string): string {
+    if (typeof window.t === 'function') {
+        const s = window.t(key);
+        if (s && s !== key) return s;
+    }
+    return fb;
+}
+
+function esc(s: unknown): string {
+    return typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? '');
+}
+
+function ensureDom(): void {
+    if (document.getElementById('kb-info-mask')) return;
+
+    const st = document.createElement('style');
+    st.id = 'kb-info-style';
+    st.textContent = `
+.kb-info-mask{position:fixed;inset:0;background:rgba(17,17,17,.42);z-index:1300;display:none;align-items:center;justify-content:center;padding:20px}
+.kb-info-mask.open{display:flex}
+.kb-info-modal{background:#fff;border-radius:16px;width:560px;max-width:100%;max-height:88vh;overflow:auto;box-shadow:0 30px 80px rgba(17,17,17,.3)}
+.kb-info-head{display:flex;align-items:flex-start;gap:14px;padding:22px 24px 0}
+.kb-info-head .ic{width:52px;height:52px;border-radius:13px;background:#fff7ee;overflow:hidden;display:grid;place-items:center;flex-shrink:0}
+.kb-info-head .ic img{width:48px;height:48px;object-fit:cover;object-position:center 14%}
+.kb-info-head h2{font-size:18px;font-weight:800;margin:0}
+.kb-info-head .lead{color:var(--ink-2,#555);font-size:12.5px;margin-top:3px;line-height:1.55}
+.kb-info-head .x{margin-left:auto;color:var(--ink-3,#999);font-size:18px;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;cursor:pointer;border:none;background:none;flex-shrink:0}
+.kb-info-head .x:hover{background:var(--bg,#f4f4f0);color:var(--ink,#111)}
+.kb-info-body{padding:18px 24px 24px}
+.kb-info-h{font-size:13px;font-weight:800;margin:18px 0 9px;display:flex;align-items:center;gap:8px}
+.kb-info-h .l{width:4px;height:14px;border-radius:3px;background:var(--btn-blue,#2563eb)}
+.kb-info-use{list-style:none;display:flex;flex-direction:column;gap:9px;padding:0;margin:0}
+.kb-info-use li{display:flex;gap:10px;font-size:12.5px;color:var(--ink-2,#555);line-height:1.55}
+.kb-info-use li .ck{width:20px;height:20px;border-radius:6px;background:var(--info-bg,#dbeafe);color:var(--info-ink,#1e40af);display:grid;place-items:center;flex-shrink:0;font-weight:800;font-size:12px}
+.kb-info-price{border:1px solid var(--border,#e8e8e3);border-radius:12px;overflow:hidden}
+.kb-info-price .row{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--border,#e8e8e3)}
+.kb-info-price .row:last-child{border-bottom:none}
+.kb-info-price .pi{width:34px;height:34px;border-radius:9px;background:var(--bg,#f4f4f0);display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.kb-info-price .pm{flex:1}
+.kb-info-price .pm b{font-weight:700;font-size:13px}
+.kb-info-price .pm .d{font-size:11px;color:var(--ink-3,#999);margin-top:1px;line-height:1.4}
+.kb-info-price .amt{font-size:11px;font-weight:700;color:var(--ink-3,#999);background:var(--bg,#f4f4f0);border-radius:7px;padding:4px 9px;white-space:nowrap}
+.kb-info-tbd{display:flex;align-items:flex-start;gap:8px;background:#fffaeb;color:#b54708;border:1px solid #fde68a;border-radius:8px;padding:9px 12px;font-size:11.5px;font-weight:600;margin-top:12px;line-height:1.5}
+.kb-info-foot{display:flex;justify-content:flex-end;padding:0 24px 22px}
+`;
+    document.head.appendChild(st);
+
+    const mask = document.createElement('div');
+    mask.id = 'kb-info-mask';
+    mask.className = 'kb-info-mask';
+    mask.innerHTML = `<div class="kb-info-modal" id="kb-info-modal" role="dialog" aria-modal="true"></div>`;
+    document.body.appendChild(mask);
+    mask.addEventListener('click', (e) => {
+        if (e.target === mask || (e.target as HTMLElement).closest('[data-kb-info-close]')) close();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && mask.classList.contains('open')) close();
+    });
+}
+
+function close(): void {
+    document.getElementById('kb-info-mask')?.classList.remove('open');
+}
+
+function useItem(key: string, fb: string): string {
+    return `<li><span class="ck">✓</span><span>${esc(iT(key, fb))}</span></li>`;
+}
+
+function priceRow(
+    icon: string,
+    nameK: string,
+    nameFb: string,
+    descK: string,
+    descFb: string,
+    amtK: string,
+    amtFb: string
+): string {
+    return `<div class="row"><div class="pi">${icon}</div>
+        <div class="pm"><b>${esc(iT(nameK, nameFb))}</b><div class="d">${esc(iT(descK, descFb))}</div></div>
+        <span class="amt">${esc(iT(amtK, amtFb))}</span></div>`;
+}
+
+function render(): void {
+    const modal = document.getElementById('kb-info-modal');
+    if (!modal) return;
+    modal.innerHTML = `
+        <div class="kb-info-head">
+            <span class="ic"><img src="/static/brand/kb-cat.png" alt=""></span>
+            <div>
+                <h2>${esc(iT('kb-info-title', '客户知识助手是什么'))}</h2>
+                <div class="lead">${esc(iT('kb-info-lead', '把每家客户的合同与规矩，变成系统记得住、能自动执行、还能随时问的「活资料」。'))}</div>
+            </div>
+            <button class="x" data-kb-info-close aria-label="close">✕</button>
+        </div>
+        <div class="kb-info-body">
+            <div class="kb-info-h"><span class="l"></span>${esc(iT('kb-info-use-h', '它真正帮你省什么'))}</div>
+            <ul class="kb-info-use">
+                ${useItem('kb-info-use1', '把客户的合同、采购政策、内部规矩上传一次，AI 读懂后建成可检索的资料库 —— 不用再翻文件夹找合同。')}
+                ${useItem('kb-info-use2', '做账时 AI 自动按这家客户的规矩检查发票：金额超上限、供应商要不要人工复核、差旅超标…… 异常当场标出来。')}
+                ${useItem('kb-info-use3', '任意页面右下角随手问「这家客户能不能这样报」，答案都带合同原文出处，点一下就能核对，AI 不瞎编。')}
+                ${useItem('kb-info-use4', '把老会计脑子里记的客户规矩，变成系统记住、新人也能直接上手 —— 给多家公司做账的事务所尤其值。')}
+            </ul>
+            <div class="kb-info-h"><span class="l"></span>${esc(iT('kb-info-cost-h', '费用怎么算'))}</div>
+            <p style="font-size:12.5px;color:var(--ink-2,#555);margin:0 0 11px;line-height:1.55">${esc(iT('kb-info-cost-lead', '从你的泰铢余额按用量扣，不用不花，跟 OCR 共用一个余额池：'))}</p>
+            <div class="kb-info-price">
+                ${priceRow('📑', 'kb-info-c1-n', '上传建库', 'kb-info-c1-d', 'PDF / 图片按页、文档按字符 —— 跟现在 OCR 同价', 'kb-info-c1-amt', '฿1.50/页起')}
+                ${priceRow('💬', 'kb-info-c2-n', 'AI 问答', 'kb-info-c2-d', '每次带合同原文出处的回答', 'kb-info-c2-amt', '฿0.50/次')}
+                ${priceRow('✅', 'kb-info-c3-n', '自动发票检查', 'kb-info-c3-d', '死规则:算术 / 税号 / 查重 / 客户规矩', 'kb-info-c3-amt', '免费')}
+            </div>
+            <div class="kb-info-tbd"><span>ℹ️</span><span>${esc(iT('kb-info-note', '充值与扣费跟现有 OCR 共用同一个泰铢余额；问答按真实成本加合理毛利定价（与 OCR 同档）。'))}</span></div>
+        </div>
+        <div class="kb-info-foot"><button class="btn btn-primary" data-kb-info-close>${esc(iT('kb-info-close', '知道了'))}</button></div>
+    `;
+}
+
+function open(): void {
+    ensureDom();
+    render();
+    document.getElementById('kb-info-mask')?.classList.add('open');
+}
+
+window._kbOpenInfo = open;

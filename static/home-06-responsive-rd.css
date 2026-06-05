@@ -207,12 +207,12 @@
     background: var(--gray-50);
 }
 .rd-modal-btn.primary {
-    background: var(--ink);
+    background: var(--btn-blue);
     color: #fff;
-    border-color: var(--ink);
+    border-color: var(--btn-blue);
 }
 .rd-modal-btn.primary:hover {
-    background: var(--ink);
+    background: var(--btn-blue-hover);
 }
 
 /* 对比行 */

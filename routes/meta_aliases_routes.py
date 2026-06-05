@@ -36,10 +36,10 @@ async def get_frontend_version():
         "version": PEARNLY_FRONTEND_VERSION,
         "ts": int(_time.time()),
         "release_notes": {
-            "zh": "本次更新优化了发票异常检查:对税额计算、税号、重复发票、发票日期等的核对更细致准确,异常列表与原因说明也更清晰。事务所还可在异常页自定义供应商名单、单据金额上限等核查规矩。即日生效。",
-            "th": "การอัปเดตนี้ปรับปรุงการตรวจสอบความผิดปกติของใบกำกับ: ตรวจการคำนวณภาษี เลขผู้เสียภาษี ใบกำกับซ้ำ และวันที่ได้ละเอียดขึ้น พร้อมคำอธิบายในรายการที่ชัดเจนขึ้น สำนักงานบัญชียังตั้งกฎตรวจสอบของตนเองได้ เช่น รายชื่อผู้ขายและวงเงินต่อใบ ที่หน้ารายการผิดปกติ มีผลทันที",
-            "en": "This update improves invoice exception checks: VAT arithmetic, tax IDs, duplicate invoices and invoice dates are now checked more thoroughly, with clearer explanations in the exception list. Firms can also set their own checks — such as supplier lists and per-invoice amount limits — on the exceptions page. Effective immediately.",
-            "ja": "今回の更新で請求書の異常チェックを強化しました。税額計算・納税者番号・重複請求書・請求日などの照合がより精密になり、異常一覧と理由の説明も分かりやすくなりました。会計事務所は仕入先リストや1件あたりの金額上限などの独自チェックを異常ページで設定できます。即日有効。",
+            "zh": "本次更新统一了系统内操作按钮与开关的颜色风格:原先部分按钮显示为深色,现已统一为品牌蓝色,整体界面看起来更一致、更清晰。即日生效。",
+            "th": "การอัปเดตนี้ได้ปรับสีของปุ่มและสวิตช์ต่าง ๆ ในระบบให้เป็นรูปแบบเดียวกัน จากเดิมที่บางปุ่มแสดงเป็นสีเข้ม ตอนนี้ปรับเป็นสีน้ำเงินของแบรนด์ทั้งหมด ทำให้หน้าจอดูสอดคล้องและชัดเจนยิ่งขึ้น มีผลทันที",
+            "en": "This update unifies the color of action buttons and toggles across the system. Some buttons that previously appeared dark are now shown in the brand blue, giving the whole interface a more consistent and clearer look. Effective immediately.",
+            "ja": "今回の更新では、システム内の操作ボタンとスイッチの配色を統一しました。これまで一部のボタンが濃い色で表示されていましたが、すべてブランドのブルーに統一し、画面全体がより一貫して見やすくなりました。即日有効。",
         },
     }
 

@@ -518,7 +518,7 @@
     margin-right: 8px;
     white-space: nowrap;
 }
-.drawer-push-btn:hover { background: var(--ink); }
+.drawer-push-btn:hover { background: var(--btn-blue-hover); }
 .drawer-push-btn:active { transform: scale(0.97); }
 .drawer-push-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .drawer-push-btn svg { width: 14px; height: 14px; }

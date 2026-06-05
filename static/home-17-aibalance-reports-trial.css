@@ -308,12 +308,12 @@
 }
 .report-modal-foot .btn { min-width: 96px; }
 .report-modal-foot .btn-primary {
-    background: var(--ink);
+    background: var(--btn-blue);
     color: #fff;
     border: none;
 }
 .report-modal-foot .btn-primary:hover:not(:disabled) {
-    background: var(--ink);
+    background: var(--btn-blue-hover);
 }
 .report-modal-foot .btn-primary:disabled {
     opacity: 0.6; cursor: not-allowed;

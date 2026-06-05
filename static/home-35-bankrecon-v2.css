@@ -150,7 +150,7 @@
   transition: all .12s;
 }
 .brv2-filter-btn.active, .brv2-filter-btn:hover {
-  background: var(--ink); color: #fff; border-color: var(--ink);
+  background: var(--btn-blue); color: #fff; border-color: var(--btn-blue);
 }
 .brv2-action-bar .btn { margin-left: auto; }
 

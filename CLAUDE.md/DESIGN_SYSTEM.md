@@ -45,7 +45,7 @@ Pearnly 同时存在 **两套主题**,职责清晰分离,**不可混用**:
 
 | Token              | HEX        | 用途                                             |
 | ------------------ | ---------- | ---------------------------------------------- |
-| `--brand`          | `#1a365d`  | 品牌主色 · 主按钮 · sidebar active 文字 · 链接           |
+| `--brand`          | `#1a365d`  | 品牌主色 · sidebar active 文字 · 链接(⚠️ 按钮底**不用**此值 · 全站按钮/切换以 home-38 `--btn-blue` `#2563EB` 为准 · 机械闸 `check_ui_consistency.py` D2 强制) |
 | `--brand-hover`    | `#2a4e7c`  | 主按钮 hover                                      |
 | `--accent`         | `#4299e1`  | 强调蓝 · focus ring · 拖拽态 · spinner 主色            |
 | `--accent-soft`    | `#ebf4ff`  | 强调浅底 · sidebar active 背景 · info alert 底色      |
@@ -408,6 +408,8 @@ font-family:
 ---
 
 ## 10. 抽屉样式
+
+> ⚠️ **新功能一律用弹窗 `.modal`(§11),不要新增抽屉 `.drawer`**(Zihao 2026-06-05 拍板 · 机械闸 `check_ui_consistency.py` D1 ratchet 冻结存量、禁新增)。存量抽屉保留不 retrofit;本节为存量样式参考。
 
 ### 10.1 容器
 

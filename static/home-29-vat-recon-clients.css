@@ -513,7 +513,7 @@
     background: var(--gray-200); color: var(--gray-700); font-size: 11px; font-weight: 600;
     margin-left: 2px;
 }
-.bv-files-toggle.open .bv-files-count { background: var(--ink); color: #fff; }
+.bv-files-toggle.open .bv-files-count { background: var(--btn-blue); color: #fff; }
 .bv-files-list {
     margin-top: 10px; padding: 6px;
     background: var(--c-fafaf8); border: 1px solid var(--line); border-radius: 10px;
@@ -920,10 +920,10 @@
 .sv-act-btn.info.active      { background: var(--indigo-500); border-color: var(--indigo-500); }
 /* v118.32.4.8 · B 方案 · 用户校对兜底 */
 .sv-act-btn.primary {
-    background: var(--ink); color: #fff; border-color: var(--ink);
+    background: var(--btn-blue); color: #fff; border-color: var(--btn-blue);
     font-weight: 600; padding: 8px 14px;
 }
-.sv-act-btn.primary:hover { background: var(--ink); border-color: var(--ink); }
+.sv-act-btn.primary:hover { background: var(--btn-blue-hover); border-color: var(--btn-blue-hover); }
 .sv-act-btn.ghost {
     background: transparent; color: var(--gray-500); border-color: var(--gray-200);
 }

@@ -994,7 +994,7 @@ body [data-i18n] {
 }
 .ob-btn-skip:hover { color: #0f172a; }
 .ob-btn-next {
-    background: linear-gradient(135deg, #111111 0%, #111111 100%);
+    background: var(--btn-blue);
     border: none;
     color: #fff;
     font-size: 14px;

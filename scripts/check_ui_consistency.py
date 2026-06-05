@@ -65,6 +65,12 @@ def find_buttons(text: str):
 # CI 当场报红。
 BASELINE_TOTAL = 480
 
+# ── 硬规则基线(Zihao 2026-06-05 拍板 · 全站弹窗 + 按钮蓝不用黑)──
+# D1 抽屉:存量冻结,只许减不许增(新 UI 一律用 .modal 弹窗)。
+# D2 按钮/切换黑底:存量清零后 = 0,任何按钮/切换黑底即红(只导航栏可黑)。
+DRAWER_BASELINE = 120
+BLACK_BTN_BASELINE = 0
+
 
 def ratchet_verdict(total: int, baseline: int) -> tuple[bool, str]:
     """纯函数:当前总违规 vs 基线 → (是否通过, 说明)。
@@ -92,6 +98,7 @@ def main(argv=None):
         default=BASELINE_TOTAL,
         help=f"违规上限基线(默认 {BASELINE_TOTAL})· 超过即非零退出",
     )
+    ap.add_argument("--quiet", action="store_true", help="只在失败时打详情(供 pre-push 调用)")
     args = ap.parse_args(argv)
 
     results = {}
@@ -144,6 +151,39 @@ def main(argv=None):
                 legacy_css_def.append((f.name, "." + c))
     results["B4 旧按钮类的 CSS 定义未删"] = legacy_css_def
 
+    # ── 硬规则 D1:全站弹窗 · 禁新增抽屉(.drawer)──
+    # 现存抽屉冻结成基线(只许减不许增);新增 .drawer 用法/定义 = 红 · 新 UI 用 .modal 弹窗。
+    ts_files = sorted((ROOT / "src" / "home").glob("*.ts"))
+    drawer_hits = []
+    for f in HTML_FILES + JS_FILES + ts_files:
+        for m in re.finditer(r'class\s*=\s*"[^"]*\bdrawer[\w-]*\b[^"]*"', read(f)):
+            drawer_hits.append((f.name, m.group(0)[:60]))
+    for f in CSS_FILES:
+        for m in re.finditer(r"\.drawer[\w-]*\s*[{,]", read(f)):
+            drawer_hits.append((f.name, m.group(0)))
+
+    # ── 硬规则 D2:按钮/切换 黑底(只导航栏可黑)· 目标基线 0 ──
+    # 逐 CSS 规则块扫:选择器含 btn/toggle/switch/act-btn/.primary,
+    # 且 background 用 var(--ink)/#000/#111/#222/#333/#1a202c → 违规。排除 nav/sidebar 与令牌文件。
+    black_bg = re.compile(
+        r"background[^;}]*:\s*[^;}]*"
+        r"(var\(--ink\)|#000000\b|#000\b|#111111\b|#111\b|#222\b|#333\b|#1a202c\b)",
+        re.I,
+    )
+    btn_sel = re.compile(r"(btn|toggle|switch|act-btn|\.primary)", re.I)
+    nav_sel = re.compile(r"(nav|sidebar)", re.I)
+    black_btn = []
+    for f in CSS_FILES:
+        if f.name in TOKEN_CSS:
+            continue
+        for chunk in read(f).split("}"):
+            if "{" not in chunk:
+                continue
+            sel, body = chunk.rsplit("{", 1)
+            sel = sel.split("{")[-1]  # 取最末段选择器 · 防 @media 包裹串味
+            if btn_sel.search(sel) and not nav_sel.search(sel) and black_bg.search(body):
+                black_btn.append((f.name, sel.strip().replace("\n", " ")[:60]))
+
     # ── 输出 ──
     print("=" * 64)
     print("  Pearnly · UI 一致性检查器(原型)")
@@ -163,16 +203,36 @@ def main(argv=None):
     )
     print("=" * 64)
 
-    # 详情(前几条样例,证明不是瞎报)
-    for rule, items in results.items():
-        if items:
-            print(f"\n  【{rule}】样例(前 6):")
-            for name, detail in items[:6]:
-                print(f"    · {name}: {detail}")
+    # 详情(前几条样例,证明不是瞎报)· --quiet 时省略
+    if not args.quiet:
+        for rule, items in results.items():
+            if items:
+                print(f"\n  【{rule}】样例(前 6):")
+                for name, detail in items[:6]:
+                    print(f"    · {name}: {detail}")
 
     ok, verdict = ratchet_verdict(total_violations, args.baseline)
     print(f"\n  基线:{args.baseline}  ·  {verdict}")
-    return 0 if ok else 1
+
+    # ── 硬规则裁决(Zihao 2026-06-05)· 独立基线 · 任一回退即非零退出 ──
+    d1_ok = len(drawer_hits) <= DRAWER_BASELINE
+    d2_ok = len(black_btn) <= BLACK_BTN_BASELINE
+    print("\n  ── 硬规则 ──")
+    print(
+        f"  {'✅' if d1_ok else '🔴'} D1 抽屉用法 {len(drawer_hits)}"
+        f"(基线 {DRAWER_BASELINE} · 禁新增 · 新 UI 用 .modal 弹窗)"
+    )
+    print(
+        f"  {'✅' if d2_ok else '🔴'} D2 按钮/切换黑底 {len(black_btn)}"
+        f"(基线 {BLACK_BTN_BASELINE} · 改蓝 var(--btn-blue) · 只导航栏可黑)"
+    )
+    if not d2_ok:
+        for nm, sel in black_btn:
+            print(f"      · {nm}: {sel}")
+    if not d1_ok:
+        print("      D1 超基线 · 新 UI 别用 .drawer · 用 .modal 弹窗")
+
+    return 0 if (ok and d1_ok and d2_ok) else 1
 
 
 if __name__ == "__main__":

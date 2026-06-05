@@ -154,6 +154,10 @@ else
     || fail "check_line_ratchet(监控文件行数净增 · 见上)"
 fi
 
+echo "  · check_ui_consistency(全站弹窗 + 按钮/切换蓝不用黑 · 硬规 D1/D2 · Zihao 2026-06-05)"
+python scripts/check_ui_consistency.py --quiet \
+  || fail "UI 硬规:新增了抽屉(用 .modal 弹窗)· 或按钮/切换黑底(改 var(--btn-blue) · 只导航栏可黑)"
+
 echo ""
 echo "✅ 全部守门绿 · 放行推送"
 echo "──────────────────────────────────────────────────────────"

@@ -9,9 +9,9 @@
     min-height: 40px;       /* v113.1 · 手机点击区域 · 不误触 */
 }
 .btn svg { width: 14px; height: 14px; }
-/* v118.33.7.7 · 主按钮改纯黑 · 跟 sidebar active 统一(对齐 prototype · 去多蓝混乱) */
-.btn-primary { background: var(--ink); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: #333; }
+/* 主按钮品牌蓝(Zihao 2026-06-05 · 收编自旧纯黑 · 全站统一 home-38 蓝)*/
+.btn-primary { background: var(--btn-blue); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--btn-blue-hover); }
 .btn-primary:disabled { background: var(--ink-3); cursor: not-allowed; }
 .btn-secondary {
     background: #fff; color: var(--ink-2);

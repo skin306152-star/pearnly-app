@@ -1943,6 +1943,7 @@ window.I18N = {
         // A4 (v118.34.19) · 集成主页面顶部 tab 切换
         'int-tab-cards': '集成卡片',
         'int-tab-logs': '推送日志',
+        'int-tab-push-exc': '推送异常',
         'int-btn-view-logs': '看推送日志 →',
         // v109.4 · 销售发票模块(v110.1)
         'nav-sales-invoices': '销售发票',
@@ -4633,6 +4634,7 @@ window.I18N = {
         // A4 (v118.34.19) · integration page top tabs
         'int-tab-cards': 'Integrations',
         'int-tab-logs': 'Push Log',
+        'int-tab-push-exc': 'Push Exceptions',
         'int-btn-view-logs': 'View push log →',
         // v109.4 · sales invoice module (v110.1)
         'nav-sales-invoices': 'Sales Invoices',
@@ -7312,6 +7314,7 @@ window.I18N = {
         // A4 (v118.34.19) · แท็บหน้าการเชื่อมต่อ
         'int-tab-cards': 'การ์ดเชื่อมต่อ',
         'int-tab-logs': 'บันทึกการส่ง',
+        'int-tab-push-exc': 'รายการส่งผิดปกติ',
         'int-btn-view-logs': 'ดูบันทึก →',
         // v109.4 · ใบกำกับขาย (v110.1)
         'nav-sales-invoices': 'ใบกำกับขาย',
@@ -9987,6 +9990,7 @@ window.I18N = {
         // A4 (v118.34.19) · 連携ページ上部タブ
         'int-tab-cards': '連携カード',
         'int-tab-logs': '送信ログ',
+        'int-tab-push-exc': '送信エラー',
         'int-btn-view-logs': '送信ログを見る →',
         // v109.4 · 売上請求書モジュール (v110.1)
         'nav-sales-invoices': '売上請求書',

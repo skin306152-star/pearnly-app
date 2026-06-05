@@ -39,10 +39,6 @@
             </div>
         </div>
 
-        <!-- ERP 推送异常块(独立来源 · Zihao 2026-05-26)· 派生自 erp_push_logs ·
-             0 条时隐藏 · 内容(标题/chip/卡片)全由 JS renderErpExceptions 填充 -->
-        <div class="erp-exc-block" id="erp-exc-block" hidden></div>
-
         <!-- 顶部 4 KPI -->
         <div class="exc-kpi-row" id="exc-kpi-row">
             <div class="exc-kpi">

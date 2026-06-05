@@ -26,9 +26,7 @@ window.loadExceptionsPage = async function () {
     _excState.loading = true;
     try {
         _refreshExcClientFilter();
-        // ERP 推送异常(独立来源 · 派生自 erp_push_logs)· 先加载 · 与 OCR 异常并存
-        // ERP 推送异常块已抽出至 erp-exceptions.js · 经 window 桥接调用
-        if (typeof window.loadErpExceptions === 'function') window.loadErpExceptions();
+        // ERP 推送异常块已搬至集成页「推送异常」tab(由 _activateIntTopTab 触发加载)
         await loadExceptionsStats();
         await loadExceptionsList();
     } finally {

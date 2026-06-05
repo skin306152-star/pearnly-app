@@ -29,6 +29,12 @@
         <div class="int-top-tabs" role="tablist">
             <button class="int-top-tab active" type="button" data-int-top-tab="cards" data-i18n="int-tab-cards">集成卡片</button>
             <button class="int-top-tab" type="button" data-int-top-tab="logs" data-i18n="int-tab-logs">推送日志</button>
+            <button class="int-top-tab" type="button" data-int-top-tab="push-exc" data-i18n="int-tab-push-exc">推送异常</button>
+        </div>
+
+        <!-- Tab 3: 推送异常(从异常页搬来 · 独立来源 · 派生自 erp_push_logs · 内容由 renderErpExceptions 填充) -->
+        <div class="int-top-panel" data-int-top-panel="push-exc">
+            <div class="erp-exc-block" id="erp-exc-block" hidden></div>
         </div>
 
         <!-- Tab 1: integration-row 卡片(现有内容不变) -->

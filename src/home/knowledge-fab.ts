@@ -5,21 +5,13 @@
 // 点开 = 磨砂玻璃问答卡,复用 _kbWireAsk(与问答 tab 同一套答案/出处逻辑)。
 // 显隐由问答 tab 的开关控制(localStorage 持久),仅知识库 flag 开 + 用户开启才出现。
 // ============================================================
-import { KB_CAT, kbProbe, kbWorkspaceName } from './knowledge-api.js';
+import { KB_CAT, kbProbe, kbT, kbWorkspaceName } from './knowledge-api.js';
 
 const LS_KEY = 'pearnly_kb_fab';
 const CAT = KB_CAT;
 const M = 14; // 离边距离
 let built = false;
 let wired = false;
-
-function fT(key: string, fb: string): string {
-    if (typeof window.t === 'function') {
-        const s = window.t(key);
-        if (s && s !== key) return s;
-    }
-    return fb;
-}
 
 function ensureStyle(): void {
     if (document.getElementById('kb-fab-style')) return;
@@ -74,8 +66,8 @@ function build(): void {
     dock.className = 'kb-fab';
     dock.id = 'kb-fab';
     dock.innerHTML = `
-        <span class="kb-say" id="kb-say">${fT('kb-fab-hi', '喵~')}</span>
-        <button class="kb-fab-btn" id="kb-fab-btn" aria-label="${fT('kb-fab-aria', '问 AI')}"><img src="${CAT}" alt=""></button>`;
+        <span class="kb-say" id="kb-say">${kbT('kb-fab-hi', '喵~')}</span>
+        <button class="kb-fab-btn" id="kb-fab-btn" aria-label="${kbT('kb-fab-aria', '问 AI')}"><img src="${CAT}" alt=""></button>`;
     document.body.appendChild(dock);
 
     card = document.createElement('div');
@@ -83,7 +75,7 @@ function build(): void {
     card.id = 'kb-card';
     card.innerHTML = `
         <div class="kb-card-top">
-            <div class="tt"><span class="mini"><img src="${CAT}" alt=""></span> ${fT('kb-fab-title', '客户知识助手')}</div>
+            <div class="tt"><span class="mini"><img src="${CAT}" alt=""></span> ${kbT('kb-fab-title', '客户知识助手')}</div>
             <div style="display:flex;align-items:center;gap:8px">
                 <span class="ws" id="kb-card-ws"></span>
                 <button class="kb-card-x" id="kb-card-x" aria-label="close">✕</button>
@@ -91,7 +83,7 @@ function build(): void {
         </div>
         <div class="kb-qa-thread" id="kb-card-thread" style="flex:1;padding:15px;display:flex;flex-direction:column;gap:14px;overflow:auto"></div>
         <div class="kb-qa-input">
-            <input id="kb-card-input" placeholder="${fT('kb-fab-ph', '随处可问，不跳页…')}">
+            <input id="kb-card-input" placeholder="${kbT('kb-fab-ph', '随处可问，不跳页…')}">
             <button class="kb-send" id="kb-card-send"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
         </div>`;
     document.body.appendChild(card);
@@ -115,12 +107,12 @@ function openCard(): void {
     const input = document.getElementById('kb-card-input') as HTMLInputElement;
     const send = document.getElementById('kb-card-send') as HTMLElement;
     if (!wired && typeof window._kbWireAsk === 'function') {
-        thread.innerHTML = `<div class="kb-msg ai"><div class="kb-ava"><img src="${CAT}" alt=""></div><div class="kb-bub">${fT('kb-ask-empty', '问点关于这家客户的事，答案都带出处；查不到时如实说「资料不足」。')}</div></div>`;
+        thread.innerHTML = `<div class="kb-msg ai"><div class="kb-ava"><img src="${CAT}" alt=""></div><div class="kb-bub">${kbT('kb-ask-empty', '问点关于这家客户的事，答案都带出处；查不到时如实说「资料不足」。')}</div></div>`;
         window._kbWireAsk(thread, input, send);
         wired = true;
     }
     const ws = document.getElementById('kb-card-ws');
-    if (ws) ws.textContent = kbWorkspaceName() || fT('kb-fab-no-ws', '未选账套');
+    if (ws) ws.textContent = kbWorkspaceName() || kbT('kb-fab-no-ws', '未选账套');
     positionCard();
     card.classList.add('open');
     catCheer();
@@ -176,7 +168,7 @@ function burst(set: string[]): void {
     }
 }
 function setupPersonality(): void {
-    const HELLO = [fT('kb-fab-hi', '喵?'), fT('kb-fab-ask', '问我呀!'), '🐾'];
+    const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
     catBtn.addEventListener('mouseenter', () => {
         if (!dock.classList.contains('lifted'))
             say(HELLO[((Date.now() / 1000) | 0) % HELLO.length], 1400);

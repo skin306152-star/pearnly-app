@@ -24,6 +24,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, s
 from pydantic import BaseModel
 
 from core import db
+from services.billing.charge import thb_to_satang
 from services.knowledge import contract
 from routes.knowledge_common import authorize_write, resolve_caller
 from services.knowledge import dal, embedding, search
@@ -199,7 +200,7 @@ async def upload_document(
                 cost_thb = db.estimate_pdf_cost_thb(0, outcome.ocr_pages)
             else:
                 cost_thb = db.estimate_excel_cost_thb(outcome.char_count)
-            satang = int(round(float(cost_thb) * 100))
+            satang = thb_to_satang(cost_thb)
             if satang > 0:
                 contract.charge_credits(
                     tenant_id,

@@ -6,6 +6,7 @@
 // 后端在 KNOWLEDGE_ENABLED=1 时才挂路由 → kbProbe() 探一次决定是否暴露入口。
 // 账套上下文复用既有 window.getActiveWorkspaceClientId / _workspaceClientsCache,不另起一套。
 // ============================================================
+/* global escapeHtml */
 
 const KB_BASE = '/api/knowledge';
 
@@ -14,6 +15,56 @@ export const KB_CAT = '/static/brand/kb-cat.png?v=2';
 
 function kbToken(): string {
     return localStorage.getItem('mrpilot_token') || '';
+}
+
+/** i18n 取词:命中 window.t 用译文,否则回退默认文案。知识库各模块共用。 */
+export function kbT(key: string, fallback: string): string {
+    if (typeof window.t === 'function') {
+        const s = window.t(key);
+        if (s && s !== key) return s;
+    }
+    return fallback;
+}
+
+/** HTML 转义(含单引号 &#39;,可安全用于单引号属性)。window.escapeHtml 缺失时直出。 */
+export function kbEsc(s: unknown): string {
+    return typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? '');
+}
+
+export interface KbModal {
+    modal: HTMLElement;
+    open(): void;
+    close(): void;
+}
+
+/**
+ * 知识库标准弹窗外壳:遮罩 + 居中卡,点遮罩 / `[data-kb-${prefix}-close]` / Esc 关闭。
+ * 尺寸、层级等样式由各模块自行注入 `#kb-${prefix}-style`;本工厂只管 DOM 与开合行为。
+ * 幂等:重复调用复用已建节点。
+ */
+export function kbModalShell(prefix: string): KbModal {
+    const maskId = `kb-${prefix}-mask`;
+    const modalId = `kb-${prefix}-modal`;
+    const open = (): void => document.getElementById(maskId)?.classList.add('open');
+    const close = (): void => document.getElementById(maskId)?.classList.remove('open');
+
+    let mask = document.getElementById(maskId);
+    if (!mask) {
+        mask = document.createElement('div');
+        mask.id = maskId;
+        mask.className = `kb-${prefix}-mask`;
+        mask.innerHTML = `<div class="kb-${prefix}-modal" id="${modalId}" role="dialog" aria-modal="true"></div>`;
+        document.body.appendChild(mask);
+        const m = mask;
+        m.addEventListener('click', (e) => {
+            if (e.target === m || (e.target as HTMLElement).closest(`[data-kb-${prefix}-close]`))
+                close();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && m.classList.contains('open')) close();
+        });
+    }
+    return { modal: document.getElementById(modalId) as HTMLElement, open, close };
 }
 
 /** 当前账套主体 id;未选返回 null(此时禁止客户私有操作)。 */

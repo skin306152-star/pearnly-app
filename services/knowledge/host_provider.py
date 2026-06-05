@@ -84,11 +84,9 @@ class MainHostProvider(HostProvider):
                 "knowledge usage tenant=%s kind=%s amount=%s (no charge)", tenant_id, kind, amount
             )
             return
-        from decimal import Decimal
+        from services.billing.charge import deduct_thb, satang_to_thb
 
-        from services.billing.charge import deduct_thb
-
-        cost_thb = Decimal(int(amount)) / Decimal(100)
+        cost_thb = satang_to_thb(amount)
         user_id = (meta or {}).get("user_id")
         res = deduct_thb(
             user_id, tenant_id, cost_thb, kind, description=f"knowledge {kind} {meta or {}}"

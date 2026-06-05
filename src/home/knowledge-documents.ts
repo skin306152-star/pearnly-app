@@ -6,8 +6,8 @@
 // (kbRequest 自动附 workspace_client_id);未选账套则落 firm-wide 知识库。
 // 由 knowledge-center 在进页 / 切到文档库 tab 时调 window._kbRenderDocs。
 // ============================================================
-/* global escapeHtml, showToast, showConfirm */
-import { kbRequest, kbUpload } from './knowledge-api.js';
+/* global showToast, showConfirm */
+import { kbEsc, kbRequest, kbT, kbUpload } from './knowledge-api.js';
 
 interface KbDoc {
     id: number;
@@ -21,33 +21,21 @@ interface KbDoc {
 let _shellBuilt = false;
 let _docs: KbDoc[] = [];
 
-function dT(key: string, fb: string): string {
-    if (typeof window.t === 'function') {
-        const s = window.t(key);
-        if (s && s !== key) return s;
-    }
-    return fb;
-}
-
-function esc(s: unknown): string {
-    return typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? '');
-}
-
 function statusBadge(d: KbDoc): string {
     if (d.status === 'ready') {
-        return `<span class="kb-badge ready"><span class="kb-bdot"></span>${esc(dT('kb-doc-ready', '已就绪'))}</span>`;
+        return `<span class="kb-badge ready"><span class="kb-bdot"></span>${kbEsc(kbT('kb-doc-ready', '已就绪'))}</span>`;
     }
     if (d.status === 'failed') {
-        return `<span class="kb-badge failed"><span class="kb-bdot"></span>${esc(dT('kb-doc-failed', '失败'))}</span>`;
+        return `<span class="kb-badge failed"><span class="kb-bdot"></span>${kbEsc(kbT('kb-doc-failed', '失败'))}</span>`;
     }
-    return `<span class="kb-badge parsing"><span class="kb-bdot"></span>${esc(dT('kb-doc-parsing', '解析中'))}</span>`;
+    return `<span class="kb-badge parsing"><span class="kb-bdot"></span>${kbEsc(kbT('kb-doc-parsing', '解析中'))}</span>`;
 }
 
 function errText(code: string | null): string {
     if (code === 'unsupported_document')
-        return dT('kb-err-unsupported_document', '不支持的文件类型');
-    if (code === 'embedding_failed') return dT('kb-err-embedding_failed', '向量化失败，可重试');
-    return code ? dT('kb-doc-failed', '失败') : '';
+        return kbT('kb-err-unsupported_document', '不支持的文件类型');
+    if (code === 'embedding_failed') return kbT('kb-err-embedding_failed', '向量化失败，可重试');
+    return code ? kbT('kb-doc-failed', '失败') : '';
 }
 
 function fmtDate(iso: string): string {
@@ -57,12 +45,12 @@ function fmtDate(iso: string): string {
 function rowHtml(d: KbDoc): string {
     const sub =
         d.status === 'failed' && d.error_code
-            ? `<div class="kb-doc-sub err">${esc(errText(d.error_code))}</div>`
-            : `<div class="kb-doc-sub">${esc((d.source_type || '').toUpperCase())} · ${esc(fmtDate(d.created_at))}</div>`;
-    const del = `<button class="btn btn-sm btn-ghost kb-doc-del" data-id="${d.id}">${esc(dT('kb-doc-delete', '删除'))}</button>`;
+            ? `<div class="kb-doc-sub err">${kbEsc(errText(d.error_code))}</div>`
+            : `<div class="kb-doc-sub">${kbEsc((d.source_type || '').toUpperCase())} · ${kbEsc(fmtDate(d.created_at))}</div>`;
+    const del = `<button class="btn btn-sm btn-ghost kb-doc-del" data-id="${d.id}">${kbEsc(kbT('kb-doc-delete', '删除'))}</button>`;
     return `<div class="kb-doc-row" data-id="${d.id}">
         <div class="kb-doc-ic">${docIcon(d.source_type)}</div>
-        <div class="kb-doc-meta"><div class="kb-doc-name">${esc(d.filename)}</div>${sub}</div>
+        <div class="kb-doc-meta"><div class="kb-doc-name">${kbEsc(d.filename)}</div>${sub}</div>
         ${statusBadge(d)}${del}
     </div>`;
 }
@@ -86,8 +74,8 @@ function renderList(): void {
     if (!_docs.length) {
         el.innerHTML = `<div class="kb-empty">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
-            <h4>${esc(dT('kb-doc-empty-title', '还没有文档'))}</h4>
-            <div>${esc(dT('kb-doc-empty', '上传客户合同、采购政策、税务登记等资料，AI 检查发票和问答时引用。'))}</div>
+            <h4>${kbEsc(kbT('kb-doc-empty-title', '还没有文档'))}</h4>
+            <div>${kbEsc(kbT('kb-doc-empty', '上传客户合同、采购政策、税务登记等资料，AI 检查发票和问答时引用。'))}</div>
         </div>`;
         return;
     }
@@ -106,8 +94,8 @@ async function loadList(): Promise<void> {
     const r = await kbRequest<{ documents: KbDoc[] }>('GET', '/documents');
     if (!r.ok) {
         setListState(`<div class="kb-empty err">
-            <div>${esc(dT('kb-doc-error', '加载失败'))}</div>
-            <button class="btn btn-sm kb-doc-reload" style="margin-top:12px">${esc(dT('kb-doc-retry', '重试'))}</button>
+            <div>${kbEsc(kbT('kb-doc-error', '加载失败'))}</div>
+            <button class="btn btn-sm kb-doc-reload" style="margin-top:12px">${kbEsc(kbT('kb-doc-retry', '重试'))}</button>
         </div>`);
         return;
     }
@@ -135,11 +123,11 @@ async function uploadFiles(files: FileList | File[]): Promise<void> {
         if (r.ok && r.data?.document) {
             _docs[idx] = r.data.document;
             if (r.data.document.status === 'failed') {
-                showToast(dT('kb-doc-failed', '失败') + '：' + file.name, 'error');
+                showToast(kbT('kb-doc-failed', '失败') + '：' + file.name, 'error');
             }
         } else {
             _docs.splice(idx, 1);
-            showToast(dT('kb-upload-fail', '上传失败') + '：' + file.name, 'error');
+            showToast(kbT('kb-upload-fail', '上传失败') + '：' + file.name, 'error');
         }
         renderList();
     }
@@ -154,9 +142,9 @@ function renderUploading(tempId: number): void {
     const div = document.createElement('div');
     div.innerHTML = `<div class="kb-doc-row" data-id="${tempId}">
         <div class="kb-doc-ic">${docIcon(d.source_type)}</div>
-        <div class="kb-doc-meta"><div class="kb-doc-name">${esc(d.filename)}</div>
-        <div class="kb-doc-sub">${esc(dT('kb-doc-uploading', '上传中…'))}</div></div>
-        <span class="kb-badge parsing"><span class="kb-bdot"></span>${esc(dT('kb-doc-uploading', '上传中…'))}</span>
+        <div class="kb-doc-meta"><div class="kb-doc-name">${kbEsc(d.filename)}</div>
+        <div class="kb-doc-sub">${kbEsc(kbT('kb-doc-uploading', '上传中…'))}</div></div>
+        <span class="kb-badge parsing"><span class="kb-bdot"></span>${kbEsc(kbT('kb-doc-uploading', '上传中…'))}</span>
     </div>`;
     el.insertBefore(div.firstElementChild as Node, el.firstChild);
 }
@@ -165,7 +153,7 @@ async function deleteDoc(id: number): Promise<void> {
     const ok =
         typeof showConfirm === 'function'
             ? await showConfirm(
-                  dT('kb-doc-del-confirm', '确定删除这份文档？删除后 AI 将不再引用它。')
+                  kbT('kb-doc-del-confirm', '确定删除这份文档？删除后 AI 将不再引用它。')
               )
             : true;
     if (!ok) return;
@@ -174,7 +162,7 @@ async function deleteDoc(id: number): Promise<void> {
         _docs = _docs.filter((d) => d.id !== id);
         renderList();
     } else {
-        showToast(dT('kb-doc-del-fail', '删除失败'), 'error');
+        showToast(kbT('kb-doc-del-fail', '删除失败'), 'error');
     }
 }
 
@@ -291,7 +279,7 @@ function renderDocs(): void {
 
 window._kbRenderDocs = renderDocs;
 
-// 切语言:已渲染的文档行用 dT() 取的是当时语言 · 重渲一遍跟上(静态壳走全局 applyLang)
+// 切语言:已渲染的文档行用 kbT() 取的是当时语言 · 重渲一遍跟上(静态壳走全局 applyLang)
 if (!Array.isArray(window.__i18nSubs)) window.__i18nSubs = [];
 window.__i18nSubs.push({
     name: 'knowledge-documents',

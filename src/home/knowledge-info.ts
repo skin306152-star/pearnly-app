@@ -4,23 +4,12 @@
 // 页头「功能介绍 · 费用」按钮触发。讲清真实用处 + 费用构成。
 // 费用金额为示意占位(标「待定」),最终定价由 Zihao 拍板后填真数。用 .modal 体系。
 // ============================================================
-/* global escapeHtml */
-import { KB_CAT } from './knowledge-api.js';
+import { KB_CAT, kbEsc, kbModalShell, kbT, type KbModal } from './knowledge-api.js';
 
-function iT(key: string, fb: string): string {
-    if (typeof window.t === 'function') {
-        const s = window.t(key);
-        if (s && s !== key) return s;
-    }
-    return fb;
-}
-
-function esc(s: unknown): string {
-    return typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? '');
-}
+let _shell: KbModal | null = null;
 
 function ensureDom(): void {
-    if (document.getElementById('kb-info-mask')) return;
+    if (_shell) return;
 
     const st = document.createElement('style');
     st.id = 'kb-info-style';
@@ -54,25 +43,11 @@ function ensureDom(): void {
 `;
     document.head.appendChild(st);
 
-    const mask = document.createElement('div');
-    mask.id = 'kb-info-mask';
-    mask.className = 'kb-info-mask';
-    mask.innerHTML = `<div class="kb-info-modal" id="kb-info-modal" role="dialog" aria-modal="true"></div>`;
-    document.body.appendChild(mask);
-    mask.addEventListener('click', (e) => {
-        if (e.target === mask || (e.target as HTMLElement).closest('[data-kb-info-close]')) close();
-    });
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && mask.classList.contains('open')) close();
-    });
-}
-
-function close(): void {
-    document.getElementById('kb-info-mask')?.classList.remove('open');
+    _shell = kbModalShell('info');
 }
 
 function useItem(key: string, fb: string): string {
-    return `<li><span class="ck">✓</span><span>${esc(iT(key, fb))}</span></li>`;
+    return `<li><span class="ck">✓</span><span>${kbEsc(kbT(key, fb))}</span></li>`;
 }
 
 function priceRow(
@@ -85,47 +60,47 @@ function priceRow(
     amtFb: string
 ): string {
     return `<div class="row"><div class="pi">${icon}</div>
-        <div class="pm"><b>${esc(iT(nameK, nameFb))}</b><div class="d">${esc(iT(descK, descFb))}</div></div>
-        <span class="amt">${esc(iT(amtK, amtFb))}</span></div>`;
+        <div class="pm"><b>${kbEsc(kbT(nameK, nameFb))}</b><div class="d">${kbEsc(kbT(descK, descFb))}</div></div>
+        <span class="amt">${kbEsc(kbT(amtK, amtFb))}</span></div>`;
 }
 
 function render(): void {
-    const modal = document.getElementById('kb-info-modal');
+    const modal = _shell?.modal;
     if (!modal) return;
     modal.innerHTML = `
         <div class="kb-info-head">
             <span class="ic"><img src="${KB_CAT}" alt=""></span>
             <div>
-                <h2>${esc(iT('kb-info-title', '客户知识助手是什么'))}</h2>
-                <div class="lead">${esc(iT('kb-info-lead', '把每家客户的合同与规矩，变成系统记得住、能自动执行、还能随时问的「活资料」。'))}</div>
+                <h2>${kbEsc(kbT('kb-info-title', '客户知识助手是什么'))}</h2>
+                <div class="lead">${kbEsc(kbT('kb-info-lead', '把每家客户的合同与规矩，变成系统记得住、能自动执行、还能随时问的「活资料」。'))}</div>
             </div>
             <button class="x" data-kb-info-close aria-label="close">✕</button>
         </div>
         <div class="kb-info-body">
-            <div class="kb-info-h"><span class="l"></span>${esc(iT('kb-info-use-h', '它真正帮你省什么'))}</div>
+            <div class="kb-info-h"><span class="l"></span>${kbEsc(kbT('kb-info-use-h', '它真正帮你省什么'))}</div>
             <ul class="kb-info-use">
                 ${useItem('kb-info-use1', '把客户的合同、采购政策、内部规矩上传一次，AI 读懂后建成可检索的资料库 —— 不用再翻文件夹找合同。')}
                 ${useItem('kb-info-use2', '做账时 AI 自动按这家客户的规矩检查发票：金额超上限、供应商要不要人工复核、差旅超标…… 异常当场标出来。')}
                 ${useItem('kb-info-use3', '任意页面右下角随手问「这家客户能不能这样报」，答案都带合同原文出处，点一下就能核对，AI 不瞎编。')}
                 ${useItem('kb-info-use4', '把老会计脑子里记的客户规矩，变成系统记住、新人也能直接上手 —— 给多家公司做账的事务所尤其值。')}
             </ul>
-            <div class="kb-info-h"><span class="l"></span>${esc(iT('kb-info-cost-h', '费用怎么算'))}</div>
-            <p style="font-size:12.5px;color:var(--ink-2,#555);margin:0 0 11px;line-height:1.55">${esc(iT('kb-info-cost-lead', '从你的泰铢余额按用量扣，不用不花，跟 OCR 共用一个余额池：'))}</p>
+            <div class="kb-info-h"><span class="l"></span>${kbEsc(kbT('kb-info-cost-h', '费用怎么算'))}</div>
+            <p style="font-size:12.5px;color:var(--ink-2,#555);margin:0 0 11px;line-height:1.55">${kbEsc(kbT('kb-info-cost-lead', '从你的泰铢余额按用量扣，不用不花，跟 OCR 共用一个余额池：'))}</p>
             <div class="kb-info-price">
                 ${priceRow('📑', 'kb-info-c1-n', '上传建库', 'kb-info-c1-d', 'PDF / 图片按页、文档按字符 —— 跟现在 OCR 同价', 'kb-info-c1-amt', '฿1.50/页起')}
                 ${priceRow('💬', 'kb-info-c2-n', 'AI 问答', 'kb-info-c2-d', '每次带合同原文出处的回答', 'kb-info-c2-amt', '฿0.50/次')}
                 ${priceRow('✅', 'kb-info-c3-n', '自动发票检查', 'kb-info-c3-d', '死规则:算术 / 税号 / 查重 / 客户规矩', 'kb-info-c3-amt', '免费')}
             </div>
-            <div class="kb-info-tbd"><span>ℹ️</span><span>${esc(iT('kb-info-note', '充值与扣费跟现有 OCR 共用同一个泰铢余额；问答按真实成本加合理毛利定价（与 OCR 同档）。'))}</span></div>
+            <div class="kb-info-tbd"><span>ℹ️</span><span>${kbEsc(kbT('kb-info-note', '充值与扣费跟现有 OCR 共用同一个泰铢余额；问答按真实成本加合理毛利定价（与 OCR 同档）。'))}</span></div>
         </div>
-        <div class="kb-info-foot"><button class="btn btn-primary" data-kb-info-close>${esc(iT('kb-info-close', '知道了'))}</button></div>
+        <div class="kb-info-foot"><button class="btn btn-primary" data-kb-info-close>${kbEsc(kbT('kb-info-close', '知道了'))}</button></div>
     `;
 }
 
 function open(): void {
     ensureDom();
     render();
-    document.getElementById('kb-info-mask')?.classList.add('open');
+    _shell?.open();
 }
 
 window._kbOpenInfo = open;

@@ -6,7 +6,7 @@
 // 故先呈现文档来源 + 相关度;原文高亮预览待后端补「按 chunk 取文」接口后再加。
 // window._kbOpenSource(citation) 由问答模块(tab + 悬浮件)共用。
 // ============================================================
-/* global escapeHtml */
+import { kbEsc, kbModalShell, kbT, type KbModal } from './knowledge-api.js';
 
 export interface KbCitation {
     chunk_id?: number;
@@ -15,20 +15,10 @@ export interface KbCitation {
     score?: number;
 }
 
-function sT(key: string, fb: string): string {
-    if (typeof window.t === 'function') {
-        const s = window.t(key);
-        if (s && s !== key) return s;
-    }
-    return fb;
-}
-
-function esc(s: unknown): string {
-    return typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? '');
-}
+let _shell: KbModal | null = null;
 
 function ensureDom(): void {
-    if (document.getElementById('kb-src-mask')) return;
+    if (_shell) return;
 
     const st = document.createElement('style');
     st.id = 'kb-src-style';
@@ -52,29 +42,14 @@ function ensureDom(): void {
 `;
     document.head.appendChild(st);
 
-    const mask = document.createElement('div');
-    mask.id = 'kb-src-mask';
-    mask.className = 'kb-src-mask';
-    mask.innerHTML = `<div class="kb-src-modal" id="kb-src-modal" role="dialog" aria-modal="true"></div>`;
-    document.body.appendChild(mask);
-
-    mask.addEventListener('click', (e) => {
-        if (e.target === mask || (e.target as HTMLElement).closest('[data-kb-src-close]')) close();
-    });
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && mask.classList.contains('open')) close();
-    });
-}
-
-function close(): void {
-    document.getElementById('kb-src-mask')?.classList.remove('open');
+    _shell = kbModalShell('src');
 }
 
 function open(cit: KbCitation): void {
     ensureDom();
-    const modal = document.getElementById('kb-src-modal');
+    const modal = _shell?.modal;
     if (!modal) return;
-    const name = cit.filename || sT('kb-src-unknown', '未知来源');
+    const name = cit.filename || kbT('kb-src-unknown', '未知来源');
     const pct =
         typeof cit.score === 'number'
             ? Math.round(Math.max(0, Math.min(1, cit.score)) * 100)
@@ -83,22 +58,22 @@ function open(cit: KbCitation): void {
         <div class="kb-src-head">
             <span class="ic">📄</span>
             <div>
-                <h3>${esc(sT('kb-src-title', '来源出处'))}</h3>
-                <div class="sub">${esc(sT('kb-src-from', '此结论引用自以下文档'))}</div>
+                <h3>${kbEsc(kbT('kb-src-title', '来源出处'))}</h3>
+                <div class="sub">${kbEsc(kbT('kb-src-from', '此结论引用自以下文档'))}</div>
             </div>
             <button class="x" data-kb-src-close aria-label="close">✕</button>
         </div>
         <div class="kb-src-body">
             <div class="kb-src-doc">
                 <span class="di">📄</span>
-                <div><div class="dn">${esc(name)}</div>
-                <div class="dm">${esc(sT('kb-src-doc-note', '已就绪 · 已建立向量索引'))}</div></div>
+                <div><div class="dn">${kbEsc(name)}</div>
+                <div class="dm">${kbEsc(kbT('kb-src-doc-note', '已就绪 · 已建立向量索引'))}</div></div>
             </div>
-            ${pct !== null ? `<div class="kb-src-rel">🎯 ${esc(sT('kb-src-relevance', '相关度'))} ${pct}%</div>` : ''}
-            <div class="kb-src-note">${esc(sT('kb-src-explain', 'AI 据此份文档作答 · 你可在文档库打开原件核对。原文片段高亮预览即将上线。'))}</div>
+            ${pct !== null ? `<div class="kb-src-rel">🎯 ${kbEsc(kbT('kb-src-relevance', '相关度'))} ${pct}%</div>` : ''}
+            <div class="kb-src-note">${kbEsc(kbT('kb-src-explain', 'AI 据此份文档作答 · 你可在文档库打开原件核对。原文片段高亮预览即将上线。'))}</div>
         </div>
     `;
-    document.getElementById('kb-src-mask')?.classList.add('open');
+    _shell?.open();
 }
 
 window._kbOpenSource = open;

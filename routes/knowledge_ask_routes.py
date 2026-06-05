@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 
 from core import db
+from services.billing.charge import SATANG_PER_THB
 from services.knowledge import contract
 from routes.knowledge_common import authorize_write, resolve_caller
 from services.knowledge import ask, dal, embedding, generation, search
@@ -57,14 +58,14 @@ def ask_question(request: Request, body: AskRequest) -> dict[str, Any]:
     try:
         _bill = db.get_billing_status_combined(identity.user_id, identity.tenant_id)
         if not _bill.get("is_exempt") and float(_bill.get("balance_thb", 0)) < (
-            _RAG_ANSWER_SATANG / 100
+            _RAG_ANSWER_SATANG / SATANG_PER_THB
         ):
             raise HTTPException(
                 status.HTTP_402_PAYMENT_REQUIRED,
                 detail={
                     "code": "insufficient_balance",
                     "balance": _bill.get("balance_thb", 0.0),
-                    "estimated_cost": _RAG_ANSWER_SATANG / 100,
+                    "estimated_cost": _RAG_ANSWER_SATANG / SATANG_PER_THB,
                 },
             )
     except HTTPException:

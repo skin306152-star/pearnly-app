@@ -6,18 +6,9 @@
 // 文档库 / 问答 的数据装填在后续阶段各自模块接手,本文件只搭页面外壳行为。
 // 骨架由 page-knowledge.ts 注入 → 本文件 import 须在其后。
 // ============================================================
-/* global escapeHtml */
-import { kbProbe, kbWorkspaceId, kbWorkspaceName } from './knowledge-api.js';
+import { kbEsc, kbProbe, kbT, kbWorkspaceId, kbWorkspaceName } from './knowledge-api.js';
 
 let _tabsBound = false;
-
-function kbT(key: string, fallback: string): string {
-    if (typeof window.t === 'function') {
-        const s = window.t(key);
-        if (s && s !== key) return s;
-    }
-    return fallback;
-}
 
 function renderWorkspaceBar(): void {
     const bar = document.getElementById('kb-ws-bar');
@@ -27,7 +18,7 @@ function renderWorkspaceBar(): void {
     if (id) {
         bar.classList.remove('kb-ws-empty');
         label.innerHTML =
-            kbT('kb-ws-current', '账套主体') + '：<b>' + escapeName(kbWorkspaceName()) + '</b>';
+            kbT('kb-ws-current', '账套主体') + '：<b>' + kbEsc(kbWorkspaceName()) + '</b>';
     } else {
         bar.classList.add('kb-ws-empty');
         label.textContent = kbT(
@@ -35,10 +26,6 @@ function renderWorkspaceBar(): void {
             '请先在右上角选择账套主体,再使用客户私有文档与问答。'
         );
     }
-}
-
-function escapeName(s: string): string {
-    return typeof escapeHtml === 'function' ? escapeHtml(s) : s;
 }
 
 function switchTab(tab: string): void {

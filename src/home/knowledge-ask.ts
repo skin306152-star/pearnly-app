@@ -5,8 +5,8 @@
 // 答案逻辑做成可复用(_kbWireAsk),问答 tab 与悬浮件(阶段4)两个挂载点共用。
 // citation 点开经 knowledge-sources(.modal)。每条答出后端扣 1 credit(no_answer 不扣)。
 // ============================================================
-/* global escapeHtml, showToast */
-import { KB_CAT, kbRequest } from './knowledge-api.js';
+/* global showToast */
+import { KB_CAT, kbEsc, kbRequest, kbT } from './knowledge-api.js';
 import type { KbCitation } from './knowledge-sources.js';
 
 interface AskResult {
@@ -16,39 +16,27 @@ interface AskResult {
     message_key?: string;
 }
 
-function aT(key: string, fb: string): string {
-    if (typeof window.t === 'function') {
-        const s = window.t(key);
-        if (s && s !== key) return s;
-    }
-    return fb;
-}
-
-function esc(s: unknown): string {
-    return typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? '');
-}
-
 function userBubble(text: string): string {
-    return `<div class="kb-msg user"><div class="kb-bub">${esc(text)}</div></div>`;
+    return `<div class="kb-msg user"><div class="kb-bub">${kbEsc(text)}</div></div>`;
 }
 
 function citeChip(c: KbCitation): string {
-    const name = c.filename || aT('kb-src-unknown', '未知来源');
-    const data = esc(JSON.stringify(c));
+    const name = c.filename || kbT('kb-src-unknown', '未知来源');
+    const data = kbEsc(JSON.stringify(c));
     return `<button class="kb-cite" data-cite='${data}'>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
-        ${esc(name)}<span class="ch">›</span></button>`;
+        ${kbEsc(name)}<span class="ch">›</span></button>`;
 }
 
 function aiBubble(data: AskResult): string {
     if (data.no_answer) {
-        const msg = aT(data.message_key || 'ask.no_source', '资料不足，无法判断。');
+        const msg = kbT(data.message_key || 'ask.no_source', '资料不足，无法判断。');
         return `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div>
-            <div class="kb-bub no-src">${esc(msg)}</div></div>`;
+            <div class="kb-bub no-src">${kbEsc(msg)}</div></div>`;
     }
     const cites = (data.citations || []).map((c) => citeChip(c)).join('');
     return `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div>
-        <div class="kb-bub">${esc(data.answer)}${cites ? `<div class="kb-cites">${cites}</div>` : ''}</div></div>`;
+        <div class="kb-bub">${kbEsc(data.answer)}${cites ? `<div class="kb-cites">${cites}</div>` : ''}</div></div>`;
 }
 
 async function runAsk(question: string): Promise<AskResult | null> {
@@ -79,16 +67,16 @@ function wireAsk(threadEl: HTMLElement, inputEl: HTMLInputElement, sendBtn: HTML
         inputEl.value = '';
         append(userBubble(q));
         const thinking = append(
-            `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div><div class="kb-bub kb-thinking">${esc(aT('kb-ask-thinking', '思考中…'))}</div></div>`
+            `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div><div class="kb-bub kb-thinking">${kbEsc(kbT('kb-ask-thinking', '思考中…'))}</div></div>`
         );
         const data = await runAsk(q);
         thinking.remove();
         if (!data) {
             append(
-                `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div><div class="kb-bub no-src">${esc(aT('kb-ask-error', '出错了，请稍后重试。'))}</div></div>`
+                `<div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div><div class="kb-bub no-src">${kbEsc(kbT('kb-ask-error', '出错了，请稍后重试。'))}</div></div>`
             );
             if (typeof showToast === 'function')
-                showToast(aT('kb-ask-error', '出错了，请稍后重试。'), 'error');
+                showToast(kbT('kb-ask-error', '出错了，请稍后重试。'), 'error');
         } else {
             append(aiBubble(data));
         }
@@ -168,23 +156,23 @@ function renderAsk(): void {
     if (pane.dataset.kbBuilt === '1') return;
     ensureStyle();
 
-    const ex1 = esc(aT('kb-ask-ex1', '这家客户有金额上限吗？'));
-    const ex2 = esc(aT('kb-ask-ex2', '合同约定的付款周期是多久？'));
-    const ex3 = esc(aT('kb-ask-ex3', '哪些供应商需要人工复核？'));
+    const ex1 = kbEsc(kbT('kb-ask-ex1', '这家客户有金额上限吗？'));
+    const ex2 = kbEsc(kbT('kb-ask-ex2', '合同约定的付款周期是多久？'));
+    const ex3 = kbEsc(kbT('kb-ask-ex3', '哪些供应商需要人工复核？'));
     const fabOn = typeof window._kbFabEnabled === 'function' && window._kbFabEnabled();
     pane.innerHTML = `
         <div class="kb-ft">
             <span class="ft-cat"><img src="${KB_CAT}" alt=""></span>
             <div class="ft-txt">
-                <b>${esc(aT('kb-fab-toggle', '桌面悬浮问答助手'))}</b>
-                <div class="sub">${esc(aT('kb-fab-toggle-sub', '打开后任意页面右下角常驻一只猫，随手就能问，可长按拖到屏幕任意一边。'))}</div>
+                <b>${kbEsc(kbT('kb-fab-toggle', '桌面悬浮问答助手'))}</b>
+                <div class="sub">${kbEsc(kbT('kb-fab-toggle-sub', '打开后任意页面右下角常驻一只猫，随手就能问，可长按拖到屏幕任意一边。'))}</div>
             </div>
             <button class="kb-switch${fabOn ? ' on' : ''}" id="kb-fab-switch" role="switch" aria-checked="${fabOn}"></button>
         </div>
         <div class="kb-qa">
             <div class="kb-qa-thread" id="kb-qa-thread">
                 <div class="kb-msg ai"><div class="kb-ava"><img src="${KB_CAT}" alt=""></div>
-                <div class="kb-bub">${esc(aT('kb-ask-empty', '问点关于这家客户的事，答案都带合同原文出处；查不到时如实说「资料不足」。'))}</div></div>
+                <div class="kb-bub">${kbEsc(kbT('kb-ask-empty', '问点关于这家客户的事，答案都带合同原文出处；查不到时如实说「资料不足」。'))}</div></div>
             </div>
             <div class="kb-qa-foot">
                 <div class="kb-qa-ex">
@@ -193,12 +181,12 @@ function renderAsk(): void {
                     <button class="kb-chip" data-q="${ex3}">${ex3}</button>
                 </div>
                 <div class="kb-qa-input">
-                    <input id="kb-qa-input" data-i18n-placeholder="kb-ask-placeholder" placeholder="${esc(aT('kb-ask-placeholder', '问点关于这家客户的事…'))}">
+                    <input id="kb-qa-input" data-i18n-placeholder="kb-ask-placeholder" placeholder="${kbEsc(kbT('kb-ask-placeholder', '问点关于这家客户的事…'))}">
                     <button class="kb-send" id="kb-qa-send"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
                 </div>
             </div>
         </div>
-        <p class="kb-qa-hint">🔒 ${esc(aT('kb-ask-disclaimer', 'AI 的每个结论都带可点开的出处；查不到依据时固定回答「资料不足」，绝不编。'))}</p>
+        <p class="kb-qa-hint">🔒 ${kbEsc(kbT('kb-ask-disclaimer', 'AI 的每个结论都带可点开的出处；查不到依据时固定回答「资料不足」，绝不编。'))}</p>
     `;
     pane.dataset.kbBuilt = '1';
 

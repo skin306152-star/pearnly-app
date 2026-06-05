@@ -27,6 +27,45 @@ from decimal import Decimal as _Dec
 
 logger = logging.getLogger(__name__)
 
+SATANG_PER_THB = 100
+
+
+def thb_to_satang(thb) -> int:
+    """泰铢 → 萨当(分)· 四舍五入取整。计费写入前归一用。"""
+    return int(round(float(thb) * SATANG_PER_THB))
+
+
+def satang_to_thb(satang) -> _Dec:
+    """萨当(分)→ 泰铢 Decimal。扣费金额从 satang 计价转回 THB 时用。"""
+    return _Dec(int(satang)) / _Dec(SATANG_PER_THB)
+
+
+def _debit_balance(cur, tenant_id, cost: _Dec) -> _Dec:
+    """从 `tenant_credits.balance_thb` 原子扣减 cost,返回扣后余额。
+
+    SELECT ... FOR UPDATE 防并发(行不存在先建 0)→ 扣减(可到负 · 用量已发生)→ UPDATE。
+    调用方须在 `db.get_cursor(commit=True)` 事务内,并自行写 `credit_transactions`。
+    """
+    cur.execute(
+        "SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s::uuid FOR UPDATE",
+        (str(tenant_id),),
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.execute(
+            "INSERT INTO tenant_credits (tenant_id, balance_thb) "
+            "VALUES (%s::uuid, 0) RETURNING balance_thb",
+            (str(tenant_id),),
+        )
+        row = cur.fetchone()
+    new_bal = _Dec(str(row["balance_thb"])) - cost
+    cur.execute(
+        "UPDATE tenant_credits SET balance_thb = %s, updated_at = NOW() "
+        "WHERE tenant_id = %s::uuid",
+        (str(new_bal), str(tenant_id)),
+    )
+    return new_bal
+
 
 # ⚠️ 循环 import 处理:
 # db.py 文件尾 `from services.billing.charge import charge_ocr` 在自己模块体内 ·
@@ -95,26 +134,7 @@ def charge_ocr(
     ym = db._bkk_year_month()
     try:
         with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                "SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s::uuid FOR UPDATE",
-                (str(tenant_id),),
-            )
-            row = cur.fetchone()
-            if not row:
-                cur.execute(
-                    "INSERT INTO tenant_credits (tenant_id, balance_thb) "
-                    "VALUES (%s::uuid, 0) RETURNING balance_thb",
-                    (str(tenant_id),),
-                )
-                row = cur.fetchone()
-            current_bal = _Dec(str(row["balance_thb"]))
-            new_bal = current_bal - cost  # 可扣到负数(OCR 已完成 · 后续充值补)
-
-            cur.execute(
-                "UPDATE tenant_credits SET balance_thb = %s, updated_at = NOW() "
-                "WHERE tenant_id = %s::uuid",
-                (str(new_bal), str(tenant_id)),
-            )
+            new_bal = _debit_balance(cur, tenant_id, cost)  # 可扣到负数(OCR 已完成 · 后续充值补)
             cur.execute(
                 "INSERT INTO credit_transactions "
                 "(tenant_id, user_id, type, amount_thb, pages, balance_after, description) "
@@ -228,24 +248,7 @@ def deduct_thb(user_id, tenant_id, cost_thb, kind: str, description: str = "") -
         pass
     try:
         with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                "SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s::uuid FOR UPDATE",
-                (str(tenant_id),),
-            )
-            row = cur.fetchone()
-            if not row:
-                cur.execute(
-                    "INSERT INTO tenant_credits (tenant_id, balance_thb) "
-                    "VALUES (%s::uuid, 0) RETURNING balance_thb",
-                    (str(tenant_id),),
-                )
-                row = cur.fetchone()
-            new_bal = _Dec(str(row["balance_thb"])) - cost
-            cur.execute(
-                "UPDATE tenant_credits SET balance_thb = %s, updated_at = NOW() "
-                "WHERE tenant_id = %s::uuid",
-                (str(new_bal), str(tenant_id)),
-            )
+            new_bal = _debit_balance(cur, tenant_id, cost)
             cur.execute(
                 "INSERT INTO credit_transactions "
                 "(tenant_id, user_id, type, amount_thb, pages, balance_after, description) "

@@ -285,6 +285,8 @@ interface Window {
     _kbRenderAsk?: () => void;
     _kbOpenSource?: (citation: { chunk_id?: number; document_id?: number; filename?: string; score?: number }) => void;
     _kbWireAsk?: (threadEl: HTMLElement, inputEl: HTMLInputElement, sendBtn: HTMLElement) => void;
+    _kbFabSetEnabled?: (on: boolean) => void;
+    _kbFabEnabled?: () => boolean;
     getHistoryClientFilter?: () => unknown;
     fillCategoryDatalist?: () => void;
     _tcApplyVisibility?: () => void;

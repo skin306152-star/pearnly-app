@@ -148,6 +148,16 @@ function ensureStyle(): void {
 .kb-send:hover{background:var(--btn-blue-hover,#1d4ed8)}
 .kb-send svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2}
 .kb-qa-hint{font-size:12px;color:var(--ink-3,#999);margin-top:12px;max-width:760px;line-height:1.6}
+.kb-ft{display:flex;align-items:center;gap:13px;background:var(--card,#fff);border:1px solid var(--border,#e8e8e3);border-radius:12px;padding:13px 16px;margin-bottom:16px;max-width:760px}
+.kb-ft .ft-cat{width:38px;height:38px;border-radius:10px;background:#fff7ee;display:grid;place-items:center;overflow:hidden;flex-shrink:0}
+.kb-ft .ft-cat img{width:34px;height:34px;object-fit:cover;object-position:center 16%}
+.kb-ft .ft-txt{flex:1}
+.kb-ft .ft-txt b{font-weight:700}
+.kb-ft .ft-txt .sub{font-size:11px;color:var(--ink-3,#999);margin-top:1px}
+.kb-switch{width:38px;height:22px;border-radius:20px;background:#d6d6d0;position:relative;transition:.18s;flex-shrink:0;cursor:pointer;border:none}
+.kb-switch.on{background:var(--btn-blue,#2563eb)}
+.kb-switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.kb-switch.on::after{left:18px}
 `;
     document.head.appendChild(st);
 }
@@ -161,7 +171,16 @@ function renderAsk(): void {
     const ex1 = esc(aT('kb-ask-ex1', '这家客户有金额上限吗？'));
     const ex2 = esc(aT('kb-ask-ex2', '合同约定的付款周期是多久？'));
     const ex3 = esc(aT('kb-ask-ex3', '哪些供应商需要人工复核？'));
+    const fabOn = typeof window._kbFabEnabled === 'function' && window._kbFabEnabled();
     pane.innerHTML = `
+        <div class="kb-ft">
+            <span class="ft-cat"><img src="/static/brand/kb-cat.png" alt=""></span>
+            <div class="ft-txt">
+                <b>${esc(aT('kb-fab-toggle', '桌面悬浮问答助手'))}</b>
+                <div class="sub">${esc(aT('kb-fab-toggle-sub', '打开后任意页面右下角常驻一只猫，随手就能问，可长按拖到屏幕任意一边。'))}</div>
+            </div>
+            <button class="kb-switch${fabOn ? ' on' : ''}" id="kb-fab-switch" role="switch" aria-checked="${fabOn}"></button>
+        </div>
         <div class="kb-qa">
             <div class="kb-qa-thread" id="kb-qa-thread">
                 <div class="kb-msg ai"><div class="kb-ava">🐱</div>
@@ -192,6 +211,13 @@ function renderAsk(): void {
             input.value = chip.dataset.q || '';
             send.click();
         });
+    });
+    const fabSwitch = pane.querySelector('#kb-fab-switch') as HTMLElement;
+    fabSwitch?.addEventListener('click', () => {
+        const next = !fabSwitch.classList.contains('on');
+        fabSwitch.classList.toggle('on', next);
+        fabSwitch.setAttribute('aria-checked', String(next));
+        if (typeof window._kbFabSetEnabled === 'function') window._kbFabSetEnabled(next);
     });
 }
 

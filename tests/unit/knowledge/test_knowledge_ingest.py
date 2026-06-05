@@ -1,8 +1,7 @@
 """Tests for the DB-independent ingest core (parse -> normalize -> chunk)."""
 
 import io
-
-import pytest
+import unittest
 
 from services.knowledge.ingest import (
     DEFAULT_MAX_CHARS,
@@ -105,12 +104,12 @@ def test_pdf_extracts_text_layer():
 
 
 def test_scanned_pdf_without_text_raises_for_ocr():
-    with pytest.raises(UnsupportedDocument):
+    with unittest.TestCase().assertRaises(UnsupportedDocument):
         extract_text("scan.pdf", _make_pdf(""))
 
 
 def test_unknown_type_raises():
-    with pytest.raises(UnsupportedDocument):
+    with unittest.TestCase().assertRaises(UnsupportedDocument):
         extract_text("photo.png", b"\x89PNG")
 
 
@@ -138,7 +137,7 @@ def test_oversized_paragraph_window_splits_with_overlap():
 
 
 def test_chunk_text_rejects_nonpositive_budget():
-    with pytest.raises(ValueError):
+    with unittest.TestCase().assertRaises(ValueError):
         chunk_text("anything", max_chars=0)
 
 

@@ -7,8 +7,6 @@ hit) and asserts exactly that rule_id appears. No database, no network.
 
 from datetime import date, datetime
 
-import pytest
-
 from services.knowledge.rules.context import ClientRuleSet, Invoice, RuleContext
 from services.knowledge.rules_engine import run_rules
 from services.knowledge.schema import (

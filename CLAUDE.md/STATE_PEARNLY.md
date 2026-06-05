@@ -6,18 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-05 · **✅ 知识库「死规则+客户规矩」整条上线 + 后续修复 · version-banner 删除**）
+## 🎯 状态卡（2026-06-05 · **✅ 知识库「文档库+问答+悬浮猫+费用+全格式OCR入库+真实计费」整条上线**）
 
-- **知识库死规则引擎上线接管发票异常检测**(`feat/knowledge-backend` 已并 master · master `c5d1fc7` · 版本 `11850104` · prod 200 · `KNOWLEDGE_ENABLED=1`):
-  - 引擎 finding(算术 R-VAT/SUM/LINE/MULTIPAGE、税号 R-TAXID、查重 R-DUP、日期 R-DATE、客户规矩 R-SUP/R-LIMIT/R-CAT)写进**现有异常存储**,异常列表/筛选 chip(收 5 组)/详情抽屉/已学规则全认 **16 个新规则码**(`detail.message_key`→`risk.*` · 4 语复用沙盒字典 · 真浏览器验)。旧码历史行兼容并存。
-  - **8 张 Supabase 表 + pgvector 已建**(prod 无 alembic_version → 服务器 venv python 直接跑 5 迁移的 `IF NOT EXISTS` DDL · pgvector 直接可装)。
-  - **客户规矩设置弹窗**(异常页右上「规矩设置」· flag 探针门控):类型卡片高亮跟随、停用变灰可恢复(GET `include_inactive`·引擎加载仍 active-only)、删除=确认+删整条、开关**乐观更新**丝滑+toast。
-  - **ERP 推送异常块搬到集成页**新增「推送异常」tab(纯位置·`erp-exceptions.ts` 逻辑零改)+ 修溢出/原始报错串。
-- **version-banner 更新通知功能彻底删除**(commit `c5d1fc7`):删 js + post.js 清单 + `/api/version` 去 release_notes(留 version+ts)+ 死 i18n 键。⚠️ **铁律 #6(每次部署写 release_notes)作废 · 下个窗口别再写**。见 [[version-banner-removed]]。
-- **并行窗口已上线(非本线)**:全站按钮统一品牌蓝 + UI 一致性硬闸 `lint-ui` FAIL(`check_ui_consistency` D1 禁新抽屉/D2 按钮黑底基线 0)· 测试拔 pytest 依赖(unittest only)。见 [[ui-modal-blue-button-gate]]/[[no-pytest-tests-unittest-only]]。
-- **未提交残留**:无(全 push · 9 道闸绿 · prod 200)。
-- **闭环判断**:**「死规则 + 客户规矩 + 异常 UI」= 闭环上线可用**;**「RAG 带出处问答 + 文档库」= 未做**(后端 P1/P2/P4 路由已 mounted 但零 UI)。
-- **下一步(下个窗口)**:继续本线 = 按 [[ui-design-before-build-rule]] **先出「文档库 + 悬浮问答 FAB + 知识中心页」设计稿**再实现(沙盒 `docs/...UI设计...` 有草图);或转整顿 Wave3(闲置笔记本 staging [[spare-laptop-staging-then-prod]] / `lint-ui` B 类视觉清理)。全貌见 [[kb-rag-sandbox-project]]。
+- **客户知识中心整条上线**(master `2732f20` · 版本 `11850605` · prod 活 · `KNOWLEDGE_ENABLED=1` · 全量对所有用户可见含 mrerp · Zihao 拍板全开)。5 前端阶段 `src/home/knowledge-*.ts`(api/center/documents/ask/sources/fab/info + page-knowledge):
+  - **文档库**(拖拽上传/状态轮询/删除/四态)、**问答**(带 `[n]` 出处卡 · 点开来源弹窗 `.modal` · 无来源回「资料不足」)、**悬浮猫 FAB**(长按拖拽吸边+卖萌·问答 tab 开关控显隐·素材 `static/brand/kb-cat.png`)、**功能介绍+费用弹窗**。侧栏「客户知识」探针门控(`GET /bases` 200 才显)。i18n 全 4 语。
+- **全格式入库**(`services/knowledge/ocr_ingest.py`):文本走纯核心(ingest.py 不动·按字符);**图片/扫描件 PDF 走 OCR Layer1 Vision** 整页 full_text → 切片建索引(按页)。上传走 `asyncio.to_thread`。
+- **真实计费接通**(钱路径·Zihao 拍板):`charge.deduct_thb` 通用扣 `tenant_credits.balance_thb`·`host_provider.charge_credits` 取代 log-only(amount=satang)。**上传**图片/扫描件按页(`estimate_pdf` ฿1.50/页起)·文本按字符(`estimate_excel`);**问答**答出扣 ฿0.50(`_RAG_ANSWER_SATANG=50`·no_answer 不扣·余额前置检查 402)。跟 OCR 同池。
+- **验证**:前端本地反代真账号 5 阶段全 PASS;**计费 prod 真账号自验通过**(文本฿0.02/图片OCR ready ฿1.50/问答฿0.50/503 不扣)。单测 `test_knowledge_billing` 8 例 + 守门 9 道绿。
+- **未提交残留**:无(全 push)。**未闭环**:① 问答出处暂只显文档名+相关度,**原文片段高亮**需加后端「按 chunk_id 取文」接口(留后续)② 问答偶发 **Gemini 503**(瞬时·前端优雅降级显「出错重试」不扣费)。
+- **下一步**:等 **Codex 真 prod UI 实测** 出报告(文案已给 Zihao)→ 看报告修问题。原文高亮接口可另起。全貌见 [[kb-rag-sandbox-project]]。
 
 <!-- ═══════════════ 历史明细已移至 CLAUDE.md/STATE_ARCHIVE.md ═══════════════ -->
 <!-- 新窗口:读上面状态卡 + 跑 scripts/refactor_progress.py 就能开工 -->

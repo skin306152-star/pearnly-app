@@ -1,6 +1,6 @@
 // 销项开票模块 PO-10 · 共享叶子:类型 / 金额日期格式化 / 单据类型映射 / 带鉴权 fetch
 // 纯工具 · 无副作用 · 被 sales-workbench / sales-detail import。t / escapeHtml 用全局。
-/* global t */
+/* global t, escapeHtml */
 
 export interface SalesLine {
     description?: string;
@@ -53,6 +53,11 @@ export function fmtMoney(v: number | string | null | undefined): string {
 
 export function fmtDate(iso: string | null | undefined): string {
     return iso ? iso.slice(0, 10) : '—';
+}
+
+// 表单初值转义:null/undefined → ''、其余 → escapeHtml(String(v))。用于 value="${...}"。
+export function htmlVal(v: string | number | null | undefined): string {
+    return escapeHtml(v == null ? '' : String(v));
 }
 
 function authHeaders(): Record<string, string> {

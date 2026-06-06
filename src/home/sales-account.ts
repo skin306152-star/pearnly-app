@@ -2,7 +2,7 @@
 // 接真接口 GET /api/sales/sellers · PUT /api/sales/sellers/{id}(name/税号/地址/分店/电话/promptpay
 // + template_id/brand_color/logo_url/seal_url/signature_url/footer_text · §L4 后端已支持)。
 /* global t, escapeHtml, apiGet, showToast */
-import { salesFetch } from './sales-common.js';
+import { salesFetch, htmlVal } from './sales-common.js';
 
 interface Seller {
     id: number;
@@ -32,10 +32,6 @@ function cur(): Seller | undefined {
     return sellers[idx];
 }
 
-function v(s?: string): string {
-    return escapeHtml(s == null ? '' : s);
-}
-
 function formHtml(): string {
     const s = cur();
     if (!s) return `<div class="sx-state">${escapeHtml(t('sx-acc-none'))}</div>`;
@@ -55,23 +51,23 @@ function formHtml(): string {
     ).join('');
     return `<div class="sx-field"><label>${escapeHtml(t('sx-acc-pick'))}</label><select id="sx-acc-sel">${sellerOpts}</select></div>
     <div class="sx-acc-grid">
-        <div class="sx-field"><label>${escapeHtml(t('sx-acc-name'))}</label><input type="text" id="sx-a-name" value="${v(s.name)}" maxlength="200"></div>
-        <div class="sx-field"><label>${escapeHtml(t('sx-acc-tax'))}</label><input type="text" id="sx-a-tax" value="${v(s.tax_id)}" maxlength="20"></div>
+        <div class="sx-field"><label>${escapeHtml(t('sx-acc-name'))}</label><input type="text" id="sx-a-name" value="${htmlVal(s.name)}" maxlength="200"></div>
+        <div class="sx-field"><label>${escapeHtml(t('sx-acc-tax'))}</label><input type="text" id="sx-a-tax" value="${htmlVal(s.tax_id)}" maxlength="20"></div>
     </div>
-    <div class="sx-field"><label>${escapeHtml(t('sx-acc-address'))}</label><input type="text" id="sx-a-addr" value="${v(s.address)}" maxlength="500"></div>
+    <div class="sx-field"><label>${escapeHtml(t('sx-acc-address'))}</label><input type="text" id="sx-a-addr" value="${htmlVal(s.address)}" maxlength="500"></div>
     <div class="sx-acc-grid">
-        <div class="sx-field"><label>${escapeHtml(t('sx-acc-branch'))}</label><input type="text" id="sx-a-branch" value="${v(s.branch)}" maxlength="120"></div>
-        <div class="sx-field"><label>${escapeHtml(t('sx-acc-phone'))}</label><input type="text" id="sx-a-phone" value="${v(s.phone)}" maxlength="50"></div>
+        <div class="sx-field"><label>${escapeHtml(t('sx-acc-branch'))}</label><input type="text" id="sx-a-branch" value="${htmlVal(s.branch)}" maxlength="120"></div>
+        <div class="sx-field"><label>${escapeHtml(t('sx-acc-phone'))}</label><input type="text" id="sx-a-phone" value="${htmlVal(s.phone)}" maxlength="50"></div>
     </div>
-    <div class="sx-field"><label>${escapeHtml(t('sx-acc-promptpay'))}</label><input type="text" id="sx-a-pp" value="${v(s.promptpay_id)}" maxlength="40" placeholder="08x-xxx-xxxx / ${escapeHtml(t('sx-acc-tax'))}"></div>
+    <div class="sx-field"><label>${escapeHtml(t('sx-acc-promptpay'))}</label><input type="text" id="sx-a-pp" value="${htmlVal(s.promptpay_id)}" maxlength="40" placeholder="08x-xxx-xxxx / ${escapeHtml(t('sx-acc-tax'))}"></div>
 
     <div class="sx-head" style="margin-top:18px"><h2 style="font-size:14px">${escapeHtml(t('sx-acc-sec-brand'))}</h2></div>
     <div class="sx-acc-grid">
-        <div class="sx-field"><label>${escapeHtml(t('sx-acc-logo'))}</label><input type="text" id="sx-a-logo" value="${v(s.logo_url)}" maxlength="500" placeholder="https://…"></div>
-        <div class="sx-field"><label>${escapeHtml(t('sx-acc-seal'))}</label><input type="text" id="sx-a-seal" value="${v(s.seal_url)}" maxlength="500" placeholder="https://…"></div>
+        <div class="sx-field"><label>${escapeHtml(t('sx-acc-logo'))}</label><input type="text" id="sx-a-logo" value="${htmlVal(s.logo_url)}" maxlength="500" placeholder="https://…"></div>
+        <div class="sx-field"><label>${escapeHtml(t('sx-acc-seal'))}</label><input type="text" id="sx-a-seal" value="${htmlVal(s.seal_url)}" maxlength="500" placeholder="https://…"></div>
     </div>
-    <div class="sx-field"><label>${escapeHtml(t('sx-acc-sign'))}</label><input type="text" id="sx-a-sign" value="${v(s.signature_url)}" maxlength="500" placeholder="https://…"></div>
-    <div class="sx-field"><label>${escapeHtml(t('sx-acc-footer'))}</label><textarea id="sx-a-footer" rows="2" maxlength="500">${v(s.footer_text)}</textarea></div>
+    <div class="sx-field"><label>${escapeHtml(t('sx-acc-sign'))}</label><input type="text" id="sx-a-sign" value="${htmlVal(s.signature_url)}" maxlength="500" placeholder="https://…"></div>
+    <div class="sx-field"><label>${escapeHtml(t('sx-acc-footer'))}</label><textarea id="sx-a-footer" rows="2" maxlength="500">${htmlVal(s.footer_text)}</textarea></div>
 
     <div class="sx-head" style="margin-top:18px"><h2 style="font-size:14px">${escapeHtml(t('sx-acc-sec-template'))}</h2></div>
     <div class="sx-tpls">${tplCards}</div>

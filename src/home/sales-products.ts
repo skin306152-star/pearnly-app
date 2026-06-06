@@ -1,7 +1,7 @@
 // 销项 PO-10 · 商品管理(主数据 · 共享 · 以后 POS/库存复用)
 // 接真接口 GET/POST/PATCH/DELETE /api/sales/products + /import。四态 + .modal(非抽屉)。
 /* global t, escapeHtml, apiGet, apiPost, showToast */
-import { salesFetch, fmtMoney } from './sales-common.js';
+import { salesFetch, fmtMoney, htmlVal } from './sales-common.js';
 
 interface Product {
     id: string;
@@ -125,26 +125,25 @@ function bindRowActions() {
 
 function openEdit(p: Product | null) {
     const mask = ensureMask('sales-prod-mask');
-    const v = (s?: string | number) => escapeHtml(s == null ? '' : String(s));
     mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
         <div class="modal-header"><div class="modal-title">${escapeHtml(t(p ? 'sx-p-edit' : 'sx-p-new'))}</div>
             <button class="modal-close" id="sx-p-close">${IC_X}</button></div>
         <div class="modal-body">
             <div class="form-row form-row-2col">
-                <div><label>${escapeHtml(t('sx-p-f-code'))}</label><input type="text" id="sx-pf-code" value="${v(p?.code)}" maxlength="100"></div>
-                <div><label>${escapeHtml(t('sx-p-f-barcode'))}</label><input type="text" id="sx-pf-barcode" value="${v(p?.barcode)}" maxlength="100"></div>
+                <div><label>${escapeHtml(t('sx-p-f-code'))}</label><input type="text" id="sx-pf-code" value="${htmlVal(p?.code)}" maxlength="100"></div>
+                <div><label>${escapeHtml(t('sx-p-f-barcode'))}</label><input type="text" id="sx-pf-barcode" value="${htmlVal(p?.barcode)}" maxlength="100"></div>
             </div>
-            <div class="form-row"><label>${escapeHtml(t('sx-p-f-name-th'))} *</label><input type="text" id="sx-pf-th" value="${v(p?.name_th)}" maxlength="300"></div>
+            <div class="form-row"><label>${escapeHtml(t('sx-p-f-name-th'))} *</label><input type="text" id="sx-pf-th" value="${htmlVal(p?.name_th)}" maxlength="300"></div>
             <div class="form-row form-row-2col">
-                <div><label>${escapeHtml(t('sx-p-f-name-en'))}</label><input type="text" id="sx-pf-en" value="${v(p?.name_en)}" maxlength="300"></div>
-                <div><label>${escapeHtml(t('sx-p-f-name-zh'))}</label><input type="text" id="sx-pf-zh" value="${v(p?.name_zh)}" maxlength="300"></div>
+                <div><label>${escapeHtml(t('sx-p-f-name-en'))}</label><input type="text" id="sx-pf-en" value="${htmlVal(p?.name_en)}" maxlength="300"></div>
+                <div><label>${escapeHtml(t('sx-p-f-name-zh'))}</label><input type="text" id="sx-pf-zh" value="${htmlVal(p?.name_zh)}" maxlength="300"></div>
             </div>
             <div class="form-row form-row-2col">
-                <div><label>${escapeHtml(t('sx-p-f-unit'))}</label><input type="text" id="sx-pf-unit" value="${v(p?.unit)}" maxlength="50"></div>
+                <div><label>${escapeHtml(t('sx-p-f-unit'))}</label><input type="text" id="sx-pf-unit" value="${htmlVal(p?.unit)}" maxlength="50"></div>
                 <div><label>${escapeHtml(t('sx-p-f-price'))}</label><input type="number" id="sx-pf-price" value="${p ? p.unit_price : ''}" min="0" step="0.01"></div>
             </div>
             <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sx-pf-vat" ${!p || p.vat_applicable ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-p-f-vat'))}</label></div>
-            <div class="form-row"><label>${escapeHtml(t('sx-p-f-image'))}</label><input type="text" id="sx-pf-image" value="${v(p?.image_url)}" maxlength="1000" placeholder="https://…"></div>
+            <div class="form-row"><label>${escapeHtml(t('sx-p-f-image'))}</label><input type="text" id="sx-pf-image" value="${htmlVal(p?.image_url)}" maxlength="1000" placeholder="https://…"></div>
         </div>
         <div class="modal-footer" style="justify-content:flex-end;gap:8px">
             <button class="btn btn-ghost" id="sx-p-cancel">${escapeHtml(t('sx-cancel'))}</button>

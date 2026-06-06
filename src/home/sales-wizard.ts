@@ -156,13 +156,12 @@ function bindEvents() {
         .querySelectorAll<HTMLElement>('[data-rm]')
         .forEach((el) => (el.onclick = () => removeLine(+el.dataset.rm!)));
     mask()
-        .querySelectorAll<HTMLElement>('[data-ln]')
+        .querySelectorAll<HTMLInputElement>('[data-ln]')
         .forEach((el) => {
             const i = +el.dataset.ln!;
             const f = el.dataset.f as 'desc' | 'price' | 'disc';
-            (el as HTMLInputElement).oninput = () =>
-                ((st.lines[i][f] as string) = (el as HTMLInputElement).value);
-            (el as HTMLInputElement).onblur = render;
+            el.oninput = () => ((st.lines[i][f] as string) = el.value);
+            el.onblur = render;
         });
     const ac = document.getElementById('sw-addcustom');
     if (ac)
@@ -276,28 +275,20 @@ function removeLine(i: number) {
     if (!st.lines.length) st.lines = [{ desc: '', qty: 1, price: 0, disc: 0, vat: true }];
     render();
 }
+// 常见场景预设(对应 step1 的 4 个 chip):单据类型 / 买方类型 / 收款状态 / 收款方式
+const SCENARIOS: [string, WState['buyer']['type'], WState['pay']['status'], string][] = [
+    ['tax_invoice_receipt', 'individual', 'paid', 'cash'],
+    ['tax_invoice', 'company', 'unpaid', 'transfer'],
+    ['tax_invoice_receipt', 'individual', 'paid', 'transfer'],
+    ['tax_invoice_simple', 'anonymous', 'paid', 'cash'],
+];
 function applyScenario(i: number) {
-    const base = { name: '', addr: '', tin: '', branchType: 'hq' as const, branchNo: '' };
-    if (i === 0) {
-        st.docType = 'tax_invoice_receipt';
-        st.buyer = { type: 'individual', ...base };
-        st.pay = { status: 'paid', method: 'cash', date: today(), paidAmt: null };
-    }
-    if (i === 1) {
-        st.docType = 'tax_invoice';
-        st.buyer = { type: 'company', ...base };
-        st.pay = { status: 'unpaid', method: 'transfer', date: today(), paidAmt: null };
-    }
-    if (i === 2) {
-        st.docType = 'tax_invoice_receipt';
-        st.buyer = { type: 'individual', ...base };
-        st.pay = { status: 'paid', method: 'transfer', date: today(), paidAmt: null };
-    }
-    if (i === 3) {
-        st.docType = 'tax_invoice_simple';
-        st.buyer = { type: 'anonymous', ...base };
-        st.pay = { status: 'paid', method: 'cash', date: today(), paidAmt: null };
-    }
+    const sc = SCENARIOS[i];
+    if (!sc) return;
+    const [docType, buyerType, payStatus, payMethod] = sc;
+    st.docType = docType;
+    st.buyer = { type: buyerType, name: '', addr: '', tin: '', branchType: 'hq', branchNo: '' };
+    st.pay = { status: payStatus, method: payMethod, date: today(), paidAmt: null };
     cur = 0;
     render();
 }

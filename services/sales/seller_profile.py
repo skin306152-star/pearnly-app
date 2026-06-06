@@ -10,7 +10,11 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-_SELLER_COLS = "id, name, tax_id, address, branch, phone, vat_registered, promptpay_id"
+# 品牌/模板列(§L4):account 级,渲染时套到每张票;promptpay_id(§L1)同段。
+_BRAND_COLS = "template_id, brand_color, logo_url, seal_url, signature_url, footer_text"
+_SELLER_COLS = (
+    "id, name, tax_id, address, branch, phone, vat_registered, promptpay_id, " + _BRAND_COLS
+)
 _SELLER_WRITABLE = (
     "name",
     "tax_id",
@@ -19,6 +23,12 @@ _SELLER_WRITABLE = (
     "phone",
     "vat_registered",
     "promptpay_id",
+    "template_id",
+    "brand_color",
+    "logo_url",
+    "seal_url",
+    "signature_url",
+    "footer_text",
 )
 
 

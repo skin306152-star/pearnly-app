@@ -171,9 +171,25 @@ def _payment_gate(row: dict) -> Optional[str]:
     return None
 
 
+# 卖方快照字段:法定信息(§A 冻结)+ 品牌/模板(§L4 · 随单冻结,保证买方那联与存档一致)。
+_SELLER_SNAPSHOT_FIELDS = (
+    "name",
+    "tax_id",
+    "address",
+    "branch",
+    "phone",
+    "template_id",
+    "brand_color",
+    "logo_url",
+    "seal_url",
+    "signature_url",
+    "footer_text",
+)
+
+
 def _seller_snapshot(s: Optional[dict]) -> dict:
     s = s or {}
-    return {k: s.get(k) for k in ("name", "tax_id", "address", "branch", "phone")}
+    return {k: s.get(k) for k in _SELLER_SNAPSHOT_FIELDS}
 
 
 def _freeze_parties(cur, tenant_id: str, row: dict) -> dict:

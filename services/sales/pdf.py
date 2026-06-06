@@ -12,6 +12,7 @@ import hashlib
 import io
 from decimal import Decimal
 
+from services.sales import templates
 from services.sales.dates import to_thai_date
 from services.sales.totals import _d
 from services.sales.wht import pdf_label as wht_label
@@ -97,6 +98,18 @@ def _total_rows(doc: dict) -> list:
     return rows
 
 
+def _grid_style(grid: str, colors, accent) -> list:
+    """明细表格线按模板(§L4):full=全网格 / light=逐行细线 / none=仅表头分隔。"""
+    if grid == "none":
+        return [("LINEBELOW", (0, 0), (-1, 0), 0.6, accent)]
+    if grid == "light":
+        return [
+            ("LINEBELOW", (0, 0), (-1, 0), 0.6, accent),
+            ("LINEBELOW", (0, 1), (-1, -1), 0.25, colors.lightgrey),
+        ]
+    return [("GRID", (0, 0), (-1, -1), 0.5, colors.grey)]
+
+
 def _buyer_branch_text(b: dict) -> str:
     """公司买方的总公司/分店标识(§86/4 第 13 项强制字段)。"""
     if b.get("branch_type") == "branch" and b.get("branch_no"):
@@ -155,10 +168,18 @@ def render_invoice_pdf(
 
     seller = seller or {}
     buyer = buyer or {}
+    # 模板/品牌(§L4):账套 template_id + brand_color 解析成强调色/表格线(随快照冻结)。
+    tpl = templates.resolve(seller.get("template_id"), seller.get("brand_color"))
+    accent = colors.HexColor(tpl["accent"])
 
-    def P(text, b=False, align=TA_LEFT, size=9):
+    def P(text, b=False, align=TA_LEFT, size=9, color=None):
         style = ParagraphStyle(
-            "c", fontName=(bold if b else base), fontSize=size, leading=size + 3, alignment=align
+            "c",
+            fontName=(bold if b else base),
+            fontSize=size,
+            leading=size + 3,
+            alignment=align,
+            textColor=color or colors.black,
         )
         return Paragraph(
             _build_paragraph_text(str(text if text not in (None, "") else "-"), b), style
@@ -193,7 +214,13 @@ def render_invoice_pdf(
     def build_copy(ck):
         """组一联的 flowable 列表(供单联渲染或省纸两联各拿一份独立实例)。"""
         story = [
-            P(_DOC_LABEL.get(doc.get("doc_type"), doc.get("doc_type") or ""), True, TA_CENTER, 15),
+            P(
+                _DOC_LABEL.get(doc.get("doc_type"), doc.get("doc_type") or ""),
+                True,
+                TA_CENTER,
+                15,
+                color=accent,
+            ),
             P(_COPY_LABEL[ck], True, TA_CENTER, 9),
             Spacer(1, 4 * mm),
         ]
@@ -253,7 +280,7 @@ def render_invoice_pdf(
             "ส่วนลด / Discount",
             "จำนวนเงิน / Amount",
         ]
-        rows = [[P(h, True, TA_CENTER) for h in head]]
+        rows = [[P(h, True, TA_CENTER, color=colors.white) for h in head]]
         for ln in doc.get("lines", []):
             rows.append(
                 [
@@ -268,9 +295,9 @@ def render_invoice_pdf(
         items = Table(rows, colWidths=cw(8, 72, 18, 24, 28, 30), repeatRows=1)
         items.setStyle(
             TableStyle(
-                [
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.93, 0.93, 0.93)),
+                [("BACKGROUND", (0, 0), (-1, 0), accent)]
+                + _grid_style(tpl["grid"], colors, accent)
+                + [
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("TOPPADDING", (0, 0), (-1, -1), 3),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
@@ -289,7 +316,7 @@ def render_invoice_pdf(
         totals.setStyle(
             TableStyle(
                 [
-                    ("LINEABOVE", (0, -1), (-1, -1), 0.7, colors.black),
+                    ("LINEABOVE", (0, -1), (-1, -1), 0.7, accent),
                     ("TOPPADDING", (0, 0), (-1, -1), 2),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                 ]
@@ -300,6 +327,9 @@ def render_invoice_pdf(
         pay = _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer)
         if pay:
             story.extend(pay)
+        if seller.get("footer_text"):
+            story.append(Spacer(1, 4 * mm))
+            story.append(P(seller.get("footer_text"), align=TA_CENTER, size=8, color=colors.grey))
         return story
 
     buf = io.BytesIO()

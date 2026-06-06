@@ -38,6 +38,13 @@ class SellerProfileIn(BaseModel):
     phone: Optional[str] = Field(None, max_length=50)
     vat_registered: Optional[bool] = None
     promptpay_id: Optional[str] = Field(None, max_length=40, description="PromptPay 代理 · §L1")
+    # 品牌/模板(§L4):账套级,渲染套到每张票。
+    template_id: Optional[str] = Field(None, max_length=40)
+    brand_color: Optional[str] = Field(None, max_length=9)
+    logo_url: Optional[str] = Field(None, max_length=500)
+    seal_url: Optional[str] = Field(None, max_length=500)
+    signature_url: Optional[str] = Field(None, max_length=500)
+    footer_text: Optional[str] = Field(None, max_length=500)
 
 
 def _out(s: dict) -> dict:
@@ -50,6 +57,12 @@ def _out(s: dict) -> dict:
         "phone": s.get("phone"),
         "vat_registered": bool(s.get("vat_registered")),
         "promptpay_id": s.get("promptpay_id"),
+        "template_id": s.get("template_id"),
+        "brand_color": s.get("brand_color"),
+        "logo_url": s.get("logo_url"),
+        "seal_url": s.get("seal_url"),
+        "signature_url": s.get("signature_url"),
+        "footer_text": s.get("footer_text"),
     }
 
 

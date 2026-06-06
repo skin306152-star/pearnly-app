@@ -166,11 +166,15 @@ class PdfRenderTests(unittest.TestCase):
             payment_date="2026-06-06",
         )
         b = dict(_BUYER, type="anonymous")
-        self.assertTrue(pdf.render_invoice_pdf(doc, _SELLER, b, page="thermal_80").startswith(b"%PDF"))
+        self.assertTrue(
+            pdf.render_invoice_pdf(doc, _SELLER, b, page="thermal_80").startswith(b"%PDF")
+        )
 
     def test_thermal_two_up_falls_back(self):
         """热敏不支持 two_up:回落单联,仍出有效 PDF(§E2)。"""
-        data = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, page="thermal_80", copies_layout="two_up")
+        data = pdf.render_invoice_pdf(
+            _DOC, _SELLER, _BUYER, page="thermal_80", copies_layout="two_up"
+        )
         self.assertTrue(data.startswith(b"%PDF"))
 
     def test_archival_sha256_deterministic(self):
@@ -189,6 +193,19 @@ class PdfRenderTests(unittest.TestCase):
         a = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, deterministic=True)
         b = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, deterministic=True)
         self.assertEqual(a, b)
+
+    def test_brand_template_and_footer_render(self):
+        """§L4:品牌色模板 + 页脚文字渲染为有效 PDF。"""
+        seller = dict(
+            _SELLER, template_id="brand", brand_color="#10b981", footer_text="ขอบคุณที่ใช้บริการ"
+        )
+        for tid in ("classic", "minimal", "brand", "compact", "thai_official", "mono"):
+            s = dict(seller, template_id=tid)
+            self.assertTrue(pdf.render_invoice_pdf(_DOC, s, _BUYER).startswith(b"%PDF"), tid)
+
+    def test_invalid_brand_color_does_not_crash(self):
+        seller = dict(_SELLER, template_id="brand", brand_color="garbage")
+        self.assertTrue(pdf.render_invoice_pdf(_DOC, seller, _BUYER).startswith(b"%PDF"))
 
 
 if __name__ == "__main__":

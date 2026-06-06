@@ -247,6 +247,24 @@ class StateGuardTests(unittest.TestCase):
         self.assertEqual(err, "already_void")
 
 
+class SellerSnapshotTests(unittest.TestCase):
+    """§L4:卖方快照随单冻结品牌/模板,保证买方那联与存档一致。"""
+
+    def test_snapshot_includes_brand_fields(self):
+        snap = doc._seller_snapshot(
+            {"name": "A", "tax_id": "1", "template_id": "brand", "brand_color": "#10b981"}
+        )
+        self.assertEqual(snap["template_id"], "brand")
+        self.assertEqual(snap["brand_color"], "#10b981")
+        for k in ("logo_url", "seal_url", "signature_url", "footer_text"):
+            self.assertIn(k, snap)
+
+    def test_snapshot_handles_none_seller(self):
+        snap = doc._seller_snapshot(None)
+        self.assertIsNone(snap["name"])
+        self.assertIsNone(snap["template_id"])
+
+
 class CaptureCursor:
     def __init__(self):
         self.calls = []
@@ -265,7 +283,9 @@ _ARCH_DOC = {
     "vat_amount": "7.00",
     "wht_amount": "0.00",
     "grand_total": "107.00",
-    "lines": [{"line_no": 1, "description": "x", "qty": "1", "unit_price": "100", "line_total": "100.00"}],
+    "lines": [
+        {"line_no": 1, "description": "x", "qty": "1", "unit_price": "100", "line_total": "100.00"}
+    ],
 }
 
 
@@ -275,7 +295,9 @@ class ArchivalHashTests(unittest.TestCase):
     def test_stores_sha256_and_sets_doc_field(self):
         cur = CaptureCursor()
         d = dict(_ARCH_DOC)
-        doc._store_archival_hash(cur, "t", "d", d, {"seller": {"name": "A"}, "buyer": {"name": "B"}})
+        doc._store_archival_hash(
+            cur, "t", "d", d, {"seller": {"name": "A"}, "buyer": {"name": "B"}}
+        )
         self.assertEqual(len(d["pdf_sha256"]), 64)
         self.assertTrue(any("pdf_sha256=%s" in sql for sql, _ in cur.calls))
 

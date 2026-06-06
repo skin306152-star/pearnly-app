@@ -58,12 +58,18 @@ def create_note(
     doc_number, _ = numbering.allocate(
         cur, tenant_id=tenant_id, doc_type=note_type, prefix=use_prefix, reset=reset, on=on
     )
+    # 买方/卖方信息从原单继承冻结快照(docs/16 §A):红冲/补开是原票的法律延续,
+    # 双方信息须与原单一致,且原单开出时已冻结,这里 verbatim 带过来。
     cur.execute(
         "INSERT INTO sales_documents (tenant_id, doc_type, doc_number, client_id, issue_date, "
         "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_amount, "
-        "grand_total, issued_at, created_by, references_document_id, reference_reason) "
+        "grand_total, issued_at, created_by, references_document_id, reference_reason, "
+        "parties_snapshot, buyer_type, buyer_name, buyer_address, buyer_tax_id, "
+        "buyer_branch_type, buyer_branch_no) "
         "SELECT %s, %s, %s, client_id, %s, 'issued', currency, %s, %s, %s, %s, %s, %s, now(), "
-        "%s, id, %s FROM sales_documents WHERE tenant_id=%s AND id=%s RETURNING id",
+        "%s, id, %s, parties_snapshot, buyer_type, buyer_name, buyer_address, buyer_tax_id, "
+        "buyer_branch_type, buyer_branch_no FROM sales_documents "
+        "WHERE tenant_id=%s AND id=%s RETURNING id",
         (
             tenant_id,
             note_type,

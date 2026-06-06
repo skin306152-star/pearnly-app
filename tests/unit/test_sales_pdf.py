@@ -53,6 +53,70 @@ class PdfRenderTests(unittest.TestCase):
         self.assertIn("credit_note", pdf._DOC_LABEL)
         self.assertIn("ใบลดหนี้", pdf._DOC_LABEL["credit_note"])
 
+    def test_combined_doc_label_present(self):
+        self.assertIn("tax_invoice_receipt", pdf._DOC_LABEL)
+        self.assertIn("ใบเสร็จรับเงิน", pdf._DOC_LABEL["tax_invoice_receipt"])
+
+    def test_renders_each_buyer_type(self):
+        for btype, tin in (
+            ("company", "1234567890123"),
+            ("individual", "1234567890123"),
+            ("foreigner", "AB12345"),
+            ("anonymous", ""),
+        ):
+            b = dict(_BUYER, type=btype, tax_id=tin, branch_type="hq")
+            self.assertTrue(pdf.render_invoice_pdf(_DOC, _SELLER, b).startswith(b"%PDF"))
+
+    def test_company_branch_text(self):
+        self.assertIn("Head Office", pdf._buyer_branch_text({"branch_type": "hq"}))
+        self.assertIn(
+            "Branch 00001", pdf._buyer_branch_text({"branch_type": "branch", "branch_no": "00001"})
+        )
+
+    def test_due_date_and_terms_render(self):
+        d = dict(_DOC, due_date="2026-07-06", payment_terms="net 30")
+        self.assertTrue(pdf.render_invoice_pdf(d, _SELLER, _BUYER).startswith(b"%PDF"))
+
+    def test_a5_page_renders(self):
+        self.assertTrue(
+            pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, page="A5").startswith(b"%PDF")
+        )
+
+    def test_copy_kind_original_and_copy(self):
+        for kind in ("original", "copy"):
+            data = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, copy_kind=kind)
+            self.assertTrue(data.startswith(b"%PDF"))
+        self.assertIn("ต้นฉบับ", pdf._COPY_LABEL["original"])
+        self.assertIn("สำเนา", pdf._COPY_LABEL["copy"])
+
+    def test_unknown_copy_kind_falls_back(self):
+        self.assertTrue(
+            pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, copy_kind="bogus").startswith(b"%PDF")
+        )
+
+    def test_discount_cell_formatting(self):
+        self.assertEqual(pdf._discount_cell({"discount": "0"}), "-")
+        self.assertEqual(pdf._discount_cell({"discount": "20"}), "20.00")
+        self.assertIn("(10.00%)", pdf._discount_cell({"discount": "20", "discount_pct": "10"}))
+
+    def test_header_discount_row_renders(self):
+        d = dict(_DOC, header_discount_amount="15.00", subtotal="100.00")
+        d["lines"][0]["discount"] = "5"
+        d["lines"][0]["discount_pct"] = "10"
+        self.assertTrue(pdf.render_invoice_pdf(d, _SELLER, _BUYER).startswith(b"%PDF"))
+
+    def test_combined_doc_with_payment_renders(self):
+        doc = dict(
+            _DOC,
+            doc_type="tax_invoice_receipt",
+            payment_status="partial",
+            paid_amount="50.00",
+            payment_method="transfer",
+            payment_date="2026-06-06",
+        )
+        b = dict(_BUYER, type="company", branch_type="hq")
+        self.assertTrue(pdf.render_invoice_pdf(doc, _SELLER, b).startswith(b"%PDF"))
+
 
 if __name__ == "__main__":
     unittest.main()

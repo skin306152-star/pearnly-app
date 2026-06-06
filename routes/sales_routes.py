@@ -18,7 +18,9 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
+from services.sales import buyer as buyer_mod
 from services.sales import credit_note
+from services.sales import dates as sales_dates
 from services.sales import document as doc_svc
 from services.sales import numbering
 from services.sales import pdf as pdf_svc
@@ -34,6 +36,12 @@ _ERR_HTTP = {
     "original_not_found": 404,
     "original_not_issued": 409,
     "bad_note_type": 400,
+    # 买方完整性 / 收款闸:不合规请求,语义错误(422),不占号。
+    "buyer_incomplete": 422,
+    "buyer_tax_id_invalid": 422,
+    "buyer_branch_required": 422,
+    "buyer_branch_no_invalid": 422,
+    "payment_required": 422,
 }
 
 
@@ -51,7 +59,28 @@ class LineIn(BaseModel):
     qty: float = Field(1, ge=0)
     unit_price: float = Field(0, ge=0)
     discount: float = Field(0, ge=0)
+    discount_pct: Optional[float] = Field(None, ge=0, le=100)
     vat_applicable: bool = True
+
+
+class BuyerIn(BaseModel):
+    """买方块(docs/15)。type 决定 tax_id 语义与分店是否适用;后端再归一化+校验。"""
+
+    type: str = Field("company", max_length=20)
+    name: Optional[str] = Field(None, max_length=300)
+    address: Optional[str] = Field(None, max_length=500)
+    tax_id: Optional[str] = Field(None, max_length=40)
+    branch_type: Optional[str] = Field(None, max_length=10)
+    branch_no: Optional[str] = Field(None, max_length=10)
+
+
+class PaymentIn(BaseModel):
+    """收款块(docs/16 §J2)。收据/合并单开出前必须已收款。"""
+
+    status: str = Field("unpaid", max_length=12)
+    paid_amount: float = Field(0, ge=0)
+    method: Optional[str] = Field(None, max_length=20)
+    date: Optional[str] = Field(None, description="YYYY-MM-DD")
 
 
 class DocumentIn(BaseModel):
@@ -61,7 +90,13 @@ class DocumentIn(BaseModel):
     currency: str = Field("THB", max_length=8)
     vat_rate: float = Field(7, ge=0, le=100)
     wht_rate: float = Field(0, ge=0, le=100)
+    header_discount_amount: float = Field(0, ge=0)
+    header_discount_pct: float = Field(0, ge=0, le=100)
+    due_date: Optional[str] = Field(None, description="YYYY-MM-DD · 账期到期日")
+    payment_terms: Optional[str] = Field(None, max_length=200)
     lines: list[LineIn] = Field(..., min_length=1)
+    buyer: Optional[BuyerIn] = None
+    payment: Optional[PaymentIn] = None
 
 
 class IssueIn(BaseModel):
@@ -78,6 +113,48 @@ def _m(v) -> Optional[str]:
     return str(v) if v is not None else None
 
 
+def _payment_payload(pay: Optional[dict]) -> Optional[dict]:
+    """收款块:把 date 字符串解析成 date(无效 422),其余透传给业务层归一化。"""
+    if not pay:
+        return None
+    d = None
+    if pay.get("date"):
+        try:
+            d = date.fromisoformat(pay["date"])
+        except ValueError:
+            raise HTTPException(422, detail="sales.bad_payment_date")
+    return {
+        "status": pay.get("status"),
+        "paid_amount": pay.get("paid_amount"),
+        "method": pay.get("method"),
+        "date": d,
+    }
+
+
+def _opt_date(raw: Optional[str], code: str = "bad_due_date") -> Optional[date]:
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        raise HTTPException(422, detail=f"sales.{code}")
+
+
+def _resolve_issue_date(raw: Optional[str]) -> date:
+    """开票日:给了就用(校 ISO),否则默认曼谷当天;再过未来/跨期护栏(§G)。"""
+    if raw:
+        try:
+            on = date.fromisoformat(raw)
+        except ValueError:
+            raise HTTPException(422, detail="sales.bad_issue_date")
+    else:
+        on = sales_dates.bangkok_today()
+    err = sales_dates.validate_issue_date(on)
+    if err:
+        raise HTTPException(422, detail=f"sales.{err}")
+    return on
+
+
 def _line_out(ln: dict) -> dict:
     return {
         "line_no": ln.get("line_no"),
@@ -86,6 +163,7 @@ def _line_out(ln: dict) -> dict:
         "qty": _m(ln.get("qty")),
         "unit_price": _m(ln.get("unit_price")),
         "discount": _m(ln.get("discount")),
+        "discount_pct": _m(ln.get("discount_pct")),
         "vat_applicable": bool(ln.get("vat_applicable")),
         "line_total": _m(ln.get("line_total")),
     }
@@ -107,6 +185,8 @@ def _doc_out(d: dict) -> dict:
         "currency": d.get("currency"),
         "subtotal": _m(d.get("subtotal")),
         "discount_total": _m(d.get("discount_total")),
+        "header_discount_amount": _m(d.get("header_discount_amount")),
+        "header_discount_pct": _m(d.get("header_discount_pct")),
         "vat_rate": _m(d.get("vat_rate")),
         "vat_amount": _m(d.get("vat_amount")),
         "wht_amount": _m(d.get("wht_amount")),
@@ -116,6 +196,22 @@ def _doc_out(d: dict) -> dict:
             str(d["references_document_id"]) if d.get("references_document_id") else None
         ),
         "reference_reason": d.get("reference_reason"),
+        "due_date": d["due_date"].isoformat() if d.get("due_date") else None,
+        "payment_terms": d.get("payment_terms"),
+        "buyer": {
+            "type": d.get("buyer_type"),
+            "name": d.get("buyer_name"),
+            "address": d.get("buyer_address"),
+            "tax_id": d.get("buyer_tax_id"),
+            "branch_type": d.get("buyer_branch_type"),
+            "branch_no": d.get("buyer_branch_no"),
+        },
+        "payment": {
+            "status": d.get("payment_status"),
+            "paid_amount": _m(d.get("paid_amount")),
+            "method": d.get("payment_method"),
+            "date": d["payment_date"].isoformat() if d.get("payment_date") else None,
+        },
         "created_at": d["created_at"].isoformat() if d.get("created_at") else None,
         "lines": [_line_out(ln) for ln in d.get("lines", [])],
     }
@@ -123,6 +219,25 @@ def _doc_out(d: dict) -> dict:
 
 def _fail(code: str):
     raise HTTPException(_ERR_HTTP.get(code, 400), detail=f"sales.{code}")
+
+
+def _pdf_parties(cur, tid: str, doc: dict):
+    """PDF 双方来源:已开出从冻结快照取(docs/16 §A · 不实时 join);草稿实时组合。"""
+    snap = doc.get("parties_snapshot")
+    if snap:
+        return snap.get("seller"), snap.get("buyer")
+    seller = None
+    if doc.get("seller_workspace_client_id"):
+        seller = seller_profile.get_seller(
+            cur, tenant_id=tid, workspace_client_id=doc["seller_workspace_client_id"]
+        )
+    if doc.get("buyer_type"):
+        buyer = buyer_mod.from_row(doc)
+    elif doc.get("client_id"):  # 旧单据回退:买方来自 clients
+        buyer = seller_profile.get_buyer(cur, tenant_id=tid, client_id=doc["client_id"])
+    else:
+        buyer = None
+    return seller, buyer
 
 
 @router.get("")
@@ -151,6 +266,12 @@ async def api_create_document(req: DocumentIn, request: Request):
             vat_rate=p["vat_rate"],
             wht_rate=p["wht_rate"],
             lines=p["lines"],
+            buyer=p.get("buyer"),
+            payment=_payment_payload(p.get("payment")),
+            header_discount_amount=p["header_discount_amount"],
+            header_discount_pct=p["header_discount_pct"],
+            due_date=_opt_date(p.get("due_date")),
+            payment_terms=p.get("payment_terms"),
         )
     return {"ok": True, "document": _doc_out(doc)}
 
@@ -166,24 +287,26 @@ async def api_get_document(doc_id: str, request: Request):
 
 
 @router.get("/{doc_id}/pdf")
-async def api_document_pdf(doc_id: str, request: Request):
-    """生成合规 PDF(卖方账套 + 买方客户 + 明细 · VAT 分列 · 连号)。"""
+async def api_document_pdf(doc_id: str, request: Request, page: str = "A4", copy: str = "original"):
+    """生成合规 PDF(卖方账套 + 买方客户 + 明细 · VAT 分列 · 连号)。
+
+    page=A4|A5(§E1)· copy=original|copy(正本给买方 / 副本自留 · §E2)。
+    """
     tid, _ = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
         doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
         if not doc:
             _fail("not_found")
-        seller = None
-        if doc.get("seller_workspace_client_id"):
-            seller = seller_profile.get_seller(
-                cur, tenant_id=tid, workspace_client_id=doc["seller_workspace_client_id"]
-            )
-        buyer = None
-        if doc.get("client_id"):
-            buyer = seller_profile.get_buyer(cur, tenant_id=tid, client_id=doc["client_id"])
+        seller, buyer = _pdf_parties(cur, tid, doc)
     body = _doc_out(doc)
-    data = pdf_svc.render_invoice_pdf(body, seller, buyer)
-    filename = (doc.get("doc_number") or "document").replace("/", "_")
+    # pdf 收款区读扁平字段;_doc_out 把收款放在嵌套块,这里补扁平给渲染层。
+    body["payment_status"] = doc.get("payment_status")
+    body["payment_method"] = doc.get("payment_method")
+    body["paid_amount"] = _m(doc.get("paid_amount"))
+    body["payment_date"] = doc["payment_date"].isoformat() if doc.get("payment_date") else None
+    data = pdf_svc.render_invoice_pdf(body, seller, buyer, page=page, copy_kind=copy)
+    suffix = "" if copy == "original" else "_copy"
+    filename = (doc.get("doc_number") or "document").replace("/", "_") + suffix
     return Response(
         content=data,
         media_type="application/pdf",
@@ -207,6 +330,12 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
             vat_rate=p["vat_rate"],
             wht_rate=p["wht_rate"],
             lines=p["lines"],
+            buyer=p.get("buyer"),
+            payment=_payment_payload(p.get("payment")),
+            header_discount_amount=p["header_discount_amount"],
+            header_discount_pct=p["header_discount_pct"],
+            due_date=_opt_date(p.get("due_date")),
+            payment_terms=p.get("payment_terms"),
         )
         if err:
             _fail(err)
@@ -218,10 +347,7 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
 async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
     tid, _ = _require_tenant(request)
     p = _dump(req)
-    try:
-        on = date.fromisoformat(p["issue_date"]) if p.get("issue_date") else date.today()
-    except ValueError:
-        raise HTTPException(422, detail="sales.bad_issue_date")
+    on = _resolve_issue_date(p.get("issue_date"))
     reset = p.get("reset") or numbering.RESET_YEARLY
     with db.get_cursor_rls(tid, commit=True) as cur:
         doc, err = doc_svc.issue_document(
@@ -255,10 +381,7 @@ class NoteIn(BaseModel):
 def _make_note(doc_id: str, req: NoteIn, request: Request, note_type: str) -> dict:
     tid, uid = _require_tenant(request)
     p = _dump(req)
-    try:
-        on = date.fromisoformat(p["issue_date"]) if p.get("issue_date") else date.today()
-    except ValueError:
-        raise HTTPException(422, detail="sales.bad_issue_date")
+    on = _resolve_issue_date(p.get("issue_date"))
     with db.get_cursor_rls(tid, commit=True) as cur:
         note, err = credit_note.create_note(
             cur,

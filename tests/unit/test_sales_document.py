@@ -46,6 +46,48 @@ class ComputeTotalsTests(unittest.TestCase):
         self.assertEqual([ln["line_no"] for ln in t["lines"]], [1, 2])
 
 
+class DiscountTests(unittest.TestCase):
+    def test_line_percentage_discount(self):
+        t = doc.compute_totals([{"qty": 2, "unit_price": "100", "discount_pct": "10"}], vat_rate=7)
+        self.assertEqual(t["lines"][0]["discount"], Decimal("20.00"))  # 200 * 10%
+        self.assertEqual(t["lines"][0]["discount_pct"], Decimal("10"))
+        self.assertEqual(t["subtotal"], Decimal("180.00"))
+        self.assertEqual(t["vat_amount"], Decimal("12.60"))  # 180 * 7%
+        self.assertEqual(t["grand_total"], Decimal("192.60"))
+
+    def test_line_total_never_negative(self):
+        """折扣大于行金额时夹到 0,净额不为负(§D5)。"""
+        t = doc.compute_totals([{"qty": 1, "unit_price": "50", "discount": "80"}], vat_rate=7)
+        self.assertEqual(t["lines"][0]["discount"], Decimal("50.00"))
+        self.assertEqual(t["lines"][0]["line_total"], Decimal("0.00"))
+        self.assertEqual(t["grand_total"], Decimal("0.00"))
+
+    def test_header_discount_amount(self):
+        t = doc.compute_totals(
+            [{"qty": 1, "unit_price": "1000"}], vat_rate=7, header_discount_amount="100"
+        )
+        self.assertEqual(t["header_discount_amount"], Decimal("100.00"))
+        self.assertEqual(t["subtotal"], Decimal("1000.00"))  # 行净额合计(折前)
+        self.assertEqual(t["vat_amount"], Decimal("63.00"))  # (1000-100) * 7%
+        self.assertEqual(t["grand_total"], Decimal("963.00"))  # 900 + 63
+
+    def test_header_discount_prorated_to_taxable_base(self):
+        """整单折扣按比例摊到应税净额,VAT 只落应税那份的折后(§D2)。"""
+        lines = [
+            {"qty": 1, "unit_price": "100", "vat_applicable": True},
+            {"qty": 1, "unit_price": "100", "vat_applicable": False},
+        ]
+        t = doc.compute_totals(lines, vat_rate=7, header_discount_pct="10")
+        self.assertEqual(t["header_discount_amount"], Decimal("20.00"))  # 200 * 10%
+        self.assertEqual(t["vat_amount"], Decimal("6.30"))  # (100 - 10) * 7%
+        self.assertEqual(t["grand_total"], Decimal("186.30"))  # 180 + 6.30
+
+    def test_no_discount_keeps_pct_none(self):
+        t = doc.compute_totals([{"qty": 1, "unit_price": "100"}], vat_rate=7)
+        self.assertIsNone(t["lines"][0]["discount_pct"])
+        self.assertIsNone(t["header_discount_pct"])
+
+
 class SeqCursor:
     """模拟 document_number_sequences 的取号事务,验证连号不跳。"""
 

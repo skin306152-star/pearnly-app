@@ -169,17 +169,9 @@ function bindBody() {
 
 function bindShell() {
     const newBtn = document.getElementById('sx-new-btn');
-    if (newBtn)
-        newBtn.onclick = () =>
-            window.openSalesWizard
-                ? window.openSalesWizard()
-                : showToast(t('sx-wizard-soon'), 'info');
+    if (newBtn) newBtn.onclick = () => window.openSalesWizard?.();
     const setBtn = document.getElementById('sx-settings-btn');
-    if (setBtn)
-        setBtn.onclick = () =>
-            window.openSalesSettings
-                ? window.openSalesSettings()
-                : showToast(t('sx-settings-soon'), 'info');
+    if (setBtn) setBtn.onclick = () => window.openSalesSettings?.();
 }
 
 async function load() {

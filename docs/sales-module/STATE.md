@@ -97,7 +97,7 @@
 > **整套前端"图纸"已出齐**(Zihao 2026-06-06「先出全套设计再施工」):`Pearnly开票UI预览/app.html`(模块工作台:列表/详情含作废红冲补开转换/商品/客户含买方类型/账套含品牌+模板/开票设置)+ `index.html`(开票向导:5步+输出设置+省纸+成功面板)+ `sales-buyer-block-draft.html`(买方逻辑)。**前后端契约 + 设置存储缺口见 `docs/16` §N。** PO-10 照这三份施工,视觉别另起。
 > **按图施工保障 = `docs/17-frontend-handoff-and-acceptance.md`**(Zihao 担心漏功能/死按钮):全量「按钮→动作→接口」矩阵(精确 path · ✅有/🔧待建)+ 设计令牌锁死 + **验收 = 真浏览器自动点每个按钮断言路由真通 + 截图比对草稿** + 每屏完成判定。**🔧 待建接口(settings/send/promptpay-qr/convert + clients/seller 补字段)先于对应前端按钮做,否则必出死按钮。** 施工窗口照 §17 验收,不过不算完成。
 
-## 2026-06-06(续)· §M 后端块 1-3 做完(本地验·**未 push·待 Zihao 授权 prod 迁移+上线**)
+## 2026-06-06(续)· §M 后端块 1-3 ✅ 已上线 prod + 真库 E2E 过(commit 7fd635d)
 
 **做了什么**(§M 1-3 · 迁移 0012/0013 · 本地提交未 push):
 - **§M1 C 价内/价外**(`price_includes_vat`·单据级开关·默认价外):`compute_totals` 价内反算
@@ -116,8 +116,12 @@
 check_line_ratchet 全绿(已加 5 个 RATCHET-EXEMPT·新功能合理增长)·import app OK。`/simplify` 已收口
 (pdf 复用 totals._d·删未用 subtotal_after)。HEAD=本地 6 commit(d613143..exempt)·**origin 仍在 a1169bf**。
 
-**待 Zihao(高敏闭环卡口)**:① 授权 prod 迁移 0012+0013(ssh `pearnly`→`psql` 一事务 ADD COLUMN IF NOT EXISTS)
-② 授权 push(=部署)③ push 后真账号 E2E 验价内外/省纸PDF/审批三态。**真账号 E2E + LINE 仍按铁律 #26。**
+**已闭环(Zihao 2026-06-06 授权)**:① prod 迁移 0012+0013 已 apply(`alembic_version=0013_sales_approval`·4 列在)
+② 已 push `7fd635d`(守门全绿)· webhook 部署完成(两 worker `Application startup complete`·`/api/health` 200·无 Traceback)
+③ **prod 真库 E2E 过**(`/opt/mrpilot` 真代码+真库·全程 ROLLBACK 零残留):§C 价内 vat=7/grand=107/flag 回读真;
+§F 审批全链 approval_required→提交→驳回(理由存)→重提→批准 issued+号+approved_by。省纸 two_up 纯渲染单测覆盖。
+> prod 运维通道:`ssh pearnly` → `cd /opt/mrpilot && set -a; . ./.env; set +a` 取 `$DATABASE_URL` → `psql`/`venv/bin/python`
+> (app=`mrpilot.service` 原生 venv·非 docker·跑脚本需 `PYTHONPATH=/opt/mrpilot`)。
 
 **下一棒(§M 续)**:4. E3 `pdf_sha256`+热敏窄版 5. L1 PromptPay / L2 WHT多档 / L3 报价转换
 6. L4 模板后端管道 7. `sales_settings`(并激活 approval_mode)+ clients/workspace_clients 补字段

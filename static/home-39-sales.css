@@ -493,7 +493,11 @@ table.sx-tbl tr.click:hover td {
 .sx-page input[type='text'],
 .sx-page input[type='number'],
 .sx-page select,
-.sx-page textarea {
+.sx-page textarea,
+.sx-modal-mask input[type='text'],
+.sx-modal-mask input[type='number'],
+.sx-modal-mask select,
+.sx-modal-mask textarea {
     width: 100%;
     padding: 9px 11px;
     border: 1px solid var(--line);
@@ -505,7 +509,10 @@ table.sx-tbl tr.click:hover td {
 }
 .sx-page input:focus,
 .sx-page select:focus,
-.sx-page textarea:focus {
+.sx-page textarea:focus,
+.sx-modal-mask input:focus,
+.sx-modal-mask select:focus,
+.sx-modal-mask textarea:focus {
     outline: 0;
     border-color: var(--btn-blue);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);

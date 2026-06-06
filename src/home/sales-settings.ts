@@ -49,11 +49,12 @@ function close() {
 }
 
 // seg:就地切换(改状态 + 同组 .on),不整体 render(避免滚动回顶/闪)
-function seg(field: keyof Settings, opts: [string, string][]): string {
-    return `<div class="sx-seg" data-seg="${String(field)}" style="width:100%">${opts
+// full=true:撑满标签字段(连号重置/语言/纸张);false:紧凑左对齐(审批/VAT)·照草稿
+function seg(field: keyof Settings, opts: [string, string][], full = false): string {
+    return `<div class="sx-seg" data-seg="${String(field)}"${full ? ' style="width:100%"' : ''}>${opts
         .map(
             (o) =>
-                `<button type="button" data-seg-v="${o[0]}" class="${String(st[field]) === o[0] ? 'on' : ''}" style="flex:1">${escapeHtml(o[1])}</button>`
+                `<button type="button" data-seg-v="${o[0]}" class="${String(st[field]) === o[0] ? 'on' : ''}"${full ? ' style="flex:1"' : ''}>${escapeHtml(o[1])}</button>`
         )
         .join('')}</div>`;
 }
@@ -73,7 +74,7 @@ function render() {
                 `<option value="${r}" ${whtCur === r ? 'selected' : ''}>${r}% ${escapeHtml(t(k))}</option>`
         ).join('') +
         `<option value="custom" ${!whtPreset ? 'selected' : ''}>${escapeHtml(t('sx-wht-custom'))}</option>`;
-    mask().innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
+    mask().innerHTML = `<div class="modal" role="dialog" style="max-width:720px">
         <div class="modal-header"><div class="modal-title">${escapeHtml(t('sx-set-title'))}</div>
             <button class="modal-close" id="sx-set-close">${IC_X}</button></div>
         <div class="modal-body">
@@ -87,7 +88,8 @@ function render() {
                             ['yearly', t('sx-set-reset-yearly')],
                             ['monthly', t('sx-set-reset-monthly')],
                             ['never', t('sx-set-reset-never')],
-                        ]
+                        ],
+                        true
                     )}</div>
                     <div class="sx-field"><label>${escapeHtml(t('sx-set-start'))}</label><input type="number" id="sx-set-start" value="${st.number_start || 1}" min="1"></div>
                 </div>
@@ -116,22 +118,26 @@ function render() {
             </div>
             <div class="sx-set-card">
                 <div class="sx-set-h">${escapeHtml(t('sx-set-output'))}</div>
-                <div class="sx-field"><label>${escapeHtml(t('sx-set-lang'))}</label>${seg(
-                    'default_doc_lang',
-                    [
-                        ['th', t('sx-set-lang-th')],
-                        ['th_en', t('sx-set-lang-then')],
-                        ['th_zh', t('sx-set-lang-thzh')],
-                    ]
-                )}</div>
-                <div class="sx-field"><label>${escapeHtml(t('sx-set-paper'))}</label>${seg(
-                    'default_paper',
-                    [
-                        ['A4', 'A4'],
-                        ['A5', 'A5'],
-                        ['80mm', '80mm'],
-                    ]
-                )}</div>
+                <div class="sx-acc-grid">
+                    <div class="sx-field"><label>${escapeHtml(t('sx-set-lang'))}</label>${seg(
+                        'default_doc_lang',
+                        [
+                            ['th', t('sx-set-lang-th')],
+                            ['th_en', t('sx-set-lang-then')],
+                            ['th_zh', t('sx-set-lang-thzh')],
+                        ],
+                        true
+                    )}</div>
+                    <div class="sx-field"><label>${escapeHtml(t('sx-set-paper'))}</label>${seg(
+                        'default_paper',
+                        [
+                            ['A4', 'A4'],
+                            ['A5', 'A5'],
+                            ['80mm', '80mm'],
+                        ],
+                        true
+                    )}</div>
+                </div>
                 <label style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer"><input type="checkbox" id="sx-set-2up" ${st.default_copies_layout === 'two_up' ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-set-copies-2up'))}</label>
             </div>
         </div>

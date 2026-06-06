@@ -185,7 +185,7 @@ function noteModal(d: SalesDoc, type: 'credit_note' | 'debit_note') {
             <div class="form-row"><label>${escapeHtml(t('sx-reason'))}</label><input type="text" id="sx-note-reason" maxlength="200"></div>
             <div class="form-row"><label>${escapeHtml(t('sx-note-amount'))}</label><input type="number" id="sx-note-amount" min="0" step="0.01" placeholder="0.00"></div>
         </div>
-        <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+        <div class="modal-footer" style="justify-content:space-between;gap:8px">
             <button class="btn btn-ghost" id="sx-note-cancel">${escapeHtml(t('sx-cancel'))}</button>
             <button class="btn btn-primary" id="sx-note-ok">${escapeHtml(t('sx-note-ok'))}</button>
         </div></div>`;
@@ -234,7 +234,7 @@ function voidModal(d: SalesDoc) {
         <div class="modal-header"><div class="modal-title">${escapeHtml(t('sx-void-title'))}</div>
             <button class="modal-close" id="sx-void-close">${I.x}</button></div>
         <div class="modal-body"><div class="sx-banner warn">${escapeHtml(t('sx-void-warn'))}</div></div>
-        <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+        <div class="modal-footer" style="justify-content:space-between;gap:8px">
             <button class="btn btn-ghost" id="sx-void-cancel">${escapeHtml(t('sx-cancel'))}</button>
             <button class="btn btn-danger" id="sx-void-ok">${escapeHtml(t('sx-void'))}</button>
         </div></div>`;
@@ -314,7 +314,7 @@ function sendModal(d: SalesDoc) {
                 )}</div>
             ${body}
         </div>
-        <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+        <div class="modal-footer" style="justify-content:space-between;gap:8px">
             <button class="btn btn-ghost" id="sx-send-cancel">${escapeHtml(t('sx-cancel'))}</button>
             <button class="btn btn-primary" id="sx-send-do">${escapeHtml(sendCh === 'email' ? t('sx-send-do') : t('sx-send-genlink'))}</button>
         </div></div>`;
@@ -358,7 +358,7 @@ async function doSend(d: SalesDoc) {
             <div class="sx-banner">${escapeHtml(t('sx-send-line-ready'))}</div>
             <div class="form-row" style="margin-top:10px"><input type="text" id="sx-link-url" readonly value="${escapeHtml(url)}"></div>
         </div>
-        <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+        <div class="modal-footer" style="justify-content:space-between;gap:8px">
             <button class="btn btn-ghost" id="sx-link-done">${escapeHtml(t('sx-close'))}</button>
             <button class="btn btn-primary" id="sx-link-copy">${escapeHtml(t('sx-send-copy'))}</button>
         </div></div>`;

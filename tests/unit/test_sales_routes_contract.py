@@ -9,6 +9,7 @@ EXPECTED = {
     ("GET", "/api/sales/documents"),
     ("POST", "/api/sales/documents"),
     ("GET", "/api/sales/documents/{doc_id}"),
+    ("GET", "/api/sales/documents/{doc_id}/pdf"),
     ("PATCH", "/api/sales/documents/{doc_id}"),
     ("POST", "/api/sales/documents/{doc_id}/issue"),
     ("POST", "/api/sales/documents/{doc_id}/void"),

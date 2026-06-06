@@ -58,6 +58,9 @@ from routes.clients_routes import (
 )  # REFACTOR-B1 · 客户管理 5 路由 · 2026-05-24
 from routes.products_routes import router as products_router  # 销项商品主数据 PO-2 · 2026-06-06
 from routes.sales_routes import router as sales_router  # 销项单据/开票 PO-4 · 2026-06-06
+from routes.sales_seller_routes import (
+    router as sales_seller_router,
+)  # 销项开票方资料 PO-6 · 2026-06-06
 from routes.team_routes import router as team_router  # REFACTOR-B1 · 员工管理 7 路由 · 2026-05-25
 from routes.email_ingest_routes import (
     router as email_ingest_router,
@@ -184,6 +187,7 @@ app.include_router(notification_router)  # REFACTOR-B1 · 通知规则 6 路由(
 app.include_router(clients_router)  # REFACTOR-B1 · 客户管理 5 路由(2026-05-24)
 app.include_router(products_router)  # 销项商品主数据 6 路由(PO-2 · 2026-06-06)
 app.include_router(sales_router)  # 销项单据/开票 6 路由(PO-4 · 2026-06-06)
+app.include_router(sales_seller_router)  # 销项开票方资料 3 路由(PO-6 · 2026-06-06)
 app.include_router(team_router)  # REFACTOR-B1 · 员工管理 7 路由(2026-05-25)
 app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2026-05-25)
 app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(2026-05-25)

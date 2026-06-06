@@ -13,6 +13,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from core import db
@@ -20,6 +21,8 @@ from core.auth import get_current_user_from_request
 from services.sales import credit_note
 from services.sales import document as doc_svc
 from services.sales import numbering
+from services.sales import pdf as pdf_svc
+from services.sales import seller_profile
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/documents", tags=["sales-documents"])
@@ -54,6 +57,7 @@ class LineIn(BaseModel):
 class DocumentIn(BaseModel):
     doc_type: str = Field("tax_invoice", max_length=40)
     client_id: Optional[int] = None
+    seller_workspace_client_id: Optional[int] = None
     currency: str = Field("THB", max_length=8)
     vat_rate: float = Field(7, ge=0, le=100)
     wht_rate: float = Field(0, ge=0, le=100)
@@ -93,6 +97,11 @@ def _doc_out(d: dict) -> dict:
         "doc_type": d.get("doc_type"),
         "doc_number": d.get("doc_number"),
         "client_id": int(d["client_id"]) if d.get("client_id") is not None else None,
+        "seller_workspace_client_id": (
+            int(d["seller_workspace_client_id"])
+            if d.get("seller_workspace_client_id") is not None
+            else None
+        ),
         "issue_date": d["issue_date"].isoformat() if d.get("issue_date") else None,
         "status": d.get("status"),
         "currency": d.get("currency"),
@@ -137,6 +146,7 @@ async def api_create_document(req: DocumentIn, request: Request):
             created_by=uid,
             doc_type=p["doc_type"],
             client_id=p["client_id"],
+            seller_workspace_client_id=p["seller_workspace_client_id"],
             currency=p["currency"],
             vat_rate=p["vat_rate"],
             wht_rate=p["wht_rate"],
@@ -155,6 +165,32 @@ async def api_get_document(doc_id: str, request: Request):
     return {"document": _doc_out(doc)}
 
 
+@router.get("/{doc_id}/pdf")
+async def api_document_pdf(doc_id: str, request: Request):
+    """生成合规 PDF(卖方账套 + 买方客户 + 明细 · VAT 分列 · 连号)。"""
+    tid, _ = _require_tenant(request)
+    with db.get_cursor_rls(tid) as cur:
+        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
+        if not doc:
+            _fail("not_found")
+        seller = None
+        if doc.get("seller_workspace_client_id"):
+            seller = seller_profile.get_seller(
+                cur, tenant_id=tid, workspace_client_id=doc["seller_workspace_client_id"]
+            )
+        buyer = None
+        if doc.get("client_id"):
+            buyer = seller_profile.get_buyer(cur, tenant_id=tid, client_id=doc["client_id"])
+    body = _doc_out(doc)
+    data = pdf_svc.render_invoice_pdf(body, seller, buyer)
+    filename = (doc.get("doc_number") or "document").replace("/", "_")
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}.pdf"'},
+    )
+
+
 @router.patch("/{doc_id}")
 async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
     tid, _ = _require_tenant(request)
@@ -166,6 +202,7 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
             doc_id=doc_id,
             doc_type=p["doc_type"],
             client_id=p["client_id"],
+            seller_workspace_client_id=p["seller_workspace_client_id"],
             currency=p["currency"],
             vat_rate=p["vat_rate"],
             wht_rate=p["wht_rate"],

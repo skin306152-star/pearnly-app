@@ -31,8 +31,8 @@ _CENT = Decimal("0.01")
 _HUNDRED = Decimal("100")
 
 _DOC_COLS = (
-    "id, tenant_id, doc_type, doc_number, client_id, issue_date, status, currency, "
-    "subtotal, discount_total, vat_rate, vat_amount, wht_amount, grand_total, "
+    "id, tenant_id, doc_type, doc_number, client_id, seller_workspace_client_id, issue_date, "
+    "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_amount, grand_total, "
     "issued_at, created_by, references_document_id, reference_reason, created_at, updated_at"
 )
 _LINE_COLS = (
@@ -138,6 +138,7 @@ def create_draft(
     created_by: Optional[str],
     doc_type: str,
     client_id: Optional[int],
+    seller_workspace_client_id: Optional[int],
     currency: str,
     vat_rate,
     wht_rate,
@@ -145,13 +146,15 @@ def create_draft(
 ) -> dict:
     t = compute_totals(lines, vat_rate=vat_rate, wht_rate=wht_rate)
     cur.execute(
-        "INSERT INTO sales_documents (tenant_id, doc_type, client_id, status, currency, "
-        "subtotal, discount_total, vat_rate, vat_amount, wht_amount, grand_total, created_by) "
-        "VALUES (%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+        "INSERT INTO sales_documents (tenant_id, doc_type, client_id, seller_workspace_client_id, "
+        "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_amount, "
+        "grand_total, created_by) "
+        "VALUES (%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
         (
             tenant_id,
             doc_type,
             client_id,
+            seller_workspace_client_id,
             currency,
             t["subtotal"],
             t["discount_total"],
@@ -224,6 +227,7 @@ def update_draft(
     doc_id,
     doc_type=None,
     client_id=None,
+    seller_workspace_client_id=None,
     currency=None,
     vat_rate,
     wht_rate,
@@ -236,7 +240,12 @@ def update_draft(
     if status != STATUS_DRAFT:
         return "not_draft"
     sets, params = [], []
-    for col, val in (("doc_type", doc_type), ("client_id", client_id), ("currency", currency)):
+    for col, val in (
+        ("doc_type", doc_type),
+        ("client_id", client_id),
+        ("seller_workspace_client_id", seller_workspace_client_id),
+        ("currency", currency),
+    ):
         if val is not None:
             sets.append(f"{col}=%s")
             params.append(val)

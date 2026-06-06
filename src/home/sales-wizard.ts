@@ -279,17 +279,65 @@ async function doRd() {
         if (!/^\d{13}$/.test(b.tin)) return showToast(wt('rdCo13'), 'error');
         const r = await rdLookup(b.tin, 0);
         if (!r.found) return showToast(wt('lookupFail'), 'error');
-        if (r.name) b.name = r.name;
-        if (r.address) b.addr = r.address;
+        showRdResult(r); // 弹结果窗:核对/可编辑后由用户确认才填入(不再静默覆盖)
+    } else {
+        // 个人/外国:仅验真,给明确成败反馈(原先验真通过无任何提示)。
+        const r = await rdVerify(b.tin);
+        if (!r.valid) {
+            b.verified = false;
+            render();
+            return showToast(wt('verifyFail'), 'error');
+        }
+        b.verified = true;
+        render();
+        showToast(wt('verified'), 'success');
+    }
+}
+
+// 公司「核验并带出」结果窗:呈现税局登记信息,核对/可编辑后由用户确认填入买方。
+// 仿识别记录抽屉 openRdSyncModal(复用 .modal / .modal-mask · z-index 10000 盖在向导之上)。
+function showRdResult(found: { name?: string; address?: string }) {
+    const b = st.buyer;
+    let m = document.getElementById('sw-rd-modal');
+    if (!m) {
+        m = document.createElement('div');
+        m.id = 'sw-rd-modal';
+        m.className = 'modal-mask sx-modal-mask';
+        document.body.appendChild(m);
+    }
+    const row = (label: string, id: string, val: string) =>
+        `<div class="form-row"><label>${escapeHtml(label)}</label><input type="text" id="${id}" value="${escapeHtml(val)}"></div>`;
+    m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        <div class="modal-header"><div class="modal-title">${escapeHtml(wt('rdModalTitle'))}</div>
+            <button class="modal-close" id="sw-rd-x" aria-label="close">✕</button></div>
+        <div class="modal-body">
+            <div class="sw-sub">${escapeHtml(wt('rdModalSub'))}</div>
+            ${row(wt('name'), 'sw-rd-name', found.name || b.name)}
+            ${row(wt('addr'), 'sw-rd-addr', found.address || b.addr)}
+        </div>
+        <div class="modal-footer" style="justify-content:space-between;gap:8px">
+            <button class="btn btn-ghost" id="sw-rd-cancel">${escapeHtml(wt('rdCancel'))}</button>
+            <button class="btn btn-primary" id="sw-rd-fill">${escapeHtml(wt('rdFill'))}</button>
+        </div></div>`;
+    m.style.display = 'flex';
+    const close = () => {
+        m!.style.display = 'none';
+        m!.innerHTML = '';
+    };
+    document.getElementById('sw-rd-x')!.onclick = close;
+    document.getElementById('sw-rd-cancel')!.onclick = close;
+    m.onclick = (e) => {
+        if (e.target === m) close();
+    };
+    document.getElementById('sw-rd-fill')!.onclick = () => {
+        b.name = (document.getElementById('sw-rd-name') as HTMLInputElement).value.trim();
+        b.addr = (document.getElementById('sw-rd-addr') as HTMLInputElement).value.trim();
         b.branchType = 'hq';
         b.branchNo = '';
         b.verified = true;
-    } else {
-        const r = await rdVerify(b.tin);
-        if (!r.valid) return showToast(wt('verifyFail'), 'error');
-        b.verified = true;
-    }
-    render();
+        close();
+        render();
+    };
 }
 async function doSaveDraft() {
     if (!st.lines.some((l) => (l.desc || '').trim())) return showToast(wt('needLines'), 'error');
@@ -300,16 +348,52 @@ async function doSaveDraft() {
         window.dispatchEvent(new CustomEvent('pearnly:sales-changed'));
     } else showToast(wt('saveFail') + (r.error ? ' · ' + r.error : ''), 'error');
 }
+// 合规检查 / 服务端错误码 → 该去哪一步补(0:类型 1:买卖双方 2:商品 3:收款 4:核对)。
+const CHECK_STEP: Record<string, number> = { ckBuyer: 1, ckTin: 1, ckPay: 3 };
+// 服务端开票错误码 → 复用第5步合规清单的具体说明键(descKey)+ 跳转步骤。不新增文案。
+const SERVER_ERR: Record<string, { descKey: string; step: number }> = {
+    buyer_incomplete: { descKey: 'ckBuyerD', step: 1 },
+    buyer_branch_required: { descKey: 'ckBuyerD', step: 1 },
+    buyer_branch_no_invalid: { descKey: 'ckBuyerD', step: 1 },
+    buyer_tax_id_invalid: { descKey: 'ckTinD', step: 1 },
+    payment_required: { descKey: 'ckPayD', step: 3 },
+};
+
+function goStep(step: number) {
+    if (step !== cur) {
+        cur = step;
+        render();
+    }
+}
+
 async function doIssue() {
+    // 先确保有商品行(否则跳回第3步)。
+    if (!st.lines.some((l) => (l.desc || '').trim())) {
+        goStep(2);
+        return showToast(wt('needLines'), 'error');
+    }
+    // 合规未过:跳到第一个缺项所在步骤 + 用具体说明(descKey)逐条列出缺什么。
     const blockers = compliance(st).filter((x) => x.req && !x.pass);
-    if (blockers.length)
-        return showToast(wt('blockers') + ' ' + blockers.map((b) => wt(b.key)).join(', '), 'error');
-    if (!st.lines.some((l) => (l.desc || '').trim())) return showToast(wt('needLines'), 'error');
+    if (blockers.length) {
+        goStep(CHECK_STEP[blockers[0].key] ?? cur);
+        const detail = blockers.map((b) => wt(b.descKey)).join(' · ');
+        return showToast(wt('blockers') + ' ' + detail, 'error');
+    }
     const r = await issueDraft(st);
     if (r.ok && r.id) {
         showSuccess(r.id);
         window.dispatchEvent(new CustomEvent('pearnly:sales-changed'));
-    } else showToast(wt('issueFail') + (r.error ? ' · ' + r.error : ''), 'error');
+        return;
+    }
+    // 服务端兜底拦截(买方/税号/分店/收款):跳到对应步骤 + 友好说明,不暴露原始错误码。
+    const code = (r.error || '').replace(/^sales\./, '');
+    const hit = SERVER_ERR[code];
+    if (hit) {
+        goStep(hit.step);
+        showToast(wt('blockers') + ' ' + wt(hit.descKey), 'error');
+    } else {
+        showToast(wt('issueFail') + (r.error ? ' · ' + r.error : ''), 'error');
+    }
 }
 function showSuccess(docId: string) {
     mask().innerHTML = `<div class="sw-okwrap"><div class="sw-okbox">

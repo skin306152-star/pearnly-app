@@ -97,6 +97,29 @@ export async function openDocPdf(docId: string, forPrint: boolean): Promise<void
     }
 }
 
+// 把受鉴权保护的图 URL(/api/uploads/image/...)装进 <img>:取图路由要 Bearer,而 <img src>
+// 带不了 Authorization 头 → 直接当 src 会 401。故 fetch(带 Bearer)→ blob → objectURL 再喂 src
+// (与 PDF/导出同一 house 模式)。非该前缀的 URL(blob/外链)原样设 src。
+export async function loadAuthedImg(
+    img: HTMLImageElement,
+    url: string | null | undefined
+): Promise<void> {
+    if (!url) return;
+    if (!url.startsWith('/api/uploads/image/')) {
+        img.src = url;
+        return;
+    }
+    try {
+        const r = await salesFetch(url);
+        if (!r.ok) return;
+        const obj = URL.createObjectURL(await r.blob());
+        img.addEventListener('load', () => URL.revokeObjectURL(obj), { once: true });
+        img.src = obj;
+    } catch (_) {
+        /* 取图失败:留空,不抛 */
+    }
+}
+
 // 真上传一张图(POST /api/uploads/image · multipart)→ 返回可存进 image_url/logo_url 的 URL。
 export async function uploadImage(file: File): Promise<{ url?: string; error?: string }> {
     const fd = new FormData();
@@ -124,7 +147,8 @@ export function imageFieldHtml(id: string, label: string, url?: string | null): 
         <div class="sx-drop${u ? ' has' : ''}" id="${id}-drop">
             <input type="file" id="${id}-file" accept="image/png,image/jpeg,image/webp" hidden>
             <input type="hidden" id="${id}" value="${escapeHtml(u)}">
-            <img id="${id}-prev" src="${escapeHtml(u)}" alt="" style="${u ? '' : 'display:none'}">
+            <!-- 预览 src 由 bindImageField 经 loadAuthedImg 注入(鉴权图不能直接当 src 否则 401) -->
+            <img id="${id}-prev" alt="" style="${u ? '' : 'display:none'}">
             <span class="sx-drop-lbl" id="${id}-lbl" style="${u ? 'display:none' : ''}">${SX_UP_ICON} ${escapeHtml(label)}</span>
             <button type="button" class="sx-drop-clr" id="${id}-clr" style="${u ? '' : 'display:none'}" title="${escapeHtml(t('sx-upload-clear'))}">×</button>
         </div>
@@ -144,13 +168,16 @@ export function bindImageField(id: string): void {
     const show = (u: string) => {
         hidden.value = u;
         if (prev) {
-            prev.src = u;
             prev.style.display = u ? '' : 'none';
+            if (u) void loadAuthedImg(prev, u);
+            else prev.removeAttribute('src');
         }
         if (lbl) lbl.style.display = u ? 'none' : '';
         if (clr) clr.style.display = u ? '' : 'none';
         drop.classList.toggle('has', !!u);
     };
+    // 初值(编辑既有商品/账套)也要经鉴权取图,不能靠 <img src>。
+    if (prev && hidden.value) void loadAuthedImg(prev, hidden.value);
     drop.onclick = (e) => {
         if ((e.target as HTMLElement).closest('.sx-drop-clr')) return;
         fileEl.click();

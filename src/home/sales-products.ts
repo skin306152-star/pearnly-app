@@ -7,6 +7,7 @@ import {
     htmlVal,
     imageFieldHtml,
     bindImageField,
+    loadAuthedImg,
     IC_X,
 } from './sales-common.js';
 
@@ -61,7 +62,7 @@ function rowsHtml(): string {
         .map((p) => {
             const name = p.name_th || p.name_en || p.name_zh || '—';
             const img = p.image_url
-                ? `<img src="${escapeHtml(p.image_url)}" alt="" style="width:34px;height:34px;border-radius:7px;object-fit:cover">`
+                ? `<img data-aimg="${escapeHtml(p.image_url)}" alt="" style="width:34px;height:34px;border-radius:7px;object-fit:cover">`
                 : `<div class="sx-thumb">${IC_BOX}</div>`;
             return `<tr>
                 <td>${img}</td>
@@ -110,6 +111,10 @@ function bindList() {
     bindRowActions();
 }
 function bindRowActions() {
+    // 缩略图经鉴权取图(列表行的 <img> 不能直接 src 鉴权 URL,否则 401)。
+    document.querySelectorAll<HTMLImageElement>('#sx-p-body [data-aimg]').forEach((im) => {
+        void loadAuthedImg(im, im.dataset.aimg || '');
+    });
     document.querySelectorAll<HTMLElement>('#sx-p-body [data-edit]').forEach((el) => {
         el.onclick = () => openEdit(products.find((p) => p.id === el.dataset.edit) || null);
     });

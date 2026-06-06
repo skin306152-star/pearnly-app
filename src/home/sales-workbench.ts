@@ -16,9 +16,11 @@ const ICON_CHEV =
 const PAY_STATES = ['paid', 'unpaid', 'partial'];
 type Filter = 'all' | 'draft' | 'issued' | 'void';
 
-let docs: SalesDoc[] = [];
+let allDocs: SalesDoc[] = []; // 汇总卡数据源(全量·不随筛选变)
+let docs: SalesDoc[] = []; // 表格当前视图(服务端 status/q 筛选结果)
 let filter: Filter = 'all';
 let keyword = '';
+let searchTimer: number | undefined;
 
 function payState(d: SalesDoc): string {
     const s = (d.payment && d.payment.status) || '';
@@ -36,33 +38,20 @@ function inCurrentMonth(iso: string | null): boolean {
     return iso.slice(0, 7) === ym;
 }
 
+// 汇总卡始终基于全量(本月开票/草稿数/应收),不受表格筛选影响。
 function summary() {
-    const issued = docs.filter((d) => d.status === 'issued');
+    const issued = allDocs.filter((d) => d.status === 'issued');
     const monthIssued = issued.filter((d) => inCurrentMonth(d.issue_date));
     const monthAmount = monthIssued.reduce((s, d) => s + Number(d.grand_total || 0), 0);
-    const drafts = docs.filter((d) => d.status === 'draft').length;
+    const drafts = allDocs.filter((d) => d.status === 'draft').length;
     const due = issued
         .filter((d) => payState(d) !== 'paid')
         .reduce((s, d) => s + (Number(d.grand_total || 0) - Number(d.payment.paid_amount || 0)), 0);
     return { count: monthIssued.length, amount: monthAmount, drafts, due };
 }
 
-function visibleDocs(): SalesDoc[] {
-    let list = docs;
-    if (filter !== 'all') list = list.filter((d) => d.status === filter);
-    const kw = keyword.trim().toLowerCase();
-    if (kw) {
-        list = list.filter(
-            (d) =>
-                (d.doc_number || '').toLowerCase().indexOf(kw) >= 0 ||
-                buyerName(d).toLowerCase().indexOf(kw) >= 0
-        );
-    }
-    return list;
-}
-
 function rowsHtml(): string {
-    const list = visibleDocs();
+    const list = docs;
     if (!list.length) {
         return `<tr><td colspan="8"><div class="sx-state">${ICON_INV}<div>${escapeHtml(
             t('sx-empty')
@@ -151,8 +140,13 @@ function bindRows() {
 
 function bindBody() {
     document.querySelectorAll<HTMLElement>('#sx-wb-body [data-flt]').forEach((el) => {
-        el.onclick = () => {
+        el.onclick = async () => {
             filter = el.dataset.flt as Filter;
+            try {
+                docs = await fetchDocs();
+            } catch (_) {
+                return;
+            }
             renderBody(listInnerHtml());
             bindBody();
         };
@@ -161,10 +155,32 @@ function bindBody() {
     if (search) {
         search.oninput = () => {
             keyword = search.value;
-            rerenderRows();
+            clearTimeout(searchTimer);
+            searchTimer = window.setTimeout(refreshView, 250);
         };
     }
     bindRows();
+}
+
+// 服务端筛选:GET /api/sales/documents?status=&q=('all' 不传 status,空关键词不传 q)。
+async function fetchDocs(): Promise<SalesDoc[]> {
+    const params = new URLSearchParams();
+    if (filter !== 'all') params.set('status', filter);
+    const kw = keyword.trim();
+    if (kw) params.set('q', kw);
+    const qs = params.toString();
+    const data = await apiGet('/api/sales/documents' + (qs ? '?' + qs : ''));
+    return (data && (data.documents as SalesDoc[])) || [];
+}
+
+// 搜索输入:只刷表格行(不重渲整页 → 不丢搜索框焦点/光标)。
+async function refreshView() {
+    try {
+        docs = await fetchDocs();
+    } catch (_) {
+        return;
+    }
+    rerenderRows();
 }
 
 function bindShell() {
@@ -179,7 +195,9 @@ async function load() {
     try {
         const data = await apiGet('/api/sales/documents');
         if (!data) return; // 鉴权失败已由 apiGet 处理
-        docs = (data.documents || []) as SalesDoc[];
+        allDocs = (data.documents || []) as SalesDoc[];
+        // 有筛选/搜索在身则取服务端结果,否则全量即视图(省一次请求)。
+        docs = filter !== 'all' || keyword.trim() ? await fetchDocs() : allDocs;
         renderBody(listInnerHtml());
         bindBody();
     } catch (e) {

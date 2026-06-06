@@ -47,6 +47,16 @@ class ImageStoreTests(unittest.TestCase):
             st.save_image("t", b"definitely not an image")
         self.assertEqual(c.exception.code, "not_an_image")
 
+    def test_reject_corrupt_png_as_upload_error(self):
+        # 回归(prod 500):合法 PNG 头但 IDAT 数据损坏 → Pillow verify() 抛 SyntaxError。
+        # 必须归为 UploadError(→422),绝不能冒泡成未处理异常(→500)。
+        raw = bytearray(_png(40, 40))
+        idat = raw.find(b"IDAT")
+        raw[idat + 6] ^= 0xFF  # 篡改 IDAT 数据 → CRC 不匹配
+        with self.assertRaises(st.UploadError) as c:
+            st.save_image("t", bytes(raw))
+        self.assertEqual(c.exception.code, "not_an_image")
+
     def test_reject_too_large(self):
         big = b"\x89PNG" + b"0" * (st.MAX_BYTES + 1)
         with self.assertRaises(st.UploadError) as c:

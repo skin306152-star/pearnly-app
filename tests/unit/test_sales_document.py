@@ -326,5 +326,44 @@ class ArchivalHashTests(unittest.TestCase):
         self.assertEqual(cur.calls, [])
 
 
+class _ListCursor:
+    def __init__(self):
+        self.sql = ""
+        self.params = None
+
+    def execute(self, sql, params=None):
+        self.sql = sql
+        self.params = list(params) if params is not None else None
+
+    def fetchall(self):
+        return []
+
+
+class ListDocumentsQueryTests(unittest.TestCase):
+    """工作台搜索:?q= 走服务端 ILIKE,匹配单号/买方名/税号,且必须参数化。"""
+
+    def test_q_adds_parameterized_ilike(self):
+        cur = _ListCursor()
+        doc.list_documents(cur, tenant_id="t", q="INV2026")
+        self.assertIn("doc_number ILIKE %s", cur.sql)
+        self.assertIn("buyer_name ILIKE %s", cur.sql)
+        self.assertIn("buyer_tax_id ILIKE %s", cur.sql)
+        # 关键词作为参数三次传入(%kw%),绝不拼进 SQL 串 → 无注入面。
+        self.assertEqual(cur.params.count("%INV2026%"), 3)
+
+    def test_blank_q_skips_filter(self):
+        cur = _ListCursor()
+        doc.list_documents(cur, tenant_id="t", q="   ")
+        self.assertNotIn("ILIKE", cur.sql)
+
+    def test_status_and_q_combine(self):
+        cur = _ListCursor()
+        doc.list_documents(cur, tenant_id="t", status="issued", q="abc")
+        self.assertIn("status=%s", cur.sql)
+        self.assertIn("ILIKE", cur.sql)
+        self.assertIn("issued", cur.params)
+        self.assertIn("%abc%", cur.params)
+
+
 if __name__ == "__main__":
     unittest.main()

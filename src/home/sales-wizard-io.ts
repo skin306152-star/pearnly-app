@@ -134,9 +134,34 @@ async function interpret(resp: Response | null): Promise<SaveResult> {
     return { ok: true, id: data.document && String(data.document.id) };
 }
 
+// 「存入商品库」勾选的自定义行 → 创建为商品主数据(供以后复用)。
+// best-effort:单行失败不阻塞存草稿/开票;成功即回填 product_id 并清 save 标志,
+// 避免「存草稿→开票」两次都经 saveDraft 时重复创建同一商品。
+async function persistSavedLines(st: WState): Promise<void> {
+    const targets = st.lines.filter(
+        (l) => l.save && l.custom && !l.product_id && (l.desc || '').trim()
+    );
+    for (const l of targets) {
+        try {
+            const resp = await apiPost('/api/sales/products', {
+                name_th: l.desc.trim(),
+                unit_price: +l.price || 0,
+                vat_applicable: !!l.vat,
+            });
+            if (!resp || !resp.ok) continue;
+            const d = await resp.json().catch(() => ({}));
+            if (d && d.product && d.product.id) l.product_id = String(d.product.id);
+            l.save = false;
+        } catch (_) {
+            /* 单行失败不阻塞主流程 */
+        }
+    }
+}
+
 // 存草稿:首次 POST,已有 draftId 则 PATCH(原始 fetch · apiPost 仅 POST)
 export async function saveDraft(st: WState): Promise<SaveResult> {
     const body = buildPayload(st);
+    let result: SaveResult;
     if (st.draftId) {
         const { salesFetch } = await import('./sales-common.js');
         const resp = await salesFetch(`/api/sales/documents/${st.draftId}`, {
@@ -144,9 +169,12 @@ export async function saveDraft(st: WState): Promise<SaveResult> {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         });
-        return interpret(resp);
+        result = await interpret(resp);
+    } else {
+        result = await interpret(await apiPost('/api/sales/documents', body));
     }
-    return interpret(await apiPost('/api/sales/documents', body));
+    if (result.ok) await persistSavedLines(st);
+    return result;
 }
 
 // 开出:确保有草稿(建/更新)→ POST /{id}/issue

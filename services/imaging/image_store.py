@@ -48,7 +48,16 @@ def _verify_image(content: bytes) -> tuple[str, int, int]:
             im.verify()  # 校验完整性(校验后 im 不可再用,需重开取尺寸)
         with Image.open(io.BytesIO(content)) as im2:
             fmt, size = im2.format, im2.size
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+    # Pillow 对损坏图的异常不统一:坏 PNG(IDAT 校验和错)抛 SyntaxError、
+    # 截断/非图抛 OSError/UnidentifiedImageError、个别解码器抛 ValueError。
+    # 全部归为「不是有效图片」(422),绝不让它冒泡成 500。
+    except (
+        UnidentifiedImageError,
+        OSError,
+        SyntaxError,
+        ValueError,
+        Image.DecompressionBombError,
+    ):
         raise UploadError("not_an_image")
     ext = _FORMAT_EXT.get(fmt or "")
     if not ext:

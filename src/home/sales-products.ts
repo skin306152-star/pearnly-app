@@ -32,6 +32,7 @@ const IC_TRASH =
 
 let products: Product[] = [];
 let keyword = '';
+let searchTimer: number | undefined;
 
 function ensureMask(id: string): HTMLElement {
     let m = document.getElementById(id);
@@ -52,18 +53,8 @@ function closeMask(id: string) {
     }
 }
 
-function visible(): Product[] {
-    const kw = keyword.trim().toLowerCase();
-    if (!kw) return products;
-    return products.filter((p) =>
-        [p.code, p.name_th, p.name_en, p.name_zh, p.barcode]
-            .filter(Boolean)
-            .some((v) => v!.toLowerCase().indexOf(kw) >= 0)
-    );
-}
-
 function rowsHtml(): string {
-    const list = visible();
+    const list = products;
     if (!list.length)
         return `<tr><td colspan="7"><div class="sx-state">${escapeHtml(t('sx-empty'))}</div></td></tr>`;
     return list
@@ -111,9 +102,8 @@ function bindList() {
     if (search)
         search.oninput = () => {
             keyword = search.value;
-            const tb = document.getElementById('sx-p-tbody');
-            if (tb) tb.innerHTML = rowsHtml();
-            bindRowActions();
+            clearTimeout(searchTimer);
+            searchTimer = window.setTimeout(refreshRows, 250);
         };
     document.getElementById('sx-p-add')!.onclick = () => openEdit(null);
     document.getElementById('sx-p-import')!.onclick = openImport;
@@ -274,12 +264,30 @@ async function doImport() {
     }
 }
 
+// 服务端搜索:GET /api/sales/products?q=(后端按 code/barcode/名称匹配)。空关键词取全量。
+async function fetchProducts(): Promise<Product[]> {
+    const kw = keyword.trim();
+    const url = '/api/sales/products' + (kw ? '?q=' + encodeURIComponent(kw) : '');
+    const data = await apiGet(url);
+    return (data && (data.products as Product[])) || [];
+}
+
+// 搜索输入触发:只换 tbody(不重渲整个列表 → 不丢输入框焦点/光标)。
+async function refreshRows() {
+    try {
+        products = await fetchProducts();
+    } catch (_) {
+        return;
+    }
+    const tb = document.getElementById('sx-p-tbody');
+    if (tb) tb.innerHTML = rowsHtml();
+    bindRowActions();
+}
+
 async function load() {
     renderBody(`<div class="sx-state">${escapeHtml(t('sx-loading'))}</div>`);
     try {
-        const data = await apiGet('/api/sales/products');
-        if (!data) return;
-        products = (data.products || []) as Product[];
+        products = await fetchProducts();
         renderBody(listHtml());
         bindList();
     } catch (_) {

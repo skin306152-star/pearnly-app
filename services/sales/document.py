@@ -285,6 +285,7 @@ def list_documents(
     tenant_id: str,
     status: Optional[str] = None,
     client_id: Optional[int] = None,
+    q: Optional[str] = None,
     limit: int = 100,
 ) -> list:
     sql = f"SELECT {_DOC_COLS} FROM sales_documents WHERE tenant_id=%s"
@@ -295,6 +296,10 @@ def list_documents(
     if client_id:
         sql += " AND client_id=%s"
         params.append(client_id)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        sql += " AND (doc_number ILIKE %s OR buyer_name ILIKE %s OR buyer_tax_id ILIKE %s)"
+        params.extend([like, like, like])
     sql += " ORDER BY created_at DESC LIMIT %s"
     params.append(limit)
     cur.execute(sql, params)

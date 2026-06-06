@@ -1,6 +1,6 @@
 // 销项开票模块 PO-10 · 共享叶子:类型 / 金额日期格式化 / 单据类型映射 / 带鉴权 fetch
 // 纯工具 · 无副作用 · 被 sales-workbench / sales-detail import。t / escapeHtml 用全局。
-/* global t, escapeHtml */
+/* global t, escapeHtml, showToast */
 
 export interface SalesLine {
     description?: string;
@@ -77,6 +77,24 @@ function authHeaders(): Record<string, string> {
 // 带鉴权的原始 fetch(用于 PDF / PromptPay 等非 JSON 响应)。
 export function salesFetch(url: string, opts: RequestInit = {}): Promise<Response> {
     return fetch(url, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
+}
+
+// 打开单据 PDF(GET /pdf · A4 正本)到新标签;forPrint 则加载完成后自动唤起打印。
+// detail 操作区与向导成功面板共用,避免重复 blob/打印逻辑。
+export async function openDocPdf(docId: string, forPrint: boolean): Promise<void> {
+    try {
+        const resp = await salesFetch(`/api/sales/documents/${docId}/pdf?page=A4&copy=original`);
+        if (!resp.ok) {
+            showToast(t('sx-pdf-fail'), 'error');
+            return;
+        }
+        const url = URL.createObjectURL(await resp.blob());
+        const w = window.open(url, '_blank');
+        if (forPrint && w) w.addEventListener('load', () => w.print());
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (_) {
+        showToast(t('sx-pdf-fail'), 'error');
+    }
 }
 
 // 真上传一张图(POST /api/uploads/image · multipart)→ 返回可存进 image_url/logo_url 的 URL。

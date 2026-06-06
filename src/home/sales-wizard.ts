@@ -2,6 +2,7 @@
 // 接真接口(sellers/products/rd/create+issue);视觉照 index.html 样稿。自含 4 语 + 自带切换。
 // 从工作台「开票」按钮启动:window.openSalesWizard()。
 /* global escapeHtml, showToast */
+import { openDocPdf } from './sales-common.js';
 import { type WState, compliance } from './sales-wizard-calc.js';
 import {
     loadWizardData,
@@ -317,6 +318,8 @@ function showSuccess(docId: string) {
         <div class="sw-okarch">${ICO.checkG} ${escapeHtml(wt('okArchived'))}</div>
         <div class="sw-okacts">
             <button class="btn btn-primary" id="sw-ok-view">${escapeHtml(wt('viewSend'))}</button>
+            <button class="btn btn-ghost" id="sw-ok-dl">${escapeHtml(wt('dl'))}</button>
+            <button class="btn btn-ghost" id="sw-ok-print">${escapeHtml(wt('prnt'))}</button>
             <button class="btn btn-ghost" id="sw-ok-new">${escapeHtml(wt('newOne'))}</button>
             <button class="btn btn-ghost" id="sw-ok-done" style="grid-column:1/-1">${escapeHtml(wt('done'))}</button>
         </div></div></div>`;
@@ -331,6 +334,8 @@ function showSuccess(docId: string) {
         close();
         if (window.openSalesDetail) window.openSalesDetail(docId);
     };
+    document.getElementById('sw-ok-dl')!.onclick = () => void openDocPdf(docId, false);
+    document.getElementById('sw-ok-print')!.onclick = () => void openDocPdf(docId, true);
 }
 
 window.openSalesWizard = async function () {

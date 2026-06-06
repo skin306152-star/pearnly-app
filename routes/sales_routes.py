@@ -183,11 +183,14 @@ def _fail(code: str):
 
 @router.get("")
 async def api_list_documents(
-    request: Request, status: Optional[str] = None, client_id: Optional[int] = None
+    request: Request,
+    status: Optional[str] = None,
+    client_id: Optional[int] = None,
+    q: Optional[str] = None,
 ):
     tid, _ = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
-        rows = doc_svc.list_documents(cur, tenant_id=tid, status=status, client_id=client_id)
+        rows = doc_svc.list_documents(cur, tenant_id=tid, status=status, client_id=client_id, q=q)
     return {"documents": [_doc_out(r) for r in rows]}
 
 

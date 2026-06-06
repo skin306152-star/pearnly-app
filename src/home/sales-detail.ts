@@ -8,6 +8,7 @@ import {
     fmtMoney,
     fmtDate,
     salesFetch,
+    openDocPdf,
     IC_X,
 } from './sales-common.js';
 
@@ -134,22 +135,6 @@ function bindDetail(d: SalesDoc) {
     detailMask()
         .querySelectorAll<HTMLElement>('[data-act]')
         .forEach((el) => (el.onclick = () => runAction(el.dataset.act!, d)));
-}
-
-async function downloadPdf(d: SalesDoc, forPrint: boolean) {
-    try {
-        const resp = await salesFetch(`/api/sales/documents/${d.id}/pdf?page=A4&copy=original`);
-        if (!resp.ok) {
-            showToast(t('sx-pdf-fail'), 'error');
-            return;
-        }
-        const url = URL.createObjectURL(await resp.blob());
-        const w = window.open(url, '_blank');
-        if (forPrint && w) w.addEventListener('load', () => w.print());
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (_) {
-        showToast(t('sx-pdf-fail'), 'error');
-    }
 }
 
 async function promptpay(d: SalesDoc) {
@@ -430,8 +415,8 @@ async function copyDoc(d: SalesDoc) {
 }
 
 function runAction(act: string, d: SalesDoc) {
-    if (act === 'download') return void downloadPdf(d, false);
-    if (act === 'print') return void downloadPdf(d, true);
+    if (act === 'download') return void openDocPdf(d.id, false);
+    if (act === 'print') return void openDocPdf(d.id, true);
     if (act === 'send') return sendModal(d);
     if (act === 'promptpay') return void promptpay(d);
     if (act === 'copy') return void copyDoc(d);

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """发票发送 + 公开分享(PO-7 · docs/16 §L5)。
 
-POST /{id}/send:渠道 + 身份都让使用者选。本期(不被 Google 卡):
-- email/official:hello@pearnly.com 发 PDF,From 显示卖方名、Reply-To 卖方邮箱。
-- line/self:生成分享链接,卖方用自己 LINE 转给买家(不在此推送)。
-email/gmail(私人 Gmail·需 Google 审核)与 line/official(官号推送·高敏)= 后续,返 501。
+POST /{id}/send 只两档(各渠道唯一发法):
+- channel=email:Pearnly 官方代发——hello@pearnly.com 发 PDF,From 显示卖方名、Reply-To 卖方邮箱。
+- channel=line:生成公开分享链接,卖方用自己 LINE 转给买家(不在此推送)。
+其余渠道一律拒(私人 Gmail / LINE 官号推送已砍,不做)。
 
 GET /shared/{token}/pdf:公开能力链接(不鉴权·token 即凭证),凭 token 反查渲染 PDF。
 薄层:鉴权 + 整形;发送/分享/渲染在 services/sales/{send,share,render}.py。
@@ -34,8 +34,8 @@ _ERR_HTTP = {
     "not_found": 404,
     "not_issued": 409,
     "recipient_required": 422,
+    "unsupported_channel": 400,
     "send_failed": 502,
-    "channel_unavailable": 501,
 }
 
 
@@ -52,8 +52,7 @@ def _require_tenant(request: Request) -> tuple[str, Optional[str]]:
 
 
 class SendIn(BaseModel):
-    channel: str = Field(..., max_length=10, description="email | line")
-    identity: str = Field("official", max_length=12, description="email: official | line: self")
+    channel: str = Field(..., max_length=10, description="email(官方代发)| line(分享链接)")
     to: Optional[str] = Field(None, max_length=200, description="收件邮箱(email 渠道)")
     message: Optional[str] = Field(None, max_length=2000, description="附言(可选)")
 
@@ -79,10 +78,12 @@ def _email_content(doc: dict, seller: dict, message: Optional[str]) -> tuple[str
 
 @router.post("/{doc_id}/send")
 async def api_send_document(doc_id: str, req: SendIn, request: Request):
-    """发送已开票:email/official 代发 PDF;line/self 出分享链接。其余渠道 501。"""
+    """发送已开票:channel=email 官方代发 PDF;channel=line 出分享链接。各渠道唯一发法,其余拒。"""
     tid, uid = _require_tenant(request)
     p = req.model_dump() if hasattr(req, "model_dump") else req.dict()
-    channel, identity = p["channel"], (p.get("identity") or "official")
+    channel = p["channel"]
+    if channel not in ("email", "line"):
+        _fail("unsupported_channel", detail=f"sales.unsupported_channel:{channel}")
     with db.get_cursor_rls(tid, commit=True) as cur:
         doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
         if not doc:
@@ -90,7 +91,7 @@ async def api_send_document(doc_id: str, req: SendIn, request: Request):
         if not doc.get("doc_number"):
             _fail("not_issued")
 
-        if channel == "email" and identity == "official":
+        if channel == "email":
             to = (p.get("to") or "").strip()
             if not to:
                 _fail("recipient_required")
@@ -121,26 +122,20 @@ async def api_send_document(doc_id: str, req: SendIn, request: Request):
                 _fail("send_failed", detail=f"sales.send_failed:{err}")
             return {"ok": True, "channel": "email", "identity": "official", "recipient": to}
 
-        if channel == "line" and identity == "self":
-            token = share_svc.get_or_create_share_token(cur, tenant_id=tid, doc_id=doc_id)
-            share_url = (
-                f"{str(request.base_url).rstrip('/')}/api/sales/documents/shared/{token}/pdf"
-            )
-            send_svc.record_send(
-                cur,
-                tenant_id=tid,
-                doc_id=doc_id,
-                channel="line",
-                identity="self",
-                recipient=None,
-                status="link_created",
-                error=None,
-                created_by=uid,
-            )
-            return {"ok": True, "channel": "line", "identity": "self", "share_url": share_url}
-
-    # email/gmail(需 Google 审核)与 line/official(官号推送·高敏)= 后续
-    _fail("channel_unavailable", detail=f"sales.channel_unavailable:{channel}/{identity}")
+        token = share_svc.get_or_create_share_token(cur, tenant_id=tid, doc_id=doc_id)
+        share_url = f"{str(request.base_url).rstrip('/')}/api/sales/documents/shared/{token}/pdf"
+        send_svc.record_send(
+            cur,
+            tenant_id=tid,
+            doc_id=doc_id,
+            channel="line",
+            identity="self",
+            recipient=None,
+            status="link_created",
+            error=None,
+            created_by=uid,
+        )
+        return {"ok": True, "channel": "line", "identity": "self", "share_url": share_url}
 
 
 @router.get("/shared/{token}/pdf")

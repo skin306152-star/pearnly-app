@@ -20,7 +20,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from core import db
-from core.auth import get_current_user_from_request
+from core.route_helpers import _require_tenant
 from services.sales import document as doc_svc
 from services.sales import pdf as pdf_svc
 from services.sales import render as sales_render
@@ -41,14 +41,6 @@ _ERR_HTTP = {
 
 def _fail(code: str, detail: Optional[str] = None):
     raise HTTPException(_ERR_HTTP.get(code, 400), detail=detail or f"sales.{code}")
-
-
-def _require_tenant(request: Request) -> tuple[str, Optional[str]]:
-    user = get_current_user_from_request(request)
-    tid = user.get("tenant_id") if user else None
-    if not tid:
-        raise HTTPException(400, detail="sales.tenant_required")
-    return str(tid), (str(user["id"]) if user and user.get("id") else None)
 
 
 class SendIn(BaseModel):
@@ -95,8 +87,9 @@ async def api_send_document(doc_id: str, req: SendIn, request: Request):
             to = (p.get("to") or "").strip()
             if not to:
                 _fail("recipient_required")
-            seller, _buyer = sales_render.resolve_parties(cur, tenant_id=tid, doc=doc)
-            pdf_bytes = sales_render.build_pdf(cur, tenant_id=tid, doc=doc)
+            parties = sales_render.resolve_parties(cur, tenant_id=tid, doc=doc)
+            seller = parties[0]
+            pdf_bytes = sales_render.build_pdf(cur, tenant_id=tid, doc=doc, parties=parties)
             subject, html = _email_content(doc, seller or {}, p.get("message"))
             ok, err = send_svc.send_email_with_pdf(
                 to_email=to,

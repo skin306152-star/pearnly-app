@@ -17,8 +17,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 
 from core import db
-from core.auth import get_current_user_from_request
-from core.route_helpers import _require_owner_or_super
+from core.route_helpers import _require_owner_or_super, _require_tenant
 from routes.sales_schemas import ConvertIn, DocumentIn, IssueIn, NoteIn, RejectIn
 from services.sales import approval as approval_svc
 from services.sales import credit_note
@@ -56,14 +55,6 @@ _ERR_HTTP = {
     "promptpay_unset": 422,
     "already_paid": 409,
 }
-
-
-def _require_tenant(request: Request) -> tuple[str, Optional[str]]:
-    user = get_current_user_from_request(request)
-    tid = user.get("tenant_id") if user else None
-    if not tid:
-        raise HTTPException(400, detail="sales.tenant_required")
-    return str(tid), (str(user["id"]) if user and user.get("id") else None)
 
 
 def _dump(req) -> dict:

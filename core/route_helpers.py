@@ -190,6 +190,18 @@ def _check_password_strength(password: str) -> Optional[str]:
     return None
 
 
+def _require_tenant(request: Request) -> "tuple[str, Optional[str]]":
+    """销项等 router 共用:取当前用户的 (tenant_id, user_id) 字符串;无 tenant 报 400。
+
+    返回 2 元组(tid, uid);uid 可空。错误码 sales.tenant_required(沿用既有契约)。
+    """
+    user = get_current_user_from_request(request)
+    tid = user.get("tenant_id") if user else None
+    if not tid:
+        raise HTTPException(400, detail="sales.tenant_required")
+    return str(tid), (str(user["id"]) if user and user.get("id") else None)
+
+
 def _require_owner_or_super(request: Request) -> Dict[str, Any]:
     """老板或超管
     v118.26.2.4 · BUG 4 修补:新注册老板 tenant_id=NULL · 加员工时被拒

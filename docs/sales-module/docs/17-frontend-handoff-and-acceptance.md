@@ -45,8 +45,10 @@
 |---|---|---|
 | 下载 PDF 正本 | 下载 | ✅ `GET /api/sales/documents/{id}/pdf` |
 | 打印 | 系统打印对话框 | 🖥 用 PDF·无接口 |
-| 邮件 | 发买方 | 🔧 `POST /api/sales/documents/{id}/send` (channel=email) |
-| LINE | 发买方(**高敏**) | 🔧 `POST …/send` (channel=line) |
+| 发送给买家(发送弹窗·**只两档**) | 选渠道 | ✅ `POST /api/sales/documents/{id}/send`(channel=email/line·已上线) |
+| └ 邮件(Pearnly 代发) | hello@pearnly 发PDF·回复卖方 | ✅ 已上线 |
+| └ LINE(生成链接·自己转) | 分享 token·卖方自己转 | ✅ 已上线 |
+> ❌ **私人 Gmail / LINE 官号推送 = 已砍**(2026-06-06·太麻烦不做)。发送弹窗只留上面两档。
 | 付款二维码(未收款) | PromptPay QR | 🔧 `GET /api/sales/documents/{id}/promptpay-qr` |
 | 复制再开 | 预填新草稿 | ✅ `POST /api/sales/documents`(带源) |
 | 红冲 | 开 credit note | ✅ `POST /api/sales/documents/{id}/credit-note` |

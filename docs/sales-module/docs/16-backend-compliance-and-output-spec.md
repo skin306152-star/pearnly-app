@@ -389,6 +389,18 @@ payment_date     date
 - **取号**:转出的新票按自己类型,**开出时**才取连号(报价单不占发票号)。
 - **落点**:`services/sales/document.py` 加 `convert_quotation` · 路由 `POST /sales/documents/{id}/convert`。
 
+### L5 · 发送(PO-7 · ✅ Zihao 2026-06-06 拍板 · **只做两档·已上线**)
+发票发给买家,**只做这两档**(都已实现上线 prod);**私人 Gmail / LINE 官号推送 = 已砍**(太麻烦·不做)。
+| 渠道 | 机制 | 状态 |
+|---|---|---|
+| **邮件(Pearnly 代发)** | 从 `hello@pearnly.com` 发 PDF 附件;`From` 显示卖方名、`Reply-To` 卖方邮箱(买家回信回卖方) | ✅ 已上线(`services/sales/send.py`) |
+| **LINE(生成链接·自己转)** | 生成不可猜分享 token → 公开 `GET /shared/{token}/pdf`,卖方用**自己 LINE** 转给买家 · 适配所有买家 | ✅ 已上线(`services/sales/share.py`) |
+
+**❌ 已砍(2026-06-06 · 不做)**:
+- **私人 Gmail 发信**(OAuth + Google 审核那套)—— 太麻烦,删空壳,不做。
+- **LINE 官号推送**(@pearnly 自动推)—— 受 LINE 好友限制 + 计费,不做。
+- 后端清理:删 `oauth_routes` 里 `gmail.send` 相关空壳/501 桩;`/send` 只保留 email + line(share)两档。前端发送弹窗只留这两档。
+
 ### L4 · H 模板(✅ 策略已定 · Zihao 2026-06-06)
 **做法 = 多套精选模板 + 每家自定义品牌**(不做"上传任意模板让系统学习")。
 - **为什么不做 upload-and-learn**:任意旧票图/Word 像素级复现极不稳;§86/4 强制字段必须每张都在,自由模板易漏字段=废票。大厂(Xero/QuickBooks/FlowAccount)都是"精选模板 + 换 logo/颜色/印章/页脚"。
@@ -425,7 +437,8 @@ payment_date     date
 > **设计稿(桌面·施工依据)**:`Pearnly开票UI预览/app.html`(模块工作台:列表/详情/商品/账套+模板)+ `index.html`(开票向导:整流程+输出设置+省纸+成功面板)+ `sales-buyer-block-draft.html`(买方状态机逻辑)。**实现 PO-10 照这三份;视觉别另起。**
 >
 > **导航归属(Zihao 2026-06-06 拍板 · 贴现有左栏 IA · 别新建导航)**:
-> - **模块屏进「销项管理 ▸ 销售发票 ▸ {发票工作台 / 商品管理 / 账套·开票资料}」子导航**(点"销售发票"展开下拉)——不新增顶层导航项。
+> - **开票相关屏进「销项管理 ▸ 销售发票 ▸ {发票工作台 / 账套·开票资料}」子导航**(点"销售发票"展开下拉)。
+> - **商品管理 = 顶层「主数据」区**(挨着客户管理),**不放销售发票子菜单下**——商品是**共享主数据底座**(开票/未来 POS/库存都复用同一份·见 `docs/PRODUCT_VISION_MODULAR.md`),与客户管理同级。`products_routes` 已有。
 > - **客户管理 = 复用现有顶层「客户管理」**(`clients_routes` + 现有页),**不新建**;本模块只给它**补字段** `party_type`/`branch`/`promptpay_id`。
 > - **开票设置 = 右上角「开票」按钮旁的齿轮(弹窗)**,不占导航项。
 

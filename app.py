@@ -56,6 +56,7 @@ from routes.notification_routes import router as notification_router  # REFACTOR
 from routes.clients_routes import (
     router as clients_router,
 )  # REFACTOR-B1 · 客户管理 5 路由 · 2026-05-24
+from routes.products_routes import router as products_router  # 销项商品主数据 PO-2 · 2026-06-06
 from routes.team_routes import router as team_router  # REFACTOR-B1 · 员工管理 7 路由 · 2026-05-25
 from routes.email_ingest_routes import (
     router as email_ingest_router,
@@ -180,6 +181,7 @@ app.include_router(recon_router)  # v118.32.0 · 销项税对账
 app.include_router(vat_excel_router)  # v118.32.4.9.5 · Excel 公式对账内测(skin306152 only)
 app.include_router(notification_router)  # REFACTOR-B1 · 通知规则 6 路由(2026-05-24)
 app.include_router(clients_router)  # REFACTOR-B1 · 客户管理 5 路由(2026-05-24)
+app.include_router(products_router)  # 销项商品主数据 6 路由(PO-2 · 2026-06-06)
 app.include_router(team_router)  # REFACTOR-B1 · 员工管理 7 路由(2026-05-25)
 app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2026-05-25)
 app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(2026-05-25)

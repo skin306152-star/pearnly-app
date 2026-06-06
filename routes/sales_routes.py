@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
+from core.route_helpers import _require_owner_or_super
+from services.sales import approval as approval_svc
 from services.sales import buyer as buyer_mod
 from services.sales import credit_note
 from services.sales import dates as sales_dates
@@ -36,6 +38,9 @@ _ERR_HTTP = {
     "original_not_found": 404,
     "original_not_issued": 409,
     "bad_note_type": 400,
+    # 审批工作流(§F):草稿在审批模式下不能直开 / 单据不在待审状态。
+    "approval_required": 409,
+    "not_pending": 409,
     # 买方完整性 / 收款闸:不合规请求,语义错误(422),不占号。
     "buyer_incomplete": 422,
     "buyer_tax_id_invalid": 422,
@@ -214,6 +219,11 @@ def _doc_out(d: dict) -> dict:
             "method": d.get("payment_method"),
             "date": d["payment_date"].isoformat() if d.get("payment_date") else None,
         },
+        "approval": {
+            "approved_by": d.get("approved_by"),
+            "approved_at": d["approved_at"].isoformat() if d.get("approved_at") else None,
+            "rejected_reason": d.get("rejected_reason"),
+        },
         "created_at": d["created_at"].isoformat() if d.get("created_at") else None,
         "lines": [_line_out(ln) for ln in d.get("lines", [])],
     }
@@ -379,6 +389,61 @@ async def api_void_document(doc_id: str, request: Request):
         if err:
             _fail(err)
     return {"ok": True}
+
+
+class RejectIn(BaseModel):
+    reason: Optional[str] = Field(None, max_length=500)
+
+
+@router.post("/{doc_id}/submit")
+async def api_submit_for_approval(doc_id: str, request: Request):
+    """提交审批(§F):草稿/被驳回 → 待审批。任意成员可提交。"""
+    tid, _ = _require_tenant(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        err = approval_svc.submit_for_approval(cur, tenant_id=tid, doc_id=doc_id)
+        if err:
+            _fail(err)
+        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
+    return {"ok": True, "document": _doc_out(doc)}
+
+
+@router.post("/{doc_id}/approve")
+async def api_approve_document(doc_id: str, req: IssueIn, request: Request):
+    """审批通过(§F · 仅 owner/超管):待审批 → 取号开出 + 记审批人。"""
+    user = _require_owner_or_super(request)
+    tid, uid = _require_tenant(request)
+    p = _dump(req)
+    on = _resolve_issue_date(p.get("issue_date"))
+    reset = p.get("reset") or numbering.RESET_YEARLY
+    approver = str(user.get("id")) if user.get("id") else uid
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        doc, err = approval_svc.approve(
+            cur,
+            tenant_id=tid,
+            doc_id=doc_id,
+            approver=approver,
+            prefix=p.get("prefix"),
+            reset=reset,
+            on=on,
+        )
+        if err:
+            _fail(err)
+    return {"ok": True, "document": _doc_out(doc)}
+
+
+@router.post("/{doc_id}/reject")
+async def api_reject_document(doc_id: str, req: RejectIn, request: Request):
+    """驳回(§F · 仅 owner/超管):待审批 → 驳回(留理由),改后回到草稿。"""
+    _require_owner_or_super(request)
+    tid, _ = _require_tenant(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        err = approval_svc.reject(
+            cur, tenant_id=tid, doc_id=doc_id, reason=_dump(req).get("reason")
+        )
+        if err:
+            _fail(err)
+        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
+    return {"ok": True, "document": _doc_out(doc)}
 
 
 class NoteIn(BaseModel):

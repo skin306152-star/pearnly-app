@@ -25,6 +25,11 @@ from services.sales.totals import _CENT, _d, compute_totals  # noqa: F401
 STATUS_DRAFT = "draft"
 STATUS_ISSUED = "issued"
 STATUS_VOID = "void"
+# 审批工作流态(docs/16 §F):approval_mode!=none 时草稿先提交审批,owner 批准才取号开出。
+STATUS_PENDING = "pending_approval"
+STATUS_REJECTED = "rejected"
+# 草稿可编辑/可提交审批的态:草稿本身 + 被驳回(改后回到草稿)。
+EDITABLE_STATUSES = (STATUS_DRAFT, STATUS_REJECTED)
 
 # doc_type → 默认号码前缀(可被开票请求覆盖)。合并单(税票+收据)走自己的序列。
 DEFAULT_PREFIX = {
@@ -45,7 +50,7 @@ _DOC_COLS = (
     "header_discount_amount, header_discount_pct, price_includes_vat, "
     "buyer_type, buyer_name, buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no, "
     "parties_snapshot, payment_status, paid_amount, payment_method, payment_date, "
-    "due_date, payment_terms, "
+    "due_date, payment_terms, approved_by, approved_at, rejected_reason, "
     "issued_at, created_by, references_document_id, reference_reason, created_at, updated_at"
 )
 _LINE_COLS = (
@@ -303,13 +308,17 @@ def update_draft(
     due_date=None,
     payment_terms=None,
 ) -> Optional[str]:
-    """改草稿。返回错误码('not_found' / 'not_draft')或 None(成功)。"""
+    """改草稿。返回错误码('not_found' / 'not_draft')或 None(成功)。
+
+    被驳回(rejected)的单可继续改,改动即回到草稿态并清掉驳回理由(§F:rejected→改→draft)。
+    """
     status = _status_of(cur, tenant_id, doc_id)
     if status is None:
         return "not_found"
-    if status != STATUS_DRAFT:
+    if status not in EDITABLE_STATUSES:
         return "not_draft"
-    sets, params = [], []
+    # 改动总把状态归位草稿、清驳回理由(草稿态为幂等无害,驳回态则回到草稿)。
+    sets, params = ["status='draft'", "rejected_reason=NULL"], []
     for col, val in (
         ("doc_type", doc_type),
         ("client_id", client_id),
@@ -319,11 +328,10 @@ def update_draft(
         if val is not None:
             sets.append(f"{col}=%s")
             params.append(val)
-    if sets:
-        cur.execute(
-            f"UPDATE sales_documents SET {', '.join(sets)} WHERE tenant_id=%s AND id=%s",
-            params + [tenant_id, doc_id],
-        )
+    cur.execute(
+        f"UPDATE sales_documents SET {', '.join(sets)} WHERE tenant_id=%s AND id=%s",
+        params + [tenant_id, doc_id],
+    )
     _write_buyer_payment(cur, tenant_id, doc_id, buyer, payment)
     _write_terms(cur, tenant_id, doc_id, due_date, payment_terms)
     t = compute_totals(
@@ -339,13 +347,8 @@ def update_draft(
     return None
 
 
-def issue_document(
-    cur, *, tenant_id: str, doc_id, prefix: Optional[str], reset: str, on: date
-) -> tuple[Optional[dict], Optional[str]]:
-    """正式开出:草稿 → 完整性/收款闸 → 事务取连号 → status=issued + 冻结双方快照。
-
-    返回 (doc, error_code)。买方完整性(§B)与收款(§J)在取号前校验,不过则不占号。
-    """
+def lock_for_issue(cur, tenant_id: str, doc_id) -> Optional[dict]:
+    """取号前锁行,读出闸校验所需字段(buyer/payment/seller)。供开出/审批通过共用。"""
     cur.execute(
         "SELECT status, doc_type, seller_workspace_client_id, "
         "buyer_type, buyer_name, buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no, "
@@ -353,11 +356,17 @@ def issue_document(
         "FROM sales_documents WHERE tenant_id=%s AND id=%s FOR UPDATE",
         (tenant_id, doc_id),
     )
-    row = cur.fetchone()
-    if not row:
-        return None, "not_found"
-    if row["status"] != STATUS_DRAFT:
-        return None, "not_draft"
+    return cur.fetchone()
+
+
+def finalize_issue(
+    cur, *, tenant_id: str, doc_id, row: dict, prefix, reset: str, on: date, approved_by=None
+) -> tuple[Optional[dict], Optional[str]]:
+    """已锁行 → 完整性/收款闸 → 取连号 → status=issued + 冻结双方快照。不过闸不占号。
+
+    approved_by 非空时同时记审批人/时间(经审批通过开出 · §F)。供 issue_document 与
+    approval.approve 共用,保证两条路径取号/冻结/校验完全一致。
+    """
     berr = buyer_mod.validate_buyer(buyer_mod.from_row(row), row["doc_type"])
     if berr:
         return None, berr
@@ -369,12 +378,49 @@ def issue_document(
         cur, tenant_id=tenant_id, doc_type=row["doc_type"], prefix=use_prefix, reset=reset, on=on
     )
     snapshot = _freeze_parties(cur, tenant_id, row)
+    sets = [
+        "status='issued'",
+        "doc_number=%s",
+        "issue_date=%s",
+        "issued_at=now()",
+        "parties_snapshot=%s",
+    ]
+    params: list = [doc_number, on, Json(snapshot)]
+    if approved_by is not None:
+        sets += ["approved_by=%s", "approved_at=now()", "rejected_reason=NULL"]
+        params.append(approved_by)
+    sets.append("updated_at=now()")
     cur.execute(
-        "UPDATE sales_documents SET status='issued', doc_number=%s, issue_date=%s, "
-        "issued_at=now(), parties_snapshot=%s, updated_at=now() WHERE tenant_id=%s AND id=%s",
-        (doc_number, on, Json(snapshot), tenant_id, doc_id),
+        f"UPDATE sales_documents SET {', '.join(sets)} WHERE tenant_id=%s AND id=%s",
+        params + [tenant_id, doc_id],
     )
     return get_document(cur, tenant_id=tenant_id, doc_id=doc_id), None
+
+
+def issue_document(
+    cur,
+    *,
+    tenant_id: str,
+    doc_id,
+    prefix: Optional[str],
+    reset: str,
+    on: date,
+    approval_mode: str = "none",
+) -> tuple[Optional[dict], Optional[str]]:
+    """正式开出(直开路径)。approval_mode!=none 时草稿不能直开,须走提交审批→审批通过(§F)。
+
+    返回 (doc, error_code)。买方完整性(§B)与收款(§J)在取号前校验,不过则不占号。
+    """
+    row = lock_for_issue(cur, tenant_id, doc_id)
+    if not row:
+        return None, "not_found"
+    if row["status"] != STATUS_DRAFT:
+        return None, "not_draft"
+    if approval_mode and approval_mode != "none":
+        return None, "approval_required"
+    return finalize_issue(
+        cur, tenant_id=tenant_id, doc_id=doc_id, row=row, prefix=prefix, reset=reset, on=on
+    )
 
 
 def void_document(cur, *, tenant_id: str, doc_id) -> Optional[str]:

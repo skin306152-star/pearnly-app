@@ -15,6 +15,9 @@ EXPECTED = {
     ("POST", "/api/sales/documents/{doc_id}/void"),
     ("POST", "/api/sales/documents/{doc_id}/credit-note"),
     ("POST", "/api/sales/documents/{doc_id}/debit-note"),
+    ("POST", "/api/sales/documents/{doc_id}/submit"),
+    ("POST", "/api/sales/documents/{doc_id}/approve"),
+    ("POST", "/api/sales/documents/{doc_id}/reject"),
 }
 
 

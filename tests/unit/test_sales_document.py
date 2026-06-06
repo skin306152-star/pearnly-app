@@ -211,6 +211,25 @@ class StateGuardTests(unittest.TestCase):
         )
         self.assertEqual(err, "not_found")
 
+    def test_update_rejected_returns_to_draft(self):
+        """被驳回的单可继续改(§F:rejected→改→draft)。"""
+        err = doc.update_draft(
+            StatusCursor("rejected"), tenant_id="t", doc_id="d", vat_rate=7, wht_rate=0, lines=[]
+        )
+        self.assertIsNone(err)
+
+    def test_issue_draft_blocked_when_approval_required(self):
+        _, err = doc.issue_document(
+            StatusCursor("draft"),
+            tenant_id="t",
+            doc_id="d",
+            prefix="INV",
+            reset="yearly",
+            on=date(2026, 6, 6),
+            approval_mode="single",
+        )
+        self.assertEqual(err, "approval_required")
+
     def test_issue_non_draft_rejected(self):
         _, err = doc.issue_document(
             StatusCursor("issued"),

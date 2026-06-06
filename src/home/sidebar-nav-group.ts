@@ -14,6 +14,7 @@
         history: 'sales',
         reconcile: 'sales',
         'sales-invoices': 'sales',
+        'sales-account': 'sales',
         receivables: 'sales',
         vouchers: 'expense',
     };

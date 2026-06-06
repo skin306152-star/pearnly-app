@@ -18,6 +18,9 @@ type Client = {
     contact_phone?: string;
     contact_email?: string;
     notes?: string;
+    party_type?: string;
+    branch?: string;
+    promptpay_id?: string;
 };
 
 // ---------- 加载客户列表 ----------
@@ -232,6 +235,13 @@ function openClientModal(client: Client | null) {
         (client && client.contact_email) || '';
     (document.getElementById('client-input-notes') as HTMLInputElement).value =
         (client && client.notes) || '';
+    // 买方目录字段(§N · party_type/branch/promptpay_id)
+    (document.getElementById('client-input-party-type') as HTMLSelectElement).value =
+        (client && client.party_type) || '';
+    (document.getElementById('client-input-branch') as HTMLInputElement).value =
+        (client && client.branch) || '';
+    (document.getElementById('client-input-promptpay') as HTMLInputElement).value =
+        (client && client.promptpay_id) || '';
     // 颜色
     const targetColor = (client && client.color) || '#111111';
     document.querySelectorAll('#client-color-picker .color-swatch').forEach((s) => {
@@ -277,6 +287,14 @@ async function saveClient() {
             (document.getElementById('client-input-notes') as HTMLInputElement).value.trim() ||
             null,
         color: getActiveColor(),
+        party_type:
+            (document.getElementById('client-input-party-type') as HTMLSelectElement).value || null,
+        branch:
+            (document.getElementById('client-input-branch') as HTMLInputElement).value.trim() ||
+            null,
+        promptpay_id:
+            (document.getElementById('client-input-promptpay') as HTMLInputElement).value.trim() ||
+            null,
     };
     try {
         if (S.editingClientId) {

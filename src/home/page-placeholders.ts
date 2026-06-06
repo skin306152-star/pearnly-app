@@ -58,27 +58,6 @@
             <div class="coming-eta" data-i18n="cs-vouchers-eta">预计 v104 上线</div>
         </div>
 `,
-        'page-sales-invoices': `
-        <div class="auto-coming-hero">
-            <div class="coming-big-icon">
-                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 6h18l6 6v30H12z"/>
-                    <path d="M30 6v6h6"/>
-                    <line x1="18" y1="20" x2="32" y2="20"/>
-                    <line x1="18" y1="26" x2="32" y2="26"/>
-                    <line x1="18" y1="32" x2="26" y2="32"/>
-                </svg>
-            </div>
-            <div class="coming-big-title" data-i18n="cs-sales-invoices-title">销售发票</div>
-            <div class="coming-big-desc" data-i18n="cs-sales-invoices-desc">给客户开发票一键生成 · 进项识别 + 销项开票一站搞定 · ภ.พ.30 报税进销一并汇总</div>
-            <ul class="coming-features">
-                <li data-i18n="cs-sales-invoices-f1">选客户(已存档)+ 商品行项目 + 自动算 7% VAT · 1 分钟开一张</li>
-                <li data-i18n="cs-sales-invoices-f2">生成正规 ใบกำกับภาษี / ใบเสร็จ PDF · 一键发邮件 / LINE 给客户</li>
-                <li data-i18n="cs-sales-invoices-f3">销项数据自动汇入 ภ.พ.30 · 不再手抄进销税额对账</li>
-            </ul>
-            <div class="coming-eta" data-i18n="cs-sales-invoices-eta">预计 v110.1 上线</div>
-        </div>
-`,
         'page-receivables': `
         <div class="auto-coming-hero">
             <div class="coming-big-icon">

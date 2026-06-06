@@ -50,6 +50,8 @@ const HOME_CSS = [
     'home-modal-override.css',
     'home-37-html-inline.css',
     'home-38-buttons.css',
+    'home-39-sales.css',
+    'home-40-sales-wizard.css',
     'erp-mrerp-connect.css',
 ];
 

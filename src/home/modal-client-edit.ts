@@ -37,6 +37,26 @@ const CLIENT_HTML = `
                 </div>
                 <div class="form-row form-row-2col">
                     <div>
+                        <label data-i18n="client-field-party-type">买方类型</label>
+                        <select id="client-input-party-type">
+                            <option value="" data-i18n="client-party-unset">未指定</option>
+                            <option value="company" data-i18n="client-party-company">公司</option>
+                            <option value="individual" data-i18n="client-party-individual">个人</option>
+                            <option value="foreigner" data-i18n="client-party-foreigner">外国</option>
+                            <option value="anonymous" data-i18n="client-party-anonymous">匿名</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label data-i18n="client-field-branch">总公司 / 分店</label>
+                        <input type="text" id="client-input-branch" maxlength="120" data-i18n-placeholder="client-field-branch-ph">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label data-i18n="client-field-promptpay">PromptPay 收款号</label>
+                    <input type="text" id="client-input-promptpay" maxlength="40">
+                </div>
+                <div class="form-row form-row-2col">
+                    <div>
                         <label data-i18n="client-field-contact">联系人</label>
                         <input type="text" id="client-input-contact" maxlength="100">
                     </div>

@@ -191,13 +191,22 @@ const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-reconcile">对账中心</span>
             </div>
-            <div class="nav-item nav-sub-item" data-route="sales-invoices">
+            <div class="nav-item nav-sub-item nav-sales-head" data-route="sales-invoices">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 2h8l3 3v13H5z"/>
                     <path d="M8 8h5M8 11h5M8 14h3"/>
                     <path d="M13 2v3h3"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-sales-invoices">销售发票</span>
+            </div>
+            <!-- 销售发票 两子屏(PO-10)· 工作台 / 账套(商品=共享主数据·见下方主数据区) -->
+            <div class="nav-sub2">
+                <div class="nav-item nav-sub2-item" data-route="sales-invoices">
+                    <span class="nav-label" data-i18n="nav-sales-workbench">发票工作台</span>
+                </div>
+                <div class="nav-item nav-sub2-item" data-route="sales-account">
+                    <span class="nav-label" data-i18n="nav-sales-account">账套 / 开票资料</span>
+                </div>
             </div>
             <div class="nav-item nav-sub-item" data-route="receivables">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -236,6 +245,17 @@ const SIDEBAR_HTML = `
 
     <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
     <div class="nav-divider"></div>
+
+    <!-- 主数据 · 商品/客户共享(以后 POS/库存复用同一份商品库)-->
+    <div class="nav-section-label" data-i18n="nav-group-master">主数据</div>
+
+    <!-- 商品管理 = 共享主数据(销项 PO-10 · 不归销售发票子菜单) -->
+    <div class="nav-item" data-route="sales-products">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7l1-4h12l1 4M4 7v9h12V7M8 16v-4h4v4"/>
+        </svg>
+        <span class="nav-label" data-i18n="nav-sales-products">商品管理</span>
+    </div>
 
     <!-- 客户 / 异常栏 / 自动化 独立项(自动化 Phase 7 才合并进集成页) -->
     <div class="nav-item" data-route="clients">

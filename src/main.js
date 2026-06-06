@@ -91,6 +91,13 @@ import './home/knowledge-sources.js'; // KNOWLEDGE · 来源出处弹窗(.modal 
 import './home/knowledge-ask.js'; // KNOWLEDGE · 问答 tab + 可复用问答接线(window._kbRenderAsk/_kbWireAsk · 接 /api/knowledge/ask)
 import './home/knowledge-fab.js'; // KNOWLEDGE · 悬浮猫问答助手(拖拽吸边+卖萌·复用 _kbWireAsk·问答 tab 开关控显隐·须在 knowledge-ask 后)
 import './home/knowledge-info.js'; // KNOWLEDGE · 功能介绍+费用弹窗(.modal · window._kbOpenInfo · 页头按钮触发)
+import './home/sales-common.js'; // 销项 PO-10 · 共享叶子(类型/格式化/带鉴权 fetch · 无副作用)
+import './home/sales-detail.js'; // 销项 PO-10 · 发票详情弹窗(window.openSalesDetail · #sales-detail-mask)
+import './home/sales-workbench.js'; // 销项 PO-10 · 发票工作台(window.loadSalesWorkbench · 接 GET /api/sales/documents)
+import './home/sales-products.js'; // 销项 PO-10 · 商品管理(主数据 · window.loadSalesProducts · CRUD+import)
+import './home/sales-account.js'; // 销项 PO-10 · 账套·开票资料(window.loadSalesAccount · 卖方+品牌+模板 · PUT sellers)
+import './home/sales-settings.js'; // 销项 PO-10 · 开票设置弹窗(window.openSalesSettings · GET/PUT /api/sales/settings · §M7)
+import './home/sales-wizard.js'; // 销项 PO-10 · 开票向导(window.openSalesWizard · 5步 · 接 sellers/products/rd/create+issue · 自含计算/预览/i18n/io)
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件

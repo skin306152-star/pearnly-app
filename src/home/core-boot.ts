@@ -229,6 +229,8 @@ const VALID_ROUTES = [
     'clients',
     'vouchers',
     'sales-invoices',
+    'sales-products',
+    'sales-account',
     'receivables',
     'reconcile',
     'cloud',
@@ -272,6 +274,13 @@ function routeTo(route?: any) {
     // KNOWLEDGE · 客户知识中心
     if (route === 'knowledge' && typeof window.loadKnowledgePage === 'function')
         window.loadKnowledgePage();
+    // 销项 PO-10 · 发票工作台 / 商品管理 / 账套·开票资料
+    if (route === 'sales-invoices' && typeof window.loadSalesWorkbench === 'function')
+        window.loadSalesWorkbench();
+    if (route === 'sales-products' && typeof window.loadSalesProducts === 'function')
+        window.loadSalesProducts();
+    if (route === 'sales-account' && typeof window.loadSalesAccount === 'function')
+        window.loadSalesAccount();
     // v118.20.2 · 异常栏页面加载
     if (route === 'exceptions' && typeof window.loadExceptionsPage === 'function')
         window.loadExceptionsPage();

@@ -280,6 +280,13 @@ interface Window {
     loadTestCenterPage?: () => void;
     loadClientsPage?: () => void;
     loadKnowledgePage?: () => void;
+    loadSalesWorkbench?: () => void;
+    loadSalesProducts?: () => void;
+    loadSalesAccount?: () => void;
+    openSalesDetail?: (docId: string) => void;
+    openSalesWizard?: () => void;
+    openSalesSettings?: () => void;
+    _wsHeader?: () => Record<string, string | undefined>;
     _knowledgeProbed?: boolean;
     _kbRenderDocs?: () => void;
     _kbRenderAsk?: () => void;

@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
+from core.route_helpers import translate_unique_violation
 from services.sales import product_import
 from services.sales import products as products_dal
 
@@ -98,7 +99,10 @@ async def api_list_products(
 @router.post("")
 async def api_create_product(req: ProductCreate, request: Request):
     tid = _require_tenant(request)
-    with db.get_cursor_rls(tid, commit=True) as cur:
+    with (
+        db.get_cursor_rls(tid, commit=True) as cur,
+        translate_unique_violation("sales.product_code_exists"),
+    ):
         row = products_dal.create_product(cur, tenant_id=tid, fields=_dump(req))
     return {"ok": True, "product": _out(row)}
 
@@ -164,7 +168,10 @@ async def api_update_product(product_id: str, req: ProductUpdate, request: Reque
     raw = {k: v for k, v in _dump(req).items() if v is not None}
     if not raw:
         raise HTTPException(400, detail="sales.no_changes")
-    with db.get_cursor_rls(tid, commit=True) as cur:
+    with (
+        db.get_cursor_rls(tid, commit=True) as cur,
+        translate_unique_violation("sales.product_code_exists"),
+    ):
         row = products_dal.update_product(cur, tenant_id=tid, product_id=product_id, fields=raw)
     if not row:
         raise HTTPException(404, detail="sales.product_not_found")

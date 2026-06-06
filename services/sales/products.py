@@ -42,7 +42,19 @@ def _money(v: Any) -> Any:
     return Decimal(str(v)) if v is not None else None
 
 
+def _norm_code(fields: dict) -> dict:
+    """唯一键 code 空白归一为 NULL:留空商品不进唯一索引(uq_products_tenant_code
+    WHERE code IS NOT NULL),否则多个"无编码"商品都存空串会撞唯一约束。非空则去首尾空白。"""
+    code = fields.get("code")
+    if not isinstance(code, str):
+        return fields
+    f = dict(fields)
+    f["code"] = code.strip() or None
+    return f
+
+
 def create_product(cur, *, tenant_id: str, fields: dict) -> dict:
+    fields = _norm_code(fields)
     cols = ["tenant_id"]
     vals: list = [tenant_id]
     for k in _WRITABLE:
@@ -88,6 +100,7 @@ def list_products(
 
 
 def update_product(cur, *, tenant_id: str, product_id: str, fields: dict) -> Optional[dict]:
+    fields = _norm_code(fields)
     updates = {k: fields[k] for k in _UPDATABLE if fields.get(k) is not None}
     if not updates:
         return get_product(cur, tenant_id=tenant_id, product_id=product_id)

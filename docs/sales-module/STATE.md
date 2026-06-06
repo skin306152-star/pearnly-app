@@ -2,6 +2,13 @@
 
 > 新窗口/下一棒**先读这张卡**,再按需翻 `docs/`。保持 ≤40 行有效信息,历史往下沉到「变更日志」。
 
+## 🆕 PO-10 前端全套上线 + 实测两轮修完(2026-06-06 · cef809f · ?v=11850617)
+
+- **屏全做完接真接口**:发票工作台 / 详情(下载·打印·发送邮件+LINE·PromptPay·红冲·补开·作废·转换·复制再开)/ 开票向导(全屏局内弹窗·5步·税号验真带出·商品菜单点选·省纸·泰铢中文大写·合规清单·成功面板)/ 商品 CRUD+Excel导入+**图片上传** / 账套(主体+品牌+6模板+主色+实时预览+**logo/印章/签字上传**)/ 客户补 party_type/branch/promptpay / 开票设置(连号/审批/价内外/WHT档/语言纸张省纸)。代码 `src/home/sales-*.ts` + `home-39/40 css`。
+- **图片真上传**:`POST /api/uploads/image`(multipart `file`→`{url}`)· 商品图/logo/印章/签字共用 `uploadImage/imageFieldHtml/bindImageField`@sales-common。
+- **实测纪律(必守)**:改完跑 `tests/e2e/zz-sales-uiverify.spec.js`(env `PEARNLY_E2E_USER/PASS`)→看截图→再推;每次 bump `home.html ?v=`。详见记忆 [[sales-frontend-po10-shipped]]。
+- **下一棒**:**等 Zihao 实测回复再定**。/simplify 留账:图标常量四处可合 sales-common(低 ROI·勿在 live 乱动)。
+
 ## 当前状态(2026-06-06 · 已开建上线)
 
 - **🚀 已开建上线**(Zihao 拍板破例):sandbox 已迁主项目,**Phase 1 后端 PO-1~6 全做完 + 上线 master + 真账号 E2E**。代码在主仓库 `services/sales/` + `routes/sales*.py` + `alembic 0006~0008`。prod 库已 apply 到 0008。alembic 追踪本次首次在 prod 立起(之前没有)。

@@ -600,6 +600,44 @@ table.sx-tbl tr.click:hover td {
     font-size: 10.5px;
     white-space: pre-wrap;
 }
+/* 模板差异(切换可见)·经典=网格线 / 简约=无框 / 紧凑=小字 / 官方=居中粗线 / 极简=黑白虚线 */
+.sx-prev-classic .sx-prev-parties {
+    border-color: #c9c9c2;
+}
+.sx-prev-classic .sx-prev-row {
+    border-bottom: 1px solid #d8d8d2;
+}
+.sx-prev-clean .sx-prev-parties {
+    border: 0;
+    padding: 0 0 6px;
+}
+.sx-prev-clean .sx-prev-row {
+    border-bottom: 0;
+}
+.sx-prev-compact {
+    font-size: 10px;
+    padding: 12px;
+}
+.sx-prev-compact .sx-prev-co {
+    font-size: 12px;
+}
+.sx-prev-official .sx-prev-co {
+    border-bottom: 2px solid currentColor;
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+}
+.sx-prev-official .sx-prev-sub {
+    text-align: center;
+}
+.sx-prev-mono .sx-prev-co {
+    color: #111 !important;
+}
+.sx-prev-mono .sx-prev-parties {
+    border-style: dashed;
+}
+.sx-prev-mono .sx-prev-row {
+    border-bottom: 1px dashed #999;
+}
 @media (max-width: 920px) {
     .sx-acc-2col {
         grid-template-columns: 1fr;
@@ -624,6 +662,21 @@ table.sx-tbl tr.click:hover td {
 }
 .sx-sw.on {
     box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* 弹窗自适应:居中 · 内容自适应 · 封顶 88vh · 超出 body 内滚 */
+.sx-modal-mask {
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+}
+.sx-modal-mask .modal {
+    display: flex;
+    flex-direction: column;
+    max-height: 88vh;
+}
+.sx-modal-mask .modal-body {
+    overflow: auto;
 }
 
 /* 开票设置弹窗 */

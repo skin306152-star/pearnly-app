@@ -191,7 +191,7 @@ const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-reconcile">对账中心</span>
             </div>
-            <div class="nav-item nav-sub-item nav-sales-head" data-route="sales-invoices">
+            <div class="nav-sub-item nav-sales-head">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 2h8l3 3v13H5z"/>
                     <path d="M8 8h5M8 11h5M8 14h3"/>

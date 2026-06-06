@@ -33,7 +33,7 @@ function ensureMask(id: string): HTMLElement {
     if (!m) {
         m = document.createElement('div');
         m.id = id;
-        m.className = 'modal-mask';
+        m.className = 'modal-mask sx-modal-mask';
         m.style.display = 'none';
         document.body.appendChild(m);
     }
@@ -275,7 +275,7 @@ window.loadSalesProducts = function () {
     const sec = document.getElementById('page-sales-products');
     if (!sec) return;
     if (sec.dataset.sxInit !== '1') {
-        sec.innerHTML = `<div class="sx-page"><div class="sx-head"><h2>${escapeHtml(t('nav-sales-products'))}</h2><span class="sx-sub">สินค้า</span></div><div id="sx-p-body"></div></div>`;
+        sec.innerHTML = `<div class="sx-page"><div class="sx-head"><h2>${escapeHtml(t('nav-sales-products'))}</h2></div><div id="sx-p-body"></div></div>`;
         sec.dataset.sxInit = '1';
     }
     load();

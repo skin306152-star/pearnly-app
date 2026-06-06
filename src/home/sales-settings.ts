@@ -27,7 +27,7 @@ function mask(): HTMLElement {
     if (!m) {
         m = document.createElement('div');
         m.id = 'sales-settings-mask';
-        m.className = 'modal-mask';
+        m.className = 'modal-mask sx-modal-mask';
         m.style.display = 'none';
         document.body.appendChild(m);
     }

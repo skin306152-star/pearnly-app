@@ -146,9 +146,10 @@ export function step3(st: WState): string {
         ? st.lines
               .map(
                   (l, i) => `<div class="sw-citem">
-            <div class="sw-crow1"><input type="text" data-ln="${i}" data-f="desc" value="${escapeHtml(l.desc)}" placeholder="${escapeHtml(wt('s3h'))}" style="border:0;font-weight:600;padding:2px;flex:1;background:transparent"><button class="sw-iconbtn" data-rm="${i}">${ICO.trash}</button></div>
+            <div class="sw-crow1"><input type="text" data-ln="${i}" data-f="desc" value="${escapeHtml(l.desc)}" placeholder="${escapeHtml(wt('lineNamePh'))}" style="border:0;font-weight:600;padding:2px;flex:1;background:transparent"><button class="sw-iconbtn" data-rm="${i}">${ICO.trash}</button></div>
             <div class="sw-crow2"><div class="sw-cqty"><button data-q="${i}" data-d="-1">−</button><span>${l.qty}</span><button data-q="${i}" data-d="1">+</button></div>
-              <input type="number" data-ln="${i}" data-f="price" value="${l.price}" min="0" step="0.01"><input type="number" data-ln="${i}" data-f="disc" value="${l.disc}" min="0" step="0.01">
+              <div class="sw-cfield"><label>${escapeHtml(wt('linePrice'))}</label><input type="number" data-ln="${i}" data-f="price" value="${l.price}" min="0" step="0.01"></div>
+              <div class="sw-cfield"><label>${escapeHtml(wt('lineDisc'))}</label><input type="number" data-ln="${i}" data-f="disc" value="${l.disc}" min="0" step="0.01"></div>
               <span class="sw-amt">฿${money(Math.max(0, (+l.qty || 0) * (+l.price || 0) - (+l.disc || 0)))}</span></div>
             ${l.custom ? `<label style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;color:var(--ink-3);cursor:pointer"><input type="checkbox" style="width:auto" data-save="${i}" ${l.save ? 'checked' : ''}> ${escapeHtml(wt('saveCatalog'))}</label>` : ''}</div>`
               )

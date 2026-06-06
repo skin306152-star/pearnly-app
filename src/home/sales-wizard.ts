@@ -32,7 +32,7 @@ function freshState(): WState {
         docType: 'tax_invoice_receipt',
         sellerIdx: 0,
         buyer: { type: 'company', name: '', addr: '', tin: '', branchType: 'hq', branchNo: '' },
-        lines: [{ desc: '', qty: 1, price: 0, disc: 0, vat: true }],
+        lines: [],
         hdisc: 0,
         vatRate: 7,
         whtRate: 0,
@@ -234,15 +234,6 @@ function addProduct(i: number) {
     const nm = pname(p);
     const ex = st.lines.find((l) => l.product_id === p.id);
     if (ex) ex.qty = (+ex.qty || 0) + 1;
-    else if (st.lines.length === 1 && !st.lines[0].desc && !st.lines[0].price)
-        st.lines[0] = {
-            desc: nm,
-            qty: 1,
-            price: p.unit_price,
-            disc: 0,
-            vat: p.vat_applicable,
-            product_id: p.id,
-        };
     else
         st.lines.push({
             desc: nm,
@@ -257,12 +248,10 @@ function addProduct(i: number) {
 function qtyStep(i: number, d: number) {
     st.lines[i].qty = Math.max(0, (+st.lines[i].qty || 0) + d);
     if (+st.lines[i].qty === 0) st.lines.splice(i, 1);
-    if (!st.lines.length) st.lines = [{ desc: '', qty: 1, price: 0, disc: 0, vat: true }];
     render();
 }
 function removeLine(i: number) {
     st.lines.splice(i, 1);
-    if (!st.lines.length) st.lines = [{ desc: '', qty: 1, price: 0, disc: 0, vat: true }];
     render();
 }
 // 常见场景预设(对应 step1 的 4 个 chip):单据类型 / 买方类型 / 收款状态 / 收款方式

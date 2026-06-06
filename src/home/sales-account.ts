@@ -97,7 +97,7 @@ function accPreview(): string {
         tpl === 'brand'
             ? `<div style="height:7px;background:${accent};margin:-18px -18px 12px;border-radius:8px 8px 0 0"></div>`
             : '';
-    return `<div class="sx-prev-inv" style="${tpl === 'brand' ? 'border-color:' + accent + '55' : ''}">
+    return `<div class="sx-prev-inv sx-prev-${tpl}" style="${tpl === 'brand' ? 'border-color:' + accent + '55' : ''}">
         ${bar}
         <div class="sx-prev-co" style="color:${accent};${tpl === 'official' ? 'text-align:center' : ''}">${escapeHtml(s.name || '—')}</div>
         <div class="sx-prev-sub">${escapeHtml(t('sx-dt-tax_invoice'))} · INV2026-00001 · 2026-06-06</div>
@@ -230,7 +230,7 @@ window.loadSalesAccount = function () {
     const sec = document.getElementById('page-sales-account');
     if (!sec) return;
     if (sec.dataset.sxInit !== '1') {
-        sec.innerHTML = `<div class="sx-page"><div class="sx-head"><h2>${escapeHtml(t('nav-sales-account'))}</h2><span class="sx-sub">กิจการ / ข้อมูลออกบิล</span></div><div id="sx-acc-body" style="max-width:1040px"></div></div>`;
+        sec.innerHTML = `<div class="sx-page"><div class="sx-head"><h2>${escapeHtml(t('nav-sales-account'))}</h2></div><div id="sx-acc-body" style="max-width:1040px"></div></div>`;
         sec.dataset.sxInit = '1';
     }
     load();

@@ -78,10 +78,6 @@ function miniInvoice(d: SalesDoc): string {
     </div>`;
 }
 
-function softBtn(label: string, icon: string, msgKey: string): string {
-    return `<button class="btn btn-ghost btn-sm" data-soft="${escapeHtml(msgKey)}">${icon}<span>${escapeHtml(label)}</span></button>`;
-}
-
 function renderDetail(d: SalesDoc) {
     const voided = d.status === 'void';
     const isQuote = d.doc_type === 'quotation';
@@ -92,7 +88,7 @@ function renderDetail(d: SalesDoc) {
            <button class="btn btn-ghost btn-sm" data-act="print">${I.print}<span>${escapeHtml(t('sx-print'))}</span></button>
            <button class="btn btn-ghost btn-sm" data-act="send">${I.send}<span>${escapeHtml(t('sx-send-to'))}</span></button>
            ${unpaid ? `<button class="btn btn-accent btn-sm" data-act="promptpay">${I.qr}<span>${escapeHtml(t('sx-promptpay'))}</span></button>` : ''}
-           ${softBtn(t('sx-copy'), I.copy, 'sx-copy-soon')}`;
+           <button class="btn btn-ghost btn-sm" data-act="copy">${I.copy}<span>${escapeHtml(t('sx-copy'))}</span></button>`;
     const mutate = voided
         ? ''
         : `${isQuote ? `<button class="btn btn-ghost btn-sm" data-act="convert">${escapeHtml(t('sx-convert'))}</button>` : ''}
@@ -376,11 +372,62 @@ async function doSend(d: SalesDoc) {
     };
 }
 
+// 复制再开:用本单内容(双方/明细/税率)建一张新草稿,回流工作台。
+async function copyDoc(d: SalesDoc) {
+    const dd = d as unknown as {
+        client_id: number | null;
+        seller_workspace_client_id: number | null;
+        currency: string;
+        header_discount_amount: number | string;
+        header_discount_pct: number | string;
+    };
+    const lines = (d.lines || [])
+        .map((l) => {
+            const ln = l as unknown as {
+                description?: string;
+                qty?: number | string;
+                unit_price?: number | string;
+                discount?: number | string;
+                vat_applicable?: boolean;
+            };
+            return {
+                description: (ln.description || '').trim(),
+                qty: Number(ln.qty || 0),
+                unit_price: Number(ln.unit_price || 0),
+                discount: Number(ln.discount || 0),
+                vat_applicable: ln.vat_applicable !== false,
+            };
+        })
+        .filter((l) => l.description);
+    if (!lines.length) return showToast(t('sx-action-fail'), 'error');
+    const body = {
+        doc_type: d.doc_type,
+        client_id: dd.client_id,
+        seller_workspace_client_id: dd.seller_workspace_client_id,
+        currency: dd.currency || 'THB',
+        vat_rate: Number(d.vat_rate || 0),
+        wht_rate: Number(d.wht_rate || 0),
+        header_discount_amount: Number(dd.header_discount_amount || 0),
+        header_discount_pct: Number(dd.header_discount_pct || 0),
+        price_includes_vat: !!d.price_includes_vat,
+        lines,
+        buyer: d.buyer && d.buyer.type ? { ...d.buyer } : null,
+        payment: null,
+    };
+    const ok = await postMutate('/api/sales/documents', body);
+    if (ok) {
+        closeDetail();
+        showToast(t('sx-copied'), 'success');
+        window.dispatchEvent(new CustomEvent('pearnly:sales-changed'));
+    }
+}
+
 function runAction(act: string, d: SalesDoc) {
     if (act === 'download') return void downloadPdf(d, false);
     if (act === 'print') return void downloadPdf(d, true);
     if (act === 'send') return sendModal(d);
     if (act === 'promptpay') return void promptpay(d);
+    if (act === 'copy') return void copyDoc(d);
     if (act === 'credit') return noteModal(d, 'credit_note');
     if (act === 'debit') return noteModal(d, 'debit_note');
     if (act === 'void') return voidModal(d);

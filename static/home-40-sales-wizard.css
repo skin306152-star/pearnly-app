@@ -432,6 +432,15 @@
     width: 66px;
     padding: 5px 7px;
 }
+.sw-cfield {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.sw-cfield label {
+    font-size: 9px;
+    color: var(--ink-3);
+}
 .sw-cqty {
     display: inline-flex;
     align-items: center;

@@ -19,6 +19,7 @@ export interface SalesDoc {
     subtotal: number | string;
     vat_rate: number | string;
     vat_amount: number | string;
+    wht_rate: number | string;
     wht_amount: number | string;
     grand_total: number | string;
     price_includes_vat: boolean;

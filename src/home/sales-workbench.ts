@@ -119,7 +119,7 @@ function pageShell(): string {
     return `<div class="sx-page">
         <div class="sx-head">
             <h2 data-i18n="sx-wb-title">${escapeHtml(t('sx-wb-title'))}</h2>
-            <span class="sx-sub">ใบกำกับภาษี</span>
+            
             <div class="sx-actions">
                 <button class="btn btn-ghost" id="sx-settings-btn">${ICON_GEAR}<span>${escapeHtml(t('sx-settings'))}</span></button>
                 <button class="btn btn-primary" id="sx-new-btn">${ICON_PLUS}<span>${escapeHtml(t('sx-new'))}</span></button>

@@ -2028,6 +2028,7 @@ window.I18N = {
         // v109.4 · 销售发票模块(v110.1)
         'nav-sales-invoices': '销售发票',
         'sx-cancel': '取消',
+        'sx-copied': '已复制为草稿',
         'sx-send-email-required': '请填买家邮箱',
         'sx-send-email-ok': '已发送邮件给买家',
         'sx-send-fail': '发送失败',
@@ -4997,6 +4998,7 @@ window.I18N = {
         // v109.4 · sales invoice module (v110.1)
         'nav-sales-invoices': 'Sales Invoices',
         'sx-cancel': 'Cancel',
+        'sx-copied': 'Copied to a draft',
         'sx-send-email-required': 'Buyer email required',
         'sx-send-email-ok': 'Emailed to buyer',
         'sx-send-fail': 'Send failed',
@@ -7955,6 +7957,7 @@ window.I18N = {
         // v109.4 · ใบกำกับขาย (v110.1)
         'nav-sales-invoices': 'ใบกำกับขาย',
         'sx-cancel': 'ยกเลิก',
+        'sx-copied': 'คัดลอกเป็นร่างแล้ว',
         'sx-send-email-required': 'กรอกอีเมลผู้ซื้อ',
         'sx-send-email-ok': 'ส่งอีเมลแล้ว',
         'sx-send-fail': 'ส่งไม่สำเร็จ',
@@ -10909,6 +10912,7 @@ window.I18N = {
         // v109.4 · 売上請求書モジュール (v110.1)
         'nav-sales-invoices': '売上請求書',
         'sx-cancel': 'キャンセル',
+        'sx-copied': '下書きに複製しました',
         'sx-send-email-required': '買い手のメールを入力',
         'sx-send-email-ok': '買い手にメール送信しました',
         'sx-send-fail': '送信失敗',

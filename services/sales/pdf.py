@@ -12,6 +12,7 @@ import hashlib
 import io
 from decimal import Decimal
 
+from services.sales import pdf_brand
 from services.sales import templates
 from services.sales.dates import to_thai_date
 from services.sales.totals import _d
@@ -213,7 +214,8 @@ def render_invoice_pdf(
 
     def build_copy(ck):
         """组一联的 flowable 列表(供单联渲染或省纸两联各拿一份独立实例)。"""
-        story = [
+        story = pdf_brand.logo_flowables(seller, mm, Spacer)
+        story += [
             P(
                 _DOC_LABEL.get(doc.get("doc_type"), doc.get("doc_type") or ""),
                 True,
@@ -327,6 +329,11 @@ def render_invoice_pdf(
         pay = _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer)
         if pay:
             story.extend(pay)
+        story.extend(
+            pdf_brand.signature_flowables(
+                seller, P, cw, Table, TableStyle, colors, mm, Spacer, TA_CENTER
+            )
+        )
         if seller.get("footer_text"):
             story.append(Spacer(1, 4 * mm))
             story.append(P(seller.get("footer_text"), align=TA_CENTER, size=8, color=colors.grey))

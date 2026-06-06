@@ -67,6 +67,7 @@ from routes.sales_settings_routes import (
 from routes.sales_send_routes import (
     router as sales_send_router,
 )  # 销项发票发送/分享 PO-7 · 2026-06-06
+from routes.uploads_routes import router as uploads_router  # 图片上传/取图 §L4 · 2026-06-06
 from routes.team_routes import router as team_router  # REFACTOR-B1 · 员工管理 7 路由 · 2026-05-25
 from routes.email_ingest_routes import (
     router as email_ingest_router,
@@ -196,6 +197,7 @@ app.include_router(sales_router)  # 销项单据/开票 6 路由(PO-4 · 2026-06
 app.include_router(sales_seller_router)  # 销项开票方资料 3 路由(PO-6 · 2026-06-06)
 app.include_router(sales_settings_router)  # 销项开票设置 2 路由(§M7 · 2026-06-06)
 app.include_router(sales_send_router)  # 销项发票发送/公开分享 2 路由(PO-7 · 2026-06-06)
+app.include_router(uploads_router)  # 图片上传/取图 2 路由(§L4 · 2026-06-06)
 app.include_router(team_router)  # REFACTOR-B1 · 员工管理 7 路由(2026-05-25)
 app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2026-05-25)
 app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(2026-05-25)

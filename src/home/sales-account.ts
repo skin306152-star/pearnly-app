@@ -67,11 +67,11 @@ function formHtml(): string {
         <div class="sx-field"><label>${escapeHtml(t('sx-acc-promptpay'))}</label><input type="text" id="sx-a-pp" value="${htmlVal(s.promptpay_id)}" maxlength="40" placeholder="08x-xxx-xxxx / ${escapeHtml(t('sx-acc-tax'))}"></div>
 
         <div class="sx-head" style="margin-top:18px"><h2 style="font-size:14px">${escapeHtml(t('sx-acc-sec-brand'))}</h2></div>
-        <div class="sx-acc-grid">
+        <div class="sx-acc-assets">
             ${imageFieldHtml('sx-a-logo', t('sx-acc-logo'), s.logo_url)}
             ${imageFieldHtml('sx-a-seal', t('sx-acc-seal'), s.seal_url)}
+            ${imageFieldHtml('sx-a-sign', t('sx-acc-sign'), s.signature_url)}
         </div>
-        ${imageFieldHtml('sx-a-sign', t('sx-acc-sign'), s.signature_url)}
         <div class="sx-field"><label>${escapeHtml(t('sx-acc-footer'))}</label><textarea id="sx-a-footer" rows="2" maxlength="500">${htmlVal(s.footer_text)}</textarea></div>
 
         <div class="sx-head" style="margin-top:18px"><h2 style="font-size:14px">${escapeHtml(t('sx-acc-sec-template'))}</h2></div>

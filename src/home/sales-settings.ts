@@ -2,7 +2,7 @@
 // 照 app.html settingsModal:号码格式预览 / WHT 下拉 / 纸张含 80mm / 省纸复选。
 // 交互(seg/下拉/复选)只改状态 + 就地 toggle,不整体 render → 不闪、不回顶。
 /* global t, escapeHtml, apiGet, showToast */
-import { salesFetch } from './sales-common.js';
+import { salesFetch, IC_X } from './sales-common.js';
 
 interface Settings {
     number_prefix?: string | null;
@@ -16,8 +16,6 @@ interface Settings {
     default_copies_layout: string;
 }
 
-const IC_X =
-    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 // WHT 档位(照草稿):值 + 类型标签 i18n 键;另加「自定义」可填任意率。
 const WHT_OPTS: [string, string][] = [
     ['0', 'sx-wht-none'],

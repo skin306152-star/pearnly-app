@@ -1,7 +1,14 @@
 // 销项 PO-10 · 商品管理(主数据 · 共享 · 以后 POS/库存复用)
 // 接真接口 GET/POST/PATCH/DELETE /api/sales/products + /import。四态 + .modal(非抽屉)。
 /* global t, escapeHtml, apiGet, apiPost, showToast */
-import { salesFetch, fmtMoney, htmlVal, imageFieldHtml, bindImageField } from './sales-common.js';
+import {
+    salesFetch,
+    fmtMoney,
+    htmlVal,
+    imageFieldHtml,
+    bindImageField,
+    IC_X,
+} from './sales-common.js';
 
 interface Product {
     id: string;
@@ -22,8 +29,6 @@ const IC_EDIT =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4v16h16v-7M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>';
 const IC_TRASH =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
-const IC_X =
-    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
 let products: Product[] = [];
 let keyword = '';

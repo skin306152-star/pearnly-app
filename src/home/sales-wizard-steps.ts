@@ -234,7 +234,7 @@ export function step5(st: WState): string {
         )
         .join('');
     return `<div class="sw-card"><h2>${escapeHtml(wt('s5h'))}</h2><div class="sw-sub">${escapeHtml(wt('s5sub'))}</div>
-        <div class="sw-sectitle">${escapeHtml(wt('compliance'))}</div><div>${checks}</div>
+        <div class="sw-sectitle">${escapeHtml(wt('compliance'))}</div><div class="sw-checks">${checks}</div>
         <div class="sw-sectitle" style="margin-top:22px">${escapeHtml(wt('output'))}</div>
         <div class="sw-row" style="max-width:580px">
             <div class="sw-field"><label>${escapeHtml(wt('paper'))}</label><div class="sw-seg">${segP}</div></div>

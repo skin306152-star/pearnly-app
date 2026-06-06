@@ -93,17 +93,22 @@ export async function uploadImage(file: File): Promise<{ url?: string; error?: s
     }
 }
 
-// 图片字段(上传按钮 + 缩略图 + 清除)· URL 存进隐藏 input#id,供表单读取。products/account 共用。
+// 关闭图标(18px)· 各销项弹窗共用,避免重复常量。
+export const IC_X =
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+const SX_UP_ICON =
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg>';
+
+// 图片字段 = 草稿虚线投放框:空态居中「↑ 名字」· 填后图片铺满 + 右上角 × 清除。products/account 共用。
 export function imageFieldHtml(id: string, label: string, url?: string | null): string {
     const u = url || '';
-    return `<div class="sx-imgfield">
-        <label>${escapeHtml(label)}</label>
-        <div class="sx-imgfield-row">
-            <div class="sx-imgfield-prev" id="${id}-prev">${u ? `<img src="${escapeHtml(u)}" alt="">` : ''}</div>
+    return `<div class="sx-dropwrap">
+        <div class="sx-drop${u ? ' has' : ''}" id="${id}-drop">
             <input type="file" id="${id}-file" accept="image/png,image/jpeg,image/webp" hidden>
-            <button type="button" class="btn btn-ghost btn-sm" id="${id}-btn">${escapeHtml(t('sx-upload'))}</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="${id}-clr" style="${u ? '' : 'display:none'}">${escapeHtml(t('sx-upload-clear'))}</button>
             <input type="hidden" id="${id}" value="${escapeHtml(u)}">
+            <img id="${id}-prev" src="${escapeHtml(u)}" alt="" style="${u ? '' : 'display:none'}">
+            <span class="sx-drop-lbl" id="${id}-lbl" style="${u ? 'display:none' : ''}">${SX_UP_ICON} ${escapeHtml(label)}</span>
+            <button type="button" class="sx-drop-clr" id="${id}-clr" style="${u ? '' : 'display:none'}" title="${escapeHtml(t('sx-upload-clear'))}">×</button>
         </div>
         <div class="sx-field-err" id="${id}-err"></div>
     </div>`;
@@ -111,31 +116,40 @@ export function imageFieldHtml(id: string, label: string, url?: string | null): 
 
 export function bindImageField(id: string): void {
     const fileEl = document.getElementById(id + '-file') as HTMLInputElement | null;
-    const btn = document.getElementById(id + '-btn');
+    const drop = document.getElementById(id + '-drop');
     const clr = document.getElementById(id + '-clr');
     const hidden = document.getElementById(id) as HTMLInputElement | null;
-    const prev = document.getElementById(id + '-prev');
+    const prev = document.getElementById(id + '-prev') as HTMLImageElement | null;
+    const lbl = document.getElementById(id + '-lbl');
     const err = document.getElementById(id + '-err');
-    if (!fileEl || !btn || !hidden) return;
-    btn.onclick = () => fileEl.click();
+    if (!fileEl || !drop || !hidden) return;
+    const show = (u: string) => {
+        hidden.value = u;
+        if (prev) {
+            prev.src = u;
+            prev.style.display = u ? '' : 'none';
+        }
+        if (lbl) lbl.style.display = u ? 'none' : '';
+        if (clr) clr.style.display = u ? '' : 'none';
+        drop.classList.toggle('has', !!u);
+    };
+    drop.onclick = (e) => {
+        if ((e.target as HTMLElement).closest('.sx-drop-clr')) return;
+        fileEl.click();
+    };
     fileEl.onchange = async () => {
         const f = fileEl.files && fileEl.files[0];
         if (!f) return;
         if (err) err.textContent = '';
         const r = await uploadImage(f);
-        if (r.url) {
-            hidden.value = r.url;
-            if (prev) prev.innerHTML = `<img src="${escapeHtml(r.url)}" alt="">`;
-            if (clr) clr.style.display = '';
-        } else if (err) {
+        if (r.url) show(r.url);
+        else if (err)
             err.textContent = t(r.error || '') !== r.error ? t(r.error || '') : t('sx-upload-fail');
-        }
         fileEl.value = '';
     };
     if (clr)
-        clr.onclick = () => {
-            hidden.value = '';
-            if (prev) prev.innerHTML = '';
-            clr.style.display = 'none';
+        clr.onclick = (e) => {
+            e.stopPropagation();
+            show('');
         };
 }

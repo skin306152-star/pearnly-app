@@ -541,7 +541,17 @@
     gap: 10px;
 }
 
-/* compliance checklist */
+/* compliance checklist · 两列紧凑(省竖向空间) */
+.sw-checks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 20px;
+}
+@media (max-width: 680px) {
+    .sw-checks {
+        grid-template-columns: 1fr;
+    }
+}
 .sw-check {
     display: flex;
     align-items: flex-start;

@@ -183,17 +183,18 @@ export interface Check {
 export function compliance(st: WState): Check[] {
     const b = st.buyer;
     const isFull = FULL_TAX.includes(st.docType);
-    // 匿名散客=用户主动「不记名」→ 买方齐全检查置 N/A(放行);合法性(匿名能否开完整税票)由后端 §B 裁定。
+    // 完整税票/合并单:买方必须齐全且【非匿名】(§86/4)→ 匿名或不齐都不合规(与后端 §B 一致)。
+    // 简易票/收据/报价:买方非必填 → N/A。匿名只能开简易票。
     const anon = b.type === 'anonymous';
-    const buyerOk =
-        anon || !isFull
-            ? true
-            : !!(
-                  b.name &&
-                  b.addr &&
-                  b.tin &&
-                  (b.type !== 'company' || b.branchType === 'hq' || /^\d{5}$/.test(b.branchNo))
-              );
+    const buyerOk = !isFull
+        ? true
+        : !anon &&
+          !!(
+              b.name &&
+              b.addr &&
+              b.tin &&
+              (b.type !== 'company' || b.branchType === 'hq' || /^\d{5}$/.test(b.branchNo))
+          );
     let tinOk = true;
     if (['company', 'individual'].includes(b.type) && b.tin) tinOk = /^\d{13}$/.test(b.tin);
     if (b.type === 'foreigner' && b.tin) tinOk = /^[A-Za-z0-9]{4,20}$/.test(b.tin);
@@ -205,8 +206,8 @@ export function compliance(st: WState): Check[] {
             key: 'ckBuyer',
             descKey: 'ckBuyerD',
             pass: buyerOk,
-            req: isFull && !anon,
-            na: !isFull || anon,
+            req: isFull,
+            na: !isFull,
         },
         {
             key: 'ckTin',

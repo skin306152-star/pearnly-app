@@ -143,7 +143,6 @@
             // home.js 挂载步骤提供真实弹层 UI;本模块给它数据 + 回调
             window.openWorkspaceChooserUI({
                 clients: list,
-                canCreate: _isOwner(),
                 active: getActiveWorkspaceClientId(),
                 onPersonal: enterPersonalMode,
                 onPick: function (id: number | string) {
@@ -235,7 +234,6 @@
     function openWorkspaceChooserUI(opts: {
         clients?: Array<{ id: number; name?: string }>;
         active?: number | null;
-        canCreate?: boolean;
         emptyHint?: string | null;
         onPersonal?: () => void;
         onPick?: (id: number | string) => void;
@@ -290,13 +288,18 @@
                 })
             );
             selectHtml =
-                '<div class="ws-modal-select-row">' +
-                '<label class="ws-modal-select-label">' +
+                '<div class="ws-modal-item ws-modal-item-account">' +
+                '<span class="ws-modal-item-ic">' +
+                _icon('building') +
+                '</span>' +
+                '<span class="ws-modal-item-text" style="display:flex;flex-direction:column;align-items:flex-start;min-width:0;flex:1;">' +
+                '<span class="ws-modal-item-name">' +
                 _esc(_t('ws-select-label', '账套主体')) +
-                '</label>' +
-                '<select class="ws-modal-select" data-ws-select="1">' +
+                '</span>' +
+                '<select class="ws-modal-select" data-ws-select="1" style="margin-top:6px;width:100%;">' +
                 opts.join('') +
                 '</select>' +
+                '</span>' +
                 '</div>';
         }
 
@@ -304,21 +307,11 @@
             !clients.length && opts.emptyHint
                 ? '<div class="ws-modal-empty">' + _esc(opts.emptyHint) + '</div>'
                 : '';
-        const createHtml = opts.canCreate
-            ? '<div class="ws-modal-create">' +
-              '<button type="button" class="ws-modal-create-toggle" data-ws-create-toggle="1">+ ' +
-              _esc(_t('ws-create-client', '新建工作空间')) +
-              '</button>' +
-              '<div class="ws-modal-create-form" data-ws-create-form style="display:none;">' +
-              '<input type="text" class="ws-modal-create-input" data-ws-create-name placeholder="' +
-              _esc(_t('ws-create-ph', '公司名称,例如 BAKELAB')) +
-              '">' +
-              '<button type="button" class="ws-modal-create-submit" data-ws-create-submit="1">' +
-              _esc(_t('ws-create-submit', '创建')) +
-              '</button>' +
-              '</div>' +
-              '</div>'
-            : '';
+        // 弹层只为「选择」· 新增账套主体到「客户管理」做(Zihao 2026-06-06)。
+        const createHtml =
+            '<div class="ws-modal-hint" style="font-size:12px;color:#6b7280;padding:10px 4px 2px;line-height:1.5;white-space:normal;">' +
+            _esc(_t('ws-add-hint', '如需新增账套主体,请前往「客户管理」添加')) +
+            '</div>';
 
         overlay.innerHTML =
             '<div class="ws-modal-box" role="dialog" aria-modal="true">' +
@@ -383,59 +376,7 @@
                 renderWorkspaceControl();
                 return;
             }
-            const toggle = (e.target as HTMLElement).closest('[data-ws-create-toggle]');
-            if (toggle) {
-                const form = overlay.querySelector('[data-ws-create-form]') as HTMLElement | null;
-                if (form) {
-                    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
-                    const inp = form.querySelector('[data-ws-create-name]') as HTMLElement | null;
-                    if (inp) inp.focus();
-                }
-                return;
-            }
-            const submit = (e.target as HTMLElement).closest('[data-ws-create-submit]');
-            if (submit) {
-                _doCreate(overlay, opts, close);
-                return;
-            }
         });
-    }
-
-    async function _doCreate(
-        overlay: HTMLElement,
-        opts: { onPick?: (id: number | string) => void },
-        close: () => void
-    ) {
-        const inp = overlay.querySelector('[data-ws-create-name]') as HTMLInputElement | null;
-        const name = inp ? (inp.value || '').trim() : '';
-        if (!name) {
-            if (inp) inp.focus();
-            return;
-        }
-        let res = null;
-        try {
-            if (typeof window.apiPost === 'function') {
-                const r = await window.apiPost('/api/workspace/clients', { name: name });
-                res = r && typeof r.json === 'function' ? await r.json().catch(() => null) : r;
-            }
-        } catch {
-            res = null;
-        }
-        const newId = res && (res.id || (res.client && res.client.id));
-        if (!newId) {
-            if (typeof window.showToast === 'function') {
-                window.showToast(_t('ws-create-fail', '新建工作空间失败 · 请重试'), 'error');
-            }
-            return;
-        }
-        // 刷新缓存(让右上角标签能解析到新客户名)再选中它
-        window._workspaceClientsCache = await fetchWorkspaceClients();
-        setActiveWorkspaceClientId(Number(newId));
-        if (typeof opts.onPick === 'function') {
-            // onPick 已在弹层里再调一次 setActive 也幂等 · 但 _doCreate 直接走完整闭环更稳
-        }
-        close();
-        renderWorkspaceControl();
     }
 
     window.openWorkspaceChooserUI = openWorkspaceChooserUI;

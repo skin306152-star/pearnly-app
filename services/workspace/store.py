@@ -76,8 +76,12 @@ def create_workspace_client(
     name: str,
     tax_id: Optional[str] = None,
     erp_endpoint_id: Optional[str] = None,
+    address: Optional[str] = None,
+    branch: Optional[str] = None,
+    phone: Optional[str] = None,
+    vat_registered: bool = True,
 ) -> Optional[int]:
-    """新建账套主体。返回新 id。name 必填。"""
+    """新建账套主体(= 发票卖方)。返回新 id。name 必填,其余开票字段可空。"""
     if not name or not name.strip():
         return None
     try:
@@ -85,8 +89,9 @@ def create_workspace_client(
             cur.execute(
                 """
                 INSERT INTO workspace_clients
-                    (user_id, tenant_id, name, tax_id, erp_endpoint_id)
-                VALUES (%s, %s, %s, %s, %s)
+                    (user_id, tenant_id, name, tax_id, erp_endpoint_id,
+                     address, branch, phone, vat_registered)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -95,6 +100,10 @@ def create_workspace_client(
                     name.strip()[:200],
                     (tax_id or "").strip()[:30] or None,
                     (str(erp_endpoint_id).strip() if erp_endpoint_id else None),
+                    (address or "").strip()[:500] or None,
+                    (branch or "").strip()[:120] or "สำนักงานใหญ่",
+                    (phone or "").strip()[:50] or None,
+                    bool(vat_registered),
                 ),
             )
             row = cur.fetchone()
@@ -172,8 +181,12 @@ def update_workspace_client(
     tenant_id: Optional[str] = None,
     name: Optional[str] = None,
     tax_id: Optional[str] = None,
+    address: Optional[str] = None,
+    branch: Optional[str] = None,
+    phone: Optional[str] = None,
+    vat_registered: Optional[bool] = None,
 ) -> bool:
-    """改账套主体的名称/税号(P3-客户管理页编辑用)。tenant 隔离。
+    """改账套主体的开票字段(P3-客户管理页编辑用)。tenant 隔离。
 
     只更新传入的字段(None=不动)。name 给空串视为不改(账套主体名不能清空)。
     """
@@ -185,6 +198,18 @@ def update_workspace_client(
     if tax_id is not None:
         sets.append("tax_id = %s")
         params.append((tax_id or "").strip()[:30] or None)
+    if address is not None:
+        sets.append("address = %s")
+        params.append((address or "").strip()[:500] or None)
+    if branch is not None:
+        sets.append("branch = %s")
+        params.append((branch or "").strip()[:120] or "สำนักงานใหญ่")
+    if phone is not None:
+        sets.append("phone = %s")
+        params.append((phone or "").strip()[:50] or None)
+    if vat_registered is not None:
+        sets.append("vat_registered = %s")
+        params.append(bool(vat_registered))
     if not sets:
         return False
     sets.append("updated_at = NOW()")

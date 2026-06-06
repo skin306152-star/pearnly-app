@@ -111,6 +111,15 @@ function openWsClientModal(ws: any) {
         (ws && ws.name) || '';
     (document.getElementById('wsclient-input-tax') as HTMLInputElement).value =
         (ws && ws.tax_id) || '';
+    (document.getElementById('wsclient-input-address') as HTMLInputElement).value =
+        (ws && ws.address) || '';
+    (document.getElementById('wsclient-input-branch') as HTMLInputElement).value =
+        (ws && ws.branch) || '';
+    (document.getElementById('wsclient-input-phone') as HTMLInputElement).value =
+        (ws && ws.phone) || '';
+    (document.getElementById('wsclient-input-vat') as HTMLInputElement).checked = ws
+        ? ws.vat_registered !== false
+        : true;
     document.getElementById('wsclient-modal-archive')!.style.display = ws ? '' : 'none';
     document.getElementById('wsclient-modal-mask')!.style.display = 'flex';
     setTimeout(() => document.getElementById('wsclient-input-name')!.focus(), 50);
@@ -124,21 +133,38 @@ function closeWsClientModal() {
 async function saveWsClient() {
     const name = (document.getElementById('wsclient-input-name') as HTMLInputElement).value.trim();
     const tax = (document.getElementById('wsclient-input-tax') as HTMLInputElement).value.trim();
+    const address = (
+        document.getElementById('wsclient-input-address') as HTMLInputElement
+    ).value.trim();
+    const branch = (
+        document.getElementById('wsclient-input-branch') as HTMLInputElement
+    ).value.trim();
+    const phone = (
+        document.getElementById('wsclient-input-phone') as HTMLInputElement
+    ).value.trim();
+    const vatRegistered = (document.getElementById('wsclient-input-vat') as HTMLInputElement)
+        .checked;
     if (!name) {
         showToast(t('client-msg-name-required'), 'fail');
         return;
     }
+    const seller = {
+        address: address || null,
+        branch: branch || null,
+        phone: phone || null,
+        vat_registered: vatRegistered,
+    };
     try {
         if (S.editingWsClientId) {
             await apiClient('/api/workspace/clients/' + S.editingWsClientId, {
                 method: 'PATCH',
-                body: JSON.stringify({ name, tax_id: tax }),
+                body: JSON.stringify({ name, tax_id: tax, ...seller }),
             });
             showToast(t('client-msg-updated'), 'success');
         } else {
             await apiClient('/api/workspace/clients', {
                 method: 'POST',
-                body: JSON.stringify({ name, tax_id: tax || null }),
+                body: JSON.stringify({ name, tax_id: tax || null, ...seller }),
             });
             showToast(t('client-msg-created'), 'success');
         }

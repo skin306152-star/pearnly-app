@@ -96,6 +96,21 @@ const WSCLIENT_HTML = `
                     <label data-i18n="wsclient-field-tax">税号</label>
                     <input type="text" id="wsclient-input-tax" maxlength="30">
                 </div>
+                <div class="form-row">
+                    <label data-i18n="wsclient-field-address">地址</label>
+                    <input type="text" id="wsclient-input-address" maxlength="500" data-i18n-placeholder="wsclient-field-address-ph" placeholder="开票地址(印在税票上)">
+                </div>
+                <div class="form-row">
+                    <label data-i18n="wsclient-field-branch">总公司 / 分公司</label>
+                    <input type="text" id="wsclient-input-branch" maxlength="120" data-i18n-placeholder="wsclient-field-branch-ph" placeholder="สำนักงานใหญ่(总公司)或 สาขาที่ 1">
+                </div>
+                <div class="form-row">
+                    <label data-i18n="wsclient-field-phone">电话</label>
+                    <input type="text" id="wsclient-input-phone" maxlength="50">
+                </div>
+                <div class="form-row form-row-check">
+                    <label class="wsclient-check"><input type="checkbox" id="wsclient-input-vat" checked> <span data-i18n="wsclient-field-vat">已注册 VAT(可开税务发票)</span></label>
+                </div>
                 <div class="wsclient-modal-note" data-i18n="wsclient-note">账套主体 = 你的公司(发票卖方)。它和右上角切换器、登录弹窗共用,这里改了那边同步。</div>
             </div>
             <div class="modal-footer">

@@ -31,6 +31,11 @@ class WorkspaceClientCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200, description="账套主体公司名")
     tax_id: Optional[str] = Field(None, description="税号(可选)")
     erp_endpoint_id: Optional[str] = Field(None, description="绑定的已有 ERP endpoint id(可选)")
+    # 开票方资料(销项 PO-6 · 出合规税票用)
+    address: Optional[str] = Field(None, max_length=500, description="地址")
+    branch: Optional[str] = Field(None, max_length=120, description="总公司/分公司")
+    phone: Optional[str] = Field(None, max_length=50, description="电话")
+    vat_registered: Optional[bool] = Field(None, description="是否注册 VAT")
 
 
 class WorkspaceEndpointBind(BaseModel):
@@ -42,6 +47,10 @@ class WorkspaceEndpointBind(BaseModel):
 class WorkspaceClientUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=200, description="账套主体公司名")
     tax_id: Optional[str] = Field(None, description="税号(可选 · 空串=清空)")
+    address: Optional[str] = Field(None, max_length=500, description="地址")
+    branch: Optional[str] = Field(None, max_length=120, description="总公司/分公司")
+    phone: Optional[str] = Field(None, max_length=50, description="电话")
+    vat_registered: Optional[bool] = Field(None, description="是否注册 VAT")
 
 
 @router.get("/api/workspace/clients")
@@ -73,6 +82,10 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
         req.name,
         tax_id=req.tax_id,
         erp_endpoint_id=req.erp_endpoint_id,
+        address=req.address,
+        branch=req.branch,
+        phone=req.phone,
+        vat_registered=req.vat_registered if req.vat_registered is not None else True,
     )
     if not wid:
         raise HTTPException(400, detail="workspace.create_failed")

@@ -18,6 +18,7 @@ EXPECTED = {
     ("GET", "/api/sales/products"),
     ("POST", "/api/sales/products"),
     ("GET", "/api/sales/products/lookup"),
+    ("POST", "/api/sales/products/import"),
     ("GET", "/api/sales/products/{product_id}"),
     ("PATCH", "/api/sales/products/{product_id}"),
     ("DELETE", "/api/sales/products/{product_id}"),

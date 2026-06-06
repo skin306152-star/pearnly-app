@@ -10,11 +10,12 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
+from services.sales import product_import
 from services.sales import products as products_dal
 
 logger = logging.getLogger("mr-pilot")
@@ -122,6 +123,29 @@ async def api_lookup_product(
     if not row:
         raise HTTPException(404, detail="sales.product_not_found")
     return {"product": _out(row)}
+
+
+@router.post("/import")
+async def api_import_products(request: Request, file: UploadFile = File(...)):
+    """Excel 批量导入:解析 → 行校验 → 入库可入库行 · 返回入库数 + 行级错误。"""
+    tid = _require_tenant(request)
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, detail="sales.empty_file")
+    try:
+        valid, errors = product_import.parse_workbook(data)
+    except ValueError as e:
+        raise HTTPException(400, detail=f"sales.import_{e}")
+    created = 0
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        for rec in valid:
+            try:
+                products_dal.create_product(cur, tenant_id=tid, fields=rec)
+                created += 1
+            except Exception as e:  # 单行入库失败不连累整批
+                logger.warning("[product_import] row insert failed: %s", e)
+                errors.append({"row": "?", "error": "db_insert_failed"})
+    return {"ok": True, "created": created, "skipped": len(errors), "errors": errors[:100]}
 
 
 @router.get("/{product_id}")

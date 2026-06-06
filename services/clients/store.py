@@ -296,9 +296,10 @@ def create_client(user_id: str, tenant_id: Optional[str], name: str, **kwargs) -
         with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
-                INSERT INTO clients (user_id, tenant_id, name, short_name, tax_id, 
-                    address, contact_person, contact_phone, contact_email, notes, color)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO clients (user_id, tenant_id, name, short_name, tax_id,
+                    address, contact_person, contact_phone, contact_email, notes, color,
+                    party_type, branch, promptpay_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """,
                 (
@@ -313,6 +314,10 @@ def create_client(user_id: str, tenant_id: Optional[str], name: str, **kwargs) -
                     (kwargs.get("contact_email") or "").strip()[:200] or None,
                     (kwargs.get("notes") or "").strip()[:1000] or None,
                     kwargs.get("color") or "#3b82f6",
+                    # 买方目录字段(docs/16 §N · 向导预填买方块):类型/分店/PromptPay。
+                    (kwargs.get("party_type") or "").strip()[:20] or None,
+                    (kwargs.get("branch") or "").strip()[:120] or None,
+                    (kwargs.get("promptpay_id") or "").strip()[:40] or None,
                 ),
             )
             return cur.fetchone()["id"]
@@ -338,6 +343,10 @@ def update_client(user_id: str, client_id: int, tenant_id: Optional[str] = None,
         "notes",
         "color",
         "is_active",
+        # 买方目录字段(docs/16 §N)。
+        "party_type",
+        "branch",
+        "promptpay_id",
     ]
     updates = []
     params = []
@@ -358,6 +367,9 @@ def update_client(user_id: str, client_id: int, tenant_id: Optional[str] = None,
                     "contact_email": 200,
                     "notes": 1000,
                     "color": 20,
+                    "party_type": 20,
+                    "branch": 120,
+                    "promptpay_id": 40,
                 }
                 if k in limits:
                     v = v[: limits[k]] or None

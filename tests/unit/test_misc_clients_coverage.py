@@ -302,7 +302,19 @@ class CreateClientTests(unittest.TestCase):
         cur = _FakeCursor(one_seq=[{"id": 1}])
         with _patch(cur):
             store.create_client("u1", None, "Acme")
-        self.assertEqual(cur.executed[0][1][-1], "#3b82f6")
+        # color 是第 11 个参数(index 10);其后是买方目录字段 party_type/branch/promptpay_id。
+        self.assertEqual(cur.executed[0][1][10], "#3b82f6")
+
+    def test_buyer_directory_fields_persist(self):
+        cur = _FakeCursor(one_seq=[{"id": 1}])
+        with _patch(cur):
+            store.create_client(
+                "u1", None, "Acme", party_type="company", branch="HQ", promptpay_id="0812345678"
+            )
+        params = cur.executed[0][1]
+        self.assertIn("company", params)
+        self.assertIn("HQ", params)
+        self.assertIn("0812345678", params)
 
     def test_exception_returns_none(self):
         with _patch(_ExplodingCursor()):

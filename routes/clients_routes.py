@@ -49,6 +49,12 @@ def _tid(user: dict) -> Optional[str]:
     return str(tid) if tid else None
 
 
+# 买方目录字段(docs/16 §N):party_type 买方类型 / branch 分店 / promptpay_id · 开票向导预填买方块。
+_PARTY_TYPE = Field(None, max_length=20, description="company|individual|foreigner|anonymous")
+_BRANCH = Field(None, max_length=120)
+_PROMPTPAY = Field(None, max_length=40)
+
+
 class ClientCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     short_name: Optional[str] = Field(None, max_length=80)
@@ -59,6 +65,9 @@ class ClientCreateRequest(BaseModel):
     contact_email: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = Field(None, max_length=1000)
     color: Optional[str] = Field(None, max_length=20)
+    party_type: Optional[str] = _PARTY_TYPE
+    branch: Optional[str] = _BRANCH
+    promptpay_id: Optional[str] = _PROMPTPAY
 
 
 class ClientUpdateRequest(BaseModel):
@@ -72,6 +81,9 @@ class ClientUpdateRequest(BaseModel):
     notes: Optional[str] = Field(None, max_length=1000)
     color: Optional[str] = Field(None, max_length=20)
     is_active: Optional[bool] = None
+    party_type: Optional[str] = _PARTY_TYPE
+    branch: Optional[str] = _BRANCH
+    promptpay_id: Optional[str] = _PROMPTPAY
 
 
 def _serialize_client(c: dict) -> dict:
@@ -87,6 +99,9 @@ def _serialize_client(c: dict) -> dict:
         "contact_email": c.get("contact_email"),
         "notes": c.get("notes"),
         "color": c.get("color") or "#3b82f6",
+        "party_type": c.get("party_type"),
+        "branch": c.get("branch"),
+        "promptpay_id": c.get("promptpay_id"),
         "is_active": bool(c.get("is_active")),
         "invoice_count": int(c.get("invoice_count") or 0),
         "total_amount": float(c.get("total_amount") or 0),

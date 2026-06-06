@@ -127,6 +127,31 @@ check_line_ratchet 全绿(已加 5 个 RATCHET-EXEMPT·新功能合理增长)·i
 6. L4 模板后端管道 7. `sales_settings`(并激活 approval_mode)+ clients/workspace_clients 补字段
 8. PO-7 邮件发送 9. PO-10 前端。
 
+## 2026-06-06(续2)· §M4-7 后端全上线 prod + 真库 E2E 全过(HEAD 4bb523c)
+
+**做了什么**(迁移 0014-0017 · prod alembic 推到 0017):
+- §M4 E3 留底:`pdf_sha256`/`pdf_url`(0014)· 开票/红冲确定性渲染(invariant 画布)规范存档件
+  取 sha256 写回 · 可复算核验未篡改(渲染失败兜底不阻断 · 助手 `services/sales/archive.py`)
+  + 热敏 80/58mm 窄版 `services/sales/pdf_thermal.py`(单列自适应纸高)。
+- §M5:L1 PromptPay `services/sales/promptpay.py`(EMVCo+CRC16+qrcode PNG · `GET /{id}/promptpay-qr`)
+  · 新依赖 `qrcode==8.2` 已装进 prod venv;L2 WHT 多档 `services/sales/wht.py`+持久化 `wht_rate`(0015);
+  L3 报价转换 `services/sales/quotation.py` · `POST /{id}/convert`。
+- §M6 L4 模板:`services/sales/templates.py` 6 套预设 · pdf 套强调色/表格线/页脚 · 品牌随
+  `parties_snapshot.seller` 冻结(0016 给 workspace_clients 加品牌/模板列)。
+- §M7 `services/sales/settings.py` + `routes/sales_settings_routes.py`(`GET/PUT /api/sales/settings`
+  · 0017)· **审批已激活**(issue/approve 读 `settings.approval_mode` · none 默认行为不变)·
+  连号 prefix/reset/`number_start`(接旧账本)取设置默认 · clients 加 party_type/branch/promptpay_id。
+- 整理:路由模型抽 `routes/sales_schemas.py`;存档哈希抽 `archive.py`(保各文件 <500)。
+
+**验证**:本地 tests/unit **2495 OK** · ruff/black/check_ai_smell/check_file_size/check_line_ratchet 全绿
+(18 个 RATCHET-EXEMPT)· import app OK · pre-push 全绿已 push。**prod 真库 E2E 13 项全过零残留**:
+审批激活(single→approval_required→提交→批准 issued+approved_by)· number_start 种子(E2ETEST2026-05000)·
+wht_rate 持久化 3.00 · pdf_sha256 留底+复算匹配 · 品牌随快照冻结 · 热敏渲染 · PromptPay payload/CRC/PNG ·
+报价转换。详见 [[sales-mhz-blocks-and-prod-ops]]。
+
+**下一棒**:8. PO-7 邮件发送(**LINE=高敏·留 Zihao 在场**·铁律#26)· 9. PO-10 前端
+(**并行窗口进行中** · `src/home/sales-{workbench,detail,common}.ts`+`home-39-sales.css` 未提交 · 别动)。
+
 ## 变更日志
 
 - 2026-06-04 · 建沙盒 · 调研 15 图 + 定调 + 铺全套设计文档与 schema 草案。

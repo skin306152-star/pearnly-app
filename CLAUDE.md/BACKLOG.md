@@ -1919,7 +1919,7 @@ function _openBankDrawer(sessionId) {
   - 风险:高 · 单独部署窗口 · 预计半天
 
 - [ ] **admin LINE 告警**（撤销过 · 留代码框架）
-  - 决定专门建告警 LINE Bot 还是用现有 `@059oupmg`
+  - 决定专门建告警 LINE Bot 还是用现有 `@pearnly`
   - 复活 `services/alerts.py`（git history 可找）
   - DB 表 `monitoring_alerts_config` 已撤 · 重新加
 

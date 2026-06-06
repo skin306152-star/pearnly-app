@@ -19,8 +19,12 @@ class NoteCursor:
         self.note_doc_type = None
 
     def execute(self, sql, params=None):
-        if sql.startswith("SELECT status FROM sales_documents"):
-            self._last = None if self.original_status is None else {"status": self.original_status}
+        if sql.startswith("SELECT status, price_includes_vat FROM sales_documents"):
+            self._last = (
+                None
+                if self.original_status is None
+                else {"status": self.original_status, "price_includes_vat": False}
+            )
         elif sql.startswith("INSERT INTO document_number_sequences"):
             self.seq.setdefault(tuple(params[:4]), 1)
             self.note_doc_type = params[1]

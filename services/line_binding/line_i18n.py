@@ -17,15 +17,13 @@ LINE_I18N = {
             "LINE:{display_name}\n\n"
             "现在可以:\n"
             "📸 发发票/收据照片或 PDF → 自动识别入账\n"
-            "🧾 发一句「ค่าน้ำ 50」→ 自动记一笔并分类\n"
-            "💬 需要人工 → 回复「人工」"
+            "🧾 发一句「ค่าน้ำ 50」→ 自动记一笔并分类"
         ),
         "already_bound_hint": (
             "Hi {username} 👋 我能帮你:\n"
             "📸 发发票/收据照片或 PDF → 自动识别、查重、入账\n"
             "💡 拍全张、光线清晰,识别最准\n"
             "🧾 发一句「ค่าน้ำ 50」→ 自动记一笔并归类到凭证中心\n"
-            "💬 需要人工 → 回复「人工」\n"
             "🔗 完整功能在 pearnly.com"
         ),
         "need_bind": (
@@ -43,10 +41,8 @@ LINE_I18N = {
         ),
         "unsupported": (
             "我能识别发票/收据:图片 / PDF / Excel / CSV / Word / TXT\n"
-            "也可发一句文字记账,如「ค่าน้ำ 50」\n"
-            "需要人工 → 回复「人工」"
+            "也可发一句文字记账,如「ค่าน้ำ 50」"
         ),
-        "agent_ack": "🙋 正在为你转接人工 · 我们的团队会尽快回复(周一–周五 9:00–18:00)",
     },
     "en": {
         "bind_invalid": "❌ Invalid or expired code\nGet a new one at pearnly.com",
@@ -60,15 +56,13 @@ LINE_I18N = {
             "LINE: {display_name}\n\n"
             "You can now:\n"
             "📸 Send a photo/PDF of an invoice or receipt → auto-read & recorded\n"
-            "🧾 Type 'Water 50' → auto-logged and categorized\n"
-            "💬 Need a human → type 'agent'"
+            "🧾 Type 'Water 50' → auto-logged and categorized"
         ),
         "already_bound_hint": (
             "Hi {username} 👋 Here's what I can do:\n"
             "📸 Send a photo/PDF of an invoice or receipt → read, de-duplicate, record\n"
             "💡 Tip: capture the full document in good light for best accuracy\n"
             "🧾 Type 'Water 50' → auto-logged to your voucher center, categorized\n"
-            "💬 Need a human → type 'agent'\n"
             "🔗 Full features at pearnly.com"
         ),
         "need_bind": (
@@ -86,10 +80,8 @@ LINE_I18N = {
         ),
         "unsupported": (
             "I can read invoices/receipts: photos / PDF / Excel / CSV / Word / TXT\n"
-            "Or type an expense like 'Water 50'\n"
-            "Need a human → type 'agent'"
+            "Or type an expense like 'Water 50'"
         ),
-        "agent_ack": "🙋 Connecting you to our team · we'll reply shortly (Mon–Fri 9:00–18:00)",
     },
     "th": {
         "bind_invalid": "❌ รหัสไม่ถูกต้องหรือหมดอายุ\nกรุณารับรหัสใหม่ที่ pearnly.com",
@@ -103,15 +95,13 @@ LINE_I18N = {
             "LINE: {display_name}\n\n"
             "ตอนนี้ทำได้เลย:\n"
             "📸 ส่งรูป/PDF ใบกำกับหรือใบเสร็จ → อ่านและบันทึกอัตโนมัติ\n"
-            "🧾 พิมพ์ 'ค่าน้ำ 50' → บันทึกและจัดหมวดให้อัตโนมัติ\n"
-            "💬 ต้องการเจ้าหน้าที่ → พิมพ์ 'เจ้าหน้าที่'"
+            "🧾 พิมพ์ 'ค่าน้ำ 50' → บันทึกและจัดหมวดให้อัตโนมัติ"
         ),
         "already_bound_hint": (
             "สวัสดี {username} 👋 Pearnly ช่วยคุณได้:\n"
             "📸 ส่งรูป/PDF ใบกำกับหรือใบเสร็จ → อ่าน ตรวจซ้ำ และบันทึกอัตโนมัติ\n"
             "💡 เคล็ดลับ: ถ่ายให้เห็นเต็มใบ แสงชัดเจน เพื่อความแม่นยำสูงสุด\n"
             "🧾 พิมพ์ 'ค่าน้ำ 50' → บันทึกและจัดหมวดเข้าศูนย์ใบสำคัญ\n"
-            "💬 ต้องการเจ้าหน้าที่ → พิมพ์ 'เจ้าหน้าที่'\n"
             "🔗 ฟีเจอร์ทั้งหมดที่ pearnly.com"
         ),
         "need_bind": (
@@ -129,10 +119,8 @@ LINE_I18N = {
         ),
         "unsupported": (
             "รองรับใบกำกับ/ใบเสร็จ: รูป / PDF / Excel / CSV / Word / TXT\n"
-            "หรือพิมพ์บันทึกค่าใช้จ่าย เช่น 'ค่าน้ำ 50'\n"
-            "ต้องการเจ้าหน้าที่ → พิมพ์ 'เจ้าหน้าที่'"
+            "หรือพิมพ์บันทึกค่าใช้จ่าย เช่น 'ค่าน้ำ 50'"
         ),
-        "agent_ack": "🙋 กำลังโอนสายให้เจ้าหน้าที่ · ทีมงานจะตอบกลับโดยเร็ว (จันทร์–ศุกร์ 9:00–18:00)",
     },
     "ja": {
         "bind_invalid": "❌ コードが無効または期限切れです\npearnly.com で新しいコードを取得してください",
@@ -146,15 +134,13 @@ LINE_I18N = {
             "LINE: {display_name}\n\n"
             "これで使えます:\n"
             "📸 請求書・領収書の写真/PDF → 自動で読み取り・記帳\n"
-            "🧾 「水道 50」と入力 → 自動で記録・仕分け\n"
-            "💬 オペレーター希望 → 「オペレーター」と入力"
+            "🧾 「水道 50」と入力 → 自動で記録・仕分け"
         ),
         "already_bound_hint": (
             "こんにちは {username} 👋 Pearnly でできること:\n"
             "📸 請求書・領収書の写真/PDF → 読み取り・重複チェック・記帳\n"
             "💡 コツ: 書類全体を明るく撮ると精度が上がります\n"
             "🧾 「水道 50」と入力 → 証憑センターへ自動記録・仕分け\n"
-            "💬 オペレーター希望 → 「オペレーター」と入力\n"
             "🔗 全機能は pearnly.com"
         ),
         "need_bind": (
@@ -172,10 +158,8 @@ LINE_I18N = {
         ),
         "unsupported": (
             "対応: 請求書・領収書の 写真 / PDF / Excel / CSV / Word / TXT\n"
-            "または「水道 50」のように入力して記帳\n"
-            "オペレーター希望 → 「オペレーター」と入力"
+            "または「水道 50」のように入力して記帳"
         ),
-        "agent_ack": "🙋 オペレーターにおつなぎします · 担当者より順次ご返信します(月–金 9:00–18:00)",
     },
 }
 

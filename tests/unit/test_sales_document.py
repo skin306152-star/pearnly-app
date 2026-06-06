@@ -88,6 +88,44 @@ class DiscountTests(unittest.TestCase):
         self.assertIsNone(t["header_discount_pct"])
 
 
+class PriceIncludesVatTests(unittest.TestCase):
+    """§C 价内含税:VAT 从含税额反算单列,grand 不变;默认价外保持原行为。"""
+
+    def test_default_is_exclusive(self):
+        t = doc.compute_totals([{"qty": 1, "unit_price": "100"}], vat_rate=7)
+        self.assertFalse(t["price_includes_vat"])
+        self.assertEqual(t["vat_amount"], Decimal("7.00"))
+        self.assertEqual(t["grand_total"], Decimal("107.00"))
+
+    def test_inclusive_extracts_vat(self):
+        t = doc.compute_totals(
+            [{"qty": 1, "unit_price": "107"}], vat_rate=7, price_includes_vat=True
+        )
+        self.assertTrue(t["price_includes_vat"])
+        self.assertEqual(t["subtotal"], Decimal("107.00"))  # 含税额(录入价)
+        self.assertEqual(t["vat_amount"], Decimal("7.00"))  # 107 * 7/107
+        self.assertEqual(t["subtotal_after"], Decimal("100.00"))  # 不含税净额
+        self.assertEqual(t["grand_total"], Decimal("107.00"))  # 含税总额不变
+
+    def test_inclusive_with_line_discount(self):
+        t = doc.compute_totals(
+            [{"qty": 1, "unit_price": "107", "discount_pct": "10"}],
+            vat_rate=7,
+            price_includes_vat=True,
+        )
+        self.assertEqual(t["subtotal"], Decimal("96.30"))  # 107 - 10.70
+        self.assertEqual(t["vat_amount"], Decimal("6.30"))  # 96.30 * 7/107
+        self.assertEqual(t["grand_total"], Decimal("96.30"))
+
+    def test_inclusive_with_wht(self):
+        t = doc.compute_totals(
+            [{"qty": 1, "unit_price": "107"}], vat_rate=7, wht_rate=3, price_includes_vat=True
+        )
+        self.assertEqual(t["vat_amount"], Decimal("7.00"))
+        self.assertEqual(t["wht_amount"], Decimal("3.00"))  # 100(净) * 3%
+        self.assertEqual(t["grand_total"], Decimal("104.00"))  # 107 - 3 WHT
+
+
 class SeqCursor:
     """模拟 document_number_sequences 的取号事务,验证连号不跳。"""
 

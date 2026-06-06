@@ -63,6 +63,39 @@ def _discount_cell(ln: dict) -> str:
     return _money(disc)
 
 
+def _dec(v) -> Decimal:
+    return Decimal(str(v if v is not None else 0))
+
+
+def _total_rows(doc: dict) -> list:
+    """合计区行 [label, value]。价外(默认)= 净额 + VAT 加总;价内(§C)= 标注含税并把
+    VAT 从含税额里反算单列(票面仍单独列税额)。"""
+    cur = doc.get("currency") or "THB"
+    vat_rate = _money(doc.get("vat_rate"))
+    subtotal = _dec(doc.get("subtotal"))
+    header_disc = _dec(doc.get("header_discount_amount"))
+    vat = _dec(doc.get("vat_amount"))
+    wht = _dec(doc.get("wht_amount"))
+    grand = doc.get("grand_total")
+
+    if doc.get("price_includes_vat"):
+        net = subtotal - header_disc - vat
+        rows = [["รวมเป็นเงิน (รวมภาษี) / Total (VAT incl.)", _money(subtotal)]]
+        if header_disc != 0:
+            rows.append(["ส่วนลดท้ายบิล / Discount", "-" + _money(header_disc)])
+        rows.append(["มูลค่าก่อนภาษี / Net (VAT excl.)", _money(net)])
+        rows.append([f"ภาษีมูลค่าเพิ่ม / VAT {vat_rate}% (รวมในราคา/incl.)", _money(vat)])
+    else:
+        rows = [["มูลค่า / Subtotal", _money(subtotal)]]
+        if header_disc != 0:
+            rows.append(["ส่วนลดท้ายบิล / Discount", "-" + _money(header_disc)])
+        rows.append([f"ภาษีมูลค่าเพิ่ม / VAT {vat_rate}%", _money(vat)])
+    if wht != 0:
+        rows.append(["หัก ณ ที่จ่าย / WHT", "-" + _money(wht)])
+    rows.append([f"รวมทั้งสิ้น / Grand Total ({cur})", _money(grand)])
+    return rows
+
+
 def _buyer_branch_text(b: dict) -> str:
     """公司买方的总公司/分店标识(§86/4 第 13 项强制字段)。"""
     if b.get("branch_type") == "branch" and b.get("branch_no"):
@@ -227,18 +260,7 @@ def render_invoice_pdf(
     story.append(items)
     story.append(Spacer(1, 3 * mm))
 
-    cur = doc.get("currency") or "THB"
-    total_rows = [["มูลค่า / Subtotal", _money(doc.get("subtotal"))]]
-    if Decimal(str(doc.get("header_discount_amount") or 0)) != 0:
-        total_rows.append(
-            ["ส่วนลดท้ายบิล / Discount", "-" + _money(doc.get("header_discount_amount"))]
-        )
-    total_rows.append(
-        [f"ภาษีมูลค่าเพิ่ม / VAT {_money(doc.get('vat_rate'))}%", _money(doc.get("vat_amount"))]
-    )
-    if Decimal(str(doc.get("wht_amount") or 0)) != 0:
-        total_rows.append(["หัก ณ ที่จ่าย / WHT", "-" + _money(doc.get("wht_amount"))])
-    total_rows.append([f"รวมทั้งสิ้น / Grand Total ({cur})", _money(doc.get("grand_total"))])
+    total_rows = _total_rows(doc)
     trows = [
         [P(a, align=TA_RIGHT), P(b, b=(i == len(total_rows) - 1), align=TA_RIGHT)]
         for i, (a, b) in enumerate(total_rows)

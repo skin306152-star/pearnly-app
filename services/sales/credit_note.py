@@ -44,7 +44,7 @@ def create_note(
     if note_type not in NOTE_TYPES:
         return None, "bad_note_type"
     cur.execute(
-        "SELECT status FROM sales_documents WHERE tenant_id=%s AND id=%s",
+        "SELECT status, price_includes_vat FROM sales_documents WHERE tenant_id=%s AND id=%s",
         (tenant_id, original_id),
     )
     row = cur.fetchone()
@@ -53,7 +53,9 @@ def create_note(
     if row["status"] != doc_svc.STATUS_ISSUED:
         return None, "original_not_issued"
 
-    t = doc_svc.compute_totals(lines, vat_rate=vat_rate, wht_rate=wht_rate)
+    t = doc_svc.compute_totals(
+        lines, vat_rate=vat_rate, wht_rate=wht_rate, price_includes_vat=row["price_includes_vat"]
+    )
     use_prefix = prefix or _NOTE_PREFIX[note_type]
     doc_number, _ = numbering.allocate(
         cur, tenant_id=tenant_id, doc_type=note_type, prefix=use_prefix, reset=reset, on=on
@@ -63,12 +65,12 @@ def create_note(
     cur.execute(
         "INSERT INTO sales_documents (tenant_id, doc_type, doc_number, client_id, issue_date, "
         "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_amount, "
-        "grand_total, issued_at, created_by, references_document_id, reference_reason, "
-        "parties_snapshot, buyer_type, buyer_name, buyer_address, buyer_tax_id, "
+        "grand_total, price_includes_vat, issued_at, created_by, references_document_id, "
+        "reference_reason, parties_snapshot, buyer_type, buyer_name, buyer_address, buyer_tax_id, "
         "buyer_branch_type, buyer_branch_no) "
-        "SELECT %s, %s, %s, client_id, %s, 'issued', currency, %s, %s, %s, %s, %s, %s, now(), "
-        "%s, id, %s, parties_snapshot, buyer_type, buyer_name, buyer_address, buyer_tax_id, "
-        "buyer_branch_type, buyer_branch_no FROM sales_documents "
+        "SELECT %s, %s, %s, client_id, %s, 'issued', currency, %s, %s, %s, %s, %s, %s, "
+        "price_includes_vat, now(), %s, id, %s, parties_snapshot, buyer_type, buyer_name, "
+        "buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no FROM sales_documents "
         "WHERE tenant_id=%s AND id=%s RETURNING id",
         (
             tenant_id,

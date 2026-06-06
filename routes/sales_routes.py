@@ -92,6 +92,7 @@ class DocumentIn(BaseModel):
     wht_rate: float = Field(0, ge=0, le=100)
     header_discount_amount: float = Field(0, ge=0)
     header_discount_pct: float = Field(0, ge=0, le=100)
+    price_includes_vat: bool = Field(False, description="价内含税(§C·单据级·默认价外)")
     due_date: Optional[str] = Field(None, description="YYYY-MM-DD · 账期到期日")
     payment_terms: Optional[str] = Field(None, max_length=200)
     lines: list[LineIn] = Field(..., min_length=1)
@@ -189,6 +190,7 @@ def _doc_out(d: dict) -> dict:
         "header_discount_pct": _m(d.get("header_discount_pct")),
         "vat_rate": _m(d.get("vat_rate")),
         "vat_amount": _m(d.get("vat_amount")),
+        "price_includes_vat": bool(d.get("price_includes_vat")),
         "wht_amount": _m(d.get("wht_amount")),
         "grand_total": _m(d.get("grand_total")),
         "issued_at": d["issued_at"].isoformat() if d.get("issued_at") else None,
@@ -270,6 +272,7 @@ async def api_create_document(req: DocumentIn, request: Request):
             payment=_payment_payload(p.get("payment")),
             header_discount_amount=p["header_discount_amount"],
             header_discount_pct=p["header_discount_pct"],
+            price_includes_vat=p["price_includes_vat"],
             due_date=_opt_date(p.get("due_date")),
             payment_terms=p.get("payment_terms"),
         )
@@ -334,6 +337,7 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
             payment=_payment_payload(p.get("payment")),
             header_discount_amount=p["header_discount_amount"],
             header_discount_pct=p["header_discount_pct"],
+            price_includes_vat=p["price_includes_vat"],
             due_date=_opt_date(p.get("due_date")),
             payment_terms=p.get("payment_terms"),
         )

@@ -105,6 +105,18 @@ class PdfRenderTests(unittest.TestCase):
         d["lines"][0]["discount_pct"] = "10"
         self.assertTrue(pdf.render_invoice_pdf(d, _SELLER, _BUYER).startswith(b"%PDF"))
 
+    def test_price_inclusive_total_rows(self):
+        """§C 价内:合计区标注含税 + 反算净额,且仍单列 VAT。"""
+        doc = dict(_DOC, price_includes_vat=True, subtotal="107.00", grand_total="107.00")
+        labels = [r[0] for r in pdf._total_rows(doc)]
+        self.assertTrue(any("incl." in lb for lb in labels))
+        self.assertTrue(any("Net (VAT excl.)" in lb for lb in labels))
+        self.assertTrue(pdf.render_invoice_pdf(doc, _SELLER, _BUYER).startswith(b"%PDF"))
+
+    def test_price_exclusive_total_rows_default(self):
+        rows = pdf._total_rows(_DOC)
+        self.assertIn("มูลค่า / Subtotal", rows[0][0])
+
     def test_combined_doc_with_payment_renders(self):
         doc = dict(
             _DOC,

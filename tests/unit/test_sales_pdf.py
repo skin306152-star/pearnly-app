@@ -105,6 +105,20 @@ class PdfRenderTests(unittest.TestCase):
         d["lines"][0]["discount_pct"] = "10"
         self.assertTrue(pdf.render_invoice_pdf(d, _SELLER, _BUYER).startswith(b"%PDF"))
 
+    def test_two_up_renders_single_page_pdf(self):
+        """§E2 省纸:正副本同页,返回有效 PDF。"""
+        data = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, copies_layout="two_up")
+        self.assertTrue(data.startswith(b"%PDF"))
+        self.assertGreater(len(data), 800)
+
+    def test_two_up_a5_renders(self):
+        data = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, page="A5", copies_layout="two_up")
+        self.assertTrue(data.startswith(b"%PDF"))
+
+    def test_separate_layout_is_default(self):
+        data = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, copies_layout="separate")
+        self.assertTrue(data.startswith(b"%PDF"))
+
     def test_price_inclusive_total_rows(self):
         """§C 价内:合计区标注含税 + 反算净额,且仍单列 VAT。"""
         doc = dict(_DOC, price_includes_vat=True, subtotal="107.00", grand_total="107.00")

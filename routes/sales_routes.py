@@ -290,10 +290,17 @@ async def api_get_document(doc_id: str, request: Request):
 
 
 @router.get("/{doc_id}/pdf")
-async def api_document_pdf(doc_id: str, request: Request, page: str = "A4", copy: str = "original"):
+async def api_document_pdf(
+    doc_id: str,
+    request: Request,
+    page: str = "A4",
+    copy: str = "original",
+    copies_layout: str = "separate",
+):
     """生成合规 PDF(卖方账套 + 买方客户 + 明细 · VAT 分列 · 连号)。
 
-    page=A4|A5(§E1)· copy=original|copy(正本给买方 / 副本自留 · §E2)。
+    page=A4|A5(§E1)· copy=original|copy(正本给买方 / 副本自留 · §E2)·
+    copies_layout=separate|two_up(省纸:正副本同页 · §E2)。
     """
     tid, _ = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
@@ -307,8 +314,10 @@ async def api_document_pdf(doc_id: str, request: Request, page: str = "A4", copy
     body["payment_method"] = doc.get("payment_method")
     body["paid_amount"] = _m(doc.get("paid_amount"))
     body["payment_date"] = doc["payment_date"].isoformat() if doc.get("payment_date") else None
-    data = pdf_svc.render_invoice_pdf(body, seller, buyer, page=page, copy_kind=copy)
-    suffix = "" if copy == "original" else "_copy"
+    data = pdf_svc.render_invoice_pdf(
+        body, seller, buyer, page=page, copy_kind=copy, copies_layout=copies_layout
+    )
+    suffix = "_set" if copies_layout == "two_up" else ("" if copy == "original" else "_copy")
     filename = (doc.get("doc_number") or "document").replace("/", "_") + suffix
     return Response(
         content=data,

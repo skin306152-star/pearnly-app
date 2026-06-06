@@ -104,9 +104,20 @@ def _buyer_branch_text(b: dict) -> str:
 
 
 def render_invoice_pdf(
-    doc: dict, seller: dict, buyer: dict, *, page: str = "A4", copy_kind: str = "original"
+    doc: dict,
+    seller: dict,
+    buyer: dict,
+    *,
+    page: str = "A4",
+    copy_kind: str = "original",
+    copies_layout: str = "separate",
 ) -> bytes:
-    """渲染合规 PDF。page=A4|A5(共用布局);copy_kind=original|copy(正/副本角标·§E2)。"""
+    """渲染合规 PDF。page=A4|A5(共用布局);copy_kind=original|copy(正/副本角标·§E2)。
+
+    copies_layout(§E2 省纸):separate=单联(默认,按 copy_kind 出一联);two_up=正本+副本印
+    同一张 A4/A5,上半正本、下半副本,中间虚线裁切线(打一张撕开,上联给客户、下联自留)。
+    two_up 仅 A4/A5 适用,其余纸张回落 separate。
+    """
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     from reportlab.lib.pagesizes import A4, A5
@@ -161,7 +172,123 @@ def render_invoice_pdf(
             cell.append(P(_buyer_branch_text(b)))
         return cell
 
+    def build_copy(ck):
+        """组一联的 flowable 列表(供单联渲染或省纸两联各拿一份独立实例)。"""
+        story = [
+            P(_DOC_LABEL.get(doc.get("doc_type"), doc.get("doc_type") or ""), True, TA_CENTER, 15),
+            P(_COPY_LABEL[ck], True, TA_CENTER, 9),
+            Spacer(1, 4 * mm),
+        ]
+        meta = Table(
+            [
+                [
+                    P("เลขที่ / No.: " + (doc.get("doc_number") or "-"), True),
+                    P(
+                        "วันที่ / Date: " + to_thai_date(doc.get("issue_date")) + " (พ.ศ.)",
+                        align=TA_RIGHT,
+                    ),
+                ]
+            ],
+            colWidths=cw(90, 90),
+        )
+        story.append(meta)
+        story.append(Spacer(1, 3 * mm))
+
+        if doc.get("due_date") or doc.get("payment_terms"):
+            bits = []
+            if doc.get("due_date"):
+                bits.append("ครบกำหนด / Due: " + to_thai_date(doc.get("due_date")) + " (พ.ศ.)")
+            if doc.get("payment_terms"):
+                bits.append("เงื่อนไข / Terms: " + str(doc.get("payment_terms")))
+            story.append(P("    ".join(bits)))
+            story.append(Spacer(1, 2 * mm))
+
+        parties = Table(
+            [
+                [
+                    party("ผู้ขาย / Seller", seller, "เลขประจำตัวผู้เสียภาษี / TIN"),
+                    buyer_party("ผู้ซื้อ / Buyer", buyer),
+                ]
+            ],
+            colWidths=cw(90, 90),
+        )
+        parties.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        story.append(parties)
+        story.append(Spacer(1, 4 * mm))
+
+        head = [
+            "#",
+            "รายการ / Description",
+            "จำนวน / Qty",
+            "ราคา / Price",
+            "ส่วนลด / Discount",
+            "จำนวนเงิน / Amount",
+        ]
+        rows = [[P(h, True, TA_CENTER) for h in head]]
+        for ln in doc.get("lines", []):
+            rows.append(
+                [
+                    P(ln.get("line_no"), align=TA_CENTER),
+                    P(ln.get("description")),
+                    P(_money(ln.get("qty")), align=TA_RIGHT),
+                    P(_money(ln.get("unit_price")), align=TA_RIGHT),
+                    P(_discount_cell(ln), align=TA_RIGHT),
+                    P(_money(ln.get("line_total")), align=TA_RIGHT),
+                ]
+            )
+        items = Table(rows, colWidths=cw(8, 72, 18, 24, 28, 30), repeatRows=1)
+        items.setStyle(
+            TableStyle(
+                [
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.93, 0.93, 0.93)),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
+        story.append(items)
+        story.append(Spacer(1, 3 * mm))
+
+        total_rows = _total_rows(doc)
+        trows = [
+            [P(a, align=TA_RIGHT), P(b, b=(i == len(total_rows) - 1), align=TA_RIGHT)]
+            for i, (a, b) in enumerate(total_rows)
+        ]
+        totals = Table(trows, colWidths=cw(150, 30))
+        totals.setStyle(
+            TableStyle(
+                [
+                    ("LINEABOVE", (0, -1), (-1, -1), 0.7, colors.black),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ]
+            )
+        )
+        story.append(totals)
+
+        pay = _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer)
+        if pay:
+            story.extend(pay)
+        return story
+
     buf = io.BytesIO()
+    title = doc.get("doc_number") or "document"
+    if str(copies_layout).lower() == "two_up" and str(page).upper() in ("A4", "A5"):
+        _render_two_up(buf, build_copy("original"), build_copy("copy"), pagesize, title=title)
+        return buf.getvalue()
     pdf = SimpleDocTemplate(
         buf,
         pagesize=pagesize,
@@ -169,120 +296,56 @@ def render_invoice_pdf(
         rightMargin=15 * mm,
         topMargin=15 * mm,
         bottomMargin=15 * mm,
-        title=doc.get("doc_number") or "document",
+        title=title,
     )
-    story = [
-        P(_DOC_LABEL.get(doc.get("doc_type"), doc.get("doc_type") or ""), True, TA_CENTER, 15),
-        P(_COPY_LABEL[copy_kind], True, TA_CENTER, 9),
-        Spacer(1, 4 * mm),
-    ]
-
-    meta = Table(
-        [
-            [
-                P("เลขที่ / No.: " + (doc.get("doc_number") or "-"), True),
-                P(
-                    "วันที่ / Date: " + to_thai_date(doc.get("issue_date")) + " (พ.ศ.)",
-                    align=TA_RIGHT,
-                ),
-            ]
-        ],
-        colWidths=cw(90, 90),
-    )
-    story.append(meta)
-    story.append(Spacer(1, 3 * mm))
-
-    if doc.get("due_date") or doc.get("payment_terms"):
-        bits = []
-        if doc.get("due_date"):
-            bits.append("ครบกำหนด / Due: " + to_thai_date(doc.get("due_date")) + " (พ.ศ.)")
-        if doc.get("payment_terms"):
-            bits.append("เงื่อนไข / Terms: " + str(doc.get("payment_terms")))
-        story.append(P("    ".join(bits)))
-        story.append(Spacer(1, 2 * mm))
-
-    parties = Table(
-        [
-            [
-                party("ผู้ขาย / Seller", seller, "เลขประจำตัวผู้เสียภาษี / TIN"),
-                buyer_party("ผู้ซื้อ / Buyer", buyer),
-            ]
-        ],
-        colWidths=cw(90, 90),
-    )
-    parties.setStyle(
-        TableStyle(
-            [
-                ("BOX", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ]
-        )
-    )
-    story.append(parties)
-    story.append(Spacer(1, 4 * mm))
-
-    head = [
-        "#",
-        "รายการ / Description",
-        "จำนวน / Qty",
-        "ราคา / Price",
-        "ส่วนลด / Discount",
-        "จำนวนเงิน / Amount",
-    ]
-    rows = [[P(h, True, TA_CENTER) for h in head]]
-    for ln in doc.get("lines", []):
-        rows.append(
-            [
-                P(ln.get("line_no"), align=TA_CENTER),
-                P(ln.get("description")),
-                P(_money(ln.get("qty")), align=TA_RIGHT),
-                P(_money(ln.get("unit_price")), align=TA_RIGHT),
-                P(_discount_cell(ln), align=TA_RIGHT),
-                P(_money(ln.get("line_total")), align=TA_RIGHT),
-            ]
-        )
-    items = Table(rows, colWidths=cw(8, 72, 18, 24, 28, 30), repeatRows=1)
-    items.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.93, 0.93, 0.93)),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 3),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ]
-        )
-    )
-    story.append(items)
-    story.append(Spacer(1, 3 * mm))
-
-    total_rows = _total_rows(doc)
-    trows = [
-        [P(a, align=TA_RIGHT), P(b, b=(i == len(total_rows) - 1), align=TA_RIGHT)]
-        for i, (a, b) in enumerate(total_rows)
-    ]
-    totals = Table(trows, colWidths=cw(150, 30))
-    totals.setStyle(
-        TableStyle(
-            [
-                ("LINEABOVE", (0, -1), (-1, -1), 0.7, colors.black),
-                ("TOPPADDING", (0, 0), (-1, -1), 2),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ]
-        )
-    )
-    story.append(totals)
-
-    pay = _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer)
-    if pay:
-        story.extend(pay)
-
-    pdf.build(story)
+    pdf.build(build_copy(copy_kind))
     return buf.getvalue()
+
+
+def _render_two_up(buf, original_flow, copy_flow, pagesize, *, title) -> None:
+    """正本 + 副本印同一张纸(§E2 省纸):上下两半幅 Frame,中间虚线裁切线。
+
+    每联用 KeepInFrame(mode=shrink)收进半幅,无论行数都不会顶到对联;两联内容完全一致
+    (同号同额),仅角标 ต้นฉบับ vs สำเนา 不同。打一张撕开:上联给客户、下联自留。
+    """
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        BaseDocTemplate,
+        Frame,
+        FrameBreak,
+        KeepInFrame,
+        PageTemplate,
+    )
+
+    pw, ph = pagesize
+    margin = 12 * mm
+    gap = 8 * mm
+    half = (ph - 2 * margin - gap) / 2
+    fw = pw - 2 * margin
+    top = Frame(margin, margin + half + gap, fw, half, id="top")
+    bot = Frame(margin, margin, fw, half, id="bot")
+
+    def cut_line(canvas, _doc):
+        y = margin + half + gap / 2
+        canvas.saveState()
+        canvas.setDash(3, 3)
+        canvas.setStrokeColor(colors.grey)
+        canvas.line(margin, y, pw - margin, y)
+        canvas.setFont("Helvetica", 6)
+        canvas.setFillColor(colors.grey)
+        canvas.drawCentredString(pw / 2, y + 2, "- - - - - -  cut here  - - - - - -")
+        canvas.restoreState()
+
+    pdf = BaseDocTemplate(buf, pagesize=pagesize, title=title)
+    pdf.addPageTemplates([PageTemplate(id="two_up", frames=[top, bot], onPage=cut_line)])
+    pdf.build(
+        [
+            KeepInFrame(fw, half, original_flow, mode="shrink"),
+            FrameBreak(),
+            KeepInFrame(fw, half, copy_flow, mode="shrink"),
+        ]
+    )
 
 
 def _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer):

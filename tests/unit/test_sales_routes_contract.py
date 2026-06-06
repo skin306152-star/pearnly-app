@@ -12,6 +12,8 @@ EXPECTED = {
     ("PATCH", "/api/sales/documents/{doc_id}"),
     ("POST", "/api/sales/documents/{doc_id}/issue"),
     ("POST", "/api/sales/documents/{doc_id}/void"),
+    ("POST", "/api/sales/documents/{doc_id}/credit-note"),
+    ("POST", "/api/sales/documents/{doc_id}/debit-note"),
 }
 
 

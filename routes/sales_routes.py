@@ -17,13 +17,21 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
+from services.sales import credit_note
 from services.sales import document as doc_svc
 from services.sales import numbering
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/documents", tags=["sales-documents"])
 
-_ERR_HTTP = {"not_found": 404, "not_draft": 409, "already_void": 409}
+_ERR_HTTP = {
+    "not_found": 404,
+    "not_draft": 409,
+    "already_void": 409,
+    "original_not_found": 404,
+    "original_not_issued": 409,
+    "bad_note_type": 400,
+}
 
 
 def _require_tenant(request: Request) -> tuple[str, Optional[str]]:
@@ -95,6 +103,10 @@ def _doc_out(d: dict) -> dict:
         "wht_amount": _m(d.get("wht_amount")),
         "grand_total": _m(d.get("grand_total")),
         "issued_at": d["issued_at"].isoformat() if d.get("issued_at") else None,
+        "references_document_id": (
+            str(d["references_document_id"]) if d.get("references_document_id") else None
+        ),
+        "reference_reason": d.get("reference_reason"),
         "created_at": d["created_at"].isoformat() if d.get("created_at") else None,
         "lines": [_line_out(ln) for ln in d.get("lines", [])],
     }
@@ -191,3 +203,52 @@ async def api_void_document(doc_id: str, request: Request):
         if err:
             _fail(err)
     return {"ok": True}
+
+
+class NoteIn(BaseModel):
+    reason: Optional[str] = Field(None, max_length=500)
+    vat_rate: float = Field(7, ge=0, le=100)
+    wht_rate: float = Field(0, ge=0, le=100)
+    lines: list[LineIn] = Field(..., min_length=1)
+    prefix: Optional[str] = Field(None, max_length=20)
+    reset: str = Field("yearly")
+    issue_date: Optional[str] = Field(None, description="YYYY-MM-DD · 默认今天")
+
+
+def _make_note(doc_id: str, req: NoteIn, request: Request, note_type: str) -> dict:
+    tid, uid = _require_tenant(request)
+    p = _dump(req)
+    try:
+        on = date.fromisoformat(p["issue_date"]) if p.get("issue_date") else date.today()
+    except ValueError:
+        raise HTTPException(422, detail="sales.bad_issue_date")
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        note, err = credit_note.create_note(
+            cur,
+            tenant_id=tid,
+            created_by=uid,
+            original_id=doc_id,
+            note_type=note_type,
+            reason=p.get("reason"),
+            lines=p["lines"],
+            vat_rate=p["vat_rate"],
+            wht_rate=p["wht_rate"],
+            prefix=p.get("prefix"),
+            reset=p.get("reset") or numbering.RESET_YEARLY,
+            on=on,
+        )
+        if err:
+            _fail(err)
+    return {"ok": True, "document": _doc_out(note)}
+
+
+@router.post("/{doc_id}/credit-note")
+async def api_credit_note(doc_id: str, req: NoteIn, request: Request):
+    """红冲 ใบลดหนี้:引用已开出原单 · 自身连号开出。"""
+    return _make_note(doc_id, req, request, "credit_note")
+
+
+@router.post("/{doc_id}/debit-note")
+async def api_debit_note(doc_id: str, req: NoteIn, request: Request):
+    """补开 ใบเพิ่มหนี้:引用已开出原单 · 自身连号开出。"""
+    return _make_note(doc_id, req, request, "debit_note")

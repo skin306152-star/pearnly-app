@@ -33,7 +33,7 @@ _HUNDRED = Decimal("100")
 _DOC_COLS = (
     "id, tenant_id, doc_type, doc_number, client_id, issue_date, status, currency, "
     "subtotal, discount_total, vat_rate, vat_amount, wht_amount, grand_total, "
-    "issued_at, created_by, created_at, updated_at"
+    "issued_at, created_by, references_document_id, reference_reason, created_at, updated_at"
 )
 _LINE_COLS = (
     "id, document_id, line_no, product_id, description, qty, unit_price, "

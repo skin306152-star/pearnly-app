@@ -1,0 +1,151 @@
+# -*- coding: utf-8 -*-
+"""销项 PO-4 · 开票核心守门测试(金额计算 + 连号 + 状态写保护 · 不连库)。"""
+
+import unittest
+from datetime import date
+from decimal import Decimal
+
+from services.sales import document as doc
+from services.sales import numbering
+
+
+class ComputeTotalsTests(unittest.TestCase):
+    def test_vat_7_percent(self):
+        t = doc.compute_totals([{"qty": 2, "unit_price": "50", "discount": 0}], vat_rate=7)
+        self.assertEqual(t["subtotal"], Decimal("100.00"))
+        self.assertEqual(t["vat_amount"], Decimal("7.00"))
+        self.assertEqual(t["grand_total"], Decimal("107.00"))
+
+    def test_non_vat_line_excluded_from_tax(self):
+        lines = [
+            {"qty": 1, "unit_price": "100", "vat_applicable": True},
+            {"qty": 1, "unit_price": "100", "vat_applicable": False},
+        ]
+        t = doc.compute_totals(lines, vat_rate=7)
+        self.assertEqual(t["subtotal"], Decimal("200.00"))
+        self.assertEqual(t["vat_amount"], Decimal("7.00"))  # 只对应税的 100 收税
+        self.assertEqual(t["grand_total"], Decimal("207.00"))
+
+    def test_seller_not_vat_registered_zero_tax(self):
+        t = doc.compute_totals([{"qty": 1, "unit_price": "100"}], vat_rate=0)
+        self.assertEqual(t["vat_amount"], Decimal("0.00"))
+        self.assertEqual(t["grand_total"], Decimal("100.00"))
+
+    def test_line_discount_and_wht(self):
+        t = doc.compute_totals(
+            [{"qty": 1, "unit_price": "1000", "discount": "100"}], vat_rate=7, wht_rate=3
+        )
+        self.assertEqual(t["subtotal"], Decimal("900.00"))
+        self.assertEqual(t["discount_total"], Decimal("100.00"))
+        self.assertEqual(t["vat_amount"], Decimal("63.00"))  # 900*7%
+        self.assertEqual(t["wht_amount"], Decimal("27.00"))  # 900*3%(按不含税额)
+        self.assertEqual(t["grand_total"], Decimal("936.00"))  # 900+63-27
+
+    def test_line_no_assigned_sequentially(self):
+        t = doc.compute_totals([{"unit_price": "1"}, {"unit_price": "2"}], vat_rate=7)
+        self.assertEqual([ln["line_no"] for ln in t["lines"]], [1, 2])
+
+
+class SeqCursor:
+    """模拟 document_number_sequences 的取号事务,验证连号不跳。"""
+
+    def __init__(self):
+        self.store = {}
+        self._last = None
+        self.saw_for_update = False
+
+    def execute(self, sql, params=None):
+        if sql.startswith("INSERT INTO document_number_sequences"):
+            self.store.setdefault(tuple(params[:4]), 1)
+            self._last = None
+        elif sql.startswith("SELECT next_number"):
+            if "FOR UPDATE" in sql:
+                self.saw_for_update = True
+            self._last = {"next_number": self.store.get(tuple(params), 1)}
+        elif sql.startswith("UPDATE document_number_sequences"):
+            key = tuple(params)
+            self.store[key] = self.store.get(key, 1) + 1
+            self._last = None
+
+    def fetchone(self):
+        return self._last
+
+
+class NumberingTests(unittest.TestCase):
+    def test_gapless_sequential(self):
+        cur = SeqCursor()
+        got = [
+            numbering.allocate(
+                cur,
+                tenant_id="t",
+                doc_type="tax_invoice",
+                prefix="INV",
+                reset="yearly",
+                on=date(2026, 6, 6),
+            )
+            for _ in range(3)
+        ]
+        self.assertEqual([n for _, n in got], [1, 2, 3])
+        self.assertEqual([s for s, _ in got], ["INV2026-00001", "INV2026-00002", "INV2026-00003"])
+        self.assertTrue(cur.saw_for_update, "取号必须走 SELECT ... FOR UPDATE 锁行")
+
+    def test_reset_modes_format(self):
+        d = date(2026, 6, 6)
+        self.assertEqual(numbering.format_number("INV", "yearly", d, 5), "INV2026-00005")
+        self.assertEqual(numbering.format_number("INV", "monthly", d, 5), "INV202606-00005")
+        self.assertEqual(numbering.format_number("INV", "never", d, 5), "INV-00005")
+
+    def test_period_key_buckets(self):
+        d = date(2026, 6, 6)
+        self.assertEqual(numbering.period_key("yearly", d), "2026")
+        self.assertEqual(numbering.period_key("monthly", d), "2026-06")
+        self.assertEqual(numbering.period_key("never", d), "ALL")
+
+
+class StatusCursor:
+    def __init__(self, status):
+        self.status = status
+        self._sql = ""
+
+    def execute(self, sql, params=None):
+        self._sql = sql
+
+    def fetchone(self):
+        if "SELECT status" in self._sql:
+            if self.status is None:
+                return None
+            return {"status": self.status, "doc_type": "tax_invoice"}
+        return None
+
+
+class StateGuardTests(unittest.TestCase):
+    def test_update_issued_is_rejected(self):
+        err = doc.update_draft(
+            StatusCursor("issued"), tenant_id="t", doc_id="d", vat_rate=7, wht_rate=0, lines=[]
+        )
+        self.assertEqual(err, "not_draft")
+
+    def test_update_missing_is_not_found(self):
+        err = doc.update_draft(
+            StatusCursor(None), tenant_id="t", doc_id="d", vat_rate=7, wht_rate=0, lines=[]
+        )
+        self.assertEqual(err, "not_found")
+
+    def test_issue_non_draft_rejected(self):
+        _, err = doc.issue_document(
+            StatusCursor("issued"),
+            tenant_id="t",
+            doc_id="d",
+            prefix="INV",
+            reset="yearly",
+            on=date(2026, 6, 6),
+        )
+        self.assertEqual(err, "not_draft")
+
+    def test_void_already_void_rejected(self):
+        err = doc.void_document(StatusCursor("void"), tenant_id="t", doc_id="d")
+        self.assertEqual(err, "already_void")
+
+
+if __name__ == "__main__":
+    unittest.main()

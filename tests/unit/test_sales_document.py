@@ -104,7 +104,7 @@ class PriceIncludesVatTests(unittest.TestCase):
         self.assertTrue(t["price_includes_vat"])
         self.assertEqual(t["subtotal"], Decimal("107.00"))  # 含税额(录入价)
         self.assertEqual(t["vat_amount"], Decimal("7.00"))  # 107 * 7/107
-        self.assertEqual(t["subtotal_after"], Decimal("100.00"))  # 不含税净额
+        self.assertEqual(t["subtotal"] - t["vat_amount"], Decimal("100.00"))  # 不含税净额
         self.assertEqual(t["grand_total"], Decimal("107.00"))  # 含税总额不变
 
     def test_inclusive_with_line_discount(self):

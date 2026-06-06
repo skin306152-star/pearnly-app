@@ -19,7 +19,7 @@ class TotalsTests(unittest.TestCase):
             [{"qty": 1, "unit_price": "107"}], vat_rate=7, price_includes_vat=True
         )
         self.assertEqual(t["vat_amount"], Decimal("7.00"))
-        self.assertEqual(t["subtotal_after"], Decimal("100.00"))
+        self.assertEqual(t["subtotal"] - t["vat_amount"], Decimal("100.00"))  # 不含税净额
         self.assertEqual(t["grand_total"], Decimal("107.00"))
 
     def test_line_total_clamped_non_negative(self):

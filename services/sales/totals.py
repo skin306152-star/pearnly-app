@@ -122,7 +122,6 @@ def compute_totals(
         ),
         "vat_rate": vr,
         "vat_amount": vat_amount,
-        "subtotal_after": subtotal_after,
         "price_includes_vat": bool(price_includes_vat),
         "wht_amount": wht_amount,
         "grand_total": grand,

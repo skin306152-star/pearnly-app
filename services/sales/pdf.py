@@ -12,6 +12,7 @@ import io
 from decimal import Decimal
 
 from services.sales.dates import to_thai_date
+from services.sales.totals import _d
 from services.usage.usage_report_pdf_text import _build_paragraph_text, _register_fonts
 
 _DOC_LABEL = {
@@ -63,19 +64,15 @@ def _discount_cell(ln: dict) -> str:
     return _money(disc)
 
 
-def _dec(v) -> Decimal:
-    return Decimal(str(v if v is not None else 0))
-
-
 def _total_rows(doc: dict) -> list:
     """合计区行 [label, value]。价外(默认)= 净额 + VAT 加总;价内(§C)= 标注含税并把
     VAT 从含税额里反算单列(票面仍单独列税额)。"""
     cur = doc.get("currency") or "THB"
     vat_rate = _money(doc.get("vat_rate"))
-    subtotal = _dec(doc.get("subtotal"))
-    header_disc = _dec(doc.get("header_discount_amount"))
-    vat = _dec(doc.get("vat_amount"))
-    wht = _dec(doc.get("wht_amount"))
+    subtotal = _d(doc.get("subtotal"))
+    header_disc = _d(doc.get("header_discount_amount"))
+    vat = _d(doc.get("vat_amount"))
+    wht = _d(doc.get("wht_amount"))
     grand = doc.get("grand_total")
 
     if doc.get("price_includes_vat"):

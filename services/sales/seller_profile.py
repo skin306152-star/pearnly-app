@@ -10,8 +10,16 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-_SELLER_COLS = "id, name, tax_id, address, branch, phone, vat_registered"
-_SELLER_WRITABLE = ("name", "tax_id", "address", "branch", "phone", "vat_registered")
+_SELLER_COLS = "id, name, tax_id, address, branch, phone, vat_registered, promptpay_id"
+_SELLER_WRITABLE = (
+    "name",
+    "tax_id",
+    "address",
+    "branch",
+    "phone",
+    "vat_registered",
+    "promptpay_id",
+)
 
 
 def list_sellers(cur, *, tenant_id: str) -> list:

@@ -47,7 +47,8 @@ PAYMENT_STATUSES = ("unpaid", "partial", "paid")
 
 _DOC_COLS = (
     "id, tenant_id, doc_type, doc_number, client_id, seller_workspace_client_id, issue_date, "
-    "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_amount, grand_total, "
+    "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_rate, wht_amount, "
+    "grand_total, "
     "header_discount_amount, header_discount_pct, price_includes_vat, "
     "buyer_type, buyer_name, buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no, "
     "parties_snapshot, payment_status, paid_amount, payment_method, payment_date, "
@@ -65,7 +66,8 @@ def _write_header_totals(cur, tenant_id: str, doc_id, t: dict) -> None:
     cur.execute(
         "UPDATE sales_documents SET subtotal=%s, discount_total=%s, header_discount_amount=%s, "
         "header_discount_pct=%s, price_includes_vat=%s, vat_rate=%s, vat_amount=%s, "
-        "wht_amount=%s, grand_total=%s, updated_at=now() WHERE tenant_id=%s AND id=%s",
+        "wht_rate=%s, wht_amount=%s, grand_total=%s, updated_at=now() "
+        "WHERE tenant_id=%s AND id=%s",
         (
             t["subtotal"],
             t["discount_total"],
@@ -74,6 +76,7 @@ def _write_header_totals(cur, tenant_id: str, doc_id, t: dict) -> None:
             t["price_includes_vat"],
             t["vat_rate"],
             t["vat_amount"],
+            t["wht_rate"],
             t["wht_amount"],
             t["grand_total"],
             tenant_id,
@@ -213,8 +216,8 @@ def create_draft(
     cur.execute(
         "INSERT INTO sales_documents (tenant_id, doc_type, client_id, seller_workspace_client_id, "
         "status, currency, subtotal, discount_total, header_discount_amount, header_discount_pct, "
-        "price_includes_vat, vat_rate, vat_amount, wht_amount, grand_total, created_by) "
-        "VALUES (%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+        "price_includes_vat, vat_rate, vat_amount, wht_rate, wht_amount, grand_total, created_by) "
+        "VALUES (%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
         (
             tenant_id,
             doc_type,
@@ -228,6 +231,7 @@ def create_draft(
             t["price_includes_vat"],
             t["vat_rate"],
             t["vat_amount"],
+            t["wht_rate"],
             t["wht_amount"],
             t["grand_total"],
             created_by,

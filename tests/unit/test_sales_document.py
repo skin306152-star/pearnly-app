@@ -38,6 +38,7 @@ class ComputeTotalsTests(unittest.TestCase):
         self.assertEqual(t["subtotal"], Decimal("900.00"))
         self.assertEqual(t["discount_total"], Decimal("100.00"))
         self.assertEqual(t["vat_amount"], Decimal("63.00"))  # 900*7%
+        self.assertEqual(t["wht_rate"], Decimal("3"))  # 档率持久化(§L2)
         self.assertEqual(t["wht_amount"], Decimal("27.00"))  # 900*3%(按不含税额)
         self.assertEqual(t["grand_total"], Decimal("936.00"))  # 900+63-27
 

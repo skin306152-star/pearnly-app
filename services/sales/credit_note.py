@@ -64,7 +64,7 @@ def create_note(
     # 双方信息须与原单一致,且原单开出时已冻结,这里 verbatim 带过来。
     cur.execute(
         "INSERT INTO sales_documents (tenant_id, doc_type, doc_number, client_id, issue_date, "
-        "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_amount, "
+        "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_rate, wht_amount, "
         "grand_total, price_includes_vat, issued_at, created_by, references_document_id, "
         "reference_reason, parties_snapshot, buyer_type, buyer_name, buyer_address, buyer_tax_id, "
         "buyer_branch_type, buyer_branch_no) "
@@ -81,6 +81,7 @@ def create_note(
             t["discount_total"],
             t["vat_rate"],
             t["vat_amount"],
+            t["wht_rate"],
             t["wht_amount"],
             t["grand_total"],
             created_by,

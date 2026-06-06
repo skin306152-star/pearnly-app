@@ -14,6 +14,7 @@ from decimal import Decimal
 
 from services.sales.dates import to_thai_date
 from services.sales.totals import _d
+from services.sales.wht import pdf_label as wht_label
 from services.usage.usage_report_pdf_text import _build_paragraph_text, _register_fonts
 
 _DOC_LABEL = {
@@ -91,7 +92,7 @@ def _total_rows(doc: dict) -> list:
             rows.append(["ส่วนลดท้ายบิล / Discount", "-" + _money(header_disc)])
         rows.append([f"ภาษีมูลค่าเพิ่ม / VAT {vat_rate}%", _money(vat)])
     if wht != 0:
-        rows.append(["หัก ณ ที่จ่าย / WHT", "-" + _money(wht)])
+        rows.append([wht_label(doc.get("wht_rate")), "-" + _money(wht)])
     rows.append([f"รวมทั้งสิ้น / Grand Total ({cur})", _money(grand)])
     return rows
 

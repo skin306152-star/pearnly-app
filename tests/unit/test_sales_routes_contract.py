@@ -18,6 +18,8 @@ EXPECTED = {
     ("POST", "/api/sales/documents/{doc_id}/submit"),
     ("POST", "/api/sales/documents/{doc_id}/approve"),
     ("POST", "/api/sales/documents/{doc_id}/reject"),
+    ("POST", "/api/sales/documents/{doc_id}/convert"),
+    ("GET", "/api/sales/documents/{doc_id}/promptpay-qr"),
 }
 
 

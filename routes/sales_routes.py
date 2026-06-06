@@ -10,15 +10,16 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
 from core.route_helpers import _require_owner_or_super
+from routes.sales_schemas import ConvertIn, DocumentIn, IssueIn, NoteIn, RejectIn
 from services.sales import approval as approval_svc
 from services.sales import buyer as buyer_mod
 from services.sales import credit_note
@@ -26,6 +27,8 @@ from services.sales import dates as sales_dates
 from services.sales import document as doc_svc
 from services.sales import numbering
 from services.sales import pdf as pdf_svc
+from services.sales import promptpay as promptpay_svc
+from services.sales import quotation as quotation_svc
 from services.sales import seller_profile
 
 logger = logging.getLogger("mr-pilot")
@@ -47,6 +50,11 @@ _ERR_HTTP = {
     "buyer_branch_required": 422,
     "buyer_branch_no_invalid": 422,
     "payment_required": 422,
+    # 报价转换(§L3)/ PromptPay(§L1)。
+    "bad_target_type": 400,
+    "not_a_quotation": 409,
+    "promptpay_unset": 422,
+    "already_paid": 409,
 }
 
 
@@ -56,59 +64,6 @@ def _require_tenant(request: Request) -> tuple[str, Optional[str]]:
     if not tid:
         raise HTTPException(400, detail="sales.tenant_required")
     return str(tid), (str(user["id"]) if user and user.get("id") else None)
-
-
-class LineIn(BaseModel):
-    description: str = Field(..., min_length=1, max_length=500)
-    product_id: Optional[str] = Field(None, max_length=64)
-    qty: float = Field(1, ge=0)
-    unit_price: float = Field(0, ge=0)
-    discount: float = Field(0, ge=0)
-    discount_pct: Optional[float] = Field(None, ge=0, le=100)
-    vat_applicable: bool = True
-
-
-class BuyerIn(BaseModel):
-    """买方块(docs/15)。type 决定 tax_id 语义与分店是否适用;后端再归一化+校验。"""
-
-    type: str = Field("company", max_length=20)
-    name: Optional[str] = Field(None, max_length=300)
-    address: Optional[str] = Field(None, max_length=500)
-    tax_id: Optional[str] = Field(None, max_length=40)
-    branch_type: Optional[str] = Field(None, max_length=10)
-    branch_no: Optional[str] = Field(None, max_length=10)
-
-
-class PaymentIn(BaseModel):
-    """收款块(docs/16 §J2)。收据/合并单开出前必须已收款。"""
-
-    status: str = Field("unpaid", max_length=12)
-    paid_amount: float = Field(0, ge=0)
-    method: Optional[str] = Field(None, max_length=20)
-    date: Optional[str] = Field(None, description="YYYY-MM-DD")
-
-
-class DocumentIn(BaseModel):
-    doc_type: str = Field("tax_invoice", max_length=40)
-    client_id: Optional[int] = None
-    seller_workspace_client_id: Optional[int] = None
-    currency: str = Field("THB", max_length=8)
-    vat_rate: float = Field(7, ge=0, le=100)
-    wht_rate: float = Field(0, ge=0, le=100)
-    header_discount_amount: float = Field(0, ge=0)
-    header_discount_pct: float = Field(0, ge=0, le=100)
-    price_includes_vat: bool = Field(False, description="价内含税(§C·单据级·默认价外)")
-    due_date: Optional[str] = Field(None, description="YYYY-MM-DD · 账期到期日")
-    payment_terms: Optional[str] = Field(None, max_length=200)
-    lines: list[LineIn] = Field(..., min_length=1)
-    buyer: Optional[BuyerIn] = None
-    payment: Optional[PaymentIn] = None
-
-
-class IssueIn(BaseModel):
-    prefix: Optional[str] = Field(None, max_length=20)
-    reset: str = Field("yearly")
-    issue_date: Optional[str] = Field(None, description="YYYY-MM-DD · 默认今天")
 
 
 def _dump(req) -> dict:
@@ -196,6 +151,7 @@ def _doc_out(d: dict) -> dict:
         "vat_rate": _m(d.get("vat_rate")),
         "vat_amount": _m(d.get("vat_amount")),
         "price_includes_vat": bool(d.get("price_includes_vat")),
+        "wht_rate": _m(d.get("wht_rate")),
         "wht_amount": _m(d.get("wht_amount")),
         "grand_total": _m(d.get("grand_total")),
         "issued_at": d["issued_at"].isoformat() if d.get("issued_at") else None,
@@ -392,10 +348,6 @@ async def api_void_document(doc_id: str, request: Request):
     return {"ok": True}
 
 
-class RejectIn(BaseModel):
-    reason: Optional[str] = Field(None, max_length=500)
-
-
 @router.post("/{doc_id}/submit")
 async def api_submit_for_approval(doc_id: str, request: Request):
     """提交审批(§F):草稿/被驳回 → 待审批。任意成员可提交。"""
@@ -447,16 +399,6 @@ async def api_reject_document(doc_id: str, req: RejectIn, request: Request):
     return {"ok": True, "document": _doc_out(doc)}
 
 
-class NoteIn(BaseModel):
-    reason: Optional[str] = Field(None, max_length=500)
-    vat_rate: float = Field(7, ge=0, le=100)
-    wht_rate: float = Field(0, ge=0, le=100)
-    lines: list[LineIn] = Field(..., min_length=1)
-    prefix: Optional[str] = Field(None, max_length=20)
-    reset: str = Field("yearly")
-    issue_date: Optional[str] = Field(None, description="YYYY-MM-DD · 默认今天")
-
-
 def _make_note(doc_id: str, req: NoteIn, request: Request, note_type: str) -> dict:
     tid, uid = _require_tenant(request)
     p = _dump(req)
@@ -491,3 +433,41 @@ async def api_credit_note(doc_id: str, req: NoteIn, request: Request):
 async def api_debit_note(doc_id: str, req: NoteIn, request: Request):
     """补开 ใบเพิ่มหนี้:引用已开出原单 · 自身连号开出。"""
     return _make_note(doc_id, req, request, "debit_note")
+
+
+@router.post("/{doc_id}/convert")
+async def api_convert_quotation(doc_id: str, req: ConvertIn, request: Request):
+    """报价单 → 发票转换(§L3):复制成目标类型草稿,引用原报价单(报价单本身不变)。"""
+    tid, uid = _require_tenant(request)
+    target = _dump(req)["target_doc_type"]
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        doc, err = quotation_svc.convert_quotation(
+            cur, tenant_id=tid, created_by=uid, quote_id=doc_id, target_doc_type=target
+        )
+        if err:
+            _fail(err)
+    return {"ok": True, "document": _doc_out(doc)}
+
+
+@router.get("/{doc_id}/promptpay-qr")
+async def api_promptpay_qr(doc_id: str, request: Request):
+    """PromptPay 付款二维码 PNG(§L1):金额=应付额(partial 取未收余额)。已收款不出。"""
+    tid, _ = _require_tenant(request)
+    with db.get_cursor_rls(tid) as cur:
+        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
+        if not doc:
+            _fail("not_found")
+        if (doc.get("payment_status") or "unpaid") == "paid":
+            _fail("already_paid")
+        sid = doc.get("seller_workspace_client_id")
+        seller = (
+            seller_profile.get_seller(cur, tenant_id=tid, workspace_client_id=sid) if sid else None
+        )
+    promptpay_id = (seller or {}).get("promptpay_id")
+    if not promptpay_id:
+        _fail("promptpay_unset")
+    grand = Decimal(str(doc.get("grand_total") or 0))
+    paid = Decimal(str(doc.get("paid_amount") or 0))
+    amount = grand - paid if doc.get("payment_status") == "partial" else grand
+    png = promptpay_svc.build_qr_png(promptpay_id, f"{amount:.2f}")
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})

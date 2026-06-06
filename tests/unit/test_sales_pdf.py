@@ -49,6 +49,13 @@ class PdfRenderTests(unittest.TestCase):
         doc = dict(_DOC, wht_amount="9.00")
         self.assertTrue(pdf.render_invoice_pdf(doc, _SELLER, _BUYER).startswith(b"%PDF"))
 
+    def test_wht_label_shows_rate(self):
+        """§L2:WHT 行标签带档率,如 'หัก ณ ที่จ่าย 3%'。"""
+        doc = dict(_DOC, wht_amount="27.00", wht_rate="3")
+        wht_row = [r for r in pdf._total_rows(doc) if "หัก ณ ที่จ่าย" in r[0]]
+        self.assertEqual(len(wht_row), 1)
+        self.assertIn("3%", wht_row[0][0])
+
     def test_credit_note_label(self):
         self.assertIn("credit_note", pdf._DOC_LABEL)
         self.assertIn("ใบลดหนี้", pdf._DOC_LABEL["credit_note"])

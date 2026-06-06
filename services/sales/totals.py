@@ -123,6 +123,7 @@ def compute_totals(
         "vat_rate": vr,
         "vat_amount": vat_amount,
         "price_includes_vat": bool(price_includes_vat),
+        "wht_rate": wr,
         "wht_amount": wht_amount,
         "grand_total": grand,
         "lines": norm_lines,

@@ -37,6 +37,7 @@ class SellerProfileIn(BaseModel):
     branch: Optional[str] = Field(None, max_length=120)
     phone: Optional[str] = Field(None, max_length=50)
     vat_registered: Optional[bool] = None
+    promptpay_id: Optional[str] = Field(None, max_length=40, description="PromptPay 代理 · §L1")
 
 
 def _out(s: dict) -> dict:
@@ -48,6 +49,7 @@ def _out(s: dict) -> dict:
         "branch": s.get("branch"),
         "phone": s.get("phone"),
         "vat_registered": bool(s.get("vat_registered")),
+        "promptpay_id": s.get("promptpay_id"),
     }
 
 

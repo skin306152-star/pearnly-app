@@ -1,16 +1,30 @@
 /* 销项开票模块 PO-10 · 发票工作台 / 商品 / 账套 · 复用项目 token 与 .btn 系统 */
 
-/* 侧栏三级子项(销售发票 ▸ 工作台/商品/账套) */
+/* 侧栏三级子项(销售发票 ▸ 工作台/账套)· 默认收起,点头部展开 */
 .nav-sub2 {
     display: none;
     flex-direction: column;
 }
-.nav-collapsible:not(.collapsed) .nav-sub2 {
+.nav-sub2.show {
     display: flex;
 }
 .nav-sub2-item {
     padding-left: 52px;
     font-size: 12.5px;
+}
+.nav-sales-head {
+    cursor: pointer;
+}
+.nav-sub2-chev {
+    width: 14px;
+    height: 14px;
+    margin-left: auto;
+    flex: none;
+    transition: transform 0.15s;
+    color: var(--ink-3);
+}
+.nav-sales-head.sx-open .nav-sub2-chev {
+    transform: rotate(180deg);
 }
 /* 销售发票 头行命中时不抢黑底高亮(留给具体子项) */
 .nav-sales-head.active {
@@ -489,8 +503,110 @@ table.sx-tbl tr.click:hover td {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 .sx-tpl-pv {
-    height: 72px;
+    height: 86px;
     background: #faf9f5;
+    border-bottom: 1px solid var(--line);
+    padding: 9px;
+    overflow: hidden;
+    position: relative;
+}
+.sx-tpl-bar {
+    height: 5px;
+    margin: -9px -9px 6px;
+}
+.sx-tpl-co {
+    font-weight: 700;
+    font-size: 8.5px;
+}
+.sx-tpl-ln {
+    border-top: 1px solid #e3e3dd;
+    margin-top: 5px;
+    padding-top: 4px;
+    font-size: 7.5px;
+    color: #999;
+}
+.sx-tpl-tt {
+    text-align: right;
+    font-weight: 700;
+    font-size: 9px;
+    margin-top: 5px;
+    color: #333;
+}
+
+/* 账套 2 栏:表单 + 右侧实时预览 */
+.sx-acc-2col {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 22px;
+    align-items: start;
+}
+.sx-acc-preview-col {
+    position: sticky;
+    top: 12px;
+}
+.sx-prev-inv {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    padding: 18px;
+    font-size: 11.5px;
+    color: #111;
+    margin-top: 8px;
+}
+.sx-prev-co {
+    font-weight: 700;
+    font-size: 14px;
+}
+.sx-prev-sub {
+    color: var(--ink-3);
+    font-size: 10.5px;
+    margin: 2px 0 10px;
+}
+.sx-prev-parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 9px 11px;
+    margin-bottom: 9px;
+    font-size: 10.5px;
+}
+.sx-prev-mut {
+    color: var(--ink-3);
+}
+.sx-prev-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--line-soft);
+}
+.sx-prev-vat {
+    color: var(--ink-3);
+}
+.sx-prev-tot {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1.3px solid var(--ink);
+    margin-top: 4px;
+    padding-top: 6px;
+    font-weight: 700;
+}
+.sx-prev-foot {
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px dashed var(--line);
+    color: var(--ink-3);
+    font-size: 10.5px;
+    white-space: pre-wrap;
+}
+@media (max-width: 920px) {
+    .sx-acc-2col {
+        grid-template-columns: 1fr;
+    }
+    .sx-acc-preview-col {
+        position: static;
+    }
 }
 .sx-tpl-nm {
     padding: 9px 11px;
@@ -528,6 +644,19 @@ table.sx-tbl tr.click:hover td {
     font-size: 11.5px;
     color: var(--ink-3);
     margin-top: 8px;
+}
+.sx-set-row3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+}
+.sx-set-row3 .sx-field {
+    margin-bottom: 0;
+}
+@media (max-width: 640px) {
+    .sx-set-row3 {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 820px) {

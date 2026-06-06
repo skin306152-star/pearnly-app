@@ -108,7 +108,7 @@ export function step2(st: WState): string {
            <div class="sw-field"><label>${escapeHtml(wt('addr'))} ${reqMark}</label><input type="text" id="sw-baddr" value="${escapeHtml(b.addr)}"></div>
            <div class="sw-field"><label>${escapeHtml(tinLabel)} ${reqMark}</label>
              <div style="display:flex;gap:8px"><input type="text" id="sw-btin" value="${escapeHtml(b.tin)}" style="flex:1">
-               <button type="button" id="sw-rd" class="btn btn-ghost" style="white-space:nowrap">${b.type === 'company' ? escapeHtml(wt('verifyLookup')) : escapeHtml(wt('verify'))}</button></div>
+               <button type="button" id="sw-rd" class="btn btn-primary" style="white-space:nowrap">${b.type === 'company' ? escapeHtml(wt('verifyLookup')) : escapeHtml(wt('verify'))}</button></div>
              ${b.verified ? `<div class="sw-hint ok">${ICO.checkG} ${escapeHtml(b.type === 'company' ? wt('verifiedCo') : wt('verified'))}</div>` : tinHint}</div>
            ${isCo ? branchBlock(st) : ''}`;
     return `<div class="sw-card"><h2>${escapeHtml(wt('s2h'))}</h2><div class="sw-sub">${escapeHtml(wt('s2sub'))}</div>
@@ -141,7 +141,7 @@ export function step3(st: WState): string {
     const empty = products.length
         ? ''
         : `<div class="sw-muted" style="padding:20px;text-align:center">—</div>`;
-    const has = st.lines.some((l) => l.desc || l.price);
+    const has = st.lines.some((l) => l.desc || +l.price || l.custom);
     const cart = has
         ? st.lines
               .map(
@@ -219,10 +219,11 @@ export function step5(st: WState): string {
             return `<div class="sw-check ${c.pass ? 'pass' : 'fail'}"><div class="sw-ci">${c.pass ? ICO.checkG : ICO.x}</div><div><div class="sw-ct">${escapeHtml(wt(c.key))}${c.req && !c.pass ? ' <span class="sw-req">*</span>' : ''}</div><div class="sw-cd">${escapeHtml(wt(c.descKey))}</div></div></div>`;
         })
         .join('');
+    const paperKey = { a4: 'paperA4', a5: 'paperA5', pos: 'paperPos' } as const;
     const segP = (['a4', 'a5', 'pos'] as const)
         .map(
             (x) =>
-                `<button type="button" data-paper="${x}" class="${st.paper === x ? 'on' : ''}">${escapeHtml(wt('paper' + x.toUpperCase()))}</button>`
+                `<button type="button" data-paper="${x}" class="${st.paper === x ? 'on' : ''}">${escapeHtml(wt(paperKey[x]))}</button>`
         )
         .join('');
     const segL = (['th', 'th_en', 'th_zh'] as const)

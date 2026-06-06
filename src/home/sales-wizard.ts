@@ -11,7 +11,7 @@ import {
     saveDraft,
     issueDraft,
 } from './sales-wizard-io.js';
-import { wt, wpack, setWizardLang, getWizardLang, WIZARD_LANGS } from './sales-wizard-i18n.js';
+import { wt, wpack, setWizardLang } from './sales-wizard-i18n.js';
 import { ICO, pname, step1, step2, step3, step4, step5 } from './sales-wizard-steps.js';
 
 function today(): string {
@@ -74,18 +74,11 @@ function render() {
             return `<div class="sw-step ${cls}"><div class="sw-num">${inner}</div><div class="sw-lbl">${escapeHtml(s)}</div>${i < 4 ? '<div class="sw-bar"></div>' : ''}</div>`;
         })
         .join('');
-    const langBtns = WIZARD_LANGS.map(
-        (l) =>
-            `<button data-wl="${l}" class="${getWizardLang() === l ? 'on' : ''}">${l.toUpperCase()}</button>`
-    ).join('');
     const body = [step1, step2, step3, step4, step5][cur](st);
     mask().innerHTML = `<div class="sw-wrap">
         <div class="sw-topbar">
             <div class="sw-brand">${escapeHtml(wt('title'))}<small>${escapeHtml(wt('sub'))}</small></div>
-            <div style="display:flex;gap:10px;align-items:center">
-                <div class="sw-langtoggle">${langBtns}</div>
-                <button class="sw-x" id="sw-close" aria-label="close">${ICO.close}</button>
-            </div>
+            <button class="sw-x" id="sw-close" aria-label="close">${ICO.close}</button>
         </div>
         <div class="sw-stepper">${stepper}</div>
         <div id="sw-body">${body}</div>
@@ -97,7 +90,7 @@ function render() {
             <button class="btn btn-primary" id="sw-next">${escapeHtml(cur === 4 ? wt('issue') : wt('next'))}</button>
         </div>
     </div>`;
-    mask().style.display = 'block';
+    mask().style.display = 'flex';
     bindEvents();
 }
 
@@ -113,9 +106,6 @@ function bindEvents() {
     document.getElementById('sw-back')!.onclick = () => go(-1);
     document.getElementById('sw-next')!.onclick = () => go(1);
     document.getElementById('sw-draft')!.onclick = doSaveDraft;
-    mask()
-        .querySelectorAll<HTMLElement>('[data-wl]')
-        .forEach((el) => (el.onclick = () => (setWizardLang(el.dataset.wl!), render())));
     // step1
     mask()
         .querySelectorAll<HTMLElement>('[data-doc]')
@@ -341,7 +331,7 @@ function showSuccess(docId: string) {
             <button class="btn btn-ghost" id="sw-ok-new">${escapeHtml(wt('newOne'))}</button>
             <button class="btn btn-ghost" id="sw-ok-done" style="grid-column:1/-1">${escapeHtml(wt('done'))}</button>
         </div></div></div>`;
-    mask().style.display = 'block';
+    mask().style.display = 'flex';
     document.getElementById('sw-ok-done')!.onclick = close;
     document.getElementById('sw-ok-new')!.onclick = () => {
         st = freshState();
@@ -363,7 +353,7 @@ window.openSalesWizard = async function () {
         'th';
     setWizardLang(appLang);
     mask().innerHTML = `<div class="sw-wrap"><div class="sw-card"><div class="sx-state">${escapeHtml(wt('s1h'))}…</div></div></div>`;
-    mask().style.display = 'block';
+    mask().style.display = 'flex';
     await loadWizardData();
     render();
 };

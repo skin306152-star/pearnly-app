@@ -145,7 +145,7 @@ function openEdit(p: Product | null) {
             <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sx-pf-vat" ${!p || p.vat_applicable ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-p-f-vat'))}</label></div>
             <div class="form-row"><label>${escapeHtml(t('sx-p-f-image'))}</label><input type="text" id="sx-pf-image" value="${htmlVal(p?.image_url)}" maxlength="1000" placeholder="https://…"></div>
         </div>
-        <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+        <div class="modal-footer" style="justify-content:space-between;gap:8px">
             <button class="btn btn-ghost" id="sx-p-cancel">${escapeHtml(t('sx-cancel'))}</button>
             <button class="btn btn-primary" id="sx-p-save">${escapeHtml(t('sx-p-save'))}</button>
         </div></div>`;
@@ -173,20 +173,25 @@ function readForm() {
     };
 }
 
+async function failMsg(r: Response, fallbackKey: string): Promise<string> {
+    const d = await r.json().catch(() => ({}));
+    const detail = d && d.detail ? String(d.detail) : 'HTTP ' + r.status;
+    return t(fallbackKey) + ' · ' + detail;
+}
+
 async function save(p: Product | null) {
     const payload = readForm();
     if (!payload.name_th) return showToast(t('sx-p-name-required'), 'error');
+    const url = p ? `/api/sales/products/${p.id}` : '/api/sales/products';
     try {
-        if (p) {
-            const r = await salesFetch(`/api/sales/products/${p.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            if (!r.ok) throw new Error();
-        } else {
-            const r = await apiPost('/api/sales/products', payload);
-            if (!r || !r.ok) throw new Error();
+        const r = await salesFetch(url, {
+            method: p ? 'PATCH' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!r.ok) {
+            showToast(await failMsg(r, 'sx-p-save-fail'), 'error');
+            return;
         }
         closeMask('sales-prod-mask');
         showToast(t('sx-p-saved'), 'success');
@@ -203,7 +208,10 @@ async function del(id: string) {
     } else if (!confirm(t('sx-p-del-confirm'))) return;
     try {
         const r = await salesFetch(`/api/sales/products/${id}`, { method: 'DELETE' });
-        if (!r.ok) throw new Error();
+        if (!r.ok) {
+            showToast(await failMsg(r, 'sx-p-del-fail'), 'error');
+            return;
+        }
         showToast(t('sx-p-deleted'), 'success');
         await load();
     } catch (_) {
@@ -220,7 +228,7 @@ function openImport() {
             <input type="file" id="sx-imp-file" accept=".xlsx,.xls" style="width:100%">
             <div class="sx-banner" style="margin-top:10px">${escapeHtml(t('sx-p-import-hint'))}</div>
         </div>
-        <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+        <div class="modal-footer" style="justify-content:space-between;gap:8px">
             <button class="btn btn-ghost" id="sx-imp-cancel">${escapeHtml(t('sx-cancel'))}</button>
             <button class="btn btn-primary" id="sx-imp-go">${escapeHtml(t('sx-p-import-go'))}</button>
         </div></div>`;

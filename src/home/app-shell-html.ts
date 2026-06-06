@@ -198,8 +198,9 @@ const SIDEBAR_HTML = `
                     <path d="M13 2v3h3"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-sales-invoices">销售发票</span>
+                <svg class="nav-sub2-chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8l4 4 4-4"/></svg>
             </div>
-            <!-- 销售发票 两子屏(PO-10)· 工作台 / 账套(商品=共享主数据·见下方主数据区) -->
+            <!-- 销售发票 两子屏(PO-10)· 默认收起 · 点头部展开 · 工作台 / 账套(商品=共享主数据·见下方主数据区) -->
             <div class="nav-sub2">
                 <div class="nav-item nav-sub2-item" data-route="sales-invoices">
                     <span class="nav-label" data-i18n="nav-sales-workbench">发票工作台</span>

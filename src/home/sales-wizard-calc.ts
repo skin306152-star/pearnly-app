@@ -196,24 +196,25 @@ export function compliance(st: WState): Check[] {
     if (b.type === 'foreigner' && b.tin) tinOk = /^[A-Za-z0-9]{4,20}$/.test(b.tin);
     const payOk = !payRequired(st) || st.pay.status !== 'unpaid';
     const isTax = isFull || st.docType === 'tax_invoice_simple';
+    // key/descKey 用向导自含字典(sales-wizard-i18n)的键名,经 wt() 取文案。
     return [
-        { key: 'sw-ck-buyer', descKey: 'sw-ck-buyer-d', pass: buyerOk, req: isFull, na: !isFull },
+        { key: 'ckBuyer', descKey: 'ckBuyerD', pass: buyerOk, req: isFull, na: !isFull },
         {
-            key: 'sw-ck-tin',
-            descKey: 'sw-ck-tin-d',
+            key: 'ckTin',
+            descKey: 'ckTinD',
             pass: tinOk,
             req: isFull,
             na: st.docType === 'quotation',
         },
-        { key: 'sw-ck-vat', descKey: 'sw-ck-vat-d', pass: true, req: isTax, na: !isTax },
+        { key: 'ckVat', descKey: 'ckVatD', pass: true, req: isTax, na: !isTax },
         {
-            key: 'sw-ck-pay',
-            descKey: 'sw-ck-pay-d',
+            key: 'ckPay',
+            descKey: 'ckPayD',
             pass: payOk,
             req: payRequired(st),
             na: !payRequired(st),
         },
-        { key: 'sw-ck-seq', descKey: 'sw-ck-seq-d', pass: true, req: true, na: false },
-        { key: 'sw-ck-words', descKey: 'sw-ck-words-d', pass: true, req: isTax, na: !isTax },
+        { key: 'ckSeq', descKey: 'ckSeqD', pass: true, req: true, na: false },
+        { key: 'ckWords', descKey: 'ckWordsD', pass: true, req: isTax, na: !isTax },
     ];
 }

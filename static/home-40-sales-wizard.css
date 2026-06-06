@@ -1,18 +1,28 @@
 /* 销项开票向导 PO-10 · 全屏 5 步向导样式 · 从 index.html 样稿移植 · 令牌复用项目 token */
 
+/* 局内弹窗:遮罩 + 居中对话框(非全屏铺满) */
 .sw-mask {
     display: none;
     position: fixed;
     inset: 0;
     z-index: 80;
-    background: var(--bg);
+    background: rgba(15, 23, 42, 0.45);
     overflow: auto;
     -webkit-overflow-scrolling: touch;
+    padding: 28px 16px;
+}
+.sw-mask {
+    align-items: flex-start;
+    justify-content: center;
 }
 .sw-wrap {
+    width: 100%;
     max-width: 880px;
     margin: 0 auto;
-    padding: 20px 16px 64px;
+    background: var(--card);
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+    padding: 20px 22px 22px;
     font-size: 13px;
 }
 .sw-topbar {
@@ -513,10 +523,9 @@
     justify-content: space-between;
     align-items: center;
     gap: 10px;
-    position: sticky;
-    bottom: 0;
-    background: linear-gradient(180deg, rgba(244, 244, 240, 0), var(--bg) 40%);
-    padding: 14px 0 4px;
+    padding: 14px 0 2px;
+    margin-top: 4px;
+    border-top: 1px solid var(--line);
 }
 .sw-left {
     display: flex;

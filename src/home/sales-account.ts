@@ -2,7 +2,7 @@
 // 接真接口 GET /api/sales/sellers · PUT /api/sales/sellers/{id}(name/税号/地址/分店/电话/promptpay
 // + template_id/brand_color/logo_url/seal_url/signature_url/footer_text · §L4 后端已支持)。
 /* global t, escapeHtml, apiGet, showToast */
-import { salesFetch, htmlVal } from './sales-common.js';
+import { salesFetch, htmlVal, imageFieldHtml, bindImageField } from './sales-common.js';
 
 interface Seller {
     id: number;
@@ -68,10 +68,10 @@ function formHtml(): string {
 
         <div class="sx-head" style="margin-top:18px"><h2 style="font-size:14px">${escapeHtml(t('sx-acc-sec-brand'))}</h2></div>
         <div class="sx-acc-grid">
-            <div class="sx-field"><label>${escapeHtml(t('sx-acc-logo'))}</label><input type="text" id="sx-a-logo" value="${htmlVal(s.logo_url)}" maxlength="500" placeholder="https://…"></div>
-            <div class="sx-field"><label>${escapeHtml(t('sx-acc-seal'))}</label><input type="text" id="sx-a-seal" value="${htmlVal(s.seal_url)}" maxlength="500" placeholder="https://…"></div>
+            ${imageFieldHtml('sx-a-logo', t('sx-acc-logo'), s.logo_url)}
+            ${imageFieldHtml('sx-a-seal', t('sx-acc-seal'), s.seal_url)}
         </div>
-        <div class="sx-field"><label>${escapeHtml(t('sx-acc-sign'))}</label><input type="text" id="sx-a-sign" value="${htmlVal(s.signature_url)}" maxlength="500" placeholder="https://…"></div>
+        ${imageFieldHtml('sx-a-sign', t('sx-acc-sign'), s.signature_url)}
         <div class="sx-field"><label>${escapeHtml(t('sx-acc-footer'))}</label><textarea id="sx-a-footer" rows="2" maxlength="500">${htmlVal(s.footer_text)}</textarea></div>
 
         <div class="sx-head" style="margin-top:18px"><h2 style="font-size:14px">${escapeHtml(t('sx-acc-sec-template'))}</h2></div>
@@ -169,6 +169,9 @@ function bind() {
                 refreshPreview();
             };
     });
+    bindImageField('sx-a-logo');
+    bindImageField('sx-a-seal');
+    bindImageField('sx-a-sign');
     const save = document.getElementById('sx-a-save');
     if (save) save.onclick = doSave;
 }

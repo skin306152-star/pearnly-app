@@ -39,6 +39,9 @@ test.describe('销项 UI 自查', () => {
         await shot('01-workbench');
         await go('sales-products');
         await shot('02-products');
+        await click('#sx-p-add', 700);
+        await shot('02b-product-modal');
+        await click('#sx-p-close', 300);
         await go('sales-account', 1800);
         await shot('03-account');
 
@@ -61,6 +64,12 @@ test.describe('销项 UI 自查', () => {
         await shot('09-wizard-step4-pay');
         await click('#sw-next', 600);
         await shot('10-wizard-step5-review');
+
+        // 侧栏收起态(验销售发票/主数据不竖排)
+        await page.evaluate(() => (globalThis.location.hash = '#/sales-invoices'));
+        await page.waitForTimeout(400);
+        await click('#sidebar-toggle', 500);
+        await shot('11-sidebar-collapsed');
 
         assertNoConsoleErrors(expect, guard);
     });

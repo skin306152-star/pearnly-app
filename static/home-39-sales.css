@@ -12,8 +12,26 @@
     padding-left: 52px;
     font-size: 12.5px;
 }
+/* 销售发票 头(纯折叠·非路由)· 复刻 .nav-item 布局令其与同级对齐 */
 .nav-sales-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 7px;
+    color: var(--ink-2);
     cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+    transition: all 120ms;
+}
+.nav-sales-head:hover {
+    background: var(--bg);
+    color: var(--ink);
+}
+.nav-sales-head .nav-label {
+    flex: 1;
+    min-width: 0;
 }
 .nav-sub2-chev {
     width: 14px;
@@ -26,10 +44,16 @@
 .nav-sales-head.sx-open .nav-sub2-chev {
     transform: rotate(180deg);
 }
-/* 销售发票 头行命中时不抢黑底高亮(留给具体子项) */
-.nav-sales-head.active {
-    background: transparent;
-    color: var(--ink);
+/* 侧栏收起态:只留图标 · 隐藏标签/箭头/子项/分区标题(复刻 .nav-item 收起行为) */
+body.sidebar-collapsed .nav-sales-head {
+    justify-content: center;
+    padding: 10px;
+}
+body.sidebar-collapsed .nav-sales-head .nav-label,
+body.sidebar-collapsed .nav-sub2-chev,
+body.sidebar-collapsed .nav-sub2,
+body.sidebar-collapsed .nav-section-label {
+    display: none;
 }
 /* 主数据 分区小标题(商品/客户共享) */
 .nav-section-label {
@@ -706,6 +730,35 @@ table.sx-tbl tr.click:hover td {
 }
 .sx-field-err:empty {
     display: none;
+}
+/* 图片上传字段(商品图 / logo / 印章 / 签字) */
+.sx-imgfield > label {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 5px;
+    color: #374151;
+}
+.sx-imgfield-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sx-imgfield-prev {
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    flex: none;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.sx-imgfield-prev img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 .sx-set-row3 {
     display: grid;

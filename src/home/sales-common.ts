@@ -78,3 +78,64 @@ function authHeaders(): Record<string, string> {
 export function salesFetch(url: string, opts: RequestInit = {}): Promise<Response> {
     return fetch(url, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
 }
+
+// 真上传一张图(POST /api/uploads/image · multipart)→ 返回可存进 image_url/logo_url 的 URL。
+export async function uploadImage(file: File): Promise<{ url?: string; error?: string }> {
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+        const r = await salesFetch('/api/uploads/image', { method: 'POST', body: fd });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.url) return { url: String(d.url) };
+        return { error: String(d.detail || 'HTTP ' + r.status) };
+    } catch (_) {
+        return { error: 'network' };
+    }
+}
+
+// 图片字段(上传按钮 + 缩略图 + 清除)· URL 存进隐藏 input#id,供表单读取。products/account 共用。
+export function imageFieldHtml(id: string, label: string, url?: string | null): string {
+    const u = url || '';
+    return `<div class="sx-imgfield">
+        <label>${escapeHtml(label)}</label>
+        <div class="sx-imgfield-row">
+            <div class="sx-imgfield-prev" id="${id}-prev">${u ? `<img src="${escapeHtml(u)}" alt="">` : ''}</div>
+            <input type="file" id="${id}-file" accept="image/png,image/jpeg,image/webp" hidden>
+            <button type="button" class="btn btn-ghost btn-sm" id="${id}-btn">${escapeHtml(t('sx-upload'))}</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="${id}-clr" style="${u ? '' : 'display:none'}">${escapeHtml(t('sx-upload-clear'))}</button>
+            <input type="hidden" id="${id}" value="${escapeHtml(u)}">
+        </div>
+        <div class="sx-field-err" id="${id}-err"></div>
+    </div>`;
+}
+
+export function bindImageField(id: string): void {
+    const fileEl = document.getElementById(id + '-file') as HTMLInputElement | null;
+    const btn = document.getElementById(id + '-btn');
+    const clr = document.getElementById(id + '-clr');
+    const hidden = document.getElementById(id) as HTMLInputElement | null;
+    const prev = document.getElementById(id + '-prev');
+    const err = document.getElementById(id + '-err');
+    if (!fileEl || !btn || !hidden) return;
+    btn.onclick = () => fileEl.click();
+    fileEl.onchange = async () => {
+        const f = fileEl.files && fileEl.files[0];
+        if (!f) return;
+        if (err) err.textContent = '';
+        const r = await uploadImage(f);
+        if (r.url) {
+            hidden.value = r.url;
+            if (prev) prev.innerHTML = `<img src="${escapeHtml(r.url)}" alt="">`;
+            if (clr) clr.style.display = '';
+        } else if (err) {
+            err.textContent = t(r.error || '') !== r.error ? t(r.error || '') : t('sx-upload-fail');
+        }
+        fileEl.value = '';
+    };
+    if (clr)
+        clr.onclick = () => {
+            hidden.value = '';
+            if (prev) prev.innerHTML = '';
+            clr.style.display = 'none';
+        };
+}

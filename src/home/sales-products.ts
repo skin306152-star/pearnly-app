@@ -1,7 +1,7 @@
 // 销项 PO-10 · 商品管理(主数据 · 共享 · 以后 POS/库存复用)
 // 接真接口 GET/POST/PATCH/DELETE /api/sales/products + /import。四态 + .modal(非抽屉)。
 /* global t, escapeHtml, apiGet, apiPost, showToast */
-import { salesFetch, fmtMoney, htmlVal } from './sales-common.js';
+import { salesFetch, fmtMoney, htmlVal, imageFieldHtml, bindImageField } from './sales-common.js';
 
 interface Product {
     id: string;
@@ -143,7 +143,7 @@ function openEdit(p: Product | null) {
                 <div><label>${escapeHtml(t('sx-p-f-price'))}</label><input type="number" id="sx-pf-price" value="${p ? p.unit_price : ''}" min="0" step="0.01"></div>
             </div>
             <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sx-pf-vat" ${!p || p.vat_applicable ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-p-f-vat'))}</label></div>
-            <div class="form-row"><label>${escapeHtml(t('sx-p-f-image'))}</label><input type="text" id="sx-pf-image" value="${htmlVal(p?.image_url)}" maxlength="1000" placeholder="https://…"></div>
+            <div class="form-row">${imageFieldHtml('sx-pf-image', t('sx-p-f-image'), p?.image_url)}</div>
         </div>
         <div class="modal-footer" style="justify-content:space-between;gap:8px">
             <button class="btn btn-ghost" id="sx-p-cancel">${escapeHtml(t('sx-cancel'))}</button>
@@ -156,6 +156,7 @@ function openEdit(p: Product | null) {
         if (e.target === mask) closeMask('sales-prod-mask');
     };
     document.getElementById('sx-p-save')!.onclick = () => save(p);
+    bindImageField('sx-pf-image');
 }
 
 function readForm() {

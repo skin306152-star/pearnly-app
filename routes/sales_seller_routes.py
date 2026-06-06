@@ -36,6 +36,7 @@ class SellerProfileIn(BaseModel):
     address: Optional[str] = Field(None, max_length=500)
     branch: Optional[str] = Field(None, max_length=120)
     phone: Optional[str] = Field(None, max_length=50)
+    email: Optional[str] = Field(None, max_length=200, description="卖方邮箱 · 发信 Reply-To · §L5")
     vat_registered: Optional[bool] = None
     promptpay_id: Optional[str] = Field(None, max_length=40, description="PromptPay 代理 · §L1")
     # 品牌/模板(§L4):账套级,渲染套到每张票。
@@ -55,6 +56,7 @@ def _out(s: dict) -> dict:
         "address": s.get("address"),
         "branch": s.get("branch"),
         "phone": s.get("phone"),
+        "email": s.get("email"),
         "vat_registered": bool(s.get("vat_registered")),
         "promptpay_id": s.get("promptpay_id"),
         "template_id": s.get("template_id"),

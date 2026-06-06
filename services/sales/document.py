@@ -178,6 +178,7 @@ _SELLER_SNAPSHOT_FIELDS = (
     "address",
     "branch",
     "phone",
+    "email",
     "template_id",
     "brand_color",
     "logo_url",

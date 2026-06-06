@@ -13,7 +13,7 @@ from typing import Any, Optional
 # 品牌/模板列(§L4):account 级,渲染时套到每张票;promptpay_id(§L1)同段。
 _BRAND_COLS = "template_id, brand_color, logo_url, seal_url, signature_url, footer_text"
 _SELLER_COLS = (
-    "id, name, tax_id, address, branch, phone, vat_registered, promptpay_id, " + _BRAND_COLS
+    "id, name, tax_id, address, branch, phone, email, vat_registered, promptpay_id, " + _BRAND_COLS
 )
 _SELLER_WRITABLE = (
     "name",
@@ -21,6 +21,7 @@ _SELLER_WRITABLE = (
     "address",
     "branch",
     "phone",
+    "email",
     "vat_registered",
     "promptpay_id",
     "template_id",

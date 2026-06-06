@@ -21,14 +21,13 @@ from core.auth import get_current_user_from_request
 from core.route_helpers import _require_owner_or_super
 from routes.sales_schemas import ConvertIn, DocumentIn, IssueIn, NoteIn, RejectIn
 from services.sales import approval as approval_svc
-from services.sales import buyer as buyer_mod
 from services.sales import credit_note
 from services.sales import dates as sales_dates
 from services.sales import document as doc_svc
 from services.sales import numbering
-from services.sales import pdf as pdf_svc
 from services.sales import promptpay as promptpay_svc
 from services.sales import quotation as quotation_svc
+from services.sales import render as sales_render
 from services.sales import seller_profile
 from services.sales import settings as settings_svc
 
@@ -191,25 +190,6 @@ def _fail(code: str):
     raise HTTPException(_ERR_HTTP.get(code, 400), detail=f"sales.{code}")
 
 
-def _pdf_parties(cur, tid: str, doc: dict):
-    """PDF 双方来源:已开出从冻结快照取(docs/16 §A · 不实时 join);草稿实时组合。"""
-    snap = doc.get("parties_snapshot")
-    if snap:
-        return snap.get("seller"), snap.get("buyer")
-    seller = None
-    if doc.get("seller_workspace_client_id"):
-        seller = seller_profile.get_seller(
-            cur, tenant_id=tid, workspace_client_id=doc["seller_workspace_client_id"]
-        )
-    if doc.get("buyer_type"):
-        buyer = buyer_mod.from_row(doc)
-    elif doc.get("client_id"):  # 旧单据回退:买方来自 clients
-        buyer = seller_profile.get_buyer(cur, tenant_id=tid, client_id=doc["client_id"])
-    else:
-        buyer = None
-    return seller, buyer
-
-
 @router.get("")
 async def api_list_documents(
     request: Request, status: Optional[str] = None, client_id: Optional[int] = None
@@ -275,16 +255,9 @@ async def api_document_pdf(
         doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
         if not doc:
             _fail("not_found")
-        seller, buyer = _pdf_parties(cur, tid, doc)
-    body = _doc_out(doc)
-    # pdf 收款区读扁平字段;_doc_out 把收款放在嵌套块,这里补扁平给渲染层。
-    body["payment_status"] = doc.get("payment_status")
-    body["payment_method"] = doc.get("payment_method")
-    body["paid_amount"] = _m(doc.get("paid_amount"))
-    body["payment_date"] = doc["payment_date"].isoformat() if doc.get("payment_date") else None
-    data = pdf_svc.render_invoice_pdf(
-        body, seller, buyer, page=page, copy_kind=copy, copies_layout=copies_layout
-    )
+        data = sales_render.build_pdf(
+            cur, tenant_id=tid, doc=doc, page=page, copy_kind=copy, copies_layout=copies_layout
+        )
     suffix = "_set" if copies_layout == "two_up" else ("" if copy == "original" else "_copy")
     filename = (doc.get("doc_number") or "document").replace("/", "_") + suffix
     return Response(

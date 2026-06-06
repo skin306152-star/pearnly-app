@@ -60,7 +60,7 @@ class DocumentIn(BaseModel):
 
 class IssueIn(BaseModel):
     prefix: Optional[str] = Field(None, max_length=20)
-    reset: str = Field("yearly")
+    reset: Optional[str] = Field(None, description="留空则用账套设置默认(§M7)")
     issue_date: Optional[str] = Field(None, description="YYYY-MM-DD · 默认今天")
 
 

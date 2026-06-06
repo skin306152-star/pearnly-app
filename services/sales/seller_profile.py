@@ -64,9 +64,10 @@ def set_seller(cur, *, tenant_id: str, workspace_client_id: int, fields: dict) -
 
 
 def get_buyer(cur, *, tenant_id: str, client_id: int) -> Optional[dict]:
-    """买方(clients)展示信息。clients.tenant_id 可空,故按 (id) 取后校 tenant 归属。"""
+    """买方(clients)展示信息 + 买方目录字段(party_type/branch/promptpay_id · §N)供向导预填买方块。
+    clients.tenant_id 可空,故按 (id) 取后校 tenant 归属。"""
     cur.execute(
-        "SELECT id, name, tax_id, address FROM clients "
+        "SELECT id, name, tax_id, address, party_type, branch, promptpay_id FROM clients "
         "WHERE id=%s AND (tenant_id=%s OR tenant_id IS NULL)",
         (client_id, tenant_id),
     )

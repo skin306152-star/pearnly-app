@@ -30,6 +30,7 @@ from services.sales import pdf as pdf_svc
 from services.sales import promptpay as promptpay_svc
 from services.sales import quotation as quotation_svc
 from services.sales import seller_profile
+from services.sales import settings as settings_svc
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/documents", tags=["sales-documents"])
@@ -325,13 +326,22 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
 
 @router.post("/{doc_id}/issue")
 async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
+    """正式开出。连号前缀/重置/起始号与审批模式取账套设置(§M7)默认,请求可覆盖前缀/重置/日期。
+    审批模式开启(!=none)时草稿不能直开,返 approval_required(走提交→审批)。"""
     tid, _ = _require_tenant(request)
     p = _dump(req)
     on = _resolve_issue_date(p.get("issue_date"))
-    reset = p.get("reset") or numbering.RESET_YEARLY
     with db.get_cursor_rls(tid, commit=True) as cur:
+        st = settings_svc.get_settings(cur, tenant_id=tid)
         doc, err = doc_svc.issue_document(
-            cur, tenant_id=tid, doc_id=doc_id, prefix=p.get("prefix"), reset=reset, on=on
+            cur,
+            tenant_id=tid,
+            doc_id=doc_id,
+            prefix=p.get("prefix") or st["number_prefix"],
+            reset=p.get("reset") or st["number_reset"],
+            on=on,
+            start=st["number_start"],
+            approval_mode=st["approval_mode"],
         )
         if err:
             _fail(err)
@@ -367,17 +377,18 @@ async def api_approve_document(doc_id: str, req: IssueIn, request: Request):
     tid, uid = _require_tenant(request)
     p = _dump(req)
     on = _resolve_issue_date(p.get("issue_date"))
-    reset = p.get("reset") or numbering.RESET_YEARLY
     approver = str(user.get("id")) if user.get("id") else uid
     with db.get_cursor_rls(tid, commit=True) as cur:
+        st = settings_svc.get_settings(cur, tenant_id=tid)
         doc, err = approval_svc.approve(
             cur,
             tenant_id=tid,
             doc_id=doc_id,
             approver=approver,
-            prefix=p.get("prefix"),
-            reset=reset,
+            prefix=p.get("prefix") or st["number_prefix"],
+            reset=p.get("reset") or st["number_reset"],
             on=on,
+            start=st["number_start"],
         )
         if err:
             _fail(err)

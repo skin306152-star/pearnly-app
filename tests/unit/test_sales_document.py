@@ -5,6 +5,7 @@ import unittest
 from datetime import date
 from decimal import Decimal
 
+from services.sales import archive
 from services.sales import document as doc
 from services.sales import numbering
 
@@ -137,7 +138,8 @@ class SeqCursor:
 
     def execute(self, sql, params=None):
         if sql.startswith("INSERT INTO document_number_sequences"):
-            self.store.setdefault(tuple(params[:4]), 1)
+            # params[4] = 起始号(§M7 number_start);序列已存在则 setdefault 不覆盖。
+            self.store.setdefault(tuple(params[:4]), params[4] if len(params) > 4 else 1)
             self._last = None
         elif sql.startswith("SELECT next_number"):
             if "FOR UPDATE" in sql:
@@ -169,6 +171,21 @@ class NumberingTests(unittest.TestCase):
         self.assertEqual([n for _, n in got], [1, 2, 3])
         self.assertEqual([s for s, _ in got], ["INV2026-00001", "INV2026-00002", "INV2026-00003"])
         self.assertTrue(cur.saw_for_update, "取号必须走 SELECT ... FOR UPDATE 锁行")
+
+    def test_start_seeds_first_number(self):
+        """§M7 number_start:新序列从起始号起(接旧账本)。"""
+        cur = SeqCursor()
+        s, n = numbering.allocate(
+            cur,
+            tenant_id="t",
+            doc_type="tax_invoice",
+            prefix="INV",
+            reset="yearly",
+            on=date(2026, 6, 6),
+            start=1001,
+        )
+        self.assertEqual(n, 1001)
+        self.assertEqual(s, "INV2026-01001")
 
     def test_reset_modes_format(self):
         d = date(2026, 6, 6)
@@ -295,7 +312,7 @@ class ArchivalHashTests(unittest.TestCase):
     def test_stores_sha256_and_sets_doc_field(self):
         cur = CaptureCursor()
         d = dict(_ARCH_DOC)
-        doc._store_archival_hash(
+        archive.store_archival_hash(
             cur, "t", "d", d, {"seller": {"name": "A"}, "buyer": {"name": "B"}}
         )
         self.assertEqual(len(d["pdf_sha256"]), 64)
@@ -305,7 +322,7 @@ class ArchivalHashTests(unittest.TestCase):
         cur = CaptureCursor()
         # lines 缺字段会让渲染抛错 -> 兜底吞掉,不写哈希、不抛(assertLogs 收掉那条 ERROR)。
         with self.assertLogs("mr-pilot", level="ERROR"):
-            doc._store_archival_hash(cur, "t", "d", {"lines": [object()]}, {})
+            archive.store_archival_hash(cur, "t", "d", {"lines": [object()]}, {})
         self.assertEqual(cur.calls, [])
 
 

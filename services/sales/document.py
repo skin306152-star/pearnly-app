@@ -9,12 +9,12 @@ tenant_id。SQL 全参数化,列名只来自模块内常量。
 
 from __future__ import annotations
 
-import logging
 from datetime import date
 from typing import Optional
 
 from psycopg2.extras import Json
 
+from services.sales import archive
 from services.sales import buyer as buyer_mod
 from services.sales import numbering
 from services.sales import seller_profile
@@ -382,7 +382,16 @@ def lock_for_issue(cur, tenant_id: str, doc_id) -> Optional[dict]:
 
 
 def finalize_issue(
-    cur, *, tenant_id: str, doc_id, row: dict, prefix, reset: str, on: date, approved_by=None
+    cur,
+    *,
+    tenant_id: str,
+    doc_id,
+    row: dict,
+    prefix,
+    reset: str,
+    on: date,
+    start: int = 1,
+    approved_by=None,
 ) -> tuple[Optional[dict], Optional[str]]:
     """已锁行 → 完整性/收款闸 → 取连号 → status=issued + 冻结双方快照。不过闸不占号。
 
@@ -397,7 +406,13 @@ def finalize_issue(
         return None, perr
     use_prefix = prefix or DEFAULT_PREFIX.get(row["doc_type"], "DOC")
     doc_number, _ = numbering.allocate(
-        cur, tenant_id=tenant_id, doc_type=row["doc_type"], prefix=use_prefix, reset=reset, on=on
+        cur,
+        tenant_id=tenant_id,
+        doc_type=row["doc_type"],
+        prefix=use_prefix,
+        reset=reset,
+        on=on,
+        start=start,
     )
     snapshot = _freeze_parties(cur, tenant_id, row)
     sets = [
@@ -417,27 +432,8 @@ def finalize_issue(
         params + [tenant_id, doc_id],
     )
     doc = get_document(cur, tenant_id=tenant_id, doc_id=doc_id)
-    _store_archival_hash(cur, tenant_id, doc_id, doc, snapshot)
+    archive.store_archival_hash(cur, tenant_id, doc_id, doc, snapshot)
     return doc, None
-
-
-def _store_archival_hash(cur, tenant_id: str, doc_id, doc: dict, snapshot: dict) -> None:
-    """开票存档哈希(§E3 留底):确定性渲染规范存档件取 sha256,写回 pdf_sha256。
-
-    审计增强,非合规闸——渲染失败只记日志、留 NULL,不回滚已开出的票。
-    """
-    try:
-        from services.sales import pdf as pdf_svc
-
-        digest = pdf_svc.archival_sha256(doc, snapshot.get("seller"), snapshot.get("buyer"))
-    except Exception:
-        logging.getLogger("mr-pilot").exception("sales archival hash failed doc=%s", doc_id)
-        return
-    cur.execute(
-        "UPDATE sales_documents SET pdf_sha256=%s WHERE tenant_id=%s AND id=%s",
-        (digest, tenant_id, doc_id),
-    )
-    doc["pdf_sha256"] = digest
 
 
 def issue_document(
@@ -448,6 +444,7 @@ def issue_document(
     prefix: Optional[str],
     reset: str,
     on: date,
+    start: int = 1,
     approval_mode: str = "none",
 ) -> tuple[Optional[dict], Optional[str]]:
     """正式开出(直开路径)。approval_mode!=none 时草稿不能直开,须走提交审批→审批通过(§F)。
@@ -462,7 +459,14 @@ def issue_document(
     if approval_mode and approval_mode != "none":
         return None, "approval_required"
     return finalize_issue(
-        cur, tenant_id=tenant_id, doc_id=doc_id, row=row, prefix=prefix, reset=reset, on=on
+        cur,
+        tenant_id=tenant_id,
+        doc_id=doc_id,
+        row=row,
+        prefix=prefix,
+        reset=reset,
+        on=on,
+        start=start,
     )
 
 

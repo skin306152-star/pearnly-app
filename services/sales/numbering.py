@@ -37,15 +37,19 @@ def format_number(prefix: str, reset: str, on: date, n: int, width: int = 5) -> 
 
 
 def allocate(
-    cur, *, tenant_id: str, doc_type: str, prefix: str, reset: str, on: date
+    cur, *, tenant_id: str, doc_type: str, prefix: str, reset: str, on: date, start: int = 1
 ) -> tuple[str, int]:
-    """事务内取下一个连号 → (展示号, 流水号)。调用方负责开事务并提交。"""
+    """事务内取下一个连号 → (展示号, 流水号)。调用方负责开事务并提交。
+
+    start = 新序列(该 period 首次出号)的起始流水号(接旧账本设 = 旧末号+1);序列已存在则
+    忽略 start(不回拨已发出的号)。
+    """
     period = period_key(reset, on)
     cur.execute(
         "INSERT INTO document_number_sequences (tenant_id, doc_type, prefix, period, next_number) "
-        "VALUES (%s, %s, %s, %s, 1) "
+        "VALUES (%s, %s, %s, %s, %s) "
         "ON CONFLICT (tenant_id, doc_type, prefix, period) DO NOTHING",
-        (tenant_id, doc_type, prefix, period),
+        (tenant_id, doc_type, prefix, period, max(int(start), 1)),
     )
     cur.execute(
         "SELECT next_number FROM document_number_sequences "

@@ -8,6 +8,7 @@
   - PO-1 schema / PO-2 商品 CRUD / PO-3 Excel 导入 / PO-4 开票核心(连号 FOR UPDATE/开出不可改 409/VAT+WHT)/ PO-5 红冲补开(独立连号)/ PO-6 合规 PDF(reportlab·桌面有实物样票)。
   - **账套主体=卖方**(Zihao 纠正:会计事务所多公司):账套主体加开票字段(地址/总分公司/电话/VAT)· 选择账套弹窗改「只选不建」(新增去客户管理)· 真浏览器验 + 0 console error。
 - **⏭️ 下个窗口先做**:**买方信息动态模块** `docs/15-buyer-info-spec.md`(买方类型选择器 + 字段状态机·公司/个人/外国/匿名)——当前完全没有,是 PO-4 表单/PO-10 前端的买方块基础。之后续 PO-7(发送)/PO-10(开票页前端,先出 HTML 草稿)。
+- **📋 后端合规 + 开票全兼容规格** `docs/16-backend-compliance-and-output-spec.md`(与 15 并列·调研窗口审代码产出):A 双方信息冻结快照(已开票不可改·**合规硬伤**)· B §86/4 开票完整性闸 · C VAT 价内/价外 · D 折扣/优惠/内部价(现状只算不显示·要加百分比/整单/PDF显示)· E 纸张(A4/A5/热敏)+正副本(ต้นฉบับ/สำเนา)+留底≥5年+打印 · F 开具审批(多模式可开关)· G 日期历法(曼谷本地日/倒填护栏/佛历/账期)· H 模板(多公司品牌)· **J 税票+收据合并单 + 收款状态(Zihao 2026-06-06 拍板·本期做)** · I 完整性清单 P1~P2(报价转换/发送/WHT多档/PromptPay…)。**P0 硬伤=双方冻结+折扣显示+留底+合并单,建议优先**。
 - **阶段**:需求已澄清 + 设计骨架已铺。~~等两道闸~~ 已破例开建。
 - **范围已定**(Zihao 拍板):统一智能录入引擎 + 销项第一出口 + 比 Paypers 更智能。见 `docs/00-overview.md`。
 - **产出**:全套设计文档 `docs/00–09` + 泰语客户问卷 + 核心 schema 草案 `migrations/0001_sales_core.sql`。
@@ -71,6 +72,26 @@
 - Phase 1 就铺:接口 + `etax_submissions` 表 + `etax_channel` 配置 + **发票模型一次性带全 e-Tax XML 字段** + Provider/SelfHosted 桩(throw 待接通)。
 - 开票流程留唯一 hook(开出后 `if channel: channel.submit(doc)`)· 未来拿到证书/选定中介 = 只填一个适配器,**不动开票主流程**。
 - 合作者"自建 vs 中介"回复只决定填哪个桩 · **不卡 Phase 1**。Paypers 不开销项票/无 e-Tax(已查证)→ 此为超越它的净新增。
+
+## 2026-06-06 · 买方模块 + 合规四块后端【已上线 prod + E2E 全过】(commit 87c21b7)
+
+**做了什么**(spec 15 + spec 16 A/B/D/E1/E2/G/J · 迁移 0009~0011):
+- 买方动态模块 `services/sales/buyer.py`(配置表/归一化/§B 完整性闸)+ 买方块随单据存。
+- §A 双方冻结 `parties_snapshot`(开出冻结 · PDF 从快照渲染 · 改档案不动已开票)。
+- §J 合并单 `tax_invoice_receipt` + 收款四列(无款不开)。
+- D 折扣(行百分比 + 整单按比例摊 · PDF 折扣列)。E1/E2 纸张 A4/A5 + 正/副本角标。
+- G 历法 `services/sales/dates.py`(曼谷本地开票日 + 倒填/未来护栏 + 佛历 + 账期)。
+- 买方块前端**草稿** `桌面/sales-buyer-block-draft.html`(Zihao 已认可**逻辑**;**样式不按此草稿**,等 Zihao 最终设计稿再做 PO-10)。
+
+**验证状态(全部真实做过)**:
+- ✅ 本地全量 unittest **2399 OK** + ruff/black/check_ai_smell/check_file_size/import app 全绿。所有文件 <500。
+- ✅ **prod 迁移已应用**(ssh `pearnly`→`psql $DATABASE_URL`·一个事务原子加 15+1 列·`ADD COLUMN IF NOT EXISTS`·`alembic_version` 推到 `0011_sales_terms`·已验列全在)。prod 不自动迁移(Dockerfile/store.py/db_migrations 无钩子)→ 走既定 ssh+psql 通道(Zihao 授权)。
+- ✅ **已 push 上线**(`87c21b7`·pre-push 守门全绿〔补 6 个 RATCHET-EXEMPT〕·webhook 部署完成·两 worker `Application startup complete`·无 ImportError/Traceback)。
+- ✅ **prod 真链路 E2E = 13/13 PASS**(在 prod 库跑真代码·全程事务 ROLLBACK·零残留)。过的:A 公司买方块入库+行折扣算税(180/12.60/192.60)· B 取号+`parties_snapshot` jsonb+买卖双方冻结 · **E 冻结证明:改卖方档案后已开票快照仍旧名 + PDF 从快照渲染** · F 红冲继承冻结快照 · C §B 匿名开完整税票被拦 · D §J 收据无款不开+补款后可开。
+
+**产品决策(Zihao 2026-06-06 · 留后续)**:C 价内外=默认价外·单据级开关·不做行级;F 审批=本期不做(有客户再加·默认关·老板=审批人);H 模板/热敏=随 UI 一起设计;E3 pdf_sha256=可选有空再加。
+
+**下一棒**:① PO-10 开票页前端(买方块状态机·**等 Zihao 最终设计稿**·桌面 `sales-buyer-block-draft.html` 仅逻辑参考)② PO-7 发送(邮件/LINE/打印)③ C 价内外(默认价外·单据级开关)。i18n 4 语随 PO-10 前端补。
 
 ## 变更日志
 

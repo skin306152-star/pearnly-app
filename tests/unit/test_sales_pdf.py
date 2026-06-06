@@ -143,6 +143,46 @@ class PdfRenderTests(unittest.TestCase):
         b = dict(_BUYER, type="company", branch_type="hq")
         self.assertTrue(pdf.render_invoice_pdf(doc, _SELLER, b).startswith(b"%PDF"))
 
+    def test_thermal_80_and_58_render(self):
+        """§E1 热敏窄版:80/58mm 走单列布局,返回有效 PDF。"""
+        for pg in ("thermal_80", "thermal_58"):
+            data = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, page=pg)
+            self.assertTrue(data.startswith(b"%PDF"), pg)
+
+    def test_thermal_receipt_with_payment_renders(self):
+        doc = dict(
+            _DOC,
+            doc_type="tax_invoice_receipt",
+            payment_status="paid",
+            paid_amount="107.00",
+            payment_method="cash",
+            payment_date="2026-06-06",
+        )
+        b = dict(_BUYER, type="anonymous")
+        self.assertTrue(pdf.render_invoice_pdf(doc, _SELLER, b, page="thermal_80").startswith(b"%PDF"))
+
+    def test_thermal_two_up_falls_back(self):
+        """热敏不支持 two_up:回落单联,仍出有效 PDF(§E2)。"""
+        data = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, page="thermal_80", copies_layout="two_up")
+        self.assertTrue(data.startswith(b"%PDF"))
+
+    def test_archival_sha256_deterministic(self):
+        """§E3 留底:确定性渲染同输入同哈希,可复算核验未篡改。"""
+        h1 = pdf.archival_sha256(_DOC, _SELLER, _BUYER)
+        h2 = pdf.archival_sha256(_DOC, _SELLER, _BUYER)
+        self.assertEqual(h1, h2)
+        self.assertEqual(len(h1), 64)
+
+    def test_archival_sha256_changes_with_content(self):
+        h1 = pdf.archival_sha256(_DOC, _SELLER, _BUYER)
+        h2 = pdf.archival_sha256(dict(_DOC, grand_total="999.00"), _SELLER, _BUYER)
+        self.assertNotEqual(h1, h2)
+
+    def test_deterministic_flag_reproduces_bytes(self):
+        a = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, deterministic=True)
+        b = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, deterministic=True)
+        self.assertEqual(a, b)
+
 
 if __name__ == "__main__":
     unittest.main()

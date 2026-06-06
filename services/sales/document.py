@@ -9,6 +9,7 @@ tenant_id。SQL 全参数化,列名只来自模块内常量。
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Optional
 
@@ -51,6 +52,7 @@ _DOC_COLS = (
     "buyer_type, buyer_name, buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no, "
     "parties_snapshot, payment_status, paid_amount, payment_method, payment_date, "
     "due_date, payment_terms, approved_by, approved_at, rejected_reason, "
+    "pdf_sha256, pdf_url, "
     "issued_at, created_by, references_document_id, reference_reason, created_at, updated_at"
 )
 _LINE_COLS = (
@@ -394,7 +396,28 @@ def finalize_issue(
         f"UPDATE sales_documents SET {', '.join(sets)} WHERE tenant_id=%s AND id=%s",
         params + [tenant_id, doc_id],
     )
-    return get_document(cur, tenant_id=tenant_id, doc_id=doc_id), None
+    doc = get_document(cur, tenant_id=tenant_id, doc_id=doc_id)
+    _store_archival_hash(cur, tenant_id, doc_id, doc, snapshot)
+    return doc, None
+
+
+def _store_archival_hash(cur, tenant_id: str, doc_id, doc: dict, snapshot: dict) -> None:
+    """开票存档哈希(§E3 留底):确定性渲染规范存档件取 sha256,写回 pdf_sha256。
+
+    审计增强,非合规闸——渲染失败只记日志、留 NULL,不回滚已开出的票。
+    """
+    try:
+        from services.sales import pdf as pdf_svc
+
+        digest = pdf_svc.archival_sha256(doc, snapshot.get("seller"), snapshot.get("buyer"))
+    except Exception:
+        logging.getLogger("mr-pilot").exception("sales archival hash failed doc=%s", doc_id)
+        return
+    cur.execute(
+        "UPDATE sales_documents SET pdf_sha256=%s WHERE tenant_id=%s AND id=%s",
+        (digest, tenant_id, doc_id),
+    )
+    doc["pdf_sha256"] = digest
 
 
 def issue_document(

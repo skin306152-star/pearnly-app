@@ -199,6 +199,7 @@ def _doc_out(d: dict) -> dict:
         "wht_amount": _m(d.get("wht_amount")),
         "grand_total": _m(d.get("grand_total")),
         "issued_at": d["issued_at"].isoformat() if d.get("issued_at") else None,
+        "pdf_sha256": d.get("pdf_sha256"),
         "references_document_id": (
             str(d["references_document_id"]) if d.get("references_document_id") else None
         ),

@@ -246,5 +246,45 @@ class StateGuardTests(unittest.TestCase):
         self.assertEqual(err, "already_void")
 
 
+class CaptureCursor:
+    def __init__(self):
+        self.calls = []
+
+    def execute(self, sql, params=None):
+        self.calls.append((sql, params))
+
+
+_ARCH_DOC = {
+    "doc_type": "tax_invoice",
+    "doc_number": "INV2026-00001",
+    "issue_date": "2026-06-06",
+    "currency": "THB",
+    "subtotal": "100.00",
+    "vat_rate": "7.00",
+    "vat_amount": "7.00",
+    "wht_amount": "0.00",
+    "grand_total": "107.00",
+    "lines": [{"line_no": 1, "description": "x", "qty": "1", "unit_price": "100", "line_total": "100.00"}],
+}
+
+
+class ArchivalHashTests(unittest.TestCase):
+    """§E3 留底:开票时存确定性 PDF 哈希(审计增强,失败不阻断)。"""
+
+    def test_stores_sha256_and_sets_doc_field(self):
+        cur = CaptureCursor()
+        d = dict(_ARCH_DOC)
+        doc._store_archival_hash(cur, "t", "d", d, {"seller": {"name": "A"}, "buyer": {"name": "B"}})
+        self.assertEqual(len(d["pdf_sha256"]), 64)
+        self.assertTrue(any("pdf_sha256=%s" in sql for sql, _ in cur.calls))
+
+    def test_render_failure_does_not_raise(self):
+        cur = CaptureCursor()
+        # lines 缺字段会让渲染抛错 -> 兜底吞掉,不写哈希、不抛(assertLogs 收掉那条 ERROR)。
+        with self.assertLogs("mr-pilot", level="ERROR"):
+            doc._store_archival_hash(cur, "t", "d", {"lines": [object()]}, {})
+        self.assertEqual(cur.calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()

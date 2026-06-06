@@ -130,7 +130,7 @@ function openEdit(p: Product | null) {
             <button class="modal-close" id="sx-p-close">${IC_X}</button></div>
         <div class="modal-body">
             <div class="form-row form-row-2col">
-                <div><label>${escapeHtml(t('sx-p-f-code'))}</label><input type="text" id="sx-pf-code" value="${htmlVal(p?.code)}" maxlength="100"></div>
+                <div><label>${escapeHtml(t('sx-p-f-code'))}</label><input type="text" id="sx-pf-code" value="${htmlVal(p?.code)}" maxlength="100"><div class="sx-field-err" id="sx-pf-code-err"></div></div>
                 <div><label>${escapeHtml(t('sx-p-f-barcode'))}</label><input type="text" id="sx-pf-barcode" value="${htmlVal(p?.barcode)}" maxlength="100"></div>
             </div>
             <div class="form-row"><label>${escapeHtml(t('sx-p-f-name-th'))} *</label><input type="text" id="sx-pf-th" value="${htmlVal(p?.name_th)}" maxlength="300"></div>
@@ -179,8 +179,14 @@ async function failMsg(r: Response, fallbackKey: string): Promise<string> {
     return t(fallbackKey) + ' · ' + detail;
 }
 
+function setCodeErr(msg: string) {
+    const el = document.getElementById('sx-pf-code-err');
+    if (el) el.textContent = msg;
+}
+
 async function save(p: Product | null) {
     const payload = readForm();
+    setCodeErr('');
     if (!payload.name_th) return showToast(t('sx-p-name-required'), 'error');
     const url = p ? `/api/sales/products/${p.id}` : '/api/sales/products';
     try {
@@ -190,7 +196,15 @@ async function save(p: Product | null) {
             body: JSON.stringify(payload),
         });
         if (!r.ok) {
-            showToast(await failMsg(r, 'sx-p-save-fail'), 'error');
+            const d = await r.json().catch(() => ({}));
+            const detail = d && d.detail ? String(d.detail) : 'HTTP ' + r.status;
+            // 编码重复 → 标在「编码」框旁(红字),不弹系统错误
+            if (detail === 'sales.product_code_exists') {
+                setCodeErr(t('sales.product_code_exists'));
+                (document.getElementById('sx-pf-code') as HTMLInputElement)?.focus();
+                return;
+            }
+            showToast(t('sx-p-save-fail') + ' · ' + detail, 'error');
             return;
         }
         closeMask('sales-prod-mask');

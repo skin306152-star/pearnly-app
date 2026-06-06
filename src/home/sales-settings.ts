@@ -18,7 +18,14 @@ interface Settings {
 
 const IC_X =
     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>';
-const WHT_RATES = ['0', '1', '2', '3', '5'];
+// WHT 档位(照草稿):值 + 类型标签 i18n 键;另加「自定义」可填任意率。
+const WHT_OPTS: [string, string][] = [
+    ['0', 'sx-wht-none'],
+    ['1', 'sx-wht-transport'],
+    ['2', 'sx-wht-ad'],
+    ['3', 'sx-wht-service'],
+    ['5', 'sx-wht-rent'],
+];
 
 let st: Settings;
 
@@ -58,10 +65,14 @@ function numberPreview(): string {
 }
 
 function render() {
-    const whtOpts = WHT_RATES.map(
-        (r) =>
-            `<option value="${r}" ${String(Number(st.default_wht_rate)) === r ? 'selected' : ''}>${r}%</option>`
-    ).join('');
+    const whtCur = String(Number(st.default_wht_rate) || 0);
+    const whtPreset = WHT_OPTS.some((o) => o[0] === whtCur);
+    const whtOpts =
+        WHT_OPTS.map(
+            ([r, k]) =>
+                `<option value="${r}" ${whtCur === r ? 'selected' : ''}>${r}% ${escapeHtml(t(k))}</option>`
+        ).join('') +
+        `<option value="custom" ${!whtPreset ? 'selected' : ''}>${escapeHtml(t('sx-wht-custom'))}</option>`;
     mask().innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
         <div class="modal-header"><div class="modal-title">${escapeHtml(t('sx-set-title'))}</div>
             <button class="modal-close" id="sx-set-close">${IC_X}</button></div>
@@ -99,7 +110,8 @@ function render() {
             </div>
             <div class="sx-set-card">
                 <div class="sx-set-h">${escapeHtml(t('sx-set-wht'))}</div>
-                <select id="sx-set-wht" style="max-width:280px">${whtOpts}</select>
+                <select id="sx-set-wht" style="width:100%">${whtOpts}</select>
+                <input type="number" id="sx-set-wht-custom" min="0" max="100" step="0.5" value="${whtPreset ? '' : Number(st.default_wht_rate) || 0}" placeholder="%" style="width:120px;margin-top:8px;${whtPreset ? 'display:none' : ''}">
                 <div class="sx-hint">${escapeHtml(t('sx-set-wht-hint'))}</div>
             </div>
             <div class="sx-set-card">
@@ -160,7 +172,14 @@ function bind() {
             if (pv) pv.textContent = numberPreview();
         };
     const wht = document.getElementById('sx-set-wht') as HTMLSelectElement | null;
-    if (wht) wht.onchange = () => (st.default_wht_rate = wht.value);
+    const whtCustom = document.getElementById('sx-set-wht-custom') as HTMLInputElement | null;
+    if (wht)
+        wht.onchange = () => {
+            const custom = wht.value === 'custom';
+            if (whtCustom) whtCustom.style.display = custom ? '' : 'none';
+            st.default_wht_rate = custom ? Number(whtCustom?.value) || 0 : wht.value;
+        };
+    if (whtCustom) whtCustom.oninput = () => (st.default_wht_rate = Number(whtCustom.value) || 0);
     const twoUp = document.getElementById('sx-set-2up') as HTMLInputElement | null;
     if (twoUp)
         twoUp.onchange = () => (st.default_copies_layout = twoUp.checked ? 'two_up' : 'separate');

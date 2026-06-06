@@ -91,7 +91,37 @@
 
 **产品决策(Zihao 2026-06-06 · 留后续)**:C 价内外=默认价外·单据级开关·不做行级;F 审批=本期不做(有客户再加·默认关·老板=审批人);H 模板/热敏=随 UI 一起设计;E3 pdf_sha256=可选有空再加。
 
-**下一棒**:① PO-10 开票页前端(买方块状态机·**等 Zihao 最终设计稿**·桌面 `sales-buyer-block-draft.html` 仅逻辑参考)② PO-7 发送(邮件/LINE/打印)③ C 价内外(默认价外·单据级开关)。i18n 4 语随 PO-10 前端补。
+**下一棒 = 按 `docs/16` §M「执行顺序到闭环」逐一做,每块做完即验**(Zihao 2026-06-06 拍板:把后端全做完→再前端→上线闭环):
+1. C 价内外(§C·默认价外·单据级) 2. 省纸两联(§E2 `copies_layout=two_up`) 3. F 审批(§F·默认关·owner审批) 4. E3 `pdf_sha256`+热敏窄版(§E1/E3) 5. PromptPay/WHT多档/报价转换(§L1-3) 6. H 模板**后端管道**(§L4·视觉留设计稿) 7. PO-7 邮件发送(**LINE=高敏·留 Zihao 在场**) 8. PO-10 开票页前端〔按桌面样稿 **`Pearnly开票UI预览/index.html`** 向导式整流程 + buyer 草稿逻辑〕→ i18n 4 语 → 真账号 E2E → **上线闭环**。
+> 卡口:**LINE 发送**不无人值守(等 Zihao 在场);prod 迁移走 ssh+psql 经授权。**H 模板视觉已定稿**(app.html 3 套预设)不再 gated。
+> **整套前端"图纸"已出齐**(Zihao 2026-06-06「先出全套设计再施工」):`Pearnly开票UI预览/app.html`(模块工作台:列表/详情含作废红冲补开转换/商品/客户含买方类型/账套含品牌+模板/开票设置)+ `index.html`(开票向导:5步+输出设置+省纸+成功面板)+ `sales-buyer-block-draft.html`(买方逻辑)。**前后端契约 + 设置存储缺口见 `docs/16` §N。** PO-10 照这三份施工,视觉别另起。
+> **按图施工保障 = `docs/17-frontend-handoff-and-acceptance.md`**(Zihao 担心漏功能/死按钮):全量「按钮→动作→接口」矩阵(精确 path · ✅有/🔧待建)+ 设计令牌锁死 + **验收 = 真浏览器自动点每个按钮断言路由真通 + 截图比对草稿** + 每屏完成判定。**🔧 待建接口(settings/send/promptpay-qr/convert + clients/seller 补字段)先于对应前端按钮做,否则必出死按钮。** 施工窗口照 §17 验收,不过不算完成。
+
+## 2026-06-06(续)· §M 后端块 1-3 做完(本地验·**未 push·待 Zihao 授权 prod 迁移+上线**)
+
+**做了什么**(§M 1-3 · 迁移 0012/0013 · 本地提交未 push):
+- **§M1 C 价内/价外**(`price_includes_vat`·单据级开关·默认价外):`compute_totals` 价内反算
+  `vat=base*rate/(100+rate)`,PDF 合计区按模式分支并单列 VAT;红冲/补开继承原单价内外。迁移 0012。
+  顺带把金额算法从 `document.py` 抽到新 **`services/sales/totals.py`**(document 506→<500·`compute_totals` re-export)。
+- **§M2 省纸两联**(`copies_layout=two_up`):`render_invoice_pdf` 正本+副本印同张 A4/A5(上下半幅
+  Frame+虚线裁切线·`KeepInFrame` shrink·7 行明细实测仍单页)·热敏自动回落 separate。无 schema。
+- **§M3 F 审批**(`approval_mode`·默认 none):状态机 draft→submit→pending_approval→(owner 批准取号)
+  issued / 驳回→rejected→改→draft。新 **`services/sales/approval.py`**(状态迁移叶子)+ 抽出
+  `document.finalize_issue`/`lock_for_issue`(直开与审批同一套取号/冻结/闸)。审批端点 owner-gated
+  (复用 `_require_owner_or_super`)。迁移 0013(approved_by/at + rejected_reason)。
+  ⚠️ `approval_mode` 策略源 = `sales_settings`(§M7·**尚未建**)→ 当前路由默认 none(行为不变),
+  端点已就绪;**§M7 落地时把 issue 路由接 settings.approval_mode 即激活**(已留 seam)。
+
+**验证(本地全做)**:全量 unittest **2431 OK** · ruff/black/check_ai_smell/check_file_size 全绿(全文件 <500)·
+check_line_ratchet 全绿(已加 5 个 RATCHET-EXEMPT·新功能合理增长)·import app OK。`/simplify` 已收口
+(pdf 复用 totals._d·删未用 subtotal_after)。HEAD=本地 6 commit(d613143..exempt)·**origin 仍在 a1169bf**。
+
+**待 Zihao(高敏闭环卡口)**:① 授权 prod 迁移 0012+0013(ssh `pearnly`→`psql` 一事务 ADD COLUMN IF NOT EXISTS)
+② 授权 push(=部署)③ push 后真账号 E2E 验价内外/省纸PDF/审批三态。**真账号 E2E + LINE 仍按铁律 #26。**
+
+**下一棒(§M 续)**:4. E3 `pdf_sha256`+热敏窄版 5. L1 PromptPay / L2 WHT多档 / L3 报价转换
+6. L4 模板后端管道 7. `sales_settings`(并激活 approval_mode)+ clients/workspace_clients 补字段
+8. PO-7 邮件发送 9. PO-10 前端。
 
 ## 变更日志
 

@@ -348,6 +348,20 @@
         }
     };
 
+    // 前台启动包(04 §1)· 取业态(modules.pos.config.business_type)分流零售/餐厅。
+    data.bootstrap = async function () {
+        try {
+            return await apiFetch(
+                'GET',
+                '/api/pos/bootstrap?workspace_client_id=' + (state.workspaceClientId || '')
+            );
+        } catch (e) {
+            if (POS.isRouteMissing(e) && POS.allowMock())
+                return { modules: { pos: { config: { business_type: 'retail' } } } };
+            throw e;
+        }
+    };
+
     data.products = async function (q, cat) {
         try {
             const qs = new URLSearchParams({ workspace_client_id: state.workspaceClientId || '' });

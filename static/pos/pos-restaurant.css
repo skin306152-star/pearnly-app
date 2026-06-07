@@ -1,0 +1,184 @@
+/*
+ * Pearnly POS 餐厅业态 · 4 屏样式(docs/pos/restaurant · 视觉照搬桌面 Pearnly_餐厅POS_UI预览)
+ * 逐字移植概念稿 01 桌台总览 / 02 点单 / 03 厨房单 KOT / 04 埋单结账 的 :root 令牌 + <style>,
+ * 数值一个不改;按屏作用域(.pos-view--rtables/rorder/rkitchen + .rt-*)隔离,不碰零售 .pos-view--main。
+ * 复用 pos.css 顶层 --blue/--ink/--bg 等令牌;厨房屏自带深色令牌。.prettierignore 豁免(同 home-*.css)。
+ */
+
+/* 餐厅状态色(总览 + 厨房共用)*/
+.pos-view--rtables, .pos-view--rorder {
+    --free: #16A34A; --free-bg: #f0fdf4; --seat: #2563EB; --seat-bg: #eff5ff;
+    --cook: #F59E0B; --cook-bg: #fffbeb; --bill: #DC2626; --bill-bg: #fef2f2;
+}
+
+/* ════════════════ 屏 1 · 桌台总览(概念稿 01)════════════════ */
+.pos-view--rtables.is-active { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.pos-view--rtables .rtop { height: 54px; flex: 0 0 54px; background: var(--ink); color: #fff; display: flex; align-items: center; gap: 16px; padding: 0 18px; }
+.pos-view--rtables .rtop .brand { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.pos-view--rtables .rtop .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--blue); }
+.pos-view--rtables .seg { display: flex; background: rgba(255, 255, 255, .08); border-radius: 9px; padding: 3px; }
+.pos-view--rtables .seg button { border: 0; background: transparent; color: #cbd2dc; font-size: 13px; padding: 6px 14px; border-radius: 7px; cursor: pointer; }
+.pos-view--rtables .seg button.on { background: #fff; color: var(--ink); font-weight: 600; }
+.pos-view--rtables .rtop .sp { flex: 1; }
+.pos-view--rtables .rtop .kbtn { height: 32px; padding: 0 13px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 8px; background: rgba(255, 255, 255, .06); color: #e5e7eb; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.pos-view--rtables .rtop .clock { color: #d1d5db; font-size: 13px; }
+.pos-view--rtables .legend { display: flex; gap: 16px; padding: 12px 20px; align-items: center; flex-wrap: wrap; }
+.pos-view--rtables .lg { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink2); }
+.pos-view--rtables .lg .d { width: 11px; height: 11px; border-radius: 3px; }
+.pos-view--rtables .zones { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.pos-view--rtables .zone { height: 30px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 12.5px; cursor: pointer; color: var(--ink2); display: inline-flex; align-items: center; }
+.pos-view--rtables .zone.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.pos-view--rtables .grid { flex: 1; overflow: auto; padding: 6px 20px 22px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-content: start; }
+.pos-view--rtables .t { border-radius: 14px; border: 1.5px solid; padding: 14px; cursor: pointer; min-height: 128px; display: flex; flex-direction: column; transition: transform .08s; box-shadow: var(--shadow); }
+.pos-view--rtables .t:active { transform: scale(.97); }
+.pos-view--rtables .t .no { font-size: 19px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; }
+.pos-view--rtables .t .cap { font-size: 12px; color: var(--ink2); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+.pos-view--rtables .t .mid { flex: 1; }
+.pos-view--rtables .t .ft { display: flex; align-items: flex-end; justify-content: space-between; }
+.pos-view--rtables .t .amt { font-weight: 700; font-size: 16px; }
+.pos-view--rtables .t .time { font-size: 11.5px; color: var(--ink3); }
+.pos-view--rtables .t .st { font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 600; }
+.pos-view--rtables .t.free { border-color: #bbf7d0; background: var(--free-bg); }
+.pos-view--rtables .t.free .st { background: #dcfce7; color: #15803d; }
+.pos-view--rtables .t.free .amt { color: var(--ink3); }
+.pos-view--rtables .t.seat { border-color: #bfdbfe; background: var(--seat-bg); }
+.pos-view--rtables .t.seat .st { background: #dbeafe; color: #1d4ed8; }
+.pos-view--rtables .t.cook { border-color: #fde9c8; background: var(--cook-bg); }
+.pos-view--rtables .t.cook .st { background: #fef3c7; color: #b45309; }
+.pos-view--rtables .t.bill { border-color: #fecaca; background: var(--bill-bg); }
+.pos-view--rtables .t.bill .st { background: #fee2e2; color: #b91c1c; }
+.pos-view--rtables .rstate { flex: 1; display: grid; place-items: center; color: var(--ink3); font-size: 13.5px; text-align: center; padding: 40px; }
+
+/* ════════════════ 屏 2 · 点单(概念稿 02)════════════════ */
+.pos-view--rorder.is-active { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.pos-view--rorder .rtop { height: 54px; flex: 0 0 54px; background: var(--ink); color: #fff; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
+.pos-view--rorder .rtop .back { width: 32px; height: 32px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, .08); color: #e5e7eb; display: grid; place-items: center; cursor: pointer; }
+.pos-view--rorder .rtop .tt { font-weight: 700; font-size: 16px; }
+.pos-view--rorder .rtop .meta { color: #cbd2dc; font-size: 12.5px; }
+.pos-view--rorder .rtop .sp { flex: 1; }
+.pos-view--rorder .main { flex: 1; display: flex; min-height: 0; }
+.pos-view--rorder .left { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 14px 14px 0; }
+.pos-view--rorder .cats { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; }
+.pos-view--rorder .cat { flex: 0 0 auto; height: 34px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink2); font-size: 13.5px; cursor: pointer; }
+.pos-view--rorder .cat.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.pos-view--rorder .dishes { flex: 1; overflow: auto; display: grid; gap: 11px; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); align-content: start; padding-bottom: 14px; }
+.pos-view--rorder .dish { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; transition: transform .08s; }
+.pos-view--rorder .dish:active { transform: scale(.96); }
+.pos-view--rorder .dish .img { aspect-ratio: 1.5/1; background: linear-gradient(135deg, #f0f0ec, #e6e6e1); display: grid; place-items: center; color: var(--ink3); }
+.pos-view--rorder .dish .m { padding: 8px 10px 10px; }
+.pos-view--rorder .dish .n { font-size: 13px; line-height: 1.3; height: 34px; overflow: hidden; }
+.pos-view--rorder .dish .p { margin-top: 4px; font-weight: 700; }
+.pos-view--rorder .right { flex: 0 0 350px; background: var(--card); border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+.pos-view--rorder .rh { padding: 13px 16px; border-bottom: 1px solid var(--line-2); }
+.pos-view--rorder .rh .a { font-weight: 700; }
+.pos-view--rorder .rh .b { font-size: 12px; color: var(--ink2); margin-top: 2px; }
+.pos-view--rorder .lines { flex: 1; overflow: auto; }
+.pos-view--rorder .ln { padding: 11px 16px; border-bottom: 1px solid #f6f6f3; }
+.pos-view--rorder .ln .top1 { display: flex; align-items: center; gap: 10px; }
+.pos-view--rorder .ln .nm { flex: 1; font-size: 13.5px; }
+.pos-view--rorder .ln .stp { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.pos-view--rorder .ln .stp button { width: 28px; height: 28px; border: 0; background: #fff; font-size: 16px; cursor: pointer; }
+.pos-view--rorder .ln .stp .q { width: 28px; text-align: center; font-size: 13.5px; }
+.pos-view--rorder .ln .amt { width: 58px; text-align: right; font-weight: 600; font-size: 13.5px; }
+.pos-view--rorder .ln .opt { font-size: 11.5px; color: var(--amber); margin-top: 4px; cursor: pointer; }
+.pos-view--rorder .ln.sent .nm::after { content: attr(data-sent); font-size: 10.5px; color: var(--green); background: #dcfce7; padding: 1px 6px; border-radius: 5px; margin-left: 7px; }
+.pos-view--rorder .tot { border-top: 1px solid var(--line-2); padding: 12px 16px; }
+.pos-view--rorder .trow { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 6px; color: var(--ink2); }
+.pos-view--rorder .grand { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 12px; }
+.pos-view--rorder .grand .v { font-size: 24px; font-weight: 800; }
+.pos-view--rorder .acts { display: flex; gap: 9px; }
+.pos-view--rorder .acts button { flex: 1; height: 50px; border: 0; border-radius: 11px; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.pos-view--rorder .acts .send { background: var(--blue); color: #fff; }
+.pos-view--rorder .acts .send:hover { background: var(--blue-d); }
+.pos-view--rorder .acts .send:disabled { background: #c7cdd6; cursor: not-allowed; }
+.pos-view--rorder .acts .bill { background: #fff; border: 1px solid var(--line); color: var(--ink); flex: 0 0 auto; width: 54px; }
+.pos-view--rorder .empty { padding: 30px 16px; text-align: center; color: var(--ink3); font-size: 13px; }
+
+/* ════════════════ 屏 3 · 厨房单 KOT(概念稿 03 · 深色)════════════════ */
+.pos-view--rkitchen { --kbg: #0f1115; --kcard: #1b1e25; --kline: #2a2e37; --knew: #F59E0B; --kcook: #2563EB; --klate: #DC2626; --kdone: #16A34A; }
+.pos-view--rkitchen.is-active { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--kbg); color: #e5e7eb; }
+.pos-view--rkitchen .ktop { height: 52px; flex: 0 0 52px; background: #15171c; display: flex; align-items: center; gap: 16px; padding: 0 18px; border-bottom: 1px solid var(--kline); }
+.pos-view--rkitchen .ktop .brand { font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+.pos-view--rkitchen .ktop .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--kcook); }
+.pos-view--rkitchen .ktop .back { width: 30px; height: 30px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, .08); color: #e5e7eb; display: grid; place-items: center; cursor: pointer; }
+.pos-view--rkitchen .ktop .sp { flex: 1; }
+.pos-view--rkitchen .ktop .stat { font-size: 12.5px; color: var(--ink3); }
+.pos-view--rkitchen .kgrid { flex: 1; overflow: auto; padding: 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); align-content: start; }
+.pos-view--rkitchen .tk { background: var(--kcard); border: 1px solid var(--kline); border-top: 4px solid var(--knew); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+.pos-view--rkitchen .tk.cooking { border-top-color: var(--kcook); }
+.pos-view--rkitchen .tk.late { border-top-color: var(--klate); }
+.pos-view--rkitchen .tk .h { padding: 11px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--kline); }
+.pos-view--rkitchen .tk .no { font-size: 17px; font-weight: 800; color: #fff; }
+.pos-view--rkitchen .tk .tm { font-size: 12.5px; color: var(--ink3); display: flex; align-items: center; gap: 5px; }
+.pos-view--rkitchen .tk.late .tm { color: #f87171; font-weight: 700; }
+.pos-view--rkitchen .tk .items { padding: 10px 14px; flex: 1; }
+.pos-view--rkitchen .it { display: flex; gap: 9px; padding: 6px 0; font-size: 14.5px; }
+.pos-view--rkitchen .it .q { color: var(--knew); font-weight: 800; flex: 0 0 auto; }
+.pos-view--rkitchen .tk.cooking .it .q { color: #60a5fa; }
+.pos-view--rkitchen .it .nt { font-size: 12px; color: #fca5a5; margin-left: auto; }
+.pos-view--rkitchen .tk .act { padding: 10px 14px; border-top: 1px solid var(--kline); }
+.pos-view--rkitchen .tk .btn { width: 100%; height: 42px; border: 0; border-radius: 9px; font-weight: 700; font-size: 14px; cursor: pointer; color: #fff; }
+.pos-view--rkitchen .tk .btn.start { background: var(--kcook); }
+.pos-view--rkitchen .tk .btn.done { background: var(--kdone); }
+.pos-view--rkitchen .kempty { grid-column: 1 / -1; text-align: center; color: var(--ink3); font-size: 13.5px; padding: 60px 16px; }
+
+/* ════════════════ 屏 4 · 埋单结账(概念稿 04 · 弹窗)════════════════ */
+.rt-mask { position: fixed; inset: 0; background: rgba(17, 24, 39, .5); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 60; padding: 20px; }
+.rt-mask.show { display: flex; }
+.rt-bill { width: 560px; max-width: 96vw; background: var(--card); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); max-height: 92vh; display: flex; flex-direction: column; }
+.rt-bill .h { padding: 16px 20px; border-bottom: 1px solid var(--line-2); display: flex; align-items: center; gap: 12px; }
+.rt-bill .h .t { font-weight: 700; font-size: 16px; }
+.rt-bill .h .s { color: var(--ink2); font-size: 12.5px; margin-top: 2px; }
+.rt-bill .h .x { margin-left: auto; width: 30px; height: 30px; border: 0; border-radius: 8px; background: #f0f0ec; color: #6b7280; cursor: pointer; display: grid; place-items: center; }
+.rt-bill .split { display: flex; gap: 8px; padding: 14px 20px 4px; }
+.rt-bill .split button { flex: 1; height: 40px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink2); font-size: 13px; cursor: pointer; }
+.rt-bill .split button.on { border-color: var(--blue); background: var(--blue-l); color: var(--blue); font-weight: 600; }
+.rt-bill .lines { padding: 6px 20px; overflow: auto; flex: 1; }
+.rt-bill .ln { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid #f6f6f3; font-size: 13.5px; }
+.rt-bill .ln:last-child { border-bottom: 0; }
+.rt-bill .ln .nm { flex: 1; }
+.rt-bill .ln .q { color: var(--ink2); font-size: 12px; }
+.rt-bill .ln .amt { font-weight: 600; }
+.rt-bill .ln .chk { width: 22px; height: 22px; border: 1.5px solid var(--line); border-radius: 6px; display: none; place-items: center; color: transparent; cursor: pointer; flex: 0 0 22px; }
+.rt-bill.byitem .ln .chk { display: grid; }
+.rt-bill .ln.sel .chk { background: var(--blue); border-color: var(--blue); color: #fff; }
+.rt-bill .tot { border-top: 1px solid var(--line-2); padding: 14px 20px; }
+.rt-bill .trow { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 7px; color: var(--ink2); }
+.rt-bill .trow.vat { font-size: 12px; }
+.rt-bill .grand { display: flex; justify-content: space-between; align-items: baseline; margin: 6px 0 0; }
+.rt-bill .grand .l { font-weight: 600; font-size: 15px; }
+.rt-bill .grand .v { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+.rt-bill .pm { display: flex; gap: 9px; padding: 14px 20px 4px; }
+.rt-bill .pm button { flex: 1; height: 54px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--ink2); font-size: 12.5px; }
+.rt-bill .pm button.on { border-color: var(--blue); background: var(--blue-l); color: var(--blue); }
+.rt-bill .foot { padding: 10px 20px 20px; display: flex; gap: 10px; }
+.rt-bill .foot .ghost { flex: 0 0 auto; height: 52px; padding: 0 16px; border: 1px solid var(--line); border-radius: 11px; background: #fff; color: var(--ink2); font-size: 13.5px; cursor: pointer; }
+.rt-bill .foot .pay { flex: 1; height: 52px; border: 0; border-radius: 11px; background: var(--blue); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+.rt-bill .foot .pay:hover { background: var(--blue-d); }
+.rt-bill .foot .pay:disabled { background: #c7cdd6; cursor: not-allowed; }
+.rt-bill .billerr { color: var(--red); font-size: 13px; padding: 0 20px; min-height: 16px; text-align: center; }
+
+/* 开台弹窗 + 紧凑税票弹窗(餐厅自含 · 复用 fullTaxInvoice 接口)*/
+.rt-open { width: 340px; max-width: 92vw; background: #fff; border-radius: 18px; padding: 22px; box-shadow: var(--shadow); text-align: center; }
+.rt-open .t { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+.rt-open .s { color: var(--ink2); font-size: 13px; margin-bottom: 16px; }
+.rt-open .ppl { display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap; }
+.rt-open .ppl button { width: 46px; height: 46px; border: 1.5px solid var(--line); border-radius: 11px; background: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
+.rt-open .ppl button.on { border-color: var(--blue); background: var(--blue-l); color: var(--blue); }
+.rt-open .go { width: 100%; height: 50px; border: 0; border-radius: 11px; background: var(--blue); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+.rt-tax { width: 460px; max-width: 94vw; background: #fff; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); }
+.rt-tax .h { padding: 16px 20px; border-bottom: 1px solid var(--line-2); display: flex; align-items: center; }
+.rt-tax .h .t { font-weight: 700; font-size: 16px; }
+.rt-tax .h .x { margin-left: auto; width: 30px; height: 30px; border: 0; border-radius: 8px; background: #f0f0ec; color: #6b7280; cursor: pointer; display: grid; place-items: center; }
+.rt-tax .body { padding: 16px 20px; }
+.rt-tax .seg { display: flex; gap: 8px; margin-bottom: 14px; }
+.rt-tax .seg button { flex: 1; height: 42px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink2); cursor: pointer; font-size: 14px; }
+.rt-tax .seg button.on { border-color: var(--blue); background: var(--blue-l); color: var(--blue); }
+.rt-tax label { display: block; font-size: 12.5px; color: var(--ink2); margin: 0 0 6px; }
+.rt-tax .fld { height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; display: flex; align-items: center; margin-bottom: 12px; background: #fbfbf9; }
+.rt-tax .fld input { border: 0; outline: 0; background: transparent; flex: 1; min-width: 0; font-size: 14.5px; color: var(--ink); }
+.rt-tax .billerr { color: var(--red); font-size: 13px; min-height: 16px; text-align: center; }
+.rt-tax .foot { padding: 6px 20px 20px; display: flex; gap: 10px; }
+.rt-tax .foot .ghost { flex: 0 0 auto; height: 50px; padding: 0 18px; border: 1px solid var(--line); border-radius: 11px; background: #fff; color: var(--ink2); cursor: pointer; }
+.rt-tax .foot .primary { flex: 1; height: 50px; border: 0; border-radius: 11px; background: var(--blue); color: #fff; font-weight: 700; cursor: pointer; }
+.rt-tax .foot .primary:disabled { background: #c7cdd6; cursor: not-allowed; }

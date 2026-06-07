@@ -61,10 +61,14 @@
         else if (active === 'hold' && POS.cashier) POS.cashier.renderHold();
         else if (active === 'refund' && POS.ops) POS.ops.resetRefund();
         else if (active === 'shift' && POS.ops) POS.ops.renderShift();
+        else if (active === 'rtables' && POS.restaurant) POS.restaurant.renderTables();
+        else if (active === 'rkitchen' && POS.restaurant) POS.restaurant.renderKitchen();
+        else if (active === 'rorder' && POS.restaurant && POS.restaurant.curSession())
+            POS.restaurant.reloadOrder();
     }
 
     // ── 路由 ──
-    const VIEWS = ['login', 'main', 'hold', 'refund', 'shift'];
+    const VIEWS = ['login', 'main', 'hold', 'refund', 'shift', 'rtables', 'rorder', 'rkitchen'];
     POS.showView = function (name) {
         VIEWS.forEach((v) => {
             const el = $('view-' + v);
@@ -75,6 +79,7 @@
         if (name === 'hold' && POS.cashier) POS.cashier.renderHold();
         if (name === 'refund' && POS.ops) POS.ops.resetRefund();
         if (name === 'shift' && POS.ops) POS.ops.renderShift();
+        if (name === 'rkitchen' && POS.restaurant) POS.restaurant.renderKitchen();
     };
 
     // ── 时钟 ──
@@ -215,7 +220,12 @@
         }
     }
 
-    function enterMain() {
+    async function enterMain() {
+        // 业态=restaurant 进桌台流;零售/药房走收银主屏(pos-cashier)。
+        if (POS.restaurant && (await POS.restaurant.ensureBusinessType())) {
+            POS.restaurant.enter();
+            return;
+        }
         POS.showView('main');
         POS.cashier.enterMain();
     }
@@ -271,6 +281,7 @@
         updateLangButtons();
         if (POS.cashier) POS.cashier.init();
         if (POS.ops) POS.ops.init();
+        if (POS.restaurant) POS.restaurant.init();
         if (POS.offline) POS.offline.init();
         POS.setNet(navigator.onLine !== false);
         window.addEventListener('online', () => {
@@ -284,7 +295,7 @@
         });
         // PWA 外壳 SW(08 ADR-1)· 失败不影响在线使用
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850705').catch(() => {});
+            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850706').catch(() => {});
         }
         tick();
         setInterval(tick, 10000);

@@ -52,6 +52,12 @@ CONVERTED: list[tuple[str, str]] = [
     ("services/inventory/reports.py", "inventory_batches"),
     # PO-6a 银行对账 v1(会话头按套账;流水经 session FK 派生)
     ("services/recon/bank_recon_v1_store.py", "bank_reconcile_sessions"),
+    # PO-6b 银行对账 v2 任务(结果表按套账 · 读写过滤)
+    ("services/recon/bank_recon_v2_store.py", "bank_recon_v2_task"),
+    # PO-6c VAT 对账任务(结果表按套账 · 读写过滤)
+    ("services/recon/vat_recon_tasks_store.py", "vat_recon_tasks"),
+    # PO-6d 异步对账 job(套账随 job 行存 · enqueue 写入 · worker/handler 从行/params 取)
+    ("services/recon_jobs/store.py", "recon_jobs"),
 ]
 
 

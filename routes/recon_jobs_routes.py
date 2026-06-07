@@ -25,11 +25,28 @@ from typing import List, Optional
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from core import db
+from core import workspace_context as wc
 from core.auth import get_current_user_from_request
+from core.route_helpers import _tid
 from services.recon_jobs import store, worker
 
 logger = logging.getLogger("recon_jobs.routes")
 router = APIRouter(tags=["recon-jobs"])
+
+
+def _active_ws(request: Request, user: dict):
+    """PO-6d · 取当前请求套账(rollout-safe);随 job 行 + params 存,异步 worker 从中取。"""
+    tid = _tid(user)
+    if not tid:
+        return None
+    try:
+        with db.get_cursor() as cur:
+            return wc.resolve_active_workspace_id(cur, request, tenant_id=str(tid))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"[recon_jobs] resolve workspace failed: {e}")
+        return None
 
 
 def _user_key(user) -> str:
@@ -200,9 +217,11 @@ async def bank_v2_submit(
         if nm:
             _cleanup_on_fail(job_id)
             return nm
+        _ws = _active_ws(request, user)
         params = {
             "user_id": str(user["id"]),
             "tenant_id": tenant_id,
+            "workspace_client_id": _ws,  # PO-6d · 套账随 job 行/params 存
             "api_key": _user_key(user),
             "is_exempt": bool(billing.get("is_exempt", True)),
             "lang": lang,
@@ -212,7 +231,15 @@ async def bank_v2_submit(
             "gl_closing_override": gl_closing_override,
             "stmt_closing_override": stmt_closing_override,
         }
-        rid = store.enqueue("bank", str(user["id"]), tenant_id, params, input_ref, job_id=job_id)
+        rid = store.enqueue(
+            "bank",
+            str(user["id"]),
+            tenant_id,
+            params,
+            input_ref,
+            job_id=job_id,
+            workspace_client_id=_ws,
+        )
         if not rid:
             _cleanup_on_fail(job_id)
             raise HTTPException(500, "任务创建失败,请稍后重试")
@@ -255,15 +282,25 @@ async def gl_vat_submit(
     try:
         input_ref = await _stage_uploads(job_id, gl_list, "gl", "gl.pdf")
         input_ref += await _stage_uploads(job_id, vat_list, "vat", "vat.pdf")
+        _ws = _active_ws(request, user)
         params = {
             "user_id": str(user["id"]),
             "tenant_id": tenant_id,
+            "workspace_client_id": _ws,  # PO-6d
             "api_key": _user_key(user),
             "is_exempt": bool(billing.get("is_exempt", True)),
             "revenue_prefix": revenue_prefix or "4",
             "lang": lang,
         }
-        rid = store.enqueue("glvat", str(user["id"]), tenant_id, params, input_ref, job_id=job_id)
+        rid = store.enqueue(
+            "glvat",
+            str(user["id"]),
+            tenant_id,
+            params,
+            input_ref,
+            job_id=job_id,
+            workspace_client_id=_ws,
+        )
         if not rid:
             _cleanup_on_fail(job_id)
             raise HTTPException(500, "任务创建失败,请稍后重试")
@@ -295,15 +332,23 @@ async def vat_excel_submit(
     try:
         input_ref = await _stage_uploads(job_id, invoices, "invoice", "invoice.pdf")
         input_ref += await _stage_uploads(job_id, reports, "report", "report.pdf")
+        _ws = _active_ws(request, user)
         params = {
             "user_id": str(user["id"]),
             "tenant_id": tenant_id,
+            "workspace_client_id": _ws,  # PO-6d
             "api_key": _user_key(user),
             "is_exempt": bool(billing.get("is_exempt", True)),
             "lang": lang,
         }
         rid = store.enqueue(
-            "salesvat", str(user["id"]), tenant_id, params, input_ref, job_id=job_id
+            "salesvat",
+            str(user["id"]),
+            tenant_id,
+            params,
+            input_ref,
+            job_id=job_id,
+            workspace_client_id=_ws,
         )
         if not rid:
             _cleanup_on_fail(job_id)
@@ -389,7 +434,13 @@ async def bank_v2_confirm_rows(job_id: str, request: Request):
     params["confirmed_stmt_rows"] = rows
     params["confirmed_opening"] = review.get("opening", 0.0)
     rid = store.enqueue(
-        "bank", str(user["id"]), user.get("tenant_id"), params, new_input, job_id=new_job
+        "bank",
+        str(user["id"]),
+        user.get("tenant_id"),
+        params,
+        new_input,
+        job_id=new_job,
+        workspace_client_id=params.get("workspace_client_id"),  # PO-6d · 沿用原任务套账
     )
     # 原暂存清理(gl 已复制到新任务)
     worker._cleanup_stage(job_id)

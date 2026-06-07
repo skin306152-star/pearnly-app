@@ -13,6 +13,15 @@ from core import db
 logger = logging.getLogger(__name__)
 
 
+def _ws_clause(workspace_client_id: Optional[int]) -> tuple:
+    """PO-6b 套账隔离过滤子句 + 参数(rollout-safe 含 IS NULL · PO-1 已回填 · 残留 NULL 仅废租户)。"""
+    if workspace_client_id is None:
+        return "", ()
+    return " AND (workspace_client_id = %s OR workspace_client_id IS NULL)", (
+        int(workspace_client_id),
+    )
+
+
 def ensure_bank_recon_v2_table():
     """幂等 DDL · 建 bank_recon_v2_task 表（首次启动时调用）"""
     try:
@@ -75,6 +84,7 @@ def create_bank_recon_v2_task(
     formula_diff: float,
     detail_json: list,
     summary_json: dict,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[int]:
     import json as _j
 
@@ -88,12 +98,12 @@ def create_bank_recon_v2_task(
                     stmt_row_count, gl_row_count,
                     matched_count, unmatched_gl, unmatched_stmt,
                     stmt_opening, stmt_closing, gl_opening, gl_closing, formula_diff,
-                    detail_json, summary_json, status
+                    detail_json, summary_json, status, workspace_client_id
                 ) VALUES (
                     %s::uuid, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
-                    %s::jsonb, %s::jsonb, 'done'
+                    %s::jsonb, %s::jsonb, 'done', %s
                 ) RETURNING id
             """,
                 (
@@ -115,6 +125,7 @@ def create_bank_recon_v2_task(
                     float(formula_diff or 0),
                     _j.dumps(detail_json or [], ensure_ascii=False, default=str),
                     _j.dumps(summary_json or {}, ensure_ascii=False, default=str),
+                    workspace_client_id,
                 ),
             )
             row = cur.fetchone()
@@ -124,21 +135,24 @@ def create_bank_recon_v2_task(
         return None
 
 
-def get_bank_recon_v2_task(task_id: int, user_id: str, tenant_id=None) -> Optional[Dict[str, Any]]:
+def get_bank_recon_v2_task(
+    task_id: int, user_id: str, tenant_id=None, workspace_client_id: Optional[int] = None
+) -> Optional[Dict[str, Any]]:
     """v118.35.0.29 P0 安全 (体检 2026-05-21 风险 2):
     镜像 get_gl_vat_task · 旧签名无权限校验 · 现强制 user_id + 可选 tenant_id ·
-    Dual-Key 模式 · DB 层 fail-safe"""
+    Dual-Key 模式 · DB 层 fail-safe。PO-6b:再叠套账过滤(rollout-safe)。"""
+    ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor() as cur:
             if tenant_id:
                 cur.execute(
-                    "SELECT * FROM bank_recon_v2_task WHERE id = %s AND tenant_id = %s::uuid",
-                    (task_id, tenant_id),
+                    f"SELECT * FROM bank_recon_v2_task WHERE id = %s AND tenant_id = %s::uuid{ws_sql}",
+                    (task_id, tenant_id, *ws_params),
                 )
             else:
                 cur.execute(
-                    "SELECT * FROM bank_recon_v2_task WHERE id = %s AND user_id = %s::uuid",
-                    (task_id, user_id),
+                    f"SELECT * FROM bank_recon_v2_task WHERE id = %s AND user_id = %s::uuid{ws_sql}",
+                    (task_id, user_id, *ws_params),
                 )
             row = cur.fetchone()
             return dict(row) if row else None
@@ -147,12 +161,15 @@ def get_bank_recon_v2_task(task_id: int, user_id: str, tenant_id=None) -> Option
         return None
 
 
-def list_bank_recon_v2_tasks(user_id: str, tenant_id=None, limit: int = 50) -> List[Dict[str, Any]]:
+def list_bank_recon_v2_tasks(
+    user_id: str, tenant_id=None, limit: int = 50, workspace_client_id: Optional[int] = None
+) -> List[Dict[str, Any]]:
+    ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor() as cur:
             if tenant_id:
                 cur.execute(
-                    """
+                    f"""
                     SELECT id, user_id, tenant_id, bank_code, gl_account,
                            stmt_files, gl_files,
                            stmt_row_count, gl_row_count,
@@ -160,14 +177,14 @@ def list_bank_recon_v2_tasks(user_id: str, tenant_id=None, limit: int = 50) -> L
                            stmt_opening, stmt_closing, gl_opening, gl_closing, formula_diff,
                            status, created_at
                     FROM bank_recon_v2_task
-                    WHERE tenant_id = %s::uuid
+                    WHERE tenant_id = %s::uuid{ws_sql}
                     ORDER BY created_at DESC LIMIT %s
                 """,
-                    (str(tenant_id), int(limit)),
+                    (str(tenant_id), *ws_params, int(limit)),
                 )
             else:
                 cur.execute(
-                    """
+                    f"""
                     SELECT id, user_id, tenant_id, bank_code, gl_account,
                            stmt_files, gl_files,
                            stmt_row_count, gl_row_count,
@@ -175,10 +192,10 @@ def list_bank_recon_v2_tasks(user_id: str, tenant_id=None, limit: int = 50) -> L
                            stmt_opening, stmt_closing, gl_opening, gl_closing, formula_diff,
                            status, created_at
                     FROM bank_recon_v2_task
-                    WHERE user_id = %s::uuid
+                    WHERE user_id = %s::uuid{ws_sql}
                     ORDER BY created_at DESC LIMIT %s
                 """,
-                    (str(user_id), int(limit)),
+                    (str(user_id), *ws_params, int(limit)),
                 )
             rows = cur.fetchall() or []
             return [dict(r) for r in rows]

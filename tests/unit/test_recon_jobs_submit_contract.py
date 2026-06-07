@@ -113,8 +113,16 @@ class SubmitFlowTests(unittest.TestCase):
     def test_bank_submit_stages_and_enqueues(self):
         captured = {}
 
-        def fake_enqueue(job_type, uid, tid, params, input_ref, job_id=None):
-            captured.update(job_type=job_type, params=params, input_ref=input_ref, job_id=job_id)
+        def fake_enqueue(
+            job_type, uid, tid, params, input_ref, job_id=None, workspace_client_id=None
+        ):
+            captured.update(
+                job_type=job_type,
+                params=params,
+                input_ref=input_ref,
+                job_id=job_id,
+                workspace_client_id=workspace_client_id,
+            )
             return job_id
 
         with (

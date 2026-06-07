@@ -8,7 +8,9 @@ from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 
 from core import db
+from core import workspace_context as wc
 from core.auth import get_current_user_from_request
+from core.route_helpers import _tid
 from routes.recon_routes_shared import _user_key, _pdf_billing_units
 from routes.recon_routes_bankv2_helpers import (
     _BANK_V2_OK,
@@ -217,6 +219,7 @@ async def bank_v2_run(
             return db.create_bank_recon_v2_task(
                 user_id=str(user["id"]),
                 tenant_id=user.get("tenant_id"),
+                workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
                 bank_code=bc,
                 gl_account=gl_account,
                 stmt_files=stmt_file_names,
@@ -368,6 +371,7 @@ async def bank_v2_run(
     task_id = db.create_bank_recon_v2_task(
         user_id=str(user["id"]),
         tenant_id=user.get("tenant_id"),
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
         bank_code=bank_code,
         gl_account=gl_account,
         stmt_files=stmt_file_names,

@@ -126,6 +126,26 @@ def resolve_active_workspace_id(cur, request: Request, *, tenant_id: str) -> int
     return ws
 
 
+def active_workspace_for_request(request: Request, tenant_id) -> Optional[int]:
+    """路由层便捷:自开游标 resolve 当前套账(rollout-safe)。
+
+    tenant 缺失 / 解析异常 → None(调用方退回旧 tenant/user 口径);套账头不属本租户 → 403 透传。
+    供无预开游标的主程序运营路由复用(对账/进项等),省去各文件各写一遍 _active_ws。
+    """
+    if not tenant_id:
+        return None
+    try:
+        from core import db
+
+        with db.get_cursor() as cur:
+            return resolve_active_workspace_id(cur, request, tenant_id=str(tenant_id))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"active_workspace_for_request failed (tenant={tenant_id}): {e}")
+        return None
+
+
 def default_workspace_for_write(tenant_id) -> Optional[int]:
     """写入路径(无请求头/无顶栏切换器:上传识别 / LINE)的套账归属 = 本租户默认套账。
 

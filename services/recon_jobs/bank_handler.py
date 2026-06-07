@@ -40,6 +40,7 @@ def run_bank_recon(
     api_key = (params.get("api_key") or os.environ.get("GEMINI_API_KEY", "")).strip()
     user_id = str(params.get("user_id"))
     tenant_id = params.get("tenant_id")
+    workspace_client_id = params.get("workspace_client_id")  # PO-6d · 套账随 job 行存
     is_exempt = bool(params.get("is_exempt", True))
 
     # ADR-006 S8 · 用户核对纠错后的重对账:注入修正行 → 跳过 stmt OCR(不重读、不重扣费)
@@ -162,6 +163,7 @@ def run_bank_recon(
             return db.create_bank_recon_v2_task(
                 user_id=user_id,
                 tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
                 bank_code=bc,
                 gl_account=gl_account,
                 stmt_files=stmt_file_names,
@@ -283,6 +285,7 @@ def run_bank_recon(
     task_id = db.create_bank_recon_v2_task(
         user_id=user_id,
         tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
         bank_code=bank_code,
         gl_account=gl_account,
         stmt_files=stmt_file_names,

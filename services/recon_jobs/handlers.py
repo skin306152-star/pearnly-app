@@ -159,6 +159,7 @@ def run_salesvat(
     api_key = params.get("api_key")
     user_id = str(params.get("user_id"))
     tenant_id = params.get("tenant_id")
+    workspace_client_id = params.get("workspace_client_id")  # PO-6d · 套账随 job 行存
     is_exempt = bool(params.get("is_exempt", True))
 
     invoices = _read_inputs(input_ref, "invoice")
@@ -274,6 +275,7 @@ def run_salesvat(
     task_id = db.create_vat_recon_task(
         tenant_id=tenant_id,
         user_id=user_id,
+        workspace_client_id=workspace_client_id,
         client_name=seller_short,
         period=period_label,
         invoice_count=len(ok_invoices),

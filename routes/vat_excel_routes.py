@@ -16,6 +16,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Form
 from fastapi.responses import StreamingResponse, FileResponse
 
 from core import db
+from core import workspace_context as wc
 from core.auth import get_current_user_from_request
 from services.vat.vat_excel_export import (
     extract_invoices_parallel,
@@ -263,6 +264,7 @@ async def build_excel_endpoint(
         task_id = db.create_vat_recon_task(
             tenant_id=tenant_id,
             user_id=str(user_id),
+            workspace_client_id=wc.active_workspace_for_request(request, tenant_id),
             client_name=seller_short,
             period=period_label,
             invoice_count=len(ok_invoices),
@@ -319,7 +321,12 @@ async def build_excel_endpoint(
 async def download_task(task_id: str, request: Request):
     user = _require_user(request)
     tenant_id, user_id = _tenant_user(user)
-    task = db.get_vat_recon_task(task_id=task_id, tenant_id=tenant_id, user_id=str(user_id))
+    task = db.get_vat_recon_task(
+        task_id=task_id,
+        tenant_id=tenant_id,
+        user_id=str(user_id),
+        workspace_client_id=wc.active_workspace_for_request(request, tenant_id),
+    )
     if not task:
         raise HTTPException(404, "任务不存在")
 
@@ -387,7 +394,12 @@ async def download_task(task_id: str, request: Request):
 async def regenerate_task(task_id: str, request: Request):
     user = _require_user(request)
     tenant_id, user_id = _tenant_user(user)
-    task = db.get_vat_recon_task(task_id=task_id, tenant_id=tenant_id, user_id=str(user_id))
+    task = db.get_vat_recon_task(
+        task_id=task_id,
+        tenant_id=tenant_id,
+        user_id=str(user_id),
+        workspace_client_id=wc.active_workspace_for_request(request, tenant_id),
+    )
     if not task:
         raise HTTPException(404, "任务不存在")
     raw = task.get("raw_data_json") or {}

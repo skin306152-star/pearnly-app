@@ -10,6 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from core import db
+from core import workspace_context as wc
 from services.vat.vat_excel_helpers import _require_user, _tenant_user
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ async def list_tasks(
 ):
     user = _require_user(request)
     tenant_id, user_id = _tenant_user(user)
+    _ws = wc.active_workspace_for_request(request, tenant_id)
     result = db.list_vat_recon_tasks(
         tenant_id=tenant_id,
         user_id=str(user_id),
@@ -35,8 +37,11 @@ async def list_tasks(
         page_size=page_size,
         status=status,
         period=period,
+        workspace_client_id=_ws,
     )
-    kpi = db.get_vat_recon_tasks_kpi(tenant_id=tenant_id, user_id=str(user_id))
+    kpi = db.get_vat_recon_tasks_kpi(
+        tenant_id=tenant_id, user_id=str(user_id), workspace_client_id=_ws
+    )
     # UUID/datetime 序列化
     for row in result["rows"]:
         for k in ("id", "tenant_id", "user_id"):
@@ -57,7 +62,12 @@ async def list_tasks(
 async def get_task(task_id: str, request: Request):
     user = _require_user(request)
     tenant_id, user_id = _tenant_user(user)
-    task = db.get_vat_recon_task(task_id=task_id, tenant_id=tenant_id, user_id=str(user_id))
+    task = db.get_vat_recon_task(
+        task_id=task_id,
+        tenant_id=tenant_id,
+        user_id=str(user_id),
+        workspace_client_id=wc.active_workspace_for_request(request, tenant_id),
+    )
     if not task:
         raise HTTPException(404, "任务不存在")
     # 序列化

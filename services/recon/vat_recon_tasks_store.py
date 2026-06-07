@@ -6,10 +6,20 @@ db.py 文件尾 re-export 回本命名空间 · 所有 `db.xxx()` 调用点不�
 """
 
 import logging
+from typing import Optional
 
 from core import db
 
 logger = logging.getLogger(__name__)
+
+
+def _ws_clause(workspace_client_id: Optional[int]) -> tuple:
+    """PO-6c 套账隔离过滤子句 + 参数(rollout-safe 含 IS NULL · PO-1 已回填 · 残留 NULL 仅废租户)。"""
+    if workspace_client_id is None:
+        return "", ()
+    return " AND (workspace_client_id = %s OR workspace_client_id IS NULL)", (
+        int(workspace_client_id),
+    )
 
 
 def ensure_vat_recon_tasks_table():
@@ -67,6 +77,7 @@ def create_vat_recon_task(
     excel_path,
     raw_data_json,
     lang: str = "th",
+    workspace_client_id: Optional[int] = None,
 ):
     """INSERT · 返回新 task UUID"""
     import json as _json
@@ -78,8 +89,9 @@ def create_vat_recon_task(
                 INSERT INTO vat_recon_tasks
                     (tenant_id, user_id, client_name, period,
                      invoice_count, report_count, matched, mismatched,
-                     mismatch_amount, elapsed_seconds, excel_path, raw_data_json, lang)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     mismatch_amount, elapsed_seconds, excel_path, raw_data_json, lang,
+                     workspace_client_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """,
                 (
@@ -96,6 +108,7 @@ def create_vat_recon_task(
                     excel_path,
                     _json.dumps(raw_data_json, ensure_ascii=False) if raw_data_json else None,
                     lang,
+                    workspace_client_id,
                 ),
             )
             row = cur.fetchone()
@@ -112,8 +125,9 @@ def list_vat_recon_tasks(
     page_size: int = 20,
     status=None,
     period=None,
+    workspace_client_id: Optional[int] = None,
 ):
-    """列表查询 · 带分页 · tenant 隔离"""
+    """列表查询 · 带分页 · tenant 隔离(PO-6c:再叠套账过滤 rollout-safe)"""
     try:
         where = []
         params = []
@@ -123,6 +137,9 @@ def list_vat_recon_tasks(
         else:
             where.append("user_id = %s::uuid")
             params.append(str(user_id))
+        if workspace_client_id is not None:
+            where.append("(workspace_client_id = %s OR workspace_client_id IS NULL)")
+            params.append(int(workspace_client_id))
         if status:
             where.append("status = %s")
             params.append(status)
@@ -155,19 +172,20 @@ def list_vat_recon_tasks(
         return {"rows": [], "total": 0, "page": page, "page_size": page_size}
 
 
-def get_vat_recon_task(task_id: str, tenant_id, user_id: str):
-    """单条详情 · 含 raw_data_json · tenant 隔离"""
+def get_vat_recon_task(task_id: str, tenant_id, user_id: str, workspace_client_id=None):
+    """单条详情 · 含 raw_data_json · tenant 隔离(PO-6c:再叠套账过滤 rollout-safe)"""
+    ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor() as cur:
             if tenant_id:
                 cur.execute(
-                    "SELECT * FROM vat_recon_tasks WHERE id = %s::uuid AND tenant_id = %s",
-                    (task_id, str(tenant_id)),
+                    f"SELECT * FROM vat_recon_tasks WHERE id = %s::uuid AND tenant_id = %s{ws_sql}",
+                    (task_id, str(tenant_id), *ws_params),
                 )
             else:
                 cur.execute(
-                    "SELECT * FROM vat_recon_tasks WHERE id = %s::uuid AND user_id = %s::uuid",
-                    (task_id, str(user_id)),
+                    f"SELECT * FROM vat_recon_tasks WHERE id = %s::uuid AND user_id = %s::uuid{ws_sql}",
+                    (task_id, str(user_id), *ws_params),
                 )
             row = cur.fetchone()
             return dict(row) if row else None
@@ -229,33 +247,34 @@ def delete_vat_recon_tasks_older_than(days: int, tenant_id, user_id: str):
         return 0, []
 
 
-def get_vat_recon_tasks_kpi(tenant_id, user_id: str):
-    """本月 KPI: total / running / done / failed"""
+def get_vat_recon_tasks_kpi(tenant_id, user_id: str, workspace_client_id=None):
+    """本月 KPI: total / running / done / failed(PO-6c:再叠套账过滤 rollout-safe)"""
+    ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor() as cur:
             if tenant_id:
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         COUNT(*) FILTER (WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())) AS this_month,
                         COUNT(*) FILTER (WHERE status = 'running') AS running,
                         COUNT(*) FILTER (WHERE status = 'done') AS done,
                         COUNT(*) FILTER (WHERE status = 'failed') AS failed
-                    FROM vat_recon_tasks WHERE tenant_id = %s
+                    FROM vat_recon_tasks WHERE tenant_id = %s{ws_sql}
                 """,
-                    (str(tenant_id),),
+                    (str(tenant_id), *ws_params),
                 )
             else:
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         COUNT(*) FILTER (WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())) AS this_month,
                         COUNT(*) FILTER (WHERE status = 'running') AS running,
                         COUNT(*) FILTER (WHERE status = 'done') AS done,
                         COUNT(*) FILTER (WHERE status = 'failed') AS failed
-                    FROM vat_recon_tasks WHERE user_id = %s::uuid
+                    FROM vat_recon_tasks WHERE user_id = %s::uuid{ws_sql}
                 """,
-                    (str(user_id),),
+                    (str(user_id), *ws_params),
                 )
             row = cur.fetchone()
             if row:

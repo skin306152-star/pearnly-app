@@ -29,6 +29,7 @@ _DDL = [
         job_type      TEXT NOT NULL,
         user_id       UUID NOT NULL,
         tenant_id     UUID,
+        workspace_client_id BIGINT,
         status        TEXT NOT NULL DEFAULT 'queued',
         progress      JSONB,
         params        JSONB,
@@ -51,6 +52,9 @@ _DDL = [
     "ON recon_jobs (user_id, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_recon_jobs_tenant_created "
     "ON recon_jobs (tenant_id, created_at DESC) WHERE tenant_id IS NOT NULL",
+    # PO-6d 套账隔离:列 PO-1 已加,这里幂等补(新库)。异步 worker 无 request,
+    # 套账随 job 行存(enqueue 写入),worker/handler 从行/params 取,绝不"看全租户"。
+    "ALTER TABLE recon_jobs ADD COLUMN IF NOT EXISTS workspace_client_id BIGINT",
 ]
 
 
@@ -99,11 +103,13 @@ def enqueue(
     input_ref: Optional[list] = None,
     max_attempts: int = 1,
     job_id: Optional[str] = None,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[str]:
     """建一个 queued 任务 · 返回 job_id(uuid 字符串)。
 
     job_id 可由调用方预生成(submit 接口先用它命名暂存目录 STAGE_DIR/<job_id>/ ·
     工人完成后按同一 id 清理)· 不传则 DB gen_random_uuid()。
+    PO-6d:workspace_client_id 随 job 行存(异步 worker 无 request,从行/params 取套账)。
     """
     if job_type not in VALID_JOB_TYPES:
         raise ValueError(f"unknown job_type: {job_type!r}")
@@ -112,6 +118,7 @@ def enqueue(
     ma = int(max_attempts or 1)
     uid = str(user_id)
     tid = str(tenant_id) if tenant_id else None
+    ws = int(workspace_client_id) if workspace_client_id is not None else None
 
     def _insert() -> Optional[str]:
         # progress 不在 INSERT 里(可空 · 默认 NULL · 工人跑起来后 update_progress 再写)。
@@ -121,22 +128,22 @@ def enqueue(
             if job_id:
                 cur.execute(
                     """
-                    INSERT INTO recon_jobs (id, job_type, user_id, tenant_id, status,
-                                            params, input_ref, max_attempts)
-                    VALUES (%s::uuid, %s, %s::uuid, %s, 'queued', %s::jsonb, %s::jsonb, %s)
+                    INSERT INTO recon_jobs (id, job_type, user_id, tenant_id, workspace_client_id,
+                                            status, params, input_ref, max_attempts)
+                    VALUES (%s::uuid, %s, %s::uuid, %s, %s, 'queued', %s::jsonb, %s::jsonb, %s)
                     RETURNING id
                     """,
-                    (str(job_id), job_type, uid, tid, p, ir, ma),
+                    (str(job_id), job_type, uid, tid, ws, p, ir, ma),
                 )
             else:
                 cur.execute(
                     """
-                    INSERT INTO recon_jobs (job_type, user_id, tenant_id, status,
-                                            params, input_ref, max_attempts)
-                    VALUES (%s, %s::uuid, %s, 'queued', %s::jsonb, %s::jsonb, %s)
+                    INSERT INTO recon_jobs (job_type, user_id, tenant_id, workspace_client_id,
+                                            status, params, input_ref, max_attempts)
+                    VALUES (%s, %s::uuid, %s, %s, 'queued', %s::jsonb, %s::jsonb, %s)
                     RETURNING id
                     """,
-                    (job_type, uid, tid, p, ir, ma),
+                    (job_type, uid, tid, ws, p, ir, ma),
                 )
             row = cur.fetchone()
             return str(row["id"]) if row else None

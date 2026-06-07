@@ -11,7 +11,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from core import db
+from core import workspace_context as wc
 from core.auth import get_current_user_from_request
+from core.route_helpers import _tid
 from routes.recon_routes_bankv2_helpers import (
     _brv2_err,
     bank_summary_from_json,
@@ -34,6 +36,7 @@ async def bank_v2_list_tasks(request: Request):
         user_id=str(user["id"]),
         tenant_id=user.get("tenant_id"),
         limit=50,
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
     return {"ok": True, "tasks": tasks}
 
@@ -44,7 +47,12 @@ async def bank_v2_get_task(task_id: int, request: Request):
     user = get_current_user_from_request(request)
     if not user:
         raise HTTPException(401, "未登录")
-    task = db.get_bank_recon_v2_task(task_id, str(user["id"]), user.get("tenant_id"))
+    task = db.get_bank_recon_v2_task(
+        task_id,
+        str(user["id"]),
+        user.get("tenant_id"),
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+    )
     if not task:
         raise HTTPException(404, _brv2_err("task_not_found", "th"))
     import json as _j
@@ -112,7 +120,12 @@ async def bank_v2_export(task_id: int, request: Request, lang: str = "th"):
         lang = "th"
 
     # v118.35.0.29 P0 隔离修复(体检风险 2) · 强制 user_id + tenant_id scope
-    task = db.get_bank_recon_v2_task(task_id, str(user["id"]), user.get("tenant_id"))
+    task = db.get_bank_recon_v2_task(
+        task_id,
+        str(user["id"]),
+        user.get("tenant_id"),
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+    )
     if not task:
         raise HTTPException(404, "任务不存在")
 

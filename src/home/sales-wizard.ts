@@ -11,6 +11,7 @@ import {
     rdLookup,
     saveDraft,
     issueDraft,
+    docToState,
 } from './sales-wizard-io.js';
 import { wt, wpack, setWizardLang } from './sales-wizard-i18n.js';
 import { ICO, pname, step1, step2, step3, step4, step5 } from './sales-wizard-steps.js';
@@ -424,16 +425,31 @@ function showSuccess(docId: string) {
     document.getElementById('sw-ok-print')!.onclick = () => void openDocPdf(docId, true);
 }
 
+function wizardLang(): string {
+    return (
+        (typeof currentLang !== 'undefined' && currentLang) ||
+        localStorage.getItem('mrpilot_lang') ||
+        'th'
+    );
+}
+
+async function bootWizard() {
+    setWizardLang(wizardLang());
+    mask().innerHTML = `<div class="sw-wrap"><div class="sw-card"><div class="sx-state">${escapeHtml(wt('s1h'))}…</div></div></div>`;
+    mask().style.display = 'flex';
+    await loadWizardData(); // 先载 sellers/products(docToState 要按 seller id 反查下标)
+}
+
 window.openSalesWizard = async function () {
     st = freshState();
     cur = 0;
-    const appLang =
-        (typeof currentLang !== 'undefined' && currentLang) ||
-        localStorage.getItem('mrpilot_lang') ||
-        'th';
-    setWizardLang(appLang);
-    mask().innerHTML = `<div class="sw-wrap"><div class="sw-card"><div class="sx-state">${escapeHtml(wt('s1h'))}…</div></div></div>`;
-    mask().style.display = 'flex';
-    await loadWizardData();
+    await bootWizard();
+    render();
+};
+
+window.editSalesDraft = async function (docRaw) {
+    await bootWizard();
+    st = docToState(freshState(), docRaw); // 草稿→向导状态(逆向后端契约 · 在 io 层)
+    cur = 0;
     render();
 };

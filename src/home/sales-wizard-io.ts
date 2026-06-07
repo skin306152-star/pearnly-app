@@ -2,7 +2,7 @@
 // 接真接口 GET /api/sales/sellers · /api/sales/products · POST /api/rd/verify|lookup ·
 // POST /api/sales/documents(+/{id}/issue)。把向导状态映射成后端 DocumentIn 契约。
 /* global apiGet, apiPost */
-import { type WState, calc, payApplicable } from './sales-wizard-calc.js';
+import { type WState, type WBuyer, calc, payApplicable } from './sales-wizard-calc.js';
 
 export interface WSeller {
     id: number;
@@ -42,6 +42,81 @@ export async function loadWizardData(): Promise<void> {
     ]);
     sellers = (s && s.sellers) || [];
     products = (p && p.products) || [];
+}
+
+// 既有草稿 → 向导状态(buildPayload 的逆向)。base 传 freshState() 提供默认值(纸张/历法等
+// 输出偏好后端不存,沿用默认)。设 draftId → 保存走 PATCH 不新建。供「继续编辑草稿」用。
+interface DraftDoc {
+    id: string | number;
+    doc_type?: string;
+    seller_workspace_client_id?: string | number | null;
+    buyer?: {
+        type?: string;
+        name?: string;
+        address?: string;
+        tax_id?: string;
+        branch_type?: string;
+        branch_no?: string;
+    };
+    lines?: Array<{
+        description?: string;
+        qty?: number | string;
+        unit_price?: number | string;
+        discount?: number | string;
+        vat_applicable?: boolean;
+        product_id?: string;
+    }>;
+    header_discount_amount?: number | string;
+    vat_rate?: number | string;
+    wht_rate?: number | string;
+    payment?: {
+        status?: string;
+        method?: string;
+        date?: string;
+        paid_amount?: number | string | null;
+    };
+    issue_date?: string | null;
+    due_date?: string | null;
+}
+
+export function docToState(base: WState, docRaw: unknown): WState {
+    const d = (docRaw || {}) as DraftDoc;
+    const s = base;
+    s.docType = d.doc_type || s.docType;
+    const si = sellers.findIndex((x) => String(x.id) === String(d.seller_workspace_client_id));
+    if (si >= 0) s.sellerIdx = si;
+    const b = d.buyer || {};
+    s.buyer = {
+        type: (b.type || 'company') as WBuyer['type'],
+        name: b.name || '',
+        addr: b.address || '',
+        tin: b.tax_id || '',
+        branchType: (b.branch_type || (b.branch_no ? 'branch' : 'hq')) as 'hq' | 'branch',
+        branchNo: b.branch_no || '',
+        verified: false,
+    };
+    s.lines = (d.lines || []).map((l) => ({
+        desc: l.description || '',
+        qty: Number(l.qty || 0),
+        price: Number(l.unit_price || 0),
+        disc: Number(l.discount || 0),
+        vat: l.vat_applicable !== false,
+        product_id: l.product_id || undefined,
+    }));
+    s.hdisc = Number(d.header_discount_amount || 0);
+    s.vatRate = Number(d.vat_rate || 0);
+    s.whtRate = Number(d.wht_rate || 0);
+    const p = d.payment || {};
+    s.pay = {
+        status: (p.status || s.pay.status) as WState['pay']['status'],
+        method: p.method || s.pay.method,
+        date: p.date || s.pay.date,
+        paidAmt: p.paid_amount != null ? Number(p.paid_amount) : null,
+    };
+    s.issueDate = d.issue_date || s.issueDate;
+    s.dueDate = d.due_date || '';
+    s.draftId = String(d.id);
+    return s;
 }
 
 // 税号验真(任意类型)→ {valid}

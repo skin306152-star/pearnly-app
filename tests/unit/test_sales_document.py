@@ -264,6 +264,40 @@ class StateGuardTests(unittest.TestCase):
         self.assertEqual(err, "already_void")
 
 
+class _DeleteCursor:
+    def __init__(self, status):
+        self.status = status
+        self._sql = ""
+        self.deletes = 0
+
+    def execute(self, sql, params=None):
+        self._sql = sql
+        if sql.lstrip().upper().startswith("DELETE"):
+            self.deletes += 1
+
+    def fetchone(self):
+        if "SELECT status" in self._sql:
+            return {"status": self.status, "doc_type": "tax_invoice"} if self.status else None
+        return None
+
+
+class DeleteDraftTests(unittest.TestCase):
+    def test_draft_deleted(self):
+        cur = _DeleteCursor("draft")
+        self.assertIsNone(doc.delete_draft(cur, tenant_id="t", doc_id="d"))
+        self.assertEqual(cur.deletes, 1)  # 只删头;明细行随 FK ON DELETE CASCADE
+
+    def test_issued_not_deletable(self):
+        cur = _DeleteCursor("issued")
+        self.assertEqual(doc.delete_draft(cur, tenant_id="t", doc_id="d"), "not_draft")
+        self.assertEqual(cur.deletes, 0)
+
+    def test_missing_is_not_found(self):
+        cur = _DeleteCursor(None)
+        self.assertEqual(doc.delete_draft(cur, tenant_id="t", doc_id="d"), "not_found")
+        self.assertEqual(cur.deletes, 0)
+
+
 class SellerSnapshotTests(unittest.TestCase):
     """§L4:卖方快照随单冻结品牌/模板,保证买方那联与存档一致。"""
 

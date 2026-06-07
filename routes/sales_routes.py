@@ -325,6 +325,17 @@ async def api_void_document(doc_id: str, request: Request):
     return {"ok": True}
 
 
+@router.delete("/{doc_id}")
+async def api_delete_draft(doc_id: str, request: Request):
+    """删除草稿(仅草稿可删 · 未占连号)。已开/已作废 → 409 not_draft。"""
+    tid, _ = _require_tenant(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        err = doc_svc.delete_draft(cur, tenant_id=tid, doc_id=doc_id)
+        if err:
+            _fail(err)
+    return {"ok": True}
+
+
 @router.post("/{doc_id}/submit")
 async def api_submit_for_approval(doc_id: str, request: Request):
     """提交审批(§F):草稿/被驳回 → 待审批。任意成员可提交。"""

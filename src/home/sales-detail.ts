@@ -21,6 +21,7 @@ const I = {
     ban: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="m5 5 14 14"/></svg>',
     undo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 7v6h6M3 13a9 9 0 1 0 3-7.7L3 8"/></svg>',
     copy: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 9h11v11H9zM5 15H4V4h11v1"/></svg>',
+    edit: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M11 4H4v16h16v-7M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>',
     qr: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM21 14v7M17 21h4"/></svg>',
 };
 
@@ -88,22 +89,29 @@ function miniInvoice(d: SalesDoc): string {
 }
 
 function renderDetail(d: SalesDoc) {
-    const voided = d.status === 'void';
     const isQuote = d.doc_type === 'quotation';
     const unpaid = d.status === 'issued' && (d.payment?.status || 'unpaid') !== 'paid';
-    const acts = voided
-        ? `<span style="color:var(--ink-3)">${escapeHtml(t('sx-voided-note'))}</span>`
-        : `<button class="btn btn-ghost btn-sm" data-act="download">${I.dl}<span>${escapeHtml(t('sx-download'))}</span></button>
+    // 动作集按状态分档:草稿=可改/可删(红冲补开作废发送只对已开有意义);已开=完整;作废=只读。
+    let acts: string;
+    let mutate: string;
+    if (d.status === 'void') {
+        acts = `<span style="color:var(--ink-3)">${escapeHtml(t('sx-voided-note'))}</span>`;
+        mutate = '';
+    } else if (d.status === 'draft') {
+        acts = `<button class="btn btn-primary btn-sm" data-act="edit">${I.edit}<span>${escapeHtml(t('sx-edit-draft'))}</span></button>
+           <button class="btn btn-ghost btn-sm" data-act="download">${I.dl}<span>${escapeHtml(t('sx-download'))}</span></button>`;
+        mutate = `<button class="btn btn-danger btn-sm" data-act="delete">${I.ban}<span>${escapeHtml(t('sx-del-draft'))}</span></button>`;
+    } else {
+        acts = `<button class="btn btn-ghost btn-sm" data-act="download">${I.dl}<span>${escapeHtml(t('sx-download'))}</span></button>
            <button class="btn btn-ghost btn-sm" data-act="print">${I.print}<span>${escapeHtml(t('sx-print'))}</span></button>
            <button class="btn btn-ghost btn-sm" data-act="send">${I.send}<span>${escapeHtml(t('sx-send-to'))}</span></button>
            ${unpaid ? `<button class="btn btn-accent btn-sm" data-act="promptpay">${I.qr}<span>${escapeHtml(t('sx-promptpay'))}</span></button>` : ''}
            <button class="btn btn-ghost btn-sm" data-act="copy">${I.copy}<span>${escapeHtml(t('sx-copy'))}</span></button>`;
-    const mutate = voided
-        ? ''
-        : `${isQuote ? `<button class="btn btn-ghost btn-sm" data-act="convert">${escapeHtml(t('sx-convert'))}</button>` : ''}
+        mutate = `${isQuote ? `<button class="btn btn-ghost btn-sm" data-act="convert">${escapeHtml(t('sx-convert'))}</button>` : ''}
            <button class="btn btn-ghost btn-sm" data-act="credit">${I.undo}<span>${escapeHtml(t('sx-credit'))}</span></button>
            <button class="btn btn-ghost btn-sm" data-act="debit"><span>${escapeHtml(t('sx-debit'))}</span></button>
            <button class="btn btn-danger btn-sm" data-act="void">${I.ban}<span>${escapeHtml(t('sx-void'))}</span></button>`;
+    }
     detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
         <div class="modal-header">
             <div class="modal-title">${escapeHtml(t('sx-detail-title'))} · ${escapeHtml(d.doc_number || t('sx-draft-tag'))}
@@ -415,7 +423,36 @@ async function copyDoc(d: SalesDoc) {
     }
 }
 
+// 草稿:载回向导继续编辑(向导按 draftId 走 PATCH,不新建)。
+function editDraft(d: SalesDoc) {
+    closeDetail();
+    if (window.editSalesDraft) window.editSalesDraft(d);
+}
+
+// 草稿:删除(仅草稿可删 · 未占连号)。二次确认后 DELETE。
+async function deleteDraft(d: SalesDoc) {
+    const ok = window.pearnlyConfirm
+        ? await window.pearnlyConfirm(t('sx-del-draft-confirm'))
+        : confirm(t('sx-del-draft-confirm'));
+    if (!ok) return;
+    try {
+        const r = await salesFetch(`/api/sales/documents/${d.id}`, { method: 'DELETE' });
+        if (!r.ok) {
+            const body = await r.json().catch(() => ({}));
+            showToast(salesErrMsg(body.detail, 'sx-action-fail'), 'error');
+            return;
+        }
+        closeDetail();
+        showToast(t('sx-draft-deleted'), 'success');
+        window.dispatchEvent(new CustomEvent('pearnly:sales-changed'));
+    } catch (_) {
+        showToast(t('sx-action-fail'), 'error');
+    }
+}
+
 function runAction(act: string, d: SalesDoc) {
+    if (act === 'edit') return editDraft(d);
+    if (act === 'delete') return void deleteDraft(d);
     if (act === 'download') return void openDocPdf(d.id, false);
     if (act === 'print') return void openDocPdf(d.id, true);
     if (act === 'send') return sendModal(d);

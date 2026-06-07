@@ -285,6 +285,7 @@ interface Window {
     loadSalesAccount?: () => void;
     openSalesDetail?: (docId: string) => void;
     openSalesWizard?: () => void;
+    editSalesDraft?: (doc: unknown) => void;
     openSalesSettings?: () => void;
     _wsHeader?: () => Record<string, string | undefined>;
     _knowledgeProbed?: boolean;

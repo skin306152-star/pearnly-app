@@ -336,10 +336,7 @@ def update_draft(
     due_date=None,
     payment_terms=None,
 ) -> Optional[str]:
-    """改草稿。返回错误码('not_found' / 'not_draft')或 None(成功)。
-
-    被驳回(rejected)的单可继续改,改动即回到草稿态并清掉驳回理由(§F:rejected→改→draft)。
-    """
+    """改草稿(rejected 单可改 · 改后回草稿态并清驳回理由 §F)。错误码 not_found/not_draft 或 None。"""
     status = _status_of(cur, tenant_id, doc_id)
     if status is None:
         return "not_found"
@@ -399,10 +396,8 @@ def finalize_issue(
     start: int = 1,
     approved_by=None,
 ) -> tuple[Optional[dict], Optional[str]]:
-    """已锁行 → 完整性/收款闸 → 取连号 → status=issued + 冻结双方快照。不过闸不占号。
-
-    approved_by 非空时同时记审批人/时间(经审批通过开出 · §F)。供 issue_document 与
-    approval.approve 共用,保证两条路径取号/冻结/校验完全一致。
+    """已锁行 → 完整性/收款闸 → 取连号 → status=issued + 冻结双方快照(不过闸不占号)。
+    approved_by 非空记审批人/时间(§F)。issue_document 与 approval.approve 共用,保证两路径一致。
     """
     berr = buyer_mod.validate_buyer(buyer_mod.from_row(row), row["doc_type"])
     if berr:
@@ -485,6 +480,20 @@ def void_document(cur, *, tenant_id: str, doc_id) -> Optional[str]:
         return "already_void"
     cur.execute(
         "UPDATE sales_documents SET status='void', updated_at=now() WHERE tenant_id=%s AND id=%s",
+        (tenant_id, doc_id),
+    )
+    return None
+
+
+def delete_draft(cur, *, tenant_id: str, doc_id) -> Optional[str]:
+    """删除草稿:仅草稿可删(未占连号);已开/已作废不可删。明细行随 FK ON DELETE CASCADE 自动删。"""
+    status = _status_of(cur, tenant_id, doc_id)
+    if status is None:
+        return "not_found"
+    if status != STATUS_DRAFT:
+        return "not_draft"
+    cur.execute(
+        "DELETE FROM sales_documents WHERE tenant_id=%s AND id=%s",
         (tenant_id, doc_id),
     )
     return None

@@ -36,20 +36,22 @@ def stock_overview(
     items:每个在售商品的总在库(跨批求和)+ 阈值 + 均价 + 状态 low/ok/out + 批次明细。
     filter_:low|out|all(在库总量筛选)。q:商品名/条码 ILIKE。
     """
+    # 批次均价用【预聚合子查询】join(每商品一行),不直接 join inventory_batches——
+    # 否则 stock×batches 笛卡尔积会把 SUM(qty_on_hand) 按批次数重复计(实测 2 批 → 翻倍)。
     sql = (
         "SELECT p.id AS product_id, p.name_th, p.name_en, p.name_zh, p.barcode, "
         "p.base_unit, p.min_stock, p.default_cost, "
         "COALESCE(SUM(s.qty_on_hand), 0) AS qty_on_hand, "
-        "COALESCE(AVG(b.unit_cost), p.default_cost) AS avg_cost "
+        "COALESCE(MAX(b.avg_cost), p.default_cost) AS avg_cost "
         "FROM products p "
         "LEFT JOIN inventory_stock s "
         "  ON s.product_id = p.id AND s.tenant_id = p.tenant_id "
         "  AND s.workspace_client_id = %s "
-        "LEFT JOIN inventory_batches b "
-        "  ON b.product_id = p.id AND b.tenant_id = p.tenant_id "
+        "LEFT JOIN (SELECT product_id, AVG(unit_cost) AS avg_cost FROM inventory_batches "
+        "           WHERE tenant_id = %s GROUP BY product_id) b ON b.product_id = p.id "
         "WHERE p.tenant_id = %s AND p.is_active = TRUE"
     )
-    params: list = [workspace_client_id, tenant_id]
+    params: list = [workspace_client_id, tenant_id, tenant_id]
     if q:
         sql += " AND (p.name_th ILIKE %s OR p.name_en ILIKE %s OR p.barcode ILIKE %s)"
         like = f"%{q}%"

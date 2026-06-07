@@ -118,6 +118,20 @@ def main():
         ne = [r["batch_no"] for r in cur.fetchall()]
         record("近效期(30天)只含 NEAR", ne == ["NEAR"], str(ne))
 
+        # stock_overview 聚合不被批次数翻倍(预聚合子查询 join · 实测 bug 回归)
+        cur.execute(
+            "SELECT COALESCE(SUM(s.qty_on_hand),0) AS qty, COALESCE(MAX(b.avg_cost), p.default_cost) AS avg "
+            "FROM products p "
+            "LEFT JOIN inventory_stock s ON s.product_id=p.id AND s.tenant_id=p.tenant_id "
+            "  AND s.workspace_client_id=%s "
+            "LEFT JOIN (SELECT product_id, AVG(unit_cost) AS avg_cost FROM inventory_batches "
+            "           WHERE tenant_id=%s GROUP BY product_id) b ON b.product_id=p.id "
+            "WHERE p.tenant_id=%s AND p.id=%s GROUP BY p.id, p.default_cost",
+            (ws, ta, ta, pid),
+        )
+        agg = cur.fetchone()
+        record("库存汇总不被批次数翻倍(=13 非 26)", agg["qty"] == Decimal("13"), str(agg["qty"]))
+
         # NULL batch 的 partial unique:同 (product,wh,NULL) 第二行被拒
         cur.execute(
             "INSERT INTO inventory_stock (tenant_id, workspace_client_id, product_id, warehouse_id, qty_on_hand) "

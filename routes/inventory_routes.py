@@ -18,6 +18,7 @@ from core.pos_api import (
     PosError,
     assert_module_enabled,
     ok,
+    require_owner,
     require_tenant,
     require_workspace,
 )
@@ -39,11 +40,14 @@ def _read(request: Request, workspace_client_id: int, fn, commit: bool = False):
 
 
 def _write(request: Request, req, fn):
-    """写端骨架:鉴权 → 单事务(模块守门 + 账套归属 + 解析仓 + fn)→ 信封。
+    """写端骨架:鉴权(老板/会计 · 收银员 token 不可调库存写)→ 单事务(模块守门 + 账套归属
+    + 解析仓 + fn)→ 信封。
 
+    require_owner:库存进货/盘点/调整是后台动作,收银员 token → pos.forbidden(403)(docs/10
+    §5.1)。POS 售卖扣库存走服务层(不经此路由),不受影响。
     InventoryError → PosError(422) 收口在此一处(各 handler 不再各写 try/except)。
     """
-    tid, uid = require_tenant(request)
+    tid, uid = require_owner(request)
     try:
         with db.get_cursor_rls(tid, commit=True) as cur:
             assert_module_enabled(cur, tid, "inventory")

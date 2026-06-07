@@ -240,10 +240,12 @@ def apply_stock_delta(
         batch_id=batch_id,
     )
     if existing:
+        # id 来自上面 tenant 限定的 get_stock_for_update(且 FOR UPDATE 锁行);UPDATE 再带
+        # tenant_id 是纵深防御——RLS 被 BYPASSRLS 架空,应用层每句自证隔离不依赖调用方纪律。
         cur.execute(
             "UPDATE inventory_stock SET qty_on_hand = qty_on_hand + %s, updated_at = now() "
-            "WHERE id = %s RETURNING qty_on_hand",
-            (delta, existing["id"]),
+            "WHERE id = %s AND tenant_id = %s RETURNING qty_on_hand",
+            (delta, existing["id"], tenant_id),
         )
         return cur.fetchone()["qty_on_hand"]
     cur.execute(

@@ -5420,11 +5420,11 @@ ${p.raw_text||p.text||""}`).join(`
         <h3>${escapeHtml(S("okTitle"))}</h3>
         <div class="sw-okarch">${ye.checkG} ${escapeHtml(S("okArchived"))}</div>
         <div class="sw-okacts">
-            <button class="btn btn-primary" id="sw-ok-view">${escapeHtml(S("viewSend"))}</button>
+            <button class="btn btn-ghost" id="sw-ok-view">${escapeHtml(S("viewSend"))}</button>
             <button class="btn btn-ghost" id="sw-ok-dl">${escapeHtml(S("dl"))}</button>
             <button class="btn btn-ghost" id="sw-ok-print">${escapeHtml(S("prnt"))}</button>
             <button class="btn btn-ghost" id="sw-ok-new">${escapeHtml(S("newOne"))}</button>
-            <button class="btn btn-ghost" id="sw-ok-done" style="grid-column:1/-1">${escapeHtml(S("done"))}</button>
+            <button class="btn btn-primary" id="sw-ok-done" style="grid-column:1/-1">${escapeHtml(S("done"))}</button>
         </div></div></div>`,me().style.display="flex",document.getElementById("sw-ok-done").onclick=ms,document.getElementById("sw-ok-new").onclick=()=>{O=no(),_e=0,re()},document.getElementById("sw-ok-view").onclick=()=>{ms(),window.openSalesDetail&&window.openSalesDetail(e)},document.getElementById("sw-ok-dl").onclick=()=>void In(e,!1),document.getElementById("sw-ok-print").onclick=()=>void In(e,!0)}function Om(){return typeof currentLang<"u"&&currentLang||localStorage.getItem("mrpilot_lang")||"th"}async function qr(){gm(Om()),me().innerHTML=`<div class="sw-wrap"><div class="sw-card"><div class="sx-state">${escapeHtml(S("s1h"))}…</div></div></div>`,me().style.display="flex",await im()}window.openSalesWizard=async function(){O=no(),_e=0,await qr(),re()};window.editSalesDraft=async function(e){await qr(),O=rm(no(),e),_e=0,re()};const Vm=`
     <div class="cmdk">
         <div class="cmdk-input-wrap">

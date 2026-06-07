@@ -404,11 +404,11 @@ function showSuccess(docId: string) {
         <h3>${escapeHtml(wt('okTitle'))}</h3>
         <div class="sw-okarch">${ICO.checkG} ${escapeHtml(wt('okArchived'))}</div>
         <div class="sw-okacts">
-            <button class="btn btn-primary" id="sw-ok-view">${escapeHtml(wt('viewSend'))}</button>
+            <button class="btn btn-ghost" id="sw-ok-view">${escapeHtml(wt('viewSend'))}</button>
             <button class="btn btn-ghost" id="sw-ok-dl">${escapeHtml(wt('dl'))}</button>
             <button class="btn btn-ghost" id="sw-ok-print">${escapeHtml(wt('prnt'))}</button>
             <button class="btn btn-ghost" id="sw-ok-new">${escapeHtml(wt('newOne'))}</button>
-            <button class="btn btn-ghost" id="sw-ok-done" style="grid-column:1/-1">${escapeHtml(wt('done'))}</button>
+            <button class="btn btn-primary" id="sw-ok-done" style="grid-column:1/-1">${escapeHtml(wt('done'))}</button>
         </div></div></div>`;
     mask().style.display = 'flex';
     document.getElementById('sw-ok-done')!.onclick = close;

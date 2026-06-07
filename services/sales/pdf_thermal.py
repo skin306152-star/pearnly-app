@@ -21,6 +21,7 @@ def render_thermal_pdf(
     *,
     copy_kind: str = "original",
     width_mm: int = 80,
+    lang: str = "th_en",
     deterministic: bool = False,
 ) -> bytes:
     from reportlab.lib import colors
@@ -32,6 +33,7 @@ def render_thermal_pdf(
     seller = seller or {}
     buyer = buyer or {}
     copy_kind = copy_kind if copy_kind in pdf_mod._COPY_LABEL else "original"
+    L = pdf_mod._label_fn(lang, sep="/")
     base, bold = _register_fonts()
     # 58mm 卷纸印幅更窄,整体再收一档字号。
     fs = 7 if width_mm >= 80 else 6
@@ -66,23 +68,24 @@ def render_thermal_pdf(
 
     def build_story():
         s = [
-            P(
-                pdf_mod._DOC_LABEL.get(doc.get("doc_type"), doc.get("doc_type") or ""),
-                True,
-                TA_CENTER,
-                fs + 2,
-            ),
-            P(pdf_mod._COPY_LABEL[copy_kind], align=TA_CENTER, size=fs - 1),
+            P(pdf_mod._doc_label(doc.get("doc_type"), L), True, TA_CENTER, fs + 2),
+            P(L(*pdf_mod._COPY_LABEL[copy_kind]), align=TA_CENTER, size=fs - 1),
             Spacer(1, 1.5 * mm),
             P(seller.get("name"), True, TA_CENTER, fs + 1),
         ]
-        for field, label in (("address", ""), ("tax_id", "TIN "), ("phone", "Tel ")):
+        for field, label in (
+            ("address", ""),
+            ("tax_id", L("เลขภาษี", "TIN", "税号") + " "),
+            ("phone", L("โทร", "Tel", "电话") + " "),
+        ):
             if seller.get(field):
                 s.append(P(label + str(seller[field]), align=TA_CENTER))
         s += [Spacer(1, 1 * mm), rule()]
-        s.append(P("เลขที่/No. " + (doc.get("doc_number") or "-"), True))
-        s.append(P("วันที่/Date " + to_thai_date(doc.get("issue_date")) + " (พ.ศ.)"))
-        s += _buyer_lines(doc, buyer, P)
+        s.append(P(L("เลขที่", "No.", "编号") + " " + (doc.get("doc_number") or "-"), True))
+        s.append(
+            P(L("วันที่", "Date", "日期") + " " + to_thai_date(doc.get("issue_date")) + " (พ.ศ.)")
+        )
+        s += _buyer_lines(doc, buyer, P, L)
         s.append(rule())
         for ln in doc.get("lines", []):
             s.append(P(ln.get("description"), True))
@@ -90,11 +93,11 @@ def render_thermal_pdf(
             price = pdf_mod._money(ln.get("unit_price"))
             s.append(kv(f"{qty} x {price}", pdf_mod._money(ln.get("line_total"))))
         s.append(rule())
-        rows = pdf_mod._total_rows(doc)
+        rows = pdf_mod._total_rows(doc, lang)
         for i, (label, value) in enumerate(rows):
             s.append(kv(label, value, strong=(i == len(rows) - 1)))
-        s += _payment_lines(doc, P, kv, rule)
-        s += [Spacer(1, 2 * mm), P("ขอบคุณค่ะ / Thank you", align=TA_CENTER)]
+        s += _payment_lines(doc, P, kv, rule, L)
+        s += [Spacer(1, 2 * mm), P(L("ขอบคุณค่ะ", "Thank you", "谢谢惠顾"), align=TA_CENTER)]
         return s
 
     # 自适应纸高:先按内容宽度量一遍各 flowable 高度求和,再以该高度建页渲染(单页卷纸)。
@@ -118,21 +121,21 @@ def render_thermal_pdf(
     return buf.getvalue()
 
 
-def _buyer_lines(doc, buyer, P):
+def _buyer_lines(doc, buyer, P, L):
     """窄版买方块:匿名只标散客;其余显名称 + 类型对应税号标签。"""
     btype = buyer.get("type")
     if not btype:
         return []
-    lines = [P("ผู้ซื้อ/Buyer: " + str(buyer.get("name") or "-"))]
+    lines = [P(L("ผู้ซื้อ", "Buyer", "买方") + ": " + str(buyer.get("name") or "-"))]
     if btype == "anonymous":
-        lines.append(P("ลูกค้าทั่วไป / Walk-in"))
+        lines.append(P(L("ลูกค้าทั่วไป", "Walk-in", "散客")))
         return lines
-    label = pdf_mod._BUYER_TIN_LABEL.get(btype, "TIN")
+    label = L(*pdf_mod._BUYER_TIN_LABEL.get(btype, ("เลขประจำตัวผู้เสียภาษี", "TIN", "税号")))
     lines.append(P(f"{label}: {buyer.get('tax_id') or '-'}"))
     return lines
 
 
-def _payment_lines(doc, P, kv, rule):
+def _payment_lines(doc, P, kv, rule, L):
     """收款区(§J4):仅收据/合并单且已收款时出;partial 标未收余额。"""
     from decimal import Decimal
 
@@ -142,15 +145,15 @@ def _payment_lines(doc, P, kv, rule):
     if not status or status == "unpaid":
         return []
     pm = doc.get("payment_method")
-    method = pdf_mod._PAYMENT_METHOD_LABEL.get(pm, pm or "-")
+    method = L(*pdf_mod._PAYMENT_METHOD_LABEL.get(pm, (pm or "-", "", "")))
     out = [
         rule(),
-        kv("วิธีชำระ/Method", method),
-        kv("ชำระแล้ว/Paid", pdf_mod._money(doc.get("paid_amount"))),
+        kv(L("วิธีชำระ", "Method", "付款方式"), method),
+        kv(L("ชำระแล้ว", "Paid", "已付"), pdf_mod._money(doc.get("paid_amount"))),
     ]
     if status == "partial":
         outstanding = Decimal(str(doc.get("grand_total") or 0)) - Decimal(
             str(doc.get("paid_amount") or 0)
         )
-        out.append(kv("คงเหลือ/Outstanding", pdf_mod._money(outstanding)))
+        out.append(kv(L("คงเหลือ", "Outstanding", "未付余额"), pdf_mod._money(outstanding)))
     return out

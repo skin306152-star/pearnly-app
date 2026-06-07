@@ -54,6 +54,8 @@ class DocumentIn(BaseModel):
     copies_layout: str = Field(
         "separate", max_length=20, description="separate|two_up 正副本同页(§E2)"
     )
+    paper_size: str = Field("A4", max_length=16, description="A4|A5|thermal_80|thermal_58(§E1)")
+    doc_language: str = Field("th_en", max_length=10, description="th|th_en|th_zh 文档语言")
     due_date: Optional[str] = Field(None, description="YYYY-MM-DD · 账期到期日")
     payment_terms: Optional[str] = Field(None, max_length=200)
     lines: list[LineIn] = Field(..., min_length=1)

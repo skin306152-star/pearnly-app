@@ -40,6 +40,7 @@ def build_pdf(
     page: str = "A4",
     copy_kind: str = "original",
     copies_layout: str = "separate",
+    lang: str = "th_en",
     parties: tuple = None,
 ) -> bytes:
     """parties 给了就复用(避免调用方已解析后再解析一次);否则现解析。"""
@@ -47,5 +48,5 @@ def build_pdf(
         parties if parties is not None else resolve_parties(cur, tenant_id=tenant_id, doc=doc)
     )
     return pdf_svc.render_invoice_pdf(
-        doc, seller, buyer, page=page, copy_kind=copy_kind, copies_layout=copies_layout
+        doc, seller, buyer, page=page, copy_kind=copy_kind, copies_layout=copies_layout, lang=lang
     )

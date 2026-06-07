@@ -17,6 +17,7 @@ from services.sales import archive
 from services.sales import buyer as buyer_mod
 from services.sales import numbering
 from services.sales import seller_profile
+from services.sales.document_cols import _DOC_COLS, _LINE_COLS
 
 # compute_totals 在此 re-export(沿用 doc_svc.compute_totals 约定);_CENT/_d 供收款归一化复用。
 from services.sales.totals import _CENT, _d, compute_totals  # noqa: F401
@@ -42,22 +43,6 @@ DEFAULT_PREFIX = {
 # 收据 / 合并单开出前必须已收款(docs/16 §J3:收钱凭证无款不开)。
 REQUIRE_PAYMENT = ("receipt", "tax_invoice_receipt")
 PAYMENT_STATUSES = ("unpaid", "partial", "paid")
-
-_DOC_COLS = (
-    "id, tenant_id, doc_type, doc_number, client_id, seller_workspace_client_id, issue_date, "
-    "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_rate, wht_amount, "
-    "grand_total, "
-    "header_discount_amount, header_discount_pct, price_includes_vat, copies_layout, "
-    "buyer_type, buyer_name, buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no, "
-    "parties_snapshot, payment_status, paid_amount, payment_method, payment_date, "
-    "due_date, payment_terms, approved_by, approved_at, rejected_reason, "
-    "pdf_sha256, pdf_url, "
-    "issued_at, created_by, references_document_id, reference_reason, created_at, updated_at"
-)
-_LINE_COLS = (
-    "id, document_id, line_no, product_id, description, qty, unit_price, "
-    "discount, discount_pct, vat_applicable, line_total"
-)
 
 
 def _write_header_totals(cur, tenant_id: str, doc_id, t: dict) -> None:
@@ -218,6 +203,8 @@ def create_draft(
     header_discount_pct=0,
     price_includes_vat=False,
     copies_layout="separate",
+    paper_size="A4",
+    doc_language="th_en",
     due_date=None,
     payment_terms=None,
 ) -> dict:
@@ -233,8 +220,8 @@ def create_draft(
         "INSERT INTO sales_documents (tenant_id, doc_type, client_id, seller_workspace_client_id, "
         "status, currency, subtotal, discount_total, header_discount_amount, header_discount_pct, "
         "price_includes_vat, vat_rate, vat_amount, wht_rate, wht_amount, grand_total, created_by, "
-        "copies_layout) "
-        "VALUES (%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+        "copies_layout, paper_size, doc_language) "
+        "VALUES (%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
         (
             tenant_id,
             doc_type,
@@ -253,6 +240,8 @@ def create_draft(
             t["grand_total"],
             created_by,
             copies_layout,
+            paper_size,
+            doc_language,
         ),
     )
     doc_id = cur.fetchone()["id"]
@@ -335,6 +324,8 @@ def update_draft(
     header_discount_pct=0,
     price_includes_vat=False,
     copies_layout=None,
+    paper_size=None,
+    doc_language=None,
     due_date=None,
     payment_terms=None,
 ) -> Optional[str]:
@@ -352,6 +343,8 @@ def update_draft(
         ("seller_workspace_client_id", seller_workspace_client_id),
         ("currency", currency),
         ("copies_layout", copies_layout),
+        ("paper_size", paper_size),
+        ("doc_language", doc_language),
     ):
         if val is not None:
             sets.append(f"{col}=%s")

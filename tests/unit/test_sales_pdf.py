@@ -62,7 +62,22 @@ class PdfRenderTests(unittest.TestCase):
 
     def test_combined_doc_label_present(self):
         self.assertIn("tax_invoice_receipt", pdf._DOC_LABEL)
-        self.assertIn("ใบเสร็จรับเงิน", pdf._DOC_LABEL["tax_invoice_receipt"])
+        label = pdf._doc_label("tax_invoice_receipt", pdf._label_fn("th_en"))
+        self.assertIn("ใบเสร็จรับเงิน", label)
+
+    def test_doc_language_switches_secondary_label(self):
+        # 泰文恒在;次语随 doc_language:th=仅泰 / th_en=泰+英 / th_zh=泰+中。
+        self.assertEqual(pdf._doc_label("tax_invoice", pdf._label_fn("th")), "ใบกำกับภาษี")
+        self.assertIn("Tax Invoice", pdf._doc_label("tax_invoice", pdf._label_fn("th_en")))
+        self.assertIn("税务发票", pdf._doc_label("tax_invoice", pdf._label_fn("th_zh")))
+        rows_zh = pdf._total_rows(dict(_DOC), "th_zh")
+        joined = " ".join(r[0] for r in rows_zh)
+        self.assertIn("增值税", joined)
+        self.assertIn("合计", joined)
+        for lang in ("th", "th_en", "th_zh"):
+            self.assertTrue(
+                pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, lang=lang).startswith(b"%PDF")
+            )
 
     def test_renders_each_buyer_type(self):
         for btype, tin in (
@@ -75,9 +90,11 @@ class PdfRenderTests(unittest.TestCase):
             self.assertTrue(pdf.render_invoice_pdf(_DOC, _SELLER, b).startswith(b"%PDF"))
 
     def test_company_branch_text(self):
-        self.assertIn("Head Office", pdf._buyer_branch_text({"branch_type": "hq"}))
+        L = pdf._label_fn("th_en")
+        self.assertIn("Head Office", pdf._buyer_branch_text({"branch_type": "hq"}, L))
         self.assertIn(
-            "Branch 00001", pdf._buyer_branch_text({"branch_type": "branch", "branch_no": "00001"})
+            "Branch 00001",
+            pdf._buyer_branch_text({"branch_type": "branch", "branch_no": "00001"}, L),
         )
 
     def test_due_date_and_terms_render(self):

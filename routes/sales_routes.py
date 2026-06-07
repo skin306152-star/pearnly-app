@@ -57,8 +57,18 @@ _ERR_HTTP = {
 }
 
 
+_VALID_PAPER = {"A4", "A5", "thermal_80", "thermal_58"}
+_VALID_LANG = {"th", "th_en", "th_zh"}
+
+
 def _dump(req) -> dict:
-    return req.model_dump() if hasattr(req, "model_dump") else req.dict()
+    d = req.model_dump() if hasattr(req, "model_dump") else req.dict()
+    # 纸张/语言白名单兜底:非法值回落默认,杜绝脏值流到 PDF 渲染层。
+    if "paper_size" in d and d.get("paper_size") not in _VALID_PAPER:
+        d["paper_size"] = "A4"
+    if "doc_language" in d and d.get("doc_language") not in _VALID_LANG:
+        d["doc_language"] = "th_en"
+    return d
 
 
 def _m(v) -> Optional[str]:
@@ -143,6 +153,8 @@ def _doc_out(d: dict) -> dict:
         "vat_amount": _m(d.get("vat_amount")),
         "price_includes_vat": bool(d.get("price_includes_vat")),
         "copies_layout": d.get("copies_layout") or "separate",
+        "paper_size": d.get("paper_size") or "A4",
+        "doc_language": d.get("doc_language") or "th_en",
         "wht_rate": _m(d.get("wht_rate")),
         "wht_amount": _m(d.get("wht_amount")),
         "grand_total": _m(d.get("grand_total")),
@@ -217,6 +229,8 @@ async def api_create_document(req: DocumentIn, request: Request):
             header_discount_pct=p["header_discount_pct"],
             price_includes_vat=p["price_includes_vat"],
             copies_layout=p["copies_layout"],
+            paper_size=p["paper_size"],
+            doc_language=p["doc_language"],
             due_date=_opt_date(p.get("due_date")),
             payment_terms=p.get("payment_terms"),
         )
@@ -237,23 +251,31 @@ async def api_get_document(doc_id: str, request: Request):
 async def api_document_pdf(
     doc_id: str,
     request: Request,
-    page: str = "A4",
+    page: Optional[str] = None,
     copy: str = "original",
     copies_layout: Optional[str] = None,
 ):
     """生成合规 PDF(卖方账套 + 买方客户 + 明细 · VAT 分列 · 连号)。
 
-    page=A4|A5(§E1)· copy=original|copy(正本给买方 / 副本自留 · §E2)。copies_layout
-    省纸正副本同页(§E2):不传则用单据开票时存的版式(向导第5步选择),回落 separate。
+    page/copies_layout/语言均默认取单据开票时存的选择(向导第5步);query 显式传入可覆盖。
+    page=A4|A5|thermal_80|thermal_58(§E1)· copy=original|copy(正/副本 · §E2)。
     """
     tid, _ = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
         doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
         if not doc:
             _fail("not_found")
+        eff_page = page or doc.get("paper_size") or "A4"
         layout = copies_layout or doc.get("copies_layout") or "separate"
+        lang = doc.get("doc_language") or "th_en"
         data = sales_render.build_pdf(
-            cur, tenant_id=tid, doc=doc, page=page, copy_kind=copy, copies_layout=layout
+            cur,
+            tenant_id=tid,
+            doc=doc,
+            page=eff_page,
+            copy_kind=copy,
+            copies_layout=layout,
+            lang=lang,
         )
     suffix = "_set" if layout == "two_up" else ("" if copy == "original" else "_copy")
     filename = (doc.get("doc_number") or "document").replace("/", "_") + suffix
@@ -286,6 +308,8 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
             header_discount_pct=p["header_discount_pct"],
             price_includes_vat=p["price_includes_vat"],
             copies_layout=p["copies_layout"],
+            paper_size=p["paper_size"],
+            doc_language=p["doc_language"],
             due_date=_opt_date(p.get("due_date")),
             payment_terms=p.get("payment_terms"),
         )

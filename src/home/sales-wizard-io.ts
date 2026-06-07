@@ -28,6 +28,15 @@ export interface WProduct {
 let sellers: WSeller[] = [];
 let products: WProduct[] = [];
 
+// 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
+const PAPER_TO_API: Record<WState['paper'], string> = { a4: 'A4', a5: 'A5', pos: 'thermal_80' };
+const API_TO_PAPER: Record<string, WState['paper']> = {
+    A4: 'a4',
+    A5: 'a5',
+    thermal_80: 'pos',
+    thermal_58: 'pos',
+};
+
 export function getSellers(): WSeller[] {
     return sellers;
 }
@@ -70,6 +79,8 @@ interface DraftDoc {
     vat_rate?: number | string;
     wht_rate?: number | string;
     copies_layout?: string;
+    paper_size?: string;
+    doc_language?: string;
     payment?: {
         status?: string;
         method?: string;
@@ -115,6 +126,8 @@ export function docToState(base: WState, docRaw: unknown): WState {
         paidAmt: p.paid_amount != null ? Number(p.paid_amount) : null,
     };
     s.layout = d.copies_layout === 'two_up' ? 'pair' : 'single';
+    if (d.paper_size && API_TO_PAPER[d.paper_size]) s.paper = API_TO_PAPER[d.paper_size];
+    if (d.doc_language) s.docLang = d.doc_language as WState['docLang'];
     s.issueDate = d.issue_date || s.issueDate;
     s.dueDate = d.due_date || '';
     s.draftId = String(d.id);
@@ -188,8 +201,10 @@ function buildPayload(st: WState) {
         header_discount_amount: +st.hdisc || 0,
         header_discount_pct: 0,
         price_includes_vat: false,
-        // 第5步版式选择 → 单据级 copies_layout(下载/打印按此渲染正副本同页)。
+        // 第5步输出选择 → 单据级持久化(下载/打印/发送都按此出):版式 / 纸张 / 文档语言。
         copies_layout: st.layout === 'pair' ? 'two_up' : 'separate',
+        paper_size: PAPER_TO_API[st.paper] || 'A4',
+        doc_language: st.docLang || 'th_en',
         due_date: st.docType === 'tax_invoice' && st.dueDate ? st.dueDate : null,
         lines,
         buyer: {

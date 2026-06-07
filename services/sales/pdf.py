@@ -19,37 +19,18 @@ from services.sales.totals import _d
 from services.sales.wht import pdf_label as wht_label
 from services.usage.usage_report_pdf_text import _build_paragraph_text, _register_fonts
 
-_DOC_LABEL = {
-    "tax_invoice": "ใบกำกับภาษี / Tax Invoice",
-    "tax_invoice_simple": "ใบกำกับภาษีอย่างย่อ / Simplified Tax Invoice",
-    "tax_invoice_receipt": "ใบกำกับภาษี/ใบเสร็จรับเงิน / Tax Invoice / Receipt",
-    "receipt": "ใบเสร็จรับเงิน / Receipt",
-    "credit_note": "ใบลดหนี้ / Credit Note",
-    "debit_note": "ใบเพิ่มหนี้ / Debit Note",
-    "quotation": "ใบเสนอราคา / Quotation",
-}
-
-# 买方税号标签随买方类型变(docs/15 §4):公司=税号 / 个人=身份证 / 外国=护照。
-_BUYER_TIN_LABEL = {
-    "company": "เลขประจำตัวผู้เสียภาษี / Tax ID",
-    "individual": "เลขบัตรประชาชน / National ID",
-    "foreigner": "เลขหนังสือเดินทาง / Passport No.",
-}
+# 标签三元组 + 语言解析拆到 pdf_labels(SRP · 控行数)。re-export 进本模块命名空间,
+# 使 pdf_thermal 仍能经 pdf_mod._DOC_LABEL / _COPY_LABEL 等取用。
+from services.sales.pdf_labels import _DOC_LABEL  # noqa: F401 (re-export 供测试/兼容)
+from services.sales.pdf_labels import (
+    _BUYER_TIN_LABEL,
+    _COPY_LABEL,
+    _PAYMENT_METHOD_LABEL,
+    _doc_label,
+    _label_fn,
+)
 
 _PAYMENT_DOC_TYPES = ("receipt", "tax_invoice_receipt")
-_PAYMENT_METHOD_LABEL = {
-    "cash": "เงินสด / Cash",
-    "transfer": "โอนเงิน / Transfer",
-    "cheque": "เช็ค / Cheque",
-    "card": "บัตร / Card",
-    "promptpay": "พร้อมเพย์ / PromptPay",
-}
-
-# 正本给买方 / 副本自留(泰国 VAT 注册方至少出 2 联 · docs/16 §E2)。
-_COPY_LABEL = {
-    "original": "ต้นฉบับ / Original",
-    "copy": "สำเนา / Copy",
-}
 PAGE_SIZES = ("A4", "A5")
 # 热敏卷纸窄版(§E1):POS 简易票。走 pdf_thermal 单列布局,不套 A4 表格(列宽溢出)。
 THERMAL_WIDTHS = {"thermal_80": 80, "thermal_58": 58}
@@ -70,9 +51,10 @@ def _discount_cell(ln: dict) -> str:
     return _money(disc)
 
 
-def _total_rows(doc: dict) -> list:
+def _total_rows(doc: dict, lang: str = "th_en") -> list:
     """合计区行 [label, value]。价外(默认)= 净额 + VAT 加总;价内(§C)= 标注含税并把
-    VAT 从含税额里反算单列(票面仍单独列税额)。"""
+    VAT 从含税额里反算单列(票面仍单独列税额)。标签随 doc_language 出。"""
+    L = _label_fn(lang)
     cur = doc.get("currency") or "THB"
     vat_rate = _money(doc.get("vat_rate"))
     subtotal = _d(doc.get("subtotal"))
@@ -80,22 +62,25 @@ def _total_rows(doc: dict) -> list:
     vat = _d(doc.get("vat_amount"))
     wht = _d(doc.get("wht_amount"))
     grand = doc.get("grand_total")
+    vat_lbl = L("ภาษีมูลค่าเพิ่ม", "VAT", "增值税")
+    disc_lbl = L("ส่วนลดท้ายบิล", "Discount", "整单折扣")
 
     if doc.get("price_includes_vat"):
         net = subtotal - header_disc - vat
-        rows = [["รวมเป็นเงิน (รวมภาษี) / Total (VAT incl.)", _money(subtotal)]]
+        rows = [[L("รวมเป็นเงิน (รวมภาษี)", "Total (VAT incl.)", "价税合计"), _money(subtotal)]]
         if header_disc != 0:
-            rows.append(["ส่วนลดท้ายบิล / Discount", "-" + _money(header_disc)])
-        rows.append(["มูลค่าก่อนภาษี / Net (VAT excl.)", _money(net)])
-        rows.append([f"ภาษีมูลค่าเพิ่ม / VAT {vat_rate}% (รวมในราคา/incl.)", _money(vat)])
+            rows.append([disc_lbl, "-" + _money(header_disc)])
+        rows.append([L("มูลค่าก่อนภาษี", "Net (VAT excl.)", "不含税金额"), _money(net)])
+        incl = L("รวมในราคา", "incl.", "含于价内")
+        rows.append([f"{vat_lbl} {vat_rate}% ({incl})", _money(vat)])
     else:
-        rows = [["มูลค่า / Subtotal", _money(subtotal)]]
+        rows = [[L("มูลค่า", "Subtotal", "金额"), _money(subtotal)]]
         if header_disc != 0:
-            rows.append(["ส่วนลดท้ายบิล / Discount", "-" + _money(header_disc)])
-        rows.append([f"ภาษีมูลค่าเพิ่ม / VAT {vat_rate}%", _money(vat)])
+            rows.append([disc_lbl, "-" + _money(header_disc)])
+        rows.append([f"{vat_lbl} {vat_rate}%", _money(vat)])
     if wht != 0:
-        rows.append([wht_label(doc.get("wht_rate")), "-" + _money(wht)])
-    rows.append([f"รวมทั้งสิ้น / Grand Total ({cur})", _money(grand)])
+        rows.append([wht_label(doc.get("wht_rate"), lang), "-" + _money(wht)])
+    rows.append([f"{L('รวมทั้งสิ้น', 'Grand Total', '合计')} ({cur})", _money(grand)])
     return rows
 
 
@@ -111,11 +96,12 @@ def _grid_style(grid: str, colors, accent) -> list:
     return [("GRID", (0, 0), (-1, -1), 0.5, colors.grey)]
 
 
-def _buyer_branch_text(b: dict) -> str:
+def _buyer_branch_text(b: dict, L) -> str:
     """公司买方的总公司/分店标识(§86/4 第 13 项强制字段)。"""
     if b.get("branch_type") == "branch" and b.get("branch_no"):
-        return f"สาขาที่ {b['branch_no']} / Branch {b['branch_no']}"
-    return "สำนักงานใหญ่ / Head Office"
+        no = b["branch_no"]
+        return L(f"สาขาที่ {no}", f"Branch {no}", f"分支 {no}")
+    return L("สำนักงานใหญ่", "Head Office", "总公司")
 
 
 def render_invoice_pdf(
@@ -126,6 +112,7 @@ def render_invoice_pdf(
     page: str = "A4",
     copy_kind: str = "original",
     copies_layout: str = "separate",
+    lang: str = "th_en",
     deterministic: bool = False,
 ) -> bytes:
     """渲染合规 PDF。page=A4|A5(共用布局)/ thermal_80|thermal_58(窄版单列·§E1);
@@ -148,6 +135,7 @@ def render_invoice_pdf(
             buyer,
             copy_kind=copy_kind,
             width_mm=THERMAL_WIDTHS[pg],
+            lang=lang,
             deterministic=deterministic,
         )
     from reportlab.lib import colors
@@ -159,6 +147,7 @@ def render_invoice_pdf(
 
     pagesize = A5 if str(page).upper() == "A5" else A4
     copy_kind = copy_kind if copy_kind in _COPY_LABEL else "original"
+    L = _label_fn(lang)
     base, bold = _register_fonts()
 
     # 列宽按可用页宽等比缩放(A4 基准 180mm),A4/A5 共用同一套布局不溢出。
@@ -194,7 +183,7 @@ def render_invoice_pdf(
         if p.get("branch"):
             cell.append(P(p.get("branch")))
         if p.get("phone"):
-            cell.append(P(f"โทร / Tel: {p.get('phone')}"))
+            cell.append(P(f"{L('โทร', 'Tel', '电话')}: {p.get('phone')}"))
         return cell
 
     def buyer_party(title, b):
@@ -204,34 +193,31 @@ def render_invoice_pdf(
             cell.append(P(b.get("address")))
         btype = b.get("type")
         if btype == "anonymous":
-            cell.append(P("ลูกค้าทั่วไป / Walk-in customer"))
+            cell.append(P(L("ลูกค้าทั่วไป", "Walk-in customer", "散客")))
             return cell
-        label = _BUYER_TIN_LABEL.get(btype, "เลขประจำตัวผู้เสียภาษี / TIN")
+        label = L(*_BUYER_TIN_LABEL.get(btype, ("เลขประจำตัวผู้เสียภาษี", "TIN", "税号")))
         cell.append(P(f"{label}: {b.get('tax_id') or '-'}"))
         if btype == "company":
-            cell.append(P(_buyer_branch_text(b)))
+            cell.append(P(_buyer_branch_text(b, L)))
         return cell
 
     def build_copy(ck):
         """组一联的 flowable 列表(供单联渲染或省纸两联各拿一份独立实例)。"""
         story = pdf_brand.logo_flowables(seller, mm, Spacer)
         story += [
-            P(
-                _DOC_LABEL.get(doc.get("doc_type"), doc.get("doc_type") or ""),
-                True,
-                TA_CENTER,
-                15,
-                color=accent,
-            ),
-            P(_COPY_LABEL[ck], True, TA_CENTER, 9),
+            P(_doc_label(doc.get("doc_type"), L), True, TA_CENTER, 15, color=accent),
+            P(L(*_COPY_LABEL[ck]), True, TA_CENTER, 9),
             Spacer(1, 4 * mm),
         ]
         meta = Table(
             [
                 [
-                    P("เลขที่ / No.: " + (doc.get("doc_number") or "-"), True),
+                    P(L("เลขที่", "No.", "编号") + ": " + (doc.get("doc_number") or "-"), True),
                     P(
-                        "วันที่ / Date: " + to_thai_date(doc.get("issue_date")) + " (พ.ศ.)",
+                        L("วันที่", "Date", "日期")
+                        + ": "
+                        + to_thai_date(doc.get("issue_date"))
+                        + " (พ.ศ.)",
                         align=TA_RIGHT,
                     ),
                 ]
@@ -244,17 +230,26 @@ def render_invoice_pdf(
         if doc.get("due_date") or doc.get("payment_terms"):
             bits = []
             if doc.get("due_date"):
-                bits.append("ครบกำหนด / Due: " + to_thai_date(doc.get("due_date")) + " (พ.ศ.)")
+                bits.append(
+                    L("ครบกำหนด", "Due", "到期")
+                    + ": "
+                    + to_thai_date(doc.get("due_date"))
+                    + " (พ.ศ.)"
+                )
             if doc.get("payment_terms"):
-                bits.append("เงื่อนไข / Terms: " + str(doc.get("payment_terms")))
+                bits.append(L("เงื่อนไข", "Terms", "条款") + ": " + str(doc.get("payment_terms")))
             story.append(P("    ".join(bits)))
             story.append(Spacer(1, 2 * mm))
 
         parties = Table(
             [
                 [
-                    party("ผู้ขาย / Seller", seller, "เลขประจำตัวผู้เสียภาษี / TIN"),
-                    buyer_party("ผู้ซื้อ / Buyer", buyer),
+                    party(
+                        L("ผู้ขาย", "Seller", "卖方"),
+                        seller,
+                        L("เลขประจำตัวผู้เสียภาษี", "TIN", "税号"),
+                    ),
+                    buyer_party(L("ผู้ซื้อ", "Buyer", "买方"), buyer),
                 ]
             ],
             colWidths=cw(90, 90),
@@ -276,11 +271,11 @@ def render_invoice_pdf(
 
         head = [
             "#",
-            "รายการ / Description",
-            "จำนวน / Qty",
-            "ราคา / Price",
-            "ส่วนลด / Discount",
-            "จำนวนเงิน / Amount",
+            L("รายการ", "Description", "项目"),
+            L("จำนวน", "Qty", "数量"),
+            L("ราคา", "Price", "单价"),
+            L("ส่วนลด", "Discount", "折扣"),
+            L("จำนวนเงิน", "Amount", "金额"),
         ]
         rows = [[P(h, True, TA_CENTER, color=colors.white) for h in head]]
         for ln in doc.get("lines", []):
@@ -309,7 +304,7 @@ def render_invoice_pdf(
         story.append(items)
         story.append(Spacer(1, 3 * mm))
 
-        total_rows = _total_rows(doc)
+        total_rows = _total_rows(doc, lang)
         trows = [
             [P(a, align=TA_RIGHT), P(b, b=(i == len(total_rows) - 1), align=TA_RIGHT)]
             for i, (a, b) in enumerate(total_rows)
@@ -326,7 +321,7 @@ def render_invoice_pdf(
         )
         story.append(totals)
 
-        pay = _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer)
+        pay = _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer, lang)
         if pay:
             story.extend(pay)
         story.extend(
@@ -438,25 +433,26 @@ def _render_two_up(buf, original_flow, copy_flow, pagesize, *, title, canvasmake
     )
 
 
-def _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer):
+def _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer, lang="th_en"):
     """合并单/收据的收款区(docs/16 §J4):方式/日期/已收;partial 时显未收余额。"""
     if doc.get("doc_type") not in _PAYMENT_DOC_TYPES:
         return None
     status = doc.get("payment_status")
     if not status or status == "unpaid":
         return None
+    L = _label_fn(lang)
     pm = doc.get("payment_method")
-    method = _PAYMENT_METHOD_LABEL.get(pm, pm or "-")
+    method = L(*_PAYMENT_METHOD_LABEL.get(pm, (pm or "-", "", "")))
     rows = [
-        [P("วิธีชำระ / Method", True), P(method)],
-        [P("วันที่ชำระ / Date", True), P(doc.get("payment_date") or "-")],
-        [P("ชำระแล้ว / Paid", True), P(_money(doc.get("paid_amount")))],
+        [P(L("วิธีชำระ", "Method", "付款方式"), True), P(method)],
+        [P(L("วันที่ชำระ", "Date", "付款日期"), True), P(doc.get("payment_date") or "-")],
+        [P(L("ชำระแล้ว", "Paid", "已付"), True), P(_money(doc.get("paid_amount")))],
     ]
     if status == "partial":
         outstanding = Decimal(str(doc.get("grand_total") or 0)) - Decimal(
             str(doc.get("paid_amount") or 0)
         )
-        rows.append([P("คงเหลือ / Outstanding", True), P(_money(outstanding))])
+        rows.append([P(L("คงเหลือ", "Outstanding", "未付余额"), True), P(_money(outstanding))])
     table = Table(rows, colWidths=cw(60, 60))
     table.setStyle(
         TableStyle(
@@ -468,4 +464,4 @@ def _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer):
             ]
         )
     )
-    return [Spacer(1, 4 * mm), P("การชำระเงิน / Payment", True, size=10), table]
+    return [Spacer(1, 4 * mm), P(L("การชำระเงิน", "Payment", "付款"), True, size=10), table]

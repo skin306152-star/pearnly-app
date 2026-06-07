@@ -26,6 +26,9 @@ def _fmt_rate(rate) -> str:
     return format(d.normalize(), "f")
 
 
-def pdf_label(rate) -> str:
-    """票面 WHT 标签带档率(§L2):'หัก ณ ที่จ่าย 3% / WHT'。"""
-    return f"หัก ณ ที่จ่าย {_fmt_rate(rate)}% / WHT"
+def pdf_label(rate, lang: str = "th_en") -> str:
+    """票面 WHT 标签带档率(§L2):'หัก ณ ที่จ่าย 3% / WHT'。随 doc_language 出次语。"""
+    base = f"หัก ณ ที่จ่าย {_fmt_rate(rate)}%"
+    if lang == "th":
+        return base
+    return f"{base} / {'预扣税' if lang == 'th_zh' else 'WHT'}"

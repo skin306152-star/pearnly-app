@@ -94,7 +94,9 @@ async def api_send_document(doc_id: str, req: SendIn, request: Request):
                 tenant_id=tid,
                 doc=doc,
                 parties=parties,
+                page=doc.get("paper_size") or "A4",
                 copies_layout=doc.get("copies_layout") or "separate",
+                lang=doc.get("doc_language") or "th_en",
             )
             subject, html = _email_content(doc, seller or {}, p.get("message"))
             ok, err = send_svc.send_email_with_pdf(
@@ -138,7 +140,7 @@ async def api_send_document(doc_id: str, req: SendIn, request: Request):
 
 
 @router.get("/shared/{token}/pdf")
-async def api_shared_pdf(token: str, page: str = "A4"):
+async def api_shared_pdf(token: str, page: str = ""):
     """公开发票 PDF(能力链接·不鉴权):token 不可猜即凭证;凭 token 反查租户/单据后渲染。"""
     with db.get_cursor_rls(bypass=True) as cur:
         ref = share_svc.resolve_token(cur, token)
@@ -152,8 +154,9 @@ async def api_shared_pdf(token: str, page: str = "A4"):
             cur,
             tenant_id=tid,
             doc=doc,
-            page=page,
+            page=page or doc.get("paper_size") or "A4",
             copies_layout=doc.get("copies_layout") or "separate",
+            lang=doc.get("doc_language") or "th_en",
         )
     filename = (doc.get("doc_number") or "invoice").replace("/", "_")
     return Response(

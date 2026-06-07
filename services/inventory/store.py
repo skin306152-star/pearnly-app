@@ -91,6 +91,12 @@ def ensure_schema() -> None:
                 "ON inventory_stock (tenant_id, product_id, warehouse_id) "
                 "WHERE batch_id IS NULL"
             )
+            # stock_overview / 近效期 / 库存报表按 (tenant, workspace) 过滤再聚合;uq_* 以 product
+            # 打头不含 workspace,这条补 (tenant, workspace) 前缀避免大库全租户扫(C2 性能 · 04 §4)。
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS ix_stock_ws_product "
+                "ON inventory_stock (tenant_id, workspace_client_id, product_id)"
+            )
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS inventory_transactions (
                     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

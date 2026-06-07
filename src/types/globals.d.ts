@@ -285,6 +285,8 @@ interface Window {
     loadSalesAccount?: () => void;
     // POS PO-A1/A4/B1 · 模块导航显隐 + 库存后台(屏7)+ 开通收银(屏8)桥
     applyModuleNav?: () => void;
+    // 平台业态套餐 PO-PP2 · 业态选择器弹窗(注册首次 / 设置切换业态 / 可开启功能)
+    openBusinessPicker?: (opts?: { businessType?: string; onDone?: () => void }) => void;
     loadInventoryPage?: () => void;
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;

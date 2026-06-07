@@ -102,6 +102,7 @@ import './home/module-nav.js'; // POS PO-A1 配套 · 导航按 GET /api/me/modu
 import './home/inventory.js'; // POS PO-A4 · 库存后台主页(屏7 · window.loadInventoryPage · 接 GET /api/inventory/stock · 四态)
 import './home/inventory-modals.js'; // POS PO-A4 · 入库/盘点弹窗(window.openInventoryIn/openInventoryCount · POST /api/inventory/in|count · .modal)
 import './home/pos-onboarding.js'; // POS PO-B1 · 开通收银(屏8 · window.loadPosOnboardingPage · PUT /api/pos/admin/onboarding · 选业态/建收银员)
+import './home/onboarding-business.js'; // 平台业态套餐 PO-PP2 · 业态选择器弹窗(window.openBusinessPicker · PUT /api/me/onboarding · 可开启功能/切换业态)
 import './home/sales-report.js'; // POS 屏9 · 销售报表(window.loadSalesReport · GET /api/pos/admin/report · KPI/图/榜 · 四态)
 import './home/pos-cashiers.js'; // POS · 收银员管理(window.loadPosCashiers · GET/POST/PUT /api/pos/admin/cashiers · owner · 加人/改名换色/重设PIN/启停)
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)

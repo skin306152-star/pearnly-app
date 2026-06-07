@@ -92,3 +92,32 @@ def assert_scope(cur, scope: WorkspaceScope) -> None:
     assert_workspace_in_tenant(
         cur, tenant_id=scope.tenant_id, workspace_client_id=scope.workspace_client_id
     )
+
+
+def default_workspace_id(cur, tenant_id: str) -> Optional[int]:
+    """租户的"默认套账"= 最早建的那个(与 PO-1 回填口径一致)。无则 None。"""
+    cur.execute(
+        "SELECT id FROM workspace_clients WHERE tenant_id = %s ORDER BY created_at, id LIMIT 1",
+        (tenant_id,),
+    )
+    row = cur.fetchone()
+    return int(row["id"]) if row else None
+
+
+def resolve_active_workspace_id(cur, request: Request, *, tenant_id: str) -> int:
+    """主程序运营接口取"当前套账"。**过渡期 rollout-safe**(前端 PO-2 顶栏切换器未上线前):
+      - 有 X-Workspace-Client-Id 头且属本租户 → 用它。
+      - 没头 → 回落到本租户【默认套账】(earliest)。**永远锁定一个套账,绝不"看全租户"。**
+    PO-2 前端上线(每请求都带套账头)后:本函数收紧为 require_workspace_id + assert(fail-closed),
+    去掉默认回落。届时改这一处即可,调用方不动。
+
+    与 PO-0 的 require_workspace_id 区别:那个是 fail-closed 终态;本函数是兼容前端冻结的过渡态。
+    """
+    ws = read_workspace_id(request)
+    if ws is not None:
+        assert_workspace_in_tenant(cur, tenant_id=tenant_id, workspace_client_id=ws)
+        return ws
+    ws = default_workspace_id(cur, tenant_id)
+    if ws is None:
+        raise HTTPException(400, detail="workspace.required")
+    return ws

@@ -14,6 +14,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from core import db
+from core import workspace_context as wc
 from core.auth import get_current_user_from_request
 from core.route_helpers import translate_unique_violation
 from services.sales import product_import
@@ -142,8 +143,13 @@ async def api_list_products(
 ):
     tid = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         rows = products_dal.list_products(
-            cur, tenant_id=tid, include_inactive=include_inactive, query=q
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            include_inactive=include_inactive,
+            query=q,
         )
     return {"products": [_out(r) for r in rows]}
 
@@ -155,7 +161,10 @@ async def api_create_product(req: ProductCreate, request: Request):
         db.get_cursor_rls(tid, commit=True) as cur,
         translate_unique_violation("sales.product_code_exists"),
     ):
-        row = products_dal.create_product(cur, tenant_id=tid, fields=_dump(req))
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        row = products_dal.create_product(
+            cur, tenant_id=tid, workspace_client_id=ws, fields=_dump(req)
+        )
     return {"ok": True, "product": _out(row)}
 
 
@@ -175,7 +184,8 @@ async def api_lookup_product(
     if not key:
         raise HTTPException(400, detail="sales.lookup_key_required")
     with db.get_cursor_rls(tid) as cur:
-        row = products_dal.find_by(cur, tenant_id=tid, key=key, value=value)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        row = products_dal.find_by(cur, tenant_id=tid, workspace_client_id=ws, key=key, value=value)
     if not row:
         raise HTTPException(404, detail="sales.product_not_found")
     return {"product": _out(row)}
@@ -194,9 +204,10 @@ async def api_import_products(request: Request, file: UploadFile = File(...)):
         raise HTTPException(400, detail=f"sales.import_{e}")
     created = 0
     with db.get_cursor_rls(tid, commit=True) as cur:
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         for rec in valid:
             try:
-                products_dal.create_product(cur, tenant_id=tid, fields=rec)
+                products_dal.create_product(cur, tenant_id=tid, workspace_client_id=ws, fields=rec)
                 created += 1
             except Exception as e:  # 单行入库失败不连累整批
                 logger.warning("[product_import] row insert failed: %s", e)
@@ -208,7 +219,10 @@ async def api_import_products(request: Request, file: UploadFile = File(...)):
 async def api_get_product(product_id: str, request: Request):
     tid = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
-        row = products_dal.get_product(cur, tenant_id=tid, product_id=product_id)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        row = products_dal.get_product(
+            cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id
+        )
     if not row:
         raise HTTPException(404, detail="sales.product_not_found")
     return {"product": _out(row)}
@@ -224,7 +238,10 @@ async def api_update_product(product_id: str, req: ProductUpdate, request: Reque
         db.get_cursor_rls(tid, commit=True) as cur,
         translate_unique_violation("sales.product_code_exists"),
     ):
-        row = products_dal.update_product(cur, tenant_id=tid, product_id=product_id, fields=raw)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        row = products_dal.update_product(
+            cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id, fields=raw
+        )
     if not row:
         raise HTTPException(404, detail="sales.product_not_found")
     return {"ok": True, "product": _out(row)}
@@ -234,7 +251,10 @@ async def api_update_product(product_id: str, req: ProductUpdate, request: Reque
 async def api_delete_product(product_id: str, request: Request):
     tid = _require_tenant(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
-        ok = products_dal.deactivate_product(cur, tenant_id=tid, product_id=product_id)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        ok = products_dal.deactivate_product(
+            cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id
+        )
     if not ok:
         raise HTTPException(404, detail="sales.product_not_found")
     return {"ok": True}
@@ -245,7 +265,10 @@ async def api_delete_product(product_id: str, request: Request):
 async def api_list_units(product_id: str, request: Request):
     tid = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
-        rows = units_dal.list_units(cur, tenant_id=tid, product_id=product_id)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        rows = units_dal.list_units(
+            cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id
+        )
     return {"units": [_unit_out(r) for r in rows]}
 
 
@@ -256,10 +279,15 @@ async def api_create_unit(product_id: str, req: UnitCreate, request: Request):
         db.get_cursor_rls(tid, commit=True) as cur,
         translate_unique_violation("sales.unit_name_exists"),
     ):
-        # 先确认商品属于本租户(product_id 非租户级 FK · 防挂到他人商品)。
-        if not products_dal.get_product(cur, tenant_id=tid, product_id=product_id):
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        # 先确认商品属于本租户+本套账(product_id 非租户级 FK · 防挂到他人/别套账商品)。
+        if not products_dal.get_product(
+            cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id
+        ):
             raise HTTPException(404, detail="sales.product_not_found")
-        row = units_dal.create_unit(cur, tenant_id=tid, product_id=product_id, fields=_dump(req))
+        row = units_dal.create_unit(
+            cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id, fields=_dump(req)
+        )
     return {"ok": True, "unit": _unit_out(row)}
 
 
@@ -273,8 +301,14 @@ async def api_update_unit(product_id: str, unit_id: str, req: UnitUpdate, reques
         db.get_cursor_rls(tid, commit=True) as cur,
         translate_unique_violation("sales.unit_name_exists"),
     ):
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         row = units_dal.update_unit(
-            cur, tenant_id=tid, product_id=product_id, unit_id=unit_id, fields=raw
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            product_id=product_id,
+            unit_id=unit_id,
+            fields=raw,
         )
     if not row:
         raise HTTPException(404, detail="sales.unit_not_found")
@@ -285,7 +319,10 @@ async def api_update_unit(product_id: str, unit_id: str, req: UnitUpdate, reques
 async def api_delete_unit(product_id: str, unit_id: str, request: Request):
     tid = _require_tenant(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
-        ok = units_dal.delete_unit(cur, tenant_id=tid, product_id=product_id, unit_id=unit_id)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        ok = units_dal.delete_unit(
+            cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id, unit_id=unit_id
+        )
     if not ok:
         raise HTTPException(404, detail="sales.unit_not_found")
     return {"ok": True}

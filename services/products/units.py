@@ -74,38 +74,46 @@ def _num(v: Any) -> Any:
     return Decimal(str(v)) if v is not None else None
 
 
-def list_units(cur, *, tenant_id: str, product_id: str) -> list:
+def list_units(cur, *, tenant_id: str, workspace_client_id: int, product_id: str) -> list:
     cur.execute(
-        f"SELECT {_UCOLS} FROM product_units WHERE tenant_id = %s AND product_id = %s "
+        f"SELECT {_UCOLS} FROM product_units "
+        f"WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = %s "
         f"ORDER BY factor_to_base",
-        (tenant_id, product_id),
+        (tenant_id, workspace_client_id, product_id),
     )
     return cur.fetchall()
 
 
-def get_unit(cur, *, tenant_id: str, product_id: str, unit_id: str) -> Optional[dict]:
+def get_unit(
+    cur, *, tenant_id: str, workspace_client_id: int, product_id: str, unit_id: str
+) -> Optional[dict]:
     cur.execute(
         f"SELECT {_UCOLS} FROM product_units "
-        f"WHERE tenant_id = %s AND product_id = %s AND id = %s",
-        (tenant_id, product_id, unit_id),
+        f"WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, product_id, unit_id),
     )
     return cur.fetchone()
 
 
-def _clear_default(cur, *, tenant_id: str, product_id: str) -> None:
+def _clear_default(cur, *, tenant_id: str, workspace_client_id: int, product_id: str) -> None:
     """置某商品所有单位 is_default_sell=FALSE(设新默认前调 · 保证单一默认)。"""
     cur.execute(
         "UPDATE product_units SET is_default_sell = FALSE, updated_at = now() "
-        "WHERE tenant_id = %s AND product_id = %s AND is_default_sell = TRUE",
-        (tenant_id, product_id),
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = %s "
+        "AND is_default_sell = TRUE",
+        (tenant_id, workspace_client_id, product_id),
     )
 
 
-def create_unit(cur, *, tenant_id: str, product_id: str, fields: dict) -> dict:
+def create_unit(
+    cur, *, tenant_id: str, workspace_client_id: int, product_id: str, fields: dict
+) -> dict:
     if fields.get("is_default_sell"):
-        _clear_default(cur, tenant_id=tenant_id, product_id=product_id)
-    cols = ["tenant_id", "product_id"]
-    vals: list = [tenant_id, product_id]
+        _clear_default(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, product_id=product_id
+        )
+    cols = ["tenant_id", "workspace_client_id", "product_id"]
+    vals: list = [tenant_id, workspace_client_id, product_id]
     for k in _UWRITABLE:
         if fields.get(k) is not None:
             cols.append(k)
@@ -120,28 +128,40 @@ def create_unit(cur, *, tenant_id: str, product_id: str, fields: dict) -> dict:
 
 
 def update_unit(
-    cur, *, tenant_id: str, product_id: str, unit_id: str, fields: dict
+    cur, *, tenant_id: str, workspace_client_id: int, product_id: str, unit_id: str, fields: dict
 ) -> Optional[dict]:
     updates = {k: fields[k] for k in _UWRITABLE if fields.get(k) is not None}
     if not updates:
-        return get_unit(cur, tenant_id=tenant_id, product_id=product_id, unit_id=unit_id)
+        return get_unit(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            product_id=product_id,
+            unit_id=unit_id,
+        )
     if updates.get("is_default_sell"):
-        _clear_default(cur, tenant_id=tenant_id, product_id=product_id)
+        _clear_default(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, product_id=product_id
+        )
     sets = ", ".join(f"{k} = %s" for k in updates) + ", updated_at = now()"
     params = [_num(v) if k in _NUMERIC else v for k, v in updates.items()]
-    params += [tenant_id, product_id, unit_id]
+    params += [tenant_id, workspace_client_id, product_id, unit_id]
     cur.execute(
         f"UPDATE product_units SET {sets} "
-        f"WHERE tenant_id = %s AND product_id = %s AND id = %s RETURNING {_UCOLS}",
+        f"WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = %s AND id = %s "
+        f"RETURNING {_UCOLS}",
         params,
     )
     return cur.fetchone()
 
 
-def delete_unit(cur, *, tenant_id: str, product_id: str, unit_id: str) -> bool:
+def delete_unit(
+    cur, *, tenant_id: str, workspace_client_id: int, product_id: str, unit_id: str
+) -> bool:
     """硬删单位(product_units 无引用历史 · 直接删行)。"""
     cur.execute(
-        "DELETE FROM product_units WHERE tenant_id = %s AND product_id = %s AND id = %s",
-        (tenant_id, product_id, unit_id),
+        "DELETE FROM product_units "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, product_id, unit_id),
     )
     return cur.rowcount > 0

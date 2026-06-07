@@ -64,7 +64,9 @@ def _norm_code(fields: dict) -> dict:
     return f
 
 
-def _revive_soft_deleted(cur, *, tenant_id: str, fields: dict) -> Optional[dict]:
+def _revive_soft_deleted(
+    cur, *, tenant_id: str, workspace_client_id: int, fields: dict
+) -> Optional[dict]:
     """新建商品的编码撞到一条【已软删】(is_active=FALSE)同编码记录时复活它并用新内容覆盖。
 
     软删保留已开票引用,但 uq_products_tenant_code(WHERE code IS NOT NULL)跨 active+inactive
@@ -81,8 +83,9 @@ def _revive_soft_deleted(cur, *, tenant_id: str, fields: dict) -> Optional[dict]
     dead = cur.fetchone()
     if not dead:
         return None
-    sets = ["is_active = TRUE"]
-    vals: list = []
+    # 复活时归到当前套账(code 唯一约束是租户级 · 死记录全租户至多 1 条 · 移到当前套账安全)。
+    sets = ["is_active = TRUE", "workspace_client_id = %s"]
+    vals: list = [workspace_client_id]
     for k in _WRITABLE:
         if fields.get(k) is not None:
             sets.append(f"{k} = %s")
@@ -95,13 +98,15 @@ def _revive_soft_deleted(cur, *, tenant_id: str, fields: dict) -> Optional[dict]
     return cur.fetchone()
 
 
-def create_product(cur, *, tenant_id: str, fields: dict) -> dict:
+def create_product(cur, *, tenant_id: str, workspace_client_id: int, fields: dict) -> dict:
     fields = _norm_code(fields)
-    revived = _revive_soft_deleted(cur, tenant_id=tenant_id, fields=fields)
+    revived = _revive_soft_deleted(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, fields=fields
+    )
     if revived is not None:
         return revived
-    cols = ["tenant_id"]
-    vals: list = [tenant_id]
+    cols = ["tenant_id", "workspace_client_id"]
+    vals: list = [tenant_id, workspace_client_id]
     for k in _WRITABLE:
         if fields.get(k) is not None:
             cols.append(k)
@@ -114,10 +119,12 @@ def create_product(cur, *, tenant_id: str, fields: dict) -> dict:
     return cur.fetchone()
 
 
-def get_product(cur, *, tenant_id: str, product_id: str) -> Optional[dict]:
+def get_product(
+    cur, *, tenant_id: str, workspace_client_id: int, product_id: str
+) -> Optional[dict]:
     cur.execute(
-        f"SELECT {_COLS} FROM products WHERE tenant_id = %s AND id = %s",
-        (tenant_id, product_id),
+        f"SELECT {_COLS} FROM products WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, product_id),
     )
     return cur.fetchone()
 
@@ -126,12 +133,13 @@ def list_products(
     cur,
     *,
     tenant_id: str,
+    workspace_client_id: int,
     include_inactive: bool = False,
     query: Optional[str] = None,
     limit: int = 200,
 ) -> list:
-    sql = f"SELECT {_COLS} FROM products WHERE tenant_id = %s"
-    params: list = [tenant_id]
+    sql = f"SELECT {_COLS} FROM products WHERE tenant_id = %s AND workspace_client_id = %s"
+    params: list = [tenant_id, workspace_client_id]
     if not include_inactive:
         sql += " AND is_active = TRUE"
     if query:
@@ -144,39 +152,46 @@ def list_products(
     return cur.fetchall()
 
 
-def update_product(cur, *, tenant_id: str, product_id: str, fields: dict) -> Optional[dict]:
+def update_product(
+    cur, *, tenant_id: str, workspace_client_id: int, product_id: str, fields: dict
+) -> Optional[dict]:
     fields = _norm_code(fields)
     updates = {k: fields[k] for k in _UPDATABLE if fields.get(k) is not None}
     if not updates:
-        return get_product(cur, tenant_id=tenant_id, product_id=product_id)
+        return get_product(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, product_id=product_id
+        )
     sets = ", ".join(f"{k} = %s" for k in updates) + ", updated_at = now()"
     params = [_money(v) if k in _NUMERIC else v for k, v in updates.items()]
-    params += [tenant_id, product_id]
+    params += [tenant_id, workspace_client_id, product_id]
     cur.execute(
-        f"UPDATE products SET {sets} WHERE tenant_id = %s AND id = %s RETURNING {_COLS}",
+        f"UPDATE products SET {sets} "
+        f"WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s RETURNING {_COLS}",
         params,
     )
     return cur.fetchone()
 
 
-def deactivate_product(cur, *, tenant_id: str, product_id: str) -> bool:
+def deactivate_product(cur, *, tenant_id: str, workspace_client_id: int, product_id: str) -> bool:
     """软删:置 is_active=FALSE(不物删 · 保留已开票引用)。"""
     cur.execute(
         "UPDATE products SET is_active = FALSE, updated_at = now() "
-        "WHERE tenant_id = %s AND id = %s",
-        (tenant_id, product_id),
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, product_id),
     )
     return cur.rowcount > 0
 
 
-def find_by(cur, *, tenant_id: str, key: str, value: str) -> Optional[dict]:
+def find_by(
+    cur, *, tenant_id: str, workspace_client_id: int, key: str, value: str
+) -> Optional[dict]:
     """按 code/barcode/qr 精确查在售商品(POS 点单/扫码快速带出)。"""
     col = _LOOKUP_COLS.get(key)
     if not col or not value:
         return None
     cur.execute(
-        f"SELECT {_COLS} FROM products "
-        f"WHERE tenant_id = %s AND {col} = %s AND is_active = TRUE LIMIT 1",
-        (tenant_id, value),
+        f"SELECT {_COLS} FROM products WHERE tenant_id = %s AND workspace_client_id = %s "
+        f"AND {col} = %s AND is_active = TRUE LIMIT 1",
+        (tenant_id, workspace_client_id, value),
     )
     return cur.fetchone()

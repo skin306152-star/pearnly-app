@@ -21,14 +21,14 @@ def _name(r) -> dict:
     return {"th": r["name_th"], "en": r["name_en"], "zh": r["name_zh"]}
 
 
-def _units_by_product(cur, *, tenant_id: str, product_ids: list) -> dict:
+def _units_by_product(cur, *, tenant_id: str, workspace_client_id: int, product_ids: list) -> dict:
     if not product_ids:
         return {}
     cur.execute(
         "SELECT product_id, unit_name, factor_to_base, barcode, price, is_default_sell "
-        "FROM product_units WHERE tenant_id = %s AND product_id = ANY(%s::uuid[]) "
-        "ORDER BY factor_to_base",
-        (tenant_id, product_ids),
+        "FROM product_units WHERE tenant_id = %s AND workspace_client_id = %s "
+        "AND product_id = ANY(%s::uuid[]) ORDER BY factor_to_base",
+        (tenant_id, workspace_client_id, product_ids),
     )
     out: dict = {}
     for r in cur.fetchall():
@@ -116,8 +116,11 @@ def list_products(
     category: Optional[str] = None,
     near_days: int = _DEFAULT_NEAR_EXPIRY_DAYS,
 ) -> dict:
-    sql = f"SELECT {_PROD_COLS} FROM products " f"WHERE tenant_id = %s AND is_active = TRUE"
-    params: list = [tenant_id]
+    sql = (
+        f"SELECT {_PROD_COLS} FROM products "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND is_active = TRUE"
+    )
+    params: list = [tenant_id, workspace_client_id]
     if q:
         sql += " AND (name_th ILIKE %s OR name_en ILIKE %s OR barcode ILIKE %s)"
         like = f"%{q}%"
@@ -129,7 +132,9 @@ def list_products(
     cur.execute(sql, params)
     rows = cur.fetchall()
     pids = [str(r["id"]) for r in rows]
-    units = _units_by_product(cur, tenant_id=tenant_id, product_ids=pids)
+    units = _units_by_product(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, product_ids=pids
+    )
     stock = _stock_by_product(
         cur,
         tenant_id=tenant_id,
@@ -144,8 +149,8 @@ def product_by_barcode(cur, *, tenant_id: str, workspace_client_id: int, code: s
     """扫码取单品。先配单位码(箱码≠瓶码),再配商品主码;命中单位回 matched_unit。"""
     cur.execute(
         "SELECT product_id, unit_name FROM product_units "
-        "WHERE tenant_id = %s AND barcode = %s LIMIT 1",
-        (tenant_id, code),
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND barcode = %s LIMIT 1",
+        (tenant_id, workspace_client_id, code),
     )
     u = cur.fetchone()
     matched_unit = None
@@ -153,21 +158,27 @@ def product_by_barcode(cur, *, tenant_id: str, workspace_client_id: int, code: s
         product_id = str(u["product_id"])
         matched_unit = u["unit_name"]
         cur.execute(
-            f"SELECT {_PROD_COLS} FROM products WHERE tenant_id = %s AND id = %s AND is_active = TRUE",
-            (tenant_id, product_id),
+            f"SELECT {_PROD_COLS} FROM products "
+            "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s AND is_active = TRUE",
+            (tenant_id, workspace_client_id, product_id),
         )
     else:
         cur.execute(
-            f"SELECT {_PROD_COLS} FROM products "
-            f"WHERE tenant_id = %s AND barcode = %s AND is_active = TRUE LIMIT 1",
-            (tenant_id, code),
+            f"SELECT {_PROD_COLS} FROM products WHERE tenant_id = %s AND workspace_client_id = %s "
+            "AND barcode = %s AND is_active = TRUE LIMIT 1",
+            (tenant_id, workspace_client_id, code),
         )
     row = cur.fetchone()
     if not row:
         from core.pos_api import PosError
 
         raise PosError("pos.product_not_found", 404)
-    units = _units_by_product(cur, tenant_id=tenant_id, product_ids=[str(row["id"])])
+    units = _units_by_product(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        product_ids=[str(row["id"])],
+    )
     stock = _stock_by_product(
         cur,
         tenant_id=tenant_id,

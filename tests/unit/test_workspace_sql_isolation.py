@@ -38,7 +38,11 @@ OPERATIONAL_TABLES = {
 # PO-3 加 products/units · PO-4 加 ocr_history · PO-5 加 inventory_batches ·
 # PO-6 加对账各表 · PO-7 加销项各表。
 CONVERTED: list[tuple[str, str]] = [
-    # ("services/products/store.py", "products"),   # ← PO-3 解注
+    # PO-3 商品(读写按套账)
+    ("services/sales/products.py", "products"),
+    ("services/pos/catalog.py", "products"),
+    ("services/products/units.py", "product_units"),
+    ("services/pos/catalog.py", "product_units"),
 ]
 
 

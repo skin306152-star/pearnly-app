@@ -94,22 +94,34 @@ class ProductsRoutesContractTests(unittest.TestCase):
 class ProductsDalTenantIsolationTests(unittest.TestCase):
     def test_every_statement_scopes_to_tenant(self):
         for fn in (
-            lambda c: dal.get_product(c, tenant_id="t-1", product_id="p"),
-            lambda c: dal.list_products(c, tenant_id="t-1"),
-            lambda c: dal.list_products(c, tenant_id="t-1", include_inactive=True, query="x"),
-            lambda c: dal.update_product(c, tenant_id="t-1", product_id="p", fields={"unit": "ea"}),
-            lambda c: dal.deactivate_product(c, tenant_id="t-1", product_id="p"),
-            lambda c: dal.find_by(c, tenant_id="t-1", key="code", value="P01"),
+            lambda c: dal.get_product(c, tenant_id="t-1", workspace_client_id=1, product_id="p"),
+            lambda c: dal.list_products(c, tenant_id="t-1", workspace_client_id=1),
+            lambda c: dal.list_products(
+                c, tenant_id="t-1", workspace_client_id=1, include_inactive=True, query="x"
+            ),
+            lambda c: dal.update_product(
+                c, tenant_id="t-1", workspace_client_id=1, product_id="p", fields={"unit": "ea"}
+            ),
+            lambda c: dal.deactivate_product(
+                c, tenant_id="t-1", workspace_client_id=1, product_id="p"
+            ),
+            lambda c: dal.find_by(
+                c, tenant_id="t-1", workspace_client_id=1, key="code", value="P01"
+            ),
         ):
             cur = FakeCursor(fetchone=ROW)
             fn(cur)
             self.assertTrue(cur.calls, "statement must execute")
             self.assertIn("tenant_id = %s", cur.last_sql)
+            self.assertIn("workspace_client_id = %s", cur.last_sql)
             self.assertIn("t-1", cur.last_params)
+            self.assertIn(1, cur.last_params)
 
     def test_create_inserts_tenant_and_parameterizes(self):
         cur = FakeCursor(fetchone=ROW)
-        dal.create_product(cur, tenant_id="t-1", fields={"name_th": "น้ำ", "unit_price": 50})
+        dal.create_product(
+            cur, tenant_id="t-1", workspace_client_id=1, fields={"name_th": "น้ำ", "unit_price": 50}
+        )
         self.assertIn("INSERT INTO products", cur.last_sql)
         self.assertIn("RETURNING", cur.last_sql)
         self.assertEqual(cur.last_params[0], "t-1")
@@ -120,27 +132,29 @@ class ProductsDalTenantIsolationTests(unittest.TestCase):
 
     def test_list_active_filter_toggles(self):
         cur = FakeCursor(fetchall=[ROW])
-        dal.list_products(cur, tenant_id="t-1")
+        dal.list_products(cur, tenant_id="t-1", workspace_client_id=1)
         self.assertIn("is_active = TRUE", cur.last_sql)
         cur2 = FakeCursor(fetchall=[ROW])
-        dal.list_products(cur2, tenant_id="t-1", include_inactive=True)
+        dal.list_products(cur2, tenant_id="t-1", workspace_client_id=1, include_inactive=True)
         self.assertNotIn("is_active = TRUE", cur2.last_sql)
 
     def test_deactivate_is_soft_delete(self):
         cur = FakeCursor(rowcount=1)
-        ok = dal.deactivate_product(cur, tenant_id="t-1", product_id="p")
+        ok = dal.deactivate_product(cur, tenant_id="t-1", workspace_client_id=1, product_id="p")
         self.assertTrue(ok)
         self.assertIn("is_active = FALSE", cur.last_sql)
         self.assertNotIn("DELETE", cur.last_sql)
 
     def test_lookup_rejects_unknown_key(self):
         cur = FakeCursor(fetchone=ROW)
-        self.assertIsNone(dal.find_by(cur, tenant_id="t-1", key="evil; DROP", value="x"))
+        self.assertIsNone(
+            dal.find_by(cur, tenant_id="t-1", workspace_client_id=1, key="evil; DROP", value="x")
+        )
         self.assertFalse(cur.calls, "unknown lookup key must not hit the DB")
 
     def test_lookup_uses_qr_payload_column(self):
         cur = FakeCursor(fetchone=ROW)
-        dal.find_by(cur, tenant_id="t-1", key="qr", value="Q1")
+        dal.find_by(cur, tenant_id="t-1", workspace_client_id=1, key="qr", value="Q1")
         self.assertIn("qr_payload = %s", cur.last_sql)
 
 

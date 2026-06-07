@@ -159,6 +159,31 @@ async def admin_layout_page(rest: str):
     )
 
 
+# POS 收银前台 SPA(PO-B3 · 2026-06-07)· 独立 plain-script SPA(参考 admin layout)
+# /pos · /pos/{rest:path} 全返回 static/pos/pos.html;鉴权由前端 pos.js 落地
+# (PIN 登录 + 收银员 token),非收银员偷进由 SPA boot 弹回——复用 admin SPA 的前端鉴权模式。
+# 登录分流(role=cashier → /pos)见 routes/oauth_routes.py:_login_redirect_path。
+def _pos_page() -> FileResponse:
+    return FileResponse(
+        "static/pos/pos.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
+
+@router.get("/pos", response_class=HTMLResponse)
+async def pos_page():
+    return _pos_page()
+
+
+@router.get("/pos/{rest:path}", response_class=HTMLResponse)
+async def pos_layout_page(rest: str):
+    return _pos_page()
+
+
 @router.get("/reset", response_class=HTMLResponse)
 async def reset_page():
     return FileResponse("static/reset.html")

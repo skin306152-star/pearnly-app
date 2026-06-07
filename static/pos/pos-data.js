@@ -14,7 +14,8 @@
     const state = (POS.state = {
         token: null,
         storeToken: null, // 设备店铺令牌(绑定后 · PIN 登录前的鉴权)
-        lang: 'zh',
+        lang: 'th', // 泰国市场默认泰语;有 mrpilot_lang 时随之(readEnv);页内可切
+
         workspaceClientId: null,
         terminalId: null,
         store: '',

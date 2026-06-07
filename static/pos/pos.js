@@ -330,6 +330,75 @@
         }
     }
 
+    // ── 摄像头扫码(BarcodeDetector · 安卓 Chrome 等支持;iOS Safari 无此 API → 回落手输)──
+    let scanStream = null;
+    let scanTimer = null;
+    function parseStoreCode(raw) {
+        if (!raw) return null;
+        const m = String(raw).match(/[?&]store=([^&\s]+)/i);
+        return m ? decodeURIComponent(m[1]) : String(raw).trim();
+    }
+    function closeScan() {
+        if (scanTimer) {
+            clearTimeout(scanTimer);
+            scanTimer = null;
+        }
+        if (scanStream) {
+            scanStream.getTracks().forEach((t) => t.stop());
+            scanStream = null;
+        }
+        const mask = $('bind-scan-mask');
+        if (mask) mask.classList.remove('show');
+    }
+    async function openScan() {
+        const inp = $('bind-code');
+        const ok =
+            'BarcodeDetector' in window &&
+            navigator.mediaDevices &&
+            navigator.mediaDevices.getUserMedia;
+        if (!ok) {
+            POS.toast(POS.t('posui.bind.scan_unsupported'));
+            if (inp) inp.focus();
+            return;
+        }
+        const video = $('bind-scan-video');
+        try {
+            scanStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' },
+            });
+            video.srcObject = scanStream;
+            await video.play();
+        } catch (_) {
+            POS.toast(POS.t('posui.bind.scan_denied'));
+            if (inp) inp.focus();
+            return;
+        }
+        $('bind-scan-mask').classList.add('show');
+        let detector;
+        try {
+            detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        } catch (_) {
+            detector = new window.BarcodeDetector();
+        }
+        const tick = async () => {
+            if (!scanStream) return;
+            try {
+                const codes = await detector.detect(video);
+                if (codes && codes.length) {
+                    const code = parseStoreCode(codes[0].rawValue);
+                    if (code) {
+                        closeScan();
+                        $('bind-code').value = code;
+                        bindDevice(code);
+                        return;
+                    }
+                }
+            } catch (_) {}
+            scanTimer = setTimeout(tick, 350);
+        };
+        tick();
+    }
+
     function bindBindScreen() {
         const go = $('bind-go');
         if (go) go.addEventListener('click', () => bindDevice($('bind-code').value));
@@ -338,6 +407,10 @@
             inp.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') bindDevice(inp.value);
             });
+        const scanBtn = $('bind-scan-btn');
+        if (scanBtn) scanBtn.addEventListener('click', openScan);
+        const scanCancel = $('bind-scan-cancel');
+        if (scanCancel) scanCancel.addEventListener('click', closeScan);
     }
 
     // 入口决策:URL ?store= 自动绑定 → 已绑/旧路径进登录 → 否则绑定屏。
@@ -386,7 +459,7 @@
         });
         // PWA 外壳 SW(08 ADR-1)· 失败不影响在线使用
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850707').catch(() => {});
+            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850709').catch(() => {});
         }
         tick();
         setInterval(tick, 10000);

@@ -12,20 +12,26 @@
     <title>Pearnly POS · 收银台</title>
     <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any" />
     <!-- PWA 预留(离线 PO-B5 再注册 Service Worker;此处先挂 manifest 占位) -->
-    <link rel="manifest" href="/static/pos/manifest.webmanifest?v=11850707" />
-    <link rel="stylesheet" href="/static/pos/pos.css?v=11850707" />
-    <link rel="stylesheet" href="/static/pos/pos-restaurant.css?v=11850707" />
+    <link rel="manifest" href="/static/pos/manifest.webmanifest?v=11850709" />
+    <link rel="stylesheet" href="/static/pos/pos.css?v=11850709" />
+    <link rel="stylesheet" href="/static/pos/pos-restaurant.css?v=11850709" />
   </head>
   <body>
     <!-- ── 设备绑定(未绑店铺 · 照稿 12②)── -->
     <section class="pos-view pos-view--bind" id="view-bind">
       <div class="dev">
+        <div class="langbar bind-langs">
+          <button data-lang="th">ไทย</button>
+          <button data-lang="en">EN</button>
+          <button data-lang="zh">中</button>
+          <button data-lang="ja">日</button>
+        </div>
         <div class="logo"><span class="dot"></span> Pearnly POS</div>
         <div class="big" data-i18n="posui.bind.title">先绑定这台设备到你的店</div>
         <div class="small" data-i18n="posui.bind.sub">
           问老板要店铺码,在这里输入(或扫店铺二维码)
         </div>
-        <div class="scan">
+        <button class="scan" id="bind-scan-btn" type="button" title="">
           <svg
             width="34"
             height="34"
@@ -39,7 +45,8 @@
             />
             <rect x="7" y="7" width="10" height="10" rx="1" />
           </svg>
-        </div>
+          <span class="scan-label" data-i18n="posui.bind.scan">扫二维码</span>
+        </button>
         <div class="or" data-i18n="posui.bind.or">— 或 —</div>
         <input
           class="inp tnum"
@@ -50,6 +57,16 @@
         />
         <div class="bind-err" id="bind-err"></div>
         <button class="bind-go" id="bind-go" data-i18n="posui.bind.go">绑定这家店</button>
+      </div>
+
+      <!-- 摄像头扫码层(BarcodeDetector 支持时 · 否则回落手输)-->
+      <div class="scan-mask" id="bind-scan-mask">
+        <video id="bind-scan-video" playsinline muted></video>
+        <div class="scan-frame"></div>
+        <div class="scan-tip" data-i18n="posui.bind.scanning">把老板的店铺二维码对准框内</div>
+        <button class="scan-cancel" id="bind-scan-cancel" data-i18n="posui.bind.scan.cancel">
+          取消
+        </button>
       </div>
     </section>
 
@@ -1144,14 +1161,14 @@
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=11850707"></script>
-    <script src="/static/pos/pos-totals.js?v=11850707"></script>
-    <script src="/static/pos/pos-data.js?v=11850707"></script>
-    <script src="/static/pos/pos-offline.js?v=11850707"></script>
-    <script src="/static/pos/pos-ops.js?v=11850707"></script>
-    <script src="/static/pos/pos-cashier.js?v=11850707"></script>
-    <script src="/static/pos/pos-restaurant.js?v=11850707"></script>
-    <script src="/static/pos/pos-restaurant-ops.js?v=11850707"></script>
-    <script src="/static/pos/pos.js?v=11850707" defer></script>
+    <script src="/static/pos/pos-i18n.js?v=11850709"></script>
+    <script src="/static/pos/pos-totals.js?v=11850709"></script>
+    <script src="/static/pos/pos-data.js?v=11850709"></script>
+    <script src="/static/pos/pos-offline.js?v=11850709"></script>
+    <script src="/static/pos/pos-ops.js?v=11850709"></script>
+    <script src="/static/pos/pos-cashier.js?v=11850709"></script>
+    <script src="/static/pos/pos-restaurant.js?v=11850709"></script>
+    <script src="/static/pos/pos-restaurant-ops.js?v=11850709"></script>
+    <script src="/static/pos/pos.js?v=11850709" defer></script>
   </body>
 </html>

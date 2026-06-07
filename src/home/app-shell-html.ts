@@ -288,6 +288,18 @@ const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-pos-cashiers">收银员</span>
             </div>
+            <div class="nav-item nav-sub-item" id="nav-pos-tables" data-module="pos" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-tables">桌台管理</span>
+            </div>
+            <div class="nav-item nav-sub-item" id="nav-pos-payment" data-module="pos" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="16" height="11" rx="1.5"/><line x1="2" y1="9" x2="18" y2="9"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-payment">收款设置</span>
+            </div>
             <div class="nav-item nav-sub-item" id="nav-pos-switch" data-href="/pos" data-module="pos">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="4" width="16" height="11" rx="1.5"/>

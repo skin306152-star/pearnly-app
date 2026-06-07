@@ -80,6 +80,9 @@ from routes.pos_restaurant_routes import (
 from routes.pos_restaurant_admin_routes import (
     router as pos_restaurant_admin_router,
 )  # 餐厅 POS 桌台/区域管理 PO-R · 2026-06-07
+from routes.pos_payment_routes import (
+    router as pos_payment_router,
+)  # POS 收款设置(老板后台)· 2026-06-08
 from routes.sales_routes import router as sales_router  # 销项单据/开票 PO-4 · 2026-06-06
 from routes.sales_seller_routes import (
     router as sales_seller_router,
@@ -226,6 +229,7 @@ app.include_router(pos_report_router)  # POS 销售报表 1 路由(PO-B6 · 2026
 app.include_router(pos_modules_router)  # POS 设置页模块管理 4 路由(C3 · 2026-06-07)
 app.include_router(pos_restaurant_router)  # 餐厅 POS 前台/后厨/埋单 14 路由(PO-R · 2026-06-07)
 app.include_router(pos_restaurant_admin_router)  # 餐厅 POS 桌台/区域管理 6 路由(PO-R · 2026-06-07)
+app.include_router(pos_payment_router)  # POS 收款设置 GET/PUT(老板后台 · 2026-06-08)
 app.include_router(sales_router)  # 销项单据/开票 6 路由(PO-4 · 2026-06-06)
 app.include_router(sales_seller_router)  # 销项开票方资料 3 路由(PO-6 · 2026-06-06)
 app.include_router(sales_settings_router)  # 销项开票设置 2 路由(§M7 · 2026-06-06)

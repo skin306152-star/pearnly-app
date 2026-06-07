@@ -289,6 +289,10 @@ interface Window {
     openBusinessPicker?: (opts?: { businessType?: string; onDone?: () => void }) => void;
     // 平台业态套餐 PO-PP3 · 设置「业务/模块」页加载(切到 modules tab 调)
     loadModuleSettings?: () => void;
+    // 餐厅 POS · 桌台管理弹窗(owner · 餐厅业态 · nav-pos-tables 触发)
+    openPosTables?: () => void;
+    // POS · 收款设置弹窗(owner · nav-pos-payment 触发)
+    openPosPayment?: () => void;
     loadInventoryPage?: () => void;
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;

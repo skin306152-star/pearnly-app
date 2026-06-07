@@ -19,7 +19,7 @@ function show(el: HTMLElement | null, on: boolean) {
     if (el) el.style.display = on ? '' : 'none';
 }
 
-function apply(modules: Record<string, ModuleFlag>) {
+function apply(modules: Record<string, ModuleFlag>, businessType?: string | null) {
     const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
     const on = (k: string) => !!(modules[k] && modules[k].enabled);
 
@@ -44,6 +44,9 @@ function apply(modules: Record<string, ModuleFlag>) {
     show(document.getElementById('nav-group-pos'), inv || pos || showOnboard);
     show(document.getElementById('nav-pos-onboard'), showOnboard);
     show(document.getElementById('nav-pos-cashiers'), pos && owner); // 收银员管理 = owner · pos 开通后
+    // 收款设置 = owner · pos 开通后(全 POS 业态);桌台管理 = 仅餐厅业态(owner · pos)。
+    show(document.getElementById('nav-pos-payment'), pos && owner);
+    show(document.getElementById('nav-pos-tables'), pos && owner && businessType === 'restaurant');
 
     // 「可开启功能 →」引导(owner + 有未开模块)→ 进设置 · 业务/模块 自助开通。
     const anyOff = owner && GATEABLE.some((k) => !on(k));
@@ -65,7 +68,7 @@ async function applyModuleNav() {
     try {
         const body = await apiGet('/api/me/modules');
         const data = (body && body.data) || {};
-        apply(data.modules || {});
+        apply(data.modules || {}, data.business_type);
         maybeAutoOnboard(data);
     } catch (_) {
         // 取不到开关:保持默认隐藏(安全侧),不弹错、不阻塞其余导航。

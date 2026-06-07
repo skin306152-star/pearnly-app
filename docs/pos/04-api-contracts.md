@@ -99,6 +99,23 @@
 ### GET /api/inventory/near-expiry?workspace_client_id=&days=30 — 近效期清单
 `data.items[]`:`{ "product_id","name","batch_no","expiry_date","qty","days_left":12 }`
 
+### GET /api/inventory/report?workspace_client_id=&from=&to=&near_expiry_days=30 — 库存报表(C1 · owner/会计)
+进销存 + 周转 + 近效期看板聚合。默认期间=本月 1 号至今天。数据从 inventory_transactions 聚合(签名量 qty_delta)。
+`data:`
+```json
+{ "period":{"from":"2026-06-01","to":"2026-06-07"},
+  "movement":[ {"product_id","name":{"th","en","zh"},"base_unit":"粒",
+    "opening":"100.000","in":"50.000","out":"30.000","sold":"28.000","closing":"120.000",
+    "turnover_ratio":"0.25","days_on_hand":"28.0"} ],
+  "near_expiry":{ "near_expiry_days":30,
+    "buckets":[ {"label":"expired","batches":1,"qty":"5.000"},
+                {"label":"le_7d","batches":2,"qty":"12.000"},
+                {"label":"le_30d","batches":4,"qty":"30.000"} ],
+    "value_at_risk":"840.00" } }
+```
+> 进销存:期初=期初前累计净额、期末=含 to 当天累计净额(半开窗口);周转率=售出量(txn sale_out)/平均库存。
+> SQL 每分区独立聚合(防笛卡尔积);turnover_ratio/days_on_hand 平均库存为 0 时返 null。
+
 ---
 
 ## 5. 班次

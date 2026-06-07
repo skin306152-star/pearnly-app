@@ -59,6 +59,9 @@ from routes.clients_routes import (
 from routes.products_routes import router as products_router  # 销项商品主数据 PO-2 · 2026-06-06
 from routes.modules_routes import router as modules_router  # POS 模块开关 PO-A1 · 2026-06-07
 from routes.inventory_routes import router as inventory_router  # POS 库存后台 PO-A3 · 2026-06-07
+from routes.inventory_report_routes import (
+    router as inventory_report_router,
+)  # POS 库存报表 C1 · 2026-06-07
 from routes.pos_auth_routes import (
     router as pos_auth_router,
 )  # POS 收银员鉴权/开通 PO-B1 · 2026-06-07
@@ -207,6 +210,7 @@ app.include_router(clients_router)  # REFACTOR-B1 · 客户管理 5 路由(2026-
 app.include_router(products_router)  # 销项商品主数据 6 路由(PO-2 · 2026-06-06)
 app.include_router(modules_router)  # POS 模块开关(GET /api/me/modules · PO-A1 · 2026-06-07)
 app.include_router(inventory_router)  # POS 库存后台 6 路由(PO-A3 · 2026-06-07)
+app.include_router(inventory_report_router)  # POS 库存报表 1 路由(C1 · 2026-06-07)
 app.include_router(pos_auth_router)  # POS 收银员鉴权/开通 3 路由(PO-B1 · 2026-06-07)
 app.include_router(pos_sales_router)  # POS 收银前台 14 路由(PO-B2/B4/B5 · 2026-06-07)
 app.include_router(pos_report_router)  # POS 销售报表 1 路由(PO-B6 · 2026-06-07)

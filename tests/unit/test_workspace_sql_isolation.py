@@ -50,6 +50,8 @@ CONVERTED: list[tuple[str, str]] = [
     ("services/inventory/queries.py", "inventory_batches"),
     ("services/inventory/fefo.py", "inventory_batches"),
     ("services/inventory/reports.py", "inventory_batches"),
+    # PO-6a 银行对账 v1(会话头按套账;流水经 session FK 派生)
+    ("services/recon/bank_recon_v1_store.py", "bank_reconcile_sessions"),
 ]
 
 

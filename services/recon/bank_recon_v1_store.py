@@ -45,20 +45,41 @@ def ensure_bank_recon_client_id_column():
         logger.warning(f"ensure_bank_recon_client_id_column failed: {e}")
 
 
+def _ws_clause(workspace_client_id: Optional[int]) -> tuple:
+    """PO-6a 套账隔离过滤子句 + 参数。None → 不过滤(向后兼容);给了 → 限本套账 + NULL 未归属行
+    (rollout-safe:bank_reconcile_sessions 列 PO-1 已回填,残留 NULL 仅废租户;PO-8 收口去 IS NULL)。"""
+    if workspace_client_id is None:
+        return "", ()
+    return " AND (workspace_client_id = %s OR workspace_client_id IS NULL)", (
+        int(workspace_client_id),
+    )
+
+
 def create_bank_recon_session(
-    user_id: str, bank_code: str, filename: str, pages: int
+    user_id: str,
+    bank_code: str,
+    filename: str,
+    pages: int,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[str]:
-    """创建一条会话 · 返回 id"""
+    """创建一条会话 · 返回 id。PO-6a:归当前套账(workspace_client_id · 缺则 NULL · 不拦)。"""
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO bank_reconcile_sessions
-                    (user_id, bank_code, source_filename, source_pages, parse_status)
-                VALUES (%s, %s, %s, %s, 'pending')
+                    (user_id, bank_code, source_filename, source_pages, parse_status,
+                     workspace_client_id)
+                VALUES (%s, %s, %s, %s, 'pending', %s)
                 RETURNING id
             """,
-                (str(user_id), bank_code, (filename or "")[:200], int(pages)),
+                (
+                    str(user_id),
+                    bank_code,
+                    (filename or "")[:200],
+                    int(pages),
+                    workspace_client_id,
+                ),
             )
             row = cur.fetchone()
             return str(row["id"]) if row else None
@@ -165,16 +186,19 @@ def mark_recon_parse_failed(session_id: str, error_msg: str) -> bool:
         return False
 
 
-def get_bank_recon_session(user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
-    """获取会话头(鉴权)"""
+def get_bank_recon_session(
+    user_id: str, session_id: str, workspace_client_id: Optional[int] = None
+) -> Optional[Dict[str, Any]]:
+    """获取会话头(鉴权)。PO-6a:可选按套账过滤(rollout-safe)。"""
+    ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor() as cur:
             cur.execute(
-                """
+                f"""
                 SELECT * FROM bank_reconcile_sessions
-                WHERE id = %s AND user_id = %s
+                WHERE id = %s AND user_id = %s{ws_sql}
             """,
-                (session_id, str(user_id)),
+                (session_id, str(user_id), *ws_params),
             )
             row = cur.fetchone()
             return dict(row) if row else None
@@ -184,14 +208,19 @@ def get_bank_recon_session(user_id: str, session_id: str) -> Optional[Dict[str, 
 
 
 def list_bank_recon_sessions(
-    user_id: str, limit: int = 30, restrict_client_ids: Optional[List[int]] = None
+    user_id: str,
+    limit: int = 30,
+    restrict_client_ids: Optional[List[int]] = None,
+    workspace_client_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """列最近会话
     v118.26.2 · 加 restrict_client_ids 参数(v28.1 客户分配 filter)
       None       → 不限(老板/超管)
       []         → 没分到任何客户 · 只能看自己上传未归属(client_id IS NULL)
       [1,2,3]    → (client_id IN list) OR (user_id = self AND client_id IS NULL)
+    PO-6a · workspace_client_id 给了 → 限本套账(套账硬边界 · 与 client_id 买方分层)。
     """
+    ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor() as cur:
             base_sql = """
@@ -202,8 +231,8 @@ def list_bank_recon_sessions(
                        client_id
                 FROM bank_reconcile_sessions
                 WHERE user_id = %s
-            """
-            params: list = [str(user_id)]
+            """ + ws_sql
+            params: list = [str(user_id), *ws_params]
 
             if restrict_client_ids is None:
                 pass  # 老板/超管 · 不加 filter
@@ -226,22 +255,26 @@ def list_bank_recon_sessions(
 
 # v118.26.2 · 给一个 session 绑客户(老板分客户给员工 · 流水进 client filter)
 def update_bank_recon_session_client(
-    user_id: str, session_id: str, client_id: Optional[int]
+    user_id: str,
+    session_id: str,
+    client_id: Optional[int],
+    workspace_client_id: Optional[int] = None,
 ) -> bool:
     """
     更新 session 的 client_id · None 表示解绑
-    鉴权:session 必须属于本 user
+    鉴权:session 必须属于本 user(PO-6a:再加套账边界 · rollout-safe)
     返回:成功 True / 不存在 False
     """
+    ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute(
-                """
+                f"""
                 UPDATE bank_reconcile_sessions
                 SET client_id = %s, updated_at = NOW()
-                WHERE id = %s AND user_id = %s
+                WHERE id = %s AND user_id = %s{ws_sql}
             """,
-                (client_id, session_id, str(user_id)),
+                (client_id, session_id, str(user_id), *ws_params),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -250,7 +283,7 @@ def update_bank_recon_session_client(
 
 
 # v118.26.0 · 对账中心首页统计(当月 · BKK 时区)
-def get_bank_recon_stats(user_id: str) -> Dict[str, Any]:
+def get_bank_recon_stats(user_id: str, workspace_client_id: Optional[int] = None) -> Dict[str, Any]:
     """
     对账中心首页用 · 当月概览
     pending = suggested(系统推荐 · 等会计点确认)
@@ -274,9 +307,16 @@ def get_bank_recon_stats(user_id: str) -> Dict[str, Any]:
         now_bkk = datetime.now(bkk)
         month_start_bkk = now_bkk.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
+        # PO-6a · 套账过滤(s 别名:作用于会话头;NULL 未归属仍计入 rollout-safe)
+        ws_sql = ""
+        ws_params: tuple = ()
+        if workspace_client_id is not None:
+            ws_sql = " AND (s.workspace_client_id = %s OR s.workspace_client_id IS NULL)"
+            ws_params = (int(workspace_client_id),)
+
         with db.get_cursor() as cur:
             cur.execute(
-                """
+                f"""
                 SELECT
                   COUNT(*) FILTER (WHERE t.match_status = 'suggested') AS pending,
                   COUNT(*) FILTER (WHERE t.match_status = 'matched')   AS matched,
@@ -287,9 +327,9 @@ def get_bank_recon_stats(user_id: str) -> Dict[str, Any]:
                 LEFT JOIN bank_reconcile_transactions t
                   ON t.session_id = s.id AND t.user_id = s.user_id
                 WHERE s.user_id = %s
-                  AND s.created_at >= %s
+                  AND s.created_at >= %s{ws_sql}
             """,
-                (str(user_id), month_start_bkk),
+                (str(user_id), month_start_bkk, *ws_params),
             )
             row = cur.fetchone()
             if not row:
@@ -336,15 +376,18 @@ def list_bank_recon_transactions(
         return []
 
 
-def delete_bank_recon_session(user_id: str, session_id: str) -> bool:
+def delete_bank_recon_session(
+    user_id: str, session_id: str, workspace_client_id: Optional[int] = None
+) -> bool:
+    ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute(
-                """
+                f"""
                 DELETE FROM bank_reconcile_sessions
-                WHERE id = %s AND user_id = %s
+                WHERE id = %s AND user_id = %s{ws_sql}
             """,
-                (session_id, str(user_id)),
+                (session_id, str(user_id), *ws_params),
             )
             return cur.rowcount > 0
     except Exception as e:

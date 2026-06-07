@@ -31,11 +31,31 @@ import logging
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from core import db
+from core import workspace_context as wc
 from core.auth import get_current_user_from_request
+from core.route_helpers import _tid
 
 logger = logging.getLogger("mr-pilot")
 
 router = APIRouter()
+
+
+def _active_ws(request: Request, user: dict):
+    """PO-6a 套账隔离 · 取当前请求的套账 id(rollout-safe:有头按头校验归属,无头回落默认套账)。
+
+    tenant 缺失 / 解析异常 → None → store 退回旧 user 口径(不抛、不拦)。同 history_routes._active_ws。
+    """
+    tid = _tid(user)
+    if not tid:
+        return None
+    try:
+        with db.get_cursor() as cur:
+            return wc.resolve_active_workspace_id(cur, request, tenant_id=str(tid))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"[bank_recon] resolve workspace failed: {e}")
+        return None
 
 
 @router.post("/api/bank-recon/upload")
@@ -105,6 +125,7 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
         bank_code=parsed.bank_code,
         filename=filename,
         pages=parsed.pages,
+        workspace_client_id=_active_ws(request, user),  # PO-6a · 归当前套账
     )
     if not session_id:
         raise HTTPException(500, detail="bank_recon.create_session_failed")
@@ -158,7 +179,12 @@ async def bank_recon_list_sessions(request: Request, limit: int = 30):
     user = get_current_user_from_request(request)
     limit = max(1, min(int(limit), 100))
     restrict = db.get_visible_client_ids_for_user(user)
-    return db.list_bank_recon_sessions(user["id"], limit, restrict_client_ids=restrict)
+    return db.list_bank_recon_sessions(
+        user["id"],
+        limit,
+        restrict_client_ids=restrict,
+        workspace_client_id=_active_ws(request, user),
+    )
 
 
 # v118.26.0 · 对账中心首页统计 · 当月概览
@@ -175,14 +201,16 @@ async def bank_recon_stats(request: Request):
     时区按 Asia/Bangkok 算「当月」
     """
     user = get_current_user_from_request(request)
-    return db.get_bank_recon_stats(user["id"])
+    return db.get_bank_recon_stats(user["id"], workspace_client_id=_active_ws(request, user))
 
 
 @router.get("/api/bank-recon/sessions/{session_id}")
 async def bank_recon_session_detail(session_id: str, request: Request, filter: str = "all"):
     """会话详情 · 含流水列表 · 可按 match_status 过滤"""
     user = get_current_user_from_request(request)
-    session = db.get_bank_recon_session(user["id"], session_id)
+    session = db.get_bank_recon_session(
+        user["id"], session_id, workspace_client_id=_active_ws(request, user)
+    )
     if not session:
         raise HTTPException(404, detail="bank_recon.session_not_found")
 
@@ -197,7 +225,9 @@ async def bank_recon_session_detail(session_id: str, request: Request, filter: s
 async def bank_recon_delete_session(session_id: str, request: Request):
     """删除对账会话(级联删流水和候选)"""
     user = get_current_user_from_request(request)
-    ok = db.delete_bank_recon_session(user["id"], session_id)
+    ok = db.delete_bank_recon_session(
+        user["id"], session_id, workspace_client_id=_active_ws(request, user)
+    )
     if not ok:
         raise HTTPException(404, detail="bank_recon.session_not_found")
     return {"ok": True}
@@ -207,7 +237,9 @@ async def bank_recon_delete_session(session_id: str, request: Request):
 async def bank_recon_run_match(session_id: str, request: Request):
     """触发匹配算法 · 同步等结果(最长 60 秒)"""
     user = get_current_user_from_request(request)
-    session = db.get_bank_recon_session(user["id"], session_id)
+    session = db.get_bank_recon_session(
+        user["id"], session_id, workspace_client_id=_active_ws(request, user)
+    )
     if not session:
         raise HTTPException(404, detail="bank_recon.session_not_found")
     if session.get("parse_status") != "parsed":
@@ -274,7 +306,9 @@ async def bank_recon_set_session_client(session_id: str, request: Request):
         visible = db.get_visible_client_ids_for_user(user)
         if visible is not None and cid not in visible:
             raise HTTPException(403, detail="client.no_access")
-    ok = db.update_bank_recon_session_client(str(user["id"]), session_id, cid)
+    ok = db.update_bank_recon_session_client(
+        str(user["id"]), session_id, cid, workspace_client_id=_active_ws(request, user)
+    )
     if not ok:
         raise HTTPException(404, detail="bank_recon.session_not_found")
     return {"ok": True, "client_id": cid}

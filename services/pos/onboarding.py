@@ -45,6 +45,10 @@ def onboard(
     modules_store.set_module(
         cur, tenant_id=tenant_id, module_key="pos", enabled=True, config=pos_config
     )
+    # 业态同步到哨兵行:module-nav 读 get_business_type(哨兵)做导航门控(如桌台管理仅餐厅显)。
+    # 屏8 选业态只写 pos.config.business_type 会与平台 onboarding 的哨兵行不一致 → 两处同写。
+    # (长期业态归账套级,并入套账隔离;本次先同步两处。)
+    modules_store.set_business_type(cur, tenant_id=tenant_id, business_type=business_type)
 
     inventory_store.get_or_create_default_warehouse(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, name=warehouse_name

@@ -58,10 +58,7 @@ function errToast(e: unknown): void {
 
 // ── 注入式作用域样式(.ptbl · 主蓝 var(--btn-blue))──
 const STYLE = `
-.ptbl-mask{position:fixed;inset:0;background:rgba(17,24,39,.5);backdrop-filter:blur(3px);display:none;align-items:flex-start;justify-content:center;z-index:1200;padding:32px 16px;overflow:auto;}
-.ptbl-mask.show{display:flex;}
-.ptbl{width:760px;max-width:96vw;background:#fff;border-radius:18px;padding:24px 26px 22px;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.25);}
-.ptbl-x{position:absolute;top:16px;right:18px;border:0;background:#f0f0ec;color:#6b7280;width:30px;height:30px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1;}
+.ptbl{max-width:760px;margin:0 auto;padding:6px 0 48px;}
 .ptbl .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
 .ptbl h1{font-size:20px;color:#111827;margin:0;}
 .ptbl .sub{color:#6b7280;font-size:13px;margin-bottom:16px;}
@@ -112,33 +109,20 @@ function ensureStyle(): void {
     document.head.appendChild(s);
 }
 
-function ensureShell(): HTMLElement {
-    let m = document.getElementById('ptbl-mask');
-    if (m) return m;
+// 进路由即渲染页面骨架到 #page-pos-tables(只建一次 · routeTo 控 .page 显隐)。
+function ensureShell(sec: HTMLElement): void {
+    if (sec.dataset.ptblInit === '1') return;
     ensureStyle();
-    m = document.createElement('div');
-    m.id = 'ptbl-mask';
-    m.className = 'ptbl-mask';
-    m.innerHTML = `<div class="ptbl">
-        <button class="ptbl-x" id="ptbl-close" aria-label="close">&times;</button>
+    sec.innerHTML = `<div class="ptbl">
         <div class="hd"><h1>${escapeHtml(t('rtbl.title'))}</h1>
             <button class="ztab add" id="ptbl-add-area">+ ${escapeHtml(t('rtbl.add_area'))}</button></div>
         <div class="sub">${escapeHtml(t('rtbl.sub'))}</div>
         <div id="ptbl-body"></div>
         <div class="note">${t('rtbl.note')}</div>
     </div>`;
-    document.body.appendChild(m);
-    m.addEventListener('click', (e) => {
-        if (e.target === m) close();
-    });
-    m.querySelector('#ptbl-close')!.addEventListener('click', close);
-    m.querySelector('#ptbl-add-area')!.addEventListener('click', () => openAreaDialog());
-    m.querySelector('#ptbl-body')!.addEventListener('click', onBodyClick);
-    return m;
-}
-
-function close(): void {
-    document.getElementById('ptbl-mask')?.classList.remove('show');
+    sec.dataset.ptblInit = '1';
+    sec.querySelector('#ptbl-add-area')!.addEventListener('click', () => openAreaDialog());
+    sec.querySelector('#ptbl-body')!.addEventListener('click', onBodyClick);
 }
 
 function renderBody(state: 'loading' | 'error' | 'ok'): void {
@@ -191,6 +175,21 @@ function renderBody(state: 'loading' | 'error' | 'ok'): void {
 }
 
 async function load(): Promise<void> {
+    // 按账套隔离 · 个人模式/未选账套 → 页内引导先选账套(不空请求)。
+    const id = activeWsId();
+    if (id == null) {
+        const body = document.getElementById('ptbl-body');
+        if (body)
+            body.innerHTML = `<div class="state">${escapeHtml(t('rtbl.no_workspace'))}<br><button class="ztab add" id="ptbl-pick-ws" style="margin-top:12px;">${escapeHtml(t('rtbl.pick_ws'))}</button></div>`;
+        const pick = document.getElementById('ptbl-pick-ws');
+        if (pick)
+            pick.onclick = () =>
+                window.requireWorkspace
+                    ? window.requireWorkspace(() => load())
+                    : window.openWorkspaceChooserUI?.();
+        return;
+    }
+    ws = id;
     renderBody('loading');
     try {
         const a = (await call('GET', `/areas?workspace_client_id=${ws}`)) as { areas: Area[] };
@@ -366,27 +365,11 @@ function showDialog(title: string, bodyHtml: string, onOk: () => Promise<boolean
     });
 }
 
-window.openPosTables = function () {
-    const isOwner = typeof window.isOwner === 'function' ? window.isOwner() : false;
-    if (!isOwner) {
-        showToast(t('rtbl.owner_only'), 'error');
-        return;
-    }
-    const id = activeWsId();
-    if (!id) {
-        showToast(t('rtbl.no_workspace'), 'error');
-        return;
-    }
-    ws = id;
-    ensureShell().classList.add('show');
+// 路由 'pos-tables' 进入即调(core-boot ROUTE_LOADERS)· 渲染到 #page-pos-tables 平铺 section。
+// owner 门控由 nav(module-nav:餐厅+pos+owner 才显 nav-pos-tables)把守;此处只渲染。页内动作仍弹窗。
+window.loadPosTables = function () {
+    const sec = document.getElementById('page-pos-tables');
+    if (!sec) return;
+    ensureShell(sec);
     load();
 };
-
-// 侧栏「桌台管理」入口(owner · 餐厅 · module-nav 控显隐)→ 弹窗(core-boot 满 500 不加路由)。
-document.addEventListener('click', (e) => {
-    if (
-        (e.target as HTMLElement).closest('#nav-pos-tables') &&
-        typeof window.openPosTables === 'function'
-    )
-        window.openPosTables();
-});

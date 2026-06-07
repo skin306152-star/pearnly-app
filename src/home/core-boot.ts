@@ -240,7 +240,30 @@ const VALID_ROUTES = [
     'pos-onboarding',
     'sales-report',
     'pos-cashiers',
+    'pos-tables',
+    'pos-payment',
 ];
+
+// route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。
+const ROUTE_LOADERS: Record<string, string> = {
+    settings: 'renderSettings',
+    history: 'loadHistoryPage',
+    clients: 'loadClientsPage',
+    knowledge: 'loadKnowledgePage',
+    inventory: 'loadInventoryPage',
+    'pos-onboarding': 'loadPosOnboardingPage',
+    'sales-report': 'loadSalesReport',
+    'pos-cashiers': 'loadPosCashiers',
+    'pos-tables': 'loadPosTables',
+    'pos-payment': 'loadPosPayment',
+    'sales-invoices': 'loadSalesWorkbench',
+    'sales-products': 'loadSalesProducts',
+    'sales-account': 'loadSalesAccount',
+    exceptions: 'loadExceptionsPage',
+    reconcile: 'loadReconcilePage',
+    'test-center': 'loadTestCenterPage',
+    dashboard: 'loadDashboard',
+};
 
 function routeTo(route?: any) {
     // REFACTOR-C1 · 老 admin/admin-users/admin-cost 路由已下线(超管走独立 /admin SPA)· 落到 ocr
@@ -266,48 +289,11 @@ function routeTo(route?: any) {
     // 移动端收起侧栏
     if (window.innerWidth <= 768) document.body.classList.remove('sidebar-open');
 
-    // 特殊页面加载
-    if (route === 'settings' && typeof window.renderSettings === 'function')
-        window.renderSettings();
-    // REFACTOR-C1-home-batch4 · loadHistoryPage 已迁 history-list.js(defer)· 同 clients 范式守卫;bootstrap 期未就绪由 history-list.js 自举补调
-    if (route === 'history' && typeof window.loadHistoryPage === 'function')
-        window.loadHistoryPage();
-    // automation 路由已移除 · 银行上传改为对账中心原地弹文件选择器
-    if (route === 'clients' && typeof window.loadClientsPage === 'function')
-        window.loadClientsPage();
-    // KNOWLEDGE · 客户知识中心
-    if (route === 'knowledge' && typeof window.loadKnowledgePage === 'function')
-        window.loadKnowledgePage();
-    // POS PO-A4 · 库存后台(屏7)
-    if (route === 'inventory' && typeof window.loadInventoryPage === 'function')
-        window.loadInventoryPage();
-    // POS PO-B1 · 开通收银(屏8)
-    if (route === 'pos-onboarding' && typeof window.loadPosOnboardingPage === 'function')
-        window.loadPosOnboardingPage();
-    // POS 屏9 · 销售报表
-    if (route === 'sales-report' && typeof window.loadSalesReport === 'function')
-        window.loadSalesReport();
-    // POS · 收银员管理(owner · pos 开通后显)
-    if (route === 'pos-cashiers' && typeof window.loadPosCashiers === 'function')
-        window.loadPosCashiers();
-    // 销项 PO-10 · 发票工作台 / 商品管理 / 账套·开票资料
-    if (route === 'sales-invoices' && typeof window.loadSalesWorkbench === 'function')
-        window.loadSalesWorkbench();
-    if (route === 'sales-products' && typeof window.loadSalesProducts === 'function')
-        window.loadSalesProducts();
-    if (route === 'sales-account' && typeof window.loadSalesAccount === 'function')
-        window.loadSalesAccount();
-    // v118.20.2 · 异常栏页面加载
-    if (route === 'exceptions' && typeof window.loadExceptionsPage === 'function')
-        window.loadExceptionsPage();
-    // v118.26.0 · 对账中心首页加载
-    if (route === 'reconcile' && typeof window.loadReconcilePage === 'function')
-        window.loadReconcilePage();
-    // v118.28.1.0 · 测试中心
-    if (route === 'test-center' && typeof window.loadTestCenterPage === 'function')
-        window.loadTestCenterPage();
-    // v118.32.5.5.16 · 首页 dashboard
-    if (route === 'dashboard' && typeof window.loadDashboard === 'function') window.loadDashboard();
+    // 特殊页面加载:route → 页面加载函数名(window.* · 进路由即调,缺失则守卫跳过)。
+    // 数据驱动表替原 if 链(同行为 · 腾 core-boot 空间)。各页加载器自身幂等/四态。
+    const loader = ROUTE_LOADERS[route];
+    const winFns = window as unknown as Record<string, () => void>;
+    if (loader && typeof winFns[loader] === 'function') winFns[loader]();
     // A4 (v118.34.19) · 进集成页 · 默认 cards tab · 同时刷新 erp logs
     // (logs tab 切过去时会再调一次 · 这里是首屏 / 切回时数据保鲜)
     if (route === 'integrations') {

@@ -42,10 +42,7 @@ async function call(method: string, body?: unknown): Promise<PaySettings> {
 }
 
 const STYLE = `
-.rpay-mask{position:fixed;inset:0;background:rgba(17,24,39,.5);backdrop-filter:blur(3px);display:none;align-items:flex-start;justify-content:center;z-index:1200;padding:32px 16px;overflow:auto;}
-.rpay-mask.show{display:flex;}
-.rpay{width:600px;max-width:96vw;background:#fff;border-radius:18px;padding:24px 26px 22px;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.25);}
-.rpay-x{position:absolute;top:16px;right:18px;border:0;background:#f0f0ec;color:#6b7280;width:30px;height:30px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1;}
+.rpay{max-width:600px;margin:0 auto;padding:6px 0 48px;}
 .rpay h1{font-size:20px;color:#111827;margin:0 0 4px;}
 .rpay .sub{color:#6b7280;font-size:13px;margin-bottom:18px;}
 .rpay .card{border:1px solid #e8e8e3;border-radius:14px;overflow:hidden;margin-bottom:16px;}
@@ -88,25 +85,16 @@ function ensureStyle(): void {
     document.head.appendChild(s);
 }
 
-function ensureShell(): HTMLElement {
-    let m = document.getElementById('rpay-mask');
-    if (m) return m;
+// 进路由即渲染页面骨架到 #page-pos-payment(只建一次 · routeTo 控 .page 显隐)。
+function ensureShell(sec: HTMLElement): void {
+    if (sec.dataset.rpayInit === '1') return;
     ensureStyle();
-    m = document.createElement('div');
-    m.id = 'rpay-mask';
-    m.className = 'rpay-mask';
-    m.innerHTML = `<div class="rpay">
-        <button class="rpay-x" id="rpay-close" aria-label="close">&times;</button>
+    sec.innerHTML = `<div class="rpay">
         <h1>${escapeHtml(t('rpay.title'))}</h1>
         <div class="sub">${escapeHtml(t('rpay.sub'))}</div>
         <div id="rpay-body"><div class="state">${escapeHtml(t('rpay.loading'))}</div></div>
     </div>`;
-    document.body.appendChild(m);
-    m.addEventListener('click', (e) => {
-        if (e.target === m) m!.classList.remove('show');
-    });
-    m.querySelector('#rpay-close')!.addEventListener('click', () => m!.classList.remove('show'));
-    return m;
+    sec.dataset.rpayInit = '1';
 }
 
 function pmRow(
@@ -211,6 +199,20 @@ async function save(): Promise<void> {
 
 async function load(): Promise<void> {
     const body = document.getElementById('rpay-body');
+    // 收款设置按账套(workspace_client_id)隔离 · 未选账套 → 页内引导先选账套。
+    const id = activeWsId();
+    if (id == null) {
+        if (body)
+            body.innerHTML = `<div class="state">${escapeHtml(t('rpay.no_workspace'))}<br><button class="save" id="rpay-pick-ws" style="margin-top:14px;width:auto;padding:0 20px;height:42px;">${escapeHtml(t('rpay.pick_ws'))}</button></div>`;
+        const pick = document.getElementById('rpay-pick-ws');
+        if (pick)
+            pick.onclick = () =>
+                window.requireWorkspace
+                    ? window.requireWorkspace(() => load())
+                    : window.openWorkspaceChooserUI?.();
+        return;
+    }
+    ws = id;
     if (body) body.innerHTML = `<div class="state">${escapeHtml(t('rpay.loading'))}</div>`;
     try {
         render(await call('GET'));
@@ -219,26 +221,11 @@ async function load(): Promise<void> {
     }
 }
 
-window.openPosPayment = function () {
-    const isOwner = typeof window.isOwner === 'function' ? window.isOwner() : false;
-    if (!isOwner) {
-        showToast(t('rpay.owner_only'), 'error');
-        return;
-    }
-    const id = activeWsId();
-    if (!id) {
-        showToast(t('rpay.no_workspace'), 'error');
-        return;
-    }
-    ws = id;
-    ensureShell().classList.add('show');
+// 路由 'pos-payment' 进入即调(core-boot ROUTE_LOADERS)· 渲染到 #page-pos-payment 平铺 section。
+// owner 门控由 nav(module-nav:pos+owner 才显 nav-pos-payment)把守;此处只渲染。页内动作仍弹窗/原地。
+window.loadPosPayment = function () {
+    const sec = document.getElementById('page-pos-payment');
+    if (!sec) return;
+    ensureShell(sec);
     load();
 };
-
-document.addEventListener('click', (e) => {
-    if (
-        (e.target as HTMLElement).closest('#nav-pos-payment') &&
-        typeof window.openPosPayment === 'function'
-    )
-        window.openPosPayment();
-});

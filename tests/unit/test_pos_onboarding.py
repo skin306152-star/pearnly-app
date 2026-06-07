@@ -15,10 +15,14 @@ class _Recorder:
         self.cashiers = []
         self.warehouses = []
         self.terminals = 0
+        self.business_type = None
 
     def set_module(self, cur, *, tenant_id, module_key, enabled, config=None):
         self.modules[module_key] = {"enabled": enabled, "config": config}
         return {"module_key": module_key, "enabled": enabled, "config": config or {}}
+
+    def set_business_type(self, cur, *, tenant_id, business_type):
+        self.business_type = business_type
 
     def get_or_create_default_warehouse(self, cur, *, tenant_id, workspace_client_id, name=None):
         self.warehouses.append(name)
@@ -40,11 +44,13 @@ class OnboardingTests(unittest.TestCase):
         self.rec = _Recorder()
         self._saved = (
             onboarding.modules_store.set_module,
+            onboarding.modules_store.set_business_type,
             onboarding.inventory_store.get_or_create_default_warehouse,
             onboarding.cashier_dal.get_or_create_default_terminal,
             onboarding.cashier_dal.create_cashier,
         )
         onboarding.modules_store.set_module = self.rec.set_module
+        onboarding.modules_store.set_business_type = self.rec.set_business_type
         onboarding.inventory_store.get_or_create_default_warehouse = (
             self.rec.get_or_create_default_warehouse
         )
@@ -56,6 +62,7 @@ class OnboardingTests(unittest.TestCase):
     def tearDown(self):
         (
             onboarding.modules_store.set_module,
+            onboarding.modules_store.set_business_type,
             onboarding.inventory_store.get_or_create_default_warehouse,
             onboarding.cashier_dal.get_or_create_default_terminal,
             onboarding.cashier_dal.create_cashier,
@@ -81,6 +88,13 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(out["cashier_id"], "new-cashier")
         self.assertEqual(self.rec.warehouses, ["ร้านยา"])
         self.assertEqual(self.rec.terminals, 1)
+
+    def test_business_type_synced_to_sentinel_for_module_nav(self):
+        # 屏8 选业态须同步到哨兵行(module-nav 读 get_business_type 做门控,如桌台仅餐厅显)
+        onboarding.onboard(None, tenant_id="t", workspace_client_id=9, business_type="restaurant")
+        self.assertEqual(self.rec.business_type, "restaurant")
+        # 与 pos.config 两处一致
+        self.assertEqual(self.rec.modules["pos"]["config"]["business_type"], "restaurant")
 
     def test_pin_is_hashed_not_plaintext(self):
         onboarding.onboard(

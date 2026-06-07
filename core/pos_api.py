@@ -159,6 +159,16 @@ def require_owner(request: Request) -> tuple[str, Optional[str]]:
     return str(tid), uid
 
 
+def require_workspace(cur, tenant_id: str, workspace_client_id: int) -> None:
+    """账套归属校验:workspace_client_id 必属本租户,否则 pos.forbidden(403)。用调用方游标。"""
+    cur.execute(
+        "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+        (workspace_client_id, tenant_id),
+    )
+    if not cur.fetchone():
+        raise PosError("pos.forbidden", 403)
+
+
 def assert_module_enabled(cur, tenant_id: str, module_key: str) -> None:
     """模块未开 → PosError pos.module_disabled(403)。用调用方已开的游标(不另起连接)。"""
     from services.modules import store

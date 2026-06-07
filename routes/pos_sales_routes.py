@@ -15,7 +15,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from core import db
-from core.pos_api import PosError, assert_module_enabled, ok, pos_auth
+from core.pos_api import PosError, assert_module_enabled, ok, pos_auth, require_workspace
 from services.pos import catalog, refund as refund_svc, sale as sale_svc, shift as shift_svc
 
 router = APIRouter(prefix="/api/pos", tags=["pos-sales"])
@@ -36,21 +36,12 @@ def _resolve_ws(user: dict, override: Optional[int]) -> int:
     return int(ws)
 
 
-def _require_workspace(cur, tid: str, ws: int) -> None:
-    cur.execute(
-        "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-        (ws, tid),
-    )
-    if not cur.fetchone():
-        raise PosError("pos.forbidden", 403)
-
-
 def _read(request: Request, ws_override: Optional[int], fn, commit: bool = False):
     user, tid = _subject(request)
     ws = _resolve_ws(user, ws_override)
     with db.get_cursor_rls(tid, commit=commit) as cur:
         assert_module_enabled(cur, tid, "pos")
-        _require_workspace(cur, tid, ws)
+        require_workspace(cur, tid, ws)
         return ok(fn(cur, tid, ws, user))
 
 
@@ -59,7 +50,7 @@ def _write(request: Request, ws_override: Optional[int], fn):
     ws = _resolve_ws(user, ws_override)
     with db.get_cursor_rls(tid, commit=True) as cur:
         assert_module_enabled(cur, tid, "pos")
-        _require_workspace(cur, tid, ws)
+        require_workspace(cur, tid, ws)
         return ok(fn(cur, tid, ws, user))
 
 
@@ -285,15 +276,10 @@ async def api_promptpay_qr(
 ):
     import base64
 
+    from services.pos import sales_store
     from services.sales.promptpay import build_payload, build_qr_png
 
-    user, tid = _subject(request)
-    ws = _resolve_ws(user, workspace_client_id)
-    with db.get_cursor_rls(tid) as cur:
-        assert_module_enabled(cur, tid, "pos")
-        _require_workspace(cur, tid, ws)
-        from services.pos import sales_store
-
+    def _fn(cur, tid, ws, user):
         sale = sales_store.get_sale(cur, tenant_id=tid, sale_id=sale_id)
         if not sale:
             raise PosError("pos.product_not_found", 404)
@@ -302,18 +288,17 @@ async def api_promptpay_qr(
             (tid, ws),
         )
         row = cur.fetchone()
-    ppid = row["promptpay_id"] if row else None
-    if not ppid:
-        raise PosError("pos.line_invalid", 422, detail="no_promptpay_id")
-    amount = sale["grand_total"]
-    png = build_qr_png(ppid, amount)
-    return ok(
-        {
+        ppid = row["promptpay_id"] if row else None
+        if not ppid:
+            raise PosError("pos.line_invalid", 422, detail="no_promptpay_id")
+        amount = sale["grand_total"]
+        return {
             "qr_payload": build_payload(ppid, amount),
-            "png_base64": base64.b64encode(png).decode("ascii"),
+            "png_base64": base64.b64encode(build_qr_png(ppid, amount)).decode("ascii"),
             "amount": f"{amount:.2f}",
         }
-    )
+
+    return _read(request, workspace_client_id, _fn)
 
 
 @router.get("/sales/{sale_id}/receipt-pdf")
@@ -327,6 +312,6 @@ async def api_receipt_pdf(
     ws = _resolve_ws(user, workspace_client_id)
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
-        _require_workspace(cur, tid, ws)
+        require_workspace(cur, tid, ws)
         pdf = sale_svc.build_receipt_pdf(cur, tenant_id=tid, sale_id=sale_id, width_mm=width)
     return Response(content=pdf, media_type="application/pdf")

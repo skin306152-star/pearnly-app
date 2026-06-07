@@ -44,20 +44,27 @@ def _units_by_product(cur, *, tenant_id: str, product_ids: list) -> dict:
     return out
 
 
-def _stock_by_product(cur, *, tenant_id: str, workspace_client_id: int, near_days: int) -> dict:
-    """每商品默认仓总在库 + 近效期标记(预聚合 · 防 stock×batches 笛卡尔积翻倍)。"""
+def _stock_by_product(
+    cur, *, tenant_id: str, workspace_client_id: int, near_days: int, product_ids: list
+) -> dict:
+    """这批商品的默认仓总在库 + 近效期标记。两条查询分开(SUM 不 join batches · 防笛卡尔积翻倍 ·
+    见 [[pos-po-a1-shipped]])。只聚合本页 product_ids(大商品库时不全表扫)。空列表直接返回空。"""
+    if not product_ids:
+        return {"qty": {}, "near": set()}
     cur.execute(
         "SELECT product_id, COALESCE(SUM(qty_on_hand), 0) AS qty FROM inventory_stock "
-        "WHERE tenant_id = %s AND workspace_client_id = %s GROUP BY product_id",
-        (tenant_id, workspace_client_id),
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = ANY(%s) "
+        "GROUP BY product_id",
+        (tenant_id, workspace_client_id, product_ids),
     )
     qty = {str(r["product_id"]): r["qty"] for r in cur.fetchall()}
     cur.execute(
         "SELECT DISTINCT s.product_id FROM inventory_stock s "
         "JOIN inventory_batches b ON b.id = s.batch_id "
-        "WHERE s.tenant_id = %s AND s.workspace_client_id = %s AND s.qty_on_hand > 0 "
-        "AND b.expiry_date IS NOT NULL AND b.expiry_date <= CURRENT_DATE + %s",
-        (tenant_id, workspace_client_id, near_days),
+        "WHERE s.tenant_id = %s AND s.workspace_client_id = %s AND s.product_id = ANY(%s) "
+        "AND s.qty_on_hand > 0 AND b.expiry_date IS NOT NULL "
+        "AND b.expiry_date <= CURRENT_DATE + %s",
+        (tenant_id, workspace_client_id, product_ids, near_days),
     )
     near = {str(r["product_id"]) for r in cur.fetchall()}
     return {"qty": qty, "near": near}
@@ -124,7 +131,11 @@ def list_products(
     pids = [str(r["id"]) for r in rows]
     units = _units_by_product(cur, tenant_id=tenant_id, product_ids=pids)
     stock = _stock_by_product(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, near_days=near_days
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        near_days=near_days,
+        product_ids=pids,
     )
     return {"items": [_row_to_item(r, units, stock) for r in rows]}
 
@@ -162,6 +173,7 @@ def product_by_barcode(cur, *, tenant_id: str, workspace_client_id: int, code: s
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         near_days=_DEFAULT_NEAR_EXPIRY_DAYS,
+        product_ids=[str(row["id"])],
     )
     item = _row_to_item(row, units, stock)
     item["matched_unit"] = matched_unit or row["base_unit"]

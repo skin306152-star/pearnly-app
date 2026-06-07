@@ -14,19 +14,16 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from core import db
-from core.pos_api import PosError, assert_module_enabled, ok, require_tenant
+from core.pos_api import (
+    PosError,
+    assert_module_enabled,
+    ok,
+    require_tenant,
+    require_workspace,
+)
 from services.inventory import ledger, queries, store
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
-
-
-def _require_workspace(cur, tid: str, workspace_client_id: int) -> None:
-    cur.execute(
-        "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-        (workspace_client_id, tid),
-    )
-    if not cur.fetchone():
-        raise PosError("pos.forbidden", 403)
 
 
 def _read(request: Request, workspace_client_id: int, fn, commit: bool = False):
@@ -37,7 +34,7 @@ def _read(request: Request, workspace_client_id: int, fn, commit: bool = False):
     tid, _uid = require_tenant(request)
     with db.get_cursor_rls(tid, commit=commit) as cur:
         assert_module_enabled(cur, tid, "inventory")
-        _require_workspace(cur, tid, workspace_client_id)
+        require_workspace(cur, tid, workspace_client_id)
         return ok(fn(cur, tid))
 
 
@@ -50,7 +47,7 @@ def _write(request: Request, req, fn):
     try:
         with db.get_cursor_rls(tid, commit=True) as cur:
             assert_module_enabled(cur, tid, "inventory")
-            _require_workspace(cur, tid, req.workspace_client_id)
+            require_workspace(cur, tid, req.workspace_client_id)
             wh = _resolve_warehouse(cur, tid, req.workspace_client_id, req.warehouse_id)
             return ok(fn(cur, tid, uid, wh))
     except ledger.InventoryError as e:

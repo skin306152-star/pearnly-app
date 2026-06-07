@@ -18,7 +18,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from core import db
-from core.pos_api import PosError, ok, require_owner
+from core.pos_api import PosError, ok, require_owner, require_workspace
 from services.pos import auth as pos_auth
 from services.pos import cashier as cashier_dal
 from services.pos import onboarding as onboarding_svc
@@ -50,15 +50,6 @@ def _resolve_tenant(cur, workspace_client_id: int) -> str:
     if not tid:
         raise PosError("pos.forbidden", 403)
     return tid
-
-
-def _require_workspace(cur, tid: str, workspace_client_id: int) -> None:
-    cur.execute(
-        "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-        (workspace_client_id, tid),
-    )
-    if not cur.fetchone():
-        raise PosError("pos.forbidden", 403)
 
 
 @router.get("/cashiers")
@@ -93,7 +84,7 @@ async def api_onboarding(req: OnboardingRequest, request: Request):
     tid, _uid = require_owner(request)
     fc = req.first_cashier.model_dump() if req.first_cashier else None
     with db.get_cursor_rls(tid, commit=True) as cur:
-        _require_workspace(cur, tid, req.workspace_client_id)
+        require_workspace(cur, tid, req.workspace_client_id)
         data = onboarding_svc.onboard(
             cur,
             tenant_id=tid,

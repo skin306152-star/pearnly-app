@@ -11,6 +11,8 @@ from services.sales import products as products_dal
 
 
 class _CaptureCursor:
+    """默认无软删同码记录(revive SELECT → None)→ 走正常 INSERT 路径。"""
+
     def __init__(self):
         self.calls = []
 
@@ -18,7 +20,22 @@ class _CaptureCursor:
         self.calls.append((sql, params))
 
     def fetchone(self):
-        return {"id": "p1"}
+        return None
+
+
+class _ReviveCursor:
+    """模拟存在一条已软删的同编码记录:首个 fetchone(revive SELECT)返回死记录 id。"""
+
+    def __init__(self):
+        self.calls = []
+        self._n = 0
+
+    def execute(self, sql, params=None):
+        self.calls.append((sql, params))
+
+    def fetchone(self):
+        self._n += 1
+        return {"id": "dead1"} if self._n == 1 else {"id": "dead1", "is_active": True}
 
 
 class NormCodeTests(unittest.TestCase):
@@ -42,7 +59,29 @@ class NormCodeTests(unittest.TestCase):
     def test_real_code_kept_in_insert(self):
         cur = _CaptureCursor()
         products_dal.create_product(cur, tenant_id="t", fields={"name_th": "A", "code": "SKU1"})
-        self.assertIn("SKU1", cur.calls[0][1])
+        insert = next(c for c in cur.calls if "INSERT" in c[0])
+        self.assertIn("SKU1", insert[1])
+
+
+class ReviveSoftDeletedTests(unittest.TestCase):
+    """编码撞到已软删记录 → 复活并覆盖(不再误报"已存在"·编码可复用)。"""
+
+    def test_recreate_revives_instead_of_insert(self):
+        cur = _ReviveCursor()
+        out = products_dal.create_product(
+            cur, tenant_id="t", fields={"name_th": "新名", "code": "1"}
+        )
+        self.assertIn("is_active = FALSE", cur.calls[0][0])  # 先查软删同码
+        self.assertIn("UPDATE products", cur.calls[1][0])  # 复活而非 INSERT
+        self.assertIn("is_active = TRUE", cur.calls[1][0])
+        self.assertIn("新名", cur.calls[1][1])
+        self.assertFalse(any("INSERT" in c[0] for c in cur.calls))
+        self.assertEqual(out["id"], "dead1")
+
+    def test_no_code_skips_revive_query(self):
+        cur = _CaptureCursor()
+        products_dal.create_product(cur, tenant_id="t", fields={"name_th": "A"})
+        self.assertFalse(any("is_active = FALSE" in c[0] for c in cur.calls))
 
 
 class TranslateUniqueViolationTests(unittest.TestCase):

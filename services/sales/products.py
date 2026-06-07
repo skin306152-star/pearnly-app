@@ -53,8 +53,42 @@ def _norm_code(fields: dict) -> dict:
     return f
 
 
+def _revive_soft_deleted(cur, *, tenant_id: str, fields: dict) -> Optional[dict]:
+    """新建商品的编码撞到一条【已软删】(is_active=FALSE)同编码记录时复活它并用新内容覆盖。
+
+    软删保留已开票引用,但 uq_products_tenant_code(WHERE code IS NOT NULL)跨 active+inactive
+    去重 → 同编码全表至多 1 条,故撞到软删的必无在售同码,复活安全。否则用户删了某编码后
+    永远无法再用该编码(列表又看不到死记录,提示"已存在"令人困惑)。无编码或撞在售时返 None,
+    走正常 INSERT(在售冲突由唯一约束 → 路由翻 product_code_exists)。"""
+    code = fields.get("code")
+    if not code:
+        return None
+    cur.execute(
+        "SELECT id FROM products WHERE tenant_id = %s AND code = %s AND is_active = FALSE",
+        (tenant_id, code),
+    )
+    dead = cur.fetchone()
+    if not dead:
+        return None
+    sets = ["is_active = TRUE"]
+    vals: list = []
+    for k in _WRITABLE:
+        if fields.get(k) is not None:
+            sets.append(f"{k} = %s")
+            vals.append(_money(fields[k]) if k == "unit_price" else fields[k])
+    sets.append("updated_at = now()")
+    cur.execute(
+        f"UPDATE products SET {', '.join(sets)} WHERE tenant_id = %s AND id = %s RETURNING {_COLS}",
+        vals + [tenant_id, dead["id"]],
+    )
+    return cur.fetchone()
+
+
 def create_product(cur, *, tenant_id: str, fields: dict) -> dict:
     fields = _norm_code(fields)
+    revived = _revive_soft_deleted(cur, tenant_id=tenant_id, fields=fields)
+    if revived is not None:
+        return revived
     cols = ["tenant_id"]
     vals: list = [tenant_id]
     for k in _WRITABLE:

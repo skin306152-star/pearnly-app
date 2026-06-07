@@ -74,7 +74,7 @@ def _total_rows(doc: dict, lang: str = "th_en") -> list:
         incl = L("รวมในราคา", "incl.", "含于价内")
         rows.append([f"{vat_lbl} {vat_rate}% ({incl})", _money(vat)])
     else:
-        rows = [[L("มูลค่า", "Subtotal", "金额"), _money(subtotal)]]
+        rows = [[L("มูลค่า", "Subtotal", "小计"), _money(subtotal)]]
         if header_disc != 0:
             rows.append([disc_lbl, "-" + _money(header_disc)])
         rows.append([f"{vat_lbl} {vat_rate}%", _money(vat)])
@@ -100,7 +100,7 @@ def _buyer_branch_text(b: dict, L) -> str:
     """公司买方的总公司/分店标识(§86/4 第 13 项强制字段)。"""
     if b.get("branch_type") == "branch" and b.get("branch_no"):
         no = b["branch_no"]
-        return L(f"สาขาที่ {no}", f"Branch {no}", f"分支 {no}")
+        return L(f"สาขาที่ {no}", f"Branch {no}", f"分店 {no}")
     return L("สำนักงานใหญ่", "Head Office", "总公司")
 
 

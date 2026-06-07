@@ -12,8 +12,8 @@
     <title>Pearnly POS · 收银台</title>
     <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any" />
     <!-- PWA 预留(离线 PO-B5 再注册 Service Worker;此处先挂 manifest 占位) -->
-    <link rel="manifest" href="/static/pos/manifest.webmanifest?v=11850703" />
-    <link rel="stylesheet" href="/static/pos/pos.css?v=11850703" />
+    <link rel="manifest" href="/static/pos/manifest.webmanifest?v=11850705" />
+    <link rel="stylesheet" href="/static/pos/pos.css?v=11850705" />
   </head>
   <body>
     <!-- ── 屏 6 · 开班登录 ── -->
@@ -22,6 +22,12 @@
         <div class="brand">
           <div class="b"><span class="dot"></span> Pearnly POS</div>
           <div class="store" id="login-store">—</div>
+        </div>
+        <div class="langbar" id="login-langs">
+          <button data-lang="th">ไทย</button>
+          <button data-lang="en">EN</button>
+          <button data-lang="zh">中文</button>
+          <button data-lang="ja">日本語</button>
         </div>
         <div class="body">
           <div class="who" data-i18n="posui.login.pick">选择收银员</div>
@@ -86,6 +92,12 @@
             />
           </svg>
           <span id="net-txt" data-i18n="posui.net.online">在线</span>
+        </div>
+        <div class="langbar topbar-langs">
+          <button data-lang="th">ไทย</button>
+          <button data-lang="en">EN</button>
+          <button data-lang="zh">中</button>
+          <button data-lang="ja">日</button>
         </div>
         <div class="pill sync-pill" id="sync-pill" style="display: none" title="">
           <svg
@@ -759,12 +771,12 @@
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=11850703"></script>
-    <script src="/static/pos/pos-totals.js?v=11850703"></script>
-    <script src="/static/pos/pos-data.js?v=11850703"></script>
-    <script src="/static/pos/pos-offline.js?v=11850703"></script>
-    <script src="/static/pos/pos-ops.js?v=11850703"></script>
-    <script src="/static/pos/pos-cashier.js?v=11850703"></script>
-    <script src="/static/pos/pos.js?v=11850703" defer></script>
+    <script src="/static/pos/pos-i18n.js?v=11850705"></script>
+    <script src="/static/pos/pos-totals.js?v=11850705"></script>
+    <script src="/static/pos/pos-data.js?v=11850705"></script>
+    <script src="/static/pos/pos-offline.js?v=11850705"></script>
+    <script src="/static/pos/pos-ops.js?v=11850705"></script>
+    <script src="/static/pos/pos-cashier.js?v=11850705"></script>
+    <script src="/static/pos/pos.js?v=11850705" defer></script>
   </body>
 </html>

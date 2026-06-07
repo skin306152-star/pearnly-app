@@ -9,8 +9,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Optional
 
 from core.pos_api import PosError
+from services.pos import cashier as cashier_dal
 
 
 def _f(v) -> float:
@@ -22,10 +24,16 @@ def open_shift(
     *,
     tenant_id: str,
     workspace_client_id: int,
-    terminal_id: int,
+    terminal_id: Optional[int] = None,
     cashier_id: str,
     opening_float,
 ) -> dict:
+    # 单终端门店常态:前台不显式带 terminal_id → 回落账套默认终端(无则建)。
+    if terminal_id is None:
+        term = cashier_dal.get_or_create_default_terminal(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+        )
+        terminal_id = term["id"]
     cur.execute(
         "SELECT 1 FROM pos_shifts WHERE tenant_id = %s AND terminal_id = %s AND status = 'open'",
         (tenant_id, terminal_id),
@@ -41,6 +49,7 @@ def open_shift(
     row = cur.fetchone()
     return {
         "id": str(row["id"]),
+        "terminal_id": terminal_id,
         "opened_at": row["opened_at"].isoformat() if row["opened_at"] else None,
         "opening_float": _f(row["opening_float"]),
     }

@@ -35,6 +35,34 @@
         document.documentElement.lang = state.lang;
     };
 
+    // ── 语言切换(店员可在登录页/主屏自选 · 持久化到 mrpilot_lang · 与主程序共享)──
+    function updateLangButtons() {
+        document.querySelectorAll('[data-lang]').forEach((b) => {
+            b.classList.toggle('on', b.dataset.lang === state.lang);
+        });
+    }
+    POS.setLang = function (lang) {
+        if (!window.POS_I18N || !window.POS_I18N[lang]) return;
+        state.lang = lang;
+        try {
+            localStorage.setItem('mrpilot_lang', lang);
+        } catch (_) {}
+        POS.applyI18n(lang);
+        updateLangButtons();
+        rerenderActive(); // 重渲当前屏的 JS 动态内容(静态 data-i18n 已由 applyI18n 处理)
+    };
+    function rerenderActive() {
+        const active = VIEWS.find((v) => {
+            const el = $('view-' + v);
+            return el && el.classList.contains('is-active');
+        });
+        if (active === 'login') loadLogin();
+        else if (active === 'main' && POS.cashier) POS.cashier.enterMain();
+        else if (active === 'hold' && POS.cashier) POS.cashier.renderHold();
+        else if (active === 'refund' && POS.ops) POS.ops.resetRefund();
+        else if (active === 'shift' && POS.ops) POS.ops.renderShift();
+    }
+
     // ── 路由 ──
     const VIEWS = ['login', 'main', 'hold', 'refund', 'shift'];
     POS.showView = function (name) {
@@ -141,6 +169,7 @@
             POS.cashier.applyCashier();
             if (resp.shift) {
                 state.shift = resp.shift;
+                if (resp.shift.terminal_id != null) state.terminalId = resp.shift.terminal_id;
                 enterMain();
             } else {
                 openShiftModal();
@@ -176,6 +205,7 @@
         try {
             const shift = await POS.data.openShift(raw || '0');
             state.shift = shift;
+            if (shift && shift.terminal_id != null) state.terminalId = shift.terminal_id;
             $('shift-mask').classList.remove('show');
             enterMain();
         } catch (e) {
@@ -235,6 +265,10 @@
         POS.applyI18n(state.lang);
         bindLogin();
         bindNav();
+        document.querySelectorAll('[data-lang]').forEach((b) => {
+            b.addEventListener('click', () => POS.setLang(b.dataset.lang));
+        });
+        updateLangButtons();
         if (POS.cashier) POS.cashier.init();
         if (POS.ops) POS.ops.init();
         if (POS.offline) POS.offline.init();
@@ -250,7 +284,7 @@
         });
         // PWA 外壳 SW(08 ADR-1)· 失败不影响在线使用
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850703').catch(() => {});
+            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850705').catch(() => {});
         }
         tick();
         setInterval(tick, 10000);

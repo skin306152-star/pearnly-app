@@ -107,7 +107,7 @@ async def api_by_barcode(
 # ── 班次 ──────────────────────────────────────────────────────────────
 class OpenShiftRequest(BaseModel):
     workspace_client_id: Optional[int] = None
-    terminal_id: int
+    terminal_id: Optional[int] = None  # 缺省 → 服务端回落账套默认终端(单终端门店)
     opening_float: float = Field(0, ge=0)
 
 

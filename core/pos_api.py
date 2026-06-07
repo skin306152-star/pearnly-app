@@ -25,9 +25,10 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-# POS/库存接口前缀:这些路径的请求体校验错误也要走信封(其余路由保持 FastAPI 默认)。
-_POS_PREFIXES = ("/api/inventory", "/api/pos")
-_POS_EXACT = ("/api/me/modules",)
+# POS/库存/模块接口前缀:这些路径的请求体校验错误也要走信封(其余路由保持 FastAPI 默认)。
+# /api/me/modules 既匹配 GET(精确)也匹配 toggle 子路径(/api/me/modules/{key} 走前缀)。
+_POS_PREFIXES = ("/api/inventory", "/api/pos", "/api/me/modules")
+_POS_EXACT = ("/api/me/onboarding",)
 
 
 def ok(data: Optional[dict] = None) -> dict:
@@ -154,6 +155,24 @@ def require_owner(request: Request) -> tuple[str, Optional[str]]:
     if not tid:
         raise PosError("pos.forbidden", 403)
     if user.get("role") == "cashier" and not user.get("is_super_admin"):
+        raise PosError("pos.forbidden", 403)
+    uid = str(user["id"]) if user and user.get("id") else None
+    return str(tid), uid
+
+
+def require_account_owner(request: Request) -> tuple[str, Optional[str]]:
+    """取 (tenant_id, user_id) 且主体必须是【账号 owner】(invited_by is None · 非收银员)。
+
+    比 require_owner 更严:require_owner 只挡收银员,受邀成员/会计可过;平台模块配置
+    (业态 onboarding / 模块开关)是租户级动作,只有创建账号的 owner 能改 → 否则 pos.forbidden。
+    """
+    user = pos_auth(request)
+    tid = user.get("tenant_id") if user else None
+    if not tid:
+        raise PosError("pos.forbidden", 403)
+    is_cashier = user.get("role") == "cashier" and not user.get("is_super_admin")
+    is_owner = user.get("invited_by") is None
+    if is_cashier or not (is_owner or user.get("is_super_admin")):
         raise PosError("pos.forbidden", 403)
     uid = str(user["id"]) if user and user.get("id") else None
     return str(tid), uid

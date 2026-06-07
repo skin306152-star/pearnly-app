@@ -1,0 +1,58 @@
+# -*- coding: utf-8 -*-
+"""业态预设 — business_type → 该开的模块组合(平台业态套餐 · docs/platform-onboarding/02)。
+
+平台 onboarding(注册选业态 / 设置切换业态)调 apply_preset:把 KNOWN_MODULES 7 个模块逐个
+按预设翻开关(在预设里→开,不在→关),并记录 business_type。只翻 enabled(config=None),
+不动既有 config、不建 POS 硬件(终端/收银员/默认仓走 services/pos/onboarding 屏8)。
+
+注意两层「预设」互不替代:
+  - 本模块 = 平台【模块】预设(哪些模块出现)。
+  - services/pos/onboarding.BUSINESS_PRESETS = POS【能力块】预设(POS 模块内开哪些行为)。
+两者都按 business_type 索引,语义独立。
+"""
+
+from __future__ import annotations
+
+from services.modules import store
+
+# business_type → 默认开的 module_key 列表(canonical 6 业态 · 02 表)。
+# sales 在所有业态都开(平台主线尖刀)。未列业态拒绝(onboarding 报 unknown_business_type)。
+BUSINESS_PRESETS: dict[str, list[str]] = {
+    "firm": ["sales", "expense", "recon", "knowledge"],
+    "retail": ["sales", "inventory", "pos"],
+    "pharmacy": ["sales", "inventory", "pos"],
+    "restaurant": ["sales", "inventory", "pos"],
+    "service": ["sales", "expense"],
+    "b2b": ["sales", "inventory", "receivable", "expense"],
+}
+
+
+def is_known(business_type: str) -> bool:
+    return business_type in BUSINESS_PRESETS
+
+
+def apply_preset(cur, *, tenant_id: str, business_type: str) -> dict:
+    """应用业态预设:7 模块按预设翻开关 + 记录 business_type。
+
+    未知 business_type 抛 ValueError(路由翻 platform.unknown_business_type)。
+    只翻 enabled(set_module config=None 保留既有 config)。调用方负责事务(commit)。
+    返回 {business_type, modules}(回写后的全模块态)。
+    """
+    if business_type not in BUSINESS_PRESETS:
+        raise ValueError(f"unknown business_type: {business_type}")
+
+    enabled_keys = set(BUSINESS_PRESETS[business_type])
+    for module_key in store.KNOWN_MODULES:
+        store.set_module(
+            cur,
+            tenant_id=tenant_id,
+            module_key=module_key,
+            enabled=module_key in enabled_keys,
+            config=None,
+        )
+    store.set_business_type(cur, tenant_id=tenant_id, business_type=business_type)
+
+    return {
+        "business_type": business_type,
+        "modules": store.get_modules(cur, tenant_id=tenant_id),
+    }

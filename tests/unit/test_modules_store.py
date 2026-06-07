@@ -65,6 +65,26 @@ class GetModulesDefaultsTests(unittest.TestCase):
         self.assertFalse(out["inventory"]["enabled"])
         self.assertEqual(out["pos"]["config"], {})
 
+    def test_receivable_in_known_modules_and_defaults_on(self):
+        # 平台业态套餐:receivable 纳入可开关全集 · 老租户默认开(不破坏现状)
+        self.assertIn("receivable", store.KNOWN_MODULES)
+        cur = FakeCursor(fetchall=[])
+        out = store.get_modules(cur, tenant_id="t-1")
+        self.assertTrue(out["receivable"]["enabled"])
+
+    def test_business_type_sentinel_not_leaked_as_module(self):
+        # 哨兵行 __business_type__ 不在 KNOWN_MODULES → get_modules 不把它当模块
+        self.assertNotIn(store._BUSINESS_TYPE_KEY, store.KNOWN_MODULES)
+        cur = FakeCursor(
+            fetchall=[
+                {"module_key": store._BUSINESS_TYPE_KEY, "enabled": False,
+                 "config": {"value": "retail"}},
+            ]
+        )
+        out = store.get_modules(cur, tenant_id="t-1")
+        self.assertNotIn(store._BUSINESS_TYPE_KEY, out)
+        self.assertEqual(set(out.keys()), set(store.KNOWN_MODULES))
+
     def test_explicit_row_overrides_default(self):
         cur = FakeCursor(
             fetchall=[
@@ -129,6 +149,32 @@ class SetModuleTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.set_module(cur, tenant_id="t-1", module_key="evil", enabled=True)
         self.assertFalse(cur.calls, "must reject before touching the DB")
+
+
+class BusinessTypeTests(unittest.TestCase):
+    def test_get_returns_none_when_no_sentinel(self):
+        cur = FakeCursor(fetchone=None)
+        self.assertIsNone(store.get_business_type(cur, tenant_id="t-1"))
+        self.assertIn("module_key = %s", cur.last_sql)
+        self.assertEqual(cur.last_params, ("t-1", store._BUSINESS_TYPE_KEY))
+
+    def test_get_reads_value_from_config(self):
+        cur = FakeCursor(fetchone={"config": {"value": "retail"}})
+        self.assertEqual(store.get_business_type(cur, tenant_id="t-1"), "retail")
+
+    def test_get_handles_empty_or_bad_value(self):
+        cur = FakeCursor(fetchone={"config": {}})
+        self.assertIsNone(store.get_business_type(cur, tenant_id="t-1"))
+
+    def test_set_upserts_json_param_scoped_to_tenant(self):
+        cur = FakeCursor()
+        store.set_business_type(cur, tenant_id="t-1", business_type="firm")
+        self.assertIn("ON CONFLICT (tenant_id, module_key)", cur.last_sql)
+        self.assertEqual(cur.last_params[0], "t-1")
+        self.assertEqual(cur.last_params[1], store._BUSINESS_TYPE_KEY)
+        # 值作 JSON 串参数传(不拼进 SQL)
+        self.assertEqual(cur.last_params[-1], json.dumps({"value": "firm"}))
+        self.assertNotIn("firm", cur.last_sql)
 
 
 if __name__ == "__main__":

@@ -21,25 +21,32 @@ from core.rls import apply_tenant_rls
 
 logger = logging.getLogger("mr-pilot")
 
-# 可被开关的模块全集。未列入的 key 一律拒写(防任意键污染)。
+# 可被开关的模块全集(平台业态套餐 7 模块)。未列入的 key 一律拒写(防任意键污染)。
 KNOWN_MODULES = (
     "inventory",
     "pos",
     "sales",
     "expense",
     "recon",
+    "receivable",
     "knowledge",
 )
 
-# 无显式行时的回落:既有功能默认开;POS/库存默认关(onboarding 才开)。
+# 无显式行时的回落:既有功能默认开(老租户导航不变 · 平台 onboarding 是 opt-in);
+# POS/库存默认关(onboarding 才开)。receivable 随既有「应收追踪」常显 → 默认开。
 DEFAULT_ENABLED = {
     "sales": True,
     "expense": True,
     "recon": True,
+    "receivable": True,
     "knowledge": True,
     "inventory": False,
     "pos": False,
 }
+
+# 业态(business_type)持久化:复用本表的保留哨兵行,不新增表/迁移。
+# 该行不在 KNOWN_MODULES,get_modules 永不把它当模块泄漏到导航。
+_BUSINESS_TYPE_KEY = "__business_type__"
 
 
 def ensure_table() -> None:
@@ -148,6 +155,35 @@ def set_module(
         "enabled": bool(row["enabled"]),
         "config": _as_dict(row["config"]),
     }
+
+
+def get_business_type(cur, *, tenant_id: str) -> Optional[str]:
+    """返回该租户选定的业态;未 onboarding(无哨兵行)返 None。
+
+    走保留哨兵行 _BUSINESS_TYPE_KEY,不经 KNOWN_MODULES 白名单(它本就不是模块)。
+    """
+    cur.execute(
+        "SELECT config FROM tenant_modules WHERE tenant_id = %s AND module_key = %s",
+        (tenant_id, _BUSINESS_TYPE_KEY),
+    )
+    row = cur.fetchone()
+    if row is None:
+        return None
+    value = _as_dict(row["config"]).get("value")
+    return value if isinstance(value, str) and value else None
+
+
+def set_business_type(cur, *, tenant_id: str, business_type: str) -> None:
+    """upsert 业态哨兵行(平台 onboarding / 切换业态调)。值一律占位符。"""
+    cur.execute(
+        """
+        INSERT INTO tenant_modules (tenant_id, module_key, enabled, config)
+        VALUES (%s, %s, FALSE, %s::jsonb)
+        ON CONFLICT (tenant_id, module_key)
+        DO UPDATE SET config = EXCLUDED.config, updated_at = now()
+        """,
+        (tenant_id, _BUSINESS_TYPE_KEY, json.dumps({"value": business_type})),
+    )
 
 
 def _as_dict(config) -> dict:

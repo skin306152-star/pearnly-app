@@ -77,6 +77,24 @@
             return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
         });
     };
+    // HH:MM(本地时分 · 顶栏时钟/班次开班/挂单/交班共用)
+    POS.hm = function (d) {
+        return (
+            String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+        );
+    };
+    // 头像首字母(收银员名 · 登录选人 + 主屏顶栏共用)
+    POS.initial = function (name) {
+        return String(name || '?')
+            .trim()
+            .charAt(0)
+            .toUpperCase();
+    };
+    // mock 兜底总开关:仅无 workspace 的纯本地预览才允许 mock;真租户绑定后端缺路由一律走诚实失败,
+    // 绝不在真店渲染假成功/假财务数(单一策略 · 治"假功能":跨小票/退货/交班/班次汇总统一生效)。
+    POS.allowMock = function () {
+        return !state.workspaceClientId;
+    };
 
     // ── 信封 fetch ──
     // enveloped=true 表示服务端返了 {ok:...} 信封(业务级成败);false 表示路由缺失/网络失败。
@@ -284,7 +302,7 @@
             );
             return d.cashiers || [];
         } catch (e) {
-            if (POS.isRouteMissing(e)) return MOCK_CASHIERS; // 本地预览(无后端)
+            if (POS.isRouteMissing(e) && POS.allowMock()) return MOCK_CASHIERS; // 纯本地预览
             throw e;
         }
     };
@@ -297,7 +315,7 @@
                 pin,
             });
         } catch (e) {
-            if (POS.isRouteMissing(e)) {
+            if (POS.isRouteMissing(e) && POS.allowMock()) {
                 // 本地预览(无后端):任意非空 PIN 视为通过,返 mock token
                 const c = MOCK_CASHIERS.find((x) => x.id === cashierId) || MOCK_CASHIERS[0];
                 return { token: 'mock-token', cashier: c, shift: null, offline_ttl_hours: 12 };
@@ -315,7 +333,7 @@
             });
             return d.shift;
         } catch (e) {
-            if (POS.isRouteMissing(e)) {
+            if (POS.isRouteMissing(e) && POS.allowMock()) {
                 return {
                     id: 'mock-shift',
                     opened_at: new Date().toISOString(),
@@ -334,7 +352,7 @@
             const d = await apiFetch('GET', '/api/pos/products?' + qs.toString());
             return d.items || [];
         } catch (e) {
-            if (POS.isRouteMissing(e)) return filterProducts(q, cat);
+            if (POS.isRouteMissing(e) && POS.allowMock()) return filterProducts(q, cat);
             throw e;
         }
     };
@@ -344,7 +362,7 @@
         try {
             return await apiFetch('POST', '/api/pos/sales', payload);
         } catch (e) {
-            if (POS.isRouteMissing(e)) {
+            if (POS.isRouteMissing(e) && POS.allowMock()) {
                 const grand = payload.lines.reduce(
                     (s, l) => s + Number(l.unit_price) * Number(l.qty),
                     0
@@ -371,7 +389,7 @@
         try {
             return await apiFetch('GET', '/api/pos/sales/by-receipt?no=' + encodeURIComponent(no));
         } catch (e) {
-            if (POS.isRouteMissing(e)) {
+            if (POS.isRouteMissing(e) && POS.allowMock()) {
                 // mock 原单:固定一张可演示退货流程
                 return {
                     sale: {
@@ -416,7 +434,7 @@
                 refund_method: method,
             });
         } catch (e) {
-            if (POS.isRouteMissing(e)) {
+            if (POS.isRouteMissing(e) && POS.allowMock()) {
                 const total = lines.reduce((s, l) => s + Number(l._amt || 0), 0);
                 return {
                     refund_sale: {
@@ -440,9 +458,9 @@
             );
             return d;
         } catch (e) {
-            // mock 仅用于无 workspace 的纯本地预览;真租户绑定后端却缺 summary 端点时返 null
-            // (屏5 显诚实空态),绝不在真店渲染假财务数。班次汇总 GET 待后端补(close 才返 summary)。
-            if (POS.isRouteMissing(e) && !state.workspaceClientId) {
+            // 真租户绑定后端却缺 summary 端点时返 null(屏5 显诚实空态),绝不在真店渲染假财务数。
+            // 班次汇总 GET 待后端补(close 才返 summary)· mock 仅纯本地预览(POS.allowMock 单一策略)。
+            if (POS.isRouteMissing(e) && POS.allowMock()) {
                 if (!state.shift) return null;
                 return {
                     shift: {
@@ -469,7 +487,7 @@
                 counted_cash: countedCash,
             });
         } catch (e) {
-            if (POS.isRouteMissing(e)) {
+            if (POS.isRouteMissing(e) && POS.allowMock()) {
                 return {
                     shift: {
                         id: state.shift.id,

@@ -53,9 +53,7 @@
     function tick() {
         const c = $('main-clock');
         if (!c) return;
-        const d = new Date();
-        c.textContent =
-            String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        c.textContent = POS.hm(new Date());
     }
 
     // ── 网络指示(真实探测 navigator.onLine + 手动模拟)──
@@ -83,10 +81,7 @@
         box.innerHTML = list
             .map((c, i) => {
                 const color = c.color || '#2563EB';
-                const initial = String(c.display_name || '?')
-                    .trim()
-                    .charAt(0)
-                    .toUpperCase();
+                const initial = POS.initial(c.display_name);
                 return (
                     '<div class="ca' +
                     (i === 0 ? ' on' : '') +

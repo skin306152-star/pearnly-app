@@ -38,4 +38,5 @@ async function applyModuleNav() {
 }
 
 window.applyModuleNav = applyModuleNav;
-void applyModuleNav();
+// 由 core-boot 在用户就绪后调用(owner 门控需 _userInfo)· 不在 eval 期自调,
+// 避免与 core-boot 的 post-load 调用重复 fetch /api/me/modules + 早于 _userInfo 算错 owner 门控。

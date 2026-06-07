@@ -213,9 +213,7 @@
         }
         const sm = d.summary;
         const sh = d.shift;
-        const t0 = new Date(sh.opened_at);
-        const openT =
-            String(t0.getHours()).padStart(2, '0') + ':' + String(t0.getMinutes()).padStart(2, '0');
+        const openT = POS.hm(new Date(sh.opened_at));
         const expected = Number(sm.expected_cash);
         wrap.innerHTML =
             '<div class="card"><div class="h"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +

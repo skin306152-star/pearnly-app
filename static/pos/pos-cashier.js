@@ -10,7 +10,6 @@
 
     let cart = []; // { id, name, sell_unit, qty, price }
     let activeCat = null;
-    let payMethod = 'cash';
     let tendered = 0;
     let discount = 0;
     const HELD_KEY = 'pos_held_orders';
@@ -19,22 +18,13 @@
     function applyCashier() {
         const c = state.cashier;
         if (!c) return;
-        const initial = String(c.display_name || '?')
-            .trim()
-            .charAt(0)
-            .toUpperCase();
-        $('main-avatar').textContent = initial;
+        $('main-avatar').textContent = POS.initial(c.display_name);
         $('main-avatar').style.background = c.color || '#2563EB';
         $('main-cashier-name').textContent = c.display_name || '';
         $('main-store').textContent = state.store ? '· ' + state.store : '';
         if (state.shift) {
-            const t = new Date(state.shift.opened_at);
             $('main-shift-info').textContent =
-                POS.t('posui.shift.opened') +
-                ' ' +
-                String(t.getHours()).padStart(2, '0') +
-                ':' +
-                String(t.getMinutes()).padStart(2, '0');
+                POS.t('posui.shift.opened') + ' ' + POS.hm(new Date(state.shift.opened_at));
         }
     }
 
@@ -246,7 +236,6 @@
         $('pay-mask').classList.remove('show');
     }
     function setPm(m) {
-        payMethod = m;
         document
             .querySelectorAll('#pay-mask .pm')
             .forEach((e) => e.classList.toggle('active', e.dataset.pm === m));
@@ -347,14 +336,10 @@
     function holdCurrent() {
         if (!cart.length) return;
         const list = loadHeld();
-        const d = new Date();
         list.push({
             id: POS.uuid(),
             no: 'H-' + String(list.length + 1).padStart(2, '0'),
-            time:
-                String(d.getHours()).padStart(2, '0') +
-                ':' +
-                String(d.getMinutes()).padStart(2, '0'),
+            time: POS.hm(new Date()),
             cart: cart.slice(),
             discount,
         });
@@ -376,7 +361,8 @@
         grid.innerHTML = list
             .map((h) => {
                 const items = h.cart.reduce((s, c) => s + c.qty, 0);
-                const total = subtotalOf(h.cart) - Math.min(h.discount || 0, subtotalOf(h.cart));
+                const sub = subtotalOf(h.cart);
+                const total = sub - Math.min(h.discount || 0, sub);
                 const names = h.cart.map((c) => POS.nm(c.name) + ' ×' + c.qty).join(' · ');
                 return (
                     '<div class="held"><div class="h"><span class="no">' +

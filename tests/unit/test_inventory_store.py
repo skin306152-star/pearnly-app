@@ -70,11 +70,21 @@ class ApplyStockDeltaTests(unittest.TestCase):
 class BatchWarehouseTests(unittest.TestCase):
     def test_get_or_create_batch_returns_existing(self):
         cur = FakeCursor(
-            ones=[{"id": "b1", "batch_no": "L1", "expiry_date": None, "unit_cost": None}]
+            ones=[
+                {
+                    "id": "b1",
+                    "batch_no": "L1",
+                    "expiry_date": None,
+                    "unit_cost": None,
+                    "workspace_client_id": 9,
+                }
+            ]
         )
-        out = store.get_or_create_batch(cur, tenant_id="t-1", product_id="p", batch_no="L1")
+        out = store.get_or_create_batch(
+            cur, tenant_id="t-1", workspace_client_id=9, product_id="p", batch_no="L1"
+        )
         self.assertEqual(out["id"], "b1")
-        self.assertEqual(len(cur.calls), 1)  # 命中即返 · 不 INSERT
+        self.assertEqual(len(cur.calls), 1)  # 命中且套账已填 → 不 INSERT、不自愈 UPDATE
         self.assertIn("WHERE tenant_id = %s AND product_id = %s AND batch_no = %s", cur.calls[0][0])
 
     def test_get_or_create_batch_inserts_when_missing(self):
@@ -85,10 +95,12 @@ class BatchWarehouseTests(unittest.TestCase):
             ]
         )
         out = store.get_or_create_batch(
-            cur, tenant_id="t-1", product_id="p", batch_no="L2", unit_cost=18
+            cur, tenant_id="t-1", workspace_client_id=9, product_id="p", batch_no="L2", unit_cost=18
         )
         self.assertEqual(out["id"], "b2")
         self.assertIn("INSERT INTO inventory_batches", cur.calls[1][0])
+        self.assertIn("workspace_client_id", cur.calls[1][0])  # PO-5 · 写入套账
+        self.assertIn(9, cur.calls[1][1])  # workspace_client_id 入参
         self.assertIn(Decimal("18"), cur.calls[1][1])
 
     def test_default_warehouse_created_when_none(self):

@@ -45,6 +45,11 @@ CONVERTED: list[tuple[str, str]] = [
     ("services/pos/catalog.py", "product_units"),
     # PO-4 进项识别历史(读侧全部带套账过滤)
     ("services/ocr_history/queries.py", "ocr_history"),
+    # PO-5 库存批次(批次主数据归主体 · 读写带套账;FEFO/近效期经已隔离的 stock 派生)
+    ("services/inventory/store.py", "inventory_batches"),
+    ("services/inventory/queries.py", "inventory_batches"),
+    ("services/inventory/fefo.py", "inventory_batches"),
+    ("services/inventory/reports.py", "inventory_batches"),
 ]
 
 

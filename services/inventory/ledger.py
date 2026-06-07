@@ -140,6 +140,7 @@ def receive(
             batch = store.get_or_create_batch(
                 cur,
                 tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
                 product_id=product_id,
                 batch_no=line["batch_no"],
                 expiry_date=line.get("expiry_date"),

@@ -47,6 +47,14 @@ class StockOverviewSqlTests(unittest.TestCase):
         # 不得直接 join inventory_batches(会笛卡尔积翻倍库存)
         self.assertNotIn("LEFT JOIN inventory_batches b ON", sql)
 
+    def test_products_filtered_by_workspace(self):
+        # PO-5:商品列表按套账隔离(不再只 p.tenant_id),批次均价子查询同步按套账。
+        cur = FakeCursor([[], []])
+        queries.stock_overview(cur, tenant_id="t", workspace_client_id=9)
+        sql = cur.calls[0][0]
+        self.assertIn("p.workspace_client_id = %s", sql)
+        self.assertIn("WHERE tenant_id = %s AND workspace_client_id = %s", sql)  # 批次子查询
+
 
 class StatusAndSummaryTests(unittest.TestCase):
     def test_status_low_ok_out(self):

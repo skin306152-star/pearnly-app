@@ -55,6 +55,7 @@ def ensure_schema() -> None:
                 CREATE TABLE IF NOT EXISTS inventory_batches (
                     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                     tenant_id uuid NOT NULL,
+                    workspace_client_id bigint,
                     product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
                     batch_no text NOT NULL,
                     expiry_date date,
@@ -64,9 +65,18 @@ def ensure_schema() -> None:
                     UNIQUE (tenant_id, product_id, batch_no)
                 )
                 """)
+            # PO-5 套账隔离:批次归主体。列在 PO-1 回填已加,这里幂等补(新库/未回填库)。
+            # 仍可空(rollout):写侧 get_or_create_batch 写入当前套账,收 NOT NULL 留 PO-8。
+            cur.execute(
+                "ALTER TABLE inventory_batches ADD COLUMN IF NOT EXISTS workspace_client_id bigint"
+            )
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS ix_batches_fefo "
                 "ON inventory_batches (tenant_id, product_id, expiry_date)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS ix_batches_ws "
+                "ON inventory_batches (tenant_id, workspace_client_id, product_id)"
             )
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS inventory_stock (
@@ -179,33 +189,48 @@ def get_or_create_batch(
     cur,
     *,
     tenant_id: str,
+    workspace_client_id: int,
     product_id: str,
     batch_no: str,
     expiry_date=None,
     unit_cost=None,
 ) -> dict:
-    """按 (product, batch_no) 取批次;无则建。已存在则补回 expiry/cost(首次为准 · 不覆盖非空)。"""
+    """按 (product, batch_no) 取批次;无则建(归当前套账)。已存在则补回 expiry/cost(首次为准)。
+
+    PO-5:自然唯一键 (tenant, product, batch_no) 不含套账(product 已按套账隔离 → 批次随之归属),
+    故 SELECT 仍按自然键,避免 NULL 套账行与新插入撞唯一约束;INSERT 写入 workspace_client_id。
+    命中旧行若套账为空(回填遗漏)→ 顺手回填到当前套账(自愈)。
+    """
     cur.execute(
-        "SELECT id, batch_no, expiry_date, unit_cost FROM inventory_batches "
+        "SELECT id, batch_no, expiry_date, unit_cost, workspace_client_id FROM inventory_batches "
         "WHERE tenant_id = %s AND product_id = %s AND batch_no = %s",
         (tenant_id, product_id, batch_no),
     )
     row = cur.fetchone()
     if row:
+        if row.get("workspace_client_id") is None and workspace_client_id is not None:
+            cur.execute(
+                "UPDATE inventory_batches SET workspace_client_id = %s "
+                "WHERE id = %s AND tenant_id = %s",
+                (workspace_client_id, row["id"], tenant_id),
+            )
         return row
     cur.execute(
-        "INSERT INTO inventory_batches (tenant_id, product_id, batch_no, expiry_date, unit_cost) "
-        "VALUES (%s, %s, %s, %s, %s) RETURNING id, batch_no, expiry_date, unit_cost",
-        (tenant_id, product_id, batch_no, expiry_date, _num(unit_cost)),
+        "INSERT INTO inventory_batches "
+        "(tenant_id, workspace_client_id, product_id, batch_no, expiry_date, unit_cost) "
+        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, batch_no, expiry_date, unit_cost",
+        (tenant_id, workspace_client_id, product_id, batch_no, expiry_date, _num(unit_cost)),
     )
     return cur.fetchone()
 
 
-def get_batch(cur, *, tenant_id: str, product_id: str, batch_id: str):
+def get_batch(cur, *, tenant_id: str, workspace_client_id: int, product_id: str, batch_id: str):
+    # PO-5:读 batch 带套账过滤(rollout-safe:含 IS NULL,回填遗漏行仍可读)。
     cur.execute(
         "SELECT id, batch_no, expiry_date, unit_cost FROM inventory_batches "
-        "WHERE tenant_id = %s AND product_id = %s AND id = %s",
-        (tenant_id, product_id, batch_id),
+        "WHERE tenant_id = %s AND product_id = %s AND id = %s "
+        "AND (workspace_client_id = %s OR workspace_client_id IS NULL)",
+        (tenant_id, product_id, batch_id, workspace_client_id),
     )
     return cur.fetchone()
 

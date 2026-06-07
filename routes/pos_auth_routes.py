@@ -158,11 +158,14 @@ async def api_get_store_code(request: Request, workspace_client_id: int = Query(
             workspace_client_id=workspace_client_id,
             store_name=nm["name"] if nm else "",
         )
+    link = "https://pearnly.com/pos?store=" + info["code"]
     return ok(
         {
             "code": info["code"],
             "store_name": nm["name"] if nm else "",
             "workspace_client_id": workspace_client_id,
+            "link": link,
+            "qr": store_binding.qr_png_base64(link),
         }
     )
 

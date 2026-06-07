@@ -126,6 +126,19 @@ def resolve(cur, *, code: str):
     return cur.fetchone()
 
 
+def qr_png_base64(text: str) -> str:
+    """任意文本(此处=店铺接入链接)→ QR 码 PNG 的 base64(供老板页 <img> 内联展示供收银员扫)。"""
+    import base64
+    import io
+
+    import qrcode
+
+    img = qrcode.make(text)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
 def current_version(cur, *, tenant_id: str, workspace_client_id: int) -> Optional[int]:
     """该账套当前 token_version(校验店铺令牌是否被重置吊销)。无行返 None。"""
     cur.execute(

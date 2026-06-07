@@ -62,14 +62,30 @@
 }
 .cshp .csh-ac-row {
     display: flex;
-    gap: 14px;
+    gap: 18px;
+    align-items: flex-start;
     flex-wrap: wrap;
+}
+.cshp .csh-ac-qr {
+    width: 132px;
+    height: 132px;
+    flex: 0 0 132px;
+    border: 1px solid var(--c-line);
+    border-radius: 12px;
+    padding: 8px;
+    background: #fff;
+}
+.cshp .csh-ac-info {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 .cshp .csh-ac-codebox {
     flex: 0 0 auto;
 }
 .cshp .csh-ac-linkbox {
-    flex: 1;
     min-width: 200px;
 }
 .cshp .csh-ac-label {

@@ -136,25 +136,35 @@ function shellHtml(): string {
     </div>`;
 }
 
-// ── 收银台接入(店铺码 · 收银员任意设备 PIN 登录 · 照稿 12①)──
-function accessHtml(code: string): string {
-    const link = location.origin + '/pos?store=' + encodeURIComponent(code);
+// ── 收银台接入(店铺码 + 二维码 · 收银员任意设备 PIN 登录 · 照稿 12①)──
+interface StoreCode {
+    code?: string;
+    link?: string;
+    qr?: string;
+}
+function accessHtml(d: StoreCode): string {
+    const code = d.code || '';
+    const link = d.link || location.origin + '/pos?store=' + encodeURIComponent(code);
+    const qr = d.qr ? `<img class="csh-ac-qr" alt="QR" src="data:image/png;base64,${d.qr}" />` : '';
     return `<div class="csh-access-card">
         <div class="csh-ac-h">${escapeHtml(t('csh-access-title'))}</div>
         <div class="csh-ac-sub">${escapeHtml(t('csh-access-sub'))}</div>
         <div class="csh-ac-row">
-            <div class="csh-ac-codebox">
-                <div class="csh-ac-label">${escapeHtml(t('csh-access-code'))}</div>
-                <div class="csh-ac-code">${escapeHtml(code)}</div>
+            ${qr}
+            <div class="csh-ac-info">
+                <div class="csh-ac-codebox">
+                    <div class="csh-ac-label">${escapeHtml(t('csh-access-code'))}</div>
+                    <div class="csh-ac-code">${escapeHtml(code)}</div>
+                </div>
+                <div class="csh-ac-linkbox">
+                    <div class="csh-ac-label">${escapeHtml(t('csh-access-link'))}</div>
+                    <div class="csh-ac-link" id="csh-ac-link">${escapeHtml(link)}</div>
+                </div>
+                <div class="csh-ac-acts">
+                    <button class="csh-op" id="csh-ac-copy" data-link="${escapeHtml(link)}">${escapeHtml(t('csh-access-copy'))}</button>
+                    <button class="csh-op danger" id="csh-ac-reset">${escapeHtml(t('csh-access-reset'))}</button>
+                </div>
             </div>
-            <div class="csh-ac-linkbox">
-                <div class="csh-ac-label">${escapeHtml(t('csh-access-link'))}</div>
-                <div class="csh-ac-link" id="csh-ac-link">${escapeHtml(link)}</div>
-            </div>
-        </div>
-        <div class="csh-ac-acts">
-            <button class="csh-op" id="csh-ac-copy" data-link="${escapeHtml(link)}">${escapeHtml(t('csh-access-copy'))}</button>
-            <button class="csh-op danger" id="csh-ac-reset">${escapeHtml(t('csh-access-reset'))}</button>
         </div>
     </div>`;
 }
@@ -163,14 +173,14 @@ async function loadAccess() {
     const wsId = activeWsId();
     const host = document.getElementById('csh-access');
     if (!host || wsId == null) return;
-    let data: { code?: string };
+    let data: StoreCode;
     try {
         data = await cshApi('GET', '/api/pos/admin/store-code?workspace_client_id=' + wsId);
     } catch (_) {
         host.innerHTML = '';
         return; // 取不到不阻断收银员管理主功能
     }
-    host.innerHTML = accessHtml(data.code || '');
+    host.innerHTML = accessHtml(data || {});
     const copy = document.getElementById('csh-ac-copy');
     if (copy)
         copy.onclick = () => {

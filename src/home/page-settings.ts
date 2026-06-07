@@ -82,6 +82,11 @@
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"/></svg>
                     <span>通用设置</span>
                 </button>
+                <!-- 平台业态套餐 PO-PP3 · 业务/模块(owner-only · 复用 .set-tab-owner-only 显隐) -->
+                <button class="settings-tab settings-nav-item set-tab-owner-only" data-tab="modules" data-i18n="set.module_section" style="display:none;">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/></svg>
+                    <span>业务 / 模块</span>
+                </button>
                 <!-- v118.28.8 · 仅 owner 可见 · 由 JS 控制显隐 -->
                 <button class="settings-tab settings-nav-item set-tab-owner-only" data-tab="access-log" data-i18n="set-tab-access-log" style="display:none;">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M7 8h6M7 11h6M7 14h4"/></svg>
@@ -444,6 +449,9 @@
                     <div class="access-log-pager" id="access-log-pager"></div>
                 </div>
             </div>
+
+            <!-- 平台业态套餐 PO-PP3 · 业务/模块(空壳 · module-settings.ts 注入 bizbar + 7 toggle) -->
+            <div class="settings-pane" data-pane="modules"></div>
 
             <!-- Tab 8 · 联系我们 -->
             <div class="settings-pane" data-pane="about">

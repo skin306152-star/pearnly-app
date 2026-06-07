@@ -50,11 +50,23 @@ function apply(modules: Record<string, ModuleFlag>) {
     show(document.getElementById('nav-enroll'), anyOff);
 }
 
+// 新注册首进自动弹业态选择(仅本次 page load 一次 · 老租户无 needs_onboarding 标记 → 永不弹)。
+let autoPopped = false;
+
+function maybeAutoOnboard(data: { needs_onboarding?: boolean }): void {
+    if (autoPopped || !data || !data.needs_onboarding) return;
+    const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
+    if (!owner || typeof window.openBusinessPicker !== 'function') return;
+    autoPopped = true;
+    window.openBusinessPicker();
+}
+
 async function applyModuleNav() {
     try {
         const body = await apiGet('/api/me/modules');
-        const modules = (body && body.data && body.data.modules) || {};
-        apply(modules);
+        const data = (body && body.data) || {};
+        apply(data.modules || {});
+        maybeAutoOnboard(data);
     } catch (_) {
         // 取不到开关:保持默认隐藏(安全侧),不弹错、不阻塞其余导航。
     }

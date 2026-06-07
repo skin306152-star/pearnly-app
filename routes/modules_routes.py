@@ -32,6 +32,7 @@ def _modules_view(cur, tenant_id: str) -> dict:
         "modules": store.get_modules(cur, tenant_id=tenant_id),
         "business_type": store.get_business_type(cur, tenant_id=tenant_id),
         "gateable": list(store.KNOWN_MODULES),
+        "needs_onboarding": store.needs_onboarding(cur, tenant_id=tenant_id),
     }
 
 

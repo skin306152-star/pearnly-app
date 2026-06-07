@@ -456,6 +456,16 @@ def _ensure_tenant_for_new_user(
             "UPDATE users SET tenant_id = %s WHERE id = %s AND tenant_id IS NULL",
             (str(new_tenant_id), str(user_id)),
         )
+
+        # 平台业态套餐 · 新注册打「待选业态」标记 → 首进自动弹业态选择器(仅新租户)。
+        # 这是所有注册路径(邮箱 / Google / LINE)创建租户的唯一汇合点 → 一处覆盖全部。
+        # 失败不阻塞注册(标记缺失只是不弹,不致命)。
+        try:
+            from services.modules import store as _modules_store
+
+            _modules_store.set_needs_onboarding(cur, tenant_id=str(new_tenant_id), value=True)
+        except Exception as _e_onb:
+            logger.warning(f"[platform-onboarding] set_needs_onboarding skip: {_e_onb}")
         logger.info(
             f"[v118.26.2.5 ensure-tenant] +tenant {str(new_tenant_id)[:8]}.. user={str(user_id)[:8]}.. plan={plan} quota={monthly_quota}"
         )

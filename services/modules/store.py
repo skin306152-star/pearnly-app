@@ -48,6 +48,11 @@ DEFAULT_ENABLED = {
 # 该行不在 KNOWN_MODULES,get_modules 永不把它当模块泄漏到导航。
 _BUSINESS_TYPE_KEY = "__business_type__"
 
+# 新注册首弹业态选择的标记(平台 onboarding · docs/platform-onboarding/05 P 阶段)。
+# business_type==None 区分不了新/老租户(老租户也 None)→ 注册时显式打此哨兵行,
+# 前端首进检测到则自动弹业态选择器;onboarding 完成清除。老租户无此行,永不弹。
+_NEEDS_ONBOARDING_KEY = "__needs_onboarding__"
+
 
 def ensure_table() -> None:
     """幂等建表 + RLS policy(启动调 · 与 alembic 0021 双跑)。失败仅告警不 raise。"""
@@ -183,6 +188,34 @@ def set_business_type(cur, *, tenant_id: str, business_type: str) -> None:
         DO UPDATE SET config = EXCLUDED.config, updated_at = now()
         """,
         (tenant_id, _BUSINESS_TYPE_KEY, json.dumps({"value": business_type})),
+    )
+
+
+def needs_onboarding(cur, *, tenant_id: str) -> bool:
+    """该租户是否待首次选业态:仅新注册打了哨兵行且未完成 onboarding 时为 True。
+
+    老租户无哨兵行 → False(永不弹)。onboarding 完成后清为 False。
+    """
+    cur.execute(
+        "SELECT config FROM tenant_modules WHERE tenant_id = %s AND module_key = %s",
+        (tenant_id, _NEEDS_ONBOARDING_KEY),
+    )
+    row = cur.fetchone()
+    if row is None:
+        return False
+    return bool(_as_dict(row["config"]).get("value"))
+
+
+def set_needs_onboarding(cur, *, tenant_id: str, value: bool) -> None:
+    """upsert「待选业态」哨兵行(注册时置 True · onboarding 完成置 False)。"""
+    cur.execute(
+        """
+        INSERT INTO tenant_modules (tenant_id, module_key, enabled, config)
+        VALUES (%s, %s, FALSE, %s::jsonb)
+        ON CONFLICT (tenant_id, module_key)
+        DO UPDATE SET config = EXCLUDED.config, updated_at = now()
+        """,
+        (tenant_id, _NEEDS_ONBOARDING_KEY, json.dumps({"value": bool(value)})),
     )
 
 

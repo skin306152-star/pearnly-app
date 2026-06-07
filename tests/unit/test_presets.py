@@ -85,6 +85,21 @@ class ApplyPresetTests(unittest.TestCase):
         ]
         self.assertTrue(sentinel_writes, "apply_preset 必须记录 business_type 哨兵行")
 
+    def test_clears_needs_onboarding_flag(self):
+        # onboarding 完成 → 清「待选业态」哨兵行(值置 False),前端不再自动弹
+        cur = FakeCursor()
+        presets.apply_preset(cur, tenant_id="t-1", business_type="retail")
+        cleared = [
+            params
+            for sql, params in cur.calls
+            if params and store._NEEDS_ONBOARDING_KEY in (params or ())
+        ]
+        self.assertTrue(cleared, "apply_preset 必须清 needs_onboarding 哨兵行")
+        # 写入的值是 {"value": false}(置 False)
+        import json as _json
+
+        self.assertEqual(cleared[-1][-1], _json.dumps({"value": False}))
+
     def test_config_not_touched(self):
         # set_module(config=None) → 走只翻 enabled 的 SQL 分支(无 %s::jsonb)
         cur = FakeCursor()

@@ -51,6 +51,8 @@ def apply_preset(cur, *, tenant_id: str, business_type: str) -> dict:
             config=None,
         )
     store.set_business_type(cur, tenant_id=tenant_id, business_type=business_type)
+    # onboarding 完成 → 清「待选业态」标记,前端不再自动弹。
+    store.set_needs_onboarding(cur, tenant_id=tenant_id, value=False)
 
     return {
         "business_type": business_type,

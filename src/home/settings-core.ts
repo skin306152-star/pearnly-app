@@ -56,6 +56,9 @@ function switchSettingsTab(tabName: any) {
         // v118.35.0.14 · 切到 plan tab 时重渲 credits 计费卡 · 否则首次打开 modal
         // 之后切 tab 来回 · #settings-info 内容会消失(原 bug: 套餐&用量 panel 空白)
         if (tabName === 'plan' && typeof renderSettings === 'function') renderSettings();
+        // 平台业态套餐 PO-PP3 · 切到「业务/模块」tab 时拉取并渲染开关
+        if (tabName === 'modules' && typeof window.loadModuleSettings === 'function')
+            window.loadModuleSettings();
     } catch (e) {
         console.warn('settings tab side effect failed:', e);
     }

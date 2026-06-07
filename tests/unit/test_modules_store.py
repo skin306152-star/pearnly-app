@@ -180,5 +180,35 @@ class BusinessTypeTests(unittest.TestCase):
         self.assertNotIn("firm", cur.last_sql)
 
 
+class NeedsOnboardingTests(unittest.TestCase):
+    def test_sentinel_not_a_known_module(self):
+        # 哨兵行 __needs_onboarding__ 不在 KNOWN_MODULES → 不泄漏到导航
+        self.assertNotIn(store._NEEDS_ONBOARDING_KEY, store.KNOWN_MODULES)
+
+    def test_false_when_no_sentinel_row(self):
+        # 老租户无哨兵行 → 永不弹
+        cur = FakeCursor(fetchone=None)
+        self.assertFalse(store.needs_onboarding(cur, tenant_id="t-1"))
+        self.assertIn("module_key = %s", cur.last_sql)
+        self.assertEqual(cur.last_params, ("t-1", store._NEEDS_ONBOARDING_KEY))
+
+    def test_true_when_flag_set(self):
+        cur = FakeCursor(fetchone={"config": {"value": True}})
+        self.assertTrue(store.needs_onboarding(cur, tenant_id="t-1"))
+
+    def test_false_when_flag_cleared(self):
+        cur = FakeCursor(fetchone={"config": {"value": False}})
+        self.assertFalse(store.needs_onboarding(cur, tenant_id="t-1"))
+
+    def test_set_upserts_bool_json_param_scoped_to_tenant(self):
+        cur = FakeCursor()
+        store.set_needs_onboarding(cur, tenant_id="t-1", value=True)
+        self.assertIn("ON CONFLICT (tenant_id, module_key)", cur.last_sql)
+        self.assertEqual(cur.last_params[0], "t-1")
+        self.assertEqual(cur.last_params[1], store._NEEDS_ONBOARDING_KEY)
+        # 值作 JSON 串参数传(不拼进 SQL)
+        self.assertEqual(cur.last_params[-1], json.dumps({"value": True}))
+
+
 if __name__ == "__main__":
     unittest.main()

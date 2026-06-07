@@ -287,6 +287,8 @@ interface Window {
     applyModuleNav?: () => void;
     // 平台业态套餐 PO-PP2 · 业态选择器弹窗(注册首次 / 设置切换业态 / 可开启功能)
     openBusinessPicker?: (opts?: { businessType?: string; onDone?: () => void }) => void;
+    // 平台业态套餐 PO-PP3 · 设置「业务/模块」页加载(切到 modules tab 调)
+    loadModuleSettings?: () => void;
     loadInventoryPage?: () => void;
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;

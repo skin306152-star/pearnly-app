@@ -45,6 +45,11 @@ class ModulesRoutesContractTests(unittest.TestCase):
         # 读接口用 require_tenant(任意已登录主体)
         self.assertIn("require_tenant", inspect.getsource(modules_routes.api_get_modules))
 
+    def test_modules_view_exposes_needs_onboarding(self):
+        # 视图须含 needs_onboarding(前端首进自动弹业态选择的判据)
+        src = inspect.getsource(modules_routes._modules_view)
+        self.assertIn("needs_onboarding", src)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -79,7 +79,8 @@ class ApplyPresetTests(unittest.TestCase):
         cur = FakeCursor()
         presets.apply_preset(cur, tenant_id="t-1", business_type="retail")
         sentinel_writes = [
-            params for sql, params in cur.calls
+            params
+            for sql, params in cur.calls
             if params and store._BUSINESS_TYPE_KEY in (params or ())
         ]
         self.assertTrue(sentinel_writes, "apply_preset 必须记录 business_type 哨兵行")
@@ -89,9 +90,9 @@ class ApplyPresetTests(unittest.TestCase):
         cur = FakeCursor()
         presets.apply_preset(cur, tenant_id="t-1", business_type="retail")
         module_writes = [
-            sql for sql, params in cur.calls
-            if "INSERT INTO tenant_modules" in sql
-            and params and params[1] in store.KNOWN_MODULES
+            sql
+            for sql, params in cur.calls
+            if "INSERT INTO tenant_modules" in sql and params and params[1] in store.KNOWN_MODULES
         ]
         for sql in module_writes:
             self.assertNotIn("config = EXCLUDED.config", sql, "apply_preset 不该改 config")

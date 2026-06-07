@@ -60,9 +60,7 @@ async def api_toggle_module(module_key: str, req: ModuleToggleRequest, request: 
     tid, _uid = require_account_owner(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
         try:
-            row = store.set_module(
-                cur, tenant_id=tid, module_key=module_key, enabled=req.enabled
-            )
+            row = store.set_module(cur, tenant_id=tid, module_key=module_key, enabled=req.enabled)
         except ValueError as exc:
             raise PosError("platform.unknown_module", 404, detail=module_key) from exc
         return ok(row)

@@ -77,8 +77,11 @@ class GetModulesDefaultsTests(unittest.TestCase):
         self.assertNotIn(store._BUSINESS_TYPE_KEY, store.KNOWN_MODULES)
         cur = FakeCursor(
             fetchall=[
-                {"module_key": store._BUSINESS_TYPE_KEY, "enabled": False,
-                 "config": {"value": "retail"}},
+                {
+                    "module_key": store._BUSINESS_TYPE_KEY,
+                    "enabled": False,
+                    "config": {"value": "retail"},
+                },
             ]
         )
         out = store.get_modules(cur, tenant_id="t-1")

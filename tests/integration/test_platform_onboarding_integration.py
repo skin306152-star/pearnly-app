@@ -21,8 +21,6 @@ from __future__ import annotations
 
 import unittest
 
-import unittest as _unittest
-
 from services.modules import presets, store
 from tests.integration._helpers import (
     auth_header,
@@ -60,16 +58,14 @@ class PlatformOnboardingE2E(unittest.TestCase):
     def _login(self, username: str, password: str) -> str:
         """登录拿 token(主登录 /api/login · 返 {token,user})· 失败 SkipTest 不红 CI。"""
         try:
-            resp = self.client.post(
-                "/api/login", json={"username": username, "password": password}
-            )
+            resp = self.client.post("/api/login", json={"username": username, "password": password})
         except Exception as e:  # noqa: BLE001
-            raise _unittest.SkipTest(f"/api/login 不可达:{e}")
+            raise unittest.SkipTest(f"/api/login 不可达:{e}")
         if resp.status_code != 200:
-            raise _unittest.SkipTest(f"/api/login 返 {resp.status_code}:{resp.text[:200]}")
+            raise unittest.SkipTest(f"/api/login 返 {resp.status_code}:{resp.text[:200]}")
         token = resp.json().get("token")
         if not token:
-            raise _unittest.SkipTest(f"/api/login 没返 token:{resp.text[:200]}")
+            raise unittest.SkipTest(f"/api/login 没返 token:{resp.text[:200]}")
         return token
 
     def _get_view(self) -> dict:
@@ -142,9 +138,7 @@ class PlatformOnboardingE2E(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "platform.unknown_business_type")
 
     def test_unknown_module_toggle_404(self):
-        resp = self.client.put(
-            "/api/me/modules/evil", json={"enabled": True}, headers=self.h
-        )
+        resp = self.client.put("/api/me/modules/evil", json={"enabled": True}, headers=self.h)
         self.assertEqual(resp.status_code, 404, resp.text)
         body = resp.json()
         self.assertFalse(body.get("ok"))

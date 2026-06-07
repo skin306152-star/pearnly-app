@@ -130,9 +130,71 @@ function shellHtml(): string {
             <h1 class="csh-t">${escapeHtml(t('csh-title'))}</h1>
             <button class="csh-add" id="csh-add">${plus}${escapeHtml(t('csh-add'))}</button>
         </div>
+        <div id="csh-access"></div>
         <div id="csh-list"></div>
         <div id="csh-modal-host"></div>
     </div>`;
+}
+
+// ── 收银台接入(店铺码 · 收银员任意设备 PIN 登录 · 照稿 12①)──
+function accessHtml(code: string): string {
+    const link = location.origin + '/pos?store=' + encodeURIComponent(code);
+    return `<div class="csh-access-card">
+        <div class="csh-ac-h">${escapeHtml(t('csh-access-title'))}</div>
+        <div class="csh-ac-sub">${escapeHtml(t('csh-access-sub'))}</div>
+        <div class="csh-ac-row">
+            <div class="csh-ac-codebox">
+                <div class="csh-ac-label">${escapeHtml(t('csh-access-code'))}</div>
+                <div class="csh-ac-code">${escapeHtml(code)}</div>
+            </div>
+            <div class="csh-ac-linkbox">
+                <div class="csh-ac-label">${escapeHtml(t('csh-access-link'))}</div>
+                <div class="csh-ac-link" id="csh-ac-link">${escapeHtml(link)}</div>
+            </div>
+        </div>
+        <div class="csh-ac-acts">
+            <button class="csh-op" id="csh-ac-copy" data-link="${escapeHtml(link)}">${escapeHtml(t('csh-access-copy'))}</button>
+            <button class="csh-op danger" id="csh-ac-reset">${escapeHtml(t('csh-access-reset'))}</button>
+        </div>
+    </div>`;
+}
+
+async function loadAccess() {
+    const wsId = activeWsId();
+    const host = document.getElementById('csh-access');
+    if (!host || wsId == null) return;
+    let data: { code?: string };
+    try {
+        data = await cshApi('GET', '/api/pos/admin/store-code?workspace_client_id=' + wsId);
+    } catch (_) {
+        host.innerHTML = '';
+        return; // 取不到不阻断收银员管理主功能
+    }
+    host.innerHTML = accessHtml(data.code || '');
+    const copy = document.getElementById('csh-ac-copy');
+    if (copy)
+        copy.onclick = () => {
+            const link = (copy as HTMLElement).dataset.link || '';
+            const done = () => showToast(t('csh-access-copied'), 'success');
+            if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, done);
+            else done();
+        };
+    const reset = document.getElementById('csh-ac-reset');
+    if (reset) reset.onclick = () => resetStoreCode(wsId);
+}
+
+async function resetStoreCode(wsId: number) {
+    const proceed = window.pearnlyConfirm
+        ? await window.pearnlyConfirm(t('csh-access-reset-confirm'))
+        : window.confirm(t('csh-access-reset-confirm'));
+    if (!proceed) return;
+    try {
+        await cshApi('POST', '/api/pos/admin/store-code/reset', { workspace_client_id: wsId });
+        showToast(t('csh-save-ok'), 'success');
+        await loadAccess();
+    } catch (e) {
+        showToast(posErrMsg(e instanceof Error ? e.message : '', 'csh-save-fail'), 'error');
+    }
 }
 
 function setList(html: string) {
@@ -270,6 +332,7 @@ async function load() {
         return;
     }
     setList('<div class="csh-state csh-loading">···</div>');
+    loadAccess(); // 收银台接入(店铺码)· 不阻断主列表
     try {
         const data = await cshApi('GET', '/api/pos/admin/cashiers?workspace_client_id=' + wsId);
         items = (data && data.cashiers) || [];

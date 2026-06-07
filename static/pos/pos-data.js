@@ -13,6 +13,7 @@
 
     const state = (POS.state = {
         token: null,
+        storeToken: null, // 设备店铺令牌(绑定后 · PIN 登录前的鉴权)
         lang: 'zh',
         workspaceClientId: null,
         terminalId: null,
@@ -108,7 +109,9 @@
 
     async function apiFetch(method, path, body) {
         const headers = { 'Content-Type': 'application/json' };
-        if (state.token) headers.Authorization = 'Bearer ' + state.token;
+        // PIN 登录前用设备店铺令牌鉴权(列收银员/验PIN);登录后收银员 token 覆盖。
+        const bearer = state.token || state.storeToken;
+        if (bearer) headers.Authorization = 'Bearer ' + bearer;
         let res;
         try {
             res = await fetch(path, {
@@ -296,6 +299,11 @@
 
     data.categories = function () {
         return CATS;
+    };
+
+    // 设备绑定:店铺码 → 店铺令牌(04 §1b)。无 mock 兜底:绑定必须真后端(隔离关键)。
+    data.bind = async function (code) {
+        return apiFetch('POST', '/api/pos/bind', { code: code });
     };
 
     data.listCashiers = async function () {

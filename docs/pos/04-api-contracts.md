@@ -48,6 +48,27 @@
 ### GET /api/pos/bootstrap — 前台启动包(登录后一次拉全,支撑离线)
 `data: { "store": {...}, "modules": {...0.业态能力块...}, "products": [...见 §3...], "terminals": [...], "settings": {"allow_price_edit":false,"allow_discount":true,"near_expiry_days":30} }`
 
+## 1b. 收银台设备绑定(店铺码 · 收银员任意设备 PIN 登录)
+
+设备先一次性绑到某家店,之后收银员开 `pearnly.com/pos` → 选名字 + 4 位 PIN 卖货,不用老板账号、设备不留老板凭证。隔离靠"绑了哪家店"(店铺令牌 → 唯一 tenant+workspace),不靠 PIN(4 位 PIN 不跨店冲突)。每个 `(tenant, workspace)` 一个全局唯一店铺码 + `token_version`。
+
+### POST /api/pos/bind — 设备绑定(公开 · 店铺码即低敏凭证)
+请求:`{ "code": "MTA-7K9Q" }`
+成功:`data: { "store_token": "...", "workspace_client_id": 12, "store_name": "Metta Pharmacy" }`(店铺令牌 typ=pos_store · 长期 · 设备存 localStorage `pos_store_token`)
+错误:`pos.store_code_invalid`(404)
+
+### GET /api/pos/cashiers / POST /api/pos/auth/pin — 账套来源改造
+- 优先认 `Authorization: Bearer <店铺令牌>`(typ=pos_store)→ 从中取 tenant+workspace(并校 `token_version` 防重置后旧令牌);否则回落老板「切到收银台」旧路径(query/body `workspace_client_id` + bypass 反查 tenant)。
+- 店铺令牌版本与库中 `token_version` 不符(老板已重置)→ `pos.store_unbound`(401),设备需重绑。
+
+### GET /api/pos/admin/store-code?workspace_client_id= — 取/建店铺码(owner)
+`data: { "code": "MTA-7K9Q", "store_name": "...", "workspace_client_id": 12 }`(前端拼 `pearnly.com/pos?store=<code>` + 二维码)
+
+### POST /api/pos/admin/store-code/reset — 重置店铺码(owner · 换码 + bump token_version 吊销所有已绑设备)
+请求:`{ "workspace_client_id": 12 }`;成功:`data: { "code": "<新码>", "store_name": "..." }`
+
+> 错误码并入 06:`pos.store_code_invalid`(404)· `pos.store_unbound`(401)。表 `pos_store_codes`(迁移 0028 · dual-run `services/pos/store_binding.ensure_store_schema`)。
+
 ---
 
 ## 2. 模块 / 业态开关

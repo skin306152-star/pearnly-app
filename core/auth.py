@@ -21,6 +21,7 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 7
 JWT_REMEMBER_DAYS = 30  # v0.17 · 勾选"记住我"时的长有效期
 POS_TOKEN_TTL_HOURS = 12  # POS 收银员 token 有效期(离线缓存窗口 · docs/pos/04 §1)
+POS_STORE_TOKEN_TTL_DAYS = 365  # 设备店铺令牌(绑定一次长期用 · docs/pos/04 §1b)
 
 
 def _jwt_secret() -> str:
@@ -115,6 +116,32 @@ def create_pos_token(
         "exp": now + timedelta(hours=ttl_hours),
     }
     return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM), ttl_hours
+
+
+def create_pos_store_token(
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    version: int,
+    ttl_days: int = POS_STORE_TOKEN_TTL_DAYS,
+) -> str:
+    """设备店铺令牌(扫店铺码绑定时签发 · docs/pos/04 §1b)。
+
+    typ='pos_store',自含 tenant/workspace + token 版本 ver。能力仅"列本店收银员 / 验 PIN / 卖货",
+    **不是收银员 token、更不是老板 token**——设备丢了碰不到会计/财务。老板「重置店铺码」= 库里 bump
+    token_version,旧令牌 ver 对不上即失效(校验侧 store_binding.current_version 比对)。长期有效。
+    """
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": f"store:{int(workspace_client_id)}",
+        "typ": "pos_store",
+        "tenant_id": str(tenant_id),
+        "workspace_client_id": int(workspace_client_id),
+        "ver": int(version),
+        "iat": now,
+        "exp": now + timedelta(days=ttl_days),
+    }
+    return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:

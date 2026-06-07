@@ -323,6 +323,22 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .tax-foot .primary:disabled { background: #c7cdd6; cursor: not-allowed; }
 .pos-view--main .tax-modal.buyer-individual #tax-company-fields { display: none; }
 
+/* ════════════════ 设备绑定屏(照稿 12② · 暗底)════════════════ */
+.pos-view--bind.is-active { display: grid; place-items: center; min-height: 100vh; padding: 24px; }
+.pos-view--bind .dev { width: 340px; max-width: 92vw; background: linear-gradient(160deg, #1f2937, #111827); border-radius: 18px; color: #fff; padding: 28px 22px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, .35); }
+.pos-view--bind .logo { display: flex; align-items: center; gap: 7px; font-weight: 700; margin-bottom: 18px; }
+.pos-view--bind .logo .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+.pos-view--bind .big { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.pos-view--bind .small { font-size: 12.5px; color: #9ca3af; margin-bottom: 18px; line-height: 1.5; }
+.pos-view--bind .scan { width: 120px; height: 120px; border: 2px dashed #4b5563; border-radius: 14px; display: grid; place-items: center; color: #6b7280; margin-bottom: 14px; }
+.pos-view--bind .or { font-size: 12px; color: #6b7280; margin: 2px 0 12px; }
+.pos-view--bind .inp { width: 100%; height: 48px; border: 1px solid #374151; border-radius: 10px; background: #1b1e25; color: #fff; text-align: center; font-size: 19px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; }
+.pos-view--bind .inp::placeholder { color: #4b5563; letter-spacing: 3px; }
+.pos-view--bind .bind-err { color: #fca5a5; font-size: 12.5px; min-height: 16px; margin-bottom: 8px; }
+.pos-view--bind .bind-go { width: 100%; height: 48px; border: 0; border-radius: 10px; background: var(--blue); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; }
+.pos-view--bind .bind-go:hover { background: var(--blue-d); }
+.pos-view--bind .bind-go:disabled { background: #4b5563; cursor: not-allowed; }
+
 /* ════════════════ 全局 toast(跨屏)· 照搬概念稿 01 ════════════════ */
 .pos-toast { position: fixed; left: 50%; top: 24px; transform: translateX(-50%) translateY(-20px); opacity: 0; transition: .25s; background: var(--ink); color: #fff; padding: 13px 20px; border-radius: 12px; display: flex; align-items: center; gap: 10px; z-index: 80; box-shadow: 0 12px 30px rgba(0, 0, 0, .25); pointer-events: none; max-width: 90vw; }
 .pos-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }

@@ -68,7 +68,17 @@
     }
 
     // ── 路由 ──
-    const VIEWS = ['login', 'main', 'hold', 'refund', 'shift', 'rtables', 'rorder', 'rkitchen'];
+    const VIEWS = [
+        'bind',
+        'login',
+        'main',
+        'hold',
+        'refund',
+        'shift',
+        'rtables',
+        'rorder',
+        'rkitchen',
+    ];
     POS.showView = function (name) {
         VIEWS.forEach((v) => {
             const el = $('view-' + v);
@@ -259,15 +269,95 @@
     }
 
     // ════════════════ 启动 ════════════════
+    const STORE_TOKEN_KEY = 'pos_store_token';
+    const STORE_WS_KEY = 'pos_store_ws';
+    const STORE_NAME_KEY = 'pos_store_name';
+
     function readEnv() {
         try {
             state.token = localStorage.getItem('mrpilot_token') || null;
             const lang = localStorage.getItem('mrpilot_lang');
             if (lang && window.POS_I18N[lang]) state.lang = lang;
-            const wc = localStorage.getItem('pearnly_active_workspace_client_id');
-            state.workspaceClientId = wc ? Number(wc) : null;
-            state.store = localStorage.getItem('pearnly_active_workspace_name') || '';
+            // 设备店铺绑定(收银员任意设备路径)优先;否则老板「切到收银台」旧路径(选的账套)
+            state.storeToken = localStorage.getItem(STORE_TOKEN_KEY) || null;
+            if (state.storeToken) {
+                const sw = localStorage.getItem(STORE_WS_KEY);
+                state.workspaceClientId = sw ? Number(sw) : null;
+                state.store = localStorage.getItem(STORE_NAME_KEY) || '';
+            } else {
+                const wc = localStorage.getItem('pearnly_active_workspace_client_id');
+                state.workspaceClientId = wc ? Number(wc) : null;
+                state.store = localStorage.getItem('pearnly_active_workspace_name') || '';
+            }
         } catch (_) {}
+    }
+
+    function saveBinding(d) {
+        state.storeToken = d.store_token;
+        state.workspaceClientId = d.workspace_client_id;
+        state.store = d.store_name || '';
+        try {
+            localStorage.setItem(STORE_TOKEN_KEY, d.store_token);
+            localStorage.setItem(STORE_WS_KEY, String(d.workspace_client_id));
+            localStorage.setItem(STORE_NAME_KEY, state.store);
+        } catch (_) {}
+    }
+
+    // 已绑定(店铺令牌)或老板旧路径(选了账套)→ 进登录;否则进设备绑定屏。
+    function isProvisioned() {
+        return !!(state.storeToken || state.workspaceClientId);
+    }
+
+    async function bindDevice(code) {
+        const go = $('bind-go');
+        const err = $('bind-err');
+        const c = (code || '').trim().toUpperCase();
+        err.textContent = '';
+        if (c.length < 4) {
+            err.textContent = POS.posErrMsg('pos.store_code_invalid');
+            return;
+        }
+        go.disabled = true;
+        try {
+            const d = await POS.data.bind(c);
+            saveBinding(d);
+            POS.showView('login');
+            loadLogin();
+        } catch (e) {
+            err.textContent = POS.posErrMsg(e.code, 'pos.store_code_invalid');
+        } finally {
+            go.disabled = false;
+        }
+    }
+
+    function bindBindScreen() {
+        const go = $('bind-go');
+        if (go) go.addEventListener('click', () => bindDevice($('bind-code').value));
+        const inp = $('bind-code');
+        if (inp)
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') bindDevice(inp.value);
+            });
+    }
+
+    // 入口决策:URL ?store= 自动绑定 → 已绑/旧路径进登录 → 否则绑定屏。
+    async function startEntry() {
+        let code = null;
+        try {
+            code = new URLSearchParams(location.search).get('store');
+        } catch (_) {}
+        if (code && !state.storeToken) {
+            await bindDevice(code);
+            return;
+        }
+        if (isProvisioned()) {
+            POS.showView('login');
+            loadLogin();
+        } else {
+            POS.showView('bind');
+            const inp = $('bind-code');
+            if (inp) inp.focus();
+        }
     }
 
     function boot() {
@@ -275,6 +365,7 @@
         POS.applyI18n(state.lang);
         bindLogin();
         bindNav();
+        bindBindScreen();
         document.querySelectorAll('[data-lang]').forEach((b) => {
             b.addEventListener('click', () => POS.setLang(b.dataset.lang));
         });
@@ -295,12 +386,11 @@
         });
         // PWA 外壳 SW(08 ADR-1)· 失败不影响在线使用
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850706').catch(() => {});
+            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850707').catch(() => {});
         }
         tick();
         setInterval(tick, 10000);
-        POS.showView('login');
-        loadLogin();
+        startEntry();
     }
 
     if (document.readyState === 'loading') {

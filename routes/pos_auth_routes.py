@@ -18,18 +18,56 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from core import db
+from core.auth import create_pos_store_token, decode_access_token
 from core.pos_api import PosError, ok, require_owner, require_workspace
 from services.pos import auth as pos_auth
 from services.pos import cashier as cashier_dal
 from services.pos import onboarding as onboarding_svc
+from services.pos import store_binding
 
 router = APIRouter(prefix="/api/pos", tags=["pos-auth"])
 
 
 class PinLoginRequest(BaseModel):
-    workspace_client_id: int
+    workspace_client_id: Optional[int] = None  # 老板「切到收银台」旧路径用;设备绑定走店铺令牌
     cashier_id: str = Field(..., min_length=1, max_length=64)
     pin: str = Field(..., min_length=1, max_length=32)
+
+
+class BindRequest(BaseModel):
+    code: str = Field(..., min_length=4, max_length=16)
+
+
+class WorkspaceBody(BaseModel):
+    workspace_client_id: int
+
+
+def _store_claims(request: Request) -> Optional[dict]:
+    """从 Authorization 里取已验签的店铺令牌声明(typ=pos_store);非店铺令牌返 None。"""
+    auth = request.headers.get("Authorization") or request.headers.get("authorization") or ""
+    if not auth.startswith("Bearer "):
+        return None
+    payload = decode_access_token(auth[7:].strip())
+    if not payload or payload.get("typ") != "pos_store":
+        return None
+    return payload
+
+
+def _workspace_from_store_or_legacy(cur, request: Request, legacy_ws: Optional[int]) -> tuple:
+    """收银前台定位 (tenant, workspace):优先设备店铺令牌(校 token_version 防重置后旧令牌),
+    否则回落老板「切到收银台」旧路径(localStorage 选的账套 → 传 workspace_client_id)。"""
+    claims = _store_claims(request)
+    if claims:
+        tid = str(claims["tenant_id"])
+        ws = int(claims["workspace_client_id"])
+        ver = store_binding.current_version(cur, tenant_id=tid, workspace_client_id=ws)
+        if ver is None or ver != claims.get("ver"):
+            raise PosError("pos.store_unbound", 401)  # 店铺码已被重置 → 设备需重绑
+        return tid, ws
+    if legacy_ws is None:
+        raise PosError("pos.store_unbound", 401)  # 既无店铺令牌又无账套 → 设备未绑定
+    tid = _resolve_tenant(cur, legacy_ws)
+    return tid, int(legacy_ws)
 
 
 class FirstCashier(BaseModel):
@@ -52,30 +90,101 @@ def _resolve_tenant(cur, workspace_client_id: int) -> str:
     return tid
 
 
-@router.get("/cashiers")
-async def api_list_cashiers(request: Request, workspace_client_id: int = Query(...)):
-    """开班选人列表(匿名 · 仅名字/颜色)。"""
+@router.post("/bind")
+async def api_bind_device(req: BindRequest, request: Request):
+    """设备绑定:店铺码 → 解析 (tenant, workspace) → 签发长期店铺令牌(设备存 localStorage)。
+    公开端点(店铺码本身即低敏凭证 · 列名+需 PIN 才能卖)。无效码 → pos.store_code_invalid。"""
+    code = (req.code or "").strip().upper()
     with db.get_cursor_rls(bypass=True) as cur:
-        tid = _resolve_tenant(cur, workspace_client_id)
-        rows = cashier_dal.list_cashiers(
-            cur, tenant_id=tid, workspace_client_id=workspace_client_id
+        row = store_binding.resolve(cur, code=code)
+        if not row:
+            raise PosError("pos.store_code_invalid", 404)
+        tid = str(row["tenant_id"])
+        ws = int(row["workspace_client_id"])
+        ver = int(row["token_version"])
+        cur.execute(
+            "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+            (ws, tid),
         )
+        nm = cur.fetchone()
+    token = create_pos_store_token(tenant_id=tid, workspace_client_id=ws, version=ver)
+    return ok(
+        {
+            "store_token": token,
+            "workspace_client_id": ws,
+            "store_name": nm["name"] if nm else "",
+        }
+    )
+
+
+@router.get("/cashiers")
+async def api_list_cashiers(request: Request, workspace_client_id: Optional[int] = Query(None)):
+    """开班选人列表(仅名字/颜色)。账套来自设备店铺令牌(优先)或老板旧路径 workspace_client_id。"""
+    with db.get_cursor_rls(bypass=True) as cur:
+        tid, ws = _workspace_from_store_or_legacy(cur, request, workspace_client_id)
+        rows = cashier_dal.list_cashiers(cur, tenant_id=tid, workspace_client_id=ws)
     return ok({"cashiers": [dict(r) | {"id": str(r["id"])} for r in rows]})
 
 
 @router.post("/auth/pin")
 async def api_pin_login(req: PinLoginRequest, request: Request):
-    """PIN 登录 → POS token。"""
+    """PIN 登录 → POS 收银员 token。账套来自设备店铺令牌(优先)或老板旧路径。"""
     with db.get_cursor_rls(bypass=True) as cur:
-        tid = _resolve_tenant(cur, req.workspace_client_id)
+        tid, ws = _workspace_from_store_or_legacy(cur, request, req.workspace_client_id)
         data = pos_auth.login(
             cur,
             tenant_id=tid,
-            workspace_client_id=req.workspace_client_id,
+            workspace_client_id=ws,
             cashier_id=req.cashier_id,
             pin=req.pin,
         )
     return ok(data)
+
+
+@router.get("/admin/store-code")
+async def api_get_store_code(request: Request, workspace_client_id: int = Query(...)):
+    """取该账套店铺码(无则建)· owner。前端拼二维码/链接 pearnly.com/pos?store=<code>。"""
+    tid, _uid = require_owner(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        require_workspace(cur, tid, workspace_client_id)
+        cur.execute(
+            "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+            (workspace_client_id, tid),
+        )
+        nm = cur.fetchone()
+        info = store_binding.get_or_create_code(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=workspace_client_id,
+            store_name=nm["name"] if nm else "",
+        )
+    return ok(
+        {
+            "code": info["code"],
+            "store_name": nm["name"] if nm else "",
+            "workspace_client_id": workspace_client_id,
+        }
+    )
+
+
+@router.post("/admin/store-code/reset")
+async def api_reset_store_code(req: WorkspaceBody, request: Request):
+    """重置店铺码:换码 + 吊销所有已绑设备(丢机/离职)· owner。"""
+    tid, _uid = require_owner(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        require_workspace(cur, tid, req.workspace_client_id)
+        cur.execute(
+            "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+            (req.workspace_client_id, tid),
+        )
+        nm = cur.fetchone()
+        info = store_binding.reset_code(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=req.workspace_client_id,
+            store_name=nm["name"] if nm else "",
+        )
+    return ok({"code": info["code"], "store_name": nm["name"] if nm else ""})
 
 
 class CashierCreate(BaseModel):

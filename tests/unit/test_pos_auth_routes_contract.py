@@ -22,6 +22,10 @@ EXPECTED = {
     ("POST", "/api/pos/admin/cashiers"),
     ("PUT", "/api/pos/admin/cashiers/{cashier_id}"),
     ("DELETE", "/api/pos/admin/cashiers/{cashier_id}"),
+    # 收银台设备绑定(店铺码)· 收银员任意设备 PIN 登录
+    ("POST", "/api/pos/bind"),
+    ("GET", "/api/pos/admin/store-code"),
+    ("POST", "/api/pos/admin/store-code/reset"),
 }
 
 

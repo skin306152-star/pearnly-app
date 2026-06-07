@@ -22,6 +22,11 @@ EXPECTED = {
     ("GET", "/api/sales/products/{product_id}"),
     ("PATCH", "/api/sales/products/{product_id}"),
     ("DELETE", "/api/sales/products/{product_id}"),
+    # POS PO-A2 · 多单位 product_units CRUD
+    ("GET", "/api/sales/products/{product_id}/units"),
+    ("POST", "/api/sales/products/{product_id}/units"),
+    ("PATCH", "/api/sales/products/{product_id}/units/{unit_id}"),
+    ("DELETE", "/api/sales/products/{product_id}/units/{unit_id}"),
 }
 
 ROW = {

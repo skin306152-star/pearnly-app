@@ -345,13 +345,13 @@ async def run_startup() -> dict:
     except Exception as e:
         logger.warning(f"启动 credits 建表失败: {e}")
 
-    # POS PO-A1 (2026-06-07) · tenant_modules 模块开关表 + RLS(跟 alembic 0021 双跑)
+    # POS 项目 schema 双跑(A1 tenant_modules / A2 product_units / ...)· 集中在 services/pos_schema
     try:
-        from services.modules import store as _modules_store
+        from services.pos_schema import bootstrap_pos_schema
 
-        _modules_store.ensure_table()
+        bootstrap_pos_schema()
     except Exception as e:
-        logger.warning(f"启动 tenant_modules 建表失败(等 alembic 0021): {e}")
+        logger.warning(f"启动 POS schema 失败: {e}")
 
     # v118.34.4 · MR.ERP test-connection cache flush
     # On every restart, drop any cached test-connection entries so users

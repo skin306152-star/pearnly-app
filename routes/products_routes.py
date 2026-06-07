@@ -18,6 +18,7 @@ from core.auth import get_current_user_from_request
 from core.route_helpers import translate_unique_violation
 from services.sales import product_import
 from services.sales import products as products_dal
+from services.products import units as units_dal
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/products", tags=["sales-products"])
@@ -31,6 +32,7 @@ def _require_tenant(request: Request) -> str:
     return str(tid)
 
 
+# POS PO-A2 库存地基:base_unit/批次效期/称重/低库存阈值/参考成本(都可空 · 不破既有调用)。
 class ProductCreate(BaseModel):
     name_th: str = Field(..., min_length=1, max_length=300)
     code: Optional[str] = Field(None, max_length=100)
@@ -43,6 +45,12 @@ class ProductCreate(BaseModel):
     vat_applicable: bool = True
     image_url: Optional[str] = Field(None, max_length=1000)
     category_id: Optional[int] = None
+    base_unit: Optional[str] = Field(None, max_length=50)
+    track_batch: Optional[bool] = None
+    track_expiry: Optional[bool] = None
+    is_weighed: Optional[bool] = None
+    min_stock: Optional[float] = Field(None, ge=0)
+    default_cost: Optional[float] = Field(None, ge=0)
 
 
 class ProductUpdate(BaseModel):
@@ -57,7 +65,29 @@ class ProductUpdate(BaseModel):
     vat_applicable: Optional[bool] = None
     image_url: Optional[str] = Field(None, max_length=1000)
     category_id: Optional[int] = None
+    base_unit: Optional[str] = Field(None, max_length=50)
+    track_batch: Optional[bool] = None
+    track_expiry: Optional[bool] = None
+    is_weighed: Optional[bool] = None
+    min_stock: Optional[float] = Field(None, ge=0)
+    default_cost: Optional[float] = Field(None, ge=0)
     is_active: Optional[bool] = None
+
+
+class UnitCreate(BaseModel):
+    unit_name: str = Field(..., min_length=1, max_length=50)
+    factor_to_base: float = Field(..., gt=0)
+    barcode: Optional[str] = Field(None, max_length=100)
+    price: Optional[float] = Field(None, ge=0)
+    is_default_sell: bool = False
+
+
+class UnitUpdate(BaseModel):
+    unit_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    factor_to_base: Optional[float] = Field(None, gt=0)
+    barcode: Optional[str] = Field(None, max_length=100)
+    price: Optional[float] = Field(None, ge=0)
+    is_default_sell: Optional[bool] = None
 
 
 def _dump(req) -> dict:
@@ -78,9 +108,31 @@ def _out(p: dict) -> dict:
         "vat_applicable": bool(p.get("vat_applicable")),
         "image_url": p.get("image_url"),
         "category_id": int(p["category_id"]) if p.get("category_id") is not None else None,
+        "base_unit": p.get("base_unit"),
+        "track_batch": bool(p.get("track_batch")),
+        "track_expiry": bool(p.get("track_expiry")),
+        "is_weighed": bool(p.get("is_weighed")),
+        "min_stock": float(p["min_stock"]) if p.get("min_stock") is not None else None,
+        "default_cost": float(p["default_cost"]) if p.get("default_cost") is not None else None,
         "is_active": bool(p.get("is_active")),
         "created_at": p["created_at"].isoformat() if p.get("created_at") else None,
         "updated_at": p["updated_at"].isoformat() if p.get("updated_at") else None,
+    }
+
+
+def _unit_out(u: dict) -> dict:
+    return {
+        "id": str(u["id"]),
+        "product_id": str(u["product_id"]),
+        "unit_name": u.get("unit_name"),
+        "factor_to_base": (
+            float(u["factor_to_base"]) if u.get("factor_to_base") is not None else None
+        ),
+        "barcode": u.get("barcode"),
+        "price": float(u["price"]) if u.get("price") is not None else None,
+        "is_default_sell": bool(u.get("is_default_sell")),
+        "created_at": u["created_at"].isoformat() if u.get("created_at") else None,
+        "updated_at": u["updated_at"].isoformat() if u.get("updated_at") else None,
     }
 
 
@@ -185,4 +237,55 @@ async def api_delete_product(product_id: str, request: Request):
         ok = products_dal.deactivate_product(cur, tenant_id=tid, product_id=product_id)
     if not ok:
         raise HTTPException(404, detail="sales.product_not_found")
+    return {"ok": True}
+
+
+# ── 多单位/拆零 product_units(POS PO-A2 · 盒/板/粒 换算)──────────────
+@router.get("/{product_id}/units")
+async def api_list_units(product_id: str, request: Request):
+    tid = _require_tenant(request)
+    with db.get_cursor_rls(tid) as cur:
+        rows = units_dal.list_units(cur, tenant_id=tid, product_id=product_id)
+    return {"units": [_unit_out(r) for r in rows]}
+
+
+@router.post("/{product_id}/units")
+async def api_create_unit(product_id: str, req: UnitCreate, request: Request):
+    tid = _require_tenant(request)
+    with (
+        db.get_cursor_rls(tid, commit=True) as cur,
+        translate_unique_violation("sales.unit_name_exists"),
+    ):
+        # 先确认商品属于本租户(product_id 非租户级 FK · 防挂到他人商品)。
+        if not products_dal.get_product(cur, tenant_id=tid, product_id=product_id):
+            raise HTTPException(404, detail="sales.product_not_found")
+        row = units_dal.create_unit(cur, tenant_id=tid, product_id=product_id, fields=_dump(req))
+    return {"ok": True, "unit": _unit_out(row)}
+
+
+@router.patch("/{product_id}/units/{unit_id}")
+async def api_update_unit(product_id: str, unit_id: str, req: UnitUpdate, request: Request):
+    tid = _require_tenant(request)
+    raw = {k: v for k, v in _dump(req).items() if v is not None}
+    if not raw:
+        raise HTTPException(400, detail="sales.no_changes")
+    with (
+        db.get_cursor_rls(tid, commit=True) as cur,
+        translate_unique_violation("sales.unit_name_exists"),
+    ):
+        row = units_dal.update_unit(
+            cur, tenant_id=tid, product_id=product_id, unit_id=unit_id, fields=raw
+        )
+    if not row:
+        raise HTTPException(404, detail="sales.unit_not_found")
+    return {"ok": True, "unit": _unit_out(row)}
+
+
+@router.delete("/{product_id}/units/{unit_id}")
+async def api_delete_unit(product_id: str, unit_id: str, request: Request):
+    tid = _require_tenant(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        ok = units_dal.delete_unit(cur, tenant_id=tid, product_id=product_id, unit_id=unit_id)
+    if not ok:
+        raise HTTPException(404, detail="sales.unit_not_found")
     return {"ok": True}

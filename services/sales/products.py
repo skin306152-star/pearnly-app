@@ -13,11 +13,13 @@ from typing import Any, Optional
 
 _COLS = (
     "id, tenant_id, code, barcode, qr_payload, name_th, name_en, name_zh, "
-    "unit, unit_price, vat_applicable, image_url, category_id, is_active, "
-    "created_at, updated_at"
+    "unit, unit_price, vat_applicable, image_url, category_id, "
+    "base_unit, track_batch, track_expiry, is_weighed, min_stock, default_cost, "
+    "is_active, created_at, updated_at"
 )
 
 # create 可写列;update 额外允许 is_active(软删/恢复)。
+# 末 6 列为 POS PO-A2 库存地基(base_unit/批次效期/称重/低库存阈值/参考成本)。
 _WRITABLE = (
     "code",
     "barcode",
@@ -30,8 +32,17 @@ _WRITABLE = (
     "vat_applicable",
     "image_url",
     "category_id",
+    "base_unit",
+    "track_batch",
+    "track_expiry",
+    "is_weighed",
+    "min_stock",
+    "default_cost",
 )
 _UPDATABLE = _WRITABLE + ("is_active",)
+
+# numeric 列经 str→Decimal 存(避免 float 精度)。
+_NUMERIC = {"unit_price", "min_stock", "default_cost"}
 
 # 查找键 → 列名白名单(值参数化 · 键不入 SQL 字符串拼接前先经此映射)。
 _LOOKUP_COLS = {"code": "code", "barcode": "barcode", "qr": "qr_payload"}
@@ -75,7 +86,7 @@ def _revive_soft_deleted(cur, *, tenant_id: str, fields: dict) -> Optional[dict]
     for k in _WRITABLE:
         if fields.get(k) is not None:
             sets.append(f"{k} = %s")
-            vals.append(_money(fields[k]) if k == "unit_price" else fields[k])
+            vals.append(_money(fields[k]) if k in _NUMERIC else fields[k])
     sets.append("updated_at = now()")
     cur.execute(
         f"UPDATE products SET {', '.join(sets)} WHERE tenant_id = %s AND id = %s RETURNING {_COLS}",
@@ -94,7 +105,7 @@ def create_product(cur, *, tenant_id: str, fields: dict) -> dict:
     for k in _WRITABLE:
         if fields.get(k) is not None:
             cols.append(k)
-            vals.append(_money(fields[k]) if k == "unit_price" else fields[k])
+            vals.append(_money(fields[k]) if k in _NUMERIC else fields[k])
     placeholders = ", ".join(["%s"] * len(vals))
     cur.execute(
         f"INSERT INTO products ({', '.join(cols)}) VALUES ({placeholders}) RETURNING {_COLS}",
@@ -139,7 +150,7 @@ def update_product(cur, *, tenant_id: str, product_id: str, fields: dict) -> Opt
     if not updates:
         return get_product(cur, tenant_id=tenant_id, product_id=product_id)
     sets = ", ".join(f"{k} = %s" for k in updates) + ", updated_at = now()"
-    params = [_money(v) if k == "unit_price" else v for k, v in updates.items()]
+    params = [_money(v) if k in _NUMERIC else v for k, v in updates.items()]
     params += [tenant_id, product_id]
     cur.execute(
         f"UPDATE products SET {sets} WHERE tenant_id = %s AND id = %s RETURNING {_COLS}",

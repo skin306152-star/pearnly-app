@@ -231,6 +231,7 @@
         );
     }
     async function loadPaymentSettings() {
+        if (state.payment) return; // enterMain 的 ensureBusinessType 已拉过 bootstrap → 免重复 I/O
         try {
             const b = await POS.data.bootstrap();
             if (b && b.payment) state.payment = b.payment;

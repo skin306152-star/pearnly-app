@@ -330,33 +330,38 @@ async def api_full_tax_invoice(sale_id: str, req: FullInvoiceRequest, request: R
     )
 
 
+def _promptpay_qr_result(cur, tenant_id, workspace_client_id, amount) -> dict:
+    """按账套 promptpay_id + 金额出 PromptPay 码(payload+PNG)。未配 ID → 422。两个 QR 端点共用。"""
+    import base64
+
+    from services.sales.promptpay import build_payload, build_qr_png
+
+    cur.execute(
+        "SELECT promptpay_id FROM workspace_clients WHERE tenant_id = %s AND id = %s",
+        (tenant_id, workspace_client_id),
+    )
+    row = cur.fetchone()
+    ppid = row["promptpay_id"] if row else None
+    if not ppid:
+        raise PosError("pos.line_invalid", 422, detail="no_promptpay_id")
+    return {
+        "qr_payload": build_payload(ppid, amount),
+        "png_base64": base64.b64encode(build_qr_png(ppid, amount)).decode("ascii"),
+        "amount": f"{amount:.2f}",
+    }
+
+
 @router.get("/sales/{sale_id}/promptpay-qr")
 async def api_promptpay_qr(
     sale_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    import base64
-
     from services.pos import sales_store
-    from services.sales.promptpay import build_payload, build_qr_png
 
     def _fn(cur, tid, ws, user):
         sale = sales_store.get_sale(cur, tenant_id=tid, sale_id=sale_id)
         if not sale:
             raise PosError("pos.product_not_found", 404)
-        cur.execute(
-            "SELECT promptpay_id FROM workspace_clients WHERE tenant_id = %s AND id = %s",
-            (tid, ws),
-        )
-        row = cur.fetchone()
-        ppid = row["promptpay_id"] if row else None
-        if not ppid:
-            raise PosError("pos.line_invalid", 422, detail="no_promptpay_id")
-        amount = sale["grand_total"]
-        return {
-            "qr_payload": build_payload(ppid, amount),
-            "png_base64": base64.b64encode(build_qr_png(ppid, amount)).decode("ascii"),
-            "amount": f"{amount:.2f}",
-        }
+        return _promptpay_qr_result(cur, tid, ws, sale["grand_total"])
 
     return _read(request, workspace_client_id, _fn)
 
@@ -371,26 +376,10 @@ async def api_promptpay_qr_presale(
 
     收银员可调(_read)。未配 ID → 422,收银端提示去「收款设置」填。
     """
-    import base64
     from decimal import Decimal
 
-    from services.sales.promptpay import build_payload, build_qr_png
-
     def _fn(cur, tid, ws, user):
-        cur.execute(
-            "SELECT promptpay_id FROM workspace_clients WHERE tenant_id = %s AND id = %s",
-            (tid, ws),
-        )
-        row = cur.fetchone()
-        ppid = row["promptpay_id"] if row else None
-        if not ppid:
-            raise PosError("pos.line_invalid", 422, detail="no_promptpay_id")
-        amt = Decimal(str(amount)).quantize(Decimal("0.01"))
-        return {
-            "qr_payload": build_payload(ppid, amt),
-            "png_base64": base64.b64encode(build_qr_png(ppid, amt)).decode("ascii"),
-            "amount": f"{amt:.2f}",
-        }
+        return _promptpay_qr_result(cur, tid, ws, Decimal(str(amount)).quantize(Decimal("0.01")))
 
     return _read(request, workspace_client_id, _fn)
 

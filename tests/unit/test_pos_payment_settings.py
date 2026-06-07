@@ -147,10 +147,11 @@ class RoutesContractTests(unittest.TestCase):
         # 收款前出码端点(收银员可调)· 用账套 promptpay_id · 未配 422
         from routes import pos_sales_routes
 
-        src = inspect.getsource(pos_sales_routes.api_promptpay_qr_presale)
-        self.assertIn("_read(", src)  # 收银员可读(非 owner-gated)
-        self.assertIn("no_promptpay_id", src)
-        self.assertIn("build_qr_png", src)
+        self.assertIn("_read(", inspect.getsource(pos_sales_routes.api_promptpay_qr_presale))
+        # 出码逻辑(promptpay_id 查询 + 422 + 建码)收进两端点共用的 helper
+        helper = inspect.getsource(pos_sales_routes._promptpay_qr_result)
+        self.assertIn("no_promptpay_id", helper)
+        self.assertIn("build_qr_png", helper)
 
 
 if __name__ == "__main__":

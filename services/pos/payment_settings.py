@@ -75,32 +75,40 @@ def _clean_rate(value) -> Decimal:
     return Decimal("100") if d > 100 else d
 
 
-def get_settings(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
-    """返回该账套收款设置(无行回落默认)+ 账套 promptpay_id。"""
+def get_settings(cur, *, tenant_id: str, workspace_client_id: int, promptpay_id=None) -> dict:
+    """返回该账套收款设置(无行回落默认)+ 账套 promptpay_id。
+
+    promptpay_id 传入(非 None)则跳过 workspace_clients 查询——bootstrap 已握有该值,免重复 I/O。
+    """
     cur.execute(
         "SELECT promptpay_enabled, card_enabled, service_charge_rate, price_includes_vat "
         "FROM pos_payment_settings WHERE tenant_id = %s AND workspace_client_id = %s",
         (tenant_id, workspace_client_id),
     )
     row = cur.fetchone()
-    cur.execute(
-        "SELECT promptpay_id FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-        (workspace_client_id, tenant_id),
-    )
-    pp = cur.fetchone()
-    out = {
+    if promptpay_id is None:
+        cur.execute(
+            "SELECT promptpay_id FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+            (workspace_client_id, tenant_id),
+        )
+        pp = cur.fetchone()
+        promptpay_id = pp["promptpay_id"] if pp else None
+    if row is not None:
+        return {
+            "promptpay_enabled": bool(row["promptpay_enabled"]),
+            "card_enabled": bool(row["card_enabled"]),
+            "service_charge_rate": _rate_str(row["service_charge_rate"]),
+            "price_includes_vat": bool(row["price_includes_vat"]),
+            "promptpay_id": promptpay_id or "",
+        }
+    # 无显式行:才按业态算服务费智能默认(避免给已配账套白跑一次业态查询)。
+    return {
         "promptpay_enabled": _DEFAULTS["promptpay_enabled"],
         "card_enabled": _DEFAULTS["card_enabled"],
         "service_charge_rate": _default_service_rate(cur, tenant_id),
         "price_includes_vat": _DEFAULTS["price_includes_vat"],
-        "promptpay_id": (pp["promptpay_id"] if pp else None) or "",
+        "promptpay_id": promptpay_id or "",
     }
-    if row is not None:
-        out["promptpay_enabled"] = bool(row["promptpay_enabled"])
-        out["card_enabled"] = bool(row["card_enabled"])
-        out["service_charge_rate"] = _rate_str(row["service_charge_rate"])
-        out["price_includes_vat"] = bool(row["price_includes_vat"])
-    return out
 
 
 def save_settings(

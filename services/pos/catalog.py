@@ -224,7 +224,11 @@ def bootstrap(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
             "near_expiry_days": near_days,
         },
         # 收款设置(老板配)→ 收银端按此显隐支付方式 / 出码用配的 PromptPay ID / 服务费·含VAT。
+        # promptpay_id 复用上面 store_row 已查到的值,免 get_settings 再查一次 workspace_clients。
         "payment": pay_settings.get_settings(
-            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            promptpay_id=(store_row["promptpay_id"] if store_row else ""),
         ),
     }

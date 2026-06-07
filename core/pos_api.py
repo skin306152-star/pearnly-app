@@ -21,7 +21,13 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from fastapi import HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+# POS/库存接口前缀:这些路径的请求体校验错误也要走信封(其余路由保持 FastAPI 默认)。
+_POS_PREFIXES = ("/api/inventory", "/api/pos")
+_POS_EXACT = ("/api/me/modules",)
 
 
 def ok(data: Optional[dict] = None) -> dict:
@@ -58,9 +64,32 @@ async def _pos_error_handler(request: Request, exc: PosError) -> JSONResponse:
     )
 
 
+def _is_pos_path(request: Request) -> bool:
+    path = str(request.url.path or "")
+    return path.startswith(_POS_PREFIXES) or path in _POS_EXACT
+
+
+async def _pos_validation_handler(request: Request, exc: RequestValidationError):
+    """POS/库存路径的请求体校验错误 → 信封(pos.line_invalid);其余路由走 FastAPI 默认。
+
+    FastAPI 的请求体校验在路由函数执行前触发,不经 PosError;不接管的话 POS 前端会收到
+    默认 {detail:[...]} 而非信封(读 body.error.code 失败)。这里按路径前缀只接管 POS。
+    """
+    if _is_pos_path(request):
+        return JSONResponse(
+            status_code=422, content=_error_body("pos.line_invalid", "invalid_request_body")
+        )
+    return await request_validation_exception_handler(request, exc)
+
+
 def register_pos_error_handler(app) -> None:
-    """app 启动时注册 · 让 PosError 渲染成信封。只挂新异常类型,不碰现有处理器。"""
+    """app 启动时注册:PosError → 信封;POS 路径的请求体校验错误 → 信封。
+
+    PosError 是新异常类型(不碰现有处理器)。RequestValidationError 处理器对非 POS 路径委托
+    回 FastAPI 默认实现,行为不变。
+    """
     app.add_exception_handler(PosError, _pos_error_handler)
+    app.add_exception_handler(RequestValidationError, _pos_validation_handler)
 
 
 def pos_auth(request: Request) -> dict:

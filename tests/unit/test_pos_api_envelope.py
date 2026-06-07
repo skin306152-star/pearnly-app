@@ -54,6 +54,41 @@ class PosErrorHandlerTests(unittest.TestCase):
         self.assertEqual(body["error"]["detail"], "coke x2")
 
 
+class ValidationHandlerScopeTests(unittest.TestCase):
+    """POS 路径的请求体校验错误走信封;非 POS 路径委托 FastAPI 默认。"""
+
+    class _Req:
+        def __init__(self, path):
+            self.url = type("U", (), {"path": path})()
+
+    def _render_pos(self, path):
+        from fastapi.exceptions import RequestValidationError
+
+        exc = RequestValidationError([])
+        resp = _run(pos_api._pos_validation_handler(self._Req(path), exc))
+        return resp.status_code, json.loads(bytes(resp.body))
+
+    def test_inventory_path_enveloped(self):
+        status, body = self._render_pos("/api/inventory/in")
+        self.assertEqual(status, 422)
+        self.assertFalse(body["ok"])
+        self.assertEqual(body["error"]["code"], "pos.line_invalid")
+
+    def test_pos_path_enveloped(self):
+        _status, body = self._render_pos("/api/pos/sales")
+        self.assertEqual(body["error"]["code"], "pos.line_invalid")
+
+    def test_modules_path_enveloped(self):
+        _status, body = self._render_pos("/api/me/modules")
+        self.assertFalse(body["ok"])
+
+    def test_non_pos_path_delegates_to_default(self):
+        # 非 POS 路径不应被信封接管(委托 FastAPI 默认 · 返回 {detail:...} 非 {ok:...})
+        _status, body = self._render_pos("/api/sales/products")
+        self.assertNotIn("ok", body)
+        self.assertIn("detail", body)
+
+
 class PosAuthTests(unittest.TestCase):
     def test_translates_http_exception_to_pos_error(self):
         # pos_auth lazily imports get_current_user_from_request from core.auth — patch there.

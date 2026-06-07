@@ -283,9 +283,11 @@ interface Window {
     loadSalesWorkbench?: () => void;
     loadSalesProducts?: () => void;
     loadSalesAccount?: () => void;
-    // POS PO-A1/A4 · 模块导航显隐 + 库存后台(屏7)桥
+    // POS PO-A1/A4/B1 · 模块导航显隐 + 库存后台(屏7)+ 开通收银(屏8)桥
     applyModuleNav?: () => void;
     loadInventoryPage?: () => void;
+    loadPosOnboardingPage?: () => void;
+    isOwner?: (u?: AppUser | null) => boolean;
     reloadInventory?: () => void;
     openInventoryIn?: () => void;
     openInventoryCount?: () => void;

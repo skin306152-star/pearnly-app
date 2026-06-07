@@ -45,7 +45,12 @@ LEGACY_BTN_CLASSES = [
 # 设计令牌允许出现裸 hex 的文件(令牌定义处)
 # home-41-inventory.css:POS 库存后台样式表 · 视觉照搬概念稿(09 §H)· :root 令牌与
 # 概念稿原样裸 hex 整块移植,作用域到 .invp 防污染 —— 同 home-38 按令牌文件处理。
-TOKEN_CSS = {"home-01-base.css", "home-38-buttons.css", "home-41-inventory.css"}
+TOKEN_CSS = {
+    "home-01-base.css",
+    "home-38-buttons.css",
+    "home-41-inventory.css",
+    "home-42-pos-onboarding.css",
+}
 
 
 def read(p: Path) -> str:

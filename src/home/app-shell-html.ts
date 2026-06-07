@@ -260,6 +260,12 @@ const SIDEBAR_HTML = `
             </svg>
         </div>
         <div class="nav-sub">
+            <div class="nav-item nav-sub-item" id="nav-pos-onboard" data-route="pos-onboarding" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 2l1.6 4.4 4.4 1.6-4.4 1.6L10 14l-1.6-4.4L4 8l4.4-1.6z"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-onboard">开通收银台</span>
+            </div>
             <div class="nav-item nav-sub-item" data-route="inventory">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M10 2l7 4v8l-7 4-7-4V6l7-4z"/>

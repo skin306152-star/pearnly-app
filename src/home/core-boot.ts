@@ -237,6 +237,7 @@ const VALID_ROUTES = [
     'test-center',
     'knowledge',
     'inventory',
+    'pos-onboarding',
 ];
 
 function routeTo(route?: any) {
@@ -278,6 +279,9 @@ function routeTo(route?: any) {
     // POS PO-A4 · 库存后台(屏7)
     if (route === 'inventory' && typeof window.loadInventoryPage === 'function')
         window.loadInventoryPage();
+    // POS PO-B1 · 开通收银(屏8)
+    if (route === 'pos-onboarding' && typeof window.loadPosOnboardingPage === 'function')
+        window.loadPosOnboardingPage();
     // 销项 PO-10 · 发票工作台 / 商品管理 / 账套·开票资料
     if (route === 'sales-invoices' && typeof window.loadSalesWorkbench === 'function')
         window.loadSalesWorkbench();
@@ -345,6 +349,8 @@ async function loadAll() {
         } catch (_) {
             /* silent */
         }
+        // POS PO-B1 · 用户就绪后重应用模块导航(owner 门控「开通收银台」引导项需 _userInfo)
+        if (typeof window.applyModuleNav === 'function') window.applyModuleNav();
 
         // ============================================================
         // v118.44.0 · NAV-IA Phase 8 · admin layout 独立 SPA 早退分支

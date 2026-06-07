@@ -53,6 +53,7 @@ const HOME_CSS = [
     'home-39-sales.css',
     'home-40-sales-wizard.css',
     'home-41-inventory.css',
+    'home-42-pos-onboarding.css',
     'erp-mrerp-connect.css',
 ];
 

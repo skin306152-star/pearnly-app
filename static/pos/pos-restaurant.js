@@ -65,6 +65,7 @@
                 const b = await POS.data.bootstrap();
                 const cfg = (b.modules && b.modules.pos && b.modules.pos.config) || {};
                 state.businessType = cfg.business_type || 'retail';
+                if (b && b.payment) state.payment = b.payment; // 收款设置(服务费/含VAT/方式显隐)
             } catch (_) {
                 state.businessType = 'retail';
             }

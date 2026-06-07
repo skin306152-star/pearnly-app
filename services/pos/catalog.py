@@ -211,6 +211,8 @@ def bootstrap(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
     inv_store.get_or_create_default_warehouse(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
     )
+    from services.pos import payment_settings as pay_settings
+
     return {
         "store": dict(store_row) | {"id": store_row["id"]} if store_row else None,
         "modules": modules,
@@ -221,4 +223,8 @@ def bootstrap(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
             "allow_discount": bool(pos_cfg.get("allow_discount", True)),
             "near_expiry_days": near_days,
         },
+        # 收款设置(老板配)→ 收银端按此显隐支付方式 / 出码用配的 PromptPay ID / 服务费·含VAT。
+        "payment": pay_settings.get_settings(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+        ),
     }

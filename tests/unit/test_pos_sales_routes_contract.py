@@ -23,6 +23,7 @@ EXPECTED = {
     ("POST", "/api/pos/sales/{sale_id}/full-tax-invoice"),
     ("GET", "/api/pos/sales/{sale_id}/promptpay-qr"),
     ("GET", "/api/pos/sales/{sale_id}/receipt-pdf"),
+    ("GET", "/api/pos/promptpay-qr"),
 }
 
 

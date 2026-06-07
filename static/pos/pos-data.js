@@ -371,6 +371,15 @@
         }
     };
 
+    // 收款前出码:按账套配的 PromptPay ID + 待收金额生成二维码(无需先建单)。
+    data.promptpayQr = async function (amount) {
+        const qs = new URLSearchParams({
+            workspace_client_id: state.workspaceClientId || '',
+            amount: Number(amount || 0).toFixed(2),
+        });
+        return await apiFetch('GET', '/api/pos/promptpay-qr?' + qs.toString());
+    };
+
     data.products = async function (q, cat) {
         try {
             const qs = new URLSearchParams({ workspace_client_id: state.workspaceClientId || '' });

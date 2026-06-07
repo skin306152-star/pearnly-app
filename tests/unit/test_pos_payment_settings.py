@@ -135,6 +135,23 @@ class RoutesContractTests(unittest.TestCase):
         self.assertIn('assert_module_enabled(cur, tid, "pos")', src)  # 模块守门
         self.assertIn("require_workspace", src)  # 账套归属
 
+    def test_bootstrap_surfaces_payment_for_cashier(self):
+        # 收银端(POS token·owner-gated 路由调不了)走 bootstrap 拿收款设置 → 必含 payment 块
+        from services.pos import catalog
+
+        src = inspect.getsource(catalog.bootstrap)
+        self.assertIn('"payment"', src)
+        self.assertIn("pay_settings.get_settings", src)
+
+    def test_presale_qr_route_is_cashier_readable(self):
+        # 收款前出码端点(收银员可调)· 用账套 promptpay_id · 未配 422
+        from routes import pos_sales_routes
+
+        src = inspect.getsource(pos_sales_routes.api_promptpay_qr_presale)
+        self.assertIn("_read(", src)  # 收银员可读(非 owner-gated)
+        self.assertIn("no_promptpay_id", src)
+        self.assertIn("build_qr_png", src)
+
 
 if __name__ == "__main__":
     unittest.main()

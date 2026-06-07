@@ -220,6 +220,35 @@
     }
 
     // ════════════════ 收款弹窗 ════════════════
+    // 收款设置(老板配):默认全开 + 价内 VAT;enterMain 拉 bootstrap 覆盖。关了的方式结账不显。
+    function pay() {
+        return (
+            state.payment || {
+                promptpay_enabled: true,
+                card_enabled: true,
+                price_includes_vat: true,
+            }
+        );
+    }
+    async function loadPaymentSettings() {
+        try {
+            const b = await POS.data.bootstrap();
+            if (b && b.payment) state.payment = b.payment;
+        } catch (_) {
+            /* 取不到 → 用默认(全开)· 不阻塞卖货 */
+        }
+    }
+    // 按收款设置显隐支付方式 tab(现金恒显;PromptPay/刷卡关了不显)。
+    function applyPayMethods() {
+        const p = pay();
+        const show = (pm, on) => {
+            const tab = document.querySelector('#pay-mask .pm[data-pm="' + pm + '"]');
+            if (tab) tab.style.display = on ? '' : 'none';
+        };
+        show('qr', p.promptpay_enabled !== false);
+        show('card', p.card_enabled !== false);
+    }
+
     function grandTotal() {
         const sub = subtotalOf(cart);
         return sub - Math.min(discount, sub);
@@ -232,6 +261,7 @@
         tendered = 0;
         renderQuickCash();
         updateCash();
+        applyPayMethods(); // 按收款设置显隐 PromptPay/刷卡
         setPm('cash');
         ['pay-cash-err', 'pay-qr-err', 'pay-card-err'].forEach((id) => ($(id).textContent = ''));
         $('pay-mask').classList.add('show');
@@ -246,6 +276,28 @@
         $('pm-cash').style.display = m === 'cash' ? 'block' : 'none';
         $('pm-qr').style.display = m === 'qr' ? 'block' : 'none';
         $('pm-card').style.display = m === 'card' ? 'block' : 'none';
+        if (m === 'qr') loadQr();
+    }
+    // 切到 PromptPay → 用账套配的 ID + 待收金额出码;未配 ID 提示去收款设置填。
+    async function loadQr() {
+        const box = $('pay-qr-box');
+        if (!box) return;
+        box.innerHTML = '<div class="qr-loading">' + POS.t('posui.loading') + '</div>';
+        $('pay-qr-err').textContent = '';
+        try {
+            const r = await POS.data.promptpayQr(grandTotal());
+            box.innerHTML =
+                '<img alt="PromptPay QR" style="width:200px;height:200px;" src="data:image/png;base64,' +
+                r.png_base64 +
+                '">';
+        } catch (e) {
+            box.innerHTML = '';
+            // 未配 PromptPay ID(后端 422 detail no_promptpay_id)→ 引导去「收款设置」填。
+            $('pay-qr-err').textContent =
+                e && e.detail === 'no_promptpay_id'
+                    ? POS.t('posui.pay.qr.no_id')
+                    : POS.posErrMsg(e && e.code, 'posui.pay.qr.fail');
+        }
     }
     function renderQuickCash() {
         const box = $('pay-quick');
@@ -287,7 +339,7 @@
             doc_kind: 'receipt',
             sale_type: 'sale',
             member_client_id: null,
-            price_includes_vat: true,
+            price_includes_vat: pay().price_includes_vat !== false,
             lines: cart.map((c) => ({
                 product_id: c.id,
                 sell_unit: c.sell_unit,
@@ -697,6 +749,7 @@
         renderCats();
         renderCart();
         loadGrid();
+        loadPaymentSettings(); // 拉收款设置(显隐方式 / 价内VAT / PromptPay 出码)
     }
 
     POS.cashier = {

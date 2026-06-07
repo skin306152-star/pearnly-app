@@ -361,6 +361,40 @@ async def api_promptpay_qr(
     return _read(request, workspace_client_id, _fn)
 
 
+@router.get("/promptpay-qr")
+async def api_promptpay_qr_presale(
+    request: Request,
+    amount: float = Query(..., ge=0),
+    workspace_client_id: Optional[int] = Query(None),
+):
+    """收款前先出码:按账套配的 PromptPay ID + 待收金额生成二维码(无需先建单)。
+
+    收银员可调(_read)。未配 ID → 422,收银端提示去「收款设置」填。
+    """
+    import base64
+    from decimal import Decimal
+
+    from services.sales.promptpay import build_payload, build_qr_png
+
+    def _fn(cur, tid, ws, user):
+        cur.execute(
+            "SELECT promptpay_id FROM workspace_clients WHERE tenant_id = %s AND id = %s",
+            (tid, ws),
+        )
+        row = cur.fetchone()
+        ppid = row["promptpay_id"] if row else None
+        if not ppid:
+            raise PosError("pos.line_invalid", 422, detail="no_promptpay_id")
+        amt = Decimal(str(amount)).quantize(Decimal("0.01"))
+        return {
+            "qr_payload": build_payload(ppid, amt),
+            "png_base64": base64.b64encode(build_qr_png(ppid, amt)).decode("ascii"),
+            "amount": f"{amt:.2f}",
+        }
+
+    return _read(request, workspace_client_id, _fn)
+
+
 @router.get("/sales/{sale_id}/receipt-pdf")
 async def api_receipt_pdf(
     sale_id: str,

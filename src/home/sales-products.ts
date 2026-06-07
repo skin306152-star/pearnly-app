@@ -8,6 +8,7 @@ import {
     imageFieldHtml,
     bindImageField,
     loadAuthedImg,
+    salesErrMsg,
     IC_X,
 } from './sales-common.js';
 
@@ -176,8 +177,7 @@ function readForm() {
 
 async function failMsg(r: Response, fallbackKey: string): Promise<string> {
     const d = await r.json().catch(() => ({}));
-    const detail = d && d.detail ? String(d.detail) : 'HTTP ' + r.status;
-    return t(fallbackKey) + ' · ' + detail;
+    return salesErrMsg(d && d.detail, fallbackKey);
 }
 
 function setCodeErr(msg: string) {
@@ -205,7 +205,7 @@ async function save(p: Product | null) {
                 (document.getElementById('sx-pf-code') as HTMLInputElement)?.focus();
                 return;
             }
-            showToast(t('sx-p-save-fail') + ' · ' + detail, 'error');
+            showToast(salesErrMsg(detail, 'sx-p-save-fail'), 'error');
             return;
         }
         closeMask('sales-prod-mask');

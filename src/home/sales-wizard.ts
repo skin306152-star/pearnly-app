@@ -2,7 +2,7 @@
 // 接真接口(sellers/products/rd/create+issue);视觉照 index.html 样稿。自含 4 语 + 自带切换。
 // 从工作台「开票」按钮启动:window.openSalesWizard()。
 /* global escapeHtml, showToast */
-import { openDocPdf } from './sales-common.js';
+import { openDocPdf, salesErrText } from './sales-common.js';
 import { type WState, compliance } from './sales-wizard-calc.js';
 import {
     loadWizardData,
@@ -347,7 +347,7 @@ async function doSaveDraft() {
         st.draftId = r.id || st.draftId;
         showToast(wt('draftSaved'), 'success');
         window.dispatchEvent(new CustomEvent('pearnly:sales-changed'));
-    } else showToast(wt('saveFail') + (r.error ? ' · ' + r.error : ''), 'error');
+    } else showToast(salesErrText(r.error) || wt('saveFail'), 'error');
 }
 // 合规检查 / 服务端错误码 → 该去哪一步补(0:类型 1:买卖双方 2:商品 3:收款 4:核对)。
 const CHECK_STEP: Record<string, number> = { ckBuyer: 1, ckTin: 1, ckPay: 3 };
@@ -393,7 +393,8 @@ async function doIssue() {
         goStep(hit.step);
         showToast(wt('blockers') + ' ' + wt(hit.descKey), 'error');
     } else {
-        showToast(wt('issueFail') + (r.error ? ' · ' + r.error : ''), 'error');
+        // 未在 SERVER_ERR 表里的码:用全局本地化文案,实在没有才回退向导兜底(不露原始码)。
+        showToast(salesErrText(r.error) || wt('issueFail'), 'error');
     }
 }
 function showSuccess(docId: string) {

@@ -120,6 +120,21 @@ export async function loadAuthedImg(
     }
 }
 
+// 服务端错误码(detail · 形如 'sales.not_draft' 或裸 'not_draft')→ 对应语言文案。
+// 找不到对应键则返回 null,由调用方回退到自己的本地化兜底 —— 绝不把原始码/HTTP 状态抛给用户。
+export function salesErrText(detail: string | null | undefined): string | null {
+    const d = String(detail || '').trim();
+    if (!d) return null;
+    const key = d.startsWith('sales.') ? d : 'sales.' + d;
+    const msg = t(key);
+    return msg && msg !== key ? msg : null;
+}
+
+// 同上,但带本地化兜底 key(各弹窗的「保存/确定/完成/开出」失败统一用此,文案永远本地化)。
+export function salesErrMsg(detail: string | null | undefined, fallbackKey: string): string {
+    return salesErrText(detail) || t(fallbackKey);
+}
+
 // 真上传一张图(POST /api/uploads/image · multipart)→ 返回可存进 image_url/logo_url 的 URL。
 export async function uploadImage(file: File): Promise<{ url?: string; error?: string }> {
     const fd = new FormData();

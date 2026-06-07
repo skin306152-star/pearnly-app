@@ -9,6 +9,7 @@ import {
     fmtDate,
     salesFetch,
     openDocPdf,
+    salesErrMsg,
     IC_X,
 } from './sales-common.js';
 
@@ -263,7 +264,7 @@ async function postMutate(url: string, body: unknown): Promise<boolean> {
         const resp = await apiPost(url, body);
         if (resp && resp.ok) return true;
         const data = resp ? await resp.json().catch(() => ({})) : {};
-        showToast(t('sx-action-fail') + (data.detail ? ' · ' + data.detail : ''), 'error');
+        showToast(salesErrMsg(data.detail, 'sx-action-fail'), 'error');
         return false;
     } catch (_) {
         showToast(t('sx-action-fail'), 'error');

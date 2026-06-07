@@ -1,0 +1,12 @@
+{
+    "name": "Pearnly POS",
+    "short_name": "Pearnly POS",
+    "description": "Pearnly POS cashier terminal",
+    "start_url": "/pos",
+    "scope": "/pos",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#111827",
+    "theme_color": "#111827",
+    "icons": [{ "src": "/static/brand/favicon-32.png", "sizes": "32x32", "type": "image/png" }]
+}

@@ -66,14 +66,9 @@ def _shift_is_open(cur, *, tenant_id: str, shift_id: str) -> bool:
 
 
 def _header_discount(hd: dict) -> tuple:
-    if not hd:
-        return 0, 0
+    hd = hd or {}
     t, val = hd.get("type"), hd.get("value", 0)
-    if t == "pct":
-        return 0, val
-    if t == "amount":
-        return val, 0
-    return 0, 0
+    return (0, val) if t == "pct" else (val, 0) if t == "amount" else (0, 0)
 
 
 def create_sale(

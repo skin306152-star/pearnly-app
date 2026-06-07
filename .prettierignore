@@ -39,6 +39,9 @@ home.css
 # 拆出的 css 切片:verbatim 搬迁,必须与原 home.css 字节级一致以保证级联零变化 →
 # 跟 home.css 同策略豁免 prettier(重排会破坏字节等价 → 视觉漂移风险)。
 static/home-*.css
+# POS 收银前台样式表:逐字移植概念稿(docs/pos 09 §H)· 同 home-*.css 策略 · 保紧凑(<500)
+# 便于与概念稿源码侧拼对照;prettier 展开成每声明一行会到 1500+ 行并扰乱视觉核对。
+static/pos/*.css
 # REFACTOR-C3 · home.html → 组件化
 home.html
 # C 阶段相邻 · login.html 242KB · 未来模块化

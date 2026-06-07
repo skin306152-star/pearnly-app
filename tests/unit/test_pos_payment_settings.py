@@ -41,17 +41,23 @@ class RateHelpersTests(unittest.TestCase):
 
 
 class GetSettingsTests(unittest.TestCase):
-    def test_defaults_when_no_row(self):
-        cur = FakeCursor([None, {"promptpay_id": None}])
+    # 第3次 fetchone = _default_service_rate→get_business_type 的哨兵行查询。
+    def test_defaults_when_no_row_non_restaurant(self):
+        cur = FakeCursor([None, {"promptpay_id": None}, None])  # 业态哨兵 None → 非餐厅
         out = svc.get_settings(cur, tenant_id="t-1", workspace_client_id=7)
         self.assertTrue(out["promptpay_enabled"])
         self.assertTrue(out["card_enabled"])
-        self.assertEqual(out["service_charge_rate"], "0")
+        self.assertEqual(out["service_charge_rate"], "0")  # 非餐厅默认 0
         self.assertTrue(out["price_includes_vat"])
         self.assertEqual(out["promptpay_id"], "")
-        # 隔离:settings 查询带 tenant + workspace,参数化
         self.assertIn("tenant_id = %s AND workspace_client_id = %s", cur.calls[0][0])
         self.assertEqual(cur.calls[0][1], ("t-1", 7))
+
+    def test_restaurant_default_service_rate_is_10(self):
+        # 餐厅业态(哨兵 restaurant)无显式设置 → 服务费智能默认 10%
+        cur = FakeCursor([None, {"promptpay_id": None}, {"config": {"value": "restaurant"}}])
+        out = svc.get_settings(cur, tenant_id="t-1", workspace_client_id=7)
+        self.assertEqual(out["service_charge_rate"], "10")
 
     def test_reads_explicit_row_and_promptpay(self):
         cur = FakeCursor(
@@ -63,6 +69,7 @@ class GetSettingsTests(unittest.TestCase):
                     "price_includes_vat": False,
                 },
                 {"promptpay_id": "0812345678"},
+                {"config": {"value": "restaurant"}},  # 业态查询(显式行会覆盖费率,不受默认影响)
             ]
         )
         out = svc.get_settings(cur, tenant_id="t-1", workspace_client_id=7)
@@ -74,8 +81,8 @@ class GetSettingsTests(unittest.TestCase):
 
 class SaveSettingsTests(unittest.TestCase):
     def test_upsert_and_writeback_promptpay_and_clamp(self):
-        # save 末尾会调 get_settings(2 次查询)→ 备好回读结果
-        cur = FakeCursor([None, {"promptpay_id": "088"}])
+        # save 末尾会调 get_settings(settings + promptpay + 业态哨兵 3 次查询)→ 备好回读结果
+        cur = FakeCursor([None, {"promptpay_id": "088"}, None])
         svc.save_settings(
             cur,
             tenant_id="t-1",

@@ -160,7 +160,7 @@ function renderBody(state: 'loading' | 'error' | 'ok'): void {
             <div class="ops">${
                 tb.is_active
                     ? `<button class="op" data-act="edit">${escapeHtml(t('rtbl.edit'))}</button><button class="op" data-act="disable">${escapeHtml(t('rtbl.disable'))}</button>`
-                    : `<button class="op" data-act="enable">${escapeHtml(t('rtbl.enable'))}</button>`
+                    : `<button class="op" data-act="enable">${escapeHtml(t('rtbl.enable'))}</button><button class="op" data-act="delete">${escapeHtml(t('rtbl.delete'))}</button>`
             }</div>
           </div>`
             )
@@ -222,6 +222,27 @@ function onBodyClick(e: Event): void {
     if (act === 'edit' && tb) openTableDialog(tb);
     else if (act === 'disable') setTableActive(id, false);
     else if (act === 'enable') setTableActive(id, true);
+    else if (act === 'delete' && tb) deleteTable(tb);
+}
+
+// 硬删:仅从没开过台的(后端校验)· 二次确认 · 开过台的 409 → 提示只能停用。
+function deleteTable(tb: Table): void {
+    showDialog(
+        t('rtbl.delete'),
+        `<div style="font-size:13.5px;color:#374151;line-height:1.6;">${escapeHtml(t('rtbl.del_confirm').replace('{name}', tb.name))}</div>`,
+        async () => {
+            try {
+                await call('DELETE', `/tables/${tb.id}?workspace_client_id=${ws}`);
+                return true;
+            } catch (e) {
+                // 开过台(有历史)→ 后端 409 pos.void_not_allowed:留账只能停用,给专属人话。
+                const code = e instanceof Error ? e.message : 'pos.unexpected';
+                const key = code === 'pos.void_not_allowed' ? 'rtbl.del_has_history' : code;
+                showToast(posErrMsg(key, 'pos.unexpected'), 'error');
+                return false;
+            }
+        }
+    );
 }
 
 async function setTableActive(id: number, on: boolean): Promise<void> {

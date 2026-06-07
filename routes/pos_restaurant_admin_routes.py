@@ -152,3 +152,18 @@ async def api_update_table(table_id: int, req: TableUpdate, request: Request):
         ),
         commit=True,
     )
+
+
+@router.delete("/tables/{table_id}")
+async def api_delete_table(
+    table_id: int, request: Request, workspace_client_id: Optional[int] = Query(None)
+):
+    """硬删桌台(仅从没开过台的;开过台的留账 → 409 只能停用)。"""
+    return _run(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws: tables_svc.delete_table(
+            cur, tenant_id=tid, workspace_client_id=ws, table_id=table_id
+        ),
+        commit=True,
+    )

@@ -184,6 +184,23 @@ def session_aggregates(cur, *, tenant_id: str, workspace_client_id: int) -> dict
 
 
 # ── 开台 session ──────────────────────────────────────────────────────
+def table_has_session_history(cur, *, tenant_id: str, table_id: int) -> bool:
+    """该桌是否开过台(含已结账历史)。有历史 → 只能停用不能硬删(留账)。"""
+    cur.execute(
+        "SELECT 1 FROM pos_table_sessions WHERE tenant_id = %s AND table_id = %s LIMIT 1",
+        (tenant_id, table_id),
+    )
+    return cur.fetchone() is not None
+
+
+def delete_table(cur, *, tenant_id: str, workspace_client_id: int, table_id: int) -> None:
+    """硬删桌台(仅从没开过台的 · 调用方先校验)。按 tenant+workspace 隔离。"""
+    cur.execute(
+        "DELETE FROM pos_tables WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, table_id),
+    )
+
+
 def get_active_session_for_table(cur, *, tenant_id: str, table_id: int):
     cur.execute(
         "SELECT id, table_id, service_type, party_size, status, opened_at "

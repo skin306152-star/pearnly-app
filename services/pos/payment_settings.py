@@ -16,13 +16,22 @@ from core.rls import apply_tenant_rls
 
 logger = logging.getLogger("mr-pilot")
 
-# 默认值:现金恒开;PromptPay/刷卡默认开(老板可关);服务费 0;价格含 VAT(泰国零售惯例)。
+# 默认值:现金恒开;PromptPay/刷卡默认开(老板可关);价格含 VAT(泰国零售惯例)。
+# 服务费默认按业态智能给:餐厅 10%(泰国餐厅惯例·老板可改),其余 0。见 _default_service_rate。
 _DEFAULTS = {
     "promptpay_enabled": True,
     "card_enabled": True,
-    "service_charge_rate": "0",
     "price_includes_vat": True,
 }
+_RESTAURANT_DEFAULT_SERVICE_RATE = "10"
+
+
+def _default_service_rate(cur, tenant_id: str) -> str:
+    """无显式设置时的服务费默认:餐厅业态 10%,其余 0(智能默认·老板可改)。"""
+    from services.modules import store as modules_store
+
+    bt = modules_store.get_business_type(cur, tenant_id=tenant_id)
+    return _RESTAURANT_DEFAULT_SERVICE_RATE if bt == "restaurant" else "0"
 
 
 def ensure_payment_schema() -> None:
@@ -82,7 +91,7 @@ def get_settings(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
     out = {
         "promptpay_enabled": _DEFAULTS["promptpay_enabled"],
         "card_enabled": _DEFAULTS["card_enabled"],
-        "service_charge_rate": _DEFAULTS["service_charge_rate"],
+        "service_charge_rate": _default_service_rate(cur, tenant_id),
         "price_includes_vat": _DEFAULTS["price_includes_vat"],
         "promptpay_id": (pp["promptpay_id"] if pp else None) or "",
     }

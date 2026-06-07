@@ -145,5 +145,47 @@ class OverviewStatusTests(unittest.TestCase):
         self.assertEqual(v["status"], "seat")
 
 
+class DeleteTableTests(unittest.TestCase):
+    """硬删桌台:仅从没开过台的;不存在 404;有 session 历史 409(只能停用)。"""
+
+    def setUp(self):
+        self._saved = (
+            tbl.store.get_table,
+            tbl.store.table_has_session_history,
+            tbl.store.delete_table,
+        )
+        self.deleted = []
+        tbl.store.delete_table = lambda cur, **kw: self.deleted.append(kw["table_id"])
+
+    def tearDown(self):
+        (
+            tbl.store.get_table,
+            tbl.store.table_has_session_history,
+            tbl.store.delete_table,
+        ) = self._saved
+
+    def test_not_found_raises_404(self):
+        tbl.store.get_table = lambda cur, **kw: None
+        with self.assertRaises(tbl.PosError) as ctx:
+            tbl.delete_table(None, tenant_id="t", workspace_client_id=9, table_id=5)
+        self.assertEqual(ctx.exception.http_status, 404)
+        self.assertEqual(self.deleted, [])
+
+    def test_with_history_blocks_409(self):
+        tbl.store.get_table = lambda cur, **kw: {"id": 5}
+        tbl.store.table_has_session_history = lambda cur, **kw: True
+        with self.assertRaises(tbl.PosError) as ctx:
+            tbl.delete_table(None, tenant_id="t", workspace_client_id=9, table_id=5)
+        self.assertEqual(ctx.exception.http_status, 409)
+        self.assertEqual(self.deleted, [], "有历史不删,留账")
+
+    def test_never_opened_deletes(self):
+        tbl.store.get_table = lambda cur, **kw: {"id": 5}
+        tbl.store.table_has_session_history = lambda cur, **kw: False
+        out = tbl.delete_table(None, tenant_id="t", workspace_client_id=9, table_id=5)
+        self.assertEqual(out, {"deleted": 5})
+        self.assertEqual(self.deleted, [5])
+
+
 if __name__ == "__main__":
     unittest.main()

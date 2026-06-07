@@ -34,6 +34,7 @@ ADMIN_EXPECTED = {
     ("GET", "/api/pos/admin/restaurant/tables"),
     ("POST", "/api/pos/admin/restaurant/tables"),
     ("PATCH", "/api/pos/admin/restaurant/tables/{table_id}"),
+    ("DELETE", "/api/pos/admin/restaurant/tables/{table_id}"),
 }
 
 

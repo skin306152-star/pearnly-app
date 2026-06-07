@@ -120,6 +120,23 @@ def update_table(
     return {"table": _table_view(row)}
 
 
+def delete_table(cur, *, tenant_id: str, workspace_client_id: int, table_id: int) -> dict:
+    """硬删桌台 · 仅限从没开过台的;开过台(有 session 历史)的留账只能停用 → 409。"""
+    if (
+        store.get_table(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, table_id=table_id
+        )
+        is None
+    ):
+        raise PosError("pos.product_not_found", 404)
+    if store.table_has_session_history(cur, tenant_id=tenant_id, table_id=table_id):
+        raise PosError("pos.void_not_allowed", 409, detail="table_has_history")
+    store.delete_table(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, table_id=table_id
+    )
+    return {"deleted": table_id}
+
+
 # ── 总览(状态机派生)─────────────────────────────────────────────────
 def overview(cur, *, tenant_id: str, workspace_client_id: int, area_id=None) -> dict:
     areas = store.list_areas(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)

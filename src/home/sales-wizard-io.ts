@@ -69,6 +69,7 @@ interface DraftDoc {
     header_discount_amount?: number | string;
     vat_rate?: number | string;
     wht_rate?: number | string;
+    copies_layout?: string;
     payment?: {
         status?: string;
         method?: string;
@@ -113,6 +114,7 @@ export function docToState(base: WState, docRaw: unknown): WState {
         date: p.date || s.pay.date,
         paidAmt: p.paid_amount != null ? Number(p.paid_amount) : null,
     };
+    s.layout = d.copies_layout === 'two_up' ? 'pair' : 'single';
     s.issueDate = d.issue_date || s.issueDate;
     s.dueDate = d.due_date || '';
     s.draftId = String(d.id);
@@ -186,6 +188,8 @@ function buildPayload(st: WState) {
         header_discount_amount: +st.hdisc || 0,
         header_discount_pct: 0,
         price_includes_vat: false,
+        // 第5步版式选择 → 单据级 copies_layout(下载/打印按此渲染正副本同页)。
+        copies_layout: st.layout === 'pair' ? 'two_up' : 'separate',
         due_date: st.docType === 'tax_invoice' && st.dueDate ? st.dueDate : null,
         lines,
         buyer: {

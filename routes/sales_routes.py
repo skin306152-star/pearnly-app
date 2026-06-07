@@ -142,6 +142,7 @@ def _doc_out(d: dict) -> dict:
         "vat_rate": _m(d.get("vat_rate")),
         "vat_amount": _m(d.get("vat_amount")),
         "price_includes_vat": bool(d.get("price_includes_vat")),
+        "copies_layout": d.get("copies_layout") or "separate",
         "wht_rate": _m(d.get("wht_rate")),
         "wht_amount": _m(d.get("wht_amount")),
         "grand_total": _m(d.get("grand_total")),
@@ -215,6 +216,7 @@ async def api_create_document(req: DocumentIn, request: Request):
             header_discount_amount=p["header_discount_amount"],
             header_discount_pct=p["header_discount_pct"],
             price_includes_vat=p["price_includes_vat"],
+            copies_layout=p["copies_layout"],
             due_date=_opt_date(p.get("due_date")),
             payment_terms=p.get("payment_terms"),
         )
@@ -237,22 +239,23 @@ async def api_document_pdf(
     request: Request,
     page: str = "A4",
     copy: str = "original",
-    copies_layout: str = "separate",
+    copies_layout: Optional[str] = None,
 ):
     """生成合规 PDF(卖方账套 + 买方客户 + 明细 · VAT 分列 · 连号)。
 
-    page=A4|A5(§E1)· copy=original|copy(正本给买方 / 副本自留 · §E2)·
-    copies_layout=separate|two_up(省纸:正副本同页 · §E2)。
+    page=A4|A5(§E1)· copy=original|copy(正本给买方 / 副本自留 · §E2)。copies_layout
+    省纸正副本同页(§E2):不传则用单据开票时存的版式(向导第5步选择),回落 separate。
     """
     tid, _ = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
         doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
         if not doc:
             _fail("not_found")
+        layout = copies_layout or doc.get("copies_layout") or "separate"
         data = sales_render.build_pdf(
-            cur, tenant_id=tid, doc=doc, page=page, copy_kind=copy, copies_layout=copies_layout
+            cur, tenant_id=tid, doc=doc, page=page, copy_kind=copy, copies_layout=layout
         )
-    suffix = "_set" if copies_layout == "two_up" else ("" if copy == "original" else "_copy")
+    suffix = "_set" if layout == "two_up" else ("" if copy == "original" else "_copy")
     filename = (doc.get("doc_number") or "document").replace("/", "_") + suffix
     return Response(
         content=data,
@@ -282,6 +285,7 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
             header_discount_amount=p["header_discount_amount"],
             header_discount_pct=p["header_discount_pct"],
             price_includes_vat=p["price_includes_vat"],
+            copies_layout=p["copies_layout"],
             due_date=_opt_date(p.get("due_date")),
             payment_terms=p.get("payment_terms"),
         )

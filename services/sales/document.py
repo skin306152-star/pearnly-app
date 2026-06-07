@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """销项单据业务层(PO-4 · docs/sales-module/docs/13)。
 
-建草稿 / 改草稿 / 取详情 / 列单 / 正式开出(事务取连号·冻结金额) / 作废。
-金额服务端用 Decimal 精确算,不信前端。开出后(status != draft)禁改——update/issue
-在此校验状态并返回错误码,路由层据此返 409。租户隔离靠 get_cursor_rls + 每条 WHERE
-tenant_id。SQL 全参数化,列名只来自模块内常量。
+建/改/删草稿 · 取详情/列单 · 正式开出(事务取连号·冻结金额)·作废。金额服务端 Decimal 精确算;
+开出后(status!=draft)禁改,update/issue 校验状态返错误码(路由层据此 409);租户隔离 get_cursor_rls
++ 每条 WHERE tenant_id;SQL 全参数化,列名只来自模块内常量。
 """
 
 from __future__ import annotations
@@ -19,8 +18,7 @@ from services.sales import buyer as buyer_mod
 from services.sales import numbering
 from services.sales import seller_profile
 
-# 金额计算抽到 totals.py(纯函数叶子);compute_totals 在此 re-export,沿用
-# doc_svc.compute_totals 调用约定。_CENT/_d 供本模块收款归一化复用。
+# compute_totals 在此 re-export(沿用 doc_svc.compute_totals 约定);_CENT/_d 供收款归一化复用。
 from services.sales.totals import _CENT, _d, compute_totals  # noqa: F401
 
 STATUS_DRAFT = "draft"
@@ -49,7 +47,7 @@ _DOC_COLS = (
     "id, tenant_id, doc_type, doc_number, client_id, seller_workspace_client_id, issue_date, "
     "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_rate, wht_amount, "
     "grand_total, "
-    "header_discount_amount, header_discount_pct, price_includes_vat, "
+    "header_discount_amount, header_discount_pct, price_includes_vat, copies_layout, "
     "buyer_type, buyer_name, buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no, "
     "parties_snapshot, payment_status, paid_amount, payment_method, payment_date, "
     "due_date, payment_terms, approved_by, approved_at, rejected_reason, "
@@ -219,6 +217,7 @@ def create_draft(
     header_discount_amount=0,
     header_discount_pct=0,
     price_includes_vat=False,
+    copies_layout="separate",
     due_date=None,
     payment_terms=None,
 ) -> dict:
@@ -233,8 +232,9 @@ def create_draft(
     cur.execute(
         "INSERT INTO sales_documents (tenant_id, doc_type, client_id, seller_workspace_client_id, "
         "status, currency, subtotal, discount_total, header_discount_amount, header_discount_pct, "
-        "price_includes_vat, vat_rate, vat_amount, wht_rate, wht_amount, grand_total, created_by) "
-        "VALUES (%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+        "price_includes_vat, vat_rate, vat_amount, wht_rate, wht_amount, grand_total, created_by, "
+        "copies_layout) "
+        "VALUES (%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
         (
             tenant_id,
             doc_type,
@@ -252,6 +252,7 @@ def create_draft(
             t["wht_amount"],
             t["grand_total"],
             created_by,
+            copies_layout,
         ),
     )
     doc_id = cur.fetchone()["id"]
@@ -333,6 +334,7 @@ def update_draft(
     header_discount_amount=0,
     header_discount_pct=0,
     price_includes_vat=False,
+    copies_layout=None,
     due_date=None,
     payment_terms=None,
 ) -> Optional[str]:
@@ -349,6 +351,7 @@ def update_draft(
         ("client_id", client_id),
         ("seller_workspace_client_id", seller_workspace_client_id),
         ("currency", currency),
+        ("copies_layout", copies_layout),
     ):
         if val is not None:
             sets.append(f"{col}=%s")
@@ -448,10 +451,8 @@ def issue_document(
     start: int = 1,
     approval_mode: str = "none",
 ) -> tuple[Optional[dict], Optional[str]]:
-    """正式开出(直开路径)。approval_mode!=none 时草稿不能直开,须走提交审批→审批通过(§F)。
-
-    返回 (doc, error_code)。买方完整性(§B)与收款(§J)在取号前校验,不过则不占号。
-    """
+    """正式开出(直开路径 · approval_mode!=none 须走提交→审批 §F)。返回 (doc, error_code);
+    买方完整性(§B)/收款(§J)在取号前校验,不过不占号。"""
     row = lock_for_issue(cur, tenant_id, doc_id)
     if not row:
         return None, "not_found"

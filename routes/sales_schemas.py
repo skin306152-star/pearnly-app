@@ -51,6 +51,9 @@ class DocumentIn(BaseModel):
     header_discount_amount: float = Field(0, ge=0)
     header_discount_pct: float = Field(0, ge=0, le=100)
     price_includes_vat: bool = Field(False, description="价内含税(§C·单据级·默认价外)")
+    copies_layout: str = Field(
+        "separate", max_length=20, description="separate|two_up 正副本同页(§E2)"
+    )
     due_date: Optional[str] = Field(None, description="YYYY-MM-DD · 账期到期日")
     payment_terms: Optional[str] = Field(None, max_length=200)
     lines: list[LineIn] = Field(..., min_length=1)

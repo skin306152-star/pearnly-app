@@ -43,6 +43,8 @@ CONVERTED: list[tuple[str, str]] = [
     ("services/pos/catalog.py", "products"),
     ("services/products/units.py", "product_units"),
     ("services/pos/catalog.py", "product_units"),
+    # PO-4 进项识别历史(读侧全部带套账过滤)
+    ("services/ocr_history/queries.py", "ocr_history"),
 ]
 
 

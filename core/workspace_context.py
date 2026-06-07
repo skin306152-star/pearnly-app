@@ -18,10 +18,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
 from fastapi import HTTPException, Request
+
+logger = logging.getLogger("mr-pilot")
 
 WS_HEADER = "X-Workspace-Client-Id"
 
@@ -121,3 +124,21 @@ def resolve_active_workspace_id(cur, request: Request, *, tenant_id: str) -> int
     if ws is None:
         raise HTTPException(400, detail="workspace.required")
     return ws
+
+
+def default_workspace_for_write(tenant_id) -> Optional[int]:
+    """写入路径(无请求头/无顶栏切换器:上传识别 / LINE)的套账归属 = 本租户默认套账。
+
+    自开只读游标(调用方多在无打开事务的入口处)。缺租户 / 无套账 / 异常 → None,
+    调用方据此写 NULL(绝不报错、不拦上传)。rollout-safe:PO-2 顶栏切换器上线后由请求头覆盖。
+    """
+    if not tenant_id:
+        return None
+    try:
+        from core import db
+
+        with db.get_cursor() as cur:
+            return default_workspace_id(cur, str(tenant_id))
+    except Exception as e:
+        logger.warning(f"default_workspace_for_write failed (tenant={tenant_id}): {e}")
+        return None

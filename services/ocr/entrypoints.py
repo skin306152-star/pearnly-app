@@ -40,11 +40,17 @@ def content_hash(content: bytes) -> str:
     return hashlib.sha256(content or b"").hexdigest()
 
 
-def get_cached_history(user: Dict[str, Any], file_hash: str) -> Optional[Dict[str, Any]]:
+def get_cached_history(
+    user: Dict[str, Any],
+    file_hash: str,
+    workspace_client_id: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    # PO-4 · 文件指纹缓存按套账隔离:同文件在另一套账上传不复用本套账结果(跨套账不串)。
     return db.find_ocr_by_hash(
         str(user["id"]),
         file_hash,
         tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
+        workspace_client_id=workspace_client_id,
     )
 
 

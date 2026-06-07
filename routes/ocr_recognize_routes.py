@@ -13,6 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from core import db
+from core import workspace_context as wc
 from core.db import increment_user_monthly_usage
 from core.auth import get_current_user_from_request, get_client_ip
 from core.route_helpers import _plan_permissions, _tid
@@ -49,9 +50,13 @@ async def ocr_recognize(
     client_ip = get_client_ip(request)
     plan = user.get("plan", "free")
 
-    # B1 相 1 · 解析 workspace 账套归属:优先 Form,回退 header;非数字/缺失 → None(写 NULL)。
+    # B1 相 1 · 解析 workspace 账套归属:优先 Form,回退 header;非数字/缺失 → None。
     _ws_raw = workspace_client_id or request.headers.get("X-Workspace-Client-Id")
     _ws_client_id = int(_ws_raw) if (_ws_raw and str(_ws_raw).strip().isdigit()) else None
+    # PO-4 · 缺套账头/Form 时回落本租户默认套账(rollout-safe:上传记录绝不漏归属写 NULL,
+    # 否则切套账后看不到本张票)。insert_ocr_history 内仍校验归属·非本租户→NULL·不拦上传。
+    if _ws_client_id is None:
+        _ws_client_id = wc.default_workspace_for_write(_tid(user))
 
     # P1b · ERP 自动处理方式:本批 Form 覆盖优先,否则读账户级默认(容错 smart)。
     # ocr_only → 下方两处 auto-push 直接跳过(零风险纯跳过);smart/fixed 的真正分流在 P1d。
@@ -117,7 +122,7 @@ async def ocr_recognize(
     # v92 · 缓存窗口从 24h 扩到 30 天(默认) · 月末复核上月票也能命中 · 省 Gemini 配额
     # v118.47 · 缓存必须先于余额闸:缓存命中不产生新 OCR 成本,余额为 0 也应可复用旧结果。
     file_hash = _ocr_content_hash(content)
-    cached = _ocr_get_cached(user, file_hash)
+    cached = _ocr_get_cached(user, file_hash, workspace_client_id=_ws_client_id)
     if cached:
         return serve_cache_hit(
             cached=cached,

@@ -16,6 +16,19 @@ from core import db
 logger = logging.getLogger(__name__)
 
 
+def _workspace_clause(workspace_client_id: Optional[int]) -> tuple[str, tuple]:
+    """PO-4 套账隔离 · 生成可拼到 WHERE 末尾的过滤子句 + 参数。
+
+    None → 不过滤(("", ()),向后兼容老调用方);给了 id → 限本套账 + 尚未归属的 NULL 行
+    (rollout-safe:多写入路径未全部归属,NULL 行须保持可见;PO-8 收口后去掉 IS NULL)。
+    """
+    if workspace_client_id is None:
+        return "", ()
+    return " AND (workspace_client_id = %s OR workspace_client_id IS NULL)", (
+        int(workspace_client_id),
+    )
+
+
 def list_ocr_history(
     user_id: str,
     retention_days: Optional[int] = None,
@@ -25,6 +38,7 @@ def list_ocr_history(
     tenant_id: Optional[str] = None,
     client_id: Optional[int] = None,
     restrict_client_ids: Optional[List[int]] = None,
+    workspace_client_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     分页列表查询。
@@ -38,6 +52,10 @@ def list_ocr_history(
                 空列表 = 没分到任何客户(只能看自己上传未归属的)
     v118.27.7.1 · retention_days 改 Optional · 兼容 reports_router 等老调用方漏传
                   None 时从 user 表 history_retention_days 字段自动拉(权限不被绕过)
+    PO-4 套账隔离 · workspace_client_id 给了 → 仅看本套账(+ 尚未归属套账的 NULL 行)的记录。
+                   这是"为哪家公司做账"的硬边界(顶栏套账切换器),与 client_id(买方)分层。
+                   rollout-safe:含 IS NULL —— ocr_history 多写入路径,部分(邮件/对账批)
+                   暂未归属套账,其 NULL 行须保持可见不丢;PO-8 收口后去掉 IS NULL。
     """
     # v118.27.7.1 · 自动 fallback:调用方漏传 retention_days 时从 user 表拉真实保留期
     if retention_days is None:
@@ -73,6 +91,11 @@ def list_ocr_history(
         where.append("(filename ILIKE %s OR invoice_no ILIKE %s OR seller_name ILIKE %s)")
         kw = f"%{keyword}%"
         params.extend([kw, kw, kw])
+
+    # PO-4 · 套账隔离(硬边界)· 含 NULL 行(尚未归属套账的旧/外部写入)保持可见
+    if workspace_client_id is not None:
+        where.append("(workspace_client_id = %s OR workspace_client_id IS NULL)")
+        params.append(int(workspace_client_id))
 
     # v118.28.0 · 客户切换器过滤
     if client_id is not None:
@@ -157,40 +180,45 @@ def list_ocr_history(
 
 
 def get_ocr_history_detail(
-    user_id: str, record_id: str, tenant_id: Optional[str] = None
+    user_id: str,
+    record_id: str,
+    tenant_id: Optional[str] = None,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[dict]:
     """取单条详情(含完整 pages)
     v118.14 · tenant_id 给了 → 同 tenant 任意成员可查 · 否则只能查自己的
+    PO-4 · workspace_client_id 给了 → 限本套账(+ NULL 未归属行)· 见 list_ocr_history 说明
     """
+    ws_sql, ws_params = _workspace_clause(workspace_client_id)
     try:
         with db.get_cursor() as cur:
             if tenant_id:
                 cur.execute(
-                    """
+                    f"""
                     SELECT id, filename, page_count, confidence, elapsed_ms,
                            pages, invoice_no, invoice_date, seller_name, total_amount,
                            archive_name, category_tag,
                            fields_edited_at, edit_count, created_at, updated_at,
                            client_id, workspace_client_id
                     FROM ocr_history
-                    WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
+                    WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s){ws_sql}
                     LIMIT 1
                 """,
-                    (record_id, tenant_id),
+                    (record_id, tenant_id, *ws_params),
                 )
             else:
                 cur.execute(
-                    """
+                    f"""
                     SELECT id, filename, page_count, confidence, elapsed_ms,
                            pages, invoice_no, invoice_date, seller_name, total_amount,
                            archive_name, category_tag,
                            fields_edited_at, edit_count, created_at, updated_at,
                            client_id, workspace_client_id
                     FROM ocr_history
-                    WHERE id = %s AND user_id = %s
+                    WHERE id = %s AND user_id = %s{ws_sql}
                     LIMIT 1
                 """,
-                    (record_id, user_id),
+                    (record_id, user_id, *ws_params),
                 )
             r = cur.fetchone()
             if not r:
@@ -225,32 +253,37 @@ def get_ocr_history_detail(
 
 
 def get_history_pdf_info(
-    user_id: str, record_id: str, tenant_id: Optional[str] = None
+    user_id: str,
+    record_id: str,
+    tenant_id: Optional[str] = None,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[dict]:
     """v114 · 取一条历史的 PDF 留底信息(只查路径 · 鉴权用 user_id)
     v118.14 · tenant_id 给了 → 同 tenant 任意成员可下载 PDF
+    PO-4 · workspace_client_id 给了 → 限本套账(+ NULL 未归属行)
     """
+    ws_sql, ws_params = _workspace_clause(workspace_client_id)
     try:
         with db.get_cursor() as cur:
             if tenant_id:
                 cur.execute(
-                    """
+                    f"""
                     SELECT pdf_storage_path, pdf_size_bytes, filename
                     FROM ocr_history
-                    WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
+                    WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s){ws_sql}
                     LIMIT 1
                 """,
-                    (record_id, tenant_id),
+                    (record_id, tenant_id, *ws_params),
                 )
             else:
                 cur.execute(
-                    """
+                    f"""
                     SELECT pdf_storage_path, pdf_size_bytes, filename
                     FROM ocr_history
-                    WHERE id = %s AND user_id = %s
+                    WHERE id = %s AND user_id = %s{ws_sql}
                     LIMIT 1
                 """,
-                    (record_id, user_id),
+                    (record_id, user_id, *ws_params),
                 )
             r = cur.fetchone()
             if not r or not r.get("pdf_storage_path"):
@@ -266,7 +299,11 @@ def get_history_pdf_info(
 
 
 def find_ocr_by_hash(
-    user_id: str, file_hash: str, max_age_hours: int = 24 * 30, tenant_id: Optional[str] = None
+    user_id: str,
+    file_hash: str,
+    max_age_hours: int = 24 * 30,
+    tenant_id: Optional[str] = None,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[dict]:
     """
     按文件哈希查最近的识别结果。
@@ -275,45 +312,36 @@ def find_ocr_by_hash(
     v92 · 窗口从 24h 扩到 30 天 · 会计真实场景下月末才会复核上月票 · 24h 太短
     v92 · 只返回有效结果 · 识别失败(关键字段全空)的记录视为未命中 · 配合第 1 层防御
     v118.14 · tenant_id 给了 → 同 tenant 内任意成员上传过此文件就能复用结果(省额度)
+    PO-4 · workspace_client_id 给了 → 缓存复用限本套账(+ NULL 未归属行)· 跨套账不串结果
     """
     if not file_hash:
         return None
+    ws_sql, ws_params = _workspace_clause(workspace_client_id)
+    hours = int(max_age_hours)
+    if tenant_id:
+        scope_sql = "user_id IN (SELECT id FROM users WHERE tenant_id = %s)"
+        scope_params = (tenant_id,)
+    else:
+        scope_sql = "user_id = %s"
+        scope_params = (user_id,)
     try:
         with db.get_cursor() as cur:
-            if tenant_id:
-                cur.execute(
-                    """
-                    SELECT id, filename, page_count, confidence, elapsed_ms, pages,
-                           archive_name, category_tag, created_at
-                    FROM ocr_history
-                    WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)
-                      AND file_hash = %s
-                      AND created_at >= NOW() - INTERVAL '%s hours'
-                      AND pages IS NOT NULL
-                      AND jsonb_array_length(pages) > 0
-                      AND (total_amount IS NOT NULL OR invoice_no IS NOT NULL OR seller_name IS NOT NULL)
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """ % ("%s", "%s", int(max_age_hours)),
-                    (tenant_id, file_hash),
-                )
-            else:
-                cur.execute(
-                    """
-                    SELECT id, filename, page_count, confidence, elapsed_ms, pages,
-                           archive_name, category_tag, created_at
-                    FROM ocr_history
-                    WHERE user_id = %s
-                      AND file_hash = %s
-                      AND created_at >= NOW() - INTERVAL '%s hours'
-                      AND pages IS NOT NULL
-                      AND jsonb_array_length(pages) > 0
-                      AND (total_amount IS NOT NULL OR invoice_no IS NOT NULL OR seller_name IS NOT NULL)
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """ % ("%s", "%s", int(max_age_hours)),
-                    (user_id, file_hash),
-                )
+            cur.execute(
+                f"""
+                SELECT id, filename, page_count, confidence, elapsed_ms, pages,
+                       archive_name, category_tag, created_at
+                FROM ocr_history
+                WHERE {scope_sql}
+                  AND file_hash = %s
+                  AND created_at >= NOW() - INTERVAL '{hours} hours'
+                  AND pages IS NOT NULL
+                  AND jsonb_array_length(pages) > 0
+                  AND (total_amount IS NOT NULL OR invoice_no IS NOT NULL OR seller_name IS NOT NULL){ws_sql}
+                ORDER BY created_at DESC
+                LIMIT 1
+            """,
+                (*scope_params, file_hash, *ws_params),
+            )
             r = cur.fetchone()
             if not r:
                 return None
@@ -340,6 +368,7 @@ def check_duplicate_invoice(
     seller_name: Optional[str],
     total_amount: Optional[float],
     exclude_id: Optional[str] = None,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     v0.13 · 重复发票检测 · 仅当前用户的历史
@@ -352,7 +381,9 @@ def check_duplicate_invoice(
 
     第 1 层 · invoice_no 严格匹配(大小写不敏感)
     第 2 层 · 发票号缺失时 · 用 (date+seller+amount) 三字段匹配
+    PO-4 · workspace_client_id 给了 → 重复检测限本套账(+ NULL 未归属行)· 跨套账不互判重复
     """
+    ws_sql, ws_params = _workspace_clause(workspace_client_id)
     try:
         with db.get_cursor() as cur:
             # ─────────────────────────────────────────
@@ -360,10 +391,10 @@ def check_duplicate_invoice(
             # ─────────────────────────────────────────
             inv = (invoice_no or "").strip()
             if inv:
-                where_extra = ""
-                params = [user_id, inv.lower()]
+                where_extra = ws_sql
+                params = [user_id, inv.lower(), *ws_params]
                 if exclude_id:
-                    where_extra = " AND id != %s"
+                    where_extra += " AND id != %s"
                     params.append(exclude_id)
                 cur.execute(
                     f"""
@@ -407,10 +438,16 @@ def check_duplicate_invoice(
             # 必须 3 个字段都有 · 才查
             # ─────────────────────────────────────────
             if invoice_date and total_amount is not None and (seller_name or "").strip():
-                where_extra = ""
-                params = [user_id, invoice_date, float(total_amount), (seller_name or "").strip()]
+                where_extra = ws_sql
+                params = [
+                    user_id,
+                    invoice_date,
+                    float(total_amount),
+                    (seller_name or "").strip(),
+                    *ws_params,
+                ]
                 if exclude_id:
-                    where_extra = " AND id != %s"
+                    where_extra += " AND id != %s"
                     params.append(exclude_id)
                 cur.execute(
                     f"""

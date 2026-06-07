@@ -153,6 +153,7 @@ def persist_invoices(
                     invoice_date=date_iso,
                     seller_name=seller,
                     total_amount=total_f,
+                    workspace_client_id=_ws_client_id,  # PO-4 · 重复检测限本套账
                 )
                 if dup:
                     duplicate_warnings.append(

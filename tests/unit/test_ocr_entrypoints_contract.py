@@ -94,7 +94,7 @@ class OcrEntrypointContractTests(unittest.TestCase):
         # 缓存先于余额闸的顺序契约随之跟到新文件。
         route_py = Path(__file__).resolve().parents[2] / "routes" / "ocr_recognize_routes.py"
         src = route_py.read_text(encoding="utf-8")
-        cache_pos = src.index("cached = _ocr_get_cached(user, file_hash)")
+        cache_pos = src.index("cached = _ocr_get_cached(user, file_hash")
         billing_pos = src.index('db.get_billing_status_combined(str(user.get("id")), _tid(user))')
         self.assertLess(
             cache_pos,

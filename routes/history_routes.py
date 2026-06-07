@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core import db
+from core import workspace_context as wc
 from services.ocr import pdf_storage
 from core.db import (
     delete_ocr_history_with_pdf_paths,
@@ -41,6 +42,26 @@ from services.exceptions.exception_checks import _async_run_exception_checks, _p
 logger = logging.getLogger("mr-pilot")
 
 router = APIRouter()
+
+
+def _active_ws(request: Request, user: dict) -> Optional[int]:
+    """PO-4 套账隔离 · 取当前请求的套账 id(进项识别读侧过滤键)。
+
+    rollout-safe(顶栏切换器 PO-2 未上线前):有 X-Workspace-Client-Id 头按头(校验归属),
+    无头回落本租户默认套账(earliest)。绝不"看全租户";单套账租户=唯一套账(零行为变化)。
+    tenant 缺失(理论不该发生)→ None → 读路径退回旧 tenant/user 口径(不抛、不拦)。
+    """
+    tid = _tid(user)
+    if not tid:
+        return None
+    try:
+        with db.get_cursor() as cur:
+            return wc.resolve_active_workspace_id(cur, request, tenant_id=str(tid))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"[history] resolve workspace failed (tid={tid}): {e}")
+        return None
 
 
 class HistoryUpdateRequest(BaseModel):
@@ -78,6 +99,7 @@ async def history_list(
         tenant_id=_tid(user),
         client_id=client_id,  # v118.28.0 · 顶栏客户切换器过滤
         restrict_client_ids=db.get_visible_client_ids_for_user(user),  # v118.28.1 · 员工分配
+        workspace_client_id=_active_ws(request, user),  # PO-4 · 套账硬边界
     )
 
 
@@ -85,7 +107,12 @@ async def history_list(
 async def history_detail(record_id: str, request: Request):
     user = get_current_user_from_request(request)
     _check_history_access(user)
-    detail = get_ocr_history_detail(str(user["id"]), record_id, tenant_id=_tid(user))
+    detail = get_ocr_history_detail(
+        str(user["id"]),
+        record_id,
+        tenant_id=_tid(user),
+        workspace_client_id=_active_ws(request, user),  # PO-4 · 套账硬边界
+    )
     if not detail:
         raise HTTPException(404, detail="history.not_found")
     return detail
@@ -191,7 +218,12 @@ async def history_pdf_download(record_id: str, request: Request):
 
     user = get_current_user_from_request(request)
     _check_history_access(user)
-    info = get_history_pdf_info(str(user["id"]), record_id, tenant_id=_tid(user))
+    info = get_history_pdf_info(
+        str(user["id"]),
+        record_id,
+        tenant_id=_tid(user),
+        workspace_client_id=_active_ws(request, user),  # PO-4 · 套账硬边界
+    )
     if not info:
         raise HTTPException(404, detail="history.pdf_not_found")
     abs_path = pdf_storage.get_pdf_abs_path(info["pdf_storage_path"])

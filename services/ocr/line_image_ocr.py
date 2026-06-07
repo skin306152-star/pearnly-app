@@ -10,6 +10,7 @@ import os
 import logging
 
 from core import db
+from core import workspace_context as wc
 from core.db import insert_ocr_history
 from services.exceptions.exception_checks import _async_run_exception_checks
 from services.ocr.entrypoints import (
@@ -62,9 +63,13 @@ async def _handle_line_image_ocr(
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
             return
 
-        # 3. 文件指纹缓存查找:命中则跳 OCR + 跳扣费
+        # PO-4 · LINE 上传套账分流(product-vision §三-bis):LINE 无顶栏切换器,
+        # 归 LINE 用户租户的默认套账(绑定店)。缺则 None(insert 内 NULL · 不拦上传)。
+        _ws_client_id = wc.default_workspace_for_write(user_fresh.get("tenant_id"))
+
+        # 3. 文件指纹缓存查找:命中则跳 OCR + 跳扣费(缓存按套账隔离)
         file_hash = _ocr_content_hash(file_bytes)
-        cached = _ocr_get_cached(user_fresh, file_hash)
+        cached = _ocr_get_cached(user_fresh, file_hash, workspace_client_id=_ws_client_id)
         if cached:
             logger.info(f"[line_ocr] 命中文件缓存 (hash={file_hash[:12]}...) hid={cached['id']}")
             # 跑异常 hook(同网页缓存命中分支 · 不重复扣配额)
@@ -178,6 +183,7 @@ async def _handle_line_image_ocr(
                 file_hash=file_hash,
                 source="line_bot",
                 source_ref=line_user_id,
+                workspace_client_id=_ws_client_id,  # PO-4 · 归 LINE 绑定店套账
             )
         except Exception as e:
             logger.warning(f"[line_ocr] 写 history 失败(不影响回复): {e}")
@@ -242,6 +248,7 @@ async def _handle_line_image_ocr(
                         seller_name=_f.get("seller_name"),
                         total_amount=_exc_total,
                         exclude_id=str(hid),
+                        workspace_client_id=_ws_client_id,  # PO-4 · 重复检测限本套账
                     )
                     if _dup_raw:
                         _dup = {

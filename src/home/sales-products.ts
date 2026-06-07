@@ -262,7 +262,10 @@ async function doImport() {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error();
         closeMask('sales-prod-mask');
-        showToast(t('sx-p-import-done').replace('{n}', String(data.imported ?? 0)), 'success');
+        showToast(
+            t('sx-p-import-done').replace('{n}', String(data.created ?? data.imported ?? 0)),
+            'success'
+        );
         await load();
     } catch (_) {
         showToast(t('sx-p-import-fail'), 'error');

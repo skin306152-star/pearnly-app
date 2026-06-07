@@ -79,11 +79,12 @@ export function salesFetch(url: string, opts: RequestInit = {}): Promise<Respons
     return fetch(url, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
 }
 
-// 打开单据 PDF(GET /pdf · A4 正本)到新标签;forPrint 则加载完成后自动唤起打印。
-// detail 操作区与向导成功面板共用,避免重复 blob/打印逻辑。
+// 打开单据 PDF(GET /pdf · 正本)到新标签;forPrint 则加载完成后自动唤起打印。
+// 不传 page → 后端按单据存的 paper_size/doc_language 渲染(§E1 逐单生效);写死 page 会
+// 把 A5/热敏的单据强制成 A4。detail 操作区与向导成功面板共用,避免重复 blob/打印逻辑。
 export async function openDocPdf(docId: string, forPrint: boolean): Promise<void> {
     try {
-        const resp = await salesFetch(`/api/sales/documents/${docId}/pdf?page=A4&copy=original`);
+        const resp = await salesFetch(`/api/sales/documents/${docId}/pdf?copy=original`);
         if (!resp.ok) {
             showToast(t('sx-pdf-fail'), 'error');
             return;

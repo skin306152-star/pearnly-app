@@ -18,8 +18,7 @@ interface Cashier {
 const COLORS = ['#2563EB', '#0891b2', '#7c3aed', '#16a34a', '#db2777', '#f59e0b'];
 
 let items: Cashier[] = [];
-let modalMode: 'add' | 'resetpin' = 'add';
-let resetTarget: Cashier | null = null;
+let modalTarget: Cashier | null = null; // null = 新增模式;非空 = 给该收银员重设 PIN
 let saving = false;
 
 async function cshApi(method: string, path: string, body?: unknown): Promise<any> {
@@ -100,7 +99,7 @@ function listHtml(): string {
 }
 
 function modalHtml(): string {
-    const isReset = modalMode === 'resetpin';
+    const isReset = modalTarget !== null;
     const title = isReset ? t('csh-resetpin') : t('csh-new-title');
     const nameRow = isReset
         ? ''
@@ -147,15 +146,15 @@ function renderList() {
         const c = items.find((x) => x.id === b.dataset.id);
         if (!c) return;
         const act = b.dataset.act;
-        if (act === 'resetpin') b.onclick = () => openModal('resetpin', c);
+        if (act === 'resetpin') b.onclick = () => openModal(c);
         else if (act === 'toggle') b.onclick = () => toggleActive(c);
         else if (act === 'delete') b.onclick = () => removeCashier(c);
     });
 }
 
-function openModal(mode: 'add' | 'resetpin', target?: Cashier) {
-    modalMode = mode;
-    resetTarget = target || null;
+// target 省略 = 新增收银员;传 target = 给该收银员重设 PIN
+function openModal(target?: Cashier) {
+    modalTarget = target || null;
     const host = document.getElementById('csh-modal-host');
     if (!host) return;
     host.innerHTML = modalHtml();
@@ -165,7 +164,7 @@ function openModal(mode: 'add' | 'resetpin', target?: Cashier) {
     });
     document.getElementById('csh-save')!.onclick = save;
     const focusEl = document.getElementById(
-        mode === 'resetpin' ? 'csh-i-pin' : 'csh-i-name'
+        modalTarget ? 'csh-i-pin' : 'csh-i-name'
     ) as HTMLInputElement | null;
     if (focusEl) focusEl.focus();
 }
@@ -173,7 +172,7 @@ function openModal(mode: 'add' | 'resetpin', target?: Cashier) {
 function closeModal() {
     const host = document.getElementById('csh-modal-host');
     if (host) host.innerHTML = '';
-    resetTarget = null;
+    modalTarget = null;
 }
 
 async function save() {
@@ -187,7 +186,7 @@ async function save() {
         return;
     }
     let name = '';
-    if (modalMode === 'add') {
+    if (!modalTarget) {
         name = ((document.getElementById('csh-i-name') as HTMLInputElement).value || '').trim();
         if (!name) {
             errEl.textContent = t('csh-err-name');
@@ -199,17 +198,17 @@ async function save() {
     btn.disabled = true;
     errEl.textContent = '';
     try {
-        if (modalMode === 'add') {
+        if (modalTarget) {
+            await cshApi('PUT', '/api/pos/admin/cashiers/' + modalTarget.id, {
+                workspace_client_id: wsId,
+                pin,
+            });
+        } else {
             await cshApi('POST', '/api/pos/admin/cashiers', {
                 workspace_client_id: wsId,
                 display_name: name,
                 pin,
                 color: COLORS[items.length % COLORS.length],
-            });
-        } else if (resetTarget) {
-            await cshApi('PUT', '/api/pos/admin/cashiers/' + resetTarget.id, {
-                workspace_client_id: wsId,
-                pin,
             });
         }
         closeModal();
@@ -291,7 +290,7 @@ window.loadPosCashiers = function () {
         sec.innerHTML = shellHtml();
         sec.dataset.cshInit = '1';
         const add = document.getElementById('csh-add');
-        if (add) add.onclick = () => openModal('add');
+        if (add) add.onclick = () => openModal();
     }
     load();
 };

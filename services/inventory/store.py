@@ -13,6 +13,8 @@ import logging
 from decimal import Decimal
 from typing import Any, Optional
 
+from core.rls import apply_tenant_rls
+
 logger = logging.getLogger("mr-pilot")
 
 _TXN_COLS = (
@@ -112,21 +114,7 @@ def ensure_schema() -> None:
                 "CREATE INDEX IF NOT EXISTS ix_txn_product ON inventory_transactions "
                 "(tenant_id, workspace_client_id, product_id, created_at)"
             )
-            for table in rls_tables:
-                cur.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-                cur.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table}")
-                cur.execute(f"""
-                    CREATE POLICY tenant_isolation ON {table}
-                    FOR ALL
-                    USING (
-                        tenant_id::text = current_setting('app.current_tenant_id', true)
-                        OR current_setting('app.bypass_rls', true) = 'on'
-                    )
-                    WITH CHECK (
-                        tenant_id::text = current_setting('app.current_tenant_id', true)
-                        OR current_setting('app.bypass_rls', true) = 'on'
-                    )
-                    """)
+            apply_tenant_rls(cur, *rls_tables)
         logger.info("✅ 库存 4 表 + RLS 已就绪 (POS PO-A3)")
     except Exception as e:
         logger.warning(f"ensure_schema inventory 失败(跳过 · 等 alembic 0023): {e}")

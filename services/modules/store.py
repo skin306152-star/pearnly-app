@@ -17,6 +17,8 @@ import json
 import logging
 from typing import Optional
 
+from core.rls import apply_tenant_rls
+
 logger = logging.getLogger("mr-pilot")
 
 # 可被开关的模块全集。未列入的 key 一律拒写(防任意键污染)。
@@ -62,20 +64,7 @@ def ensure_table() -> None:
                 "CREATE INDEX IF NOT EXISTS ix_tenant_modules_tenant "
                 "ON tenant_modules (tenant_id)"
             )
-            cur.execute("ALTER TABLE tenant_modules ENABLE ROW LEVEL SECURITY")
-            cur.execute("DROP POLICY IF EXISTS tenant_isolation ON tenant_modules")
-            cur.execute("""
-                CREATE POLICY tenant_isolation ON tenant_modules
-                FOR ALL
-                USING (
-                    tenant_id::text = current_setting('app.current_tenant_id', true)
-                    OR current_setting('app.bypass_rls', true) = 'on'
-                )
-                WITH CHECK (
-                    tenant_id::text = current_setting('app.current_tenant_id', true)
-                    OR current_setting('app.bypass_rls', true) = 'on'
-                )
-                """)
+            apply_tenant_rls(cur, "tenant_modules")
         logger.info("✅ tenant_modules 表 + RLS policy 已就绪 (POS PO-A1)")
     except Exception as e:
         logger.warning(f"ensure_table tenant_modules 失败(跳过 · 等 alembic 0021): {e}")

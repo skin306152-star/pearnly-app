@@ -14,6 +14,8 @@ import logging
 from decimal import Decimal
 from typing import Any, Optional
 
+from core.rls import apply_tenant_rls
+
 logger = logging.getLogger("mr-pilot")
 
 _UCOLS = (
@@ -62,20 +64,7 @@ def ensure_schema() -> None:
                 "CREATE INDEX IF NOT EXISTS ix_product_units_product "
                 "ON product_units (tenant_id, product_id)"
             )
-            cur.execute("ALTER TABLE product_units ENABLE ROW LEVEL SECURITY")
-            cur.execute("DROP POLICY IF EXISTS tenant_isolation ON product_units")
-            cur.execute("""
-                CREATE POLICY tenant_isolation ON product_units
-                FOR ALL
-                USING (
-                    tenant_id::text = current_setting('app.current_tenant_id', true)
-                    OR current_setting('app.bypass_rls', true) = 'on'
-                )
-                WITH CHECK (
-                    tenant_id::text = current_setting('app.current_tenant_id', true)
-                    OR current_setting('app.bypass_rls', true) = 'on'
-                )
-                """)
+            apply_tenant_rls(cur, "product_units")
         logger.info("✅ products 多单位列 + product_units 表已就绪 (POS PO-A2)")
     except Exception as e:
         logger.warning(f"ensure_schema product_units 失败(跳过 · 等 alembic 0022): {e}")

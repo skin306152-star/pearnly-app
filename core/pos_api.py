@@ -112,11 +112,9 @@ def require_tenant(request: Request) -> tuple[str, Optional[str]]:
     return str(tid), uid
 
 
-def assert_module_enabled(tenant_id: str, module_key: str) -> None:
-    """模块未开 → PosError pos.module_disabled(403)。POS/库存写接口入口调。"""
-    from core import db
+def assert_module_enabled(cur, tenant_id: str, module_key: str) -> None:
+    """模块未开 → PosError pos.module_disabled(403)。用调用方已开的游标(不另起连接)。"""
     from services.modules import store
 
-    with db.get_cursor_rls(tenant_id) as cur:
-        if not store.is_enabled(cur, tenant_id=tenant_id, module_key=module_key):
-            raise PosError("pos.module_disabled", 403)
+    if not store.is_enabled(cur, tenant_id=tenant_id, module_key=module_key):
+        raise PosError("pos.module_disabled", 403)

@@ -26,8 +26,8 @@ class InventoryError(Exception):
         self.code = code
 
 
-def resolve_factor(cur, *, tenant_id: str, product_id: str, unit_name: Optional[str]) -> Decimal:
-    """返回售卖/入库单位换算成 base_unit 的系数;顺带校验商品属本租户。"""
+def assert_product_owned(cur, *, tenant_id: str, product_id: str) -> str:
+    """校验商品属本租户且在售;返回其 base_unit。不属/已删 → InventoryError。"""
     cur.execute(
         "SELECT base_unit FROM products WHERE tenant_id = %s AND id = %s AND is_active = TRUE",
         (tenant_id, product_id),
@@ -35,7 +35,13 @@ def resolve_factor(cur, *, tenant_id: str, product_id: str, unit_name: Optional[
     p = cur.fetchone()
     if not p:
         raise InventoryError("pos.product_not_found")
-    if not unit_name or unit_name == p["base_unit"]:
+    return p["base_unit"]
+
+
+def resolve_factor(cur, *, tenant_id: str, product_id: str, unit_name: Optional[str]) -> Decimal:
+    """返回售卖/入库单位换算成 base_unit 的系数;顺带校验商品属本租户。"""
+    base_unit = assert_product_owned(cur, tenant_id=tenant_id, product_id=product_id)
+    if not unit_name or unit_name == base_unit:
         return Decimal("1")
     cur.execute(
         "SELECT factor_to_base FROM product_units "
@@ -174,7 +180,7 @@ def adjust(
     created_by=None,
 ) -> dict:
     """手动调整/报损(qty_delta 带符号)。"""
-    resolve_factor(cur, tenant_id=tenant_id, product_id=product_id, unit_name=None)
+    assert_product_owned(cur, tenant_id=tenant_id, product_id=product_id)
     mv = apply_movement(
         cur,
         tenant_id=tenant_id,
@@ -210,7 +216,7 @@ def count(
     for line in lines:
         product_id = line["product_id"]
         batch_id = line.get("batch_id")
-        resolve_factor(cur, tenant_id=tenant_id, product_id=product_id, unit_name=None)
+        assert_product_owned(cur, tenant_id=tenant_id, product_id=product_id)
         row = store.get_stock_for_update(
             cur,
             tenant_id=tenant_id,

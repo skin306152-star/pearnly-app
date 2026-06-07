@@ -109,52 +109,30 @@ class PosAuthTests(unittest.TestCase):
 
 
 class AssertModuleEnabledTests(unittest.TestCase):
+    """用调用方传入的游标(不另起连接);开/关分别通过/抛 module_disabled。"""
+
     def test_disabled_module_raises_module_disabled(self):
         from services.modules import store
 
         saved = store.is_enabled
         store.is_enabled = lambda cur, *, tenant_id, module_key: False
-
-        import contextlib
-
-        from core import db
-
-        @contextlib.contextmanager
-        def _fake_cursor(tenant_id=None, bypass=False, commit=False):
-            yield object()
-
-        saved_cursor = db.get_cursor_rls
-        db.get_cursor_rls = _fake_cursor
         try:
             with self.assertRaises(PosError) as ctx:
-                pos_api.assert_module_enabled("t-1", "pos")
+                pos_api.assert_module_enabled(object(), "t-1", "pos")
             self.assertEqual(ctx.exception.code, "pos.module_disabled")
             self.assertEqual(ctx.exception.http_status, 403)
         finally:
             store.is_enabled = saved
-            db.get_cursor_rls = saved_cursor
 
     def test_enabled_module_passes(self):
         from services.modules import store
 
         saved = store.is_enabled
         store.is_enabled = lambda cur, *, tenant_id, module_key: True
-
-        import contextlib
-
-        from core import db
-
-        @contextlib.contextmanager
-        def _fake_cursor(tenant_id=None, bypass=False, commit=False):
-            yield object()
-
-        saved_cursor = db.get_cursor_rls
-        db.get_cursor_rls = _fake_cursor
         try:
-            pos_api.assert_module_enabled("t-1", "pos")  # 不抛即通过
+            pos_api.assert_module_enabled(object(), "t-1", "pos")  # 不抛即通过
         finally:
             store.is_enabled = saved
-            db.get_cursor_rls = saved_cursor
 
 
 if __name__ == "__main__":

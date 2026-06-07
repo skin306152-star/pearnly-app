@@ -244,6 +244,48 @@ const SIDEBAR_HTML = `
         </div>
     </div>
 
+    <!-- POS PO-A4 · 收银业务 ▼ 可折叠组(库存上线 · 销售报表 PO-B6 锁 · 切到收银台跳独立 /pos)
+         默认隐藏 · module-nav.ts 据 GET /api/me/modules 按租户开关显隐(inventory/pos 默认关) -->
+    <div class="nav-group nav-collapsible" data-collapsible="pos" id="nav-group-pos" style="display:none;">
+        <div class="nav-group-toggle" data-toggle-group="pos">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 7l2-3h10l2 3"/>
+                <path d="M3 7v9a1 1 0 001 1h12a1 1 0 001-1V7"/>
+                <path d="M3 7h14"/>
+                <path d="M8 11h4"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-pos">收银业务</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="inventory">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 2l7 4v8l-7 4-7-4V6l7-4z"/>
+                    <path d="M10 2v16M3 6l7 4 7-4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-inventory">库存</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="sales-report" data-locked="1">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="17" x2="4" y2="9"/>
+                    <line x1="10" y1="17" x2="10" y2="4"/>
+                    <line x1="16" y1="17" x2="16" y2="12"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-sales-report">销售报表</span>
+            </div>
+            <div class="nav-item nav-sub-item" id="nav-pos-switch" data-href="/pos">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="16" height="11" rx="1.5"/>
+                    <line x1="2" y1="9" x2="18" y2="9"/>
+                    <line x1="7" y1="18" x2="13" y2="18"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-switch">切到收银台</span>
+            </div>
+        </div>
+    </div>
+
     <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
     <div class="nav-divider"></div>
 

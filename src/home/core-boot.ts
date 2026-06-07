@@ -236,6 +236,7 @@ const VALID_ROUTES = [
     'cloud',
     'test-center',
     'knowledge',
+    'inventory',
 ];
 
 function routeTo(route?: any) {
@@ -274,6 +275,9 @@ function routeTo(route?: any) {
     // KNOWLEDGE · 客户知识中心
     if (route === 'knowledge' && typeof window.loadKnowledgePage === 'function')
         window.loadKnowledgePage();
+    // POS PO-A4 · 库存后台(屏7)
+    if (route === 'inventory' && typeof window.loadInventoryPage === 'function')
+        window.loadInventoryPage();
     // 销项 PO-10 · 发票工作台 / 商品管理 / 账套·开票资料
     if (route === 'sales-invoices' && typeof window.loadSalesWorkbench === 'function')
         window.loadSalesWorkbench();

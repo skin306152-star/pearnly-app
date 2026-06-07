@@ -98,6 +98,9 @@ import './home/sales-products.js'; // 销项 PO-10 · 商品管理(主数据 · 
 import './home/sales-account.js'; // 销项 PO-10 · 账套·开票资料(window.loadSalesAccount · 卖方+品牌+模板 · PUT sellers)
 import './home/sales-settings.js'; // 销项 PO-10 · 开票设置弹窗(window.openSalesSettings · GET/PUT /api/sales/settings · §M7)
 import './home/sales-wizard.js'; // 销项 PO-10 · 开票向导(window.openSalesWizard · 5步 · 接 sellers/products/rd/create+issue · 自含计算/预览/i18n/io)
+import './home/module-nav.js'; // POS PO-A1 配套 · 导航按 GET /api/me/modules 显隐(收银业务组默认隐藏 · inventory/pos 开才显)
+import './home/inventory.js'; // POS PO-A4 · 库存后台主页(屏7 · window.loadInventoryPage · 接 GET /api/inventory/stock · 四态)
+import './home/inventory-modals.js'; // POS PO-A4 · 入库/盘点弹窗(window.openInventoryIn/openInventoryCount · POST /api/inventory/in|count · .modal)
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件

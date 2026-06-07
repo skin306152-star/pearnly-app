@@ -1,0 +1,434 @@
+/* POS 项目 · PO-A4 库存后台(屏7)· 视觉照搬概念稿 桌面/Pearnly_POS_UI预览/07-库存后台.html
+ * 09 §H 铁律:概念稿 = 唯一视觉真理。:root 令牌 + 内容区 <style> 逐字移植,数值一个不改。
+ * 仅作两处必要适配(非视觉改动):① 全部选择器加 .invp 作用域,防与现有 home.css 互相污染
+ * ② 概念稿的 .side(侧栏)/.ptag(预览角标)不搬 —— 库存后台嵌在主程序 /home,用真侧栏。
+ * 四态(加载/空/出错)与入库/盘点弹窗为概念稿外的「补四态/补交互」,沿用同一套令牌。
+ * 本文件在 check_ui_consistency TOKEN_CSS 白名单(同 home-38)· 容纳概念稿原样裸 hex。
+ */
+
+/* —— 概念稿 :root 令牌(原样)· 作用域到 .invp 子树 —— */
+.invp {
+    --blue: #2563eb;
+    --blue-d: #1d4ed8;
+    --blue-l: #dbeafe;
+    --ink: #111827;
+    --ink2: #6b7280;
+    --ink3: #9ca3af;
+    --bg: #f4f4f0;
+    --card: #fff;
+    --line: #e8e8e3;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #f59e0b;
+    --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 20px rgba(17, 24, 39, 0.06);
+    color: var(--ink);
+    font-size: 13px;
+    padding: 20px 24px 50px;
+}
+.invp,
+.invp * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+.invp {
+    padding: 20px 24px 50px;
+}
+.invp .tnum {
+    font-variant-numeric: tabular-nums;
+}
+
+/* —— page head —— */
+.invp .ph {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.invp .ph .t {
+    font-size: 19px;
+    font-weight: 700;
+}
+.invp .ph .acts {
+    display: flex;
+    gap: 8px;
+}
+.invp .btn {
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.invp .btn.primary {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+}
+.invp .btn.primary:hover {
+    background: var(--blue-d);
+}
+
+/* —— stat cards —— */
+.invp .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.invp .stat {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+}
+.invp .stat .l {
+    color: var(--ink2);
+    font-size: 12px;
+}
+.invp .stat .v {
+    font-size: 22px;
+    font-weight: 800;
+    margin-top: 5px;
+}
+.invp .stat .v.warn {
+    color: var(--amber);
+}
+.invp .stat .v.bad {
+    color: var(--red);
+}
+
+/* —— toolbar —— */
+.invp .bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.invp .search {
+    flex: 1;
+    max-width: 320px;
+    height: 38px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 12px;
+}
+.invp .search input {
+    border: 0;
+    outline: 0;
+    flex: 1;
+    background: transparent;
+    font-size: 13.5px;
+}
+.invp .chip {
+    height: 32px;
+    padding: 0 13px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink2);
+    font-size: 12.5px;
+    cursor: pointer;
+    /* 概念稿 .chip 只设 height 未做垂直居中(文字顶上边)· Zihao 2026-06-07 校正:flex 居中 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.invp .chip.on {
+    background: #fff8ec;
+    border-color: #fde9c8;
+    color: #b45309;
+}
+
+/* —— table —— */
+.invp table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+.invp th {
+    text-align: left;
+    font-size: 11.5px;
+    color: var(--ink2);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+    background: #fafaf8;
+}
+.invp td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f4f4f0;
+    font-size: 13.5px;
+}
+.invp tr:last-child td {
+    border-bottom: 0;
+}
+.invp tr:hover td {
+    background: #fafaf8;
+}
+.invp .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.invp .qty {
+    font-weight: 700;
+}
+.invp .st {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 3px 9px;
+    border-radius: 6px;
+}
+.invp .st.ok {
+    background: #dcfce7;
+    color: #15803d;
+}
+.invp .st.low {
+    background: #fef3c7;
+    color: #b45309;
+}
+.invp .st.out {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+.invp .thumb {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #f0f0ec, #e3e3de);
+    display: inline-grid;
+    place-items: center;
+    color: var(--ink3);
+    vertical-align: middle;
+    margin-right: 9px;
+}
+.invp .nm {
+    display: flex;
+    align-items: center;
+}
+
+/* —— 四态(概念稿外 · 07-ui-states 要求 · 同令牌)—— */
+.invp .inv-state {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 56px 20px;
+    text-align: center;
+    color: var(--ink2);
+    font-size: 13.5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+.invp .inv-state svg {
+    color: var(--ink3);
+}
+.invp .inv-state.error {
+    color: var(--red);
+}
+.invp .inv-skel {
+    height: 14px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #efefe9 25%, #f6f6f2 37%, #efefe9 63%);
+    background-size: 400% 100%;
+    animation: inv-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes inv-shimmer {
+    0% {
+        background-position: 100% 0;
+    }
+    100% {
+        background-position: 0 0;
+    }
+}
+.invp td .inv-skel {
+    width: 70%;
+}
+.invp .qty.bad {
+    color: var(--red);
+}
+.invp .exp-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--amber);
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+/* —— 入库 / 盘点弹窗(概念稿外 · 用 .modal 非 drawer · 同令牌)—— */
+.inv-modal-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.45);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 1200;
+    padding: 48px 16px;
+    overflow: auto;
+}
+.inv-modal-mask.show {
+    display: flex;
+}
+.inv-modal {
+    --blue: #2563eb;
+    --blue-d: #1d4ed8;
+    --ink: #111827;
+    --ink2: #6b7280;
+    --ink3: #9ca3af;
+    --card: #fff;
+    --line: #e8e8e3;
+    --red: #dc2626;
+    --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 20px rgba(17, 24, 39, 0.06);
+    width: 100%;
+    max-width: 640px;
+    background: var(--card);
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(17, 24, 39, 0.18);
+    color: var(--ink);
+    font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+}
+.inv-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--line);
+}
+.inv-modal-head .h {
+    font-size: 16px;
+    font-weight: 700;
+}
+.inv-modal-x {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: var(--ink2);
+    cursor: pointer;
+    display: inline-grid;
+    place-items: center;
+}
+.inv-modal-x:hover {
+    background: #f4f4f0;
+}
+.inv-modal-body {
+    padding: 16px 18px;
+    max-height: 60vh;
+    overflow: auto;
+}
+.inv-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 18px;
+    border-top: 1px solid var(--line);
+}
+.inv-frow {
+    display: grid;
+    grid-template-columns: 1fr 90px 110px 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.inv-frow.count {
+    grid-template-columns: 1fr 110px;
+}
+.inv-field {
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 10px;
+    font-size: 13px;
+    background: #fff;
+    color: var(--ink);
+    width: 100%;
+    outline: 0;
+}
+.inv-field:focus {
+    border-color: var(--blue);
+}
+.inv-flabels {
+    display: grid;
+    grid-template-columns: 1fr 90px 110px 1fr;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 11.5px;
+    color: var(--ink2);
+}
+.inv-flabels.count {
+    grid-template-columns: 1fr 110px;
+}
+.inv-addrow {
+    height: 34px;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--blue);
+    cursor: pointer;
+    width: 100%;
+    font-size: 12.5px;
+    margin-top: 4px;
+}
+.inv-rowx {
+    border: 0;
+    background: transparent;
+    color: var(--ink3);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+.inv-mbtn {
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    font-size: 13px;
+    cursor: pointer;
+}
+.inv-mbtn.primary {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+}
+.inv-mbtn.primary:hover {
+    background: var(--blue-d);
+}
+.inv-mbtn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.inv-merr {
+    color: var(--red);
+    font-size: 12.5px;
+    margin-top: 10px;
+    min-height: 16px;
+}

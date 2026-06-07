@@ -17,6 +17,7 @@
         'sales-account': 'sales',
         receivables: 'sales',
         vouchers: 'expense',
+        inventory: 'pos',
     };
     function _getState(): Record<string, boolean> {
         try {

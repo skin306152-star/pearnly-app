@@ -42,6 +42,11 @@ document.querySelectorAll<HTMLElement>('.nav-item').forEach((item) => {
             showToast(t('feature-coming-soon'), 'info');
             return;
         }
+        // POS · 跨 SPA 入口(切到收银台 → 独立 /pos · 整页跳转,非 hash 路由)
+        if (item.dataset.href) {
+            window.location.href = item.dataset.href;
+            return;
+        }
         routeTo(item.dataset.route!);
     });
 });

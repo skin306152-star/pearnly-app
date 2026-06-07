@@ -58,6 +58,8 @@ CONVERTED: list[tuple[str, str]] = [
     ("services/recon/vat_recon_tasks_store.py", "vat_recon_tasks"),
     # PO-6d 异步对账 job(套账随 job 行存 · enqueue 写入 · worker/handler 从行/params 取)
     ("services/recon_jobs/store.py", "recon_jobs"),
+    # PO-7a 销项单据(读/改/删/开出按 seller_workspace_client_id 主体过滤)
+    ("services/sales/document.py", "sales_documents"),
 ]
 
 

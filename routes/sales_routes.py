@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 
 from core import db
+from core import workspace_context as wc
 from core.route_helpers import _require_owner_or_super, _require_tenant
 from routes.sales_schemas import ConvertIn, DocumentIn, IssueIn, NoteIn, RejectIn
 from services.sales import approval as approval_svc
@@ -203,7 +204,10 @@ async def api_list_documents(
 ):
     tid, _ = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
-        rows = doc_svc.list_documents(cur, tenant_id=tid, status=status, client_id=client_id, q=q)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
+        rows = doc_svc.list_documents(
+            cur, tenant_id=tid, status=status, client_id=client_id, q=q, workspace_client_id=ws
+        )
     return {"documents": [_doc_out(r) for r in rows]}
 
 
@@ -241,7 +245,8 @@ async def api_create_document(req: DocumentIn, request: Request):
 async def api_get_document(doc_id: str, request: Request):
     tid, _ = _require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
-        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
+        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id, workspace_client_id=ws)
     if not doc:
         _fail("not_found")
     return {"document": _doc_out(doc)}
@@ -256,7 +261,6 @@ async def api_document_pdf(
     copies_layout: Optional[str] = None,
 ):
     """生成合规 PDF(卖方账套 + 买方客户 + 明细 · VAT 分列 · 连号)。
-
     page/copies_layout/语言均默认取单据开票时存的选择(向导第5步);query 显式传入可覆盖。
     page=A4|A5|thermal_80|thermal_58(§E1)· copy=original|copy(正/副本 · §E2)。
     """
@@ -291,10 +295,12 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
     tid, _ = _require_tenant(request)
     p = _dump(req)
     with db.get_cursor_rls(tid, commit=True) as cur:
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
         err = doc_svc.update_draft(
             cur,
             tenant_id=tid,
             doc_id=doc_id,
+            workspace_client_id=ws,
             doc_type=p["doc_type"],
             client_id=p["client_id"],
             seller_workspace_client_id=p["seller_workspace_client_id"],
@@ -328,6 +334,7 @@ async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
     on = _resolve_issue_date(p.get("issue_date"))
     with db.get_cursor_rls(tid, commit=True) as cur:
         st = settings_svc.get_settings(cur, tenant_id=tid)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
         doc, err = doc_svc.issue_document(
             cur,
             tenant_id=tid,
@@ -337,6 +344,7 @@ async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
             on=on,
             start=st["number_start"],
             approval_mode=st["approval_mode"],
+            workspace_client_id=ws,
         )
         if err:
             _fail(err)
@@ -347,7 +355,8 @@ async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
 async def api_void_document(doc_id: str, request: Request):
     tid, _ = _require_tenant(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
-        err = doc_svc.void_document(cur, tenant_id=tid, doc_id=doc_id)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
+        err = doc_svc.void_document(cur, tenant_id=tid, doc_id=doc_id, workspace_client_id=ws)
         if err:
             _fail(err)
     return {"ok": True}
@@ -358,7 +367,8 @@ async def api_delete_draft(doc_id: str, request: Request):
     """删除草稿(仅草稿可删 · 未占连号)。已开/已作废 → 409 not_draft。"""
     tid, _ = _require_tenant(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
-        err = doc_svc.delete_draft(cur, tenant_id=tid, doc_id=doc_id)
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
+        err = doc_svc.delete_draft(cur, tenant_id=tid, doc_id=doc_id, workspace_client_id=ws)
         if err:
             _fail(err)
     return {"ok": True}

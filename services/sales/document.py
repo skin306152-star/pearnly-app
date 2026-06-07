@@ -18,6 +18,8 @@ from services.sales import buyer as buyer_mod
 from services.sales import numbering
 from services.sales import seller_profile
 from services.sales.document_cols import _DOC_COLS, _LINE_COLS
+from services.sales.document_writes import replace_lines as _replace_lines
+from services.sales.document_writes import write_header_totals as _write_header_totals
 
 # compute_totals 在此 re-export(沿用 doc_svc.compute_totals 约定);_CENT/_d 供收款归一化复用。
 from services.sales.totals import _CENT, _d, compute_totals  # noqa: F401
@@ -45,53 +47,14 @@ REQUIRE_PAYMENT = ("receipt", "tax_invoice_receipt")
 PAYMENT_STATUSES = ("unpaid", "partial", "paid")
 
 
-def _write_header_totals(cur, tenant_id: str, doc_id, t: dict) -> None:
-    cur.execute(
-        "UPDATE sales_documents SET subtotal=%s, discount_total=%s, header_discount_amount=%s, "
-        "header_discount_pct=%s, price_includes_vat=%s, vat_rate=%s, vat_amount=%s, "
-        "wht_rate=%s, wht_amount=%s, grand_total=%s, updated_at=now() "
-        "WHERE tenant_id=%s AND id=%s",
-        (
-            t["subtotal"],
-            t["discount_total"],
-            t["header_discount_amount"],
-            t["header_discount_pct"],
-            t["price_includes_vat"],
-            t["vat_rate"],
-            t["vat_amount"],
-            t["wht_rate"],
-            t["wht_amount"],
-            t["grand_total"],
-            tenant_id,
-            doc_id,
-        ),
+def _ws_and(workspace_client_id: Optional[int]) -> tuple:
+    """PO-7 主体隔离过滤(按 seller_workspace_client_id)。None→不过滤(向后兼容);
+    给了→限本主体+NULL 未归属行(rollout-safe·PO-8 收口去 IS NULL)。"""
+    if workspace_client_id is None:
+        return "", ()
+    return " AND (seller_workspace_client_id = %s OR seller_workspace_client_id IS NULL)", (
+        int(workspace_client_id),
     )
-
-
-def _replace_lines(cur, tenant_id: str, doc_id, lines: list) -> None:
-    cur.execute(
-        "DELETE FROM sales_document_lines WHERE tenant_id=%s AND document_id=%s",
-        (tenant_id, doc_id),
-    )
-    for ln in lines:
-        cur.execute(
-            "INSERT INTO sales_document_lines (tenant_id, document_id, line_no, product_id, "
-            "description, qty, unit_price, discount, discount_pct, vat_applicable, line_total) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-            (
-                tenant_id,
-                doc_id,
-                ln["line_no"],
-                ln["product_id"],
-                ln["description"],
-                ln["qty"],
-                ln["unit_price"],
-                ln["discount"],
-                ln["discount_pct"],
-                ln["vat_applicable"],
-                ln["line_total"],
-            ),
-        )
 
 
 def _normalize_payment(payment: Optional[dict]) -> dict:
@@ -251,10 +214,13 @@ def create_draft(
     return get_document(cur, tenant_id=tenant_id, doc_id=doc_id)
 
 
-def get_document(cur, *, tenant_id: str, doc_id) -> Optional[dict]:
+def get_document(
+    cur, *, tenant_id: str, doc_id, workspace_client_id: Optional[int] = None
+) -> Optional[dict]:
+    ws_sql, ws_params = _ws_and(workspace_client_id)
     cur.execute(
-        f"SELECT {_DOC_COLS} FROM sales_documents WHERE tenant_id=%s AND id=%s",
-        (tenant_id, doc_id),
+        f"SELECT {_DOC_COLS} FROM sales_documents WHERE tenant_id=%s AND id=%s{ws_sql}",
+        (tenant_id, doc_id, *ws_params),
     )
     doc = cur.fetchone()
     if not doc:
@@ -277,9 +243,11 @@ def list_documents(
     client_id: Optional[int] = None,
     q: Optional[str] = None,
     limit: int = 100,
+    workspace_client_id: Optional[int] = None,
 ) -> list:
-    sql = f"SELECT {_DOC_COLS} FROM sales_documents WHERE tenant_id=%s"
-    params: list = [tenant_id]
+    ws_sql, ws_params = _ws_and(workspace_client_id)
+    sql = f"SELECT {_DOC_COLS} FROM sales_documents WHERE tenant_id=%s{ws_sql}"
+    params: list = [tenant_id, *ws_params]
     if status:
         sql += " AND status=%s"
         params.append(status)
@@ -296,11 +264,14 @@ def list_documents(
     return cur.fetchall()
 
 
-def _status_of(cur, tenant_id: str, doc_id, lock: bool = False) -> Optional[str]:
+def _status_of(
+    cur, tenant_id: str, doc_id, lock: bool = False, workspace_client_id: Optional[int] = None
+) -> Optional[str]:
+    ws_sql, ws_params = _ws_and(workspace_client_id)
     cur.execute(
-        "SELECT status FROM sales_documents WHERE tenant_id=%s AND id=%s"
+        f"SELECT status FROM sales_documents WHERE tenant_id=%s AND id=%s{ws_sql}"
         + (" FOR UPDATE" if lock else ""),
-        (tenant_id, doc_id),
+        (tenant_id, doc_id, *ws_params),
     )
     row = cur.fetchone()
     return row["status"] if row else None
@@ -328,9 +299,10 @@ def update_draft(
     doc_language=None,
     due_date=None,
     payment_terms=None,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[str]:
     """改草稿(rejected 单可改 · 改后回草稿态并清驳回理由 §F)。错误码 not_found/not_draft 或 None。"""
-    status = _status_of(cur, tenant_id, doc_id)
+    status = _status_of(cur, tenant_id, doc_id, workspace_client_id=workspace_client_id)
     if status is None:
         return "not_found"
     if status not in EDITABLE_STATUSES:
@@ -368,14 +340,18 @@ def update_draft(
     return None
 
 
-def lock_for_issue(cur, tenant_id: str, doc_id) -> Optional[dict]:
-    """取号前锁行,读出闸校验所需字段(buyer/payment/seller)。供开出/审批通过共用。"""
+def lock_for_issue(
+    cur, tenant_id: str, doc_id, workspace_client_id: Optional[int] = None
+) -> Optional[dict]:
+    """取号前锁行,读出闸校验所需字段(buyer/payment/seller)。供开出/审批通过共用。
+    PO-7:按当前主体过滤(rollout-safe),不能跨主体开别套账的单。"""
+    ws_sql, ws_params = _ws_and(workspace_client_id)
     cur.execute(
         "SELECT status, doc_type, seller_workspace_client_id, "
         "buyer_type, buyer_name, buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no, "
         "payment_status, payment_method, payment_date "
-        "FROM sales_documents WHERE tenant_id=%s AND id=%s FOR UPDATE",
-        (tenant_id, doc_id),
+        f"FROM sales_documents WHERE tenant_id=%s AND id=%s{ws_sql} FOR UPDATE",
+        (tenant_id, doc_id, *ws_params),
     )
     return cur.fetchone()
 
@@ -443,10 +419,11 @@ def issue_document(
     on: date,
     start: int = 1,
     approval_mode: str = "none",
+    workspace_client_id: Optional[int] = None,
 ) -> tuple[Optional[dict], Optional[str]]:
     """正式开出(直开路径 · approval_mode!=none 须走提交→审批 §F)。返回 (doc, error_code);
     买方完整性(§B)/收款(§J)在取号前校验,不过不占号。"""
-    row = lock_for_issue(cur, tenant_id, doc_id)
+    row = lock_for_issue(cur, tenant_id, doc_id, workspace_client_id=workspace_client_id)
     if not row:
         return None, "not_found"
     if row["status"] != STATUS_DRAFT:
@@ -465,29 +442,36 @@ def issue_document(
     )
 
 
-def void_document(cur, *, tenant_id: str, doc_id) -> Optional[str]:
+def void_document(
+    cur, *, tenant_id: str, doc_id, workspace_client_id: Optional[int] = None
+) -> Optional[str]:
     """作废:留记录、不回收号。返回错误码或 None。"""
-    status = _status_of(cur, tenant_id, doc_id)
+    status = _status_of(cur, tenant_id, doc_id, workspace_client_id=workspace_client_id)
     if status is None:
         return "not_found"
     if status == STATUS_VOID:
         return "already_void"
+    ws_sql, ws_params = _ws_and(workspace_client_id)
     cur.execute(
-        "UPDATE sales_documents SET status='void', updated_at=now() WHERE tenant_id=%s AND id=%s",
-        (tenant_id, doc_id),
+        f"UPDATE sales_documents SET status='void', updated_at=now() "
+        f"WHERE tenant_id=%s AND id=%s{ws_sql}",
+        (tenant_id, doc_id, *ws_params),
     )
     return None
 
 
-def delete_draft(cur, *, tenant_id: str, doc_id) -> Optional[str]:
+def delete_draft(
+    cur, *, tenant_id: str, doc_id, workspace_client_id: Optional[int] = None
+) -> Optional[str]:
     """删除草稿:仅草稿可删(未占连号);已开/已作废不可删。明细行随 FK ON DELETE CASCADE 自动删。"""
-    status = _status_of(cur, tenant_id, doc_id)
+    status = _status_of(cur, tenant_id, doc_id, workspace_client_id=workspace_client_id)
     if status is None:
         return "not_found"
     if status != STATUS_DRAFT:
         return "not_draft"
+    ws_sql, ws_params = _ws_and(workspace_client_id)
     cur.execute(
-        "DELETE FROM sales_documents WHERE tenant_id=%s AND id=%s",
-        (tenant_id, doc_id),
+        f"DELETE FROM sales_documents WHERE tenant_id=%s AND id=%s{ws_sql}",
+        (tenant_id, doc_id, *ws_params),
     )
     return None

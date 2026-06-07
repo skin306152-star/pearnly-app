@@ -56,32 +56,50 @@ function errToast(e: unknown): void {
     showToast(posErrMsg(key, 'pos.unexpected'), 'error');
 }
 
-// ── 注入式作用域样式(.ptbl · 主蓝 var(--btn-blue))──
+// ── 注入式作用域样式(.ptbl · 逐令牌照搬桌面 05-桌台管理 v2 稿:左对齐 960 · :root 令牌原样)──
 const STYLE = `
-.ptbl{max-width:760px;margin:0 auto;padding:6px 0 48px;}
-.ptbl .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
-.ptbl h1{font-size:20px;color:#111827;margin:0;}
-.ptbl .sub{color:#6b7280;font-size:13px;margin-bottom:16px;}
-.ptbl .zones{display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
-.ptbl .ztab{height:34px;padding:0 15px;border-radius:999px;border:1px solid #e8e8e3;background:#fff;color:#6b7280;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
-.ptbl .ztab.on{background:#111827;color:#fff;border-color:#111827;}
-.ptbl .ztab .c{font-size:11px;opacity:.7;}
-.ptbl .ztab.add{border-style:dashed;color:#2563EB;border-color:#c7d2fe;}
-.ptbl .card{border:1px solid #e8e8e3;border-radius:14px;overflow:hidden;}
-.ptbl .ch{padding:11px 16px;border-bottom:1px solid #f0f0ec;font-weight:700;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;color:#111827;}
-.ptbl .ch .btn{height:32px;padding:0 12px;border:0;border-radius:8px;background:var(--btn-blue,#2563EB);color:#fff;font-weight:700;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
-.ptbl .grid{padding:14px;display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}
-.ptbl .tcard{border:1px solid #e8e8e3;border-radius:12px;padding:13px;}
-.ptbl .tcard.off{opacity:.55;}
-.ptbl .tcard .no{font-size:18px;font-weight:800;color:#111827;}
-.ptbl .tcard .seats{font-size:12px;color:#6b7280;margin-top:4px;display:flex;align-items:center;gap:5px;}
-.ptbl .tcard .ops{display:flex;gap:6px;margin-top:11px;}
-.ptbl .tcard .op{flex:1;height:30px;border:1px solid #e8e8e3;border-radius:7px;background:#fff;color:#6b7280;font-size:12px;cursor:pointer;}
-.ptbl .tcard .op:hover{border-color:#c7d2fe;color:var(--btn-blue,#2563EB);}
-.ptbl .addcard{border:1.5px dashed #e8e8e3;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#9ca3af;cursor:pointer;min-height:96px;}
-.ptbl .addcard:hover{border-color:var(--btn-blue,#2563EB);color:var(--btn-blue,#2563EB);}
-.ptbl .state{padding:40px 0;text-align:center;color:#9ca3af;font-size:13.5px;}
-.ptbl .note{margin-top:14px;font-size:12.5px;color:#6b7280;background:#f8f8f5;border:1px solid #e8e8e3;border-radius:10px;padding:11px 13px;line-height:1.6;}
+.ptbl{max-width:960px;margin:0;padding:26px 0 60px 28px;font-size:13.5px;color:#111827;}
+.ptbl .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;}
+.ptbl .ph .tt{font-size:21px;font-weight:700;}
+.ptbl .ph .sub{color:#6B7280;font-size:13px;margin-top:4px;}
+.ptbl .btn{height:38px;padding:0 15px;border-radius:10px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;border:1px solid #e8e8e3;background:#fff;color:#111827;font-weight:500;}
+.ptbl .btn:hover{border-color:#c7d2fe;}
+.ptbl .btn.primary{background:#2563EB;border-color:#2563EB;color:#fff;font-weight:600;}
+.ptbl .btn.primary:hover{background:#1D4ED8;}
+.ptbl .zones{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.ptbl .zone{height:36px;padding:0 6px 0 15px;border-radius:999px;border:1px solid #e8e8e3;background:#fff;color:#6B7280;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
+.ptbl .zone .c{font-size:12px;color:#9CA3AF;}
+.ptbl .zone .mg{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:transparent;}
+.ptbl .zone:hover .mg{color:#9CA3AF;}
+.ptbl .zone.on{background:#111827;color:#fff;border-color:#111827;}
+.ptbl .zone.on .c{color:#cbd2dc;}.ptbl .zone.on .mg{color:#9aa3af;}
+.ptbl .zone.on:hover .mg{color:#fff;}
+.ptbl .card{background:#fff;border:1px solid #e8e8e3;border-radius:14px;box-shadow:0 1px 2px rgba(17,24,39,.04),0 4px 14px rgba(17,24,39,.05);overflow:hidden;}
+.ptbl .ch{padding:14px 18px;border-bottom:1px solid #f0f0ec;display:flex;align-items:center;justify-content:space-between;}
+.ptbl .ch .zt{font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px;}
+.ptbl .ch .zacts{display:flex;align-items:center;gap:8px;}
+.ptbl .ch .zlink{font-size:12.5px;color:#6B7280;cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;}
+.ptbl .ch .zlink:hover{background:#f4f4f0;color:#111827;}
+.ptbl .ch .zlink.del:hover{background:#fef2f2;color:#DC2626;}
+.ptbl .grid{padding:16px 18px;display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+.ptbl .t{border:1px solid #e8e8e3;border-radius:12px;padding:14px;background:#fff;transition:box-shadow .12s;}
+.ptbl .t:hover{box-shadow:0 1px 2px rgba(17,24,39,.04),0 4px 14px rgba(17,24,39,.05);}
+.ptbl .t .top{display:flex;align-items:flex-start;justify-content:space-between;}
+.ptbl .t .no{font-size:19px;font-weight:800;}
+.ptbl .t .more{color:#9CA3AF;line-height:1;}
+.ptbl .t .seats{font-size:12.5px;color:#6B7280;margin-top:6px;display:flex;align-items:center;gap:5px;}
+.ptbl .t .ops{display:flex;gap:7px;margin-top:12px;}
+.ptbl .t .op{flex:1;height:30px;border:1px solid #e8e8e3;border-radius:7px;background:#fff;color:#6B7280;font-size:12px;cursor:pointer;}
+.ptbl .t .op:hover{border-color:#c7d2fe;color:#2563EB;}
+.ptbl .t.off{opacity:.55;}.ptbl .t.off .no{color:#9CA3AF;}
+.ptbl .addt{border:1.5px dashed #d8d8d3;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#9CA3AF;cursor:pointer;min-height:104px;font-size:13px;}
+.ptbl .addt:hover{border-color:#2563EB;color:#2563EB;background:#EEF4FF;}
+.ptbl .empty{padding:34px 18px;text-align:center;color:#9CA3AF;}
+.ptbl .empty svg{opacity:.4;margin-bottom:10px;}
+.ptbl .empty .e-btn{margin-top:14px;}
+.ptbl .state{padding:34px 18px;text-align:center;color:#9CA3AF;}
+.ptbl .note{margin-top:16px;font-size:12.5px;color:#6B7280;background:#fff;border:1px solid #e8e8e3;border-radius:12px;padding:13px 16px;line-height:1.7;}
+.ptbl .note b{color:#111827;}
 .ptbl-sub{position:fixed;inset:0;background:rgba(17,24,39,.45);display:none;align-items:center;justify-content:center;z-index:1300;padding:16px;}
 .ptbl-sub.show{display:flex;}
 .ptbl-dlg{width:380px;max-width:92vw;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);}
@@ -113,10 +131,13 @@ function ensureStyle(): void {
 function ensureShell(sec: HTMLElement): void {
     if (sec.dataset.ptblInit === '1') return;
     ensureStyle();
+    const plus =
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
     sec.innerHTML = `<div class="ptbl">
-        <div class="hd"><h1>${escapeHtml(t('rtbl.title'))}</h1>
-            <button class="ztab add" id="ptbl-add-area">+ ${escapeHtml(t('rtbl.add_area'))}</button></div>
-        <div class="sub">${escapeHtml(t('rtbl.sub'))}</div>
+        <div class="ph">
+            <div><div class="tt">${escapeHtml(t('rtbl.title'))}</div><div class="sub">${escapeHtml(t('rtbl.sub'))}</div></div>
+            <button class="btn" id="ptbl-add-area">${plus}${escapeHtml(t('rtbl.add_area'))}</button>
+        </div>
         <div id="ptbl-body"></div>
         <div class="note">${t('rtbl.note')}</div>
     </div>`;
@@ -140,37 +161,49 @@ function renderBody(state: 'loading' | 'error' | 'ok'): void {
         body.innerHTML = `<div class="state">${escapeHtml(t('rtbl.no_area'))}</div>`;
         return;
     }
+    const dots =
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="12" r="1.6"/></svg>';
+    const plus13 =
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+    const seatSvg =
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>';
     const zones = areas
         .map(
             (a) =>
-                `<div class="ztab${a.id === activeArea ? ' on' : ''}" data-area="${a.id}">${escapeHtml(
+                `<div class="zone${a.id === activeArea ? ' on' : ''}" data-area="${a.id}">${escapeHtml(
                     a.name
-                )}<span class="c">${a.table_count ?? 0}</span></div>`
+                )} <span class="c">${a.table_count ?? 0}</span><span class="mg">${dots}</span></div>`
         )
         .join('');
     const inZone = tables.filter((tb) => tb.area_id === activeArea);
     const cur = areas.find((a) => a.id === activeArea);
-    const cards =
-        inZone
-            .map(
-                (tb) =>
-                    `<div class="tcard${tb.is_active ? '' : ' off'}" data-table="${tb.id}">
-            <div class="no">${escapeHtml(tb.name)}</div>
-            <div class="seats">${tb.is_active ? escapeHtml(t('rtbl.seats_n').replace('{n}', String(tb.seats))) : escapeHtml(t('rtbl.disabled'))}</div>
+    const tcard = (tb: Table) =>
+        `<div class="t${tb.is_active ? '' : ' off'}" data-table="${tb.id}">
+            <div class="top"><div class="no">${escapeHtml(tb.name)}</div><span class="more">⋯</span></div>
+            <div class="seats">${tb.is_active ? seatSvg + escapeHtml(t('rtbl.seats_n').replace('{n}', String(tb.seats))) : escapeHtml(t('rtbl.disabled'))}</div>
             <div class="ops">${
                 tb.is_active
                     ? `<button class="op" data-act="edit">${escapeHtml(t('rtbl.edit'))}</button><button class="op" data-act="disable">${escapeHtml(t('rtbl.disable'))}</button>`
                     : `<button class="op" data-act="enable">${escapeHtml(t('rtbl.enable'))}</button><button class="op" data-act="delete">${escapeHtml(t('rtbl.delete'))}</button>`
             }</div>
-          </div>`
-            )
-            .join('') +
-        `<div class="addcard" data-act="add-table"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${escapeHtml(t('rtbl.add_table'))}</div>`;
+        </div>`;
+    const addt = `<div class="addt" data-act="add-table"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${escapeHtml(t('rtbl.add_table'))}</div>`;
+    const grid = inZone.length
+        ? `<div class="grid">${inZone.map(tcard).join('')}${addt}</div>`
+        : `<div class="empty"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <div>${escapeHtml(t('rtbl.empty_tables'))}</div>
+            <button class="btn primary e-btn" data-act="add-table">${plus13}${escapeHtml(t('rtbl.add_table'))}</button></div>`;
     body.innerHTML = `<div class="zones">${zones}</div>
         <div class="card">
-            <div class="ch"><span>${escapeHtml(cur ? cur.name : '')} · ${escapeHtml(t('rtbl.tables'))}</span>
-                <button class="btn" data-act="add-table"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${escapeHtml(t('rtbl.add_table'))}</button></div>
-            <div class="grid">${cards}</div>
+            <div class="ch">
+                <div class="zt">${escapeHtml(cur ? cur.name : '')}</div>
+                <div class="zacts">
+                    <span class="zlink" data-act="rename-area"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>${escapeHtml(t('rtbl.rename'))}</span>
+                    <span class="zlink del" data-act="delete-area"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>${escapeHtml(t('rtbl.del_area'))}</span>
+                    <button class="btn primary" data-act="add-table">${plus13}${escapeHtml(t('rtbl.add_table'))}</button>
+                </div>
+            </div>
+            ${grid}
         </div>`;
 }
 
@@ -180,7 +213,7 @@ async function load(): Promise<void> {
     if (id == null) {
         const body = document.getElementById('ptbl-body');
         if (body)
-            body.innerHTML = `<div class="state">${escapeHtml(t('rtbl.no_workspace'))}<br><button class="ztab add" id="ptbl-pick-ws" style="margin-top:12px;">${escapeHtml(t('rtbl.pick_ws'))}</button></div>`;
+            body.innerHTML = `<div class="state">${escapeHtml(t('rtbl.no_workspace'))}<br><button class="btn primary e-btn" id="ptbl-pick-ws">${escapeHtml(t('rtbl.pick_ws'))}</button></div>`;
         const pick = document.getElementById('ptbl-pick-ws');
         if (pick)
             pick.onclick = () =>
@@ -207,7 +240,7 @@ async function load(): Promise<void> {
 
 function onBodyClick(e: Event): void {
     const el = e.target as HTMLElement;
-    const zone = el.closest('.ztab[data-area]') as HTMLElement | null;
+    const zone = el.closest('.zone[data-area]') as HTMLElement | null;
     if (zone) {
         activeArea = Number(zone.dataset.area);
         renderBody('ok');
@@ -215,7 +248,9 @@ function onBodyClick(e: Event): void {
     }
     const act = (el.closest('[data-act]') as HTMLElement | null)?.dataset.act;
     if (act === 'add-table') return openTableDialog();
-    const card = el.closest('.tcard[data-table]') as HTMLElement | null;
+    if (act === 'rename-area') return openAreaDialog(curArea());
+    if (act === 'delete-area') return deleteArea();
+    const card = el.closest('.t[data-table]') as HTMLElement | null;
     if (!card || !act) return;
     const id = Number(card.dataset.table);
     const tb = tables.find((x) => x.id === id);
@@ -223,6 +258,32 @@ function onBodyClick(e: Event): void {
     else if (act === 'disable') setTableActive(id, false);
     else if (act === 'enable') setTableActive(id, true);
     else if (act === 'delete' && tb) deleteTable(tb);
+}
+
+function curArea(): Area | undefined {
+    return areas.find((a) => a.id === activeArea);
+}
+
+// 删区域(仅空区域;有桌台后端 409 → 专属人话)· 二次确认。
+function deleteArea(): void {
+    const a = curArea();
+    if (!a) return;
+    showDialog(
+        t('rtbl.del_area'),
+        `<div style="font-size:13.5px;color:#374151;line-height:1.6;">${escapeHtml(t('rtbl.del_area_confirm').replace('{name}', a.name))}</div>`,
+        async () => {
+            try {
+                await call('DELETE', `/areas/${a.id}?workspace_client_id=${ws}`);
+                activeArea = null;
+                return true;
+            } catch (err) {
+                const code = err instanceof Error ? err.message : 'pos.unexpected';
+                const key = code === 'pos.void_not_allowed' ? 'rtbl.area_has_tables' : code;
+                showToast(posErrMsg(key, 'pos.unexpected'), 'error');
+                return false;
+            }
+        }
+    );
 }
 
 // 硬删:仅从没开过台的(后端校验)· 二次确认 · 开过台的 409 → 提示只能停用。
@@ -255,16 +316,20 @@ async function setTableActive(id: number, on: boolean): Promise<void> {
     }
 }
 
-// ── 区域弹窗 ──
-function openAreaDialog(): void {
+// ── 区域弹窗(新增 / 改名)──
+function openAreaDialog(area?: Area): void {
+    const isEdit = !!area;
     showDialog(
-        t('rtbl.add_area'),
-        `<label>${escapeHtml(t('rtbl.area_name'))}</label><div class="fld"><input id="ptbl-an" maxlength="40" placeholder="${escapeHtml(t('rtbl.area_ph'))}"></div>`,
+        isEdit ? t('rtbl.rename_area') : t('rtbl.add_area'),
+        `<label>${escapeHtml(t('rtbl.area_name'))}</label><div class="fld"><input id="ptbl-an" maxlength="40" value="${area ? escapeHtml(area.name) : ''}" placeholder="${escapeHtml(t('rtbl.area_ph'))}"></div>`,
         async () => {
             const name = (document.getElementById('ptbl-an') as HTMLInputElement).value.trim();
             if (!name) return false;
-            await call('POST', '/areas', { workspace_client_id: ws, name });
-            activeArea = null; // 让 load 选回有效区
+            if (area) await call('PATCH', `/areas/${area.id}`, { workspace_client_id: ws, name });
+            else {
+                await call('POST', '/areas', { workspace_client_id: ws, name });
+                activeArea = null; // 让 load 选回有效区
+            }
             return true;
         }
     );

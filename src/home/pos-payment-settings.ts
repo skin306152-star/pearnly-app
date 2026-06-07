@@ -42,8 +42,8 @@ async function call(method: string, body?: unknown): Promise<PaySettings> {
 }
 
 const STYLE = `
-.rpay{max-width:600px;margin:0 auto;padding:6px 0 48px;}
-.rpay h1{font-size:20px;color:#111827;margin:0 0 4px;}
+.rpay{max-width:760px;margin:0;padding:26px 0 60px 28px;font-size:13.5px;color:#111827;}
+.rpay h1{font-size:21px;font-weight:700;color:#111827;margin:0 0 4px;}
 .rpay .sub{color:#6b7280;font-size:13px;margin-bottom:18px;}
 .rpay .card{border:1px solid #e8e8e3;border-radius:14px;overflow:hidden;margin-bottom:16px;}
 .rpay .ch{padding:12px 16px;border-bottom:1px solid #f0f0ec;font-weight:700;font-size:13.5px;color:#111827;}

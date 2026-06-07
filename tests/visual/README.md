@@ -160,3 +160,28 @@ npx playwright show-report
 - Playwright 视觉回归官方文档:https://playwright.dev/docs/test-snapshots
 - 主 E2E config:`playwright.config.js`(testDir 是 tests/e2e · 不跑本目录)
 - 入门:`docs/ONBOARDING.md` §8 真账号 E2E
+
+---
+
+## 5. 视觉照搬机械闸(test_design_fidelity.spec.js · docs/pos/12)
+
+与上面的 screenshot 回归不同:这是 **令牌级照搬闸** —— 把【设计稿快照】与【生产页本地渲染】的关键
+元素 `getComputedStyle` 逐项比对(主色 #2563EB / 圆角 / box-shadow / font-size / 容器左对齐),
+不一致 = 退出码 1 + 打印"哪页/哪选择器/稿 X 生产 Y"。治"施工不照搬设计稿反复返工"。
+
+**自洽**:内置静态服务器伺服 repo + Playwright stub 所有 `/api/**`,渲染本地真 bundle,**无需真账号/
+真后端**。设计稿快照入库在 `tests/visual/design/*.html`(不依赖桌面 · CI 也能跑)。
+
+**跑法**:`node tests/visual/test_design_fidelity.spec.js`
+
+**挂在哪**:pre-push(改 `static/pos/**` 或 `src/home/{pos,inventory,purchase}-*` 或 `tests/visual/design/*`
+触发)。红了就是没照搬,自己回去对齐,不用肉眼抓。
+
+**加新照搬页怎么补映射**(3 步):
+1. 把设计稿拷进 `tests/visual/design/<短名>.html`(设计稿改版也更新这份)。
+2. 在 spec 的 `MAPPINGS` 加一项:`{name, design:'<短名>.html', route:'<core-boot 路由>', ready:'<生产就绪选择器>',
+   layout:{sel,maxWidth}, tokens:[{design:'<稿选择器>', prod:'<生产选择器>', props:[...]}], bluemust, nosvgemoji}`。
+3. 若该页要 stub 的接口没覆盖,在 spec 顶部 `API` 加 canned 响应(信封 `{ok,data}`)。
+跑 `node tests/visual/test_design_fidelity.spec.js` 绿 = 照搬到位。
+
+> 待补映射:收银设置(14)、采购主屏/拍照识别(采购 01/02)—— 等这些页建好,按上 3 步加。

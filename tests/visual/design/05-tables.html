@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pearnly 餐厅 · 桌台管理 v2(重设计 · 概念预览)</title>
+<style>
+  :root{--blue:#2563EB;--blue-d:#1D4ED8;--blue-l:#EEF4FF;--ink:#111827;--ink2:#6B7280;--ink3:#9CA3AF;
+    --bg:#f4f4f0;--card:#fff;--line:#e8e8e3;--green:#16A34A;--red:#DC2626;
+    --r:14px;--shadow:0 1px 2px rgba(17,24,39,.04),0 4px 14px rgba(17,24,39,.05);}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  /* 内容区:左对齐 · 统一最大宽 · 跟全站设计语言一致 */
+  .wrap{max-width:960px;margin:0;padding:26px 0 60px 28px;}
+  .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;}
+  .ph .t{font-size:21px;font-weight:700;}
+  .ph .sub{color:var(--ink2);font-size:13px;margin-top:4px;}
+  .btn{height:38px;padding:0 15px;border-radius:10px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:500;}
+  .btn:hover{border-color:#c7d2fe;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;}
+  .btn.primary:hover{background:var(--blue-d);}
+  /* 区域行:tabs + 每个可管理 */
+  .zones{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .zone{height:36px;padding:0 6px 0 15px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink2);font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
+  .zone .c{font-size:12px;color:var(--ink3);}
+  .zone .mg{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:transparent;}
+  .zone:hover .mg{color:var(--ink3);}
+  .zone.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .zone.on .c{color:#cbd2dc;} .zone.on .mg{color:#9aa3af;}
+  .zone.on:hover .mg{color:#fff;}
+  /* 桌台卡片区 */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;}
+  .ch{padding:14px 18px;border-bottom:1px solid #f0f0ec;display:flex;align-items:center;justify-content:space-between;}
+  .ch .zt{font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px;}
+  .ch .zacts{display:flex;align-items:center;gap:8px;}
+  .ch .zlink{font-size:12.5px;color:var(--ink2);cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;}
+  .ch .zlink:hover{background:#f4f4f0;color:var(--ink);}
+  .ch .zlink.del:hover{background:#fef2f2;color:var(--red);}
+  .grid{padding:16px 18px;display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+  .t{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff;transition:box-shadow .12s;}
+  .t:hover{box-shadow:var(--shadow);}
+  .t .top{display:flex;align-items:flex-start;justify-content:space-between;}
+  .t .no{font-size:19px;font-weight:800;}
+  .t .more{color:var(--ink3);cursor:pointer;line-height:1;}
+  .t .seats{font-size:12.5px;color:var(--ink2);margin-top:6px;display:flex;align-items:center;gap:5px;}
+  .t .ops{display:flex;gap:7px;margin-top:12px;}
+  .t .op{flex:1;height:30px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink2);font-size:12px;cursor:pointer;}
+  .t .op:hover{border-color:#c7d2fe;color:var(--blue);}
+  .t.off{opacity:.55;} .t.off .no{color:var(--ink3);}
+  .addt{border:1.5px dashed #d8d8d3;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:var(--ink3);cursor:pointer;min-height:104px;font-size:13px;}
+  .addt:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-l);}
+  /* 空态(本区域无桌台) */
+  .empty{padding:34px 18px;text-align:center;color:var(--ink3);}
+  .empty svg{opacity:.4;margin-bottom:10px;}
+  .empty .e-btn{margin-top:14px;}
+  .note{margin-top:16px;font-size:12.5px;color:var(--ink2);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 16px;line-height:1.7;}
+  .note b{color:var(--ink);}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(17,24,39,.82);color:#fff;font-size:11px;padding:5px 10px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ph">
+    <div><div class="t">桌台管理</div><div class="sub">设好区域和桌台,收银员端「桌台总览」按区域显示。</div></div>
+    <button class="btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加区域</button>
+  </div>
+
+  <!-- 区域:tabs,每个可改名/删除(hover 出齿轮 或 进区域看卡头) -->
+  <div class="zones">
+    <div class="zone on">大厅 <span class="c">4</span><span class="mg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="12" r="1.6"/></svg></span></div>
+    <div class="zone">包间 <span class="c">3</span><span class="mg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="12" r="1.6"/></svg></span></div>
+    <div class="zone">露台 <span class="c">2</span><span class="mg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="12" r="1.6"/></svg></span></div>
+  </div>
+
+  <div class="card">
+    <div class="ch">
+      <div class="zt">大厅</div>
+      <div class="zacts">
+        <span class="zlink"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>改名</span>
+        <span class="zlink del"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>删除区域</span>
+        <button class="btn primary"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加桌台</button>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="t"><div class="top"><div class="no">A1</div><span class="more">⋯</span></div><div class="seats"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>4 座</div><div class="ops"><button class="op">编辑</button><button class="op">停用</button></div></div>
+      <div class="t"><div class="top"><div class="no">A2</div><span class="more">⋯</span></div><div class="seats"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>4 座</div><div class="ops"><button class="op">编辑</button><button class="op">停用</button></div></div>
+      <div class="t"><div class="top"><div class="no">A3</div><span class="more">⋯</span></div><div class="seats"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>2 座</div><div class="ops"><button class="op">编辑</button><button class="op">停用</button></div></div>
+      <div class="t off"><div class="top"><div class="no">A4</div><span class="more">⋯</span></div><div class="seats">已停用</div><div class="ops"><button class="op">启用</button><button class="op">删除</button></div></div>
+      <div class="addt"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加桌台</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>区域</b>(大厅/包间/露台)可改名、删除(空区域才能删);<b>桌台</b>(桌号+座位数)停用=隐藏不删,有人未结账时不能停。设好后收银员端「桌台总览」按区域显示,空桌可开台。
+  </div>
+</div>
+<div class="ptag">概念预览 · 桌台管理 v2 · 左对齐统一宽 · 区域可改名/删除 · 桌台卡片 · 干净按钮(照搬此稿令牌)</div>
+</body>
+</html>

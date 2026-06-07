@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pearnly · 收款设置(老板后台 · 概念预览)</title>
+<style>
+  :root{--blue:#2563EB;--blue-d:#1D4ED8;--blue-l:#DBEAFE;--ink:#111827;--ink2:#6B7280;--ink3:#9CA3AF;
+    --bg:#f4f4f0;--card:#fff;--line:#e8e8e3;--green:#16A34A;--amber:#F59E0B;
+    --shadow:0 1px 2px rgba(17,24,39,.04),0 6px 20px rgba(17,24,39,.07);}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);padding:30px 20px 60px;}
+  /* 左对齐 · 统一最大宽 · 跟桌台管理 v2 / 全站设计语言一致(不居中飘) */
+  .wrap{max-width:760px;margin:0;padding-left:28px;padding-top:6px;}
+  h1{font-size:20px;margin-bottom:4px;}
+  .sub{color:var(--ink2);font-size:13.5px;margin-bottom:20px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
+  .ch{padding:12px 16px;border-bottom:1px solid #f0f0ec;font-weight:700;font-size:13.5px;}
+  .pm{padding:14px 16px;border-bottom:1px solid #f6f6f3;}
+  .pm:last-child{border-bottom:0;}
+  .pmtop{display:flex;align-items:center;gap:12px;}
+  .pm .ic{width:38px;height:38px;border-radius:10px;background:#f4f4f0;color:var(--ink2);display:grid;place-items:center;flex:0 0 38px;}
+  .pm.on .ic{background:var(--blue-l);color:var(--blue);}
+  .pm .tx{flex:1;}
+  .pm .n{font-size:14.5px;font-weight:600;}
+  .pm .d{font-size:12px;color:var(--ink2);margin-top:2px;}
+  .sw{width:44px;height:25px;border-radius:999px;flex:0 0 44px;position:relative;cursor:pointer;transition:.15s;}
+  .sw::after{content:"";position:absolute;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+  .on .sw{background:var(--blue);} .on .sw::after{left:21px;}
+  .off .sw{background:#d8d8d3;} .off .sw::after{left:2px;}
+  .lock .sw{background:#bcd0f7;cursor:not-allowed;} .lock .sw::after{left:21px;}
+  .sub-cfg{margin:12px 0 0 50px;}
+  .sub-cfg label{display:block;font-size:12px;color:var(--ink2);margin-bottom:6px;}
+  .fld{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 13px;display:flex;align-items:center;background:#fbfbf9;}
+  .fld input{border:0;outline:0;background:transparent;flex:1;font-size:14.5px;}
+  .fld .pre{color:var(--ink3);font-size:13px;margin-right:8px;}
+  .hint{font-size:11.5px;color:var(--ink3);margin-top:6px;}
+  .tagb{display:inline-block;font-size:10.5px;color:#b45309;background:#fef3c7;padding:1px 7px;border-radius:5px;margin-left:7px;}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #f6f6f3;}
+  .row:last-child{border-bottom:0;}
+  .row .tx{flex:1;} .row .n{font-size:14px;font-weight:600;} .row .d{font-size:12px;color:var(--ink2);margin-top:2px;}
+  .pctfld{width:84px;height:38px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;padding:0 10px;background:#fbfbf9;}
+  .pctfld input{border:0;outline:0;background:transparent;width:100%;text-align:right;font-size:14px;font-weight:600;}
+  .save{width:100%;height:50px;border:0;border-radius:11px;background:var(--blue);color:#fff;font-weight:700;font-size:16px;cursor:pointer;}
+  .save:hover{background:var(--blue-d);}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(17,24,39,.82);color:#fff;font-size:11px;padding:5px 10px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>收款设置</h1>
+  <div class="sub">配收银台能收哪些钱。改完收银员结账时只显示开着的方式。</div>
+
+  <div class="card">
+    <div class="ch">支付方式</div>
+
+    <!-- 现金 -->
+    <div class="pm on lock">
+      <div class="pmtop">
+        <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></div>
+        <div class="tx"><div class="n">现金</div><div class="d">自动算找零 · 默认开启</div></div>
+        <div class="sw"></div>
+      </div>
+    </div>
+
+    <!-- PromptPay -->
+    <div class="pm on" id="pp">
+      <div class="pmtop">
+        <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="21" y2="21"/></svg></div>
+        <div class="tx"><div class="n">PromptPay 扫码</div><div class="d">收款时自动生成二维码,顾客扫手机付</div></div>
+        <div class="sw" onclick="tog('pp')"></div>
+      </div>
+      <div class="sub-cfg">
+        <label>收款 PromptPay ID</label>
+        <div class="fld"><span class="pre">฿</span><input value="08X-XXX-XXXX" placeholder="手机号 / 税号 / e-Wallet"></div>
+        <div class="hint">你收钱的 PromptPay 账号,二维码按它生成。可用手机号或公司税号。</div>
+      </div>
+    </div>
+
+    <!-- 刷卡 -->
+    <div class="pm on" id="card">
+      <div class="pmtop">
+        <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+        <div class="tx"><div class="n">刷卡 <span class="tagb">仅记录</span></div><div class="d">顾客在银行刷卡机(EDC)上刷,系统记一笔。钱进你的银行账户。</div></div>
+        <div class="sw" onclick="tog('card')"></div>
+      </div>
+      <div class="sub-cfg">
+        <div class="hint">现在是"记录模式":Pearnly 不经手刷卡的钱,只把这单标成「刷卡付」进报表。<br>在线直接刷卡(接支付网关)即将推出。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch">其他</div>
+    <div class="row">
+      <div class="tx"><div class="n">服务费(餐厅)</div><div class="d">埋单时按比例加收,可关</div></div>
+      <div class="pctfld"><input value="10"><span style="color:var(--ink3);font-size:13px;">%</span></div>
+    </div>
+    <div class="row">
+      <div class="tx"><div class="n">价格含 VAT</div><div class="d">商品标价是否已含 7% 增值税</div></div>
+      <div class="off"><div class="sw" onclick="this.parentElement.classList.toggle('off');this.parentElement.classList.toggle('on')"></div></div>
+    </div>
+  </div>
+
+  <button class="save">保存</button>
+</div>
+<div class="ptag">概念预览 · 收款设置(老板后台·主程序) · 现金/PromptPay(填ID)/刷卡(仅记录) + 服务费/VAT</div>
+<script>
+  function tog(id){const e=document.getElementById(id);e.classList.toggle('on');e.classList.toggle('off');}
+</script>
+</body>
+</html>

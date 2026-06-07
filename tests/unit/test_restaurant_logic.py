@@ -187,5 +187,38 @@ class DeleteTableTests(unittest.TestCase):
         self.assertEqual(self.deleted, [5])
 
 
+class DeleteAreaTests(unittest.TestCase):
+    """删区域:不存在 404;还有桌台 409(先移走);空区域成功。"""
+
+    def setUp(self):
+        self._saved = (tbl.store.get_area, tbl.store.area_has_tables, tbl.store.delete_area)
+        self.deleted = []
+        tbl.store.delete_area = lambda cur, **kw: self.deleted.append(kw["area_id"])
+
+    def tearDown(self):
+        tbl.store.get_area, tbl.store.area_has_tables, tbl.store.delete_area = self._saved
+
+    def test_not_found_404(self):
+        tbl.store.get_area = lambda cur, **kw: None
+        with self.assertRaises(tbl.PosError) as ctx:
+            tbl.delete_area(None, tenant_id="t", workspace_client_id=9, area_id=3)
+        self.assertEqual(ctx.exception.http_status, 404)
+
+    def test_has_tables_409(self):
+        tbl.store.get_area = lambda cur, **kw: {"id": 3}
+        tbl.store.area_has_tables = lambda cur, **kw: True
+        with self.assertRaises(tbl.PosError) as ctx:
+            tbl.delete_area(None, tenant_id="t", workspace_client_id=9, area_id=3)
+        self.assertEqual(ctx.exception.http_status, 409)
+        self.assertEqual(self.deleted, [])
+
+    def test_empty_area_deletes(self):
+        tbl.store.get_area = lambda cur, **kw: {"id": 3}
+        tbl.store.area_has_tables = lambda cur, **kw: False
+        out = tbl.delete_area(None, tenant_id="t", workspace_client_id=9, area_id=3)
+        self.assertEqual(out, {"deleted": 3})
+        self.assertEqual(self.deleted, [3])
+
+
 if __name__ == "__main__":
     unittest.main()

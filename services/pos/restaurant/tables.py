@@ -51,10 +51,34 @@ def update_area(
     return {"area": _area_view(row)}
 
 
+def delete_area(cur, *, tenant_id: str, workspace_client_id: int, area_id: int) -> dict:
+    """删区域 · 仅空区域(0 桌台);还有桌台 → 409(先移走/删桌台)。"""
+    if (
+        store.get_area(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, area_id=area_id
+        )
+        is None
+    ):
+        raise PosError("pos.product_not_found", 404)
+    if store.area_has_tables(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, area_id=area_id
+    ):
+        raise PosError("pos.void_not_allowed", 409, detail="area_has_tables")
+    store.delete_area(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, area_id=area_id
+    )
+    return {"deleted": area_id}
+
+
 # ── 桌台 CRUD ─────────────────────────────────────────────────────────
 def list_tables(cur, *, tenant_id: str, workspace_client_id: int, area_id=None) -> dict:
+    # 老板后台管理:含停用桌台(显 off 卡可启用/删除);收银端总览另走 tables_with_session。
     rows = store.list_tables(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, area_id=area_id
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        area_id=area_id,
+        include_inactive=True,
     )
     return {"tables": [_table_view(r) for r in rows]}
 

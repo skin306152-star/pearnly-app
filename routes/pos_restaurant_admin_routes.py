@@ -89,6 +89,21 @@ async def api_update_area(area_id: int, req: AreaUpdate, request: Request):
     )
 
 
+@router.delete("/areas/{area_id}")
+async def api_delete_area(
+    area_id: int, request: Request, workspace_client_id: Optional[int] = Query(None)
+):
+    """删区域(仅空区域;还有桌台 → 409)。"""
+    return _run(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws: tables_svc.delete_area(
+            cur, tenant_id=tid, workspace_client_id=ws, area_id=area_id
+        ),
+        commit=True,
+    )
+
+
 # ── 桌台 ──────────────────────────────────────────────────────────────
 class TableCreate(BaseModel):
     workspace_client_id: Optional[int] = None

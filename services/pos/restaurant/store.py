@@ -74,6 +74,24 @@ def get_area(cur, *, tenant_id: str, workspace_client_id: int, area_id: int):
     return cur.fetchone()
 
 
+def area_has_tables(cur, *, tenant_id: str, workspace_client_id: int, area_id: int) -> bool:
+    """区域下是否还有桌台(含停用)。有则不能删区域(先移走/删桌台)。"""
+    cur.execute(
+        "SELECT 1 FROM pos_tables "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND area_id = %s LIMIT 1",
+        (tenant_id, workspace_client_id, area_id),
+    )
+    return cur.fetchone() is not None
+
+
+def delete_area(cur, *, tenant_id: str, workspace_client_id: int, area_id: int) -> None:
+    """硬删区域(仅 0 桌台 · 调用方先校验)。按 tenant+workspace 隔离。"""
+    cur.execute(
+        "DELETE FROM pos_areas WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, area_id),
+    )
+
+
 # ── 桌台 ──────────────────────────────────────────────────────────────
 def list_tables(
     cur, *, tenant_id: str, workspace_client_id: int, area_id=None, include_inactive=False

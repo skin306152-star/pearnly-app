@@ -89,14 +89,17 @@
     box-shadow: none;
 }
 
-/* ── 幽灵 · 透明 · 灰字 · hover 浅底 ── */
+/* ── 幽灵 · 透明底 + 浅描边 · 灰字 · hover 加深 ──
+ * 静止态描边(#e8e8e3 = --line)让次级动作按钮在白底上始终可辨,
+ * 不再"漂浮灰字";仍比 secondary(#d7d8d1)浅一档,保层级。 */
 .btn-ghost {
     background: transparent;
     color: #6b7280;
-    border-color: transparent;
+    border-color: #e8e8e3;
 }
 .btn-ghost:hover:not(:disabled):not(.is-disabled) {
     background: #f0f1ee;
+    border-color: #d7d8d1;
     color: #374151;
 }
 .btn-ghost:active:not(:disabled):not(.is-disabled) {

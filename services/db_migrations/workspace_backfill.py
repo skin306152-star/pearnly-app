@@ -21,7 +21,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from core import db
 
@@ -113,69 +113,117 @@ def add_workspace_columns(cur) -> List[str]:
     return changed
 
 
-def _count_orphans(cur, table: str) -> int:
-    if not _table_exists(cur, table) or not _column_exists(cur, table, "workspace_client_id"):
-        return 0
-    cur.execute(f"SELECT count(*) AS c FROM {table} WHERE workspace_client_id IS NULL")
-    return int(cur.fetchone()["c"])
+def _row_tenant_expr(cur, table: str) -> Optional[str]:
+    """该表每行的"归属租户"SQL 表达式(别名 x = 该表)。
+
+    关键:多张表同时有 tenant_id 和 user_id,且 tenant_id 只填了一部分
+    (ocr_history 94/146 · bank_reconcile_sessions 1/4)。**按行** COALESCE:
+    优先用行自己的 tenant_id,为空再经 user_id 找 users.tenant_id —— 否则按表二选一
+    会让"有 user 无 tenant_id"的行(如 52 条识别记录)一条都回填不上。
+    report() 与 _backfill_table 共用本表达式,确保估算 = 实际(不再分叉)。
+    """
+    has_tenant = _column_exists(cur, table, "tenant_id")
+    has_user = _column_exists(cur, table, "user_id")
+    user_lookup = "(SELECT u.tenant_id FROM users u WHERE u.id = x.user_id)"
+    if has_tenant and has_user:
+        return f"COALESCE(x.tenant_id, {user_lookup})"
+    if has_tenant:
+        return "x.tenant_id"
+    if has_user:
+        return user_lookup
+    return None
 
 
 def _backfill_table(cur, table: str) -> int:
-    """把 workspace_client_id IS NULL 的行回填到"每租户最早套账"。返回回填行数。
+    """把 workspace_client_id IS NULL 的行回填到其归属租户的"最早套账"。返回回填行数。
 
-    按表是否有 tenant_id 列选映射路径:
-      有 tenant_id  → 直接按 t.tenant_id 映射。
-      无 tenant_id  → 按 user_id 经 users.tenant_id 映射(对账 v1 session 等)。
-    租户无关(tenant_id IS NULL 的个人模式旧数据)→ 不匹配,保持 NULL(dry-run 会报出,单独处理)。
+    归属租户 = _row_tenant_expr(按行 COALESCE)。租户无关(无 tenant_id 又找不到 user 的租户)
+    的行不匹配,保持 NULL(dry-run 会报出,单独处理)。
     """
     if not _table_exists(cur, table) or not _column_exists(cur, table, "workspace_client_id"):
         return 0
-    dw_cte = (
-        "WITH dw AS (SELECT DISTINCT ON (tenant_id) tenant_id, id AS ws "
-        "FROM workspace_clients WHERE tenant_id IS NOT NULL "
-        "ORDER BY tenant_id, created_at, id)"
-    )
-    if _column_exists(cur, table, "tenant_id"):
-        cur.execute(
-            f"{dw_cte} UPDATE {table} t SET workspace_client_id = dw.ws "
-            "FROM dw WHERE t.tenant_id = dw.tenant_id AND t.workspace_client_id IS NULL",
-        )
-    elif _column_exists(cur, table, "user_id"):
-        cur.execute(
-            f"{dw_cte} UPDATE {table} t SET workspace_client_id = dw.ws "
-            "FROM users u JOIN dw ON dw.tenant_id = u.tenant_id "
-            "WHERE t.user_id = u.id AND t.workspace_client_id IS NULL",
-        )
-    else:
+    texpr = _row_tenant_expr(cur, table)
+    if not texpr:
         logger.warning("_backfill_table: %s 既无 tenant_id 也无 user_id · 跳过", table)
         return 0
+    cur.execute(
+        "WITH dw AS (SELECT DISTINCT ON (tenant_id) tenant_id, id AS ws "
+        "FROM workspace_clients WHERE tenant_id IS NOT NULL "
+        "ORDER BY tenant_id, created_at, id) "
+        f"UPDATE {table} x SET workspace_client_id = dw.ws FROM dw "
+        f"WHERE x.workspace_client_id IS NULL AND dw.tenant_id = {texpr}"
+    )
     return cur.rowcount
 
 
-def report() -> Dict[str, object]:
-    """DRY-RUN:不改任何数据,只报"会发生什么"。Zihao 过目用。
+def _willhave_ws_sql(tenant_col: str) -> str:
+    """子条件:tenant_col(某行的租户列)指向的租户在 apply 后【会有】套账可落 —
+    要么现在已有套账,要么能建默认套账(owner 非空 / 有可当 owner 的用户)。
 
-    单事务内做完所有改动 → 统计 → ROLLBACK(零残留),从而拿到回填后的真实剩余 NULL 数。
+    别名 uo/w/t 避免与外层 x/u 冲突('owner' 为 SQL 字面量,非用户输入,安全)。
     """
-    out: Dict[str, object] = {"tenants_needing_default": 0, "tables": {}, "remaining_null": {}}
+    return (
+        f"(EXISTS (SELECT 1 FROM workspace_clients w WHERE w.tenant_id = {tenant_col}) "
+        f"OR EXISTS (SELECT 1 FROM tenants t WHERE t.id = {tenant_col} "
+        "AND (t.owner_user_id IS NOT NULL OR EXISTS (SELECT 1 FROM users uo "
+        "WHERE uo.tenant_id = t.id AND (uo.role = 'owner' OR uo.role IS NULL)))))"
+    )
+
+
+def report() -> Dict[str, object]:
+    """DRY-RUN:**纯 SELECT**,零 mutation、不加锁(和 app 日常读一样安全)。Zihao 过目用。
+
+    不走"做了再回滚"(get_cursor 正常路径不显式 rollback → 会把带 ALTER 锁的未提交事务留在
+    连接池阻塞线上)。直接用 SELECT 算 apply 后的真实结果:
+      - tenants_needing_default / _creatable:几个租户缺默认套账 / 其中几个能真建(有 owner)。
+      - 每表 orphans(列已存在=NULL 行数;列未存在=全表行数,因加列后全为 NULL)
+        / would_fill(其租户 apply 后会有套账的)/ remaining(填不了:租户无 owner 或无租户)。
+    remaining 用 _willhave_ws_sql 取反计,与 apply 的实际回填范围一致(避免估算 alias 阴影偏差)。
+    """
+    out: Dict[str, object] = {
+        "tenants_needing_default": 0,
+        "tenants_default_creatable": 0,
+        "tables": {},
+    }
     all_tables = _ADD_AND_BACKFILL + _BACKFILL_ONLY
-    with db.get_cursor() as cur:  # 不 commit · 块结束自动回滚
-        # 会新建几个默认套账
+    with db.get_cursor() as cur:
         cur.execute(
             "SELECT count(*) AS c FROM tenants t "
             "WHERE NOT EXISTS (SELECT 1 FROM workspace_clients w WHERE w.tenant_id = t.id)"
         )
         out["tenants_needing_default"] = int(cur.fetchone()["c"])
-        # 回填前各表孤儿数
-        before = {t: _count_orphans(cur, t) for t in all_tables}
-        # 在同一事务里真做一遍(随后回滚)拿到回填后剩余
-        ensure_default_workspaces(cur)
-        add_workspace_columns(cur)
-        filled = {t: _backfill_table(cur, t) for t in all_tables}
-        after = {t: _count_orphans(cur, t) for t in all_tables}
-        out["tables"] = {t: {"orphans_before": before[t], "filled": filled[t]} for t in all_tables}
-        out["remaining_null"] = {t: after[t] for t in all_tables if after[t] > 0}
-        # 不 commit → 自动回滚,数据库零变化
+        cur.execute(
+            f"SELECT count(*) AS c FROM tenants x WHERE NOT EXISTS "
+            "(SELECT 1 FROM workspace_clients w WHERE w.tenant_id = x.id) "
+            f"AND {_willhave_ws_sql('x.id')}"
+        )
+        out["tenants_default_creatable"] = int(cur.fetchone()["c"])
+
+        tables: Dict[str, object] = {}
+        for table in all_tables:
+            if not _table_exists(cur, table):
+                tables[table] = "(表不存在)"
+                continue
+            has_col = _column_exists(cur, table, "workspace_client_id")
+            orphan = "workspace_client_id IS NULL" if has_col else "TRUE"
+            cur.execute(f"SELECT count(*) AS c FROM {table} WHERE {orphan}")
+            orphans = int(cur.fetchone()["c"])
+            texpr = _row_tenant_expr(cur, table)
+            if texpr:
+                cur.execute(
+                    f"SELECT count(*) AS c FROM {table} x "
+                    f"WHERE {orphan} AND NOT {_willhave_ws_sql(texpr)}"
+                )
+                remaining = int(cur.fetchone()["c"])
+            else:
+                remaining = orphans
+            tables[table] = {
+                "orphans": orphans,
+                "would_fill": orphans - remaining,
+                "remaining": remaining,
+                "had_column": has_col,
+            }
+        out["tables"] = tables
     return out
 
 

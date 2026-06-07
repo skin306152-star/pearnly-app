@@ -152,7 +152,13 @@ async def login(req: LoginRequest, request: Request):
         logger.warning(f"[login] 清理失败日志失败: {e}")
 
     # 返回 · 同时提供 token 和 access_token 两个键(向前兼容)
-    user_info = {"id": str(user["id"]), "username": user["username"], "plan": user["plan"]}
+    # POS PO-B1 · 带 role 让前端落地分流(role=cashier → /pos)
+    user_info = {
+        "id": str(user["id"]),
+        "username": user["username"],
+        "plan": user["plan"],
+        "role": user.get("role") or "owner",
+    }
     return JSONResponse(
         {
             "token": token,

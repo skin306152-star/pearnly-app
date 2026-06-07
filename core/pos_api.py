@@ -93,7 +93,17 @@ def register_pos_error_handler(app) -> None:
 
 
 def pos_auth(request: Request) -> dict:
-    """取当前用户;鉴权失败转成 PosError(信封),保留原 auth.* code 给前端映射。"""
+    """取当前主体;鉴权失败转成 PosError(信封),保留原 auth.* code 给前端映射。
+
+    两种 token 分流:
+      - POS 收银员 token(typ='pos'):自含 tenant/workspace/cashier 声明,合成主体直接返回
+        (不查 users · 支撑离线)。形如普通 user dict + workspace_client_id/cashier_id。
+      - 其余(老板/会计/超管):走 get_current_user_from_request(查 users + session 校验)。
+    """
+    cashier = _pos_token_subject(request)
+    if cashier is not None:
+        return cashier
+
     from core.auth import get_current_user_from_request
 
     try:
@@ -102,11 +112,48 @@ def pos_auth(request: Request) -> dict:
         raise PosError(str(exc.detail), exc.status_code) from exc
 
 
+def _pos_token_subject(request: Request) -> Optional[dict]:
+    """Bearer 是 POS 收银员 token(typ='pos')→ 合成主体;否则 None(交给普通用户鉴权)。"""
+    from core.auth import decode_access_token
+
+    headers = getattr(request, "headers", None)
+    auth = headers.get("Authorization", "") if headers else ""
+    if not auth.startswith("Bearer "):
+        return None
+    payload = decode_access_token(auth[7:].strip())
+    if not payload or payload.get("typ") != "pos":
+        return None
+    return {
+        "id": payload.get("cashier_id"),
+        "tenant_id": payload.get("tenant_id"),
+        "workspace_client_id": payload.get("workspace_client_id"),
+        "cashier_id": payload.get("cashier_id"),
+        "display_name": payload.get("display_name"),
+        "role": "cashier",
+        "is_super_admin": False,
+    }
+
+
 def require_tenant(request: Request) -> tuple[str, Optional[str]]:
     """取 (tenant_id, user_id);无 tenant → PosError pos.forbidden(403)。"""
     user = pos_auth(request)
     tid = user.get("tenant_id") if user else None
     if not tid:
+        raise PosError("pos.forbidden", 403)
+    uid = str(user["id"]) if user and user.get("id") else None
+    return str(tid), uid
+
+
+def require_owner(request: Request) -> tuple[str, Optional[str]]:
+    """取 (tenant_id, user_id) 且主体必须是老板/超管(非收银员)。
+
+    收银员管理/开通收银(onboarding)等管理动作不许收银员 token 调 → pos.forbidden(403)。
+    """
+    user = pos_auth(request)
+    tid = user.get("tenant_id") if user else None
+    if not tid:
+        raise PosError("pos.forbidden", 403)
+    if user.get("role") == "cashier" and not user.get("is_super_admin"):
         raise PosError("pos.forbidden", 403)
     uid = str(user["id"]) if user and user.get("id") else None
     return str(tid), uid

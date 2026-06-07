@@ -140,8 +140,10 @@ def get_warehouse(cur, *, tenant_id: str, workspace_client_id: int, warehouse_id
     return cur.fetchone()
 
 
-def get_or_create_default_warehouse(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
-    """每个账套至少一个默认仓;无则建(入库/盘点首次自动有仓)。"""
+def get_or_create_default_warehouse(
+    cur, *, tenant_id: str, workspace_client_id: int, name: Optional[str] = None
+) -> dict:
+    """每个账套至少一个默认仓;无则建(入库/盘点首次自动有仓)。name 仅在新建时生效(已有仓不改名)。"""
     cur.execute(
         "SELECT id, name, is_default, is_active FROM warehouses "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND is_default = TRUE "
@@ -151,11 +153,18 @@ def get_or_create_default_warehouse(cur, *, tenant_id: str, workspace_client_id:
     row = cur.fetchone()
     if row:
         return row
-    cur.execute(
-        "INSERT INTO warehouses (tenant_id, workspace_client_id, is_default) "
-        "VALUES (%s, %s, TRUE) RETURNING id, name, is_default, is_active",
-        (tenant_id, workspace_client_id),
-    )
+    if name:
+        cur.execute(
+            "INSERT INTO warehouses (tenant_id, workspace_client_id, is_default, name) "
+            "VALUES (%s, %s, TRUE, %s) RETURNING id, name, is_default, is_active",
+            (tenant_id, workspace_client_id, name),
+        )
+    else:
+        cur.execute(
+            "INSERT INTO warehouses (tenant_id, workspace_client_id, is_default) "
+            "VALUES (%s, %s, TRUE) RETURNING id, name, is_default, is_active",
+            (tenant_id, workspace_client_id),
+        )
     return cur.fetchone()
 
 

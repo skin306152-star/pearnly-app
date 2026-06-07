@@ -36,6 +36,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _login_redirect_path(user: dict) -> str:
+    """登录落地分流:超管→/admin · 收银员→/pos · 其余→/home(POS PO-B1)。"""
+    if bool(user.get("is_super_admin")):
+        return "/admin"
+    if (user.get("role") or "owner") == "cashier":
+        return "/pos"
+    return "/home"
+
+
 # ============================================================
 # v118.27.5 · Google OAuth 2.0 · 仅支持已注册账号登录(自动绑定 google_sub)
 # 未注册用户:跳回 /login 提示先邮箱注册(自动建账号留 v118.27.6)
@@ -181,8 +190,9 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
 
     # 中间页 set localStorage 再跳 /home 或 /admin(callback 是 GET 不能直接 set)
     # v118.28.2 · 超管 → /admin · 普通用户 → /home
+    # POS PO-B1 · role=cashier → /pos(收银员只进收银前台)
     safe_token = json.dumps(token)
-    _redirect_path = "/admin" if bool(user.get("is_super_admin")) else "/home"
+    _redirect_path = _login_redirect_path(user)
     return HTMLResponse(f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Pearnly · Signing in...</title></head>
 <body style="font-family:-apple-system,sans-serif;background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
@@ -333,8 +343,8 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
     )
 
     safe_token = json.dumps(token)
-    # v118.28.2 · 超管 → /admin · 普通用户 → /home
-    _redirect_path = "/admin" if bool(user.get("is_super_admin")) else "/home"
+    # v118.28.2 · 超管 → /admin · 普通用户 → /home · POS PO-B1 · cashier → /pos
+    _redirect_path = _login_redirect_path(user)
     return HTMLResponse(f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Pearnly · Signing in...</title></head>
 <body style="font-family:-apple-system,sans-serif;background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">

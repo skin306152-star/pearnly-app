@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 7
 JWT_REMEMBER_DAYS = 30  # v0.17 · 勾选"记住我"时的长有效期
+POS_TOKEN_TTL_HOURS = 12  # POS 收银员 token 有效期(离线缓存窗口 · docs/pos/04 §1)
 
 
 def _jwt_secret() -> str:
@@ -84,6 +85,36 @@ def create_access_token(
     except Exception as e:
         logger.warning(f"[session] set active_jti failed (non-blocking): {e}")
     return token
+
+
+def create_pos_token(
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    cashier_id: str,
+    display_name: str,
+    ttl_hours: int = POS_TOKEN_TTL_HOURS,
+) -> tuple[str, int]:
+    """POS 收银员 token(PIN 登录签发 · docs/pos/04 §1)。
+
+    自含 tenant/workspace/cashier 声明,typ='pos',role='cashier'。**不查 users 表、不写
+    active_jti**——收银员未必有正式账号,且 token 须支撑离线(get_current_user 的 DB 校验不可用)。
+    校验侧走 core.pos_api.pos_auth(按 typ 分流);因无 users 行,POS token 进 /home 接口必 401。
+    返回 (token, ttl_hours)。
+    """
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(cashier_id),
+        "typ": "pos",
+        "role": "cashier",
+        "tenant_id": str(tenant_id),
+        "workspace_client_id": int(workspace_client_id),
+        "cashier_id": str(cashier_id),
+        "display_name": display_name,
+        "iat": now,
+        "exp": now + timedelta(hours=ttl_hours),
+    }
+    return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM), ttl_hours
 
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:

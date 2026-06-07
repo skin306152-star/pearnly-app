@@ -12,12 +12,14 @@ logger = logging.getLogger("mr-pilot")
 
 
 def bootstrap_pos_schema() -> None:
+    from services.inventory import store as inventory_store
     from services.modules import store as modules_store
     from services.products import units as product_units
 
     steps = (
         ("tenant_modules", modules_store.ensure_table),
         ("product_units", product_units.ensure_schema),
+        ("inventory_core", inventory_store.ensure_schema),
     )
     for label, fn in steps:
         try:

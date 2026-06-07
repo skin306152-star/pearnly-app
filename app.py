@@ -58,6 +58,7 @@ from routes.clients_routes import (
 )  # REFACTOR-B1 · 客户管理 5 路由 · 2026-05-24
 from routes.products_routes import router as products_router  # 销项商品主数据 PO-2 · 2026-06-06
 from routes.modules_routes import router as modules_router  # POS 模块开关 PO-A1 · 2026-06-07
+from routes.inventory_routes import router as inventory_router  # POS 库存后台 PO-A3 · 2026-06-07
 from routes.sales_routes import router as sales_router  # 销项单据/开票 PO-4 · 2026-06-06
 from routes.sales_seller_routes import (
     router as sales_seller_router,
@@ -196,6 +197,7 @@ app.include_router(notification_router)  # REFACTOR-B1 · 通知规则 6 路由(
 app.include_router(clients_router)  # REFACTOR-B1 · 客户管理 5 路由(2026-05-24)
 app.include_router(products_router)  # 销项商品主数据 6 路由(PO-2 · 2026-06-06)
 app.include_router(modules_router)  # POS 模块开关(GET /api/me/modules · PO-A1 · 2026-06-07)
+app.include_router(inventory_router)  # POS 库存后台 6 路由(PO-A3 · 2026-06-07)
 app.include_router(sales_router)  # 销项单据/开票 6 路由(PO-4 · 2026-06-06)
 app.include_router(sales_seller_router)  # 销项开票方资料 3 路由(PO-6 · 2026-06-06)
 app.include_router(sales_settings_router)  # 销项开票设置 2 路由(§M7 · 2026-06-06)

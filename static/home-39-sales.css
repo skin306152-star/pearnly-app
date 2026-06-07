@@ -208,6 +208,56 @@ table.sx-tbl tr.click:hover td {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
+/* 列宽分配(固定布局):防文本列(客户/名称)吞掉余宽,把右侧数字/徽章列挤成一团。
+ * 文本列不设宽 → 平分剩余;数字/状态列各自定宽;超长文本省略号。 */
+#page-sales-invoices table.sx-tbl,
+#page-sales-products table.sx-tbl {
+    table-layout: fixed;
+}
+#page-sales-invoices .sx-tbl td,
+#page-sales-products .sx-tbl td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* 工作台:号码 日期 类型 客户(弹性) 金额 收款 状态 操作 */
+#page-sales-invoices .sx-tbl th:nth-child(1) {
+    width: 13%;
+}
+#page-sales-invoices .sx-tbl th:nth-child(2) {
+    width: 10%;
+}
+#page-sales-invoices .sx-tbl th:nth-child(5) {
+    width: 13%;
+}
+#page-sales-invoices .sx-tbl th:nth-child(6) {
+    width: 8%;
+}
+#page-sales-invoices .sx-tbl th:nth-child(7) {
+    width: 10%;
+}
+#page-sales-invoices .sx-tbl th:nth-child(8) {
+    width: 48px;
+}
+/* 商品:图 编码 名称(弹性) 单位 单价 VAT 操作 */
+#page-sales-products .sx-tbl th:nth-child(1) {
+    width: 54px;
+}
+#page-sales-products .sx-tbl th:nth-child(2) {
+    width: 12%;
+}
+#page-sales-products .sx-tbl th:nth-child(4) {
+    width: 10%;
+}
+#page-sales-products .sx-tbl th:nth-child(5) {
+    width: 14%;
+}
+#page-sales-products .sx-tbl th:nth-child(6) {
+    width: 9%;
+}
+#page-sales-products .sx-tbl th:nth-child(7) {
+    width: 86px;
+}
 .sx-chev {
     border: 0;
     background: none;

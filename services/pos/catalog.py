@@ -26,7 +26,7 @@ def _units_by_product(cur, *, tenant_id: str, product_ids: list) -> dict:
         return {}
     cur.execute(
         "SELECT product_id, unit_name, factor_to_base, barcode, price, is_default_sell "
-        "FROM product_units WHERE tenant_id = %s AND product_id = ANY(%s) "
+        "FROM product_units WHERE tenant_id = %s AND product_id = ANY(%s::uuid[]) "
         "ORDER BY factor_to_base",
         (tenant_id, product_ids),
     )
@@ -53,7 +53,7 @@ def _stock_by_product(
         return {"qty": {}, "near": set()}
     cur.execute(
         "SELECT product_id, COALESCE(SUM(qty_on_hand), 0) AS qty FROM inventory_stock "
-        "WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = ANY(%s) "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = ANY(%s::uuid[]) "
         "GROUP BY product_id",
         (tenant_id, workspace_client_id, product_ids),
     )
@@ -61,7 +61,7 @@ def _stock_by_product(
     cur.execute(
         "SELECT DISTINCT s.product_id FROM inventory_stock s "
         "JOIN inventory_batches b ON b.id = s.batch_id "
-        "WHERE s.tenant_id = %s AND s.workspace_client_id = %s AND s.product_id = ANY(%s) "
+        "WHERE s.tenant_id = %s AND s.workspace_client_id = %s AND s.product_id = ANY(%s::uuid[]) "
         "AND s.qty_on_hand > 0 AND b.expiry_date IS NOT NULL "
         "AND b.expiry_date <= CURRENT_DATE + %s",
         (tenant_id, workspace_client_id, product_ids, near_days),

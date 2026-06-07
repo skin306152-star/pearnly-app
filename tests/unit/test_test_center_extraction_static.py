@@ -63,9 +63,11 @@ class TestCenterExtractionStaticTests(unittest.TestCase):
 
     def test_home_js_keeps_callers(self):
         """调用方(路由分发 + 错误拦截器钩子)仍存在 · 经 window 调新模块入口。
-        REFACTOR-C1-home-batch9f:routeTo 路由分发 → core-boot.js(window.loadTestCenterPage())。
+        REFACTOR-C1-home-batch9f:routeTo 路由分发 → core-boot.js。
+        2026-06-08:routeTo 改用 ROUTE_LOADERS 映射 + 动态 winFns[loader]() 分发(不再逐个 window.loadXxx() 字面量)·
+        改为验 test-center 仍在映射表里接上其 loader。
         REFACTOR-C1-home-batch9g2:错误拦截器 IIFE(含 _tcOnNewLog 钩子)→ state.js · home.js 已删。"""
-        self.assertIn("window.loadTestCenterPage()", self.core_boot_js)
+        self.assertIn("'test-center': 'loadTestCenterPage'", self.core_boot_js)
         self.assertIn("window._tcOnNewLog(", self.state_js)
 
     def test_home_html_load_order(self):

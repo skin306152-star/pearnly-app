@@ -62,6 +62,18 @@ CONVERTED: list[tuple[str, str]] = [
     ("services/sales/document.py", "sales_documents"),
 ]
 
+# PO-8 完整性闸:尚未切隔离的运营表,必须在此显式登记理由(否则完整性测试 fail)。
+# 杜绝"新建运营表忘了隔离又没人发现"。登记 = 有意识的延后,不是漏。
+DEFERRED: dict[str, str] = {
+    # 连号按主体 = RD 合规 + 需 prod schema 迁移(建 uq_dns_ws + drop 旧 PK)+ 代码同上,
+    # 铁律"改计费/主路径先报方案"· 见 docs/workspace-isolation/06-po7b-numbering-proposal.md。
+    "document_number_sequences": "PO-7b · 连号按主体 · Zihao-gated(需 prod 迁移+在场)",
+    # e-Tax 提交/通道 = 未来 e-Tax 模块的占位表,当前零 DAL 代码(grep services/routes = 0)。
+    # 待该模块开建时按套账隔离从一开始就做。PO-1 已回填列,无读写可隔离。
+    "etax_submissions": "无 DAL 代码(未来 e-Tax 模块占位)· 建表时随手隔离",
+    "etax_channel_settings": "无 DAL 代码(未来 e-Tax 模块占位)· 建表时随手隔离",
+}
+
 
 def _read(rel_path: str) -> str:
     with open(os.path.join(_REPO, rel_path), "r", encoding="utf-8") as f:
@@ -84,6 +96,23 @@ class WorkspaceSqlIsolationTest(unittest.TestCase):
         """CONVERTED 里的表必须都在 OPERATIONAL_TABLES 名单内(防登记错表名)。"""
         for rel_path, table in CONVERTED:
             self.assertIn(table, OPERATIONAL_TABLES, f"{table} 不在运营表名单")
+        for table in DEFERRED:
+            self.assertIn(table, OPERATIONAL_TABLES, f"DEFERRED {table} 不在运营表名单")
+
+    def test_every_operational_table_converted_or_deferred(self):
+        """PO-8 完整性闸:每张运营表要么已切隔离(CONVERTED),要么显式登记延后(DEFERRED)。
+
+        新增运营表却两边都没登记 → fail。逼"新表必须有意识决定隔离与否",杜绝静默漏隔离。
+        延后项清零(PO-7b/etax 落地)时,从 DEFERRED 移到 CONVERTED 即可。
+        """
+        converted_tables = {table for _, table in CONVERTED}
+        for table in OPERATIONAL_TABLES:
+            covered = table in converted_tables or table in DEFERRED
+            self.assertTrue(
+                covered,
+                f"运营表 {table} 既未切隔离(CONVERTED)也未登记延后(DEFERRED)→ "
+                f"套账隔离完整性漏洞:补隔离并登记 CONVERTED,或带理由登记 DEFERRED",
+            )
 
     def test_context_layer_present(self):
         """地基模块可导入(闸依赖它)。"""

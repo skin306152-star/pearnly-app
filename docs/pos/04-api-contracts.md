@@ -59,6 +59,18 @@
 请求:`{ "business_type": "pharmacy", "warehouse_name": "门店", "first_cashier": {"display_name":"Nok","pin":"1234"} }`
 成功:`data: { "enabled_modules": ["inventory","pos"], "capabilities": ["track_batch","multi_unit","prescription"], "cashier_id": "uuid" }`
 
+### 设置页「业务/模块」管理(C3 · owner · docs/pos/02 §2.2)
+- **GET /api/pos/admin/modules** — 全模块开关视图(含默认回落 + config)。
+  `data: { "modules": { "pos":{"enabled":true,"config":{...}}, "inventory":{...}, "sales":{...}, ... } }`
+- **PUT /api/pos/admin/modules** — 开/关单模块(**关=隐藏入口·不删数据**)。
+  请求:`{ "module_key":"pos", "enabled":false, "config":{...可选} }`(config 省略=只翻开关不动 config)
+  成功:`data: { "module": {"module_key","enabled","config"} }`;未知 module_key → `pos.line_invalid`(422)。
+- **GET /api/pos/admin/onboarding-state?workspace_client_id=** — 该账套是否已开通 + 当前业态(屏8 判断避免重复开通)。
+  `data: { "onboarded":true, "business_type":"pharmacy", "capabilities":["track_batch",...], "pos_enabled":true, "inventory_enabled":true, "has_warehouse":true, "cashier_count":2 }`
+  > onboarded = pos 模块开 且 该账套已建仓 + ≥1 名在职收银员。
+- **GET /api/pos/admin/business-presets** — 业态预设(业态 → 能力块清单)· 给开通向导渲染。
+  `data: { "presets": { "pharmacy":["multi_unit","track_batch","track_expiry","prescription"], ... } }`
+
 ---
 
 ## 3. 商品(POS 选品 · 复用 products + units + 实时库存)

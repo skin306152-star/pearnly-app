@@ -71,6 +71,9 @@ from routes.pos_sales_routes import (
 from routes.pos_report_routes import (
     router as pos_report_router,
 )  # POS 销售报表 PO-B6 · 2026-06-07
+from routes.pos_modules_routes import (
+    router as pos_modules_router,
+)  # POS 设置页模块管理 C3 · 2026-06-07
 from routes.sales_routes import router as sales_router  # 销项单据/开票 PO-4 · 2026-06-06
 from routes.sales_seller_routes import (
     router as sales_seller_router,
@@ -214,6 +217,7 @@ app.include_router(inventory_report_router)  # POS 库存报表 1 路由(C1 · 2
 app.include_router(pos_auth_router)  # POS 收银员鉴权/开通 3 路由(PO-B1 · 2026-06-07)
 app.include_router(pos_sales_router)  # POS 收银前台 14 路由(PO-B2/B4/B5 · 2026-06-07)
 app.include_router(pos_report_router)  # POS 销售报表 1 路由(PO-B6 · 2026-06-07)
+app.include_router(pos_modules_router)  # POS 设置页模块管理 4 路由(C3 · 2026-06-07)
 app.include_router(sales_router)  # 销项单据/开票 6 路由(PO-4 · 2026-06-06)
 app.include_router(sales_seller_router)  # 销项开票方资料 3 路由(PO-6 · 2026-06-06)
 app.include_router(sales_settings_router)  # 销项开票设置 2 路由(§M7 · 2026-06-06)

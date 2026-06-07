@@ -78,6 +78,105 @@ async def api_pin_login(req: PinLoginRequest, request: Request):
     return ok(data)
 
 
+class CashierCreate(BaseModel):
+    workspace_client_id: int
+    display_name: str = Field(..., min_length=1, max_length=80)
+    pin: str = Field(..., min_length=4, max_length=32)
+    color: Optional[str] = Field(None, max_length=20)
+
+
+class CashierUpdate(BaseModel):
+    workspace_client_id: int
+    display_name: Optional[str] = Field(None, min_length=1, max_length=80)
+    pin: Optional[str] = Field(None, min_length=4, max_length=32)
+    color: Optional[str] = Field(None, max_length=20)
+    is_active: Optional[bool] = None
+
+
+def _cashier_out(row) -> dict:
+    return {
+        "id": str(row["id"]),
+        "display_name": row["display_name"],
+        "color": row.get("color"),
+        "is_active": bool(row["is_active"]),
+    }
+
+
+@router.get("/admin/cashiers")
+async def api_admin_list_cashiers(request: Request, workspace_client_id: int = Query(...)):
+    """收银员后台管理列表(老板/超管 · 含停用项 + 最近开班 + 可否删)。"""
+    tid, _uid = require_owner(request)
+    with db.get_cursor_rls(tid) as cur:
+        require_workspace(cur, tid, workspace_client_id)
+        rows = cashier_dal.list_cashiers_admin(
+            cur, tenant_id=tid, workspace_client_id=workspace_client_id
+        )
+    out = []
+    for r in rows:
+        item = _cashier_out(r)
+        lo = r.get("last_opened_at")
+        item["last_opened_at"] = lo.isoformat() if lo else None
+        item["has_shifts"] = bool(r.get("has_shifts"))
+        out.append(item)
+    return ok({"cashiers": out})
+
+
+@router.post("/admin/cashiers")
+async def api_admin_create_cashier(req: CashierCreate, request: Request):
+    """新增收银员(名字 + PIN + 颜色)。"""
+    tid, _uid = require_owner(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        require_workspace(cur, tid, req.workspace_client_id)
+        row = cashier_dal.create_cashier(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=req.workspace_client_id,
+            display_name=req.display_name.strip(),
+            pin_hash=pos_auth.hash_pin(req.pin),
+            color=req.color,
+        )
+    return ok({"cashier": _cashier_out(row)})
+
+
+@router.put("/admin/cashiers/{cashier_id}")
+async def api_admin_update_cashier(cashier_id: str, req: CashierUpdate, request: Request):
+    """改名/换色/启停/重设 PIN(只更传入字段)。"""
+    tid, _uid = require_owner(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        require_workspace(cur, tid, req.workspace_client_id)
+        row = cashier_dal.update_cashier(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=req.workspace_client_id,
+            cashier_id=cashier_id,
+            display_name=req.display_name.strip() if req.display_name else None,
+            color=req.color,
+            is_active=req.is_active,
+            pin_hash=pos_auth.hash_pin(req.pin) if req.pin else None,
+        )
+        if not row:
+            raise PosError("pos.cashier_not_found", 404)
+    return ok({"cashier": _cashier_out(row)})
+
+
+@router.delete("/admin/cashiers/{cashier_id}")
+async def api_admin_delete_cashier(
+    cashier_id: str, request: Request, workspace_client_id: int = Query(...)
+):
+    """删除从未开过班的收银员;开过班的只能停用(保历史)→ pos.cashier_in_use(409)。"""
+    tid, _uid = require_owner(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        require_workspace(cur, tid, workspace_client_id)
+        res = cashier_dal.delete_cashier_if_unused(
+            cur, tenant_id=tid, workspace_client_id=workspace_client_id, cashier_id=cashier_id
+        )
+        if res is None:
+            raise PosError("pos.cashier_not_found", 404)
+        if res is False:
+            raise PosError("pos.cashier_in_use", 409)
+    return ok({"deleted": True})
+
+
 @router.put("/admin/onboarding")
 async def api_onboarding(req: OnboardingRequest, request: Request):
     """开通收银(老板/超管)→ 开模块 + 建仓/终端/首位收银员。"""

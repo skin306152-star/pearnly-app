@@ -27,6 +27,7 @@ function apply(modules: Record<string, ModuleFlag>) {
     show(document.getElementById('nav-pos-onboard'), showOnboard);
     show(document.querySelector<HTMLElement>('[data-route="inventory"]'), inv);
     show(document.querySelector<HTMLElement>('[data-route="sales-report"]'), pos);
+    show(document.getElementById('nav-pos-cashiers'), pos && owner); // 收银员管理 = owner · pos 开通后
     show(document.getElementById('nav-pos-switch'), pos);
 }
 

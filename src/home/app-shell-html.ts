@@ -281,6 +281,13 @@ const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-sales-report">销售报表</span>
             </div>
+            <div class="nav-item nav-sub-item" data-route="pos-cashiers" id="nav-pos-cashiers" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="6.5" r="3"/>
+                    <path d="M4 16.5a6 6 0 0 1 12 0"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-cashiers">收银员</span>
+            </div>
             <div class="nav-item nav-sub-item" id="nav-pos-switch" data-href="/pos">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="4" width="16" height="11" rx="1.5"/>

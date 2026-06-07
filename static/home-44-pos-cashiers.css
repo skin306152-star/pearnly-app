@@ -1,0 +1,259 @@
+/* POS 收银员管理 · 视觉照搬概念稿 桌面/Pearnly_POS_UI预览/11-收银员管理.html。
+   作用域 .cshp 防污染;令牌按概念稿裸 hex 整块移植(同 home-41/42/43 · TOKEN_CSS 处理)。
+   按钮一律蓝(全站按钮蓝硬规),删除为白底 hover 转红(danger)非黑底。 */
+.cshp {
+    --c-blue: #2563eb;
+    --c-blue-d: #1d4ed8;
+    --c-blue-l: #dbeafe;
+    --c-ink: #111827;
+    --c-ink2: #6b7280;
+    --c-ink3: #9ca3af;
+    --c-card: #fff;
+    --c-line: #e8e8e3;
+    --c-red: #dc2626;
+    --c-shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 20px rgba(17, 24, 39, 0.07);
+    color: var(--c-ink);
+    max-width: 680px;
+}
+.cshp .csh-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.cshp .csh-t {
+    font-size: 20px;
+    font-weight: 700;
+}
+.cshp .csh-add {
+    height: 40px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--c-blue);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.cshp .csh-add:hover {
+    background: var(--c-blue-d);
+}
+.cshp .csh-card {
+    background: var(--c-card);
+    border: 1px solid var(--c-line);
+    border-radius: 14px;
+    box-shadow: var(--c-shadow);
+    overflow: hidden;
+    margin-top: 14px;
+}
+.cshp .csh-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #f4f4f0;
+}
+.cshp .csh-row:last-child {
+    border-bottom: 0;
+}
+.cshp .csh-av {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+    flex: 0 0 42px;
+}
+.cshp .csh-row.off .csh-av {
+    background: #cbd5e1 !important;
+}
+.cshp .csh-info {
+    flex: 1;
+    min-width: 0;
+}
+.cshp .csh-n {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.cshp .csh-row.off .csh-n {
+    color: var(--c-ink3);
+}
+.cshp .csh-m {
+    font-size: 12.5px;
+    color: var(--c-ink2);
+    margin-top: 3px;
+    font-variant-numeric: tabular-nums;
+}
+.cshp .csh-st {
+    font-size: 11px;
+    padding: 2px 9px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+.cshp .csh-st.on {
+    background: #dcfce7;
+    color: #15803d;
+}
+.cshp .csh-st.off {
+    background: #f1f1ee;
+    color: #9ca3af;
+}
+.cshp .csh-ops {
+    display: flex;
+    gap: 7px;
+    flex: 0 0 auto;
+}
+.cshp .csh-op {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--c-line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--c-ink2);
+    font-size: 12.5px;
+    cursor: pointer;
+}
+.cshp .csh-op:hover {
+    border-color: #c7d2fe;
+    color: var(--c-blue);
+}
+.cshp .csh-op.danger:hover {
+    border-color: #fecaca;
+    color: var(--c-red);
+}
+.cshp .csh-note {
+    margin-top: 16px;
+    font-size: 12.5px;
+    color: var(--c-ink2);
+    background: var(--c-card);
+    border: 1px solid var(--c-line);
+    border-radius: 12px;
+    padding: 13px 15px;
+    line-height: 1.6;
+}
+.cshp .csh-state {
+    text-align: center;
+    color: var(--c-ink3);
+    padding: 48px 16px;
+    font-size: 13.5px;
+}
+.cshp .csh-state.error {
+    color: var(--c-ink2);
+}
+.cshp .csh-state .csh-op,
+.cshp .csh-state .csh-add {
+    margin-top: 12px;
+}
+.cshp .csh-loading {
+    letter-spacing: 3px;
+}
+/* modal */
+.cshp .csh-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.45);
+    backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.cshp .csh-mask.show {
+    display: flex;
+}
+.cshp .csh-modal {
+    width: 380px;
+    max-width: 92vw;
+    background: #fff;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+.cshp .csh-mh {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0ec;
+    font-weight: 700;
+    font-size: 16px;
+}
+.cshp .csh-mb {
+    padding: 18px 20px;
+}
+.cshp .csh-mb label {
+    display: block;
+    font-size: 12.5px;
+    color: var(--c-ink2);
+    margin-bottom: 7px;
+}
+.cshp .csh-fld {
+    height: 46px;
+    border: 1px solid var(--c-line);
+    border-radius: 10px;
+    padding: 0 13px;
+    display: flex;
+    align-items: center;
+    background: #fbfbf9;
+    margin-bottom: 15px;
+}
+.cshp .csh-fld input {
+    border: 0;
+    outline: 0;
+    background: transparent;
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    color: var(--c-ink);
+}
+.cshp .csh-fld input.csh-pin {
+    letter-spacing: 8px;
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.cshp .csh-err {
+    color: var(--c-red);
+    font-size: 12.5px;
+    min-height: 16px;
+}
+.cshp .csh-mf {
+    padding: 0 20px 20px;
+    display: flex;
+    gap: 10px;
+}
+.cshp .csh-ghost {
+    flex: 0 0 auto;
+    height: 46px;
+    padding: 0 16px;
+    border: 1px solid var(--c-line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--c-ink2);
+    cursor: pointer;
+}
+.cshp .csh-ok {
+    flex: 1;
+    height: 46px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--c-blue);
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+}
+.cshp .csh-ok:hover {
+    background: var(--c-blue-d);
+}
+.cshp .csh-ok:disabled {
+    background: #c7cdd6;
+    cursor: not-allowed;
+}

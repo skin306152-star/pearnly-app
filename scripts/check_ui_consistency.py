@@ -51,6 +51,7 @@ TOKEN_CSS = {
     "home-41-inventory.css",
     "home-42-pos-onboarding.css",
     "home-43-pos-report.css",
+    "home-44-pos-cashiers.css",
 }
 
 

@@ -288,6 +288,7 @@ interface Window {
     loadInventoryPage?: () => void;
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;
+    loadPosCashiers?: () => void;
     isOwner?: (u?: AppUser | null) => boolean;
     reloadInventory?: () => void;
     openInventoryIn?: () => void;

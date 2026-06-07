@@ -239,6 +239,7 @@ const VALID_ROUTES = [
     'inventory',
     'pos-onboarding',
     'sales-report',
+    'pos-cashiers',
 ];
 
 function routeTo(route?: any) {
@@ -286,6 +287,9 @@ function routeTo(route?: any) {
     // POS 屏9 · 销售报表
     if (route === 'sales-report' && typeof window.loadSalesReport === 'function')
         window.loadSalesReport();
+    // POS · 收银员管理(owner · pos 开通后显)
+    if (route === 'pos-cashiers' && typeof window.loadPosCashiers === 'function')
+        window.loadPosCashiers();
     // 销项 PO-10 · 发票工作台 / 商品管理 / 账套·开票资料
     if (route === 'sales-invoices' && typeof window.loadSalesWorkbench === 'function')
         window.loadSalesWorkbench();

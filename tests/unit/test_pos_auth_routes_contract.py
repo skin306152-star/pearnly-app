@@ -17,6 +17,11 @@ EXPECTED = {
     ("GET", "/api/pos/cashiers"),
     ("POST", "/api/pos/auth/pin"),
     ("PUT", "/api/pos/admin/onboarding"),
+    # 收银员后台管理(owner · 加人/改名换色/重设PIN/启停/删除未开班者)
+    ("GET", "/api/pos/admin/cashiers"),
+    ("POST", "/api/pos/admin/cashiers"),
+    ("PUT", "/api/pos/admin/cashiers/{cashier_id}"),
+    ("DELETE", "/api/pos/admin/cashiers/{cashier_id}"),
 }
 
 

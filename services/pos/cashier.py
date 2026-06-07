@@ -184,6 +184,88 @@ def create_cashier(
     return cur.fetchone()
 
 
+# ── 收银员后台管理(owner · 含停用项)─────────────────────────────────
+def list_cashiers_admin(cur, *, tenant_id: str, workspace_client_id: int) -> list:
+    """后台管理列表:含停用项 + is_active + 最近开班时间 + 是否开过班(决定可否删)。不含 pin_hash。"""
+    cur.execute(
+        "SELECT c.id, c.display_name, c.color, c.is_active, "
+        "  (SELECT MAX(s.opened_at) FROM pos_shifts s "
+        "   WHERE s.tenant_id = c.tenant_id AND s.cashier_id = c.id) AS last_opened_at, "
+        "  EXISTS(SELECT 1 FROM pos_shifts s "
+        "   WHERE s.tenant_id = c.tenant_id AND s.cashier_id = c.id) AS has_shifts "
+        "FROM pos_cashiers c "
+        "WHERE c.tenant_id = %s AND c.workspace_client_id = %s "
+        "ORDER BY c.is_active DESC, c.display_name",
+        (tenant_id, workspace_client_id),
+    )
+    return cur.fetchall()
+
+
+def delete_cashier_if_unused(cur, *, tenant_id: str, workspace_client_id: int, cashier_id: str):
+    """删除从未开过班的收银员。返回 True=已删 / False=有开班记录不可删 / None=不存在。"""
+    cur.execute(
+        "SELECT 1 FROM pos_cashiers "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, cashier_id),
+    )
+    if not cur.fetchone():
+        return None
+    cur.execute(
+        "SELECT 1 FROM pos_shifts WHERE tenant_id = %s AND cashier_id = %s LIMIT 1",
+        (tenant_id, cashier_id),
+    )
+    if cur.fetchone():
+        return False
+    cur.execute(
+        "DELETE FROM pos_cashiers " "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, cashier_id),
+    )
+    return True
+
+
+def update_cashier(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    cashier_id: str,
+    display_name: Optional[str] = None,
+    color: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    pin_hash: Optional[str] = None,
+):
+    """改名/换色/启停/重设 PIN(只更非 None 字段)。找不到返 None。"""
+    sets, vals = [], []
+    if display_name is not None:
+        sets.append("display_name = %s")
+        vals.append(display_name)
+    if color is not None:
+        sets.append("color = %s")
+        vals.append(color)
+    if is_active is not None:
+        sets.append("is_active = %s")
+        vals.append(is_active)
+    if pin_hash is not None:
+        sets.append("pin_hash = %s")
+        vals.append(pin_hash)
+    if not sets:
+        cur.execute(
+            "SELECT id, display_name, color, is_active FROM pos_cashiers "
+            "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+            (tenant_id, workspace_client_id, cashier_id),
+        )
+        return cur.fetchone()
+    sets.append("updated_at = now()")
+    set_clause = ", ".join(sets)  # 全为 "<列名> = %s" 常量片段(值走 %s 参数化)
+    cur.execute(
+        f"UPDATE pos_cashiers SET {set_clause} "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s "
+        "RETURNING id, display_name, color, is_active",
+        vals + [tenant_id, workspace_client_id, cashier_id],
+    )
+    return cur.fetchone()
+
+
 # ── 班次只读(PIN 登录返回当前 open 班次 · 开/交逻辑在 shift.py B2)────────
 def get_open_shift_for_cashier(cur, *, tenant_id: str, cashier_id: str):
     cur.execute(

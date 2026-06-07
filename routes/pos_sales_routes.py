@@ -1,0 +1,332 @@
+# -*- coding: utf-8 -*-
+"""POS 收银前台路由(POS 项目 · PO-B2 · docs/pos/04 §3/§5/§6)。
+
+薄层:鉴权(POS token 收银员 / 老板)→ 模块守门(pos)→ 账套归属 → 调 services/pos。统一信封。
+收银员 token 自带 workspace_client_id;老板调需在 body/query 给 workspace_client_id。写端单事务
+(get_cursor_rls commit=True)发号/扣库存/落库原子。
+"""
+
+from __future__ import annotations
+
+from typing import List, Optional
+
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
+
+from core import db
+from core.pos_api import PosError, assert_module_enabled, ok, pos_auth
+from services.pos import catalog, refund as refund_svc, sale as sale_svc, shift as shift_svc
+
+router = APIRouter(prefix="/api/pos", tags=["pos-sales"])
+
+
+def _subject(request: Request) -> tuple[dict, str]:
+    user = pos_auth(request)
+    tid = user.get("tenant_id")
+    if not tid:
+        raise PosError("pos.forbidden", 403)
+    return user, str(tid)
+
+
+def _resolve_ws(user: dict, override: Optional[int]) -> int:
+    ws = user.get("workspace_client_id") or override
+    if ws is None:
+        raise PosError("pos.forbidden", 403)
+    return int(ws)
+
+
+def _require_workspace(cur, tid: str, ws: int) -> None:
+    cur.execute(
+        "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+        (ws, tid),
+    )
+    if not cur.fetchone():
+        raise PosError("pos.forbidden", 403)
+
+
+def _read(request: Request, ws_override: Optional[int], fn, commit: bool = False):
+    user, tid = _subject(request)
+    ws = _resolve_ws(user, ws_override)
+    with db.get_cursor_rls(tid, commit=commit) as cur:
+        assert_module_enabled(cur, tid, "pos")
+        _require_workspace(cur, tid, ws)
+        return ok(fn(cur, tid, ws, user))
+
+
+def _write(request: Request, ws_override: Optional[int], fn):
+    user, tid = _subject(request)
+    ws = _resolve_ws(user, ws_override)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        assert_module_enabled(cur, tid, "pos")
+        _require_workspace(cur, tid, ws)
+        return ok(fn(cur, tid, ws, user))
+
+
+def _created_by(user: dict) -> Optional[str]:
+    return str(user["id"]) if user.get("id") else None
+
+
+# ── 启动包 / 选品 ──────────────────────────────────────────────────────
+@router.get("/bootstrap")
+async def api_bootstrap(request: Request, workspace_client_id: Optional[int] = Query(None)):
+    return _read(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws, user: catalog.bootstrap(cur, tenant_id=tid, workspace_client_id=ws),
+        commit=True,
+    )
+
+
+@router.get("/products")
+async def api_products(
+    request: Request,
+    workspace_client_id: Optional[int] = Query(None),
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+):
+    return _read(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws, user: catalog.list_products(
+            cur, tenant_id=tid, workspace_client_id=ws, q=q, category=category
+        ),
+    )
+
+
+@router.get("/products/by-barcode")
+async def api_by_barcode(
+    request: Request, code: str = Query(...), workspace_client_id: Optional[int] = Query(None)
+):
+    return _read(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws, user: catalog.product_by_barcode(
+            cur, tenant_id=tid, workspace_client_id=ws, code=code
+        ),
+    )
+
+
+# ── 班次 ──────────────────────────────────────────────────────────────
+class OpenShiftRequest(BaseModel):
+    workspace_client_id: Optional[int] = None
+    terminal_id: int
+    opening_float: float = Field(0, ge=0)
+
+
+class CloseShiftRequest(BaseModel):
+    workspace_client_id: Optional[int] = None
+    counted_cash: float = Field(..., ge=0)
+
+
+@router.post("/shifts/open")
+async def api_open_shift(req: OpenShiftRequest, request: Request):
+    def _fn(cur, tid, ws, user):
+        cashier_id = user.get("cashier_id")
+        if not cashier_id:
+            raise PosError("pos.forbidden", 403)  # 仅收银员(PIN 登录)可开班
+        return {
+            "shift": shift_svc.open_shift(
+                cur,
+                tenant_id=tid,
+                workspace_client_id=ws,
+                terminal_id=req.terminal_id,
+                cashier_id=cashier_id,
+                opening_float=req.opening_float,
+            )
+        }
+
+    return _write(request, req.workspace_client_id, _fn)
+
+
+@router.post("/shifts/{shift_id}/close")
+async def api_close_shift(shift_id: str, req: CloseShiftRequest, request: Request):
+    return _write(
+        request,
+        req.workspace_client_id,
+        lambda cur, tid, ws, user: shift_svc.close_shift(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            shift_id=shift_id,
+            counted_cash=req.counted_cash,
+        ),
+    )
+
+
+# ── 小票 ──────────────────────────────────────────────────────────────
+class SaleLine(BaseModel):
+    product_id: str
+    sell_unit: Optional[str] = None
+    qty: float = Field(..., gt=0)
+    unit_price: float = Field(..., ge=0)
+    line_discount: float = Field(0, ge=0)
+    batch_id: Optional[str] = None
+
+
+class HeaderDiscount(BaseModel):
+    type: str = "none"
+    value: float = 0
+
+
+class Payment(BaseModel):
+    method: str
+    amount: float
+    ref: Optional[str] = None
+
+
+class CreateSaleRequest(BaseModel):
+    workspace_client_id: Optional[int] = None
+    client_uuid: Optional[str] = None
+    shift_id: Optional[str] = None
+    terminal_id: Optional[int] = None
+    doc_kind: str = "receipt"
+    member_client_id: Optional[int] = None
+    price_includes_vat: bool = False
+    lines: List[SaleLine] = Field(..., min_length=1)
+    header_discount: Optional[HeaderDiscount] = None
+    payments: List[Payment] = Field(default_factory=list)
+    sold_at: Optional[str] = None
+
+
+def _dump(m) -> dict:
+    return m.model_dump() if hasattr(m, "model_dump") else m.dict()
+
+
+@router.post("/sales")
+async def api_create_sale(req: CreateSaleRequest, request: Request):
+    payload = _dump(req)
+    return _write(
+        request,
+        req.workspace_client_id,
+        lambda cur, tid, ws, user: sale_svc.create_sale(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            payload={**payload, "cashier_id": user.get("cashier_id")},
+            created_by=_created_by(user),
+        ),
+    )
+
+
+@router.get("/sales/by-receipt")
+async def api_sale_by_receipt(
+    request: Request, no: str = Query(...), workspace_client_id: Optional[int] = Query(None)
+):
+    return _read(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws, user: sale_svc.get_sale_by_receipt(cur, tenant_id=tid, receipt_no=no),
+    )
+
+
+@router.get("/sales/{sale_id}")
+async def api_get_sale(
+    sale_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
+):
+    return _read(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws, user: sale_svc.get_sale_detail(cur, tenant_id=tid, sale_id=sale_id),
+    )
+
+
+class RefundLine(BaseModel):
+    sale_line_id: str
+    qty: float = Field(..., gt=0)
+
+
+class RefundRequest(BaseModel):
+    workspace_client_id: Optional[int] = None
+    client_uuid: Optional[str] = None
+    lines: List[RefundLine] = Field(..., min_length=1)
+    refund_method: str = "cash"
+
+
+@router.post("/sales/{sale_id}/refund")
+async def api_refund(sale_id: str, req: RefundRequest, request: Request):
+    return _write(
+        request,
+        req.workspace_client_id,
+        lambda cur, tid, ws, user: refund_svc.refund(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            original_sale_id=sale_id,
+            lines=[_dump(line) for line in req.lines],
+            refund_method=req.refund_method,
+            client_uuid=req.client_uuid,
+            cashier_id=user.get("cashier_id"),
+            created_by=_created_by(user),
+        ),
+    )
+
+
+@router.post("/sales/{sale_id}/void")
+async def api_void(
+    sale_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
+):
+    return _write(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws, user: sale_svc.void_sale(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            sale_id=sale_id,
+            created_by=_created_by(user),
+        ),
+    )
+
+
+@router.get("/sales/{sale_id}/promptpay-qr")
+async def api_promptpay_qr(
+    sale_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
+):
+    import base64
+
+    from services.sales.promptpay import build_payload, build_qr_png
+
+    user, tid = _subject(request)
+    ws = _resolve_ws(user, workspace_client_id)
+    with db.get_cursor_rls(tid) as cur:
+        assert_module_enabled(cur, tid, "pos")
+        _require_workspace(cur, tid, ws)
+        from services.pos import sales_store
+
+        sale = sales_store.get_sale(cur, tenant_id=tid, sale_id=sale_id)
+        if not sale:
+            raise PosError("pos.product_not_found", 404)
+        cur.execute(
+            "SELECT promptpay_id FROM workspace_clients WHERE tenant_id = %s AND id = %s",
+            (tid, ws),
+        )
+        row = cur.fetchone()
+    ppid = row["promptpay_id"] if row else None
+    if not ppid:
+        raise PosError("pos.line_invalid", 422, detail="no_promptpay_id")
+    amount = sale["grand_total"]
+    png = build_qr_png(ppid, amount)
+    return ok(
+        {
+            "qr_payload": build_payload(ppid, amount),
+            "png_base64": base64.b64encode(png).decode("ascii"),
+            "amount": f"{amount:.2f}",
+        }
+    )
+
+
+@router.get("/sales/{sale_id}/receipt-pdf")
+async def api_receipt_pdf(
+    sale_id: str,
+    request: Request,
+    workspace_client_id: Optional[int] = Query(None),
+    width: int = Query(80),
+):
+    user, tid = _subject(request)
+    ws = _resolve_ws(user, workspace_client_id)
+    with db.get_cursor_rls(tid) as cur:
+        assert_module_enabled(cur, tid, "pos")
+        _require_workspace(cur, tid, ws)
+        pdf = sale_svc.build_receipt_pdf(cur, tenant_id=tid, sale_id=sale_id, width_mm=width)
+    return Response(content=pdf, media_type="application/pdf")

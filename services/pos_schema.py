@@ -15,6 +15,7 @@ def bootstrap_pos_schema() -> None:
     from services.inventory import store as inventory_store
     from services.modules import store as modules_store
     from services.pos import cashier as pos_cashier
+    from services.pos import sales_store as pos_sales_store
     from services.products import units as product_units
 
     steps = (
@@ -22,6 +23,7 @@ def bootstrap_pos_schema() -> None:
         ("product_units", product_units.ensure_schema),
         ("inventory_core", inventory_store.ensure_schema),
         ("pos_core", pos_cashier.ensure_core_schema),
+        ("pos_sales", pos_sales_store.ensure_sales_schema),
     )
     for label, fn in steps:
         try:

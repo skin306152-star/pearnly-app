@@ -16,7 +16,13 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.pos_api import PosError, assert_module_enabled, ok, pos_auth, require_workspace
-from services.pos import catalog, refund as refund_svc, sale as sale_svc, shift as shift_svc
+from services.pos import (
+    catalog,
+    refund as refund_svc,
+    sale as sale_svc,
+    shift as shift_svc,
+    upgrade as upgrade_svc,
+)
 
 router = APIRouter(prefix="/api/pos", tags=["pos-sales"])
 
@@ -265,6 +271,38 @@ async def api_void(
             tenant_id=tid,
             workspace_client_id=ws,
             sale_id=sale_id,
+            created_by=_created_by(user),
+        ),
+    )
+
+
+class FullInvoiceBuyer(BaseModel):
+    party_type: str = "company"
+    name: Optional[str] = None
+    tax_id: Optional[str] = None
+    branch_type: Optional[str] = None
+    branch_no: Optional[str] = None
+    address: Optional[str] = None
+
+
+class FullInvoiceRequest(BaseModel):
+    workspace_client_id: Optional[int] = None
+    buyer: Optional[FullInvoiceBuyer] = None
+
+
+@router.post("/sales/{sale_id}/full-tax-invoice")
+async def api_full_tax_invoice(sale_id: str, req: FullInvoiceRequest, request: Request):
+    """小票升级正式税票:落 sales_documents(合规连号/冻结/不可改)+ 回填 full_invoice_id。"""
+    buyer = _dump(req.buyer) if req.buyer else None
+    return _write(
+        request,
+        req.workspace_client_id,
+        lambda cur, tid, ws, user: upgrade_svc.upgrade_to_full_tax_invoice(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            sale_id=sale_id,
+            buyer=buyer,
             created_by=_created_by(user),
         ),
     )

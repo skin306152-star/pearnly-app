@@ -277,6 +277,14 @@ def set_status(cur, *, tenant_id: str, sale_id: str, status: str) -> None:
     )
 
 
+def set_full_invoice_id(cur, *, tenant_id: str, sale_id: str, doc_id) -> None:
+    """升级正式税票后回填:标记该小票被全式票取代(VAT 申报去重锚点 · PO-B4)。"""
+    cur.execute(
+        "UPDATE pos_sales SET full_invoice_id = %s WHERE tenant_id = %s AND id = %s",
+        (doc_id, tenant_id, sale_id),
+    )
+
+
 def has_refunds(cur, *, tenant_id: str, sale_id: str) -> bool:
     cur.execute(
         "SELECT 1 FROM pos_sales WHERE tenant_id = %s AND refund_of_sale_id = %s LIMIT 1",

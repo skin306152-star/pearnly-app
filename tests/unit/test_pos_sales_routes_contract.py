@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """POS 收银前台路由守门测试(POS 项目 · PO-B2)。
 
-锁定:12 条路由 path+method 契约 · app.py include · 路由用 POS 信封 + 模块守门。"""
+锁定:13 条路由 path+method 契约 · app.py include · 路由用 POS 信封 + 模块守门。"""
 
 import unittest
 
@@ -19,6 +19,7 @@ EXPECTED = {
     ("GET", "/api/pos/sales/{sale_id}"),
     ("POST", "/api/pos/sales/{sale_id}/refund"),
     ("POST", "/api/pos/sales/{sale_id}/void"),
+    ("POST", "/api/pos/sales/{sale_id}/full-tax-invoice"),
     ("GET", "/api/pos/sales/{sale_id}/promptpay-qr"),
     ("GET", "/api/pos/sales/{sale_id}/receipt-pdf"),
 }

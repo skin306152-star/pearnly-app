@@ -89,7 +89,13 @@ async def api_send_document(doc_id: str, req: SendIn, request: Request):
                 _fail("recipient_required")
             parties = sales_render.resolve_parties(cur, tenant_id=tid, doc=doc)
             seller = parties[0]
-            pdf_bytes = sales_render.build_pdf(cur, tenant_id=tid, doc=doc, parties=parties)
+            pdf_bytes = sales_render.build_pdf(
+                cur,
+                tenant_id=tid,
+                doc=doc,
+                parties=parties,
+                copies_layout=doc.get("copies_layout") or "separate",
+            )
             subject, html = _email_content(doc, seller or {}, p.get("message"))
             ok, err = send_svc.send_email_with_pdf(
                 to_email=to,
@@ -142,7 +148,13 @@ async def api_shared_pdf(token: str, page: str = "A4"):
         doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=ref["document_id"])
         if not doc:
             raise HTTPException(404, detail="sales.not_found")
-        data = sales_render.build_pdf(cur, tenant_id=tid, doc=doc, page=page)
+        data = sales_render.build_pdf(
+            cur,
+            tenant_id=tid,
+            doc=doc,
+            page=page,
+            copies_layout=doc.get("copies_layout") or "separate",
+        )
     filename = (doc.get("doc_number") or "invoice").replace("/", "_")
     return Response(
         content=data,

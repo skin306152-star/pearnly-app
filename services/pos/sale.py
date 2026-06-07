@@ -216,6 +216,64 @@ def create_sale(
     return _sale_result(sale, deduped=False)
 
 
+def sync_sales(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    items: list,
+    cashier_id=None,
+    created_by=None,
+) -> dict:
+    """离线批量补传(PO-B5 · docs/pos/04 §6 sync)。逐张幂等处理,部分失败不卡其余。
+
+    每张包在 SAVEPOINT 里:成功 RELEASE、失败 ROLLBACK TO(清掉该张引发的 aborted 状态,
+    不污染同批其余)。client_uuid 命中=返原结果 deduped=true(防补传双扣)。cashier_id 取自
+    token(不信 body · 与单建一致),shift_id/terminal_id 等保留离线会话原值。失败项带错误码
+    返回供端上保留重试。
+    """
+    results = []
+    for raw in items:
+        cu = raw.get("client_uuid") if isinstance(raw, dict) else None
+        cur.execute("SAVEPOINT pos_sync_item")
+        try:
+            payload = {**raw, "cashier_id": cashier_id}
+            res = create_sale(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                payload=payload,
+                created_by=created_by,
+            )
+            cur.execute("RELEASE SAVEPOINT pos_sync_item")
+            results.append(
+                {
+                    "client_uuid": cu,
+                    "ok": True,
+                    "sale_id": res["sale"]["id"],
+                    "receipt_no": res["sale"]["receipt_no"],
+                    "deduped": res["deduped"],
+                }
+            )
+        except PosError as e:
+            cur.execute("ROLLBACK TO SAVEPOINT pos_sync_item")
+            results.append({"client_uuid": cu, "ok": False, "error": _err_body(e.code, e.detail)})
+        except Exception:
+            # 结构性坏张(类型/缺字段)也不许卡批:回退到 savepoint,标 line_invalid 让端上重试。
+            cur.execute("ROLLBACK TO SAVEPOINT pos_sync_item")
+            results.append(
+                {"client_uuid": cu, "ok": False, "error": _err_body("pos.line_invalid", None)}
+            )
+    return {"results": results}
+
+
+def _err_body(code: str, detail) -> dict:
+    body = {"code": code, "message_key": code}
+    if detail:
+        body["detail"] = detail
+    return body
+
+
 def _sale_result(sale: dict, *, deduped: bool) -> dict:
     return {
         "sale": {

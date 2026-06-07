@@ -206,6 +206,28 @@ async def api_create_sale(req: CreateSaleRequest, request: Request):
     )
 
 
+class SyncRequest(BaseModel):
+    workspace_client_id: Optional[int] = None
+    sales: List[dict] = Field(..., min_length=1, max_length=500)
+
+
+@router.post("/sales/sync")
+async def api_sync_sales(req: SyncRequest, request: Request):
+    """离线批量补传:逐张 client_uuid 幂等,部分失败不卡其余(失败项带错误码供端上重试)。"""
+    return _write(
+        request,
+        req.workspace_client_id,
+        lambda cur, tid, ws, user: sale_svc.sync_sales(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            items=req.sales,
+            cashier_id=user.get("cashier_id"),
+            created_by=_created_by(user),
+        ),
+    )
+
+
 @router.get("/sales/by-receipt")
 async def api_sale_by_receipt(
     request: Request, no: str = Query(...), workspace_client_id: Optional[int] = Query(None)

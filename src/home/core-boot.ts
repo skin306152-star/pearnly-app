@@ -238,6 +238,7 @@ const VALID_ROUTES = [
     'knowledge',
     'inventory',
     'pos-onboarding',
+    'sales-report',
 ];
 
 function routeTo(route?: any) {
@@ -282,6 +283,9 @@ function routeTo(route?: any) {
     // POS PO-B1 · 开通收银(屏8)
     if (route === 'pos-onboarding' && typeof window.loadPosOnboardingPage === 'function')
         window.loadPosOnboardingPage();
+    // POS 屏9 · 销售报表
+    if (route === 'sales-report' && typeof window.loadSalesReport === 'function')
+        window.loadSalesReport();
     // 销项 PO-10 · 发票工作台 / 商品管理 / 账套·开票资料
     if (route === 'sales-invoices' && typeof window.loadSalesWorkbench === 'function')
         window.loadSalesWorkbench();

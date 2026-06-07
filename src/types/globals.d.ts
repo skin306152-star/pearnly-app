@@ -287,6 +287,7 @@ interface Window {
     applyModuleNav?: () => void;
     loadInventoryPage?: () => void;
     loadPosOnboardingPage?: () => void;
+    loadSalesReport?: () => void;
     isOwner?: (u?: AppUser | null) => boolean;
     reloadInventory?: () => void;
     openInventoryIn?: () => void;

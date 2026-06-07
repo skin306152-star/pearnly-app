@@ -273,7 +273,7 @@ const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-inventory">库存</span>
             </div>
-            <div class="nav-item nav-sub-item" data-route="sales-report" data-locked="1">
+            <div class="nav-item nav-sub-item" data-route="sales-report">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="4" y1="17" x2="4" y2="9"/>
                     <line x1="10" y1="17" x2="10" y2="4"/>

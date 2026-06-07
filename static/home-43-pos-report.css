@@ -1,0 +1,244 @@
+/* POS 屏9 销售报表 · 视觉照搬概念稿 桌面/Pearnly_POS_UI预览/09-销售报表.html(09 §H)。
+   作用域 .posrep 防污染主程序;令牌按概念稿裸 hex 整块移植(同 home-41/42 · TOKEN_CSS 处理)。
+   唯一偏离:区间选中 + 重试按钮用蓝(#2563EB)不用黑 —— 全站按钮蓝硬规则(Zihao 2026-06-05)覆盖概念稿黑底。 */
+.posrep {
+    --rep-blue: #2563eb;
+    --rep-blue-d: #1d4ed8;
+    --rep-ink: #111827;
+    --rep-ink2: #6b7280;
+    --rep-ink3: #9ca3af;
+    --rep-card: #fff;
+    --rep-line: #e8e8e3;
+    --rep-green: #16a34a;
+    --rep-amber: #f59e0b;
+    --rep-shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 20px rgba(17, 24, 39, 0.06);
+    color: var(--rep-ink);
+    font-size: 13px;
+}
+.posrep .tnum {
+    font-variant-numeric: tabular-nums;
+}
+.posrep .ph {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.posrep .ph .t {
+    font-size: 19px;
+    font-weight: 700;
+}
+.posrep .range {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.posrep .range button {
+    height: 34px;
+    padding: 0 13px;
+    border: 1px solid var(--rep-line);
+    background: #fff;
+    border-radius: 8px;
+    font-size: 12.5px;
+    cursor: pointer;
+    color: var(--rep-ink2);
+}
+.posrep .range button.on {
+    background: var(--rep-blue);
+    color: #fff;
+    border-color: var(--rep-blue);
+}
+.posrep .range input[type='date'] {
+    height: 34px;
+    border: 1px solid var(--rep-line);
+    border-radius: 8px;
+    padding: 0 8px;
+    font-size: 12.5px;
+    color: var(--rep-ink);
+}
+.posrep .range .rep-dash {
+    color: var(--rep-ink3);
+}
+.posrep .kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.posrep .kpi {
+    background: var(--rep-card);
+    border: 1px solid var(--rep-line);
+    border-radius: 12px;
+    padding: 15px 16px;
+    box-shadow: var(--rep-shadow);
+}
+.posrep .kpi .l {
+    color: var(--rep-ink2);
+    font-size: 12px;
+}
+.posrep .kpi .v {
+    font-size: 24px;
+    font-weight: 800;
+    margin-top: 6px;
+}
+.posrep .cards2 {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+}
+.posrep .panel {
+    background: var(--rep-card);
+    border: 1px solid var(--rep-line);
+    border-radius: 14px;
+    box-shadow: var(--rep-shadow);
+    overflow: hidden;
+}
+.posrep .panel .h {
+    padding: 13px 16px;
+    border-bottom: 1px solid #f0f0ec;
+    font-weight: 700;
+    font-size: 13.5px;
+}
+.posrep .panel .h.border-top {
+    border-top: 1px solid #f0f0ec;
+}
+.posrep .chart {
+    padding: 18px 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 200px;
+}
+.posrep .col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    height: 100%;
+    justify-content: flex-end;
+    min-width: 0;
+}
+.posrep .col .b {
+    width: 60%;
+    min-height: 3px;
+    background: linear-gradient(180deg, #60a5fa, var(--rep-blue));
+    border-radius: 6px 6px 0 0;
+}
+.posrep .col .b.skel {
+    background: #eef0f3;
+}
+.posrep .col .x {
+    font-size: 10.5px;
+    color: var(--rep-ink3);
+    white-space: nowrap;
+}
+.posrep .pmrow {
+    display: flex;
+    padding: 14px 16px;
+    gap: 16px;
+    border-top: 1px solid #f0f0ec;
+}
+.posrep .pmrow .pm {
+    flex: 1;
+    text-align: center;
+}
+.posrep .pmrow .pm .l {
+    font-size: 12px;
+    color: var(--rep-ink2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+}
+.posrep .pmrow .pm .l .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.posrep .pmrow .pm .v {
+    font-size: 19px;
+    font-weight: 800;
+    margin-top: 5px;
+}
+.posrep .rows {
+    padding: 6px 0;
+}
+.posrep .row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #f6f6f3;
+    font-size: 13.5px;
+}
+.posrep .row:last-child {
+    border-bottom: 0;
+}
+.posrep .row .rk {
+    width: 20px;
+    color: var(--rep-ink3);
+    font-weight: 700;
+}
+.posrep .row .nm {
+    flex: 1;
+    min-width: 0;
+}
+.posrep .row .q {
+    color: var(--rep-ink2);
+    font-size: 12px;
+}
+.posrep .row .v {
+    font-weight: 700;
+}
+.posrep .rep-state {
+    text-align: center;
+    color: var(--rep-ink3);
+    padding: 48px 16px;
+    font-size: 13.5px;
+}
+.posrep .rep-state.sm {
+    padding: 24px 16px;
+}
+.posrep .rep-state.error {
+    color: var(--rep-ink2);
+}
+.posrep .rep-retry {
+    display: inline-block;
+    margin-top: 12px;
+    height: 36px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--rep-blue);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+.posrep .rep-retry:hover {
+    background: var(--rep-blue-d);
+}
+.posrep .rep-skel {
+    height: 56px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #f0f0ec 25%, #f7f7f4 50%, #f0f0ec 75%);
+    background-size: 200% 100%;
+    animation: rep-shimmer 1.2s infinite;
+}
+@keyframes rep-shimmer {
+    to {
+        background-position: -200% 0;
+    }
+}
+@media (max-width: 900px) {
+    .posrep .kpis {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .posrep .cards2 {
+        grid-template-columns: 1fr;
+    }
+}

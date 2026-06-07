@@ -78,6 +78,9 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .pill { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; background: rgba(255, 255, 255, .08); color: #e5e7eb; cursor: pointer; }
 .pos-view--main .pill.online .ic { color: #34d399; }
 .pos-view--main .pill.offline { background: rgba(245, 158, 11, .18); color: #fcd34d; }
+.pos-view--main .sync-pill { background: rgba(37, 99, 235, .22); color: #bfdbfe; }
+.pos-view--main .sync-pill.busy .ic { animation: pos-spin 1s linear infinite; }
+@keyframes pos-spin { to { transform: rotate(360deg); } }
 .pos-view--main .top-cashier { display: flex; align-items: center; gap: 9px; }
 .pos-view--main .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--blue); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
 .pos-view--main .clock { color: #d1d5db; font-size: 13px; }
@@ -262,6 +265,55 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--shift .submit:hover { background: var(--blue-d); }
 .pos-view--shift .submit:disabled { background: #c7cdd6; cursor: not-allowed; }
 .pos-view--shift .state { text-align: center; color: var(--ink3); padding: 40px 16px; font-size: 13.5px; }
+
+/* ════════════════ 收款成功面板(开税票入口)· 07 屏1 成交态 ════════════════ */
+.pos-view--main .done-modal { width: 360px; }
+.pos-view--main .done-top { padding: 26px 22px 18px; text-align: center; }
+.pos-view--main .done-ic { width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 50%; background: #ecfdf5; color: var(--green); display: grid; place-items: center; }
+.pos-view--main .done-title { font-size: 18px; font-weight: 700; }
+.pos-view--main .done-change-row { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin-top: 12px; font-size: 15px; color: var(--ink2); }
+.pos-view--main .done-change-row .tnum { font-size: 26px; font-weight: 800; color: var(--green); }
+.pos-view--main .done-meta { margin-top: 10px; font-size: 12.5px; color: var(--ink3); }
+.pos-view--main .done-acts { display: flex; gap: 10px; padding: 4px 22px 0; }
+.pos-view--main .done-btn { flex: 1; height: 46px; border: 1px solid var(--line); border-radius: 11px; background: #fff; color: var(--ink); cursor: pointer; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.pos-view--main .done-btn:active { background: var(--blue-l); }
+.pos-view--main .done-offline-note { display: none; margin: 12px 22px 0; padding: 9px 12px; border-radius: 10px; background: #fff8ec; border: 1px solid #fde9c8; color: #92600c; font-size: 12px; line-height: 1.45; }
+.pos-view--main .done-modal.is-offline #done-tax { display: none; }
+.pos-view--main .done-modal.is-offline .done-offline-note { display: block; }
+.pos-view--main .done-next { width: calc(100% - 44px); height: 50px; margin: 16px 22px 20px; border: 0; border-radius: 12px; background: var(--blue); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+.pos-view--main .done-next:hover { background: var(--blue-d); }
+
+/* ════════════════ 屏 2 升级正式税票 · 照搬概念稿 02 ════════════════ */
+.pos-view--main .tax-modal { width: 520px; }
+.pos-view--main .tax-body { padding: 18px 22px 4px; max-height: 70vh; overflow-y: auto; }
+.pos-view--main .tax-ref { display: flex; align-items: center; gap: 12px; background: #f8f8f5; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; }
+.pos-view--main .tax-ref .ico { width: 36px; height: 36px; border-radius: 9px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink2); flex: 0 0 36px; }
+.pos-view--main .tax-ref .info { flex: 1; min-width: 0; }
+.pos-view--main .tax-ref .info .a { font-size: 13.5px; font-weight: 600; }
+.pos-view--main .tax-ref .info .b { font-size: 12px; color: var(--ink2); margin-top: 2px; }
+.pos-view--main .tax-ref .amt { font-weight: 700; }
+.pos-view--main .tax-seg { display: flex; gap: 8px; margin-bottom: 16px; }
+.pos-view--main .tax-seg button { flex: 1; height: 46px; border: 1.5px solid var(--line); border-radius: 11px; background: #fff; cursor: pointer; font-size: 14px; color: var(--ink2); }
+.pos-view--main .tax-seg button.active { border-color: var(--blue); background: var(--blue-l); color: var(--blue); }
+.pos-view--main .tax-body label { display: block; font-size: 12.5px; color: var(--ink2); margin: 0 0 6px; }
+.pos-view--main .tax-fld { height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; background: #fbfbf9; }
+.pos-view--main .tax-fld input { border: 0; outline: 0; background: transparent; flex: 1; min-width: 0; font-size: 14.5px; color: var(--ink); }
+.pos-view--main .tax-fld input::placeholder { color: var(--ink3); }
+.pos-view--main .tax-fld.ok-on { border-color: #bbf7d0; background: #f0fdf4; }
+.pos-view--main .tax-fld .ok { display: none; align-items: center; gap: 5px; font-size: 12.5px; color: var(--green); flex: 0 0 auto; }
+.pos-view--main .tax-fld.ok-on .ok { display: flex; }
+.pos-view--main .tax-branch { display: flex; gap: 8px; margin-bottom: 14px; }
+.pos-view--main .tax-branch button { flex: 1; height: 40px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink2); cursor: pointer; font-size: 13px; }
+.pos-view--main .tax-branch button.active { border-color: var(--blue); background: var(--blue-l); color: var(--blue); }
+.pos-view--main .tax-branch .bno { flex: 0 0 120px; margin: 0; }
+.pos-view--main .tax-lock { display: flex; gap: 10px; background: #fff8ec; border: 1px solid #fde9c8; border-radius: 11px; padding: 11px 13px; margin: 6px 0 8px; font-size: 12.5px; color: #92600c; line-height: 1.5; }
+.pos-view--main .tax-lock svg { flex: 0 0 16px; color: var(--amber); margin-top: 1px; }
+.pos-view--main .tax-foot { padding: 8px 22px 20px; display: flex; gap: 10px; }
+.pos-view--main .tax-foot .ghost { flex: 0 0 auto; height: 50px; padding: 0 18px; border: 1px solid var(--line); border-radius: 11px; background: #fff; color: var(--ink2); cursor: pointer; font-size: 14px; }
+.pos-view--main .tax-foot .primary { flex: 1; height: 50px; border: 0; border-radius: 11px; background: var(--blue); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px; }
+.pos-view--main .tax-foot .primary:hover { background: var(--blue-d); }
+.pos-view--main .tax-foot .primary:disabled { background: #c7cdd6; cursor: not-allowed; }
+.pos-view--main .tax-modal.buyer-individual #tax-company-fields { display: none; }
 
 /* ════════════════ 全局 toast(跨屏)· 照搬概念稿 01 ════════════════ */
 .pos-toast { position: fixed; left: 50%; top: 24px; transform: translateX(-50%) translateY(-20px); opacity: 0; transition: .25s; background: var(--ink); color: #fff; padding: 13px 20px; border-radius: 12px; display: flex; align-items: center; gap: 10px; z-index: 80; box-shadow: 0 12px 30px rgba(0, 0, 0, .25); pointer-events: none; max-width: 90vw; }

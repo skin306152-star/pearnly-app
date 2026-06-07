@@ -12,6 +12,9 @@
     let activeCat = null;
     let tendered = 0;
     let discount = 0;
+    let lastSale = null; // 刚成交的单(成功面板 + 升级税票用)
+    let taxBuyerType = 'company';
+    let taxBranch = 'head';
     const HELD_KEY = 'pos_held_orders';
 
     // ── topbar ──
@@ -142,6 +145,7 @@
                 sell_unit: unit.unit_name,
                 qty: 1,
                 price: Number(unit.price),
+                vat_applicable: p.vat_applicable !== false,
             });
         renderCart();
     }
@@ -291,6 +295,7 @@
                 unit_price: c.price.toFixed(2),
                 line_discount: '0',
                 batch_id: null,
+                vat_applicable: c.vat_applicable !== false, // 离线本地算价用(服务端忽略,以商品为准)
             })),
             header_discount:
                 discount > 0
@@ -307,16 +312,222 @@
             return;
         }
         btn.disabled = true;
+        const snapshot = {
+            lines: cart.map((c) => ({
+                name: c.name,
+                qty: c.qty,
+                price: c.price,
+                sell_unit: c.sell_unit,
+            })),
+            method,
+            grand: grandTotal(),
+            tendered: method === 'cash' ? tendered : grandTotal(),
+        };
         try {
-            await POS.data.createSale(buildSalePayload(method));
+            const res = await POS.data.createSale(buildSalePayload(method));
             closePay();
             POS.toast(POS.t('posui.toast.paid'));
             clearCart();
+            showDone(res, snapshot);
         } catch (e) {
             // 07 屏1:收款失败弹窗内红字,不关弹窗,可改可重试
             $(errId).textContent = POS.posErrMsg(e.code, 'pos.unexpected');
         } finally {
             btn.disabled = false;
+        }
+    }
+
+    // ════════════════ 成交成功面板 + 屏2 升级税票 ════════════════
+    function showDone(res, snap) {
+        const sale = (res && res.sale) || {};
+        lastSale = {
+            id: sale.id || null,
+            receipt_no: sale.receipt_no || '',
+            grand_total: sale.grand_total != null ? sale.grand_total : snap.grand.toFixed(2),
+            change_amount: sale.change_amount,
+            offline: !!(res && res.offline), // 离线补单(Part B5)→ 不可即时开税票
+            lines: snap.lines,
+            method: snap.method,
+            sold_at: new Date(),
+        };
+        const cash = snap.method === 'cash';
+        const change =
+            lastSale.change_amount != null
+                ? lastSale.change_amount
+                : cash
+                  ? Math.max(0, snap.tendered - snap.grand).toFixed(2)
+                  : '0.00';
+        $('done-change-row').style.display = cash ? 'flex' : 'none';
+        $('done-change').textContent = fmt(change);
+        $('done-receipt').textContent = lastSale.receipt_no || '—';
+        // 离线单 / 纯本地预览均不可开正式税票(税票需联网连号)→ 隐税票钮 + 显提示
+        const taxable = !lastSale.offline && !!lastSale.id;
+        document.querySelector('#done-mask .done-modal').classList.toggle('is-offline', !taxable);
+        $('done-mask').classList.add('show');
+    }
+
+    function openReceipt() {
+        if (!lastSale) return;
+        if (!lastSale.offline && lastSale.id && !POS.allowMock()) {
+            printServerReceipt(lastSale.id);
+        } else {
+            printLocalReceipt(lastSale);
+        }
+    }
+
+    // 在线真单:取后端热敏 PDF(带 Bearer)新窗打印;取不到回落本地小票
+    async function printServerReceipt(saleId) {
+        try {
+            const res = await fetch('/api/pos/sales/' + saleId + '/receipt-pdf', {
+                headers: state.token ? { Authorization: 'Bearer ' + state.token } : {},
+            });
+            if (!res.ok) throw new Error('pdf');
+            const url = URL.createObjectURL(await res.blob());
+            window.open(url, '_blank');
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (_) {
+            printLocalReceipt(lastSale);
+        }
+    }
+
+    // 本地热敏小票(离线 / 取不到服务端 PDF 时)· 弹窗即打印
+    function printLocalReceipt(sale) {
+        const rows = (sale.lines || [])
+            .map(
+                (l) =>
+                    '<tr><td>' +
+                    POS.nm(l.name) +
+                    ' ×' +
+                    l.qty +
+                    '</td><td class="r">฿' +
+                    fmt(l.price * l.qty) +
+                    '</td></tr>'
+            )
+            .join('');
+        const html =
+            '<!doctype html><html><head><meta charset="utf-8"><title>' +
+            (sale.receipt_no || '') +
+            '</title><style>body{font:12px monospace;width:280px;margin:0 auto;padding:12px;color:#111}' +
+            'h3{text-align:center;margin:0 0 8px}table{width:100%;border-collapse:collapse}' +
+            'td{padding:2px 0}.r{text-align:right}.tot td{border-top:1px dashed #000;padding-top:6px;font-weight:700}' +
+            '.meta{color:#555;margin-bottom:8px}</style></head><body><h3>' +
+            (state.store || 'Pearnly POS') +
+            '</h3><div class="meta">' +
+            (sale.receipt_no || '') +
+            ' · ' +
+            POS.hm(sale.sold_at || new Date()) +
+            '</div><table>' +
+            rows +
+            '<tr class="tot"><td>' +
+            POS.t('posui.done.total') +
+            '</td><td class="r">฿' +
+            fmt(sale.grand_total) +
+            '</td></tr></table>' +
+            '<scr' +
+            'ipt>window.onload=function(){window.print()}</scr' +
+            'ipt></body></html>';
+        const w = window.open('', '_blank', 'width=320,height=620');
+        if (!w) {
+            POS.toast(POS.t('posui.done.print'));
+            return;
+        }
+        w.document.write(html);
+        w.document.close();
+    }
+
+    function openTaxModal() {
+        if (!lastSale || lastSale.offline || !lastSale.id) return;
+        taxBuyerType = 'company';
+        taxBranch = 'head';
+        $('tax-ref-no').textContent = POS.t('posui.tax.ref') + ' ' + (lastSale.receipt_no || '');
+        const items = (lastSale.lines || []).reduce((s, l) => s + l.qty, 0);
+        $('tax-ref-sub').textContent = POS.tf('posui.cart.items', {
+            n: items,
+            k: (lastSale.lines || []).length,
+        });
+        $('tax-ref-amt').textContent = '฿' + fmt(lastSale.grand_total);
+        ['tax-name', 'tax-taxid', 'tax-branchno', 'tax-address'].forEach((id) => {
+            const e = $(id);
+            if (e) e.value = '';
+        });
+        $('tax-err').textContent = '';
+        applyTaxBuyerType();
+        applyTaxBranch();
+        validateTaxId();
+        $('tax-mask').classList.add('show');
+    }
+
+    function applyTaxBuyerType() {
+        document
+            .querySelector('#tax-mask .tax-modal')
+            .classList.toggle('buyer-individual', taxBuyerType === 'individual');
+        document
+            .querySelectorAll('#tax-seg button')
+            .forEach((b) => b.classList.toggle('active', b.dataset.bt === taxBuyerType));
+        const lbl = $('tax-l-name');
+        const lblKey = taxBuyerType === 'company' ? 'posui.tax.f.company' : 'posui.tax.f.name';
+        lbl.setAttribute('data-i18n', lblKey);
+        lbl.textContent = POS.t(lblKey);
+        const nameInput = $('tax-name');
+        const phKey = taxBuyerType === 'company' ? 'posui.tax.ph.company' : 'posui.tax.ph.name';
+        nameInput.setAttribute('data-i18n-placeholder', phKey);
+        nameInput.setAttribute('placeholder', POS.t(phKey));
+    }
+
+    function applyTaxBranch() {
+        document
+            .querySelectorAll('.tax-branch button[data-branch]')
+            .forEach((b) => b.classList.toggle('active', b.dataset.branch === taxBranch));
+        const bno = $('tax-branchno').closest('.bno');
+        if (bno) bno.style.display = taxBranch === 'branch' ? 'flex' : 'none';
+    }
+
+    function validateTaxId() {
+        const v = ($('tax-taxid').value || '').replace(/\D/g, '');
+        $('tax-taxid-fld').classList.toggle('ok-on', v.length === 13);
+        updateTaxSubmit();
+    }
+
+    function updateTaxSubmit() {
+        const name = ($('tax-name').value || '').trim();
+        const tid = ($('tax-taxid').value || '').replace(/\D/g, '');
+        // 公司:名 + 13 位税号必填;个人:仅名必填(税号可选)
+        const ok = taxBuyerType === 'company' ? !!name && tid.length === 13 : !!name;
+        $('tax-submit').disabled = !ok;
+    }
+
+    async function doIssueTax() {
+        if (!lastSale || !lastSale.id) return;
+        const btn = $('tax-submit');
+        const tid = ($('tax-taxid').value || '').replace(/\D/g, '');
+        const buyer = {
+            party_type: taxBuyerType,
+            name: ($('tax-name').value || '').trim() || null,
+            tax_id: tid || null,
+            branch_type: taxBuyerType === 'company' ? taxBranch : null,
+            branch_no:
+                taxBuyerType === 'company' && taxBranch === 'branch'
+                    ? ($('tax-branchno').value || '').trim() || null
+                    : null,
+            address: ($('tax-address').value || '').trim() || null,
+        };
+        btn.disabled = true;
+        $('tax-err').textContent = '';
+        try {
+            await POS.data.fullTaxInvoice(lastSale.id, buyer);
+            $('tax-mask').classList.remove('show');
+            $('done-mask').classList.remove('show');
+            POS.toast(POS.t('posui.tax.done'));
+        } catch (e) {
+            // 已升级过:关弹窗 + toast(07 屏2);其余(税号无效等)弹窗内红字可改重试
+            if (e.code === 'pos.already_upgraded') {
+                $('tax-mask').classList.remove('show');
+                $('done-mask').classList.remove('show');
+                POS.toast(POS.posErrMsg('pos.already_upgraded'), 'error');
+            } else {
+                $('tax-err').textContent = POS.posErrMsg(e.code, 'pos.tax_id_invalid');
+                btn.disabled = false;
+            }
         }
     }
 
@@ -435,6 +646,7 @@
             POS.toast(
                 state.online ? POS.t('posui.net.toast.online') : POS.t('posui.net.toast.offline')
             );
+            if (state.online && POS.offline) POS.offline.sync();
         });
         $('pay-close-btn').addEventListener('click', closePay);
         document
@@ -452,6 +664,32 @@
         $('pay-card-confirm').addEventListener('click', (e) =>
             confirmPay('card', 'pay-card-err', e.currentTarget)
         );
+        // 成交成功面板
+        $('done-print').addEventListener('click', openReceipt);
+        $('done-tax').addEventListener('click', () => {
+            $('done-mask').classList.remove('show');
+            openTaxModal();
+        });
+        $('done-next').addEventListener('click', () => $('done-mask').classList.remove('show'));
+        // 屏2 升级税票
+        $('tax-close').addEventListener('click', () => $('tax-mask').classList.remove('show'));
+        $('tax-cancel').addEventListener('click', () => $('tax-mask').classList.remove('show'));
+        $('tax-submit').addEventListener('click', doIssueTax);
+        document.querySelectorAll('#tax-seg button').forEach((b) =>
+            b.addEventListener('click', () => {
+                taxBuyerType = b.dataset.bt;
+                applyTaxBuyerType();
+                updateTaxSubmit();
+            })
+        );
+        document.querySelectorAll('.tax-branch button[data-branch]').forEach((b) =>
+            b.addEventListener('click', () => {
+                taxBranch = b.dataset.branch;
+                applyTaxBranch();
+            })
+        );
+        $('tax-name').addEventListener('input', updateTaxSubmit);
+        $('tax-taxid').addEventListener('input', validateTaxId);
     }
 
     function enterMain() {

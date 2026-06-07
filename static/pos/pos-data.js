@@ -273,18 +273,22 @@
     ];
     POS.mock = { CATS, PRODUCTS: MOCK_PRODUCTS, CASHIERS: MOCK_CASHIERS };
 
-    function filterProducts(q, cat) {
-        let items = MOCK_PRODUCTS.slice();
+    // 通用本地选品过滤(mock 预览 + 离线快照共用)
+    POS.filterCatalog = function (list, q, cat) {
+        let items = (list || []).slice();
         if (cat) items = items.filter((p) => p.category_id === cat);
         if (q) {
             const s = q.toLowerCase();
             items = items.filter((p) => {
                 const hit = Object.values(p.name).join(' ').toLowerCase().includes(s);
-                const code = p.units.some((u) => (u.barcode || '').includes(q));
+                const code = (p.units || []).some((u) => (u.barcode || '').includes(q));
                 return hit || code;
             });
         }
         return items;
+    };
+    function filterProducts(q, cat) {
+        return POS.filterCatalog(MOCK_PRODUCTS, q, cat);
     }
 
     // ════════════════ 高层数据方法 ════════════════
@@ -350,18 +354,27 @@
             if (q) qs.set('q', q);
             if (cat) qs.set('category', cat);
             const d = await apiFetch('GET', '/api/pos/products?' + qs.toString());
-            return d.items || [];
+            const items = d.items || [];
+            if (!q && !cat && POS.offline) POS.offline.cacheCatalog(items); // 全量快照供离线选品
+            return items;
         } catch (e) {
             if (POS.isRouteMissing(e) && POS.allowMock()) return filterProducts(q, cat);
+            // 离线真租户:回落本地商品快照(联网时已缓存)
+            if (POS.isRouteMissing(e) && POS.offline && POS.offline.hasSnapshot())
+                return POS.offline.filterCached(q, cat);
             throw e;
         }
     };
 
-    // 收款建小票。B2 前回落 mock(本地生成单号/找零);上线后走真 POST。
+    // 收款建小票。离线(navigator/手动)→ 走 outbox 本地出单;在线 → 真 POST;纯本地预览回落 mock。
     data.createSale = async function (payload) {
+        if (!state.online && POS.offline) return POS.offline.enqueueSale(payload);
         try {
             return await apiFetch('POST', '/api/pos/sales', payload);
         } catch (e) {
+            // 在线请求却网络失败(信封缺失 = isRouteMissing)且引擎在 → 落 outbox 不丢单
+            if (POS.isRouteMissing(e) && POS.offline && !POS.allowMock())
+                return POS.offline.enqueueSale(payload);
             if (POS.isRouteMissing(e) && POS.allowMock()) {
                 const grand = payload.lines.reduce(
                     (s, l) => s + Number(l.unit_price) * Number(l.qty),
@@ -479,6 +492,36 @@
             if (POS.isRouteMissing(e)) return null;
             throw e;
         }
+    };
+
+    // 小票升级正式税票(04 §6 · B4)。买方公司/个人字段集见屏2。
+    // 离线不可开税票(税票需联网连号 · 08 ADR v1 范围),仅纯本地预览回落 mock 演示。
+    data.fullTaxInvoice = async function (saleId, buyer) {
+        try {
+            return await apiFetch('POST', '/api/pos/sales/' + saleId + '/full-tax-invoice', {
+                workspace_client_id: state.workspaceClientId,
+                buyer,
+            });
+        } catch (e) {
+            if (POS.isRouteMissing(e) && POS.allowMock()) {
+                return {
+                    document: {
+                        id: POS.uuid(),
+                        doc_number: 'INV-LOCAL-' + Math.floor(Math.random() * 90000 + 10000),
+                        doc_type: 'tax_invoice',
+                    },
+                };
+            }
+            throw e;
+        }
+    };
+
+    // 离线批量补传(04 §6 · B5)。逐张幂等,部分失败不卡其余;失败项端上保留重试。
+    data.syncSales = function (items) {
+        return apiFetch('POST', '/api/pos/sales/sync', {
+            workspace_client_id: state.workspaceClientId,
+            sales: items,
+        });
     };
 
     data.closeShift = async function (countedCash) {

@@ -237,15 +237,21 @@
         bindNav();
         if (POS.cashier) POS.cashier.init();
         if (POS.ops) POS.ops.init();
+        if (POS.offline) POS.offline.init();
         POS.setNet(navigator.onLine !== false);
         window.addEventListener('online', () => {
             POS.setNet(true);
             POS.toast(POS.t('posui.net.toast.online'));
+            if (POS.offline) POS.offline.sync();
         });
         window.addEventListener('offline', () => {
             POS.setNet(false);
             POS.toast(POS.t('posui.net.toast.offline'));
         });
+        // PWA 外壳 SW(08 ADR-1)· 失败不影响在线使用
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850703').catch(() => {});
+        }
         tick();
         setInterval(tick, 10000);
         POS.showView('login');

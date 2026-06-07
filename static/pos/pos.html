@@ -12,8 +12,8 @@
     <title>Pearnly POS · 收银台</title>
     <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any" />
     <!-- PWA 预留(离线 PO-B5 再注册 Service Worker;此处先挂 manifest 占位) -->
-    <link rel="manifest" href="/static/pos/manifest.webmanifest?v=11850702" />
-    <link rel="stylesheet" href="/static/pos/pos.css?v=11850702" />
+    <link rel="manifest" href="/static/pos/manifest.webmanifest?v=11850703" />
+    <link rel="stylesheet" href="/static/pos/pos.css?v=11850703" />
   </head>
   <body>
     <!-- ── 屏 6 · 开班登录 ── -->
@@ -86,6 +86,21 @@
             />
           </svg>
           <span id="net-txt" data-i18n="posui.net.online">在线</span>
+        </div>
+        <div class="pill sync-pill" id="sync-pill" style="display: none" title="">
+          <svg
+            class="ic"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M23 4v6h-6M1 20v-6h6" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+          <span id="sync-txt"></span>
         </div>
         <div class="clock" id="main-clock">--:--</div>
         <div class="top-cashier">
@@ -363,6 +378,218 @@
           </div>
         </div>
       </div>
+
+      <!-- 收款成功 · 小票完成(开正式税票入口) -->
+      <div class="mask" id="done-mask">
+        <div class="modal done-modal">
+          <div class="done-top">
+            <div class="done-ic">
+              <svg
+                width="30"
+                height="30"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </div>
+            <div class="done-title" data-i18n="posui.done.title">收款完成</div>
+            <div class="done-change-row" id="done-change-row">
+              <span data-i18n="posui.done.change">找零</span>
+              <span class="tnum">฿<span id="done-change">0.00</span></span>
+            </div>
+            <div class="done-meta">
+              <span data-i18n="posui.done.receipt">小票号</span> ·
+              <span class="tnum" id="done-receipt">—</span>
+            </div>
+          </div>
+          <div class="done-acts">
+            <button class="done-btn" id="done-print">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path
+                  d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+                />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+              <span data-i18n="posui.done.print">打印小票</span>
+            </button>
+            <button class="done-btn" id="done-tax">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span data-i18n="posui.done.tax">开正式税票</span>
+            </button>
+          </div>
+          <div class="done-offline-note" id="done-offline-note" data-i18n="posui.done.tax_offline">
+            离线单 · 联网后可开正式税票
+          </div>
+          <button class="done-next" id="done-next" data-i18n="posui.done.new">完成 · 下一单</button>
+        </div>
+      </div>
+
+      <!-- ── 屏 2 · 升级正式税票 ── -->
+      <div class="mask" id="tax-mask">
+        <div class="modal tax-modal">
+          <div class="modal-head">
+            <div class="t" data-i18n="posui.tax.title">开正式税票</div>
+            <button class="icbtn" style="background: #f0f0ec; color: #6b7280" id="tax-close">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div class="tax-body">
+            <div class="tax-ref">
+              <div class="ico">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"
+                  />
+                  <line x1="8" y1="8" x2="16" y2="8" />
+                  <line x1="8" y1="12" x2="16" y2="12" />
+                </svg>
+              </div>
+              <div class="info">
+                <div class="a" id="tax-ref-no">—</div>
+                <div class="b" id="tax-ref-sub">—</div>
+              </div>
+              <div class="amt tnum" id="tax-ref-amt">฿0.00</div>
+            </div>
+
+            <div class="tax-seg" id="tax-seg">
+              <button class="active" data-bt="company">
+                <span data-i18n="posui.tax.buyer.company">公司</span>
+              </button>
+              <button data-bt="individual">
+                <span data-i18n="posui.tax.buyer.individual">个人</span>
+              </button>
+            </div>
+
+            <label id="tax-l-name" data-i18n="posui.tax.f.company">公司名称</label>
+            <div class="tax-fld">
+              <input id="tax-name" data-i18n-placeholder="posui.tax.ph.company" />
+            </div>
+
+            <label data-i18n="posui.tax.f.taxid">税号(13 位)</label>
+            <div class="tax-fld" id="tax-taxid-fld">
+              <input
+                class="tnum"
+                id="tax-taxid"
+                inputmode="numeric"
+                data-i18n-placeholder="posui.tax.ph.taxid"
+              />
+              <span class="ok" id="tax-taxid-ok">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span data-i18n="posui.tax.valid">税号有效</span>
+              </span>
+            </div>
+
+            <div id="tax-company-fields">
+              <label data-i18n="posui.tax.branch">分支机构</label>
+              <div class="tax-branch">
+                <button class="active" data-branch="head" data-i18n="posui.tax.branch.head">
+                  总店
+                </button>
+                <button data-branch="branch" data-i18n="posui.tax.branch.sub">分店</button>
+                <div class="tax-fld bno">
+                  <input
+                    class="tnum"
+                    id="tax-branchno"
+                    data-i18n-placeholder="posui.tax.ph.branchno"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <label data-i18n="posui.tax.address">地址</label>
+            <div class="tax-fld">
+              <input id="tax-address" data-i18n-placeholder="posui.tax.ph.address" />
+            </div>
+
+            <div class="tax-lock">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <div data-i18n="posui.tax.lock">
+                开具后 =
+                正式税票:走税票连号、买卖双方信息冻结存档、不可修改(如需更正走红冲补开)。与会计端销项税自动对账。
+              </div>
+            </div>
+
+            <div class="pm-err" id="tax-err"></div>
+          </div>
+          <div class="tax-foot">
+            <button class="ghost" id="tax-cancel" data-i18n="posui.tax.cancel">取消</button>
+            <button class="primary" id="tax-submit">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path
+                  d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+                />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+              <span data-i18n="posui.tax.submit">开具并打印税票</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ── 屏 3 · 挂单 / 取单 ── -->
@@ -532,10 +759,12 @@
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=11850702"></script>
-    <script src="/static/pos/pos-data.js?v=11850702"></script>
-    <script src="/static/pos/pos-ops.js?v=11850702"></script>
-    <script src="/static/pos/pos-cashier.js?v=11850702"></script>
-    <script src="/static/pos/pos.js?v=11850702" defer></script>
+    <script src="/static/pos/pos-i18n.js?v=11850703"></script>
+    <script src="/static/pos/pos-totals.js?v=11850703"></script>
+    <script src="/static/pos/pos-data.js?v=11850703"></script>
+    <script src="/static/pos/pos-offline.js?v=11850703"></script>
+    <script src="/static/pos/pos-ops.js?v=11850703"></script>
+    <script src="/static/pos/pos-cashier.js?v=11850703"></script>
+    <script src="/static/pos/pos.js?v=11850703" defer></script>
   </body>
 </html>

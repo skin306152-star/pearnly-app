@@ -53,6 +53,23 @@ def _store_claims(request: Request) -> Optional[dict]:
     return payload
 
 
+def _store_name(cur, tid: str, workspace_client_id: int) -> str:
+    """账套显示名(店铺令牌签发/二维码标注用)。无则空串。"""
+    cur.execute(
+        "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+        (workspace_client_id, tid),
+    )
+    row = cur.fetchone()
+    return row["name"] if row else ""
+
+
+def _pos_base_url() -> str:
+    """自身 base URL(店铺接入链接/二维码用)· 同 oauth/邮件链接范式 · 多环境不写死。"""
+    import os
+
+    return (os.environ.get("PEARNLY_BASE_URL") or "https://pearnly.com").rstrip("/")
+
+
 def _workspace_from_store_or_legacy(cur, request: Request, legacy_ws: Optional[int]) -> tuple:
     """收银前台定位 (tenant, workspace):优先设备店铺令牌(校 token_version 防重置后旧令牌),
     否则回落老板「切到收银台」旧路径(localStorage 选的账套 → 传 workspace_client_id)。"""
@@ -102,17 +119,13 @@ async def api_bind_device(req: BindRequest, request: Request):
         tid = str(row["tenant_id"])
         ws = int(row["workspace_client_id"])
         ver = int(row["token_version"])
-        cur.execute(
-            "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-            (ws, tid),
-        )
-        nm = cur.fetchone()
+        store_name = _store_name(cur, tid, ws)
     token = create_pos_store_token(tenant_id=tid, workspace_client_id=ws, version=ver)
     return ok(
         {
             "store_token": token,
             "workspace_client_id": ws,
-            "store_name": nm["name"] if nm else "",
+            "store_name": store_name,
         }
     )
 
@@ -147,22 +160,18 @@ async def api_get_store_code(request: Request, workspace_client_id: int = Query(
     tid, _uid = require_owner(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, workspace_client_id)
-        cur.execute(
-            "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-            (workspace_client_id, tid),
-        )
-        nm = cur.fetchone()
+        store_name = _store_name(cur, tid, workspace_client_id)
         info = store_binding.get_or_create_code(
             cur,
             tenant_id=tid,
             workspace_client_id=workspace_client_id,
-            store_name=nm["name"] if nm else "",
+            store_name=store_name,
         )
-    link = "https://pearnly.com/pos?store=" + info["code"]
+    link = _pos_base_url() + "/pos?store=" + info["code"]
     return ok(
         {
             "code": info["code"],
-            "store_name": nm["name"] if nm else "",
+            "store_name": store_name,
             "workspace_client_id": workspace_client_id,
             "link": link,
             "qr": store_binding.qr_png_base64(link),
@@ -176,18 +185,14 @@ async def api_reset_store_code(req: WorkspaceBody, request: Request):
     tid, _uid = require_owner(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, req.workspace_client_id)
-        cur.execute(
-            "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-            (req.workspace_client_id, tid),
-        )
-        nm = cur.fetchone()
+        store_name = _store_name(cur, tid, req.workspace_client_id)
         info = store_binding.reset_code(
             cur,
             tenant_id=tid,
             workspace_client_id=req.workspace_client_id,
-            store_name=nm["name"] if nm else "",
+            store_name=store_name,
         )
-    return ok({"code": info["code"], "store_name": nm["name"] if nm else ""})
+    return ok({"code": info["code"], "store_name": store_name})
 
 
 class CashierCreate(BaseModel):

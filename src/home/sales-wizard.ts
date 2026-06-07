@@ -214,9 +214,10 @@ function bindEvents() {
 }
 
 function go(dir: number) {
+    // 第5步「开出」必须先于边界检查:否则 nx=5>4 提前 return,doIssue() 永不可达(死按钮)。
+    if (dir > 0 && cur === 4) return void doIssue();
     const nx = cur + dir;
     if (nx < 0 || nx > 4) return;
-    if (dir > 0 && cur === 4) return void doIssue();
     cur = nx;
     render();
 }

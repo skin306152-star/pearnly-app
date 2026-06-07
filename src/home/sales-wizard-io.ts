@@ -45,11 +45,13 @@ export async function loadWizardData(): Promise<void> {
 }
 
 // 税号验真(任意类型)→ {valid}
+// RD 接口统一回 {ok, data:{...}, cached};真实字段(valid/name/address)嵌在 data 里,不在顶层。
 export async function rdVerify(taxId: string): Promise<{ valid: boolean }> {
     const resp = await apiPost('/api/rd/verify', { tax_id: taxId });
     if (!resp || !resp.ok) return { valid: false };
-    const data = await resp.json().catch(() => ({}));
-    return { valid: !!data.valid };
+    const body = await resp.json().catch(() => ({}));
+    const d = (body && body.data) || {};
+    return { valid: !!(body && body.ok && d.valid) };
 }
 
 // 一键带出(仅公司)→ 税局登记名称/地址/分店
@@ -62,12 +64,13 @@ export interface RdLookup {
 export async function rdLookup(taxId: string, branch = 0): Promise<RdLookup> {
     const resp = await apiPost('/api/rd/lookup', { tax_id: taxId, branch });
     if (!resp || !resp.ok) return { found: false };
-    const d = await resp.json().catch(() => ({}));
+    const body = await resp.json().catch(() => ({}));
+    const d = (body && body.data) || {};
     return {
-        found: !!(d.found || d.name),
-        name: d.name || d.company_name,
-        address: d.address || d.full_address,
-        branch_no: d.branch_no || d.branch,
+        found: !!(body && body.ok && (d.name || d.address)),
+        name: d.name,
+        address: d.address,
+        branch_no: d.branch_no,
     };
 }
 

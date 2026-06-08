@@ -53,7 +53,11 @@ from services.erp._customer_sync_models import (  # noqa: F401  public re-export
     ListingCustomer,
     CustomerSyncResult,
 )
-from services.erp._customer_sync_parse import parse_armas_listing  # noqa: F401  public re-export
+from services.erp._customer_sync_parse import (  # noqa: F401  public re-export
+    _norm_tax,
+    _strip_tags,
+    parse_armas_listing,
+)
 from services.erp._customer_sync_resolve import CustomerResolveMixin
 from services.erp._customer_sync_create import CustomerCreateMixin
 from services.erp._customer_sync_fetch import CustomerFetchMixin

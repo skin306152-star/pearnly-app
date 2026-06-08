@@ -193,8 +193,9 @@ class ThaiInvoice(BaseModel):
         if v is None:
             return {}
         if isinstance(v, dict):
-            # 只保留值是 dict(可构造 FieldRef)的条目;null / 标量 / list 一律丢弃。
-            return {k: val for k, val in v.items() if isinstance(val, dict)}
+            # 只保留可构造 FieldRef 的条目:dict(Gemini JSON)或已是 FieldRef 实例(代码内构造);
+            # null / 标量 / list 一律丢弃。漏掉 FieldRef 实例会静默丢溯源 → validator 拦不住误源金额。
+            return {k: val for k, val in v.items() if isinstance(val, (dict, FieldRef))}
         return v
 
     @field_validator("additional_invoices", mode="before")

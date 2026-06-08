@@ -199,9 +199,11 @@ def main() -> int:
         )
 
         sale_id = r1["sale"]["id"]
-        detail = sale_svc.get_sale_detail(cur, tenant_id=tid, sale_id=sale_id)
+        detail = sale_svc.get_sale_detail(
+            cur, tenant_id=tid, workspace_client_id=ws, sale_id=sale_id
+        )
         by_no = sale_svc.get_sale_by_receipt(
-            cur, tenant_id=tid, receipt_no=r1["sale"]["receipt_no"]
+            cur, tenant_id=tid, workspace_client_id=ws, receipt_no=r1["sale"]["receipt_no"]
         )
         record(
             "取单 / 按号取单",
@@ -256,7 +258,9 @@ def main() -> int:
         )
 
         # 热敏小票出字节
-        pdf = sale_svc.build_receipt_pdf(cur, tenant_id=tid, sale_id=sale_id)
+        pdf = sale_svc.build_receipt_pdf(
+            cur, tenant_id=tid, workspace_client_id=ws, sale_id=sale_id
+        )
         record("热敏小票 PDF 出字节", pdf[:4] == b"%PDF" and len(pdf) > 500, f"{len(pdf)}B")
 
         # 交班日结

@@ -136,7 +136,7 @@ def main() -> int:
         )
 
         # 回填 full_invoice_id
-        reloaded = sales_store.get_sale(cur, tenant_id=tid, sale_id=sale_id)
+        reloaded = sales_store.get_sale(cur, tenant_id=tid, workspace_client_id=ws, sale_id=sale_id)
         record(
             "回填 full_invoice_id",
             str(reloaded["full_invoice_id"]) == doc["id"],

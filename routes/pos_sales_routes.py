@@ -235,7 +235,9 @@ async def api_sale_by_receipt(
     return _read(
         request,
         workspace_client_id,
-        lambda cur, tid, ws, user: sale_svc.get_sale_by_receipt(cur, tenant_id=tid, receipt_no=no),
+        lambda cur, tid, ws, user: sale_svc.get_sale_by_receipt(
+            cur, tenant_id=tid, workspace_client_id=ws, receipt_no=no
+        ),
     )
 
 
@@ -246,7 +248,9 @@ async def api_get_sale(
     return _read(
         request,
         workspace_client_id,
-        lambda cur, tid, ws, user: sale_svc.get_sale_detail(cur, tenant_id=tid, sale_id=sale_id),
+        lambda cur, tid, ws, user: sale_svc.get_sale_detail(
+            cur, tenant_id=tid, workspace_client_id=ws, sale_id=sale_id
+        ),
     )
 
 
@@ -358,7 +362,7 @@ async def api_promptpay_qr(
     from services.pos import sales_store
 
     def _fn(cur, tid, ws, user):
-        sale = sales_store.get_sale(cur, tenant_id=tid, sale_id=sale_id)
+        sale = sales_store.get_sale(cur, tenant_id=tid, workspace_client_id=ws, sale_id=sale_id)
         if not sale:
             raise PosError("pos.product_not_found", 404)
         return _promptpay_qr_result(cur, tid, ws, sale["grand_total"])
@@ -396,5 +400,7 @@ async def api_receipt_pdf(
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
         require_workspace(cur, tid, ws)
-        pdf = sale_svc.build_receipt_pdf(cur, tenant_id=tid, sale_id=sale_id, width_mm=width)
+        pdf = sale_svc.build_receipt_pdf(
+            cur, tenant_id=tid, workspace_client_id=ws, sale_id=sale_id, width_mm=width
+        )
     return Response(content=pdf, media_type="application/pdf")

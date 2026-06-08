@@ -117,46 +117,54 @@ def ensure_sales_schema() -> None:
 
 
 # ── 商品(售卖时取标志/单位)────────────────────────────────────────────
-def get_product_for_sale(cur, *, tenant_id: str, product_id: str):
+# 隔离:同一 tenant 下可代多套账(workspace_client_id),取商品/单位/单据必须连 ws 过滤,
+# 否则知道 id/票号即可跨套账读取(见 [[workspace-isolation-audit]])。ws 为必填,不许漏。
+def get_product_for_sale(cur, *, tenant_id: str, workspace_client_id: int, product_id: str):
     cur.execute(
         "SELECT id, base_unit, track_batch, vat_applicable, name_th, name_en, name_zh "
-        "FROM products WHERE tenant_id = %s AND id = %s AND is_active = TRUE",
-        (tenant_id, product_id),
+        "FROM products WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s "
+        "AND is_active = TRUE",
+        (tenant_id, workspace_client_id, product_id),
     )
     return cur.fetchone()
 
 
-def get_unit_factor(cur, *, tenant_id: str, product_id: str, unit_name: str):
+def get_unit_factor(
+    cur, *, tenant_id: str, workspace_client_id: int, product_id: str, unit_name: str
+):
     cur.execute(
         "SELECT factor_to_base FROM product_units "
-        "WHERE tenant_id = %s AND product_id = %s AND unit_name = %s",
-        (tenant_id, product_id, unit_name),
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = %s AND unit_name = %s",
+        (tenant_id, workspace_client_id, product_id, unit_name),
     )
     return cur.fetchone()
 
 
 # ── sales 头 ──────────────────────────────────────────────────────────
-def find_sale_by_client_uuid(cur, *, tenant_id: str, client_uuid: str):
+def find_sale_by_client_uuid(cur, *, tenant_id: str, workspace_client_id: int, client_uuid: str):
     cur.execute(
-        f"SELECT {_SALE_COLS} FROM pos_sales WHERE tenant_id = %s AND client_uuid = %s",
-        (tenant_id, client_uuid),
+        f"SELECT {_SALE_COLS} FROM pos_sales "
+        f"WHERE tenant_id = %s AND workspace_client_id = %s AND client_uuid = %s",
+        (tenant_id, workspace_client_id, client_uuid),
     )
     return cur.fetchone()
 
 
-def get_sale(cur, *, tenant_id: str, sale_id: str):
+def get_sale(cur, *, tenant_id: str, workspace_client_id: int, sale_id: str):
     cur.execute(
-        f"SELECT {_SALE_COLS} FROM pos_sales WHERE tenant_id = %s AND id = %s",
-        (tenant_id, sale_id),
+        f"SELECT {_SALE_COLS} FROM pos_sales "
+        f"WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, sale_id),
     )
     return cur.fetchone()
 
 
-def get_sale_by_receipt(cur, *, tenant_id: str, receipt_no: str):
+def get_sale_by_receipt(cur, *, tenant_id: str, workspace_client_id: int, receipt_no: str):
     cur.execute(
-        f"SELECT {_SALE_COLS} FROM pos_sales WHERE tenant_id = %s AND receipt_no = %s "
+        f"SELECT {_SALE_COLS} FROM pos_sales "
+        f"WHERE tenant_id = %s AND workspace_client_id = %s AND receipt_no = %s "
         f"ORDER BY created_at DESC LIMIT 1",
-        (tenant_id, receipt_no),
+        (tenant_id, workspace_client_id, receipt_no),
     )
     return cur.fetchone()
 

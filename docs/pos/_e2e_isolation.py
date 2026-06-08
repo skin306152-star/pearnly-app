@@ -69,8 +69,10 @@ def main() -> int:
             print("找不到第二个租户做隔离对照", file=sys.stderr)
             conn.rollback()
             return 2
-        tid_b = str(b["tid"])
+        tid_b, ws_b = str(b["tid"]), b["ws"]
         record("锚定两个真实租户 A/B", tid_a != tid_b, f"A={tid_a[:8]} B={tid_b[:8]}")
+        # 同租户内不存在的套账 id,用于跨套账(同 tenant 不同 workspace)隔离断言(POS-RO-003)。
+        ws_a_other = int(ws_a) + 999_000
 
         # 租户 A 造小票 + 库存
         cur.execute(
@@ -119,20 +121,41 @@ def main() -> int:
         )
         sale_id = sale["sale"]["id"]
 
-        # 正向对照:A 读得到
+        # 正向对照:A 用自己的套账读得到
         record(
             "A 读自己的小票(正向对照)",
-            sales_store.get_sale(cur, tenant_id=tid_a, sale_id=sale_id) is not None,
+            sales_store.get_sale(cur, tenant_id=tid_a, workspace_client_id=ws_a, sale_id=sale_id)
+            is not None,
         )
 
-        # 隔离:B 读不到 A 的小票
+        # 隔离(跨套账 · 同租户不同 workspace · POS-RO-003):A 换个套账读不到自己的小票
+        record(
+            "同租户跨套账取不到小票(get_sale)",
+            sales_store.get_sale(
+                cur, tenant_id=tid_a, workspace_client_id=ws_a_other, sale_id=sale_id
+            )
+            is None,
+        )
+        record(
+            "同租户跨套账取不到小票(by client_uuid)",
+            sales_store.find_sale_by_client_uuid(
+                cur, tenant_id=tid_a, workspace_client_id=ws_a_other, client_uuid=cu
+            )
+            is None,
+        )
+
+        # 隔离(跨租户):B 读不到 A 的小票
         record(
             "B 取不到 A 的小票(get_sale)",
-            sales_store.get_sale(cur, tenant_id=tid_b, sale_id=sale_id) is None,
+            sales_store.get_sale(cur, tenant_id=tid_b, workspace_client_id=ws_b, sale_id=sale_id)
+            is None,
         )
         record(
             "B 取不到 A 的小票(by client_uuid)",
-            sales_store.find_sale_by_client_uuid(cur, tenant_id=tid_b, client_uuid=cu) is None,
+            sales_store.find_sale_by_client_uuid(
+                cur, tenant_id=tid_b, workspace_client_id=ws_b, client_uuid=cu
+            )
+            is None,
         )
 
         # 隔离:B 看不到 A 的库存(按 tenant_id + product 直查)

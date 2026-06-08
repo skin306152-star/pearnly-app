@@ -268,7 +268,7 @@ def main() -> int:
         )
 
         # 7) 退货:退 5 粒 → 负额 + NEAR 回补 35→40
-        det = sale_svc.get_sale_detail(cur, tenant_id=tid, sale_id=s["id"])
+        det = sale_svc.get_sale_detail(cur, tenant_id=tid, workspace_client_id=ws, sale_id=s["id"])
         grain_line = [ln for ln in det["lines"] if ln["sell_unit"] == "粒"][0]
         rf = refund_svc.refund(
             cur,

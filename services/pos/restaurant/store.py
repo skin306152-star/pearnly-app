@@ -278,11 +278,13 @@ def set_session_status(cur, *, tenant_id: str, session_id: str, status: str, clo
 
 
 # ── 菜品快照(加菜时冻结价/单位/税)────────────────────────────────────
-def get_menu_product(cur, *, tenant_id: str, product_id: str):
+def get_menu_product(cur, *, tenant_id: str, workspace_client_id: int, product_id: str):
+    # 加菜取价必须连套账过滤(否则可点到别套账的菜品 · POS-RO-003)。
     cur.execute(
         "SELECT id, base_unit, vat_applicable, unit_price, name_th, name_en, name_zh "
-        "FROM products WHERE tenant_id = %s AND id = %s AND is_active = TRUE",
-        (tenant_id, product_id),
+        "FROM products WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s "
+        "AND is_active = TRUE",
+        (tenant_id, workspace_client_id, product_id),
     )
     return cur.fetchone()
 

@@ -142,9 +142,9 @@ def main() -> int:
             f"deduped={rep['deduped']}",
         )
 
-        line_id = sale_svc.get_sale_detail(cur, tenant_id=tid, sale_id=sa["sale"]["id"])["lines"][
-            0
-        ]["id"]
+        line_id = sale_svc.get_sale_detail(
+            cur, tenant_id=tid, workspace_client_id=ws, sale_id=sa["sale"]["id"]
+        )["lines"][0]["id"]
         _expect(
             "退货超额 over_refund",
             "pos.over_refund",

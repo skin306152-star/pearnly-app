@@ -175,7 +175,9 @@ def checkout(
 ) -> dict:
     cu = payload.get("client_uuid")
     if cu:
-        existing = sales_store.find_sale_by_client_uuid(cur, tenant_id=tenant_id, client_uuid=cu)
+        existing = sales_store.find_sale_by_client_uuid(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, client_uuid=cu
+        )
         if existing:
             return _checkout_result(
                 cur,
@@ -294,7 +296,9 @@ def checkout(
             cur, tenant_id=tenant_id, session_id=session_id, status="closed", closed=True
         )
     split = _split(grand, payload.get("ways")) if mode == "aa" else None
-    full = sales_store.get_sale(cur, tenant_id=tenant_id, sale_id=sale_id)
+    full = sales_store.get_sale(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
+    )
     return _checkout_result(
         cur, tenant_id=tenant_id, sale=full, session_id=session_id, split=split, deduped=False
     )
@@ -302,8 +306,9 @@ def checkout(
 
 # ── 内部 ──────────────────────────────────────────────────────────────
 def _assert_shift_open(cur, *, tenant_id: str, shift_id) -> None:
+    # 埋单同零售:必须挂 open 班次,缺 shift_id 一律拒(现金责任链 · POS-RO-002)。
     if not shift_id:
-        return
+        raise PosError("pos.shift_closed", 409, detail="shift_required")
     cur.execute(
         "SELECT status FROM pos_shifts WHERE tenant_id = %s AND id = %s",
         (tenant_id, shift_id),

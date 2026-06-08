@@ -33,12 +33,17 @@ def refund(
 ) -> dict:
     if client_uuid:
         existing = sales_store.find_sale_by_client_uuid(
-            cur, tenant_id=tenant_id, client_uuid=client_uuid
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            client_uuid=client_uuid,
         )
         if existing:
             return _refund_result(existing, deduped=True)
 
-    orig = sales_store.get_sale(cur, tenant_id=tenant_id, sale_id=original_sale_id)
+    orig = sales_store.get_sale(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=original_sale_id
+    )
     if not orig:
         raise PosError("pos.product_not_found", 404)
     if orig["status"] != "completed" or orig["sale_type"] != "sale":

@@ -93,7 +93,12 @@ def add_lines(
     if not lines:
         raise PosError("pos.line_invalid", 422, detail="empty_lines")
     for ln in lines:
-        prod = store.get_menu_product(cur, tenant_id=tenant_id, product_id=ln.get("product_id"))
+        prod = store.get_menu_product(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            product_id=ln.get("product_id"),
+        )
         if not prod:
             raise PosError("pos.line_invalid", 422, detail=str(ln.get("product_id")))
         qty = Decimal(str(ln.get("qty", 0)))

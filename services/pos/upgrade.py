@@ -83,7 +83,9 @@ def upgrade_to_full_tax_invoice(
     created_by: Optional[str] = None,
 ) -> dict:
     """小票 → 全式税票。单事务(调用方 commit):校验 → 建草稿 → 取连号开出冻结 → 回填标记。"""
-    sale = sales_store.get_sale(cur, tenant_id=tenant_id, sale_id=sale_id)
+    sale = sales_store.get_sale(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
+    )
     if not sale or sale["sale_type"] != "sale" or sale["status"] != "completed":
         raise PosError("pos.product_not_found", 404)
     if sale.get("full_invoice_id"):

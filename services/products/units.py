@@ -45,10 +45,12 @@ def ensure_schema() -> None:
         with db.get_cursor(commit=True) as cur:
             for clause in _PRODUCT_COLS:
                 cur.execute(f"ALTER TABLE products {clause}")
+            # 全新库:建表即带 workspace_client_id(套账隔离硬列 · DAL 全列读写)。
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS product_units (
                     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                     tenant_id uuid NOT NULL,
+                    workspace_client_id bigint NOT NULL,
                     product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
                     unit_name text NOT NULL,
                     factor_to_base numeric(14,3) NOT NULL,
@@ -60,14 +62,23 @@ def ensure_schema() -> None:
                     UNIQUE (tenant_id, product_id, unit_name)
                 )
                 """)
+            # 既有库(本列之前建的表):幂等补列 + 从 products 回填,再补索引。NOT NULL 收口走 alembic 0030
+            # (回填后),此处保持可空以免老库有孤儿行时启动失败。
             cur.execute(
-                "CREATE INDEX IF NOT EXISTS ix_product_units_product "
-                "ON product_units (tenant_id, product_id)"
+                "ALTER TABLE product_units ADD COLUMN IF NOT EXISTS workspace_client_id bigint"
+            )
+            cur.execute(
+                "UPDATE product_units pu SET workspace_client_id = p.workspace_client_id "
+                "FROM products p WHERE p.id = pu.product_id AND pu.workspace_client_id IS NULL"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS ix_product_units_ws "
+                "ON product_units (tenant_id, workspace_client_id, product_id)"
             )
             apply_tenant_rls(cur, "product_units")
         logger.info("✅ products 多单位列 + product_units 表已就绪 (POS PO-A2)")
     except Exception as e:
-        logger.warning(f"ensure_schema product_units 失败(跳过 · 等 alembic 0022): {e}")
+        logger.warning(f"ensure_schema product_units 失败(跳过 · 等 alembic 0022/0030): {e}")
 
 
 def _num(v: Any) -> Any:

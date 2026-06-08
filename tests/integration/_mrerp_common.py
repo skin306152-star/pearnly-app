@@ -37,7 +37,16 @@ SCREENSHOT_ROOT = PROJECT_ROOT / "docs" / "integrations" / "screenshots" / "_tes
 
 def require_credentials() -> Tuple[str, str, str, str, str]:
     """Return (login_url, username, password, comidyear, seldb) or call
-    unittest.SkipTest if any piece is missing."""
+    unittest.SkipTest if any piece is missing.
+
+    Opt-in gate: these tests hit the live MR.ERP site (create/delete customers,
+    take screenshots), so plain ``unittest discover`` must NOT run them — even
+    when credentials happen to be present in .env.local. Set
+    PEARNLY_RUN_LIVE_MRERP=1 to actually run the live suite (TEST-RO-001)."""
+    if os.environ.get("PEARNLY_RUN_LIVE_MRERP", "").strip() not in ("1", "true", "yes"):
+        raise unittest.SkipTest(
+            "live MR.ERP suite disabled by default; set PEARNLY_RUN_LIVE_MRERP=1 to run"
+        )
     login_url = os.environ.get("MRERP_LOGIN_URL", "").strip()
     username = os.environ.get("MRERP_USERNAME", "").strip()
     password = os.environ.get("MRERP_PASSWORD", "").strip()

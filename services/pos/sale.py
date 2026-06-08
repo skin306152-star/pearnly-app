@@ -33,11 +33,17 @@ def _parse_sold_at(raw) -> datetime:
         return datetime.now(timezone.utc)
 
 
-def _resolve_factor(cur, *, tenant_id: str, prod: dict, sell_unit: Optional[str]) -> Decimal:
+def _resolve_factor(
+    cur, *, tenant_id: str, workspace_client_id: int, prod: dict, sell_unit: Optional[str]
+) -> Decimal:
     if not sell_unit or sell_unit == prod["base_unit"]:
         return Decimal("1")
     r = sales_store.get_unit_factor(
-        cur, tenant_id=tenant_id, product_id=str(prod["id"]), unit_name=sell_unit
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        product_id=str(prod["id"]),
+        unit_name=sell_unit,
     )
     if not r:
         raise PosError("pos.line_invalid", 422, detail=sell_unit)
@@ -45,8 +51,9 @@ def _resolve_factor(cur, *, tenant_id: str, prod: dict, sell_unit: Optional[str]
 
 
 def _assert_shift_open(cur, *, tenant_id: str, shift_id: Optional[str]) -> None:
+    # 卖货必须挂一个 open 班次:缺 shift_id 一律拒(否则现金责任链断 · 见 POS-RO-002)。
     if not shift_id:
-        return
+        raise PosError("pos.shift_closed", 409, detail="shift_required")
     cur.execute(
         "SELECT status FROM pos_shifts WHERE tenant_id = %s AND id = %s",
         (tenant_id, shift_id),
@@ -76,7 +83,9 @@ def create_sale(
 ) -> dict:
     cu = payload.get("client_uuid")
     if cu:
-        existing = sales_store.find_sale_by_client_uuid(cur, tenant_id=tenant_id, client_uuid=cu)
+        existing = sales_store.find_sale_by_client_uuid(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, client_uuid=cu
+        )
         if existing:
             return _sale_result(existing, deduped=True)
 
@@ -91,14 +100,23 @@ def create_sale(
     totals_lines = []
     for ln in payload.get("lines", []):
         prod = sales_store.get_product_for_sale(
-            cur, tenant_id=tenant_id, product_id=ln.get("product_id")
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            product_id=ln.get("product_id"),
         )
         if not prod:
             raise PosError("pos.line_invalid", 422, detail=str(ln.get("product_id")))
         qty = Decimal(str(ln.get("qty", 0)))
         if qty <= 0:
             raise PosError("pos.line_invalid", 422)
-        factor = _resolve_factor(cur, tenant_id=tenant_id, prod=prod, sell_unit=ln.get("sell_unit"))
+        factor = _resolve_factor(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            prod=prod,
+            sell_unit=ln.get("sell_unit"),
+        )
         unit_price = Decimal(str(ln.get("unit_price", 0)))
         line_discount = Decimal(str(ln.get("line_discount") or 0))
         vat_app = bool(prod["vat_applicable"])
@@ -295,15 +313,19 @@ def _sale_result(sale: dict, *, deduped: bool) -> dict:
     }
 
 
-def get_sale_detail(cur, *, tenant_id: str, sale_id: str) -> dict:
-    sale = sales_store.get_sale(cur, tenant_id=tenant_id, sale_id=sale_id)
+def get_sale_detail(cur, *, tenant_id: str, workspace_client_id: int, sale_id: str) -> dict:
+    sale = sales_store.get_sale(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
+    )
     if not sale:
         raise PosError("pos.product_not_found", 404)
     return _detail_view(cur, tenant_id=tenant_id, sale=sale)
 
 
-def get_sale_by_receipt(cur, *, tenant_id: str, receipt_no: str) -> dict:
-    sale = sales_store.get_sale_by_receipt(cur, tenant_id=tenant_id, receipt_no=receipt_no)
+def get_sale_by_receipt(cur, *, tenant_id: str, workspace_client_id: int, receipt_no: str) -> dict:
+    sale = sales_store.get_sale_by_receipt(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, receipt_no=receipt_no
+    )
     if not sale:
         raise PosError("pos.product_not_found", 404)
     return _detail_view(cur, tenant_id=tenant_id, sale=sale)
@@ -354,11 +376,15 @@ def _header_view(sale: dict) -> dict:
     }
 
 
-def build_receipt_pdf(cur, *, tenant_id: str, sale_id: str, width_mm: int = 80) -> bytes:
+def build_receipt_pdf(
+    cur, *, tenant_id: str, workspace_client_id: int, sale_id: str, width_mm: int = 80
+) -> bytes:
     """热敏小票 PDF(复用销项 pdf_thermal · 58/80mm)。doc_type=receipt;合计按存额反推以票面自洽。"""
     from services.sales.pdf_thermal import render_thermal_pdf
 
-    sale = sales_store.get_sale(cur, tenant_id=tenant_id, sale_id=sale_id)
+    sale = sales_store.get_sale(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
+    )
     if not sale:
         raise PosError("pos.product_not_found", 404)
     cur.execute(
@@ -409,7 +435,9 @@ def void_sale(
     cur, *, tenant_id: str, workspace_client_id: int, sale_id: str, created_by=None
 ) -> dict:
     """作废当班错单:回补库存 + 标 void。已交班/已退货/已作废 → void_not_allowed。"""
-    sale = sales_store.get_sale(cur, tenant_id=tenant_id, sale_id=sale_id)
+    sale = sales_store.get_sale(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
+    )
     if not sale or sale["status"] != "completed" or sale["sale_type"] != "sale":
         raise PosError("pos.void_not_allowed", 409)
     if sale.get("shift_id") and not _shift_is_open(

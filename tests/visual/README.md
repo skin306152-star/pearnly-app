@@ -177,11 +177,16 @@ npx playwright show-report
 **挂在哪**:pre-push(改 `static/pos/**` 或 `src/home/{pos,inventory,purchase}-*` 或 `tests/visual/design/*`
 触发)。红了就是没照搬,自己回去对齐,不用肉眼抓。
 
-**加新照搬页怎么补映射**(3 步):
+**加新照搬页怎么补映射**(3 步 · 无隐藏步骤):
 1. 把设计稿拷进 `tests/visual/design/<短名>.html`(设计稿改版也更新这份)。
 2. 在 spec 的 `MAPPINGS` 加一项:`{name, design:'<短名>.html', route:'<core-boot 路由>', ready:'<生产就绪选择器>',
    layout:{sel,maxWidth}, tokens:[{design:'<稿选择器>', prod:'<生产选择器>', props:[...]}], bluemust, nosvgemoji}`。
 3. 若该页要 stub 的接口没覆盖,在 spec 顶部 `API` 加 canned 响应(信封 `{ok,data}`)。
 跑 `node tests/visual/test_design_fidelity.spec.js` 绿 = 照搬到位。
+**就这 3 步**:"bundle 就绪"探针已数据驱动(只认 `routeTo`),加页不必再改它。
 
-> 待补映射:收银设置(14)、采购主屏/拍照识别(采购 01/02)—— 等这些页建好,按上 3 步加。
+> **已覆盖**:桌台管理(餐厅稿 05 v2)、收款设置(POS 稿 13 · 即现金/PromptPay/刷卡那页 · 已建已上线)。
+> **待页建好再补**(现在无页可比 · 不是漏做):
+> - 收银设置(POS 稿 14「收银设置-平铺页」· 含小票/打印 · **与已建的「收款设置 13」是两个不同页** · 尚未建);
+> - 采购主屏 / 拍照识别(采购稿 01/02 · 采购模块尚未建)。
+> 这些页一旦建出来,按上 3 步加即可。

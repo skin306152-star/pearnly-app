@@ -184,14 +184,10 @@ async function styleOf(page, sel, props) {
         await page
             .goto('http://localhost:' + PORT + '/home', { waitUntil: 'domcontentloaded' })
             .catch(() => {});
+        // bundle 就绪 = routeTo 在(各页 loader 由 routeTo 经 ROUTE_LOADERS 表调度,无需逐个探)。
+        // 数据驱动:加新页只往 MAPPINGS 加一项即可,这里不必改(曾写死 loadPosTables/loadPosPayment → 加页必踩)。
         const fnReady = await page
-            .waitForFunction(
-                () =>
-                    typeof window.routeTo === 'function' &&
-                    typeof window.loadPosTables === 'function' &&
-                    typeof window.loadPosPayment === 'function',
-                { timeout: 20000 }
-            )
+            .waitForFunction(() => typeof window.routeTo === 'function', { timeout: 20000 })
             .then(() => true)
             .catch(() => false);
         ok(fnReady, '生产 bundle 就绪');

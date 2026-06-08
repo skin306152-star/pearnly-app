@@ -1,8 +1,12 @@
 /* 移动端响应式 · 从 landing-static-bg.css 拆出(铁律 ≤500)·
-   必在 landing-static-bg.css 之后加载(覆盖桌面基础规则)·
-   B 版手机稿照搬:品牌场景背景 + 底部登录按钮上拉登录框(桌面端不受影响) */
+   必在 landing-static-bg.css 之后加载(覆盖桌面基础规则)。
 
-/* 新增的手机端专属元素 · 桌面端一律隐藏(桌面恒显示内联表单) */
+   响应式做法:整个 390 设计稿按手机宽度等比缩放。
+   --s = 一个「设计 px」对应的真实长度 = min(100vw,430px)/390。
+   场景里所有尺寸写成 calc(设计px × var(--s)) → 任何手机同比例、不错位、一屏装下。
+   底部按钮/联系方式/安全三件不分层(直接落在场景上)。桌面端不受影响。 */
+
+/* 新增手机端专属元素 · 桌面端一律隐藏 */
 .m-dock,
 .m-backdrop,
 .m-sheet-close {
@@ -21,103 +25,112 @@
   }
 
   .auth-stage {
-    width: 100%;
-    min-height: 100vh;
+    --s: calc(min(100vw, 430px) / 390);
+    width: min(100vw, 430px);
+    margin: 0 auto;
+    min-height: 100svh;
     transform: none !important;
     position: relative;
   }
 
-  /* 场景背景:弃用整张烤图 · 换柔和渐变(对齐预览 .scene) */
+  /* 场景背景:柔和渐变(替换整张烤图) */
   .auth-shell {
     width: 100%;
     height: auto;
-    min-height: 100vh;
+    min-height: 100svh;
     background:
       radial-gradient(120% 70% at 18% 8%, #eef0ff 0%, rgba(238, 240, 255, 0) 55%),
       radial-gradient(120% 60% at 100% 26%, #fbe6f2 0%, rgba(251, 230, 242, 0) 60%),
       linear-gradient(168deg, #e9e6fb 0%, #f3ecf7 42%, #fdeaf0 68%, #e9eefb 100%);
   }
 
-  /* 悬浮玻璃 logo 标牌:复用桌面玻璃底/扫光/浮动 · 仅改尺寸位置 */
+  /* 桌面交互热区在移动端关闭(避免错位拦截点击) */
+  .mascot-interaction-layer,
+  .mascot-effect-layer {
+    display: none !important;
+  }
+
+  /* 悬浮玻璃 logo 标牌(等比缩放) */
   .brand-panel {
     position: absolute;
     inset: 0;
     height: auto;
-    --badge-x: 20px;
-    --badge-y: 22px;
-    --badge-w: 218px;
-    --badge-h: 80px;
-    --badge-r: 20px;
+    --badge-x: calc(20 * var(--s));
+    --badge-y: calc(22 * var(--s));
+    --badge-w: calc(218 * var(--s));
+    --badge-h: calc(80 * var(--s));
+    --badge-r: calc(20 * var(--s));
   }
 
   .brand-logo {
-    top: 34px;
-    left: 38px;
-    width: 182px;
-    height: 64px;
+    top: calc(34 * var(--s));
+    left: calc(38 * var(--s));
+    width: calc(182 * var(--s));
+    height: calc(64 * var(--s));
     object-fit: contain;
     object-position: left center;
   }
 
   .welcome-copy {
-    top: 116px;
-    left: 24px;
-    right: 182px;
+    top: calc(116 * var(--s));
+    left: calc(24 * var(--s));
+    right: calc(182 * var(--s));
   }
 
   .welcome-copy h1 {
-    font-size: 31px;
+    font-size: calc(31 * var(--s));
+    line-height: 1.1;
     color: #3a2bb8;
   }
 
   .welcome-copy p {
-    font-size: 15px;
+    margin-top: calc(8 * var(--s));
+    font-size: calc(15 * var(--s));
     color: #3a3358;
   }
 
-  /* 工作气泡(显示 · 收窄靠右 · 不压问候) */
-  .work-bubble {
-    display: flex;
-    top: 150px;
-    left: auto;
-    right: 16px;
-    width: 152px;
-    padding: 12px 14px;
-    border-radius: 20px;
-  }
-
-  .work-bubble::after {
-    left: 28px;
-    bottom: -15px;
-    border-top: 18px solid rgba(255, 255, 255, 0.9);
-    border-right: 19px solid transparent;
-  }
-
-  .work-bubble p {
-    font-size: 13px;
-    line-height: 1.32;
-  }
-
-  /* 桌面端靠烤图把这些 live 挂件 display:none · 移动端换了渐变场景须重新显示 */
+  /* 桌面靠烤图把这些 live 挂件 display:none · 移动端须显示 */
   .cat-wrap {
     display: block;
   }
-
   .spark {
     display: block;
   }
-
   .mini-bars {
     display: grid;
   }
 
-  /* 猫:全宽 cover + 四边羽化融入背景(不再像贴图) */
+  /* 工作气泡(等比缩放 · 收窄靠右 · 不压问候) */
+  .work-bubble {
+    display: flex;
+    top: calc(150 * var(--s));
+    left: auto;
+    right: calc(16 * var(--s));
+    width: calc(152 * var(--s));
+    padding: calc(12 * var(--s)) calc(14 * var(--s));
+    gap: calc(10 * var(--s));
+    border-radius: calc(20 * var(--s));
+  }
+
+  .work-bubble::after {
+    left: calc(28 * var(--s));
+    bottom: calc(-15 * var(--s));
+    border-top: calc(18 * var(--s)) solid rgba(255, 255, 255, 0.9);
+    border-right: calc(19 * var(--s)) solid transparent;
+  }
+
+  .work-bubble p {
+    font-size: calc(13 * var(--s));
+    line-height: 1.32;
+  }
+
+  /* 猫:全宽 cover + 四边羽化融入背景(位置/高度等比) */
   .cat-wrap {
     left: 0;
     right: 0;
-    top: 246px;
+    top: calc(246 * var(--s));
     width: auto;
-    height: 244px;
+    height: calc(244 * var(--s));
     transform: none;
   }
 
@@ -135,46 +148,45 @@
   }
 
   .spark-a {
-    left: 32px;
-    top: 392px;
-    font-size: 28px;
+    left: calc(32 * var(--s));
+    top: calc(392 * var(--s));
+    font-size: calc(28 * var(--s));
   }
 
   .spark-b {
     left: auto;
-    right: 40px;
-    top: 326px;
-    font-size: 22px;
+    right: calc(40 * var(--s));
+    top: calc(326 * var(--s));
+    font-size: calc(22 * var(--s));
   }
 
-  /* 清单卡隐藏 */
   .check-card,
   .check-heart {
     display: none;
   }
 
-  /* 今日 Quote(精确参数 · 盖住桌面下沿) */
+  /* 今日 Quote(等比 · 盖住桌面下沿) */
   .quote-card {
-    left: 13px;
-    right: 16px;
-    top: 476px;
+    left: calc(13 * var(--s));
+    right: calc(16 * var(--s));
+    top: calc(476 * var(--s));
     bottom: auto;
     width: auto;
-    padding: 13px 20px 12px;
-    border-radius: 20px;
+    padding: calc(13 * var(--s)) calc(20 * var(--s)) calc(12 * var(--s));
+    border-radius: calc(20 * var(--s));
     background: rgba(255, 255, 255, 0.9);
-    box-shadow: 0 16px 40px rgba(96, 74, 156, 0.18);
+    box-shadow: 0 calc(16 * var(--s)) calc(40 * var(--s)) rgba(96, 74, 156, 0.18);
     backdrop-filter: blur(10px);
   }
 
   .quote-card header {
-    font-size: 12px;
-    margin-bottom: 6px;
-    gap: 8px;
+    font-size: calc(12 * var(--s));
+    margin-bottom: calc(6 * var(--s));
+    gap: calc(8 * var(--s));
   }
 
   .quote-card blockquote {
-    font-size: 13px;
+    font-size: calc(13 * var(--s));
     line-height: 1.4;
   }
 
@@ -184,35 +196,36 @@
   }
 
   .quote-card footer {
-    font-size: 12px;
-    margin-top: 6px;
+    font-size: calc(12 * var(--s));
+    margin-top: calc(6 * var(--s));
   }
 
   .quote-card footer::after {
     display: none;
   }
 
-  /* ===== 底部 dock(关闭态):登录按钮 + 联系方式 + 安全三件 ===== */
+  /* ===== 底部 dock(不分层:透明底 · 直接落在场景上) ===== */
   .m-dock {
     display: block;
     position: fixed;
-    left: 0;
-    right: 0;
+    left: 50%;
     bottom: 0;
+    transform: translateX(-50%);
+    width: min(100vw, 430px);
     z-index: 12;
-    padding: 22px 22px 30px;
-    background: linear-gradient(0deg, rgba(248, 246, 255, 0.98) 58%, rgba(248, 246, 255, 0));
+    padding: 14px 22px calc(18px + env(safe-area-inset-bottom));
+    background: transparent;
   }
 
   .m-login-cta {
     width: 100%;
-    height: 56px;
+    height: 54px;
     border: 0;
     border-radius: 15px;
     cursor: pointer;
     color: #fff;
     background: linear-gradient(100deg, #7655f6 0%, #8b55fb 37%, #f04fbd 100%);
-    box-shadow: 0 16px 30px rgba(124, 87, 246, 0.32);
+    box-shadow: 0 14px 26px rgba(124, 87, 246, 0.34);
     font-size: 17px;
     font-weight: 850;
   }
@@ -222,8 +235,8 @@
     align-items: center;
     justify-content: center;
     gap: 16px;
-    margin-top: 14px;
-    color: #6a6384;
+    margin-top: 12px;
+    color: #5f5879;
     font-size: 12px;
     font-weight: 700;
   }
@@ -232,7 +245,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: #6a6384;
+    color: #5f5879;
     text-decoration: none;
   }
 
@@ -246,32 +259,31 @@
     align-items: center;
     justify-content: center;
     gap: 18px;
-    margin: 14px 0 0;
-    padding-top: 14px;
+    margin: 10px 0 0;
+    padding: 0;
     list-style: none;
-    border-top: 1px solid rgba(124, 87, 246, 0.1);
   }
 
   .m-sec-item {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: #9a93b2;
+    color: #8b84a1;
   }
 
   .m-sec-item svg {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
   }
 
   .m-sec-item b {
-    color: #8a83a0;
+    color: #7d7693;
     font-size: 11px;
     font-weight: 700;
     white-space: nowrap;
   }
 
-  /* ===== 上拉登录框(复用 .auth-card 作底部 sheet) ===== */
+  /* ===== 上拉登录框(复用 .auth-card 作底部 sheet · 表单不缩放,保点击友好) ===== */
   .m-backdrop {
     display: block;
     position: fixed;
@@ -291,29 +303,30 @@
   .auth-card,
   .auth-card.signup-mode {
     position: fixed;
-    left: 0;
-    right: 0;
+    left: 50%;
+    right: auto;
     bottom: 0;
     top: auto;
+    transform: translateX(-50%) translateY(110%);
     z-index: 50;
-    width: 100%;
-    max-height: 92%;
+    width: min(100vw, 430px);
+    max-height: 92svh;
     min-height: 0;
     height: auto;
     margin: 0;
-    padding: 18px 22px 28px;
+    padding: 18px 22px calc(24px + env(safe-area-inset-bottom));
     border: 0;
     border-radius: 26px 26px 0 0;
     background: #fff;
     box-shadow: 0 -16px 40px rgba(40, 33, 63, 0.28);
     backdrop-filter: none;
     overflow-y: auto;
-    transform: translateY(110%);
     transition: transform 0.28s ease;
   }
 
-  .auth-stage.m-auth-open .auth-card {
-    transform: translateY(0);
+  .auth-stage.m-auth-open .auth-card,
+  .auth-stage.m-auth-open .auth-card.signup-mode {
+    transform: translateX(-50%) translateY(0);
   }
 
   .m-sheet-close {
@@ -333,7 +346,7 @@
     cursor: pointer;
   }
 
-  /* 登录框内:语言切换 / 模式 tab 回归正常流(预览样式) */
+  /* 登录框内:语言 / 模式 tab 回归正常流 */
   .language-switcher {
     position: static;
     top: auto;
@@ -356,7 +369,7 @@
     font-size: 26px;
   }
 
-  /* 开票内联帮助卡:移动端由 dock 内联系方式替代 */
+  /* 内联帮助卡:移动端由 dock 内联系方式替代 */
   .support-card {
     display: none;
   }

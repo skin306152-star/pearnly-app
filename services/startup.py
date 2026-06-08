@@ -250,6 +250,15 @@ async def run_startup() -> dict:
     except Exception as e:
         logger.warning(f"启动 POS schema 失败: {e}")
 
+    # 商户采购(进项)schema 双跑(suppliers / purchase_docs+lines / categories+settings+
+    # intake+attachments)· 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
+    try:
+        from services.purchase.schema import ensure_purchase_schema
+
+        ensure_purchase_schema()
+    except Exception as e:
+        logger.warning(f"启动 采购 schema 失败(等 alembic 0031-0033): {e}")
+
     # v118.34.4 · MR.ERP test-connection cache flush
     # On every restart, drop any cached test-connection entries so users
     # don't see stale "stub" responses from before the v118.34.x dispatch

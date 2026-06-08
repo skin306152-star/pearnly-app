@@ -1,0 +1,63 @@
+# -*- coding: utf-8 -*-
+"""采购 schema 双跑对齐闸(docs/purchasing/01 · S1)。
+
+prod 无自动迁移,services/purchase/schema.ensure_purchase_schema 与 alembic 0031-0033 是同一
+份 DDL 的两处副本(启动 ensure / 正式迁移)。本测试机械保证两处覆盖同一组表 + 每表 RLS,
+任一处漏建/漏隔离 → 红。纯静态扫文本,不连库。
+"""
+
+import pathlib
+import re
+import unittest
+
+_ROOT = pathlib.Path(__file__).resolve().parents[2]
+_MIGRATIONS = (
+    "alembic/versions/0031_suppliers.py",
+    "alembic/versions/0032_purchase_docs.py",
+    "alembic/versions/0033_purchase_config.py",
+)
+_ENSURE = "services/purchase/schema.py"
+
+_EXPECTED_TABLES = {
+    "suppliers",
+    "purchase_docs",
+    "purchase_lines",
+    "expense_categories",
+    "purchase_settings",
+    "intake_items",
+    "purchase_attachments",
+}
+
+_CREATE_RE = re.compile(r"CREATE TABLE IF NOT EXISTS\s+(\w+)", re.I)
+
+
+def _tables_in(path: str) -> set:
+    text = (_ROOT / path).read_text(encoding="utf-8")
+    return set(_CREATE_RE.findall(text))
+
+
+class PurchaseSchemaParityTests(unittest.TestCase):
+    def test_ensure_covers_all_expected_tables(self):
+        self.assertEqual(_tables_in(_ENSURE), _EXPECTED_TABLES)
+
+    def test_migrations_cover_all_expected_tables(self):
+        migrated = set()
+        for m in _MIGRATIONS:
+            migrated |= _tables_in(m)
+        self.assertEqual(migrated, _EXPECTED_TABLES)
+
+    def test_every_table_has_rls_in_ensure(self):
+        text = (_ROOT / _ENSURE).read_text(encoding="utf-8")
+        # ensure 走 apply_tenant_rls(cur, *_RLS_TABLES);校验 7 表全列入 _RLS_TABLES。
+        for t in _EXPECTED_TABLES:
+            self.assertIn(f'"{t}"', text, f"{t} 未列入 ensure 的 RLS 清单")
+
+    def test_every_table_has_rls_in_migrations(self):
+        for m in _MIGRATIONS:
+            text = (_ROOT / m).read_text(encoding="utf-8")
+            for t in _tables_in(m):
+                self.assertIn(f't="{t}"', text, f"{m}:{t} 缺 RLS policy 应用(_RLS.format)")
+
+
+if __name__ == "__main__":
+    unittest.main()

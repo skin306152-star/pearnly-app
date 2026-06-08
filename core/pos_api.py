@@ -27,7 +27,7 @@ from fastapi.responses import JSONResponse
 
 # POS/库存/模块接口前缀:这些路径的请求体校验错误也要走信封(其余路由保持 FastAPI 默认)。
 # /api/me/modules 既匹配 GET(精确)也匹配 toggle 子路径(/api/me/modules/{key} 走前缀)。
-_POS_PREFIXES = ("/api/inventory", "/api/pos", "/api/me/modules")
+_POS_PREFIXES = ("/api/inventory", "/api/pos", "/api/me/modules", "/api/purchase")
 _POS_EXACT = ("/api/me/onboarding",)
 
 
@@ -77,9 +77,9 @@ async def _pos_validation_handler(request: Request, exc: RequestValidationError)
     默认 {detail:[...]} 而非信封(读 body.error.code 失败)。这里按路径前缀只接管 POS。
     """
     if _is_pos_path(request):
-        return JSONResponse(
-            status_code=422, content=_error_body("pos.line_invalid", "invalid_request_body")
-        )
+        path = str(request.url.path or "")
+        code = "purchase.line_invalid" if path.startswith("/api/purchase") else "pos.line_invalid"
+        return JSONResponse(status_code=422, content=_error_body(code, "invalid_request_body"))
     return await request_validation_exception_handler(request, exc)
 
 

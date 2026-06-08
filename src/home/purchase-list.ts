@@ -4,7 +4,6 @@
 /* global t, escapeHtml, showToast */
 import {
     papi,
-    papiForm,
     activeWsId,
     purchaseErrMsg,
     fmtBaht,
@@ -266,7 +265,7 @@ async function onCapture(input: HTMLInputElement): Promise<void> {
     fd.append('image', f);
     if (ws != null) fd.append('workspace_client_id', String(ws));
     try {
-        const res = (await papiForm('/api/purchase/intake', fd)) as {
+        const res = (await papi('POST', '/api/purchase/intake', fd)) as {
             draft?: Record<string, unknown> | null;
             dedupe_hit?: boolean;
         };

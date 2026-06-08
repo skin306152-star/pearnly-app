@@ -156,47 +156,33 @@ function unwrap(body: Envelope): unknown {
 // papi:打真接口 /api/purchase/*。后端已上线(S1-S5)→ 一律走真:成功取 data,失败抛 code。
 // 仅当路由「不存在」(HTTP 404)才落本地 mock —— 这只发生在离线视觉闸/冒烟 harness(stub 回 404);
 // 线上路由存在(鉴权失败回 401 等),走真信封/真错误,绝不静默吞成 mock(状态诚实)。
+// payload 传 FormData = multipart 上传(拍进项票真传图):浏览器自带边界,不塞 Content-Type。
 export async function papi(method: string, path: string, payload?: unknown): Promise<unknown> {
+    const isForm = payload instanceof FormData;
     let status = 0;
     let body: Envelope | null = null;
     let netFail = false;
     try {
+        const headers = authHeaders();
+        if (payload !== undefined && !isForm) headers['Content-Type'] = 'application/json';
         const r = await fetch(path, {
             method,
-            headers:
-                payload !== undefined
-                    ? ({ ...authHeaders(), 'Content-Type': 'application/json' } as HeadersInit)
-                    : (authHeaders() as HeadersInit),
-            body: payload !== undefined ? JSON.stringify(payload) : undefined,
+            headers: headers as HeadersInit,
+            body: isForm
+                ? (payload as FormData)
+                : payload !== undefined
+                  ? JSON.stringify(payload)
+                  : undefined,
         });
         status = r.status;
         body = (await r.json().catch(() => null)) as Envelope | null;
     } catch (_) {
         netFail = true;
     }
-    if (status === 404) return mockHandle(method, path, payload); // 路由不存在(harness)→ mock
+    if (status === 404) return mockHandle(method, path, isForm ? {} : payload); // 路由不存在(harness)→ mock
     if (netFail) throw new PurchaseError('purchase.unexpected'); // 网络/解析失败 → 诚实报错
     if (body != null && typeof body.ok === 'boolean') return unwrap(body); // 真信封
     throw new PurchaseError('purchase.unexpected'); // 401/500/非信封 → 诚实报错,不吞成 mock
-}
-
-// papiForm:multipart 上传(拍进项票 → /intake 传真图)。同 papi 的信封/404-mock/错误处理,
-// 但 body 走 FormData(浏览器自带 multipart 边界 · 不能塞 Content-Type)。
-export async function papiForm(path: string, form: FormData): Promise<unknown> {
-    let status = 0;
-    let body: Envelope | null = null;
-    let netFail = false;
-    try {
-        const r = await fetch(path, { method: 'POST', headers: authHeaders(), body: form });
-        status = r.status;
-        body = (await r.json().catch(() => null)) as Envelope | null;
-    } catch (_) {
-        netFail = true;
-    }
-    if (status === 404) return mockHandle('POST', path, {});
-    if (netFail) throw new PurchaseError('purchase.unexpected');
-    if (body != null && typeof body.ok === 'boolean') return unwrap(body);
-    throw new PurchaseError('purchase.unexpected');
 }
 
 // 当前账套(进项按 workspace_client_id 隔离)· 个人模式/未选 → null(调用方提示选账套)。

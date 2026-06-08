@@ -210,11 +210,54 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
     else:
         # v118.25.4 · 已绑定 · 优先用户偏好 · 兜底 LINE 语言
         lang = bound_user.get("preferred_lang") or ev_lang
+        # F10 · 商户(非 firm)+ 开 expense + 文本含金额 → 记一笔费用并回执;否则回功能提示(现状不变)。
+        recorded = _maybe_record_line_expense(bound_user, text, lang)
+        if recorded:
+            line_client.reply_text(reply_token, recorded)
+            return
         username = bound_user.get("username") or ""
         line_client.reply_text(
             reply_token,
             line_client.t_line(lang, "already_bound_hint", username=username),
         )
+
+
+def _maybe_record_line_expense(bound_user: dict, text: str, lang: str):
+    """商户(business_type 非 firm/未选)+ 开 expense + 文本含金额 → 记一笔 posted 费用,返回回执文案。
+    事务所(firm/null)/ 未开 expense / 无默认套账 / 无金额 / 任何异常 → None(LINE 主路径 + 事务所底线一字不破坏)。"""
+    try:
+        tid = bound_user.get("tenant_id")
+        if not tid:
+            return None
+        from core.workspace_context import default_workspace_id
+        from services.modules import store as modules_store
+        from services.purchase import intake as intake_svc
+
+        with db.get_cursor_rls(str(tid), commit=True) as cur:
+            bt = modules_store.get_business_type(cur, tenant_id=str(tid))
+            if bt in (None, "firm"):
+                return None
+            if not modules_store.is_enabled(cur, tenant_id=str(tid), module_key="expense"):
+                return None
+            ws = default_workspace_id(cur, str(tid))
+            if ws is None:
+                return None
+            created_by = str(bound_user["id"]) if bound_user.get("id") else None
+            res = intake_svc.record_line_expense(
+                cur,
+                tenant_id=str(tid),
+                workspace_client_id=ws,
+                text=text,
+                created_by=created_by,
+            )
+        if not res:
+            return None
+        return line_client.t_line(
+            lang, "expense_recorded", desc=res["description"], amount=res["amount"]
+        )
+    except Exception:
+        logger.exception("[line] expense record failed; fall back to hint")
+        return None
 
 
 @router.post("/api/line/webhook")

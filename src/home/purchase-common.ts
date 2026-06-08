@@ -185,6 +185,22 @@ export async function papi(method: string, path: string, payload?: unknown): Pro
     throw new PurchaseError('purchase.unexpected'); // 401/500/非信封 → 诚实报错,不吞成 mock
 }
 
+// 受鉴权的 PDF(替代收据/扣缴凭证/票图)→ blob → 新标签打开。window.open 无法带 Bearer,
+// 故 fetch(authHeaders) 取 blob 再开 object URL(对齐销项 loadAuthedImg 思路)。失败抛 code。
+export async function openPurchasePdf(path: string): Promise<void> {
+    let r: Response;
+    try {
+        r = await fetch(path, { headers: authHeaders() as HeadersInit });
+    } catch (_) {
+        throw new PurchaseError('purchase.unexpected');
+    }
+    if (!r.ok) throw new PurchaseError('purchase.unexpected');
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 // 当前账套(进项按 workspace_client_id 隔离)· 个人模式/未选 → null(调用方提示选账套)。
 export function activeWsId(): number | null {
     try {

@@ -187,24 +187,6 @@ def resolve_image_intake(
     kind, route = judge_direction(fields, my_tax_id=my_tax)
     low_conf = str(confidence or "").lower() in ("needs_review", "low", "")
 
-    if route == "inbox" or (low_conf and route == "purchase"):
-        _stash_inbox(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            source=source,
-            raw=fields,
-            image_url=image_url,
-            ai_guess={"kind": kind, "confidence": confidence},
-        )
-        return {
-            "kind": kind,
-            "confidence": confidence,
-            "route": "inbox",
-            "draft": None,
-            "dedupe_hit": False,
-        }
-
     if route in ("sales", "recon"):
         return {
             "kind": kind,
@@ -214,8 +196,32 @@ def resolve_image_intake(
             "dedupe_hit": False,
         }
 
-    draft = build_draft_from_invoice(fields, kind=kind)
-    calc = totals_svc.compute_purchase_totals(draft["lines"])
+    draft = None
+    calc = None
+    if route in ("purchase", "expense"):
+        draft = build_draft_from_invoice(fields, kind=kind)
+        calc = totals_svc.compute_purchase_totals(draft["lines"])
+
+    # 低置信 / unknown / 抽取过空(糊图税号"13"·金额฿0)→ 落待归类,绝不直接进可保存的 ฿0 表单(F5)。
+    too_empty = calc is None or calc["grand_total"] <= 0
+    if route == "inbox" or draft is None or low_conf or too_empty:
+        _stash_inbox(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            source=source,
+            raw=fields,
+            image_url=image_url,
+            ai_guess={"kind": kind, "confidence": confidence, "route": route},
+        )
+        return {
+            "kind": kind,
+            "confidence": confidence,
+            "route": "inbox",
+            "draft": None,
+            "dedupe_hit": False,
+        }
+
     dkey = totals_svc.dedupe_key(
         supplier_tax=draft["supplier"]["tax_id"],
         doc_no=draft["doc_no"],
@@ -308,6 +314,127 @@ def route_line_image(*, tenant_id, workspace_client_id, fields, confidence) -> b
             ai_guess={"kind": kind, "route": route, "confidence": confidence},
         )
         return True
+
+
+def record_line_expense(cur, *, tenant_id, workspace_client_id, text, created_by) -> Optional[dict]:
+    """LINE 文字一句话 → 归类 → 直接记一笔 posted 费用(F10)。无金额(<=0)→ None(不记·调用方回提示)。
+    复用 /api/purchase/expense 同一套 services,逐字对齐。失败由调用方 try/except 兜底(不破坏 LINE 回复)。"""
+    from services.purchase import categories as cat_svc
+    from services.purchase import docs as docs_svc
+    from services.purchase import posting as posting_svc
+    from services.purchase import settings as settings_svc
+
+    cfg = settings_svc.get_settings(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+    )
+    cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    parsed = classify_expense_text(text, cats)
+    if _to_decimal(parsed.get("amount")) <= 0:
+        return None
+    data = {
+        "doc_kind": "expense",
+        "source": "line",
+        "category_id": parsed["category_id"],
+        "lines": [expense_line(parsed)],
+    }
+    created = docs_svc.create_doc(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        created_by=created_by,
+        data=data,
+        settings=cfg,
+        status="draft",
+    )
+    posted = posting_svc.post_doc(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        doc_id=created["doc"]["id"],
+        auto_stock_in=False,
+        created_by=created_by,
+    )
+    return {
+        "doc": posted["doc"],
+        "amount": str(parsed["amount"]),
+        "description": parsed["description"],
+        "categorized": parsed["category_id"] is not None,
+    }
+
+
+def list_inbox(cur, *, tenant_id, workspace_client_id) -> list[dict]:
+    """待归类收件箱:本套账 status='pending' 的 intake_items(新→旧)。供前端一点归类。"""
+    cur.execute(
+        "SELECT id, source, raw, image_url, ai_guess, created_at FROM intake_items "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND status = 'pending' "
+        "ORDER BY created_at DESC",
+        (tenant_id, workspace_client_id),
+    )
+    return [
+        {
+            "id": str(r["id"]),
+            "source": r["source"],
+            "raw": r["raw"] or {},
+            "image_url": r["image_url"],
+            "ai_guess": r["ai_guess"] or {},
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+        }
+        for r in cur.fetchall()
+    ]
+
+
+_INBOX_ACTIONS = ("purchase", "expense", "sales", "recon", "dismiss")
+
+
+def resolve_inbox(
+    cur, *, tenant_id, workspace_client_id, item_id, action, created_by, settings
+) -> dict:
+    """一点归类。purchase/expense → 据 raw 建草稿单(返 doc_id 供前端开录入屏确认);
+    sales/recon → 移出收件箱(去对应模块处理);dismiss → 标记非票。绝不静默丢:全留痕。"""
+    if action not in _INBOX_ACTIONS:
+        from core.pos_api import PosError
+
+        raise PosError("purchase.line_invalid", 422, detail="bad_action")
+    cur.execute(
+        "SELECT raw FROM intake_items "
+        "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s AND status = 'pending'",
+        (item_id, tenant_id, workspace_client_id),
+    )
+    row = cur.fetchone()
+    if row is None:
+        from core.pos_api import PosError
+
+        raise PosError("purchase.forbidden", 404, detail="inbox_item_not_found")
+
+    if action in ("purchase", "expense"):
+        from services.purchase import docs as docs_svc
+
+        kind = "purchase_invoice" if action == "purchase" else "expense"
+        draft = build_draft_from_invoice(row["raw"] or {}, kind=kind)
+        created = docs_svc.create_doc(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            created_by=created_by,
+            data=draft,
+            settings=settings,
+            status="draft",
+        )
+        doc_id = created["doc"]["id"]
+        cur.execute(
+            "UPDATE intake_items SET status = 'resolved', resolved_doc_id = %s "
+            "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s",
+            (doc_id, item_id, tenant_id, workspace_client_id),
+        )
+        return {"status": "resolved", "doc_id": str(doc_id), "doc_kind": kind}
+
+    new_status = "dismissed" if action == "dismiss" else "resolved"
+    cur.execute(
+        "UPDATE intake_items SET status = %s "
+        "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s",
+        (new_status, item_id, tenant_id, workspace_client_id),
+    )
+    return {"status": new_status, "route": action}
 
 
 def _stash_inbox(cur, *, tenant_id, workspace_client_id, source, raw, image_url, ai_guess) -> None:

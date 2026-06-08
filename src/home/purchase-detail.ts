@@ -96,21 +96,27 @@ function amountCard(d: DocDetail): string {
         return `<div class="card"><div class="hd">${escapeHtml(t('pur-amount'))}</div><div class="bd">
             <div class="sum tot"><span>${escapeHtml(t('pur-grand'))}</span><span class="tnum">฿${fmtMoney(d.grand_total)}</span></div></div></div>`;
     }
+    const wht =
+        d.wht_amount > 0
+            ? `<div class="sum"><span>${escapeHtml(t('pur-wht'))}</span><span class="tnum">−฿${fmtMoney(d.wht_amount)}</span></div>
+        <div class="sum tot"><span>${escapeHtml(t('pur-net-payable'))}</span><span class="tnum">฿${fmtMoney(d.net_payable)}</span></div>`
+            : '';
     return `<div class="card"><div class="hd">${escapeHtml(t('pur-amount'))}</div><div class="bd">
         <div class="sum"><span>${escapeHtml(t('pur-subtotal-ex'))}</span><span class="tnum">฿${fmtMoney(d.subtotal)}</span></div>
         <div class="sum"><span>${escapeHtml(t('pur-vat-in'))} <span class="pill ok">${escapeHtml(t('pur-creditable'))}</span></span><span class="tnum tax">฿${fmtMoney(d.vat_amount)}</span></div>
         <div class="sum tot"><span>${escapeHtml(t('pur-grand'))}</span><span class="tnum">฿${fmtMoney(d.grand_total)}</span></div>
+        ${wht}
     </div></div>`;
 }
 
 function payCard(d: DocDetail): string {
-    const due = d.grand_total - d.paid_amount;
+    const due = d.net_payable - d.paid_amount;
     const btn =
         d.status === 'posted' && d.payment_status !== 'paid'
             ? `<button class="btn primary" id="pur-pay-btn" style="width:100%;margin-top:10px;">${escapeHtml(t('pur-pay'))}</button>`
             : '';
     return `<div class="card"><div class="hd">${escapeHtml(t('pur-payment'))}</div><div class="bd">
-        <div class="pay"><span>${escapeHtml(t('pur-payable'))}</span><span class="tnum">฿${fmtMoney(d.grand_total)}</span></div>
+        <div class="pay"><span>${escapeHtml(t('pur-payable'))}</span><span class="tnum">฿${fmtMoney(d.net_payable)}</span></div>
         <div class="pay"><span>${escapeHtml(t('pur-paid'))}</span><span class="tnum">฿${fmtMoney(d.paid_amount)}</span></div>
         <div class="pay"><span>${escapeHtml(t('pur-due-balance'))}</span><span class="tnum due">฿${fmtMoney(due)}</span></div>
         ${btn}
@@ -175,7 +181,8 @@ async function doVoid(): Promise<void> {
     }
     try {
         await papi('POST', `/api/purchase/docs/${cur!.id}/void`, {});
-        showToast(t('pur-void-ok'), 'success');
+        // 交互完整性:作废成功反馈;已入库的单回冲库存 → 明示"库存已回冲"(连带影响说明)。
+        showToast(t(cur!.stock_applied ? 'pur-void-ok-stock' : 'pur-void-ok'), 'success');
         load(cur!.id);
     } catch (e) {
         showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');

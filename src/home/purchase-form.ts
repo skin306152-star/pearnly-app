@@ -7,6 +7,7 @@ import {
     papi,
     activeWsId,
     purchaseErrMsg,
+    openPurchasePdf,
     fmtMoney,
     normDetail,
     injectPurBase,
@@ -369,8 +370,27 @@ function bindShell(): void {
             el.oninput = () => setField(el.dataset.fld!, el.value);
             el.onchange = () => setField(el.dataset.fld!, el.value);
         });
-    document.getElementById('pur-gen-receipt')!.onclick = () =>
-        showToast(t('pur-receipt-generated'), 'success');
+    // F3b · 替代收据:存单后调后端生成凭据 PDF 并打开(禁连点 · 三态反馈)。需单据已存(有 id)。
+    const genBtn = document.getElementById('pur-gen-receipt') as HTMLButtonElement | null;
+    if (genBtn)
+        genBtn.onclick = async () => {
+            const id = st && st.id;
+            if (!id) return showToast(t('pur-receipt-need-save'), 'error');
+            genBtn.disabled = true;
+            try {
+                await papi('POST', `/api/purchase/docs/${id}/substitute-receipt`, {
+                    workspace_client_id: activeWsId(),
+                });
+                showToast(t('pur-receipt-generated'), 'success');
+                await openPurchasePdf(
+                    `/api/purchase/docs/${id}/document.pdf?kind=substitute_receipt`
+                );
+            } catch (e) {
+                showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+            } finally {
+                genBtn.disabled = false;
+            }
+        };
     const save = document.getElementById('pur-save-draft');
     if (save) save.onclick = () => submit('draft');
     const post = document.getElementById('pur-post');

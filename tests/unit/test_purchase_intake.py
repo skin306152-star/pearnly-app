@@ -174,5 +174,117 @@ class LineDispatchFirmSafetyTests(unittest.TestCase):
         self.assertEqual(stashed, [1])  # 商户租户 → 落采购待办
 
 
+class ResolveImageIntakeTests(unittest.TestCase):
+    """F5/F12:糊图(抽取过空 ฿0)/ 低置信 → 落 inbox,绝不返回可保存的 ฿0 草稿。"""
+
+    def _resolve(self, fields, confidence):
+        from unittest import mock
+
+        stashed = []
+        with mock.patch.object(ik, "_stash_inbox", side_effect=lambda *a, **k: stashed.append(k)):
+            data = ik.resolve_image_intake(
+                _FakeCur(),
+                tenant_id="t",
+                workspace_client_id=1,
+                fields=fields,
+                confidence=confidence,
+                settings={},
+            )
+        return data, stashed
+
+    def test_zero_amount_goes_inbox(self):
+        # 买方=我 + 有 VAT 标志 → 方向 purchase,但抽取金额为 0 → 不进表单,落待归类。
+        f = {
+            "document_type": "tax_invoice",
+            "buyer_tax": MY,
+            "vat": "7",
+            "subtotal": "0",
+            "items": [],
+        }
+        data, stashed = self._resolve(f, "high")
+        self.assertEqual(data["route"], "inbox")
+        self.assertIsNone(data["draft"])
+        self.assertEqual(len(stashed), 1)
+
+    def test_low_confidence_goes_inbox(self):
+        f = {
+            "document_type": "tax_invoice",
+            "buyer_tax": MY,
+            "vat": "7",
+            "subtotal": "1000",
+            "items": [{"name": "x", "qty": "1", "price": "1000"}],
+        }
+        data, stashed = self._resolve(f, "needs_review")
+        self.assertEqual(data["route"], "inbox")
+        self.assertIsNone(data["draft"])
+
+    def test_sales_route_no_stash(self):
+        f = {"document_type": "tax_invoice", "seller_tax": MY, "buyer_tax": "9", "vat": "7"}
+        data, stashed = self._resolve(f, "high")
+        self.assertEqual(data["route"], "sales")
+        self.assertEqual(stashed, [])
+
+
+class ResolveInboxTests(unittest.TestCase):
+    """待归类一点归类:非法动作拒绝;dismiss/sales 移出收件箱(不建单)。"""
+
+    def test_bad_action_raises(self):
+        from core.pos_api import PosError
+
+        with self.assertRaises(PosError):
+            ik.resolve_inbox(
+                _FakeCur(),
+                tenant_id="t",
+                workspace_client_id=1,
+                item_id="x",
+                action="bogus",
+                created_by="u",
+                settings={},
+            )
+
+    def test_dismiss_marks_dismissed(self):
+        r = ik.resolve_inbox(
+            _FakeCur(),
+            tenant_id="t",
+            workspace_client_id=1,
+            item_id="x",
+            action="dismiss",
+            created_by="u",
+            settings={},
+        )
+        self.assertEqual(r["status"], "dismissed")
+
+    def test_sales_marks_resolved(self):
+        r = ik.resolve_inbox(
+            _FakeCur(),
+            tenant_id="t",
+            workspace_client_id=1,
+            item_id="x",
+            action="sales",
+            created_by="u",
+            settings={},
+        )
+        self.assertEqual(r["status"], "resolved")
+
+
+class RecordLineExpenseTests(unittest.TestCase):
+    """F10:LINE 文字无金额(如「水」)→ 不记一笔(返 None),调用方回功能提示。"""
+
+    def test_no_amount_returns_none(self):
+        from unittest import mock
+
+        from services.purchase import categories as cs
+        from services.purchase import settings as ss
+
+        with (
+            mock.patch.object(ss, "get_settings", return_value={}),
+            mock.patch.object(cs, "get_tree", return_value=[]),
+        ):
+            r = ik.record_line_expense(
+                _FakeCur(), tenant_id="t", workspace_client_id=1, text="ค่าน้ำ", created_by="u"
+            )
+        self.assertIsNone(r)
+
+
 if __name__ == "__main__":
     unittest.main()

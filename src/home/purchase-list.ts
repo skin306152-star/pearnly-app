@@ -1,6 +1,6 @@
-// 商户采购 · 屏1 采购/进项主屏(列表 + KPI · 桌面表格 / 手机卡片)· 照搬设计稿 01-采购进项主屏。
-// KPI 4 张(本月进货/费用/可抵进项税/未付)· chip 筛(全部/进货/费用/未付)+ 搜 · 行点按 status 分流
-// (draft→屏10 录入 / posted→屏6 详情)· 拍进项票(intake→录入)/ LINE 记费用(屏3 弹窗)· 四态。
+// 商户采购 · 屏1 采购/进项主屏 · 收拢版(照搬设计稿 01-采购进项主屏收拢版 · DESIGN_LANGUAGE)。
+// 一个面板分层:① 主信息带(本月花费北极星 + 手动/LINE/拍票动作)② 未付行动条 ③ 控件带(筛选 seg + 搜)
+// ④ 列表行(桌面/手机同一面板内 row · 不再 4 卡碎片飘灰底)。行点按 status 分流(draft→录入 / posted→详情)。
 /* global t, escapeHtml, showToast */
 import {
     papi,
@@ -19,57 +19,62 @@ import {
 } from './purchase-common.js';
 
 const ICON_CAM =
-    '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 const ICON_SEARCH =
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
 const ICON_CAM_SM =
     '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/></svg>';
 
 type Chip = 'all' | 'purchase' | 'expense' | 'unpaid';
 
+// 收拢版令牌页内自定义(.pur.pl 作用域 · 不动 base/detail/form):面板圆角16+收拢阴影 · 按钮圆角11。
 const PAGE_CSS = `
-.pur .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.pur .ph .t{font-size:20px;font-weight:700;}
-.pur .ph .sub{color:var(--ink2);font-size:13px;margin-top:3px;}
-.pur .acts{display:flex;gap:9px;}
-.pur .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
-.pur .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);}
-.pur .kpi .l{color:var(--ink2);font-size:12px;}
-.pur .kpi .v{font-size:21px;font-weight:800;margin-top:5px;}
-.pur .kpi .v.tax{color:var(--green);} .pur .kpi .v.unpaid{color:var(--amber);}
-.pur .kpi .d{font-size:11px;color:var(--ink3);margin-top:3px;}
-.pur .bar{display:flex;gap:8px;margin-bottom:12px;align-items:center;}
-.pur .chip{height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink2);font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;}
-.pur .chip.on{background:var(--ink);color:#fff;border-color:var(--ink);}
-.pur .search{margin-left:auto;width:240px;height:34px;background:var(--card);border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 11px;}
-.pur .search input{border:0;outline:0;flex:1;background:transparent;font-size:13px;}
-.pur table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);}
-.pur th{text-align:left;font-size:11.5px;color:var(--ink2);font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:11px 14px;border-bottom:1px solid var(--line);background:#fafaf8;}
-.pur td{padding:12px 14px;border-bottom:1px solid #f4f4f0;font-size:13.5px;}
-.pur tr:last-child td{border-bottom:0;}
-.pur tbody tr{cursor:pointer;}
-.pur tbody tr:hover td{background:#fafaf8;}
-.pur .src{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 8px;border-radius:6px;background:#eef2ff;color:#4338ca;}
-.pur .src.line{background:#dcfce7;color:#15803d;}
-.pur .st{font-size:11px;padding:2px 9px;border-radius:6px;}
-.pur .st.paid{background:#dcfce7;color:#15803d;} .pur .st.unpaid{background:#fef3c7;color:#b45309;} .pur .st.partial{background:#ffedd5;color:#c2410c;}
-.pur .ty{font-size:11px;color:var(--ink2);}
-.pur .cards{display:none;}
-.pur .cards .card{padding:13px 14px;cursor:pointer;}
-.pur .cards .r1{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
-.pur .cards .nm{font-weight:600;font-size:14px;}
-.pur .cards .amt{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap;}
-.pur .cards .r2{display:flex;align-items:center;gap:7px;margin-top:9px;flex-wrap:wrap;}
-.pur .cards .dt{color:var(--ink3);font-size:11px;margin-left:auto;}
-.pur .cards .vat{font-size:11.5px;color:var(--ink2);}
+.pur.pl .wrap{max-width:1020px;}
+.pur.pl .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
+.pur.pl .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+.pur.pl .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
+.pur.pl .panel{background:var(--card);border:1px solid #ECECE7;border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);overflow:hidden;}
+.pur.pl .band{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid #F1F1EC;}
+.pur.pl .star .lbl{color:var(--ink2);font-size:12.5px;margin-bottom:5px;}
+.pur.pl .star .num{font-size:30px;font-weight:740;letter-spacing:-1px;line-height:1;}
+.pur.pl .star .ctx{margin-top:8px;color:var(--ink2);font-size:12.5px;}
+.pur.pl .star .ctx .g{color:var(--green);font-weight:600;}
+.pur.pl .acts{display:flex;gap:9px;}
+.pur.pl .btn{border-radius:11px;}
+.pur.pl .btn.primary{font-weight:650;box-shadow:0 1px 2px rgba(37,99,235,.3);}
+.pur.pl .alert{display:flex;align-items:center;gap:9px;padding:11px 22px;background:#FFF8EC;border-bottom:1px solid #F1F1EC;font-size:13px;color:#92400E;cursor:pointer;}
+.pur.pl .alert .pip{width:7px;height:7px;border-radius:50%;background:var(--amber);flex:0 0 7px;}
+.pur.pl .alert b{font-weight:700;color:#B45309;}
+.pur.pl .alert .go{margin-left:auto;color:#B45309;font-weight:650;font-size:12.5px;}
+.pur.pl .toolbar{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid #F1F1EC;background:#FCFCFA;}
+.pur.pl .seg{display:inline-flex;gap:2px;}
+.pur.pl .seg .o{height:30px;padding:0 13px;border-radius:8px;display:flex;align-items:center;font-size:12.5px;color:var(--ink2);cursor:pointer;}
+.pur.pl .seg .o.on{background:var(--ink);color:#fff;font-weight:600;}
+.pur.pl .search{margin-left:auto;width:230px;height:34px;background:#fff;border:1px solid #ECECE7;border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 11px;}
+.pur.pl .search input{border:0;outline:0;flex:1;background:transparent;font-size:13px;}
+.pur.pl .row{display:flex;align-items:center;gap:14px;padding:15px 18px;border-bottom:1px solid #F1F1EC;cursor:pointer;}
+.pur.pl .row:last-child{border-bottom:0;} .pur.pl .row:hover{background:#FCFCFA;}
+.pur.pl .row .dt{width:46px;color:var(--ink3);font-size:12px;flex:0 0 46px;}
+.pur.pl .row .who{flex:1;min-width:0;}
+.pur.pl .row .nm{font-weight:600;font-size:14px;}
+.pur.pl .row .meta{color:var(--ink3);font-size:12px;margin-top:2px;display:flex;align-items:center;gap:8px;}
+.pur.pl .src{font-size:10.5px;padding:1px 7px;border-radius:5px;background:#F1F5F9;color:#475569;}
+.pur.pl .src.line{background:#ECFDF3;color:#15803d;}
+.pur.pl .amt{text-align:right;}
+.pur.pl .amt .v{font-weight:700;font-size:14.5px;font-variant-numeric:tabular-nums;}
+.pur.pl .amt .vat{color:var(--ink3);font-size:11px;margin-top:2px;}
+.pur.pl .st{font-size:11px;padding:3px 10px;border-radius:7px;min-width:52px;text-align:center;}
+.pur.pl .st.paid{background:#F1F5F9;color:#64748B;}
+.pur.pl .st.unpaid{background:#FFF1E6;color:#C2410C;font-weight:600;}
+.pur.pl .st.partial{background:#FFEDD5;color:#C2410C;font-weight:600;}
+.pur.pl .state{padding:48px 20px;text-align:center;color:var(--ink3);font-size:13px;}
 @media(max-width:600px){
-  .pur .ph{flex-direction:column;align-items:flex-start;gap:11px;}
-  .pur .acts{width:100%;} .pur .acts .btn{flex:1;}
-  .pur .kpis{grid-template-columns:repeat(2,1fr);}
-  .pur .search{margin-left:0;width:100%;}
-  .pur .bar{flex-wrap:wrap;}
-  .pur table{display:none;}
-  .pur .cards{display:flex;flex-direction:column;gap:10px;}
+  .pur.pl .ph{flex-direction:column;align-items:flex-start;gap:11px;}
+  .pur.pl .band{flex-direction:column;align-items:stretch;gap:14px;}
+  .pur.pl .acts{width:100%;} .pur.pl .acts .btn{flex:1;}
+  .pur.pl .search{width:100%;margin-left:0;}
+  .pur.pl .toolbar{flex-wrap:wrap;}
+  .pur.pl .row{flex-wrap:wrap;}
 }
 `;
 
@@ -96,71 +101,37 @@ function view(): DocListItem[] {
     return allDocs.filter((d) => matchChip(d) && matchKw(d));
 }
 
-function payBadge(d: DocListItem): string {
-    return `<span class="st ${d.payment_status}">${escapeHtml(t('pur-pay-' + d.payment_status))}</span>`;
-}
-
 function srcChip(d: DocListItem): string {
     const cls = d.source === 'line' ? 'src line' : 'src';
     const ico = d.source === 'photo' ? ICON_CAM_SM : '';
     return `<span class="${cls}">${ico}${escapeHtml(t(srcLabelKey(d.source)))}</span>`;
 }
 
-// 类型列:有细分科目名用之,否则回退票种(进货/费用/采购单)· 后端列表暂只返 doc_kind。
+// 类型:有细分科目名用之,否则回退票种(进货/费用/采购单)。
 function typeLabel(d: DocListItem): string {
     return d.category_label || t(kindLabelKey(d.doc_kind));
 }
 
-function rowsHtml(list: DocListItem[]): string {
-    return list
-        .map((d) => {
-            const sup = escapeHtml(d.supplier_name || '—');
-            const title = d.title ? ' · ' + escapeHtml(d.title) : '';
-            const vat = d.vat_amount > 0 ? fmtBaht(d.vat_amount) : '—';
-            return `<tr data-id="${escapeHtml(d.id)}" data-status="${d.status}">
-                <td class="tnum">${escapeHtml(fmtMonthDay(d.doc_date))}</td>
-                <td>${sup}${title}</td>
-                <td class="ty">${escapeHtml(typeLabel(d))}</td>
-                <td>${srcChip(d)}</td>
-                <td class="num">${fmtBaht(d.grand_total)}</td>
-                <td class="num">${vat}</td>
-                <td>${payBadge(d)}</td></tr>`;
-        })
-        .join('');
+// ① 主信息带北极星:本月花费(进货+费用)+ 上下文(进货/费用/可抵进项税)。summary 缺 → 占位。
+function starHtml(s: DocSummary | null): string {
+    const spend = s ? s.purchase_total + s.expense_total : 0;
+    const ctx = s
+        ? `${escapeHtml(t('pur-chip-purchase'))} ${fmtBaht(s.purchase_total)} · ${escapeHtml(t('pur-chip-expense'))} ${fmtBaht(s.expense_total)} · <span class="g">${escapeHtml(t('pur-kpi-vat'))} ${fmtBaht(s.vat_creditable)}</span>`
+        : '—';
+    return `<div class="lbl">${escapeHtml(t('pur-month-spend'))}</div><div class="num tnum">${fmtBaht(spend)}</div><div class="ctx">${ctx}</div>`;
 }
 
-function cardsHtml(list: DocListItem[]): string {
-    return list
-        .map((d) => {
-            const sup = escapeHtml(d.supplier_name || '—');
-            const title = d.title ? ' · ' + escapeHtml(d.title) : '';
-            const vat =
-                d.vat_amount > 0
-                    ? `<span class="vat">${escapeHtml(t('pur-vat-in'))} ${fmtBaht(d.vat_amount)}</span>`
-                    : '';
-            return `<div class="card" data-id="${escapeHtml(d.id)}" data-status="${d.status}">
-                <div class="r1"><div class="nm">${sup}${title}</div><div class="amt">${fmtBaht(d.grand_total)}</div></div>
-                <div class="r2"><span class="ty">${escapeHtml(typeLabel(d))}</span>${srcChip(d)}${payBadge(d)}${vat}<span class="dt tnum">${escapeHtml(fmtMonthDay(d.doc_date))}</span></div>
-            </div>`;
-        })
-        .join('');
+// ② 未付行动条:有未付才显(行动卡 · 点去未付筛选)。
+function alertHtml(s: DocSummary | null): string {
+    if (!s || s.unpaid_total <= 0) return '';
+    const sup =
+        s.unpaid_suppliers > 0
+            ? ` · ${s.unpaid_suppliers} ${escapeHtml(t('pur-unit-suppliers'))}`
+            : '';
+    return `<div class="alert" id="pur-alert"><span class="pip"></span><b>${fmtBaht(s.unpaid_total)} ${escapeHtml(t('pur-kpi-unpaid'))}</b><span>${sup}</span><span class="go">${escapeHtml(t('pur-go-process'))} →</span></div>`;
 }
 
-// 计数副标(本月笔数/欠款供应商数):后端 summary 暂不返计数 → >0 才显,缺则留空不显假「0 笔」。
-function countSub(n: number, unitKey: string): string {
-    return n > 0 ? n + ' ' + escapeHtml(t(unitKey)) : '';
-}
-
-function kpisHtml(s: DocSummary): string {
-    return `<div class="kpis">
-        <div class="kpi"><div class="l">${escapeHtml(t('pur-kpi-purchase'))}</div><div class="v tnum">${fmtBaht(s.purchase_total)}</div><div class="d">${countSub(s.purchase_count, 'pur-unit-rows')}</div></div>
-        <div class="kpi"><div class="l">${escapeHtml(t('pur-kpi-expense'))}</div><div class="v tnum">${fmtBaht(s.expense_total)}</div><div class="d">${countSub(s.expense_count, 'pur-unit-rows')}</div></div>
-        <div class="kpi"><div class="l">${escapeHtml(t('pur-kpi-vat'))}</div><div class="v tax tnum">${fmtBaht(s.vat_creditable)}</div><div class="d">${escapeHtml(t('pur-kpi-vat-d'))}</div></div>
-        <div class="kpi"><div class="l">${escapeHtml(t('pur-kpi-unpaid'))}</div><div class="v unpaid tnum">${fmtBaht(s.unpaid_total)}</div><div class="d">${countSub(s.unpaid_suppliers, 'pur-unit-suppliers')}</div></div>
-    </div>`;
-}
-
-function chipsHtml(): string {
+function segHtml(): string {
     const defs: [Chip, string][] = [
         ['all', 'pur-chip-all'],
         ['purchase', 'pur-chip-purchase'],
@@ -170,52 +141,78 @@ function chipsHtml(): string {
     return defs
         .map(
             ([k, key]) =>
-                `<div class="chip ${k === chip ? 'on' : ''}" data-chip="${k}">${escapeHtml(t(key))}</div>`
+                `<div class="o ${k === chip ? 'on' : ''}" data-chip="${k}">${escapeHtml(t(key))}</div>`
         )
         .join('');
 }
 
-function tableHtml(): string {
-    const list = view();
-    if (!list.length) {
-        return `<div class="state" id="pur-empty">${escapeHtml(t('pur-empty'))}</div>`;
-    }
-    return `<table>
-        <thead><tr>
-            <th>${escapeHtml(t('pur-col-date'))}</th><th>${escapeHtml(t('pur-col-supplier'))}</th>
-            <th>${escapeHtml(t('pur-col-type'))}</th><th>${escapeHtml(t('pur-col-source'))}</th>
-            <th class="num">${escapeHtml(t('pur-col-total'))}</th><th class="num">${escapeHtml(t('pur-col-vat'))}</th>
-            <th>${escapeHtml(t('pur-col-pay'))}</th>
-        </tr></thead>
-        <tbody>${rowsHtml(list)}</tbody>
-    </table>
-    <div class="cards">${cardsHtml(list)}</div>`;
+function rowsHtml(list: DocListItem[]): string {
+    return list
+        .map((d) => {
+            const sup = escapeHtml(d.supplier_name || '—');
+            const vat =
+                d.vat_amount > 0
+                    ? `<div class="vat">${escapeHtml(t('pur-vat-in'))} ${fmtBaht(d.vat_amount)}</div>`
+                    : '';
+            const pay = d.payment_status;
+            return `<div class="row" data-id="${escapeHtml(d.id)}" data-status="${d.status}">
+                <span class="dt tnum">${escapeHtml(fmtMonthDay(d.doc_date))}</span>
+                <div class="who"><div class="nm">${sup}</div><div class="meta">${srcChip(d)}<span>${escapeHtml(typeLabel(d))}</span></div></div>
+                <div class="amt"><div class="v">${fmtBaht(d.grand_total)}</div>${vat}</div>
+                <span class="st ${pay}">${escapeHtml(t('pur-pay-' + pay))}</span>
+            </div>`;
+        })
+        .join('');
 }
 
 function shell(): string {
-    return `<div class="pur"><div class="wrap">
-        <div class="ph">
-            <div><div class="t">${escapeHtml(t('pur-title'))}</div><div class="sub">${escapeHtml(t('pur-subtitle'))}</div></div>
-            <div class="acts">
-                <button class="btn" id="pur-line-btn">${escapeHtml(t('pur-line-expense'))}</button>
-                <button class="btn primary" id="pur-cam-btn">${ICON_CAM}${escapeHtml(t('pur-photo'))}</button>
+    return `<div class="pur pl"><div class="wrap">
+        <div class="ph"><div><div class="t">${escapeHtml(t('pur-title'))}</div><div class="sub">${escapeHtml(t('pur-subtitle'))}</div></div></div>
+        <div class="panel">
+            <div class="band">
+                <div class="star" id="pur-star">${starHtml(summary)}</div>
+                <div class="acts">
+                    <button class="btn" id="pur-manual-btn">${escapeHtml(t('pur-manual-new'))}</button>
+                    <button class="btn" id="pur-line-btn">${escapeHtml(t('pur-line-expense'))}</button>
+                    <button class="btn primary" id="pur-cam-btn">${ICON_CAM}${escapeHtml(t('pur-photo'))}</button>
+                </div>
             </div>
+            <div id="pur-alert-slot">${alertHtml(summary)}</div>
+            <div class="toolbar">
+                <div class="seg" id="pur-seg">${segHtml()}</div>
+                <div class="search">${ICON_SEARCH}<input id="pur-search" placeholder="${escapeHtml(t('pur-search-ph'))}" value="${escapeHtml(keyword)}"></div>
+            </div>
+            <div id="pur-body"></div>
         </div>
-        <div id="pur-kpis"></div>
-        <div class="bar">${chipsHtml()}
-            <div class="search">${ICON_SEARCH}<input id="pur-search" placeholder="${escapeHtml(t('pur-search-ph'))}" value="${escapeHtml(keyword)}"></div>
-        </div>
-        <div id="pur-body"></div>
         <input type="file" id="pur-cam-input" accept="image/*,application/pdf" style="display:none">
     </div></div>`;
 }
 
 function renderBody(): void {
-    const kpis = document.getElementById('pur-kpis');
-    if (kpis && summary) kpis.innerHTML = kpisHtml(summary);
+    const star = document.getElementById('pur-star');
+    if (star) star.innerHTML = starHtml(summary);
+    const slot = document.getElementById('pur-alert-slot');
+    if (slot) {
+        slot.innerHTML = alertHtml(summary);
+        const al = document.getElementById('pur-alert');
+        if (al) al.onclick = () => setChip('unpaid');
+    }
     const body = document.getElementById('pur-body');
-    if (body) body.innerHTML = tableHtml();
+    if (body) {
+        const list = view();
+        body.innerHTML = list.length
+            ? rowsHtml(list)
+            : `<div class="state">${escapeHtml(t('pur-empty'))}</div>`;
+    }
     bindRows();
+}
+
+function setChip(c: Chip): void {
+    chip = c;
+    document.querySelectorAll<HTMLElement>('#pur-seg .o').forEach((el) => {
+        el.classList.toggle('on', el.dataset.chip === c);
+    });
+    renderBody();
 }
 
 function bindRows(): void {
@@ -229,13 +226,8 @@ function bindRows(): void {
 }
 
 function bindChrome(): void {
-    document.querySelectorAll<HTMLElement>('[data-chip]').forEach((el) => {
-        el.onclick = () => {
-            chip = el.dataset.chip as Chip;
-            document.querySelectorAll('[data-chip]').forEach((c) => c.classList.remove('on'));
-            el.classList.add('on');
-            renderBody();
-        };
+    document.querySelectorAll<HTMLElement>('#pur-seg .o').forEach((el) => {
+        el.onclick = () => setChip(el.dataset.chip as Chip);
     });
     const search = document.getElementById('pur-search') as HTMLInputElement | null;
     if (search) {
@@ -245,6 +237,10 @@ function bindChrome(): void {
             searchTimer = window.setTimeout(renderBody, 200);
         };
     }
+    const manualBtn = document.getElementById('pur-manual-btn');
+    // F3a · 手动记一笔(没发票费用)→ 直接进录入屏费用模式。
+    if (manualBtn)
+        manualBtn.onclick = () => window.openPurchaseForm?.(null, { doc_kind: 'expense' });
     const lineBtn = document.getElementById('pur-line-btn');
     if (lineBtn) lineBtn.onclick = () => window.openPurchaseLine?.();
     const camBtn = document.getElementById('pur-cam-btn');
@@ -253,9 +249,8 @@ function bindChrome(): void {
     if (camInput) camInput.onchange = () => onCapture(camInput);
 }
 
-// 拍进项票 → intake 分流 → 落屏10 录入(预填识别 draft)。图走 multipart 真上传给 OCR。
-// 后端返分流信封 {route,draft,dedupe_hit}:有 draft → 预填录入;低置信/看不清(inbox·draft=null)
-// → 不静默丢,提示手填并开空表单(四态诚实)。
+// 拍进项票 → 统一智能入口分流(F12)。后端返 {route,draft}:purchase/expense+draft→录入;
+// sales/recon→提示去对应模块;inbox(低置信/糊图฿0/拿不准)→ 安全落待归类并带去收件箱(绝不进฿0单)。
 async function onCapture(input: HTMLInputElement): Promise<void> {
     const f = input.files && input.files[0];
     input.value = '';
@@ -264,17 +259,26 @@ async function onCapture(input: HTMLInputElement): Promise<void> {
     const fd = new FormData();
     fd.append('image', f);
     if (ws != null) fd.append('workspace_client_id', String(ws));
+    showToast(t('pur-intake-reading'), 'info');
     try {
         const res = (await papi('POST', '/api/purchase/intake', fd)) as {
+            route?: string;
             draft?: Record<string, unknown> | null;
             dedupe_hit?: boolean;
         };
         const d = res && res.draft;
         if (d) {
             window.openPurchaseForm?.(null, { ...d, dedupe_hit: res.dedupe_hit });
+            return;
+        }
+        const route = (res && res.route) || 'inbox';
+        if (route === 'sales') {
+            showToast(t('pur-intake-sales'), 'error');
+        } else if (route === 'recon') {
+            showToast(t('pur-intake-recon'), 'error');
         } else {
-            showToast(t('pur-intake-manual'), 'error');
-            window.openPurchaseForm?.(null, {});
+            showToast(t('pur-intake-inbox'), 'success');
+            window.routeTo?.('purchase-inbox');
         }
     } catch (e) {
         showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');

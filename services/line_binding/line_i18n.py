@@ -43,6 +43,9 @@ LINE_I18N = {
             "我能识别发票/收据:图片 / PDF / Excel / CSV / Word / TXT\n"
             "也可发一句文字记账,如「ค่าน้ำ 50」"
         ),
+        "expense_recorded": (
+            "✅ 已记一笔费用\n{desc} · ฿{amount}\n在 pearnly.com「采购 / 进项」可查看或补全 🧾"
+        ),
     },
     "en": {
         "bind_invalid": "❌ Invalid or expired code\nGet a new one at pearnly.com",
@@ -81,6 +84,9 @@ LINE_I18N = {
         "unsupported": (
             "I can read invoices/receipts: photos / PDF / Excel / CSV / Word / TXT\n"
             "Or type an expense like 'Water 50'"
+        ),
+        "expense_recorded": (
+            "✅ Expense recorded\n{desc} · ฿{amount}\nView or complete it at pearnly.com 'Purchases' 🧾"
         ),
     },
     "th": {
@@ -121,6 +127,9 @@ LINE_I18N = {
             "รองรับใบกำกับ/ใบเสร็จ: รูป / PDF / Excel / CSV / Word / TXT\n"
             "หรือพิมพ์บันทึกค่าใช้จ่าย เช่น 'ค่าน้ำ 50'"
         ),
+        "expense_recorded": (
+            "✅ บันทึกค่าใช้จ่ายแล้ว\n{desc} · ฿{amount}\nดูหรือแก้ไขได้ที่ pearnly.com 'จัดซื้อ' 🧾"
+        ),
     },
     "ja": {
         "bind_invalid": "❌ コードが無効または期限切れです\npearnly.com で新しいコードを取得してください",
@@ -159,6 +168,9 @@ LINE_I18N = {
         "unsupported": (
             "対応: 請求書・領収書の 写真 / PDF / Excel / CSV / Word / TXT\n"
             "または「水道 50」のように入力して記帳"
+        ),
+        "expense_recorded": (
+            "✅ 費用を記録しました\n{desc} · ฿{amount}\npearnly.com「仕入」で確認・補完できます 🧾"
         ),
     },
 }

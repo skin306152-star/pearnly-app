@@ -283,6 +283,8 @@ interface Window {
     loadSalesWorkbench?: () => void;
     loadSalesProducts?: () => void;
     loadSalesAccount?: () => void;
+    // core-boot 路由跳转(module-nav 据业态把识别记录隐藏后回落首页用)
+    routeTo?: (route: string) => void;
     // POS PO-A1/A4/B1 · 模块导航显隐 + 库存后台(屏7)+ 开通收银(屏8)桥
     applyModuleNav?: () => void;
     // 平台业态套餐 PO-PP2 · 业态选择器弹窗(注册首次 / 设置切换业态 / 可开启功能)
@@ -301,6 +303,7 @@ interface Window {
     loadPurchaseList?: () => void;
     loadPurchaseSuppliers?: () => void;
     loadPurchaseSettings?: () => void;
+    loadPurchaseInbox?: () => void;
     loadPurchaseForm?: () => void;
     loadPurchaseDetail?: () => void;
     openPurchaseForm?: (id?: string | null, draft?: unknown) => void;

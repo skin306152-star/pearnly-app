@@ -15,6 +15,11 @@ interface ModuleFlag {
 // 此处接管会与 kbProbe 抢同一元素 → 留给它,避免回归。module-nav 只数据驱动后端模块门控的 6 项。
 const GATEABLE = ['sales', 'expense', 'recon', 'inventory', 'pos', 'receivable'];
 
+// 识别记录(上传识别 / 单据记录)= 事务所栈,仅事务所显示。显式商户业态 → 隐藏(F14·降级事务所专用)。
+// 关键:legacy 事务所从未 onboard → business_type=null,必须保留(与后端 route_line_image 的
+// `bt in (None,"firm")` 同源)。绝不"非 firm 就隐",会误杀老事务所主路径(铁律#26)。
+const MERCHANT_TYPES = ['retail', 'pharmacy', 'restaurant', 'service', 'b2b'];
+
 function show(el: HTMLElement | null, on: boolean) {
     if (el) el.style.display = on ? '' : 'none';
 }
@@ -29,6 +34,19 @@ function apply(modules: Record<string, ModuleFlag>, businessType?: string | null
             .querySelectorAll<HTMLElement>('[data-module="' + k + '"]')
             .forEach((el) => show(el, on(k)));
     });
+
+    // F14 · 识别记录降级事务所专用:显式商户业态隐藏「上传识别 / 单据记录」(null/firm 保留)。
+    const isMerchant = !!businessType && MERCHANT_TYPES.indexOf(businessType) >= 0;
+    if (isMerchant) {
+        document
+            .querySelectorAll<HTMLElement>('[data-route="ocr"], [data-route="history"]')
+            .forEach((el) => show(el, false));
+        // 商户落在已隐藏的识别记录路由(含 routeTo 兜底回落 ocr)→ 改去首页(默认落地页)。
+        const cur = (location.hash || '').replace(/^#\//, '');
+        if ((!cur || cur === 'ocr' || cur === 'history') && typeof window.routeTo === 'function') {
+            window.routeTo('dashboard');
+        }
+    }
 
     // 折叠组级:混装组按「组内任一模块开」显隐(整组仅当全关才收起)。
     show(

@@ -116,6 +116,7 @@ import './home/purchase-detail.js'; // 屏6 详情(window.loadPurchaseDetail/ope
 import './home/purchase-modals.js'; // 屏7 记付款 / 屏8 商品匹配 / 屏9 供应商选择器 / 屏3 LINE 说明(桌面居中/手机底抽屉)
 import './home/purchase-suppliers.js'; // 屏4 供应商管理(window.loadPurchaseSuppliers · CRUD · 套账隔离)
 import './home/purchase-settings.js'; // 屏5 采购设置(window.loadPurchaseSettings · 默认VAT/进货入库/重复票拦/两级科目/账期/审批)
+import './home/purchase-inbox.js'; // 待归类收件箱(window.loadPurchaseInbox · 长尾安全网 · 智能猜测 + 一点归类)
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件

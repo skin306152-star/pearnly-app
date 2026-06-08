@@ -1,5 +1,5 @@
-// 商户采购 · 屏4 供应商管理(配置后台 · 平铺页)· 照搬设计稿 04-供应商管理。
-// AI 拍票自动建档为主、手动加为辅 · 套账隔离 · owner/会计可改。加供应商 = 页内弹窗。四态。
+// 商户采购 · 屏4 供应商管理 · 收拢版(照搬设计稿 04-供应商管理收拢版 · DESIGN_LANGUAGE)。
+// 一个面板:提示(拍票自动建档)+ 搜索 + 列表 + 脚注 · 不再各飘卡。加/改 = 页内弹窗。套账隔离。四态。
 /* global t, escapeHtml, showToast */
 import {
     papi,
@@ -12,27 +12,27 @@ import {
 } from './purchase-common.js';
 
 const PAGE_CSS = `
-.pur.s .wrap{max-width:760px;}
-.pur.s .card{border-radius:14px;box-shadow:0 1px 2px rgba(17,24,39,.04),0 6px 20px rgba(17,24,39,.07);}
-.pur .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
-.pur h1{font-size:20px;}
-.pur .sub{color:var(--ink2);font-size:13px;margin-bottom:18px;}
-.pur .add{height:38px;padding:0 14px;border:0;border-radius:9px;background:var(--blue);color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
-.pur .add:hover{background:var(--blue-d);}
-.pur .aibar{display:flex;gap:9px;align-items:center;background:var(--blue-l);border:1px solid #c7d8fb;border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12.5px;color:#1d4ed8;}
-.pur .aibar svg{flex:0 0 16px;}
-.pur .sup-card{overflow:hidden;}
-.pur .srch{padding:11px 14px;border-bottom:1px solid #f0f0ec;display:flex;align-items:center;gap:8px;}
-.pur .srch input{border:0;outline:0;flex:1;font-size:13.5px;background:transparent;}
-.pur .srow{display:flex;align-items:center;gap:13px;padding:13px 15px;border-bottom:1px solid #f4f4f0;}
-.pur .srow:last-child{border-bottom:0;}
-.pur .av{width:40px;height:40px;border-radius:10px;background:#f0f0ec;color:var(--ink2);display:flex;align-items:center;justify-content:center;font-weight:700;flex:0 0 40px;}
-.pur .sinfo{flex:1;min-width:0;} .pur .sinfo .n{font-size:14.5px;font-weight:600;} .pur .sinfo .m{font-size:12px;color:var(--ink2);margin-top:3px;}
-.pur .stat{text-align:right;} .pur .stat .v{font-weight:700;} .pur .stat .l{font-size:11px;color:var(--ink3);}
-.pur .op{height:32px;padding:0 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink2);font-size:12.5px;cursor:pointer;}
-.pur .op:hover{border-color:#c7d2fe;color:var(--blue);}
-.pur .snote{margin-top:14px;font-size:12.5px;color:var(--ink2);background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 15px;line-height:1.6;}
-.pur .snote b{color:var(--ink);}
+.pur.s .wrap{max-width:920px;}
+.pur.s .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
+.pur.s .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+.pur.s .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
+.pur.s .add{height:40px;padding:0 16px;border:1px solid var(--blue);border-radius:11px;background:var(--blue);color:#fff;font-weight:650;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.pur.s .add:hover{background:var(--blue-d);}
+.pur.s .panel{background:var(--card);border:1px solid #ECECE7;border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);overflow:hidden;}
+.pur.s .hint{display:flex;align-items:center;gap:9px;padding:13px 20px;background:var(--blue-l);border-bottom:1px solid #F1F1EC;font-size:12.5px;color:#1e40af;}
+.pur.s .hint svg{flex:0 0 16px;}
+.pur.s .toolbar{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #F1F1EC;background:#FCFCFA;}
+.pur.s .search{flex:1;height:36px;background:#fff;border:1px solid #ECECE7;border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 12px;}
+.pur.s .search input{border:0;outline:0;flex:1;background:transparent;font-size:13.5px;}
+.pur.s .row{display:flex;align-items:center;gap:13px;padding:14px 20px;border-bottom:1px solid #F1F1EC;}
+.pur.s .row:last-child{border-bottom:0;} .pur.s .row:hover{background:#FCFCFA;}
+.pur.s .av{width:38px;height:38px;border-radius:10px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;color:var(--ink2);font-weight:700;flex:0 0 38px;}
+.pur.s .sinfo{flex:1;min-width:0;} .pur.s .nm{font-weight:600;font-size:13.5px;} .pur.s .meta{color:var(--ink3);font-size:11.5px;margin-top:2px;}
+.pur.s .amt{margin-left:auto;text-align:right;} .pur.s .amt .v{font-weight:700;font-variant-numeric:tabular-nums;} .pur.s .amt .l{font-size:11px;color:var(--ink3);}
+.pur.s .edit{margin-left:14px;height:32px;padding:0 13px;border:1px solid #ECECE7;border-radius:9px;background:#fff;font-size:12.5px;cursor:pointer;color:var(--ink2);}
+.pur.s .edit:hover{border-color:#c7d2fe;color:var(--blue);}
+.pur.s .foot{padding:12px 20px;font-size:11.5px;color:var(--ink3);background:#FCFCFA;border-top:1px solid #F1F1EC;}
+.pur.s .state{padding:48px 20px;text-align:center;color:var(--ink3);font-size:13px;}
 .pur .smask{position:fixed;inset:0;background:rgba(17,24,39,.45);display:none;align-items:center;justify-content:center;z-index:1200;padding:18px;}
 .pur .smask.show{display:flex;}
 .pur .smodal{width:380px;max-width:92vw;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);}
@@ -43,29 +43,30 @@ const PAGE_CSS = `
 .pur .smf{padding:0 20px 20px;display:flex;gap:10px;}
 .pur .smf .g{height:46px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink2);cursor:pointer;}
 .pur .smf .ok{flex:1;height:46px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:700;font-size:15px;cursor:pointer;}
-@media(max-width:600px){ .pur .stat{display:none;} }
+@media(max-width:600px){ .pur.s .amt{display:none;} }
 `;
 
 const ICON_STAR =
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z"/></svg>';
 const ICON_SEARCH =
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
 const ICON_PLUS =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
 
 let all: Supplier[] = [];
 let keyword = '';
+let offline = false;
 
 function rowHtml(s: Supplier): string {
     const meta = s.tax_id ? `${t('pur-tax-id')} ${s.tax_id}` : t('pur-no-tax-receipt');
     const last = s.last_purchase_date
         ? ` · ${t('pur-last-buy')} ${fmtMonthDay(s.last_purchase_date)}`
         : '';
-    return `<div class="srow">
+    return `<div class="row">
         <div class="av">${escapeHtml((s.name || '?').slice(0, 1))}</div>
-        <div class="sinfo"><div class="n">${escapeHtml(s.name)}</div><div class="m tnum">${escapeHtml(meta)}${escapeHtml(last)}</div></div>
-        <div class="stat"><div class="v tnum">${fmtBaht(s.total_purchased)}</div><div class="l">${escapeHtml(t('pur-cum-buy'))}</div></div>
-        <button class="op" data-edit="${escapeHtml(s.id)}">${escapeHtml(t('pur-edit'))}</button>
+        <div class="sinfo"><div class="nm">${escapeHtml(s.name)}</div><div class="meta tnum">${escapeHtml(meta)}${escapeHtml(last)}</div></div>
+        <div class="amt"><div class="v tnum">${fmtBaht(s.total_purchased)}</div><div class="l">${escapeHtml(t('pur-cum-buy'))}</div></div>
+        <button class="edit" data-edit="${escapeHtml(s.id)}">${escapeHtml(t('pur-edit'))}</button>
     </div>`;
 }
 
@@ -74,20 +75,23 @@ function listHtml(): string {
     const list = all.filter(
         (s) => !kw || (s.name + ' ' + (s.tax_id || '')).toLowerCase().includes(kw)
     );
-    if (!list.length) return `<div class="state">${escapeHtml(t('pur-supplier-empty'))}</div>`;
+    // F9 · 断网时不显"还没有供应商"(会误读成真没有),显式标离线·无法加载。
+    if (!list.length) {
+        const msg = offline ? t('pur-supplier-offline') : t('pur-supplier-empty');
+        return `<div class="state">${escapeHtml(msg)}</div>`;
+    }
     return list.map(rowHtml).join('');
 }
 
 function shell(): string {
     return `<div class="pur s"><div class="wrap">
-        <div class="hd"><h1>${escapeHtml(t('pur-suppliers'))}</h1><button class="add" id="pur-sup-add">${ICON_PLUS}${escapeHtml(t('pur-supplier-add'))}</button></div>
-        <div class="sub">${escapeHtml(t('pur-suppliers-sub'))}</div>
-        <div class="aibar">${ICON_STAR}${escapeHtml(t('pur-suppliers-ai'))}</div>
-        <div class="card sup-card">
-            <div class="srch">${ICON_SEARCH}<input id="pur-sup-search" placeholder="${escapeHtml(t('pur-supplier-search'))}" value="${escapeHtml(keyword)}"></div>
+        <div class="ph"><div><div class="t">${escapeHtml(t('pur-suppliers'))}</div><div class="sub">${escapeHtml(t('pur-suppliers-sub'))}</div></div><button class="add" id="pur-sup-add">${ICON_PLUS}${escapeHtml(t('pur-supplier-add'))}</button></div>
+        <div class="panel">
+            <div class="hint">${ICON_STAR}${escapeHtml(t('pur-suppliers-ai'))}</div>
+            <div class="toolbar"><div class="search">${ICON_SEARCH}<input id="pur-sup-search" placeholder="${escapeHtml(t('pur-supplier-search'))}" value="${escapeHtml(keyword)}"></div></div>
             <div id="pur-sup-list">${listHtml()}</div>
+            <div class="foot">${escapeHtml(t('pur-suppliers-note'))}</div>
         </div>
-        <div class="snote">${escapeHtml(t('pur-suppliers-note'))}</div>
         <div class="smask" id="pur-sup-mask"><div class="smodal">
             <div class="smh" id="pur-sup-mtitle">${escapeHtml(t('pur-supplier-add'))}</div>
             <div class="smb">
@@ -171,8 +175,10 @@ async function load(): Promise<void> {
     try {
         const d = (await papi('GET', '/api/purchase/suppliers')) as { suppliers?: Supplier[] };
         all = d.suppliers || [];
+        offline = false;
     } catch (_) {
         all = [];
+        offline = true;
     }
     sec.innerHTML = shell();
     bind();

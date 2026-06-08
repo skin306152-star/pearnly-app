@@ -1,6 +1,6 @@
-// 商户采购 · 屏5 采购设置(配置后台 · 平铺页)· 照搬设计稿 05-采购设置。
-// 税与库存(默认VAT/进货入库/重复票拦)· 费用科目(两级 · 增删)· 付款(默认账期/付款审批 + 服务默认WHT)。
-// 配一次,以后拍票/记费用都按这套自动来。owner/会计可改。GET/PUT /settings · GET/POST /categories。
+// 商户采购 · 屏5 采购设置 · 收拢版(照搬设计稿 05-采购设置收拢版 · DESIGN_LANGUAGE)。
+// 一个面板分段(税与库存 / 费用科目 / 付款)· 不再三飘卡。配一次,以后拍票/记费用都按这套自动来。
+// GET/PUT /settings · GET/POST /categories · owner/会计可改。四态(loading/错误重试/空)。
 /* global t, escapeHtml, showToast */
 import {
     papi,
@@ -13,27 +13,30 @@ import {
 } from './purchase-common.js';
 
 const PAGE_CSS = `
-.pur.cfg .wrap{max-width:600px;}
-.pur.cfg .card{border-radius:14px;box-shadow:0 1px 2px rgba(17,24,39,.04),0 6px 20px rgba(17,24,39,.07);}
-.pur h1{font-size:20px;margin-bottom:4px;}
-.pur .sub{color:var(--ink2);font-size:13px;margin-bottom:18px;}
-.pur .scard{overflow:hidden;margin-bottom:16px;}
-.pur .ch{padding:12px 16px;border-bottom:1px solid #f0f0ec;font-weight:700;font-size:13.5px;}
-.pur .crow{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #f6f6f3;}
-.pur .crow:last-child{border-bottom:0;}
-.pur .tx{flex:1;} .pur .tx .n{font-size:14px;font-weight:600;} .pur .tx .d{font-size:12px;color:var(--ink2);margin-top:2px;}
-.pur .sw{width:44px;height:25px;border-radius:999px;flex:0 0 44px;position:relative;cursor:pointer;transition:.15s;}
-.pur .sw::after{content:"";position:absolute;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
-.pur .crow.on .sw{background:var(--blue);} .pur .crow.on .sw::after{left:21px;}
-.pur .crow.off .sw{background:#d8d8d3;} .pur .crow.off .sw::after{left:2px;}
-.pur .pctfld{width:88px;height:36px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;padding:0 10px;background:#fbfbf9;}
-.pur .pctfld input{border:0;outline:0;background:transparent;width:100%;text-align:right;font-size:14px;font-weight:600;}
-.pur .cats{padding:8px 16px 14px;}
-.pur .cat{display:inline-flex;align-items:center;gap:6px;background:#f4f4f0;border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12.5px;margin:4px 6px 0 0;}
-.pur .cat .x{color:var(--ink3);cursor:pointer;}
-.pur .addcat{display:inline-flex;align-items:center;gap:5px;border:1px dashed var(--line);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--blue);cursor:pointer;margin-top:4px;}
-.pur .save{width:100%;height:50px;border:0;border-radius:11px;background:var(--blue);color:#fff;font-weight:700;font-size:16px;cursor:pointer;}
-.pur .save:hover{background:var(--blue-d);}
+.pur.cfg .wrap{max-width:820px;}
+.pur.cfg .ph{margin-bottom:16px;}
+.pur.cfg .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+.pur.cfg .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
+.pur.cfg .panel{background:var(--card);border:1px solid #ECECE7;border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);overflow:hidden;}
+.pur.cfg .grp{padding:11px 22px;font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.3px;background:#FCFCFA;border-bottom:1px solid #F1F1EC;}
+.pur.cfg .item{display:flex;align-items:center;gap:14px;padding:15px 22px;border-bottom:1px solid #F1F1EC;}
+.pur.cfg .item .l .t2{font-size:13.5px;font-weight:600;}
+.pur.cfg .item .l .d{color:var(--ink2);font-size:12px;margin-top:3px;}
+.pur.cfg .item .ctl{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.pur.cfg .sw{width:42px;height:24px;border-radius:999px;background:#E2E8F0;position:relative;cursor:pointer;flex:0 0 42px;}
+.pur.cfg .sw.on{background:var(--blue);} .pur.cfg .sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s;} .pur.cfg .sw.on i{left:21px;}
+.pur.cfg .inp{height:36px;min-width:90px;border:1px solid #ECECE7;border-radius:9px;display:flex;align-items:center;justify-content:flex-end;padding:0 12px;font-size:13px;background:#fff;gap:4px;}
+.pur.cfg .inp input{border:0;outline:0;background:transparent;width:48px;text-align:right;font-size:13px;font-weight:600;}
+.pur.cfg .inp .u{color:var(--ink3);}
+.pur.cfg .cats{padding:14px 22px;border-bottom:1px solid #F1F1EC;display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
+.pur.cfg .chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:1px solid #ECECE7;border-radius:999px;background:#fff;font-size:12.5px;}
+.pur.cfg .chip .x{color:var(--ink3);cursor:pointer;}
+.pur.cfg .addcat{height:32px;padding:0 13px;border:1px dashed var(--blue);border-radius:999px;color:var(--blue);font-size:12.5px;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+.pur.cfg .addcat-input{height:32px;padding:0 13px;border:1px solid var(--blue);border-radius:999px;font-size:12.5px;outline:0;min-width:130px;}
+.pur.cfg .foot{display:flex;justify-content:flex-end;padding:14px 22px;}
+.pur.cfg .save{height:40px;padding:0 22px;border-radius:11px;border:1px solid var(--blue);background:var(--blue);color:#fff;font-weight:650;font-size:14px;cursor:pointer;}
+.pur.cfg .save:hover{background:var(--blue-d);}
+.pur.cfg .state{padding:48px 16px;text-align:center;color:var(--ink2);font-size:14px;}
 `;
 
 const ICON_PLUS =
@@ -44,7 +47,11 @@ let cats: Category[] = [];
 
 function toggleRow(key: keyof PurchaseSettings, nameKey: string, descKey: string): string {
     const on = !!cfg[key];
-    return `<div class="crow ${on ? 'on' : 'off'}" data-toggle="${key}"><div class="tx"><div class="n">${escapeHtml(t(nameKey))}</div><div class="d">${escapeHtml(t(descKey))}</div></div><div class="sw"></div></div>`;
+    return `<div class="item" data-toggle="${key}"><div class="l"><div class="t2">${escapeHtml(t(nameKey))}</div><div class="d">${escapeHtml(t(descKey))}</div></div><div class="ctl"><div class="sw ${on ? 'on' : ''}"><i></i></div></div></div>`;
+}
+
+function numRow(id: string, nameKey: string, descKey: string, val: number, unit: string): string {
+    return `<div class="item"><div class="l"><div class="t2">${escapeHtml(t(nameKey))}</div><div class="d">${escapeHtml(t(descKey))}</div></div><div class="ctl"><div class="inp"><input id="${id}" type="number" value="${val}"><span class="u">${escapeHtml(unit)}</span></div></div></div>`;
 }
 
 function catsHtml(): string {
@@ -52,38 +59,32 @@ function catsHtml(): string {
         cats
             .map(
                 (c) =>
-                    `<span class="cat" data-cat="${escapeHtml(c.id)}">${escapeHtml(c.name)} <span class="x" data-del="${escapeHtml(c.id)}">×</span></span>`
+                    `<span class="chip" data-cat="${escapeHtml(c.id)}">${escapeHtml(c.name)} <span class="x" data-del="${escapeHtml(c.id)}">×</span></span>`
             )
             .join('') +
-        `<br><span class="addcat" id="pur-addcat">${ICON_PLUS}${escapeHtml(t('pur-add-cat'))}</span>`
+        `<span class="addcat" id="pur-addcat">${ICON_PLUS}${escapeHtml(t('pur-add-cat'))}</span>`
     );
 }
 
 function shell(): string {
     return `<div class="pur cfg"><div class="wrap">
-        <h1>${escapeHtml(t('pur-settings'))}</h1>
-        <div class="sub">${escapeHtml(t('pur-settings-sub'))}</div>
-
-        <div class="card scard">
-            <div class="ch">${escapeHtml(t('pur-set-tax-stock'))}</div>
-            <div class="crow"><div class="tx"><div class="n">${escapeHtml(t('pur-set-vat'))}</div><div class="d">${escapeHtml(t('pur-set-vat-d'))}</div></div><div class="pctfld"><input id="pur-set-vat" type="number" value="${cfg.default_vat_rate}"><span style="color:var(--ink3);font-size:13px;">%</span></div></div>
+        <div class="ph"><div class="t">${escapeHtml(t('pur-settings'))}</div><div class="sub">${escapeHtml(t('pur-settings-sub'))}</div></div>
+        <div class="panel">
+            <div class="grp">${escapeHtml(t('pur-set-tax-stock'))}</div>
+            ${numRow('pur-set-vat', 'pur-set-vat', 'pur-set-vat-d', cfg.default_vat_rate, '%')}
             ${toggleRow('auto_stock_in', 'pur-set-stock', 'pur-set-stock-d')}
             ${toggleRow('dedupe_block', 'pur-set-dedupe', 'pur-set-dedupe-d')}
-        </div>
 
-        <div class="card scard">
-            <div class="ch">${escapeHtml(t('pur-set-cats'))}</div>
+            <div class="grp">${escapeHtml(t('pur-set-cats'))}</div>
             <div class="cats" id="pur-cats">${catsHtml()}</div>
-        </div>
 
-        <div class="card scard">
-            <div class="ch">${escapeHtml(t('pur-set-pay'))}</div>
-            <div class="crow"><div class="tx"><div class="n">${escapeHtml(t('pur-set-due'))}</div><div class="d">${escapeHtml(t('pur-set-due-d'))}</div></div><div class="pctfld"><input id="pur-set-due" type="number" value="${cfg.default_due_days}"><span style="color:var(--ink3);font-size:13px;">${escapeHtml(t('pur-unit-days'))}</span></div></div>
-            <div class="crow"><div class="tx"><div class="n">${escapeHtml(t('pur-set-wht'))}</div><div class="d">${escapeHtml(t('pur-set-wht-d'))}</div></div><div class="pctfld"><input id="pur-set-wht" type="number" value="${cfg.default_wht_service_rate}"><span style="color:var(--ink3);font-size:13px;">%</span></div></div>
+            <div class="grp">${escapeHtml(t('pur-set-pay'))}</div>
+            ${numRow('pur-set-due', 'pur-set-due', 'pur-set-due-d', cfg.default_due_days, t('pur-unit-days'))}
+            ${numRow('pur-set-wht', 'pur-set-wht', 'pur-set-wht-d', cfg.default_wht_service_rate, '%')}
             ${toggleRow('pay_needs_approval', 'pur-set-approval', 'pur-set-approval-d')}
-        </div>
 
-        <button class="save" id="pur-set-save">${escapeHtml(t('pur-save'))}</button>
+            <div class="foot"><button class="save" id="pur-set-save">${escapeHtml(t('pur-save'))}</button></div>
+        </div>
     </div></div>`;
 }
 
@@ -96,21 +97,47 @@ function bindCats(): void {
         };
     });
     const add = document.getElementById('pur-addcat');
+    // F16 · 去原生 prompt():点「加科目」就地变行内输入框(Enter 存 / Esc 取消 / 失焦存)。
     if (add)
-        add.onclick = async () => {
-            const name = (window.prompt && window.prompt(t('pur-add-cat'))) || '';
-            const nm = name.trim();
-            if (!nm) return;
-            try {
-                const res = (await papi('POST', '/api/purchase/categories', { name: nm })) as {
-                    category?: Category;
-                };
-                if (res.category) cats.push({ ...res.category, is_active: true, children: [] });
-                else cats.push({ id: 'tmp-' + nm, parent_id: null, name: nm, is_active: true });
+        add.onclick = () => {
+            const inp = document.createElement('input');
+            inp.className = 'addcat-input';
+            inp.placeholder = t('pur-add-cat');
+            add.replaceWith(inp);
+            inp.focus();
+            let done = false;
+            const commit = async () => {
+                const nm = inp.value.trim();
+                if (!nm) {
+                    refreshCats();
+                    return;
+                }
+                try {
+                    const res = (await papi('POST', '/api/purchase/categories', { name: nm })) as {
+                        category?: Category;
+                    };
+                    if (res.category) cats.push({ ...res.category, is_active: true, children: [] });
+                    else cats.push({ id: 'tmp-' + nm, parent_id: null, name: nm, is_active: true });
+                } catch (e) {
+                    showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+                }
                 refreshCats();
-            } catch (e) {
-                showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
-            }
+            };
+            inp.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    done = true;
+                    commit();
+                } else if (e.key === 'Escape') {
+                    done = true;
+                    refreshCats();
+                }
+            };
+            inp.onblur = () => {
+                if (!done) {
+                    done = true;
+                    commit();
+                }
+            };
         };
 }
 
@@ -125,8 +152,8 @@ function bind(): void {
         el.onclick = () => {
             const key = el.dataset.toggle as keyof PurchaseSettings;
             (cfg as unknown as Record<string, boolean>)[key] = !cfg[key];
-            el.classList.toggle('on');
-            el.classList.toggle('off');
+            const sw = el.querySelector('.sw');
+            if (sw) sw.classList.toggle('on');
         };
     });
     document.getElementById('pur-set-save')!.onclick = save;
@@ -148,20 +175,31 @@ async function save(): Promise<void> {
     }
 }
 
+function stateHtml(msg: string, retry: boolean): string {
+    const btn = retry
+        ? `<button class="btn" id="pur-set-retry" style="margin-top:12px;">${escapeHtml(t('pur-retry'))}</button>`
+        : '';
+    return `<div class="pur cfg"><div class="wrap"><div class="state">${escapeHtml(msg)}${btn}</div></div></div>`;
+}
+
+// F4 · 四态:先显 loading(消除"主区空白")→ 并行拉设置/科目 → 成功 shell;设置硬失败 → 错误+重试。
 async function load(): Promise<void> {
     const sec = document.getElementById('page-purchase-settings');
     if (!sec) return;
-    try {
-        cfg = (await papi('GET', '/api/purchase/settings')) as PurchaseSettings;
-    } catch (_) {
-        /* 用默认 */
+    sec.innerHTML = stateHtml(t('pur-loading'), false);
+    const FAIL = Symbol('fail');
+    const [s, c] = await Promise.all([
+        papi('GET', '/api/purchase/settings').catch(() => FAIL),
+        papi('GET', '/api/purchase/categories').catch(() => null),
+    ]);
+    if (s === FAIL) {
+        sec.innerHTML = stateHtml(t('pur-error'), true);
+        const retry = document.getElementById('pur-set-retry');
+        if (retry) retry.onclick = load;
+        return;
     }
-    try {
-        const d = (await papi('GET', '/api/purchase/categories')) as { categories?: Category[] };
-        cats = d.categories || [];
-    } catch (_) {
-        cats = [];
-    }
+    cfg = s as PurchaseSettings;
+    cats = (c as { categories?: Category[] } | null)?.categories || [];
     sec.innerHTML = shell();
     bind();
 }

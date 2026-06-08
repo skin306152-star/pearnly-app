@@ -198,9 +198,10 @@ def _insert_lines(cur, *, tenant_id, doc_id, lines) -> None:
 
 
 def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
-    """详情:头(带 supplier_name)+ 行 + 附件。不存在/跨套账 → None。"""
+    """详情:头(带 supplier_name/tax_id)+ 行 + 附件。不存在/跨套账 → None。"""
     sql = (
-        f"SELECT d.{', d.'.join(_DOC_COLS.split(', '))}, s.name AS supplier_name "
+        f"SELECT d.{', d.'.join(_DOC_COLS.split(', '))}, "
+        "s.name AS supplier_name, s.tax_id AS supplier_tax_id "
         "FROM purchase_docs d "
         "LEFT JOIN suppliers s ON s.id = d.supplier_id AND s.tenant_id = d.tenant_id "
         "WHERE d.tenant_id = %s AND d.workspace_client_id = %s AND d.id = %s"

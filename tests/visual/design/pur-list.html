@@ -3,108 +3,98 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Pearnly · 采购/进项主屏(概念预览)</title>
+<title>进项主屏 · 收拢版(按钉死的设计语言)</title>
 <style>
-  :root{--blue:#2563EB;--blue-d:#1D4ED8;--blue-l:#DBEAFE;--ink:#111827;--ink2:#6B7280;--ink3:#9CA3AF;
-    --bg:#f4f4f0;--card:#fff;--line:#e8e8e3;--green:#16A34A;--amber:#F59E0B;--red:#DC2626;
-    --shadow:0 1px 2px rgba(17,24,39,.04),0 6px 20px rgba(17,24,39,.06);}
+  :root{--blue:#2563EB;--blue-d:#1D4ED8;--blue-l:#EFF4FF;--ink:#0F172A;--ink2:#64748B;--ink3:#94A3B8;
+    --bg:#FAFAF8;--card:#fff;--line:#ECECE7;--line2:#F1F1EC;--green:#16A34A;--amber:#F59E0B;--amber-bg:#FFF8EC;--amber-line:#FCE9C0;
+    --shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);}
   *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
-  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:24px 22px 60px;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:30px 28px 60px;}
   .tnum{font-variant-numeric:tabular-nums;}
-  .wrap{max-width:1000px;margin:0 auto;}
-  .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-  .ph .t{font-size:20px;font-weight:700;}
-  .ph .sub{color:var(--ink2);font-size:13px;margin-top:3px;}
+  .wrap{max-width:1020px;margin:0 auto;}
+  .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
+  .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+  .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
   .acts{display:flex;gap:9px;}
-  .btn{height:40px;padding:0 15px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
-  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700;}
-  .btn.primary:hover{background:var(--blue-d);}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
-  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);}
-  .kpi .l{color:var(--ink2);font-size:12px;}
-  .kpi .v{font-size:21px;font-weight:800;margin-top:5px;}
-  .kpi .v.tax{color:var(--green);} .kpi .v.unpaid{color:var(--amber);}
-  .kpi .d{font-size:11px;color:var(--ink3);margin-top:3px;}
-  .bar{display:flex;gap:8px;margin-bottom:12px;align-items:center;}
-  .chip{height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink2);font-size:12.5px;cursor:pointer;}
-  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink);}
-  .search{margin-left:auto;width:240px;height:34px;background:var(--card);border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 11px;}
+  .btn{height:40px;padding:0 16px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:650;box-shadow:0 1px 2px rgba(37,99,235,.3);}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
+  .band{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid var(--line2);}
+  .star .lbl{color:var(--ink2);font-size:12.5px;margin-bottom:5px;}
+  .star .num{font-size:30px;font-weight:740;letter-spacing:-1px;line-height:1;}
+  .star .ctx{margin-top:8px;color:var(--ink2);font-size:12.5px;}
+  .star .ctx .g{color:var(--green);font-weight:600;}
+  .attn{display:flex;align-items:center;gap:13px;background:var(--amber-bg);border:1px solid var(--amber-line);border-radius:12px;padding:10px 12px 10px 14px;}
+  .attn .l{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#B45309;font-weight:600;}
+  .attn .l .pip{width:6px;height:6px;border-radius:50%;background:var(--amber);}
+  .attn .m{font-size:14px;font-weight:700;margin-top:2px;}
+  .attn .go{height:34px;padding:0 13px;border-radius:9px;background:#fff;border:1px solid var(--amber-line);color:#B45309;font-weight:650;font-size:12.5px;cursor:pointer;display:flex;align-items:center;}
+  .alert{display:flex;align-items:center;gap:9px;padding:11px 22px;background:var(--amber-bg);border-bottom:1px solid var(--line2);font-size:13px;color:#92400E;}
+  .alert .pip{width:7px;height:7px;border-radius:50%;background:var(--amber);}
+  .alert b{font-weight:700;color:#B45309;}
+  .alert .sub2{color:#B45309;opacity:.7;font-size:12px;}
+  .alert .go{margin-left:auto;color:#B45309;font-weight:650;font-size:12.5px;cursor:pointer;}
+
+  .toolbar{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--line2);background:#FCFCFA;}
+  .seg{display:inline-flex;gap:2px;}
+  .seg .o{height:30px;padding:0 13px;border-radius:8px;display:flex;align-items:center;font-size:12.5px;color:var(--ink2);cursor:pointer;}
+  .seg .o.on{background:var(--ink);color:#fff;font-weight:600;}
+  .search{margin-left:auto;width:230px;height:34px;background:#fff;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 11px;}
   .search input{border:0;outline:0;flex:1;background:transparent;font-size:13px;}
-  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);}
-  th{text-align:left;font-size:11.5px;color:var(--ink2);font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:11px 14px;border-bottom:1px solid var(--line);background:#fafaf8;}
-  td{padding:12px 14px;border-bottom:1px solid #f4f4f0;font-size:13.5px;}
-  tr:last-child td{border-bottom:0;}
-  tr:hover td{background:#fafaf8;}
-  .num{text-align:right;font-variant-numeric:tabular-nums;}
-  .src{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 8px;border-radius:6px;background:#eef2ff;color:#4338ca;}
-  .src.line{background:#dcfce7;color:#15803d;}
-  .st{font-size:11px;padding:2px 9px;border-radius:6px;}
-  .st.paid{background:#dcfce7;color:#15803d;} .st.unpaid{background:#fef3c7;color:#b45309;}
-  .ty{font-size:11px;color:var(--ink2);}
-  .note{margin-top:14px;font-size:12px;color:var(--ink3);}
-  .cards{display:none;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px;box-shadow:var(--shadow);}
-  .card .r1{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
-  .card .nm{font-weight:600;font-size:14px;}
-  .card .amt{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap;}
-  .card .r2{display:flex;align-items:center;gap:7px;margin-top:9px;flex-wrap:wrap;}
-  .card .dt{color:var(--ink3);font-size:11px;margin-left:auto;}
-  .card .vat{font-size:11.5px;color:var(--ink2);}
-  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(17,24,39,.82);color:#fff;font-size:11px;padding:5px 10px;border-radius:8px;}
-  @media(max-width:600px){
-    body{padding:16px 14px 60px;}
-    .ph{flex-direction:column;align-items:flex-start;gap:11px;}
-    .acts{width:100%;} .acts .btn{flex:1;justify-content:center;}
-    .kpis{grid-template-columns:repeat(2,1fr);}
-    .search{margin-left:0;width:100%;}
-    .bar{flex-wrap:wrap;}
-    table{display:none;}
-    .cards{display:flex;flex-direction:column;gap:10px;}
-  }
+
+  .row{display:flex;align-items:center;gap:14px;padding:15px 18px;border-bottom:1px solid var(--line2);cursor:pointer;}
+  .row:last-child{border-bottom:0;} .row:hover{background:#FCFCFA;}
+  .row .dt{width:46px;color:var(--ink3);font-size:12px;}
+  .row .who{flex:1;}
+  .row .nm{font-weight:600;font-size:14px;}
+  .row .meta{color:var(--ink3);font-size:12px;margin-top:2px;display:flex;align-items:center;gap:8px;}
+  .src{font-size:10.5px;padding:1px 7px;border-radius:5px;background:#F1F5F9;color:#475569;}
+  .src.line{background:#ECFDF3;color:#15803d;}
+  .amt{text-align:right;}
+  .amt .v{font-weight:700;font-size:14.5px;font-variant-numeric:tabular-nums;}
+  .amt .vat{color:var(--ink3);font-size:11px;margin-top:2px;}
+  .st{font-size:11px;padding:3px 10px;border-radius:7px;width:52px;text-align:center;}
+  .st.paid{background:#F1F5F9;color:#64748B;} .st.unpaid{background:#FFF1E6;color:#C2410C;font-weight:600;}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(22,163,74,.92);color:#fff;font-size:11px;padding:5px 11px;border-radius:8px;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="ph">
-    <div><div class="t">采购 / 进项</div><div class="sub">花出去的钱 · 拍照或 LINE 一句话自动入账</div></div>
-    <div class="acts">
-      <button class="btn">LINE 记费用</button>
-      <button class="btn primary"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>拍进项票</button>
+    <div><div class="t">采购 / 进项</div><div class="sub">花出去的钱 · 拍照或一句话自动入账</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="band">
+      <div class="star">
+        <div class="lbl">本月花费</div>
+        <div class="num tnum">฿70,550</div>
+        <div class="ctx">进货 ฿62,400 · 费用 ฿8,150 · <span class="g">可抵进项税 ฿4,613</span></div>
+      </div>
+      <div class="acts">
+        <button class="btn">LINE 记费用</button>
+        <button class="btn primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>拍进项票</button>
+      </div>
     </div>
-  </div>
 
-  <div class="kpis">
-    <div class="kpi"><div class="l">本月进货</div><div class="v tnum">฿62,400</div><div class="d">18 笔</div></div>
-    <div class="kpi"><div class="l">本月费用</div><div class="v tnum">฿8,150</div><div class="d">23 笔</div></div>
-    <div class="kpi"><div class="l">可抵进项税</div><div class="v tax tnum">฿4,613</div><div class="d">月底抵销项税</div></div>
-    <div class="kpi"><div class="l">未付</div><div class="v unpaid tnum">฿21,000</div><div class="d">3 笔供应商</div></div>
-  </div>
+    <div class="alert">
+      <span class="pip"></span><b>3 笔未付 · ฿21,000</b><span class="sub2">其中 2 笔本周到期</span>
+      <span class="go">去处理 →</span>
+    </div>
 
-  <div class="bar">
-    <div class="chip on">全部</div><div class="chip">进货</div><div class="chip">费用</div><div class="chip">未付</div>
-    <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input placeholder="搜供应商 / 单号"></div>
-  </div>
+    <div class="toolbar">
+      <div class="seg"><div class="o on">全部</div><div class="o">进货</div><div class="o">费用</div><div class="o">未付</div></div>
+      <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input placeholder="搜供应商 / 单号"></div>
+    </div>
 
-  <table>
-    <thead><tr><th>日期</th><th>供应商 / 项目</th><th>类型</th><th>来源</th><th class="num">含税额</th><th class="num">进项税</th><th>付款</th></tr></thead>
-    <tbody>
-      <tr><td class="tnum">06-08</td><td>บริษัท ทิปโก้ · 进货 12 项</td><td class="ty">进货</td><td><span class="src"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/></svg>拍照</span></td><td class="num">฿18,190</td><td class="num">฿1,190</td><td><span class="st unpaid">未付</span></td></tr>
-      <tr><td class="tnum">06-08</td><td>แท็กซี่ · 打车</td><td class="ty">交通费</td><td><span class="src line">LINE</span></td><td class="num">฿200</td><td class="num">—</td><td><span class="st paid">已付</span></td></tr>
-      <tr><td class="tnum">06-07</td><td>การไฟฟ้า · 电费</td><td class="ty">水电费</td><td><span class="src line">LINE</span></td><td class="num">฿1,840</td><td class="num">฿120</td><td><span class="st paid">已付</span></td></tr>
-      <tr><td class="tnum">06-07</td><td>สยามแม็คโคร · 进货 8 项</td><td class="ty">进货</td><td><span class="src"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/></svg>拍照</span></td><td class="num">฿9,630</td><td class="num">฿630</td><td><span class="st paid">已付</span></td></tr>
-      <tr><td class="tnum">06-06</td><td>ออฟฟิศเมท · 办公用品</td><td class="ty">办公费</td><td><span class="src">拍小票</span></td><td class="num">฿560</td><td class="num">฿37</td><td><span class="st paid">已付</span></td></tr>
-    </tbody>
-  </table>
-
-  <div class="cards">
-    <div class="card"><div class="r1"><div class="nm">บริษัท ทิปโก้</div><div class="amt">฿18,190</div></div><div class="r2"><span class="ty">进货 12 项</span><span class="src">拍照</span><span class="st unpaid">未付</span><span class="vat">进项税 ฿1,190</span><span class="dt">06-08</span></div></div>
-    <div class="card"><div class="r1"><div class="nm">แท็กซี่ · 打车</div><div class="amt">฿200</div></div><div class="r2"><span class="ty">交通费</span><span class="src line">LINE</span><span class="st paid">已付</span><span class="dt">06-08</span></div></div>
-    <div class="card"><div class="r1"><div class="nm">การไฟฟ้า · 电费</div><div class="amt">฿1,840</div></div><div class="r2"><span class="ty">水电费</span><span class="src line">LINE</span><span class="st paid">已付</span><span class="vat">进项税 ฿120</span><span class="dt">06-07</span></div></div>
-    <div class="card"><div class="r1"><div class="nm">สยามแม็คโคร</div><div class="amt">฿9,630</div></div><div class="r2"><span class="ty">进货 8 项</span><span class="src">拍照</span><span class="st paid">已付</span><span class="vat">进项税 ฿630</span><span class="dt">06-07</span></div></div>
-    <div class="card"><div class="r1"><div class="nm">ออฟฟิศเมท · 办公用品</div><div class="amt">฿560</div></div><div class="r2"><span class="ty">办公费</span><span class="src">拍小票</span><span class="st paid">已付</span><span class="vat">进项税 ฿37</span><span class="dt">06-06</span></div></div>
+    <div class="row"><span class="dt tnum">06-08</span><div class="who"><div class="nm">บริษัท ทิปโก้</div><div class="meta"><span class="src">拍照</span>进货 12 项</div></div><div class="amt"><div class="v">฿18,190</div><div class="vat">进项税 ฿1,190</div></div><span class="st unpaid">未付</span></div>
+    <div class="row"><span class="dt tnum">06-08</span><div class="who"><div class="nm">แท็กซี่ · 打车</div><div class="meta"><span class="src line">LINE</span>交通费</div></div><div class="amt"><div class="v">฿200</div></div><span class="st paid">已付</span></div>
+    <div class="row"><span class="dt tnum">06-07</span><div class="who"><div class="nm">การไฟฟ้า · 电费</div><div class="meta"><span class="src line">LINE</span>水电费</div></div><div class="amt"><div class="v">฿1,840</div><div class="vat">进项税 ฿120</div></div><span class="st paid">已付</span></div>
+    <div class="row"><span class="dt tnum">06-07</span><div class="who"><div class="nm">สยามแม็คโคร</div><div class="meta"><span class="src">拍照</span>进货 8 项</div></div><div class="amt"><div class="v">฿9,630</div><div class="vat">进项税 ฿630</div></div><span class="st paid">已付</span></div>
+    <div class="row"><span class="dt tnum">06-06</span><div class="who"><div class="nm">ออฟฟิศเมท · 办公用品</div><div class="meta"><span class="src">拍小票</span>办公费</div></div><div class="amt"><div class="v">฿560</div><div class="vat">进项税 ฿37</div></div><span class="st paid">已付</span></div>
   </div>
-  <div class="note">四态:空=「还没记账,拍第一张进项票 →」· 加载=骨架行 · 出错=[重试] · 未付红点提醒。来源标签:拍照 / 拍小票 / LINE。</div>
 </div>
-<div class="ptag">概念预览 · 采购/进项主屏 · 总览+列表+付款状态 · 拍照/LINE 两入口 · 进项税自动汇总(联报税)</div>
+<div class="ptag">进项主屏 · 收拢版 · 4卡碎片 → 一个面板(主信息带+控件带+列表)· 按钉死的设计语言</div>
 </body>
 </html>

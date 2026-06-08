@@ -158,3 +158,39 @@ async def api_quick_expense(req: ExpenseIn, request: Request):
             created_by=_uid(user),
         )
         return ok({"doc": posted["doc"], "category": {"id": category_id}})
+
+
+@router.get("/inbox")
+async def api_inbox_list(request: Request, workspace_client_id: Optional[int] = None):
+    """待归类收件箱:本套账 pending intake_items(长尾安全网入口)。成员可读。"""
+    _user, tid = auth_member(request)
+    with db.get_cursor_rls(tid, commit=False) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, workspace_client_id)
+        items = intake_svc.list_inbox(cur, tenant_id=tid, workspace_client_id=ws)
+    return ok({"items": items})
+
+
+class InboxResolveIn(BaseModel):
+    workspace_client_id: Optional[int] = None
+    action: str = ""
+
+
+@router.post("/inbox/{item_id}/resolve")
+async def api_inbox_resolve(item_id: str, req: InboxResolveIn, request: Request):
+    """一点归类:purchase/expense → 建草稿单(返 doc_id);sales/recon → 移出;dismiss → 非票。"""
+    user, tid = auth_member(request)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
+        data = intake_svc.resolve_inbox(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            item_id=item_id,
+            action=req.action,
+            created_by=_uid(user),
+            settings=cfg,
+        )
+    return ok(data)

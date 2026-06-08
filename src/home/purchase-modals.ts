@@ -87,12 +87,12 @@ function closeMask(maskId: string): void {
 // ── 屏7 记付款 ────────────────────────────────────────────────────────
 window.openPurchasePay = function (docArg, onDone) {
     const d = docArg as DocDetail;
-    const due = d.grand_total - d.paid_amount;
+    const due = d.net_payable - d.paid_amount;
     const inner = `<div class="purm"><div class="mh"><div class="t">${escapeHtml(t('pur-pay'))}</div><div class="x" data-close>×</div></div>
         <div class="mb">
             <div class="who">${escapeHtml(t('pur-pay-to'))} <b>${escapeHtml((d.supplier && d.supplier.name) || '—')}</b>${d.doc_no ? ' · ' + escapeHtml(d.doc_no) : ''}</div>
             <div class="recap">
-                <div class="row"><span>${escapeHtml(t('pur-payable'))}</span><span class="tnum">฿${fmtMoney(d.grand_total)}</span></div>
+                <div class="row"><span>${escapeHtml(t('pur-payable'))}</span><span class="tnum">฿${fmtMoney(d.net_payable)}</span></div>
                 <div class="row"><span>${escapeHtml(t('pur-paid'))}</span><span class="tnum">฿${fmtMoney(d.paid_amount)}</span></div>
                 <div class="row due"><span>${escapeHtml(t('pur-due-balance'))}</span><span class="tnum"><span class="a">฿${fmtMoney(due)}</span></span></div>
             </div>
@@ -102,7 +102,7 @@ window.openPurchasePay = function (docArg, onDone) {
                 <div class="field"><label>${escapeHtml(t('pur-pay-date'))}</label><div class="inp" style="font-weight:400;font-size:14px;"><input type="date" id="purm-date"></div></div>
                 <div class="field"><label>${escapeHtml(t('pur-note'))}</label><div class="inp" style="font-weight:400;font-size:13px;"><input id="purm-note" placeholder="—"></div></div>
             </div>
-            <div class="after">${escapeHtml(t('pur-pay-after'))}</div>
+            <div class="after" id="purm-after">${escapeHtml(t('pur-pay-after-full'))}</div>
         </div>
         <div class="mf"><button class="btn" data-close>${escapeHtml(t('pur-cancel'))}</button><button class="btn primary" id="purm-confirm">${escapeHtml(t('pur-pay-confirm'))}</button></div>
     </div>`;
@@ -117,8 +117,24 @@ window.openPurchasePay = function (docArg, onDone) {
         };
     });
     const amt = mask.querySelector('#purm-amt') as HTMLInputElement;
-    (mask.querySelector('#purm-payfull') as HTMLElement).onclick = () =>
-        (amt.value = due.toFixed(2));
+    const afterEl = mask.querySelector('#purm-after') as HTMLElement;
+    // F6 · 文案随金额动态:部分付款 → 显"将记部分付款 ฿x · 剩余 ฿y";付清 → "标记已付清"。
+    const updateAfter = () => {
+        const v = Number(amt.value);
+        afterEl.textContent =
+            v > 0 && v < due - 0.001
+                ? t('pur-pay-after-partial', {
+                      amount: fmtMoney(v),
+                      remain: fmtMoney(due - v),
+                  })
+                : t('pur-pay-after-full');
+    };
+    amt.oninput = updateAfter;
+    updateAfter();
+    (mask.querySelector('#purm-payfull') as HTMLElement).onclick = () => {
+        amt.value = due.toFixed(2);
+        updateAfter();
+    };
     (mask.querySelector('#purm-confirm') as HTMLElement).onclick = async () => {
         const v = Number(amt.value);
         if (!(v > 0) || v > due + 0.001) {
@@ -141,29 +157,45 @@ window.openPurchasePay = function (docArg, onDone) {
     };
 };
 
-// ── 屏8 商品匹配 / 建商品 ─────────────────────────────────────────────
-const MATCH_CANDIDATES = [
-    { id: 'p-br1', name: 'ขนมปังโฮลวีท', meta: 'SKU BR-001', suggest: true },
-    { id: 'p-br2', name: 'ขนมปังแซนวิช', meta: 'SKU BR-002', suggest: false },
-];
+// ── 屏8 商品匹配 / 建商品(F7 · 拉真实商品库按相关度排序 · 服务行不硬推商品)──────
+interface MatchProduct {
+    id: string;
+    name_th?: string;
+    name_en?: string;
+    name_zh?: string;
+    sku?: string | null;
+}
+
+// 相关度:全等 > 整串包含 > 命中词数。无查询=0(保持库内顺序)。给服务咨询不会再冒出零食。
+function matchScore(name: string, q: string): number {
+    const n = (name || '').toLowerCase();
+    const query = (q || '').trim().toLowerCase();
+    if (!query) return 0;
+    if (n === query) return 100;
+    if (n.includes(query)) return 60;
+    let hit = 0;
+    query.split(/\s+/).forEach((tok) => {
+        if (tok && n.includes(tok)) hit += 1;
+    });
+    return hit * 10;
+}
 
 window.openPurchaseMatch = function (lineArg, onDone) {
     const ln = (lineArg || {}) as {
         id?: string;
         description?: string;
+        item_type?: string;
         qty?: number;
         unit_price?: number;
     };
     const from = `${escapeHtml(ln.description || '—')}${ln.qty ? ' · ' + ln.qty + ' × ฿' + fmtMoney(ln.unit_price) : ''}`;
-    const rows = MATCH_CANDIDATES.map(
-        (c) =>
-            `<div class="row" data-pid="${c.id}"><div class="av">▢</div><div><div class="nm">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.meta)}</div></div>${c.suggest ? `<span class="match">${escapeHtml(t('pur-ai-suggest'))}</span>` : ''}</div>`
-    ).join('');
+    const isService = ln.item_type === 'service';
     const inner = `<div class="purm w480"><div class="mh"><div class="t">${escapeHtml(t('pur-match-title'))}</div><div class="x" data-close>×</div></div>
         <div class="mb">
             <div class="from"><div class="l">${escapeHtml(t('pur-from-bill'))}</div><b>${from}</b></div>
+            ${isService ? `<div class="note">${escapeHtml(t('pur-match-service-hint'))}</div>` : ''}
             <div class="search"><input id="purm-msearch" placeholder="${escapeHtml(t('pur-match-search'))}" value="${escapeHtml(ln.description || '')}"></div>
-            <div class="list">${rows}<div class="row new" data-pid="__new__">+ ${escapeHtml(t('pur-make-new'))}</div></div>
+            <div class="list" id="purm-mlist"><div class="row"><div class="meta">${escapeHtml(t('pur-loading'))}</div></div></div>
         </div>
         <div class="mf"><button class="btn" data-close>${escapeHtml(t('pur-skip'))}</button><button class="btn primary" id="purm-mok" disabled>${escapeHtml(t('pur-match-confirm'))}</button></div>
     </div>`;
@@ -171,14 +203,59 @@ window.openPurchaseMatch = function (lineArg, onDone) {
     if (!mask) return;
     let picked: string | null = null;
     const okBtn = mask.querySelector('#purm-mok') as HTMLButtonElement;
-    mask.querySelectorAll<HTMLElement>('[data-pid]').forEach((el) => {
-        el.onclick = () => {
-            picked = el.dataset.pid!;
-            mask.querySelectorAll('[data-pid]').forEach((x) => x.classList.remove('on'));
-            el.style.borderColor = 'var(--blue)';
-            okBtn.disabled = false;
-        };
-    });
+    const listEl = mask.querySelector('#purm-mlist') as HTMLElement;
+    const search = mask.querySelector('#purm-msearch') as HTMLInputElement;
+    const pname = (p: MatchProduct) => p.name_th || p.name_en || p.name_zh || '—';
+    const newRow = `<div class="row new" data-pid="__new__">+ ${escapeHtml(t('pur-make-new'))}</div>`;
+
+    const bindRows = () => {
+        listEl.querySelectorAll<HTMLElement>('[data-pid]').forEach((el) => {
+            el.onclick = () => {
+                picked = el.dataset.pid!;
+                listEl
+                    .querySelectorAll<HTMLElement>('[data-pid]')
+                    .forEach((x) => (x.style.borderColor = ''));
+                el.style.borderColor = 'var(--blue)';
+                okBtn.disabled = false;
+            };
+        });
+    };
+    const render = (products: MatchProduct[], q: string) => {
+        const sorted = products
+            .slice()
+            .sort((a, b) => matchScore(pname(b), q) - matchScore(pname(a), q));
+        const rows = sorted
+            .map(
+                (p) =>
+                    `<div class="row" data-pid="${escapeHtml(p.id)}"><div class="av">▢</div><div><div class="nm">${escapeHtml(pname(p))}</div><div class="meta">${escapeHtml(p.sku || '')}</div></div></div>`
+            )
+            .join('');
+        const empty = rows
+            ? ''
+            : `<div class="row"><div class="meta">${escapeHtml(t('pur-match-none'))}</div></div>`;
+        listEl.innerHTML = rows + empty + newRow;
+        picked = null;
+        okBtn.disabled = true;
+        bindRows();
+    };
+    const fetchProducts = async (q: string) => {
+        try {
+            const d = (await papi('GET', '/api/products?q=' + encodeURIComponent(q || ''))) as {
+                products?: MatchProduct[];
+            };
+            render(d.products || [], q);
+        } catch (_) {
+            listEl.innerHTML = `<div class="row"><div class="meta">${escapeHtml(t('pur-error'))}</div></div>${newRow}`;
+            bindRows();
+        }
+    };
+    let timer = 0;
+    search.oninput = () => {
+        clearTimeout(timer);
+        timer = window.setTimeout(() => fetchProducts(search.value), 250);
+    };
+    fetchProducts(ln.description || '');
+
     okBtn.onclick = async () => {
         const isNew = picked === '__new__';
         const payload = isNew ? { create: { name: ln.description || '' } } : { product_id: picked };

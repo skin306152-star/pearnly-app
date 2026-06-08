@@ -3,79 +3,52 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Pearnly · 供应商管理(配置后台 · 概念预览)</title>
+<title>采购 · 供应商管理(收拢版)</title>
 <style>
-  :root{--blue:#2563EB;--blue-d:#1D4ED8;--blue-l:#DBEAFE;--ink:#111827;--ink2:#6B7280;--ink3:#9CA3AF;
-    --bg:#f4f4f0;--card:#fff;--line:#e8e8e3;--green:#16A34A;--shadow:0 1px 2px rgba(17,24,39,.04),0 6px 20px rgba(17,24,39,.07);}
+  :root{--blue:#2563EB;--blue-d:#1D4ED8;--blue-l:#EFF4FF;--ink:#0F172A;--ink2:#64748B;--ink3:#94A3B8;
+    --bg:#FAFAF8;--card:#fff;--line:#ECECE7;--line2:#F1F1EC;--green:#16A34A;--amber:#F59E0B;
+    --shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);}
   *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
-  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:28px 20px 60px;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:30px 28px 60px;}
   .tnum{font-variant-numeric:tabular-nums;}
-  .wrap{max-width:760px;margin:0 auto;}
-  .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
-  h1{font-size:20px;}
-  .sub{color:var(--ink2);font-size:13px;margin-bottom:18px;}
-  .add{height:38px;padding:0 14px;border:0;border-radius:9px;background:var(--blue);color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
-  .add:hover{background:var(--blue-d);}
-  .aibar{display:flex;gap:9px;align-items:center;background:var(--blue-l);border:1px solid #c7d8fb;border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12.5px;color:#1d4ed8;}
-  .aibar svg{flex:0 0 16px;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;}
-  .search{padding:11px 14px;border-bottom:1px solid #f0f0ec;display:flex;align-items:center;gap:8px;}
-  .search input{border:0;outline:0;flex:1;font-size:13.5px;background:transparent;}
-  .row{display:flex;align-items:center;gap:13px;padding:13px 15px;border-bottom:1px solid #f4f4f0;}
-  .row:last-child{border-bottom:0;}
-  .av{width:40px;height:40px;border-radius:10px;background:#f0f0ec;color:var(--ink2);display:grid;place-items:center;font-weight:700;flex:0 0 40px;}
-  .info{flex:1;min-width:0;}
-  .info .n{font-size:14.5px;font-weight:600;}
-  .info .m{font-size:12px;color:var(--ink2);margin-top:3px;}
-  .stat{text-align:right;}
-  .stat .v{font-weight:700;}
-  .stat .l{font-size:11px;color:var(--ink3);}
-  .ops{display:flex;gap:6px;}
-  .op{height:32px;padding:0 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink2);font-size:12.5px;cursor:pointer;}
-  .op:hover{border-color:#c7d2fe;color:var(--blue);}
-  .note{margin-top:14px;font-size:12.5px;color:var(--ink2);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px;line-height:1.6;}
-  .note b{color:var(--ink);}
-  .mask{position:fixed;inset:0;background:rgba(17,24,39,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;}
-  .mask.show{display:flex;}
-  .modal{width:380px;max-width:92vw;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);}
-  .mh{padding:16px 20px;border-bottom:1px solid #f0f0ec;font-weight:700;font-size:16px;}
-  .mb{padding:18px 20px;}
-  label{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:7px;}
-  .fld{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 13px;display:flex;align-items:center;background:#fbfbf9;margin-bottom:14px;}
-  .fld input{border:0;outline:0;background:transparent;flex:1;font-size:14.5px;}
-  .mf{padding:0 20px 20px;display:flex;gap:10px;}
-  .mf .g{height:46px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink2);cursor:pointer;}
-  .mf .ok{flex:1;height:46px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:700;font-size:15px;cursor:pointer;}
-  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(17,24,39,.82);color:#fff;font-size:11px;padding:5px 10px;border-radius:8px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
+  .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+  .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
+  .btn{height:40px;padding:0 16px;border:1px solid var(--blue);border-radius:11px;background:var(--blue);color:#fff;font-weight:650;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
+  .hint{display:flex;align-items:center;gap:9px;padding:13px 20px;background:var(--blue-l);border-bottom:1px solid var(--line2);font-size:12.5px;color:#1e40af;}
+  .toolbar{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line2);background:#FCFCFA;}
+  .search{flex:1;height:36px;background:#fff;border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 12px;}
+  .search input{border:0;outline:0;flex:1;background:transparent;font-size:13.5px;}
+  .row{display:flex;align-items:center;gap:13px;padding:14px 20px;border-bottom:1px solid var(--line2);}
+  .row:last-child{border-bottom:0;} .row:hover{background:#FCFCFA;}
+  .av{width:38px;height:38px;border-radius:10px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;color:var(--ink2);font-weight:700;flex-shrink:0;}
+  .nm{font-weight:600;font-size:13.5px;} .meta{color:var(--ink3);font-size:11.5px;margin-top:2px;}
+  .amt{margin-left:auto;text-align:right;} .amt .v{font-weight:700;font-variant-numeric:tabular-nums;} .amt .l{font-size:11px;color:var(--ink3);}
+  .edit{margin-left:14px;height:32px;padding:0 13px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:12.5px;cursor:pointer;}
+  .foot{padding:12px 20px;font-size:11.5px;color:var(--ink3);background:#FCFCFA;border-top:1px solid var(--line2);}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(22,163,74,.92);color:#fff;font-size:11px;padding:5px 11px;border-radius:8px;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="hd"><h1>供应商</h1><button class="add" onclick="document.getElementById('m').classList.add('show')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>加供应商</button></div>
-  <div class="sub">给你进货/付款的对象。大多不用手动加——拍进项票时 AI 自动建好。</div>
-
-  <div class="aibar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z"/></svg>拍进项票时,AI 自动从票里认出供应商:老的自动匹配、新的自动建档,你一般不用在这手动加。</div>
-
-  <div class="card">
-    <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input placeholder="搜供应商 / 税号"></div>
-    <div class="row"><div class="av">ท</div><div class="info"><div class="n">บริษัท ทิปโก้ จำกัด</div><div class="m">税号 0105512345678 · 上次进货 06-08</div></div><div class="stat"><div class="v tnum">฿182,400</div><div class="l">累计采购</div></div><div class="ops"><button class="op">编辑</button></div></div>
-    <div class="row"><div class="av">ส</div><div class="info"><div class="n">สยามแม็คโคร</div><div class="m">税号 0107536000123 · 上次进货 06-07</div></div><div class="stat"><div class="v tnum">฿96,300</div><div class="l">累计采购</div></div><div class="ops"><button class="op">编辑</button></div></div>
-    <div class="row"><div class="av">อ</div><div class="info"><div class="n">ออฟฟิศเมท</div><div class="m">无税号(小票)· 上次 06-06</div></div><div class="stat"><div class="v tnum">฿2,180</div><div class="l">累计采购</div></div><div class="ops"><button class="op">编辑</button></div></div>
+  <div class="ph">
+    <div><div class="t">供应商</div><div class="sub">给你进货/付款的对象 · 大多不用手动加 —— 拍进项票时自动建好</div></div>
+    <button class="btn">+ 加供应商</button>
   </div>
-  <div class="note"><b>套账隔离</b>:供应商只属于当前公司(切公司只看本家的)。<b>权限</b>:加/改供应商 = 老板/会计;员工只能选用。<b>删除</b>仅限从没记过账的。</div>
-</div>
 
-<div class="mask" id="m">
-  <div class="modal">
-    <div class="mh">加供应商</div>
-    <div class="mb">
-      <label>名称</label><div class="fld"><input placeholder="บริษัท ... จำกัด"></div>
-      <label>税号(可空 · 小供应商可不填)</label><div class="fld"><input class="tnum" placeholder="13 位"></div>
-      <label>电话 / 备注(可空)</label><div class="fld"><input></div>
+  <div class="panel">
+    <div class="hint">★ 拍进项票时自动从票里认出供应商:老的自动匹配、新的自动建档,你一般不用在这手动加。</div>
+    <div class="toolbar">
+      <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input placeholder="搜供应商 / 税号"></div>
     </div>
-    <div class="mf"><button class="g" onclick="document.getElementById('m').classList.remove('show')">取消</button><button class="ok" onclick="document.getElementById('m').classList.remove('show')">保存</button></div>
+    <div class="row"><div class="av">ท</div><div><div class="nm">บริษัท ทิปโก้ จำกัด</div><div class="meta tnum">税号 0105512345678 · 上次进货 06-08</div></div><div class="amt"><div class="v tnum">฿182,400</div><div class="l">累计采购</div></div><button class="edit">编辑</button></div>
+    <div class="row"><div class="av">ส</div><div><div class="nm">สยามแม็คโคร</div><div class="meta tnum">税号 0107536000123 · 上次进货 06-07</div></div><div class="amt"><div class="v tnum">฿96,300</div><div class="l">累计采购</div></div><button class="edit">编辑</button></div>
+    <div class="row"><div class="av">อ</div><div><div class="nm">ออฟฟิศเมท</div><div class="meta">无税号(小票) · 上次 06-06</div></div><div class="amt"><div class="v tnum">฿2,180</div><div class="l">累计采购</div></div><button class="edit">编辑</button></div>
+    <div class="foot">套账隔离:供应商只属于当前公司(切公司只看本家)· 加/改 = 老板/会计 · 删除仅限没记过账的</div>
   </div>
 </div>
-<div class="ptag">概念预览 · 供应商管理(配置后台)· AI 拍票自动建档为主 · 手动加为辅 · 套账隔离 · owner/会计可改</div>
+<div class="ptag">采购 · 供应商管理(收拢版)· 一个面板:提示+搜索+列表+脚注·不再各飘卡 · 照 DESIGN_LANGUAGE</div>
 </body>
 </html>

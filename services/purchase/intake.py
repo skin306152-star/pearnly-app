@@ -235,6 +235,67 @@ def resolve_image_intake(
     }
 
 
+def fields_from_invoice(inv) -> dict:
+    """ThaiInvoice(OCR 结构化结果)→ 判方向/建草稿用的扁平 fields。"""
+    return {
+        "document_type": getattr(inv, "document_type", ""),
+        "is_not_invoice": getattr(inv, "is_not_invoice", False),
+        "seller_name": getattr(inv, "seller_name", ""),
+        "seller_tax": getattr(inv, "seller_tax", ""),
+        "seller_addr": getattr(inv, "seller_addr", ""),
+        "buyer_name": getattr(inv, "buyer_name", ""),
+        "buyer_tax": getattr(inv, "buyer_tax", ""),
+        "invoice_number": getattr(inv, "invoice_number", ""),
+        "date": getattr(inv, "date", ""),
+        "subtotal": getattr(inv, "subtotal", ""),
+        "vat": getattr(inv, "vat", ""),
+        "total_amount": getattr(inv, "total_amount", ""),
+        "items": [
+            {
+                "name": getattr(it, "name", ""),
+                "qty": getattr(it, "qty", ""),
+                "price": getattr(it, "price", ""),
+            }
+            for it in (getattr(inv, "items", None) or [])
+        ],
+    }
+
+
+def route_line_image(*, tenant_id, workspace_client_id, fields, confidence) -> bool:
+    """LINE 收图分流(纯加法):商户租户 → 落采购待办 intake_item(等用户在采购 inbox 一点)。
+
+    事务所(firm)/ 未选业态 / 未开 expense → 返回 False 不动,识别中心路径一字不变。自开游标。
+    调用方须用 try/except 包裹:本函数任何异常都不得影响既有 LINE 回复。
+    """
+    if not tenant_id or not workspace_client_id:
+        return False
+    from core import db
+    from services.modules import store as modules_store
+
+    with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
+        bt = modules_store.get_business_type(cur, tenant_id=str(tenant_id))
+        if bt in (None, "firm"):
+            return False
+        if not modules_store.is_enabled(cur, tenant_id=str(tenant_id), module_key="expense"):
+            return False
+        kind, route = judge_direction(
+            fields,
+            my_tax_id=_my_tax_id(
+                cur, tenant_id=str(tenant_id), workspace_client_id=workspace_client_id
+            ),
+        )
+        _stash_inbox(
+            cur,
+            tenant_id=str(tenant_id),
+            workspace_client_id=workspace_client_id,
+            source="line",
+            raw=fields,
+            image_url=None,
+            ai_guess={"kind": kind, "route": route, "confidence": confidence},
+        )
+        return True
+
+
 def _stash_inbox(cur, *, tenant_id, workspace_client_id, source, raw, image_url, ai_guess) -> None:
     """低置信/拿不准落待归类(绝不静默丢错)。"""
     cur.execute(

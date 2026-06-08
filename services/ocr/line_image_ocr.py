@@ -168,6 +168,24 @@ async def _handle_line_image_ocr(
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
             return
 
+        # 5-bis. 商户采购分流(纯加法 · 事务所 firm 早退不动 · docs/purchasing/00 §三接入)。
+        # 商户租户(零售/餐厅/服务等 + 开 expense)→ 把这张票落采购待办 intake_item,
+        # 让老板在「采购」inbox 一点入账。事务所 / 未开 expense / 任何异常 → 完全不影响下方
+        # 识别中心既有流程(铁律 #26 · 底线:firm 路径一字不破坏)。
+        try:
+            from services.purchase.intake import fields_from_invoice, route_line_image
+
+            _pages_struct = getattr(_pipe_res, "pages", None) or []
+            if _pages_struct and _ws_client_id:
+                route_line_image(
+                    tenant_id=user_fresh.get("tenant_id"),
+                    workspace_client_id=_ws_client_id,
+                    fields=fields_from_invoice(_pages_struct[0].invoice),
+                    confidence=result.get("confidence"),
+                )
+        except Exception as _route_err:
+            logger.warning(f"[line_ocr] 采购分流跳过(不影响识别中心): {_route_err}")
+
         # 5. 写 history(source='line_bot')
         # file_hash 已在 3.5 计算(v118.22.0.3)
         try:

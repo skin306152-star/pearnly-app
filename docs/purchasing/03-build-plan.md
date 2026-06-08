@@ -1,60 +1,41 @@
-# 商户采购 · 03 逐 PO 施工单
+# 商户采购 · 03 施工计划(封板 · 依赖 + 风险 · 详细文案见 05)
 
-> 风险低→高。每 PO 独立可上 + 独立 E2E(跨套账 A/B 互不串)+ 守门全绿。
-> **前置地基**:① 套账隔离(workspace_client 上下文 + ocr_history 套账·PO-4)② OCR 扩 schema 认进项票。涉钱/改注册无,但碰 OCR/LINE 主路径处先报方案。
+> Zihao 定调:**设计一次封板 → 一口气建到整模块完工 → 拎包入住**,不"上线一半再设计后半"。
+> 本页只讲依赖关系 + 风险排序 + 前置修。**逐屏/逐段施工文案、错误码、验收、施工顺序见 [[05-build-handoff]]**;互通接线见 [[04-interaction-map]]。
 
-## 依赖
+## 前置地基(已就绪 / 开工即修)
+- ✅ **套账隔离 100% 收官**(STATE 确认·A/B E2E 9/9)—— 进项建其上。
+- ✅ `ocr_history` 套账化(PO-4 已上)。
+- ⚠️ 开工即修(P0·见 05 §4):
+  - **P0a OCR 判方向 + 抽全卖方**(不是"加新票种";进项票物理=tax_invoice,区别在买方=本主体→进项。扩 `services/ocr` 抽全卖方 + 比对本套账税号定方向)· **放开做最优方案(Zihao 已授权·不报)**。
+  - **P0b expense 模块门控**:注册业态预设 + 后端 `assert_module_enabled` + 前端导航数据驱动(现 sales/expense 无门控·见 `docs/platform-onboarding/01`)。
+  - **P0c** 迁移号 **0031+**(0030 已被 product_units 占)· 进项管理组重排 + 凭证中心改名归位(见 04 §一)。
+
+## 依赖图(同一套封板设计下的内部次序)
 ```
-套账隔离地基(在跑) + OCR扩schema
+套账隔离(就绪) + P0a OCR方向 + P0b expense门控
         │
-PO-1 主数据/配置 ─► PO-2 进项单据(手录+列表) ─► PO-3 拍照OCR识别确认
-                                                      │
-                          PO-4 智能分流(intake·AI判类型+去向) ─► PO-5 LINE一句话+分流接入
-                                                      │
-                          PO-6 联动(进货入库 / 进项税→报税 / 付款应付)
-                                                      │
-                          PO-7 前端 5 屏(照桌面稿·等地基+窗口)─► PO-8 闸 + 全链路E2E
+S1 数据层(迁移 0031-0033 + ensure + 隔离闸)
+        │
+S2 后端(主数据/设置 → 单据 CRUD/post/pay/void → intake 分流 → 凭据生成 → summary)
+        │
+S3 前端(导航 → 主屏 → 录入屏10 → 详情 → 三弹窗 → 供应商/设置 → LINE)
+        │
+S4 联动(进货入库 / 进项税+WHT 汇总 / 应付聚合 / 做账 hook 留)
+        │
+S5 收口(四态 · i18n4语 · 视觉照搬闸 · 隔离/权限机械闸 · /simplify)
 ```
 
-## PO-1 · 主数据 + 配置(低风险 · 练手)
-- `suppliers` 表 + CRUD(套账隔离)· `expense_categories`(预设 seed)· `purchase_settings`。
-- 出口:供应商/科目/设置能配,套账隔离;无前端也能契约测。
+## 风险排序(低→高)
+1. 主数据/配置(suppliers/categories 两级/settings)—— 低,练手。
+2. 单据 CRUD + 合计(含 **WHT** 反算)—— 中,钱,Decimal。
+3. intake 智能分流 —— 中,AI 判类型+方向。
+4. **OCR 扩(P0a)** —— 放开做最优方案(已授权)。判方向+抽全卖方,复用现有 pipeline。
+5. **LINE 一句话 + 分流接入** —— 放开做最优方案(已授权)。碰 `services/ocr/line_image_ocr.py`:**唯一底线=现有事务所「拍图→识别中心」一字不破坏**,只在其上加分流(按绑定套账 business_type 路由)。
+6. 凭据生成(替代收据/扣缴凭证)—— 中,复用销项 reportlab。
 
-## PO-2 · 进项单据核心(手录先通)
-- `purchase_docs` + `purchase_lines` 表 + 建单/列表/详情/post/pay/void + dedupe 防重复票。
-- 先支持手动录(不依赖 OCR),把"单据→入账→付款"主干跑通 + 跨套账 E2E。
+## 完整屏清单(设计封板 · 10 屏 + 四态)
+主屏(列表)· 拍照识别(过场)· **录入屏10(完整·对标 Paypers·双端)** · 详情 · 记付款弹窗 · 商品匹配弹窗 · 供应商选择器弹窗 · LINE 记费用 · 供应商管理 · 采购设置。设计稿 `Pearnly_采购_UI预览/` 01-10。
 
-## PO-3 · 拍照 OCR 识别确认(★智能)
-- **扩 OCR schema 认进项票/小票**(现 OCR 只识销项):抽 供应商/税号/日期/金额/VAT/品项。
-- 拍照/上传 → OCR → 预填 draft → 确认建单(屏2)。复用现有 OCR 引擎 + 计费。
-- 行品项 `match-product`(匹配 SKU / 一键建商品)。
-- ⚠️ 碰 OCR 主路径 → 先报方案。
-
-## PO-4 · 智能分流(统一入口 · product-vision §三-bis)
-- `POST /api/purchase/intake`:AI 判 kind(进项票/采购单/费用/银行/销项/unknown)+ confidence + route + draft。
-- 低置信/unknown → `intake_items` 待归类(不静默丢错)。dedupe 检测。
-- 与 PO-3 可合做(识别即分流)。
-
-## PO-5 · LINE 一句话 + 分流接入
-- LINE bot 文字"清洁剂 50" → `/api/purchase/expense`(AI 归类)。
-- LINE 拍图 → 走 intake 分流(进项票→采购,小票→费用),归当前绑定套账。
-- ⚠️ 改现有 `services/ocr/line_image_ocr.py`(LINE 主路径)+ 套账分流 → 先报方案;与套账隔离 PO-4 协调。
-
-## PO-6 · 联动(seam 接实)
-- 进货 `post` → `inventory_transactions` 入库(进货入库开时)。
-- `/api/purchase/summary` 进项税汇总 → 报税(销项−进项)。
-- 付款 → 应付 aging(完整应付归应收应付模块,本期出基础聚合)。
-- 做账凭证 hook 留给 Phase 2。
-
-## PO-7 · 前端 5 屏(照桌面 `Pearnly_采购_UI预览`)
-- 主屏 / 拍照识别确认 / LINE记费用入口 / 供应商管理 / 采购设置。
-- **手机优先适配**(拍照主场景)。视觉照搬稿(双语标注→i18n 单语)· 信封 · posErrMsg。
-- ⚠️ 老板配置(供应商/设置)走**平铺页**(同收银设置教训:点导航进页面,不弹窗;页内动作才弹窗)。
-- 等套账隔离前端(顶栏切换器)+ src/home 窗口腾出再上。
-
-## PO-8 · 机械闸 + 全链路 E2E
-- `test_purchase_sql_isolation`(套账隔离)+ dedupe + intake 分流 进 CI。
-- 全链路:拍进项票→AI分流→确认入账→进库存→进项税进汇总→付款 跨套账 E2E。
-
-## 每 PO 验收
-守门 6 道 + 单测 + 真账号跨套账 E2E + (碰 OCR/LINE)先报方案。手机端真机/视口验。
+## 每段验收
+守门 6 道 + 单测 + 真账号跨套账 E2E + 视觉照搬闸 + 双端真机/视口 +(碰 OCR/LINE)先报方案。详见 [[05-build-handoff]] §5。

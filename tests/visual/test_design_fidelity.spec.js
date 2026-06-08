@@ -104,6 +104,93 @@ const MAPPINGS = [
         bluemust: '.rpay .save',
         nosvgemoji: '.rpay .pm .ic svg',
     },
+    {
+        name: '采购/进项主屏(01)',
+        design: 'pur-list.html',
+        route: 'purchase',
+        ready: '.pur .btn.primary',
+        layout: { sel: '.pur .wrap', maxWidth: '1000px' },
+        tokens: [
+            {
+                design: '.btn.primary',
+                prod: '.pur .btn.primary',
+                props: ['backgroundColor', 'borderRadius', 'fontSize'],
+            },
+            { design: '.kpi', prod: '.pur .kpi', props: ['borderRadius', 'boxShadow'] },
+            { design: '.chip', prod: '.pur .chip', props: ['borderRadius'] },
+        ],
+        bluemust: '.pur .btn.primary',
+        nosvgemoji: '.pur .btn.primary svg',
+    },
+    {
+        name: '费用/进项录入(10)',
+        design: 'pur-form.html',
+        route: 'purchase-form',
+        ready: '.pur .btn.primary',
+        layout: { sel: '.pur .wrap', maxWidth: '1080px' },
+        tokens: [
+            {
+                design: '.btn.primary',
+                prod: '.pur .btn.primary',
+                props: ['backgroundColor', 'borderRadius', 'fontSize'],
+            },
+            { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
+        ],
+        bluemust: '.pur .btn.primary',
+        nosvgemoji: '.pur .img svg',
+    },
+    {
+        name: '单据详情(06)',
+        design: 'pur-detail.html',
+        route: 'purchase-detail',
+        pre: () => window.openPurchaseDetail && window.openPurchaseDetail('doc-1'),
+        ready: '.pur .btn.primary',
+        layout: { sel: '.pur .wrap', maxWidth: '1000px' },
+        tokens: [
+            {
+                design: '.btn.primary',
+                prod: '.pur .btn.primary',
+                props: ['backgroundColor', 'borderRadius'],
+            },
+            { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
+        ],
+        bluemust: '.pur .btn.primary',
+        nosvgemoji: '.pur .img svg',
+    },
+    {
+        name: '供应商管理(04)',
+        design: 'pur-suppliers.html',
+        route: 'purchase-suppliers',
+        ready: '.pur .add',
+        layout: { sel: '.pur .wrap', maxWidth: '760px' },
+        tokens: [
+            {
+                design: '.add',
+                prod: '.pur .add',
+                props: ['backgroundColor', 'borderRadius', 'fontSize'],
+            },
+            { design: '.card', prod: '.pur .card', props: ['borderRadius'] },
+        ],
+        bluemust: '.pur .add',
+        nosvgemoji: '.pur .add svg',
+    },
+    {
+        name: '采购设置(05)',
+        design: 'pur-settings.html',
+        route: 'purchase-settings',
+        ready: '.pur .save',
+        layout: { sel: '.pur .wrap', maxWidth: '600px' },
+        tokens: [
+            {
+                design: '.save',
+                prod: '.pur .save',
+                props: ['backgroundColor', 'borderRadius', 'fontSize'],
+            },
+            { design: '.card', prod: '.pur .card', props: ['borderRadius'] },
+        ],
+        bluemust: '.pur .save',
+        nosvgemoji: '.pur .addcat svg',
+    },
 ];
 
 const fails = [];
@@ -163,6 +250,10 @@ async function styleOf(page, sel, props) {
     const page = await ctx.newPage();
     await page.route('**/api/**', (route) => {
         const u = new URL(route.request().url());
+        // 采购模块:后端未上线时 papi 走前端 mock 兜底(purchase-mock)· 这里回 404 触发兜底,让页渲染真 mock 数据。
+        if (u.pathname.startsWith('/api/purchase/')) {
+            return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+        }
         const body = API[u.pathname] !== undefined ? API[u.pathname] : { ok: true, data: {} };
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     });
@@ -199,6 +290,8 @@ async function styleOf(page, sel, props) {
             st.textContent = '#ws-modal{display:none!important;}';
             document.head.appendChild(st);
         });
+        // 进路由前可选预置(如详情屏需先 openPurchaseDetail 置当前单据 id)。
+        if (m.pre) await page.evaluate(m.pre);
         await page.evaluate((r) => window.routeTo(r), m.route);
         const rendered = await page
             .waitForSelector(m.ready, { timeout: 15000 })

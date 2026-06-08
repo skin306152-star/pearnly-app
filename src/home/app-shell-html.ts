@@ -219,7 +219,7 @@ const SIDEBAR_HTML = `
         </div>
     </div>
 
-    <!-- 进项管理 ▼ 可折叠组(默认折叠 · Phase 6 才填全 5 子项) -->
+    <!-- 进项管理 ▼ 可折叠组(采购 Phase 1 · 3 子项:采购/进项 · 供应商 · 采购设置)· 门控 expense -->
     <div class="nav-group nav-collapsible" data-collapsible="expense">
         <div class="nav-group-toggle" data-toggle-group="expense">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -233,13 +233,53 @@ const SIDEBAR_HTML = `
             </svg>
         </div>
         <div class="nav-sub">
-            <div class="nav-item nav-sub-item" data-route="vouchers" data-module="expense">
+            <div class="nav-item nav-sub-item" data-route="purchase" data-module="expense">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 4h2l1.2 8.4a1 1 0 001 .86h7.1a1 1 0 001-.8L17.5 7H6"/>
+                    <circle cx="8" cy="16.5" r="1"/>
+                    <circle cx="15" cy="16.5" r="1"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-purchase">采购 / 进项</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="purchase-suppliers" data-module="expense">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 8l2-4h10l2 4"/>
+                    <path d="M3 8v8a1 1 0 001 1h12a1 1 0 001-1V8"/>
+                    <path d="M3 8h14M8 17v-4h4v4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-purchase-suppliers">供应商</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="purchase-settings" data-module="expense">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="2.5"/>
+                    <path d="M10 3.5v1.6M10 14.9v1.6M16.5 10h-1.6M5.1 10H3.5M14.6 5.4l-1.1 1.1M6.5 13.5l-1.1 1.1M14.6 14.6l-1.1-1.1M6.5 6.5L5.4 5.4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-purchase-settings">采购设置</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 做账 ▼ 新建组(Phase 2 占位 · 本期不开发)· 凭证中心改名「自动凭证」归位 · 标「即将上线」 -->
+    <div class="nav-group nav-collapsible" data-collapsible="accounting">
+        <div class="nav-group-toggle" data-toggle-group="accounting">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="14" height="14" rx="2"/>
+                <path d="M3 8h14M7 3v14"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-accounting">做账</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="vouchers">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 4h7l5 5v7a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/>
                     <path d="M11 4v5h5"/>
                     <path d="M6 13l2 2 4-4"/>
                 </svg>
-                <span class="nav-label" data-i18n="nav-vouchers">凭证中心</span>
+                <span class="nav-label" data-i18n="nav-vouchers">自动凭证</span>
+                <span class="nav-badge" style="margin-left:auto;background:#f3f4f6;color:#6b7280;" data-i18n="nav-soon">即将上线</span>
             </div>
         </div>
     </div>

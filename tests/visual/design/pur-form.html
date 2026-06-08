@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pearnly · 费用/进项录入(完整 · 对标 Paypers · 双端)</title>
+<style>
+  :root{--blue:#2563EB;--blue-d:#1D4ED8;--blue-l:#DBEAFE;--ink:#111827;--ink2:#6B7280;--ink3:#9CA3AF;
+    --bg:#f4f4f0;--card:#fff;--line:#e8e8e3;--green:#16A34A;--amber:#F59E0B;--red:#DC2626;
+    --shadow:0 1px 2px rgba(17,24,39,.04),0 6px 20px rgba(17,24,39,.06);}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:22px 22px 60px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  .wrap{max-width:1080px;margin:0 auto;}
+  .back{display:inline-flex;align-items:center;gap:6px;color:var(--ink2);font-size:12.5px;margin-bottom:11px;cursor:pointer;}
+  .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px;}
+  .ph .t{font-size:20px;font-weight:700;}
+  .ph .sub{color:var(--ink2);font-size:12.5px;margin-top:3px;}
+  .acts{display:flex;gap:9px;flex-shrink:0;}
+  .btn{height:40px;padding:0 15px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700;}
+  .btn.full{width:100%;} .btn.ghost{border-style:dashed;color:var(--blue);} .btn.sm{height:34px;font-size:12.5px;flex:1;}
+  .wsbar{background:var(--blue-l);border:1px solid #bfdbfe;border-radius:10px;padding:9px 13px;font-size:12.5px;color:#1e40af;margin-bottom:14px;}
+  .wsbar .link{color:var(--blue-d);font-weight:700;cursor:pointer;text-decoration:underline;}
+  .grid{display:grid;grid-template-columns:330px 1fr;gap:14px;align-items:start;}
+  .col{display:flex;flex-direction:column;gap:14px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);}
+  .card>.hd{padding:12px 15px;border-bottom:1px solid var(--line);font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center;}
+  .card>.hd .muted{color:var(--ink3);font-weight:400;cursor:pointer;}
+  .card>.bd{padding:13px 15px;}
+  .field{margin-bottom:11px;}
+  .field>label{display:block;font-size:11.5px;color:var(--ink2);margin-bottom:5px;}
+  .inp{min-height:40px;border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;padding:7px 12px;font-size:13.5px;background:#fff;}
+  .inp.pick{cursor:pointer;justify-content:space-between;} .inp.ro{background:#fafaf8;font-weight:700;} .inp.ph{color:var(--ink3);}
+  .inp.sm{min-height:36px;font-size:13px;padding:5px 10px;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+  .seg{display:flex;gap:7px;}
+  .seg .o{flex:1;height:38px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12.5px;color:var(--ink2);cursor:pointer;text-align:center;padding:0 6px;}
+  .seg .o.on{border-color:var(--blue);background:var(--blue-l);color:var(--blue-d);font-weight:700;}
+  .seg.sm2 .o{height:34px;font-size:12px;}
+  .aimark{font-size:10.5px;background:#dcfce7;color:#15803d;padding:1px 7px;border-radius:5px;margin-left:6px;font-weight:600;}
+  .hint{background:#fffbeb;border:1px solid #fde68a;border-radius:9px;padding:8px 11px;font-size:12px;color:#b45309;margin-bottom:10px;}
+  .docchip{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:12.5px;margin-bottom:9px;}
+  .docchip .pdf{background:#fee2e2;color:#dc2626;font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;}
+  .docchip .x{margin-left:auto;color:var(--ink3);cursor:pointer;}
+  .img{aspect-ratio:3/4;background:#fafaf8;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--ink3);margin-bottom:9px;}
+  .seg2{display:flex;gap:8px;} .mt{margin-top:10px;}
+  /* 明细行 */
+  .item{border:1px solid var(--line);border-radius:11px;padding:11px 12px;margin-bottom:10px;}
+  .irow1{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .irow1 .seg{flex:0 0 130px;} .irow1 .iname{flex:1;font-weight:600;font-size:13.5px;}
+  .irow1 .x{color:var(--ink3);cursor:pointer;font-size:16px;}
+  .igrid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;}
+  .igrid .f label{display:block;font-size:11px;color:var(--ink2);margin-bottom:4px;}
+  .iextra{margin-top:9px;font-size:11.5px;color:var(--ink2);}
+  .iextra .link{color:var(--blue);cursor:pointer;}
+  .pill{font-size:10.5px;padding:1px 7px;border-radius:5px;}
+  .pill.ok{background:#dcfce7;color:#15803d;} .pill.warn{background:#fef3c7;color:#b45309;}
+  /* 合计 */
+  .sum{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;}
+  .sum.tot{border-top:1px solid var(--line);margin-top:6px;padding-top:11px;font-weight:800;font-size:16px;}
+  .sum .tax{color:var(--green);} .sum .wht{color:var(--amber);}
+  .note{margin-top:14px;font-size:11.5px;color:var(--ink3);line-height:1.7;}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(17,24,39,.82);color:#fff;font-size:11px;padding:5px 10px;border-radius:8px;}
+  @media(max-width:760px){
+    body{padding:14px 13px 60px;}
+    .ph{flex-direction:column;} .acts{width:100%;} .acts .btn{flex:1;}
+    .grid{grid-template-columns:1fr;}
+    .igrid{grid-template-columns:repeat(2,1fr);}
+    .irow1{flex-wrap:wrap;} .irow1 .seg{flex:0 0 100%;order:3;} .irow1 .iname{order:1;} .irow1 .x{order:2;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="back">‹ 返回 采购/进项</div>
+  <div class="ph">
+    <div><div class="t">费用 / 进项录入</div><div class="sub">拍照后 AI 已自动填好,你只核对例外 · 手动新建 / 编辑也进这里</div></div>
+    <div class="acts"><button class="btn">存草稿</button><button class="btn primary">确认入账</button></div>
+  </div>
+
+  <div class="wsbar">记账给 <b>บริษัท สบาย จำกัด</b>(本公司)· <span class="link">切换公司</span></div>
+
+  <div class="grid">
+    <!-- 左:票图 + 凭据 -->
+    <div class="col">
+      <div class="card">
+        <div class="hd">票图</div>
+        <div class="bd">
+          <div class="img"><span style="font-size:28px;">📄</span><span class="aimark">AI 已读 9 字段</span></div>
+          <div class="seg2"><button class="btn sm">重拍</button><button class="btn sm">放大看</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="hd">凭据(报税用)</div>
+        <div class="bd">
+          <div class="hint">没正规发票?一键生成「替代收据」,这笔就能合规抵税报税。</div>
+          <div class="docchip"><span class="pdf">PDF</span> 替代收据(สินค้า)<span class="x">×</span></div>
+          <button class="btn full ghost" style="margin-bottom:8px;">+ 生成替代收据</button>
+          <button class="btn full ghost">+ 附付款凭证 / 扣缴凭证</button>
+          <div class="field mt"><label>报销申请人 / 审批人</label><div class="inp pick">Patrakorn A. <span style="color:var(--ink3)">▾</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右:信息 + 明细 + 合计 -->
+    <div class="col">
+      <div class="card">
+        <div class="hd">单据信息</div>
+        <div class="bd">
+          <div class="field"><label>类型</label><div class="seg"><div class="o on">进货(进项票)</div><div class="o">费用</div><div class="o">采购单</div></div></div>
+          <div class="field"><label>供应商 <span class="aimark">AI 认出·老供应商</span></label><div class="inp pick">บริษัท ทิปโก้ จำกัด <span style="color:var(--ink3)">切换 ▾</span></div></div>
+          <div class="two">
+            <div class="field"><label>税号</label><div class="inp tnum">0105512345678</div></div>
+            <div class="field"><label>总 / 分公司</label><div class="inp pick">总公司 <span style="color:var(--ink3)">▾</span></div></div>
+          </div>
+          <div class="field"><label>供应商地址(选填)</label><div class="inp ph">—</div></div>
+          <div class="two">
+            <div class="field"><label>开票日期</label><div class="inp tnum">2026-06-08</div></div>
+            <div class="field"><label>账期 / 到期</label><div class="inp tnum">30 天 · 07-08</div></div>
+          </div>
+          <div class="two">
+            <div class="field"><label>是否有税票</label><div class="seg sm2"><div class="o on">有</div><div class="o">无</div></div></div>
+            <div class="field"><label>票号</label><div class="inp">INV-25060801</div></div>
+          </div>
+          <div class="field"><label>付款状态</label><div class="seg"><div class="o">已付</div><div class="o on">挂应付(未付)</div></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">明细 <span class="muted">币种 THB · Thai Baht ▾</span></div>
+        <div class="bd">
+          <div class="item">
+            <div class="irow1"><div class="seg sm2"><div class="o on">商品</div><div class="o">服务</div></div><div class="iname">โค้ก 325ml</div><span class="x">×</span></div>
+            <div class="igrid">
+              <div class="f"><label>数量</label><div class="inp sm tnum">240</div></div>
+              <div class="f"><label>单价</label><div class="inp sm tnum">15.00</div></div>
+              <div class="f"><label>科目(大类›小类)</label><div class="inp sm">进货 › 商品成本 ▾</div></div>
+              <div class="f"><label>VAT</label><div class="inp sm">7% ▾</div></div>
+              <div class="f"><label>小计</label><div class="inp sm ro tnum">฿3,600</div></div>
+            </div>
+            <div class="iextra"><span class="pill ok">已配 SKU</span> · <span class="link">同时入库 ✓</span> · <span class="link">加折扣</span></div>
+          </div>
+
+          <div class="item">
+            <div class="irow1"><div class="seg sm2"><div class="o">商品</div><div class="o on">服务</div></div><div class="iname">设计服务费</div><span class="x">×</span></div>
+            <div class="igrid">
+              <div class="f"><label>数量</label><div class="inp sm tnum">1</div></div>
+              <div class="f"><label>单价</label><div class="inp sm tnum">10,000</div></div>
+              <div class="f"><label>科目(大类›小类)</label><div class="inp sm">服务 › 外包费 ▾</div></div>
+              <div class="f"><label>VAT</label><div class="inp sm">7% ▾</div></div>
+              <div class="f"><label>小计</label><div class="inp sm ro tnum">฿10,000</div></div>
+            </div>
+            <div class="iextra"><span class="pill warn">服务 → 自动预扣 WHT 3%</span> · <span class="link">改税率</span></div>
+          </div>
+
+          <button class="btn full ghost">+ 加一行</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">合计</div>
+        <div class="bd">
+          <div class="sum"><span>税前小计</span><span class="tnum">฿13,600.00</span></div>
+          <div class="sum"><span>折扣</span><span class="tnum">−฿0.00</span></div>
+          <div class="sum"><span>进项税 VAT 7% <span class="pill ok">可抵</span></span><span class="tnum tax">+฿952.00</span></div>
+          <div class="sum tot" style="font-size:13px;font-weight:600;border-bottom:1px solid var(--line);border-top:1px solid var(--line);"><span>含税合计</span><span class="tnum">฿14,552.00</span></div>
+          <div class="sum"><span>预扣税 WHT 3%(服务·代供应商扣缴)<span class="pill warn">代扣</span></span><span class="tnum wht">−฿300.00</span></div>
+          <div class="sum"><span>凑整</span><span class="tnum">฿0.00</span></div>
+          <div class="sum tot"><span>实付供应商</span><span class="tnum">฿14,252.00</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    四态:加载=骨架卡 · AI 没抽到的字段=黄底待填 · 坏图=「看不清,重拍/手填」· 重复票=顶部红条「像录过,确认是新的再入账」。<br>
+    双端:桌面=票图/凭据(左)+ 信息/明细/合计(右)两栏;手机=同一套竖向堆叠(票图→信息→明细→合计),非另画。
+  </div>
+</div>
+<div class="ptag">概念预览 · 费用/进项录入(完整 · 对标 Paypers)· 票图+替代收据+审批人 / 供应商总分公司 / 多行商品服务+两级科目+多币种 / VAT+WHT+折扣合计 · 双端</div>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pearnly · 采购设置(配置后台 · 概念预览)</title>
+<style>
+  :root{--blue:#2563EB;--blue-d:#1D4ED8;--ink:#111827;--ink2:#6B7280;--ink3:#9CA3AF;
+    --bg:#f4f4f0;--card:#fff;--line:#e8e8e3;--green:#16A34A;--shadow:0 1px 2px rgba(17,24,39,.04),0 6px 20px rgba(17,24,39,.07);}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:28px 20px 60px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  .wrap{max-width:600px;margin:0 auto;}
+  h1{font-size:20px;margin-bottom:4px;}
+  .sub{color:var(--ink2);font-size:13px;margin-bottom:18px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
+  .ch{padding:12px 16px;border-bottom:1px solid #f0f0ec;font-weight:700;font-size:13.5px;}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #f6f6f3;}
+  .row:last-child{border-bottom:0;}
+  .tx{flex:1;} .tx .n{font-size:14px;font-weight:600;} .tx .d{font-size:12px;color:var(--ink2);margin-top:2px;}
+  .sw{width:44px;height:25px;border-radius:999px;flex:0 0 44px;position:relative;cursor:pointer;transition:.15s;}
+  .sw::after{content:"";position:absolute;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+  .on .sw{background:var(--blue);} .on .sw::after{left:21px;}
+  .off .sw{background:#d8d8d3;} .off .sw::after{left:2px;}
+  .pctfld{width:78px;height:36px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;padding:0 10px;background:#fbfbf9;}
+  .pctfld input{border:0;outline:0;background:transparent;width:100%;text-align:right;font-size:14px;font-weight:600;}
+  .cats{padding:8px 16px 14px;}
+  .cat{display:inline-flex;align-items:center;gap:6px;background:#f4f4f0;border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12.5px;margin:4px 6px 0 0;}
+  .cat .x{color:var(--ink3);cursor:pointer;}
+  .addcat{display:inline-flex;align-items:center;gap:5px;border:1px dashed var(--line);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--blue);cursor:pointer;margin-top:4px;}
+  .save{width:100%;height:50px;border:0;border-radius:11px;background:var(--blue);color:#fff;font-weight:700;font-size:16px;cursor:pointer;}
+  .save:hover{background:var(--blue-d);}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(17,24,39,.82);color:#fff;font-size:11px;padding:5px 10px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>采购设置</h1>
+  <div class="sub">配一次,以后拍票/记费用都按这套自动来。</div>
+
+  <div class="card">
+    <div class="ch">税与库存</div>
+    <div class="row"><div class="tx"><div class="n">默认进项 VAT 率</div><div class="d">拍票抽不到时按此填,可逐张改</div></div><div class="pctfld"><input value="7"><span style="color:var(--ink3);font-size:13px;">%</span></div></div>
+    <div class="row on"><div class="tx"><div class="n">进货自动入库</div><div class="d">拍进货票确认后,品项自动进库存(库存模块开时)</div></div><div class="sw" onclick="t(this)"></div></div>
+    <div class="row on"><div class="tx"><div class="n">重复票拦截</div><div class="d">同一张进项票重复录时提醒(防重复抵税)</div></div><div class="sw" onclick="t(this)"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="ch">费用科目(AI 自动归类用 · 可增删)</div>
+    <div class="cats">
+      <span class="cat">进货 <span class="x">×</span></span><span class="cat">交通费 <span class="x">×</span></span>
+      <span class="cat">水电费 <span class="x">×</span></span><span class="cat">办公费 <span class="x">×</span></span>
+      <span class="cat">清洁费 <span class="x">×</span></span><span class="cat">租金 <span class="x">×</span></span>
+      <span class="cat">广告费 <span class="x">×</span></span><span class="cat">维修费 <span class="x">×</span></span>
+      <br><span class="addcat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>加科目</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch">付款</div>
+    <div class="row"><div class="tx"><div class="n">默认账期</div><div class="d">供应商赊账天数(0=现结)</div></div><div class="pctfld"><input value="0"><span style="color:var(--ink3);font-size:13px;">天</span></div></div>
+    <div class="row off"><div class="tx"><div class="n">付款需审批</div><div class="d">付供应商前要老板批(大店用)</div></div><div class="sw" onclick="t(this)"></div></div>
+  </div>
+
+  <button class="save">保存</button>
+</div>
+<div class="ptag">概念预览 · 采购设置(配置后台)· 默认VAT/进货入库/重复票拦/费用科目/账期/付款审批</div>
+<script>function t(s){const r=s.closest('.row');r.classList.toggle('on');r.classList.toggle('off');}</script>
+</body>
+</html>

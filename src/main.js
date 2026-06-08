@@ -108,6 +108,14 @@ import './home/pos-tables.js'; // 餐厅 POS · 桌台管理(window.openPosTable
 import './home/pos-payment-settings.js'; // POS · 收款设置(window.openPosPayment · 现金/PromptPay/刷卡+服务费/VAT · owner·弹窗)
 import './home/sales-report.js'; // POS 屏9 · 销售报表(window.loadSalesReport · GET /api/pos/admin/report · KPI/图/榜 · 四态)
 import './home/pos-cashiers.js'; // POS · 收银员管理(window.loadPosCashiers · GET/POST/PUT /api/pos/admin/cashiers · owner · 加人/改名换色/重设PIN/启停)
+// 商户采购(进项)Phase 1 · 屏1 主屏 / 屏10 录入 / 屏6 详情 / 屏7-9+3 弹窗 / 屏4 供应商 / 屏5 设置(docs/purchasing)
+// mock 兜底先行(purchase-mock)· 后端 /api/purchase/* 上线自动切真 · 全屏照搬设计稿 Pearnly_采购_UI预览/。
+import './home/purchase-list.js'; // 屏1 采购/进项主屏(window.loadPurchaseList · 桌面表格/手机卡片 + KPI + chip + 四态)
+import './home/purchase-form.js'; // 屏10 录入(window.loadPurchaseForm/openPurchaseForm · 商品服务联动 WHT · 即时重算)
+import './home/purchase-detail.js'; // 屏6 详情(window.loadPurchaseDetail/openPurchaseDetail · 记付款/作废/编辑)
+import './home/purchase-modals.js'; // 屏7 记付款 / 屏8 商品匹配 / 屏9 供应商选择器 / 屏3 LINE 说明(桌面居中/手机底抽屉)
+import './home/purchase-suppliers.js'; // 屏4 供应商管理(window.loadPurchaseSuppliers · CRUD · 套账隔离)
+import './home/purchase-settings.js'; // 屏5 采购设置(window.loadPurchaseSettings · 默认VAT/进货入库/重复票拦/两级科目/账期/审批)
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件

@@ -16,7 +16,12 @@
         'sales-invoices': 'sales',
         'sales-account': 'sales',
         receivables: 'sales',
-        vouchers: 'expense',
+        purchase: 'expense',
+        'purchase-suppliers': 'expense',
+        'purchase-settings': 'expense',
+        'purchase-form': 'expense',
+        'purchase-detail': 'expense',
+        vouchers: 'accounting',
         inventory: 'pos',
     };
     function _getState(): Record<string, boolean> {
@@ -46,7 +51,7 @@
         _setState(state);
         _applyState();
     }
-    // 默认:首次访问 · 销项展开(日常)· 进项折叠(Phase 6 才填全)
+    // 默认:首次访问 · 销项 + 进项(采购 Phase 1 已填 3 子项)展开 · 做账(占位)折叠
     (function _ensureDefault() {
         const state = _getState();
         let changed = false;
@@ -55,7 +60,11 @@
             changed = true;
         }
         if (state.expense === undefined) {
-            state.expense = true;
+            state.expense = false;
+            changed = true;
+        }
+        if (state.accounting === undefined) {
+            state.accounting = true;
             changed = true;
         }
         if (changed) _setState(state);

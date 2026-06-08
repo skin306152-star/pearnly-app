@@ -297,6 +297,18 @@ interface Window {
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;
     loadPosCashiers?: () => void;
+    // 商户采购(进项)Phase 1 · 路由页加载器 + 跨屏唤起桥
+    loadPurchaseList?: () => void;
+    loadPurchaseSuppliers?: () => void;
+    loadPurchaseSettings?: () => void;
+    loadPurchaseForm?: () => void;
+    loadPurchaseDetail?: () => void;
+    openPurchaseForm?: (id?: string | null, draft?: unknown) => void;
+    openPurchaseDetail?: (id: string) => void;
+    openPurchaseLine?: () => void;
+    openPurchasePay?: (doc: unknown, onDone?: () => void) => void;
+    openPurchaseMatch?: (line: unknown, onDone?: (res: unknown) => void) => void;
+    openPurchaseSupplierPicker?: (onPick: (s: unknown) => void) => void;
     isOwner?: (u?: AppUser | null) => boolean;
     reloadInventory?: () => void;
     openInventoryIn?: () => void;

@@ -1,5 +1,9 @@
 # 05 · PO 计划(施工顺序)
 
+> ⚠️ 状态更正(2026-06-08):B 阶段(后端 PO-PB1/PB2)+ P 阶段(前端 PO-PP1~PP4 导航数据驱动/注册选业态屏/
+> 设置模块管理页/i18n)均【已施工并上线 prod】。下面的"本窗口先做 B、P 等 POS 收完再起"是旧排期、已过时,以代码为准。
+> 唯一仍未做:老模块 sales/expense/recon/receivable/knowledge 的【后端门控】(见 01-module-gating-map,独立 workstream)。
+
 > 防撞铁律:**P 阶段(前端导航数据驱动)动 `app-shell-html.ts`/`core-boot.ts`/`module-nav.ts`/`i18n-data.js`,与 POS 屏8 前端窗口同批 → 必须等 POS 前端窗口收完 push 后再起。** 本窗口先做 B 阶段(后端,不碰这些文件)。
 
 ## B 阶段 · 后端(本窗口 · 不碰 POS 前端文件)

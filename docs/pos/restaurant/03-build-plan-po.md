@@ -1,8 +1,10 @@
 # 餐厅 POS · 03 逐 PO 施工计划
 
+> ⚠️ 状态更正(2026-06-08):餐厅后端 PO-R1~R3 + 前端 4 屏(PO-R4)均【已施工并上线 prod】
+> (见 git log `feat(pos)` 餐厅前后端)。下行"前端 4 屏待…再做"是旧状态、已过时。以代码为准。
+
 > 餐厅 = POS 第二业态,后端全新独立(不碰零售 POS 前端/服务)。复用 `products`/`pos_sales`/班次/连号/
-> totals/promptpay/pdf_thermal。库存原料扣减(BOM)先不做,菜品当成品。前端 4 屏待 `/pos` 前端窗口收完
-> 再做(现已收口 commit bfbaef0,屏可起)。每 PO 自含、做完即按 02 §7 + docs/pos/10 验收。
+> totals/promptpay/pdf_thermal。库存原料扣减(BOM)先不做,菜品当成品。每 PO 自含、做完即按 02 §7 + docs/pos/10 验收。
 
 ## 阶段 R · 餐厅后端
 

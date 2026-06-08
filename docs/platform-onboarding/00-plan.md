@@ -1,7 +1,14 @@
 # 全平台业态套餐 · 规划(POS 之后做)
 
+> ⚠️ 状态更正(2026-06-08):"业态套餐切换"核心【已施工并上线 prod】——注册选业态、6 业态预设、
+> tenant_modules、3 接口(GET /api/me/modules、PUT /onboarding、PUT /modules/{key})、前端导航数据驱动、
+> 设置开关页、注册自动弹,全部完成(见 git log `feat(workspace)`/平台提交、services/modules/*、routes/modules_routes.py)。
+> ⛔ 仍未做(独立 workstream,见下文第 42 行 / 01-module-gating-map):给老模块 sales/expense/recon/receivable/knowledge
+> 补【后端门控 assert_module_enabled】——目前只有 pos/inventory 有后端门控,其余只在前端导航隐藏、后端不拦。
+> 下行"当前=规划,未开建"是旧状态、已过时。
+
 > Zihao 2026-06-07 拍板:POS+库存 上线后接此项目。本页先把概念/范围/架构/工作量/决策规划好,
-> 到时按此出完整图纸(同 docs/pos 的 12 份套路)再施工。当前=规划,未开建。
+> 到时按此出完整图纸(同 docs/pos 的 12 份套路)再施工。
 
 ## 一句话
 

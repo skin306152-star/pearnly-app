@@ -220,35 +220,7 @@
     }
 
     // ════════════════ 收款弹窗 ════════════════
-    // 收款设置(老板配):默认全开 + 价内 VAT;enterMain 拉 bootstrap 覆盖。关了的方式结账不显。
-    function pay() {
-        return (
-            state.payment || {
-                promptpay_enabled: true,
-                card_enabled: true,
-                price_includes_vat: true,
-            }
-        );
-    }
-    async function loadPaymentSettings() {
-        if (state.payment) return; // enterMain 的 ensureBusinessType 已拉过 bootstrap → 免重复 I/O
-        try {
-            const b = await POS.data.bootstrap();
-            if (b && b.payment) state.payment = b.payment;
-        } catch (_) {
-            /* 取不到 → 用默认(全开)· 不阻塞卖货 */
-        }
-    }
-    // 按收款设置显隐支付方式 tab(现金恒显;PromptPay/刷卡关了不显)。
-    function applyPayMethods() {
-        const p = pay();
-        const show = (pm, on) => {
-            const tab = document.querySelector('#pay-mask .pm[data-pm="' + pm + '"]');
-            if (tab) tab.style.display = on ? '' : 'none';
-        };
-        show('qr', p.promptpay_enabled !== false);
-        show('card', p.card_enabled !== false);
-    }
+    // 收款设置访问器/显隐/拉取统一在 POS.pay(与餐厅埋单共用)。
 
     function grandTotal() {
         const sub = subtotalOf(cart);
@@ -262,7 +234,7 @@
         tendered = 0;
         renderQuickCash();
         updateCash();
-        applyPayMethods(); // 按收款设置显隐 PromptPay/刷卡
+        POS.pay.applyMethods('#pay-mask .pm'); // 按收款设置显隐 PromptPay/刷卡
         setPm('cash');
         ['pay-cash-err', 'pay-qr-err', 'pay-card-err'].forEach((id) => ($(id).textContent = ''));
         $('pay-mask').classList.add('show');
@@ -340,7 +312,7 @@
             doc_kind: 'receipt',
             sale_type: 'sale',
             member_client_id: null,
-            price_includes_vat: pay().price_includes_vat !== false,
+            price_includes_vat: POS.pay.inclVat(),
             lines: cart.map((c) => ({
                 product_id: c.id,
                 sell_unit: c.sell_unit,
@@ -750,7 +722,7 @@
         renderCats();
         renderCart();
         loadGrid();
-        loadPaymentSettings(); // 拉收款设置(显隐方式 / 价内VAT / PromptPay 出码)
+        POS.pay.ensure(); // 拉收款设置(显隐方式 / 价内VAT / PromptPay 出码)
     }
 
     POS.cashier = {

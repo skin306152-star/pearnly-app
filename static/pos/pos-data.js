@@ -98,6 +98,44 @@
         return !state.workspaceClientId;
     };
 
+    // ── 收款设置访问器(老板配 · bootstrap 拉到 state.payment;未拉到用默认全开)──
+    // 收银台与餐厅埋单共用。支付方式显隐数据驱动:data-pm 值同时是发后端的 method 字符串
+    // (收银台 qr / 餐厅 promptpay 指同一 PromptPay),不归一以免改动报表分组,经 PM_FLAG 映射到开关。
+    const PAY_DEFAULTS = { promptpay_enabled: true, card_enabled: true, price_includes_vat: true };
+    const PM_FLAG = {
+        qr: 'promptpay_enabled',
+        promptpay: 'promptpay_enabled',
+        card: 'card_enabled',
+        // cash 无开关 → 恒显
+    };
+    const pay = (POS.pay = {});
+    pay.settings = function () {
+        return state.payment || PAY_DEFAULTS;
+    };
+    pay.inclVat = function () {
+        return pay.settings().price_includes_vat !== false;
+    };
+    pay.svcRate = function () {
+        const r = pay.settings().service_charge_rate;
+        return r != null ? String(r) : '10';
+    };
+    // bootstrap 拉收款设置到 state.payment(已拉过则跳过;失败静默用默认,不阻塞卖货)。
+    pay.ensure = async function () {
+        if (state.payment) return;
+        try {
+            const b = await POS.data.bootstrap();
+            if (b && b.payment) state.payment = b.payment;
+        } catch (_) {}
+    };
+    // 按收款设置显隐支付方式元素(现金恒显;关掉的方式不显)。sel 命中容器内带 data-pm 的元素。
+    pay.applyMethods = function (sel) {
+        const s = pay.settings();
+        document.querySelectorAll(sel).forEach((el) => {
+            const flag = PM_FLAG[el.dataset.pm];
+            if (flag) el.style.display = s[flag] !== false ? '' : 'none';
+        });
+    };
+
     // ── 信封 fetch ──
     // enveloped=true 表示服务端返了 {ok:...} 信封(业务级成败);false 表示路由缺失/网络失败。
     function PosErr(code, status, detail, enveloped) {

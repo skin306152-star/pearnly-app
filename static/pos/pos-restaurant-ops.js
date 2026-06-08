@@ -32,7 +32,7 @@
                 '&mode=' +
                 mode +
                 '&service_rate=' +
-                svcRate();
+                POS.pay.svcRate();
             (lineIds || []).forEach((id) => (p += '&line_ids=' + id));
             if (ways) p += '&ways=' + ways;
             return POS.apiFetch('GET', p);
@@ -46,23 +46,7 @@
     });
     const RD = R.data;
 
-    // 收款设置(老板配·bootstrap 拉到 state.payment):服务费率 / 价内VAT / 支付方式显隐。
-    function svcRate() {
-        const p = state.payment;
-        return p && p.service_charge_rate != null ? String(p.service_charge_rate) : '10';
-    }
-    function inclVat() {
-        return !state.payment || state.payment.price_includes_vat !== false;
-    }
-    function applyBillPayMethods() {
-        const p = state.payment || {};
-        const show = (pm, on) => {
-            const btn = document.querySelector('#rb-pm button[data-pm="' + pm + '"]');
-            if (btn) btn.style.display = on ? '' : 'none';
-        };
-        show('promptpay', p.promptpay_enabled !== false);
-        show('card', p.card_enabled !== false);
-    }
+    // 收款设置访问器(服务费率 / 价内VAT / 支付方式显隐)统一在 POS.pay(与收银台共用)。
 
     // ════════════════ 屏 3 · 厨房单 KOT ════════════════
     let kitchenTimer = null;
@@ -183,7 +167,7 @@
             (state.cashier ? ' · ' + state.cashier.display_name : '');
         $('rb-err').textContent = '';
         setPaidState(false);
-        applyBillPayMethods(); // 按收款设置显隐 PromptPay/刷卡
+        POS.pay.applyMethods('#rb-pm button'); // 按收款设置显隐 PromptPay/刷卡
         try {
             await RD.requestBill(bill.sid);
         } catch (_) {}
@@ -303,8 +287,8 @@
             mode: bill.mode,
             line_ids: bill.mode === 'by_item' ? Array.from(bill.selected) : null,
             ways: bill.mode === 'aa' ? bill.ways : null,
-            service_rate: svcRate(),
-            price_includes_vat: inclVat(),
+            service_rate: POS.pay.svcRate(),
+            price_includes_vat: POS.pay.inclVat(),
             payments: [{ method: bill.payment, amount: bill.totals.grand_total }],
             sold_at: new Date().toISOString(),
         };

@@ -40,24 +40,6 @@ logger = logging.getLogger("mr-pilot")
 router = APIRouter()
 
 
-def _active_ws(request: Request, user: dict):
-    """PO-6a 套账隔离 · 取当前请求的套账 id(rollout-safe:有头按头校验归属,无头回落默认套账)。
-
-    tenant 缺失 / 解析异常 → None → store 退回旧 user 口径(不抛、不拦)。同 history_routes._active_ws。
-    """
-    tid = _tid(user)
-    if not tid:
-        return None
-    try:
-        with db.get_cursor() as cur:
-            return wc.resolve_active_workspace_id(cur, request, tenant_id=str(tid))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.warning(f"[bank_recon] resolve workspace failed: {e}")
-        return None
-
-
 @router.post("/api/bank-recon/upload")
 async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
     """
@@ -125,7 +107,9 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
         bank_code=parsed.bank_code,
         filename=filename,
         pages=parsed.pages,
-        workspace_client_id=_active_ws(request, user),  # PO-6a · 归当前套账
+        workspace_client_id=wc.active_workspace_for_request(
+            request, _tid(user)
+        ),  # PO-6a · 归当前套账
     )
     if not session_id:
         raise HTTPException(500, detail="bank_recon.create_session_failed")
@@ -183,7 +167,7 @@ async def bank_recon_list_sessions(request: Request, limit: int = 30):
         user["id"],
         limit,
         restrict_client_ids=restrict,
-        workspace_client_id=_active_ws(request, user),
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
 
 
@@ -201,7 +185,9 @@ async def bank_recon_stats(request: Request):
     时区按 Asia/Bangkok 算「当月」
     """
     user = get_current_user_from_request(request)
-    return db.get_bank_recon_stats(user["id"], workspace_client_id=_active_ws(request, user))
+    return db.get_bank_recon_stats(
+        user["id"], workspace_client_id=wc.active_workspace_for_request(request, _tid(user))
+    )
 
 
 @router.get("/api/bank-recon/sessions/{session_id}")
@@ -209,7 +195,9 @@ async def bank_recon_session_detail(session_id: str, request: Request, filter: s
     """会话详情 · 含流水列表 · 可按 match_status 过滤"""
     user = get_current_user_from_request(request)
     session = db.get_bank_recon_session(
-        user["id"], session_id, workspace_client_id=_active_ws(request, user)
+        user["id"],
+        session_id,
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
     if not session:
         raise HTTPException(404, detail="bank_recon.session_not_found")
@@ -226,7 +214,9 @@ async def bank_recon_delete_session(session_id: str, request: Request):
     """删除对账会话(级联删流水和候选)"""
     user = get_current_user_from_request(request)
     ok = db.delete_bank_recon_session(
-        user["id"], session_id, workspace_client_id=_active_ws(request, user)
+        user["id"],
+        session_id,
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
     if not ok:
         raise HTTPException(404, detail="bank_recon.session_not_found")
@@ -238,7 +228,9 @@ async def bank_recon_run_match(session_id: str, request: Request):
     """触发匹配算法 · 同步等结果(最长 60 秒)"""
     user = get_current_user_from_request(request)
     session = db.get_bank_recon_session(
-        user["id"], session_id, workspace_client_id=_active_ws(request, user)
+        user["id"],
+        session_id,
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
     if not session:
         raise HTTPException(404, detail="bank_recon.session_not_found")
@@ -307,7 +299,10 @@ async def bank_recon_set_session_client(session_id: str, request: Request):
         if visible is not None and cid not in visible:
             raise HTTPException(403, detail="client.no_access")
     ok = db.update_bank_recon_session_client(
-        str(user["id"]), session_id, cid, workspace_client_id=_active_ws(request, user)
+        str(user["id"]),
+        session_id,
+        cid,
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
     if not ok:
         raise HTTPException(404, detail="bank_recon.session_not_found")

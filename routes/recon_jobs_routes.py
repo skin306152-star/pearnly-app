@@ -34,21 +34,6 @@ logger = logging.getLogger("recon_jobs.routes")
 router = APIRouter(tags=["recon-jobs"])
 
 
-def _active_ws(request: Request, user: dict):
-    """PO-6d · 取当前请求套账(rollout-safe);随 job 行 + params 存,异步 worker 从中取。"""
-    tid = _tid(user)
-    if not tid:
-        return None
-    try:
-        with db.get_cursor() as cur:
-            return wc.resolve_active_workspace_id(cur, request, tenant_id=str(tid))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.warning(f"[recon_jobs] resolve workspace failed: {e}")
-        return None
-
-
 def _user_key(user) -> str:
     # 回退兼容服务器两种环境变量名(OCR 历史上 GEMINI_API_KEY / GOOGLE_API_KEY 混用)
     # → S7 AI 在生产不管服务器配哪个都能拿到 key · 否则静默退回 needs_mapping
@@ -217,7 +202,7 @@ async def bank_v2_submit(
         if nm:
             _cleanup_on_fail(job_id)
             return nm
-        _ws = _active_ws(request, user)
+        _ws = wc.active_workspace_for_request(request, _tid(user))
         params = {
             "user_id": str(user["id"]),
             "tenant_id": tenant_id,
@@ -282,7 +267,7 @@ async def gl_vat_submit(
     try:
         input_ref = await _stage_uploads(job_id, gl_list, "gl", "gl.pdf")
         input_ref += await _stage_uploads(job_id, vat_list, "vat", "vat.pdf")
-        _ws = _active_ws(request, user)
+        _ws = wc.active_workspace_for_request(request, _tid(user))
         params = {
             "user_id": str(user["id"]),
             "tenant_id": tenant_id,
@@ -332,7 +317,7 @@ async def vat_excel_submit(
     try:
         input_ref = await _stage_uploads(job_id, invoices, "invoice", "invoice.pdf")
         input_ref += await _stage_uploads(job_id, reports, "report", "report.pdf")
-        _ws = _active_ws(request, user)
+        _ws = wc.active_workspace_for_request(request, _tid(user))
         params = {
             "user_id": str(user["id"]),
             "tenant_id": tenant_id,

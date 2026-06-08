@@ -130,8 +130,9 @@ def main() -> int:
 
         # ── ocr_history:生产同款过滤子句直查 ──
         cur.execute(
-            "INSERT INTO ocr_history (user_id, tenant_id, workspace_client_id, filename, invoice_no) "
-            "VALUES (%s,%s,%s,'iso.pdf','ISO-OCR-1') RETURNING id",
+            "INSERT INTO ocr_history "
+            "(user_id, tenant_id, workspace_client_id, filename, invoice_no, pages) "
+            "VALUES (%s,%s,%s,'iso.pdf','ISO-OCR-1','[]'::jsonb) RETURNING id",
             (uid, tid, ws_a),
         )
         oid = cur.fetchone()["id"]

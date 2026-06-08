@@ -14,7 +14,6 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from core import workspace_context as wc
 from services.sales import archive
 from services.sales import document as doc_svc
 from services.sales import numbering
@@ -61,7 +60,7 @@ def create_note(
     )
     use_prefix = prefix or _NOTE_PREFIX[note_type]
     # PO-7b:红冲/补开是原票的法律延续,继承原单卖方主体 → 同主体号段连续 + 归属同套账。
-    ws = row.get("seller_workspace_client_id") or wc.default_workspace_id(cur, tenant_id)
+    ws = doc_svc.workspace_for_numbering(cur, tenant_id, row)
     doc_number, _ = numbering.allocate(
         cur,
         tenant_id=tenant_id,

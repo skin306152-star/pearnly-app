@@ -39,11 +39,22 @@ def _table_exists(cur) -> bool:
     return cur.fetchone() is not None
 
 
+def _migration_done(cur) -> bool:
+    """已完全迁移 = 新唯一索引在 + 旧 PK 已下线 → 后续每次重启跳过全表回填/计数扫描。"""
+    cur.execute("SELECT 1 FROM pg_indexes WHERE indexname = %s", (_INDEX,))
+    if cur.fetchone() is None:
+        return False
+    cur.execute("SELECT 1 FROM pg_constraint WHERE conname = %s", (_OLD_PK,))
+    return cur.fetchone() is None
+
+
 def ensure_numbering_workspace_key() -> None:
     """幂等迁移连号计数器到按主体键(startup 调 · alembic 缺位时的 prod 自应用)。"""
     with db.get_cursor(commit=True) as cur:
         if not _table_exists(cur):
             return  # 全新/部分库:开票首次取号时建表逻辑另处,无可迁移
+        if _migration_done(cur):
+            return  # 稳态:索引就绪且旧 PK 已下线,无需再扫表
 
         cur.execute(f"ALTER TABLE {_TABLE} ADD COLUMN IF NOT EXISTS workspace_client_id BIGINT")
         # NULL 主体回填到本租户最早套账(与 PO-1 / default_workspace_id 口径一致)。

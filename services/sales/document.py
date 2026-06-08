@@ -357,6 +357,12 @@ def lock_for_issue(
     return cur.fetchone()
 
 
+def workspace_for_numbering(cur, tenant_id: str, row: dict) -> Optional[int]:
+    """取号归属主体(PO-7b):本单卖方主体,NULL 单兜底到租户默认套账 → 每主体号段独立连续。
+    开票与红冲/补开共用,保证号段归属一致。"""
+    return row.get("seller_workspace_client_id") or wc.default_workspace_id(cur, tenant_id)
+
+
 def finalize_issue(
     cur,
     *,
@@ -379,8 +385,7 @@ def finalize_issue(
     if perr:
         return None, perr
     use_prefix = prefix or DEFAULT_PREFIX.get(row["doc_type"], "DOC")
-    # PO-7b 连号按主体:用本单的卖方主体取号(NULL 单兜底到租户默认套账),每主体号段独立连续。
-    ws = row.get("seller_workspace_client_id") or wc.default_workspace_id(cur, tenant_id)
+    ws = workspace_for_numbering(cur, tenant_id, row)
     doc_number, _ = numbering.allocate(
         cur,
         tenant_id=tenant_id,

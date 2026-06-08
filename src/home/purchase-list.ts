@@ -33,7 +33,6 @@ const PAGE_CSS = `
 .pur.pl .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
 .pur.pl .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
 .pur.pl .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
-.pur.pl .panel{background:var(--card);border:1px solid #ECECE7;border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);overflow:hidden;}
 .pur.pl .band{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid #F1F1EC;}
 .pur.pl .star .lbl{color:var(--ink2);font-size:12.5px;margin-bottom:5px;}
 .pur.pl .star .num{font-size:30px;font-weight:740;letter-spacing:-1px;line-height:1;}
@@ -67,7 +66,6 @@ const PAGE_CSS = `
 .pur.pl .st.paid{background:#F1F5F9;color:#64748B;}
 .pur.pl .st.unpaid{background:#FFF1E6;color:#C2410C;font-weight:600;}
 .pur.pl .st.partial{background:#FFEDD5;color:#C2410C;font-weight:600;}
-.pur.pl .state{padding:48px 20px;text-align:center;color:var(--ink3);font-size:13px;}
 @media(max-width:600px){
   .pur.pl .ph{flex-direction:column;align-items:flex-start;gap:11px;}
   .pur.pl .band{flex-direction:column;align-items:stretch;gap:14px;}

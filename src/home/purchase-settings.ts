@@ -17,7 +17,6 @@ const PAGE_CSS = `
 .pur.cfg .ph{margin-bottom:16px;}
 .pur.cfg .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
 .pur.cfg .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
-.pur.cfg .panel{background:var(--card);border:1px solid #ECECE7;border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);overflow:hidden;}
 .pur.cfg .grp{padding:11px 22px;font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.3px;background:#FCFCFA;border-bottom:1px solid #F1F1EC;}
 .pur.cfg .item{display:flex;align-items:center;gap:14px;padding:15px 22px;border-bottom:1px solid #F1F1EC;}
 .pur.cfg .item .l .t2{font-size:13.5px;font-weight:600;}

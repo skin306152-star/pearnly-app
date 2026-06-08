@@ -202,9 +202,9 @@ def resolve_image_intake(
         draft = build_draft_from_invoice(fields, kind=kind)
         calc = totals_svc.compute_purchase_totals(draft["lines"])
 
-    # 低置信 / unknown / 抽取过空(糊图税号"13"·金额฿0)→ 落待归类,绝不直接进可保存的 ฿0 表单(F5)。
-    too_empty = calc is None or calc["grand_total"] <= 0
-    if route == "inbox" or draft is None or low_conf or too_empty:
+    # 低置信 / unknown(draft 未建)/ 抽取过空(糊图税号"13"·金额฿0)→ 落待归类,绝不直接进可保存的 ฿0 表单(F5)。
+    too_empty = calc is not None and calc["grand_total"] <= 0
+    if draft is None or low_conf or too_empty:
         _stash_inbox(
             cur,
             tenant_id=tenant_id,
@@ -281,6 +281,18 @@ def fields_from_invoice(inv) -> dict:
     }
 
 
+def line_expense_gate_open(cur, *, tenant_id) -> bool:
+    """LINE 记费用门控(单一来源 · 铁律#26 底线集中):商户(非 firm/未选业态)+ 开 expense → True。
+    事务所 firm / 未 onboard(business_type=None)/ 未开 expense → False。图(route_line_image)与
+    文字(webhook _maybe_record_line_expense)共用,改门控只动这一处,防两路漂移。"""
+    from services.modules import store as modules_store
+
+    bt = modules_store.get_business_type(cur, tenant_id=tenant_id)
+    if bt in (None, "firm"):
+        return False
+    return modules_store.is_enabled(cur, tenant_id=tenant_id, module_key="expense")
+
+
 def route_line_image(*, tenant_id, workspace_client_id, fields, confidence) -> bool:
     """LINE 收图分流(纯加法):商户租户 → 落采购待办 intake_item(等用户在采购 inbox 一点)。
 
@@ -290,13 +302,9 @@ def route_line_image(*, tenant_id, workspace_client_id, fields, confidence) -> b
     if not tenant_id or not workspace_client_id:
         return False
     from core import db
-    from services.modules import store as modules_store
 
     with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
-        bt = modules_store.get_business_type(cur, tenant_id=str(tenant_id))
-        if bt in (None, "firm"):
-            return False
-        if not modules_store.is_enabled(cur, tenant_id=str(tenant_id), module_key="expense"):
+        if not line_expense_gate_open(cur, tenant_id=str(tenant_id)):
             return False
         kind, route = judge_direction(
             fields,
@@ -324,13 +332,14 @@ def record_line_expense(cur, *, tenant_id, workspace_client_id, text, created_by
     from services.purchase import posting as posting_svc
     from services.purchase import settings as settings_svc
 
-    cfg = settings_svc.get_settings(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
-    )
+    # 先归类(只需 cats)+ 金额闸:无金额(LINE 多数闲聊)→ 直接 None,省掉 settings 取数(在 LINE 回复热路径)。
     cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     parsed = classify_expense_text(text, cats)
     if _to_decimal(parsed.get("amount")) <= 0:
         return None
+    cfg = settings_svc.get_settings(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+    )
     data = {
         "doc_kind": "expense",
         "source": "line",

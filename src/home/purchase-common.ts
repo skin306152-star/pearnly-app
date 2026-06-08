@@ -423,6 +423,8 @@ const PUR_BASE_CSS = `
 .pur .btn.danger{color:var(--red);}
 .pur .btn:disabled{opacity:.55;cursor:not-allowed;}
 .pur .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);}
+/* 收拢版面板(钉死令牌:圆角16 + 收拢阴影)· 单一来源 · 进项4屏(list/suppliers/settings/inbox)共用 */
+.pur .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);overflow:hidden;}
 .pur .state{padding:48px 20px;text-align:center;color:var(--ink3);font-size:13px;}
 .pur .state .btn{margin-top:12px;}
 `;

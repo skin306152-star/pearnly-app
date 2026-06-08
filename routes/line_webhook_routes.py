@@ -230,14 +230,10 @@ def _maybe_record_line_expense(bound_user: dict, text: str, lang: str):
         if not tid:
             return None
         from core.workspace_context import default_workspace_id
-        from services.modules import store as modules_store
         from services.purchase import intake as intake_svc
 
         with db.get_cursor_rls(str(tid), commit=True) as cur:
-            bt = modules_store.get_business_type(cur, tenant_id=str(tid))
-            if bt in (None, "firm"):
-                return None
-            if not modules_store.is_enabled(cur, tenant_id=str(tid), module_key="expense"):
+            if not intake_svc.line_expense_gate_open(cur, tenant_id=str(tid)):
                 return None
             ws = default_workspace_id(cur, str(tid))
             if ws is None:

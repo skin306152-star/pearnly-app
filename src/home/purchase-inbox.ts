@@ -32,7 +32,6 @@ interface InboxItem {
 
 const PAGE_CSS = `
 .pur.ibx .wrap{max-width:760px;}
-.pur.ibx .panel{background:var(--card,#fff);border:1px solid var(--line,#ECECE7);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);overflow:hidden;}
 .pur.ibx .phd{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid var(--line,#ECECE7);}
 .pur.ibx .phd .t{font-size:21px;font-weight:700;}
 .pur.ibx .phd .s{color:var(--ink2,#64748B);font-size:13px;margin-top:3px;}
@@ -165,10 +164,13 @@ function bindItems(): void {
     });
 }
 
+const stateShell = (inner: string): string =>
+    `<div class="pur ibx"><div class="wrap"><div class="panel"><div class="state">${inner}</div></div></div></div>`;
+
 async function load(): Promise<void> {
     const sec = document.getElementById('page-purchase-inbox');
     if (!sec) return;
-    sec.innerHTML = `<div class="pur ibx"><div class="wrap"><div class="panel"><div class="state">${escapeHtml(t('pur-loading'))}</div></div></div></div>`;
+    sec.innerHTML = stateShell(escapeHtml(t('pur-loading')));
     let failed = false;
     try {
         const d = (await papi('GET', '/api/purchase/inbox')) as { items?: InboxItem[] };
@@ -177,7 +179,9 @@ async function load(): Promise<void> {
         failed = true;
     }
     if (failed) {
-        sec.innerHTML = `<div class="pur ibx"><div class="wrap"><div class="panel"><div class="state">${escapeHtml(t('pur-error'))}<br><span class="rt" id="ibx-retry">${escapeHtml(t('pur-retry'))}</span></div></div></div></div>`;
+        sec.innerHTML = stateShell(
+            `${escapeHtml(t('pur-error'))}<br><span class="rt" id="ibx-retry">${escapeHtml(t('pur-retry'))}</span>`
+        );
         const rt = document.getElementById('ibx-retry');
         if (rt) rt.onclick = load;
         return;
